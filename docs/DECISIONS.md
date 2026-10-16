@@ -2,6 +2,12 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-16: Content READMEs name no field or file layout before the example exists
+
+**Decided by:** Claude, within the plan.
+**Decision:** The content area READMEs describe the contract as "the base class (arrives in milestone X)" and point to an example that arrives with Claude's first content, instead of inventing field names. Sub-folder `.gitkeep` files (spells, wizard, story) stay because those sub-folders have no README.
+**Reason:** The base classes don't exist yet; documenting invented names would contradict the code later. Each README gets the real example path when its area opens.
+
 ## 2026-10-16: Claude never holds a write token where it has a shell
 
 **Decided by:** Claude, after reviewing the session design.

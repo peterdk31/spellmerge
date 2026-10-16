@@ -24,6 +24,7 @@
   "paused_by_command": false,
   "pending_instructions": [],
   "processed_comments": [],
+  "task_failures": {},
   "triage_closed": {
     "2026-10-16": {}
   },

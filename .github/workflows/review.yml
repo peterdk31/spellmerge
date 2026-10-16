@@ -67,6 +67,12 @@ jobs:
         run: |
           python3 -m smbot.session review-prompt --pr "$PR" --sha "$SHA" --round "$ROUND"
           echo "schema=$(jq -c . .github/maintainer/schemas/review.json)" >> "$GITHUB_OUTPUT"
+      - name: Install bubblewrap (isolates Claude's subprocesses and scrubs secrets from them)
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq bubblewrap
+          # Ubuntu 24.04 blocks the unprivileged user namespaces bubblewrap needs.
+          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          bwrap --ro-bind / / --dev /dev --proc /proc true
       - id: claude
         continue-on-error: true
         uses: anthropics/claude-code-action@97c53473391bff1901034d4b454b5bac7ab7a029 # v1.0.239

@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import copy
 import datetime as dt
+import tempfile
 import unittest
+from pathlib import Path
 
 from smbot import commands, control, nexttask, pacing, panel, state
 
@@ -188,6 +190,18 @@ class NextTaskTest(unittest.TestCase):
     def test_queue(self) -> None:
         text = "# Next\n\n## Queue\n\n- [x] done\n- [ ] **First** thing\n- [ ] Second\n\n## Blocked\n\n- [ ] not this\n"
         self.assertEqual(nexttask.queue(text), ["**First** thing", "Second"])
+
+    def test_parked_tasks_are_skipped_until_their_time(self) -> None:
+        now = dt.datetime(2026, 10, 17, 12, tzinfo=dt.timezone.utc)
+        st = {"task_failures": {"First": {"count": 2, "parked_until": "2026-10-18T00:00:00Z"},
+                                "Old": {"count": 2, "parked_until": "2026-10-17T00:00:00Z"},
+                                "Once": {"count": 1}}}
+        self.assertEqual(nexttask.parked(st, now), {"First"})
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp, "NEXT.md")
+            path.write_text("## Queue\n\n- [ ] First\n- [ ] Second\n")
+            self.assertEqual(nexttask.next_task(path, skip={"First"}), "Second")
+            self.assertIsNone(nexttask.next_task(path, skip={"First", "Second"}))
 
 
 if __name__ == "__main__":

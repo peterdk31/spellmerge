@@ -110,7 +110,7 @@ def main(argv: list[str] | None = None) -> int:
     st, _ = state.load(cfg)
     if args.action == "check":
         started = st.setdefault("automation_started", iso(now))
-        log = check(cfg, st, now, nexttask.next_task() is not None, last_main_commit(), last_own_merge(cfg),
+        log = check(cfg, st, now, nexttask.next_task(skip=nexttask.parked(st, now)) is not None, last_main_commit(), last_own_merge(cfg),
                     dt.datetime.fromisoformat(started.replace("Z", "+00:00")))
     elif args.action == "token-failed":
         log = [line for line in [raise_alarm(cfg, st, "token")] if line]

@@ -36,6 +36,8 @@ from . import config as config_mod
 MAINTAINER = Path(".github/maintainer")
 FENCE = "`" * 3
 MAX_FAILURES = 2
+PARK_BLOCKED = dt.timedelta(days=7)  # blocked or failed too often: revisited by the weekly planning run
+PARK_WAITING = dt.timedelta(days=1)  # approved, but the merge waits on GitHub or the owner
 
 _LIMIT = re.compile(r"usage limit|limit reached|reached (?:your |the )?(?:\w+ )?limit|rate[ _-]?limit|\b429\b|"
                     r"quota|out of (?:extra )?usage|resets? (?:at|in)", re.IGNORECASE)
@@ -128,11 +130,13 @@ def open_pr_for(cfg: config_mod.Config, task_slug: str) -> dict[str, Any] | None
     return None
 
 
-def prepare(cfg: config_mod.Config, st: dict[str, Any], focus: str, today: dt.date) -> dict[str, str]:
+def prepare(cfg: config_mod.Config, st: dict[str, Any], focus: str, today: dt.date,
+            now: dt.datetime | None = None) -> dict[str, str]:
     if st.get("followups"):
         task, kind = followup_task(st["followups"]), "followups"
     else:
-        task, kind = nexttask.next_task(), "next"
+        now = now or dt.datetime.now(dt.timezone.utc)
+        task, kind = nexttask.next_task(skip=nexttask.parked(st, now)), "next"
     failures = st.get("task_failures", {}).get(task or "", {})
     previous = ""
     if failures:
@@ -320,6 +324,14 @@ def finish(cfg: config_mod.Config, env: dict[str, str]) -> dict[str, str]:
     lines: list[str] = []
     now = dt.datetime.now(dt.timezone.utc)
 
+    # The merge job sets MERGED to "true" or "false"; it's empty when the job didn't run.
+    merge_refused = bool(pr) and mergeable(review) and env.get("MERGED") == "false"
+    merge_skipped = bool(pr) and mergeable(review) and not env.get("MERGED")
+
+    def park(entry: dict[str, Any], span: dt.timedelta, reason: str) -> None:
+        entry["parked_until"] = pacing.iso(now + span)
+        entry["parked_reason"] = reason[:500]
+
     def apply(s: dict[str, Any]) -> None:
         failures = s.setdefault("task_failures", {})
         if merged:
@@ -334,8 +346,15 @@ def finish(cfg: config_mod.Config, env: dict[str, str]) -> dict[str, str]:
             entry["pr"] = pr
             entry["problems"] = "\n".join(f"- {p.get('problem')} Fix: {p.get('fix')}"
                                           for p in review.get("problems", []))[:4000]
+            if entry["count"] >= MAX_FAILURES and task:
+                park(entry, PARK_BLOCKED, f"failed review {entry['count']} times")
+        elif merge_refused and task:
+            entry = failures.setdefault(task, {"count": 0})
+            entry["pr"] = pr
+            park(entry, PARK_WAITING, env.get("MERGE_RESULT") or "the merge was refused")
         elif status == "blocked":
-            failures.pop(task, None)
+            if task:
+                park(failures.setdefault(task, {"count": 0}), PARK_BLOCKED, env.get("IMPLEMENT_SUMMARY", "blocked"))
             s["pending_instructions"] = []
     state.update(cfg, apply, f"session: finished ({'merged' if merged else 'not merged'})")
 
@@ -344,8 +363,11 @@ def finish(cfg: config_mod.Config, env: dict[str, str]) -> dict[str, str]:
     elif env.get("TASK_KIND") == "plan" and status == "nothing_to_do":
         lines.append("Weekly planning: no plan changes needed this week")
     elif status == "blocked":
-        lines.append(f"Reported blocked, so it's tried again next session: {task[:200]}. "
+        lines.append(f"Reported blocked, so it's set aside for a week and the next task goes first: {task[:200]}. "
                      f"Claude's summary: {env.get('IMPLEMENT_SUMMARY', '')[:600]}")
+    elif merge_refused:
+        lines.append(f"Approved but not merged: #{pr} ({task[:200]}). {env.get('MERGE_RESULT', '')[:400]} "
+                     "It's set aside for a day and the next task goes first.")
     elif pr:
         reason = env.get("MERGE_RESULT") or review.get("summary", "the final review did not approve it")
         lines.append(f"Not merged: #{pr} ({task}). {reason[:400]}")
@@ -358,12 +380,16 @@ def finish(cfg: config_mod.Config, env: dict[str, str]) -> dict[str, str]:
         lines.append(f"[Workflow run]({env['RUN_URL']})")
     dailylog.post(cfg, "Development session", lines)
 
-    # Keep going while there is work and budget, up to about 2 hours per chain.
+    # Start the next session right away while there is work and budget. A task that waits on
+    # someone is parked above, so the next session takes another one. Stop when the session
+    # made no progress (an error or usage limit: the hourly check retries) or merging is paused.
     started = env.get("CHAIN_STARTED") or pacing.iso(now)
-    elapsed = now - pacing.parse_time(started)
     budget = pacing.budget(st, now, settings.get("dev_intensity", 90), settings.get("weekly_share", 90))
-    again = (env.get("TASK_KIND") != "plan" and merged and budget.allowed and elapsed < dt.timedelta(hours=2)
-             and nexttask.next_task() is not None)
+    progressed = merged or bool(pr) or status == "blocked"
+    has_work = (nexttask.next_task(skip=nexttask.parked(st, now)) is not None
+                or bool(st.get("followups")) or bool(st.get("pending_instructions")))
+    again = (env.get("TASK_KIND") != "plan" and progressed and not merge_skipped
+             and budget.allowed and has_work)
     return {"again": str(again).lower(), "chain_started": started}
 
 

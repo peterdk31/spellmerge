@@ -61,10 +61,19 @@ class PromptTest(unittest.TestCase):
         self.assertEqual(session.slug("**Area READMEs for the content areas.** Write..."),
                          "area-readmes-for-the-content-areas")
 
+    def test_prepare_continues_an_open_pr_for_the_task(self) -> None:
+        pr = {"number": 15, "user": {"login": CFG.bot.login},
+              "head": {"ref": "claude/20261016-area-readmes-for-the-content-areas"}}
+        with mock.patch.object(session.gh, "api", return_value=[pr]):
+            out = session.prepare(CFG, copy.deepcopy(state.DEFAULT), "", dt.date(2026, 10, 17))
+        self.assertEqual(out["branch"], "claude/20261016-area-readmes-for-the-content-areas")
+        self.assertIn("PR #15 is already open", out["prompt"])
+
     def test_prepare_includes_task_and_instructions(self) -> None:
         st = copy.deepcopy(state.DEFAULT)
         st["pending_instructions"] = [{"kind": "ask", "text": "how is it going?", "number": 9, "url": "u"}]
-        out = session.prepare(CFG, st, "bugs first", dt.date(2026, 10, 17))
+        with mock.patch.object(session.gh, "api", return_value=[]):
+            out = session.prepare(CFG, st, "bugs first", dt.date(2026, 10, 17))
         self.assertIn("Area READMEs for the content areas", out["prompt"])
         self.assertIn("`/ask` on #9", out["prompt"])
         self.assertIn("bugs first", out["prompt"])
@@ -74,7 +83,8 @@ class PromptTest(unittest.TestCase):
     def test_prepare_mentions_previous_failure(self) -> None:
         st = copy.deepcopy(state.DEFAULT)
         st["task_failures"] = {FIXTURE_TASK: {"count": 1, "pr": 12, "problems": "- missing tests"}}
-        prompt = session.prepare(CFG, st, "", dt.date(2026, 10, 17))["prompt"]
+        with mock.patch.object(session.gh, "api", return_value=[]):
+            prompt = session.prepare(CFG, st, "", dt.date(2026, 10, 17))["prompt"]
         self.assertIn("PR #12", prompt)
         self.assertIn("last attempt", prompt)
 

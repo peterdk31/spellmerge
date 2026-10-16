@@ -4,8 +4,8 @@
 export_credentials.cfg
 
 # Build output (builds are published only as GitHub Releases)
-build/
-dist/
+/build/
+/dist/
 *.pck
 *.zip
 

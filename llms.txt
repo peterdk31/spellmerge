@@ -53,6 +53,9 @@ Each area README states the area's job, the milestone that builds and opens it, 
 - [content/bosses/README.md](content/bosses/README.md): multi-phase boss fights.
 - [content/rooms/README.md](content/rooms/README.md): room templates, one folder per biome.
 - [content/story/README.md](content/story/README.md): lore, dialogue and in-run story events.
+- [art/README.md](art/README.md): shared art (tilesets, UI, VFX): 32×32 pixel art, size limits, origin manifest.
+- [audio/README.md](audio/README.md): shared audio (music, sound effects): `.ogg` only, size limits, origin manifest.
+- [tests/README.md](tests/README.md): the test tree, smoke test, benchmark and bots.
 
 ## Tools and checks
 

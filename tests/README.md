@@ -25,6 +25,18 @@ Tests for the whole game. The tree mirrors the code: a test for `gameplay/combat
 
 `.gd`, `.tscn`, `.tres`, `.json` and Godot's `.uid` files. Limit: 1 MB per file.
 
+## Steps
+
+1. Find the area your change is in and use the mirrored path under `tests/` (for example `tests/core/` for `core/`).
+2. Write the test as typed GDScript. Cover more than one player index where it matters; use a fixed seed and no real-time waits.
+3. For a bug fix, write the regression test first and check that it fails without the fix.
+4. Run it (see "Run" below), then run the checks under "Validate".
+5. Open a PR using the template.
+
+## Example to copy
+
+`tests/smoke/boot_smoke.gd`, the boot smoke test. Copy its structure for a new test.
+
 ## Run
 
 ```sh
@@ -40,3 +52,11 @@ The Python tests for the CI scripts are in `ci/tests/` and are owner-maintained.
 tools/check.sh
 ci/build/build.sh --quick
 ```
+
+## Rating questions
+
+Besides the standard criteria (fit, fun, quality, value, performance, risk, scope):
+
+- Does it cover more than one player index where it matters?
+- Is it fast and deterministic (no real-time waits, fixed seed)?
+- For a bug fix, does it fail without the fix?

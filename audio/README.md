@@ -4,8 +4,7 @@
 
 Shared sound used by more than one thing: music (`music/`) and sound effects (`sfx/`). Sound that belongs to a single item (a spell's cast sound) lives in that item's folder under `content/`, not here.
 
-**Opens for PRs in M1** (see "Opens for PRs" in docs/ROADMAP.md). Until then, PRs to this folder are a gamble. **The example to copy arrives with Claude's first audio in M1**; this README is updated then with its path.
-
+**Opens for PRs in M1** (see "Opens for PRs" in docs/ROADMAP.md). Until then, PRs to this folder are a gamble.
 ## Contract
 
 - Audio depends on nothing. It holds files only, no logic.
@@ -51,6 +50,10 @@ The manifest drives the Steam AI disclosure and the "Replace placeholder" issues
 2. Add the `.ogg` in `sfx/` or `music/`.
 3. Add its entry to `audio/manifest.json`.
 4. Run the checks below, then open a PR using the template.
+
+## Example to copy
+
+Arrives with Claude's first audio in M1; this README is updated then with its path. Do not guess its layout before then.
 
 ## Validate
 

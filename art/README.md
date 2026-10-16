@@ -4,8 +4,7 @@
 
 Shared pixel art used by more than one thing: tilesets (`tilesets/`), UI art (`ui/`) and visual effects (`vfx/`). Art that belongs to a single item (a spell icon, an enemy sprite) lives in that item's folder under `content/`, not here. The look is 32×32 pixel art; the vision is in docs/DESIGN.md, and the style guide (`docs/STYLE.md`) arrives with M1. Until it exists, follow the rules in docs/PLAN.md ("Art direction"): light from the top-left, 1px dark outline, no gradients, at most 3 shades per material.
 
-**Opens for PRs in M1** (see "Opens for PRs" in docs/ROADMAP.md). Until then, PRs to this folder are a gamble. **The example to copy arrives with Claude's first art in M1**; this README is updated then with its path.
-
+**Opens for PRs in M1** (see "Opens for PRs" in docs/ROADMAP.md). Until then, PRs to this folder are a gamble.
 ## Contract
 
 - Art depends on nothing. It holds files only, no logic.
@@ -48,6 +47,10 @@ The manifest drives the Steam AI disclosure and the "Replace placeholder" issues
 2. Add the file in the right sub-folder (`tilesets/`, `ui/` or `vfx/`).
 3. Add its entry to `art/manifest.json`.
 4. Run the checks below, then open a PR using the template.
+
+## Example to copy
+
+Arrives with Claude's first art in M1; this README is updated then with its path. Do not guess its layout before then.
 
 ## Validate
 

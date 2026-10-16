@@ -2,6 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-16: M1 starts before M0's dry runs
+
+**Decided by:** owner.
+**Context:** All seven M0 parts are built, and the bot now develops, reviews and merges its own PRs. M0's done-when also asks for 3 daily releases in a row and 15 dry runs. GitHub hasn't fired the daily schedule yet (the catch-up in `develop.yml` covers it from now on), and most dry runs need a second GitHub account or a deliberately broken build, so the bot's queue was empty with nothing it could do.
+**Decision:** M0 is closed early and M1 starts now. The dry runs and the 3-release streak are not dropped: they carry into M1 and are part of M1's done-when, so M1 can't finish without them. The first M1 task is the M1 design document, which goes through the normal review before any M1 code. Art and Audio open for PRs with M1, as planned.
+**Consequence:** the pipeline's end-to-end checks (rule-breaking PRs auto-closed, CLA, votes, quarantine, kill switch, token alarm, revert of a broken build) are still unproven while M1 is built and Art and Audio take outside PRs. The owner runs them during M1.
+
 ## 2026-10-16: llms.txt uses relative links and lists maintainer prompts as Optional
 
 **Decided by:** Claude (details the plan left open).

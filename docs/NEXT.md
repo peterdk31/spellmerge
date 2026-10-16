@@ -1,10 +1,10 @@
 # Next
 
-The ordered task queue for the current milestone, M0 ([design](milestones/M0-foundation.md)). The first unchecked task under "Queue" is next. Bug reports go above features. Claude keeps this file up to date; only tasks in paths Claude may change belong here (docs/PLAN.md, "Path tiers").
+The ordered task queue for the current milestone, M1 (its design is the first task below; M0's [dry runs](milestones/M0-foundation.md#dry-runs) carry over). The first unchecked task under "Queue" is next. Bug reports go above features. Claude keeps this file up to date; only tasks in paths Claude may change belong here (docs/PLAN.md, "Path tiers").
 
 ## Queue
 
-The queue is empty. What is left of M0 is the dry runs in the milestone design, which need owner or CI actions, not changes Claude can make in a PR. The one open Claude task waits for M1 (below).
+- [ ] **M1 design document.** Write `docs/milestones/M1-core-loop.md` from docs/PLAN.md and docs/DESIGN.md, in the same shape as `M0-foundation.md`: goal, done when, who builds what, parts in build order, out of scope. M1 is the core loop prototype: 1 spell, 1 enemy, 1 room, 4-player join, game feel and pools ("Roadmap"); the `core/` services and the `player`, `combat`, `feel` and `coop` sub-areas ("Gameplay sub-areas", "Co-op technology"); performance budgets and the 4-bot smoke test; the provisional Style Guide page and starter kit, and the weekly owner playtest ("Infrastructure first"); Art and Audio open for PRs; checkpoint C1 at the end. Done when: the 4-bot smoke test passes on web, plus M0's carried-over dry runs and 3 daily releases in a row (docs/ROADMAP.md). Then replace this task with M1's tasks in this queue, in build order, each sized to one session, with the first content example per area. No M1 code before the design has merged.
 
 ## Blocked
 

@@ -6,7 +6,7 @@ A 2D top-down roguelite about building deep, combinable spells, for 1–4 local 
 
 **Play:** [in the browser](https://peterdk31.github.io/spellmerge/play/) · [today's nightly](https://peterdk31.github.io/spellmerge/nightly/) · [Windows and Linux downloads](https://github.com/peterdk31/spellmerge/releases)
 
-**Status:** milestone M0, the foundation. The infrastructure is being built, and there is no game to play yet. See the [roadmap](docs/ROADMAP.md).
+**Status:** milestone M1, the core loop prototype. The infrastructure (M0) is in place, and the first playable loop is being built. See the [roadmap](docs/ROADMAP.md).
 
 ## Built by an AI, in the open
 

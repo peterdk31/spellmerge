@@ -4,6 +4,8 @@
 
 **Done when:** 3 daily releases in a row work, and every pipeline part passes its dry run.
 
+**Status:** closed early by the owner on 2026-10-16 (docs/DECISIONS.md, "M1 starts before M0's dry runs"). All seven parts are built. The dry runs below and the 3-release streak carry into M1 and are part of M1's done-when.
+
 ## Who builds what
 
 Most of M0 lives in owner-only paths (`.github/`, `ci/`), which the bot can't change, because its app has no Workflows permission and CODEOWNERS requires the owner's review. So M0's infrastructure is built in interactive sessions with the owner and merged by the owner. The bot takes over the parts in bot-maintained paths (area READMEs, `llms.txt`, plan files) through its normal development loop, which is how that loop gets its first real test.

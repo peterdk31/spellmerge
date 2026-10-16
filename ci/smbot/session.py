@@ -322,7 +322,8 @@ def finish(cfg: config_mod.Config, env: dict[str, str]) -> dict[str, str]:
     elif env.get("TASK_KIND") == "plan" and status == "nothing_to_do":
         lines.append("Weekly planning: no plan changes needed this week")
     elif status == "blocked":
-        lines.append(f"Marked blocked: {task} ({env.get('IMPLEMENT_SUMMARY', '')[:300]})")
+        lines.append(f"Reported blocked, so it's tried again next session: {task[:200]}. "
+                     f"Claude's summary: {env.get('IMPLEMENT_SUMMARY', '')[:600]}")
     elif pr:
         reason = env.get("MERGE_RESULT") or review.get("summary", "the final review did not approve it")
         lines.append(f"Not merged: #{pr} ({task}). {reason[:400]}")

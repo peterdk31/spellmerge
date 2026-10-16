@@ -191,12 +191,13 @@ jobs:
           GH_TOKEN: ${{ steps.read-token.outputs.token }}
           PR: ${{ matrix.pr }}
         run: python3 -m smbot.rate prepare --pr "$PR"
-      - name: Install bubblewrap (isolates Claude's subprocesses and scrubs secrets from them)
+      - name: Install the sandbox (bubblewrap and socat isolate Claude's commands and scrub secrets)
         run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq bubblewrap
+          sudo apt-get update -qq && sudo apt-get install -y -qq bubblewrap socat
           # Ubuntu 24.04 blocks the unprivileged user namespaces bubblewrap needs.
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
           bwrap --ro-bind / / --dev /dev --proc /proc true
+          command -v socat
       - id: claude
         continue-on-error: true
         uses: anthropics/claude-code-action@97c53473391bff1901034d4b454b5bac7ab7a029 # v1.0.239

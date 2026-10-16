@@ -4,6 +4,7 @@ What each run did, newest first. Claude appends a short entry after each develop
 
 ## 2026-10-16
 
+- Owner's decision: M0 closed early and M1 started. M0's dry runs and the 3-release streak carry into M1's done-when. First M1 task in `docs/NEXT.md`: the M1 design document.
 - Owner's session: wrote `tools/README.md` (sessions may not write to `tools/`), unblocking the last README task. `develop` now also starts `daily` and `weekly` when GitHub misses their schedule.
 - Tried again to write `tools/README.md`; writes to `tools/` were denied a third time. Moved the task to "Blocked" in `docs/NEXT.md` with what the owner needs to change and the facts for the README.
 - Wrote READMEs for `art/`, `audio/` and `tests/` (size limits, `.ogg`-only audio, manifest format, how to validate). `tools/README.md` could not be written: writes to `tools/` were denied by the session, so it stays in the queue.

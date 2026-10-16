@@ -5,7 +5,7 @@ Eight strictly sequential milestones (docs/PLAN.md, "Roadmap"). One milestone at
 | # | Milestone | Status | Done when | Opens for PRs |
 | --- | --- | --- | --- | --- |
 | M0 | [Foundation](milestones/M0-foundation.md) | **Closed early** on 2026-10-16 by the owner; its dry runs and release streak carry into M1 | 3 daily releases in a row work and every pipeline part passes its dry run | No areas yet |
-| M1 | Core loop prototype | **In progress** since 2026-10-16 | 4-bot smoke test passes on web, plus M0's carried-over dry runs and 3 daily releases in a row | Art, Audio |
+| M1 | [Core loop prototype](milestones/M1-core-loop.md) | **In progress** since 2026-10-16 | 4-bot smoke test passes on web, plus M0's carried-over dry runs and 3 daily releases in a row | Art, Audio |
 | M2 | Spell system | Not started | Validators pass, 20+ combos work | Spells, Story |
 | M3 | Run structure | Not started | A full run can be completed | Rooms, Enemies, Bosses, Relics, AI |
 | M4 | Polish and variety | Not started | Polished enough to show off | HUD, Wizard, core gameplay systems |

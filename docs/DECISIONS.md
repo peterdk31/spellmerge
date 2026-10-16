@@ -2,6 +2,22 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-16: M1 design choices the plan left open
+
+**Decided by:** Claude (details the plan left open), in `docs/milestones/M1-core-loop.md`.
+**Decision:**
+- The ten `gameplay/` sub-areas, `content/spells` and `content/wizard` don't allow `.tscn` (`hud/`, `content/enemies` and `content/rooms` do), so M1 scenes live with their content (`content/wizard/base`, which gets `.tscn` in its README, `content/enemies`, `content/rooms`, `hud/`); `gameplay/` stays script-only and gets scenes through `core/registry`. Rejected: allowing `.tscn` in `gameplay/`, because the Areas table in `docs/PLAN.md` lists only `.gd` and `.tres` for it. The allowed-files paragraph of `gameplay/README.md`, which left this open for M1, is rewritten to say so (part 9).
+- The main menu starts the arena only through a new HUD intent event, `play_requested(player)`, that `flow` listens to; areas never call each other.
+- Sounds are the Audio contributors' job. Gameplay code asks `core/registry` for a sound by id; the registry (the one place that loads by a computed path) returns `null` for a missing one and nothing plays, so a missing sound is silent and the literal-path rule holds.
+- M1 is 25 parts: input, the player, combat with the enemy, and the HUD are each split in two so a task fits one session.
+- The player and bots only call one cast method and read no spell fields, so M2 can replace the fire bolt.
+- The registry scans folders at start; the build-time manifest waits until content is large.
+- The one spell is a fire bolt on a small base class that M2 replaces; nothing else may depend on its fields.
+- A minimal slice of `flow` (load the room, spawn the wave, restart) is built in M1 instead of M3, so the loop is playable. M3 replaces it. There is no pause menu in M1.
+- Placeholder art is hand-written SVG, since sessions have no image tools. The web 4-bot run and the Style Guide page and kit zip need small owner-only changes in `ci/smbot/`, which their tasks file in `docs/BACKLOG.md`.
+
+**Reason:** each keeps M1 small, inside the path rules, and playable for the first checkpoint.
+
 ## 2026-10-16: M1 starts before M0's dry runs
 
 **Decided by:** owner.

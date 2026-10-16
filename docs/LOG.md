@@ -4,6 +4,7 @@ What each run did, newest first. Claude appends a short entry after each develop
 
 ## 2026-10-16
 
+- Wrote the M1 design document (`docs/milestones/M1-core-loop.md`): 25 parts in build order (after review, four big parts were split), decisions on events (including the `play_requested` intent from the menu to `flow`), scenes, registry (sounds by id, `null` when missing), the one spell, arena glue and placeholder art, and the owner-only steps. Replaced the task in `docs/NEXT.md` with M1's 25 tasks. `tools/check.sh` reports the same 3 errors and 3 warnings on `main` and here: they are untracked local files (`.idea`, `.vscode`, `scripts`) that are not part of the change.
 - Owner's decision: M0 closed early and M1 started. M0's dry runs and the 3-release streak carry into M1's done-when. First M1 task in `docs/NEXT.md`: the M1 design document.
 - Owner's session: wrote `tools/README.md` (sessions may not write to `tools/`), unblocking the last README task. `develop` now also starts `daily` and `weekly` when GitHub misses their schedule.
 - Tried again to write `tools/README.md`; writes to `tools/` were denied a third time. Moved the task to "Blocked" in `docs/NEXT.md` with what the owner needs to change and the facts for the README.

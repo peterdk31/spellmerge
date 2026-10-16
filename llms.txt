@@ -18,6 +18,7 @@ Start with AGENTS.md for the hard rules, then docs/DESIGN.md (nothing may contra
 - [docs/PLAN.md](docs/PLAN.md): the full owner-approved project plan: security model, path tiers, roadmap, quality bar.
 - [docs/ROADMAP.md](docs/ROADMAP.md): the eight sequential milestones and which areas are open for PRs in each.
 - [docs/milestones/M0-foundation.md](docs/milestones/M0-foundation.md): design of M0, the infrastructure before any gameplay; closed early, its dry runs carry into M1.
+- [docs/milestones/M1-core-loop.md](docs/milestones/M1-core-loop.md): design of M1, the core loop prototype (one spell, one enemy, one room, 4-player co-op), its parts in build order and checkpoint C1.
 - [docs/NEXT.md](docs/NEXT.md): the ordered task queue for the current milestone.
 - [docs/BACKLOG.md](docs/BACKLOG.md): ideas and future work outside the current milestone.
 - [docs/DECISIONS.md](docs/DECISIONS.md): why things were decided, newest first, so they are not reversed by accident.

@@ -2,6 +2,12 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-16: Entry script names, event names and file types in the code-area READMEs
+
+**Decided by:** Claude (details the plan left open).
+**Context:** docs/PLAN.md gives `combat/combat.gd` as an example entry script but doesn't list the rest, and the event bus doesn't exist yet.
+**Decision:** Each gameplay sub-area's entry script is `gameplay/<area>/<area>.gd`. `core/events` owns the event definitions; each README only lists the events its area sends (each event has one sender) and listens to, marked **provisional** until the event bus is built in M1, when the READMEs are updated. The HUD's sent events are the player-intent requests from "The HUD sends player-intent events": `build_change_requested` (listener `player`), `reward_pick_requested` (`rewards`), `door_vote_requested` (`flow`) and `pause_requested` (`run`), all in the table in `gameplay/README.md`. Text shared by all sub-areas lives in `gameplay/README.md`. Gameplay PRs allow `.gd` and `.tres` only, as in the plan's Areas table. `core/` services get their entry scripts and sections when built.
+
 ## 2026-10-16: The bot can merge its own approved PRs
 
 **Decided by:** owner.

@@ -462,7 +462,14 @@ def run(repo: Path, policy: Path, base: str, author: str | None, worktree: bool)
         findings += check_file_type(change, role)
         findings += check_mode(change, role)
         if change.status != "D" and change.mode not in ("120000", "160000") and role != DEPENDENCY_BOT:
-            findings += check_content(change, read_file(repo, change, worktree), role)
+            try:
+                data = read_file(repo, change, worktree)
+            except OSError as e:  # e.g. a sandbox's own unreadable files in a local checkout
+                findings.append(Finding("unreadable", "warning", change.path, 0, f"Couldn't read the file ({e}).",
+                                        "Check its permissions; if it isn't part of your change, remove it or "
+                                        "add it to .gitignore."))
+                continue
+            findings += check_content(change, data, role)
 
     if role == OWNER:
         for f in findings:

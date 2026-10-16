@@ -240,6 +240,14 @@ class RepoTest(unittest.TestCase):
         self.commit()
         self.assertEqual(self.check("dependabot[bot]"), [("dependency-bot", "error", "content/x.gd")])
 
+    def test_unreadable_untracked_file_is_a_warning_not_a_crash(self) -> None:
+        self.write("content/relics/a/locked.json", b"{}")
+        os.chmod(self.tmp / "content/relics/a/locked.json", 0)
+        self.addCleanup(os.chmod, self.tmp / "content/relics/a/locked.json", 0o644)
+        if os.access(self.tmp / "content/relics/a/locked.json", os.R_OK):
+            self.skipTest("running as root")
+        self.assertEqual(self.check(worktree=True), [("unreadable", "warning", "content/relics/a/locked.json")])
+
     def test_worktree_includes_untracked_files(self) -> None:
         self.write("content/relics/a/tool.exe", b"MZ")
         self.assertEqual(self.check(worktree=False), [])

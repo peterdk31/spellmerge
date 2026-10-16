@@ -40,7 +40,13 @@ jobs:
         env:
           PYTHONPATH: trusted/ci
           AUTHOR: ${{ github.event.pull_request.user.login }}
-        run: python3 -m smbot.rules --repo pr --policy trusted --base HEAD^1 --author "$AUTHOR" --format github
+        run: |
+          if [ ! -f trusted/ci/smbot/rules.py ]; then
+            # Only possible before the PR that adds the rules script is merged.
+            echo "::error::The rules script is not on main yet, so this PR can't be checked. Only the owner can merge it."
+            exit 1
+          fi
+          python3 -m smbot.rules --repo pr --policy trusted --base HEAD^1 --author "$AUTHOR" --format github
 
   ci-tests:
     name: ci-tests

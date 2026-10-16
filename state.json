@@ -25,11 +25,6 @@
   "pending_instructions": [],
   "processed_comments": [],
   "task_failures": {
-    "**Area READMEs for code areas.** The same for `core/`, `hud/` and each of the 10 `gameplay/` sub-areas, including each sub-area's job, when it is built and when it opens (docs/PLAN.md, \"Gameplay sub-areas\"), its public entry script name, and the dependency direction `core` \u2190 `gameplay` \u2190 `content`. `core/` states it is closed to outside PRs.": {
-      "count": 0,
-      "parked_reason": "I continued PR #19 on branch `claude/20261016-area-readmes-for-code-areas-the` but could not bring it up to date with `main`, so I made no new commits. `git merge origin/main` aborts with \"Read-only file system\" when it tries to rewrite `.github/workflows/develop.yml`, `review.yml` and `session.yml`. `.github/` is owner-only and read-only in this session. The README content from the two earlier review rounds is already on the branch: core, hud, the 10 gameplay sub-areas and the shared `gameplay/",
-      "parked_until": "2026-10-23T22:29:18Z"
-    },
     "**Area READMEs for shared assets and tests.** The same for `art/`, `audio/`, `tests/` and `tools/`, including the asset size limits, `.ogg`-only audio, the origin manifest (`art/manifest.json`, `audio/manifest.json`) and how to run `tools/check.sh`.": {
       "count": 1,
       "parked_reason": "I could not continue PR #27 and made no commits. `git switch` to the PR branch failed because `.github/` is read-only in this sandbox, and I cleared the half-applied index with `git reset -q`. Later git commands stopped for approval that nobody could give. The PR branch is behind `origin/main`, and merging it needs to rewrite `.github/workflows/*`, which this sandbox cannot do. From what I read, the branch already has the Steps, Example to copy and Rating questions sections (I read `audio/README",

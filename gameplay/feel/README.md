@@ -17,17 +17,28 @@ Feel only reacts: it never changes damage or outcomes. Hit-stop is its only effe
   - Listens to: `damage_dealt`, `enemy_died` and `player_downed`.
 - Areas never call each other directly; they talk through events. [gameplay/README.md](../README.md) has the rules every sub-area shares.
 
-## What a good PR looks like
+## Allowed files
 
-A good PR here adds or tunes one juice preset (hit-stop length, shake strength), stays readable with four players hitting at once, and never changes damage or outcomes, with hit-stop kept short and the same for every player.
+`.gd` and `.tres`, plus `.uid`, `.import` and `.license` files. Limit: 1 MB per file. Typed GDScript only; no banned APIs. The text shared by all sub-areas is in [gameplay/README.md](../README.md).
 
-## Steps, tests and validation
+## Steps
 
-Not open yet. When it opens, follow the steps, test layout and checks in [gameplay/README.md](../README.md).
+Not open yet. When it opens, follow the steps and test layout in [gameplay/README.md](../README.md).
+
+## Example to copy
+
+Arrives with Claude's first code for this area. Do not guess its layout before then.
+
+## Validate
+
+```sh
+tools/check.sh
+ci/build/build.sh --quick
+```
 
 ## Rating questions
 
-Besides the standard criteria:
+A good PR here adds or tunes one juice preset (hit-stop length, shake strength), stays readable with four players hitting at once, and never changes damage or outcomes, with hit-stop kept short and the same for every player. Besides the standard criteria:
 
 - Is the effect readable with 4 players on screen? Does it avoid per-frame allocations and stay within the particle limits?
 - Does it keep to the dependency direction, without calling another area directly?

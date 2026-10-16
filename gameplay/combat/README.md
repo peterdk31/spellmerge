@@ -17,17 +17,28 @@ Element reactions are content data, so contributors add them without touching th
   - Listens to: `projectile_hit` (from `core/projectiles`) and `spell_cast`.
 - Areas never call each other directly; they talk through events. [gameplay/README.md](../README.md) has the rules every sub-area shares.
 
-## What a good PR looks like
+## Allowed files
 
-A good PR here changes one step of the damage pipeline (a status effect, knockback, a hit or hurt box rule), reads reactions from data, and does not allocate per hit.
+`.gd` and `.tres`, plus `.uid`, `.import` and `.license` files. Limit: 1 MB per file. Typed GDScript only; no banned APIs. The text shared by all sub-areas is in [gameplay/README.md](../README.md).
 
-## Steps, tests and validation
+## Steps
 
-Not open yet. When it opens, follow the steps, test layout and checks in [gameplay/README.md](../README.md).
+Not open yet. When it opens, follow the steps and test layout in [gameplay/README.md](../README.md).
+
+## Example to copy
+
+Arrives with Claude's first code for this area. Do not guess its layout before then.
+
+## Validate
+
+```sh
+tools/check.sh
+ci/build/build.sh --quick
+```
 
 ## Rating questions
 
-Besides the standard criteria:
+A good PR here changes one step of the damage pipeline (a status effect, knockback, a hit or hurt box rule), reads reactions from data, and does not allocate per hit. Besides the standard criteria:
 
 - Is damage applied the same for any player index and any enemy? Does it stay within the frame budget with 1,000+ projectiles?
 - Does it keep to the dependency direction, without calling another area directly?

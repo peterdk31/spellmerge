@@ -17,17 +17,28 @@ Enemies in `content/enemies/` pick and configure behaviours from here instead of
   - Listens to: `room_entered` and `player_downed`.
 - Areas never call each other directly; they talk through events. [gameplay/README.md](../README.md) has the rules every sub-area shares.
 
-## What a good PR looks like
+## Allowed files
 
-A good PR here adds or improves one reusable behaviour that several enemies can configure, targets any of the 1–4 players, and stays cheap with 100–200 enemies.
+`.gd` and `.tres`, plus `.uid`, `.import` and `.license` files. Limit: 1 MB per file. Typed GDScript only; no banned APIs. The text shared by all sub-areas is in [gameplay/README.md](../README.md).
 
-## Steps, tests and validation
+## Steps
 
-Not open yet. When it opens, follow the steps, test layout and checks in [gameplay/README.md](../README.md).
+Not open yet. When it opens, follow the steps and test layout in [gameplay/README.md](../README.md).
+
+## Example to copy
+
+Arrives with Claude's first code for this area. Do not guess its layout before then.
+
+## Validate
+
+```sh
+tools/check.sh
+ci/build/build.sh --quick
+```
 
 ## Rating questions
 
-Besides the standard criteria:
+A good PR here adds or improves one reusable behaviour that several enemies can configure, targets any of the 1–4 players, and stays cheap with 100–200 enemies. Besides the standard criteria:
 
 - Are behaviours reusable by several enemies? Do 100–200 enemies stay within the frame budget?
 - Does it keep to the dependency direction, without calling another area directly?

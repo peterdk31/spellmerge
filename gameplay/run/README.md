@@ -14,20 +14,31 @@ A run has one seed, so the same seed gives the same rooms and rolls.
 - **Dependency direction:** `core` ← `gameplay` ← `content`. This area may use `core/` and the registry. `core/` never depends on it, and content never reaches into it.
 - **Events** (**provisional**: `core/events` owns the definitions, and the lists are checked against each other when the event bus is built in M1):
   - Sends: `run_started`, `run_ended`.
-  - Listens to: `room_cleared` and `player_downed`.
+  - Listens to: `room_cleared`, `player_downed` and `pause_requested` (from the HUD).
 - Areas never call each other directly; they talk through events. [gameplay/README.md](../README.md) has the rules every sub-area shares.
 
-## What a good PR looks like
+## Allowed files
 
-A good PR here changes how a run starts, ends or is summarised, keeps runs reproducible from their seed, and works for 1–4 players.
+`.gd` and `.tres`, plus `.uid`, `.import` and `.license` files. Limit: 1 MB per file. Typed GDScript only; no banned APIs. The text shared by all sub-areas is in [gameplay/README.md](../README.md).
 
-## Steps, tests and validation
+## Steps
 
-Not open yet. When it opens, follow the steps, test layout and checks in [gameplay/README.md](../README.md).
+Not open yet. When it opens, follow the steps and test layout in [gameplay/README.md](../README.md).
+
+## Example to copy
+
+Arrives with Claude's first code for this area. Do not guess its layout before then.
+
+## Validate
+
+```sh
+tools/check.sh
+ci/build/build.sh --quick
+```
 
 ## Rating questions
 
-Besides the standard criteria:
+A good PR here changes how a run starts, ends or is summarised, keeps runs reproducible from their seed, and works for 1–4 players. Besides the standard criteria:
 
 - Is a run reproducible from its seed? Does the summary cover every player and never wait for one?
 - Does it keep to the dependency direction, without calling another area directly?

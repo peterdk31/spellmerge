@@ -4,7 +4,7 @@
 
 The rules of the game, in 10 sub-areas: `player`, `combat`, `feel`, `coop`, `ai`, `run`, `flow`, `rewards`, `difficulty` and `progression`. Each has its own README with its job, when it is built and when it opens for PRs (docs/PLAN.md, "Gameplay sub-areas"). This file holds the text they share.
 
-**All sub-areas are closed for now.** The first to open is `ai` in M3 (docs/ROADMAP.md, "Opens for PRs"). A PR to a closed area may still be merged, but it's a gamble.
+Which sub-areas are open for PRs is in docs/ROADMAP.md ("Opens for PRs"). A PR to a closed area may still be merged, but it's a gamble.
 
 ## Contract shared by every sub-area
 
@@ -35,8 +35,12 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `difficulty_changed` | `difficulty` | none yet |
 | `reward_rolled`, `reward_taken` | `rewards` | none yet |
 | `unlock_gained`, `currency_changed` | `progression` | none yet |
+| `build_change_requested` | HUD | `player` |
+| `reward_pick_requested` | HUD | `rewards` |
+| `door_vote_requested` | HUD | `flow` |
+| `pause_requested` | HUD | `run` |
 
-Device events come from `core/input`. The HUD's player-intent requests (see `hud/README.md`) are sent by the HUD only and are not listed here.
+Device events come from `core/input`. The last four rows are the HUD's player-intent requests (see `hud/README.md`); each carries a player index 0–3. The gameplay area checks the request and announces the result as a state event: `door_voted` is flow's result of `door_vote_requested`, and `reward_taken` is rewards' result of `reward_pick_requested`.
 
 ## Allowed files
 

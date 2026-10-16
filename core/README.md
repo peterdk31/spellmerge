@@ -18,7 +18,7 @@ The shared services every other area stands on: the event bus, the content regis
   - `base/`: base classes and build info (`build_info.gd`).
   - `projectiles/`: the projectile manager for thousands of projectiles.
   - `pools/`: object pools; no per-frame allocations.
-- Most services arrive in M1 (docs/ROADMAP.md). Folders without code yet only hold a `.gitkeep`. Each service gets its entry script and a section here when it is built.
+- Most services arrive in M1 (docs/ROADMAP.md). Folders without code yet only hold a `.gitkeep`; so far only `base/` has code (`build_info.gd`). Each service gets its entry script and a section here when it is built.
 - Services that act per player take a player index 0–3. Nothing assumes a single player.
 
 ## Allowed files
@@ -28,6 +28,10 @@ Claude only. Typed GDScript, no banned APIs, file access only in `user://`. Test
 ## Steps
 
 Outside contributors: open an issue instead of a PR. Claude: follow docs/NEXT.md.
+
+## Example to copy
+
+None: `core/` is closed, so there is nothing for outside PRs to copy.
 
 ## Validate
 

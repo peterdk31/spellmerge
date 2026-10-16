@@ -17,17 +17,28 @@ Saving goes through `core/save`, under `user://` only.
   - Listens to: `run_ended`.
 - Areas never call each other directly; they talk through events. [gameplay/README.md](../README.md) has the rules every sub-area shares.
 
-## What a good PR looks like
+## Allowed files
 
-A good PR here changes the hub, an unlock rule, currency or the codex, keeps saves under `user://` and does not break older saves.
+`.gd` and `.tres`, plus `.uid`, `.import` and `.license` files. Limit: 1 MB per file. Typed GDScript only; no banned APIs. The text shared by all sub-areas is in [gameplay/README.md](../README.md).
 
-## Steps, tests and validation
+## Steps
 
-Not open yet. When it opens, follow the steps, test layout and checks in [gameplay/README.md](../README.md).
+Not open yet. When it opens, follow the steps and test layout in [gameplay/README.md](../README.md).
+
+## Example to copy
+
+Arrives with Claude's first code for this area. Do not guess its layout before then.
+
+## Validate
+
+```sh
+tools/check.sh
+ci/build/build.sh --quick
+```
 
 ## Rating questions
 
-Besides the standard criteria:
+A good PR here changes the hub, an unlock rule, currency or the codex, keeps saves under `user://` and does not break older saves. Besides the standard criteria:
 
 - Does it keep older saves working?
 - Does it keep to the dependency direction, without calling another area directly?

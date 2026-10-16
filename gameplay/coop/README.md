@@ -17,17 +17,28 @@ Players join with a button press on their own device and can leave at any time. 
   - Listens to: device events from `core/input`, and `player_downed`.
 - Areas never call each other directly; they talk through events. [gameplay/README.md](../README.md) has the rules every sub-area shares.
 
-## What a good PR looks like
+## Allowed files
 
-A good PR here improves joining or leaving mid-run, the friendly-fire rules or the shared camera, and is checked with 1, 2, 3 and 4 players.
+`.gd` and `.tres`, plus `.uid`, `.import` and `.license` files. Limit: 1 MB per file. Typed GDScript only; no banned APIs. The text shared by all sub-areas is in [gameplay/README.md](../README.md).
 
-## Steps, tests and validation
+## Steps
 
-Not open yet. When it opens, follow the steps, test layout and checks in [gameplay/README.md](../README.md).
+Not open yet. When it opens, follow the steps and test layout in [gameplay/README.md](../README.md).
+
+## Example to copy
+
+Arrives with Claude's first code for this area. Do not guess its layout before then.
+
+## Validate
+
+```sh
+tools/check.sh
+ci/build/build.sh --quick
+```
 
 ## Rating questions
 
-Besides the standard criteria:
+A good PR here improves joining or leaving mid-run, the friendly-fire rules or the shared camera, and is checked with 1, 2, 3 and 4 players. Besides the standard criteria:
 
 - Does it work for any join order of 1–4 players, and does the camera keep everyone on screen?
 - Does it keep to the dependency direction, without calling another area directly?

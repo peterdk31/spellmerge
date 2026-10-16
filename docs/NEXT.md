@@ -4,9 +4,15 @@ The ordered task queue for the current milestone, M0 ([design](milestones/M0-fou
 
 ## Queue
 
-- [ ] **README for `tools/`.** Left over from "Area READMEs for shared assets and tests": write `tools/README.md` (purpose, how to run `tools/check.sh` with `--author` and `--format`, contract, allowed files) and add it to `llms.txt`. Writes to `tools/` are denied by the session's permission settings (twice now), so it needs a session that may write there.
+The queue is empty. What is left of M0 is the dry runs in the milestone design, which need owner or CI actions, not changes Claude can make in a PR. The one open Claude task is blocked below.
 
 ## Blocked
+
+- [ ] **README for `tools/` (blocked: the session may not write to `tools/`).** Left over from "Area READMEs for shared assets and tests": write `tools/README.md` and add it to `llms.txt`.
+  - Blocker: writes to `tools/` were denied three times (the last on 2026-10-16, even for a plain `Write`). `ci/smbot/session.py` keeps `tools/` read-only for Claude's sandbox, yet `ci/smbot/rules.py` allows the bot to change `.sh` and `.py` files there.
+  - Owner action: allow writes to `tools/` in the development session, or add `tools/README.md` by hand. Where that permission lives is unconfirmed.
+  - README contents: purpose, how to run `tools/check.sh` with `--author` and `--format`, contract, allowed files.
+  - Facts: `tools/check.sh` runs `python3 -m smbot.rules --base origin/main --worktree`; extra flags pass through. `--author LOGIN` is the PR author's GitHub login (default is an outside contributor; `'spellmerge-bot[bot]'` applies the bot's wider path rules). `--format text|github|json` (default `text`). It needs git and Python 3.10+, fetches `origin/main` first, and prints rule, file, line and fix for each problem.
 
 - [ ] **Reconcile the event lists (waits for the M1 event bus).** The "Events at a glance" table in `gameplay/README.md` and the per-area event lists are kept in sync by hand. Once `core/events` exists, make it the single source: delete the table or generate it, and fix the area READMEs to match.
 

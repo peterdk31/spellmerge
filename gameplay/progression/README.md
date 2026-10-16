@@ -2,42 +2,32 @@
 
 ## Purpose
 
-Hub, unlocks, currency and codex.
+Hub, unlocks, currency and the codex.
 
-**Built in M5. Opens for PRs in M6** (see "Gameplay sub-areas" in docs/PLAN.md and "Opens for PRs" in docs/ROADMAP.md). Until then Claude maintains it; an outside PR is a gamble.
+**Closed until M6.** Built in M5, opens for PRs in M6 (see "Gameplay sub-areas" in docs/PLAN.md and "Opens for PRs" in docs/ROADMAP.md). Until then Claude maintains it; an outside PR is a gamble.
 
-Lasting progression between runs. Unlocks refer to content by registry id, so adding a spell or relic does not mean editing this area. Saves go through `core/save`.
+Saving goes through `core/save`, under `user://` only.
 
 ## Contract
 
-- **Public entry script:** `gameplay/progression/progression.gd`. Other code uses only this script and the events below; nothing else in the folder is public. The script arrives when the area is built (M5).
-- **Dependency direction:** `core` ← `gameplay` ← `content`. This area may use `core/` and reads content data through the registry. `core/` never depends on it, and content never reaches into it.
-- **Areas never call each other directly.** They talk through `core/events`; direct calls only in the documented directions. Events sent: `unlock_gained`, `currency_changed`. Names are provisional until the event bus is built in M1.
-- **Depends on:** `core/save`; run results via events.
-- Every system takes a player index 0–3. Nothing assumes a single player.
-- Performance: no per-frame allocations; use the pools and the projectile manager from `core/`; respect the particle limits.
+- **Public entry script:** `gameplay/progression/progression.gd`. Other code uses only this script and the events it sends and listens to; nothing else in the folder is public. The script arrives when the area is built.
+- **Dependency direction:** `core` ← `gameplay` ← `content`. This area may use `core/` and the registry. `core/` never depends on it, and content never reaches into it.
+- **Events** (**provisional**: `core/events` owns the definitions, and the lists are checked against each other when the event bus is built in M1):
+  - Sends: `unlock_gained`, `currency_changed`.
+  - Listens to: `run_ended`.
+- Areas never call each other directly; they talk through events. [gameplay/README.md](../README.md) has the rules every sub-area shares.
 
-## Allowed files
+## What a good PR looks like
 
-`.gd`, `.tres`, `.tscn`, plus `.uid`, `.import` and `.license` files. Limit: 1 MB per file. Typed GDScript only (types on every variable, parameter and return); no banned APIs. Tests mirror the tree in `tests/gameplay/progression/`.
+A good PR here changes the hub, an unlock rule, currency or the codex, keeps saves under `user://` and does not break older saves.
 
-## Steps
+## Steps, tests and validation
 
-1. Pick an issue labelled `now` in this area (only once the area is open) and comment `/claim`.
-2. Read this contract and the events above; make one focused change.
-3. Add or update tests in `tests/gameplay/progression/`.
-4. Run the checks below, then open a PR using the template. For gameplay changes, add a short GIF or video.
-
-## Validate
-
-```sh
-tools/check.sh
-ci/build/build.sh --quick
-```
+Not open yet. When it opens, follow the steps, test layout and checks in [gameplay/README.md](../README.md).
 
 ## Rating questions
 
 Besides the standard criteria:
 
-- Does it reward every run, even lost ones? Can a save from an older version still load?
+- Does it keep older saves working?
 - Does it keep to the dependency direction, without calling another area directly?

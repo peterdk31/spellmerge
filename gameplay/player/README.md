@@ -4,36 +4,26 @@
 
 Wizard controller: move, dodge, cast, mana, health, downed and revive.
 
-**Built in M1. Opens for PRs in M4** (see "Gameplay sub-areas" in docs/PLAN.md and "Opens for PRs" in docs/ROADMAP.md). Until then Claude maintains it; an outside PR is a gamble.
+**Closed until M4.** Built in M1, opens for PRs in M4 (see "Gameplay sub-areas" in docs/PLAN.md and "Opens for PRs" in docs/ROADMAP.md). Until then Claude maintains it; an outside PR is a gamble.
 
 Every player is an index 0–3 with their own device, mana, health and downed state. A downed player can be revived by a teammate; nobody ever waits for another player.
 
 ## Contract
 
-- **Public entry script:** `gameplay/player/player.gd`. Other code uses only this script and the events below; nothing else in the folder is public. The script arrives when the area is built (M1).
-- **Dependency direction:** `core` ← `gameplay` ← `content`. This area may use `core/` and reads content data through the registry. `core/` never depends on it, and content never reaches into it.
-- **Areas never call each other directly.** They talk through `core/events`; direct calls only in the documented directions. Events sent: `player_downed`, `player_revived`, `spell_cast`. Names are provisional until the event bus is built in M1.
-- **Depends on:** input from `core/input`; hits from `combat` arrive as events.
-- Every system takes a player index 0–3. Nothing assumes a single player.
-- Performance: no per-frame allocations; use the pools and the projectile manager from `core/`; respect the particle limits.
+- **Public entry script:** `gameplay/player/player.gd`. Other code uses only this script and the events it sends and listens to; nothing else in the folder is public. The script arrives when the area is built.
+- **Dependency direction:** `core` ← `gameplay` ← `content`. This area may use `core/` and the registry. `core/` never depends on it, and content never reaches into it.
+- **Events** (**provisional**: `core/events` owns the definitions, and the lists are checked against each other when the event bus is built in M1):
+  - Sends: `player_downed`, `player_revived`, `spell_cast`.
+  - Listens to: hit and damage events from `combat`, and device events from `core/input`.
+- Areas never call each other directly; they talk through events. [gameplay/README.md](../README.md) has the rules every sub-area shares.
 
-## Allowed files
+## What a good PR looks like
 
-`.gd`, `.tres`, `.tscn`, plus `.uid`, `.import` and `.license` files. Limit: 1 MB per file. Typed GDScript only (types on every variable, parameter and return); no banned APIs. Tests mirror the tree in `tests/gameplay/player/`.
+A good PR here changes how one wizard moves, dodges, casts or recovers, works the same for player 0 and player 3, and keeps input responsive with full effects on screen.
 
-## Steps
+## Steps, tests and validation
 
-1. Pick an issue labelled `now` in this area (only once the area is open) and comment `/claim`.
-2. Read this contract and the events above; make one focused change.
-3. Add or update tests in `tests/gameplay/player/`.
-4. Run the checks below, then open a PR using the template. For gameplay changes, add a short GIF or video.
-
-## Validate
-
-```sh
-tools/check.sh
-ci/build/build.sh --quick
-```
+Not open yet. When it opens, follow the steps, test layout and checks in [gameplay/README.md](../README.md).
 
 ## Rating questions
 

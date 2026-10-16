@@ -4,20 +4,20 @@
 
 Everything the players see and click: panels, the spell builder UI, menus, shared widgets and the one theme. It must stay readable with 4 players on one screen and fully usable with a gamepad.
 
-**Opens for PRs in M4** (Polish and variety; see "Opens for PRs" in docs/ROADMAP.md). Until then Claude builds it. A placeholder main menu exists in `hud/menus/main_menu/`.
+**Opens for PRs in M4** (Polish and variety; see "Opens for PRs" in docs/ROADMAP.md). Until then Claude builds it.
 
 ## Contract
 
 - **Sub-folders:** `panels/` (per-player panels), `builder/` (the spell builder), `menus/` (main menu, pause, summary), `widgets/` (shared, reusable controls), `theme/` (the single theme).
-- **The HUD only listens.** It reads state through `core/events` and never calls gameplay directly. Dependency direction: `core` ← `gameplay` ← `content`; the HUD sits beside `gameplay` and uses only `core/`.
-- **Public entry script:** none for the area as a whole; each scene's root script is its own entry (for example `hud/menus/main_menu/main_menu.gd`). Other areas never reach into the HUD.
+- **Events both ways.** The HUD listens to state events from `core/events` and sends the player's choices (menu picks, spell builder choices) as events too. It never calls gameplay directly. Dependency direction: `core` ← `gameplay` ← `content`; the HUD sits beside `gameplay` and uses only `core/`. The event names are provisional until the event bus is built in M1.
+- **Public entry script:** none for the area as a whole; each scene's root script is its own entry (for example a menu scene's script under `menus/`). Other areas never reach into the HUD.
 - Widgets build on `core/ui_focus`, so each panel takes input only from its owner (player index 0–3). Nothing assumes a single player, and a player in the builder never makes anyone else wait.
 - Use the shared theme; don't style single controls by hand.
 - Accessibility: readable text sizes, no information by colour alone, gamepad navigation everywhere.
 
 ## Allowed files
 
-`.gd`, `.tscn`, `.tres`, UI art (`.png`, `.svg`), plus `.uid`, `.import` and `.license` files. Limits: 1 MB per image, 1 MB for anything else. Typed GDScript only; no banned APIs. Tests mirror the tree in `tests/hud/`.
+`.gd`, `.tscn`, `.tres`, UI art (`.png`, `.svg`), plus `.uid`, `.import` and `.license` files. Limits: 1 MB per image, 1 MB for anything else. Typed GDScript only; no banned APIs. Tests for the HUD go in `tests/hud/`; the runner and naming are documented in `tests/README.md`, which a later task writes.
 
 ## Steps
 

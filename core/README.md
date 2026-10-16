@@ -10,8 +10,8 @@ The shared services every other area stands on: the event bus, the content regis
 
 - **Dependency direction:** `core` ← `gameplay` ← `content`. `core/` depends on none of `gameplay/`, `hud/` or `content/`. It finds content by folder through `core/registry`.
 - **Sub-folders, one per service:**
-  - `events/`: the event bus (`spell_cast`, `enemy_died`, `player_downed`, `room_cleared`, ...). Areas talk only through it; the HUD only listens.
-  - `registry/`: discovers content by folder from a manifest generated at build time. It is the only place that loads by a computed path.
+  - `events/`: the event bus (`spell_cast`, `enemy_died`, `player_downed`, `room_cleared`, ...). Areas talk only through it. It owns the event definitions; each area's README lists only which events the area sends and listens to (names provisional until M1).
+  - `registry/`: discovers content by folder, so no central list is edited. Everyone else loads with literal paths only.
   - `input/`: the player manager; devices join with a button press and each player gets their own device.
   - `ui_focus/`: per-player UI focus, because Godot has one global focus. Every widget builds on it.
   - `save/`: reading and writing under `user://` only.
@@ -19,11 +19,11 @@ The shared services every other area stands on: the event bus, the content regis
   - `projectiles/`: the projectile manager for thousands of projectiles.
   - `pools/`: object pools; no per-frame allocations.
 - Most services arrive in M1 (docs/ROADMAP.md). Folders without code yet only hold a `.gitkeep`. Each service gets its entry script and a section here when it is built.
-- Every service takes a player index 0–3. Nothing assumes a single player.
+- Services that act per player take a player index 0–3. Nothing assumes a single player.
 
 ## Allowed files
 
-Claude only. Typed GDScript, no banned APIs, file access only in `user://`. Tests mirror the tree in `tests/core/`.
+Claude only. Typed GDScript, no banned APIs, file access only in `user://`. Tests for `core/` go in `tests/core/`; the runner and naming are documented in `tests/README.md`, which a later task writes.
 
 ## Steps
 

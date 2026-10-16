@@ -4,40 +4,30 @@
 
 Room sequence, door voting, transitions and waiting for builders.
 
-**Built in M3. Opens for PRs in M5** (see "Gameplay sub-areas" in docs/PLAN.md and "Opens for PRs" in docs/ROADMAP.md). Until then Claude maintains it; an outside PR is a gamble.
+**Closed until M5.** Built in M3, opens for PRs in M5 (see "Gameplay sub-areas" in docs/PLAN.md and "Opens for PRs" in docs/ROADMAP.md). Until then Claude maintains it; an outside PR is a gamble.
 
-Players vote at doors. A player who is still in the spell builder never holds the others back: the room moves on and the builder catches up.
+Players in the spell builder never block the others: the rest keep playing.
 
 ## Contract
 
-- **Public entry script:** `gameplay/flow/flow.gd`. Other code uses only this script and the events below; nothing else in the folder is public. The script arrives when the area is built (M3).
-- **Dependency direction:** `core` ← `gameplay` ← `content`. This area may use `core/` and reads content data through the registry. `core/` never depends on it, and content never reaches into it.
-- **Areas never call each other directly.** They talk through `core/events`; direct calls only in the documented directions. Events sent: `room_entered`, `room_cleared`, `door_voted`. Names are provisional until the event bus is built in M1.
-- **Depends on:** room data from the registry; events only.
-- Every system takes a player index 0–3. Nothing assumes a single player, and nobody ever waits for another player.
-- Performance: no per-frame allocations; use the pools and the projectile manager from `core/`; respect the particle limits.
+- **Public entry script:** `gameplay/flow/flow.gd`. Other code uses only this script and the events it sends and listens to; nothing else in the folder is public. The script arrives when the area is built.
+- **Dependency direction:** `core` ← `gameplay` ← `content`. This area may use `core/` and the registry. `core/` never depends on it, and content never reaches into it.
+- **Events** (**provisional**: `core/events` owns the definitions, and the lists are checked against each other when the event bus is built in M1):
+  - Sends: `room_entered`, `room_cleared`, `door_voted`.
+  - Listens to: `enemy_died`, `run_started` and `player_downed`.
+- Areas never call each other directly; they talk through events. [gameplay/README.md](../README.md) has the rules every sub-area shares.
 
-## Allowed files
+## What a good PR looks like
 
-`.gd`, `.tres`, `.tscn`, plus `.uid`, `.import` and `.license` files. Limit: 1 MB per file. Typed GDScript only (types on every variable, parameter and return); no banned APIs. Tests mirror the tree in `tests/gameplay/flow/`.
+A good PR here changes room order, door voting or transitions, and keeps the no-waiting pillar: one player in the builder never stalls the rest.
 
-## Steps
+## Steps, tests and validation
 
-1. Pick an issue labelled `now` in this area (only once the area is open) and comment `/claim`.
-2. Read this contract and the events above; make one focused change.
-3. Add or update tests in `tests/gameplay/flow/`.
-4. Run the checks below, then open a PR using the template. For gameplay changes, add a short GIF or video.
-
-## Validate
-
-```sh
-tools/check.sh
-ci/build/build.sh --quick
-```
+Not open yet. When it opens, follow the steps, test layout and checks in [gameplay/README.md](../README.md).
 
 ## Rating questions
 
 Besides the standard criteria:
 
-- Does any state exist where a player can block the others? Are transitions short and clear with four players?
+- Does a player idling in the builder block anyone? Does voting work for 1–4 players?
 - Does it keep to the dependency direction, without calling another area directly?

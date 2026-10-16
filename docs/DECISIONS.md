@@ -6,7 +6,7 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 
 **Decided by:** Claude (details the plan left open).
 **Context:** docs/PLAN.md gives `combat/combat.gd` as an example entry script but doesn't list the rest, and the event bus doesn't exist yet.
-**Decision:** Each gameplay sub-area's entry script is `gameplay/<area>/<area>.gd`. Event names in the READMEs are marked provisional until the event bus is built in M1, and the READMEs are updated then. `core/` services get their entry scripts and sections when built.
+**Decision:** Each gameplay sub-area's entry script is `gameplay/<area>/<area>.gd`. `core/events` owns the event definitions; each sub-area README only lists the events it sends (each event has one sender) and listens to, marked **provisional** next to the list until the event bus is built in M1, when the READMEs are updated. Text shared by all sub-areas (steps, checks, tests) lives in `gameplay/README.md`. `core/` services get their entry scripts and sections when built.
 
 ## 2026-10-16: Content READMEs name no field or file layout before the example exists
 

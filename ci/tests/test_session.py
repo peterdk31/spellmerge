@@ -219,6 +219,48 @@ class PublishTest(unittest.TestCase):
                                     capture_output=True, text=True, check=True).stdout
             self.assertIn("refs/heads/claude/20261017-x", listed)
 
+    def test_sync_with_main_merges_or_leaves_conflicts(self) -> None:
+        """The scripted merge of main before Claude starts (Claude's sandbox can't write .github/)."""
+        import os
+        import subprocess
+        env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t",
+               "GIT_COMMITTER_EMAIL": "t@t"}
+        with tempfile.TemporaryDirectory() as tmp:
+            origin, work, other = Path(tmp, "origin.git"), Path(tmp, "work"), Path(tmp, "other")
+            run = lambda *a, cwd=tmp: subprocess.run(a, cwd=cwd, check=True, capture_output=True, env=env)
+            run("git", "init", "-q", "--bare", "-b", "main", str(origin))
+            run("git", "clone", "-q", str(origin), str(other))
+            Path(other, "a.md").write_text("a\n")
+            run("git", "add", "a.md", cwd=other)
+            run("git", "commit", "-qm", "base", cwd=other)
+            run("git", "push", "-q", "origin", "main", cwd=other)
+            for name, text in (("claude/20261016-ok", None), ("claude/20261016-clash", "pr\n")):
+                run("git", "switch", "-qc", name, "origin/main", cwd=other)
+                Path(other, "b.md" if text is None else "a.md").write_text(text or "b\n")
+                run("git", "commit", "-qam" if text else "-qm", "pr", cwd=other) if text else (
+                    run("git", "add", "b.md", cwd=other), run("git", "commit", "-qm", "pr", cwd=other))
+                run("git", "push", "-q", "origin", name, cwd=other)
+            run("git", "switch", "-q", "main", cwd=other)
+            Path(other, "a.md").write_text("main\n")
+            Path(other, ".github").mkdir()
+            Path(other, ".github/w.yml").write_text("on: push\n")
+            run("git", "add", "-A", cwd=other)
+            run("git", "commit", "-qm", "main moves", cwd=other)
+            run("git", "push", "-q", "origin", "main", cwd=other)
+            run("git", "clone", "-q", str(origin), str(work))
+            old = os.getcwd()
+            os.chdir(work)
+            try:
+                with mock.patch.dict(os.environ, env):
+                    ok = session.sync_with_main("claude/20261016-ok")
+                    self.assertIn("up to date", ok)
+                    self.assertTrue(Path(work, ".github/w.yml").exists())
+                    clash = session.sync_with_main("claude/20261016-clash")
+                    self.assertIn("`a.md`", clash)
+                    self.assertEqual(session.sync_with_main("main"), "")
+            finally:
+                os.chdir(old)
+
     def test_package_renames_a_branch_outside_claude(self) -> None:
         """Commits left on e.g. `pr19` (from `gh pr checkout`) are bundled under the expected branch."""
         import os

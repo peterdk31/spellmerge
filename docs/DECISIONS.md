@@ -65,7 +65,7 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - **Merge method:** squash for every merge, so each PR is one commit that one `git revert` undoes. The PR author stays the commit author.
 - **State:** bookkeeping lives in `state.json` on the `automation-state` branch: token usage, learned limits, back-off, processed commands and alarm issues. Writes use the file's SHA, so concurrent runs can't silently overwrite each other. It is never trusted for security decisions.
 - **Pacing:** each run records its tokens. When a usage limit is hit, the tokens used in the last 5 hours (or 7 days) become the learned window (or week) size, and runs back off until the reset. After that, runs stop at `DEV_INTENSITY`% of a window and at `WEEKLY_SHARE`% of a week, spread evenly at a seventh per day.
-- **Schedule:** the hourly run starts at minute 17, away from the busy top of the hour.
+- **Schedule:** the hourly run starts at minute 23, away from the busy top of the hour.
 - **Alarms:** each alarm is an issue labelled `alarm` that mentions the owner, opened once and closed automatically when the problem is resolved.
 - The bot app's token is minted with `app-id`, which is deprecated in favour of `client-id` (see `docs/BACKLOG.md`).
 

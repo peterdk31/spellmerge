@@ -204,6 +204,8 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ steps.read-token.outputs.token }}
+          # Started by develop.yml's catch-up (github-actions[bot]) when GitHub misses the schedule.
+          allowed_bots: "github-actions[bot]"
           prompt: ${{ steps.prepare.outputs.prompt }}
           claude_args: >-
             --max-turns 40

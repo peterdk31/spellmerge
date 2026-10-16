@@ -89,8 +89,8 @@ Security comes first: all outside input (PR code, PR text, issues, discussions) 
 
 | Tier | Paths | Who may change |
 | --- | --- | --- |
-| Owner only | `.github/` (incl. `.github/maintainer/` prompts), `ci/`, `.claude/`, `docs/DESIGN.md`, `LICENSE`, `CLA.md`, `setup.sh`, `REUSE.toml`, `docs/SECURITY-CHECKLIST.md`, `docs/SETUP-APP.md` | Owner review required |
-| Bot maintained | `docs/ROADMAP.md`, `docs/NEXT.md`, `docs/BACKLOG.md`, `docs/DECISIONS.md`, `docs/LOG.md`, `docs/milestones/`, `docs/STYLE.md`, `docs/STORY.md`, area `README.md` files, `AGENTS.md`, `CLAUDE.md`, `llms.txt`, `docs/cla-signatures.json`, `core/` | Claude's own PRs only |
+| Owner only | `.github/` (incl. `.github/maintainer/` prompts), `ci/`, `.claude/`, `docs/DESIGN.md`, `LICENSE`, `CLA.md`, `setup.sh`, `REUSE.toml`, `docs/SECURITY-CHECKLIST.md`, `docs/SETUP-APP.md`, `addons/` | Owner review required |
+| Bot maintained | `docs/ROADMAP.md`, `docs/NEXT.md`, `docs/BACKLOG.md`, `docs/DECISIONS.md`, `docs/LOG.md`, `docs/milestones/`, `docs/STYLE.md`, `docs/STORY.md`, area `README.md` files, `AGENTS.md`, `CLAUDE.md`, `llms.txt`, `docs/cla-signatures.json`, `core/`, `project.godot`, `export_presets.cfg` | Claude's own PRs only |
 | Open | Content areas that are open in the current milestone | Anyone, through the rating pipeline |
 
 **Kill switch:** set the repo variable `AUTOMATION_ENABLED=false`, or disable the workflow in the Actions tab. The Control panel issue also has a kill-switch checkbox usable from the GitHub mobile app. Every bot action is posted to a pinned "Daily log" issue, and every merge can be reverted.

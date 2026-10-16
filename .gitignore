@@ -12,3 +12,6 @@ build/
 *.pem
 *.key
 .env
+
+# Python
+__pycache__/

@@ -44,7 +44,7 @@ Defined in `ci/settings/rulesets/` and applied by `setup.sh`.
 - [ ] **(auto)** Spellmerge Bot is **not** a bypass actor anywhere. It merges only through PRs, and can't merge anything that needs code-owner review.
 - [ ] **(auto)** Ruleset `release-tags` stops `v*` tags from being deleted, moved or force-pushed.
 - [ ] **(auto)** `.github/CODEOWNERS` is on `main` and GitHub reports no errors in it.
-- [ ] `CODEOWNERS` lists every owner-only path from the plan: `.github/`, `ci/`, `.claude/`, `docs/DESIGN.md`, `LICENSE`, `CLA.md`, `setup.sh`, `REUSE.toml`, `docs/SECURITY-CHECKLIST.md`, `docs/SETUP-APP.md`.
+- [ ] `CODEOWNERS` lists every owner-only path from the plan: `.github/`, `ci/`, `.claude/`, `docs/DESIGN.md`, `LICENSE`, `CLA.md`, `setup.sh`, `REUSE.toml`, `docs/SECURITY-CHECKLIST.md`, `docs/SETUP-APP.md`, `addons/`.
 - [ ] Once `checks.yml` exists, its job is named exactly `rules`. Until then nothing can be merged except by you, which is intended.
 - [ ] **Test:** open a PR from a second account (or a fork) that edits `.github/CODEOWNERS`. GitHub shows "Review required from code owners", and the merge button is blocked for everyone but you.
 

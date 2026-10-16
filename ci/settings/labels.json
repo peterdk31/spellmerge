@@ -1,0 +1,32 @@
+[
+  { "name": "now",              "color": "0e8a16", "description": "Wanted now: PRs welcome" },
+  { "name": "soon",             "color": "fbca04", "description": "Next milestone: discuss first" },
+  { "name": "later",            "color": "c5def5", "description": "Further out" },
+
+  { "name": "area:spells",      "color": "5319e7", "description": "Forms, elements, modifiers, triggers" },
+  { "name": "area:relics",      "color": "5319e7", "description": "Passive items" },
+  { "name": "area:wizard",      "color": "5319e7", "description": "Cosmetics and staffs" },
+  { "name": "area:enemies",     "color": "5319e7", "description": "Enemies and attack patterns" },
+  { "name": "area:bosses",      "color": "5319e7", "description": "Bosses with phases" },
+  { "name": "area:rooms",       "color": "5319e7", "description": "Room templates" },
+  { "name": "area:gameplay",    "color": "5319e7", "description": "The 10 gameplay sub-areas" },
+  { "name": "area:hud",         "color": "5319e7", "description": "Widgets, menus, accessibility" },
+  { "name": "area:art",         "color": "5319e7", "description": "Sprites, tilesets, VFX" },
+  { "name": "area:audio",       "color": "5319e7", "description": "Music and SFX" },
+  { "name": "area:story",       "color": "5319e7", "description": "Dialogue, lore, descriptions" },
+  { "name": "area:core",        "color": "5319e7", "description": "Core services (no outside PRs)" },
+
+  { "name": "code",             "color": "1d76db", "description": "Skill: code" },
+  { "name": "pixel-art",        "color": "1d76db", "description": "Skill: pixel art" },
+  { "name": "music",            "color": "1d76db", "description": "Skill: music" },
+  { "name": "sfx",              "color": "1d76db", "description": "Skill: sound effects" },
+  { "name": "writing",          "color": "1d76db", "description": "Skill: writing" },
+  { "name": "level-design",     "color": "1d76db", "description": "Skill: level design" },
+
+  { "name": "good first issue", "color": "7057ff", "description": "Size: good for newcomers" },
+  { "name": "S",                "color": "bfdadc", "description": "Size: small" },
+  { "name": "M",                "color": "bfdadc", "description": "Size: medium" },
+  { "name": "L",                "color": "bfdadc", "description": "Size: large" },
+
+  { "name": "claude:working",   "color": "d93f0b", "description": "Claude is working on this; don't claim" }
+]

@@ -1,0 +1,19 @@
+version = 1
+SPDX-PackageName = "Spellmerge"
+SPDX-PackageSupplier = "peterdk31"
+SPDX-PackageDownloadLocation = "https://github.com/peterdk31/spellmerge"
+
+# Code and everything else default to GPL-3.0-or-later (docs/PLAN.md "Protection").
+[[annotations]]
+path = "**"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 peterdk31 and Spellmerge contributors"
+SPDX-License-Identifier = "GPL-3.0-or-later"
+
+# Assets are CC-BY-SA-4.0. Individual assets with another compatible license
+# (CC0, CC-BY 4.0) declare it in a header or .license file, which takes precedence.
+[[annotations]]
+path = ["**/*.png", "**/*.svg", "**/*.ogg", "content/story/**"]
+precedence = "closest"
+SPDX-FileCopyrightText = "2026 peterdk31 and Spellmerge contributors"
+SPDX-License-Identifier = "CC-BY-SA-4.0"

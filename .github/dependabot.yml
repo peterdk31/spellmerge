@@ -1,0 +1,8 @@
+# Keeps SHA-pinned GitHub Actions up to date (docs/PLAN.md, "Supply chain").
+# Dependabot PRs touch .github/, so they always need the owner's review.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

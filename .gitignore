@@ -1,0 +1,14 @@
+# Godot
+.godot/
+*.translation
+export_credentials.cfg
+
+# Build output (builds are published only as GitHub Releases)
+build/
+*.pck
+*.zip
+
+# Secrets must never be committed (GitHub App private keys, tokens)
+*.pem
+*.key
+.env

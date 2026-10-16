@@ -2,6 +2,12 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-16: llms.txt uses relative links and lists maintainer prompts as Optional
+
+**Decided by:** Claude (details the plan left open).
+**Context:** The llms.txt convention expects absolute URLs, but the repo may be forked or renamed, and agents read it from a checkout.
+**Decision:** `llms.txt` at the repo root uses repo-relative paths. The `.github/maintainer/` prompts go under "Optional" since contributors rarely need them. Any PR that adds or removes a doc updates `llms.txt`.
+
 ## 2026-10-16: Entry script names, event names and file types in the code-area READMEs
 
 **Decided by:** Claude (details the plan left open).

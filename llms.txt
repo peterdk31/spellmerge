@@ -1,0 +1,71 @@
+# Spellmerge
+
+> A 2D top-down roguelite about building deep, combinable spells, for 1–4 local co-op players. Made in Godot 4.7 with typed GDScript only, in 32×32 pixel art. Claude, an AI, maintains it and outside contributors send PRs. Links are paths relative to the repository root.
+
+Start with AGENTS.md for the hard rules, then docs/DESIGN.md (nothing may contradict it) and the README of the area you will touch.
+
+## Start here
+
+- [README.md](README.md): what the project is, how to play and how to join in.
+- [AGENTS.md](AGENTS.md): the guide for coding agents: hard rules, how to find a task, checks to run, how PRs are rated and merged.
+- [CLAUDE.md](CLAUDE.md): Claude Code entry point; it only imports AGENTS.md.
+- [CONTRIBUTING.md](CONTRIBUTING.md): the friendlier guide for people, with the same rules as AGENTS.md.
+- [CLA.md](CLA.md): the Contributor License Agreement every PR author signs once.
+
+## Plan and design
+
+- [docs/DESIGN.md](docs/DESIGN.md): the vision and pillars; owner-only, and every task is checked against it.
+- [docs/PLAN.md](docs/PLAN.md): the full owner-approved project plan: security model, path tiers, roadmap, quality bar.
+- [docs/ROADMAP.md](docs/ROADMAP.md): the eight sequential milestones and which areas are open for PRs in each.
+- [docs/milestones/M0-foundation.md](docs/milestones/M0-foundation.md): design of the current milestone, M0, the infrastructure before any gameplay.
+- [docs/NEXT.md](docs/NEXT.md): the ordered task queue for the current milestone.
+- [docs/BACKLOG.md](docs/BACKLOG.md): ideas and future work outside the current milestone.
+- [docs/DECISIONS.md](docs/DECISIONS.md): why things were decided, newest first, so they are not reversed by accident.
+- [docs/LOG.md](docs/LOG.md): a short entry per development session, newest first.
+
+## Operations
+
+- [docs/SETUP-APP.md](docs/SETUP-APP.md): how to set up the Spellmerge Bot GitHub App (owner-only).
+- [docs/SECURITY-CHECKLIST.md](docs/SECURITY-CHECKLIST.md): checklist for verifying the security model after setup or a settings change (owner-only).
+- [.github/pull_request_template.md](.github/pull_request_template.md): the PR template contributors fill in.
+
+## Area contracts
+
+Each area README states the area's job, the milestone that builds and opens it, the file types allowed, an entry script and the dependency direction `core` ← `gameplay` ← `content`.
+
+- [core/README.md](core/README.md): shared services: event bus, registry, input, saving, base classes, projectile manager, pools; closed to outside PRs.
+- [hud/README.md](hud/README.md): panels, spell builder UI, menus, widgets and the one theme.
+- [gameplay/README.md](gameplay/README.md): shared rules for the gameplay sub-areas and an events-at-a-glance table.
+- [gameplay/ai/README.md](gameplay/ai/README.md): shared enemy behaviours: steering, targeting, attack patterns.
+- [gameplay/combat/README.md](gameplay/combat/README.md): damage pipeline, hit and hurt boxes, knockback, status effects, element reactions.
+- [gameplay/coop/README.md](gameplay/coop/README.md): joining and leaving mid-run, friendly fire, shared camera.
+- [gameplay/difficulty/README.md](gameplay/difficulty/README.md): scaling by player count, depth and setting.
+- [gameplay/feel/README.md](gameplay/feel/README.md): hit-stop, screen shake and juice presets.
+- [gameplay/flow/README.md](gameplay/flow/README.md): room sequence, door voting, transitions, waiting for builders.
+- [gameplay/player/README.md](gameplay/player/README.md): wizard controller: move, dodge, cast, mana, health, downed, revive.
+- [gameplay/progression/README.md](gameplay/progression/README.md): hub, unlocks, currency, codex.
+- [gameplay/rewards/README.md](gameplay/rewards/README.md): per-player loot rolls, unspent rewards, shops.
+- [gameplay/run/README.md](gameplay/run/README.md): run lifecycle: start, seed, end, summary screen.
+- [content/spells/README.md](content/spells/README.md): spell components: forms, elements, modifiers, triggers.
+- [content/relics/README.md](content/relics/README.md): passive items that change how spells behave.
+- [content/wizard/README.md](content/wizard/README.md): cosmetics and staffs for the base wizard.
+- [content/enemies/README.md](content/enemies/README.md): regular enemies and their attack patterns.
+- [content/bosses/README.md](content/bosses/README.md): multi-phase boss fights.
+- [content/rooms/README.md](content/rooms/README.md): room templates, one folder per biome.
+- [content/story/README.md](content/story/README.md): lore, dialogue and in-run story events.
+
+## Tools and checks
+
+- [tools/check.sh](tools/check.sh): runs the hard rules CI enforces on your changes; run it before opening a PR.
+- [art/manifest.json](art/manifest.json): origin record (human or ai, author, license) for every art asset.
+- [audio/manifest.json](audio/manifest.json): origin record for every audio asset.
+- [REUSE.toml](REUSE.toml): default licenses: GPL-3.0-or-later for code, CC-BY-SA-4.0 for assets.
+
+## Optional
+
+- [.github/maintainer/develop.md](.github/maintainer/develop.md): prompt for Claude's daily development session.
+- [.github/maintainer/plan.md](.github/maintainer/plan.md): prompt for the weekly planning session.
+- [.github/maintainer/rate.md](.github/maintainer/rate.md): prompt for rating outside PRs.
+- [.github/maintainer/review.md](.github/maintainer/review.md): prompt for the independent PR review.
+- [.github/maintainer/revise.md](.github/maintainer/revise.md): prompt for revising a PR after review.
+- [.github/maintainer/digest.md](.github/maintainer/digest.md): prompt for summarising weekly community input.

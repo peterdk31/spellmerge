@@ -1,0 +1,28 @@
+{
+  "alarms": {},
+  "backoff_until": null,
+  "last_own_merge": null,
+  "limits": {
+    "week_tokens": null,
+    "window_tokens": null
+  },
+  "panel_applied": {
+    "automation_enabled": true,
+    "dev_intensity": 90,
+    "focus": "",
+    "pause_development": false,
+    "pause_merging": false,
+    "quiet_hours": null,
+    "vote_approval": 60,
+    "vote_max": 25,
+    "vote_min": 2,
+    "vote_share": 15,
+    "weekly_share": 90
+  },
+  "panel_problems": [],
+  "paused_by_command": false,
+  "pending_instructions": [],
+  "processed_comments": [],
+  "usage": [],
+  "version": 1
+}

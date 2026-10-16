@@ -49,7 +49,13 @@ class ClassifyTest(unittest.TestCase):
             self.assertEqual(session.read_messages(Path(tmp, "missing")), [])
 
 
+FIXTURE_TASK = "**Area READMEs for the content areas.** Write the READMEs."
+
+
+@mock.patch.object(session.nexttask, "next_task", lambda *a, **k: FIXTURE_TASK)
 class PromptTest(unittest.TestCase):
+    """Uses a fixed task, so the tests don't depend on what docs/NEXT.md says today."""
+
     def test_render_and_slug(self) -> None:
         self.assertEqual(session.render("a {{X}} {{Y}}", {"X": "1"}), "a 1 {{Y}}")
         self.assertEqual(session.slug("**Area READMEs for the content areas.** Write..."),
@@ -67,8 +73,7 @@ class PromptTest(unittest.TestCase):
 
     def test_prepare_mentions_previous_failure(self) -> None:
         st = copy.deepcopy(state.DEFAULT)
-        task = session.nexttask.next_task()
-        st["task_failures"] = {task: {"count": 1, "pr": 12, "problems": "- missing tests"}}
+        st["task_failures"] = {FIXTURE_TASK: {"count": 1, "pr": 12, "problems": "- missing tests"}}
         prompt = session.prepare(CFG, st, "", dt.date(2026, 10, 17))["prompt"]
         self.assertIn("PR #12", prompt)
         self.assertIn("last attempt", prompt)

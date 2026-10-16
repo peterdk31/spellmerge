@@ -165,6 +165,16 @@ class FinishTest(unittest.TestCase):
 
 
 class PublishTest(unittest.TestCase):
+    def test_open_pr_finds_only_the_bots_pr(self) -> None:
+        own = {"number": 19, "user": {"login": CFG.bot.login}, "head": {"sha": "abc", "repo": {"full_name": CFG.repo}}}
+        other = {"number": 20, "user": {"login": "someone"}, "head": {"sha": "def", "repo": {"full_name": CFG.repo}}}
+        with mock.patch.object(session.gh, "api", return_value=[other, own]):
+            self.assertEqual(session.open_pr(CFG, "claude/20261016-x"),
+                             {"pr": "19", "sha": "abc", "branch": "claude/20261016-x"})
+        with mock.patch.object(session.gh, "api", return_value=[other]):
+            self.assertEqual(session.open_pr(CFG, "claude/20261016-x"), {})
+        self.assertEqual(session.open_pr(CFG, "main"), {})
+
     def test_branch_names(self) -> None:
         self.assertTrue(session.valid_branch("claude/20261017-area-readmes"))
         for bad in ["main", "claude/../main", "claude/", "feature/x", "claude/x;rm -rf", "claude/X"]:

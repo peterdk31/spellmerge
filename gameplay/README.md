@@ -44,7 +44,7 @@ Device events come from `core/input`. The last four rows are the HUD's player-in
 
 ## Allowed files
 
-`.gd`, `.tres`, plus `.uid`, `.import` and `.license` files. Limit: 1 MB per file. Typed GDScript only (types on every variable, parameter and return); no banned APIs (see AGENTS.md, hard rules).
+`.gd`, `.tres`, plus `.uid`, `.import` and `.license` files. Limit: 1 MB per file. This list follows the Areas table in docs/PLAN.md. Scenes (`.tscn`) for the player, enemies and effects are not part of this area yet; where they live is decided in M1, and this list is updated then. Typed GDScript only (types on every variable, parameter and return); no banned APIs (see AGENTS.md, hard rules).
 
 ## Steps (once the area is open)
 

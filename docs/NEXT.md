@@ -9,7 +9,7 @@ The ordered task queue for the current milestone, M0 ([design](milestones/M0-fou
 
 ## Blocked
 
-(none)
+- [ ] **Reconcile the event lists (waits for the M1 event bus).** The "Events at a glance" table in `gameplay/README.md` and the per-area event lists are kept in sync by hand. Once `core/events` exists, make it the single source: delete the table or generate it, and fix the area READMEs to match.
 
 ## Done recently
 

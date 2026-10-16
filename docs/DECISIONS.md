@@ -2,6 +2,17 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-16: Own CLA check instead of CLA Assistant; no lawyer review
+
+**Decided by:** owner.
+**Context:** cla-assistant.io keeps an OAuth token for the owner's account with `repo:status`, `write:repo_hook` and `gist` scopes on all repos. The owner account is what the whole security model protects.
+**Decision:**
+- `CLA.md` is adapted from the Apache Individual CLA v2.2, because a standard, widely used text is the safest choice without a lawyer.
+- Contributors sign by commenting `I have read the CLA and I agree to it.` on their PR. For no-git submissions, the issue-form checkbox counts.
+- The daily run records signatures in the bot-maintained `docs/cla-signatures.json` by numeric user ID and CLA version.
+- Unsigned PRs get a how-to-sign comment and are closed only if still unsigned after 7 days, because a signature is only seen at the next daily run. They are never merged unsigned.
+- The plan's "short lawyer review before selling" item is dropped entirely.
+
 ## 2026-10-16: PRs merge into `main`; `staging` is only a test branch
 
 **Decided by:** owner.

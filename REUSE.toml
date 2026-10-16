@@ -10,8 +10,17 @@ precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 peterdk31 and Spellmerge contributors"
 SPDX-License-Identifier = "GPL-3.0-or-later"
 
+# CLA.md is adapted from the Apache Software Foundation ICLA, whose text is Apache-2.0.
+[[annotations]]
+path = "CLA.md"
+precedence = "override"
+SPDX-FileCopyrightText = ["2026 peterdk31", "The Apache Software Foundation"]
+SPDX-License-Identifier = "Apache-2.0"
+
 # Assets are CC-BY-SA-4.0. Individual assets with another compatible license
 # (CC0, CC-BY 4.0) declare it in a header or .license file, which takes precedence.
+# LICENSES/CC-BY-SA-4.0.txt is added with the first asset (`reuse download CC-BY-SA-4.0`),
+# because `reuse lint` rejects license texts that no file uses.
 [[annotations]]
 path = ["**/*.png", "**/*.svg", "**/*.ogg", "content/story/**"]
 precedence = "closest"

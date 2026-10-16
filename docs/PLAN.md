@@ -90,7 +90,7 @@ Security comes first: all outside input (PR code, PR text, issues, discussions) 
 | Tier | Paths | Who may change |
 | --- | --- | --- |
 | Owner only | `.github/` (incl. `.github/maintainer/` prompts), `ci/`, `.claude/`, `docs/DESIGN.md`, `LICENSE`, `CLA.md`, `setup.sh`, `REUSE.toml`, `docs/SECURITY-CHECKLIST.md`, `docs/SETUP-APP.md` | Owner review required |
-| Bot maintained | `docs/ROADMAP.md`, `docs/NEXT.md`, `docs/BACKLOG.md`, `docs/DECISIONS.md`, `docs/LOG.md`, `docs/milestones/`, `docs/STYLE.md`, `docs/STORY.md`, area `README.md` files, `AGENTS.md`, `CLAUDE.md`, `llms.txt`, `core/` | Claude's own PRs only |
+| Bot maintained | `docs/ROADMAP.md`, `docs/NEXT.md`, `docs/BACKLOG.md`, `docs/DECISIONS.md`, `docs/LOG.md`, `docs/milestones/`, `docs/STYLE.md`, `docs/STORY.md`, area `README.md` files, `AGENTS.md`, `CLAUDE.md`, `llms.txt`, `docs/cla-signatures.json`, `core/` | Claude's own PRs only |
 | Open | Content areas that are open in the current milestone | Anyone, through the rating pipeline |
 
 **Kill switch:** set the repo variable `AUTOMATION_ENABLED=false`, or disable the workflow in the Actions tab. The Control panel issue also has a kill-switch checkbox usable from the GitHub mobile app. Every bot action is posted to a pinned "Daily log" issue, and every merge can be reverted.
@@ -142,7 +142,7 @@ Auto-closed with a reason if the PR:
 - touches owner-only or bot-maintained paths
 - uses banned APIs, or adds binaries or native code
 - adds a file type outside the allowed set (images, `.ogg`, Godot text files, `.gd`, `.json`) or a file over its size limit (1 MB per sprite sheet, 5 MB per music track)
-- has no CLA signature (one click), or a file without license info (REUSE check; one line in the template)
+- has no CLA signature (one comment on the PR; unsigned PRs get a comment explaining how to sign and are closed only if still unsigned after 7 days, and are never merged unsigned), or a file without license info (REUSE check; one line in the template)
 - comes from an author who already had 2 PRs closed that day (spam limit)
 
 Hard rules are kept to security and copyright only. Everything else (PR size, touching several areas, an area not yet open, a missing description) is guidance handled kindly in the review: Claude writes a missing description itself and may still merge a good PR for an area that isn't open yet.
@@ -696,7 +696,9 @@ The web demo stays free, and daily desktop builds stay free on GitHub Releases, 
 
 - **Code: GPL-3.0.** Anyone selling a fork must publish its source.
 - **Assets: CC-BY-SA 4.0.** Music or key art can be kept proprietary if commissioned.
-- **CLA** (CLA Assistant bot, checked in Filter 1): lets the owner also license contributions under other terms, which a future console port needs.
+- **CLA** (`CLA.md`, adapted from the Apache Individual CLA, checked in Filter 1): lets the owner also license contributions under other terms, which a future console port needs. No third-party CLA service is used, so no outside service holds a token for the owner's account.
+  - **Signing:** the contributor comments `I have read the CLA and I agree to it.` on their PR once; for no-git submissions, the CLA checkbox in the issue form counts.
+  - **Record:** the daily run stores each signature in the bot-maintained `docs/cla-signatures.json` (numeric user ID, login, CLA version, link to the comment or issue, date). A new CLA version needs a new signature.
 - **Trademark "Spellmerge"** once there is traction (EU trademark about €850). It is the real moat, since mostly AI-generated code has weak copyright protection.
 
 ### Fair deal for contributors
@@ -754,7 +756,8 @@ Copyright infringement is treated like a security risk: when in doubt, leave it 
 A first web search (October 2026) found no game or trademark named "Spellmerge"; the name exists only as an unrelated [GemStone IV player script](https://gstowncrier.com/knowledge-base/repospotlight-for-spellmerge/) and a [Stata utility](http://fmwww.bc.edu/RePEc/bocode/s/spellmerge.html). "Spell merging" is also a generic mechanic description used by other games.
 
 - [ ] Formal trademark search in EUIPO and USPTO registers before the Steam page (M6)
-- [ ] Short lawyer review before selling: CLA, GPL on Steam, trademark (not legal advice)
+
+No lawyer review is planned; the CLA uses a widely used standard text instead.
 
 ## Costs and owner setup
 
@@ -763,7 +766,7 @@ Running costs are about $20/month (Claude Pro), and setup takes about 20 minutes
 | Item | Cost |
 | --- | --- |
 | Public repo, Actions, Releases, Pages, Discussions, Projects | Free |
-| Godot, GUT tests, export templates, CLA Assistant | Free |
+| Godot, GUT tests, export templates | Free |
 | Claude Pro | About $20/month |
 | Steam Direct (at M6–M7) | $100 once, recouped after $1,000 revenue |
 | EU trademark (optional, later) | About €850 |
@@ -787,7 +790,7 @@ Actions artifact and cache storage terms for public repos were not confirmed in 
 4. Run `./setup.sh` (written by Claude). It creates `peterdk31/spellmerge` and applies all settings as code: rulesets, CODEOWNERS enforcement, read-only default workflow token, protected environment, Pages, Discussions, labels, project board and immutable releases. Discussions categories and project views have no API and are created by hand once (setup.sh lists them); `./setup.sh --check` verifies the live settings at any time.
 5. Create the custom "Spellmerge Bot" GitHub App following `docs/SETUP-APP.md` (about 5 minutes): permissions Contents, Issues and Pull requests only, with no Workflows permission. Store its app ID and private key as secrets in the protected environment.
 6. Run `claude setup-token` and store the token as the `CLAUDE_CODE_OAUTH_TOKEN` secret in the protected environment.
-7. Install CLA Assistant on the repo, and create a free itch.io page with an API key stored as a secret in the protected environment.
+7. Create a free itch.io page with an API key stored as a secret in the protected environment.
 8. Check the settings against `docs/SECURITY-CHECKLIST.md`.
 
 After that, the first daily run starts M0 automatically.

@@ -4,6 +4,8 @@ What each run did, newest first. Claude appends a short entry after each develop
 
 ## 2026-10-16
 
+- M1 part 1: built the event bus (`core/events/events.gd`, autoload `Events`, 24 typed signals, player index first, new `play_requested`) and the `SpellBase`, `EnemyBase` and `RoomBase` resources in `core/base/`. Tests in `tests/core/`; spells, enemies, rooms and core READMEs reworded. Signal arguments beyond the player index were not specified anywhere, so I chose them (see `docs/DECISIONS.md`); part 2 reconciles the README lists.
+
 - Wrote the M1 design document (`docs/milestones/M1-core-loop.md`): 25 parts in build order (after review, four big parts were split), decisions on events (including the `play_requested` intent from the menu to `flow`), scenes, registry (sounds by id, `null` when missing), the one spell, arena glue and placeholder art, and the owner-only steps. Replaced the task in `docs/NEXT.md` with M1's 25 tasks. `tools/check.sh` reports the same 3 errors and 3 warnings on `main` and here: they are untracked local files (`.idea`, `.vscode`, `scripts`) that are not part of the change.
 - Owner's decision: M0 closed early and M1 started. M0's dry runs and the 3-release streak carry into M1's done-when. First M1 task in `docs/NEXT.md`: the M1 design document.
 - Owner's session: wrote `tools/README.md` (sessions may not write to `tools/`), unblocking the last README task. `develop` now also starts `daily` and `weekly` when GitHub misses their schedule.

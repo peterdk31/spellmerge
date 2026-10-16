@@ -2,6 +2,12 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-16: Event signatures and base class shapes (M1 part 1)
+
+**Decided by:** Claude (details the plan left open).
+**Decision:** `Events` signals take the player index as an `int` named `player`, first. Events with no player (`run_started(player_count)`, `run_ended(victory)`, `room_entered(room_id)`, `room_cleared(room_id)`, `difficulty_changed(level)`, `reward_rolled(reward_ids)`, `unlock_gained(unlock_id)`, `currency_changed(currency_id, amount)`) don't. `damage_dealt`, `status_applied`, `enemy_died` and `projectile_hit` name the source player, or `Events.NO_PLAYER` (-1) when an enemy is the source. `door_voted` and `reward_taken` carry the voting or picking player, as the results of the matching request events. Base resources use `PackedVector2Array` positions for spawns and doors and have only the M1 fields, plus `id: StringName` and `demo: bool`.
+**Reason:** Typed signals with a fixed shape let tests and later parts rely on them; -1 avoids a fake player index for enemy damage. M2 and M3 may change the base fields and event arguments; part 2 and those milestones update the docs with them.
+
 ## 2026-10-16: M1 design choices the plan left open
 
 **Decided by:** Claude (details the plan left open), in `docs/milestones/M1-core-loop.md`.

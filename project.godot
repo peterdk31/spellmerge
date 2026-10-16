@@ -14,6 +14,10 @@ config/icon="res://icon.svg"
 boot_splash/bg_color=Color(0.105882, 0.0941176, 0.188235, 1)
 boot_splash/show_image=false
 
+[autoload]
+
+Events="*res://core/events/events.gd"
+
 [debug]
 
 gdscript/warnings/untyped_declaration=1

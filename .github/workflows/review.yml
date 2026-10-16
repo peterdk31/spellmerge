@@ -80,8 +80,8 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ steps.read-token.outputs.token }}
-          # Reviews in a chained session run under github-actions[bot] (see session.yml).
-          allowed_bots: "github-actions[bot]"
+          # Reviews in a chained or push-started session run under a bot (see session.yml).
+          allowed_bots: "github-actions[bot],spellmerge-bot[bot]"
           prompt: ${{ steps.prepare.outputs.prompt }}
           claude_args: >-
             --max-turns 40

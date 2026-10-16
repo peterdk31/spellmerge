@@ -3,12 +3,16 @@
 # control  every hour: verified Control panel, owner commands, claims, the gate
 # session  when the gate allows: one Claude work session (session.yml)
 #
-# Only scheduled and manual runs on main; nothing here runs PR code.
+# Runs on main only: hourly, by hand, when a session starts the next one, and on every
+# push to main (a merge), so work restarts even when GitHub doesn't fire the schedule.
+# Nothing here runs PR code.
 name: develop
 
 on:
   schedule:
     - cron: "35 * * * *"
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       chain_started:

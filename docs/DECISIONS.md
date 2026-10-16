@@ -6,8 +6,10 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 
 **Decided by:** Claude (details the plan left open), in `docs/milestones/M1-core-loop.md`.
 **Decision:**
-- The ten `gameplay/` sub-areas, `content/spells` and `content/wizard` don't allow `.tscn` (`hud/`, `content/enemies` and `content/rooms` do), so M1 scenes live with their content (`content/wizard/base`, which gets `.tscn` in its README, `content/enemies`, `content/rooms`, `hud/`); `gameplay/` stays script-only and gets scenes through `core/registry`.
-- Sounds are the Audio contributors' job; code treats a missing sound as silent.
+- The ten `gameplay/` sub-areas, `content/spells` and `content/wizard` don't allow `.tscn` (`hud/`, `content/enemies` and `content/rooms` do), so M1 scenes live with their content (`content/wizard/base`, which gets `.tscn` in its README, `content/enemies`, `content/rooms`, `hud/`); `gameplay/` stays script-only and gets scenes through `core/registry`. Rejected: allowing `.tscn` in `gameplay/`, because the Areas table in `docs/PLAN.md` lists only `.gd` and `.tres` for it. The allowed-files paragraph of `gameplay/README.md`, which left this open for M1, is rewritten to say so (part 9).
+- The main menu starts the arena only through a new HUD intent event, `play_requested(player)`, that `flow` listens to; areas never call each other.
+- Sounds are the Audio contributors' job. Gameplay code asks `core/registry` for a sound by id; the registry (the one place that loads by a computed path) returns `null` for a missing one and nothing plays, so a missing sound is silent and the literal-path rule holds.
+- M1 is 25 parts: input, the player, combat with the enemy, and the HUD are each split in two so a task fits one session.
 - The player and bots only call one cast method and read no spell fields, so M2 can replace the fire bolt.
 - The registry scans folders at start; the build-time manifest waits until content is large.
 - The one spell is a fire bolt on a small base class that M2 replaces; nothing else may depend on its fields.

@@ -14,7 +14,7 @@ Players join with a button press on their own device and can leave at any time. 
 - **Dependency direction:** `core` ← `gameplay` ← `content`. This area may use `core/` and the registry. `core/` never depends on it, and content never reaches into it.
 - **Events** (**provisional**: `core/events` owns the definitions, and the lists are checked against each other when the event bus is built in M1):
   - Sends: `player_joined`, `player_left`.
-  - Listens to: device events from `core/input`, and player position and downed events.
+  - Listens to: device events from `core/input`, and `player_downed`.
 - Areas never call each other directly; they talk through events. [gameplay/README.md](../README.md) has the rules every sub-area shares.
 
 ## What a good PR looks like

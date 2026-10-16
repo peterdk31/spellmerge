@@ -14,6 +14,30 @@ The rules of the game, in 10 sub-areas: `player`, `combat`, `feel`, `coop`, `ai`
 - **Players:** everything that acts per player takes a player index 0–3. Nothing assumes a single player, and nobody ever waits for another player.
 - **Performance:** no per-frame allocations; use the pools and the projectile manager from `core/`; respect the particle limits.
 
+## Events at a glance
+
+One table for all sub-areas, so "each event has exactly one sender" can be checked in one place. It is **provisional** and is reconciled with `core/events` when the event bus is built in M1; the per-area lists must match it.
+
+| Event | Sender | Listeners |
+| --- | --- | --- |
+| `spell_cast` | `player` | `combat` |
+| `projectile_hit` | `core/projectiles` | `combat` |
+| `damage_dealt` | `combat` | `feel`, `player` |
+| `status_applied` | `combat` | none yet |
+| `enemy_died` | `combat` | `feel`, `flow` |
+| `player_downed` | `player` | `ai`, `coop`, `feel`, `flow`, `run` |
+| `player_revived` | `player` | none yet |
+| `player_joined`, `player_left` | `coop` | `difficulty` |
+| `run_started`, `run_ended` | `run` | `run_started`: `difficulty`, `flow`; `run_ended`: `progression` |
+| `room_entered` | `flow` | `ai`, `difficulty` |
+| `room_cleared` | `flow` | `rewards`, `run` |
+| `door_voted` | `flow` | none yet |
+| `difficulty_changed` | `difficulty` | none yet |
+| `reward_rolled`, `reward_taken` | `rewards` | none yet |
+| `unlock_gained`, `currency_changed` | `progression` | none yet |
+
+Device events come from `core/input`. The HUD's player-intent requests (see `hud/README.md`) are sent by the HUD only and are not listed here.
+
 ## Allowed files
 
 `.gd`, `.tres`, plus `.uid`, `.import` and `.license` files. Limit: 1 MB per file. Typed GDScript only (types on every variable, parameter and return); no banned APIs (see AGENTS.md, hard rules).

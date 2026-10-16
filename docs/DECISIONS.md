@@ -8,12 +8,18 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 **Context:** docs/PLAN.md gives `combat/combat.gd` as an example entry script but doesn't list the rest, and the event bus doesn't exist yet.
 **Decision:** Each gameplay sub-area's entry script is `gameplay/<area>/<area>.gd`. `core/events` owns the event definitions; each README only lists the events its area sends (each event has one sender) and listens to, marked **provisional** until the event bus is built in M1, when the READMEs are updated. The HUD's sent events are the player-intent requests from "The HUD sends player-intent events": `build_change_requested` (listener `player`), `reward_pick_requested` (`rewards`), `door_vote_requested` (`flow`) and `pause_requested` (`run`), all in the table in `gameplay/README.md`. Text shared by all sub-areas lives in `gameplay/README.md`. Gameplay PRs allow `.gd` and `.tres` only, as in the plan's Areas table. `core/` services get their entry scripts and sections when built.
 
+## 2026-10-16: The bot can merge its own approved PRs
+
+**Decided by:** owner.
+**Context:** The `main` ruleset had "Require approval of the most recent reviewable push", which needs an approving review from someone other than the last pusher. The bot pushes its own PRs and can't approve them, and the merge script never approves anything, so GitHub refused every automated merge ("the base branch policy prohibits the merge") and every bot PR waited for the owner.
+**Decision:** `require_last_push_approval` is off (`ci/settings/rulesets/main.json`, and on GitHub). Owner-only paths still need the owner's code-owner review, and the merge script still merges only the exact reviewed commit, after the required checks and the hard rules pass.
+**Consequence:** the bot's PRs merge the same day, as the plan intends. What contributor PRs may change is unaffected: the hard rules and the code-owner review still apply.
+
 ## 2026-10-16: develop also runs on every push to main
 
 **Decided by:** owner.
 **Context:** GitHub never fired this repository's schedule: no scheduled run of any workflow on its first day, through two cron changes and turning the workflow off and on. When a session chain stops (an error, a usage limit, an empty queue), nothing started it again.
-**Decision:** `develop.yml` also runs on every push to `main`, so any merge, by the bot or the owner, restarts work if the chain had stopped. The gate still checks the budget, the queue and pauses, and the `develop` concurrency group keeps it to one session at a time. The hourly schedule stays for when GitHub does fire it. The Claude steps allow `spellmerge-bot[bot]` as well as `github-actions[bot]`, because a run after the bot's own merge is started by the bot.
-**Consequence:** a push during a session queues one more run after it. If a chained run is already waiting, GitHub cancels it in favour of the newer one, so an extra cancelled run can appear in the Actions list.
+**Decision:** a push to `main` (any merge, by the bot or the owner) runs a small `kick` job in `develop.yml`. If no develop run is running or queued, it starts one with `workflow_dispatch`; otherwise the running chain carries on by itself. The kick job runs no Claude step, because `claude-code-action` doesn't accept `push` events, and it sits outside the `develop` concurrency group, so it never waits behind a session. The hourly schedule stays for when GitHub does fire it.
 
 ## 2026-10-16: Sessions don't wait for each other or for the owner
 

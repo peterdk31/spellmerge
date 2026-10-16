@@ -199,6 +199,36 @@ class PublishTest(unittest.TestCase):
                                     capture_output=True, text=True, check=True).stdout
             self.assertIn("refs/heads/claude/20261017-x", listed)
 
+    def test_package_renames_a_branch_outside_claude(self) -> None:
+        """Commits left on e.g. `pr19` (from `gh pr checkout`) are bundled under the expected branch."""
+        import os
+        import subprocess
+        env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t",
+               "GIT_COMMITTER_EMAIL": "t@t"}
+        with tempfile.TemporaryDirectory() as tmp:
+            origin, work = Path(tmp, "origin.git"), Path(tmp, "work")
+            run = lambda *a, cwd=tmp: subprocess.run(a, cwd=cwd, check=True, capture_output=True, env=env)
+            run("git", "init", "-q", "--bare", "-b", "main", str(origin))
+            run("git", "clone", "-q", str(origin), str(work))
+            Path(work, "a.txt").write_text("a\n")
+            run("git", "add", "a.txt", cwd=work)
+            run("git", "commit", "-qm", "base", cwd=work)
+            run("git", "push", "-q", "origin", "main", cwd=work)
+            run("git", "switch", "-qc", "pr19", cwd=work)
+            Path(work, "b.txt").write_text("b\n")
+            run("git", "add", "b.txt", cwd=work)
+            run("git", "commit", "-qm", "work", cwd=work)
+            old = os.getcwd()
+            os.chdir(work)
+            try:
+                out = session.package(Path(tmp, "out"), "claude/20261017-x")
+                bare = session.package(Path(tmp, "out2"))
+            finally:
+                os.chdir(old)
+            self.assertEqual(out, {"branch": "claude/20261017-x", "commits": "1"})
+            self.assertTrue(Path(tmp, "out/work.bundle").exists())
+            self.assertFalse(Path(tmp, "out2/work.bundle").exists())  # no expected branch: nothing to push
+
 
 class MergeTest(unittest.TestCase):
     def runs(self, *items: tuple[str, str, str | None]) -> dict:

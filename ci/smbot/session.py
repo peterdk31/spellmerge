@@ -255,12 +255,19 @@ def record(cfg: config_mod.Config, kind: str, status: str, tokens: int) -> str:
 BRANCH_PREFIX = "claude/"
 
 
-def package(out: Path) -> dict[str, str]:
-    """Bundles the commits Claude made on top of origin/main (runs where Claude had a shell)."""
+def package(out: Path, expected: str = "") -> dict[str, str]:
+    """Bundles the commits Claude made on top of origin/main (runs where Claude had a shell).
+
+    If Claude's commits ended up on a branch outside claude/ (say `pr19` from `gh pr checkout`,
+    or a detached HEAD), they are bundled under the branch the session expected.
+    """
     out.mkdir(parents=True, exist_ok=True)
     branch = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True, text=True).stdout.strip()
     ahead = subprocess.run(["git", "rev-list", "--count", "origin/main..HEAD"], capture_output=True,
                            text=True).stdout.strip() or "0"
+    if int(ahead) > 0 and not branch.startswith(BRANCH_PREFIX) and valid_branch(expected):
+        subprocess.run(["git", "branch", "--force", expected, "HEAD"], check=True)
+        branch = expected
     if branch.startswith(BRANCH_PREFIX) and int(ahead) > 0:
         subprocess.run(["git", "bundle", "create", str(out / "work.bundle"), f"origin/main..{branch}"], check=True)
     return {"branch": branch, "commits": ahead}
@@ -283,6 +290,12 @@ def publish(cfg: config_mod.Config, bundle: Path, branch: str, mode: str, result
         pr = gh.api(f"repos/{cfg.repo}/pulls/{pr_number}")
         if pr["head"]["ref"] != branch or pr["user"]["login"] != cfg.bot.login or pr["state"] != "open":
             raise ValueError(f"PR #{pr_number} is not the bot's open PR for {branch}")
+        # A revision must build on the PR's current head, so the force push below can't drop its commits.
+        subprocess.run([*git, "fetch", "--quiet", remote, f"+refs/heads/{branch}:refs/remotes/current/{branch}"],
+                       check=True)
+        if subprocess.run(["git", "merge-base", "--is-ancestor", f"refs/remotes/current/{branch}",
+                           f"refs/remotes/work/{branch}"]).returncode != 0:
+            raise ValueError(f"the revision doesn't build on PR #{pr_number}'s current head; not overwriting it")
     pushed = subprocess.run(["git", "rev-parse", f"refs/remotes/work/{branch}"], check=True, capture_output=True,
                             text=True).stdout.strip()
     subprocess.run([*git, "push", "--quiet", "--force", remote, f"refs/remotes/work/{branch}:refs/heads/{branch}"],
@@ -405,7 +418,9 @@ def main(argv: list[str] | None = None) -> int:
     us.add_argument("--file", type=Path, required=True)
     us.add_argument("--step-failed", action="store_true")
     sub.add_parser("record").add_argument("--kind", choices=("dev", "review", "rate", "plan"), required=True)
-    sub.add_parser("package").add_argument("--out", type=Path, default=Path("work"))
+    pk = sub.add_parser("package")
+    pk.add_argument("--out", type=Path, default=Path("work"))
+    pk.add_argument("--branch", default="", help="the branch the session expected Claude to commit on")
     pb = sub.add_parser("publish")
     pb.add_argument("--bundle", type=Path, required=True)
     pb.add_argument("--branch", required=True)
@@ -443,7 +458,7 @@ def main(argv: list[str] | None = None) -> int:
         status = os.environ.get("STATUS") or "error"
         write_outputs({"status": record(cfg, args.kind, status, int(os.environ.get("TOKENS") or 0))})
     elif args.cmd == "package":
-        write_outputs(package(args.out))
+        write_outputs(package(args.out, args.branch))
     elif args.cmd == "publish":
         result = json.loads(os.environ.get("RESULT") or "{}")
         out = publish(cfg, args.bundle, args.branch, args.mode, result, args.pr, os.environ["GH_TOKEN"])

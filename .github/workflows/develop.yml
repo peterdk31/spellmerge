@@ -3,9 +3,10 @@
 # control  every hour: verified Control panel, owner commands, claims, the gate
 # session  when the gate allows: one Claude work session (session.yml)
 #
-# Runs on main only: hourly, by hand, when a session starts the next one, and on every
-# push to main (a merge), so work restarts even when GitHub doesn't fire the schedule.
-# Nothing here runs PR code.
+# Runs on main only: hourly, by hand, and when a session starts the next one. A push to
+# main (a merge) only dispatches a run when none is running or queued, so work restarts
+# even when GitHub doesn't fire the schedule (claude-code-action doesn't accept push
+# events). Nothing here runs PR code.
 name: develop
 
 on:
@@ -24,16 +25,39 @@ permissions:
   contents: read
 
 concurrency:
-  group: develop
+  # The push kick stays out of the develop group, so it never waits behind a session or
+  # replaces a chained run that is already queued.
+  group: ${{ github.event_name == 'push' && 'develop-kick' || 'develop' }}
   cancel-in-progress: false
 
 env:
   PYTHONPATH: ci
 
 jobs:
+  kick:
+    name: start develop after a merge, unless it's already running
+    if: github.event_name == 'push' && vars.AUTOMATION_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write # start develop.yml
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SELF: ${{ github.run_id }}
+        run: |
+          busy=$(gh run list --workflow develop.yml --limit 30 --json databaseId,status,event \
+            --jq "[.[] | select(.databaseId != $SELF and .event != \"push\" and .status != \"completed\")] | length")
+          if [ "$busy" -gt 0 ]; then
+            echo "A develop run is already running or queued; it starts the next session itself."
+          else
+            gh workflow run develop.yml --ref main
+          fi
+
   control:
     name: control panel, owner commands and gate
-    if: github.ref == 'refs/heads/main' && vars.AUTOMATION_ENABLED == 'true'
+    if: github.event_name != 'push' && github.ref == 'refs/heads/main' && vars.AUTOMATION_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: automation

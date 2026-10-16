@@ -115,6 +115,19 @@ def followup_task(followups: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
+def open_pr_for(cfg: config_mod.Config, task_slug: str) -> dict[str, Any] | None:
+    """An open bot PR whose branch is for this task (any date), if there is one."""
+    try:
+        prs = gh.api(f"repos/{cfg.repo}/pulls?state=open&per_page=100")
+    except gh.GhError:
+        return None
+    for pr in prs:
+        ref = pr["head"]["ref"]
+        if pr["user"]["login"] == cfg.bot.login and ref.startswith(BRANCH_PREFIX) and ref.endswith("-" + task_slug):
+            return pr
+    return None
+
+
 def prepare(cfg: config_mod.Config, st: dict[str, Any], focus: str, today: dt.date) -> dict[str, str]:
     if st.get("followups"):
         task, kind = followup_task(st["followups"]), "followups"
@@ -130,6 +143,13 @@ def prepare(cfg: config_mod.Config, st: dict[str, Any], focus: str, today: dt.da
                        if failures["count"] >= MAX_FAILURES - 1 else
                        "Continue on that PR's branch if it is still useful, otherwise start fresh."))
     branch = f"claude/{today:%Y%m%d}-{slug(task or 'owner-instructions') if kind == 'next' else 'polish-contributions'}"
+    existing = open_pr_for(cfg, branch.split("-", 1)[1]) if task else None
+    if existing:
+        branch = existing["head"]["ref"]
+        previous = (f"PR #{existing['number']} is already open for this task, on branch `{branch}`. Continue it: "
+                    f"`git fetch origin {branch} && git switch {branch}`, read its review comments with "
+                    f"`gh pr view {existing['number']} --comments`, and improve it rather than starting over. "
+                    + (previous or ""))
     template = (MAINTAINER / "develop.md").read_text()
     prompt = render(template, {
         "TASK": task or "(the queue is empty: only handle the owner instructions below)",
@@ -259,6 +279,8 @@ def publish(cfg: config_mod.Config, bundle: Path, branch: str, mode: str, result
         pr = gh.api(f"repos/{cfg.repo}/pulls/{pr_number}")
         if pr["head"]["ref"] != branch or pr["user"]["login"] != cfg.bot.login or pr["state"] != "open":
             raise ValueError(f"PR #{pr_number} is not the bot's open PR for {branch}")
+    pushed = subprocess.run(["git", "rev-parse", f"refs/remotes/work/{branch}"], check=True, capture_output=True,
+                            text=True).stdout.strip()
     subprocess.run([*git, "push", "--quiet", "--force", remote, f"refs/remotes/work/{branch}:refs/heads/{branch}"],
                    check=True)
     if mode == "new":
@@ -278,8 +300,8 @@ def publish(cfg: config_mod.Config, bundle: Path, branch: str, mode: str, result
     elif result.get("comment"):
         gh.api(f"repos/{cfg.repo}/issues/{pr_number}/comments", "-X", "POST",
                input={"body": f"**Revised after the critique.**\n\n{result['comment']}"})
-    sha = gh.api(f"repos/{cfg.repo}/pulls/{pr_number}")["head"]["sha"]
-    return {"pr": str(pr_number), "sha": sha}
+    # The commit we pushed, not the API's view of the PR head, which can lag right after a push.
+    return {"pr": str(pr_number), "sha": pushed}
 
 
 def post_answers(cfg: config_mod.Config, answers: list[dict[str, Any]], allowed: set[int]) -> None:

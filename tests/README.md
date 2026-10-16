@@ -4,7 +4,7 @@
 
 Tests for the whole game. The tree mirrors the code: a test for `gameplay/combat/` lives in `tests/gameplay/combat/`. Three special folders hold the checks that run on every build: `smoke/`, `benchmark/` and `bots/`.
 
-**Not an area for outside PRs.** Claude writes the tests. A contributor who adds content may add a test at the mirrored path; it is welcome but never required (Claude adds a missing test in a follow-up).
+**Outside PRs are accepted only as tests that accompany content.** A contributor who adds content may add a test at the mirrored path; it is welcome but never required (Claude adds a missing test in a follow-up). Claude owns the rest of the tree.
 
 ## Contract
 
@@ -41,7 +41,6 @@ Tests for the whole game. The tree mirrors the code: a test for `gameplay/combat
 
 ```sh
 ci/build/build.sh --quick        # downloads the pinned Godot once, imports, runs the editor smoke test
-godot --headless --path . --script res://tests/smoke/boot_smoke.gd    # one smoke test, with your own Godot
 ```
 
 The Python tests for the CI scripts are in `ci/tests/` and are owner-maintained.

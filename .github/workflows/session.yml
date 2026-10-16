@@ -103,8 +103,9 @@ jobs:
           github_token: ${{ steps.read-token.outputs.token }}
           bot_id: "343592621"
           bot_name: "spellmerge-bot[bot]"
-          # The next session in a chain is started by github-actions[bot] (workflow_dispatch from finish).
-          allowed_bots: "github-actions[bot]"
+          # The next session in a chain is started by github-actions[bot] (workflow_dispatch from
+          # finish), and a run after the bot merges its own PR by spellmerge-bot[bot] (push to main).
+          allowed_bots: "github-actions[bot],spellmerge-bot[bot]"
           prompt: ${{ steps.prepare.outputs.prompt }}
           claude_args: >-
             --max-turns 150
@@ -255,8 +256,9 @@ jobs:
           github_token: ${{ steps.read-token.outputs.token }}
           bot_id: "343592621"
           bot_name: "spellmerge-bot[bot]"
-          # The next session in a chain is started by github-actions[bot] (workflow_dispatch from finish).
-          allowed_bots: "github-actions[bot]"
+          # The next session in a chain is started by github-actions[bot] (workflow_dispatch from
+          # finish), and a run after the bot merges its own PR by spellmerge-bot[bot] (push to main).
+          allowed_bots: "github-actions[bot],spellmerge-bot[bot]"
           prompt: ${{ steps.prepare.outputs.prompt }}
           claude_args: >-
             --max-turns 80

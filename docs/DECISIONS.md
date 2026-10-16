@@ -2,11 +2,27 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
-## 2026-10-16: Entry script names and event names in area READMEs
+## 2026-10-16: Entry script names, event names and file types in the code-area READMEs
 
 **Decided by:** Claude (details the plan left open).
 **Context:** docs/PLAN.md gives `combat/combat.gd` as an example entry script but doesn't list the rest, and the event bus doesn't exist yet.
-**Decision:** Each gameplay sub-area's entry script is `gameplay/<area>/<area>.gd`. `core/events` owns the event definitions; each sub-area README only lists the events it sends (each event has one sender) and listens to, marked **provisional** next to the list until the event bus is built in M1, when the READMEs are updated. Text shared by all sub-areas (steps, checks, tests) lives in `gameplay/README.md`. `core/` services get their entry scripts and sections when built.
+**Decision:** Each gameplay sub-area's entry script is `gameplay/<area>/<area>.gd`. `core/events` owns the event definitions; each README only lists the events its area sends (each event has one sender) and listens to, marked **provisional** until the event bus is built in M1, when the READMEs are updated. The HUD's sent events are the player-intent requests from "The HUD sends player-intent events". Text shared by all sub-areas lives in `gameplay/README.md`. Gameplay PRs allow `.gd` and `.tres` only, as in the plan's Areas table. `core/` services get their entry scripts and sections when built.
+
+## 2026-10-16: Sessions don't wait for each other or for the owner
+
+**Decided by:** owner.
+**Context:** The next session started only after a merge, and only within 2 hours of the first. Any PR that didn't merge (a failed review, a blocked task, a merge GitHub refused) ended the chain, and work waited for the next hourly check. A stuck task also stayed at the top of the queue, so the next session tried it again.
+**Decision:**
+- When a session ends, the next one starts right away if the session made progress (it merged, opened or updated a PR, or reported the task blocked), the budget allows it, and there is a task. There is no time cap; the pacing budget limits usage. The chain stops on an error, a usage limit, nothing to do, or paused merging, and the hourly check starts it again.
+- A task that can't move without someone else is parked in the state's `task_failures` and skipped, so the next task goes first: for 7 days when it failed review twice or was reported blocked, and for 1 day when its approved PR wasn't merged. Afterwards it is picked up again, and its open PR is continued.
+**Consequence:** Work only waits on the owner for things only the owner can do, and even then other tasks go ahead. A task that failed review once is still retried straight away, with the review's problems.
+
+## 2026-10-16: The HUD sends player-intent events
+
+**Decided by:** owner.
+**Context:** The plan said "The HUD only listens." But the spell builder, reward picks, door votes and the pause menu are all HUD scenes whose choices must reach gameplay. With a listen-only HUD, that input would have to go through direct calls into gameplay, which principle 2 forbids.
+**Decision:** The HUD may send events, but only player-intent events: a request carrying the player index (0–3), such as a builder change, a reward pick, a door vote or opening the pause menu. Gameplay owns all state. It checks each request, applies it or refuses it, and announces the result as a normal state event. The HUD shows only what those state events say, never its own guess of the outcome. It still never calls gameplay directly, and other areas never call into the HUD.
+**Consequence:** Plan principle 2 now says this. Event names are settled when the event bus is built in M1; intent events are named as requests, so they can't be mistaken for state events.
 
 ## 2026-10-16: Content READMEs name no field or file layout before the example exists
 
@@ -58,7 +74,7 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - **Reviewers** (`review.yml`) get a read-only app token and read-only tools (`gh pr view/diff`, `git diff/log/show`). Their verdict is structured JSON. A PR merges only with `approve` and no blocker or major problems, and only after the required checks and the hard rules (re-run from `main`) pass, pinned to the reviewed commit.
 - **The implementer** gets a curated command list: git, `gh pr`, `gh issue view/comment`, `tools/check.sh`, `ci/build/build.sh --quick`, and basic file commands. No `curl`, `wget`, Python, web fetch or web search. Secrets are scrubbed from its subprocesses where the action supports it. Prompts are in owner-only `.github/maintainer/`.
 - **One critique and one revision round** per session. If the final review rejects, the PR stays open, and the next session sees the problems and continues. After the second failed attempt, the task is marked blocked, with the reason, and work moves on.
-- **Continuous work:** after a successful merge, the session starts the next one with `workflow_dispatch`, while there is a task and budget, for up to about 2 hours per chain. One session at a time, through the `develop` concurrency group.
+- **Continuous work:** after every session that made progress, the next one starts with `workflow_dispatch` while there is a task and budget (see "Sessions don't wait for each other or for the owner"). One session at a time, through the `develop` concurrency group.
 - **Usage accounting** reads each step's execution file. Cache reads count a tenth, because they cost far less quota. A usage-limit message starts the back-off; a rejected token opens the token alarm, and the alarm closes after the next good run.
 
 ## 2026-10-16: How the control gate, owner commands and pacing work

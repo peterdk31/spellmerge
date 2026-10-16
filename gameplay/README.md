@@ -16,7 +16,7 @@ The rules of the game, in 10 sub-areas: `player`, `combat`, `feel`, `coop`, `ai`
 
 ## Allowed files
 
-`.gd`, `.tres`, `.tscn`, plus `.uid`, `.import` and `.license` files. Limit: 1 MB per file. Typed GDScript only (types on every variable, parameter and return); no banned APIs (see AGENTS.md, hard rules).
+`.gd`, `.tres`, plus `.uid`, `.import` and `.license` files. Limit: 1 MB per file. Typed GDScript only (types on every variable, parameter and return); no banned APIs (see AGENTS.md, hard rules).
 
 ## Steps (once the area is open)
 

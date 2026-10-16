@@ -6,7 +6,7 @@ Hit-stop, screen shake and juice presets.
 
 **Closed until M4.** Built in M1, opens for PRs in M4 (see "Gameplay sub-areas" in docs/PLAN.md and "Opens for PRs" in docs/ROADMAP.md). Until then Claude maintains it; an outside PR is a gamble.
 
-Feel only reacts: it never changes gameplay results.
+Feel only reacts: it never changes damage or outcomes. Hit-stop is its only effect on timing; it is short and the same for every player.
 
 ## Contract
 
@@ -19,7 +19,7 @@ Feel only reacts: it never changes gameplay results.
 
 ## What a good PR looks like
 
-A good PR here adds or tunes one juice preset (hit-stop length, shake strength), stays readable with four players hitting at once, and never changes the damage or timing of gameplay.
+A good PR here adds or tunes one juice preset (hit-stop length, shake strength), stays readable with four players hitting at once, and never changes damage or outcomes, with hit-stop kept short and the same for every player.
 
 ## Steps, tests and validation
 

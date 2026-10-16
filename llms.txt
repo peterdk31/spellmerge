@@ -56,6 +56,7 @@ Each area README states the area's job, the milestone that builds and opens it, 
 - [art/README.md](art/README.md): shared art (tilesets, UI, VFX): 32×32 pixel art, size limits, origin manifest.
 - [audio/README.md](audio/README.md): shared audio (music, sound effects): `.ogg` only, size limits, origin manifest.
 - [tests/README.md](tests/README.md): the test tree, smoke test, benchmark and bots.
+- [tools/README.md](tools/README.md): local tools: how to run `tools/check.sh`, its flags and output.
 
 ## Tools and checks
 

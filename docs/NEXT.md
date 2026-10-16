@@ -4,21 +4,16 @@ The ordered task queue for the current milestone, M0 ([design](milestones/M0-fou
 
 ## Queue
 
-The queue is empty. What is left of M0 is the dry runs in the milestone design, which need owner or CI actions, not changes Claude can make in a PR. The one open Claude task is blocked below.
+The queue is empty. What is left of M0 is the dry runs in the milestone design, which need owner or CI actions, not changes Claude can make in a PR. The one open Claude task waits for M1 (below).
 
 ## Blocked
-
-- [ ] **README for `tools/` (blocked: the session may not write to `tools/`).** Left over from "Area READMEs for shared assets and tests": write `tools/README.md` and add it to `llms.txt`.
-  - Blocker: writes to `tools/` were denied three times (the last on 2026-10-16, even for a plain `Write`). `ci/smbot/session.py` keeps `tools/` read-only for Claude's sandbox, yet `ci/smbot/rules.py` allows the bot to change `.sh` and `.py` files there.
-  - Owner action: allow writes to `tools/` in the development session, or add `tools/README.md` by hand. Where that permission lives is unconfirmed.
-  - README contents: purpose, how to run `tools/check.sh` with `--author` and `--format`, contract, allowed files.
-  - Facts: `tools/check.sh` runs `python3 -m smbot.rules --base origin/main --worktree`; extra flags pass through. `--author LOGIN` is the PR author's GitHub login (default is an outside contributor; `'spellmerge-bot[bot]'` applies the bot's wider path rules). `--format text|github|json` (default `text`). It needs git and Python 3.10+, fetches `origin/main` first, and prints rule, file, line and fix for each problem.
 
 - [ ] **Reconcile the event lists (waits for the M1 event bus).** The "Events at a glance" table in `gameplay/README.md` and the per-area event lists are kept in sync by hand. Once `core/events` exists, make it the single source: delete the table or generate it, and fix the area READMEs to match.
 
 ## Done recently
 
-- [x] **READMEs for `art/`, `audio/` and `tests/`.** Size limits, `.ogg`-only audio, the origin manifest format, how to validate; all three are in `llms.txt`. `tools/README.md` is still open (see Queue).
+- [x] **README for `tools/`.** Added by the owner's session (Claude sessions may not write to `tools/`): how to run `tools/check.sh`, its flags and output; listed in `llms.txt`.
+- [x] **READMEs for `art/`, `audio/` and `tests/`.** Size limits, `.ogg`-only audio, the origin manifest format, how to validate; all three are in `llms.txt`. `tools/README.md` followed separately.
 - [x] **llms.txt.** `llms.txt` at the repo root indexes every doc (guides, plan files, ops docs, all area READMEs, tools, manifests, maintainer prompts) with a one-line description each.
 - [x] **Area READMEs for code areas.** `core/`, `hud/` and the 10 `gameplay/` sub-areas each have a README with the fixed sections, build and open milestones, entry script name and the dependency direction; `core/` states it is closed to outside PRs.
 - [x] **Area READMEs for the content areas.** `content/spells/`, `relics/`, `wizard/`, `enemies/`, `bosses/`, `rooms/` and `story/` each have a README with the fixed sections. The four top-level `.gitkeep` files are gone; spells, wizard and story keep their sub-folder `.gitkeep`s.

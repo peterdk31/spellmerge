@@ -6,7 +6,8 @@
 # Runs on main only: hourly, by hand, and when a session starts the next one. A push to
 # main (a merge) only dispatches a run when none is running or queued, so work restarts
 # even when GitHub doesn't fire the schedule (claude-code-action doesn't accept push
-# events). Nothing here runs PR code.
+# events). Every run also starts daily.yml and weekly.yml if GitHub missed their schedule
+# (smbot.catchup). Nothing here runs PR code.
 name: develop
 
 on:
@@ -54,6 +55,25 @@ jobs:
           else
             gh workflow run develop.yml --ref main
           fi
+
+  catch-up:
+    name: start daily and weekly if GitHub missed their schedule
+    if: github.ref == 'refs/heads/main' && vars.AUTOMATION_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: catch-up # one at a time, so two runs never start the same workflow twice
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      actions: write # start daily.yml and weekly.yml
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -m smbot.catchup
 
   control:
     name: control panel, owner commands and gate

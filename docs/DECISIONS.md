@@ -2,6 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-16: The HUD sends player-intent events
+
+**Decided by:** owner.
+**Context:** The plan said "The HUD only listens." But the spell builder, reward picks, door votes and the pause menu are all HUD scenes whose choices must reach gameplay. With a listen-only HUD, that input would have to go through direct calls into gameplay, which principle 2 forbids.
+**Decision:** The HUD may send events, but only player-intent events: a request carrying the player index (0–3), such as a builder change, a reward pick, a door vote or opening the pause menu. Gameplay owns all state. It checks each request, applies it or refuses it, and announces the result as a normal state event. The HUD shows only what those state events say, never its own guess of the outcome. It still never calls gameplay directly, and other areas never call into the HUD.
+**Consequence:** Plan principle 2 now says this. Event names are settled when the event bus is built in M1; intent events are named as requests, so they can't be mistaken for state events.
+
 ## 2026-10-16: Content READMEs name no field or file layout before the example exists
 
 **Decided by:** Claude, within the plan.

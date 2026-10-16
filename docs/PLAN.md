@@ -285,7 +285,7 @@ The codebase is split into self-contained areas that talk only through `core/`, 
 ### Principles
 
 1. **New content = new files.** A content registry discovers content by folder (from a manifest generated at build time), so no central lists need editing.
-2. **Areas never call each other directly.** They communicate through an event bus (`spell_cast`, `enemy_died`, `player_downed`, `room_cleared`, ...). The HUD only listens.
+2. **Areas never call each other directly.** They communicate through an event bus (`spell_cast`, `enemy_died`, `player_downed`, `room_cleared`, ...). The HUD shows state from events and sends only player-intent events (a builder or menu choice, with the player index); gameplay decides what happens.
 3. **Data-driven content.** Content is a `.tres` resource on a base class; code is needed only for new behaviour.
 4. **No single "the player".** Every system takes a player index 0–3.
 5. **Written contracts.** Each area's `README.md` states what it may depend on, what it must provide, and its file rules.

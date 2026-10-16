@@ -254,5 +254,16 @@ class RepoTest(unittest.TestCase):
         self.assertIn(("file-type", "error", "content/relics/a/tool.exe"), self.check(worktree=True))
 
 
+    def test_sandbox_placeholders_are_skipped_but_real_files_are_not(self) -> None:
+        for name in (".bashrc", ".zshrc", ".gitconfig", ".idea/workspace.xml", ".claude/commands/x.md"):
+            self.write(name, b"")
+        self.assertEqual(self.check(worktree=True), [])
+        self.write(".bashrc", "alias x=y\n")  # not empty: someone wrote it, so it's checked
+        self.write("scripts/gen.py", "print(1)\n")
+        found = self.check(worktree=True)
+        self.assertIn(("file-type", "error", ".bashrc"), found)
+        self.assertIn(("file-type", "error", "scripts/gen.py"), found)
+
+
 if __name__ == "__main__":
     unittest.main()

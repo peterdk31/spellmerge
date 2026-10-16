@@ -31,6 +31,7 @@ from . import gh, rules
 
 REQUIRED_CHECKS = ("rules", "ci-tests")
 CHECK_TIMEOUT = 15 * 60
+CONFLICT = "the PR conflicts with main"  # finish() looks for this to send the PR back for a merge of main
 
 
 class NotMerged(Exception):
@@ -56,6 +57,17 @@ def wait_for_checks(repo: str, sha: str, read_token: str | None, timeout: float 
         time.sleep(20)
 
 
+def mergeable_now(repo: str, number: int, pr: dict, attempts: int = 6, delay: float = 10) -> bool:
+    """False when GitHub reports a conflict. `mergeable` is null while GitHub is still computing it."""
+    for attempt in range(attempts):
+        if pr.get("mergeable") is not None:
+            return bool(pr["mergeable"])
+        if attempt < attempts - 1:
+            time.sleep(delay)
+            pr = gh.api(f"repos/{repo}/pulls/{number}")
+    return True  # still unknown: let the checks decide, as before
+
+
 def rerun_rules(cfg: config_mod.Config, number: int, sha: str, author: str) -> list[rules.Finding]:
     """Runs main's rules against the PR head in a temporary worktree."""
     policy = Path.cwd()
@@ -77,6 +89,9 @@ def merge(cfg: config_mod.Config, number: int, sha: str, read_token: str | None)
         raise NotMerged(f"the PR targets {pr['base']['ref']}, not main")
     if pr["head"]["sha"] != sha:
         raise NotMerged(f"the PR changed after review (reviewed {sha[:7]}, head is {pr['head']['sha'][:7]})")
+    if not mergeable_now(cfg.repo, number, pr):
+        # GitHub runs no pull_request checks on a conflicting PR, so waiting for them would only time out.
+        raise NotMerged(f"{CONFLICT}: merge origin/main into its branch and resolve the conflicts")
     wait_for_checks(cfg.repo, sha, read_token)
     errors = [f for f in rerun_rules(cfg, number, sha, pr["user"]["login"]) if f.severity == "error"]
     if errors:

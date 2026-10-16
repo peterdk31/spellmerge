@@ -31,6 +31,7 @@ from pathlib import Path
 from typing import Any
 
 from . import alarms, dailylog, gh, nexttask, pacing, state, weekly
+from . import merge as merge_mod
 from . import config as config_mod
 
 MAINTAINER = Path(".github/maintainer")
@@ -352,7 +353,8 @@ def finish(cfg: config_mod.Config, env: dict[str, str]) -> dict[str, str]:
     now = dt.datetime.now(dt.timezone.utc)
 
     # The merge job sets MERGED to "true" or "false"; it's empty when the job didn't run.
-    merge_refused = bool(pr) and mergeable(review) and env.get("MERGED") == "false"
+    conflict = bool(pr) and env.get("MERGED") == "false" and merge_mod.CONFLICT in env.get("MERGE_RESULT", "")
+    merge_refused = bool(pr) and mergeable(review) and env.get("MERGED") == "false" and not conflict
     merge_skipped = bool(pr) and mergeable(review) and not env.get("MERGED")
 
     def park(entry: dict[str, Any], span: dt.timedelta, reason: str) -> None:
@@ -375,6 +377,16 @@ def finish(cfg: config_mod.Config, env: dict[str, str]) -> dict[str, str]:
                                           for p in review.get("problems", []))[:4000]
             if entry["count"] >= MAX_FAILURES and task:
                 park(entry, PARK_BLOCKED, f"failed review {entry['count']} times")
+        elif conflict and task:
+            # Like a failed review: the next session continues the PR and merges main into it.
+            entry = failures.setdefault(task, {"count": 0})
+            entry["count"] += 1
+            entry["pr"] = pr
+            entry["problems"] = (f"- Approved, but PR #{pr} conflicts with main, so it couldn't merge. Fix: "
+                                 "`git fetch origin main && git merge origin/main`, resolve the conflicts, "
+                                 "and keep both sides' entries in the plan files.")
+            if entry["count"] >= MAX_FAILURES:
+                park(entry, PARK_BLOCKED, f"conflicted with main {entry['count']} times")
         elif merge_refused and task:
             entry = failures.setdefault(task, {"count": 0})
             entry["pr"] = pr

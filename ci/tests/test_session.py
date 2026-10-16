@@ -155,6 +155,15 @@ class FinishTest(unittest.TestCase):
         self.assertIn("refused", st["task_failures"]["A"]["parked_reason"])
         self.assertEqual(out["again"], "true")
 
+    def test_a_conflict_sends_the_pr_back_instead_of_parking_it(self) -> None:
+        out, st = self.run_finish(copy.deepcopy(state.DEFAULT), ["A", "B"], PR="19", FINAL_REVIEW=self.APPROVE,
+                                  MERGED="false", MERGE_RESULT=f"Not merged: {merge.CONFLICT}: merge origin/main")
+        entry = st["task_failures"]["A"]
+        self.assertEqual(entry["count"], 1)
+        self.assertNotIn("parked_until", entry)
+        self.assertIn("git merge origin/main", entry["problems"])
+        self.assertEqual(out["again"], "true")
+
     def test_stops_on_errors_paused_merging_and_plan_runs(self) -> None:
         for env in ({"IMPLEMENT_STATUS": "error"}, {"IMPLEMENT_STATUS": "limit"},
                     {"IMPLEMENT_STATUS": "nothing_to_do"},
@@ -271,6 +280,21 @@ class MergeTest(unittest.TestCase):
         with mock.patch.object(merge.gh, "api", return_value=pr):
             with self.assertRaisesRegex(merge.NotMerged, "changed after review"):
                 merge.merge(CFG, 1, "old", None)
+
+    def test_conflicting_pr_is_refused_without_waiting_for_checks(self) -> None:
+        pr = {"state": "open", "base": {"ref": "main"}, "head": {"sha": "abc"}, "user": {"login": "x"},
+              "mergeable": False}
+        with mock.patch.object(merge.gh, "api", return_value=pr), \
+                mock.patch.object(merge, "wait_for_checks") as wait:
+            with self.assertRaisesRegex(merge.NotMerged, merge.CONFLICT):
+                merge.merge(CFG, 1, "abc", None)
+        wait.assert_not_called()
+
+    def test_mergeable_is_polled_while_github_computes_it(self) -> None:
+        with mock.patch.object(merge.gh, "api", side_effect=[{"mergeable": None}, {"mergeable": False}]):
+            self.assertFalse(merge.mergeable_now("o/r", 1, {"mergeable": None}, delay=0))
+        with mock.patch.object(merge.gh, "api", return_value={"mergeable": None}):
+            self.assertTrue(merge.mergeable_now("o/r", 1, {"mergeable": None}, attempts=2, delay=0))
 
 
 if __name__ == "__main__":

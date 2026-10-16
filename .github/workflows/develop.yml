@@ -8,7 +8,7 @@ name: develop
 
 on:
   schedule:
-    - cron: "23 * * * *"
+    - cron: "35 * * * *"
   workflow_dispatch:
     inputs:
       chain_started:

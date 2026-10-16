@@ -320,7 +320,19 @@ def publish(cfg: config_mod.Config, bundle: Path, branch: str, mode: str, result
         gh.api(f"repos/{cfg.repo}/issues/{pr_number}/comments", "-X", "POST",
                input={"body": f"**Revised after the critique.**\n\n{result['comment']}"})
     # The commit we pushed, not the API's view of the PR head, which can lag right after a push.
-    return {"pr": str(pr_number), "sha": pushed}
+    return {"pr": str(pr_number), "sha": pushed, "branch": branch}
+
+
+def open_pr(cfg: config_mod.Config, branch: str) -> dict[str, str]:
+    """The bot's open PR for a branch, for a session that continued it without new commits."""
+    if not valid_branch(branch):
+        return {}
+    prs = gh.api(f"repos/{cfg.repo}/pulls?state=open&head={cfg.repo.split('/')[0]}:{branch}")
+    own = [p for p in prs if p["user"]["login"] == cfg.bot.login and p["head"]["repo"]["full_name"] == cfg.repo]
+    if not own:
+        print(f"no open bot PR for {branch}")
+        return {}
+    return {"pr": str(own[0]["number"]), "sha": own[0]["head"]["sha"], "branch": branch}
 
 
 def post_answers(cfg: config_mod.Config, answers: list[dict[str, Any]], allowed: set[int]) -> None:
@@ -438,6 +450,7 @@ def main(argv: list[str] | None = None) -> int:
     pi = sub.add_parser("pr-info")
     pi.add_argument("--pr", type=int, required=True)
     pi.add_argument("--require-own", action="store_true", help="fail unless the bot opened the PR")
+    sub.add_parser("open-pr").add_argument("--branch", required=True)
     sub.add_parser("finish")
     args = ap.parse_args(argv)
 
@@ -481,6 +494,8 @@ def main(argv: list[str] | None = None) -> int:
             print(f"::error::PR #{args.pr} was not opened by the bot from this repository")
             return 1
         write_outputs({"sha": pr["head"]["sha"], "branch": pr["head"]["ref"], "own": str(own).lower()})
+    elif args.cmd == "open-pr":
+        write_outputs(open_pr(cfg, args.branch))
     else:
         write_outputs(finish(cfg, dict(os.environ)))
     return 0

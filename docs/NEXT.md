@@ -4,7 +4,7 @@ The ordered task queue for the current milestone, M0 ([design](milestones/M0-fou
 
 ## Queue
 
-- [ ] **Area READMEs for shared assets and tests.** The same for `art/`, `audio/`, `tests/` and `tools/`, including the asset size limits, `.ogg`-only audio, the origin manifest (`art/manifest.json`, `audio/manifest.json`) and how to run `tools/check.sh`.
+- [ ] **Area READMEs for shared assets and tests.** The same for `art/`, `audio/`, `tests/` and `tools/`, including the asset size limits, `.ogg`-only audio, the origin manifest (`art/manifest.json`, `audio/manifest.json`) and how to run `tools/check.sh`. Add each new README to `llms.txt` in the same PR.
 
 ## Blocked
 

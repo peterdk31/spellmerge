@@ -21,7 +21,7 @@ Shared sound used by more than one thing: music (`music/`) and sound effects (`s
 
 ## The origin manifest
 
-`audio/manifest.json` is `{"assets": [ ... ]}`, one entry per asset, sorted by `path`:
+`audio/manifest.json` is `{"assets": [ ... ]}`, one entry per asset (keeping it sorted by `path` is a convention, not checked):
 
 ```json
 {
@@ -58,6 +58,8 @@ The manifest drives the Steam AI disclosure and the "Replace placeholder" issues
 tools/check.sh                   # the hard rules (file types, sizes, licenses), on your changes
 ci/build/build.sh --quick        # import and smoke test in Godot
 ```
+
+`tools/check.sh` does not yet check that every asset has a manifest entry. Until that validator exists, the reviewer checks it (see "Is the origin recorded honestly" below), so don't skip the entry.
 
 ## Rating questions
 

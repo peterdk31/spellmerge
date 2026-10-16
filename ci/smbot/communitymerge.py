@@ -85,7 +85,7 @@ def candidates(cfg: config_mod.Config, now: dt.datetime, settings: votes.VoteSet
 
         if votes.is_votable(labels):
             if activity is None:
-                activity = community.gather(cfg, now)
+                activity = community.gather(cfg, now, os.environ.get("DISCUSSIONS_TOKEN"))
                 _, voters, phase = community.counts(activity, now, user_cache)
             started = dt.datetime.fromisoformat(rating_comment["created_at"].replace("Z", "+00:00"))
             reactions = gh.api_paginated(f"repos/{cfg.repo}/issues/{number}/reactions?per_page=100")

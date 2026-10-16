@@ -237,6 +237,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     environment: automation
+    permissions:
+      contents: read
+      discussions: read # Discussions posts count as community activity for votes
     outputs:
       candidates: ${{ steps.candidates.outputs.candidates }}
     steps:
@@ -254,6 +257,7 @@ jobs:
       - id: candidates
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          DISCUSSIONS_TOKEN: ${{ github.token }}
           SETTINGS: ${{ needs.control.outputs.settings }}
         run: python3 -m smbot.communitymerge candidates
 

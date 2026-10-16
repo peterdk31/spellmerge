@@ -105,6 +105,8 @@ def expire(cfg: config_mod.Config, claims: dict[str, dict], now: dt.datetime) ->
 def run_hourly(cfg: config_mod.Config, now: dt.datetime) -> list[str]:
     st, _ = state.load(cfg)
     log, new_claims, processed = process_new(cfg, st, now)
+    if not processed:
+        return log
 
     def apply(s: dict[str, Any]) -> None:
         s.setdefault("claims", {}).update(new_claims)
@@ -117,6 +119,8 @@ def run_daily(cfg: config_mod.Config, now: dt.datetime) -> list[str]:
     st, _ = state.load(cfg)
     log, remaining = expire(cfg, st.get("claims", {}), now)
     checked = set(st.get("claims", {}))
+    if remaining == st.get("claims", {}):
+        return log
 
     def apply(s: dict[str, Any]) -> None:
         # Keep claims added since this run started; replace the ones it checked.

@@ -121,7 +121,10 @@ def main(argv: list[str] | None = None) -> int:
             if result.verified:
                 s["panel_applied"] = panel.to_json(result.settings)
             effects.apply(s)
-        st = state.update(cfg, apply, "control: panel and owner commands")
+        changed = (st.get("panel_problems") != result.problems or effects.processed
+                   or (result.verified and st.get("panel_applied") != panel.to_json(result.settings)))
+        if changed:
+            st = state.update(cfg, apply, "control: panel and owner commands")
 
     task = nexttask.next_task()
     decision = decide(kill_switch_on, result, st, now, cfg.timezone, task is not None or args.planning)

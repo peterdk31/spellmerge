@@ -56,7 +56,8 @@ class Activity:
             self.first[login] = at
 
 
-def gather(cfg: config_mod.Config, now: dt.datetime) -> Activity:
+def gather(cfg: config_mod.Config, now: dt.datetime, discussions_token: str | None = None) -> Activity:
+    """Collects activity; Discussions need a token with discussions: read (the bot app has none)."""
     act = Activity()
     owner, name = cfg.repo.split("/")
     for issue in gh.api_paginated(f"repos/{cfg.repo}/issues?state=all&per_page=100"):
@@ -71,7 +72,12 @@ def gather(cfg: config_mod.Config, now: dt.datetime) -> Activity:
             act.see(login, created, now, participation=True)
     cursor: str | None = None
     while True:
-        data = gh.graphql(_DISCUSSIONS, owner=owner, name=name, **({"cursor": cursor} if cursor else {}))
+        try:
+            data = gh.graphql(_DISCUSSIONS, gh_token=discussions_token, owner=owner, name=name,
+                              **({"cursor": cursor} if cursor else {}))
+        except gh.GhError as e:
+            print(f"Discussions couldn't be read, so they don't count today: {e}")
+            break
         page = data["repository"]["discussions"]
         for d in page["nodes"]:
             act.see((d.get("author") or {}).get("login"), _time(d["createdAt"]), now, participation=True)

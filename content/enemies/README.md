@@ -12,7 +12,7 @@ Regular enemies and their attack patterns. Enemies create the "readable chaos" o
 - Use the shared behaviours from `gameplay/ai` (steering, targeting) through the base class; do not reimplement them. Targeting considers all players, indices 0–3.
 - Every attack has a visible telegraph before it deals damage.
 - Enemy health and count scale with player count; use the scaling the base class provides rather than your own.
-- Enemies come from pools; no per-frame allocations. Respect the particle and sprite sheet limits (enforced by validators).
+- Enemies come from pools; no per-frame allocations. Respect the particle and sprite sheet limits (1 MB per sprite sheet; validators for the rest arrive with the base class).
 - Communicate only through `core/` events (`enemy_died`, ...). Original names and art only.
 
 ## Allowed files
@@ -47,4 +47,4 @@ Besides the standard criteria:
 - Does it scale sensibly from 1 to 4 players?
 - Is it a distinct role, not a re-skin of an existing enemy?
 
-Art and gameplay changes here also need the community vote (👍/👎, 24 hours).
+Art changes (sprites) also need the community vote (👍/👎, 24 hours).

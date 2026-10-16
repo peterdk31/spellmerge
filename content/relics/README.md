@@ -8,7 +8,7 @@ Passive items found during runs. Some add a small bonus; the best change how spe
 
 ## Contract
 
-- A relic is one folder holding a `.tres` resource on the relic base class (arrives in M3), an optional `.gd` for new behaviour and an icon. Validators reject missing or out-of-range values.
+- A relic is one folder holding a `.tres` resource on the relic base class (arrives in M3), an optional `.gd` for new behaviour and an icon. Validators for missing or out-of-range values arrive with the base class.
 - Content is discovered by folder through `core/registry`; no central list to edit.
 - A relic reacts to `core/` events and changes behaviour through the hooks `core/` provides. It never calls spells, enemies or other areas directly.
 - Relics are owned per player (index 0–3). Rewards are rolled per player and never wait for anyone.

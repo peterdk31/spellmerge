@@ -8,7 +8,7 @@ Words in the game: **lore** (`lore/`) for item and world descriptions, **dialogu
 
 ## Contract
 
-- All story content is `.json`, in the schema the first example defines. Validators reject missing fields, unknown keys and over-long text.
+- All story content is `.json`, in the schema the first example defines. Validators for missing fields, unknown keys and over-long text arrive with the first example.
 - It must fit the canon and tone in `docs/STORY.md` (written by Claude before this area opens). Do not contradict established lore.
 - Text is short and readable by all 4 players at once. Nothing makes one player wait for another, and no choice blocks the others.
 - Original writing only: no quotes, names or characters from other works, and no real people.

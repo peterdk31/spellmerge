@@ -16,14 +16,14 @@ Boss fights with several phases. A boss is the high point of a biome: spectacle 
 
 ## Allowed files
 
-`.tres`, `.gd`, `.tscn` (saved as text), sprites (`.png` or `.svg`), SFX (`.ogg`), plus `.uid`, `.import` and `.license` files. Limits: 1 MB per image, 5 MB per `.ogg`, 1 MB for anything else. Typed GDScript only; no banned APIs.
+`.tres`, `.gd`, `.tscn` (saved as text), sprites (`.png` or `.svg`), plus `.uid`, `.import` and `.license` files. Limits: 1 MB per image, 1 MB for anything else. Boss audio goes through the Audio area, not this folder. Typed GDScript only; no banned APIs.
 
 ## Steps
 
 1. Pick an issue labelled `now` in this area and comment `/claim`.
 2. Copy the example folder and rename it.
 3. Define the phases in the `.tres` and the patterns in the `.gd`.
-4. Replace the sprites and SFX; add each to `art/manifest.json` or `audio/manifest.json`; commit `.uid` files.
+4. Replace the sprites; add each to `art/manifest.json`; commit `.uid` files.
 5. Run the checks below, then open a PR with a GIF or video of the whole fight.
 
 ## Example to copy
@@ -45,4 +45,4 @@ Besides the standard criteria:
 - Does it have spectacle and distinct phases?
 - Does it scale from 1 to 4 players?
 
-Art and gameplay changes here also need the community vote (👍/👎, 24 hours).
+Art changes (sprites) also need the community vote (👍/👎, 24 hours).

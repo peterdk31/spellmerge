@@ -10,7 +10,7 @@ Everything that customises the single base wizard. **Cosmetics** (`cosmetics/`) 
 
 - There is one base wizard. No new characters or classes.
 - Cosmetics are visual only and must never change gameplay or hitboxes.
-- A staff is a `.tres` on the staff base class (arrives with the first example) plus an optional `.gd` for a new basic attack. It reacts through `core/` events and the projectile manager, and takes a player index 0–3.
+- A staff is a `.tres` on the staff base class (arrives in M4) plus an optional `.gd` for a new basic attack. It reacts through `core/` events and the projectile manager, and takes a player index 0–3.
 - Each of the four players must stay recognisable: respect the player colours and keep the silhouette readable at 1× with 4 wizards on screen.
 - Sprites follow `docs/STYLE.md` (32×32, palette, frame counts). Content is discovered by folder through `core/registry`.
 
@@ -45,4 +45,4 @@ Besides the standard criteria:
 - Does it follow the style guide (`docs/STYLE.md`) and read well at 1×?
 - For staffs: is the basic attack fun, and is the bonus small enough not to dominate spells?
 
-Art and gameplay changes here also need the community vote (👍/👎, 24 hours).
+Art changes (sprites) also need the community vote (👍/👎, 24 hours).

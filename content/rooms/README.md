@@ -11,13 +11,13 @@ Room templates, one folder per biome. A room is a tile-based arena where a wave 
 - A room is a `.tscn` scene with a tilemap, plus a `.tres` describing it on the room base class (arrives in M3).
 - Rooms are discovered by folder through `core/registry`: put it in its biome's folder, no list to edit.
 - Space for four: the room must be playable and readable with 4 wizards, with room to dodge and no spot where a player can get stuck.
-- Valid doors and spawns: the required doors, spawn points for 4 players, and enemy spawn points that are reachable and not inside walls. Validators check this.
+- Valid doors and spawns: the required doors, spawn points for 4 players, and enemy spawn points that are reachable and not inside walls. Validators for this arrive with the room base class.
 - Rooms hold layout only. Enemies come from `content/enemies/` through the spawn points and the `gameplay/` systems; do not reference other areas directly.
 - Tiles come from the shared tilesets in `art/tilesets/`; do not add new art here.
 
 ## Allowed files
 
-`.tscn` (text), `.tres`, plus `.uid` and `.license` files. Limit: 1 MB per file. If a script is attached it must be typed GDScript with no banned APIs.
+`.tscn` (text), `.tres`, plus `.uid` and `.license` files. Limit: 1 MB per file. Rooms hold layout only and carry no scripts.
 
 ## Steps
 

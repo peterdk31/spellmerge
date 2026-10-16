@@ -8,7 +8,7 @@ The spell components that players assemble into spells: **forms** (bolt, beam, n
 
 ## Contract
 
-- A component is one folder holding a `.tres` resource on the spell component base class, an optional `.gd` for new behaviour, an icon and an optional SFX. The base class and its documented fields arrive in M2; validators reject missing or out-of-range values.
+- A component is one folder holding a `.tres` resource on the spell component base class, an optional `.gd` for new behaviour, an icon and an optional SFX. The base class and its documented fields arrive in M2; validators for missing or out-of-range values arrive with it.
 - Content is discovered by folder through `core/registry`. Do not edit any central list.
 - Element interactions go in `reactions.tres` (in this folder), so a new element does not need changes in other components.
 - Components may depend only on `core/`. They never call other areas; they talk through `core/` events (`spell_cast`, ...).
@@ -36,7 +36,7 @@ Arrives with Claude's first content in M2. Do not guess its layout before then.
 ## Validate
 
 ```sh
-tools/check.sh                   # hard rules and content validators, on your changes
+tools/check.sh                   # hard rules, on your changes (content validators arrive with the base classes)
 ci/build/build.sh --quick        # import and smoke test in Godot
 ```
 

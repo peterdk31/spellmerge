@@ -151,7 +151,9 @@ def prepare(cfg: config_mod.Config, st: dict[str, Any], focus: str, today: dt.da
     if existing:
         branch = existing["head"]["ref"]
         previous = (f"PR #{existing['number']} is already open for this task, on branch `{branch}`. Continue it: "
-                    f"`git fetch origin {branch} && git switch {branch}`, read its review comments with "
+                    f"`git fetch origin {branch} && git switch {branch}`, then bring it up to date with "
+                    f"`git fetch origin main && git merge origin/main` and resolve any conflicts (never rebase: the "
+                    f"PR's history must stay). Read its review comments with "
                     f"`gh pr view {existing['number']} --comments`, and improve it rather than starting over. "
                     + (previous or ""))
     template = (MAINTAINER / "develop.md").read_text()

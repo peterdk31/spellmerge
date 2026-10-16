@@ -68,6 +68,7 @@ class PromptTest(unittest.TestCase):
             out = session.prepare(CFG, copy.deepcopy(state.DEFAULT), "", dt.date(2026, 10, 17))
         self.assertEqual(out["branch"], "claude/20261016-area-readmes-for-the-content-areas")
         self.assertIn("PR #15 is already open", out["prompt"])
+        self.assertIn("git merge origin/main", out["prompt"])  # a continued PR is brought up to date
 
     def test_prepare_includes_task_and_instructions(self) -> None:
         st = copy.deepcopy(state.DEFAULT)

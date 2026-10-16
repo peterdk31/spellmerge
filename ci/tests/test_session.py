@@ -100,6 +100,69 @@ class PromptTest(unittest.TestCase):
         self.assertFalse(session.mergeable({"verdict": "revise", "problems": []}))
 
 
+class FinishTest(unittest.TestCase):
+    """finish() decides whether the next session starts right away."""
+
+    APPROVE = json.dumps({"verdict": "approve", "problems": []})
+    REVISE = json.dumps({"verdict": "revise", "problems": [{"severity": "major", "problem": "p", "fix": "f"}]})
+
+    def run_finish(self, st: dict, queue: list[str], **env: str) -> tuple[dict[str, str], dict]:
+        base = {"TASK": "A", "TASK_KIND": "next", "PR": "", "IMPLEMENT_STATUS": "ready", "FINAL_REVIEW": "",
+                "MERGED": "", "SETTINGS": "{}"}
+        base.update(env)
+
+        def update(cfg: object, change, message: str) -> dict:
+            change(st)
+            return st
+
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp, "NEXT.md")
+            path.write_text("## Queue\n\n" + "".join(f"- [ ] {t}\n" for t in queue))
+            real = session.nexttask.next_task
+            with mock.patch.object(session.state, "update", update), \
+                    mock.patch.object(session.state, "load", lambda cfg: (st, "sha")), \
+                    mock.patch.object(session.dailylog, "post"), \
+                    mock.patch.object(session.nexttask, "next_task", lambda path_=None, skip=(): real(path, skip)):
+                return session.finish(CFG, base), st
+
+    def test_continues_after_a_merge(self) -> None:
+        out, _ = self.run_finish(copy.deepcopy(state.DEFAULT), ["B"], PR="5", FINAL_REVIEW=self.APPROVE,
+                                 MERGED="true")
+        self.assertEqual(out["again"], "true")
+
+    def test_continues_after_a_failed_review_without_waiting(self) -> None:
+        out, st = self.run_finish(copy.deepcopy(state.DEFAULT), ["A", "B"], PR="5", FINAL_REVIEW=self.REVISE)
+        self.assertEqual(out["again"], "true")
+        self.assertEqual(st["task_failures"]["A"]["count"], 1)
+        self.assertNotIn("parked_until", st["task_failures"]["A"])
+
+    def test_a_task_that_failed_twice_is_parked_and_work_moves_on(self) -> None:
+        st = copy.deepcopy(state.DEFAULT)
+        st["task_failures"] = {"A": {"count": 1, "pr": 5}}
+        out, st = self.run_finish(st, ["A", "B"], PR="5", FINAL_REVIEW=self.REVISE)
+        self.assertIn("parked_until", st["task_failures"]["A"])
+        self.assertEqual(out["again"], "true")
+        out, _ = self.run_finish(st, ["A"], PR="5", FINAL_REVIEW=self.REVISE)
+        self.assertEqual(out["again"], "false")  # only the parked task is left
+
+    def test_blocked_and_refused_merges_are_parked(self) -> None:
+        out, st = self.run_finish(copy.deepcopy(state.DEFAULT), ["A", "B"], IMPLEMENT_STATUS="blocked")
+        self.assertIn("parked_until", st["task_failures"]["A"])
+        self.assertEqual(out["again"], "true")
+        out, st = self.run_finish(copy.deepcopy(state.DEFAULT), ["A", "B"], PR="5", FINAL_REVIEW=self.APPROVE,
+                                  MERGED="false", MERGE_RESULT="Not merged: GitHub refused the merge")
+        self.assertIn("refused", st["task_failures"]["A"]["parked_reason"])
+        self.assertEqual(out["again"], "true")
+
+    def test_stops_on_errors_paused_merging_and_plan_runs(self) -> None:
+        for env in ({"IMPLEMENT_STATUS": "error"}, {"IMPLEMENT_STATUS": "limit"},
+                    {"IMPLEMENT_STATUS": "nothing_to_do"},
+                    {"PR": "5", "FINAL_REVIEW": self.APPROVE, "MERGED": ""},
+                    {"TASK_KIND": "plan", "PR": "5", "FINAL_REVIEW": self.APPROVE, "MERGED": "true"}):
+            out, _ = self.run_finish(copy.deepcopy(state.DEFAULT), ["A", "B"], **env)
+            self.assertEqual(out["again"], "false", env)
+
+
 class PublishTest(unittest.TestCase):
     def test_branch_names(self) -> None:
         self.assertTrue(session.valid_branch("claude/20261017-area-readmes"))

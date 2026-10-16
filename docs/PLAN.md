@@ -285,7 +285,7 @@ The codebase is split into self-contained areas that talk only through `core/`, 
 ### Principles
 
 1. **New content = new files.** A content registry discovers content by folder (from a manifest generated at build time), so no central lists need editing.
-2. **Areas never call each other directly.** They communicate through an event bus (`spell_cast`, `enemy_died`, `player_downed`, `room_cleared`, ...). The HUD only listens.
+2. **Areas never call each other directly.** They communicate through an event bus (`spell_cast`, `enemy_died`, `player_downed`, `room_cleared`, ...). The HUD shows state from events and sends only player-intent events (a builder or menu choice, with the player index); gameplay decides what happens.
 3. **Data-driven content.** Content is a `.tres` resource on a base class; code is needed only for new behaviour.
 4. **No single "the player".** Every system takes a player index 0–3.
 5. **Written contracts.** Each area's `README.md` states what it may depend on, what it must provide, and its file rules.
@@ -449,7 +449,7 @@ Claude's own development is the main engine and outside PRs are a bonus, so the 
 ### Capacity
 
 - **Adaptive sessions:** an hourly check starts a development session when `NEXT.md` has a task and no session is running; it costs nothing when there is nothing to do.
-- **A session keeps working** while quota and tasks remain (take task, finish, merge, next), up to about 2 hours per run.
+- **A session keeps working** while quota and tasks remain: when one session ends, the next starts right away, whether or not its PR merged. It stops on an error, a usage limit or paused merging, and the hourly check picks up from there.
 - **Back-off:** when a usage limit is hit, it is recorded and hourly checks pause until the usage window resets (about 5 hours).
 - **One session at a time** to avoid conflicts; parallel sessions in clearly separate areas are a later option.
 - **Reviews are capped** at about 30% of the quota; unused review quota goes to development. PR reviews and the release run once a day at 03:00 UTC.
@@ -466,7 +466,7 @@ Claude's own development is the main engine and outside PRs are a bonus, so the 
 
 - **Same-day merge of Claude's own PRs:** rules, tests, smoke test and benchmark, plus an independent review by a separate Claude session with fresh context. If all pass, it merges immediately and the next session builds on it.
 - **Tasks sized to one session;** the weekly planning run splits larger ones.
-- **Never stuck:** a task that fails twice is marked blocked with the reason logged, and work moves on; blocked tasks are revisited weekly.
+- **Never stuck:** a task that fails twice or is reported blocked is set aside for a week with the reason logged, and work moves on to the next task; blocked tasks are revisited weekly. A task whose approved PR waits on GitHub or the owner is set aside for a day the same way.
 - **Never waiting for humans:** unclear points are decided by Claude and recorded in `DECISIONS.md`; only `DESIGN.md` needs the owner.
 - **Milestones never depend on contributors:** all content targets are planned as Claude's work, and a contribution simply removes a task.
 

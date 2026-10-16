@@ -126,7 +126,7 @@ def main(argv: list[str] | None = None) -> int:
         if changed:
             st = state.update(cfg, apply, "control: panel and owner commands")
 
-    task = nexttask.next_task()
+    task = nexttask.next_task(skip=nexttask.parked(st, now))
     decision = decide(kill_switch_on, result, st, now, cfg.timezone, task is not None or args.planning)
     if log:
         dailylog.post(cfg, args.log_title, log, mention_owner=mention)

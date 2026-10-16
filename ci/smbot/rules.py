@@ -215,6 +215,22 @@ def _git(repo: Path, *args: str) -> bytes:
     return subprocess.run(["git", "-C", str(repo), *args], check=True, capture_output=True).stdout
 
 
+# Claude Code's sandbox protects these paths by leaving empty (or unreadable) placeholder files
+# in the working directory. They are never part of a change, so local checks skip them.
+SANDBOX_PLACEHOLDERS = {".bashrc", ".bash_profile", ".bash_login", ".bash_logout", ".zshrc", ".zprofile",
+                        ".zshenv", ".zlogin", ".profile", ".gitconfig", ".gitmodules", ".ripgreprc", ".mcp.json"}
+SANDBOX_PLACEHOLDER_DIRS = (".idea/", ".vscode/", ".claude/commands/", ".claude/agents/")
+
+
+def is_sandbox_placeholder(repo: Path, path: str) -> bool:
+    if path not in SANDBOX_PLACEHOLDERS and not path.startswith(SANDBOX_PLACEHOLDER_DIRS):
+        return False
+    try:
+        return (repo / path).stat().st_size == 0 or not os.access(repo / path, os.R_OK)
+    except OSError:
+        return True
+
+
 def changes_between(repo: Path, base: str, worktree: bool) -> list[Change]:
     if worktree:
         merge_base = _git(repo, "merge-base", base, "HEAD").decode().strip()
@@ -230,7 +246,7 @@ def changes_between(repo: Path, base: str, worktree: bool) -> list[Change]:
         i += 2
     if worktree:
         untracked = _git(repo, "ls-files", "--others", "--exclude-standard", "-z").decode().split("\0")
-        out += [Change("A", p, "100644") for p in untracked if p]
+        out += [Change("A", p, "100644") for p in untracked if p and not is_sandbox_placeholder(repo, p)]
     return out
 
 

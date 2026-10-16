@@ -5,6 +5,7 @@
 Shared pixel art used by more than one thing: tilesets (`tilesets/`), UI art (`ui/`) and visual effects (`vfx/`). Art that belongs to a single item (a spell icon, an enemy sprite) lives in that item's folder under `content/`, not here. The look is 32×32 pixel art; the vision is in docs/DESIGN.md, and the style guide (`docs/STYLE.md`) arrives with M1. Until it exists, follow the rules in docs/PLAN.md ("Art direction"): light from the top-left, 1px dark outline, no gradients, at most 3 shades per material.
 
 **Opens for PRs in M1** (see "Opens for PRs" in docs/ROADMAP.md). Until then, PRs to this folder are a gamble.
+
 ## Contract
 
 - Art depends on nothing. It holds files only, no logic.
@@ -59,7 +60,7 @@ tools/check.sh                   # the hard rules (file types, sizes, licenses),
 ci/build/build.sh --quick        # import and smoke test in Godot
 ```
 
-`tools/check.sh` does not yet check that every asset has a manifest entry. Until that validator exists, the reviewer checks it (see "Is the origin recorded honestly" below), so don't skip the entry.
+`tools/check.sh` does not yet check that every asset has a manifest entry. Until that validator exists, the reviewer checks it (see the rating questions below), so don't skip the entry.
 
 Add a screenshot of the asset in the game to the PR.
 

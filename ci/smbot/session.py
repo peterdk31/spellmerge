@@ -28,9 +28,10 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from . import alarms, dailylog, gh, nexttask, pacing, state, weekly
+from . import merge as merge_mod
 from . import config as config_mod
 
 MAINTAINER = Path(".github/maintainer")
@@ -130,8 +131,38 @@ def open_pr_for(cfg: config_mod.Config, task_slug: str) -> dict[str, Any] | None
     return None
 
 
+def sync_with_main(branch: str) -> str:
+    """Checks out a PR's branch and merges origin/main into it, before Claude starts.
+
+    This runs outside Claude's sandbox, which keeps .github/, ci/ and tools/ read-only, so a
+    merge that updates those files can't happen inside a session. Conflicts can only be in files
+    the PR changed, which Claude may edit; they are left for Claude to resolve. Returns a note
+    for the prompt.
+    """
+    if not valid_branch(branch):
+        return ""
+    git = ["git", "-c", "core.hooksPath=/dev/null"]
+    fetched = subprocess.run([*git, "fetch", "--quiet", "origin", "main", branch], capture_output=True, text=True)
+    if fetched.returncode != 0:
+        return ""
+    subprocess.run([*git, "switch", "--quiet", "--force", "-C", branch, f"origin/{branch}"], check=True)
+    merged = subprocess.run([*git, "merge", "--no-edit", "origin/main"], capture_output=True, text=True)
+    if merged.returncode == 0:
+        return (f"The session has checked out `{branch}` for you and merged `origin/main` into it, so it's up "
+                "to date. Stay on this branch and don't merge or rebase yourself.")
+    conflicts = subprocess.run(["git", "diff", "--name-only", "--diff-filter=U"], capture_output=True,
+                               text=True).stdout.split()
+    if not conflicts:
+        subprocess.run([*git, "merge", "--abort"], capture_output=True)
+        return ""
+    return (f"The session has checked out `{branch}` for you and started merging `origin/main` into it. The merge "
+            f"has conflicts in {', '.join(f'`{c}`' for c in conflicts)}. Before anything else, resolve them (in "
+            "plan files, keep both sides' entries), `git add` the files and `git commit` to finish the merge. "
+            "Don't merge, rebase or abort yourself.")
+
+
 def prepare(cfg: config_mod.Config, st: dict[str, Any], focus: str, today: dt.date,
-            now: dt.datetime | None = None) -> dict[str, str]:
+            now: dt.datetime | None = None, sync: Callable[[str], str] | None = None) -> dict[str, str]:
     if st.get("followups"):
         task, kind = followup_task(st["followups"]), "followups"
     else:
@@ -150,12 +181,13 @@ def prepare(cfg: config_mod.Config, st: dict[str, Any], focus: str, today: dt.da
     existing = open_pr_for(cfg, branch.split("-", 1)[1]) if task else None
     if existing:
         branch = existing["head"]["ref"]
-        previous = (f"PR #{existing['number']} is already open for this task, on branch `{branch}`. Continue it: "
-                    f"`git fetch origin {branch} && git switch {branch}`, then bring it up to date with "
-                    f"`git fetch origin main && git merge origin/main` and resolve any conflicts (never rebase: the "
-                    f"PR's history must stay). Read its review comments with "
-                    f"`gh pr view {existing['number']} --comments`, and improve it rather than starting over. "
-                    + (previous or ""))
+        synced = sync(branch) if sync else ""
+        how = synced or (f"`git fetch origin {branch} && git switch {branch}`, then bring it up to date with "
+                         "`git fetch origin main && git merge origin/main` and resolve any conflicts (never rebase: "
+                         "the PR's history must stay).")
+        previous = (f"PR #{existing['number']} is already open for this task, on branch `{branch}`. Continue it. "
+                    f"{how} Read its review comments with `gh pr view {existing['number']} --comments`, and "
+                    "improve it rather than starting over. " + (previous or ""))
     template = (MAINTAINER / "develop.md").read_text()
     prompt = render(template, {
         "TASK": task or "(the queue is empty: only handle the owner instructions below)",
@@ -191,13 +223,16 @@ def review_prompt(cfg: config_mod.Config, pr: int, sha: str, round_: str) -> str
     })
 
 
-def revise_prompt(cfg: config_mod.Config, pr: int, review: dict[str, Any], branch: str = "") -> str:
+def revise_prompt(cfg: config_mod.Config, pr: int, review: dict[str, Any], branch: str = "", synced: str = "") -> str:
     problems = "\n".join(
         f"- [{p.get('severity')}] {p.get('file', '')}{':' + str(p['line']) if p.get('line') else ''}: "
         f"{p.get('problem')} Fix: {p.get('fix')}" for p in review.get("problems", [])) or "(no specific problems)"
     return render((MAINTAINER / "revise.md").read_text(), {
         "PR": str(pr), "REPO": cfg.repo, "SUMMARY": review.get("summary", ""), "PROBLEMS": problems,
         "BRANCH": branch or "the PR's head branch",
+        "SYNC": synced or (f"Switch to it with `git fetch origin {branch} && git switch {branch}`. If GitHub reports "
+                           "the PR as conflicting, or `main` has moved on, run `git fetch origin main && git merge "
+                           "origin/main` and resolve the conflicts (never rebase: the PR's history must stay)."),
     })
 
 
@@ -352,7 +387,8 @@ def finish(cfg: config_mod.Config, env: dict[str, str]) -> dict[str, str]:
     now = dt.datetime.now(dt.timezone.utc)
 
     # The merge job sets MERGED to "true" or "false"; it's empty when the job didn't run.
-    merge_refused = bool(pr) and mergeable(review) and env.get("MERGED") == "false"
+    conflict = bool(pr) and env.get("MERGED") == "false" and merge_mod.CONFLICT in env.get("MERGE_RESULT", "")
+    merge_refused = bool(pr) and mergeable(review) and env.get("MERGED") == "false" and not conflict
     merge_skipped = bool(pr) and mergeable(review) and not env.get("MERGED")
 
     def park(entry: dict[str, Any], span: dt.timedelta, reason: str) -> None:
@@ -375,6 +411,16 @@ def finish(cfg: config_mod.Config, env: dict[str, str]) -> dict[str, str]:
                                           for p in review.get("problems", []))[:4000]
             if entry["count"] >= MAX_FAILURES and task:
                 park(entry, PARK_BLOCKED, f"failed review {entry['count']} times")
+        elif conflict and task:
+            # Like a failed review: the next session continues the PR and merges main into it.
+            entry = failures.setdefault(task, {"count": 0})
+            entry["count"] += 1
+            entry["pr"] = pr
+            entry["problems"] = (f"- Approved, but PR #{pr} conflicts with main, so it couldn't merge. Fix: "
+                                 "`git fetch origin main && git merge origin/main`, resolve the conflicts, "
+                                 "and keep both sides' entries in the plan files.")
+            if entry["count"] >= MAX_FAILURES:
+                park(entry, PARK_BLOCKED, f"conflicted with main {entry['count']} times")
         elif merge_refused and task:
             entry = failures.setdefault(task, {"count": 0})
             entry["pr"] = pr
@@ -458,8 +504,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "prepare":
         st, _ = state.load(cfg)
         today = dt.datetime.now(dt.timezone.utc).date()
-        build = prepare_plan if args.mode == "plan" else prepare
-        out = build(cfg, st, os.environ.get("FOCUS", ""), today)
+        out = (prepare_plan(cfg, st, os.environ.get("FOCUS", ""), today) if args.mode == "plan" else
+               prepare(cfg, st, os.environ.get("FOCUS", ""), today, sync=sync_with_main))
         schema = MAINTAINER / "schemas" / ("plan.json" if args.mode == "plan" else "session.json")
         out["schema"] = json.dumps(json.loads(schema.read_text()), separators=(",", ":"))
         write_outputs(out)
@@ -485,7 +531,7 @@ def main(argv: list[str] | None = None) -> int:
         write_outputs({"prompt": review_prompt(cfg, args.pr, args.sha, args.round_)})
     elif args.cmd == "revise-prompt":
         review = json.loads(os.environ.get("REVIEW") or "{}")
-        write_outputs({"prompt": revise_prompt(cfg, args.pr, review, args.branch),
+        write_outputs({"prompt": revise_prompt(cfg, args.pr, review, args.branch, sync_with_main(args.branch)),
                        "needed": str(bool(review.get("problems")) or review.get("verdict") != "approve").lower()})
     elif args.cmd == "pr-info":
         pr = gh.api(f"repos/{cfg.repo}/pulls/{args.pr}")

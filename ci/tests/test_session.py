@@ -155,6 +155,15 @@ class FinishTest(unittest.TestCase):
         self.assertIn("refused", st["task_failures"]["A"]["parked_reason"])
         self.assertEqual(out["again"], "true")
 
+    def test_a_conflict_sends_the_pr_back_instead_of_parking_it(self) -> None:
+        out, st = self.run_finish(copy.deepcopy(state.DEFAULT), ["A", "B"], PR="19", FINAL_REVIEW=self.APPROVE,
+                                  MERGED="false", MERGE_RESULT=f"Not merged: {merge.CONFLICT}: merge origin/main")
+        entry = st["task_failures"]["A"]
+        self.assertEqual(entry["count"], 1)
+        self.assertNotIn("parked_until", entry)
+        self.assertIn("git merge origin/main", entry["problems"])
+        self.assertEqual(out["again"], "true")
+
     def test_stops_on_errors_paused_merging_and_plan_runs(self) -> None:
         for env in ({"IMPLEMENT_STATUS": "error"}, {"IMPLEMENT_STATUS": "limit"},
                     {"IMPLEMENT_STATUS": "nothing_to_do"},
@@ -209,6 +218,48 @@ class PublishTest(unittest.TestCase):
             listed = subprocess.run(["git", "bundle", "list-heads", str(Path(tmp, "out/work.bundle"))],
                                     capture_output=True, text=True, check=True).stdout
             self.assertIn("refs/heads/claude/20261017-x", listed)
+
+    def test_sync_with_main_merges_or_leaves_conflicts(self) -> None:
+        """The scripted merge of main before Claude starts (Claude's sandbox can't write .github/)."""
+        import os
+        import subprocess
+        env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t",
+               "GIT_COMMITTER_EMAIL": "t@t"}
+        with tempfile.TemporaryDirectory() as tmp:
+            origin, work, other = Path(tmp, "origin.git"), Path(tmp, "work"), Path(tmp, "other")
+            run = lambda *a, cwd=tmp: subprocess.run(a, cwd=cwd, check=True, capture_output=True, env=env)
+            run("git", "init", "-q", "--bare", "-b", "main", str(origin))
+            run("git", "clone", "-q", str(origin), str(other))
+            Path(other, "a.md").write_text("a\n")
+            run("git", "add", "a.md", cwd=other)
+            run("git", "commit", "-qm", "base", cwd=other)
+            run("git", "push", "-q", "origin", "main", cwd=other)
+            for name, text in (("claude/20261016-ok", None), ("claude/20261016-clash", "pr\n")):
+                run("git", "switch", "-qc", name, "origin/main", cwd=other)
+                Path(other, "b.md" if text is None else "a.md").write_text(text or "b\n")
+                run("git", "commit", "-qam" if text else "-qm", "pr", cwd=other) if text else (
+                    run("git", "add", "b.md", cwd=other), run("git", "commit", "-qm", "pr", cwd=other))
+                run("git", "push", "-q", "origin", name, cwd=other)
+            run("git", "switch", "-q", "main", cwd=other)
+            Path(other, "a.md").write_text("main\n")
+            Path(other, ".github").mkdir()
+            Path(other, ".github/w.yml").write_text("on: push\n")
+            run("git", "add", "-A", cwd=other)
+            run("git", "commit", "-qm", "main moves", cwd=other)
+            run("git", "push", "-q", "origin", "main", cwd=other)
+            run("git", "clone", "-q", str(origin), str(work))
+            old = os.getcwd()
+            os.chdir(work)
+            try:
+                with mock.patch.dict(os.environ, env):
+                    ok = session.sync_with_main("claude/20261016-ok")
+                    self.assertIn("up to date", ok)
+                    self.assertTrue(Path(work, ".github/w.yml").exists())
+                    clash = session.sync_with_main("claude/20261016-clash")
+                    self.assertIn("`a.md`", clash)
+                    self.assertEqual(session.sync_with_main("main"), "")
+            finally:
+                os.chdir(old)
 
     def test_package_renames_a_branch_outside_claude(self) -> None:
         """Commits left on e.g. `pr19` (from `gh pr checkout`) are bundled under the expected branch."""
@@ -271,6 +322,21 @@ class MergeTest(unittest.TestCase):
         with mock.patch.object(merge.gh, "api", return_value=pr):
             with self.assertRaisesRegex(merge.NotMerged, "changed after review"):
                 merge.merge(CFG, 1, "old", None)
+
+    def test_conflicting_pr_is_refused_without_waiting_for_checks(self) -> None:
+        pr = {"state": "open", "base": {"ref": "main"}, "head": {"sha": "abc"}, "user": {"login": "x"},
+              "mergeable": False}
+        with mock.patch.object(merge.gh, "api", return_value=pr), \
+                mock.patch.object(merge, "wait_for_checks") as wait:
+            with self.assertRaisesRegex(merge.NotMerged, merge.CONFLICT):
+                merge.merge(CFG, 1, "abc", None)
+        wait.assert_not_called()
+
+    def test_mergeable_is_polled_while_github_computes_it(self) -> None:
+        with mock.patch.object(merge.gh, "api", side_effect=[{"mergeable": None}, {"mergeable": False}]):
+            self.assertFalse(merge.mergeable_now("o/r", 1, {"mergeable": None}, delay=0))
+        with mock.patch.object(merge.gh, "api", return_value={"mergeable": None}):
+            self.assertTrue(merge.mergeable_now("o/r", 1, {"mergeable": None}, attempts=2, delay=0))
 
 
 if __name__ == "__main__":

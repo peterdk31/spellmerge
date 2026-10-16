@@ -4,15 +4,15 @@ The ordered task queue for the current milestone, M0 ([design](milestones/M0-fou
 
 ## Queue
 
-- [ ] **Area READMEs for code areas.** The same for `core/`, `hud/` and each of the 10 `gameplay/` sub-areas, including each sub-area's job, when it is built and when it opens (docs/PLAN.md, "Gameplay sub-areas"), its public entry script name, and the dependency direction `core` ← `gameplay` ← `content`. `core/` states it is closed to outside PRs.
-- [ ] **README for `tools/`.** Left over from "Area READMEs for shared assets and tests": write `tools/README.md` (purpose, how to run `tools/check.sh` with `--author` and `--format`, contract, allowed files). The write to `tools/` was denied by the session's permission settings, so it needs a session that may write there.
-- [ ] **llms.txt.** An index of every doc in the repo with a one-line description each, following the llms.txt convention, for agents and LLM tools.
+- [ ] **README for `tools/`.** Left over from "Area READMEs for shared assets and tests": write `tools/README.md` (purpose, how to run `tools/check.sh` with `--author` and `--format`, contract, allowed files) and add it to `llms.txt`. Writes to `tools/` are denied by the session's permission settings (twice now), so it needs a session that may write there.
 
 ## Blocked
 
-(none)
+- [ ] **Reconcile the event lists (waits for the M1 event bus).** The "Events at a glance" table in `gameplay/README.md` and the per-area event lists are kept in sync by hand. Once `core/events` exists, make it the single source: delete the table or generate it, and fix the area READMEs to match.
 
 ## Done recently
 
-- [x] **READMEs for `art/`, `audio/` and `tests/`.** Size limits, `.ogg`-only audio, the origin manifest format and how to validate. `tools/README.md` is still open (see Queue).
+- [x] **READMEs for `art/`, `audio/` and `tests/`.** Size limits, `.ogg`-only audio, the origin manifest format, how to validate; all three are in `llms.txt`. `tools/README.md` is still open (see Queue).
+- [x] **llms.txt.** `llms.txt` at the repo root indexes every doc (guides, plan files, ops docs, all area READMEs, tools, manifests, maintainer prompts) with a one-line description each.
+- [x] **Area READMEs for code areas.** `core/`, `hud/` and the 10 `gameplay/` sub-areas each have a README with the fixed sections, build and open milestones, entry script name and the dependency direction; `core/` states it is closed to outside PRs.
 - [x] **Area READMEs for the content areas.** `content/spells/`, `relics/`, `wizard/`, `enemies/`, `bosses/`, `rooms/` and `story/` each have a README with the fixed sections. The four top-level `.gitkeep` files are gone; spells, wizard and story keep their sub-folder `.gitkeep`s.

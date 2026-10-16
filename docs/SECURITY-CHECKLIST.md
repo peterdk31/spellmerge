@@ -66,7 +66,9 @@ Check these whenever a workflow is added or changed. A violation of any one of t
 - [ ] Every `uses:` is pinned to a full 40-character commit SHA with a version comment.
 - [ ] `actions/checkout` uses `persist-credentials: false` unless the job must push.
 - [ ] No untrusted text goes into a `run:` script through `${{ }}`. PR titles, bodies, branch names, issue and comment text are passed through `env:` and quoted as `"$VAR"`.
-- [ ] The Claude reviewer has read-only tools, no shell and no write token. Its output is parsed as data by a script and never executed.
+- [ ] The Claude reviewers (`review.yml`) have read-only tools, no general shell and a read-only token. Their output is parsed as data by a script and never executed.
+- [ ] Each Claude step runs in its own job; the merge job runs no AI and uses scripts from a clean checkout of `main`.
+- [ ] Claude steps that read text from outside contributors (PR rating, triage) never get a write token or a general shell.
 - [ ] Merges use `gh pr merge --match-head-commit <reviewed SHA>`.
 - [ ] Godot and export templates are downloaded by exact version and checked against a SHA256 that is committed in `ci/`.
 - [ ] Every Claude step has a turn cap, and every job has a `timeout-minutes`.

@@ -1,0 +1,109 @@
+# Independent review of one of Claude's own PRs (docs/PLAN.md, "Claude's
+# self-critique loop"). Called by develop.yml twice: the critique, then the
+# final verdict.
+#
+# A fresh runner and a fresh Claude session, with a read-only token and
+# read-only tools: the reviewer can't change the PR, and the PR's author can't
+# change the reviewer. The verdict is data; only the merge script merges.
+name: review
+
+on:
+  workflow_call:
+    inputs:
+      pr:
+        type: string
+        required: true
+      sha:
+        type: string
+        required: true
+      round:
+        type: string # critique or final
+        required: true
+    outputs:
+      review:
+        value: ${{ jobs.review.outputs.review }}
+      needs_revision:
+        value: ${{ jobs.review.outputs.needs_revision }}
+      mergeable:
+        value: ${{ jobs.review.outputs.mergeable }}
+      sha:
+        value: ${{ inputs.sha }}
+
+permissions:
+  contents: read
+
+env:
+  PYTHONPATH: ci
+  CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1"
+
+jobs:
+  review:
+    name: ${{ inputs.round }} review of #${{ inputs.pr }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: automation
+    outputs:
+      review: ${{ steps.verdict.outputs.review }}
+      needs_revision: ${{ steps.verdict.outputs.needs_revision }}
+      mergeable: ${{ steps.verdict.outputs.mergeable }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: read-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+          permission-contents: read
+          permission-pull-requests: read
+          permission-issues: read
+      - id: prepare
+        env:
+          GH_TOKEN: ${{ steps.read-token.outputs.token }}
+          PR: ${{ inputs.pr }}
+          SHA: ${{ inputs.sha }}
+          ROUND: ${{ inputs.round }}
+        run: |
+          python3 -m smbot.session review-prompt --pr "$PR" --sha "$SHA" --round "$ROUND"
+          echo "schema=$(jq -c . .github/maintainer/schemas/review.json)" >> "$GITHUB_OUTPUT"
+      - id: claude
+        continue-on-error: true
+        uses: anthropics/claude-code-action@97c53473391bff1901034d4b454b5bac7ab7a029 # v1.0.239
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ steps.read-token.outputs.token }}
+          prompt: ${{ steps.prepare.outputs.prompt }}
+          claude_args: >-
+            --max-turns 40
+            --allowedTools "Read,Glob,Grep,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*)"
+            --disallowedTools "Write,Edit,MultiEdit,NotebookEdit,WebFetch,WebSearch"
+            --json-schema '${{ steps.prepare.outputs.schema }}'
+      - id: account-token
+        if: always()
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-issues: write
+      - id: account
+        if: always()
+        env:
+          GH_TOKEN: ${{ steps.account-token.outputs.token }}
+          EXEC_FILE: ${{ steps.claude.outputs.execution_file }}
+          FAILED: ${{ steps.claude.outcome != 'success' }}
+        run: python3 -m smbot.session account --file "${EXEC_FILE:-/nonexistent}" --kind review $([ "$FAILED" = true ] && echo --step-failed)
+      - id: verdict
+        if: steps.account.outputs.status == 'ok' && steps.claude.outputs.structured_output != ''
+        env:
+          REVIEW: ${{ steps.claude.outputs.structured_output }}
+        run: |
+          echo "$REVIEW" | jq .
+          {
+            echo "review<<__END__"
+            echo "$REVIEW"
+            echo "__END__"
+            echo "mergeable=$(echo "$REVIEW" | jq -r 'if .verdict == "approve" and ([.problems[] | select(.severity == "blocker" or .severity == "major")] | length) == 0 then "true" else "false" end')"
+            echo "needs_revision=$(echo "$REVIEW" | jq -r 'if .verdict != "approve" or (.problems | length) > 0 then "true" else "false" end')"
+          } >> "$GITHUB_OUTPUT"

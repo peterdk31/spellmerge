@@ -6,6 +6,7 @@ The token comes from GH_TOKEN in the environment, set per step by the workflow.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from typing import Any
 
@@ -14,18 +15,20 @@ class GhError(RuntimeError):
     pass
 
 
-def run(*args: str, input: str | None = None) -> str:
-    proc = subprocess.run(["gh", *args], input=input, capture_output=True, text=True)
+def run(*args: str, input: str | None = None, token: str | None = None) -> str:
+    """Runs gh; `token` overrides GH_TOKEN for this call (e.g. a read-only token)."""
+    env = {**os.environ, "GH_TOKEN": token} if token else None
+    proc = subprocess.run(["gh", *args], input=input, capture_output=True, text=True, env=env)
     if proc.returncode != 0:
         raise GhError(f"gh {' '.join(args)} failed: {proc.stderr.strip()}")
     return proc.stdout
 
 
-def api(path: str, *args: str, input: Any = None) -> Any:
+def api(path: str, *args: str, input: Any = None, token: str | None = None) -> Any:
     """Calls the REST API and returns parsed JSON (None for empty bodies)."""
     extra = ["--input", "-"] if input is not None else []
     out = run("api", "-H", "X-GitHub-Api-Version: 2022-11-28", path, *args, *extra,
-              input=json.dumps(input) if input is not None else None)
+              input=json.dumps(input) if input is not None else None, token=token)
     return json.loads(out) if out.strip() else None
 
 

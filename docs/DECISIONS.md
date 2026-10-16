@@ -2,6 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-16: The bot can merge its own approved PRs
+
+**Decided by:** owner.
+**Context:** The `main` ruleset had "Require approval of the most recent reviewable push", which needs an approving review from someone other than the last pusher. The bot pushes its own PRs and can't approve them, and the merge script never approves anything, so GitHub refused every automated merge ("the base branch policy prohibits the merge") and every bot PR waited for the owner.
+**Decision:** `require_last_push_approval` is off (`ci/settings/rulesets/main.json`, and on GitHub). Owner-only paths still need the owner's code-owner review, and the merge script still merges only the exact reviewed commit, after the required checks and the hard rules pass.
+**Consequence:** the bot's PRs merge the same day, as the plan intends. What contributor PRs may change is unaffected: the hard rules and the code-owner review still apply.
+
 ## 2026-10-16: develop also runs on every push to main
 
 **Decided by:** owner.

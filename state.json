@@ -24,7 +24,13 @@
   "paused_by_command": false,
   "pending_instructions": [],
   "processed_comments": [],
-  "task_failures": {},
+  "task_failures": {
+    "**Area READMEs for code areas.** The same for `core/`, `hud/` and each of the 10 `gameplay/` sub-areas, including each sub-area's job, when it is built and when it opens (docs/PLAN.md, \"Gameplay sub-areas\"), its public entry script name, and the dependency direction `core` \u2190 `gameplay` \u2190 `content`. `core/` states it is closed to outside PRs.": {
+      "count": 1,
+      "pr": "19",
+      "problems": "- The README says the HUD \"sends the player's choices (menu picks, spell builder choices) as events too\". docs/PLAN.md, Architecture principle 2, says \"The HUD only listens.\" The PR changes a plan-level rule and docs/DECISIONS.md doesn't record it. The new DECISIONS entry covers only entry script names and provisional event names. AGENTS.md says nothing may contradict the plan, and decisions must be recorded so they aren't reversed by accident. Fix: Either change the HUD text to match the plan, or keep it and add a DECISIONS.md entry with the reasoning (the builder and menus need to send input upstream). If the plan sentence is updated, update it in the same PR. Also state in the README which events the HUD sends, with the one-sender rule.\n- The README says Feel \"never changes gameplay results\" and, in the PR guidance, \"never changes the damage or timing of gameplay\". Hit-stop pauses or slows time, so it does change timing. The sentence contradicts the area's own job. Fix: Reword to \"never changes damage or outcomes; hit-stop is the only timing effect, and it is short and the same for every player\", or similar.\n- The \"Allowed files\" section allows `.tscn` for gameplay PRs. The Areas table in docs/PLAN.md lists only `.gd` and `.tres` for Gameplay. Fix: Remove `.tscn`, or note in DECISIONS.md why gameplay scenes are allowed."
+    }
+  },
   "triage_closed": {
     "2026-10-16": {}
   },

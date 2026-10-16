@@ -68,6 +68,7 @@ Check these whenever a workflow is added or changed. A violation of any one of t
 - [ ] No untrusted text goes into a `run:` script through `${{ }}`. PR titles, bodies, branch names, issue and comment text are passed through `env:` and quoted as `"$VAR"`.
 - [ ] The Claude reviewers (`review.yml`) have read-only tools, no general shell and a read-only token. Their output is parsed as data by a script and never executed.
 - [ ] Each Claude step runs in its own job; the merge job runs no AI and uses scripts from a clean checkout of `main`.
+- [ ] Claude sessions with a shell (implement, revise) get only a read-only token; their commits are pushed by a separate `publish` job on a fresh runner.
 - [ ] Claude steps that read text from outside contributors (PR rating, triage) never get a write token or a general shell.
 - [ ] Merges use `gh pr merge --match-head-commit <reviewed SHA>`.
 - [ ] Godot and export templates are downloaded by exact version and checked against a SHA256 that is committed in `ci/`.

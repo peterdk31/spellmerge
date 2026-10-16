@@ -2,6 +2,17 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-16: Claude never holds a write token where it has a shell
+
+**Decided by:** Claude, after reviewing the session design.
+**Context:** The implementing and revising sessions can effectively run code: through git, file commands, or Godot running scripts they wrote. If a prompt injection ever reached them (say, from a merged contribution's comments), a write token on that runner could be stolen and used to merge.
+**Decision:**
+- Those sessions get a read-only app token and commit only locally. Their commits leave the runner as a git bundle, which is plain data.
+- A `publish` job on a fresh runner fetches the bundle into a clean checkout of `main` (with git hooks disabled), pushes only to a `claude/...` branch, and opens or updates the PR from Claude's structured output. It also records usage and posts `/ask` answers, only on issues where the owner asked.
+- Claude is also denied edits under `.git/`, `.github/`, `ci/` and `tools/`, and gets only specific `git` subcommands.
+- Sessions without shell or file-writing tools (rating, review, digest) still mint a write token after Claude finishes, because they can't run code.
+**Residual risk:** a session could still leak its read-only token or its Claude token over the network. The next hardening step would be an egress firewall on those runners (see `docs/BACKLOG.md`).
+
 ## 2026-10-16: How the weekly planning run works
 
 **Decided by:** Claude, within the plan.

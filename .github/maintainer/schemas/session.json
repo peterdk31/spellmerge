@@ -1,11 +1,52 @@
 {
   "type": "object",
   "properties": {
-    "status": { "type": "string", "enum": ["pr_opened", "blocked", "nothing_to_do"] },
-    "pr_number": { "type": "integer" },
-    "summary": { "type": "string" },
-    "blocked_reason": { "type": "string" }
+    "status": {
+      "type": "string",
+      "enum": [
+        "ready",
+        "blocked",
+        "nothing_to_do"
+      ]
+    },
+    "pr_title": {
+      "type": "string"
+    },
+    "pr_body": {
+      "type": "string"
+    },
+    "summary": {
+      "type": "string"
+    },
+    "blocked_reason": {
+      "type": "string"
+    },
+    "comment": {
+      "type": "string"
+    },
+    "answers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "issue": {
+            "type": "integer"
+          },
+          "body": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "issue",
+          "body"
+        ],
+        "additionalProperties": false
+      }
+    }
   },
-  "required": ["status", "summary"],
+  "required": [
+    "status",
+    "summary"
+  ],
   "additionalProperties": false
 }

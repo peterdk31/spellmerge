@@ -4,6 +4,13 @@
   python3 -m smbot.session account --file F --kind dev|review
                                               records token usage, detects usage
                                               limits and a rejected token
+  python3 -m smbot.session usage --file F     the same detection, without writing
+                                              anything (on a runner where Claude had a shell)
+  python3 -m smbot.session record --kind K    writes $STATUS and $TOKENS to the state
+  python3 -m smbot.session package            bundles Claude's local commits as data
+  python3 -m smbot.session publish --bundle B --mode new|update
+                                              on a fresh runner: pushes the bundled
+                                              commits and opens or updates the PR
   python3 -m smbot.session review-prompt --pr N --sha S --round critique|final
   python3 -m smbot.session revise-prompt --pr N
   python3 -m smbot.session finish             Daily log, task failures, next run
@@ -18,6 +25,7 @@ import datetime as dt
 import json
 import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -157,12 +165,13 @@ def review_prompt(cfg: config_mod.Config, pr: int, sha: str, round_: str) -> str
     })
 
 
-def revise_prompt(cfg: config_mod.Config, pr: int, review: dict[str, Any]) -> str:
+def revise_prompt(cfg: config_mod.Config, pr: int, review: dict[str, Any], branch: str = "") -> str:
     problems = "\n".join(
         f"- [{p.get('severity')}] {p.get('file', '')}{':' + str(p['line']) if p.get('line') else ''}: "
         f"{p.get('problem')} Fix: {p.get('fix')}" for p in review.get("problems", [])) or "(no specific problems)"
     return render((MAINTAINER / "revise.md").read_text(), {
         "PR": str(pr), "REPO": cfg.repo, "SUMMARY": review.get("summary", ""), "PROBLEMS": problems,
+        "BRANCH": branch or "the PR's head branch",
     })
 
 
@@ -186,6 +195,12 @@ def write_outputs(values: dict[str, str]) -> None:
 
 def account(cfg: config_mod.Config, path: Path, kind: str, step_failed: bool) -> str:
     status, tokens, detail = classify(read_messages(path), step_failed)
+    print(f"{kind}: {status}, {tokens:,} tokens {detail}")
+    return record(cfg, kind, status, tokens)
+
+
+def record(cfg: config_mod.Config, kind: str, status: str, tokens: int) -> str:
+    """Records usage and limits in the state, and raises or clears the token alarm."""
     now = dt.datetime.now(dt.timezone.utc)
 
     def apply(s: dict[str, Any]) -> None:
@@ -208,8 +223,71 @@ def account(cfg: config_mod.Config, path: Path, kind: str, step_failed: bool) ->
             state.update(cfg, lambda s: s["alarms"].pop("token", None), "session: token works again")
             if line:
                 dailylog.post(cfg, "Claude token works again", [line])
-    print(f"{kind}: {status}, {tokens:,} tokens {detail}")
     return status
+
+
+# --- Moving Claude's work off its runner ---------------------------------------
+
+BRANCH_PREFIX = "claude/"
+
+
+def package(out: Path) -> dict[str, str]:
+    """Bundles the commits Claude made on top of origin/main (runs where Claude had a shell)."""
+    out.mkdir(parents=True, exist_ok=True)
+    branch = subprocess.run(["git", "rev-parse", "--abbrev-ref", "HEAD"], capture_output=True, text=True).stdout.strip()
+    ahead = subprocess.run(["git", "rev-list", "--count", "origin/main..HEAD"], capture_output=True,
+                           text=True).stdout.strip() or "0"
+    if branch.startswith(BRANCH_PREFIX) and int(ahead) > 0:
+        subprocess.run(["git", "bundle", "create", str(out / "work.bundle"), f"origin/main..{branch}"], check=True)
+    return {"branch": branch, "commits": ahead}
+
+
+def valid_branch(name: str) -> bool:
+    return bool(re.fullmatch(r"claude/[a-z0-9][a-z0-9./-]{0,100}", name)) and ".." not in name
+
+
+def publish(cfg: config_mod.Config, bundle: Path, branch: str, mode: str, result: dict[str, Any],
+            pr_number: int | None, token: str) -> dict[str, str]:
+    """Pushes Claude's bundled commits from a clean checkout of main and opens or updates the PR."""
+    if not valid_branch(branch):
+        raise ValueError(f"refusing to push branch {branch!r}")
+    remote = f"https://x-access-token:{token}@github.com/{cfg.repo}.git"
+    git = ["git", "-c", "core.hooksPath=/dev/null"]
+    subprocess.run([*git, "fetch", "--quiet", str(bundle), f"+refs/heads/{branch}:refs/remotes/work/{branch}"],
+                   check=True)
+    if mode == "update":
+        pr = gh.api(f"repos/{cfg.repo}/pulls/{pr_number}")
+        if pr["head"]["ref"] != branch or pr["user"]["login"] != cfg.bot.login or pr["state"] != "open":
+            raise ValueError(f"PR #{pr_number} is not the bot's open PR for {branch}")
+    subprocess.run([*git, "push", "--quiet", "--force", remote, f"refs/remotes/work/{branch}:refs/heads/{branch}"],
+                   check=True)
+    if mode == "new":
+        existing = gh.api(f"repos/{cfg.repo}/pulls?state=open&head={cfg.repo.split('/')[0]}:{branch}")
+        if existing:
+            pr_number = existing[0]["number"]
+            gh.api(f"repos/{cfg.repo}/pulls/{pr_number}", "-X", "PATCH",
+                   input={"title": result.get("pr_title") or existing[0]["title"],
+                          "body": result.get("pr_body") or existing[0]["body"]})
+        else:
+            created = gh.api(f"repos/{cfg.repo}/pulls", "-X", "POST", input={
+                "title": (result.get("pr_title") or result.get("summary", "Claude's work"))[:200],
+                "head": branch, "base": "main",
+                "body": result.get("pr_body") or result.get("summary", ""),
+            })
+            pr_number = created["number"]
+    elif result.get("comment"):
+        gh.api(f"repos/{cfg.repo}/issues/{pr_number}/comments", "-X", "POST",
+               input={"body": f"**Revised after the critique.**\n\n{result['comment']}"})
+    sha = gh.api(f"repos/{cfg.repo}/pulls/{pr_number}")["head"]["sha"]
+    return {"pr": str(pr_number), "sha": sha}
+
+
+def post_answers(cfg: config_mod.Config, answers: list[dict[str, Any]], allowed: set[int]) -> None:
+    """Posts answers to /ask, only on issues the owner actually asked in."""
+    for a in answers:
+        if a.get("issue") in allowed and a.get("body"):
+            gh.api(f"repos/{cfg.repo}/issues/{a['issue']}/comments", "-X", "POST",
+                   input={"body": a["body"][:10000]})
 
 
 def finish(cfg: config_mod.Config, env: dict[str, str]) -> dict[str, str]:
@@ -274,12 +352,23 @@ def main(argv: list[str] | None = None) -> int:
     acc.add_argument("--file", type=Path, required=True)
     acc.add_argument("--kind", choices=("dev", "review", "rate", "plan"), required=True)
     acc.add_argument("--step-failed", action="store_true")
+    us = sub.add_parser("usage")
+    us.add_argument("--file", type=Path, required=True)
+    us.add_argument("--step-failed", action="store_true")
+    sub.add_parser("record").add_argument("--kind", choices=("dev", "review", "rate", "plan"), required=True)
+    sub.add_parser("package").add_argument("--out", type=Path, default=Path("work"))
+    pb = sub.add_parser("publish")
+    pb.add_argument("--bundle", type=Path, required=True)
+    pb.add_argument("--branch", required=True)
+    pb.add_argument("--mode", choices=("new", "update"), required=True)
+    pb.add_argument("--pr", type=int)
     rp = sub.add_parser("review-prompt")
     rp.add_argument("--pr", type=int, required=True)
     rp.add_argument("--sha", required=True)
     rp.add_argument("--round", dest="round_", choices=("critique", "final"), required=True)
     vp = sub.add_parser("revise-prompt")
     vp.add_argument("--pr", type=int, required=True)
+    vp.add_argument("--branch", default="")
     pi = sub.add_parser("pr-info")
     pi.add_argument("--pr", type=int, required=True)
     pi.add_argument("--require-own", action="store_true", help="fail unless the bot opened the PR")
@@ -297,11 +386,27 @@ def main(argv: list[str] | None = None) -> int:
         write_outputs(out)
     elif args.cmd == "account":
         write_outputs({"status": account(cfg, args.file, args.kind, args.step_failed)})
+    elif args.cmd == "usage":
+        status, tokens, detail = classify(read_messages(args.file), args.step_failed)
+        print(f"{status}, {tokens:,} tokens {detail}")
+        write_outputs({"status": status, "tokens": str(tokens)})
+    elif args.cmd == "record":
+        status = os.environ.get("STATUS") or "error"
+        write_outputs({"status": record(cfg, args.kind, status, int(os.environ.get("TOKENS") or 0))})
+    elif args.cmd == "package":
+        write_outputs(package(args.out))
+    elif args.cmd == "publish":
+        result = json.loads(os.environ.get("RESULT") or "{}")
+        out = publish(cfg, args.bundle, args.branch, args.mode, result, args.pr, os.environ["GH_TOKEN"])
+        st, _ = state.load(cfg)
+        post_answers(cfg, result.get("answers", []),
+                     {p["number"] for p in st.get("pending_instructions", []) if p["kind"] == "ask"})
+        write_outputs(out)
     elif args.cmd == "review-prompt":
         write_outputs({"prompt": review_prompt(cfg, args.pr, args.sha, args.round_)})
     elif args.cmd == "revise-prompt":
         review = json.loads(os.environ.get("REVIEW") or "{}")
-        write_outputs({"prompt": revise_prompt(cfg, args.pr, review),
+        write_outputs({"prompt": revise_prompt(cfg, args.pr, review, args.branch),
                        "needed": str(bool(review.get("problems")) or review.get("verdict") != "approve").lower()})
     elif args.cmd == "pr-info":
         pr = gh.api(f"repos/{cfg.repo}/pulls/{args.pr}")

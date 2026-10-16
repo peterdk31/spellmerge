@@ -1,17 +1,20 @@
 # One Claude work session (docs/PLAN.md, "Claude's self-critique loop"),
 # called by develop.yml (mode develop, hourly) and weekly.yml (mode plan).
 #
-# implement Claude does the task (or the weekly planning) and opens a PR
-# critique  a separate Claude session with fresh context reviews it critically
-# revise    Claude revises based on the critique
-# final     a fresh Claude session decides: approve or not (a verdict as data)
-# merge     a plain script merges only if the verdict, checks and hard rules
-#           all pass, pinned to the reviewed commit
-# finish    Daily log, task failures, weekly outputs, and the next session
+# implement   Claude does the task with a shell but only a READ-ONLY token, and
+#             commits locally; the commits leave the runner as a git bundle (data)
+# publish     a fresh runner pushes the bundle from a clean checkout of main and
+#             opens the PR, records usage, posts /ask answers
+# critique    a separate Claude session with fresh context reviews it critically
+# revise      Claude revises (read-only token again); publish-revision pushes it
+# final       a fresh Claude session decides: approve or not (a verdict as data)
+# merge       a plain script merges only if the verdict, checks and hard rules
+#             all pass, pinned to the reviewed commit
+# finish      Daily log, task failures, weekly outputs, and the next session
 #
-# Each Claude step runs in its own job on a fresh runner, so a session can't
-# tamper with the reviewers or the merge script. Reviewers get a read-only
-# token and read-only tools. Nothing here runs PR code from outside contributors.
+# Claude never holds a write token where it has a shell, and every job that
+# writes runs on a fresh runner with scripts from a clean checkout of main.
+# Reviewers have read-only tools. Nothing here runs outside contributors' PR code.
 name: session
 
 on:
@@ -48,25 +51,26 @@ jobs:
     timeout-minutes: 120
     environment: automation
     outputs:
-      status: ${{ steps.account.outputs.status }}
       result: ${{ steps.claude.outputs.structured_output }}
+      usage_status: ${{ steps.usage.outputs.status }}
+      usage_tokens: ${{ steps.usage.outputs.tokens }}
       task: ${{ steps.prepare.outputs.task }}
       kind: ${{ steps.prepare.outputs.kind }}
-      pr: ${{ steps.result.outputs.pr }}
-      sha: ${{ steps.info.outputs.sha }}
+      branch: ${{ steps.package.outputs.branch }}
+      commits: ${{ steps.package.outputs.commits }}
     steps:
-      - id: app-token
+      - id: read-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           app-id: ${{ secrets.BOT_APP_ID }}
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
-          permission-contents: write
-          permission-issues: write
-          permission-pull-requests: write
+          permission-contents: read
+          permission-issues: read
+          permission-pull-requests: read
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          token: ${{ steps.app-token.outputs.token }}
           fetch-depth: 0
+          persist-credentials: false
       - name: Git identity of the bot
         run: |
           git config --global user.name "spellmerge-bot[bot]"
@@ -79,7 +83,7 @@ jobs:
         run: ci/build/build.sh --quick
       - id: prepare
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TOKEN: ${{ steps.read-token.outputs.token }}
           FOCUS: ${{ inputs.focus }}
           MODE: ${{ inputs.mode }}
         run: python3 -m smbot.session prepare --mode "$MODE"
@@ -88,68 +92,48 @@ jobs:
         uses: anthropics/claude-code-action@97c53473391bff1901034d4b454b5bac7ab7a029 # v1.0.239
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          github_token: ${{ steps.app-token.outputs.token }}
+          github_token: ${{ steps.read-token.outputs.token }}
           bot_id: "343592621"
           bot_name: "spellmerge-bot[bot]"
           prompt: ${{ steps.prepare.outputs.prompt }}
           claude_args: >-
             --max-turns 150
-            --allowedTools "Read,Write,Edit,MultiEdit,Glob,Grep,Bash(git:*),Bash(gh pr:*),Bash(gh issue view:*),Bash(gh issue comment:*),Bash(tools/check.sh:*),Bash(ci/build/build.sh --quick),Bash(ls:*),Bash(mkdir:*),Bash(mv:*),Bash(cp:*),Bash(rm:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(diff:*),Bash(sort:*),Bash(find:*)"
-            --disallowedTools "WebFetch,WebSearch"
+            --allowedTools "Read,Write,Edit,MultiEdit,Glob,Grep,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git switch:*),Bash(git checkout:*),Bash(git add:*),Bash(git rm:*),Bash(git mv:*),Bash(git commit:*),Bash(git restore:*),Bash(git branch:*),Bash(git fetch:*),Bash(git rev-parse:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr list:*),Bash(gh pr checkout:*),Bash(gh issue view:*),Bash(gh issue list:*),Bash(tools/check.sh:*),Bash(ci/build/build.sh --quick),Bash(ls:*),Bash(mkdir:*),Bash(mv:*),Bash(cp:*),Bash(rm:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(diff:*),Bash(sort:*)"
+            --disallowedTools "WebFetch,WebSearch,Edit(/.git/**),Write(/.git/**),MultiEdit(/.git/**),Edit(/ci/**),Write(/ci/**),MultiEdit(/ci/**),Edit(/.github/**),Write(/.github/**),MultiEdit(/.github/**),Edit(/tools/**),Write(/tools/**),MultiEdit(/tools/**)"
             --json-schema '${{ steps.prepare.outputs.schema }}'
-      - id: account-token
-        if: always()
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-        with:
-          app-id: ${{ secrets.BOT_APP_ID }}
-          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
-          permission-contents: write
-          permission-issues: write
-      - id: account
+      - id: usage
         if: always()
         env:
-          GH_TOKEN: ${{ steps.account-token.outputs.token }}
           EXEC_FILE: ${{ steps.claude.outputs.execution_file }}
           FAILED: ${{ steps.claude.outcome != 'success' }}
-        run: python3 -m smbot.session account --file "${EXEC_FILE:-/nonexistent}" --kind dev $([ "$FAILED" = true ] && echo --step-failed)
-      - id: result
-        if: steps.account.outputs.status == 'ok' && steps.claude.outputs.structured_output != ''
-        env:
-          RESULT: ${{ steps.claude.outputs.structured_output }}
-        run: |
-          echo "$RESULT" | jq .
-          if [ "$(echo "$RESULT" | jq -r .status)" = pr_opened ]; then
-            echo "pr=$(echo "$RESULT" | jq -r '.pr_number // empty')" >> "$GITHUB_OUTPUT"
-          fi
-      - id: info
-        if: steps.result.outputs.pr != ''
-        env:
-          GH_TOKEN: ${{ steps.account-token.outputs.token }}
-          PR: ${{ steps.result.outputs.pr }}
-        run: python3 -m smbot.session pr-info --pr "$PR" --require-own
+        run: python3 -m smbot.session usage --file "${EXEC_FILE:-/nonexistent}" $([ "$FAILED" = true ] && echo --step-failed)
+      - id: package
+        if: always()
+        run: python3 -m smbot.session package --out work
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: steps.package.outputs.commits != '0' && steps.package.outputs.commits != ''
+        with:
+          name: work
+          path: work/work.bundle
+          retention-days: 1
 
-  critique:
-    name: critique (fresh context)
-    needs: [implement]
-    if: needs.implement.outputs.pr != '' && needs.implement.outputs.sha != ''
-    uses: ./.github/workflows/review.yml
-    with:
-      pr: ${{ needs.implement.outputs.pr }}
-      sha: ${{ needs.implement.outputs.sha }}
-      round: critique
-    secrets: inherit
-
-  revise:
-    name: revise after the critique
-    needs: [implement, critique]
-    if: needs.critique.outputs.needs_revision == 'true'
+  publish:
+    name: push the work and open the PR
+    needs: implement
+    if: always() && needs.implement.result != 'skipped'
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 15
     environment: automation
     outputs:
-      status: ${{ steps.account.outputs.status }}
-      sha: ${{ steps.info.outputs.sha }}
+      status: ${{ steps.record.outputs.status }}
+      pr: ${{ steps.publish.outputs.pr }}
+      sha: ${{ steps.publish.outputs.sha }}
     steps:
+      - name: Clean checkout of main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
       - id: app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
@@ -158,10 +142,64 @@ jobs:
           permission-contents: write
           permission-issues: write
           permission-pull-requests: write
+      - id: record
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          STATUS: ${{ needs.implement.outputs.usage_status }}
+          TOKENS: ${{ needs.implement.outputs.usage_tokens }}
+        run: python3 -m smbot.session record --kind dev
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        if: steps.record.outputs.status == 'ok' && needs.implement.outputs.commits != '0' && needs.implement.outputs.commits != ''
+        with:
+          name: work
+          path: work
+      - id: publish
+        if: >-
+          steps.record.outputs.status == 'ok' && needs.implement.outputs.commits != '0'
+          && needs.implement.outputs.commits != '' && needs.implement.outputs.result != ''
+          && fromJSON(needs.implement.outputs.result).status != 'nothing_to_do'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          RESULT: ${{ needs.implement.outputs.result }}
+          BRANCH: ${{ needs.implement.outputs.branch }}
+        run: python3 -m smbot.session publish --bundle work/work.bundle --branch "$BRANCH" --mode new
+
+  critique:
+    name: critique (fresh context)
+    needs: [publish]
+    if: always() && needs.publish.outputs.pr != ''
+    uses: ./.github/workflows/review.yml
+    with:
+      pr: ${{ needs.publish.outputs.pr }}
+      sha: ${{ needs.publish.outputs.sha }}
+      round: critique
+    secrets: inherit
+
+  revise:
+    name: revise after the critique
+    needs: [implement, publish, critique]
+    if: always() && needs.critique.outputs.needs_revision == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    environment: automation
+    outputs:
+      result: ${{ steps.claude.outputs.structured_output }}
+      usage_status: ${{ steps.usage.outputs.status }}
+      usage_tokens: ${{ steps.usage.outputs.tokens }}
+      commits: ${{ steps.package.outputs.commits }}
+    steps:
+      - id: read-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+          permission-contents: read
+          permission-issues: read
+          permission-pull-requests: read
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          token: ${{ steps.app-token.outputs.token }}
           fetch-depth: 0
+          persist-credentials: false
       - name: Git identity of the bot
         run: |
           git config --global user.name "spellmerge-bot[bot]"
@@ -175,62 +213,101 @@ jobs:
       - id: prepare
         env:
           REVIEW: ${{ needs.critique.outputs.review }}
-          PR: ${{ needs.implement.outputs.pr }}
+          PR: ${{ needs.publish.outputs.pr }}
+          BRANCH: ${{ needs.implement.outputs.branch }}
         run: |
-          python3 -m smbot.session revise-prompt --pr "$PR"
+          python3 -m smbot.session revise-prompt --pr "$PR" --branch "$BRANCH"
           echo "schema=$(jq -c . .github/maintainer/schemas/session.json)" >> "$GITHUB_OUTPUT"
       - id: claude
         continue-on-error: true
         uses: anthropics/claude-code-action@97c53473391bff1901034d4b454b5bac7ab7a029 # v1.0.239
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          github_token: ${{ steps.app-token.outputs.token }}
+          github_token: ${{ steps.read-token.outputs.token }}
           bot_id: "343592621"
           bot_name: "spellmerge-bot[bot]"
           prompt: ${{ steps.prepare.outputs.prompt }}
           claude_args: >-
             --max-turns 80
-            --allowedTools "Read,Write,Edit,MultiEdit,Glob,Grep,Bash(git:*),Bash(gh pr:*),Bash(tools/check.sh:*),Bash(ci/build/build.sh --quick),Bash(ls:*),Bash(mkdir:*),Bash(mv:*),Bash(cp:*),Bash(rm:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(diff:*),Bash(sort:*),Bash(find:*)"
-            --disallowedTools "WebFetch,WebSearch"
+            --allowedTools "Read,Write,Edit,MultiEdit,Glob,Grep,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git switch:*),Bash(git checkout:*),Bash(git add:*),Bash(git rm:*),Bash(git mv:*),Bash(git commit:*),Bash(git restore:*),Bash(git branch:*),Bash(git fetch:*),Bash(git rev-parse:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr checkout:*),Bash(tools/check.sh:*),Bash(ci/build/build.sh --quick),Bash(ls:*),Bash(mkdir:*),Bash(mv:*),Bash(cp:*),Bash(rm:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(diff:*),Bash(sort:*)"
+            --disallowedTools "WebFetch,WebSearch,Edit(/.git/**),Write(/.git/**),MultiEdit(/.git/**),Edit(/ci/**),Write(/ci/**),MultiEdit(/ci/**),Edit(/.github/**),Write(/.github/**),MultiEdit(/.github/**),Edit(/tools/**),Write(/tools/**),MultiEdit(/tools/**)"
             --json-schema '${{ steps.prepare.outputs.schema }}'
-      - id: account-token
+      - id: usage
         if: always()
+        env:
+          EXEC_FILE: ${{ steps.claude.outputs.execution_file }}
+          FAILED: ${{ steps.claude.outcome != 'success' }}
+        run: python3 -m smbot.session usage --file "${EXEC_FILE:-/nonexistent}" $([ "$FAILED" = true ] && echo --step-failed)
+      - id: package
+        if: always()
+        run: python3 -m smbot.session package --out work
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: steps.package.outputs.commits != '0' && steps.package.outputs.commits != ''
+        with:
+          name: revision
+          path: work/work.bundle
+          retention-days: 1
+
+  publish-revision:
+    name: push the revision
+    needs: [implement, publish, revise]
+    if: always() && needs.revise.result != 'skipped'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: automation
+    outputs:
+      status: ${{ steps.record.outputs.status }}
+      sha: ${{ steps.publish.outputs.sha }}
+    steps:
+      - name: Clean checkout of main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: app-token
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           app-id: ${{ secrets.BOT_APP_ID }}
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-issues: write
-      - id: account
-        if: always()
+          permission-pull-requests: write
+      - id: record
         env:
-          GH_TOKEN: ${{ steps.account-token.outputs.token }}
-          EXEC_FILE: ${{ steps.claude.outputs.execution_file }}
-          FAILED: ${{ steps.claude.outcome != 'success' }}
-        run: python3 -m smbot.session account --file "${EXEC_FILE:-/nonexistent}" --kind dev $([ "$FAILED" = true ] && echo --step-failed)
-      - id: info
-        if: steps.account.outputs.status == 'ok'
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          STATUS: ${{ needs.revise.outputs.usage_status }}
+          TOKENS: ${{ needs.revise.outputs.usage_tokens }}
+        run: python3 -m smbot.session record --kind dev
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        if: steps.record.outputs.status == 'ok' && needs.revise.outputs.commits != '0' && needs.revise.outputs.commits != ''
+        with:
+          name: revision
+          path: work
+      - id: publish
+        if: steps.record.outputs.status == 'ok' && needs.revise.outputs.commits != '0' && needs.revise.outputs.commits != ''
         env:
-          GH_TOKEN: ${{ steps.account-token.outputs.token }}
-          PR: ${{ needs.implement.outputs.pr }}
-        run: python3 -m smbot.session pr-info --pr "$PR"
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          RESULT: ${{ needs.revise.outputs.result }}
+          BRANCH: ${{ needs.implement.outputs.branch }}
+          PR: ${{ needs.publish.outputs.pr }}
+        run: python3 -m smbot.session publish --bundle work/work.bundle --branch "$BRANCH" --mode update --pr "$PR"
 
   final:
     name: final review (fresh context)
-    needs: [implement, critique, revise]
+    needs: [publish, critique, publish-revision]
     if: >-
-      always() && needs.implement.outputs.pr != '' && needs.critique.result == 'success'
-      && (needs.revise.result == 'skipped' || needs.revise.outputs.status == 'ok')
+      always() && needs.publish.outputs.pr != '' && needs.critique.result == 'success'
+      && (needs.publish-revision.result == 'skipped' || needs.publish-revision.outputs.sha != '')
     uses: ./.github/workflows/review.yml
     with:
-      pr: ${{ needs.implement.outputs.pr }}
-      sha: ${{ needs.revise.outputs.sha || needs.implement.outputs.sha }}
+      pr: ${{ needs.publish.outputs.pr }}
+      sha: ${{ needs.publish-revision.outputs.sha || needs.publish.outputs.sha }}
       round: final
     secrets: inherit
 
   merge:
     name: merge (script, no AI)
-    needs: [implement, revise, final]
+    needs: [publish, final]
     if: always() && needs.final.outputs.mergeable == 'true' && inputs.merge == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -258,7 +335,7 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           READ_TOKEN: ${{ github.token }}
-          PR: ${{ needs.implement.outputs.pr }}
+          PR: ${{ needs.publish.outputs.pr }}
           SHA: ${{ needs.final.outputs.sha }}
         run: |
           set +e
@@ -270,7 +347,7 @@ jobs:
 
   finish:
     name: Daily log and next session
-    needs: [implement, critique, revise, final, merge]
+    needs: [implement, publish, critique, revise, publish-revision, final, merge]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -295,8 +372,8 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           TASK: ${{ needs.implement.outputs.task }}
           TASK_KIND: ${{ needs.implement.outputs.kind }}
-          PR: ${{ needs.implement.outputs.pr }}
-          IMPLEMENT_STATUS: ${{ needs.implement.outputs.result && fromJSON(needs.implement.outputs.result).status || needs.implement.outputs.status }}
+          PR: ${{ needs.publish.outputs.pr }}
+          IMPLEMENT_STATUS: ${{ needs.implement.outputs.result && fromJSON(needs.implement.outputs.result).status || needs.publish.outputs.status }}
           IMPLEMENT_SUMMARY: ${{ needs.implement.outputs.result && fromJSON(needs.implement.outputs.result).summary || '' }}
           FINAL_REVIEW: ${{ needs.final.outputs.review }}
           MERGED: ${{ needs.merge.outputs.merged }}

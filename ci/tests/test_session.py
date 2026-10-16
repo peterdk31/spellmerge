@@ -85,6 +85,43 @@ class PromptTest(unittest.TestCase):
         self.assertFalse(session.mergeable({"verdict": "revise", "problems": []}))
 
 
+class PublishTest(unittest.TestCase):
+    def test_branch_names(self) -> None:
+        self.assertTrue(session.valid_branch("claude/20261017-area-readmes"))
+        for bad in ["main", "claude/../main", "claude/", "feature/x", "claude/x;rm -rf", "claude/X"]:
+            self.assertFalse(session.valid_branch(bad), bad)
+
+    def test_package_and_publish_roundtrip(self) -> None:
+        """Commits made in one clone travel as a bundle and are pushed from another."""
+        import os
+        import subprocess
+        env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t",
+               "GIT_COMMITTER_EMAIL": "t@t"}
+        with tempfile.TemporaryDirectory() as tmp:
+            origin, work = Path(tmp, "origin.git"), Path(tmp, "work")
+            run = lambda *a, cwd=tmp: subprocess.run(a, cwd=cwd, check=True, capture_output=True, env=env)
+            run("git", "init", "-q", "--bare", "-b", "main", str(origin))
+            run("git", "clone", "-q", str(origin), str(work))
+            Path(work, "a.txt").write_text("a\n")
+            run("git", "add", "a.txt", cwd=work)
+            run("git", "commit", "-qm", "base", cwd=work)
+            run("git", "push", "-q", "origin", "main", cwd=work)
+            run("git", "switch", "-qc", "claude/20261017-x", cwd=work)
+            Path(work, "b.txt").write_text("b\n")
+            run("git", "add", "b.txt", cwd=work)
+            run("git", "commit", "-qm", "work", cwd=work)
+            old = os.getcwd()
+            os.chdir(work)
+            try:
+                out = session.package(Path(tmp, "out"))
+            finally:
+                os.chdir(old)
+            self.assertEqual(out, {"branch": "claude/20261017-x", "commits": "1"})
+            listed = subprocess.run(["git", "bundle", "list-heads", str(Path(tmp, "out/work.bundle"))],
+                                    capture_output=True, text=True, check=True).stdout
+            self.assertIn("refs/heads/claude/20261017-x", listed)
+
+
 class MergeTest(unittest.TestCase):
     def runs(self, *items: tuple[str, str, str | None]) -> dict:
         return {"check_runs": [{"name": n, "status": s, "conclusion": c, "started_at": f"2026-10-17T00:00:0{i}Z"}

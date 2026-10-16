@@ -2,6 +2,18 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-16: M1 design choices the plan left open
+
+**Decided by:** Claude (details the plan left open), in `docs/milestones/M1-core-loop.md`.
+**Decision:**
+- Gameplay folders allow `.gd` and `.tres` only, so M1 scenes live with their content (`content/wizard`, `content/enemies`, `content/rooms`, `hud/`); gameplay gets them through `core/registry`.
+- The registry scans folders at start; the build-time manifest waits until content is large.
+- The one spell is a fire bolt on a small base class that M2 replaces; nothing else may depend on its fields.
+- A minimal slice of `flow` (load the room, spawn the wave, restart) is built in M1 instead of M3, so the loop is playable. M3 replaces it. There is no pause menu in M1.
+- Placeholder art is hand-written SVG, since sessions have no image tools. The web 4-bot run and the Style Guide page and kit zip need small owner-only changes in `ci/smbot/`, which their tasks file in `docs/BACKLOG.md`.
+
+**Reason:** each keeps M1 small, inside the path rules, and playable for the first checkpoint.
+
 ## 2026-10-16: M1 starts before M0's dry runs
 
 **Decided by:** owner.

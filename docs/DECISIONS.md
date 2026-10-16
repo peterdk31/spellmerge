@@ -129,4 +129,4 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - The protected environment is called `automation`. Its secrets are `BOT_APP_ID`, `BOT_APP_PRIVATE_KEY`, `CLAUDE_CODE_OAUTH_TOKEN` and `BUTLER_API_KEY` (the name itch.io's `butler` tool reads).
 - The repository variables are `AUTOMATION_ENABLED` (the kill switch), `OWNER_ID` (the owner's numeric user ID) and `BOT_LOGIN`.
 - The required PR status check is the `checks.yml` job named `rules`, pinned to the GitHub Actions app.
-- Only GitHub-owned actions plus `anthropics/claude-code-action` are allowed, all pinned by SHA (`ci/settings/allowed-actions.json`).
+- Only GitHub-owned actions plus `anthropics/claude-code-action` and `oven-sh/setup-bun` are allowed, all pinned by SHA (`ci/settings/allowed-actions.json`). claude-code-action uses `oven-sh/setup-bun` internally, pinned by SHA in its own `action.yml`.

@@ -57,6 +57,7 @@ jobs:
       task: ${{ steps.prepare.outputs.task }}
       kind: ${{ steps.prepare.outputs.kind }}
       branch: ${{ steps.package.outputs.branch }}
+      expected_branch: ${{ steps.prepare.outputs.branch }}
       commits: ${{ steps.package.outputs.commits }}
     steps:
       - id: read-token
@@ -102,12 +103,13 @@ jobs:
           github_token: ${{ steps.read-token.outputs.token }}
           bot_id: "343592621"
           bot_name: "spellmerge-bot[bot]"
-          # The next session in a chain is started by github-actions[bot] (workflow_dispatch from finish).
-          allowed_bots: "github-actions[bot]"
+          # The next session in a chain is started by github-actions[bot] (workflow_dispatch from
+          # finish), and a run after the bot merges its own PR by spellmerge-bot[bot] (push to main).
+          allowed_bots: "github-actions[bot],spellmerge-bot[bot]"
           prompt: ${{ steps.prepare.outputs.prompt }}
           claude_args: >-
             --max-turns 150
-            --allowedTools "Read,Write,Edit,MultiEdit,Glob,Grep,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git switch:*),Bash(git checkout:*),Bash(git add:*),Bash(git rm:*),Bash(git mv:*),Bash(git commit:*),Bash(git restore:*),Bash(git branch:*),Bash(git fetch:*),Bash(git rev-parse:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr list:*),Bash(gh pr checkout:*),Bash(gh issue view:*),Bash(gh issue list:*),Bash(tools/check.sh:*),Bash(ci/build/build.sh --quick),Bash(ls:*),Bash(mkdir:*),Bash(mv:*),Bash(cp:*),Bash(rm:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(diff:*),Bash(sort:*)"
+            --allowedTools "Read,Write,Edit,MultiEdit,Glob,Grep,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git switch:*),Bash(git checkout:*),Bash(git add:*),Bash(git rm:*),Bash(git mv:*),Bash(git commit:*),Bash(git restore:*),Bash(git branch:*),Bash(git fetch:*),Bash(git merge:*),Bash(git rev-parse:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr list:*),Bash(gh pr checkout:*),Bash(gh issue view:*),Bash(gh issue list:*),Bash(tools/check.sh:*),Bash(ci/build/build.sh --quick),Bash(ls:*),Bash(mkdir:*),Bash(mv:*),Bash(cp:*),Bash(rm:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(diff:*),Bash(sort:*)"
             --disallowedTools "WebFetch,WebSearch,Edit(/.git/**),Write(/.git/**),MultiEdit(/.git/**),Edit(/ci/**),Write(/ci/**),MultiEdit(/ci/**),Edit(/.github/**),Write(/.github/**),MultiEdit(/.github/**),Edit(/tools/**),Write(/tools/**),MultiEdit(/tools/**)"
             --json-schema '${{ steps.prepare.outputs.schema }}'
       - id: usage
@@ -137,8 +139,10 @@ jobs:
     environment: automation
     outputs:
       status: ${{ steps.record.outputs.status }}
-      pr: ${{ steps.publish.outputs.pr }}
-      sha: ${{ steps.publish.outputs.sha }}
+      # With no new commits, an open PR the session continued still goes on to review and merge.
+      pr: ${{ steps.publish.outputs.pr || steps.existing.outputs.pr }}
+      sha: ${{ steps.publish.outputs.sha || steps.existing.outputs.sha }}
+      branch: ${{ steps.publish.outputs.branch || steps.existing.outputs.branch }}
     steps:
       - name: Clean checkout of main
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -174,6 +178,14 @@ jobs:
           RESULT: ${{ needs.implement.outputs.result }}
           BRANCH: ${{ needs.implement.outputs.branch }}
         run: python3 -m smbot.session publish --bundle work/work.bundle --branch "$BRANCH" --mode new
+      - id: existing
+        if: >-
+          steps.record.outputs.status == 'ok' && (needs.implement.outputs.commits == '0' || needs.implement.outputs.commits == '')
+          && needs.implement.outputs.result != '' && fromJSON(needs.implement.outputs.result).status == 'ready'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          BRANCH: ${{ needs.implement.outputs.expected_branch }}
+        run: python3 -m smbot.session open-pr --branch "$BRANCH"
 
   critique:
     name: critique (fresh context)
@@ -225,7 +237,7 @@ jobs:
         env:
           REVIEW: ${{ needs.critique.outputs.review }}
           PR: ${{ needs.publish.outputs.pr }}
-          BRANCH: ${{ needs.implement.outputs.branch }}
+          BRANCH: ${{ needs.publish.outputs.branch }}
         run: |
           python3 -m smbot.session revise-prompt --pr "$PR" --branch "$BRANCH"
           echo "schema=$(jq -c . .github/maintainer/schemas/session.json)" >> "$GITHUB_OUTPUT"
@@ -244,12 +256,13 @@ jobs:
           github_token: ${{ steps.read-token.outputs.token }}
           bot_id: "343592621"
           bot_name: "spellmerge-bot[bot]"
-          # The next session in a chain is started by github-actions[bot] (workflow_dispatch from finish).
-          allowed_bots: "github-actions[bot]"
+          # The next session in a chain is started by github-actions[bot] (workflow_dispatch from
+          # finish), and a run after the bot merges its own PR by spellmerge-bot[bot] (push to main).
+          allowed_bots: "github-actions[bot],spellmerge-bot[bot]"
           prompt: ${{ steps.prepare.outputs.prompt }}
           claude_args: >-
             --max-turns 80
-            --allowedTools "Read,Write,Edit,MultiEdit,Glob,Grep,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git switch:*),Bash(git checkout:*),Bash(git add:*),Bash(git rm:*),Bash(git mv:*),Bash(git commit:*),Bash(git restore:*),Bash(git branch:*),Bash(git fetch:*),Bash(git rev-parse:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr checkout:*),Bash(tools/check.sh:*),Bash(ci/build/build.sh --quick),Bash(ls:*),Bash(mkdir:*),Bash(mv:*),Bash(cp:*),Bash(rm:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(diff:*),Bash(sort:*)"
+            --allowedTools "Read,Write,Edit,MultiEdit,Glob,Grep,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git switch:*),Bash(git checkout:*),Bash(git add:*),Bash(git rm:*),Bash(git mv:*),Bash(git commit:*),Bash(git restore:*),Bash(git branch:*),Bash(git fetch:*),Bash(git merge:*),Bash(git rev-parse:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr checkout:*),Bash(tools/check.sh:*),Bash(ci/build/build.sh --quick),Bash(ls:*),Bash(mkdir:*),Bash(mv:*),Bash(cp:*),Bash(rm:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(diff:*),Bash(sort:*)"
             --disallowedTools "WebFetch,WebSearch,Edit(/.git/**),Write(/.git/**),MultiEdit(/.git/**),Edit(/ci/**),Write(/ci/**),MultiEdit(/ci/**),Edit(/.github/**),Write(/.github/**),MultiEdit(/.github/**),Edit(/tools/**),Write(/tools/**),MultiEdit(/tools/**)"
             --json-schema '${{ steps.prepare.outputs.schema }}'
       - id: usage
@@ -261,7 +274,7 @@ jobs:
       - id: package
         if: always()
         env:
-          BRANCH: ${{ needs.implement.outputs.branch }}
+          BRANCH: ${{ needs.publish.outputs.branch }}
         run: python3 -m smbot.session package --out work --branch "$BRANCH"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: steps.package.outputs.commits != '0' && steps.package.outputs.commits != ''
@@ -310,7 +323,7 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           RESULT: ${{ needs.revise.outputs.result }}
-          BRANCH: ${{ needs.implement.outputs.branch }}
+          BRANCH: ${{ needs.publish.outputs.branch }}
           PR: ${{ needs.publish.outputs.pr }}
         run: python3 -m smbot.session publish --bundle work/work.bundle --branch "$BRANCH" --mode update --pr "$PR"
 

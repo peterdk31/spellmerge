@@ -6,7 +6,9 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 
 **Decided by:** Claude (details the plan left open), in `docs/milestones/M1-core-loop.md`.
 **Decision:**
-- Gameplay folders allow `.gd` and `.tres` only, so M1 scenes live with their content (`content/wizard`, `content/enemies`, `content/rooms`, `hud/`); gameplay gets them through `core/registry`.
+- The ten `gameplay/` sub-areas, `content/spells` and `content/wizard` don't allow `.tscn` (`hud/`, `content/enemies` and `content/rooms` do), so M1 scenes live with their content (`content/wizard/base`, which gets `.tscn` in its README, `content/enemies`, `content/rooms`, `hud/`); `gameplay/` stays script-only and gets scenes through `core/registry`.
+- Sounds are the Audio contributors' job; code treats a missing sound as silent.
+- The player and bots only call one cast method and read no spell fields, so M2 can replace the fire bolt.
 - The registry scans folders at start; the build-time manifest waits until content is large.
 - The one spell is a fire bolt on a small base class that M2 replaces; nothing else may depend on its fields.
 - A minimal slice of `flow` (load the room, spawn the wave, restart) is built in M1 instead of M3, so the loop is playable. M3 replaces it. There is no pause menu in M1.

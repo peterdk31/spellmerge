@@ -28,6 +28,12 @@
   "triage_closed": {
     "2026-10-16": {}
   },
-  "usage": [],
+  "usage": [
+    {
+      "at": "2026-10-16T17:33:54Z",
+      "kind": "dev",
+      "tokens": 74933
+    }
+  ],
   "version": 1
 }

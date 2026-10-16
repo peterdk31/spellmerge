@@ -1,0 +1,63 @@
+name: Report a bug
+description: Something in the game is broken. Bug reports go ahead of new features.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for reporting! The more exact the steps, the faster it gets fixed.
+  - type: input
+    id: version
+    attributes:
+      label: Build version
+      description: Shown on the main menu, e.g. "v0.20261017 nightly (a1b2c3d)".
+      placeholder: v0.20261017 nightly (a1b2c3d)
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Where did you play?
+      options:
+        - Web (browser)
+        - Windows
+        - Linux
+    validations:
+      required: true
+  - type: input
+    id: players
+    attributes:
+      label: Players
+      description: How many players, and with which controls (keyboard, gamepad)?
+      placeholder: 2 players, both gamepads
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Start a run with the frost staff
+        2. Cast bolt + split at a slime
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What happened, and what did you expect?
+    validations:
+      required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: How bad is it?
+      options:
+        - The game crashed or froze
+        - It blocks playing or progressing
+        - Something is wrong, but I can keep playing
+        - Cosmetic
+    validations:
+      required: true
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: Screenshot or video (optional)
+      description: Drag an image or video here.

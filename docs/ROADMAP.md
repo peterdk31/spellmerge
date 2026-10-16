@@ -1,0 +1,25 @@
+# Roadmap
+
+Eight strictly sequential milestones (docs/PLAN.md, "Roadmap"). One milestone at a time; nothing from a later milestone is built early. A milestone ends when its done-when criteria and the quality bar are met, never because time ran out.
+
+| # | Milestone | Status | Done when | Opens for PRs |
+| --- | --- | --- | --- | --- |
+| M0 | [Foundation](milestones/M0-foundation.md) | **In progress** since 2026-10-16 | 3 daily releases in a row work and every pipeline part passes its dry run | No areas yet |
+| M1 | Core loop prototype | Not started | 4-bot smoke test passes on web | Art, Audio |
+| M2 | Spell system | Not started | Validators pass, 20+ combos work | Spells, Story |
+| M3 | Run structure | Not started | A full run can be completed | Rooms, Enemies, Bosses, Relics, AI |
+| M4 | Polish and variety | Not started | Polished enough to show off | HUD, Wizard, core gameplay systems |
+| M5 | Meta-progression | Not started | Runs give lasting progression | Run, flow, rewards, difficulty |
+| M6 | Content expansion | Not started | 3 biomes, 3 bosses, Steam page | All areas |
+| M7 | Early Access ready | Not started | Ready to launch on Steam | Steam Early Access launch |
+
+## Checkpoints
+
+| Checkpoint | Question | Decided by |
+| --- | --- | --- |
+| C1: end of M1 | Do moving, dodging and casting feel good, alone and with 4 players? | Owner, with Claude's assessment |
+| C2: end of M2 | Is building spells fun and deep, with surprising combos? | Owner, with bot data and player feedback |
+| C3: end of M3 | After one full run, do you want to play another? | Owner, with player feedback |
+| C4: before the Steam page | Is the art, sound and polish good enough to show the world? | Owner |
+
+Each milestone's design document is written in `docs/milestones/` before any code, and passes an independent self-critique review against `docs/DESIGN.md` before it merges.

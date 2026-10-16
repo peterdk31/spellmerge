@@ -1,0 +1,80 @@
+# Hourly check and development session (docs/PLAN.md, "Self-driven progress").
+#
+# control  every hour: verified Control panel, owner commands, claims, the gate
+# session  when the gate allows: one Claude work session (session.yml)
+#
+# Only scheduled and manual runs on main; nothing here runs PR code.
+name: develop
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+    inputs:
+      chain_started:
+        description: "Internal: when the current chain of sessions started (ISO time)"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: develop
+  cancel-in-progress: false
+
+env:
+  PYTHONPATH: ci
+
+jobs:
+  control:
+    name: control panel, owner commands and gate
+    if: github.ref == 'refs/heads/main' && vars.AUTOMATION_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: automation
+    outputs:
+      develop: ${{ steps.gate.outputs.develop }}
+      merge: ${{ steps.gate.outputs.merge }}
+      focus: ${{ steps.gate.outputs.focus }}
+      settings: ${{ steps.gate.outputs.settings }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+          permission-contents: write # automation-state branch, /revert branches
+          permission-issues: write # replies, Daily log
+          permission-pull-requests: write # /merge, /close, /revert
+      - id: gate
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          AUTOMATION_ENABLED: ${{ vars.AUTOMATION_ENABLED }}
+        run: python3 -m smbot.control --commands --log-title "Hourly check"
+      - name: Claims (/claim comments)
+        if: steps.gate.outputs.automation == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: python3 -m smbot.claims hourly
+
+  session:
+    name: development session
+    needs: control
+    if: needs.control.outputs.develop == 'true'
+    uses: ./.github/workflows/session.yml
+    with:
+      mode: develop
+      focus: ${{ needs.control.outputs.focus }}
+      settings: ${{ needs.control.outputs.settings }}
+      merge: ${{ needs.control.outputs.merge }}
+      chain_started: ${{ inputs.chain_started }}
+    secrets: inherit
+    permissions:
+      contents: read
+      checks: read
+      actions: write
+      discussions: write

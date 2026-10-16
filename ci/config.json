@@ -1,0 +1,20 @@
+{
+  "repo": "peterdk31/spellmerge",
+  "owner": {
+    "login": "peterdk31",
+    "id": 13425287
+  },
+  "bot": {
+    "login": "spellmerge-bot[bot]",
+    "id": 343592621
+  },
+  "dependency_bots": [
+    "dependabot[bot]"
+  ],
+  "issues": {
+    "control_panel": 4,
+    "daily_log": 5
+  },
+  "timezone": "Europe/Copenhagen",
+  "state_branch": "automation-state"
+}

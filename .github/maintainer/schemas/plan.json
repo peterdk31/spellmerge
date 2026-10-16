@@ -1,0 +1,159 @@
+{
+  "type": "object",
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": [
+        "ready",
+        "nothing_to_do",
+        "blocked"
+      ]
+    },
+    "summary": {
+      "type": "string"
+    },
+    "progress_post": {
+      "type": "string"
+    },
+    "task_issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "milestone": {
+            "type": "string"
+          },
+          "area": {
+            "type": "string",
+            "enum": [
+              "spells",
+              "relics",
+              "wizard",
+              "enemies",
+              "bosses",
+              "rooms",
+              "gameplay",
+              "hud",
+              "art",
+              "audio",
+              "story"
+            ]
+          },
+          "skill": {
+            "type": "string",
+            "enum": [
+              "code",
+              "pixel-art",
+              "music",
+              "sfx",
+              "writing",
+              "level-design"
+            ]
+          },
+          "size": {
+            "type": "string",
+            "enum": [
+              "good first issue",
+              "S",
+              "M",
+              "L"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "now",
+              "soon",
+              "later"
+            ]
+          },
+          "what": {
+            "type": "string"
+          },
+          "where": {
+            "type": "string"
+          },
+          "specs": {
+            "type": "string"
+          },
+          "example": {
+            "type": "string"
+          },
+          "placeholder": {
+            "type": "string"
+          },
+          "done_when": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "milestone",
+          "area",
+          "skill",
+          "size",
+          "status",
+          "what",
+          "where",
+          "done_when"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "owner_issues": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "body"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "playtest": {
+      "type": "object",
+      "properties": {
+        "changes": {
+          "type": "string"
+        },
+        "questions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "changes",
+        "questions"
+      ],
+      "additionalProperties": false
+    },
+    "pr_title": {
+      "type": "string"
+    },
+    "pr_body": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "status",
+    "summary",
+    "progress_post",
+    "task_issues",
+    "owner_issues"
+  ],
+  "additionalProperties": false
+}

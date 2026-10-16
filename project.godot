@@ -1,0 +1,35 @@
+; Engine configuration file.
+; Edited by hand and by Claude's PRs; keep it in Godot's own format.
+
+config_version=5
+
+[application]
+
+config/name="Spellmerge"
+config/description="Merge spells. Cause chaos. Together."
+config/version="dev"
+run/main_scene="res://hud/menus/main_menu/main_menu.tscn"
+config/features=PackedStringArray("4.7", "GL Compatibility")
+config/icon="res://icon.svg"
+boot_splash/bg_color=Color(0.105882, 0.0941176, 0.188235, 1)
+boot_splash/show_image=false
+
+[debug]
+
+gdscript/warnings/untyped_declaration=1
+
+[display]
+
+window/size/viewport_width=640
+window/size/viewport_height=360
+window/size/window_width_override=1280
+window/size/window_height_override=720
+window/stretch/mode="viewport"
+window/stretch/scale_mode="integer"
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+environment/defaults/default_clear_color=Color(0.105882, 0.0941176, 0.188235, 1)
+textures/canvas_textures/default_texture_filter=0

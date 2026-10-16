@@ -1,0 +1,50 @@
+{
+  "type": "object",
+  "properties": {
+    "ideas": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "discussion_id": { "type": "string" },
+          "title": { "type": "string" },
+          "verdict": { "type": "string", "enum": ["backlog", "planned", "declined", "question"] },
+          "summary": { "type": "string" },
+          "reply": { "type": "string" }
+        },
+        "required": ["discussion_id", "verdict", "summary", "reply"],
+        "additionalProperties": false
+      }
+    },
+    "spell_ideas": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "issue": { "type": "integer" },
+          "summary": { "type": "string" },
+          "verdict": { "type": "string", "enum": ["backlog", "planned", "declined"] }
+        },
+        "required": ["issue", "summary", "verdict"],
+        "additionalProperties": false
+      }
+    },
+    "bugs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "issue": { "type": "integer" },
+          "severity": { "type": "string", "enum": ["crash", "blocker", "major", "minor"] },
+          "summary": { "type": "string" }
+        },
+        "required": ["issue", "severity", "summary"],
+        "additionalProperties": false
+      }
+    },
+    "feedback_themes": { "type": "array", "items": { "type": "string" } },
+    "concerns": { "type": "array", "items": { "type": "string" } }
+  },
+  "required": ["ideas", "spell_ideas", "bugs", "feedback_themes", "concerns"],
+  "additionalProperties": false
+}

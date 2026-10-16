@@ -5,6 +5,7 @@ export_credentials.cfg
 
 # Build output (builds are published only as GitHub Releases)
 build/
+dist/
 *.pck
 *.zip
 
@@ -12,3 +13,6 @@ build/
 *.pem
 *.key
 .env
+
+# Python
+__pycache__/

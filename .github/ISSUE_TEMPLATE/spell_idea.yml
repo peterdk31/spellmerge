@@ -1,0 +1,36 @@
+name: Spell idea
+description: Suggest a spell component (form, element, modifier or trigger) or a combo.
+labels: ["idea:spell"]
+body:
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind
+      options:
+        - Form (bolt, beam, nova, rune, orbit, ...)
+        - Element (fire, frost, storm, void, ...)
+        - Modifier (split, pierce, homing, chain, bigger, faster, ...)
+        - Trigger (on hit, on expire, timer, ...)
+        - A combo of existing components
+    validations:
+      required: true
+  - type: input
+    id: name
+    attributes:
+      label: Name
+      description: A generic name, not one from another game or story.
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What does it do?
+    validations:
+      required: true
+  - type: textarea
+    id: interactions
+    attributes:
+      label: Interesting interactions
+      description: Every new component needs at least 2 interesting interactions with others, e.g. "frost + storm = shatter".
+    validations:
+      required: true

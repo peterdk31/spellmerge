@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Ideas and suggestions
+    url: https://github.com/peterdk31/spellmerge/discussions/categories/ideas
+    about: Share an idea for the game. The weekly planning run reads every idea and replies.
+  - name: Spell combos
+    url: https://github.com/peterdk31/spellmerge/discussions/categories/spell-combos
+    about: Show off a combo you found, or one you wish existed.
+  - name: Security problem
+    url: https://github.com/peterdk31/spellmerge/security/advisories/new
+    about: Report a security problem privately, not in a public issue.

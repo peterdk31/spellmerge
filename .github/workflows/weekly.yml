@@ -1,0 +1,185 @@
+# Weekly planning run, Sundays (docs/PLAN.md, "Weekly planning run").
+#
+# control  kill switch and the owner's verified Control panel
+# gather   the week's Discussions, spell ideas, bug reports and merges
+# digest   Claude summarises that untrusted text with read-only tools and no
+#          write token; the result is data
+# publish  replies to each idea in Discussions; the digest is stored
+# session  a normal Claude work session in planning mode (session.yml):
+#          NEXT.md, backlog, milestone progress, the next milestone's design,
+#          contributor task issues, the devlog post, the owner's playtest
+name: weekly
+
+on:
+  schedule:
+    - cron: "0 6 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: develop # never at the same time as a development session
+  cancel-in-progress: false
+
+env:
+  PYTHONPATH: ci
+  CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1"
+
+jobs:
+  control:
+    name: control panel and gate
+    if: github.ref == 'refs/heads/main' && vars.AUTOMATION_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: automation
+    outputs:
+      develop: ${{ steps.gate.outputs.develop }}
+      merge: ${{ steps.gate.outputs.merge }}
+      focus: ${{ steps.gate.outputs.focus }}
+      settings: ${{ steps.gate.outputs.settings }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-issues: write
+      - id: gate
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          AUTOMATION_ENABLED: ${{ vars.AUTOMATION_ENABLED }}
+        run: python3 -m smbot.control --planning --log-title "Weekly planning"
+
+  gather:
+    name: gather the week's community input
+    needs: control
+    if: needs.control.outputs.develop == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+      discussions: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -m smbot.weekly gather
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: weekly-input
+          path: weekly-input.json
+          retention-days: 1
+
+  digest:
+    name: digest (read-only Claude)
+    needs: gather
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: automation
+    outputs:
+      digest: ${{ steps.claude.outputs.structured_output }}
+      status: ${{ steps.account.outputs.status }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: weekly-input
+      - id: read-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+          permission-contents: read
+      - id: prepare
+        run: |
+          {
+            echo "prompt<<__END__"
+            sed "s|{{REPO}}|${GITHUB_REPOSITORY}|g" .github/maintainer/digest.md
+            echo "__END__"
+            echo "schema=$(jq -c . .github/maintainer/schemas/digest.json)"
+          } >> "$GITHUB_OUTPUT"
+      - id: claude
+        continue-on-error: true
+        uses: anthropics/claude-code-action@97c53473391bff1901034d4b454b5bac7ab7a029 # v1.0.239
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github_token: ${{ steps.read-token.outputs.token }}
+          prompt: ${{ steps.prepare.outputs.prompt }}
+          claude_args: >-
+            --max-turns 30
+            --allowedTools "Read,Glob,Grep"
+            --disallowedTools "Bash,Write,Edit,MultiEdit,NotebookEdit,WebFetch,WebSearch"
+            --json-schema '${{ steps.prepare.outputs.schema }}'
+      - id: account-token
+        if: always()
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-issues: write
+      - id: account
+        if: always()
+        env:
+          GH_TOKEN: ${{ steps.account-token.outputs.token }}
+          EXEC_FILE: ${{ steps.claude.outputs.execution_file }}
+          FAILED: ${{ steps.claude.outcome != 'success' }}
+        run: python3 -m smbot.session account --file "${EXEC_FILE:-/nonexistent}" --kind plan $([ "$FAILED" = true ] && echo --step-failed)
+
+  publish-digest:
+    name: answer ideas and store the digest
+    needs: digest
+    if: needs.digest.outputs.status == 'ok' && needs.digest.outputs.digest != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: automation
+    permissions:
+      contents: read
+      discussions: write # replies to ideas (the bot app has no Discussions permission)
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: weekly-input
+      - id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-issues: write
+      - env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          DISCUSSIONS_TOKEN: ${{ github.token }}
+          DIGEST: ${{ needs.digest.outputs.digest }}
+        run: python3 -m smbot.weekly publish-digest
+
+  session:
+    name: planning session
+    needs: [control, publish-digest]
+    if: always() && needs.control.outputs.develop == 'true'
+    uses: ./.github/workflows/session.yml
+    with:
+      mode: plan
+      focus: ${{ needs.control.outputs.focus }}
+      settings: ${{ needs.control.outputs.settings }}
+      merge: ${{ needs.control.outputs.merge }}
+    secrets: inherit
+    permissions:
+      contents: read
+      checks: read
+      actions: write
+      discussions: write

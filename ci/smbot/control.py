@@ -92,6 +92,7 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--commands", action="store_true", help="carry out owner commands (needs the app token)")
     ap.add_argument("--log-title", default="Hourly check")
+    ap.add_argument("--planning", action="store_true", help="the weekly planning session doesn't need a task")
     args = ap.parse_args(argv)
 
     cfg = config_mod.load()
@@ -123,7 +124,7 @@ def main(argv: list[str] | None = None) -> int:
         st = state.update(cfg, apply, "control: panel and owner commands")
 
     task = nexttask.next_task()
-    decision = decide(kill_switch_on, result, st, now, cfg.timezone, task is not None)
+    decision = decide(kill_switch_on, result, st, now, cfg.timezone, task is not None or args.planning)
     if log:
         dailylog.post(cfg, args.log_title, log, mention_owner=mention)
 

@@ -1,18 +1,9 @@
 # Hourly check and development session (docs/PLAN.md, "Self-driven progress").
 #
-# control   every hour: verified Control panel, owner commands, the gate
-# implement Claude takes the top task from docs/NEXT.md and opens a PR
-# critique  a separate Claude session with fresh context reviews it critically
-# revise    Claude revises based on the critique
-# final     a fresh Claude session decides: approve or not (a verdict as data)
-# merge     a plain script merges only if the verdict, checks and hard rules
-#           all pass, pinned to the reviewed commit
-# finish    Daily log, task failures, and another session while budget lasts
+# control  every hour: verified Control panel, owner commands, claims, the gate
+# session  when the gate allows: one Claude work session (session.yml)
 #
-# Each Claude step runs in its own job on a fresh runner, so a session can't
-# tamper with the reviewers or the merge script. Reviewers get a read-only
-# token and read-only tools. Only scheduled and manual runs on main; no job
-# here runs PR code from outside contributors.
+# Only scheduled and manual runs on main; nothing here runs PR code.
 name: develop
 
 on:
@@ -34,8 +25,6 @@ concurrency:
 
 env:
   PYTHONPATH: ci
-  # Best-effort removal of secrets from the environment of Claude's subprocesses.
-  CLAUDE_CODE_SUBPROCESS_ENV_SCRUB: "1"
 
 jobs:
   control:
@@ -72,274 +61,20 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: python3 -m smbot.claims hourly
 
-  implement:
-    name: implement the next task
+  session:
+    name: development session
     needs: control
     if: needs.control.outputs.develop == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 120
-    environment: automation
-    outputs:
-      status: ${{ steps.account.outputs.status }}
-      result: ${{ steps.claude.outputs.structured_output }}
-      task: ${{ steps.prepare.outputs.task }}
-      kind: ${{ steps.prepare.outputs.kind }}
-      pr: ${{ steps.result.outputs.pr }}
-      sha: ${{ steps.info.outputs.sha }}
-    steps:
-      - id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-        with:
-          app-id: ${{ secrets.BOT_APP_ID }}
-          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
-          permission-contents: write
-          permission-issues: write
-          permission-pull-requests: write
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          token: ${{ steps.app-token.outputs.token }}
-          fetch-depth: 0
-      - name: Git identity of the bot
-        run: |
-          git config --global user.name "spellmerge-bot[bot]"
-          git config --global user.email "343592621+spellmerge-bot[bot]@users.noreply.github.com"
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/spellmerge-godot
-          key: godot-${{ hashFiles('ci/build/godot.env') }}
-      - name: Prepare Godot for checks
-        run: ci/build/build.sh --quick
-      - id: prepare
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          FOCUS: ${{ needs.control.outputs.focus }}
-        run: |
-          python3 -m smbot.session prepare
-          echo "schema=$(jq -c . .github/maintainer/schemas/session.json)" >> "$GITHUB_OUTPUT"
-      - id: claude
-        continue-on-error: true
-        uses: anthropics/claude-code-action@97c53473391bff1901034d4b454b5bac7ab7a029 # v1.0.239
-        with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          github_token: ${{ steps.app-token.outputs.token }}
-          bot_id: "343592621"
-          bot_name: "spellmerge-bot[bot]"
-          prompt: ${{ steps.prepare.outputs.prompt }}
-          claude_args: >-
-            --max-turns 150
-            --allowedTools "Read,Write,Edit,MultiEdit,Glob,Grep,Bash(git:*),Bash(gh pr:*),Bash(gh issue view:*),Bash(gh issue comment:*),Bash(tools/check.sh:*),Bash(ci/build/build.sh --quick),Bash(ls:*),Bash(mkdir:*),Bash(mv:*),Bash(cp:*),Bash(rm:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(diff:*),Bash(sort:*),Bash(find:*)"
-            --disallowedTools "WebFetch,WebSearch"
-            --json-schema '${{ steps.prepare.outputs.schema }}'
-      - id: account-token
-        if: always()
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-        with:
-          app-id: ${{ secrets.BOT_APP_ID }}
-          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
-          permission-contents: write
-          permission-issues: write
-      - id: account
-        if: always()
-        env:
-          GH_TOKEN: ${{ steps.account-token.outputs.token }}
-          EXEC_FILE: ${{ steps.claude.outputs.execution_file }}
-          FAILED: ${{ steps.claude.outcome != 'success' }}
-        run: python3 -m smbot.session account --file "${EXEC_FILE:-/nonexistent}" --kind dev $([ "$FAILED" = true ] && echo --step-failed)
-      - id: result
-        if: steps.account.outputs.status == 'ok' && steps.claude.outputs.structured_output != ''
-        env:
-          RESULT: ${{ steps.claude.outputs.structured_output }}
-        run: |
-          echo "$RESULT" | jq .
-          if [ "$(echo "$RESULT" | jq -r .status)" = pr_opened ]; then
-            echo "pr=$(echo "$RESULT" | jq -r '.pr_number // empty')" >> "$GITHUB_OUTPUT"
-          fi
-      - id: info
-        if: steps.result.outputs.pr != ''
-        env:
-          GH_TOKEN: ${{ steps.account-token.outputs.token }}
-          PR: ${{ steps.result.outputs.pr }}
-        run: python3 -m smbot.session pr-info --pr "$PR" --require-own
-
-  critique:
-    name: critique (fresh context)
-    needs: [control, implement]
-    if: needs.implement.outputs.pr != '' && needs.implement.outputs.sha != ''
-    uses: ./.github/workflows/review.yml
+    uses: ./.github/workflows/session.yml
     with:
-      pr: ${{ needs.implement.outputs.pr }}
-      sha: ${{ needs.implement.outputs.sha }}
-      round: critique
+      mode: develop
+      focus: ${{ needs.control.outputs.focus }}
+      settings: ${{ needs.control.outputs.settings }}
+      merge: ${{ needs.control.outputs.merge }}
+      chain_started: ${{ inputs.chain_started }}
     secrets: inherit
-
-  revise:
-    name: revise after the critique
-    needs: [control, implement, critique]
-    if: needs.critique.outputs.needs_revision == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 90
-    environment: automation
-    outputs:
-      status: ${{ steps.account.outputs.status }}
-      sha: ${{ steps.info.outputs.sha }}
-    steps:
-      - id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-        with:
-          app-id: ${{ secrets.BOT_APP_ID }}
-          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
-          permission-contents: write
-          permission-issues: write
-          permission-pull-requests: write
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          token: ${{ steps.app-token.outputs.token }}
-          fetch-depth: 0
-      - name: Git identity of the bot
-        run: |
-          git config --global user.name "spellmerge-bot[bot]"
-          git config --global user.email "343592621+spellmerge-bot[bot]@users.noreply.github.com"
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/spellmerge-godot
-          key: godot-${{ hashFiles('ci/build/godot.env') }}
-      - name: Prepare Godot for checks
-        run: ci/build/build.sh --quick
-      - id: prepare
-        env:
-          REVIEW: ${{ needs.critique.outputs.review }}
-          PR: ${{ needs.implement.outputs.pr }}
-        run: |
-          python3 -m smbot.session revise-prompt --pr "$PR"
-          echo "schema=$(jq -c . .github/maintainer/schemas/session.json)" >> "$GITHUB_OUTPUT"
-      - id: claude
-        continue-on-error: true
-        uses: anthropics/claude-code-action@97c53473391bff1901034d4b454b5bac7ab7a029 # v1.0.239
-        with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          github_token: ${{ steps.app-token.outputs.token }}
-          bot_id: "343592621"
-          bot_name: "spellmerge-bot[bot]"
-          prompt: ${{ steps.prepare.outputs.prompt }}
-          claude_args: >-
-            --max-turns 80
-            --allowedTools "Read,Write,Edit,MultiEdit,Glob,Grep,Bash(git:*),Bash(gh pr:*),Bash(tools/check.sh:*),Bash(ci/build/build.sh --quick),Bash(ls:*),Bash(mkdir:*),Bash(mv:*),Bash(cp:*),Bash(rm:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(diff:*),Bash(sort:*),Bash(find:*)"
-            --disallowedTools "WebFetch,WebSearch"
-            --json-schema '${{ steps.prepare.outputs.schema }}'
-      - id: account-token
-        if: always()
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-        with:
-          app-id: ${{ secrets.BOT_APP_ID }}
-          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
-          permission-contents: write
-          permission-issues: write
-      - id: account
-        if: always()
-        env:
-          GH_TOKEN: ${{ steps.account-token.outputs.token }}
-          EXEC_FILE: ${{ steps.claude.outputs.execution_file }}
-          FAILED: ${{ steps.claude.outcome != 'success' }}
-        run: python3 -m smbot.session account --file "${EXEC_FILE:-/nonexistent}" --kind dev $([ "$FAILED" = true ] && echo --step-failed)
-      - id: info
-        if: steps.account.outputs.status == 'ok'
-        env:
-          GH_TOKEN: ${{ steps.account-token.outputs.token }}
-          PR: ${{ needs.implement.outputs.pr }}
-        run: python3 -m smbot.session pr-info --pr "$PR"
-
-  final:
-    name: final review (fresh context)
-    needs: [control, implement, critique, revise]
-    if: >-
-      always() && needs.implement.outputs.pr != '' && needs.critique.result == 'success'
-      && (needs.revise.result == 'skipped' || needs.revise.outputs.status == 'ok')
-    uses: ./.github/workflows/review.yml
-    with:
-      pr: ${{ needs.implement.outputs.pr }}
-      sha: ${{ needs.revise.outputs.sha || needs.implement.outputs.sha }}
-      round: final
-    secrets: inherit
-
-  merge:
-    name: merge (script, no AI)
-    needs: [control, implement, revise, final]
-    if: always() && needs.final.outputs.mergeable == 'true' && needs.control.outputs.merge == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    environment: automation
     permissions:
       contents: read
-      checks: read # READ_TOKEN reads check results; the app has no Checks permission
-    outputs:
-      merged: ${{ steps.merge.outputs.merged }}
-      message: ${{ steps.merge.outputs.message }}
-    steps:
-      - name: Clean checkout of main (the merge script and rules come from here)
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-        with:
-          app-id: ${{ secrets.BOT_APP_ID }}
-          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
-          permission-contents: write
-          permission-pull-requests: write
-      - id: merge
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          READ_TOKEN: ${{ github.token }}
-          PR: ${{ needs.implement.outputs.pr }}
-          SHA: ${{ needs.final.outputs.sha }}
-        run: |
-          set +e
-          message=$(python3 -m smbot.merge --pr "$PR" --sha "$SHA")
-          status=$?
-          echo "$message"
-          echo "message=$message" >> "$GITHUB_OUTPUT"
-          echo "merged=$([ $status -eq 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-
-  finish:
-    name: Daily log and next session
-    needs: [control, implement, critique, revise, final, merge]
-    if: always() && needs.control.outputs.develop == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    environment: automation
-    permissions:
-      contents: read
-      actions: write # start the next session in the chain
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - id: app-token
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-        with:
-          app-id: ${{ secrets.BOT_APP_ID }}
-          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
-          permission-contents: write
-          permission-issues: write
-      - id: finish
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          TASK: ${{ needs.implement.outputs.task }}
-          TASK_KIND: ${{ needs.implement.outputs.kind }}
-          PR: ${{ needs.implement.outputs.pr }}
-          IMPLEMENT_STATUS: ${{ needs.implement.outputs.result && fromJSON(needs.implement.outputs.result).status || needs.implement.outputs.status }}
-          IMPLEMENT_SUMMARY: ${{ needs.implement.outputs.result && fromJSON(needs.implement.outputs.result).summary || '' }}
-          FINAL_REVIEW: ${{ needs.final.outputs.review }}
-          MERGED: ${{ needs.merge.outputs.merged }}
-          MERGE_RESULT: ${{ needs.merge.outputs.message }}
-          SETTINGS: ${{ needs.control.outputs.settings }}
-          CHAIN_STARTED: ${{ inputs.chain_started }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: python3 -m smbot.session finish
-      - name: Start the next session
-        if: steps.finish.outputs.again == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          STARTED: ${{ steps.finish.outputs.chain_started }}
-        run: gh workflow run develop.yml --ref main -f chain_started="$STARTED"
+      checks: read
+      actions: write
+      discussions: write

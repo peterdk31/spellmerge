@@ -17,7 +17,7 @@ Most of M0 lives in owner-only paths (`.github/`, `ci/`), which the bot can't ch
 | 3 | **Autonomy:** plan files, hourly development sessions, Daily log, stall and token alarms | Built (#6, #7) |
 | 4 | **Owner control:** Control panel and owner commands | Built (#6) |
 | 5 | **Contribution pipeline:** PR rating and merging, CLA, PR and issue templates, no-git submission forms, claims, labels, project board | Built (#8) |
-| 6 | **Community:** scaling community voting (dormant until there are voters), Discussions categories, copyright report form and quarantine, bug report form | In progress: built in #8 except the weekly planning run |
+| 6 | **Community:** scaling community voting (dormant until there are voters), Discussions categories, copyright report form and quarantine, bug report form | Built (#8, #10); Discussions categories are created by hand |
 | 7 | **Onboarding:** AGENTS.md, CLAUDE.md, llms.txt, CONTRIBUTING.md, area READMEs, local check script, Contribute page | In progress: area READMEs and llms.txt are Claude's first tasks in docs/NEXT.md |
 
 ## Dry runs

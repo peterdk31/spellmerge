@@ -22,10 +22,11 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from . import alarms, dailylog, gh, nexttask, pacing, state
+from . import alarms, dailylog, gh, nexttask, pacing, state, weekly
 from . import config as config_mod
 
 MAINTAINER = Path(".github/maintainer")
+FENCE = "`" * 3
 MAX_FAILURES = 2
 
 _LIMIT = re.compile(r"usage limit|limit reached|reached (?:your |the )?(?:\w+ )?limit|rate[ _-]?limit|\b429\b|"
@@ -133,6 +134,20 @@ def prepare(cfg: config_mod.Config, st: dict[str, Any], focus: str, today: dt.da
     return {"prompt": prompt, "branch": branch, "task": task or "", "kind": kind}
 
 
+def prepare_plan(cfg: config_mod.Config, st: dict[str, Any], focus: str, today: dt.date) -> dict[str, str]:
+    stored = weekly.load_digest(cfg) or {}
+    digest = json.dumps(stored.get("digest", {"note": "no community digest this week"}), indent=2)
+    branch = f"claude/{today:%Y%m%d}-weekly-planning"
+    prompt = render((MAINTAINER / "plan.md").read_text(), {
+        "DIGEST": digest.replace(FENCE, "` ` `"),  # keep the digest inside its code block
+        "FOCUS": focus or "(none)",
+        "INSTRUCTIONS": instructions_text(st.get("pending_instructions", [])),
+        "BRANCH": branch,
+        "REPO": cfg.repo,
+    })
+    return {"prompt": prompt, "branch": branch, "task": "Weekly planning", "kind": "plan"}
+
+
 def review_prompt(cfg: config_mod.Config, pr: int, sha: str, round_: str) -> str:
     return render((MAINTAINER / "review.md").read_text(), {
         "PR": str(pr), "SHA": sha, "REPO": cfg.repo,
@@ -226,6 +241,8 @@ def finish(cfg: config_mod.Config, env: dict[str, str]) -> dict[str, str]:
 
     if merged:
         lines.append(f"Merged #{pr}: {task or 'owner instructions'}")
+    elif env.get("TASK_KIND") == "plan" and status == "nothing_to_do":
+        lines.append("Weekly planning: no plan changes needed this week")
     elif status == "blocked":
         lines.append(f"Marked blocked: {task} ({env.get('IMPLEMENT_SUMMARY', '')[:300]})")
     elif pr:
@@ -244,14 +261,15 @@ def finish(cfg: config_mod.Config, env: dict[str, str]) -> dict[str, str]:
     started = env.get("CHAIN_STARTED") or pacing.iso(now)
     elapsed = now - pacing.parse_time(started)
     budget = pacing.budget(st, now, settings.get("dev_intensity", 90), settings.get("weekly_share", 90))
-    again = merged and budget.allowed and elapsed < dt.timedelta(hours=2) and nexttask.next_task() is not None
+    again = (env.get("TASK_KIND") != "plan" and merged and budget.allowed and elapsed < dt.timedelta(hours=2)
+             and nexttask.next_task() is not None)
     return {"again": str(again).lower(), "chain_started": started}
 
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
-    sub.add_parser("prepare")
+    sub.add_parser("prepare").add_argument("--mode", choices=("develop", "plan"), default="develop")
     acc = sub.add_parser("account")
     acc.add_argument("--file", type=Path, required=True)
     acc.add_argument("--kind", choices=("dev", "review", "rate", "plan"), required=True)
@@ -271,7 +289,12 @@ def main(argv: list[str] | None = None) -> int:
     cfg = config_mod.load()
     if args.cmd == "prepare":
         st, _ = state.load(cfg)
-        write_outputs(prepare(cfg, st, os.environ.get("FOCUS", ""), dt.datetime.now(dt.timezone.utc).date()))
+        today = dt.datetime.now(dt.timezone.utc).date()
+        build = prepare_plan if args.mode == "plan" else prepare
+        out = build(cfg, st, os.environ.get("FOCUS", ""), today)
+        schema = MAINTAINER / "schemas" / ("plan.json" if args.mode == "plan" else "session.json")
+        out["schema"] = json.dumps(json.loads(schema.read_text()), separators=(",", ":"))
+        write_outputs(out)
     elif args.cmd == "account":
         write_outputs({"status": account(cfg, args.file, args.kind, args.step_failed)})
     elif args.cmd == "review-prompt":

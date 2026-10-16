@@ -21,6 +21,10 @@ class Config:
     owner: Identity
     bot: Identity
     dependency_bots: tuple[str, ...]
+    control_panel_issue: int
+    daily_log_issue: int
+    timezone: str
+    state_branch: str
 
 
 def load(path: Path | None = None) -> Config:
@@ -30,4 +34,8 @@ def load(path: Path | None = None) -> Config:
         owner=Identity(**data["owner"]),
         bot=Identity(**data["bot"]),
         dependency_bots=tuple(data["dependency_bots"]),
+        control_panel_issue=data["issues"]["control_panel"],
+        daily_log_issue=data["issues"]["daily_log"],
+        timezone=data["timezone"],
+        state_branch=data["state_branch"],
     )

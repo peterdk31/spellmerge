@@ -1,11 +1,13 @@
 # Daily run (docs/PLAN.md, "Daily run"), 03:00 UTC on main.
 #
-# Built so far: build and smoke test (step 6) and release (step 7). Triage,
-# claims, rating, merging and development are added by later M0 work.
+# Built so far: the control gate, build and smoke test (step 6), release
+# (step 7), alarms and the Daily log summary (step 8). Triage, claims, rating
+# and merging are added by later M0 work; development runs hourly (develop.yml).
 #
-# Every job is skipped when the kill switch (repository variable
-# AUTOMATION_ENABLED) is not "true". Only jobs that need a secret use the
-# protected "automation" environment, and no job here runs PR code.
+# Nothing runs unless the kill switch (repository variable AUTOMATION_ENABLED)
+# is "true" and the owner's verified Control panel allows it. Only jobs that
+# need a secret use the protected "automation" environment, and no job here
+# runs PR code.
 name: daily
 
 on:
@@ -21,9 +23,40 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  control:
+    name: control panel and gate
+    if: github.ref == 'refs/heads/main' && vars.AUTOMATION_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: automation
+    permissions:
+      contents: read
+    outputs:
+      automation: ${{ steps.gate.outputs.automation }}
+      merge: ${{ steps.gate.outputs.merge }}
+      settings: ${{ steps.gate.outputs.settings }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+          permission-contents: write # the automation-state branch
+          permission-issues: write # the Daily log
+      - id: gate
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          AUTOMATION_ENABLED: ${{ vars.AUTOMATION_ENABLED }}
+          PYTHONPATH: ci
+        run: python3 -m smbot.control --log-title "Daily run"
+
   build:
     name: build and smoke test
-    if: github.ref == 'refs/heads/main' && vars.AUTOMATION_ENABLED == 'true'
+    needs: control
+    if: needs.control.outputs.automation == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
@@ -156,3 +189,62 @@ jobs:
           VERSION: ${{ needs.build.outputs.version }}
           CHANNEL: ${{ needs.build.outputs.channel }}
         run: ci/build/itch.sh "$TARGET" "$VERSION" "$CHANNEL" dist
+
+  alarms:
+    name: stall and inactivity alarms
+    needs: control
+    if: needs.control.outputs.automation == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: automation
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-issues: write
+      - env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PYTHONPATH: ci
+        run: python3 -m smbot.alarms check
+
+  summary:
+    name: post to the Daily log
+    needs: [control, build, release, pages, itch, alarms]
+    if: always() && needs.control.outputs.automation == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: automation
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.BOT_APP_ID }}
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+          permission-contents: read
+          permission-issues: write
+      - env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PYTHONPATH: ci
+          VERSION: ${{ needs.build.outputs.version }}
+          CHANNEL: ${{ needs.build.outputs.channel }}
+          SETTINGS: ${{ needs.control.outputs.settings }}
+          RESULT_BUILD: ${{ needs.build.result }}
+          RESULT_RELEASE: ${{ needs.release.result }}
+          RESULT_PAGES: ${{ needs.pages.result }}
+          RESULT_ITCH: ${{ needs.itch.result }}
+          RESULT_ALARMS: ${{ needs.alarms.result }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: python3 -m smbot.summary

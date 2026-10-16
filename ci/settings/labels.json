@@ -31,5 +31,7 @@
   { "name": "crash",            "color": "b60205", "description": "The game crashes; blocks stable releases" },
   { "name": "blocker",          "color": "b60205", "description": "Blocks play or progress; blocks stable releases" },
 
+  { "name": "alarm",            "color": "e99695", "description": "Raised by the bot; needs the owner" },
+
   { "name": "claude:working",   "color": "d93f0b", "description": "Claude is working on this; don't claim" }
 ]

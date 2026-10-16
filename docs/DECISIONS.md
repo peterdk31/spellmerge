@@ -6,8 +6,7 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 
 **Decided by:** owner.
 **Context:** GitHub never fired this repository's schedule: no scheduled run of any workflow on its first day, through two cron changes and turning the workflow off and on. When a session chain stops (an error, a usage limit, an empty queue), nothing started it again.
-**Decision:** `develop.yml` also runs on every push to `main`, so any merge, by the bot or the owner, restarts work if the chain had stopped. The gate still checks the budget, the queue and pauses, and the `develop` concurrency group keeps it to one session at a time. The hourly schedule stays for when GitHub does fire it. The Claude steps allow `spellmerge-bot[bot]` as well as `github-actions[bot]`, because a run after the bot's own merge is started by the bot.
-**Consequence:** a push during a session queues one more run after it. If a chained run is already waiting, GitHub cancels it in favour of the newer one, so an extra cancelled run can appear in the Actions list.
+**Decision:** a push to `main` (any merge, by the bot or the owner) runs a small `kick` job in `develop.yml`. If no develop run is running or queued, it starts one with `workflow_dispatch`; otherwise the running chain carries on by itself. The kick job runs no Claude step, because `claude-code-action` doesn't accept `push` events, and it sits outside the `develop` concurrency group, so it never waits behind a session. The hourly schedule stays for when GitHub does fire it.
 
 ## 2026-10-16: Sessions don't wait for each other or for the owner
 

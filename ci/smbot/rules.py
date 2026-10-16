@@ -94,7 +94,8 @@ class BannedApi:
     pattern: re.Pattern[str]
     message: str
     fix: str
-    allowed_in_core: bool = False
+    # core/ (bot-maintained) and tests/ (never exported) may load and read files.
+    relaxed_in_core_and_tests: bool = False
 
 
 def _rx(pattern: str) -> re.Pattern[str]:
@@ -163,7 +164,7 @@ BANNED_APIS = (
             r"save_encrypted_pass)" + _NOT_USER_PATH),
         "File access is only allowed inside user:// and the path must be written out as text.",
         'Use a literal path starting with "user://", or load content through the content registry.',
-        allowed_in_core=True,
+        relaxed_in_core_and_tests=True,
     ),
     BannedApi(
         "dynamic-load",
@@ -171,7 +172,7 @@ BANNED_APIS = (
             r"\s*\(\s*(?![\"']res://)|\bstr_to_var\s*\("),
         "Loading from a computed path (or from user://) could run code that was never reviewed.",
         'Use a literal "res://..." path or preload(); dynamic loading is done by core/registry.',
-        allowed_in_core=True,
+        relaxed_in_core_and_tests=True,
     ),
 )
 
@@ -373,10 +374,10 @@ def _line_of(text: str, index: int) -> int:
 
 
 def check_banned_apis(path: str, text: str) -> list[Finding]:
-    in_core = path.startswith("core/")
+    relaxed = path.startswith(("core/", "tests/"))
     findings = []
     for api in BANNED_APIS:
-        if api.allowed_in_core and in_core:
+        if api.relaxed_in_core_and_tests and relaxed:
             continue
         for m in api.pattern.finditer(text):
             findings.append(Finding("banned-api", "error", path, _line_of(text, m.start()),

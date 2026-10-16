@@ -69,9 +69,10 @@ class BannedApiTest(unittest.TestCase):
             with self.subTest(code=code):
                 self.assertEqual(banned(code), [], f"wrongly flagged: {code}")
 
-    def test_core_may_load_dynamically_but_not_execute(self) -> None:
-        self.assertEqual(banned("var res = load(path)", "core/registry/registry.gd"), [])
-        self.assertTrue(banned('OS.execute("x", [])', "core/registry/registry.gd"))
+    def test_core_and_tests_may_load_dynamically_but_not_execute(self) -> None:
+        for path in ("core/registry/registry.gd", "tests/smoke/boot_smoke.gd"):
+            self.assertEqual(banned("var res = load(path)", path), [])
+            self.assertTrue(banned('OS.execute("x", [])', path))
 
     def test_reports_line_numbers(self) -> None:
         found = rules.check_banned_apis("a.gd", 'extends Node\n\nfunc _ready() -> void:\n\tOS.execute("x", [])\n')

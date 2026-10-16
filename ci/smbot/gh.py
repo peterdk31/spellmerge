@@ -32,17 +32,17 @@ def api(path: str, *args: str, input: Any = None, token: str | None = None) -> A
     return json.loads(out) if out.strip() else None
 
 
-def api_paginated(path: str, *args: str) -> list[Any]:
+def api_paginated(path: str, *args: str, token: str | None = None) -> list[Any]:
     """All pages of a REST list endpoint, flattened into one list."""
-    out = run("api", "-H", "X-GitHub-Api-Version: 2022-11-28", "--paginate", "--slurp", path, *args)
+    out = run("api", "-H", "X-GitHub-Api-Version: 2022-11-28", "--paginate", "--slurp", path, *args, token=token)
     return [item for page in json.loads(out) for item in page]
 
 
-def graphql(query: str, **variables: Any) -> Any:
+def graphql(query: str, *, gh_token: str | None = None, **variables: Any) -> Any:
     args = ["api", "graphql", "-f", f"query={query}"]
     for key, value in variables.items():
         args += ["-F" if isinstance(value, (int, bool)) else "-f", f"{key}={value}"]
-    data = json.loads(run(*args))
+    data = json.loads(run(*args, token=gh_token))
     if data.get("errors"):
         raise GhError(f"GraphQL errors: {data['errors']}")
     return data["data"]

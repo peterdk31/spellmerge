@@ -66,6 +66,11 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           AUTOMATION_ENABLED: ${{ vars.AUTOMATION_ENABLED }}
         run: python3 -m smbot.control --commands --log-title "Hourly check"
+      - name: Claims (/claim comments)
+        if: steps.gate.outputs.automation == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: python3 -m smbot.claims hourly
 
   implement:
     name: implement the next task
@@ -78,6 +83,7 @@ jobs:
       status: ${{ steps.account.outputs.status }}
       result: ${{ steps.claude.outputs.structured_output }}
       task: ${{ steps.prepare.outputs.task }}
+      kind: ${{ steps.prepare.outputs.kind }}
       pr: ${{ steps.result.outputs.pr }}
       sha: ${{ steps.info.outputs.sha }}
     steps:
@@ -320,6 +326,7 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           TASK: ${{ needs.implement.outputs.task }}
+          TASK_KIND: ${{ needs.implement.outputs.kind }}
           PR: ${{ needs.implement.outputs.pr }}
           IMPLEMENT_STATUS: ${{ needs.implement.outputs.result && fromJSON(needs.implement.outputs.result).status || needs.implement.outputs.status }}
           IMPLEMENT_SUMMARY: ${{ needs.implement.outputs.result && fromJSON(needs.implement.outputs.result).summary || '' }}

@@ -1,0 +1,30 @@
+name: Report a copyright concern
+description: Something in Spellmerge may copy someone else's work. The asset is taken out of the next build while it's checked.
+labels: ["copyright"]
+body:
+  - type: markdown
+    attributes:
+      value: Thank you for reporting this. When in doubt, we leave it out. The asset is replaced by a placeholder right away and excluded from the next build while it's investigated.
+  - type: input
+    id: path
+    attributes:
+      label: File
+      description: The path of the file in the repository, e.g. content/enemies/slime/slime.png
+    validations:
+      required: true
+  - type: textarea
+    id: original
+    attributes:
+      label: Original work
+      description: What does it copy? A link to the original helps.
+    validations:
+      required: true
+  - type: dropdown
+    id: relation
+    attributes:
+      label: Are you the rights holder?
+      options:
+        - Yes, it copies my work
+        - No, I noticed it
+    validations:
+      required: true

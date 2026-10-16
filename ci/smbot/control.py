@@ -72,9 +72,9 @@ def decide(kill_switch_on: bool, result: panel.PanelResult, st: dict, now: dt.da
         if not b.allowed:
             develop = False
             reasons.append(b.reason)
-    if develop and not has_task and not st.get("pending_instructions"):
+    if develop and not has_task and not st.get("pending_instructions") and not st.get("followups"):
         develop = False
-        reasons.append("no task in docs/NEXT.md and no owner instructions")
+        reasons.append("no task in docs/NEXT.md, no follow-ups and no owner instructions")
     return Decision(True, develop, merge, reasons)
 
 

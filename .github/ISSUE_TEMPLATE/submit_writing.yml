@@ -1,0 +1,50 @@
+name: Submit writing (no git needed)
+description: Lore, dialogue or item descriptions. We check it, then open the pull request for you.
+labels: ["submission:writing"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for writing for Spellmerge! The tone is a self-aware, slightly comic magic world with real stakes. Check the story canon (docs/STORY.md, once it exists) first.
+  - type: input
+    id: task
+    attributes:
+      label: Task
+      description: The issue this is for, if any (e.g. #123).
+  - type: input
+    id: where
+    attributes:
+      label: Where should it go?
+      description: A path under content/story/, if there's no task issue, e.g. content/story/lore/the_first_merge.json
+  - type: input
+    id: title
+    attributes:
+      label: Title
+  - type: textarea
+    id: text
+    attributes:
+      label: Text
+    validations:
+      required: true
+  - type: dropdown
+    id: license
+    attributes:
+      label: License
+      options:
+        - CC-BY-SA-4.0 (the project's default)
+        - CC-BY-4.0
+        - CC0-1.0
+    validations:
+      required: true
+  - type: input
+    id: credit
+    attributes:
+      label: Credit as
+  - type: checkboxes
+    id: agreement
+    attributes:
+      label: Agreement
+      options:
+        - label: I have read the CLA and I agree to it (https://github.com/peterdk31/spellmerge/blob/main/CLA.md)
+          required: true
+        - label: I made this, or I have the right to submit it, and it isn't copied from another work
+          required: true

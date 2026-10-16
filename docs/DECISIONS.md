@@ -2,6 +2,12 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-16: Entry script names and event names in area READMEs
+
+**Decided by:** Claude (details the plan left open).
+**Context:** docs/PLAN.md gives `combat/combat.gd` as an example entry script but doesn't list the rest, and the event bus doesn't exist yet.
+**Decision:** Each gameplay sub-area's entry script is `gameplay/<area>/<area>.gd`. Event names in the READMEs are marked provisional until the event bus is built in M1, and the READMEs are updated then. `core/` services get their entry scripts and sections when built.
+
 ## 2026-10-16: Content READMEs name no field or file layout before the example exists
 
 **Decided by:** Claude, within the plan.

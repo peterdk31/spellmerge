@@ -451,6 +451,8 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
+      issues: read # Contribute page: wanted-now counts
+      pull-requests: read # Contribute page: recently merged
       pages: write
       id-token: write
     environment:

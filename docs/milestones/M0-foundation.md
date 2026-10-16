@@ -14,11 +14,11 @@ Most of M0 lives in owner-only paths (`.github/`, `ci/`), which the bot can't ch
 | --- | --- | --- |
 | 1 | **Security:** rules check, protected paths, custom app, protected environment, REUSE licence check | Built (#2) |
 | 2 | **Build and release:** CI, daily release (web demo and desktop), smoke tests, nightly/stable channels | Built (#3) |
-| 3 | **Autonomy:** plan files, hourly development sessions, Daily log, stall and token alarms | In progress |
-| 4 | **Owner control:** Control panel and owner commands | In progress |
-| 5 | **Contribution pipeline:** PR rating and merging, CLA, PR and issue templates, no-git submission forms, claims, labels, project board | Not started |
-| 6 | **Community:** scaling community voting (dormant until there are voters), Discussions categories, copyright report form and quarantine, bug report form | Not started |
-| 7 | **Onboarding:** AGENTS.md, CLAUDE.md, llms.txt, CONTRIBUTING.md, area READMEs, local check script, Contribute page | Not started |
+| 3 | **Autonomy:** plan files, hourly development sessions, Daily log, stall and token alarms | Built (#6, #7) |
+| 4 | **Owner control:** Control panel and owner commands | Built (#6) |
+| 5 | **Contribution pipeline:** PR rating and merging, CLA, PR and issue templates, no-git submission forms, claims, labels, project board | Built (#8) |
+| 6 | **Community:** scaling community voting (dormant until there are voters), Discussions categories, copyright report form and quarantine, bug report form | In progress: built in #8 except the weekly planning run |
+| 7 | **Onboarding:** AGENTS.md, CLAUDE.md, llms.txt, CONTRIBUTING.md, area READMEs, local check script, Contribute page | In progress: area READMEs and llms.txt are Claude's first tasks in docs/NEXT.md |
 
 ## Dry runs
 

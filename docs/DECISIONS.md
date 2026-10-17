@@ -2,6 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-17: The 4-bot test runs in a separate `Linux Test` export (M1 part 21)
+
+**Decided by:** Claude.
+**Context:** The shipped presets exclude `tests/*`, so the exported game has no `four_bot_smoke.gd`. Dropping the exclusion would put test scripts in every release.
+**Decision:** a fourth preset, `Linux Test`, in `export_presets.cfg` (Claude-maintained) with no exclusion and its own path `build/linux-test/`; the release presets are unchanged. The step that exports it and runs the test is in `ci/build/build.sh` (owner-only), so it is written in `docs/BACKLOG.md` under "Needs an owner decision".
+**Consequence:** until the owner adds the step, the test runs only through `build.sh --quick --tests`.
+
 ## 2026-10-17: The owner inbox
 
 **Decided by:** owner.

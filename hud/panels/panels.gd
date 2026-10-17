@@ -7,20 +7,35 @@ extends CanvasLayer
 ## their numbers, so none stays over the menu. Numbers come only from `player_stats_changed`; the
 ## "MENU" word follows `UIFocus.opened` and `closed` for that player. Nothing is
 ## polled and nothing here takes input, so a player in their overlay never makes
-## another panel wait. The HUD sends no events from here.
+## another panel wait.
+##
+## The overlays (`overlay/`, nodes Root/Overlay1 to Root/Overlay4) open and close
+## with the owner's `overlay` action. The toggle is read here, from the press
+## counter of `core/input` (a tap released within a frame is not lost); each
+## overlay then takes its input through `core/ui_focus`. Nothing is paused. The
+## only event the HUD sends from here is `build_change_requested`, by the stub
+## button of an overlay.
 
 const EventsScript := preload("res://core/events/events.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
+const InputManagerScript := preload("res://core/input/input_manager.gd")
+const OverlayScript := preload("res://hud/panels/overlay/overlay.gd")
 const PlayerPanelScript := preload("res://hud/panels/player_panel/player_panel.gd")
 
 const PLAYER_COUNT: int = 4
+const OVERLAY_ACTION: StringName = &"overlay"
 
-## The event bus and the UI focus service. Only tests set these, before adding
-## the node; otherwise the "Events" and "UIFocus" autoloads.
+## The event bus, the UI focus service and the input manager. Only tests set
+## these, before adding the node; otherwise the "Events", "UIFocus" and
+## "PlayerInput" autoloads.
 var events: EventsScript = null
 var ui_focus: UIFocusScript = null
+var input: InputManagerScript = null
 
 var _panels: Array[PlayerPanelScript] = []
+var _overlays: Array[OverlayScript] = []
+## Per player: the `overlay` press count at the last poll.
+var _seen_overlay: Array[int] = [0, 0, 0, 0]
 var _joined: Array[bool] = [false, false, false, false]
 var _in_room: bool = false
 
@@ -30,10 +45,18 @@ func _ready() -> void:
 		var panel := get_node("Root/Panel%d" % (player + 1)) as PlayerPanelScript
 		panel.visible = false
 		_panels.append(panel)
+		_overlays.append(get_node("Root/Overlay%d" % (player + 1)) as OverlayScript)
 	if events == null:
 		events = get_node_or_null("/root/Events") as EventsScript
 	if ui_focus == null:
 		ui_focus = get_node_or_null("/root/UIFocus") as UIFocusScript
+	if input == null:
+		input = get_node_or_null("/root/PlayerInput") as InputManagerScript
+	if input != null:
+		for player in PLAYER_COUNT:
+			_seen_overlay[player] = input.get_press_count(player, OVERLAY_ACTION)
+	for overlay in _overlays:
+		overlay.bind(events, ui_focus)
 	if events != null:
 		events.player_joined.connect(_on_player_joined)
 		events.player_left.connect(_on_player_left)
@@ -44,6 +67,31 @@ func _ready() -> void:
 	if ui_focus != null:
 		ui_focus.opened.connect(_on_overlay_opened)
 		ui_focus.closed.connect(_on_overlay_closed)
+
+
+func _process(_delta: float) -> void:
+	poll()
+
+
+## Toggle the overlay of every joined player who pressed `overlay` since the
+## last poll (several presses in one frame toggle once). Called every frame by
+## _process; tests call it directly. One player's press never touches another.
+func poll() -> void:
+	if input == null:
+		return
+	for player in PLAYER_COUNT:
+		var count: int = input.get_press_count(player, OVERLAY_ACTION)
+		var presses: int = count - _seen_overlay[player]
+		_seen_overlay[player] = count
+		if presses > 0 and input.is_joined(player):
+			_overlays[player].toggle()
+
+
+## The overlay of `player`, or null for a bad index.
+func get_overlay(player: int) -> OverlayScript:
+	if player < 0 or player >= PLAYER_COUNT:
+		return null
+	return _overlays[player]
 
 
 ## The panel of `player`, or null for a bad index.

@@ -65,6 +65,20 @@ func set_menu_open(open: bool) -> void:
 		_refresh_status()
 
 
+## Back to the empty state (no numbers, not down, no menu word), for a player who
+## left or a run that ended. The next `player_stats_changed` fills it again.
+func reset() -> void:
+	_health = -1
+	_mana = -1
+	_downed = false
+	_menu_open = false
+	_health_bar.value = 0
+	_mana_bar.value = 0
+	_health_value.text = ""
+	_mana_value.text = ""
+	_refresh_status()
+
+
 func is_downed() -> bool:
 	return _downed
 

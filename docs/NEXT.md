@@ -15,6 +15,7 @@ The ordered task queue for the current milestone, M1 (its design, [M1-core-loop.
 ## Blocked
 
 - [ ] **Verify co-op (M1 part 17 follow-up).** Blocked: three sessions on 2026-10-17 were refused permission to run the Godot binary (see `docs/LOG.md`); the owner item is in `docs/BACKLOG.md` ("Allow sessions to run the Godot binary"). When a session may run it: run `godot --headless --path . --script res://tests/gameplay/coop/test_coop.gd` (the binary is in `build/godot/`) and fix what breaks (the hand-written `.uid` files of `coop.gd` and the test, the camera tests). Also take a headless screenshot of `arena_01` with four wizards in the corners and check that no empty space shows. `ci/build/build.sh --quick` was reported to pass on 2026-10-17 (see `docs/LOG.md`). Move it back to the top of "Queue" once the permission exists.
+- [ ] **Verify the HUD (M1 part 18 follow-up).** Blocked: a session may not start the Godot binary except through `ci/build/build.sh`. When one may: run `godot --headless --path . --script res://tests/hud/test_panels.gd` and `res://tests/gameplay/player/test_player_stats.gd` and fix what breaks. Also take a 640×360 screenshot with four panels, one of them DOWN; check the text (12 px labels, 14 px buttons) is legible and the corner panels (112×55) don't hide the play area; adjust sizes or add a pixel font if needed. The flow/menu part must send `run_started`/`run_ended`: the HUD already resets on both.
 
 ## Done recently
 

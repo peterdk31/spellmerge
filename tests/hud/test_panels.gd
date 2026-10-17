@@ -27,6 +27,8 @@ func _initialize() -> void:
 	_test_down_and_menu_words()
 	_test_hud_waits_for_room_and_join()
 	_test_hud_routes_to_the_right_panel()
+	_test_leave_and_rejoin_resets_the_panel()
+	_test_run_boundaries_hide_panels()
 	_test_hud_four_players_in_four_corners()
 	_test_hud_menu_word_follows_ui_focus()
 	_test_bad_indices_are_ignored()
@@ -138,6 +140,43 @@ func _test_hud_waits_for_room_and_join() -> void:
 	_check(hud.get_panel(1).visible, "a mid-run joiner's panel shows at once")
 	bus.player_left.emit(0)
 	_check(not hud.get_panel(0).visible and hud.get_panel(2).visible, "a leaver's panel hides and the others stay")
+	_free_hud(parts)
+
+
+func _test_leave_and_rejoin_resets_the_panel() -> void:
+	var parts: Array = _make_hud()
+	var hud: HudScript = parts[0]
+	var bus: EventsScript = parts[1]
+	bus.room_entered.emit(&"arena_01")
+	bus.player_joined.emit(1)
+	bus.player_stats_changed.emit(1, 0, 5, 3.0, 10.0)
+	_check(hud.get_panel(1).is_downed(), "the panel shows down before the player leaves")
+	bus.player_left.emit(1)
+	_check(not hud.get_panel(1).is_downed() and hud.get_panel(1).status_text() == "", "leaving clears the down state")
+	# Stats may arrive before the join: they are kept and shown when the join comes.
+	bus.player_stats_changed.emit(1, 5, 5, 10.0, 10.0)
+	_check(not hud.get_panel(1).visible, "stats alone do not show a panel")
+	bus.player_joined.emit(1)
+	_check(hud.get_panel(1).visible and not hud.get_panel(1).is_downed(), "the rejoined panel shows with fresh numbers")
+	_free_hud(parts)
+
+
+func _test_run_boundaries_hide_panels() -> void:
+	var parts: Array = _make_hud()
+	var hud: HudScript = parts[0]
+	var bus: EventsScript = parts[1]
+	bus.player_joined.emit(0)
+	bus.player_joined.emit(3)
+	bus.room_entered.emit(&"arena_01")
+	bus.player_stats_changed.emit(0, 0, 5, 0.0, 10.0)
+	_check(hud.get_panel(0).visible and hud.get_panel(3).visible, "panels show during the run")
+	bus.run_ended.emit(false)
+	_check(not hud.get_panel(0).visible and not hud.get_panel(3).visible, "run_ended hides all panels")
+	_check(not hud.get_panel(0).is_downed(), "run_ended clears the down state")
+	bus.run_started.emit(2)
+	_check(not hud.get_panel(0).visible, "panels wait for a room after run_started")
+	bus.room_entered.emit(&"arena_01")
+	_check(hud.get_panel(0).visible and hud.get_panel(3).visible, "joined players' panels return in the next run")
 	_free_hud(parts)
 
 

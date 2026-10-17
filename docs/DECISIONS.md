@@ -2,6 +2,17 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-17: Placeholder art (M1 part 4)
+
+**Decided by:** Claude (details the task left open).
+
+- Four wizard files, one per player colour (`wizard_p1_idle.svg` to `wizard_p4_idle.svg`), not one file tinted in code: a tint multiplies colours, so the result would leave the palette. `wizard.tscn` lists the four textures in `textures` and `player.gd` shows `textures[index]` on `Sprite` in `_ready()`. The files differ only in the three ramp colours.
+- Filtering off: Godot's texture importer has no filter option, so the `.import` files keep the defaults. Filtering is set by the project (`rendering/textures/canvas_textures/default_texture_filter=0`, nearest) and the wizard's `Sprite` also sets `texture_filter` to nearest. Size is exact because the SVG is 32×32 and `svg/scale` is 1.0.
+- The `.import` files and their uids were written by hand (the session had no Godot, and the md5 in each `path` follows Godot's rule: the md5 of the `res://` path). Godot rewrites them if they differ.
+- SVGs are written rect by rect, with outlines inside the grid, as `docs/STYLE.md` asks. The session could not run scripts or render, so the pictures were checked by reading the rects, not by eye; the no-overlap rule and the look (a screenshot) are still unchecked. The crypt floor uses the darkest stone as its base so it reads apart from the wall.
+- The wizard staff carries a Spark gem (light source) and the imp uses only Fire, Bone and Spark, so no player colour appears on an enemy. The floor tile is flat; the wall tile has the lit and shaded edges.
+- Sounds are not made here: `cast`, `hit` and `enemy_death` are under "Audio needs" in the backlog.
+
 ## 2026-10-17: Pools and the projectile manager (M1 part 7)
 
 **Decided by:** Claude (details the task left open).

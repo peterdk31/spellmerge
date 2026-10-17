@@ -51,7 +51,7 @@ The manifest drives the Steam AI disclosure and the "Replace placeholder" issues
 
 ## Example to copy
 
-Arrives with Claude's first art in M1; this README is updated then with its path. Do not guess its layout before then.
+`art/vfx/hit_spark.svg` with its `art/vfx/hit_spark.svg.import` and its entry in `art/manifest.json` (a placeholder SVG written as rects, see "Placeholder SVGs" in docs/STYLE.md). More: `art/tilesets/crypt/floor.svg` (a flat tile) and `wall.svg` (a lit and shaded tile). Item art sits with its item, for example `content/enemies/ember_imp/idle.svg`. The `.import` files keep Godot's defaults (the project draws textures with nearest-neighbour filtering, see `rendering/textures/canvas_textures/default_texture_filter` in `project.godot`), and scenes that show art set `texture_filter` to nearest as well.
 
 ## Validate
 

@@ -262,3 +262,14 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - Content is any `.tres` with an `id` below `content/<folder>/`, so M2 components need no registry change; the first in sorted path order wins a duplicate id.
 - `demo_only` is a runtime variable set from the `demo` feature tag, so tests and the web build share one code path.
 - `scan()` takes roots and a sound extension list so tests can use a fixture: a valid `.ogg` cannot be written in a session, so the fixture sound is an `AudioStreamWAV` `.tres`.
+
+## 2026-10-17: Player movement and dodge (M1 part 9)
+
+**Decided by:** Claude (details the plan left open).
+
+- The wizard is a `CharacterBody2D` in floating mode on physics layer 2, colliding only with walls (layer 1): wizards walk through each other, so nobody blocks a teammate.
+- The values are binary fractions (walk 90 px/s, dodge 220 px/s for 0.25 s, invulnerable the first 0.125 s, cooldown 0.625 s) so fixed-step tests add up exactly; tune them at C1.
+- A dodge is detected with `get_press_count`, not `is_action_just_pressed`, so a tap released within a frame is not lost. A press made while the dodge is not ready, or while the player's input is captured by an overlay, is dropped, never queued.
+- The scene was built before the part 4 sprite existed, with an empty `Sprite` node; part 4 fills it in rather than part 9 inventing art. Part 9 ran before part 4 because the session picked it; it needs no art, and parts 10–12 build on the script. Part 4's done-when now asks for a visible sprite per player index.
+- Opening an overlay ends a dash in progress (cooldown stays), so a captured player is fully frozen.
+- Physics layers: 1 walls, 2 players, 3 enemies, 4 projectiles and hit boxes (in the player README); `core/` is asked to name them in `project.godot`.

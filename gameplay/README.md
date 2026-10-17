@@ -46,7 +46,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 
 ## Allowed files
 
-`.gd`, `.tres`, plus `.uid`, `.import` and `.license` files. Limit: 1 MB per file. This list follows the Areas table in docs/PLAN.md. Scenes (`.tscn`) for the player, enemies and effects are not part of this area yet; where they live is decided in M1, and this list is updated then. Typed GDScript only (types on every variable, parameter and return); no banned APIs (see AGENTS.md, hard rules).
+`.gd`, `.tres`, plus `.uid`, `.import` and `.license` files. Limit: 1 MB per file. This list follows the Areas table in docs/PLAN.md. `gameplay/` is script-only: it has no scenes. The scenes that gameplay scripts drive live with their content in `content/` (the wizard in `content/wizard/base/`, enemies in `content/enemies/`, rooms in `content/rooms/`) and in `hud/`; the scene's root node carries the gameplay script, and gameplay gets scenes through `core/registry`. Typed GDScript only (types on every variable, parameter and return); no banned APIs (see AGENTS.md, hard rules).
 
 ## Steps (once the area is open)
 

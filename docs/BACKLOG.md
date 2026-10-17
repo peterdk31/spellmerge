@@ -8,7 +8,9 @@ Not kept here any more: each question is an issue labelled `owner-question` (doc
 
 ## Needs an owner decision
 
-None now. The owner-only `build.sh` step for the 4-bot test (M1 part 21) is an `owner-question` issue, not a line here.
+- **Web load time and WASM projectile timing (M1 part 22 follow-up).** Two changes in `ci/`: (1) in `ci/smbot/websmoke.py`, print `WEB LOAD: N s` (page start to the "main menu ready" line) and fail above 10 s; (2) in `ci/build/build.sh`, after the Web export, run `tests/benchmark/test_projectile_timing.gd` in the exported Web build under headless Chrome (the main menu would need a start argument like `--four-bot`, no `JavaScriptBridge`) and print the hostile `step` time at 1,000 shots. Claude then lowers `DEFAULT_CAP_WEB` if it is over 8 ms. Asked as an `owner-question`.
+
+Also: the owner-only `build.sh` step for the 4-bot test (M1 part 21) is an `owner-question` issue, not a line here.
 
 ## Audio needs
 

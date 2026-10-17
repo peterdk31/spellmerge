@@ -17,7 +17,7 @@ The art rules for Spellmerge, written so a person, an agent or a script can chec
 
 - A sprite or tile is **32×32 px**. Bigger things (a boss, a wide prop) are a whole multiple: 64×64, 96×64 and so on.
 - Characters stand on the lower half of the cell with their feet about 2 px above the bottom edge, so they overlap correctly in the top-down view. Leave 1 px of empty border where you can; the outline needs it.
-- Tiles fill the whole 32×32 cell and must repeat without a visible seam. A tile's lit edge is its top and left.
+- Tiles fill the whole 32×32 cell and must repeat without a visible seam. **Floor tiles are flat**: Stone base with a few inner details (a crack, a joint) in Stone shadow or light, and nothing on the outer edge pixels. The top-left lit edge and bottom-right shaded edge apply only to **walls and raised props**.
 - Pixel positions are whole numbers. No half-pixel offsets, no rotation by angles other than 90°, no scaling other than whole multiples.
 - Backgrounds are transparent (fully, never partly). Tiles are the exception: they are fully opaque.
 
@@ -60,7 +60,9 @@ The player colours belong to the players: enemies, props and tiles don't use the
 - A silhouette must read at 1× in solid black. Check it before adding detail.
 - Enemy telegraphs use Fire colours and are larger and brighter than anything else on screen.
 - Colour is never the only signal for who a player is; the HUD adds a number or a shape next to the colour.
-- Player sprites differ only in the player colour ramp. The same shapes in four colours are fine.
+- Player sprites differ only in the player colour ramp. The ramp covers the robe and hat (and the panel and markers); the face and hands use Skin, the staff uses Wood. The same shapes in four colours are fine.
+- The four player base colours (`#3b73c9`, `#d9477a`, `#3f8f4f`, `#8a4fc4`) are the comparison set: any two must differ clearly in hue, and nothing else on screen may use a colour close to one of them.
+- Floors use only Stone base and light, with Stone shadow only for small inner details. Players and enemies don't use Stone shadow for their own surfaces, so a silhouette doesn't melt into the floor.
 
 ## Animation frame counts
 
@@ -75,12 +77,14 @@ One animation is one horizontal strip: frame 1 at the left, each frame 32 px wid
 | Hurt | 2 | no | 12 fps | One frame of recoil, one of recovery |
 | Downed | 2 | yes | 4 fps | The player lies down in their colour; the revive ring is drawn by the game |
 | Death | 6 | no | 12 fps | Ends on an empty frame, never a partly transparent one |
-| Enemy attack | 6 | no | 12 fps | Frames 1–3 are the telegraph (wind-up, hold); the hit lands on frame 4 |
+| Enemy attack | 6 | no | 12 fps | Frames 1–3 show the telegraph (wind-up, hold); the hit pose is frame 4 |
 | Projectile | 2–4 | yes | 12 fps | Loops while it flies |
 | Impact / spark | 4 | no | 20 fps | Over in 0.2 s |
 | Animated tile | 4 | yes | 4 fps | Optional (torches, water); still tiles are 1 frame |
 
 A single still image has 1 frame and is a plain 32×32 file.
+
+The art only shows timing; it doesn't set it. The telegraph's length and the moment damage lands are set by the AI and the scene (the telegraph frames can be held longer there; 0.25 s is only the shortest), never by the animation.
 
 ## File formats
 
@@ -100,7 +104,7 @@ Sessions and contributors without an image editor may write a pixel sprite as an
 - A background is simply absent; tiles cover all 32×32 with rects.
 - Rects don't overlap, so every pixel gets exactly one colour.
 
-A minimal valid example, a stone tile with its lit top-left edge and shaded bottom-right edge:
+A minimal valid example, a stone **wall** tile with its lit top-left edge and shaded bottom-right edge (a floor tile is flat instead, see "The 32×32 grid"):
 
 ```svg
 <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" shape-rendering="crispEdges">
@@ -111,6 +115,16 @@ A minimal valid example, a stone tile with its lit top-left edge and shaded bott
   <rect x="0" y="31" width="31" height="1" fill="#2b2840"/>
 </svg>
 ```
+
+## UI
+
+Provisional, like the rest. The HUD (M1 parts 18 and 19) and the Style Guide page build on these.
+
+- **Font:** one pixel font, set in `hud/theme`, at whole-number sizes only. Body text is Bone light on Stone shadow; headings Bone base; warnings Fire light; gold and pickups Spark light. No other text colours.
+- **Panels:** a 1 px Outline border, Stone shadow fill, a Stone light top and left inner edge (3 shades at most). Corners are cut by one pixel, not rounded.
+- **Player panels:** the border and name tab use that player's ramp (base fill, light top-left edge, shadow bottom-right edge). Next to the colour sit the player's number (1–4) and a shape, so colour is never the only signal. Health bars are Fire and mana bars Bone on a Stone shadow trough; neither uses a player colour.
+- **Icons:** 16×16 for spells and relics in the overlay, 8×8 for status marks, with the 1 px outline and at most 3 shades per material.
+- Everything snaps to whole pixels at the 640×360 base size, and four panels stay readable there.
 
 ## Checklist
 

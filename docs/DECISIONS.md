@@ -2,6 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-17: C1 changes no wave or feel value (M1 part 25)
+
+**Decided by:** Claude.
+**Context:** The task says to tune from bot logs and playtest answers. There are no playtest answers, no owner feedback and no open bug. The only data is the new `tests/bots/test_wave_balance.gd` run: bots that never dodge clear the wave of 8 imps alone with 20 of 100 health left, and with four players lose 20 health each.
+**Decision:** keep every value (imp health 20, bolt damage 5 and cooldown 0.35, mana, move and dodge numbers, `WAVE`). One bot run does not say how moving, dodging and casting feel, which is the C1 question; a change made from it would be a guess, and player scaling is `difficulty`'s job in M3. The probe stays so the next round (iterate) starts from numbers.
+**Consequence:** the owner's playtest answer decides what to tune; the C1 issue asks for it.
+
 ## 2026-10-17: The web 4-bot test starts from the page config, in a `Web Test` export (M1 part 23)
 
 **Decided by:** Claude.

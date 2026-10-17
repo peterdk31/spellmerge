@@ -29,6 +29,15 @@ extends Node2D
 ## through a crowd), nearest first. It remembers the last HIT_MEMORY targets it
 ## hit and does not hit them again until it has hit that many others.
 ##
+## The hit work of one step is bounded (WORK_PER_STEP), so a crowd of packed
+## targets with thousands of piercing shots inside it cannot stall a frame.
+## When the budget runs out, the projectiles not yet tested still move, but
+## are not hit-tested this step; the next step starts with them, so nobody is
+## starved. A deferred shot that is still inside a target hits it a step late;
+## a very fast one may skip a target. Only crowds at the caps ever get there.
+## The budget is per `step` call, not per frame: if the engine runs several
+## physics steps in one frame to catch up, each has its own budget.
+##
 ## Friendly fire: while `friendly_fire` is on, a shot fired by a player (0-3) also
 ## hits targets on LAYER_PLAYER, except targets registered with that same player
 ## as their `owner` (a wizard is never hit by its own shot). It is off by default
@@ -56,6 +65,12 @@ const DEFAULT_CAP_DESKTOP: int = 3000
 ## How many recently hit targets a piercing projectile remembers; also the most
 ## hits one projectile can register in a single step.
 const HIT_MEMORY: int = 3
+## The most hit-test work one step does, in units: each target examined costs 1,
+## each hit costs HIT_WORK. Once it is spent, the remaining projectiles are not
+## tested this step (see the class doc). Normal play uses a tiny part of it.
+const WORK_PER_STEP: int = 8000
+## The work one hit counts for: the event, its handlers and the bookkeeping.
+const HIT_WORK: int = 40
 ## Floats per projectile in the MultiMesh buffer: 8 transform, 4 colour.
 const DRAW_STRIDE: int = 12
 ## Spatial grid cell size in pixels.
@@ -140,6 +155,10 @@ var _draw_buffer: PackedFloat32Array = PackedFloat32Array()
 ## True inside step(): the grid is in use, so a target removed then is only
 ## switched off (layer 0) and swept at the start of the next step.
 var _stepping: bool = false
+## Hit-test work left in this step, and the slot the next step starts from
+## (the first one that went untested when the budget ran out).
+var _work_left: int = 0
+var _resume: int = 0
 
 
 func _init() -> void:
@@ -325,7 +344,13 @@ func step(delta: float) -> void:
 	var first_new: int = _next_seq
 	var limit: Rect2 = _bounds.grow(BOUNDS_MARGIN)
 	_stepping = true
-	for slot in top:
+	_work_left = WORK_PER_STEP
+	var resume: int = _resume if _resume < top else 0
+	var starved_at: int = -1
+	for n in top:
+		var slot: int = n + resume
+		if slot >= top:
+			slot -= top
 		# A hit handler may have dropped or reused this slot; a projectile
 		# spawned during this step waits for the next one.
 		if _alive[slot] == 0 or _seq[slot] >= first_new:
@@ -340,12 +365,17 @@ func step(delta: float) -> void:
 			_kill(slot)
 			continue
 		if _layers[slot] != 0 and not _targets.is_empty():
+			if _work_left <= 0:
+				if starved_at < 0:
+					starved_at = slot
+				continue
 			# A piercing shot may pass through several targets this step. A
 			# hit handler may end it or even reuse the slot, so check each time.
 			var seq: int = _seq[slot]
 			for _hit in HIT_MEMORY:
 				if not _hit_test(slot) or _alive[slot] == 0 or _seq[slot] != seq:
 					break
+	_resume = maxi(starved_at, 0)
 	_stepping = false
 
 
@@ -512,6 +542,7 @@ func _hit_test(slot: int) -> bool:
 			var t: int = _cell_head[y * _grid_w + x]
 			while t >= 0:
 				var next_target: int = _target_next[t]
+				_work_left -= 1
 				# Skip other layers, the shooter's own body, and targets already hit.
 				if (_target_layer[t] & layers) == 0 or (shooter >= 0 and _target_owner[t] == shooter) or _remembers(slot, _target_id[t]):
 					t = next_target
@@ -528,6 +559,7 @@ func _hit_test(slot: int) -> bool:
 				t = next_target
 	if best < 0:
 		return false
+	_work_left -= HIT_WORK
 	_register_hit(slot, best, best_point)
 	return true
 

@@ -53,7 +53,7 @@ jobs:
       - id: read-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          app-id: ${{ secrets.BOT_APP_ID }}
+          client-id: Iv23lirdyRvc0KC6625s # the bot app's Client ID (public)
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           permission-contents: read
           permission-pull-requests: read
@@ -92,7 +92,7 @@ jobs:
         if: always()
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          app-id: ${{ secrets.BOT_APP_ID }}
+          client-id: Iv23lirdyRvc0KC6625s # the bot app's Client ID (public)
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-issues: write

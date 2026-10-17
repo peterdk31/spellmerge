@@ -389,6 +389,35 @@ def _line_of(text: str, index: int) -> int:
     return text.count("\n", 0, index) + 1
 
 
+# The one place the game may open a web page (docs/DECISIONS.md, "Opening web links, narrowly"):
+# a bot-maintained file that opens only entries of its own constant table of known addresses.
+LINKS_FILE = "core/links/links.gd"
+LINK_PREFIXES = ("https://github.com/peterdk31/spellmerge", "https://peterdk31.github.io/spellmerge",
+                 "https://peterdk31.itch.io/spellmerge")
+_SHELL_OPEN = re.compile(r"\bOS\s*\.\s*shell_open\b")
+_SHELL_OPEN_FROM_TABLE = re.compile(r"\bOS\s*\.\s*shell_open\s*\(\s*URLS\s*\[\s*\w+\s*\]\s*\)")
+_URL_LITERAL = re.compile(r"[\"']([a-zA-Z][\w+.-]*://[^\"']*)[\"']")
+
+
+def check_links_file(path: str, text: str) -> list[Finding]:
+    """Rules for LINKS_FILE: shell_open only as OS.shell_open(URLS[key]), URLS a const of known addresses."""
+    findings = []
+    calls, safe = list(_SHELL_OPEN.finditer(text)), len(_SHELL_OPEN_FROM_TABLE.findall(text))
+    if calls and (len(calls) != safe or not re.search(r"^const\s+URLS\b", text, re.MULTILINE)):
+        findings.append(Finding("banned-api", "error", path, _line_of(text, calls[0].start()),
+                                "Here `OS.shell_open` may only open an entry of the constant `URLS` table.",
+                                "Write `const URLS := {...}` and call `OS.shell_open(URLS[key])`, nothing else."))
+    if re.search(r"\bURLS\s*(\[[^\]]*\]\s*=(?!=)|\.(merge|erase|clear|assign)\b)", text):
+        findings.append(Finding("banned-api", "error", path, 0, "The `URLS` table may not be changed at run time.",
+                                "Keep `URLS` a constant with literal entries."))
+    for m in _URL_LITERAL.finditer(text):
+        if not m.group(1).startswith(LINK_PREFIXES):
+            findings.append(Finding("banned-api", "error", path, _line_of(text, m.start()),
+                                    f"`{m.group(1)}` is not one of the project's own addresses.",
+                                    "Only " + ", ".join(LINK_PREFIXES) + " may be linked."))
+    return findings
+
+
 def check_banned_apis(path: str, text: str) -> list[Finding]:
     relaxed = path.startswith(("core/", "tests/"))
     findings = []
@@ -396,8 +425,12 @@ def check_banned_apis(path: str, text: str) -> list[Finding]:
         if api.relaxed_in_core_and_tests and relaxed:
             continue
         for m in api.pattern.finditer(text):
+            if path == LINKS_FILE and m.group(0).strip().endswith("shell_open"):
+                continue  # checked by check_links_file
             findings.append(Finding("banned-api", "error", path, _line_of(text, m.start()),
                                     f"{api.message} (found `{m.group(0).strip()}`)", api.fix))
+    if path == LINKS_FILE:
+        findings += check_links_file(path, text)
     return findings
 
 

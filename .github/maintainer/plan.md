@@ -32,4 +32,4 @@ Owner's current focus: {{FOCUS}}
 
 ## Your answer
 
-The structured output: `status` (`ready` when there are commits, or `nothing_to_do`), `pr_title` and `pr_body` when ready, a short `summary`, the `progress_post` (markdown), `task_issues` (may be empty), `owner_issues` (may be empty), and `playtest` (omit before M1).
+The structured output: `status` (`ready` when there are commits, or `nothing_to_do`), `pr_title` and `pr_body` when ready, a short `summary`, the `progress_post` (markdown), `task_issues` (may be empty), `owner_issues` (may be empty; announcements such as a new milestone), `owner_questions` (may be empty; decisions only the owner can make, in the same form as in development sessions, checked against `gh issue list --label owner-question` first), and `playtest` (omit before M1).

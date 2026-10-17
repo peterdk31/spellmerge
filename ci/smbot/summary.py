@@ -14,7 +14,7 @@ import os
 import sys
 
 from . import config as config_mod
-from . import dailylog, pacing, state
+from . import dailylog, gh, inbox, pacing, state
 
 JOBS = {  # job id -> what it does, for the summary
     "build": "Build and smoke tests",
@@ -51,6 +51,12 @@ def main() -> int:
     st, _ = state.load(cfg)
     lines.append(pacing.usage_line(st, dt.datetime.now(dt.timezone.utc),
                                    settings.get("dev_intensity", 90), settings.get("weekly_share", 90)))
+    try:
+        waiting = inbox.reminder(cfg)
+    except gh.GhError:
+        waiting = ""
+    if waiting:
+        lines.append(waiting)
     failed = any(env.get(f"RESULT_{job.upper()}") == "failure" for job in JOBS)
     dailylog.post(cfg, "Daily run", lines, mention_owner=failed)
     return 0

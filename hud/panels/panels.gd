@@ -9,6 +9,11 @@ extends CanvasLayer
 ## polled and nothing here takes input, so a player in their overlay never makes
 ## another panel wait.
 ##
+## An overlay opens only while a room is active and its owner is not down, and
+## it closes when the run starts or ends or when its owner goes down, so none is
+## ever left open over the menu. Each overlay sits just under (P1, P2) or over
+## (P3, P4) its own corner panel, placed from that panel's height.
+##
 ## The overlays (`overlay/`, nodes Root/Overlay1 to Root/Overlay4) open and close
 ## with the owner's `overlay` action. The toggle is read here, from the press
 ## counter of `core/input` (a tap released within a frame is not lost); each
@@ -24,6 +29,9 @@ const PlayerPanelScript := preload("res://hud/panels/player_panel/player_panel.g
 
 const PLAYER_COUNT: int = 4
 const OVERLAY_ACTION: StringName = &"overlay"
+## Space between the screen edge and a panel, and between a panel and its overlay.
+const EDGE_MARGIN: float = 4.0
+const OVERLAY_GAP: float = 2.0
 
 ## The event bus, the UI focus service and the input manager. Only tests set
 ## these, before adding the node; otherwise the "Events", "UIFocus" and
@@ -52,6 +60,9 @@ func _ready() -> void:
 		ui_focus = get_node_or_null("/root/UIFocus") as UIFocusScript
 	if input == null:
 		input = get_node_or_null("/root/PlayerInput") as InputManagerScript
+	for player in PLAYER_COUNT:
+		_panels[player].minimum_size_changed.connect(_place_overlay.bind(player))
+		_place_overlay(player)
 	if input != null:
 		for player in PLAYER_COUNT:
 			_seen_overlay[player] = input.get_press_count(player, OVERLAY_ACTION)
@@ -74,7 +85,8 @@ func _process(_delta: float) -> void:
 
 
 ## Toggle the overlay of every joined player who pressed `overlay` since the
-## last poll (several presses in one frame toggle once). Called every frame by
+## last poll (several presses in one frame toggle once). Presses outside a room
+## are dropped, and a downed player's overlay is not opened. Called every frame by
 ## _process; tests call it directly. One player's press never touches another.
 func poll() -> void:
 	if input == null:
@@ -83,8 +95,12 @@ func poll() -> void:
 		var count: int = input.get_press_count(player, OVERLAY_ACTION)
 		var presses: int = count - _seen_overlay[player]
 		_seen_overlay[player] = count
-		if presses > 0 and input.is_joined(player):
-			_overlays[player].toggle()
+		if presses <= 0 or not input.is_joined(player):
+			continue
+		if _overlays[player].is_open():
+			_overlays[player].close_overlay()
+		elif _in_room and not _panels[player].is_downed():
+			_overlays[player].open_overlay()
 
 
 ## The overlay of `player`, or null for a bad index.
@@ -99,6 +115,15 @@ func get_panel(player: int) -> PlayerPanelScript:
 	if player < 0 or player >= PLAYER_COUNT:
 		return null
 	return _panels[player]
+
+
+## Put the overlay of `player` clear of that player's panel: under it in the top
+## corners, over it in the bottom ones, from the panel's height, not a fixed number.
+func _place_overlay(player: int) -> void:
+	var offset: float = EDGE_MARGIN + _panels[player].get_combined_minimum_size().y + OVERLAY_GAP
+	var y: float = offset if player < 2 else -offset
+	_overlays[player].offset_top = y
+	_overlays[player].offset_bottom = y
 
 
 func _refresh(player: int) -> void:
@@ -139,6 +164,7 @@ func _on_run_ended(_victory: bool) -> void:
 func _reset_all() -> void:
 	_in_room = false
 	for player in PLAYER_COUNT:
+		_overlays[player].close_overlay()
 		_panels[player].reset()
 		_refresh(player)
 
@@ -146,6 +172,8 @@ func _reset_all() -> void:
 func _on_stats_changed(player: int, health: int, max_health: int, mana: float, max_mana: float) -> void:
 	if player >= 0 and player < PLAYER_COUNT:
 		_panels[player].set_stats(health, max_health, mana, max_mana)
+		if health <= 0:
+			_overlays[player].close_overlay()
 
 
 func _on_overlay_opened(player: int) -> void:

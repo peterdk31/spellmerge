@@ -33,6 +33,10 @@ func _initialize() -> void:
 	await process_frame
 	_test_owner_opens_and_closes()
 	_test_overlay_looks_like_its_owner()
+	await _test_overlays_do_not_overlap()
+	_test_no_overlay_outside_a_room()
+	_test_overlay_closes_when_the_room_ends()
+	_test_downed_player_cannot_open()
 	_test_tap_within_one_frame_counts()
 	_test_other_players_cannot_open_it()
 	_test_player_without_device_cannot_open()
@@ -84,6 +88,9 @@ func _setup(count: int) -> void:
 	_hud.ui_focus = _focus
 	_hud.input = _input
 	root.add_child(_hud)
+	for index in count:
+		_bus.player_joined.emit(index)
+	_bus.room_entered.emit(&"test_room")
 
 
 func _teardown() -> void:
@@ -148,14 +155,87 @@ func _test_overlay_looks_like_its_owner() -> void:
 		_check(overlay.theme_type_variation == StringName("PlayerPanel%d" % (player + 1)), "overlay %d uses its player's panel look" % player)
 		var title := overlay.get_node("Rows/Title") as Label
 		_check(title.text == "P%d MENU" % (player + 1), "overlay %d is titled with its player and the word MENU" % player)
-	# Layout is not computed before a frame, so check sizes, not rectangles: an
-	# overlay sits beside its corner panel inside its own quarter of the 640x360
-	# view, so four of them never overlap or leave the screen.
+
+
+## The real rectangles after a layout pass, at 640x360 with all four overlays
+## shown: each is on screen, clear of its own panel and of every other panel and
+## overlay. (Only the geometry is checked; how it looks has not been seen.)
+func _test_overlays_do_not_overlap() -> void:
+	_setup(4)
+	root.size = Vector2i(640, 360)
 	for player in 4:
-		var size: Vector2 = _overlay(player).get_combined_minimum_size()
-		var panel_height: float = _hud.get_panel(player).get_combined_minimum_size().y
-		_check(size.x <= 312.0, "overlay %d fits its quarter's width, got %s" % [player, size])
-		_check(size.y + panel_height + 12.0 <= 180.0, "overlay %d and its panel fit its quarter's height, got %s" % [player, size])
+		_overlay(player).visible = true
+	await process_frame
+	await process_frame
+	var screen := Rect2(0, 0, 640, 360)
+	var rects: Array[Rect2] = []
+	var names: Array[String] = []
+	for player in 4:
+		rects.append(_hud.get_panel(player).get_global_rect())
+		names.append("panel %d" % (player + 1))
+		rects.append(_overlay(player).get_global_rect())
+		names.append("overlay %d" % (player + 1))
+	for i in rects.size():
+		_check(rects[i].size.x > 0.0 and rects[i].size.y > 0.0, "%s has a size after layout, got %s" % [names[i], rects[i]])
+		_check(screen.encloses(rects[i]), "%s is inside the 640x360 view, got %s" % [names[i], rects[i]])
+		for j in range(i + 1, rects.size()):
+			_check(not rects[i].intersects(rects[j]), "%s and %s do not overlap, got %s and %s" % [names[i], names[j], rects[i], rects[j]])
+
+
+func _test_no_overlay_outside_a_room() -> void:
+	_setup(2)
+	_bus.run_started.emit(2)
+	_tap(0, &"overlay")
+	_frame()
+	_check(not _overlay(0).is_open() and not _overlay(0).visible, "the overlay action does nothing before a room is entered")
+	_check(not _input.is_captured(0) and not _focus.is_open(0), "and the player's input is not captured")
+	_tap(0, &"cast")
+	_frame()
+	_check(not _input.is_captured(0), "so the menu's buttons keep getting cast")
+	_bus.room_entered.emit(&"test_room")
+	_frame()
+	_check(not _overlay(0).is_open(), "a press made outside a room is not remembered")
+	_tap(0, &"overlay")
+	_frame()
+	_check(_overlay(0).is_open(), "inside a room the overlay opens")
+
+
+func _test_overlay_closes_when_the_room_ends() -> void:
+	for ending in ["run_ended", "run_started"]:
+		_setup(2)
+		_tap(0, &"overlay")
+		_tap(1, &"overlay")
+		_frame()
+		_check(_overlay(0).is_open() and _overlay(1).is_open(), "%s: both overlays are open" % ending)
+		if ending == "run_ended":
+			_bus.run_ended.emit(false)
+		else:
+			_bus.run_started.emit(2)
+		for player in 2:
+			_check(not _overlay(player).is_open() and not _overlay(player).visible, "%s: overlay %d is closed and hidden" % [ending, player])
+			_check(not _input.is_captured(player) and not _focus.is_open(player), "%s: player %d's input is free" % [ending, player])
+		_tap(0, &"overlay")
+		_frame()
+		_check(not _overlay(0).is_open(), "%s: no overlay opens until the next room" % ending)
+
+
+func _test_downed_player_cannot_open() -> void:
+	_setup(2)
+	_bus.player_stats_changed.emit(0, 0, 100, 50.0, 50.0)
+	_tap(0, &"overlay")
+	_frame()
+	_check(not _overlay(0).is_open() and not _input.is_captured(0), "a downed player cannot open the overlay")
+	_check(_hud.get_panel(0).status_text() == "DOWN", "and their panel says DOWN")
+	_tap(1, &"overlay")
+	_frame()
+	_check(_overlay(1).is_open(), "a teammate can still open theirs")
+	_bus.player_stats_changed.emit(1, 0, 100, 50.0, 50.0)
+	_check(not _overlay(1).is_open() and not _input.is_captured(1), "an open overlay closes when its owner goes down")
+	_check(_hud.get_panel(1).status_text() == "DOWN", "and DOWN shows, not MENU")
+	_bus.player_stats_changed.emit(0, 50, 100, 50.0, 50.0)
+	_tap(0, &"overlay")
+	_frame()
+	_check(_overlay(0).is_open(), "after a revive the overlay opens again")
 
 
 func _test_tap_within_one_frame_counts() -> void:

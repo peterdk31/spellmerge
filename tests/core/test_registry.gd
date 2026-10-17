@@ -128,7 +128,8 @@ func _test_export_suffixes_and_default_sounds() -> void:
 	_check(tres_files == PackedStringArray([root + "/content/spells/a.tres", root + "/content/spells/b.tres"]), "a .remap suffix is stripped and not listed twice: %s" % [tres_files])
 	var ogg_files: PackedStringArray = registry._find_files(root + "/audio", PackedStringArray(["ogg"]))
 	_check(ogg_files == PackedStringArray([root + "/audio/sfx/boom.ogg", root + "/audio/sfx/pop.ogg"]), "an .import suffix is stripped and not listed twice: %s" % [ogg_files])
-	# Only the sounds: the empty .tres files above are not loadable resources.
+	# The content root is skipped on purpose: the .tres files above are empty, so loading
+	# them would log errors. Scanning a real content root is covered by the fixture tests.
 	registry.scan(root + "/no_content", root + "/audio")
 	_check(registry._sound_paths.has(&"pop") and registry._sound_paths.has(&"boom"), "the default scan indexes .ogg names")
 	registry.free()

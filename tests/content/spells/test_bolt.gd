@@ -302,7 +302,8 @@ func _test_scanner_catches_field_reads() -> void:
 func _test_no_script_reads_spell_fields() -> void:
 	var offenders: PackedStringArray = PackedStringArray()
 	var checked: int = _scan_dir("res://", offenders)
-	_check(checked > 15,"the scan looked at the scripts (%d)" % checked)
+	# About 20 scripts remain after the skipped folders; fewer than 16 means the walk broke.
+	_check(checked > 15, "the scan looked at the scripts (%d)" % checked)
 	_check(offenders.is_empty(), "scripts read spell fields: " + ", ".join(offenders))
 
 
@@ -327,8 +328,9 @@ func _line_reads_spell_field(line: String, typed_names: PackedStringArray = Pack
 			return true
 	var unique := RegEx.new()
 	unique.compile("[\\w\\)\\]]\\s*\\.\\s*(mana_cost|cooldown|lifetime|display_name)\\b")
-	# `burst.lifetime` is a CPUParticles2D property (gameplay/feel), not a spell field.
-	return unique.search(code) != null and not code.contains("burst.lifetime")
+	# `burst.lifetime` is a CPUParticles2D property (gameplay/feel), not a spell field:
+	# only that token is dropped, so the rest of the line is still checked.
+	return unique.search(code.replace("burst.lifetime", "")) != null
 
 
 ## Names of the variables, parameters and loop variables a script types as `SpellBase`.

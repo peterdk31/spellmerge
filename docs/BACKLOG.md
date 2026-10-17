@@ -10,13 +10,13 @@ Ideas and future work outside the current milestone (docs/PLAN.md, "Planning sys
 - **Run the unit tests in CI.** `ci/build/build.sh` only runs `tests/smoke/boot_smoke.gd`. The tests in `tests/core/` (run by hand with `godot --headless --path . --script res://tests/core/<name>.gd`) need a step in `ci/build/build.sh` that runs every `tests/**/test_*.gd` and fails on a non-zero exit. `ci/` is owner-only. The exact change, in `import_and_smoke()` of `ci/build/build.sh` after the boot smoke test (each test is its own `SceneTree` script that calls `quit()`, so it can't be run from inside a smoke script and needs its own Godot process):
 
   ```sh
-  for test in tests/core/test_*.gd; do
+  for test in tests/**/test_*.gd; do   # all of tests/ (core, content, gameplay), e.g. with `shopt -s globstar`
     step "Unit test $test"
     godot_checked "unit-$(basename "$test" .gd)" "$GODOT" --headless --path . --script "res://$test"
   done
   ```
 
-  Until then none of the `tests/core` tests have ever run in CI, including `test_pools.gd` and `test_projectiles.gd`.
+  Until then none of the tests (`tests/core`, `tests/gameplay`, `tests/content`, including `test_bolt.gd`) have ever run in CI, including `test_pools.gd` and `test_projectiles.gd`.
 
 ## Audio needs
 

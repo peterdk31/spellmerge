@@ -23,6 +23,7 @@ var _failures: Array[String] = []
 var _bus: Node
 var _projectiles: Node
 var _combat: Node
+var _registry: Node
 var _nodes: Array[Node] = []
 var _deaths: Array = []
 
@@ -32,6 +33,9 @@ func _initialize() -> void:
 	_test_cast_spawns_one_shot_with_mana_and_cooldown()
 	_test_bolt_kills_the_imp()
 	_test_four_players_each_land_hits()
+	_test_missing_manager_refuses_the_cast()
+	_test_combat_learns_the_profile_from_the_event()
+	_test_shared_resource_cooldowns_reset()
 	_test_zero_direction_fires_right()
 	_test_player_casts_the_bolt()
 	_test_registry_finds_the_bolt()
@@ -57,9 +61,12 @@ func _setup() -> void:
 	_bus = EventsScript.new()
 	_projectiles = ProjectileManagerScript.new()
 	_projectiles.events = _bus
+	_registry = RegistryScript.new()
+	_registry.scan()
 	_combat = CombatScript.new()
 	_combat.events = _bus
 	_combat.projectiles = _projectiles
+	_combat.registry = _registry
 	_combat._ready()
 	_bus.enemy_died.connect(_on_enemy_died)
 
@@ -69,9 +76,10 @@ func _teardown() -> void:
 		if is_instance_valid(node):
 			node.free()
 	_nodes.clear()
-	for node: Node in [_combat, _projectiles, _bus]:
+	for node: Node in [_combat, _projectiles, _bus, _registry]:
 		if node != null:
 			node.free()
+	_registry = null
 	_combat = null
 	_projectiles = null
 	_bus = null
@@ -86,8 +94,16 @@ func _on_enemy_died(player: int, enemy: Node) -> void:
 func _bolt() -> SpellBase:
 	var bolt: SpellBase = BoltResource.duplicate() as SpellBase
 	bolt.set("projectiles", _projectiles)
-	bolt.set("combat", _combat)
 	return bolt
+
+
+## Cast like a wizard does: cast(), then send `spell_cast` when it fired. That event is
+## how Combat learns what the bolt's hits do.
+func _cast(spell: SpellBase, player: int, origin: Vector2, direction: Vector2) -> float:
+	var spent: float = spell.cast(player, origin, direction, 100.0)
+	if spent != SpellBase.REFUSED:
+		_bus.spell_cast.emit(player, spell.spell_id(), origin, direction)
+	return spent
 
 
 func _enemy(health: int, at: Vector2) -> Node2D:
@@ -112,7 +128,7 @@ func _test_resource_is_a_spell() -> void:
 	_check(spell.spell_id() == &"bolt", "the id is bolt")
 	_check(spell.demo and spell.mana_cost > 0.0 and spell.cooldown > 0.0, "demo, with a cost and a cooldown")
 	_check(spell.damage > 0 and spell.speed > 0.0 and spell.lifetime > 0.0, "damage, speed and lifetime are set")
-	_check(ceili(float(ImpData.max_health) / float(spell.damage)) <= 8,"an imp dies in a handful of bolts")
+	_check(ceili(float(ImpData.max_health) / float(spell.damage)) <= 8, "an imp dies in a handful of bolts")
 
 
 func _test_cast_spawns_one_shot_with_mana_and_cooldown() -> void:
@@ -138,7 +154,7 @@ func _test_bolt_kills_the_imp() -> void:
 	for shot in needed:
 		_check(_combat.is_enemy(imp), "the imp is alive before bolt %d lands" % (shot + 1))
 		bolt.tick(0, 10.0)
-		_check(bolt.cast(0, Vector2.ZERO, Vector2.RIGHT, 100.0) == bolt.mana_cost, "bolt %d is fired" % (shot + 1))
+		_check(_cast(bolt, 0, Vector2.ZERO, Vector2.RIGHT) == bolt.mana_cost, "bolt %d is fired" % (shot + 1))
 		_run(24)
 	_check(not _combat.is_enemy(imp), "%d bolts kill the imp" % needed)
 	_check(_deaths.size() == 1 and _deaths[0][0] == 0 and _deaths[0][1] == imp, "enemy_died names player 0 and the imp")
@@ -151,7 +167,7 @@ func _test_four_players_each_land_hits() -> void:
 	for index in 4:
 		var bolt: SpellBase = _bolt()
 		var imp := _enemy(100, Vector2(80.0, 40.0 * index))
-		bolt.cast(index, Vector2(0.0, 40.0 * index), Vector2.RIGHT, 100.0)
+		_cast(bolt, index, Vector2(0.0, 40.0 * index), Vector2.RIGHT)
 		_check(imp != null, "enemy %d exists" % index)
 	_run(24)
 	_check(damage.size() == 4, "four hits, one per player")
@@ -159,10 +175,45 @@ func _test_four_players_each_land_hits() -> void:
 		_check(damage.any(func(entry: Array) -> bool: return entry[0] == index), "player %d is credited" % index)
 
 
+func _test_missing_manager_refuses_the_cast() -> void:
+	var bolt: SpellBase = BoltResource.duplicate() as SpellBase
+	# No Projectiles autoload in this test's tree, so nothing can be fired.
+	_check(bolt.cast(0, Vector2.ZERO, Vector2.RIGHT, 100.0) == SpellBase.REFUSED, "no manager: the cast is refused, no mana")
+	_setup()
+	bolt.set("projectiles", _projectiles)
+	_check(bolt.cast(0, Vector2.ZERO, Vector2.RIGHT, 100.0) == bolt.mana_cost, "no cooldown was started by the refused cast")
+
+
+## Combat learns the profile from `spell_cast` only: no event, no damage; the bolt never calls Combat.
+func _test_combat_learns_the_profile_from_the_event() -> void:
+	_setup()
+	var bolt: SpellBase = _bolt()
+	var imp := _enemy(100, Vector2(40.0, 0.0))
+	bolt.cast(0, Vector2.ZERO, Vector2.RIGHT, 100.0)
+	_run(24)
+	_check(_combat.get_health(imp) == 100, "without spell_cast Combat has no profile, so the hit does nothing")
+	bolt.tick(0, 10.0)
+	_cast(bolt, 0, Vector2.ZERO, Vector2.RIGHT)
+	_run(24)
+	_check(_combat.get_health(imp) == 100 - bolt.damage, "after spell_cast the hit deals the bolt's damage")
+
+
+## One resource is shared by every holder (the registry hands out one), so a run's leftover
+## cooldown blocks the next run's first cast until `reset_cooldowns()`.
+func _test_shared_resource_cooldowns_reset() -> void:
+	_setup()
+	var shared: SpellBase = _bolt()
+	_check(_cast(shared, 0, Vector2.ZERO, Vector2.RIGHT) != SpellBase.REFUSED, "first holder casts")
+	_check(shared.cast(0, Vector2.ZERO, Vector2.RIGHT, 100.0) == SpellBase.REFUSED, "a second holder of the same resource is blocked while it cools down")
+	_check(shared.cast(1, Vector2.ZERO, Vector2.RIGHT, 100.0) == shared.mana_cost, "another player index is not blocked")
+	shared.reset_cooldowns()
+	_check(shared.cast(0, Vector2.ZERO, Vector2.RIGHT, 100.0) == shared.mana_cost, "after reset_cooldowns() the first cast of a new run fires")
+
+
 func _test_zero_direction_fires_right() -> void:
 	_setup()
 	var bolt: SpellBase = _bolt()
-	bolt.cast(0, Vector2.ZERO, Vector2.ZERO, 100.0)
+	_cast(bolt, 0, Vector2.ZERO, Vector2.ZERO)
 	_run(2)
 	var slot: int = 0
 	while slot < 8 and not _projectiles.is_alive(slot):
@@ -229,6 +280,10 @@ func _test_scanner_catches_field_reads() -> void:
 	]
 	for line in good:
 		_check(not _line_reads_spell_field(line), "not flagged: " + line)
+	var names: PackedStringArray = _spell_typed_names("var pick: SpellBase = null\nfunc f(other: SpellBase) -> void:")
+	_check(names == PackedStringArray(["pick", "other"]), "typed names are found")
+	_check(_line_reads_spell_field("var d: int = pick.damage", names), "caught: a field on a variable typed SpellBase")
+	_check(not _line_reads_spell_field("pick.cast(0, a, b, 1.0)", names), "not flagged: cast on a typed variable")
 
 
 func _test_no_script_reads_spell_fields() -> void:
@@ -242,16 +297,36 @@ func _test_no_script_reads_spell_fields() -> void:
 
 ## True when a line reads a spell field: a variable named like a spell followed by a
 ## field, or one of the four field names that nothing else uses (`.mana_cost`,
-## `.cooldown`, `.lifetime`, `.display_name`). Comments and declarations do not count.
-func _line_reads_spell_field(line: String) -> bool:
+## `.cooldown`, `.lifetime`, `.display_name`), or a field on any variable the file declares
+## as `SpellBase` (`typed_names`). Comments and declarations do not count. It is only a
+## text heuristic: it cannot see a spell reached through an untyped variable, a call result
+## (`get_spell().damage`) or `get()`, so reviews still look for those.
+func _line_reads_spell_field(line: String, typed_names: PackedStringArray = PackedStringArray()) -> bool:
 	var code: String = line.get_slice("#", 0)
 	var named := RegEx.new()
 	named.compile("(?i)\\w*spell\\w*\\s*\\.\\s*" + FIELD_PATTERN + "\\b")
 	if named.search(code) != null:
 		return true
+	for typed_name in typed_names:
+		var typed := RegEx.new()
+		typed.compile("\\b" + typed_name + "\\s*\\.\\s*" + FIELD_PATTERN + "\\b")
+		if typed.search(code) != null:
+			return true
 	var unique := RegEx.new()
 	unique.compile("[\\w\\)\\]]\\s*\\.\\s*(mana_cost|cooldown|lifetime|display_name)\\b")
 	return unique.search(code) != null
+
+
+## Names of the variables, parameters and loop variables a script types as `SpellBase`.
+func _spell_typed_names(text: String) -> PackedStringArray:
+	var names: PackedStringArray = PackedStringArray()
+	var declared := RegEx.new()
+	declared.compile("(\\w+)\\s*:\\s*SpellBase\\b")
+	for found in declared.search_all(text):
+		var declared_name: String = found.get_string(1)
+		if not names.has(declared_name):
+			names.append(declared_name)
+	return names
 
 
 ## Scan every .gd below `path` except the skipped folders and the test_*.gd files
@@ -272,9 +347,11 @@ func _scan_dir(path: String, offenders: PackedStringArray) -> int:
 		var file_path: String = path.path_join(file_name)
 		count += 1
 		var number: int = 0
-		for line in FileAccess.get_file_as_string(file_path).split("\n"):
+		var text: String = FileAccess.get_file_as_string(file_path)
+		var typed_names: PackedStringArray = _spell_typed_names(text)
+		for line in text.split("\n"):
 			number += 1
-			if _line_reads_spell_field(line):
+			if _line_reads_spell_field(line, typed_names):
 				offenders.append("%s:%d" % [file_path, number])
 	return count
 

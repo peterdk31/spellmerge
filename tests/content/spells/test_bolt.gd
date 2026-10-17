@@ -245,7 +245,7 @@ func _test_player_casts_the_bolt() -> void:
 		wizard.index = index
 		wizard.events = _bus
 		wizard.spell = _bolt()
-		wizard.facing = Vector2.RIGHT
+		wizard.aim = Vector2.RIGHT
 		root.add_child(wizard)
 		_nodes.append(wizard)
 		wizard.position = Vector2(0.0, LANE * index)
@@ -284,8 +284,8 @@ func _test_scanner_catches_field_reads() -> void:
 	for line in bad:
 		_check(_line_reads_spell_field(line), "caught: " + line)
 	var good: PackedStringArray = [
-		"spell.cast(index, global_position, facing, mana)",
-		"events.spell_cast.emit(index, spell.spell_id(), pos, facing)",
+		"spell.cast(index, global_position, aim, mana)",
+		"events.spell_cast.emit(index, spell.spell_id(), pos, aim)",
 		"var speed: float = 3.0",
 		"data.id",
 		"spell.tick(index, delta)  # reads spell.damage later",

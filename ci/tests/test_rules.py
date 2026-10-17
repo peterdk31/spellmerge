@@ -248,6 +248,20 @@ class RepoTest(unittest.TestCase):
             self.skipTest("running as root")
         self.assertEqual(self.check(worktree=True), [("unreadable", "warning", "content/relics/a/locked.json")])
 
+    def test_links_file_may_open_only_its_own_table(self) -> None:
+        good = ('extends Node\n\nconst URLS := {\n\t"feedback": "https://github.com/peterdk31/spellmerge/discussions",\n'
+                '\t"contribute": "https://peterdk31.github.io/spellmerge/contribute/",\n}\n\n'
+                'func open(key: String) -> void:\n\tif URLS.has(key):\n\t\tOS.shell_open(URLS[key])\n')
+        self.assertEqual(banned(good, rules.LINKS_FILE), [])
+        self.assertTrue(banned(good, "core/menu/menu.gd"))  # anywhere else it stays banned
+        self.assertTrue(banned(good.replace("OS.shell_open(URLS[key])", "OS.shell_open(key)"), rules.LINKS_FILE))
+        self.assertTrue(banned(good.replace("https://peterdk31.github.io/spellmerge/contribute/",
+                                            "https://evil.example/x"), rules.LINKS_FILE))
+        self.assertTrue(banned(good + '\nfunc x() -> void:\n\tURLS["a"] = "https://github.com/peterdk31/spellmerge"\n',
+                               rules.LINKS_FILE))
+        self.assertTrue(banned(good.replace("const URLS", "var URLS"), rules.LINKS_FILE))
+        self.assertTrue(banned(good + '\nfunc y() -> void:\n\tOS.execute("sh", [])\n', rules.LINKS_FILE))
+
     def test_worktree_includes_untracked_files(self) -> None:
         self.write("content/relics/a/tool.exe", b"MZ")
         self.assertEqual(self.check(worktree=False), [])

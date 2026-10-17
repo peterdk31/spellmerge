@@ -42,6 +42,52 @@
         ],
         "additionalProperties": false
       }
+    },
+    "owner_questions": {
+      "type": "array",
+      "description": "Questions only the owner can answer (see 'Questions for the owner'). May be empty.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "A short question, e.g. 'Allow sessions to run the Godot binary?'"
+          },
+          "question": {
+            "type": "string",
+            "description": "What is needed and why, in plain words"
+          },
+          "options": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Each option with its trade-off"
+          },
+          "recommendation": {
+            "type": "string"
+          },
+          "meanwhile": {
+            "type": "string",
+            "description": "What the bot does until the owner answers"
+          },
+          "owner_change": {
+            "type": "boolean",
+            "description": "true if the answer needs a change in an owner-only path"
+          },
+          "change": {
+            "type": "string",
+            "description": "For owner_change: the exact change (a diff or the new lines)"
+          }
+        },
+        "required": [
+          "title",
+          "question",
+          "recommendation",
+          "meanwhile"
+        ],
+        "additionalProperties": false
+      }
     }
   },
   "required": [

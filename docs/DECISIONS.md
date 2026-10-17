@@ -2,6 +2,29 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-17: The owner inbox
+
+**Decided by:** owner.
+**Context:** Questions for the owner were written into `docs/BACKLOG.md` ("Needs an owner decision"). Nothing notified the owner, there was no clear way to answer, and sessions never learned the answer.
+**Decision:** a session that needs the owner puts the question in `owner_questions` in its structured output (development, revision and weekly planning). The publish step opens one issue per question, labelled `owner-question` (plus `owner-change` when the answer needs an owner-only change, with the exact change), mentioning the owner, with the options, Claude's recommendation and what happens meanwhile; a question already open under the same title isn't asked again. The owner answers with `/claude <answer>` in the issue; the next session carries it out and its PR says `Closes #N`. The Daily log lists the open questions. Sessions still decide everything they can themselves (docs/PLAN.md, "Never waiting for humans").
+**Consequence:** `docs/BACKLOG.md` no longer holds owner questions. Its four open ones were answered in the same change (below).
+
+## 2026-10-17: Unit tests run through `build.sh --tests`
+
+**Decided by:** owner.
+**Context:** Sessions were refused when they ran the Godot binary directly, and `build.sh` ran only the boot smoke test, so no unit test had ever run.
+**Decision:** `ci/build/build.sh --quick --tests` runs every `tests/**/test_*.gd` in its own Godot process after the import and smoke test, and fails if any test fails or logs an error. Sessions may run exactly that command, the only way they run Godot. `--quick` alone is unchanged, because the implement job runs it before Claude starts. The daily build doesn't run the tests yet: a first run passed 5 of 17, so making them pass is first in the queue, and the bot asks the owner to make the daily build run them once they all pass.
+
+## 2026-10-17: The bot app's Client ID
+
+**Decided by:** owner. The workflows mint the bot's token with `client-id: Iv23lirdyRvc0KC6625s` (public, from the app's settings page) instead of the deprecated `app-id`. The `BOT_APP_ID` secret is no longer read; it can stay until `setup.sh` stops checking for it.
+
+## 2026-10-17: Opening web links, narrowly
+
+**Decided by:** owner.
+**Context:** The feedback button and the main menu's Contribute button need `OS.shell_open`, a banned API.
+**Decision:** it is allowed in one file only, `core/links/links.gd` (bot-maintained, closed to outside PRs). There the rules check allows `OS.shell_open(URLS[key])` and nothing else, requires `URLS` to be a `const`, refuses any change to it at run time, and refuses any address that isn't the project's own (`github.com/peterdk31/spellmerge`, `peterdk31.github.io/spellmerge`, `peterdk31.itch.io/spellmerge`). Everywhere else, and for every other process call, the ban stays.
+
 ## 2026-10-17: Co-op (M1 part 17)
 
 **Decided by:** Claude (details the task left open).

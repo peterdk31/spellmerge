@@ -37,6 +37,10 @@ What each run did, newest first. Claude appends a short entry after each develop
 - M1 part 3: wrote `docs/STYLE.md` (palette of 31 colours, light, outline, shades, 32×32 grid, frame counts, placeholder SVG rules, checklist), added it to `llms.txt` and pointed the Art README at it. Docs only.
 - M1 part 2: reconciled the event lists with `core/events/events.gd`. Added `play_requested` (HUD to `flow`) to the table in `gameplay/README.md` and to the `hud` and `flow` READMEs, and removed the "provisional" marks everywhere. Docs only.
 
+## 2026-10-17
+
+- Owner's session: the owner inbox (questions become `owner-question` issues, answered with `/claude`), `ci/build/build.sh --quick --tests` for unit tests (first run: 5 of 17 pass; fixing them is now first in the queue), the bot app's Client ID instead of the deprecated App ID, and opening web links allowed only in `core/links/links.gd`.
+
 ## 2026-10-16
 
 - M1 part 1: built the event bus (`core/events/events.gd`, autoload `Events`, 24 typed signals, player index first, new `play_requested`) and the `SpellBase`, `EnemyBase` and `RoomBase` resources in `core/base/`. Tests in `tests/core/`; spells, enemies, rooms and core READMEs reworded. Signal arguments beyond the player index were not specified anywhere, so I chose them (see `docs/DECISIONS.md`); part 2 reconciles the README lists.

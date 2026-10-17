@@ -1,5 +1,5 @@
 extends SpellBase
-## The fire bolt (M1): one shot in the facing direction. The only code besides
+## The fire bolt (M1): one shot in the aim direction. The only code besides
 ## `core/base` that knows the spell's fields. Players and bots just call cast().
 ##
 ## The shot is a row in `core/projectiles` (its packed arrays are the fixed-size

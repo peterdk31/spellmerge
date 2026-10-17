@@ -4,6 +4,8 @@ What each run did, newest first. Claude appends a short entry after each develop
 
 ## 2026-10-17
 
+- Owner `/claude` on the C1 issue (#97): iterate on aiming and graphics. Aim is now separate from walking (twin-stick): right stick, or the mouse for the keyboard player, else the walk direction; the sprite turns toward the aim, and a player-colour reticle plus a ground shadow are drawn. New `get_aim`, `send_virtual_aim`, `is_mouse_aiming` in `core/input`; tests `tests/gameplay/player/test_player_aim.gd` and two in `tests/core/test_input.gd`. `ci/build/build.sh --quick --tests` and `--screenshots` pass; looked at `arena_four_wizards` (each wizard aiming a different way). Not done: aim assist, a feel check by a person, new art files.
+
 - M1 part 25: stabilisation and checkpoint C1. `ci/build/build.sh --quick --tests` passes; no open bug in M1's scope, so no bug fix. Added `tests/bots/test_wave_balance.gd` (fighter bots, 1 to 4 players, `BALANCE:` lines; it fails only if a run neither clears nor is lost; who is downed is reported, not gated, because the bots play in real time). One run on a GitHub runner, headless, bots that never dodge:
   - 1 player: cleared in 28.1 game seconds, 80 of 100 health lost, 39 casts.
   - 2 players: 20.5 s, 70 health lost in total, 53 casts.

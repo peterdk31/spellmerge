@@ -22,7 +22,13 @@ extends CharacterBody2D
 ## changes or mana crosses a whole number, so the HUD shows only what it is told
 ## (about 10 events a second per regenerating player, none when nothing changes).
 ##
-## Cast: while `cast` is held the wizard calls `spell.cast(index, origin, facing, mana)`
+## Aim: shots go where the wizard aims, not where it walks (twin-stick). The right
+## stick aims; the keyboard player aims at the mouse once it has moved (the J key
+## switches back); with no aim input the wizard aims the way it walks. After the
+## right stick is let go the aim holds AIM_HOLD_TIME, so a quick flick still
+## shoots where it pointed. A small reticle in the player colour shows the aim.
+##
+## Cast: while `cast` is held the wizard calls `spell.cast(index, origin, aim, mana)`
 ## and reads no spell field. If the spell fired it takes the mana returned, sends
 ## `spell_cast` and plays the sound `cast` from `core/registry` (nothing on null).
 ##
@@ -48,6 +54,22 @@ const REVIVE_HEALTH: int = 50
 const MAX_MANA: float = 100.0
 ## Mana regained per second.
 const MANA_REGEN: float = 10.0
+## Seconds the aim holds after the right stick is let go.
+const AIM_HOLD_TIME: float = 0.6
+## A mouse closer than this (pixels) to the wizard gives no direction.
+const MOUSE_MIN_DISTANCE: float = 4.0
+## The reticle: its distance from the wizard's feet and its size, in pixels.
+const RETICLE_DISTANCE: float = 38.0
+const RETICLE_SIZE: float = 4.0
+## Aim x beyond which the sprite turns (and turns back): a band against flicker.
+## The flip also mirrors the painted light; fine for the placeholder art.
+const FLIP_BAND: float = 0.3
+## Light colour of each player's ramp, for the reticle. The single source is the
+## player ramps in docs/STYLE.md; core has only the base colours (projectile manager).
+const PLAYER_COLORS: Array[Color] = [
+	Color("7fc0f0"), Color("f59ab8"), Color("8fd46a"), Color("c99af0"),
+]
+const OUTLINE_COLOR: Color = Color("14121f")
 ## Seconds a wizard who joins mid-run cannot be hurt (see `protect`).
 const JOIN_PROTECTION: float = 2.0
 ## Id of the cast sound (looked up in core/registry; a missing sound is silent).
@@ -80,8 +102,22 @@ var spell: SpellBase = null
 var health: int = MAX_HEALTH
 var mana: float = MAX_MANA
 
-## The way the wizard faces: the last move direction (unit length).
+## The last move direction (unit length); a dodge without a direction goes this way.
 var facing: Vector2 = Vector2.DOWN
+
+## Where spells are fired (unit length): see _update_aim().
+var aim: Vector2 = Vector2.DOWN
+
+## Only tests set this: the mouse position in the world, instead of the real one.
+## Vector2.INF means "ask the viewport".
+var mouse_world_override: Vector2 = Vector2.INF
+
+var _aim_hold_left: float = 0.0
+## What the last _draw() drew, to redraw only when the reticle moved.
+var _drawn_aim: Vector2 = Vector2.ZERO
+## The `Sprite` node (null in bare-script tests) and which way it is turned.
+var _sprite: Sprite2D = null
+var _faces_left: bool = false
 
 var _dodge_left: float = 0.0
 var _invulnerable_left: float = 0.0
@@ -103,13 +139,14 @@ func _init() -> void:
 
 ## Show the idle texture for this player index on the `Sprite` node.
 func apply_texture() -> void:
-	var sprite := get_node_or_null("Sprite") as Sprite2D
-	if sprite == null:
+	if _sprite == null:
+		_sprite = get_node_or_null("Sprite") as Sprite2D
+	if _sprite == null:
 		return
 	if index < 0 or index >= textures.size():
 		push_warning("Wizard %d: no texture for this player index." % index)
 		return
-	sprite.texture = textures[index]
+	_sprite.texture = textures[index]
 
 
 func _ready() -> void:
@@ -168,6 +205,7 @@ func step(delta: float) -> void:
 		_invulnerable_left = 0.0
 	if move != Vector2.ZERO:
 		facing = move.normalized()
+	_update_aim(move, delta)
 	# Count presses rather than asking "just pressed": a tap released again
 	# before this frame is not lost. A captured player (overlay open) is skipped,
 	# and a press made meanwhile is not held against them later.
@@ -186,18 +224,80 @@ func step(delta: float) -> void:
 		cast()
 
 
+## Choose `aim` for this step: the right stick, else the mouse (keyboard player),
+## else the held stick aim, else the move direction.
+func _update_aim(move: Vector2, delta: float) -> void:
+	var stick: Vector2 = input.get_aim(index)
+	if stick != Vector2.ZERO:
+		aim = stick
+		_aim_hold_left = AIM_HOLD_TIME
+	elif input.is_mouse_aiming(index):
+		var to_mouse: Vector2 = _mouse_world() - global_position
+		if to_mouse.length() >= MOUSE_MIN_DISTANCE:
+			aim = to_mouse.normalized()
+		_aim_hold_left = 0.0
+	else:
+		_aim_hold_left = maxf(_aim_hold_left - delta, 0.0)
+		if _aim_hold_left <= 0.0 and move != Vector2.ZERO:
+			aim = move.normalized()
+	_refresh_look()
+
+
+func _mouse_world() -> Vector2:
+	if mouse_world_override != Vector2.INF:
+		return mouse_world_override
+	return get_global_mouse_position() if is_inside_tree() else global_position
+
+
+## Turn the sprite toward the aim and redraw the reticle if the aim changed.
+func _refresh_look() -> void:
+	# Flip below -FLIP_BAND, unflip above FLIP_BAND: no flicker while the aim wobbles.
+	if aim.x < -FLIP_BAND:
+		_faces_left = true
+	elif aim.x > FLIP_BAND:
+		_faces_left = false
+	if _sprite != null:
+		_sprite.flip_h = _faces_left
+	if not aim.is_equal_approx(_drawn_aim):
+		_drawn_aim = aim
+		queue_redraw()
+
+
+## A soft shadow under the feet and the aim reticle (a chevron in the player
+## colour with an outline). No arrays are made: lines only.
+func _draw() -> void:
+	draw_set_transform(Vector2(0, 2), 0.0, Vector2(1.0, 0.4))
+	draw_circle(Vector2.ZERO, 8.0, Color(0, 0, 0, 0.35))
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	if not _reticle_visible():
+		return
+	var tip: Vector2 = aim * RETICLE_DISTANCE
+	var side: Vector2 = aim.orthogonal()
+	var back: Vector2 = tip - aim * RETICLE_SIZE
+	var color: Color = PLAYER_COLORS[clampi(index, 0, PLAYER_COLORS.size() - 1)]
+	draw_line(back + side * RETICLE_SIZE, tip, OUTLINE_COLOR, 3.0)
+	draw_line(back - side * RETICLE_SIZE, tip, OUTLINE_COLOR, 3.0)
+	draw_line(back + side * RETICLE_SIZE, tip, color, 1.0)
+	draw_line(back - side * RETICLE_SIZE, tip, color, 1.0)
+
+
+## True when _draw() shows the aim reticle: not while downed.
+func _reticle_visible() -> bool:
+	return not _downed and aim != Vector2.ZERO
+
+
 ## Fire the equipped spell now. Returns true if it fired. Does nothing when
 ## downed or without a spell.
 func cast() -> bool:
 	if _downed or spell == null:
 		return false
-	var spent: float = spell.cast(index, global_position, facing, mana)
+	var spent: float = spell.cast(index, global_position, aim, mana)
 	if spent == SpellBase.REFUSED:
 		return false
 	mana -= spent
 	_announce_stats()
 	if events != null:
-		events.spell_cast.emit(index, spell.spell_id(), global_position, facing)
+		events.spell_cast.emit(index, spell.spell_id(), global_position, aim)
 	_play_cast_sound()
 	return true
 
@@ -240,6 +340,7 @@ func take_damage(amount: int) -> bool:
 	_announce_stats()
 	if health == 0:
 		_downed = true
+		queue_redraw()
 		_dodge_left = 0.0
 		_invulnerable_left = 0.0
 		velocity = Vector2.ZERO
@@ -254,6 +355,7 @@ func revive(reviver: int) -> bool:
 	if not _downed:
 		return false
 	_downed = false
+	queue_redraw()
 	health = REVIVE_HEALTH
 	_announce_stats()
 	if events != null:

@@ -26,6 +26,11 @@ func _initialize() -> void:
 	_test_miss()
 	_test_fast_shot_does_not_tunnel()
 	_test_pierce()
+	_test_large_target_and_very_fast_shot()
+	_test_hits_come_in_travel_order()
+	_test_pierce_in_a_crowd_hits_each_once()
+	_test_cap_drop_order_after_other_deaths()
+	_test_default_cap_follows_the_platform()
 	_test_bad_arguments()
 	_test_cap_drops_the_oldest_of_the_richest()
 	_test_cap_keeps_every_player_alive()
@@ -168,6 +173,89 @@ func _test_pierce() -> void:
 	_check(not _mgr.is_alive(slot), "and ends on the second")
 
 
+func _test_large_target_and_very_fast_shot() -> void:
+	# A radius-80 target whose centre is 3 cells from the shot's end point.
+	_setup()
+	var boss: Node2D = _target(Vector2(200.0, 0.0), 80.0)
+	_mgr.spawn(0, Vector2(100.0, 0.0), Vector2(1200.0, 0.0), 1.0, 4.0)
+	_mgr.step(DT)
+	_check(_hits.size() == 1 and _hits[0][1] == boss, "a shot touching the edge of a radius-80 target hits it")
+	# 5000 px/s is 83 px per step.
+	_setup()
+	_target(Vector2(200.0, 0.0), 80.0)
+	_mgr.spawn(0, Vector2(40.0, 0.0), Vector2(5000.0, 0.0), 1.0, 4.0)
+	_mgr.step(DT)
+	_check(_hits.size() == 1, "a 5,000 px/s shot hits a big target")
+	_setup()
+	_target(Vector2(500.0, 0.0), 6.0)
+	_mgr.spawn(0, Vector2(400.0, 0.0), Vector2(30000.0, 0.0), 1.0, 2.0)
+	_mgr.step(DT)
+	_check(_hits.size() == 1, "a 30,000 px/s shot (500 px per step) hits a small target on the way")
+	_setup()
+	_target(Vector2(500.0, 100.0), 6.0)
+	_mgr.spawn(0, Vector2(400.0, 0.0), Vector2(30000.0, 0.0), 1.0, 2.0)
+	_mgr.step(DT)
+	_check(_hits.is_empty(), "and still misses one 100 px off the path")
+
+
+func _test_hits_come_in_travel_order() -> void:
+	_setup()
+	# The far target is registered last, so it comes first in the grid chain.
+	var near: Node2D = _target(Vector2(20.0, 0.0), 10.0)
+	_target(Vector2(60.0, 0.0), 10.0)
+	_mgr.spawn(0, Vector2.ZERO, Vector2(4800.0, 0.0), 1.0, 2.0)
+	_mgr.step(DT)
+	_check(_hits.size() == 1 and _hits[0][1] == near, "the nearest target along the path is hit first")
+	if not _hits.is_empty():
+		_check(_hits[0][2].is_equal_approx(Vector2(20.0, 0.0)), "the hit position is the closest point on the path (%s)" % str(_hits[0][2]))
+
+
+func _test_pierce_in_a_crowd_hits_each_once() -> void:
+	# Two overlapping targets and pierce 2: exactly one event per target.
+	_setup()
+	var a: Node2D = _target(Vector2(30.0, 0.0), 14.0)
+	var b: Node2D = _target(Vector2(38.0, 4.0), 14.0)
+	var slot: int = _mgr.spawn(0, Vector2.ZERO, Vector2(300.0, 0.0), 1.0, 4.0, ManagerScript.LAYER_ENEMY, 2)
+	for i in 30:
+		_mgr.step(DT)
+	_check(_hits.size() == 2, "two overlapping targets give two events (%d)" % _hits.size())
+	var seen: Array = []
+	for hit in _hits:
+		_check(not seen.has(hit[1]), "no target is hit twice")
+		seen.append(hit[1])
+	_check(seen.has(a) and seen.has(b), "each target was hit")
+	_check(_mgr.is_alive(slot), "the shot keeps one pierce")
+
+
+func _test_cap_drop_order_after_other_deaths() -> void:
+	_setup()
+	_mgr.set_cap(6)
+	var short_lived: int = _mgr.spawn(0, Vector2(0.0, 0.0), Vector2.ZERO, 0.01)
+	var keep_old: int = _mgr.spawn(0, Vector2(1.0, 0.0), Vector2.ZERO, 5.0)
+	for i in 4:
+		_mgr.spawn(0, Vector2(2.0 + i, 0.0), Vector2.ZERO, 5.0)
+	_mgr.step(DT)
+	_check(not _mgr.is_alive(short_lived) and _mgr.get_count() == 5, "the first shot expired")
+	_mgr.spawn(0, Vector2(10.0, 0.0), Vector2.ZERO, 5.0)
+	_check(_mgr.get_count() == 6, "full again")
+	_mgr.spawn(0, Vector2(11.0, 0.0), Vector2.ZERO, 5.0)
+	_check(keep_old >= 0 and _mgr.dropped == 1, "one shot was dropped")
+	var survivors: int = 0
+	for s in 6:
+		if _mgr.is_alive(s) and _mgr.get_position_of(s).x == 1.0:
+			survivors += 1
+	_check(survivors == 0, "the oldest living shot is the one dropped")
+	for i in 20:
+		_mgr.spawn(i % 2, Vector2(20.0 + i, 0.0), Vector2.ZERO, 5.0)
+	_check(_mgr.get_count() == 6 and _mgr.get_count_for(0) + _mgr.get_count_for(1) == 6, "the lists stay consistent under churn")
+
+
+func _test_default_cap_follows_the_platform() -> void:
+	_setup()
+	var expected: int = ManagerScript.DEFAULT_CAP_WEB if OS.has_feature("web") else ManagerScript.DEFAULT_CAP_DESKTOP
+	_check(_mgr.get_cap() == expected, "the default cap is %d on this platform" % expected)
+
+
 func _test_bad_arguments() -> void:
 	_setup()
 	_check(_mgr.spawn(4, Vector2.ZERO, Vector2.RIGHT, 1.0) == -1, "player 4 is refused")
@@ -263,17 +351,23 @@ func _test_one_thousand_match_brute_force() -> void:
 		moves.append(velocity * DT)
 		_mgr.spawn(i % 4, start, velocity, 5.0, 4.0)
 	_check(_mgr.get_count() == 1000, "1,000 projectiles are alive")
+	# The manager stores float32; the search here is float64. Cases within 0.01
+	# px of the reach could go either way, so they only widen the allowed range.
 	var expected_hits: int = 0
+	var borderline: int = 0
 	for i in 1000:
+		var nearest: float = INF
 		for center in centers:
 			var closest: Vector2 = Geometry2D.get_closest_point_to_segment(center, starts[i], starts[i] + moves[i])
-			if closest.distance_to(center) <= 16.0:
-				expected_hits += 1
-				break
+			nearest = minf(nearest, closest.distance_to(center))
+		if nearest <= 15.99:
+			expected_hits += 1
+		elif nearest <= 16.01:
+			borderline += 1
 	_mgr.step(DT)
 	_check(expected_hits > 0, "the layout has hits to find (%d)" % expected_hits)
-	_check(_hits.size() == expected_hits, "the grid finds exactly the hits a brute-force search does (%d vs %d)" % [_hits.size(), expected_hits])
-	_check(_mgr.get_count() == 1000 - expected_hits, "and ends exactly those projectiles")
+	_check(_hits.size() >= expected_hits and _hits.size() <= expected_hits + borderline, "the grid finds the hits a brute-force search does (%d vs %d, %d borderline)" % [_hits.size(), expected_hits, borderline])
+	_check(_mgr.get_count() == 1000 - _hits.size(), "and ends exactly those projectiles")
 
 
 func _test_one_thousand_run_and_draw() -> void:

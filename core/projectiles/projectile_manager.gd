@@ -15,18 +15,23 @@ extends Node2D
 ## manager knows nothing about damage, spells or gameplay.
 ##
 ## Hits are found with a spatial grid of the targets (cells of GRID_CELL
-## pixels): a projectile looks only at the 3x3 cells around it, and the path it
-## covered this step is checked as a segment, so a fast shot cannot skip over a
-## target. Keep the distance covered in one step plus both radii under GRID_CELL
-## (64 px; at 60 Hz that is about 3,000 px/s for a small shot). A piercing projectile does not hit the target it just passed
-## again straight away.
+## pixels, each target in the cell of its centre). The path a projectile covered
+## this step is checked as a segment, and the cells searched are those the
+## segment touches, widened by the projectile's radius and the largest target
+## radius registered. So fast shots and big targets (bosses) are both found, at
+## any speed; the cost only grows with the length of the step. When a segment
+## touches several targets, the one nearest the start of the path is hit first,
+## and the event carries the point on the path closest to it. A piercing
+## projectile remembers its last HIT_MEMORY targets and does not hit them again
+## while it is still overlapping them.
 ##
-## The global cap (`get_cap()`, DEFAULT_CAP) degrades gracefully. When it is
-## full, a new projectile is never refused: the oldest projectile of whoever
-## owns the most of them is dropped. Nobody is starved, and a player who floods
-## the screen only loses their own old shots. `dropped` counts these. Spell
-## limits (projectiles per cast, trigger depth) keep the cap from being reached
-## often.
+## The global cap (`get_cap()`, set by platform: DEFAULT_CAP_WEB or
+## DEFAULT_CAP_DESKTOP) degrades gracefully. When it is full, a new projectile
+## is never refused: the oldest projectile of whoever owns the most of them is
+## dropped (in constant time: each owner's projectiles are a list in spawn
+## order). Nobody is starved, and a player who floods the screen only loses
+## their own old shots. `dropped` counts these. Spell limits (projectiles per
+## cast, trigger depth) keep the cap from being reached often.
 ##
 ## Nothing here allocates per frame: the arrays are sized when the cap is set,
 ## and the grid is reused. Coordinates are world coordinates (the manager sits
@@ -36,8 +41,13 @@ extends Node2D
 const EventsScript := preload("res://core/events/events.gd")
 
 const MAX_PLAYERS: int = 4
-## Default global cap on live projectiles.
-const DEFAULT_CAP: int = 2048
+## Default global caps on live projectiles: the PLAN budgets for each platform.
+const DEFAULT_CAP_WEB: int = 1000
+const DEFAULT_CAP_DESKTOP: int = 3000
+## How many recently hit targets a piercing projectile remembers.
+const HIT_MEMORY: int = 3
+## Floats per projectile in the MultiMesh buffer: 8 transform, 4 colour.
+const DRAW_STRIDE: int = 12
 ## Spatial grid cell size in pixels.
 const GRID_CELL: float = 64.0
 ## Projectiles that leave the bounds by more than this are removed.
@@ -81,7 +91,14 @@ var _layers: PackedInt32Array = PackedInt32Array()
 var _pierce: PackedInt32Array = PackedInt32Array()
 ## Spawn order, so "oldest" is the lowest.
 var _seq: PackedInt64Array = PackedInt64Array()
+## HIT_MEMORY target ids per slot, newest first (0 for none).
 var _last_hit: PackedInt64Array = PackedInt64Array()
+## Per-owner list of live slots in spawn order (oldest at the head), indexed
+## like _owned: head and tail slot per owner (-1 for none), and the links.
+var _own_head: PackedInt32Array = PackedInt32Array([-1, -1, -1, -1, -1])
+var _own_tail: PackedInt32Array = PackedInt32Array([-1, -1, -1, -1, -1])
+var _own_prev: PackedInt32Array = PackedInt32Array()
+var _own_next: PackedInt32Array = PackedInt32Array()
 var _alive: PackedByteArray = PackedByteArray()
 ## Stack of free slots.
 var _free_slots: PackedInt32Array = PackedInt32Array()
@@ -100,15 +117,18 @@ var _grid_w: int = 1
 var _grid_h: int = 1
 var _cell_head: PackedInt32Array = PackedInt32Array()
 var _target_next: PackedInt32Array = PackedInt32Array()
+## The largest radius of any registered target; sets how far hits are searched.
+var _max_target_radius: float = 0.0
 
 var _draw_node: MultiMeshInstance2D = null
+var _draw_buffer: PackedFloat32Array = PackedFloat32Array()
 ## True inside step(): the grid is in use, so a target removed then is only
 ## switched off (layer 0) and swept at the start of the next step.
 var _stepping: bool = false
 
 
 func _init() -> void:
-	set_cap(DEFAULT_CAP)
+	set_cap(DEFAULT_CAP_WEB if OS.has_feature("web") else DEFAULT_CAP_DESKTOP)
 	set_bounds(_bounds)
 
 
@@ -149,7 +169,10 @@ func set_cap(value: int) -> void:
 	_layers.resize(_cap)
 	_pierce.resize(_cap)
 	_seq.resize(_cap)
-	_last_hit.resize(_cap)
+	_last_hit.resize(_cap * HIT_MEMORY)
+	_own_prev.resize(_cap)
+	_own_next.resize(_cap)
+	_draw_buffer.resize(_cap * DRAW_STRIDE)
 	_alive.resize(_cap)
 	_free_slots.resize(_cap)
 	clear()
@@ -178,6 +201,8 @@ func clear() -> void:
 	_count = 0
 	_high = 0
 	_owned.fill(0)
+	_own_head.fill(-1)
+	_own_tail.fill(-1)
 	drawn = 0
 
 
@@ -203,6 +228,7 @@ func add_target(node: Node2D, radius: float, layer: int = LAYER_ENEMY) -> void:
 	if at >= 0:
 		_target_radius[at] = radius
 		_target_layer[at] = layer
+		_max_target_radius = maxf(_max_target_radius, radius)
 		return
 	_targets.append(node)
 	_target_id.append(id)
@@ -210,6 +236,7 @@ func add_target(node: Node2D, radius: float, layer: int = LAYER_ENEMY) -> void:
 	_target_layer.append(layer)
 	_target_pos.append(Vector2.ZERO)
 	_target_next.append(-1)
+	_max_target_radius = maxf(_max_target_radius, radius)
 
 
 func remove_target(node: Node2D) -> void:
@@ -251,10 +278,19 @@ func spawn(player: int, position: Vector2, velocity: Vector2, lifetime: float, r
 	_pierce[slot] = maxi(pierce, 0)
 	_seq[slot] = _next_seq
 	_next_seq += 1
-	_last_hit[slot] = 0
+	for i in HIT_MEMORY:
+		_last_hit[slot * HIT_MEMORY + i] = 0
 	_alive[slot] = 1
 	_count += 1
-	_owned[player + 1] += 1
+	var owner: int = player + 1
+	_owned[owner] += 1
+	_own_prev[slot] = _own_tail[owner]
+	_own_next[slot] = -1
+	if _own_tail[owner] >= 0:
+		_own_next[_own_tail[owner]] = slot
+	else:
+		_own_head[owner] = slot
+	_own_tail[owner] = slot
 	if slot >= _high:
 		_high = slot + 1
 	return slot
@@ -286,12 +322,18 @@ func step(delta: float) -> void:
 	_stepping = false
 
 
-## Copy the live projectiles into the one batched draw. Called every frame.
+## Copy the live projectiles into the one batched draw (a single buffer write).
+## Called every frame. Positions are interpolated between physics steps, so
+## shots stay smooth on screens faster than the physics rate. Does nothing
+## while there are no projectiles.
 func update_draw() -> void:
-	drawn = 0
 	if _draw_node == null:
+		drawn = 0
+		return
+	if _high == 0 and drawn == 0:
 		return
 	var multimesh: MultiMesh = _draw_node.multimesh
+	var fraction: float = clampf(Engine.get_physics_interpolation_fraction(), 0.0, 1.0)
 	var out: int = 0
 	for slot in _high:
 		if _alive[slot] == 0:
@@ -300,9 +342,25 @@ func update_draw() -> void:
 		var dir: Vector2 = Vector2.RIGHT
 		if _vel[slot].length_squared() > 0.0:
 			dir = _vel[slot].normalized()
-		multimesh.set_instance_transform_2d(out, Transform2D(dir * diameter, dir.orthogonal() * diameter, _pos[slot]))
-		multimesh.set_instance_color(out, _color_of(_player[slot]))
+		var at: Vector2 = _prev[slot].lerp(_pos[slot], fraction)
+		var color: Color = _color_of(_player[slot])
+		# Transform2D(dir * d, dir.orthogonal() * d, at), row by row, then the colour.
+		var i: int = out * DRAW_STRIDE
+		_draw_buffer[i] = dir.x * diameter
+		_draw_buffer[i + 1] = dir.y * diameter
+		_draw_buffer[i + 2] = 0.0
+		_draw_buffer[i + 3] = at.x
+		_draw_buffer[i + 4] = dir.y * diameter
+		_draw_buffer[i + 5] = -dir.x * diameter
+		_draw_buffer[i + 6] = 0.0
+		_draw_buffer[i + 7] = at.y
+		_draw_buffer[i + 8] = color.r
+		_draw_buffer[i + 9] = color.g
+		_draw_buffer[i + 10] = color.b
+		_draw_buffer[i + 11] = color.a
 		out += 1
+	if out > 0:
+		multimesh.buffer = _draw_buffer
 	multimesh.visible_instance_count = out
 	drawn = out
 
@@ -329,7 +387,18 @@ func _kill(slot: int) -> void:
 	_free_slots[_free_count] = slot
 	_free_count += 1
 	_count -= 1
-	_owned[_player[slot] + 1] -= 1
+	var owner: int = _player[slot] + 1
+	_owned[owner] -= 1
+	var before: int = _own_prev[slot]
+	var after: int = _own_next[slot]
+	if before >= 0:
+		_own_next[before] = after
+	else:
+		_own_head[owner] = after
+	if after >= 0:
+		_own_prev[after] = before
+	else:
+		_own_tail[owner] = before
 	while _high > 0 and _alive[_high - 1] == 0:
 		_high -= 1
 
@@ -340,15 +409,7 @@ func _drop_one() -> void:
 	for i in range(1, _owned.size()):
 		if _owned[i] > _owned[richest]:
 			richest = i
-	var oldest: int = -1
-	var oldest_seq: int = 0
-	for slot in _high:
-		if _alive[slot] == 0 or _player[slot] + 1 != richest:
-			continue
-		if oldest < 0 or _seq[slot] < oldest_seq:
-			oldest = slot
-			oldest_seq = _seq[slot]
-	_kill(oldest)
+	_kill(_own_head[richest])
 	dropped += 1
 
 
@@ -397,30 +458,58 @@ func _cell_of(point: Vector2) -> int:
 	return cy * _grid_w + cx
 
 
+## Hit the first target along this step's path (nearest its start). The cells
+## searched are those the path touches, widened by both radii.
 func _hit_test(slot: int) -> void:
-	var here: Vector2 = _pos[slot]
-	var cx: int = clampi(floori((here.x - _bounds.position.x) / GRID_CELL), 0, _grid_w - 1)
-	var cy: int = clampi(floori((here.y - _bounds.position.y) / GRID_CELL), 0, _grid_h - 1)
-	for y in range(maxi(cy - 1, 0), mini(cy + 2, _grid_h)):
-		for x in range(maxi(cx - 1, 0), mini(cx + 2, _grid_w)):
+	var from: Vector2 = _prev[slot]
+	var to: Vector2 = _pos[slot]
+	var pad: Vector2 = Vector2.ONE * (_radius[slot] + _max_target_radius)
+	var low: Vector2 = from.min(to) - pad
+	var high: Vector2 = from.max(to) + pad
+	var x0: int = clampi(floori((low.x - _bounds.position.x) / GRID_CELL), 0, _grid_w - 1)
+	var x1: int = clampi(floori((high.x - _bounds.position.x) / GRID_CELL), 0, _grid_w - 1)
+	var y0: int = clampi(floori((low.y - _bounds.position.y) / GRID_CELL), 0, _grid_h - 1)
+	var y1: int = clampi(floori((high.y - _bounds.position.y) / GRID_CELL), 0, _grid_h - 1)
+	var path: Vector2 = to - from
+	var path_sq: float = path.length_squared()
+	var best: int = -1
+	var best_along: float = 0.0
+	var best_point: Vector2 = to
+	for y in range(y0, y1 + 1):
+		for x in range(x0, x1 + 1):
 			var t: int = _cell_head[y * _grid_w + x]
 			while t >= 0:
-				if (_target_layer[t] & _layers[slot]) != 0 and _target_id[t] != _last_hit[slot]:
+				if (_target_layer[t] & _layers[slot]) != 0 and not _remembers(slot, _target_id[t]):
+					var along: float = 0.0
+					if path_sq > 0.0:
+						along = clampf((_target_pos[t] - from).dot(path) / path_sq, 0.0, 1.0)
+					var closest: Vector2 = from + path * along
 					var reach: float = _radius[slot] + _target_radius[t]
-					var closest: Vector2 = Geometry2D.get_closest_point_to_segment(_target_pos[t], _prev[slot], here)
-					if closest.distance_squared_to(_target_pos[t]) <= reach * reach:
-						_register_hit(slot, t)
-						return
+					if closest.distance_squared_to(_target_pos[t]) <= reach * reach and (best < 0 or along < best_along):
+						best = t
+						best_along = along
+						best_point = closest
 				t = _target_next[t]
+	if best >= 0:
+		_register_hit(slot, best, best_point)
 
 
-func _register_hit(slot: int, target: int) -> void:
+func _remembers(slot: int, id: int) -> bool:
+	for i in HIT_MEMORY:
+		if _last_hit[slot * HIT_MEMORY + i] == id:
+			return true
+	return false
+
+
+func _register_hit(slot: int, target: int, at: Vector2) -> void:
 	var node: Variant = _targets[target]
 	var player: int = _player[slot]
-	var at: Vector2 = _pos[slot]
 	if _pierce[slot] > 0:
 		_pierce[slot] -= 1
-		_last_hit[slot] = _target_id[target]
+		var memory: int = slot * HIT_MEMORY
+		for i in range(HIT_MEMORY - 1, 0, -1):
+			_last_hit[memory + i] = _last_hit[memory + i - 1]
+		_last_hit[memory] = _target_id[target]
 	else:
 		_kill(slot)
 	if events != null and is_instance_valid(node):

@@ -4,11 +4,11 @@
 
 Room templates, one folder per biome. A room is a tile-based arena where a wave of enemies is fought, a reward is picked or a story event happens.
 
-**Opens for PRs in M3** (Run structure; see "Opens for PRs" in docs/ROADMAP.md). A small M1 base class already exists (`core/base/room_base.gd`, `RoomBase`); M3 extends it. **The example to copy arrives with Claude's first room (the M1 crypt arena, then M3)**; this README is updated then with its path. Biome folders are created with the first content.
+**Opens for PRs in M3** (Run structure; see "Opens for PRs" in docs/ROADMAP.md). A small M1 base class already exists (`core/base/room_base.gd`, `RoomBase`); M3 extends it. The example to copy is the M1 crypt arena (see "Example to copy"); M3 adds more rooms.
 
 ## Contract
 
-- A room is a `.tscn` scene with a tilemap, plus a `.tres` describing it on the room base class (`RoomBase`, with the M1 fields `id`, `demo`, `scene`, `player_spawns`, `enemy_spawns` and `doors`; M3 extends it).
+- A room is a `.tscn` scene with tiles from the shared tileset (M1 uses repeated `Sprite2D` tiles; a `TileMapLayer` is welcome once a tileset resource exists), plus a `.tres` describing it on the room base class (`RoomBase`, with the M1 fields `id`, `demo`, `scene`, `player_spawns`, `enemy_spawns` and `doors`; M3 extends it).
 - Rooms are discovered by folder through `core/registry`: put it in its biome's folder, no list to edit.
 - Space for four: the room must be playable and readable with 4 wizards, with room to dodge and no spot where a player can get stuck.
 - Valid doors and spawns: the required doors, spawn points for 4 players, and enemy spawn points that are reachable and not inside walls. Validators for this arrive when M3 extends the room base class.
@@ -29,7 +29,7 @@ Room templates, one folder per biome. A room is a tile-based arena where a wave 
 
 ## Example to copy
 
-Arrives with Claude's first content (the M1 crypt arena, then M3). Do not guess its layout before then.
+`content/rooms/crypt/arena_01.tscn` and `arena_01.tres`: a 20×12-tile (640×384 px) crypt arena with a wall border, six pillars for cover, four player spawns in a row at the bottom, six enemy spawns, and an entry (bottom) and exit (top) door. The scene is layout only: the floor and walls are `Sprite2D` nodes with the shared tiles from `art/tilesets/crypt/` repeated, the walls are one `StaticBody2D` on physics layer 1 (the wall layer, see the player README), and spawns and doors are `Marker2D` nodes under `PlayerSpawns`, `EnemySpawns` and `Doors`. The `.tres` repeats the marker positions (the registry and `flow` read the `.tres`, so keep both in step; `tests/content/rooms/test_arena_01.gd` checks they match, that no spawn is inside a wall, and that the scene has no scripts).
 
 ## Validate
 

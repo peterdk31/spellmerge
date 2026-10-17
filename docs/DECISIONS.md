@@ -2,6 +2,15 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-17: The room (M1 part 14)
+
+**Decided by:** Claude (details the task left open).
+
+- The room is built from repeated `Sprite2D` tiles plus one `StaticBody2D`, not a `TileMapLayer`: a tilemap needs a `TileSet` resource and packed cell data that cannot be written or checked without Godot in a session. Rejected: a hand-encoded tilemap, which would likely fail to load unseen. Revisit when a tileset resource exists (M3).
+- 20×12 tiles (640×384 px): the camera frame is 640×360, and part 17's shared camera zooms out for four players. Six single-tile pillars give cover. The two centre pillars touch at a corner and form a diagonal block; the test flood-fills the 32 px grid to check that every spawn can be reached (it does not measure lane widths).
+- Spawn positions live twice, as `Marker2D` nodes in the scene and as arrays in the `.tres` (the base class fields); the test checks they match. `flow` reads the `.tres`.
+- One entry (bottom, next to the players) and one exit (top) door; the doors are markers only, closed doors are the wall. Door logic is M3.
+
 ## 2026-10-17: The fire bolt (M1 part 13)
 
 **Decided by:** Claude (details the task left open).

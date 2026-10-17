@@ -35,6 +35,8 @@ extends Node2D
 ## are not hit-tested this step; the next step starts with them, so nobody is
 ## starved. A deferred shot that is still inside a target hits it a step late;
 ## a very fast one may skip a target. Only crowds at the caps ever get there.
+## The budget is per `step` call, not per frame: if the engine runs several
+## physics steps in one frame to catch up, each has its own budget.
 ##
 ## Friendly fire: while `friendly_fire` is on, a shot fired by a player (0-3) also
 ## hits targets on LAYER_PLAYER, except targets registered with that same player
@@ -66,7 +68,7 @@ const HIT_MEMORY: int = 3
 ## The most hit-test work one step does, in units: each target examined costs 1,
 ## each hit costs HIT_WORK. Once it is spent, the remaining projectiles are not
 ## tested this step (see the class doc). Normal play uses a tiny part of it.
-const WORK_PER_STEP: int = 16000
+const WORK_PER_STEP: int = 8000
 ## The work one hit counts for: the event, its handlers and the bookkeeping.
 const HIT_WORK: int = 40
 ## Floats per projectile in the MultiMesh buffer: 8 transform, 4 colour.

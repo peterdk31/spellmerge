@@ -4,10 +4,10 @@ What each run did, newest first. Claude appends a short entry after each develop
 
 ## 2026-10-17
 
-- M1 part 22 follow-up: bounded the projectile hit test. `ProjectileManager.step` now has a hit-work budget (`WORK_PER_STEP` = 16,000 units per step; each target examined costs 1, each hit `HIT_WORK` = 40). When it is spent, the rest of the shots move but are not tested; the next step starts at the first untested slot, so nobody is starved. Same hostile benchmark, GitHub runner, native, headless (before; budget 40,000 as a calibration run; after):
-  - 1,000 shots: step with fresh hits 108 ms, 16 ms, **6.5 ms** (168 hits a step); steady state 54, 15, **6.7 ms**.
-  - 3,000 shots: 333 ms, 17 ms, **7.4 ms**; steady state 166, 17, **7.5 ms**. Plain movement is 1.1 ms of that at 3,000.
-  - Both are under the 8 ms target. The WASM check (2-4x slower) is the web task in the queue; if it is over 8 ms there, lower `WORK_PER_STEP` first, then `DEFAULT_CAP_WEB`.
+- M1 part 22 follow-up: bounded the projectile hit test. `ProjectileManager.step` now has a hit-work budget (`WORK_PER_STEP` = 8,000 units per step, after a first try at 16,000 left 81-93% of the 8 ms target; each target examined costs 1, each hit `HIT_WORK` = 40). When it is spent, the rest of the shots move but are not tested; the next step starts at the first untested slot, so nobody is starved. Same hostile benchmark, GitHub runner, native, headless (before; budget 40,000 as a calibration run; after):
+  - 1,000 shots: step with fresh hits 108 ms, 16 ms, **2.8 ms** (84 hits a step; 6.5 ms at 16,000); steady state 54, 15, **2.7 ms**.
+  - 3,000 shots: 333 ms, 17 ms, **3.1 ms** (7.4 ms at 16,000); steady state 166, 17, **3.3 ms**. Plain movement is 0.6 ms of that at 3,000.
+  - Both are under the 8 ms target, with room for WASM only up to about 2.5x. The WASM check (2-4x slower) is the web task in the queue; if it is over 8 ms there, lower `WORK_PER_STEP` first, then `DEFAULT_CAP_WEB`.
   - The benchmark's `_hit_test` line still reads about 36 us a call: it calls `_hit_test` directly, outside the budget.
 - M1 part 22: performance probe and budgets. Added `tests/benchmark/`: `probe.gd` (the 4-bot runner adds it; it prints `BENCH:` lines for frame time, peak nodes, projectiles, memory and live hit particles against `Feel.PARTICLE_LIMIT`), `test_projectile_timing.gd` (times the manager at both caps with four players) and `test_probe.gd`. Nothing gates on them. Numbers are from `build.sh --quick --tests` on a GitHub runner, headless and native (not WASM); they vary run to run, so read them as orders of magnitude:
   - 4-bot run: 940 frames, 6.9 ms average, 7.4 ms p95, 7.8 ms max (logic only; time-scaled ×2); peak 189 nodes, 10 projectiles, 30.7 MiB static memory (budget 512 web / 1,536 desktop), 40 of 48 hit particles.

@@ -47,6 +47,10 @@ func _initialize() -> void:
 	_test_no_restart_while_one_stands()
 	_test_revive_cancels_the_restart()
 	_test_no_restart_after_clear()
+	_test_last_enemy_dies_after_all_down()
+	_test_failed_restart_goes_idle()
+	_test_play_keeps_joined_pad_without_keyboard()
+	_test_wave_stands_on_floor()
 	_test_restart_leaves_no_old_enemies_or_shots()
 	_test_main_menu_only_sends_play_requested()
 	_stop()
@@ -224,6 +228,73 @@ func _test_no_restart_after_clear() -> void:
 		_events.emit_signal("enemy_died", 0, enemy, Vector2.ZERO)
 	(_flow.get_wizard(0) as PlayerScript).take_damage(PlayerScript.MAX_HEALTH)
 	_check(not _flow.is_restarting(), "a cleared room does not restart when the players go down")
+	_stop()
+
+
+## The last enemy dies (a bolt still in flight) after every wizard is down: the
+## room is cleared, but the restart timer keeps running and gives a new world.
+func _test_last_enemy_dies_after_all_down() -> void:
+	_setup(2)
+	_play()
+	var old_world: Node = _flow.world
+	for wizard in _wizards():
+		wizard.take_damage(PlayerScript.MAX_HEALTH)
+	_check(_flow.is_restarting(), "all down: restarting")
+	for enemy: Node in _flow._enemies.duplicate():
+		_events.emit_signal("enemy_died", 0, enemy, Vector2.ZERO)
+	_check(_cleared == [&"arena_01"], "the room still counts as cleared, got %s" % [_cleared])
+	_check(_flow.is_restarting(), "the last enemy dying does not cancel the restart")
+	_flow.step(FlowScript.RESTART_DELAY)
+	_check(_flow.world != old_world and _flow.world != null, "the run restarted after the last enemy died with everyone down")
+	_check(_flow.state == FlowScript.State.RUNNING and _flow.enemies_left() == FlowScript.WAVE.size(), "the new run is running with a full wave")
+	_stop()
+
+
+## A failed restart (content gone) ends the run instead of leaving it stuck.
+func _test_failed_restart_goes_idle() -> void:
+	_setup(1)
+	_play()
+	var registry: Node = _flow.registry
+	_flow.registry = null
+	(_flow.get_wizard(0) as PlayerScript).take_damage(PlayerScript.MAX_HEALTH)
+	_flow.step(FlowScript.RESTART_DELAY)
+	_flow.registry = registry
+	_check(_flow.state == FlowScript.State.IDLE and _flow.world == null, "a failed restart returns flow to idle")
+	_play()
+	_check(_flow.state == FlowScript.State.RUNNING, "Play starts again after a failed restart")
+	_stop()
+
+
+## A gamepad owner already joined in a later slot keeps it: the keyboard stays out.
+func _test_play_keeps_joined_pad_without_keyboard() -> void:
+	_setup(0)
+	_input.add_virtual_device(2)
+	_play(0)
+	_check(not _input.is_joined(0), "the keyboard does not take slot 0 when someone else joined")
+	_check(_wizards().size() == 1 and _flow.get_wizard(2) != null, "only the joined player plays")
+	_stop()
+
+
+## Every wave enemy stands inside the room and clear of the walls.
+func _test_wave_stands_on_floor() -> void:
+	_setup(1)
+	_play()
+	var room: RoomBase = load("res://content/rooms/crypt/arena_01.tres") as RoomBase
+	var scene: Node = room.scene.instantiate()
+	var walls: Array[Rect2] = []
+	for child in scene.get_node("Walls").get_children():
+		var shape_node := child as CollisionShape2D
+		if shape_node != null and shape_node.shape is RectangleShape2D:
+			var size: Vector2 = (shape_node.shape as RectangleShape2D).size
+			walls.append(Rect2(shape_node.position - size * 0.5, size))
+	scene.free()
+	var inner := Rect2(Vector2.ZERO, Vector2(640.0, 384.0))
+	_check(_flow._enemies.size() == FlowScript.WAVE.size(), "the wave is up")
+	for enemy: Node2D in _flow._enemies:
+		var body := Rect2(enemy.position - Vector2(12.0, 12.0), Vector2(24.0, 24.0))
+		_check(inner.encloses(body), "enemy at %s is inside the room" % enemy.position)
+		for wall in walls:
+			_check(not wall.intersects(body), "enemy at %s is clear of the wall %s" % [enemy.position, wall])
 	_stop()
 
 

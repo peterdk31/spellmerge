@@ -112,7 +112,9 @@ func step(delta: float) -> void:
 	_restart_left -= delta
 	if _restart_left <= 0.0:
 		_restart_left = -1.0
-		start_run(_starter)
+		if not start_run(_starter):
+			push_error("Flow: the restart failed, so the run is over; Play starts a new one.")
+			stop_run()
 
 
 ## True while a restart is counting down.
@@ -191,7 +193,6 @@ func _on_enemy_died(_player: int, enemy: Node, _position: Vector2) -> void:
 	_enemies.remove_at(at)
 	if _enemies.is_empty() and state == State.RUNNING:
 		state = State.CLEARED
-		_restart_left = -1.0
 		if events != null:
 			events.room_cleared.emit(room_id)
 
@@ -222,9 +223,10 @@ func _all_down() -> bool:
 
 
 ## The Play button may be pressed with the mouse by nobody who has joined: the
-## keyboard then takes slot 0.
+## keyboard then takes slot 0. Anyone already joined (a gamepad, in any slot)
+## plays as they are and the keyboard stays out.
 func _ensure_joined(requester: int) -> void:
-	if input == null or requester != 0 or input.is_joined(0):
+	if input == null or requester != 0 or input.joined_count() > 0:
 		return
 	input.join(InputManagerScript.KEYBOARD)
 

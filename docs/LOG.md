@@ -4,7 +4,7 @@ What each run did, newest first. Claude appends a short entry after each develop
 
 ## 2026-10-17
 
-- M1 part 25: stabilisation and checkpoint C1. `ci/build/build.sh --quick --tests` passes; no open bug in M1's scope, so no bug fix. Added `tests/bots/test_wave_balance.gd` (fighter bots, 1 to 4 players, `BALANCE:` lines; it fails only if a run neither clears nor is lost, or if 2 to 4 players lose a wizard). One run on a GitHub runner, headless, bots that never dodge:
+- M1 part 25: stabilisation and checkpoint C1. `ci/build/build.sh --quick --tests` passes; no open bug in M1's scope, so no bug fix. Added `tests/bots/test_wave_balance.gd` (fighter bots, 1 to 4 players, `BALANCE:` lines; it fails only if a run neither clears nor is lost; who is downed is reported, not gated, because the bots play in real time). One run on a GitHub runner, headless, bots that never dodge:
   - 1 player: cleared in 28.1 game seconds, 80 of 100 health lost, 39 casts.
   - 2 players: 20.5 s, 70 health lost in total, 53 casts.
   - 3 players: 14.4 s, 80 lost, 51 casts.

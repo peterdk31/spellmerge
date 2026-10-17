@@ -8,6 +8,9 @@ extends Resource
 @export var id: StringName = &""
 ## Seconds the game slows on a hit. Short, and the same for every player.
 @export_range(0.0, 0.2, 0.005) var hit_stop_seconds: float = 0.04
+## Seconds after a plain hit's stop in which plain hits cannot stop the game again.
+## Keeps a crowded fight from sitting near 5% speed (0.04 s of every 0.19 s is 21%).
+@export_range(0.0, 0.5, 0.01) var hit_stop_rest: float = 0.15
 ## Seconds for an enemy death or a downed wizard (a little longer than a plain hit).
 @export_range(0.0, 0.3, 0.005) var death_stop_seconds: float = 0.07
 ## Engine.time_scale while the hit-stop lasts (0 would freeze the physics step).
@@ -23,6 +26,8 @@ extends Resource
 ## How far hit particles fly (pixels per second) and how long they live.
 @export_range(0.0, 400.0, 1.0) var particle_speed: float = 90.0
 @export_range(0.05, 2.0, 0.05) var particle_lifetime: float = 0.3
+## How much bigger (speed, life, particle size) a death burst is than a hit burst.
+@export_range(1.0, 3.0, 0.1) var death_particle_size: float = 1.6
 ## Sound ids asked from `core/registry`. A missing sound is silent.
 @export var hit_sound: StringName = &"hit"
 @export var death_sound: StringName = &"enemy_death"

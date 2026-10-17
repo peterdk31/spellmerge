@@ -34,6 +34,11 @@ func _initialize() -> void:
 	_test_downed_has_no_particles()
 	_test_feel_never_changes_damage()
 	_test_projectile_texture_is_set()
+	_test_bursts_survive_the_world_being_freed()
+	_test_hit_stops_are_limited()
+	_test_a_kill_uses_one_slot_and_beats_a_full_pool()
+	_test_engine_time_scale_comes_back()
+	_test_camera_change_is_followed()
 	_teardown()
 	Engine.time_scale = 1.0
 	if _failures.is_empty():
@@ -261,3 +266,90 @@ func _test_projectile_texture_is_set() -> void:
 	_setup(&"", projectiles)
 	_check(projectiles.texture == texture, "feel sets Projectiles.texture to the fire bolt")
 	projectiles.free()
+
+
+func _test_bursts_survive_the_world_being_freed() -> void:
+	_setup()
+	for round in 3:
+		var world := Node2D.new()
+		root.add_child(world)
+		current_scene = world
+		_hit(0, Vector2(4.0, 4.0))
+		_check(_feel.live_particles() == FeelScript.BURST_PARTICLES, "a burst starts with a world scene (round %d)" % round)
+		world.free()
+		current_scene = null
+		for i in 9:
+			_feel.step(STEP)
+	for shot in 12:
+		_hit(shot % 4, Vector2(shot, 0.0))
+	_check(_feel.live_particles() == FeelScript.PARTICLE_LIMIT, "after the world was freed three times, bursts still fill the limit")
+
+
+func _test_hit_stops_are_limited() -> void:
+	_setup()
+	var stopped: float = 0.0
+	var total: float = 0.0
+	for frame in 256:
+		for player in 4:
+			_hit(player)
+		if _feel.stop_left > 0.0:
+			stopped += 0.015625
+		total += 0.015625
+		_feel.step(0.015625)
+	_check(stopped / total < 0.3, "a stream of hits keeps the stopped time under 30%% (was %.2f)" % (stopped / total))
+	_check(stopped > 0.0, "a stream of hits still stops the game now and then")
+	_setup()
+	_hit(0)
+	_feel.step(STEP)
+	_check(_feel.rest_left > 0.0, "a rest follows a hit-stop")
+	_hit(0)
+	_check(_feel.stop_left == 0.0, "a plain hit in the rest does not stop the game")
+	_bus.enemy_died.emit(0, null, Vector2.ZERO)
+	_check(_feel.stop_left > 0.0, "a death stops the game even in the rest")
+
+
+func _test_a_kill_uses_one_slot_and_beats_a_full_pool() -> void:
+	_setup()
+	_hit(0, Vector2(7.0, 7.0))
+	_bus.enemy_died.emit(0, null, Vector2(7.0, 7.0))
+	_check(_feel.live_particles() == FeelScript.BURST_PARTICLES, "a killing blow uses one burst, not two")
+	_feel.step(STEP)
+	for i in FeelScript.BURST_SLOTS:
+		_hit(i % 4, Vector2(100.0 + i, 0.0))
+	_check(_feel.live_particles() == FeelScript.PARTICLE_LIMIT, "the pool is full of hit bursts")
+	_bus.enemy_died.emit(1, null, Vector2(-50.0, 9.0))
+	var found: bool = false
+	for child in _feel.get_children():
+		if child is CPUParticles2D and (child as CPUParticles2D).global_position == Vector2(-50.0, 9.0):
+			found = true
+	_check(found, "a kill gets a burst even when the pool is full of hit bursts")
+	_check(_feel.live_particles() == FeelScript.PARTICLE_LIMIT, "taking a burst over keeps the limit")
+
+
+func _test_engine_time_scale_comes_back() -> void:
+	_setup()
+	_feel.drive_engine = true
+	_hit(0)
+	_check(Engine.time_scale < 1.0, "a hit slows the engine")
+	_feel.step(STEP)
+	_check(Engine.time_scale == 1.0, "the engine is back to full speed when the stop ends")
+	_bus.enemy_died.emit(0, null, Vector2.ZERO)
+	_check(Engine.time_scale < 1.0, "a death slows the engine")
+	_teardown()
+	_check(Engine.time_scale == 1.0, "removing feel mid-stop restores the engine speed")
+
+
+func _test_camera_change_is_followed() -> void:
+	_setup()
+	_camera.make_current()
+	_hit(0)
+	_feel.step(0.015625)
+	_check(_camera.offset != Vector2.ZERO, "the first camera shakes")
+	var second := Camera2D.new()
+	root.add_child(second)
+	second.make_current()
+	_hit(0)
+	_check(_camera.offset == Vector2.ZERO, "the old camera is put back at rest")
+	_feel.step(0.015625)
+	_check(second.offset != Vector2.ZERO, "the new camera shakes")
+	second.free()

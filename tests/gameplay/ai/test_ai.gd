@@ -35,6 +35,8 @@ func _initialize() -> void:
 	_test_telegraph_standing_still_and_aim_locked()
 	_test_shot_hurts_wizard_through_combat()
 	_test_shot_can_be_dodged_by_stepping_aside()
+	_test_no_lookups_while_nobody_stands()
+	_test_telegraph_nodes_follow_the_windup()
 	_test_recover_then_chase_again()
 	_test_knockback_moves_the_enemy()
 	_test_group_players_are_found()
@@ -67,7 +69,8 @@ func _setup(player_count: int = 0) -> void:
 		var wizard := PlayerScript.new()
 		wizard.index = index
 		wizard.events = _bus
-		wizard._ready()
+		# In the tree, or the projectile manager never sees the wizard as a target.
+		root.add_child(wizard)
 		wizard.position = Vector2(1000.0, 1000.0 * index)
 		_players.append(wizard)
 		_combat.register_player(index, wizard, 8.0)
@@ -242,6 +245,13 @@ func _test_shot_hurts_wizard_through_combat() -> void:
 
 
 func _test_shot_can_be_dodged_by_stepping_aside() -> void:
+	# Control: the same shot does hit a player who stays put.
+	_setup(1)
+	_players[0].position = Vector2(60.0, 0.0)
+	var control := _imp()
+	control.step(STEP)
+	_run(control, int(control.windup_time / STEP) + 20)
+	_check(_players[0].health < PlayerScript.MAX_HEALTH, "control: a player who stays on the line is hit")
 	_setup(1)
 	_players[0].position = Vector2(60.0, 0.0)
 	var imp := _imp()
@@ -249,6 +259,49 @@ func _test_shot_can_be_dodged_by_stepping_aside() -> void:
 	_players[0].position = Vector2(60.0, 40.0)
 	_run(imp, int(imp.windup_time / STEP) + 20)
 	_check(_players[0].health == PlayerScript.MAX_HEALTH, "a player who stepped aside during the telegraph is not hit")
+
+
+func _test_no_lookups_while_nobody_stands() -> void:
+	_setup(2)
+	var imp := _imp()
+	imp.targets.clear()
+	_players[0].take_damage(PlayerScript.MAX_HEALTH)
+	_players[1].take_damage(PlayerScript.MAX_HEALTH)
+	imp.step(STEP)
+	var before: int = imp.lookup_count
+	var steps: int = 160
+	for i in steps:
+		imp.step(STEP)
+	var allowed: int = int(float(steps) * STEP / AiScript.RETARGET_TIME) + 1
+	_check(imp.target == null, "nobody stands, so there is no target")
+	_check(imp.lookup_count - before <= allowed, "with no target the players are looked up only every RETARGET_TIME (%d lookups)" % (imp.lookup_count - before))
+
+
+func _test_telegraph_nodes_follow_the_windup() -> void:
+	_setup(1)
+	_players[0].position = Vector2(0.0, 80.0)
+	var imp: AiScript = ImpData.scene.instantiate()
+	imp.data = ImpData
+	imp.events = _bus
+	imp.combat = _combat
+	imp.projectiles = _projectiles
+	imp.targets.append(_players[0])
+	imp._ready()
+	_enemies.append(imp)
+	var line: Line2D = imp.get_node("Telegraph")
+	var sprite: Sprite2D = imp.get_node("Sprite")
+	var reach: float = imp.attack_speed * imp.attack_lifetime
+	_check(is_equal_approx(line.get_point_position(1).x, reach), "the telegraph line is as long as the shot flies")
+	_check(not line.visible, "the telegraph is hidden before the windup")
+	imp.step(STEP)
+	_check(line.visible and is_equal_approx(line.rotation, imp.aim.angle()), "the telegraph shows, turned toward the locked aim")
+	_check(sprite.modulate != Color.WHITE, "the sprite flashes during the windup")
+	var early_width: float = line.width
+	var early_alpha: float = line.modulate.a
+	_run(imp, int(imp.windup_time / STEP) - 4)
+	_check(line.width > early_width and line.modulate.a > early_alpha, "the telegraph grows wider and brighter with progress")
+	_run(imp, 4)
+	_check(not line.visible and sprite.modulate == Color.WHITE, "after the shot the telegraph is hidden and the sprite is white again")
 
 
 func _test_recover_then_chase_again() -> void:

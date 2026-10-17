@@ -17,10 +17,13 @@ extends CharacterBody2D
 ## Combat's (it frees the node), so there is no death code here.
 ##
 ## Telegraph: an optional `Sprite` child flashes (`modulate`) and an optional
-## `Telegraph` child (a Line2D along +X) turns toward the locked aim and shows.
+## `Telegraph` child (a Line2D along +X) turns toward the locked aim and shows. Its
+## far end is set to the real reach of the shot (`attack_speed * attack_lifetime`),
+## and it grows wider and brighter with `telegraph_progress()`.
 ## Nothing here allocates per frame. Retargeting runs every RETARGET_TIME seconds
-## (staggered per enemy) or at once when `player_downed` arrives; with no explicit
-## `targets` it reads the `players` group then.
+## (staggered per enemy), at once when `player_downed` arrives or the current target
+## is lost, and once at the first step; with no explicit `targets` it reads the
+## `players` group then. With nobody to chase it looks only every RETARGET_TIME.
 ##
 ## All timing runs in step(delta), so tests drive it with fixed deltas.
 ## _physics_process() calls step() and then move_and_slide().
@@ -33,8 +36,19 @@ enum State { CHASE, WINDUP, RECOVER }
 
 ## The group every wizard is in (player.gd adds it).
 const PLAYERS_GROUP: StringName = &"players"
-## Hit profile tag of the enemy shot. Tag 0 means "no tag"; the fire bolt will use other tags.
-const ATTACK_TAG: int = 1000
+## Hit profile tags of enemy shots start here, plus a number derived from the enemy
+## id (see `attack_tag`), so two enemy types do not overwrite each other's damage.
+## Tag 0 means "no tag"; the fire bolt will use other tags.
+const ATTACK_TAG_BASE: int = 1000
+const ATTACK_TAG_SPREAD: int = 100000
+## Collision layers of this body (see player.gd's LAYER_PLAYERS): its own and the walls.
+const LAYER_ENEMIES: int = 4
+const LAYER_WALLS: int = 1
+## The telegraph line starts this far from the enemy; its look at 0% and 100% progress.
+const TELEGRAPH_START: float = 10.0
+const TELEGRAPH_WIDTH_MIN: float = 1.0
+const TELEGRAPH_WIDTH_MAX: float = 3.0
+const TELEGRAPH_ALPHA_MIN: float = 0.3
 ## Seconds between looking for the nearest player again.
 const RETARGET_TIME: float = 0.5
 ## `Sprite` modulate while the telegraph shows.
@@ -70,24 +84,36 @@ var state: State = State.CHASE
 var target: Node2D = null
 ## Direction of the attack, locked when the windup starts (unit length).
 var aim: Vector2 = Vector2.DOWN
+## Hit profile tag of this enemy's shot, set in _ready() from `data.id`.
+var attack_tag: int = ATTACK_TAG_BASE
+## How often the players were looked up (tests count it).
+var lookup_count: int = 0
 
 var _state_left: float = 0.0
 var _retarget_left: float = 0.0
+var _retarget_offset: float = 0.0
+var _looked: bool = false
 var _sprite: Sprite2D = null
 var _telegraph: Node2D = null
+var _telegraph_line: Line2D = null
 
 
 func _init() -> void:
-	collision_layer = 4
-	collision_mask = 1
+	collision_layer = LAYER_ENEMIES
+	collision_mask = LAYER_WALLS
 	motion_mode = CharacterBody2D.MOTION_MODE_FLOATING
 
 
 func _ready() -> void:
 	_sprite = get_node_or_null("Sprite") as Sprite2D
 	_telegraph = get_node_or_null("Telegraph") as Node2D
+	_telegraph_line = _telegraph as Line2D
 	if _telegraph != null:
 		_telegraph.visible = false
+	if _telegraph_line != null and _telegraph_line.get_point_count() >= 2:
+		var reach: float = maxf(attack_speed * attack_lifetime, TELEGRAPH_START)
+		_telegraph_line.set_point_position(0, Vector2(TELEGRAPH_START, 0.0))
+		_telegraph_line.set_point_position(1, Vector2(reach, 0.0))
 	if events == null:
 		events = get_node_or_null("/root/Events") as EventsScript
 	if combat == null:
@@ -99,11 +125,14 @@ func _ready() -> void:
 	if data == null:
 		push_warning("Ai: no enemy data set, so this enemy stands still.")
 	if combat != null:
-		combat.set_hit_profile(ATTACK_TAG, attack_damage, 0.0)
+		if data != null:
+			attack_tag = ATTACK_TAG_BASE + absi(hash(data.id)) % ATTACK_TAG_SPREAD
+		combat.set_hit_profile(attack_tag, attack_damage, 0.0)
 		if data != null:
 			combat.register_enemy(self, data.max_health, hurt_radius, data.contact_damage)
 	# Spread retargeting over the half second so 200 enemies do not all look at once.
-	_retarget_left = RETARGET_TIME * float(get_instance_id() % 8) / 8.0
+	_retarget_offset = RETARGET_TIME * float(get_instance_id() % 8) / 8.0
+	_retarget_left = _retarget_offset
 
 
 func _exit_tree() -> void:
@@ -120,8 +149,12 @@ func _physics_process(delta: float) -> void:
 ## (_physics_process does).
 func step(delta: float) -> void:
 	_retarget_left -= delta
-	if _retarget_left <= 0.0 or not _is_valid_target(target):
-		_retarget_left = RETARGET_TIME
+	# Look on the timer, at the first step (staggered afterwards) or when the target
+	# was just lost. With no target at all only the timer applies.
+	var lost: bool = target != null and not _is_valid_target(target)
+	if _retarget_left <= 0.0 or lost or not _looked:
+		_retarget_left = RETARGET_TIME if _looked else _retarget_offset
+		_looked = true
 		target = _find_target()
 	match state:
 		State.CHASE:
@@ -131,6 +164,8 @@ func step(delta: float) -> void:
 			_state_left -= delta
 			if _state_left <= 0.0:
 				_attack()
+			else:
+				_update_telegraph()
 		State.RECOVER:
 			velocity = Vector2.ZERO
 			_state_left -= delta
@@ -172,7 +207,7 @@ func _step_chase() -> void:
 func _attack() -> void:
 	if projectiles != null:
 		projectiles.spawn(EventsScript.NO_PLAYER, _position_of(self), aim * attack_speed,
-				attack_lifetime, attack_radius, ProjectileManagerScript.LAYER_PLAYER, 0, ATTACK_TAG)
+				attack_lifetime, attack_radius, ProjectileManagerScript.LAYER_PLAYER, 0, attack_tag)
 	state = State.RECOVER
 	_state_left = recover_time
 	_show_telegraph(false)
@@ -183,11 +218,23 @@ func _show_telegraph(on: bool) -> void:
 		_telegraph.visible = on
 		if on:
 			_telegraph.rotation = aim.angle()
+			_update_telegraph()
 	if _sprite != null:
 		_sprite.modulate = TELEGRAPH_COLOR if on else Color.WHITE
 
 
+## Grow the telegraph line wider and brighter as the shot gets closer.
+func _update_telegraph() -> void:
+	if _telegraph == null:
+		return
+	var progress: float = telegraph_progress()
+	_telegraph.modulate.a = lerpf(TELEGRAPH_ALPHA_MIN, 1.0, progress)
+	if _telegraph_line != null:
+		_telegraph_line.width = lerpf(TELEGRAPH_WIDTH_MIN, TELEGRAPH_WIDTH_MAX, progress)
+
+
 func _find_target() -> Node2D:
+	lookup_count += 1
 	var here: Vector2 = _position_of(self)
 	var best: Node2D = null
 	var best_distance: float = INF

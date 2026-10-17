@@ -14,7 +14,7 @@ shape = SubResource("CircleShape2D_body")
 
 [node name="Telegraph" type="Line2D" parent="."]
 visible = false
-points = PackedVector2Array(10, 0, 90, 0)
+points = PackedVector2Array(10, 0, 175, 0)
 width = 2.0
 default_color = Color(0.878, 0.349, 0.184, 0.7)
 

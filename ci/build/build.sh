@@ -55,6 +55,8 @@ GODOT="$TOOLS/Godot_v${GODOT_RELEASE}_linux.x86_64"
 # Budgets from docs/PLAN.md, "Performance": compressed download sizes.
 WEB_BUDGET=$((40 * 1000 * 1000))
 DESKTOP_BUDGET=$((300 * 1000 * 1000))
+# docs/PLAN.md budget: the web build loads in under 10 s (here from a local server, so no download).
+WEB_LOAD_LIMIT=10
 
 step() { printf '\n==> %s\n' "$*"; }
 
@@ -185,12 +187,29 @@ export_all() {
 
   step "Boot smoke test (web build in headless Chrome)"
   local status=0
-  PYTHONPATH=ci python3 -m smbot.websmoke build/web --expect "main menu ready" \
+  PYTHONPATH=ci python3 -m smbot.websmoke build/web --expect "main menu ready" --max-load "$WEB_LOAD_LIMIT" \
     --screenshot build/logs/web.png || status=$?
   if ((status == 2)) && [[ -z "${CI:-}" ]]; then
     echo "warning: Chrome is not installed, so the web build was not smoke-tested"
+    return 0
   elif ((status != 0)); then
     return 1
+  fi
+
+  # "Web Test" is the Web preset with tests/, never zipped or deployed. The game reads
+  # --four-bot from the page's start config, which websmoke fills in.
+  step "4-bot test (exported web build with tests, headless Chrome)"
+  rm -rf build/web-test && mkdir -p build/web-test
+  godot_checked export-web-test "$GODOT" --headless --path . --export-release "Web Test" build/web-test/index.html
+  [[ -s build/web-test/index.html ]] || { echo "::error::Web Test export produced no index.html"; exit 1; }
+  PYTHONPATH=ci python3 -m smbot.websmoke build/web-test --page-args=--four-bot --expect "SMOKE OK" --timeout 240
+
+  # Projectile timing in WASM (#91). Runs once the game has the runner the main menu starts on
+  # --projectile-timing (an exported build can't run a --script); it prints BENCH lines, then TIMING OK.
+  if [[ -f tests/benchmark/projectile_timing_runner.gd ]]; then
+    step "Projectile timing (exported web build, headless Chrome)"
+    PYTHONPATH=ci python3 -m smbot.websmoke build/web-test --page-args=--projectile-timing --expect "TIMING OK" \
+      --timeout 240
   fi
 }
 

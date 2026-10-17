@@ -201,7 +201,8 @@ def render(cfg: config_mod.Config, data: PageData, version: str, channel: str, s
       <h2>Wanted now</h2>
       {wanted}
       <p class="small"><a href="{repo_url}/blob/main/CONTRIBUTING.md">How to contribute</a> (no git needed for art,
-         sound and writing) &middot; <a href="{repo_url}/blob/main/AGENTS.md">for coding agents</a></p>
+         sound and writing) &middot; <a href="{repo_url}/blob/main/AGENTS.md">for coding agents</a> &middot;
+         <a href="style-guide/">Style Guide and art starter kit</a></p>
     </section>
     <section>
       <h2>Coming next</h2>

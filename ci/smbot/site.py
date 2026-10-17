@@ -6,6 +6,7 @@
   /play/     the latest stable web demo (the default)
   /nightly/  today's web build
   /screenshots/  today's screenshots (smbot.screenshots), when the build took any
+  /style-guide/  the Style Guide page and the art starter kit zip (smbot.styleguide)
 """
 
 from __future__ import annotations
@@ -17,7 +18,7 @@ import tempfile
 import zipfile
 from pathlib import Path
 
-from . import config, contribute, gh, screenshots
+from . import config, contribute, gh, screenshots, styleguide
 
 
 def unpack(zip_path: Path, dest: Path) -> None:
@@ -64,6 +65,10 @@ def build(repo: str, dist: Path, version: str, channel: str, out: Path, shots: P
 
     if shots:
         screenshots.gallery(shots, out / "screenshots", version)
+    try:
+        styleguide.build(out / "style-guide", shots / "arena_four_wizards.png" if shots else None)
+    except (OSError, ValueError, KeyError) as exc:  # never keep today's build off the site
+        print(f"::warning::the Style Guide page was not built: {exc}")
     cfg = config.load()
     page = contribute.render(cfg, contribute.gather(cfg), version, channel, stable_name)
     (out / "index.html").write_text(page)

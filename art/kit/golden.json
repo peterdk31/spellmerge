@@ -4,13 +4,13 @@
   "examples": [
     {
       "path": "content/wizard/base/wizard_p1_idle.svg",
-      "shows": "A player character: Player 1 ramp on robe and hat, Skin face, Wood staff, feet 2 px above the bottom edge",
+      "shows": "A player character: Player 1 ramp on robe and hat, Skin face, Wood staff, feet about 2-3 px above the bottom edge",
       "rules": ["outline", "three shades", "light from the top-left", "player colour"]
     },
     {
       "path": "content/enemies/ember_imp/idle.svg",
-      "shows": "An enemy: Fire materials only, no player colour, a bold silhouette",
-      "rules": ["outline", "silhouette", "enemy colours"]
+      "shows": "An enemy: Fire body, Bone horns and Spark eyes, no player colour, a bold silhouette",
+      "rules": ["outline", "silhouette", "no player colour"]
     },
     {
       "path": "art/tilesets/crypt/wall.svg",

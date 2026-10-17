@@ -16,7 +16,7 @@ The art rules for Spellmerge, written so a person, an agent or a script can chec
 ## The 32×32 grid
 
 - A sprite or tile is **32×32 px**. Bigger things (a boss, a wide prop) are a whole multiple: 64×64, 96×64 and so on.
-- Characters stand on the lower half of the cell with their feet about 2 px above the bottom edge, so they overlap correctly in the top-down view. Leave 1 px of empty border where you can; the outline needs it.
+- Characters stand on the lower half of the cell with their feet about 2–3 px above the bottom edge, so they overlap correctly in the top-down view. Leave 1 px of empty border where you can; the outline needs it.
 - Tiles fill the whole 32×32 cell and must repeat without a visible seam. **Floor tiles are flat**: Stone base with a few inner details (a crack, a joint) in Stone shadow or light, and nothing on the outer edge pixels. The top-left lit edge and bottom-right shaded edge apply only to **walls and raised props**.
 - Pixel positions are whole numbers. No half-pixel offsets, no rotation by angles other than 90°, no scaling other than whole multiples.
 - Backgrounds are transparent (fully, never partly). Tiles are the exception: they are fully opaque.
@@ -132,8 +132,8 @@ Candidates for the pieces the Style Guide page shows as "this is the look". They
 
 | Kind | File | What to learn from it |
 | --- | --- | --- |
-| Player character | `content/wizard/base/wizard_p1_idle.svg` | Player ramp on robe and hat, Skin face, Wood staff, feet 2 px above the bottom edge |
-| Enemy | `content/enemies/ember_imp/idle.svg` | Fire materials only, no player colour, a bold silhouette |
+| Player character | `content/wizard/base/wizard_p1_idle.svg` | Player ramp on robe and hat, Skin face, Wood staff, feet about 2-3 px above the bottom edge |
+| Enemy | `content/enemies/ember_imp/idle.svg` | Fire body, Bone horns and Spark eyes, no player colour, a bold silhouette |
 | Raised tile | `art/tilesets/crypt/wall.svg` | Lit top and left edge, shaded bottom and right edge |
 | Flat tile | `art/tilesets/crypt/floor.svg` | Stone base, a few inner details, nothing on the outer edge |
 | Projectile | `art/vfx/fire_bolt.svg` | Fire streak with a Spark core, outlined in its own shadow shade |
@@ -151,6 +151,8 @@ Before opening an art PR:
 - [ ] Only palette colours; no gradients, no antialiasing, no partial transparency.
 - [ ] 1 px outline, closed; light from the top-left; at most 3 shades per material.
 - [ ] Reads as a silhouette at 1×, and next to four players.
+- [ ] No baked drop shadow, no glow halo; the background is fully transparent (tiles are fully opaque).
+- [ ] Floors are flat; walls and raised props have the lit top-left edge. Tiles repeat without a seam.
 - [ ] Imports with filtering off.
 - [ ] Manifest entry with the honest origin (and tool and prompt for AI).
 - [ ] A screenshot of it in the game in the PR.

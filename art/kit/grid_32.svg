@@ -2,7 +2,7 @@
   <!-- Spellmerge 32x32 grid template. Open it in an editor and draw on a layer above it, then export your art
        WITHOUT this grid at 32x32. This file is a template, not a game asset. Colours are palette colours.
        Guides: Outline border = the cell; Spark light = centre lines; Fire light = the line a character's feet stand on
-       (about 2 px above the bottom edge); Player 1 light = the 1 px empty border where you can leave it. -->
+       (about 2-3 px above the bottom edge); Player 1 light = the 1 px empty border where you can leave it. -->
   <defs>
     <pattern id="cell" width="1" height="1" patternUnits="userSpaceOnUse">
       <rect x="0" y="0" width="1" height="0.06" fill="#a39fb8"/>

@@ -56,6 +56,8 @@ const AXIS_RIGHT_Y: int = 3
 const AXIS_TRIGGER_RIGHT: int = 5
 ## A trigger counts as pressed above this value.
 const TRIGGER_PRESSED: float = 0.5
+## Pixels the mouse must travel before the keyboard player aims with it.
+const MOUSE_AIM_TRAVEL: float = 8.0
 
 ## The per-player actions, defined in project.godot. `join` and `leave` are
 ## handled here and are not per-player state.
@@ -94,6 +96,8 @@ var _captured: Array[bool] = []
 ## Per player: the raw right stick (x and y axis values, -1 to 1).
 var _aim_stick: Array[Vector2] = []
 var _mouse_aiming: bool = false
+## How far the mouse moved (pixels) since the cast key last turned mouse aim off.
+var _mouse_travel: float = 0.0
 
 
 func _init() -> void:
@@ -199,6 +203,7 @@ func leave(player: int) -> bool:
 	_aim_stick[player] = Vector2.ZERO
 	if device == KEYBOARD:
 		_mouse_aiming = false
+		_mouse_travel = 0.0
 	for action in ACTIONS:
 		_strength[player][action] = 0.0
 		_sources[player][action].clear()
@@ -235,12 +240,16 @@ func handle_event(event: InputEvent) -> void:
 		leave(player)
 		return
 	if event is InputEventMouseMotion:
-		_mouse_aiming = true
+		# A brush of the mouse is not a decision to aim with it.
+		_mouse_travel += (event as InputEventMouseMotion).relative.length()
+		if _mouse_travel >= MOUSE_AIM_TRAVEL:
+			_mouse_aiming = true
 		return
 	if event is InputEventMouseButton:
 		_mouse_aiming = true
 	elif event is InputEventKey and event.is_action_pressed(&"cast"):
 		_mouse_aiming = false
+		_mouse_travel = 0.0
 	if event is InputEventJoypadMotion:
 		_handle_motion(player, event)
 		return

@@ -31,6 +31,9 @@ func _initialize() -> void:
 	_test_cast_goes_along_the_aim()
 	_test_four_players_aim_alone()
 	_test_sprite_turns_with_the_aim()
+	_test_sprite_turn_has_a_band()
+	_test_downed_wizard_hides_the_reticle()
+	_test_mouse_jitter_is_not_aiming()
 	_teardown()
 	if _failures.is_empty():
 		print("TEST OK: gameplay/player (aim)")
@@ -123,7 +126,7 @@ func _test_mouse_aim_for_the_keyboard_player() -> void:
 	_players[0].mouse_world_override = Vector2(100, 40)
 	_run(1)
 	_check(_near(_players[0].aim, Vector2.DOWN), "the mouse is not used before it moves")
-	_input.handle_event(InputEventMouseMotion.new())
+	_input.handle_event(_mouse_move(20.0))
 	_run(1)
 	_check(_near(_players[0].aim, Vector2.UP), "the keyboard player aims at the mouse")
 	_players[0].mouse_world_override = Vector2(160, 100)
@@ -193,3 +196,49 @@ func _test_sprite_turns_with_the_aim() -> void:
 	_input.send_virtual_aim(0, Vector2.RIGHT)
 	wizard.step(STEP)
 	_check(not sprite.flip_h, "the sprite turns back when aiming right")
+
+
+func _mouse_move(distance: float) -> InputEventMouseMotion:
+	var motion := InputEventMouseMotion.new()
+	motion.relative = Vector2(distance, 0.0)
+	return motion
+
+
+func _test_sprite_turn_has_a_band() -> void:
+	_teardown()
+	_bus = EventsScript.new()
+	_input = InputManagerScript.new()
+	_input.events = _bus
+	_input.add_virtual_device(0)
+	var wizard := WizardScene.instantiate() as PlayerScript
+	wizard.input = _input
+	wizard.events = _bus
+	wizard._ready()
+	_players.append(wizard)
+	var sprite := wizard.get_node("Sprite") as Sprite2D
+	_input.send_virtual_aim(0, Vector2.LEFT)
+	wizard.step(STEP)
+	_input.send_virtual_aim(0, Vector2(0.2, 1.0).normalized())
+	wizard.step(STEP)
+	_check(sprite.flip_h, "a small wobble past straight down does not unflip the sprite")
+	_input.send_virtual_aim(0, Vector2(0.9, 0.4).normalized())
+	wizard.step(STEP)
+	_check(not sprite.flip_h, "aiming clearly right unflips the sprite")
+
+
+func _test_downed_wizard_hides_the_reticle() -> void:
+	_setup(1)
+	_check(_players[0]._reticle_visible(), "a standing wizard shows the reticle")
+	_players[0].take_damage(PlayerScript.MAX_HEALTH)
+	_check(not _players[0]._reticle_visible(), "a downed wizard hides the reticle")
+	_players[0].revive(1)
+	_check(_players[0]._reticle_visible(), "a revived wizard shows the reticle again")
+
+
+func _test_mouse_jitter_is_not_aiming() -> void:
+	_setup(1, true)
+	_input.handle_event(_mouse_move(1.0))
+	_input.handle_event(_mouse_move(-2.0))
+	_check(not _input.is_mouse_aiming(0), "a tiny mouse brush does not turn mouse aim on")
+	_input.handle_event(_mouse_move(20.0))
+	_check(_input.is_mouse_aiming(0), "a real mouse move does")

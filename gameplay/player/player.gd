@@ -61,7 +61,11 @@ const MOUSE_MIN_DISTANCE: float = 4.0
 ## The reticle: its distance from the wizard's feet and its size, in pixels.
 const RETICLE_DISTANCE: float = 38.0
 const RETICLE_SIZE: float = 4.0
-## Light colour of each player's ramp (docs/STYLE.md), for the reticle.
+## Aim x beyond which the sprite turns (and turns back): a band against flicker.
+## The flip also mirrors the painted light; fine for the placeholder art.
+const FLIP_BAND: float = 0.3
+## Light colour of each player's ramp, for the reticle. The single source is the
+## player ramps in docs/STYLE.md; core has only the base colours (projectile manager).
 const PLAYER_COLORS: Array[Color] = [
 	Color("7fc0f0"), Color("f59ab8"), Color("8fd46a"), Color("c99af0"),
 ]
@@ -111,6 +115,9 @@ var mouse_world_override: Vector2 = Vector2.INF
 var _aim_hold_left: float = 0.0
 ## What the last _draw() drew, to redraw only when the reticle moved.
 var _drawn_aim: Vector2 = Vector2.ZERO
+## The `Sprite` node (null in bare-script tests) and which way it is turned.
+var _sprite: Sprite2D = null
+var _faces_left: bool = false
 
 var _dodge_left: float = 0.0
 var _invulnerable_left: float = 0.0
@@ -132,13 +139,14 @@ func _init() -> void:
 
 ## Show the idle texture for this player index on the `Sprite` node.
 func apply_texture() -> void:
-	var sprite := get_node_or_null("Sprite") as Sprite2D
-	if sprite == null:
+	if _sprite == null:
+		_sprite = get_node_or_null("Sprite") as Sprite2D
+	if _sprite == null:
 		return
 	if index < 0 or index >= textures.size():
 		push_warning("Wizard %d: no texture for this player index." % index)
 		return
-	sprite.texture = textures[index]
+	_sprite.texture = textures[index]
 
 
 func _ready() -> void:
@@ -243,9 +251,13 @@ func _mouse_world() -> Vector2:
 
 ## Turn the sprite toward the aim and redraw the reticle if the aim changed.
 func _refresh_look() -> void:
-	var sprite := get_node_or_null("Sprite") as Sprite2D
-	if sprite != null:
-		sprite.flip_h = aim.x < -0.3
+	# Flip below -FLIP_BAND, unflip above FLIP_BAND: no flicker while the aim wobbles.
+	if aim.x < -FLIP_BAND:
+		_faces_left = true
+	elif aim.x > FLIP_BAND:
+		_faces_left = false
+	if _sprite != null:
+		_sprite.flip_h = _faces_left
 	if not aim.is_equal_approx(_drawn_aim):
 		_drawn_aim = aim
 		queue_redraw()
@@ -257,7 +269,7 @@ func _draw() -> void:
 	draw_set_transform(Vector2(0, 2), 0.0, Vector2(1.0, 0.4))
 	draw_circle(Vector2.ZERO, 8.0, Color(0, 0, 0, 0.35))
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-	if _downed or aim == Vector2.ZERO:
+	if not _reticle_visible():
 		return
 	var tip: Vector2 = aim * RETICLE_DISTANCE
 	var side: Vector2 = aim.orthogonal()
@@ -267,6 +279,11 @@ func _draw() -> void:
 	draw_line(back - side * RETICLE_SIZE, tip, OUTLINE_COLOR, 3.0)
 	draw_line(back + side * RETICLE_SIZE, tip, color, 1.0)
 	draw_line(back - side * RETICLE_SIZE, tip, color, 1.0)
+
+
+## True when _draw() shows the aim reticle: not while downed.
+func _reticle_visible() -> bool:
+	return not _downed and aim != Vector2.ZERO
 
 
 ## Fire the equipped spell now. Returns true if it fired. Does nothing when
@@ -323,6 +340,7 @@ func take_damage(amount: int) -> bool:
 	_announce_stats()
 	if health == 0:
 		_downed = true
+		queue_redraw()
 		_dodge_left = 0.0
 		_invulnerable_left = 0.0
 		velocity = Vector2.ZERO
@@ -337,6 +355,7 @@ func revive(reviver: int) -> bool:
 	if not _downed:
 		return false
 	_downed = false
+	queue_redraw()
 	health = REVIVE_HEALTH
 	_announce_stats()
 	if events != null:

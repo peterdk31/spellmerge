@@ -21,10 +21,6 @@ Sounds the game asks for by id and does not have yet. A missing sound is silent 
 
 ## Later milestones
 
-- **Gate the daily build on the unit tests.** `ci/build/build.sh --tests` passes now, but the daily build does not run it, so regressions could return unnoticed. The workflow lives under `.github/`, so the owner makes the change; it is asked as an owner question in the PR #71 session.
-
-- **A screenshot of `arena_01` with four wizards.** `ci/build/build.sh` runs Godot with `--headless`, which has no renderer, so no screenshot can be taken there. It needs a display (for example `xvfb-run` and the editor binary) in a script the owner adds under `ci/`; the HUD screenshot check in `docs/NEXT.md` waits for the same thing.
-
 - **A downed mid-run joiner.** A joiner has 2 s of protection but, like everyone, cannot come back once downed until the revive rule below exists.
 - **Revive by standing next to a downed wizard.** `Player.revive(reviver)` exists and `DECISIONS.md` gave the "how" to `coop`, but the co-op task (M1 part 17) listed only join/leave, friendly fire and the camera. Nothing calls `revive` yet; decide the rule (hold time, range, a short invulnerability window after a revive) when playtests show the need.
 

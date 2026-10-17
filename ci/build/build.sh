@@ -8,6 +8,10 @@
 #   ci/build/build.sh [--version v0.20261017] [--channel nightly] [--commit SHA]
 #   ci/build/build.sh --quick     import and editor smoke test only (for development)
 #   ci/build/build.sh --quick --tests   the same, then every tests/**/test_*.gd unit test
+#   ci/build/build.sh --quick --screenshots   the same, then every tests/screenshots/shot_*.gd
+#                                     on a virtual display (xvfb-run); PNGs in build/screenshots/
+#
+# A full build runs the unit tests and takes the screenshots too.
 #
 # Downloads the pinned Godot editor and export templates into $GODOT_CACHE
 # (default ~/.cache/spellmerge-godot) and refuses them if a hash differs. Only
@@ -25,10 +29,12 @@ CHANNEL="dev"
 COMMIT="$(git rev-parse HEAD 2>/dev/null || echo "")"
 QUICK=0
 TESTS=0
+SHOTS=0
 while (($#)); do
   case "$1" in
     --quick)   QUICK=1; shift ;;
     --tests)   TESTS=1; shift ;;
+    --screenshots) SHOTS=1; shift ;;
     --version) VERSION=$2; shift 2 ;;
     --channel) CHANNEL=$2; shift 2 ;;
     --commit)  COMMIT=$2; shift 2 ;;
@@ -123,6 +129,35 @@ unit_tests() {
   step "All unit tests passed"
 }
 
+# Each shot script saves PNGs to user://screenshots/ (scripts may only write to user://),
+# which is Godot's data folder for the project under $XDG_DATA_HOME.
+screenshots() {
+  step "Screenshots (virtual display)"
+  if ! command -v xvfb-run >/dev/null; then
+    if [[ -n "${CI:-}" ]]; then
+      echo "::error::xvfb-run is not installed (sudo apt-get install xvfb)"
+      return 1
+    fi
+    echo "warning: xvfb-run is not installed, so no screenshots were taken"
+    return 0
+  fi
+  local saved="$XDG_DATA_HOME/godot/app_userdata/Spellmerge/screenshots" script failed=()
+  rm -rf "$saved" build/screenshots && mkdir -p build/screenshots
+  while IFS= read -r script; do
+    godot_checked "shot-$(basename "$script" .gd)" xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24" \
+      "$GODOT" --path . --rendering-driver opengl3 --audio-driver Dummy --script "res://$script" \
+      || failed+=("$script")
+  done < <(find tests/screenshots -name 'shot_*.gd' 2>/dev/null | sort)
+  if [[ -d "$saved" ]]; then
+    cp "$saved"/*.png build/screenshots/ 2>/dev/null || true
+  fi
+  ls -l build/screenshots
+  if ((${#failed[@]})); then
+    echo "::error::${#failed[@]} screenshot script(s) failed: ${failed[*]}"
+    return 1
+  fi
+}
+
 export_all() {
   for preset in Web Windows Linux; do
     step "Exporting $preset"
@@ -196,12 +231,15 @@ mkdir -p build/logs
 if ((QUICK)); then
   import_and_smoke
   ((TESTS)) && unit_tests
+  ((SHOTS)) && screenshots
   step "Quick check passed"
   exit 0
 fi
 stamp
 trap reset_build_info EXIT
 import_and_smoke
+unit_tests
+screenshots
 export_all
 package
 step "Done: dist/"

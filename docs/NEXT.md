@@ -4,6 +4,7 @@ The ordered task queue for the current milestone, M1 (its design, [M1-core-loop.
 
 ## Queue
 
+- [ ] **HUD screenshot (M1 part 18 follow-up).** Take the shots with `ci/build/build.sh --quick --screenshots` (`tests/screenshots/shot_m1.gd` already saves `arena_four_wizards.png`; add four panels with one DOWN, the four overlays (part 19) and the Coop camera at zoom 0.5 as shots there) and look at them: is the 12 px/14 px text legible over the panels? The player panels are translucent (background alpha 0.4, border 0.8, bar backs 0.7, the owner, 2026-10-17); a panel covering a wizard or enemy now and then is fine.
 - [ ] **Performance probe and budgets (M1 part 22).** Add `tests/benchmark/` with a probe that runs inside the 4-bot test and logs frame time and node, projectile and memory counts, and reads the particle limit constant from part 16; it gates nothing yet. Also time `Projectiles.spawn` at the cap and `update_draw` with a full cap: a hard prerequisite before relying on the 1,000/3,000 caps (if slow, upload only the first `drawn` instances and lower the web cap). Also time the projectile hit test (`_hit_test`, the hottest loop; part 17 added an owner check) with four players and a full cap. Check web build size and load time against the budgets in docs/PLAN.md and record the numbers in `docs/LOG.md`.
 - [ ] **Web 4-bot run (M1 part 23).** Write the exact change `ci/smbot/websmoke.py` needs to run the 4-bot test in headless Chrome (how the game is told to start it, without `JavaScriptBridge`) under "Needs an owner decision" in `docs/BACKLOG.md`, open one issue labelled `owner` with the same text, and make the game side ready. If the owner hasn't made the change, report the task blocked so the next one goes on; the weekly run repeats the request until it is done.
 - [ ] **Starter kit sources and Style Guide content (M1 part 24).** In `art/` add the kit's source files that sessions can write: palette files (a GIMP `.gpl` and a hex list), 32×32 grid and sheet templates as SVG, golden-example candidates, and the checklist (it exists in `docs/STYLE.md` from part 3: extend it with the golden examples and export it as a one-page file in `art/`). Write in `docs/BACKLOG.md` what the owner must add to `ci/smbot/site.py` to build the Style Guide page and the zip, and open one issue labelled `owner` with the same text.
@@ -11,7 +12,7 @@ The ordered task queue for the current milestone, M1 (its design, [M1-core-loop.
 
 ## Blocked
 
-- [ ] **HUD screenshot (M1 part 18 follow-up), needs a display.** Take a 640×360 screenshot with four panels, one of them DOWN, and look at it: is the 12 px/14 px text legible over the 60% translucent panels, and does nothing important hide in a corner at Coop zooms 0.5–1.0? Also check the four overlays (part 19) beside the panels. Blocked on the display-run item in `docs/BACKLOG.md` (an owner script under `ci/`). Move it back to the Queue when that exists.
+(none)
 
 ## Done recently
 

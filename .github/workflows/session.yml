@@ -82,8 +82,10 @@ jobs:
         with:
           path: ~/.cache/spellmerge-godot
           key: godot-${{ hashFiles('ci/build/godot.env') }}
-      - name: Prepare Godot for checks
-        run: ci/build/build.sh --quick
+      - name: Prepare Godot for checks (and a virtual display for screenshots)
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq xvfb
+          ci/build/build.sh --quick
       - id: prepare
         env:
           GH_TOKEN: ${{ steps.read-token.outputs.token }}
@@ -112,7 +114,7 @@ jobs:
           prompt: ${{ steps.prepare.outputs.prompt }}
           claude_args: >-
             --max-turns 400
-            --allowedTools "Read,Write,Edit,MultiEdit,Glob,Grep,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git switch:*),Bash(git checkout:*),Bash(git add:*),Bash(git rm:*),Bash(git mv:*),Bash(git commit:*),Bash(git restore:*),Bash(git branch:*),Bash(git fetch:*),Bash(git merge:*),Bash(git rev-parse:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr list:*),Bash(gh pr checkout:*),Bash(gh issue view:*),Bash(gh issue list:*),Bash(tools/check.sh:*),Bash(ci/build/build.sh --quick),Bash(ci/build/build.sh --quick --tests),Bash(ls:*),Bash(mkdir:*),Bash(mv:*),Bash(cp:*),Bash(rm:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(diff:*),Bash(sort:*)"
+            --allowedTools "Read,Write,Edit,MultiEdit,Glob,Grep,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git switch:*),Bash(git checkout:*),Bash(git add:*),Bash(git rm:*),Bash(git mv:*),Bash(git commit:*),Bash(git restore:*),Bash(git branch:*),Bash(git fetch:*),Bash(git merge:*),Bash(git rev-parse:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr list:*),Bash(gh pr checkout:*),Bash(gh issue view:*),Bash(gh issue list:*),Bash(tools/check.sh:*),Bash(ci/build/build.sh --quick),Bash(ci/build/build.sh --quick --tests),Bash(ci/build/build.sh --quick --screenshots),Bash(ls:*),Bash(mkdir:*),Bash(mv:*),Bash(cp:*),Bash(rm:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(diff:*),Bash(sort:*)"
             --disallowedTools "WebFetch,WebSearch,Edit(/.git/**),Write(/.git/**),MultiEdit(/.git/**),Edit(/ci/**),Write(/ci/**),MultiEdit(/ci/**),Edit(/.github/**),Write(/.github/**),MultiEdit(/.github/**),Edit(/tools/**),Write(/tools/**),MultiEdit(/tools/**)"
             --json-schema '${{ steps.prepare.outputs.schema }}'
       - id: usage
@@ -259,8 +261,10 @@ jobs:
         with:
           path: ~/.cache/spellmerge-godot
           key: godot-${{ hashFiles('ci/build/godot.env') }}
-      - name: Prepare Godot for checks
-        run: ci/build/build.sh --quick
+      - name: Prepare Godot for checks (and a virtual display for screenshots)
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq xvfb
+          ci/build/build.sh --quick
       - id: prepare
         env:
           REVIEW: ${{ needs.critique.outputs.review }}
@@ -291,7 +295,7 @@ jobs:
           prompt: ${{ steps.prepare.outputs.prompt }}
           claude_args: >-
             --max-turns 250
-            --allowedTools "Read,Write,Edit,MultiEdit,Glob,Grep,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git switch:*),Bash(git checkout:*),Bash(git add:*),Bash(git rm:*),Bash(git mv:*),Bash(git commit:*),Bash(git restore:*),Bash(git branch:*),Bash(git fetch:*),Bash(git merge:*),Bash(git rev-parse:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr checkout:*),Bash(tools/check.sh:*),Bash(ci/build/build.sh --quick),Bash(ci/build/build.sh --quick --tests),Bash(ls:*),Bash(mkdir:*),Bash(mv:*),Bash(cp:*),Bash(rm:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(diff:*),Bash(sort:*)"
+            --allowedTools "Read,Write,Edit,MultiEdit,Glob,Grep,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git switch:*),Bash(git checkout:*),Bash(git add:*),Bash(git rm:*),Bash(git mv:*),Bash(git commit:*),Bash(git restore:*),Bash(git branch:*),Bash(git fetch:*),Bash(git merge:*),Bash(git rev-parse:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr checkout:*),Bash(tools/check.sh:*),Bash(ci/build/build.sh --quick),Bash(ci/build/build.sh --quick --tests),Bash(ci/build/build.sh --quick --screenshots),Bash(ls:*),Bash(mkdir:*),Bash(mv:*),Bash(cp:*),Bash(rm:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(diff:*),Bash(sort:*)"
             --disallowedTools "WebFetch,WebSearch,Edit(/.git/**),Write(/.git/**),MultiEdit(/.git/**),Edit(/ci/**),Write(/ci/**),MultiEdit(/ci/**),Edit(/.github/**),Write(/.github/**),MultiEdit(/.github/**),Edit(/tools/**),Write(/tools/**),MultiEdit(/tools/**)"
             --json-schema '${{ steps.prepare.outputs.schema }}'
       - id: usage
@@ -375,6 +379,71 @@ jobs:
           RESULT: ${{ needs.revise.outputs.result }}
           SOURCE: the revision of PR #${{ needs.publish.outputs.pr }}
         run: python3 -m smbot.inbox ask
+
+  # Screenshots of the PR's latest commit, for the owner and voters to see. The game code
+  # runs here with no secrets, no environment and a read-only token; posting is separate.
+  screenshots:
+    name: screenshots (no secrets)
+    needs: [publish, publish-revision]
+    if: always() && needs.publish.outputs.pr != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    outputs:
+      sha: ${{ steps.sha.outputs.sha }}
+    steps:
+      - id: sha
+        env:
+          SHA: ${{ needs.publish-revision.outputs.sha || needs.publish.outputs.sha }}
+        run: echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.sha.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/spellmerge-godot
+          key: godot-${{ hashFiles('ci/build/godot.env') }}
+      - name: Virtual display
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq xvfb
+      - run: ci/build/build.sh --quick --screenshots
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: screenshots
+          path: build/screenshots
+          retention-days: 1
+          if-no-files-found: ignore
+
+  post-screenshots:
+    name: post the screenshots on the PR
+    needs: [publish, screenshots]
+    if: always() && needs.screenshots.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: automation
+    steps:
+      - name: Clean checkout of main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        continue-on-error: true # the PR had no screenshot scripts
+        with:
+          name: screenshots
+          path: shots
+      - id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: Iv23lirdyRvc0KC6625s # the bot app's Client ID (public)
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+      - env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PR: ${{ needs.publish.outputs.pr }}
+          SHA: ${{ needs.screenshots.outputs.sha }}
+        run: python3 -m smbot.screenshots post --pr "$PR" --sha "$SHA" --dir shots
 
   final:
     name: final review (fresh context)

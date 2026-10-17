@@ -478,3 +478,23 @@ The HUD screenshot cannot be taken in a session (no display, `docs/BACKLOG.md`),
 - Errors are caught by a `Logger` (`OS.add_logger`), not by reading a log file, so the test works the same in the editor and in an export. A warning counts as a failure only for "the restart failed" (see "Flow" above).
 - Bots call nothing on a spell (a deliberate deviation from "calling only the cast method" in the old NEXT.md wording): they hold the `cast` action and the wizard calls the cast method. "Alive or revived" is checked as "not down at the end"; revive itself is still in `docs/BACKLOG.md`.
 - Game time runs at `Engine.time_scale` 2 with a limit of 120 game seconds, since no real-time wait is wanted.
+
+## 2026-10-17: The daily build runs the unit tests and takes screenshots
+
+**Decided by:** the owner (#72: "make the daily build run the unit tests and fail when one fails"; and screenshots "posted somewhere").
+
+- The full `ci/build/build.sh` (the daily build) runs every unit test. A failing test fails the build, which then goes through the usual find-and-revert of the merge that broke it.
+- `ci/build/build.sh --quick --screenshots`, also part of the full build, runs every `tests/screenshots/shot_*.gd` under `xvfb-run` with the OpenGL renderer (Mesa's software renderer on the runners). The shots save 640×360 PNGs to `user://screenshots/`, and the script copies them to `build/screenshots/`. The first shot script, `shot_m1.gd`, takes the main menu and the arena with four wizards.
+- **Where they are posted:**
+  - The daily build publishes a gallery at `/screenshots/` on the Pages site.
+  - Every bot PR gets a comment with the screenshots of its latest commit. The images are stored on the orphan `screenshots` branch under `pr-<N>/<sha7>/` and linked by commit.
+  - The game code that takes the PR's shots runs in a job with no secrets and a read-only token. A separate job posts the images and accepts only plain PNGs under 1 MB.
+- Sessions may run `--screenshots` and open the PNGs with Read, so Claude can see what it built.
+
+## 2026-10-17: Translucent player panels (replaces the 60% entry above)
+
+**Decided by:** the owner ("it's generally fine [that the HUD covers imps]... but the HUD could be transparent").
+
+- A corner panel may sometimes cover a wizard or an enemy; that is accepted, not something to design around.
+- The four player panels in `hud/theme/spellmerge_theme.tres` are translucent: background alpha 0.4, border 0.8, and the bar backs 0.7, so whatever is behind a panel shows through. `panel_plain`, the default panel for menus and overlays, stays opaque.
+- The values were checked on the `arena_four_wizards` screenshot: the imps in the top corners show through and the labels stay legible.

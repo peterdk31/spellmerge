@@ -5,6 +5,7 @@
   /          the Contribute page (smbot.contribute)
   /play/     the latest stable web demo (the default)
   /nightly/  today's web build
+  /screenshots/  today's screenshots (smbot.screenshots), when the build took any
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ import tempfile
 import zipfile
 from pathlib import Path
 
-from . import config, contribute, gh
+from . import config, contribute, gh, screenshots
 
 
 def unpack(zip_path: Path, dest: Path) -> None:
@@ -41,7 +42,7 @@ def latest_stable_web_zip(repo: str, workdir: Path) -> tuple[str, Path] | None:
     return (tag, zips[0]) if zips else None
 
 
-def build(repo: str, dist: Path, version: str, channel: str, out: Path) -> None:
+def build(repo: str, dist: Path, version: str, channel: str, out: Path, shots: Path | None = None) -> None:
     if out.exists():
         shutil.rmtree(out)
     out.mkdir(parents=True)
@@ -61,6 +62,8 @@ def build(repo: str, dist: Path, version: str, channel: str, out: Path) -> None:
                 stable_name = f"{version} (nightly)"
                 unpack(today_zip, out / "play")
 
+    if shots:
+        screenshots.gallery(shots, out / "screenshots", version)
     cfg = config.load()
     page = contribute.render(cfg, contribute.gather(cfg), version, channel, stable_name)
     (out / "index.html").write_text(page)
@@ -73,8 +76,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--version", required=True)
     ap.add_argument("--channel", choices=("stable", "nightly"), required=True)
     ap.add_argument("--out", type=Path, default=Path("site"))
+    ap.add_argument("--screenshots", type=Path, help="folder of today's screenshots (optional)")
     args = ap.parse_args(argv)
-    build(config.load().repo, args.dist, args.version, args.channel, args.out)
+    build(config.load().repo, args.dist, args.version, args.channel, args.out, args.screenshots)
     return 0
 
 

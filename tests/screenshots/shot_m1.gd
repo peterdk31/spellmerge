@@ -1,10 +1,13 @@
 extends SceneTree
-## Screenshots of the M1 game, for people and for Claude to look at (not a test:
-## it checks nothing). Needs a display, so it runs only through
+## Screenshots of the M1 game, for people and for Claude to look at (not a test: it only
+## checks that each staged state happened). Needs a display, so it runs only through
 ## `ci/build/build.sh --quick --screenshots` (on a virtual display); each shot is
 ## saved as user://screenshots/<name>.png and the script copies them to build/screenshots/.
 ##
-## Shots: the main menu, and the arena with four wizards just after Play.
+## Shots: the main menu, the arena with four wizards just after Play, the same
+## with all four overlays open, with player 4 down, and with the Coop camera at
+## zoom 0.5 (wizards in the corners of an area twice the screen). Look at them for legible 12/14 px text
+## over the translucent panels.
 
 const SHOTS_DIR := "user://screenshots"
 const SETTLE_FRAMES := 30
@@ -25,14 +28,82 @@ func _initialize() -> void:
 		input.call("add_virtual_device", index)
 	flow.call("start_run", 0)
 	await _shot("arena_four_wizards")
+	for index in 4:
+		_tap(input, index, &"overlay")
+	await _settle()
+	var focus: Node = root.get_node_or_null("UIFocus")
+	for index in 4:
+		if focus == null or not focus.call("is_open", index):
+			_fail("the overlay of player %d is not open in hud_four_overlays" % (index + 1))
+			return
+	await _shot("hud_four_overlays")
+	for index in 4:
+		_tap(input, index, &"overlay")
+	await process_frame
+	var wizard4: Node = flow.call("get_wizard", 3)
+	if wizard4 == null:
+		_fail("player 4 has no wizard")
+		return
+	wizard4.call("take_damage", 9999)
+	await _settle()
+	if not wizard4.call("is_downed"):
+		_fail("player 4 is not down in hud_player_four_down")
+		return
+	await _shot("hud_player_four_down")
+	wizard4.call("revive", 0)
+	_spread_wizards(flow)
+	await _settle()
+	var coop: Node = root.get_node_or_null("Coop")
+	var camera: Camera2D = null if coop == null else coop.get("camera") as Camera2D
+	if camera == null or camera.zoom.x > 0.51:
+		_fail("the Coop camera is not at zoom 0.5 in coop_camera_zoom_half")
+		return
+	print("SHOT: camera zoom %.2f" % camera.zoom.x)
+	await _shot("coop_camera_zoom_half")
 	flow.call("stop_run")
 	await create_timer(0.3).timeout
 	quit(0)
 
 
-func _shot(shot_name: String) -> void:
+## One press and release of `action` on the virtual device of `player`.
+func _tap(input: Node, player: int, action: StringName) -> void:
+	input.call("send_virtual", player, action, 1.0)
+	input.call("send_virtual", player, action, 0.0)
+
+
+## Put the wizards in the four corners of an area twice the screen and snap the
+## Coop camera to fit them, which zooms it out to its limit (0.5). The room is only
+## one screen, so its camera limits are widened first, or the zoom would stay at 1.
+## Most of the picture is then outside the room; the panels are what is looked at.
+func _spread_wizards(flow: Node) -> void:
+	var coop: Node = root.get_node_or_null("Coop")
+	var corners: Array[Vector2] = [Vector2(24, 24), Vector2(1208, 24), Vector2(24, 648), Vector2(1208, 648)]
+	for index in 4:
+		var wizard: Node2D = flow.call("get_wizard", index) as Node2D
+		if wizard != null:
+			wizard.global_position = corners[index]
+	if coop != null:
+		var camera: Camera2D = coop.get("camera") as Camera2D
+		if camera != null:
+			camera.limit_left = -64
+			camera.limit_top = -64
+			camera.limit_right = 1344
+			camera.limit_bottom = 784
+		coop.call("snap")
+
+
+func _fail(message: String) -> void:
+	printerr("SHOT FAILED: " + message)
+	quit(1)
+
+
+func _settle() -> void:
 	for i in SETTLE_FRAMES:
 		await process_frame
+
+
+func _shot(shot_name: String) -> void:
+	await _settle()
 	await RenderingServer.frame_post_draw
 	var image: Image = root.get_texture().get_image()
 	var path: String = "%s/%s.png" % [SHOTS_DIR, shot_name]

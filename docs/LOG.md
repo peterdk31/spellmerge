@@ -4,6 +4,7 @@ What each run did, newest first. Claude appends a short entry after each develop
 
 ## 2026-10-17
 
+- M1 part 10: player health, mana, downed, revive and cast. `SpellBase.cast/tick/spell_id/_fire` added; `player.gd` calls only those; events `spell_cast`, `player_downed`, `player_revived`; cast sound by id, silent on `null`. Test with two and four players. No Godot binary: the test and `build.sh --quick` have not run, and the `.uid` files are hand-written.
 - M1 part 4: placeholder art. Nine hand-written SVGs (crypt floor and wall, wizard idle in the four player colours, ember imp, fire bolt, hit spark) with `.import` files and manifest entries (`origin: ai`, tier `placeholder`); `wizard.tscn` + `player.gd` show the sprite for `index`; test extended. "Audio needs" (`cast`, `hit`, `enemy_death`) added to the backlog. The session could not run scripts or Godot, so the SVGs were written rect by rect and not rendered, and the `.import` files and uids are hand-written: the first CI import is the real check, and a look at a screenshot is still owed.
 
 - M1 part 9, revision (review of PR #48): an overlay opening now ends a dash in progress (test added); a missing `PlayerInput` autoload gives a `push_warning`; the physics layer plan is in the player README and DECISIONS; DECISIONS says why part 9 ran before part 4, and part 4's done-when asks for a sprite per player index. Still no Godot binary: the test and `build.sh --quick` have not run.

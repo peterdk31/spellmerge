@@ -2,6 +2,17 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-17: Player health, mana, downed and cast (M1 part 10)
+
+**Decided by:** Claude (details the task left open).
+
+- **One cast method, no fields read.** `SpellBase.cast(player, origin, direction, mana)` returns the mana spent, or `REFUSED` (-1) if it is cooling down or too costly; the player subtracts what it returns. The spell keeps its own cooldown per player index (a 4-slot array), run by `tick(player, delta)` each step, so one spell resource can be shared by four players. The event id comes from the method `spell_id()`, not the field. Part 13 overrides `_fire()`; its test checks that nobody outside `content/spells/` and `core/base/` reads a field.
+- **Cast is held, not tapped:** while `cast` is held the spell's cooldown sets the rate. A player with an overlay open is captured, so `cast` is hidden and nothing fires.
+- **Numbers (placeholders to tune in part 25):** 100 health, 100 mana, 10 mana per second, 50 health after a revive. A downed wizard does not regenerate mana, cannot move, dodge or cast, and ignores later hits. Hits during a dodge's invulnerability do nothing.
+- **Revive is a method, `revive(reviver)`:** who revives and how (standing next to a body) belongs to `coop` (part 17). The player sends `player_revived`.
+- **Damage:** the player listens to `damage_dealt` and takes it when `target` is itself; `combat` (part 11) decides when to send it.
+- **Sound:** the `AudioStreamPlayer` is made once in `_ready()` (only inside the tree); the stream is looked up by id at each cast and `null` plays nothing. Only the silent path is tested (no `.ogg` can be made in a session).
+
 ## 2026-10-17: Placeholder art (M1 part 4)
 
 **Decided by:** Claude (details the task left open).

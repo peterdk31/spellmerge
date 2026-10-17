@@ -17,6 +17,7 @@ boot_splash/show_image=false
 [autoload]
 
 Events="*res://core/events/events.gd"
+Registry="*res://core/registry/registry.gd"
 PlayerInput="*res://core/input/input_manager.gd"
 UIFocus="*res://core/ui_focus/ui_focus.gd"
 Projectiles="*res://core/projectiles/projectile_manager.gd"

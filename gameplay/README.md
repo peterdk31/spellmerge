@@ -20,6 +20,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 
 | Event | Sender | Listeners |
 | --- | --- | --- |
+| `device_joined`, `device_left` | `core/input` | `coop` |
 | `spell_cast` | `player` | `combat` |
 | `projectile_hit` | `core/projectiles` | `combat` |
 | `damage_dealt` | `combat` | `feel`, `player` |
@@ -41,7 +42,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `door_vote_requested` | HUD | `flow` |
 | `pause_requested` | HUD | `run` |
 
-Device events come from `core/input`; they are defined in M1 part 5 and are not in `events.gd` yet. The last five rows are the HUD's player-intent requests (see `hud/README.md`); each carries a player index 0–3. The gameplay area checks the request and announces the result as a state event: `door_voted` is flow's result of `door_vote_requested`, and `reward_taken` is rewards' result of `reward_pick_requested`. `play_requested` (the Play button) carries the index of the player who pressed it (0 if the pointer is not tied to a player) and makes `flow` load the first room and send `room_entered`.
+`device_joined` and `device_left` come from `core/input` (a button press joins or leaves; `device` is the device id from `core/input/input_manager.gd`); `coop` turns them into `player_joined` and `player_left`. The last five rows are the HUD's player-intent requests (see `hud/README.md`); each carries a player index 0–3. The gameplay area checks the request and announces the result as a state event: `door_voted` is flow's result of `door_vote_requested`, and `reward_taken` is rewards' result of `reward_pick_requested`. `play_requested` (the Play button) carries the index of the player who pressed it (0 if the pointer is not tied to a player) and makes `flow` load the first room and send `room_entered`.
 
 ## Allowed files
 

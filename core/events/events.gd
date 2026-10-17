@@ -22,6 +22,13 @@ signal door_vote_requested(player: int, door: int)
 ## A player asked to pause. Heard by run.
 signal pause_requested(player: int)
 
+# --- Devices (sender: core/input) -------------------------------------------
+
+## Sender: core/input. `device` (ids in input_manager.gd) took the free slot `player`, by a button press or as a bot's virtual device.
+signal device_joined(player: int, device: int)
+## Sender: core/input. `device` left slot `player`, by a button press or an unplugged gamepad. The slot is free again.
+signal device_left(player: int, device: int)
+
 # --- Spells and combat ------------------------------------------------------
 
 ## Sender: player. A cast left the wand of `player`.

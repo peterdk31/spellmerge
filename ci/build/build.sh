@@ -172,6 +172,15 @@ export_all() {
   step "Boot smoke test (exported Linux build)"
   godot_checked smoke-linux build/linux/Spellmerge.x86_64 --headless --quit-after 300
 
+  # The shipped presets leave tests/ out; "Linux Test" is the Linux preset with tests, never packaged.
+  step "4-bot test (exported Linux build with tests)"
+  rm -rf build/linux-test && mkdir -p build/linux-test
+  godot_checked export-linux-test "$GODOT" --headless --path . --export-release "Linux Test" build/linux-test/Spellmerge.x86_64
+  [[ -s build/linux-test/Spellmerge.x86_64 ]] || { echo "::error::Linux Test export produced no binary"; exit 1; }
+  godot_checked four-bot-linux build/linux-test/Spellmerge.x86_64 --headless --script res://tests/smoke/four_bot_smoke.gd
+  grep -q '^SMOKE OK' build/logs/four-bot-linux.log \
+    || { echo "::error::the 4-bot test did not print SMOKE OK in the export (--script ignored?)"; exit 1; }
+
   step "Boot smoke test (web build in headless Chrome)"
   local status=0
   PYTHONPATH=ci python3 -m smbot.websmoke build/web --expect "main menu ready" \

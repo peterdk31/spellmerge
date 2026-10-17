@@ -11,6 +11,6 @@ Problems:
 4. Run `tools/check.sh --author 'spellmerge-bot[bot]'`, and `ci/build/build.sh --quick --tests` if you changed anything Godot loads (it runs every unit test; run Godot only through it), and `ci/build/build.sh --quick --screenshots` to look at anything visible you changed (PNGs in `build/screenshots/`, open them with Read). Fix what they report.
 5. Commit on that branch. **Don't push:** you have a read-only token, and the session pushes your commits afterwards.
 
-If you need the owner, use `owner_questions` as described for development sessions; never write the question into a file.
+If you need the owner, use `owner_questions` as described for development sessions; never write the question into a file. First check the open questions with `gh issue list --label owner-question`: the session that wrote this PR may have asked already, and a question already open must not be asked again (mention its number in your summary instead).
 
 End with the structured output: `status` (`ready` when your commits are on the branch, `blocked` if it can't be done properly), a one-paragraph `summary`, and `comment`: what you changed for each point, and why you disagree where you didn't change something. It's posted on the PR for you.

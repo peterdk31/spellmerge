@@ -2,6 +2,15 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-17: Per-player focus (M1 part 6)
+
+**Decided by:** Claude (details the task left open).
+
+- One autoload, `UIFocus`. A panel is opened for one player with an ordered list of controls; only that player's input moves it. It reads `PlayerInput` by index, never `Input`, and never calls `grab_focus`, so Godot's single global focus plays no part and the mouse cannot steal a panel.
+- Navigation uses the gameplay actions, no new ones: up/left and down/right step through the controls (wrapping), `cast` activates, `dodge` cancels. Cancel only sends `cancelled`; the panel decides whether to close. The `overlay` action that opens panels is handled by the overlay (M1 part 19).
+- It detects presses from `is_action_pressed` plus a held state of its own, not `is_action_just_pressed`, so it works from any frame and tests need no frame stepping. A button already held at open (the one that opened the panel) is ignored until released.
+- Results are signals with the player first (`opened`, `closed`, `focus_changed`, `activated`, `cancelled`); widgets check that the player is their owner. A panel closes when its player's device leaves. Nothing is paused.
+
 ## 2026-10-17: Input devices and join (M1 part 5)
 
 **Decided by:** Claude (details the task left open).

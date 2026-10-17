@@ -461,3 +461,11 @@ The HUD screenshot cannot be taken in a session (no display, `docs/BACKLOG.md`),
   - Every bot PR gets a comment with the screenshots of its latest commit. The images are stored on the orphan `screenshots` branch under `pr-<N>/<sha7>/` and linked by commit.
   - The game code that takes the PR's shots runs in a job with no secrets and a read-only token. A separate job posts the images and accepts only plain PNGs under 1 MB.
 - Sessions may run `--screenshots` and open the PNGs with Read, so Claude can see what it built.
+
+## 2026-10-17: Translucent player panels
+
+**Decided by:** the owner ("it's generally fine [that the HUD covers imps]... but the HUD could be transparent").
+
+- A corner panel may sometimes cover a wizard or an enemy; that is accepted, not something to design around.
+- The four player panels in `hud/theme/spellmerge_theme.tres` are translucent: background alpha 0.4, border 0.8, and the bar backs 0.7, so whatever is behind a panel shows through. `panel_plain`, the default panel for menus and overlays, stays opaque.
+- The values were checked on the `arena_four_wizards` screenshot: the imps in the top corners show through and the labels stay legible.

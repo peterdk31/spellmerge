@@ -4,6 +4,7 @@ What each run did, newest first. Claude appends a short entry after each develop
 
 ## 2026-10-17
 
+- M1 part 5: built `core/input` (`input_manager.gd`, autoload `PlayerInput`): join by button press, one device per player, keyboard as P1 only, gamepads for P1–P4, leave, virtual devices for bots. Added `device_joined` and `device_left` to `events.gd`, the table and the coop and player READMEs, the nine input actions to `project.godot`, and `tests/core/test_input.gd`. The session had no Godot binary, so the tests were not run.
 - M1 part 3: wrote `docs/STYLE.md` (palette of 31 colours, light, outline, shades, 32×32 grid, frame counts, placeholder SVG rules, checklist), added it to `llms.txt` and pointed the Art README at it. Docs only.
 - M1 part 2: reconciled the event lists with `core/events/events.gd`. Added `play_requested` (HUD to `flow`) to the table in `gameplay/README.md` and to the `hud` and `flow` READMEs, and removed the "provisional" marks everywhere. Docs only.
 

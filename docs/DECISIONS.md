@@ -2,6 +2,16 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-17: Input devices and join (M1 part 5)
+
+**Decided by:** Claude (details the task left open).
+
+- One autoload, `PlayerInput`, routes every input event by device to a player index and keeps per-player action state. Gameplay asks it by index and never reads `Input` directly, so one global action map serves all four players.
+- A gamepad takes the lowest free index. The keyboard and mouse count as one device that may only take index 0, matching "P1 keyboard or gamepad, P2–P4 gamepads"; if a gamepad already holds P1, the keyboard cannot join.
+- `join` (Enter, Space, gamepad A or Start) and `leave` (Backspace, gamepad Back) are actions. An unplugged gamepad leaves; plugging one in never joins without a button press.
+- Bots use virtual devices, ids 1000 + index. They send `InputEventAction`s through the same `handle_event` path as real events, so bot tests exercise the real input code.
+- The device events are `device_joined(player, device)` and `device_left(player, device)`, sent by `core/input`; `coop` (M1 part 17) turns them into `player_joined` and `player_left`.
+
 ## 2026-10-17: The provisional palette and style rules (M1 part 3)
 
 **Decided by:** Claude (details the plan left open).

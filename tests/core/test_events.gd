@@ -16,6 +16,9 @@ const EVENTS: Dictionary = {
 	&"reward_pick_requested": [["player", TYPE_INT], ["choice", TYPE_INT]],
 	&"door_vote_requested": [["player", TYPE_INT], ["door", TYPE_INT]],
 	&"pause_requested": [["player", TYPE_INT]],
+	# Devices.
+	&"device_joined": [["player", TYPE_INT], ["device", TYPE_INT]],
+	&"device_left": [["player", TYPE_INT], ["device", TYPE_INT]],
 	# Spells and combat.
 	&"spell_cast": [["player", TYPE_INT], ["spell_id", TYPE_STRING_NAME], ["origin", TYPE_VECTOR2], ["direction", TYPE_VECTOR2]],
 	&"projectile_hit": [["player", TYPE_INT], ["target", TYPE_OBJECT], ["position", TYPE_VECTOR2]],

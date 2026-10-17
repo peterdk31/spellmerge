@@ -14,7 +14,7 @@ Every player is an index 0–3 with their own device, mana, health and downed st
 - **Dependency direction:** `core` ← `gameplay` ← `content`. This area may use `core/` and the registry. `core/` never depends on it, and content never reaches into it.
 - **Events** (`core/events/events.gd` owns the definitions; this list matches it and the table in [gameplay/README.md](../README.md)):
   - Sends: `player_downed`, `player_revived`, `spell_cast`.
-  - Listens to: `damage_dealt` from `combat`, `build_change_requested` (from the HUD), and device events from `core/input` (defined in M1 part 5, not in `events.gd` yet).
+  - Listens to: `damage_dealt` from `combat`, `build_change_requested` (from the HUD), and `device_joined`, `device_left` from `core/input`.
 - Areas never call each other directly; they talk through events. [gameplay/README.md](../README.md) has the rules every sub-area shares.
 
 ## Allowed files

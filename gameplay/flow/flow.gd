@@ -201,7 +201,10 @@ func _on_player_joined(player: int) -> void:
 		return
 	if get_wizard(player) != null:
 		return
-	_add_wizard(world, _room, player, _bolt)
+	_add_wizard(world, _room, player, _bolt, _joiner_spawn(_room, player))
+	var joiner := get_wizard(player) as PlayerScript
+	if joiner != null:
+		joiner.protect(PlayerScript.JOIN_PROTECTION)
 	_downed[player] = false
 	if _restart_left >= 0.0 and not _all_down():
 		_restart_left = -1.0
@@ -313,11 +316,34 @@ func _spawn_players(parent: Node2D, room: RoomBase, players: Array[int], bolt: S
 		_add_wizard(parent, room, index, bolt)
 
 
-func _add_wizard(parent: Node2D, room: RoomBase, index: int, bolt: SpellBase) -> void:
+## The player spawn for a mid-run joiner: the one farthest from every enemy and
+## every wizard already there (the joiner's own slot wins a tie).
+func _joiner_spawn(room: RoomBase, index: int) -> Vector2:
+	var best: Vector2 = room.player_spawns[index] if index < room.player_spawns.size() else Vector2.ZERO
+	var best_gap: float = -1.0
+	for i in room.player_spawns.size():
+		var point: Vector2 = room.player_spawns[i]
+		var gap: float = INF
+		for enemy: Node in _enemies:
+			if is_instance_valid(enemy) and enemy is Node2D:
+				gap = minf(gap, point.distance_squared_to((enemy as Node2D).position))
+		for other in PLAYER_SLOTS:
+			var wizard: Node2D = get_wizard(other)
+			if wizard != null:
+				gap = minf(gap, point.distance_squared_to(wizard.position))
+		if gap > best_gap or (gap == best_gap and i == index):
+			best_gap = gap
+			best = point
+	return best
+
+
+func _add_wizard(parent: Node2D, room: RoomBase, index: int, bolt: SpellBase, at: Vector2 = Vector2.INF) -> void:
 	var wizard := WizardScene.instantiate() as PlayerScript
 	wizard.index = index
 	wizard.spell = bolt
-	if index < room.player_spawns.size():
+	if at != Vector2.INF:
+		wizard.position = at
+	elif index < room.player_spawns.size():
 		wizard.position = room.player_spawns[index]
 	parent.add_child(wizard)
 	_wizards.append(wizard)

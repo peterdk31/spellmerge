@@ -505,21 +505,27 @@ func _hit_test(slot: int) -> bool:
 	var best: int = -1
 	var best_along: float = 0.0
 	var best_point: Vector2 = to
+	var layers: int = _layers[slot]
+	var shooter: int = _player[slot]
 	for y in range(y0, y1 + 1):
 		for x in range(x0, x1 + 1):
 			var t: int = _cell_head[y * _grid_w + x]
 			while t >= 0:
-				if (_target_layer[t] & _layers[slot]) != 0 and not _remembers(slot, _target_id[t]) and not (_target_owner[t] >= 0 and _target_owner[t] == _player[slot]):
-					var along: float = 0.0
-					if path_sq > 0.0:
-						along = clampf((_target_pos[t] - from).dot(path) / path_sq, 0.0, 1.0)
-					var closest: Vector2 = from + path * along
-					var reach: float = _radius[slot] + _target_radius[t]
-					if closest.distance_squared_to(_target_pos[t]) <= reach * reach and (best < 0 or along < best_along):
-						best = t
-						best_along = along
-						best_point = closest
-				t = _target_next[t]
+				var next_target: int = _target_next[t]
+				# Skip other layers, the shooter's own body, and targets already hit.
+				if (_target_layer[t] & layers) == 0 or (shooter >= 0 and _target_owner[t] == shooter) or _remembers(slot, _target_id[t]):
+					t = next_target
+					continue
+				var along: float = 0.0
+				if path_sq > 0.0:
+					along = clampf((_target_pos[t] - from).dot(path) / path_sq, 0.0, 1.0)
+				var closest: Vector2 = from + path * along
+				var reach: float = _radius[slot] + _target_radius[t]
+				if closest.distance_squared_to(_target_pos[t]) <= reach * reach and (best < 0 or along < best_along):
+					best = t
+					best_along = along
+					best_point = closest
+				t = next_target
 	if best < 0:
 		return false
 	_register_hit(slot, best, best_point)

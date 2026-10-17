@@ -44,6 +44,8 @@ const REVIVE_HEALTH: int = 50
 const MAX_MANA: float = 100.0
 ## Mana regained per second.
 const MANA_REGEN: float = 10.0
+## Seconds a wizard who joins mid-run cannot be hurt (see `protect`).
+const JOIN_PROTECTION: float = 2.0
 ## Id of the cast sound (looked up in core/registry; a missing sound is silent).
 const CAST_SOUND_ID: StringName = &"cast"
 ## Physics layers (the plan: 1 walls, 2 players, 3 enemies, 4 projectiles and
@@ -242,6 +244,13 @@ func is_dodging() -> bool:
 ## True while a hit must do nothing (the first INVULNERABLE_TIME of a dodge).
 func is_invulnerable() -> bool:
 	return _invulnerable_left > 0.0
+
+
+## Cannot be hurt for `seconds` (at least what is left). Flow uses this for a
+## wizard who joins mid-run. A downed wizard stays as it is.
+func protect(seconds: float) -> void:
+	if not _downed:
+		_invulnerable_left = maxf(_invulnerable_left, seconds)
 
 
 ## True if a dodge pressed now would start.

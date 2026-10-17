@@ -51,6 +51,9 @@ func _initialize() -> void:
 	_test_last_standing_leaves_restarts_the_room()
 	_test_camera_zooms_out_to_fit()
 	_test_camera_eases()
+	_test_camera_respects_room_limits()
+	_test_nobody_leaves_the_view_while_easing()
+	_test_joiner_is_protected()
 	_test_camera_survives_a_restart()
 	_test_friendly_fire()
 	_stop()
@@ -112,10 +115,18 @@ func _start_with(first: int) -> void:
 	_events.emit_signal("play_requested", first)
 
 
-## True if the wizard is inside the camera's view, using the camera's real position and zoom.
-func _in_view(wizard: Node2D, camera: Camera2D) -> bool:
-	var offset: Vector2 = (wizard.global_position - camera.position) * camera.zoom.x
-	return absf(offset.x) <= VIEW.x * 0.5 and absf(offset.y) <= VIEW.y * 0.5
+## True if the wizard is inside what the camera really shows: its position and
+## zoom with the camera limits applied (`visible_rect`).
+func _in_view(wizard: Node2D, _camera: Camera2D) -> bool:
+	return _coop.visible_rect().grow(0.01).has_point(wizard.global_position)
+
+
+## Take the room's limits off the camera, to test the zoom alone.
+func _open_limits(camera: Camera2D) -> void:
+	camera.limit_left = -10000000
+	camera.limit_top = -10000000
+	camera.limit_right = 10000000
+	camera.limit_bottom = 10000000
 
 
 func _everyone_in_view() -> bool:
@@ -253,6 +264,7 @@ func _test_camera_zooms_out_to_fit() -> void:
 	_check(camera != null, "the camera was found after room_entered")
 	if camera == null:
 		return
+	_open_limits(camera)
 	_check(is_equal_approx(camera.zoom.x, CoopScript.MAX_ZOOM), "one player: no zoom out, got %f" % camera.zoom.x)
 	_check(camera.position.is_equal_approx(_wizard(0).global_position), "one player: the camera is on the player")
 	for slot in range(1, 4):
@@ -296,6 +308,7 @@ func _test_camera_eases() -> void:
 	if camera == null:
 		_check(false, "the camera exists for the easing test")
 		return
+	_open_limits(camera)
 	_wizard(0).global_position = Vector2(100.0, 100.0)
 	_wizard(1).global_position = Vector2(500.0, 300.0)
 	_coop.snap()
@@ -314,6 +327,76 @@ func _test_camera_eases() -> void:
 	_coop.step(0.0)
 	_coop.step(-1.0)
 	_check(camera.position == at, "a zero or negative step does not move the camera")
+	_stop()
+
+
+## The room's limits and the zoom agree: wizards in opposite corners of arena_01
+## are all in the real view, and the view never shows beyond the room.
+func _test_camera_respects_room_limits() -> void:
+	_stop()
+	_start_with(0)
+	for slot in range(1, 4):
+		_input.add_virtual_device(slot)
+	var camera: Camera2D = _coop.camera
+	if camera == null:
+		_check(false, "the camera exists for the limits test")
+		return
+	var room := Rect2(Vector2(camera.limit_left, camera.limit_top), Vector2(camera.limit_right - camera.limit_left, camera.limit_bottom - camera.limit_top))
+	var corners: Array[Vector2] = [Vector2(20.0, 20.0), Vector2(room.end.x - 20.0, 20.0), Vector2(20.0, room.end.y - 20.0), room.end - Vector2(20.0, 20.0)]
+	for slot in 4:
+		_wizard(slot).global_position = corners[slot]
+	_coop.refresh_wizards()
+	_coop.snap()
+	_check(room.grow(0.01).encloses(_coop.visible_rect()), "snapped: the view stays inside the room, got %s" % _coop.visible_rect())
+	for slot in 4:
+		_check(_in_view(_wizard(slot), camera), "snapped: the wizard in corner %d is in the view" % slot)
+	# Start from the middle and ease out to the corners: nobody is ever outside.
+	camera.position = room.get_center()
+	camera.zoom = Vector2.ONE
+	for i in 60:
+		_coop.step(0.016)
+		_check(room.grow(0.01).encloses(_coop.visible_rect()), "easing %d: the view stays inside the room" % i)
+		_check(_everyone_in_view(), "easing %d: everyone is in view" % i)
+	_stop()
+
+
+## A far-off joiner: while the camera eases, nobody is outside the view.
+func _test_nobody_leaves_the_view_while_easing() -> void:
+	_stop()
+	_start_with(0)
+	_input.add_virtual_device(1)
+	var camera: Camera2D = _coop.camera
+	if camera == null:
+		_check(false, "the camera exists for the ease-out test")
+		return
+	_open_limits(camera)
+	_wizard(0).global_position = Vector2(60.0, 200.0)
+	_wizard(1).global_position = Vector2(70.0, 200.0)
+	_coop.snap()
+	_wizard(1).global_position = Vector2(560.0, 200.0)
+	for i in 120:
+		_coop.step(0.016)
+		_check(_everyone_in_view(), "ease-out frame %d: everyone is in view" % i)
+	_stop()
+
+
+## A mid-run joiner is protected for a moment and does not land on an enemy.
+func _test_joiner_is_protected() -> void:
+	_stop()
+	_start_with(0)
+	var spawns: PackedVector2Array = _flow._room.player_spawns
+	# An enemy stands on slot 1's spawn.
+	var enemy: Node2D = _flow._enemies[0] as Node2D
+	enemy.position = spawns[1]
+	_input.add_virtual_device(1)
+	var joiner: PlayerScript = _wizard(1)
+	_check(joiner != null, "the joiner has a wizard")
+	if joiner == null:
+		return
+	_check(joiner.is_invulnerable(), "the joiner cannot be hurt at first")
+	_check(not joiner.take_damage(SHOT_DAMAGE) and joiner.health == PlayerScript.MAX_HEALTH, "a hit on the new joiner does nothing")
+	_check(joiner.position.distance_to(spawns[1]) > 1.0, "the joiner is not put under the enemy")
+	_check(joiner.position.distance_to(_wizard(0).position) > 1.0, "the joiner does not stand on another wizard")
 	_stop()
 
 

@@ -32,8 +32,13 @@ func _ready() -> void:
 	_play.pressed.connect(_on_play_pressed)
 	_play.grab_focus()
 	print("Spellmerge %s: main menu ready" % BuildInfo.describe())
-	# The web page config (`args`) may pass the argument without a "--" before it, so look in both lists.
-	_start_four_bot_test(OS.get_cmdline_user_args() + OS.get_cmdline_args())
+	_start_four_bot_test(_cmdline_arguments())
+
+
+## Every command line argument, with or without a "--" before it. The web page
+## config (`args`) may pass `--four-bot` without one, so look in both lists.
+func _cmdline_arguments() -> PackedStringArray:
+	return OS.get_cmdline_user_args() + OS.get_cmdline_args()
 
 
 ## Starts the 4-bot test when `args` has the 4-bot argument. Only the `Linux Test`

@@ -81,6 +81,10 @@ def classify(messages: list[dict[str, Any]], step_failed: bool) -> tuple[str, in
     text = " ".join(str(result.get(k, "")) for k in ("result", "subtype", "error")) if result else ""
     if not result and not step_failed:
         return "error", 0, "no result in the execution file"
+    # The action fails the step when Claude finishes successfully but used more turns than
+    # --max-turns allows; the work is still done, so it counts (see structured_result).
+    if step_failed and result and not result.get("is_error") and result.get("subtype") == "success":
+        return "ok", tokens, f"finished after {result.get('num_turns', '?')} turns (over the turn cap)"
     if result.get("is_error") or step_failed or not result:
         if _AUTH.search(text):
             return "auth", tokens, text[:300]
@@ -109,6 +113,24 @@ def reset_time(text: str, now: dt.datetime) -> dt.datetime | None:
     if reset <= local:
         reset += dt.timedelta(days=1)
     return reset.astimezone(dt.timezone.utc)
+
+
+def structured_result(messages: list[dict[str, Any]]) -> str:
+    """Claude's structured output from the execution file, as compact JSON ("" if there is none).
+
+    The action only sets its structured_output when the step succeeds, so a session that
+    finished over the turn cap would otherwise lose its finished work.
+    """
+    results = [m for m in messages if m.get("type") == "result"]
+    if not results or results[-1].get("is_error") or results[-1].get("subtype") != "success":
+        return ""
+    data = results[-1].get("structured_output")
+    if not isinstance(data, dict):
+        try:
+            data = json.loads(str(results[-1].get("result", "")))
+        except json.JSONDecodeError:
+            return ""
+    return json.dumps(data, separators=(",", ":")) if isinstance(data, dict) and "status" in data else ""
 
 
 # --- Prompts -------------------------------------------------------------------
@@ -546,9 +568,11 @@ def main(argv: list[str] | None = None) -> int:
     elif args.cmd == "account":
         write_outputs({"status": account(cfg, args.file, args.kind, args.step_failed)})
     elif args.cmd == "usage":
-        status, tokens, detail = classify(read_messages(args.file), args.step_failed)
+        messages = read_messages(args.file)
+        status, tokens, detail = classify(messages, args.step_failed)
         print(f"{status}, {tokens:,} tokens {detail}")
-        write_outputs({"status": status, "tokens": str(tokens), "resets_at": resets_at(status, detail)})
+        write_outputs({"status": status, "tokens": str(tokens), "resets_at": resets_at(status, detail),
+                       "result": structured_result(messages) if status == "ok" else ""})
     elif args.cmd == "record":
         status = os.environ.get("STATUS") or "error"
         write_outputs({"status": record(cfg, args.kind, status, int(os.environ.get("TOKENS") or 0),

@@ -50,6 +50,16 @@ class ClassifyTest(unittest.TestCase):
         self.assertIsNone(session.reset_time("no time here", now))
         self.assertEqual(session.resets_at("error", "resets 9am"), "")
 
+    def test_success_over_the_turn_cap_still_counts(self) -> None:
+        """Run #99 finished the task in 206 turns; the action failed the step for passing 150."""
+        out = {"status": "ready", "pr_title": "t", "summary": "s"}
+        msgs = result(num_turns=206, result=json.dumps(out))
+        self.assertEqual(session.classify(msgs, True)[0], "ok")
+        self.assertEqual(json.loads(session.structured_result(msgs)), out)
+        self.assertEqual(json.loads(session.structured_result(result(structured_output=out, result="done"))), out)
+        self.assertEqual(session.structured_result(result(is_error=True, result=json.dumps(out))), "")
+        self.assertEqual(session.structured_result(result(result="not json")), "")
+
     def test_rejected_token(self) -> None:
         status, _, _ = session.classify(result(is_error=True, result="Invalid bearer token"), True)
         self.assertEqual(status, "auth")

@@ -10,13 +10,13 @@ Which sub-areas are open for PRs is in docs/ROADMAP.md ("Opens for PRs"). A PR t
 
 - **Entry script:** `gameplay/<area>/<area>.gd`. Other code uses only that script and the area's events.
 - **Dependency direction:** `core` ← `gameplay` ← `content`. A sub-area may use `core/` and the registry. Areas never call each other directly; they talk through events.
-- **Events:** `core/events` owns the event definitions. A sub-area README only lists which events the area sends and which it listens to, and each event has exactly one sender. The names in those lists are **provisional** until the event bus is built in M1.
+- **Events:** `core/events` owns the event definitions. A sub-area README only lists which events the area sends and which it listens to, and each event has exactly one sender. The lists must match `core/events/events.gd` and the table below.
 - **Players:** everything that acts per player takes a player index 0–3. Nothing assumes a single player, and nobody ever waits for another player.
 - **Performance:** no per-frame allocations; use the pools and the projectile manager from `core/`; respect the particle limits.
 
 ## Events at a glance
 
-One table for all sub-areas, so "each event has exactly one sender" can be checked in one place. It is **provisional** and is reconciled with `core/events` when the event bus is built in M1; the per-area lists must match it.
+One table for all sub-areas, so "each event has exactly one sender" can be checked in one place. It matches `core/events/events.gd`, and the per-area lists must match it.
 
 | Event | Sender | Listeners |
 | --- | --- | --- |
@@ -35,12 +35,13 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `difficulty_changed` | `difficulty` | none yet |
 | `reward_rolled`, `reward_taken` | `rewards` | none yet |
 | `unlock_gained`, `currency_changed` | `progression` | none yet |
+| `play_requested` | HUD | `flow` |
 | `build_change_requested` | HUD | `player` |
 | `reward_pick_requested` | HUD | `rewards` |
 | `door_vote_requested` | HUD | `flow` |
 | `pause_requested` | HUD | `run` |
 
-Device events come from `core/input`. The last four rows are the HUD's player-intent requests (see `hud/README.md`); each carries a player index 0–3. The gameplay area checks the request and announces the result as a state event: `door_voted` is flow's result of `door_vote_requested`, and `reward_taken` is rewards' result of `reward_pick_requested`.
+Device events come from `core/input`. The last five rows are the HUD's player-intent requests (see `hud/README.md`); each carries a player index 0–3. The gameplay area checks the request and announces the result as a state event: `door_voted` is flow's result of `door_vote_requested`, and `reward_taken` is rewards' result of `reward_pick_requested`. `play_requested` (the Play button) makes `flow` load the first room and send `room_entered`.
 
 ## Allowed files
 

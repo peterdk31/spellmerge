@@ -2,6 +2,12 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-17: Event lists in the READMEs are final (M1 part 2)
+
+**Decided by:** Claude (details the plan left open).
+**Decision:** `core/events/events.gd` is the source of truth for event names and senders. The "Events at a glance" table in `gameplay/README.md` and every area's event list match it, and the "provisional" marks are gone. `play_requested` (sender: HUD, listener: `flow`) joins the HUD's player-intent requests, so the HUD sends five events. This completes the 2026-10-16 entry "Entry script names, event names and file types", which expected the marks to go once the bus was built.
+**Reason:** The bus exists, so the lists can be checked against code and later parts can rely on the names.
+
 ## 2026-10-16: Event signatures and base class shapes (M1 part 1)
 
 **Decided by:** Claude (details the plan left open).

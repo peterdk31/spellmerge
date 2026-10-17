@@ -12,7 +12,7 @@ Loot tables are content data read through the registry, so contributors add them
 
 - **Public entry script:** `gameplay/rewards/rewards.gd`. Other code uses only this script and the events it sends and listens to; nothing else in the folder is public. The script arrives when the area is built.
 - **Dependency direction:** `core` ← `gameplay` ← `content`. This area may use `core/` and the registry. `core/` never depends on it, and content never reaches into it.
-- **Events** (**provisional**: `core/events` owns the definitions, and the lists are checked against each other when the event bus is built in M1):
+- **Events** (`core/events/events.gd` owns the definitions; this list matches it and the table in [gameplay/README.md](../README.md)):
   - Sends: `reward_rolled`, `reward_taken`.
   - Listens to: `room_cleared` and `reward_pick_requested` (from the HUD; `reward_taken` is the announced result).
 - Areas never call each other directly; they talk through events. [gameplay/README.md](../README.md) has the rules every sub-area shares.

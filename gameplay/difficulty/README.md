@@ -12,7 +12,7 @@ A run with 1 player and a run with 4 players should both feel fair.
 
 - **Public entry script:** `gameplay/difficulty/difficulty.gd`. Other code uses only this script and the events it sends and listens to; nothing else in the folder is public. The script arrives when the area is built.
 - **Dependency direction:** `core` ← `gameplay` ← `content`. This area may use `core/` and the registry. `core/` never depends on it, and content never reaches into it.
-- **Events** (**provisional**: `core/events` owns the definitions, and the lists are checked against each other when the event bus is built in M1):
+- **Events** (`core/events/events.gd` owns the definitions; this list matches it and the table in [gameplay/README.md](../README.md)):
   - Sends: `difficulty_changed`.
   - Listens to: `run_started`, `player_joined`, `player_left` and `room_entered`.
 - Areas never call each other directly; they talk through events. [gameplay/README.md](../README.md) has the rules every sub-area shares.

@@ -22,6 +22,7 @@ PlayerInput="*res://core/input/input_manager.gd"
 UIFocus="*res://core/ui_focus/ui_focus.gd"
 Projectiles="*res://core/projectiles/projectile_manager.gd"
 Combat="*res://gameplay/combat/combat.gd"
+Flow="*res://gameplay/flow/flow.gd"
 
 [debug]
 

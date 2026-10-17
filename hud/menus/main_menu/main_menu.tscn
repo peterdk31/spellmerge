@@ -44,11 +44,16 @@ layout_mode = 2
 text = "Merge spells. Cause chaos. Together."
 horizontal_alignment = 1
 
+[node name="Play" type="Button" parent="Center/Lines"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Play"
+
 [node name="Status" type="Label" parent="Center/Lines"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.6, 0.6, 0.72, 1)
 theme_override_font_sizes/font_size = 12
-text = "Nothing to play yet: the game starts in milestone M1."
+text = "Move: WASD. Cast: mouse or J. Dodge: Space. Gamepads join with A."
 horizontal_alignment = 1
 
 [node name="Version" type="Label" parent="Center/Lines"]

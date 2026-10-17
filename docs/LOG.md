@@ -4,6 +4,7 @@ What each run did, newest first. Claude appends a short entry after each develop
 
 ## 2026-10-17
 
+- Web size, load time and WASM projectile timing: not done. A development session can run only `build.sh --quick`, which neither exports the Web preset nor starts Chrome, and `build/godot/templates` is empty. The daily build already exports Web, logs the size against 40 MB and smoke-tests it in Chrome; missing are a load-time line and `test_projectile_timing` in WASM, both in owner-only `ci/` (exact step in `docs/BACKLOG.md`, asked as an owner question). Moved to Blocked in `docs/NEXT.md`; `DEFAULT_CAP_WEB` (1,000) is unchanged and unchecked in WASM.
 - M1 part 22 follow-up: bounded the projectile hit test. `ProjectileManager.step` now has a hit-work budget (`WORK_PER_STEP` = 8,000 units per step, after a first try at 16,000 left 81-93% of the 8 ms target; each target examined costs 1, each hit `HIT_WORK` = 40). When it is spent, the rest of the shots move but are not tested; the next step starts at the first untested slot, so nobody is starved. Same hostile benchmark, GitHub runner, native, headless (before; budget 40,000 as a calibration run; after):
   - 1,000 shots: step with fresh hits 108 ms, 16 ms, **2.8 ms** (84 hits a step; 6.5 ms at 16,000); steady state 54, 15, **2.7 ms**.
   - 3,000 shots: 333 ms, 17 ms, **3.1 ms** (7.4 ms at 16,000); steady state 166, 17, **3.3 ms**. Plain movement is 0.6 ms of that at 3,000.

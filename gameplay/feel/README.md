@@ -10,7 +10,7 @@ Feel only reacts: it never changes damage or outcomes. Hit-stop is its only effe
 
 ## Contract
 
-- **Public entry script:** `gameplay/feel/feel.gd`. Other code uses only this script and the events it sends and listens to; nothing else in the folder is public. The script arrives when the area is built.
+- **Public entry script:** `gameplay/feel/feel.gd`. Other code uses only this script and the events it sends and listens to; nothing else in the folder is public. It is the autoload `Feel`. The setting `Feel.shake_enabled` turns screen shake off (kept in memory; saving it belongs to `core/save`, not built yet); hit-stop, particles and sound stay. The limit `Feel.PARTICLE_LIMIT` (48 live hit particles in all, across every player) is the one other code reads.
 - **Dependency direction:** `core` ← `gameplay` ← `content`. This area may use `core/` and the registry. `core/` never depends on it, and content never reaches into it.
 - **Events** (`core/events/events.gd` owns the definitions; this list matches it and the table in [gameplay/README.md](../README.md)):
   - Sends: none.
@@ -23,11 +23,11 @@ Feel only reacts: it never changes damage or outcomes. Hit-stop is its only effe
 
 ## Steps
 
-Not open yet. When it opens, follow the steps and test layout in [gameplay/README.md](../README.md).
+Not open yet (the first preset is `presets/punchy.tres`). When it opens, follow the steps and test layout in [gameplay/README.md](../README.md).
 
 ## Example to copy
 
-Arrives with Claude's first code for this area. Do not guess its layout before then.
+`gameplay/feel/presets/punchy.tres`, a `FeelPreset` (`presets/feel_preset.gd`): hit-stop length, shake strength and decay, particle speed and life, and the sound ids. Copy it, change the numbers and load it as `Feel.preset`. A preset only tunes reactions; it has no field that touches damage. Tests: `tests/gameplay/feel/test_feel.gd`.
 
 ## Validate
 

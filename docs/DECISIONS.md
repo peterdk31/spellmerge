@@ -2,6 +2,20 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-17: Feel (M1 part 16)
+
+**Decided by:** Claude (details the task left open).
+
+- **One autoload, `Feel`, listening to three events and sending none.** It cannot change damage: it never calls `Combat` or a wizard (tested by running the same hits with and without it).
+- **Hit-stop is `Engine.time_scale`** dropped to 0.05 (not 0, so physics still steps) for 0.04 s on a hit and 0.07 s on a death or a downed wizard, counted in real time from `Time.get_ticks_usec()` (not delta divided by the time scale, so other uses of `time_scale` cannot skew it; `Feel` resets it to 1.0 when it leaves the tree). The longest stop wins, so four players hitting in one frame never stack. Same numbers for every player: the event's player index is ignored.
+- **Hit-stop rest (review fix):** after a plain hit's stop, plain hits cannot stop the game again for 0.15 s (`hit_stop_rest`), so a four-player bolt fight spends about 21% of real time slowed, not most of it (a test holds it under 30%). Deaths and downed wizards ignore the rest: they are rarer and are the moments worth a punch.
+- **Particle limit:** `PARTICLE_LIMIT = 48` live hit particles in total, as 6 pooled `CPUParticles2D` bursts of 8 (`core/pools`). With the pool empty, a hit burst is skipped (degrade by dropping, like the projectile cap), but a death takes over the burst closest to ending. A killing blow sends `damage_dealt` then `enemy_died` at one spot: the death upgrades the hit's burst (1.6x speed, life and size) and cuts the hit sound, so a kill costs one slot and one sound and looks bigger than a hit. The downed event carries no position, so a downed wizard gets stop, shake and sound but no burst.
+- **Where bursts live (review fix):** under the `Feel` node, `top_level` so they sit in world space. Not under the current scene: `Flow` frees the world on Play and on every restart, which would have killed the pool.
+- **Shake** is a trauma value (0–1, squared into pixels, 6 px at most) on the current `Camera2D`'s `offset` (looked up again whenever a shake starts; the old camera is put back at rest), so the co-op camera (part 17) can move the camera's position freely. The setting `Feel.shake_enabled` is kept in memory only: the hard rules ban file loading and saving calls, so saving it waits for `core/save`, and so does the settings screen that flips it. Hit-stop is not part of that setting.
+- **Sounds:** `hit`, `enemy_death` and `player_downed` by id from the registry, 8 voices round-robin, silent on `null`. `player_downed` was added to "Audio needs" in the backlog.
+- **Presets** are `FeelPreset` resources in `gameplay/feel/presets/`; the first is `punchy.tres` (the script's defaults). Feel also sets `Projectiles.texture` to `art/vfx/fire_bolt.svg` if nothing set it (DECISIONS part 13 left this to feel).
+- Values are first guesses to tune at C1. No Godot binary in the session: the test has not run.
+
 ## 2026-10-17: Arena glue (M1 part 15)
 
 **Decided by:** Claude (details the task left open).

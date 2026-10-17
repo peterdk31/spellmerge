@@ -495,7 +495,9 @@ def finish(cfg: config_mod.Config, env: dict[str, str]) -> dict[str, str]:
                 or bool(st.get("followups")) or bool(st.get("pending_instructions")))
     again = (env.get("TASK_KIND") != "plan" and progressed and not merge_skipped
              and budget.allowed and has_work)
-    return {"again": str(again).lower(), "chain_started": started}
+    # Stopped by a usage limit: resume.yml starts develop again when it resets.
+    resume_at = pacing.backing_off_until(st, now) if env.get("TASK_KIND") != "plan" and has_work else ""
+    return {"again": str(again).lower(), "chain_started": started, "resume_at": resume_at}
 
 
 def main(argv: list[str] | None = None) -> int:

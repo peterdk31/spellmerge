@@ -31,6 +31,25 @@ class ClassifyTest(unittest.TestCase):
         status, _, _ = session.classify(result(is_error=True, result="You've reached your weekly limit"), True)
         self.assertEqual(status, "limit-weekly")
 
+    def test_session_limit_message(self) -> None:
+        """The message of run #43 on 2026-10-16, which was taken for an ordinary error."""
+        text = "You've hit your session limit · resets 12am (UTC)"
+        self.assertEqual(session.classify(result(is_error=True, result=text), True)[0], "limit")
+        now = dt.datetime(2026, 10, 16, 23, 50, tzinfo=dt.timezone.utc)
+        self.assertEqual(session.reset_time(text, now), dt.datetime(2026, 10, 17, 0, 0, tzinfo=dt.timezone.utc))
+
+    def test_reset_times(self) -> None:
+        now = dt.datetime(2026, 10, 17, 10, 0, tzinfo=dt.timezone.utc)
+        utc = dt.timezone.utc
+        self.assertEqual(session.reset_time("resets at 3:30pm (UTC)", now), dt.datetime(2026, 10, 17, 15, 30, tzinfo=utc))
+        self.assertEqual(session.reset_time("resets 9am", now), dt.datetime(2026, 10, 18, 9, 0, tzinfo=utc))
+        # 1pm in Copenhagen (CEST, UTC+2) is 11:00 UTC
+        self.assertEqual(session.reset_time("resets 1pm (Europe/Copenhagen)", now),
+                         dt.datetime(2026, 10, 17, 11, 0, tzinfo=utc))
+        self.assertEqual(session.reset_time("resets 1pm (Mars/Base)", now), dt.datetime(2026, 10, 17, 13, 0, tzinfo=utc))
+        self.assertIsNone(session.reset_time("no time here", now))
+        self.assertEqual(session.resets_at("error", "resets 9am"), "")
+
     def test_rejected_token(self) -> None:
         status, _, _ = session.classify(result(is_error=True, result="Invalid bearer token"), True)
         self.assertEqual(status, "auth")

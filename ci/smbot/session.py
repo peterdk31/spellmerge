@@ -29,6 +29,7 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Any, Callable
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from . import alarms, dailylog, gh, nexttask, pacing, state, weekly
 from . import merge as merge_mod
@@ -40,8 +41,11 @@ MAX_FAILURES = 2
 PARK_BLOCKED = dt.timedelta(days=7)  # blocked or failed too often: revisited by the weekly planning run
 PARK_WAITING = dt.timedelta(days=1)  # approved, but the merge waits on GitHub or the owner
 
-_LIMIT = re.compile(r"usage limit|limit reached|reached (?:your |the )?(?:\w+ )?limit|rate[ _-]?limit|\b429\b|"
-                    r"quota|out of (?:extra )?usage|resets? (?:at|in)", re.IGNORECASE)
+_LIMIT = re.compile(r"usage limit|limit reached|reached (?:your |the )?(?:\w+ )?limit|hit (?:your |the )?(?:\w+ )?limit|"
+                    r"session limit|rate[ _-]?limit|\b429\b|quota|out of (?:extra )?usage|resets? (?:at |in )?\d",
+                    re.IGNORECASE)
+# e.g. "You've hit your session limit · resets 12am (UTC)" or "resets at 3:30pm (Europe/Copenhagen)"
+_RESETS = re.compile(r"resets?\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*(?:\(([^)]+)\))?", re.IGNORECASE)
 _WEEKLY = re.compile(r"weekly|7[- ]day", re.IGNORECASE)
 _AUTH = re.compile(r"invalid (?:api key|bearer|token|x-api-key)|oauth token|authentication[_ ]error|\b401\b|"
                    r"unauthori[sz]ed|token (?:has )?expired|credit balance", re.IGNORECASE)
@@ -84,6 +88,27 @@ def classify(messages: list[dict[str, Any]], step_failed: bool) -> tuple[str, in
             return ("limit-weekly" if _WEEKLY.search(text) else "limit"), tokens, text[:300]
         return "error", tokens, text[:300] or "the Claude step failed"
     return "ok", tokens, ""
+
+
+def reset_time(text: str, now: dt.datetime) -> dt.datetime | None:
+    """When a usage limit resets, from the message: the next such time of day after now."""
+    m = _RESETS.search(text)
+    if not m:
+        return None
+    hour, minute, ampm, zone = int(m.group(1)), int(m.group(2) or 0), (m.group(3) or "").lower(), m.group(4)
+    if ampm:
+        hour = hour % 12 + (12 if ampm == "pm" else 0)
+    if hour > 23 or minute > 59:
+        return None
+    try:
+        tz = ZoneInfo(zone.strip()) if zone else dt.timezone.utc
+    except (ZoneInfoNotFoundError, ValueError):
+        tz = dt.timezone.utc
+    local = now.astimezone(tz)
+    reset = local.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    if reset <= local:
+        reset += dt.timedelta(days=1)
+    return reset.astimezone(dt.timezone.utc)
 
 
 # --- Prompts -------------------------------------------------------------------
@@ -254,13 +279,19 @@ def write_outputs(values: dict[str, str]) -> None:
                 fh.write(f"{key}<<__END__\n{value}\n__END__\n")
 
 
+def resets_at(status: str, detail: str) -> str:
+    """The reset time of a usage limit as an ISO time, or "" when it isn't a limit or isn't given."""
+    reset = reset_time(detail, dt.datetime.now(dt.timezone.utc)) if status.startswith("limit") else None
+    return pacing.iso(reset) if reset else ""
+
+
 def account(cfg: config_mod.Config, path: Path, kind: str, step_failed: bool) -> str:
     status, tokens, detail = classify(read_messages(path), step_failed)
     print(f"{kind}: {status}, {tokens:,} tokens {detail}")
-    return record(cfg, kind, status, tokens)
+    return record(cfg, kind, status, tokens, resets_at(status, detail))
 
 
-def record(cfg: config_mod.Config, kind: str, status: str, tokens: int) -> str:
+def record(cfg: config_mod.Config, kind: str, status: str, tokens: int, reset: str = "") -> str:
     """Records usage and limits in the state, and raises or clears the token alarm."""
     now = dt.datetime.now(dt.timezone.utc)
 
@@ -268,7 +299,8 @@ def record(cfg: config_mod.Config, kind: str, status: str, tokens: int) -> str:
         if tokens:
             pacing.record(s, now, tokens, kind)
         if status in ("limit", "limit-weekly"):
-            pacing.limit_hit(s, now, weekly=status == "limit-weekly")
+            pacing.limit_hit(s, now, weekly=status == "limit-weekly",
+                             resets_at=pacing.parse_time(reset) if reset else None)
     state.update(cfg, apply, f"session: {kind} used {tokens} tokens ({status})")
 
     if status == "auth":
@@ -514,10 +546,11 @@ def main(argv: list[str] | None = None) -> int:
     elif args.cmd == "usage":
         status, tokens, detail = classify(read_messages(args.file), args.step_failed)
         print(f"{status}, {tokens:,} tokens {detail}")
-        write_outputs({"status": status, "tokens": str(tokens)})
+        write_outputs({"status": status, "tokens": str(tokens), "resets_at": resets_at(status, detail)})
     elif args.cmd == "record":
         status = os.environ.get("STATUS") or "error"
-        write_outputs({"status": record(cfg, args.kind, status, int(os.environ.get("TOKENS") or 0))})
+        write_outputs({"status": record(cfg, args.kind, status, int(os.environ.get("TOKENS") or 0),
+                                        os.environ.get("RESETS_AT", ""))})
     elif args.cmd == "package":
         write_outputs(package(args.out, args.branch))
     elif args.cmd == "publish":

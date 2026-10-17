@@ -42,7 +42,9 @@ func _initialize() -> void:
 	_test_engine_time_scale_comes_back()
 	_test_camera_change_is_followed()
 	_teardown()
-	Node.print_orphan_nodes()
+	# The audio server drops stopped playbacks on its next mix; without this wait they
+	# are reported as leaked objects (and a resource still in use) at exit.
+	await create_timer(0.3).timeout
 	Engine.time_scale = 1.0
 	if _failures.is_empty():
 		print("TEST OK: gameplay/feel (hit-stop, shake, particle limit)")

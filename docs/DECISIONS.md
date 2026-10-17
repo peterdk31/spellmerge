@@ -463,3 +463,10 @@ Still no display in sessions, so decided from sizes, not from a screenshot, and 
 ## 2026-10-17: HUD sizes unchanged for now, visual check still open
 
 The HUD screenshot cannot be taken in a session (no display, `docs/BACKLOG.md`), so no HUD size or font was changed. This is not a finding that they are fine. The four 112×55 panels are screen-space corners: a wizard or enemy standing in a corner can be hidden by one, and the Coop camera moves and zooms (0.5–1.0), so a paper check at one camera position says little. The legibility of the smooth default font at 12/14 px on the 640×360 canvas is unverified, and the design calls for pixel art, so a pixel font may be wanted (side note: a font file would need a licence entry). Decide on panel size, a translucent background and the font after the display run; tracked in `docs/NEXT.md` ("HUD screenshot and legibility check").
+
+## 2026-10-17: the 4-bot smoke test
+
+- The test is `tests/smoke/four_bot_smoke.gd`; `tests/smoke/test_four_bot_smoke.gd` only extends it, because `build.sh` runs `test_*.gd` and sessions may not edit `ci/`. Part 21 decides how the export runs it.
+- Errors are caught by a `Logger` (`OS.add_logger`), not by reading a log file, so the test works the same in the editor and in an export. A warning counts as a failure only for "the restart failed" (see "Flow" above).
+- Bots call nothing on a spell: they hold the `cast` action and the wizard calls the cast method. "Alive or revived" is checked as "not down at the end"; revive itself is still in `docs/BACKLOG.md`.
+- Game time runs at `Engine.time_scale` 2 with a limit of 120 game seconds, since no real-time wait is wanted.

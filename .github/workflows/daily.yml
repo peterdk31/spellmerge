@@ -46,6 +46,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: automation
+    permissions:
+      contents: read
+      actions: read # smbot.catchup --already-ran
     outputs:
       automation: ${{ steps.gate.outputs.automation }}
       merge: ${{ steps.gate.outputs.merge }}
@@ -61,7 +64,16 @@ jobs:
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           permission-contents: write # the automation-state branch
           permission-issues: write # the Daily log
+      # GitHub sometimes fires the schedule hours late, after develop's catch-up already
+      # started this workflow; then the late run does nothing.
+      - id: already
+        if: github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SELF: ${{ github.run_id }}
+        run: python3 -m smbot.catchup --already-ran daily.yml --self "$SELF"
       - id: gate
+        if: steps.already.outputs.done != 'true'
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           AUTOMATION_ENABLED: ${{ vars.AUTOMATION_ENABLED }}

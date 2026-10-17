@@ -139,6 +139,8 @@ def main(argv: list[str] | None = None) -> int:
         "next_task": task or "",
         "reasons": "; ".join(decision.reasons) or "none",
         "settings": json.dumps(panel.to_json(result.settings)),
+        # When set, the workflow starts resume.yml, which starts develop again at that time.
+        "backoff_until": pacing.backing_off_until(st, now) if decision.automation else "",
     })
     return 0
 

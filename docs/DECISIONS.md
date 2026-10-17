@@ -13,6 +13,13 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - **Restart after 2 seconds** from the last wizard going down (`RESTART_DELAY`, under the 3 s limit); a revive cancels it; a cleared room never restarts. After `room_cleared` nothing happens yet (no reward or next room until M3); listed in the flow README.
 - **A second `play_requested` during a run is ignored.** `stop_run()` returns flow to idle (tests; later the run area).
 
+## 2026-10-17: Work resumes when a usage limit resets; late scheduled runs don't repeat
+
+**Decided by:** owner.
+**Context:** On 2026-10-17 a usage limit stopped development at 03:28 with a reset at 05:10, but GitHub's hourly schedule didn't fire again until hours later, so no session ran. The same night the daily run was started by the catch-up at 04:55, and GitHub then fired the 03:00 schedule at 07:35, so it built and released twice.
+**Decision:** when the develop gate or a session's finish job sees a back-off, it starts `resume.yml`, which waits until just after the reset and starts `develop`. `daily.yml` and `weekly.yml` skip a scheduled run when another run since their due time is running or succeeded.
+**Consequence:** work stops only as long as the limit lasts. A waiting `resume` run shows in the Actions list; a newer request replaces it.
+
 ## 2026-10-17: The room (M1 part 14)
 
 **Decided by:** Claude (details the task left open).

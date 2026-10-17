@@ -446,6 +446,10 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - **Mid-run joiners** take the free spawn farthest from enemies and wizards (part 17), so the coop test checks "a player spawn", not the one numbered like the slot.
 - **`player.gd` and `combat.gd`** read absolute autoload paths only inside the tree (tests build them outside it).
 
+## 2026-10-17: HUD panels 60% translucent, fonts unchanged (replaces the entry below on sizes)
+
+Still no display in sessions, so decided from sizes, not from a screenshot, and text legibility over the floor is NOT verified (no contrast was computed or seen). Only the translucency was added; fonts stay 12/14 px at 640×360 (integer-scaled ×2); no licensed pixel font is in the repo, so none was added. An opaque 112×55 corner panel can hide a wizard or enemy in a room corner (at Coop zoom 0.5 it covers 224×110 world px), so the panel background alpha is now 0.6; border and text stay opaque and state stays in words. If a real screenshot shows text hard to read over bright floor, raise the alpha to 0.75 in `hud/theme/spellmerge_theme.tres`; the four `panel_p1`–`panel_p4` styleboxes there hold the same literal and must change together (the test only checks the range 0.4 to below 1). The real screenshot stays in `docs/BACKLOG.md`.
+
 ## 2026-10-17: HUD sizes unchanged for now, visual check still open
 
 The HUD screenshot cannot be taken in a session (no display, `docs/BACKLOG.md`), so no HUD size or font was changed. This is not a finding that they are fine. The four 112×55 panels are screen-space corners: a wizard or enemy standing in a corner can be hidden by one, and the Coop camera moves and zooms (0.5–1.0), so a paper check at one camera position says little. The legibility of the smooth default font at 12/14 px on the 640×360 canvas is unverified, and the design calls for pixel art, so a pixel font may be wanted (side note: a font file would need a licence entry). Decide on panel size, a translucent background and the font after the display run; tracked in `docs/NEXT.md` ("HUD screenshot and legibility check").

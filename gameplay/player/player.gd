@@ -18,6 +18,10 @@ extends CharacterBody2D
 ## decides a teammate revived it, e.g. coop) brings it back with REVIVE_HEALTH and
 ## sends `player_revived`. Other wizards are never affected: nobody waits.
 ##
+## Stats: `player_stats_changed` is sent when the wizard appears and whenever health
+## changes or mana crosses a whole number, so the HUD shows only what it is told
+## (about 10 events a second per regenerating player, none when nothing changes).
+##
 ## Cast: while `cast` is held the wizard calls `spell.cast(index, origin, facing, mana)`
 ## and reads no spell field. If the spell fired it takes the mana returned, sends
 ## `spell_cast` and plays the sound `cast` from `core/registry` (nothing on null).
@@ -86,6 +90,9 @@ var _dodge_direction: Vector2 = Vector2.ZERO
 var _seen_dodge_presses: int = 0
 var _downed: bool = false
 var _sound_player: AudioStreamPlayer = null
+## What the last `player_stats_changed` said, to send it only on a change.
+var _sent_health: int = -1
+var _sent_mana: int = -1
 
 
 func _init() -> void:
@@ -125,6 +132,7 @@ func _ready() -> void:
 		add_child(_sound_player)
 	if input != null:
 		_seen_dodge_presses = input.get_press_count(index, &"dodge")
+	_announce_stats()
 
 
 func _physics_process(delta: float) -> void:
@@ -142,6 +150,7 @@ func step(delta: float) -> void:
 			_seen_dodge_presses = input.get_press_count(index, &"dodge")
 		return
 	mana = minf(mana + MANA_REGEN * delta, MAX_MANA)
+	_announce_stats()
 	if spell != null:
 		spell.tick(index, delta)
 	_dodge_left = maxf(_dodge_left - delta, 0.0)
@@ -184,6 +193,7 @@ func cast() -> bool:
 	if spent == SpellBase.REFUSED:
 		return false
 	mana -= spent
+	_announce_stats()
 	if events != null:
 		events.spell_cast.emit(index, spell.spell_id(), global_position, facing)
 	_play_cast_sound()
@@ -198,6 +208,16 @@ func _play_cast_sound() -> void:
 		return
 	_sound_player.stream = stream
 	_sound_player.play()
+
+
+## Send `player_stats_changed` if health or whole mana differ from the last one sent.
+func _announce_stats() -> void:
+	var whole_mana: int = floori(mana)
+	if events == null or (health == _sent_health and whole_mana == _sent_mana):
+		return
+	_sent_health = health
+	_sent_mana = whole_mana
+	events.player_stats_changed.emit(index, health, MAX_HEALTH, float(whole_mana), MAX_MANA)
 
 
 func is_downed() -> bool:
@@ -215,6 +235,7 @@ func take_damage(amount: int) -> bool:
 	if _downed or is_invulnerable() or amount <= 0:
 		return false
 	health = maxi(health - amount, 0)
+	_announce_stats()
 	if health == 0:
 		_downed = true
 		_dodge_left = 0.0
@@ -232,6 +253,7 @@ func revive(reviver: int) -> bool:
 		return false
 	_downed = false
 	health = REVIVE_HEALTH
+	_announce_stats()
 	if events != null:
 		events.player_revived.emit(index, reviver)
 	return true

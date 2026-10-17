@@ -49,6 +49,8 @@ signal enemy_died(player: int, enemy: Node, position: Vector2)
 signal player_downed(player: int)
 ## Sender: player. `player` was revived by `reviver`.
 signal player_revived(player: int, reviver: int)
+## Sender: player. The health or the whole-number mana of `player` changed, or the wizard appeared. Carries all the numbers so a listener never has to ask.
+signal player_stats_changed(player: int, health: int, max_health: int, mana: float, max_mana: float)
 ## Sender: coop. `player` joined the game.
 signal player_joined(player: int)
 ## Sender: coop. `player` left the game.

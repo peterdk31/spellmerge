@@ -28,6 +28,7 @@ const EVENTS: Dictionary = {
 	# Players.
 	&"player_downed": [["player", TYPE_INT]],
 	&"player_revived": [["player", TYPE_INT], ["reviver", TYPE_INT]],
+	&"player_stats_changed": [["player", TYPE_INT], ["health", TYPE_INT], ["max_health", TYPE_INT], ["mana", TYPE_FLOAT], ["max_mana", TYPE_FLOAT]],
 	&"player_joined": [["player", TYPE_INT]],
 	&"player_left": [["player", TYPE_INT]],
 	# Run and rooms.

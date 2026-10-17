@@ -25,6 +25,7 @@ Combat="*res://gameplay/combat/combat.gd"
 Feel="*res://gameplay/feel/feel.gd"
 Flow="*res://gameplay/flow/flow.gd"
 Coop="*res://gameplay/coop/coop.gd"
+Hud="*res://hud/panels/panels.tscn"
 
 [debug]
 
@@ -38,6 +39,10 @@ window/size/window_width_override=1280
 window/size/window_height_override=720
 window/stretch/mode="viewport"
 window/stretch/scale_mode="integer"
+
+[gui]
+
+theme/custom="res://hud/theme/spellmerge_theme.tres"
 
 [input]
 

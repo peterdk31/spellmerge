@@ -2,6 +2,29 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-17: The enemy and its AI (M1 part 12)
+
+**Decided by:** Claude (details the task left open).
+
+- **`ai.gd` is the script on the enemy scene's root** (a `CharacterBody2D`), as the wizard scene does with `player.gd`; `gameplay/` stays script-only. The spawner sets `data` (the `EnemyBase`) before adding the node. The scene does not point back to the `.tres` (that would be a resource cycle), so speed and health come from `data` and the attack numbers are exports on the root. The exports are scene-level, set in the enemy's `.tscn`, not per spawn.
+- **The attack is a shot**, not a lunge: Combat's contact damage is always on, so it cannot be telegraphed. The imp has `contact_damage = 0` and its damage is `attack_damage` (an export in `ai.gd`) through a hit profile for the enemy's `attack_tag`, set by the AI in `_ready` as 1000 plus a number from `data.id` and `attack_damage` (so another enemy type, or the same one with another damage, does not overwrite the profile; two ids could still collide by chance, which Combat's tag-changed warning would show, and the spawner (part 15) may take over the tags). The shot belongs to `Events.NO_PLAYER` and uses `LAYER_PLAYER`. The telegraph is a 0.75 s windup standing still, a flash and a `Telegraph` line as long as the shot's real reach (`attack_speed * attack_lifetime`) that grows wider and brighter with progress (2 to 4 px, alpha 0.5 to 1; placeholders, to check at 640×360 with four players in the part 25 playtest); the aim is locked at the start, so stepping aside works. First guesses, for the C1 tuning.
+- **The AI talks to `Combat` and `Projectiles` through the autoload nodes** (found by path, replaceable in tests, as `player.gd` does with `Events`), not through events: `core/events` has no event for "register this enemy" or "spawn a shot", and the part 11 design already has the mover add `consume_knockback_step`. Revisit if a spawner (`flow`, part 15) should register enemies instead. Leaving the tree unregisters the enemy from `Combat` (so a room swap leaves no hidden target); it is not registered again on re-entry, so spawn a new enemy instead.
+- **Targets:** every node in the `players` group (`player.gd` joins it in `_ready`), or an explicit `targets` list; the nearest one that is not downed, rechecked every 0.5 s (staggered by instance id), at once when the current target is lost, and at once on `player_downed` only for enemies whose target was that player (the others keep their stagger, so a death is not a one-frame spike). With no target (all downed, nobody joined) it still looks only every 0.5 s. The group read allocates a small array twice a second per enemy; if 200 enemies show it in the part 22 probe, share one list refreshed by `flow`.
+- Combat's `register_player` now also adds the wizard as a projectile target (see the part 11 notes).
+
+## 2026-10-17: Combat (M1 part 11)
+
+**Decided by:** Claude (details the task left open).
+
+- **Combat owns the tag table.** The earlier note said the spawner keeps the table from `tag` to damage and `combat` looks it up there. Content may use `gameplay/` (the dependency direction is `core` <- `gameplay` <- `content`) but `gameplay/` may not reach into content, so the bolt calls `Combat.set_hit_profile(tag, damage, knockback)` and combat keeps the table. Tag 0 stays "no tag".
+- **Enemy health lives in combat,** in packed rows, not on the enemy node: `register_enemy(node, health, hurt_radius, contact_damage)`; the AI (part 12) and the enemy scene hold no health. Death sends `enemy_died` and frees the node.
+- **Wizards decide their own damage.** Combat sends `damage_dealt` and the wizard takes it. It skips the event (no hit-stop or shake for nothing) when the wizard answers `is_invulnerable()` or `is_downed()`, found by `has_method` on registered wizard nodes. Wizards are not knocked back in M1; the player owns its movement.
+- **Contact damage** is a distance check per enemy row and registered wizard (4 at most), once per `CONTACT_COOLDOWN` (1 s) per wizard, since wizards have no invulnerability after a hit. First guesses, for the C1 tuning.
+- `damage_dealt` carries the requested amount, not the health actually removed (overkill is not trimmed).
+- Knockback speed is `direction * strength` (a hit overwrites any earlier push) and falls by `KNOCKBACK_DECAY` per second; Combat never moves the enemy: it only keeps the velocity (`get_knockback`), and the node that moves the enemy (AI or enemy base, part 12) adds `consume_knockback_step(enemy, delta)` to its own `move_and_slide()` each physics frame, which also fades it. That way walls and parent transforms are respected and only one node owns the enemy's movement.
+- **(Part 12 addition.)** `register_player` also makes the wizard a projectile target on `LAYER_PLAYER` (and `unregister_player` removes it); without that an enemy shot could never hit a wizard. Part 11 left this out.
+- Re-registering an enemy also updates its projectile target radius. A freed enemy is dropped in `step()`; the projectile manager prunes its own freed targets (tested). Contact hits are sent after the enemy loop and `hit()` re-finds its row after `damage_dealt`, so listeners may change registrations. A tag whose profile changes is replaced with a warning; the spawner picks the tags.
+
 ## 2026-10-17: Player health, mana, downed and cast (M1 part 10)
 
 **Decided by:** Claude (details the task left open).
@@ -296,14 +319,3 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - Opening an overlay ends a dash in progress (cooldown stays), so a captured player is fully frozen.
 - Physics layers: 1 walls, 2 players, 3 enemies, 4 projectiles and hit boxes (in the player README); `core/` is asked to name them in `project.godot`.
 
-## 2026-10-17: Combat (M1 part 11)
-
-**Decided by:** Claude (details the task left open).
-
-- **Combat owns the tag table.** The earlier note said the spawner keeps the table from `tag` to damage and `combat` looks it up there. Content may use `gameplay/` (the dependency direction is `core` <- `gameplay` <- `content`) but `gameplay/` may not reach into content, so the bolt calls `Combat.set_hit_profile(tag, damage, knockback)` and combat keeps the table. Tag 0 stays "no tag".
-- **Enemy health lives in combat,** in packed rows, not on the enemy node: `register_enemy(node, health, hurt_radius, contact_damage)`; the AI (part 12) and the enemy scene hold no health. Death sends `enemy_died` and frees the node.
-- **Wizards decide their own damage.** Combat sends `damage_dealt` and the wizard takes it. It skips the event (no hit-stop or shake for nothing) when the wizard answers `is_invulnerable()` or `is_downed()`, found by `has_method` on registered wizard nodes. Wizards are not knocked back in M1; the player owns its movement.
-- **Contact damage** is a distance check per enemy row and registered wizard (4 at most), once per `CONTACT_COOLDOWN` (1 s) per wizard, since wizards have no invulnerability after a hit. First guesses, for the C1 tuning.
-- `damage_dealt` carries the requested amount, not the health actually removed (overkill is not trimmed).
-- Knockback speed is `direction * strength` (a hit overwrites any earlier push) and falls by `KNOCKBACK_DECAY` per second; Combat never moves the enemy: it only keeps the velocity (`get_knockback`), and the node that moves the enemy (AI or enemy base, part 12) adds `consume_knockback_step(enemy, delta)` to its own `move_and_slide()` each physics frame, which also fades it. That way walls and parent transforms are respected and only one node owns the enemy's movement.
-- Re-registering an enemy also updates its projectile target radius. A freed enemy is dropped in `step()`; the projectile manager prunes its own freed targets (tested). Contact hits are sent after the enemy loop and `hit()` re-finds its row after `damage_dealt`, so listeners may change registrations. A tag whose profile changes is replaced with a warning; the spawner picks the tags.

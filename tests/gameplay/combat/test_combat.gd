@@ -45,6 +45,8 @@ func _initialize() -> void:
 	_test_death_frees_enemy_in_tree()
 	_test_reregister_resets_numbers_and_target()
 	_test_listener_may_change_registrations()
+	_test_wizard_is_a_projectile_target_for_enemy_shots()
+	_test_downed_wizard_is_not_a_projectile_target()
 	_teardown()
 	if _failures.is_empty():
 		print("TEST OK: gameplay/combat (damage, knockback, death)")
@@ -331,3 +333,24 @@ func _test_listener_may_change_registrations() -> void:
 			_combat.unregister_enemy(third))
 	_check(_combat.hit(0, third, 1), "a hit still counts when a listener unregisters the enemy")
 	_check(_deaths.is_empty(), "no death is sent for an enemy a listener removed")
+
+
+func _test_wizard_is_a_projectile_target_for_enemy_shots() -> void:
+	_setup(2, true)
+	_check(_projectiles.get_target_count() == 2, "both wizards are projectile targets")
+	_combat.unregister_player(0)
+	_check(_projectiles.get_target_count() == 1, "an unregistered wizard stops being a target")
+	_combat.register_player(1, _players[0], 8.0)
+	_check(_projectiles.get_target_count() == 1, "re-registering index 1 with another wizard replaces its target")
+
+
+func _test_downed_wizard_is_not_a_projectile_target() -> void:
+	_setup(2, true)
+	_players[0].take_damage(1000)
+	_check(_players[0].is_downed(), "the wizard is downed")
+	_check(_projectiles.get_target_count() == 1, "a downed wizard stops being a projectile target")
+	_players[0].revive(1)
+	_check(_projectiles.get_target_count() == 2, "a revived wizard is a projectile target again")
+	_players[0].take_damage(1000)
+	_combat.register_player(0, _players[0], 8.0)
+	_check(_projectiles.get_target_count() == 1, "registering a downed wizard does not make it a target")

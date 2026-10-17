@@ -4,7 +4,7 @@
 
 Regular enemies and their attack patterns. Enemies create the "readable chaos" of the game: clear telegraphs, distinct roles, fair at any player count.
 
-**Opens for PRs in M3** (Run structure; see "Opens for PRs" in docs/ROADMAP.md). A small M1 base class already exists (`core/base/enemy_base.gd`, `EnemyBase`); M3 extends it. **The example to copy arrives with Claude's first enemy (the M1 ember imp, then M3)**; this README is updated then with its path.
+**Opens for PRs in M3** (Run structure; see "Opens for PRs" in docs/ROADMAP.md). A small M1 base class already exists (`core/base/enemy_base.gd`, `EnemyBase`); M3 extends it. The example to copy is the M1 ember imp, `content/enemies/ember_imp/`.
 
 ## Contract
 
@@ -30,7 +30,7 @@ Regular enemies and their attack patterns. Enemies create the "readable chaos" o
 
 ## Example to copy
 
-The enemy's scene and `.tres` arrive with the M1 ember imp (part 12). Until then, its sprite `content/enemies/ember_imp/idle.svg` (with `idle.svg.import` and its entry in `art/manifest.json`) is the example for enemy art. Do not guess the rest of the layout.
+`content/enemies/ember_imp/`: `ember_imp.tres` (an `EnemyBase` with `id`, `max_health`, `move_speed`, `contact_damage` and `scene`), `ember_imp.tscn` (a `CharacterBody2D` whose root script is `gameplay/ai/ai.gd`, with a collision shape, a `Sprite` and a `Telegraph` line that shows during the windup) and the sprite `idle.svg` (with `idle.svg.import` and its entry in `art/manifest.json`). The attack numbers (range, windup, damage) are exports on the scene root. The imp has no contact damage: its only damage is the telegraphed shot. Its test is `tests/gameplay/ai/test_ai.gd`.
 
 ## Validate
 

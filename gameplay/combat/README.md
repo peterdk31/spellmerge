@@ -10,7 +10,7 @@ Element reactions are content data, so contributors add them without touching th
 
 ## Contract
 
-- **Public entry script:** `gameplay/combat/combat.gd`. Other code uses only this script and the events it sends and listens to; nothing else in the folder is public. It is the autoload `Combat`. Spawners tell it what a shot does with `Combat.set_hit_profile(tag, damage, knockback)`; enemies register with `Combat.register_enemy(node, health, hurt_radius, contact_damage)` and wizards with `Combat.register_player(index, node, radius)`. `Combat.hit(player, target, amount, direction, strength)` is the pipeline for hits that do not come from a projectile.
+- **Public entry script:** `gameplay/combat/combat.gd`. Other code uses only this script and the events it sends and listens to; nothing else in the folder is public. It is the autoload `Combat`. Spawners tell it what a shot does with `Combat.set_hit_profile(tag, damage, knockback)`; enemies register with `Combat.register_enemy(node, health, hurt_radius, contact_damage)` and wizards with `Combat.register_player(index, node, radius)` (which also makes the wizard a projectile target on `LAYER_PLAYER`, so enemy shots can hit it). `Combat.hit(player, target, amount, direction, strength)` is the pipeline for hits that do not come from a projectile.
 - **Dependency direction:** `core` ← `gameplay` ← `content`. This area may use `core/` and the registry. `core/` never depends on it, and content never reaches into it.
 - **Events** (`core/events/events.gd` owns the definitions; this list matches it and the table in [gameplay/README.md](../README.md)):
   - Sends: `enemy_died`, `damage_dealt`, `status_applied`.

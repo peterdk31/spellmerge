@@ -467,6 +467,7 @@ The HUD screenshot cannot be taken in a session (no display, `docs/BACKLOG.md`),
 ## 2026-10-17: the 4-bot smoke test
 
 - The test is `tests/smoke/four_bot_smoke.gd`; `tests/smoke/test_four_bot_smoke.gd` only extends it, because `build.sh` runs `test_*.gd` and sessions may not edit `ci/`. Part 21 decides how the export runs it.
+- A downed bot 4 is not a failure (it only idles); its overlay closing while it is not downed is, and so is zero `spell_cast` events. The logger (`tests/smoke/error_log.gd`) is unit-tested with hand-fed calls and starts after the autoloads load, so startup errors are not covered.
 - Errors are caught by a `Logger` (`OS.add_logger`), not by reading a log file, so the test works the same in the editor and in an export. A warning counts as a failure only for "the restart failed" (see "Flow" above).
-- Bots call nothing on a spell: they hold the `cast` action and the wizard calls the cast method. "Alive or revived" is checked as "not down at the end"; revive itself is still in `docs/BACKLOG.md`.
+- Bots call nothing on a spell (a deliberate deviation from "calling only the cast method" in the old NEXT.md wording): they hold the `cast` action and the wizard calls the cast method. "Alive or revived" is checked as "not down at the end"; revive itself is still in `docs/BACKLOG.md`.
 - Game time runs at `Engine.time_scale` 2 with a limit of 120 game seconds, since no real-time wait is wanted.

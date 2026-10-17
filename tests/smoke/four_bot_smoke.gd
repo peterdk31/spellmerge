@@ -6,16 +6,24 @@ extends SceneTree
 ## It passes only if
 ##  - `room_cleared` is received,
 ##  - players 1-3 (indices 0-2) are alive or revived at the end,
-##  - bot 4's overlay is still open at the end (it idled the whole time), and
+##  - at least one `spell_cast` happened (the bots really fired),
+##  - bot 4's overlay opened and was never seen closed afterwards (polled every
+##    frame). Bot 4 stands still and can be downed; it is not checked for that, and
+##    a close while it was downed is printed as a note, not a failure, and
 ##  - the log has no `push_error` call, no line starting `ERROR:` and no "the
-##    restart failed" warning (a logger watches every message from the moment the
-##    test starts).
+##    restart failed" warning (tests/smoke/error_log.gd, which has a unit test; it
+##    starts after the autoloads load, so errors during startup are not covered).
 ## If the run is not cleared within TIME_LIMIT game seconds the test fails.
+##
+## Reproducibility: the game logic draws no random numbers (only cosmetic feel code
+## does) and the bots decide from the world, so a run varies only with frame
+## timing. There is no seed to set. The pass rate over repeated runs is in
+## docs/LOG.md.
 ##
 ## godot --headless --path . --script res://tests/smoke/four_bot_smoke.gd
 
 const BotScript := preload("res://tests/bots/bot.gd")
-const InputManagerScript := preload("res://core/input/input_manager.gd")
+const ErrorLogScript := preload("res://tests/smoke/error_log.gd")
 
 const PLAYERS: int = 4
 ## The index of the bot that idles in its overlay (bot 4).
@@ -27,38 +35,7 @@ const TIME_SCALE: float = 2.0
 ## Frames to let the world settle after the room is cleared, then the checks run.
 const SETTLE_FRAMES: int = 30
 
-
-## The text of the one warning that counts as a failure: Flow gives up a restart
-## with a warning, not an error (docs/DECISIONS.md, "Flow").
-const FAILED_RESTART: String = "the restart failed"
-
-
-## Collects every error the engine logs: `push_error` and script errors arrive in
-## _log_error (warnings have type ERROR_TYPE_WARNING and are ignored, except
-## FAILED_RESTART), and a plain
-## printed line is an error if it starts with `ERROR:`.
-class ErrorLog:
-	extends Logger
-
-	var lines: Array[String] = []
-	var _mutex: Mutex = Mutex.new()
-
-	func _log_error(function: String, file: String, line: int, code: String, rationale: String, _editor_notify: bool, error_type: int, _script_backtraces: Array[ScriptBacktrace]) -> void:
-		var text: String = rationale if not rationale.is_empty() else code
-		if error_type == ERROR_TYPE_WARNING and not text.contains(FAILED_RESTART):
-			return
-		_mutex.lock()
-		lines.append("%s (%s:%d in %s)" % [text, file, line, function])
-		_mutex.unlock()
-
-	func _log_message(message: String, error: bool) -> void:
-		if message.begins_with("ERROR:"):
-			_mutex.lock()
-			lines.append(message.strip_edges())
-			_mutex.unlock()
-
-
-var _log: ErrorLog = ErrorLog.new()
+var _log: Logger = ErrorLogScript.new()
 var _failures: Array[String] = []
 var _events: Node
 var _flow: Node
@@ -67,10 +44,14 @@ var _hud: Node
 var _bots: Array[BotScript] = []
 var _cleared: int = 0
 var _entered: int = 0
+var _casts: int = 0
 var _downed: Array[bool] = [false, false, false, false]
 var _elapsed: float = 0.0
 var _settle: int = -1
 var _started: bool = false
+var _overlay_seen_open: bool = false
+var _overlay_closed_at: float = -1.0
+var _idler_downed_at_close: bool = false
 
 
 func _initialize() -> void:
@@ -88,6 +69,7 @@ func _initialize() -> void:
 	_events.connect("room_cleared", _on_room_cleared)
 	_events.connect("player_downed", _on_player_downed)
 	_events.connect("player_revived", _on_player_revived)
+	_events.connect("spell_cast", _on_spell_cast)
 	for index in PLAYERS:
 		var bot := BotScript.new()
 		var mode: BotScript.Mode = BotScript.Mode.IDLER if index == IDLER else BotScript.Mode.FIGHTER
@@ -104,6 +86,7 @@ func _process(delta: float) -> bool:
 	if not _started:
 		return false
 	_elapsed += delta
+	_watch_overlay()
 	for bot in _bots:
 		bot.step(delta)
 	if _settle >= 0:
@@ -118,6 +101,17 @@ func _process(delta: float) -> bool:
 	return false
 
 
+## Record that the idler's overlay opened and when it was first closed again.
+func _watch_overlay() -> void:
+	var overlay := _hud.call("get_overlay", IDLER) as Node
+	var open: bool = overlay != null and bool(overlay.call("is_open"))
+	if open:
+		_overlay_seen_open = true
+	elif _overlay_seen_open and _overlay_closed_at < 0.0:
+		_overlay_closed_at = _elapsed
+		_idler_downed_at_close = _downed[IDLER]
+
+
 func _on_room_entered(_room_id: StringName) -> void:
 	_entered += 1
 	_bots[IDLER].tap_overlay()
@@ -127,6 +121,10 @@ func _on_room_cleared(_room_id: StringName) -> void:
 	_cleared += 1
 	if _settle < 0:
 		_settle = SETTLE_FRAMES
+
+
+func _on_spell_cast(_player: int, _spell_id: StringName, _origin: Vector2, _direction: Vector2) -> void:
+	_casts += 1
 
 
 func _on_player_downed(player: int) -> void:
@@ -151,21 +149,29 @@ func _check() -> Array[String]:
 		var wizard := _flow.call("get_wizard", index) as Node
 		if wizard == null or bool(wizard.call("is_downed")) or _downed[index]:
 			failed.append("player %d is down at the end (and was not revived)" % (index + 1))
-	var overlay := _hud.call("get_overlay", IDLER) as Node
-	if overlay == null or not bool(overlay.call("is_open")):
-		failed.append("the overlay of bot %d is not open at the end: it did not idle in it the whole time" % (IDLER + 1))
+	if _casts == 0:
+		failed.append("no bot ever cast a spell")
+	if not _overlay_seen_open:
+		failed.append("the overlay of bot %d never opened" % (IDLER + 1))
+	elif _overlay_closed_at >= 0.0:
+		var message: String = "the overlay of bot %d closed at %.1f game seconds, after it had opened" % [IDLER + 1, _overlay_closed_at]
+		if _idler_downed_at_close:
+			print("SMOKE NOTE: " + message + " (bot %d was downed; not a failure)" % (IDLER + 1))
+		else:
+			failed.append(message + " while it was not downed")
 	return failed
 
 
 func _finish(failed: Array[String]) -> void:
 	Engine.time_scale = 1.0
+	OS.remove_logger(_log)
 	for bot in _bots:
 		bot.leave()
 	if _flow != null:
 		_flow.call("stop_run")
 	failed.append_array(_errors())
 	if failed.is_empty():
-		print("SMOKE OK: 4 bots cleared the room in %.1f game seconds, bot 4 idled in its overlay, no errors logged" % _elapsed)
+		print("SMOKE OK: 4 bots cleared the room in %.1f game seconds (%d casts), bot 4 idled in its overlay, no errors logged" % [_elapsed, _casts])
 		quit(0)
 	else:
 		for reason in failed:
@@ -177,6 +183,7 @@ func _finish(failed: Array[String]) -> void:
 ## failure report itself is not mistaken for an engine error.
 func _errors() -> Array[String]:
 	var found: Array[String] = []
-	for line in _log.lines:
+	var lines: Array[String] = _log.call("get_lines")
+	for line in lines:
 		found.append("the log has an error: " + line.trim_prefix("ERROR:").strip_edges())
 	return found

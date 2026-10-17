@@ -22,6 +22,7 @@ func _initialize() -> void:
 		printerr("TEST FAILED: the Events, PlayerInput and Flow autoloads must exist")
 		quit(1)
 		return
+	_test_names_exist(events)
 	_test_join_and_leave()
 	_test_idler_sends_nothing()
 	await _test_fighter(events)
@@ -37,6 +38,18 @@ func _initialize() -> void:
 func _check(condition: bool, message: String) -> void:
 	if not condition:
 		_failures.append(message)
+
+
+## The bot calls these by name; a rename must fail here, not silently at runtime.
+func _test_names_exist(events: Node) -> void:
+	for method in ["add_virtual_device", "send_virtual", "leave"]:
+		_check(_input.has_method(method), "PlayerInput has %s" % method)
+	_check(_input.get("NO_DEVICE") != null, "PlayerInput has NO_DEVICE")
+	for method in ["get_wizard", "stop_run"]:
+		_check(_flow.has_method(method), "Flow has %s" % method)
+	_check("world" in _flow, "Flow has a world property")
+	for signal_name in ["play_requested", "room_entered", "room_cleared", "player_downed", "player_revived", "spell_cast"]:
+		_check(events.has_signal(signal_name), "Events has %s" % signal_name)
 
 
 func _test_join_and_leave() -> void:

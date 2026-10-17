@@ -14,7 +14,7 @@ var _failures: Array[String] = []
 var _bus: Node
 var _mgr: Node2D
 var _targets: Array[Node2D] = []
-## Every projectile_hit as [player, target, position].
+## Every projectile_hit as [player, target, position, tag].
 var _hits: Array = []
 
 
@@ -29,6 +29,8 @@ func _initialize() -> void:
 	_test_large_target_and_very_fast_shot()
 	_test_hits_come_in_travel_order()
 	_test_pierce_in_a_crowd_hits_each_once()
+	_test_fast_pierce_hits_everything_on_the_path()
+	_test_tag_comes_back_with_the_hit()
 	_test_cap_drop_order_after_other_deaths()
 	_test_default_cap_follows_the_platform()
 	_test_bad_arguments()
@@ -63,7 +65,7 @@ func _setup() -> void:
 	_mgr = ManagerScript.new()
 	_mgr.events = _bus
 	_hits.clear()
-	_bus.projectile_hit.connect(func(player: int, target: Node, position: Vector2) -> void: _hits.append([player, target, position]))
+	_bus.projectile_hit.connect(func(player: int, target: Node, position: Vector2, tag: int) -> void: _hits.append([player, target, position, tag]))
 
 
 func _teardown() -> void:
@@ -225,6 +227,52 @@ func _test_pierce_in_a_crowd_hits_each_once() -> void:
 		seen.append(hit[1])
 	_check(seen.has(a) and seen.has(b), "each target was hit")
 	_check(_mgr.is_alive(slot), "the shot keeps one pierce")
+
+
+func _test_fast_pierce_hits_everything_on_the_path() -> void:
+	# One step of 480 px passes three targets: all three are hit, in order.
+	_setup()
+	var a: Node2D = _target(Vector2(100.0, 0.0), 10.0)
+	var b: Node2D = _target(Vector2(200.0, 0.0), 10.0)
+	var c: Node2D = _target(Vector2(300.0, 0.0), 10.0)
+	var slot: int = _mgr.spawn(0, Vector2.ZERO, Vector2(28800.0, 0.0), 1.0, 2.0, ManagerScript.LAYER_ENEMY, 3)
+	_mgr.step(DT)
+	_check(_hits.size() == 3, "a fast piercing shot hits every target on its path in one step (%d)" % _hits.size())
+	if _hits.size() == 3:
+		_check(_hits[0][1] == a and _hits[1][1] == b and _hits[2][1] == c, "in the order along the path")
+	_check(_mgr.is_alive(slot), "and keeps its last pierce")
+	# Without pierce the first hit ends it: one event.
+	_setup()
+	_target(Vector2(100.0, 0.0), 10.0)
+	_target(Vector2(200.0, 0.0), 10.0)
+	_mgr.spawn(0, Vector2.ZERO, Vector2(28800.0, 0.0), 1.0, 2.0)
+	_mgr.step(DT)
+	_check(_hits.size() == 1, "a shot without pierce stops at the first target (%d)" % _hits.size())
+
+
+func _test_tag_comes_back_with_the_hit() -> void:
+	_setup()
+	_target(Vector2(20.0, 0.0))
+	_target(Vector2(20.0, 100.0))
+	_mgr.spawn(0, Vector2.ZERO, Vector2(600.0, 0.0), 1.0, 4.0, ManagerScript.LAYER_ENEMY, 0, 41)
+	_mgr.spawn(1, Vector2(0.0, 100.0), Vector2(600.0, 0.0), 1.0, 4.0, ManagerScript.LAYER_ENEMY, 0, 42)
+	_mgr.spawn(2, Vector2(0.0, 500.0), Vector2(600.0, 0.0), 1.0)
+	for i in 4:
+		_mgr.step(DT)
+	_check(_hits.size() == 2, "both tagged shots hit (%d)" % _hits.size())
+	var tags: Dictionary = {}
+	for hit in _hits:
+		tags[hit[0]] = hit[3]
+	_check(tags.get(0, -1) == 41 and tags.get(1, -1) == 42, "each hit carries the tag of its own projectile (%s)" % str(tags))
+	# The default tag is 0, and a reused slot does not keep an old tag.
+	_setup()
+	_target(Vector2(20.0, 0.0))
+	_mgr.spawn(0, Vector2.ZERO, Vector2(600.0, 0.0), 1.0, 4.0, ManagerScript.LAYER_ENEMY, 0, 99)
+	_mgr.step(DT * 4.0)
+	_mgr.spawn(0, Vector2.ZERO, Vector2(600.0, 0.0), 1.0)
+	_hits.clear()
+	_mgr.step(DT * 4.0)
+	_check(_hits.size() == 1 and _hits[0][3] == 0, "an untagged shot in a reused slot sends tag 0")
 
 
 func _test_cap_drop_order_after_other_deaths() -> void:
@@ -406,7 +454,7 @@ func _test_target_removed_by_a_hit_handler() -> void:
 	_setup()
 	_target(Vector2(30.0, 0.0))
 	_target(Vector2(30.0, 300.0))
-	_bus.projectile_hit.connect(func(_p: int, target: Node, _at: Vector2) -> void: _mgr.remove_target(target as Node2D))
+	_bus.projectile_hit.connect(func(_p: int, target: Node, _at: Vector2, _tag: int) -> void: _mgr.remove_target(target as Node2D))
 	_mgr.spawn(0, Vector2.ZERO, Vector2(1200.0, 0.0), 1.0)
 	_mgr.spawn(1, Vector2(0.0, 300.0), Vector2(1200.0, 0.0), 1.0)
 	_mgr.step(DT)
@@ -420,7 +468,7 @@ func _test_spawn_in_a_hit_handler_waits_a_step() -> void:
 	_setup()
 	_target(Vector2(30.0, 0.0))
 	var spawned: Array[int] = []
-	_bus.projectile_hit.connect(func(_p: int, _t: Node, at: Vector2) -> void: spawned.append(_mgr.spawn(0, at, Vector2(600.0, 0.0), 1.0)))
+	_bus.projectile_hit.connect(func(_p: int, _t: Node, at: Vector2, _tag: int) -> void: spawned.append(_mgr.spawn(0, at, Vector2(600.0, 0.0), 1.0)))
 	_mgr.spawn(0, Vector2.ZERO, Vector2(1200.0, 0.0), 1.0)
 	_mgr.step(DT)
 	_check(spawned.size() == 1 and _mgr.get_count() == 1, "a spawn from a handler is kept")

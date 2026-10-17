@@ -10,9 +10,12 @@ extends Node2D
 ## Targets are Node2Ds registered with a radius and a layer. A projectile hits
 ## the targets on the layers in its `hit_layers` mask: a fired spell hits
 ## LAYER_ENEMY, an enemy's shot hits LAYER_PLAYER. A hit sends
-## `Events.projectile_hit(player, target, position)`; the projectile then ends,
-## unless it has `pierce` left, and `combat` turns the event into damage. The
-## manager knows nothing about damage, spells or gameplay.
+## `Events.projectile_hit(player, target, position, tag)`; the projectile then
+## ends, unless it has `pierce` left, and `combat` turns the event into damage.
+## The `tag` is the opaque int given to `spawn()`: the manager stores it and
+## sends it back unread, so whoever spawned the shot (a spell) can look up its
+## damage and effects from it. The manager knows nothing about damage, spells
+## or gameplay.
 ##
 ## Hits are found with a spatial grid of the targets (cells of GRID_CELL
 ## pixels, each target in the cell of its centre). The path a projectile covered
@@ -22,8 +25,9 @@ extends Node2D
 ## any speed; the cost only grows with the length of the step. When a segment
 ## touches several targets, the one nearest the start of the path is hit first,
 ## and the event carries the point on the path closest to it. A piercing
-## projectile remembers its last HIT_MEMORY targets and does not hit them again
-## while it is still overlapping them.
+## projectile can hit up to HIT_MEMORY targets in one step (a fast shot passing
+## through a crowd), nearest first. It remembers the last HIT_MEMORY targets it
+## hit and does not hit them again until it has hit that many others.
 ##
 ## The global cap (`get_cap()`, set by platform: DEFAULT_CAP_WEB or
 ## DEFAULT_CAP_DESKTOP) degrades gracefully. When it is full, a new projectile
@@ -44,7 +48,8 @@ const MAX_PLAYERS: int = 4
 ## Default global caps on live projectiles: the PLAN budgets for each platform.
 const DEFAULT_CAP_WEB: int = 1000
 const DEFAULT_CAP_DESKTOP: int = 3000
-## How many recently hit targets a piercing projectile remembers.
+## How many recently hit targets a piercing projectile remembers; also the most
+## hits one projectile can register in a single step.
 const HIT_MEMORY: int = 3
 ## Floats per projectile in the MultiMesh buffer: 8 transform, 4 colour.
 const DRAW_STRIDE: int = 12
@@ -89,6 +94,8 @@ var _radius: PackedFloat32Array = PackedFloat32Array()
 var _player: PackedInt32Array = PackedInt32Array()
 var _layers: PackedInt32Array = PackedInt32Array()
 var _pierce: PackedInt32Array = PackedInt32Array()
+## The opaque value given to spawn(), sent with every hit.
+var _tag: PackedInt64Array = PackedInt64Array()
 ## Spawn order, so "oldest" is the lowest.
 var _seq: PackedInt64Array = PackedInt64Array()
 ## HIT_MEMORY target ids per slot, newest first (0 for none).
@@ -168,6 +175,7 @@ func set_cap(value: int) -> void:
 	_player.resize(_cap)
 	_layers.resize(_cap)
 	_pierce.resize(_cap)
+	_tag.resize(_cap)
 	_seq.resize(_cap)
 	_last_hit.resize(_cap * HIT_MEMORY)
 	_own_prev.resize(_cap)
@@ -258,8 +266,9 @@ func get_target_count() -> int:
 ## Start a projectile for `player` (0-3, or Events.NO_PLAYER for an enemy) at
 ## `origin`, moving `velocity` pixels per second for `lifetime` seconds.
 ## `pierce` is how many targets it passes through before it ends. Returns its
-## slot, or -1 for bad arguments. A full cap never refuses: see the class doc.
-func spawn(player: int, origin: Vector2, velocity: Vector2, lifetime: float, radius: float = 4.0, hit_layers: int = LAYER_ENEMY, pierce: int = 0) -> int:
+## slot, or -1 for bad arguments.
+## `tag` is stored and sent back with every hit of this projectile. A full cap never refuses: see the class doc.
+func spawn(player: int, origin: Vector2, velocity: Vector2, lifetime: float, radius: float = 4.0, hit_layers: int = LAYER_ENEMY, pierce: int = 0, tag: int = 0) -> int:
 	if player < EventsScript.NO_PLAYER or player >= MAX_PLAYERS:
 		return -1
 	if not (lifetime > 0.0) or not origin.is_finite() or not velocity.is_finite():
@@ -276,6 +285,7 @@ func spawn(player: int, origin: Vector2, velocity: Vector2, lifetime: float, rad
 	_player[slot] = player
 	_layers[slot] = hit_layers
 	_pierce[slot] = maxi(pierce, 0)
+	_tag[slot] = tag
 	_seq[slot] = _next_seq
 	_next_seq += 1
 	for i in HIT_MEMORY:
@@ -318,7 +328,12 @@ func step(delta: float) -> void:
 			_kill(slot)
 			continue
 		if _layers[slot] != 0 and not _targets.is_empty():
-			_hit_test(slot)
+			# A piercing shot may pass through several targets this step. A
+			# hit handler may end it or even reuse the slot, so check each time.
+			var seq: int = _seq[slot]
+			for _hit in HIT_MEMORY:
+				if not _hit_test(slot) or _alive[slot] == 0 or _seq[slot] != seq:
+					break
 	_stepping = false
 
 
@@ -458,9 +473,10 @@ func _cell_of(point: Vector2) -> int:
 	return cy * _grid_w + cx
 
 
-## Hit the first target along this step's path (nearest its start). The cells
-## searched are those the path touches, widened by both radii.
-func _hit_test(slot: int) -> void:
+## Hit the first target along this step's path (nearest its start) and say
+## whether there was one. The cells searched are those the path touches,
+## widened by both radii.
+func _hit_test(slot: int) -> bool:
 	var from: Vector2 = _prev[slot]
 	var to: Vector2 = _pos[slot]
 	var pad: Vector2 = Vector2.ONE * (_radius[slot] + _max_target_radius)
@@ -490,8 +506,10 @@ func _hit_test(slot: int) -> void:
 						best_along = along
 						best_point = closest
 				t = _target_next[t]
-	if best >= 0:
-		_register_hit(slot, best, best_point)
+	if best < 0:
+		return false
+	_register_hit(slot, best, best_point)
+	return true
 
 
 func _remembers(slot: int, id: int) -> bool:
@@ -504,6 +522,7 @@ func _remembers(slot: int, id: int) -> bool:
 func _register_hit(slot: int, target: int, at: Vector2) -> void:
 	var node: Variant = _targets[target]
 	var player: int = _player[slot]
+	var tag: int = _tag[slot]
 	if _pierce[slot] > 0:
 		_pierce[slot] -= 1
 		var memory: int = slot * HIT_MEMORY
@@ -513,4 +532,4 @@ func _register_hit(slot: int, target: int, at: Vector2) -> void:
 	else:
 		_kill(slot)
 	if events != null and is_instance_valid(node):
-		events.projectile_hit.emit(player, node, at)
+		events.projectile_hit.emit(player, node, at, tag)

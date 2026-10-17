@@ -7,7 +7,16 @@ Ideas and future work outside the current milestone (docs/PLAN.md, "Planning sys
 - **Opening web links from the game.** The plan's feedback button ("What was fun?" opens a pre-filled GitHub Discussion) and the main menu's Contribute button need `OS.shell_open`, which is a banned API. One option: allow it in a single `core/` file that only opens a fixed list of `github.com/peterdk31/spellmerge` and itch.io URLs, checked by the rules script. Needed in M1 at the earliest.
 - **Bot app Client ID.** `actions/create-github-app-token` now prefers `client-id` over the deprecated `app-id`. The Client ID is on the app's settings page; adding it to `ci/config.json` would make the `BOT_APP_ID` secret unnecessary.
 
-- **Run the unit tests in CI.** `ci/build/build.sh` only runs `tests/smoke/boot_smoke.gd`. The tests in `tests/core/` (run by hand with `godot --headless --path . --script res://tests/core/<name>.gd`) need a step in `ci/build/build.sh` that runs every `tests/**/test_*.gd` and fails on a non-zero exit. `ci/` is owner-only.
+- **Run the unit tests in CI.** `ci/build/build.sh` only runs `tests/smoke/boot_smoke.gd`. The tests in `tests/core/` (run by hand with `godot --headless --path . --script res://tests/core/<name>.gd`) need a step in `ci/build/build.sh` that runs every `tests/**/test_*.gd` and fails on a non-zero exit. `ci/` is owner-only. The exact change, in `import_and_smoke()` of `ci/build/build.sh` after the boot smoke test (each test is its own `SceneTree` script that calls `quit()`, so it can't be run from inside a smoke script and needs its own Godot process):
+
+  ```sh
+  for test in tests/core/test_*.gd; do
+    step "Unit test $test"
+    godot_checked "unit-$(basename "$test" .gd)" "$GODOT" --headless --path . --script "res://$test"
+  done
+  ```
+
+  Until then none of the `tests/core` tests have ever run in CI, including `test_pools.gd` and `test_projectiles.gd`.
 
 ## Later milestones
 

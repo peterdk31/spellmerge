@@ -19,6 +19,7 @@ func _initialize() -> void:
 	_test_hooks()
 	_test_zero_and_negative_size()
 	_test_clear_frees_the_objects()
+	_test_acquire_skips_objects_freed_from_outside()
 	if _failures.is_empty():
 		print("TEST OK: core/pools")
 		quit(0)
@@ -120,6 +121,26 @@ func _test_zero_and_negative_size() -> void:
 	_check(empty.acquire() == null and empty.capacity == 0, "size 0 is an empty pool")
 	var negative: RefCounted = _pool(-3)
 	_check(negative.acquire() == null and negative.capacity == 0, "a negative size is an empty pool")
+
+
+func _test_acquire_skips_objects_freed_from_outside() -> void:
+	var pool: RefCounted = _pool(3)
+	var first: Object = pool.acquire()
+	var second: Object = pool.acquire()
+	var third: Object = pool.acquire()
+	pool.release(first)
+	pool.release(second)
+	pool.release(third)
+	# The last released comes up first; free it behind the pool's back.
+	third.free()
+	var got: Object = pool.acquire()
+	_check(got != null and is_instance_valid(got), "acquire never returns a freed object")
+	_check(got == second, "it skips to the next free one")
+	_check(pool.capacity == 2, "and the pool forgets the dead object (%d)" % pool.capacity)
+	first.free()
+	_check(pool.acquire() == null, "when every free object was freed, acquire returns null")
+	_check(pool.capacity == 1 and pool.available() == 0, "and only the one handed out is still counted")
+	got.free()
 
 
 func _test_clear_frees_the_objects() -> void:

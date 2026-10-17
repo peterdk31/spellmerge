@@ -18,6 +18,8 @@ extends RefCounted
 ## Optional hooks: `on_acquire(item)` runs as an object leaves the pool and
 ## `on_release(item)` as it comes back (reset state, hide a node). Releasing an
 ## object twice, or one the pool did not make, does nothing and returns false.
+## An object freed from outside while in the pool is dropped when it comes up,
+## and `capacity` shrinks by one.
 
 ## Total objects the pool owns.
 var capacity: int = 0
@@ -49,9 +51,17 @@ func _init(factory: Callable, size: int, on_acquire: Callable = Callable(), on_r
 
 ## Take an object out, or null if every one is in use.
 func acquire() -> Object:
-	if _free.is_empty():
+	var item: Object = null
+	while not _free.is_empty():
+		var candidate: Object = _free.pop_back()
+		if is_instance_valid(candidate):
+			item = candidate
+			break
+		# Freed from outside (say its parent room was freed): forget it.
+		_is_free.erase(candidate)
+		capacity -= 1
+	if item == null:
 		return null
-	var item: Object = _free.pop_back()
 	_is_free[item] = false
 	if _on_acquire.is_valid():
 		_on_acquire.call(item)

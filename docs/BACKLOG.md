@@ -21,6 +21,8 @@ Sounds the game asks for by id and does not have yet. A missing sound is silent 
 
 ## Later milestones
 
+- **Web size and load time (from M1 part 22).** Needs the daily build, which has the Web template: log the compressed size of `build/web/` and a headless Chrome load time against the PLAN budgets (40 MB, 10 s). Also time the projectile manager in WASM: natively the hit test costs 3.6 ms at the web cap of 1,000 in a dense room, and WASM is often 2–4× slower. If the web demo is over budget, make the hit test cheaper first, then lower `DEFAULT_CAP_WEB`.
+- **Hit test cost at the desktop cap (from M1 part 22).** 10.6 ms a step at 3,000 piercing shots in one room with 104 targets (63% of a frame, natively). Before M2 relies on the 3,000 cap, add a per-layer grid (enemy and player targets separate) so player shots never walk the wizards' cells and enemy shots never walk enemy cells.
 - **A downed mid-run joiner.** A joiner has 2 s of protection but, like everyone, cannot come back once downed until the revive rule below exists.
 - **Revive by standing next to a downed wizard.** `Player.revive(reviver)` exists and `DECISIONS.md` gave the "how" to `coop`, but the co-op task (M1 part 17) listed only join/leave, friendly fire and the camera. Nothing calls `revive` yet; decide the rule (hold time, range, a short invulnerability window after a revive) when playtests show the need.
 

@@ -2,6 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-17: Keep the projectile caps and the draw code as they are (M1 part 22)
+
+**Decided by:** Claude.
+**Context:** The task required timing `spawn`, `update_draw` and `_hit_test` at the cap before relying on 1,000 (web) and 3,000 (desktop). The numbers are in `docs/LOG.md`.
+**Decision:** no change to the caps or to `update_draw`. Spawning at the cap (2 µs) and the draw copy (0.6 and 1.9 ms) are cheap, and `multimesh.buffer` is one bulk write, so uploading only the first `drawn` instances would save nothing measurable. The hit test is the cost (3.6 ms at 1,000, 10.6 ms at 3,000, dense worst case), but those are native numbers, so there is no basis yet to lower the web cap; WASM timing and a cheaper hit test are in `docs/BACKLOG.md`. The probe prints and gates nothing, as the task said.
+**Consequence:** the caps stay; the web cap is unverified on WASM.
+
 ## 2026-10-17: The 4-bot test runs in a separate `Linux Test` export (M1 part 21)
 
 **Decided by:** Claude.

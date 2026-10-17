@@ -9,6 +9,10 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 **Decision:** a fourth preset, `Linux Test`, in `export_presets.cfg` (Claude-maintained) with no exclusion and its own path `build/linux-test/`; the release presets are unchanged. It is a copy of `Linux` (including `custom_features="full"`, so the test runs the same feature set as the shipped desktop build) and must stay one: `tests/smoke/test_export_presets.gd` fails if the two differ in anything but name, `runnable`, `exclude_filter` and `export_path`. The step that exports it and runs the test is in `ci/build/build.sh` (owner-only), so it is asked as an `owner-change` owner question with the exact lines. The step greps the run's log for `SMOKE OK`, so a release template that ignores `--script` fails the step instead of passing without running the test.
 **Consequence:** until the owner adds the step, the test runs only through `build.sh --quick --tests`. If the exported binary refuses `--script`, the fallback is an autoload reading a user argument (`-- --four-bot`), a game-side change.
 
+## 2026-10-17: The export starts the 4-bot test from the main menu (#80)
+
+The `Linux Test` binary hangs on `--script` while the autoloads start, so it can't run a `SceneTree` script. The checks are now a node (`tests/smoke/four_bot_runner.gd`); the main menu adds it when the user argument `--four-bot` is given and `ResourceLoader.exists` finds the file. Why the menu and not an export-only autoload: autoloads live in `project.godot`, shared by every export, and a missing autoload script would break the normal builds. The menu holds a literal-path `load` behind that check, and `tests/*` is excluded from every shipped export, so there the argument only logs a warning. Cost: a small hook in `hud/` that mentions `tests/`.
+
 ## 2026-10-17: The owner inbox
 
 **Decided by:** owner.

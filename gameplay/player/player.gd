@@ -34,6 +34,10 @@ const LAYER_PLAYERS: int = 2
 ## The player index 0-3.
 @export var index: int = 0
 
+## One idle texture per player index (the player colour). The scene lists the four
+## textures; _ready() shows the one for `index` on the `Sprite` node.
+@export var textures: Array[Texture2D] = []
+
 ## The input manager. Only tests set this, before adding the node; otherwise the
 ## "PlayerInput" autoload is used.
 var input: InputManagerScript = null
@@ -55,6 +59,9 @@ func _init() -> void:
 
 
 func _ready() -> void:
+	var sprite := get_node_or_null("Sprite") as Sprite2D
+	if sprite != null and index >= 0 and index < textures.size():
+		sprite.texture = textures[index]
 	if input == null:
 		input = get_node_or_null("/root/PlayerInput") as InputManagerScript
 		if input == null and is_inside_tree():

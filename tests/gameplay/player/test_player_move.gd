@@ -106,7 +106,21 @@ func _test_wizard_scene() -> void:
 	_check(wizard.get_node_or_null("CollisionShape2D") != null, "the wizard scene has a collision shape")
 	_check(wizard.get_node_or_null("Sprite") is Sprite2D, "the wizard scene has a Sprite node")
 	_check(wizard.collision_mask == PlayerScript.LAYER_WALLS, "players collide only with walls")
+	_check(wizard.get_node("Sprite").texture_filter == CanvasItem.TEXTURE_FILTER_NEAREST, "the sprite is drawn with filtering off")
 	wizard.free()
+	# Each index shows its own colour: four different textures, each 32x32.
+	var shown: Array[Texture2D] = []
+	for index in 4:
+		var instance := WizardScene.instantiate() as PlayerScript
+		instance.index = index
+		instance._ready()  # not added to a tree: no input manager is needed to look at the sprite
+		var texture: Texture2D = (instance.get_node("Sprite") as Sprite2D).texture
+		_check(texture != null, "wizard %d shows a sprite" % index)
+		if texture != null:
+			_check(texture.get_size() == Vector2(32, 32), "wizard %d sprite is 32x32" % index)
+			_check(not shown.has(texture), "wizard %d has its own colour" % index)
+			shown.append(texture)
+		instance.free()
 
 
 func _test_stands_still() -> void:

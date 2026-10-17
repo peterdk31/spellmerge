@@ -30,7 +30,7 @@ Regular enemies and their attack patterns. Enemies create the "readable chaos" o
 
 ## Example to copy
 
-Arrives with Claude's first content (the M1 ember imp, then M3). Do not guess its layout before then.
+The enemy's scene and `.tres` arrive with the M1 ember imp (part 12). Until then, its sprite `content/enemies/ember_imp/idle.svg` (with `idle.svg.import` and its entry in `art/manifest.json`) is the example for enemy art. Do not guess the rest of the layout.
 
 ## Validate
 

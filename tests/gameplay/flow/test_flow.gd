@@ -23,6 +23,8 @@ var _cleared: Array[StringName] = []
 
 
 func _initialize() -> void:
+	# The root joins the scene tree only after _initialize returns: wait one frame.
+	await process_frame
 	_events = root.get_node_or_null("Events")
 	_flow = root.get_node_or_null("Flow") as FlowScript
 	_input = root.get_node_or_null("PlayerInput") as InputManagerScript

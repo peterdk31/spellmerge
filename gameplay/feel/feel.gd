@@ -177,7 +177,9 @@ func _on_player_downed(_player: int) -> void:
 ## `strong` is a death or a downed wizard: it ignores the rest after a hit-stop and
 ## gets the bigger burst.
 func _juice(position: Vector2, stop: float, strong: bool, shake: float, sound: StringName) -> void:
-	if stop > stop_left and (strong or rest_left <= 0.0):
+	# A plain hit only starts a stop when none runs and the rest is over (or a stream
+	# of hits would extend it for ever); a strong one may lengthen a shorter stop.
+	if stop > stop_left and (strong or (stop_left <= 0.0 and rest_left <= 0.0)):
 		stop_left = stop
 		_set_time_scale(preset.hit_stop_scale)
 	if shake_enabled:

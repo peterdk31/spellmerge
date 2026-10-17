@@ -24,6 +24,8 @@ var _players: Array[PlayerScript] = []
 
 
 func _initialize() -> void:
+	# The root joins the scene tree only after _initialize returns: wait one frame.
+	await process_frame
 	_test_imp_resource_and_scene()
 	_test_chase_walks_toward_player()
 	_test_chase_stops_without_players()

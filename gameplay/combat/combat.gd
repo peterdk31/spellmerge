@@ -69,13 +69,15 @@ var _contact_left: PackedFloat32Array = PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
 
 
 func _ready() -> void:
-	if events == null:
+	# Absolute paths only work inside the tree (tests build combat outside it).
+	var in_tree: bool = is_inside_tree()
+	if events == null and in_tree:
 		events = get_node_or_null("/root/Events") as EventsScript
-		if events == null and is_inside_tree():
+		if events == null:
 			push_warning("Combat: the Events autoload is missing, so combat hears and sends nothing.")
-	if projectiles == null:
+	if projectiles == null and in_tree:
 		projectiles = get_node_or_null("/root/Projectiles") as ProjectileManagerScript
-	if registry == null:
+	if registry == null and in_tree:
 		registry = get_node_or_null("/root/Registry") as RegistryScript
 	if events != null and not events.projectile_hit.is_connected(_on_projectile_hit):
 		events.projectile_hit.connect(_on_projectile_hit)

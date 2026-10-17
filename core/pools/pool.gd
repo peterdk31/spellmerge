@@ -53,9 +53,10 @@ func _init(factory: Callable, size: int, on_acquire: Callable = Callable(), on_r
 func acquire() -> Object:
 	var item: Object = null
 	while not _free.is_empty():
-		var candidate: Object = _free.pop_back()
+		# A Variant: assigning a freed object to an Object variable is an error.
+		var candidate: Variant = _free.pop_back()
 		if is_instance_valid(candidate):
-			item = candidate
+			item = candidate as Object
 			break
 		# Freed from outside (say its parent room was freed): forget it.
 		_is_free.erase(candidate)

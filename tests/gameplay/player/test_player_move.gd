@@ -21,6 +21,8 @@ var _players: Array[PlayerScript] = []
 
 
 func _initialize() -> void:
+	# The root joins the scene tree only after _initialize returns: wait one frame.
+	await process_frame
 	_test_wizard_scene()
 	_test_stands_still()
 	_test_walks_at_move_speed()

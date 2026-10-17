@@ -12,7 +12,9 @@ const EventsScript := preload("res://core/events/events.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
 const PlayerPanelScript := preload("res://hud/panels/player_panel/player_panel.gd")
 const PanelScene := preload("res://hud/panels/player_panel/player_panel.tscn")
-const HudScene := preload("res://hud/panels/panels.tscn")
+## Loaded when needed, not preloaded: this scene is also the "Hud" autoload, and
+## preloading it here makes the autoload's own load fail at start (cyclic resource).
+const HUD_SCENE_PATH: String = "res://hud/panels/panels.tscn"
 const HudScript := preload("res://hud/panels/panels.gd")
 const SpellmergeTheme := preload("res://hud/theme/spellmerge_theme.tres")
 
@@ -20,6 +22,8 @@ var _failures: Array[String] = []
 
 
 func _initialize() -> void:
+	# The root joins the scene tree only after _initialize returns: wait one frame.
+	await process_frame
 	_test_theme_has_the_variations()
 	_test_project_uses_the_theme()
 	_test_panel_per_player()
@@ -50,7 +54,7 @@ func _check(condition: bool, message: String) -> void:
 func _make_hud() -> Array:
 	var bus: EventsScript = EventsScript.new()
 	var focus: UIFocusScript = UIFocusScript.new()
-	var hud: HudScript = HudScene.instantiate() as HudScript
+	var hud: HudScript = (load(HUD_SCENE_PATH) as PackedScene).instantiate() as HudScript
 	hud.events = bus
 	hud.ui_focus = focus
 	root.add_child(hud)

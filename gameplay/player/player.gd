@@ -115,17 +115,19 @@ func apply_texture() -> void:
 func _ready() -> void:
 	add_to_group(&"players")
 	apply_texture()
-	if input == null:
+	# Absolute paths only work inside the tree (tests build wizards outside it).
+	var in_tree: bool = is_inside_tree()
+	if input == null and in_tree:
 		input = get_node_or_null("/root/PlayerInput") as InputManagerScript
-		if input == null and is_inside_tree():
+		if input == null:
 			push_warning("Wizard %d: the PlayerInput autoload is missing, so this wizard cannot move." % index)
-	if events == null:
+	if events == null and in_tree:
 		events = get_node_or_null("/root/Events") as EventsScript
-		if events == null and is_inside_tree():
+		if events == null:
 			push_warning("Wizard %d: the Events autoload is missing, so this wizard sends no events." % index)
 	if events != null and not events.damage_dealt.is_connected(_on_damage_dealt):
 		events.damage_dealt.connect(_on_damage_dealt)
-	if registry == null:
+	if registry == null and in_tree:
 		registry = get_node_or_null("/root/Registry") as RegistryScript
 	if is_inside_tree() and _sound_player == null:
 		_sound_player = AudioStreamPlayer.new()

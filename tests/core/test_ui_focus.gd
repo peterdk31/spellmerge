@@ -20,6 +20,8 @@ var _buttons: Array[Array] = []
 
 
 func _initialize() -> void:
+	# The root joins the scene tree only after _initialize returns: wait one frame.
+	await process_frame
 	_test_autoload_registered()
 	_test_open_focuses_first()
 	_test_open_rejects_bad_input()

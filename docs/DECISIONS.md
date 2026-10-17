@@ -445,3 +445,7 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - **Flow:** a failed restart is a `push_warning`, not a `push_error`: the run ends cleanly, a test provokes it, and the build fails on `ERROR:` lines. The 4-bot smoke test (M1 part 20) must therefore also fail on the warning text "the restart failed".
 - **Mid-run joiners** take the free spawn farthest from enemies and wizards (part 17), so the coop test checks "a player spawn", not the one numbered like the slot.
 - **`player.gd` and `combat.gd`** read absolute autoload paths only inside the tree (tests build them outside it).
+
+## 2026-10-17: HUD sizes stay as they are
+
+The HUD screenshot cannot be taken in a session (no display, `docs/BACKLOG.md`). On paper the four 112×55 corner panels at 640×360 cover only the wall border and about 23 px of floor in each corner; no spawn, door or pillar lies under them. So no size changed and no pixel font was added (a font file would also need a licence entry). Reconsider when a display run exists and the text can be seen.

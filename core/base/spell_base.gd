@@ -48,12 +48,30 @@ func reset_cooldowns() -> void:
 func cast(player: int, origin: Vector2, direction: Vector2, mana: float) -> float:
 	if _cooldown_left[player] > 0.0 or mana < mana_cost:
 		return REFUSED
+	if not _fire(player, origin, direction):
+		return REFUSED
 	_cooldown_left[player] = cooldown
-	_fire(player, origin, direction)
 	return mana_cost
 
 
-## What the spell does when it fires. The fire bolt (M1 part 13) overrides this to
-## spawn projectiles through `core/projectiles`.
-func _fire(_player: int, _origin: Vector2, _direction: Vector2) -> void:
-	pass
+## The tag of this spell's shots (0 = none). `gameplay/combat` reads it, with
+## hit_damage() and hit_knockback(), after a `spell_cast` event to learn what a hit does.
+func hit_tag() -> int:
+	return 0
+
+
+## Damage of one hit of this spell's shots.
+func hit_damage() -> int:
+	return damage
+
+
+## Knockback strength of one hit, in pixels per second.
+func hit_knockback() -> float:
+	return 0.0
+
+
+## What the spell does when it fires. Returns false when nothing was fired (a missing
+## service), so cast() charges no mana and starts no cooldown. The fire bolt overrides
+## this to spawn projectiles through `core/projectiles`.
+func _fire(_player: int, _origin: Vector2, _direction: Vector2) -> bool:
+	return true

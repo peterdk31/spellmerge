@@ -10,13 +10,13 @@ Ideas and future work outside the current milestone (docs/PLAN.md, "Planning sys
 - **Run the unit tests in CI.** `ci/build/build.sh` only runs `tests/smoke/boot_smoke.gd`. The tests in `tests/core/` (run by hand with `godot --headless --path . --script res://tests/core/<name>.gd`) need a step in `ci/build/build.sh` that runs every `tests/**/test_*.gd` and fails on a non-zero exit. `ci/` is owner-only. The exact change, in `import_and_smoke()` of `ci/build/build.sh` after the boot smoke test (each test is its own `SceneTree` script that calls `quit()`, so it can't be run from inside a smoke script and needs its own Godot process):
 
   ```sh
-  for test in tests/core/test_*.gd; do
+  for test in tests/**/test_*.gd; do   # all of tests/ (core, content, gameplay), e.g. with `shopt -s globstar`
     step "Unit test $test"
     godot_checked "unit-$(basename "$test" .gd)" "$GODOT" --headless --path . --script "res://$test"
   done
   ```
 
-  Until then none of the `tests/core` tests have ever run in CI, including `test_pools.gd` and `test_projectiles.gd`.
+  Until then none of the tests (`tests/core`, `tests/gameplay`, `tests/content`, including `test_bolt.gd`) have ever run in CI, including `test_pools.gd` and `test_projectiles.gd`.
 
 ## Audio needs
 
@@ -34,6 +34,8 @@ Sounds the game asks for by id and does not have yet. A missing sound is silent 
 - Cross-player spell linking (one player's frost plus another's storm), asynchronous, with no waiting (docs/PLAN.md, "Co-op rules").
 - Windows code signing, before Steam (M7).
 - GUT test framework as an owner-added addon, when game code needs unit tests (M1).
+
+- **Invalid UIDs with a 9.** Godot's UID alphabet is a-y and 0-8. Fix the digit 9 in: `tests/gameplay/combat/test_combat.gd.uid`, `tests/gameplay/player/fixtures/counting_spell.gd.uid`, `tests/gameplay/player/test_player_move.gd.uid`, `tests/core/test_spell_base.gd.uid`, `tests/core/test_registry.gd.uid`.
 
 ## Ideas from the community
 

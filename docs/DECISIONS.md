@@ -2,6 +2,18 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-17: The fire bolt (M1 part 13)
+
+**Decided by:** Claude (details the task left open).
+
+- **`bolt.tres` uses `bolt.gd`, a script that extends `SpellBase`,** so everyone who loads it gets a `SpellBase`, but the firing code is content, not `core/base`. It reaches only `Projectiles` (a `core/` autoload; tests set `projectiles`), looked up once and kept. **Content never calls `gameplay/`** (the spells and combat READMEs agree): the bolt answers `hit_tag()`, `hit_damage()` and `hit_knockback()` (new `SpellBase` methods), and `Combat` reads them through `core/registry` the first time it hears `spell_cast` for that spell id and sets the hit profile itself. A spell that is cast without `spell_cast` (nothing sends it today but the player) has no profile, so its hits do nothing; the test covers this. `_fire()` now returns `bool`; `false` (no projectile manager, or `spawn` returned -1) makes `cast()` return `REFUSED` with no mana taken and no cooldown started.
+- **No separate `core/pools` pool for shots.** The projectile manager's packed arrays are already a fixed-size pool (a free-slot list, no allocation per spawn), so wrapping it in `Pool` would add a layer for nothing. `Pool` stays for node-based things (hit sparks, part 16).
+- **The tag is `BOLT_TAG = 1`** (the imp's attack tags start at 1000). The hit profile is set by `Combat` on the first `spell_cast` of the bolt, with knockback 120 px/s. The values (5 mana, 0.35 s cooldown, 5 damage, 220 px/s, 1.2 s) are first guesses for C1 tuning: four bolts kill a 20-health imp.
+- **The "no field reads" test is a text scan** of every `.gd` outside `content/spells/`, `core/base/` and `test_*.gd` files (tests build fixtures by setting fields): a variable named like a spell followed by a field name, or `.mana_cost`, `.cooldown`, `.lifetime`, `.display_name`. It is a heuristic; a self-check in the test makes sure the scanner still catches what it should.
+- The bolt has no texture yet: the projectile manager draws tinted quads. Setting `Projectiles.texture` to `art/vfx/fire_bolt.svg` belongs to feel (part 16), where `docs/NEXT.md` lists it.
+- **Cooldowns are on the shared resource.** `Registry` hands out one `bolt.tres`, so all holders share its cooldowns (kept per player index, so four players do not clash). `flow` (part 15) calls `reset_cooldowns()` on a new run. A restarted `Combat` simply learns the profile again on the next `spell_cast`. A test shows two holders of the shared resource block each other until `reset_cooldowns()`.
+- `Registry` finds the bolt as `spells` / `bolt` (a folder is a direct child of `content/`; the `.tres` may be at any depth below); the test checks it.
+
 ## 2026-10-17: The enemy and its AI (M1 part 12)
 
 **Decided by:** Claude (details the task left open).
@@ -16,7 +28,7 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 
 **Decided by:** Claude (details the task left open).
 
-- **Combat owns the tag table.** The earlier note said the spawner keeps the table from `tag` to damage and `combat` looks it up there. Content may use `gameplay/` (the dependency direction is `core` <- `gameplay` <- `content`) but `gameplay/` may not reach into content, so the bolt calls `Combat.set_hit_profile(tag, damage, knockback)` and combat keeps the table. Tag 0 stays "no tag".
+- **Combat owns the tag table.** The earlier note said the spawner keeps the table from `tag` to damage and `combat` looks it up there. Combat keeps the table (changed in part 13: the bolt does not call `Combat`; Combat fills the table from the spell's `hit_tag()` etc. after `spell_cast`, see "The fire bolt"). Tag 0 stays "no tag".
 - **Enemy health lives in combat,** in packed rows, not on the enemy node: `register_enemy(node, health, hurt_radius, contact_damage)`; the AI (part 12) and the enemy scene hold no health. Death sends `enemy_died` and frees the node.
 - **Wizards decide their own damage.** Combat sends `damage_dealt` and the wizard takes it. It skips the event (no hit-stop or shake for nothing) when the wizard answers `is_invulnerable()` or `is_downed()`, found by `has_method` on registered wizard nodes. Wizards are not knocked back in M1; the player owns its movement.
 - **Contact damage** is a distance check per enemy row and registered wizard (4 at most), once per `CONTACT_COOLDOWN` (1 s) per wizard, since wizards have no invulnerability after a hit. First guesses, for the C1 tuning.

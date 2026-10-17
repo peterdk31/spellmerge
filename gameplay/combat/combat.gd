@@ -31,6 +31,7 @@ extends Node
 
 const EventsScript := preload("res://core/events/events.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
+const RegistryScript := preload("res://core/registry/registry.gd")
 
 const PLAYER_SLOTS: int = 4
 ## Seconds a wizard is safe from contact damage after one contact hit.
@@ -38,14 +39,17 @@ const CONTACT_COOLDOWN: float = 1.0
 ## How fast knockback speed falls, in pixels per second per second.
 const KNOCKBACK_DECAY: float = 1200.0
 
-## The event bus and the projectile manager. Only tests set these, before
-## adding the node; otherwise the "Events" and "Projectiles" autoloads are used.
+## The event bus, the projectile manager and the registry. Only tests set these, before
+## adding the node; otherwise the "Events", "Projectiles" and "Registry" autoloads are used.
 var events: EventsScript = null
 var projectiles: ProjectileManagerScript = null
+var registry: RegistryScript = null
 
 # Hit profiles: tag -> damage and knockback strength.
 var _profile_damage: Dictionary = {}
 var _profile_knockback: Dictionary = {}
+# Spell ids whose hit profile was already read after a `spell_cast`.
+var _profiled_spells: Dictionary = {}
 
 # Enemies, one row each.
 var _enemies: Array[Node2D] = []
@@ -71,9 +75,13 @@ func _ready() -> void:
 			push_warning("Combat: the Events autoload is missing, so combat hears and sends nothing.")
 	if projectiles == null:
 		projectiles = get_node_or_null("/root/Projectiles") as ProjectileManagerScript
+	if registry == null:
+		registry = get_node_or_null("/root/Registry") as RegistryScript
 	if events != null and not events.projectile_hit.is_connected(_on_projectile_hit):
 		events.projectile_hit.connect(_on_projectile_hit)
 	if events != null:
+		if not events.spell_cast.is_connected(_on_spell_cast):
+			events.spell_cast.connect(_on_spell_cast)
 		if not events.player_downed.is_connected(_on_player_downed):
 			events.player_downed.connect(_on_player_downed)
 		if not events.player_revived.is_connected(_on_player_revived):
@@ -299,6 +307,20 @@ func _on_player_revived(player: int, _reviver: int) -> void:
 		var wizard: Node2D = _players[player]
 		if wizard != null and is_instance_valid(wizard):
 			projectiles.add_target(wizard, _player_radius[player], ProjectileManagerScript.LAYER_PLAYER)
+
+
+## The first time a spell is cast, ask it (through the registry) what its shots do and
+## keep that as a hit profile. Content never calls Combat; the spell only answers.
+func _on_spell_cast(_player: int, spell_id: StringName, _origin: Vector2, _direction: Vector2) -> void:
+	if registry == null or _profiled_spells.has(spell_id):
+		return
+	var spell: SpellBase = registry.get_resource(&"spells", spell_id) as SpellBase
+	if spell == null:
+		return
+	_profiled_spells[spell_id] = true
+	var tag: int = spell.hit_tag()
+	if tag != 0:
+		set_hit_profile(tag, spell.hit_damage(), spell.hit_knockback())
 
 
 func _on_projectile_hit(player: int, target: Node, position: Vector2, tag: int) -> void:

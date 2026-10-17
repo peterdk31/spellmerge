@@ -417,6 +417,16 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - Opening an overlay ends a dash in progress (cooldown stays), so a captured player is fully frozen.
 - Physics layers: 1 walls, 2 players, 3 enemies, 4 projectiles and hit boxes (in the player README); `core/` is asked to name them in `project.godot`.
 
+## 2026-10-17: The overlay (M1 part 19)
+
+- The `overlay` action is read in `hud/panels/panels.gd` from `PlayerInput.get_press_count`, not by each overlay, so one place owns the toggle and a tap released within a frame is not lost. Everything after opening goes through `UIFocus`; the overlay ignores every signal that names another player.
+- An overlay opens only for a joined player and only if that player's `UIFocus` panel is free, so it never replaces another panel. Closing comes from Resume, `dodge`, the `overlay` action, or the device leaving (`UIFocus` closes it).
+- The stub button sends `build_change_requested(player, 0, &"stub")` and nothing else; the `player` area has no listener yet and will refuse unknown ids. The overlay never pauses and never changes `Engine.time_scale`.
+- The overlay is made visible before `UIFocus.open`, because `UIFocus` only focuses controls that are shown; it is hidden again if opening fails.
+- An overlay opens only while a room is active (`room_entered` seen, no `run_started`/`run_ended` since), so a press on the menu does nothing and the player's input is not captured there. It closes on `run_started`, `run_ended` and when its owner goes down. A downed player cannot open it (they would be frozen and the team would lose sight of who needs a revive); the panel word keeps DOWN above MENU.
+- The overlay offset is not a fixed number: `panels.gd` derives it from the panel's minimum height plus a 4 px edge margin and a 2 px gap (under the panel in the top corners, over it in the bottom ones), and again when that height changes. `test_overlay` checks the rectangles at 640×360.
+- Focus is shown with a "> " text mark because Godot's own focus is unused (`UIFocus` decision), and state is never colour alone.
+
 
 ## 2026-10-17: Unfinished sessions keep their work
 

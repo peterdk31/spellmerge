@@ -41,6 +41,10 @@ func _initialize() -> void:
 	_test_contact_hurts_only_the_one_touched()
 	_test_four_players_kill_credit()
 	_test_freed_enemy_is_dropped()
+	_test_freed_enemy_target_is_pruned()
+	_test_death_frees_enemy_in_tree()
+	_test_reregister_resets_numbers_and_target()
+	_test_listener_may_change_registrations()
 	_teardown()
 	if _failures.is_empty():
 		print("TEST OK: gameplay/combat (damage, knockback, death)")
@@ -162,22 +166,28 @@ func _test_knockback_pushes_away_and_fades() -> void:
 	var enemy := _enemy(100, Vector2(10.0, 0.0))
 	_combat.hit(0, enemy, 1, Vector2.RIGHT, 160.0)
 	_check(_combat.get_knockback(enemy) == Vector2(160.0, 0.0), "knockback velocity is direction times strength")
-	_run(1)
-	_check(enemy.position.x > 10.0 and is_equal_approx(enemy.position.y, 0.0), "the enemy moved along the hit direction")
-	_run(8)
-	_check(_combat.get_knockback(enemy) == Vector2.ZERO, "knockback fades to zero")
-	var stopped_at: float = enemy.position.x
 	_run(4)
-	_check(is_equal_approx(enemy.position.x, stopped_at), "the enemy stands still once knockback ends")
-	_check(stopped_at < 10.0 + 160.0, "knockback travels a short distance only")
+	_check(enemy.position == Vector2(10.0, 0.0), "Combat never moves the enemy itself")
+	_check(_combat.get_knockback(enemy) == Vector2(160.0, 0.0), "step() does not fade knockback")
+	var first: Vector2 = _combat.consume_knockback_step(enemy, STEP)
+	_check(first == Vector2(160.0, 0.0), "the mover gets the full velocity on the first step")
+	_check(_combat.get_knockback(enemy).x < 160.0, "the stored knockback fades after a step")
+	var travelled: float = first.x * STEP
+	for i in 8:
+		travelled += _combat.consume_knockback_step(enemy, STEP).x * STEP
+	_check(_combat.get_knockback(enemy) == Vector2.ZERO, "knockback fades to zero")
+	_check(_combat.consume_knockback_step(enemy, STEP) == Vector2.ZERO, "nothing left to consume")
+	_check(travelled > 0.0 and travelled < 160.0, "knockback travels a short distance only")
+	var stranger := Node2D.new()
+	_enemies.append(stranger)
+	_check(_combat.consume_knockback_step(stranger, STEP) == Vector2.ZERO, "an unregistered node has no knockback")
 
 
 func _test_knockback_zero_strength_does_not_move() -> void:
 	_setup()
 	var enemy := _enemy(10, Vector2(3.0, 3.0))
 	_combat.hit(0, enemy, 1, Vector2.RIGHT, 0.0)
-	_run(2)
-	_check(enemy.position == Vector2(3.0, 3.0), "strength 0 pushes nothing")
+	_check(_combat.consume_knockback_step(enemy, STEP) == Vector2.ZERO, "strength 0 pushes nothing")
 
 
 func _test_projectile_hit_uses_profile() -> void:
@@ -275,3 +285,49 @@ func _test_freed_enemy_is_dropped() -> void:
 	_run(1)
 	_check(_combat.get_enemy_count() == 1 and _combat.is_enemy(keep), "a freed enemy is dropped, the other stays")
 	_check(_combat.hit(0, keep, 1), "the remaining enemy can still be hit")
+
+
+func _test_freed_enemy_target_is_pruned() -> void:
+	_setup(0, true)
+	var enemy := _enemy(5)
+	enemy.free()
+	_run(1)
+	_projectiles.step(STEP)
+	_check(_projectiles.get_target_count() == 0, "the projectile manager prunes a freed enemy's target")
+
+
+func _test_death_frees_enemy_in_tree() -> void:
+	_setup()
+	var enemy := _enemy(1)
+	root.add_child(enemy)
+	_combat.hit(0, enemy, 1)
+	_check(enemy.is_queued_for_deletion(), "an enemy in the tree is queue_free'd on death")
+	_check(_deaths == [[0, enemy]], "its death was sent")
+
+
+func _test_reregister_resets_numbers_and_target() -> void:
+	_setup(0, true)
+	var enemy := _enemy(5)
+	_combat.hit(0, enemy, 2)
+	_combat.register_enemy(enemy, 9, 30.0, 2)
+	_check(_combat.get_health(enemy) == 9 and _combat.get_enemy_count() == 1, "registering twice resets health, one row")
+	_check(_projectiles.get_target_count() == 1, "still one projectile target")
+	_check(is_equal_approx(_projectiles._target_radius[0], 30.0), "the projectile target radius follows the new hurt radius")
+
+
+func _test_listener_may_change_registrations() -> void:
+	_setup(1)
+	var first := _enemy(5, _players[0].position, 1)
+	var second := _enemy(5, _players[0].position, 1)
+	_bus.damage_dealt.connect(func(_p: int, target: Node, _a: int, _at: Vector2) -> void:
+		if target == _players[0]:
+			_combat.unregister_enemy(first)
+			_combat.unregister_enemy(second))
+	_run(1)
+	_check(_combat.get_enemy_count() == 0, "a listener removed both enemies during step without errors")
+	var third := _enemy(5)
+	_bus.damage_dealt.connect(func(_p: int, target: Node, _a: int, _at: Vector2) -> void:
+		if target == third:
+			_combat.unregister_enemy(third))
+	_check(_combat.hit(0, third, 1), "a hit still counts when a listener unregisters the enemy")
+	_check(_deaths.is_empty(), "no death is sent for an enemy a listener removed")

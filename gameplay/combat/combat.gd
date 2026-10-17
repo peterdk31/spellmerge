@@ -18,9 +18,16 @@ extends Node
 ## sends no event for those). Hit boxes: an enemy with contact damage hurts a
 ## registered wizard whose circle it overlaps, once per CONTACT_COOLDOWN per wizard.
 ##
+## Knockback: Combat only keeps each enemy's knockback velocity. It never moves an
+## enemy. The node that moves the enemy (the AI or enemy base, M1 part 12) adds
+## `Combat.consume_knockback_step(enemy, delta)` to its own `move_and_slide()`
+## velocity each physics frame, so walls and parent transforms are respected.
+##
 ## Nothing here allocates per hit or per frame: enemies are rows in packed arrays.
 ## Players are told only through `damage_dealt`; wizards are not pushed (their
-## movement is theirs), only enemies are.
+## movement is theirs), only enemies are. Listeners of `damage_dealt` and
+## `enemy_died` may call hit(), register_enemy() or unregister_enemy(): contact
+## hits are sent after the enemy loop, and hit() re-checks its row after sending.
 
 const EventsScript := preload("res://core/events/events.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
@@ -47,6 +54,10 @@ var _contact_damage: PackedInt32Array = PackedInt32Array()
 var _hurt_radius: PackedFloat32Array = PackedFloat32Array()
 var _knock: PackedVector2Array = PackedVector2Array()
 
+# Contact hits waiting to be sent after the enemy loop: wizard index and damage.
+var _pending_index: PackedInt32Array = PackedInt32Array()
+var _pending_amount: PackedInt32Array = PackedInt32Array()
+
 # Wizards by player index.
 var _players: Array = [null, null, null, null]
 var _player_radius: PackedFloat32Array = PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
@@ -69,11 +80,14 @@ func _physics_process(delta: float) -> void:
 
 
 ## Say what a shot with `tag` does: `damage` and knockback `strength` (pixels per second).
-## Tag 0 means "no tag" and is refused.
+## Tag 0 means "no tag" and is refused. Whoever spawns the shots (a spell's bolt)
+## picks its tag; setting a different profile on a tag in use replaces it, with a warning.
 func set_hit_profile(tag: int, damage: int, strength: float = 0.0) -> void:
 	if tag == 0:
 		push_warning("Combat: tag 0 means no tag, so it has no hit profile.")
 		return
+	if _profile_damage.has(tag) and (_profile_damage[tag] != damage or _profile_knockback[tag] != strength):
+		push_warning("Combat: tag %d already had a different hit profile; replacing it." % tag)
 	_profile_damage[tag] = damage
 	_profile_knockback[tag] = strength
 
@@ -93,6 +107,8 @@ func register_enemy(enemy: Node2D, health: int, hurt_radius: float, contact_dama
 		_health[at] = health
 		_hurt_radius[at] = hurt_radius
 		_contact_damage[at] = contact_damage
+		if projectiles != null:
+			projectiles.add_target(enemy, hurt_radius, ProjectileManagerScript.LAYER_ENEMY)
 		return
 	_enemies.append(enemy)
 	_health.append(health)
@@ -146,6 +162,19 @@ func get_knockback(enemy: Node2D) -> Vector2:
 	return _knock[at] if at >= 0 else Vector2.ZERO
 
 
+## For the node that moves `enemy`: the knockback velocity (pixels per second) to
+## add to its own movement this frame. Call it once per physics frame; it then
+## fades the stored knockback by `KNOCKBACK_DECAY * delta`. Zero when there is none.
+func consume_knockback_step(enemy: Node2D, delta: float) -> Vector2:
+	var at: int = _enemies.find(enemy)
+	if at < 0:
+		return Vector2.ZERO
+	var push: Vector2 = _knock[at]
+	if push != Vector2.ZERO:
+		_knock[at] = push.move_toward(Vector2.ZERO, KNOCKBACK_DECAY * delta)
+	return push
+
+
 ## The damage pipeline. `player` (or EventsScript.NO_PLAYER) dealt `amount` to
 ## `target`, pushing it along `direction` (unit length, or zero) at `strength`
 ## pixels per second. Returns true if the hit counted: it did damage, so
@@ -164,6 +193,10 @@ func hit(player: int, target: Node, amount: int, direction: Vector2 = Vector2.ZE
 		_knock[at] = direction * strength
 	if events != null:
 		events.damage_dealt.emit(player, enemy, amount, where)
+		# A listener may have changed the registrations; find the row again.
+		at = _enemies.find(enemy)
+		if at < 0:
+			return true
 	if _health[at] == 0:
 		_remove_enemy_at(at)
 		if events != null:
@@ -173,8 +206,8 @@ func hit(player: int, target: Node, amount: int, direction: Vector2 = Vector2.ZE
 	return true
 
 
-## Move time on: knockback pushes and fades, contact boxes hurt wizards. Called
-## every physics frame; tests call it with fixed deltas.
+## Move time on: contact boxes hurt wizards. Called every physics frame; tests
+## call it with fixed deltas. Knockback is not applied here (see the top).
 func step(delta: float) -> void:
 	for i in PLAYER_SLOTS:
 		_contact_left[i] = maxf(_contact_left[i] - delta, 0.0)
@@ -185,13 +218,17 @@ func step(delta: float) -> void:
 			_remove_enemy_at(at)
 		at -= 1
 	for row in _enemies.size():
-		var enemy: Node2D = _enemies[row]
-		var push: Vector2 = _knock[row]
-		if push != Vector2.ZERO:
-			enemy.position += push * delta
-			_knock[row] = push.move_toward(Vector2.ZERO, KNOCKBACK_DECAY * delta)
 		if _contact_damage[row] > 0:
 			_touch_players(row)
+	# Send after the loop, so listeners can change registrations safely.
+	var sent: int = 0
+	while sent < _pending_index.size():
+		var wizard: Node2D = _players[_pending_index[sent]]
+		if wizard != null and is_instance_valid(wizard) and events != null:
+			events.damage_dealt.emit(EventsScript.NO_PLAYER, wizard, _pending_amount[sent], _position_of(wizard))
+		sent += 1
+	_pending_index.clear()
+	_pending_amount.clear()
 
 
 func _touch_players(row: int) -> void:
@@ -206,22 +243,30 @@ func _touch_players(row: int) -> void:
 		var reach: float = _hurt_radius[row] + _player_radius[index]
 		if enemy_at.distance_squared_to(_position_of(wizard)) > reach * reach:
 			continue
-		if _hit_player(EventsScript.NO_PLAYER, wizard, _contact_damage[row]):
+		if _can_hurt_player(wizard):
 			_contact_left[index] = CONTACT_COOLDOWN
+			_pending_index.append(index)
+			_pending_amount.append(_contact_damage[row])
 
 
 ## A wizard decides for itself how much it is hurt; Combat only skips the event
 ## for hits it knows do nothing (the wizard is dodging or downed), and for
 ## nodes that are not registered wizards.
 func _hit_player(player: int, target: Node, amount: int) -> bool:
+	if not _can_hurt_player(target):
+		return false
+	if events != null:
+		events.damage_dealt.emit(player, target, amount, _position_of(target as Node2D))
+	return true
+
+
+func _can_hurt_player(target: Node) -> bool:
 	if not target is Node2D or not _players.has(target):
 		return false
 	if target.has_method("is_invulnerable") and target.is_invulnerable():
 		return false
 	if target.has_method("is_downed") and target.is_downed():
 		return false
-	if events != null:
-		events.damage_dealt.emit(player, target, amount, _position_of(target as Node2D))
 	return true
 
 

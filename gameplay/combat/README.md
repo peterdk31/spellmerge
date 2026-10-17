@@ -27,7 +27,7 @@ Not open yet. When it opens, follow the steps and test layout in [gameplay/READM
 
 ## Example to copy
 
-`gameplay/combat/combat.gd` is the example, and `tests/gameplay/combat/test_combat.gd` shows how to test it (damage, knockback, death and contact hits, with several players). Hits arrive as `projectile_hit` events on a test bus; time moves with `Combat.step(delta)`.
+`gameplay/combat/combat.gd` is the example, and `tests/gameplay/combat/test_combat.gd` shows how to test it (damage, knockback, death and contact hits, with several players). Hits arrive as `projectile_hit` events on a test bus; time moves with `Combat.step(delta)`. Combat never moves enemies: whoever moves an enemy adds `Combat.consume_knockback_step(enemy, delta)` to its own velocity each physics frame.
 
 ## Validate
 

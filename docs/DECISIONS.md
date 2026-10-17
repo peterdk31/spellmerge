@@ -538,3 +538,10 @@ The HUD screenshot cannot be taken in a session (no display, `docs/BACKLOG.md`),
 - `.gpl` is not an allowed file type (hard rule 2), so the GIMP palette is `spellmerge.gpl.txt`; the kit zip ships it as `spellmerge.gpl`. Binary palettes (Aseprite, Photoshop, Krita) can't be written by sessions; the hex list and the `.gpl` cover those editors' import functions.
 - The golden example candidates are not copies. A second wizard would duplicate `content/wizard/base/wizard_p1_idle.svg`, so `art/kit/golden.json` lists the six best existing placeholder files by path with what each shows, and the zip build copies them. The M2 art direction call confirms or replaces them.
 - The checklist's source stays `docs/STYLE.md`; `art/kit/checklist.md` is its one-page export, kept in step by hand until the site build generates it.
+
+## 2026-10-17: Panels may hide the wizards at zoom 0.5; walls are tested
+
+**Decided by:** the owner (#87: "It's fine as it is").
+
+- At the widest Coop zoom (0.5), each corner panel may cover its player's wizard. The panels stay as they are: translucent at alpha 0.4.
+- The staged screenshot is now named `staged_zoom_half_wizards_placed_outside_room`, because `shot_m1.gd` places the wizards outside the one-screen room to force the zoom-out, and the old name looked like gameplay. A new test, `tests/gameplay/flow/test_walls_hold.gd`, has four wizards walk and dodge into the walls through the real input path and checks that none leaves the room.

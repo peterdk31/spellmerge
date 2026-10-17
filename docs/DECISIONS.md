@@ -426,3 +426,11 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - An unfinished revision is pushed to its PR with the same note, and the final review is skipped, so the next session continues the PR.
 - The implement job may run 4 hours (its Claude step stops at 200 minutes) and the revise job 3 hours (150 minutes), so a step that runs too long still leaves time to package and keep its commits.
 - Triage already skips draft PRs, so an unfinished PR is never rated as a contribution.
+
+## 2026-10-17: The bot may push main's workflow changes, never its own
+
+**Decided by:** the owner.
+
+- GitHub refuses a push from the bot app when any pushed commit changes a file in `.github/workflows/`, even a merge that only takes in main's version. Run #103 lost a finished session this way: it merged main after #67 had changed `session.yml`.
+- The push tokens in `session.yml` ask for `workflows: write`, and the bot app has that permission.
+- Before every push, `publish` checks each file under `.github/`: it must match main or the branch as already pushed, or nothing is pushed. So the bot can take in the owner's workflow changes, but it can't make its own.

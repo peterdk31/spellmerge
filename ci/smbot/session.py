@@ -377,6 +377,16 @@ def task_title(task: str) -> str:
     return (m.group(1) if m else task.strip()).rstrip(".")[:150] or "Claude's work"
 
 
+def workflow_changes(tip: str, bases: list[str]) -> list[str]:
+    """Files under .github/ whose version at `tip` matches none of `bases` (main, the branch as pushed)."""
+    changed: set[str] | None = None
+    for base in bases:
+        names = set(subprocess.run(["git", "diff", "--name-only", "--no-renames", base, tip, "--", ".github/"],
+                                   check=True, capture_output=True, text=True).stdout.split())
+        changed = names if changed is None else changed & names
+    return sorted(changed or ())
+
+
 def publish(cfg: config_mod.Config, bundle: Path, branch: str, mode: str, result: dict[str, Any],
             pr_number: int | None, token: str, unfinished: str = "", task: str = "") -> dict[str, str]:
     """Pushes Claude's bundled commits from a clean checkout of main and opens or updates the PR.
@@ -401,6 +411,16 @@ def publish(cfg: config_mod.Config, bundle: Path, branch: str, mode: str, result
         if subprocess.run(["git", "merge-base", "--is-ancestor", f"refs/remotes/current/{branch}",
                            f"refs/remotes/work/{branch}"]).returncode != 0:
             raise ValueError(f"the revision doesn't build on PR #{pr_number}'s current head; not overwriting it")
+    # The push token may change workflows, so that a branch can take in main's workflow changes (GitHub
+    # refuses such a merge otherwise); the bot's own commits must never change one.
+    subprocess.run([*git, "fetch", "--quiet", remote, "+refs/heads/main:refs/remotes/current/main"], check=True)
+    on_remote = subprocess.run([*git, "fetch", "--quiet", remote, f"+refs/heads/{branch}:refs/remotes/current/{branch}"],
+                               capture_output=True).returncode == 0
+    changed = workflow_changes(f"refs/remotes/work/{branch}",
+                               ["refs/remotes/current/main"] + ([f"refs/remotes/current/{branch}"] if on_remote else []))
+    if changed:
+        raise ValueError(f"refusing to push {branch}: it changes {', '.join(changed)} (owner-only), "
+                         "which is neither main's version nor the branch's")
     pushed = subprocess.run(["git", "rev-parse", f"refs/remotes/work/{branch}"], check=True, capture_output=True,
                             text=True).stdout.strip()
     subprocess.run([*git, "push", "--quiet", "--force", remote, f"refs/remotes/work/{branch}:refs/heads/{branch}"],

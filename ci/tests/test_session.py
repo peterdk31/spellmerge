@@ -239,6 +239,7 @@ class PublishTest(unittest.TestCase):
     def _publish(self, api: mock.Mock, mode: str, pr: int | None = None) -> dict[str, str]:
         done = mock.Mock(returncode=0, stdout="abcdef1234\n")
         with mock.patch.object(session.subprocess, "run", return_value=done), \
+                mock.patch.object(session, "workflow_changes", return_value=[]), \
                 mock.patch.object(session.gh, "api", api):
             return session.publish(CFG, Path("work.bundle"), "claude/20261017-x", mode, {}, pr, "t",
                                    unfinished="usage limit", task="**Unit tests.** More words.")
@@ -260,6 +261,50 @@ class PublishTest(unittest.TestCase):
         pr = {"head": {"ref": "claude/20261017-x"}, "user": {"login": CFG.bot.login}, "state": "open"}
         api = mock.Mock(side_effect=[pr, {}])
         self.assertEqual(self._publish(api, "update", 19), {"saved_pr": "19", "branch": "claude/20261017-x"})
+
+    def test_publish_refuses_the_bots_own_workflow_changes(self) -> None:
+        done = mock.Mock(returncode=0, stdout="")
+        with mock.patch.object(session.subprocess, "run", return_value=done) as run, \
+                mock.patch.object(session, "workflow_changes", return_value=[".github/workflows/x.yml"]), \
+                mock.patch.object(session.gh, "api") as api:
+            with self.assertRaisesRegex(ValueError, "x.yml"):
+                session.publish(CFG, Path("work.bundle"), "claude/20261017-x", "new", {}, None, "t")
+        self.assertFalse([c for c in run.call_args_list if "push" in c.args[0]])
+        api.assert_not_called()
+
+    def test_workflow_changes_allows_only_mains_or_the_branchs_version(self) -> None:
+        import os
+        import subprocess
+        env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t",
+               "GIT_COMMITTER_EMAIL": "t@t"}
+        with tempfile.TemporaryDirectory() as tmp:
+            run = lambda *a: subprocess.run(["git", "-C", tmp, *a], check=True, capture_output=True, env=env)
+
+            def commit(name: str, text: str, msg: str) -> None:
+                Path(tmp, name).parent.mkdir(parents=True, exist_ok=True)
+                Path(tmp, name).write_text(text)
+                run("add", "-A")
+                run("commit", "-qm", msg)
+
+            run("init", "-q", "-b", "main")
+            commit(".github/workflows/w.yml", "old\n", "base")
+            run("switch", "-qc", "pr")
+            commit("a.gd", "a\n", "work")
+            run("branch", "pushed")
+            run("switch", "-q", "main")
+            commit(".github/workflows/w.yml", "new\n", "main changes a workflow")
+            run("switch", "-q", "pr")
+            run("merge", "-q", "--no-edit", "main")
+            old = os.getcwd()
+            os.chdir(tmp)
+            try:
+                self.assertEqual(session.workflow_changes("pr", ["main", "pushed"]), [])
+                self.assertEqual(session.workflow_changes("pushed", ["main"]), [".github/workflows/w.yml"])
+                self.assertEqual(session.workflow_changes("pushed", ["main", "pushed"]), [])
+                commit(".github/workflows/w.yml", "evil\n", "the bot edits a workflow")
+                self.assertEqual(session.workflow_changes("pr", ["main", "pushed"]), [".github/workflows/w.yml"])
+            finally:
+                os.chdir(old)
 
     def test_branch_names(self) -> None:
         self.assertTrue(session.valid_branch("claude/20261017-area-readmes"))

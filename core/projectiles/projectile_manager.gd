@@ -29,6 +29,11 @@ extends Node2D
 ## through a crowd), nearest first. It remembers the last HIT_MEMORY targets it
 ## hit and does not hit them again until it has hit that many others.
 ##
+## Friendly fire: while `friendly_fire` is on, a shot fired by a player (0-3) also
+## hits targets on LAYER_PLAYER, except targets registered with that same player
+## as their `owner` (a wizard is never hit by its own shot). It is off by default
+## and read when a shot is spawned. `gameplay/coop` owns the option.
+##
 ## The global cap (`get_cap()`, set by platform: DEFAULT_CAP_WEB or
 ## DEFAULT_CAP_DESKTOP) degrades gracefully. When it is full, a new projectile
 ## is never refused: the oldest projectile of whoever owns the most of them is
@@ -77,6 +82,8 @@ var events: EventsScript = null
 var dropped: int = 0
 ## Projectiles written into the batch by the last update_draw().
 var drawn: int = 0
+## Whether shots fired by players also hit other players' targets (see the class doc).
+var friendly_fire: bool = false
 
 var _cap: int = 0
 var _count: int = 0
@@ -119,6 +126,7 @@ var _target_radius: PackedFloat32Array = PackedFloat32Array()
 var _target_layer: PackedInt32Array = PackedInt32Array()
 var _target_pos: PackedVector2Array = PackedVector2Array()
 var _target_id: PackedInt64Array = PackedInt64Array()
+var _target_owner: PackedInt32Array = PackedInt32Array()
 ## The grid: first target in each cell (-1 for none), and the next in its chain.
 var _grid_w: int = 1
 var _grid_h: int = 1
@@ -227,8 +235,10 @@ func get_count_for(player: int) -> int:
 
 
 ## Register a Node2D as something projectiles can hit (`layer` is a non-zero
-## bit mask). Registering twice only updates the radius and layer. A freed target is dropped by itself.
-func add_target(node: Node2D, radius: float, layer: int = LAYER_ENEMY) -> void:
+## bit mask). Registering twice only updates the radius, layer and owner. A freed target is dropped by itself.
+## `owner` is the player (0-3) the target belongs to, or Events.NO_PLAYER: shots of that
+## player never hit it (matters with friendly fire).
+func add_target(node: Node2D, radius: float, layer: int = LAYER_ENEMY, owner: int = EventsScript.NO_PLAYER) -> void:
 	if node == null or layer == 0:
 		return
 	var id: int = node.get_instance_id()
@@ -236,12 +246,14 @@ func add_target(node: Node2D, radius: float, layer: int = LAYER_ENEMY) -> void:
 	if at >= 0:
 		_target_radius[at] = radius
 		_target_layer[at] = layer
+		_target_owner[at] = owner
 		_max_target_radius = maxf(_max_target_radius, radius)
 		return
 	_targets.append(node)
 	_target_id.append(id)
 	_target_radius.append(radius)
 	_target_layer.append(layer)
+	_target_owner.append(owner)
 	_target_pos.append(Vector2.ZERO)
 	_target_next.append(-1)
 	_max_target_radius = maxf(_max_target_radius, radius)
@@ -283,7 +295,7 @@ func spawn(player: int, origin: Vector2, velocity: Vector2, lifetime: float, rad
 	_life[slot] = lifetime
 	_radius[slot] = maxf(radius, 0.0)
 	_player[slot] = player
-	_layers[slot] = hit_layers
+	_layers[slot] = (hit_layers | LAYER_PLAYER) if friendly_fire and player >= 0 else hit_layers
 	_pierce[slot] = maxi(pierce, 0)
 	_tag[slot] = tag
 	_seq[slot] = _next_seq
@@ -434,11 +446,13 @@ func _remove_target_at(at: int) -> void:
 	_target_id[at] = _target_id[last]
 	_target_radius[at] = _target_radius[last]
 	_target_layer[at] = _target_layer[last]
+	_target_owner[at] = _target_owner[last]
 	_target_pos[at] = _target_pos[last]
 	_targets.resize(last)
 	_target_id.resize(last)
 	_target_radius.resize(last)
 	_target_layer.resize(last)
+	_target_owner.resize(last)
 	_target_pos.resize(last)
 	_target_next.resize(last)
 
@@ -495,7 +509,7 @@ func _hit_test(slot: int) -> bool:
 		for x in range(x0, x1 + 1):
 			var t: int = _cell_head[y * _grid_w + x]
 			while t >= 0:
-				if (_target_layer[t] & _layers[slot]) != 0 and not _remembers(slot, _target_id[t]):
+				if (_target_layer[t] & _layers[slot]) != 0 and not _remembers(slot, _target_id[t]) and not (_target_owner[t] >= 0 and _target_owner[t] == _player[slot]):
 					var along: float = 0.0
 					if path_sq > 0.0:
 						along = clampf((_target_pos[t] - from).dot(path) / path_sq, 0.0, 1.0)

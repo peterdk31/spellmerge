@@ -27,6 +27,8 @@ var _cast_ids: Array[StringName] = []
 
 
 func _initialize() -> void:
+	# The root joins the scene tree only after _initialize returns: wait one frame.
+	await process_frame
 	_test_starts_full()
 	_test_damage_event_hurts_only_the_target()
 	_test_invulnerable_ignores_damage()

@@ -25,6 +25,8 @@ var _deaths: Array = []
 
 
 func _initialize() -> void:
+	# The root joins the scene tree only after _initialize returns: wait one frame.
+	await process_frame
 	_test_damage_reduces_health_and_sends_event()
 	_test_bad_hits_do_nothing()
 	_test_unknown_target_is_ignored()

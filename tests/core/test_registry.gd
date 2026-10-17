@@ -11,6 +11,8 @@ var _failures: Array[String] = []
 
 
 func _initialize() -> void:
+	# The root joins the scene tree only after _initialize returns: wait one frame.
+	await process_frame
 	_test_lookup()
 	_test_nested_folders_and_skipped_files()
 	_test_duplicate_id_keeps_the_first()
@@ -33,6 +35,13 @@ func _check(condition: bool, message: String) -> void:
 		_failures.append(message)
 
 
+## A typed copy: the registry returns Array[StringName], which never equals an untyped array.
+func _names(values: Array) -> Array[StringName]:
+	var result: Array[StringName] = []
+	result.assign(values)
+	return result
+
+
 func _registry() -> Node:
 	var registry: Node = RegistryScript.new()
 	registry.scan(FIXTURE + "/content", FIXTURE + "/audio", PackedStringArray(["tres"]))
@@ -45,7 +54,7 @@ func _test_lookup() -> void:
 	_check(spark is SpellBase, "spark is a SpellBase")
 	_check(registry.get_resource(&"enemies", &"blob") is EnemyBase, "blob is an EnemyBase")
 	_check(registry.get_resource(&"rooms", &"hall") is RoomBase, "hall is a RoomBase")
-	_check(registry.get_folders() == [&"enemies", &"rooms", &"spells"], "folders are found, sorted")
+	_check(registry.get_folders() == _names([&"enemies", &"rooms", &"spells"]), "folders are found, sorted: %s" % [registry.get_folders()])
 	_check(registry.get_resource(&"enemies", &"spark") == null, "ids are per folder")
 	registry.free()
 
@@ -53,7 +62,7 @@ func _test_lookup() -> void:
 func _test_nested_folders_and_skipped_files() -> void:
 	var registry: Node = _registry()
 	_check(registry.get_resource(&"spells", &"deep") != null,"a resource two folders down is found")
-	_check(registry.get_ids(&"spells") == [&"deep", &"hidden", &"spark"], "ids are sorted; a .tres without an id is skipped")
+	_check(registry.get_ids(&"spells") == _names([&"deep", &"hidden", &"spark"]),"ids are sorted; a .tres without an id is skipped: %s" % [registry.get_ids(&"spells")])
 	registry.free()
 
 
@@ -70,7 +79,7 @@ func _test_demo_flag() -> void:
 	_check(registry.get_resource(&"enemies", &"blob") != null,"a non-demo enemy is visible when demo_only is off")
 	registry.demo_only = true
 	_check(registry.get_resource(&"spells", &"hidden") == null, "a non-demo resource is hidden by demo_only")
-	_check(registry.get_ids(&"spells") == [&"deep", &"spark"], "get_ids leaves out non-demo ids")
+	_check(registry.get_ids(&"spells") == _names([&"deep", &"spark"]),"get_ids leaves out non-demo ids")
 	_check(registry.get_all(&"spells").size() == 2, "get_all leaves out non-demo resources")
 	_check(registry.get_ids(&"enemies").is_empty(), "a folder with only non-demo content is empty")
 	_check(registry.get_resource(&"rooms", &"hall") != null,"demo content stays visible")
@@ -119,7 +128,8 @@ func _test_export_suffixes_and_default_sounds() -> void:
 	_check(tres_files == PackedStringArray([root + "/content/spells/a.tres", root + "/content/spells/b.tres"]), "a .remap suffix is stripped and not listed twice: %s" % [tres_files])
 	var ogg_files: PackedStringArray = registry._find_files(root + "/audio", PackedStringArray(["ogg"]))
 	_check(ogg_files == PackedStringArray([root + "/audio/sfx/boom.ogg", root + "/audio/sfx/pop.ogg"]), "an .import suffix is stripped and not listed twice: %s" % [ogg_files])
-	registry.scan(root + "/content", root + "/audio")
+	# Only the sounds: the empty .tres files above are not loadable resources.
+	registry.scan(root + "/no_content", root + "/audio")
 	_check(registry._sound_paths.has(&"pop") and registry._sound_paths.has(&"boom"), "the default scan indexes .ogg names")
 	registry.free()
 	for file_name: String in files:

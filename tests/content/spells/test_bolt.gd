@@ -29,6 +29,8 @@ var _deaths: Array = []
 
 
 func _initialize() -> void:
+	# The root joins the scene tree only after _initialize returns: wait one frame.
+	await process_frame
 	_test_resource_is_a_spell()
 	_test_cast_spawns_one_shot_with_mana_and_cooldown()
 	_test_bolt_kills_the_imp()
@@ -314,7 +316,8 @@ func _line_reads_spell_field(line: String, typed_names: PackedStringArray = Pack
 			return true
 	var unique := RegEx.new()
 	unique.compile("[\\w\\)\\]]\\s*\\.\\s*(mana_cost|cooldown|lifetime|display_name)\\b")
-	return unique.search(code) != null
+	# `burst.lifetime` is a CPUParticles2D property (gameplay/feel), not a spell field.
+	return unique.search(code) != null and not code.contains("burst.lifetime")
 
 
 ## Names of the variables, parameters and loop variables a script types as `SpellBase`.

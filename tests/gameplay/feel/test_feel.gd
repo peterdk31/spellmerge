@@ -22,6 +22,8 @@ var _registry: Node
 
 
 func _initialize() -> void:
+	# The root joins the scene tree only after _initialize returns: wait one frame.
+	await process_frame
 	_test_default_preset_loads()
 	_test_hit_stop_is_short_and_the_same_for_every_player()
 	_test_hit_stop_longest_wins()

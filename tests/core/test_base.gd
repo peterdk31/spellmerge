@@ -13,6 +13,8 @@ func _initialize() -> void:
 	_test_room()
 	_test_demo_defaults_to_false()
 	_test_round_trip()
+	_test_room_round_trip()
+	_test_enemy_round_trip()
 	if _failures.is_empty():
 		print("TEST OK: core/base")
 		quit(0)
@@ -80,4 +82,40 @@ func _test_round_trip() -> void:
 	_check(loaded != null, "spell loads back as SpellBase")
 	if loaded != null:
 		_check(loaded.id == &"fire_bolt" and loaded.demo and loaded.damage == 4, "spell keeps its values")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+
+
+func _test_room_round_trip() -> void:
+	var room := RoomBase.new()
+	room.id = &"start_room"
+	room.demo = true
+	room.player_spawns = PackedVector2Array([Vector2(1, 1), Vector2(2, 1), Vector2(1, 2), Vector2(2, 2)])
+	room.enemy_spawns = PackedVector2Array([Vector2(8, 8), Vector2(9, 8)])
+	room.doors = PackedVector2Array([Vector2(0, 5)])
+	var path := "user://test_base_room.tres"
+	_check(ResourceSaver.save(room, path) == OK, "room saves as text")
+	var loaded := ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE) as RoomBase
+	_check(loaded != null, "room loads back as RoomBase")
+	if loaded != null:
+		_check(loaded.id == &"start_room" and loaded.demo, "room keeps its id and demo flag")
+		_check(loaded.player_spawns == room.player_spawns, "room keeps its player spawns")
+		_check(loaded.enemy_spawns == room.enemy_spawns, "room keeps its enemy spawns")
+		_check(loaded.doors == room.doors, "room keeps its doors")
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+
+
+func _test_enemy_round_trip() -> void:
+	var enemy := EnemyBase.new()
+	enemy.id = &"ember_imp"
+	enemy.max_health = 8
+	enemy.move_speed = 60.0
+	enemy.contact_damage = 2
+	var path := "user://test_base_enemy.tres"
+	_check(ResourceSaver.save(enemy, path) == OK, "enemy saves as text")
+	var loaded := ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE) as EnemyBase
+	_check(loaded != null, "enemy loads back as EnemyBase")
+	if loaded != null:
+		_check(loaded.id == &"ember_imp" and loaded.max_health == 8, "enemy keeps its id and health")
+		_check(loaded.move_speed == 60.0 and loaded.contact_damage == 2, "enemy keeps its speed and damage")
+		_check(loaded.scene == null, "enemy scene stays empty")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))

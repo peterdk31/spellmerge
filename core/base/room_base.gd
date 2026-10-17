@@ -9,7 +9,7 @@ extends Resource
 @export var demo: bool = false
 ## The layout scene (tiles only, no scripts).
 @export var scene: PackedScene
-## Where the players start, in room pixels. Index i is player i; four are needed.
+## Where the players start, in room pixels. Index i is player i; four are expected (checked from M3).
 @export var player_spawns: PackedVector2Array = PackedVector2Array()
 ## Where enemies may appear, in room pixels.
 @export var enemy_spawns: PackedVector2Array = PackedVector2Array()

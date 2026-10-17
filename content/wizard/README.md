@@ -16,7 +16,7 @@ Everything that customises the single base wizard. **Cosmetics** (`cosmetics/`) 
 
 ## Allowed files
 
-`.tres`, `.gd`, sprites (`.png` or `.svg`), plus `.uid`, `.import` and `.license` files. Limits: 1 MB per image, 1 MB for anything else. Typed GDScript only; no banned APIs.
+`.tscn`, `.tres`, `.gd`, sprites (`.png` or `.svg`), plus `.uid`, `.import` and `.license` files. Limits: 1 MB per image, 1 MB for anything else. Typed GDScript only; no banned APIs.
 
 ## Steps
 
@@ -28,7 +28,7 @@ Everything that customises the single base wizard. **Cosmetics** (`cosmetics/`) 
 
 ## Example to copy
 
-Arrives with Claude's first content in M4. Do not guess its layout before then.
+`content/wizard/base/wizard.tscn`, the base wizard scene (collision shape and a `Sprite` node, with `gameplay/player/player.gd` on the root). The sprite art follows from M1 part 4. Cosmetics and staffs (M4) get their own example when Claude adds the first.
 
 ## Validate
 

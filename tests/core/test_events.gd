@@ -21,7 +21,7 @@ const EVENTS: Dictionary = {
 	&"device_left": [["player", TYPE_INT], ["device", TYPE_INT]],
 	# Spells and combat.
 	&"spell_cast": [["player", TYPE_INT], ["spell_id", TYPE_STRING_NAME], ["origin", TYPE_VECTOR2], ["direction", TYPE_VECTOR2]],
-	&"projectile_hit": [["player", TYPE_INT], ["target", TYPE_OBJECT], ["position", TYPE_VECTOR2]],
+	&"projectile_hit": [["player", TYPE_INT], ["target", TYPE_OBJECT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT]],
 	&"damage_dealt": [["player", TYPE_INT], ["target", TYPE_OBJECT], ["amount", TYPE_INT], ["position", TYPE_VECTOR2]],
 	&"status_applied": [["player", TYPE_INT], ["target", TYPE_OBJECT], ["status_id", TYPE_STRING_NAME]],
 	&"enemy_died": [["player", TYPE_INT], ["enemy", TYPE_OBJECT], ["position", TYPE_VECTOR2]],

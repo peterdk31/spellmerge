@@ -34,7 +34,8 @@ signal device_left(player: int, device: int)
 ## Sender: player. A cast left the wand of `player`.
 signal spell_cast(player: int, spell_id: StringName, origin: Vector2, direction: Vector2)
 ## Sender: core/projectiles. A projectile fired by `player` touched `target`.
-signal projectile_hit(player: int, target: Node, position: Vector2)
+## `tag` is the value given to `Projectiles.spawn()`, for looking up the damage.
+signal projectile_hit(player: int, target: Node, position: Vector2, tag: int)
 ## Sender: combat. `player` (or NO_PLAYER) dealt `amount` damage to `target`.
 signal damage_dealt(player: int, target: Node, amount: int, position: Vector2)
 ## Sender: combat. A status effect from `player` (or NO_PLAYER) was put on `target`.

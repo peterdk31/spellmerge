@@ -183,6 +183,15 @@ class FinishTest(unittest.TestCase):
         self.assertIn("git merge origin/main", entry["problems"])
         self.assertEqual(out["again"], "true")
 
+    def test_a_usage_limit_asks_to_resume_at_its_reset(self) -> None:
+        st = copy.deepcopy(state.DEFAULT)
+        until = dt.datetime.now(dt.timezone.utc) + dt.timedelta(minutes=30)
+        st["backoff_until"] = state_iso = until.isoformat(timespec="seconds").replace("+00:00", "Z")
+        out, _ = self.run_finish(st, ["A"], IMPLEMENT_STATUS="limit")
+        self.assertEqual((out["again"], out["resume_at"]), ("false", state_iso))
+        out, _ = self.run_finish(copy.deepcopy(state.DEFAULT), ["A"], IMPLEMENT_STATUS="error")
+        self.assertEqual(out["resume_at"], "")
+
     def test_stops_on_errors_paused_merging_and_plan_runs(self) -> None:
         for env in ({"IMPLEMENT_STATUS": "error"}, {"IMPLEMENT_STATUS": "limit"},
                     {"IMPLEMENT_STATUS": "nothing_to_do"},

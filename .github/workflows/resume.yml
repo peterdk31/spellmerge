@@ -1,0 +1,47 @@
+# Starts develop again when a usage-limit back-off ends (docs/PLAN.md, "Capacity").
+#
+# GitHub's hourly schedule is unreliable here, so after a usage limit nothing started
+# the next session. The develop gate and a session's finish job start this workflow with
+# the reset time; it waits until just after it and starts develop. A newer request
+# replaces a waiting one. It runs no Claude step and needs no secrets.
+name: resume
+
+on:
+  workflow_dispatch:
+    inputs:
+      at:
+        description: "When the back-off ends (ISO time, UTC)"
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: resume
+  cancel-in-progress: true
+
+jobs:
+  resume:
+    name: wait for the usage limit to reset, then start develop
+    if: github.ref == 'refs/heads/main' && vars.AUTOMATION_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    permissions:
+      actions: write # start develop.yml
+    steps:
+      - name: Wait until the reset
+        env:
+          AT: ${{ inputs.at }}
+        run: |
+          secs=$(python3 -c '
+          import datetime as d, os
+          at = d.datetime.fromisoformat(os.environ["AT"].replace("Z", "+00:00"))
+          left = (at - d.datetime.now(d.timezone.utc)).total_seconds() + 60
+          print(max(0, min(int(left), 21000)))')
+          echo "Waiting ${secs}s, until just after $AT"
+          sleep "$secs"
+      - name: Start develop
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: gh workflow run develop.yml --ref main

@@ -435,3 +435,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           STARTED: ${{ steps.finish.outputs.chain_started }}
         run: gh workflow run develop.yml --ref main -f chain_started="$STARTED"
+      - name: Start develop again when the usage limit resets
+        if: steps.finish.outputs.again != 'true' && steps.finish.outputs.resume_at != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          AT: ${{ steps.finish.outputs.resume_at }}
+        run: gh workflow run resume.yml --ref main -f at="$AT"

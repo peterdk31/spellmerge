@@ -49,6 +49,12 @@ def limit_hit(state: dict[str, Any], now: dt.datetime, weekly: bool, resets_at: 
     state["backoff_until"] = iso(until)
 
 
+def backing_off_until(state: dict[str, Any], now: dt.datetime) -> str:
+    """The end of the current back-off after a usage limit as an ISO time, or "" when there is none."""
+    until = state.get("backoff_until")
+    return until if until and now < parse_time(until) else ""
+
+
 @dataclass(frozen=True)
 class Budget:
     allowed: bool

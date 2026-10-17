@@ -1,0 +1,36 @@
+{
+  "status": "candidates",
+  "note": "Golden example candidates for the Style Guide (docs/STYLE.md, 'Golden examples'). They are the best placeholder art so far; the M2 art direction call confirms or replaces them. The starter kit zip includes these files next to the palette and templates.",
+  "examples": [
+    {
+      "path": "content/wizard/base/wizard_p1_idle.svg",
+      "shows": "A player character: Player 1 ramp on robe and hat, Skin face, Wood staff, feet 2 px above the bottom edge",
+      "rules": ["outline", "three shades", "light from the top-left", "player colour"]
+    },
+    {
+      "path": "content/enemies/ember_imp/idle.svg",
+      "shows": "An enemy: Fire materials only, no player colour, a bold silhouette",
+      "rules": ["outline", "silhouette", "enemy colours"]
+    },
+    {
+      "path": "art/tilesets/crypt/wall.svg",
+      "shows": "A raised tile: lit top and left edge, shaded bottom and right edge",
+      "rules": ["light from the top-left", "three shades", "tile fills the cell"]
+    },
+    {
+      "path": "art/tilesets/crypt/floor.svg",
+      "shows": "A flat tile: Stone base, a few inner details, nothing on the outer edge so it repeats",
+      "rules": ["seamless tile", "flat floor"]
+    },
+    {
+      "path": "art/vfx/fire_bolt.svg",
+      "shows": "A projectile: a streak in Fire materials with a Spark core, outlined in its own shadow shade",
+      "rules": ["effects outline", "no glow halo", "readable at speed"]
+    },
+    {
+      "path": "art/vfx/hit_spark.svg",
+      "shows": "An impact: a flat burst in Spark materials, over in 0.2 s",
+      "rules": ["effects outline", "no partial transparency"]
+    }
+  ]
+}

@@ -126,6 +126,23 @@ Provisional, like the rest. The HUD (M1 parts 18 and 19) and the Style Guide pag
 - **Icons:** 16×16 for spells and relics in the overlay, 8×8 for status marks, with the 1 px outline and at most 3 shades per material.
 - Everything snaps to whole pixels at the 640×360 base size, and four panels stay readable there.
 
+## Golden examples
+
+Candidates for the pieces the Style Guide page shows as "this is the look". They are the best placeholder art so far, listed with what each one shows in [art/kit/golden.json](../art/kit/golden.json). In M2 the art direction call confirms or replaces them. Copy their approach, not their pixels.
+
+| Kind | File | What to learn from it |
+| --- | --- | --- |
+| Player character | `content/wizard/base/wizard_p1_idle.svg` | Player ramp on robe and hat, Skin face, Wood staff, feet 2 px above the bottom edge |
+| Enemy | `content/enemies/ember_imp/idle.svg` | Fire materials only, no player colour, a bold silhouette |
+| Raised tile | `art/tilesets/crypt/wall.svg` | Lit top and left edge, shaded bottom and right edge |
+| Flat tile | `art/tilesets/crypt/floor.svg` | Stone base, a few inner details, nothing on the outer edge |
+| Projectile | `art/vfx/fire_bolt.svg` | Fire streak with a Spark core, outlined in its own shadow shade |
+| Impact | `art/vfx/hit_spark.svg` | A flat Spark burst, no glow halo |
+
+## The starter kit
+
+The source files are in [art/kit/](../art/kit/README.md): the palette (`spellmerge.gpl.txt` for GIMP-style editors, `palette.hex.txt`), a 32×32 grid and an animation strip template as SVG, `golden.json` and the one-page checklist [art/kit/checklist.md](../art/kit/checklist.md). The palette files and the checklist copy this document; when you change the palette table, frame counts or the checklist below, change them too.
+
 ## Checklist
 
 Before opening an art PR:

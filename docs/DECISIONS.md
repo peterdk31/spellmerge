@@ -524,3 +524,10 @@ The HUD screenshot cannot be taken in a session (no display, `docs/BACKLOG.md`),
 - With the work bounded, the hostile step no longer grows with the number of shots, only plain movement does (0.2 ms at 1,000, 0.6 ms at 3,000). Measured 2.8 and 3.1 ms natively. A first try with 16,000 gave 6.5 and 7.4 ms, 81-93% of the 8 ms target: too close when WASM may be 2-4x slower, so the budget was halved. At 4x, 2.8 ms is still about 11 ms, so the web task re-checks it in WASM and lowers `WORK_PER_STEP`, then `DEFAULT_CAP_WEB`, if needed. The caps stay 1,000 web / 3,000 desktop: the budget, not the cap, now sets the hostile cost.
 - The budget is per `step` call, not per frame: catch-up physics steps in one frame (up to 8 by default) each get their own. Slot order is not player-fair, so in a flood the player whose shots sit in the starved slots hits a step late; the resume point moves on each step, so it evens out over a few steps. Tested with piercing shots that never die (`_test_spent_budget_resumes_at_the_first_untested_shot`).
 - Not done: a per-layer grid and cheaper overlapping-target handling. The budget alone met the target; they stay options.
+
+## 2026-10-17: Starter kit sources live in `art/kit/`; golden examples are existing art
+
+- The kit sources are in `art/kit/` with a `.gdignore`, so Godot neither imports nor ships them, and they have no manifest entries (templates and lists, not game assets).
+- `.gpl` is not an allowed file type (hard rule 2), so the GIMP palette is `spellmerge.gpl.txt`; the kit zip ships it as `spellmerge.gpl`. Binary palettes (Aseprite, Photoshop, Krita) can't be written by sessions; the hex list and the `.gpl` cover those editors' import functions.
+- The golden example candidates are not copies. A second wizard would duplicate `content/wizard/base/wizard_p1_idle.svg`, so `art/kit/golden.json` lists the six best existing placeholder files by path with what each shows, and the zip build copies them. The M2 art direction call confirms or replaces them.
+- The checklist's source stays `docs/STYLE.md`; `art/kit/checklist.md` is its one-page export, kept in step by hand until the site build generates it.

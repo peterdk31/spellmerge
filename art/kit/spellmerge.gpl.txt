@@ -1,0 +1,35 @@
+GIMP Palette
+Name: Spellmerge
+Columns: 3
+# The 31 colours of docs/STYLE.md. Opens in GIMP, Krita, Aseprite, LibreSprite and Inkscape.
+ 20  18  31 Outline
+ 43  40  64 Stone shadow
+ 74  70  99 Stone base
+122 118 148 Stone light
+163 159 184 Bone shadow
+212 208 224 Bone base
+244 241 234 Bone light
+143  45  42 Fire shadow
+224  89  47 Fire base
+255 162  60 Fire light
+184 128  31 Spark shadow
+242 194  48 Spark base
+255 243 166 Spark light
+ 61  42  46 Wood shadow
+122  74  53 Wood base
+178 122  74 Wood light
+138  90  68 Skin shadow
+217 154 116 Skin base
+245 207 168 Skin light
+ 29  58 107 Player 1 shadow
+ 59 115 201 Player 1 base
+127 192 240 Player 1 light
+122  35  71 Player 2 shadow
+217  71 122 Player 2 base
+245 154 184 Player 2 light
+ 31  74  58 Player 3 shadow
+ 63 143  79 Player 3 base
+143 212 106 Player 3 light
+ 74  42 107 Player 4 shadow
+138  79 196 Player 4 base
+201 154 240 Player 4 light

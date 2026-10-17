@@ -56,6 +56,7 @@ Each area README states the area's job, the milestone that builds and opens it, 
 - [content/rooms/README.md](content/rooms/README.md): room templates, one folder per biome.
 - [content/story/README.md](content/story/README.md): lore, dialogue and in-run story events.
 - [art/README.md](art/README.md): shared art (tilesets, UI, VFX): 32×32 pixel art, size limits, origin manifest.
+- [art/kit/README.md](art/kit/README.md): the art starter kit sources: palette files, grid and strip templates, golden examples, one-page checklist.
 - [audio/README.md](audio/README.md): shared audio (music, sound effects): `.ogg` only, size limits, origin manifest.
 - [tests/README.md](tests/README.md): the test tree, smoke test, benchmark and bots.
 - [tools/README.md](tools/README.md): local tools: how to run `tools/check.sh`, its flags and output.

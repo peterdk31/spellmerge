@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 32 32" shape-rendering="crispEdges">
+  <!-- Spellmerge 32x32 grid template. Open it in an editor and draw on a layer above it, then export your art
+       WITHOUT this grid at 32x32. This file is a template, not a game asset. Colours are palette colours.
+       Guides: Outline border = the cell; Spark light = centre lines; Fire light = the line a character's feet stand on
+       (about 2 px above the bottom edge); Player 1 light = the 1 px empty border where you can leave it. -->
+  <defs>
+    <pattern id="cell" width="1" height="1" patternUnits="userSpaceOnUse">
+      <rect x="0" y="0" width="1" height="0.06" fill="#a39fb8"/>
+      <rect x="0" y="0" width="0.06" height="1" fill="#a39fb8"/>
+    </pattern>
+  </defs>
+  <rect x="0" y="0" width="32" height="32" fill="#f4f1ea"/>
+  <rect x="0" y="0" width="32" height="32" fill="url(#cell)"/>
+  <rect x="15.95" y="0" width="0.1" height="32" fill="#f2c230"/>
+  <rect x="0" y="15.95" width="32" height="0.1" fill="#f2c230"/>
+  <rect x="1" y="1" width="30" height="0.1" fill="#7fc0f0"/>
+  <rect x="1" y="30.95" width="30" height="0.1" fill="#7fc0f0"/>
+  <rect x="1" y="1" width="0.1" height="30" fill="#7fc0f0"/>
+  <rect x="30.95" y="1" width="0.1" height="30" fill="#7fc0f0"/>
+  <rect x="0" y="29.95" width="32" height="0.1" fill="#ffa23c"/>
+  <rect x="0" y="0" width="32" height="0.15" fill="#14121f"/>
+  <rect x="0" y="31.85" width="32" height="0.15" fill="#14121f"/>
+  <rect x="0" y="0" width="0.15" height="32" fill="#14121f"/>
+  <rect x="31.85" y="0" width="0.15" height="32" fill="#14121f"/>
+</svg>

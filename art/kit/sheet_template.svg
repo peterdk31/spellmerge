@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1040" height="896" viewBox="0 0 260 224" shape-rendering="crispEdges">
+  <!-- Spellmerge animation strip template (4x zoom). One animation = one horizontal strip, frame 1 at the left, each
+       frame 32 px wide (docs/STYLE.md, "Animation frame counts"). Draw one animation per file: for example idle.png is
+       the first row cut out at 128x32. Light cells are frames; dark cells are unused. The labels are outside the sheet
+       (x from 192). This file is a template, not a game asset. -->
+  <defs>
+    <pattern id="cell" width="1" height="1" patternUnits="userSpaceOnUse">
+      <rect x="0" y="0" width="1" height="0.06" fill="#a39fb8"/>
+      <rect x="0" y="0" width="0.06" height="1" fill="#a39fb8"/>
+    </pattern>
+  </defs>
+  <rect x="0" y="0" width="260" height="224" fill="#d4d0e0"/>
+  <!-- unused cells -->
+  <rect x="128" y="0" width="64" height="32" fill="#4a4663"/>
+  <rect x="64" y="64" width="128" height="32" fill="#4a4663"/>
+  <rect x="128" y="96" width="64" height="32" fill="#4a4663"/>
+  <rect x="128" y="128" width="64" height="32" fill="#4a4663"/>
+  <rect x="64" y="160" width="128" height="32" fill="#4a4663"/>
+  <!-- used cells -->
+  <rect x="0" y="0" width="128" height="32" fill="#f4f1ea"/>
+  <rect x="0" y="32" width="192" height="32" fill="#f4f1ea"/>
+  <rect x="0" y="64" width="64" height="32" fill="#f4f1ea"/>
+  <rect x="0" y="96" width="128" height="32" fill="#f4f1ea"/>
+  <rect x="0" y="128" width="128" height="32" fill="#f4f1ea"/>
+  <rect x="0" y="160" width="64" height="32" fill="#f4f1ea"/>
+  <rect x="0" y="192" width="192" height="32" fill="#f4f1ea"/>
+  <rect x="0" y="0" width="192" height="224" fill="url(#cell)"/>
+  <!-- feet line in every row: 2 px above the bottom edge of the cell -->
+  <rect x="0" y="29.95" width="192" height="0.1" fill="#ffa23c"/>
+  <rect x="0" y="61.95" width="192" height="0.1" fill="#ffa23c"/>
+  <rect x="0" y="93.95" width="192" height="0.1" fill="#ffa23c"/>
+  <rect x="0" y="125.95" width="192" height="0.1" fill="#ffa23c"/>
+  <rect x="0" y="157.95" width="192" height="0.1" fill="#ffa23c"/>
+  <rect x="0" y="189.95" width="192" height="0.1" fill="#ffa23c"/>
+  <rect x="0" y="221.95" width="192" height="0.1" fill="#ffa23c"/>
+  <!-- strip borders -->
+  <rect x="0" y="0" width="192" height="0.15" fill="#14121f"/>
+  <rect x="0" y="31.92" width="192" height="0.15" fill="#14121f"/>
+  <rect x="0" y="63.92" width="192" height="0.15" fill="#14121f"/>
+  <rect x="0" y="95.92" width="192" height="0.15" fill="#14121f"/>
+  <rect x="0" y="127.92" width="192" height="0.15" fill="#14121f"/>
+  <rect x="0" y="159.92" width="192" height="0.15" fill="#14121f"/>
+  <rect x="0" y="191.92" width="192" height="0.15" fill="#14121f"/>
+  <rect x="0" y="223.85" width="192" height="0.15" fill="#14121f"/>
+  <text x="196" y="19" font-family="monospace" font-size="6" fill="#14121f">Idle 4 · 128x32</text>
+  <text x="196" y="51" font-family="monospace" font-size="6" fill="#14121f">Walk 6 · 192x32</text>
+  <text x="196" y="83" font-family="monospace" font-size="6" fill="#14121f">Hurt 2 · 64x32</text>
+  <text x="196" y="115" font-family="monospace" font-size="6" fill="#14121f">Dodge 4 · 128x32</text>
+  <text x="196" y="147" font-family="monospace" font-size="6" fill="#14121f">Cast 4 · 128x32</text>
+  <text x="196" y="179" font-family="monospace" font-size="6" fill="#14121f">Downed 2 · 64x32</text>
+  <text x="196" y="211" font-family="monospace" font-size="6" fill="#14121f">Death 6 · 192x32</text>
+</svg>

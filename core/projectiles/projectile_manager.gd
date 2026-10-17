@@ -203,7 +203,7 @@ func clear() -> void:
 	_owned.fill(0)
 	_own_head.fill(-1)
 	_own_tail.fill(-1)
-	drawn = 0
+	# `drawn` stays: the next update_draw() must still empty the batch.
 
 
 ## Live projectiles.
@@ -256,20 +256,20 @@ func get_target_count() -> int:
 
 
 ## Start a projectile for `player` (0-3, or Events.NO_PLAYER for an enemy) at
-## `position`, moving `velocity` pixels per second for `lifetime` seconds.
+## `origin`, moving `velocity` pixels per second for `lifetime` seconds.
 ## `pierce` is how many targets it passes through before it ends. Returns its
 ## slot, or -1 for bad arguments. A full cap never refuses: see the class doc.
-func spawn(player: int, position: Vector2, velocity: Vector2, lifetime: float, radius: float = 4.0, hit_layers: int = LAYER_ENEMY, pierce: int = 0) -> int:
+func spawn(player: int, origin: Vector2, velocity: Vector2, lifetime: float, radius: float = 4.0, hit_layers: int = LAYER_ENEMY, pierce: int = 0) -> int:
 	if player < EventsScript.NO_PLAYER or player >= MAX_PLAYERS:
 		return -1
-	if not (lifetime > 0.0) or not position.is_finite() or not velocity.is_finite():
+	if not (lifetime > 0.0) or not origin.is_finite() or not velocity.is_finite():
 		return -1
 	if _free_count == 0:
 		_drop_one()
 	_free_count -= 1
 	var slot: int = _free_slots[_free_count]
-	_pos[slot] = position
-	_prev[slot] = position
+	_pos[slot] = origin
+	_prev[slot] = origin
 	_vel[slot] = velocity
 	_life[slot] = lifetime
 	_radius[slot] = maxf(radius, 0.0)
@@ -282,15 +282,15 @@ func spawn(player: int, position: Vector2, velocity: Vector2, lifetime: float, r
 		_last_hit[slot * HIT_MEMORY + i] = 0
 	_alive[slot] = 1
 	_count += 1
-	var owner: int = player + 1
-	_owned[owner] += 1
-	_own_prev[slot] = _own_tail[owner]
+	var owner_index: int = player + 1
+	_owned[owner_index] += 1
+	_own_prev[slot] = _own_tail[owner_index]
 	_own_next[slot] = -1
-	if _own_tail[owner] >= 0:
-		_own_next[_own_tail[owner]] = slot
+	if _own_tail[owner_index] >= 0:
+		_own_next[_own_tail[owner_index]] = slot
 	else:
-		_own_head[owner] = slot
-	_own_tail[owner] = slot
+		_own_head[owner_index] = slot
+	_own_tail[owner_index] = slot
 	if slot >= _high:
 		_high = slot + 1
 	return slot
@@ -387,18 +387,18 @@ func _kill(slot: int) -> void:
 	_free_slots[_free_count] = slot
 	_free_count += 1
 	_count -= 1
-	var owner: int = _player[slot] + 1
-	_owned[owner] -= 1
+	var owner_index: int = _player[slot] + 1
+	_owned[owner_index] -= 1
 	var before: int = _own_prev[slot]
 	var after: int = _own_next[slot]
 	if before >= 0:
 		_own_next[before] = after
 	else:
-		_own_head[owner] = after
+		_own_head[owner_index] = after
 	if after >= 0:
 		_own_prev[after] = before
 	else:
-		_own_tail[owner] = before
+		_own_tail[owner_index] = before
 	while _high > 0 and _alive[_high - 1] == 0:
 		_high -= 1
 

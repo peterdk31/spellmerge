@@ -320,13 +320,13 @@ func _test_cap_never_exceeded_and_nothing_grows() -> void:
 func _test_slots_are_reused() -> void:
 	_setup()
 	_mgr.set_cap(8)
-	for round in 50:
+	for round_index in 50:
 		for i in 8:
-			_mgr.spawn(round % 4, Vector2.ZERO, Vector2(10.0, 0.0), 0.1)
-		_check(_mgr.get_count() == 8, "round %d fills the 8 slots" % round)
+			_mgr.spawn(round_index % 4, Vector2.ZERO, Vector2(10.0, 0.0), 0.1)
+		_check(_mgr.get_count() == 8, "round %d fills the 8 slots" % round_index)
 		for step in 7:
 			_mgr.step(DT)
-		_check(_mgr.get_count() == 0, "round %d: all expired" % round)
+		_check(_mgr.get_count() == 0, "round %d: all expired" % round_index)
 	_check(_mgr.dropped == 0, "reuse never needed a drop")
 	_check(_mgr._pos.size() == 8, "still 8 slots")
 	var slot: int = _mgr.spawn(0, Vector2.ZERO, Vector2.ZERO, 1.0)
@@ -385,6 +385,7 @@ func _test_one_thousand_run_and_draw() -> void:
 	_mgr.clear()
 	_mgr.update_draw()
 	_check(_mgr.drawn == 0 and _mgr.get_count() == 0, "clear empties the batch")
+	_check(_mgr._draw_node.multimesh.visible_instance_count == 0, "clear empties the drawn multimesh, not just the counter")
 	root.remove_child(_mgr)
 
 

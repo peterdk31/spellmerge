@@ -10,11 +10,11 @@ Element reactions are content data, so contributors add them without touching th
 
 ## Contract
 
-- **Public entry script:** `gameplay/combat/combat.gd`. Other code uses only this script and the events it sends and listens to; nothing else in the folder is public. The script arrives when the area is built.
+- **Public entry script:** `gameplay/combat/combat.gd`. Other code uses only this script and the events it sends and listens to; nothing else in the folder is public. It is the autoload `Combat`. Spawners tell it what a shot does with `Combat.set_hit_profile(tag, damage, knockback)`; enemies register with `Combat.register_enemy(node, health, hurt_radius, contact_damage)` and wizards with `Combat.register_player(index, node, radius)`. `Combat.hit(player, target, amount, direction, strength)` is the pipeline for hits that do not come from a projectile.
 - **Dependency direction:** `core` ← `gameplay` ← `content`. This area may use `core/` and the registry. `core/` never depends on it, and content never reaches into it.
 - **Events** (`core/events/events.gd` owns the definitions; this list matches it and the table in [gameplay/README.md](../README.md)):
   - Sends: `enemy_died`, `damage_dealt`, `status_applied`.
-  - Listens to: `projectile_hit` (from `core/projectiles`) and `spell_cast`.
+  - Listens to: `projectile_hit` (from `core/projectiles`). It does not use `spell_cast` yet.
 - Areas never call each other directly; they talk through events. [gameplay/README.md](../README.md) has the rules every sub-area shares.
 
 ## Allowed files
@@ -27,7 +27,7 @@ Not open yet. When it opens, follow the steps and test layout in [gameplay/READM
 
 ## Example to copy
 
-Arrives with Claude's first code for this area. Do not guess its layout before then.
+`gameplay/combat/combat.gd` is the example, and `tests/gameplay/combat/test_combat.gd` shows how to test it (damage, knockback, death and contact hits, with several players). Hits arrive as `projectile_hit` events on a test bus; time moves with `Combat.step(delta)`. Combat never moves enemies: whoever moves an enemy adds `Combat.consume_knockback_step(enemy, delta)` to its own velocity each physics frame.
 
 ## Validate
 

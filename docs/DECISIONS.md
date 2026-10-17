@@ -6,8 +6,8 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 
 **Decided by:** Claude.
 **Context:** The shipped presets exclude `tests/*`, so the exported game has no `four_bot_smoke.gd`. Dropping the exclusion would put test scripts in every release.
-**Decision:** a fourth preset, `Linux Test`, in `export_presets.cfg` (Claude-maintained) with no exclusion and its own path `build/linux-test/`; the release presets are unchanged. The step that exports it and runs the test is in `ci/build/build.sh` (owner-only), so it is written in `docs/BACKLOG.md` under "Needs an owner decision".
-**Consequence:** until the owner adds the step, the test runs only through `build.sh --quick --tests`.
+**Decision:** a fourth preset, `Linux Test`, in `export_presets.cfg` (Claude-maintained) with no exclusion and its own path `build/linux-test/`; the release presets are unchanged. It is a copy of `Linux` (including `custom_features="full"`, so the test runs the same feature set as the shipped desktop build) and must stay one: `tests/smoke/test_export_presets.gd` fails if the two differ in anything but name, `runnable`, `exclude_filter` and `export_path`. The step that exports it and runs the test is in `ci/build/build.sh` (owner-only), so it is asked as an `owner-change` owner question with the exact lines. The step greps the run's log for `SMOKE OK`, so a release template that ignores `--script` fails the step instead of passing without running the test.
+**Consequence:** until the owner adds the step, the test runs only through `build.sh --quick --tests`. If the exported binary refuses `--script`, the fallback is an autoload reading a user argument (`-- --four-bot`), a game-side change.
 
 ## 2026-10-17: The owner inbox
 

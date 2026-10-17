@@ -8,17 +8,7 @@ Not kept here any more: each question is an issue labelled `owner-question` (doc
 
 ## Needs an owner decision
 
-- **Run the 4-bot test in the Linux export (M1 part 21).** `export_presets.cfg` has a new preset, `Linux Test` (same as `Linux` but `exclude_filter=""`, exported to `build/linux-test/`), because the shipped presets exclude `tests/*` and the test must not be shipped. `ci/build/build.sh` is owner-only, so the owner adds this at the end of `export_all()`, after the "Boot smoke test (exported Linux build)" step (`package()` zips only web, windows and linux, so the test build is never released):
-
-  ```bash
-  step "4-bot test (exported Linux build with tests)"
-  rm -rf build/linux-test && mkdir -p build/linux-test
-  godot_checked export-linux-test "$GODOT" --headless --path . --export-release "Linux Test" build/linux-test/Spellmerge.x86_64
-  [[ -s build/linux-test/Spellmerge.x86_64 ]] || { echo "::error::Linux Test export produced no binary"; exit 1; }
-  godot_checked four-bot-linux build/linux-test/Spellmerge.x86_64 --headless --script res://tests/smoke/four_bot_smoke.gd
-  ```
-
-  Not verified: no session may run the export, so it is untested that an exported binary accepts `--script` and that the `Linux Test` preset exports. If `--script` is refused, the fallback is a user argument read by an autoload (`-- --four-bot`), which is a game-side change for a later session.
+None now. The owner-only `build.sh` step for the 4-bot test (M1 part 21) is an `owner-question` issue, not a line here.
 
 ## Audio needs
 

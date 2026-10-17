@@ -19,6 +19,13 @@ extends Node
 ## Events bus. Nothing here allocates per frame; events allocate only when a
 ## bot sends one.
 ##
+## A player's input can be captured (set_captured) while one of their UI panels
+## is open: the gameplay questions below (get_move, get_strength,
+## is_action_pressed, is_action_just_pressed) then answer "nothing" for the
+## actions in CAPTURED_ACTIONS, so a wizard does not walk, cast or dodge while
+## their player works a menu. Gameplay needs no extra check. core/ui_focus reads
+## get_press_count instead, which is never captured.
+##
 ## Several inputs can feed one action (W and Up, the d-pad and the stick). Each
 ## input is tracked as its own source and the action takes the strongest one, so
 ## letting go of one input never cancels another that is still held.
@@ -53,6 +60,11 @@ const SOURCE_MOUSE: int = 1 << 40
 const SOURCE_BUTTON: int = 2 << 40
 const SOURCE_AXIS: int = 3 << 40
 const SOURCE_VIRTUAL: int = 4 << 40
+## The actions hidden from gameplay while a player is captured. `overlay` stays
+## readable so the overlay can close itself with its own button.
+const CAPTURED_ACTIONS: Array[StringName] = [
+	&"move_left", &"move_right", &"move_up", &"move_down", &"dodge", &"cast",
+]
 const JOIN: StringName = &"join"
 const LEAVE: StringName = &"leave"
 
@@ -68,6 +80,10 @@ var _sources: Array[Dictionary] = []
 ## Per player: action -> the process or physics frame of the last press.
 var _pressed_process: Array[Dictionary] = []
 var _pressed_physics: Array[Dictionary] = []
+## Per player: action -> how many times it went down since the start. Unlike the
+## press frames, a tap that is released within the same frame still counts.
+var _press_count: Array[Dictionary] = []
+var _captured: Array[bool] = []
 
 
 func _init() -> void:
@@ -77,15 +93,19 @@ func _init() -> void:
 		var sources: Dictionary = {}
 		var process: Dictionary = {}
 		var physics: Dictionary = {}
+		var counts: Dictionary = {}
 		for action in ACTIONS:
 			strength[action] = 0.0
 			sources[action] = {}
 			process[action] = -1
 			physics[action] = -1
+			counts[action] = 0
 		_strength.append(strength)
 		_sources.append(sources)
 		_pressed_process.append(process)
 		_pressed_physics.append(physics)
+		_press_count.append(counts)
+		_captured.append(false)
 
 
 func _ready() -> void:
@@ -164,6 +184,7 @@ func leave(player: int) -> bool:
 		return false
 	var device: int = _devices[player]
 	_devices[player] = NO_DEVICE
+	_captured[player] = false
 	for action in ACTIONS:
 		_strength[player][action] = 0.0
 		_sources[player][action].clear()
@@ -209,7 +230,7 @@ func handle_event(event: InputEvent) -> void:
 
 ## The move direction of `player`, length 0 to 1 (a diagonal is not faster).
 func get_move(player: int) -> Vector2:
-	if not _valid(player):
+	if not _valid(player) or _captured[player]:
 		return Vector2.ZERO
 	var strength: Dictionary = _strength[player]
 	var move := Vector2(
@@ -220,7 +241,7 @@ func get_move(player: int) -> Vector2:
 
 ## How far `action` is held by `player`, 0 to 1.
 func get_strength(player: int, action: StringName) -> float:
-	if not _valid(player) or not _strength[player].has(action):
+	if not _valid(player) or not _strength[player].has(action) or _is_hidden(player, action):
 		return 0.0
 	return _strength[player][action]
 
@@ -236,11 +257,36 @@ func is_action_pressed(player: int, action: StringName) -> bool:
 ## steps run in one frame, a press can be missed there; read presses in
 ## _process when none may be lost.
 func is_action_just_pressed(player: int, action: StringName) -> bool:
-	if not _valid(player) or not _strength[player].has(action):
+	if not _valid(player) or not _strength[player].has(action) or _is_hidden(player, action):
 		return false
 	if Engine.is_in_physics_frame():
 		return _pressed_physics[player][action] == Engine.get_physics_frames()
 	return _pressed_process[player][action] == Engine.get_process_frames()
+
+
+## How many times `action` went down for `player` since the start, captured or
+## not. Compare it with the value you saw last to find presses without losing a
+## tap that was released again before you looked.
+func get_press_count(player: int, action: StringName) -> int:
+	if not _valid(player) or not _press_count[player].has(action):
+		return 0
+	return _press_count[player][action]
+
+
+## Capture or free the gameplay input of `player` (see the class comment). Keys
+## stay tracked meanwhile, so a direction still held when the capture ends
+## carries on. A player who leaves is freed.
+func set_captured(player: int, captured: bool) -> void:
+	if _valid(player):
+		_captured[player] = captured
+
+
+func is_captured(player: int) -> bool:
+	return _valid(player) and _captured[player]
+
+
+func _is_hidden(player: int, action: StringName) -> bool:
+	return _captured[player] and CAPTURED_ACTIONS.has(action)
 
 
 func _valid(player: int) -> bool:
@@ -313,6 +359,7 @@ func _set_strength(player: int, action: StringName, strength: float) -> void:
 	var was_down: bool = float(_strength[player][action]) > 0.0
 	_strength[player][action] = strength
 	if strength > 0.0 and not was_down:
+		_press_count[player][action] = int(_press_count[player][action]) + 1
 		_pressed_process[player][action] = Engine.get_process_frames()
 		_pressed_physics[player][action] = Engine.get_physics_frames()
 

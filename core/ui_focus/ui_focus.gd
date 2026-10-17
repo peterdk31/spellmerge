@@ -17,9 +17,22 @@ extends Node
 ##
 ## Controls: move_up and move_left go to the previous control, move_down and
 ## move_right to the next (wrapping round); `cast` activates the focused
-## control and `dodge` cancels. A button already held when the panel opens (the
-## one that opened it) does nothing until it is let go. Controls that are hidden
-## or have `disabled` set are skipped. Nothing here allocates per frame.
+## control and `dodge` cancels. Presses come from PlayerInput's press counter,
+## so even a tap released within one frame is not lost, and a button already
+## held when the panel opens (the one that opened it) does nothing until it is
+## let go and pressed again.
+##
+## While a panel is open its owner's gameplay input is captured
+## (PlayerInput.set_captured): the wizard does not walk, cast or dodge, and
+## gameplay needs no check of its own. The other players are not affected.
+##
+## A control can take focus when it is valid, visible in the tree (a hidden
+## parent counts; a control not in the tree uses its own `visible`) and does not
+## have `disabled` set. Its `focus_mode` is ignored, since Godot's focus is
+## never used. The focused control is checked again every frame and before
+## each activation: if it was disabled, hidden or freed, focus moves on to the
+## next usable control (or to none) and nothing is activated for it. Nothing
+## here allocates per frame.
 
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
@@ -56,8 +69,8 @@ var events: EventsScript = null
 var _controls: Array[Array] = []
 var _open: Array[bool] = []
 var _focus: Array[int] = []
-## Per player: action -> was it held at the last poll (for press edges).
-var _held: Array[Dictionary] = []
+## Per player: action -> PlayerInput's press count at the last poll.
+var _seen: Array[Dictionary] = []
 
 
 func _init() -> void:
@@ -66,10 +79,10 @@ func _init() -> void:
 		_controls.append(controls)
 		_open.append(false)
 		_focus.append(NO_FOCUS)
-		var held: Dictionary = {}
+		var seen: Dictionary = {}
 		for action in WATCHED:
-			held[action] = false
-		_held.append(held)
+			seen[action] = 0
+		_seen.append(seen)
 
 
 func _ready() -> void:
@@ -85,8 +98,8 @@ func _process(_delta: float) -> void:
 	poll()
 
 
-## Read the input of every player with an open panel and act on new presses.
-## Called every frame by _process; tests call it directly.
+## Read the input of every player with an open panel and act on new presses
+## since the last poll. Called every frame by _process; tests call it directly.
 func poll() -> void:
 	if input == null:
 		return
@@ -96,16 +109,23 @@ func poll() -> void:
 
 
 ## Open `player`'s panel with these controls, in order, and focus the first one
-## that can take focus. Returns false for a bad index or no controls. Opening
-## again replaces the controls.
+## that can take focus, and capture the player's gameplay input. Returns false
+## for a bad index, no controls, or a player with no joined device (such a panel
+## could never be driven or closed). Opening a panel that is already open
+## replaces it: `closed` is sent for the old one, then `opened` for the new one.
 func open(player: int, controls: Array[Control]) -> bool:
 	if not _valid(player) or controls.is_empty():
 		return false
+	if input == null or not input.is_joined(player):
+		return false
+	if _open[player]:
+		close(player)
 	_controls[player].clear()
 	_controls[player].append_array(controls)
 	_open[player] = true
 	_focus[player] = NO_FOCUS
 	_prime(player)
+	input.set_captured(player, true)
 	opened.emit(player)
 	_focus_first(player)
 	return true
@@ -118,6 +138,8 @@ func close(player: int) -> bool:
 	_open[player] = false
 	_focus[player] = NO_FOCUS
 	_controls[player].clear()
+	if input != null:
+		input.set_captured(player, false)
 	closed.emit(player)
 	return true
 
@@ -129,7 +151,9 @@ func is_open(player: int) -> bool:
 ## The focused control of `player`, or null.
 func focused(player: int) -> Control:
 	var index: int = focus_index(player)
-	return null if index == NO_FOCUS else _controls[player][index] as Control
+	if index == NO_FOCUS or not is_instance_valid(_controls[player][index]):
+		return null
+	return _controls[player][index] as Control
 
 
 func focus_index(player: int) -> int:
@@ -153,11 +177,18 @@ func move_focus(player: int, step: int) -> void:
 
 
 ## Activate the focused control of `player`, as if the activate button was
-## pressed. Does nothing if the panel is closed or nothing is focused.
+## pressed. Does nothing if the panel is closed or nothing is focused. If the
+## focused control can no longer take focus, nothing is activated and focus
+## moves on to the next usable control instead (the player sees it, then
+## presses again).
 func activate(player: int) -> void:
+	if not is_open(player):
+		return
 	var control: Control = focused(player)
-	if control != null:
-		activated.emit(player, control)
+	if control == null or not _can_focus(control):
+		_revalidate(player)
+		return
+	activated.emit(player, control)
 
 
 ## Ask to go back, as if the cancel button was pressed.
@@ -171,29 +202,51 @@ func _valid(player: int) -> bool:
 
 
 func _poll_player(player: int) -> void:
-	var held: Dictionary = _held[player]
+	var seen: Dictionary = _seen[player]
 	for action in WATCHED:
-		var down: bool = input.is_action_pressed(player, action)
-		var pressed: bool = down and not held[action]
-		held[action] = down
-		# An earlier press in this poll may have closed the panel.
-		if not pressed or not _open[player]:
-			continue
-		if action == ACTIVATE:
-			activate(player)
-		elif action == CANCEL:
-			cancel(player)
-		elif PREVIOUS_ACTIONS.has(action):
-			move_focus(player, -1)
-		else:
-			move_focus(player, 1)
+		var count: int = input.get_press_count(player, action)
+		var presses: int = count - int(seen[action])
+		seen[action] = count
+		# An earlier press in this poll may have closed or replaced the panel.
+		for _press in presses:
+			if not _open[player]:
+				break
+			if action == ACTIVATE:
+				activate(player)
+			elif action == CANCEL:
+				cancel(player)
+			elif PREVIOUS_ACTIONS.has(action):
+				move_focus(player, -1)
+			else:
+				move_focus(player, 1)
+	# After the presses, so a press never lands on a control the player has not
+	# seen focused.
+	_revalidate(player)
 
 
-## Remember what is held now, so a button that was already down is not a press.
+## Remember the press counts now, so presses from before the panel opened (and a
+## button still held from then) are not acted on.
 func _prime(player: int) -> void:
-	var held: Dictionary = _held[player]
+	var seen: Dictionary = _seen[player]
 	for action in WATCHED:
-		held[action] = input != null and input.is_action_pressed(player, action)
+		seen[action] = input.get_press_count(player, action)
+
+
+## If the focused control can no longer take focus (disabled, hidden, freed),
+## move focus to the next usable control, or to none.
+func _revalidate(player: int) -> void:
+	if not is_open(player):
+		return
+	var index: int = _focus[player]
+	if index == NO_FOCUS or _can_focus(_controls[player][index]):
+		return
+	var count: int = _controls[player].size()
+	for step in range(1, count):
+		var next: int = (index + step) % count
+		if _can_focus(_controls[player][next]):
+			_set_focus(player, next)
+			return
+	_focus[player] = NO_FOCUS
 
 
 func _focus_first(player: int) -> void:
@@ -210,8 +263,13 @@ func _set_focus(player: int, index: int) -> void:
 	focus_changed.emit(player, _controls[player][index])
 
 
-func _can_focus(control: Control) -> bool:
-	if not is_instance_valid(control) or not control.visible:
+## Takes a Variant because a stored control may have been freed since.
+func _can_focus(candidate: Variant) -> bool:
+	if not is_instance_valid(candidate):
+		return false
+	var control: Control = candidate
+	var shown: bool = control.is_visible_in_tree() if control.is_inside_tree() else control.visible
+	if not shown:
 		return false
 	var disabled: Variant = control.get(&"disabled")
 	return disabled != true

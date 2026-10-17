@@ -4,14 +4,14 @@
 
 Room templates, one folder per biome. A room is a tile-based arena where a wave of enemies is fought, a reward is picked or a story event happens.
 
-**Opens for PRs in M3** (Run structure; see "Opens for PRs" in docs/ROADMAP.md). **The example to copy arrives with Claude's first room in M3**; this README is updated then with its path. Biome folders are created with the first content.
+**Opens for PRs in M3** (Run structure; see "Opens for PRs" in docs/ROADMAP.md). A small M1 base class already exists (`core/base/room_base.gd`, `RoomBase`); M3 extends it. **The example to copy arrives with Claude's first room (the M1 crypt arena, then M3)**; this README is updated then with its path. Biome folders are created with the first content.
 
 ## Contract
 
-- A room is a `.tscn` scene with a tilemap, plus a `.tres` describing it on the room base class (arrives in M3).
+- A room is a `.tscn` scene with a tilemap, plus a `.tres` describing it on the room base class (`RoomBase`, with the M1 fields `id`, `demo`, `scene`, `player_spawns`, `enemy_spawns` and `doors`; M3 extends it).
 - Rooms are discovered by folder through `core/registry`: put it in its biome's folder, no list to edit.
 - Space for four: the room must be playable and readable with 4 wizards, with room to dodge and no spot where a player can get stuck.
-- Valid doors and spawns: the required doors, spawn points for 4 players, and enemy spawn points that are reachable and not inside walls. Validators for this arrive with the room base class.
+- Valid doors and spawns: the required doors, spawn points for 4 players, and enemy spawn points that are reachable and not inside walls. Validators for this arrive when M3 extends the room base class.
 - Rooms hold layout only. Enemies come from `content/enemies/` through the spawn points and the `gameplay/` systems; do not reference other areas directly.
 - Tiles come from the shared tilesets in `art/tilesets/`; do not add new art here.
 
@@ -29,7 +29,7 @@ Room templates, one folder per biome. A room is a tile-based arena where a wave 
 
 ## Example to copy
 
-Arrives with Claude's first content in M3. Do not guess its layout before then.
+Arrives with Claude's first content (the M1 crypt arena, then M3). Do not guess its layout before then.
 
 ## Validate
 

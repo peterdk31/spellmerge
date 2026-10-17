@@ -4,15 +4,15 @@
 
 Regular enemies and their attack patterns. Enemies create the "readable chaos" of the game: clear telegraphs, distinct roles, fair at any player count.
 
-**Opens for PRs in M3** (Run structure; see "Opens for PRs" in docs/ROADMAP.md). **The example to copy arrives with Claude's first enemy in M3**; this README is updated then with its path.
+**Opens for PRs in M3** (Run structure; see "Opens for PRs" in docs/ROADMAP.md). A small M1 base class already exists (`core/base/enemy_base.gd`, `EnemyBase`); M3 extends it. **The example to copy arrives with Claude's first enemy (the M1 ember imp, then M3)**; this README is updated then with its path.
 
 ## Contract
 
-- An enemy is one folder with a `.tres` resource on the enemy base class (arrives in M3), an optional `.gd` for a new attack pattern, a `.tscn` scene and sprites.
+- An enemy is one folder with a `.tres` resource on the enemy base class (`EnemyBase`, with the M1 fields `id`, `demo`, `max_health`, `move_speed`, `contact_damage` and `scene`; M3 extends it), an optional `.gd` for a new attack pattern, a `.tscn` scene and sprites.
 - Use the shared behaviours from `gameplay/ai` (steering, targeting) through the base class; do not reimplement them. Targeting considers all players, indices 0–3.
 - Every attack has a visible telegraph before it deals damage.
 - Enemy health and count scale with player count; use the scaling the base class provides rather than your own.
-- Enemies come from pools; no per-frame allocations. Respect the particle and sprite sheet limits (1 MB per sprite sheet; validators for the rest arrive with the base class).
+- Enemies come from pools; no per-frame allocations. Respect the particle and sprite sheet limits (1 MB per sprite sheet; validators for the rest arrive when M3 extends the base class).
 - Communicate only through `core/` events (`enemy_died`, ...). Original names and art only.
 
 ## Allowed files
@@ -30,7 +30,7 @@ Regular enemies and their attack patterns. Enemies create the "readable chaos" o
 
 ## Example to copy
 
-Arrives with Claude's first content in M3. Do not guess its layout before then.
+Arrives with Claude's first content (the M1 ember imp, then M3). Do not guess its layout before then.
 
 ## Validate
 

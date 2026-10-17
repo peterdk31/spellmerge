@@ -4,11 +4,11 @@
 
 The spell components that players assemble into spells: **forms** (bolt, beam, nova, rune, orbit), **elements** (fire, frost, storm, void), **modifiers** (split, pierce, homing, chain, bigger, faster) and **triggers** (on hit, on expire, timer). A spell is built as form → element → modifiers → trigger, and a trigger holds another spell. Few components, many combinations: this is the game's first pillar (docs/DESIGN.md).
 
-**Opens for PRs in M2** (Spell system; see "Opens for PRs" in docs/ROADMAP.md). Until then, PRs to this folder are a gamble. **The example to copy arrives with Claude's first spell content in M2**; this README is updated then with its path.
+**Opens for PRs in M2** (Spell system; see "Opens for PRs" in docs/ROADMAP.md). Until then, PRs to this folder are a gamble. A small M1 base class already exists (`core/base/spell_base.gd`, `SpellBase`); M2 replaces or extends it with the real component classes. **The example to copy arrives with Claude's first spell content (the M1 fire bolt, then M2)**; this README is updated then with its path.
 
 ## Contract
 
-- A component is one folder holding a `.tres` resource on the spell component base class, an optional `.gd` for new behaviour, an icon and an optional SFX. The base class and its documented fields arrive in M2; validators for missing or out-of-range values arrive with it.
+- A component is one folder holding a `.tres` resource on the spell component base class, an optional `.gd` for new behaviour, an icon and an optional SFX. Today the base class is `SpellBase` with the M1 fields `id`, `demo`, `display_name`, `mana_cost`, `cooldown`, `damage`, `speed` and `lifetime`. M2 replaces or extends it with the component classes and their documented fields, and adds validators for missing or out-of-range values.
 - Content is discovered by folder through `core/registry`. Do not edit any central list.
 - Element interactions go in `reactions.tres` (in this folder), so a new element does not need changes in other components.
 - Components may depend only on `core/`. They never call other areas; they talk through `core/` events (`spell_cast`, ...).
@@ -31,7 +31,7 @@ The spell components that players assemble into spells: **forms** (bolt, beam, n
 
 ## Example to copy
 
-Arrives with Claude's first content in M2. Do not guess its layout before then.
+Arrives with Claude's first content (the M1 fire bolt, then M2). Do not guess its layout before then.
 
 ## Validate
 

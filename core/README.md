@@ -10,15 +10,15 @@ The shared services every other area stands on: the event bus, the content regis
 
 - **Dependency direction:** `core` ← `gameplay` ← `content`. `core/` depends on none of `gameplay/`, `hud/` or `content/`. It finds content by folder through `core/registry`.
 - **Sub-folders, one per service:**
-  - `events/`: the event bus (`spell_cast`, `enemy_died`, `player_downed`, `room_cleared`, ...). Areas talk only through it. It owns the event definitions; each area's README lists only which events the area sends and listens to (names provisional until M1).
+  - `events/`: the event bus (`spell_cast`, `enemy_died`, `player_downed`, `room_cleared`, ...). One autoload, `Events` (`events/events.gd`), with a typed signal per event and the player index first. Areas talk only through it. It owns the event definitions; each area's README lists only which events the area sends and listens to.
   - `registry/`: discovers content by folder, so no central list is edited. Everyone else loads with literal paths only.
   - `input/`: the player manager; devices join with a button press and each player gets their own device.
   - `ui_focus/`: per-player UI focus, because Godot has one global focus. Every widget builds on it.
   - `save/`: reading and writing under `user://` only.
-  - `base/`: base classes and build info (`build_info.gd`).
+  - `base/`: base classes (`spell_base.gd`, `enemy_base.gd`, `room_base.gd`: small M1 resources with `id` and `demo`; M2 and M3 replace or extend them) and build info (`build_info.gd`).
   - `projectiles/`: the projectile manager for thousands of projectiles.
   - `pools/`: object pools; no per-frame allocations.
-- Most services arrive in M1 (docs/ROADMAP.md). Folders without code yet only hold a `.gitkeep`; so far only `base/` has code (`build_info.gd`). Each service gets its entry script and a section here when it is built.
+- Most services arrive in M1 (docs/ROADMAP.md). Folders without code yet only hold a `.gitkeep`; so far `base/` and `events/` have code. Each service gets its entry script and a section here when it is built.
 - Services that act per player take a player index 0–3. Nothing assumes a single player.
 
 ## Allowed files

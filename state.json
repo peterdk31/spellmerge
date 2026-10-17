@@ -2,7 +2,7 @@
   "alarms": {},
   "automation_started": "2026-10-16T16:49:06Z",
   "backoff_until": null,
-  "last_own_merge": "2026-10-17T02:30:18Z",
+  "last_own_merge": "2026-10-17T02:52:55Z",
   "limits": {
     "week_tokens": null,
     "window_tokens": null
@@ -36,11 +36,6 @@
       "count": 0,
       "parked_reason": "I did not create the placeholder art. In this session every Python command needs an approval nobody can give, so I couldn't run my SVG generator or `tools/check.sh`. The branch `claude/20261017-placeholder-art-m1-part-4-hand` exists with no commits, and no repo files changed. A re-run with Python allowed can do the whole task.",
       "parked_until": "2026-10-24T00:38:16Z"
-    },
-    "**The enemy and its AI (M1 part 12).** Build a minimal `gameplay/ai/ai.gd` (chase and one telegraphed attack) and the enemy `content/enemies/ember_imp/` (`.tres` on the enemy base class, scene, using the part 4 sprite). Tests for the chase and the telegraph. Update the enemies and ai READMEs with the real example paths.": {
-      "count": 1,
-      "pr": "52",
-      "problems": "- The hand-written UID `uid://d2k7r4w9xn5pm` contains the digit '9'. Godot's UID alphabet is a\u2013y and 0\u20138, so this is an invalid UID. Godot will log an error or regenerate the file on import. The smoke build treats `ERROR:` lines as failures, so this can break the build. The PR itself says the `.uid` files were written by hand. Fix: Replace it with a valid UID, using only a\u2013y and 0\u20138, or let Godot generate the file and commit that. Check the other hand-written `.uid` file (`gameplay/ai/ai.gd.uid`) the same way.\n- The new AI test, the extended combat test and `ci/build/build.sh --quick` have never been run. The PR says there was no Godot binary. The tests exercise Godot-specific behaviour such as `root.add_child`, the `players` group, and typed `Array[AiScript]` holding `AiScript.new()` results. The \"final review: merge as is\" bar can't be met on unverified code. Fix: Run `godot --headless --path . --script res://tests/gameplay/ai/test_ai.gd`, the combat test and `tools/check.sh` plus `ci/build/build.sh --quick`. Fix any failures, then state in the PR that they pass.\n- `register_player` makes every wizard a projectile target for as long as it is registered, including while it is downed or dodging. An enemy shot that reaches a downed teammate is consumed by `_hit_player`, which does nothing, so the downed body acts as a shield for the standing players behind it. Co-op shots then behave unpredictably. Fix: Skip or remove the target while the wizard is downed. For example, have the projectile hit path check `is_downed()` and let the shot pass, or have Combat remove the target on `player_downed` and re-add it on `player_revived`. Add a test for it."
     }
   },
   "triage_closed": {

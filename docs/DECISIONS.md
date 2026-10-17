@@ -417,3 +417,12 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - Opening an overlay ends a dash in progress (cooldown stays), so a captured player is fully frozen.
 - Physics layers: 1 walls, 2 players, 3 enemies, 4 projectiles and hit boxes (in the player README); `core/` is asked to name them in `project.godot`.
 
+
+## 2026-10-17: Unfinished sessions keep their work
+
+**Decided by:** the owner ("work should not be thrown out").
+
+- A session that stops before it is done (usage limit, error, timeout, or no result) but has commits pushes them to its task's branch in a draft PR titled `Unfinished: <task>`, with a note saying why. It is not reviewed or merged; the next session for the task finds the PR by its branch and continues it, and the PR becomes ready for review when that session finishes.
+- An unfinished revision is pushed to its PR with the same note, and the final review is skipped, so the next session continues the PR.
+- The implement job may run 4 hours (its Claude step stops at 200 minutes) and the revise job 3 hours (150 minutes), so a step that runs too long still leaves time to package and keep its commits.
+- Triage already skips draft PRs, so an unfinished PR is never rated as a contribution.

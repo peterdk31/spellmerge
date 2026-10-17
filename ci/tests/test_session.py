@@ -231,6 +231,36 @@ class PublishTest(unittest.TestCase):
             self.assertEqual(session.open_pr(CFG, "claude/20261016-x"), {})
         self.assertEqual(session.open_pr(CFG, "main"), {})
 
+    def test_task_title(self) -> None:
+        self.assertEqual(session.task_title("**Unit tests for spells.** Add tests for ..."), "Unit tests for spells")
+        self.assertEqual(session.task_title("Fix the HUD."), "Fix the HUD")
+        self.assertEqual(session.task_title(""), "Claude's work")
+
+    def _publish(self, api: mock.Mock, mode: str, pr: int | None = None) -> dict[str, str]:
+        done = mock.Mock(returncode=0, stdout="abcdef1234\n")
+        with mock.patch.object(session.subprocess, "run", return_value=done), \
+                mock.patch.object(session.gh, "api", api):
+            return session.publish(CFG, Path("work.bundle"), "claude/20261017-x", mode, {}, pr, "t",
+                                   unfinished="usage limit", task="**Unit tests.** More words.")
+
+    def test_unfinished_work_is_kept_in_a_draft_pr(self) -> None:
+        api = mock.Mock(side_effect=[[], {"number": 70}])
+        self.assertEqual(self._publish(api, "new"), {"saved_pr": "70", "branch": "claude/20261017-x"})
+        created = api.call_args_list[1].kwargs["input"]
+        self.assertTrue(created["draft"])
+        self.assertEqual(created["title"], "Unfinished: Unit tests")
+        self.assertIn("usage limit", created["body"])
+
+    def test_unfinished_work_on_an_open_pr_comments_without_a_review(self) -> None:
+        api = mock.Mock(side_effect=[[{"number": 19}], {}])
+        out = self._publish(api, "new")
+        self.assertEqual(out, {"saved_pr": "19", "branch": "claude/20261017-x"})
+        self.assertNotIn("sha", out)  # no sha: no review starts
+        self.assertIn("Pushed abcdef1", api.call_args_list[1].kwargs["input"]["body"])
+        pr = {"head": {"ref": "claude/20261017-x"}, "user": {"login": CFG.bot.login}, "state": "open"}
+        api = mock.Mock(side_effect=[pr, {}])
+        self.assertEqual(self._publish(api, "update", 19), {"saved_pr": "19", "branch": "claude/20261017-x"})
+
     def test_branch_names(self) -> None:
         self.assertTrue(session.valid_branch("claude/20261017-area-readmes"))
         for bad in ["main", "claude/../main", "claude/", "feature/x", "claude/x;rm -rf", "claude/X"]:

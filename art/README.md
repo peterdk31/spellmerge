@@ -6,6 +6,8 @@ Shared pixel art used by more than one thing: tilesets (`tilesets/`), UI art (`u
 
 **Opens for PRs in M1** (see "Opens for PRs" in docs/ROADMAP.md). Until then, PRs to this folder are a gamble.
 
+Palette files, grid templates and the one-page checklist are in [kit/](kit/README.md).
+
 ## Contract
 
 - Art depends on nothing. It holds files only, no logic.

@@ -44,6 +44,14 @@ func _initialize() -> void:
 	await process_frame
 	_expect(_count_runners() == 0, "a missing runner still added a node")
 
+	# `_ready` is the only caller of the command line lookup, which merges the user
+	# arguments (after "--") with the plain ones (the web page `args`). The test run
+	# has the script path and no `--four-bot`, so the merge must hold the former only.
+	var merged: PackedStringArray = menu.call("_cmdline_arguments") as PackedStringArray
+	var expected: int = OS.get_cmdline_user_args().size() + OS.get_cmdline_args().size()
+	_expect(merged.size() == expected, "the command line lookup lost arguments")
+	_expect(not menu.get("FOUR_BOT_ARGUMENT") in merged, "the test run saw --four-bot")
+
 	# The constant names a file that exists in this build, and the stub-free path loads it.
 	_expect(ResourceLoader.exists(String(menu.get("FOUR_BOT_RUNNER"))), "FOUR_BOT_RUNNER does not exist")
 	menu.free()

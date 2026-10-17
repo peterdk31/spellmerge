@@ -434,3 +434,14 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - GitHub refuses a push from the bot app when any pushed commit changes a file in `.github/workflows/`, even a merge that only takes in main's version. Run #103 lost a finished session this way: it merged main after #67 had changed `session.yml`.
 - The push tokens in `session.yml` ask for `workflows: write`, and the bot app has that permission.
 - Before every push, `publish` checks each file under `.github/`: it must match main or the branch as already pushed, or nothing is pushed. So the bot can take in the owner's workflow changes, but it can't make its own.
+
+## 2026-10-17: Making the unit tests pass
+
+- **Unit tests wait one frame** (`await process_frame` first in `_initialize`): in Godot 4.7 the root is not in the scene tree during `_initialize`. The rules for tests are in `tests/README.md`.
+- **Sorting `StringName`:** `Array.sort()` orders StringNames by address, not by letters. The registry sorts ids and folders by their text.
+- **Pool:** a pooled object is held as a `Variant` until checked, since assigning a freed object to an `Object` variable is an error.
+- **AI:** a freed target reads as `null`, so the AI keeps the target's instance id to know it was lost and looks again at once, as documented.
+- **Feel:** a plain hit never starts or extends a hit-stop while one runs; before, four players hitting every frame froze the game for ever. A kill still lengthens a shorter stop.
+- **Flow:** a failed restart is a `push_warning`, not a `push_error`: the run ends cleanly, a test provokes it, and the build fails on `ERROR:` lines.
+- **Mid-run joiners** take the free spawn farthest from enemies and wizards (part 17), so the coop test checks "a player spawn", not the one numbered like the slot.
+- **`player.gd` and `combat.gd`** read absolute autoload paths only inside the tree (tests build them outside it).

@@ -295,3 +295,14 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - The scene was built before the part 4 sprite existed, with an empty `Sprite` node; part 4 fills it in rather than part 9 inventing art. Part 9 ran before part 4 because the session picked it; it needs no art, and parts 10–12 build on the script. Part 4's done-when now asks for a visible sprite per player index.
 - Opening an overlay ends a dash in progress (cooldown stays), so a captured player is fully frozen.
 - Physics layers: 1 walls, 2 players, 3 enemies, 4 projectiles and hit boxes (in the player README); `core/` is asked to name them in `project.godot`.
+
+## 2026-10-17: Combat (M1 part 11)
+
+**Decided by:** Claude (details the task left open).
+
+- **Combat owns the tag table.** The earlier note said the spawner keeps the table from `tag` to damage and `combat` looks it up there. Content may use `gameplay/` (the dependency direction is `core` <- `gameplay` <- `content`) but `gameplay/` may not reach into content, so the bolt calls `Combat.set_hit_profile(tag, damage, knockback)` and combat keeps the table. Tag 0 stays "no tag".
+- **Enemy health lives in combat,** in packed rows, not on the enemy node: `register_enemy(node, health, hurt_radius, contact_damage)`; the AI (part 12) and the enemy scene hold no health. Death sends `enemy_died` and frees the node.
+- **Wizards decide their own damage.** Combat sends `damage_dealt` and the wizard takes it. It skips the event (no hit-stop or shake for nothing) when the wizard answers `is_invulnerable()` or `is_downed()`, found by `has_method` on registered wizard nodes. Wizards are not knocked back in M1; the player owns its movement.
+- **Contact damage** is a distance check per enemy row and registered wizard (4 at most), once per `CONTACT_COOLDOWN` (1 s) per wizard, since wizards have no invulnerability after a hit. First guesses, for the C1 tuning.
+- `damage_dealt` carries the requested amount, not the health actually removed (overkill is not trimmed).
+- Knockback speed is `direction * strength` (a hit overwrites any earlier push) and falls by `KNOCKBACK_DECAY` per second; it moves the enemy's `position` directly, so the AI should add its own movement to it.

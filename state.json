@@ -36,6 +36,11 @@
       "count": 0,
       "parked_reason": "I did not create the placeholder art. In this session every Python command needs an approval nobody can give, so I couldn't run my SVG generator or `tools/check.sh`. The branch `claude/20261017-placeholder-art-m1-part-4-hand` exists with no commits, and no repo files changed. A re-run with Python allowed can do the whole task.",
       "parked_until": "2026-10-24T00:38:16Z"
+    },
+    "**Pools and the projectile manager (M1 part 7).** Build `core/pools` (generic typed pool, no per-frame allocation) and `core/projectiles` (bulk simulation, one batched draw, spatial grid, a global cap that degrades gracefully, `projectile_hit` events), with tests for the cap, for reuse and for 1,000 projectiles. First example: `core/pools/pool.gd`.": {
+      "count": 1,
+      "pr": "46",
+      "problems": "- `clear()` sets `drawn = 0`, so the early return in `update_draw()` (`if _high == 0 and drawn == 0: return`) is taken right after it. `multimesh.visible_instance_count` and the buffer keep their old values. After `clear()` (room restart, `set_cap`), the old projectiles stay drawn, frozen, until the next shot is spawned. `test_projectiles.gd` only checks the `drawn` counter after `clear()`, so it passes. Fix: Don't let `clear()` zero `drawn` by itself. Remove `drawn = 0` from `clear()` so the next `update_draw()` writes `visible_instance_count = 0`. Or have `clear()` set `_draw_node.multimesh.visible_instance_count = 0` when the node exists. Add a test that reads `_draw_node.multimesh.visible_instance_count` after `clear()` and one `update_draw()`.\n- The parameter `position` (spawn) and the locals `owner` (spawn, _kill) shadow `Node2D.position` and `Node.owner`. This raises GDScript shadowing warnings and is easy to misread. Fix: Rename them, for example `origin` and `owner_index`. Do the same in the test's `round` loop variable, which shadows the builtin."
     }
   },
   "triage_closed": {

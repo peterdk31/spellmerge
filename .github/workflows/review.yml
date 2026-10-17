@@ -84,7 +84,7 @@ jobs:
           allowed_bots: "github-actions[bot]"
           prompt: ${{ steps.prepare.outputs.prompt }}
           claude_args: >-
-            --max-turns 40
+            --max-turns 80
             --allowedTools "Read,Glob,Grep,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*)"
             --disallowedTools "Write,Edit,MultiEdit,NotebookEdit,WebFetch,WebSearch"
             --json-schema '${{ steps.prepare.outputs.schema }}'

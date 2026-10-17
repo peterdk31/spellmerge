@@ -51,7 +51,8 @@ jobs:
     timeout-minutes: 120
     environment: automation
     outputs:
-      result: ${{ steps.claude.outputs.structured_output }}
+      # Falls back to the execution file when the step failed only for going over --max-turns.
+      result: ${{ steps.claude.outputs.structured_output || steps.usage.outputs.result }}
       usage_status: ${{ steps.usage.outputs.status }}
       usage_tokens: ${{ steps.usage.outputs.tokens }}
       usage_resets_at: ${{ steps.usage.outputs.resets_at }}
@@ -109,7 +110,7 @@ jobs:
           allowed_bots: "github-actions[bot]"
           prompt: ${{ steps.prepare.outputs.prompt }}
           claude_args: >-
-            --max-turns 150
+            --max-turns 400
             --allowedTools "Read,Write,Edit,MultiEdit,Glob,Grep,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git switch:*),Bash(git checkout:*),Bash(git add:*),Bash(git rm:*),Bash(git mv:*),Bash(git commit:*),Bash(git restore:*),Bash(git branch:*),Bash(git fetch:*),Bash(git merge:*),Bash(git rev-parse:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr list:*),Bash(gh pr checkout:*),Bash(gh issue view:*),Bash(gh issue list:*),Bash(tools/check.sh:*),Bash(ci/build/build.sh --quick),Bash(ci/build/build.sh --quick --tests),Bash(ls:*),Bash(mkdir:*),Bash(mv:*),Bash(cp:*),Bash(rm:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(diff:*),Bash(sort:*)"
             --disallowedTools "WebFetch,WebSearch,Edit(/.git/**),Write(/.git/**),MultiEdit(/.git/**),Edit(/ci/**),Write(/ci/**),MultiEdit(/ci/**),Edit(/.github/**),Write(/.github/**),MultiEdit(/.github/**),Edit(/tools/**),Write(/tools/**),MultiEdit(/tools/**)"
             --json-schema '${{ steps.prepare.outputs.schema }}'
@@ -215,7 +216,8 @@ jobs:
     timeout-minutes: 90
     environment: automation
     outputs:
-      result: ${{ steps.claude.outputs.structured_output }}
+      # Falls back to the execution file when the step failed only for going over --max-turns.
+      result: ${{ steps.claude.outputs.structured_output || steps.usage.outputs.result }}
       usage_status: ${{ steps.usage.outputs.status }}
       usage_tokens: ${{ steps.usage.outputs.tokens }}
       usage_resets_at: ${{ steps.usage.outputs.resets_at }}
@@ -271,7 +273,7 @@ jobs:
           allowed_bots: "github-actions[bot]"
           prompt: ${{ steps.prepare.outputs.prompt }}
           claude_args: >-
-            --max-turns 80
+            --max-turns 250
             --allowedTools "Read,Write,Edit,MultiEdit,Glob,Grep,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git switch:*),Bash(git checkout:*),Bash(git add:*),Bash(git rm:*),Bash(git mv:*),Bash(git commit:*),Bash(git restore:*),Bash(git branch:*),Bash(git fetch:*),Bash(git merge:*),Bash(git rev-parse:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr checkout:*),Bash(tools/check.sh:*),Bash(ci/build/build.sh --quick),Bash(ci/build/build.sh --quick --tests),Bash(ls:*),Bash(mkdir:*),Bash(mv:*),Bash(cp:*),Bash(rm:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(diff:*),Bash(sort:*)"
             --disallowedTools "WebFetch,WebSearch,Edit(/.git/**),Write(/.git/**),MultiEdit(/.git/**),Edit(/ci/**),Write(/ci/**),MultiEdit(/ci/**),Edit(/.github/**),Write(/.github/**),MultiEdit(/.github/**),Edit(/tools/**),Write(/tools/**),MultiEdit(/tools/**)"
             --json-schema '${{ steps.prepare.outputs.schema }}'

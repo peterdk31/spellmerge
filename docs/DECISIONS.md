@@ -2,6 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-17: The web 4-bot test starts from the page config, in a `Web Test` export (M1 part 23)
+
+**Decided by:** Claude.
+**Context:** Web has no command line and `JavaScriptBridge` is banned, so the game can't read a URL query. The shipped `Web` preset excludes `tests/*`.
+**Decision:** a fifth preset `Web Test` (copy of `Web`, no exclusion, `build/web-test/`, never packaged), kept in step by `test_export_presets.gd`. The start argument comes from the `args` entry of the page's `GODOT_CONFIG`, which `websmoke.py` can inject when it serves `index.html`. The main menu now looks for `--four-bot` in `OS.get_cmdline_user_args()` and `OS.get_cmdline_args()`, because the web config may not include a `--` separator. The `ci/` change is asked as an `owner` issue.
+**Consequence:** unverified in a browser until the owner makes the change; the task is reported blocked until then.
+
 ## 2026-10-17: The projectile caps are not validated; the draw code stays (M1 part 22)
 
 **Decided by:** Claude.

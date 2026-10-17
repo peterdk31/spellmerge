@@ -1,7 +1,7 @@
 extends SceneTree
-## `Linux Test` (the export that keeps tests/ for the 4-bot run) must stay a copy of
-## `Linux`: the two presets, and their options, differ only in name, runnable,
-## exclude_filter and export_path. A new option added to one must be added to both.
+## `Linux Test` and `Web Test` (the exports that keep tests/ for the 4-bot run) must stay
+## copies of `Linux` and `Web`: each pair, and their options, differ only in name,
+## runnable, exclude_filter and export_path. A new option added to one must be added to both.
 ##
 ## godot --headless --path . --script res://tests/smoke/test_export_presets.gd
 
@@ -13,7 +13,8 @@ var _failures: Array[String] = []
 
 func _initialize() -> void:
 	await process_frame
-	_test_linux_test_matches_linux()
+	_test_test_preset_matches("Linux", "Linux Test")
+	_test_test_preset_matches("Web", "Web Test")
 	if _failures.is_empty():
 		print("TEST OK: tests/smoke/export_presets")
 		quit(0)
@@ -36,17 +37,17 @@ func _section_of(config: ConfigFile, preset_name: String) -> String:
 	return ""
 
 
-func _test_linux_test_matches_linux() -> void:
+func _test_test_preset_matches(shipped_name: String, test_name: String) -> void:
 	var config := ConfigFile.new()
 	_check(config.load(PRESETS_PATH) == OK, "export_presets.cfg loads")
-	var linux: String = _section_of(config, "Linux")
-	var test: String = _section_of(config, "Linux Test")
-	_check(linux != "" and test != "", "both the Linux and Linux Test presets exist")
+	var linux: String = _section_of(config, shipped_name)
+	var test: String = _section_of(config, test_name)
+	_check(linux != "" and test != "", "both the %s and %s presets exist" % [shipped_name, test_name])
 	if linux == "" or test == "":
 		return
-	_check(config.get_value(test, "exclude_filter", "x") == "", "Linux Test excludes nothing")
-	_check(config.get_value(linux, "exclude_filter", "") == "tests/*", "Linux still excludes tests/*")
-	_check(config.get_value(test, "runnable", true) == false, "Linux Test is not runnable")
+	_check(config.get_value(test, "exclude_filter", "x") == "", "%s excludes nothing" % test_name)
+	_check(config.get_value(linux, "exclude_filter", "") == "tests/*", "%s still excludes tests/*" % shipped_name)
+	_check(config.get_value(test, "runnable", true) == false, "%s is not runnable" % test_name)
 	_check(config.get_value(test, "export_path", "") != config.get_value(linux, "export_path", ""), "the two presets export to different paths")
 	_compare(config, linux, test)
 	_compare(config, linux + ".options", test + ".options")

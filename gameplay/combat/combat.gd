@@ -73,6 +73,11 @@ func _ready() -> void:
 		projectiles = get_node_or_null("/root/Projectiles") as ProjectileManagerScript
 	if events != null and not events.projectile_hit.is_connected(_on_projectile_hit):
 		events.projectile_hit.connect(_on_projectile_hit)
+	if events != null:
+		if not events.player_downed.is_connected(_on_player_downed):
+			events.player_downed.connect(_on_player_downed)
+		if not events.player_revived.is_connected(_on_player_revived):
+			events.player_revived.connect(_on_player_revived)
 
 
 func _physics_process(delta: float) -> void:
@@ -138,7 +143,8 @@ func register_player(index: int, node: Node2D, radius: float) -> void:
 	_player_radius[index] = radius
 	_contact_left[index] = 0.0
 	# Enemy shots (LAYER_PLAYER) find the wizard as a projectile target.
-	if projectiles != null:
+	# A downed wizard is not a target, so shots fly past it to the standing ones.
+	if projectiles != null and not _is_downed(node):
 		projectiles.add_target(node, radius, ProjectileManagerScript.LAYER_PLAYER)
 
 
@@ -275,6 +281,24 @@ func _can_hurt_player(target: Node) -> bool:
 	if target.has_method("is_downed") and target.is_downed():
 		return false
 	return true
+
+
+func _is_downed(node: Node) -> bool:
+	return node.has_method("is_downed") and node.is_downed()
+
+
+func _on_player_downed(player: int) -> void:
+	if projectiles != null and player >= 0 and player < PLAYER_SLOTS:
+		var wizard: Node2D = _players[player]
+		if wizard != null and is_instance_valid(wizard):
+			projectiles.remove_target(wizard)
+
+
+func _on_player_revived(player: int, _reviver: int) -> void:
+	if projectiles != null and player >= 0 and player < PLAYER_SLOTS:
+		var wizard: Node2D = _players[player]
+		if wizard != null and is_instance_valid(wizard):
+			projectiles.add_target(wizard, _player_radius[player], ProjectileManagerScript.LAYER_PLAYER)
 
 
 func _on_projectile_hit(player: int, target: Node, position: Vector2, tag: int) -> void:

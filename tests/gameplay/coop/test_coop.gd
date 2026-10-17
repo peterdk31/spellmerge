@@ -279,6 +279,8 @@ func _test_camera_zooms_out_to_fit() -> void:
 	if camera == null:
 		return
 	_open_limits(camera)
+	# The limits changed, so the target moved: snap again to see the zoom alone.
+	_coop.snap()
 	_check(is_equal_approx(camera.zoom.x, CoopScript.MAX_ZOOM), "one player: no zoom out, got %f" % camera.zoom.x)
 	_check(camera.position.is_equal_approx(_wizard(0).global_position), "one player: the camera is on the player: %s vs %s" % [camera.position, _wizard(0).global_position])
 	for slot in range(1, 4):

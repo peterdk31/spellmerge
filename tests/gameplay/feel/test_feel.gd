@@ -42,6 +42,7 @@ func _initialize() -> void:
 	_test_engine_time_scale_comes_back()
 	_test_camera_change_is_followed()
 	_teardown()
+	Node.print_orphan_nodes()
 	Engine.time_scale = 1.0
 	if _failures.is_empty():
 		print("TEST OK: gameplay/feel (hit-stop, shake, particle limit)")
@@ -78,6 +79,13 @@ func _setup(sound_id: StringName = &"", projectiles: Node = null) -> void:
 
 
 func _teardown() -> void:
+	# A voice that is still playing keeps its stream (a resource) alive at exit.
+	if _feel != null and is_instance_valid(_feel):
+		for child in _feel.get_children():
+			var voice := child as AudioStreamPlayer
+			if voice != null:
+				voice.stop()
+				voice.stream = null
 	for node: Node in [_feel, _camera, _registry, _bus]:
 		if node != null and is_instance_valid(node):
 			node.free()

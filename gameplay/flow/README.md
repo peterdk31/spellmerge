@@ -12,9 +12,9 @@ Players in the spell builder never block the others: the rest keep playing.
 
 - **Public entry script:** `gameplay/flow/flow.gd`. Other code uses only this script and the events it sends and listens to; nothing else in the folder is public. The script arrives when the area is built.
 - **Dependency direction:** `core` ← `gameplay` ← `content`. This area may use `core/` and the registry. `core/` never depends on it, and content never reaches into it.
-- **Events** (**provisional**: `core/events` owns the definitions, and the lists are checked against each other when the event bus is built in M1):
+- **Events** (`core/events/events.gd` owns the definitions; this list matches it and the table in [gameplay/README.md](../README.md)):
   - Sends: `room_entered`, `room_cleared`, `door_voted`.
-  - Listens to: `enemy_died`, `run_started`, `player_downed` and `door_vote_requested` (from the HUD; `door_voted` is flow's announced result of that request).
+  - Listens to: `enemy_died`, `run_started`, `player_downed`, and from the HUD `play_requested` and `door_vote_requested` (`door_voted` is flow's announced result of the vote; `room_entered` follows `play_requested`).
 - Areas never call each other directly; they talk through events. [gameplay/README.md](../README.md) has the rules every sub-area shares.
 
 ## Allowed files

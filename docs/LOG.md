@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue.
 
+## 2026-10-17
+
+- M1 part 2: reconciled the event lists with `core/events/events.gd`. Added `play_requested` (HUD to `flow`) to the table in `gameplay/README.md` and to the `hud` and `flow` READMEs, and removed the "provisional" marks everywhere. Docs only.
+
 ## 2026-10-16
 
 - M1 part 1: built the event bus (`core/events/events.gd`, autoload `Events`, 24 typed signals, player index first, new `play_requested`) and the `SpellBase`, `EnemyBase` and `RoomBase` resources in `core/base/`. Tests in `tests/core/`; spells, enemies, rooms and core READMEs reworded. Signal arguments beyond the player index were not specified anywhere, so I chose them (see `docs/DECISIONS.md`); part 2 reconciles the README lists.

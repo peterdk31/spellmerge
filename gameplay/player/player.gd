@@ -58,10 +58,19 @@ func _init() -> void:
 	motion_mode = CharacterBody2D.MOTION_MODE_FLOATING
 
 
-func _ready() -> void:
+## Show the idle texture for this player index on the `Sprite` node.
+func apply_texture() -> void:
 	var sprite := get_node_or_null("Sprite") as Sprite2D
-	if sprite != null and index >= 0 and index < textures.size():
-		sprite.texture = textures[index]
+	if sprite == null:
+		return
+	if index < 0 or index >= textures.size():
+		push_warning("Wizard %d: no texture for this player index." % index)
+		return
+	sprite.texture = textures[index]
+
+
+func _ready() -> void:
+	apply_texture()
 	if input == null:
 		input = get_node_or_null("/root/PlayerInput") as InputManagerScript
 		if input == null and is_inside_tree():

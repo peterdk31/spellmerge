@@ -108,18 +108,37 @@ func _test_wizard_scene() -> void:
 	_check(wizard.collision_mask == PlayerScript.LAYER_WALLS, "players collide only with walls")
 	_check(wizard.get_node("Sprite").texture_filter == CanvasItem.TEXTURE_FILTER_NEAREST, "the sprite is drawn with filtering off")
 	wizard.free()
-	# Each index shows its own colour: four different textures, each 32x32.
-	var shown: Array[Texture2D] = []
+	# Each index shows its own colour: four textures, each 32x32, with different robe colours.
+	var robes: Array[Color] = []
 	for index in 4:
 		var instance := WizardScene.instantiate() as PlayerScript
+		_check(instance.textures.size() == 4, "the wizard scene lists four textures")
 		instance.index = index
-		instance._ready()  # not added to a tree: no input manager is needed to look at the sprite
+		instance.apply_texture()  # no tree and no _ready() needed to look at the sprite
 		var texture: Texture2D = (instance.get_node("Sprite") as Sprite2D).texture
 		_check(texture != null, "wizard %d shows a sprite" % index)
 		if texture != null:
 			_check(texture.get_size() == Vector2(32, 32), "wizard %d sprite is 32x32" % index)
-			_check(not shown.has(texture), "wizard %d has its own colour" % index)
-			shown.append(texture)
+			var colour_count: Dictionary = {}
+			var image := texture.get_image()
+			for y in image.get_height():
+				for x in image.get_width():
+					var pixel := image.get_pixel(x, y)
+					if pixel.a > 0.0:
+						colour_count[pixel] = int(colour_count.get(pixel, 0)) + 1
+			# The robe is the most common colour apart from the outline and the skin.
+			var robe := Color.BLACK
+			var best := 0
+			for pixel: Color in colour_count:
+				if pixel.is_equal_approx(Color("#14121f")) or pixel.is_equal_approx(Color("#d99a74")):
+					continue
+				if int(colour_count[pixel]) > best:
+					best = int(colour_count[pixel])
+					robe = pixel
+			_check(best > 0, "wizard %d has a robe colour" % index)
+			for other in robes:
+				_check(not other.is_equal_approx(robe), "wizard %d robe colour differs from the others" % index)
+			robes.append(robe)
 		instance.free()
 
 

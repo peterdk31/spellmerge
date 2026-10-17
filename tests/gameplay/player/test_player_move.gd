@@ -33,6 +33,7 @@ func _initialize() -> void:
 	_test_tap_released_before_step_counts()
 	_test_captured_player_cannot_move_or_dodge()
 	_test_press_while_captured_is_not_saved()
+	_test_capture_during_dash_ends_it()
 	_test_two_players_at_once()
 	_test_four_players_at_once()
 	_test_no_input_manager()
@@ -237,6 +238,25 @@ func _test_press_while_captured_is_not_saved() -> void:
 	_input.set_captured(0, false)
 	_run(1)
 	_check(not player.is_dodging(), "a dodge pressed in the overlay does not fire when it closes")
+
+
+func _test_capture_during_dash_ends_it() -> void:
+	_setup(1)
+	var player: PlayerScript = _players[0]
+	_hold(0, &"move_right")
+	_hold(0, &"dodge")
+	_run(1)
+	_release(0, &"dodge")
+	_check(player.is_dodging(), "the dodge started")
+	_input.set_captured(0, true)
+	_run(1)
+	_check(not player.is_dodging(), "an overlay opening ends the dash")
+	_check(not player.is_invulnerable(), "an overlay opening ends the invulnerability")
+	_check(player.velocity == Vector2.ZERO, "the captured wizard stands still")
+	_input.set_captured(0, false)
+	_hold(0, &"dodge")
+	_run(1)
+	_check(not player.is_dodging(), "the cooldown still holds after a cancelled dash")
 
 
 func _test_two_players_at_once() -> void:

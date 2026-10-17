@@ -25,6 +25,10 @@ Every player is an index 0–3 with their own device, mana, health and downed st
 
 Not open yet. When it opens, follow the steps and test layout in [gameplay/README.md](../README.md).
 
+## Physics layers
+
+One plan for every part that adds bodies: layer 1 walls, 2 players, 3 enemies, 4 projectiles and hit boxes. Players collide only with walls (mask 1). `player.gd` sets its layer and mask in `_init`. `core/` owns `project.godot` and has not yet named the layers there: until it does, use these numbers.
+
 ## Example to copy
 
 `gameplay/player/player.gd` (move and dodge so far) with its scene `content/wizard/base/wizard.tscn`, and its test `tests/gameplay/player/test_player_move.gd`. `gameplay/` has no scenes: the wizard scene lives in `content/wizard/base/`. The script is driven by `step(delta)`, so a test runs time with fixed deltas. Combat asks `is_invulnerable()` before it hurts a wizard.

@@ -25,7 +25,8 @@ const DODGE_TIME: float = 0.25
 const INVULNERABLE_TIME: float = 0.125
 ## Seconds from the start of a dodge until the next one may start.
 const DODGE_COOLDOWN: float = 0.625
-## Physics layers: players are on layer 2 and collide only with walls on layer 1,
+## Physics layers (the plan: 1 walls, 2 players, 3 enemies, 4 projectiles and
+## hit boxes; see gameplay/player/README.md): players are on layer 2 and collide only with walls on layer 1,
 ## so wizards walk through each other and never block a teammate.
 const LAYER_WALLS: int = 1
 const LAYER_PLAYERS: int = 2
@@ -56,6 +57,8 @@ func _init() -> void:
 func _ready() -> void:
 	if input == null:
 		input = get_node_or_null("/root/PlayerInput") as InputManagerScript
+		if input == null and is_inside_tree():
+			push_warning("Wizard %d: the PlayerInput autoload is missing, so this wizard cannot move." % index)
 	if input != null:
 		_seen_dodge_presses = input.get_press_count(index, &"dodge")
 
@@ -75,6 +78,10 @@ func step(delta: float) -> void:
 		velocity = Vector2.ZERO
 		return
 	var move: Vector2 = input.get_move(index)
+	if input.is_captured(index):
+		# An overlay opened: freeze, and end a dash in progress (the cooldown stays).
+		_dodge_left = 0.0
+		_invulnerable_left = 0.0
 	if move != Vector2.ZERO:
 		facing = move.normalized()
 	# Count presses rather than asking "just pressed": a tap released again

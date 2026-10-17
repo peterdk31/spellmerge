@@ -11,7 +11,9 @@ extends SceneTree
 const EventsScript := preload("res://core/events/events.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
-const HudScene := preload("res://hud/panels/panels.tscn")
+## Loaded when needed, not preloaded: this scene is also the "Hud" autoload, and
+## preloading it here makes the autoload's own load fail at start (cyclic resource).
+const HUD_SCENE_PATH: String = "res://hud/panels/panels.tscn"
 const HudScript := preload("res://hud/panels/panels.gd")
 const OverlayScript := preload("res://hud/panels/overlay/overlay.gd")
 const PlayerScript := preload("res://gameplay/player/player.gd")
@@ -28,6 +30,7 @@ var _requests: Array[Array] = []
 
 
 func _initialize() -> void:
+	await process_frame
 	_test_owner_opens_and_closes()
 	_test_overlay_looks_like_its_owner()
 	_test_tap_within_one_frame_counts()
@@ -66,6 +69,7 @@ func _setup(count: int) -> void:
 	_focus = UIFocusScript.new()
 	_focus.input = _input
 	_focus.events = _bus
+	_focus._ready()
 	_bus.build_change_requested.connect(_on_build_change_requested)
 	for index in count:
 		_input.add_virtual_device(index)
@@ -75,7 +79,7 @@ func _setup(count: int) -> void:
 		player.events = _bus
 		player._ready()
 		_players.append(player)
-	_hud = HudScene.instantiate() as HudScript
+	_hud = (load(HUD_SCENE_PATH) as PackedScene).instantiate() as HudScript
 	_hud.events = _bus
 	_hud.ui_focus = _focus
 	_hud.input = _input

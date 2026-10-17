@@ -69,10 +69,12 @@ func open_overlay() -> bool:
 	if _open or _ui_focus == null or _ui_focus.is_open(index):
 		return false
 	var controls: Array[Control] = [_resume, _build]
+	# Visible first: UIFocus only focuses controls that are shown.
+	visible = true
 	if not _ui_focus.open(index, controls):
+		visible = false
 		return false
 	_open = true
-	visible = true
 	_mark_focus(_ui_focus.focused(index))
 	return true
 

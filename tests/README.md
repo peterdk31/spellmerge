@@ -16,9 +16,9 @@ Tests for the whole game. The tree mirrors the code: a test for `gameplay/combat
 
 ## Folders
 
-- `smoke/`: the boot smoke test (`boot_smoke.gd`), which starts the main scene and fails unless the menu comes up. The 4-bot smoke test (M1) goes here too. A build that fails a smoke test is broken.
+- `smoke/`: the boot smoke test (`boot_smoke.gd`), which starts the main scene and fails unless the menu comes up, and the 4-bot smoke test (`four_bot_smoke.gd`): four bots join and play the first room, bot 4 idles in its overlay, and it passes only if `room_cleared` arrives, players 1–3 are alive or revived, bot 4's overlay stayed open, and the log has no `push_error`, no `ERROR:` line and no "the restart failed" warning. `error_log.gd` is its error logger (unit test `test_error_log.gd`). `test_four_bot_smoke.gd` runs it under `build.sh --quick --tests`. A build that fails a smoke test is broken.
 - `benchmark/`: the stress benchmark. A frame-time regression over 10% counts as a broken build.
-- `bots/`: the bots that play headless runs for smoke tests and playtest reports.
+- `bots/`: the bots that play headless runs for smoke tests and playtest reports. `bot.gd` plays one slot through a virtual device and the real input path (`PlayerInput.send_virtual`): a fighter walks at the nearest enemy and holds `cast`, an idler only taps `overlay`. A bot reads no spell field; the wizard calls the spell's one cast method.
 - `screenshots/`: scripts named `shot_*.gd` that set up a scene and save 640×360 PNGs to `user://screenshots/` (they check nothing). The build copies them to `build/screenshots/`; they are posted on every bot PR and on the site's `/screenshots/` page by the daily build. Needs `xvfb-run`.
 - Everything else mirrors the tree (`tests/core/...`, `tests/gameplay/...`).
 

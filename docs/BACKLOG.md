@@ -6,6 +6,10 @@ Ideas and future work outside the current milestone (docs/PLAN.md, "Planning sys
 
 Not kept here any more: each question is an issue labelled `owner-question` (docs/DECISIONS.md, "The owner inbox").
 
+## Needs an owner decision
+
+None now. The owner-only `build.sh` step for the 4-bot test (M1 part 21) is an `owner-question` issue, not a line here.
+
 ## Audio needs
 
 Sounds the game asks for by id and does not have yet. A missing sound is silent (`Registry.get_sound` returns `null`), never an error. The weekly run opens one `now` issue per line for Audio contributors. Files are `.ogg` in `audio/`, listed in `audio/manifest.json`; the id is the file name without the extension.

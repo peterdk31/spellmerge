@@ -2,6 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-17: The 4-bot test runs in a separate `Linux Test` export (M1 part 21)
+
+**Decided by:** Claude.
+**Context:** The shipped presets exclude `tests/*`, so the exported game has no `four_bot_smoke.gd`. Dropping the exclusion would put test scripts in every release.
+**Decision:** a fourth preset, `Linux Test`, in `export_presets.cfg` (Claude-maintained) with no exclusion and its own path `build/linux-test/`; the release presets are unchanged. It is a copy of `Linux` (including `custom_features="full"`, so the test runs the same feature set as the shipped desktop build) and must stay one: `tests/smoke/test_export_presets.gd` fails if the two differ in anything but name, `runnable`, `exclude_filter` and `export_path`. The step that exports it and runs the test is in `ci/build/build.sh` (owner-only), so it is asked as an `owner-change` owner question with the exact lines. The step greps the run's log for `SMOKE OK`, so a release template that ignores `--script` fails the step instead of passing without running the test.
+**Consequence:** until the owner adds the step, the test runs only through `build.sh --quick --tests`. If the exported binary refuses `--script`, the fallback is an autoload reading a user argument (`-- --four-bot`), a game-side change.
+
 ## 2026-10-17: The owner inbox
 
 **Decided by:** owner.
@@ -417,6 +424,16 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - Opening an overlay ends a dash in progress (cooldown stays), so a captured player is fully frozen.
 - Physics layers: 1 walls, 2 players, 3 enemies, 4 projectiles and hit boxes (in the player README); `core/` is asked to name them in `project.godot`.
 
+## 2026-10-17: The overlay (M1 part 19)
+
+- The `overlay` action is read in `hud/panels/panels.gd` from `PlayerInput.get_press_count`, not by each overlay, so one place owns the toggle and a tap released within a frame is not lost. Everything after opening goes through `UIFocus`; the overlay ignores every signal that names another player.
+- An overlay opens only for a joined player and only if that player's `UIFocus` panel is free, so it never replaces another panel. Closing comes from Resume, `dodge`, the `overlay` action, or the device leaving (`UIFocus` closes it).
+- The stub button sends `build_change_requested(player, 0, &"stub")` and nothing else; the `player` area has no listener yet and will refuse unknown ids. The overlay never pauses and never changes `Engine.time_scale`.
+- The overlay is made visible before `UIFocus.open`, because `UIFocus` only focuses controls that are shown; it is hidden again if opening fails.
+- An overlay opens only while a room is active (`room_entered` seen, no `run_started`/`run_ended` since), so a press on the menu does nothing and the player's input is not captured there. It closes on `run_started`, `run_ended` and when its owner goes down. A downed player cannot open it (they would be frozen and the team would lose sight of who needs a revive); the panel word keeps DOWN above MENU.
+- The overlay offset is not a fixed number: `panels.gd` derives it from the panel's minimum height plus a 4 px edge margin and a 2 px gap (under the panel in the top corners, over it in the bottom ones), and again when that height changes. `test_overlay` checks the rectangles at 640×360.
+- Focus is shown with a "> " text mark because Godot's own focus is unused (`UIFocus` decision), and state is never colour alone.
+
 
 ## 2026-10-17: Unfinished sessions keep their work
 
@@ -446,9 +463,21 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - **Mid-run joiners** take the free spawn farthest from enemies and wizards (part 17), so the coop test checks "a player spawn", not the one numbered like the slot.
 - **`player.gd` and `combat.gd`** read absolute autoload paths only inside the tree (tests build them outside it).
 
+## 2026-10-17: HUD panels 60% translucent, fonts unchanged (replaces the entry below on sizes)
+
+Still no display in sessions, so decided from sizes, not from a screenshot, and text legibility over the floor is NOT verified (no contrast was computed or seen). Only the translucency was added; fonts stay 12/14 px at 640×360 (integer-scaled ×2); no licensed pixel font is in the repo, so none was added. An opaque 112×55 corner panel can hide a wizard or enemy in a room corner (at Coop zoom 0.5 it covers 224×110 world px), so the panel background alpha is now 0.6; border and text stay opaque and state stays in words. If a real screenshot shows text hard to read over bright floor, raise the alpha to 0.75 in `hud/theme/spellmerge_theme.tres`; the four `panel_p1`–`panel_p4` styleboxes there hold the same literal and must change together (the test only checks the range 0.4 to below 1). The real screenshot stays in `docs/BACKLOG.md`.
+
 ## 2026-10-17: HUD sizes unchanged for now, visual check still open
 
 The HUD screenshot cannot be taken in a session (no display, `docs/BACKLOG.md`), so no HUD size or font was changed. This is not a finding that they are fine. The four 112×55 panels are screen-space corners: a wizard or enemy standing in a corner can be hidden by one, and the Coop camera moves and zooms (0.5–1.0), so a paper check at one camera position says little. The legibility of the smooth default font at 12/14 px on the 640×360 canvas is unverified, and the design calls for pixel art, so a pixel font may be wanted (side note: a font file would need a licence entry). Decide on panel size, a translucent background and the font after the display run; tracked in `docs/NEXT.md` ("HUD screenshot and legibility check").
+
+## 2026-10-17: the 4-bot smoke test
+
+- The test is `tests/smoke/four_bot_smoke.gd`; `tests/smoke/test_four_bot_smoke.gd` only extends it, because `build.sh` runs `test_*.gd` and sessions may not edit `ci/`. Part 21 decides how the export runs it.
+- A downed bot 4 is not a failure (it only idles); its overlay closing while it is not downed is, and so is zero `spell_cast` events. The logger (`tests/smoke/error_log.gd`) is unit-tested with hand-fed calls and starts after the autoloads load, so startup errors are not covered.
+- Errors are caught by a `Logger` (`OS.add_logger`), not by reading a log file, so the test works the same in the editor and in an export. A warning counts as a failure only for "the restart failed" (see "Flow" above).
+- Bots call nothing on a spell (a deliberate deviation from "calling only the cast method" in the old NEXT.md wording): they hold the `cast` action and the wizard calls the cast method. "Alive or revived" is checked as "not down at the end"; revive itself is still in `docs/BACKLOG.md`.
+- Game time runs at `Engine.time_scale` 2 with a limit of 120 game seconds, since no real-time wait is wanted.
 
 ## 2026-10-17: The daily build runs the unit tests and takes screenshots
 
@@ -462,7 +491,7 @@ The HUD screenshot cannot be taken in a session (no display, `docs/BACKLOG.md`),
   - The game code that takes the PR's shots runs in a job with no secrets and a read-only token. A separate job posts the images and accepts only plain PNGs under 1 MB.
 - Sessions may run `--screenshots` and open the PNGs with Read, so Claude can see what it built.
 
-## 2026-10-17: Translucent player panels
+## 2026-10-17: Translucent player panels (replaces the 60% entry above)
 
 **Decided by:** the owner ("it's generally fine [that the HUD covers imps]... but the HUD could be transparent").
 

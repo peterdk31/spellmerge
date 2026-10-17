@@ -18,6 +18,7 @@ boot_splash/show_image=false
 
 Events="*res://core/events/events.gd"
 PlayerInput="*res://core/input/input_manager.gd"
+UIFocus="*res://core/ui_focus/ui_focus.gd"
 
 [debug]
 

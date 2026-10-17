@@ -55,7 +55,7 @@ var _flow: Node
 var _input: Node
 var _hud: Node
 var _bots: Array[BotScript] = []
-var _probe: Node = ProbeScript.new()
+var _probe: Node
 var _cleared: int = 0
 var _entered: int = 0
 var _casts: int = 0
@@ -72,9 +72,10 @@ var _idler_downed_at_close: bool = false
 func _ready() -> void:
 	OS.add_logger(_log)
 	_logging = true
+	_probe = ProbeScript.new()
 	add_child(_probe)
 	var root: Node = get_tree().root
-	_events =root.get_node_or_null("Events")
+	_events = root.get_node_or_null("Events")
 	_flow = root.get_node_or_null("Flow")
 	_input = root.get_node_or_null("PlayerInput")
 	_hud = root.get_node_or_null("Hud")
@@ -196,7 +197,8 @@ func _finish(failed: Array[String]) -> void:
 		bot.leave()
 	if _flow != null:
 		_flow.call("stop_run")
-	_probe.call("report")
+	if _probe != null:
+		_probe.call("report")
 	failed.append_array(_errors())
 	if failed.is_empty():
 		print("SMOKE OK: 4 bots cleared the room in %.1f game seconds (%d casts), bot 4 idled in its overlay, no errors logged" % [_elapsed, _casts])

@@ -22,6 +22,9 @@ const FRAME_BUDGET_MS: float = 1000.0 / 60.0
 const MEMORY_BUDGET_WEB_MIB: int = 512
 const MEMORY_BUDGET_DESKTOP_MIB: int = 1536
 
+## Frames kept; a test sets it (before the probe enters the tree) to reach the overflow.
+var max_samples: int = MAX_SAMPLES
+
 var _samples: PackedFloat32Array = PackedFloat32Array()
 var _count: int = 0
 var _frames: int = 0
@@ -37,7 +40,7 @@ var _feel: Node = null
 
 
 func _ready() -> void:
-	_samples.resize(MAX_SAMPLES)
+	_samples.resize(max_samples)
 	_projectiles = get_node_or_null("/root/Projectiles")
 	_feel = get_node_or_null("/root/Feel")
 
@@ -45,13 +48,7 @@ func _ready() -> void:
 func _process(_delta: float) -> void:
 	var now: int = Time.get_ticks_usec()
 	if _last_usec >= 0:
-		var ms: float = float(now - _last_usec) / 1000.0
-		if _count < MAX_SAMPLES:
-			_samples[_count] = ms
-			_count += 1
-		_sum_ms += ms
-		_max_ms = maxf(_max_ms, ms)
-		_frames += 1
+		record(float(now - _last_usec) / 1000.0)
 	_last_usec = now
 	_peak_nodes = maxi(_peak_nodes, int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT)))
 	_peak_memory = maxf(_peak_memory, Performance.get_monitor(Performance.MEMORY_STATIC))
@@ -59,6 +56,27 @@ func _process(_delta: float) -> void:
 		_peak_projectiles = maxi(_peak_projectiles, int(_projectiles.call("get_count")))
 	if _feel != null:
 		_peak_particles = maxi(_peak_particles, int(_feel.call("live_particles")))
+
+
+## Count one frame of `ms` milliseconds. Past `max_samples` frames it still counts
+## towards the average and the maximum, but not the percentile.
+func record(ms: float) -> void:
+	if _count < max_samples:
+		_samples[_count] = ms
+		_count += 1
+	_sum_ms += ms
+	_max_ms = maxf(_max_ms, ms)
+	_frames += 1
+
+
+## Average frame time so far, in milliseconds (0 with no frames).
+func average_ms() -> float:
+	return _sum_ms / float(_frames) if _frames > 0 else 0.0
+
+
+## Longest frame so far, in milliseconds.
+func max_ms() -> float:
+	return _max_ms
 
 
 ## The 95th percentile of the kept samples, in milliseconds (0 with no samples).
@@ -80,7 +98,7 @@ func report() -> void:
 	if _frames == 0:
 		print("BENCH: no frames measured")
 		return
-	var average: float = _sum_ms / float(_frames)
+	var average: float = average_ms()
 	print("BENCH: frames %d, frame time avg %.2f ms, p95 %.2f ms, max %.2f ms (60 FPS budget %.1f ms; game logic only if headless)" % [_frames, average, percentile_95(), _max_ms, FRAME_BUDGET_MS])
 	var cap: int = 0
 	var dropped: int = 0

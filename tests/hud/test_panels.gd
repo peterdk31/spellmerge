@@ -79,6 +79,13 @@ func _test_theme_has_the_variations() -> void:
 		_check(box != null and not borders.has(box.border_color), "player panel %d has its own border colour" % n)
 		if box != null:
 			borders.append(box.border_color)
+			# Translucent, so a wizard or enemy standing under a corner panel
+			# (also at Coop's 0.5 zoom, where a panel covers 224x110 world px) shows through.
+			_check(box.bg_color.a < 1.0 and box.bg_color.a >= 0.4, "player panel %d background is translucent but readable, alpha %s" % [n, box.bg_color.a])
+	# Text sizes stay legible at the 640x360 view: 12 px labels, 14 px buttons.
+	_check(SpellmergeTheme.default_font_size >= 12, "default font is at least 12 px")
+	_check(SpellmergeTheme.get_font_size("font_size", "Label") >= 12, "labels are at least 12 px")
+	_check(SpellmergeTheme.get_font_size("font_size", "Button") >= 14, "buttons are at least 14 px")
 
 
 func _test_project_uses_the_theme() -> void:

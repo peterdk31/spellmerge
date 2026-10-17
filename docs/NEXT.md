@@ -4,7 +4,6 @@ The ordered task queue for the current milestone, M1 (its design, [M1-core-loop.
 
 ## Queue
 
-- [ ] **HUD screenshot and legibility check (M1 part 18 follow-up), needs a display.** Take a 640×360 screenshot with four panels, one of them DOWN; check the text (12 px labels, 14 px buttons) is legible and the corner panels (112×55) don't hide a wizard or enemy standing in a corner, also at the Coop camera zooms (0.5–1.0); adjust sizes, add a translucent panel background or a pixel font if needed. Waits on the display-run item in `docs/BACKLOG.md`.
 - [ ] **The overlay (M1 part 19).** Add the per-player overlay to `hud/panels`: it opens and closes with the `overlay` input action from `core/input`, takes input only from its owner through `core/ui_focus`, never pauses the game, and sends `build_change_requested` as a stub. Test: with one player's overlay open, the other three players still move. Update the HUD README. When this is merged, the weekly run starts the "Playtest of the week" issues.
 - [ ] **Bots and the 4-bot smoke test (M1 part 20).** Build `tests/bots/` (a bot that plays through virtual devices and the real input path, calling only the cast method) and `tests/smoke/four_bot_smoke.gd`: four bots join and clear the room, and bot 4 opens its overlay with the `overlay` action and idles in it the whole time. The test passes only if `room_cleared` is received, players 1–3 are alive or revived, and the log has no `push_error` call and no line starting `ERROR:`. Run it in the editor. First example: `tests/smoke/boot_smoke.gd`.
 - [ ] **The 4-bot test in the Linux export (M1 part 21).** Run the 4-bot test in the Linux export through `ci/build/build.sh`. If that needs an owner-only change, write the exact change under "Needs an owner decision" in `docs/BACKLOG.md`.
@@ -15,9 +14,11 @@ The ordered task queue for the current milestone, M1 (its design, [M1-core-loop.
 
 ## Blocked
 
-(none)
+- [ ] **HUD screenshot (M1 part 18 follow-up), needs a display.** Take a 640×360 screenshot with four panels, one of them DOWN, and look at it: is the 12 px/14 px text legible over the 60% translucent panels, and does nothing important hide in a corner at Coop zooms 0.5–1.0? Blocked on the display-run item in `docs/BACKLOG.md` (an owner script under `ci/`). Move it back to the Queue when that exists.
 
 ## Done recently
+
+- [x] **HUD legibility check, by calculation (M1 part 18 follow-up).** No screenshot was possible (no display). Corner panels are now 60% translucent so a wizard or enemy in a corner stays visible (also at Coop zoom 0.5, where a panel covers 224×110 world px); fonts kept at 12/14 px, now asserted in `tests/hud/test_panels.gd`; reasoning in `docs/DECISIONS.md`. `ci/build/build.sh --quick --tests` passes.
 
 - [x] **Verify the HUD, test half (M1 part 18 follow-up).** `ci/build/build.sh --quick --tests` passes (all unit tests, including `test_panels` and `test_player_stats`). The screenshot, legibility and overlap checks are not done: they stay in the Queue as "HUD screenshot and legibility check". Sending `run_started`/`run_ended` stays with the flow/menu part (the HUD already resets on both).
 - [x] **Make every unit test pass (bug).** All 19 unit scripts pass through `ci/build/build.sh --quick --tests` with no error lines (fixes in `docs/DECISIONS.md`, 2026-10-17; rules for tests in `tests/README.md`). The camera tests pass and the `.uid` files load. The headless screenshot of `arena_01` with four wizards is not possible without a display (`docs/BACKLOG.md`). The owner is asked to make the daily build run `--tests`. The HUD tests (`test_panels`, `test_player_stats`) pass too, so "Verify the HUD" only needs its screenshot check.

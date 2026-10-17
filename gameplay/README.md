@@ -16,7 +16,7 @@ Which sub-areas are open for PRs is in docs/ROADMAP.md ("Opens for PRs"). A PR t
 
 ## Events at a glance
 
-One table for all sub-areas, so "each event has exactly one sender" can be checked in one place. It matches `core/events/events.gd`, and the per-area lists must match it.
+One table for all sub-areas, so "each event has exactly one sender" can be checked in one place. The event names and senders match `core/events/events.gd`; the listener column is kept by hand, because `events.gd` records only the HUD's receivers. The per-area lists must match this table.
 
 | Event | Sender | Listeners |
 | --- | --- | --- |
@@ -41,7 +41,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `door_vote_requested` | HUD | `flow` |
 | `pause_requested` | HUD | `run` |
 
-Device events come from `core/input`. The last five rows are the HUD's player-intent requests (see `hud/README.md`); each carries a player index 0–3. The gameplay area checks the request and announces the result as a state event: `door_voted` is flow's result of `door_vote_requested`, and `reward_taken` is rewards' result of `reward_pick_requested`. `play_requested` (the Play button) makes `flow` load the first room and send `room_entered`.
+Device events come from `core/input`; they are defined in M1 part 5 and are not in `events.gd` yet. The last five rows are the HUD's player-intent requests (see `hud/README.md`); each carries a player index 0–3. The gameplay area checks the request and announces the result as a state event: `door_voted` is flow's result of `door_vote_requested`, and `reward_taken` is rewards' result of `reward_pick_requested`. `play_requested` (the Play button) carries the index of the player who pressed it (0 if the pointer is not tied to a player) and makes `flow` load the first room and send `room_entered`.
 
 ## Allowed files
 

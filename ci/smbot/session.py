@@ -494,6 +494,9 @@ def finish(cfg: config_mod.Config, env: dict[str, str]) -> dict[str, str]:
     conflict = bool(pr) and env.get("MERGED") == "false" and merge_mod.CONFLICT in env.get("MERGE_RESULT", "")
     merge_refused = bool(pr) and mergeable(review) and env.get("MERGED") == "false" and not conflict
     merge_skipped = bool(pr) and mergeable(review) and not env.get("MERGED")
+    # A queue task with nothing to do now (it waits on the owner, or another PR) must not stop
+    # development: it's set aside like a refused merge and the next task goes first.
+    idle_task = status == "nothing_to_do" and bool(task) and env.get("TASK_KIND") == "next" and not pr
 
     def park(entry: dict[str, Any], span: dt.timedelta, reason: str) -> None:
         entry["parked_until"] = pacing.iso(now + span)
@@ -529,6 +532,9 @@ def finish(cfg: config_mod.Config, env: dict[str, str]) -> dict[str, str]:
             entry = failures.setdefault(task, {"count": 0})
             entry["pr"] = pr
             park(entry, PARK_WAITING, env.get("MERGE_RESULT") or "the merge was refused")
+        elif idle_task:
+            park(failures.setdefault(task, {"count": 0}), PARK_WAITING,
+                 env.get("IMPLEMENT_SUMMARY", "nothing to do on it now"))
         elif status == "blocked":
             if task:
                 park(failures.setdefault(task, {"count": 0}), PARK_BLOCKED, env.get("IMPLEMENT_SUMMARY", "blocked"))
@@ -542,6 +548,9 @@ def finish(cfg: config_mod.Config, env: dict[str, str]) -> dict[str, str]:
     elif status == "blocked":
         lines.append(f"Reported blocked, so it's set aside for a week and the next task goes first: {task[:200]}. "
                      f"Claude's summary: {env.get('IMPLEMENT_SUMMARY', '')[:600]}")
+    elif idle_task:
+        lines.append(f"Nothing to do on this task now, so it's set aside for a day and the next task goes first: "
+                     f"{task[:200]}. Claude's summary: {env.get('IMPLEMENT_SUMMARY', '')[:600]}")
     elif merge_refused:
         lines.append(f"Approved but not merged: #{pr} ({task[:200]}). {env.get('MERGE_RESULT', '')[:400]} "
                      "It's set aside for a day and the next task goes first.")
@@ -562,7 +571,7 @@ def finish(cfg: config_mod.Config, env: dict[str, str]) -> dict[str, str]:
     # made no progress (an error or usage limit: the hourly check retries) or merging is paused.
     started = env.get("CHAIN_STARTED") or pacing.iso(now)
     budget = pacing.budget(st, now, settings.get("dev_intensity", 90), settings.get("weekly_share", 90))
-    progressed = merged or bool(pr) or status == "blocked"
+    progressed = merged or bool(pr) or status == "blocked" or idle_task
     has_work = (nexttask.next_task(skip=nexttask.parked(st, now)) is not None
                 or bool(st.get("followups")) or bool(st.get("pending_instructions")))
     again = (env.get("TASK_KIND") != "plan" and progressed and not merge_skipped

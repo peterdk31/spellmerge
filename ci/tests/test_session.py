@@ -193,6 +193,18 @@ class FinishTest(unittest.TestCase):
         self.assertIn("refused", st["task_failures"]["A"]["parked_reason"])
         self.assertEqual(out["again"], "true")
 
+    def test_a_task_with_nothing_to_do_is_set_aside_and_work_moves_on(self) -> None:
+        """Run #127: the first task waited on an owner question, so every session stopped at once."""
+        out, st = self.run_finish(copy.deepcopy(state.DEFAULT), ["A", "B"], IMPLEMENT_STATUS="nothing_to_do",
+                                  IMPLEMENT_SUMMARY="waits on #84")
+        self.assertIn("#84", st["task_failures"]["A"]["parked_reason"])
+        self.assertEqual(out["again"], "true")
+        out, _ = self.run_finish(st, ["A"], IMPLEMENT_STATUS="nothing_to_do")
+        self.assertEqual(out["again"], "false")  # only the parked task is left
+        out, st = self.run_finish(copy.deepcopy(state.DEFAULT), ["B"], TASK="", IMPLEMENT_STATUS="nothing_to_do")
+        self.assertEqual(out["again"], "false")  # an empty queue is not a task to set aside
+        self.assertEqual(st.get("task_failures", {}), {})
+
     def test_a_conflict_sends_the_pr_back_instead_of_parking_it(self) -> None:
         out, st = self.run_finish(copy.deepcopy(state.DEFAULT), ["A", "B"], PR="19", FINAL_REVIEW=self.APPROVE,
                                   MERGED="false", MERGE_RESULT=f"Not merged: {merge.CONFLICT}: merge origin/main")
@@ -213,7 +225,7 @@ class FinishTest(unittest.TestCase):
 
     def test_stops_on_errors_paused_merging_and_plan_runs(self) -> None:
         for env in ({"IMPLEMENT_STATUS": "error"}, {"IMPLEMENT_STATUS": "limit"},
-                    {"IMPLEMENT_STATUS": "nothing_to_do"},
+                    {"TASK": "", "IMPLEMENT_STATUS": "nothing_to_do"},
                     {"PR": "5", "FINAL_REVIEW": self.APPROVE, "MERGED": ""},
                     {"TASK_KIND": "plan", "PR": "5", "FINAL_REVIEW": self.APPROVE, "MERGED": "true"}):
             out, _ = self.run_finish(copy.deepcopy(state.DEFAULT), ["A", "B"], **env)

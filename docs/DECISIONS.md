@@ -2,6 +2,12 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-17: The provisional palette and style rules (M1 part 3)
+
+**Decided by:** Claude (details the plan left open).
+**Decision:** `docs/STYLE.md` fixes a 31-colour palette: outline `#14121f` plus ten 3-shade materials (stone, bone, fire, spark, wood, skin and one ramp per player: blue, rose, green, purple). Player ramps are used only for players. Animations are horizontal strips of 32 px frames with fixed counts per animation type. Placeholder SVGs use only `<rect>`s with whole-number coordinates, palette fills and `shape-rendering="crispEdges"`.
+**Reason:** Part 4 and outside Art PRs need concrete values to check against. Rects-only SVG guarantees no antialiasing. The style is provisional: the M2 art direction call may replace it (the plan already says so), and then the palette changes in one file.
+
 ## 2026-10-17: Event lists in the READMEs are final (M1 part 2)
 
 **Decided by:** Claude (details the plan left open).

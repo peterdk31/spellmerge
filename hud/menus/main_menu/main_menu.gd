@@ -9,6 +9,10 @@ const EventsScript := preload("res://core/events/events.gd")
 ## and keyboard, or the gamepad that joined first).
 const MENU_PLAYER: int = 0
 
+## The user argument (`-- --four-bot`) that starts the 4-bot test, and its script.
+const FOUR_BOT_ARGUMENT: String = "--four-bot"
+const FOUR_BOT_RUNNER: String = "res://tests/smoke/four_bot_runner.gd"
+
 ## The event bus. Only tests set this, before adding the node; otherwise the
 ## "Events" autoload is used.
 var events: EventsScript = null
@@ -24,6 +28,19 @@ func _ready() -> void:
 	_play.pressed.connect(_on_play_pressed)
 	_play.grab_focus()
 	print("Spellmerge %s: main menu ready" % BuildInfo.describe())
+	if FOUR_BOT_ARGUMENT in OS.get_cmdline_user_args():
+		_start_four_bot_test()
+
+
+## Only the `Linux Test` export keeps tests/, so the 4-bot test is started only
+## where its script exists; in every other build the argument does nothing.
+func _start_four_bot_test() -> void:
+	if not ResourceLoader.exists(FOUR_BOT_RUNNER):
+		push_warning("Main menu: %s needs a build that includes tests/; ignored." % FOUR_BOT_ARGUMENT)
+		return
+	var runner: Node = (load("res://tests/smoke/four_bot_runner.gd") as GDScript).new()
+	# On the root, so the node outlives this menu when the flow swaps the scene.
+	get_tree().root.add_child.call_deferred(runner)
 
 
 func _on_play_pressed() -> void:

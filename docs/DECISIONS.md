@@ -2,6 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-17: The projectile caps are not validated; the draw code stays (M1 part 22)
+
+**Decided by:** Claude.
+**Context:** The task required timing `spawn`, `update_draw` and `_hit_test` at the cap before relying on 1,000 (web) and 3,000 (desktop). The numbers are in `docs/LOG.md`.
+**Decision:** `update_draw` stays: spawning at the cap (about 1 µs) and the draw copy (0.3 and 0.9 ms) are cheap, and `multimesh.buffer` is one bulk write, so uploading only the first `drawn` instances would save nothing measurable. The hit test is different. In a hostile scene (fast shots, all piercing and starting inside 100 packed targets, each hit sending a signal) one step costs about 50 ms at 1,000 shots and 150 ms at 3,000, natively, and still 25 ms and 75 ms once the targets are remembered. Real play is far from that (the 4-bot run peaks at 10 shots), but the caps cannot be called safe. The caps are left as they are for now only because nothing in M1 gets near them; the work to bound the hit test and set the caps from the numbers is queued in `docs/NEXT.md`, with the rule that the web cap drops if the WASM step is over 8 ms. The probe prints and gates nothing, as the task said.
+**Consequence:** the caps are provisional, not validated, on native or WASM; the queued tasks decide them.
+
 ## 2026-10-17: The 4-bot test runs in a separate `Linux Test` export (M1 part 21)
 
 **Decided by:** Claude.

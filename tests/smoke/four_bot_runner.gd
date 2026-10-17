@@ -24,6 +24,9 @@ extends Node
 ##
 ## build/linux-test/Spellmerge.x86_64 --headless -- --four-bot
 ##
+## The performance probe (tests/benchmark/probe.gd) rides along and prints `BENCH:`
+## lines at the end; it gates nothing.
+##
 ## Either way the node prints `SMOKE OK` or `SMOKE FAILED` lines and quits with 0 or 1.
 ##
 ## Reproducibility: the game logic draws no random numbers (only cosmetic feel code
@@ -33,6 +36,7 @@ extends Node
 
 const BotScript := preload("res://tests/bots/bot.gd")
 const ErrorLogScript := preload("res://tests/smoke/error_log.gd")
+const ProbeScript := preload("res://tests/benchmark/probe.gd")
 
 const PLAYERS: int = 4
 ## The index of the bot that idles in its overlay (bot 4).
@@ -51,6 +55,7 @@ var _flow: Node
 var _input: Node
 var _hud: Node
 var _bots: Array[BotScript] = []
+var _probe: Node
 var _cleared: int = 0
 var _entered: int = 0
 var _casts: int = 0
@@ -67,6 +72,8 @@ var _idler_downed_at_close: bool = false
 func _ready() -> void:
 	OS.add_logger(_log)
 	_logging = true
+	_probe = ProbeScript.new()
+	add_child(_probe)
 	var root: Node = get_tree().root
 	_events = root.get_node_or_null("Events")
 	_flow = root.get_node_or_null("Flow")
@@ -190,6 +197,8 @@ func _finish(failed: Array[String]) -> void:
 		bot.leave()
 	if _flow != null:
 		_flow.call("stop_run")
+	if _probe != null:
+		_probe.call("report")
 	failed.append_array(_errors())
 	if failed.is_empty():
 		print("SMOKE OK: 4 bots cleared the room in %.1f game seconds (%d casts), bot 4 idled in its overlay, no errors logged" % [_elapsed, _casts])

@@ -22,8 +22,18 @@
   },
   "panel_problems": [],
   "paused_by_command": false,
-  "pending_instructions": [],
-  "processed_comments": [],
+  "pending_instructions": [
+    {
+      "at": "2026-10-17T21:58:03Z",
+      "kind": "claude",
+      "number": 97,
+      "text": "iterate a bit more on the basics like aiming etc. And also a bit on the graphics",
+      "url": "https://github.com/peterdk31/spellmerge/issues/97#issuecomment-6241847784"
+    }
+  ],
+  "processed_comments": [
+    6241847784
+  ],
   "task_failures": {
     "**Area READMEs for shared assets and tests.** The same for `art/`, `audio/`, `tests/` and `tools/`, including the asset size limits, `.ogg`-only audio, the origin manifest (`art/manifest.json`, `audio/manifest.json`) and how to run `tools/check.sh`.": {
       "count": 1,

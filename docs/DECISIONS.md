@@ -509,3 +509,10 @@ The HUD screenshot cannot be taken in a session (no display, `docs/BACKLOG.md`),
 - A corner panel may sometimes cover a wizard or an enemy; that is accepted, not something to design around.
 - The four player panels in `hud/theme/spellmerge_theme.tres` are translucent: background alpha 0.4, border 0.8, and the bar backs 0.7, so whatever is behind a panel shows through. `panel_plain`, the default panel for menus and overlays, stays opaque.
 - The values were checked on the `arena_four_wizards` screenshot: the imps in the top corners show through and the labels stay legible.
+
+## 2026-10-17: Hit work is budgeted per step; the projectile caps stay
+
+- `ProjectileManager.step` spends at most `WORK_PER_STEP` (16,000) units of hit-test work a step: 1 per target examined, `HIT_WORK` (40) per hit. Counting examined targets as well as hits bounds both costs the benchmark found (a hit limit alone would not bound the crowd scans of the steady state). The budget is work, not time, so tests stay deterministic.
+- When it runs out, the remaining shots still move and are not tested; the next step starts from the first untested slot, so a flood cannot starve high slots. The price: in a crowd at the caps a shot can hit a step late, and a very fast one can skip a target. Real play (about 10 shots) never gets near it.
+- With the work bounded, the hostile step no longer grows with the number of shots, only plain movement does (0.4 ms at 1,000, 1.1 ms at 3,000). Measured 6.5 and 7.4 ms natively, under the 8 ms target, so `DEFAULT_CAP_WEB` stays 1,000 and `DEFAULT_CAP_DESKTOP` stays 3,000. WASM may be 2-4x slower: the web task re-checks it and lowers `WORK_PER_STEP`, then the web cap, if needed.
+- Not done: a per-layer grid and cheaper overlapping-target handling. The budget alone met the target; they stay options.

@@ -46,6 +46,7 @@ func _initialize() -> void:
 	_test_target_removed_by_a_hit_handler()
 	_test_spawn_in_a_hit_handler_waits_a_step()
 	_test_out_of_bounds_removed()
+	_test_hit_work_per_step_is_bounded()
 	_teardown()
 	if _failures.is_empty():
 		print("TEST OK: core/projectiles")
@@ -484,3 +485,20 @@ func _test_out_of_bounds_removed() -> void:
 	_mgr.spawn(0, Vector2(600.0, 100.0), Vector2(12000.0, 0.0), 5.0)
 	_mgr.step(DT)
 	_check(_mgr.get_count() == 0, "a shot far outside the bounds is removed")
+
+
+func _test_hit_work_per_step_is_bounded() -> void:
+	_setup()
+	_mgr.set_cap(2000)
+	_target(Vector2.ZERO)
+	var shots: int = 3 * ManagerScript.WORK_PER_STEP / ManagerScript.HIT_WORK
+	for i in shots:
+		_mgr.spawn(i % 4, Vector2(float(i % 5), 0.0), Vector2(1.0, 0.0), 10.0)
+	_mgr.step(DT)
+	var most: int = ManagerScript.WORK_PER_STEP / ManagerScript.HIT_WORK
+	_check(_hits.size() > 0 and _hits.size() <= most, "one step hits at most the budget (%d of %d)" % [_hits.size(), most])
+	_check(_mgr.get_count() == shots - _hits.size(), "the untested shots are kept, not lost")
+	# Deferred shots are tested first on the next steps: all are hit in the end.
+	for i in 20:
+		_mgr.step(DT)
+	_check(_mgr.get_count() == 0 and _hits.size() == shots, "every shot is hit in the end (%d of %d)" % [_hits.size(), shots])

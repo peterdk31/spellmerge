@@ -253,3 +253,12 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - The repository variables are `AUTOMATION_ENABLED` (the kill switch), `OWNER_ID` (the owner's numeric user ID) and `BOT_LOGIN`.
 - The required PR status check is the `checks.yml` job named `rules`, pinned to the GitHub Actions app.
 - Only GitHub-owned actions plus `anthropics/claude-code-action` and `oven-sh/setup-bun` are allowed, all pinned by SHA (`ci/settings/allowed-actions.json`). claude-code-action uses `oven-sh/setup-bun` internally, pinned by SHA in its own `action.yml`.
+
+## 2026-10-17: Registry shape (M1 part 8)
+
+**Decided by:** Claude (details the plan left open).
+
+- Sounds are found by file name under `audio/` only (any depth), as the task says; item sounds in `content/` are not indexed yet. A sound id is the file name without `.ogg`.
+- Content is any `.tres` with an `id` below `content/<folder>/`, so M2 components need no registry change; the first in sorted path order wins a duplicate id.
+- `demo_only` is a runtime variable set from the `demo` feature tag, so tests and the web build share one code path.
+- `scan()` takes roots and a sound extension list so tests can use a fixture: a valid `.ogg` cannot be written in a session, so the fixture sound is an `AudioStreamWAV` `.tres`.

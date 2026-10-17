@@ -2,6 +2,16 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-17: The fire bolt (M1 part 13)
+
+**Decided by:** Claude (details the task left open).
+
+- **`bolt.tres` uses `bolt.gd`, a script that extends `SpellBase`,** so everyone who loads it gets a `SpellBase`, but the firing code is content, not `core/base`. It reaches `Projectiles` and `Combat` by autoload path (tests set `projectiles` and `combat`); content may use `gameplay/`.
+- **No separate `core/pools` pool for shots.** The projectile manager's packed arrays are already a fixed-size pool (a free-slot list, no allocation per spawn), so wrapping it in `Pool` would add a layer for nothing. `Pool` stays for node-based things (hit sparks, part 16).
+- **The tag is `BOLT_TAG = 1`** (the imp's attack tags start at 1000). The hit profile is set on the first cast per `Combat` instance, with knockback 120 px/s. The values (5 mana, 0.35 s cooldown, 5 damage, 220 px/s, 1.2 s) are first guesses for C1 tuning: four bolts kill a 20-health imp.
+- **The "no field reads" test is a text scan** of every `.gd` outside `content/spells/`, `core/base/` and `test_*.gd` files (tests build fixtures by setting fields): a variable named like a spell followed by a field name, or `.mana_cost`, `.cooldown`, `.lifetime`, `.display_name`. It is a heuristic; a self-check in the test makes sure the scanner still catches what it should.
+- The bolt has no texture yet: the projectile manager draws tinted quads. Setting `Projectiles.texture` to `art/vfx/fire_bolt.svg` belongs to the flow glue (part 15) or feel (part 16).
+
 ## 2026-10-17: The enemy and its AI (M1 part 12)
 
 **Decided by:** Claude (details the task left open).

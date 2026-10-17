@@ -1,0 +1,273 @@
+extends SceneTree
+## Tests for the fire bolt (content/spells/forms/bolt): it loads on SpellBase, fires through
+## core/projectiles, hits and kills the ember imp through Combat, works for players 0-3, and
+## no script outside content/spells and core/base reads a spell field.
+##
+## godot --headless --path . --script res://tests/content/spells/test_bolt.gd
+
+const CombatScript := preload("res://gameplay/combat/combat.gd")
+const EventsScript := preload("res://core/events/events.gd")
+const PlayerScript := preload("res://gameplay/player/player.gd")
+const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
+const BoltResource := preload("res://content/spells/forms/bolt/bolt.tres")
+const ImpData := preload("res://content/enemies/ember_imp/ember_imp.tres")
+
+const STEP: float = 0.0625
+## Spell fields no script outside the allowed folders may read.
+const FIELD_PATTERN: String = "(id|demo|display_name|mana_cost|cooldown|damage|speed|lifetime)"
+## Folders that are not game scripts, and the two that may read spell fields.
+const SKIPPED_DIRS: PackedStringArray = [".git", ".github", ".godot", "addons", "ci", "docs", "content/spells", "core/base"]
+
+var _failures: Array[String] = []
+var _bus: Node
+var _projectiles: Node
+var _combat: Node
+var _nodes: Array[Node] = []
+var _deaths: Array = []
+
+
+func _initialize() -> void:
+	_test_resource_is_a_spell()
+	_test_cast_spawns_one_shot_with_mana_and_cooldown()
+	_test_bolt_kills_the_imp()
+	_test_four_players_each_land_hits()
+	_test_zero_direction_fires_right()
+	_test_player_casts_the_bolt()
+	_test_scanner_catches_field_reads()
+	_test_no_script_reads_spell_fields()
+	_teardown()
+	if _failures.is_empty():
+		print("TEST OK: content/spells/forms/bolt (fire bolt, hits, no field reads)")
+		quit(0)
+	else:
+		for failure in _failures:
+			printerr("TEST FAILED: " + failure)
+		quit(1)
+
+
+func _check(condition: bool, message: String) -> void:
+	if not condition:
+		_failures.append(message)
+
+
+func _setup() -> void:
+	_teardown()
+	_bus = EventsScript.new()
+	_projectiles = ProjectileManagerScript.new()
+	_projectiles.events = _bus
+	_combat = CombatScript.new()
+	_combat.events = _bus
+	_combat.projectiles = _projectiles
+	_combat._ready()
+	_bus.enemy_died.connect(_on_enemy_died)
+
+
+func _teardown() -> void:
+	for node in _nodes:
+		if is_instance_valid(node):
+			node.free()
+	_nodes.clear()
+	for node: Node in [_combat, _projectiles, _bus]:
+		if node != null:
+			node.free()
+	_combat = null
+	_projectiles = null
+	_bus = null
+	_deaths.clear()
+
+
+func _on_enemy_died(player: int, enemy: Node) -> void:
+	_deaths.append([player, enemy])
+
+
+## A fresh bolt (own cooldowns) wired to this test's manager and Combat.
+func _bolt() -> SpellBase:
+	var bolt: SpellBase = BoltResource.duplicate() as SpellBase
+	bolt.set("projectiles", _projectiles)
+	bolt.set("combat", _combat)
+	return bolt
+
+
+func _enemy(health: int, at: Vector2) -> Node2D:
+	var enemy := Node2D.new()
+	enemy.position = at
+	_nodes.append(enemy)
+	_combat.register_enemy(enemy, health, 10.0)
+	return enemy
+
+
+func _run(count: int) -> void:
+	for i in count:
+		_projectiles.step(STEP)
+		_combat.step(STEP)
+
+
+# --- Tests ------------------------------------------------------------------
+
+func _test_resource_is_a_spell() -> void:
+	var spell: SpellBase = BoltResource as SpellBase
+	_check(spell != null, "bolt.tres loads as a SpellBase")
+	_check(spell.spell_id() == &"bolt", "the id is bolt")
+	_check(spell.demo and spell.mana_cost > 0.0 and spell.cooldown > 0.0, "demo, with a cost and a cooldown")
+	_check(spell.damage > 0 and spell.speed > 0.0 and spell.lifetime > 0.0, "damage, speed and lifetime are set")
+	_check(ceili(float(ImpData.max_health) / float(spell.damage)) <= 8,"an imp dies in a handful of bolts")
+
+
+func _test_cast_spawns_one_shot_with_mana_and_cooldown() -> void:
+	_setup()
+	var bolt: SpellBase = _bolt()
+	var spent: float = bolt.cast(1, Vector2.ZERO, Vector2.RIGHT, 100.0)
+	_check(spent == bolt.mana_cost, "cast returns the mana cost")
+	_check(_projectiles.get_count() == 1 and _projectiles.get_count_for(1) == 1, "one shot, owned by player 1")
+	_check(bolt.cast(1, Vector2.ZERO, Vector2.RIGHT, 100.0) == SpellBase.REFUSED, "the cooldown refuses a second cast")
+	_check(_projectiles.get_count() == 1, "a refused cast spawns nothing")
+	_check(bolt.cast(1, Vector2.ZERO, Vector2.RIGHT, 1.0) == SpellBase.REFUSED, "too little mana is refused")
+	bolt.tick(1, 10.0)
+	_check(bolt.cast(1, Vector2.ZERO, Vector2.RIGHT, 100.0) == bolt.mana_cost, "after the cooldown it fires again")
+	_check(_projectiles.get_count() == 2, "two shots now")
+
+
+func _test_bolt_kills_the_imp() -> void:
+	_setup()
+	var bolt: SpellBase = _bolt()
+	var imp := _enemy(ImpData.max_health, Vector2(80.0, 0.0))
+	var casts: int = 0
+	var mana: float = 100.0
+	while _combat.is_enemy(imp) and casts < 20:
+		var spent: float = bolt.cast(0, Vector2.ZERO, Vector2.RIGHT, mana)
+		if spent != SpellBase.REFUSED:
+			mana -= spent
+			casts += 1
+		bolt.tick(0, STEP)
+		_run(1)
+	_check(not _combat.is_enemy(imp), "the bolts kill the imp")
+	_check(_deaths == [[0, imp]], "enemy_died names player 0 and the imp")
+	_check(casts == ceili(float(ImpData.max_health) / float(bolt.damage)), "it takes exactly health / damage bolts")
+
+
+func _test_four_players_each_land_hits() -> void:
+	_setup()
+	var damage: Array = []
+	_bus.damage_dealt.connect(func(player: int, _target: Node, amount: int) -> void: damage.append([player, amount]))
+	for index in 4:
+		var bolt: SpellBase = _bolt()
+		var imp := _enemy(100, Vector2(80.0, 40.0 * index))
+		bolt.cast(index, Vector2(0.0, 40.0 * index), Vector2.RIGHT, 100.0)
+		_check(imp != null, "enemy %d exists" % index)
+	_run(24)
+	_check(damage.size() == 4, "four hits, one per player")
+	for index in 4:
+		_check(damage.any(func(entry: Array) -> bool: return entry[0] == index), "player %d is credited" % index)
+
+
+func _test_zero_direction_fires_right() -> void:
+	_setup()
+	var bolt: SpellBase = _bolt()
+	bolt.cast(0, Vector2.ZERO, Vector2.ZERO, 100.0)
+	_run(2)
+	var slot: int = 0
+	while slot < 8 and not _projectiles.is_alive(slot):
+		slot += 1
+	_check(slot < 8 and _projectiles.get_position_of(slot).x > 0.0, "a zero direction fires to the right")
+
+
+func _test_player_casts_the_bolt() -> void:
+	_setup()
+	var imp := _enemy(5, Vector2(60.0, 0.0))
+	var wizards: Array[PlayerScript] = []
+	for index in 4:
+		var wizard := PlayerScript.new()
+		wizard.index = index
+		wizard.events = _bus
+		wizard.spell = _bolt()
+		root.add_child(wizard)
+		_nodes.append(wizard)
+		wizard.position = Vector2(0.0, 500.0 * index)
+		wizards.append(wizard)
+	wizards[0].position = Vector2.ZERO
+	_check(wizards[0].cast(), "the wizard casts the bolt through cast()")
+	_check(is_equal_approx(wizards[0].mana, PlayerScript.MAX_MANA - BoltResource.mana_cost), "the wizard paid the mana the cast returned")
+	for index in range(1, 4):
+		_check(wizards[index].cast(), "player %d casts too" % index)
+	_run(24)
+	_check(_deaths.size() == 1 and _deaths[0][0] == 0 and _deaths[0][1] == imp, "player 0's bolt killed the imp")
+
+
+## The scanner must catch what it is there to catch, or the real scan proves nothing.
+func _test_scanner_catches_field_reads() -> void:
+	var bad: PackedStringArray = [
+		"var cost: float = spell.mana_cost",
+		"if player_spell.cooldown > 0.0:",
+		"x = _spell.damage",
+		"label.text = bolt.display_name",
+		"var left = something.cooldown",
+		"var life := s.lifetime",
+	]
+	for line in bad:
+		_check(_line_reads_spell_field(line), "caught: " + line)
+	var good: PackedStringArray = [
+		"spell.cast(index, global_position, facing, mana)",
+		"events.spell_cast.emit(index, spell.spell_id(), pos, facing)",
+		"var speed: float = 3.0",
+		"data.id",
+		"spell.tick(index, delta)  # reads spell.damage later",
+		"@export var cooldown: float = 0.0",
+	]
+	for line in good:
+		_check(not _line_reads_spell_field(line), "not flagged: " + line)
+
+
+func _test_no_script_reads_spell_fields() -> void:
+	var offenders: PackedStringArray = PackedStringArray()
+	var checked: int = _scan_dir("res://", offenders)
+	_check(checked > 20, "the scan looked at the scripts (%d)" % checked)
+	_check(offenders.is_empty(), "scripts read spell fields: " + ", ".join(offenders))
+
+
+# --- The field-read scan ------------------------------------------------------
+
+## True when a line reads a spell field: a variable named like a spell followed by a
+## field, or one of the four field names that nothing else uses (`.mana_cost`,
+## `.cooldown`, `.lifetime`, `.display_name`). Comments and declarations do not count.
+func _line_reads_spell_field(line: String) -> bool:
+	var code: String = line.get_slice("#", 0)
+	var named := RegEx.new()
+	named.compile("(?i)\\w*spell\\w*\\s*\\.\\s*" + FIELD_PATTERN + "\\b")
+	if named.search(code) != null:
+		return true
+	var unique := RegEx.new()
+	unique.compile("[\\w\\)\\]]\\s*\\.\\s*(mana_cost|cooldown|lifetime|display_name)\\b")
+	return unique.search(code) != null
+
+
+## Scan every .gd below `path` except the skipped folders and the test_*.gd files
+## (tests may set fields to build their fixtures). Returns the count scanned.
+func _scan_dir(path: String, offenders: PackedStringArray) -> int:
+	var dir: DirAccess = DirAccess.open(path)
+	if dir == null:
+		return 0
+	var count: int = 0
+	for sub in dir.get_directories():
+		var sub_path: String = path.path_join(sub)
+		if _is_skipped(sub_path):
+			continue
+		count += _scan_dir(sub_path, offenders)
+	for file_name in dir.get_files():
+		if file_name.get_extension() != "gd" or file_name.begins_with("test_"):
+			continue
+		var file_path: String = path.path_join(file_name)
+		count += 1
+		var number: int = 0
+		for line in FileAccess.get_file_as_string(file_path).split("\n"):
+			number += 1
+			if _line_reads_spell_field(line):
+				offenders.append("%s:%d" % [file_path, number])
+	return count
+
+
+func _is_skipped(path: String) -> bool:
+	var relative: String = path.trim_prefix("res://")
+	for skipped in SKIPPED_DIRS:
+		if relative == skipped:
+			return true
+	return false

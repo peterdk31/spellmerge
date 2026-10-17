@@ -4,7 +4,7 @@
 
 The spell components that players assemble into spells: **forms** (bolt, beam, nova, rune, orbit), **elements** (fire, frost, storm, void), **modifiers** (split, pierce, homing, chain, bigger, faster) and **triggers** (on hit, on expire, timer). A spell is built as form → element → modifiers → trigger, and a trigger holds another spell. Few components, many combinations: this is the game's first pillar (docs/DESIGN.md).
 
-**Opens for PRs in M2** (Spell system; see "Opens for PRs" in docs/ROADMAP.md). Until then, PRs to this folder are a gamble. A small M1 base class already exists (`core/base/spell_base.gd`, `SpellBase`); M2 replaces or extends it with the real component classes. **The example to copy arrives with Claude's first spell content (the M1 fire bolt, then M2)**; this README is updated then with its path.
+**Opens for PRs in M2** (Spell system; see "Opens for PRs" in docs/ROADMAP.md). Until then, PRs to this folder are a gamble. A small M1 base class already exists (`core/base/spell_base.gd`, `SpellBase`); M2 replaces or extends it with the real component classes. The example to copy is the M1 fire bolt, `content/spells/forms/bolt/`.
 
 ## Contract
 
@@ -31,7 +31,7 @@ The spell components that players assemble into spells: **forms** (bolt, beam, n
 
 ## Example to copy
 
-Arrives with Claude's first content (the M1 fire bolt, then M2). Do not guess its layout before then.
+`content/spells/forms/bolt/`: `bolt.tres` (the values: id, mana cost, cooldown, damage, speed, lifetime) on `bolt.gd`, which extends `SpellBase` and overrides `_fire()` to spawn a shot through `Projectiles.spawn` and give `Combat` its hit profile. Players and bots never read these fields; they only call `cast()`. `tests/content/spells/test_bolt.gd` fails if any script outside `content/spells/` and `core/base/` reads one. M2 replaces this with the real component classes and migrates the bolt.
 
 ## Validate
 

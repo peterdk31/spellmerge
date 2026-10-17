@@ -11,10 +11,23 @@ extends CharacterBody2D
 ## before the next dodge. Combat (part 11) asks is_invulnerable() before damage.
 ## A press made while the dodge is not ready is dropped, not queued.
 ##
+## Health and mana: MAX_HEALTH, and MAX_MANA that regenerates. A hit (the
+## `damage_dealt` event with this wizard as target, or take_damage()) does nothing
+## while invulnerable or downed. At 0 health the wizard is downed: it cannot move,
+## dodge or cast, and `player_downed` is sent. revive(reviver) (called by whoever
+## decides a teammate revived it, e.g. coop) brings it back with REVIVE_HEALTH and
+## sends `player_revived`. Other wizards are never affected: nobody waits.
+##
+## Cast: while `cast` is held the wizard calls `spell.cast(index, origin, facing, mana)`
+## and reads no spell field. If the spell fired it takes the mana returned, sends
+## `spell_cast` and plays the sound `cast` from `core/registry` (nothing on null).
+##
 ## All timing runs in step(delta), so tests drive it with fixed deltas and no
 ## real-time waits. Nothing here allocates per frame.
 
 const InputManagerScript := preload("res://core/input/input_manager.gd")
+const EventsScript := preload("res://core/events/events.gd")
+const RegistryScript := preload("res://core/registry/registry.gd")
 
 ## Walking speed in pixels per second (the view is 640x360).
 const MOVE_SPEED: float = 90.0
@@ -25,6 +38,14 @@ const DODGE_TIME: float = 0.25
 const INVULNERABLE_TIME: float = 0.125
 ## Seconds from the start of a dodge until the next one may start.
 const DODGE_COOLDOWN: float = 0.625
+const MAX_HEALTH: int = 100
+## Health after a revive.
+const REVIVE_HEALTH: int = 50
+const MAX_MANA: float = 100.0
+## Mana regained per second.
+const MANA_REGEN: float = 10.0
+## Id of the cast sound (looked up in core/registry; a missing sound is silent).
+const CAST_SOUND_ID: StringName = &"cast"
 ## Physics layers (the plan: 1 walls, 2 players, 3 enemies, 4 projectiles and
 ## hit boxes; see gameplay/player/README.md): players are on layer 2 and collide only with walls on layer 1,
 ## so wizards walk through each other and never block a teammate.
@@ -42,6 +63,17 @@ const LAYER_PLAYERS: int = 2
 ## "PlayerInput" autoload is used.
 var input: InputManagerScript = null
 
+## The event bus and the registry. Only tests set these, before adding the node;
+## otherwise the "Events" and "Registry" autoloads are used.
+var events: EventsScript = null
+var registry: RegistryScript = null
+
+## The equipped spell. The wizard only calls its cast() method.
+var spell: SpellBase = null
+
+var health: int = MAX_HEALTH
+var mana: float = MAX_MANA
+
 ## The way the wizard faces: the last move direction (unit length).
 var facing: Vector2 = Vector2.DOWN
 
@@ -50,6 +82,8 @@ var _invulnerable_left: float = 0.0
 var _cooldown_left: float = 0.0
 var _dodge_direction: Vector2 = Vector2.ZERO
 var _seen_dodge_presses: int = 0
+var _downed: bool = false
+var _sound_player: AudioStreamPlayer = null
 
 
 func _init() -> void:
@@ -75,6 +109,17 @@ func _ready() -> void:
 		input = get_node_or_null("/root/PlayerInput") as InputManagerScript
 		if input == null and is_inside_tree():
 			push_warning("Wizard %d: the PlayerInput autoload is missing, so this wizard cannot move." % index)
+	if events == null:
+		events = get_node_or_null("/root/Events") as EventsScript
+		if events == null and is_inside_tree():
+			push_warning("Wizard %d: the Events autoload is missing, so this wizard sends no events." % index)
+	if events != null and not events.damage_dealt.is_connected(_on_damage_dealt):
+		events.damage_dealt.connect(_on_damage_dealt)
+	if registry == null:
+		registry = get_node_or_null("/root/Registry") as RegistryScript
+	if is_inside_tree() and _sound_player == null:
+		_sound_player = AudioStreamPlayer.new()
+		add_child(_sound_player)
 	if input != null:
 		_seen_dodge_presses = input.get_press_count(index, &"dodge")
 
@@ -87,6 +132,15 @@ func _physics_process(delta: float) -> void:
 ## Advance the wizard by `delta` seconds: read input, start a dodge, set
 ## `velocity`. The caller moves the body (_physics_process does).
 func step(delta: float) -> void:
+	if _downed:
+		velocity = Vector2.ZERO
+		if input != null:
+			# Presses made while downed are not held against the wizard after a revive.
+			_seen_dodge_presses = input.get_press_count(index, &"dodge")
+		return
+	mana = minf(mana + MANA_REGEN * delta, MAX_MANA)
+	if spell != null:
+		spell.tick(index, delta)
 	_dodge_left = maxf(_dodge_left - delta, 0.0)
 	_invulnerable_left = maxf(_invulnerable_left - delta, 0.0)
 	_cooldown_left = maxf(_cooldown_left - delta, 0.0)
@@ -112,6 +166,72 @@ func step(delta: float) -> void:
 		velocity = _dodge_direction * DODGE_SPEED
 	else:
 		velocity = move * MOVE_SPEED
+	# Held, not pressed: the spell's own cooldown sets the rate. `cast` is hidden
+	# while an overlay is open (captured), so a menu tap never fires.
+	if spell != null and input.is_action_pressed(index, &"cast"):
+		cast()
+
+
+## Fire the equipped spell now. Returns true if it fired. Does nothing when
+## downed or without a spell.
+func cast() -> bool:
+	if _downed or spell == null:
+		return false
+	var spent: float = spell.cast(index, global_position, facing, mana)
+	if spent == SpellBase.REFUSED:
+		return false
+	mana -= spent
+	if events != null:
+		events.spell_cast.emit(index, spell.spell_id(), global_position, facing)
+	_play_cast_sound()
+	return true
+
+
+func _play_cast_sound() -> void:
+	if registry == null or _sound_player == null:
+		return
+	var stream: AudioStream = registry.get_sound(CAST_SOUND_ID)
+	if stream == null:
+		return
+	_sound_player.stream = stream
+	_sound_player.play()
+
+
+func is_downed() -> bool:
+	return _downed
+
+
+func _on_damage_dealt(_player: int, target: Node, amount: int, _position: Vector2) -> void:
+	if target == self:
+		take_damage(amount)
+
+
+## Lose `amount` health. Ignored while invulnerable or downed. Returns true if it
+## was applied. At 0 health the wizard is downed and `player_downed` is sent.
+func take_damage(amount: int) -> bool:
+	if _downed or is_invulnerable() or amount <= 0:
+		return false
+	health = maxi(health - amount, 0)
+	if health == 0:
+		_downed = true
+		_dodge_left = 0.0
+		_invulnerable_left = 0.0
+		velocity = Vector2.ZERO
+		if events != null:
+			events.player_downed.emit(index)
+	return true
+
+
+## Bring a downed wizard back with REVIVE_HEALTH; `reviver` is the index of the
+## teammate who did it. Returns false if the wizard was not downed.
+func revive(reviver: int) -> bool:
+	if not _downed:
+		return false
+	_downed = false
+	health = REVIVE_HEALTH
+	if events != null:
+		events.player_revived.emit(index, reviver)
+	return true
 
 
 func is_dodging() -> bool:

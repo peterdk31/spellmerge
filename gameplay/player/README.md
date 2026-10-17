@@ -10,7 +10,7 @@ Every player is an index 0–3 with their own device, mana, health and downed st
 
 ## Contract
 
-- **Public entry script:** `gameplay/player/player.gd`. Other code uses only this script and the events it sends and listens to; nothing else in the folder is public. Move and dodge exist (M1 part 9); health, mana, downed and cast follow in part 10.
+- **Public entry script:** `gameplay/player/player.gd`. Other code uses only this script and the events it sends and listens to; nothing else in the folder is public. Move, dodge, health, mana, downed, revive and cast exist (M1 parts 9 and 10). Health and mana are `health` and `mana` (`MAX_HEALTH`, `MAX_MANA`, `MANA_REGEN`); `take_damage(amount)` (also reached by `damage_dealt` with the wizard as target), `is_downed()` and `revive(reviver)` (called by whoever decides a revive happened, e.g. `coop`; it is not automatic yet). Cast: the wizard holds a `spell: SpellBase` and, while `cast` is held, calls only `spell.cast(index, origin, direction, mana)` and `spell.tick(index, delta)`; it reads no spell field (`spell_id()` is a method). The cast returns the mana spent or `SpellBase.REFUSED`. The cast sound is `Registry.get_sound(&"cast")`, skipped on `null`. Nothing sets `spell` yet: the fire bolt (part 13) and the flow glue do.
 - **Dependency direction:** `core` ← `gameplay` ← `content`. This area may use `core/` and the registry. `core/` never depends on it, and content never reaches into it.
 - **Events** (`core/events/events.gd` owns the definitions; this list matches it and the table in [gameplay/README.md](../README.md)):
   - Sends: `player_downed`, `player_revived`, `spell_cast`.
@@ -31,7 +31,7 @@ One plan for every part that adds bodies: layer 1 walls, 2 players, 3 enemies, 4
 
 ## Example to copy
 
-`gameplay/player/player.gd` (move and dodge so far) with its scene `content/wizard/base/wizard.tscn`, and its test `tests/gameplay/player/test_player_move.gd`. `gameplay/` has no scenes: the wizard scene lives in `content/wizard/base/`. The script is driven by `step(delta)`, so a test runs time with fixed deltas. Combat asks `is_invulnerable()` before it hurts a wizard.
+`gameplay/player/player.gd` with its scene `content/wizard/base/wizard.tscn`, and its tests `tests/gameplay/player/test_player_move.gd` and `test_player_health_cast.gd` (a fixture spell is in `tests/gameplay/player/fixtures/`). `gameplay/` has no scenes: the wizard scene lives in `content/wizard/base/`. The script is driven by `step(delta)`, so a test runs time with fixed deltas. Combat asks `is_invulnerable()` before it hurts a wizard.
 
 ## Validate
 

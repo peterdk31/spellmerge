@@ -16,6 +16,10 @@ Everything the players see and click: panels, the spell builder UI, menus, share
 - Use the shared theme; don't style single controls by hand.
 - Accessibility: readable text sizes, no information by colour alone, gamepad navigation everywhere.
 
+- **The theme** is `theme/spellmerge_theme.tres`, set as the project theme (`gui/theme/custom`), so every control uses it. Player colours are type variations: `PlayerPanel1-4` (panel border), `PlayerLabel1-4` (text), plus `HealthBar` and `ManaBar`. Add a new look there, not as an override on one control. Colours are from `docs/STYLE.md`.
+- **The panels** (`panels/`): `panels.tscn` is the autoload `Hud`, a `CanvasLayer` with one `player_panel/` per player in a corner (P1 top left, P2 top right, P3 bottom left, P4 bottom right; about 112×55 px each, so four fit a 640×360 view). It hears `player_joined`, `player_left`, `room_entered`, `player_stats_changed` (from `player`) and `UIFocus.opened`/`closed`, and shows only that. A panel shows for a joined player after the first room; it takes no input. It says "P1".."P4", "HP", "MP" with numbers, "DOWN" at 0 health and "MENU" while that player's overlay is open (priority DOWN), so nothing is shown by colour alone.
+- Events the HUD listens to: `player_joined`, `player_left`, `room_entered`, `player_stats_changed`.
+
 ## Allowed files
 
 `.gd`, `.tscn`, `.tres`, UI art (`.png`, `.svg`), plus `.uid`, `.import` and `.license` files. Limits: 1 MB per image, 1 MB for anything else. Typed GDScript only; no banned APIs. Tests for the HUD go in `tests/hud/`; the runner and naming are documented in `tests/README.md`, which a later task writes.
@@ -29,7 +33,7 @@ Everything the players see and click: panels, the spell builder UI, menus, share
 
 ## Example to copy
 
-`hud/menus/main_menu/main_menu.tscn` and `main_menu.gd`: the main menu with the Play button. Play sends `play_requested(0)` through the `Events` autoload and nothing else: it never calls `flow` and never changes the scene (flow does, on the event). The test is in `tests/gameplay/flow/test_flow.gd` (it presses the button and scans the script). The panels, the theme and the overlay arrive in M1 parts 18 and 19.
+`hud/menus/main_menu/main_menu.tscn` and `main_menu.gd`: the main menu with the Play button. Play sends `play_requested(0)` through the `Events` autoload and nothing else: it never calls `flow` and never changes the scene (flow does, on the event). The test is in `tests/gameplay/flow/test_flow.gd` (it presses the button and scans the script). For a panel, copy `hud/panels/player_panel/` (`player_panel.tscn` and `.gd`: the root script gets its numbers through methods, listens to nothing, and styles itself only through theme variations); its container is `hud/panels/panels.gd`, and the tests are `tests/hud/test_panels.gd` and `tests/gameplay/player/test_player_stats.gd`. The overlay arrives in M1 part 19.
 
 ## Validate
 

@@ -1,0 +1,76 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://hud/panels/player_panel/player_panel.gd" id="1_panel"]
+
+[node name="PlayerPanel" type="PanelContainer"]
+custom_minimum_size = Vector2(112, 0)
+mouse_filter = 2
+script = ExtResource("1_panel")
+
+[node name="Rows" type="VBoxContainer" parent="."]
+layout_mode = 2
+theme_override_constants/separation = 1
+
+[node name="Header" type="HBoxContainer" parent="Rows"]
+layout_mode = 2
+
+[node name="Name" type="Label" parent="Rows/Header"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "P1"
+
+[node name="Status" type="Label" parent="Rows/Header"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+horizontal_alignment = 2
+
+[node name="Health" type="HBoxContainer" parent="Rows"]
+layout_mode = 2
+
+[node name="Tag" type="Label" parent="Rows/Health"]
+custom_minimum_size = Vector2(18, 0)
+layout_mode = 2
+text = "HP"
+
+[node name="HealthBar" type="ProgressBar" parent="Rows/Health"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(40, 8)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+theme_type_variation = &"HealthBar"
+value = 100.0
+show_percentage = false
+
+[node name="HealthValue" type="Label" parent="Rows/Health"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(24, 0)
+layout_mode = 2
+text = "100"
+horizontal_alignment = 2
+
+[node name="Mana" type="HBoxContainer" parent="Rows"]
+layout_mode = 2
+
+[node name="Tag" type="Label" parent="Rows/Mana"]
+custom_minimum_size = Vector2(18, 0)
+layout_mode = 2
+text = "MP"
+
+[node name="ManaBar" type="ProgressBar" parent="Rows/Mana"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(40, 8)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+theme_type_variation = &"ManaBar"
+value = 100.0
+show_percentage = false
+
+[node name="ManaValue" type="Label" parent="Rows/Mana"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(24, 0)
+layout_mode = 2
+text = "100"
+horizontal_alignment = 2

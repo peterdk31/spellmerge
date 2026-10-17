@@ -2,6 +2,17 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-17: HUD theme and player panels (M1 part 18)
+
+**Decided by:** Claude (details the plan left open).
+
+- **One new event, `player_stats_changed(player, health, max_health, mana, max_mana)`, sender `player`.** The HUD may only show what events say, and no event carried health or mana. It is sent when a wizard appears, on a health change, and when mana crosses a whole number (about 10 a second per regenerating player, none when nothing changes). Rejected: the HUD reading the wizard nodes (a direct call into gameplay), and a per-frame event.
+- **"Downed" is derived from health 0**, not from `player_downed`/`player_revived`, so a restart that builds new full-health wizards clears it with no extra event.
+- **The panels are an autoload scene `Hud`** (a `CanvasLayer`), so neither `flow` nor the menu has to add them and areas keep not calling each other. They show for a joined player after `room_entered`. Rejected: `flow` adding the HUD to its world.
+- **The theme is the project theme** (`gui/theme/custom`), so every control, including the main menu, uses it. Player colours are theme type variations, not per-control overrides. Rejected: a theme set on each scene root.
+- **No information by colour alone:** the panel says "P1".."P4", "HP"/"MP" with numbers, and the words "DOWN" and "MENU". Health uses Fire and mana Spark from `docs/STYLE.md`; no new colour was invented.
+- **The corner panels are display-only.** They take no input; "on `core/ui_focus`" means they show `UIFocus.opened`/`closed` as the "MENU" word. The overlay that uses `UIFocus` to take input is part 19.
+
 ## 2026-10-17: Co-op (M1 part 17)
 
 **Decided by:** Claude (details the task left open).

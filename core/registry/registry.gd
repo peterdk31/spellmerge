@@ -14,8 +14,8 @@ extends Node
 ## A "folder" is a direct child of the content root (`spells`, `enemies`,
 ## `rooms`, ...). Every `.tres` below it, at any depth, that has an `id` is
 ## registered under that id; a `.tres` without one (a sub-resource of an item)
-## is skipped. The first file found wins a duplicate id (folders are read in
-## sorted order) and a warning names both.
+## is skipped. The first file found wins a duplicate id (files are read in
+## sorted path order) and a warning names both.
 ##
 ## The `demo` flag: when `demo_only` is true (the web demo build, the feature
 ## tag `demo`), resources whose `demo` is false are hidden from every question.
@@ -93,10 +93,6 @@ func get_resource(folder: StringName, id: StringName) -> Resource:
 	return res
 
 
-func has_resource(folder: StringName, id: StringName) -> bool:
-	return get_resource(folder, id) != null
-
-
 ## Every visible id in the folder, sorted. Empty for an unknown folder.
 func get_ids(folder: StringName) -> Array[StringName]:
 	var result: Array[StringName] = []
@@ -134,13 +130,8 @@ func get_sound(id: StringName) -> AudioStream:
 	if path == "":
 		return null
 	var stream: AudioStream = ResourceLoader.load(path) as AudioStream
-	if stream != null:
-		_sounds[id] = stream
+	_sounds[id] = stream  # a failed load is remembered too, so it is tried once
 	return stream
-
-
-func has_sound(id: StringName) -> bool:
-	return _sound_paths.has(id)
 
 
 func _visible(res: Resource) -> bool:
@@ -169,12 +160,17 @@ func _list_dir(path: String, directories: bool) -> PackedStringArray:
 	return names
 
 
-## Every file with one of the extensions below `root`, in sorted order.
+## Every file with one of the extensions below `root`, in full-path sorted order.
 func _find_files(root: String, extensions: PackedStringArray) -> PackedStringArray:
 	var found: PackedStringArray = PackedStringArray()
+	_collect_files(root, extensions, found)
+	found.sort()
+	return found
+
+
+func _collect_files(root: String, extensions: PackedStringArray, found: PackedStringArray) -> void:
 	for file_name: String in _list_dir(root, false):
 		if extensions.has(file_name.get_extension()):
 			found.append(root.path_join(file_name))
 	for sub: String in _list_dir(root, true):
-		found.append_array(_find_files(root.path_join(sub), extensions))
-	return found
+		_collect_files(root.path_join(sub), extensions, found)

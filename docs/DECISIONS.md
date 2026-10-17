@@ -259,6 +259,6 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 **Decided by:** Claude (details the plan left open).
 
 - Sounds are found by file name under `audio/` only (any depth), as the task says; item sounds in `content/` are not indexed yet. A sound id is the file name without `.ogg`.
-- Content is any `.tres` with an `id` below `content/<folder>/`, so M2 components need no registry change; the first in sorted order wins a duplicate id.
+- Content is any `.tres` with an `id` below `content/<folder>/`, so M2 components need no registry change; the first in sorted path order wins a duplicate id.
 - `demo_only` is a runtime variable set from the `demo` feature tag, so tests and the web build share one code path.
 - `scan()` takes roots and a sound extension list so tests can use a fixture: a valid `.ogg` cannot be written in a session, so the fixture sound is an `AudioStreamWAV` `.tres`.

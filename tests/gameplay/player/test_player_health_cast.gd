@@ -40,6 +40,8 @@ func _initialize() -> void:
 	_test_cast_needs_mana()
 	_test_no_spell_no_cast()
 	_test_missing_sound_is_silent()
+	_test_missing_sound_in_tree_is_silent()
+	_test_downed_mana_and_cooldowns_freeze()
 	_test_two_players_cast_and_down_independently()
 	_test_four_players()
 	_test_captured_player_does_not_cast()
@@ -254,6 +256,35 @@ func _test_missing_sound_is_silent() -> void:
 	_check(_players[0].cast(), "a cast with no sound still fires")
 	_players[0].registry = null
 	_check(_players[0].cast(), "a cast without a registry still fires")
+
+
+func _test_missing_sound_in_tree_is_silent() -> void:
+	_setup(0)
+	_input.add_virtual_device(0)
+	var player := PlayerScript.new()
+	player.index = 0
+	player.input = _input
+	player.events = _bus
+	player.registry = _registry
+	root.add_child(player)  # _ready() makes the AudioStreamPlayer
+	_players.append(player)
+	_check(player._sound_player != null, "inside the tree the wizard has a sound player")
+	player.spell = _make_spell(1.0, 0.0)
+	_check(player.cast(), "a cast with the sound player but no sound fires")
+	_check(player._sound_player != null and not player._sound_player.playing, "and plays nothing")
+
+
+func _test_downed_mana_and_cooldowns_freeze() -> void:
+	_setup(1)
+	_players[0].spell = _make_spell(10.0, 1.0)
+	_check(_players[0].cast(), "a cast fires before the hit")
+	_hit(_players[0], PlayerScript.MAX_HEALTH)
+	var mana: float = _players[0].mana
+	_run(16)
+	_check(_players[0].mana == mana, "a downed wizard does not regenerate mana")
+	_check(not _players[0].cast(), "a downed wizard cannot cast")
+	_players[0].revive(1)
+	_check(not _players[0].cast(), "the spell's cooldown did not run while downed")
 
 
 func _test_two_players_cast_and_down_independently() -> void:

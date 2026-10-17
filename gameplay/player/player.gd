@@ -111,6 +111,8 @@ func _ready() -> void:
 			push_warning("Wizard %d: the PlayerInput autoload is missing, so this wizard cannot move." % index)
 	if events == null:
 		events = get_node_or_null("/root/Events") as EventsScript
+		if events == null and is_inside_tree():
+			push_warning("Wizard %d: the Events autoload is missing, so this wizard sends no events." % index)
 	if events != null and not events.damage_dealt.is_connected(_on_damage_dealt):
 		events.damage_dealt.connect(_on_damage_dealt)
 	if registry == null:
@@ -176,7 +178,7 @@ func cast() -> bool:
 	if _downed or spell == null:
 		return false
 	var spent: float = spell.cast(index, global_position, facing, mana)
-	if spent < 0.0:
+	if spent == SpellBase.REFUSED:
 		return false
 	mana -= spent
 	if events != null:

@@ -35,6 +35,8 @@ Sounds the game asks for by id and does not have yet. A missing sound is silent 
 - Windows code signing, before Steam (M7).
 - GUT test framework as an owner-added addon, when game code needs unit tests (M1).
 
+- **Invalid UIDs with a 9.** Godot's UID alphabet is a-y and 0-8. Fix the digit 9 in: `tests/gameplay/combat/test_combat.gd.uid`, `tests/gameplay/player/fixtures/counting_spell.gd.uid`, `tests/gameplay/player/test_player_move.gd.uid`, `tests/core/test_spell_base.gd.uid`, `tests/core/test_registry.gd.uid`.
+
 ## Ideas from the community
 
 (none yet)

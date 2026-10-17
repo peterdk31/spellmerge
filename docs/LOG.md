@@ -4,6 +4,8 @@ What each run did, newest first. Claude appends a short entry after each develop
 
 ## 2026-10-17
 
+- M1 part 16: feel. `gameplay/feel/feel.gd` (autoload `Feel`, in `project.godot`): hit-stop (same for every player, longest wins), screen shake with the `shake_enabled` setting (in memory; saving waits for `core/save`), pooled hit particles under `PARTICLE_LIMIT`, a hit sound by id (silent on `null`), all from `damage_dealt`, `enemy_died` and `player_downed`; sets `Projectiles.texture` to the fire bolt art; `presets/feel_preset.gd` + `punchy.tres`; test `tests/gameplay/feel/test_feel.gd` (limit with four players, feel never changes damage); feel README. No Godot binary: the test and `build.sh --quick` have not run, `.uid` files hand-written.
+
 - M1 part 15: arena glue. `gameplay/flow/flow.gd` (autoload `Flow`, in `project.godot`): `play_requested` loads the room, wizards for every joined player and the fixed wave of 8 imps, sends `room_entered` and `room_cleared`, restarts 2 s after the last wizard is down (bolt cooldowns reset); Play button in the main menu that only sends the event; test `tests/gameplay/flow/test_flow.gd`; flow and HUD READMEs. First internal playable build. No Godot binary: the test and `build.sh --quick` have not run.
 
 - M1 part 14: the room. `content/rooms/crypt/arena_01.tscn` + `.tres` on `RoomBase` (space for four, four player spawns, six enemy spawns, entry and exit doors, six pillars for cover); test `tests/content/rooms/test_arena_01.gd`; rooms README example filled in. No Godot binary: scene and test not opened or run, `.uid` hand-written. Review fixes: the test also checks sprites against collision shapes, the floor, doors and spawn reachability (flood fill); still to be run in Godot before part 15.

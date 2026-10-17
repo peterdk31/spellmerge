@@ -1,0 +1,7 @@
+[gd_resource type="Resource" script_class="FeelPreset" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://gameplay/feel/presets/feel_preset.gd" id="1_preset"]
+
+[resource]
+script = ExtResource("1_preset")
+id = &"punchy"

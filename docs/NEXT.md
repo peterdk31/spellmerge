@@ -4,14 +4,13 @@ The ordered task queue for the current milestone, M1 (its design, [M1-core-loop.
 
 ## Queue
 
-- [ ] **Web size, load time and WASM projectile timing (M1 part 22 follow-up).** Needs the Web export template, so it runs in the daily build, not in a development session. Log the compressed size of `build/web/` and a headless Chrome load time against the PLAN budgets (40 MB, 10 s), and log `test_projectile_timing` in the web export. Rule: if the hostile step is over 8 ms in WASM, lower `DEFAULT_CAP_WEB` until it is under. If the template stays unavailable, move this task to Blocked and name it.
 - [ ] **Web 4-bot run (M1 part 23).** Write the exact change `ci/smbot/websmoke.py` needs to run the 4-bot test in headless Chrome (how the game is told to start it, without `JavaScriptBridge`) under "Needs an owner decision" in `docs/BACKLOG.md`, open one issue labelled `owner` with the same text, and make the game side ready. If the owner hasn't made the change, report the task blocked so the next one goes on; the weekly run repeats the request until it is done.
 - [ ] **Starter kit sources and Style Guide content (M1 part 24).** In `art/` add the kit's source files that sessions can write: palette files (a GIMP `.gpl` and a hex list), 32×32 grid and sheet templates as SVG, golden-example candidates, and the checklist (it exists in `docs/STYLE.md` from part 3: extend it with the golden examples and export it as a one-page file in `art/`). Write in `docs/BACKLOG.md` what the owner must add to `ci/smbot/site.py` to build the Style Guide page and the zip, and open one issue labelled `owner` with the same text.
 - [ ] **Stabilisation and checkpoint C1 (M1 part 25).** Fix every open bug in M1's scope and tune the wave and feel values from bot logs and playtest answers. Then prepare the C1 issue: a build link, an honest assessment, any owner items still open listed first, the question "do moving, dodging and casting feel good, alone and with 4 players?" and the verdicts go, iterate and pivot. Default to iterate after 7 days without an answer. If owner-only steps are still open, keep fixing and polishing and leave done-when items 1 and 4 open.
 
 ## Blocked
 
-(none)
+- [ ] **Web size, load time and WASM projectile timing (M1 part 22 follow-up).** Needs the Web export template, so it runs in the daily build, not in a development session. Log the compressed size of `build/web/` and a headless Chrome load time against the PLAN budgets (40 MB, 10 s), and log `test_projectile_timing` in the web export. Rule: if the hostile step is over 8 ms in WASM, lower `DEFAULT_CAP_WEB` until it is under. **Blocked 2026-10-17 on the Web export template:** a development session may run Godot only as `ci/build/build.sh --quick`, which does not export the Web preset or start Chrome, and a full `ci/build/build.sh` was refused by the session permissions. It needs the daily build (or an owner run of the full script); nothing was measured and `DEFAULT_CAP_WEB` is unchanged.
 
 ## Done recently
 

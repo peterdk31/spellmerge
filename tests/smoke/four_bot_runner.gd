@@ -58,6 +58,7 @@ var _downed: Array[bool] = [false, false, false, false]
 var _elapsed: float = 0.0
 var _settle: int = -1
 var _started: bool = false
+var _logging: bool = false
 var _overlay_seen_open: bool = false
 var _overlay_closed_at: float = -1.0
 var _idler_downed_at_close: bool = false
@@ -65,6 +66,7 @@ var _idler_downed_at_close: bool = false
 
 func _ready() -> void:
 	OS.add_logger(_log)
+	_logging = true
 	var root: Node = get_tree().root
 	_events = root.get_node_or_null("Events")
 	_flow = root.get_node_or_null("Flow")
@@ -88,6 +90,18 @@ func _ready() -> void:
 	Engine.time_scale = TIME_SCALE
 	_events.emit_signal("play_requested", 0)
 	_started = true
+
+
+## Puts the global state back if the node is freed before it finished.
+func _exit_tree() -> void:
+	Engine.time_scale = 1.0
+	_stop_logging()
+
+
+func _stop_logging() -> void:
+	if _logging:
+		_logging = false
+		OS.remove_logger(_log)
 
 
 func _process(delta: float) -> void:
@@ -119,6 +133,7 @@ func _watch_overlay() -> void:
 
 func _on_room_entered(_room_id: StringName) -> void:
 	_entered += 1
+	print("SMOKE: room_entered (%.1f game seconds)" % _elapsed)
 	_bots[IDLER].tap_overlay()
 
 
@@ -170,7 +185,7 @@ func _check() -> Array[String]:
 func _finish(failed: Array[String]) -> void:
 	set_process(false)
 	Engine.time_scale = 1.0
-	OS.remove_logger(_log)
+	_stop_logging()
 	for bot in _bots:
 		bot.leave()
 	if _flow != null:

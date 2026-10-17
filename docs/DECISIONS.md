@@ -11,7 +11,7 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 
 ## 2026-10-17: The export starts the 4-bot test from the main menu (#80)
 
-The `Linux Test` binary hangs on `--script` while the autoloads start, so it can't run a `SceneTree` script. The checks are now a node (`tests/smoke/four_bot_runner.gd`); the main menu adds it when the user argument `--four-bot` is given and `ResourceLoader.exists` finds the file. Why the menu and not an export-only autoload: autoloads live in `project.godot`, shared by every export, and a missing autoload script would break the normal builds. The menu holds a literal-path `load` behind that check, and `tests/*` is excluded from every shipped export, so there the argument only logs a warning. Cost: a four-line hook in `hud/` that mentions `tests/`.
+The `Linux Test` binary hangs on `--script` while the autoloads start, so it can't run a `SceneTree` script. The checks are now a node (`tests/smoke/four_bot_runner.gd`); the main menu adds it when the user argument `--four-bot` is given and `ResourceLoader.exists` finds the file. Why the menu and not an export-only autoload: autoloads live in `project.godot`, shared by every export, and a missing autoload script would break the normal builds. The menu holds a literal-path `load` behind that check, and `tests/*` is excluded from every shipped export, so there the argument only logs a warning. Cost: a small hook in `hud/` that mentions `tests/`.
 
 ## 2026-10-17: The owner inbox
 

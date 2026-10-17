@@ -21,7 +21,12 @@ const KNOCKBACK: float = 120.0
 var projectiles: ProjectileManagerScript = null
 var combat: CombatScript = null
 
-var _profiled: CombatScript = null
+## Instance id of the Combat that has the hit profile (an id, not the node, so a freed
+## Combat after a scene reload is just a different id).
+var _profiled_id: int = 0
+
+## Note: the cooldowns live on this one resource, which the registry shares between all
+## holders, so `flow` must call `reset_cooldowns()` on a new run (or `duplicate()` the spell).
 
 
 func _fire(player: int, origin: Vector2, direction: Vector2) -> void:
@@ -36,8 +41,10 @@ func _fire(player: int, origin: Vector2, direction: Vector2) -> void:
 	if manager == null:
 		push_warning("Bolt: the Projectiles autoload is missing, so nothing was fired.")
 		return
-	if fight != null and fight != _profiled:
+	if fight == null:
+		push_warning("Bolt: the Combat autoload is missing, so the shot will deal no damage.")
+	elif fight.get_instance_id() != _profiled_id:
 		fight.set_hit_profile(BOLT_TAG, damage, KNOCKBACK)
-		_profiled = fight
+		_profiled_id = fight.get_instance_id()
 	var aim: Vector2 = direction.normalized() if direction != Vector2.ZERO else Vector2.RIGHT
 	manager.spawn(player, origin, aim * speed, lifetime, SHOT_RADIUS, ProjectileManagerScript.LAYER_ENEMY, 0, BOLT_TAG)

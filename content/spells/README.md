@@ -31,7 +31,7 @@ The spell components that players assemble into spells: **forms** (bolt, beam, n
 
 ## Example to copy
 
-`content/spells/forms/bolt/`: `bolt.tres` (the values: id, mana cost, cooldown, damage, speed, lifetime) on `bolt.gd`, which extends `SpellBase` and overrides `_fire()` to spawn a shot through `Projectiles.spawn` and give `Combat` its hit profile. Players and bots never read these fields; they only call `cast()`. `tests/content/spells/test_bolt.gd` fails if any script outside `content/spells/` and `core/base/` reads one. M2 replaces this with the real component classes and migrates the bolt.
+`content/spells/forms/bolt/`: `bolt.tres` (the values: id, mana cost, cooldown, damage, speed, lifetime) on `bolt.gd`, which extends `SpellBase` and overrides `_fire()` to spawn a shot through `Projectiles.spawn` and give `Combat` its hit profile. Players and bots never read these fields; they only call `cast()`. The registry shares one resource, so its cooldowns are shared: `flow` calls `reset_cooldowns()` on a new run. `tests/content/spells/test_bolt.gd` fails if any script outside `content/spells/` and `core/base/` reads one. M2 replaces this with the real component classes and migrates the bolt.
 
 ## Validate
 

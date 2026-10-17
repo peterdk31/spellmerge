@@ -7,6 +7,7 @@ extends SceneTree
 
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const EventsScript := preload("res://core/events/events.gd")
+const RegistryScript := preload("res://core/registry/registry.gd")
 const PlayerScript := preload("res://gameplay/player/player.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const BoltResource := preload("res://content/spells/forms/bolt/bolt.tres")
@@ -33,6 +34,7 @@ func _initialize() -> void:
 	_test_four_players_each_land_hits()
 	_test_zero_direction_fires_right()
 	_test_player_casts_the_bolt()
+	_test_registry_finds_the_bolt()
 	_test_scanner_catches_field_reads()
 	_test_no_script_reads_spell_fields()
 	_teardown()
@@ -131,18 +133,15 @@ func _test_bolt_kills_the_imp() -> void:
 	_setup()
 	var bolt: SpellBase = _bolt()
 	var imp := _enemy(ImpData.max_health, Vector2(80.0, 0.0))
-	var casts: int = 0
-	var mana: float = 100.0
-	while _combat.is_enemy(imp) and casts < 20:
-		var spent: float = bolt.cast(0, Vector2.ZERO, Vector2.RIGHT, mana)
-		if spent != SpellBase.REFUSED:
-			mana -= spent
-			casts += 1
-		bolt.tick(0, STEP)
-		_run(1)
-	_check(not _combat.is_enemy(imp), "the bolts kill the imp")
-	_check(_deaths == [[0, imp]], "enemy_died names player 0 and the imp")
-	_check(casts == ceili(float(ImpData.max_health) / float(bolt.damage)), "it takes exactly health / damage bolts")
+	var needed: int = ceili(float(ImpData.max_health) / float(bolt.damage))
+	# Exactly `needed` casts, each landing before the next is fired: no timing involved.
+	for shot in needed:
+		_check(_combat.is_enemy(imp), "the imp is alive before bolt %d lands" % (shot + 1))
+		bolt.tick(0, 10.0)
+		_check(bolt.cast(0, Vector2.ZERO, Vector2.RIGHT, 100.0) == bolt.mana_cost, "bolt %d is fired" % (shot + 1))
+		_run(24)
+	_check(not _combat.is_enemy(imp), "%d bolts kill the imp" % needed)
+	_check(_deaths.size() == 1 and _deaths[0][0] == 0 and _deaths[0][1] == imp, "enemy_died names player 0 and the imp")
 
 
 func _test_four_players_each_land_hits() -> void:
@@ -173,24 +172,39 @@ func _test_zero_direction_fires_right() -> void:
 
 func _test_player_casts_the_bolt() -> void:
 	_setup()
-	var imp := _enemy(5, Vector2(60.0, 0.0))
+	var imps: Array[Node2D] = []
 	var wizards: Array[PlayerScript] = []
 	for index in 4:
+		# Each wizard has its own lane, far from the others, and an imp one bolt from death.
+		imps.append(_enemy(BoltResource.damage, Vector2(60.0, 500.0 * index)))
 		var wizard := PlayerScript.new()
 		wizard.index = index
 		wizard.events = _bus
 		wizard.spell = _bolt()
+		wizard.facing = Vector2.RIGHT
 		root.add_child(wizard)
 		_nodes.append(wizard)
 		wizard.position = Vector2(0.0, 500.0 * index)
 		wizards.append(wizard)
-	wizards[0].position = Vector2.ZERO
 	_check(wizards[0].cast(), "the wizard casts the bolt through cast()")
 	_check(is_equal_approx(wizards[0].mana, PlayerScript.MAX_MANA - BoltResource.mana_cost), "the wizard paid the mana the cast returned")
+	_run(24)
+	_check(_deaths.size() == 1 and _deaths[0][0] == 0 and _deaths[0][1] == imps[0], "only player 0's bolt landed, on player 0's imp")
 	for index in range(1, 4):
+		_check(_combat.is_enemy(imps[index]), "player %d's imp is untouched by the other lanes" % index)
 		_check(wizards[index].cast(), "player %d casts too" % index)
 	_run(24)
-	_check(_deaths.size() == 1 and _deaths[0][0] == 0 and _deaths[0][1] == imp, "player 0's bolt killed the imp")
+	_check(_deaths.size() == 4, "all four imps died")
+	for index in 4:
+		_check(_deaths.any(func(entry: Array) -> bool: return entry[0] == index and entry[1] == imps[index]), "player %d killed their own imp" % index)
+
+
+func _test_registry_finds_the_bolt() -> void:
+	var registry: Node = RegistryScript.new()
+	registry.call("scan")
+	var found: Resource = registry.call("get_resource", &"spells", &"bolt") as Resource
+	_check(found is SpellBase and (found as SpellBase).spell_id() == &"bolt", "Registry finds the bolt under spells/forms/bolt")
+	registry.free()
 
 
 ## The scanner must catch what it is there to catch, or the real scan proves nothing.

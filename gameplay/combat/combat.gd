@@ -132,13 +132,20 @@ func register_player(index: int, node: Node2D, radius: float) -> void:
 	if index < 0 or index >= PLAYER_SLOTS:
 		push_warning("Combat: player index %d is not 0-3." % index)
 		return
+	if _players[index] != node:
+		unregister_player(index)
 	_players[index] = node
 	_player_radius[index] = radius
 	_contact_left[index] = 0.0
+	# Enemy shots (LAYER_PLAYER) find the wizard as a projectile target.
+	if projectiles != null:
+		projectiles.add_target(node, radius, ProjectileManagerScript.LAYER_PLAYER)
 
 
 func unregister_player(index: int) -> void:
 	if index >= 0 and index < PLAYER_SLOTS:
+		if projectiles != null and _players[index] != null and is_instance_valid(_players[index]):
+			projectiles.remove_target(_players[index])
 		_players[index] = null
 
 

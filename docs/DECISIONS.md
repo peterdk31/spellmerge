@@ -306,4 +306,16 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - **Contact damage** is a distance check per enemy row and registered wizard (4 at most), once per `CONTACT_COOLDOWN` (1 s) per wizard, since wizards have no invulnerability after a hit. First guesses, for the C1 tuning.
 - `damage_dealt` carries the requested amount, not the health actually removed (overkill is not trimmed).
 - Knockback speed is `direction * strength` (a hit overwrites any earlier push) and falls by `KNOCKBACK_DECAY` per second; Combat never moves the enemy: it only keeps the velocity (`get_knockback`), and the node that moves the enemy (AI or enemy base, part 12) adds `consume_knockback_step(enemy, delta)` to its own `move_and_slide()` each physics frame, which also fades it. That way walls and parent transforms are respected and only one node owns the enemy's movement.
+- **(Part 12 addition.)** `register_player` also makes the wizard a projectile target on `LAYER_PLAYER` (and `unregister_player` removes it); without that an enemy shot could never hit a wizard. Part 11 left this out.
 - Re-registering an enemy also updates its projectile target radius. A freed enemy is dropped in `step()`; the projectile manager prunes its own freed targets (tested). Contact hits are sent after the enemy loop and `hit()` re-finds its row after `damage_dealt`, so listeners may change registrations. A tag whose profile changes is replaced with a warning; the spawner picks the tags.
+
+## 2026-10-17: The enemy and its AI (M1 part 12)
+
+**Decided by:** Claude (details the task left open).
+
+- **`ai.gd` is the script on the enemy scene's root** (a `CharacterBody2D`), as the wizard scene does with `player.gd`; `gameplay/` stays script-only. The spawner sets `data` (the `EnemyBase`) before adding the node. The scene does not point back to the `.tres` (that would be a resource cycle), so speed and health come from `data` and the attack numbers are exports on the root.
+- **The attack is a shot**, not a lunge: Combat's contact damage is always on, so it cannot be telegraphed. The imp has `contact_damage = 0` and its damage is `Ai.attack_damage` through a hit profile for `Ai.ATTACK_TAG` (1000, set by the AI in `_ready`). The shot belongs to `Events.NO_PLAYER` and uses `LAYER_PLAYER`. The telegraph is a 0.75 s windup standing still, a flash and a `Telegraph` line; the aim is locked at the start, so stepping aside works. First guesses, for the C1 tuning.
+- **The AI talks to `Combat` and `Projectiles` through the autoload nodes** (found by path, replaceable in tests, as `player.gd` does with `Events`), not through events: `core/events` has no event for "register this enemy" or "spawn a shot", and the part 11 design already has the mover add `consume_knockback_step`. Revisit if a spawner (`flow`, part 15) should register enemies instead.
+- **Targets:** every node in the `players` group (`player.gd` joins it in `_ready`), or an explicit `targets` list; the nearest one that is not downed, rechecked every 0.5 s (staggered by instance id) and at once on `player_downed`. The group read allocates a small array twice a second per enemy; if 200 enemies show it in the part 22 probe, share one list refreshed by `flow`.
+- Combat's `register_player` now also adds the wizard as a projectile target (see the part 11 notes).
+

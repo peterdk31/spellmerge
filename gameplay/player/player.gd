@@ -104,6 +104,7 @@ func apply_texture() -> void:
 
 
 func _ready() -> void:
+	add_to_group(&"players")
 	apply_texture()
 	if input == null:
 		input = get_node_or_null("/root/PlayerInput") as InputManagerScript

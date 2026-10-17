@@ -17,6 +17,13 @@ const PanelScene := preload("res://hud/panels/player_panel/player_panel.tscn")
 const HUD_SCENE_PATH: String = "res://hud/panels/panels.tscn"
 const HudScript := preload("res://hud/panels/panels.gd")
 const SpellmergeTheme := preload("res://hud/theme/spellmerge_theme.tres")
+## Panel background alpha must stay below 1 (a wizard or enemy under a corner panel shows
+## through) and at or above this floor (the 0.75 fallback in docs/DECISIONS.md is higher;
+## below 0.4 the text would stand on almost nothing). All four panel_p1-p4 boxes change together.
+const PANEL_ALPHA_MIN: float = 0.4
+## The sizes the HUD was designed with at 640x360; lowering them is a deliberate decision.
+const LABEL_SIZE_MIN: int = 12
+const BUTTON_SIZE_MIN: int = 14
 
 var _failures: Array[String] = []
 
@@ -79,13 +86,9 @@ func _test_theme_has_the_variations() -> void:
 		_check(box != null and not borders.has(box.border_color), "player panel %d has its own border colour" % n)
 		if box != null:
 			borders.append(box.border_color)
-			# Translucent, so a wizard or enemy standing under a corner panel
-			# (also at Coop's 0.5 zoom, where a panel covers 224x110 world px) shows through.
-			_check(box.bg_color.a < 1.0 and box.bg_color.a >= 0.4, "player panel %d background is translucent but readable, alpha %s" % [n, box.bg_color.a])
-	# Text sizes stay legible at the 640x360 view: 12 px labels, 14 px buttons.
-	_check(SpellmergeTheme.default_font_size >= 12, "default font is at least 12 px")
-	_check(SpellmergeTheme.get_font_size("font_size", "Label") >= 12, "labels are at least 12 px")
-	_check(SpellmergeTheme.get_font_size("font_size", "Button") >= 14, "buttons are at least 14 px")
+			_check(box.bg_color.a < 1.0 and box.bg_color.a >= PANEL_ALPHA_MIN, "player panel %d background is translucent but readable, alpha %s" % [n, box.bg_color.a])
+	_check(SpellmergeTheme.get_font_size("font_size", "Label") >= LABEL_SIZE_MIN, "labels are at least %d px" % LABEL_SIZE_MIN)
+	_check(SpellmergeTheme.get_font_size("font_size", "Button") >= BUTTON_SIZE_MIN, "buttons are at least %d px" % BUTTON_SIZE_MIN)
 
 
 func _test_project_uses_the_theme() -> void:

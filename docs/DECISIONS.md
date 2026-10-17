@@ -448,7 +448,7 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 
 ## 2026-10-17: HUD panels 60% translucent, fonts unchanged (replaces the entry below on sizes)
 
-Still no display in sessions, so decided from sizes, not from a screenshot. Labels (12 px) and buttons (14 px) at 640×360, integer-scaled ×2, with a 2 px outline are legible; no licensed pixel font is in the repo, so none was added. An opaque 112×55 corner panel can hide a wizard or enemy in a room corner (at Coop zoom 0.5 it covers 224×110 world px), so the panel background alpha is now 0.6; border and text stay opaque and state stays in words. If a real screenshot shows text hard to read over bright floor, raise the alpha to 0.75 in `hud/theme/spellmerge_theme.tres`. The real screenshot stays in `docs/BACKLOG.md`.
+Still no display in sessions, so decided from sizes, not from a screenshot, and text legibility over the floor is NOT verified (no contrast was computed or seen). Only the translucency was added; fonts stay 12/14 px at 640×360 (integer-scaled ×2); no licensed pixel font is in the repo, so none was added. An opaque 112×55 corner panel can hide a wizard or enemy in a room corner (at Coop zoom 0.5 it covers 224×110 world px), so the panel background alpha is now 0.6; border and text stay opaque and state stays in words. If a real screenshot shows text hard to read over bright floor, raise the alpha to 0.75 in `hud/theme/spellmerge_theme.tres`; the four `panel_p1`–`panel_p4` styleboxes there hold the same literal and must change together (the test only checks the range 0.4 to below 1). The real screenshot stays in `docs/BACKLOG.md`.
 
 ## 2026-10-17: HUD sizes unchanged for now, visual check still open
 

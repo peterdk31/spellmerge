@@ -4,6 +4,7 @@ Ideas and future work outside the current milestone (docs/PLAN.md, "Planning sys
 
 ## Needs an owner decision
 
+- **Allow sessions to run the Godot binary.** Three sessions on 2026-10-17 were refused with "This command requires approval" when running `build/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tests/gameplay/coop/test_coop.gd`. The permission needed is to run that binary with `--headless --path . --script res://tests/...` (owner-only `.claude/` settings or the session's permission setup), or the owner runs the command once and reports the result. Until then the co-op test, its camera tests, the `coop.gd` `.uid` files and the four-wizard `arena_01` screenshot are unverified (task under "Blocked" in `docs/NEXT.md`).
 - **Opening web links from the game.** The plan's feedback button ("What was fun?" opens a pre-filled GitHub Discussion) and the main menu's Contribute button need `OS.shell_open`, which is a banned API. One option: allow it in a single `core/` file that only opens a fixed list of `github.com/peterdk31/spellmerge` and itch.io URLs, checked by the rules script. Needed in M1 at the earliest.
 - **Bot app Client ID.** `actions/create-github-app-token` now prefers `client-id` over the deprecated `app-id`. The Client ID is on the app's settings page; adding it to `ci/config.json` would make the `BOT_APP_ID` secret unnecessary.
 

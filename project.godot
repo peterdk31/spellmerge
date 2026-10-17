@@ -24,6 +24,7 @@ Projectiles="*res://core/projectiles/projectile_manager.gd"
 Combat="*res://gameplay/combat/combat.gd"
 Feel="*res://gameplay/feel/feel.gd"
 Flow="*res://gameplay/flow/flow.gd"
+Coop="*res://gameplay/coop/coop.gd"
 
 [debug]
 

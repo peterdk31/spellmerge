@@ -153,7 +153,7 @@ func register_player(index: int, node: Node2D, radius: float) -> void:
 	# Enemy shots (LAYER_PLAYER) find the wizard as a projectile target.
 	# A downed wizard is not a target, so shots fly past it to the standing ones.
 	if projectiles != null and not _is_downed(node):
-		projectiles.add_target(node, radius, ProjectileManagerScript.LAYER_PLAYER)
+		projectiles.add_target(node, radius, ProjectileManagerScript.LAYER_PLAYER, index)
 
 
 func unregister_player(index: int) -> void:
@@ -306,7 +306,7 @@ func _on_player_revived(player: int, _reviver: int) -> void:
 	if projectiles != null and player >= 0 and player < PLAYER_SLOTS:
 		var wizard: Node2D = _players[player]
 		if wizard != null and is_instance_valid(wizard):
-			projectiles.add_target(wizard, _player_radius[player], ProjectileManagerScript.LAYER_PLAYER)
+			projectiles.add_target(wizard, _player_radius[player], ProjectileManagerScript.LAYER_PLAYER, player)
 
 
 ## The first time a spell is cast, ask it (through the registry) what its shots do and

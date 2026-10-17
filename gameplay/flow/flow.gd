@@ -12,7 +12,9 @@ extends Node
 ##
 ## Players: one wizard for every player slot that has a device (`core/input`), so
 ## 1-4 players. The keyboard joins slot 0 if the Play button was pressed with the
-## mouse and nobody is joined there. Joining mid-run arrives with `coop` (part 17).
+## mouse and nobody is joined there. Joining and leaving mid-run: `coop` sends
+## `player_joined` / `player_left` and Flow adds a wizard at the room's spawn for
+## that slot, or removes it (the run goes on; nobody waits for anyone).
 ##
 ## The wave is fixed and sized for four players (WAVE); `difficulty` scales it in
 ## M3. `room_cleared` is sent when the last enemy of the wave has died.
@@ -75,6 +77,8 @@ var world: Node2D = null
 var room_id: StringName = &""
 
 var _starter: int = 0
+var _room: RoomBase = null
+var _bolt: SpellBase = null
 var _enemies: Array[Node] = []
 var _wizards: Array[Node2D] = []
 var _downed: Array[bool] = [false, false, false, false]
@@ -99,6 +103,8 @@ func _ready() -> void:
 	events.enemy_died.connect(_on_enemy_died)
 	events.player_downed.connect(_on_player_downed)
 	events.player_revived.connect(_on_player_revived)
+	events.player_joined.connect(_on_player_joined)
+	events.player_left.connect(_on_player_left)
 
 
 func _process(delta: float) -> void:
@@ -152,6 +158,8 @@ func start_run(requester: int) -> bool:
 	_starter = requester
 	_restart_left = -1.0
 	_clear_run()
+	_room = room
+	_bolt = bolt
 	bolt.reset_cooldowns()
 	if projectiles != null:
 		projectiles.clear()
@@ -184,6 +192,42 @@ func _on_play_requested(player: int) -> void:
 	if state != State.IDLE:
 		return
 	start_run(player)
+
+
+## Add the wizard of a player who joined mid-run. Ignored while no run is up, and
+## for a slot that already has a wizard.
+func _on_player_joined(player: int) -> void:
+	if state == State.IDLE or world == null or _room == null or player < 0 or player >= PLAYER_SLOTS:
+		return
+	if get_wizard(player) != null:
+		return
+	_add_wizard(world, _room, player, _bolt, _joiner_spawn(_room, player))
+	var joiner := get_wizard(player) as PlayerScript
+	if joiner != null:
+		joiner.protect(PlayerScript.JOIN_PROTECTION)
+	_downed[player] = false
+	if _restart_left >= 0.0 and not _all_down():
+		_restart_left = -1.0
+
+
+## Remove the wizard of a player who left. If everyone still here is down, the
+## restart timer starts, as when the last standing wizard goes down.
+func _on_player_left(player: int) -> void:
+	if player < 0 or player >= PLAYER_SLOTS:
+		return
+	var wizard: Node2D = get_wizard(player)
+	if wizard == null:
+		return
+	if combat != null:
+		combat.unregister_player(player)
+	_wizards.erase(wizard)
+	_downed[player] = false
+	var parent: Node = wizard.get_parent()
+	if parent != null:
+		parent.remove_child(wizard)
+	wizard.queue_free()
+	if state == State.RUNNING and _restart_left < 0.0 and _all_down():
+		_restart_left = RESTART_DELAY
 
 
 func _on_enemy_died(_player: int, enemy: Node, _position: Vector2) -> void:
@@ -254,7 +298,13 @@ func _room_size(room: RoomBase) -> Vector2:
 
 func _add_camera(parent: Node2D, room: RoomBase) -> void:
 	var camera := Camera2D.new()
-	camera.position = _room_size(room) * 0.5
+	var size: Vector2 = _room_size(room)
+	camera.position = size * 0.5
+	# `coop` moves and zooms this camera to fit everyone; the limits keep it inside the room.
+	camera.limit_left = 0
+	camera.limit_top = 0
+	camera.limit_right = ceili(size.x)
+	camera.limit_bottom = ceili(size.y)
 	parent.add_child(camera)
 
 
@@ -263,15 +313,42 @@ func _spawn_players(parent: Node2D, room: RoomBase, players: Array[int], bolt: S
 	for index in PLAYER_SLOTS:
 		_downed[index] = false
 	for index: int in players:
-		var wizard := WizardScene.instantiate() as PlayerScript
-		wizard.index = index
-		wizard.spell = bolt
-		if index < room.player_spawns.size():
-			wizard.position = room.player_spawns[index]
-		parent.add_child(wizard)
-		_wizards.append(wizard)
-		if combat != null:
-			combat.register_player(index, wizard, PLAYER_RADIUS)
+		_add_wizard(parent, room, index, bolt)
+
+
+## The player spawn for a mid-run joiner: the one farthest from every enemy and
+## every wizard already there (the joiner's own slot wins a tie).
+func _joiner_spawn(room: RoomBase, index: int) -> Vector2:
+	var best: Vector2 = room.player_spawns[index] if index < room.player_spawns.size() else Vector2.ZERO
+	var best_gap: float = -1.0
+	for i in room.player_spawns.size():
+		var point: Vector2 = room.player_spawns[i]
+		var gap: float = INF
+		for enemy: Node in _enemies:
+			if is_instance_valid(enemy) and enemy is Node2D:
+				gap = minf(gap, point.distance_squared_to((enemy as Node2D).position))
+		for other in PLAYER_SLOTS:
+			var wizard: Node2D = get_wizard(other)
+			if wizard != null:
+				gap = minf(gap, point.distance_squared_to(wizard.position))
+		if gap > best_gap or (gap == best_gap and i == index):
+			best_gap = gap
+			best = point
+	return best
+
+
+func _add_wizard(parent: Node2D, room: RoomBase, index: int, bolt: SpellBase, at: Vector2 = Vector2.INF) -> void:
+	var wizard := WizardScene.instantiate() as PlayerScript
+	wizard.index = index
+	wizard.spell = bolt
+	if at != Vector2.INF:
+		wizard.position = at
+	elif index < room.player_spawns.size():
+		wizard.position = room.player_spawns[index]
+	parent.add_child(wizard)
+	_wizards.append(wizard)
+	if combat != null:
+		combat.register_player(index, wizard, PLAYER_RADIUS)
 
 
 func _spawn_wave(parent: Node2D, room: RoomBase, data: EnemyBase) -> void:

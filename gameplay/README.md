@@ -26,11 +26,11 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `damage_dealt` | `combat` | `feel`, `player` |
 | `status_applied` | `combat` | none yet |
 | `enemy_died` | `combat` | `feel`, `flow` |
-| `player_downed` | `player` | `ai`, `coop`, `feel`, `flow`, `run` |
+| `player_downed` | `player` | `ai`, `feel`, `flow`, `run` |
 | `player_revived` | `player` | none yet |
-| `player_joined`, `player_left` | `coop` | `difficulty` |
+| `player_joined`, `player_left` | `coop` | `difficulty`, `flow` |
 | `run_started`, `run_ended` | `run` | `run_started`: `difficulty`, `flow`; `run_ended`: `progression` |
-| `room_entered` | `flow` | `ai`, `difficulty` |
+| `room_entered` | `flow` | `ai`, `coop`, `difficulty` |
 | `room_cleared` | `flow` | `rewards`, `run` |
 | `door_voted` | `flow` | none yet |
 | `difficulty_changed` | `difficulty` | none yet |

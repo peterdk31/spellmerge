@@ -2,6 +2,17 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-17: Co-op (M1 part 17)
+
+**Decided by:** Claude (details the task left open).
+
+- **`flow` adds and removes the wizards; `coop` only announces.** Coop turns `device_joined` / `device_left` into `player_joined` / `player_left` (once per real change) and flow, which owns the world and the wizards, listens. This keeps "areas never call each other"; the events table lists `flow` as a listener of both.
+- **Friendly fire lives in `core/projectiles` as a flag** (`Projectiles.friendly_fire`, default off, set by `Coop.set_friendly_fire`), because spells (content) fix their own hit mask and must not read gameplay settings. A player's shot spawned while it is on also hits `LAYER_PLAYER`; targets carry an `owner` (`add_target(..., owner)`, set by `combat`) so a wizard is never hit by its own shot. Damage is the same pipeline as any hit. In memory only until `core/save`.
+- **Camera:** `coop` drives the world's `Camera2D` (found after `room_entered`): centre of all wizards' bounding box, zoom out (never in past 1, never out past 0.5) until all fit with 48 px of margin, easing at 6 per second. Downed wizards count, so a body can be found. `flow` sets the camera's limits to the room, and `coop` makes the zoom agree with them: the zoom never goes below `max(view.x / room.x, view.y / room.y)` and the centre is clamped the way Godot does, so the shot never shows empty space. In `arena_01` (640×384 for a 640×360 view) that means no zoom-out at all: the view is pushed in from the edges instead (a wizard at the top or bottom wall may sit up to 12 px from the view's edge). Padding the limits was rejected, since it would show void beyond the walls. Each frame the zoom is also lowered, if needed, so everyone is inside a view centred where the camera is now, not where it is heading (zooming out is immediate, zooming in is eased). Mid-run joiners spawn on the free spawn farthest from enemies and wizards and are invulnerable for `Player.JOIN_PROTECTION` (2 s). Shake only touches `offset`, so the two do not clash.
+- **Coop no longer listens to `player_downed`** (the old README line): the camera fits downed wizards too, so there was nothing to do with it. It listens to `room_entered` instead.
+- **Revive is not part of this task** and stays in the backlog (nothing calls `Player.revive` yet).
+- A player leaving when the only standing wizard remains while the rest are down starts flow's restart timer; one joining while all are down cancels it. With nobody left the run just waits.
+
 ## 2026-10-17: Feel (M1 part 16)
 
 **Decided by:** Claude (details the task left open).

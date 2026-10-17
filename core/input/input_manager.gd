@@ -18,6 +18,12 @@ extends Node
 ## Joins and leaves are announced as `device_joined` and `device_left` on the
 ## Events bus. Nothing here allocates per frame; events allocate only when a
 ## bot sends one.
+##
+## Several inputs can feed one action (W and Up, the d-pad and the stick). Each
+## input is tracked as its own source and the action takes the strongest one, so
+## letting go of one input never cancels another that is still held.
+
+const EventsScript := preload("res://core/events/events.gd")
 
 ## The keyboard and mouse as one device.
 const KEYBOARD: int = -1
@@ -42,16 +48,23 @@ const TRIGGER_PRESSED: float = 0.5
 const ACTIONS: Array[StringName] = [
 	&"move_left", &"move_right", &"move_up", &"move_down", &"dodge", &"cast", &"overlay",
 ]
+## Source ids: keys use their keycode; the other kinds sit in separate ranges.
+const SOURCE_MOUSE: int = 1 << 40
+const SOURCE_BUTTON: int = 2 << 40
+const SOURCE_AXIS: int = 3 << 40
+const SOURCE_VIRTUAL: int = 4 << 40
 const JOIN: StringName = &"join"
 const LEAVE: StringName = &"leave"
 
-## The Events bus. Set before adding the node to use another one (tests do);
-## otherwise the "Events" autoload is used.
-var events: Node = null
+## The Events bus. Only tests set this, before adding the node, to use their own
+## bus; otherwise the "Events" autoload is used.
+var events: EventsScript = null
 
 var _devices: Array[int] = []
-## Per player: action -> strength 0..1.
+## Per player: action -> strength 0..1 (the strongest of its held sources).
 var _strength: Array[Dictionary] = []
+## Per player: action -> {source id -> strength} for the sources held right now.
+var _sources: Array[Dictionary] = []
 ## Per player: action -> the process or physics frame of the last press.
 var _pressed_process: Array[Dictionary] = []
 var _pressed_physics: Array[Dictionary] = []
@@ -61,20 +74,23 @@ func _init() -> void:
 	for player in MAX_PLAYERS:
 		_devices.append(NO_DEVICE)
 		var strength: Dictionary = {}
+		var sources: Dictionary = {}
 		var process: Dictionary = {}
 		var physics: Dictionary = {}
 		for action in ACTIONS:
 			strength[action] = 0.0
+			sources[action] = {}
 			process[action] = -1
 			physics[action] = -1
 		_strength.append(strength)
+		_sources.append(sources)
 		_pressed_process.append(process)
 		_pressed_physics.append(physics)
 
 
 func _ready() -> void:
 	if events == null:
-		events = get_node_or_null("/root/Events")
+		events = get_node_or_null("/root/Events") as EventsScript
 	Input.joy_connection_changed.connect(_on_joy_connection_changed)
 
 
@@ -150,6 +166,7 @@ func leave(player: int) -> bool:
 	_devices[player] = NO_DEVICE
 	for action in ACTIONS:
 		_strength[player][action] = 0.0
+		_sources[player][action].clear()
 	if events != null:
 		events.device_left.emit(player, device)
 	return true
@@ -187,7 +204,7 @@ func handle_event(event: InputEvent) -> void:
 		return
 	for action in ACTIONS:
 		if event.is_action(action):
-			_set_strength(player, action, event.get_action_strength(action))
+			_set_source(player, action, _source_of(event), event.get_action_strength(action))
 
 
 ## The move direction of `player`, length 0 to 1 (a diagonal is not faster).
@@ -212,8 +229,12 @@ func is_action_pressed(player: int, action: StringName) -> bool:
 	return get_strength(player, action) > 0.0
 
 
-## True during the frame `action` went down for `player` (the process frame when
-## called from _process, the physics frame when called from _physics_process).
+## True during the frame `action` went down for `player`. Call it from _process
+## or _physics_process only: it answers for the process frame in _process and
+## for the physics frame in _physics_process. From anywhere else (a signal
+## handler, a deferred call) it uses the process frame. When several physics
+## steps run in one frame, a press can be missed there; read presses in
+## _process when none may be lost.
 func is_action_just_pressed(player: int, action: StringName) -> bool:
 	if not _valid(player) or not _strength[player].has(action):
 		return false
@@ -247,15 +268,45 @@ func _device_of_event(event: InputEvent) -> int:
 func _handle_motion(player: int, event: InputEventJoypadMotion) -> void:
 	var value: float = event.axis_value
 	var scaled: float = clampf((absf(value) - DEADZONE) / (1.0 - DEADZONE), 0.0, 1.0)
+	var source: int = _source_of(event)
 	match event.axis:
 		AXIS_LEFT_X:
-			_set_strength(player, &"move_left", scaled if value < 0.0 else 0.0)
-			_set_strength(player, &"move_right", scaled if value > 0.0 else 0.0)
+			_set_source(player, &"move_left", source, scaled if value < 0.0 else 0.0)
+			_set_source(player, &"move_right", source, scaled if value > 0.0 else 0.0)
 		AXIS_LEFT_Y:
-			_set_strength(player, &"move_up", scaled if value < 0.0 else 0.0)
-			_set_strength(player, &"move_down", scaled if value > 0.0 else 0.0)
+			_set_source(player, &"move_up", source, scaled if value < 0.0 else 0.0)
+			_set_source(player, &"move_down", source, scaled if value > 0.0 else 0.0)
 		AXIS_TRIGGER_RIGHT:
-			_set_strength(player, &"cast", 1.0 if value > TRIGGER_PRESSED else 0.0)
+			_set_source(player, &"cast", source, 1.0 if value > TRIGGER_PRESSED else 0.0)
+
+
+## An id for the physical input behind an event (one key, one mouse button, one
+## gamepad button, one axis), so each can be held and released on its own.
+func _source_of(event: InputEvent) -> int:
+	if event is InputEventKey:
+		var key: InputEventKey = event
+		return key.physical_keycode if key.physical_keycode != KEY_NONE else key.keycode
+	if event is InputEventMouseButton:
+		return SOURCE_MOUSE + (event as InputEventMouseButton).button_index
+	if event is InputEventJoypadButton:
+		return SOURCE_BUTTON + (event as InputEventJoypadButton).button_index
+	if event is InputEventJoypadMotion:
+		return SOURCE_AXIS + (event as InputEventJoypadMotion).axis
+	return SOURCE_VIRTUAL
+
+
+## Record how hard one source holds `action`, then give the action the strongest
+## of its sources.
+func _set_source(player: int, action: StringName, source: int, strength: float) -> void:
+	var sources: Dictionary = _sources[player][action]
+	if strength > 0.0:
+		sources[source] = strength
+	else:
+		sources.erase(source)
+	var strongest: float = 0.0
+	for held in sources:
+		strongest = maxf(strongest, float(sources[held]))
+	_set_strength(player, action, strongest)
 
 
 func _set_strength(player: int, action: StringName, strength: float) -> void:

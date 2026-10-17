@@ -37,6 +37,10 @@ func _initialize() -> void:
 	_test_move_from_gamepad_stick()
 	_test_players_do_not_share_state()
 	_test_just_pressed()
+	_test_two_inputs_one_action()
+	_test_bindings_route_as_documented()
+	_test_input_map_has_documented_bindings()
+	_test_press_frames_recorded()
 	_test_leave_clears_held_actions()
 	_test_join_press_is_not_a_dodge()
 	_test_invalid_player_index()
@@ -342,6 +346,107 @@ func _test_just_pressed() -> void:
 	_check(_manager.is_action_just_pressed(2, &"dodge"), "player 2 just pressed dodge this frame")
 	_check(not _manager.is_action_just_pressed(1, &"dodge"), "player 1 did not")
 	_check(not _manager.is_action_just_pressed(2, &"cast"), "player 2 did not press cast")
+
+
+func _test_two_inputs_one_action() -> void:
+	_setup()
+	_manager.handle_event(_key(KEY_ENTER))
+	_manager.handle_event(_key(KEY_A))
+	_manager.handle_event(_key(KEY_LEFT))
+	_manager.handle_event(_key(KEY_LEFT, false))
+	_check(_manager.get_move(0) == Vector2.LEFT, "A still moves left after Left is released")
+	_manager.handle_event(_key(KEY_A, false))
+	_check(_manager.get_move(0) == Vector2.ZERO, "releasing the last key stops")
+	_manager.handle_event(_key(KEY_W))
+	_manager.handle_event(_key(KEY_UP))
+	_manager.handle_event(_key(KEY_W, false))
+	_check(_manager.get_move(0) == Vector2.UP, "Up still moves up after W is released")
+
+	_press_join(1)
+	_press_join(2)
+	_manager.handle_event(_button(2, JOY_BUTTON_DPAD_LEFT))
+	_manager.handle_event(_axis(2, JOY_AXIS_LEFT_X, 0.0))
+	_check(_manager.get_move(2) == Vector2.LEFT, "a stick at rest does not cancel the held d-pad")
+	_manager.handle_event(_axis(2, JOY_AXIS_LEFT_X, -1.0))
+	_manager.handle_event(_button(2, JOY_BUTTON_DPAD_LEFT, false))
+	_check(_manager.get_move(2) == Vector2.LEFT, "the stick still moves left after the d-pad is released")
+	_manager.handle_event(_axis(2, JOY_AXIS_LEFT_X, 0.0))
+	_check(_manager.get_move(2) == Vector2.ZERO, "everything released stops")
+
+	_manager.handle_event(_axis(2, JOY_AXIS_TRIGGER_RIGHT, 1.0))
+	_manager.handle_event(_button(2, JOY_BUTTON_X))
+	_manager.handle_event(_button(2, JOY_BUTTON_X, false))
+	_check(_manager.is_action_pressed(2, &"cast"), "the trigger still casts after X is released")
+	_manager.handle_event(_axis(2, JOY_AXIS_TRIGGER_RIGHT, 0.0))
+	_check(not _manager.is_action_pressed(2, &"cast"), "the cast stops when the last input is released")
+
+
+func _test_bindings_route_as_documented() -> void:
+	_setup()
+	_manager.handle_event(_button(0, JOY_BUTTON_START))
+	_check(_manager.is_joined(0), "Start joins a gamepad")
+	var dpad: Dictionary = {
+		JOY_BUTTON_DPAD_LEFT: Vector2.LEFT, JOY_BUTTON_DPAD_RIGHT: Vector2.RIGHT,
+		JOY_BUTTON_DPAD_UP: Vector2.UP, JOY_BUTTON_DPAD_DOWN: Vector2.DOWN,
+	}
+	for button: JoyButton in dpad:
+		_manager.handle_event(_button(0, button))
+		_check(_manager.get_move(0) == dpad[button], "d-pad button %d moves %s" % [button, dpad[button]])
+		_manager.handle_event(_button(0, button, false))
+	var buttons: Dictionary = {
+		JOY_BUTTON_B: &"dodge", JOY_BUTTON_X: &"cast", JOY_BUTTON_RIGHT_SHOULDER: &"cast", JOY_BUTTON_Y: &"overlay",
+	}
+	for button: JoyButton in buttons:
+		_manager.handle_event(_button(0, button))
+		_check(_manager.is_action_pressed(0, buttons[button]), "gamepad button %d is %s" % [button, buttons[button]])
+		_manager.handle_event(_button(0, button, false))
+		_check(not _manager.is_action_pressed(0, buttons[button]), "releasing gamepad button %d stops %s" % [button, buttons[button]])
+	_manager.handle_event(_button(0, JOY_BUTTON_BACK))
+	_check(not _manager.is_joined(0), "Back leaves")
+
+	_manager.handle_event(_key(KEY_ENTER))
+	var keys: Dictionary = {
+		KEY_LEFT: &"move_left", KEY_RIGHT: &"move_right", KEY_UP: &"move_up", KEY_DOWN: &"move_down",
+		KEY_SHIFT: &"dodge", KEY_SPACE: &"dodge", KEY_TAB: &"overlay", KEY_E: &"overlay", KEY_J: &"cast",
+	}
+	for key: Key in keys:
+		_manager.handle_event(_key(key))
+		_check(_manager.is_action_pressed(0, keys[key]), "key %d is %s" % [key, keys[key]])
+		_manager.handle_event(_key(key, false))
+		_check(not _manager.is_action_pressed(0, keys[key]), "releasing key %d stops %s" % [key, keys[key]])
+	_manager.handle_event(_key(KEY_BACKSPACE))
+	_check(not _manager.is_joined(0), "Backspace leaves")
+
+
+func _test_input_map_has_documented_bindings() -> void:
+	var keys: Dictionary = {
+		&"move_left": [KEY_A, KEY_LEFT], &"move_right": [KEY_D, KEY_RIGHT],
+		&"move_up": [KEY_W, KEY_UP], &"move_down": [KEY_S, KEY_DOWN],
+		&"dodge": [KEY_SPACE, KEY_SHIFT], &"cast": [KEY_J], &"overlay": [KEY_TAB, KEY_E],
+		&"join": [KEY_ENTER, KEY_SPACE], &"leave": [KEY_BACKSPACE],
+	}
+	for action: StringName in keys:
+		for key: Key in keys[action]:
+			_check(InputMap.action_has_event(action, _key(key)), "%s is bound to key %d" % [action, key])
+	var pad: Dictionary = {
+		&"move_left": JOY_BUTTON_DPAD_LEFT, &"move_right": JOY_BUTTON_DPAD_RIGHT,
+		&"move_up": JOY_BUTTON_DPAD_UP, &"move_down": JOY_BUTTON_DPAD_DOWN,
+		&"dodge": JOY_BUTTON_B, &"cast": JOY_BUTTON_X, &"overlay": JOY_BUTTON_Y,
+		&"join": JOY_BUTTON_A, &"leave": JOY_BUTTON_BACK,
+	}
+	for action: StringName in pad:
+		_check(InputMap.action_has_event(action, _button(0, pad[action])), "%s is bound to gamepad button %d" % [action, pad[action]])
+	_check(InputMap.action_has_event(&"join", _button(0, JOY_BUTTON_START)), "join is bound to Start")
+	_check(InputMap.action_has_event(&"cast", _button(0, JOY_BUTTON_RIGHT_SHOULDER)), "cast is bound to the right shoulder")
+
+
+func _test_press_frames_recorded() -> void:
+	_setup()
+	_manager.add_virtual_device(0)
+	_manager.send_virtual(0, &"dodge")
+	_check(_manager._pressed_physics[0][&"dodge"] == Engine.get_physics_frames(), "a press is stamped with the physics frame")
+	_check(_manager._pressed_process[0][&"dodge"] == Engine.get_process_frames(), "a press is stamped with the process frame")
+	_check(_manager.is_action_just_pressed(0, &"dodge"), "the press counts as just pressed outside a physics step")
 
 
 func _test_leave_clears_held_actions() -> void:

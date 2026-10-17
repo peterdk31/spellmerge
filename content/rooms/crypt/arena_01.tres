@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="RoomBase" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/base/room_base.gd" id="1_base"]
+[ext_resource type="PackedScene" path="res://content/rooms/crypt/arena_01.tscn" id="2_scene"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"arena_01"
+demo = true
+scene = ExtResource("2_scene")
+player_spawns = PackedVector2Array(224, 320, 288, 320, 352, 320, 416, 320)
+enemy_spawns = PackedVector2Array(96, 96, 224, 64, 416, 64, 544, 96, 96, 224, 544, 224)
+doors = PackedVector2Array(320, 16, 320, 368)

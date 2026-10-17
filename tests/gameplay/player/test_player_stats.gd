@@ -24,6 +24,8 @@ var _stats: Array[Array] = []
 
 
 func _initialize() -> void:
+	# The root joins the scene tree only after _initialize returns: wait one frame.
+	await process_frame
 	_test_sent_when_the_wizard_appears()
 	_test_hit_and_revive()
 	_test_nothing_changed_sends_nothing()

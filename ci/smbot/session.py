@@ -81,6 +81,10 @@ def classify(messages: list[dict[str, Any]], step_failed: bool) -> tuple[str, in
     text = " ".join(str(result.get(k, "")) for k in ("result", "subtype", "error")) if result else ""
     if not result and not step_failed:
         return "error", 0, "no result in the execution file"
+    # The action fails the step when Claude finishes successfully but used more turns than
+    # --max-turns allows; the work is still done, so it counts (see structured_result).
+    if step_failed and result and not result.get("is_error") and result.get("subtype") == "success":
+        return "ok", tokens, f"finished after {result.get('num_turns', '?')} turns (over the turn cap)"
     if result.get("is_error") or step_failed or not result:
         if _AUTH.search(text):
             return "auth", tokens, text[:300]
@@ -109,6 +113,24 @@ def reset_time(text: str, now: dt.datetime) -> dt.datetime | None:
     if reset <= local:
         reset += dt.timedelta(days=1)
     return reset.astimezone(dt.timezone.utc)
+
+
+def structured_result(messages: list[dict[str, Any]]) -> str:
+    """Claude's structured output from the execution file, as compact JSON ("" if there is none).
+
+    The action only sets its structured_output when the step succeeds, so a session that
+    finished over the turn cap would otherwise lose its finished work.
+    """
+    results = [m for m in messages if m.get("type") == "result"]
+    if not results or results[-1].get("is_error") or results[-1].get("subtype") != "success":
+        return ""
+    data = results[-1].get("structured_output")
+    if not isinstance(data, dict):
+        try:
+            data = json.loads(str(results[-1].get("result", "")))
+        except json.JSONDecodeError:
+            return ""
+    return json.dumps(data, separators=(",", ":")) if isinstance(data, dict) and "status" in data else ""
 
 
 # --- Prompts -------------------------------------------------------------------
@@ -346,9 +368,33 @@ def valid_branch(name: str) -> bool:
     return bool(re.fullmatch(r"claude/[a-z0-9][a-z0-9./-]{0,100}", name)) and ".." not in name
 
 
+UNFINISHED = ("**Unfinished:** the session stopped before it was done ({reason}). Its commits are kept here, "
+              "and the next session for this task continues from them. Not reviewed or merged until then.")
+
+
+def task_title(task: str) -> str:
+    m = re.match(r"\*\*(.+?)\*\*", task.strip())
+    return (m.group(1) if m else task.strip()).rstrip(".")[:150] or "Claude's work"
+
+
+def workflow_changes(tip: str, bases: list[str]) -> list[str]:
+    """Files under .github/ whose version at `tip` matches none of `bases` (main, the branch as pushed)."""
+    changed: set[str] | None = None
+    for base in bases:
+        names = set(subprocess.run(["git", "diff", "--name-only", "--no-renames", base, tip, "--", ".github/"],
+                                   check=True, capture_output=True, text=True).stdout.split())
+        changed = names if changed is None else changed & names
+    return sorted(changed or ())
+
+
 def publish(cfg: config_mod.Config, bundle: Path, branch: str, mode: str, result: dict[str, Any],
-            pr_number: int | None, token: str) -> dict[str, str]:
-    """Pushes Claude's bundled commits from a clean checkout of main and opens or updates the PR."""
+            pr_number: int | None, token: str, unfinished: str = "", task: str = "") -> dict[str, str]:
+    """Pushes Claude's bundled commits from a clean checkout of main and opens or updates the PR.
+
+    With `unfinished` (why the session stopped: a usage limit, an error, a timeout), the commits
+    are kept on the branch in a draft PR (or the PR is updated) so the next session continues
+    them; nothing is returned that would start a review.
+    """
     if not valid_branch(branch):
         raise ValueError(f"refusing to push branch {branch!r}")
     remote = f"https://x-access-token:{token}@github.com/{cfg.repo}.git"
@@ -365,10 +411,34 @@ def publish(cfg: config_mod.Config, bundle: Path, branch: str, mode: str, result
         if subprocess.run(["git", "merge-base", "--is-ancestor", f"refs/remotes/current/{branch}",
                            f"refs/remotes/work/{branch}"]).returncode != 0:
             raise ValueError(f"the revision doesn't build on PR #{pr_number}'s current head; not overwriting it")
+    # The push token may change workflows, so that a branch can take in main's workflow changes (GitHub
+    # refuses such a merge otherwise); the bot's own commits must never change one.
+    subprocess.run([*git, "fetch", "--quiet", remote, "+refs/heads/main:refs/remotes/current/main"], check=True)
+    on_remote = subprocess.run([*git, "fetch", "--quiet", remote, f"+refs/heads/{branch}:refs/remotes/current/{branch}"],
+                               capture_output=True).returncode == 0
+    changed = workflow_changes(f"refs/remotes/work/{branch}",
+                               ["refs/remotes/current/main"] + ([f"refs/remotes/current/{branch}"] if on_remote else []))
+    if changed:
+        raise ValueError(f"refusing to push {branch}: it changes {', '.join(changed)} (owner-only), "
+                         "which is neither main's version nor the branch's")
     pushed = subprocess.run(["git", "rev-parse", f"refs/remotes/work/{branch}"], check=True, capture_output=True,
                             text=True).stdout.strip()
     subprocess.run([*git, "push", "--quiet", "--force", remote, f"refs/remotes/work/{branch}:refs/heads/{branch}"],
                    check=True)
+    if unfinished:
+        note = UNFINISHED.format(reason=unfinished)
+        if mode == "new":
+            existing = gh.api(f"repos/{cfg.repo}/pulls?state=open&head={cfg.repo.split('/')[0]}:{branch}")
+            if existing:
+                pr_number = existing[0]["number"]
+            else:
+                pr_number = gh.api(f"repos/{cfg.repo}/pulls", "-X", "POST", input={
+                    "title": f"Unfinished: {task_title(task)}", "head": branch, "base": "main", "draft": True,
+                    "body": f"{note}\n\nTask: {task[:3000]}"})["number"]
+                return {"saved_pr": str(pr_number), "branch": branch}
+        gh.api(f"repos/{cfg.repo}/issues/{pr_number}/comments", "-X", "POST",
+               input={"body": f"{note}\n\nPushed {pushed[:7]}."})
+        return {"saved_pr": str(pr_number), "branch": branch}
     if mode == "new":
         existing = gh.api(f"repos/{cfg.repo}/pulls?state=open&head={cfg.repo.split('/')[0]}:{branch}")
         if existing:
@@ -376,6 +446,8 @@ def publish(cfg: config_mod.Config, bundle: Path, branch: str, mode: str, result
             gh.api(f"repos/{cfg.repo}/pulls/{pr_number}", "-X", "PATCH",
                    input={"title": result.get("pr_title") or existing[0]["title"],
                           "body": result.get("pr_body") or existing[0]["body"]})
+            if existing[0].get("draft"):  # an unfinished PR the session has now finished
+                gh.run("pr", "ready", str(pr_number), "--repo", cfg.repo)
         else:
             created = gh.api(f"repos/{cfg.repo}/pulls", "-X", "POST", input={
                 "title": (result.get("pr_title") or result.get("summary", "Claude's work"))[:200],
@@ -520,6 +592,7 @@ def main(argv: list[str] | None = None) -> int:
     pb.add_argument("--branch", required=True)
     pb.add_argument("--mode", choices=("new", "update"), required=True)
     pb.add_argument("--pr", type=int)
+    pb.add_argument("--unfinished", default="", help="why the session stopped; keeps the commits without review")
     rp = sub.add_parser("review-prompt")
     rp.add_argument("--pr", type=int, required=True)
     rp.add_argument("--sha", required=True)
@@ -546,9 +619,11 @@ def main(argv: list[str] | None = None) -> int:
     elif args.cmd == "account":
         write_outputs({"status": account(cfg, args.file, args.kind, args.step_failed)})
     elif args.cmd == "usage":
-        status, tokens, detail = classify(read_messages(args.file), args.step_failed)
+        messages = read_messages(args.file)
+        status, tokens, detail = classify(messages, args.step_failed)
         print(f"{status}, {tokens:,} tokens {detail}")
-        write_outputs({"status": status, "tokens": str(tokens), "resets_at": resets_at(status, detail)})
+        write_outputs({"status": status, "tokens": str(tokens), "resets_at": resets_at(status, detail),
+                       "result": structured_result(messages) if status == "ok" else ""})
     elif args.cmd == "record":
         status = os.environ.get("STATUS") or "error"
         write_outputs({"status": record(cfg, args.kind, status, int(os.environ.get("TOKENS") or 0),
@@ -557,7 +632,8 @@ def main(argv: list[str] | None = None) -> int:
         write_outputs(package(args.out, args.branch))
     elif args.cmd == "publish":
         result = json.loads(os.environ.get("RESULT") or "{}")
-        out = publish(cfg, args.bundle, args.branch, args.mode, result, args.pr, os.environ["GH_TOKEN"])
+        out = publish(cfg, args.bundle, args.branch, args.mode, result, args.pr, os.environ["GH_TOKEN"],
+                      args.unfinished, os.environ.get("TASK", ""))
         st, _ = state.load(cfg)
         post_answers(cfg, result.get("answers", []),
                      {p["number"] for p in st.get("pending_instructions", []) if p["kind"] == "ask"})

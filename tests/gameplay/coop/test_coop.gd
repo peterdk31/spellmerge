@@ -29,6 +29,8 @@ var _left_events: Array = []
 
 
 func _initialize() -> void:
+	# The root joins the scene tree only after _initialize returns: wait one frame.
+	await process_frame
 	_events = root.get_node_or_null("Events")
 	_coop = root.get_node_or_null("Coop") as CoopScript
 	_flow = root.get_node_or_null("Flow") as FlowScript
@@ -82,6 +84,14 @@ func _stop() -> void:
 
 func _wizard(index: int) -> PlayerScript:
 	return _flow.get_wizard(index) as PlayerScript
+
+
+## True if `point` is one of arena_01's four player spawns.
+func _is_player_spawn(point: Vector2) -> bool:
+	for slot in InputManagerScript.MAX_PLAYERS:
+		if point == Vector2(224.0 + 64.0 * slot, 320.0):
+			return true
+	return false
 
 
 func _wizard_count() -> int:
@@ -162,7 +172,9 @@ func _test_every_join_order() -> void:
 				expected.append(sequence[i] as int)
 			_check(_joined_events == expected, label + ": player_joined came in order, got %s" % [_joined_events])
 			_check(_wizard(slot) != null, label + ": slot %d got a wizard mid-run" % slot)
-			_check(_wizard(slot) != null and _wizard(slot).position == Vector2(224.0 + 64.0 * slot, 320.0), label + ": slot %d stands on its spawn" % slot)
+			# A joiner takes the free spawn farthest from enemies and wizards (DECISIONS.md), not
+			# necessarily the one numbered like its slot.
+			_check(_wizard(slot) != null and _is_player_spawn(_wizard(slot).position), label + ": slot %d stands on a player spawn" % slot)
 			_check(_coop.joined_count() == position + 1, label + ": %d players joined" % (position + 1))
 			_check(_wizard_count() == position + 1, label + ": %d wizards" % (position + 1))
 			_check(_flow.state == FlowScript.State.RUNNING and not _flow.is_restarting(), label + ": the run went on while someone joined")
@@ -194,7 +206,9 @@ func _test_every_leave_order() -> void:
 				_check(left.has(other) or _wizard(other) != null, label + ": slot %d kept its wizard" % other)
 			_coop.step(0.1)
 			_check(_everyone_in_view() or _wizard_count() == 0, label + ": the rest are in view")
-		_check(_wizard_count() == 0 and _flow.state == FlowScript.State.RUNNING and not _flow.is_restarting(), label + ": with everyone gone the run waits quietly (nobody is down)")
+		# The order may name only some slots: the rest are still playing. When everyone is
+		# gone, the run waits quietly (nobody is down, so nothing restarts).
+		_check(_wizard_count() == 4 - sequence.size() and _flow.state == FlowScript.State.RUNNING and not _flow.is_restarting(), label + ": the run goes on, and waits quietly once everyone is gone (nobody is down)")
 	_stop()
 
 
@@ -265,8 +279,10 @@ func _test_camera_zooms_out_to_fit() -> void:
 	if camera == null:
 		return
 	_open_limits(camera)
+	# The limits changed, so the target moved: snap again to see the zoom alone.
+	_coop.snap()
 	_check(is_equal_approx(camera.zoom.x, CoopScript.MAX_ZOOM), "one player: no zoom out, got %f" % camera.zoom.x)
-	_check(camera.position.is_equal_approx(_wizard(0).global_position), "one player: the camera is on the player")
+	_check(camera.position.is_equal_approx(_wizard(0).global_position), "one player: the camera is on the player: %s vs %s" % [camera.position, _wizard(0).global_position])
 	for slot in range(1, 4):
 		_input.add_virtual_device(slot)
 	# Spread the four wizards to the corners of a wide area.
@@ -420,9 +436,10 @@ func _test_camera_survives_a_restart() -> void:
 func _test_friendly_fire() -> void:
 	for enabled: bool in [false, true]:
 		_stop()
-		_start_with(0)
+		# All three are in before Play: a mid-run joiner is invulnerable for 2 s.
 		_input.add_virtual_device(1)
 		_input.add_virtual_device(2)
+		_start_with(0)
 		# No enemy gets in the way of the test shots.
 		for enemy: Node in _flow._enemies.duplicate():
 			_combat.call("unregister_enemy", enemy)

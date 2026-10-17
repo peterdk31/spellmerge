@@ -2,6 +2,29 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-17: The owner inbox
+
+**Decided by:** owner.
+**Context:** Questions for the owner were written into `docs/BACKLOG.md` ("Needs an owner decision"). Nothing notified the owner, there was no clear way to answer, and sessions never learned the answer.
+**Decision:** a session that needs the owner puts the question in `owner_questions` in its structured output (development, revision and weekly planning). The publish step opens one issue per question, labelled `owner-question` (plus `owner-change` when the answer needs an owner-only change, with the exact change), mentioning the owner, with the options, Claude's recommendation and what happens meanwhile; a question already open under the same title isn't asked again. The owner answers with `/claude <answer>` in the issue; the next session carries it out and its PR says `Closes #N`. The Daily log lists the open questions. Sessions still decide everything they can themselves (docs/PLAN.md, "Never waiting for humans").
+**Consequence:** `docs/BACKLOG.md` no longer holds owner questions. Its four open ones were answered in the same change (below).
+
+## 2026-10-17: Unit tests run through `build.sh --tests`
+
+**Decided by:** owner.
+**Context:** Sessions were refused when they ran the Godot binary directly, and `build.sh` ran only the boot smoke test, so no unit test had ever run.
+**Decision:** `ci/build/build.sh --quick --tests` runs every `tests/**/test_*.gd` in its own Godot process after the import and smoke test, and fails if any test fails or logs an error. Sessions may run exactly that command, the only way they run Godot. `--quick` alone is unchanged, because the implement job runs it before Claude starts. The daily build doesn't run the tests yet: a first run passed 5 of 17, so making them pass is first in the queue, and the bot asks the owner to make the daily build run them once they all pass.
+
+## 2026-10-17: The bot app's Client ID
+
+**Decided by:** owner. The workflows mint the bot's token with `client-id: Iv23lirdyRvc0KC6625s` (public, from the app's settings page) instead of the deprecated `app-id`. The `BOT_APP_ID` secret is no longer read; it can stay until `setup.sh` stops checking for it.
+
+## 2026-10-17: Opening web links, narrowly
+
+**Decided by:** owner.
+**Context:** The feedback button and the main menu's Contribute button need `OS.shell_open`, a banned API.
+**Decision:** it is allowed in one file only, `core/links/links.gd` (bot-maintained, closed to outside PRs). There the rules check allows `OS.shell_open(URLS[key])` and nothing else, requires `URLS` to be a `const`, refuses any change to it at run time, and refuses any address that isn't the project's own (`github.com/peterdk31/spellmerge`, `peterdk31.github.io/spellmerge`, `peterdk31.itch.io/spellmerge`). Everywhere else, and for every other process call, the ban stays.
+
 ## 2026-10-17: HUD theme and player panels (M1 part 18)
 
 **Decided by:** Claude (details the plan left open).
@@ -401,3 +424,39 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - The stub button sends `build_change_requested(player, 0, &"stub")` and nothing else; the `player` area has no listener yet and will refuse unknown ids. The overlay never pauses and never changes `Engine.time_scale`.
 - Focus is shown with a "> " text mark because Godot's own focus is unused (`UIFocus` decision), and state is never colour alone.
 
+
+## 2026-10-17: Unfinished sessions keep their work
+
+**Decided by:** the owner ("work should not be thrown out").
+
+- A session that stops before it is done (usage limit, error, timeout, or no result) but has commits pushes them to its task's branch in a draft PR titled `Unfinished: <task>`, with a note saying why. It is not reviewed or merged; the next session for the task finds the PR by its branch and continues it, and the PR becomes ready for review when that session finishes.
+- An unfinished revision is pushed to its PR with the same note, and the final review is skipped, so the next session continues the PR.
+- The implement job may run 4 hours (its Claude step stops at 200 minutes) and the revise job 3 hours (150 minutes), so a step that runs too long still leaves time to package and keep its commits.
+- Triage already skips draft PRs, so an unfinished PR is never rated as a contribution.
+
+## 2026-10-17: The bot may push main's workflow changes, never its own
+
+**Decided by:** the owner.
+
+- GitHub refuses a push from the bot app when any pushed commit changes a file in `.github/workflows/`, even a merge that only takes in main's version. Run #103 lost a finished session this way: it merged main after #67 had changed `session.yml`.
+- The push tokens in `session.yml` ask for `workflows: write`, and the bot app has that permission.
+- Before every push, `publish` checks each file under `.github/`: it must match main or the branch as already pushed, or nothing is pushed. So the bot can take in the owner's workflow changes, but it can't make its own.
+
+## 2026-10-17: Making the unit tests pass
+
+- **Unit tests wait one frame** (`await process_frame` first in `_initialize`): in Godot 4.7 the root is not in the scene tree during `_initialize`. The rules for tests are in `tests/README.md`.
+- **Sorting `StringName`:** `Array.sort()` orders StringNames by address, not by letters. The registry sorts ids and folders by their text.
+- **Pool:** a pooled object is held as a `Variant` until checked, since assigning a freed object to an `Object` variable is an error.
+- **AI:** a freed target reads as `null`, so the AI keeps the target's instance id to know it was lost and looks again at once, as documented.
+- **Feel:** a plain hit never starts or extends a hit-stop while one runs; before, four players hitting every frame froze the game for ever. A kill still lengthens a shorter stop.
+- **Flow:** a failed restart is a `push_warning`, not a `push_error`: the run ends cleanly, a test provokes it, and the build fails on `ERROR:` lines. The 4-bot smoke test (M1 part 20) must therefore also fail on the warning text "the restart failed".
+- **Mid-run joiners** take the free spawn farthest from enemies and wizards (part 17), so the coop test checks "a player spawn", not the one numbered like the slot.
+- **`player.gd` and `combat.gd`** read absolute autoload paths only inside the tree (tests build them outside it).
+
+## 2026-10-17: HUD panels 60% translucent, fonts unchanged (replaces the entry below on sizes)
+
+Still no display in sessions, so decided from sizes, not from a screenshot, and text legibility over the floor is NOT verified (no contrast was computed or seen). Only the translucency was added; fonts stay 12/14 px at 640×360 (integer-scaled ×2); no licensed pixel font is in the repo, so none was added. An opaque 112×55 corner panel can hide a wizard or enemy in a room corner (at Coop zoom 0.5 it covers 224×110 world px), so the panel background alpha is now 0.6; border and text stay opaque and state stays in words. If a real screenshot shows text hard to read over bright floor, raise the alpha to 0.75 in `hud/theme/spellmerge_theme.tres`; the four `panel_p1`–`panel_p4` styleboxes there hold the same literal and must change together (the test only checks the range 0.4 to below 1). The real screenshot stays in `docs/BACKLOG.md`.
+
+## 2026-10-17: HUD sizes unchanged for now, visual check still open
+
+The HUD screenshot cannot be taken in a session (no display, `docs/BACKLOG.md`), so no HUD size or font was changed. This is not a finding that they are fine. The four 112×55 panels are screen-space corners: a wizard or enemy standing in a corner can be hidden by one, and the Coop camera moves and zooms (0.5–1.0), so a paper check at one camera position says little. The legibility of the smooth default font at 12/14 px on the 640×360 canvas is unverified, and the design calls for pixel art, so a pixel font may be wanted (side note: a font file would need a licence entry). Decide on panel size, a translucent background and the font after the display run; tracked in `docs/NEXT.md` ("HUD screenshot and legibility check").

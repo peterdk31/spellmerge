@@ -119,7 +119,8 @@ func step(delta: float) -> void:
 	if _restart_left <= 0.0:
 		_restart_left = -1.0
 		if not start_run(_starter):
-			push_error("Flow: the restart failed, so the run is over; Play starts a new one.")
+			# A warning, not an error: the run ends cleanly and a test provokes this on purpose.
+			push_warning("Flow: the restart failed, so the run is over; Play starts a new one.")
 			stop_run()
 
 

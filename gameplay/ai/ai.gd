@@ -93,6 +93,8 @@ var _state_left: float = 0.0
 var _retarget_left: float = 0.0
 var _retarget_offset: float = 0.0
 var _looked: bool = false
+## Instance id of `target` when it was chosen, or 0 for none.
+var _target_id: int = 0
 var _sprite: Sprite2D = null
 var _telegraph: Node2D = null
 var _telegraph_line: Line2D = null
@@ -154,11 +156,13 @@ func step(delta: float) -> void:
 	_retarget_left -= delta
 	# Look on the timer, at the first step (staggered afterwards) or when the target
 	# was just lost. With no target at all only the timer applies.
-	var lost: bool = target != null and not _is_valid_target(target)
+	# A freed target reads as null, so the id tells "never had one" from "lost it".
+	var lost: bool = _target_id != 0 and not _is_valid_target(target)
 	if _retarget_left <= 0.0 or lost or not _looked:
 		_retarget_left = RETARGET_TIME if _looked else _retarget_offset
 		_looked = true
 		target = _find_target()
+		_target_id = target.get_instance_id() if target != null else 0
 	match state:
 		State.CHASE:
 			_step_chase()

@@ -53,7 +53,7 @@ jobs:
       - id: read-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          app-id: ${{ secrets.BOT_APP_ID }}
+          client-id: Iv23lirdyRvc0KC6625s # the bot app's Client ID (public)
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           permission-contents: read
           permission-pull-requests: read
@@ -84,7 +84,7 @@ jobs:
           allowed_bots: "github-actions[bot]"
           prompt: ${{ steps.prepare.outputs.prompt }}
           claude_args: >-
-            --max-turns 40
+            --max-turns 80
             --allowedTools "Read,Glob,Grep,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*)"
             --disallowedTools "Write,Edit,MultiEdit,NotebookEdit,WebFetch,WebSearch"
             --json-schema '${{ steps.prepare.outputs.schema }}'
@@ -92,7 +92,7 @@ jobs:
         if: always()
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          app-id: ${{ secrets.BOT_APP_ID }}
+          client-id: Iv23lirdyRvc0KC6625s # the bot app's Client ID (public)
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-issues: write

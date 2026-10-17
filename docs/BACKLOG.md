@@ -2,22 +2,9 @@
 
 Ideas and future work outside the current milestone (docs/PLAN.md, "Planning system"). The weekly planning run triages Discussions ideas into this file and moves items into `docs/NEXT.md` when their milestone comes.
 
-## Needs an owner decision
+## Questions for the owner
 
-- **Allow sessions to run the Godot binary.** Three sessions on 2026-10-17 were refused with "This command requires approval" when running `build/godot/Godot_v4.7.2-stable_linux.x86_64 --headless --path . --script res://tests/gameplay/coop/test_coop.gd`. The permission needed is to run that binary with `--headless --path . --script res://tests/...` (owner-only `.claude/` settings or the session's permission setup), or the owner runs the command once and reports the result. Until then the co-op test, its camera tests, the `coop.gd` `.uid` files and the four-wizard `arena_01` screenshot are unverified (task under "Blocked" in `docs/NEXT.md`).
-- **Opening web links from the game.** The plan's feedback button ("What was fun?" opens a pre-filled GitHub Discussion) and the main menu's Contribute button need `OS.shell_open`, which is a banned API. One option: allow it in a single `core/` file that only opens a fixed list of `github.com/peterdk31/spellmerge` and itch.io URLs, checked by the rules script. Needed in M1 at the earliest.
-- **Bot app Client ID.** `actions/create-github-app-token` now prefers `client-id` over the deprecated `app-id`. The Client ID is on the app's settings page; adding it to `ci/config.json` would make the `BOT_APP_ID` secret unnecessary.
-
-- **Run the unit tests in CI.** `ci/build/build.sh` only runs `tests/smoke/boot_smoke.gd`. The tests in `tests/core/` (run by hand with `godot --headless --path . --script res://tests/core/<name>.gd`) need a step in `ci/build/build.sh` that runs every `tests/**/test_*.gd` and fails on a non-zero exit. `ci/` is owner-only. The exact change, in `import_and_smoke()` of `ci/build/build.sh` after the boot smoke test (each test is its own `SceneTree` script that calls `quit()`, so it can't be run from inside a smoke script and needs its own Godot process):
-
-  ```sh
-  for test in tests/**/test_*.gd; do   # all of tests/ (core, content, gameplay), e.g. with `shopt -s globstar`
-    step "Unit test $test"
-    godot_checked "unit-$(basename "$test" .gd)" "$GODOT" --headless --path . --script "res://$test"
-  done
-  ```
-
-  Until then none of the tests (`tests/core`, `tests/gameplay`, `tests/content`, including `test_bolt.gd`) have ever run in CI, including `test_pools.gd` and `test_projectiles.gd`.
+Not kept here any more: each question is an issue labelled `owner-question` (docs/DECISIONS.md, "The owner inbox").
 
 ## Audio needs
 
@@ -30,6 +17,10 @@ Sounds the game asks for by id and does not have yet. A missing sound is silent 
 
 ## Later milestones
 
+- **Gate the daily build on the unit tests.** `ci/build/build.sh --tests` passes now, but the daily build does not run it, so regressions could return unnoticed. The workflow lives under `.github/`, so the owner makes the change; it is asked as an owner question in the PR #71 session.
+
+- **A screenshot of `arena_01` with four wizards.** `ci/build/build.sh` runs Godot with `--headless`, which has no renderer, so no screenshot can be taken there. It needs a display (for example `xvfb-run` and the editor binary) in a script the owner adds under `ci/`; the HUD screenshot check in `docs/NEXT.md` waits for the same thing.
+
 - **A downed mid-run joiner.** A joiner has 2 s of protection but, like everyone, cannot come back once downed until the revive rule below exists.
 - **Revive by standing next to a downed wizard.** `Player.revive(reviver)` exists and `DECISIONS.md` gave the "how" to `coop`, but the co-op task (M1 part 17) listed only join/leave, friendly fire and the camera. Nothing calls `revive` yet; decide the rule (hold time, range, a short invulnerability window after a revive) when playtests show the need.
 
@@ -39,6 +30,7 @@ Sounds the game asks for by id and does not have yet. A missing sound is silent 
 - Cross-player spell linking (one player's frost plus another's storm), asynchronous, with no waiting (docs/PLAN.md, "Co-op rules").
 - Windows code signing, before Steam (M7).
 - GUT test framework as an owner-added addon, when game code needs unit tests (M1).
+- **Feedback and Contribute buttons** (docs/PLAN.md): opening web pages is allowed only in `core/links/links.gd`, through its constant `URLS` table of the project's own addresses (docs/DECISIONS.md, "Opening web links, narrowly").
 
 - **Invalid UIDs with a 9.** Godot's UID alphabet is a-y and 0-8. Fix the digit 9 in: `tests/gameplay/combat/test_combat.gd.uid`, `tests/gameplay/player/fixtures/counting_spell.gd.uid`, `tests/gameplay/player/test_player_move.gd.uid`, `tests/core/test_spell_base.gd.uid`, `tests/core/test_registry.gd.uid`.
 

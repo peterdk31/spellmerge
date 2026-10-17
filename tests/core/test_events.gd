@@ -86,7 +86,8 @@ func _test_autoload_registered() -> void:
 
 func _test_signals_exist() -> void:
 	var signals: Dictionary = {}
-	for info: Dictionary in EventsScript.get_script_signal_list():
+	var script: Script = EventsScript
+	for info: Dictionary in script.get_script_signal_list():
 		signals[StringName(info["name"])] = info["args"]
 	for event: StringName in EVENTS:
 		_check(signals.has(event), "signal %s exists" % event)

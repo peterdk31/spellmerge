@@ -41,7 +41,18 @@ Tests for the whole game. The tree mirrors the code: a test for `gameplay/combat
 
 ```sh
 ci/build/build.sh --quick        # downloads the pinned Godot once, imports, runs the editor smoke test
+ci/build/build.sh --quick --tests  # the same, then every tests/**/test_*.gd (about a second each)
 ```
+
+Rules every unit test script (a `SceneTree` script) follows, learned the hard way:
+
+- Start `_initialize()` with `await process_frame`. The root joins the scene tree only after `_initialize` returns, so before that nodes added to `root` are not in the tree (no `_ready`, no `global_position`, no absolute `get_node` paths).
+- The real autoloads exist in the run (`Events`, `Projectiles`, `Combat`, ...). A test of "autoload missing" takes the node out of `root` and puts it back.
+- Nodes that the projectile manager must see as targets have to be in the tree.
+- The log must have no line starting `ERROR:` or `SCRIPT ERROR:` (the build fails on it); warnings are fine. Free what you create and stop audio players before the end; wait a moment (`await create_timer(0.3).timeout`) so the audio server lets go, or the exit reports leaks and a resource in use.
+- Do not `preload` a scene that is also an autoload (like `hud/panels/panels.tscn`): the autoload then fails to load at start. Use `load()` inside the test.
+- Compare typed arrays with typed arrays: an `Array[StringName]` never equals an untyped `[&"a"]`.
+- Signal handlers must take every argument of the signal.
 
 The Python tests for the CI scripts are in `ci/tests/` and are owner-maintained.
 

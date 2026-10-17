@@ -19,6 +19,8 @@ var _hits: Array = []
 
 
 func _initialize() -> void:
+	# The root joins the scene tree only after _initialize returns: wait one frame.
+	await process_frame
 	_test_moves_and_expires()
 	_test_hit_sends_the_event_and_ends_the_projectile()
 	_test_hits_report_their_own_player()

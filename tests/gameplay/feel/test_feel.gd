@@ -22,6 +22,8 @@ var _registry: Node
 
 
 func _initialize() -> void:
+	# The root joins the scene tree only after _initialize returns: wait one frame.
+	await process_frame
 	_test_default_preset_loads()
 	_test_hit_stop_is_short_and_the_same_for_every_player()
 	_test_hit_stop_longest_wins()
@@ -40,6 +42,9 @@ func _initialize() -> void:
 	_test_engine_time_scale_comes_back()
 	_test_camera_change_is_followed()
 	_teardown()
+	# The audio server drops stopped playbacks on its next mix; without this wait they
+	# are reported as leaked objects (and a resource still in use) at exit.
+	await create_timer(0.3).timeout
 	Engine.time_scale = 1.0
 	if _failures.is_empty():
 		print("TEST OK: gameplay/feel (hit-stop, shake, particle limit)")
@@ -76,6 +81,13 @@ func _setup(sound_id: StringName = &"", projectiles: Node = null) -> void:
 
 
 func _teardown() -> void:
+	# A voice that is still playing keeps its stream (a resource) alive at exit.
+	if _feel != null and is_instance_valid(_feel):
+		for child in _feel.get_children():
+			var voice := child as AudioStreamPlayer
+			if voice != null:
+				voice.stop()
+				voice.stream = null
 	for node: Node in [_feel, _camera, _registry, _bus]:
 		if node != null and is_instance_valid(node):
 			node.free()

@@ -12,14 +12,25 @@ const EventsScript := preload("res://core/events/events.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
 const PlayerPanelScript := preload("res://hud/panels/player_panel/player_panel.gd")
 const PanelScene := preload("res://hud/panels/player_panel/player_panel.tscn")
-const HudScene := preload("res://hud/panels/panels.tscn")
+## Loaded when needed, not preloaded: this scene is also the "Hud" autoload, and
+## preloading it here makes the autoload's own load fail at start (cyclic resource).
+const HUD_SCENE_PATH: String = "res://hud/panels/panels.tscn"
 const HudScript := preload("res://hud/panels/panels.gd")
 const SpellmergeTheme := preload("res://hud/theme/spellmerge_theme.tres")
+## Panel background alpha must stay below 1 (a wizard or enemy under a corner panel shows
+## through) and at or above this floor (the 0.75 fallback in docs/DECISIONS.md is higher;
+## below 0.4 the text would stand on almost nothing). All four panel_p1-p4 boxes change together.
+const PANEL_ALPHA_MIN: float = 0.4
+## The sizes the HUD was designed with at 640x360; lowering them is a deliberate decision.
+const LABEL_SIZE_MIN: int = 12
+const BUTTON_SIZE_MIN: int = 14
 
 var _failures: Array[String] = []
 
 
 func _initialize() -> void:
+	# The root joins the scene tree only after _initialize returns: wait one frame.
+	await process_frame
 	_test_theme_has_the_variations()
 	_test_project_uses_the_theme()
 	_test_panel_per_player()
@@ -50,7 +61,7 @@ func _check(condition: bool, message: String) -> void:
 func _make_hud() -> Array:
 	var bus: EventsScript = EventsScript.new()
 	var focus: UIFocusScript = UIFocusScript.new()
-	var hud: HudScript = HudScene.instantiate() as HudScript
+	var hud: HudScript = (load(HUD_SCENE_PATH) as PackedScene).instantiate() as HudScript
 	hud.events = bus
 	hud.ui_focus = focus
 	root.add_child(hud)
@@ -75,6 +86,9 @@ func _test_theme_has_the_variations() -> void:
 		_check(box != null and not borders.has(box.border_color), "player panel %d has its own border colour" % n)
 		if box != null:
 			borders.append(box.border_color)
+			_check(box.bg_color.a < 1.0 and box.bg_color.a >= PANEL_ALPHA_MIN, "player panel %d background is translucent but readable, alpha %s" % [n, box.bg_color.a])
+	_check(SpellmergeTheme.get_font_size("font_size", "Label") >= LABEL_SIZE_MIN, "labels are at least %d px" % LABEL_SIZE_MIN)
+	_check(SpellmergeTheme.get_font_size("font_size", "Button") >= BUTTON_SIZE_MIN, "buttons are at least %d px" % BUTTON_SIZE_MIN)
 
 
 func _test_project_uses_the_theme() -> void:

@@ -48,10 +48,11 @@ jobs:
   implement:
     name: ${{ inputs.mode == 'plan' && 'weekly planning' || 'implement the next task' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 240 # the Claude step stops at 200, so its commits are still packaged and kept
     environment: automation
     outputs:
-      result: ${{ steps.claude.outputs.structured_output }}
+      # Falls back to the execution file when the step failed only for going over --max-turns.
+      result: ${{ steps.claude.outputs.structured_output || steps.usage.outputs.result }}
       usage_status: ${{ steps.usage.outputs.status }}
       usage_tokens: ${{ steps.usage.outputs.tokens }}
       usage_resets_at: ${{ steps.usage.outputs.resets_at }}
@@ -64,7 +65,7 @@ jobs:
       - id: read-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          app-id: ${{ secrets.BOT_APP_ID }}
+          client-id: Iv23lirdyRvc0KC6625s # the bot app's Client ID (public)
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           permission-contents: read
           permission-issues: read
@@ -98,6 +99,7 @@ jobs:
           command -v socat
       - id: claude
         continue-on-error: true
+        timeout-minutes: 200
         uses: anthropics/claude-code-action@1d6de8cb0c237e7c15e9e1bdf973826ebae490cc # v1.0.248
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -109,8 +111,8 @@ jobs:
           allowed_bots: "github-actions[bot]"
           prompt: ${{ steps.prepare.outputs.prompt }}
           claude_args: >-
-            --max-turns 150
-            --allowedTools "Read,Write,Edit,MultiEdit,Glob,Grep,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git switch:*),Bash(git checkout:*),Bash(git add:*),Bash(git rm:*),Bash(git mv:*),Bash(git commit:*),Bash(git restore:*),Bash(git branch:*),Bash(git fetch:*),Bash(git merge:*),Bash(git rev-parse:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr list:*),Bash(gh pr checkout:*),Bash(gh issue view:*),Bash(gh issue list:*),Bash(tools/check.sh:*),Bash(ci/build/build.sh --quick),Bash(ls:*),Bash(mkdir:*),Bash(mv:*),Bash(cp:*),Bash(rm:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(diff:*),Bash(sort:*)"
+            --max-turns 400
+            --allowedTools "Read,Write,Edit,MultiEdit,Glob,Grep,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git switch:*),Bash(git checkout:*),Bash(git add:*),Bash(git rm:*),Bash(git mv:*),Bash(git commit:*),Bash(git restore:*),Bash(git branch:*),Bash(git fetch:*),Bash(git merge:*),Bash(git rev-parse:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr list:*),Bash(gh pr checkout:*),Bash(gh issue view:*),Bash(gh issue list:*),Bash(tools/check.sh:*),Bash(ci/build/build.sh --quick),Bash(ci/build/build.sh --quick --tests),Bash(ls:*),Bash(mkdir:*),Bash(mv:*),Bash(cp:*),Bash(rm:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(diff:*),Bash(sort:*)"
             --disallowedTools "WebFetch,WebSearch,Edit(/.git/**),Write(/.git/**),MultiEdit(/.git/**),Edit(/ci/**),Write(/ci/**),MultiEdit(/ci/**),Edit(/.github/**),Write(/.github/**),MultiEdit(/.github/**),Edit(/tools/**),Write(/tools/**),MultiEdit(/tools/**)"
             --json-schema '${{ steps.prepare.outputs.schema }}'
       - id: usage
@@ -153,11 +155,13 @@ jobs:
       - id: app-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          app-id: ${{ secrets.BOT_APP_ID }}
+          client-id: Iv23lirdyRvc0KC6625s # the bot app's Client ID (public)
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-issues: write
           permission-pull-requests: write
+          # Only to push a branch that took in main's workflow changes; publish refuses any other change.
+          permission-workflows: write
       - id: record
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -166,7 +170,7 @@ jobs:
           RESETS_AT: ${{ needs.implement.outputs.usage_resets_at }}
         run: python3 -m smbot.session record --kind dev
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        if: steps.record.outputs.status == 'ok' && needs.implement.outputs.commits != '0' && needs.implement.outputs.commits != ''
+        if: needs.implement.outputs.commits != '0' && needs.implement.outputs.commits != ''
         with:
           name: work
           path: work
@@ -180,6 +184,13 @@ jobs:
           RESULT: ${{ needs.implement.outputs.result }}
           BRANCH: ${{ needs.implement.outputs.branch }}
         run: python3 -m smbot.session publish --bundle work/work.bundle --branch "$BRANCH" --mode new
+      - name: Questions for the owner
+        if: steps.record.outputs.status == 'ok' && needs.implement.outputs.result != ''
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          RESULT: ${{ needs.implement.outputs.result }}
+          SOURCE: the session working on "${{ needs.implement.outputs.task }}"
+        run: python3 -m smbot.inbox ask
       - id: existing
         if: >-
           steps.record.outputs.status == 'ok' && (needs.implement.outputs.commits == '0' || needs.implement.outputs.commits == '')
@@ -188,6 +199,19 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           BRANCH: ${{ needs.implement.outputs.expected_branch }}
         run: python3 -m smbot.session open-pr --branch "$BRANCH"
+      # The session stopped before it was done (usage limit, error, timeout) but has commits:
+      # keep them in a draft PR, which the next session for this task continues. No review.
+      - id: save
+        if: >-
+          steps.publish.outcome == 'skipped' && needs.implement.outputs.commits != '0'
+          && needs.implement.outputs.commits != ''
+          && !(needs.implement.outputs.result != '' && fromJSON(needs.implement.outputs.result).status == 'nothing_to_do')
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          BRANCH: ${{ needs.implement.outputs.branch }}
+          TASK: ${{ needs.implement.outputs.task }}
+          REASON: ${{ steps.record.outputs.status == 'ok' && 'no result' || steps.record.outputs.status }}
+        run: python3 -m smbot.session publish --bundle work/work.bundle --branch "$BRANCH" --mode new --unfinished "$REASON"
 
   critique:
     name: critique (fresh context)
@@ -205,10 +229,11 @@ jobs:
     needs: [implement, publish, critique]
     if: always() && needs.critique.outputs.needs_revision == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 180 # the Claude step stops at 150, so its commits are still packaged and kept
     environment: automation
     outputs:
-      result: ${{ steps.claude.outputs.structured_output }}
+      # Falls back to the execution file when the step failed only for going over --max-turns.
+      result: ${{ steps.claude.outputs.structured_output || steps.usage.outputs.result }}
       usage_status: ${{ steps.usage.outputs.status }}
       usage_tokens: ${{ steps.usage.outputs.tokens }}
       usage_resets_at: ${{ steps.usage.outputs.resets_at }}
@@ -217,7 +242,7 @@ jobs:
       - id: read-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          app-id: ${{ secrets.BOT_APP_ID }}
+          client-id: Iv23lirdyRvc0KC6625s # the bot app's Client ID (public)
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           permission-contents: read
           permission-issues: read
@@ -253,6 +278,7 @@ jobs:
           command -v socat
       - id: claude
         continue-on-error: true
+        timeout-minutes: 150
         uses: anthropics/claude-code-action@1d6de8cb0c237e7c15e9e1bdf973826ebae490cc # v1.0.248
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -264,8 +290,8 @@ jobs:
           allowed_bots: "github-actions[bot]"
           prompt: ${{ steps.prepare.outputs.prompt }}
           claude_args: >-
-            --max-turns 80
-            --allowedTools "Read,Write,Edit,MultiEdit,Glob,Grep,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git switch:*),Bash(git checkout:*),Bash(git add:*),Bash(git rm:*),Bash(git mv:*),Bash(git commit:*),Bash(git restore:*),Bash(git branch:*),Bash(git fetch:*),Bash(git merge:*),Bash(git rev-parse:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr checkout:*),Bash(tools/check.sh:*),Bash(ci/build/build.sh --quick),Bash(ls:*),Bash(mkdir:*),Bash(mv:*),Bash(cp:*),Bash(rm:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(diff:*),Bash(sort:*)"
+            --max-turns 250
+            --allowedTools "Read,Write,Edit,MultiEdit,Glob,Grep,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git switch:*),Bash(git checkout:*),Bash(git add:*),Bash(git rm:*),Bash(git mv:*),Bash(git commit:*),Bash(git restore:*),Bash(git branch:*),Bash(git fetch:*),Bash(git merge:*),Bash(git rev-parse:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr checkout:*),Bash(tools/check.sh:*),Bash(ci/build/build.sh --quick),Bash(ci/build/build.sh --quick --tests),Bash(ls:*),Bash(mkdir:*),Bash(mv:*),Bash(cp:*),Bash(rm:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(diff:*),Bash(sort:*)"
             --disallowedTools "WebFetch,WebSearch,Edit(/.git/**),Write(/.git/**),MultiEdit(/.git/**),Edit(/ci/**),Write(/ci/**),MultiEdit(/ci/**),Edit(/.github/**),Write(/.github/**),MultiEdit(/.github/**),Edit(/tools/**),Write(/tools/**),MultiEdit(/tools/**)"
             --json-schema '${{ steps.prepare.outputs.schema }}'
       - id: usage
@@ -305,11 +331,13 @@ jobs:
       - id: app-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          app-id: ${{ secrets.BOT_APP_ID }}
+          client-id: Iv23lirdyRvc0KC6625s # the bot app's Client ID (public)
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-issues: write
           permission-pull-requests: write
+          # Only to push a branch that took in main's workflow changes; publish refuses any other change.
+          permission-workflows: write
       - id: record
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -318,7 +346,7 @@ jobs:
           RESETS_AT: ${{ needs.revise.outputs.usage_resets_at }}
         run: python3 -m smbot.session record --kind dev
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        if: steps.record.outputs.status == 'ok' && needs.revise.outputs.commits != '0' && needs.revise.outputs.commits != ''
+        if: needs.revise.outputs.commits != '0' && needs.revise.outputs.commits != ''
         with:
           name: revision
           path: work
@@ -330,6 +358,23 @@ jobs:
           BRANCH: ${{ needs.publish.outputs.branch }}
           PR: ${{ needs.publish.outputs.pr }}
         run: python3 -m smbot.session publish --bundle work/work.bundle --branch "$BRANCH" --mode update --pr "$PR"
+      # An unfinished revision: push it to the PR so it isn't lost, but give no sha, so the
+      # final review is skipped and the next session continues the PR.
+      - id: save
+        if: steps.publish.outcome == 'skipped' && needs.revise.outputs.commits != '0' && needs.revise.outputs.commits != ''
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          BRANCH: ${{ needs.publish.outputs.branch }}
+          PR: ${{ needs.publish.outputs.pr }}
+          REASON: ${{ steps.record.outputs.status }}
+        run: python3 -m smbot.session publish --bundle work/work.bundle --branch "$BRANCH" --mode update --pr "$PR" --unfinished "$REASON"
+      - name: Questions for the owner
+        if: steps.record.outputs.status == 'ok' && needs.revise.outputs.result != ''
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          RESULT: ${{ needs.revise.outputs.result }}
+          SOURCE: the revision of PR #${{ needs.publish.outputs.pr }}
+        run: python3 -m smbot.inbox ask
 
   final:
     name: final review (fresh context)
@@ -366,7 +411,7 @@ jobs:
       - id: app-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          app-id: ${{ secrets.BOT_APP_ID }}
+          client-id: Iv23lirdyRvc0KC6625s # the bot app's Client ID (public)
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-pull-requests: write
@@ -403,7 +448,7 @@ jobs:
       - id: app-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          app-id: ${{ secrets.BOT_APP_ID }}
+          client-id: Iv23lirdyRvc0KC6625s # the bot app's Client ID (public)
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-issues: write

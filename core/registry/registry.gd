@@ -73,7 +73,7 @@ func scan(content_root: String = DEFAULT_CONTENT_ROOT, audio_root: String = DEFA
 			var ids: Array[StringName] = []
 			for id: StringName in found:
 				ids.append(id)
-			ids.sort()
+			ids.sort_custom(_name_less)
 			_ids[folder] = ids
 	for path: String in _find_files(audio_root, sound_extensions):
 		var sound_id: StringName = StringName(path.get_file().get_basename())
@@ -117,8 +117,13 @@ func get_folders() -> Array[StringName]:
 	var result: Array[StringName] = []
 	for folder: StringName in _resources:
 		result.append(folder)
-	result.sort()
+	result.sort_custom(_name_less)
 	return result
+
+
+## StringName's own `<` compares addresses, not letters, so sort by the text.
+static func _name_less(a: StringName, b: StringName) -> bool:
+	return String(a) < String(b)
 
 
 ## The sound with this id, or `null` when there is none: no such file, or it

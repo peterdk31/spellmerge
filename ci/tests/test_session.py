@@ -50,6 +50,16 @@ class ClassifyTest(unittest.TestCase):
         self.assertIsNone(session.reset_time("no time here", now))
         self.assertEqual(session.resets_at("error", "resets 9am"), "")
 
+    def test_success_over_the_turn_cap_still_counts(self) -> None:
+        """Run #99 finished the task in 206 turns; the action failed the step for passing 150."""
+        out = {"status": "ready", "pr_title": "t", "summary": "s"}
+        msgs = result(num_turns=206, result=json.dumps(out))
+        self.assertEqual(session.classify(msgs, True)[0], "ok")
+        self.assertEqual(json.loads(session.structured_result(msgs)), out)
+        self.assertEqual(json.loads(session.structured_result(result(structured_output=out, result="done"))), out)
+        self.assertEqual(session.structured_result(result(is_error=True, result=json.dumps(out))), "")
+        self.assertEqual(session.structured_result(result(result="not json")), "")
+
     def test_rejected_token(self) -> None:
         status, _, _ = session.classify(result(is_error=True, result="Invalid bearer token"), True)
         self.assertEqual(status, "auth")
@@ -118,6 +128,15 @@ class PromptTest(unittest.TestCase):
         self.assertTrue(session.mergeable({"verdict": "approve", "problems": [{"severity": "minor"}]}))
         self.assertFalse(session.mergeable({"verdict": "approve", "problems": [{"severity": "major"}]}))
         self.assertFalse(session.mergeable({"verdict": "revise", "problems": []}))
+
+
+class SchemaTest(unittest.TestCase):
+    def test_schemas_survive_the_shell_quoting(self) -> None:
+        """The workflows pass each schema inside single quotes (--json-schema '...'), so a quote breaks it."""
+        for path in sorted(session.MAINTAINER.joinpath("schemas").glob("*.json")):
+            text = path.read_text()
+            json.loads(text)
+            self.assertNotIn("'", text, f"{path.name} contains a single quote")
 
 
 class FinishTest(unittest.TestCase):
@@ -211,6 +230,81 @@ class PublishTest(unittest.TestCase):
         with mock.patch.object(session.gh, "api", return_value=[other]):
             self.assertEqual(session.open_pr(CFG, "claude/20261016-x"), {})
         self.assertEqual(session.open_pr(CFG, "main"), {})
+
+    def test_task_title(self) -> None:
+        self.assertEqual(session.task_title("**Unit tests for spells.** Add tests for ..."), "Unit tests for spells")
+        self.assertEqual(session.task_title("Fix the HUD."), "Fix the HUD")
+        self.assertEqual(session.task_title(""), "Claude's work")
+
+    def _publish(self, api: mock.Mock, mode: str, pr: int | None = None) -> dict[str, str]:
+        done = mock.Mock(returncode=0, stdout="abcdef1234\n")
+        with mock.patch.object(session.subprocess, "run", return_value=done), \
+                mock.patch.object(session, "workflow_changes", return_value=[]), \
+                mock.patch.object(session.gh, "api", api):
+            return session.publish(CFG, Path("work.bundle"), "claude/20261017-x", mode, {}, pr, "t",
+                                   unfinished="usage limit", task="**Unit tests.** More words.")
+
+    def test_unfinished_work_is_kept_in_a_draft_pr(self) -> None:
+        api = mock.Mock(side_effect=[[], {"number": 70}])
+        self.assertEqual(self._publish(api, "new"), {"saved_pr": "70", "branch": "claude/20261017-x"})
+        created = api.call_args_list[1].kwargs["input"]
+        self.assertTrue(created["draft"])
+        self.assertEqual(created["title"], "Unfinished: Unit tests")
+        self.assertIn("usage limit", created["body"])
+
+    def test_unfinished_work_on_an_open_pr_comments_without_a_review(self) -> None:
+        api = mock.Mock(side_effect=[[{"number": 19}], {}])
+        out = self._publish(api, "new")
+        self.assertEqual(out, {"saved_pr": "19", "branch": "claude/20261017-x"})
+        self.assertNotIn("sha", out)  # no sha: no review starts
+        self.assertIn("Pushed abcdef1", api.call_args_list[1].kwargs["input"]["body"])
+        pr = {"head": {"ref": "claude/20261017-x"}, "user": {"login": CFG.bot.login}, "state": "open"}
+        api = mock.Mock(side_effect=[pr, {}])
+        self.assertEqual(self._publish(api, "update", 19), {"saved_pr": "19", "branch": "claude/20261017-x"})
+
+    def test_publish_refuses_the_bots_own_workflow_changes(self) -> None:
+        done = mock.Mock(returncode=0, stdout="")
+        with mock.patch.object(session.subprocess, "run", return_value=done) as run, \
+                mock.patch.object(session, "workflow_changes", return_value=[".github/workflows/x.yml"]), \
+                mock.patch.object(session.gh, "api") as api:
+            with self.assertRaisesRegex(ValueError, "x.yml"):
+                session.publish(CFG, Path("work.bundle"), "claude/20261017-x", "new", {}, None, "t")
+        self.assertFalse([c for c in run.call_args_list if "push" in c.args[0]])
+        api.assert_not_called()
+
+    def test_workflow_changes_allows_only_mains_or_the_branchs_version(self) -> None:
+        import os
+        import subprocess
+        env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t",
+               "GIT_COMMITTER_EMAIL": "t@t"}
+        with tempfile.TemporaryDirectory() as tmp:
+            run = lambda *a: subprocess.run(["git", "-C", tmp, *a], check=True, capture_output=True, env=env)
+
+            def commit(name: str, text: str, msg: str) -> None:
+                Path(tmp, name).parent.mkdir(parents=True, exist_ok=True)
+                Path(tmp, name).write_text(text)
+                run("add", "-A")
+                run("commit", "-qm", msg)
+
+            run("init", "-q", "-b", "main")
+            commit(".github/workflows/w.yml", "old\n", "base")
+            run("switch", "-qc", "pr")
+            commit("a.gd", "a\n", "work")
+            run("branch", "pushed")
+            run("switch", "-q", "main")
+            commit(".github/workflows/w.yml", "new\n", "main changes a workflow")
+            run("switch", "-q", "pr")
+            run("merge", "-q", "--no-edit", "main")
+            old = os.getcwd()
+            os.chdir(tmp)
+            try:
+                self.assertEqual(session.workflow_changes("pr", ["main", "pushed"]), [])
+                self.assertEqual(session.workflow_changes("pushed", ["main"]), [".github/workflows/w.yml"])
+                self.assertEqual(session.workflow_changes("pushed", ["main", "pushed"]), [])
+                commit(".github/workflows/w.yml", "evil\n", "the bot edits a workflow")
+                self.assertEqual(session.workflow_changes("pr", ["main", "pushed"]), [".github/workflows/w.yml"])
+            finally:
+                os.chdir(old)
 
     def test_branch_names(self) -> None:
         self.assertTrue(session.valid_branch("claude/20261017-area-readmes"))

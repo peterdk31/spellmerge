@@ -1,6 +1,6 @@
 extends Control
 ## The main menu: the name, the tagline, the build version and the Play button.
-## Play only sends the intent event `play_requested`; `gameplay/flow` hears it and
+## Play only sends the intent event `play_requested`; the flow area hears it and
 ## starts the arena. The menu never calls flow and never changes the scene itself.
 
 const EventsScript := preload("res://core/events/events.gd")

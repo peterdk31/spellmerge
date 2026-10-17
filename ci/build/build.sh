@@ -7,6 +7,7 @@
 #
 #   ci/build/build.sh [--version v0.20261017] [--channel nightly] [--commit SHA]
 #   ci/build/build.sh --quick     import and editor smoke test only (for development)
+#   ci/build/build.sh --quick --tests   the same, then every tests/**/test_*.gd unit test
 #
 # Downloads the pinned Godot editor and export templates into $GODOT_CACHE
 # (default ~/.cache/spellmerge-godot) and refuses them if a hash differs. Only
@@ -23,9 +24,11 @@ VERSION="dev"
 CHANNEL="dev"
 COMMIT="$(git rev-parse HEAD 2>/dev/null || echo "")"
 QUICK=0
+TESTS=0
 while (($#)); do
   case "$1" in
     --quick)   QUICK=1; shift ;;
+    --tests)   TESTS=1; shift ;;
     --version) VERSION=$2; shift 2 ;;
     --channel) CHANNEL=$2; shift 2 ;;
     --commit)  COMMIT=$2; shift 2 ;;
@@ -104,6 +107,22 @@ import_and_smoke() {
   godot_checked smoke-editor "$GODOT" --headless --path . --script res://tests/smoke/boot_smoke.gd
 }
 
+# Each unit test is its own SceneTree script that quits with a non-zero code on failure,
+# so each needs its own Godot process. Runs them all and then fails if any failed.
+unit_tests() {
+  local test failed=()
+  while IFS= read -r test; do
+    step "Unit test $test"
+    godot_checked "unit-$(basename "$test" .gd)" "$GODOT" --headless --path . --script "res://$test" \
+      || failed+=("$test")
+  done < <(find tests -name 'test_*.gd' -not -path '*/fixtures/*' | sort)
+  if ((${#failed[@]})); then
+    echo "::error::${#failed[@]} unit test(s) failed: ${failed[*]}"
+    return 1
+  fi
+  step "All unit tests passed"
+}
+
 export_all() {
   for preset in Web Windows Linux; do
     step "Exporting $preset"
@@ -176,6 +195,7 @@ setup_godot
 mkdir -p build/logs
 if ((QUICK)); then
   import_and_smoke
+  ((TESTS)) && unit_tests
   step "Quick check passed"
   exit 0
 fi

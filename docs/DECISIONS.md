@@ -2,6 +2,18 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-17: Pools and the projectile manager (M1 part 7)
+
+**Decided by:** Claude (details the task left open).
+
+- **Pool:** GDScript has no generics, so a pool is typed by its factory Callable and the caller casts `acquire()`. It makes all objects up front and never grows: at capacity `acquire()` returns `null` and the caller degrades. A growing pool would allocate mid-frame, which the budgets forbid.
+- **Projectiles are rows in packed arrays** (struct of arrays), simulated in `_physics_process` and drawn by one `MultiMeshInstance2D`, tinted by player colour (STYLE.md base colours; enemy shots Fire). A texture can be set later for the real bolt art.
+- **Targets are registered, not searched for:** `add_target(node, radius, layer)`. The manager reads their positions each step into a grid of 64 px cells, so it depends on no gameplay class and `core/` keeps its dependency direction. Hit layers (`LAYER_ENEMY`, `LAYER_PLAYER`) let enemy shots hit players and player shots hit enemies, and a shot's owner can be `NO_PLAYER`. Friendly fire (part 17) means a player shot with `LAYER_PLAYER` in its mask.
+- **Hits test the path, not the point:** each step's segment against the target circle, so fast shots can't tunnel.
+- **The cap degrades by dropping, never by refusing:** at the cap, the oldest projectile of whoever owns the most is dropped. A refused shot would feel like a broken button; dropping the oldest of the richest means a player who floods the screen loses only their own old shots, and nobody is starved (pillar 2). The default cap is 2048, above the web stress budget of 1,000 and below desktop's 3,000; `set_cap` changes it, and the desktop build can raise it.
+- **`projectile_hit(player, target, position)` carries no damage**, as the event was fixed in part 1. The bolt (part 13) and `combat` (part 11) must get the damage another way (for example `combat` asks the equipped spell's cast result, or the manager gets a per-projectile payload then). Left open on purpose; part 13 decides, and may add a payload to `spawn` without changing the event.
+- Removing a target or spawning a projectile inside a `projectile_hit` handler is safe: removal waits for the next step and new shots start moving on the next step.
+
 ## 2026-10-17: Per-player focus (M1 part 6)
 
 **Decided by:** Claude (details the task left open).

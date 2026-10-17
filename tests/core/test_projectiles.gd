@@ -1,0 +1,341 @@
+extends SceneTree
+## Tests for core/projectiles: movement, hits and the event, layers, piercing,
+## the global cap, slot reuse, 1,000 projectiles checked against a brute-force
+## search, and the batched draw. The manager is stepped by hand.
+##
+## godot --headless --path . --script res://tests/core/test_projectiles.gd
+
+const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
+const EventsScript := preload("res://core/events/events.gd")
+
+const DT: float = 1.0 / 60.0
+
+var _failures: Array[String] = []
+var _bus: Node
+var _mgr: Node2D
+var _targets: Array[Node2D] = []
+## Every projectile_hit as [player, target, position].
+var _hits: Array = []
+
+
+func _initialize() -> void:
+	_test_moves_and_expires()
+	_test_hit_sends_the_event_and_ends_the_projectile()
+	_test_hits_report_their_own_player()
+	_test_layers()
+	_test_miss()
+	_test_fast_shot_does_not_tunnel()
+	_test_pierce()
+	_test_bad_arguments()
+	_test_cap_drops_the_oldest_of_the_richest()
+	_test_cap_keeps_every_player_alive()
+	_test_cap_never_exceeded_and_nothing_grows()
+	_test_slots_are_reused()
+	_test_one_thousand_match_brute_force()
+	_test_one_thousand_run_and_draw()
+	_test_freed_target_is_dropped()
+	_test_target_removed_by_a_hit_handler()
+	_test_spawn_in_a_hit_handler_waits_a_step()
+	_test_out_of_bounds_removed()
+	_teardown()
+	if _failures.is_empty():
+		print("TEST OK: core/projectiles")
+		quit(0)
+	else:
+		for failure in _failures:
+			printerr("TEST FAILED: " + failure)
+		quit(1)
+
+
+func _check(condition: bool, message: String) -> void:
+	if not condition:
+		_failures.append(message)
+
+
+func _setup() -> void:
+	_teardown()
+	_bus = EventsScript.new()
+	_mgr = ManagerScript.new()
+	_mgr.events = _bus
+	_hits.clear()
+	_bus.projectile_hit.connect(func(player: int, target: Node, position: Vector2) -> void: _hits.append([player, target, position]))
+
+
+func _teardown() -> void:
+	for target in _targets:
+		if is_instance_valid(target):
+			target.free()
+	_targets.clear()
+	for node: Node in [_mgr, _bus]:
+		if node != null and is_instance_valid(node):
+			node.free()
+	_mgr = null
+	_bus = null
+
+
+## A target in the tree at `position`.
+func _target(position: Vector2, radius: float = 10.0, layer: int = ManagerScript.LAYER_ENEMY) -> Node2D:
+	var node := Node2D.new()
+	root.add_child(node)
+	node.global_position = position
+	_targets.append(node)
+	_mgr.add_target(node, radius, layer)
+	return node
+
+
+func _test_moves_and_expires() -> void:
+	_setup()
+	var slot: int = _mgr.spawn(0, Vector2.ZERO, Vector2(60.0, 0.0), 0.5)
+	_check(slot >= 0 and _mgr.get_count() == 1, "spawn starts one projectile")
+	_mgr.step(0.25)
+	_check(_mgr.get_position_of(slot).is_equal_approx(Vector2(15.0, 0.0)), "it moves velocity * delta")
+	_mgr.step(0.25)
+	_check(_mgr.get_count() == 0 and not _mgr.is_alive(slot), "it ends when its lifetime is over")
+	_check(_mgr.get_position_of(slot) == Vector2.INF, "a dead slot has no position")
+
+
+func _test_hit_sends_the_event_and_ends_the_projectile() -> void:
+	_setup()
+	var enemy: Node2D = _target(Vector2(30.0, 0.0))
+	_mgr.spawn(2, Vector2.ZERO, Vector2(1200.0, 0.0), 1.0)
+	_mgr.step(DT)
+	_check(_hits.size() == 1, "one hit event")
+	if _hits.size() == 1:
+		_check(_hits[0][0] == 2 and _hits[0][1] == enemy, "the event names the player and the target")
+	_check(_mgr.get_count() == 0, "the projectile ends on a hit")
+	_mgr.step(DT)
+	_check(_hits.size() == 1, "no second event")
+
+
+func _test_hits_report_their_own_player() -> void:
+	_setup()
+	var a: Node2D = _target(Vector2(30.0, 0.0))
+	var b: Node2D = _target(Vector2(30.0, 400.0))
+	_mgr.spawn(0, Vector2.ZERO, Vector2(1200.0, 0.0), 1.0)
+	_mgr.spawn(3, Vector2(0.0, 400.0), Vector2(1200.0, 0.0), 1.0)
+	_mgr.step(DT)
+	_check(_hits.size() == 2, "two hits at once")
+	for hit in _hits:
+		if hit[1] == a:
+			_check(hit[0] == 0, "player 0's shot hit the first target")
+		elif hit[1] == b:
+			_check(hit[0] == 3, "player 3's shot hit the second target")
+		else:
+			_check(false, "a hit named an unknown target")
+
+
+func _test_layers() -> void:
+	_setup()
+	_target(Vector2(30.0, 0.0), 10.0, ManagerScript.LAYER_PLAYER)
+	_mgr.spawn(0, Vector2.ZERO, Vector2(1200.0, 0.0), 1.0, 4.0, ManagerScript.LAYER_ENEMY)
+	_mgr.step(DT)
+	_check(_hits.is_empty() and _mgr.get_count() == 1, "a shot at enemies passes a player target")
+	_setup()
+	_target(Vector2(30.0, 0.0), 10.0, ManagerScript.LAYER_PLAYER)
+	_mgr.spawn(EventsScript.NO_PLAYER, Vector2.ZERO, Vector2(1200.0, 0.0), 1.0, 4.0, ManagerScript.LAYER_PLAYER)
+	_mgr.step(DT)
+	_check(_hits.size() == 1 and _hits[0][0] == EventsScript.NO_PLAYER, "an enemy shot hits a player target, with NO_PLAYER")
+	_check(_mgr.get_count_for(EventsScript.NO_PLAYER) == 0, "the enemy shot ended")
+
+
+func _test_miss() -> void:
+	_setup()
+	_target(Vector2(30.0, 40.0), 10.0)
+	_mgr.spawn(0, Vector2.ZERO, Vector2(1200.0, 0.0), 1.0, 4.0)
+	_mgr.step(DT)
+	_check(_hits.is_empty() and _mgr.get_count() == 1, "a shot that passes 40 px away misses a 10 px target")
+
+
+func _test_fast_shot_does_not_tunnel() -> void:
+	_setup()
+	# 3000 px/s is 50 px per step: it starts left of the target and ends right of it.
+	_target(Vector2(25.0, 0.0), 6.0)
+	_mgr.spawn(0, Vector2(-5.0, 0.0), Vector2(3000.0, 0.0), 1.0, 2.0)
+	_mgr.step(DT)
+	_check(_hits.size() == 1, "a fast shot hits a target it passed over within one step")
+
+
+func _test_pierce() -> void:
+	_setup()
+	var first: Node2D = _target(Vector2(20.0, 0.0))
+	var second: Node2D = _target(Vector2(60.0, 0.0))
+	var slot: int = _mgr.spawn(1, Vector2.ZERO, Vector2(600.0, 0.0), 1.0, 4.0, ManagerScript.LAYER_ENEMY, 1)
+	for i in 12:
+		_mgr.step(DT)
+	_check(_hits.size() == 2, "a pierce-1 shot hits two targets, once each (%d)" % _hits.size())
+	if _hits.size() == 2:
+		_check(_hits[0][1] == first and _hits[1][1] == second, "in the order it reached them")
+	_check(not _mgr.is_alive(slot), "and ends on the second")
+
+
+func _test_bad_arguments() -> void:
+	_setup()
+	_check(_mgr.spawn(4, Vector2.ZERO, Vector2.RIGHT, 1.0) == -1, "player 4 is refused")
+	_check(_mgr.spawn(-2, Vector2.ZERO, Vector2.RIGHT, 1.0) == -1, "player -2 is refused")
+	_check(_mgr.spawn(0, Vector2.ZERO, Vector2.RIGHT, 0.0) == -1, "zero lifetime is refused")
+	_check(_mgr.spawn(0, Vector2(NAN, 0.0), Vector2.RIGHT, 1.0) == -1, "a NaN position is refused")
+	_check(_mgr.spawn(0, Vector2.ZERO, Vector2(INF, 0.0), 1.0) == -1, "an infinite velocity is refused")
+	_check(_mgr.get_count() == 0, "refused spawns leave nothing behind")
+	_check(_mgr.get_count_for(7) == 0, "counting an invalid player gives 0")
+
+
+func _test_cap_drops_the_oldest_of_the_richest() -> void:
+	_setup()
+	_mgr.set_cap(10)
+	var oldest: int = _mgr.spawn(0, Vector2(1.0, 0.0), Vector2.ZERO, 5.0)
+	for i in 9:
+		_mgr.spawn(0, Vector2(2.0 + i, 0.0), Vector2.ZERO, 5.0)
+	_check(_mgr.get_count() == 10, "the cap fills to 10")
+	var slot: int = _mgr.spawn(1, Vector2(100.0, 0.0), Vector2.ZERO, 5.0)
+	_check(slot >= 0, "a full cap still accepts the new shot")
+	_check(_mgr.get_count() == 10, "and stays at the cap")
+	_check(_mgr.dropped == 1, "one projectile was dropped")
+	_check(_mgr.get_count_for(0) == 9 and _mgr.get_count_for(1) == 1, "from the player who owned the most")
+	_check(slot == oldest, "the oldest one's slot was reused")
+	var survivors: int = 0
+	for s in 10:
+		if _mgr.is_alive(s) and _mgr.get_position_of(s).x == 1.0:
+			survivors += 1
+	_check(survivors == 0, "the oldest shot is the one that went")
+
+
+func _test_cap_keeps_every_player_alive() -> void:
+	_setup()
+	_mgr.set_cap(40)
+	# Player 0 floods; the others fire a little. Everyone's newest shot lives.
+	for i in 200:
+		_mgr.spawn(0, Vector2(i, 0.0), Vector2.ZERO, 5.0)
+		if i % 20 == 0:
+			_mgr.spawn(1 + floori(i / 20.0) % 3, Vector2(i, 10.0), Vector2.ZERO, 5.0)
+	_check(_mgr.get_count() == 40, "the cap holds under a flood")
+	for player in 4:
+		_check(_mgr.get_count_for(player) > 0, "player %d still has projectiles" % player)
+	_check(_mgr.dropped > 0, "the flood dropped some")
+	_check(_mgr.get_count_for(0) + _mgr.get_count_for(1) + _mgr.get_count_for(2) + _mgr.get_count_for(3) == 40, "the per-player counts add up")
+
+
+func _test_cap_never_exceeded_and_nothing_grows() -> void:
+	_setup()
+	_mgr.set_cap(100)
+	var size_before: int = _mgr._pos.size()
+	var worst: int = 0
+	for i in 2000:
+		_mgr.spawn(i % 4, Vector2(i % 50, 0.0), Vector2(30.0, 0.0), 100.0)
+		if i % 3 == 0:
+			_mgr.step(DT)
+		worst = maxi(worst, _mgr.get_count())
+	_check(worst == 100, "the count reaches the cap and never passes it (%d)" % worst)
+	_check(_mgr._pos.size() == size_before and _mgr._alive.size() == 100, "the arrays never grow")
+	_check(_mgr.get_cap() == 100, "the cap is unchanged")
+
+
+func _test_slots_are_reused() -> void:
+	_setup()
+	_mgr.set_cap(8)
+	for round in 50:
+		for i in 8:
+			_mgr.spawn(round % 4, Vector2.ZERO, Vector2(10.0, 0.0), 0.1)
+		_check(_mgr.get_count() == 8, "round %d fills the 8 slots" % round)
+		for step in 7:
+			_mgr.step(DT)
+		_check(_mgr.get_count() == 0, "round %d: all expired" % round)
+	_check(_mgr.dropped == 0, "reuse never needed a drop")
+	_check(_mgr._pos.size() == 8, "still 8 slots")
+	var slot: int = _mgr.spawn(0, Vector2.ZERO, Vector2.ZERO, 1.0)
+	_check(slot >= 0 and slot < 8, "a new shot takes a free slot")
+
+
+func _test_one_thousand_match_brute_force() -> void:
+	_setup()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+	var centers: Array[Vector2] = []
+	for i in 100:
+		var at := Vector2(rng.randf_range(-900.0, 900.0), rng.randf_range(-900.0, 900.0))
+		centers.append(at)
+		_target(at, 12.0)
+	var starts: Array[Vector2] = []
+	var moves: Array[Vector2] = []
+	for i in 1000:
+		var start := Vector2(rng.randf_range(-900.0, 900.0), rng.randf_range(-900.0, 900.0))
+		var velocity := Vector2.from_angle(rng.randf() * TAU) * rng.randf_range(100.0, 2000.0)
+		starts.append(start)
+		moves.append(velocity * DT)
+		_mgr.spawn(i % 4, start, velocity, 5.0, 4.0)
+	_check(_mgr.get_count() == 1000, "1,000 projectiles are alive")
+	var expected_hits: int = 0
+	for i in 1000:
+		for center in centers:
+			var closest: Vector2 = Geometry2D.get_closest_point_to_segment(center, starts[i], starts[i] + moves[i])
+			if closest.distance_to(center) <= 16.0:
+				expected_hits += 1
+				break
+	_mgr.step(DT)
+	_check(expected_hits > 0, "the layout has hits to find (%d)" % expected_hits)
+	_check(_hits.size() == expected_hits, "the grid finds exactly the hits a brute-force search does (%d vs %d)" % [_hits.size(), expected_hits])
+	_check(_mgr.get_count() == 1000 - expected_hits, "and ends exactly those projectiles")
+
+
+func _test_one_thousand_run_and_draw() -> void:
+	_setup()
+	root.add_child(_mgr)
+	for i in 1000:
+		_mgr.spawn(i % 4, Vector2(-500.0 + i % 100 * 10.0, -400.0 + floorf(i / 100.0) * 80.0), Vector2(200.0, 40.0), 2.0)
+	_target(Vector2(0.0, 0.0), 30.0)
+	for i in 30:
+		_mgr.step(DT)
+	var alive: int = _mgr.get_count()
+	_check(alive > 900, "most of the 1,000 are still flying (%d)" % alive)
+	_mgr.update_draw()
+	_check(_mgr.drawn == alive, "one batch holds every live projectile (%d of %d)" % [_mgr.drawn, alive])
+	_mgr.clear()
+	_mgr.update_draw()
+	_check(_mgr.drawn == 0 and _mgr.get_count() == 0, "clear empties the batch")
+	root.remove_child(_mgr)
+
+
+func _test_freed_target_is_dropped() -> void:
+	_setup()
+	var enemy: Node2D = _target(Vector2(30.0, 0.0))
+	_check(_mgr.get_target_count() == 1, "one target registered")
+	_mgr.add_target(enemy, 12.0)
+	_check(_mgr.get_target_count() == 1, "registering twice keeps one")
+	enemy.free()
+	_mgr.spawn(0, Vector2.ZERO, Vector2(1200.0, 0.0), 1.0)
+	_mgr.step(DT)
+	_check(_mgr.get_target_count() == 0, "a freed target is dropped")
+	_check(_hits.is_empty() and _mgr.get_count() == 1, "and nothing hits it")
+
+
+func _test_target_removed_by_a_hit_handler() -> void:
+	_setup()
+	_target(Vector2(30.0, 0.0))
+	_target(Vector2(30.0, 300.0))
+	_bus.projectile_hit.connect(func(_p: int, target: Node, _at: Vector2) -> void: _mgr.remove_target(target as Node2D))
+	_mgr.spawn(0, Vector2.ZERO, Vector2(1200.0, 0.0), 1.0)
+	_mgr.spawn(1, Vector2(0.0, 300.0), Vector2(1200.0, 0.0), 1.0)
+	_mgr.step(DT)
+	_check(_hits.size() == 2, "both targets were hit despite one removal mid-step")
+	_check(_mgr.get_target_count() == 2, "removal inside a step waits for the next one")
+	_mgr.step(DT)
+	_check(_mgr.get_target_count() == 0, "removed targets are swept")
+
+
+func _test_spawn_in_a_hit_handler_waits_a_step() -> void:
+	_setup()
+	_target(Vector2(30.0, 0.0))
+	var spawned: Array[int] = []
+	_bus.projectile_hit.connect(func(_p: int, _t: Node, at: Vector2) -> void: spawned.append(_mgr.spawn(0, at, Vector2(600.0, 0.0), 1.0)))
+	_mgr.spawn(0, Vector2.ZERO, Vector2(1200.0, 0.0), 1.0)
+	_mgr.step(DT)
+	_check(spawned.size() == 1 and _mgr.get_count() == 1, "a spawn from a handler is kept")
+	var at: Vector2 = _mgr.get_position_of(spawned[0])
+	_check(at.x > 19.0 and at.x < 21.0, "it did not move in the step that made it (%s)" % str(at))
+
+
+func _test_out_of_bounds_removed() -> void:
+	_setup()
+	_mgr.set_bounds(Rect2(0.0, 0.0, 640.0, 360.0))
+	_mgr.spawn(0, Vector2(600.0, 100.0), Vector2(12000.0, 0.0), 5.0)
+	_mgr.step(DT)
+	_check(_mgr.get_count() == 0, "a shot far outside the bounds is removed")

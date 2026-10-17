@@ -46,9 +46,9 @@ const LAYER_ENEMIES: int = 4
 const LAYER_WALLS: int = 1
 ## The telegraph line starts this far from the enemy; its look at 0% and 100% progress.
 const TELEGRAPH_START: float = 10.0
-const TELEGRAPH_WIDTH_MIN: float = 1.0
-const TELEGRAPH_WIDTH_MAX: float = 3.0
-const TELEGRAPH_ALPHA_MIN: float = 0.3
+const TELEGRAPH_WIDTH_MIN: float = 2.0
+const TELEGRAPH_WIDTH_MAX: float = 4.0
+const TELEGRAPH_ALPHA_MIN: float = 0.5
 ## Seconds between looking for the nearest player again.
 const RETARGET_TIME: float = 0.5
 ## `Sprite` modulate while the telegraph shows.
@@ -126,7 +126,7 @@ func _ready() -> void:
 		push_warning("Ai: no enemy data set, so this enemy stands still.")
 	if combat != null:
 		if data != null:
-			attack_tag = ATTACK_TAG_BASE + absi(hash(data.id)) % ATTACK_TAG_SPREAD
+			attack_tag = ATTACK_TAG_BASE + absi(hash([data.id, attack_damage])) % ATTACK_TAG_SPREAD
 		combat.set_hit_profile(attack_tag, attack_damage, 0.0)
 		if data != null:
 			combat.register_enemy(self, data.max_health, hurt_radius, data.contact_damage)
@@ -138,6 +138,9 @@ func _ready() -> void:
 func _exit_tree() -> void:
 	if events != null and events.player_downed.is_connected(_on_player_downed):
 		events.player_downed.disconnect(_on_player_downed)
+	# Leaving the tree without being freed must not leave a target behind in Combat.
+	if combat != null and is_instance_valid(combat):
+		combat.unregister_enemy(self)
 
 
 func _physics_process(delta: float) -> void:
@@ -259,8 +262,11 @@ func _is_valid_target(node: Variant) -> bool:
 	return not (node.has_method("is_downed") and node.is_downed())
 
 
-func _on_player_downed(_player: int) -> void:
-	_retarget_left = 0.0
+func _on_player_downed(player: int) -> void:
+	# Only enemies chasing the downed wizard look again at once; the rest keep their
+	# staggered timer, so a death does not make every enemy search in one frame.
+	if is_instance_valid(target) and target.get("index") == player:
+		_retarget_left = 0.0
 
 
 func _position_of(node: Node2D) -> Vector2:

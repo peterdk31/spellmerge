@@ -2,6 +2,17 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-17: Arena glue (M1 part 15)
+
+**Decided by:** Claude (details the task left open).
+
+- **Flow builds the whole world and makes it the current scene.** The menu only sends `play_requested(0)`; flow adds one `Arena` node (room scene, `Camera2D`, wizards, enemies), makes it `current_scene` and removes the menu at once. A restart removes the old world from the tree at once (so its enemies leave `Combat` in the same frame) and frees it.
+- **Wizards: one per player slot with a device.** If Play is pressed by the mouse and slot 0 is free, the keyboard joins as P1. A request from another slot with nobody joined starts nothing (with a warning). Joining mid-run is `coop`'s job (part 17).
+- **Flow reaches `Combat`, `Projectiles` and `PlayerInput` through the autoload nodes**, as the AI does, since `core/events` has no event for "register this wizard"; it sets bounds for the projectiles and clears them on a run. Flow preloads `content/wizard/base/wizard.tscn` by a literal path: the wizard has no registry resource yet. The room, the enemy and the bolt come from the registry by id (`arena_01`, `ember_imp`, `bolt`).
+- **The wave:** 8 imps at the six enemy spawns (two spawns used twice, the repeat 14 px along the diagonal), a constant in `flow.gd`. 8 × 20 health is 32 bolt hits; it is a first guess for C1.
+- **Restart after 2 seconds** from the last wizard going down (`RESTART_DELAY`, under the 3 s limit); a revive cancels it; a cleared room never restarts. After `room_cleared` nothing happens yet (no reward or next room until M3); listed in the flow README.
+- **A second `play_requested` during a run is ignored.** `stop_run()` returns flow to idle (tests; later the run area).
+
 ## 2026-10-17: Work resumes when a usage limit resets; late scheduled runs don't repeat
 
 **Decided by:** owner.

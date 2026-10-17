@@ -10,7 +10,9 @@ Players in the spell builder never block the others: the rest keep playing.
 
 ## Contract
 
-- **Public entry script:** `gameplay/flow/flow.gd`. Other code uses only this script and the events it sends and listens to; nothing else in the folder is public. The script arrives when the area is built.
+- **Public entry script:** `gameplay/flow/flow.gd`. Other code uses only this script and the events it sends and listens to; nothing else in the folder is public. It is the autoload `Flow` (registered in `project.godot`).
+- **What exists (M1 slice):** on `play_requested` it asks `core/registry` for the room `arena_01`, the `ember_imp` and the `bolt`, and builds one world node (room scene, a camera, a wizard for every player slot that has a device, the fixed wave) that becomes the current scene. It sends `room_entered`, and `room_cleared` when the last enemy of the wave has died. When every wizard is down it restarts the room after `RESTART_DELAY` (2 seconds): new world, full health, new wave, no shots left, and `reset_cooldowns()` on the bolt (the registry shares one bolt resource between all holders). The restart also happens when the last enemy dies after everyone is down. If a restart cannot start (content missing) it logs an error and flow goes idle, so Play can start again. Play with the mouse joins the keyboard as P1 only when nobody has joined; anyone already joined (for example a gamepad) plays as they are. A second `play_requested` while a run is on is ignored. `stop_run()` ends the run (tests use it). Mid-run joins arrive with `coop`; door voting, the room sequence and the run lifecycle arrive in M3, which replaces this slice. `run_started` and `door_vote_requested` are not used yet.
+- **Known gaps:** after `room_cleared` nothing happens yet (no reward, no next room, no way back to the menu); the wave is a constant in `flow.gd` (`WAVE`), tuned at C1.
 - **Dependency direction:** `core` ← `gameplay` ← `content`. This area may use `core/` and the registry. `core/` never depends on it, and content never reaches into it.
 - **Events** (`core/events/events.gd` owns the definitions; this list matches it and the table in [gameplay/README.md](../README.md)):
   - Sends: `room_entered`, `room_cleared`, `door_voted`.
@@ -27,7 +29,7 @@ Not open yet. When it opens, follow the steps and test layout in [gameplay/READM
 
 ## Example to copy
 
-Arrives with Claude's first code for this area. Do not guess its layout before then.
+`gameplay/flow/flow.gd` and its test `tests/gameplay/flow/test_flow.gd` (run with `godot --headless --path . --script res://tests/gameplay/flow/test_flow.gd`). The test runs on the real autoloads, drives time through `Flow.step(delta)` and covers 1, 2 and 4 players.
 
 ## Validate
 

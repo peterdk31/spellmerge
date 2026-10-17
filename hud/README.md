@@ -29,7 +29,7 @@ Everything the players see and click: panels, the spell builder UI, menus, share
 
 ## Example to copy
 
-Arrives with Claude's first HUD scene. Do not guess its layout before then.
+`hud/menus/main_menu/main_menu.tscn` and `main_menu.gd`: the main menu with the Play button. Play sends `play_requested(0)` through the `Events` autoload and nothing else: it never calls `flow` and never changes the scene (flow does, on the event). The test is in `tests/gameplay/flow/test_flow.gd` (it presses the button and scans the script). The panels, the theme and the overlay arrive in M1 parts 18 and 19.
 
 ## Validate
 

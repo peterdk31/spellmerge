@@ -149,13 +149,13 @@
     },
     "owner_questions": {
       "type": "array",
-      "description": "Questions only the owner can answer (see 'Questions for the owner'). May be empty.",
+      "description": "Questions only the owner can answer (see Questions for the owner). May be empty.",
       "items": {
         "type": "object",
         "properties": {
           "title": {
             "type": "string",
-            "description": "A short question, e.g. 'Allow sessions to run the Godot binary?'"
+            "description": "A short question, for example: Allow sessions to run the Godot binary?"
           },
           "question": {
             "type": "string",

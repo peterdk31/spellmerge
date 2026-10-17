@@ -120,6 +120,15 @@ class PromptTest(unittest.TestCase):
         self.assertFalse(session.mergeable({"verdict": "revise", "problems": []}))
 
 
+class SchemaTest(unittest.TestCase):
+    def test_schemas_survive_the_shell_quoting(self) -> None:
+        """The workflows pass each schema inside single quotes (--json-schema '...'), so a quote breaks it."""
+        for path in sorted(session.MAINTAINER.joinpath("schemas").glob("*.json")):
+            text = path.read_text()
+            json.loads(text)
+            self.assertNotIn("'", text, f"{path.name} contains a single quote")
+
+
 class FinishTest(unittest.TestCase):
     """finish() decides whether the next session starts right away."""
 

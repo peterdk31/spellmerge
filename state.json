@@ -36,6 +36,11 @@
       "count": 0,
       "parked_reason": "I did not create the placeholder art. In this session every Python command needs an approval nobody can give, so I couldn't run my SVG generator or `tools/check.sh`. The branch `claude/20261017-placeholder-art-m1-part-4-hand` exists with no commits, and no repo files changed. A re-run with Python allowed can do the whole task.",
       "parked_until": "2026-10-24T00:38:16Z"
+    },
+    "**The fire bolt and projectile hookup (M1 part 13).** Build the bolt in `content/spells/forms/bolt/` (a `.tres` on the spell base class), fired through `core/pools` and `core/projectiles`, hitting through the damage pipeline. Done when: the bolt hits and kills the enemy in a test; the player and the bots only call the cast method and a test fails if any script outside `content/spells/` and `core/base/` reads a spell field. Update the spells README with the real example path.": {
+      "count": 1,
+      "pr": "53",
+      "problems": "- `uid://b3v7h2nq9xk4m` contains the digit 9. Godot's UID alphabet is a-y and 0-8, so this UID is invalid. Godot logs an error when it parses it, and the project requires no `ERROR:` lines. This is the same mistake PR #52 fixed in its revision 2 (`d2k7r4w9xn5pm` became `d2k7r4w8xn5pm`). Fix: Replace the 9 with a valid character, for example `uid://b3v7h2nq8xk4m`. Check that every other `.uid` file in the PR uses only a-y and 0-8; `bolt.gd.uid` (`dq5n3wk8y2b7f`) is valid.\n- `_profiled_id` is a single value. If the `Combat` node is replaced (a scene reload), the profile is set again on the first cast. If two `Combat` instances alternate, which only happens in tests, `set_hit_profile` runs on every cast. It works, but it is a small hidden coupling to Combat's lifetime. Fix: Optional: have `flow` or `Combat` register the bolt profile once at start-up. For now the existing comment is acceptable."
     }
   },
   "triage_closed": {

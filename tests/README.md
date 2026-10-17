@@ -19,6 +19,7 @@ Tests for the whole game. The tree mirrors the code: a test for `gameplay/combat
 - `smoke/`: the boot smoke test (`boot_smoke.gd`), which starts the main scene and fails unless the menu comes up. The 4-bot smoke test (M1) goes here too. A build that fails a smoke test is broken.
 - `benchmark/`: the stress benchmark. A frame-time regression over 10% counts as a broken build.
 - `bots/`: the bots that play headless runs for smoke tests and playtest reports.
+- `screenshots/`: scripts named `shot_*.gd` that set up a scene and save 640×360 PNGs to `user://screenshots/` (they check nothing). The build copies them to `build/screenshots/`; they are posted on every bot PR and on the site's `/screenshots/` page by the daily build. Needs `xvfb-run`.
 - Everything else mirrors the tree (`tests/core/...`, `tests/gameplay/...`).
 
 ## Allowed files
@@ -42,6 +43,7 @@ Tests for the whole game. The tree mirrors the code: a test for `gameplay/combat
 ```sh
 ci/build/build.sh --quick        # downloads the pinned Godot once, imports, runs the editor smoke test
 ci/build/build.sh --quick --tests  # the same, then every tests/**/test_*.gd (about a second each)
+ci/build/build.sh --quick --screenshots  # the same, then every tests/screenshots/shot_*.gd on a virtual display
 ```
 
 Rules every unit test script (a `SceneTree` script) follows, learned the hard way:

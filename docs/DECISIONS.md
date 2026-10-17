@@ -449,3 +449,15 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 ## 2026-10-17: HUD sizes unchanged for now, visual check still open
 
 The HUD screenshot cannot be taken in a session (no display, `docs/BACKLOG.md`), so no HUD size or font was changed. This is not a finding that they are fine. The four 112×55 panels are screen-space corners: a wizard or enemy standing in a corner can be hidden by one, and the Coop camera moves and zooms (0.5–1.0), so a paper check at one camera position says little. The legibility of the smooth default font at 12/14 px on the 640×360 canvas is unverified, and the design calls for pixel art, so a pixel font may be wanted (side note: a font file would need a licence entry). Decide on panel size, a translucent background and the font after the display run; tracked in `docs/NEXT.md` ("HUD screenshot and legibility check").
+
+## 2026-10-17: The daily build runs the unit tests and takes screenshots
+
+**Decided by:** the owner (#72: "make the daily build run the unit tests and fail when one fails"; and screenshots "posted somewhere").
+
+- The full `ci/build/build.sh` (the daily build) runs every unit test. A failing test fails the build, which then goes through the usual find-and-revert of the merge that broke it.
+- `ci/build/build.sh --quick --screenshots`, also part of the full build, runs every `tests/screenshots/shot_*.gd` under `xvfb-run` with the OpenGL renderer (Mesa's software renderer on the runners). The shots save 640×360 PNGs to `user://screenshots/`, and the script copies them to `build/screenshots/`. The first shot script, `shot_m1.gd`, takes the main menu and the arena with four wizards.
+- **Where they are posted:**
+  - The daily build publishes a gallery at `/screenshots/` on the Pages site.
+  - Every bot PR gets a comment with the screenshots of its latest commit. The images are stored on the orphan `screenshots` branch under `pr-<N>/<sha7>/` and linked by commit.
+  - The game code that takes the PR's shots runs in a job with no secrets and a read-only token. A separate job posts the images and accepts only plain PNGs under 1 MB.
+- Sessions may run `--screenshots` and open the PNGs with Read, so Claude can see what it built.

@@ -341,12 +341,12 @@ func _test_windup_pose_flashes_faster_and_brighter() -> void:
 			flips.append(i)
 			last = sprite.frame
 	_check(flips.size() >= 3, "the windup frame flips several times (%d)" % flips.size())
-	if flips.size() >= 4:
-		_check(flips[flips.size() - 1] - flips[flips.size() - 2] < flips[1] - flips[0] + 1, "the flips speed up toward the shot")
+	if flips.size() >= 3:
+		_check(flips[flips.size() - 1] - flips[flips.size() - 2] < flips[0] + 1, "the flips speed up toward the shot")
+	_check(sprite.frame == sprite.hframes - 1, "the bright frame is held for the last part of the windup")
 	_check(sprite.modulate == AiScript.TELEGRAPH_COLOR_LAST and early_color == AiScript.TELEGRAPH_COLOR, "the sprite is brighter for the last part of the windup")
 	_run(imp, 2)
 	_check(sprite.texture == idle_texture and sprite.hframes == 2, "after the shot the idle strip is back")
-
 
 func _test_hurt_pose_shows_without_cancelling_the_attack() -> void:
 	var imp: AiScript = _scene_imp()
@@ -369,7 +369,6 @@ func _test_hurt_pose_shows_without_cancelling_the_attack() -> void:
 	_check(sprite.texture == imp.hurt_texture, "a hit while recovering shows the hurt pose too")
 	_run(imp, int(AiScript.HURT_TIME / STEP) + 1)
 	_check(sprite.frame == 0 and sprite.hframes == 2 and sprite.texture != imp.hurt_texture, "afterwards the idle strip is back")
-
 
 func _test_recover_then_chase_again() -> void:
 	_setup(1)

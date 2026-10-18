@@ -23,7 +23,7 @@ extends CharacterBody2D
 ##
 ## Poses: with `windup_texture` set (a strip of 32 px frames), the `Sprite` shows it from the
 ## start of the windup and flips between its frames faster and faster (WINDUP_FLASHES), and
-## goes brighter still for the last stretch (TELEGRAPH_LAST_PART). With `hurt_texture` set,
+## goes brighter still for the last stretch (TELEGRAPH_LAST_FROM). With `hurt_texture` set,
 ## a hit on this enemy (`damage_dealt` with this node as target) shows it for HURT_TIME
 ## seconds, over the windup too. A hit never cancels the windup: the shot still comes,
 ## so the telegraph stays honest (knockback and Feel's flash and squash are Combat's and
@@ -63,10 +63,12 @@ const RETARGET_TIME: float = 0.5
 ## `Sprite` modulate while the telegraph shows, and for its last part.
 const TELEGRAPH_COLOR: Color = Color(1.6, 1.3, 1.3)
 const TELEGRAPH_COLOR_LAST: Color = Color(2.0, 1.8, 1.5)
-## The last share of the windup (0..1 progress) that is drawn in TELEGRAPH_COLOR_LAST.
-const TELEGRAPH_LAST_PART: float = 0.8
-## Windup frame flips: frame = floor(progress² × this) mod frames, so it starts slow and speeds up.
-const WINDUP_FLASHES: float = 9.0
+## Where the last part of the windup starts (0..1 progress): from here the sprite is drawn in
+## TELEGRAPH_COLOR_LAST and holds its bright frame instead of flipping.
+const TELEGRAPH_LAST_FROM: float = 0.8
+## Windup frame flips before the last part: frame = floor(progress² × this) mod frames, so it
+## starts slow and speeds up, to about 5 bright-dark cycles a second at most.
+const WINDUP_FLASHES: float = 5.0
 ## Seconds the hurt pose shows after a hit.
 const HURT_TIME: float = 0.25
 
@@ -270,7 +272,7 @@ func _show_telegraph(on: bool) -> void:
 func _update_telegraph() -> void:
 	var progress: float = telegraph_progress()
 	if _sprite != null:
-		_sprite.modulate = TELEGRAPH_COLOR_LAST if progress >= TELEGRAPH_LAST_PART else TELEGRAPH_COLOR
+		_sprite.modulate = TELEGRAPH_COLOR_LAST if progress >= TELEGRAPH_LAST_FROM else TELEGRAPH_COLOR
 	if _telegraph == null:
 		return
 	_telegraph.modulate.a = lerpf(TELEGRAPH_ALPHA_MIN, 1.0, progress)
@@ -307,7 +309,10 @@ func _update_sprite() -> void:
 					_animation.play()
 	if pose == Pose.WINDUP:
 		var progress: float = telegraph_progress()
-		_sprite.frame = int(progress * progress * WINDUP_FLASHES) % _sprite.hframes
+		if progress >= TELEGRAPH_LAST_FROM:
+			_sprite.frame = _sprite.hframes - 1
+		else:
+			_sprite.frame = int(progress * progress * WINDUP_FLASHES) % _sprite.hframes
 
 
 ## Show a strip of square frames on the sprite and stop the idle animation.

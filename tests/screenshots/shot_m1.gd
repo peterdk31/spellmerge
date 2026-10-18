@@ -32,6 +32,25 @@ func _initialize() -> void:
 	for index in 4:
 		input.call("send_virtual_aim", index, aims[index])
 	await _shot("arena_four_wizards")
+	# Shots above the floor, fired from the staff tips, and a wizard mid-dash.
+	for index in 3:
+		input.call("send_virtual", index, &"cast", 1.0)
+	input.call("send_virtual", 3, &"move_right", 1.0)
+	_tap(input, 3, &"dodge")
+	for i in 12:
+		await physics_frame
+	await RenderingServer.frame_post_draw
+	var shots_node: Node = root.get_node_or_null("Projectiles")
+	if shots_node == null or int(shots_node.get("drawn")) < 3:
+		_fail("the three shots are not in the draw batch in shots_and_dash")
+		return
+	var action_image: Image = root.get_texture().get_image()
+	if action_image != null:
+		action_image.save_png("%s/shots_and_dash.png" % SHOTS_DIR)
+		print("SHOT: shots_and_dash (%dx%d)" % [action_image.get_width(), action_image.get_height()])
+	for index in 3:
+		input.call("send_virtual", index, &"cast", 0.0)
+	input.call("send_virtual", 3, &"move_right", 0.0)
 	for index in 4:
 		_tap(input, index, &"overlay")
 	await _settle()

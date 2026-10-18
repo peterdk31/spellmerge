@@ -42,6 +42,7 @@ func _initialize() -> void:
 	_test_slots_are_reused()
 	_test_one_thousand_match_brute_force()
 	_test_one_thousand_run_and_draw()
+	_test_shot_colours_differ_and_stay_bright()
 	_test_freed_target_is_dropped()
 	_test_target_removed_by_a_hit_handler()
 	_test_spawn_in_a_hit_handler_waits_a_step()
@@ -438,7 +439,26 @@ func _test_one_thousand_run_and_draw() -> void:
 	_mgr.update_draw()
 	_check(_mgr.drawn == 0 and _mgr.get_count() == 0, "clear empties the batch")
 	_check(_mgr._draw_node.multimesh.visible_instance_count == 0, "clear empties the drawn multimesh, not just the counter")
+	# Regression (issue #102): the autoload is drawn before the room, so shots need a raised z_index to show above its floor.
+	_check(_mgr._draw_node.z_index >= 1, "the shots are drawn above the room's floor")
+	# Regression (issue #102): without a culling box covering the area, shots away from the origin were never drawn.
+	var box: AABB = _mgr._draw_node.multimesh.custom_aabb
+	_check(box.has_point(Vector3(-500.0, -400.0, 0.0)) and box.has_point(Vector3(900.0, 900.0, 0.0)), "the batch's culling box covers the whole play area")
 	root.remove_child(_mgr)
+
+
+## The tint keeps every owner's shots readable: the five colours (players 0-3 and
+## the enemy) differ from each other and none is dark.
+func _test_shot_colours_differ_and_stay_bright() -> void:
+	_setup()
+	var colours: Array[Color] = []
+	for owner_index in [-1, 0, 1, 2, 3]:
+		colours.append(_mgr._color_of(owner_index))
+	for i in colours.size():
+		_check(colours[i].get_luminance() >= 0.45, "shot colour %d is not dark (luminance %.2f)" % [i, colours[i].get_luminance()])
+		for j in range(i + 1, colours.size()):
+			var gap: float = absf(colours[i].r - colours[j].r) + absf(colours[i].g - colours[j].g) + absf(colours[i].b - colours[j].b)
+			_check(gap >= 0.15, "shot colours %d and %d differ (gap %.2f)" % [i, j, gap])
 
 
 func _test_freed_target_is_dropped() -> void:

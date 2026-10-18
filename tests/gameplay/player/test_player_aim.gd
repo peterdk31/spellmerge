@@ -34,6 +34,10 @@ func _initialize() -> void:
 	_test_sprite_turn_has_a_band()
 	_test_downed_wizard_hides_the_reticle()
 	_test_mouse_jitter_is_not_aiming()
+	_test_muzzle_is_the_staff_tip()
+	_test_dash_look_applies_and_resets()
+	_test_dash_look_follows_direction()
+	_test_dash_ghosts_trail_the_wizard()
 	_teardown()
 	if _failures.is_empty():
 		print("TEST OK: gameplay/player (aim)")
@@ -242,3 +246,85 @@ func _test_mouse_jitter_is_not_aiming() -> void:
 	_check(not _input.is_mouse_aiming(0), "a tiny mouse brush does not turn mouse aim on")
 	_input.handle_event(_mouse_move(20.0))
 	_check(_input.is_mouse_aiming(0), "a real mouse move does")
+
+
+## Regression (issue #102): shots left the wizard's feet; they start at the staff tip.
+func _test_muzzle_is_the_staff_tip() -> void:
+	_setup(1)
+	_players[0].global_position = Vector2(100, 100)
+	_input.send_virtual_aim(0, Vector2.RIGHT)
+	_input.send_virtual(0, &"cast", 1.0)
+	_run(1)
+	var spell := _players[0].spell as AimSpell
+	var expected := Vector2(100.0 + PlayerScript.STAFF_REACH, 100.0 - PlayerScript.HAND_HEIGHT)
+	_check(spell.origins.size() > 0 and _near(spell.origins[0], expected), "the shot starts at the staff tip, got %s" % [spell.origins])
+	_check(_near(_players[0].muzzle_position(), expected), "muzzle_position is hand height plus the reach along the aim")
+
+
+## A fresh wizard (no tree) that has started a dash with `action` held, and has
+## had two steps since.
+func _dashing_wizard(action: StringName) -> PlayerScript:
+	_teardown()
+	_bus = EventsScript.new()
+	_input = InputManagerScript.new()
+	_input.events = _bus
+	_input.add_virtual_device(0)
+	var wizard := WizardScene.instantiate() as PlayerScript
+	wizard.input = _input
+	wizard.events = _bus
+	wizard._ready()
+	_players.append(wizard)
+	_input.send_virtual(0, action, 1.0)
+	_input.send_virtual(0, &"dodge", 1.0)
+	_input.send_virtual(0, &"dodge", 0.0)
+	wizard.step(STEP)
+	wizard.step(STEP)
+	return wizard
+
+
+## The dash stretches and leans the sprite, and the look is gone when the dash ends.
+func _test_dash_look_applies_and_resets() -> void:
+	var wizard := _dashing_wizard(&"move_right")
+	var sprite := wizard.get_node("Sprite") as Sprite2D
+	_check(wizard.is_dodging(), "the wizard is dashing")
+	_check(sprite.scale == PlayerScript.DASH_STRETCH, "the sprite stretches during the dash")
+	_check(sprite.rotation > 0.0, "the sprite leans into a dash to the right")
+	var steps: int = 0
+	while wizard.is_dodging() and steps < 60:
+		wizard.step(STEP)
+		steps += 1
+	_check(not wizard.is_dodging(), "the dash is over")
+	_check(sprite.scale == Vector2.ONE and sprite.rotation == 0.0, "the sprite is back to normal after the dash")
+
+
+## The stretch follows the dash axis and the lean follows its side, also for a
+## sprite that faces left.
+func _test_dash_look_follows_direction() -> void:
+	var wizard := _dashing_wizard(&"move_left")
+	var sprite := wizard.get_node("Sprite") as Sprite2D
+	_check(sprite.scale == PlayerScript.DASH_STRETCH and sprite.rotation < 0.0, "a dash to the left stretches sideways and leans left")
+	var vertical := Vector2(PlayerScript.DASH_STRETCH.y, PlayerScript.DASH_STRETCH.x)
+	wizard = _dashing_wizard(&"move_up")
+	sprite = wizard.get_node("Sprite") as Sprite2D
+	_check(sprite.scale == vertical, "a dash up stretches upright, got %s" % [sprite.scale])
+	_check(is_zero_approx(sprite.rotation), "a dash straight up does not lean")
+	wizard = _dashing_wizard(&"move_down")
+	sprite = wizard.get_node("Sprite") as Sprite2D
+	_check(sprite.scale == vertical, "a dash down stretches upright, got %s" % [sprite.scale])
+	# A left-facing sprite (aim left) dashing right: flip and lean are independent.
+	wizard = _dashing_wizard(&"move_right")
+	sprite = wizard.get_node("Sprite") as Sprite2D
+	_input.send_virtual_aim(0, Vector2.LEFT)
+	wizard.step(STEP)
+	_check(sprite.flip_h and sprite.rotation > 0.0, "a left-facing wizard dashing right still leans right")
+
+
+## The ghosts start on the wizard and fall behind it as it moves, newest first.
+func _test_dash_ghosts_trail_the_wizard() -> void:
+	var wizard := _dashing_wizard(&"move_right")
+	_check(wizard._trail[0] == wizard.global_position and wizard._trail[2] == wizard.global_position, "the ghosts start on the wizard")
+	for i in 4:
+		wizard.global_position += Vector2(10.0, 0.0)
+		wizard.step(STEP)
+	_check(wizard._trail[0].x > wizard._trail[1].x or wizard._trail[1].x > wizard._trail[2].x, "the ghosts fall behind as the wizard moves")
+	_check(wizard._trail[0].x <= wizard.global_position.x, "no ghost is ahead of the wizard")

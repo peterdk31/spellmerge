@@ -188,6 +188,9 @@ func _ready() -> void:
 		projectiles = get_node_or_null("/root/Projectiles")
 	if projectiles != null and "texture" in projectiles and projectiles.texture == null:
 		projectiles.texture = load("res://art/vfx/fire_bolt.svg") as Texture2D
+	# Enemy shots look different (a spiky orb, not a comet), so they are never taken for a spell.
+	if projectiles != null and "hostile_texture" in projectiles and projectiles.hostile_texture == null:
+		projectiles.hostile_texture = load("res://art/vfx/imp_fireball.svg") as Texture2D
 
 
 func _exit_tree() -> void:

@@ -38,6 +38,10 @@ extends Node2D
 ## The budget is per `step` call, not per frame: if the engine runs several
 ## physics steps in one frame to catch up, each has its own budget.
 ##
+## Drawing: two batches. Shots of players are tinted with their colour; enemy shots
+## (owner NO_PLAYER) have their own texture (`hostile_texture`), are not tinted and are
+## drawn one layer above, so a dangerous shot never hides under a friendly one.
+##
 ## Friendly fire: while `friendly_fire` is on, a shot fired by a player (0-3) also
 ## hits targets on LAYER_PLAYER, except targets registered with that same player
 ## as their `owner` (a wizard is never hit by its own shot). It is off by default
@@ -119,8 +123,13 @@ const ENEMY_COLOR: Color = Color("#e0592f")
 var texture: Texture2D = null:
 	set(value):
 		texture = value
-		if _draw_node != null:
-			_draw_node.texture = value
+		_apply_textures()
+## The art of enemy shots (owner NO_PLAYER), drawn apart from the players' shots: other
+## shape, no tint, on top. Left empty, they use `texture`.
+var hostile_texture: Texture2D = null:
+	set(value):
+		hostile_texture = value
+		_apply_textures()
 var events: EventsScript = null
 ## How many projectiles were dropped because the cap was full, since start.
 var dropped: int = 0
@@ -189,6 +198,11 @@ var _has_walls: bool = false
 
 var _draw_node: MultiMeshInstance2D = null
 var _draw_buffer: PackedFloat32Array = PackedFloat32Array()
+## The second batch, for enemy shots (see `hostile_texture`).
+var _hostile_node: MultiMeshInstance2D = null
+var _hostile_buffer: PackedFloat32Array = PackedFloat32Array()
+## Enemy shots written by the last update_draw() (part of `drawn`).
+var drawn_hostile: int = 0
 ## True inside step(): the grid is in use, so a target removed then is only
 ## switched off (layer 0) and swept at the start of the next step.
 var _stepping: bool = false
@@ -206,7 +220,15 @@ func _init() -> void:
 func _ready() -> void:
 	if events == null:
 		events = get_node_or_null("/root/Events") as EventsScript
-	_draw_node = MultiMeshInstance2D.new()
+	_draw_node = _make_batch(DRAW_Z)
+	_hostile_node = _make_batch(DRAW_Z + 1)
+	_apply_textures()
+	_fit_draw_bounds()
+
+
+## One batched draw of up to `_cap` quads (TRANSFORM_2D plus a colour each), added as a child.
+func _make_batch(z: int) -> MultiMeshInstance2D:
+	var node := MultiMeshInstance2D.new()
 	var quad := QuadMesh.new()
 	quad.size = Vector2.ONE
 	var multimesh := MultiMesh.new()
@@ -215,11 +237,17 @@ func _ready() -> void:
 	multimesh.mesh = quad
 	multimesh.instance_count = _cap
 	multimesh.visible_instance_count = 0
-	_draw_node.multimesh = multimesh
-	_draw_node.texture = texture
-	_draw_node.z_index = DRAW_Z
-	add_child(_draw_node)
-	_fit_draw_bounds()
+	node.multimesh = multimesh
+	node.z_index = z
+	add_child(node)
+	return node
+
+
+func _apply_textures() -> void:
+	if _draw_node != null:
+		_draw_node.texture = texture
+	if _hostile_node != null:
+		_hostile_node.texture = hostile_texture if hostile_texture != null else texture
 
 
 func _physics_process(delta: float) -> void:
@@ -247,11 +275,13 @@ func set_cap(value: int) -> void:
 	_own_prev.resize(_cap)
 	_own_next.resize(_cap)
 	_draw_buffer.resize(_cap * DRAW_STRIDE)
+	_hostile_buffer.resize(_cap * DRAW_STRIDE)
 	_alive.resize(_cap)
 	_free_slots.resize(_cap)
 	clear()
 	if _draw_node != null:
 		_draw_node.multimesh.instance_count = _cap
+		_hostile_node.multimesh.instance_count = _cap
 
 
 func get_cap() -> int:
@@ -387,7 +417,9 @@ func _fit_draw_bounds() -> void:
 	if _draw_node == null:
 		return
 	var box: Rect2 = _bounds.grow(BOUNDS_MARGIN)
-	_draw_node.multimesh.custom_aabb = AABB(Vector3(box.position.x, box.position.y, -1.0), Vector3(box.size.x, box.size.y, 2.0))
+	var aabb := AABB(Vector3(box.position.x, box.position.y, -1.0), Vector3(box.size.x, box.size.y, 2.0))
+	_draw_node.multimesh.custom_aabb = aabb
+	_hostile_node.multimesh.custom_aabb = aabb
 
 
 ## Remove every projectile (targets stay registered).
@@ -572,8 +604,10 @@ func update_draw() -> void:
 	if _high == 0 and drawn == 0:
 		return
 	var multimesh: MultiMesh = _draw_node.multimesh
+	var hostile_multimesh: MultiMesh = _hostile_node.multimesh
 	var fraction: float = clampf(Engine.get_physics_interpolation_fraction(), 0.0, 1.0)
 	var out: int = 0
+	var hostile_out: int = 0
 	for slot in _high:
 		if _alive[slot] == 0:
 			continue
@@ -582,26 +616,37 @@ func update_draw() -> void:
 		if _vel[slot].length_squared() > 0.0:
 			dir = _vel[slot].normalized()
 		var at: Vector2 = _prev[slot].lerp(_pos[slot], fraction)
-		var color: Color = _color_of(_player[slot])
-		# Transform2D(dir * d, dir.orthogonal() * d, at), row by row, then the colour.
-		var i: int = out * DRAW_STRIDE
-		_draw_buffer[i] = dir.x * diameter
-		_draw_buffer[i + 1] = dir.y * diameter
-		_draw_buffer[i + 2] = 0.0
-		_draw_buffer[i + 3] = at.x
-		_draw_buffer[i + 4] = dir.y * diameter
-		_draw_buffer[i + 5] = -dir.x * diameter
-		_draw_buffer[i + 6] = 0.0
-		_draw_buffer[i + 7] = at.y
-		_draw_buffer[i + 8] = color.r
-		_draw_buffer[i + 9] = color.g
-		_draw_buffer[i + 10] = color.b
-		_draw_buffer[i + 11] = color.a
-		out += 1
+		if _player[slot] < 0:
+			_write_quad(_hostile_buffer, hostile_out * DRAW_STRIDE, dir, diameter, at, Color.WHITE)
+			hostile_out += 1
+		else:
+			_write_quad(_draw_buffer, out * DRAW_STRIDE, dir, diameter, at, _color_of(_player[slot]))
+			out += 1
 	if out > 0:
 		multimesh.buffer = _draw_buffer
 	multimesh.visible_instance_count = out
-	drawn = out
+	if hostile_out > 0:
+		hostile_multimesh.buffer = _hostile_buffer
+	hostile_multimesh.visible_instance_count = hostile_out
+	drawn_hostile = hostile_out
+	drawn = out + hostile_out
+
+
+## Write one quad at float index `i` of `buffer` (packed arrays are shared, not copied):
+## Transform2D(dir * d, dir.orthogonal() * d, at), row by row, then the colour.
+func _write_quad(buffer: PackedFloat32Array, i: int, dir: Vector2, diameter: float, at: Vector2, color: Color) -> void:
+	buffer[i] = dir.x * diameter
+	buffer[i + 1] = dir.y * diameter
+	buffer[i + 2] = 0.0
+	buffer[i + 3] = at.x
+	buffer[i + 4] = dir.y * diameter
+	buffer[i + 5] = -dir.x * diameter
+	buffer[i + 6] = 0.0
+	buffer[i + 7] = at.y
+	buffer[i + 8] = color.r
+	buffer[i + 9] = color.g
+	buffer[i + 10] = color.b
+	buffer[i + 11] = color.a
 
 
 ## Position of a live projectile, or Vector2.INF if the slot is empty.

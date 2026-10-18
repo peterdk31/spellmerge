@@ -46,6 +46,33 @@
       "prompt": "A 2-frame idle strip (64x32; the second frame bobs one pixel) of a small fire imp seen from the front: Fire ramp body with a lighter belly, two Bone horns, yellow Spark eyes and small claws, 1px dark outline, light from the top-left. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no player colours."
     },
     {
+      "path": "content/enemies/ember_imp/windup.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 2-frame windup strip (64x32) of the ember imp about to shoot, copied from its idle frame: the mouth and belly glow Spark (frame 2 brighter, Spark light), Spark flecks beside and above the head. The game flips the frames faster as the shot gets close. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no player colours."
+    },
+    {
+      "path": "content/enemies/ember_imp/hurt.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A single 32x32 hurt frame of the ember imp, copied from its idle frame: eyes squeezed shut in dark Outline patches, the mouth open wide, two Spark flecks flying off. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no player colours."
+    },
+    {
+      "path": "art/vfx/imp_fireball.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 32x32 enemy shot: a round ember orb with four short spikes along the axes, drawn as concentric rings from a dark Outline edge through Fire shadow, base and light to a Spark core and a Spark light centre, so it is the brightest thing in the room. A different silhouette from the player's comet-shaped fire bolt. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no player colours."
+    },
+    {
       "path": "content/wizard/base/wizard_p1_idle.svg",
       "origin": "ai",
       "author": "Claude",

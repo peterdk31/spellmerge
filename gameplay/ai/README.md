@@ -14,7 +14,7 @@ Enemies in `content/enemies/` pick and configure behaviours from here instead of
 - **Dependency direction:** `core` ← `gameplay` ← `content`. This area may use `core/` and the registry. `core/` never depends on it, and content never reaches into it.
 - **Events** (`core/events/events.gd` owns the definitions; this list matches it and the table in [gameplay/README.md](../README.md)):
   - Sends: none. An attack is a shot spawned in `core/projectiles` for `Events.NO_PLAYER`; `gameplay/combat` turns its hit into damage (the hit profile for `attack_tag` in `ai.gd`: `ATTACK_TAG_BASE` plus a number from the enemy id and `attack_damage`, which the AI sets; the exports such as `attack_damage` belong to the enemy scene, not to a spawn) and sends `damage_dealt`. The AI also registers the enemy with `Combat` and adds its knockback to its velocity (the same autoload-by-node-path lookup `player.gd` uses for `Events`).
-  - Listens to: `player_downed` (enemies chasing that player retarget at once). When an enemy leaves the tree it unregisters from `Combat`; it is not registered again on re-entry, so spawn a new one. `room_entered` is not used yet.
+  - Listens to: `player_downed` (enemies chasing that player retarget at once) and `damage_dealt` (a hit on this enemy shows its optional `hurt_texture` pose for 0.25 s; it never cancels the windup). With `windup_texture` set, the windup pose flashes faster and brighter as the shot gets close. When an enemy leaves the tree it unregisters from `Combat`; it is not registered again on re-entry, so spawn a new one. `room_entered` is not used yet.
 - Areas never call each other directly; they talk through events. [gameplay/README.md](../README.md) has the rules every sub-area shares.
 
 ## Allowed files

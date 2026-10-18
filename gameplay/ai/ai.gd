@@ -20,6 +20,14 @@ extends CharacterBody2D
 ## `Telegraph` child (a Line2D along +X) turns toward the locked aim and shows. Its
 ## far end is set to the real reach of the shot (`attack_speed * attack_lifetime`),
 ## and it grows wider and brighter with `telegraph_progress()`.
+##
+## Poses: with `windup_texture` set (a strip of 32 px frames), the `Sprite` shows it from the
+## start of the windup and flips between its frames faster and faster (WINDUP_FLASHES), and
+## goes brighter still for the last stretch (TELEGRAPH_LAST_FROM). With `hurt_texture` set,
+## a hit on this enemy (`damage_dealt` with this node as target) shows it for HURT_TIME
+## seconds, over the windup too. A hit never cancels the windup: the shot still comes,
+## so the telegraph stays honest (knockback and Feel's flash and squash are Combat's and
+## Feel's). An `AnimationPlayer` child is paused while a pose other than the idle shows.
 ## Nothing here allocates per frame. Retargeting runs every RETARGET_TIME seconds
 ## (staggered per enemy), at once when `player_downed` arrives or the current target
 ## is lost, and once at the first step; with no explicit `targets` it reads the
@@ -33,6 +41,7 @@ const CombatScript := preload("res://gameplay/combat/combat.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 
 enum State { CHASE, WINDUP, RECOVER }
+enum Pose { IDLE, WINDUP, HURT }
 
 ## The group every wizard is in (player.gd adds it).
 const PLAYERS_GROUP: StringName = &"players"
@@ -46,13 +55,22 @@ const LAYER_ENEMIES: int = 4
 const LAYER_WALLS: int = 1
 ## The telegraph line starts this far from the enemy; its look at 0% and 100% progress.
 const TELEGRAPH_START: float = 10.0
-const TELEGRAPH_WIDTH_MIN: float = 2.0
-const TELEGRAPH_WIDTH_MAX: float = 4.0
+const TELEGRAPH_WIDTH_MIN: float = 3.0
+const TELEGRAPH_WIDTH_MAX: float = 6.0
 const TELEGRAPH_ALPHA_MIN: float = 0.5
 ## Seconds between looking for the nearest player again.
 const RETARGET_TIME: float = 0.5
-## `Sprite` modulate while the telegraph shows.
+## `Sprite` modulate while the telegraph shows, and for its last part.
 const TELEGRAPH_COLOR: Color = Color(1.6, 1.3, 1.3)
+const TELEGRAPH_COLOR_LAST: Color = Color(2.0, 1.8, 1.5)
+## Where the last part of the windup starts (0..1 progress): from here the sprite is drawn in
+## TELEGRAPH_COLOR_LAST and holds its bright frame instead of flipping.
+const TELEGRAPH_LAST_FROM: float = 0.8
+## Windup frame flips before the last part: frame = floor(progress² × this) mod frames, so it
+## starts slow and speeds up, to about 5 bright-dark cycles a second at most.
+const WINDUP_FLASHES: float = 5.0
+## Seconds the hurt pose shows after a hit.
+const HURT_TIME: float = 0.25
 
 ## The enemy's numbers (speed, health, contact damage). Set before adding to the tree.
 var data: EnemyBase = null
@@ -72,6 +90,9 @@ var targets: Array = []
 @export var attack_radius: float = 4.0
 ## Radius of the enemy's hurt box in pixels.
 @export var hurt_radius: float = 8.0
+## Optional poses for the `Sprite`: strips of square frames (width / height frames).
+@export var windup_texture: Texture2D = null
+@export var hurt_texture: Texture2D = null
 
 ## The event bus, Combat and the projectile manager. Only tests set these, before
 ## _ready(); otherwise the "Events", "Combat" and "Projectiles" autoloads are used.
@@ -98,6 +119,13 @@ var _target_id: int = 0
 var _sprite: Sprite2D = null
 var _telegraph: Node2D = null
 var _telegraph_line: Line2D = null
+var _animation: AnimationPlayer = null
+var _idle_texture: Texture2D = null
+var _idle_hframes: int = 1
+## Seconds the hurt pose still shows.
+var _hurt_left: float = 0.0
+## The pose now on the sprite.
+var _pose: Pose = Pose.IDLE
 
 
 func _init() -> void:
@@ -108,6 +136,10 @@ func _init() -> void:
 
 func _ready() -> void:
 	_sprite = get_node_or_null("Sprite") as Sprite2D
+	_animation = get_node_or_null("AnimationPlayer") as AnimationPlayer
+	if _sprite != null:
+		_idle_texture = _sprite.texture
+		_idle_hframes = _sprite.hframes
 	_telegraph = get_node_or_null("Telegraph") as Node2D
 	_telegraph_line = _telegraph as Line2D
 	if _telegraph != null:
@@ -124,6 +156,8 @@ func _ready() -> void:
 		projectiles = get_node_or_null("/root/Projectiles") as ProjectileManagerScript
 	if events != null and not events.player_downed.is_connected(_on_player_downed):
 		events.player_downed.connect(_on_player_downed)
+	if events != null and not events.damage_dealt.is_connected(_on_damage_dealt):
+		events.damage_dealt.connect(_on_damage_dealt)
 	if data == null:
 		push_warning("Ai: no enemy data set, so this enemy stands still.")
 	if combat != null:
@@ -140,6 +174,8 @@ func _ready() -> void:
 func _exit_tree() -> void:
 	if events != null and events.player_downed.is_connected(_on_player_downed):
 		events.player_downed.disconnect(_on_player_downed)
+	if events != null and events.damage_dealt.is_connected(_on_damage_dealt):
+		events.damage_dealt.disconnect(_on_damage_dealt)
 	# Leaving the tree without being freed must not leave a target behind in Combat.
 	if combat != null and is_instance_valid(combat):
 		combat.unregister_enemy(self)
@@ -178,6 +214,8 @@ func step(delta: float) -> void:
 			_state_left -= delta
 			if _state_left <= 0.0:
 				state = State.CHASE
+	_hurt_left = maxf(_hurt_left - delta, 0.0)
+	_update_sprite()
 	if combat != null:
 		velocity += combat.consume_knockback_step(self, delta)
 
@@ -232,12 +270,64 @@ func _show_telegraph(on: bool) -> void:
 
 ## Grow the telegraph line wider and brighter as the shot gets closer.
 func _update_telegraph() -> void:
+	var progress: float = telegraph_progress()
+	if _sprite != null:
+		_sprite.modulate = TELEGRAPH_COLOR_LAST if progress >= TELEGRAPH_LAST_FROM else TELEGRAPH_COLOR
 	if _telegraph == null:
 		return
-	var progress: float = telegraph_progress()
 	_telegraph.modulate.a = lerpf(TELEGRAPH_ALPHA_MIN, 1.0, progress)
 	if _telegraph_line != null:
 		_telegraph_line.width = lerpf(TELEGRAPH_WIDTH_MIN, TELEGRAPH_WIDTH_MAX, progress)
+
+
+## True while the hurt pose shows (a hit landed in the last HURT_TIME seconds).
+func is_hurt() -> bool:
+	return _hurt_left > 0.0
+
+
+## Which pose the sprite shows: the hurt one over the windup one over the idle strip. A pose
+## without its texture is skipped.
+func _update_sprite() -> void:
+	if _sprite == null:
+		return
+	var pose: Pose = Pose.IDLE
+	if _hurt_left > 0.0 and hurt_texture != null:
+		pose = Pose.HURT
+	elif state == State.WINDUP and windup_texture != null:
+		pose = Pose.WINDUP
+	if pose != _pose:
+		_pose = pose
+		match pose:
+			Pose.HURT:
+				_show_strip(hurt_texture)
+			Pose.WINDUP:
+				_show_strip(windup_texture)
+			_:
+				_sprite.hframes = _idle_hframes
+				_sprite.texture = _idle_texture
+				if _animation != null and _animation.is_inside_tree():
+					_animation.play()
+	if pose == Pose.WINDUP:
+		var progress: float = telegraph_progress()
+		if progress >= TELEGRAPH_LAST_FROM:
+			_sprite.frame = _sprite.hframes - 1
+		else:
+			_sprite.frame = int(progress * progress * WINDUP_FLASHES) % _sprite.hframes
+
+
+## Show a strip of square frames on the sprite and stop the idle animation.
+func _show_strip(strip: Texture2D) -> void:
+	_sprite.hframes = maxi(roundi(float(strip.get_width()) / maxf(float(strip.get_height()), 1.0)), 1)
+	_sprite.texture = strip
+	_sprite.frame = 0
+	if _animation != null and _animation.is_inside_tree():
+		_animation.pause()
+
+
+func _on_damage_dealt(_player: int, target: Node, _amount: int, _position: Vector2) -> void:
+	if target == self:
+		_hurt_left = HURT_TIME
+		_update_sprite()
 
 
 func _find_target() -> Node2D:

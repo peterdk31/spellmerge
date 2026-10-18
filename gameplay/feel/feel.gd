@@ -18,11 +18,15 @@ extends Node
 ##   blow just made into a bigger one, so it costs one slot, not two.
 ## - a white hit flash and a squash on the hit enemy's or wizard's `Sprite` node
 ##   (a fixed set of reactions; a sprite that is gone is skipped).
-## - a white puff where an enemy dies.
+## - a white puff where an enemy dies, and a short death animation: a white copy of
+##   the dead enemy's `Sprite` widens, collapses and fades (the enemy itself is freed
+##   at once).
 ## - a sound from `core/registry` by id; nothing plays on `null`.
 ##
-## On `spell_cast` it shows a muzzle flash at the staff tip and kicks the camera a
-## little against the aim. Neither touches the cast itself.
+## On `spell_cast` it shows a muzzle flash at the staff tip, stretched along the aim
+## and in the player's colour, and kicks the camera a little against the aim. On
+## `wizard_cast` (which carries the wizard node) the caster's `Sprite` gets thin and
+## tall for a moment. None of this touches the cast itself.
 ##
 ## Nothing is allocated while playing: emitters and sound players are made once.
 ## The emitters live under this autoload (top level, so in world space), never
@@ -46,6 +50,15 @@ const REACT_SLOTS: int = 16
 ## Flash sprites: one muzzle flash per player (slots 0-3), then the death puffs.
 const MUZZLE_SLOTS: int = 4
 const FLASH_SLOTS: int = 8
+## Death animations at once; past that the oldest slot is taken over.
+const GHOST_SLOTS: int = 8
+## Muzzle flash colour of each player: the light colour of the player ramps in
+## docs/STYLE.md (the same as the reticle in `gameplay/player`).
+const PLAYER_COLORS: Array[Color] = [
+	Color("7fc0f0"), Color("f59ab8"), Color("8fd46a"), Color("c99af0"),
+]
+## How long a muzzle flash is compared with its width.
+const MUZZLE_STRETCH: float = 1.8
 ## The biggest camera kick in pixels, however fast the casting.
 const MAX_KICK_PIXELS: float = 4.0
 
@@ -95,6 +108,10 @@ var _react_sprites: PackedInt64Array = PackedInt64Array()
 var _react_scale: PackedVector2Array = PackedVector2Array()
 var _react_written: PackedVector2Array = PackedVector2Array()
 var _react_left: PackedFloat32Array = PackedFloat32Array()
+## Per reaction: its length in seconds and its squash (a hit squashes wide and low, a
+## cast thin and tall, which is negative).
+var _react_total: PackedFloat32Array = PackedFloat32Array()
+var _react_amount: PackedFloat32Array = PackedFloat32Array()
 var _flash_material: ShaderMaterial = null
 ## Muzzle flashes and death puffs: sprites made once, with seconds left, seconds
 ## they started with and their size (parallel arrays of FLASH_SLOTS).
@@ -102,7 +119,15 @@ var _flashes: Array[Sprite2D] = []
 var _flash_left: PackedFloat32Array = PackedFloat32Array()
 var _flash_total: PackedFloat32Array = PackedFloat32Array()
 var _flash_size: PackedFloat32Array = PackedFloat32Array()
+var _flash_aspect: PackedVector2Array = PackedVector2Array()
 var _next_puff: int = MUZZLE_SLOTS
+## Death animations: sprites made once, seconds left, seconds they started with and
+## the scale they started at (parallel arrays of GHOST_SLOTS).
+var _ghosts: Array[Sprite2D] = []
+var _ghost_left: PackedFloat32Array = PackedFloat32Array()
+var _ghost_total: PackedFloat32Array = PackedFloat32Array()
+var _ghost_scale: PackedVector2Array = PackedVector2Array()
+var _next_ghost: int = 0
 ## Camera kick of casts (pixels), added to the shake.
 var _kick: Vector2 = Vector2.ZERO
 var _last_usec: int = 0
@@ -133,6 +158,20 @@ func _ready() -> void:
 	_flash_left.resize(FLASH_SLOTS)
 	_flash_total.resize(FLASH_SLOTS)
 	_flash_size.resize(FLASH_SLOTS)
+	_flash_aspect.resize(FLASH_SLOTS)
+	_flash_aspect.fill(Vector2.ONE)
+	for i in GHOST_SLOTS:
+		var ghost := Sprite2D.new()
+		ghost.top_level = true
+		ghost.visible = false
+		ghost.z_index = 21
+		ghost.material = _flash_material
+		ghost.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		add_child(ghost)
+		_ghosts.append(ghost)
+	_ghost_left.resize(GHOST_SLOTS)
+	_ghost_total.resize(GHOST_SLOTS)
+	_ghost_scale.resize(GHOST_SLOTS)
 	for i in SOUND_VOICES:
 		var voice := AudioStreamPlayer.new()
 		add_child(voice)
@@ -144,6 +183,7 @@ func _ready() -> void:
 	events.enemy_died.connect(_on_enemy_died)
 	events.player_downed.connect(_on_player_downed)
 	events.spell_cast.connect(_on_spell_cast)
+	events.wizard_cast.connect(_on_wizard_cast)
 	if projectiles == null:
 		projectiles = get_node_or_null("/root/Projectiles")
 	if projectiles != null and "texture" in projectiles and projectiles.texture == null:
@@ -188,6 +228,7 @@ func step(real_delta: float) -> void:
 		_apply_camera()
 	_step_reactions(real_delta)
 	_step_flashes(real_delta)
+	_step_ghosts(real_delta)
 	var at: int = _active.size() - 1
 	while at >= 0:
 		_active_left[at] -= real_delta
@@ -221,12 +262,16 @@ func _step_reactions(real_delta: float) -> void:
 			_react_scale[at] = _react_scale[last]
 			_react_written[at] = _react_written[last]
 			_react_left[at] = _react_left[last]
+			_react_total[at] = _react_total[last]
+			_react_amount[at] = _react_amount[last]
 			_react_sprites.resize(last)
 			_react_scale.resize(last)
 			_react_written.resize(last)
 			_react_left.resize(last)
+			_react_total.resize(last)
+			_react_amount.resize(last)
 		else:
-			var squash: float = preset.hit_squash * _react_left[at] / maxf(preset.flash_seconds, 0.001)
+			var squash: float = _react_amount[at] * _react_left[at] / maxf(_react_total[at], 0.001)
 			_react_written[at] = _react_scale[at] * Vector2(1.0 + squash, 1.0 - squash)
 			sprite.scale = _react_written[at]
 		at -= 1
@@ -244,17 +289,72 @@ func _step_flashes(real_delta: float) -> void:
 			continue
 		var t: float = _flash_left[i] / _flash_total[i]
 		flash.modulate.a = t
-		flash.scale = Vector2.ONE * (_flash_size[i] * (1.0 + 0.5 * (1.0 - t)))
+		flash.scale = _flash_aspect[i] * (_flash_size[i] * (1.0 + 0.5 * (1.0 - t)))
 
 
-## Show flash `slot` at `position` for `seconds`, `size` times the art's size.
-func _show_flash(slot: int, position: Vector2, seconds: float, size: float) -> void:
+## Fade, widen and collapse the death animations.
+func _step_ghosts(real_delta: float) -> void:
+	for i in GHOST_SLOTS:
+		if _ghost_left[i] <= 0.0:
+			continue
+		_ghost_left[i] -= real_delta
+		var ghost: Sprite2D = _ghosts[i]
+		if _ghost_left[i] <= 0.0:
+			ghost.visible = false
+			continue
+		var t: float = _ghost_left[i] / _ghost_total[i]
+		var progress: float = 1.0 - t
+		ghost.scale = _ghost_scale[i] * Vector2(1.0 + 0.3 * progress, maxf(1.0 - progress, 0.05))
+		ghost.modulate.a = clampf(t * 2.0, 0.0, 1.0)
+
+
+## Start a death animation from a copy of the dead node's `Sprite` child, where that
+## sprite is. Nothing happens for a node without one.
+func _start_ghost(dead: Node) -> void:
+	if preset.death_anim_seconds <= 0.0 or dead == null or not is_instance_valid(dead):
+		return
+	var source := dead.get_node_or_null("Sprite") as Sprite2D
+	if source == null or source.texture == null:
+		return
+	var slot: int = _next_ghost
+	_next_ghost = (_next_ghost + 1) % GHOST_SLOTS
+	var ghost: Sprite2D = _ghosts[slot]
+	ghost.texture = source.texture
+	ghost.hframes = source.hframes
+	ghost.vframes = source.vframes
+	ghost.frame = source.frame
+	ghost.region_enabled = source.region_enabled
+	ghost.region_rect = source.region_rect
+	ghost.offset = source.offset
+	ghost.flip_h = source.flip_h
+	ghost.flip_v = source.flip_v
+	ghost.centered = source.centered
+	ghost.global_position = source.global_position
+	ghost.global_rotation = source.global_rotation
+	ghost.modulate = Color.WHITE
+	# Start from the rest scale: a sprite killed mid-squash would otherwise pop.
+	var rest: Vector2 = source.global_scale
+	var at: int = _react_sprites.find(source.get_instance_id())
+	if at >= 0 and source.scale.x != 0.0 and source.scale.y != 0.0:
+		rest = rest / source.scale * _react_scale[at]
+	ghost.scale = rest
+	ghost.visible = true
+	_ghost_left[slot] = preset.death_anim_seconds
+	_ghost_total[slot] = preset.death_anim_seconds
+	_ghost_scale[slot] = rest
+
+
+## Show flash `slot` at `position` for `seconds`, `size` times the art's size, turned
+## to `angle` and stretched to `aspect` (x along the angle), tinted `tint`.
+func _show_flash(slot: int, position: Vector2, seconds: float, size: float, tint: Color = Color.WHITE, angle: float = 0.0, aspect: Vector2 = Vector2.ONE) -> void:
 	if seconds <= 0.0:
 		return
 	var flash: Sprite2D = _flashes[slot]
 	flash.global_position = position
-	flash.modulate = Color.WHITE
-	flash.scale = Vector2.ONE * size
+	flash.modulate = tint
+	flash.rotation = angle
+	flash.scale = aspect * size
+	_flash_aspect[slot] = aspect
 	flash.visible = true
 	_flash_left[slot] = seconds
 	_flash_total[slot] = seconds
@@ -263,22 +363,35 @@ func _show_flash(slot: int, position: Vector2, seconds: float, size: float) -> v
 
 ## Start the flash and squash of the hit node's `Sprite` child, if it has one.
 func _react(target: Node) -> void:
-	if target == null or not is_instance_valid(target):
+	_start_reaction(target, preset.flash_seconds, preset.hit_squash, true)
+
+
+## Squash the `Sprite` child of `target` by `amount` (positive: wide and low, negative:
+## thin and tall) for `seconds`, with the white flash if `flash`. A hit replaces a
+## running cast squash; a cast never replaces a running hit.
+func _start_reaction(target: Node, seconds: float, amount: float, flash: bool) -> void:
+	if seconds <= 0.0 or target == null or not is_instance_valid(target):
 		return
 	var sprite := target.get_node_or_null("Sprite") as Sprite2D
 	if sprite == null:
 		return
 	var at: int = _react_sprites.find(sprite.get_instance_id())
 	if at >= 0:
-		_react_left[at] = preset.flash_seconds
+		if not flash and sprite.material == _flash_material:
+			return
+		_react_left[at] = seconds
+		_react_total[at] = seconds
+		_react_amount[at] = amount
 	elif _react_sprites.size() < REACT_SLOTS:
 		_react_sprites.append(sprite.get_instance_id())
 		_react_scale.append(sprite.scale)
 		_react_written.append(sprite.scale)
-		_react_left.append(preset.flash_seconds)
+		_react_left.append(seconds)
+		_react_total.append(seconds)
+		_react_amount.append(amount)
 	else:
 		return
-	sprite.material = _flash_material
+	sprite.material = _flash_material if flash else null
 
 
 ## Sprites flashing right now (for tests).
@@ -293,6 +406,25 @@ func live_flashes() -> int:
 		if _flash_left[i] > 0.0:
 			count += 1
 	return count
+
+
+## Death animations showing right now (for tests).
+func live_ghosts() -> int:
+	var count: int = 0
+	for i in GHOST_SLOTS:
+		if _ghost_left[i] > 0.0:
+			count += 1
+	return count
+
+
+## The death animation sprite in `slot` (for tests).
+func ghost(slot: int) -> Sprite2D:
+	return _ghosts[slot]
+
+
+## The muzzle flash sprite of `player` (for tests).
+func muzzle_flash(player: int) -> Sprite2D:
+	return _flashes[clampi(player, 0, MUZZLE_SLOTS - 1)]
 
 
 ## Current camera kick in pixels (for tests).
@@ -315,17 +447,27 @@ func _on_damage_dealt(_player: int, target: Node, _amount: int, position: Vector
 	_juice(position, preset.hit_stop_seconds, false, preset.hit_shake, preset.hit_sound)
 
 
-func _on_enemy_died(_player: int, _enemy: Node, position: Vector2) -> void:
+func _on_enemy_died(_player: int, enemy: Node, position: Vector2) -> void:
+	_start_ghost(enemy)
 	_show_flash(_next_puff, position, preset.death_puff_seconds, preset.death_puff_size)
 	_next_puff = MUZZLE_SLOTS + (_next_puff - MUZZLE_SLOTS + 1) % (FLASH_SLOTS - MUZZLE_SLOTS)
 	_juice(position, preset.death_stop_seconds, true, preset.death_shake, preset.death_sound)
 
 
 func _on_spell_cast(player: int, _spell_id: StringName, origin: Vector2, direction: Vector2) -> void:
-	_show_flash(clampi(player, 0, MUZZLE_SLOTS - 1), origin, preset.muzzle_flash_seconds, preset.muzzle_flash_size)
+	var slot: int = clampi(player, 0, MUZZLE_SLOTS - 1)
+	var angle: float = direction.angle() if direction != Vector2.ZERO else 0.0
+	_show_flash(slot, origin, preset.muzzle_flash_seconds, preset.muzzle_flash_size, PLAYER_COLORS[slot], angle, Vector2(MUZZLE_STRETCH, 1.0))
 	if shake_enabled and direction != Vector2.ZERO:
 		_refresh_camera()
 		_kick = (_kick - direction.normalized() * preset.cast_kick_pixels).limit_length(MAX_KICK_PIXELS)
+
+
+func _on_wizard_cast(_player: int, wizard: Node) -> void:
+	# The dash look owns the sprite scale while dodging; a squash would fight it.
+	if wizard != null and wizard.has_method("is_dodging") and wizard.call("is_dodging"):
+		return
+	_start_reaction(wizard, preset.cast_squash_seconds, -preset.cast_squash, false)
 
 
 func _on_player_downed(_player: int) -> void:

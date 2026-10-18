@@ -21,7 +21,8 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | Event | Sender | Listeners |
 | --- | --- | --- |
 | `device_joined`, `device_left` | `core/input` | `coop` |
-| `spell_cast` | `player` | `combat` |
+| `spell_cast` | `player` | `combat`, `feel` |
+| `wizard_cast` | `player` | `feel` |
 | `projectile_hit` | `core/projectiles` | `combat` |
 | `damage_dealt` | `combat` | `feel`, `player` |
 | `status_applied` | `combat` | none yet |

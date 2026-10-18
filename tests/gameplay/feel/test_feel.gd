@@ -9,7 +9,8 @@ const CombatScript := preload("res://gameplay/combat/combat.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
 const FeelPresetScript := preload("res://gameplay/feel/presets/feel_preset.gd")
-const RegistryScript := preload("res://core/registry/registry.gd")
+const PlayerScript := preload("res://gameplay/player/player.gd")
+const RegistryScript :=preload("res://core/registry/registry.gd")
 
 const STEP: float = 0.0625
 const FIXTURE: String = "res://tests/core/fixtures/registry"
@@ -44,6 +45,12 @@ func _initialize() -> void:
 	_test_hit_flash_and_squash()
 	_test_cast_flash_and_kick()
 	_test_death_puff_is_limited()
+	_test_muzzle_flash_follows_aim_and_colour()
+	_test_cast_squash()
+	_test_death_animation()
+	_test_death_animation_starts_at_rest_scale()
+	_test_cast_squash_skips_a_dash()
+	_test_muzzle_colours_match_the_reticles()
 	_teardown()
 	# The audio server drops stopped playbacks on its next mix; without this wait they
 	# are reported as leaked objects (and a resource still in use) at exit.
@@ -445,6 +452,85 @@ func _test_cast_flash_and_kick() -> void:
 	_check(_feel.kick() == Vector2.ZERO, "no kick with shake off")
 
 
+func _test_muzzle_flash_follows_aim_and_colour() -> void:
+	_setup()
+	_bus.spell_cast.emit(1, &"fire_bolt", Vector2(10, 5), Vector2.DOWN)
+	var flash: Sprite2D = _feel.muzzle_flash(1)
+	_check(flash.visible, "the muzzle flash shows")
+	_check(is_equal_approx(flash.rotation, PI / 2.0), "the muzzle flash turns along the aim")
+	_check(flash.scale.x > flash.scale.y, "the muzzle flash is stretched along the aim")
+	var colour: Color = FeelScript.PLAYER_COLORS[1]
+	_check(flash.modulate.r == colour.r and flash.modulate.b == colour.b, "the muzzle flash has the colour of player 2")
+	_feel.step(0.03125)
+	_check(flash.modulate.a < 1.0 and flash.modulate.r == colour.r, "the muzzle flash fades and keeps its colour")
+	_check(_feel.muzzle_flash(3).modulate != flash.modulate, "each player has a colour of their own")
+
+
+func _test_cast_squash() -> void:
+	_setup()
+	var wizard := Node2D.new()
+	var sprite := Sprite2D.new()
+	sprite.name = "Sprite"
+	wizard.add_child(sprite)
+	root.add_child(wizard)
+	_bus.wizard_cast.emit(0, wizard)
+	_check(_feel.reacting_sprites() == 1, "a cast starts a reaction on the caster")
+	_check(sprite.material == null, "a cast squash has no white flash")
+	_feel.step(0.015625)
+	_check(sprite.scale.x < 1.0 and sprite.scale.y > 1.0, "the caster gets thin and tall")
+	# A hit during the cast squash takes it over; a cast during a hit does not.
+	_bus.damage_dealt.emit(0, wizard, 1, Vector2.ZERO)
+	_check(sprite.material != null and _feel.reacting_sprites() == 1, "a hit replaces the cast squash")
+	_bus.wizard_cast.emit(0, wizard)
+	_check(sprite.material != null, "a cast does not replace a hit's flash")
+	for i in 4:
+		_feel.step(STEP)
+	_check(sprite.scale == Vector2.ONE and sprite.material == null and _feel.reacting_sprites() == 0, "the sprite is back at rest")
+	wizard.free()
+	# Nothing to squash: no node, or a node without a Sprite.
+	var bare := Node.new()
+	_bus.wizard_cast.emit(0, null)
+	_bus.wizard_cast.emit(0, bare)
+	_check(_feel.reacting_sprites() == 0, "nothing reacts without a Sprite")
+	bare.free()
+
+
+func _test_death_animation() -> void:
+	_setup()
+	var texture := load("res://art/vfx/hit_spark.svg") as Texture2D
+	var enemy := Node2D.new()
+	enemy.position = Vector2(40, 30)
+	var sprite := Sprite2D.new()
+	sprite.name = "Sprite"
+	sprite.texture = texture
+	enemy.add_child(sprite)
+	root.add_child(enemy)
+	_bus.enemy_died.emit(0, enemy, enemy.position)
+	enemy.free()
+	_check(_feel.live_ghosts() == 1, "a death starts an animation although the enemy is freed")
+	var copy: Sprite2D = _feel.ghost(0)
+	_check(copy.global_position == Vector2(40, 30) and copy.texture == texture, "the copy sits where the enemy was")
+	_feel.step(0.1875)
+	_check(copy.scale.y < 1.0 and copy.modulate.a < 1.0, "the copy collapses and fades")
+	for i in 4:
+		_feel.step(STEP)
+	_check(_feel.live_ghosts() == 0 and not copy.visible, "the animation ends")
+	for i in 40:
+		var many := Node2D.new()
+		var s := Sprite2D.new()
+		s.name = "Sprite"
+		s.texture = texture
+		many.add_child(s)
+		root.add_child(many)
+		_bus.enemy_died.emit(0, many, Vector2.ZERO)
+		many.free()
+	_check(_feel.live_ghosts() == FeelScript.GHOST_SLOTS, "death animations stay within their limit")
+	var bare := Node2D.new()
+	_bus.enemy_died.emit(0, null, Vector2.ZERO)
+	_bus.enemy_died.emit(0, bare, Vector2.ZERO)
+	bare.free()
+
+
 func _test_death_puff_is_limited() -> void:
 	_setup()
 	for i in 20:
@@ -453,3 +539,47 @@ func _test_death_puff_is_limited() -> void:
 	for i in 10:
 		_feel.step(STEP)
 	_check(_feel.live_flashes() == 0, "the puffs end")
+
+
+func _test_muzzle_colours_match_the_reticles() -> void:
+	_check(FeelScript.PLAYER_COLORS == PlayerScript.PLAYER_COLORS, "the muzzle colours are the reticle colours")
+
+
+func _test_death_animation_starts_at_rest_scale() -> void:
+	_setup()
+	var enemy := Node2D.new()
+	var sprite := Sprite2D.new()
+	sprite.name = "Sprite"
+	sprite.texture = load("res://art/vfx/hit_spark.svg") as Texture2D
+	sprite.centered = false
+	sprite.scale = Vector2(2.0, 2.0)
+	enemy.add_child(sprite)
+	root.add_child(enemy)
+	_bus.damage_dealt.emit(0, enemy, 1, Vector2.ZERO)
+	_feel.step(0.015625)
+	_check(sprite.scale != Vector2(2.0, 2.0), "the enemy is squashed when it is killed")
+	_bus.enemy_died.emit(0, enemy, Vector2.ZERO)
+	enemy.free()
+	var copy: Sprite2D = _feel.ghost(0)
+	_check(copy.scale.is_equal_approx(Vector2(2.0, 2.0)), "the copy starts at the rest scale, not the squashed one")
+	_check(not copy.centered, "the copy keeps the sprite's centring")
+
+
+## A stand-in wizard in the middle of a dodge.
+class DashingWizard:
+	extends Node2D
+
+	func is_dodging() -> bool:
+		return true
+
+
+func _test_cast_squash_skips_a_dash() -> void:
+	_setup()
+	var wizard := DashingWizard.new()
+	var sprite := Sprite2D.new()
+	sprite.name = "Sprite"
+	wizard.add_child(sprite)
+	root.add_child(wizard)
+	_bus.wizard_cast.emit(0, wizard)
+	_check(_feel.reacting_sprites() == 0 and sprite.scale == Vector2.ONE, "a cast during a dash does not touch the sprite scale")
+	wizard.free()

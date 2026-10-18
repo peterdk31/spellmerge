@@ -79,6 +79,11 @@ func reset() -> void:
 	_refresh_status()
 
 
+## The health shown, or -1 before any numbers arrived.
+func health() -> int:
+	return _health
+
+
 func is_downed() -> bool:
 	return _downed
 

@@ -1,0 +1,407 @@
+{
+  "digest": {
+    "ideas": [],
+    "spell_ideas": [],
+    "bugs": [],
+    "feedback_themes": [],
+    "concerns": []
+  },
+  "categories": {
+    "Announcements": "DIC_kwDOVMXldc4DIoua",
+    "Art feedback": "DIC_kwDOVMXldc4DIpic",
+    "General": "DIC_kwDOVMXldc4DIoub",
+    "Ideas": "DIC_kwDOVMXldc4DIoud",
+    "Polls": "DIC_kwDOVMXldc4DIouf",
+    "Q&A": "DIC_kwDOVMXldc4DIouc",
+    "Show and tell": "DIC_kwDOVMXldc4DIoue",
+    "Spell combos": "DIC_kwDOVMXldc4DIpiP"
+  },
+  "repository_id": "R_kgDOVMXldQ",
+  "merged_this_week": [
+    {
+      "number": 99,
+      "title": "Iterate on C1: aim apart from walking, turning sprite, reticle and shadow",
+      "author": "spellmerge-bot[bot]"
+    },
+    {
+      "number": 96,
+      "title": "Checkpoint C1 prep: wave balance probe, no value changes (M1 part 25)",
+      "author": "spellmerge-bot[bot]"
+    },
+    {
+      "number": 94,
+      "title": "Starter kit sources and Style Guide content (M1 part 24)",
+      "author": "spellmerge-bot[bot]"
+    },
+    {
+      "number": 92,
+      "title": "Web 4-bot run, game side: Web Test preset and page-args start (M1 part 23)",
+      "author": "spellmerge-bot[bot]"
+    },
+    {
+      "number": 90,
+      "title": "Move the web size and WASM timing task to Blocked",
+      "author": "spellmerge-bot[bot]"
+    },
+    {
+      "number": 89,
+      "title": "Bound the projectile hit test with a per-step work budget; keep the caps (M1 part 22 follow-up)",
+      "author": "spellmerge-bot[bot]"
+    },
+    {
+      "number": 88,
+      "title": "Performance probe and projectile timing benchmark (M1 part 22)",
+      "author": "spellmerge-bot[bot]"
+    },
+    {
+      "number": 86,
+      "title": "HUD screenshots: overlays, a downed player and Coop zoom 0.5",
+      "author": "spellmerge-bot[bot]"
+    },
+    {
+      "number": 85,
+      "title": "Keep developing when a task waits on the owner; run the 4-bot test in the export",
+      "author": "peterdk31"
+    },
+    {
+      "number": 82,
+      "title": "Start the 4-bot test from the --four-bot argument in the Linux Test export",
+      "author": "spellmerge-bot[bot]"
+    },
+    {
+      "number": 81,
+      "title": "Stop revisions re-asking owner questions; queue the export 4-bot fix (#80)",
+      "author": "peterdk31"
+    },
+    {
+      "number": 78,
+      "title": "Linux Test export preset for the 4-bot test (M1 part 21)",
+      "author": "spellmerge-bot[bot]"
+    },
+    {
+      "number": 77,
+      "title": "Run the unit tests in the daily build; take screenshots and post them",
+      "author": "peterdk31"
+    },
+    {
+      "number": 76,
+      "title": "Bots and the 4-bot smoke test (M1 part 20)",
+      "author": "spellmerge-bot[bot]"
+    },
+    {
+      "number": 75,
+      "title": "Make HUD corner panels translucent, assert text sizes (M1 part 18 follow-up)",
+      "author": "spellmerge-bot[bot]"
+    },
+    {
+      "number": 74,
+      "title": "Verify the HUD (M1 part 18 follow-up)",
+      "author": "spellmerge-bot[bot]"
+    },
+    {
+      "number": 71,
+      "title": "Make every unit test pass (19 of 19, no errors in the log)",
+      "author": "spellmerge-bot[bot]"
+    },
+    {
+      "number": 70,
+      "title": "Move workflows: write to the push tokens",
+      "author": "peterdk31"
+    },
+    {
+      "number": 69,
+      "title": "Fixed workflow permissions",
+      "author": "peterdk31"
+    },
+    {
+      "number": 68,
+      "title": "Let the bot push main's workflow changes, never its own",
+      "author": "peterdk31"
+    },
+    {
+      "number": 67,
+      "title": "Keep the work of unfinished sessions in a draft PR",
+      "author": "peterdk31"
+    },
+    {
+      "number": 66,
+      "title": "Keep work that finishes over the turn cap; raise the turn caps",
+      "author": "peterdk31"
+    },
+    {
+      "number": 65,
+      "title": "Remove single quotes from the output schemas; they broke every session",
+      "author": "peterdk31"
+    },
+    {
+      "number": 64,
+      "title": "The overlay (M1 part 19)",
+      "author": "spellmerge-bot[bot]"
+    },
+    {
+      "number": 63,
+      "title": "Owner inbox; unit tests through build.sh --tests; Client ID; narrow web links",
+      "author": "peterdk31"
+    },
+    {
+      "number": 62,
+      "title": "HUD theme and player panels (M1 part 18)",
+      "author": "spellmerge-bot[bot]"
+    },
+    {
+      "number": 61,
+      "title": "Log: co-op verification still blocked (third attempt)",
+      "author": "spellmerge-bot[bot]"
+    },
+    {
+      "number": 60,
+      "title": "Log: co-op verification still blocked (Godot run not permitted)",
+      "author": "spellmerge-bot[bot]"
+    },
+    {
+      "number": 59,
+      "title": "Log partial co-op verification (build.sh --quick passes)",
+      "author": "spellmerge-bot[bot]"
+    },
+    {
+      "number": 58,
+      "title": "Co-op: join/leave mid-run, friendly fire, shared camera (M1 part 17)",
+      "author": "spellmerge-bot[bot]"
+    },
+    {
+      "number": 57,
+      "title": "Feel: hit-stop, screen shake, hit particles and sound (M1 part 16)",
+      "author": "spellmerge-bot[bot]"
+    },
+    {
+      "number": 56,
+      "title": "Resume develop when a usage limit resets; skip late scheduled daily and weekly runs",
+      "author": "peterdk31"
+    },
+    {
+      "number": 55,
+      "title": "Arena glue: the flow slice and the Play button (M1 part 15)",
+      "author": "spellmerge-bot[bot]"
+    },
+    {
+      "number": 54,
+      "title": "The crypt arena room (M1 part 14)",
+      "author": "spellmerge-bot[bot]"
+    },
+    {
+      "number": 53,
+      "title": "The fire bolt and projectile hookup (M1 part 13)",
+      "author": "spellmerge-bot[bot]"
+    },
+    {
+      "number": 52,
+      "title": "The enemy and its AI: chase and a telegraphed shot, ember imp (M1 part 12)",
+      "author": "spellmerge-bot[bot]"
+    },
+    {
+      "number": 51,
+      "title": "Add combat: damage pipeline, hurt and contact boxes, knockback (M1 part 11)",
+      "author": "spellmerge-bot[bot]"
+    },
+    {
+      "number": 50,
+      "title": "Add player health, mana, downed, revive and cast (M1 part 10)",
+      "author": "spellmerge-bot[bot]"
+    },
+    {
+      "number": 49,
+      "title": "Add placeholder art: crypt tiles, wizard in four colours, ember imp, fire bolt, hit spark (M1 part 4)",
+      "author": "spellmerge-bot[bot]"
+    },
+    {
+      "number": 48,
+      "title": "Add player movement and dodge, wizard scene (M1 part 9)",
+      "author": "spellmerge-bot[bot]"
+    },
+    {
+      "number": 47,
+      "title": "Add core/registry: content by folder and id, demo flag, sounds by id (M1 part 8)",
+      "author": "spellmerge-bot[bot]"
+    },
+    {
+      "number": 46,
+      "title": "Add core/pools and core/projectiles: pool, bulk projectile manager (M1 part 7)",
+      "author": "spellmerge-bot[bot]"
+    },
+    {
+      "number": 45,
+      "title": "Add core/ui_focus: per-player focus (M1 part 6)",
+      "author": "spellmerge-bot[bot]"
+    },
+    {
+      "number": 44,
+      "title": "Add core/input: join by button press, one device per player, virtual devices (M1 part 5)",
+      "author": "spellmerge-bot[bot]"
+    },
+    {
+      "number": 43,
+      "title": "Add the style document (M1 part 3)",
+      "author": "spellmerge-bot[bot]"
+    },
+    {
+      "number": 42,
+      "title": "Reconcile event lists with core/events (M1 part 2)",
+      "author": "spellmerge-bot[bot]"
+    },
+    {
+      "number": 41,
+      "title": "Recognise \"hit your session limit\" as a usage limit and back off until its reset",
+      "author": "peterdk31"
+    },
+    {
+      "number": 40,
+      "title": "Add the event bus and the spell, enemy and room base classes (M1 part 1)",
+      "author": "spellmerge-bot[bot]"
+    },
+    {
+      "number": 39,
+      "title": "Add the M1 design document and M1's task queue",
+      "author": "spellmerge-bot[bot]"
+    },
+    {
+      "number": 38,
+      "title": "Start M1 now; carry M0's dry runs and release streak into M1",
+      "author": "peterdk31"
+    },
+    {
+      "number": 37,
+      "title": "Add tools/README.md; start daily and weekly when GitHub misses their schedule",
+      "author": "peterdk31"
+    },
+    {
+      "number": 35,
+      "title": "Mark the tools/ README task blocked (tools/ not writable)",
+      "author": "spellmerge-bot[bot]"
+    },
+    {
+      "number": 34,
+      "title": "Add llms.txt, an index of every doc",
+      "author": "spellmerge-bot[bot]"
+    },
+    {
+      "number": 33,
+      "title": "Merge main into a continued PR's branch before Claude starts",
+      "author": "peterdk31"
+    },
+    {
+      "number": 32,
+      "title": "Kick develop after merges, keep merge output on one line, let the bot merge its approved PRs",
+      "author": "peterdk31"
+    },
+    {
+      "number": 31,
+      "title": "Refuse conflicting PRs at once and send them back for a merge of main",
+      "author": "peterdk31"
+    },
+    {
+      "number": 30,
+      "title": "Run develop on every push to main, since GitHub doesn't fire the schedule",
+      "author": "peterdk31"
+    },
+    {
+      "number": 29,
+      "title": "Review an open PR that a session continued without new commits",
+      "author": "peterdk31"
+    },
+    {
+      "number": 28,
+      "title": "Let sessions merge main into a PR they continue; skip sandbox placeholders in check.sh",
+      "author": "peterdk31"
+    },
+    {
+      "number": 27,
+      "title": "Add READMEs for art/, audio/ and tests/, and list them in llms.txt",
+      "author": "spellmerge-bot[bot]"
+    },
+    {
+      "number": 26,
+      "title": "Fix chained sessions: allow github-actions[bot], keep revisions on the PR branch",
+      "author": "peterdk31"
+    },
+    {
+      "number": 25,
+      "title": "Start the next session right away and set aside tasks that wait on someone",
+      "author": "peterdk31"
+    },
+    {
+      "number": 24,
+      "title": "Record that the HUD sends player-intent events",
+      "author": "peterdk31"
+    },
+    {
+      "number": 23,
+      "title": "Bump anthropics/claude-code-action from 1.0.239 to 1.0.248",
+      "author": "dependabot[bot]"
+    },
+    {
+      "number": 22,
+      "title": "Bump actions/upload-artifact from 7.0.1 to 7.0.2",
+      "author": "dependabot[bot]"
+    },
+    {
+      "number": 21,
+      "title": "Bump actions/download-artifact from 8.0.1 to 8.0.2",
+      "author": "dependabot[bot]"
+    },
+    {
+      "number": 20,
+      "title": "Bump actions/create-github-app-token from 3.2.0 to 3.3.0",
+      "author": "dependabot[bot]"
+    },
+    {
+      "number": 19,
+      "title": "Area READMEs for core, hud and the 10 gameplay sub-areas",
+      "author": "spellmerge-bot[bot]"
+    },
+    {
+      "number": 18,
+      "title": "Move the hourly develop schedule to minute 23 so GitHub registers it",
+      "author": "peterdk31"
+    },
+    {
+      "number": 17,
+      "title": "Fix: reviewed SHA from the pushed commit; continue open PRs for a task",
+      "author": "peterdk31"
+    },
+    {
+      "number": 16,
+      "title": "Fix: test independent of NEXT.md; check.sh doesn't crash on unreadable files",
+      "author": "peterdk31"
+    },
+    {
+      "number": 15,
+      "title": "Add READMEs for the seven content areas",
+      "author": "spellmerge-bot[bot]"
+    },
+    {
+      "number": 14,
+      "title": "Fix: install socat too (Claude's sandbox needs bubblewrap and socat)",
+      "author": "peterdk31"
+    },
+    {
+      "number": 13,
+      "title": "Fix: install bubblewrap before Claude steps (needed for secret scrubbing)",
+      "author": "peterdk31"
+    },
+    {
+      "number": 12,
+      "title": "Fix: allow oven-sh/setup-bun (used inside claude-code-action)",
+      "author": "peterdk31"
+    },
+    {
+      "number": 11,
+      "title": "Fix: commit ci/build/ (hidden by .gitignore), so the daily build can run",
+      "author": "peterdk31"
+    },
+    {
+      "number": 10,
+      "title": "M0: complete foundation (includes #1, #2, #3, #6, #7, #8, #9)",
+      "author": "peterdk31"
+    }
+  ]
+}

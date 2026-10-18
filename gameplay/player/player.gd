@@ -105,6 +105,11 @@ const PLAYER_COLORS: Array[Color] = [
 const OUTLINE_COLOR: Color = Color("14121f")
 ## Seconds a wizard who joins mid-run cannot be hurt (see `protect`).
 const JOIN_PROTECTION: float = 2.0
+## The revive ring over a downed wizard: radius in pixels and the colour of its empty track.
+const REVIVE_RING_RADIUS: float = 7.0
+## Height of the ring's centre above the feet: over the hat, so the body stays visible.
+const REVIVE_RING_HEIGHT: float = 34.0
+const REVIVE_RING_BACK: Color = Color("5a5a6e")
 ## Id of the cast sound (looked up in core/registry; a missing sound is silent).
 const CAST_SOUND_ID: StringName = &"cast"
 ## Physics layers (the plan: 1 walls, 2 players, 3 enemies, 4 projectiles and
@@ -178,6 +183,8 @@ var _cooldown_left: float = 0.0
 var _dodge_direction: Vector2 = Vector2.ZERO
 var _seen_dodge_presses: int = 0
 var _downed: bool = false
+## How far a teammate's revive has got (0 to 1), from `revive_progress`; drawn as a ring.
+var _revive_progress: float = 0.0
 var _sound_player: AudioStreamPlayer = null
 ## What the last `player_stats_changed` said, to send it only on a change.
 var _sent_health: int = -1
@@ -269,6 +276,8 @@ func _ready() -> void:
 			push_warning("Wizard %d: the Events autoload is missing, so this wizard sends no events." % index)
 	if events != null and not events.damage_dealt.is_connected(_on_damage_dealt):
 		events.damage_dealt.connect(_on_damage_dealt)
+	if events != null and not events.revive_progress.is_connected(_on_revive_progress):
+		events.revive_progress.connect(_on_revive_progress)
 	if registry == null and in_tree:
 		registry = get_node_or_null("/root/Registry") as RegistryScript
 	if _overlay == null:
@@ -436,6 +445,9 @@ func _draw() -> void:
 ## The staff and the aim reticle (a chevron in the player colour with an
 ## outline), above the sprite. No arrays are made: lines only.
 func _draw_overlay() -> void:
+	if _downed:
+		_draw_revive_ring()
+		return
 	if not _reticle_visible():
 		return
 	_draw_staff()
@@ -447,6 +459,22 @@ func _draw_overlay() -> void:
 	_overlay.draw_line(back - side * RETICLE_SIZE, tip, OUTLINE_COLOR, 3.0)
 	_overlay.draw_line(back + side * RETICLE_SIZE, tip, color, 1.0)
 	_overlay.draw_line(back - side * RETICLE_SIZE, tip, color, 1.0)
+
+
+## The revive ring over a downed wizard: a dark ring with an arc that sweeps
+## round clockwise from the top as the hold goes on, so the progress reads from the
+## length, not the colour. A small cross in the middle marks it as a revive.
+func _draw_revive_ring() -> void:
+	var centre := Vector2(0.0, -REVIVE_RING_HEIGHT)
+	var color: Color = PLAYER_COLORS[clampi(index, 0, PLAYER_COLORS.size() - 1)]
+	_overlay.draw_arc(centre, REVIVE_RING_RADIUS, 0.0, TAU, 24, OUTLINE_COLOR, 4.0)
+	_overlay.draw_arc(centre, REVIVE_RING_RADIUS, 0.0, TAU, 24, REVIVE_RING_BACK, 2.0)
+	if _revive_progress > 0.0:
+		_overlay.draw_arc(centre, REVIVE_RING_RADIUS, -PI * 0.5, -PI * 0.5 + TAU * _revive_progress, 24, color, 2.0)
+	_overlay.draw_line(centre + Vector2(-2, 0), centre + Vector2(2, 0), OUTLINE_COLOR, 3.0)
+	_overlay.draw_line(centre + Vector2(0, -2), centre + Vector2(0, 2), OUTLINE_COLOR, 3.0)
+	_overlay.draw_line(centre + Vector2(-2, 0), centre + Vector2(2, 0), Color.WHITE, 1.0)
+	_overlay.draw_line(centre + Vector2(0, -2), centre + Vector2(0, 2), Color.WHITE, 1.0)
 
 
 ## Fading copies of the sprite where the wizard was, stretched and leaned like it.
@@ -531,6 +559,19 @@ func is_downed() -> bool:
 	return _downed
 
 
+## How far a teammate's revive has got, 0 to 1 (0 when standing).
+func revive_progress() -> float:
+	return _revive_progress
+
+
+func _on_revive_progress(player: int, progress: float) -> void:
+	if player != index:
+		return
+	_revive_progress = clampf(progress, 0.0, 1.0)
+	if _overlay != null:
+		_overlay.queue_redraw()
+
+
 func _on_damage_dealt(_player: int, target: Node, amount: int, _position: Vector2) -> void:
 	if target == self:
 		take_damage(amount)
@@ -549,6 +590,8 @@ func take_damage(amount: int) -> bool:
 		_dodge_left = 0.0
 		_invulnerable_left = 0.0
 		velocity = Vector2.ZERO
+		_revive_progress = 0.0
+		_redraw()
 		if events != null:
 			events.player_downed.emit(index)
 	return true
@@ -560,6 +603,7 @@ func revive(reviver: int) -> bool:
 	if not _downed:
 		return false
 	_downed = false
+	_revive_progress = 0.0
 	_redraw()
 	health = REVIVE_HEALTH
 	_announce_stats()

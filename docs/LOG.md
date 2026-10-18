@@ -2,6 +2,11 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue.
 
+## 2026-10-18: Revive (C1 round 2, task 1)
+
+- `coop` now revives: a standing wizard within 48 px of a downed one for 2 s brings it back (50 health) and it is protected for 1.5 s. The nearest standing wizard is the reviver; progress drains at twice the fill rate when nobody is near; each downed wizard has its own progress, any slots 0-3. New event `revive_progress(player, progress)` drives a ring (a clockwise-sweeping arc with a cross) over the downed wizard's hat.
+- Tests: two players, each of four players in turn, three down at once, a leaving reviver or downed player (`test_coop.gd`); the new signal in `test_events.gd`. Shot `revive_ring_half`. Joiner protection has to be stepped away in tests before a joiner can be downed. The "Revive by standing next to a downed wizard" backlog line is gone. Reasoning and numbers: `docs/DECISIONS.md`.
+
 ## 2026-10-18: C1 juice leftovers, and six more M1 tasks queued (owner `/claude` on #102)
 
 - All four leftovers are done. (1) New event `wizard_cast(player, wizard)` (sender `player`, right after `spell_cast`); `Feel` squashes the caster's `Sprite` thin and tall for 0.1 s (15%, no white flash; a hit takes it over, a cast never replaces a hit). (2) The muzzle flash is turned along the aim, stretched 1.8× and tinted in the player's light colour. (3) The dead enemy's `Sprite` is copied into a pooled sprite (8 slots) that is white, widens, collapses and fades in 0.25 s while the enemy itself is freed at once. (4) The HUD has a red vignette (`hud/panels/vignette/`, behind the panels) that glows when a wizard's health falls, strongest toward that wizard's corner, gone in about 0.4 s.

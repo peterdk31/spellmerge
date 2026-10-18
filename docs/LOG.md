@@ -2,6 +2,13 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue.
 
+## 2026-10-18: Juice pass on the core loop (owner `/claude` on #102)
+
+- `gameplay/feel` (all inside `Feel`, driven by events, never touching damage): a white hit flash (a tiny `hit_flash.gdshader` set as the sprite's material for 0.08 s) and a squash on the `Sprite` child of whatever `damage_dealt` names (enemies and wizards; at most 16 at once, tracked by instance id so a freed enemy is safe); a death puff (the hit spark, bigger and fading, 4 slots); a muzzle flash per player at the `spell_cast` origin; a camera kick against the aim (1.5 px per cast, capped at 4 px, off with `shake_enabled` off).
+- `punchy.tres`: hit-stop 0.05 s (was 0.04), death 0.09 s (0.07), shake 0.2 / 0.38 / 0.6, up to 7 px, particles faster and a bigger death burst. New preset fields are in `feel_preset.gd`.
+- Checked: `ci/build/build.sh --quick --tests` passes with new tests for the flash, the kick and the puffs; looked at the arena shot. The 0.07 s muzzle flash is too short to appear in a still.
+- Left for later: see `docs/NEXT.md` (caster squash, aimed muzzle flash, enemy death animation).
+
 ## 2026-10-18: Placeholder art iteration (owner `/claude` on #102)
 
 - Redrew the placeholders as SVG rects, same palette and rules: floor (Stone base with flagstone joints, light chips and cracks, nothing on the edge pixels; it is lighter than before, so figures stand out more), wall (four brick courses, each lit on top with a shadow joint), fire bolt (a comet with a round head, tapering tail and Spark core), hit spark (added four diagonal flecks), ember imp (2-frame idle strip, the second bobs 1 px, played by an `AnimationPlayer` in the scene), wizard (no staff in the sprite any more).

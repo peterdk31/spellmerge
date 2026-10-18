@@ -41,6 +41,9 @@ func _initialize() -> void:
 	_test_a_kill_uses_one_slot_and_beats_a_full_pool()
 	_test_engine_time_scale_comes_back()
 	_test_camera_change_is_followed()
+	_test_hit_flash_and_squash()
+	_test_cast_flash_and_kick()
+	_test_death_puff_is_limited()
 	_teardown()
 	# The audio server drops stopped playbacks on its next mix; without this wait they
 	# are reported as leaked objects (and a resource still in use) at exit.
@@ -365,3 +368,73 @@ func _test_camera_change_is_followed() -> void:
 	_feel.step(0.015625)
 	_check(second.offset != Vector2.ZERO, "the new camera shakes")
 	second.free()
+
+
+func _test_hit_flash_and_squash() -> void:
+	_setup()
+	var enemy := Node2D.new()
+	var sprite := Sprite2D.new()
+	sprite.name = "Sprite"
+	enemy.add_child(sprite)
+	root.add_child(enemy)
+	_bus.damage_dealt.emit(0, enemy, 1, Vector2.ZERO)
+	_check(sprite.material != null, "a hit flashes the sprite")
+	_check(_feel.reacting_sprites() == 1, "one sprite reacts")
+	_feel.step(0.015625)
+	_check(sprite.scale.x > 1.0 and sprite.scale.y < 1.0, "the sprite squashes")
+	_bus.damage_dealt.emit(1, enemy, 1, Vector2.ZERO)
+	_check(_feel.reacting_sprites() == 1, "a second hit on the same sprite does not add a reaction")
+	for i in 4:
+		_feel.step(STEP)
+	_check(sprite.material == null, "the flash ends")
+	_check(sprite.scale == Vector2.ONE, "the sprite is back to its size")
+	_check(_feel.reacting_sprites() == 0, "no reaction is left")
+	# A target without a Sprite, and one freed mid-flash, are fine.
+	var bare := Node2D.new()
+	_bus.damage_dealt.emit(0, bare, 1, Vector2.ZERO)
+	bare.free()
+	_bus.damage_dealt.emit(0, enemy, 1, Vector2.ZERO)
+	enemy.free()
+	_feel.step(STEP)
+	_check(_feel.reacting_sprites() == 0, "a freed sprite is dropped")
+	var crowd: Array[Node2D] = []
+	for i in 40:
+		var many := Node2D.new()
+		var s := Sprite2D.new()
+		s.name = "Sprite"
+		many.add_child(s)
+		root.add_child(many)
+		crowd.append(many)
+		_bus.damage_dealt.emit(i % 4, many, 1, Vector2.ZERO)
+	_check(_feel.reacting_sprites() <= FeelScript.REACT_SLOTS, "reactions stay within their limit")
+	for many in crowd:
+		many.free()
+
+
+func _test_cast_flash_and_kick() -> void:
+	_setup()
+	_bus.spell_cast.emit(2, &"fire_bolt", Vector2(10, 5), Vector2.RIGHT)
+	_check(_feel.live_flashes() == 1, "a cast shows a muzzle flash")
+	_check(_feel.kick().x < 0.0 and _feel.kick().y == 0.0, "the camera kicks against the aim")
+	_feel.step(0.015625)
+	_check(_camera.offset.x < 0.0, "the camera moves with the kick")
+	for i in 100:
+		_bus.spell_cast.emit(i % 4, &"fire_bolt", Vector2.ZERO, Vector2.RIGHT)
+	_check(_feel.kick().length() <= FeelScript.MAX_KICK_PIXELS + 0.001, "the kick is capped")
+	for i in 10:
+		_feel.step(STEP)
+	_check(_feel.live_flashes() == 0, "the muzzle flashes end")
+	_check(_camera.offset == Vector2.ZERO and _feel.kick() == Vector2.ZERO, "the camera settles after a cast")
+	_feel.shake_enabled = false
+	_bus.spell_cast.emit(0, &"fire_bolt", Vector2.ZERO, Vector2.RIGHT)
+	_check(_feel.kick() == Vector2.ZERO, "no kick with shake off")
+
+
+func _test_death_puff_is_limited() -> void:
+	_setup()
+	for i in 20:
+		_bus.enemy_died.emit(i % 4, null, Vector2(i, 0))
+	_check(_feel.live_flashes() == FeelScript.FLASH_SLOTS - FeelScript.MUZZLE_SLOTS, "death puffs use their own slots and no more")
+	for i in 10:
+		_feel.step(STEP)
+	_check(_feel.live_flashes() == 0, "the puffs end")

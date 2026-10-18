@@ -207,7 +207,7 @@ func apply_texture() -> void:
 ## Show a strip on the sprite from its first frame.
 func _show_strip(strip: Texture2D) -> void:
 	_sprite.texture = strip
-	_sprite.hframes = maxi(strip.get_width() / FRAME_SIZE, 1)
+	_sprite.hframes = maxi(int(strip.get_width()) / FRAME_SIZE, 1)
 	_sprite.frame = 0
 
 
@@ -273,6 +273,7 @@ func _ready() -> void:
 		registry = get_node_or_null("/root/Registry") as RegistryScript
 	if _overlay == null:
 		_overlay = Node2D.new()
+		_overlay.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		_overlay.draw.connect(_draw_overlay)
 		add_child(_overlay)
 	if is_inside_tree() and _sound_player == null:

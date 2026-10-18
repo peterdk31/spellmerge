@@ -10,6 +10,7 @@ const PlayerScript := preload("res://gameplay/player/player.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const WizardScene := preload("res://content/wizard/base/wizard.tscn")
+const ImpScene := preload("res://content/enemies/ember_imp/ember_imp.tscn")
 
 const STEP: float = 0.0625
 
@@ -26,6 +27,7 @@ func _initialize() -> void:
 	_test_walking_plays_the_walk_strip()
 	_test_dash_plays_once_then_idle()
 	_test_every_player_shows_its_own_strips()
+	_test_imp_plays_its_idle()
 	_teardown()
 	if _failures.is_empty():
 		print("TEST OK: gameplay/player (animation)")
@@ -53,6 +55,16 @@ func _setup(index: int = 0) -> void:
 	_wizard.input = _input
 	_wizard.events = _bus
 	_wizard._ready()
+
+
+## The imp is a two-frame strip and its scene plays the idle animation on its own.
+func _test_imp_plays_its_idle() -> void:
+	var imp: Node = ImpScene.instantiate()
+	var sprite: Sprite2D = imp.get_node("Sprite") as Sprite2D
+	var animation: AnimationPlayer = imp.get_node("AnimationPlayer") as AnimationPlayer
+	_check(sprite.hframes == 2, "the imp sprite has 2 frames")
+	_check(animation.has_animation(&"idle") and animation.autoplay == "idle", "the imp scene autoplays idle")
+	imp.free()
 
 
 func _teardown() -> void:

@@ -37,6 +37,7 @@ func _initialize() -> void:
 	_test_panel_shows_numbers()
 	_test_down_and_menu_words()
 	_test_hud_waits_for_room_and_join()
+	_test_wave_line()
 	_test_hud_routes_to_the_right_panel()
 	_test_leave_and_rejoin_resets_the_panel()
 	_test_run_boundaries_hide_panels()
@@ -193,6 +194,22 @@ func _test_run_boundaries_hide_panels() -> void:
 	_check(not hud.get_panel(0).visible, "panels wait for a room after run_started")
 	bus.room_entered.emit(&"arena_01")
 	_check(hud.get_panel(0).visible and hud.get_panel(3).visible, "joined players' panels return in the next run")
+	_free_hud(parts)
+
+
+func _test_wave_line() -> void:
+	var parts: Array = _make_hud()
+	var hud: HudScript = parts[0]
+	var bus: EventsScript = parts[1]
+	var label: Label = hud.get_wave_label()
+	_check(label != null and not label.visible, "the wave line is hidden before a wave")
+	bus.wave_started.emit(1)
+	_check(label.visible and label.text == "Wave 1", "wave 1 shows 'Wave 1', got '%s'" % label.text)
+	bus.wave_started.emit(7)
+	_check(label.text == "Wave 7", "the line follows wave_started, got '%s'" % label.text)
+	_check(label.mouse_filter == Control.MOUSE_FILTER_IGNORE, "the wave line takes no input")
+	bus.run_ended.emit(false)
+	_check(not label.visible, "the wave line is hidden when the run ends")
 	_free_hud(parts)
 
 

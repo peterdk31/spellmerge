@@ -38,6 +38,10 @@ const OVERLAY_ACTION: StringName = &"overlay"
 ## Space between the screen edge and a panel, and between a panel and its overlay.
 const EDGE_MARGIN: float = 4.0
 const OVERLAY_GAP: float = 2.0
+## The "Wave N" line at the top middle of the view (between the P1 and P2 panels).
+const WAVE_LABEL_WIDTH: float = 96.0
+const WAVE_LABEL_FONT_SIZE: int = 16
+const WAVE_LABEL_OUTLINE: int = 4
 
 ## The event bus, the UI focus service and the input manager. Only tests set
 ## these, before adding the node; otherwise the "Events", "UIFocus" and
@@ -53,6 +57,7 @@ var _seen_overlay: Array[int] = [0, 0, 0, 0]
 var _joined: Array[bool] = [false, false, false, false]
 var _in_room: bool = false
 var _vignette: VignetteScript = null
+var _wave_label: Label = null
 
 
 func _ready() -> void:
@@ -62,6 +67,20 @@ func _ready() -> void:
 	var root_control: Control = get_node("Root") as Control
 	root_control.add_child(_vignette)
 	root_control.move_child(_vignette, 0)
+	_wave_label = Label.new()
+	_wave_label.name = "WaveLabel"
+	_wave_label.visible = false
+	_wave_label.add_theme_font_size_override("font_size", WAVE_LABEL_FONT_SIZE)
+	_wave_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	_wave_label.add_theme_constant_override("outline_size", WAVE_LABEL_OUTLINE)
+	_wave_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_wave_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_wave_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP, Control.PRESET_MODE_MINSIZE)
+	_wave_label.custom_minimum_size = Vector2(WAVE_LABEL_WIDTH, 0.0)
+	_wave_label.offset_left = -WAVE_LABEL_WIDTH * 0.5
+	_wave_label.offset_right = WAVE_LABEL_WIDTH * 0.5
+	_wave_label.offset_top = EDGE_MARGIN
+	root_control.add_child(_wave_label)
 	for player in PLAYER_COUNT:
 		var panel := get_node("Root/Panel%d" % (player + 1)) as PlayerPanelScript
 		panel.visible = false
@@ -86,6 +105,7 @@ func _ready() -> void:
 		events.player_left.connect(_on_player_left)
 		events.player_stats_changed.connect(_on_stats_changed)
 		events.room_entered.connect(_on_room_entered)
+		events.wave_started.connect(_on_wave_started)
 		events.run_started.connect(_on_run_started)
 		events.run_ended.connect(_on_run_ended)
 	if ui_focus != null:
@@ -170,6 +190,16 @@ func _on_room_entered(_room_id: StringName) -> void:
 		_refresh(player)
 
 
+func _on_wave_started(wave: int) -> void:
+	_wave_label.text = "Wave %d" % wave
+	_wave_label.visible = true
+
+
+## The "Wave N" line, or null before the script's `_ready`.
+func get_wave_label() -> Label:
+	return _wave_label
+
+
 ## A new run starts with no room entered yet: panels wait for `room_entered`.
 func _on_run_started(_player_count: int) -> void:
 	_reset_all()
@@ -182,6 +212,7 @@ func _on_run_ended(_victory: bool) -> void:
 
 func _reset_all() -> void:
 	_in_room = false
+	_wave_label.visible = false
 	_vignette.clear()
 	for player in PLAYER_COUNT:
 		_overlays[player].close_overlay()

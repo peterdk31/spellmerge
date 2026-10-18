@@ -194,7 +194,7 @@ func _on_stats_changed(player: int, health: int, max_health: int, mana: float, m
 		var before: int = _panels[player].health()
 		_panels[player].set_stats(health, max_health, mana, max_mana)
 		if _in_room and before >= 0 and health < before:
-			_vignette.flash(player)
+			_vignette.flash_hit(player, float(before - health) / float(maxi(max_health, 1)), _joined.count(true))
 		if health <= 0:
 			_overlays[player].close_overlay()
 

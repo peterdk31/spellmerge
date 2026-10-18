@@ -9,7 +9,8 @@ const CombatScript := preload("res://gameplay/combat/combat.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
 const FeelPresetScript := preload("res://gameplay/feel/presets/feel_preset.gd")
-const RegistryScript := preload("res://core/registry/registry.gd")
+const PlayerScript := preload("res://gameplay/player/player.gd")
+const RegistryScript :=preload("res://core/registry/registry.gd")
 
 const STEP: float = 0.0625
 const FIXTURE: String = "res://tests/core/fixtures/registry"
@@ -47,6 +48,9 @@ func _initialize() -> void:
 	_test_muzzle_flash_follows_aim_and_colour()
 	_test_cast_squash()
 	_test_death_animation()
+	_test_death_animation_starts_at_rest_scale()
+	_test_cast_squash_skips_a_dash()
+	_test_muzzle_colours_match_the_reticles()
 	_teardown()
 	# The audio server drops stopped playbacks on its next mix; without this wait they
 	# are reported as leaked objects (and a resource still in use) at exit.
@@ -535,3 +539,47 @@ func _test_death_puff_is_limited() -> void:
 	for i in 10:
 		_feel.step(STEP)
 	_check(_feel.live_flashes() == 0, "the puffs end")
+
+
+func _test_muzzle_colours_match_the_reticles() -> void:
+	_check(FeelScript.PLAYER_COLORS == PlayerScript.PLAYER_COLORS, "the muzzle colours are the reticle colours")
+
+
+func _test_death_animation_starts_at_rest_scale() -> void:
+	_setup()
+	var enemy := Node2D.new()
+	var sprite := Sprite2D.new()
+	sprite.name = "Sprite"
+	sprite.texture = load("res://art/vfx/hit_spark.svg") as Texture2D
+	sprite.centered = false
+	sprite.scale = Vector2(2.0, 2.0)
+	enemy.add_child(sprite)
+	root.add_child(enemy)
+	_bus.damage_dealt.emit(0, enemy, 1, Vector2.ZERO)
+	_feel.step(0.015625)
+	_check(sprite.scale != Vector2(2.0, 2.0), "the enemy is squashed when it is killed")
+	_bus.enemy_died.emit(0, enemy, Vector2.ZERO)
+	enemy.free()
+	var copy: Sprite2D = _feel.ghost(0)
+	_check(copy.scale.is_equal_approx(Vector2(2.0, 2.0)), "the copy starts at the rest scale, not the squashed one")
+	_check(not copy.centered, "the copy keeps the sprite's centring")
+
+
+## A stand-in wizard in the middle of a dodge.
+class DashingWizard:
+	extends Node2D
+
+	func is_dodging() -> bool:
+		return true
+
+
+func _test_cast_squash_skips_a_dash() -> void:
+	_setup()
+	var wizard := DashingWizard.new()
+	var sprite := Sprite2D.new()
+	sprite.name = "Sprite"
+	wizard.add_child(sprite)
+	root.add_child(wizard)
+	_bus.wizard_cast.emit(0, wizard)
+	_check(_feel.reacting_sprites() == 0 and sprite.scale == Vector2.ONE, "a cast during a dash does not touch the sprite scale")
+	wizard.free()

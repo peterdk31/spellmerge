@@ -164,7 +164,7 @@ func _ready() -> void:
 		var ghost := Sprite2D.new()
 		ghost.top_level = true
 		ghost.visible = false
-		ghost.z_index = 10
+		ghost.z_index = 21
 		ghost.material = _flash_material
 		ghost.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		add_child(ghost)
@@ -327,13 +327,21 @@ func _start_ghost(dead: Node) -> void:
 	ghost.region_rect = source.region_rect
 	ghost.offset = source.offset
 	ghost.flip_h = source.flip_h
+	ghost.flip_v = source.flip_v
+	ghost.centered = source.centered
 	ghost.global_position = source.global_position
+	ghost.global_rotation = source.global_rotation
 	ghost.modulate = Color.WHITE
-	ghost.scale = source.global_scale
+	# Start from the rest scale: a sprite killed mid-squash would otherwise pop.
+	var rest: Vector2 = source.global_scale
+	var at: int = _react_sprites.find(source.get_instance_id())
+	if at >= 0 and source.scale.x != 0.0 and source.scale.y != 0.0:
+		rest = rest / source.scale * _react_scale[at]
+	ghost.scale = rest
 	ghost.visible = true
 	_ghost_left[slot] = preset.death_anim_seconds
 	_ghost_total[slot] = preset.death_anim_seconds
-	_ghost_scale[slot] = source.global_scale
+	_ghost_scale[slot] = rest
 
 
 ## Show flash `slot` at `position` for `seconds`, `size` times the art's size, turned
@@ -456,6 +464,9 @@ func _on_spell_cast(player: int, _spell_id: StringName, origin: Vector2, directi
 
 
 func _on_wizard_cast(_player: int, wizard: Node) -> void:
+	# The dash look owns the sprite scale while dodging; a squash would fight it.
+	if wizard != null and wizard.has_method("is_dodging") and wizard.call("is_dodging"):
+		return
 	_start_reaction(wizard, preset.cast_squash_seconds, -preset.cast_squash, false)
 
 

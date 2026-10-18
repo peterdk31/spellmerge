@@ -41,6 +41,7 @@ func _initialize() -> void:
 	_test_leave_and_rejoin_resets_the_panel()
 	_test_run_boundaries_hide_panels()
 	_test_hurt_vignette()
+	_test_vignette_with_four_players()
 	_test_hud_four_players_in_four_corners()
 	_test_hud_menu_word_follows_ui_focus()
 	_test_bad_indices_are_ignored()
@@ -237,6 +238,37 @@ func _test_hurt_vignette() -> void:
 	bus.run_ended.emit(false)
 	_check(not vignette.visible, "a run ending clears the vignette")
 	_check(vignette.mouse_filter == Control.MOUSE_FILTER_IGNORE, "the vignette takes no input")
+	_free_hud(parts)
+
+
+func _test_vignette_with_four_players() -> void:
+	var parts: Array = _make_hud()
+	var hud: HudScript = parts[0]
+	var bus: EventsScript = parts[1]
+	var vignette := hud.get_vignette()
+	for player in 4:
+		bus.player_joined.emit(player)
+		bus.player_stats_changed.emit(player, 100, 100, 5.0, 100.0)
+	bus.room_entered.emit(&"arena_01")
+	# Eight seconds of a fight: each wizard loses 10 of 100 health every half second.
+	var peak: float = 0.0
+	for tick in 64:
+		var player: int = tick % 4
+		bus.player_stats_changed.emit(player, 90, 100, 5.0, 100.0)
+		bus.player_stats_changed.emit(player, 100, 100, 5.0, 100.0)
+		vignette.step(0.125)
+		peak = maxf(peak, vignette.strength)
+	_check(peak < vignette.MAX_STRENGTH * 0.8, "four wizards under fire do not keep the vignette at its limit")
+	vignette.clear()
+	vignette.flash_hit(0, 0.05, 1)
+	var small: float = vignette.strength
+	vignette.clear()
+	vignette.flash_hit(0, 0.5, 1)
+	_check(small < vignette.strength, "a small hit glows less than a big one")
+	vignette.clear()
+	vignette.enabled = false
+	vignette.flash_hit(0, 0.5, 1)
+	_check(not vignette.visible and vignette.strength == 0.0, "the vignette can be turned off")
 	_free_hud(parts)
 
 

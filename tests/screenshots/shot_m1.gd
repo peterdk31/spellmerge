@@ -70,9 +70,15 @@ func _initialize() -> void:
 	# One frame after a cast and after a hit: the muzzle flash in the caster's colour
 	# along the aim, the caster squash, and the red vignette toward player 4's corner.
 	await _settle()
-	_tap(input, 0, &"cast")
+	var wizard1: Node2D = flow.call("get_wizard", 0) as Node2D
+	# The HUD stops fading the vignette for this shot: frames are slow on a software
+	# renderer and the glow would be gone before it is drawn.
+	root.get_node("Hud").set_process(false)
+	input.call("send_virtual", 0, &"cast", 1.0)
 	wizard4.call("take_damage", 30)
 	await physics_frame
+	await physics_frame
+	input.call("send_virtual", 0, &"cast", 0.0)
 	await RenderingServer.frame_post_draw
 	var juice_image: Image = root.get_texture().get_image()
 	var hud: Node = root.get_node_or_null("Hud")
@@ -81,6 +87,31 @@ func _initialize() -> void:
 		return
 	juice_image.save_png("%s/juice_cast_and_hit.png" % SHOTS_DIR)
 	print("SHOT: juice_cast_and_hit (%dx%d)" % [juice_image.get_width(), juice_image.get_height()])
+	# The caster and its muzzle flash, cropped and enlarged 4 times (the flash and the
+	# squash last a few frames, so two frames are taken after the cast).
+	root.get_node("Hud").set_process(true)
+	_save_crop(juice_image, wizard1, "juice_muzzle_flash_a")
+	await physics_frame
+	await RenderingServer.frame_post_draw
+	_save_crop(root.get_texture().get_image(), wizard1, "juice_muzzle_flash_b")
+	await _settle()
+	# An imp 6 frames (0.1 s) after the killing blow: the death animation.
+	var combat: Node = root.get_node_or_null("Combat")
+	var imps: Array = flow.get("_enemies")
+	var imp: Node2D = null
+	for candidate: Variant in imps:
+		if is_instance_valid(candidate):
+			imp = candidate as Node2D
+			break
+	if combat == null or imp == null:
+		_fail("there is no imp to kill in juice_death_animation")
+		return
+	var imp_at: Transform2D = imp.get_global_transform_with_canvas()
+	combat.call("hit", 0, imp, 9999)
+	for i in 6:
+		await process_frame
+	await RenderingServer.frame_post_draw
+	_save_crop_at(root.get_texture().get_image(), imp_at.origin, "juice_death_animation")
 	await _settle()
 	wizard4.call("take_damage", 9999)
 	await _settle()
@@ -128,6 +159,25 @@ func _spread_wizards(flow: Node) -> void:
 			camera.limit_right = 1344
 			camera.limit_bottom = 784
 		coop.call("snap")
+
+
+## Save a 4x enlarged crop of `image` around `node` (see `_save_crop_at`).
+func _save_crop(image: Image, node: Node2D, name: String) -> void:
+	_save_crop_at(image, node.get_global_transform_with_canvas().origin, name)
+
+
+## Save the 96x96 pixels of `image` around the screen position `at`, enlarged 4 times.
+func _save_crop_at(image: Image, at: Vector2, name: String) -> void:
+	var size: Vector2 = Vector2(image.get_size())
+	var scale_to_image: Vector2 = size / Vector2(root.get_visible_rect().size)
+	var centre: Vector2 = at * scale_to_image
+	var half: int = 48
+	var corner: Vector2i = Vector2i(centre) - Vector2i(half, half)
+	corner = corner.clamp(Vector2i.ZERO, Vector2i(image.get_size()) - Vector2i(half * 2, half * 2))
+	var crop: Image = image.get_region(Rect2i(corner, Vector2i(half * 2, half * 2)))
+	crop.resize(half * 8, half * 8, Image.INTERPOLATE_NEAREST)
+	crop.save_png("%s/%s.png" % [SHOTS_DIR, name])
+	print("SHOT: %s" % name)
 
 
 func _fail(message: String) -> void:

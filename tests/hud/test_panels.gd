@@ -40,6 +40,7 @@ func _initialize() -> void:
 	_test_hud_routes_to_the_right_panel()
 	_test_leave_and_rejoin_resets_the_panel()
 	_test_run_boundaries_hide_panels()
+	_test_hurt_vignette()
 	_test_hud_four_players_in_four_corners()
 	_test_hud_menu_word_follows_ui_focus()
 	_test_bad_indices_are_ignored()
@@ -205,6 +206,37 @@ func _test_hud_routes_to_the_right_panel() -> void:
 	_check(value.call(0, "HealthValue") == "100" and value.call(3, "HealthValue") == "100", "the other panels are untouched")
 	bus.player_stats_changed.emit(3, 0, 100, 0.0, 100.0)
 	_check(hud.get_panel(3).is_downed() and not hud.get_panel(2).is_downed(), "only player 3 is shown down")
+	_free_hud(parts)
+
+
+func _test_hurt_vignette() -> void:
+	var parts: Array = _make_hud()
+	var hud: HudScript = parts[0]
+	var bus: EventsScript = parts[1]
+	var vignette := hud.get_vignette()
+	bus.player_joined.emit(2)
+	bus.room_entered.emit(&"arena_01")
+	bus.player_stats_changed.emit(2, 100, 100, 10.0, 100.0)
+	_check(not vignette.visible, "no vignette when a wizard appears")
+	bus.player_stats_changed.emit(2, 100, 100, 5.0, 100.0)
+	_check(not vignette.visible, "no vignette when only mana changes")
+	bus.player_stats_changed.emit(2, 80, 100, 5.0, 100.0)
+	_check(vignette.visible and vignette.strength > 0.0, "a health drop shows the vignette")
+	var first: float = vignette.strength
+	bus.player_stats_changed.emit(2, 60, 100, 5.0, 100.0)
+	_check(vignette.strength > first and vignette.strength <= vignette.MAX_STRENGTH, "more hits glow more, up to a limit")
+	for i in 10:
+		bus.player_stats_changed.emit(2, 59 - i, 100, 5.0, 100.0)
+	_check(vignette.strength <= vignette.MAX_STRENGTH, "the vignette never passes its limit")
+	for i in 30:
+		vignette.step(0.0625)
+	_check(not vignette.visible and vignette.strength == 0.0, "the vignette fades out")
+	bus.player_stats_changed.emit(2, 80, 100, 5.0, 100.0)
+	_check(not vignette.visible, "a revive or heal shows no vignette")
+	bus.player_stats_changed.emit(2, 10, 100, 5.0, 100.0)
+	bus.run_ended.emit(false)
+	_check(not vignette.visible, "a run ending clears the vignette")
+	_check(vignette.mouse_filter == Control.MOUSE_FILTER_IGNORE, "the vignette takes no input")
 	_free_hud(parts)
 
 

@@ -14,6 +14,11 @@ extends CanvasLayer
 ## ever left open over the menu. Each overlay sits just under (P1, P2) or over
 ## (P3, P4) its own corner panel, placed from that panel's height.
 ##
+## A red vignette (`vignette/`, node Root/Vignette, behind the panels) glows when a
+## wizard's health falls, strongest toward that wizard's corner and fading in under
+## half a second. It is read from `player_stats_changed` alone (a drop in health),
+## never from a node, and it takes no input.
+##
 ## The overlays (`overlay/`, nodes Root/Overlay1 to Root/Overlay4) open and close
 ## with the owner's `overlay` action. The toggle is read here, from the press
 ## counter of `core/input` (a tap released within a frame is not lost); each
@@ -26,6 +31,7 @@ const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 const OverlayScript := preload("res://hud/panels/overlay/overlay.gd")
 const PlayerPanelScript := preload("res://hud/panels/player_panel/player_panel.gd")
+const VignetteScript := preload("res://hud/panels/vignette/vignette.gd")
 
 const PLAYER_COUNT: int = 4
 const OVERLAY_ACTION: StringName = &"overlay"
@@ -46,9 +52,16 @@ var _overlays: Array[OverlayScript] = []
 var _seen_overlay: Array[int] = [0, 0, 0, 0]
 var _joined: Array[bool] = [false, false, false, false]
 var _in_room: bool = false
+var _vignette: VignetteScript = null
 
 
 func _ready() -> void:
+	# Behind the panels: the first child of Root.
+	_vignette = VignetteScript.new()
+	_vignette.name = "Vignette"
+	var root_control: Control = get_node("Root") as Control
+	root_control.add_child(_vignette)
+	root_control.move_child(_vignette, 0)
 	for player in PLAYER_COUNT:
 		var panel := get_node("Root/Panel%d" % (player + 1)) as PlayerPanelScript
 		panel.visible = false
@@ -80,8 +93,9 @@ func _ready() -> void:
 		ui_focus.closed.connect(_on_overlay_closed)
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	poll()
+	_vignette.step(delta)
 
 
 ## Toggle the overlay of every joined player who pressed `overlay` since the
@@ -108,6 +122,11 @@ func get_overlay(player: int) -> OverlayScript:
 	if player < 0 or player >= PLAYER_COUNT:
 		return null
 	return _overlays[player]
+
+
+## The red vignette (for tests).
+func get_vignette() -> VignetteScript:
+	return _vignette
 
 
 ## The panel of `player`, or null for a bad index.
@@ -163,6 +182,7 @@ func _on_run_ended(_victory: bool) -> void:
 
 func _reset_all() -> void:
 	_in_room = false
+	_vignette.clear()
 	for player in PLAYER_COUNT:
 		_overlays[player].close_overlay()
 		_panels[player].reset()
@@ -171,7 +191,10 @@ func _reset_all() -> void:
 
 func _on_stats_changed(player: int, health: int, max_health: int, mana: float, max_mana: float) -> void:
 	if player >= 0 and player < PLAYER_COUNT:
+		var before: int = _panels[player].health()
 		_panels[player].set_stats(health, max_health, mana, max_mana)
+		if _in_room and before >= 0 and health < before:
+			_vignette.flash(player)
 		if health <= 0:
 			_overlays[player].close_overlay()
 

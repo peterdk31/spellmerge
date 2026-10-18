@@ -33,6 +33,8 @@ signal device_left(player: int, device: int)
 
 ## Sender: player. A cast left the wand of `player`.
 signal spell_cast(player: int, spell_id: StringName, origin: Vector2, direction: Vector2)
+## Sender: player. The wizard node of `player` has just cast, for visual reactions only (a squash). Sent right after `spell_cast`.
+signal wizard_cast(player: int, wizard: Node)
 ## Sender: core/projectiles. A projectile fired by `player` touched `target`.
 ## `tag` is the value given to `Projectiles.spawn()`, for looking up the damage.
 signal projectile_hit(player: int, target: Node, position: Vector2, tag: int)

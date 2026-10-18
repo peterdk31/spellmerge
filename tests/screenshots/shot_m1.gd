@@ -67,6 +67,21 @@ func _initialize() -> void:
 	if wizard4 == null:
 		_fail("player 4 has no wizard")
 		return
+	# One frame after a cast and after a hit: the muzzle flash in the caster's colour
+	# along the aim, the caster squash, and the red vignette toward player 4's corner.
+	await _settle()
+	_tap(input, 0, &"cast")
+	wizard4.call("take_damage", 30)
+	await physics_frame
+	await RenderingServer.frame_post_draw
+	var juice_image: Image = root.get_texture().get_image()
+	var hud: Node = root.get_node_or_null("Hud")
+	if juice_image == null or hud == null or not hud.call("get_vignette").visible:
+		_fail("the vignette does not show after player 4 is hit in juice_cast_and_hit")
+		return
+	juice_image.save_png("%s/juice_cast_and_hit.png" % SHOTS_DIR)
+	print("SHOT: juice_cast_and_hit (%dx%d)" % [juice_image.get_width(), juice_image.get_height()])
+	await _settle()
 	wizard4.call("take_damage", 9999)
 	await _settle()
 	if not wizard4.call("is_downed"):

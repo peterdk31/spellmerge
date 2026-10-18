@@ -32,6 +32,11 @@ extends Resource
 ## squashes then (0.25 is 25% wider and 25% lower), settling back in the same time.
 @export_range(0.0, 0.3, 0.01) var flash_seconds: float = 0.08
 @export_range(0.0, 0.6, 0.01) var hit_squash: float = 0.25
+## The caster's squash on a cast: seconds, and how much thinner and taller (0.15 is 15%).
+@export_range(0.0, 0.3, 0.01) var cast_squash_seconds: float = 0.1
+@export_range(0.0, 0.6, 0.01) var cast_squash: float = 0.15
+## Seconds a dead enemy's white copy takes to collapse and fade.
+@export_range(0.0, 0.6, 0.01) var death_anim_seconds: float = 0.25
 ## The muzzle flash at the staff tip: seconds it shows and its size (1 is the art's size).
 @export_range(0.0, 0.3, 0.01) var muzzle_flash_seconds: float = 0.07
 @export_range(0.1, 3.0, 0.1) var muzzle_flash_size: float = 1.0

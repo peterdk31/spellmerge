@@ -2,6 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-18: Juice leftovers: a `wizard_cast` event, a copied sprite for deaths, a vignette read from health
+
+**Decided by:** Claude (owner `/claude` on #102, the "C1 juice, leftovers" task).
+**Context:** The four things left from the juice pass each needed a node or a position that Feel may not look up.
+**Decision:** (1) A new event `wizard_cast(player, wizard)`, sent by `player` right after `spell_cast`, hands Feel the caster node, so the squash needs no lookup. It is a second event rather than a changed `spell_cast`, which `combat` and the bots already use. The squash is thin and tall (the opposite of a hit's) for 0.1 s, 15%, without the white flash. (2) The muzzle flash gets rotation, a 1.8× stretch along the aim and the player's light colour from a table in `feel.gd` that repeats the reticle colours (`docs/STYLE.md` is the source). (3) The enemy is still freed at once (`combat` and `flow` depend on it); on `enemy_died` Feel copies the dead node's `Sprite` (texture, frames, region, offset, flip, world scale) into one of 8 pooled sprites, white, that widens, collapses and fades over 0.25 s. A full set takes the oldest slot. (4) The vignette lives in the HUD and is driven by a drop in `player_stats_changed` health, not by `damage_dealt`, because that event names a node, not a player index, and the HUD must not look nodes up. It is one shared overlay (one screen, four wizards) that is strongest toward the hurt wizard's corner, so "who" is shown by position and not by colour alone (the panel's HP number also falls).
+**Consequence:** a new enemy dies with the animation if its sprite node is named `Sprite`. Values are in `feel_preset.gd`; none of `punchy.tres` changed, because no one could play it in this session. If the cast squash feels too strong, lower `cast_squash` in `punchy.tres` only. The vignette numbers are constants in `vignette.gd` (the HUD may not read a gameplay preset).
+
 ## 2026-10-18: Juice lives in Feel and reaches sprites only through the event's target
 
 **Decided by:** Claude (owner `/claude` on #102).

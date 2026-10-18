@@ -2,6 +2,13 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue.
 
+## 2026-10-18: C1 juice leftovers, and six more M1 tasks queued (owner `/claude` on #102)
+
+- All four leftovers are done. (1) New event `wizard_cast(player, wizard)` (sender `player`, right after `spell_cast`); `Feel` squashes the caster's `Sprite` thin and tall for 0.1 s (15%, no white flash; a hit takes it over, a cast never replaces a hit). (2) The muzzle flash is turned along the aim, stretched 1.8× and tinted in the player's light colour. (3) The dead enemy's `Sprite` is copied into a pooled sprite (8 slots) that is white, widens, collapses and fades in 0.25 s while the enemy itself is freed at once. (4) The HUD has a red vignette (`hud/panels/vignette/`, behind the panels) that glows when a wizard's health falls, strongest toward that wizard's corner, gone in about 0.4 s.
+- New preset fields: `cast_squash`, `cast_squash_seconds`, `death_anim_seconds`. Nothing in `punchy.tres` changed: the numbers could not be played here (no person at the keyboard), so no value was tuned.
+- Tests: `test_feel.gd` (aimed and tinted flash, cast squash, death animation and its limit), `test_panels.gd` (vignette on a health drop only, limit, fade, clear), `test_events.gd` (the new signal). New screenshot `juice_cast_and_hit` in `shot_m1.gd`.
+- `docs/NEXT.md` now holds the six tasks of the owner's second round: revive, shots stop at walls, dodge and cast feel, enemy readability, wave pacing, cleanup. Not started yet: one session and one PR each.
+
 ## 2026-10-18: Juice pass on the core loop (owner `/claude` on #102)
 
 - `gameplay/feel` (all inside `Feel`, driven by events, never touching damage): a white hit flash (a tiny `hit_flash.gdshader` set as the sprite's material for 0.08 s) and a squash on the `Sprite` child of whatever `damage_dealt` names (enemies and wizards; at most 16 at once, tracked by instance id so a freed enemy is safe); a death puff (the hit spark, bigger and fading, 4 slots); a muzzle flash per player at the `spell_cast` origin; a camera kick against the aim (1.5 px per cast, capped at 4 px, off with `shake_enabled` off).

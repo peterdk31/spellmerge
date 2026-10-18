@@ -502,6 +502,7 @@ func cast() -> bool:
 	_announce_stats()
 	if events != null:
 		events.spell_cast.emit(index, spell.spell_id(), origin, aim)
+		events.wizard_cast.emit(index, self)
 	_play_cast_sound()
 	return true
 

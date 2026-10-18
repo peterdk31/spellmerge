@@ -14,8 +14,8 @@ Feel only reacts: it never changes damage or outcomes. Hit-stop is its only effe
 - **Dependency direction:** `core` ← `gameplay` ← `content`. This area may use `core/` and the registry. `core/` never depends on it, and content never reaches into it.
 - **Events** (`core/events/events.gd` owns the definitions; this list matches it and the table in [gameplay/README.md](../README.md)):
   - Sends: none.
-  - Listens to: `damage_dealt`, `enemy_died`, `player_downed` and `spell_cast`.
-- **What it shows:** hit-stop, shake, hit and death particles, a white flash and squash on the hit node's `Sprite` child (name your sprite `Sprite` to get it), a death puff, a muzzle flash and a small camera kick on a cast. At most `REACT_SLOTS` (16) sprites react at once; past that a hit skips its flash and squash. If the sprite's owner changes its scale during a squash, Feel takes that as the new size to return to. Sounds are asked from `core/registry` and stay silent when missing.
+  - Listens to: `damage_dealt`, `enemy_died`, `player_downed`, `spell_cast` and `wizard_cast`.
+- **What it shows:** hit-stop, shake, hit and death particles, a white flash and squash on the hit node's `Sprite` child (name your sprite `Sprite` to get it), a death puff and a death animation (a white copy of the dead enemy's `Sprite` that collapses and fades; the enemy is freed at once), a muzzle flash turned along the aim in the player's colour, a thin-and-tall squash of the caster's `Sprite` (from `wizard_cast`) and a small camera kick on a cast. At most `REACT_SLOTS` (16) sprites react at once; past that a hit skips its flash and squash. If the sprite's owner changes its scale during a squash, Feel takes that as the new size to return to. Sounds are asked from `core/registry` and stay silent when missing.
 - Areas never call each other directly; they talk through events. [gameplay/README.md](../README.md) has the rules every sub-area shares.
 
 ## Allowed files

@@ -553,4 +553,4 @@ The HUD screenshot cannot be taken in a session (no display, `docs/BACKLOG.md`),
 **Decided by:** Claude (weekly run). The digest was empty; the owner gave no instructions and no focus.
 
 - M1 is not complete: C1 (#97) has no verdict, and the web 4-bot run (#93) and the Style Guide site step (#95) wait on the owner. No M2 design is written; the 7-day default for C1 is iterate on 2026-10-24.
-- Re-examined the aim work (#99): it works, but the shot leaves the feet while the reticle sits ahead of the body. One polish task added to the Queue. Nothing moved to the backlog.
+- No task added. Shots keep starting at the feet, in line with the shadow, as decided on 2026-10-17; that is revisited only with a feel-check answer or the C1 verdict, not on a re-read of the code.

@@ -4,9 +4,7 @@ The ordered task queue for the current milestone, M1 (its design, [M1-core-loop.
 
 ## Queue
 
-- [ ] **Polish the aim (C1 iterate, polish).** Weekly re-check of the aim work (#99): shots start at the feet while the reticle sits ahead of the body, and the sprite flip mirrors the painted light. Move the shot origin to the wizard's hands in the aim direction (player-side only, no spell field read), add a test for it, and note in `docs/DECISIONS.md` what still looks off. Aim assist stays out until playtest answers exist.
-
-Otherwise no task is open in the Queue. The owner's C1 verdict decides what comes next: **go** starts M2, **iterate** reworks the weak parts (at most 2 rounds), **pivot** changes the plan. Default after 7 days without an answer (2026-10-24): iterate.
+No unchecked task is open in the Queue. The owner's C1 verdict decides what comes next: **go** starts M2, **iterate** reworks the weak parts (at most 2 rounds), **pivot** changes the plan. Default after 7 days without an answer (2026-10-24): iterate.
 
 ## Blocked
 

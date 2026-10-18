@@ -2,6 +2,13 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue.
 
+## 2026-10-18: Dodge and cast feel (C1 round 2, task 3)
+
+- Input buffer: a dodge or cast press is remembered for `INPUT_BUFFER` = 0.15 s (about 9 frames at 60 FPS) and fires when it becomes possible; used once, dropped when the overlay is open, when downed, or when older than the buffer. A held `cast` works as before.
+- Invulnerability window: sprite at 55% opacity plus a ring (player colour, dark outline) that closes over `INVULNERABLE_TIME`; shown for every kind of protection. Looked at in the shot `dodge_invulnerable`: the wall shows through the wizard and the ring reads at 640×360.
+- Cast rate and mana against the bots (`test_wave_balance`, headless runner, bots never dodge): 1 player 21 casts in 14.2 s (lost), 2 players 67 casts in 26.7 s (lost), 3 players 91 in 29.4 s, 4 players 67 in 15.1 s. No value changed; see `docs/DECISIONS.md`. The 1 and 2 player runs are lost by bots that never dodge, as already noted in the backlog.
+- Tests: buffered, too-early, used-once and overlay presses for dodge and cast; the look follows the window and clears when downed. `ci/build/build.sh --quick --tests` passes.
+
 ## 2026-10-18: Shots stop at walls (C1 round 2, task 2)
 
 - `core/projectiles` keeps a grid of solid 8 px cells (`set_walls`, `add_wall_body`, `clear_walls`, `clip_to_walls`, counter `wall_hits`). Each step walks the cells the path crosses and ends the shot at the first solid one (piercing shots too; fast shots cannot skip a wall). The wizard clips the staff tip to the wall before it casts, so a wizard against a wall cannot fire through it. `flow` gives the manager the room's wall-layer static bodies after the room is in the tree.

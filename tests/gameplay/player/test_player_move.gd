@@ -32,6 +32,7 @@ func _initialize() -> void:
 	_test_dodge_direction_is_locked()
 	_test_cooldown()
 	_test_press_too_early_is_dropped()
+	_test_press_just_before_ready_is_buffered()
 	_test_tap_released_before_step_counts()
 	_test_captured_player_cannot_move_or_dodge()
 	_test_press_while_captured_is_not_saved()
@@ -242,6 +243,51 @@ func _test_press_too_early_is_dropped() -> void:
 	_release(0, &"dodge")
 	_run(int((PlayerScript.DODGE_COOLDOWN + 0.25) / STEP))
 	_check(not player.is_dodging(), "a press made too early is not queued for later")
+
+
+## A press within INPUT_BUFFER of the end of the cooldown starts the dodge when it
+## ends; one made earlier is dropped; a buffered press is used once.
+func _test_press_just_before_ready_is_buffered() -> void:
+	_setup(1)
+	var player: PlayerScript = _players[0]
+	_hold(0, &"dodge")
+	_run(1)
+	_release(0, &"dodge")
+	_run(8)  # 0.125 s of the cooldown left
+	_check(not player.can_dodge(), "the cooldown is almost over")
+	_hold(0, &"dodge")
+	_release(0, &"dodge")
+	_run(1)
+	_check(not player.is_dodging(), "the press is not used while the cooldown runs")
+	_run(1)
+	_check(player.is_dodging(), "the press just before the end starts the dodge when it is ready")
+	_run(int((PlayerScript.DODGE_TIME + PlayerScript.DODGE_COOLDOWN) / STEP))
+	_check(not player.is_dodging(), "a buffered press is used once")
+	# A press 0.25 s before the end is longer ago than the buffer.
+	_setup(1)
+	player = _players[0]
+	_hold(0, &"dodge")
+	_run(1)
+	_release(0, &"dodge")
+	_run(6)  # 0.25 s left
+	_hold(0, &"dodge")
+	_release(0, &"dodge")
+	_run(int(PlayerScript.DODGE_COOLDOWN / STEP))
+	_check(not player.is_dodging(), "a press longer ago than INPUT_BUFFER is dropped")
+	# A press made in an overlay is not buffered either.
+	_setup(1)
+	player = _players[0]
+	_hold(0, &"dodge")
+	_run(1)
+	_release(0, &"dodge")
+	_run(8)
+	_input.set_captured(0, true)
+	_hold(0, &"dodge")
+	_release(0, &"dodge")
+	_run(1)
+	_input.set_captured(0, false)
+	_run(3)
+	_check(not player.is_dodging(), "a press made while captured is not buffered")
 
 
 func _test_tap_released_before_step_counts() -> void:

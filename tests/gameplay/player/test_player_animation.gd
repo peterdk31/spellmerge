@@ -26,6 +26,7 @@ func _initialize() -> void:
 	_test_idle_at_rest()
 	_test_walking_plays_the_walk_strip()
 	_test_dash_plays_once_then_idle()
+	_test_invulnerable_look_follows_the_window()
 	_test_every_player_shows_its_own_strips()
 	_test_imp_plays_its_idle()
 	_teardown()
@@ -151,6 +152,30 @@ func _test_dash_plays_once_then_idle() -> void:
 	_input.send_virtual(0, &"move_right", 0.0)
 	_run(2)
 	_check(sprite.texture == _wizard.textures[0], "idle again after the dash")
+
+
+## During the invulnerable part of a dodge the sprite is translucent and the ring
+## shows; both are gone as soon as the window ends, and a downed wizard has neither.
+func _test_invulnerable_look_follows_the_window() -> void:
+	_setup()
+	_check(_sprite().modulate.a == 1.0 and not _wizard._invulnerable_look, "a wizard at rest is opaque with no ring")
+	_input.send_virtual(0, &"dodge", 1.0)
+	_run(1)
+	_check(_wizard.is_invulnerable(), "the dodge made the wizard invulnerable")
+	_check(is_equal_approx(_sprite().modulate.a, PlayerScript.INVULNERABLE_ALPHA), "the sprite is translucent while invulnerable")
+	_check(_wizard._invulnerable_look, "the ring shows while invulnerable")
+	_input.send_virtual(0, &"dodge", 0.0)
+	_run(int(PlayerScript.INVULNERABLE_TIME / STEP))
+	_check(not _wizard.is_invulnerable(), "the window ended")
+	_check(_sprite().modulate.a == 1.0 and not _wizard._invulnerable_look, "the sprite is opaque again and the ring is gone")
+	_check(_wizard.is_dodging(), "the look ends with the window, not with the dash")
+	_setup()
+	_wizard.protect(1.0)
+	_run(1)
+	_check(_wizard._invulnerable_look, "protection (join or revive) shows the same look")
+	_wizard._invulnerable_left = 0.0
+	_wizard.take_damage(PlayerScript.MAX_HEALTH)
+	_check(_sprite().modulate.a == 1.0 and not _wizard._invulnerable_look, "a downed wizard is opaque with no ring")
 
 
 func _test_every_player_shows_its_own_strips() -> void:

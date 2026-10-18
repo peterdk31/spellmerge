@@ -127,6 +127,16 @@ func _initialize() -> void:
 	_save_crop(root.get_texture().get_image(), wizard4, "revive_ring_half")
 	wizard4.call("revive", 0)
 	_spread_wizards(flow)
+	# Wizard 1 dodges: translucent with a closing ring while it cannot be hurt.
+	wizard1.global_position = Vector2(320.0, 200.0)
+	await _settle()
+	_tap(input, 0, &"dodge")
+	await create_timer(0.05).timeout
+	await RenderingServer.frame_post_draw
+	if not wizard1.call("is_invulnerable"):
+		_fail("wizard 1 is not invulnerable in dodge_invulnerable")
+		return
+	_save_crop(root.get_texture().get_image(), wizard1, "dodge_invulnerable")
 	await _settle()
 	var coop: Node = root.get_node_or_null("Coop")
 	var camera: Camera2D = null if coop == null else coop.get("camera") as Camera2D

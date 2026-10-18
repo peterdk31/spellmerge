@@ -9,7 +9,11 @@ extends CharacterBody2D
 ## Dodge: a press of the `dodge` action starts a short dash. The wizard cannot
 ## be hurt for the first part of it (is_invulnerable()), then there is a cooldown
 ## before the next dodge. Combat (part 11) asks is_invulnerable() before damage.
-## A press made while the dodge is not ready is dropped, not queued.
+## A press made while the dodge is not ready is remembered for INPUT_BUFFER
+## seconds: if the dodge becomes ready in that time it starts then, so a press just
+## before the end of the cooldown still counts. An earlier press is dropped.
+## While the wizard cannot be hurt it is drawn translucent with a closing ring in
+## its colour, so everyone sees the window (also after joining or a revive).
 ##
 ## Health and mana: MAX_HEALTH, and MAX_MANA that regenerates. A hit (the
 ## `damage_dealt` event with this wizard as target, or take_damage()) does nothing
@@ -37,7 +41,10 @@ extends CharacterBody2D
 ## Dash look: during a dodge the sprite stretches and leans along the dash and
 ## fading ghosts of it trail behind (drawn in _draw; no nodes or arrays made).
 ##
-## Cast: while `cast` is held the wizard calls `spell.cast(index, origin, aim, mana)`
+## Cast: a press of `cast` is buffered like the dodge (INPUT_BUFFER seconds), so a tap
+## just before the spell's cooldown ends still fires.
+##
+## While `cast` is held the wizard calls `spell.cast(index, origin, aim, mana)`
 ## and reads no spell field. If the spell fired it takes the mana returned, sends
 ## `spell_cast` and plays the sound `cast` from `core/registry` (nothing on null).
 ##
@@ -58,6 +65,12 @@ const DODGE_TIME: float = 0.25
 const INVULNERABLE_TIME: float = 0.125
 ## Seconds from the start of a dodge until the next one may start.
 const DODGE_COOLDOWN: float = 0.625
+## A dodge or cast pressed this long (seconds) before it is possible still happens.
+const INPUT_BUFFER: float = 0.15
+## Sprite opacity and ring size while the wizard cannot be hurt.
+const INVULNERABLE_ALPHA: float = 0.55
+const INVULNERABLE_RING_RADIUS: float = 15.0
+const INVULNERABLE_RING_HEIGHT: float = 14.0
 const MAX_HEALTH: int = 100
 ## Health after a revive.
 const REVIVE_HEALTH: int = 50
@@ -185,6 +198,12 @@ var _invulnerable_left: float = 0.0
 var _cooldown_left: float = 0.0
 var _dodge_direction: Vector2 = Vector2.ZERO
 var _seen_dodge_presses: int = 0
+var _seen_cast_presses: int = 0
+## Seconds left in which a remembered press still counts (0 = none remembered).
+var _dodge_buffer_left: float = 0.0
+var _cast_buffer_left: float = 0.0
+## True while the invulnerable look (translucent sprite and ring) is shown.
+var _invulnerable_look: bool = false
 var _downed: bool = false
 ## How far a teammate's revive has got (0 to 1), from `revive_progress`; drawn as a ring.
 var _revive_progress: float = 0.0
@@ -295,6 +314,7 @@ func _ready() -> void:
 		add_child(_sound_player)
 	if input != null:
 		_seen_dodge_presses = input.get_press_count(index, &"dodge")
+		_seen_cast_presses = input.get_press_count(index, &"cast")
 	_announce_stats()
 
 
@@ -311,6 +331,10 @@ func step(delta: float) -> void:
 		if input != null:
 			# Presses made while downed are not held against the wizard after a revive.
 			_seen_dodge_presses = input.get_press_count(index, &"dodge")
+			_seen_cast_presses = input.get_press_count(index, &"cast")
+		_dodge_buffer_left = 0.0
+		_cast_buffer_left = 0.0
+		_update_invulnerable_look()
 		return
 	mana = minf(mana + MANA_REGEN * delta, MAX_MANA)
 	_announce_stats()
@@ -319,14 +343,19 @@ func step(delta: float) -> void:
 	_dodge_left = maxf(_dodge_left - delta, 0.0)
 	_invulnerable_left = maxf(_invulnerable_left - delta, 0.0)
 	_cooldown_left = maxf(_cooldown_left - delta, 0.0)
+	_dodge_buffer_left = maxf(_dodge_buffer_left - delta, 0.0)
+	_cast_buffer_left = maxf(_cast_buffer_left - delta, 0.0)
 	if input == null:
 		velocity = Vector2.ZERO
+		_update_invulnerable_look()
 		return
 	var move: Vector2 = input.get_move(index)
 	if input.is_captured(index):
 		# An overlay opened: freeze, and end a dash in progress (the cooldown stays).
 		_dodge_left = 0.0
 		_invulnerable_left = 0.0
+		_dodge_buffer_left = 0.0
+		_cast_buffer_left = 0.0
 	if move != Vector2.ZERO:
 		facing = move.normalized()
 	_update_aim(move, delta)
@@ -338,17 +367,33 @@ func step(delta: float) -> void:
 	var presses: int = input.get_press_count(index, &"dodge")
 	var pressed: bool = presses != _seen_dodge_presses
 	_seen_dodge_presses = presses
-	if pressed and not input.is_captured(index) and can_dodge():
+	var captured: bool = input.is_captured(index)
+	if pressed and not captured:
+		_dodge_buffer_left = INPUT_BUFFER
+	if _dodge_buffer_left > 0.0 and not captured and can_dodge():
+		_dodge_buffer_left = 0.0
 		_start_dodge(move)
 	if is_dodging():
 		velocity = _dodge_direction * DODGE_SPEED
 	else:
 		velocity = move * MOVE_SPEED
 	_update_animation(delta)
-	# Held, not pressed: the spell's own cooldown sets the rate. `cast` is hidden
-	# while an overlay is open (captured), so a menu tap never fires.
-	if spell != null and input.is_action_pressed(index, &"cast"):
-		cast()
+	_update_invulnerable_look()
+	# Held: the spell's own cooldown sets the rate. A press is also remembered, so a
+	# tap just before the cooldown ends fires. `cast` is hidden while an overlay is
+	# open (captured), so a menu tap never fires.
+	var cast_presses: int = input.get_press_count(index, &"cast")
+	if cast_presses != _seen_cast_presses:
+		_seen_cast_presses = cast_presses
+		if not captured:
+			_cast_buffer_left = INPUT_BUFFER
+	if spell == null:
+		return
+	if input.is_action_pressed(index, &"cast"):
+		if cast():
+			_cast_buffer_left = 0.0
+	elif _cast_buffer_left > 0.0 and not captured and cast():
+		_cast_buffer_left = 0.0
 
 
 ## Choose `aim` for this step: the right stick, else the mouse (keyboard player),
@@ -396,6 +441,18 @@ func _refresh_look() -> void:
 	if not aim.is_equal_approx(_drawn_aim):
 		_drawn_aim = aim
 		_redraw()
+
+
+## Show or hide the invulnerable look when the state changes; while it shows, the
+## closing ring is redrawn every step.
+func _update_invulnerable_look() -> void:
+	var now: bool = is_invulnerable() and not _downed
+	if not now and not _invulnerable_look:
+		return
+	_invulnerable_look = now
+	if _sprite != null:
+		_sprite.modulate = Color(1.0, 1.0, 1.0, INVULNERABLE_ALPHA if now else 1.0)
+	_redraw()
 
 
 ## Redraw the parts below the sprite (shadow, ghosts) and the overlay above it.
@@ -455,6 +512,7 @@ func _draw_overlay() -> void:
 		return
 	if not _reticle_visible():
 		return
+	_draw_invulnerable_ring()
 	_draw_staff()
 	var tip: Vector2 = aim * RETICLE_DISTANCE
 	var side: Vector2 = aim.orthogonal()
@@ -464,6 +522,18 @@ func _draw_overlay() -> void:
 	_overlay.draw_line(back - side * RETICLE_SIZE, tip, OUTLINE_COLOR, 3.0)
 	_overlay.draw_line(back + side * RETICLE_SIZE, tip, color, 1.0)
 	_overlay.draw_line(back - side * RETICLE_SIZE, tip, color, 1.0)
+
+
+## A ring round the body that closes as the invulnerable time runs out.
+func _draw_invulnerable_ring() -> void:
+	if not _invulnerable_look:
+		return
+	var left: float = clampf(_invulnerable_left / INVULNERABLE_TIME, 0.0, 1.0)
+	var centre: Vector2 = Vector2(0.0, -INVULNERABLE_RING_HEIGHT)
+	var color: Color = PLAYER_COLORS[clampi(index, 0, PLAYER_COLORS.size() - 1)]
+	var end: float = -PI * 0.5 + TAU * left
+	_overlay.draw_arc(centre, INVULNERABLE_RING_RADIUS, -PI * 0.5, end, 24, OUTLINE_COLOR, 4.0)
+	_overlay.draw_arc(centre, INVULNERABLE_RING_RADIUS, -PI * 0.5, end, 24, color, 2.0)
 
 
 ## The revive ring over a downed wizard: a dark ring with an arc that sweeps
@@ -600,6 +670,7 @@ func take_damage(amount: int) -> bool:
 		_invulnerable_left = 0.0
 		velocity = Vector2.ZERO
 		_revive_progress = 0.0
+		_update_invulnerable_look()
 		_redraw()
 		if events != null:
 			events.player_downed.emit(index)

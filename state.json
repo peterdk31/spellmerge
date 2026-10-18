@@ -2,7 +2,7 @@
   "alarms": {},
   "automation_started": "2026-10-16T16:49:06Z",
   "backoff_until": "2026-10-17T05:10:00Z",
-  "last_own_merge": "2026-10-18T06:40:06Z",
+  "last_own_merge": "2026-10-18T15:07:09Z",
   "limits": {
     "week_tokens": null,
     "window_tokens": 10471923
@@ -22,22 +22,7 @@
   },
   "panel_problems": [],
   "paused_by_command": false,
-  "pending_instructions": [
-    {
-      "at": "2026-10-18T14:36:14Z",
-      "kind": "claude",
-      "number": 102,
-      "text": "The shots are not visible. Neither from the player nor the enemies. This needs to be fixed. So I can't really tell if they go where I expect.\n    Haven't tried with a controller. Mouse works.\n    Haven't tried with more players than 1. Sorry\n    No aim assist. We will potentially have a \"homing\" modifier later when building spells.\n    Why would the shots leave his feet? I can't see them as explained in 1. But I would expect them to come out of his staff.\n\nThe dash needs to feel more like a dash - maybe it just needs some kind of animation\n\nOtherwise I'm impressed with what we have already!\nObviously we need better art and animations!",
-      "url": "https://github.com/peterdk31/spellmerge/issues/102#issuecomment-6251160604"
-    },
-    {
-      "at": "2026-10-18T14:38:07Z",
-      "kind": "claude",
-      "number": 97,
-      "text": "iterate I have made a playtest and commented on the playtest issue. Please make tasks for this and implement them",
-      "url": "https://github.com/peterdk31/spellmerge/issues/97#issuecomment-6251179471"
-    }
-  ],
+  "pending_instructions": [],
   "processed_comments": [
     6241847784,
     6251160604,

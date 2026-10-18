@@ -2,6 +2,17 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-18: Wave pacing: waves in the same room, +2 enemies a wave, downed wizards stand up between waves
+
+**Decided by:** Claude, from the owner's round-2 task list (#102).
+
+- **Growth is +2 enemies per wave, capped at 24** (`WAVE_GROWTH`, `WAVE_MAX`). Wave 1 stays the fixed 8-imp list the balance and 4-bot tests were tuned on; later waves carry on round the room's spawns (stacked with the existing diagonal offset). Linear, because the bots (which never dodge) already struggle with 1 and 2 players at wave 1; faster growth would end runs at wave 2. The cap keeps the enemy count (and the shot count) inside the performance budgets. Real scaling by player count and level belongs to `difficulty` in M3.
+- **3 s between a clear and the next wave** (`NEXT_WAVE_DELAY`): enough to see the clear, not long enough to idle. The world, the wizards and their positions are kept (a "same room" feel); only the shots in flight are cleared.
+- **Downed wizards are back up at the start of the next wave** (with `revive`, 50 health, plus the 2 s join protection for everyone), so one mistake does not leave a player watching for the rest of the run, and nobody waits (pillar). Health is otherwise not refilled: a wave is a real cost. If this proves too hard, a heal belongs to rewards (M4), not here.
+- **Quick restart: `RESTART_DELAY` 2.0 s to 1.5 s.** A lost room goes back to wave 1. The restart still builds a new world and sends `room_entered`; the wave counter restarts with `wave_started(1)`.
+- **New event `wave_started(wave)`** (sender `flow`, heard by `hud`), so the HUD never reads `flow`. `room_entered` is not repeated for a new wave; `room_cleared` is sent for every wave.
+- **HUD:** a plain "Wave N" label at the top middle (between the P1 and P2 panels), shown from the first `wave_started`, hidden when a run ends. Not tuned by playing (not possible here).
+
 ## 2026-10-18: Enemy readability: shape and brightness, a second draw batch, a hit never cancels a windup
 
 **Decided by:** Claude, from the owner's round-2 task list (#102).

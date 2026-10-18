@@ -70,6 +70,8 @@ signal run_ended(victory: bool)
 signal room_entered(room_id: StringName)
 ## Sender: flow. The room `room_id` was cleared.
 signal room_cleared(room_id: StringName)
+## Sender: flow. Wave number `wave` (1 for the first of a run) of the room began.
+signal wave_started(wave: int)
 ## Sender: flow. The result of a door vote: `player` voted for `door`.
 signal door_voted(player: int, door: int)
 ## Sender: difficulty. The difficulty level changed to `level`.

@@ -20,6 +20,7 @@ var _combat: Node
 var _bolt: SpellBase
 var _entered: Array[StringName] = []
 var _cleared: Array[StringName] = []
+var _waves: Array[int] = []
 
 
 func _initialize() -> void:
@@ -37,6 +38,7 @@ func _initialize() -> void:
 	_bolt = registry.call("get_resource", &"spells", &"bolt") as SpellBase
 	_events.connect("room_entered", func(id: StringName) -> void: _entered.append(id))
 	_events.connect("room_cleared", func(id: StringName) -> void: _cleared.append(id))
+	_events.connect("wave_started", func(number: int) -> void: _waves.append(number))
 	_test_restart_delay_is_under_three_seconds()
 	for count: int in [1, 2, 4]:
 		_test_play_starts_the_room(count)
@@ -55,6 +57,10 @@ func _initialize() -> void:
 	_test_wave_stands_on_floor()
 	_test_restart_leaves_no_old_enemies_or_shots()
 	_test_walls_reach_the_projectile_manager()
+	_test_waves_grow_in_the_same_room()
+	_test_wave_size_is_capped()
+	_test_next_wave_stands_up_downed_wizards()
+	_test_restart_goes_back_to_wave_one()
 	_test_main_menu_only_sends_play_requested()
 	_stop()
 	if _failures.is_empty():
@@ -78,6 +84,7 @@ func _setup(count: int) -> void:
 		_input.add_virtual_device(index)
 	_entered.clear()
 	_cleared.clear()
+	_waves.clear()
 
 
 ## End the run and free every device, so the next test starts clean.
@@ -317,6 +324,82 @@ func _test_restart_leaves_no_old_enemies_or_shots() -> void:
 ## Flow gives the arena's walls to the projectile manager: after `start_run` and
 ## after a restart, a path across the top border or a pillar ends there, and each
 ## of two players' shots is stopped.
+## Kill every enemy of the current wave (as if shot down).
+func _kill_wave() -> void:
+	for enemy: Node in _flow._enemies.duplicate():
+		_events.emit_signal("enemy_died", 0, enemy, Vector2.ZERO)
+
+
+## After a clear and NEXT_WAVE_DELAY the next, bigger wave stands in the same world.
+func _test_waves_grow_in_the_same_room() -> void:
+	for count: int in [1, 4]:
+		_setup(count)
+		_play()
+		var world: Node = _flow.world
+		_check(_waves == [1] and _flow.wave == 1, "%d players: wave 1 is announced once, got %s" % [count, _waves])
+		_check(_flow.enemies_left() == FlowScript.wave_size(1), "%d players: wave 1 has %d enemies" % [count, FlowScript.wave_size(1)])
+		_kill_wave()
+		_check(_flow.state == FlowScript.State.CLEARED and _waves == [1], "%d players: a cleared wave waits before the next" % count)
+		_flow.step(FlowScript.NEXT_WAVE_DELAY - 0.5)
+		_check(_flow.enemies_left() == 0 and _waves == [1], "%d players: no next wave before the delay" % count)
+		_flow.step(0.5)
+		_check(_flow.world == world, "%d players: wave 2 stands in the same world" % count)
+		_check(_waves == [1, 2] and _flow.wave == 2, "%d players: wave_started(2) was sent, got %s" % [count, _waves])
+		_check(_flow.state == FlowScript.State.RUNNING, "%d players: running again" % count)
+		_check(_flow.enemies_left() == FlowScript.wave_size(2), "%d players: wave 2 has %d enemies" % [count, FlowScript.wave_size(2)])
+		_check(FlowScript.wave_size(2) > FlowScript.wave_size(1), "wave 2 is bigger than wave 1")
+		_check(_entered.size() == 1, "%d players: room_entered is not sent again for a new wave" % count)
+		_kill_wave()
+		_check(_cleared.size() == 2, "%d players: room_cleared is sent for every wave, got %d" % [count, _cleared.size()])
+		_flow.step(FlowScript.NEXT_WAVE_DELAY)
+		_check(_flow.wave == 3 and _flow.enemies_left() == FlowScript.wave_size(3), "%d players: wave 3 follows" % count)
+		_stop()
+
+
+func _test_wave_size_is_capped() -> void:
+	_check(FlowScript.wave_size(1) == FlowScript.WAVE.size(), "wave 1 is the WAVE list")
+	var last: int = 0
+	for number in range(1, 200):
+		var size: int = FlowScript.wave_size(number)
+		_check(size >= last and size <= FlowScript.WAVE_MAX, "wave %d size %d never shrinks or passes WAVE_MAX" % [number, size])
+		last = size
+	_check(FlowScript.wave_size(200) == FlowScript.WAVE_MAX, "a very late wave holds WAVE_MAX enemies")
+
+
+## A wizard who was down when the wave ended stands up for the next one, and nobody is hurt at once.
+func _test_next_wave_stands_up_downed_wizards() -> void:
+	_setup(2)
+	_play()
+	(_flow.get_wizard(1) as PlayerScript).take_damage(PlayerScript.MAX_HEALTH)
+	_check(not _flow.is_restarting(), "one of two down: no restart")
+	_kill_wave()
+	_flow.step(FlowScript.NEXT_WAVE_DELAY)
+	var wizard := _flow.get_wizard(1) as PlayerScript
+	_check(not wizard.is_downed() and wizard.health > 0, "the downed wizard is up for wave 2")
+	_check(wizard.is_invulnerable(), "the wizard is protected for a moment at the start of wave 2")
+	_check(not _flow.is_restarting(), "no restart is pending in wave 2")
+	_stop()
+
+
+## Losing the room starts again from wave 1.
+func _test_restart_goes_back_to_wave_one() -> void:
+	_setup(1)
+	_play()
+	_kill_wave()
+	_flow.step(FlowScript.NEXT_WAVE_DELAY)
+	_check(_flow.wave == 2, "the test reached wave 2")
+	var wizard := _flow.get_wizard(0) as PlayerScript
+	wizard._invulnerable_left = 0.0 # the wave-start protection would absorb the hit
+	wizard.take_damage(PlayerScript.MAX_HEALTH)
+	_flow.step(FlowScript.RESTART_DELAY)
+	_check(_flow.wave == 1 and _waves.back() == 1, "the restart begins at wave 1, got %d" % _flow.wave)
+	_check(_flow.enemies_left() == FlowScript.wave_size(1), "the restart has the wave 1 size")
+	# A pending next wave of the old run must not fire in the new one.
+	_flow.step(FlowScript.NEXT_WAVE_DELAY)
+	_check(_flow.wave == 1, "no stray wave timer survives the restart")
+	_stop()
+
+
 func _test_walls_reach_the_projectile_manager() -> void:
 	_setup(2)
 	_play()

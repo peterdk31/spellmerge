@@ -2,6 +2,12 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue.
 
+## 2026-10-18: Wave pacing (C1 round 2, task 5)
+
+- `flow`: after `room_cleared`, `NEXT_WAVE_DELAY` (3 s) later the next wave stands in the same world with 2 more enemies (8, 10, 12 ... up to 24); downed wizards are revived and protected; the restart is 1.5 s and goes back to wave 1. New event `wave_started(wave)`; the HUD shows "Wave N" at the top middle.
+- Tests: `test_flow.gd` (growth, same world, cap, downed wizards, restart to wave 1, no stray timer), `test_panels.gd` (wave line), `test_events.gd`. `ci/build/build.sh --quick --tests` passes, including the 4-bot test (clears wave 1 in 13.6 game seconds this run) and the wave balance test (wave 1 is unchanged; its `BALANCE:` lines are as noisy as before: bots never dodge). Screenshot `arena_four_wizards` shows the line.
+- `tools/check.sh` reports only untracked files of the session's home directory (`.idea`, `.vscode`, `scripts`), none of them part of the change.
+
 ## 2026-10-18: Enemy readability (C1 round 2, task 4)
 
 - Telegraph: the imp swaps to a `windup.svg` pose (glowing mouth and belly, sparks) and flips its two frames faster toward the shot (`frame = floor(progress² × 9) mod 2`), goes brighter for the last 20%, and the line is 3 to 6 px wide in Fire light (was 2 to 4, darker).

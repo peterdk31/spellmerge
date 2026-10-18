@@ -529,7 +529,8 @@ func cast() -> bool:
 		return false
 	var origin: Vector2 = muzzle_position()
 	if projectiles != null:
-		# A staff tip behind a wall: the shot starts at the wall and ends on it.
+		# A staff tip behind a wall: the shot starts at the wall and ends on it
+		# (the manager takes no pool slot for a shot that starts inside a wall).
 		origin = projectiles.clip_to_walls(global_position, origin)
 	var spent: float = spell.cast(index, origin, aim, mana)
 	if spent == SpellBase.REFUSED:

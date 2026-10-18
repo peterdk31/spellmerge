@@ -120,6 +120,20 @@ func _run_cap(cap: int) -> void:
 	_check(_mgr.get_count() < cap, "cap %d: some shots ended on a wall" % cap)
 	_check(_mgr.wall_hits > 0, "cap %d: wall_hits counts them" % cap)
 	_log("step, full cap, no targets, arena walls set", wall_us / float(REPEATS), 1, "per step")
+	# The costly case: every shot is fast (1,500 px/s, 25 px a step: several wall
+	# cells) and flies in the open band between the top border and the pillars, so
+	# nearly none ends in the first cell.
+	var long_us: float = 0.0
+	for i in REPEATS:
+		_mgr.clear()
+		for n in cap:
+			var lane := Vector2(48.0 + float(n * 37 % 500), 40.0 + float(n * 53 % 80))
+			_mgr.spawn(n % PLAYERS, lane, Vector2(1500.0, 0.0), 1.0e6, 4.0, 0)
+		var long_start: int = Time.get_ticks_usec()
+		_mgr.step(DT)
+		long_us += float(Time.get_ticks_usec() - long_start)
+	_check(_mgr.get_count() > cap * 9 / 10, "cap %d: the long paths mostly survive (%d)" % [cap, _mgr.get_count()])
+	_log("step, full cap, long wall paths, none dying", long_us / float(REPEATS), 1, "per step")
 	_mgr.clear_walls()
 
 	# The crowd: 100 enemies packed into a few cells, four wizards beside them, and

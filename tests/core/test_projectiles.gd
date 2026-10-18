@@ -51,6 +51,9 @@ func _initialize() -> void:
 	_test_spent_budget_resumes_at_the_first_untested_shot()
 	_test_shot_ends_on_a_wall()
 	_test_wall_stops_a_piercing_shot_and_a_fast_shot()
+	_test_target_in_front_of_a_wall_is_hit_by_a_long_step()
+	_test_shot_born_in_a_wall_takes_no_slot()
+	_test_wall_walk_is_capped()
 	_test_wall_hits_from_every_direction()
 	_test_wall_edges_and_clearing()
 	_test_clip_to_walls()
@@ -595,6 +598,55 @@ func _test_wall_stops_a_piercing_shot_and_a_fast_shot() -> void:
 	_check(not _mgr.is_alive(piercing), "a piercing shot ends on a wall too")
 	_check(not _mgr.is_alive(fast), "a shot faster than the wall is thick does not tunnel")
 	_check(_hits.is_empty(), "nothing behind the wall was hit (%d)" % _hits.size())
+
+
+func _test_target_in_front_of_a_wall_is_hit_by_a_long_step() -> void:
+	_setup()
+	_mgr.set_bounds(Rect2(0.0, 0.0, 640.0, 360.0))
+	_mgr.set_walls(_wall_rects())
+	var in_front: Node2D = _target(Vector2(90.0, 100.0))
+	# 6,000 px/s: one step from x 50 to x 150 crosses the target, then the wall.
+	var shot: int = _mgr.spawn(0, Vector2(50.0, 100.0), Vector2(6000.0, 0.0), 5.0)
+	_mgr.step(DT)
+	_check(_hits.size() == 1 and _hits[0][1] == in_front, "the target in front of the wall is hit (%d hits)" % _hits.size())
+	_check(not _mgr.is_alive(shot), "the shot ends at the wall or on the hit")
+	# A piercing shot passes the target and still ends on the wall in the same step.
+	_hits.clear()
+	var piercing: int = _mgr.spawn(0, Vector2(50.0, 100.0), Vector2(6000.0, 0.0), 5.0, 4.0, ManagerScript.LAYER_ENEMY, 5)
+	_mgr.step(DT)
+	_check(_hits.size() == 1, "a piercing shot hits the target in front of the wall (%d)" % _hits.size())
+	_check(not _mgr.is_alive(piercing), "and ends on the wall in the same step")
+	_check(_mgr.wall_hits >= 1, "wall_hits counts the end")
+
+
+func _test_shot_born_in_a_wall_takes_no_slot() -> void:
+	_setup()
+	_mgr.set_bounds(Rect2(0.0, 0.0, 640.0, 360.0))
+	_mgr.set_cap(3)
+	_mgr.set_walls(_wall_rects())
+	var first: int = _mgr.spawn(1, Vector2(10.0, 300.0), Vector2(1.0, 0.0), 5.0)
+	_mgr.spawn(1, Vector2(20.0, 300.0), Vector2(1.0, 0.0), 5.0)
+	_mgr.spawn(1, Vector2(30.0, 300.0), Vector2(1.0, 0.0), 5.0)
+	var dead: int = _mgr.spawn(0, Vector2(110.0, 100.0), Vector2(100.0, 0.0), 5.0)
+	_check(dead == -1, "a shot spawned inside a wall is refused")
+	_check(_mgr.get_count() == 3 and _mgr.is_alive(first), "at the cap it evicted nobody")
+	_check(_mgr.wall_hits == 1, "it counts as ended on a wall (%d)" % _mgr.wall_hits)
+
+
+func _test_wall_walk_is_capped() -> void:
+	_setup()
+	_mgr.set_bounds(Rect2(0.0, 0.0, 2000.0, 360.0))
+	var far_wall: Array[Rect2] = [Rect2(1200.0, 0.0, 32.0, 360.0)]
+	_mgr.set_walls(far_wall)
+	# One step of 1,800 px is 225 cells, more than MAX_WALL_VISITS: the shot is
+	# ended even though the wall lies in the part that is not walked.
+	var shot: int = _mgr.spawn(0, Vector2(50.0, 100.0), Vector2(108000.0, 0.0), 5.0)
+	_mgr.step(DT)
+	_check(not _mgr.is_alive(shot), "a step too long to walk ends the shot instead of crossing the wall")
+	# A long step with nothing in the way, within the cap, flies on.
+	var near: int = _mgr.spawn(0, Vector2(50.0, 100.0), Vector2(18000.0, 0.0), 5.0)
+	_mgr.step(DT)
+	_check(_mgr.is_alive(near), "a 300 px step toward a far wall is walked and clear")
 
 
 func _test_wall_hits_from_every_direction() -> void:

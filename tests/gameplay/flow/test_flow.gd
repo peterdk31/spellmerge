@@ -54,6 +54,7 @@ func _initialize() -> void:
 	_test_play_keeps_joined_pad_without_keyboard()
 	_test_wave_stands_on_floor()
 	_test_restart_leaves_no_old_enemies_or_shots()
+	_test_walls_reach_the_projectile_manager()
 	_test_main_menu_only_sends_play_requested()
 	_stop()
 	if _failures.is_empty():
@@ -311,6 +312,35 @@ func _test_restart_leaves_no_old_enemies_or_shots() -> void:
 	_check(projectiles.call("get_count") == 0, "the restart cleared the shots")
 	_check(_combat.call("get_enemy_count") == FlowScript.WAVE.size(), "combat knows only the new wave, got %d" % _combat.call("get_enemy_count"))
 	_stop()
+
+
+## Flow gives the arena's walls to the projectile manager: after `start_run` and
+## after a restart, a path across the top border or a pillar ends there, and each
+## of two players' shots is stopped.
+func _test_walls_reach_the_projectile_manager() -> void:
+	_setup(2)
+	_play()
+	var projectiles: Node = root.get_node("Projectiles")
+	_check_arena_walls(projectiles, "after start_run")
+	for index in 2:
+		projectiles.call("spawn", index, Vector2(100.0 + 20.0 * index, 100.0), Vector2(0.0, -300.0), 5.0, 2.0, 0)
+	_check(projectiles.call("get_count_for", 0) == 1 and projectiles.call("get_count_for", 1) == 1, "each player has a shot in the air")
+	projectiles.call("step", 0.25)
+	_check(projectiles.call("get_count") == 0, "both players' shots ended on the border, %d left" % projectiles.call("get_count"))
+	# A restart builds a new world and must give the walls again.
+	(_flow.get_wizard(0) as PlayerScript).take_damage(PlayerScript.MAX_HEALTH)
+	(_flow.get_wizard(1) as PlayerScript).take_damage(PlayerScript.MAX_HEALTH)
+	_flow.step(FlowScript.RESTART_DELAY)
+	_check(_flow.state == FlowScript.State.RUNNING, "the run restarted")
+	_check_arena_walls(projectiles, "after a restart")
+	_stop()
+
+
+func _check_arena_walls(projectiles: Node, when: String) -> void:
+	var top: Vector2 = projectiles.call("clip_to_walls", Vector2(100.0, 100.0), Vector2(100.0, -10.0))
+	_check(top.is_equal_approx(Vector2(100.0, 32.0)), "%s: a path up ends on the top border at y 32, got %s" % [when, top])
+	var pillar: Vector2 = projectiles.call("clip_to_walls", Vector2(100.0, 144.0), Vector2(300.0, 144.0))
+	_check(pillar.is_equal_approx(Vector2(160.0, 144.0)), "%s: a path right ends on the pillar at x 160, got %s" % [when, pillar])
 
 
 ## The menu's Play button sends `play_requested` and nothing else: it neither

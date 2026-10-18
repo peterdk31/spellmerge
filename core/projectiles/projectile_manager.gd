@@ -46,12 +46,16 @@ extends Node2D
 ## Walls: `set_walls(rects)` (or `add_wall_body(body)` for a room's static body) gives
 ## the solid parts of the room. They are rasterised into a grid of WALL_CELL
 ## pixel cells, so a wall check is a walk over the cells the step's path crosses
-## (a few for a normal shot; the cost grows with the length of the step, like the
-## hit search) and needs no physics query. A projectile whose path enters a solid
-## cell ends there, even a piercing one: there is no bouncing. It is checked as a
-## point, not a circle, and before any target, so the work budget above is not
-## spent on it. `wall_hits` counts these ends. `clip_to_walls(from, to)` shortens
-## a segment to the first wall, for a shot whose start point may be behind one.
+## (a few for a normal shot; at most MAX_WALL_VISITS for a huge step, and a path
+## not fully walked then counts as a wall hit) and needs no physics query. A
+## projectile whose path enters a solid cell ends there, even a piercing one:
+## there is no bouncing. It is checked as a point, not a circle. The step is cut
+## at the wall first, so a target in front of the wall is still hit by a fast
+## shot, and one behind it is not. The wall walk is not charged to the work
+## budget above (its length is capped instead). `wall_hits` counts these ends.
+## `clip_to_walls(from, to)` shortens a segment to the first wall. `spawn` refuses
+## (-1, counted in `wall_hits`) a shot that starts inside a wall, so it takes no
+## pool slot and evicts nobody at the cap.
 ##
 ## The global cap (`get_cap()`, set by platform: DEFAULT_CAP_WEB or
 ## DEFAULT_CAP_DESKTOP) degrades gracefully. When it is full, a new projectile
@@ -79,6 +83,9 @@ const HIT_MEMORY: int = 3
 ## each hit costs HIT_WORK. Once it is spent, the remaining projectiles are not
 ## tested this step (see the class doc). Normal play uses a tiny part of it.
 const WORK_PER_STEP: int = 8000
+
+## The most wall cells one shot walks in one step (see `_wall_hit`).
+const MAX_WALL_VISITS: int = 64
 ## The work one hit counts for: the event, its handlers and the bookkeeping.
 const HIT_WORK: int = 40
 ## Floats per projectile in the MultiMesh buffer: 8 transform, 4 colour.
@@ -352,7 +359,11 @@ func _wall_hit(from: Vector2, to: Vector2) -> float:
 		per_y = absf(1.0 / delta.y)
 		next_y = (float(cy + (1 if step_y > 0 else 0)) - start.y) / delta.y
 	var t: float = 0.0
-	var visits: int = absi(end_x - cx) + absi(end_y - cy) + 1
+	# A huge step (after a hitch) walks at most MAX_WALL_VISITS cells; a path
+	# that is still unchecked after that counts as a hit, so a shot never
+	# crosses a wall it did not look at.
+	var full: int = absi(end_x - cx) + absi(end_y - cy) + 1
+	var visits: int = mini(full, MAX_WALL_VISITS)
 	for _n in visits:
 		if cx >= 0 and cx < _wall_w and cy >= 0 and cy < _wall_h and _wall_cells[cy * _wall_w + cx] != 0:
 			return t
@@ -365,8 +376,8 @@ func _wall_hit(from: Vector2, to: Vector2) -> float:
 			next_y += per_y
 			cy += step_y
 		if t > 1.0:
-			break
-	return -1.0
+			return -1.0
+	return t if full > visits else -1.0
 
 
 ## The batch's culling box must cover the whole area. Without it the renderer
@@ -449,12 +460,17 @@ func get_target_count() -> int:
 ## Start a projectile for `player` (0-3, or Events.NO_PLAYER for an enemy) at
 ## `origin`, moving `velocity` pixels per second for `lifetime` seconds.
 ## `pierce` is how many targets it passes through before it ends. Returns its
-## slot, or -1 for bad arguments.
+## slot, or -1 for bad arguments or an origin inside a wall.
 ## `tag` is stored and sent back with every hit of this projectile. A full cap never refuses: see the class doc.
 func spawn(player: int, origin: Vector2, velocity: Vector2, lifetime: float, radius: float = 4.0, hit_layers: int = LAYER_ENEMY, pierce: int = 0, tag: int = 0) -> int:
 	if player < EventsScript.NO_PLAYER or player >= MAX_PLAYERS:
 		return -1
 	if not (lifetime > 0.0) or not origin.is_finite() or not velocity.is_finite():
+		return -1
+	if _has_walls and _wall_hit(origin, origin) >= 0.0:
+		# Born inside a wall it would end in the next step: count it as ended, but
+		# take no pool slot (at the cap that would evict another shot).
+		wall_hits += 1
 		return -1
 	if _free_count == 0:
 		_drop_one()
@@ -516,13 +532,20 @@ func step(delta: float) -> void:
 		if not limit.has_point(_pos[slot]):
 			_kill(slot)
 			continue
-		if _has_walls and _wall_hit(_prev[slot], _pos[slot]) >= 0.0:
-			wall_hits += 1
-			_kill(slot)
-			continue
+		# A shot that meets a wall is cut short there: it can still hit what is
+		# in front of the wall, then it ends.
+		var walled: bool = false
+		if _has_walls:
+			var cut: float = _wall_hit(_prev[slot], _pos[slot])
+			if cut >= 0.0:
+				walled = true
+				_pos[slot] = _prev[slot].lerp(_pos[slot], cut)
 		if _layers[slot] != 0 and not _targets.is_empty():
 			if _work_left <= 0:
-				if starved_at < 0:
+				if walled:
+					wall_hits += 1
+					_kill(slot)
+				elif starved_at < 0:
 					starved_at = slot
 				continue
 			# A piercing shot may pass through several targets this step. A
@@ -531,6 +554,9 @@ func step(delta: float) -> void:
 			for _hit in HIT_MEMORY:
 				if not _hit_test(slot) or _alive[slot] == 0 or _seq[slot] != seq:
 					break
+		if walled and _alive[slot] != 0:
+			wall_hits += 1
+			_kill(slot)
 	_resume = maxi(starved_at, 0)
 	_stepping = false
 

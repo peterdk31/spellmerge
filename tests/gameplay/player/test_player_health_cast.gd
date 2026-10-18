@@ -239,9 +239,9 @@ func _test_cast_origin_stops_at_a_wall() -> void:
 	var origins: Array[Vector2] = []
 	_bus.spell_cast.connect(func(_p: int, _id: StringName, origin: Vector2, _d: Vector2) -> void: origins.append(origin))
 	_players[0].spell = _make_spell(1.0, 0.0)
-	_check(_players[0].cast(), "a wizard against a wall still casts")
 	var tip: Vector2 = _players[0].muzzle_position()
 	_check(tip.x > 96.0, "the staff tip is behind the wall (%s)" % str(tip))
+	_check(_players[0].cast(), "a wizard against a wall still casts")
 	_check(origins.size() == 1 and origins[0].x <= 96.01, "the shot starts in front of the wall (%s)" % str(origins))
 	# Aiming away from the wall is not clipped.
 	_players[0].aim = Vector2.LEFT

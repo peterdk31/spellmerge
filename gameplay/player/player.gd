@@ -75,9 +75,11 @@ const HAND_HEIGHT: float = 10.0
 const STAFF_REACH: float = 14.0
 ## Dash look: sprite stretch along the dash, lean in radians, the ghosts' spacing
 ## in pixels and their opacities (one per ghost).
+## The stretch is for a horizontal dash; a mostly vertical one swaps the axes.
 const DASH_STRETCH: Vector2 = Vector2(1.3, 0.8)
 const DASH_LEAN: float = 0.2
-const GHOST_SPACING: float = 9.0
+## A ghost is left behind every GHOST_INTERVAL seconds of the dash (3 of them).
+const GHOST_INTERVAL: float = 0.04
 const GHOST_ALPHAS: Array[float] = [0.45, 0.28, 0.14]
 ## Light colour of each player's ramp, for the reticle. The single source is the
 ## player ramps in docs/STYLE.md; core has only the base colours (projectile manager).
@@ -135,6 +137,12 @@ var _sprite: Sprite2D = null
 var _faces_left: bool = false
 ## True while the dash look is applied (to redraw and to reset it once).
 var _dash_look: bool = false
+## Where the wizard was at the last ghost ticks of the dash (newest first; a
+## fixed array, only overwritten), and the time to the next tick.
+var _trail: Array[Vector2] = [Vector2.ZERO, Vector2.ZERO, Vector2.ZERO]
+var _trail_timer: float = 0.0
+## Child drawn above the sprite: the staff and the reticle (null in bare scripts).
+var _overlay: Node2D = null
 
 var _dodge_left: float = 0.0
 var _invulnerable_left: float = 0.0
@@ -183,6 +191,10 @@ func _ready() -> void:
 		events.damage_dealt.connect(_on_damage_dealt)
 	if registry == null and in_tree:
 		registry = get_node_or_null("/root/Registry") as RegistryScript
+	if _overlay == null:
+		_overlay = Node2D.new()
+		_overlay.draw.connect(_draw_overlay)
+		add_child(_overlay)
 	if is_inside_tree() and _sound_player == null:
 		_sound_player = AudioStreamPlayer.new()
 		add_child(_sound_player)
@@ -223,6 +235,8 @@ func step(delta: float) -> void:
 	if move != Vector2.ZERO:
 		facing = move.normalized()
 	_update_aim(move, delta)
+	if _dash_look:
+		_tick_trail(delta)
 	# Count presses rather than asking "just pressed": a tap released again
 	# before this frame is not lost. A captured player (overlay open) is skipped,
 	# and a press made meanwhile is not held against them later.
@@ -285,26 +299,61 @@ func _refresh_look() -> void:
 		_apply_dash_look(dashing)
 	if not aim.is_equal_approx(_drawn_aim):
 		_drawn_aim = aim
-		queue_redraw()
+		_redraw()
+
+
+## Redraw the parts below the sprite (shadow, ghosts) and the overlay above it.
+func _redraw() -> void:
+	queue_redraw()
+	if _overlay != null:
+		_overlay.queue_redraw()
+
+
+## The sprite scale of a dash: stretched along the dominant axis of the dash.
+func _dash_scale() -> Vector2:
+	if absf(_dodge_direction.x) >= absf(_dodge_direction.y):
+		return DASH_STRETCH
+	return Vector2(DASH_STRETCH.y, DASH_STRETCH.x)
+
+
+## Lean in radians, into the dash. A node's rotation is not mirrored by flip_h,
+## so the sign needs no care for a sprite that faces left.
+func _dash_lean() -> float:
+	return clampf(_dodge_direction.x, -1.0, 1.0) * DASH_LEAN
 
 
 ## Stretch and lean the sprite along the dash, or put it back when it ends.
 func _apply_dash_look(dashing: bool) -> void:
 	_dash_look = dashing
 	if _sprite != null:
-		_sprite.scale = DASH_STRETCH if dashing else Vector2.ONE
-		_sprite.rotation = clampf(_dodge_direction.x, -1.0, 1.0) * DASH_LEAN if dashing else 0.0
-	queue_redraw()
+		_sprite.scale = _dash_scale() if dashing else Vector2.ONE
+		_sprite.rotation = _dash_lean() if dashing else 0.0
+	_redraw()
 
 
-## A soft shadow under the feet and the aim reticle (a chevron in the player
-## colour with an outline). No arrays are made: lines only.
+## Note where the wizard is every GHOST_INTERVAL of the dash (shifts 3 values).
+func _tick_trail(delta: float) -> void:
+	_trail_timer -= delta
+	if _trail_timer > 0.0:
+		return
+	_trail_timer = GHOST_INTERVAL
+	for i in range(_trail.size() - 1, 0, -1):
+		_trail[i] = _trail[i - 1]
+	_trail[0] = global_position
+
+
+## A soft shadow under the feet and the dash ghosts, both below the sprite.
 func _draw() -> void:
 	draw_set_transform(Vector2(0, 2), 0.0, Vector2(1.0, 0.4))
 	draw_circle(Vector2.ZERO, 8.0, Color(0, 0, 0, 0.35))
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	if _dash_look and _sprite != null and _sprite.texture != null:
 		_draw_ghosts()
+
+
+## The staff and the aim reticle (a chevron in the player colour with an
+## outline), above the sprite. No arrays are made: lines only.
+func _draw_overlay() -> void:
 	if not _reticle_visible():
 		return
 	_draw_staff()
@@ -312,21 +361,23 @@ func _draw() -> void:
 	var side: Vector2 = aim.orthogonal()
 	var back: Vector2 = tip - aim * RETICLE_SIZE
 	var color: Color = PLAYER_COLORS[clampi(index, 0, PLAYER_COLORS.size() - 1)]
-	draw_line(back + side * RETICLE_SIZE, tip, OUTLINE_COLOR, 3.0)
-	draw_line(back - side * RETICLE_SIZE, tip, OUTLINE_COLOR, 3.0)
-	draw_line(back + side * RETICLE_SIZE, tip, color, 1.0)
-	draw_line(back - side * RETICLE_SIZE, tip, color, 1.0)
+	_overlay.draw_line(back + side * RETICLE_SIZE, tip, OUTLINE_COLOR, 3.0)
+	_overlay.draw_line(back - side * RETICLE_SIZE, tip, OUTLINE_COLOR, 3.0)
+	_overlay.draw_line(back + side * RETICLE_SIZE, tip, color, 1.0)
+	_overlay.draw_line(back - side * RETICLE_SIZE, tip, color, 1.0)
 
 
-## Fading copies of the sprite behind the dash.
+## Fading copies of the sprite where the wizard was, stretched and leaned like it.
 func _draw_ghosts() -> void:
 	var texture: Texture2D = _sprite.texture
 	var size: Vector2 = texture.get_size()
 	var tint: Color = PLAYER_COLORS[clampi(index, 0, PLAYER_COLORS.size() - 1)]
 	var flip: float = -1.0 if _faces_left else 1.0
+	var stretch: Vector2 = _dash_scale()
+	var lean: float = _dash_lean()
 	for i in GHOST_ALPHAS.size():
-		var at: Vector2 = _sprite.position - _dodge_direction * GHOST_SPACING * float(i + 1)
-		draw_set_transform(at, 0.0, Vector2(flip, 1.0))
+		var at: Vector2 = _sprite.position + _trail[i] - global_position
+		draw_set_transform(at, lean, Vector2(flip * stretch.x, stretch.y))
 		draw_texture_rect(texture, Rect2(-size * 0.5, size), false, Color(tint, GHOST_ALPHAS[i]))
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
@@ -336,10 +387,10 @@ func _draw_staff() -> void:
 	var hand: Vector2 = Vector2(0.0, -HAND_HEIGHT)
 	var tip: Vector2 = hand + aim * STAFF_REACH
 	var color: Color = PLAYER_COLORS[clampi(index, 0, PLAYER_COLORS.size() - 1)]
-	draw_line(hand, tip, OUTLINE_COLOR, 3.0)
-	draw_line(hand, tip, Color("8a5a44"), 1.0)
-	draw_circle(tip, 2.5, OUTLINE_COLOR)
-	draw_circle(tip, 1.5, color)
+	_overlay.draw_line(hand, tip, OUTLINE_COLOR, 3.0)
+	_overlay.draw_line(hand, tip, Color("8a5a44"), 1.0)
+	_overlay.draw_circle(tip, 2.5, OUTLINE_COLOR)
+	_overlay.draw_circle(tip, 1.5, color)
 
 
 ## True when _draw() shows the aim reticle: not while downed.
@@ -352,13 +403,14 @@ func _reticle_visible() -> bool:
 func cast() -> bool:
 	if _downed or spell == null:
 		return false
-	var spent: float = spell.cast(index, muzzle_position(), aim, mana)
+	var origin: Vector2 = muzzle_position()
+	var spent: float = spell.cast(index, origin, aim, mana)
 	if spent == SpellBase.REFUSED:
 		return false
 	mana -= spent
 	_announce_stats()
 	if events != null:
-		events.spell_cast.emit(index, spell.spell_id(), muzzle_position(), aim)
+		events.spell_cast.emit(index, spell.spell_id(), origin, aim)
 	_play_cast_sound()
 	return true
 
@@ -416,7 +468,7 @@ func revive(reviver: int) -> bool:
 	if not _downed:
 		return false
 	_downed = false
-	queue_redraw()
+	_redraw()
 	health = REVIVE_HEALTH
 	_announce_stats()
 	if events != null:
@@ -450,3 +502,6 @@ func _start_dodge(move: Vector2) -> void:
 	_dodge_left = DODGE_TIME
 	_invulnerable_left = INVULNERABLE_TIME
 	_cooldown_left = DODGE_COOLDOWN
+	# The ghosts start on the wizard and grow out behind as the dash goes on.
+	_trail.fill(global_position)
+	_trail_timer = GHOST_INTERVAL

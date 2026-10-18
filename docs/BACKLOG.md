@@ -53,6 +53,8 @@ Sounds the game asks for by id and does not have yet. A missing sound is silent 
 
 - **Invalid UIDs with a 9.** Godot's UID alphabet is a-y and 0-8. Fix the digit 9 in: `tests/gameplay/combat/test_combat.gd.uid`, `tests/gameplay/player/fixtures/counting_spell.gd.uid`, `tests/gameplay/player/test_player_move.gd.uid`, `tests/core/test_spell_base.gd.uid`, `tests/core/test_registry.gd.uid`.
 
+- **Shots stop at walls.** Projectiles ignore room geometry in M1, so a wizard pressed to a wall fires from the far side of it (the muzzle is 14 px out). Needs a wall check in `core/projectiles` and a decision on bouncing spells.
+
 ## Ideas from the community
 
 (none yet)

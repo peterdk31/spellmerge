@@ -176,6 +176,7 @@ func start_run(requester: int) -> bool:
 	room_id = room.id
 	state = State.RUNNING
 	_show_world(new_world)
+	_set_walls(new_world)
 	if events != null:
 		events.room_entered.emit(room.id)
 	return true
@@ -284,6 +285,18 @@ func _joined_players() -> Array[int]:
 		if input.is_joined(index):
 			players.append(index)
 	return players
+
+
+## Tell the projectile manager where the walls are: every static body on the wall
+## layer (1) of the room. The world must be in the tree.
+func _set_walls(new_world: Node2D) -> void:
+	if projectiles == null or not new_world.is_inside_tree():
+		return
+	projectiles.clear_walls()
+	for node: Node in new_world.find_children("*", "StaticBody2D", true, false):
+		var body := node as StaticBody2D
+		if (body.collision_layer & 1) != 0:
+			projectiles.add_wall_body(body)
 
 
 func _room_size(room: RoomBase) -> Vector2:

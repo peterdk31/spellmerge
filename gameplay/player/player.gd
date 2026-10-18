@@ -47,6 +47,7 @@ extends CharacterBody2D
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
+const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 
 ## Walking speed in pixels per second (the view is 640x360).
 const MOVE_SPEED: float = 90.0
@@ -138,10 +139,12 @@ const LAYER_PLAYERS: int = 2
 ## "PlayerInput" autoload is used.
 var input: InputManagerScript = null
 
-## The event bus and the registry. Only tests set these, before adding the node;
-## otherwise the "Events" and "Registry" autoloads are used.
+## The event bus, the registry and the projectile manager (asked where the walls
+## are). Only tests set these, before adding the node; otherwise the "Events",
+## "Registry" and "Projectiles" autoloads are used.
 var events: EventsScript = null
 var registry: RegistryScript = null
+var projectiles: ProjectileManagerScript = null
 
 ## The equipped spell. The wizard only calls its cast() method.
 var spell: SpellBase = null
@@ -280,6 +283,8 @@ func _ready() -> void:
 		events.revive_progress.connect(_on_revive_progress)
 	if registry == null and in_tree:
 		registry = get_node_or_null("/root/Registry") as RegistryScript
+	if projectiles == null and in_tree:
+		projectiles = get_node_or_null("/root/Projectiles") as ProjectileManagerScript
 	if _overlay == null:
 		_overlay = Node2D.new()
 		_overlay.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -523,6 +528,10 @@ func cast() -> bool:
 	if _downed or spell == null:
 		return false
 	var origin: Vector2 = muzzle_position()
+	if projectiles != null:
+		# A staff tip behind a wall: the shot starts at the wall and ends on it
+		# (the manager takes no pool slot for a shot that starts inside a wall).
+		origin = projectiles.clip_to_walls(global_position, origin)
 	var spent: float = spell.cast(index, origin, aim, mana)
 	if spent == SpellBase.REFUSED:
 		return false

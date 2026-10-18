@@ -2,6 +2,8 @@
 
 **Goal:** prove the core is fun before anything is scaled up (docs/PLAN.md, "Roadmap" and "Go/no-go checkpoints"). One spell, one enemy, one room and 1–4 players joining on their own devices, with game feel, pools and performance budgets built in from the start. Moving, dodging and casting must feel good alone and with four players, and nobody ever waits for another player (docs/DESIGN.md, pillar 2). M1 also gives Art and Audio contributors their first working ground: a provisional style, placeholder assets and examples to copy.
 
+**Status (2026-10-18):** in progress, waiting on the owner. Criterion 4 is met (stabilisation over, no known blocker). Criterion 5: C1 asked in #97; iterate round 1 (aiming, graphics) is merged and the 7-day default (iterate) falls on 2026-10-24. Criterion 1 (web run) waits on owner change #93; criteria 2 and 3 are owner-run/daily-release checks with no result in `docs/LOG.md` yet. M1 is not over its estimate, so nothing is cut.
+
 **Done when:**
 
 1. The 4-bot smoke test passes on web, including one bot that idles in a per-player overlay while the others progress.

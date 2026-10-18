@@ -6,6 +6,11 @@ extends SceneTree
 ## godot --headless --path . --script res://tests/core/test_uids.gd
 
 const ALPHABET: String = "abcdefghijklmnopqrstuvwxy012345678"
+## Files that must always be found, so a broken scan cannot pass by finding nothing.
+const KNOWN_UID_FILES: Array[String] = [
+	"res://core/events/events.gd.uid",
+	"res://tests/core/test_uids.gd.uid",
+]
 const SKIPPED_FOLDERS: Array[String] = ["build", "addons"]
 
 var _failures: Array[String] = []
@@ -15,7 +20,8 @@ func _initialize() -> void:
 	_test_validator()
 	var seen: Dictionary = {}
 	var files: Array[String] = _find_uid_files("res://")
-	_check(files.size() > 50, "found only %d .uid files: the scan is broken" % files.size())
+	for known in KNOWN_UID_FILES:
+		_check(files.has(known), "the scan did not find %s: it is broken" % known)
 	for path in files:
 		var text: String = FileAccess.get_file_as_string(path).strip_edges()
 		var problem: String = _problem(text)

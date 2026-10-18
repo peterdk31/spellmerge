@@ -2,6 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-18: Placeholder animation uses fewer frames than the table, and the staff is drawn by the game
+
+**Decided by:** Claude (owner `/claude` on #102).
+**Context:** The owner asked for readable placeholders, a visible staff and simple idle, walk and dash frames "if it fits in one session". `docs/STYLE.md` lists 4 idle, 6 walk and 4 dodge frames, but "use fewer frames rather than more", and a session that cannot run scripts has to write every pixel rect by hand.
+**Decision:** idle 2 frames (2 fps), walk 4 (8 fps), dash 3 (16 fps, plays once, the last frame is held), imp idle 2. The strips are placeholders (tier `placeholder`); M2 replaces them. The staff is not in the wizard strips: the shots start at the muzzle along the aim, so a staff painted into the sprite pointed the wrong way for any aim but one. `staff.svg` is drawn from the hand, turned along the aim (the pixel art is rotated at runtime, which is only acceptable for a placeholder). Frames are composed with whole-number `translate` on rects, which `docs/STYLE.md` allows, so one hat or body is shifted per frame instead of redrawn.
+**Consequence:** the frame counts in the table are targets for final art, not checked. `player.gd` reads the frame count from the strip's width, so a better strip with more frames works with no code change.
+
 ## 2026-10-17: C1 changes no wave or feel value (M1 part 25)
 
 **Decided by:** Claude.

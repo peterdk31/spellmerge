@@ -2,6 +2,13 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue.
 
+## 2026-10-18: Enemy readability (C1 round 2, task 4)
+
+- Telegraph: the imp swaps to a `windup.svg` pose (glowing mouth and belly, sparks) and flips its two frames faster toward the shot (`frame = floor(progress² × 9) mod 2`), goes brighter for the last 20%, and the line is 3 to 6 px wide in Fire light (was 2 to 4, darker).
+- Hurt: `hurt.svg` (eyes shut, mouth open) for 0.25 s after a hit on that imp; the windup is not cancelled.
+- Enemy shots: `art/vfx/imp_fireball.svg`, a round ember orb with four spikes and a Spark core, in its own draw batch above the players' shots, untinted. Player shots stay the tinted comet. Looked at in `enemy_shot_beside_player_shot`: round and spiked against a comet, brighter centre.
+- Art is hand-written SVG rects from the imp's idle frame, with manifest lines. `ci/build/build.sh --quick --tests` passes; the wave balance and 4-bot runs are real-time and vary between runs (one run had a wave-balance failure that did not repeat).
+
 ## 2026-10-18: Dodge and cast feel (C1 round 2, task 3)
 
 - Input buffer: a dodge or cast press is remembered for `INPUT_BUFFER` = 0.15 s (about 9 frames at 60 FPS) and fires when it becomes possible; used once, dropped when the overlay is open, when downed, or when older than the buffer. A held `cast` works as before.

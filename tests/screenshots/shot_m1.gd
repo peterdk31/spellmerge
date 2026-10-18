@@ -113,6 +113,8 @@ func _initialize() -> void:
 	await RenderingServer.frame_post_draw
 	_save_crop_at(root.get_texture().get_image(), imp_at.origin, "juice_death_animation")
 	await _settle()
+	if not await _enemy_readability(flow, combat, wizard1):
+		return
 	wizard4.call("take_damage", 9999)
 	await _settle()
 	if not wizard4.call("is_downed"):
@@ -148,6 +150,62 @@ func _initialize() -> void:
 	flow.call("stop_run")
 	await create_timer(0.3).timeout
 	quit(0)
+
+
+## Enemy readability: an imp half-way through its windup (telegraph line, glowing pose), an
+## imp one frame after a hit (hurt pose), and an enemy shot beside a player's shot.
+## Returns false after a failure. The imps are held still so the poses can be framed.
+func _enemy_readability(flow: Node, combat: Node, wizard: Node2D) -> bool:
+	var spare: Array[Node2D] = []
+	for candidate: Variant in flow.get("_enemies"):
+		if is_instance_valid(candidate) and spare.size() < 2:
+			spare.append(candidate as Node2D)
+	if spare.size() < 2:
+		_fail("fewer than two imps are left for enemy_windup")
+		return false
+	for other: Variant in flow.get("_enemies"):
+		if is_instance_valid(other) and not spare.has(other):
+			(other as Node2D).process_mode = Node.PROCESS_MODE_DISABLED
+	var winding: Node2D = spare[0]
+	var hurt: Node2D = spare[1]
+	winding.set_physics_process(false)
+	hurt.set_physics_process(false)
+	wizard.global_position = Vector2(200.0, 180.0)
+	winding.global_position = Vector2(200.0, 130.0)
+	hurt.global_position = Vector2(470.0, 130.0)
+	winding.set("targets", [wizard])
+	for i in 8:
+		winding.call("step", 0.0625)
+	if not winding.call("is_telegraphing"):
+		_fail("the imp is not winding up in enemy_windup")
+		return false
+	combat.call("hit", 0, hurt, 1)
+	hurt.call("step", 0.0)
+	if not hurt.call("is_hurt"):
+		_fail("the imp is not hurt in enemy_hurt")
+		return false
+	# Past the white hit flash, the hurt pose is what is left (the imp is held still, so it stays).
+	await _settle()
+	# Two shots side by side, away from the walls (a shot that starts in a wall is refused).
+	var shots: Node = root.get_node_or_null("Projectiles")
+	var beside: Vector2 = Vector2.INF
+	for offset: Vector2 in [Vector2(120.0, 0.0), Vector2(-120.0, 0.0), Vector2(0.0, -70.0), Vector2(0.0, 70.0), Vector2(100.0, 60.0)]:
+		var spot: Vector2 = wizard.global_position + offset
+		var enemy_slot: int = int(shots.call("spawn", -1, spot + Vector2(0.0, 14.0), Vector2(1.0, 0.0), 5.0, 4.0, 2))
+		var player_slot: int = int(shots.call("spawn", 0, spot + Vector2(0.0, -14.0), Vector2(1.0, 0.0), 5.0, 4.0))
+		if enemy_slot >= 0 and player_slot >= 0:
+			beside = offset
+			break
+	if beside == Vector2.INF:
+		_fail("no free spot for the two shots in enemy_shot_beside_player_shot")
+		return false
+	await process_frame
+	await RenderingServer.frame_post_draw
+	var image: Image = root.get_texture().get_image()
+	_save_crop(image, winding, "enemy_windup")
+	_save_crop(image, hurt, "enemy_hurt")
+	_save_crop_at(image, wizard.get_global_transform_with_canvas().origin + beside, "enemy_shot_beside_player_shot")
+	return true
 
 
 ## One press and release of `action` on the virtual device of `player`.

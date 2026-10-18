@@ -2,6 +2,16 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-18: Enemy readability: shape and brightness, a second draw batch, a hit never cancels a windup
+
+**Decided by:** Claude, from the owner's round-2 task list (#102).
+
+- **Enemy shots get their own batch, not a second texture in one.** A multimesh has one texture; an atlas needs a shader and per-instance data. A second `MultiMeshInstance2D` (one layer above) costs a second buffer of the same size and no extra loop. Enemy shots are untinted so they stay the brightest thing on screen; the player's comet keeps its 45% tint. Shape differs (round and spiked against a comet with a tail), so colour is not the only signal (docs/STYLE.md, "Readability").
+- **Poses are textures, not new frames in `idle.svg`.** STYLE says one strip per animation, named by it. `ai.gd` swaps `Sprite.texture` and `hframes` and pauses the `AnimationPlayer` for the pose; the exports `windup_texture` and `hurt_texture` are optional, so another enemy without them behaves as before.
+- **A hit does not cancel the windup.** Stun-locking would let one fast shooter cancel every imp, and the telegraph would stop meaning "a shot comes". The imp still has knockback (Combat) and Feel's flash; the hurt pose shows on top for 0.25 s and the telegraph line stays.
+- **The windup flips by progress², not by time.** The pose slows at the start and speeds up, so "about to fire" is readable without a number: 9 flips-worth over the windup.
+- **Not done:** no sound cue (audio is not in M1), no windup frames for the other directions (the imp is drawn from the front).
+
 ## 2026-10-18: Revive is automatic proximity in `coop`: 2 s hold, 48 px, 1.5 s protection
 
 **Decided by:** Claude (owner `/claude` on #102, C1 round 2 task 1).

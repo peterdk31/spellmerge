@@ -42,6 +42,7 @@ func _initialize() -> void:
 	_test_slots_are_reused()
 	_test_one_thousand_match_brute_force()
 	_test_one_thousand_run_and_draw()
+	_test_enemy_shots_have_their_own_batch()
 	_test_shot_colours_differ_and_stay_bright()
 	_test_freed_target_is_dropped()
 	_test_target_removed_by_a_hit_handler()
@@ -453,6 +454,34 @@ func _test_one_thousand_run_and_draw() -> void:
 	# Regression (issue #102): without a culling box covering the area, shots away from the origin were never drawn.
 	var box: AABB = _mgr._draw_node.multimesh.custom_aabb
 	_check(box.has_point(Vector3(-500.0, -400.0, 0.0)) and box.has_point(Vector3(900.0, 900.0, 0.0)), "the batch's culling box covers the whole play area")
+	root.remove_child(_mgr)
+
+
+## Enemy shots are drawn in a batch of their own: other texture, untinted, one layer
+## above the players' shots (task "Enemy readability": shots must not read as a spell).
+func _test_enemy_shots_have_their_own_batch() -> void:
+	_setup()
+	root.add_child(_mgr)
+	var player_art := PlaceholderTexture2D.new()
+	var enemy_art := PlaceholderTexture2D.new()
+	_mgr.texture = player_art
+	_check(_mgr._hostile_node.texture == player_art, "without hostile art, enemy shots use the shared texture")
+	_mgr.hostile_texture = enemy_art
+	_check(_mgr._hostile_node.texture == enemy_art and _mgr._draw_node.texture == player_art, "enemy shots get their own texture")
+	_check(_mgr._hostile_node.z_index > _mgr._draw_node.z_index, "enemy shots are drawn above the players' shots")
+	_mgr.spawn(0, Vector2(10.0, 0.0), Vector2(100.0, 0.0), 1.0)
+	_mgr.spawn(EventsScript.NO_PLAYER, Vector2(20.0, 0.0), Vector2(0.0, 100.0), 1.0, 5.0, ManagerScript.LAYER_PLAYER)
+	_mgr.spawn(EventsScript.NO_PLAYER, Vector2(30.0, 0.0), Vector2(0.0, 100.0), 1.0, 5.0, ManagerScript.LAYER_PLAYER)
+	_mgr.update_draw()
+	_check(_mgr.drawn == 3 and _mgr.drawn_hostile == 2, "drawn counts both batches (%d, %d hostile)" % [_mgr.drawn, _mgr.drawn_hostile])
+	_check(_mgr._draw_node.multimesh.visible_instance_count == 1, "the player batch holds the one player shot")
+	_check(_mgr._hostile_node.multimesh.visible_instance_count == 2, "the enemy batch holds the two enemy shots")
+	var buffer: PackedFloat32Array = _mgr._hostile_node.multimesh.buffer
+	_check(buffer.size() > 12 and is_equal_approx(buffer[3], 20.0) and is_equal_approx(buffer[15], 30.0), "the enemy batch has the enemy shots' positions")
+	_check(is_equal_approx(buffer[8], 1.0) and is_equal_approx(buffer[9], 1.0) and is_equal_approx(buffer[10], 1.0), "enemy shots are not tinted")
+	_mgr.clear()
+	_mgr.update_draw()
+	_check(_mgr.drawn == 0 and _mgr._hostile_node.multimesh.visible_instance_count == 0, "clear empties the enemy batch too")
 	root.remove_child(_mgr)
 
 

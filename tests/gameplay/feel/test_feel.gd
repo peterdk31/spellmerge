@@ -287,6 +287,8 @@ func _test_projectile_texture_is_set() -> void:
 	_check(projectiles.texture == null, "the projectile texture starts empty")
 	_setup(&"", projectiles)
 	_check(projectiles.texture == texture, "feel sets Projectiles.texture to the fire bolt")
+	var orb := load("res://art/vfx/imp_fireball.svg") as Texture2D
+	_check(orb != null and projectiles.hostile_texture == orb, "feel sets the enemy shot art, apart from the player's bolt")
 	projectiles.free()
 
 

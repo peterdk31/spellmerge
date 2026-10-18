@@ -53,6 +53,8 @@ const SPELL_ID: StringName = &"bolt"
 ## again puts the enemy a step further along the diagonal.
 const WAVE: Array[int] = [0, 1, 2, 3, 4, 5, 0, 3]
 const WAVE_REPEAT_OFFSET: Vector2 = Vector2(14.0, 14.0)
+const WAVE_STACK_DEPTH: int = 3
+const WAVE_LAP_OFFSET: Vector2 = Vector2(-14.0, 14.0)
 ## Enemies added by each wave after the first, and the most one wave holds.
 const WAVE_GROWTH: int = 2
 const WAVE_MAX: int = 24
@@ -146,6 +148,15 @@ func step(delta: float) -> void:
 ## True while a restart is counting down.
 func is_restarting() -> bool:
 	return _restart_left >= 0.0
+
+
+## Where the `times`-th enemy (0 = first) at `spawn` stands: up to WAVE_STACK_DEPTH
+## steps along the diagonal, then the next row starts a lap further to the side, so
+## a stack never runs into a wall.
+static func stacked_position(spawn: Vector2, times: int) -> Vector2:
+	var step: int = times % WAVE_STACK_DEPTH
+	var lap: int = times / WAVE_STACK_DEPTH
+	return spawn + WAVE_REPEAT_OFFSET * float(step) + WAVE_LAP_OFFSET * float(lap)
 
 
 ## How many enemies wave `number` (1 or more) has.
@@ -424,7 +435,7 @@ func _spawn_wave(parent: Node2D, room: RoomBase, data: EnemyBase, number: int) -
 		push_warning("Flow: the room has no enemy spawns, so the wave is empty.")
 		return
 	var uses: Dictionary = {}
-	for at in wave_size(number):
+	for at: int in wave_size(number):
 		# Wave 1 is WAVE as written; a bigger wave carries on round the spawns.
 		var entry: int = WAVE[at] if at < WAVE.size() else at
 		var spawn: int = entry % room.enemy_spawns.size()
@@ -435,7 +446,7 @@ func _spawn_wave(parent: Node2D, room: RoomBase, data: EnemyBase, number: int) -
 			push_warning("Flow: the enemy scene has no AI script on its root, so it is skipped.")
 			continue
 		enemy.data = data
-		enemy.position = room.enemy_spawns[spawn] + WAVE_REPEAT_OFFSET * float(times)
+		enemy.position = stacked_position(room.enemy_spawns[spawn], times)
 		parent.add_child(enemy)
 		_enemies.append(enemy)
 

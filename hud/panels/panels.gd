@@ -40,6 +40,8 @@ const EDGE_MARGIN: float = 4.0
 const OVERLAY_GAP: float = 2.0
 ## The "Wave N" line at the top middle of the view (between the P1 and P2 panels).
 const WAVE_LABEL_WIDTH: float = 96.0
+const WAVE_LABEL_FONT_SIZE: int = 16
+const WAVE_LABEL_OUTLINE: int = 4
 
 ## The event bus, the UI focus service and the input manager. Only tests set
 ## these, before adding the node; otherwise the "Events", "UIFocus" and
@@ -68,6 +70,9 @@ func _ready() -> void:
 	_wave_label = Label.new()
 	_wave_label.name = "WaveLabel"
 	_wave_label.visible = false
+	_wave_label.add_theme_font_size_override("font_size", WAVE_LABEL_FONT_SIZE)
+	_wave_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	_wave_label.add_theme_constant_override("outline_size", WAVE_LABEL_OUTLINE)
 	_wave_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_wave_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_wave_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP, Control.PRESET_MODE_MINSIZE)

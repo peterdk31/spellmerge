@@ -55,6 +55,7 @@ func _initialize() -> void:
 	_test_failed_restart_goes_idle()
 	_test_play_keeps_joined_pad_without_keyboard()
 	_test_wave_stands_on_floor()
+	_test_biggest_wave_stands_on_floor()
 	_test_restart_leaves_no_old_enemies_or_shots()
 	_test_walls_reach_the_projectile_manager()
 	_test_waves_grow_in_the_same_room()
@@ -308,6 +309,35 @@ func _test_wave_stands_on_floor() -> void:
 	_stop()
 
 
+## Even the biggest wave stands on the floor: the stacked spawns stay inside the
+## room and clear of the walls.
+func _test_biggest_wave_stands_on_floor() -> void:
+	_setup(1)
+	_play()
+	var room: RoomBase = load("res://content/rooms/crypt/arena_01.tres") as RoomBase
+	var scene: Node = room.scene.instantiate()
+	var walls: Array[Rect2] = []
+	for child in scene.get_node("Walls").get_children():
+		var shape_node := child as CollisionShape2D
+		if shape_node != null and shape_node.shape is RectangleShape2D:
+			var size: Vector2 = (shape_node.shape as RectangleShape2D).size
+			walls.append(Rect2(shape_node.position - size * 0.5, size))
+	scene.free()
+	var inner := Rect2(Vector2.ZERO, Vector2(640.0, 384.0))
+	var uses: Dictionary = {}
+	for at: int in FlowScript.wave_size(FlowScript.WAVE_MAX):
+		var entry: int = FlowScript.WAVE[at] if at < FlowScript.WAVE.size() else at
+		var spawn: int = entry % room.enemy_spawns.size()
+		var times: int = uses.get(spawn, 0)
+		uses[spawn] = times + 1
+		var position: Vector2 = FlowScript.stacked_position(room.enemy_spawns[spawn], times)
+		var body := Rect2(position - Vector2(12.0, 12.0), Vector2(24.0, 24.0))
+		_check(inner.encloses(body), "spawn %d of the biggest wave (%s) is inside the room" % [at, position])
+		for wall in walls:
+			_check(not wall.intersects(body), "spawn %d (%s) is clear of the wall %s" % [at, position, wall])
+	_stop()
+
+
 func _test_restart_leaves_no_old_enemies_or_shots() -> void:
 	_setup(1)
 	_play()
@@ -321,9 +351,6 @@ func _test_restart_leaves_no_old_enemies_or_shots() -> void:
 	_stop()
 
 
-## Flow gives the arena's walls to the projectile manager: after `start_run` and
-## after a restart, a path across the top border or a pillar ends there, and each
-## of two players' shots is stopped.
 ## Kill every enemy of the current wave (as if shot down).
 func _kill_wave() -> void:
 	for enemy: Node in _flow._enemies.duplicate():
@@ -400,6 +427,9 @@ func _test_restart_goes_back_to_wave_one() -> void:
 	_stop()
 
 
+## Flow gives the arena's walls to the projectile manager: after `start_run` and
+## after a restart, a path across the top border or a pillar ends there, and each
+## of two players' shots is stopped.
 func _test_walls_reach_the_projectile_manager() -> void:
 	_setup(2)
 	_play()

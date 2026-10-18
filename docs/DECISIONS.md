@@ -2,6 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-18: Juice lives in Feel and reaches sprites only through the event's target
+
+**Decided by:** Claude (owner `/claude` on #102).
+**Context:** The owner wants punchier hits, casts and deaths. Feel may not call other areas, and `damage_dealt` carries the hit node.
+**Decision:** Feel flashes and squashes the `Sprite` child of the `damage_dealt` target (the same convention `ai.gd` and `player.gd` already use), with a shared white shader material it removes again. Feel stores instance ids, because a typed or plain array cannot hold an enemy freed in the same frame. Casts get a muzzle flash and a camera kick from `spell_cast`; the caster's own squash was left out, since the event has no node and a lookup would break the area rule. Hit-stop keeps the defaults (0.04 s hit, 0.15 s rest, so about 21% of real time slowed in a four-player fight, under the 30% test limit); extra punch comes from flash, squash and shake. Deaths stop 0.09 s. Everything else is tuned in `punchy.tres`.
+**Consequence:** a new enemy gets the flash and squash if its sprite node is named `Sprite`. Flash and squash replace `Sprite.material` for 0.08 s, so a scene must not rely on a material there. Feel multiplies its squash onto the scale it finds; if the owner sets `scale` meanwhile (the dash look), Feel adopts that as the base and returns to it. Past 16 sprites reacting at once, a hit skips its flash and squash.
+
 ## 2026-10-18: Placeholder animation uses fewer frames than the table, and the staff is drawn by the game
 
 **Decided by:** Claude (owner `/claude` on #102).

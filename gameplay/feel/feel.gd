@@ -16,7 +16,13 @@ extends Node
 ##   exceed PARTICLE_LIMIT. With the pool empty a hit burst is skipped, but a death
 ##   takes over the burst closest to ending. A kill upgrades the burst its killing
 ##   blow just made into a bigger one, so it costs one slot, not two.
+## - a white hit flash and a squash on the hit enemy's or wizard's `Sprite` node
+##   (a fixed set of reactions; a sprite that is gone is skipped).
+## - a white puff where an enemy dies.
 ## - a sound from `core/registry` by id; nothing plays on `null`.
+##
+## On `spell_cast` it shows a muzzle flash at the staff tip and kicks the camera a
+## little against the aim. Neither touches the cast itself.
 ##
 ## Nothing is allocated while playing: emitters and sound players are made once.
 ## The emitters live under this autoload (top level, so in world space), never
@@ -26,6 +32,7 @@ const EventsScript := preload("res://core/events/events.gd")
 const PoolScript := preload("res://core/pools/pool.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const FeelPresetScript := preload("res://gameplay/feel/presets/feel_preset.gd")
+const FLASH_SHADER: Shader = preload("res://gameplay/feel/hit_flash.gdshader")
 
 ## Most hit particles alive at once, across all players (one limit for the "hit" effect).
 const PARTICLE_LIMIT: int = 48
@@ -34,6 +41,13 @@ const BURST_PARTICLES: int = 8
 const BURST_SLOTS: int = PARTICLE_LIMIT / BURST_PARTICLES
 ## Sounds that can play at once.
 const SOUND_VOICES: int = 8
+## Sprites reacting to a hit at once; a hit past this only skips its flash.
+const REACT_SLOTS: int = 16
+## Flash sprites: one muzzle flash per player (slots 0-3), then the death puffs.
+const MUZZLE_SLOTS: int = 4
+const FLASH_SLOTS: int = 8
+## The biggest camera kick in pixels, however fast the casting.
+const MAX_KICK_PIXELS: float = 4.0
 
 ## The services. Only tests set these, before adding the node; otherwise the
 ## autoloads are used.
@@ -49,6 +63,7 @@ var shake_enabled: bool = true:
 		shake_enabled = value
 		if not value:
 			_trauma = 0.0
+			_kick = Vector2.ZERO
 			_reset_camera()
 ## Seconds of hit-stop left, in real time.
 var stop_left: float = 0.0
@@ -73,6 +88,23 @@ var _hit_voice: int = -1
 var _voices: Array[AudioStreamPlayer] = []
 var _next_voice: int = 0
 var _texture: Texture2D = null
+## Hit reactions: the sprite, the scale it had, and seconds left (parallel arrays).
+## Instance ids, not references: a sprite may be freed while it waits, and an
+## array cannot hold a freed object.
+var _react_sprites: PackedInt64Array = PackedInt64Array()
+var _react_scale: PackedVector2Array = PackedVector2Array()
+var _react_written: PackedVector2Array = PackedVector2Array()
+var _react_left: PackedFloat32Array = PackedFloat32Array()
+var _flash_material: ShaderMaterial = null
+## Muzzle flashes and death puffs: sprites made once, with seconds left, seconds
+## they started with and their size (parallel arrays of FLASH_SLOTS).
+var _flashes: Array[Sprite2D] = []
+var _flash_left: PackedFloat32Array = PackedFloat32Array()
+var _flash_total: PackedFloat32Array = PackedFloat32Array()
+var _flash_size: PackedFloat32Array = PackedFloat32Array()
+var _next_puff: int = MUZZLE_SLOTS
+## Camera kick of casts (pixels), added to the shake.
+var _kick: Vector2 = Vector2.ZERO
 var _last_usec: int = 0
 
 
@@ -87,6 +119,20 @@ func _ready() -> void:
 	_texture = load("res://art/vfx/hit_spark.svg") as Texture2D
 	_last_usec = Time.get_ticks_usec()
 	_bursts = PoolScript.new(_make_burst, BURST_SLOTS, Callable(), _hide_burst)
+	_flash_material = ShaderMaterial.new()
+	_flash_material.shader = FLASH_SHADER
+	for i in FLASH_SLOTS:
+		var flash := Sprite2D.new()
+		flash.texture = _texture
+		flash.top_level = true
+		flash.visible = false
+		flash.z_index = 20
+		flash.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		add_child(flash)
+		_flashes.append(flash)
+	_flash_left.resize(FLASH_SLOTS)
+	_flash_total.resize(FLASH_SLOTS)
+	_flash_size.resize(FLASH_SLOTS)
 	for i in SOUND_VOICES:
 		var voice := AudioStreamPlayer.new()
 		add_child(voice)
@@ -97,6 +143,7 @@ func _ready() -> void:
 	events.damage_dealt.connect(_on_damage_dealt)
 	events.enemy_died.connect(_on_enemy_died)
 	events.player_downed.connect(_on_player_downed)
+	events.spell_cast.connect(_on_spell_cast)
 	if projectiles == null:
 		projectiles = get_node_or_null("/root/Projectiles")
 	if projectiles != null and "texture" in projectiles and projectiles.texture == null:
@@ -130,13 +177,17 @@ func step(real_delta: float) -> void:
 		if stop_left == 0.0:
 			rest_left = preset.hit_stop_rest
 			_set_time_scale(1.0)
-	if _trauma > 0.0:
+	if _trauma > 0.0 or _kick != Vector2.ZERO:
 		_trauma = maxf(_trauma - preset.shake_decay * real_delta, 0.0)
 		var strength: float = _trauma * _trauma * preset.max_shake_pixels
 		shake_offset = Vector2(_rng.randf_range(-1.0, 1.0), _rng.randf_range(-1.0, 1.0)) * strength
 		if _trauma == 0.0:
 			shake_offset = Vector2.ZERO
+		_kick = _kick.move_toward(Vector2.ZERO, preset.cast_kick_decay * real_delta)
+		shake_offset += _kick
 		_apply_camera()
+	_step_reactions(real_delta)
+	_step_flashes(real_delta)
 	var at: int = _active.size() - 1
 	while at >= 0:
 		_active_left[at] -= real_delta
@@ -151,6 +202,104 @@ func step(real_delta: float) -> void:
 		at -= 1
 
 
+## Flash and squash the hit sprites for `real_delta` seconds, and put back those done.
+func _step_reactions(real_delta: float) -> void:
+	var at: int = _react_sprites.size() - 1
+	while at >= 0:
+		_react_left[at] -= real_delta
+		var sprite := instance_from_id(_react_sprites[at]) as Sprite2D
+		var alive: bool = sprite != null
+		if alive and sprite.scale != _react_written[at]:
+			# The sprite's owner changed the scale (a dash look): that is the new base.
+			_react_scale[at] = sprite.scale
+		if _react_left[at] <= 0.0 or not alive:
+			if alive:
+				sprite.material = null
+				sprite.scale = _react_scale[at]
+			var last: int = _react_sprites.size() - 1
+			_react_sprites[at] = _react_sprites[last]
+			_react_scale[at] = _react_scale[last]
+			_react_written[at] = _react_written[last]
+			_react_left[at] = _react_left[last]
+			_react_sprites.resize(last)
+			_react_scale.resize(last)
+			_react_written.resize(last)
+			_react_left.resize(last)
+		else:
+			var squash: float = preset.hit_squash * _react_left[at] / maxf(preset.flash_seconds, 0.001)
+			_react_written[at] = _react_scale[at] * Vector2(1.0 + squash, 1.0 - squash)
+			sprite.scale = _react_written[at]
+		at -= 1
+
+
+## Fade and grow the muzzle flashes and death puffs.
+func _step_flashes(real_delta: float) -> void:
+	for i in FLASH_SLOTS:
+		if _flash_left[i] <= 0.0:
+			continue
+		_flash_left[i] -= real_delta
+		var flash: Sprite2D = _flashes[i]
+		if _flash_left[i] <= 0.0:
+			flash.visible = false
+			continue
+		var t: float = _flash_left[i] / _flash_total[i]
+		flash.modulate.a = t
+		flash.scale = Vector2.ONE * (_flash_size[i] * (1.0 + 0.5 * (1.0 - t)))
+
+
+## Show flash `slot` at `position` for `seconds`, `size` times the art's size.
+func _show_flash(slot: int, position: Vector2, seconds: float, size: float) -> void:
+	if seconds <= 0.0:
+		return
+	var flash: Sprite2D = _flashes[slot]
+	flash.global_position = position
+	flash.modulate = Color.WHITE
+	flash.scale = Vector2.ONE * size
+	flash.visible = true
+	_flash_left[slot] = seconds
+	_flash_total[slot] = seconds
+	_flash_size[slot] = size
+
+
+## Start the flash and squash of the hit node's `Sprite` child, if it has one.
+func _react(target: Node) -> void:
+	if target == null or not is_instance_valid(target):
+		return
+	var sprite := target.get_node_or_null("Sprite") as Sprite2D
+	if sprite == null:
+		return
+	var at: int = _react_sprites.find(sprite.get_instance_id())
+	if at >= 0:
+		_react_left[at] = preset.flash_seconds
+	elif _react_sprites.size() < REACT_SLOTS:
+		_react_sprites.append(sprite.get_instance_id())
+		_react_scale.append(sprite.scale)
+		_react_written.append(sprite.scale)
+		_react_left.append(preset.flash_seconds)
+	else:
+		return
+	sprite.material = _flash_material
+
+
+## Sprites flashing right now (for tests).
+func reacting_sprites() -> int:
+	return _react_sprites.size()
+
+
+## Muzzle flashes and death puffs showing right now (for tests).
+func live_flashes() -> int:
+	var count: int = 0
+	for i in FLASH_SLOTS:
+		if _flash_left[i] > 0.0:
+			count += 1
+	return count
+
+
+## Current camera kick in pixels (for tests).
+func kick() -> Vector2:
+	return _kick
+
+
 ## Live hit particles right now: never more than PARTICLE_LIMIT.
 func live_particles() -> int:
 	return _active.size() * BURST_PARTICLES
@@ -161,12 +310,22 @@ func trauma() -> float:
 	return _trauma
 
 
-func _on_damage_dealt(_player: int, _target: Node, _amount: int, position: Vector2) -> void:
+func _on_damage_dealt(_player: int, target: Node, _amount: int, position: Vector2) -> void:
+	_react(target)
 	_juice(position, preset.hit_stop_seconds, false, preset.hit_shake, preset.hit_sound)
 
 
 func _on_enemy_died(_player: int, _enemy: Node, position: Vector2) -> void:
+	_show_flash(_next_puff, position, preset.death_puff_seconds, preset.death_puff_size)
+	_next_puff = MUZZLE_SLOTS + (_next_puff - MUZZLE_SLOTS + 1) % (FLASH_SLOTS - MUZZLE_SLOTS)
 	_juice(position, preset.death_stop_seconds, true, preset.death_shake, preset.death_sound)
+
+
+func _on_spell_cast(player: int, _spell_id: StringName, origin: Vector2, direction: Vector2) -> void:
+	_show_flash(clampi(player, 0, MUZZLE_SLOTS - 1), origin, preset.muzzle_flash_seconds, preset.muzzle_flash_size)
+	if shake_enabled and direction != Vector2.ZERO:
+		_refresh_camera()
+		_kick = (_kick - direction.normalized() * preset.cast_kick_pixels).limit_length(MAX_KICK_PIXELS)
 
 
 func _on_player_downed(_player: int) -> void:

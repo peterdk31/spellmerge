@@ -6,12 +6,16 @@ The ordered task queue for the current milestone, M1 (its design, [M1-core-loop.
 
 No unchecked task is open in the Queue. The owner's C1 verdict decides what comes next: **go** starts M2, **iterate** reworks the weak parts (at most 2 rounds), **pivot** changes the plan. Default after 7 days without an answer (2026-10-24): iterate.
 
+- [ ] **C1 juice, leftovers (only if the owner's verdict is iterate).** Not done in round 4: (1) a squash and stretch of the caster's sprite on a cast (Feel gets only the player index from `spell_cast` and may not look the wizard up; `Player` should send an event, or `Feel` should get a node in the event, which is a `core/events` change); (2) a muzzle flash turned along the aim and in the player's colour; (3) a short enemy death animation (the enemy is freed at once, so only the puff shows); (4) a wizard-hit red vignette in the HUD. Sounds stay with the Audio contributors. Playtest the new values first: if the feel is too strong, change only `punchy.tres`.
+
 ## Blocked
 
 - [ ] **Web 4-bot run (M1 part 23).** Game side done: `Web Test` preset, `--four-bot` read from the page's `args`. Blocked on the owner-only change to `ci/smbot/websmoke.py` and `ci/build/build.sh` (exact text under "Needs an owner decision" in `docs/BACKLOG.md`, asked as an `owner` issue). Untested in a browser until then; the weekly run repeats the request.
 - [ ] **Web load time and WASM projectile timing (M1 part 22 follow-up).** Checked 2026-10-17: `build/godot/templates` is empty here, so a session cannot export Web. The daily `ci/build/build.sh` already exports Web, smoke-tests it in headless Chrome (`smbot.websmoke`, "main menu ready") and prints `web: N kB of 40000 kB` in its "Size budgets" step, so the size is covered; no number is recorded in the docs yet (read it from the latest daily build log and write it here). Still missing, and owner-only (`ci/` is protected): a load-time line in `websmoke` against the 10 s budget, and running `test_projectile_timing` in the exported Web build and printing the hostile step time (rule: over 8 ms in WASM, lower `DEFAULT_CAP_WEB` until it is under). The exact step is under "Needs an owner decision" in `docs/BACKLOG.md`, asked as an `owner-question`. Until then nothing is measured and `DEFAULT_CAP_WEB` stays 1,000 (unchecked in WASM).
 
 ## Done recently
+
+- [x] **C1 iterate round 4: juice pass (owner `/claude` on #102).** `gameplay/feel` now also does a white hit flash and a squash on the hit enemy or wizard `Sprite`, a death puff, a muzzle flash at the staff tip and a small camera kick on `spell_cast`; `punchy.tres` has stronger hit-stop and shake. Tests in `test_feel.gd`. Details in `docs/LOG.md` and `docs/DECISIONS.md`.
 
 - [x] **C1 iterate round 3: placeholder art (owner `/claude` on #102).** New floor, wall, fire bolt, hit spark and ember imp (2-frame idle), the wizard with idle (2), walk (4) and dash (3) strips and a staff drawn from the hand along the aim. `player.gd` plays the strips; test `test_player_animation.gd`; sheet shot `art_sheet`. Still open: cast, hurt, downed and death frames, enemy attack frames, animated bolt and spark. Details in `docs/LOG.md` and `docs/DECISIONS.md`.
 

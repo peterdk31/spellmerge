@@ -43,6 +43,16 @@ extends Node2D
 ## as their `owner` (a wizard is never hit by its own shot). It is off by default
 ## and read when a shot is spawned. `gameplay/coop` owns the option.
 ##
+## Walls: `set_walls(rects)` (or `add_wall_body(body)` for a room's static body) gives
+## the solid parts of the room. They are rasterised into a grid of WALL_CELL
+## pixel cells, so a wall check is a walk over the cells the step's path crosses
+## (a few for a normal shot; the cost grows with the length of the step, like the
+## hit search) and needs no physics query. A projectile whose path enters a solid
+## cell ends there, even a piercing one: there is no bouncing. It is checked as a
+## point, not a circle, and before any target, so the work budget above is not
+## spent on it. `wall_hits` counts these ends. `clip_to_walls(from, to)` shortens
+## a segment to the first wall, for a shot whose start point may be behind one.
+##
 ## The global cap (`get_cap()`, set by platform: DEFAULT_CAP_WEB or
 ## DEFAULT_CAP_DESKTOP) degrades gracefully. When it is full, a new projectile
 ## is never refused: the oldest projectile of whoever owns the most of them is
@@ -82,6 +92,9 @@ const DRAW_SCALE: float = 3.0
 ## How much of the owner's colour tints the art (the rest stays white): a full
 ## multiply turned the orange bolt of a blue wizard nearly black.
 const TINT_STRENGTH: float = 0.45
+## Wall grid cell size in pixels. Walls are rounded out to whole cells, so they are
+## exact when their edges are multiples of it (room tiles are 32 px).
+const WALL_CELL: float = 8.0
 ## Spatial grid cell size in pixels.
 const GRID_CELL: float = 64.0
 ## Projectiles that leave the bounds by more than this are removed.
@@ -104,6 +117,8 @@ var texture: Texture2D = null:
 var events: EventsScript = null
 ## How many projectiles were dropped because the cap was full, since start.
 var dropped: int = 0
+## How many projectiles ended on a wall, since start.
+var wall_hits: int = 0
 ## Projectiles written into the batch by the last update_draw().
 var drawn: int = 0
 ## Whether shots fired by players also hit other players' targets (see the class doc).
@@ -158,6 +173,12 @@ var _cell_head: PackedInt32Array = PackedInt32Array()
 var _target_next: PackedInt32Array = PackedInt32Array()
 ## The largest radius of any registered target; sets how far hits are searched.
 var _max_target_radius: float = 0.0
+
+## The wall grid over the bounds: one byte per WALL_CELL cell, 1 for solid.
+var _wall_w: int = 1
+var _wall_h: int = 1
+var _wall_cells: PackedByteArray = PackedByteArray()
+var _has_walls: bool = false
 
 var _draw_node: MultiMeshInstance2D = null
 var _draw_buffer: PackedFloat32Array = PackedFloat32Array()
@@ -237,6 +258,115 @@ func set_bounds(rect: Rect2) -> void:
 	_grid_w = maxi(ceili(rect.size.x / GRID_CELL), 1)
 	_grid_h = maxi(ceili(rect.size.y / GRID_CELL), 1)
 	_cell_head.resize(_grid_w * _grid_h)
+	_wall_w = maxi(ceili(rect.size.x / WALL_CELL), 1)
+	_wall_h = maxi(ceili(rect.size.y / WALL_CELL), 1)
+	_wall_cells.resize(_wall_w * _wall_h)
+	clear_walls()
+
+
+## Make these world rectangles solid, replacing any walls set before. Parts outside
+## the bounds are ignored. Call it after `set_bounds()`, which removes the walls.
+func set_walls(rects: Array[Rect2]) -> void:
+	clear_walls()
+	for rect in rects:
+		_add_wall(rect)
+
+
+## Remove every wall.
+func clear_walls() -> void:
+	_wall_cells.fill(0)
+	_has_walls = false
+
+
+## Add the rectangle shapes of a body (a room's static body) as walls. The body must
+## be in the tree. Shapes that are not rectangles are ignored; a turned rectangle
+## counts as its bounding box.
+func add_wall_body(body: CollisionObject2D) -> void:
+	for child in body.get_children():
+		var shape_node := child as CollisionShape2D
+		if shape_node == null or shape_node.disabled:
+			continue
+		var rectangle := shape_node.shape as RectangleShape2D
+		if rectangle == null:
+			continue
+		var xf: Transform2D = shape_node.global_transform
+		var half: Vector2 = rectangle.size * 0.5
+		var low: Vector2 = xf * -half
+		var high: Vector2 = low
+		for corner: Vector2 in [Vector2(half.x, -half.y), half, Vector2(-half.x, half.y)]:
+			var point: Vector2 = xf * corner
+			low = low.min(point)
+			high = high.max(point)
+		_add_wall(Rect2(low, high - low))
+
+
+func _add_wall(rect: Rect2) -> void:
+	if rect.size.x <= 0.0 or rect.size.y <= 0.0:
+		return
+	var x0: int = maxi(floori((rect.position.x - _bounds.position.x) / WALL_CELL), 0)
+	var y0: int = maxi(floori((rect.position.y - _bounds.position.y) / WALL_CELL), 0)
+	var x1: int = mini(ceili((rect.end.x - _bounds.position.x) / WALL_CELL), _wall_w)
+	var y1: int = mini(ceili((rect.end.y - _bounds.position.y) / WALL_CELL), _wall_h)
+	for y in range(y0, y1):
+		for x in range(x0, x1):
+			_wall_cells[y * _wall_w + x] = 1
+			_has_walls = true
+
+
+## The point where the segment from `from` to `to` first meets a wall, or `to` when
+## it is clear. If `from` is inside a wall, that is `from`.
+func clip_to_walls(from: Vector2, to: Vector2) -> Vector2:
+	var t: float = _wall_hit(from, to)
+	if t < 0.0:
+		return to
+	return from.lerp(to, t)
+
+
+## How far along `from`->`to` (0 to 1) the path first enters a solid cell, or -1.0
+## when it does not. Walks the cells the path crosses (Amanatides and Woo), at
+## most |dx| + |dy| + 1 of them, in cells.
+func _wall_hit(from: Vector2, to: Vector2) -> float:
+	if not _has_walls:
+		return -1.0
+	var start: Vector2 = (from - _bounds.position) / WALL_CELL
+	var delta: Vector2 = (to - from) / WALL_CELL
+	var cx: int = floori(start.x)
+	var cy: int = floori(start.y)
+	var end_x: int = floori(start.x + delta.x)
+	var end_y: int = floori(start.y + delta.y)
+	if cx == end_x and cy == end_y:
+		# The usual step stays in one cell.
+		if cx >= 0 and cx < _wall_w and cy >= 0 and cy < _wall_h and _wall_cells[cy * _wall_w + cx] != 0:
+			return 0.0
+		return -1.0
+	var step_x: int = 1 if delta.x > 0.0 else -1
+	var step_y: int = 1 if delta.y > 0.0 else -1
+	var next_x: float = INF
+	var next_y: float = INF
+	var per_x: float = INF
+	var per_y: float = INF
+	if delta.x != 0.0:
+		per_x = absf(1.0 / delta.x)
+		next_x = (float(cx + (1 if step_x > 0 else 0)) - start.x) / delta.x
+	if delta.y != 0.0:
+		per_y = absf(1.0 / delta.y)
+		next_y = (float(cy + (1 if step_y > 0 else 0)) - start.y) / delta.y
+	var t: float = 0.0
+	var visits: int = absi(end_x - cx) + absi(end_y - cy) + 1
+	for _n in visits:
+		if cx >= 0 and cx < _wall_w and cy >= 0 and cy < _wall_h and _wall_cells[cy * _wall_w + cx] != 0:
+			return t
+		if next_x < next_y:
+			t = next_x
+			next_x += per_x
+			cx += step_x
+		else:
+			t = next_y
+			next_y += per_y
+			cy += step_y
+		if t > 1.0:
+			break
+	return -1.0
 
 
 ## The batch's culling box must cover the whole area. Without it the renderer
@@ -384,6 +514,10 @@ func step(delta: float) -> void:
 		_prev[slot] = _pos[slot]
 		_pos[slot] += _vel[slot] * delta
 		if not limit.has_point(_pos[slot]):
+			_kill(slot)
+			continue
+		if _has_walls and _wall_hit(_prev[slot], _pos[slot]) >= 0.0:
+			wall_hits += 1
 			_kill(slot)
 			continue
 		if _layers[slot] != 0 and not _targets.is_empty():

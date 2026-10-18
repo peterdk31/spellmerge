@@ -8,7 +8,8 @@ extends RefCounted
 ##
 ## Fighter: walks toward the nearest enemy of the current world (a wizard faces
 ## where it walks, so the shots fly at the enemy) and holds `cast` within
-## FIRE_RANGE. When it hardly moved for STUCK_STEPS steps (a pillar) it side-steps
+## FIRE_RANGE and sees it (shots stop at walls; with a wall in between it strafes
+## along it instead). When it hardly moved for STUCK_STEPS steps (a pillar) it side-steps
 ## for SIDESTEP_STEPS steps. Idler: stands still; it only opens its overlay.
 ##
 ## Everything is driven by step(delta), so a run with the same frames repeats. A
@@ -78,8 +79,24 @@ func step(_delta: float) -> void:
 	if _sidestep_left > 0:
 		_sidestep_left -= 1
 		direction = direction.orthogonal() * _sidestep_sign
+	var in_range: bool = offset.length() <= FIRE_RANGE
+	var sees: bool = _can_see(wizard, target)
+	if in_range and not sees and _sidestep_left == 0:
+		# A wall in the way: strafe along it until the enemy is in view.
+		direction = direction.orthogonal() * _sidestep_sign
 	_hold_move(direction)
-	_hold_cast(offset.length() <= FIRE_RANGE)
+	_hold_cast(in_range and sees)
+
+
+## False when a wall (physics layer 1) is between the wizard and the enemy: shots
+## stop at walls, and a person does not fire into a pillar. Without a physics
+## space (a test without a world) nothing blocks.
+func _can_see(wizard: Node2D, target: Node2D) -> bool:
+	var space: PhysicsDirectSpaceState2D = wizard.get_world_2d().direct_space_state if wizard.is_inside_tree() else null
+	if space == null:
+		return true
+	var query := PhysicsRayQueryParameters2D.create(wizard.global_position, target.global_position, 1)
+	return space.intersect_ray(query).is_empty()
 
 
 func _nearest_enemy(world: Node2D, from: Vector2) -> Node2D:

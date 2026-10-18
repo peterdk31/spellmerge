@@ -2,6 +2,13 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue.
 
+## 2026-10-18: Shots stop at walls (C1 round 2, task 2)
+
+- `core/projectiles` keeps a grid of solid 8 px cells (`set_walls`, `add_wall_body`, `clear_walls`, `clip_to_walls`, counter `wall_hits`). Each step walks the cells the path crosses and ends the shot at the first solid one (piercing shots too; fast shots cannot skip a wall). The wizard clips the staff tip to the wall before it casts, so a wizard against a wall cannot fire through it. `flow` gives the manager the room's wall-layer static bodies after the room is in the tree.
+- Timing (`test_projectile_timing`, headless runner, full cap, no targets): 3,000 shots 0.9 ms a step without walls, 3.0 to 4.2 ms with the arena's 10 wall rectangles (refilled each step, so many shots start inside a wall and die); 1,000 shots 0.3 ms and 1.0 to 1.4 ms. The hit tests and their work budget are unchanged (a wall check is not charged to it). A one-cell shortcut for the usual short step cut the 3,000 case from 4.2 to 3.0 ms.
+- Tests: wall stop, piercing and 100 px steps, all directions, edges, `clip_to_walls`, `add_wall_body` (`test_projectiles.gd`); a wizard against a wall (`test_player_health_cast.gd`).
+- The 4-bot smoke started to fail (player 3 down): the bots held fire into pillars. The bots now check the line of sight with a physics ray and strafe along a wall in the way. It passed three runs in a row afterwards, but the `BALANCE:` lines for 1 and 2 players got worse (bots still never dodge); noted in `docs/BACKLOG.md`.
+
 ## 2026-10-18: Revive (C1 round 2, task 1)
 
 - `coop` now revives: a standing wizard within 48 px of a downed one for 2 s brings it back (50 health) and it is protected for 1.5 s. The nearest standing wizard is the reviver; progress drains at twice the fill rate when nobody is near; each downed wizard has its own progress, any slots 0-3. New event `revive_progress(player, progress)` drives a ring (a clockwise-sweeping arc with a cross) over the downed wizard's hat.

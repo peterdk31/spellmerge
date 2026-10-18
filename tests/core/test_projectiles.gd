@@ -49,6 +49,12 @@ func _initialize() -> void:
 	_test_out_of_bounds_removed()
 	_test_hit_work_per_step_is_bounded()
 	_test_spent_budget_resumes_at_the_first_untested_shot()
+	_test_shot_ends_on_a_wall()
+	_test_wall_stops_a_piercing_shot_and_a_fast_shot()
+	_test_wall_hits_from_every_direction()
+	_test_wall_edges_and_clearing()
+	_test_clip_to_walls()
+	_test_wall_body_rectangles_become_walls()
 	_teardown()
 	if _failures.is_empty():
 		print("TEST OK: core/projectiles")
@@ -557,3 +563,120 @@ func _test_spent_budget_resumes_at_the_first_untested_shot() -> void:
 	_mgr.spawn(0, Vector2.ZERO, Vector2(0.1, 0.0), 10.0, 4.0, ManagerScript.LAYER_ENEMY, 5, 0)
 	_mgr.step(DT)
 	_check(_mgr._resume == 0, "a step that tests everything resets the resume point")
+
+
+func _wall_rects() -> Array[Rect2]:
+	return [Rect2(96.0, 0.0, 32.0, 200.0)]
+
+
+func _test_shot_ends_on_a_wall() -> void:
+	_setup()
+	_mgr.set_bounds(Rect2(0.0, 0.0, 640.0, 360.0))
+	_mgr.set_walls(_wall_rects())
+	var shot: int = _mgr.spawn(0, Vector2(50.0, 100.0), Vector2(120.0, 0.0), 5.0)
+	var clear_shot: int = _mgr.spawn(0, Vector2(50.0, 250.0), Vector2(120.0, 0.0), 5.0)
+	for _i in 60:
+		_mgr.step(DT)
+	_check(not _mgr.is_alive(shot), "a shot that reaches a wall ends")
+	_check(_mgr.is_alive(clear_shot), "a shot below the wall keeps flying")
+	_check(_mgr.wall_hits == 1, "wall_hits counts the shot that ended (%d)" % _mgr.wall_hits)
+
+
+func _test_wall_stops_a_piercing_shot_and_a_fast_shot() -> void:
+	_setup()
+	_mgr.set_bounds(Rect2(0.0, 0.0, 640.0, 360.0))
+	_mgr.set_walls(_wall_rects())
+	_target(Vector2(200.0, 100.0))
+	var piercing: int = _mgr.spawn(0, Vector2(50.0, 100.0), Vector2(600.0, 0.0), 5.0, 4.0, ManagerScript.LAYER_ENEMY, 5)
+	# 6,000 px/s moves 100 px in one step: a shot that would skip a thin wall.
+	var fast: int = _mgr.spawn(0, Vector2(60.0, 150.0), Vector2(6000.0, 0.0), 5.0)
+	for _i in 30:
+		_mgr.step(DT)
+	_check(not _mgr.is_alive(piercing), "a piercing shot ends on a wall too")
+	_check(not _mgr.is_alive(fast), "a shot faster than the wall is thick does not tunnel")
+	_check(_hits.is_empty(), "nothing behind the wall was hit (%d)" % _hits.size())
+
+
+func _test_wall_hits_from_every_direction() -> void:
+	_setup()
+	_mgr.set_bounds(Rect2(0.0, 0.0, 640.0, 360.0))
+	var block: Array[Rect2] = [Rect2(304.0, 152.0, 32.0, 32.0)]
+	_mgr.set_walls(block)
+	var centre := Vector2(320.0, 168.0)
+	var slots: Array[int] = []
+	for i in 16:
+		var direction: Vector2 = Vector2.from_angle(float(i) * TAU / 16.0 + 0.1)
+		slots.append(_mgr.spawn(0, centre + direction * 90.0, -direction * 200.0, 5.0))
+	for _i in 40:
+		_mgr.step(DT)
+	var alive: int = 0
+	for slot in slots:
+		if _mgr.is_alive(slot):
+			alive += 1
+	_check(alive == 0, "shots from all sides end on the block (%d still fly)" % alive)
+	_check(_mgr.wall_hits == 16, "each one counted (%d)" % _mgr.wall_hits)
+
+
+func _test_wall_edges_and_clearing() -> void:
+	_setup()
+	_mgr.set_bounds(Rect2(0.0, 0.0, 640.0, 360.0))
+	_mgr.set_walls(_wall_rects())
+	# The wall covers x 96..128, y 0..200.
+	var beside: int = _mgr.spawn(0, Vector2(90.0, 260.0), Vector2(0.0, -100.0), 1.0)
+	var below: int = _mgr.spawn(0, Vector2(120.0, 205.0), Vector2(0.0, 100.0), 1.0)
+	_mgr.step(DT)
+	_check(_mgr.is_alive(beside), "a shot beside the wall does not touch it")
+	_check(_mgr.is_alive(below), "a shot leaving the wall's bottom edge flies on")
+	_mgr.clear_walls()
+	var through: int = _mgr.spawn(0, Vector2(90.0, 100.0), Vector2(300.0, 0.0), 2.0)
+	for _i in 20:
+		_mgr.step(DT)
+	_check(_mgr.is_alive(through) and _mgr.get_position_of(through).x > 128.0, "with the walls cleared the shot passes")
+	_mgr.set_walls(_wall_rects())
+	_mgr.set_bounds(Rect2(0.0, 0.0, 640.0, 360.0))
+	var again: int = _mgr.spawn(0, Vector2(90.0, 100.0), Vector2(300.0, 0.0), 2.0)
+	for _i in 20:
+		_mgr.step(DT)
+	_check(_mgr.is_alive(again), "set_bounds removes the walls")
+
+
+func _test_clip_to_walls() -> void:
+	_setup()
+	_mgr.set_bounds(Rect2(0.0, 0.0, 640.0, 360.0))
+	var open_end: Vector2 = _mgr.clip_to_walls(Vector2(10.0, 10.0), Vector2(90.0, 10.0))
+	_check(open_end == Vector2(90.0, 10.0), "without walls the segment is unchanged")
+	_mgr.set_walls(_wall_rects())
+	var clipped: Vector2 = _mgr.clip_to_walls(Vector2(60.0, 100.0), Vector2(160.0, 100.0))
+	_check(absf(clipped.x - 96.0) < 0.01 and clipped.y == 100.0, "the segment stops at the wall's near edge (%s)" % str(clipped))
+	var diagonal: Vector2 = _mgr.clip_to_walls(Vector2(80.0, 80.0), Vector2(180.0, 180.0))
+	_check(absf(diagonal.x - 96.0) < 0.01 and absf(diagonal.y - 96.0) < 0.01, "a diagonal segment stops at the edge (%s)" % str(diagonal))
+	var inside: Vector2 = _mgr.clip_to_walls(Vector2(110.0, 100.0), Vector2(60.0, 100.0))
+	_check(inside == Vector2(110.0, 100.0), "from inside a wall the segment is empty")
+	var clear: Vector2 = _mgr.clip_to_walls(Vector2(60.0, 250.0), Vector2(160.0, 250.0))
+	_check(clear == Vector2(160.0, 250.0), "a clear segment is unchanged")
+
+
+func _test_wall_body_rectangles_become_walls() -> void:
+	_setup()
+	_mgr.set_bounds(Rect2(0.0, 0.0, 640.0, 360.0))
+	var body := StaticBody2D.new()
+	body.position = Vector2(96.0, 0.0)
+	var shape_node := CollisionShape2D.new()
+	var rectangle := RectangleShape2D.new()
+	rectangle.size = Vector2(32.0, 64.0)
+	shape_node.shape = rectangle
+	shape_node.position = Vector2(16.0, 32.0)
+	body.add_child(shape_node)
+	var circle_node := CollisionShape2D.new()
+	circle_node.shape = CircleShape2D.new()
+	circle_node.position = Vector2(400.0, 200.0)
+	body.add_child(circle_node)
+	root.add_child(body)
+	_mgr.add_wall_body(body)
+	var clipped: Vector2 = _mgr.clip_to_walls(Vector2(60.0, 30.0), Vector2(200.0, 30.0))
+	_check(absf(clipped.x - 96.0) < 0.01, "the body's rectangle (96..128, 0..64) is a wall (%s)" % str(clipped))
+	var below: Vector2 = _mgr.clip_to_walls(Vector2(60.0, 100.0), Vector2(200.0, 100.0))
+	_check(below.x == 200.0, "below the rectangle is open")
+	var round_shape: Vector2 = _mgr.clip_to_walls(Vector2(300.0, 200.0), Vector2(500.0, 200.0))
+	_check(round_shape.x == 500.0, "a circle shape is ignored")
+	body.free()

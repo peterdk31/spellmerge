@@ -547,3 +547,10 @@ The HUD screenshot cannot be taken in a session (no display, `docs/BACKLOG.md`),
 - The mouse is only a flag in `core/input` (`is_mouse_aiming`); the wizard turns it into a direction with the world mouse position. The J key switches the keyboard player back to walk-direction aim.
 - Aim assist toward enemies is not done: it needs the wizard to look at enemies, which crosses areas; decide with playtest answers.
 - Graphics, small and code-drawn (no new art files): the sprite flips toward the aim (with a 0.3 band either side against flicker; the flip also mirrors the painted light, accepted for the placeholder art), a soft ground shadow, and a chevron reticle in the player's light ramp colour with a 1 px outline. Shots still start at the wizard's feet, in line with the shadow.
+
+## 2026-10-18: Weekly planning, M1 stays open
+
+**Decided by:** Claude (weekly run). The digest was empty; the owner gave no instructions and no focus.
+
+- M1 is not complete: C1 (#97) has no verdict, and the web 4-bot run (#93) and the Style Guide site step (#95) wait on the owner. No M2 design is written; the 7-day default for C1 is iterate on 2026-10-24.
+- No task added. Shots keep starting at the feet, in line with the shadow, as decided on 2026-10-17; that is revisited only with a feel-check answer or the C1 verdict, not on a re-read of the code.

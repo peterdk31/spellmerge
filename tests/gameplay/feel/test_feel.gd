@@ -389,6 +389,21 @@ func _test_hit_flash_and_squash() -> void:
 	_check(sprite.material == null, "the flash ends")
 	_check(sprite.scale == Vector2.ONE, "the sprite is back to its size")
 	_check(_feel.reacting_sprites() == 0, "no reaction is left")
+	# A scale set by the sprite's owner mid-squash (a dash look) is kept, not overwritten.
+	var dasher := Node2D.new()
+	var dash_sprite := Sprite2D.new()
+	dash_sprite.name = "Sprite"
+	dasher.add_child(dash_sprite)
+	root.add_child(dasher)
+	_bus.damage_dealt.emit(0, dasher, 1, Vector2.ZERO)
+	_feel.step(0.015625)
+	dash_sprite.scale = Vector2(1.4, 0.7)
+	_feel.step(0.015625)
+	_check(dash_sprite.scale.x > 1.0 and dash_sprite.scale.y < 1.0, "a dash look set during a squash stays stretched")
+	for i in 4:
+		_feel.step(STEP)
+	_check(dash_sprite.scale.is_equal_approx(Vector2(1.4, 0.7)), "the squash ends on the dash scale, not the old one")
+	dasher.free()
 	# A target without a Sprite, and one freed mid-flash, are fine.
 	var bare := Node2D.new()
 	_bus.damage_dealt.emit(0, bare, 1, Vector2.ZERO)

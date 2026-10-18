@@ -5,8 +5,6 @@
 [resource]
 script = ExtResource("1_preset")
 id = &"punchy"
-hit_stop_seconds = 0.05
-hit_stop_rest = 0.12
 death_stop_seconds = 0.09
 hit_shake = 0.2
 death_shake = 0.38

@@ -93,6 +93,7 @@ var _texture: Texture2D = null
 ## array cannot hold a freed object.
 var _react_sprites: PackedInt64Array = PackedInt64Array()
 var _react_scale: PackedVector2Array = PackedVector2Array()
+var _react_written: PackedVector2Array = PackedVector2Array()
 var _react_left: PackedFloat32Array = PackedFloat32Array()
 var _flash_material: ShaderMaterial = null
 ## Muzzle flashes and death puffs: sprites made once, with seconds left, seconds
@@ -208,6 +209,9 @@ func _step_reactions(real_delta: float) -> void:
 		_react_left[at] -= real_delta
 		var sprite := instance_from_id(_react_sprites[at]) as Sprite2D
 		var alive: bool = sprite != null
+		if alive and sprite.scale != _react_written[at]:
+			# The sprite's owner changed the scale (a dash look): that is the new base.
+			_react_scale[at] = sprite.scale
 		if _react_left[at] <= 0.0 or not alive:
 			if alive:
 				sprite.material = null
@@ -215,13 +219,16 @@ func _step_reactions(real_delta: float) -> void:
 			var last: int = _react_sprites.size() - 1
 			_react_sprites[at] = _react_sprites[last]
 			_react_scale[at] = _react_scale[last]
+			_react_written[at] = _react_written[last]
 			_react_left[at] = _react_left[last]
 			_react_sprites.resize(last)
 			_react_scale.resize(last)
+			_react_written.resize(last)
 			_react_left.resize(last)
 		else:
 			var squash: float = preset.hit_squash * _react_left[at] / maxf(preset.flash_seconds, 0.001)
-			sprite.scale = _react_scale[at] * Vector2(1.0 + squash, 1.0 - squash)
+			_react_written[at] = _react_scale[at] * Vector2(1.0 + squash, 1.0 - squash)
+			sprite.scale = _react_written[at]
 		at -= 1
 
 
@@ -237,7 +244,7 @@ func _step_flashes(real_delta: float) -> void:
 			continue
 		var t: float = _flash_left[i] / _flash_total[i]
 		flash.modulate.a = t
-		flash.scale = Vector2.ONE * (_flash_size[i] * (1.5 - 0.5 * t))
+		flash.scale = Vector2.ONE * (_flash_size[i] * (1.0 + 0.5 * (1.0 - t)))
 
 
 ## Show flash `slot` at `position` for `seconds`, `size` times the art's size.
@@ -267,6 +274,7 @@ func _react(target: Node) -> void:
 	elif _react_sprites.size() < REACT_SLOTS:
 		_react_sprites.append(sprite.get_instance_id())
 		_react_scale.append(sprite.scale)
+		_react_written.append(sprite.scale)
 		_react_left.append(preset.flash_seconds)
 	else:
 		return

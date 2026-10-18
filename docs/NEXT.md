@@ -13,6 +13,8 @@ No unchecked task is open in the Queue. The owner's C1 verdict decides what come
 
 ## Done recently
 
+- [x] **C1 iterate round 3: placeholder art (owner `/claude` on #102).** New floor, wall, fire bolt, hit spark and ember imp (2-frame idle), the wizard with idle (2), walk (4) and dash (3) strips and a staff drawn from the hand along the aim. `player.gd` plays the strips; test `test_player_animation.gd`; sheet shot `art_sheet`. Still open: cast, hurt, downed and death frames, enemy attack frames, animated bolt and spark. Details in `docs/LOG.md` and `docs/DECISIONS.md`.
+
 - [x] **C1 iterate round 2: playtest of 2026-10-18 (owner `/claude` on #102 and #97).** Tasks made from the playtest and done: (1) shots invisible, fixed in `core/projectiles` (draw order and culling box); (2) shots start at the staff tip, with a staff drawn; (3) the dash gets a stretch, a lean and fading ghosts. Aim assist is unwanted (owner); controller and multi-player were not tried yet. Details in `docs/LOG.md` and `docs/DECISIONS.md`.
 - [x] **C1 iterate round 1: aiming and graphics (owner `/claude` on #97).** Shots follow `aim` (right stick, mouse for the keyboard player, else the walk direction), the sprite turns toward it, and a reticle and ground shadow are drawn. Details in `docs/DECISIONS.md`; tests `test_player_aim.gd`, `test_input.gd`. Open for the next round: aim assist, and what feels weak once a person has played it.
 

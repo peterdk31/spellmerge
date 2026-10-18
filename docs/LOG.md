@@ -2,6 +2,14 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue.
 
+## 2026-10-18: Placeholder art iteration (owner `/claude` on #102)
+
+- Redrew the placeholders as SVG rects, same palette and rules: floor (Stone base with flagstone joints, light chips and cracks, nothing on the edge pixels; it is lighter than before, so figures stand out more), wall (four brick courses, each lit on top with a shadow joint), fire bolt (a comet with a round head, tapering tail and Spark core), hit spark (added four diagonal flecks), ember imp (2-frame idle strip, the second bobs 1 px, played by an `AnimationPlayer` in the scene), wizard (no staff in the sprite any more).
+- Wizard animation: `wizard_p1..p4_idle.svg` (2 frames), `_walk.svg` (4) and `_dash.svg` (3), 32 px per frame; `player.gd` picks the strip from speed and dodge (`_update_animation`), `walk_textures`, `dash_textures` and `staff_texture` are set in `wizard.tscn`. The dash look (stretch, lean, ghosts) stays but is milder (1.2 x 0.85, lean 0.1) because the dash frames lean already; ghosts draw the current frame.
+- The staff is now art: `staff.svg` (Wood pole, fist, Spark gem) is drawn from the hand along the aim, flipped when aiming left so the light stays on top, with a player-colour gem at the tip. The muzzle position did not change.
+- Checked: `ci/build/build.sh --quick --tests` passes (new `test_player_animation.gd`), and a new shot `art_sheet` (`tests/screenshots/shot_art.gd`) shows every frame at 2x; looked at it, and at the arena shots.
+- Not done: the cast, hurt, downed and death strips; enemy walk or attack frames; a walk and dash for the imp; animated bolt and spark (the projectile manager draws one still). Real art and the art direction stay with M2. The whole session could not run scripts, so the SVGs were written by hand (no generator) and the other three player colours are recolours of player 1 by text replacement.
+
 ## 2026-10-18: Playtest fixes (owner `/claude` on #102 and #97)
 
 - Shots were invisible (player and enemy). Two causes, both in `core/projectiles`: the autoload is drawn before the room, so the floor covered the batch (now `DRAW_Z` 50), and the MultiMesh's culling box did not follow the shots, so any shot away from the origin was never drawn (now `custom_aabb` covers the bounds). Found by a screenshot probe: even a hand-set instance rendered only with the box set. Shots are also drawn 3x their hit circle (`DRAW_SCALE`) and tinted only 45% (`TINT_STRENGTH`), because a full multiply turned the orange bolt of a blue wizard nearly black.

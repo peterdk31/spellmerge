@@ -110,7 +110,7 @@ func _test_wizard_scene() -> void:
 	_check(wizard.collision_mask == PlayerScript.LAYER_WALLS, "players collide only with walls")
 	_check(wizard.get_node("Sprite").texture_filter == CanvasItem.TEXTURE_FILTER_NEAREST, "the sprite is drawn with filtering off")
 	wizard.free()
-	# Each index shows its own colour: four textures, each 32x32, with different robe colours.
+	# Each index shows its own colour: four idle strips of 32x32 frames, with different robe colours.
 	var robes: Array[Color] = []
 	for index in 4:
 		var instance := WizardScene.instantiate() as PlayerScript
@@ -120,7 +120,7 @@ func _test_wizard_scene() -> void:
 		var texture: Texture2D = (instance.get_node("Sprite") as Sprite2D).texture
 		_check(texture != null, "wizard %d shows a sprite" % index)
 		if texture != null:
-			_check(texture.get_size() == Vector2(32, 32), "wizard %d sprite is 32x32" % index)
+			_check(texture.get_height() == 32 and texture.get_width() % 32 == 0, "wizard %d sprite is a strip of 32x32 frames" % index)
 			var colour_count: Dictionary = {}
 			var image := texture.get_image()
 			for y in image.get_height():

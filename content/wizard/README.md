@@ -28,7 +28,7 @@ Everything that customises the single base wizard. **Cosmetics** (`cosmetics/`) 
 
 ## Example to copy
 
-`content/wizard/base/wizard.tscn`, the base wizard scene (collision shape and a `Sprite` node, with `gameplay/player/player.gd` on the root). Its sprites are `wizard_p1_idle.svg` to `wizard_p4_idle.svg` (the same shapes in the four player colours; the scene lists them in `textures` and `player.gd` shows the one for `index`). Cosmetics and staffs (M4) get their own example when Claude adds the first.
+`content/wizard/base/wizard.tscn`, the base wizard scene (collision shape and a `Sprite` node, with `gameplay/player/player.gd` on the root). Its sprites are strips of 32 px frames in the four player colours: `wizard_p1_idle.svg` to `wizard_p4_idle.svg`, `_walk.svg` and `_dash.svg` (the scene lists them in `textures`, `walk_textures` and `dash_textures`, and `player.gd` plays the one for `index` that fits what the wizard does). `staff.svg` is the staff, drawn along the aim (`staff_texture`). Cosmetics and staffs (M4) get their own example when Claude adds the first.
 
 ## Validate
 

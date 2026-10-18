@@ -30,6 +30,10 @@ extends CharacterBody2D
 ## Shots start at the tip of the staff (muzzle_position()), held in front of the
 ## body at hand height, not at the feet.
 ##
+## Animation: the sprite plays an idle, a walk or a dash strip (frames of 32 px
+## side by side, see docs/STYLE.md); _update_animation() picks it from the speed
+## and the dodge. The staff is drawn above the sprite along the aim.
+##
 ## Dash look: during a dodge the sprite stretches and leans along the dash and
 ## fading ghosts of it trail behind (drawn in _draw; no nodes or arrays made).
 ##
@@ -76,11 +80,23 @@ const STAFF_REACH: float = 14.0
 ## Dash look: sprite stretch along the dash, lean in radians, the ghosts' spacing
 ## in pixels and their opacities (one per ghost).
 ## The stretch is for a horizontal dash; a mostly vertical one swaps the axes.
-const DASH_STRETCH: Vector2 = Vector2(1.3, 0.8)
-const DASH_LEAN: float = 0.2
+const DASH_STRETCH: Vector2 = Vector2(1.2, 0.85)
+const DASH_LEAN: float = 0.1
 ## A ghost is left behind every GHOST_INTERVAL seconds of the dash (3 of them).
 const GHOST_INTERVAL: float = 0.04
 const GHOST_ALPHAS: Array[float] = [0.45, 0.28, 0.14]
+## Sprite strips: every frame is FRAME_SIZE wide, the frame count is the strip's
+## width divided by it. Idle and walk loop; the dash plays once and holds its
+## last frame. The art shows the poses only; the speeds are set here.
+const FRAME_SIZE: int = 32
+const IDLE_FPS: float = 2.0
+const WALK_FPS: float = 8.0
+const DASH_FPS: float = 16.0
+## Pixels per second above which the wizard counts as walking.
+const WALK_THRESHOLD: float = 10.0
+## Where the hand is on staff.svg (its pivot), in pixels from the corner.
+const STAFF_PIVOT: Vector2 = Vector2(14.0, 16.0)
+enum Anim { IDLE, WALK, DASH }
 ## Light colour of each player's ramp, for the reticle. The single source is the
 ## player ramps in docs/STYLE.md; core has only the base colours (projectile manager).
 const PLAYER_COLORS: Array[Color] = [
@@ -103,6 +119,15 @@ const LAYER_PLAYERS: int = 2
 ## One idle texture per player index (the player colour). The scene lists the four
 ## textures; _ready() shows the one for `index` on the `Sprite` node.
 @export var textures: Array[Texture2D] = []
+
+## The walk and dash strips, one per player index like `textures`. An empty
+## list (or a missing index) keeps the idle strip.
+@export var walk_textures: Array[Texture2D] = []
+@export var dash_textures: Array[Texture2D] = []
+
+## The staff, drawn from the hand along the aim; pointing right, hand at STAFF_PIVOT.
+## Without it a plain line is drawn.
+@export var staff_texture: Texture2D = null
 
 ## The input manager. Only tests set this, before adding the node; otherwise the
 ## "PlayerInput" autoload is used.
@@ -137,6 +162,9 @@ var _sprite: Sprite2D = null
 var _faces_left: bool = false
 ## True while the dash look is applied (to redraw and to reset it once).
 var _dash_look: bool = false
+## Which strip the sprite shows and the seconds it has played.
+var _anim: Anim = Anim.IDLE
+var _anim_time: float = 0.0
 ## Where the wizard was at the last ghost ticks of the dash (newest first; a
 ## fixed array, only overwritten), and the time to the next tick.
 var _trail: Array[Vector2] = [Vector2.ZERO, Vector2.ZERO, Vector2.ZERO]
@@ -171,7 +199,59 @@ func apply_texture() -> void:
 	if index < 0 or index >= textures.size():
 		push_warning("Wizard %d: no texture for this player index." % index)
 		return
-	_sprite.texture = textures[index]
+	_anim = Anim.IDLE
+	_anim_time = 0.0
+	_show_strip(textures[index])
+
+
+## Show a strip on the sprite from its first frame.
+func _show_strip(strip: Texture2D) -> void:
+	_sprite.texture = strip
+	_sprite.hframes = maxi(int(strip.get_width()) / FRAME_SIZE, 1)
+	_sprite.frame = 0
+
+
+## The strip for an animation: the walk or dash one when the scene has it for
+## this player, else the idle one.
+func _strip_for(anim: Anim) -> Texture2D:
+	var list: Array[Texture2D] = textures
+	if anim == Anim.WALK:
+		list = walk_textures
+	elif anim == Anim.DASH:
+		list = dash_textures
+	if index >= 0 and index < list.size() and list[index] != null:
+		return list[index]
+	return textures[index] if index >= 0 and index < textures.size() else null
+
+
+## Choose the strip (idle, walk, dash) from what the wizard does, and the frame
+## from the time since it started. Changes nothing if the strip is the same.
+func _update_animation(delta: float) -> void:
+	if _sprite == null:
+		return
+	var wanted: Anim = Anim.IDLE
+	if is_dodging():
+		wanted = Anim.DASH
+	elif velocity.length() > WALK_THRESHOLD:
+		wanted = Anim.WALK
+	if wanted != _anim:
+		_anim = wanted
+		_anim_time = 0.0
+		var strip: Texture2D = _strip_for(wanted)
+		if strip != null:
+			_show_strip(strip)
+	else:
+		_anim_time += delta
+	var fps: float = IDLE_FPS
+	if _anim == Anim.WALK:
+		fps = WALK_FPS
+	elif _anim == Anim.DASH:
+		fps = DASH_FPS
+	var step_index: int = int(_anim_time * fps)
+	if _anim == Anim.DASH:
+		_sprite.frame = mini(step_index, _sprite.hframes - 1)
+	else:
+		_sprite.frame = step_index % _sprite.hframes
 
 
 func _ready() -> void:
@@ -193,6 +273,7 @@ func _ready() -> void:
 		registry = get_node_or_null("/root/Registry") as RegistryScript
 	if _overlay == null:
 		_overlay = Node2D.new()
+		_overlay.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		_overlay.draw.connect(_draw_overlay)
 		add_child(_overlay)
 	if is_inside_tree() and _sound_player == null:
@@ -249,6 +330,7 @@ func step(delta: float) -> void:
 		velocity = _dodge_direction * DODGE_SPEED
 	else:
 		velocity = move * MOVE_SPEED
+	_update_animation(delta)
 	# Held, not pressed: the spell's own cooldown sets the rate. `cast` is hidden
 	# while an overlay is open (captured), so a menu tap never fires.
 	if spell != null and input.is_action_pressed(index, &"cast"):
@@ -370,7 +452,8 @@ func _draw_overlay() -> void:
 ## Fading copies of the sprite where the wizard was, stretched and leaned like it.
 func _draw_ghosts() -> void:
 	var texture: Texture2D = _sprite.texture
-	var size: Vector2 = texture.get_size()
+	var size: Vector2 = Vector2(FRAME_SIZE, texture.get_height())
+	var source: Rect2 = Rect2(Vector2(_sprite.frame * FRAME_SIZE, 0.0), size)
 	var tint: Color = PLAYER_COLORS[clampi(index, 0, PLAYER_COLORS.size() - 1)]
 	var flip: float = -1.0 if _faces_left else 1.0
 	var stretch: Vector2 = _dash_scale()
@@ -378,18 +461,26 @@ func _draw_ghosts() -> void:
 	for i in GHOST_ALPHAS.size():
 		var at: Vector2 = _sprite.position + _trail[i] - global_position
 		draw_set_transform(at, lean, Vector2(flip * stretch.x, stretch.y))
-		draw_texture_rect(texture, Rect2(-size * 0.5, size), false, Color(tint, GHOST_ALPHAS[i]))
+		draw_texture_rect_region(texture, Rect2(-size * 0.5, size), source, Color(tint, GHOST_ALPHAS[i]))
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
-## The staff: a short pole from the hand to the muzzle with a glowing tip.
+## The staff: the staff art turned along the aim with the hand on the wizard
+## (a plain line without the art), and a gem in the player colour at the tip.
 func _draw_staff() -> void:
 	var hand: Vector2 = Vector2(0.0, -HAND_HEIGHT)
 	var tip: Vector2 = hand + aim * STAFF_REACH
 	var color: Color = PLAYER_COLORS[clampi(index, 0, PLAYER_COLORS.size() - 1)]
-	_overlay.draw_line(hand, tip, OUTLINE_COLOR, 3.0)
-	_overlay.draw_line(hand, tip, Color("8a5a44"), 1.0)
-	_overlay.draw_circle(tip, 2.5, OUTLINE_COLOR)
+	if staff_texture != null:
+		# Aiming left the art is also flipped, so its lit side stays on top.
+		var flip: float = -1.0 if aim.x < 0.0 else 1.0
+		_overlay.draw_set_transform(hand, aim.angle(), Vector2(1.0, flip))
+		_overlay.draw_texture(staff_texture, -STAFF_PIVOT)
+		_overlay.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	else:
+		_overlay.draw_line(hand, tip, OUTLINE_COLOR, 3.0)
+		_overlay.draw_line(hand, tip, Color("8a5a44"), 1.0)
+		_overlay.draw_circle(tip, 2.5, OUTLINE_COLOR)
 	_overlay.draw_circle(tip, 1.5, color)
 
 

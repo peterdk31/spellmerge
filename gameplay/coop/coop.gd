@@ -259,7 +259,7 @@ func step_revive(delta: float) -> void:
 			_set_revive(player, _revive[player] - delta * REVIVE_DRAIN_FACTOR / REVIVE_HOLD_TIME)
 			continue
 		var progress: float = _revive[player] + delta / REVIVE_HOLD_TIME
-		if progress < 1.0 - 0.000001:
+		if progress < 1.0:
 			_set_revive(player, progress)
 			continue
 		_set_revive(player, 0.0)

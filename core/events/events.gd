@@ -51,7 +51,7 @@ signal enemy_died(player: int, enemy: Node, position: Vector2)
 signal player_downed(player: int)
 ## Sender: player. `player` was revived by `reviver`.
 signal player_revived(player: int, reviver: int)
-## Sender: coop. `player` is downed and being revived: `progress` (0 to 1) is how far the hold has got. Sent when it changes; 0 means the revive stopped or is done.
+## Sender: coop. `player` is downed and being revived: `progress` (0 to 1) is how far the hold has got. Sent when it changes (so every frame while a revive fills or drains); 0 means the revive stopped or is done.
 signal revive_progress(player: int, progress: float)
 ## Sender: player. The health or the whole-number mana of `player` changed, or the wizard appeared. Carries all the numbers so a listener never has to ask.
 signal player_stats_changed(player: int, health: int, max_health: int, mana: float, max_mana: float)

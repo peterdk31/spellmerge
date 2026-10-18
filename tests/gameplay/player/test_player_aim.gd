@@ -34,6 +34,8 @@ func _initialize() -> void:
 	_test_sprite_turn_has_a_band()
 	_test_downed_wizard_hides_the_reticle()
 	_test_mouse_jitter_is_not_aiming()
+	_test_muzzle_is_the_staff_tip()
+	_test_dash_look_applies_and_resets()
 	_teardown()
 	if _failures.is_empty():
 		print("TEST OK: gameplay/player (aim)")
@@ -242,3 +244,44 @@ func _test_mouse_jitter_is_not_aiming() -> void:
 	_check(not _input.is_mouse_aiming(0), "a tiny mouse brush does not turn mouse aim on")
 	_input.handle_event(_mouse_move(20.0))
 	_check(_input.is_mouse_aiming(0), "a real mouse move does")
+
+
+## Regression (issue #102): shots left the wizard's feet; they start at the staff tip.
+func _test_muzzle_is_the_staff_tip() -> void:
+	_setup(1)
+	_players[0].global_position = Vector2(100, 100)
+	_input.send_virtual_aim(0, Vector2.RIGHT)
+	_input.send_virtual(0, &"cast", 1.0)
+	_run(1)
+	var spell := _players[0].spell as AimSpell
+	var expected := Vector2(100.0 + PlayerScript.STAFF_REACH, 100.0 - PlayerScript.HAND_HEIGHT)
+	_check(spell.origins.size() > 0 and _near(spell.origins[0], expected), "the shot starts at the staff tip, got %s" % [spell.origins])
+	_check(_near(_players[0].muzzle_position(), expected), "muzzle_position is hand height plus the reach along the aim")
+
+
+## The dash stretches and leans the sprite, and the look is gone when the dash ends.
+func _test_dash_look_applies_and_resets() -> void:
+	_teardown()
+	_bus = EventsScript.new()
+	_input = InputManagerScript.new()
+	_input.events = _bus
+	_input.add_virtual_device(0)
+	var wizard := WizardScene.instantiate() as PlayerScript
+	wizard.input = _input
+	wizard.events = _bus
+	wizard._ready()
+	_players.append(wizard)
+	var sprite := wizard.get_node("Sprite") as Sprite2D
+	_check(sprite.scale == Vector2.ONE, "the sprite starts unscaled")
+	_input.send_virtual(0, &"move_right", 1.0)
+	_input.send_virtual(0, &"dodge", 1.0)
+	_input.send_virtual(0, &"dodge", 0.0)
+	wizard.step(STEP)
+	wizard.step(STEP)
+	_check(wizard.is_dodging(), "the wizard is dashing")
+	_check(sprite.scale == PlayerScript.DASH_STRETCH, "the sprite stretches during the dash")
+	_check(sprite.rotation > 0.0, "the sprite leans into a dash to the right")
+	for i in 5:
+		wizard.step(STEP)
+	_check(not wizard.is_dodging(), "the dash is over")
+	_check(sprite.scale == Vector2.ONE and sprite.rotation == 0.0, "the sprite is back to normal after the dash")

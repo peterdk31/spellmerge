@@ -27,6 +27,11 @@ extends CharacterBody2D
 ## switches back); with no aim input the wizard aims the way it walks. After the
 ## right stick is let go the aim holds AIM_HOLD_TIME, so a quick flick still
 ## shoots where it pointed. A small reticle in the player colour shows the aim.
+## Shots start at the tip of the staff (muzzle_position()), held in front of the
+## body at hand height, not at the feet.
+##
+## Dash look: during a dodge the sprite stretches and leans along the dash and
+## fading ghosts of it trail behind (drawn in _draw; no nodes or arrays made).
 ##
 ## Cast: while `cast` is held the wizard calls `spell.cast(index, origin, aim, mana)`
 ## and reads no spell field. If the spell fired it takes the mana returned, sends
@@ -64,6 +69,16 @@ const RETICLE_SIZE: float = 4.0
 ## Aim x beyond which the sprite turns (and turns back): a band against flicker.
 ## The flip also mirrors the painted light; fine for the placeholder art.
 const FLIP_BAND: float = 0.3
+## The staff: its hand is HAND_HEIGHT above the feet; the tip (where shots start)
+## is STAFF_REACH from the hand along the aim.
+const HAND_HEIGHT: float = 10.0
+const STAFF_REACH: float = 14.0
+## Dash look: sprite stretch along the dash, lean in radians, the ghosts' spacing
+## in pixels and their opacities (one per ghost).
+const DASH_STRETCH: Vector2 = Vector2(1.3, 0.8)
+const DASH_LEAN: float = 0.2
+const GHOST_SPACING: float = 9.0
+const GHOST_ALPHAS: Array[float] = [0.45, 0.28, 0.14]
 ## Light colour of each player's ramp, for the reticle. The single source is the
 ## player ramps in docs/STYLE.md; core has only the base colours (projectile manager).
 const PLAYER_COLORS: Array[Color] = [
@@ -118,6 +133,8 @@ var _drawn_aim: Vector2 = Vector2.ZERO
 ## The `Sprite` node (null in bare-script tests) and which way it is turned.
 var _sprite: Sprite2D = null
 var _faces_left: bool = false
+## True while the dash look is applied (to redraw and to reset it once).
+var _dash_look: bool = false
 
 var _dodge_left: float = 0.0
 var _invulnerable_left: float = 0.0
@@ -243,6 +260,11 @@ func _update_aim(move: Vector2, delta: float) -> void:
 	_refresh_look()
 
 
+## Where shots start: the tip of the staff, in front of the wizard at hand height.
+func muzzle_position() -> Vector2:
+	return global_position + Vector2(0.0, -HAND_HEIGHT) + aim * STAFF_REACH
+
+
 func _mouse_world() -> Vector2:
 	if mouse_world_override != Vector2.INF:
 		return mouse_world_override
@@ -258,9 +280,21 @@ func _refresh_look() -> void:
 		_faces_left = false
 	if _sprite != null:
 		_sprite.flip_h = _faces_left
+	var dashing: bool = is_dodging() and not _downed
+	if dashing or _dash_look:
+		_apply_dash_look(dashing)
 	if not aim.is_equal_approx(_drawn_aim):
 		_drawn_aim = aim
 		queue_redraw()
+
+
+## Stretch and lean the sprite along the dash, or put it back when it ends.
+func _apply_dash_look(dashing: bool) -> void:
+	_dash_look = dashing
+	if _sprite != null:
+		_sprite.scale = DASH_STRETCH if dashing else Vector2.ONE
+		_sprite.rotation = clampf(_dodge_direction.x, -1.0, 1.0) * DASH_LEAN if dashing else 0.0
+	queue_redraw()
 
 
 ## A soft shadow under the feet and the aim reticle (a chevron in the player
@@ -269,8 +303,11 @@ func _draw() -> void:
 	draw_set_transform(Vector2(0, 2), 0.0, Vector2(1.0, 0.4))
 	draw_circle(Vector2.ZERO, 8.0, Color(0, 0, 0, 0.35))
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	if _dash_look and _sprite != null and _sprite.texture != null:
+		_draw_ghosts()
 	if not _reticle_visible():
 		return
+	_draw_staff()
 	var tip: Vector2 = aim * RETICLE_DISTANCE
 	var side: Vector2 = aim.orthogonal()
 	var back: Vector2 = tip - aim * RETICLE_SIZE
@@ -279,6 +316,30 @@ func _draw() -> void:
 	draw_line(back - side * RETICLE_SIZE, tip, OUTLINE_COLOR, 3.0)
 	draw_line(back + side * RETICLE_SIZE, tip, color, 1.0)
 	draw_line(back - side * RETICLE_SIZE, tip, color, 1.0)
+
+
+## Fading copies of the sprite behind the dash.
+func _draw_ghosts() -> void:
+	var texture: Texture2D = _sprite.texture
+	var size: Vector2 = texture.get_size()
+	var tint: Color = PLAYER_COLORS[clampi(index, 0, PLAYER_COLORS.size() - 1)]
+	var flip: float = -1.0 if _faces_left else 1.0
+	for i in GHOST_ALPHAS.size():
+		var at: Vector2 = _sprite.position - _dodge_direction * GHOST_SPACING * float(i + 1)
+		draw_set_transform(at, 0.0, Vector2(flip, 1.0))
+		draw_texture_rect(texture, Rect2(-size * 0.5, size), false, Color(tint, GHOST_ALPHAS[i]))
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+## The staff: a short pole from the hand to the muzzle with a glowing tip.
+func _draw_staff() -> void:
+	var hand: Vector2 = Vector2(0.0, -HAND_HEIGHT)
+	var tip: Vector2 = hand + aim * STAFF_REACH
+	var color: Color = PLAYER_COLORS[clampi(index, 0, PLAYER_COLORS.size() - 1)]
+	draw_line(hand, tip, OUTLINE_COLOR, 3.0)
+	draw_line(hand, tip, Color("8a5a44"), 1.0)
+	draw_circle(tip, 2.5, OUTLINE_COLOR)
+	draw_circle(tip, 1.5, color)
 
 
 ## True when _draw() shows the aim reticle: not while downed.
@@ -291,13 +352,13 @@ func _reticle_visible() -> bool:
 func cast() -> bool:
 	if _downed or spell == null:
 		return false
-	var spent: float = spell.cast(index, global_position, aim, mana)
+	var spent: float = spell.cast(index, muzzle_position(), aim, mana)
 	if spent == SpellBase.REFUSED:
 		return false
 	mana -= spent
 	_announce_stats()
 	if events != null:
-		events.spell_cast.emit(index, spell.spell_id(), global_position, aim)
+		events.spell_cast.emit(index, spell.spell_id(), muzzle_position(), aim)
 	_play_cast_sound()
 	return true
 
@@ -340,7 +401,7 @@ func take_damage(amount: int) -> bool:
 	_announce_stats()
 	if health == 0:
 		_downed = true
-		queue_redraw()
+		_apply_dash_look(false)
 		_dodge_left = 0.0
 		_invulnerable_left = 0.0
 		velocity = Vector2.ZERO

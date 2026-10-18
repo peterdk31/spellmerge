@@ -554,3 +554,13 @@ The HUD screenshot cannot be taken in a session (no display, `docs/BACKLOG.md`),
 
 - M1 is not complete: C1 (#97) has no verdict, and the web 4-bot run (#93) and the Style Guide site step (#95) wait on the owner. No M2 design is written; the 7-day default for C1 is iterate on 2026-10-24.
 - No task added. Shots keep starting at the feet, in line with the shadow, as decided on 2026-10-17; that is revisited only with a feel-check answer or the C1 verdict, not on a re-read of the code.
+
+## 2026-10-18: Playtest fixes: shots at the staff, visible, and a dash look
+
+**Decided by:** Claude, on the owner's `/claude` in #102 (playtest) and #97 (C1).
+
+- **Shots start at the staff tip, reversing the 2026-10-17 "feet" choice.** The owner asked for it and could not see the shots anyway. `muzzle_position()` is hand height (10 px) plus 14 px along the aim; the same point goes out in `spell_cast`. The staff is drawn in code, not a sprite part, so it works for every player colour and aim angle until real art arrives (M2).
+- **No aim assist.** The owner does not want it; a "homing" spell modifier is the planned way, so nothing is added to `player` for it.
+- **Projectile visibility lives in `core/projectiles`.** The batch is drawn at `z_index` 50 (above room and wizards) with a `custom_aabb` over the bounds, and drawn at 3x the hit circle with a 45% tint. Reason: the bugs were in how the batch is drawn, not in spells or the player.
+- **Dash look is code-drawn** (stretch, lean, three ghosts), no frames: no art files are needed and it works for all four colours. Real animation is M2 art.
+- Not decided here: controller and 4-player feel (the owner has not tried them); they stay in the C1 round.

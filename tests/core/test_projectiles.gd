@@ -438,6 +438,11 @@ func _test_one_thousand_run_and_draw() -> void:
 	_mgr.update_draw()
 	_check(_mgr.drawn == 0 and _mgr.get_count() == 0, "clear empties the batch")
 	_check(_mgr._draw_node.multimesh.visible_instance_count == 0, "clear empties the drawn multimesh, not just the counter")
+	# Regression (issue #102): the autoload is drawn before the room, so shots need a raised z_index to show above its floor.
+	_check(_mgr._draw_node.z_index >= 1, "the shots are drawn above the room's floor")
+	# Regression (issue #102): without a culling box covering the area, shots away from the origin were never drawn.
+	var box: AABB = _mgr._draw_node.multimesh.custom_aabb
+	_check(box.has_point(Vector3(-500.0, -400.0, 0.0)) and box.has_point(Vector3(900.0, 900.0, 0.0)), "the batch's culling box covers the whole play area")
 	root.remove_child(_mgr)
 
 

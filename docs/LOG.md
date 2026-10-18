@@ -2,6 +2,14 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue.
 
+## 2026-10-18: Playtest fixes (owner `/claude` on #102 and #97)
+
+- Shots were invisible (player and enemy). Two causes, both in `core/projectiles`: the autoload is drawn before the room, so the floor covered the batch (now `DRAW_Z` 50), and the MultiMesh's culling box did not follow the shots, so any shot away from the origin was never drawn (now `custom_aabb` covers the bounds). Found by a screenshot probe: even a hand-set instance rendered only with the box set. Shots are also drawn 3x their hit circle (`DRAW_SCALE`) and tinted only 45% (`TINT_STRENGTH`), because a full multiply turned the orange bolt of a blue wizard nearly black.
+- Shots now start at the staff tip (`muzzle_position()`: 10 px above the feet plus 14 px along the aim), and a small staff with a glowing tip in the player colour is drawn. `spell_cast` carries the same origin.
+- Dash look: the sprite stretches (1.3 x 0.8) and leans along the dash, and three fading ghosts in the player colour trail behind it; no art files.
+- Tests: `test_player_aim.gd` (muzzle, dash look and reset), `test_projectiles.gd` (z_index and culling box). New shot `shots_and_dash` in `tests/screenshots/shot_m1.gd`; looked at it: three shots in flight, the staffs, and the dash ghosts of player 4.
+- Not done: controller and multi-player aim not yet felt by the owner; aim assist is unwanted (a "homing" modifier comes with spell building); enemy shots still start at the enemy's centre; real art and animation wait for M2.
+
 ## 2026-10-17
 
 - Owner `/claude` on the C1 issue (#97): iterate on aiming and graphics. Aim is now separate from walking (twin-stick): right stick, or the mouse for the keyboard player, else the walk direction; the sprite turns toward the aim, and a player-colour reticle plus a ground shadow are drawn. New `get_aim`, `send_virtual_aim`, `is_mouse_aiming` in `core/input`; tests `tests/gameplay/player/test_player_aim.gd` and two in `tests/core/test_input.gd`. `ci/build/build.sh --quick --tests` and `--screenshots` pass; looked at `arena_four_wizards` (each wizard aiming a different way). Not done: aim assist, a feel check by a person, new art files.

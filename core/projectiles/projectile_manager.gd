@@ -73,6 +73,15 @@ const WORK_PER_STEP: int = 8000
 const HIT_WORK: int = 40
 ## Floats per projectile in the MultiMesh buffer: 8 transform, 4 colour.
 const DRAW_STRIDE: int = 12
+## Draw order of the shots: above the room and the wizards. The autoload is drawn
+## before the current scene, so at z_index 0 the room's floor hid every shot.
+const DRAW_Z: int = 50
+## A shot is drawn this many times wider than its hit circle (the art has empty
+## margins and a pixel-art bolt is small on a 640x360 view).
+const DRAW_SCALE: float = 3.0
+## How much of the owner's colour tints the art (the rest stays white): a full
+## multiply turned the orange bolt of a blue wizard nearly black.
+const TINT_STRENGTH: float = 0.45
 ## Spatial grid cell size in pixels.
 const GRID_CELL: float = 64.0
 ## Projectiles that leave the bounds by more than this are removed.
@@ -180,7 +189,9 @@ func _ready() -> void:
 	multimesh.visible_instance_count = 0
 	_draw_node.multimesh = multimesh
 	_draw_node.texture = texture
+	_draw_node.z_index = DRAW_Z
 	add_child(_draw_node)
+	_fit_draw_bounds()
 
 
 func _physics_process(delta: float) -> void:
@@ -222,9 +233,20 @@ func get_cap() -> int:
 ## The area the projectiles live in. Also sizes the target grid.
 func set_bounds(rect: Rect2) -> void:
 	_bounds = rect
+	_fit_draw_bounds()
 	_grid_w = maxi(ceili(rect.size.x / GRID_CELL), 1)
 	_grid_h = maxi(ceili(rect.size.y / GRID_CELL), 1)
 	_cell_head.resize(_grid_w * _grid_h)
+
+
+## The batch's culling box must cover the whole area. Without it the renderer
+## culls the batch by a box that does not follow the shots, and shots away from
+## the origin were never drawn.
+func _fit_draw_bounds() -> void:
+	if _draw_node == null:
+		return
+	var box: Rect2 = _bounds.grow(BOUNDS_MARGIN)
+	_draw_node.multimesh.custom_aabb = AABB(Vector3(box.position.x, box.position.y, -1.0), Vector3(box.size.x, box.size.y, 2.0))
 
 
 ## Remove every projectile (targets stay registered).
@@ -395,7 +417,7 @@ func update_draw() -> void:
 	for slot in _high:
 		if _alive[slot] == 0:
 			continue
-		var diameter: float = maxf(_radius[slot] * 2.0, 1.0)
+		var diameter: float = maxf(_radius[slot] * 2.0, 1.0) * DRAW_SCALE
 		var dir: Vector2 = Vector2.RIGHT
 		if _vel[slot].length_squared() > 0.0:
 			dir = _vel[slot].normalized()
@@ -435,8 +457,8 @@ func is_alive(slot: int) -> bool:
 
 func _color_of(player: int) -> Color:
 	if player < 0:
-		return ENEMY_COLOR
-	return PLAYER_COLORS[player]
+		return Color.WHITE.lerp(ENEMY_COLOR, TINT_STRENGTH)
+	return Color.WHITE.lerp(PLAYER_COLORS[player], TINT_STRENGTH)
 
 
 func _kill(slot: int) -> void:

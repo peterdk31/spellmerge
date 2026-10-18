@@ -119,6 +119,12 @@ func _initialize() -> void:
 		_fail("player 4 is not down in hud_player_four_down")
 		return
 	await _shot("hud_player_four_down")
+	# Wizard 3 stands beside the body for a second: the ring shows about half the hold.
+	var wizard3: Node2D = flow.call("get_wizard", 2) as Node2D
+	wizard3.global_position = wizard4.global_position + Vector2(20.0, 0.0)
+	await create_timer(1.0).timeout
+	await RenderingServer.frame_post_draw
+	_save_crop(root.get_texture().get_image(), wizard4, "revive_ring_half")
 	wizard4.call("revive", 0)
 	_spread_wizards(flow)
 	await _settle()

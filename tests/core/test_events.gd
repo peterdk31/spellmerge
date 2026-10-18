@@ -29,6 +29,7 @@ const EVENTS: Dictionary = {
 	# Players.
 	&"player_downed": [["player", TYPE_INT]],
 	&"player_revived": [["player", TYPE_INT], ["reviver", TYPE_INT]],
+	&"revive_progress": [["player", TYPE_INT], ["progress", TYPE_FLOAT]],
 	&"player_stats_changed": [["player", TYPE_INT], ["health", TYPE_INT], ["max_health", TYPE_INT], ["mana", TYPE_FLOAT], ["max_mana", TYPE_FLOAT]],
 	&"player_joined": [["player", TYPE_INT]],
 	&"player_left": [["player", TYPE_INT]],

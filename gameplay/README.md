@@ -29,6 +29,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `enemy_died` | `combat` | `feel`, `flow` |
 | `player_downed` | `player` | `ai`, `feel`, `flow`, `run` |
 | `player_revived` | `player` | none yet |
+| `revive_progress` | `coop` | `player` |
 | `player_stats_changed` | `player` | `hud` |
 | `player_joined`, `player_left` | `coop` | `difficulty`, `flow`, `hud` |
 | `run_started`, `run_ended` | `run` | `run_started`: `difficulty`, `flow`; `run_ended`: `progression` |

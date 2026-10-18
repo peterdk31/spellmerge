@@ -41,6 +41,7 @@ func _initialize() -> void:
 	_test_cast_spends_mana_and_sends_event()
 	_test_cast_origin_stops_at_a_wall()
 	_test_cast_cooldown()
+	_test_cast_tap_just_before_ready_is_buffered()
 	_test_cast_needs_mana()
 	_test_no_spell_no_cast()
 	_test_missing_sound_is_silent()
@@ -261,6 +262,45 @@ func _test_cast_cooldown() -> void:
 	_run(8)  # 0.5 s held: fires at 0 s and again once the 0.25 s cooldown is over
 	_check(spell.fired_players.size() == 2, "a held cast fires once per cooldown (got %d)" % spell.fired_players.size())
 	_check(_casts.size() == 2, "one spell_cast per cast")
+
+
+## A tap of `cast` within INPUT_BUFFER of the spell being ready fires when it is;
+## an earlier tap and a tap made in an overlay do not carry over.
+func _test_cast_tap_just_before_ready_is_buffered() -> void:
+	_setup(1)
+	var spell := _make_spell(1.0, 0.25)
+	_players[0].spell = spell
+	_check(_players[0].cast(), "the first cast fires")
+	_run(2)  # 0.125 s of the cooldown left
+	_input.send_virtual(0, &"cast", 1.0)
+	_input.send_virtual(0, &"cast", 0.0)
+	_run(1)
+	_check(spell.fired_players.size() == 1, "the tap is not used while the spell cools down")
+	_run(1)
+	_check(spell.fired_players.size() == 2, "a tap just before the spell is ready fires when it is")
+	_run(8)
+	_check(spell.fired_players.size() == 2, "a buffered tap fires once")
+	_setup(1)
+	spell = _make_spell(1.0, 0.5)
+	_players[0].spell = spell
+	_check(_players[0].cast(), "the first cast fires")
+	_run(2)  # 0.375 s left
+	_input.send_virtual(0, &"cast", 1.0)
+	_input.send_virtual(0, &"cast", 0.0)
+	_run(8)
+	_check(spell.fired_players.size() == 1, "a tap longer ago than INPUT_BUFFER is dropped")
+	_setup(1)
+	spell = _make_spell(1.0, 0.25)
+	_players[0].spell = spell
+	_check(_players[0].cast(), "the first cast fires")
+	_run(2)
+	_input.set_captured(0, true)
+	_input.send_virtual(0, &"cast", 1.0)
+	_input.send_virtual(0, &"cast", 0.0)
+	_run(1)
+	_input.set_captured(0, false)
+	_run(3)
+	_check(spell.fired_players.size() == 1, "a tap made in an overlay is not buffered")
 
 
 func _test_cast_needs_mana() -> void:

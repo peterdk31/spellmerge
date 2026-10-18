@@ -42,7 +42,9 @@ extends CharacterBody2D
 ## fading ghosts of it trail behind (drawn in _draw; no nodes or arrays made).
 ##
 ## Cast: a press of `cast` is buffered like the dodge (INPUT_BUFFER seconds), so a tap
-## just before the spell's cooldown ends still fires. While `cast` is held the wizard calls `spell.cast(index, origin, aim, mana)`
+## just before the spell's cooldown ends still fires.
+##
+## While `cast` is held the wizard calls `spell.cast(index, origin, aim, mana)`
 ## and reads no spell field. If the spell fired it takes the mana returned, sends
 ## `spell_cast` and plays the sound `cast` from `core/registry` (nothing on null).
 ##
@@ -388,7 +390,8 @@ func step(delta: float) -> void:
 	if spell == null:
 		return
 	if input.is_action_pressed(index, &"cast"):
-		cast()
+		if cast():
+			_cast_buffer_left = 0.0
 	elif _cast_buffer_left > 0.0 and not captured and cast():
 		_cast_buffer_left = 0.0
 

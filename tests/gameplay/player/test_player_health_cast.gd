@@ -301,6 +301,17 @@ func _test_cast_tap_just_before_ready_is_buffered() -> void:
 	_input.set_captured(0, false)
 	_run(3)
 	_check(spell.fired_players.size() == 1, "a tap made in an overlay is not buffered")
+	_setup(1)
+	spell = _make_spell(1.0, 0.25)
+	_players[0].spell = spell
+	_check(_players[0].cast(), "the first cast fires")
+	_run(2)
+	_input.send_virtual(0, &"cast", 1.0)  # held until the spell is ready
+	_run(2)
+	_input.send_virtual(0, &"cast", 0.0)
+	var fired: int = spell.fired_players.size()
+	_run(1)
+	_check(spell.fired_players.size() == fired, "a tap that fired while held leaves no buffered cast")
 
 
 func _test_cast_needs_mana() -> void:

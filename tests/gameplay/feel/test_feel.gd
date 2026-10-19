@@ -46,6 +46,7 @@ func _initialize() -> void:
 	_test_cast_flash_and_kick()
 	_test_death_puff_is_limited()
 	_test_muzzle_flash_follows_aim_and_colour()
+	_test_muzzle_flash_stays_small()
 	_test_cast_squash()
 	_test_death_animation()
 	_test_death_animation_starts_at_rest_scale()
@@ -452,6 +453,21 @@ func _test_cast_flash_and_kick() -> void:
 	_feel.shake_enabled = false
 	_bus.spell_cast.emit(0, &"fire_bolt", Vector2.ZERO, Vector2.RIGHT)
 	_check(_feel.kick() == Vector2.ZERO, "no kick with shake off")
+
+
+func _test_muzzle_flash_stays_small() -> void:
+	_setup()
+	_feel.preset = load("res://gameplay/feel/presets/punchy.tres") as FeelPresetScript
+	_bus.spell_cast.emit(0, &"fire_bolt", Vector2.ZERO, Vector2.RIGHT)
+	var flash: Sprite2D = _feel.muzzle_flash(0)
+	_check(flash.visible, "the muzzle flash shows after a cast")
+	var art: float = flash.texture.get_size().x
+	var longest: float = 0.0
+	for i in 12:
+		longest = maxf(longest, flash.scale.x * art)
+		_feel.step(0.015625)
+	_check(longest > 0.0, "the muzzle flash was measured")
+	_check(longest <= 48.0, "the punchy muzzle flash is at most 48 px long at its largest (%.1f)" % longest)
 
 
 func _test_muzzle_flash_follows_aim_and_colour() -> void:

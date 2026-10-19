@@ -39,7 +39,7 @@ extends Resource
 @export_range(0.0, 0.6, 0.01) var death_anim_seconds: float = 0.25
 ## The muzzle flash at the staff tip: seconds it shows and its size (1 is the art's size).
 @export_range(0.0, 0.3, 0.01) var muzzle_flash_seconds: float = 0.1
-@export_range(0.1, 3.0, 0.1) var muzzle_flash_size: float = 2.4
+@export_range(0.1, 3.0, 0.1) var muzzle_flash_size: float = 0.5
 ## The white puff where an enemy dies: seconds and biggest size.
 @export_range(0.0, 0.5, 0.01) var death_puff_seconds: float = 0.14
 @export_range(0.1, 6.0, 0.1) var death_puff_size: float = 1.6

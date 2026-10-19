@@ -2,6 +2,14 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-19: Muzzle flash: size 0.5 (a small flare, not a blast)
+
+**Decided by:** Claude, from the owner's bug report on #102.
+
+- `muzzle_flash_size` goes from 2.4 to 0.5 (the `@export_range` minimum was already 0.1). With the 32 px `hit_spark.svg`, `MUZZLE_STRETCH` 1.8 and the 1.5× growth while it fades, the flash is 29 px long at the start and 43 px at its largest, about the size of the 32 px wizard. Before it was 138 px growing to 207 px.
+- The stretch stays, so the flash still reads along the aim. The death puff has its own size (`death_puff_size`) and is unchanged.
+- `test_feel.gd` fails if the `punchy` muzzle flash is longer than 48 px at any step.
+
 ## 2026-10-18: Wave pacing: waves in the same room, +2 enemies a wave, downed wizards stand up between waves
 
 **Decided by:** Claude, from the owner's round-2 task list (#102).

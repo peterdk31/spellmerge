@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue.
 
+## 2026-10-19: Muzzle flash bug (#102)
+
+- The muzzle flash was 138-207 px around a 32 px wizard. `muzzle_flash_size` is now 0.5 (29-43 px); the death puff is unchanged. New test `_test_muzzle_flash_stays_small` (48 px limit, `punchy` preset). Reasoning in `docs/DECISIONS.md`.
+
 ## 2026-10-19: C1 round 2 summary
 
 - Wrote the summary comment for #97; the daily run posts it after this merges (a session cannot post or read comments). It covers the six tasks, an honest assessment, what stays untested (no human playtest of round 2, web, sound) and the verdict options. No code changed.

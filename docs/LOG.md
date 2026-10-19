@@ -2,12 +2,6 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue.
 
-## 2026-10-18: Cleanup: invalid UIDs (C1 round 2, task 6)
-
-- Eight `.uid` files held a digit 9 (the backlog listed five; `gameplay/feel/feel.gd.uid`, `tests/gameplay/feel/test_feel.gd.uid` and `tests/hud/test_overlay.gd.uid` had it too). Each 9 became another valid character; no scene or resource referenced those UIDs.
-- The new test also found a `z` in `gameplay/feel/feel.gd.uid` (fixed). `test_wave_balance` failed once in a full run and passed on the rerun (bot timing is noisy; unrelated).
-- New test `tests/core/test_uids.gd`: scans every `.uid` file in `res://` (not `build/` or `addons/`) and fails on a bad prefix, a character outside a-y and 0-8, or a UID shared by two files; it also checks its own validator.
-
 ## 2026-10-18: Wave pacing (C1 round 2, task 5)
 
 - `flow`: after `room_cleared`, `NEXT_WAVE_DELAY` (3 s) later the next wave stands in the same world with 2 more enemies (8, 10, 12 ... up to 24); downed wizards are revived and protected; the restart is 1.5 s and goes back to wave 1. New event `wave_started(wave)`; the HUD shows "Wave N" at the top middle.

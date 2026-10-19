@@ -46,7 +46,10 @@ def bisect() -> list[str]:
     _git("switch", "--quiet", "-C", "revert-test", "origin/main")
     culprits: list[str] = []
     for sha in merges:
-        _git("-c", "user.name=revert", "-c", "user.email=revert@localhost", "revert", "--no-edit", sha)
+        # A merge commit (from "Create a merge commit") needs the parent to keep: main's.
+        parents = _git("rev-list", "--parents", "-n1", sha).split()
+        _git("-c", "user.name=revert", "-c", "user.email=revert@localhost", "revert", "--no-edit",
+             *(["-m", "1"] if len(parents) > 2 else []), sha)
         culprits.append(sha)
         if builds():
             return culprits

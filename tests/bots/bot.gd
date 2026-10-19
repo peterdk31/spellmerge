@@ -8,9 +8,11 @@ extends RefCounted
 ##
 ## Fighter: walks toward the nearest enemy of the current world (a wizard faces
 ## where it walks, so the shots fly at the enemy) and holds `cast` within
-## FIRE_RANGE and sees it (shots stop at walls; with a wall in between it strafes
-## along it instead). When it hardly moved for STUCK_STEPS steps (a pillar) it side-steps
-## for SIDESTEP_STEPS steps. Idler: stands still; it only opens its overlay.
+## FIRE_RANGE and sees it (shots stop at walls). With a wall in between it walks
+## round it: it probes the eight directions PROBE_DISTANCE ahead, takes a free one
+## from which the enemy is in view (else the free one nearest the enemy) and keeps
+## it for DETOUR_STEPS steps. When it hardly moved for STUCK_STEPS steps (a pillar)
+## it side-steps for SIDESTEP_STEPS steps. Idler: stands still; it only opens its overlay.
 ##
 ## Everything is driven by step(delta), so a run with the same frames repeats. A
 ## bot sends an input only when it changes.
@@ -23,6 +25,12 @@ const FIRE_RANGE: float = 170.0
 const STUCK_DISTANCE: float = 0.5
 const STUCK_STEPS: int = 20
 const SIDESTEP_STEPS: int = 25
+## How far ahead (pixels) a detour direction is probed, and how many steps it is kept.
+const PROBE_DISTANCE: float = 40.0
+const DETOUR_STEPS: int = 15
+const DIRECTIONS: Array[Vector2] = [
+	Vector2(1, 0), Vector2(1, 1), Vector2(0, 1), Vector2(-1, 1),
+	Vector2(-1, 0), Vector2(-1, -1), Vector2(0, -1), Vector2(1, -1)]
 
 var player: int = 0
 var mode: Mode = Mode.FIGHTER
@@ -35,6 +43,8 @@ var _last_position: Vector2 = Vector2.INF
 var _stuck: int = 0
 var _sidestep_left: int = 0
 var _sidestep_sign: float = 1.0
+var _detour: Vector2 = Vector2.ZERO
+var _detour_left: int = 0
 
 
 ## `input` is the `PlayerInput` autoload and `flow` the `Flow` autoload. Takes the
@@ -81,9 +91,15 @@ func step(_delta: float) -> void:
 		direction = direction.orthogonal() * _sidestep_sign
 	var in_range: bool = offset.length() <= FIRE_RANGE
 	var sees: bool = _can_see(wizard, target)
-	if in_range and not sees and _sidestep_left == 0:
-		# A wall in the way: strafe along it until the enemy is in view.
-		direction = direction.orthogonal() * _sidestep_sign
+	if sees:
+		_detour_left = 0
+	elif in_range and _sidestep_left == 0:
+		# A wall in the way: walk round it until the enemy is in view.
+		if _detour_left <= 0:
+			_detour = _pick_detour(wizard, target)
+			_detour_left = DETOUR_STEPS
+		_detour_left -= 1
+		direction = _detour
 	_hold_move(direction)
 	_hold_cast(in_range and sees)
 
@@ -97,6 +113,32 @@ func _can_see(wizard: Node2D, target: Node2D) -> bool:
 		return true
 	var query := PhysicsRayQueryParameters2D.create(wizard.global_position, target.global_position, 1)
 	return space.intersect_ray(query).is_empty()
+
+
+## The direction to walk round a wall between the wizard and `target`: of the free
+## directions (no wall within PROBE_DISTANCE), one from whose end the enemy is in
+## view, else the one ending nearest the enemy. Without a physics space, straight on.
+func _pick_detour(wizard: Node2D, target: Node2D) -> Vector2:
+	var from: Vector2 = wizard.global_position
+	var goal: Vector2 = target.global_position
+	var straight: Vector2 = (goal - from).normalized()
+	var space: PhysicsDirectSpaceState2D = wizard.get_world_2d().direct_space_state if wizard.is_inside_tree() else null
+	if space == null:
+		return straight
+	var best: Vector2 = straight
+	var best_score: float = INF
+	for direction: Vector2 in DIRECTIONS:
+		var end: Vector2 = from + direction.normalized() * PROBE_DISTANCE
+		if not space.intersect_ray(PhysicsRayQueryParameters2D.create(from, end, 1)).is_empty():
+			continue
+		var score: float = end.distance_to(goal)
+		if space.intersect_ray(PhysicsRayQueryParameters2D.create(end, goal, 1)).is_empty():
+			# In view from there: always better than any direction that is not.
+			score -= 100000.0
+		if score < best_score:
+			best_score = score
+			best = direction
+	return best
 
 
 func _nearest_enemy(world: Node2D, from: Vector2) -> Node2D:

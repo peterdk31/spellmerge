@@ -36,6 +36,7 @@ func _initialize() -> void:
 	_test_mouse_jitter_is_not_aiming()
 	_test_muzzle_is_the_staff_tip()
 	_test_shot_and_reticle_line_up_with_the_mouse()
+	_test_aim_at_a_point()
 	_test_dash_look_applies_and_resets()
 	_test_dash_look_follows_direction()
 	_test_dash_ghosts_trail_the_wizard()
@@ -308,6 +309,20 @@ func _test_shot_and_reticle_line_up_with_the_mouse() -> void:
 				"the shot from %s along %s passes through the mouse at %s" % [origin, direction, mouse])
 		var to_reticle: Vector2 = wizard.reticle_position() - origin
 		_check(absf(direction.cross(to_reticle)) < 0.01, "the reticle at %s is on the shot's line" % wizard.reticle_position())
+
+
+## aim_at() is the one way to aim at a point: the shot from the staff tip along it
+## passes the point, and a point on the hand gives no direction.
+func _test_aim_at_a_point() -> void:
+	_setup(1)
+	var wizard: PlayerScript = _players[0]
+	wizard.global_position = Vector2(100, 100)
+	for point: Vector2 in [Vector2(300, 100), Vector2(100, 300), Vector2(20, 40), Vector2(108, 70)]:
+		wizard.aim = wizard.aim_at(point)
+		var to_point: Vector2 = point - wizard.muzzle_position()
+		_check(_near(wizard.aim, wizard.aim.normalized()) and absf(wizard.aim.cross(to_point)) < 0.01 and wizard.aim.dot(to_point) > 0.0,
+				"the shot along aim_at(%s) passes the point" % point)
+	_check(wizard.aim_at(wizard.aim_pivot() + Vector2(1, 1)) == Vector2.ZERO, "a point on the hand gives no direction")
 
 
 ## The dash stretches and leans the sprite, and the look is gone when the dash ends.

@@ -34,7 +34,11 @@ extends CharacterBody2D
 ## Shots start at the tip of the staff (muzzle_position()), held in front of the
 ## body at hand height, not at the feet. The aim, the staff, the reticle and the
 ## shot share one line from the hand (aim_pivot()), so a shot flies through the
-## mouse and the reticle sits on its path.
+## mouse and the reticle sits on its path. Anything that aims at a point (the
+## mouse now; aim assist or a targeted spell later) takes its direction from
+## aim_at(point), never from the feet (global_position): a direction from the feet
+## sends the shot past the point. Everything drawn along the aim is placed with
+## aim_pivot(), muzzle_position() or reticle_position().
 ##
 ## Animation: the sprite plays an idle, a walk or a dash strip (frames of 32 px
 ## side by side, see docs/STYLE.md); _update_animation() picks it from the speed
@@ -81,7 +85,7 @@ const MAX_MANA: float = 100.0
 const MANA_REGEN: float = 10.0
 ## Seconds the aim holds after the right stick is let go.
 const AIM_HOLD_TIME: float = 0.6
-## A mouse closer than this (pixels) to the wizard gives no direction.
+## A point closer than this (pixels) to the hand gives no direction (aim_at()).
 const MOUSE_MIN_DISTANCE: float = 4.0
 ## The reticle: its distance from the wizard's hand and its size, in pixels.
 const RETICLE_DISTANCE: float = 38.0
@@ -406,10 +410,9 @@ func _update_aim(move: Vector2, delta: float) -> void:
 		aim = stick
 		_aim_hold_left = AIM_HOLD_TIME
 	elif input.is_mouse_aiming(index):
-		# From the hand, where shots leave, so they fly through the mouse.
-		var to_mouse: Vector2 = _mouse_world() - aim_pivot()
-		if to_mouse.length() >= MOUSE_MIN_DISTANCE:
-			aim = to_mouse.normalized()
+		var toward: Vector2 = aim_at(_mouse_world())
+		if toward != Vector2.ZERO:
+			aim = toward
 		_aim_hold_left = 0.0
 	else:
 		_aim_hold_left = maxf(_aim_hold_left - delta, 0.0)
@@ -421,6 +424,16 @@ func _update_aim(move: Vector2, delta: float) -> void:
 ## The hand: the point the aim, the staff, the reticle and the shot line up from.
 func aim_pivot() -> Vector2:
 	return global_position + Vector2(0.0, -HAND_HEIGHT)
+
+
+## The aim (unit length) for a shot that flies through `point` (world position):
+## measured from the hand, so the shot from muzzle_position() passes `point`.
+## Vector2.ZERO when `point` is within MOUSE_MIN_DISTANCE of the hand.
+func aim_at(point: Vector2) -> Vector2:
+	var to_point: Vector2 = point - aim_pivot()
+	if to_point.length() < MOUSE_MIN_DISTANCE:
+		return Vector2.ZERO
+	return to_point.normalized()
 
 
 ## Where shots start: the tip of the staff, in front of the wizard at hand height.
@@ -584,8 +597,9 @@ func _draw_ghosts() -> void:
 ## The staff: the staff art turned along the aim with the hand on the wizard
 ## (a plain line without the art), and a gem in the player colour at the tip.
 func _draw_staff() -> void:
-	var hand: Vector2 = Vector2(0.0, -HAND_HEIGHT)
-	var tip: Vector2 = hand + aim * STAFF_REACH
+	# The same points the shot uses, in the overlay's space (the wizard's).
+	var hand: Vector2 = aim_pivot() - global_position
+	var tip: Vector2 = muzzle_position() - global_position
 	var color: Color = PLAYER_COLORS[clampi(index, 0, PLAYER_COLORS.size() - 1)]
 	if staff_texture != null:
 		# Aiming left the art is also flipped, so its lit side stays on top.

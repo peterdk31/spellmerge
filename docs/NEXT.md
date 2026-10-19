@@ -15,6 +15,8 @@ All six tasks are done and the summary is written (the daily run posts it on #97
 
 ## Done recently
 
+- [x] **Muzzle flash too big (#102).** Size 2.4 to 0.5, so the flash is at most 43 px, about the wizard's size. Regression test in `test_feel.gd`.
+
 - [x] **C1 round 2 summary.** Written for #97 (posted by the daily run after merge): what the six tasks changed, an honest assessment and what is untested. Waiting for the owner's go, iterate or pivot.
 
 - [x] **6. Cleanup (C1 round 2).** The eight `.uid` files with a 9 are fixed (three more than the backlog listed) and `tests/core/test_uids.gd` fails on any `.uid` file with a bad prefix, a character outside a-y and 0-8, or a duplicate UID. The backlog line is gone.

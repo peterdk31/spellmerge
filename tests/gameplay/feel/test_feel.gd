@@ -460,6 +460,7 @@ func _test_muzzle_flash_stays_small() -> void:
 	_feel.preset = load("res://gameplay/feel/presets/punchy.tres") as FeelPresetScript
 	_bus.spell_cast.emit(0, &"fire_bolt", Vector2.ZERO, Vector2.RIGHT)
 	var flash: Sprite2D = _feel.muzzle_flash(0)
+	_check(flash.visible, "the muzzle flash shows after a cast")
 	var art: float = flash.texture.get_size().x
 	var longest: float = 0.0
 	for i in 12:

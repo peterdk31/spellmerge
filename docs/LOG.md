@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue.
 
+## 2026-10-19: C1 round 2 summary
+
+- Wrote the summary comment for #97; the daily run posts it after this merges (a session cannot post or read comments). It covers the six tasks, an honest assessment, what stays untested (no human playtest of round 2, web, sound) and the verdict options. No code changed.
+
 ## 2026-10-19: Cleanup: invalid UIDs (C1 round 2, task 6)
 
 - Re-applies #112, which #113 had reverted ("the daily build failed", no cause given; a session cannot read it); the full unit test run passes with it, including `test_uids`.

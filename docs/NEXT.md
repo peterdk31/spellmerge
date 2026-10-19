@@ -6,7 +6,7 @@ The ordered task queue for the current milestone, M1 (its design, [M1-core-loop.
 
 C1 iterate round 2 (owner `/claude` on #102): the six tasks below, in this order, each one session and one PR, all inside M1 (one enemy type, one room; nothing from M2+). When the sixth is done, write the "C1 round 2 summary" comment on #97 (what changed, an honest assessment) so the owner can give the go/pivot verdict. Default verdict after 7 days without an answer (2026-10-24): iterate.
 
-All six tasks are done. Remaining for this round: the "C1 round 2 summary" comment on #97.
+- [ ] **6. Cleanup.** Fix the invalid `.uid` files with a 9 listed in `docs/BACKLOG.md` ("Invalid UIDs with a 9"; Godot's alphabet is a-y and 0-8) and add a test that fails on any invalid UID in the repo. Remove that line from `docs/BACKLOG.md`.
 
 ## Blocked
 
@@ -14,8 +14,6 @@ All six tasks are done. Remaining for this round: the "C1 round 2 summary" comme
 - [ ] **Web load time and WASM projectile timing (M1 part 22 follow-up).** Checked 2026-10-17: `build/godot/templates` is empty here, so a session cannot export Web. The daily `ci/build/build.sh` already exports Web, smoke-tests it in headless Chrome (`smbot.websmoke`, "main menu ready") and prints `web: N kB of 40000 kB` in its "Size budgets" step, so the size is covered; no number is recorded in the docs yet (read it from the latest daily build log and write it here). Still missing, and owner-only (`ci/` is protected): a load-time line in `websmoke` against the 10 s budget, and running `test_projectile_timing` in the exported Web build and printing the hostile step time (rule: over 8 ms in WASM, lower `DEFAULT_CAP_WEB` until it is under). The exact step is under "Needs an owner decision" in `docs/BACKLOG.md`, asked as an `owner-question`. Until then nothing is measured and `DEFAULT_CAP_WEB` stays 1,000 (unchecked in WASM).
 
 ## Done recently
-
-- [x] **6. Cleanup (C1 round 2).** The eight `.uid` files with a 9 are fixed (three more than the backlog listed) and `tests/core/test_uids.gd` fails on any `.uid` file with a bad prefix, a character outside a-y and 0-8, or a duplicate UID. The backlog line is gone.
 
 - [x] **5. Wave pacing (C1 round 2).** `flow` starts a bigger wave (+2 enemies, cap 24) in the same room 3 s after each clear, stands downed wizards up, restarts after 1.5 s at wave 1, and sends the new event `wave_started`; the HUD shows "Wave N" at the top middle. Tests in `test_flow.gd`, `test_panels.gd`, `test_events.gd`; the 4-bot and wave balance tests pass. Numbers and reasoning in `docs/DECISIONS.md`.
 

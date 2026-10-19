@@ -11,6 +11,7 @@ const KNOWN_UID_FILES: Array[String] = [
 	"res://core/events/events.gd.uid",
 	"res://tests/core/test_uids.gd.uid",
 ]
+# Generated output (build) and third-party code (addons); skipped at the repo root only.
 const SKIPPED_FOLDERS: Array[String] = ["build", "addons"]
 
 var _failures: Array[String] = []

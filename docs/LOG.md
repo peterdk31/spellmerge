@@ -4,7 +4,7 @@ What each run did, newest first. Claude appends a short entry after each develop
 
 ## 2026-10-19: Cleanup: invalid UIDs (C1 round 2, task 6)
 
-- Re-applies #112, which #113 had reverted; the full unit test run passes with it, including `test_uids`.
+- Re-applies #112, which #113 had reverted ("the daily build failed", no cause given; a session cannot read it); the full unit test run passes with it, including `test_uids`.
 - Eight `.uid` files held a digit 9 (the backlog listed five; `gameplay/feel/feel.gd.uid`, `tests/gameplay/feel/test_feel.gd.uid` and `tests/hud/test_overlay.gd.uid` had it too). Each 9 became another valid character; no scene or resource referenced those UIDs.
 - The new test also found a `z` in `gameplay/feel/feel.gd.uid` (fixed). `test_wave_balance` failed once in a full run and passed on the rerun (bot timing is noisy; unrelated).
 - New test `tests/core/test_uids.gd`: scans every `.uid` file in `res://` (not `build/` or `addons/`) and fails on a bad prefix, a character outside a-y and 0-8, or a UID shared by two files; it also checks its own validator.

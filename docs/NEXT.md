@@ -6,7 +6,9 @@ The ordered task queue for the current milestone, M1 (its design, [M1-core-loop.
 
 C1 iterate round 2 (owner `/claude` on #102): the six tasks below, in this order, each one session and one PR, all inside M1 (one enemy type, one room; nothing from M2+). When the sixth is done, write the "C1 round 2 summary" comment on #97 (what changed, an honest assessment) so the owner can give the go/pivot verdict. Default verdict after 7 days without an answer (2026-10-24): iterate.
 
-All six tasks are done. Remaining for this round: the "C1 round 2 summary" comment on #97.
+All six tasks are done.
+
+- [ ] **C1 round 2 summary.** Write the "C1 round 2 summary" comment on #97 (what changed, an honest assessment) so the owner can give the go/pivot verdict.
 
 ## Blocked
 

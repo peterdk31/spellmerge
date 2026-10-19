@@ -4,7 +4,7 @@ What each run did, newest first. Claude appends a short entry after each develop
 
 ## 2026-10-19: C1 round 2 summary
 
-- Wrote the summary comment for #97 (posted from the session's `answers`): the six tasks, an honest assessment, what stays untested (no human playtest of round 2, web, sound) and the verdict options. No code changed.
+- Wrote the summary comment for #97; the daily run posts it after this merges (a session cannot post or read comments). It covers the six tasks, an honest assessment, what stays untested (no human playtest of round 2, web, sound) and the verdict options. No code changed.
 
 ## 2026-10-19: Cleanup: invalid UIDs (C1 round 2, task 6)
 

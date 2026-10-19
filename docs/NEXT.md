@@ -6,7 +6,7 @@ The ordered task queue for the current milestone, M1 (its design, [M1-core-loop.
 
 C1 iterate round 2 (owner `/claude` on #102): the six tasks below, in this order, each one session and one PR, all inside M1 (one enemy type, one room; nothing from M2+). When the sixth is done, write the "C1 round 2 summary" comment on #97 (what changed, an honest assessment) so the owner can give the go/pivot verdict. Default verdict after 7 days without an answer (2026-10-24): iterate.
 
-All six tasks and the summary are done. Nothing is queued until the owner answers on #97 (default verdict: iterate, 2026-10-24).
+All six tasks are done and the summary is written (the daily run posts it on #97 after merge; check it is there). Nothing else is queued until the owner answers on #97 (default verdict: iterate, 2026-10-24). If the verdict is iterate, the first task is a human playtest report of round 2, then the top item from it.
 
 ## Blocked
 
@@ -15,7 +15,7 @@ All six tasks and the summary are done. Nothing is queued until the owner answer
 
 ## Done recently
 
-- [x] **C1 round 2 summary.** Posted on #97: what the six tasks changed, an honest assessment and what is untested. Waiting for the owner's go, iterate or pivot.
+- [x] **C1 round 2 summary.** Written for #97 (posted by the daily run after merge): what the six tasks changed, an honest assessment and what is untested. Waiting for the owner's go, iterate or pivot.
 
 - [x] **6. Cleanup (C1 round 2).** The eight `.uid` files with a 9 are fixed (three more than the backlog listed) and `tests/core/test_uids.gd` fails on any `.uid` file with a bad prefix, a character outside a-y and 0-8, or a duplicate UID. The backlog line is gone.
 

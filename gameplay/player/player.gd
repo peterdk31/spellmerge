@@ -32,7 +32,9 @@ extends CharacterBody2D
 ## right stick is let go the aim holds AIM_HOLD_TIME, so a quick flick still
 ## shoots where it pointed. A small reticle in the player colour shows the aim.
 ## Shots start at the tip of the staff (muzzle_position()), held in front of the
-## body at hand height, not at the feet.
+## body at hand height, not at the feet. The aim, the staff, the reticle and the
+## shot share one line from the hand (aim_pivot()), so a shot flies through the
+## mouse and the reticle sits on its path.
 ##
 ## Animation: the sprite plays an idle, a walk or a dash strip (frames of 32 px
 ## side by side, see docs/STYLE.md); _update_animation() picks it from the speed
@@ -81,7 +83,7 @@ const MANA_REGEN: float = 10.0
 const AIM_HOLD_TIME: float = 0.6
 ## A mouse closer than this (pixels) to the wizard gives no direction.
 const MOUSE_MIN_DISTANCE: float = 4.0
-## The reticle: its distance from the wizard's feet and its size, in pixels.
+## The reticle: its distance from the wizard's hand and its size, in pixels.
 const RETICLE_DISTANCE: float = 38.0
 const RETICLE_SIZE: float = 4.0
 ## Aim x beyond which the sprite turns (and turns back): a band against flicker.
@@ -404,7 +406,8 @@ func _update_aim(move: Vector2, delta: float) -> void:
 		aim = stick
 		_aim_hold_left = AIM_HOLD_TIME
 	elif input.is_mouse_aiming(index):
-		var to_mouse: Vector2 = _mouse_world() - global_position
+		# From the hand, where shots leave, so they fly through the mouse.
+		var to_mouse: Vector2 = _mouse_world() - aim_pivot()
 		if to_mouse.length() >= MOUSE_MIN_DISTANCE:
 			aim = to_mouse.normalized()
 		_aim_hold_left = 0.0
@@ -415,9 +418,19 @@ func _update_aim(move: Vector2, delta: float) -> void:
 	_refresh_look()
 
 
+## The hand: the point the aim, the staff, the reticle and the shot line up from.
+func aim_pivot() -> Vector2:
+	return global_position + Vector2(0.0, -HAND_HEIGHT)
+
+
 ## Where shots start: the tip of the staff, in front of the wizard at hand height.
 func muzzle_position() -> Vector2:
-	return global_position + Vector2(0.0, -HAND_HEIGHT) + aim * STAFF_REACH
+	return aim_pivot() + aim * STAFF_REACH
+
+
+## Where the reticle's point is drawn, on the line of the shot.
+func reticle_position() -> Vector2:
+	return aim_pivot() + aim * RETICLE_DISTANCE
 
 
 func _mouse_world() -> Vector2:
@@ -514,7 +527,7 @@ func _draw_overlay() -> void:
 		return
 	_draw_invulnerable_ring()
 	_draw_staff()
-	var tip: Vector2 = aim * RETICLE_DISTANCE
+	var tip: Vector2 = reticle_position() - global_position
 	var side: Vector2 = aim.orthogonal()
 	var back: Vector2 = tip - aim * RETICLE_SIZE
 	var color: Color = PLAYER_COLORS[clampi(index, 0, PLAYER_COLORS.size() - 1)]

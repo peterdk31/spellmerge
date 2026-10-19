@@ -35,6 +35,7 @@ func _initialize() -> void:
 	_test_downed_wizard_hides_the_reticle()
 	_test_mouse_jitter_is_not_aiming()
 	_test_muzzle_is_the_staff_tip()
+	_test_shot_and_reticle_line_up_with_the_mouse()
 	_test_dash_look_applies_and_resets()
 	_test_dash_look_follows_direction()
 	_test_dash_ghosts_trail_the_wizard()
@@ -133,7 +134,8 @@ func _test_mouse_aim_for_the_keyboard_player() -> void:
 	_input.handle_event(_mouse_move(20.0))
 	_run(1)
 	_check(_near(_players[0].aim, Vector2.UP), "the keyboard player aims at the mouse")
-	_players[0].mouse_world_override = Vector2(160, 100)
+	# The aim is measured from the hand, HAND_HEIGHT above the feet.
+	_players[0].mouse_world_override = Vector2(160, 100 - PlayerScript.HAND_HEIGHT)
 	var walk := InputEventKey.new()
 	walk.physical_keycode = KEY_S
 	walk.pressed = true
@@ -141,7 +143,7 @@ func _test_mouse_aim_for_the_keyboard_player() -> void:
 	_run(1)
 	_check(_near(_players[0].facing, Vector2.DOWN), "the keyboard player walks down")
 	_check(_near(_players[0].aim, Vector2.RIGHT), "the mouse aim does not follow the walk")
-	_players[0].mouse_world_override = Vector2(101, 100)
+	_players[0].mouse_world_override = Vector2(101, 100 - PlayerScript.HAND_HEIGHT)
 	_run(1)
 	_check(_near(_players[0].aim, Vector2.RIGHT), "a mouse on top of the wizard keeps the last aim")
 	var key := InputEventKey.new()
@@ -280,6 +282,32 @@ func _dashing_wizard(action: StringName) -> PlayerScript:
 	wizard.step(STEP)
 	wizard.step(STEP)
 	return wizard
+
+
+## Regression: the aim was measured from the feet, the reticle drawn from the feet
+## and the shot fired from the hand, so the three pointed different ways. Now the
+## shot's line passes through the mouse and the reticle lies on it.
+func _test_shot_and_reticle_line_up_with_the_mouse() -> void:
+	_setup(1, true)
+	var wizard: PlayerScript = _players[0]
+	wizard.global_position = Vector2(100, 100)
+	_input.handle_event(_mouse_move(20.0))
+	for mouse: Vector2 in [Vector2(220, 60), Vector2(40, 150), Vector2(130, 20), Vector2(160, 104)]:
+		wizard.mouse_world_override = mouse
+		_run(1)
+		var spell := wizard.spell as AimSpell
+		spell.origins.clear()
+		spell.directions.clear()
+		_check(wizard.cast(), "the wizard casts at %s" % mouse)
+		if spell.origins.is_empty():
+			continue
+		var origin: Vector2 = spell.origins[0]
+		var direction: Vector2 = spell.directions[0]
+		var to_mouse: Vector2 = mouse - origin
+		_check(absf(direction.cross(to_mouse)) < 0.01 and direction.dot(to_mouse) > 0.0,
+				"the shot from %s along %s passes through the mouse at %s" % [origin, direction, mouse])
+		var to_reticle: Vector2 = wizard.reticle_position() - origin
+		_check(absf(direction.cross(to_reticle)) < 0.01, "the reticle at %s is on the shot's line" % wizard.reticle_position())
 
 
 ## The dash stretches and leans the sprite, and the look is gone when the dash ends.

@@ -4,9 +4,10 @@ The ordered task queue for the current milestone, M1 (its design, [M1-core-loop.
 
 ## Queue
 
-C1 iterate round 2 (owner `/claude` on #102): the six tasks below, in this order, each one session and one PR, all inside M1 (one enemy type, one room; nothing from M2+). When the sixth is done, write the "C1 round 2 summary" comment on #97 (what changed, an honest assessment) so the owner can give the go/pivot verdict. Default verdict after 7 days without an answer (2026-10-24): iterate.
+C1 verdict: **iterate** (owner, #97, 2026-10-20). Per the plan for an iterate verdict, the first task is a human playtest report; the top items from it follow. Everything stays inside M1 (one enemy type, one room; nothing from M2+).
 
-All six tasks are done and the summary is written (the daily run posts it on #97 after merge; check it is there). Nothing else is queued until the owner answers on #97 (default verdict: iterate, 2026-10-24). If the verdict is iterate, the first task is a human playtest report of round 2, then the top item from it.
+- [ ] **1. Playtest report of round 2.** The weekly planning run opens a "Playtest of the week" issue for the owner (build link, what changed in round 2: revive, shots stop at walls, dodge and cast feel, enemy readability, wave pacing, muzzle flash fix) with 3-5 questions: does the dodge feel responsive; can you read the imp's attack in time; does a wave feel too easy or too hard; does reviving feel fair; what is the one thing you would change first? Also ask for a controller and a 2+ player try. Do no feel work before the answers are in, except a bug the owner reports.
+- [ ] **2. The top items from the report.** When the answers arrive, turn them into at most three tasks here, ordered by the owner's priority, each with a done-when. Until then, pick no feel or backlog work. A daily session while waiting does only: bugs the owner reports, reminders for the Blocked items below, and doc upkeep; if none apply it may do nothing.
 
 ## Blocked
 

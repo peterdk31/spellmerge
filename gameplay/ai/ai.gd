@@ -94,7 +94,10 @@ var targets: Array = []
 @export var attack_radius: float = 5.0
 ## Radius of the enemy's hurt box in pixels.
 @export var hurt_radius: float = 11.0
-## Where the hurt circle and the shots start, relative to the node (the feet): the body.
+## Where the hurt circle, the shots and the telegraph start, relative to the node (the feet).
+## -12 and not the sprite's -14: a little below the sprite's centre, where the torso is.
+## Shots are not clipped at the spawn point, so an imp pressed against a wall can shoot
+## into it and the shot ends at once (the same as before for its feet).
 @export var hurt_offset: Vector2 = Vector2(0.0, -12.0)
 ## Optional poses for the `Sprite`: strips of square frames (width / height frames).
 @export var windup_texture: Texture2D = null
@@ -150,6 +153,8 @@ func _ready() -> void:
 	_telegraph_line = _telegraph as Line2D
 	if _telegraph != null:
 		_telegraph.visible = false
+		# Starts where the shot does (the body), whatever the scene says.
+		_telegraph.position = hurt_offset
 	if _telegraph_line != null and _telegraph_line.get_point_count() >= 2:
 		var reach: float = maxf(attack_speed * attack_lifetime, TELEGRAPH_START)
 		_telegraph_line.set_point_position(0, Vector2(TELEGRAPH_START, 0.0))

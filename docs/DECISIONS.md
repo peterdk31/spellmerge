@@ -7,7 +7,7 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 **Decided by:** Claude, on the owner's bug report: hitboxes too small, shots seem to pass through sprites.
 
 - Cause: sprites are drawn 14 px above the node origin (the feet), but every hit circle was centred on the origin, so a shot through the drawn body at body height was up to 14 px from the circle's centre and often missed. Radii were also small (imp 8, wizard 6, shots 4).
-- Fix: `Projectiles.add_target` takes an `offset`; `Combat.register_enemy`/`register_player` pass it on. Both the imp (`Ai.hurt_offset`) and the wizards (`Flow.PLAYER_HIT_OFFSET`) use (0, -12). Radii: imp 8 to 11, wizard 6 to 8, bolt 4 to 5, imp shot 4 to 5. The imp's shot and telegraph now start at its body, not its feet. Contact damage still compares the nodes' origins (both feet), so it is unchanged except for the larger radii.
+- Fix: `Projectiles.add_target` takes an `offset`; `Combat.register_enemy`/`register_player` pass it on. Both the imp (`Ai.hurt_offset`) and the wizards (`Flow.PLAYER_HIT_OFFSET`) use (0, -12). Radii: imp 8 to 11, wizard 6 to 8, bolt 4 to 5, imp shot 4 to 5. The imp's shot and telegraph now start at its body, not its feet. Contact damage compares the hit circles too (each node's origin plus its offset), so it is consistent with the shots. With both at (0, -12) the offsets cancel and the contact range is only the larger radii: 14 px (6 + 8) became 19 px (8 + 11), about 36% more. The balance tests did not need new `BALANCE:` numbers.
 - Not changed: the shot's drawn size (3x its radius) and the walls (still a point check). Tuning by feel waits for the playtest.
 
 ## 2026-10-20: Art direction before M2, and tests that break one at a time

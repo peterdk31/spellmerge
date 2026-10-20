@@ -35,6 +35,7 @@ func _initialize() -> void:
 	_test_freed_player_is_dropped()
 	_test_shot_hurts_wizard_through_combat()
 	_test_shot_can_be_dodged_by_stepping_aside()
+	_test_shot_and_telegraph_start_at_the_body()
 	_test_no_lookups_while_nobody_stands()
 	_test_recover_then_chase_again()
 	_test_knockback_moves_the_enemy()
@@ -211,6 +212,21 @@ func _test_shot_hurts_wizard_through_combat() -> void:
 	_run(imp, 16)
 	_check(damaged == [[EventsScript.NO_PLAYER, _players[0], imp.attack_damage]], "the shot hurt player 0 once, as an enemy (NO_PLAYER)")
 	_check(_players[0].health == PlayerScript.MAX_HEALTH - imp.attack_damage, "the wizard lost attack_damage health")
+
+
+## Regression (#5): the shot and the telegraph start at `hurt_offset`, the body, not the feet.
+func _test_shot_and_telegraph_start_at_the_body() -> void:
+	_setup(0)
+	var imp := _imp(Vector2(10.0, 20.0))
+	imp.aim = Vector2.RIGHT
+	imp._attack()
+	_check(_projectiles.get_count() == 1, "the imp's attack spawns one shot")
+	_check(_projectiles.get_position_of(0) == Vector2(10.0, 20.0) + imp.hurt_offset, "the shot leaves from position + hurt_offset")
+	var scene_imp: AiScript = ImpData.scene.instantiate() as AiScript
+	root.add_child(scene_imp)
+	var line: Node2D = scene_imp.get_node("Telegraph") as Node2D
+	_check(line.position == scene_imp.hurt_offset, "the scene's telegraph starts where the shot does")
+	scene_imp.free()
 
 
 func _test_shot_can_be_dodged_by_stepping_aside() -> void:

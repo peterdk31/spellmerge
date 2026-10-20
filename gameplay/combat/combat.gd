@@ -56,6 +56,7 @@ var _enemies: Array[Node2D] = []
 var _health: PackedInt32Array = PackedInt32Array()
 var _contact_damage: PackedInt32Array = PackedInt32Array()
 var _hurt_radius: PackedFloat32Array = PackedFloat32Array()
+var _hurt_offset: PackedVector2Array = PackedVector2Array()
 var _knock: PackedVector2Array = PackedVector2Array()
 
 # Contact hits waiting to be sent after the enemy loop: wizard index and damage.
@@ -122,6 +123,7 @@ func register_enemy(enemy: Node2D, health: int, hurt_radius: float, contact_dama
 	if at >= 0:
 		_health[at] = health
 		_hurt_radius[at] = hurt_radius
+		_hurt_offset[at] = hurt_offset
 		_contact_damage[at] = contact_damage
 		if projectiles != null:
 			projectiles.add_target(enemy, hurt_radius, ProjectileManagerScript.LAYER_ENEMY, -1, hurt_offset)
@@ -130,6 +132,7 @@ func register_enemy(enemy: Node2D, health: int, hurt_radius: float, contact_dama
 	_health.append(health)
 	_contact_damage.append(contact_damage)
 	_hurt_radius.append(hurt_radius)
+	_hurt_offset.append(hurt_offset)
 	_knock.append(Vector2.ZERO)
 	if projectiles != null:
 		projectiles.add_target(enemy, hurt_radius, ProjectileManagerScript.LAYER_ENEMY, -1, hurt_offset)
@@ -258,7 +261,7 @@ func step(delta: float) -> void:
 
 
 func _touch_players(row: int) -> void:
-	var enemy_at: Vector2 = _position_of(_enemies[row])
+	var enemy_at: Vector2 = _position_of(_enemies[row]) + _hurt_offset[row]
 	for index in PLAYER_SLOTS:
 		if _players[index] == null or _contact_left[index] > 0.0:
 			continue
@@ -267,7 +270,7 @@ func _touch_players(row: int) -> void:
 			continue
 		var wizard: Node2D = _players[index]
 		var reach: float = _hurt_radius[row] + _player_radius[index]
-		if enemy_at.distance_squared_to(_position_of(wizard)) > reach * reach:
+		if enemy_at.distance_squared_to(_position_of(wizard) + _player_offset[index]) > reach * reach:
 			continue
 		if _can_hurt_player(wizard):
 			_contact_left[index] = CONTACT_COOLDOWN
@@ -342,6 +345,7 @@ func _remove_enemy_at(at: int) -> void:
 	_health.remove_at(at)
 	_contact_damage.remove_at(at)
 	_hurt_radius.remove_at(at)
+	_hurt_offset.remove_at(at)
 	_knock.remove_at(at)
 
 

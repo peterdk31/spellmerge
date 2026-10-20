@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue.
 
+## 2026-10-20: Hitboxes on the body (owner `/claude` on #5)
+
+- Bug: hit circles were centred on the feet while sprites are drawn 14 px higher, so shots seemed to pass through. `Projectiles.add_target` has a new `offset`; imp and wizards register their circle at (0, -12) and bigger (imp 11, wizard 8, bolt 5, imp shot 5). The imp's shot and telegraph start at its body. Regression tests in `test_projectiles.gd` and `test_combat.gd`. Details in `docs/DECISIONS.md`.
+
 ## 2026-10-20: Art direction pass and a test foundation (owner `/claude` on #102)
 
 - **Art.** The ember imp is redrawn (horns, angry brows, glowing eyes, fangs, bat wings that flap between the idle frames; new windup and hurt poses on it). Its telegraph is a dashed line (`art/vfx/telegraph_dash.svg`) over a danger lane with an arrowhead at the end of the shot's reach (`Lane`, `Tip`, fitted by `ai.gd`). The crypt room has a lit-top wall tile for the top and bottom walls, real pillars, torches, doors at the entry and exit, rubble and skulls on the floor, wall and pillar shadows on the floor and a darker floor so figures stand out. New: `wall_top`, `pillar`, `torch`, `door`, `rubble`, `skull`. Looked at with `build.sh --quick --screenshots` (`art_sheet`, `juice_cast_and_hit`, `enemy_windup`).

@@ -49,6 +49,8 @@ func _initialize() -> void:
 	_test_listener_may_change_registrations()
 	_test_wizard_is_a_projectile_target_for_enemy_shots()
 	_test_downed_wizard_is_not_a_projectile_target()
+	_test_hit_circles_follow_the_body_offset()
+	_test_contact_uses_the_body_offset()
 	_teardown()
 	if _failures.is_empty():
 		print("TEST OK: gameplay/combat (damage, knockback, death)")
@@ -356,3 +358,59 @@ func _test_downed_wizard_is_not_a_projectile_target() -> void:
 	_players[0].take_damage(1000)
 	_combat.register_player(0, _players[0], 8.0)
 	_check(_projectiles.get_target_count() == 1, "registering a downed wizard does not make it a target")
+
+
+## Regression (#5): the hurt and hit circles sat at the feet, below the drawn body.
+## Shots through the body hit and shots along the feet miss, for the wizard (also after
+## a revive) and for an enemy.
+func _test_hit_circles_follow_the_body_offset() -> void:
+	_setup(1, true)
+	_projectiles.events = _bus
+	_combat.set_hit_profile(9, 1, 0.0)
+	var body := Vector2(0.0, -12.0)
+	var wizard: Node2D = _players[0]
+	root.add_child(wizard)
+	wizard.position = Vector2(100.0, 0.0)
+	_combat.register_player(0, wizard, 8.0, body)
+	_shoot_at_wizard(-12.0)
+	_check(_damage.size() == 1, "an enemy shot through the wizard's body hits")
+	_shoot_at_wizard(0.0)
+	_check(_damage.size() == 1, "an enemy shot along the wizard's feet misses")
+	wizard.take_damage(1000)
+	wizard.revive(1)
+	_damage.clear()
+	_shoot_at_wizard(-12.0)
+	_check(_damage.size() == 1, "a revived wizard is still hit at the body")
+	var enemy := Node2D.new()
+	root.add_child(enemy)
+	enemy.position = Vector2(100.0, 0.0)
+	_enemies.append(enemy)
+	_combat.register_enemy(enemy, 5, 11.0, 0, body)
+	_damage.clear()
+	_projectiles.spawn(0, Vector2(0.0, -12.0), Vector2(600.0, 0.0), 1.0, 2.0, ProjectileManagerScript.LAYER_ENEMY, 0, 9)
+	_projectiles.step(0.2)
+	_check(_damage.size() == 1 and _damage[0][1] == enemy, "a player shot through the enemy's body hits it")
+	_damage.clear()
+	# At the feet (y = 2): 14 px from the circle's centre, beyond 11 + 2.
+	_projectiles.spawn(0, Vector2(0.0, 2.0), Vector2(600.0, 0.0), 1.0, 2.0, ProjectileManagerScript.LAYER_ENEMY, 0, 9)
+	_projectiles.step(0.2)
+	_check(_damage.is_empty(), "a player shot along the enemy's feet misses it")
+
+
+## Fire an enemy shot (tag 9) at the wizard at (100, 0) along height `y`.
+func _shoot_at_wizard(y: float) -> void:
+	_projectiles.spawn(EventsScript.NO_PLAYER, Vector2(0.0, y), Vector2(600.0, 0.0), 1.0, 2.0, ProjectileManagerScript.LAYER_PLAYER, 0, 9)
+	_projectiles.step(0.2)
+
+
+## Contact compares the bodies, not the feet.
+func _test_contact_uses_the_body_offset() -> void:
+	_setup(1)
+	var body := Vector2(0.0, -12.0)
+	_combat.register_player(0, _players[0], 8.0, body)
+	var enemy := Node2D.new()
+	enemy.position = _players[0].position + Vector2(0.0, -29.0)
+	_enemies.append(enemy)
+	_combat.register_enemy(enemy, 5, 10.0, 2)
+	_run(1)
+	_check(_players[0].health == PlayerScript.MAX_HEALTH - 2, "contact when the wizard's body touches the enemy (17 px, though the origins are 29 apart)")

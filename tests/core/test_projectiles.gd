@@ -59,6 +59,7 @@ func _initialize() -> void:
 	_test_wall_edges_and_clearing()
 	_test_clip_to_walls()
 	_test_wall_body_rectangles_become_walls()
+	_test_target_offset_moves_the_hit_circle()
 	_teardown()
 	if _failures.is_empty():
 		print("TEST OK: core/projectiles")
@@ -761,3 +762,21 @@ func _test_wall_body_rectangles_become_walls() -> void:
 	var round_shape: Vector2 = _mgr.clip_to_walls(Vector2(300.0, 200.0), Vector2(500.0, 200.0))
 	_check(round_shape.x == 500.0, "a circle shape is ignored")
 	body.free()
+
+
+## Regression (#5): the hit circle sat at the node's origin (the feet), so a shot
+## flying through the drawn body above it passed without hitting.
+func _test_target_offset_moves_the_hit_circle() -> void:
+	_setup()
+	var node := Node2D.new()
+	root.add_child(node)
+	_targets.append(node)
+	node.global_position = Vector2(50.0, 0.0)
+	_mgr.add_target(node, 8.0, ManagerScript.LAYER_ENEMY, EventsScript.NO_PLAYER, Vector2(0.0, -14.0))
+	# Through the body (y = -14) hits; along the feet (y = 0) is 14 px from the circle's centre, beyond 8 + 4.
+	_mgr.spawn(0, Vector2(0.0, -14.0), Vector2(600.0, 0.0), 1.0, 4.0)
+	_mgr.step(0.2)
+	_check(_hits.size() == 1, "a shot through the body hits a target whose circle is offset up")
+	_mgr.spawn(0, Vector2(0.0, 0.0), Vector2(600.0, 0.0), 1.0, 4.0)
+	_mgr.step(0.2)
+	_check(_hits.size() == 1, "a shot along the feet misses the offset circle")

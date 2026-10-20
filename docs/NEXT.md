@@ -16,6 +16,8 @@ C1 verdict: **iterate** (owner, #97, 2026-10-20). Per the plan for an iterate ve
 
 ## Done recently
 
+- [x] **Hitboxes too small, shots pass through sprites (owner `/claude` on #5).** Hit circles moved from the feet to the body (offset (0, -12)) and enlarged; see `docs/DECISIONS.md`. Regression tests in `test_projectiles.gd` and `test_combat.gd`. An owner-requested bug fix, so it comes before the playtest report.
+
 - [x] **Art direction pass and a test foundation (owner `/claude` on #102).** The ember imp, its telegraph (dashed line, danger lane, arrowhead) and the crypt room (wall tile with a lit top, pillars, torches, doors, rubble, skulls, shadows) are redrawn as placeholders; `tests/support/suite.gd` is the base for small isolated tests, with new tests `test_svg_art`, `test_ember_imp_art`, `test_ai_telegraph` and the room test split in three. Details in `docs/LOG.md` and `docs/DECISIONS.md`; the rest of the test migration is in `docs/BACKLOG.md`. This was an owner-requested exception to the Queue's "no feel work" rule. The playtest report of round 2 (task 1) stays first in the Queue.
 
 - [x] **Muzzle flash too big (#102).** Size 2.4 to 0.5, so the flash is at most 43 px, about the wizard's size. Regression test in `test_feel.gd`.

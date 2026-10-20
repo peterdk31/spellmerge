@@ -91,9 +91,14 @@ var targets: Array = []
 ## Shot speed in pixels per second and its life in seconds.
 @export var attack_speed: float = 140.0
 @export var attack_lifetime: float = 1.25
-@export var attack_radius: float = 4.0
+@export var attack_radius: float = 5.0
 ## Radius of the enemy's hurt box in pixels.
-@export var hurt_radius: float = 8.0
+@export var hurt_radius: float = 11.0
+## Where the hurt circle, the shots and the telegraph start, relative to the node (the feet).
+## -12 and not the sprite's -14: a little below the sprite's centre, where the torso is.
+## Shots are not clipped at the spawn point, so an imp pressed against a wall can shoot
+## into it and the shot ends at once (the same as before for its feet).
+@export var hurt_offset: Vector2 = Vector2(0.0, -12.0)
 ## Optional poses for the `Sprite`: strips of square frames (width / height frames).
 @export var windup_texture: Texture2D = null
 @export var hurt_texture: Texture2D = null
@@ -148,6 +153,8 @@ func _ready() -> void:
 	_telegraph_line = _telegraph as Line2D
 	if _telegraph != null:
 		_telegraph.visible = false
+		# Starts where the shot does (the body), whatever the scene says.
+		_telegraph.position = hurt_offset
 	if _telegraph_line != null and _telegraph_line.get_point_count() >= 2:
 		var reach: float = maxf(attack_speed * attack_lifetime, TELEGRAPH_START)
 		_telegraph_line.set_point_position(0, Vector2(TELEGRAPH_START, 0.0))
@@ -170,7 +177,7 @@ func _ready() -> void:
 			attack_tag = ATTACK_TAG_BASE + absi(hash([data.id, attack_damage])) % ATTACK_TAG_SPREAD
 		combat.set_hit_profile(attack_tag, attack_damage, 0.0)
 		if data != null:
-			combat.register_enemy(self, data.max_health, hurt_radius, data.contact_damage)
+			combat.register_enemy(self, data.max_health, hurt_radius, data.contact_damage, hurt_offset)
 	# Spread retargeting over the half second so 200 enemies do not all look at once.
 	_retarget_offset = RETARGET_TIME * float(get_instance_id() % 8) / 8.0
 	_retarget_left = _retarget_offset
@@ -256,7 +263,7 @@ func _step_chase() -> void:
 
 func _attack() -> void:
 	if projectiles != null:
-		projectiles.spawn(EventsScript.NO_PLAYER, _position_of(self), aim * attack_speed,
+		projectiles.spawn(EventsScript.NO_PLAYER, _position_of(self) + hurt_offset, aim * attack_speed,
 				attack_lifetime, attack_radius, ProjectileManagerScript.LAYER_PLAYER, 0, attack_tag)
 	state = State.RECOVER
 	_state_left = recover_time

@@ -172,7 +172,11 @@ polygon = PackedVector2Array(480, 230, 486, 230, 486, 262, 454, 262, 454, 256, 4
 
 [node name="Pillar5Shade" type="Polygon2D" parent="Shade"]
 color = Color(0.078, 0.071, 0.122, 0.35)
-polygon = PackedVector2Array(320, 166, 326, 166, 326, 198, 294, 198, 294, 192, 320, 192)
+polygon = PackedVector2Array(320, 166, 326, 166, 326, 192, 320, 192)
+
+[node name="Pillar5ShadeFoot" type="Polygon2D" parent="Shade"]
+color = Color(0.078, 0.071, 0.122, 0.35)
+polygon = PackedVector2Array(294, 192, 320, 192, 320, 198, 294, 198)
 
 [node name="Pillar6Shade" type="Polygon2D" parent="Shade"]
 color = Color(0.078, 0.071, 0.122, 0.35)

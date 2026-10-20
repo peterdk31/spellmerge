@@ -38,20 +38,23 @@ func test_every_collision_shape_has_a_wall_sprite() -> void:
 
 
 func test_decoration_has_no_collision() -> void:
-	var decor: Node = room_root.get_node_or_null("Decor")
-	check(decor != null, "the room has a Decor node")
-	if decor != null:
-		check_equal(_collision_nodes_below(decor), 0, "collision objects under Decor")
-	var shade: Node = room_root.get_node_or_null("Shade")
-	if shade != null:
-		check_equal(_collision_nodes_below(shade), 0, "collision objects under Shade")
+	for child in room_root.get_children():
+		if child.name != "Walls":
+			check_equal(_collision_nodes_below(child), 0, "collision objects under %s" % child.name)
 
 
 func test_decoration_stays_inside_the_room() -> void:
-	for child in room_root.get_node("Decor").get_children():
-		var sprite: Sprite2D = child as Sprite2D
-		if sprite != null:
-			check(Rect2(Vector2.ZERO, ROOM_SIZE).encloses(RoomScan.sprite_rect(sprite)), "%s is inside the room" % sprite.name)
+	for child in room_root.get_children():
+		if child.name != "Walls":
+			_check_sprites_inside(child)
+
+
+func _check_sprites_inside(node: Node) -> void:
+	var sprite: Sprite2D = node as Sprite2D
+	if sprite != null:
+		check(Rect2(Vector2.ZERO, ROOM_SIZE).encloses(RoomScan.sprite_rect(sprite)), "%s is inside the room" % sprite.name)
+	for child in node.get_children():
+		_check_sprites_inside(child)
 
 
 func _collision_nodes_below(node: Node) -> int:

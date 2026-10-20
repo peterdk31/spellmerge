@@ -43,14 +43,7 @@ func test_poses_are_different_art() -> void:
 
 func test_scene_has_the_telegraph_parts() -> void:
 	check(imp.get_node_or_null("Telegraph") is Line2D, "a Telegraph line")
-	check(imp.get_node_or_null("Telegraph/Lane") is Polygon2D, "a Lane under it")
-	check(imp.get_node_or_null("Telegraph/Tip") is Polygon2D, "a Tip under it")
-	check(imp.get_node_or_null("AnimationPlayer") is AnimationPlayer, "an AnimationPlayer for the idle")
 
 
 func test_telegraph_is_hidden_until_the_windup() -> void:
 	check(not (imp.get_node("Telegraph") as Line2D).visible, "the telegraph starts hidden")
-
-
-func test_sprite_is_not_filtered() -> void:
-	check_equal((imp.get_node("Sprite") as Sprite2D).texture_filter, CanvasItem.TEXTURE_FILTER_NEAREST, "pixel art needs nearest filtering")

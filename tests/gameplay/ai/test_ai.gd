@@ -200,7 +200,6 @@ func _test_freed_player_is_dropped() -> void:
 	_check(imp.target == _players[0], "a freed player is dropped without errors")
 
 
-## (The telegraph and the poses are tested in test_ai_telegraph.gd.)
 func _test_shot_hurts_wizard_through_combat() -> void:
 	_setup(1)
 	_players[0].position = Vector2(60.0, 0.0)

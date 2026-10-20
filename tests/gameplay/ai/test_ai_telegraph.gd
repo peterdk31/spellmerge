@@ -87,14 +87,17 @@ func test_line_turns_toward_the_locked_aim() -> void:
 	check(line.visible and is_equal_approx(line.rotation, imp.aim.angle()), "the line shows, turned to the aim")
 
 
-func test_line_grows_wider_and_brighter() -> void:
+func test_telegraph_grows_brighter_and_bigger() -> void:
 	var imp: AiScript = fx.imp_facing_player()
 	imp.step(Fixture.STEP)
 	var line: Line2D = imp.get_node("Telegraph")
+	var tip: Polygon2D = imp.get_node("Telegraph/Tip")
 	var early_width: float = line.width
+	var early_scale: float = tip.scale.x
 	var early_alpha: float = line.modulate.a
 	fx.run(imp, int(imp.windup_time / Fixture.STEP) - 4)
-	check(line.width > early_width, "the line is wider near the shot")
+	check_equal(line.width, early_width, "the line keeps its width, so the dashes do not stretch")
+	check(tip.scale.x > early_scale, "the arrowhead is bigger near the shot")
 	check(line.modulate.a > early_alpha, "the line is brighter near the shot")
 
 
@@ -108,6 +111,7 @@ func test_lane_and_arrowhead_follow_the_reach() -> void:
 	for point in lane.polygon:
 		far = maxf(far, point.x)
 	check(is_equal_approx(far, reach), "the lane ends where the shot ends")
+	check(lane.polygon[2].y - lane.polygon[1].y >= imp.attack_radius * 2.0, "the lane is at least as wide as the shot")
 
 
 func test_windup_pose_has_two_frames_and_idle_returns() -> void:

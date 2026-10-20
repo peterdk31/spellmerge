@@ -39,6 +39,11 @@
       "parked_reason": "I made no commits and opened no branch. Task 1 is the weekly planning run's job: it opens the \"Playtest of the week\" issue through its own `playtest` output (`.github/maintainer/plan.md`, step 7). A development session has no way to open that issue, and I didn't want to push it through `owner_questions`, which is for decisions. The next weekly run is Sunday 2026-10-25 06:00 UTC. Its issue should cover round 2 (revive, shots stop at walls, dodge and cast feel, enemy readability, wave pacing, muzz",
       "parked_until": "2026-10-21T07:55:53Z"
     },
+    "**2. The top items from the report.** When the answers arrive, turn them into at most three tasks here, ordered by the owner's priority, each with a done-when. Until then, pick no feel or backlog work. A daily session while waiting does only: bugs the owner reports, reminders for the Blocked items below, and doc upkeep; if none apply it may do nothing.": {
+      "count": 0,
+      "parked_reason": "Task 2 is waiting on the owner's round 2 playtest answers, and none have arrived. Issue #102 is still the round 1 playtest. The weekly run has not yet opened a new \"Playtest of the week\" issue. No bug is open, and the Blocked items already have their owner questions asked. I made no changes.",
+      "parked_until": "2026-10-21T07:58:47Z"
+    },
     "**Area READMEs for shared assets and tests.** The same for `art/`, `audio/`, `tests/` and `tools/`, including the asset size limits, `.ogg`-only audio, the origin manifest (`art/manifest.json`, `audio/manifest.json`) and how to run `tools/check.sh`.": {
       "count": 1,
       "parked_reason": "I could not continue PR #27 and made no commits. `git switch` to the PR branch failed because `.github/` is read-only in this sandbox, and I cleared the half-applied index with `git reset -q`. Later git commands stopped for approval that nobody could give. The PR branch is behind `origin/main`, and merging it needs to rewrite `.github/workflows/*`, which this sandbox cannot do. From what I read, the branch already has the Steps, Example to copy and Rating questions sections (I read `audio/README",

@@ -655,5 +655,5 @@ The HUD screenshot cannot be taken in a session (no display, `docs/BACKLOG.md`),
 **Decided by:** the owner (verdict on #97); Claude (the queue).
 
 - The verdict is iterate. The next work is a human playtest of round 2, then the top items from its answers, not more guessing from code and bot logs: round 2's feel values are still unverified by a human.
-- The plan allows at most 2 iterate rounds. The playtest of 2026-10-18 and its fixes were the first and the six tasks the second, so after this one the next checkpoint should be go or pivot; the next assessment must say so.
+- The plan allows at most 2 iterate rounds, counted by the owner's iterate requests on #97, not by the "round N" labels in `docs/NEXT.md` (those number batches of work: aiming, playtest fixes, art, juice and the six tasks). Round one was the owner's first `/claude` on #97 (aiming and graphics, then the 2026-10-18 playtest fixes); round two was the six tasks and their summary. This verdict, given on that summary, closes round two. After it the next checkpoint must be go or pivot, and the next assessment must say so in plain words.
 - Controller and 4-player feel are still untried by a human; the playtest questions ask for them.

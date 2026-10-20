@@ -5,6 +5,8 @@ import datetime as dt
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest import mock
 
 from smbot import commands, control, nexttask, pacing, panel, state
 
@@ -184,6 +186,16 @@ class CommandsTest(unittest.TestCase):
         eff.apply(st)
         self.assertEqual((st["processed_comments"], st["paused_by_command"], len(st["pending_instructions"])),
                          ([1, 2], True, 1))
+
+    def test_no_reply_on_the_daily_log(self) -> None:
+        cfg = SimpleNamespace(daily_log_issue=5)
+        found = [commands.Command("claude", "x", i, f"n{i}", number, False, f"u{i}", "2026-10-20T10:00:00Z")
+                 for i, number in ((1, 5), (2, 102))]
+        with mock.patch.object(commands, "find", return_value=found), \
+                mock.patch.object(commands, "reply") as reply:
+            log, _ = commands.run(cfg, set(), NOW, "token")
+        self.assertEqual([c.args[1].number for c in reply.call_args_list], [102])
+        self.assertEqual(len(log), 2)
 
 
 class NextTaskTest(unittest.TestCase):

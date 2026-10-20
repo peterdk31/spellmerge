@@ -214,6 +214,7 @@ def run(cfg: config_mod.Config, processed: set[int], now: dt.datetime, token: st
                 result = queue_instruction(effects, cmd)
         except (gh.GhError, subprocess.CalledProcessError) as e:
             result = f"Couldn't carry this out: {e}"
-        reply(cfg, cmd, result)
+        if cmd.number != cfg.daily_log_issue:  # there, the Daily log entry is the reply
+            reply(cfg, cmd, result)
         log.append(f"Owner command /{cmd.name} on #{cmd.number}: {result.splitlines()[0]}")
     return log, effects

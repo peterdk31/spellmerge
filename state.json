@@ -22,7 +22,15 @@
   },
   "panel_problems": [],
   "paused_by_command": false,
-  "pending_instructions": [],
+  "pending_instructions": [
+    {
+      "at": "2026-10-20T10:17:49Z",
+      "kind": "claude",
+      "number": 5,
+      "text": "make sure the foundation is solid and follows good software development architectures. It should be easy to implement the next planned features without breaking stuff and it should be easy to add new planned features. Art/animations should also be easy to swap out without breaking the game and tests.",
+      "url": "https://github.com/peterdk31/spellmerge/issues/5#issuecomment-6288681866"
+    }
+  ],
   "processed_comments": [
     6241847784,
     6251160604,
@@ -33,7 +41,8 @@
     6262567191,
     6284858580,
     6286380498,
-    6287191730
+    6287191730,
+    6288681866
   ],
   "task_failures": {
     "**1. Playtest report of round 2.** The weekly planning run opens a \"Playtest of the week\" issue for the owner (build link, what changed in round 2: revive, shots stop at walls, dodge and cast feel, enemy readability, wave pacing, muzzle flash fix) with 3-5 questions: does the dodge feel responsive; can you read the imp's attack in time; does a wave feel too easy or too hard; does reviving feel fair; what is the one thing you would change first? Also ask for a controller and a 2+ player try. Do no feel work before the answers are in, except a bug the owner reports.": {

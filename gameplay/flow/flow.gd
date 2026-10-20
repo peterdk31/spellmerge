@@ -62,8 +62,10 @@ const WAVE_MAX: int = 24
 const NEXT_WAVE_DELAY: float = 3.0
 ## Seconds from the last wizard going down until the room restarts (under 3).
 const RESTART_DELAY: float = 1.5
-## Hit circle of a wizard for enemy contact, in pixels.
-const PLAYER_RADIUS: float = 6.0
+## Hit circle of a wizard for enemy contact and shots, in pixels, and where it sits
+## above the wizard's feet (the body).
+const PLAYER_RADIUS: float = 8.0
+const PLAYER_HIT_OFFSET: Vector2 = Vector2(0.0, -12.0)
 ## Extra room around the room scene where projectiles may still fly, in pixels.
 const PROJECTILE_MARGIN: float = 32.0
 ## Name of the world node.
@@ -426,7 +428,7 @@ func _add_wizard(parent: Node2D, room: RoomBase, index: int, bolt: SpellBase, at
 	parent.add_child(wizard)
 	_wizards.append(wizard)
 	if combat != null:
-		combat.register_player(index, wizard, PLAYER_RADIUS)
+		combat.register_player(index, wizard, PLAYER_RADIUS, PLAYER_HIT_OFFSET)
 
 
 func _spawn_wave(parent: Node2D, room: RoomBase, data: EnemyBase, number: int) -> void:

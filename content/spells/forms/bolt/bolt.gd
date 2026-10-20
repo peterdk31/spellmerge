@@ -12,7 +12,7 @@ const ProjectileManagerScript := preload("res://core/projectiles/projectile_mana
 ## The tag of every bolt shot; Combat maps it to damage and knockback.
 const BOLT_TAG: int = 1
 ## Hit circle of the shot in pixels.
-const SHOT_RADIUS: float = 4.0
+const SHOT_RADIUS: float = 5.0
 ## Knockback strength in pixels per second.
 const KNOCKBACK: float = 120.0
 

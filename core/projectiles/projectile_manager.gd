@@ -180,6 +180,8 @@ var _targets: Array = []
 var _target_radius: PackedFloat32Array = PackedFloat32Array()
 var _target_layer: PackedInt32Array = PackedInt32Array()
 var _target_pos: PackedVector2Array = PackedVector2Array()
+## Where each target's hit circle sits, relative to its node (the body, not the feet).
+var _target_offset: PackedVector2Array = PackedVector2Array()
 var _target_id: PackedInt64Array = PackedInt64Array()
 var _target_owner: PackedInt32Array = PackedInt32Array()
 ## The grid: first target in each cell (-1 for none), and the next in its chain.
@@ -451,8 +453,10 @@ func get_count_for(player: int) -> int:
 ## Register a Node2D as something projectiles can hit (`layer` is a non-zero
 ## bit mask). Registering twice only updates the radius, layer and owner. A freed target is dropped by itself.
 ## `owner` is the player (0-3) the target belongs to, or Events.NO_PLAYER: shots of that
-## player never hit it (matters with friendly fire).
-func add_target(node: Node2D, radius: float, layer: int = LAYER_ENEMY, owner: int = EventsScript.NO_PLAYER) -> void:
+## player never hit it (matters with friendly fire). `offset` moves the hit circle from the
+## node's origin (usually the feet) to the drawn body, so a shot that looks like it touches
+## the sprite does hit.
+func add_target(node: Node2D, radius: float, layer: int = LAYER_ENEMY, owner: int = EventsScript.NO_PLAYER, offset: Vector2 = Vector2.ZERO) -> void:
 	if node == null or layer == 0:
 		return
 	var id: int = node.get_instance_id()
@@ -461,6 +465,7 @@ func add_target(node: Node2D, radius: float, layer: int = LAYER_ENEMY, owner: in
 		_target_radius[at] = radius
 		_target_layer[at] = layer
 		_target_owner[at] = owner
+		_target_offset[at] = offset
 		_max_target_radius = maxf(_max_target_radius, radius)
 		return
 	_targets.append(node)
@@ -469,6 +474,7 @@ func add_target(node: Node2D, radius: float, layer: int = LAYER_ENEMY, owner: in
 	_target_layer.append(layer)
 	_target_owner.append(owner)
 	_target_pos.append(Vector2.ZERO)
+	_target_offset.append(offset)
 	_target_next.append(-1)
 	_max_target_radius = maxf(_max_target_radius, radius)
 
@@ -705,12 +711,14 @@ func _remove_target_at(at: int) -> void:
 	_target_layer[at] = _target_layer[last]
 	_target_owner[at] = _target_owner[last]
 	_target_pos[at] = _target_pos[last]
+	_target_offset[at] = _target_offset[last]
 	_targets.resize(last)
 	_target_id.resize(last)
 	_target_radius.resize(last)
 	_target_layer.resize(last)
 	_target_owner.resize(last)
 	_target_pos.resize(last)
+	_target_offset.resize(last)
 	_target_next.resize(last)
 
 
@@ -732,7 +740,7 @@ func _refresh_targets() -> void:
 		if not node.is_inside_tree():
 			_target_pos[i] = Vector2.INF
 			continue
-		_target_pos[i] = node.global_position
+		_target_pos[i] = node.global_position + _target_offset[i]
 		var cell: int = _cell_of(_target_pos[i])
 		_target_next[i] = _cell_head[cell]
 		_cell_head[cell] = i

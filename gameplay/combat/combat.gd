@@ -65,6 +65,7 @@ var _pending_amount: PackedInt32Array = PackedInt32Array()
 # Wizards by player index.
 var _players: Array = [null, null, null, null]
 var _player_radius: PackedFloat32Array = PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
+var _player_offset: PackedVector2Array = PackedVector2Array([Vector2.ZERO, Vector2.ZERO, Vector2.ZERO, Vector2.ZERO])
 var _contact_left: PackedFloat32Array = PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
 
 
@@ -114,7 +115,7 @@ func clear_hit_profile(tag: int) -> void:
 
 ## Make `enemy` something that can be hurt and killed. Registering twice only
 ## resets its numbers.
-func register_enemy(enemy: Node2D, health: int, hurt_radius: float, contact_damage: int = 0) -> void:
+func register_enemy(enemy: Node2D, health: int, hurt_radius: float, contact_damage: int = 0, hurt_offset: Vector2 = Vector2.ZERO) -> void:
 	if enemy == null or health <= 0:
 		return
 	var at: int = _enemies.find(enemy)
@@ -123,7 +124,7 @@ func register_enemy(enemy: Node2D, health: int, hurt_radius: float, contact_dama
 		_hurt_radius[at] = hurt_radius
 		_contact_damage[at] = contact_damage
 		if projectiles != null:
-			projectiles.add_target(enemy, hurt_radius, ProjectileManagerScript.LAYER_ENEMY)
+			projectiles.add_target(enemy, hurt_radius, ProjectileManagerScript.LAYER_ENEMY, -1, hurt_offset)
 		return
 	_enemies.append(enemy)
 	_health.append(health)
@@ -131,7 +132,7 @@ func register_enemy(enemy: Node2D, health: int, hurt_radius: float, contact_dama
 	_hurt_radius.append(hurt_radius)
 	_knock.append(Vector2.ZERO)
 	if projectiles != null:
-		projectiles.add_target(enemy, hurt_radius, ProjectileManagerScript.LAYER_ENEMY)
+		projectiles.add_target(enemy, hurt_radius, ProjectileManagerScript.LAYER_ENEMY, -1, hurt_offset)
 
 
 ## Forget `enemy` without killing it (no event).
@@ -142,8 +143,9 @@ func unregister_enemy(enemy: Node2D) -> void:
 
 
 ## Make wizard `node` (player `index`, 0-3) something enemy contact can hurt.
-## `radius` is its hit circle in pixels.
-func register_player(index: int, node: Node2D, radius: float) -> void:
+## `radius` is its hit circle in pixels; `hit_offset` moves the circle for enemy shots
+## from the node's origin (the feet) to the drawn body.
+func register_player(index: int, node: Node2D, radius: float, hit_offset: Vector2 = Vector2.ZERO) -> void:
 	if index < 0 or index >= PLAYER_SLOTS:
 		push_warning("Combat: player index %d is not 0-3." % index)
 		return
@@ -151,11 +153,12 @@ func register_player(index: int, node: Node2D, radius: float) -> void:
 		unregister_player(index)
 	_players[index] = node
 	_player_radius[index] = radius
+	_player_offset[index] = hit_offset
 	_contact_left[index] = 0.0
 	# Enemy shots (LAYER_PLAYER) find the wizard as a projectile target.
 	# A downed wizard is not a target, so shots fly past it to the standing ones.
 	if projectiles != null and not _is_downed(node):
-		projectiles.add_target(node, radius, ProjectileManagerScript.LAYER_PLAYER, index)
+		projectiles.add_target(node, radius, ProjectileManagerScript.LAYER_PLAYER, index, hit_offset)
 
 
 func unregister_player(index: int) -> void:
@@ -308,7 +311,7 @@ func _on_player_revived(player: int, _reviver: int) -> void:
 	if projectiles != null and player >= 0 and player < PLAYER_SLOTS:
 		var wizard: Node2D = _players[player]
 		if wizard != null and is_instance_valid(wizard):
-			projectiles.add_target(wizard, _player_radius[player], ProjectileManagerScript.LAYER_PLAYER, player)
+			projectiles.add_target(wizard, _player_radius[player], ProjectileManagerScript.LAYER_PLAYER, player, _player_offset[player])
 
 
 ## The first time a spell is cast, ask it (through the registry) what its shots do and

@@ -91,9 +91,11 @@ var targets: Array = []
 ## Shot speed in pixels per second and its life in seconds.
 @export var attack_speed: float = 140.0
 @export var attack_lifetime: float = 1.25
-@export var attack_radius: float = 4.0
+@export var attack_radius: float = 5.0
 ## Radius of the enemy's hurt box in pixels.
-@export var hurt_radius: float = 8.0
+@export var hurt_radius: float = 11.0
+## Where the hurt circle and the shots start, relative to the node (the feet): the body.
+@export var hurt_offset: Vector2 = Vector2(0.0, -12.0)
 ## Optional poses for the `Sprite`: strips of square frames (width / height frames).
 @export var windup_texture: Texture2D = null
 @export var hurt_texture: Texture2D = null
@@ -170,7 +172,7 @@ func _ready() -> void:
 			attack_tag = ATTACK_TAG_BASE + absi(hash([data.id, attack_damage])) % ATTACK_TAG_SPREAD
 		combat.set_hit_profile(attack_tag, attack_damage, 0.0)
 		if data != null:
-			combat.register_enemy(self, data.max_health, hurt_radius, data.contact_damage)
+			combat.register_enemy(self, data.max_health, hurt_radius, data.contact_damage, hurt_offset)
 	# Spread retargeting over the half second so 200 enemies do not all look at once.
 	_retarget_offset = RETARGET_TIME * float(get_instance_id() % 8) / 8.0
 	_retarget_left = _retarget_offset
@@ -256,7 +258,7 @@ func _step_chase() -> void:
 
 func _attack() -> void:
 	if projectiles != null:
-		projectiles.spawn(EventsScript.NO_PLAYER, _position_of(self), aim * attack_speed,
+		projectiles.spawn(EventsScript.NO_PLAYER, _position_of(self) + hurt_offset, aim * attack_speed,
 				attack_lifetime, attack_radius, ProjectileManagerScript.LAYER_PLAYER, 0, attack_tag)
 	state = State.RECOVER
 	_state_left = recover_time

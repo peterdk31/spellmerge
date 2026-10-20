@@ -49,6 +49,7 @@ func _initialize() -> void:
 	_test_listener_may_change_registrations()
 	_test_wizard_is_a_projectile_target_for_enemy_shots()
 	_test_downed_wizard_is_not_a_projectile_target()
+	_test_hit_circles_follow_the_body_offset()
 	_teardown()
 	if _failures.is_empty():
 		print("TEST OK: gameplay/combat (damage, knockback, death)")
@@ -356,3 +357,27 @@ func _test_downed_wizard_is_not_a_projectile_target() -> void:
 	_players[0].take_damage(1000)
 	_combat.register_player(0, _players[0], 8.0)
 	_check(_projectiles.get_target_count() == 1, "registering a downed wizard does not make it a target")
+
+
+## Regression (#5): the hurt and hit circles sat at the feet, below the drawn body.
+func _test_hit_circles_follow_the_body_offset() -> void:
+	_setup(1, true)
+	var body := Vector2(0.0, -12.0)
+	_combat.register_player(0, _players[0], 8.0, body)
+	var enemy := Node2D.new()
+	enemy.position = Vector2(100.0, 0.0)
+	_enemies.append(enemy)
+	_combat.register_enemy(enemy, 5, 11.0, 0, body)
+	_check(_offsets(body) == 2, "the wizard's and the enemy's projectile targets sit at the body offset")
+	_players[0].take_damage(1000)
+	_players[0].revive(1)
+	_check(_offsets(body) == 2, "a revived wizard keeps the body offset")
+
+
+## How many projectile targets have this hit offset.
+func _offsets(offset: Vector2) -> int:
+	var found: int = 0
+	for at in _projectiles._target_offset.size():
+		if _projectiles._target_offset[at] == offset:
+			found += 1
+	return found

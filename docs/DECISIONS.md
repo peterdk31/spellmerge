@@ -649,3 +649,11 @@ The HUD screenshot cannot be taken in a session (no display, `docs/BACKLOG.md`),
 - **Buffer 0.15 s for both.** A press made while the action is not yet possible counts if it becomes possible within 0.15 s (about 9 frames at 60 FPS: long enough to forgive a mistimed tap, short enough that nobody dodges "by surprise" after the cooldown). One buffered press is used once and a new press restarts the window. Pressing in an overlay, being downed or a captured wizard clears it, as before for the dodge press itself. A held `cast` is unchanged; the buffer matters for taps.
 - **Invulnerability look is one rule for every kind of protection** (dodge, join 2 s, revive 1.5 s): the sprite is 55% opaque and a ring in the player colour closes over the time (full for join and revive protection until the last `INVULNERABLE_TIME`). Shape and opacity, not colour alone. The sprite's `material` stays free for the hit flash in `Feel`; only `modulate` is used.
 - **Cast rate and mana cost: no change.** The fire bolt costs 5 mana at a 0.35 s cooldown: 2.9 casts a second would use 14.3 mana a second against 10 regenerated, so from a full 100 mana a wizard who holds fire without a break runs dry after about 23 s and then fires at the regeneration rate (2 a second). The bots in `test_wave_balance` fire 1 to 1.5 casts per player-second (they walk, and hold fire without a line of sight), so mana never limits them and the cost is not what decides the fight. Five damage per hit against 20 imp health is four hits. With no person's playtest on the cast rate and the bots too crude to tell (they never dodge, which is why the 1 and 2 player runs are lost), changing a number would be a guess; revisit with a playtest answer.
+
+## 2026-10-20: C1 verdict iterate, playtest report first
+
+**Decided by:** the owner (verdict on #97); Claude (the queue).
+
+- The verdict is iterate. The next work is a human playtest of round 2, then the top items from its answers, not more guessing from code and bot logs: round 2's feel values are still unverified by a human.
+- The plan allows at most 2 iterate rounds. The playtest of 2026-10-18 and its fixes were the first and the six tasks the second, so after this one the next checkpoint should be go or pivot; the next assessment must say so.
+- Controller and 4-player feel are still untried by a human; the playtest questions ask for them.

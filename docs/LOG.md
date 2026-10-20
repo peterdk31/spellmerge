@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue.
 
+## 2026-10-20: C1 verdict: iterate
+
+- The owner answered on #97: iterate. `docs/NEXT.md` now queues a human playtest report of round 2 first, then the top items from it. Docs only; no code changed.
+
 ## 2026-10-19: Muzzle flash bug (#102)
 
 - The muzzle flash was 138-207 px around a 32 px wizard. `muzzle_flash_size` is now 0.5 (29-43 px); the death puff is unchanged. New test `_test_muzzle_flash_stays_small` (48 px limit, `punchy` preset). Reasoning in `docs/DECISIONS.md`.

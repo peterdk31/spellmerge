@@ -34,6 +34,11 @@
     6284858580
   ],
   "task_failures": {
+    "**1. Playtest report of round 2.** The weekly planning run opens a \"Playtest of the week\" issue for the owner (build link, what changed in round 2: revive, shots stop at walls, dodge and cast feel, enemy readability, wave pacing, muzzle flash fix) with 3-5 questions: does the dodge feel responsive; can you read the imp's attack in time; does a wave feel too easy or too hard; does reviving feel fair; what is the one thing you would change first? Also ask for a controller and a 2+ player try. Do no feel work before the answers are in, except a bug the owner reports.": {
+      "count": 0,
+      "parked_reason": "I made no commits and opened no branch. Task 1 is the weekly planning run's job: it opens the \"Playtest of the week\" issue through its own `playtest` output (`.github/maintainer/plan.md`, step 7). A development session has no way to open that issue, and I didn't want to push it through `owner_questions`, which is for decisions. The next weekly run is Sunday 2026-10-25 06:00 UTC. Its issue should cover round 2 (revive, shots stop at walls, dodge and cast feel, enemy readability, wave pacing, muzz",
+      "parked_until": "2026-10-21T07:55:53Z"
+    },
     "**Area READMEs for shared assets and tests.** The same for `art/`, `audio/`, `tests/` and `tools/`, including the asset size limits, `.ogg`-only audio, the origin manifest (`art/manifest.json`, `audio/manifest.json`) and how to run `tools/check.sh`.": {
       "count": 1,
       "parked_reason": "I could not continue PR #27 and made no commits. `git switch` to the PR branch failed because `.github/` is read-only in this sandbox, and I cleared the half-applied index with `git reset -q`. Later git commands stopped for approval that nobody could give. The PR branch is behind `origin/main`, and merging it needs to rewrite `.github/workflows/*`, which this sandbox cannot do. From what I read, the branch already has the Steps, Example to copy and Rating questions sections (I read `audio/README",

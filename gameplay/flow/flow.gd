@@ -38,16 +38,17 @@ const ProjectileManagerScript := preload("res://core/projectiles/projectile_mana
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const AiScript := preload("res://gameplay/ai/ai.gd")
 const PlayerScript := preload("res://gameplay/player/player.gd")
-const WizardScene: PackedScene = preload("res://content/wizard/base/wizard.tscn")
+const DefaultWizardScene: PackedScene = preload("res://content/wizard/base/wizard.tscn")
 
 const PLAYER_SLOTS: int = 4
-## Registry folders and ids of the M1 content.
+## Registry folders, and the ids of the M1 content a run uses unless `room_id_to_play`,
+## `enemy_id_to_play` or `spell_id_to_play` say otherwise.
 const ROOM_FOLDER: StringName = &"rooms"
-const ROOM_ID: StringName = &"arena_01"
+const DEFAULT_ROOM_ID: StringName = &"arena_01"
 const ENEMY_FOLDER: StringName = &"enemies"
-const ENEMY_ID: StringName = &"ember_imp"
+const DEFAULT_ENEMY_ID: StringName = &"ember_imp"
 const SPELL_FOLDER: StringName = &"spells"
-const SPELL_ID: StringName = &"bolt"
+const DEFAULT_SPELL_ID: StringName = &"bolt"
 ## The wave, sized for four players: one enemy per entry, placed at the room's
 ## enemy spawn with that index (wrapped if the room has fewer). An index used
 ## again puts the enemy a step further along the diagonal.
@@ -83,6 +84,13 @@ var projectiles: ProjectileManagerScript = null
 ## Where the world goes. Only tests set this; otherwise the world becomes the
 ## current scene (the main menu is freed).
 var world_parent: Node = null
+## What the next run is made of, by registry id. Later features (a room picker, a loadout)
+## set these; the room, enemy and spell themselves are content found by folder, so a new one
+## needs no change here. `wizard_scene` is the wizard every player gets (its art is in the scene).
+var room_id_to_play: StringName = DEFAULT_ROOM_ID
+var enemy_id_to_play: StringName = DEFAULT_ENEMY_ID
+var spell_id_to_play: StringName = DEFAULT_SPELL_ID
+var wizard_scene: PackedScene = DefaultWizardScene
 
 var state: State = State.IDLE
 ## The world of the run in progress (null before the first Play).
@@ -182,9 +190,9 @@ func get_wizard(index: int) -> Node2D:
 ## Build the world and start the run now, replacing any run in progress. Returns
 ## false (and starts nothing) when content is missing or no player has a device.
 func start_run(requester: int) -> bool:
-	var room: RoomBase = registry.get_resource(ROOM_FOLDER, ROOM_ID) as RoomBase if registry != null else null
-	var enemy_data: EnemyBase = registry.get_resource(ENEMY_FOLDER, ENEMY_ID) as EnemyBase if registry != null else null
-	var bolt: SpellBase = registry.get_resource(SPELL_FOLDER, SPELL_ID) as SpellBase if registry != null else null
+	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id_to_play) as RoomBase if registry != null else null
+	var enemy_data: EnemyBase = registry.get_resource(ENEMY_FOLDER, enemy_id_to_play) as EnemyBase if registry != null else null
+	var bolt: SpellBase = registry.get_resource(SPELL_FOLDER, spell_id_to_play) as SpellBase if registry != null else null
 	if room == null or room.scene == null or enemy_data == null or enemy_data.scene == null or bolt == null:
 		push_warning("Flow: the room, the enemy or the bolt is missing from the registry, so no run starts.")
 		return false
@@ -418,7 +426,7 @@ func _joiner_spawn(room: RoomBase, index: int) -> Vector2:
 
 
 func _add_wizard(parent: Node2D, room: RoomBase, index: int, bolt: SpellBase, at: Vector2 = Vector2.INF) -> void:
-	var wizard := WizardScene.instantiate() as PlayerScript
+	var wizard := wizard_scene.instantiate() as PlayerScript
 	wizard.index = index
 	wizard.spell = bolt
 	if at != Vector2.INF:

@@ -28,7 +28,7 @@ Not open yet (the first preset is `presets/punchy.tres`). When it opens, follow 
 
 ## Example to copy
 
-`gameplay/feel/presets/punchy.tres`, a `FeelPreset` (`presets/feel_preset.gd`): hit-stop length, shake strength and decay, particle speed and life, and the sound ids. Copy it, change the numbers and load it as `Feel.preset`. A preset only tunes reactions; it has no field that touches damage. Tests: `tests/gameplay/feel/test_feel.gd`.
+`gameplay/feel/presets/punchy.tres`, a `FeelPreset` (`presets/feel_preset.gd`): hit-stop length, shake strength and decay, particle speed and life, and the sound ids. Copy it, change the numbers and load it as `Feel.preset`. A preset only tunes reactions; it has no field that touches damage. It also names the art feel draws (`spark_texture`, `bolt_texture`, `hostile_texture`), so a re-skin is a preset, never an edit to `feel.gd`. Tests: `tests/gameplay/feel/test_feel.gd`.
 
 ## Validate
 

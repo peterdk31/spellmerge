@@ -141,7 +141,7 @@ func _ready() -> void:
 		registry = get_node_or_null("/root/Registry") as RegistryScript
 	if preset == null:
 		preset = load("res://gameplay/feel/presets/punchy.tres") as FeelPresetScript
-	_texture = load("res://art/vfx/hit_spark.svg") as Texture2D
+	_texture = preset.spark_texture
 	_last_usec = Time.get_ticks_usec()
 	_bursts = PoolScript.new(_make_burst, BURST_SLOTS, Callable(), _hide_burst)
 	_flash_material = ShaderMaterial.new()
@@ -187,10 +187,10 @@ func _ready() -> void:
 	if projectiles == null:
 		projectiles = get_node_or_null("/root/Projectiles")
 	if projectiles != null and "texture" in projectiles and projectiles.texture == null:
-		projectiles.texture = load("res://art/vfx/fire_bolt.svg") as Texture2D
+		projectiles.texture = preset.bolt_texture
 	# Enemy shots look different (a spiky orb, not a comet), so they are never taken for a spell.
 	if projectiles != null and "hostile_texture" in projectiles and projectiles.hostile_texture == null:
-		projectiles.hostile_texture = load("res://art/vfx/imp_fireball.svg") as Texture2D
+		projectiles.hostile_texture = preset.hostile_texture
 
 
 func _exit_tree() -> void:

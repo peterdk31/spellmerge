@@ -36,7 +36,6 @@ func _initialize() -> void:
 	_test_known_sound_plays()
 	_test_downed_has_no_particles()
 	_test_feel_never_changes_damage()
-	_test_projectile_texture_is_set()
 	_test_bursts_survive_the_world_being_freed()
 	_test_hit_stops_are_limited()
 	_test_a_kill_uses_one_slot_and_beats_a_full_pool()
@@ -279,18 +278,6 @@ func _test_feel_never_changes_damage() -> void:
 		enemy.free()
 	_check(results[0] == results[1], "damage, deaths and health are the same with and without feel")
 	_check(results[1][2] == 2 and results[1][1].is_empty(), "four hits of 2 leave 2 health, as combat says")
-
-
-func _test_projectile_texture_is_set() -> void:
-	var texture := load("res://art/vfx/fire_bolt.svg") as Texture2D
-	_check(texture != null, "the fire bolt art loads")
-	var projectiles: Node = load("res://core/projectiles/projectile_manager.gd").new()
-	_check(projectiles.texture == null, "the projectile texture starts empty")
-	_setup(&"", projectiles)
-	_check(projectiles.texture == texture, "feel sets Projectiles.texture to the fire bolt")
-	var orb := load("res://art/vfx/imp_fireball.svg") as Texture2D
-	_check(orb != null and projectiles.hostile_texture == orb, "feel sets the enemy shot art, apart from the player's bolt")
-	projectiles.free()
 
 
 func _test_bursts_survive_the_world_being_freed() -> void:

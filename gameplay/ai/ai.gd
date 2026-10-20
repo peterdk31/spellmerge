@@ -17,9 +17,10 @@ extends CharacterBody2D
 ## Combat's (it frees the node), so there is no death code here.
 ##
 ## Telegraph: an optional `Sprite` child flashes (`modulate`) and an optional
-## `Telegraph` child (a Line2D along +X) turns toward the locked aim and shows. Its
-## far end is set to the real reach of the shot (`attack_speed * attack_lifetime`),
-## and it grows wider and brighter with `telegraph_progress()`.
+## `Telegraph` child (a Line2D along +X, dashed by its texture) turns toward the locked aim
+## and shows. Its far end is set to the real reach of the shot (`attack_speed * attack_lifetime`),
+## and it grows brighter (and its arrowhead bigger) with `telegraph_progress()`. Its optional children `Lane`
+## (a danger strip) and `Tip` (an arrowhead at the far end) follow it.
 ##
 ## Poses: with `windup_texture` set (a strip of 32 px frames), the `Sprite` shows it from the
 ## start of the windup and flips between its frames faster and faster (WINDUP_FLASHES), and
@@ -55,8 +56,11 @@ const LAYER_ENEMIES: int = 4
 const LAYER_WALLS: int = 1
 ## The telegraph line starts this far from the enemy; its look at 0% and 100% progress.
 const TELEGRAPH_START: float = 10.0
-const TELEGRAPH_WIDTH_MIN: float = 3.0
-const TELEGRAPH_WIDTH_MAX: float = 6.0
+## The arrowhead grows from this scale to 1.0 as the shot nears. The line keeps its width,
+## because its dashed texture is tiled by width and the dashes would stretch.
+const TELEGRAPH_TIP_SCALE_MIN: float = 0.7
+## The `Lane` strip behind the dashes is the shot's hit width plus this margin.
+const TELEGRAPH_LANE_MARGIN: float = 8.0
 const TELEGRAPH_ALPHA_MIN: float = 0.5
 ## Seconds between looking for the nearest player again.
 const RETARGET_TIME: float = 0.5
@@ -148,6 +152,7 @@ func _ready() -> void:
 		var reach: float = maxf(attack_speed * attack_lifetime, TELEGRAPH_START)
 		_telegraph_line.set_point_position(0, Vector2(TELEGRAPH_START, 0.0))
 		_telegraph_line.set_point_position(1, Vector2(reach, 0.0))
+		_fit_telegraph_parts(reach)
 	if events == null:
 		events = get_node_or_null("/root/Events") as EventsScript
 	if combat == null:
@@ -258,6 +263,20 @@ func _attack() -> void:
 	_show_telegraph(false)
 
 
+## The optional `Lane` (a Polygon2D, the danger strip behind the dashes) spans the whole reach
+## and the optional `Tip` (a Polygon2D arrowhead) sits at its far end.
+func _fit_telegraph_parts(reach: float) -> void:
+	var lane: Polygon2D = _telegraph.get_node_or_null("Lane") as Polygon2D
+	if lane != null:
+		var half: float = attack_radius + TELEGRAPH_LANE_MARGIN * 0.5
+		lane.polygon = PackedVector2Array([
+			Vector2(TELEGRAPH_START, -half), Vector2(reach, -half),
+			Vector2(reach, half), Vector2(TELEGRAPH_START, half)])
+	var tip: Node2D = _telegraph.get_node_or_null("Tip") as Node2D
+	if tip != null:
+		tip.position = Vector2(reach, 0.0)
+
+
 func _show_telegraph(on: bool) -> void:
 	if _telegraph != null:
 		_telegraph.visible = on
@@ -268,7 +287,7 @@ func _show_telegraph(on: bool) -> void:
 		_sprite.modulate = TELEGRAPH_COLOR if on else Color.WHITE
 
 
-## Grow the telegraph line wider and brighter as the shot gets closer.
+## Make the telegraph brighter and its arrowhead bigger as the shot gets closer.
 func _update_telegraph() -> void:
 	var progress: float = telegraph_progress()
 	if _sprite != null:
@@ -276,8 +295,9 @@ func _update_telegraph() -> void:
 	if _telegraph == null:
 		return
 	_telegraph.modulate.a = lerpf(TELEGRAPH_ALPHA_MIN, 1.0, progress)
-	if _telegraph_line != null:
-		_telegraph_line.width = lerpf(TELEGRAPH_WIDTH_MIN, TELEGRAPH_WIDTH_MAX, progress)
+	var tip: Node2D = _telegraph.get_node_or_null("Tip") as Node2D
+	if tip != null:
+		tip.scale = Vector2.ONE * lerpf(TELEGRAPH_TIP_SCALE_MIN, 1.0, progress)
 
 
 ## True while the hurt pose shows (a hit landed in the last HURT_TIME seconds).

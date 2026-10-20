@@ -43,7 +43,7 @@
       "license": "CC-BY-SA-4.0",
       "tier": "placeholder",
       "tool": "Claude (hand-written SVG rects)",
-      "prompt": "A 2-frame idle strip (64x32; the second frame bobs one pixel) of a small fire imp seen from the front: Fire ramp body with a lighter belly, two Bone horns, yellow Spark eyes and small claws, 1px dark outline, light from the top-left. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no player colours."
+      "prompt": "A 2-frame idle strip (64x32; the second frame bobs one pixel and flaps the wings down) of a fire imp seen from the front, about 28 px wide with its wings: two curved Bone horns, a wide Fire head with angry dark brows and glowing Spark eyes, a fanged mouth, a Fire body with a lighter belly, Bone claws, small feet and two bat wings in Fire shadow with a dark outline, so the silhouette is a clear winged shape. 1px dark outline, light from the top-left. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no player colours."
     },
     {
       "path": "content/enemies/ember_imp/windup.svg",
@@ -52,7 +52,7 @@
       "license": "CC-BY-SA-4.0",
       "tier": "placeholder",
       "tool": "Claude (hand-written SVG rects)",
-      "prompt": "A 2-frame windup strip (64x32) of the ember imp about to shoot, copied from its idle frame: the mouth and belly glow Spark (frame 2 brighter, Spark light), Spark flecks beside and above the head. The game flips the frames faster as the shot gets close. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no player colours."
+      "prompt": "A 2-frame windup strip (64x32) of the ember imp about to shoot, copied from its new idle frame: the mouth and belly glow Spark (frame 2 brighter, Spark light), Spark flecks above the wings. The game flips the frames faster as the shot gets close. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no player colours."
     },
     {
       "path": "content/enemies/ember_imp/hurt.svg",
@@ -61,7 +61,70 @@
       "license": "CC-BY-SA-4.0",
       "tier": "placeholder",
       "tool": "Claude (hand-written SVG rects)",
-      "prompt": "A single 32x32 hurt frame of the ember imp, copied from its idle frame: eyes squeezed shut in dark Outline patches, the mouth open wide, two Spark flecks flying off. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no player colours."
+      "prompt": "A single 32x32 hurt frame of the ember imp, copied from its new idle frame with the wings down: eyes squeezed shut in dark Outline patches, the mouth open wide, Spark flecks flying off. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no player colours."
+    },
+    {
+      "path": "art/vfx/telegraph_dash.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "An 8x8 tile for the enemy telegraph line, repeated along the line: a 5 px wide dash (a Fire light band with a Spark light core and Fire shadow edges) followed by a 3 px gap, so the line reads as a dashed danger lane. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/tilesets/crypt/wall_top.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 32x32 crypt wall tile for the top and bottom walls: a Stone light top face on the upper 10 px (one joint, two Stone base specks), a Stone shadow edge, then two courses of Stone base bricks with Stone light top edges and Stone shadow joints, ending in a 4 px Stone shadow foot so the wall reads as a raised block. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/tilesets/crypt/pillar.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 32x32 crypt pillar seen from above: a dark Outline square with cut corners, a Stone light rim on the top and left, Stone shadow on the bottom and right, a Stone base face and a round Stone light slab with a Stone shadow centre hole, so it reads as a column and not as wall. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/tilesets/crypt/torch.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 32x32 wall torch drawn over a wall tile (transparent background): a Wood cup and handle with a dark Outline and a Fire flame with a Spark light core and two Spark sparks. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/tilesets/crypt/door.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 32x32 crypt door tile for the entry and exit of a room: a Stone frame with a light lintel, a dark Outline, Wood planks with Wood shadow joints, two Stone shadow iron bands and a Spark ring handle. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/tilesets/crypt/rubble.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 32x32 floor decal (transparent background) of three small broken stones, each with a dark Outline, a Stone light top and a Stone base face, plus two Stone shadow chips. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/tilesets/crypt/skull.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 32x32 floor decal (transparent background) of a small skull seen from above: Bone light top, Bone base and shadow sides, two dark eye sockets and a row of teeth, a dark Outline. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
     },
     {
       "path": "art/vfx/imp_fireball.svg",

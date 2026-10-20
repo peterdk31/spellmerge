@@ -14,12 +14,24 @@ Tests for the whole game. The tree mirrors the code: a test for `gameplay/combat
 - Tests never assume a single player: cover more than one player index where it matters.
 - Tests are fast and deterministic: no real-time waits, and a fixed seed for any randomness.
 
+## How to write a test: small and isolated
+
+New tests extend `tests/support/suite.gd` (`extends "res://tests/support/suite.gd"`). Every method named `test_*` is one test: it builds what it needs, checks one behaviour with `check(condition, message)` or `check_equal(actual, expected, message)`, and the suite frees whatever was handed to `own(object)`. A failing test is reported by name and never changes the next test. Copy `tests/gameplay/ai/test_ai_telegraph.gd` (a fixture and many short tests) or `tests/core/test_svg_art.gd` (a data-driven check over many files).
+
+- **One behaviour per test**, named for it (`test_a_wizard_who_steps_aside_is_not_hit`). If the name needs "and", split it.
+- **Shared setup goes in `before_each` or a fixture file** (a script in `tests/support/` or next to the tests, not named `test_*`), never in leftover state from a test before.
+- **Check behaviour, not looks or numbers.** Don't assert a pixel colour, a sprite's exact size, a child's position, a count of decorations or a tuning number (a speed, a damage) unless that is the contract. Check what has to stay true: the shot comes when the telegraph ends, the floor covers the room, a spawn can be reached. Then an art or balance change does not break a test.
+- **Look rules are checked once, for every file,** by a data-driven test (`test_svg_art.gd` for SVGs), so a new asset is covered without a new test.
+- **Don't test one thing in two places.** If a bigger test already covers it, split the big one instead of adding a copy.
+- Old test files (one `_initialize` that runs every check) still work; when you touch one, move the part you touch to the suite (`docs/BACKLOG.md`).
+
 ## Folders
 
 - `smoke/`: the boot smoke test (`boot_smoke.gd`), which starts the main scene and fails unless the menu comes up, and the 4-bot smoke test (`four_bot_smoke.gd`): four bots join and play the first room, bot 4 idles in its overlay, and it passes only if `room_cleared` arrives, players 1–3 are alive or revived, bot 4's overlay stayed open, and the log has no `push_error`, no `ERROR:` line and no "the restart failed" warning. `error_log.gd` is its error logger (unit test `test_error_log.gd`). The checks live in the node `four_bot_runner.gd`; `four_bot_smoke.gd` (a `SceneTree` script) adds it to the root, and `test_four_bot_smoke.gd` runs that under `build.sh --quick --tests`. An exported binary hangs on `--script` while the autoloads start, so in the `Linux Test` export the main menu adds the same node when the user argument `--four-bot` is given and the file exists: `build/linux-test/Spellmerge.x86_64 --headless -- --four-bot`. A build that fails a smoke test is broken.
 - `benchmark/`: the performance checks. `probe.gd` rides along in the 4-bot test and prints `BENCH:` lines (frame time, peak nodes, projectiles, memory, live hit particles); `test_projectile_timing.gd` times the projectile manager at both caps with four players. They print and gate nothing yet; the planned rule stays that a frame-time regression over 10% counts as a broken build. Numbers are in `docs/LOG.md`.
 - `bots/`: the bots that play headless runs for smoke tests and playtest reports. `bot.gd` plays one slot through a virtual device and the real input path (`PlayerInput.send_virtual`): a fighter walks at the nearest enemy and holds `cast`, an idler only taps `overlay`. A bot reads no spell field; the wizard calls the spell's one cast method.
 - `screenshots/`: scripts named `shot_*.gd` that set up a scene and save 640×360 PNGs to `user://screenshots/` (they check nothing). The build copies them to `build/screenshots/`; they are posted on every bot PR and on the site's `/screenshots/` page by the daily build. Needs `xvfb-run`.
+- `support/`: the suite base class (`suite.gd`). Fixtures shared by several tests live here; a fixture for one area lives next to its tests (`tests/gameplay/ai/ai_fixture.gd`, `tests/content/rooms/room_scan.gd`). Nothing here is named `test_*`, so the build does not run it as a test.
 - Everything else mirrors the tree (`tests/core/...`, `tests/gameplay/...`).
 
 ## Allowed files

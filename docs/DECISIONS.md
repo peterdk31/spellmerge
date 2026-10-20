@@ -2,6 +2,16 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-20: Art direction before M2, and tests that break one at a time
+
+**Decided by:** Claude, from the owner's `/claude` on #102 (art first, smaller isolated tests).
+
+- **Art stays inside M1** (one enemy, one room); nothing from M2 was started. The final style is still the M2 art direction call; these are better placeholders under the same rules in `docs/STYLE.md`.
+- **Depth without new colours.** The floor is darkened by the scene (`modulate` on the `Floor` sprite) and soft shadows are `Polygon2D` strips in the scene, not baked into art, so the art keeps the palette rule (no partial transparency). The top and bottom walls get a new tile with a lit top face; the side walls keep the old brick tile, because a lit cap repeated down a side wall would look like steps.
+- **Telegraph.** The line is dashed by a repeating 8×8 tile, with a `Lane` strip (16 px wide, the shot's hit width plus margin) and a `Tip` arrowhead, all children of `Telegraph` so one `modulate` fades them together. `ai.gd` fits them to the shot's real reach, so the picture still shows where the shot goes. Width range 4-8 px (was 3-6).
+- **Tests.** Every new test script extends `tests/support/suite.gd`: each `test_*` method is its own test, with its own setup, so one failure names one behaviour and cannot hide or break the next. Tests check behaviour and wiring, not how things look (no pixel colours, no count of decorations): an art or tuning change should not need a test change unless a rule is broken. `test_svg_art.gd` is the one place that checks the look rules (style rules for SVGs, manifest entries), data-driven over every file, so new art is covered without writing a test. Old test files are moved to the new shape when they are touched, not in one go (a mass rewrite would be a large, risky change with no new coverage); the list is in `docs/BACKLOG.md`.
+- **Tests I did not move out of `test_ai.gd`:** chase, target choice, knockback, the damage test: they still work and are not coupled to art.
+
 ## 2026-10-19: Muzzle flash: size 0.5 (a small flare, not a blast)
 
 **Decided by:** Claude, from the owner's bug report on #102.

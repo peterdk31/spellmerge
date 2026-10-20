@@ -20,6 +20,15 @@ const WALK_1 := preload("res://content/wizard/base/wizard_p1_walk.svg")
 const DASH_1 := preload("res://content/wizard/base/wizard_p1_dash.svg")
 const STAFF := preload("res://content/wizard/base/staff.svg")
 const IMP := preload("res://content/enemies/ember_imp/idle.svg")
+const IMP_WINDUP := preload("res://content/enemies/ember_imp/windup.svg")
+const IMP_HURT := preload("res://content/enemies/ember_imp/hurt.svg")
+const WALL_TOP := preload("res://art/tilesets/crypt/wall_top.svg")
+const PILLAR := preload("res://art/tilesets/crypt/pillar.svg")
+const DOOR := preload("res://art/tilesets/crypt/door.svg")
+const TORCH := preload("res://art/tilesets/crypt/torch.svg")
+const RUBBLE := preload("res://art/tilesets/crypt/rubble.svg")
+const SKULL := preload("res://art/tilesets/crypt/skull.svg")
+const DASH := preload("res://art/vfx/telegraph_dash.svg")
 const BOLT := preload("res://art/vfx/fire_bolt.svg")
 const SPARK := preload("res://art/vfx/hit_spark.svg")
 
@@ -49,8 +58,13 @@ func _initialize() -> void:
 		_frame(texture, 0, x, 120.0)
 		x += FRAME * SCALE
 	# Row 3: floor and wall tiles side by side, as in the room.
-	for i in 4:
-		_frame(WALL, 0, 32.0 + i * FRAME * SCALE, 200.0)
+	x = 32.0
+	for texture: Texture2D in [WALL, WALL_TOP, WALL_TOP, PILLAR, DOOR, TORCH, RUBBLE, SKULL, DASH]:
+		_frame(texture, 0, x, 200.0)
+		x += FRAME * SCALE
+	# Row 4: the imp's windup and hurt poses.
+	x = _strip(IMP_WINDUP, 32.0, 266.0)
+	_frame(IMP_HURT, 0, x, 266.0)
 	await _settle()
 	await RenderingServer.frame_post_draw
 	var image: Image = root.get_texture().get_image()

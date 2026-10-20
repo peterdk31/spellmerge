@@ -2,7 +2,7 @@
   "alarms": {},
   "automation_started": "2026-10-16T16:49:06Z",
   "backoff_until": "2026-10-17T05:10:00Z",
-  "last_own_merge": "2026-10-20T09:10:40Z",
+  "last_own_merge": "2026-10-20T10:34:50Z",
   "limits": {
     "week_tokens": null,
     "window_tokens": 10471923
@@ -22,15 +22,7 @@
   },
   "panel_problems": [],
   "paused_by_command": false,
-  "pending_instructions": [
-    {
-      "at": "2026-10-20T10:17:49Z",
-      "kind": "claude",
-      "number": 5,
-      "text": "make sure the foundation is solid and follows good software development architectures. It should be easy to implement the next planned features without breaking stuff and it should be easy to add new planned features. Art/animations should also be easy to swap out without breaking the game and tests.",
-      "url": "https://github.com/peterdk31/spellmerge/issues/5#issuecomment-6288681866"
-    }
-  ],
+  "pending_instructions": [],
   "processed_comments": [
     6241847784,
     6251160604,

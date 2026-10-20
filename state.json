@@ -2,7 +2,7 @@
   "alarms": {},
   "automation_started": "2026-10-16T16:49:06Z",
   "backoff_until": "2026-10-17T05:10:00Z",
-  "last_own_merge": "2026-10-20T06:35:02Z",
+  "last_own_merge": "2026-10-20T08:44:27Z",
   "limits": {
     "week_tokens": null,
     "window_tokens": 10471923
@@ -22,15 +22,7 @@
   },
   "panel_problems": [],
   "paused_by_command": false,
-  "pending_instructions": [
-    {
-      "at": "2026-10-20T08:04:25Z",
-      "kind": "claude",
-      "number": 102,
-      "text": "iterate: I think we need to focus on getting the basic art direction better before moving on to M2! The wizards are looking kinda ok. But the level design is looking bad and plain. Also the enemies are very bad looking. And their telegraph line is not looking good.\nWe also need to focus on getting the test foundation better. Right now we have some big \"unit\"-tests that can easily break. Lets instead focus on smaller isolated tests that will keep on working (or atleast be easy to change isolated)",
-      "url": "https://github.com/peterdk31/spellmerge/issues/102#issuecomment-6286380498"
-    }
-  ],
+  "pending_instructions": [],
   "processed_comments": [
     6241847784,
     6251160604,

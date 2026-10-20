@@ -2,6 +2,16 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-20: Foundation review: data over constants (owner `/claude` on #5)
+
+**Decided by:** Claude, from the owner's request to make the foundation solid, easy to extend and art easy to swap.
+
+- **The review found the layering sound** (events, registry, dependency direction, content by folder, art in scenes) and three spots where a change would have needed a code edit: `Feel` loaded three art files by path, `Flow` fixed the room, enemy, spell and wizard scene as constants, and the wizard's art contract was not tested. Fixed those only; no restructuring.
+- **Art paths live in data.** `FeelPreset` has `spark_texture`, `bolt_texture` and `hostile_texture` (defaults preloaded, so a preset that sets nothing still draws). A re-skin is a preset. Scenes already held every other texture.
+- **`Flow` takes ids and the wizard scene as fields** (`room_id_to_play`, `enemy_id_to_play`, `spell_id_to_play`, `wizard_scene`), defaulting to the M1 content. A room picker or loadout sets them; unknown ids start no run, as before. The old `ROOM_ID`, `ENEMY_ID` and `SPELL_ID` consts became `DEFAULT_*`.
+- **Not done, on purpose:** wave data on rooms, splitting `player.gd`, enemy attack patterns, the M2 spell components. Each is large and belongs to the feature that needs it (`docs/BACKLOG.md`, "Foundation"); doing them now would be guessing the shape.
+- **Tests do not check looks** (already the rule in `tests/README.md`): the art tests check strip sizes and wiring only, so a redraw cannot break them. The feel test that compared against fixed art files was replaced by one that swaps the preset's textures.
+
 ## 2026-10-20: Hit circles sit on the body, and are bigger (owner `/claude` on #5)
 
 **Decided by:** Claude, on the owner's bug report: hitboxes too small, shots seem to pass through sprites.

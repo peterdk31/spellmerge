@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue.
 
+## 2026-10-20: Foundation review (owner `/claude` on #5)
+
+- New `docs/ARCHITECTURE.md`: layers, where each kind of change goes, the art contract. `Feel` now draws the textures its `FeelPreset` names; `Flow` runs the room, enemy, spell and wizard scene it is told (`*_to_play`, `wizard_scene`). New tests: `test_feel_art.gd`, `test_flow_content_choice.gd`, `tests/content/wizard/test_wizard_art.gd`. Weak spots left for their features: `docs/BACKLOG.md`, "Foundation". Details in `docs/DECISIONS.md`.
+
 ## 2026-10-20: Hitboxes on the body (owner `/claude` on #5)
 
 - Bug: hit circles were centred on the feet while sprites are drawn 14 px higher, so shots seemed to pass through. `Projectiles.add_target` has a new `offset`; imp and wizards register their circle at (0, -12) and bigger (imp 11, wizard 8, bolt 5, imp shot 5). The imp's shot and telegraph start at its body. Regression tests in `test_projectiles.gd` and `test_combat.gd`. Details in `docs/DECISIONS.md`.

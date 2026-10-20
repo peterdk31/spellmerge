@@ -50,3 +50,10 @@ extends Resource
 @export var hit_sound: StringName = &"hit"
 @export var death_sound: StringName = &"enemy_death"
 @export var downed_sound: StringName = &"player_downed"
+## The art feel draws, so a re-skin is a new preset (or new files at these paths) and
+## never an edit to `feel.gd`. Each defaults to the shipped placeholder art.
+## The hit spark, also used for the white flashes and puffs.
+@export var spark_texture: Texture2D = preload("res://art/vfx/hit_spark.svg")
+## A player's spell shot, and an enemy's shot (drawn apart, so it never reads as a spell).
+@export var bolt_texture: Texture2D = preload("res://art/vfx/fire_bolt.svg")
+@export var hostile_texture: Texture2D = preload("res://art/vfx/imp_fireball.svg")

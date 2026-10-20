@@ -46,6 +46,7 @@ Weak spots found in the architecture review of 2026-10-20 (docs/ARCHITECTURE.md)
 - **`player.gd` does too much (750 lines).** Movement, the dodge, the animation strips, the dodge ghosts, the staff overlay and revive all live in it. Split the look (strips, ghosts, staff) into a child node the script drives when a second player-like body (a ghost, a pet) or a different wizard art style needs it.
 - **`ai.gd` has one attack.** The windup, telegraph and shot are one pattern in one script. A second enemy needs an attack as a small resource or script that `ai.gd` runs; do this with the second enemy, not before.
 - **`SpellBase` is the M1 shape.** One set of numbers and `_fire()`. M2 replaces it with components; keep the callers on `cast()`, `hit_tag()`, `hit_damage()` and `hit_knockback()` only (a test already fails when anyone reads a field).
+- **`flow.gd` preloads the default wizard scene from `content/`.** A lower layer names a higher one. Move the default into a registry folder or a setting when a character picker needs it.
 - **Sounds and effects by id only in `feel`.** Other areas that want a sound (HUD clicks, UI) have no shared way yet; add one when the HUD needs it.
 
 ## Later milestones

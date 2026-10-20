@@ -103,6 +103,8 @@ var wave: int = 0
 var _starter: int = 0
 var _room: RoomBase = null
 var _bolt: SpellBase = null
+## The wizard scene the run in progress started with (joiners get the same one).
+var _wizard_scene: PackedScene = null
 var _enemies: Array[Node] = []
 var _wizards: Array[Node2D] = []
 var _downed: Array[bool] = [false, false, false, false]
@@ -194,7 +196,10 @@ func start_run(requester: int) -> bool:
 	var enemy_data: EnemyBase = registry.get_resource(ENEMY_FOLDER, enemy_id_to_play) as EnemyBase if registry != null else null
 	var bolt: SpellBase = registry.get_resource(SPELL_FOLDER, spell_id_to_play) as SpellBase if registry != null else null
 	if room == null or room.scene == null or enemy_data == null or enemy_data.scene == null or bolt == null:
-		push_warning("Flow: the room, the enemy or the bolt is missing from the registry, so no run starts.")
+		push_warning("Flow: the room, the enemy or the spell is missing from the registry, so no run starts.")
+		return false
+	if not _is_wizard_scene(wizard_scene):
+		push_warning("Flow: the wizard scene is missing or has no player script, so no run starts.")
 		return false
 	_ensure_joined(requester)
 	var players: Array[int] = _joined_players()
@@ -208,6 +213,7 @@ func start_run(requester: int) -> bool:
 	_room = room
 	_enemy_data = enemy_data
 	_bolt = bolt
+	_wizard_scene = wizard_scene
 	bolt.reset_cooldowns()
 	if projectiles != null:
 		projectiles.clear()
@@ -425,8 +431,18 @@ func _joiner_spawn(room: RoomBase, index: int) -> Vector2:
 	return best
 
 
+## True when `scene` is set and its root is a player (a wizard scene must carry `player.gd`).
+func _is_wizard_scene(scene: PackedScene) -> bool:
+	if scene == null:
+		return false
+	var probe: Node = scene.instantiate()
+	var ok: bool = probe is PlayerScript
+	probe.free()
+	return ok
+
+
 func _add_wizard(parent: Node2D, room: RoomBase, index: int, bolt: SpellBase, at: Vector2 = Vector2.INF) -> void:
-	var wizard := wizard_scene.instantiate() as PlayerScript
+	var wizard := _wizard_scene.instantiate() as PlayerScript
 	wizard.index = index
 	wizard.spell = bolt
 	if at != Vector2.INF:

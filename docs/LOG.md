@@ -2,6 +2,12 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue.
 
+## 2026-10-20: Art direction pass and a test foundation (owner `/claude` on #102)
+
+- **Art.** The ember imp is redrawn (horns, angry brows, glowing eyes, fangs, bat wings that flap between the idle frames; new windup and hurt poses on it). Its telegraph is a dashed line (`art/vfx/telegraph_dash.svg`) over a danger lane with an arrowhead at the end of the shot's reach (`Lane`, `Tip`, fitted by `ai.gd`). The crypt room has a lit-top wall tile for the top and bottom walls, real pillars, torches, doors at the entry and exit, rubble and skulls on the floor, wall and pillar shadows on the floor and a darker floor so figures stand out. New: `wall_top`, `pillar`, `torch`, `door`, `rubble`, `skull`. Looked at with `build.sh --quick --screenshots` (`art_sheet`, `juice_cast_and_hit`, `enemy_windup`).
+- **Tests.** New base `tests/support/suite.gd`: one `test_*` method per behaviour, each independent, a failure names the method. New small tests on it: `tests/core/test_svg_art.gd` (every SVG: rects only, palette, whole numbers, no overlaps, in the manifest), `tests/content/enemies/test_ember_imp_art.gd`, `tests/gameplay/ai/test_ai_telegraph.gd` (17 tests, moved out of `test_ai.gd`) and the old `test_arena_01.gd` split into `test_arena_01_data.gd`, `_layout.gd` and `_art.gd`. Rules in `tests/README.md`.
+- Not done: the other big test files still use the old shape (see `docs/BACKLOG.md`); the new art is placeholder and hand-drawn, so the owner may still find it plain.
+
 ## 2026-10-20: C1 verdict: iterate
 
 - The owner answered on #97: iterate. `docs/NEXT.md` now queues a human playtest report of round 2 first, then the top items from it. Docs only; no code changed.

@@ -17,9 +17,10 @@ extends CharacterBody2D
 ## Combat's (it frees the node), so there is no death code here.
 ##
 ## Telegraph: an optional `Sprite` child flashes (`modulate`) and an optional
-## `Telegraph` child (a Line2D along +X) turns toward the locked aim and shows. Its
-## far end is set to the real reach of the shot (`attack_speed * attack_lifetime`),
-## and it grows wider and brighter with `telegraph_progress()`.
+## `Telegraph` child (a Line2D along +X, dashed by its texture) turns toward the locked aim
+## and shows. Its far end is set to the real reach of the shot (`attack_speed * attack_lifetime`),
+## and it grows wider and brighter with `telegraph_progress()`. Its optional children `Lane`
+## (a danger strip) and `Tip` (an arrowhead at the far end) follow it.
 ##
 ## Poses: with `windup_texture` set (a strip of 32 px frames), the `Sprite` shows it from the
 ## start of the windup and flips between its frames faster and faster (WINDUP_FLASHES), and
@@ -55,8 +56,10 @@ const LAYER_ENEMIES: int = 4
 const LAYER_WALLS: int = 1
 ## The telegraph line starts this far from the enemy; its look at 0% and 100% progress.
 const TELEGRAPH_START: float = 10.0
-const TELEGRAPH_WIDTH_MIN: float = 3.0
-const TELEGRAPH_WIDTH_MAX: float = 6.0
+const TELEGRAPH_WIDTH_MIN: float = 4.0
+const TELEGRAPH_WIDTH_MAX: float = 8.0
+## Width of the `Lane` strip behind the dashes (the shot's hit width plus a margin).
+const TELEGRAPH_LANE_WIDTH: float = 16.0
 const TELEGRAPH_ALPHA_MIN: float = 0.5
 ## Seconds between looking for the nearest player again.
 const RETARGET_TIME: float = 0.5
@@ -148,6 +151,7 @@ func _ready() -> void:
 		var reach: float = maxf(attack_speed * attack_lifetime, TELEGRAPH_START)
 		_telegraph_line.set_point_position(0, Vector2(TELEGRAPH_START, 0.0))
 		_telegraph_line.set_point_position(1, Vector2(reach, 0.0))
+		_fit_telegraph_parts(reach)
 	if events == null:
 		events = get_node_or_null("/root/Events") as EventsScript
 	if combat == null:
@@ -256,6 +260,20 @@ func _attack() -> void:
 	state = State.RECOVER
 	_state_left = recover_time
 	_show_telegraph(false)
+
+
+## The optional `Lane` (a Polygon2D, the danger strip behind the dashes) spans the whole reach
+## and the optional `Tip` (a Polygon2D arrowhead) sits at its far end.
+func _fit_telegraph_parts(reach: float) -> void:
+	var lane: Polygon2D = _telegraph.get_node_or_null("Lane") as Polygon2D
+	if lane != null:
+		var half: float = TELEGRAPH_LANE_WIDTH * 0.5
+		lane.polygon = PackedVector2Array([
+			Vector2(TELEGRAPH_START, -half), Vector2(reach, -half),
+			Vector2(reach, half), Vector2(TELEGRAPH_START, half)])
+	var tip: Node2D = _telegraph.get_node_or_null("Tip") as Node2D
+	if tip != null:
+		tip.position = Vector2(reach, 0.0)
 
 
 func _show_telegraph(on: bool) -> void:

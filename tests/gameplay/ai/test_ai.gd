@@ -33,14 +33,9 @@ func _initialize() -> void:
 	_test_downed_player_is_skipped()
 	_test_downed_event_retargets_at_once()
 	_test_freed_player_is_dropped()
-	_test_telegraph_comes_before_the_shot()
-	_test_telegraph_standing_still_and_aim_locked()
 	_test_shot_hurts_wizard_through_combat()
 	_test_shot_can_be_dodged_by_stepping_aside()
 	_test_no_lookups_while_nobody_stands()
-	_test_telegraph_nodes_follow_the_windup()
-	_test_windup_pose_flashes_faster_and_brighter()
-	_test_hurt_pose_shows_without_cancelling_the_attack()
 	_test_recover_then_chase_again()
 	_test_knockback_moves_the_enemy()
 	_test_group_players_are_found()
@@ -205,36 +200,7 @@ func _test_freed_player_is_dropped() -> void:
 	_check(imp.target == _players[0], "a freed player is dropped without errors")
 
 
-func _test_telegraph_comes_before_the_shot() -> void:
-	_setup(1)
-	_players[0].position = Vector2(80.0, 0.0)
-	var imp := _imp()
-	_check(not imp.is_telegraphing() and imp.telegraph_progress() == 0.0, "not telegraphing before it sees a player")
-	imp.step(STEP)
-	_check(imp.is_telegraphing(), "in range, the windup (telegraph) starts")
-	_check(_projectiles.get_count() == 0, "no shot yet at the start of the telegraph")
-	var steps: int = int(imp.windup_time / STEP)
-	_run(imp, steps - 2)
-	_check(imp.is_telegraphing() and _projectiles.get_count() == 0, "still telegraphing, still no damage, just before the end")
-	_check(imp.telegraph_progress() > 0.8 and imp.telegraph_progress() < 1.0, "progress is near the end")
-	_run(imp, 2)
-	_check(not imp.is_telegraphing(), "the telegraph ended")
-	_check(_projectiles.get_count() == 1, "exactly one shot left when the telegraph ended")
-
-
-func _test_telegraph_standing_still_and_aim_locked() -> void:
-	_setup(1)
-	_players[0].position = Vector2(60.0, 0.0)
-	var imp := _imp()
-	imp.step(STEP)
-	_check(imp.is_telegraphing() and imp.aim.is_equal_approx(Vector2.RIGHT), "aim points at the player")
-	var at: Vector2 = imp.position
-	_players[0].position = Vector2(0.0, 60.0)
-	_run(imp, 4)
-	_check(imp.position == at and imp.velocity == Vector2.ZERO, "the imp stands still while telegraphing")
-	_check(imp.aim.is_equal_approx(Vector2.RIGHT), "the aim stays locked on where the player was")
-
-
+## (The telegraph and the poses are tested in test_ai_telegraph.gd.)
 func _test_shot_hurts_wizard_through_combat() -> void:
 	_setup(1)
 	_players[0].position = Vector2(60.0, 0.0)
@@ -280,95 +246,6 @@ func _test_no_lookups_while_nobody_stands() -> void:
 	_check(imp.target == null, "nobody stands, so there is no target")
 	_check(imp.lookup_count - before <= allowed, "with no target the players are looked up only every RETARGET_TIME (%d lookups)" % (imp.lookup_count - before))
 
-
-func _test_telegraph_nodes_follow_the_windup() -> void:
-	_setup(1)
-	_players[0].position = Vector2(0.0, 80.0)
-	var imp: AiScript = ImpData.scene.instantiate()
-	imp.data = ImpData
-	imp.events = _bus
-	imp.combat = _combat
-	imp.projectiles = _projectiles
-	imp.targets.append(_players[0])
-	imp._ready()
-	_enemies.append(imp)
-	var line: Line2D = imp.get_node("Telegraph")
-	var sprite: Sprite2D = imp.get_node("Sprite")
-	var reach: float = imp.attack_speed * imp.attack_lifetime
-	_check(is_equal_approx(line.get_point_position(1).x, reach), "the telegraph line is as long as the shot flies")
-	_check(not line.visible, "the telegraph is hidden before the windup")
-	imp.step(STEP)
-	_check(line.visible and is_equal_approx(line.rotation, imp.aim.angle()), "the telegraph shows, turned toward the locked aim")
-	_check(sprite.modulate != Color.WHITE, "the sprite flashes during the windup")
-	var early_width: float = line.width
-	var early_alpha: float = line.modulate.a
-	_run(imp, int(imp.windup_time / STEP) - 4)
-	_check(line.width > early_width and line.modulate.a > early_alpha, "the telegraph grows wider and brighter with progress")
-	_run(imp, 4)
-	_check(not line.visible and sprite.modulate == Color.WHITE, "after the shot the telegraph is hidden and the sprite is white again")
-
-
-## The real imp scene with one wizard just in range, ready to wind up.
-func _scene_imp() -> AiScript:
-	_setup(1)
-	_players[0].position = Vector2(0.0, 80.0)
-	var imp: AiScript = ImpData.scene.instantiate()
-	imp.data = ImpData
-	imp.events = _bus
-	imp.combat = _combat
-	imp.projectiles = _projectiles
-	imp.targets.append(_players[0])
-	imp._ready()
-	_enemies.append(imp)
-	return imp
-
-
-func _test_windup_pose_flashes_faster_and_brighter() -> void:
-	var imp: AiScript = _scene_imp()
-	var sprite: Sprite2D = imp.get_node("Sprite")
-	var idle_texture: Texture2D = sprite.texture
-	_check(imp.windup_texture != null and imp.hurt_texture != null, "the imp scene has a windup and a hurt strip")
-	_check(imp.windup_texture != idle_texture and imp.hurt_texture != idle_texture, "the poses are their own art, not the idle strip")
-	_run(imp, 1)
-	_check(sprite.texture == imp.windup_texture and sprite.hframes == 2, "the windup pose shows two frames")
-	var flips: Array[int] = []
-	var last: int = sprite.frame
-	var early_color: Color = sprite.modulate
-	var steps: int = int(imp.windup_time / STEP) - 1
-	for i in steps:
-		_run(imp, 1)
-		if sprite.frame != last:
-			flips.append(i)
-			last = sprite.frame
-	_check(flips.size() >= 3, "the windup frame flips several times (%d)" % flips.size())
-	if flips.size() >= 3:
-		_check(flips[flips.size() - 1] - flips[flips.size() - 2] < flips[0] + 1, "the flips speed up toward the shot")
-	_check(sprite.frame == sprite.hframes - 1, "the bright frame is held for the last part of the windup")
-	_check(sprite.modulate == AiScript.TELEGRAPH_COLOR_LAST and early_color == AiScript.TELEGRAPH_COLOR, "the sprite is brighter for the last part of the windup")
-	_run(imp, 2)
-	_check(sprite.texture == idle_texture and sprite.hframes == 2, "after the shot the idle strip is back")
-
-func _test_hurt_pose_shows_without_cancelling_the_attack() -> void:
-	var imp: AiScript = _scene_imp()
-	var other: AiScript = _imp(Vector2(500.0, 0.0))
-	var sprite: Sprite2D = imp.get_node("Sprite")
-	_run(imp, 3)
-	_check(imp.state == AiScript.State.WINDUP, "the imp is winding up")
-	_bus.damage_dealt.emit(0, other, 1, Vector2.ZERO)
-	_check(not imp.is_hurt() and sprite.texture == imp.windup_texture, "a hit on another enemy does not hurt this one")
-	_bus.damage_dealt.emit(0, imp, 1, Vector2.ZERO)
-	_check(imp.is_hurt() and sprite.texture == imp.hurt_texture and sprite.hframes == 1, "a hit shows the hurt pose at once")
-	_run(imp, 1)
-	_check(imp.state == AiScript.State.WINDUP and imp.get_node("Telegraph").visible, "the hit does not cancel the windup or its telegraph")
-	_run(imp, int(AiScript.HURT_TIME / STEP) + 1)
-	_check(not imp.is_hurt() and sprite.texture == imp.windup_texture, "the windup pose comes back when the hurt time is over")
-	_run(imp, 4)
-	_check(_projectiles.get_count_for(EventsScript.NO_PLAYER) == 1, "the shot still comes on time after a hit")
-	_bus.damage_dealt.emit(0, imp, 1, Vector2.ZERO)
-	_run(imp, 1)
-	_check(sprite.texture == imp.hurt_texture, "a hit while recovering shows the hurt pose too")
-	_run(imp, int(AiScript.HURT_TIME / STEP) + 1)
-	_check(sprite.frame == 0 and sprite.hframes == 2 and sprite.texture != imp.hurt_texture, "afterwards the idle strip is back")
 
 func _test_recover_then_chase_again() -> void:
 	_setup(1)

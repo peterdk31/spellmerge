@@ -36,6 +36,7 @@ func _initialize() -> void:
 	_test_shot_hurts_wizard_through_combat()
 	_test_shot_can_be_dodged_by_stepping_aside()
 	_test_shot_and_telegraph_start_at_the_body()
+	_test_shot_is_small_and_dodgeable()
 	_test_no_lookups_while_nobody_stands()
 	_test_recover_then_chase_again()
 	_test_knockback_moves_the_enemy()
@@ -73,7 +74,7 @@ func _setup(player_count: int = 0) -> void:
 		root.add_child(wizard)
 		wizard.position = Vector2(1000.0, 1000.0 * index)
 		_players.append(wizard)
-		_combat.register_player(index, wizard, 8.0)
+		_combat.register_player(index, wizard, 8.0, Vector2(0.0, -12.0))
 
 
 func _teardown() -> void:
@@ -244,6 +245,20 @@ func _test_shot_can_be_dodged_by_stepping_aside() -> void:
 	_players[0].position = Vector2(60.0, 40.0)
 	_run(imp, int(imp.windup_time / STEP) + 20)
 	_check(_players[0].health == PlayerScript.MAX_HEALTH, "a player who stepped aside during the telegraph is not hit")
+
+
+## Enemy shots are small bullets (#4): a wizard (hit circle 8) is hit by a shot passing inside
+## 8 + 3.5 = 11.5 px, and clears it with a 15 px sidestep.
+func _test_shot_is_small_and_dodgeable() -> void:
+	for offset: float in [10.0, 15.0]:
+		_setup(1)
+		_players[0].position = Vector2(60.0, 0.0)
+		var imp := _imp()
+		imp.step(STEP)
+		_players[0].position = Vector2(60.0, offset)
+		_run(imp, int(imp.windup_time / STEP) + 20)
+		var hit: bool = _players[0].health < PlayerScript.MAX_HEALTH
+		_check(hit == (offset < 11.5), "a shot passing %.0f px from the wizard %s" % [offset, "hits" if offset < 11.5 else "misses"])
 
 
 func _test_no_lookups_while_nobody_stands() -> void:

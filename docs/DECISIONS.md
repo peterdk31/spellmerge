@@ -2,6 +2,21 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-21: Gates are sparse; hard gates notify the owner
+
+**Decided by:** the owner ("Gating should in general be sparse. Development should be prioritized to continue instead of gating stuff. Of course a hard gate can happen, in that case I should be notified").
+**Decision:** written into docs/PLAN.md, "Gates are sparse".
+- The hard gates are a broken build (build, tests, smoke tests, error lines) plus the security and copyright rules. Each one already mentions the owner when it trips: a broken build's Daily log post, a failed revert, and the alarm issues.
+- Budgets warn with likely fixes: web load time (above), download size (`build.sh` no longer fails over 40 MB or 300 MB), frame time and the M2 stress benchmark (a warning, not a gate, when part 25 adds it). The 10% frame-time regression no longer reverts.
+- The stable channel still promotes only builds that are within budget. Nightly builds always ship.
+**Consequence:** a budget can be broken for a while. The warning in the build log, and a task once it repeats, are what bring it back.
+
+## 2026-10-21: A slow web load warns, it never fails the build
+
+**Decided by:** the owner ("loosen up a bit on the load timing. It should not hinder development ... it should just give warnings and potential fixes").
+**Decision:** `smbot.websmoke --warn-load 10` prints `WEB LOAD: N s` and, over 10 s, a `::warning::` that lists likely fixes: the zip size, big new assets, work at start (autoloads, `Registry.scan`), trimming demo content, and a slow runner. The web smoke test still fails on errors, exceptions and a missing expected line. `--max-load` is gone. The 10 s load in docs/PLAN.md stays a target, not a gate.
+**Consequence:** a slow web start shows up in the daily build log and never reverts a merge. Acting on the warning is a normal task, filed when it repeats.
+
 ## 2026-10-21: Spell component base classes (M2 part 1)
 
 **Decided by:** Claude.
@@ -744,6 +759,13 @@ The HUD screenshot cannot be taken in a session (no display, `docs/BACKLOG.md`),
 - The verdict is iterate. The next work is a human playtest of round 2, then the top items from its answers, not more guessing from code and bot logs: round 2's feel values are still unverified by a human.
 - The plan allows at most 2 iterate rounds, counted by the owner's iterate requests on #97, not by the "round N" labels in `docs/NEXT.md` (those number batches of work: aiming, playtest fixes, art, juice and the six tasks). Round one was the owner's first `/claude` on #97 (aiming and graphics, then the 2026-10-18 playtest fixes); round two was the six tasks and their summary. This verdict, given on that summary, closes round two. After it the next checkpoint must be go or pivot, and the next assessment must say so in plain words.
 - Controller and 4-player feel are still untried by a human; the playtest questions ask for them.
+
+## 2026-10-17: Panels may hide the wizards at zoom 0.5; walls are tested
+
+**Decided by:** the owner (#87: "It's fine as it is").
+
+- At the widest Coop zoom (0.5), each corner panel may cover its player's wizard. The panels stay as they are: translucent at alpha 0.4.
+- The staged screenshot is now named `staged_zoom_half_wizards_placed_outside_room`, because `shot_m1.gd` places the wizards outside the one-screen room to force the zoom-out, and the old name looked like gameplay. A new test, `tests/gameplay/flow/test_walls_hold.gd`, has four wizards walk and dodge into the walls through the real input path and checks that none leaves the room.
 
 ## 2026-10-21: Events for M2 (M2 part 2)
 

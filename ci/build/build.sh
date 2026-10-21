@@ -55,6 +55,9 @@ GODOT="$TOOLS/Godot_v${GODOT_RELEASE}_linux.x86_64"
 # Budgets from docs/PLAN.md, "Performance": compressed download sizes.
 WEB_BUDGET=$((40 * 1000 * 1000))
 DESKTOP_BUDGET=$((300 * 1000 * 1000))
+# docs/PLAN.md target: the web build loads in under 10 s (here from a local server, so no
+# download). Over it the web smoke test warns with likely fixes; it never fails the build.
+WEB_LOAD_WARN=10
 
 step() { printf '\n==> %s\n' "$*"; }
 
@@ -185,12 +188,29 @@ export_all() {
 
   step "Boot smoke test (web build in headless Chrome)"
   local status=0
-  PYTHONPATH=ci python3 -m smbot.websmoke build/web --expect "main menu ready" \
+  PYTHONPATH=ci python3 -m smbot.websmoke build/web --expect "main menu ready" --warn-load "$WEB_LOAD_WARN" \
     --screenshot build/logs/web.png || status=$?
   if ((status == 2)) && [[ -z "${CI:-}" ]]; then
     echo "warning: Chrome is not installed, so the web build was not smoke-tested"
+    return 0
   elif ((status != 0)); then
     return 1
+  fi
+
+  # "Web Test" is the Web preset with tests/, never zipped or deployed. The game reads
+  # --four-bot from the page's start config, which websmoke fills in.
+  step "4-bot test (exported web build with tests, headless Chrome)"
+  rm -rf build/web-test && mkdir -p build/web-test
+  godot_checked export-web-test "$GODOT" --headless --path . --export-release "Web Test" build/web-test/index.html
+  [[ -s build/web-test/index.html ]] || { echo "::error::Web Test export produced no index.html"; exit 1; }
+  PYTHONPATH=ci python3 -m smbot.websmoke build/web-test --page-args=--four-bot --expect "SMOKE OK" --timeout 240
+
+  # Projectile timing in WASM (#91). Runs once the game has the runner the main menu starts on
+  # --projectile-timing (an exported build can't run a --script); it prints BENCH lines, then TIMING OK.
+  if [[ -f tests/benchmark/projectile_timing_runner.gd ]]; then
+    step "Projectile timing (exported web build, headless Chrome)"
+    PYTHONPATH=ci python3 -m smbot.websmoke build/web-test --page-args=--projectile-timing --expect "TIMING OK" \
+      --timeout 240
   fi
 }
 
@@ -222,17 +242,17 @@ package() {
   (cd dist && sha256sum ./*.zip | sed 's| \./| |' > SHA256SUMS)
   cat dist/SHA256SUMS
 
+  # Budgets warn, with likely fixes; they never fail the build (docs/PLAN.md, "Gates are sparse").
   step "Size budgets"
-  local size ok=1
+  local size
   size=$(stat -c %s "dist/spellmerge-web-$VERSION.zip")
   echo "web: $((size / 1000)) kB of $((WEB_BUDGET / 1000)) kB"
-  ((size <= WEB_BUDGET)) || { echo "::error::web download is over its 40 MB budget"; ok=0; }
+  ((size <= WEB_BUDGET)) || echo "::warning::web download is over its 40 MB budget. Not a failure. Likely fixes: big textures or sounds added recently (art/manifest.json, audio/manifest.json), more content the Web preset could exclude (export_presets.cfg, the demo flag), uncompressed imports"
   for platform in windows linux; do
     size=$(stat -c %s "dist/spellmerge-$platform-$VERSION.zip")
     echo "$platform: $((size / 1000)) kB of $((DESKTOP_BUDGET / 1000)) kB"
-    ((size <= DESKTOP_BUDGET)) || { echo "::error::$platform download is over its 300 MB budget"; ok=0; }
+    ((size <= DESKTOP_BUDGET)) || echo "::warning::$platform download is over its 300 MB budget. Not a failure. Likely fixes: big textures or sounds added recently, uncompressed imports, test or source files the export should exclude"
   done
-  ((ok))
 }
 
 mkdir -p build

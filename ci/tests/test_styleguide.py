@@ -1,0 +1,51 @@
+from __future__ import annotations
+
+import re
+import tempfile
+import unittest
+import zipfile
+from pathlib import Path
+
+from smbot import styleguide
+
+
+class StyleGuideTest(unittest.TestCase):
+    def test_the_palette_files_match_the_style_table(self) -> None:
+        """art/kit's palette files copy docs/STYLE.md's table; this keeps them from drifting."""
+        table = styleguide.sections(styleguide.STYLE.read_text())["Palette"]
+        from_table = [c.lower() for row in table.splitlines() if row.startswith("| **")
+                      for c in re.findall(r"`#([0-9a-fA-F]{6})`", row)]
+        self.assertEqual(len(from_table), 31)
+        self.assertEqual(styleguide.palette(), from_table)
+        gpl = [line.split()[:3] for line in (styleguide.KIT / "spellmerge.gpl.txt").read_text().splitlines()
+               if re.match(r"\s*\d+\s+\d+\s+\d+", line)]
+        self.assertEqual([f"{int(r):02x}{int(g):02x}{int(b):02x}" for r, g, b in gpl], from_table)
+
+    def test_render(self) -> None:
+        out = styleguide.render("1. **One** `a<b`\n2. Two\n\n- [ ] Box\n- [ ] Box 2\n\n| A | B |\n| --- | --- |\n"
+                                "| x | [y](STYLE.md) |\n\nPlain <tag> text")
+        self.assertIn("<ol><li><strong>One</strong> <code>a&lt;b</code></li>", out)
+        self.assertIn("&#9744; Box", out)
+        self.assertIn("<td>x</td>", out)
+        self.assertIn("blob/main/docs/STYLE.md", out)
+        self.assertIn("Plain &lt;tag&gt; text", out)
+
+    def test_build_writes_the_page_kit_and_zip(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp, "style-guide")
+            styleguide.build(out)
+            page = (out / "index.html").read_text()
+            for name in styleguide.SECTIONS:
+                self.assertIn(f"<h2>{name}</h2>", page)
+            self.assertEqual(page.count('class="swatch"'), 31)
+            self.assertNotIn("in_game.png", page)
+            for example in styleguide.golden():
+                self.assertTrue((out / "golden" / styleguide.flat_name(example["path"])).is_file())
+            names = zipfile.ZipFile(out / styleguide.ZIP_NAME).namelist()
+            self.assertIn("spellmerge.gpl", names)
+            self.assertIn("NOTICE.txt", names)
+            self.assertEqual(len([n for n in names if n.startswith("golden/")]), len(styleguide.golden()))
+
+
+if __name__ == "__main__":
+    unittest.main()

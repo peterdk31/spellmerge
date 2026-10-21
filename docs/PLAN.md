@@ -35,6 +35,15 @@ Spellmerge must ship as a professional-looking game with very few bugs and genui
 
 Weekly, Claude picks a recently finished feature and re-examines it critically (code, bot playtest data, player feedback). Anything that is only "OK" becomes a polish task.
 
+### Gates are sparse
+
+Development keeps going; checks inform rather than block (owner, 2026-10-21).
+
+- **Hard gates are few:** a broken build (it doesn't build, a test or smoke test fails, errors in the log) and the security and copyright rules. Only these stop a release or revert a merge.
+- **Every hard gate notifies the owner** when it trips: the Daily log post or an alarm issue mentions them.
+- **Budgets warn:** load time, download size, frame time and the stress benchmark print a warning in the build log, with likely fixes. A warning that repeats becomes a normal task in `NEXT.md`, never a revert.
+- The **stable** channel is the one place a budget still counts: a build is promoted only when it is within budget. Nightly builds always ship.
+
 ### Bugs
 
 - Every bug fix comes with a regression test that would have caught it.
@@ -110,7 +119,7 @@ Runs only the hard rules check (see PR filtering). There is no build per PR: res
 3. **Rate** (Claude, read-only tools): score up to about 8 eligible PRs; post scores as a PR comment.
 4. **Merge** (script): in score order, test-merge approved PRs together on a throwaway `staging` branch and run content validators there; merge each passing PR into `main`, pinned to its reviewed commit; skip failures and conflicts with a comment. The bot is never a bypass actor on `main`.
 5. **Develop** (Claude): take the top task from `docs/NEXT.md`, implement it with tests, update the plan files, open its own PR, which merges the same day after all checks plus an independent fresh-context review. Further adaptive development sessions start hourly whenever quota allows (see Self-driven progress).
-6. **Build and smoke test** (script): export the web demo and the full Windows and Linux builds, run the 1-player and 4-bot smoke tests and the stress benchmark (a frame-time regression over 10% also counts as broken). If broken, revert the day's merges newest first (through bot revert PRs) until it passes and comment on the culprit.
+6. **Build and smoke test** (script): export the web demo and the full Windows and Linux builds, run the 1-player and 4-bot smoke tests and the stress benchmark (a frame-time regression over 10% is a warning, not a break; see "Gates are sparse"). If broken, revert the day's merges newest first (through bot revert PRs) until it passes and comment on the culprit.
 7. **Release** (script): tag the tested `main` as `v0.YYYYMMDD`, attach build and checksums with attestation, deploy the web build to GitHub Pages and itch.io, regenerate the Contribute page.
 8. **Log**: post a summary to the Daily log issue.
 
@@ -401,8 +410,8 @@ Performance is designed in from M1, with hard budgets checked every day, because
 ### Automatic checks (daily run)
 
 - The stress scenario runs headless on GitHub's servers and measures game-logic frame time (the usual bottleneck).
-- Frame time more than 10% worse than the 7-day average: the culprit PR is reverted, as with a broken build.
-- Build size and load size are checked against budgets; content validators enforce particle counts and sprite sheet sizes.
+- Frame time more than 10% worse than the 7-day average: a warning in the build log naming the likely culprit PRs, not a revert ("Gates are sparse").
+- Build size and load size are checked against budgets and warn when over; content validators enforce particle counts and sprite sheet sizes.
 - A trend chart is published on the Contribute page.
 - GPU performance can't be measured on free runners; fixed draw limits and player-reported FPS cover it.
 

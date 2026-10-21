@@ -191,7 +191,7 @@ func _enemy_readability(flow: Node, combat: Node, wizard: Node2D) -> bool:
 	var beside: Vector2 = Vector2.INF
 	for offset: Vector2 in [Vector2(120.0, 0.0), Vector2(-120.0, 0.0), Vector2(0.0, -70.0), Vector2(0.0, 70.0), Vector2(100.0, 60.0)]:
 		var spot: Vector2 = wizard.global_position + offset
-		var enemy_slot: int = int(shots.call("spawn", -1, spot + Vector2(0.0, 14.0), Vector2(1.0, 0.0), 5.0, 4.0, 2))
+		var enemy_slot: int = int(shots.call("spawn", -1, spot + Vector2(0.0, 14.0), Vector2(1.0, 0.0), 5.0, 3.5, 2))
 		var player_slot: int = int(shots.call("spawn", 0, spot + Vector2(0.0, -14.0), Vector2(1.0, 0.0), 5.0, 4.0))
 		if enemy_slot >= 0 and player_slot >= 0:
 			beside = offset

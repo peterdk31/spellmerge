@@ -38,7 +38,7 @@ func _init(root: Node, player_count: int = 1) -> void:
 		root.add_child(wizard)
 		wizard.position = Vector2(1000.0, 1000.0 * index)
 		players.append(wizard)
-		combat.register_player(index, wizard, 8.0)
+		combat.register_player(index, wizard, 8.0, Vector2(0.0, -12.0))
 
 
 ## An imp made from the real scene (sprite, telegraph, poses) that chases every wizard.

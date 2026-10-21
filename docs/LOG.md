@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue.
 
+## 2026-10-21: Smaller enemy bullets (owner `/claude` on #4)
+
+- The imp's shot radius is 5 → 3.5, so its sprite (drawn at 3x the radius) and its hit circle both shrink by 30% (30 px → 21 px quad, orb about 10 px). Players' bolts keep radius 4, and the enemy orb keeps its own spiky art and no tint, so the two stay distinct. Test in `test_ai.gd`.
+
 ## 2026-10-20: Foundation review (owner `/claude` on #5)
 
 - New `docs/ARCHITECTURE.md`: layers, where each kind of change goes, the art contract. `Feel` now draws the textures its `FeelPreset` names; `Flow` runs the room, enemy, spell and wizard scene it is told (`*_to_play`, `wizard_scene`). New tests: `test_feel_art.gd`, `test_flow_content_choice.gd`, `tests/content/wizard/test_wizard_art.gd`. Weak spots left for their features: `docs/BACKLOG.md`, "Foundation". Details in `docs/DECISIONS.md`.

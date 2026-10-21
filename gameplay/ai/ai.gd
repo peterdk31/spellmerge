@@ -91,7 +91,7 @@ var targets: Array = []
 ## Shot speed in pixels per second and its life in seconds.
 @export var attack_speed: float = 140.0
 @export var attack_lifetime: float = 1.25
-@export var attack_radius: float = 5.0
+@export var attack_radius: float = 3.5
 ## Radius of the enemy's hurt box in pixels.
 @export var hurt_radius: float = 11.0
 ## Where the hurt circle, the shots and the telegraph start, relative to the node (the feet).

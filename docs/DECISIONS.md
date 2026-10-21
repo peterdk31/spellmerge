@@ -2,6 +2,12 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-21: Enemy shots shrink to radius 3.5 (owner `/claude` on #4)
+
+**Decided by:** Claude, on the owner's request.
+
+- `attack_radius` goes 5 to 3.5. One number sets both the hit circle and the drawn size, so sprite and collision stay matched. The orb is about 10 px wide, readable at 32 px scale, and smaller than a wizard's default bolt (radius 4). A wizard's hit circle is 8, so a 12 px sidestep clears the shot; the telegraph lane narrows with it. Each shot is checked against all players the same way, so co-op dodging is unchanged. Not playtested by a human: the next playtest report should ask.
+
 ## 2026-10-20: Foundation review: data over constants (owner `/claude` on #5)
 
 **Decided by:** Claude, from the owner's request to make the foundation solid, easy to extend and art easy to swap.

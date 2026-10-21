@@ -36,6 +36,7 @@ func _initialize() -> void:
 	_test_shot_hurts_wizard_through_combat()
 	_test_shot_can_be_dodged_by_stepping_aside()
 	_test_shot_and_telegraph_start_at_the_body()
+	_test_shot_is_small_and_dodgeable()
 	_test_no_lookups_while_nobody_stands()
 	_test_recover_then_chase_again()
 	_test_knockback_moves_the_enemy()
@@ -73,7 +74,7 @@ func _setup(player_count: int = 0) -> void:
 		root.add_child(wizard)
 		wizard.position = Vector2(1000.0, 1000.0 * index)
 		_players.append(wizard)
-		_combat.register_player(index, wizard, 8.0)
+		_combat.register_player(index, wizard, 8.0, Vector2(0.0, -12.0))
 
 
 func _teardown() -> void:
@@ -244,6 +245,20 @@ func _test_shot_can_be_dodged_by_stepping_aside() -> void:
 	_players[0].position = Vector2(60.0, 40.0)
 	_run(imp, int(imp.windup_time / STEP) + 20)
 	_check(_players[0].health == PlayerScript.MAX_HEALTH, "a player who stepped aside during the telegraph is not hit")
+
+
+## Enemy shots are small bullets (#4): smaller than a wizard's default bolt (radius 4), and a
+## wizard (hit circle 8) clears one with a short sidestep.
+func _test_shot_is_small_and_dodgeable() -> void:
+	_setup(1)
+	_players[0].position = Vector2(60.0, 0.0)
+	var dodger := _imp()
+	_check(dodger.attack_radius < 4.0, "the imp's shot is smaller than a wizard's bolt (radius %.1f)" % dodger.attack_radius)
+	dodger.step(STEP)
+	# 8 (wizard) + 3.5 (shot) = 11.5 px; 15 px leaves a little to spare.
+	_players[0].position = Vector2(60.0, 15.0)
+	_run(dodger, int(dodger.windup_time / STEP) + 20)
+	_check(_players[0].health == PlayerScript.MAX_HEALTH, "a short sidestep is enough to dodge the shot")
 
 
 func _test_no_lookups_while_nobody_stands() -> void:

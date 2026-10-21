@@ -16,6 +16,8 @@ var _mgr: Node2D
 var _targets: Array[Node2D] = []
 ## Every projectile_hit as [player, target, position, tag].
 var _hits: Array = []
+## Every projectile_expired as [player, position, tag].
+var _expired: Array = []
 
 
 func _initialize() -> void:
@@ -60,6 +62,18 @@ func _initialize() -> void:
 	_test_clip_to_walls()
 	_test_wall_body_rectangles_become_walls()
 	_test_target_offset_moves_the_hit_circle()
+	_test_expiry_event_on_end_of_life()
+	_test_expiry_event_on_a_wall()
+	_test_no_expiry_on_a_hit_a_cap_drop_or_leaving()
+	_test_expiry_handler_may_spawn()
+	_test_still_shot_waits_for_a_target()
+	_test_still_shot_pierces_and_expires()
+	_test_still_shot_beside_and_in_a_wall()
+	_test_nearest_target()
+	_test_nearest_target_with_no_targets_and_after_removal()
+	_test_queries_inside_a_hit_handler()
+	_test_targets_in()
+	_test_queries_match_brute_force()
 	_teardown()
 	if _failures.is_empty():
 		print("TEST OK: core/projectiles")
@@ -81,6 +95,8 @@ func _setup() -> void:
 	_mgr = ManagerScript.new()
 	_mgr.events = _bus
 	_hits.clear()
+	_expired.clear()
+	_bus.projectile_expired.connect(func(player: int, position: Vector2, tag: int) -> void: _expired.append([player, position, tag]))
 	_bus.projectile_hit.connect(func(player: int, target: Node, position: Vector2, tag: int) -> void: _hits.append([player, target, position, tag]))
 
 
@@ -780,3 +796,205 @@ func _test_target_offset_moves_the_hit_circle() -> void:
 	_mgr.spawn(0, Vector2(0.0, 0.0), Vector2(600.0, 0.0), 1.0, 4.0)
 	_mgr.step(0.2)
 	_check(_hits.size() == 1, "a shot along the feet misses the offset circle")
+
+
+func _test_expiry_event_on_end_of_life() -> void:
+	_setup()
+	_mgr.spawn(1, Vector2.ZERO, Vector2(60.0, 0.0), 0.5, 4.0, ManagerScript.LAYER_ENEMY, 0, 77)
+	_mgr.step(0.25)
+	_check(_expired.is_empty(), "no expiry while the shot lives")
+	_mgr.step(0.25)
+	_check(_expired.size() == 1, "one expiry when the life runs out (%d)" % _expired.size())
+	if _expired.size() == 1:
+		_check(_expired[0][0] == 1 and _expired[0][2] == 77, "it names the player and gives the tag back")
+		_check((_expired[0][1] as Vector2).is_equal_approx(Vector2(15.0, 0.0)), "it gives the place the shot reached")
+	_mgr.step(0.25)
+	_check(_expired.size() == 1, "an ended shot expires only once")
+
+
+func _test_expiry_event_on_a_wall() -> void:
+	_setup()
+	_mgr.set_bounds(Rect2(0.0, 0.0, 640.0, 360.0))
+	_mgr.set_walls(_wall_rects())
+	_mgr.spawn(0, Vector2(50.0, 100.0), Vector2(120.0, 0.0), 5.0, 4.0, ManagerScript.LAYER_ENEMY, 3, 5)
+	for _i in 60:
+		_mgr.step(DT)
+	_check(_expired.size() == 1, "a wall end sends one expiry, even for a piercing shot")
+	if _expired.size() == 1:
+		_check(absf((_expired[0][1] as Vector2).x - 96.0) < 0.5 and _expired[0][2] == 5, "at the wall, with the tag")
+
+
+func _test_no_expiry_on_a_hit_a_cap_drop_or_leaving() -> void:
+	_setup()
+	_target(Vector2(30.0, 0.0))
+	_mgr.spawn(0, Vector2.ZERO, Vector2(1200.0, 0.0), 1.0)
+	_mgr.step(DT)
+	_check(_hits.size() == 1 and _expired.is_empty(), "a shot that ends on a hit is not expired")
+	_mgr.set_cap(2)
+	for _i in 3:
+		_mgr.spawn(0, Vector2(0.0, 100.0), Vector2(1.0, 0.0), 5.0)
+	_check(_mgr.dropped == 1 and _expired.is_empty(), "a shot dropped by the cap is not expired")
+	_mgr.clear()
+	_mgr.spawn(0, Vector2(1000.0, 0.0), Vector2(5000.0, 0.0), 5.0)
+	_mgr.step(0.1)
+	_check(_mgr.get_count() == 0 and _expired.is_empty(), "a shot that leaves the bounds is not expired")
+
+
+func _test_expiry_handler_may_spawn() -> void:
+	_setup()
+	_bus.projectile_expired.connect(func(player: int, position: Vector2, _tag: int) -> void:
+		if _mgr.get_count() == 0:
+			_mgr.spawn(player, position, Vector2(10.0, 0.0), 1.0))
+	_mgr.spawn(0, Vector2.ZERO, Vector2(10.0, 0.0), 0.1)
+	_mgr.step(0.2)
+	_check(_mgr.get_count() == 1, "a shot spawned by an expiry handler lives")
+	_mgr.step(DT)
+	_check(_mgr.get_count() == 1, "and does not expire in the step after")
+
+
+func _test_still_shot_waits_for_a_target() -> void:
+	_setup()
+	var slot: int = _mgr.spawn(0, Vector2(100.0, 50.0), Vector2(300.0, 300.0), 2.0, 12.0, ManagerScript.LAYER_ENEMY, 0, 9, ManagerScript.MOTION_STILL)
+	_check(slot >= 0, "a still shot spawns")
+	for _i in 30:
+		_mgr.step(DT)
+	_check(_mgr.get_position_of(slot) == Vector2(100.0, 50.0), "a still shot stays where it was put, whatever velocity it was given")
+	_check(_hits.is_empty(), "nothing to hit yet")
+	var enemy: Node2D = _target(Vector2(300.0, 50.0))
+	enemy.global_position = Vector2(110.0, 50.0)
+	_mgr.step(DT)
+	_check(_hits.size() == 1 and _hits[0][1] == enemy and _hits[0][3] == 9, "a target walking into it is hit, with the tag")
+	_check(not _mgr.is_alive(slot), "the rune ends on the hit")
+
+
+func _test_still_shot_pierces_and_expires() -> void:
+	_setup()
+	var a: Node2D = _target(Vector2(100.0, 50.0))
+	var b: Node2D = _target(Vector2(104.0, 50.0))
+	_mgr.spawn(0, Vector2(100.0, 50.0), Vector2.ZERO, 0.5, 12.0, ManagerScript.LAYER_ENEMY, 3, 0, ManagerScript.MOTION_STILL)
+	_mgr.step(DT)
+	_check(_hits.size() == 2 and _hits[0][1] != _hits[1][1], "a piercing rune hits two overlapping targets, each once")
+	_mgr.step(DT)
+	_check(_hits.size() == 2, "it does not hit the same ones again while they stay")
+	a.global_position = Vector2(500.0, 500.0)
+	b.global_position = Vector2(500.0, 500.0)
+	for _i in 40:
+		_mgr.step(DT)
+	_check(_expired.size() == 1 and _mgr.get_count() == 0, "an unspent rune expires at the end of its life")
+	_check(_mgr.spawn(0, Vector2.ZERO, Vector2.ZERO, 1.0, 4.0, ManagerScript.LAYER_ENEMY, 0, 0, 7) == -1, "an unknown motion is refused")
+
+
+func _test_still_shot_beside_and_in_a_wall() -> void:
+	_setup()
+	_mgr.set_bounds(Rect2(0.0, 0.0, 640.0, 360.0))
+	_mgr.set_walls(_wall_rects())
+	_check(_mgr.spawn(0, Vector2(100.0, 100.0), Vector2.ZERO, 1.0, 4.0, ManagerScript.LAYER_ENEMY, 0, 0, ManagerScript.MOTION_STILL) == -1, "a rune cannot be placed in a wall")
+	var slot: int = _mgr.spawn(0, Vector2(60.0, 100.0), Vector2.ZERO, 1.0, 4.0, ManagerScript.LAYER_ENEMY, 0, 0, ManagerScript.MOTION_STILL)
+	for _i in 10:
+		_mgr.step(DT)
+	_check(_mgr.is_alive(slot) and _expired.is_empty(), "a rune beside a wall stays")
+
+
+func _test_nearest_target() -> void:
+	_setup()
+	var far: Node2D = _target(Vector2(150.0, 100.0), 10.0)
+	var near: Node2D = _target(Vector2(120.0, 100.0), 10.0)
+	var other_layer: Node2D = _target(Vector2(101.0, 100.0), 10.0, ManagerScript.LAYER_PLAYER)
+	var point := Vector2(100.0, 100.0)
+	_check(_mgr.nearest_target(point, 100.0, ManagerScript.LAYER_ENEMY) == near, "the nearest target on the layer (before any step)")
+	_check(_mgr.nearest_target(point, 100.0, ManagerScript.LAYER_ENEMY, near) == far, "exclude skips the target just hit")
+	_check(_mgr.nearest_target(point, 100.0, ManagerScript.LAYER_PLAYER) == other_layer, "layers are respected")
+	_check(_mgr.nearest_target(point, 100.0, ManagerScript.LAYER_ENEMY | ManagerScript.LAYER_PLAYER) == other_layer, "a mask of both layers finds the closest of either")
+	_check(_mgr.nearest_target(point, 5.0, ManagerScript.LAYER_ENEMY) == null, "nothing within a small radius")
+	_check(_mgr.nearest_target(point, 9.0, ManagerScript.LAYER_ENEMY) == null, "the radius counts to the target's edge: 20 away, 9 + 10 = 19")
+	_check(_mgr.nearest_target(point, 10.0, ManagerScript.LAYER_ENEMY) == near, "and 10 + 10 = 20 reaches it")
+	_check(_mgr.nearest_target(point, 100.0, 0) == null, "an empty mask finds nothing")
+	near.global_position = Vector2(400.0, 100.0)
+	_mgr.step(DT)
+	_check(_mgr.nearest_target(point, 100.0, ManagerScript.LAYER_ENEMY) == far, "after a step it follows moved targets")
+	far.free()
+	_mgr.step(DT)
+	_check(_mgr.nearest_target(point, 400.0, ManagerScript.LAYER_ENEMY) == near, "a freed target is not returned")
+
+
+func _test_nearest_target_with_no_targets_and_after_removal() -> void:
+	_setup()
+	_check(_mgr.nearest_target(Vector2.ZERO, 500.0, ManagerScript.LAYER_ENEMY) == null, "no targets, no result")
+	var enemy: Node2D = _target(Vector2(10.0, 10.0))
+	_check(_mgr.nearest_target(Vector2.ZERO, 50.0, ManagerScript.LAYER_ENEMY) == enemy, "found")
+	_mgr.remove_target(enemy)
+	_mgr.step(DT)
+	_check(_mgr.nearest_target(Vector2.ZERO, 50.0, ManagerScript.LAYER_ENEMY) == null, "a removed target is not found")
+	var doomed: Node2D = _target(Vector2(20.0, 0.0))
+	_mgr.step(DT)
+	doomed.free()
+	var out: Array[Node2D] = []
+	_check(_mgr.nearest_target(Vector2.ZERO, 50.0, ManagerScript.LAYER_ENEMY) == null, "a target freed since the last step is not returned")
+	_check(_mgr.targets_in(Vector2.ZERO, 50.0, ManagerScript.LAYER_ENEMY, out) == 0, "nor listed")
+
+
+func _test_queries_inside_a_hit_handler() -> void:
+	_setup()
+	_target(Vector2(30.0, 0.0))
+	var second: Node2D = _target(Vector2(60.0, 0.0))
+	var found: Array[Node2D] = []
+	_bus.projectile_hit.connect(func(_player: int, target: Node, position: Vector2, _tag: int) -> void:
+		found.append(_mgr.nearest_target(position, 80.0, ManagerScript.LAYER_ENEMY, target as Node2D)))
+	_mgr.spawn(0, Vector2.ZERO, Vector2(1200.0, 0.0), 1.0)
+	_mgr.step(DT)
+	_check(found.size() == 1 and found[0] == second, "a chain query from a hit handler finds the other target")
+
+
+func _test_targets_in() -> void:
+	_setup()
+	var a: Node2D = _target(Vector2(100.0, 100.0))
+	var b: Node2D = _target(Vector2(130.0, 100.0))
+	var c: Node2D = _target(Vector2(300.0, 100.0))
+	var p: Node2D = _target(Vector2(105.0, 100.0), 10.0, ManagerScript.LAYER_PLAYER)
+	var out: Array[Node2D] = []
+	var n: int = _mgr.targets_in(Vector2(110.0, 100.0), 30.0, ManagerScript.LAYER_ENEMY, out)
+	_check(n == 2 and out.size() == 2 and out.has(a) and out.has(b) and not out.has(c) and not out.has(p), "the enemies near the point, not far ones or other layers (%d)" % n)
+	n = _mgr.targets_in(Vector2(110.0, 100.0), 30.0, ManagerScript.LAYER_ENEMY | ManagerScript.LAYER_PLAYER, out)
+	_check(n == 3 and out.has(p), "a mask of both layers adds the player target; the array was cleared first")
+	n = _mgr.targets_in(Vector2(900.0, 900.0), 30.0, ManagerScript.LAYER_ENEMY, out)
+	_check(n == 0 and out.is_empty(), "no result empties the array")
+	n = _mgr.targets_in(Vector2(-5000.0, -5000.0), 20.0, ManagerScript.LAYER_ENEMY, out)
+	_check(n == 0, "a point far outside the bounds is safe")
+
+
+func _test_queries_match_brute_force() -> void:
+	_setup()
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 4242
+	var radii: Array[float] = []
+	for i in 300:
+		var radius: float = rng.randf_range(4.0, 20.0)
+		radii.append(radius)
+		_target(Vector2(rng.randf_range(-900.0, 900.0), rng.randf_range(-900.0, 900.0)), radius)
+	_mgr.step(DT)
+	var out: Array[Node2D] = []
+	var wrong: int = 0
+	for _q in 200:
+		var point := Vector2(rng.randf_range(-1000.0, 1000.0), rng.randf_range(-1000.0, 1000.0))
+		var reach: float = rng.randf_range(1.0, 150.0)
+		var expected: Array[Node2D] = []
+		var best: Node2D = null
+		var best_d: float = INF
+		for i in _targets.size():
+			var d: float = _targets[i].global_position.distance_to(point)
+			if d <= reach + radii[i]:
+				expected.append(_targets[i])
+				if d < best_d:
+					best_d = d
+					best = _targets[i]
+		_mgr.targets_in(point, reach, ManagerScript.LAYER_ENEMY, out)
+		if out.size() != expected.size():
+			wrong += 1
+		else:
+			for node in expected:
+				if not out.has(node):
+					wrong += 1
+					break
+		if _mgr.nearest_target(point, reach, ManagerScript.LAYER_ENEMY) != best:
+			wrong += 1
+	_check(wrong == 0, "200 random queries agree with a brute-force search (%d differ)" % wrong)

@@ -4,6 +4,7 @@ What each run did, newest first. Claude appends a short entry after each develop
 
 ## 2026-10-21
 
+- M2 part 2: events. `projectile_expired`, `reaction_triggered`, `spell_changed`, `build_refused` and `spell_swap_requested` in `core/events`; `build_change_requested` takes the `spell` path (the overlay stub sends `[0]`); the `swap` input action (Q, left shoulder, captured like `cast`); the events table and READMEs match; tests in `test_events.gd`, `test_input.gd` and `test_overlay.gd`. No sender for the new events yet (parts 3, 8, 11).
 - M2 part 1: spell component base classes in `core/base/` (`SpellComponent`, `FormBase`, `ElementBase`, `ModifierBase`, `TriggerBase`, `ReactionTable`, `ReactionRow`) with ranges in code; test `tests/core/test_spell_components.gd` and a fixture.
 - M2 started (owner, in a session): M1 closed on the go verdict at C1; `docs/milestones/M2-spell-system.md` written, reviewed by a fresh-context session against `docs/DESIGN.md` (one blocking finding: the wave must not wait for a builder) and revised; 28 parts queued in `docs/NEXT.md`; ROADMAP, M1 status, llms.txt, README and CONTRIBUTING updated. M1's open owner items carry into M2. No game code changed.
 

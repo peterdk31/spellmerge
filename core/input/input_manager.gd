@@ -62,7 +62,7 @@ const MOUSE_AIM_TRAVEL: float = 8.0
 ## The per-player actions, defined in project.godot. `join` and `leave` are
 ## handled here and are not per-player state.
 const ACTIONS: Array[StringName] = [
-	&"move_left", &"move_right", &"move_up", &"move_down", &"dodge", &"cast", &"overlay",
+	&"move_left", &"move_right", &"move_up", &"move_down", &"dodge", &"cast", &"overlay", &"swap",
 ]
 ## Source ids: keys use their keycode; the other kinds sit in separate ranges.
 const SOURCE_MOUSE: int = 1 << 40
@@ -72,7 +72,7 @@ const SOURCE_VIRTUAL: int = 4 << 40
 ## The actions hidden from gameplay while a player is captured. `overlay` stays
 ## readable so the overlay can close itself with its own button.
 const CAPTURED_ACTIONS: Array[StringName] = [
-	&"move_left", &"move_right", &"move_up", &"move_down", &"dodge", &"cast",
+	&"move_left", &"move_right", &"move_up", &"move_down", &"dodge", &"cast", &"swap",
 ]
 const JOIN: StringName = &"join"
 const LEAVE: StringName = &"leave"

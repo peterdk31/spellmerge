@@ -12,7 +12,8 @@ const EventsScript := preload("res://core/events/events.gd")
 const EVENTS: Dictionary = {
 	# Player intent from the HUD.
 	&"play_requested": [["player", TYPE_INT]],
-	&"build_change_requested": [["player", TYPE_INT], ["slot", TYPE_INT], ["component_id", TYPE_STRING_NAME]],
+	&"build_change_requested": [["player", TYPE_INT], ["spell", TYPE_PACKED_INT32_ARRAY], ["slot", TYPE_INT], ["component_id", TYPE_STRING_NAME]],
+	&"spell_swap_requested": [["player", TYPE_INT]],
 	&"reward_pick_requested": [["player", TYPE_INT], ["choice", TYPE_INT]],
 	&"door_vote_requested": [["player", TYPE_INT], ["door", TYPE_INT]],
 	&"pause_requested": [["player", TYPE_INT]],
@@ -24,6 +25,10 @@ const EVENTS: Dictionary = {
 	&"spell_cast": [["player", TYPE_INT], ["spell_id", TYPE_STRING_NAME], ["origin", TYPE_VECTOR2], ["direction", TYPE_VECTOR2]],
 	&"projectile_hit": [["player", TYPE_INT], ["target", TYPE_OBJECT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT]],
 	&"projectile_impact": [["player", TYPE_INT], ["target", TYPE_OBJECT], ["position", TYPE_VECTOR2], ["direction", TYPE_VECTOR2]],
+	&"projectile_expired": [["player", TYPE_INT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT]],
+	&"spell_changed": [["player", TYPE_INT], ["spell", TYPE_PACKED_INT32_ARRAY], ["description", TYPE_STRING]],
+	&"build_refused": [["player", TYPE_INT], ["reason", TYPE_STRING]],
+	&"reaction_triggered": [["player", TYPE_INT], ["reaction_id", TYPE_STRING_NAME], ["position", TYPE_VECTOR2]],
 	&"damage_dealt": [["player", TYPE_INT], ["target", TYPE_OBJECT], ["amount", TYPE_INT], ["position", TYPE_VECTOR2]],
 	&"status_applied": [["player", TYPE_INT], ["target", TYPE_OBJECT], ["status_id", TYPE_STRING_NAME]],
 	&"enemy_died": [["player", TYPE_INT], ["enemy", TYPE_OBJECT], ["position", TYPE_VECTOR2]],

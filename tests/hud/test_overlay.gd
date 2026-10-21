@@ -108,8 +108,8 @@ func _teardown() -> void:
 	_bus = null
 
 
-func _on_build_change_requested(player: int, slot: int, component_id: StringName) -> void:
-	_requests.append([player, slot, component_id])
+func _on_build_change_requested(player: int, spell: PackedInt32Array, slot: int, component_id: StringName) -> void:
+	_requests.append([player, slot, component_id, spell])
 
 
 func _tap(player: int, action: StringName) -> void:
@@ -315,6 +315,7 @@ func _test_build_button_is_a_stub() -> void:
 		var request: Array = _requests[0]
 		_check(request[0] == 3, "the request names its owner (player index 3)")
 		_check(request[1] == OverlayScript.STUB_SLOT and request[2] == OverlayScript.STUB_COMPONENT, "the stub asks for slot %d and component %s" % [OverlayScript.STUB_SLOT, OverlayScript.STUB_COMPONENT])
+		_check(request[3] == PackedInt32Array([0]), "the stub asks for spell A, path [0]")
 	_check(_overlay(3).is_open(), "the overlay stays open after the stub request")
 
 

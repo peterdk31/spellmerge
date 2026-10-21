@@ -25,6 +25,9 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `wizard_cast` | `player` | `feel` |
 | `projectile_hit` | `core/projectiles` | `combat` |
 | `projectile_impact` | `core/projectiles` | `feel` |
+| `projectile_expired` | `core/projectiles` | none yet (`core/spells` from M2 part 6) |
+| `spell_changed`, `build_refused` | `player` | none yet (`hud`, M2 part 16) |
+| `reaction_triggered` | `combat` | none yet (`feel`, M2 part 8) |
 | `damage_dealt` | `combat` | `feel`, `player` |
 | `status_applied` | `combat` | none yet |
 | `enemy_died` | `combat` | `feel`, `flow` |
@@ -42,12 +45,12 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `reward_rolled`, `reward_taken` | `rewards` | none yet |
 | `unlock_gained`, `currency_changed` | `progression` | none yet |
 | `play_requested` | HUD | `flow` |
-| `build_change_requested` | HUD | `player` |
+| `build_change_requested`, `spell_swap_requested` | HUD | `player` |
 | `reward_pick_requested` | HUD | `rewards` |
 | `door_vote_requested` | HUD | `flow` |
 | `pause_requested` | HUD | `run` |
 
-`device_joined` and `device_left` come from `core/input` (a button press joins or leaves; `device` is the device id from `core/input/input_manager.gd`); `coop` turns them into `player_joined` and `player_left`. The last five rows are the HUD's player-intent requests (see `hud/README.md`); each carries a player index 0–3. The gameplay area checks the request and announces the result as a state event: `door_voted` is flow's result of `door_vote_requested`, and `reward_taken` is rewards' result of `reward_pick_requested`. `play_requested` (the Play button) carries the index of the player who pressed it (0 if the pointer is not tied to a player) and makes `flow` load the first room and send `room_entered`.
+`device_joined` and `device_left` come from `core/input` (a button press joins or leaves; `device` is the device id from `core/input/input_manager.gd`); `coop` turns them into `player_joined` and `player_left`. The last five rows (the `build_change_requested` row holds two events) are the HUD's player-intent requests (see `hud/README.md`); each carries a player index 0–3. The gameplay area checks the request and announces the result as a state event: `door_voted` is flow's result of `door_vote_requested`, and `reward_taken` is rewards' result of `reward_pick_requested`. `play_requested` (the Play button) carries the index of the player who pressed it (0 if the pointer is not tied to a player) and makes `flow` load the first room and send `room_entered`.
 
 ## Allowed files
 

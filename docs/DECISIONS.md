@@ -744,3 +744,12 @@ The HUD screenshot cannot be taken in a session (no display, `docs/BACKLOG.md`),
 - The verdict is iterate. The next work is a human playtest of round 2, then the top items from its answers, not more guessing from code and bot logs: round 2's feel values are still unverified by a human.
 - The plan allows at most 2 iterate rounds, counted by the owner's iterate requests on #97, not by the "round N" labels in `docs/NEXT.md` (those number batches of work: aiming, playtest fixes, art, juice and the six tasks). Round one was the owner's first `/claude` on #97 (aiming and graphics, then the 2026-10-18 playtest fixes); round two was the six tasks and their summary. This verdict, given on that summary, closes round two. After it the next checkpoint must be go or pivot, and the next assessment must say so in plain words.
 - Controller and 4-player feel are still untried by a human; the playtest questions ask for them.
+
+## 2026-10-21: Events for M2 (M2 part 2)
+
+**Decided by:** Claude, following the M2 design ("Intent and result", "Projectile manager").
+
+- `build_change_requested(player, spell, slot, component_id)`: `spell` is a `PackedInt32Array` path, as the design says. The overlay's stub sends `[0]` (spell A).
+- New events: `spell_swap_requested(player)` (HUD, heard by `player`), `projectile_expired(player, position, tag)` (`core/projectiles`), `spell_changed(player, spell, description)` and `build_refused(player, reason)` (`player`), `reaction_triggered(player, reaction_id, position)` (`combat`). Each has one sender; the senders arrive in parts 3, 8 and 11, so their listeners are "none yet" in the table until then.
+- `build_refused` has exactly `(player, reason)`, as in the design: the HUD shows only the reason in plain words.
+- The `swap` action is bound to Q and the left shoulder, which were free. It is in `CAPTURED_ACTIONS`, so a player in the overlay or builder does not swap spells by accident.

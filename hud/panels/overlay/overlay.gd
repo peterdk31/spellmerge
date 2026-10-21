@@ -12,7 +12,7 @@ extends PanelContainer
 ## so the focus is never shown by colour alone.
 ##
 ## "Build slot 1" is a stub (M1 has no spell builder yet): it only sends
-## `build_change_requested(player, 0, STUB_COMPONENT)` and changes nothing here.
+## `build_change_requested(player, [0], 0, STUB_COMPONENT)` and changes nothing here.
 ## Gameplay checks the request and refuses what it does not know.
 
 const EventsScript := preload("res://core/events/events.gd")
@@ -20,6 +20,8 @@ const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
 
 const PLAYER_COUNT: int = 4
 ## The slot and the component the stub button asks for.
+## The spell path `[0]`: spell A.
+const STUB_SPELL: PackedInt32Array = [0]
 const STUB_SLOT: int = 0
 const STUB_COMPONENT: StringName = &"stub"
 const RESUME_TEXT: String = "Resume"
@@ -117,7 +119,7 @@ func _on_activated(player: int, control: Control) -> void:
 	if control == _resume:
 		close_overlay()
 	elif control == _build and _events != null:
-		_events.build_change_requested.emit(index, STUB_SLOT, STUB_COMPONENT)
+		_events.build_change_requested.emit(index, STUB_SPELL, STUB_SLOT, STUB_COMPONENT)
 
 
 func _on_cancelled(player: int) -> void:

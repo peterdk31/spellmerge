@@ -1119,6 +1119,10 @@ func get_anchor(player: int) -> Vector2:
 	return _anchors[player] if player >= 0 and player < MAX_PLAYERS else Vector2.INF
 
 
+## Where the target `nearest_target` last returned is (its hit circle's centre).
+var nearest_point: Vector2 = Vector2.INF
+
+
 ## The place of `node` as the target grid knows it (its hit circle's centre), or
 ## `Vector2.INF` when it is not a target.
 func get_target_point(node: Node2D) -> Vector2:
@@ -1187,26 +1191,32 @@ func _refresh_targets() -> void:
 
 ## The nearest target on `layers` whose hit circle overlaps the circle (`point`,
 ## `radius`), by distance to its centre, or null. `exclude` is skipped (the target
-## just hit, for a chain). Allocation-free.
-func nearest_target(point: Vector2, radius: float, layers: int, exclude: Node2D = null) -> Node2D:
+## just hit, for a chain) and so is `exclude_also`. The hit circle's centre of the target
+## returned is left in `nearest_point`. Allocation-free.
+func nearest_target(point: Vector2, radius: float, layers: int, exclude: Node2D = null, exclude_also: Node2D = null) -> Node2D:
+	nearest_point = Vector2.INF
 	if not point.is_finite() or not is_finite(radius):
 		return null
 	var best: int = -1
 	var best_sq: float = INF
 	var skip: int = exclude.get_instance_id() if exclude != null else 0
+	var skip_also: int = exclude_also.get_instance_id() if exclude_also != null else 0
 	_query_ready()
 	var cells: Vector4i = _query_cells(point, radius)
 	for y in range(cells.y, cells.w + 1):
 		for x in range(cells.x, cells.z + 1):
 			var t: int = _cell_head[y * _grid_w + x]
 			while t >= 0:
-				if _query_match(t, point, radius, layers, skip):
+				if _query_match(t, point, radius, layers, skip) and (skip_also == 0 or _target_id[t] != skip_also):
 					var d: float = _target_pos[t].distance_squared_to(point)
 					if d < best_sq:
 						best_sq = d
 						best = t
 				t = _target_next[t]
-	return _targets[best] if best >= 0 else null
+	if best < 0:
+		return null
+	nearest_point = _target_pos[best]
+	return _targets[best]
 
 
 ## Fill `out` (cleared first) with the targets on `layers` whose hit circle overlaps

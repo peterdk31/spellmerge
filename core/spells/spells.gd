@@ -14,15 +14,18 @@ extends Node
 ## point (the shot's place at expiry, a little back from a wall; the shot's place for a timer),
 ## flies along the shot's velocity (outward from the caster through the shot for an orbit or
 ## still shot, along the beam for a ray) and cannot hit the target that fired it for
-## `SpellLimits.SOURCE_EXCLUSION` seconds (a beam never hits it). Each shot fires at most `trigger_max_fires` times. One player's triggers
-## fire at most `SpellLimits.MAX_FIRES_PER_STEP` held spells per `step`; the rest are
-## dropped, never queued (`fires_dropped` counts them). A beam fires an on-expire spell
+## `SpellLimits.SOURCE_EXCLUSION` seconds (a beam never hits it). Each shot fires at most
+## `trigger_max_fires` times. One player's triggers fire at most
+## `SpellLimits.MAX_FIRES_PER_STEP` held spells per `step`; the rest are dropped, never
+## queued (`fires_dropped` counts them). A beam fires an on-expire spell
 ## at its end and has no timer. Held spells send no `spell_cast`: the player's staff does.
 ##
 ## Chain: a shot of a spell with `chain_jumps` that hits a target spawns a shot of the same
 ## tag from the hit point to the nearest other target within `SpellLimits.CHAIN_RANGE`
 ## (never the one just hit or the one before it), with one jump fewer; a beam jumps with
-## another beam. The trigger's fire count is carried along.
+## another beam that pierces nothing. The trigger's fire count is carried along. One player
+## makes at most `SpellLimits.MAX_CHAINS_PER_STEP` jumps per `step`; the rest are dropped
+## (`chains_dropped` counts them).
 ##
 ## Counting: every shot spawned here is counted with `shot_started`, and the manager's
 ## `shot_ended` signal ends it, so a generation lives as long as its last shot. A shot
@@ -60,6 +63,8 @@ const REFUSED: float = -1.0
 
 ## Held spells dropped by the per-step fire cap since the last `clear`.
 var fires_dropped: int = 0
+## Chain jumps dropped by the per-step jump cap since the last `clear`.
+var chains_dropped: int = 0
 
 ## The projectile manager and the event bus; `bind` sets them.
 var projectiles: ProjectilesScript = null
@@ -97,6 +102,8 @@ var _generation_live: Dictionary = {}
 var _cooldown: PackedFloat32Array = PackedFloat32Array()
 ## Held spells each player has fired in this step.
 var _fires_used: PackedInt32Array = PackedInt32Array()
+## Chain jumps each player has made in this step.
+var _chains_used: PackedInt32Array = PackedInt32Array()
 ## What each shot knows, by projectile slot; valid while `_rec_seq` matches the manager's.
 var _rec_seq: PackedInt64Array = PackedInt64Array()
 var _rec_fires: PackedInt32Array = PackedInt32Array()
@@ -104,6 +111,8 @@ var _rec_chain: PackedInt32Array = PackedInt32Array()
 var _rec_clock: PackedFloat32Array = PackedFloat32Array()
 ## Instance id of the target a chain came from.
 var _rec_prev: PackedInt64Array = PackedInt64Array()
+## 1 while `_timers` lists the slot (a stale entry stays until `step` prunes it).
+var _rec_timed: PackedByteArray = PackedByteArray()
 ## Slots of shots with a timer trigger.
 var _timers: PackedInt32Array = PackedInt32Array()
 var _timer_count: int = 0
@@ -113,8 +122,6 @@ var _ray_dir: Vector2 = Vector2.ZERO
 var _ray_fires: int = 0
 var _ray_chain: int = 0
 var _ray_prev: int = 0
-## Reused by chain.
-var _near: Array[Node2D] = []
 
 
 func _init() -> void:
@@ -122,6 +129,7 @@ func _init() -> void:
 	_current.fill(-1)
 	_cooldown.resize(SpellLimits.PLAYERS * SpellLimits.SLOTS)
 	_fires_used.resize(SpellLimits.PLAYERS)
+	_chains_used.resize(SpellLimits.PLAYERS)
 	_timers.resize(64)
 
 
@@ -295,15 +303,18 @@ func cast(player: int, slot: int, origin: Vector2, direction: Vector2, mana: flo
 
 
 ## Runs the cooldowns and the timer triggers by `delta` seconds, and opens a new step for
-## the fire cap. The autoload calls it every physics step, after the projectile manager.
+## the fire and jump caps. The autoload calls it every physics step; the order of the two
+## autoloads in project.godot (Projectiles first) is what makes it run after the manager.
 func step(delta: float) -> void:
 	for c in _cooldown.size():
 		_cooldown[c] = maxf(_cooldown[c] - delta, 0.0)
 	_fires_used.fill(0)
+	_chains_used.fill(0)
 	var i: int = 0
 	while i < _timer_count:
 		var slot: int = _timers[i]
-		if not _knows(slot):
+		if not _knows(slot) or not _is_timer(slot):
+			_rec_timed[slot] = 0
 			_timer_count -= 1
 			_timers[i] = _timers[_timer_count]
 			continue
@@ -311,6 +322,7 @@ func step(delta: float) -> void:
 		if _rec_clock[slot] <= 0.0:
 			_fire_timer(slot)
 		if _rec_fires[slot] <= 0:
+			_rec_timed[slot] = 0
 			_timer_count -= 1
 			_timers[i] = _timers[_timer_count]
 			continue
@@ -379,6 +391,7 @@ func _register(slot: int, tag: int, spell: CompiledSpell, fires: int, chain: int
 		_rec_chain.resize(size)
 		_rec_clock.resize(size)
 		_rec_prev.resize(size)
+		_rec_timed.resize(size)
 	_rec_seq[slot] = projectiles.get_seq_of(slot)
 	_rec_fires[slot] = fires
 	_rec_chain[slot] = chain
@@ -386,14 +399,17 @@ func _register(slot: int, tag: int, spell: CompiledSpell, fires: int, chain: int
 	_rec_clock[slot] = spell.trigger_interval
 	shot_started(tag)
 	if spell.held != null and spell.trigger_event == TriggerBase.Event.TIMER:
-		if _timer_count == _timers.size():
-			_timers.resize(_timers.size() * 2)
-		_timers[_timer_count] = slot
-		_timer_count += 1
+		# A shot that ended and was replaced in this slot before `step` is still listed once.
+		if _rec_timed[slot] == 0:
+			if _timer_count == _timers.size():
+				_timers.resize(_timers.size() * 2)
+			_timers[_timer_count] = slot
+			_timer_count += 1
+			_rec_timed[slot] = 1
 
 
 ## One beam: counted while it is cast, with its context set for the hit handler.
-func _shoot_ray(spell: CompiledSpell, tag: int, player: int, origin: Vector2, heading: Vector2, chain: int, prev: int, source: Node, length: float = -1.0) -> void:
+func _shoot_ray(spell: CompiledSpell, tag: int, player: int, origin: Vector2, heading: Vector2, chain: int, prev: int, source: Node, length: float = -1.0, pierce: int = -1) -> void:
 	shot_started(tag)
 	var saved_tag: int = _ray_tag
 	var saved_dir: Vector2 = _ray_dir
@@ -406,7 +422,7 @@ func _shoot_ray(spell: CompiledSpell, tag: int, player: int, origin: Vector2, he
 	_ray_chain = chain
 	_ray_prev = prev
 	var reach: float = spell.ray_length if length < 0.0 else length
-	var got: float = projectiles.ray(player, origin, heading, reach, spell.pierce, ProjectilesScript.LAYER_ENEMY, tag, spell.radius * 0.5, source)
+	var got: float = projectiles.ray(player, origin, heading, reach, spell.pierce if pierce < 0 else pierce, ProjectilesScript.LAYER_ENEMY, tag, spell.radius * 0.5, source)
 	if spell.held != null and spell.trigger_event == TriggerBase.Event.EXPIRE and _ray_fires > 0 and _take_fire(player):
 		_ray_fires -= 1
 		_launch(spell.held, _held_tag(tag), player, origin + heading * got, heading, null)
@@ -416,6 +432,12 @@ func _shoot_ray(spell: CompiledSpell, tag: int, player: int, origin: Vector2, he
 	_ray_chain = saved_chain
 	_ray_prev = saved_prev
 	shot_ended(tag)
+
+
+## True when the shot in `slot` fires its held spell on a timer.
+func _is_timer(slot: int) -> bool:
+	var spell: CompiledSpell = _profiles.get(projectiles.get_tag_of(slot))
+	return spell != null and spell.held != null and spell.trigger_event == TriggerBase.Event.TIMER
 
 
 func _held_tag(tag: int) -> int:
@@ -510,27 +532,23 @@ func _on_hit(player: int, target: Node, position: Vector2, tag: int) -> void:
 
 ## Sends a chain on from `position` to the nearest other target, if there is one in range.
 func _jump(spell: CompiledSpell, tag: int, player: int, position: Vector2, target: Node2D, struck: int, prev: int, fires: int, chain: int, by_ray: bool) -> void:
-	projectiles.targets_in(position, SpellLimits.CHAIN_RANGE, ProjectilesScript.LAYER_ENEMY, _near)
-	var best: Node2D = null
-	var best_sq: float = INF
-	for candidate in _near:
-		var id: int = candidate.get_instance_id()
-		if id == struck or id == prev:
-			continue
-		var d: float = candidate.global_position.distance_squared_to(position)
-		if d < best_sq:
-			best_sq = d
-			best = candidate
-	_near.clear()
+	if _chains_used[player] >= SpellLimits.MAX_CHAINS_PER_STEP:
+		chains_dropped += 1
+		return
+	var before: Node2D = null
+	if prev != 0:
+		before = instance_from_id(prev) as Node2D
+	var best: Node2D = projectiles.nearest_target(position, SpellLimits.CHAIN_RANGE, ProjectilesScript.LAYER_ENEMY, target, before)
 	if best == null:
 		return
-	var aim: Vector2 = projectiles.get_target_point(best)
+	var aim: Vector2 = projectiles.nearest_point
 	if not aim.is_finite() or aim.is_equal_approx(position):
 		return
+	_chains_used[player] += 1
 	var along: Vector2 = position.direction_to(aim)
 	var distance: float = position.distance_to(aim)
 	if by_ray:
-		_shoot_ray(spell, tag, player, position, along, chain, struck, target, distance + spell.radius + 8.0)
+		_shoot_ray(spell, tag, player, position, along, chain, struck, target, distance + spell.radius + 8.0, 0)
 		return
 	var speed: float = maxf(spell.speed, SpellLimits.CHAIN_MIN_SPEED)
 	var life: float = (distance + 16.0) / speed * 1.5 + 0.05
@@ -563,9 +581,12 @@ func _on_expired(player: int, position: Vector2, tag: int) -> void:
 func clear() -> void:
 	_cooldown.fill(0.0)
 	_fires_used.fill(0)
+	_chains_used.fill(0)
 	_timer_count = 0
 	_rec_seq.fill(-1)
+	_rec_timed.fill(0)
 	fires_dropped = 0
+	chains_dropped = 0
 	_current.fill(-1)
 	_profiles.clear()
 	_live.clear()

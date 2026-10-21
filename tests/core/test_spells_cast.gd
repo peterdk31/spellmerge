@@ -500,3 +500,51 @@ func test_counts_return_to_zero_after_a_busy_fight() -> void:
 	check_equal(_mgr.get_count(), 0, "the field is empty")
 	for player in 4:
 		check_equal(_spells.generations_held(player, 0), 1, "player %d holds only the current build" % player)
+
+
+## How many times the timer list names `slot`.
+func _timer_entries(slot: int) -> int:
+	var found: int = 0
+	for i in _spells._timer_count:
+		if _spells._timers[i] == slot:
+			found += 1
+	return found
+
+
+func test_a_shot_replaced_in_its_slot_is_timed_once() -> void:
+	_target(Vector2(60, 0))
+	_target(Vector2(110, 0))
+	_build(0, 0, {"form": &"bolt", "modifiers": [&"chain"], "trigger": &"timer", "held": {"form": &"short"}})
+	_cast(0)
+	var parent: int = _slots()[0]
+	var reused: bool = false
+	var most: int = 0
+	for _i in 60:
+		_tick(1)
+		most = maxi(most, _timer_entries(parent))
+		if _hits.size() == 1 and _mgr.is_alive(parent):
+			reused = true
+	check(reused, "the jump's shot took the slot of the shot that hit")
+	check_equal(most, 1, "the slot is listed once, so its clock runs once")
+	check(_born(_spells.current_tag(0, 0, 1)) <= 2, "the held spell fired at the timer's rate (1 s of life, every 0.5 s)")
+
+
+func test_chains_are_capped_per_step() -> void:
+	for x in range(20, 190, 8):
+		for y in range(-60, 61, 8):
+			_target(Vector2(x, y))
+	var recipe: Dictionary = {"form": &"beam", "modifiers": [&"split", &"pierce", &"chain"]}
+	var spell: CompiledSpell = _compile(recipe)
+	_build(0, 0, recipe)
+	_cast(0)
+	check(_spells.chains_dropped > 0, "the jumps over the cap were dropped and counted")
+	var direct: int = spell.shots * (spell.pierce + 1)
+	check(_hits.size() <= direct + SpellLimits.MAX_CHAINS_PER_STEP, "hits stay under the beams plus the jump budget: %d" % _hits.size())
+	var before: int = _hits.size()
+	_tick(60)
+	_cast(0)
+	check(_hits.size() > before, "the budget is renewed by the next step")
+
+
+func test_the_spell_runtime_steps_after_the_projectile_manager() -> void:
+	check(ProjectSettings.get_order("autoload/Projectiles") < ProjectSettings.get_order("autoload/Spells"), "Projectiles is listed before Spells in project.godot")

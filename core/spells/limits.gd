@@ -16,6 +16,8 @@ const MAX_DEPTH: int = 2
 ## Held spells all of one player's triggers may fire in one physics step; the rest are
 ## dropped, never queued (used by the spell runtime, M2 part 6).
 const MAX_FIRES_PER_STEP: int = 32
+## Chain jumps one player may make in one physics step; the rest are dropped.
+const MAX_CHAINS_PER_STEP: int = 16
 ## Times a timer trigger fires one shot's held spell, whatever its `max_fires`.
 const MAX_TIMER_FIRES: int = 4
 ## Reach in pixels of a chain's jump to the next target.

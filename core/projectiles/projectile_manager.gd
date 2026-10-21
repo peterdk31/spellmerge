@@ -325,6 +325,7 @@ func set_bounds(rect: Rect2) -> void:
 	_grid_h = maxi(ceili(rect.size.y / GRID_CELL), 1)
 	_cell_head.resize(_grid_w * _grid_h)
 	_cell_head.fill(-1)
+	_grid_stale = true
 	_wall_w = maxi(ceili(rect.size.x / WALL_CELL), 1)
 	_wall_h = maxi(ceili(rect.size.y / WALL_CELL), 1)
 	_wall_cells.resize(_wall_w * _wall_h)
@@ -800,6 +801,8 @@ func _refresh_targets() -> void:
 ## `radius`), by distance to its centre, or null. `exclude` is skipped (the target
 ## just hit, for a chain). Allocation-free.
 func nearest_target(point: Vector2, radius: float, layers: int, exclude: Node2D = null) -> Node2D:
+	if not point.is_finite() or not is_finite(radius):
+		return null
 	var best: int = -1
 	var best_sq: float = INF
 	var skip: int = exclude.get_instance_id() if exclude != null else 0
@@ -823,6 +826,8 @@ func nearest_target(point: Vector2, radius: float, layers: int, exclude: Node2D 
 ## so nothing is allocated. Order is not defined.
 func targets_in(point: Vector2, radius: float, layers: int, out: Array[Node2D]) -> int:
 	out.clear()
+	if not point.is_finite() or not is_finite(radius):
+		return 0
 	_query_ready()
 	var cells: Vector4i = _query_cells(point, radius)
 	for y in range(cells.y, cells.w + 1):
@@ -933,6 +938,11 @@ func _register_hit(slot: int, target: int, at: Vector2) -> void:
 	var player: int = _player[slot]
 	var tag: int = _tag[slot]
 	var heading: Vector2 = _vel[slot].normalized()
+	if heading == Vector2.ZERO:
+		# A still shot has no heading: point from the shot to the target instead.
+		heading = at.direction_to(_target_pos[target])
+		if heading == Vector2.ZERO:
+			heading = Vector2.RIGHT
 	if _pierce[slot] > 0:
 		_pierce[slot] -= 1
 		var memory: int = slot * HIT_MEMORY

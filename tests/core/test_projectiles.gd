@@ -71,6 +71,9 @@ func _initialize() -> void:
 	_test_still_shot_beside_and_in_a_wall()
 	_test_nearest_target()
 	_test_nearest_target_with_no_targets_and_after_removal()
+	_test_set_bounds_with_targets_present()
+	_test_queries_ignore_non_finite_input()
+	_test_still_shot_impact_has_a_direction()
 	_test_queries_inside_a_hit_handler()
 	_test_targets_in()
 	_test_queries_match_brute_force()
@@ -931,6 +934,37 @@ func _test_nearest_target_with_no_targets_and_after_removal() -> void:
 	var out: Array[Node2D] = []
 	_check(_mgr.nearest_target(Vector2.ZERO, 50.0, ManagerScript.LAYER_ENEMY) == null, "a target freed since the last step is not returned")
 	_check(_mgr.targets_in(Vector2.ZERO, 50.0, ManagerScript.LAYER_ENEMY, out) == 0, "nor listed")
+
+
+func _test_set_bounds_with_targets_present() -> void:
+	_setup()
+	var enemy: Node2D = _target(Vector2(50.0, 50.0))
+	_mgr.step(DT)
+	_mgr.set_bounds(Rect2(0.0, 0.0, 800.0, 600.0))
+	_check(_mgr.nearest_target(Vector2(50.0, 50.0), 20.0, ManagerScript.LAYER_ENEMY) == enemy, "targets are found after set_bounds, before the next step")
+	var out: Array[Node2D] = []
+	_mgr.set_bounds(Rect2(0.0, 0.0, 800.0, 600.0))
+	_check(_mgr.targets_in(Vector2(50.0, 50.0), 20.0, ManagerScript.LAYER_ENEMY, out) == 1, "and listed")
+
+
+func _test_queries_ignore_non_finite_input() -> void:
+	_setup()
+	_target(Vector2(50.0, 50.0))
+	var out: Array[Node2D] = []
+	_check(_mgr.nearest_target(Vector2(NAN, 0.0), 20.0, ManagerScript.LAYER_ENEMY) == null, "NaN point finds nothing")
+	_check(_mgr.nearest_target(Vector2(50.0, 50.0), INF, ManagerScript.LAYER_ENEMY) == null, "infinite radius finds nothing")
+	_check(_mgr.targets_in(Vector2(INF, 0.0), 20.0, ManagerScript.LAYER_ENEMY, out) == 0, "infinite point lists nothing")
+	_check(_mgr.targets_in(Vector2(50.0, 50.0), NAN, ManagerScript.LAYER_ENEMY, out) == 0, "NaN radius lists nothing")
+
+
+func _test_still_shot_impact_has_a_direction() -> void:
+	_setup()
+	var directions: Array[Vector2] = []
+	_bus.projectile_impact.connect(func(_player: int, _target: Node, _position: Vector2, direction: Vector2) -> void: directions.append(direction))
+	_mgr.spawn(0, Vector2(100.0, 50.0), Vector2.ZERO, 2.0, 12.0, ManagerScript.LAYER_ENEMY, 0, 0, ManagerScript.MOTION_STILL)
+	_target(Vector2(110.0, 50.0))
+	_mgr.step(DT)
+	_check(directions.size() == 1 and absf(directions[0].length() - 1.0) < 0.001, "a rune hit sends a unit direction, not zero")
 
 
 func _test_queries_inside_a_hit_handler() -> void:

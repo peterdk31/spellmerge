@@ -28,7 +28,32 @@ extends Resource
 @export_range(0.05, 2.0, 0.05) var particle_lifetime: float = 0.3
 ## How much bigger (speed, life, particle size) a death burst is than a hit burst.
 @export_range(1.0, 3.0, 0.1) var death_particle_size: float = 1.6
+## Seconds a hit enemy or wizard shows as plain white, and how much its sprite
+## squashes then (0.25 is 25% wider and 25% lower), settling back in the same time.
+@export_range(0.0, 0.3, 0.01) var flash_seconds: float = 0.08
+@export_range(0.0, 0.6, 0.01) var hit_squash: float = 0.25
+## The caster's squash on a cast: seconds, and how much thinner and taller (0.15 is 15%).
+@export_range(0.0, 0.3, 0.01) var cast_squash_seconds: float = 0.12
+@export_range(0.0, 0.6, 0.01) var cast_squash: float = 0.2
+## Seconds a dead enemy's white copy takes to collapse and fade.
+@export_range(0.0, 0.6, 0.01) var death_anim_seconds: float = 0.25
+## The muzzle flash at the staff tip: seconds it shows and its size (1 is the art's size).
+@export_range(0.0, 0.3, 0.01) var muzzle_flash_seconds: float = 0.1
+@export_range(0.1, 3.0, 0.1) var muzzle_flash_size: float = 0.5
+## The white puff where an enemy dies: seconds and biggest size.
+@export_range(0.0, 0.5, 0.01) var death_puff_seconds: float = 0.14
+@export_range(0.1, 6.0, 0.1) var death_puff_size: float = 1.6
+## Camera kick of a cast: pixels pushed against the aim, and pixels given back per second.
+@export_range(0.0, 8.0, 0.1) var cast_kick_pixels: float = 1.5
+@export_range(1.0, 200.0, 1.0) var cast_kick_decay: float = 40.0
 ## Sound ids asked from `core/registry`. A missing sound is silent.
 @export var hit_sound: StringName = &"hit"
 @export var death_sound: StringName = &"enemy_death"
 @export var downed_sound: StringName = &"player_downed"
+## The art feel draws, so a re-skin is a new preset (or new files at these paths) and
+## never an edit to `feel.gd`. Each defaults to the shipped placeholder art.
+## The hit spark, also used for the white flashes and puffs.
+@export var spark_texture: Texture2D = preload("res://art/vfx/hit_spark.svg")
+## A player's spell shot, and an enemy's shot (drawn apart, so it never reads as a spell).
+@export var bolt_texture: Texture2D = preload("res://art/vfx/fire_bolt.svg")
+@export var hostile_texture: Texture2D = preload("res://art/vfx/imp_fireball.svg")

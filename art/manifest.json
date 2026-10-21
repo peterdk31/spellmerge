@@ -16,7 +16,7 @@
       "license": "CC-BY-SA-4.0",
       "tier": "placeholder",
       "tool": "Claude (hand-written SVG rects)",
-      "prompt": "A 32x32 crypt wall tile in the Spellmerge palette: stone bricks in three staggered rows with Stone shadow joints, a Stone light edge on the top and left and a Stone shadow edge on the bottom and right (light from the top-left). Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+      "prompt": "A 32x32 crypt wall tile in the Spellmerge palette: stone bricks in four staggered courses, each brick lit on its top and shaded by a Stone shadow joint below, a Stone light edge on the top and left and a Stone shadow edge on the bottom and right (light from the top-left). Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
     },
     {
       "path": "art/vfx/fire_bolt.svg",
@@ -25,7 +25,7 @@
       "license": "CC-BY-SA-4.0",
       "tier": "placeholder",
       "tool": "Claude (hand-written SVG rects)",
-      "prompt": "A 32x32 fire bolt flying to the right: a streak with a Fire base tail, Fire light middle and a Spark light core, outlined in Fire shadow. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+      "prompt": "A 32x32 fire bolt flying to the right: a comet with a round head and a tapering tail, Fire base outside, Fire light inside and a Spark core, outlined in Fire shadow. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
     },
     {
       "path": "art/vfx/hit_spark.svg",
@@ -34,7 +34,7 @@
       "license": "CC-BY-SA-4.0",
       "tier": "placeholder",
       "tool": "Claude (hand-written SVG rects)",
-      "prompt": "A 32x32 hit spark: a four-pointed star with a Spark light core and Spark base rays, outlined in Spark shadow. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+      "prompt": "A 32x32 hit spark: a four-pointed star with a Spark light core and Spark base rays, plus four small Spark flecks on the diagonals, outlined in Spark shadow. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
     },
     {
       "path": "content/enemies/ember_imp/idle.svg",
@@ -43,7 +43,97 @@
       "license": "CC-BY-SA-4.0",
       "tier": "placeholder",
       "tool": "Claude (hand-written SVG rects)",
-      "prompt": "A 32x32 idle sprite of a small fire imp seen from the front: Fire ramp body with a lighter belly, two Bone horns, yellow Spark eyes and small claws, 1px dark outline, light from the top-left. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no player colours."
+      "prompt": "A 2-frame idle strip (64x32; the second frame bobs one pixel and flaps the wings down) of a fire imp seen from the front, about 28 px wide with its wings: two curved Bone horns, a wide Fire head with angry dark brows and glowing Spark eyes, a fanged mouth, a Fire body with a lighter belly, Bone claws, small feet and two bat wings in Fire shadow with a dark outline, so the silhouette is a clear winged shape. 1px dark outline, light from the top-left. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no player colours."
+    },
+    {
+      "path": "content/enemies/ember_imp/windup.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 2-frame windup strip (64x32) of the ember imp about to shoot, copied from its new idle frame: the mouth and belly glow Spark (frame 2 brighter, Spark light), Spark flecks above the wings. The game flips the frames faster as the shot gets close. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no player colours."
+    },
+    {
+      "path": "content/enemies/ember_imp/hurt.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A single 32x32 hurt frame of the ember imp, copied from its new idle frame with the wings down: eyes squeezed shut in dark Outline patches, the mouth open wide, Spark flecks flying off. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no player colours."
+    },
+    {
+      "path": "art/vfx/telegraph_dash.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "An 8x8 tile for the enemy telegraph line, repeated along the line: a 5 px wide dash (a Fire light band with a Spark light core and Fire shadow edges) followed by a 3 px gap, so the line reads as a dashed danger lane. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/tilesets/crypt/wall_top.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 32x32 crypt wall tile for the top and bottom walls: a Stone light top face on the upper 10 px (one joint, two Stone base specks), a Stone shadow edge, then two courses of Stone base bricks with Stone light top edges and Stone shadow joints, ending in a 4 px Stone shadow foot so the wall reads as a raised block. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/tilesets/crypt/pillar.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 32x32 crypt pillar seen from above: a dark Outline square with cut corners, a Stone light rim on the top and left, Stone shadow on the bottom and right, a Stone base face and a round Stone light slab with a Stone shadow centre hole, so it reads as a column and not as wall. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/tilesets/crypt/torch.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 32x32 wall torch drawn over a wall tile (transparent background): a Wood cup and handle with a dark Outline and a Fire flame with a Spark light core and two Spark sparks. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/tilesets/crypt/door.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 32x32 crypt door tile for the entry and exit of a room: a Stone frame with a light lintel, a dark Outline, Wood planks with Wood shadow joints, two Stone shadow iron bands and a Spark ring handle. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/tilesets/crypt/rubble.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 32x32 floor decal (transparent background) of three small broken stones, each with a dark Outline, a Stone light top and a Stone base face, plus two Stone shadow chips. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/tilesets/crypt/skull.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 32x32 floor decal (transparent background) of a small skull seen from above: Bone light top, Bone base and shadow sides, two dark eye sockets and a row of teeth, a dark Outline. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/vfx/imp_fireball.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 32x32 enemy shot: a round ember orb with four short spikes along the axes, drawn as concentric rings from a dark Outline edge through Fire shadow, base and light to a Spark core and a Spark light centre, so it is the brightest thing in the room. A different silhouette from the player's comet-shaped fire bolt. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no player colours."
     },
     {
       "path": "content/wizard/base/wizard_p1_idle.svg",
@@ -52,7 +142,7 @@
       "license": "CC-BY-SA-4.0",
       "tier": "placeholder",
       "tool": "Claude (hand-written SVG rects)",
-      "prompt": "A 32x32 idle sprite of a wizard seen from the front with a pointed hat, white beard and a staff with a gold gem, robe and hat in the Player 1 (blue) ramp, skin and wood from the shared materials, 1px dark outline, light from the top-left. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+      "prompt": "A 2-frame idle strip (64x32, the second frame breathes by one pixel) of a wizard seen from the front with a pointed hat with a gold band, white beard and a belt, no staff (the game draws it, see staff.svg), robe and hat in the Player 1 (blue) ramp, skin and wood from the shared materials, 1px dark outline, light from the top-left. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
     },
     {
       "path": "content/wizard/base/wizard_p2_idle.svg",
@@ -80,6 +170,87 @@
       "tier": "placeholder",
       "tool": "Claude (hand-written SVG rects)",
       "prompt": "The same wizard sprite as wizard_p1_idle.svg with the robe and hat recoloured to the Player 4 (purple) ramp. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "content/wizard/base/staff.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 32x32 wizard staff lying horizontally, pointing right: a Wood pole with a Skin fist on it (the hand, at pixel 14,16) and a gold Spark gem at the tip, 1px dark outline, light from the top. The game turns it along the aim and draws a player-colour gem over the tip. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "content/wizard/base/wizard_p1_walk.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 4-frame walk strip (128x32) of the same wizard as wizard_p1_idle.svg: the upper body dips one pixel on the two stride frames, and the boots alternate between a wide and a narrow stance. Only rect elements, whole-number translate offsets, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "content/wizard/base/wizard_p2_walk.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "The same walk strip as wizard_p1_walk.svg with the robe and hat recoloured to the Player 2 (rose) ramp. Only rect elements, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "content/wizard/base/wizard_p3_walk.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "The same walk strip as wizard_p1_walk.svg with the robe and hat recoloured to the Player 3 (green) ramp. Only rect elements, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "content/wizard/base/wizard_p4_walk.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "The same walk strip as wizard_p1_walk.svg with the robe and hat recoloured to the Player 4 (purple) ramp. Only rect elements, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "content/wizard/base/wizard_p1_dash.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 3-frame dash strip (96x32) of the same wizard as wizard_p1_idle.svg: a crouch with a small lean, then two frames leaning far forward with the boots off the ground and the robe trailing behind. The upper body is shifted in bands to lean. Only rect elements, whole-number translate offsets, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "content/wizard/base/wizard_p2_dash.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "The same dash strip as wizard_p1_dash.svg with the robe and hat recoloured to the Player 2 (rose) ramp. Only rect elements, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "content/wizard/base/wizard_p3_dash.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "The same dash strip as wizard_p1_dash.svg with the robe and hat recoloured to the Player 3 (green) ramp. Only rect elements, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "content/wizard/base/wizard_p4_dash.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "The same dash strip as wizard_p1_dash.svg with the robe and hat recoloured to the Player 4 (purple) ramp. Only rect elements, palette colours from docs/STYLE.md."
     }
   ]
 }

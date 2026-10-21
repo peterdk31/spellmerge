@@ -14,12 +14,13 @@ Feel only reacts: it never changes damage or outcomes. Hit-stop is its only effe
 - **Dependency direction:** `core` ← `gameplay` ← `content`. This area may use `core/` and the registry. `core/` never depends on it, and content never reaches into it.
 - **Events** (`core/events/events.gd` owns the definitions; this list matches it and the table in [gameplay/README.md](../README.md)):
   - Sends: none.
-  - Listens to: `damage_dealt`, `enemy_died` and `player_downed`.
+  - Listens to: `damage_dealt`, `enemy_died`, `player_downed`, `spell_cast` and `wizard_cast`.
+- **What it shows:** hit-stop, shake, hit and death particles, a white flash and squash on the hit node's `Sprite` child (name your sprite `Sprite` to get it), a death puff and a death animation (a white copy of the dead enemy's `Sprite` that collapses and fades; the enemy is freed at once), a muzzle flash turned along the aim in the player's colour, a thin-and-tall squash of the caster's `Sprite` (from `wizard_cast`) and a small camera kick on a cast. At most `REACT_SLOTS` (16) sprites react at once; past that a hit skips its flash and squash. If the sprite's owner changes its scale during a squash, Feel takes that as the new size to return to. Sounds are asked from `core/registry` and stay silent when missing.
 - Areas never call each other directly; they talk through events. [gameplay/README.md](../README.md) has the rules every sub-area shares.
 
 ## Allowed files
 
-`.gd` and `.tres`, plus `.uid`, `.import` and `.license` files. Limit: 1 MB per file. Typed GDScript only; no banned APIs. The text shared by all sub-areas is in [gameplay/README.md](../README.md).
+`.gd`, `.tres` and `.gdshader`, plus `.uid`, `.import` and `.license` files. Limit: 1 MB per file. Typed GDScript only; no banned APIs. The text shared by all sub-areas is in [gameplay/README.md](../README.md).
 
 ## Steps
 
@@ -27,7 +28,7 @@ Not open yet (the first preset is `presets/punchy.tres`). When it opens, follow 
 
 ## Example to copy
 
-`gameplay/feel/presets/punchy.tres`, a `FeelPreset` (`presets/feel_preset.gd`): hit-stop length, shake strength and decay, particle speed and life, and the sound ids. Copy it, change the numbers and load it as `Feel.preset`. A preset only tunes reactions; it has no field that touches damage. Tests: `tests/gameplay/feel/test_feel.gd`.
+`gameplay/feel/presets/punchy.tres`, a `FeelPreset` (`presets/feel_preset.gd`): hit-stop length, shake strength and decay, particle speed and life, and the sound ids. Copy it, change the numbers and load it as `Feel.preset` before Feel's `_ready` (the art is read once, then). A preset only tunes reactions; it has no field that touches damage. It also names the art feel draws (`spark_texture`, `bolt_texture`, `hostile_texture`), so a re-skin is a preset, never an edit to `feel.gd`. Tests: `tests/gameplay/feel/test_feel.gd`.
 
 ## Validate
 

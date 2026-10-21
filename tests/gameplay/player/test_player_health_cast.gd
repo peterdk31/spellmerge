@@ -11,6 +11,7 @@ const PlayerScript := preload("res://gameplay/player/player.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
+const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const CountingSpell := preload("res://tests/gameplay/player/fixtures/counting_spell.gd")
 
 const STEP: float = 0.0625
@@ -38,7 +39,9 @@ func _initialize() -> void:
 	_test_revive_of_standing_player_does_nothing()
 	_test_mana_regenerates_up_to_max()
 	_test_cast_spends_mana_and_sends_event()
+	_test_cast_origin_stops_at_a_wall()
 	_test_cast_cooldown()
+	_test_cast_tap_just_before_ready_is_buffered()
 	_test_cast_needs_mana()
 	_test_no_spell_no_cast()
 	_test_missing_sound_is_silent()
@@ -224,6 +227,33 @@ func _test_cast_spends_mana_and_sends_event() -> void:
 	_check(_players[0].mana == PlayerScript.MAX_MANA, "the other wizard's mana is untouched")
 
 
+func _test_cast_origin_stops_at_a_wall() -> void:
+	_setup(1)
+	var manager: Node2D = ProjectileManagerScript.new()
+	manager.set_bounds(Rect2(0.0, 0.0, 640.0, 360.0))
+	# A wall from x = 96 to 128; the wizard stands against its left side.
+	var wall: Array[Rect2] = [Rect2(96.0, 0.0, 32.0, 360.0)]
+	manager.set_walls(wall)
+	_players[0].projectiles = manager
+	_players[0].global_position = Vector2(94.0, 200.0)
+	_players[0].aim = Vector2.RIGHT
+	var origins: Array[Vector2] = []
+	_bus.spell_cast.connect(func(_p: int, _id: StringName, origin: Vector2, _d: Vector2) -> void: origins.append(origin))
+	_players[0].spell = _make_spell(1.0, 0.0)
+	var tip: Vector2 = _players[0].muzzle_position()
+	_check(tip.x > 96.0, "the staff tip is behind the wall (%s)" % str(tip))
+	_check(_players[0].cast(), "a wizard against a wall still casts")
+	_check(origins.size() == 1 and origins[0].x <= 96.01, "the shot starts in front of the wall (%s)" % str(origins))
+	# Aiming away from the wall is not clipped.
+	_players[0].aim = Vector2.LEFT
+	origins.clear()
+	_players[0].spell = _make_spell(1.0, 0.0)
+	_players[0].cast()
+	_check(origins.size() == 1 and absf(origins[0].x - _players[0].muzzle_position().x) < 0.01, "away from the wall the muzzle is where the staff points")
+	_players[0].projectiles = null
+	manager.free()
+
+
 func _test_cast_cooldown() -> void:
 	_setup(1)
 	var spell := _make_spell(1.0, 0.25)
@@ -232,6 +262,56 @@ func _test_cast_cooldown() -> void:
 	_run(8)  # 0.5 s held: fires at 0 s and again once the 0.25 s cooldown is over
 	_check(spell.fired_players.size() == 2, "a held cast fires once per cooldown (got %d)" % spell.fired_players.size())
 	_check(_casts.size() == 2, "one spell_cast per cast")
+
+
+## A tap of `cast` within INPUT_BUFFER of the spell being ready fires when it is;
+## an earlier tap and a tap made in an overlay do not carry over.
+func _test_cast_tap_just_before_ready_is_buffered() -> void:
+	_setup(1)
+	var spell := _make_spell(1.0, 0.25)
+	_players[0].spell = spell
+	_check(_players[0].cast(), "the first cast fires")
+	_run(2)  # 0.125 s of the cooldown left
+	_input.send_virtual(0, &"cast", 1.0)
+	_input.send_virtual(0, &"cast", 0.0)
+	_run(1)
+	_check(spell.fired_players.size() == 1, "the tap is not used while the spell cools down")
+	_run(1)
+	_check(spell.fired_players.size() == 2, "a tap just before the spell is ready fires when it is")
+	_run(8)
+	_check(spell.fired_players.size() == 2, "a buffered tap fires once")
+	_setup(1)
+	spell = _make_spell(1.0, 0.5)
+	_players[0].spell = spell
+	_check(_players[0].cast(), "the first cast fires")
+	_run(2)  # 0.375 s left
+	_input.send_virtual(0, &"cast", 1.0)
+	_input.send_virtual(0, &"cast", 0.0)
+	_run(8)
+	_check(spell.fired_players.size() == 1, "a tap longer ago than INPUT_BUFFER is dropped")
+	_setup(1)
+	spell = _make_spell(1.0, 0.25)
+	_players[0].spell = spell
+	_check(_players[0].cast(), "the first cast fires")
+	_run(2)
+	_input.set_captured(0, true)
+	_input.send_virtual(0, &"cast", 1.0)
+	_input.send_virtual(0, &"cast", 0.0)
+	_run(1)
+	_input.set_captured(0, false)
+	_run(3)
+	_check(spell.fired_players.size() == 1, "a tap made in an overlay is not buffered")
+	_setup(1)
+	spell = _make_spell(1.0, 0.25)
+	_players[0].spell = spell
+	_check(_players[0].cast(), "the first cast fires")
+	_run(2)
+	_input.send_virtual(0, &"cast", 1.0)  # held until the spell is ready
+	_run(2)
+	_input.send_virtual(0, &"cast", 0.0)
+	var fired: int = spell.fired_players.size()
+	_run(1)
+	_check(spell.fired_players.size() == fired, "a tap that fired while held leaves no buffered cast")
 
 
 func _test_cast_needs_mana() -> void:

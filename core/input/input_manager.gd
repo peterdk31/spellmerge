@@ -26,6 +26,11 @@ extends Node
 ## their player works a menu. Gameplay needs no extra check. core/ui_focus reads
 ## get_press_count instead, which is never captured.
 ##
+## Aim: get_aim() is the right stick (zero in its dead zone) and is_mouse_aiming()
+## says whether the keyboard player aims with the mouse (set by a mouse move or
+## click, cleared by a press of the keyboard cast key). The mouse is only a flag
+## here: turning the pointer into a direction needs the world, so the wizard does it.
+##
 ## Several inputs can feed one action (W and Up, the d-pad and the stick). Each
 ## input is tracked as its own source and the action takes the strongest one, so
 ## letting go of one input never cancels another that is still held.
@@ -46,9 +51,13 @@ const DEADZONE: float = 0.25
 ## Gamepad axes (Godot's JoyAxis values).
 const AXIS_LEFT_X: int = 0
 const AXIS_LEFT_Y: int = 1
+const AXIS_RIGHT_X: int = 2
+const AXIS_RIGHT_Y: int = 3
 const AXIS_TRIGGER_RIGHT: int = 5
 ## A trigger counts as pressed above this value.
 const TRIGGER_PRESSED: float = 0.5
+## Pixels the mouse must travel before the keyboard player aims with it.
+const MOUSE_AIM_TRAVEL: float = 8.0
 
 ## The per-player actions, defined in project.godot. `join` and `leave` are
 ## handled here and are not per-player state.
@@ -84,6 +93,11 @@ var _pressed_physics: Array[Dictionary] = []
 ## press frames, a tap that is released within the same frame still counts.
 var _press_count: Array[Dictionary] = []
 var _captured: Array[bool] = []
+## Per player: the raw right stick (x and y axis values, -1 to 1).
+var _aim_stick: Array[Vector2] = []
+var _mouse_aiming: bool = false
+## How far the mouse moved (pixels) since the cast key last turned mouse aim off.
+var _mouse_travel: float = 0.0
 
 
 func _init() -> void:
@@ -106,6 +120,7 @@ func _init() -> void:
 		_pressed_physics.append(physics)
 		_press_count.append(counts)
 		_captured.append(false)
+		_aim_stick.append(Vector2.ZERO)
 
 
 func _ready() -> void:
@@ -185,6 +200,10 @@ func leave(player: int) -> bool:
 	var device: int = _devices[player]
 	_devices[player] = NO_DEVICE
 	_captured[player] = false
+	_aim_stick[player] = Vector2.ZERO
+	if device == KEYBOARD:
+		_mouse_aiming = false
+		_mouse_travel = 0.0
 	for action in ACTIONS:
 		_strength[player][action] = 0.0
 		_sources[player][action].clear()
@@ -220,6 +239,17 @@ func handle_event(event: InputEvent) -> void:
 	if event.is_action_pressed(LEAVE):
 		leave(player)
 		return
+	if event is InputEventMouseMotion:
+		# A brush of the mouse is not a decision to aim with it.
+		_mouse_travel += (event as InputEventMouseMotion).relative.length()
+		if _mouse_travel >= MOUSE_AIM_TRAVEL:
+			_mouse_aiming = true
+		return
+	if event is InputEventMouseButton:
+		_mouse_aiming = true
+	elif event is InputEventKey and event.is_action_pressed(&"cast"):
+		_mouse_aiming = false
+		_mouse_travel = 0.0
 	if event is InputEventJoypadMotion:
 		_handle_motion(player, event)
 		return
@@ -237,6 +267,29 @@ func get_move(player: int) -> Vector2:
 		float(strength[&"move_right"]) - float(strength[&"move_left"]),
 		float(strength[&"move_down"]) - float(strength[&"move_up"]))
 	return move.limit_length(1.0)
+
+
+## The right stick of `player` as a unit vector, or zero inside the dead zone
+## (or while captured). Gamepads and bots only; see is_mouse_aiming for the mouse.
+func get_aim(player: int) -> Vector2:
+	if not _valid(player) or _captured[player]:
+		return Vector2.ZERO
+	var stick: Vector2 = _aim_stick[player]
+	if stick.length() <= DEADZONE:
+		return Vector2.ZERO
+	return stick.normalized()
+
+
+## Aim the virtual right stick of `player` (a unit vector, or zero to let go),
+## through the state a real stick feeds. Does nothing without that virtual device.
+func send_virtual_aim(player: int, direction: Vector2) -> void:
+	if _valid(player) and _devices[player] == virtual_device_id(player):
+		_aim_stick[player] = direction.limit_length(1.0)
+
+
+## True while `player` is the keyboard player and last aimed with the mouse.
+func is_mouse_aiming(player: int) -> bool:
+	return _mouse_aiming and _valid(player) and _devices[player] == KEYBOARD and not _captured[player]
 
 
 ## How far `action` is held by `player`, 0 to 1.
@@ -302,7 +355,7 @@ func _assign(player: int, device: int) -> void:
 ## Which device an event came from. Keys and mouse are one device; a virtual
 ## device is an action event with a virtual id; other events have no device.
 func _device_of_event(event: InputEvent) -> int:
-	if event is InputEventKey or event is InputEventMouseButton:
+	if event is InputEventKey or event is InputEventMouseButton or event is InputEventMouseMotion:
 		return KEYBOARD
 	if event is InputEventJoypadButton or event is InputEventJoypadMotion:
 		return event.device
@@ -322,6 +375,10 @@ func _handle_motion(player: int, event: InputEventJoypadMotion) -> void:
 		AXIS_LEFT_Y:
 			_set_source(player, &"move_up", source, scaled if value < 0.0 else 0.0)
 			_set_source(player, &"move_down", source, scaled if value > 0.0 else 0.0)
+		AXIS_RIGHT_X:
+			_aim_stick[player].x = value
+		AXIS_RIGHT_Y:
+			_aim_stick[player].y = value
 		AXIS_TRIGGER_RIGHT:
 			_set_source(player, &"cast", source, 1.0 if value > TRIGGER_PRESSED else 0.0)
 

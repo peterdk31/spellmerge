@@ -20,6 +20,7 @@ const EVENTS: Dictionary = {
 	&"device_joined": [["player", TYPE_INT], ["device", TYPE_INT]],
 	&"device_left": [["player", TYPE_INT], ["device", TYPE_INT]],
 	# Spells and combat.
+	&"wizard_cast": [["player", TYPE_INT], ["wizard", TYPE_OBJECT]],
 	&"spell_cast": [["player", TYPE_INT], ["spell_id", TYPE_STRING_NAME], ["origin", TYPE_VECTOR2], ["direction", TYPE_VECTOR2]],
 	&"projectile_hit": [["player", TYPE_INT], ["target", TYPE_OBJECT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT]],
 	&"damage_dealt": [["player", TYPE_INT], ["target", TYPE_OBJECT], ["amount", TYPE_INT], ["position", TYPE_VECTOR2]],
@@ -28,6 +29,7 @@ const EVENTS: Dictionary = {
 	# Players.
 	&"player_downed": [["player", TYPE_INT]],
 	&"player_revived": [["player", TYPE_INT], ["reviver", TYPE_INT]],
+	&"revive_progress": [["player", TYPE_INT], ["progress", TYPE_FLOAT]],
 	&"player_stats_changed": [["player", TYPE_INT], ["health", TYPE_INT], ["max_health", TYPE_INT], ["mana", TYPE_FLOAT], ["max_mana", TYPE_FLOAT]],
 	&"player_joined": [["player", TYPE_INT]],
 	&"player_left": [["player", TYPE_INT]],
@@ -36,6 +38,7 @@ const EVENTS: Dictionary = {
 	&"run_ended": [["victory", TYPE_BOOL]],
 	&"room_entered": [["room_id", TYPE_STRING_NAME]],
 	&"room_cleared": [["room_id", TYPE_STRING_NAME]],
+	&"wave_started": [["wave", TYPE_INT]],
 	&"door_voted": [["player", TYPE_INT], ["door", TYPE_INT]],
 	&"difficulty_changed": [["level", TYPE_FLOAT]],
 	# Rewards and progression.
@@ -47,7 +50,7 @@ const EVENTS: Dictionary = {
 
 ## Events about the run, a room or the account, with no player index.
 const NOT_PER_PLAYER: Array[StringName] = [
-	&"run_started", &"run_ended", &"room_entered", &"room_cleared",
+	&"run_started", &"run_ended", &"room_entered", &"room_cleared", &"wave_started",
 	&"difficulty_changed", &"reward_rolled", &"unlock_gained", &"currency_changed",
 ]
 

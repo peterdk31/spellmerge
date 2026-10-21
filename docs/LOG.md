@@ -2,7 +2,110 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue.
 
+## 2026-10-21: Smaller enemy bullets (owner `/claude` on #4)
+
+- The imp's shot radius is 5 → 3.5, so its sprite (drawn at 3x the radius) and its hit circle both shrink by 30% (30 px → 21 px quad, orb about 10 px). Players' bolts keep radius 4, and the enemy orb keeps its own spiky art and no tint, so the two stay distinct. Test in `test_ai.gd`.
+
+## 2026-10-20: Foundation review (owner `/claude` on #5)
+
+- New `docs/ARCHITECTURE.md`: layers, where each kind of change goes, the art contract. `Feel` now draws the textures its `FeelPreset` names; `Flow` runs the room, enemy, spell and wizard scene it is told (`*_to_play`, `wizard_scene`). New tests: `test_feel_art.gd`, `test_flow_content_choice.gd`, `tests/content/wizard/test_wizard_art.gd`. Weak spots left for their features: `docs/BACKLOG.md`, "Foundation". Details in `docs/DECISIONS.md`.
+
+## 2026-10-20: Hitboxes on the body (owner `/claude` on #5)
+
+- Bug: hit circles were centred on the feet while sprites are drawn 14 px higher, so shots seemed to pass through. `Projectiles.add_target` has a new `offset`; imp and wizards register their circle at (0, -12) and bigger (imp 11, wizard 8, bolt 5, imp shot 5). The imp's shot and telegraph start at its body. Regression tests in `test_projectiles.gd` and `test_combat.gd`. Details in `docs/DECISIONS.md`.
+
+## 2026-10-20: Art direction pass and a test foundation (owner `/claude` on #102)
+
+- **Art.** The ember imp is redrawn (horns, angry brows, glowing eyes, fangs, bat wings that flap between the idle frames; new windup and hurt poses on it). Its telegraph is a dashed line (`art/vfx/telegraph_dash.svg`) over a danger lane with an arrowhead at the end of the shot's reach (`Lane`, `Tip`, fitted by `ai.gd`). The crypt room has a lit-top wall tile for the top and bottom walls, real pillars, torches, doors at the entry and exit, rubble and skulls on the floor, wall and pillar shadows on the floor and a darker floor so figures stand out. New: `wall_top`, `pillar`, `torch`, `door`, `rubble`, `skull`. Looked at with `build.sh --quick --screenshots` (`art_sheet`, `juice_cast_and_hit`, `enemy_windup`).
+- **Tests.** New base `tests/support/suite.gd`: one `test_*` method per behaviour, each independent, a failure names the method. New small tests on it: `tests/core/test_svg_art.gd` (every SVG: rects only, palette, whole numbers, no overlaps, in the manifest), `tests/content/enemies/test_ember_imp_art.gd`, `tests/gameplay/ai/test_ai_telegraph.gd` (17 tests, moved out of `test_ai.gd`) and the old `test_arena_01.gd` split into `test_arena_01_data.gd`, `_layout.gd` and `_art.gd`. Rules in `tests/README.md`.
+- Not done: the other big test files still use the old shape (see `docs/BACKLOG.md`); the new art is placeholder and hand-drawn, so the owner may still find it plain.
+
+## 2026-10-20: C1 verdict: iterate
+
+- The owner answered on #97: iterate. `docs/NEXT.md` now queues a human playtest report of round 2 first, then the top items from it. Docs only; no code changed.
+
+## 2026-10-19: Muzzle flash bug (#102)
+
+- The muzzle flash was 138-207 px around a 32 px wizard. `muzzle_flash_size` is now 0.5 (29-43 px); the death puff is unchanged. New test `_test_muzzle_flash_stays_small` (48 px limit, `punchy` preset). Reasoning in `docs/DECISIONS.md`.
+
+## 2026-10-19: C1 round 2 summary
+
+- Wrote the summary comment for #97; the daily run posts it after this merges (a session cannot post or read comments). It covers the six tasks, an honest assessment, what stays untested (no human playtest of round 2, web, sound) and the verdict options. No code changed.
+
+## 2026-10-19: Cleanup: invalid UIDs (C1 round 2, task 6)
+
+- Re-applies #112, which #113 had reverted ("the daily build failed", no cause given; a session cannot read it); the full unit test run passes with it, including `test_uids`.
+- Eight `.uid` files held a digit 9 (the backlog listed five; `gameplay/feel/feel.gd.uid`, `tests/gameplay/feel/test_feel.gd.uid` and `tests/hud/test_overlay.gd.uid` had it too). Each 9 became another valid character; no scene or resource referenced those UIDs.
+- The new test also found a `z` in `gameplay/feel/feel.gd.uid` (fixed). `test_wave_balance` failed once in a full run and passed on the rerun (bot timing is noisy; unrelated).
+- New test `tests/core/test_uids.gd`: scans every `.uid` file in `res://` (not `build/` or `addons/`) and fails on a bad prefix, a character outside a-y and 0-8, or a UID shared by two files; it also checks its own validator.
+
+## 2026-10-18: Wave pacing (C1 round 2, task 5)
+
+- `flow`: after `room_cleared`, `NEXT_WAVE_DELAY` (3 s) later the next wave stands in the same world with 2 more enemies (8, 10, 12 ... up to 24); downed wizards are revived and protected; the restart is 1.5 s and goes back to wave 1. New event `wave_started(wave)`; the HUD shows "Wave N" at the top middle.
+- Tests: `test_flow.gd` (growth, same world, cap, downed wizards, restart to wave 1, no stray timer), `test_panels.gd` (wave line), `test_events.gd`. `ci/build/build.sh --quick --tests` passes, including the 4-bot test (clears wave 1 in 13.6 game seconds this run) and the wave balance test (wave 1 is unchanged; its `BALANCE:` lines are as noisy as before: bots never dodge). Screenshot `arena_four_wizards` shows the line.
+- `tools/check.sh` reports only untracked files of the session's home directory (`.idea`, `.vscode`, `scripts`), none of them part of the change.
+
+## 2026-10-18: Enemy readability (C1 round 2, task 4)
+
+- Telegraph: the imp swaps to a `windup.svg` pose (glowing mouth and belly, sparks) and flips its two frames faster toward the shot (`frame = floor(progress² × 9) mod 2`), goes brighter for the last 20%, and the line is 3 to 6 px wide in Fire light (was 2 to 4, darker).
+- Hurt: `hurt.svg` (eyes shut, mouth open) for 0.25 s after a hit on that imp; the windup is not cancelled.
+- Enemy shots: `art/vfx/imp_fireball.svg`, a round ember orb with four spikes and a Spark core, in its own draw batch above the players' shots, untinted. Player shots stay the tinted comet. Looked at in `enemy_shot_beside_player_shot`: round and spiked against a comet, brighter centre.
+- Art is hand-written SVG rects from the imp's idle frame, with manifest lines. `ci/build/build.sh --quick --tests` passes; the wave balance and 4-bot runs are real-time and vary between runs (one run had a wave-balance failure that did not repeat).
+
+## 2026-10-18: Dodge and cast feel (C1 round 2, task 3)
+
+- Input buffer: a dodge or cast press is remembered for `INPUT_BUFFER` = 0.15 s (about 9 frames at 60 FPS) and fires when it becomes possible; used once, dropped when the overlay is open, when downed, or when older than the buffer. A held `cast` works as before.
+- Invulnerability window: sprite at 55% opacity plus a ring (player colour, dark outline) that closes over `INVULNERABLE_TIME`; shown for every kind of protection. Looked at in the shot `dodge_invulnerable`: the wall shows through the wizard and the ring reads at 640×360.
+- Cast rate and mana against the bots (`test_wave_balance`, headless runner, bots never dodge): 1 player 21 casts in 14.2 s (lost), 2 players 67 casts in 26.7 s (lost), 3 players 91 in 29.4 s, 4 players 67 in 15.1 s. No value changed; see `docs/DECISIONS.md`. The 1 and 2 player runs are lost by bots that never dodge, as already noted in the backlog.
+- Tests: buffered, too-early, used-once and overlay presses for dodge and cast; the look follows the window and clears when downed. `ci/build/build.sh --quick --tests` passes.
+
+## 2026-10-18: Shots stop at walls (C1 round 2, task 2)
+
+- `core/projectiles` keeps a grid of solid 8 px cells (`set_walls`, `add_wall_body`, `clear_walls`, `clip_to_walls`, counter `wall_hits`). Each step walks the cells the path crosses and ends the shot at the first solid one (piercing shots too; fast shots cannot skip a wall). The wizard clips the staff tip to the wall before it casts, so a wizard against a wall cannot fire through it. `flow` gives the manager the room's wall-layer static bodies after the room is in the tree.
+- Timing (`test_projectile_timing`, headless runner, full cap, no targets): 3,000 shots 0.9 ms a step without walls, 3.0 to 4.2 ms with the arena's 10 wall rectangles (refilled each step, so many shots start inside a wall and die); 1,000 shots 0.3 ms and 1.0 to 1.4 ms. The hit tests and their work budget are unchanged (a wall check is not charged to it). A one-cell shortcut for the usual short step cut the 3,000 case from 4.2 to 3.0 ms.
+- Review round: the step is now cut at the wall and the hit test runs on the part before it (a fast shot keeps a hit in front of a wall); the wall walk is capped at 64 cells; `spawn` refuses a shot born inside a wall (no slot, no eviction); `test_flow.gd` checks that `start_run` and a restart give the arena's walls (border, pillar, two players' shots). Timing with every shot flying a long path without dying (1,500 px/s, none ending in the first cell, headless): 1,000 shots 1.6 ms a step, 3,000 shots 4.7 ms (28% of a 60 FPS frame; the web build is not measured, so its 1,000 cap is the number to watch). Refusing the cast at a wall was tried and made the 4-bot smoke fail every run, so the cast stays.
+- Tests: wall stop, piercing and 100 px steps, all directions, edges, `clip_to_walls`, `add_wall_body` (`test_projectiles.gd`); a wizard against a wall (`test_player_health_cast.gd`).
+- The 4-bot smoke started to fail (player 3 down): the bots held fire into pillars. The bots now check the line of sight with a physics ray and strafe along a wall in the way. It passed three runs in a row afterwards, but the `BALANCE:` lines for 1 and 2 players got worse (bots still never dodge); noted in `docs/BACKLOG.md`.
+
+## 2026-10-18: Revive (C1 round 2, task 1)
+
+- `coop` now revives: a standing wizard within 48 px of a downed one for 2 s brings it back (50 health) and it is protected for 1.5 s. The nearest standing wizard is the reviver; progress drains at twice the fill rate when nobody is near; each downed wizard has its own progress, any slots 0-3. New event `revive_progress(player, progress)` drives a ring (a clockwise-sweeping arc with a cross) over the downed wizard's hat.
+- Tests: two players, each of four players in turn, three down at once, a leaving reviver or downed player (`test_coop.gd`); the new signal in `test_events.gd`. Shot `revive_ring_half`. Joiner protection has to be stepped away in tests before a joiner can be downed. The "Revive by standing next to a downed wizard" backlog line is gone. Reasoning and numbers: `docs/DECISIONS.md`.
+
+## 2026-10-18: C1 juice leftovers, and six more M1 tasks queued (owner `/claude` on #102)
+
+- All four leftovers are done. (1) New event `wizard_cast(player, wizard)` (sender `player`, right after `spell_cast`); `Feel` squashes the caster's `Sprite` thin and tall for 0.1 s (15%, no white flash; a hit takes it over, a cast never replaces a hit). (2) The muzzle flash is turned along the aim, stretched 1.8× and tinted in the player's light colour. (3) The dead enemy's `Sprite` is copied into a pooled sprite (8 slots) that is white, widens, collapses and fades in 0.25 s while the enemy itself is freed at once. (4) The HUD has a red vignette (`hud/panels/vignette/`, behind the panels) that glows when a wizard's health falls, strongest toward that wizard's corner, gone in about 0.4 s.
+- New preset fields: `cast_squash`, `cast_squash_seconds`, `death_anim_seconds`. Nothing in `punchy.tres` changed: the numbers could not be played here (no person at the keyboard), so no value was tuned.
+- Review round: looked at the effects in new crops (`juice_muzzle_flash_a/b`, `juice_death_animation`, `juice_cast_and_hit`) and tuned: muzzle flash 0.1 s at 2.4× (was 0.07 s, 1×), cast squash 20% for 0.12 s, death puff 1.6× for 0.14 s and drawn under the death animation (which is now on top). Vignette: stronger, wider corner bias, clear middle, scaled by hit size and player count, with an `enabled` setting. The death copy starts at the rest scale (not the squashed one) and keeps centring and rotation; no cast squash during a dodge; a test that the muzzle colours equal the reticle colours.
+- Tests: `test_feel.gd` (aimed and tinted flash, cast squash, death animation and its limit), `test_panels.gd` (vignette on a health drop only, limit, fade, clear), `test_events.gd` (the new signal). New screenshot `juice_cast_and_hit` in `shot_m1.gd`.
+- `docs/NEXT.md` now holds the six tasks of the owner's second round: revive, shots stop at walls, dodge and cast feel, enemy readability, wave pacing, cleanup. Not started yet: one session and one PR each.
+
+## 2026-10-18: Juice pass on the core loop (owner `/claude` on #102)
+
+- `gameplay/feel` (all inside `Feel`, driven by events, never touching damage): a white hit flash (a tiny `hit_flash.gdshader` set as the sprite's material for 0.08 s) and a squash on the `Sprite` child of whatever `damage_dealt` names (enemies and wizards; at most 16 at once, tracked by instance id so a freed enemy is safe); a death puff (the hit spark, bigger and fading, 4 slots); a muzzle flash per player at the `spell_cast` origin; a camera kick against the aim (1.5 px per cast, capped at 4 px, off with `shake_enabled` off).
+- `punchy.tres`: hit-stop 0.05 s (was 0.04), death 0.09 s (0.07), shake 0.2 / 0.38 / 0.6, up to 7 px, particles faster and a bigger death burst. New preset fields are in `feel_preset.gd`.
+- Checked: `ci/build/build.sh --quick --tests` passes with new tests for the flash, the kick and the puffs; looked at the arena shot. The 0.07 s muzzle flash is too short to appear in a still.
+- Left for later: see `docs/NEXT.md` (caster squash, aimed muzzle flash, enemy death animation).
+
+## 2026-10-18: Placeholder art iteration (owner `/claude` on #102)
+
+- Redrew the placeholders as SVG rects, same palette and rules: floor (Stone base with flagstone joints, light chips and cracks, nothing on the edge pixels; it is lighter than before, so figures stand out more), wall (four brick courses, each lit on top with a shadow joint), fire bolt (a comet with a round head, tapering tail and Spark core), hit spark (added four diagonal flecks), ember imp (2-frame idle strip, the second bobs 1 px, played by an `AnimationPlayer` in the scene), wizard (no staff in the sprite any more).
+- Wizard animation: `wizard_p1..p4_idle.svg` (2 frames), `_walk.svg` (4) and `_dash.svg` (3), 32 px per frame; `player.gd` picks the strip from speed and dodge (`_update_animation`), `walk_textures`, `dash_textures` and `staff_texture` are set in `wizard.tscn`. The dash look (stretch, lean, ghosts) stays but is milder (1.2 x 0.85, lean 0.1) because the dash frames lean already; ghosts draw the current frame.
+- The staff is now art: `staff.svg` (Wood pole, fist, Spark gem) is drawn from the hand along the aim, flipped when aiming left so the light stays on top, with a player-colour gem at the tip. The muzzle position did not change.
+- Checked: `ci/build/build.sh --quick --tests` passes (new `test_player_animation.gd`), and a new shot `art_sheet` (`tests/screenshots/shot_art.gd`) shows every frame at 2x; looked at it, and at the arena shots.
+- Not done: the cast, hurt, downed and death strips; enemy walk or attack frames; a walk and dash for the imp; animated bolt and spark (the projectile manager draws one still). Real art and the art direction stay with M2. The whole session could not run scripts, so the SVGs were written by hand (no generator) and the other three player colours are recolours of player 1 by text replacement.
+
+## 2026-10-18: Playtest fixes (owner `/claude` on #102 and #97)
+
+- Shots were invisible (player and enemy). Two causes, both in `core/projectiles`: the autoload is drawn before the room, so the floor covered the batch (now `DRAW_Z` 50), and the MultiMesh's culling box did not follow the shots, so any shot away from the origin was never drawn (now `custom_aabb` covers the bounds). Found by a screenshot probe: even a hand-set instance rendered only with the box set. Shots are also drawn 3x their hit circle (`DRAW_SCALE`) and tinted only 45% (`TINT_STRENGTH`), because a full multiply turned the orange bolt of a blue wizard nearly black.
+- Shots now start at the staff tip (`muzzle_position()`: 10 px above the feet plus 14 px along the aim), and a small staff with a glowing tip in the player colour is drawn. `spell_cast` carries the same origin.
+- Dash look: the sprite stretches along the dash axis (1.3 x 0.8, swapped for a mostly vertical dash) and leans; three fading ghosts in the player colour sit at the wizard's last three positions (a fixed 3-value buffer, one tick per 0.04 s) with the same stretch and lean; no art files. The staff and reticle moved to a child node above the sprite (the sprite had hidden most of the staff).
+- Tests: `test_player_aim.gd` (muzzle, dash look and reset), `test_projectiles.gd` (z_index and culling box). New shot `shots_and_dash` in `tests/screenshots/shot_m1.gd`; looked at it: three shots in flight, the staffs, and the dash ghosts of player 4.
+- Not done: controller and multi-player aim not yet felt by the owner; aim assist is unwanted (a "homing" modifier comes with spell building); enemy shots still start at the enemy's centre; real art and animation wait for M2.
+
 ## 2026-10-17
+
+- Owner `/claude` on the C1 issue (#97): iterate on aiming and graphics. Aim is now separate from walking (twin-stick): right stick, or the mouse for the keyboard player, else the walk direction; the sprite turns toward the aim, and a player-colour reticle plus a ground shadow are drawn. New `get_aim`, `send_virtual_aim`, `is_mouse_aiming` in `core/input`; tests `tests/gameplay/player/test_player_aim.gd` and two in `tests/core/test_input.gd`. `ci/build/build.sh --quick --tests` and `--screenshots` pass; looked at `arena_four_wizards` (each wizard aiming a different way). Not done: aim assist, a feel check by a person, new art files.
 
 - M1 part 25: stabilisation and checkpoint C1. `ci/build/build.sh --quick --tests` passes; no open bug in M1's scope, so no bug fix. Added `tests/bots/test_wave_balance.gd` (fighter bots, 1 to 4 players, `BALANCE:` lines; it fails only if a run neither clears nor is lost; who is downed is reported, not gated, because the bots play in real time). One run on a GitHub runner, headless, bots that never dodge:
   - 1 player: cleared in 28.1 game seconds, 80 of 100 health lost, 39 casts.

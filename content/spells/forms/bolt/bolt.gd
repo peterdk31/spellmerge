@@ -1,5 +1,5 @@
 extends SpellBase
-## The fire bolt (M1): one shot in the facing direction. The only code besides
+## The fire bolt (M1): one shot in the aim direction. The only code besides
 ## `core/base` that knows the spell's fields. Players and bots just call cast().
 ##
 ## The shot is a row in `core/projectiles` (its packed arrays are the fixed-size
@@ -12,7 +12,7 @@ const ProjectileManagerScript := preload("res://core/projectiles/projectile_mana
 ## The tag of every bolt shot; Combat maps it to damage and knockback.
 const BOLT_TAG: int = 1
 ## Hit circle of the shot in pixels.
-const SHOT_RADIUS: float = 4.0
+const SHOT_RADIUS: float = 5.0
 ## Knockback strength in pixels per second.
 const KNOCKBACK: float = 120.0
 

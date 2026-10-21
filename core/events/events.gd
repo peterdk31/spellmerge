@@ -33,6 +33,8 @@ signal device_left(player: int, device: int)
 
 ## Sender: player. A cast left the wand of `player`.
 signal spell_cast(player: int, spell_id: StringName, origin: Vector2, direction: Vector2)
+## Sender: player. The wizard node of `player` has just cast, for visual reactions only (a squash). Sent right after `spell_cast`.
+signal wizard_cast(player: int, wizard: Node)
 ## Sender: core/projectiles. A projectile fired by `player` touched `target`.
 ## `tag` is the value given to `Projectiles.spawn()`, for looking up the damage.
 signal projectile_hit(player: int, target: Node, position: Vector2, tag: int)
@@ -49,6 +51,8 @@ signal enemy_died(player: int, enemy: Node, position: Vector2)
 signal player_downed(player: int)
 ## Sender: player. `player` was revived by `reviver`.
 signal player_revived(player: int, reviver: int)
+## Sender: coop. `player` is downed and being revived: `progress` (0 to 1) is how far the hold has got. Sent when it changes (so every frame while a revive fills or drains); 0 means the revive stopped or is done.
+signal revive_progress(player: int, progress: float)
 ## Sender: player. The health or the whole-number mana of `player` changed, or the wizard appeared. Carries all the numbers so a listener never has to ask.
 signal player_stats_changed(player: int, health: int, max_health: int, mana: float, max_mana: float)
 ## Sender: coop. `player` joined the game.
@@ -66,6 +70,8 @@ signal run_ended(victory: bool)
 signal room_entered(room_id: StringName)
 ## Sender: flow. The room `room_id` was cleared.
 signal room_cleared(room_id: StringName)
+## Sender: flow. Wave number `wave` (1 for the first of a run) of the room began.
+signal wave_started(wave: int)
 ## Sender: flow. The result of a door vote: `player` voted for `door`.
 signal door_voted(player: int, door: int)
 ## Sender: difficulty. The difficulty level changed to `level`.

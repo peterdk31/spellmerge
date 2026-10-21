@@ -38,10 +38,28 @@ extends Node2D
 ## The budget is per `step` call, not per frame: if the engine runs several
 ## physics steps in one frame to catch up, each has its own budget.
 ##
+## Drawing: two batches. Shots of players are tinted with their colour; enemy shots
+## (owner NO_PLAYER) have their own texture (`hostile_texture`), are not tinted and are
+## drawn one layer above, so a dangerous shot never hides under a friendly one.
+##
 ## Friendly fire: while `friendly_fire` is on, a shot fired by a player (0-3) also
 ## hits targets on LAYER_PLAYER, except targets registered with that same player
 ## as their `owner` (a wizard is never hit by its own shot). It is off by default
 ## and read when a shot is spawned. `gameplay/coop` owns the option.
+##
+## Walls: `set_walls(rects)` (or `add_wall_body(body)` for a room's static body) gives
+## the solid parts of the room. They are rasterised into a grid of WALL_CELL
+## pixel cells, so a wall check is a walk over the cells the step's path crosses
+## (a few for a normal shot; at most MAX_WALL_VISITS for a huge step, and a path
+## not fully walked then counts as a wall hit) and needs no physics query. A
+## projectile whose path enters a solid cell ends there, even a piercing one:
+## there is no bouncing. It is checked as a point, not a circle. The step is cut
+## at the wall first, so a target in front of the wall is still hit by a fast
+## shot, and one behind it is not. The wall walk is not charged to the work
+## budget above (its length is capped instead). `wall_hits` counts these ends.
+## `clip_to_walls(from, to)` shortens a segment to the first wall. `spawn` refuses
+## (-1, counted in `wall_hits`) a shot that starts inside a wall, so it takes no
+## pool slot and evicts nobody at the cap.
 ##
 ## The global cap (`get_cap()`, set by platform: DEFAULT_CAP_WEB or
 ## DEFAULT_CAP_DESKTOP) degrades gracefully. When it is full, a new projectile
@@ -69,10 +87,25 @@ const HIT_MEMORY: int = 3
 ## each hit costs HIT_WORK. Once it is spent, the remaining projectiles are not
 ## tested this step (see the class doc). Normal play uses a tiny part of it.
 const WORK_PER_STEP: int = 8000
+
+## The most wall cells one shot walks in one step (see `_wall_hit`).
+const MAX_WALL_VISITS: int = 64
 ## The work one hit counts for: the event, its handlers and the bookkeeping.
 const HIT_WORK: int = 40
 ## Floats per projectile in the MultiMesh buffer: 8 transform, 4 colour.
 const DRAW_STRIDE: int = 12
+## Draw order of the shots: above the room and the wizards. The autoload is drawn
+## before the current scene, so at z_index 0 the room's floor hid every shot.
+const DRAW_Z: int = 50
+## A shot is drawn this many times wider than its hit circle (the art has empty
+## margins and a pixel-art bolt is small on a 640x360 view).
+const DRAW_SCALE: float = 3.0
+## How much of the owner's colour tints the art (the rest stays white): a full
+## multiply turned the orange bolt of a blue wizard nearly black.
+const TINT_STRENGTH: float = 0.45
+## Wall grid cell size in pixels. Walls are rounded out to whole cells, so they are
+## exact when their edges are multiples of it (room tiles are 32 px).
+const WALL_CELL: float = 8.0
 ## Spatial grid cell size in pixels.
 const GRID_CELL: float = 64.0
 ## Projectiles that leave the bounds by more than this are removed.
@@ -90,11 +123,18 @@ const ENEMY_COLOR: Color = Color("#e0592f")
 var texture: Texture2D = null:
 	set(value):
 		texture = value
-		if _draw_node != null:
-			_draw_node.texture = value
+		_apply_textures()
+## The art of enemy shots (owner NO_PLAYER), drawn apart from the players' shots: other
+## shape, no tint, on top. Left empty, they use `texture`.
+var hostile_texture: Texture2D = null:
+	set(value):
+		hostile_texture = value
+		_apply_textures()
 var events: EventsScript = null
 ## How many projectiles were dropped because the cap was full, since start.
 var dropped: int = 0
+## How many projectiles ended on a wall, since start.
+var wall_hits: int = 0
 ## Projectiles written into the batch by the last update_draw().
 var drawn: int = 0
 ## Whether shots fired by players also hit other players' targets (see the class doc).
@@ -140,6 +180,8 @@ var _targets: Array = []
 var _target_radius: PackedFloat32Array = PackedFloat32Array()
 var _target_layer: PackedInt32Array = PackedInt32Array()
 var _target_pos: PackedVector2Array = PackedVector2Array()
+## Where each target's hit circle sits, relative to its node (the body, not the feet).
+var _target_offset: PackedVector2Array = PackedVector2Array()
 var _target_id: PackedInt64Array = PackedInt64Array()
 var _target_owner: PackedInt32Array = PackedInt32Array()
 ## The grid: first target in each cell (-1 for none), and the next in its chain.
@@ -150,8 +192,19 @@ var _target_next: PackedInt32Array = PackedInt32Array()
 ## The largest radius of any registered target; sets how far hits are searched.
 var _max_target_radius: float = 0.0
 
+## The wall grid over the bounds: one byte per WALL_CELL cell, 1 for solid.
+var _wall_w: int = 1
+var _wall_h: int = 1
+var _wall_cells: PackedByteArray = PackedByteArray()
+var _has_walls: bool = false
+
 var _draw_node: MultiMeshInstance2D = null
 var _draw_buffer: PackedFloat32Array = PackedFloat32Array()
+## The second batch, for enemy shots (see `hostile_texture`).
+var _hostile_node: MultiMeshInstance2D = null
+var _hostile_buffer: PackedFloat32Array = PackedFloat32Array()
+## Enemy shots written by the last update_draw() (part of `drawn`).
+var drawn_hostile: int = 0
 ## True inside step(): the grid is in use, so a target removed then is only
 ## switched off (layer 0) and swept at the start of the next step.
 var _stepping: bool = false
@@ -169,7 +222,15 @@ func _init() -> void:
 func _ready() -> void:
 	if events == null:
 		events = get_node_or_null("/root/Events") as EventsScript
-	_draw_node = MultiMeshInstance2D.new()
+	_draw_node = _make_batch(DRAW_Z)
+	_hostile_node = _make_batch(DRAW_Z + 1)
+	_apply_textures()
+	_fit_draw_bounds()
+
+
+## One batched draw of up to `_cap` quads (TRANSFORM_2D plus a colour each), added as a child.
+func _make_batch(z: int) -> MultiMeshInstance2D:
+	var node := MultiMeshInstance2D.new()
 	var quad := QuadMesh.new()
 	quad.size = Vector2.ONE
 	var multimesh := MultiMesh.new()
@@ -178,9 +239,17 @@ func _ready() -> void:
 	multimesh.mesh = quad
 	multimesh.instance_count = _cap
 	multimesh.visible_instance_count = 0
-	_draw_node.multimesh = multimesh
-	_draw_node.texture = texture
-	add_child(_draw_node)
+	node.multimesh = multimesh
+	node.z_index = z
+	add_child(node)
+	return node
+
+
+func _apply_textures() -> void:
+	if _draw_node != null:
+		_draw_node.texture = texture
+	if _hostile_node != null:
+		_hostile_node.texture = hostile_texture if hostile_texture != null else texture
 
 
 func _physics_process(delta: float) -> void:
@@ -208,11 +277,13 @@ func set_cap(value: int) -> void:
 	_own_prev.resize(_cap)
 	_own_next.resize(_cap)
 	_draw_buffer.resize(_cap * DRAW_STRIDE)
+	_hostile_buffer.resize(_cap * DRAW_STRIDE)
 	_alive.resize(_cap)
 	_free_slots.resize(_cap)
 	clear()
 	if _draw_node != null:
 		_draw_node.multimesh.instance_count = _cap
+		_hostile_node.multimesh.instance_count = _cap
 
 
 func get_cap() -> int:
@@ -222,9 +293,135 @@ func get_cap() -> int:
 ## The area the projectiles live in. Also sizes the target grid.
 func set_bounds(rect: Rect2) -> void:
 	_bounds = rect
+	_fit_draw_bounds()
 	_grid_w = maxi(ceili(rect.size.x / GRID_CELL), 1)
 	_grid_h = maxi(ceili(rect.size.y / GRID_CELL), 1)
 	_cell_head.resize(_grid_w * _grid_h)
+	_wall_w = maxi(ceili(rect.size.x / WALL_CELL), 1)
+	_wall_h = maxi(ceili(rect.size.y / WALL_CELL), 1)
+	_wall_cells.resize(_wall_w * _wall_h)
+	clear_walls()
+
+
+## Make these world rectangles solid, replacing any walls set before. Parts outside
+## the bounds are ignored. Call it after `set_bounds()`, which removes the walls.
+func set_walls(rects: Array[Rect2]) -> void:
+	clear_walls()
+	for rect in rects:
+		_add_wall(rect)
+
+
+## Remove every wall.
+func clear_walls() -> void:
+	_wall_cells.fill(0)
+	_has_walls = false
+
+
+## Add the rectangle shapes of a body (a room's static body) as walls. The body must
+## be in the tree. Shapes that are not rectangles are ignored; a turned rectangle
+## counts as its bounding box.
+func add_wall_body(body: CollisionObject2D) -> void:
+	for child in body.get_children():
+		var shape_node := child as CollisionShape2D
+		if shape_node == null or shape_node.disabled:
+			continue
+		var rectangle := shape_node.shape as RectangleShape2D
+		if rectangle == null:
+			continue
+		var xf: Transform2D = shape_node.global_transform
+		var half: Vector2 = rectangle.size * 0.5
+		var low: Vector2 = xf * -half
+		var high: Vector2 = low
+		for corner: Vector2 in [Vector2(half.x, -half.y), half, Vector2(-half.x, half.y)]:
+			var point: Vector2 = xf * corner
+			low = low.min(point)
+			high = high.max(point)
+		_add_wall(Rect2(low, high - low))
+
+
+func _add_wall(rect: Rect2) -> void:
+	if rect.size.x <= 0.0 or rect.size.y <= 0.0:
+		return
+	var x0: int = maxi(floori((rect.position.x - _bounds.position.x) / WALL_CELL), 0)
+	var y0: int = maxi(floori((rect.position.y - _bounds.position.y) / WALL_CELL), 0)
+	var x1: int = mini(ceili((rect.end.x - _bounds.position.x) / WALL_CELL), _wall_w)
+	var y1: int = mini(ceili((rect.end.y - _bounds.position.y) / WALL_CELL), _wall_h)
+	for y in range(y0, y1):
+		for x in range(x0, x1):
+			_wall_cells[y * _wall_w + x] = 1
+			_has_walls = true
+
+
+## The point where the segment from `from` to `to` first meets a wall, or `to` when
+## it is clear. If `from` is inside a wall, that is `from`.
+func clip_to_walls(from: Vector2, to: Vector2) -> Vector2:
+	var t: float = _wall_hit(from, to)
+	if t < 0.0:
+		return to
+	return from.lerp(to, t)
+
+
+## How far along `from`->`to` (0 to 1) the path first enters a solid cell, or -1.0
+## when it does not. Walks the cells the path crosses (Amanatides and Woo), at
+## most |dx| + |dy| + 1 of them, in cells.
+func _wall_hit(from: Vector2, to: Vector2) -> float:
+	if not _has_walls:
+		return -1.0
+	var start: Vector2 = (from - _bounds.position) / WALL_CELL
+	var delta: Vector2 = (to - from) / WALL_CELL
+	var cx: int = floori(start.x)
+	var cy: int = floori(start.y)
+	var end_x: int = floori(start.x + delta.x)
+	var end_y: int = floori(start.y + delta.y)
+	if cx == end_x and cy == end_y:
+		# The usual step stays in one cell.
+		if cx >= 0 and cx < _wall_w and cy >= 0 and cy < _wall_h and _wall_cells[cy * _wall_w + cx] != 0:
+			return 0.0
+		return -1.0
+	var step_x: int = 1 if delta.x > 0.0 else -1
+	var step_y: int = 1 if delta.y > 0.0 else -1
+	var next_x: float = INF
+	var next_y: float = INF
+	var per_x: float = INF
+	var per_y: float = INF
+	if delta.x != 0.0:
+		per_x = absf(1.0 / delta.x)
+		next_x = (float(cx + (1 if step_x > 0 else 0)) - start.x) / delta.x
+	if delta.y != 0.0:
+		per_y = absf(1.0 / delta.y)
+		next_y = (float(cy + (1 if step_y > 0 else 0)) - start.y) / delta.y
+	var t: float = 0.0
+	# A huge step (after a hitch) walks at most MAX_WALL_VISITS cells; a path
+	# that is still unchecked after that counts as a hit, so a shot never
+	# crosses a wall it did not look at.
+	var full: int = absi(end_x - cx) + absi(end_y - cy) + 1
+	var visits: int = mini(full, MAX_WALL_VISITS)
+	for _n in visits:
+		if cx >= 0 and cx < _wall_w and cy >= 0 and cy < _wall_h and _wall_cells[cy * _wall_w + cx] != 0:
+			return t
+		if next_x < next_y:
+			t = next_x
+			next_x += per_x
+			cx += step_x
+		else:
+			t = next_y
+			next_y += per_y
+			cy += step_y
+		if t > 1.0:
+			return -1.0
+	return t if full > visits else -1.0
+
+
+## The batch's culling box must cover the whole area. Without it the renderer
+## culls the batch by a box that does not follow the shots, and shots away from
+## the origin were never drawn.
+func _fit_draw_bounds() -> void:
+	if _draw_node == null:
+		return
+	var box: Rect2 = _bounds.grow(BOUNDS_MARGIN)
+	var aabb := AABB(Vector3(box.position.x, box.position.y, -1.0), Vector3(box.size.x, box.size.y, 2.0))
+	_draw_node.multimesh.custom_aabb = aabb
+	_hostile_node.multimesh.custom_aabb = aabb
 
 
 ## Remove every projectile (targets stay registered).
@@ -256,8 +453,10 @@ func get_count_for(player: int) -> int:
 ## Register a Node2D as something projectiles can hit (`layer` is a non-zero
 ## bit mask). Registering twice only updates the radius, layer and owner. A freed target is dropped by itself.
 ## `owner` is the player (0-3) the target belongs to, or Events.NO_PLAYER: shots of that
-## player never hit it (matters with friendly fire).
-func add_target(node: Node2D, radius: float, layer: int = LAYER_ENEMY, owner: int = EventsScript.NO_PLAYER) -> void:
+## player never hit it (matters with friendly fire). `offset` moves the hit circle from the
+## node's origin (usually the feet) to the drawn body, so a shot that looks like it touches
+## the sprite does hit.
+func add_target(node: Node2D, radius: float, layer: int = LAYER_ENEMY, owner: int = EventsScript.NO_PLAYER, offset: Vector2 = Vector2.ZERO) -> void:
 	if node == null or layer == 0:
 		return
 	var id: int = node.get_instance_id()
@@ -266,6 +465,7 @@ func add_target(node: Node2D, radius: float, layer: int = LAYER_ENEMY, owner: in
 		_target_radius[at] = radius
 		_target_layer[at] = layer
 		_target_owner[at] = owner
+		_target_offset[at] = offset
 		_max_target_radius = maxf(_max_target_radius, radius)
 		return
 	_targets.append(node)
@@ -274,6 +474,7 @@ func add_target(node: Node2D, radius: float, layer: int = LAYER_ENEMY, owner: in
 	_target_layer.append(layer)
 	_target_owner.append(owner)
 	_target_pos.append(Vector2.ZERO)
+	_target_offset.append(offset)
 	_target_next.append(-1)
 	_max_target_radius = maxf(_max_target_radius, radius)
 
@@ -297,12 +498,17 @@ func get_target_count() -> int:
 ## Start a projectile for `player` (0-3, or Events.NO_PLAYER for an enemy) at
 ## `origin`, moving `velocity` pixels per second for `lifetime` seconds.
 ## `pierce` is how many targets it passes through before it ends. Returns its
-## slot, or -1 for bad arguments.
+## slot, or -1 for bad arguments or an origin inside a wall.
 ## `tag` is stored and sent back with every hit of this projectile. A full cap never refuses: see the class doc.
 func spawn(player: int, origin: Vector2, velocity: Vector2, lifetime: float, radius: float = 4.0, hit_layers: int = LAYER_ENEMY, pierce: int = 0, tag: int = 0) -> int:
 	if player < EventsScript.NO_PLAYER or player >= MAX_PLAYERS:
 		return -1
 	if not (lifetime > 0.0) or not origin.is_finite() or not velocity.is_finite():
+		return -1
+	if _has_walls and _wall_hit(origin, origin) >= 0.0:
+		# Born inside a wall it would end in the next step: count it as ended, but
+		# take no pool slot (at the cap that would evict another shot).
+		wall_hits += 1
 		return -1
 	if _free_count == 0:
 		_drop_one()
@@ -364,9 +570,20 @@ func step(delta: float) -> void:
 		if not limit.has_point(_pos[slot]):
 			_kill(slot)
 			continue
+		# A shot that meets a wall is cut short there: it can still hit what is
+		# in front of the wall, then it ends.
+		var walled: bool = false
+		if _has_walls:
+			var cut: float = _wall_hit(_prev[slot], _pos[slot])
+			if cut >= 0.0:
+				walled = true
+				_pos[slot] = _prev[slot].lerp(_pos[slot], cut)
 		if _layers[slot] != 0 and not _targets.is_empty():
 			if _work_left <= 0:
-				if starved_at < 0:
+				if walled:
+					wall_hits += 1
+					_kill(slot)
+				elif starved_at < 0:
 					starved_at = slot
 				continue
 			# A piercing shot may pass through several targets this step. A
@@ -375,6 +592,9 @@ func step(delta: float) -> void:
 			for _hit in HIT_MEMORY:
 				if not _hit_test(slot) or _alive[slot] == 0 or _seq[slot] != seq:
 					break
+		if walled and _alive[slot] != 0:
+			wall_hits += 1
+			_kill(slot)
 	_resume = maxi(starved_at, 0)
 	_stepping = false
 
@@ -390,36 +610,49 @@ func update_draw() -> void:
 	if _high == 0 and drawn == 0:
 		return
 	var multimesh: MultiMesh = _draw_node.multimesh
+	var hostile_multimesh: MultiMesh = _hostile_node.multimesh
 	var fraction: float = clampf(Engine.get_physics_interpolation_fraction(), 0.0, 1.0)
 	var out: int = 0
+	var hostile_out: int = 0
 	for slot in _high:
 		if _alive[slot] == 0:
 			continue
-		var diameter: float = maxf(_radius[slot] * 2.0, 1.0)
+		var diameter: float = maxf(_radius[slot] * 2.0, 1.0) * DRAW_SCALE
 		var dir: Vector2 = Vector2.RIGHT
 		if _vel[slot].length_squared() > 0.0:
 			dir = _vel[slot].normalized()
 		var at: Vector2 = _prev[slot].lerp(_pos[slot], fraction)
-		var color: Color = _color_of(_player[slot])
-		# Transform2D(dir * d, dir.orthogonal() * d, at), row by row, then the colour.
-		var i: int = out * DRAW_STRIDE
-		_draw_buffer[i] = dir.x * diameter
-		_draw_buffer[i + 1] = dir.y * diameter
-		_draw_buffer[i + 2] = 0.0
-		_draw_buffer[i + 3] = at.x
-		_draw_buffer[i + 4] = dir.y * diameter
-		_draw_buffer[i + 5] = -dir.x * diameter
-		_draw_buffer[i + 6] = 0.0
-		_draw_buffer[i + 7] = at.y
-		_draw_buffer[i + 8] = color.r
-		_draw_buffer[i + 9] = color.g
-		_draw_buffer[i + 10] = color.b
-		_draw_buffer[i + 11] = color.a
-		out += 1
+		if _player[slot] < 0:
+			_write_quad(_hostile_buffer, hostile_out * DRAW_STRIDE, dir, diameter, at, Color.WHITE)
+			hostile_out += 1
+		else:
+			_write_quad(_draw_buffer, out * DRAW_STRIDE, dir, diameter, at, _color_of(_player[slot]))
+			out += 1
 	if out > 0:
 		multimesh.buffer = _draw_buffer
 	multimesh.visible_instance_count = out
-	drawn = out
+	if hostile_out > 0:
+		hostile_multimesh.buffer = _hostile_buffer
+	hostile_multimesh.visible_instance_count = hostile_out
+	drawn_hostile = hostile_out
+	drawn = out + hostile_out
+
+
+## Write one quad at float index `i` of `buffer` (packed arrays are shared, not copied):
+## Transform2D(dir * d, dir.orthogonal() * d, at), row by row, then the colour.
+func _write_quad(buffer: PackedFloat32Array, i: int, dir: Vector2, diameter: float, at: Vector2, color: Color) -> void:
+	buffer[i] = dir.x * diameter
+	buffer[i + 1] = dir.y * diameter
+	buffer[i + 2] = 0.0
+	buffer[i + 3] = at.x
+	buffer[i + 4] = dir.y * diameter
+	buffer[i + 5] = -dir.x * diameter
+	buffer[i + 6] = 0.0
+	buffer[i + 7] = at.y
+	buffer[i + 8] = color.r
+	buffer[i + 9] = color.g
+	buffer[i + 10] = color.b
+	buffer[i + 11] = color.a
 
 
 ## Position of a live projectile, or Vector2.INF if the slot is empty.
@@ -435,8 +668,8 @@ func is_alive(slot: int) -> bool:
 
 func _color_of(player: int) -> Color:
 	if player < 0:
-		return ENEMY_COLOR
-	return PLAYER_COLORS[player]
+		return Color.WHITE.lerp(ENEMY_COLOR, TINT_STRENGTH)
+	return Color.WHITE.lerp(PLAYER_COLORS[player], TINT_STRENGTH)
 
 
 func _kill(slot: int) -> void:
@@ -478,12 +711,14 @@ func _remove_target_at(at: int) -> void:
 	_target_layer[at] = _target_layer[last]
 	_target_owner[at] = _target_owner[last]
 	_target_pos[at] = _target_pos[last]
+	_target_offset[at] = _target_offset[last]
 	_targets.resize(last)
 	_target_id.resize(last)
 	_target_radius.resize(last)
 	_target_layer.resize(last)
 	_target_owner.resize(last)
 	_target_pos.resize(last)
+	_target_offset.resize(last)
 	_target_next.resize(last)
 
 
@@ -505,7 +740,7 @@ func _refresh_targets() -> void:
 		if not node.is_inside_tree():
 			_target_pos[i] = Vector2.INF
 			continue
-		_target_pos[i] = node.global_position
+		_target_pos[i] = node.global_position + _target_offset[i]
 		var cell: int = _cell_of(_target_pos[i])
 		_target_next[i] = _cell_head[cell]
 		_cell_head[cell] = i

@@ -32,6 +32,7 @@ func _initialize() -> void:
 	_test_dodge_direction_is_locked()
 	_test_cooldown()
 	_test_press_too_early_is_dropped()
+	_test_press_just_before_ready_is_buffered()
 	_test_tap_released_before_step_counts()
 	_test_captured_player_cannot_move_or_dodge()
 	_test_press_while_captured_is_not_saved()
@@ -110,7 +111,7 @@ func _test_wizard_scene() -> void:
 	_check(wizard.collision_mask == PlayerScript.LAYER_WALLS, "players collide only with walls")
 	_check(wizard.get_node("Sprite").texture_filter == CanvasItem.TEXTURE_FILTER_NEAREST, "the sprite is drawn with filtering off")
 	wizard.free()
-	# Each index shows its own colour: four textures, each 32x32, with different robe colours.
+	# Each index shows its own colour: four idle strips of 32x32 frames, with different robe colours.
 	var robes: Array[Color] = []
 	for index in 4:
 		var instance := WizardScene.instantiate() as PlayerScript
@@ -120,7 +121,7 @@ func _test_wizard_scene() -> void:
 		var texture: Texture2D = (instance.get_node("Sprite") as Sprite2D).texture
 		_check(texture != null, "wizard %d shows a sprite" % index)
 		if texture != null:
-			_check(texture.get_size() == Vector2(32, 32), "wizard %d sprite is 32x32" % index)
+			_check(texture.get_height() == 32 and texture.get_width() % 32 == 0, "wizard %d sprite is a strip of 32x32 frames" % index)
 			var colour_count: Dictionary = {}
 			var image := texture.get_image()
 			for y in image.get_height():
@@ -242,6 +243,51 @@ func _test_press_too_early_is_dropped() -> void:
 	_release(0, &"dodge")
 	_run(int((PlayerScript.DODGE_COOLDOWN + 0.25) / STEP))
 	_check(not player.is_dodging(), "a press made too early is not queued for later")
+
+
+## A press within INPUT_BUFFER of the end of the cooldown starts the dodge when it
+## ends; one made earlier is dropped; a buffered press is used once.
+func _test_press_just_before_ready_is_buffered() -> void:
+	_setup(1)
+	var player: PlayerScript = _players[0]
+	_hold(0, &"dodge")
+	_run(1)
+	_release(0, &"dodge")
+	_run(8)  # 0.125 s of the cooldown left
+	_check(not player.can_dodge(), "the cooldown is almost over")
+	_hold(0, &"dodge")
+	_release(0, &"dodge")
+	_run(1)
+	_check(not player.is_dodging(), "the press is not used while the cooldown runs")
+	_run(1)
+	_check(player.is_dodging(), "the press just before the end starts the dodge when it is ready")
+	_run(int((PlayerScript.DODGE_TIME + PlayerScript.DODGE_COOLDOWN) / STEP))
+	_check(not player.is_dodging(), "a buffered press is used once")
+	# A press 0.25 s before the end is longer ago than the buffer.
+	_setup(1)
+	player = _players[0]
+	_hold(0, &"dodge")
+	_run(1)
+	_release(0, &"dodge")
+	_run(6)  # 0.25 s left
+	_hold(0, &"dodge")
+	_release(0, &"dodge")
+	_run(int(PlayerScript.DODGE_COOLDOWN / STEP))
+	_check(not player.is_dodging(), "a press longer ago than INPUT_BUFFER is dropped")
+	# A press made in an overlay is not buffered either.
+	_setup(1)
+	player = _players[0]
+	_hold(0, &"dodge")
+	_run(1)
+	_release(0, &"dodge")
+	_run(8)
+	_input.set_captured(0, true)
+	_hold(0, &"dodge")
+	_release(0, &"dodge")
+	_run(1)
+	_input.set_captured(0, false)
+	_run(3)
+	_check(not player.is_dodging(), "a press made while captured is not buffered")
 
 
 func _test_tap_released_before_step_counts() -> void:

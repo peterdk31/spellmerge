@@ -1,24 +1,72 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://gameplay/ai/ai.gd" id="1_ai"]
 [ext_resource type="Texture2D" path="res://content/enemies/ember_imp/idle.svg" id="2_idle"]
+[ext_resource type="Texture2D" path="res://content/enemies/ember_imp/windup.svg" id="3_windup"]
+[ext_resource type="Texture2D" path="res://content/enemies/ember_imp/hurt.svg" id="4_hurt"]
+[ext_resource type="Texture2D" path="res://art/vfx/telegraph_dash.svg" id="5_dash"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_body"]
 radius = 6.0
 
+[sub_resource type="Animation" id="Animation_idle"]
+resource_name = "idle"
+length = 1.0
+loop_mode = 1
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("Sprite:frame")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 0.5),
+"transitions": PackedFloat32Array(1, 1),
+"update": 1,
+"values": [0, 1]
+}
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_imp"]
+_data = {
+&"idle": SubResource("Animation_idle")
+}
+
 [node name="EmberImp" type="CharacterBody2D"]
 script = ExtResource("1_ai")
+windup_texture = ExtResource("3_windup")
+hurt_texture = ExtResource("4_hurt")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 shape = SubResource("CircleShape2D_body")
 
 [node name="Telegraph" type="Line2D" parent="."]
 visible = false
+texture_filter = 1
+texture_repeat = 1
 points = PackedVector2Array(10, 0, 175, 0)
-width = 2.0
-default_color = Color(0.878, 0.349, 0.184, 0.7)
+width = 6.0
+default_color = Color(1, 1, 1, 1)
+texture = ExtResource("5_dash")
+texture_mode = 1
+
+[node name="Lane" type="Polygon2D" parent="Telegraph"]
+show_behind_parent = true
+color = Color(0.878, 0.349, 0.184, 0.28)
+polygon = PackedVector2Array(10, -8, 175, -8, 175, 8, 10, 8)
+
+[node name="Tip" type="Polygon2D" parent="Telegraph"]
+position = Vector2(175, 0)
+color = Color(1, 0.635, 0.235, 1)
+polygon = PackedVector2Array(-7, -8, 7, 0, -7, 8)
 
 [node name="Sprite" type="Sprite2D" parent="."]
 texture_filter = 1
 position = Vector2(0, -14)
 texture = ExtResource("2_idle")
+hframes = 2
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
+libraries = {
+&"": SubResource("AnimationLibrary_imp")
+}
+autoplay = "idle"

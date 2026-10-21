@@ -16,11 +16,16 @@ extends Node
 ## `player_joined` / `player_left` and Flow adds a wizard at the room's spawn for
 ## that slot, or removes it (the run goes on; nobody waits for anyone).
 ##
-## The wave is fixed and sized for four players (WAVE); `difficulty` scales it in
-## M3. `room_cleared` is sent when the last enemy of the wave has died.
+## Waves: wave 1 is WAVE (sized for four players); each wave after it has
+## WAVE_GROWTH more enemies, up to WAVE_MAX, from the same spawns and with the same
+## single enemy type. `wave_started(wave)` is sent as each begins. `room_cleared`
+## is sent when the last enemy of a wave has died; NEXT_WAVE_DELAY seconds later
+## the next wave stands in the same room (the world is kept; shots in flight are
+## cleared) and every downed wizard is back up, so a long run is "how many waves".
+## `difficulty` scales this properly in M3.
 ##
 ## Restart: when every wizard is down, a timer of RESTART_DELAY seconds runs, then
-## a fresh world replaces the old one: new wizards at full health, a new wave, no
+## a fresh world replaces the old one: new wizards at full health, wave 1, no
 ## projectiles left, and the bolt's cooldowns reset (the registry hands out one
 ## shared bolt resource, so a new run must forget its cooldowns).
 ##
@@ -33,25 +38,35 @@ const ProjectileManagerScript := preload("res://core/projectiles/projectile_mana
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const AiScript := preload("res://gameplay/ai/ai.gd")
 const PlayerScript := preload("res://gameplay/player/player.gd")
-const WizardScene: PackedScene = preload("res://content/wizard/base/wizard.tscn")
+const DefaultWizardScene: PackedScene = preload("res://content/wizard/base/wizard.tscn")
 
 const PLAYER_SLOTS: int = 4
-## Registry folders and ids of the M1 content.
+## Registry folders, and the ids of the M1 content a run uses unless `room_id_to_play`,
+## `enemy_id_to_play` or `spell_id_to_play` say otherwise.
 const ROOM_FOLDER: StringName = &"rooms"
-const ROOM_ID: StringName = &"arena_01"
+const DEFAULT_ROOM_ID: StringName = &"arena_01"
 const ENEMY_FOLDER: StringName = &"enemies"
-const ENEMY_ID: StringName = &"ember_imp"
+const DEFAULT_ENEMY_ID: StringName = &"ember_imp"
 const SPELL_FOLDER: StringName = &"spells"
-const SPELL_ID: StringName = &"bolt"
+const DEFAULT_SPELL_ID: StringName = &"bolt"
 ## The wave, sized for four players: one enemy per entry, placed at the room's
 ## enemy spawn with that index (wrapped if the room has fewer). An index used
 ## again puts the enemy a step further along the diagonal.
 const WAVE: Array[int] = [0, 1, 2, 3, 4, 5, 0, 3]
 const WAVE_REPEAT_OFFSET: Vector2 = Vector2(14.0, 14.0)
+const WAVE_STACK_DEPTH: int = 3
+const WAVE_LAP_OFFSET: Vector2 = Vector2(-14.0, 14.0)
+## Enemies added by each wave after the first, and the most one wave holds.
+const WAVE_GROWTH: int = 2
+const WAVE_MAX: int = 24
+## Seconds from a cleared wave until the next one stands.
+const NEXT_WAVE_DELAY: float = 3.0
 ## Seconds from the last wizard going down until the room restarts (under 3).
-const RESTART_DELAY: float = 2.0
-## Hit circle of a wizard for enemy contact, in pixels.
-const PLAYER_RADIUS: float = 6.0
+const RESTART_DELAY: float = 1.5
+## Hit circle of a wizard for enemy contact and shots, in pixels, and where it sits
+## above the wizard's feet (the body).
+const PLAYER_RADIUS: float = 8.0
+const PLAYER_HIT_OFFSET: Vector2 = Vector2(0.0, -12.0)
 ## Extra room around the room scene where projectiles may still fly, in pixels.
 const PROJECTILE_MARGIN: float = 32.0
 ## Name of the world node.
@@ -69,20 +84,33 @@ var projectiles: ProjectileManagerScript = null
 ## Where the world goes. Only tests set this; otherwise the world becomes the
 ## current scene (the main menu is freed).
 var world_parent: Node = null
+## What the next run is made of, by registry id. Later features (a room picker, a loadout)
+## set these; the room, enemy and spell themselves are content found by folder, so a new one
+## needs no change here. `wizard_scene` is the wizard every player gets (its art is in the scene).
+var room_id_to_play: StringName = DEFAULT_ROOM_ID
+var enemy_id_to_play: StringName = DEFAULT_ENEMY_ID
+var spell_id_to_play: StringName = DEFAULT_SPELL_ID
+var wizard_scene: PackedScene = DefaultWizardScene
 
 var state: State = State.IDLE
 ## The world of the run in progress (null before the first Play).
 var world: Node2D = null
 ## The id of the room of the run in progress.
 var room_id: StringName = &""
+## The wave in progress (1 for the first of a run; 0 before a run).
+var wave: int = 0
 
 var _starter: int = 0
 var _room: RoomBase = null
 var _bolt: SpellBase = null
+## The wizard scene the run in progress started with (joiners get the same one).
+var _wizard_scene: PackedScene = null
 var _enemies: Array[Node] = []
 var _wizards: Array[Node2D] = []
 var _downed: Array[bool] = [false, false, false, false]
 var _restart_left: float = -1.0
+var _next_wave_left: float = -1.0
+var _enemy_data: EnemyBase = null
 
 
 func _ready() -> void:
@@ -113,6 +141,11 @@ func _process(delta: float) -> void:
 
 ## Advance the restart timer by `delta` seconds.
 func step(delta: float) -> void:
+	if _next_wave_left >= 0.0:
+		_next_wave_left -= delta
+		if _next_wave_left <= 0.0:
+			_next_wave_left = -1.0
+			_start_next_wave()
 	if _restart_left < 0.0:
 		return
 	_restart_left -= delta
@@ -127,6 +160,20 @@ func step(delta: float) -> void:
 ## True while a restart is counting down.
 func is_restarting() -> bool:
 	return _restart_left >= 0.0
+
+
+## Where the `times`-th enemy (0 = first) at `spawn` stands: up to WAVE_STACK_DEPTH
+## steps along the diagonal, then the next row starts a lap further to the side, so
+## a stack never runs into a wall.
+static func stacked_position(spawn: Vector2, times: int) -> Vector2:
+	var step: int = times % WAVE_STACK_DEPTH
+	var lap: int = times / WAVE_STACK_DEPTH
+	return spawn + WAVE_REPEAT_OFFSET * float(step) + WAVE_LAP_OFFSET * float(lap)
+
+
+## How many enemies wave `number` (1 or more) has.
+static func wave_size(number: int) -> int:
+	return mini(WAVE.size() + WAVE_GROWTH * maxi(number - 1, 0), WAVE_MAX)
 
 
 ## Enemies of the wave still alive.
@@ -145,11 +192,14 @@ func get_wizard(index: int) -> Node2D:
 ## Build the world and start the run now, replacing any run in progress. Returns
 ## false (and starts nothing) when content is missing or no player has a device.
 func start_run(requester: int) -> bool:
-	var room: RoomBase = registry.get_resource(ROOM_FOLDER, ROOM_ID) as RoomBase if registry != null else null
-	var enemy_data: EnemyBase = registry.get_resource(ENEMY_FOLDER, ENEMY_ID) as EnemyBase if registry != null else null
-	var bolt: SpellBase = registry.get_resource(SPELL_FOLDER, SPELL_ID) as SpellBase if registry != null else null
+	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id_to_play) as RoomBase if registry != null else null
+	var enemy_data: EnemyBase = registry.get_resource(ENEMY_FOLDER, enemy_id_to_play) as EnemyBase if registry != null else null
+	var bolt: SpellBase = registry.get_resource(SPELL_FOLDER, spell_id_to_play) as SpellBase if registry != null else null
 	if room == null or room.scene == null or enemy_data == null or enemy_data.scene == null or bolt == null:
-		push_warning("Flow: the room, the enemy or the bolt is missing from the registry, so no run starts.")
+		push_warning("Flow: the room, the enemy or the spell is missing from the registry, so no run starts.")
+		return false
+	if not _is_wizard_scene(wizard_scene):
+		push_warning("Flow: the wizard scene is missing or has no player script, so no run starts.")
 		return false
 	_ensure_joined(requester)
 	var players: Array[int] = _joined_players()
@@ -158,9 +208,12 @@ func start_run(requester: int) -> bool:
 		return false
 	_starter = requester
 	_restart_left = -1.0
+	_next_wave_left = -1.0
 	_clear_run()
 	_room = room
+	_enemy_data = enemy_data
 	_bolt = bolt
+	_wizard_scene = wizard_scene
 	bolt.reset_cooldowns()
 	if projectiles != null:
 		projectiles.clear()
@@ -171,13 +224,16 @@ func start_run(requester: int) -> bool:
 	new_world.add_child(room.scene.instantiate())
 	_add_camera(new_world, room)
 	_spawn_players(new_world, room, players, bolt)
-	_spawn_wave(new_world, room, enemy_data)
+	wave = 1
+	_spawn_wave(new_world, room, enemy_data, wave)
 	world = new_world
 	room_id = room.id
 	state = State.RUNNING
 	_show_world(new_world)
+	_set_walls(new_world)
 	if events != null:
 		events.room_entered.emit(room.id)
+		events.wave_started.emit(wave)
 	return true
 
 
@@ -185,6 +241,8 @@ func start_run(requester: int) -> bool:
 ## `play_requested` starts a run. Nothing shows a menu yet; M3's run area will.
 func stop_run() -> void:
 	_restart_left = -1.0
+	_next_wave_left = -1.0
+	wave = 0
 	_clear_run()
 	state = State.IDLE
 
@@ -240,6 +298,29 @@ func _on_enemy_died(_player: int, enemy: Node, _position: Vector2) -> void:
 		state = State.CLEARED
 		if events != null:
 			events.room_cleared.emit(room_id)
+		_next_wave_left = NEXT_WAVE_DELAY
+
+
+## The next wave in the same room: downed wizards stand up (and are protected for
+## a moment), stray shots go, and a bigger wave spawns.
+func _start_next_wave() -> void:
+	if state != State.CLEARED or world == null or _room == null or _enemy_data == null:
+		return
+	if projectiles != null:
+		projectiles.clear()
+	for wizard: Node2D in _wizards:
+		var hero := wizard as PlayerScript
+		if not is_instance_valid(hero):
+			continue
+		if hero.revive(hero.index):
+			_downed[hero.index] = false
+		hero.protect(PlayerScript.JOIN_PROTECTION)
+	_restart_left = -1.0
+	wave += 1
+	_spawn_wave(world, _room, _enemy_data, wave)
+	state = State.RUNNING
+	if events != null:
+		events.wave_started.emit(wave)
 
 
 func _on_player_downed(player: int) -> void:
@@ -284,6 +365,18 @@ func _joined_players() -> Array[int]:
 		if input.is_joined(index):
 			players.append(index)
 	return players
+
+
+## Tell the projectile manager where the walls are: every static body on the wall
+## layer (1) of the room. The world must be in the tree.
+func _set_walls(new_world: Node2D) -> void:
+	if projectiles == null or not new_world.is_inside_tree():
+		return
+	projectiles.clear_walls()
+	for node: Node in new_world.find_children("*", "StaticBody2D", true, false):
+		var body := node as StaticBody2D
+		if (body.collision_layer & 1) != 0:
+			projectiles.add_wall_body(body)
 
 
 func _room_size(room: RoomBase) -> Vector2:
@@ -338,8 +431,18 @@ func _joiner_spawn(room: RoomBase, index: int) -> Vector2:
 	return best
 
 
+## True when `scene` is set and its root is a player (a wizard scene must carry `player.gd`).
+func _is_wizard_scene(scene: PackedScene) -> bool:
+	if scene == null:
+		return false
+	var probe: Node = scene.instantiate()
+	var ok: bool = probe is PlayerScript
+	probe.free()
+	return ok
+
+
 func _add_wizard(parent: Node2D, room: RoomBase, index: int, bolt: SpellBase, at: Vector2 = Vector2.INF) -> void:
-	var wizard := WizardScene.instantiate() as PlayerScript
+	var wizard := _wizard_scene.instantiate() as PlayerScript
 	wizard.index = index
 	wizard.spell = bolt
 	if at != Vector2.INF:
@@ -349,16 +452,18 @@ func _add_wizard(parent: Node2D, room: RoomBase, index: int, bolt: SpellBase, at
 	parent.add_child(wizard)
 	_wizards.append(wizard)
 	if combat != null:
-		combat.register_player(index, wizard, PLAYER_RADIUS)
+		combat.register_player(index, wizard, PLAYER_RADIUS, PLAYER_HIT_OFFSET)
 
 
-func _spawn_wave(parent: Node2D, room: RoomBase, data: EnemyBase) -> void:
+func _spawn_wave(parent: Node2D, room: RoomBase, data: EnemyBase, number: int) -> void:
 	_enemies.clear()
 	if room.enemy_spawns.is_empty():
 		push_warning("Flow: the room has no enemy spawns, so the wave is empty.")
 		return
 	var uses: Dictionary = {}
-	for entry: int in WAVE:
+	for at: int in wave_size(number):
+		# Wave 1 is WAVE as written; a bigger wave carries on round the spawns.
+		var entry: int = WAVE[at] if at < WAVE.size() else at
 		var spawn: int = entry % room.enemy_spawns.size()
 		var times: int = uses.get(spawn, 0)
 		uses[spawn] = times + 1
@@ -367,7 +472,7 @@ func _spawn_wave(parent: Node2D, room: RoomBase, data: EnemyBase) -> void:
 			push_warning("Flow: the enemy scene has no AI script on its root, so it is skipped.")
 			continue
 		enemy.data = data
-		enemy.position = room.enemy_spawns[spawn] + WAVE_REPEAT_OFFSET * float(times)
+		enemy.position = stacked_position(room.enemy_spawns[spawn], times)
 		parent.add_child(enemy)
 		_enemies.append(enemy)
 

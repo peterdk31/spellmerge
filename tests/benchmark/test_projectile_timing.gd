@@ -108,6 +108,34 @@ func _run_cap(cap: int) -> void:
 	var step_us: float = _time_steps()
 	_log("step, full cap, no targets", step_us, 1, "per step")
 
+	# The same with the arena's walls (border and six pillars) set: shots refilled
+	# before each step cross the wall grid and some end on a wall.
+	_mgr.set_walls(_arena_walls())
+	var wall_us: float = 0.0
+	for i in REPEATS:
+		_fill(cap, 1.0e6, false)
+		var wall_start: int = Time.get_ticks_usec()
+		_mgr.step(DT)
+		wall_us += float(Time.get_ticks_usec() - wall_start)
+	_check(_mgr.get_count() < cap, "cap %d: some shots ended on a wall" % cap)
+	_check(_mgr.wall_hits > 0, "cap %d: wall_hits counts them" % cap)
+	_log("step, full cap, no targets, arena walls set", wall_us / float(REPEATS), 1, "per step")
+	# The costly case: every shot is fast (1,500 px/s, 25 px a step: several wall
+	# cells) and flies in the open band between the top border and the pillars, so
+	# nearly none ends in the first cell.
+	var long_us: float = 0.0
+	for i in REPEATS:
+		_mgr.clear()
+		for n in cap:
+			var lane := Vector2(48.0 + float(n * 37 % 500), 40.0 + float(n * 53 % 80))
+			_mgr.spawn(n % PLAYERS, lane, Vector2(1500.0, 0.0), 1.0e6, 4.0, 0)
+		var long_start: int = Time.get_ticks_usec()
+		_mgr.step(DT)
+		long_us += float(Time.get_ticks_usec() - long_start)
+	_check(_mgr.get_count() > cap * 9 / 10, "cap %d: the long paths mostly survive (%d)" % [cap, _mgr.get_count()])
+	_log("step, full cap, long wall paths, none dying", long_us / float(REPEATS), 1, "per step")
+	_mgr.clear_walls()
+
 	# The crowd: 100 enemies packed into a few cells, four wizards beside them, and
 	# fast piercing shots fired through them. Every timing starts from a fresh fill,
 	# so every call does real hits and sends `projectile_hit`.
@@ -145,6 +173,16 @@ func _run_cap(cap: int) -> void:
 	_log("step, steady state (targets remembered)", steady_us, 1, "per step")
 	_bus.projectile_hit.disconnect(_on_hit)
 	root.remove_child(_mgr)
+
+
+## The solid parts of the arena: a 32 px border and six 32 px pillars.
+func _arena_walls() -> Array[Rect2]:
+	var rects: Array[Rect2] = [
+		Rect2(0, 0, 640, 32), Rect2(0, 328, 640, 32), Rect2(0, 0, 32, 360), Rect2(608, 0, 32, 360),
+	]
+	for corner: Vector2 in [Vector2(160, 128), Vector2(448, 128), Vector2(160, 224), Vector2(448, 224), Vector2(288, 160), Vector2(320, 192)]:
+		rects.append(Rect2(corner, Vector2(32, 32)))
+	return rects
 
 
 ## Mean microseconds of one `step` over REPEATS steps.

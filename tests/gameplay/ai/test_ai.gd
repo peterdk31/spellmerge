@@ -33,12 +33,11 @@ func _initialize() -> void:
 	_test_downed_player_is_skipped()
 	_test_downed_event_retargets_at_once()
 	_test_freed_player_is_dropped()
-	_test_telegraph_comes_before_the_shot()
-	_test_telegraph_standing_still_and_aim_locked()
 	_test_shot_hurts_wizard_through_combat()
 	_test_shot_can_be_dodged_by_stepping_aside()
+	_test_shot_and_telegraph_start_at_the_body()
+	_test_shot_is_small_and_dodgeable()
 	_test_no_lookups_while_nobody_stands()
-	_test_telegraph_nodes_follow_the_windup()
 	_test_recover_then_chase_again()
 	_test_knockback_moves_the_enemy()
 	_test_group_players_are_found()
@@ -75,7 +74,7 @@ func _setup(player_count: int = 0) -> void:
 		root.add_child(wizard)
 		wizard.position = Vector2(1000.0, 1000.0 * index)
 		_players.append(wizard)
-		_combat.register_player(index, wizard, 8.0)
+		_combat.register_player(index, wizard, 8.0, Vector2(0.0, -12.0))
 
 
 func _teardown() -> void:
@@ -203,36 +202,6 @@ func _test_freed_player_is_dropped() -> void:
 	_check(imp.target == _players[0], "a freed player is dropped without errors")
 
 
-func _test_telegraph_comes_before_the_shot() -> void:
-	_setup(1)
-	_players[0].position = Vector2(80.0, 0.0)
-	var imp := _imp()
-	_check(not imp.is_telegraphing() and imp.telegraph_progress() == 0.0, "not telegraphing before it sees a player")
-	imp.step(STEP)
-	_check(imp.is_telegraphing(), "in range, the windup (telegraph) starts")
-	_check(_projectiles.get_count() == 0, "no shot yet at the start of the telegraph")
-	var steps: int = int(imp.windup_time / STEP)
-	_run(imp, steps - 2)
-	_check(imp.is_telegraphing() and _projectiles.get_count() == 0, "still telegraphing, still no damage, just before the end")
-	_check(imp.telegraph_progress() > 0.8 and imp.telegraph_progress() < 1.0, "progress is near the end")
-	_run(imp, 2)
-	_check(not imp.is_telegraphing(), "the telegraph ended")
-	_check(_projectiles.get_count() == 1, "exactly one shot left when the telegraph ended")
-
-
-func _test_telegraph_standing_still_and_aim_locked() -> void:
-	_setup(1)
-	_players[0].position = Vector2(60.0, 0.0)
-	var imp := _imp()
-	imp.step(STEP)
-	_check(imp.is_telegraphing() and imp.aim.is_equal_approx(Vector2.RIGHT), "aim points at the player")
-	var at: Vector2 = imp.position
-	_players[0].position = Vector2(0.0, 60.0)
-	_run(imp, 4)
-	_check(imp.position == at and imp.velocity == Vector2.ZERO, "the imp stands still while telegraphing")
-	_check(imp.aim.is_equal_approx(Vector2.RIGHT), "the aim stays locked on where the player was")
-
-
 func _test_shot_hurts_wizard_through_combat() -> void:
 	_setup(1)
 	_players[0].position = Vector2(60.0, 0.0)
@@ -244,6 +213,21 @@ func _test_shot_hurts_wizard_through_combat() -> void:
 	_run(imp, 16)
 	_check(damaged == [[EventsScript.NO_PLAYER, _players[0], imp.attack_damage]], "the shot hurt player 0 once, as an enemy (NO_PLAYER)")
 	_check(_players[0].health == PlayerScript.MAX_HEALTH - imp.attack_damage, "the wizard lost attack_damage health")
+
+
+## Regression (#5): the shot and the telegraph start at `hurt_offset`, the body, not the feet.
+func _test_shot_and_telegraph_start_at_the_body() -> void:
+	_setup(0)
+	var imp := _imp(Vector2(10.0, 20.0))
+	imp.aim = Vector2.RIGHT
+	imp._attack()
+	_check(_projectiles.get_count() == 1, "the imp's attack spawns one shot")
+	_check(_projectiles.get_position_of(0) == Vector2(10.0, 20.0) + imp.hurt_offset, "the shot leaves from position + hurt_offset")
+	var scene_imp: AiScript = ImpData.scene.instantiate() as AiScript
+	root.add_child(scene_imp)
+	var line: Node2D = scene_imp.get_node("Telegraph") as Node2D
+	_check(line.position == scene_imp.hurt_offset, "the scene's telegraph starts where the shot does")
+	scene_imp.free()
 
 
 func _test_shot_can_be_dodged_by_stepping_aside() -> void:
@@ -263,6 +247,20 @@ func _test_shot_can_be_dodged_by_stepping_aside() -> void:
 	_check(_players[0].health == PlayerScript.MAX_HEALTH, "a player who stepped aside during the telegraph is not hit")
 
 
+## Enemy shots are small bullets (#4): a wizard (hit circle 8) is hit by a shot passing inside
+## 8 + 3.5 = 11.5 px, and clears it with a 15 px sidestep.
+func _test_shot_is_small_and_dodgeable() -> void:
+	for offset: float in [10.0, 15.0]:
+		_setup(1)
+		_players[0].position = Vector2(60.0, 0.0)
+		var imp := _imp()
+		imp.step(STEP)
+		_players[0].position = Vector2(60.0, offset)
+		_run(imp, int(imp.windup_time / STEP) + 20)
+		var hit: bool = _players[0].health < PlayerScript.MAX_HEALTH
+		_check(hit == (offset < 11.5), "a shot passing %.0f px from the wizard %s" % [offset, "hits" if offset < 11.5 else "misses"])
+
+
 func _test_no_lookups_while_nobody_stands() -> void:
 	_setup(2)
 	var imp := _imp()
@@ -277,33 +275,6 @@ func _test_no_lookups_while_nobody_stands() -> void:
 	var allowed: int = int(float(steps) * STEP / AiScript.RETARGET_TIME) + 1
 	_check(imp.target == null, "nobody stands, so there is no target")
 	_check(imp.lookup_count - before <= allowed, "with no target the players are looked up only every RETARGET_TIME (%d lookups)" % (imp.lookup_count - before))
-
-
-func _test_telegraph_nodes_follow_the_windup() -> void:
-	_setup(1)
-	_players[0].position = Vector2(0.0, 80.0)
-	var imp: AiScript = ImpData.scene.instantiate()
-	imp.data = ImpData
-	imp.events = _bus
-	imp.combat = _combat
-	imp.projectiles = _projectiles
-	imp.targets.append(_players[0])
-	imp._ready()
-	_enemies.append(imp)
-	var line: Line2D = imp.get_node("Telegraph")
-	var sprite: Sprite2D = imp.get_node("Sprite")
-	var reach: float = imp.attack_speed * imp.attack_lifetime
-	_check(is_equal_approx(line.get_point_position(1).x, reach), "the telegraph line is as long as the shot flies")
-	_check(not line.visible, "the telegraph is hidden before the windup")
-	imp.step(STEP)
-	_check(line.visible and is_equal_approx(line.rotation, imp.aim.angle()), "the telegraph shows, turned toward the locked aim")
-	_check(sprite.modulate != Color.WHITE, "the sprite flashes during the windup")
-	var early_width: float = line.width
-	var early_alpha: float = line.modulate.a
-	_run(imp, int(imp.windup_time / STEP) - 4)
-	_check(line.width > early_width and line.modulate.a > early_alpha, "the telegraph grows wider and brighter with progress")
-	_run(imp, 4)
-	_check(not line.visible and sprite.modulate == Color.WHITE, "after the shot the telegraph is hidden and the sprite is white again")
 
 
 func _test_recover_then_chase_again() -> void:

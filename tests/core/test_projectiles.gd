@@ -42,12 +42,24 @@ func _initialize() -> void:
 	_test_slots_are_reused()
 	_test_one_thousand_match_brute_force()
 	_test_one_thousand_run_and_draw()
+	_test_enemy_shots_have_their_own_batch()
+	_test_shot_colours_differ_and_stay_bright()
 	_test_freed_target_is_dropped()
 	_test_target_removed_by_a_hit_handler()
 	_test_spawn_in_a_hit_handler_waits_a_step()
 	_test_out_of_bounds_removed()
 	_test_hit_work_per_step_is_bounded()
 	_test_spent_budget_resumes_at_the_first_untested_shot()
+	_test_shot_ends_on_a_wall()
+	_test_wall_stops_a_piercing_shot_and_a_fast_shot()
+	_test_target_in_front_of_a_wall_is_hit_by_a_long_step()
+	_test_shot_born_in_a_wall_takes_no_slot()
+	_test_wall_walk_is_capped()
+	_test_wall_hits_from_every_direction()
+	_test_wall_edges_and_clearing()
+	_test_clip_to_walls()
+	_test_wall_body_rectangles_become_walls()
+	_test_target_offset_moves_the_hit_circle()
 	_teardown()
 	if _failures.is_empty():
 		print("TEST OK: core/projectiles")
@@ -438,7 +450,54 @@ func _test_one_thousand_run_and_draw() -> void:
 	_mgr.update_draw()
 	_check(_mgr.drawn == 0 and _mgr.get_count() == 0, "clear empties the batch")
 	_check(_mgr._draw_node.multimesh.visible_instance_count == 0, "clear empties the drawn multimesh, not just the counter")
+	# Regression (issue #102): the autoload is drawn before the room, so shots need a raised z_index to show above its floor.
+	_check(_mgr._draw_node.z_index >= 1, "the shots are drawn above the room's floor")
+	# Regression (issue #102): without a culling box covering the area, shots away from the origin were never drawn.
+	var box: AABB = _mgr._draw_node.multimesh.custom_aabb
+	_check(box.has_point(Vector3(-500.0, -400.0, 0.0)) and box.has_point(Vector3(900.0, 900.0, 0.0)), "the batch's culling box covers the whole play area")
 	root.remove_child(_mgr)
+
+
+## Enemy shots are drawn in a batch of their own: other texture, untinted, one layer
+## above the players' shots (task "Enemy readability": shots must not read as a spell).
+func _test_enemy_shots_have_their_own_batch() -> void:
+	_setup()
+	root.add_child(_mgr)
+	var player_art := PlaceholderTexture2D.new()
+	var enemy_art := PlaceholderTexture2D.new()
+	_mgr.texture = player_art
+	_check(_mgr._hostile_node.texture == player_art, "without hostile art, enemy shots use the shared texture")
+	_mgr.hostile_texture = enemy_art
+	_check(_mgr._hostile_node.texture == enemy_art and _mgr._draw_node.texture == player_art, "enemy shots get their own texture")
+	_check(_mgr._hostile_node.z_index > _mgr._draw_node.z_index, "enemy shots are drawn above the players' shots")
+	_mgr.spawn(0, Vector2(10.0, 0.0), Vector2(100.0, 0.0), 1.0)
+	_mgr.spawn(EventsScript.NO_PLAYER, Vector2(20.0, 0.0), Vector2(0.0, 100.0), 1.0, 5.0, ManagerScript.LAYER_PLAYER)
+	_mgr.spawn(EventsScript.NO_PLAYER, Vector2(30.0, 0.0), Vector2(0.0, 100.0), 1.0, 5.0, ManagerScript.LAYER_PLAYER)
+	_mgr.update_draw()
+	_check(_mgr.drawn == 3 and _mgr.drawn_hostile == 2, "drawn counts both batches (%d, %d hostile)" % [_mgr.drawn, _mgr.drawn_hostile])
+	_check(_mgr._draw_node.multimesh.visible_instance_count == 1, "the player batch holds the one player shot")
+	_check(_mgr._hostile_node.multimesh.visible_instance_count == 2, "the enemy batch holds the two enemy shots")
+	var buffer: PackedFloat32Array = _mgr._hostile_node.multimesh.buffer
+	_check(buffer.size() > 12 and is_equal_approx(buffer[3], 20.0) and is_equal_approx(buffer[15], 30.0), "the enemy batch has the enemy shots' positions")
+	_check(is_equal_approx(buffer[8], 1.0) and is_equal_approx(buffer[9], 1.0) and is_equal_approx(buffer[10], 1.0), "enemy shots are not tinted")
+	_mgr.clear()
+	_mgr.update_draw()
+	_check(_mgr.drawn == 0 and _mgr._hostile_node.multimesh.visible_instance_count == 0, "clear empties the enemy batch too")
+	root.remove_child(_mgr)
+
+
+## The tint keeps every owner's shots readable: the five colours (players 0-3 and
+## the enemy) differ from each other and none is dark.
+func _test_shot_colours_differ_and_stay_bright() -> void:
+	_setup()
+	var colours: Array[Color] = []
+	for owner_index in [-1, 0, 1, 2, 3]:
+		colours.append(_mgr._color_of(owner_index))
+	for i in colours.size():
+		_check(colours[i].get_luminance() >= 0.45, "shot colour %d is not dark (luminance %.2f)" % [i, colours[i].get_luminance()])
+		for j in range(i + 1, colours.size()):
+			var gap: float = absf(colours[i].r - colours[j].r) + absf(colours[i].g - colours[j].g) + absf(colours[i].b - colours[j].b)
+			_check(gap >= 0.15, "shot colours %d and %d differ (gap %.2f)" % [i, j, gap])
 
 
 func _test_freed_target_is_dropped() -> void:
@@ -537,3 +596,187 @@ func _test_spent_budget_resumes_at_the_first_untested_shot() -> void:
 	_mgr.spawn(0, Vector2.ZERO, Vector2(0.1, 0.0), 10.0, 4.0, ManagerScript.LAYER_ENEMY, 5, 0)
 	_mgr.step(DT)
 	_check(_mgr._resume == 0, "a step that tests everything resets the resume point")
+
+
+func _wall_rects() -> Array[Rect2]:
+	return [Rect2(96.0, 0.0, 32.0, 200.0)]
+
+
+func _test_shot_ends_on_a_wall() -> void:
+	_setup()
+	_mgr.set_bounds(Rect2(0.0, 0.0, 640.0, 360.0))
+	_mgr.set_walls(_wall_rects())
+	var shot: int = _mgr.spawn(0, Vector2(50.0, 100.0), Vector2(120.0, 0.0), 5.0)
+	var clear_shot: int = _mgr.spawn(0, Vector2(50.0, 250.0), Vector2(120.0, 0.0), 5.0)
+	for _i in 60:
+		_mgr.step(DT)
+	_check(not _mgr.is_alive(shot), "a shot that reaches a wall ends")
+	_check(_mgr.is_alive(clear_shot), "a shot below the wall keeps flying")
+	_check(_mgr.wall_hits == 1, "wall_hits counts the shot that ended (%d)" % _mgr.wall_hits)
+
+
+func _test_wall_stops_a_piercing_shot_and_a_fast_shot() -> void:
+	_setup()
+	_mgr.set_bounds(Rect2(0.0, 0.0, 640.0, 360.0))
+	_mgr.set_walls(_wall_rects())
+	_target(Vector2(200.0, 100.0))
+	var piercing: int = _mgr.spawn(0, Vector2(50.0, 100.0), Vector2(600.0, 0.0), 5.0, 4.0, ManagerScript.LAYER_ENEMY, 5)
+	# 6,000 px/s moves 100 px in one step: a shot that would skip a thin wall.
+	var fast: int = _mgr.spawn(0, Vector2(60.0, 150.0), Vector2(6000.0, 0.0), 5.0)
+	for _i in 30:
+		_mgr.step(DT)
+	_check(not _mgr.is_alive(piercing), "a piercing shot ends on a wall too")
+	_check(not _mgr.is_alive(fast), "a shot faster than the wall is thick does not tunnel")
+	_check(_hits.is_empty(), "nothing behind the wall was hit (%d)" % _hits.size())
+
+
+func _test_target_in_front_of_a_wall_is_hit_by_a_long_step() -> void:
+	_setup()
+	_mgr.set_bounds(Rect2(0.0, 0.0, 640.0, 360.0))
+	_mgr.set_walls(_wall_rects())
+	var in_front: Node2D = _target(Vector2(90.0, 100.0))
+	# 6,000 px/s: one step from x 50 to x 150 crosses the target, then the wall.
+	var shot: int = _mgr.spawn(0, Vector2(50.0, 100.0), Vector2(6000.0, 0.0), 5.0)
+	_mgr.step(DT)
+	_check(_hits.size() == 1 and _hits[0][1] == in_front, "the target in front of the wall is hit (%d hits)" % _hits.size())
+	_check(not _mgr.is_alive(shot), "the shot ends at the wall or on the hit")
+	# A piercing shot passes the target and still ends on the wall in the same step.
+	_hits.clear()
+	var piercing: int = _mgr.spawn(0, Vector2(50.0, 100.0), Vector2(6000.0, 0.0), 5.0, 4.0, ManagerScript.LAYER_ENEMY, 5)
+	_mgr.step(DT)
+	_check(_hits.size() == 1, "a piercing shot hits the target in front of the wall (%d)" % _hits.size())
+	_check(not _mgr.is_alive(piercing), "and ends on the wall in the same step")
+	_check(_mgr.wall_hits >= 1, "wall_hits counts the end")
+
+
+func _test_shot_born_in_a_wall_takes_no_slot() -> void:
+	_setup()
+	_mgr.set_bounds(Rect2(0.0, 0.0, 640.0, 360.0))
+	_mgr.set_cap(3)
+	_mgr.set_walls(_wall_rects())
+	var first: int = _mgr.spawn(1, Vector2(10.0, 300.0), Vector2(1.0, 0.0), 5.0)
+	_mgr.spawn(1, Vector2(20.0, 300.0), Vector2(1.0, 0.0), 5.0)
+	_mgr.spawn(1, Vector2(30.0, 300.0), Vector2(1.0, 0.0), 5.0)
+	var dead: int = _mgr.spawn(0, Vector2(110.0, 100.0), Vector2(100.0, 0.0), 5.0)
+	_check(dead == -1, "a shot spawned inside a wall is refused")
+	_check(_mgr.get_count() == 3 and _mgr.is_alive(first), "at the cap it evicted nobody")
+	_check(_mgr.wall_hits == 1, "it counts as ended on a wall (%d)" % _mgr.wall_hits)
+
+
+func _test_wall_walk_is_capped() -> void:
+	_setup()
+	_mgr.set_bounds(Rect2(0.0, 0.0, 2000.0, 360.0))
+	var far_wall: Array[Rect2] = [Rect2(1200.0, 0.0, 32.0, 360.0)]
+	_mgr.set_walls(far_wall)
+	# One step of 1,800 px is 225 cells, more than MAX_WALL_VISITS: the shot is
+	# ended even though the wall lies in the part that is not walked.
+	var shot: int = _mgr.spawn(0, Vector2(50.0, 100.0), Vector2(108000.0, 0.0), 5.0)
+	_mgr.step(DT)
+	_check(not _mgr.is_alive(shot), "a step too long to walk ends the shot instead of crossing the wall")
+	# A long step with nothing in the way, within the cap, flies on.
+	var near: int = _mgr.spawn(0, Vector2(50.0, 100.0), Vector2(18000.0, 0.0), 5.0)
+	_mgr.step(DT)
+	_check(_mgr.is_alive(near), "a 300 px step toward a far wall is walked and clear")
+
+
+func _test_wall_hits_from_every_direction() -> void:
+	_setup()
+	_mgr.set_bounds(Rect2(0.0, 0.0, 640.0, 360.0))
+	var block: Array[Rect2] = [Rect2(304.0, 152.0, 32.0, 32.0)]
+	_mgr.set_walls(block)
+	var centre := Vector2(320.0, 168.0)
+	var slots: Array[int] = []
+	for i in 16:
+		var direction: Vector2 = Vector2.from_angle(float(i) * TAU / 16.0 + 0.1)
+		slots.append(_mgr.spawn(0, centre + direction * 90.0, -direction * 200.0, 5.0))
+	for _i in 40:
+		_mgr.step(DT)
+	var alive: int = 0
+	for slot in slots:
+		if _mgr.is_alive(slot):
+			alive += 1
+	_check(alive == 0, "shots from all sides end on the block (%d still fly)" % alive)
+	_check(_mgr.wall_hits == 16, "each one counted (%d)" % _mgr.wall_hits)
+
+
+func _test_wall_edges_and_clearing() -> void:
+	_setup()
+	_mgr.set_bounds(Rect2(0.0, 0.0, 640.0, 360.0))
+	_mgr.set_walls(_wall_rects())
+	# The wall covers x 96..128, y 0..200.
+	var beside: int = _mgr.spawn(0, Vector2(90.0, 260.0), Vector2(0.0, -100.0), 1.0)
+	var below: int = _mgr.spawn(0, Vector2(120.0, 205.0), Vector2(0.0, 100.0), 1.0)
+	_mgr.step(DT)
+	_check(_mgr.is_alive(beside), "a shot beside the wall does not touch it")
+	_check(_mgr.is_alive(below), "a shot leaving the wall's bottom edge flies on")
+	_mgr.clear_walls()
+	var through: int = _mgr.spawn(0, Vector2(90.0, 100.0), Vector2(300.0, 0.0), 2.0)
+	for _i in 20:
+		_mgr.step(DT)
+	_check(_mgr.is_alive(through) and _mgr.get_position_of(through).x > 128.0, "with the walls cleared the shot passes")
+	_mgr.set_walls(_wall_rects())
+	_mgr.set_bounds(Rect2(0.0, 0.0, 640.0, 360.0))
+	var again: int = _mgr.spawn(0, Vector2(90.0, 100.0), Vector2(300.0, 0.0), 2.0)
+	for _i in 20:
+		_mgr.step(DT)
+	_check(_mgr.is_alive(again), "set_bounds removes the walls")
+
+
+func _test_clip_to_walls() -> void:
+	_setup()
+	_mgr.set_bounds(Rect2(0.0, 0.0, 640.0, 360.0))
+	var open_end: Vector2 = _mgr.clip_to_walls(Vector2(10.0, 10.0), Vector2(90.0, 10.0))
+	_check(open_end == Vector2(90.0, 10.0), "without walls the segment is unchanged")
+	_mgr.set_walls(_wall_rects())
+	var clipped: Vector2 = _mgr.clip_to_walls(Vector2(60.0, 100.0), Vector2(160.0, 100.0))
+	_check(absf(clipped.x - 96.0) < 0.01 and clipped.y == 100.0, "the segment stops at the wall's near edge (%s)" % str(clipped))
+	var diagonal: Vector2 = _mgr.clip_to_walls(Vector2(80.0, 80.0), Vector2(180.0, 180.0))
+	_check(absf(diagonal.x - 96.0) < 0.01 and absf(diagonal.y - 96.0) < 0.01, "a diagonal segment stops at the edge (%s)" % str(diagonal))
+	var inside: Vector2 = _mgr.clip_to_walls(Vector2(110.0, 100.0), Vector2(60.0, 100.0))
+	_check(inside == Vector2(110.0, 100.0), "from inside a wall the segment is empty")
+	var clear: Vector2 = _mgr.clip_to_walls(Vector2(60.0, 250.0), Vector2(160.0, 250.0))
+	_check(clear == Vector2(160.0, 250.0), "a clear segment is unchanged")
+
+
+func _test_wall_body_rectangles_become_walls() -> void:
+	_setup()
+	_mgr.set_bounds(Rect2(0.0, 0.0, 640.0, 360.0))
+	var body := StaticBody2D.new()
+	body.position = Vector2(96.0, 0.0)
+	var shape_node := CollisionShape2D.new()
+	var rectangle := RectangleShape2D.new()
+	rectangle.size = Vector2(32.0, 64.0)
+	shape_node.shape = rectangle
+	shape_node.position = Vector2(16.0, 32.0)
+	body.add_child(shape_node)
+	var circle_node := CollisionShape2D.new()
+	circle_node.shape = CircleShape2D.new()
+	circle_node.position = Vector2(400.0, 200.0)
+	body.add_child(circle_node)
+	root.add_child(body)
+	_mgr.add_wall_body(body)
+	var clipped: Vector2 = _mgr.clip_to_walls(Vector2(60.0, 30.0), Vector2(200.0, 30.0))
+	_check(absf(clipped.x - 96.0) < 0.01, "the body's rectangle (96..128, 0..64) is a wall (%s)" % str(clipped))
+	var below: Vector2 = _mgr.clip_to_walls(Vector2(60.0, 100.0), Vector2(200.0, 100.0))
+	_check(below.x == 200.0, "below the rectangle is open")
+	var round_shape: Vector2 = _mgr.clip_to_walls(Vector2(300.0, 200.0), Vector2(500.0, 200.0))
+	_check(round_shape.x == 500.0, "a circle shape is ignored")
+	body.free()
+
+
+## Regression (#5): the hit circle sat at the node's origin (the feet), so a shot
+## flying through the drawn body above it passed without hitting.
+func _test_target_offset_moves_the_hit_circle() -> void:
+	_setup()
+	var node := Node2D.new()
+	root.add_child(node)
+	_targets.append(node)
+	node.global_position = Vector2(50.0, 0.0)
+	_mgr.add_target(node, 8.0, ManagerScript.LAYER_ENEMY, EventsScript.NO_PLAYER, Vector2(0.0, -14.0))
+	# Through the body (y = -14) hits; along the feet (y = 0) is 14 px from the circle's centre, beyond 8 + 4.
+	_mgr.spawn(0, Vector2(0.0, -14.0), Vector2(600.0, 0.0), 1.0, 4.0)
+	_mgr.step(0.2)
+	_check(_hits.size() == 1, "a shot through the body hits a target whose circle is offset up")
+	_mgr.spawn(0, Vector2(0.0, 0.0), Vector2(600.0, 0.0), 1.0, 4.0)
+	_mgr.step(0.2)
+	_check(_hits.size() == 1, "a shot along the feet misses the offset circle")

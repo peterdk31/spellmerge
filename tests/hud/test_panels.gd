@@ -37,9 +37,12 @@ func _initialize() -> void:
 	_test_panel_shows_numbers()
 	_test_down_and_menu_words()
 	_test_hud_waits_for_room_and_join()
+	_test_wave_line()
 	_test_hud_routes_to_the_right_panel()
 	_test_leave_and_rejoin_resets_the_panel()
 	_test_run_boundaries_hide_panels()
+	_test_hurt_vignette()
+	_test_vignette_with_four_players()
 	_test_hud_four_players_in_four_corners()
 	_test_hud_menu_word_follows_ui_focus()
 	_test_bad_indices_are_ignored()
@@ -194,6 +197,22 @@ func _test_run_boundaries_hide_panels() -> void:
 	_free_hud(parts)
 
 
+func _test_wave_line() -> void:
+	var parts: Array = _make_hud()
+	var hud: HudScript = parts[0]
+	var bus: EventsScript = parts[1]
+	var label: Label = hud.get_wave_label()
+	_check(label != null and not label.visible, "the wave line is hidden before a wave")
+	bus.wave_started.emit(1)
+	_check(label.visible and label.text == "Wave 1", "wave 1 shows 'Wave 1', got '%s'" % label.text)
+	bus.wave_started.emit(7)
+	_check(label.text == "Wave 7", "the line follows wave_started, got '%s'" % label.text)
+	_check(label.mouse_filter == Control.MOUSE_FILTER_IGNORE, "the wave line takes no input")
+	bus.run_ended.emit(false)
+	_check(not label.visible, "the wave line is hidden when the run ends")
+	_free_hud(parts)
+
+
 func _test_hud_routes_to_the_right_panel() -> void:
 	var parts: Array = _make_hud()
 	var hud: HudScript = parts[0]
@@ -205,6 +224,68 @@ func _test_hud_routes_to_the_right_panel() -> void:
 	_check(value.call(0, "HealthValue") == "100" and value.call(3, "HealthValue") == "100", "the other panels are untouched")
 	bus.player_stats_changed.emit(3, 0, 100, 0.0, 100.0)
 	_check(hud.get_panel(3).is_downed() and not hud.get_panel(2).is_downed(), "only player 3 is shown down")
+	_free_hud(parts)
+
+
+func _test_hurt_vignette() -> void:
+	var parts: Array = _make_hud()
+	var hud: HudScript = parts[0]
+	var bus: EventsScript = parts[1]
+	var vignette := hud.get_vignette()
+	bus.player_joined.emit(2)
+	bus.room_entered.emit(&"arena_01")
+	bus.player_stats_changed.emit(2, 100, 100, 10.0, 100.0)
+	_check(not vignette.visible, "no vignette when a wizard appears")
+	bus.player_stats_changed.emit(2, 100, 100, 5.0, 100.0)
+	_check(not vignette.visible, "no vignette when only mana changes")
+	bus.player_stats_changed.emit(2, 80, 100, 5.0, 100.0)
+	_check(vignette.visible and vignette.strength > 0.0, "a health drop shows the vignette")
+	var first: float = vignette.strength
+	bus.player_stats_changed.emit(2, 60, 100, 5.0, 100.0)
+	_check(vignette.strength > first and vignette.strength <= vignette.MAX_STRENGTH, "more hits glow more, up to a limit")
+	for i in 10:
+		bus.player_stats_changed.emit(2, 59 - i, 100, 5.0, 100.0)
+	_check(vignette.strength <= vignette.MAX_STRENGTH, "the vignette never passes its limit")
+	for i in 30:
+		vignette.step(0.0625)
+	_check(not vignette.visible and vignette.strength == 0.0, "the vignette fades out")
+	bus.player_stats_changed.emit(2, 80, 100, 5.0, 100.0)
+	_check(not vignette.visible, "a revive or heal shows no vignette")
+	bus.player_stats_changed.emit(2, 10, 100, 5.0, 100.0)
+	bus.run_ended.emit(false)
+	_check(not vignette.visible, "a run ending clears the vignette")
+	_check(vignette.mouse_filter == Control.MOUSE_FILTER_IGNORE, "the vignette takes no input")
+	_free_hud(parts)
+
+
+func _test_vignette_with_four_players() -> void:
+	var parts: Array = _make_hud()
+	var hud: HudScript = parts[0]
+	var bus: EventsScript = parts[1]
+	var vignette := hud.get_vignette()
+	for player in 4:
+		bus.player_joined.emit(player)
+		bus.player_stats_changed.emit(player, 100, 100, 5.0, 100.0)
+	bus.room_entered.emit(&"arena_01")
+	# Eight seconds of a fight: each wizard loses 10 of 100 health every half second.
+	var peak: float = 0.0
+	for tick in 64:
+		var player: int = tick % 4
+		bus.player_stats_changed.emit(player, 90, 100, 5.0, 100.0)
+		bus.player_stats_changed.emit(player, 100, 100, 5.0, 100.0)
+		vignette.step(0.125)
+		peak = maxf(peak, vignette.strength)
+	_check(peak < vignette.MAX_STRENGTH * 0.8, "four wizards under fire do not keep the vignette at its limit")
+	vignette.clear()
+	vignette.flash_hit(0, 0.05, 1)
+	var small: float = vignette.strength
+	vignette.clear()
+	vignette.flash_hit(0, 0.5, 1)
+	_check(small < vignette.strength, "a small hit glows less than a big one")
+	vignette.clear()
+	vignette.enabled = false
+	vignette.flash_hit(0, 0.5, 1)
+	_check(not vignette.visible and vignette.strength == 0.0, "the vignette can be turned off")
 	_free_hud(parts)
 
 

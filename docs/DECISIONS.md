@@ -2,6 +2,102 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-21: Enemy shots shrink to radius 3.5 (owner `/claude` on #4)
+
+**Decided by:** Claude, on the owner's request.
+
+- `attack_radius` goes 5 to 3.5. One number sets both the hit circle and the drawn size, so sprite and collision stay matched. The orb is about 10 px wide, readable at 32 px scale, and smaller than a wizard's default bolt (radius 4). A wizard's hit circle is 8, so a 12 px sidestep clears the shot; the telegraph lane narrows with it. Each shot is checked against all players the same way, so co-op dodging is unchanged. Not playtested by a human: This partly undoes the bigger hit circles of the 2026-10-20 hit-box fix (#5) for enemy shots only: the wizard's circle of 8 plus the shot's 3.5 is still a body-sized hit. The 10 px orb inside its quad was not checked by eye. The next playtest report should ask whether shots feel like they pass through the wizard.
+
+## 2026-10-20: Foundation review: data over constants (owner `/claude` on #5)
+
+**Decided by:** Claude, from the owner's request to make the foundation solid, easy to extend and art easy to swap.
+
+- **The review found the layering sound** (events, registry, dependency direction, content by folder, art in scenes) and three spots where a change would have needed a code edit: `Feel` loaded three art files by path, `Flow` fixed the room, enemy, spell and wizard scene as constants, and the wizard's art contract was not tested. Fixed those only; no restructuring.
+- **Art paths live in data.** `FeelPreset` has `spark_texture`, `bolt_texture` and `hostile_texture` (defaults preloaded, so a preset that sets nothing still draws). A re-skin is a preset. Scenes already held every other texture.
+- **`Flow` takes ids and the wizard scene as fields** (`room_id_to_play`, `enemy_id_to_play`, `spell_id_to_play`, `wizard_scene`), defaulting to the M1 content. A room picker or loadout sets them; unknown ids start no run, as before. The old `ROOM_ID`, `ENEMY_ID` and `SPELL_ID` consts became `DEFAULT_*`.
+- **Not done, on purpose:** wave data on rooms, splitting `player.gd`, enemy attack patterns, the M2 spell components. Each is large and belongs to the feature that needs it (`docs/BACKLOG.md`, "Foundation"); doing them now would be guessing the shape.
+- **Tests do not check looks** (already the rule in `tests/README.md`): the art tests check strip sizes and wiring only, so a redraw cannot break them. The feel test that compared against fixed art files was replaced by one that swaps the preset's textures.
+
+## 2026-10-20: Hit circles sit on the body, and are bigger (owner `/claude` on #5)
+
+**Decided by:** Claude, on the owner's bug report: hitboxes too small, shots seem to pass through sprites.
+
+- Cause: sprites are drawn 14 px above the node origin (the feet), but every hit circle was centred on the origin, so a shot through the drawn body at body height was up to 14 px from the circle's centre and often missed. Radii were also small (imp 8, wizard 6, shots 4).
+- Fix: `Projectiles.add_target` takes an `offset`; `Combat.register_enemy`/`register_player` pass it on. Both the imp (`Ai.hurt_offset`) and the wizards (`Flow.PLAYER_HIT_OFFSET`) use (0, -12). Radii: imp 8 to 11, wizard 6 to 8, bolt 4 to 5, imp shot 4 to 5. The imp's shot and telegraph now start at its body, not its feet. Contact damage compares the hit circles too (each node's origin plus its offset), so it is consistent with the shots. With both at (0, -12) the offsets cancel and the contact range is only the larger radii: 14 px (6 + 8) became 19 px (8 + 11), about 36% more. The balance tests did not need new `BALANCE:` numbers.
+- Not changed: the shot's drawn size (3x its radius) and the walls (still a point check). Tuning by feel waits for the playtest.
+
+## 2026-10-20: Art direction before M2, and tests that break one at a time
+
+**Decided by:** Claude, from the owner's `/claude` on #102 (art first, smaller isolated tests).
+
+- **Art stays inside M1** (one enemy, one room); nothing from M2 was started. The final style is still the M2 art direction call; these are better placeholders under the same rules in `docs/STYLE.md`.
+- **Depth without new colours.** The floor is darkened by the scene (`modulate` on the `Floor` sprite) and soft shadows are `Polygon2D` strips in the scene, not baked into art, so the art keeps the palette rule (no partial transparency). The top and bottom walls get a new tile with a lit top face; the side walls keep the old brick tile, because a lit cap repeated down a side wall would look like steps.
+- **Telegraph.** The line is dashed by a repeating 8×8 tile, with a `Lane` strip (16 px wide, the shot's hit width plus margin) and a `Tip` arrowhead, all children of `Telegraph` so one `modulate` fades them together. `ai.gd` fits them to the shot's real reach, so the picture still shows where the shot goes. Width range 4-8 px (was 3-6).
+- **Tests.** Every new test script extends `tests/support/suite.gd`: each `test_*` method is its own test, with its own setup, so one failure names one behaviour and cannot hide or break the next. Tests check behaviour and wiring, not how things look (no pixel colours, no count of decorations): an art or tuning change should not need a test change unless a rule is broken. `test_svg_art.gd` is the one place that checks the look rules (style rules for SVGs, manifest entries), data-driven over every file, so new art is covered without writing a test. Old test files are moved to the new shape when they are touched, not in one go (a mass rewrite would be a large, risky change with no new coverage); the list is in `docs/BACKLOG.md`.
+- **Tests I did not move out of `test_ai.gd`:** chase, target choice, knockback, the damage test: they still work and are not coupled to art.
+
+## 2026-10-19: Muzzle flash: size 0.5 (a small flare, not a blast)
+
+**Decided by:** Claude, from the owner's bug report on #102.
+
+- `muzzle_flash_size` goes from 2.4 to 0.5 (the `@export_range` minimum was already 0.1). With the 32 px `hit_spark.svg`, `MUZZLE_STRETCH` 1.8 and the 1.5× growth while it fades, the flash is 29 px long at the start and 43 px at its largest, about the size of the 32 px wizard. Before it was 138 px growing to 207 px.
+- The stretch stays, so the flash still reads along the aim. The death puff has its own size (`death_puff_size`) and is unchanged.
+- `test_feel.gd` fails if the `punchy` muzzle flash is longer than 48 px at any step.
+
+## 2026-10-18: Wave pacing: waves in the same room, +2 enemies a wave, downed wizards stand up between waves
+
+**Decided by:** Claude, from the owner's round-2 task list (#102).
+
+- **Growth is +2 enemies per wave, capped at 24** (`WAVE_GROWTH`, `WAVE_MAX`). Wave 1 stays the fixed 8-imp list the balance and 4-bot tests were tuned on; later waves carry on round the room's spawns (stacked with the existing diagonal offset). Linear, because the bots (which never dodge) already struggle with 1 and 2 players at wave 1; faster growth would end runs at wave 2. The cap keeps the enemy count (and the shot count) inside the performance budgets. Real scaling by player count and level belongs to `difficulty` in M3.
+- **3 s between a clear and the next wave** (`NEXT_WAVE_DELAY`): enough to see the clear, not long enough to idle. The world, the wizards and their positions are kept (a "same room" feel); only the shots in flight are cleared.
+- **Downed wizards are back up at the start of the next wave** (with `revive`, 50 health, plus the 2 s join protection for everyone), so one mistake does not leave a player watching for the rest of the run, and nobody waits (pillar). Health is otherwise not refilled: a wave is a real cost. If this proves too hard, a heal belongs to rewards (M4), not here.
+- **Quick restart: `RESTART_DELAY` 2.0 s to 1.5 s.** A lost room goes back to wave 1. The restart still builds a new world and sends `room_entered`; the wave counter restarts with `wave_started(1)`.
+- **New event `wave_started(wave)`** (sender `flow`, heard by `hud`), so the HUD never reads `flow`. `room_entered` is not repeated for a new wave; `room_cleared` is sent for every wave.
+- **HUD:** a plain "Wave N" label at the top middle (between the P1 and P2 panels), shown from the first `wave_started`, hidden when a run ends. Not tuned by playing (not possible here).
+
+## 2026-10-18: Enemy readability: shape and brightness, a second draw batch, a hit never cancels a windup
+
+**Decided by:** Claude, from the owner's round-2 task list (#102).
+
+- **Enemy shots get their own batch, not a second texture in one.** A multimesh has one texture; an atlas needs a shader and per-instance data. A second `MultiMeshInstance2D` (one layer above) costs a second buffer of the same size and no extra loop. Enemy shots are untinted so they stay the brightest thing on screen; the player's comet keeps its 45% tint. Shape differs (round and spiked against a comet with a tail), so colour is not the only signal (docs/STYLE.md, "Readability").
+- **Poses are textures, not new frames in `idle.svg`.** STYLE says one strip per animation, named by it. `ai.gd` swaps `Sprite.texture` and `hframes` and pauses the `AnimationPlayer` for the pose; the exports `windup_texture` and `hurt_texture` are optional, so another enemy without them behaves as before.
+- **A hit does not cancel the windup.** Stun-locking would let one fast shooter cancel every imp, and the telegraph would stop meaning "a shot comes". The imp still has knockback (Combat) and Feel's flash; the hurt pose shows on top for 0.25 s and the telegraph line stays.
+- **The windup flips by progress², not by time.** The pose slows at the start and speeds up, so "about to fire" is readable without a number. It is 5 flips-worth before the last 20%, where the bright frame is held (with the brighter colour), so the flash never goes above about 5 bright-dark cycles a second, however many imps wind up at once.
+- **Cost of the second batch.** The enemy batch reserves `cap` instances and uploads its whole buffer when any enemy shot exists (Godot's `MultiMesh.buffer` takes all of it, like the player batch), so memory for draws doubles and a frame with enemy shots writes up to about 144 KB more on desktop. Accepted: the earlier decision showed the bulk write is cheap; a smaller enemy cap or a sliced upload is a later option if the web build needs it.
+- **Not done:** no sound cue (audio is not in M1), no windup frames for the other directions (the imp is drawn from the front).
+
+## 2026-10-18: Revive is automatic proximity in `coop`: 2 s hold, 48 px, 1.5 s protection
+
+**Decided by:** Claude (owner `/claude` on #102, C1 round 2 task 1).
+**Context:** `Player.revive(reviver)` existed but nothing called it, so a downed wizard stayed down until the room restarted. The earlier decision gave "how" to `coop`.
+**Decision:** `coop` runs the revive (`step_revive`, from `_process`). No button: a standing wizard who stays within `REVIVE_RANGE` (48 px, centre to centre) of a downed one fills that wizard's progress in `REVIVE_HOLD_TIME` (2 s). "Holding" is staying put; it works the same on every device and needs no input action, and the reviver can still dodge or fire from there. Per downed wizard: the nearest standing wizard in range is the reviver, and a second helper does not speed it up (simple and predictable; two revives of different wizards run at the same time, for any indices 0-3). When nobody is in range the progress drains at twice the fill rate, so a quick step away to dodge costs a little and walking off loses all of it. A downed wizard never revives another. Leaving or a new room clears the progress.
+**Numbers and why:** 2 s is long enough to be a decision (a wave of imps fires about that often, so reviving in the open is a risk the team must accept) and short enough that a downed player is not left out for long (pillar: nobody waits). 48 px is a body and a half (32 px sprite) so the reviver must really be beside the body, but a dodge (220 px/s) crosses it in 0.2 s so help is easy to give. 1.5 s of protection (the dodge's is 0.125 s, a joiner's 2 s) is enough to get out of the shot that downed the wizard; 2 s+ would let a revived wizard walk through fire. Revive health stays 50.
+**How the downed player sees it:** a new event `revive_progress(player, progress)` (sender `coop`, heard by `player`), sent when the progress changes (0 when it stops or is done). The wizard draws a ring over its hat: a dark ring with an empty track and an arc that sweeps clockwise from the top, with a white cross in the middle. Progress reads from the arc length, not the colour (the arc is also in the player colour). The HUD may not look at wizards, and an event keeps `coop` from touching the wizard's drawing.
+**Deliberate exception:** `coop` preloads `gameplay/player/player.gd` to read `index` and `is_downed()` and to call `revive`/`protect` on typed wizards, not just by `has_method`. This is the one direct link between two gameplay areas, kept because revive is the one place `coop` must act on a specific wizard every frame; everything else still goes through events.
+**Consequence:** the numbers are untested by play (no person here); tune `REVIVE_*` in `coop.gd`. A team that wants a pause for revive-while-fighting will find the 2 s costly with many enemies, which is the intended tension. Co-op remains playable: there is no way to be blocked by another player.
+
+## 2026-10-18: Juice leftovers: a `wizard_cast` event, a copied sprite for deaths, a vignette read from health
+
+**Decided by:** Claude (owner `/claude` on #102, the "C1 juice, leftovers" task).
+**Context:** The four things left from the juice pass each needed a node or a position that Feel may not look up.
+**Decision:** (1) A new event `wizard_cast(player, wizard)`, sent by `player` right after `spell_cast`, hands Feel the caster node, so the squash needs no lookup. It is a second event rather than a changed `spell_cast`, which `combat` and the bots already use. The squash is thin and tall (the opposite of a hit's) for 0.1 s, 15%, without the white flash. (2) The muzzle flash gets rotation, a 1.8× stretch along the aim and the player's light colour from a table in `feel.gd` that repeats the reticle colours (`docs/STYLE.md` is the source). (3) The enemy is still freed at once (`combat` and `flow` depend on it); on `enemy_died` Feel copies the dead node's `Sprite` (texture, frames, region, offset, flip, world scale) into one of 8 pooled sprites, white, that widens, collapses and fades over 0.25 s. A full set takes the oldest slot. (4) The vignette lives in the HUD and is driven by a drop in `player_stats_changed` health, not by `damage_dealt`, because that event names a node, not a player index, and the HUD must not look nodes up. It is one shared overlay (one screen, four wizards) that is strongest toward the hurt wizard's corner, so "who" is shown by position and not by colour alone (the panel's HP number also falls).
+**Review round (same day), after looking at crops of each effect at 4× from the screenshot script:** the muzzle flash was a thin blue sliver that was gone in 2 frames, so it is now 0.1 s at 2.4× (it still reads small beside the bolt in a still taken on a slow software renderer; at 60 FPS the first frames are larger). The big death puff (2.5×) hid the imp, so it is 1.6× for 0.14 s and the white death copy is drawn above it. The cast squash is 20% for 0.12 s (visible on the 32 px wizard). The vignette, shared by up to four wizards, adds per hit `0.7 × (share of max health lost / 0.25, 0.2 to 1) / √players`, so a four-player brawl peaks well under the limit (tested), the corner bias is 0.15 to 1 (was 0.45 to 1) and the middle of the screen is clear; the `enabled` flag turns it off for comfort. The death copy starts at the sprite's rest scale, and a cast during a dodge makes no squash because the dash look owns the scale then.
+**Consequence:** a new enemy dies with the animation if its sprite node is named `Sprite`. Values are in `feel_preset.gd` (defaults, not `punchy.tres`, which sets none of these); nobody could play it in this session. If the cast squash feels too strong, lower `cast_squash` in `punchy.tres` only. The vignette numbers are constants in `vignette.gd` (the HUD may not read a gameplay preset).
+
+## 2026-10-18: Juice lives in Feel and reaches sprites only through the event's target
+
+**Decided by:** Claude (owner `/claude` on #102).
+**Context:** The owner wants punchier hits, casts and deaths. Feel may not call other areas, and `damage_dealt` carries the hit node.
+**Decision:** Feel flashes and squashes the `Sprite` child of the `damage_dealt` target (the same convention `ai.gd` and `player.gd` already use), with a shared white shader material it removes again. Feel stores instance ids, because a typed or plain array cannot hold an enemy freed in the same frame. Casts get a muzzle flash and a camera kick from `spell_cast`; the caster's own squash was left out, since the event has no node and a lookup would break the area rule. Hit-stop keeps the defaults (0.04 s hit, 0.15 s rest, so about 21% of real time slowed in a four-player fight, under the 30% test limit); extra punch comes from flash, squash and shake. Deaths stop 0.09 s. Everything else is tuned in `punchy.tres`.
+**Consequence:** a new enemy gets the flash and squash if its sprite node is named `Sprite`. Flash and squash replace `Sprite.material` for 0.08 s, so a scene must not rely on a material there. Feel multiplies its squash onto the scale it finds; if the owner sets `scale` meanwhile (the dash look), Feel adopts that as the base and returns to it. Past 16 sprites reacting at once, a hit skips its flash and squash.
+
+## 2026-10-18: Placeholder animation uses fewer frames than the table, and the staff is drawn by the game
+
+**Decided by:** Claude (owner `/claude` on #102).
+**Context:** The owner asked for readable placeholders, a visible staff and simple idle, walk and dash frames "if it fits in one session". `docs/STYLE.md` lists 4 idle, 6 walk and 4 dodge frames, but "use fewer frames rather than more", and a session that cannot run scripts has to write every pixel rect by hand.
+**Decision:** idle 2 frames (2 fps), walk 4 (8 fps), dash 3 (16 fps, plays once, the last frame is held), imp idle 2. The strips are placeholders (tier `placeholder`); M2 replaces them. The staff is not in the wizard strips: the shots start at the muzzle along the aim, so a staff painted into the sprite pointed the wrong way for any aim but one. `staff.svg` is drawn from the hand, turned along the aim (the pixel art is rotated at runtime, which is only acceptable for a placeholder). Frames are composed with whole-number `translate` on rects, which `docs/STYLE.md` allows, so one hat or body is shifted per frame instead of redrawn.
+**Consequence:** the playback speeds are constants in `player.gd` (`IDLE_FPS`, `WALK_FPS`, `DASH_FPS`), not set in the scene, and differ from the table (idle 2 fps, walk 8 fps); they move to the scene with the final art. The frame counts in the table are targets for final art, not checked. `player.gd` reads the frame count from the strip's width, so a better strip with more frames works with no code change.
+
 ## 2026-10-17: C1 changes no wave or feel value (M1 part 25)
 
 **Decided by:** Claude.
@@ -538,6 +634,63 @@ The HUD screenshot cannot be taken in a session (no display, `docs/BACKLOG.md`),
 - `.gpl` is not an allowed file type (hard rule 2), so the GIMP palette is `spellmerge.gpl.txt`; the kit zip ships it as `spellmerge.gpl`. Binary palettes (Aseprite, Photoshop, Krita) can't be written by sessions; the hex list and the `.gpl` cover those editors' import functions.
 - The golden example candidates are not copies. A second wizard would duplicate `content/wizard/base/wizard_p1_idle.svg`, so `art/kit/golden.json` lists the six best existing placeholder files by path with what each shows, and the zip build copies them. The M2 art direction call confirms or replaces them.
 - The checklist's source stays `docs/STYLE.md`; `art/kit/checklist.md` is its one-page export, kept in step by hand until the site build generates it.
+
+## 2026-10-17: Aim is separate from walking (C1 iterate round 1)
+
+**Decided by:** the owner ("iterate a bit more on the basics like aiming etc. And also a bit on the graphics", #97); the details are Claude's.
+
+- Before, shots went the way the wizard last walked, so it could not shoot one way and retreat the other. Now `player.gd` has `aim`: the right stick, else (keyboard player only) the mouse once it has moved 8 pixels (a brush does not count), else the walk direction. The stick aim holds 0.6 s after release so a flick still shoots where it pointed; then it follows the walk again, so a player who never touches the right stick keeps the one-stick behaviour.
+- The mouse is only a flag in `core/input` (`is_mouse_aiming`); the wizard turns it into a direction with the world mouse position. The J key switches the keyboard player back to walk-direction aim.
+- Aim assist toward enemies is not done: it needs the wizard to look at enemies, which crosses areas; decide with playtest answers.
+- Graphics, small and code-drawn (no new art files): the sprite flips toward the aim (with a 0.3 band either side against flicker; the flip also mirrors the painted light, accepted for the placeholder art), a soft ground shadow, and a chevron reticle in the player's light ramp colour with a 1 px outline. Shots still start at the wizard's feet, in line with the shadow.
+
+## 2026-10-18: Weekly planning, M1 stays open
+
+**Decided by:** Claude (weekly run). The digest was empty; the owner gave no instructions and no focus.
+
+- M1 is not complete: C1 (#97) has no verdict, and the web 4-bot run (#93) and the Style Guide site step (#95) wait on the owner. No M2 design is written; the 7-day default for C1 is iterate on 2026-10-24.
+- No task added. Shots keep starting at the feet, in line with the shadow, as decided on 2026-10-17; that is revisited only with a feel-check answer or the C1 verdict, not on a re-read of the code.
+
+## 2026-10-18: Playtest fixes: shots at the staff, visible, and a dash look
+
+**Decided by:** Claude, on the owner's `/claude` in #102 (playtest) and #97 (C1).
+
+- **Shots start at the staff tip, reversing the 2026-10-17 "feet" choice.** The owner asked for it and could not see the shots anyway. `muzzle_position()` is hand height (10 px) plus 14 px along the aim; the same point goes out in `spell_cast`. The staff is drawn in code, not a sprite part, so it works for every player colour and aim angle until real art arrives (M2).
+- **No aim assist.** The owner does not want it; a "homing" spell modifier is the planned way, so nothing is added to `player` for it.
+- **Projectile visibility lives in `core/projectiles`.** The batch is drawn at `z_index` 50 (above room and wizards) with a `custom_aabb` over the bounds, and drawn at 3x the hit circle with a 45% tint. Reason: the bugs were in how the batch is drawn, not in spells or the player.
+- **Dash look is code-drawn** (stretch along the dash axis, lean, three ghosts at the wizard's last three positions with the same stretch and lean), no frames: no art files are needed and it works for all four colours. Real animation is M2 art. The staff and reticle are drawn by a child node above the sprite, the shadow and ghosts below it.
+- **Known limit: shots can start behind a wall.** The muzzle is 14 px out and 10 px up, and projectiles do not collide with room geometry in M1, so a wizard pressed to a wall can fire from the far side. Fixed on 2026-10-18, see "Shots stop at walls" below.
+- **Shot colours.** At 4 players the five shot colours (players 0-3 and the enemy) all differ and none is dark (`test_projectiles.gd`). Enemy orange and player pink are the closest pair; enemy shots are also told apart by where they come from. The 3x draw size against the hit circle is a feel value for the C1 round: if shots look bigger than they hit, lower `DRAW_SCALE`.
+- Not decided here: controller and 4-player feel (the owner has not tried them); they stay in the C1 round.
+
+## 2026-10-18: Shots stop at walls (C1 round 2, task 2)
+
+**Decided by:** Claude, from the owner's round-2 task list (#102).
+
+- **No bouncing.** A shot that meets a wall ends there, piercing shots included (`pierce` is for targets). A bouncing modifier is a spell-design question for M2+, not decided here; when it comes, it belongs in `core/projectiles` as a per-shot bounce count, using the same wall grid.
+- **Own wall grid, not physics queries.** The manager rasterises the room's solid rectangles into 8 px cells and walks the cells a step crosses. A physics ray per shot would cost thousands of queries a step against the 1,000 web / 3,000 desktop budgets. Walls are rounded out to whole cells (exact for the 32 px tiles); the shot is a point, not a circle, so its 4 px radius can overlap a wall by that much. The wall check is not charged to `WORK_PER_STEP`; its walk is capped at 64 cells a shot instead, and a path not fully walked counts as a hit (a shot never crosses a wall it did not check).
+- **Walls cut the step, they do not pre-empt it.** The step is shortened to the wall and the hit test runs on that part, so a fast shot still hits a target in front of a wall (a target behind it is not hit). Checking the wall first and dropping the whole step had lost those hits.
+- **Only rectangles.** `add_wall_body` reads `RectangleShape2D` shapes (turned ones as their bounding box) and ignores the rest. Rooms with other wall shapes need `set_walls` rects or a new case.
+- **Who tells it.** `core/` does not know rooms, so `flow` finds the static bodies on physics layer 1 in the room scene after it is in the tree and calls `add_wall_body`. `set_bounds` clears the walls, so a new run starts empty.
+- **Clip from the feet.** The wizard clips the segment from its feet (always outside a wall: the body collides) to the staff tip, and casts from the clipped point. A shot from a tip behind a wall therefore starts at the wall and ends on it at the next step; the cast still spends mana and cooldown, as a swing at a wall does, but `spawn` refuses a shot that starts inside a wall, so it takes no pool slot and evicts no one. Refusing the cast instead (no mana) was tried: the 4-bot smoke failed four runs in a row with it, so it stays a spent cast. The hand point could be inside a wall for a wizard against a top wall, so it is not the start.
+- **Wall hits are silent for now.** `wall_hits` is a counter; no event, spark or sound (backlog).
+- **Bots.** The wave bots hold fire without a line of sight and strafe along the wall instead of walking at it. Reason: with walls they fired into pillars and the 4-bot smoke failed.
+
+## 2026-10-18: Dodge and cast feel (C1 round 2, task 3)
+
+**Decided by:** Claude, from the owner's round-2 task list (#102).
+
+- **Buffer 0.15 s for both.** A press made while the action is not yet possible counts if it becomes possible within 0.15 s (about 9 frames at 60 FPS: long enough to forgive a mistimed tap, short enough that nobody dodges "by surprise" after the cooldown). One buffered press is used once and a new press restarts the window. Pressing in an overlay, being downed or a captured wizard clears it, as before for the dodge press itself. A held `cast` is unchanged; the buffer matters for taps.
+- **Invulnerability look is one rule for every kind of protection** (dodge, join 2 s, revive 1.5 s): the sprite is 55% opaque and a ring in the player colour closes over the time (full for join and revive protection until the last `INVULNERABLE_TIME`). Shape and opacity, not colour alone. The sprite's `material` stays free for the hit flash in `Feel`; only `modulate` is used.
+- **Cast rate and mana cost: no change.** The fire bolt costs 5 mana at a 0.35 s cooldown: 2.9 casts a second would use 14.3 mana a second against 10 regenerated, so from a full 100 mana a wizard who holds fire without a break runs dry after about 23 s and then fires at the regeneration rate (2 a second). The bots in `test_wave_balance` fire 1 to 1.5 casts per player-second (they walk, and hold fire without a line of sight), so mana never limits them and the cost is not what decides the fight. Five damage per hit against 20 imp health is four hits. With no person's playtest on the cast rate and the bots too crude to tell (they never dodge, which is why the 1 and 2 player runs are lost), changing a number would be a guess; revisit with a playtest answer.
+
+## 2026-10-20: C1 verdict iterate, playtest report first
+
+**Decided by:** the owner (verdict on #97); Claude (the queue).
+
+- The verdict is iterate. The next work is a human playtest of round 2, then the top items from its answers, not more guessing from code and bot logs: round 2's feel values are still unverified by a human.
+- The plan allows at most 2 iterate rounds, counted by the owner's iterate requests on #97, not by the "round N" labels in `docs/NEXT.md` (those number batches of work: aiming, playtest fixes, art, juice and the six tasks). Round one was the owner's first `/claude` on #97 (aiming and graphics, then the 2026-10-18 playtest fixes); round two was the six tasks and their summary. This verdict, given on that summary, closes round two. After it the next checkpoint must be go or pivot, and the next assessment must say so in plain words.
+- Controller and 4-player feel are still untried by a human; the playtest questions ask for them.
 
 ## 2026-10-17: Panels may hide the wizards at zoom 0.5; walls are tested
 

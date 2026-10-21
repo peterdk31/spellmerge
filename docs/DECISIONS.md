@@ -2,6 +2,12 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-21: A slow web load warns, it never fails the build
+
+**Decided by:** the owner ("loosen up a bit on the load timing. It should not hinder development ... it should just give warnings and potential fixes").
+**Decision:** `smbot.websmoke --warn-load 10` prints `WEB LOAD: N s` and, over 10 s, a `::warning::` that lists likely fixes: the zip size, big new assets, work at start (autoloads, `Registry.scan`), trimming demo content, and a slow runner. The web smoke test still fails on errors, exceptions and a missing expected line. `--max-load` is gone. The 10 s load in docs/PLAN.md stays a target, not a gate.
+**Consequence:** a slow web start shows up in the daily build log and never reverts a merge. Acting on the warning is a normal task, filed when it repeats.
+
 ## 2026-10-21: Spell component base classes (M2 part 1)
 
 **Decided by:** Claude.

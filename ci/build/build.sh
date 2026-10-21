@@ -55,8 +55,9 @@ GODOT="$TOOLS/Godot_v${GODOT_RELEASE}_linux.x86_64"
 # Budgets from docs/PLAN.md, "Performance": compressed download sizes.
 WEB_BUDGET=$((40 * 1000 * 1000))
 DESKTOP_BUDGET=$((300 * 1000 * 1000))
-# docs/PLAN.md budget: the web build loads in under 10 s (here from a local server, so no download).
-WEB_LOAD_LIMIT=10
+# docs/PLAN.md target: the web build loads in under 10 s (here from a local server, so no
+# download). Over it the web smoke test warns with likely fixes; it never fails the build.
+WEB_LOAD_WARN=10
 
 step() { printf '\n==> %s\n' "$*"; }
 
@@ -187,7 +188,7 @@ export_all() {
 
   step "Boot smoke test (web build in headless Chrome)"
   local status=0
-  PYTHONPATH=ci python3 -m smbot.websmoke build/web --expect "main menu ready" --max-load "$WEB_LOAD_LIMIT" \
+  PYTHONPATH=ci python3 -m smbot.websmoke build/web --expect "main menu ready" --warn-load "$WEB_LOAD_WARN" \
     --screenshot build/logs/web.png || status=$?
   if ((status == 2)) && [[ -z "${CI:-}" ]]; then
     echo "warning: Chrome is not installed, so the web build was not smoke-tested"

@@ -1,13 +1,14 @@
 """Web smoke test: runs the exported web build in headless Chrome.
 
-  python3 -m smbot.websmoke build/web --expect "main menu ready" [--screenshot shot.png] [--max-load 20]
+  python3 -m smbot.websmoke build/web --expect "main menu ready" [--screenshot shot.png] [--warn-load 10]
   python3 -m smbot.websmoke build/web-test --page-args=--four-bot --expect "SMOKE OK" --timeout 240
 
 Serves the build locally, opens it in Chrome, and passes once a console line
 contains the --expect text. Fails on a timeout, an uncaught exception, or any
 console error (Godot reports script and engine errors through console.error).
-Prints `WEB LOAD: N s`, the time from opening the page to the "main menu ready" line,
-and fails above --max-load when one is given.
+Prints `WEB LOAD: N s`, the time from opening the page to the "main menu ready" line.
+Above --warn-load it prints a `::warning::` with likely fixes; a slow load never fails
+the test, so it can't block development (the budget is a target, not a gate).
 
 --page-args gives the game a command line: the served index.html has its start config's
 `"args":[]` replaced by the list (Godot's web shell passes `args` to the engine, so
@@ -140,8 +141,28 @@ def _console_text(params: dict) -> str:
     return " ".join(str(a.get("value", a.get("description", ""))) for a in params.get("args", []))
 
 
+# What usually makes a Godot web build slow to start, in the order worth checking.
+LOAD_FIXES = (
+    "compare the web zip with its 40 MB budget in the Size budgets step; the engine .wasm is most of it",
+    "look for big textures or sounds added since the last fast build (art/manifest.json, audio/manifest.json)",
+    "check work at start: autoload _ready() and Registry.scan() load every content .tres; "
+    "a build-time manifest or loading on first use (docs/milestones/M1-core-loop.md, Registry) avoids that",
+    "keep demo-only content small: the Web preset can exclude more (export_presets.cfg, the demo flag)",
+    "a slow runner can add seconds: re-check the next daily build before changing anything",
+)
+
+
+def load_warning(loaded: float, limit: float | None) -> str | None:
+    """A warning with likely fixes when the load took longer than `limit` seconds, else None."""
+    if limit is None or loaded <= limit:
+        return None
+    fixes = "; ".join(f"({i}) {fix}" for i, fix in enumerate(LOAD_FIXES, 1))
+    return (f"the web build took {loaded:.1f} s to reach the main menu, over the {limit:.0f} s target "
+            f"(docs/PLAN.md, Performance). Not a failure. Likely fixes: {fixes}")
+
+
 def run(build: Path, expect: str, timeout: float, screenshot: Path | None, binary: str,
-        page_args: list[str] | None = None, max_load: float | None = None) -> list[str]:
+        page_args: list[str] | None = None, warn_load: float | None = None) -> list[str]:
     """Returns a list of problems; empty means the smoke test passed."""
     server, url = serve(build, page_args)
     profile = tempfile.mkdtemp(prefix="websmoke-")
@@ -170,8 +191,9 @@ def run(build: Path, expect: str, timeout: float, screenshot: Path | None, binar
                 if loaded is None and MENU_READY in text:
                     loaded = time.monotonic() - started
                     print(f"WEB LOAD: {loaded:.1f} s")
-                    if max_load is not None and loaded > max_load:
-                        problems.append(f"the main menu took {loaded:.1f} s to load, over the {max_load:.0f} s limit")
+                    warning = load_warning(loaded, warn_load)
+                    if warning:
+                        print(f"::warning::{warning}")
                 if expect in text:
                     seen = True
             elif method == "Runtime.exceptionThrown":
@@ -203,14 +225,15 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--screenshot", type=Path)
     ap.add_argument("--page-args", action="append", default=[], metavar="ARG",
                     help="a start argument for the game, e.g. --page-args=--four-bot (repeatable)")
-    ap.add_argument("--max-load", type=float, help="fail if the main menu takes longer than this many seconds")
+    ap.add_argument("--warn-load", type=float,
+                    help="warn, with likely fixes, if the main menu takes longer than this many seconds")
     args = ap.parse_args(argv)
 
     binary = find_chrome()
     if binary is None:
         print("websmoke: Chrome or Chromium is not installed", file=sys.stderr)
         return 2
-    problems = run(args.build, args.expect, args.timeout, args.screenshot, binary, args.page_args, args.max_load)
+    problems = run(args.build, args.expect, args.timeout, args.screenshot, binary, args.page_args, args.warn_load)
     for problem in problems:
         print(f"::error::web smoke test: {problem}")
     print("WEB SMOKE " + ("FAILED" if problems else "OK"))

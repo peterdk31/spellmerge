@@ -39,8 +39,8 @@
   "task_failures": {
     "**1. Playtest report of round 2.** The weekly planning run opens a \"Playtest of the week\" issue for the owner (build link, what changed in round 2: revive, shots stop at walls, dodge and cast feel, enemy readability, wave pacing, muzzle flash fix) with 3-5 questions: does the dodge feel responsive; can you read the imp's attack in time; does a wave feel too easy or too hard; does reviving feel fair; what is the one thing you would change first? Also ask for a controller and a 2+ player try. Do no feel work before the answers are in, except a bug the owner reports.": {
       "count": 0,
-      "parked_reason": "I made no commits and opened no branch. Task 1 is the weekly planning run's job: it opens the \"Playtest of the week\" issue through its own `playtest` output (`.github/maintainer/plan.md`, step 7). A development session has no way to open that issue, and I didn't want to push it through `owner_questions`, which is for decisions. The next weekly run is Sunday 2026-10-25 06:00 UTC. Its issue should cover round 2 (revive, shots stop at walls, dodge and cast feel, enemy readability, wave pacing, muzz",
-      "parked_until": "2026-10-21T07:55:53Z"
+      "parked_reason": "I made no changes and no branch. Task 1 is the weekly planning run's job: it opens the \"Playtest of the week\" issue for the owner, and a development session has no way to create issues. `docs/NEXT.md` says to do no feel work until the owner's answers are in, except for bugs the owner reports. There are no owner instructions this session and I know of no reported bug. The Blocked items already have open owner-question issues (#91, #93, #95), so I added no new ones.",
+      "parked_until": "2026-10-22T07:59:53Z"
     },
     "**2. The top items from the report.** When the answers arrive, turn them into at most three tasks here, ordered by the owner's priority, each with a done-when. Until then, pick no feel or backlog work. A daily session while waiting does only: bugs the owner reports, reminders for the Blocked items below, and doc upkeep; if none apply it may do nothing.": {
       "count": 0,

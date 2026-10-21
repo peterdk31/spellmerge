@@ -6,7 +6,7 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 
 **Decided by:** Claude, on the owner's request.
 
-- `attack_radius` goes 5 to 3.5. One number sets both the hit circle and the drawn size, so sprite and collision stay matched. The orb is about 10 px wide, readable at 32 px scale, and smaller than a wizard's default bolt (radius 4). A wizard's hit circle is 8, so a 12 px sidestep clears the shot; the telegraph lane narrows with it. Each shot is checked against all players the same way, so co-op dodging is unchanged. Not playtested by a human: the next playtest report should ask.
+- `attack_radius` goes 5 to 3.5. One number sets both the hit circle and the drawn size, so sprite and collision stay matched. The orb is about 10 px wide, readable at 32 px scale, and smaller than a wizard's default bolt (radius 4). A wizard's hit circle is 8, so a 12 px sidestep clears the shot; the telegraph lane narrows with it. Each shot is checked against all players the same way, so co-op dodging is unchanged. Not playtested by a human: This partly undoes the bigger hit circles of the 2026-10-20 hit-box fix (#5) for enemy shots only: the wizard's circle of 8 plus the shot's 3.5 is still a body-sized hit. The 10 px orb inside its quad was not checked by eye. The next playtest report should ask whether shots feel like they pass through the wizard.
 
 ## 2026-10-20: Foundation review: data over constants (owner `/claude` on #5)
 

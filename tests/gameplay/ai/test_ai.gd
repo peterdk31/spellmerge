@@ -247,18 +247,18 @@ func _test_shot_can_be_dodged_by_stepping_aside() -> void:
 	_check(_players[0].health == PlayerScript.MAX_HEALTH, "a player who stepped aside during the telegraph is not hit")
 
 
-## Enemy shots are small bullets (#4): smaller than a wizard's default bolt (radius 4), and a
-## wizard (hit circle 8) clears one with a short sidestep.
+## Enemy shots are small bullets (#4): a wizard (hit circle 8) is hit by a shot passing inside
+## 8 + 3.5 = 11.5 px, and clears it with a 15 px sidestep.
 func _test_shot_is_small_and_dodgeable() -> void:
-	_setup(1)
-	_players[0].position = Vector2(60.0, 0.0)
-	var dodger := _imp()
-	_check(dodger.attack_radius < 4.0, "the imp's shot is smaller than a wizard's bolt (radius %.1f)" % dodger.attack_radius)
-	dodger.step(STEP)
-	# 8 (wizard) + 3.5 (shot) = 11.5 px; 15 px leaves a little to spare.
-	_players[0].position = Vector2(60.0, 15.0)
-	_run(dodger, int(dodger.windup_time / STEP) + 20)
-	_check(_players[0].health == PlayerScript.MAX_HEALTH, "a short sidestep is enough to dodge the shot")
+	for offset: float in [10.0, 15.0]:
+		_setup(1)
+		_players[0].position = Vector2(60.0, 0.0)
+		var imp := _imp()
+		imp.step(STEP)
+		_players[0].position = Vector2(60.0, offset)
+		_run(imp, int(imp.windup_time / STEP) + 20)
+		var hit: bool = _players[0].health < PlayerScript.MAX_HEALTH
+		_check(hit == (offset < 11.5), "a shot passing %.0f px from the wizard %s" % [offset, "hits" if offset < 11.5 else "misses"])
 
 
 func _test_no_lookups_while_nobody_stands() -> void:

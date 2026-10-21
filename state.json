@@ -44,8 +44,8 @@
     },
     "**2. The top items from the report.** When the answers arrive, turn them into at most three tasks here, ordered by the owner's priority, each with a done-when. Until then, pick no feel or backlog work. A daily session while waiting does only: bugs the owner reports, reminders for the Blocked items below, and doc upkeep; if none apply it may do nothing.": {
       "count": 0,
-      "parked_reason": "Task 2 is waiting on the owner's round 2 playtest answers, and none have arrived. Issue #102 is still the round 1 playtest. The weekly run has not yet opened a new \"Playtest of the week\" issue. No bug is open, and the Blocked items already have their owner questions asked. I made no changes.",
-      "parked_until": "2026-10-21T07:58:47Z"
+      "parked_reason": "Task 2 waits on the owner's answers to the round-2 playtest report (task 1). The only \"Playtest of the week\" issue is #102 from 2026-10-18, which is the round-1 playtest and has already been handled. There is no new owner bug report, no owner instruction, and no Blocked item that needs a reminder (all of them still wait on open owner-question issues #91, #93 and #95). Docs are current, so I made no changes.",
+      "parked_until": "2026-10-22T08:02:07Z"
     },
     "**Area READMEs for shared assets and tests.** The same for `art/`, `audio/`, `tests/` and `tools/`, including the asset size limits, `.ogg`-only audio, the origin manifest (`art/manifest.json`, `audio/manifest.json`) and how to run `tools/check.sh`.": {
       "count": 1,

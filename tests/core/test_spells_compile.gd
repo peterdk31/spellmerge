@@ -191,7 +191,30 @@ func test_shots_over_the_limit_are_clamped_and_said() -> void:
 	check_equal(spell.shots, SpellLimits.MAX_SHOTS, "72 shots become 24")
 	check(spell.shots_clamped, "the clamp is recorded")
 	check_equal(spell.shots_requested, 72, "the asked-for count is kept")
-	check(spell.description.contains("cut from 72 to the limit of 24"), "the description says so: " + spell.description)
+	check(spell.description.contains("Cut from 72 to 24 shots, the limit."), "the description says so: " + spell.description)
+
+
+func test_the_status_is_described_in_plain_words() -> void:
+	(_fake.items[&"fire"] as ElementBase).status_duration = 3.0
+	var spell: CompiledSpell = _compile({"form": &"bolt", "element": &"fire"})
+	check(spell.description.contains("Burns for 3.0 s."), spell.description)
+
+
+func test_chain_jumps_timer_interval_and_lifetime_are_clamped() -> void:
+	var many: CompiledSpell = _compile({"form": &"bolt", "modifiers": [&"chain", &"chain", &"chain"]})
+	check_equal(many.chain_jumps, SpellLimits.MAX_CHAIN_JUMPS, "three chains of 2 jumps are exactly the limit")
+	(_fake.items[&"chain"] as ModifierBase).behaviour_strength = 3.0
+	var over: CompiledSpell = _compile({"form": &"bolt", "modifiers": [&"chain", &"chain", &"chain"]})
+	check_equal(over.chain_jumps, SpellLimits.MAX_CHAIN_JUMPS, "9 jumps are cut to the limit")
+	var timer: TriggerBase = _fake.items[&"timer"] as TriggerBase
+	timer.interval = SpellLimits.MIN_TIMER_INTERVAL
+	check_equal(_compile(_holding(&"bolt", &"timer", {"form": &"bolt"})).trigger_interval, SpellLimits.MIN_TIMER_INTERVAL, "the minimum interval is kept")
+	timer.interval = 0.0
+	check_equal(_compile(_holding(&"bolt", &"timer", {"form": &"bolt"})).trigger_interval, SpellLimits.MIN_TIMER_INTERVAL, "an interval of 0 is raised")
+	timer.interval = 99.0
+	check_equal(_compile(_holding(&"bolt", &"timer", {"form": &"bolt"})).trigger_interval, SpellLimits.MAX_TIMER_INTERVAL, "a huge interval is cut")
+	(_fake.items[&"bolt"] as FormBase).lifetime = 500.0
+	check_equal(_compile({"form": &"bolt"}).lifetime, SpellLimits.MAX_LIFETIME, "lifetime is capped")
 
 
 func test_other_numbers_are_clamped() -> void:
@@ -241,6 +264,17 @@ func test_bad_recipes_are_refused_with_a_reason() -> void:
 	var strings: CompiledSpell = _compile({"form": "bolt", "modifiers": ["pierce"]})
 	check(strings.valid, "plain strings (from JSON) work like names")
 
+
+func test_malformed_recipes_are_refused_not_crashed() -> void:
+	check(_compile({"form": null}).reason == "A spell needs a form.", "a null form is a missing form")
+	check(not _compile({"form": 5}).valid, "a number is no form id")
+	check(not _compile({"form": &"bolt", "modifiers": "pierce"}).valid, "modifiers as a String")
+	check(not _compile({"form": &"bolt", "modifiers": [3]}).valid, "a number in the modifiers")
+	check(_compile({"form": &"bolt", "modifiers": null}).valid, "null modifiers are none")
+	check(_compile({"form": &"bolt", "modifiers": PackedStringArray(["pierce"])}).valid, "a PackedStringArray works")
+	var held: CompiledSpell = _compile({"form": &"bolt", "trigger": &"on_hit", "held": "nova"})
+	check(not held.valid and held.reason.contains("held spell"), "a held spell that is no recipe is refused: " + held.reason)
+	check(_compile({"form": &"bolt", "held": null}).valid, "a null held spell is none")
 
 func test_compiling_does_not_change_the_components() -> void:
 	var form: FormBase = _fake.items[&"bolt"] as FormBase
@@ -322,6 +356,29 @@ func test_a_rebuild_mid_flight_keeps_the_old_profile_until_the_last_shot_ends() 
 	_spells.call("shot_ended", old_tag)
 	check(_spells.call("profile", old_tag) == null, "the last shot frees the old build")
 	check_equal(_spells.call("generations_held", 0, 0), 1, "only the new build is left")
+
+
+func test_a_rebuild_mid_flight_keeps_every_held_depth_until_the_last_shot_of_any_depth() -> void:
+	var recipe: Dictionary = _holding(&"bolt", &"on_hit", _holding(&"nova", &"on_hit", {"form": &"bolt"}))
+	var old_spell: CompiledSpell = _compile(recipe)
+	var tag0: int = _spells.call("begin_generation", 0, 0, old_spell)
+	var tag1: int = _spells.call("current_tag", 0, 0, 1)
+	var tag2: int = _spells.call("current_tag", 0, 0, 2)
+	_spells.call("shot_started", tag0)
+	_spells.call("begin_generation", 0, 0, _compile({"form": &"bolt"}))
+	check(_spells.call("profile", tag1) == old_spell.held, "the held spell survives while its parent shot is in the air")
+	check(_spells.call("profile", tag2) == old_spell.held.held, "and so does the one below it")
+	# The parent hits: the child is counted first, then the parent ends.
+	_spells.call("shot_started", tag1)
+	check_equal(_spells.call("live_shots", tag1), 1, "a held spell's shot counts after the rebuild")
+	_spells.call("shot_ended", tag0)
+	check(_spells.call("profile", tag0) == old_spell and _spells.call("profile", tag1) == old_spell.held, "the child keeps the build alive")
+	_spells.call("shot_started", tag2)
+	_spells.call("shot_ended", tag1)
+	check(_spells.call("profile", tag2) == old_spell.held.held, "the grandchild keeps it alive")
+	_spells.call("shot_ended", tag2)
+	for tag in [tag0, tag1, tag2]:
+		check(_spells.call("profile", tag) == null, "the whole build is freed with its last shot")
 
 
 func test_a_rebuild_with_no_shots_in_the_air_frees_the_old_build_at_once() -> void:

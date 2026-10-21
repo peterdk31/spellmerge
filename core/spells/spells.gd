@@ -15,11 +15,28 @@ extends Node
 ## generation of that slot and returns the tag of its cast (depth 0); its held spells get
 ## the same tag with depth 1 and 2. Shots keep the tag they were born with, so a shot still
 ## in the air after a rebuild hits with its old numbers (`profile(tag)`). A generation is
-## forgotten when its last shot has ended (`shot_ended`) and it is no longer current.
+## forgotten as a whole (all its depths together) when its last shot, of any depth, has
+## ended (`shot_ended`) and it is no longer current.
+##
+## Order matters: a shot that spawns children (a held spell on hit) must call
+## `shot_started` for each child before it calls `shot_ended` for itself, or an old build
+## could be freed between the two.
 
 ## Tags whose shots the last `begin_generation` call revoked, because all 8 generations of
-## the slot were in the air. The caller removes those shots from the projectile manager.
+## the slot were in the air. Until the caller removes those shots from the projectile
+## manager they carry a tag that now means the new spell, so read this right after
+## `begin_generation`, remove them, and only then call `begin_generation` (which clears it)
+## or `shot_ended` again for them. Part 6 does exactly that.
 var revoked_tags: PackedInt64Array = PackedInt64Array()
+
+## How the description says a status (the ids belong to gameplay/combat).
+const STATUS_VERBS: Dictionary = {
+	&"burn": "Burns",
+	&"chill": "Chills",
+	&"freeze": "Freezes",
+	&"shock": "Shocks",
+	&"hex": "Hexes",
+}
 
 ## Registry stand-in for tests: anything with `get_resource(folder, id)`. Null uses `Registry`.
 var registry: Node = null
@@ -30,6 +47,8 @@ var _current: PackedInt32Array = PackedInt32Array()
 var _profiles: Dictionary = {}
 ## tag -> live shots
 var _live: Dictionary = {}
+## generation key (the depth-0 tag) -> live shots of all depths of that generation
+var _generation_live: Dictionary = {}
 
 
 func _init() -> void:
@@ -69,7 +88,9 @@ func begin_generation(player: int, slot: int, spell: CompiledSpell) -> int:
 		var tag: int = SpellTag.make(player, slot, depth, generation)
 		if _live.get(tag, 0) > 0:
 			revoked_tags.append(tag)
-		_forget(tag)
+		_profiles.erase(tag)
+		_live.erase(tag)
+	_generation_live.erase(SpellTag.make(player, slot, 0, generation))
 	var level: CompiledSpell = spell
 	for depth in SpellLimits.MAX_DEPTH + 1:
 		if level == null:
@@ -93,20 +114,28 @@ func current_tag(player: int, slot: int, depth: int = 0) -> int:
 func shot_started(tag: int) -> void:
 	if _profiles.has(tag):
 		_live[tag] = _live.get(tag, 0) + 1
+		var key: int = _generation_key(tag)
+		_generation_live[key] = _generation_live.get(key, 0) + 1
 
 
-## A shot with `tag` ended (hit, expired or was removed). The generation's spell is freed
-## once its last shot is gone and a newer build has replaced it.
+## A shot with `tag` ended (hit, expired or was removed). The generation's spells (every
+## depth) are freed once its last shot of any depth is gone and a newer build has replaced it.
 func shot_ended(tag: int) -> void:
 	var live: int = _live.get(tag, 0)
 	if live <= 0:
 		return
 	if live == 1:
 		_live.erase(tag)
-		if not _is_current(tag):
-			_profiles.erase(tag)
 	else:
 		_live[tag] = live - 1
+	var key: int = _generation_key(tag)
+	var in_air: int = _generation_live.get(key, 0) - 1
+	if in_air > 0:
+		_generation_live[key] = in_air
+		return
+	_generation_live.erase(key)
+	if not _is_current(tag):
+		_erase_generation(tag)
 
 
 ## Live shots counted for `tag`.
@@ -131,6 +160,7 @@ func clear() -> void:
 	_current.fill(-1)
 	_profiles.clear()
 	_live.clear()
+	_generation_live.clear()
 	revoked_tags.clear()
 
 
@@ -143,17 +173,22 @@ func _is_current(tag: int) -> bool:
 	return _current[index] == SpellTag.generation_of(tag)
 
 
-func _forget(tag: int) -> void:
-	_profiles.erase(tag)
-	_live.erase(tag)
+## The depth-0 tag of the tag's generation: one key for all three depths.
+func _generation_key(tag: int) -> int:
+	return SpellTag.make(SpellTag.player_of(tag), SpellTag.slot_of(tag), 0, SpellTag.generation_of(tag))
 
 
-## The old generation is no longer current: free the depths that have no shots left.
-func _release_generation(player: int, slot: int, generation: int) -> void:
+## Erases the profiles of every depth of the tag's generation.
+func _erase_generation(tag: int) -> void:
 	for depth in SpellLimits.MAX_DEPTH + 1:
-		var tag: int = SpellTag.make(player, slot, depth, generation)
-		if _live.get(tag, 0) == 0:
-			_profiles.erase(tag)
+		_profiles.erase(SpellTag.make(SpellTag.player_of(tag), SpellTag.slot_of(tag), depth, SpellTag.generation_of(tag)))
+
+
+## The old generation is no longer current: free it now if none of its shots is in the air.
+func _release_generation(player: int, slot: int, generation: int) -> void:
+	var key: int = SpellTag.make(player, slot, 0, generation)
+	if _generation_live.get(key, 0) == 0:
+		_erase_generation(key)
 
 
 func _component(id: StringName) -> SpellComponent:
@@ -182,6 +217,36 @@ func _pick(id: StringName, kind: StringName, problem: PackedStringArray) -> Spel
 	return component
 
 
+## A component id field: missing or null is &"", a String or StringName is its id,
+## anything else adds a reason to `problem`.
+func _id_field(recipe: Dictionary, key: String, problem: PackedStringArray) -> StringName:
+	var value: Variant = recipe.get(key)
+	if value == null:
+		return &""
+	if value is String or value is StringName:
+		return StringName(value)
+	problem.append("'%s' must be a component id, not %s." % [key, type_string(typeof(value))])
+	return &""
+
+
+## A list of component ids (Array or PackedStringArray); missing or null is empty.
+func _id_list_field(recipe: Dictionary, key: String, problem: PackedStringArray) -> Array:
+	var value: Variant = recipe.get(key)
+	var ids: Array = []
+	if value == null:
+		return ids
+	if not (value is Array or value is PackedStringArray):
+		problem.append("'%s' must be a list of component ids, not %s." % [key, type_string(typeof(value))])
+		return ids
+	for item in value:
+		if item is String or item is StringName:
+			ids.append(StringName(item))
+		else:
+			problem.append("'%s' holds %s, not a component id." % [key, type_string(typeof(item))])
+			return []
+	return ids
+
+
 func _article(word: StringName) -> String:
 	return "an" if String(word).left(1) in ["a", "e", "i", "o", "u"] else "a"
 
@@ -197,20 +262,22 @@ func _compile(recipe: Dictionary, depth: int) -> CompiledSpell:
 	var trigger: TriggerBase = null
 	var modifiers: Array[ModifierBase] = []
 
-	var form_id: StringName = StringName(recipe.get("form", ""))
+	var form_id: StringName = _id_field(recipe, "form", problem)
+	var element_id: StringName = _id_field(recipe, "element", problem)
+	var trigger_id: StringName = _id_field(recipe, "trigger", problem)
+	var modifier_ids: Array = _id_list_field(recipe, "modifiers", problem)
+	if not problem.is_empty():
+		return _refused(problem[0])
 	if form_id == &"":
 		return _refused("A spell needs a form.")
-	form = _pick(form_id, &"form", problem) as FormBase
-	var element_id: StringName = StringName(recipe.get("element", ""))
-	if element_id != &"" and form != null:
-		element = _pick(element_id, &"element", problem) as ElementBase
-	var modifier_ids: Array = recipe.get("modifiers", [])
 	if modifier_ids.size() > SpellLimits.MAX_MODIFIERS:
 		return _refused("A spell holds at most %d modifiers." % SpellLimits.MAX_MODIFIERS)
+	form = _pick(form_id, &"form", problem) as FormBase
+	if element_id != &"" and form != null:
+		element = _pick(element_id, &"element", problem) as ElementBase
 	for id in modifier_ids:
 		if problem.is_empty():
-			modifiers.append(_pick(StringName(id), &"modifier", problem) as ModifierBase)
-	var trigger_id: StringName = StringName(recipe.get("trigger", ""))
+			modifiers.append(_pick(id as StringName, &"modifier", problem) as ModifierBase)
 	if trigger_id != &"" and problem.is_empty():
 		trigger = _pick(trigger_id, &"trigger", problem) as TriggerBase
 	if not problem.is_empty():
@@ -218,6 +285,8 @@ func _compile(recipe: Dictionary, depth: int) -> CompiledSpell:
 
 	var held_recipe: Variant = recipe.get("held")
 	var held: CompiledSpell = null
+	if held_recipe != null and not held_recipe is Dictionary:
+		return _refused("The held spell must be a recipe (a Dictionary).")
 	if held_recipe is Dictionary and not (held_recipe as Dictionary).is_empty():
 		if trigger == null:
 			return _refused("A held spell needs a trigger to fire it.")
@@ -238,6 +307,7 @@ func _compile(recipe: Dictionary, depth: int) -> CompiledSpell:
 ## Fills the numbers: the form's base, then the element, then the modifiers in slot order.
 func _apply(spell: CompiledSpell, form: FormBase, element: ElementBase, modifiers: Array[ModifierBase], trigger: TriggerBase) -> void:
 	spell.form_id = form.id
+	spell.form_name = _name_of(form)
 	spell.complexity = form.complexity
 	var damage: float = form.base_damage
 	var mana: float = form.mana_cost
@@ -248,6 +318,7 @@ func _apply(spell: CompiledSpell, form: FormBase, element: ElementBase, modifier
 	var pierce: int = form.pierce
 	if element != null:
 		spell.element_id = element.id
+		spell.element_name = _name_of(element)
 		spell.complexity += element.complexity
 		spell.status_id = element.status_id
 		spell.status_duration = element.status_duration
@@ -269,11 +340,12 @@ func _apply(spell: CompiledSpell, form: FormBase, element: ElementBase, modifier
 				spell.homing_turn = maxf(spell.homing_turn, modifier.behaviour_strength)
 			ModifierBase.Behaviour.CHAIN:
 				spell.chain_jumps += int(modifier.behaviour_strength)
+	spell.chain_jumps = clampi(spell.chain_jumps, 0, SpellLimits.MAX_CHAIN_JUMPS)
 	spell.damage = clampi(roundi(damage), 1, SpellLimits.MAX_DAMAGE)
 	spell.mana_cost = mana
 	spell.cooldown = maxf(cooldown, SpellLimits.MIN_COOLDOWN)
 	spell.speed = minf(speed, SpellLimits.MAX_SPEED)
-	spell.lifetime = form.lifetime
+	spell.lifetime = clampf(form.lifetime, SpellLimits.MIN_LIFETIME, SpellLimits.MAX_LIFETIME)
 	spell.radius = minf(radius, SpellLimits.MAX_RADIUS)
 	spell.pierce = mini(pierce, SpellLimits.MAX_PIERCE)
 	spell.motion = form.motion
@@ -296,17 +368,17 @@ func _apply(spell: CompiledSpell, form: FormBase, element: ElementBase, modifier
 		spell.trigger_max_fires = trigger.max_fires
 		if trigger.event == TriggerBase.Event.TIMER:
 			spell.trigger_max_fires = mini(trigger.max_fires, SpellLimits.MAX_TIMER_FIRES)
+			spell.trigger_interval = clampf(trigger.interval, SpellLimits.MIN_TIMER_INTERVAL, SpellLimits.MAX_TIMER_INTERVAL)
 
 
 ## Writes the description of this spell and, first, of the spells it holds.
 func _describe(spell: CompiledSpell) -> void:
 	if spell.held != null:
 		_describe(spell.held)
-	var form: SpellComponent = _component(spell.form_id)
 	var parts: PackedStringArray = PackedStringArray()
-	var title: String = _name_of(form)
+	var title: String = spell.form_name
 	if spell.element_id != &"":
-		title = "%s %s" % [_name_of(_component(spell.element_id)), title]
+		title = "%s %s" % [spell.element_name, title]
 	parts.append("%s: %d damage" % [title, spell.damage])
 	if spell.motion == FormBase.Motion.RAY:
 		parts.append("a ray")
@@ -314,14 +386,16 @@ func _describe(spell: CompiledSpell) -> void:
 		parts.append("%d shots" % spell.shots)
 	else:
 		parts.append("1 shot")
-	if spell.shots_clamped:
-		parts.append("cut from %d to the limit of %d" % [spell.shots_requested, SpellLimits.MAX_SHOTS])
 	parts.append("cooldown %s s" % _number(spell.cooldown))
 	if spell.mana_cost > 0.0:
 		parts.append("%s mana" % _number(spell.mana_cost))
 	var text: String = ", ".join(parts) + "."
+	if spell.shots_clamped:
+		text += " Cut from %d to %d shots, the limit." % [spell.shots_requested, SpellLimits.MAX_SHOTS]
 	if spell.pierce > 0:
 		text += " Pierces %d." % spell.pierce
+	if spell.status_id != &"" and spell.status_duration > 0.0:
+		text += " %s for %s s." % [_status_verb(spell.status_id), _number(spell.status_duration)]
 	if spell.homing_turn > 0.0:
 		text += " Homing."
 	if spell.chain_jumps > 0:
@@ -334,6 +408,10 @@ func _describe(spell: CompiledSpell) -> void:
 			when = "every %s s" % _number(spell.trigger_interval)
 		text += " Then, %s: %s" % [when, spell.held.description]
 	spell.description = text
+
+
+func _status_verb(status: StringName) -> String:
+	return STATUS_VERBS.get(status, "Applies %s" % status)
 
 
 func _number(value: float) -> String:

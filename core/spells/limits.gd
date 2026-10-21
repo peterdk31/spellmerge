@@ -35,3 +35,11 @@ const MAX_RADIUS: float = 64.0
 const MAX_PIERCE: int = 16
 const MIN_COOLDOWN: float = 0.05
 const MAX_DAMAGE: int = 999
+## Timer triggers fire no faster than this (seconds) and no slower than the maximum.
+const MIN_TIMER_INTERVAL: float = 0.1
+const MAX_TIMER_INTERVAL: float = 10.0
+## Jumps one hit's chain may make, however many chain modifiers add up.
+const MAX_CHAIN_JUMPS: int = 6
+## Seconds a shot may live; the form's allowed range.
+const MIN_LIFETIME: float = 0.05
+const MAX_LIFETIME: float = 20.0

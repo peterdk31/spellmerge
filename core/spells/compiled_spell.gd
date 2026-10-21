@@ -18,6 +18,9 @@ var depth: int = 0
 
 var form_id: StringName = &""
 var element_id: StringName = &""
+## Display names taken while compiling, so the description needs no second look-up.
+var form_name: String = ""
+var element_name: String = ""
 var modifier_ids: Array[StringName] = []
 var trigger_id: StringName = &""
 

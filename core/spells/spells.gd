@@ -23,7 +23,8 @@ extends Node
 ## Chain: a shot of a spell with `chain_jumps` that hits a target spawns a shot of the same
 ## tag from the hit point to the nearest other target within `SpellLimits.CHAIN_RANGE`
 ## (never the one just hit or the one before it), with one jump fewer; a beam jumps with
-## another beam that pierces nothing. The trigger's fire count is carried along. One player
+## another beam that pierces nothing (it skips only the one just hit, so it may stop at the
+## one before if that stands in its way). The trigger's fire count is carried along. One player
 ## makes at most `SpellLimits.MAX_CHAINS_PER_STEP` jumps per `step`; the rest are dropped
 ## (`chains_dropped` counts them).
 ##

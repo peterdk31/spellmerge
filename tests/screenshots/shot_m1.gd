@@ -146,7 +146,7 @@ func _initialize() -> void:
 		_fail("the Coop camera is not at zoom 0.5 in coop_camera_zoom_half")
 		return
 	print("SHOT: camera zoom %.2f" % camera.zoom.x)
-	await _shot("coop_camera_zoom_half")
+	await _shot("staged_zoom_half_wizards_placed_outside_room")
 	flow.call("stop_run")
 	await create_timer(0.3).timeout
 	quit(0)

@@ -13,8 +13,10 @@ const NO_PLAYER: int = -1
 
 ## The Play button was pressed. Heard by flow.
 signal play_requested(player: int)
-## A player asked to put the component `component_id` into spell slot `slot`. Heard by player.
-signal build_change_requested(player: int, slot: int, component_id: StringName)
+## A player asked to put the component `component_id` into slot `slot` of the spell at `spell`, a path of slot indices: `[0]` is spell A, `[1]` is spell B, `[0, 0]` the spell held by A's trigger. Heard by player.
+signal build_change_requested(player: int, spell: PackedInt32Array, slot: int, component_id: StringName)
+## A player asked to switch between the two prepared spells. Heard by player.
+signal spell_swap_requested(player: int)
 ## A player picked reward choice number `choice`. Heard by rewards.
 signal reward_pick_requested(player: int, choice: int)
 ## A player voted for door number `door`. Heard by flow.
@@ -40,6 +42,14 @@ signal wizard_cast(player: int, wizard: Node)
 signal projectile_hit(player: int, target: Node, position: Vector2, tag: int)
 ## Sender: core/projectiles. Where and which way a projectile struck, for looks only (sparks, dust). `target` is the node it hit, sent just before `projectile_hit` for the same hit, or `null` when it ended on a wall or pillar. `player` is who fired it (or NO_PLAYER for an enemy), `position` the point it stopped at and `direction` the unit vector it was flying.
 signal projectile_impact(player: int, target: Node, position: Vector2, direction: Vector2)
+## Sender: core/projectiles. A projectile fired by `player` ended without a hit: its life ran out or it struck a wall. `tag` is the value given to `Projectiles.spawn()`.
+signal projectile_expired(player: int, position: Vector2, tag: int)
+## Sender: player. The spell of `player` at `spell` (a path as in `build_change_requested`) was built or changed; `description` says in plain words what it does now.
+signal spell_changed(player: int, spell: PackedInt32Array, description: String)
+## Sender: player. A build change asked for by `player` was refused; `reason` says why in plain words.
+signal build_refused(player: int, reason: String)
+## Sender: combat. The reaction `reaction_id` (for example &"shatter") fired for `player` (or NO_PLAYER) at `position`.
+signal reaction_triggered(player: int, reaction_id: StringName, position: Vector2)
 ## Sender: combat. `player` (or NO_PLAYER) dealt `amount` damage to `target`.
 signal damage_dealt(player: int, target: Node, amount: int, position: Vector2)
 ## Sender: combat. A status effect from `player` (or NO_PLAYER) was put on `target`.

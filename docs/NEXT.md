@@ -6,7 +6,6 @@ The ordered task queue for the current milestone, M2 (its design, [M2-spell-syst
 
 M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97). Each task's details are the matching row and sections of the M2 design. Nothing from M3+ is built (rewards, relics, staffs, rooms, the door rule).
 
-- [ ] **Events for M2 (M2 part 2).** (`core/events`) `projectile_expired`, `reaction_triggered`, `spell_changed`, `build_refused`, `spell_swap_requested`; `build_change_requested` gets the `spell` path; the events table and area READMEs fixed to match; the `swap` input action.
 - [ ] **Projectile manager, part 1 (M2 part 3).** (`core/projectiles`) `projectile_expired` (end of life and walls), the target queries `nearest_target` and `targets_in`, the `still` motion; tests; the timing test still within budget.
 - [ ] **Projectile manager, part 2 (M2 part 4).** (`core/projectiles`) `orbit` with per-player anchors, homing on the grid every 4th step, `ray()` for the beam; the timing test extended with homing, orbit and rays; the hit-work budget still bounds a step.
 - [ ] **The compiler and limits (M2 part 5).** (`core/spells`) `limits.gd`, `CompiledSpell`, `Spells.compile(recipe)` with the complexity, shot and depth limits, clamping and a plain description; the tag scheme with generations; tests at and over every limit.
@@ -22,7 +21,7 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
 - [ ] **Spells README and example; Spells opens (M2 part 15).** The README rewritten for the component classes (fields, ranges, complexity, the combo row rule), with the bolt, frost, split and on hit as examples; the weekly run may now open `now` issues for spells.
 - [ ] **Builder, part 1 (M2 part 16).** (`hud/builder`) The expanded corner panel, the slot chain and the bag, per-player focus through `core/ui_focus`, opened from the overlay; sends `build_change_requested`; tests with four builders open at once.
 - [ ] **Builder, part 2 (M2 part 17).** (`hud/builder`) Live stats, the complexity bar, the refusal reason, the mini-preview and the descriptions (empty until part 23); screenshot shots for 1 and 4 players.
-- [ ] **The quick view and quick actions (M2 part 18).** (`hud/builder`, `hud/panels`, `gameplay/player`) The builder folds into the quick view when a wave starts; swap shown on the corner panel (active spell A or B); "Drop component" in the overlay and the quick view; tests.
+- [ ] **The quick view and quick actions (M2 part 18).** (`hud/builder`, `hud/panels`, `gameplay/player`) The builder folds into the quick view when a wave starts; swap shown on the corner panel (active spell A or B); the HUD turns a `swap` press into `spell_swap_requested` (player index) and `player` (part 11) handles it; "Drop component" in the overlay and the quick view; tests.
 - [ ] **The build break (M2 part 19).** (`gameplay/flow`, `hud/panels`) `BUILD_BREAK` instead of `NEXT_WAVE_DELAY`, the countdown, the hammer icon (display only); tests that the wave starts on time with one, two and four players, whoever is building.
 - [ ] **Bots build spells (M2 part 20).** (`tests/bots`) Seeded random builds, bot 4 staying in its builder in the 4-bot test, `test_spell_fuzz.gd`; **the weekly playtest asks about building from here**.
 - [ ] **Combos to 20+ (M2 part 21).** (`combos.json`) At least 20 combos passing, each component in two non-refusal combos; done-when item 2.
@@ -39,6 +38,8 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
 (none)
 
 ## Done recently
+
+- [x] **Events for M2 (M2 part 2).** `core/events`: `projectile_expired`, `reaction_triggered`, `spell_changed`, `build_refused`, `spell_swap_requested`; `build_change_requested(player, spell, slot, component_id)` with the `spell` path (overlay stub updated); the `swap` input action (Q, left shoulder); the events table and READMEs match. No sender yet for the new events (parts 3, 8, 11).
 
 - [x] **Component base classes (M2 part 1).** `core/base/`: `SpellComponent` and `FormBase`, `ElementBase`, `ModifierBase`, `TriggerBase` with documented fields, `kind()`, `ranges()` and `range_problems()`; `ReactionTable` of `ReactionRow`s (no `id`, so the registry skips them). Test `tests/core/test_spell_components.gd` with a fixture. `SpellBase` stays until part 11. Core and spells READMEs updated.
 

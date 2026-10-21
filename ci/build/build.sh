@@ -242,17 +242,17 @@ package() {
   (cd dist && sha256sum ./*.zip | sed 's| \./| |' > SHA256SUMS)
   cat dist/SHA256SUMS
 
+  # Budgets warn, with likely fixes; they never fail the build (docs/PLAN.md, "Gates are sparse").
   step "Size budgets"
-  local size ok=1
+  local size
   size=$(stat -c %s "dist/spellmerge-web-$VERSION.zip")
   echo "web: $((size / 1000)) kB of $((WEB_BUDGET / 1000)) kB"
-  ((size <= WEB_BUDGET)) || { echo "::error::web download is over its 40 MB budget"; ok=0; }
+  ((size <= WEB_BUDGET)) || echo "::warning::web download is over its 40 MB budget. Not a failure. Likely fixes: big textures or sounds added recently (art/manifest.json, audio/manifest.json), more content the Web preset could exclude (export_presets.cfg, the demo flag), uncompressed imports"
   for platform in windows linux; do
     size=$(stat -c %s "dist/spellmerge-$platform-$VERSION.zip")
     echo "$platform: $((size / 1000)) kB of $((DESKTOP_BUDGET / 1000)) kB"
-    ((size <= DESKTOP_BUDGET)) || { echo "::error::$platform download is over its 300 MB budget"; ok=0; }
+    ((size <= DESKTOP_BUDGET)) || echo "::warning::$platform download is over its 300 MB budget. Not a failure. Likely fixes: big textures or sounds added recently, uncompressed imports, test or source files the export should exclude"
   done
-  ((ok))
 }
 
 mkdir -p build

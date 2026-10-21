@@ -2,6 +2,15 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-21: Gates are sparse; hard gates notify the owner
+
+**Decided by:** the owner ("Gating should in general be sparse. Development should be prioritized to continue instead of gating stuff. Of course a hard gate can happen, in that case I should be notified").
+**Decision:** written into docs/PLAN.md, "Gates are sparse".
+- The hard gates are a broken build (build, tests, smoke tests, error lines) plus the security and copyright rules. Each one already mentions the owner when it trips: a broken build's Daily log post, a failed revert, and the alarm issues.
+- Budgets warn with likely fixes: web load time (above), download size (`build.sh` no longer fails over 40 MB or 300 MB), frame time and the M2 stress benchmark (a warning, not a gate, when part 25 adds it). The 10% frame-time regression no longer reverts.
+- The stable channel still promotes only builds that are within budget. Nightly builds always ship.
+**Consequence:** a budget can be broken for a while. The warning in the build log, and a task once it repeats, are what bring it back.
+
 ## 2026-10-21: A slow web load warns, it never fails the build
 
 **Decided by:** the owner ("loosen up a bit on the load timing. It should not hinder development ... it should just give warnings and potential fixes").

@@ -16,6 +16,8 @@ C1 verdict: **iterate** (owner, #97, 2026-10-20). Per the plan for an iterate ve
 
 ## Done recently
 
+- [x] **Animated decals, 2.5D pillars, impact particles (owner `/claude` x4 on #4).** Torches have a looping flame and flickering glow (shared frames, own speed and phase); pillars are a base plus a top drawn over characters, with a longer shadow; hits on characters spray along the shot in the target's colour and wall hits throw chips and a coloured spark, through the new event `projectile_impact`. Tests in `test_projectile_impacts.gd`, `test_feel_impacts.gd`, `test_arena_01_pillars.gd`, `test_arena_01_torches.gd`. `build.sh --quick --tests` passes and the pillar, torch and impact screenshots were looked at; the numbers still need a human playtest. Owner-requested feel and art work, so it comes before the playtest report; the report stays first in the Queue.
+
 - [x] **Solid foundation, easy to extend, art easy to swap (owner `/claude` on #5).** `docs/ARCHITECTURE.md` (layers, where each change goes, the art contract); `Feel` takes its textures from the `FeelPreset`; `Flow` takes the room, enemy, spell and wizard scene from settable fields; new art-contract test for the wizard and tests for both changes; weak spots in `docs/BACKLOG.md` ("Foundation").
 
 - [x] **Hitboxes too small, shots pass through sprites (owner `/claude` on #5).** Hit circles moved from the feet to the body (offset (0, -12)) and enlarged; see `docs/DECISIONS.md`. Regression tests in `test_projectiles.gd` and `test_combat.gd`. An owner-requested bug fix, so it comes before the playtest report.

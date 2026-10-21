@@ -59,7 +59,10 @@ extends Node2D
 ## budget above (its length is capped instead). `wall_hits` counts these ends.
 ## `clip_to_walls(from, to)` shortens a segment to the first wall. `spawn` refuses
 ## (-1, counted in `wall_hits`) a shot that starts inside a wall, so it takes no
-## pool slot and evicts nobody at the cap.
+## pool slot and evicts nobody at the cap. Each wall end, and each hit on a
+## target, also sends `Events.projectile_impact(player, target, position,
+## direction)` (target `null` for a wall), so a listener can show dust or a spray
+## without asking the manager anything; it changes nothing here.
 ##
 ## The global cap (`get_cap()`, set by platform: DEFAULT_CAP_WEB or
 ## DEFAULT_CAP_DESKTOP) degrades gracefully. When it is full, a new projectile
@@ -508,6 +511,7 @@ func spawn(player: int, origin: Vector2, velocity: Vector2, lifetime: float, rad
 	if _has_walls and _wall_hit(origin, origin) >= 0.0:
 		# Born inside a wall it would end in the next step: count it as ended, but
 		# take no pool slot (at the cap that would evict another shot).
+		# No shot existed, so no impact is shown (the staff tip is inside the wall).
 		wall_hits += 1
 		return -1
 	if _free_count == 0:
@@ -582,6 +586,7 @@ func step(delta: float) -> void:
 			if _work_left <= 0:
 				if walled:
 					wall_hits += 1
+					_emit_wall_impact(_player[slot], _pos[slot], _vel[slot])
 					_kill(slot)
 				elif starved_at < 0:
 					starved_at = slot
@@ -594,6 +599,7 @@ func step(delta: float) -> void:
 					break
 		if walled and _alive[slot] != 0:
 			wall_hits += 1
+			_emit_wall_impact(_player[slot], _pos[slot], _vel[slot])
 			_kill(slot)
 	_resume = maxi(starved_at, 0)
 	_stepping = false
@@ -806,10 +812,17 @@ func _remembers(slot: int, id: int) -> bool:
 	return false
 
 
+## Tell listeners a shot ended on a wall at `at`, flying along `velocity`.
+func _emit_wall_impact(player: int, at: Vector2, velocity: Vector2) -> void:
+	if events != null and not velocity.is_zero_approx():
+		events.projectile_impact.emit(player, null, at, velocity.normalized())
+
+
 func _register_hit(slot: int, target: int, at: Vector2) -> void:
 	var node: Variant = _targets[target]
 	var player: int = _player[slot]
 	var tag: int = _tag[slot]
+	var heading: Vector2 = _vel[slot].normalized()
 	if _pierce[slot] > 0:
 		_pierce[slot] -= 1
 		var memory: int = slot * HIT_MEMORY
@@ -819,4 +832,5 @@ func _register_hit(slot: int, target: int, at: Vector2) -> void:
 	else:
 		_kill(slot)
 	if events != null and is_instance_valid(node):
+		events.projectile_impact.emit(player, node, at, heading)
 		events.projectile_hit.emit(player, node, at, tag)

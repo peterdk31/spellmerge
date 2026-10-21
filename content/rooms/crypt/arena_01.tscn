@@ -1,10 +1,11 @@
-[gd_scene load_steps=12 format=3]
+[gd_scene load_steps=13 format=3]
 
 [ext_resource type="Texture2D" path="res://art/tilesets/crypt/floor.svg" id="1_floor"]
 [ext_resource type="Texture2D" path="res://art/tilesets/crypt/wall.svg" id="2_wall"]
 [ext_resource type="Texture2D" path="res://art/tilesets/crypt/wall_top.svg" id="3_walltop"]
 [ext_resource type="Texture2D" path="res://art/tilesets/crypt/pillar.svg" id="4_pillar"]
-[ext_resource type="Texture2D" path="res://art/tilesets/crypt/torch.svg" id="5_torch"]
+[ext_resource type="PackedScene" path="res://content/rooms/crypt/decals/torch.tscn" id="5_torch"]
+[ext_resource type="Texture2D" path="res://art/tilesets/crypt/pillar_top.svg" id="9_pillartop"]
 [ext_resource type="Texture2D" path="res://art/tilesets/crypt/door.svg" id="6_door"]
 [ext_resource type="Texture2D" path="res://art/tilesets/crypt/rubble.svg" id="7_rubble"]
 [ext_resource type="Texture2D" path="res://art/tilesets/crypt/skull.svg" id="8_skull"]
@@ -88,61 +89,25 @@ region_rect = Rect2(0, 0, 32, 320)
 position = Vector2(176, 144)
 shape = SubResource("RectangleShape2D_pillar")
 
-[node name="Pillar1Tile" type="Sprite2D" parent="Walls"]
-texture_filter = 1
-position = Vector2(160, 128)
-texture = ExtResource("4_pillar")
-centered = false
-
 [node name="Pillar2" type="CollisionShape2D" parent="Walls"]
 position = Vector2(464, 144)
 shape = SubResource("RectangleShape2D_pillar")
-
-[node name="Pillar2Tile" type="Sprite2D" parent="Walls"]
-texture_filter = 1
-position = Vector2(448, 128)
-texture = ExtResource("4_pillar")
-centered = false
 
 [node name="Pillar3" type="CollisionShape2D" parent="Walls"]
 position = Vector2(176, 240)
 shape = SubResource("RectangleShape2D_pillar")
 
-[node name="Pillar3Tile" type="Sprite2D" parent="Walls"]
-texture_filter = 1
-position = Vector2(160, 224)
-texture = ExtResource("4_pillar")
-centered = false
-
 [node name="Pillar4" type="CollisionShape2D" parent="Walls"]
 position = Vector2(464, 240)
 shape = SubResource("RectangleShape2D_pillar")
-
-[node name="Pillar4Tile" type="Sprite2D" parent="Walls"]
-texture_filter = 1
-position = Vector2(448, 224)
-texture = ExtResource("4_pillar")
-centered = false
 
 [node name="Pillar5" type="CollisionShape2D" parent="Walls"]
 position = Vector2(304, 176)
 shape = SubResource("RectangleShape2D_pillar")
 
-[node name="Pillar5Tile" type="Sprite2D" parent="Walls"]
-texture_filter = 1
-position = Vector2(288, 160)
-texture = ExtResource("4_pillar")
-centered = false
-
 [node name="Pillar6" type="CollisionShape2D" parent="Walls"]
 position = Vector2(336, 208)
 shape = SubResource("RectangleShape2D_pillar")
-
-[node name="Pillar6Tile" type="Sprite2D" parent="Walls"]
-texture_filter = 1
-position = Vector2(320, 192)
-texture = ExtResource("4_pillar")
-centered = false
 
 [node name="Shade" type="Node2D" parent="."]
 
@@ -156,31 +121,95 @@ polygon = PackedVector2Array(32, 42, 40, 42, 40, 352, 32, 352)
 
 [node name="Pillar1Shade" type="Polygon2D" parent="Shade"]
 color = Color(0.078, 0.071, 0.122, 0.35)
-polygon = PackedVector2Array(192, 134, 198, 134, 198, 166, 166, 166, 166, 160, 192, 160)
+polygon = PackedVector2Array(192, 136, 204, 142, 204, 172, 172, 172, 160, 160, 192, 160)
 
 [node name="Pillar2Shade" type="Polygon2D" parent="Shade"]
 color = Color(0.078, 0.071, 0.122, 0.35)
-polygon = PackedVector2Array(480, 134, 486, 134, 486, 166, 454, 166, 454, 160, 480, 160)
+polygon = PackedVector2Array(480, 136, 492, 142, 492, 172, 460, 172, 448, 160, 480, 160)
 
 [node name="Pillar3Shade" type="Polygon2D" parent="Shade"]
 color = Color(0.078, 0.071, 0.122, 0.35)
-polygon = PackedVector2Array(192, 230, 198, 230, 198, 262, 166, 262, 166, 256, 192, 256)
+polygon = PackedVector2Array(192, 232, 204, 238, 204, 268, 172, 268, 160, 256, 192, 256)
 
 [node name="Pillar4Shade" type="Polygon2D" parent="Shade"]
 color = Color(0.078, 0.071, 0.122, 0.35)
-polygon = PackedVector2Array(480, 230, 486, 230, 486, 262, 454, 262, 454, 256, 480, 256)
+polygon = PackedVector2Array(480, 232, 492, 238, 492, 268, 460, 268, 448, 256, 480, 256)
 
 [node name="Pillar5Shade" type="Polygon2D" parent="Shade"]
 color = Color(0.078, 0.071, 0.122, 0.35)
-polygon = PackedVector2Array(320, 166, 326, 166, 326, 192, 320, 192)
-
-[node name="Pillar5ShadeFoot" type="Polygon2D" parent="Shade"]
-color = Color(0.078, 0.071, 0.122, 0.35)
-polygon = PackedVector2Array(294, 192, 320, 192, 320, 198, 294, 198)
+polygon = PackedVector2Array(320, 168, 332, 174, 332, 204, 300, 204, 288, 192, 320, 192)
 
 [node name="Pillar6Shade" type="Polygon2D" parent="Shade"]
 color = Color(0.078, 0.071, 0.122, 0.35)
-polygon = PackedVector2Array(352, 198, 358, 198, 358, 230, 326, 230, 326, 224, 352, 224)
+polygon = PackedVector2Array(352, 200, 364, 206, 364, 236, 332, 236, 320, 224, 352, 224)
+
+[node name="Pillars" type="Node2D" parent="."]
+texture_filter = 1
+
+[node name="Pillar1Base" type="Sprite2D" parent="Pillars"]
+position = Vector2(160, 128)
+texture = ExtResource("4_pillar")
+centered = false
+
+[node name="Pillar2Base" type="Sprite2D" parent="Pillars"]
+position = Vector2(448, 128)
+texture = ExtResource("4_pillar")
+centered = false
+
+[node name="Pillar3Base" type="Sprite2D" parent="Pillars"]
+position = Vector2(160, 224)
+texture = ExtResource("4_pillar")
+centered = false
+
+[node name="Pillar4Base" type="Sprite2D" parent="Pillars"]
+position = Vector2(448, 224)
+texture = ExtResource("4_pillar")
+centered = false
+
+[node name="Pillar5Base" type="Sprite2D" parent="Pillars"]
+position = Vector2(288, 160)
+texture = ExtResource("4_pillar")
+centered = false
+
+[node name="Pillar6Base" type="Sprite2D" parent="Pillars"]
+position = Vector2(320, 192)
+texture = ExtResource("4_pillar")
+centered = false
+
+[node name="PillarTops" type="Node2D" parent="."]
+z_index = 5
+modulate = Color(1, 1, 1, 0.6)
+texture_filter = 1
+
+[node name="Pillar1Top" type="Sprite2D" parent="PillarTops"]
+position = Vector2(160, 96)
+texture = ExtResource("9_pillartop")
+centered = false
+
+[node name="Pillar2Top" type="Sprite2D" parent="PillarTops"]
+position = Vector2(448, 96)
+texture = ExtResource("9_pillartop")
+centered = false
+
+[node name="Pillar3Top" type="Sprite2D" parent="PillarTops"]
+position = Vector2(160, 192)
+texture = ExtResource("9_pillartop")
+centered = false
+
+[node name="Pillar4Top" type="Sprite2D" parent="PillarTops"]
+position = Vector2(448, 192)
+texture = ExtResource("9_pillartop")
+centered = false
+
+[node name="Pillar5Top" type="Sprite2D" parent="PillarTops"]
+position = Vector2(288, 128)
+texture = ExtResource("9_pillartop")
+centered = false
+
+[node name="Pillar6Top" type="Sprite2D" parent="PillarTops"]
+position = Vector2(320, 160)
+texture = ExtResource("9_pillartop")
+centered = false
 
 [node name="Decor" type="Node2D" parent="."]
 
@@ -226,53 +255,93 @@ position = Vector2(520, 160)
 texture = ExtResource("8_skull")
 centered = false
 
-[node name="Torch1" type="Sprite2D" parent="Decor"]
-texture_filter = 1
+[node name="Torch1" parent="Decor" instance=ExtResource("5_torch")]
 position = Vector2(80, 0)
-texture = ExtResource("5_torch")
-centered = false
 
-[node name="Torch2" type="Sprite2D" parent="Decor"]
-texture_filter = 1
+[node name="Core" parent="Decor/Torch1" index="1"]
+speed_scale = 1.1
+frame = 2
+
+[node name="Flame" parent="Decor/Torch1" index="3"]
+speed_scale = 0.9
+frame = 0
+
+[node name="Torch2" parent="Decor" instance=ExtResource("5_torch")]
 position = Vector2(208, 0)
-texture = ExtResource("5_torch")
-centered = false
 
-[node name="Torch3" type="Sprite2D" parent="Decor"]
-texture_filter = 1
+[node name="Core" parent="Decor/Torch2" index="1"]
+speed_scale = 0.9
+frame = 5
+
+[node name="Flame" parent="Decor/Torch2" index="3"]
+speed_scale = 1.15
+frame = 3
+
+[node name="Torch3" parent="Decor" instance=ExtResource("5_torch")]
 position = Vector2(400, 0)
-texture = ExtResource("5_torch")
-centered = false
 
-[node name="Torch4" type="Sprite2D" parent="Decor"]
-texture_filter = 1
+[node name="Core" parent="Decor/Torch3" index="1"]
+speed_scale = 1.2
+frame = 1
+
+[node name="Flame" parent="Decor/Torch3" index="3"]
+speed_scale = 1.0
+frame = 5
+
+[node name="Torch4" parent="Decor" instance=ExtResource("5_torch")]
 position = Vector2(528, 0)
-texture = ExtResource("5_torch")
-centered = false
 
-[node name="Torch5" type="Sprite2D" parent="Decor"]
-texture_filter = 1
+[node name="Core" parent="Decor/Torch4" index="1"]
+speed_scale = 1.0
+frame = 4
+
+[node name="Flame" parent="Decor/Torch4" index="3"]
+speed_scale = 0.85
+frame = 7
+
+[node name="Torch5" parent="Decor" instance=ExtResource("5_torch")]
 position = Vector2(208, 352)
-texture = ExtResource("5_torch")
-centered = false
 
-[node name="Torch6" type="Sprite2D" parent="Decor"]
-texture_filter = 1
+[node name="Core" parent="Decor/Torch5" index="1"]
+speed_scale = 0.95
+frame = 7
+
+[node name="Flame" parent="Decor/Torch5" index="3"]
+speed_scale = 1.2
+frame = 2
+
+[node name="Torch6" parent="Decor" instance=ExtResource("5_torch")]
 position = Vector2(432, 352)
-texture = ExtResource("5_torch")
-centered = false
 
-[node name="Torch7" type="Sprite2D" parent="Decor"]
-texture_filter = 1
+[node name="Core" parent="Decor/Torch6" index="1"]
+speed_scale = 1.15
+frame = 0
+
+[node name="Flame" parent="Decor/Torch6" index="3"]
+speed_scale = 0.95
+frame = 4
+
+[node name="Torch7" parent="Decor" instance=ExtResource("5_torch")]
 position = Vector2(0, 150)
-texture = ExtResource("5_torch")
-centered = false
 
-[node name="Torch8" type="Sprite2D" parent="Decor"]
-texture_filter = 1
+[node name="Core" parent="Decor/Torch7" index="1"]
+speed_scale = 0.85
+frame = 3
+
+[node name="Flame" parent="Decor/Torch7" index="3"]
+speed_scale = 1.1
+frame = 6
+
+[node name="Torch8" parent="Decor" instance=ExtResource("5_torch")]
 position = Vector2(608, 150)
-texture = ExtResource("5_torch")
-centered = false
+
+[node name="Core" parent="Decor/Torch8" index="1"]
+speed_scale = 1.05
+frame = 6
+
+[node name="Flame" parent="Decor/Torch8" index="3"]
+speed_scale = 1.25
+frame = 1
 
 [node name="ExitDoor" type="Sprite2D" parent="Decor"]
 texture_filter = 1

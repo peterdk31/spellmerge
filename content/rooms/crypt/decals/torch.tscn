@@ -1,0 +1,37 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Texture2D" path="res://art/tilesets/crypt/torch.svg" id="1_bracket"]
+[ext_resource type="Texture2D" path="res://art/tilesets/crypt/torch_glow.svg" id="2_glow"]
+[ext_resource type="SpriteFrames" path="res://content/rooms/crypt/decals/torch_flame_frames.tres" id="3_flame"]
+[ext_resource type="SpriteFrames" path="res://content/rooms/crypt/decals/torch_glow_frames.tres" id="4_core"]
+
+[sub_resource type="CanvasItemMaterial" id="CanvasItemMaterial_add"]
+blend_mode = 1
+
+[node name="Torch" type="Node2D"]
+
+[node name="Glow" type="Sprite2D" parent="."]
+modulate = Color(1, 1, 1, 0.14)
+material = SubResource("CanvasItemMaterial_add")
+texture_filter = 1
+position = Vector2(16, 10)
+texture = ExtResource("2_glow")
+
+[node name="Core" type="AnimatedSprite2D" parent="."]
+modulate = Color(1, 1, 1, 0.22)
+material = SubResource("CanvasItemMaterial_add")
+texture_filter = 1
+position = Vector2(16, 10)
+sprite_frames = ExtResource("4_core")
+autoplay = "default"
+
+[node name="Bracket" type="Sprite2D" parent="."]
+texture_filter = 1
+texture = ExtResource("1_bracket")
+centered = false
+
+[node name="Flame" type="AnimatedSprite2D" parent="."]
+texture_filter = 1
+sprite_frames = ExtResource("3_flame")
+autoplay = "default"
+centered = false

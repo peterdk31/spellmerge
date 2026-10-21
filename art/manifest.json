@@ -88,7 +88,16 @@
       "license": "CC-BY-SA-4.0",
       "tier": "placeholder",
       "tool": "Claude (hand-written SVG rects)",
-      "prompt": "A 32x32 crypt pillar seen from above: a dark Outline square with cut corners, a Stone light rim on the top and left, Stone shadow on the bottom and right, a Stone base face and a round Stone light slab with a Stone shadow centre hole, so it reads as a column and not as wall. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+      "prompt": "The lower half of a 2.5D crypt pillar, 32x32, drawn over its 32x32 footprint: a round shaft 22 px wide (Stone light on the left, base in the middle, Stone shadow on the right, one drum joint) standing on a 30 px wide plinth with a Stone light top edge and a Stone shadow foot, dark Outline. Its upper half is pillar_top.svg. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/tilesets/crypt/pillar_top.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "The upper half of a 2.5D crypt pillar, 32x32, drawn directly above pillar.svg and in front of characters: a lit Stone light capital top face with a few Stone base cracks, a Stone base lip with a Stone light top edge and a Stone shadow underside, a Stone shadow cast under the lip and the top of the shaft (light left, base middle, shadow right) that continues into pillar.svg. Dark Outline. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
     },
     {
       "path": "art/tilesets/crypt/torch.svg",
@@ -97,7 +106,34 @@
       "license": "CC-BY-SA-4.0",
       "tier": "placeholder",
       "tool": "Claude (hand-written SVG rects)",
-      "prompt": "A 32x32 wall torch drawn over a wall tile (transparent background): a Wood cup and handle with a dark Outline and a Fire flame with a Spark light core and two Spark sparks. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+      "prompt": "A 32x32 wall torch bracket drawn over a wall tile (transparent background): a Wood cup and handle with a dark Outline and no flame (the flame is torch_flame.svg, drawn on top). Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/tilesets/crypt/torch_flame.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 4-frame strip (128x32) of a torch flame above a torch cup, looping: a Fire flame with a Spark light core whose tip is tall, tilted left, short and tilted right in the four frames, with an ember base in Fire shadow and two Spark sparks that drift upward. Dark Outline. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/tilesets/crypt/torch_glow.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A flat 64x64 round light glow for a torch: one stepped disc in Fire base, no outline, no gradient. The game draws it additively at low opacity. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/tilesets/crypt/torch_glow_core.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 3-frame strip (96x32) of the bright core of a torch glow: one stepped disc in Fire light per frame, 26, 20 and 12 px wide, no outline, no gradient. The game plays the frames in an uneven order, additively at low opacity, over torch_glow.svg so the light flickers. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
     },
     {
       "path": "art/tilesets/crypt/door.svg",

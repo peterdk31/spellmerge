@@ -24,6 +24,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `spell_cast` | `player` | `combat`, `feel` |
 | `wizard_cast` | `player` | `feel` |
 | `projectile_hit` | `core/projectiles` | `combat` |
+| `projectile_impact` | `core/projectiles` | `feel` |
 | `damage_dealt` | `combat` | `feel`, `player` |
 | `status_applied` | `combat` | none yet |
 | `enemy_died` | `combat` | `feel`, `flow` |

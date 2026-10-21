@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="ElementBase" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/element_base.gd" id="1_element"]
+
+[resource]
+script = ExtResource("1_element")
+id = &"frost"
+display_name = "Frost"
+complexity = 1
+status_id = &"chill"
+status_duration = 3.0
+status_strength = 0.3

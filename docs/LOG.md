@@ -2,6 +2,11 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue.
 
+## 2026-10-21
+
+- M2 part 1: spell component base classes in `core/base/` (`SpellComponent`, `FormBase`, `ElementBase`, `ModifierBase`, `TriggerBase`, `ReactionTable`, `ReactionRow`) with ranges in code; test `tests/core/test_spell_components.gd` and a fixture.
+- M2 started (owner, in a session): M1 closed on the go verdict at C1; `docs/milestones/M2-spell-system.md` written, reviewed by a fresh-context session against `docs/DESIGN.md` (one blocking finding: the wave must not wait for a builder) and revised; 28 parts queued in `docs/NEXT.md`; ROADMAP, M1 status, llms.txt, README and CONTRIBUTING updated. M1's open owner items carry into M2. No game code changed.
+
 ## 2026-10-21: Animated torches, 2.5D pillars, impact particles (owner `/claude` on #4)
 
 - **Torches** (`content/rooms/crypt/decals/`): a looping 4-frame flame and a flickering additive glow, shared frames, each of the eight torches at its own speed and phase; no script. **Pillars:** a base under the characters, a top over them (`z_index` 5), a longer floor shadow; collision unchanged. **Particles:** new event `projectile_impact` from `core/projectiles`; `Feel` sprays hits along the shot (ember for an enemy, the wizard's colour for a wizard, bigger for more damage) and throws stone chips and a coloured spark where a shot ends on a wall or pillar. Within `PARTICLE_LIMIT` and the pools. Tests: `test_projectile_impacts.gd`, `test_feel_impacts.gd`, `test_arena_01_pillars.gd`, `test_arena_01_torches.gd`; shots in `tests/screenshots/shot_impacts.gd`. Details in `docs/DECISIONS.md`.

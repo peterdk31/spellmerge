@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="ReactionTable" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://core/base/reaction_table.gd" id="1_table"]
+[ext_resource type="Script" path="res://core/base/reaction_row.gd" id="2_row"]
+
+[sub_resource type="Resource" id="Resource_shatter"]
+script = ExtResource("2_row")
+reaction_id = &"shatter"
+display_name = "Shatter"
+status_id = &"chill"
+element_id = &"storm"
+effect = 1
+damage = 20
+
+[resource]
+script = ExtResource("1_table")
+rows = Array[ExtResource("2_row")]([SubResource("Resource_shatter")])

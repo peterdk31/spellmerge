@@ -4,7 +4,7 @@
 
 Words in the game: **lore** (`lore/`) for item and world descriptions, **dialogue** (`dialogue/`) for conversations, and **events** (`events/`) for short in-run story moments. Items without lore or a description become open writing tasks.
 
-**Opens for PRs in M2** (Spell system; see "Opens for PRs" in docs/ROADMAP.md). **The example to copy arrives with Claude's first story content in M2**; this README is updated then with its path.
+**Opens for PRs in M2, from part 23** (Spell system, which has started; see docs/milestones/M2-spell-system.md), once `docs/STORY.md` and the first component descriptions exist. **The example to copy arrives with Claude's first story content in M2**; this README is updated then with its path.
 
 ## Contract
 

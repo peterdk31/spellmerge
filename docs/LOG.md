@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue.
 
+## 2026-10-21
+
+- M2 started (owner, in a session): M1 closed on the go verdict at C1; `docs/milestones/M2-spell-system.md` written, reviewed by a fresh-context session against `docs/DESIGN.md` (one blocking finding: the wave must not wait for a builder) and revised; 28 parts queued in `docs/NEXT.md`; ROADMAP, M1 status, llms.txt, README and CONTRIBUTING updated. M1's open owner items carry into M2. No game code changed.
+
 ## 2026-10-21: Smaller enemy bullets (owner `/claude` on #4)
 
 - The imp's shot radius is 5 → 3.5, so its sprite (drawn at 3x the radius) and its hit circle both shrink by 30% (30 px → 21 px quad, orb about 10 px). Players' bolts keep radius 4, and the enemy orb keeps its own spiky art and no tint, so the two stay distinct. Test in `test_ai.gd`.

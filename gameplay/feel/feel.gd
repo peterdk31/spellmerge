@@ -142,12 +142,16 @@ var _next_spark: int = FLASH_SLOTS
 ## Where, along which way and in whom the latest shot on a character struck, from
 ## `projectile_impact` (sent just before the damage), so the damage can aim its spray.
 var _impact_target: int = 0
+## The player whose shot it was: a contact hit (another player value) never takes it.
+var _impact_player: int = 0
 ## The physics frame it was sent in: the damage follows at once, or the record is stale.
 var _impact_frame: int = -1
 var _impact_at: Vector2 = Vector2.ZERO
 var _impact_aim: Vector2 = Vector2.ZERO
 ## The tint of the latest plain hit burst, kept for a kill that makes it bigger.
 var _hit_tint: Color = Color.WHITE
+## Where the latest plain hit burst started, so a kill relaunches it from there.
+var _hit_at: Vector2 = Vector2.ZERO
 ## Death animations: sprites made once, seconds left, seconds they started with and
 ## the scale they started at (parallel arrays of GHOST_SLOTS).
 var _ghosts: Array[Sprite2D] = []
@@ -478,7 +482,7 @@ func trauma() -> float:
 	return _trauma
 
 
-func _on_damage_dealt(_player: int, target: Node, amount: int, position: Vector2) -> void:
+func _on_damage_dealt(player: int, target: Node, amount: int, position: Vector2) -> void:
 	_react(target)
 	var aim: Vector2 = Vector2.ZERO
 	var at: Vector2 = position
@@ -487,7 +491,7 @@ func _on_damage_dealt(_player: int, target: Node, amount: int, position: Vector2
 	if target != null and is_instance_valid(target):
 		tint = _target_tint(target)
 		# The shot that did this hit told us where it struck and which way it flew.
-		if target.get_instance_id() == _impact_target and Engine.get_physics_frames() == _impact_frame:
+		if target.get_instance_id() == _impact_target and player == _impact_player and Engine.get_physics_frames() == _impact_frame:
 			aim = _impact_aim
 			at = _impact_at
 			size = clampf(1.0 + float(amount - SPRAY_REF_DAMAGE) * preset.hit_spray_per_damage, SPRAY_MIN_SIZE, SPRAY_MAX_SIZE)
@@ -500,6 +504,7 @@ func _on_damage_dealt(_player: int, target: Node, amount: int, position: Vector2
 func _on_projectile_impact(player: int, target: Node, position: Vector2, direction: Vector2) -> void:
 	if target != null:
 		_impact_target = target.get_instance_id()
+		_impact_player = player
 		_impact_frame = Engine.get_physics_frames()
 		_impact_at = position
 		_impact_aim = direction
@@ -577,7 +582,8 @@ func _juice(position: Vector2, stop: float, strong: bool, shake: float, sound: S
 		if strong:
 			upgraded = _burst_death(position)
 		else:
-			_hit_burst = _burst(position if at == Vector2.INF else at, size, aim, tint, preset.hit_spray_spread)
+			_hit_at = position if at == Vector2.INF else at
+			_hit_burst = _burst(_hit_at, size, aim, tint, preset.hit_spray_spread)
 			_hit_position = position
 			_hit_tint = tint
 	if upgraded and _hit_voice >= 0:
@@ -628,7 +634,7 @@ func _burst_death(position: Vector2) -> bool:
 	if _hit_burst != null and _hit_position == position:
 		var at: int = _active.find(_hit_burst)
 		if at >= 0:
-			_launch(_hit_burst, position, size, Vector2.ZERO, _hit_tint)
+			_launch(_hit_burst, _hit_at, size, Vector2.ZERO, _hit_tint)
 			_active_left[at] = preset.particle_lifetime * size
 			return true
 	if _burst(position, size) != null:

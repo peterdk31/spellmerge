@@ -201,6 +201,23 @@ func test_an_impact_without_damage_is_not_kept_for_a_later_hit() -> void:
 	check(not bursts.is_empty() and bursts[0].spread == 180.0, "a stale impact gives a round puff")
 
 
+func test_a_contact_hit_does_not_take_a_refused_shots_direction() -> void:
+	var target: Node2D = _wizard(0)
+	bus.projectile_impact.emit(1, target, Vector2.ZERO, Vector2.RIGHT)  # combat refused it: no damage
+	bus.damage_dealt.emit(EventsScript.NO_PLAYER, target, 5, Vector2.ZERO)
+	var bursts: Array[CPUParticles2D] = _live_bursts()
+	check(not bursts.is_empty() and bursts[0].spread == 180.0, "a contact hit gets a round puff")
+
+
+func test_a_kill_relaunches_the_burst_from_the_impact_point() -> void:
+	var enemy: Node2D = _enemy()
+	enemy.global_position = Vector2(100.0, 50.0)
+	_strike(0, enemy, Vector2(92.0, 50.0), Vector2.RIGHT, 5)
+	bus.enemy_died.emit(0, enemy, enemy.global_position)
+	var bursts: Array[CPUParticles2D] = _live_bursts()
+	check(not bursts.is_empty() and bursts[0].global_position.is_equal_approx(Vector2(92.0, 50.0)), "the bigger burst stays where the shot struck")
+
+
 func test_bursts_draw_above_the_room_and_the_pillar_tops() -> void:
 	bus.damage_dealt.emit(0, null, 5, Vector2.ZERO)
 	var bursts: Array[CPUParticles2D] = _live_bursts()

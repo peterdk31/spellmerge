@@ -6,7 +6,6 @@ The ordered task queue for the current milestone, M2 (its design, [M2-spell-syst
 
 M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97). Each task's details are the matching row and sections of the M2 design. Nothing from M3+ is built (rewards, relics, staffs, rooms, the door rule).
 
-- [ ] **Component base classes (M2 part 1).** (`core/base`) `SpellComponent`, `FormBase`, `ElementBase`, `ModifierBase`, `TriggerBase`, `ReactionTable`, with documented fields and ranges; tests. `SpellBase` stays until part 11.
 - [ ] **Events for M2 (M2 part 2).** (`core/events`) `projectile_expired`, `reaction_triggered`, `spell_changed`, `build_refused`, `spell_swap_requested`; `build_change_requested` gets the `spell` path; the events table and area READMEs fixed to match; the `swap` input action.
 - [ ] **Projectile manager, part 1 (M2 part 3).** (`core/projectiles`) `projectile_expired` (end of life and walls), the target queries `nearest_target` and `targets_in`, the `still` motion; tests; the timing test still within budget.
 - [ ] **Projectile manager, part 2 (M2 part 4).** (`core/projectiles`) `orbit` with per-player anchors, homing on the grid every 4th step, `ray()` for the beam; the timing test extended with homing, orbit and rays; the hit-work budget still bounds a step.
@@ -40,6 +39,8 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
 (none)
 
 ## Done recently
+
+- [x] **Component base classes (M2 part 1).** `core/base/`: `SpellComponent` and `FormBase`, `ElementBase`, `ModifierBase`, `TriggerBase` with documented fields, `kind()`, `ranges()` and `range_problems()`; `ReactionTable` of `ReactionRow`s (no `id`, so the registry skips them). Test `tests/core/test_spell_components.gd` with a fixture. `SpellBase` stays until part 11. Core and spells READMEs updated.
 
 - [x] **M2 design document.** `docs/milestones/M2-spell-system.md`: goal, done-when, carried-over M1 items, design decisions, 28 parts in build order, the combo catalogue, checkpoint C2 and out of scope; reviewed by a fresh-context session against `docs/DESIGN.md` and revised (`docs/DECISIONS.md`, "M2 design review"). The queue above holds M2's tasks, one per part. The C1 round 2 playtest tasks are dropped: the owner chose go instead.
 

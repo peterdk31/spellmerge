@@ -2,6 +2,15 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-21: Spell component base classes (M2 part 1)
+
+**Decided by:** Claude.
+
+- **The ranges live in code.** Each class has `ranges()`, and `SpellComponent.range_problems()` checks them. The validator (part 9) and the docs then read the same numbers, so they can't drift from a separate table. The ranges are wide sanity bounds, not balance.
+- **The beam is a fourth motion, `RAY`,** next to `STRAIGHT`, `STILL` and `ORBIT`, with the extra fields `ray_length` and `orbit_radius`, each used by one motion only. The alternative, deriving the ray length from speed × lifetime, hid a meaning in two unrelated fields.
+- **Split is `shot_mult`, not a behaviour.** The `Behaviour` enum is only `NONE`, `HOMING` and `CHAIN`, the two that need code at run time; `behaviour_strength` is the turn rate or the number of jumps.
+- **Reactions are sub-resource rows (`ReactionRow`) in one `ReactionTable`.** Neither has an `id`, so the registry never registers them, which a test checks.
+
 ## 2026-10-21: M1 closes on the owner's go; M2 starts
 
 **Decided by:** owner ("Start milestone 2", in a session on 2026-10-21).

@@ -8,7 +8,7 @@ The spell components that players assemble into spells: **forms** (bolt, beam, n
 
 ## Contract
 
-- A component is one folder holding a `.tres` resource on the spell component base class, an optional `.gd` for new behaviour, an icon and an optional SFX. Today the base class is `SpellBase` with the M1 fields `id`, `demo`, `display_name`, `mana_cost`, `cooldown`, `damage`, `speed` and `lifetime`. M2 replaces or extends it with the component classes and their documented fields, and adds validators for missing or out-of-range values.
+- A component is one folder holding a `.tres` resource on the spell component base class, an optional `.gd` for new behaviour, an icon and an optional SFX. The M2 component classes exist in `core/base/` (`FormBase`, `ElementBase`, `ModifierBase`, `TriggerBase` on `SpellComponent`; fields and allowed ranges are documented in each script, and `range_problems()` lists what is out of range), with `ReactionTable` for `reactions.tres`. The game still casts the M1 `SpellBase` bolt until M2 part 11; the example below moves to the new classes in part 15, when this area opens.
 - Content is discovered by folder through `core/registry`. Do not edit any central list.
 - Element interactions go in `reactions.tres` (in this folder), so a new element does not need changes in other components.
 - Components may depend only on `core/`. They never call other areas; they talk through `core/` events (`spell_cast`, ...).

@@ -6,7 +6,6 @@ The ordered task queue for the current milestone, M2 (its design, [M2-spell-syst
 
 M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97). Each task's details are the matching row and sections of the M2 design. Nothing from M3+ is built (rewards, relics, staffs, rooms, the door rule).
 
-- [ ] **Projectile manager, part 2 (M2 part 4).** (`core/projectiles`) `orbit` with per-player anchors, homing on the grid every 4th step, `ray()` for the beam; the timing test extended with homing, orbit and rays; the hit-work budget still bounds a step.
 - [ ] **The compiler and limits (M2 part 5).** (`core/spells`) `limits.gd`, `CompiledSpell`, `Spells.compile(recipe)` with the complexity, shot and depth limits, clamping and a plain description; the tag scheme with generations; tests at and over every limit.
 - [ ] **Casting and triggers (M2 part 6).** (`core/spells`) `Spells.cast(player, slot, ...)` with per-player cooldowns, split at cast, triggers on hit, expire and timer with the per-step fire cap, held-spell origin, direction and exclusion, chain on hit, `hit_profile(tag)`; tests with four players and a rebuild mid-flight.
 - [ ] **The four elements and statuses (M2 part 7).** (`content/spells/elements/`, `gameplay/combat`) Fire, frost, storm and void as `.tres` with tints and icons; burn, chill and freeze, shock and hex as packed arrays per enemy in `combat`; `status_applied`; `combat` reads `Spells.hit_profile`; the AI respects slow and freeze; tests.
@@ -38,6 +37,7 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
 
 ## Done recently
 
+- [x] **Projectile manager, part 2 (M2 part 4).** `core/projectiles`: `spawn_orbit` with `set_anchor`/`clear_anchor` per player; `set_homing(slot, turn_rate)` (grid search every 4th step, charged to the hit-work budget) and `homing_aim` for the beam; `ray()` with pierce, width, wall stop and nesting. Tests in the new `test_projectiles_motion.gd` (including a brute-force ray comparison); the timing test now times homing, orbit and rays. The spell runtime (part 6) has to call `set_anchor` every physics step and `clear_anchor` when a wizard leaves or falls.
 - [x] **Projectile manager, part 1 (M2 part 3).** `core/projectiles`: `projectile_expired` on end of life and on walls; `MOTION_STILL` (last argument of `spawn`); `nearest_target` and `targets_in` on the target grid. Tests in `test_projectiles.gd` (including a brute-force comparison); the timing test costs the same as before. Also fixed: the grid's cell heads started at 0, not -1, before the first step.
 
 - [x] **Events for M2 (M2 part 2).** `core/events`: `projectile_expired`, `reaction_triggered`, `spell_changed`, `build_refused`, `spell_swap_requested`; `build_change_requested(player, spell, slot, component_id)` with the `spell` path (overlay stub updated); the `swap` input action (Q, left shoulder); the events table and READMEs match. No sender yet for the new events (parts 3, 8, 11).

@@ -171,8 +171,66 @@ func _run_cap(cap: int) -> void:
 	_mgr.step(DT)
 	var steady_us: float = _time_steps()
 	_log("step, steady state (targets remembered)", steady_us, 1, "per step")
+	_run_motion_timings(cap)
 	_bus.projectile_hit.disconnect(_on_hit)
 	root.remove_child(_mgr)
+
+
+## Homing, orbit and rays, against the same crowd (still registered). Each fill is
+## repeated before the timed step so the work is the same every time.
+func _run_motion_timings(cap: int) -> void:
+	# Homing: the whole cap homes on the crowd; every shot searches once in four steps.
+	var homing_us: float = 0.0
+	var turned: int = 0
+	for i in REPEATS:
+		_mgr.clear()
+		_mgr.friendly_fire = false
+		for n in cap:
+			var at := CROWD_CENTER + Vector2(float(n * 37 % 240) - 120.0, 90.0 + float(n * 53 % 60))
+			var slot: int = _mgr.spawn(n % PLAYERS, at, Vector2(0.0, -60.0), 1.0e6, 4.0, ManagerScript.LAYER_ENEMY, 1000000)
+			_mgr.set_homing(slot, 3.0)
+		var start: int = Time.get_ticks_usec()
+		_mgr.step(DT)
+		homing_us += float(Time.get_ticks_usec() - start)
+	for slot in cap:
+		if _mgr._home_at[slot].is_finite():
+			turned += 1
+	_check(_mgr.get_count() == cap, "cap %d: homing shots survive" % cap)
+	_check(turned > 0, "cap %d: some homing shots found a target in a step (%d)" % [cap, turned])
+	_log("step, full cap of homing shots near %d packed enemies (%d searched)" % [ENEMIES, turned], homing_us / float(REPEATS), 1, "per step")
+
+	# Orbit: the whole cap circles four anchors inside the crowd.
+	var orbit_us: float = 0.0
+	for i in REPEATS:
+		_mgr.clear()
+		for player in PLAYERS:
+			_mgr.set_anchor(player, CROWD_CENTER + Vector2(float(player) * 8.0 - 12.0, 0.0))
+		for n in cap:
+			_mgr.spawn_orbit(n % PLAYERS, 20.0 + float(n % 40), float(n) * 0.37, 2.0, 1.0e6, 4.0, ManagerScript.LAYER_ENEMY, 1000000)
+		var start: int = Time.get_ticks_usec()
+		_mgr.step(DT)
+		orbit_us += float(Time.get_ticks_usec() - start)
+	_check(_mgr.get_count() == cap, "cap %d: orbit shots survive" % cap)
+	_log("step, full cap of orbit shots through the crowd", orbit_us / float(REPEATS), 1, "per step")
+	for player in PLAYERS:
+		_mgr.clear_anchor(player)
+	_mgr.clear()
+
+	# Rays: 100 beams through the crowd, thin, wide and piercing (each hits the signal).
+	var rays: int = 100
+	var ray_us: float = 0.0
+	var ray_hits: int = 0
+	for i in REPEATS:
+		_hits = 0
+		var start: int = Time.get_ticks_usec()
+		for n in rays:
+			var at := CROWD_CENTER + Vector2(float(n % 10) * 12.0 - 60.0, 70.0)
+			_mgr.ray(n % PLAYERS, at, Vector2.UP, 300.0, 1000, ManagerScript.LAYER_ENEMY, 0, float(n % 3) * 4.0)
+		ray_us += float(Time.get_ticks_usec() - start)
+		ray_hits += _hits
+	_check(ray_hits > 0, "cap %d: the beams really hit (%d)" % [cap, ray_hits])
+	_check(_mgr.get_count() == 0, "cap %d: beams take no slot" % cap)
+	_log("ray through the crowd (%d beams, %d hits each round)" % [rays, ray_hits / REPEATS], ray_us / float(REPEATS), rays, "per beam")
 
 
 ## The solid parts of the arena: a 32 px border and six 32 px pillars.

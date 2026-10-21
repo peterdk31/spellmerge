@@ -4,6 +4,7 @@ What each run did, newest first. Claude appends a short entry after each develop
 
 ## 2026-10-21
 
+- M2 part 4: projectile manager, part 2. Orbit shots (per-player anchors), homing (every 4th step, on the grid, inside the work budget), `homing_aim` and `ray()`; tests in `test_projectiles_motion.gd`; `build.sh --quick --tests` passes. Native timing at the web cap (1,000): a step of homing shots near the 100-enemy crowd 5.5 ms, of orbit shots through it 4.1 ms, a piercing beam through the crowd (23 hits) 0.08 ms; at the desktop cap (3,000) 7.0 ms and 6.1 ms.
 - M2 part 3: projectile manager. `projectile_expired` (life end and walls), the `still` motion, `nearest_target` and `targets_in`; tests in `test_projectiles.gd`; `build.sh --quick --tests` passes and the timing test is as before.
 - M2 part 2: events. `projectile_expired`, `reaction_triggered`, `spell_changed`, `build_refused` and `spell_swap_requested` in `core/events`; `build_change_requested` takes the `spell` path (the overlay stub sends `[0]`); the `swap` input action (Q, left shoulder, captured like `cast`); the events table and READMEs match; tests in `test_events.gd`, `test_input.gd` and `test_overlay.gd`. No sender for the new events yet (parts 3, 8, 11).
 - M2 part 1: spell component base classes in `core/base/` (`SpellComponent`, `FormBase`, `ElementBase`, `ModifierBase`, `TriggerBase`, `ReactionTable`, `ReactionRow`) with ranges in code; test `tests/core/test_spell_components.gd` and a fixture.

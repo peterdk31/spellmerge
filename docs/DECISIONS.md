@@ -781,3 +781,13 @@ The HUD screenshot cannot be taken in a session (no display, `docs/BACKLOG.md`),
 - `projectile_expired` is sent only when a shot's life runs out or it ends on a wall, after the shot is removed (a handler may spawn at that spot). A hit, leaving the bounds and a cap drop send nothing: an on-expire trigger should not fire for a shot that did its job or was evicted.
 - `still` is a `motion` argument at the end of `spawn` (velocity ignored), so part 4's `orbit` fits the same argument.
 - The queries count a target when its hit circle overlaps the query circle (the rule of a hit) and return the nearest by centre distance. They read the grid of the latest step; `add_target` and `remove_target` outside a step mark it stale and the next query refills it. A target freed since the last step is skipped.
+
+## M2 part 4: projectile manager, part 2
+
+**Decided by:** Claude, following the M2 design ("`core/projectiles` grows only what the forms and modifiers need").
+
+- Orbit and homing are separate calls, not more `spawn` arguments: `spawn_orbit(player, orbit_radius, angle, angular_speed, lifetime, ...)` and `set_homing(slot, turn_rate)`. `spawn` already takes nine arguments, and an orbit needs three more numbers. `spawn` still refuses `MOTION_ORBIT`.
+- An orbit shot ignores walls (its caster holds it, and a wizard against a wall would lose the half of the ring in the wall) and ends quietly when its owner's anchor is cleared, so a wizard who leaves or falls drops their ring. A player with no anchor cannot spawn one.
+- Homing keeps the speed and only turns it, toward the point found by the last search (every `HOMING_PERIOD` = 4th step, staggered by slot so a full cap does not search all at once). Range `HOMING_RANGE` = 160 px. It skips the shooter's own body and targets the shot remembers hitting; the search costs 1 work unit per target examined, so a spent budget only delays the next search. Only straight shots can home.
+- `ray()` has one more optional argument than the design, `width`, so "bigger" can widen a beam. It returns the pixels reached (to the last target when `pierce + 1` were hit, else the wall or the length) and sends `projectile_impact` before each `projectile_hit`; a beam that ends on a wall sends a wall impact (not counted in `wall_hits`, which counts shots). At most `RAY_MAX_HITS` = 64 targets. Hits are found first and sent after, so a handler may free targets or fire a ray itself (an on-hit beam trigger): scratch is kept per nesting level, up to `RAY_MAX_DEPTH` = 4, deeper returns 0.
+- `homing_aim(player, origin, direction, max_angle, layers)` is the beam's homing: it returns the direction bent to the nearest target in the cone, for the spell runtime to call before `ray`.

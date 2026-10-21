@@ -29,6 +29,8 @@ func _initialize() -> void:
 	_test_orbit_follows_each_players_anchor()
 	_test_orbit_hits_what_crosses_it_and_ignores_walls()
 	_test_orbit_pierce_and_expiry()
+	_test_orbit_ring_over_a_crowd()
+	_test_homing_skips_wizards_and_freed_targets()
 	_test_homing_turns_toward_a_target()
 	_test_homing_rules()
 	_test_homing_skips_its_own_wizard_and_the_target_just_hit()
@@ -171,6 +173,28 @@ func _test_orbit_pierce_and_expiry() -> void:
 	_check(not _mgr.is_alive(slot) and _expired.size() == 1 and _expired[0][2] == 8, "it expires at the end of its life with its tag")
 
 
+func _test_orbit_ring_over_a_crowd() -> void:
+	_setup()
+	_mgr.set_anchor(0, Vector2(200.0, 200.0))
+	# Five enemies stacked under a ring that stands still (speed 0): more than the shot's
+	# HIT_MEMORY. The documented rule: an orbit shot is a piercing shot, so with enough
+	# pierce it hits the 3 it remembers, then the others, then repeats.
+	for i in 5:
+		_target(Vector2(240.0 + float(i), 200.0), 10.0)
+	var slot: int = _mgr.spawn_orbit(0, 40.0, 0.0, 0.0, 5.0, 4.0, ManagerScript.LAYER_ENEMY, 100, 1)
+	for _i in 10:
+		_mgr.step(DT)
+	_check(_mgr.is_alive(slot), "a ring with pierce left survives a crowd")
+	_check(_hits.size() > 5, "a ring over more than HIT_MEMORY enemies hits some again (%d hits)" % _hits.size())
+	_check(_mgr._pierce[slot] == 100 - _hits.size(), "pierce left is 100 minus the hits")
+	# With no pierce it ends on its first touch, like any shot.
+	_mgr.clear()
+	_hits.clear()
+	var thin: int = _mgr.spawn_orbit(0, 40.0, 0.0, 0.0, 5.0, 4.0, ManagerScript.LAYER_ENEMY, 0, 1)
+	_mgr.step(DT)
+	_check(not _mgr.is_alive(thin) and _hits.size() == 1, "a ring with pierce 0 ends on its first touch")
+
+
 func _test_homing_turns_toward_a_target() -> void:
 	_setup()
 	var enemy: Node2D = _target(Vector2(300.0, 150.0), 8.0)
@@ -203,7 +227,7 @@ func _test_homing_rules() -> void:
 	var orbit: int = _mgr.spawn_orbit(0, 10.0, 0.0, 1.0, 1.0)
 	_check(not _mgr.set_homing(rune, 3.0) and not _mgr.set_homing(orbit, 3.0), "still and orbit shots cannot home")
 	_check(not _mgr.set_homing(-1, 3.0) and not _mgr.set_homing(slot, -1.0) and not _mgr.set_homing(slot, NAN), "bad slots and rates are refused")
-	_check(not _mgr.set_homing(slot, 0.0) and _mgr._turn[slot] == 0.0, "a rate of 0 turns homing off")
+	_check(_mgr.set_homing(slot, 0.0) and _mgr._turn[slot] == 0.0, "a rate of 0 turns homing off and is accepted")
 	# A reused slot does not inherit homing.
 	_mgr.clear()
 	var gone: int = _mgr.spawn(0, Vector2.ZERO, Vector2(1.0, 0.0), 1.0)
@@ -287,6 +311,26 @@ func _test_homing_aim_for_a_beam() -> void:
 	_check(aim == Vector2.LEFT, "a target behind the aim is not chosen")
 	aim = _mgr.homing_aim(0, Vector2(100.0, 100.0), Vector2.ZERO, deg_to_rad(30.0), ManagerScript.LAYER_ENEMY)
 	_check(aim == Vector2.ZERO, "a zero aim comes back unchanged")
+	_target(Vector2(500.0, 300.0), 8.0)
+	aim = _mgr.homing_aim(0, Vector2(500.0, 300.0), Vector2.RIGHT, deg_to_rad(30.0), ManagerScript.LAYER_ENEMY)
+	_check(aim == Vector2.RIGHT, "a target exactly on the origin is skipped, never a zero aim")
+	_target(Vector2(140.0, 100.0), 8.0, ManagerScript.LAYER_PLAYER, 1)
+	aim = _mgr.homing_aim(0, Vector2(100.0, 100.0), Vector2.RIGHT, deg_to_rad(30.0), ManagerScript.LAYER_ENEMY | ManagerScript.LAYER_PLAYER)
+	_check(aim.is_equal_approx(Vector2(100.0, 100.0).direction_to(inside.global_position)), "a beam never bends toward a wizard")
+	var ray_len: float = _mgr.ray(0, Vector2(10.0, 600.0), Vector2.RIGHT, 100000.0)
+	_check(ray_len <= ManagerScript.RAY_MAX_LENGTH, "a very long beam is cut to RAY_MAX_LENGTH (%f)" % ray_len)
+
+
+func _test_homing_skips_wizards_and_freed_targets() -> void:
+	_setup()
+	_mgr.friendly_fire = true
+	_target(Vector2(300.0, 160.0), 8.0, ManagerScript.LAYER_PLAYER, 1)
+	var gone: Node2D = _target(Vector2(300.0, 40.0), 8.0)
+	var slot: int = _mgr.spawn(0, Vector2(100.0, 100.0), Vector2(100.0, 0.0), 5.0, 4.0)
+	_mgr.set_homing(slot, 3.0)
+	_mgr._refresh_targets()
+	gone.free()
+	_check(not _mgr._homing_point(slot).is_finite(), "homing neither picks another wizard (friendly fire on) nor a freed target")
 
 
 func _test_ray_hits_in_order_and_reports_its_reach() -> void:
@@ -304,8 +348,8 @@ func _test_ray_hits_in_order_and_reports_its_reach() -> void:
 	_check(absf(reach - 250.0) < 0.01, "and reaches the third (%f)" % reach)
 	_check(_hits.size() == 3 and _hits[0][2].is_equal_approx(Vector2(120.0, 100.0)), "the hit point is where the beam passes closest")
 	_hits.clear()
-	reach = _mgr.ray(0, Vector2(50.0, 100.0), Vector2.RIGHT, 400.0, 10)
-	_check(_hits.size() == 3 and absf(reach - 400.0) < 0.001, "a ray with pierce to spare, and nothing more to hit, reaches its full length")
+	reach = _mgr.ray(0, Vector2(50.0, 100.0), Vector2.RIGHT, 300.0, 10)
+	_check(_hits.size() == 3 and absf(reach - 300.0) < 0.001, "a ray with pierce to spare, and nothing more to hit, reaches its full length")
 	_hits.clear()
 	reach = _mgr.ray(0, Vector2(50.0, 100.0), Vector2.RIGHT * 7.0, 150.0, 5)
 	_check(_hits.size() == 2 and absf(reach - 150.0) < 0.001, "a non-unit direction is normalised; targets past the length are not hit")

@@ -105,6 +105,11 @@ extends Node2D
 ## is charged to the step's hit-work budget (1 per target examined); when the budget is
 ## spent the search waits for the shot's next turn. `homing_aim` does the same for a ray.
 ##
+## An orbit shot is an ordinary piercing shot: `pierce` is how many hits it survives, and
+## it remembers only its last HIT_MEMORY targets, so a ring that overlaps more than
+## HIT_MEMORY enemies at once hits some of them again on later steps. There is no
+## once-per-revolution rule; the orbit form (part 10) picks `pierce` for what it wants.
+##
 ## Rays: `ray(...)` is an instant beam. It holds no row; see its comment.
 ##
 ## Nothing here allocates per frame: the arrays are sized when the cap is set,
@@ -144,6 +149,11 @@ const RAY_MAX_HITS: int = 64
 ## How many rays can be in progress at once: a hit handler that fires another ray (an
 ## on-hit trigger) nests one level. A deeper one returns 0.0.
 const RAY_MAX_DEPTH: int = 4
+## The longest beam in pixels: what the wall walk (MAX_WALL_VISITS cells) covers even on
+## a diagonal. A longer `length` is cut to this, so a beam never ends on a wall it did
+## not look at. Rays are not charged to the hit-work budget; how many a spell fires (and
+## so how far a handler's own rays fan out) is bounded by the spell runtime's fire cap.
+const RAY_MAX_LENGTH: float = 360.0
 ## Floats per projectile in the MultiMesh buffer: 8 transform, 4 colour.
 const DRAW_STRIDE: int = 12
 ## Draw order of the shots: above the room and the wizards. The autoload is drawn
@@ -631,7 +641,8 @@ func clear_anchor(player: int) -> void:
 
 ## Make the straight shot in `slot` home on targets, turning at most `turn_rate` radians
 ## a second. Returns false for an empty slot, a shot that is not straight, or a rate
-## that is not positive. Pass 0 to stop homing.
+## that is negative or not finite; true when the rate was applied, 0 included (0 stops
+## homing).
 func set_homing(slot: int, turn_rate: float) -> bool:
 	if slot < 0 or slot >= _cap or _alive[slot] == 0 or _motion[slot] != MOTION_STRAIGHT:
 		return false
@@ -639,7 +650,7 @@ func set_homing(slot: int, turn_rate: float) -> bool:
 		return false
 	_turn[slot] = turn_rate
 	_home_at[slot] = Vector2.INF
-	return turn_rate > 0.0
+	return true
 
 
 func _spawn_row(player: int, origin: Vector2, velocity: Vector2, lifetime: float, radius: float, hit_layers: int, pierce: int, tag: int, motion: int) -> int:
@@ -786,7 +797,8 @@ func _steer(slot: int, delta: float) -> void:
 ## (not its shooter's body, not one it just hit), or INF. Charges the work budget.
 func _homing_point(slot: int) -> Vector2:
 	var point: Vector2 = _pos[slot]
-	var layers: int = _layers[slot]
+	# Homing never picks a wizard, even with friendly fire on.
+	var layers: int = _layers[slot] & ~LAYER_PLAYER
 	var shooter: int = _player[slot]
 	var best: int = -1
 	var best_sq: float = INF
@@ -796,7 +808,7 @@ func _homing_point(slot: int) -> Vector2:
 			var t: int = _cell_head[y * _grid_w + x]
 			while t >= 0:
 				_work_left -= 1
-				if (_target_layer[t] & layers) != 0 and (shooter < 0 or _target_owner[t] != shooter) and not _remembers(slot, _target_id[t]):
+				if (_target_layer[t] & layers) != 0 and (shooter < 0 or _target_owner[t] != shooter) and not _remembers(slot, _target_id[t]) and is_instance_valid(_targets[t]):
 					var reach: float = HOMING_RANGE + _target_radius[t]
 					var d: float = _target_pos[t].distance_squared_to(point)
 					if d <= reach * reach and d < best_sq:
@@ -809,11 +821,12 @@ func _homing_point(slot: int) -> Vector2:
 ## For a beam, which cannot turn: `direction` (a unit vector) bent toward the nearest
 ## target on `layers` within HOMING_RANGE of `origin` whose centre lies within
 ## `max_angle` radians of it, or `direction` unchanged when there is none. Targets
-## owned by `player` are skipped. Allocation-free.
+## owned by `player` are skipped, and so are wizards (LAYER_PLAYER). Allocation-free.
 func homing_aim(player: int, origin: Vector2, direction: Vector2, max_angle: float, layers: int) -> Vector2:
 	if not origin.is_finite() or not direction.is_finite() or direction.is_zero_approx() or not is_finite(max_angle):
 		return direction
 	_query_ready()
+	layers &= ~LAYER_PLAYER
 	var best: int = -1
 	var best_sq: float = INF
 	var cells: Vector4i = _query_cells(origin, HOMING_RANGE)
@@ -825,7 +838,7 @@ func homing_aim(player: int, origin: Vector2, direction: Vector2, max_angle: flo
 					var to_target: Vector2 = _target_pos[t] - origin
 					var reach: float = HOMING_RANGE + _target_radius[t]
 					var d: float = to_target.length_squared()
-					if d <= reach * reach and d < best_sq and absf(direction.angle_to(to_target)) <= max_angle:
+					if d <= reach * reach and d < best_sq and not to_target.is_zero_approx() and absf(direction.angle_to(to_target)) <= max_angle:
 						best_sq = d
 						best = t
 				t = _target_next[t]
@@ -845,7 +858,8 @@ func homing_aim(player: int, origin: Vector2, direction: Vector2, max_angle: flo
 ## length, the distance to the wall, or the distance to the last target it could hit.
 ## 0.0 for bad arguments or an origin inside a wall. The hits are found before any event
 ## is sent, so a handler may remove or free targets, or fire another ray (up to
-## RAY_MAX_DEPTH deep, a deeper one returns 0.0). Allocation-free.
+## RAY_MAX_DEPTH deep, a deeper one returns 0.0). A `length` over RAY_MAX_LENGTH is cut
+## to it. Allocation-free.
 func ray(player: int, origin: Vector2, direction: Vector2, length: float, pierce: int = 0, layers: int = LAYER_ENEMY, tag: int = 0, width: float = 0.0) -> float:
 	if player < EventsScript.NO_PLAYER or player >= MAX_PLAYERS:
 		return 0.0
@@ -853,6 +867,7 @@ func ray(player: int, origin: Vector2, direction: Vector2, length: float, pierce
 		return 0.0
 	if _ray_depth >= RAY_MAX_DEPTH:
 		return 0.0
+	length = minf(length, RAY_MAX_LENGTH)
 	var base: int = _ray_depth * RAY_MAX_HITS
 	var heading: Vector2 = direction.normalized()
 	var reach: float = length

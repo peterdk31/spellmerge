@@ -179,6 +179,19 @@ func _run_cap(cap: int) -> void:
 ## Homing, orbit and rays, against the same crowd (still registered). Each fill is
 ## repeated before the timed step so the work is the same every time.
 func _run_motion_timings(cap: int) -> void:
+	# Baseline: the same shots without homing, so the homing figure shows its own cost.
+	var straight_us: float = 0.0
+	for i in REPEATS:
+		_mgr.clear()
+		_mgr.friendly_fire = false
+		for n in cap:
+			var at := CROWD_CENTER + Vector2(float(n * 37 % 240) - 120.0, 90.0 + float(n * 53 % 60))
+			_mgr.spawn(n % PLAYERS, at, Vector2(0.0, -60.0), 1.0e6, 4.0, ManagerScript.LAYER_ENEMY, 1000000)
+		var begin: int = Time.get_ticks_usec()
+		_mgr.step(DT)
+		straight_us += float(Time.get_ticks_usec() - begin)
+	_log("step, full cap of straight shots near %d packed enemies (baseline for homing)" % ENEMIES, straight_us / float(REPEATS), 1, "per step")
+
 	# Homing: the whole cap homes on the crowd; every shot searches once in four steps.
 	var homing_us: float = 0.0
 	var turned: int = 0

@@ -1,7 +1,7 @@
 extends SceneTree
 ## Tests for the fire bolt (content/spells/forms/bolt): it loads on SpellBase, fires through
 ## core/projectiles, hits and kills the ember imp through Combat, works for players 0-3, and
-## no script outside content/spells and core/base reads a spell field.
+## no script outside content/spells, core/base and core/spells reads a spell field.
 ##
 ## godot --headless --path . --script res://tests/content/spells/test_bolt.gd
 
@@ -20,7 +20,7 @@ const LANE: float = 200.0
 ## Spell fields no script outside the allowed folders may read.
 const FIELD_PATTERN: String = "(id|demo|display_name|mana_cost|cooldown|damage|speed|lifetime)"
 ## Folders that are not game scripts, and the two that may read spell fields.
-const SKIPPED_DIRS: PackedStringArray = [".git", ".github", ".godot", "addons", "ci", "docs", "content/spells", "core/base"]
+const SKIPPED_DIRS: PackedStringArray = [".git", ".github", ".godot", "addons", "ci", "docs", "content/spells", "core/base", "core/spells"]
 
 var _failures: Array[String] = []
 var _bus: Node

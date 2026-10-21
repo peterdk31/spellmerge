@@ -2,6 +2,49 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-21: Spell component base classes (M2 part 1)
+
+**Decided by:** Claude.
+
+- **The ranges live in code.** Each class has `ranges()`, and `SpellComponent.range_problems()` checks them. The validator (part 9) and the docs then read the same numbers, so they can't drift from a separate table. The ranges are wide sanity bounds, not balance.
+- **The beam is a fourth motion, `RAY`,** next to `STRAIGHT`, `STILL` and `ORBIT`, with the extra fields `ray_length` and `orbit_radius`, each used by one motion only. The alternative, deriving the ray length from speed × lifetime, hid a meaning in two unrelated fields.
+- **Split is `shot_mult`, not a behaviour.** The `Behaviour` enum is only `NONE`, `HOMING` and `CHAIN`, the two that need code at run time; `behaviour_strength` is the turn rate or the number of jumps.
+- **Reactions are sub-resource rows (`ReactionRow`) in one `ReactionTable`.** Neither has an `id`, so the registry never registers them, which a test checks.
+
+## 2026-10-21: M1 closes on the owner's go; M2 starts
+
+**Decided by:** owner ("Start milestone 2", in a session on 2026-10-21).
+**Context:** C1 (#97) had two iterate rounds; the second (2026-10-20) queued a round-2 playtest report. Still open from M1's done-when: the web 4-bot run (#93, in the owner's PR #98), M0's dry runs and 3 daily releases in a row. The Claude-side WASM projectile timing runner was also unfinished.
+**Decision:** the C1 verdict is **go**. M1 is closed and M2 starts with its design document. The open items are not dropped: they carry into M2's done-when (item 5), as M0's carried into M1. The WASM runner is folded into M2 part 25. The two round-2 playtest tasks are dropped from the queue; the weekly playtest goes on and asks about building from part 20.
+**Consequence:** the web 4-bot run is still unproven while M2 is built, until PR #98 merges.
+
+## 2026-10-21: M2 design choices the plan left open
+
+**Decided by:** Claude (details in `docs/milestones/M2-spell-system.md`).
+
+- **The spell runtime is a new core service, `core/spells/` (autoload `Spells`),** not in the plan's `core/` list. Content may depend only on `core/` and the player may read no spell field, so compile, cast and triggers must sit in core. `combat` asks `Spells.hit_profile(tag)` (gameplay → core).
+- **Tags carry player, slot, depth and a generation ring of 8,** so shots in flight keep their old profile after a rebuild.
+- **Six reactions from four effect kinds in a data table;** every element reacts with the three others, more than DESIGN.md's "at least 2 interactions".
+- **Limits:** complexity 12 per spell (with the table of provisional costs), 24 shots per cast, trigger depth 3, 32 trigger fires per player per step. The stress benchmark confirms or lowers them.
+- **The bag holds every component in M2;** `rewards` (M3) fills it per player instead.
+- **The full builder is used in the break between waves, which becomes a fixed `BUILD_BREAK` (12 s)** with a countdown. When a wave starts, an open builder folds into a quick view. Nothing waits for a builder (see the review below).
+- **Spells opens at part 15** (all four kinds, the validator and the example exist), **Story at part 23.**
+
+## 2026-10-21: M2 design review
+
+**Decided by:** Claude, after an independent review with fresh context against `docs/DESIGN.md` (docs/PLAN.md, "Autonomy").
+**Findings and changes:**
+
+- **Blocking, fixed:** the first draft held the next wave up to 20 s for a player in the full builder. That made the others wait on one player (pillar 2) and borrowed M3's door rule. Now the break has a fixed length, the wave never waits, and the hammer icon is a display only.
+- The full builder was allowed during waves, against PLAN ("cleared rooms and the hub"; quick actions in combat). Now it is used in breaks and folds into a quick view in a wave.
+- The draft relied on a nearest-target query that `core/projectiles` doesn't have. Part 3 now adds `nearest_target` and `targets_in`.
+- Elements came after the parts that need them. They now come right after casting (part 7), and the validator is its own part.
+- `flow` holds a `SpellBase`. Part 11 now moves it to start recipes and updates ARCHITECTURE.md.
+- Tag lifetime after a rebuild, the type of the `spell` path (`PackedInt32Array`), and the origin, direction and source exclusion of held spells are now specified. Triggered spells send no `spell_cast`.
+- Combos 5, 6, 8, 15, 19 and 20 promised things the rules don't do; they are reworded or changed. Combos 22 and 23 and a split in 12 make every component appear twice. Provisional complexities are given, and every combo fits under 12.
+- Spells opened before modifiers and triggers existed; it now opens at part 15.
+- The path-tier wording now leaves out the owner-only docs. The projectile manager and the stress parts are each split in two. Nits fixed: modifiers may repeat, ids are unique across kinds, the reaction table has no id, cooldown is the cast time, and there are no particle counts to validate yet.
+
 ## 2026-10-21: Animated torches, 2.5D pillars and impact particles (owner `/claude` on #4)
 
 **Decided by:** Claude, on the owner's four requests.

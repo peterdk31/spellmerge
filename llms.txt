@@ -18,7 +18,8 @@ Start with AGENTS.md for the hard rules, then docs/DESIGN.md (nothing may contra
 - [docs/PLAN.md](docs/PLAN.md): the full owner-approved project plan: security model, path tiers, roadmap, quality bar.
 - [docs/ROADMAP.md](docs/ROADMAP.md): the eight sequential milestones and which areas are open for PRs in each.
 - [docs/milestones/M0-foundation.md](docs/milestones/M0-foundation.md): design of M0, the infrastructure before any gameplay; closed early, its dry runs carry into M1.
-- [docs/milestones/M1-core-loop.md](docs/milestones/M1-core-loop.md): design of M1, the core loop prototype (one spell, one enemy, one room, 4-player co-op), its parts in build order and checkpoint C1.
+- [docs/milestones/M1-core-loop.md](docs/milestones/M1-core-loop.md): design of M1, the core loop prototype (one spell, one enemy, one room, 4-player co-op), its parts in build order and checkpoint C1; closed by the owner's go at C1, its open items carry into M2.
+- [docs/milestones/M2-spell-system.md](docs/milestones/M2-spell-system.md): design of M2, the spell system (18 components, the runtime in `core/spells`, reactions, limits, the builder, validators, combos, stress benchmark, Story), its parts in build order and checkpoint C2.
 - [docs/STYLE.md](docs/STYLE.md): the art rules: 32×32 grid, palette, light from the top-left, outline, shades, frame counts, placeholder SVG rules; provisional until M2.
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): the layers, where each kind of change goes (content, art, events) and the art contract a replacement must keep.
 - [docs/NEXT.md](docs/NEXT.md): the ordered task queue for the current milestone.

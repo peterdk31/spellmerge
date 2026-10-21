@@ -795,3 +795,15 @@ The HUD screenshot cannot be taken in a session (no display, `docs/BACKLOG.md`),
 - Homing (shots and `homing_aim`) never picks a `LAYER_PLAYER` target, even with friendly fire on: a seeking shot should not curve into a teammate. A freed target is skipped.
 - `ray()` cuts `length` to `RAY_MAX_LENGTH` = 360 px (what the 64-cell wall walk covers on a diagonal) and is not charged to the hit-work budget; the spell runtime's fire cap (part 6) bounds how many rays a spell and its nested handlers fire.
 - `set_homing` returns true whenever the rate was applied, 0 included; false only for a refusal.
+
+## M2 part 5: the compiler and limits
+
+**Decided by:** Claude, following the M2 design ("The spell runtime lives in `core/spells/`", "Tags", "The spell limits are the performance limits").
+
+- A recipe is a plain Dictionary (`form`, `element`, `modifiers`, `trigger`, `held`), so it can come from JSON (the combo catalogue) and from the builder alike; ids may be Strings or StringNames. `compile` never errors: bad input gives `valid == false` with a reason in plain words.
+- Refused (nothing can fix it by clamping): no form, unknown id, wrong kind in a slot, more than 3 modifiers, a held spell without a trigger, nesting below depth 2, complexity over 12. Clamped and said in the description: shots over 24; speed, radius, pierce and the cooldown floor are clamped silently to the form ranges. A trigger with nothing held is valid (it costs complexity and fires nothing), so the builder can place a trigger before the spell it holds.
+- Number rules: damage is form x element scale x modifier multipliers, rounded, at least 1; mana, cooldown, speed and radius multiply; shots multiply and pierce adds; homing keeps the largest turn rate; chain jumps add. More than one shot with no spread of its own opens a 30 degree fan (`SPLIT_SPREAD`), except an orbit.
+- Tag layout: bit 8 is always set so no tag is 0 (combat treats 0 as "no tag"), then player (2 bits), slot (1), depth (2) and generation (3). A built spell registers its held spells at depth 1 and 2 under the same generation.
+- Ring wrap: when the generation about to be reused still has live shots, its tags go into `revoked_tags` and its counts are cleared before the new spell takes the tag; the caller removes those shots. `Projectiles` gets no remove-by-tag in this part; part 6, the first caller, adds it (queued in `docs/NEXT.md`).
+- Review fix: live shots are counted per generation across all depths, and a generation's profiles are freed together, because a shot that fires a held spell on its hit needs the depth 1 and 2 profiles after the rebuild. Part 6 starts a child's shot before it ends the parent's, and removes the shots of `revoked_tags` before the next `begin_generation` or `shot_ended`. New limits in `SpellLimits`: chain jumps 6, timer interval 0.1 to 10 s, lifetime 0.05 to 20 s. A malformed recipe field (wrong type) is refused with a reason. The compiled spell keeps its form and element display names, so the description needs no second registry look-up.
+- `Spells.registry` can be set to a stand-in with `get_resource(folder, id)`, so the tests need no content files.

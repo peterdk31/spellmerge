@@ -28,6 +28,22 @@ extends Resource
 @export_range(0.05, 2.0, 0.05) var particle_lifetime: float = 0.3
 ## How much bigger (speed, life, particle size) a death burst is than a hit burst.
 @export_range(1.0, 3.0, 0.1) var death_particle_size: float = 1.6
+## The spray of a hit on a character: along the way the shot flew, `hit_spray_spread`
+## degrees to each side, `spray_speed` times as fast as a round puff, bigger or smaller
+## by `hit_spray_per_damage` (0.06 is 6%) for each damage point above or below 5.
+## An enemy is hit in `enemy_hit_color` (ember); a wizard in its own colour.
+@export_range(0.0, 90.0, 1.0) var hit_spray_spread: float = 35.0
+@export_range(0.5, 3.0, 0.1) var spray_speed: float = 1.4
+@export_range(0.0, 0.2, 0.01) var hit_spray_per_damage: float = 0.06
+@export var enemy_hit_color: Color = Color("e0592f")
+## A shot that ends on a wall or pillar: stone chips and dust fly back off the surface
+## (`wall_chip_size`, `wall_chip_spread` degrees to each side, `wall_chip_color`) and a
+## short spark in the shot's colour shows for `wall_spark_seconds`.
+@export_range(0.3, 2.0, 0.1) var wall_chip_size: float = 0.9
+@export_range(0.0, 90.0, 1.0) var wall_chip_spread: float = 60.0
+@export var wall_chip_color: Color = Color("a39fb8")
+@export_range(0.0, 0.3, 0.01) var wall_spark_seconds: float = 0.1
+@export_range(0.1, 3.0, 0.1) var wall_spark_size: float = 0.45
 ## Seconds a hit enemy or wizard shows as plain white, and how much its sprite
 ## squashes then (0.25 is 25% wider and 25% lower), settling back in the same time.
 @export_range(0.0, 0.3, 0.01) var flash_seconds: float = 0.08

@@ -23,6 +23,12 @@ extends Node
 ##   at once).
 ## - a sound from `core/registry` by id; nothing plays on `null`.
 ##
+## `projectile_impact` (from `core/projectiles`) says where a shot struck and which way it
+## flew. On a character the hit burst becomes a spray along that way, in ember for an
+## enemy and in the wizard's own colour for a wizard, a little bigger with more damage.
+## On a wall or pillar it throws stone chips back and shows a spark in the shot's colour.
+## Wall chips leave WALL_RESERVE bursts free, so a hit on a character always has one.
+##
 ## On `spell_cast` it shows a muzzle flash at the staff tip, stretched along the aim
 ## and in the player's colour, and kicks the camera a little against the aim. On
 ## `wizard_cast` (which carries the wizard node) the caster's `Sprite` gets thin and
@@ -50,6 +56,15 @@ const REACT_SLOTS: int = 16
 ## Flash sprites: one muzzle flash per player (slots 0-3), then the death puffs.
 const MUZZLE_SLOTS: int = 4
 const FLASH_SLOTS: int = 8
+## Wall-impact sparks come after them (slots FLASH_SLOTS up to ALL_FLASH_SLOTS).
+const SPARK_SLOTS: int = 4
+const ALL_FLASH_SLOTS: int = FLASH_SLOTS + SPARK_SLOTS
+## Hit bursts always left free: wall dust never takes the last slots from a hit on a character.
+const WALL_RESERVE: int = 2
+## The damage a hit spray is sized for (the fire bolt's); more is a bigger spray, less a smaller one.
+const SPRAY_REF_DAMAGE: int = 5
+const SPRAY_MIN_SIZE: float = 0.7
+const SPRAY_MAX_SIZE: float = 1.6
 ## Death animations at once; past that the oldest slot is taken over.
 const GHOST_SLOTS: int = 8
 ## Muzzle flash colour of each player: the light colour of the player ramps in
@@ -114,13 +129,21 @@ var _react_total: PackedFloat32Array = PackedFloat32Array()
 var _react_amount: PackedFloat32Array = PackedFloat32Array()
 var _flash_material: ShaderMaterial = null
 ## Muzzle flashes and death puffs: sprites made once, with seconds left, seconds
-## they started with and their size (parallel arrays of FLASH_SLOTS).
+## they started with and their size (parallel arrays of ALL_FLASH_SLOTS).
 var _flashes: Array[Sprite2D] = []
 var _flash_left: PackedFloat32Array = PackedFloat32Array()
 var _flash_total: PackedFloat32Array = PackedFloat32Array()
 var _flash_size: PackedFloat32Array = PackedFloat32Array()
 var _flash_aspect: PackedVector2Array = PackedVector2Array()
 var _next_puff: int = MUZZLE_SLOTS
+var _next_spark: int = FLASH_SLOTS
+## Where, along which way and in whom the latest shot on a character struck, from
+## `projectile_impact` (sent just before the damage), so the damage can aim its spray.
+var _impact_target: int = 0
+var _impact_at: Vector2 = Vector2.ZERO
+var _impact_aim: Vector2 = Vector2.ZERO
+## The tint of the latest plain hit burst, kept for a kill that makes it bigger.
+var _hit_tint: Color = Color.WHITE
 ## Death animations: sprites made once, seconds left, seconds they started with and
 ## the scale they started at (parallel arrays of GHOST_SLOTS).
 var _ghosts: Array[Sprite2D] = []
@@ -146,7 +169,7 @@ func _ready() -> void:
 	_bursts = PoolScript.new(_make_burst, BURST_SLOTS, Callable(), _hide_burst)
 	_flash_material = ShaderMaterial.new()
 	_flash_material.shader = FLASH_SHADER
-	for i in FLASH_SLOTS:
+	for i in ALL_FLASH_SLOTS:
 		var flash := Sprite2D.new()
 		flash.texture = _texture
 		flash.top_level = true
@@ -155,10 +178,10 @@ func _ready() -> void:
 		flash.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		add_child(flash)
 		_flashes.append(flash)
-	_flash_left.resize(FLASH_SLOTS)
-	_flash_total.resize(FLASH_SLOTS)
-	_flash_size.resize(FLASH_SLOTS)
-	_flash_aspect.resize(FLASH_SLOTS)
+	_flash_left.resize(ALL_FLASH_SLOTS)
+	_flash_total.resize(ALL_FLASH_SLOTS)
+	_flash_size.resize(ALL_FLASH_SLOTS)
+	_flash_aspect.resize(ALL_FLASH_SLOTS)
 	_flash_aspect.fill(Vector2.ONE)
 	for i in GHOST_SLOTS:
 		var ghost := Sprite2D.new()
@@ -184,6 +207,7 @@ func _ready() -> void:
 	events.player_downed.connect(_on_player_downed)
 	events.spell_cast.connect(_on_spell_cast)
 	events.wizard_cast.connect(_on_wizard_cast)
+	events.projectile_impact.connect(_on_projectile_impact)
 	if projectiles == null:
 		projectiles = get_node_or_null("/root/Projectiles")
 	if projectiles != null and "texture" in projectiles and projectiles.texture == null:
@@ -282,7 +306,7 @@ func _step_reactions(real_delta: float) -> void:
 
 ## Fade and grow the muzzle flashes and death puffs.
 func _step_flashes(real_delta: float) -> void:
-	for i in FLASH_SLOTS:
+	for i in ALL_FLASH_SLOTS:
 		if _flash_left[i] <= 0.0:
 			continue
 		_flash_left[i] -= real_delta
@@ -405,7 +429,7 @@ func reacting_sprites() -> int:
 ## Muzzle flashes and death puffs showing right now (for tests).
 func live_flashes() -> int:
 	var count: int = 0
-	for i in FLASH_SLOTS:
+	for i in ALL_FLASH_SLOTS:
 		if _flash_left[i] > 0.0:
 			count += 1
 	return count
@@ -423,6 +447,11 @@ func live_ghosts() -> int:
 ## The death animation sprite in `slot` (for tests).
 func ghost(slot: int) -> Sprite2D:
 	return _ghosts[slot]
+
+
+## The wall-impact spark sprite in `slot` (for tests).
+func wall_spark(slot: int) -> Sprite2D:
+	return _flashes[FLASH_SLOTS + clampi(slot, 0, SPARK_SLOTS - 1)]
 
 
 ## The muzzle flash sprite of `player` (for tests).
@@ -445,9 +474,56 @@ func trauma() -> float:
 	return _trauma
 
 
-func _on_damage_dealt(_player: int, target: Node, _amount: int, position: Vector2) -> void:
+func _on_damage_dealt(_player: int, target: Node, amount: int, position: Vector2) -> void:
 	_react(target)
-	_juice(position, preset.hit_stop_seconds, false, preset.hit_shake, preset.hit_sound)
+	var aim: Vector2 = Vector2.ZERO
+	var at: Vector2 = position
+	var tint: Color = Color.WHITE
+	var size: float = 1.0
+	if target != null and is_instance_valid(target):
+		tint = _target_tint(target)
+		# The shot that did this hit told us where it struck and which way it flew.
+		if target.get_instance_id() == _impact_target:
+			aim = _impact_aim
+			at = _impact_at
+			size = clampf(1.0 + float(amount - SPRAY_REF_DAMAGE) * preset.hit_spray_per_damage, SPRAY_MIN_SIZE, SPRAY_MAX_SIZE)
+	_impact_target = 0
+	_juice(position, preset.hit_stop_seconds, false, preset.hit_shake, preset.hit_sound, aim, tint, size, at)
+
+
+## A shot struck. On a character, remember how, for the damage event that follows at once;
+## on a wall or pillar (`target` is null), show the impact.
+func _on_projectile_impact(player: int, target: Node, position: Vector2, direction: Vector2) -> void:
+	if target != null:
+		_impact_target = target.get_instance_id()
+		_impact_at = position
+		_impact_aim = direction
+		return
+	# Stone chips fly back off the surface; they only use the bursts the hits on characters leave free.
+	if _active.size() < BURST_SLOTS - WALL_RESERVE:
+		var chips: CPUParticles2D = _burst(position, preset.wall_chip_size, -direction, preset.wall_chip_color, preset.wall_chip_spread)
+		if chips != null:
+			chips.scale_amount_min = 0.2 * preset.wall_chip_size
+			chips.scale_amount_max = 0.7 * preset.wall_chip_size
+	var slot: int = _next_spark
+	_next_spark = FLASH_SLOTS + (_next_spark - FLASH_SLOTS + 1) % SPARK_SLOTS
+	_show_flash(slot, position, preset.wall_spark_seconds, preset.wall_spark_size, _shot_color(player))
+
+
+## The colour of what was hit: a wizard's own colour, else the enemy ember.
+func _target_tint(target: Node) -> Color:
+	if target.is_in_group(&"players"):
+		var index: Variant = target.get("index")
+		if index is int:
+			return PLAYER_COLORS[clampi(index as int, 0, PLAYER_COLORS.size() - 1)]
+	return preset.enemy_hit_color
+
+
+## The colour of a shot: its player's colour, the enemy ember for an enemy's.
+func _shot_color(player: int) -> Color:
+	if player >= 0 and player < PLAYER_COLORS.size():
+		return PLAYER_COLORS[player]
+	return preset.enemy_hit_color
 
 
 func _on_enemy_died(_player: int, enemy: Node, position: Vector2) -> void:
@@ -480,7 +556,9 @@ func _on_player_downed(_player: int) -> void:
 
 ## `strong` is a death or a downed wizard: it ignores the rest after a hit-stop and
 ## gets the bigger burst.
-func _juice(position: Vector2, stop: float, strong: bool, shake: float, sound: StringName) -> void:
+## A plain hit with an `aim` (the way the shot flew) sprays along it, `size` times as big,
+## from `at`, in `tint`; without one it is the old round puff at `position`.
+func _juice(position: Vector2, stop: float, strong: bool, shake: float, sound: StringName, aim: Vector2 = Vector2.ZERO, tint: Color = Color.WHITE, size: float = 1.0, at: Vector2 = Vector2.INF) -> void:
 	# A plain hit only starts a stop when none runs and the rest is over (or a stream
 	# of hits would extend it for ever); a strong one may lengthen a shorter stop.
 	if stop > stop_left and (strong or (stop_left <= 0.0 and rest_left <= 0.0)):
@@ -494,8 +572,9 @@ func _juice(position: Vector2, stop: float, strong: bool, shake: float, sound: S
 		if strong:
 			upgraded = _burst_death(position)
 		else:
-			_hit_burst = _burst(position, 1.0)
+			_hit_burst = _burst(position if at == Vector2.INF else at, size, aim, tint, preset.hit_spray_spread)
 			_hit_position = position
+			_hit_tint = tint
 	if upgraded and _hit_voice >= 0:
 		_voices[_hit_voice].stop()
 	var voice: int = _play(sound)
@@ -503,23 +582,32 @@ func _juice(position: Vector2, stop: float, strong: bool, shake: float, sound: S
 		_hit_voice = voice
 
 
-## Start a burst; `size` scales its speed, life and particle size. Returns it, or
-## null when the pool is empty.
-func _burst(position: Vector2, size: float) -> CPUParticles2D:
+## Start a burst; `size` scales its speed, life and particle size. With an `aim` it is a
+## spray along it, `spread` degrees to each side and faster; without, a round puff.
+## Returns it, or null when the pool is empty.
+func _burst(position: Vector2, size: float, aim: Vector2 = Vector2.ZERO, tint: Color = Color.WHITE, spread: float = 180.0) -> CPUParticles2D:
 	var burst := _bursts.acquire() as CPUParticles2D
 	if burst == null:
 		return null
-	_launch(burst, position, size)
+	_launch(burst, position, size, aim, tint, spread)
 	_active.append(burst)
 	_active_left.append(preset.particle_lifetime * size)
 	return burst
 
 
-func _launch(burst: CPUParticles2D, position: Vector2, size: float) -> void:
+func _launch(burst: CPUParticles2D, position: Vector2, size: float, aim: Vector2 = Vector2.ZERO, tint: Color = Color.WHITE, spread: float = 180.0) -> void:
+	var speed: float = preset.particle_speed * size
+	if aim != Vector2.ZERO:
+		burst.direction = aim
+		burst.spread = spread
+		speed *= preset.spray_speed
+	else:
+		burst.spread = 180.0
+	burst.color = tint
 	burst.global_position = position
 	burst.lifetime = preset.particle_lifetime * size
-	burst.initial_velocity_min = preset.particle_speed * 0.5 * size
-	burst.initial_velocity_max = preset.particle_speed * size
+	burst.initial_velocity_min = speed * 0.5
+	burst.initial_velocity_max = speed
 	burst.scale_amount_min = 0.3 * size
 	burst.scale_amount_max = 0.5 * size
 	burst.visible = true
@@ -535,7 +623,7 @@ func _burst_death(position: Vector2) -> bool:
 	if _hit_burst != null and _hit_position == position:
 		var at: int = _active.find(_hit_burst)
 		if at >= 0:
-			_launch(_hit_burst, position, size)
+			_launch(_hit_burst, position, size, Vector2.ZERO, _hit_tint)
 			_active_left[at] = preset.particle_lifetime * size
 			return true
 	if _burst(position, size) != null:

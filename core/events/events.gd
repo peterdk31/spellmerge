@@ -38,6 +38,8 @@ signal wizard_cast(player: int, wizard: Node)
 ## Sender: core/projectiles. A projectile fired by `player` touched `target`.
 ## `tag` is the value given to `Projectiles.spawn()`, for looking up the damage.
 signal projectile_hit(player: int, target: Node, position: Vector2, tag: int)
+## Sender: core/projectiles. Where and which way a projectile struck, for looks only (sparks, dust). `target` is the node it hit, sent just before `projectile_hit` for the same hit, or `null` when it ended on a wall or pillar. `player` is who fired it (or NO_PLAYER for an enemy), `position` the point it stopped at and `direction` the unit vector it was flying.
+signal projectile_impact(player: int, target: Node, position: Vector2, direction: Vector2)
 ## Sender: combat. `player` (or NO_PLAYER) dealt `amount` damage to `target`.
 signal damage_dealt(player: int, target: Node, amount: int, position: Vector2)
 ## Sender: combat. A status effect from `player` (or NO_PLAYER) was put on `target`.

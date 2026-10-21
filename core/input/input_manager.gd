@@ -22,7 +22,7 @@ extends Node
 ## A player's input can be captured (set_captured) while one of their UI panels
 ## is open: the gameplay questions below (get_move, get_strength,
 ## is_action_pressed, is_action_just_pressed) then answer "nothing" for the
-## actions in CAPTURED_ACTIONS, so a wizard does not walk, cast or dodge while
+## actions in CAPTURED_ACTIONS, so a wizard does not walk, cast, dodge or swap spells while
 ## their player works a menu. Gameplay needs no extra check. core/ui_focus reads
 ## get_press_count instead, which is never captured.
 ##
@@ -69,7 +69,8 @@ const SOURCE_MOUSE: int = 1 << 40
 const SOURCE_BUTTON: int = 2 << 40
 const SOURCE_AXIS: int = 3 << 40
 const SOURCE_VIRTUAL: int = 4 << 40
-## The actions hidden from gameplay while a player is captured. `overlay` stays
+## The actions hidden from gameplay while a player is captured (walking, cast,
+## dodge and swap). `overlay` stays
 ## readable so the overlay can close itself with its own button.
 const CAPTURED_ACTIONS: Array[StringName] = [
 	&"move_left", &"move_right", &"move_up", &"move_down", &"dodge", &"cast", &"swap",

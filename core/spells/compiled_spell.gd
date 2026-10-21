@@ -50,6 +50,9 @@ var status_duration: float = 0.0
 var status_strength: float = 0.0
 var tint: Color = Color.WHITE
 
+## What a hit does, for `Spells.hit_profile`; set by the compiler.
+var hit: HitProfile = null
+
 ## Radians per second a shot turns toward a target; 0 means no homing.
 var homing_turn: float = 0.0
 ## Times a hit jumps on to another target; 0 means no chain.

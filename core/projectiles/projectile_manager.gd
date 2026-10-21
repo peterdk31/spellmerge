@@ -112,12 +112,26 @@ extends Node2D
 ##
 ## Rays: `ray(...)` is an instant beam. It holds no row; see its comment.
 ##
+## Ends: `shot_ended(tag)`, a signal of the manager itself (not on the event bus), is sent
+## once for every shot with a non-zero tag when it ends for any reason: a hit that spends it,
+## its life, a wall, the bounds, the cap dropping it, a cleared anchor, `clear()`. It is sent
+## after that shot's `projectile_hit` or `projectile_expired` handlers have run, so a handler
+## can spawn children first. `remove_by_tag` is the exception: it is silent, because its
+## caller is the one that revoked the tag. While a `projectile_hit` or `projectile_expired`
+## event of a shot is being sent, `event_slot` is that shot's slot (-1 otherwise, and for a
+## ray), so a listener can read per-shot state with `get_seq_of` and `get_velocity_of`; a
+## slot that just ended is not reused until the next spawn. `exclude(slot, node, seconds)`
+## keeps one shot from hitting one target for a while.
+##
 ## Nothing here allocates per frame: the arrays are sized when the cap is set,
 ## and the grid is reused. Coordinates are world coordinates (the manager sits
 ## at the origin). A handler of `projectile_hit` may spawn more projectiles;
 ## those start moving on the next step. Tests call `step()` directly.
 
 const EventsScript := preload("res://core/events/events.gd")
+
+## A shot with a non-zero tag ended; see "Ends" above.
+signal shot_ended(tag: int)
 
 const MAX_PLAYERS: int = 4
 ## Motion modes of a shot (see the class doc).
@@ -195,6 +209,8 @@ var hostile_texture: Texture2D = null:
 var events: EventsScript = null
 ## How many projectiles were dropped because the cap was full, since start.
 var dropped: int = 0
+## The slot of the shot whose hit or expiry event is being sent, else -1. See "Ends".
+var event_slot: int = -1
 ## How many projectiles ended on a wall, since start.
 var wall_hits: int = 0
 ## Projectiles written into the batch by the last update_draw().
@@ -288,6 +304,9 @@ var _resume: int = 0
 ## Steps taken so far (staggers the homing searches).
 var _step_index: int = 0
 ## Where each player's orbit shots circle (INF for no anchor), see `set_anchor`.
+## Per slot: the target a shot must not hit, and the seconds left of that.
+var _skip_id: PackedInt64Array = PackedInt64Array()
+var _skip_left: PackedFloat32Array = PackedFloat32Array()
 var _anchors: PackedVector2Array = PackedVector2Array([Vector2.INF, Vector2.INF, Vector2.INF, Vector2.INF])
 ## Scratch for `ray`, RAY_MAX_HITS rows per nesting level: the best hits so far, nearest
 ## first (reused, never grows). `_ray_depth` is how many rays are in progress.
@@ -365,6 +384,8 @@ func set_cap(value: int) -> void:
 	_turn.resize(_cap)
 	_home_at.resize(_cap)
 	_seq.resize(_cap)
+	_skip_id.resize(_cap)
+	_skip_left.resize(_cap)
 	_last_hit.resize(_cap * HIT_MEMORY)
 	_own_prev.resize(_cap)
 	_own_next.resize(_cap)
@@ -520,6 +541,9 @@ func _fit_draw_bounds() -> void:
 
 ## Remove every projectile (targets stay registered).
 func clear() -> void:
+	for slot in _high:
+		if _alive[slot] != 0 and _tag[slot] != 0:
+			shot_ended.emit(_tag[slot])
 	_alive.fill(0)
 	for i in _cap:
 		_free_slots[i] = _cap - 1 - i
@@ -679,6 +703,7 @@ func _spawn_row(player: int, origin: Vector2, velocity: Vector2, lifetime: float
 	_tag[slot] = tag
 	_seq[slot] = _next_seq
 	_next_seq += 1
+	_skip_left[slot] = 0.0
 	for i in HIT_MEMORY:
 		_last_hit[slot * HIT_MEMORY + i] = 0
 	_alive[slot] = 1
@@ -716,6 +741,7 @@ func step(delta: float) -> void:
 		if _alive[slot] == 0 or _seq[slot] >= first_new:
 			continue
 		_life[slot] -= delta
+		_skip_left[slot] -= delta
 		if _life[slot] <= 0.0:
 			_expire(slot)
 			continue
@@ -850,7 +876,8 @@ func homing_aim(player: int, origin: Vector2, direction: Vector2, max_angle: flo
 ## An instant beam from `origin` along `direction` for up to `length` pixels, fired by
 ## `player`. It holds no row in the pool. It stops at the first wall and hits the
 ## nearest `pierce + 1` targets on `layers` (at most RAY_MAX_HITS) whose circle the beam
-## touches (`width` pixels either side of the line). For each, nearest first, it sends
+## touches (`width` pixels either side of the line; `exclude` is a target it never hits,
+## for a beam that starts on the one that fired it). For each, nearest first, it sends
 ## `projectile_impact` and `projectile_hit(player, target, point, tag)`, the point being
 ## where the beam passes closest to the target; a beam that ends on a wall sends an
 ## impact with a `null` target there. Targets owned by `player` are skipped and, as in
@@ -860,7 +887,7 @@ func homing_aim(player: int, origin: Vector2, direction: Vector2, max_angle: flo
 ## is sent, so a handler may remove or free targets, or fire another ray (up to
 ## RAY_MAX_DEPTH deep, a deeper one returns 0.0). A `length` over RAY_MAX_LENGTH is cut
 ## to it. Allocation-free.
-func ray(player: int, origin: Vector2, direction: Vector2, length: float, pierce: int = 0, layers: int = LAYER_ENEMY, tag: int = 0, width: float = 0.0) -> float:
+func ray(player: int, origin: Vector2, direction: Vector2, length: float, pierce: int = 0, layers: int = LAYER_ENEMY, tag: int = 0, width: float = 0.0, exclude: Node = null) -> float:
 	if player < EventsScript.NO_PLAYER or player >= MAX_PLAYERS:
 		return 0.0
 	if not origin.is_finite() or not direction.is_finite() or direction.is_zero_approx() or not is_finite(length) or length <= 0.0:
@@ -880,6 +907,7 @@ func ray(player: int, origin: Vector2, direction: Vector2, length: float, pierce
 	var end: Vector2 = origin + heading * reach
 	var wanted: int = mini(maxi(pierce, 0) + 1, RAY_MAX_HITS)
 	var found: int = 0
+	var skip: int = exclude.get_instance_id() if exclude != null else 0
 	if not _targets.is_empty():
 		_query_ready()
 		if friendly_fire and player >= 0:
@@ -896,7 +924,7 @@ func ray(player: int, origin: Vector2, direction: Vector2, length: float, pierce
 			for x in range(x0, x1 + 1):
 				var t: int = _cell_head[y * _grid_w + x]
 				while t >= 0:
-					if (_target_layer[t] & layers) != 0 and (player < 0 or _target_owner[t] != player) and is_instance_valid(_targets[t]):
+					if (_target_layer[t] & layers) != 0 and (player < 0 or _target_owner[t] != player) and _target_id[t] != skip and is_instance_valid(_targets[t]):
 						var along: float = clampf((_target_pos[t] - origin).dot(heading), 0.0, reach)
 						var closest: Vector2 = origin + heading * along
 						var touch: float = wide + _target_radius[t]
@@ -909,6 +937,8 @@ func ray(player: int, origin: Vector2, direction: Vector2, length: float, pierce
 		got = _ray_along[base + found - 1]
 		walled = false
 	_ray_depth += 1
+	var outer_slot: int = event_slot
+	event_slot = -1
 	for i in found:
 		var node: Variant = _ray_nodes[base + i]
 		if events != null and is_instance_valid(node):
@@ -916,6 +946,7 @@ func ray(player: int, origin: Vector2, direction: Vector2, length: float, pierce
 			events.projectile_hit.emit(player, node, _ray_points[base + i], tag)
 		_ray_nodes[base + i] = null
 	_ray_depth -= 1
+	event_slot = outer_slot
 	if walled and events != null:
 		events.projectile_impact.emit(player, null, origin + heading * got, heading)
 	return got
@@ -1011,7 +1042,9 @@ func _color_of(player: int) -> Color:
 	return Color.WHITE.lerp(PLAYER_COLORS[player], TINT_STRENGTH)
 
 
-func _kill(slot: int) -> void:
+func _kill(slot: int, announce: bool = true) -> void:
+	if announce and _tag[slot] != 0:
+		shot_ended.emit(_tag[slot])
 	_alive[slot] = 0
 	_free_slots[_free_count] = slot
 	_free_count += 1
@@ -1037,9 +1070,63 @@ func _expire(slot: int) -> void:
 	var player: int = _player[slot]
 	var at: Vector2 = _pos[slot]
 	var tag: int = _tag[slot]
-	_kill(slot)
+	_kill(slot, false)
 	if events != null:
+		event_slot = slot
 		events.projectile_expired.emit(player, at, tag)
+		event_slot = -1
+	if tag != 0:
+		shot_ended.emit(tag)
+
+
+## Remove, quietly (no event, no `shot_ended`), every shot carrying `tag`. Returns how
+## many. For the spell runtime, when a tag is revoked. Walks the pool: not for every frame.
+func remove_by_tag(tag: int) -> int:
+	var removed: int = 0
+	for slot in _high:
+		if _alive[slot] != 0 and _tag[slot] == tag:
+			_kill(slot, false)
+			removed += 1
+	return removed
+
+
+## Keep the shot in `slot` from hitting `node` for `seconds` (a held spell must not hit the
+## target that fired it). One target per shot; a later call replaces it.
+func exclude(slot: int, node: Node, seconds: float) -> void:
+	if slot >= 0 and slot < _cap and _alive[slot] != 0 and node != null:
+		_skip_id[slot] = node.get_instance_id()
+		_skip_left[slot] = seconds
+
+
+## The spawn number of the shot in `slot`: it changes when the slot is reused, so a
+## listener can tell a shot it knows from a newer one in the same slot.
+func get_seq_of(slot: int) -> int:
+	return _seq[slot] if slot >= 0 and slot < _cap else -1
+
+
+## The tag of the shot in `slot` (kept after it ended, until the slot is reused).
+func get_tag_of(slot: int) -> int:
+	return _tag[slot] if slot >= 0 and slot < _cap else 0
+
+
+## The velocity of the shot in `slot` (kept after it ended, until the slot is reused).
+func get_velocity_of(slot: int) -> Vector2:
+	return _vel[slot] if slot >= 0 and slot < _cap else Vector2.ZERO
+
+
+## Where `player`'s anchor is (see `set_anchor`), or `Vector2.INF` when it has none.
+func get_anchor(player: int) -> Vector2:
+	return _anchors[player] if player >= 0 and player < MAX_PLAYERS else Vector2.INF
+
+
+## The place of `node` as the target grid knows it (its hit circle's centre), or
+## `Vector2.INF` when it is not a target.
+func get_target_point(node: Node2D) -> Vector2:
+	if node == null:
+		return Vector2.INF
+	_query_ready()
+	var at: int = _target_id.find(node.get_instance_id())
+	return _target_pos[at] if at >= 0 else Vector2.INF
 
 
 ## Make room: drop the oldest projectile of the owner with the most.
@@ -1201,7 +1288,7 @@ func _hit_test(slot: int) -> bool:
 				var next_target: int = _target_next[t]
 				_work_left -= 1
 				# Skip other layers, the shooter's own body, and targets already hit.
-				if (_target_layer[t] & layers) == 0 or (shooter >= 0 and _target_owner[t] == shooter) or _remembers(slot, _target_id[t]):
+				if (_target_layer[t] & layers) == 0 or (shooter >= 0 and _target_owner[t] == shooter) or _remembers(slot, _target_id[t]) or (_skip_left[slot] > 0.0 and _skip_id[slot] == _target_id[t]):
 					t = next_target
 					continue
 				var along: float = 0.0
@@ -1244,6 +1331,7 @@ func _register_hit(slot: int, target: int, at: Vector2) -> void:
 		heading = at.direction_to(_target_pos[target])
 		if heading == Vector2.ZERO:
 			heading = Vector2.RIGHT
+	var spent: bool = false
 	if _pierce[slot] > 0:
 		_pierce[slot] -= 1
 		var memory: int = slot * HIT_MEMORY
@@ -1251,7 +1339,12 @@ func _register_hit(slot: int, target: int, at: Vector2) -> void:
 			_last_hit[memory + i] = _last_hit[memory + i - 1]
 		_last_hit[memory] = _target_id[target]
 	else:
-		_kill(slot)
+		spent = true
+		_kill(slot, false)
 	if events != null and is_instance_valid(node):
 		events.projectile_impact.emit(player, node, at, heading)
+		event_slot = slot
 		events.projectile_hit.emit(player, node, at, tag)
+		event_slot = -1
+	if spent and tag != 0:
+		shot_ended.emit(tag)

@@ -29,6 +29,18 @@ const SLOTS: int = 2
 ## Players, indexes 0 to 3.
 const PLAYERS: int = 4
 
+## Seconds a held spell's shots cannot hit the target that fired the trigger.
+const SOURCE_EXCLUSION: float = 0.1
+## Knockback of one hit in pixels per second (M1's fire bolt had 120).
+const KNOCKBACK: float = 120.0
+## Speed of a chain jump when the spell's own speed is lower (a rune or a beam has none).
+const CHAIN_MIN_SPEED: float = 300.0
+## Radians per second an orbit form turns when it gives no speed.
+const ORBIT_TURN: float = 3.0
+## Pixels a held spell fired when a shot expires starts back along its path, so a shot that
+## ended on a wall fires in front of it.
+const EXPIRE_BACKOFF: float = 2.0
+
 ## Clamps for the compiled numbers; they match the form's allowed ranges.
 const MAX_SPEED: float = 2000.0
 const MAX_RADIUS: float = 64.0

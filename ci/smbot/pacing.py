@@ -3,9 +3,10 @@
 The exact remaining Pro quota isn't available to automation, so every run
 records its token usage, and each time a usage limit is hit the bot learns how
 many tokens a ~5-hour window (or a week) holds. It then stops at the Control
-panel's DEV_INTENSITY share of a window and WEEKLY_SHARE share of a week, with
-the weekly share spread evenly over the days. Until a limit has been hit once,
-only the back-off after a limit applies. All numbers are estimates.
+panel's DEV_INTENSITY share of a window. The week is not gated by estimate: the
+bot just runs, and a weekly limit backs it off until the reset the limit names.
+The WEEKLY_SHARE share of a week is only reported. Until a limit has been hit
+once, only the back-off after a limit applies. All numbers are estimates.
 """
 
 from __future__ import annotations
@@ -80,13 +81,10 @@ def budget(state: dict[str, Any], now: dt.datetime, dev_intensity: int, weekly_s
             return Budget(False, f"window budget used ({window_pct:.0f}% of DEV_INTENSITY {dev_intensity}%)",
                           window_pct, week_pct)
     if week_cap:
+        # Reported only: the learned week is a rolling estimate that doesn't know when the
+        # quota resets, so gating on it kept the bot idle for days after a reset.
         weekly_allowance = week_cap * weekly_share / 100
-        per_day = weekly_allowance / 7
-        spent_week, spent_day = used(state, now, WEEK), used(state, now, DAY)
-        week_pct = 100 * spent_week / weekly_allowance if weekly_allowance else 100.0
-        if spent_week >= weekly_allowance or spent_day >= per_day:
-            return Budget(False, f"weekly share used ({week_pct:.0f}% of WEEKLY_SHARE {weekly_share}%, "
-                                 "spread evenly over the week)", window_pct, week_pct)
+        week_pct = 100 * used(state, now, WEEK) / weekly_allowance if weekly_allowance else 100.0
     return Budget(True, "ok", window_pct, week_pct)
 
 

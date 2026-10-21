@@ -453,14 +453,14 @@ Claude's own development is the main engine and outside PRs are a bonus, so the 
 - **Back-off:** when a usage limit is hit, it is recorded and hourly checks pause until the usage window resets (about 5 hours).
 - **One session at a time** to avoid conflicts; parallel sessions in clearly separate areas are a later option.
 - **Reviews are capped** at about 30% of the quota; unused review quota goes to development. PR reviews and the release run once a day at 03:00 UTC.
-- **Pacing:** each run records its token usage. Each time a limit is hit, the bot learns how many tokens a full window and a full week hold, and stops at its DEV\_INTENSITY and WEEKLY\_SHARE percentages of those, spreading the weekly share evenly. The daily log reports usage as percentages, e.g. "used \~62% of window budget, 41% of weekly share". These are estimates, since the exact remaining quota isn't available to automation.
+- **Pacing:** each run records its token usage. Each time a limit is hit, the bot learns how many tokens a full window and a full week hold, and stops at its DEV\_INTENSITY percentage of the window. The week is not gated by estimate: the bot just runs, and a weekly limit backs it off until the reset time the limit names. The daily log reports usage as percentages, e.g. "used \~62% of window budget, 41% of weekly share". These are estimates, since the exact remaining quota isn't available to automation.
 - **More quota, more speed:** upgrading to Claude Max is used automatically with no changes.
 
 | Control panel setting | Default | Effect |
 | --- | --- | --- |
 | `DEV_INTENSITY` | `90%` | Share of each \~5-hour usage window the bot may use; the rest stays free for the owner |
 | `QUIET_HOURS` | Unset (no quiet hours) | Hours with no development sessions, e.g. `07-17` Danish time; set later by the owner |
-| `WEEKLY_SHARE` | `90%` | Share of the weekly cap the bot may use |
+| `WEEKLY_SHARE` | `90%` | Reported only: the Daily log shows usage as a share of this part of the learned weekly cap |
 
 ### Flow
 

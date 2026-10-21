@@ -114,12 +114,21 @@ class PacingTest(unittest.TestCase):
         self.assertTrue(pacing.budget(st, NOW, 90, 90).allowed)
         self.assertFalse(pacing.budget(st, NOW, 80, 90).allowed)
 
-    def test_weekly_share_is_spread_over_days(self) -> None:
+    def test_weekly_share_is_reported_not_gated(self) -> None:
         st = self.fresh()
-        st["limits"]["week_tokens"] = 7_000_000
-        pacing.record(st, NOW - dt.timedelta(hours=2), 950_000, "dev")
-        self.assertFalse(pacing.budget(st, NOW, 100, 90).allowed)  # day allowance 900k
-        self.assertTrue(pacing.budget(st, NOW, 100, 100).allowed)  # day allowance 1M
+        st["limits"]["week_tokens"] = 1_000_000
+        pacing.record(st, NOW - dt.timedelta(hours=2), 1_800_000, "dev")
+        b = pacing.budget(st, NOW, 100, 90)
+        self.assertTrue(b.allowed)
+        self.assertEqual(round(b.week_pct), 200)
+
+    def test_weekly_limit_backs_off_until_the_reset(self) -> None:
+        st = self.fresh()
+        pacing.record(st, NOW - dt.timedelta(hours=1), 800_000, "dev")
+        reset = NOW + dt.timedelta(hours=6)
+        pacing.limit_hit(st, NOW, weekly=True, resets_at=reset)
+        self.assertFalse(pacing.budget(st, reset - dt.timedelta(minutes=1), 90, 90).allowed)
+        self.assertTrue(pacing.budget(st, reset + dt.timedelta(minutes=1), 90, 90).allowed)
 
     def test_usage_line(self) -> None:
         st = self.fresh()

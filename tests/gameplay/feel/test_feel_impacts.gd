@@ -192,6 +192,21 @@ func test_wall_dust_never_takes_the_bursts_hits_need() -> void:
 	check_equal(feel.live_particles(), FeelScript.PARTICLE_LIMIT, "two hits on characters still get their bursts")
 
 
+func test_an_impact_without_damage_is_not_kept_for_a_later_hit() -> void:
+	var target: Node2D = _enemy()
+	bus.projectile_impact.emit(0, target, Vector2.ZERO, Vector2.RIGHT)
+	feel._impact_frame -= 1  # the damage never came; a contact hit on a later frame
+	bus.damage_dealt.emit(0, target, 5, Vector2.ZERO)
+	var bursts: Array[CPUParticles2D] = _live_bursts()
+	check(not bursts.is_empty() and bursts[0].spread == 180.0, "a stale impact gives a round puff")
+
+
+func test_bursts_draw_above_the_room_and_the_pillar_tops() -> void:
+	bus.damage_dealt.emit(0, null, 5, Vector2.ZERO)
+	var bursts: Array[CPUParticles2D] = _live_bursts()
+	check(not bursts.is_empty() and bursts[0].z_index > 5, "above the pillar tops (z 5)")
+
+
 func test_wall_dust_and_chips_come_back_to_the_pool() -> void:
 	for i in 10:
 		bus.projectile_impact.emit(0, null, Vector2.ZERO, Vector2.UP)

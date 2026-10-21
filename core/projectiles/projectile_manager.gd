@@ -511,8 +511,8 @@ func spawn(player: int, origin: Vector2, velocity: Vector2, lifetime: float, rad
 	if _has_walls and _wall_hit(origin, origin) >= 0.0:
 		# Born inside a wall it would end in the next step: count it as ended, but
 		# take no pool slot (at the cap that would evict another shot).
+		# No shot existed, so no impact is shown (the staff tip is inside the wall).
 		wall_hits += 1
-		_emit_wall_impact(player, origin, velocity)
 		return -1
 	if _free_count == 0:
 		_drop_one()
@@ -814,7 +814,7 @@ func _remembers(slot: int, id: int) -> bool:
 
 ## Tell listeners a shot ended on a wall at `at`, flying along `velocity`.
 func _emit_wall_impact(player: int, at: Vector2, velocity: Vector2) -> void:
-	if events != null:
+	if events != null and not velocity.is_zero_approx():
 		events.projectile_impact.emit(player, null, at, velocity.normalized())
 
 

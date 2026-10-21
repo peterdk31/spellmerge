@@ -56,6 +56,11 @@ func test_the_tops_are_drawn_over_characters_and_the_bases_are_not() -> void:
 	check_equal((room_root.get_node("Pillars") as Node2D).z_index, 0, "the bases are below characters")
 
 
+func test_the_tops_let_a_character_behind_them_show_through() -> void:
+	var alpha: float = (room_root.get_node("PillarTops") as Node2D).modulate.a
+	check(alpha > 0.3 and alpha < 1.0, "translucent, so a wizard behind a pillar is still seen")
+
+
 func test_the_collision_is_only_the_base_footprint() -> void:
 	for rect in footprints:
 		var top: Rect2 = Rect2(rect.position - Vector2(0, FOOTPRINT.y), FOOTPRINT)

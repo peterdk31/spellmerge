@@ -73,13 +73,11 @@ func test_an_enemy_shot_reports_no_player() -> void:
 		check_equal(impacts[0][0], EventsScript.NO_PLAYER, "the enemy's shot has no player")
 
 
-func test_a_shot_born_in_a_wall_is_reported() -> void:
+func test_a_shot_born_in_a_wall_shows_no_impact() -> void:
 	mgr.set_walls([Rect2(96.0, 0.0, 32.0, 200.0)] as Array[Rect2])
 	var slot: int = mgr.spawn(0, Vector2(100.0, 100.0), Vector2(0.0, 200.0), 5.0)
 	check_equal(slot, -1, "the shot is refused")
-	check_equal(impacts.size(), 1, "the wizard fired into a wall, so there is an impact")
-	if not impacts.is_empty():
-		check((impacts[0][3] as Vector2).is_equal_approx(Vector2.DOWN), "along the way it was fired")
+	check_equal(impacts.size(), 0, "no shot existed, so nothing struck")
 
 
 func test_a_hit_on_a_target_says_which_way_the_shot_flew_before_the_hit() -> void:

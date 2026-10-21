@@ -61,6 +61,8 @@ const SPARK_SLOTS: int = 4
 const ALL_FLASH_SLOTS: int = FLASH_SLOTS + SPARK_SLOTS
 ## Hit bursts always left free: wall dust never takes the last slots from a hit on a character.
 const WALL_RESERVE: int = 2
+## Bursts draw above the room and the pillar tops (z 5), below the flashes (20).
+const BURST_Z: int = 19
 ## The damage a hit spray is sized for (the fire bolt's); more is a bigger spray, less a smaller one.
 const SPRAY_REF_DAMAGE: int = 5
 const SPRAY_MIN_SIZE: float = 0.7
@@ -140,6 +142,8 @@ var _next_spark: int = FLASH_SLOTS
 ## Where, along which way and in whom the latest shot on a character struck, from
 ## `projectile_impact` (sent just before the damage), so the damage can aim its spray.
 var _impact_target: int = 0
+## The physics frame it was sent in: the damage follows at once, or the record is stale.
+var _impact_frame: int = -1
 var _impact_at: Vector2 = Vector2.ZERO
 var _impact_aim: Vector2 = Vector2.ZERO
 ## The tint of the latest plain hit burst, kept for a kill that makes it bigger.
@@ -483,7 +487,7 @@ func _on_damage_dealt(_player: int, target: Node, amount: int, position: Vector2
 	if target != null and is_instance_valid(target):
 		tint = _target_tint(target)
 		# The shot that did this hit told us where it struck and which way it flew.
-		if target.get_instance_id() == _impact_target:
+		if target.get_instance_id() == _impact_target and Engine.get_physics_frames() == _impact_frame:
 			aim = _impact_aim
 			at = _impact_at
 			size = clampf(1.0 + float(amount - SPRAY_REF_DAMAGE) * preset.hit_spray_per_damage, SPRAY_MIN_SIZE, SPRAY_MAX_SIZE)
@@ -496,6 +500,7 @@ func _on_damage_dealt(_player: int, target: Node, amount: int, position: Vector2
 func _on_projectile_impact(player: int, target: Node, position: Vector2, direction: Vector2) -> void:
 	if target != null:
 		_impact_target = target.get_instance_id()
+		_impact_frame = Engine.get_physics_frames()
 		_impact_at = position
 		_impact_aim = direction
 		return
@@ -667,6 +672,8 @@ func _make_burst() -> Object:
 	# Top level: the burst sits in world space and lives under this autoload, so a
 	# scene change cannot free it.
 	burst.top_level = true
+	# Feel draws before the room: at z 0 the floor and the pillar tops would hide the burst.
+	burst.z_index = BURST_Z
 	add_child(burst)
 	return burst
 

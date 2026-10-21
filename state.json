@@ -1,10 +1,10 @@
 {
   "alarms": {},
   "automation_started": "2026-10-16T16:49:06Z",
-  "backoff_until": "2026-10-17T05:10:00Z",
+  "backoff_until": "2026-10-21T19:00:00Z",
   "last_own_merge": "2026-10-21T11:51:06Z",
   "limits": {
-    "week_tokens": null,
+    "week_tokens": 44131848,
     "window_tokens": 10471923
   },
   "panel_applied": {
@@ -1642,6 +1642,11 @@
       "at": "2026-10-21T11:50:39Z",
       "kind": "review",
       "tokens": 22162
+    },
+    {
+      "at": "2026-10-21T12:53:06Z",
+      "kind": "dev",
+      "tokens": 801194
     }
   ],
   "version": 1

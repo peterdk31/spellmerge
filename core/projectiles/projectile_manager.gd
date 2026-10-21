@@ -72,6 +72,22 @@ extends Node2D
 ## their own old shots. `dropped` counts these. Spell limits (projectiles per
 ## cast, trigger depth) keep the cap from being reached often.
 ##
+## Expiry: a shot that ends because its life ran out, or on a wall, sends
+## `Events.projectile_expired(player, position, tag)` once, after it is removed (so a
+## handler may spawn at that spot). A shot that ends on a hit (`projectile_hit`), that
+## leaves the bounds, or that the cap drops sends nothing: those did not run out.
+##
+## Motion: `MOTION_STRAIGHT` (default) flies on its velocity; `MOTION_STILL` (the
+## rune) never moves: its velocity is ignored and it waits for a target to enter its
+## circle. It still ends by life or by a hit, as any shot does.
+##
+## Queries: `nearest_target(point, radius, layers, exclude)` and `targets_in(point,
+## radius, layers, out)` use the same grid as hits, so chain, homing and area effects
+## never loop over every enemy. A target counts when its hit circle overlaps the
+## circle (point, radius). They see the target positions of the start of the latest
+## step (a query after `add_target` and before the next step refreshes the grid
+## first), so inside a hit handler they are exact for that step.
+##
 ## Nothing here allocates per frame: the arrays are sized when the cap is set,
 ## and the grid is reused. Coordinates are world coordinates (the manager sits
 ## at the origin). A handler of `projectile_hit` may spawn more projectiles;
@@ -80,6 +96,9 @@ extends Node2D
 const EventsScript := preload("res://core/events/events.gd")
 
 const MAX_PLAYERS: int = 4
+## Motion modes of a shot (see the class doc).
+const MOTION_STRAIGHT: int = 0
+const MOTION_STILL: int = 1
 ## Default global caps on live projectiles: the PLAN budgets for each platform.
 const DEFAULT_CAP_WEB: int = 1000
 const DEFAULT_CAP_DESKTOP: int = 3000
@@ -161,6 +180,8 @@ var _layers: PackedInt32Array = PackedInt32Array()
 var _pierce: PackedInt32Array = PackedInt32Array()
 ## The opaque value given to spawn(), sent with every hit.
 var _tag: PackedInt64Array = PackedInt64Array()
+## MOTION_STRAIGHT or MOTION_STILL per slot.
+var _motion: PackedByteArray = PackedByteArray()
 ## Spawn order, so "oldest" is the lowest.
 var _seq: PackedInt64Array = PackedInt64Array()
 ## HIT_MEMORY target ids per slot, newest first (0 for none).
@@ -194,6 +215,8 @@ var _cell_head: PackedInt32Array = PackedInt32Array()
 var _target_next: PackedInt32Array = PackedInt32Array()
 ## The largest radius of any registered target; sets how far hits are searched.
 var _max_target_radius: float = 0.0
+## True when targets were added since the grid was filled (a query refreshes it).
+var _grid_stale: bool = false
 
 ## The wall grid over the bounds: one byte per WALL_CELL cell, 1 for solid.
 var _wall_w: int = 1
@@ -275,6 +298,7 @@ func set_cap(value: int) -> void:
 	_layers.resize(_cap)
 	_pierce.resize(_cap)
 	_tag.resize(_cap)
+	_motion.resize(_cap)
 	_seq.resize(_cap)
 	_last_hit.resize(_cap * HIT_MEMORY)
 	_own_prev.resize(_cap)
@@ -300,6 +324,8 @@ func set_bounds(rect: Rect2) -> void:
 	_grid_w = maxi(ceili(rect.size.x / GRID_CELL), 1)
 	_grid_h = maxi(ceili(rect.size.y / GRID_CELL), 1)
 	_cell_head.resize(_grid_w * _grid_h)
+	_cell_head.fill(-1)
+	_grid_stale = true
 	_wall_w = maxi(ceili(rect.size.x / WALL_CELL), 1)
 	_wall_h = maxi(ceili(rect.size.y / WALL_CELL), 1)
 	_wall_cells.resize(_wall_w * _wall_h)
@@ -479,6 +505,7 @@ func add_target(node: Node2D, radius: float, layer: int = LAYER_ENEMY, owner: in
 	_target_pos.append(Vector2.ZERO)
 	_target_offset.append(offset)
 	_target_next.append(-1)
+	_grid_stale = true
 	_max_target_radius = maxf(_max_target_radius, radius)
 
 
@@ -492,6 +519,7 @@ func remove_target(node: Node2D) -> void:
 		_target_layer[at] = 0
 	else:
 		_remove_target_at(at)
+		_grid_stale = true
 
 
 func get_target_count() -> int:
@@ -502,8 +530,11 @@ func get_target_count() -> int:
 ## `origin`, moving `velocity` pixels per second for `lifetime` seconds.
 ## `pierce` is how many targets it passes through before it ends. Returns its
 ## slot, or -1 for bad arguments or an origin inside a wall.
+## `motion` is MOTION_STRAIGHT or MOTION_STILL (then `velocity` is ignored).
 ## `tag` is stored and sent back with every hit of this projectile. A full cap never refuses: see the class doc.
-func spawn(player: int, origin: Vector2, velocity: Vector2, lifetime: float, radius: float = 4.0, hit_layers: int = LAYER_ENEMY, pierce: int = 0, tag: int = 0) -> int:
+func spawn(player: int, origin: Vector2, velocity: Vector2, lifetime: float, radius: float = 4.0, hit_layers: int = LAYER_ENEMY, pierce: int = 0, tag: int = 0, motion: int = MOTION_STRAIGHT) -> int:
+	if motion != MOTION_STRAIGHT and motion != MOTION_STILL:
+		return -1
 	if player < EventsScript.NO_PLAYER or player >= MAX_PLAYERS:
 		return -1
 	if not (lifetime > 0.0) or not origin.is_finite() or not velocity.is_finite():
@@ -520,7 +551,8 @@ func spawn(player: int, origin: Vector2, velocity: Vector2, lifetime: float, rad
 	var slot: int = _free_slots[_free_count]
 	_pos[slot] = origin
 	_prev[slot] = origin
-	_vel[slot] = velocity
+	_vel[slot] = Vector2.ZERO if motion == MOTION_STILL else velocity
+	_motion[slot] = motion
 	_life[slot] = lifetime
 	_radius[slot] = maxf(radius, 0.0)
 	_player[slot] = player
@@ -567,7 +599,7 @@ func step(delta: float) -> void:
 			continue
 		_life[slot] -= delta
 		if _life[slot] <= 0.0:
-			_kill(slot)
+			_expire(slot)
 			continue
 		_prev[slot] = _pos[slot]
 		_pos[slot] += _vel[slot] * delta
@@ -587,7 +619,7 @@ func step(delta: float) -> void:
 				if walled:
 					wall_hits += 1
 					_emit_wall_impact(_player[slot], _pos[slot], _vel[slot])
-					_kill(slot)
+					_expire(slot)
 				elif starved_at < 0:
 					starved_at = slot
 				continue
@@ -600,7 +632,7 @@ func step(delta: float) -> void:
 		if walled and _alive[slot] != 0:
 			wall_hits += 1
 			_emit_wall_impact(_player[slot], _pos[slot], _vel[slot])
-			_kill(slot)
+			_expire(slot)
 	_resume = maxi(starved_at, 0)
 	_stepping = false
 
@@ -699,6 +731,16 @@ func _kill(slot: int) -> void:
 		_high -= 1
 
 
+## End a shot whose life ran out or that met a wall, and say so.
+func _expire(slot: int) -> void:
+	var player: int = _player[slot]
+	var at: Vector2 = _pos[slot]
+	var tag: int = _tag[slot]
+	_kill(slot)
+	if events != null:
+		events.projectile_expired.emit(player, at, tag)
+
+
 ## Make room: drop the oldest projectile of the owner with the most.
 func _drop_one() -> void:
 	var richest: int = 0
@@ -731,6 +773,8 @@ func _remove_target_at(at: int) -> void:
 ## Drop freed targets, read the positions of the rest and fill the grid.
 func _refresh_targets() -> void:
 	if _targets.is_empty():
+		_cell_head.fill(-1)
+		_grid_stale = false
 		return
 	var at: int = 0
 	while at < _targets.size():
@@ -740,6 +784,7 @@ func _refresh_targets() -> void:
 			continue
 		at += 1
 	_cell_head.fill(-1)
+	_grid_stale = false
 	for i in _targets.size():
 		var node: Node2D = _targets[i]
 		_target_next[i] = -1
@@ -750,6 +795,76 @@ func _refresh_targets() -> void:
 		var cell: int = _cell_of(_target_pos[i])
 		_target_next[i] = _cell_head[cell]
 		_cell_head[cell] = i
+
+
+## The nearest target on `layers` whose hit circle overlaps the circle (`point`,
+## `radius`), by distance to its centre, or null. `exclude` is skipped (the target
+## just hit, for a chain). Allocation-free.
+func nearest_target(point: Vector2, radius: float, layers: int, exclude: Node2D = null) -> Node2D:
+	if not point.is_finite() or not is_finite(radius):
+		return null
+	var best: int = -1
+	var best_sq: float = INF
+	var skip: int = exclude.get_instance_id() if exclude != null else 0
+	_query_ready()
+	var cells: Vector4i = _query_cells(point, radius)
+	for y in range(cells.y, cells.w + 1):
+		for x in range(cells.x, cells.z + 1):
+			var t: int = _cell_head[y * _grid_w + x]
+			while t >= 0:
+				if _query_match(t, point, radius, layers, skip):
+					var d: float = _target_pos[t].distance_squared_to(point)
+					if d < best_sq:
+						best_sq = d
+						best = t
+				t = _target_next[t]
+	return _targets[best] if best >= 0 else null
+
+
+## Fill `out` (cleared first) with the targets on `layers` whose hit circle overlaps
+## the circle (`point`, `radius`), and return how many. Pass the same array each time
+## so nothing is allocated. Order is not defined.
+func targets_in(point: Vector2, radius: float, layers: int, out: Array[Node2D]) -> int:
+	out.clear()
+	if not point.is_finite() or not is_finite(radius):
+		return 0
+	_query_ready()
+	var cells: Vector4i = _query_cells(point, radius)
+	for y in range(cells.y, cells.w + 1):
+		for x in range(cells.x, cells.z + 1):
+			var t: int = _cell_head[y * _grid_w + x]
+			while t >= 0:
+				if _query_match(t, point, radius, layers, 0):
+					out.append(_targets[t])
+				t = _target_next[t]
+	return out.size()
+
+
+## Fill the grid when targets were added since it was last filled. Never inside a
+## step, where the grid is in use and already current.
+func _query_ready() -> void:
+	if _grid_stale and not _stepping:
+		_refresh_targets()
+
+
+## The grid cells (x0, y0, x1, y1) a query circle can reach.
+func _query_cells(point: Vector2, radius: float) -> Vector4i:
+	var pad: Vector2 = Vector2.ONE * (maxf(radius, 0.0) + _max_target_radius)
+	var low: Vector2 = point - pad
+	var high: Vector2 = point + pad
+	return Vector4i(
+		clampi(floori((low.x - _bounds.position.x) / GRID_CELL), 0, _grid_w - 1),
+		clampi(floori((low.y - _bounds.position.y) / GRID_CELL), 0, _grid_h - 1),
+		clampi(floori((high.x - _bounds.position.x) / GRID_CELL), 0, _grid_w - 1),
+		clampi(floori((high.y - _bounds.position.y) / GRID_CELL), 0, _grid_h - 1))
+
+
+func _query_match(t: int, point: Vector2, radius: float, layers: int, skip: int) -> bool:
+	# A target freed since the grid was filled is skipped, never returned.
+	if (_target_layer[t] & layers) == 0 or _target_id[t] == skip or not is_instance_valid(_targets[t]):
+		return false
+	var reach: float = maxf(radius, 0.0) + _target_radius[t]
+	return _target_pos[t].distance_squared_to(point) <= reach * reach
 
 
 func _cell_of(point: Vector2) -> int:
@@ -823,6 +938,11 @@ func _register_hit(slot: int, target: int, at: Vector2) -> void:
 	var player: int = _player[slot]
 	var tag: int = _tag[slot]
 	var heading: Vector2 = _vel[slot].normalized()
+	if heading == Vector2.ZERO:
+		# A still shot has no heading: point from the shot to the target instead.
+		heading = at.direction_to(_target_pos[target])
+		if heading == Vector2.ZERO:
+			heading = Vector2.RIGHT
 	if _pierce[slot] > 0:
 		_pierce[slot] -= 1
 		var memory: int = slot * HIT_MEMORY

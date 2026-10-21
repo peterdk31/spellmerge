@@ -775,3 +775,9 @@ The HUD screenshot cannot be taken in a session (no display, `docs/BACKLOG.md`),
 - New events: `spell_swap_requested(player)` (HUD, heard by `player`), `projectile_expired(player, position, tag)` (`core/projectiles`), `spell_changed(player, spell, description)` and `build_refused(player, reason)` (`player`), `reaction_triggered(player, reaction_id, position)` (`combat`). Each has one sender; the senders arrive in parts 3, 8 and 11, so their listeners are "none yet" in the table until then.
 - `build_refused` has exactly `(player, reason)`, as in the design: the HUD shows only the reason in plain words.
 - The `swap` action is bound to Q and the left shoulder, which were free. It is in `CAPTURED_ACTIONS`, so a player in the overlay or builder does not swap spells by accident.
+
+## M2 part 3: projectile manager, part 1
+
+- `projectile_expired` is sent only when a shot's life runs out or it ends on a wall, after the shot is removed (a handler may spawn at that spot). A hit, leaving the bounds and a cap drop send nothing: an on-expire trigger should not fire for a shot that did its job or was evicted.
+- `still` is a `motion` argument at the end of `spawn` (velocity ignored), so part 4's `orbit` fits the same argument.
+- The queries count a target when its hit circle overlaps the query circle (the rule of a hit) and return the nearest by centre distance. They read the grid of the latest step; `add_target` and `remove_target` outside a step mark it stale and the next query refills it. A target freed since the last step is skipped.

@@ -14,7 +14,7 @@ Every player is an index 0–3 with their own device, mana, health and downed st
 - **Dependency direction:** `core` ← `gameplay` ← `content`. This area may use `core/` and the registry. `core/` never depends on it, and content never reaches into it.
 - **Events** (`core/events/events.gd` owns the definitions; this list matches it and the table in [gameplay/README.md](../README.md)):
   - Sends: `player_downed`, `player_revived`, `player_stats_changed` (on appearing, on a health change and when mana crosses a whole number; for the HUD), `spell_cast`, `wizard_cast` (the wizard node, for the caster squash in `feel`).
-  - Listens to: `revive_progress` from `coop` (draws the revive ring over its own downed wizard: an arc sweeping clockwise from the top, a cross in the middle; `revive_progress()` answers the value), `damage_dealt` from `combat`, `build_change_requested` (from the HUD), and `device_joined`, `device_left` from `core/input`.
+  - Listens to: `revive_progress` from `coop` (draws the revive ring over its own downed wizard: an arc sweeping clockwise from the top, a cross in the middle; `revive_progress()` answers the value), `damage_dealt` from `combat`, `build_change_requested` and `spell_swap_requested` (from the HUD; M2 part 11 makes `player` act on them and send `spell_changed` and `build_refused`), and `device_joined`, `device_left` from `core/input`.
 - Areas never call each other directly; they talk through events. [gameplay/README.md](../README.md) has the rules every sub-area shares.
 
 ## Allowed files

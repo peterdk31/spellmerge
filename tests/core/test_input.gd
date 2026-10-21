@@ -120,7 +120,7 @@ func _press_join(device: int) -> void:
 # --- Tests ------------------------------------------------------------------
 
 func _test_actions_defined() -> void:
-	for action: StringName in [&"move_left", &"move_right", &"move_up", &"move_down", &"dodge", &"cast", &"overlay", &"join", &"leave"]:
+	for action: StringName in [&"move_left", &"move_right", &"move_up", &"move_down", &"dodge", &"cast", &"overlay", &"swap", &"join", &"leave"]:
 		_check(InputMap.has_action(action), "project.godot defines the action %s" % action)
 	for action in InputManagerScript.ACTIONS:
 		_check(InputMap.has_action(action), "the manager's action %s is defined in project.godot" % action)
@@ -457,6 +457,7 @@ func _test_bindings_route_as_documented() -> void:
 		_manager.handle_event(_button(0, button, false))
 	var buttons: Dictionary = {
 		JOY_BUTTON_B: &"dodge", JOY_BUTTON_X: &"cast", JOY_BUTTON_RIGHT_SHOULDER: &"cast", JOY_BUTTON_Y: &"overlay",
+		JOY_BUTTON_LEFT_SHOULDER: &"swap",
 	}
 	for button: JoyButton in buttons:
 		_manager.handle_event(_button(0, button))
@@ -470,6 +471,7 @@ func _test_bindings_route_as_documented() -> void:
 	var keys: Dictionary = {
 		KEY_LEFT: &"move_left", KEY_RIGHT: &"move_right", KEY_UP: &"move_up", KEY_DOWN: &"move_down",
 		KEY_SHIFT: &"dodge", KEY_SPACE: &"dodge", KEY_TAB: &"overlay", KEY_E: &"overlay", KEY_J: &"cast",
+		KEY_Q: &"swap",
 	}
 	for key: Key in keys:
 		_manager.handle_event(_key(key))
@@ -484,7 +486,7 @@ func _test_input_map_has_documented_bindings() -> void:
 	var keys: Dictionary = {
 		&"move_left": [KEY_A, KEY_LEFT], &"move_right": [KEY_D, KEY_RIGHT],
 		&"move_up": [KEY_W, KEY_UP], &"move_down": [KEY_S, KEY_DOWN],
-		&"dodge": [KEY_SPACE, KEY_SHIFT], &"cast": [KEY_J], &"overlay": [KEY_TAB, KEY_E],
+		&"dodge": [KEY_SPACE, KEY_SHIFT], &"cast": [KEY_J], &"overlay": [KEY_TAB, KEY_E], &"swap": [KEY_Q],
 		&"join": [KEY_ENTER, KEY_SPACE], &"leave": [KEY_BACKSPACE],
 	}
 	for action: StringName in keys:
@@ -493,7 +495,7 @@ func _test_input_map_has_documented_bindings() -> void:
 	var pad: Dictionary = {
 		&"move_left": JOY_BUTTON_DPAD_LEFT, &"move_right": JOY_BUTTON_DPAD_RIGHT,
 		&"move_up": JOY_BUTTON_DPAD_UP, &"move_down": JOY_BUTTON_DPAD_DOWN,
-		&"dodge": JOY_BUTTON_B, &"cast": JOY_BUTTON_X, &"overlay": JOY_BUTTON_Y,
+		&"dodge": JOY_BUTTON_B, &"cast": JOY_BUTTON_X, &"overlay": JOY_BUTTON_Y, &"swap": JOY_BUTTON_LEFT_SHOULDER,
 		&"join": JOY_BUTTON_A, &"leave": JOY_BUTTON_BACK,
 	}
 	for action: StringName in pad:

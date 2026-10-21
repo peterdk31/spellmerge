@@ -766,3 +766,12 @@ The HUD screenshot cannot be taken in a session (no display, `docs/BACKLOG.md`),
 
 - At the widest Coop zoom (0.5), each corner panel may cover its player's wizard. The panels stay as they are: translucent at alpha 0.4.
 - The staged screenshot is now named `staged_zoom_half_wizards_placed_outside_room`, because `shot_m1.gd` places the wizards outside the one-screen room to force the zoom-out, and the old name looked like gameplay. A new test, `tests/gameplay/flow/test_walls_hold.gd`, has four wizards walk and dodge into the walls through the real input path and checks that none leaves the room.
+
+## 2026-10-21: Events for M2 (M2 part 2)
+
+**Decided by:** Claude, following the M2 design ("Intent and result", "Projectile manager").
+
+- `build_change_requested(player, spell, slot, component_id)`: `spell` is a `PackedInt32Array` path, as the design says. The overlay's stub sends `[0]` (spell A).
+- New events: `spell_swap_requested(player)` (HUD, heard by `player`), `projectile_expired(player, position, tag)` (`core/projectiles`), `spell_changed(player, spell, description)` and `build_refused(player, reason)` (`player`), `reaction_triggered(player, reaction_id, position)` (`combat`). Each has one sender; the senders arrive in parts 3, 8 and 11, so their listeners are "none yet" in the table until then.
+- `build_refused` has exactly `(player, reason)`, as in the design: the HUD shows only the reason in plain words.
+- The `swap` action is bound to Q and the left shoulder, which were free. It is in `CAPTURED_ACTIONS`, so a player in the overlay or builder does not swap spells by accident.

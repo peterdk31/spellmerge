@@ -23,6 +23,7 @@ const EVENTS: Dictionary = {
 	&"wizard_cast": [["player", TYPE_INT], ["wizard", TYPE_OBJECT]],
 	&"spell_cast": [["player", TYPE_INT], ["spell_id", TYPE_STRING_NAME], ["origin", TYPE_VECTOR2], ["direction", TYPE_VECTOR2]],
 	&"projectile_hit": [["player", TYPE_INT], ["target", TYPE_OBJECT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT]],
+	&"projectile_impact": [["player", TYPE_INT], ["target", TYPE_OBJECT], ["position", TYPE_VECTOR2], ["direction", TYPE_VECTOR2]],
 	&"damage_dealt": [["player", TYPE_INT], ["target", TYPE_OBJECT], ["amount", TYPE_INT], ["position", TYPE_VECTOR2]],
 	&"status_applied": [["player", TYPE_INT], ["target", TYPE_OBJECT], ["status_id", TYPE_STRING_NAME]],
 	&"enemy_died": [["player", TYPE_INT], ["enemy", TYPE_OBJECT], ["position", TYPE_VECTOR2]],

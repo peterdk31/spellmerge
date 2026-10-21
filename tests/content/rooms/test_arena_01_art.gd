@@ -33,6 +33,10 @@ func test_every_collision_shape_has_a_wall_sprite() -> void:
 	for child in room_root.get_node("Walls").get_children():
 		if child is Sprite2D:
 			drawn.append(RoomScan.sprite_rect(child as Sprite2D))
+	# A pillar is drawn in two parts outside `Walls` (see test_arena_01_pillars.gd); its base sits on the shape.
+	for child in room_root.get_node("Pillars").get_children():
+		if child is Sprite2D:
+			drawn.append(RoomScan.sprite_rect(child as Sprite2D))
 	for rect in RoomScan.wall_rects(room_root):
 		check(drawn.has(rect), "the wall %s is drawn" % rect)
 

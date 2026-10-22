@@ -90,8 +90,17 @@ def post_devlog(cfg: config_mod.Config, post: str, discussions_token: str) -> st
     return f"Devlog posted: {result['createDiscussion']['discussion']['url']}"
 
 
-def publish_plan(cfg: config_mod.Config, plan: dict[str, Any], discussions_token: str | None) -> list[str]:
-    """Posts the devlog, moves issues, and creates owner issues and the playtest issue."""
+def publish_plan(cfg: config_mod.Config, plan: dict[str, Any], discussions_token: str | None,
+                 weekly: bool = True, merged: bool = True) -> list[str]:
+    """Moves issues and creates owner issues; the weekly run also posts the devlog and the playtest issue.
+
+    Owner issues (such as "M2 done, M3 started") only go out once the plan's PR has merged, so they
+    never announce a milestone that didn't start.
+    """
+    if not weekly:  # planning because the queue ran empty
+        plan = {k: v for k, v in plan.items() if k not in ("progress_post", "playtest")}
+    if not merged:
+        plan = {k: v for k, v in plan.items() if k != "owner_issues"}
     log = []
     if plan.get("progress_post") and discussions_token:
         log.append(post_devlog(cfg, plan["progress_post"], discussions_token))
@@ -117,8 +126,9 @@ def main(argv: list[str] | None = None) -> int:
     cfg = config_mod.load()
     if cmd == "publish-plan":
         plan = json.loads(os.environ.get("PLAN") or "{}")
-        log = publish_plan(cfg, plan, os.environ.get("DISCUSSIONS_TOKEN"))
-        dailylog.post(cfg, "Weekly planning", log)
+        log = publish_plan(cfg, plan, os.environ.get("DISCUSSIONS_TOKEN"), os.environ.get("WEEKLY") == "true",
+                           os.environ.get("MERGED") == "true")
+        dailylog.post(cfg, "Planning", log)
     else:
         print(__doc__)
         return 2

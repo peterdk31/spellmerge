@@ -28,6 +28,24 @@ class WeeklyTest(unittest.TestCase):
         self.assertIn((f"repos/{CFG.repo}/issues/5/labels", ("-X", "POST"), {"labels": ["backlog"]}), calls)
         self.assertFalse(any("/99/" in c[0] for c in calls))
 
+    def test_only_the_weekly_run_posts_and_only_a_merged_plan_announces(self) -> None:
+        plan = {"progress_post": "news", "playtest": {"changes": "c", "questions": ["q"]},
+                "owner_issues": [{"title": "M2 done, M3 started", "body": "b"}]}
+        created: list = []
+
+        def api(path: str, *args: str, input: object = None, token: object = None) -> object:
+            created.append(input["title"])
+            return {"number": 1}
+
+        with mock.patch.object(weekly.gh, "api", api), mock.patch.object(weekly.gh, "api_paginated", lambda *a, **k: []), \
+                mock.patch.object(weekly, "post_devlog", lambda *a: "Devlog posted"):
+            self.assertEqual(weekly.publish_plan(CFG, plan, "t", weekly=False, merged=True),
+                             ["Owner issue #1: M2 done, M3 started"])
+            self.assertEqual(weekly.publish_plan(CFG, plan, "t", weekly=False, merged=False), [])
+            log = weekly.publish_plan(CFG, plan, "t", weekly=True, merged=True)
+        self.assertEqual(log[0], "Devlog posted")
+        self.assertTrue(log[-1].startswith("Playtest of the week"))
+
 
 if __name__ == "__main__":
     unittest.main()

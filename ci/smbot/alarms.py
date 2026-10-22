@@ -31,6 +31,12 @@ ALARMS = {
                  "Nothing has been committed to `main` for {days} days. GitHub disables scheduled workflows in "
                  "public repositories after 60 days without activity, which would stop the daily releases.\n\n"
                  "Check the Daily log and the Actions tab."),
+    "stopped": ("Development stopped: {errors} sessions in a row ended in an error",
+                "The last {errors} development sessions ended in an error, so the bot stopped starting new ones "
+                "instead of retrying forever. The latest run: {run}\n\n"
+                "Look at the run's logs. When it's fixed, comment `/resume` here or anywhere, or start the "
+                "`develop` workflow from the Actions tab. This issue closes by itself after the next session "
+                "that makes progress."),
     "token": ("Claude token needs regenerating",
               "Claude's steps failed because the subscription token was rejected or has expired. Scripted merges, "
               "builds and releases keep running; development and PR rating are paused until it's fixed.\n\n"

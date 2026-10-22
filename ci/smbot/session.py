@@ -38,6 +38,7 @@ from . import config as config_mod
 MAINTAINER = Path(".github/maintainer")
 FENCE = "`" * 3
 MAX_FAILURES = 2
+MAX_ERRORS_IN_A_ROW = 3  # sessions that end in an error are retried this often, then the owner is alarmed
 PARK_BLOCKED = dt.timedelta(days=7)  # blocked or failed too often: revisited by the weekly planning run
 PARK_WAITING = dt.timedelta(days=1)  # approved, but the merge waits on GitHub or the owner
 
@@ -159,6 +160,12 @@ def queue(cfg: config_mod.Config, st: dict[str, Any]) -> list[str]:
     return intake.queue_tasks(cfg, st)
 
 
+def nothing_queued(cfg: config_mod.Config, now: dt.datetime) -> bool:
+    """No task a session could take now: no scheduled issue and nothing unparked in docs/NEXT.md."""
+    st, _ = state.load(cfg)
+    return nexttask.next_task(skip=nexttask.parked(st, now), first=queue(cfg, st)) is None
+
+
 def open_pr_for(cfg: config_mod.Config, task_slug: str) -> dict[str, Any] | None:
     """An open bot PR whose branch is for this task (any date), if there is one."""
     try:
@@ -238,17 +245,22 @@ def prepare(cfg: config_mod.Config, st: dict[str, Any], focus: str, today: dt.da
     return {"prompt": prompt, "branch": branch, "task": task or "", "kind": kind}
 
 
-def prepare_plan(cfg: config_mod.Config, st: dict[str, Any], focus: str, today: dt.date) -> dict[str, str]:
+def prepare_plan(cfg: config_mod.Config, st: dict[str, Any], focus: str, today: dt.date,
+                 weekly: bool = False) -> dict[str, str]:
     backlog = weekly.backlog_text(cfg, st)
-    branch = f"claude/{today:%Y%m%d}-weekly-planning"
+    # Planning runs weekly and whenever the queue runs empty, so the branch carries the time.
+    branch = f"claude/{dt.datetime.now(dt.timezone.utc):%Y%m%d-%H%M}-planning"
     prompt = render((MAINTAINER / "plan.md").read_text(), {
         "BACKLOG": backlog.replace(FENCE, "` ` `"),  # keep it inside its code block
+        "RUN": ("This is the weekly run on Sunday: do every step." if weekly else
+                "This run started because the work queue is empty. Do steps 1 to 5 only: leave `progress_post` "
+                "empty and omit `playtest`; the Sunday run writes those."),
         "FOCUS": focus or "(none)",
         "INSTRUCTIONS": instructions_text(st.get("pending_instructions", [])),
         "BRANCH": branch,
         "REPO": cfg.repo,
     })
-    return {"prompt": prompt, "branch": branch, "task": "Weekly planning", "kind": "plan"}
+    return {"prompt": prompt, "branch": branch, "task": "Planning", "kind": "plan"}
 
 
 def review_prompt(cfg: config_mod.Config, pr: int, sha: str, round_: str) -> str:
@@ -504,6 +516,13 @@ def finish(cfg: config_mod.Config, env: dict[str, str]) -> dict[str, str]:
     # A queue task with nothing to do now (it waits on the owner, or another PR) must not stop
     # development: it's set aside like a refused merge and the next task goes first.
     idle_task = status == "nothing_to_do" and bool(task) and env.get("TASK_KIND") == "next" and not pr
+    planning = env.get("TASK_KIND") == "plan"
+    progressed = merged or bool(pr) or status == "blocked" or idle_task
+    # Planning that found nothing to do while the queue is empty: development has run out of work.
+    plan_idle = planning and status == "nothing_to_do" and not pr and nothing_queued(cfg, now)
+    # A usage limit backs off until its reset and a rejected token raises its own alarm; any other
+    # session that ends without progress is an error, retried a few times before the owner is told.
+    failed = (not progressed and not plan_idle and status not in ("nothing_to_do", "limit", "limit-weekly", "auth"))
 
     def park(entry: dict[str, Any], span: dt.timedelta, reason: str) -> None:
         entry["parked_until"] = pacing.iso(now + span)
@@ -511,6 +530,10 @@ def finish(cfg: config_mod.Config, env: dict[str, str]) -> dict[str, str]:
 
     def apply(s: dict[str, Any]) -> None:
         failures = s.setdefault("task_failures", {})
+        if planning:
+            s["last_plan"] = pacing.iso(now)
+        s["errors_in_a_row"] = s.get("errors_in_a_row", 0) + 1 if failed else 0 if progressed else s.get(
+            "errors_in_a_row", 0)
         if merged:
             failures.pop(task, None)
             s["pending_instructions"] = []
@@ -551,7 +574,7 @@ def finish(cfg: config_mod.Config, env: dict[str, str]) -> dict[str, str]:
     if merged:
         lines.append(f"Merged #{pr}: {what}")
     elif env.get("TASK_KIND") == "plan" and status == "nothing_to_do":
-        lines.append("Weekly planning: no plan changes needed this week")
+        lines.append("Planning: no plan changes needed")
     elif status == "blocked":
         lines.append(f"Blocked, set aside for a week: {what}. {said}")
     elif idle_task:
@@ -569,18 +592,38 @@ def finish(cfg: config_mod.Config, env: dict[str, str]) -> dict[str, str]:
         lines.append(f"[Workflow run]({env['RUN_URL']})")
     dailylog.post(cfg, "Development session", lines)
 
-    # Start the next session right away while there is work. A task that waits on someone is
-    # parked above, so the next session takes another one. Stop when the session made no
-    # progress (an error or usage limit: the hourly check retries), merging is paused, or
-    # Claude reported a usage limit.
+    # Development flows: after progress, after an empty queue (the next run plans) and after an
+    # error (retried) the next session starts at once. It stops for the owner's pauses, a usage
+    # limit (resume.yml restarts it at the reset), a rejected token, repeated errors, and when
+    # planning finds nothing left to do. Each stop that needs the owner mentions them.
     started = env.get("CHAIN_STARTED") or pacing.iso(now)
-    progressed = merged or bool(pr) or status == "blocked" or idle_task
-    has_work = (nexttask.next_task(skip=nexttask.parked(st, now), first=queue(cfg, st)) is not None
-                or bool(st.get("pending_instructions")))
-    again = (env.get("TASK_KIND") != "plan" and progressed and not merge_skipped
-             and not pacing.backing_off_until(st, now) and has_work)
-    # Stopped by a usage limit: resume.yml starts develop again when it resets.
-    resume_at = pacing.backing_off_until(st, now) if env.get("TASK_KIND") != "plan" and has_work else ""
+    errors = st.get("errors_in_a_row", 0)
+    backing_off = pacing.backing_off_until(st, now)
+    empty_queue = env.get("TASK_KIND") == "next" and not task and status == "nothing_to_do"
+    again = (not backing_off and not merge_skipped and not plan_idle and status != "auth"
+             and (progressed or empty_queue or (failed and errors < MAX_ERRORS_IN_A_ROW)))
+    stop: list[str] = []
+    if failed and errors >= MAX_ERRORS_IN_A_ROW:
+        line = alarms.raise_alarm(cfg, st, "stopped", errors=errors, run=env.get("RUN_URL", "the Actions tab"))
+        stop.append(line or f"Development stopped after {errors} errors in a row.")
+    elif progressed and "stopped" in st.get("alarms", {}):
+        stop.append(alarms.clear_alarm(cfg, st, "stopped") or "")
+    if plan_idle:
+        stop.append("Development is idle: planning found no more tasks for now. It plans again on Sunday, "
+                    "after a new scheduled issue, or when you give it work with `/claude`.")
+    stop = [line for line in stop if line]
+    if stop:
+        number = st["alarms"].get("stopped")
+
+        def keep_alarm(s: dict[str, Any]) -> None:
+            if number:
+                s["alarms"]["stopped"] = number
+            else:
+                s["alarms"].pop("stopped", None)
+        state.update(cfg, keep_alarm, "session: stop alarm")
+        dailylog.post(cfg, "Development stopped" if not progressed else "Development running again", stop,
+                      mention_owner=not progressed)
+    resume_at = backing_off if not plan_idle else ""
     return {"again": str(again).lower(), "chain_started": started, "resume_at": resume_at}
 
 
@@ -623,7 +666,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "prepare":
         st, _ = state.load(cfg)
         today = dt.datetime.now(dt.timezone.utc).date()
-        out = (prepare_plan(cfg, st, os.environ.get("FOCUS", ""), today) if args.mode == "plan" else
+        out = (prepare_plan(cfg, st, os.environ.get("FOCUS", ""), today, os.environ.get("WEEKLY") == "true")
+               if args.mode == "plan" else
                prepare(cfg, st, os.environ.get("FOCUS", ""), today, sync=sync_with_main))
         schema = MAINTAINER / "schemas" / ("plan.json" if args.mode == "plan" else "session.json")
         out["schema"] = json.dumps(json.loads(schema.read_text()), separators=(",", ":"))

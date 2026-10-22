@@ -7,7 +7,9 @@
    changes since the last run are written to the Daily log.
 3. Owner commands (with --commands): carried out or queued (smbot.commands).
 4. Decides what this run may do and writes it to $GITHUB_OUTPUT:
-   automation, develop, merge, focus, next_task, and reasons.
+   automation, develop, mode, merge, focus, next_task, and reasons.
+   With nothing in the queue the session plans (mode plan) instead of
+   stopping, so the end of a milestone flows straight into the next one.
 
 Needs GH_TOKEN with issues read; --commands and Daily log posts need the bot
 app's token (Contents, Issues and Pull requests write).
@@ -27,12 +29,16 @@ from . import commands, dailylog, intake, nexttask, pacing, panel, state
 from . import config as config_mod
 
 
+PLAN_COOLDOWN = dt.timedelta(hours=3)  # an empty queue runs planning at most this often
+
+
 @dataclass
 class Decision:
     automation: bool
     develop: bool
     merge: bool
     reasons: list[str] = field(default_factory=list)
+    mode: str = "develop"  # develop, or plan when the queue is empty
 
 
 def in_quiet_hours(quiet: tuple[int, int] | None, now: dt.datetime, tz: str) -> bool:
@@ -70,10 +76,17 @@ def decide(kill_switch_on: bool, result: panel.PanelResult, st: dict, now: dt.da
     if develop and (until := pacing.backing_off_until(st, now)):
         develop = False
         reasons.append(f"backing off after a usage limit until {until}")
+    mode = "develop"
     if develop and not has_task and not st.get("pending_instructions"):
-        develop = False
-        reasons.append("no scheduled issue, no task in docs/NEXT.md and no owner instructions")
-    return Decision(True, develop, merge, reasons)
+        last = pacing.parse_time(st["last_plan"]) if st.get("last_plan") else None
+        if last and now - last < PLAN_COOLDOWN:
+            develop = False
+            reasons.append(f"the queue is empty and planning ran at {st['last_plan']}; "
+                           f"it plans again after {pacing.iso(last + PLAN_COOLDOWN)}")
+        else:
+            mode = "plan"
+            reasons.append("the queue is empty, so this session plans the next tasks")
+    return Decision(True, develop, merge, reasons, mode)
 
 
 def write_outputs(values: dict[str, str]) -> None:
@@ -132,6 +145,7 @@ def main(argv: list[str] | None = None) -> int:
     write_outputs({
         "automation": str(decision.automation).lower(),
         "develop": str(decision.develop).lower(),
+        "mode": decision.mode,
         "merge": str(decision.merge).lower(),
         "focus": result.settings.focus,
         "next_task": task or "",

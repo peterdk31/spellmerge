@@ -22,4 +22,6 @@ Eight strictly sequential milestones (docs/PLAN.md, "Roadmap"). One milestone at
 | C3: end of M3 | After one full run, do you want to play another? | Owner, with player feedback |
 | C4: before the Steam page | Is the art, sound and polish good enough to show the world? | Owner |
 
+A checkpoint never pauses development: at the end of a milestone the planning session starts the next one right away and asks the checkpoint question in an owner issue. The owner's answer redirects the work.
+
 Each milestone's design document is written in `docs/milestones/` before any code, and passes an independent self-critique review against `docs/DESIGN.md` before it merges.

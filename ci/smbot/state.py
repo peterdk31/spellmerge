@@ -32,6 +32,8 @@ DEFAULT: dict[str, Any] = {
     "panel_problems": [],
     "alarms": {},  # alarm name -> issue number
     "last_own_merge": None,
+    "last_plan": None,  # when the last planning session finished
+    "errors_in_a_row": 0,  # sessions that ended in an error since the last one that made progress
     "intake_tasks": {},  # issue number -> the intake's neutral task for it (smbot.intake)
 }
 

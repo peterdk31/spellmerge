@@ -198,7 +198,7 @@ class FinishTest(unittest.TestCase):
         self.assertIn("parked_until", st["task_failures"]["A"])
         self.assertEqual(out["again"], "true")
         out, _ = self.run_finish(st, ["A"], PR="5", FINAL_REVIEW=self.REVISE)
-        self.assertEqual(out["again"], "false")  # only the parked task is left
+        self.assertEqual(out["again"], "true")  # only the parked task is left: the next run plans
 
     def test_blocked_and_refused_merges_are_parked(self) -> None:
         out, st = self.run_finish(copy.deepcopy(state.DEFAULT), ["A", "B"], IMPLEMENT_STATUS="blocked")
@@ -216,9 +216,9 @@ class FinishTest(unittest.TestCase):
         self.assertIn("#84", st["task_failures"]["A"]["parked_reason"])
         self.assertEqual(out["again"], "true")
         out, _ = self.run_finish(st, ["A"], IMPLEMENT_STATUS="nothing_to_do")
-        self.assertEqual(out["again"], "false")  # only the parked task is left
+        self.assertEqual(out["again"], "true")  # only the parked task is left: the next run plans
         out, st = self.run_finish(copy.deepcopy(state.DEFAULT), ["B"], TASK="", IMPLEMENT_STATUS="nothing_to_do")
-        self.assertEqual(out["again"], "false")  # an empty queue is not a task to set aside
+        self.assertEqual(out["again"], "true")  # an empty queue: the next run plans
         self.assertEqual(st.get("task_failures", {}), {})
 
     def test_a_conflict_sends_the_pr_back_instead_of_parking_it(self) -> None:
@@ -239,13 +239,43 @@ class FinishTest(unittest.TestCase):
         out, _ = self.run_finish(copy.deepcopy(state.DEFAULT), ["A"], IMPLEMENT_STATUS="error")
         self.assertEqual(out["resume_at"], "")
 
-    def test_stops_on_errors_paused_merging_and_plan_runs(self) -> None:
-        for env in ({"IMPLEMENT_STATUS": "error"}, {"IMPLEMENT_STATUS": "limit"},
-                    {"TASK": "", "IMPLEMENT_STATUS": "nothing_to_do"},
+    def test_stops_only_for_limits_pauses_the_token_and_idle_planning(self) -> None:
+        for env in ({"IMPLEMENT_STATUS": "limit"}, {"IMPLEMENT_STATUS": "auth"},
                     {"PR": "5", "FINAL_REVIEW": self.APPROVE, "MERGED": ""},
-                    {"TASK_KIND": "plan", "PR": "5", "FINAL_REVIEW": self.APPROVE, "MERGED": "true"}):
-            out, _ = self.run_finish(copy.deepcopy(state.DEFAULT), ["A", "B"], **env)
+                    {"TASK_KIND": "plan", "TASK": "Weekly planning", "IMPLEMENT_STATUS": "nothing_to_do"}):
+            out, _ = self.run_finish(copy.deepcopy(state.DEFAULT), [], **env)
             self.assertEqual(out["again"], "false", env)
+
+    def test_a_merged_plan_flows_into_development(self) -> None:
+        out, st = self.run_finish(copy.deepcopy(state.DEFAULT), [], TASK_KIND="plan", TASK="Planning",
+                                  PR="7", FINAL_REVIEW=self.APPROVE, MERGED="true")
+        self.assertEqual(out["again"], "true")
+        self.assertIsNotNone(st["last_plan"])
+
+    def test_weekly_planning_with_no_changes_is_not_idle_while_tasks_remain(self) -> None:
+        posts: list = []
+        out, _ = self.run_finish(copy.deepcopy(state.DEFAULT), ["A"], posts, TASK_KIND="plan",
+                                 TASK="Planning", IMPLEMENT_STATUS="nothing_to_do")
+        self.assertFalse(any("idle" in line for lines in posts for line in lines))
+
+    def test_idle_planning_tells_the_owner(self) -> None:
+        posts: list = []
+        self.run_finish(copy.deepcopy(state.DEFAULT), [], posts, TASK_KIND="plan", TASK="Planning",
+                        IMPLEMENT_STATUS="nothing_to_do")
+        self.assertTrue(any("Development is idle" in line for lines in posts for line in lines))
+
+    def test_errors_are_retried_then_raise_an_alarm(self) -> None:
+        st = copy.deepcopy(state.DEFAULT)
+        raised: list = []
+        with mock.patch.object(session.alarms, "raise_alarm",
+                               lambda cfg, st_, name, **k: raised.append(name) or "Alarm raised: #9"):
+            for attempt in range(1, session.MAX_ERRORS_IN_A_ROW + 1):
+                out, st = self.run_finish(st, ["A"], IMPLEMENT_STATUS="error")
+                self.assertEqual(st["errors_in_a_row"], attempt)
+                self.assertEqual(out["again"], "true" if attempt < session.MAX_ERRORS_IN_A_ROW else "false")
+        self.assertEqual(raised, ["stopped"])
+        _, st = self.run_finish(st, ["A", "B"], PR="5", FINAL_REVIEW=self.APPROVE, MERGED="true")
+        self.assertEqual(st["errors_in_a_row"], 0)
 
 
 class PublishTest(unittest.TestCase):

@@ -106,6 +106,7 @@ jobs:
       actions: write # start resume.yml after a usage limit
     outputs:
       develop: ${{ steps.gate.outputs.develop }}
+      mode: ${{ steps.gate.outputs.mode }}
       merge: ${{ steps.gate.outputs.merge }}
       focus: ${{ steps.gate.outputs.focus }}
       settings: ${{ steps.gate.outputs.settings }}
@@ -140,7 +141,7 @@ jobs:
     if: needs.control.outputs.develop == 'true'
     uses: ./.github/workflows/session.yml
     with:
-      mode: develop
+      mode: ${{ needs.control.outputs.mode }}
       focus: ${{ needs.control.outputs.focus }}
       settings: ${{ needs.control.outputs.settings }}
       merge: ${{ needs.control.outputs.merge }}

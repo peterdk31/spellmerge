@@ -40,7 +40,10 @@ Weekly, Claude picks a recently finished feature and re-examines it critically (
 Development keeps going; checks inform rather than block (owner, 2026-10-21).
 
 - **Hard gates are few:** a broken build (it doesn't build, a test or smoke test fails, errors in the log) and the security and copyright rules. Only these stop a release or revert a merge.
-- **Every hard gate notifies the owner** when it trips: the Daily log post or an alarm issue mentions them.
+- **Development itself always flows.** After each session the next one starts at once. An empty queue (the end of a milestone, say) starts a planning session instead of stopping, and a session that ends in an error is retried.
+- **What stops development:** only the owner's switches (kill switch, Control panel pauses, `/pause`, quiet hours), a usage limit (it resumes by itself at the reset), a rejected Claude token, 3 errors in a row, and planning that finds nothing left to do.
+- **Every hard gate and every stop notifies the owner** when it trips: the Daily log post or an alarm issue mentions them. A usage limit is the exception: it resumes by itself and is only logged.
+- **The end of a milestone notifies, never waits:** the planning session writes the next milestone and its first tasks, and opens an owner issue with the checkpoint question and its own assessment. Development continues; the owner redirects with `/claude` or stops it with `/pause`.
 - **Budgets warn:** load time, download size, frame time and the stress benchmark print a warning in the build log, with likely fixes. A warning that repeats becomes a normal task in `NEXT.md`, never a revert.
 - The **stable** channel is the one place a budget still counts: a build is promoted only when it is within budget. Nightly builds always ship.
 
@@ -123,7 +126,7 @@ Runs the hard rules check and the automation's unit tests. There is no build per
 
 ### Weekly planning run (Sundays)
 
-Reviews milestone progress against its done-when criteria, reorders `NEXT.md`, moves community issues between the work queue and the backlog, writes the devlog and the owner's playtest. When a milestone is done, it writes the next milestone's design document, which must pass an independent self-critique review before merging.
+Reviews milestone progress against its done-when criteria, reorders `NEXT.md`, moves community issues between the work queue and the backlog, writes the devlog and the owner's playtest. The same planning session also runs whenever the work queue runs empty (at most every 3 hours). When a milestone is done, it writes the next milestone's design document and first tasks in the same PR, which must pass the independent self-critique review before merging, and development carries on with them.
 
 ### Limits
 
@@ -538,7 +541,7 @@ Every part is verified end to end with dry runs (for example a fake PR that brea
 
 - Possible verdicts: **go** (next milestone), **iterate** (rework the weak parts, at most 2 rounds), or **pivot** (change the core mechanic or cut scope).
 - After 2 failed iteration rounds the answer is a pivot, not a third round of the same thing.
-- Claude prepares each checkpoint as an issue with a build link, its own honest assessment and the questions. If the owner doesn't answer within 7 days, Claude defaults to **iterate** so nothing stalls.
+- Claude prepares each checkpoint as an issue with a build link, its own honest assessment and the questions, and starts the next milestone right away: a checkpoint notifies, it never waits. The owner's answer redirects the work (**iterate** or **pivot** become the next tasks); with no answer, development simply carries on.
 - Content expansion (M6) only starts after C3 says the core is great.
 
 ### Owner's weekly playtest

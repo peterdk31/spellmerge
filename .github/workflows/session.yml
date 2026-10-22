@@ -23,6 +23,9 @@ on:
       mode:
         type: string # develop or plan
         default: develop
+      weekly:
+        type: boolean # the Sunday planning run, which also posts the devlog and the playtest
+        default: false
       focus:
         type: string
         default: ""
@@ -46,7 +49,7 @@ env:
 
 jobs:
   implement:
-    name: ${{ inputs.mode == 'plan' && 'weekly planning' || 'implement the next task' }}
+    name: ${{ inputs.mode == 'plan' && 'planning' || 'implement the next task' }}
     runs-on: ubuntu-latest
     timeout-minutes: 240 # the Claude step stops at 200, so its commits are still packaged and kept
     environment: automation
@@ -91,6 +94,7 @@ jobs:
           GH_TOKEN: ${{ steps.read-token.outputs.token }}
           FOCUS: ${{ inputs.focus }}
           MODE: ${{ inputs.mode }}
+          WEEKLY: ${{ inputs.weekly }}
         run: python3 -m smbot.session prepare --mode "$MODE"
       - id: claude
         continue-on-error: true # the outcome output says how it went; a timeout must not skip the steps after
@@ -510,11 +514,13 @@ jobs:
           CHAIN_STARTED: ${{ inputs.chain_started }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: python3 -m smbot.session finish
-      - name: Devlog, task issues and playtest (weekly planning)
+      - name: Owner issues, queue moves, devlog and playtest (planning)
         if: inputs.mode == 'plan' && needs.implement.outputs.result != ''
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           DISCUSSIONS_TOKEN: ${{ github.token }}
+          WEEKLY: ${{ inputs.weekly }}
+          MERGED: ${{ needs.merge.outputs.merged }}
           PLAN: ${{ needs.implement.outputs.result }}
         run: python3 -m smbot.weekly publish-plan
       - name: Start the next session

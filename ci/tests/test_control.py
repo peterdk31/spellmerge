@@ -147,9 +147,19 @@ class DecideTest(unittest.TestCase):
         self.assertFalse(control.in_quiet_hours((15, 17), NOW, "Europe/Copenhagen"))
         self.assertTrue(control.in_quiet_hours((22, 15), NOW, "Europe/Copenhagen"))  # wraps midnight
 
-    def test_no_task(self) -> None:
-        d = control.decide(True, self.ok_panel(), copy.deepcopy(state.DEFAULT), NOW, "UTC", False)
+    def test_an_empty_queue_plans_instead_of_stopping(self) -> None:
+        st = copy.deepcopy(state.DEFAULT)
+        d = control.decide(True, self.ok_panel(), st, NOW, "UTC", False)
+        self.assertEqual((d.develop, d.mode), (True, "plan"))
+        self.assertEqual(control.decide(True, self.ok_panel(), st, NOW, "UTC", True).mode, "develop")
+
+    def test_planning_on_an_empty_queue_waits_for_its_cooldown(self) -> None:
+        st = copy.deepcopy(state.DEFAULT)
+        st["last_plan"] = pacing.iso(NOW - dt.timedelta(hours=1))
+        d = control.decide(True, self.ok_panel(), st, NOW, "UTC", False)
         self.assertFalse(d.develop)
+        st["last_plan"] = pacing.iso(NOW - control.PLAN_COOLDOWN)
+        self.assertEqual(control.decide(True, self.ok_panel(), st, NOW, "UTC", False).mode, "plan")
 
 
 class CommandsTest(unittest.TestCase):

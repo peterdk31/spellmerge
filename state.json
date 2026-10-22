@@ -6,8 +6,12 @@
   "backoff_until": "2026-10-22T00:20:00Z",
   "checkpoint_answers": {},
   "cla_signatures": {},
-  "daily_log": null,
+  "daily_log": {
+    "date": "2026-10-22",
+    "number": 175
+  },
   "errors_in_a_row": 0,
+  "idle": null,
   "intake_tasks": {},
   "last_own_merge": "2026-10-22T16:06:55Z",
   "last_plan": null,

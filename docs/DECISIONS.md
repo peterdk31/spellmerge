@@ -2,6 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-22: A second round of art direction samples, and a second owner question
+
+- **Why.** The owner answered #190 (key `art-direction-pick`) with a lean towards A, a liking for C's robe, and a request for more options, a new style included. That is not a pick, so the task "record the chosen art direction" cannot be done yet and the first question is answered, not repeated.
+- **What.** D (A with C's robe) is the owner's own hint made real. E (soft, no black outline) and F (big hat, plain beveled floor) are the new styles: one changes the outline rule, the other the silhouette. Both are checked against pillar 4 (readable chaos): F is the strongest silhouette, E the weakest contrast.
+- **E breaks the outline rule on purpose** and says so in the README; the sample-icon test takes its outline colour per sample so the closed-outline rule still holds.
+- **New key.** The pick is asked again as `art-direction-pick-2` because the options are new; the task stays under "Blocked" in `docs/NEXT.md` with that key. Nothing is recorded in `golden.json` or `STYLE.md` until the answer.
+
 ## 2026-10-22: Art direction samples live in `art/samples/`
 
 - **Three options, one of them the status quo.** A (chunky) and C (grim) are new; B is the current placeholder files, so "keep and polish" is a real choice. All use the existing palette: the choice is about proportions, shading and mood, not colour.

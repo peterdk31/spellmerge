@@ -539,6 +539,69 @@
       "tier": "placeholder",
       "tool": "Claude (hand-written SVG rects)",
       "prompt": "Style sample C (grim): a 16x16 fire spell icon, a narrow two-tipped flame with a dark skull-like face in its Spark core, Fire shades and a 1 px outline. Only non-overlapping rect elements, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/samples/d_hood/wizard.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "Style sample D (chunky hood): a 32x32 wizard with style A's big face and bell proportions but in a pointed hooded robe in the Player 1 ramp, a Bone beard in the hood opening, a Spark belt and a staff with a Spark gem. 1 px outline, light from the top-left, only non-overlapping rect elements, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/samples/e_soft/wizard.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "Style sample E (soft): a 32x32 wizard with a wide-brimmed pointed hat, a round robe and a Bone beard in the Player 1 ramp, with no black outline: each part is outlined in its own shadow shade. Only non-overlapping rect elements, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/samples/e_soft/crypt_floor.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "Style sample E (soft): a seamless 32x32 crypt floor, a calm checkerboard of 8x8 squares in two Stone shades. Only non-overlapping rect elements, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/samples/e_soft/spell_icon.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "Style sample E (soft): a 16x16 fire spell icon, a tall teardrop flame in Fire and Spark shades with no black outline (the outline is Fire's dark shade). Only non-overlapping rect elements, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/samples/f_bighat/wizard.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "Style sample F (big hat): a 32x32 wizard whose tall pointed hat is as big as the body, with a Spark hat band, two pale eyes in the shadow under the brim, a small Player 1 robe and a staff with a Spark gem. 1 px outline, light from the top-left, only non-overlapping rect elements, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/samples/f_bighat/crypt_floor.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "Style sample F (big hat): a seamless 32x32 crypt floor of four large 16x16 beveled tiles, a light edge on the top and left and a dark one on the bottom and right. Only non-overlapping rect elements, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/samples/f_bighat/spell_icon.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "Style sample F (big hat): a 16x16 fire spell icon, a tall teardrop flame with a Spark core, Fire shades and a 1 px outline. Only non-overlapping rect elements, palette colours from docs/STYLE.md."
     }
   ]
 }

@@ -12,9 +12,11 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
 ## Blocked
 
 - [ ] **Record the chosen art direction (M2 part 27 follow-up).** Replace the golden example candidates in `art/kit/golden.json` and `docs/STYLE.md` with the chosen style's files, and say in `docs/STYLE.md` that the style is no longer provisional. Redrawing the placeholders in that style is spread over later milestones (M2 design, "Art and the art direction"), one area at a time.
-  - **Waits on:** owner question #190 (key `art-direction-pick`) (the owner picks A, B or C and locks it in `docs/DESIGN.md`).
+  - **Waits on:** the owner question with key `art-direction-pick-2` (the owner picks from A to F and locks it in `docs/DESIGN.md`; round one, #190, was answered with "more options").
 
 ## Done recently
+
+- [x] **More art direction options (M2 part 27, round two).** The owner's answer on #190 ("heading towards option 1, also like nr. 3's robe; give me more options, a completely new style is fine") is done: D (A's proportions with C's hooded robe), E (soft, no black outline) and F (big hat, beveled tiles) are in `art/samples/`, each with a wizard; E and F also have a floor and an icon (D reuses A's). `tests/screenshots/shot_art_direction_2.gd` makes `art_direction_sheet_2.png`; `art/samples/README.md` compares them. The pick is asked again as owner question `art-direction-pick-2`. The test for sample icons now expects four, and E's is checked against its own outline colour.
 
 - [x] **Art direction choice (M2 part 27).** Three style samples (A Chunky, B Current, C Grim), each a wizard, a crypt floor and a fire icon, are in `art/samples/` (B is the existing placeholder files); `tests/screenshots/shot_art_direction.gd` puts them side by side in `art_direction_sheet.png`, and `art/samples/README.md` compares them. The owner is asked to pick one, optionally after asking players in Discussions, and to lock it in `docs/DESIGN.md` (owner question #190, key `art-direction-pick`, open and not yet answered). Nothing in the game uses the samples.
 

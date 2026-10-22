@@ -11,9 +11,8 @@
     "number": 202
   },
   "errors_in_a_row": 0,
-  "idle": null,
   "intake_tasks": {},
-  "last_own_merge": "2026-10-22T21:56:17Z",
+  "last_own_merge": "2026-10-22T22:28:30Z",
   "last_plan": "2026-10-22T21:56:17Z",
   "last_weekly": "2026-10-22T13:49:44Z",
   "panel_applied": {
@@ -73,11 +72,6 @@
       "count": 0,
       "parked_reason": "I found no known crash or blocker to fix, so I made no changes and no commits. `ci/build/build.sh --quick --tests` passes. That covers the import, the smoke test, every unit test, the 300-recipe spell fuzz, the stress run and the 4-bot run. In the 4-bot run, all 4 bots cleared the room, bots 1-3 built spells, bot 4 stayed in its builder, and no errors were logged. The only warning in the output is the expected \"--four-bot needs a build that includes tests/\" line from the main-menu test. The only",
       "parked_until": "2026-10-23T18:42:47Z"
-    },
-    "**Upload only the used slice of each multimesh buffer (M2 part 25 follow-up, split out of the WASM task).** (`core/projectiles/`, `tests/`) Bolt, rune and orbit batches each hand over the whole cap x 16 floats every frame (up to 192 KB per batch at 3,000). Upload only the used part (or size the rune and orbit batches smaller), with a test that the drawn count and the visible shots are unchanged at 0, 1 and the cap. Needs no web numbers: it is cheaper either way.": {
-      "count": 1,
-      "pr": "199",
-      "problems": "- `_test_every_batch_is_sized_to_its_own_shots` and `_test_batch_room_grows_and_shrinks_with_hysteresis` are defined but never called from `_initialize()`. Only `_test_batches_upload_only_the_used_slice` is added to the list. The PR description says these tests passed, but they never ran. The mixed-batch sizing, the per-batch positions and the grow/shrink thresholds therefore have no coverage. Fix: Add both calls next to `_test_batches_upload_only_the_used_slice()` in `_initialize()`. Then run `ci/build/build.sh --quick --tests` to confirm they pass. Fix any expectations that turn out wrong, such as the room sizes or the orbit positions.\n- `_count_batches()` allocates a new `PackedInt32Array` every frame. AGENTS.md says no per-frame allocations. It also adds a second pass over all live slots in `update_draw`. Fix: Keep a member `_batch_counts: PackedInt32Array` of size 4. Zero it with `fill(0)` and refill it each frame. The count could also be folded into the existing slot loops.\n- The LOG and NEXT entries say the test checks 0, 1 and the cap, and the PR description names the two uncalled tests. The shipped coverage is smaller than documented. Fix: After the unused tests are wired in, make sure the LOG and NEXT wording matches the tests that actually run."
     }
   },
   "usage": [

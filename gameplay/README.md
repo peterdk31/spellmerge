@@ -29,7 +29,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `spell_changed`, `build_refused` | `player` | none yet (`hud`, M2 part 16) |
 | `reaction_triggered` | `combat` | none yet (`feel`, M2 part 8) |
 | `damage_dealt` | `combat` | `feel`, `player` |
-| `status_applied` | `combat` | none yet |
+| `status_applied` | `combat` | none yet (`feel` from M2 part 8) |
 | `enemy_died` | `combat` | `feel`, `flow` |
 | `player_downed` | `player` | `ai`, `feel`, `flow`, `run` |
 | `player_revived` | `player` | none yet |

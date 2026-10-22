@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue.
 
+## 2026-10-22
+
+- M2 part 7: the four elements and statuses. Fire, frost, storm and void in `content/spells/elements/` (`.tres`, placeholder icons, tints from the palette). `Combat` now keeps burn, chill/freeze, shock and hex per enemy and reads `Spells.hit_profile` (M1's table stays for enemy shots); `status_applied` has its sender; the imp respects slow and freeze through `Combat.speed_factor`. Tests in `test_combat_statuses.gd`, `test_ai_statuses.gd`, `test_elements.gd`; `build.sh --quick --tests` passes. `tools/check.sh` lists only the session home directory's own files (as before).
+
 ## 2026-10-21
 
 - M2 part 6: casting and triggers. `Spells.install`/`cast`/`step`/`hit_profile`: cooldowns per player and slot, fan, ring, orbit, still and beam shots, held spells on hit, expire and timer (fire cap 32 per player per step, `max_fires` per shot, source excluded for 0.1 s), chain on hit (at most 16 jumps per player per step, counted in `chains_dropped`; a chained beam pierces nothing; the nearest target is picked on the manager's hit circles), every shot counted so a rebuild mid-flight keeps old numbers and a full ring removes the revoked shots. `Projectiles` gained `remove_by_tag`, `shot_ended`, `event_slot`, `exclude` and readers. Tests in `test_spells_cast.gd` and `test_projectiles_ends.gd`; `build.sh --quick --tests` passes. Review fixes: a chained beam's jumps are queued and cast after the outer `ray()` returns (the manager nests only 4 deep, a chain can have 6 jumps); a beam whose `ray()` did nothing fires no on-expire spell; removed the unused `get_target_point`. `tools/check.sh` lists only the session home directory's own files (`.idea`, `.vscode`, `scripts`: unreadable and untracked), nothing in the change. `test_wave_balance` flaked once and was not run on main, so it is not confirmed as pre-existing (it is timing-dependent, see BACKLOG); it passed in the last full run.

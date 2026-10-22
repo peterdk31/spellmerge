@@ -287,6 +287,42 @@
       "tier": "placeholder",
       "tool": "Claude (hand-written SVG rects)",
       "prompt": "The same dash strip as wizard_p1_dash.svg with the robe and hat recoloured to the Player 4 (purple) ramp. Only rect elements, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "content/spells/elements/fire/icon.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 16x16 icon of a flame for the Fire element: a Fire base body with Fire light inside and a Spark light core, a 1 px outline, light from the top-left. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "content/spells/elements/frost/icon.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 16x16 icon of an ice crystal (a pointed diamond) for the Frost element: Player 1 light blue body with a Bone light core line, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "content/spells/elements/storm/icon.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 16x16 icon of a zigzag lightning bolt for the Storm element: Spark base with Spark light on its left edge, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "content/spells/elements/void/icon.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 16x16 icon of a dark hole in a purple ring for the Void element: Player 4 light and dark purple ring, an outlined black centre and a Bone light glint, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
     }
   ]
 }

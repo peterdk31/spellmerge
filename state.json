@@ -7,6 +7,7 @@
   "checkpoint_answers": {},
   "cla_signatures": {},
   "errors_in_a_row": 0,
+  "idle": null,
   "intake_tasks": {},
   "last_own_merge": "2026-10-22T13:33:06Z",
   "last_plan": null,
@@ -2137,6 +2138,11 @@
       "at": "2026-10-22T14:41:38Z",
       "kind": "review",
       "tokens": 125625
+    },
+    {
+      "at": "2026-10-22T14:54:15Z",
+      "kind": "dev",
+      "tokens": 127164
     }
   ],
   "version": 1

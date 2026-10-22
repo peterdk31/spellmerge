@@ -7,9 +7,8 @@
   "checkpoint_answers": {},
   "cla_signatures": {},
   "errors_in_a_row": 0,
-  "idle": null,
   "intake_tasks": {},
-  "last_own_merge": "2026-10-22T15:18:25Z",
+  "last_own_merge": "2026-10-22T15:37:17Z",
   "last_plan": null,
   "last_weekly": "2026-10-22T13:49:44Z",
   "panel_applied": {
@@ -41,13 +40,7 @@
     6316162579,
     6334365507
   ],
-  "task_failures": {
-    "**Stress in the exports and the limits (M2 part 25).** (`tests/benchmark`, `core/spells/limits.gd`) The stress run and M1's WASM projectile timing runner in the Linux Test and Web Test exports (a node the main menu adds on `--stress` or `--projectile-timing`, like the 4-bot runner); the limits confirmed or lowered from the numbers; the `ci/` gate asked as an owner issue.": {
-      "count": 1,
-      "pr": "165",
-      "problems": "- The PR description says the build was not verified. The extended main-menu test, the moved timing runner (now a Node started from `test_projectile_timing.gd`) and the new `.uid` files have never been run. The `--projectile-timing` path prints `TIMING OK` only from a runner that has not been executed since the move. Fix: Run `ci/build/build.sh --quick --tests` and `tools/check.sh` on the final commit and confirm they pass. If possible, run the `Linux Test` export with `-- --stress` and `-- --projectile-timing` once. Update the PR text with the real results.\n- The comment cites owner issue #166 as the place where the `ci/` step is asked. I could not confirm that issue exists or says what the comment claims. Fix: Confirm #166 is the right issue, or name the issue in `docs/NEXT.md` or `docs/BACKLOG.md` instead of a number in a code comment."
-    }
-  },
+  "task_failures": {},
   "usage": [
     {
       "at": "2026-10-16T17:33:54Z",

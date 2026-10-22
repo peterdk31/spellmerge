@@ -1,0 +1,113 @@
+# Web preview of main between daily runs.
+#
+# After each merge to main (about hourly, as the develop sessions merge), the same build and
+# smoke tests as the daily run, then the web build goes to Pages at /preview/. No release,
+# no itch.io, no AI and no secrets. /nightly/ and /play/ stay the daily releases
+# (smbot.site --preview). A newer merge cancels a build still running, so a burst of merges
+# builds once.
+name: preview
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PYTHONPATH: ci
+
+jobs:
+  build:
+    name: build and smoke test
+    if: github.ref == 'refs/heads/main' && vars.AUTOMATION_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    concurrency:
+      group: preview-build
+      cancel-in-progress: true
+    outputs:
+      version: ${{ steps.plan.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Name the preview (v0.YYYYMMDD.HHMM, UTC)
+        id: plan
+        run: echo "version=v0.$(date -u +%Y%m%d.%H%M)" >> "$GITHUB_OUTPUT"
+      - name: Cache Godot (hash-checked again after restore)
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/spellmerge-godot
+          key: godot-${{ hashFiles('ci/build/godot.env') }}
+      - name: Virtual display for the screenshots
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq xvfb
+      - name: Build, unit tests, screenshots, smoke test and package
+        env:
+          VERSION: ${{ steps.plan.outputs.version }}
+        run: ci/build/build.sh --version "$VERSION" --channel preview --commit "$(git rev-parse HEAD)"
+      - name: Keep the build logs
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: build-logs
+          path: build/logs
+          retention-days: 1
+      - name: Keep the screenshots
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: screenshots
+          path: build/screenshots
+          if-no-files-found: ignore
+          retention-days: 1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: web
+          path: dist/spellmerge-web-${{ steps.plan.outputs.version }}.zip
+          retention-days: 1
+          if-no-files-found: error
+
+  pages:
+    name: deploy the preview to Pages
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Shared with daily.yml's Pages job, so two deploys never overlap.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    permissions:
+      contents: read # the releases for /nightly/ and /play/
+      issues: read # Contribute page: wanted-now counts
+      pull-requests: read # Contribute page: recently merged
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: web
+          path: dist
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        continue-on-error: true # no gallery without screenshots
+        with:
+          name: screenshots
+          path: screenshots
+      - name: Assemble the site
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.build.outputs.version }}
+        run: python3 -m smbot.site --version "$VERSION" --preview --out site --screenshots screenshots
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: site
+          retention-days: 1
+      - id: deploy
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

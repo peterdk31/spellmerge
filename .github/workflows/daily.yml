@@ -483,6 +483,10 @@ jobs:
     if: always() && needs.release.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # Shared with preview.yml's Pages job, so two deploys never overlap.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
     permissions:
       contents: read
       issues: read # Contribute page: wanted-now counts

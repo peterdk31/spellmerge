@@ -922,3 +922,8 @@ The HUD screenshot cannot be taken in a session (no display, `docs/BACKLOG.md`),
 - **`Spells.builder_view` gives plain values.** `test_spell_field_reads.gd` forbids the HUD reading a `CompiledSpell`; the view returns a Dictionary (complexity of the whole spell, numbers and shot pattern of the spell at the shown level), so the compiler can change without touching the HUD. It compiles the recipe on each render (on events and key presses, never per frame).
 - **The refusal reason is text and lasts until the next try.** It comes from `build_refused` for the owner only and clears on the next request, the next successful change or the next opening. It shares one text line with the component description; the reason wins while it is set.
 - **Descriptions are empty until part 23:** `Spells.component_description(id)` returns "" for now; part 23 reads Story there.
+
+## Owner: a web preview after each merge
+
+- **`preview.yml` builds main after each merge and puts the web build at `/preview/`.** The owner wanted to see progress more often than once a day. Sessions merge about hourly, so that is about one preview an hour, and only when something changed; a newer merge cancels a build still running. It runs the same `build.sh` as the daily run (tests and smoke tests included, about 4 minutes), with no release, no itch.io, no AI and no secrets. Public-repo Actions minutes cost nothing.
+- **`/nightly/` and `/play/` stay the daily releases.** Pages replaces the whole site on each deploy, so the preview rebuilds it (`smbot.site --preview`): `/nightly/` from the newest release, `/play/` from the latest stable one. The daily run puts its build at `/preview/` too, and both Pages jobs share one concurrency group so deploys never overlap.

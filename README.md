@@ -4,7 +4,7 @@
 
 A 2D top-down roguelite about building deep, combinable spells, for 1–4 local co-op players. Assemble spells from a form, an element, modifiers and triggers (a trigger holds another spell), find relics that bend the rules, and fight through rooms with up to three friends on one screen, with nobody ever waiting for anybody.
 
-**Play:** [in the browser](https://peterdk31.github.io/spellmerge/play/) · [today's nightly](https://peterdk31.github.io/spellmerge/nightly/) · [Windows and Linux downloads](https://github.com/peterdk31/spellmerge/releases)
+**Play:** [in the browser](https://peterdk31.github.io/spellmerge/play/) · [today's nightly](https://peterdk31.github.io/spellmerge/nightly/) · [latest preview](https://peterdk31.github.io/spellmerge/preview/) (rebuilt after each merge) · [Windows and Linux downloads](https://github.com/peterdk31/spellmerge/releases)
 
 **Status:** milestone M2, the spell system. The infrastructure (M0) and the core loop prototype (M1) are in place; spell components, the spell builder and the spell limits are being built. See the [roadmap](docs/ROADMAP.md).
 

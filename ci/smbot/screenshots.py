@@ -9,8 +9,11 @@ scripts run, on the PR's commit (after/) and on main (before/), with
 `ci/build/build.sh --quick --screenshots` in a job with no secrets; shots.txt in each folder
 says which script made which PNG. The comment shows each shot before and after, a new shot
 alone, and leaves out shots that came out identical. With no scripts named, nothing is posted.
-The session's Daily log post repeats the comment (`for_log`), since bot PRs merge on their own,
-and so does each open owner question the PR's session raised (smbot.inbox.asked_in).
+The session's Daily log post repeats the comment (`for_log`), since bot PRs merge on their own.
+
+An owner question can name shot scripts too (`screenshots` in the question): they run on the
+same commit, and the question shows them in its own body (`for_question`, called by smbot.inbox),
+since the owner reads it after the PR has merged. A question that names none shows the PR's.
 
 The files are only data here: each must be a PNG under the size limit with a plain name, or
 it is left out. The images live on an orphan branch so the PR comment can show them (the
@@ -32,7 +35,7 @@ import tempfile
 from pathlib import Path
 
 from . import config as config_mod
-from . import gh, inbox
+from . import gh
 
 BRANCH = "screenshots"
 NAME = re.compile(r"^[a-z0-9_]{1,60}\.png$")
@@ -88,12 +91,20 @@ SCRIPT = re.compile(r"^shot_[a-z0-9_]{1,60}$")
 MAX_CAPTION = 300
 
 
+MAX_QUESTION_SCRIPTS = 3
+
+
 def chosen(folder: Path) -> list[dict[str, str]]:
     """The session's chosen scripts and captions (list.json), checked: names and lengths only."""
     try:
         data = json.loads((folder / "list.json").read_text())
     except (OSError, ValueError):
         return []
+    return checked(data)[:6]
+
+
+def checked(data: object) -> list[dict[str, str]]:
+    """Scripts and captions as a session gave them, checked: names and lengths only."""
     out, seen = [], set()
     for entry in data if isinstance(data, list) else []:
         script = entry.get("script") if isinstance(entry, dict) else None
@@ -101,7 +112,7 @@ def chosen(folder: Path) -> list[dict[str, str]]:
             seen.add(script)
             caption = re.sub(r"@(?=[\w-])", "@\u200b", str(entry.get("caption", "")))[:MAX_CAPTION]
             out.append({"script": script, "caption": " ".join(caption.split())})
-    return out[:6]
+    return out
 
 
 def made_by(folder: Path) -> dict[str, list[str]]:
@@ -170,14 +181,30 @@ def post(cfg: config_mod.Config, token: str, pr: int, sha: str, folder: Path) ->
     body = comment(cfg, commit, prefix, shown, sha)
     gh.api(f"repos/{cfg.repo}/issues/{pr}/comments", "-X", "POST", input={"body": body})
     print(f"posted {len(shown)} screenshot(s) on #{pr}")
-    # The owner reads a question after its PR has merged, so the question shows the shots too.
-    try:
-        for number in inbox.asked_in(cfg, pr):
-            gh.api(f"repos/{cfg.repo}/issues/{number}/comments", "-X", "POST",
-                   input={"body": body.replace(HEADING, f"**What #{pr} changes on screen**", 1)})
-            print(f"copied them to question #{number}")
-    except gh.GhError as e:
-        print(f"couldn't copy the screenshots to the questions of #{pr}: {e}")
+
+
+def for_question(cfg: config_mod.Config, token: str, question: dict, folder: Path, sha: str,
+                 remote: str = "") -> str:
+    """The shots an owner question names (its `screenshots`), as markdown for its body; "" when there are none.
+
+    They were taken on `sha` (after/ in the screenshots artifact); they're pushed under
+    questions/<sha7>/ so the question can show them.
+    """
+    made = made_by(folder / "after")
+    shown = [(entry["caption"], name) for entry in checked(question.get("screenshots"))[:MAX_QUESTION_SCRIPTS]
+             for name in made.get(entry["script"], [])][:MAX_SHOTS]
+    if not shown:
+        return ""
+    prefix = f"questions/{sha[:7]}"
+    commit = push(cfg, token, [folder / "after" / name for _, name in shown], prefix, remote)
+    base = f"https://raw.githubusercontent.com/{cfg.repo}/{commit}/{prefix}"
+    parts, caption = [], None
+    for text, name in shown:
+        if text != caption:
+            parts += [f"**{html.escape(text, quote=False) or title(Path(name))}**", ""]
+            caption = text
+        parts += [f"![{title(Path(name))}]({base}/{name})", ""]
+    return "\n".join(parts).strip()
 
 
 def gallery(folder: Path, out: Path, version: str) -> bool:

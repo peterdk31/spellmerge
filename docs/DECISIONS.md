@@ -2,6 +2,12 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-22: Owner questions carry their own screenshots, in the question
+
+- **Why.** The owner reads a question after its PR has merged. Copying the PR's before/after comment onto the question afterwards put the pictures in a later comment, missing from the notification, and they showed what the PR changed rather than what the question asks.
+- **What.** A question can name up to three shot scripts (`screenshots` in `owner_questions`), staged to show exactly what is being decided. They run in the screenshots job with the PR's, on the same commit (on `main` when there is no PR), and appear under "What it looks like", right after the question. A question that names none shows the PR's screenshots instead.
+- **Order.** Questions are asked by a new `ask` job after the screenshots are posted, not when the PR opens, so the issue is created with its pictures. The revision is told the first session's questions, since they aren't issues yet, so it doesn't ask them twice; `finish` waits for `ask`, so the next session sees them.
+
 ## 2026-10-22: A second round of art direction samples, and a second owner question
 
 - **Why.** The owner answered #190 (key `art-direction-pick`) with a lean towards A, a liking for C's robe, and a request for more options, a new style included. That is not a pick, so the task "record the chosen art direction" cannot be done yet and the first question is answered, not repeated.

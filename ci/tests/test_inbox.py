@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import datetime as dt
+import tempfile
 import unittest
+from pathlib import Path
 from unittest import mock
 
 from smbot import config, inbox
@@ -27,19 +29,50 @@ class InboxTest(unittest.TestCase):
     def test_a_question_names_the_pr_it_was_raised_in(self) -> None:
         body = inbox.render(CFG, Q, "the session working on \"X\"", pr=12)
         self.assertIn("Raised by the session working on \"X\", in PR #12.", body)
-        self.assertIn("<!-- smbot:question pr=12 -->", body)
         self.assertIn("<!-- smbot:question key= -->", body)
         body = inbox.render(CFG, Q, "the revision of PR #12", pr=12)
         self.assertIn("Raised by the revision of PR #12.", body)
-        self.assertNotIn("smbot:question pr=", inbox.render(CFG, Q, "a session"))
 
-    def test_asked_in_finds_the_open_questions_of_a_pr(self) -> None:
-        issues = [{"number": 1, "body": inbox.render(CFG, Q, "s", pr=12)},
-                  {"number": 2, "body": inbox.render(CFG, Q, "s", pr=120)},
-                  {"number": 3, "body": inbox.render(CFG, Q, "s")}, {"number": 4, "body": None}]
-        with mock.patch.object(inbox.gh, "api", lambda path: issues):
-            self.assertEqual(inbox.asked_in(CFG, 12), [1])
-            self.assertEqual(inbox.key_of(issues[0]), "")
+    def test_the_pictures_come_right_after_the_question(self) -> None:
+        body = inbox.render(CFG, Q, "s", pictures="**Samples**\n\n![A](https://x/a.png)")
+        self.assertLess(body.index("## Question"), body.index("## What it looks like"))
+        self.assertLess(body.index("![A](https://x/a.png)"), body.index("## Options"))
+        self.assertNotIn("## What it looks like", inbox.render(CFG, Q, "s"))
+
+    def test_a_new_question_is_asked_with_its_pictures_and_without_them_if_they_fail(self) -> None:
+        """The owner reads a question after its PR merged: it must show what it's about itself."""
+        bodies: list = []
+
+        def api(path: str, *args: str, input: dict | None = None, token: object = None) -> object:
+            if "issues?state=" in path:
+                return [{"number": 7, "title": "Allow X?", "state": "open", "body": ""}]
+            bodies.append(input["body"])
+            return {"number": 8}
+
+        asked: list = []
+
+        def pictures(q: dict) -> str:
+            asked.append(q["title"])
+            if q["title"] == "Pick Z?":
+                raise inbox.gh.GhError("push refused")
+            return "![shot](https://x/s.png)"
+
+        with mock.patch.object(inbox.gh, "api", api):
+            inbox.ask(CFG, [Q, {**Q, "title": "Pick Y?"}, {**Q, "title": "Pick Z?"}], pictures=pictures)
+        self.assertEqual(asked, ["Pick Y?", "Pick Z?"])  # not for a question that isn't asked again
+        self.assertIn("![shot](https://x/s.png)", bodies[0])
+        self.assertNotIn("## What it looks like", bodies[1])
+
+    def test_pictures_are_the_questions_own_shots_or_else_the_prs(self) -> None:
+        with mock.patch.object(inbox.screenshots, "for_question", return_value="own") as own, \
+                mock.patch.object(inbox.screenshots, "for_log", return_value="the PR's") as pr_shots, \
+                tempfile.TemporaryDirectory() as tmp:
+            self.assertEqual(inbox.pictures_for(CFG, "t", Path(tmp), "abc1234", 7)(Q), "own")
+            own.return_value = ""
+            self.assertEqual(inbox.pictures_for(CFG, "t", Path(tmp), "abc1234", 7)(Q), "the PR's")
+            self.assertEqual(inbox.pictures_for(CFG, "t", None, "", None)(Q), "")
+        self.assertEqual(own.call_count, 2)  # not without a folder of shots
+        pr_shots.assert_called_once_with(CFG, 7)
 
     def test_ask_skips_questions_already_open(self) -> None:
         calls = []

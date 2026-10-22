@@ -404,13 +404,20 @@ def review_prompt(cfg: config_mod.Config, pr: int, sha: str, round_: str) -> str
     })
 
 
-def revise_prompt(cfg: config_mod.Config, pr: int, review: dict[str, Any], branch: str = "", synced: str = "") -> str:
+def raised(first: dict[str, Any]) -> str:
+    """The first session's owner questions, which are only asked after the revision (with their screenshots)."""
+    questions = [q for q in first.get("owner_questions") or [] if isinstance(q, dict) and q.get("title")]
+    return "\n".join(f"- {q['title']} (key `{q.get('key', '')}`)" for q in questions) or "(none)"
+
+
+def revise_prompt(cfg: config_mod.Config, pr: int, review: dict[str, Any], branch: str = "", synced: str = "",
+                  first: dict[str, Any] | None = None) -> str:
     problems = "\n".join(
         f"- [{p.get('severity')}] {p.get('file', '')}{':' + str(p['line']) if p.get('line') else ''}: "
         f"{p.get('problem')} Fix: {p.get('fix')}" for p in review.get("problems", [])) or "(no specific problems)"
     return render((MAINTAINER / "revise.md").read_text(), {
         "PR": str(pr), "REPO": cfg.repo, "SUMMARY": review.get("summary", ""), "PROBLEMS": problems,
-        "BRANCH": branch or "the PR's head branch",
+        "RAISED": raised(first or {}), "BRANCH": branch or "the PR's head branch",
         "SYNC": synced or (f"Switch to it with `git fetch origin {branch} && git switch {branch}`. If GitHub reports "
                            "the PR as conflicting, or `main` has moved on, run `git fetch origin main && git merge "
                            "origin/main` and resolve the conflicts (never rebase: the PR's history must stay)."),
@@ -939,7 +946,12 @@ def main(argv: list[str] | None = None) -> int:
         write_outputs({"prompt": review_prompt(cfg, args.pr, args.sha, args.round_)})
     elif args.cmd == "revise-prompt":
         review = json.loads(os.environ.get("REVIEW") or "{}")
-        write_outputs({"prompt": revise_prompt(cfg, args.pr, review, args.branch, sync_with_main(args.branch)),
+        try:
+            first = json.loads(os.environ.get("FIRST") or "{}")
+        except ValueError:
+            first = {}
+        write_outputs({"prompt": revise_prompt(cfg, args.pr, review, args.branch, sync_with_main(args.branch),
+                                               first if isinstance(first, dict) else {}),
                        "needed": str(bool(review.get("problems")) or review.get("verdict") != "approve").lower()})
     elif args.cmd == "open-pr":
         write_outputs(open_pr(cfg, args.branch))

@@ -110,7 +110,7 @@ var _info: PanelContainer = null
 var _complexity_label: Label = null
 var _complexity_bar: ProgressBar = null
 var _stats: Label = null
-var _preview: Control = null
+var _preview: SpellPreviewScript = null
 var _note: Label = null
 var _rows: Array[Button] = []
 ## The component id each shown bag row asks for, in row order (`NO_COMPONENT` is "None").
@@ -321,7 +321,7 @@ func refusal_reason() -> String:
 
 
 func preview_pattern() -> String:
-	return _preview.call("pattern")
+	return _preview.pattern()
 
 
 func info_panel() -> PanelContainer:
@@ -394,7 +394,7 @@ func _render_info() -> void:
 	var complexity: int = int(view.get("complexity", 0))
 	_complexity_label.text = "Complexity %d/%d" % [complexity, SpellLimits.MAX_COMPLEXITY]
 	_complexity_bar.value = float(complexity)
-	_preview.call("show_view", view)
+	_preview.show_view(view)
 	if not bool(view.get("shown", false)):
 		_stats.text = NO_STATS_TEXT
 	else:

@@ -36,9 +36,20 @@ func pattern() -> String:
 	return String(_pattern) if _pattern != &"" else "none"
 
 
+## How many shots are kept after `show_view` (at most MAX_DRAWN), for tests.
+func shots() -> int:
+	return _shots
+
+
+## How many dots fit round a circle of this radius without running into a blob.
+func drawn_limit(radius: float) -> int:
+	return maxi(int(TAU * radius / (SHOT_RADIUS * 2.0 + 1.0)), 1)
+
+
 func _draw() -> void:
 	var middle: float = size.y * 0.5
-	var origin := Vector2(MARGIN, middle)
+	var centred: bool = _pattern == &"ring" or _pattern == &"orbit"
+	var origin := Vector2(size.x * 0.5 if centred else MARGIN, middle)
 	var reach: float = maxf(size.x - MARGIN * 2.0, 1.0)
 	match _pattern:
 		&"fan", &"ring":
@@ -50,11 +61,11 @@ func _draw() -> void:
 				draw_line(origin + Vector2(at, -3.0), origin + Vector2(at, 3.0), WIZARD, 1.0)
 		&"orbit":
 			var ring: float = minf(middle - 2.0, reach * 0.5)
-			var centre: Vector2 = origin + Vector2(ring + 8.0, 0.0)
-			draw_arc(centre, ring, 0.0, TAU, 24, _tint, 1.0)
-			for shot in _shots:
-				var angle: float = TAU * float(shot) / float(_shots)
-				draw_circle(centre + Vector2.from_angle(angle) * ring, SHOT_RADIUS + 0.5, _tint)
+			var drawn: int = mini(_shots, drawn_limit(ring))
+			draw_arc(origin, ring, 0.0, TAU, 24, _tint, 1.0)
+			for shot in drawn:
+				var angle: float = TAU * float(shot) / float(drawn)
+				draw_circle(origin +Vector2.from_angle(angle) * ring, SHOT_RADIUS + 0.5, _tint)
 		&"rune":
 			var spot: Vector2 = origin + Vector2(reach * 0.5, 0.0)
 			draw_circle(spot, 4.0, _tint)
@@ -68,10 +79,11 @@ func _draw() -> void:
 func _draw_fan(origin: Vector2, reach: float) -> void:
 	var ring: bool = _pattern == &"ring"
 	var length: float = minf(reach, size.y * 0.5 - 2.0) if ring else reach
-	for shot in _shots:
+	var drawn: int = mini(_shots, drawn_limit(length)) if ring else _shots
+	for shot in drawn:
 		var angle: float = 0.0
 		if ring:
-			angle = TAU * float(shot) / float(_shots)
+			angle = TAU * float(shot) / float(drawn)
 		elif _shots > 1:
 			angle = deg_to_rad(_spread) * (float(shot) / float(_shots - 1) - 0.5)
 		var tip: Vector2 = origin + Vector2.from_angle(angle) * length

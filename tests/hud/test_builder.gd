@@ -16,6 +16,7 @@ const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const PlayerScript := preload("res://gameplay/player/player.gd")
 const HudScript := preload("res://hud/panels/panels.gd")
 const BuilderScript := preload("res://hud/builder/builder.gd")
+const PreviewScript := preload("res://hud/builder/spell_preview.gd")
 ## Loaded when needed, not preloaded: this scene is also the "Hud" autoload.
 const HUD_SCENE_PATH: String = "res://hud/panels/panels.tscn"
 
@@ -627,6 +628,21 @@ func test_the_preview_draws_the_pattern_of_the_form() -> void:
 	for form_name: String in expected:
 		_choose(0, BuilderScript.SLOT_FORM, form_name)
 		check_equal(builder.preview_pattern(), expected[form_name], "the preview of %s" % form_name)
+
+
+func test_the_preview_caps_the_drawn_shots() -> void:
+	var preview := PreviewScript.new()
+	var view: Dictionary = {"shown": true, "pattern": "ring", "shots": 99, "spread": 360.0, "tint": Color.RED, "pierce": 0}
+	preview.show_view(view)
+	check_equal(preview.shots(), PreviewScript.MAX_DRAWN, "99 shots are kept at the cap")
+	check_equal(preview.pattern(), "ring", "the pattern is kept")
+	check(preview.drawn_limit(6.0) < PreviewScript.MAX_DRAWN, "a small circle draws fewer dots than the cap")
+	view["shots"] = 0
+	preview.show_view(view)
+	check_equal(preview.shots(), 1, "at least one shot")
+	preview.show_view({})
+	check_equal(preview.pattern(), "none", "no spell draws only the wizard")
+	preview.free()
 
 
 func test_the_description_is_empty_until_the_lore_exists() -> void:

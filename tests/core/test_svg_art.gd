@@ -150,21 +150,29 @@ func test_only_the_hat_has_the_player_colour() -> void:
 		var text: String = FileAccess.get_file_as_string("res://art/samples/%s/body.svg" % body)
 		for colour: String in PLAYER_COLOURS + SAMPLE_PALETTE_COLOURS:
 			check(not text.contains(colour), "%s/body.svg uses the player colour %s" % [body, colour])
-	var ramps: Array[Array] = [
-		["#7fc0f0", "#3b73c9", "#1d3a6b"], ["#f59ab8", "#d9477a", "#7a2347"],
-		["#8fd46a", "#3f8f4f", "#1f4a3a"], ["#c99af0", "#8a4fc4", "#4a2a6b"],
-		["#8ec8ff", "#3b7bf0", "#1b3a8c"], ["#ffa0c0", "#f0457f", "#8c1f48"],
-		["#a6f08a", "#3fc060", "#1d5a2e"], ["#d4a8ff", "#9a55f0", "#4f2090"],
-	]
-	for n in 8:
-		var folder: String = "hats_std" if n < 4 else "hats_vivid"
-		var text: String = FileAccess.get_file_as_string("res://art/samples/%s/hat_p%d.svg" % [folder, n % 4 + 1])
-		for colour: String in ramps[n]:
-			check(text.contains(colour), "%s/hat_p%d.svg is missing %s" % [folder, n % 4 + 1, colour])
-		for other in range(8):
-			if other != n:
-				var other_base: String = ramps[other][1]
-				check(not text.contains(other_base), "%s/hat_p%d.svg uses another player's colour %s" % [folder, n % 4 + 1, other_base])
+	var ramps: Dictionary = {
+		"hats_std": [
+			["#7fc0f0", "#3b73c9", "#1d3a6b"], ["#f59ab8", "#d9477a", "#7a2347"],
+			["#8fd46a", "#3f8f4f", "#1f4a3a"], ["#c99af0", "#8a4fc4", "#4a2a6b"],
+		],
+		"hats_vivid": [
+			["#8ec8ff", "#3b7bf0", "#1b3a8c"], ["#ffa0c0", "#f0457f", "#8c1f48"],
+			["#a6f08a", "#3fc060", "#1d5a2e"], ["#d4a8ff", "#9a55f0", "#4f2090"],
+		],
+	}
+	for folder: String in ["hats_std", "hats_vivid"]:
+		for player in 4:
+			var path: String = "res://art/samples/%s/hat_p%d.svg" % [folder, player + 1]
+			var text: String = FileAccess.get_file_as_string(path)
+			for colour: String in (ramps[folder] as Array)[player]:
+				check(text.contains(colour), "%s is missing %s" % [path, colour])
+			# No light, base or dark colour of any other player's ramp, in either set.
+			for other_folder: String in ramps:
+				for other in 4:
+					if other_folder == folder and other == player:
+						continue
+					for colour: String in (ramps[other_folder] as Array)[other]:
+						check(not text.contains(colour), "%s uses another player's colour %s" % [path, colour])
 
 
 func test_every_svg_is_in_the_manifest() -> void:

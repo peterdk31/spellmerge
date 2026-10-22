@@ -12,6 +12,7 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
 ## Blocked
 
 - [ ] **Record the chosen art direction (M2 part 27 follow-up).** Replace the golden example candidates in `art/kit/golden.json` and `docs/STYLE.md` with the chosen style's files, and say in `docs/STYLE.md` that the style is no longer provisional. Redrawing the placeholders in that style is spread over later milestones (M2 design, "Art and the art direction"), one area at a time.
+  - **Also decide with the pick (G, H or I):** whether the player-coloured hat is a second sprite per wizard frame or a baked sheet per player, and how the four `hat_p1` to `hat_p4` files are loaded by player index (through `core/registry`, never a computed path). Both choices change the animation and player work.
   - **Waits on:** the owner question with key `art-direction-pick-3` (the owner picks from A to I and locks it in `docs/DESIGN.md`; rounds one and two, #190 and #192, were answered with "more options").
 
 ## Done recently

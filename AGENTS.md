@@ -51,8 +51,8 @@ Copyright, in short: only original work or compatible licenses. No ripped game a
 ## Check before you open the PR
 
 ```sh
-tools/check.sh                   # the same hard rules CI runs, on your changes
-ci/build/build.sh --quick        # import and smoke test in Godot (downloads the pinned Godot once)
+tools/check.sh                     # the same hard rules CI runs, on your changes
+ci/build/build.sh --quick --tests  # import, smoke test and every unit test, spell validator included (downloads the pinned Godot once)
 ```
 
 `tools/check.sh` reports every problem as rule, file, line and fix. It needs git and Python 3.10+.

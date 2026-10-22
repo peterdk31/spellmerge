@@ -36,7 +36,7 @@ Regular enemies and their attack patterns. Enemies create the "readable chaos" o
 
 ```sh
 tools/check.sh
-ci/build/build.sh --quick
+ci/build/build.sh --quick --tests
 ```
 
 ## Rating questions

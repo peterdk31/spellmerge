@@ -34,7 +34,7 @@ Arrives with Claude's first content in M3. Do not guess its layout before then.
 
 ```sh
 tools/check.sh
-ci/build/build.sh --quick
+ci/build/build.sh --quick --tests
 ```
 
 ## Rating questions

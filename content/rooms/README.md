@@ -35,7 +35,7 @@ Room templates, one folder per biome. A room is a tile-based arena where a wave 
 
 ```sh
 tools/check.sh
-ci/build/build.sh --quick
+ci/build/build.sh --quick --tests
 ```
 
 ## Rating questions

@@ -59,8 +59,8 @@ Arrives with Claude's first audio in M1; this README is updated then with its pa
 ## Validate
 
 ```sh
-tools/check.sh                   # the hard rules (file types, sizes, licenses), on your changes
-ci/build/build.sh --quick        # import and smoke test in Godot
+tools/check.sh                     # the hard rules (file types, sizes, licenses), on your changes
+ci/build/build.sh --quick --tests  # import, smoke test and every unit test in Godot
 ```
 
 `tools/check.sh` does not yet check that every asset has a manifest entry. Until that validator exists, the reviewer checks it (see the rating questions below), so don't skip the entry.

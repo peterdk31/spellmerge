@@ -38,8 +38,8 @@ Players, bots and the HUD never read a component's fields. They call `Spells` (c
 ## Validate
 
 ```sh
-tools/check.sh                   # hard rules, on your changes (content validators arrive with the base classes)
-ci/build/build.sh --quick        # import and smoke test in Godot
+tools/check.sh                     # hard rules, on your changes
+ci/build/build.sh --quick --tests  # import, smoke test and every unit test, spell validator included
 ```
 
 For a gameplay-visible component, add a short GIF or video to the PR.

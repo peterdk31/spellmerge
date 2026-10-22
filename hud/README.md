@@ -42,7 +42,7 @@ Everything the players see and click: panels, the spell builder UI, menus, share
 
 ```sh
 tools/check.sh
-ci/build/build.sh --quick
+ci/build/build.sh --quick --tests
 ```
 
 ## Rating questions

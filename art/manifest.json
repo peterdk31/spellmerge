@@ -602,6 +602,105 @@
       "tier": "placeholder",
       "tool": "Claude (hand-written SVG rects)",
       "prompt": "Style sample F (big hat): a 16x16 fire spell icon, a tall teardrop flame with a Spark core, Fire shades and a 1 px outline. Only non-overlapping rect elements, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/samples/g_brown/body.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "Style sample G (brown robe), the body without the hat: a 32x32 wizard body under F's big hat, a bell-shaped Wood robe with a Spark belt and hem, a white beard, two pale eyes in the shadow under the brim, hands, boots and a staff with a Spark gem. No player colour: the hat is drawn on top in the player's colour. 1 px outline, light from the top-left, only non-overlapping rect elements, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/samples/h_cream/body.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "Style sample H (cream robe), the body without the hat: a 32x32 wizard body under F's big hat, a Bone robe with wide shoulders, a Wood belt, cuff and hem, a golden Spark beard, two pale eyes in the shadow under the brim, hands, boots and a staff with a Spark gem. No player colour: the hat is drawn on top in the player's colour. 1 px outline, light from the top-left, only non-overlapping rect elements, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/samples/hats_std/hat_p1.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "The big pointed hat with a Spark band and a wide brim from style sample F, alone on a 32x32 canvas, in the Player 1 ramp, to be drawn over a G or H body. 1 px outline, light from the top-left, only non-overlapping rect elements, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/samples/hats_std/hat_p2.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "The big pointed hat with a Spark band and a wide brim from style sample F, alone on a 32x32 canvas, in the Player 2 ramp, to be drawn over a G or H body. 1 px outline, light from the top-left, only non-overlapping rect elements, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/samples/hats_std/hat_p3.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "The big pointed hat with a Spark band and a wide brim from style sample F, alone on a 32x32 canvas, in the Player 3 ramp, to be drawn over a G or H body. 1 px outline, light from the top-left, only non-overlapping rect elements, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/samples/hats_std/hat_p4.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "The big pointed hat with a Spark band and a wide brim from style sample F, alone on a 32x32 canvas, in the Player 4 ramp, to be drawn over a G or H body. 1 px outline, light from the top-left, only non-overlapping rect elements, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/samples/hats_vivid/hat_p1.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "Style sample I (new palette): the big pointed hat from sample F alone on a 32x32 canvas, in a brighter, more saturated Player 1 blue ramp (a proposed palette change, not in docs/STYLE.md). 1 px outline, light from the top-left, only non-overlapping rect elements."
+    },
+    {
+      "path": "art/samples/hats_vivid/hat_p2.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "Style sample I (new palette): the big pointed hat from sample F alone on a 32x32 canvas, in a brighter, more saturated Player 2 rose ramp (a proposed palette change, not in docs/STYLE.md). 1 px outline, light from the top-left, only non-overlapping rect elements."
+    },
+    {
+      "path": "art/samples/hats_vivid/hat_p3.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "Style sample I (new palette): the big pointed hat from sample F alone on a 32x32 canvas, in a brighter, more saturated Player 3 green ramp (a proposed palette change, not in docs/STYLE.md). 1 px outline, light from the top-left, only non-overlapping rect elements."
+    },
+    {
+      "path": "art/samples/hats_vivid/hat_p4.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "Style sample I (new palette): the big pointed hat from sample F alone on a 32x32 canvas, in a brighter, more saturated Player 4 purple ramp (a proposed palette change, not in docs/STYLE.md). 1 px outline, light from the top-left, only non-overlapping rect elements."
+    },
+    {
+      "path": "art/samples/i_warm/floor.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "Style sample I (new palette): a seamless 32x32 crypt floor of four large 16x16 beveled tiles like sample F's, in a warm brown ramp (a proposed palette change, not in docs/STYLE.md) so the cool player colours stand out. Only non-overlapping rect elements."
     }
   ]
 }

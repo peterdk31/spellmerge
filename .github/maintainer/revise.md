@@ -13,4 +13,4 @@ Problems:
 
 If you need the owner, use `owner_questions` as described for development sessions; never write the question into a file. First check the open questions with `gh issue list --label owner-question`: the session that wrote this PR may have asked already, and a question already open must not be asked again (mention its number in your summary instead).
 
-End with the structured output: `status` (`ready` when your commits are on the branch, `blocked` if it can't be done properly), a one-paragraph `summary`, and `comment`: what you changed for each point, and why you disagree where you didn't change something. It's posted on the PR for you.
+End with the structured output: `status` (`ready` when your commits are on the branch, `blocked` if it can't be done properly), a one-paragraph `summary`, `comment`: what you changed for each point, and why you disagree where you didn't change something (it's posted on the PR for you), and `screenshots` if the visible part changed: the shot scripts that show what the PR does, each with a one-sentence `caption` (leave it out to keep the first session's choice).

@@ -18,6 +18,28 @@
     "summary": {
       "type": "string"
     },
+    "screenshots": {
+      "type": "array",
+      "description": "The shot scripts that show what this change does, for the before/after screenshots on the PR. Empty when nothing visible changed.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "script": {
+            "type": "string",
+            "description": "A tests/screenshots script name without .gd, e.g. shot_builder"
+          },
+          "caption": {
+            "type": "string",
+            "description": "One sentence: what to look at in these shots"
+          }
+        },
+        "required": [
+          "script",
+          "caption"
+        ],
+        "additionalProperties": false
+      }
+    },
     "blocked_reason": {
       "type": "string"
     },

@@ -1,19 +1,26 @@
-"""Posts the game's screenshots: on each bot PR, and as a gallery on the Pages site.
+"""Posts the game's screenshots: before and after on each bot PR, and as a gallery on the Pages site.
 
   python3 -m smbot.screenshots post --pr N --sha SHA --dir shots
       pushes the PNGs to the `screenshots` branch and comments on PR #N with them
 
-The PNGs come from `ci/build/build.sh --quick --screenshots` (tests/screenshots/shot_*.gd
-on a virtual display), run in a job with no secrets. They are only data here: each must
-be a PNG under the size limit with a plain name, or it is left out. The images live on
-an orphan branch so the PR comment can show them (the repository is public), under
-pr-<N>/<sha7>/; the comment links them by commit, so later pushes never change it.
+A PR's screenshots show what it changes. The session names the shot scripts that show its
+change, each with a caption (`screenshots` in its result, saved as list.json). Only those
+scripts run, on the PR's commit (after/) and on main (before/), with
+`ci/build/build.sh --quick --screenshots` in a job with no secrets; shots.txt in each folder
+says which script made which PNG. The comment shows each shot before and after, a new shot
+alone, and leaves out shots that came out identical. With no scripts named, nothing is posted.
+
+The files are only data here: each must be a PNG under the size limit with a plain name, or
+it is left out. The images live on an orphan branch so the PR comment can show them (the
+repository is public), under pr-<N>/<sha7>/; the comment links them by commit, so later
+pushes never change it.
 """
 
 from __future__ import annotations
 
 import argparse
 import html
+import json
 import os
 import re
 import shutil
@@ -49,8 +56,9 @@ def title(path: Path) -> str:
     return path.stem.replace("_", " ").capitalize()
 
 
-def push(cfg: config_mod.Config, token: str, shots: list[Path], prefix: str, remote: str = "") -> str:
-    """Adds the shots under `prefix` on the screenshots branch; returns the new commit."""
+def push(cfg: config_mod.Config, token: str, shots: list[Path], prefix: str, remote: str = "",
+         names: list[str] | None = None) -> str:
+    """Adds the shots under `prefix` on the screenshots branch (as `names`, if given); returns the new commit."""
     remote = remote or f"https://x-access-token:{token}@github.com/{cfg.repo}.git"
     with tempfile.TemporaryDirectory() as tmp:
         def git(*args: str) -> str:
@@ -64,32 +72,93 @@ def push(cfg: config_mod.Config, token: str, shots: list[Path], prefix: str, rem
                           capture_output=True).returncode == 0:
             git("reset", "-q", "--hard", "FETCH_HEAD")
         dest = Path(tmp, prefix)
-        dest.mkdir(parents=True, exist_ok=True)
-        for shot in shots:
-            shutil.copyfile(shot, dest / shot.name)
+        for shot, name in zip(shots, names or [s.name for s in shots]):
+            (dest / name).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(shot, dest / name)
         git("add", "-A")
         git("commit", "-q", "--allow-empty", "-m", f"Screenshots for {prefix}")
         git("push", "-q", remote, f"HEAD:refs/heads/{BRANCH}")
         return git("rev-parse", "HEAD")
 
 
-def comment(cfg: config_mod.Config, commit: str, prefix: str, shots: list[Path], sha: str) -> str:
+SCRIPT = re.compile(r"^shot_[a-z0-9_]{1,60}$")
+MAX_CAPTION = 300
+
+
+def chosen(folder: Path) -> list[dict[str, str]]:
+    """The session's chosen scripts and captions (list.json), checked: names and lengths only."""
+    try:
+        data = json.loads((folder / "list.json").read_text())
+    except (OSError, ValueError):
+        return []
+    out, seen = [], set()
+    for entry in data if isinstance(data, list) else []:
+        script = entry.get("script") if isinstance(entry, dict) else None
+        if isinstance(script, str) and SCRIPT.match(script) and script not in seen:
+            seen.add(script)
+            caption = re.sub(r"@(?=[\w-])", "@\u200b", str(entry.get("caption", "")))[:MAX_CAPTION]
+            out.append({"script": script, "caption": " ".join(caption.split())})
+    return out[:6]
+
+
+def made_by(folder: Path) -> dict[str, list[str]]:
+    """shots.txt: script -> the PNG names it made (only valid shots)."""
+    valid = {p.name for p in valid_shots(folder)}
+    out: dict[str, list[str]] = {}
+    try:
+        lines = (folder / "shots.txt").read_text().splitlines()
+    except OSError:
+        return out
+    for line in lines:
+        script, _, name = line.partition(" ")
+        if SCRIPT.match(script) and name in valid:
+            out.setdefault(script, []).append(name)
+    return out
+
+
+def pairs(folder: Path) -> list[tuple[str, str, Path, Path | None]]:
+    """(caption, name, after, before or None) for each chosen shot that changed or is new."""
+    after, before = folder / "after", folder / "before"
+    made_after, made_before = made_by(after), made_by(before)
+    out = []
+    for entry in chosen(folder):
+        for name in made_after.get(entry["script"], []):
+            old = before / name if name in made_before.get(entry["script"], []) else None
+            if old is not None and old.read_bytes() == (after / name).read_bytes():
+                continue  # identical: nothing to see
+            out.append((entry["caption"], name, after / name, old))
+    return out[:MAX_SHOTS]
+
+
+def comment(cfg: config_mod.Config, commit: str, prefix: str, shown: list[tuple[str, str, Path, Path | None]],
+            sha: str) -> str:
     base = f"https://raw.githubusercontent.com/{cfg.repo}/{commit}/{prefix}"
-    parts = [f"**Screenshots** of {sha[:7]} (640×360, taken by `ci/build/build.sh --quick --screenshots`)", ""]
-    for shot in shots:
-        parts += [f"**{title(shot)}**", "", f"![{title(shot)}]({base}/{shot.name})", ""]
+    parts = [f"**What this PR changes on screen** ({sha[:7]} against `main`, 640×360)", ""]
+    caption = None
+    for text, name, _, old in shown:
+        if text != caption:
+            parts += [f"**{html.escape(text, quote=False) or title(Path(name))}**", ""]
+            caption = text
+        if old is None:
+            parts += [f"New: *{title(Path(name))}*", "", f"![{title(Path(name))}]({base}/after/{name})", ""]
+        else:
+            parts += [f"*{title(Path(name))}*", "", "| Before (`main`) | After (this PR) |", "| --- | --- |",
+                      f"| ![before]({base}/before/{name}) | ![after]({base}/after/{name}) |", ""]
     return "\n".join(parts)
 
 
 def post(cfg: config_mod.Config, token: str, pr: int, sha: str, folder: Path) -> None:
-    shots = valid_shots(folder)
-    if not shots:
-        print("no screenshots to post")
+    shown = pairs(folder)
+    if not shown:
+        print("nothing visible changed in the chosen shots (or none were chosen): no screenshots posted")
         return
     prefix = f"pr-{pr}/{sha[:7]}"
-    commit = push(cfg, token, shots, prefix)
-    gh.api(f"repos/{cfg.repo}/issues/{pr}/comments", "-X", "POST", input={"body": comment(cfg, commit, prefix, shots, sha)})
-    print(f"posted {len(shots)} screenshot(s) on #{pr}")
+    files = [(after, f"after/{name}") for _, name, after, _ in shown]
+    files += [(old, f"before/{name}") for _, name, _, old in shown if old is not None]
+    commit = push(cfg, token, [f for f, _ in files], prefix, names=[n for _, n in files])
+    gh.api(f"repos/{cfg.repo}/issues/{pr}/comments", "-X", "POST",
+           input={"body": comment(cfg, commit, prefix, shown, sha)})
+    print(f"posted {len(shown)} screenshot(s) on #{pr}")
 
 
 def gallery(folder: Path, out: Path, version: str) -> bool:

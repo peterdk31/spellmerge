@@ -177,6 +177,7 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           RESULT: ${{ needs.implement.outputs.result }}
           BRANCH: ${{ needs.implement.outputs.branch }}
+          TASK: ${{ needs.implement.outputs.task }}
         run: python3 -m smbot.session publish --bundle work/work.bundle --branch "$BRANCH" --mode new
       - name: Questions for the owner
         continue-on-error: true # a failed comment must not skip saving or reviewing the work
@@ -352,6 +353,7 @@ jobs:
           RESULT: ${{ needs.revise.outputs.result }}
           BRANCH: ${{ needs.publish.outputs.branch }}
           PR: ${{ needs.publish.outputs.pr }}
+          TASK: ${{ needs.implement.outputs.task }}
         run: python3 -m smbot.session publish --bundle work/work.bundle --branch "$BRANCH" --mode update --pr "$PR"
       # An unfinished revision: push it to the PR so it isn't lost, but give no sha, so the
       # final review is skipped and the next session continues the PR.
@@ -362,6 +364,7 @@ jobs:
           BRANCH: ${{ needs.publish.outputs.branch }}
           PR: ${{ needs.publish.outputs.pr }}
           REASON: ${{ steps.record.outputs.status }}
+          TASK: ${{ needs.implement.outputs.task }}
         run: python3 -m smbot.session publish --bundle work/work.bundle --branch "$BRANCH" --mode update --pr "$PR" --unfinished "$REASON"
       - name: Questions for the owner
         continue-on-error: true # a failed comment must not skip saving or reviewing the work
@@ -379,45 +382,92 @@ jobs:
           RESULT: ${{ needs.revise.outputs.result }}
         run: python3 -m smbot.session answers
 
-  # Screenshots of the PR's latest commit, for the owner to see. The game code
-  # runs here with no secrets, no environment and a read-only token; posting is separate.
+  # Before/after screenshots of what the PR changes: only the shot scripts the session named
+  # (`screenshots` in its result) run, on the PR's commit and on main. The game code runs here
+  # with no secrets, no environment and a read-only token; posting is separate.
   screenshots:
-    name: screenshots (no secrets)
-    needs: [publish, publish-revision]
+    name: before/after screenshots (no secrets)
+    needs: [implement, revise, publish, publish-revision]
     if: always() && needs.publish.outputs.pr != ''
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 40
     permissions:
       contents: read
     outputs:
-      sha: ${{ steps.sha.outputs.sha }}
+      sha: ${{ steps.pick.outputs.sha }}
+      scripts: ${{ steps.pick.outputs.scripts }}
     steps:
-      - id: sha
+      - id: pick
         env:
           SHA: ${{ needs.publish-revision.outputs.sha || needs.publish.outputs.sha }}
-        run: echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          FIRST: ${{ needs.implement.outputs.result }}
+          REVISED: ${{ needs.revise.outputs.result }}
+        # The revision's choice wins when it made one; names are checked before they reach build.sh.
+        run: |
+          python3 - <<'PY'
+          import json, os, re
+          def shots(raw):
+              try:
+                  value = json.loads(raw or "{}").get("screenshots")
+              except (ValueError, AttributeError):
+                  return None
+              return value if isinstance(value, list) else None
+          chosen = shots(os.environ["REVISED"])
+          chosen = chosen if chosen is not None else (shots(os.environ["FIRST"]) or [])
+          names = sorted({c.get("script") for c in chosen if isinstance(c, dict)
+                          and re.fullmatch(r"shot_[a-z0-9_]{1,60}", str(c.get("script")))})[:6]
+          os.makedirs("shots", exist_ok=True)
+          with open("shots/list.json", "w") as fh:
+              json.dump(chosen, fh)
+          with open(os.environ["GITHUB_OUTPUT"], "a") as fh:
+              fh.write(f"sha={os.environ['SHA']}\nscripts={' '.join(names)}\n")
+          print("Shot scripts chosen by the session:", " ".join(names) or "none")
+          PY
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.pick.outputs.scripts != ''
         with:
-          ref: ${{ steps.sha.outputs.sha }}
+          ref: ${{ steps.pick.outputs.sha }}
+          path: after
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.pick.outputs.scripts != ''
+        with:
+          ref: main
+          path: before
           persist-credentials: false
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: steps.pick.outputs.scripts != ''
         with:
           path: ~/.cache/spellmerge-godot
-          key: godot-${{ hashFiles('ci/build/godot.env') }}
+          key: godot-${{ hashFiles('after/ci/build/godot.env') }}
       - name: Virtual display
+        if: steps.pick.outputs.scripts != ''
         run: sudo apt-get update -qq && sudo apt-get install -y -qq xvfb
-      - run: ci/build/build.sh --quick --screenshots
+      - name: After (this PR)
+        if: steps.pick.outputs.scripts != ''
+        working-directory: after
+        env:
+          SHOTS_ONLY: ${{ steps.pick.outputs.scripts }}
+        run: ci/build/build.sh --quick --screenshots && mv build/screenshots ../shots/after
+      - name: Before (main; a script the PR adds has no before)
+        if: steps.pick.outputs.scripts != ''
+        continue-on-error: true
+        working-directory: before
+        env:
+          SHOTS_ONLY: ${{ steps.pick.outputs.scripts }}
+        run: ci/build/build.sh --quick --screenshots; mv build/screenshots ../shots/before
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: steps.pick.outputs.scripts != ''
         with:
           name: screenshots
-          path: build/screenshots
+          path: shots
           retention-days: 1
           if-no-files-found: ignore
 
   post-screenshots:
     name: post the screenshots on the PR
     needs: [publish, screenshots]
-    if: always() && needs.screenshots.result == 'success'
+    if: always() && needs.screenshots.result == 'success' && needs.screenshots.outputs.scripts != ''
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: automation
@@ -427,7 +477,6 @@ jobs:
         with:
           persist-credentials: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        continue-on-error: true # the PR had no screenshot scripts
         with:
           name: screenshots
           path: shots

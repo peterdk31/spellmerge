@@ -1001,3 +1001,16 @@ An independent review of the branch found these, all fixed with a regression tes
 - **The CLA is back, once per contributor** (owner's choice over inbound=outbound licensing, to keep the Steam and console option): the signing comment on the PR or discussion, kept in the automation state with a link next to `docs/cla-signatures.json`. No signature, no schedule or backlog: the reply asks for it.
 - **A PR is only scheduled when the `rules` check passes,** so outside GDScript only runs in a session's sandbox after the banned-API rules have passed. That is a step up from "no outside code ever runs"; the sandbox, the read-only session token and the reviews are the guard.
 - **Files from Discussions** (`smbot.contrib`): Claude names the target paths, a job with no secrets downloads (GitHub attachments only, the poster's own), re-encodes and size-checks them, and the apply step puts them on `submissions/discussion-N` for the session to take. An "Art submissions" Discussions category is added by hand (setup.sh lists it).
+
+## Owner: contributions, hardened after a security review
+
+- **The hard rules are run by the intake itself, on the exact head commit,** as an outside contributor, from main's scripts in the gather job (`intake.pr_rules`). The PR's own `rules` check can't be trusted for this: a fork can rewrite the workflow that runs it. Backlog needs passing rules too.
+- **A session may only build on the checked commit.** The task names it, and publishing refuses any commit that isn't on main, isn't in that commit's history and isn't the bot's own (`session.unchecked_commits`). Commits the contributor pushes later never reach the bot's PR without a new intake check.
+- **Weekly planning can't schedule a backlog PR;** it sends it back to the intake, which checks the rules and the CLA again on its current head.
+- **The PR to close after a merge is only read from the fixed start of a finish task,** so text inside a task can't name another PR.
+- **Attachments are handled defensively:** strict asset paths (`art|audio|content/…/lowercase.png|ogg`), URL-encoded API paths, downloads only from GitHub's file hosts (checked on every redirect), a bounded PNG decode with a checked header, one bad file only affects its own post, and the apply step checks (and re-encodes) every prepared file again.
+
+## Owner: screenshots show what a PR changes
+
+- **Every PR used to get the first 12 shots of every shot script,** whatever it changed. Now the session names the shot scripts that show its change (`screenshots` in its result, each with a caption; a revision may change the choice) and writes a new shot when none shows it. Only those run, on the PR and on `main`, and the comment shows each shot before and after (a new one alone), leaving out shots that came out identical. A change with nothing visible posts no screenshots.
+- `build.sh --screenshots` writes `shots.txt` (which script made which PNG) and runs only `SHOTS_ONLY` when set. The daily Pages gallery is unchanged.

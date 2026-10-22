@@ -13,6 +13,7 @@
                                               commits and opens or updates the PR
   python3 -m smbot.session review-prompt --pr N --sha S --round critique|final
   python3 -m smbot.session revise-prompt --pr N
+  python3 -m smbot.session answers            posts the answers to /ask in $RESULT
   python3 -m smbot.session finish             Daily log, task failures, next run
 
 Outputs go to $GITHUB_OUTPUT. Prompt templates live in .github/maintainer/.
@@ -38,7 +39,6 @@ from . import config as config_mod
 MAINTAINER = Path(".github/maintainer")
 FENCE = "`" * 3
 MAX_FAILURES = 2
-MAX_ERRORS_IN_A_ROW = 3  # sessions that end in an error are retried this often, then the owner is alarmed
 PARK_BLOCKED = dt.timedelta(days=7)  # blocked or failed too often: revisited by the weekly planning run
 PARK_WAITING = dt.timedelta(days=1)  # approved, but the merge waits on GitHub or the owner
 
@@ -155,9 +155,9 @@ def instructions_text(pending: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
-def queue(cfg: config_mod.Config, st: dict[str, Any]) -> list[str]:
+def queue(cfg: config_mod.Config, st: dict[str, Any], strict: bool = False) -> list[str]:
     """The scheduled issues, which go before docs/NEXT.md."""
-    return intake.queue_tasks(cfg, st)
+    return intake.queue_tasks(cfg, st, strict)
 
 
 def open_checkpoint(cfg: config_mod.Config) -> int | None:
@@ -168,19 +168,35 @@ def open_checkpoint(cfg: config_mod.Config) -> int | None:
 
 
 def close_checkpoint(cfg: config_mod.Config, number: int, pr: str) -> list[str]:
-    """The plan that carries out the owner's checkpoint answer merged: the checkpoint is done."""
+    """The plan that carries out the owner's checkpoint answer merged: the checkpoint is done.
+
+    Its PR usually closed the issue already (`Closes #N`); the comment says where it went either way.
+    """
     gh.api(f"repos/{cfg.repo}/issues/{number}/comments", "-X", "POST",
            input={"body": f"Carried out in #{pr}. Development continues."})
-    gh.api(f"repos/{cfg.repo}/issues/{number}", "-X", "PATCH", input={"state": "closed", "state_reason": "completed"})
-    state.update(cfg, lambda s: s.get("checkpoint_answers", {}).pop(str(number), None),
-                 f"session: checkpoint #{number} carried out")
+    if gh.api(f"repos/{cfg.repo}/issues/{number}").get("state") == "open":
+        gh.api(f"repos/{cfg.repo}/issues/{number}", "-X", "PATCH",
+               input={"state": "closed", "state_reason": "completed"})
     return [f"Checkpoint #{number} carried out in #{pr}; development continues."]
 
 
+def checkpoint_allows_milestone_work(cfg: config_mod.Config, st: dict[str, Any]) -> bool:
+    """False while a checkpoint issue waits for the owner: then only scheduled issues run."""
+    number = open_checkpoint(cfg)
+    return not number or checkpoint.answer(st, number) is not None
+
+
 def nothing_queued(cfg: config_mod.Config, now: dt.datetime) -> bool:
-    """No task a session could take now: no scheduled issue and nothing unparked in docs/NEXT.md."""
+    """No task a session could take now: no scheduled issue and nothing unparked in docs/NEXT.md.
+
+    When GitHub can't be read it says False: an API error is not a reason to call development idle.
+    """
     st, _ = state.load(cfg)
-    return nexttask.next_task(skip=nexttask.parked(st, now), first=queue(cfg, st)) is None
+    try:
+        scheduled = queue(cfg, st, strict=True)
+    except gh.GhError:
+        return False
+    return nexttask.next_task(skip=nexttask.parked(st, now), first=scheduled) is None
 
 
 def open_pr_for(cfg: config_mod.Config, task_slug: str) -> dict[str, Any] | None:
@@ -229,7 +245,8 @@ def sync_with_main(branch: str) -> str:
 def prepare(cfg: config_mod.Config, st: dict[str, Any], focus: str, today: dt.date,
             now: dt.datetime | None = None, sync: Callable[[str], str] | None = None) -> dict[str, str]:
     now = now or dt.datetime.now(dt.timezone.utc)
-    task, kind = nexttask.next_task(skip=nexttask.parked(st, now), first=queue(cfg, st)), "next"
+    task, kind = nexttask.next_task(skip=nexttask.parked(st, now), first=queue(cfg, st),
+                                    milestone=checkpoint_allows_milestone_work(cfg, st)), "next"
     failures = st.get("task_failures", {}).get(task or "", {})
     previous = ""
     if failures:
@@ -263,14 +280,16 @@ def prepare(cfg: config_mod.Config, st: dict[str, Any], focus: str, today: dt.da
 
 
 def prepare_plan(cfg: config_mod.Config, st: dict[str, Any], focus: str, today: dt.date,
-                 weekly: bool = False) -> dict[str, str]:
+                 weekly_run: bool = False) -> dict[str, str]:
     backlog = weekly.backlog_text(cfg, st)
-    # Planning runs weekly and whenever the queue runs empty, so the branch carries the time.
-    branch = f"claude/{dt.datetime.now(dt.timezone.utc):%Y%m%d-%H%M}-planning"
+    # Planning runs weekly, when the queue runs empty and after a checkpoint answer, so the branch
+    # carries the time. A planning PR that didn't merge is continued instead of opening another.
+    existing = open_pr_for(cfg, "planning")
+    branch = existing["head"]["ref"] if existing else f"claude/{dt.datetime.now(dt.timezone.utc):%Y%m%d-%H%M}-planning"
     prompt = render((MAINTAINER / "plan.md").read_text(), {
         "BACKLOG": backlog.replace(FENCE, "` ` `"),  # keep it inside its code block
         "CHECKPOINT": checkpoint.prompt_text(st, open_checkpoint(cfg)),
-        "RUN": ("This is the weekly run on Sunday: do every step." if weekly else
+        "RUN": ("This is the weekly run on Sunday: do every step." if weekly_run else
                 "This run started because the work queue is empty. Do steps 1 to 5 only: leave `progress_post` "
                 "empty and omit `playtest`; the Sunday run writes those."),
         "FOCUS": focus or "(none)",
@@ -278,6 +297,10 @@ def prepare_plan(cfg: config_mod.Config, st: dict[str, Any], focus: str, today: 
         "BRANCH": branch,
         "REPO": cfg.repo,
     })
+    if existing:
+        prompt += (f"\n\nPR #{existing['number']} from an earlier planning session didn't merge. Continue it on "
+                   f"`{branch}`: `git fetch origin {branch} && git switch {branch}`, merge `origin/main`, read its "
+                   f"review with `gh pr view {existing['number']} --comments`, and fix what it says.")
     return {"prompt": prompt, "branch": branch, "task": "Planning", "kind": "plan"}
 
 
@@ -537,7 +560,9 @@ def finish(cfg: config_mod.Config, env: dict[str, str]) -> dict[str, str]:
     planning = env.get("TASK_KIND") == "plan"
     progressed = merged or bool(pr) or status == "blocked" or idle_task
     # Planning that found nothing to do while the queue is empty: development has run out of work.
-    plan_idle = planning and status == "nothing_to_do" and not pr and nothing_queued(cfg, now)
+    # (Not while a checkpoint waits: then an empty queue is expected.)
+    plan_idle = (planning and status == "nothing_to_do" and not pr and not open_checkpoint(cfg)
+                 and nothing_queued(cfg, now))
     # A usage limit backs off until its reset and a rejected token raises its own alarm; any other
     # session that ends without progress is an error, retried a few times before the owner is told.
     failed = (not progressed and not plan_idle and status not in ("nothing_to_do", "limit", "limit-weekly", "auth"))
@@ -546,12 +571,29 @@ def finish(cfg: config_mod.Config, env: dict[str, str]) -> dict[str, str]:
         entry["parked_until"] = pacing.iso(now + span)
         entry["parked_reason"] = reason[:500]
 
+    carried: list[str] = []  # checkpoint answers this merged plan carried out
+    was_idle: list[bool] = []
+
     def apply(s: dict[str, Any]) -> None:
         failures = s.setdefault("task_failures", {})
         if planning:
             s["last_plan"] = pacing.iso(now)
-        s["errors_in_a_row"] = s.get("errors_in_a_row", 0) + 1 if failed else 0 if progressed else s.get(
-            "errors_in_a_row", 0)
+            if env.get("WEEKLY") == "true" and not failed:
+                s["last_weekly"] = pacing.iso(now)
+        if failed:
+            s["errors_in_a_row"] = s.get("errors_in_a_row", 0) + 1
+        elif progressed:
+            s["errors_in_a_row"] = 0
+        was_idle[:] = [bool(s.get("idle"))]
+        if plan_idle:
+            s["idle"] = s.get("idle") or pacing.iso(now)
+        elif progressed:
+            s.pop("idle", None)
+        if planning and merged:
+            carried[:] = list(s.get("checkpoint_answers", {}))
+            s["checkpoint_answers"] = {}
+        if status == "nothing_to_do" and not pr:
+            s["pending_instructions"] = []  # handled: answered, or nothing to do for them
         if merged:
             failures.pop(task, None)
             s["pending_instructions"] = []
@@ -612,27 +654,26 @@ def finish(cfg: config_mod.Config, env: dict[str, str]) -> dict[str, str]:
 
     # Development flows: after progress, after an empty queue (the next run plans) and after an
     # error (retried) the next session starts at once. It stops for the owner's pauses, a usage
-    # limit (resume.yml restarts it at the reset), a rejected token, repeated errors, and when
-    # planning finds nothing left to do. Each stop that needs the owner mentions them.
+    # limit (resume.yml restarts it at the reset), a rejected token, repeated errors, an open
+    # checkpoint, and when planning finds nothing left to do. Each stop that needs the owner
+    # mentions them, once.
     started = env.get("CHAIN_STARTED") or pacing.iso(now)
     errors = st.get("errors_in_a_row", 0)
     backing_off = pacing.backing_off_until(st, now)
     empty_queue = env.get("TASK_KIND") == "next" and not task and status == "nothing_to_do"
     again = (not backing_off and not merge_skipped and not plan_idle and status != "auth"
-             and (progressed or empty_queue or (failed and errors < MAX_ERRORS_IN_A_ROW)))
+             and (progressed or empty_queue or (failed and errors < state.MAX_ERRORS_IN_A_ROW)))
+    for number in carried:
+        dailylog.post(cfg, "Checkpoint", close_checkpoint(cfg, int(number), pr))
     stop: list[str] = []
-    waiting = open_checkpoint(cfg) if planning else None
-    if planning and merged and checkpoint.answer(st, waiting):
-        dailylog.post(cfg, "Checkpoint", close_checkpoint(cfg, waiting, pr))
-        waiting = None
-    if failed and errors >= MAX_ERRORS_IN_A_ROW:
-        line = alarms.raise_alarm(cfg, st, "stopped", errors=errors, run=env.get("RUN_URL", "the Actions tab"))
-        stop.append(line or f"Development stopped after {errors} errors in a row.")
+    if failed and errors >= state.MAX_ERRORS_IN_A_ROW:
+        stop.append(alarms.raise_alarm(cfg, st, "stopped", errors=errors, run=env.get("RUN_URL", "the Actions tab"))
+                    or "")  # None while the alarm is already open: no new post
     elif progressed and "stopped" in st.get("alarms", {}):
         stop.append(alarms.clear_alarm(cfg, st, "stopped") or "")
-    if plan_idle and not waiting:
-        stop.append("Development is idle: planning found no more tasks for now. It plans again on Sunday, "
-                    "after a new scheduled issue, or when you give it work with `/claude`.")
+    if plan_idle and not (was_idle and was_idle[0]):
+        stop.append("Development is idle: planning found no more tasks. It plans again on Sunday, and works "
+                    "again as soon as there is a scheduled issue or an instruction from you (`/claude`).")
     stop = [line for line in stop if line]
     if stop:
         number = st["alarms"].get("stopped")
@@ -677,10 +718,8 @@ def main(argv: list[str] | None = None) -> int:
     vp = sub.add_parser("revise-prompt")
     vp.add_argument("--pr", type=int, required=True)
     vp.add_argument("--branch", default="")
-    pi = sub.add_parser("pr-info")
-    pi.add_argument("--pr", type=int, required=True)
-    pi.add_argument("--require-own", action="store_true", help="fail unless the bot opened the PR")
     sub.add_parser("open-pr").add_argument("--branch", required=True)
+    sub.add_parser("answers")
     sub.add_parser("finish")
     args = ap.parse_args(argv)
 
@@ -710,25 +749,18 @@ def main(argv: list[str] | None = None) -> int:
         write_outputs(package(args.out, args.branch))
     elif args.cmd == "publish":
         result = json.loads(os.environ.get("RESULT") or "{}")
-        out = publish(cfg, args.bundle, args.branch, args.mode, result, args.pr, os.environ["GH_TOKEN"],
-                      args.unfinished, os.environ.get("TASK", ""))
+        write_outputs(publish(cfg, args.bundle, args.branch, args.mode, result, args.pr, os.environ["GH_TOKEN"],
+                              args.unfinished, os.environ.get("TASK", "")))
+    elif args.cmd == "answers":
         st, _ = state.load(cfg)
-        post_answers(cfg, result.get("answers", []),
+        post_answers(cfg, json.loads(os.environ.get("RESULT") or "{}").get("answers", []),
                      {p["number"] for p in st.get("pending_instructions", []) if p["kind"] == "ask"})
-        write_outputs(out)
     elif args.cmd == "review-prompt":
         write_outputs({"prompt": review_prompt(cfg, args.pr, args.sha, args.round_)})
     elif args.cmd == "revise-prompt":
         review = json.loads(os.environ.get("REVIEW") or "{}")
         write_outputs({"prompt": revise_prompt(cfg, args.pr, review, args.branch, sync_with_main(args.branch)),
                        "needed": str(bool(review.get("problems")) or review.get("verdict") != "approve").lower()})
-    elif args.cmd == "pr-info":
-        pr = gh.api(f"repos/{cfg.repo}/pulls/{args.pr}")
-        own = pr["user"]["login"] == cfg.bot.login and pr["head"]["repo"]["full_name"] == cfg.repo
-        if args.require_own and not own:
-            print(f"::error::PR #{args.pr} was not opened by the bot from this repository")
-            return 1
-        write_outputs({"sha": pr["head"]["sha"], "branch": pr["head"]["ref"], "own": str(own).lower()})
     elif args.cmd == "open-pr":
         write_outputs(open_pr(cfg, args.branch))
     else:

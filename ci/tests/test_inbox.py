@@ -12,6 +12,11 @@ Q = {"title": "Allow X?", "question": "Why @someone needs X.", "options": ["Yes"
 
 
 class InboxTest(unittest.TestCase):
+    def setUp(self) -> None:
+        patcher = mock.patch("smbot.labels.ensure")  # labels are covered in test_intake
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def test_render_mentions_only_the_owner(self) -> None:
         body = inbox.render(CFG, Q, "a session")
         self.assertTrue(body.startswith(f"@{CFG.owner.login},"))

@@ -1,5 +1,5 @@
 # One Claude work session (docs/PLAN.md, "Claude's self-critique loop"),
-# called by develop.yml (mode develop, hourly) and weekly.yml (mode plan).
+# called by develop.yml with mode develop or plan (the gate decides; see smbot.control).
 #
 # implement   Claude does the task with a shell but only a READ-ONLY token, and
 #             commits locally; the commits leave the runner as a git bundle (data)
@@ -10,7 +10,7 @@
 # final       a fresh Claude session decides: approve or not (a verdict as data)
 # merge       a plain script merges only if the verdict, checks and hard rules
 #             all pass, pinned to the reviewed commit
-# finish      Daily log, task failures, weekly outputs, and the next session
+# finish      Daily log, task failures, planning outputs, and the next session
 #
 # Claude never holds a write token where it has a shell, and every job that
 # writes runs on a fresh runner with scripts from a clean checkout of main.
@@ -29,9 +29,6 @@ on:
       focus:
         type: string
         default: ""
-      settings:
-        type: string
-        default: "{}"
       merge:
         type: string # "true" when the gate allows merging
         default: "false"
@@ -77,6 +74,10 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Keep main's Claude action (the session may switch to an older branch before it runs)
+        run: |
+          cp -r .github/actions/claude .ci-claude-action
+          echo .ci-claude-action >> .git/info/exclude
       - name: Git identity of the bot
         run: |
           git config --global user.name "spellmerge-bot[bot]"
@@ -99,7 +100,7 @@ jobs:
       - id: claude
         continue-on-error: true # the outcome output says how it went; a timeout must not skip the steps after
         timeout-minutes: 200
-        uses: ./.github/actions/claude
+        uses: ./.ci-claude-action
         with:
           claude-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github-token: ${{ steps.read-token.outputs.token }}
@@ -184,6 +185,12 @@ jobs:
           RESULT: ${{ needs.implement.outputs.result }}
           SOURCE: the session working on "${{ needs.implement.outputs.task }}"
         run: python3 -m smbot.inbox ask
+      - name: Answers to /ask
+        if: steps.record.outputs.status == 'ok' && needs.implement.outputs.result != ''
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          RESULT: ${{ needs.implement.outputs.result }}
+        run: python3 -m smbot.session answers
       - id: existing
         if: >-
           steps.record.outputs.status == 'ok' && (needs.implement.outputs.commits == '0' || needs.implement.outputs.commits == '')
@@ -244,6 +251,10 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Keep main's Claude action (the session may switch to an older branch before it runs)
+        run: |
+          cp -r .github/actions/claude .ci-claude-action
+          echo .ci-claude-action >> .git/info/exclude
       - name: Git identity of the bot
         run: |
           git config --global user.name "spellmerge-bot[bot]"
@@ -267,7 +278,7 @@ jobs:
       - id: claude
         continue-on-error: true # the outcome output says how it went; a timeout must not skip the steps after
         timeout-minutes: 150
-        uses: ./.github/actions/claude
+        uses: ./.ci-claude-action
         with:
           claude-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github-token: ${{ steps.read-token.outputs.token }}
@@ -357,8 +368,14 @@ jobs:
           RESULT: ${{ needs.revise.outputs.result }}
           SOURCE: the revision of PR #${{ needs.publish.outputs.pr }}
         run: python3 -m smbot.inbox ask
+      - name: Answers to /ask
+        if: steps.record.outputs.status == 'ok' && needs.revise.outputs.result != ''
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          RESULT: ${{ needs.revise.outputs.result }}
+        run: python3 -m smbot.session answers
 
-  # Screenshots of the PR's latest commit, for the owner and voters to see. The game code
+  # Screenshots of the PR's latest commit, for the owner to see. The game code
   # runs here with no secrets, no environment and a read-only token; posting is separate.
   screenshots:
     name: screenshots (no secrets)
@@ -510,12 +527,13 @@ jobs:
           FINAL_REVIEW: ${{ needs.final.outputs.review }}
           MERGED: ${{ needs.merge.outputs.merged }}
           MERGE_RESULT: ${{ needs.merge.outputs.message }}
-          SETTINGS: ${{ inputs.settings }}
+          WEEKLY: ${{ inputs.weekly }}
           CHAIN_STARTED: ${{ inputs.chain_started }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: python3 -m smbot.session finish
-      - name: Owner issues, queue moves, devlog and playtest (planning)
+      - name: Owner issues, checkpoint, queue moves, devlog and playtest (planning)
         if: inputs.mode == 'plan' && needs.implement.outputs.result != ''
+        continue-on-error: true # never keep the next session from starting
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           DISCUSSIONS_TOKEN: ${{ github.token }}
@@ -524,13 +542,13 @@ jobs:
           PLAN: ${{ needs.implement.outputs.result }}
         run: python3 -m smbot.weekly publish-plan
       - name: Start the next session
-        if: steps.finish.outputs.again == 'true'
+        if: always() && steps.finish.outputs.again == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           STARTED: ${{ steps.finish.outputs.chain_started }}
         run: gh workflow run develop.yml --ref main -f chain_started="$STARTED"
       - name: Start develop again when the usage limit resets
-        if: steps.finish.outputs.again != 'true' && steps.finish.outputs.resume_at != ''
+        if: always() && steps.finish.outputs.again != 'true' && steps.finish.outputs.resume_at != ''
         env:
           GH_TOKEN: ${{ github.token }}
           AT: ${{ steps.finish.outputs.resume_at }}

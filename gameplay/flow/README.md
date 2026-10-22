@@ -4,7 +4,7 @@
 
 Room sequence, door voting, transitions and waiting for builders.
 
-**Closed until M5.** Built in M3, opens for PRs in M5 (see "Gameplay sub-areas" in docs/PLAN.md and "Opens for PRs" in docs/ROADMAP.md). Until then Claude maintains it; an outside PR is a gamble.
+Built in M3 (see "Gameplay sub-areas" in docs/PLAN.md).
 
 Players in the spell builder never block the others: the rest keep playing.
 
@@ -26,7 +26,7 @@ Players in the spell builder never block the others: the rest keep playing.
 
 ## Steps
 
-Not open yet. When it opens, follow the steps and test layout in [gameplay/README.md](../README.md).
+Follow the steps and test layout in [gameplay/README.md](../README.md).
 
 ## Example to copy
 
@@ -39,9 +39,9 @@ tools/check.sh
 ci/build/build.sh --quick
 ```
 
-## Rating questions
+## Review questions
 
-A good PR here changes room order, door voting or transitions, and keeps the no-waiting pillar: one player in the builder never stalls the rest. Besides the standard criteria:
+A good PR here changes room order, door voting or transitions, and keeps the no-waiting pillar: one player in the builder never stalls the rest. Besides the general review:
 
 - Does a player idling in the builder block anyone? Does voting work for 1–4 players?
 - Does it keep to the dependency direction, without calling another area directly?

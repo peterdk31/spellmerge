@@ -10,6 +10,11 @@ CFG = config.load()
 
 
 class DailyLogTest(unittest.TestCase):
+    def setUp(self) -> None:
+        patcher = mock.patch("smbot.labels.ensure")  # labels are covered in test_intake
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
     def test_shorten_cuts_at_a_sentence_or_a_word(self) -> None:
         self.assertEqual(dailylog.shorten("Short.  Fine"), "Short. Fine")
         self.assertEqual(dailylog.shorten("One two three. Four five six seven eight nine.", 30), "One two three.")

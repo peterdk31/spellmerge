@@ -18,11 +18,10 @@ import re
 from zoneinfo import ZoneInfo
 
 from . import config as config_mod
+from . import labels as labels_mod
 from . import gh
 
 LABEL = "daily-log"
-LABEL_COLOR = "ededed"
-LABEL_DESCRIPTION = "The bot's log of one day"
 TITLE = "Daily log {date}"
 
 
@@ -47,21 +46,13 @@ def _open_logs(cfg: config_mod.Config) -> list[dict]:
     return gh.api(f"repos/{cfg.repo}/issues?state=open&labels={LABEL}&per_page=100")
 
 
-def _ensure_label(cfg: config_mod.Config) -> None:
-    try:
-        gh.api(f"repos/{cfg.repo}/labels", "-X", "POST",
-               input={"name": LABEL, "color": LABEL_COLOR, "description": LABEL_DESCRIPTION})
-    except gh.GhError:
-        pass  # it exists already
-
-
 def issue_for(cfg: config_mod.Config, date: str) -> int:
     """Today's log issue: found, or opened now (closing the older ones)."""
     title = TITLE.format(date=date)
     logs = _open_logs(cfg)
     mine = sorted(i["number"] for i in logs if i["title"] == title)
     if not mine:
-        _ensure_label(cfg)
+        labels_mod.ensure(cfg, [LABEL])
         gh.api(f"repos/{cfg.repo}/issues", "-X", "POST", input={
             "title": title, "labels": [LABEL],
             "body": f"What the bot did on {date} ({cfg.timezone}). Every action is a comment below; posts that "

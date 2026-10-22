@@ -133,7 +133,7 @@ Rules for every workflow (also in the checklist):
 
 - Only `schedule` and `workflow_dispatch` jobs on `main` may use `environment: automation`. Never `pull_request_target`, `issue_comment`, `workflow_run` or any other event triggered by outside users. Those run in the context of `main` too, so the environment's branch policy alone would not stop them.
 - Each job asks for the smallest set of `permission-*` inputs it needs.
-- The PR rating job uses a read-only token (`permission-contents: read`, `permission-pull-requests: read`) and posts its verdict through a separate scripted step.
+- The Claude steps that read outside text (the intake's decide step) and the PR reviewers use a read-only token (`permission-contents: read`, and for the reviewers also `permission-pull-requests: read` and `permission-issues: read`); a separate scripted step applies their decisions or posts the verdict.
 
 ## Rotating the key
 

@@ -13,13 +13,13 @@ ROOT = Path(__file__).resolve().parents[2]
 
 class ContributePageTest(unittest.TestCase):
     def test_parse_roadmap(self) -> None:
-        text = ("| # | Milestone | Status | Done when | Opens for PRs |\n| --- | --- | --- | --- | --- |\n"
-                "| M0 | [Foundation](milestones/M0-foundation.md) | **Closed early** on 2026-10-16 | a | No areas yet |\n"
-                "| M1 | [Core loop](milestones/M1-core-loop.md) | **In progress** since 2026-10-16 | b | Art, Audio |\n"
-                "| M2 | Spell system | Not started | c | Spells, Story |\n")
+        text = ("| # | Milestone | Status | Done when |\n| --- | --- | --- | --- |\n"
+                "| M0 | [Foundation](milestones/M0-foundation.md) | **Closed early** on 2026-10-16 | a |\n"
+                "| M1 | [Core loop](milestones/M1-core-loop.md) | **In progress** since 2026-10-16 | b |\n"
+                "| M2 | Spell system | Not started | c |\n")
         current, upcoming = contribute.parse_roadmap(text)
         self.assertEqual((current.code, current.name, current.design), ("M1", "Core loop", "milestones/M1-core-loop.md"))
-        self.assertEqual(upcoming, [("M2", "Spell system", "c", "Spells, Story")])
+        self.assertEqual(upcoming, [("M2", "Spell system", "c")])
 
     def test_the_real_plan_files_parse(self) -> None:
         """Doesn't depend on which milestone is current today."""

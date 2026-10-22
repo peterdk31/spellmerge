@@ -1,7 +1,6 @@
 """The owner inbox: questions only the owner can answer, as labelled issues.
 
   python3 -m smbot.inbox ask        opens the questions in $RESULT (a session's structured output)
-  python3 -m smbot.inbox reminder   prints the Daily log line listing the open questions
 
 A session that needs the owner puts the question in `owner_questions` instead of a file.
 Each becomes an issue labelled `owner-question` that mentions the owner, with the options,
@@ -22,15 +21,14 @@ import sys
 from typing import Any
 
 from . import config as config_mod
+from . import labels as labels_mod
 from . import dailylog, gh
 
 LABEL = "owner-question"
 CHANGE_LABEL = "owner-change"
-LABELS = {LABEL: ("d93f0b", "A question only the owner can answer; reply with /claude <answer>"),
-          CHANGE_LABEL: ("b60205", "The answer needs an owner-only change; the issue has the exact change")}
 MAX_PER_SESSION = 3
 RECENT_DAYS = 30  # a question closed this recently is not asked again
-SIMILAR = 0.6  # share of title words two questions must have in common to be the same one
+SIMILAR = 0.75  # share of title words two questions must have in common to be the same one
 CONTAINED = 0.85  # or the share of the shorter title's words found in the longer one
 _KEY_MARKER = re.compile(r"<!-- smbot:question key=([a-z0-9-]*) -->")
 _STOP = {"a", "an", "the", "to", "of", "and", "or", "in", "on", "for", "it", "is", "be", "should", "we",
@@ -100,15 +98,6 @@ def same_question(q: dict[str, Any], issue: dict[str, Any]) -> bool:
     return shared / len(a | b) >= SIMILAR or (min(len(a), len(b)) >= 3 and shared / min(len(a), len(b)) >= CONTAINED)
 
 
-def _ensure_labels(cfg: config_mod.Config) -> None:
-    for name, (color, description) in LABELS.items():
-        try:
-            gh.api(f"repos/{cfg.repo}/labels", "-X", "POST",
-                   input={"name": name, "color": color, "description": description})
-        except gh.GhError:
-            pass  # it exists already
-
-
 def ask(cfg: config_mod.Config, questions: list[dict[str, Any]], source: str = "",
         now: dt.datetime | None = None) -> list[str]:
     """Opens an issue per new question.
@@ -119,7 +108,7 @@ def ask(cfg: config_mod.Config, questions: list[dict[str, Any]], source: str = "
     questions = [q for q in questions if q.get("title") and q.get("question")][:MAX_PER_SESSION]
     if not questions:
         return []
-    _ensure_labels(cfg)
+    labels_mod.ensure(cfg, [LABEL, CHANGE_LABEL])
     known = recent_questions(cfg, now or dt.datetime.now(dt.timezone.utc))
     log = []
     for q in questions:
@@ -157,8 +146,6 @@ def main(argv: list[str] | None = None) -> int:
         print("\n".join(log) or "no new questions for the owner")
         if log:
             dailylog.post(cfg, "Questions for the owner", log)
-    elif cmd == "reminder":
-        print(reminder(cfg))
     else:
         print(__doc__)
         return 2

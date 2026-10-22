@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
-import json
 import os
 import sys
 from dataclasses import dataclass, field
@@ -32,6 +31,7 @@ from . import config as config_mod
 
 
 PLAN_COOLDOWN = dt.timedelta(hours=3)  # an empty queue runs planning at most this often
+WEEKLY_AT = (6, 6)  # the weekly planning is due from Sunday (weekday 6) 06:00 UTC
 
 
 @dataclass
@@ -40,7 +40,9 @@ class Decision:
     develop: bool
     merge: bool
     reasons: list[str] = field(default_factory=list)
-    mode: str = "develop"  # develop, or plan when the queue is empty
+    mode: str = "develop"  # develop, or plan
+    weekly: bool = False  # the Sunday planning (devlog and playtest too)
+    wake_at: str = ""  # when the bot should look again by itself (a usage limit or a cooldown)
 
 
 def in_quiet_hours(quiet: tuple[int, int] | None, now: dt.datetime, tz: str) -> bool:
@@ -51,8 +53,16 @@ def in_quiet_hours(quiet: tuple[int, int] | None, now: dt.datetime, tz: str) -> 
     return start <= hour < end if start < end else hour >= start or hour < end
 
 
+def weekly_due_since(now: dt.datetime) -> dt.datetime:
+    """The latest Sunday 06:00 UTC at or before now."""
+    day, hour = WEEKLY_AT
+    due = (now - dt.timedelta(days=(now.weekday() - day) % 7)).replace(hour=hour, minute=0, second=0, microsecond=0)
+    return due if due <= now else due - dt.timedelta(days=7)
+
+
 def decide(kill_switch_on: bool, result: panel.PanelResult, st: dict, now: dt.datetime, tz: str,
            has_task: bool, checkpoint_issue: int | None = None) -> Decision:
+    """What this run may do. `has_task` already leaves out milestone work while a checkpoint waits."""
     s = result.settings
     reasons: list[str] = []
     if not kill_switch_on:
@@ -76,32 +86,36 @@ def decide(kill_switch_on: bool, result: panel.PanelResult, st: dict, now: dt.da
         develop = False
         reasons.append(f"quiet hours {panel.describe('quiet_hours', s.quiet_hours)} ({tz})")
     if develop and (until := pacing.backing_off_until(st, now)):
+        return Decision(True, False, merge, reasons + [f"backing off after a usage limit until {until}"],
+                        wake_at=until)
+    if develop and st.get("errors_in_a_row", 0) >= state.MAX_ERRORS_IN_A_ROW:
         develop = False
-        reasons.append(f"backing off after a usage limit until {until}")
-    mode = "develop"
+        reasons.append(f"stopped after {st['errors_in_a_row']} errors in a row; comment /resume to try again")
+    if not develop:
+        return Decision(True, False, merge, reasons)
+
     last = pacing.parse_time(st["last_plan"]) if st.get("last_plan") else None
+    cooled = last + PLAN_COOLDOWN if last else None
+    weekly = st.get("last_weekly")
     answer = checkpoint.answer(st, checkpoint_issue)
-    if develop and answer:
-        # Plan at once after the answer; a plan that didn't merge is retried after the cooldown.
-        if last and last > pacing.parse_time(answer["at"]) and now - last < PLAN_COOLDOWN:
-            develop = False
-            reasons.append(f"planning your answer to checkpoint #{checkpoint_issue} again after "
-                           f"{pacing.iso(last + PLAN_COOLDOWN)}")
-        else:
-            mode = "plan"
-            reasons.append(f"carrying out your answer to checkpoint #{checkpoint_issue} ({answer['verdict']})")
-    elif develop and not has_task and not st.get("pending_instructions"):
-        if checkpoint_issue:
-            develop = False
-            reasons.append(f"waiting for your answer to checkpoint #{checkpoint_issue} (/go, /iterate or /pivot)")
-        elif last and now - last < PLAN_COOLDOWN:
-            develop = False
-            reasons.append(f"the queue is empty and planning ran at {st['last_plan']}; "
-                           f"it plans again after {pacing.iso(last + PLAN_COOLDOWN)}")
-        else:
-            mode = "plan"
-            reasons.append("the queue is empty, so this session plans the next tasks")
-    return Decision(True, develop, merge, reasons, mode)
+    if weekly and pacing.parse_time(weekly) < weekly_due_since(now):
+        return Decision(True, True, merge, reasons + ["the weekly planning is due"], "plan", weekly=True)
+    if answer and not (last and last > pacing.parse_time(answer["at"]) and now < cooled):
+        return Decision(True, True, merge,
+                        reasons + [f"carrying out your answer to checkpoint #{checkpoint_issue} ({answer['verdict']})"],
+                        "plan")
+    if has_task or st.get("pending_instructions"):
+        return Decision(True, True, merge, reasons)
+    if checkpoint_issue and not answer:
+        return Decision(True, False, merge, reasons + [
+            f"waiting for your answer to checkpoint #{checkpoint_issue} (/go, /iterate or /pivot)"])
+    if st.get("idle") and not answer:
+        return Decision(True, False, merge, reasons + [
+            f"idle since {st['idle']}: planning found nothing to do; new work or Sunday's planning restarts it"])
+    if cooled and now < cooled:
+        return Decision(True, False, merge, reasons + [f"planning ran at {st['last_plan']}; it plans again after "
+                                                       f"{pacing.iso(cooled)}"], wake_at=pacing.iso(cooled))
+    return Decision(True, True, merge, reasons + ["the queue is empty, so this session plans the next tasks"], "plan")
 
 
 def write_outputs(values: dict[str, str]) -> None:
@@ -118,7 +132,6 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--commands", action="store_true", help="carry out owner commands (needs the app token)")
     ap.add_argument("--log-title", default="Hourly check")
-    ap.add_argument("--planning", action="store_true", help="the weekly planning session doesn't need a task")
     args = ap.parse_args(argv)
 
     cfg = config_mod.load()
@@ -147,18 +160,25 @@ def main(argv: list[str] | None = None) -> int:
             if result.verified:
                 s["panel_applied"] = panel.to_json(result.settings)
             effects.apply(s)
-        changed = (st.get("panel_problems") != result.problems or effects.processed
+        changed = (st.get("panel_problems") != result.problems or effects.processed or not st.get("last_weekly")
                    or (result.verified and st.get("panel_applied") != panel.to_json(result.settings)))
-        if changed:
-            st = state.update(cfg, apply, "control: panel and owner commands")
 
-    task = nexttask.next_task(skip=nexttask.parked(st, now), first=intake.queue_tasks(cfg, st))
+        def apply_all(s: dict) -> None:
+            apply(s)
+            s.setdefault("last_weekly", None)
+            s["last_weekly"] = s["last_weekly"] or pacing.iso(now)  # the first weekly planning is next Sunday
+        if changed:
+            st = state.update(cfg, apply_all, "control: panel and owner commands")
+
     try:
         open_checkpoint = checkpoint.open_issue(cfg)
     except gh.GhError:
         open_checkpoint = None
-    decision = decide(kill_switch_on, result, st, now, cfg.timezone, task is not None or args.planning,
-                      open_checkpoint)
+    # While a checkpoint waits for the owner, only scheduled issues (fixes from players) run.
+    milestone_work = not open_checkpoint or checkpoint.answer(st, open_checkpoint) is not None
+    task = nexttask.next_task(skip=nexttask.parked(st, now), first=intake.queue_tasks(cfg, st),
+                              milestone=milestone_work)
+    decision = decide(kill_switch_on, result, st, now, cfg.timezone, task is not None, open_checkpoint)
     if log:
         dailylog.post(cfg, args.log_title, log, mention_owner=mention)
 
@@ -166,13 +186,13 @@ def main(argv: list[str] | None = None) -> int:
         "automation": str(decision.automation).lower(),
         "develop": str(decision.develop).lower(),
         "mode": decision.mode,
+        "weekly": str(decision.weekly).lower(),
         "merge": str(decision.merge).lower(),
         "focus": result.settings.focus,
         "next_task": task or "",
         "reasons": "; ".join(decision.reasons) or "none",
-        "settings": json.dumps(panel.to_json(result.settings)),
         # When set, the workflow starts resume.yml, which starts develop again at that time.
-        "backoff_until": pacing.backing_off_until(st, now) if decision.automation else "",
+        "wake_at": decision.wake_at,
     })
     return 0
 

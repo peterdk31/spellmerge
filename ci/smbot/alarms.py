@@ -1,8 +1,9 @@
 """Alarms that email the owner (docs/PLAN.md, "Measurement and alarms").
 
   python3 -m smbot.alarms check          stall and inactivity alarms (daily run)
-  python3 -m smbot.alarms token-failed   the Claude token was rejected
-  python3 -m smbot.alarms token-ok       the Claude token works again
+
+The token alarm (smbot.session.record) and the "development stopped" alarm
+(smbot.session.finish) are raised and cleared by the sessions themselves.
 
 Each alarm is one issue that mentions the owner, so GitHub emails them. It is
 opened once, kept while the problem lasts, and closed when it's resolved.
@@ -38,8 +39,8 @@ ALARMS = {
                 "`develop` workflow from the Actions tab. This issue closes by itself after the next session "
                 "that makes progress."),
     "token": ("Claude token needs regenerating",
-              "Claude's steps failed because the subscription token was rejected or has expired. Scripted merges, "
-              "builds and releases keep running; development and PR rating are paused until it's fixed.\n\n"
+              "Claude's steps failed because the subscription token was rejected or has expired. Builds and "
+              "releases keep running; development and the community intake are paused until it's fixed.\n\n"
               "**To fix:** run `claude setup-token`, then\n\n"
               "```sh\ngh secret set CLAUDE_CODE_OAUTH_TOKEN --env automation --repo {repo}\n```\n\n"
               "This issue closes by itself after the next successful Claude run."),
@@ -109,7 +110,7 @@ def check(cfg: config_mod.Config, st: dict, now: dt.datetime, has_task: bool, ma
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("action", choices=("check", "token-failed", "token-ok"))
+    ap.add_argument("action", choices=("check",))
     args = ap.parse_args(argv)
     cfg = config_mod.load()
     now = dt.datetime.now(dt.timezone.utc)
@@ -117,14 +118,10 @@ def main(argv: list[str] | None = None) -> int:
 
     # Alarms change issues, so they run once and only their bookkeeping is retried.
     st, _ = state.load(cfg)
-    if args.action == "check":
-        started = st.setdefault("automation_started", iso(now))
-        log = check(cfg, st, now, nexttask.next_task(skip=nexttask.parked(st, now), first=intake.queue_tasks(cfg, st)) is not None, last_main_commit(), last_own_merge(cfg),
-                    dt.datetime.fromisoformat(started.replace("Z", "+00:00")))
-    elif args.action == "token-failed":
-        log = [line for line in [raise_alarm(cfg, st, "token")] if line]
-    else:
-        log = [line for line in [clear_alarm(cfg, st, "token")] if line]
+    started = st.setdefault("automation_started", iso(now))
+    has_task = nexttask.next_task(skip=nexttask.parked(st, now), first=intake.queue_tasks(cfg, st)) is not None
+    log = check(cfg, st, now, has_task, last_main_commit(), last_own_merge(cfg),
+                dt.datetime.fromisoformat(started.replace("Z", "+00:00")))
 
     alarms, last_merge, started = st["alarms"], st.get("last_own_merge"), st.get("automation_started")
 

@@ -18,11 +18,10 @@ from __future__ import annotations
 from typing import Any
 
 from . import config as config_mod
+from . import labels as labels_mod
 from . import gh
 
 LABEL = "checkpoint"
-LABEL_COLOR = "5319e7"
-LABEL_DESCRIPTION = "A milestone is done: development waits for /go, /iterate or /pivot"
 VERDICTS = ("go", "iterate", "pivot")
 
 
@@ -70,11 +69,7 @@ def open_checkpoint(cfg: config_mod.Config, cp: dict[str, Any]) -> str:
     existing = open_issue(cfg)
     if existing:
         return f"Checkpoint already open: #{existing}"
-    try:
-        gh.api(f"repos/{cfg.repo}/labels", "-X", "POST",
-               input={"name": LABEL, "color": LABEL_COLOR, "description": LABEL_DESCRIPTION})
-    except gh.GhError:
-        pass  # it exists already
+    labels_mod.ensure(cfg, [LABEL])
     title = f"Checkpoint: {cp['milestone']} is done. Go, iterate or pivot?"[:120]
     created = gh.api(f"repos/{cfg.repo}/issues", "-X", "POST",
                      input={"title": title, "body": body(cfg, cp), "labels": [LABEL]})

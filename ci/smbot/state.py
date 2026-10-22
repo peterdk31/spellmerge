@@ -33,13 +33,15 @@ DEFAULT: dict[str, Any] = {
     "alarms": {},  # alarm name -> issue number
     "last_own_merge": None,
     "last_plan": None,  # when the last planning session finished
-    "errors_in_a_row": 0,
-    "checkpoint_answers": {},  # checkpoint issue number -> the owner's verified /go, /iterate or /pivot  # sessions that ended in an error since the last one that made progress
+    "last_weekly": None,  # when the last weekly planning finished (smbot.control starts the next one)
+    "errors_in_a_row": 0,  # sessions that ended in an error since the last one that made progress
+    "idle": None,  # when planning last found nothing to do; cleared by the next progress
+    "checkpoint_answers": {},  # checkpoint issue number -> the owner's verified /go, /iterate or /pivot
     "intake_tasks": {},  # issue number -> the intake's neutral task for it (smbot.intake)
 }
 
 MAX_PROCESSED = 1000
-MAX_USAGE_DAYS = 8
+MAX_ERRORS_IN_A_ROW = 3  # sessions ending in an error are retried this often; then development stops
 
 
 def _url(cfg: config_mod.Config) -> str:

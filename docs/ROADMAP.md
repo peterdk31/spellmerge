@@ -2,16 +2,16 @@
 
 Eight strictly sequential milestones (docs/PLAN.md, "Roadmap"). One milestone at a time; nothing from a later milestone is built early. A milestone ends when its done-when criteria and the quality bar are met, never because time ran out.
 
-| # | Milestone | Status | Done when | Opens for PRs |
-| --- | --- | --- | --- | --- |
-| M0 | [Foundation](milestones/M0-foundation.md) | **Closed early** on 2026-10-16 by the owner; its dry runs and release streak carry into M1 | 3 daily releases in a row work and every pipeline part passes its dry run | No areas yet |
-| M1 | [Core loop prototype](milestones/M1-core-loop.md) | **Closed** on 2026-10-21 by the owner (C1: go, after two iterate rounds); its open owner items carry into M2 | 4-bot smoke test passes on web, plus M0's carried-over dry runs and 3 daily releases in a row | Art, Audio |
-| M2 | [Spell system](milestones/M2-spell-system.md) | **In progress** since 2026-10-21 | Validators pass, 20+ combos work, plus M1's carried-over items | Spells (from part 15), Story (from part 23); Art and Audio stay open |
-| M3 | Run structure | Not started | A full run can be completed | Rooms, Enemies, Bosses, Relics, AI |
-| M4 | Polish and variety | Not started | Polished enough to show off | HUD, Wizard, core gameplay systems |
-| M5 | Meta-progression | Not started | Runs give lasting progression | Run, flow, rewards, difficulty |
-| M6 | Content expansion | Not started | 3 biomes, 3 bosses, Steam page | All areas |
-| M7 | Early Access ready | Not started | Ready to launch on Steam | Steam Early Access launch |
+| # | Milestone | Status | Done when |
+| --- | --- | --- | --- |
+| M0 | [Foundation](milestones/M0-foundation.md) | **Closed early** on 2026-10-16 by the owner; its dry runs and release streak carry into M1 | 3 daily releases in a row work and every pipeline part passes its dry run |
+| M1 | [Core loop prototype](milestones/M1-core-loop.md) | **Closed** on 2026-10-21 by the owner (C1: go, after two iterate rounds); its open owner items carry into M2 | 4-bot smoke test passes on web, plus M0's carried-over dry runs and 3 daily releases in a row |
+| M2 | [Spell system](milestones/M2-spell-system.md) | **In progress** since 2026-10-21 | Validators pass, 20+ combos work, plus M1's carried-over items |
+| M3 | Run structure | Not started | A full run can be completed |
+| M4 | Polish and variety | Not started | Polished enough to show off |
+| M5 | Meta-progression | Not started | Runs give lasting progression |
+| M6 | Content expansion | Not started | 3 biomes, 3 bosses, Steam page |
+| M7 | Early Access ready | Not started | Ready to launch on Steam |
 
 ## Checkpoints
 

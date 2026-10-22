@@ -41,7 +41,10 @@ def parked(state: dict[str, Any], now: dt.datetime) -> set[str]:
 
 
 def next_task(path: Path = Path("docs/NEXT.md"), skip: Collection[str] = (),
-              first: Sequence[str] = ()) -> str | None:
-    """The first task of `first` (the scheduled issues), then of docs/NEXT.md, that isn't in `skip`."""
-    tasks = [*first, *(queue(path.read_text()) if path.exists() else [])]
+              first: Sequence[str] = (), milestone: bool = True) -> str | None:
+    """The first task of `first` (the scheduled issues), then of docs/NEXT.md, that isn't in `skip`.
+
+    With `milestone` False (a checkpoint waits for the owner) only `first` counts.
+    """
+    tasks = [*first, *(queue(path.read_text()) if milestone and path.exists() else [])]
     return next((t for t in tasks if t not in skip), None)

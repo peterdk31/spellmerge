@@ -36,25 +36,25 @@ class Milestone:
 @dataclass
 class PageData:
     current: Milestone = field(default_factory=Milestone)
-    upcoming: list[tuple[str, str, str, str]] = field(default_factory=list)  # code, name, done when, opens
+    upcoming: list[tuple[str, str, str]] = field(default_factory=list)  # code, name, done when
     queue: dict[str, int] | None = None  # scheduled and backlog community issues
     merged: list[dict[str, str]] | None = None
     done: list[dict[str, str]] | None = None  # community reports done recently
 
 
-def parse_roadmap(text: str) -> tuple[Milestone, list[tuple[str, str, str, str]]]:
+def parse_roadmap(text: str) -> tuple[Milestone, list[tuple[str, str, str]]]:
     current, upcoming = Milestone(), []
     for line in text.splitlines():
         cells = [c.strip() for c in line.strip().strip("|").split("|")]
-        if len(cells) != 5 or not re.fullmatch(r"M\d", cells[0]):
+        if len(cells) != 4 or not re.fullmatch(r"M\d", cells[0]):
             continue
-        code, name_cell, status, done_when, opens = cells
+        code, name_cell, status, done_when = cells
         link = re.search(r"\[([^\]]+)\]\(([^)]+)\)", name_cell)
         name = link.group(1) if link else name_cell
         if "In progress" in status:
             current = Milestone(code, name, link.group(2) if link else "", done_when)
         elif current.code != "?" and status.startswith("Not started"):
-            upcoming.append((code, name, done_when, opens))
+            upcoming.append((code, name, done_when))
     return current, upcoming
 
 
@@ -122,8 +122,8 @@ def render(cfg: config_mod.Config, data: PageData, version: str, channel: str, s
             "<p class='small'>None yet: be the first to report a bug or share an idea!</p>" if not data.done else
             "<ul>" + "".join(f"<li><a href='{e(p['url'])}'>{e(p['title'])}</a> <span class='small'>reported by "
                              f"@{e(p['author'])}</span></li>" for p in data.done) + "</ul>")
-    upcoming = "".join(f"<li><strong>{e(code)}: {e(name)}</strong>. Done when: {e(done)}. Opens: {e(opens)}.</li>"
-                       for code, name, done, opens in data.upcoming[:3])
+    upcoming = "".join(f"<li><strong>{e(code)}: {e(name)}</strong>. Done when: {e(done)}.</li>"
+                       for code, name, done in data.upcoming[:3])
     design_link = f"{repo_url}/blob/main/docs/{e(m.design)}" if m.design else f"{repo_url}/blob/main/docs/ROADMAP.md"
 
     return f"""<!doctype html>

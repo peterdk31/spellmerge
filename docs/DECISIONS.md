@@ -966,3 +966,18 @@ The HUD screenshot cannot be taken in a session (no display, `docs/BACKLOG.md`),
 - **A milestone end is the one gate that waits for the owner** (owner, 2026-10-22). Planning marks the milestone done and outputs a `checkpoint`; once that PR merges, a `checkpoint` issue asks for `/go`, `/iterate <what>` or `/pivot <how>` (verified owner commands, only in that issue). Until then the gate starts no planning and no milestone work, but scheduled issues still run. The answer starts a planning session at once (`smbot.checkpoint`), which writes the next milestone, the rework tasks or the new direction; when it merges, the issue closes. No timeout: the old 7-day default to iterate is gone.
 - **Errors are retried, then alarm.** A session that ends in an error starts the next one at once; after 3 in a row the bot stops and opens the "Development stopped" alarm, which closes after the next session that makes progress. A merged planning PR chains into development too.
 - **What still stops development:** a checkpoint, the owner's switches, a usage limit (resumes at the reset), a rejected token, 3 errors in a row, and planning that finds nothing to do. Each, except the usage limit, mentions the owner.
+
+## Owner: review of the reworked harness
+
+An independent review of the branch found these, all fixed with a regression test each:
+
+- **Every planning session crashed:** `prepare_plan`'s `weekly` parameter hid the `weekly` module. Renamed to `weekly_run`.
+- **The weekly planning is started by the gate,** not `weekly.yml` (deleted). With development always running, the separate workflow sat behind a session in the shared concurrency group and was cancelled, and catch-up counted the cancelled run as done. The gate now runs the next session as the weekly planning once Sunday 06:00 UTC has passed (`last_weekly` in the state).
+- **"Stopped after 3 errors" stops for real:** the gate refuses to develop until `/resume`, which resets the count; the alarm is posted once, not on every later failure.
+- **Idle is said once:** planning that finds nothing sets `idle`; the gate then waits for new work or the Sunday planning instead of planning (and pinging the owner) every 3 hours.
+- **An `/ask` with an empty queue looped,** because instructions were only cleared on a merge and the answers were only posted with commits. Answers now post in their own step, and a session that ends with nothing to do clears its instructions.
+- **A checkpoint really holds milestone work:** while it waits, only scheduled issues count as tasks (the gate and the session both); a carried-out answer closes the issue even when the PR's `Closes #N` closed it first.
+- **Cooldowns and limits wake the bot by themselves** (`wake_at` → `resume.yml`). Failed planning PRs are continued instead of piling up.
+- **The Claude action is copied aside before a session switches branches,** so an older PR branch without it can't break the step; the next session starts even if a planning step fails.
+- **Intake text is safer:** `inert()` also removes secrets (tokens, private keys), uppercase and `www.` links and look-alike repository links; raw titles never reach the log; Claude may not read `/proc`, `/sys` or its own config. An answered post is closed; a needs-info reply on a closed PR asks for an issue.
+- **Simpler:** one label list (`ci/settings/labels.json`, `smbot.labels`), no project board, no `settings` plumbing, no unused CLI commands; owner questions only merge on a close match (0.75).

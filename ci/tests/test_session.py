@@ -82,7 +82,7 @@ FIXTURE_TASK = "**Area READMEs for the content areas.** Write the READMEs."
 
 
 @mock.patch.object(session.nexttask, "next_task", lambda *a, **k: FIXTURE_TASK)
-@mock.patch.object(session, "queue", lambda cfg, st: [])
+@mock.patch.object(session, "queue", lambda cfg, st, strict=False: [])
 @mock.patch.object(session, "open_checkpoint", lambda cfg: None)
 class PromptTest(unittest.TestCase):
     """Uses a fixed task, so the tests don't depend on what docs/NEXT.md says today."""
@@ -119,6 +119,27 @@ class PromptTest(unittest.TestCase):
             prompt = session.prepare(CFG, st, "", dt.date(2026, 10, 17))["prompt"]
         self.assertIn("PR #12", prompt)
         self.assertIn("last attempt", prompt)
+
+    def test_prepare_plan_builds_the_planning_prompt(self) -> None:
+        """A parameter named `weekly` once hid the weekly module, so every planning session crashed."""
+        st = copy.deepcopy(state.DEFAULT)
+        with mock.patch.object(session.weekly, "backlog_text", lambda cfg, st: "[]"), \
+                mock.patch.object(session, "open_pr_for", lambda cfg, slug: None):
+            out = session.prepare_plan(CFG, st, "", dt.date(2026, 10, 22), weekly_run=False)
+            weekly_out = session.prepare_plan(CFG, st, "", dt.date(2026, 10, 25), weekly_run=True)
+        self.assertEqual((out["kind"], out["task"]), ("plan", "Planning"))
+        self.assertRegex(out["branch"], r"^claude/\d{8}-\d{4}-planning$")
+        self.assertIn("the work queue is empty", out["prompt"])
+        self.assertIn("weekly run on Sunday", weekly_out["prompt"])
+        self.assertNotIn("{{", out["prompt"])
+
+    def test_prepare_plan_continues_an_open_planning_pr(self) -> None:
+        pr = {"number": 12, "head": {"ref": "claude/20261022-0900-planning"}}
+        with mock.patch.object(session.weekly, "backlog_text", lambda cfg, st: "[]"), \
+                mock.patch.object(session, "open_pr_for", lambda cfg, slug: pr if slug == "planning" else None):
+            out = session.prepare_plan(CFG, copy.deepcopy(state.DEFAULT), "", dt.date(2026, 10, 22))
+        self.assertEqual(out["branch"], "claude/20261022-0900-planning")
+        self.assertIn("PR #12", out["prompt"])
 
     def test_review_and_revise_prompts(self) -> None:
         self.assertIn("#7 at commit abc", session.review_prompt(CFG, 7, "abc", "final"))
@@ -166,7 +187,7 @@ class FinishTest(unittest.TestCase):
                     mock.patch.object(session.dailylog, "post",
                                       lambda cfg, title, lines, **k: (posts if posts is not None else []).append(lines)), \
                     mock.patch.object(session, "pr_title", lambda cfg, pr: f"Title of #{pr}" if pr else ""), \
-                    mock.patch.object(session, "queue", lambda cfg, st: []), \
+                    mock.patch.object(session, "queue", lambda cfg, st, strict=False: []), \
                     mock.patch.object(session, "open_checkpoint", lambda cfg: checkpoint_issue), \
                     mock.patch.object(session.nexttask, "next_task",
                                       lambda path_=None, skip=(), first=(): real(path, skip, first)):
@@ -266,6 +287,24 @@ class FinishTest(unittest.TestCase):
                         IMPLEMENT_STATUS="nothing_to_do")
         self.assertTrue(any("Development is idle" in line for lines in posts for line in lines))
 
+    def test_idle_is_told_once_and_cleared_by_progress(self) -> None:
+        st = copy.deepcopy(state.DEFAULT)
+        posts: list = []
+        for _ in range(2):
+            out, st = self.run_finish(st, [], posts, TASK_KIND="plan", TASK="Planning", IMPLEMENT_STATUS="nothing_to_do")
+            self.assertEqual(out["again"], "false")
+        self.assertEqual(sum("Development is idle" in line for lines in posts for line in lines), 1)
+        self.assertIsNotNone(st["idle"])
+        _, st = self.run_finish(st, ["A"], PR="5", FINAL_REVIEW=self.APPROVE, MERGED="true")
+        self.assertIsNone(st.get("idle"))
+
+    def test_an_empty_session_clears_its_instructions(self) -> None:
+        """An /ask with an empty queue used to start the same session again and again."""
+        st = copy.deepcopy(state.DEFAULT)
+        st["pending_instructions"] = [{"kind": "ask", "number": 3, "url": "u", "text": "how is M2?"}]
+        out, st = self.run_finish(st, [], TASK="", IMPLEMENT_STATUS="nothing_to_do")
+        self.assertEqual(st["pending_instructions"], [])
+
     def test_no_idle_alarm_while_a_checkpoint_waits(self) -> None:
         posts: list = []
         self.run_finish(copy.deepcopy(state.DEFAULT), [], posts, checkpoint_issue=50, TASK_KIND="plan",
@@ -286,11 +325,15 @@ class FinishTest(unittest.TestCase):
         raised: list = []
         with mock.patch.object(session.alarms, "raise_alarm",
                                lambda cfg, st_, name, **k: raised.append(name) or "Alarm raised: #9"):
-            for attempt in range(1, session.MAX_ERRORS_IN_A_ROW + 1):
+            for attempt in range(1, state.MAX_ERRORS_IN_A_ROW + 1):
                 out, st = self.run_finish(st, ["A"], IMPLEMENT_STATUS="error")
                 self.assertEqual(st["errors_in_a_row"], attempt)
-                self.assertEqual(out["again"], "true" if attempt < session.MAX_ERRORS_IN_A_ROW else "false")
+                self.assertEqual(out["again"], "true" if attempt < state.MAX_ERRORS_IN_A_ROW else "false")
         self.assertEqual(raised, ["stopped"])
+        posts: list = []
+        with mock.patch.object(session.alarms, "raise_alarm", lambda *a, **k: None):  # already open
+            self.run_finish(st, ["A"], posts, IMPLEMENT_STATUS="error")
+        self.assertFalse(any(lines for lines in posts if "Development stopped" in str(lines)))
         _, st = self.run_finish(st, ["A", "B"], PR="5", FINAL_REVIEW=self.APPROVE, MERGED="true")
         self.assertEqual(st["errors_in_a_row"], 0)
 

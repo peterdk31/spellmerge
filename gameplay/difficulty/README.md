@@ -4,7 +4,7 @@
 
 Scaling by player count, depth and setting.
 
-**Closed until M5.** Built in M3, opens for PRs in M5 (see "Gameplay sub-areas" in docs/PLAN.md and "Opens for PRs" in docs/ROADMAP.md). Until then Claude maintains it; an outside PR is a gamble.
+Built in M3 (see "Gameplay sub-areas" in docs/PLAN.md).
 
 A run with 1 player and a run with 4 players should both feel fair.
 
@@ -23,7 +23,7 @@ A run with 1 player and a run with 4 players should both feel fair.
 
 ## Steps
 
-Not open yet. When it opens, follow the steps and test layout in [gameplay/README.md](../README.md).
+Follow the steps and test layout in [gameplay/README.md](../README.md).
 
 ## Example to copy
 
@@ -36,9 +36,9 @@ tools/check.sh
 ci/build/build.sh --quick
 ```
 
-## Rating questions
+## Review questions
 
-A good PR here tunes how enemy count, health or rewards scale with players, depth or the chosen setting. Besides the standard criteria:
+A good PR here tunes how enemy count, health or rewards scale with players, depth or the chosen setting. Besides the general review:
 
 - Does it feel fair from 1 to 4 players?
 - Does it keep to the dependency direction, without calling another area directly?

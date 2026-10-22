@@ -180,6 +180,8 @@ class Effects:
         state["processed_comments"] += [i for i in self.processed if i not in seen]
         if self.paused is not None:
             state["paused_by_command"] = self.paused
+            if not self.paused:
+                state["errors_in_a_row"] = 0  # /resume also restarts development stopped by errors
         known = {i["url"] for i in state["pending_instructions"]}
         state["pending_instructions"] += [i for i in self.instructions if i["url"] not in known]
         for a in self.checkpoints:

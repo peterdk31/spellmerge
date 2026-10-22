@@ -49,7 +49,6 @@ jobs:
       actions: read # smbot.catchup --already-ran
     outputs:
       automation: ${{ steps.gate.outputs.automation }}
-      settings: ${{ steps.gate.outputs.settings }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -137,6 +136,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
       - id: claude
         continue-on-error: true # the outcome output says how it went; a timeout must not skip the steps after
+        timeout-minutes: 25
         uses: ./.github/actions/claude
         with:
           claude-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -348,7 +348,7 @@ jobs:
       cancel-in-progress: false
     permissions:
       contents: read
-      issues: read # Contribute page: wanted-now counts
+      issues: read # Contribute page: the community queue
       pull-requests: read # Contribute page: recently merged
       pages: write
       id-token: write
@@ -430,7 +430,7 @@ jobs:
 
   summary:
     name: post to the Daily log
-    needs: [control, intake-gather, intake-apply, build, release, pages, itch, alarms, revert-apply]
+    needs: [control, intake-gather, intake-decide, intake-apply, build, release, pages, itch, alarms, revert-apply]
     if: always() && needs.control.outputs.automation == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -450,8 +450,8 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           VERSION: ${{ needs.build.outputs.version }}
           CHANNEL: ${{ needs.build.outputs.channel }}
-          SETTINGS: ${{ needs.control.outputs.settings }}
           INTAKE_COUNT: ${{ needs.intake-gather.outputs.count }}
+          INTAKE_STATUS: ${{ needs.intake-decide.outputs.status }}
           RESULT_INTAKE: ${{ needs.intake-apply.result }}
           RESULT_BUILD: ${{ needs.build.result }}
           RESULT_RELEASE: ${{ needs.release.result }}

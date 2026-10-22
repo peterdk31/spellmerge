@@ -169,8 +169,47 @@ class DecideTest(unittest.TestCase):
         checkpoint.record(st, 50, "go", "", "u", pacing.iso(NOW - dt.timedelta(minutes=5)))
         d = control.decide(True, self.ok_panel(), st, NOW, "UTC", True, checkpoint_issue=50)
         self.assertEqual((d.develop, d.mode), (True, "plan"))
-        st["last_plan"] = pacing.iso(NOW - dt.timedelta(minutes=1))  # that plan didn't merge: wait
-        self.assertFalse(control.decide(True, self.ok_panel(), st, NOW, "UTC", True, checkpoint_issue=50).develop)
+        st["last_plan"] = pacing.iso(NOW - dt.timedelta(minutes=1))  # that plan didn't merge: plan again later
+        d = control.decide(True, self.ok_panel(), st, NOW, "UTC", True, checkpoint_issue=50)
+        self.assertEqual((d.develop, d.mode), (True, "develop"))  # scheduled fixes still run meanwhile
+        d = control.decide(True, self.ok_panel(), st, NOW, "UTC", False, checkpoint_issue=50)
+        self.assertEqual((d.develop, d.wake_at), (False, pacing.iso(NOW - dt.timedelta(minutes=1)
+                                                                    + control.PLAN_COOLDOWN)))
+
+    def test_repeated_errors_stop_development_until_resume(self) -> None:
+        st = copy.deepcopy(state.DEFAULT)
+        st["errors_in_a_row"] = state.MAX_ERRORS_IN_A_ROW
+        d = control.decide(True, self.ok_panel(), st, NOW, "UTC", True)
+        self.assertFalse(d.develop)
+        self.assertIn("/resume", d.reasons[-1])
+        commands.Effects([1], False, []).apply(st)  # /resume
+        self.assertTrue(control.decide(True, self.ok_panel(), st, NOW, "UTC", True).develop)
+
+    def test_idle_waits_for_new_work_or_the_weekly_planning(self) -> None:
+        st = copy.deepcopy(state.DEFAULT)
+        st["idle"] = pacing.iso(NOW - dt.timedelta(days=1))
+        self.assertFalse(control.decide(True, self.ok_panel(), st, NOW, "UTC", False).develop)
+        self.assertTrue(control.decide(True, self.ok_panel(), st, NOW, "UTC", True).develop)
+
+    def test_the_weekly_planning_is_due_from_sunday_morning(self) -> None:
+        sunday = dt.datetime(2026, 10, 18, 6, 0, tzinfo=dt.timezone.utc)
+        self.assertEqual(control.weekly_due_since(sunday + dt.timedelta(hours=1)), sunday)
+        self.assertEqual(control.weekly_due_since(sunday - dt.timedelta(hours=1)), sunday - dt.timedelta(days=7))
+        self.assertEqual(control.weekly_due_since(sunday + dt.timedelta(days=3)), sunday)
+        st = copy.deepcopy(state.DEFAULT)
+        st["last_weekly"] = pacing.iso(sunday - dt.timedelta(days=2))
+        d = control.decide(True, self.ok_panel(), st, sunday + dt.timedelta(hours=2), "UTC", True)
+        self.assertEqual((d.mode, d.weekly), ("plan", True))
+        st["last_weekly"] = pacing.iso(sunday + dt.timedelta(hours=1))
+        self.assertEqual(control.decide(True, self.ok_panel(), st, sunday + dt.timedelta(hours=2), "UTC", True).mode,
+                         "develop")
+
+    def test_a_usage_limit_wakes_the_bot_at_the_reset(self) -> None:
+        st = copy.deepcopy(state.DEFAULT)
+        reset = NOW + dt.timedelta(hours=2)
+        pacing.limit_hit(st, NOW, weekly=False, resets_at=reset)
+        d = control.decide(True, self.ok_panel(), st, NOW, "UTC", True)
+        self.assertEqual((d.develop, d.wake_at), (False, pacing.iso(reset)))
 
     def test_planning_on_an_empty_queue_waits_for_its_cooldown(self) -> None:
         st = copy.deepcopy(state.DEFAULT)

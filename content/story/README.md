@@ -2,9 +2,9 @@
 
 ## Purpose
 
-Words in the game: **lore** (`lore/`) for item and world descriptions, **dialogue** (`dialogue/`) for conversations, and **events** (`events/`) for short in-run story moments. Items without lore or a description become open writing tasks.
+Words in the game: **lore** (`lore/`) for item and world descriptions, **dialogue** (`dialogue/`) for conversations, and **events** (`events/`) for short in-run story moments. Items without lore or a description become writing tasks.
 
-**Opens for PRs in M2, from part 23** (Spell system, which has started; see docs/milestones/M2-spell-system.md), once `docs/STORY.md` and the first component descriptions exist. **The example to copy arrives with Claude's first story content in M2**; this README is updated then with its path.
+**Built in M2, from part 23** (Spell system, which has started; see docs/milestones/M2-spell-system.md), once `docs/STORY.md` and the first component descriptions exist. **The example to copy arrives with Claude's first story content in M2**; this README is updated then with its path.
 
 ## Contract
 
@@ -20,10 +20,9 @@ Words in the game: **lore** (`lore/`) for item and world descriptions, **dialogu
 
 ## Steps
 
-1. Pick an issue labelled `now` in this area (or use the "Submit writing" form) and comment `/claim`.
-2. Copy the example file into the right sub-folder and rename it.
-3. Replace the text, keeping the structure and ids valid.
-4. Run the check below, then open a PR using the template.
+1. Copy the example file into the right sub-folder and rename it.
+2. Replace the text, keeping the structure and ids valid.
+3. Run the check below, then open a PR using the template.
 
 ## Example to copy
 
@@ -35,9 +34,9 @@ Arrives with Claude's first content in M2. Do not guess its layout before then.
 tools/check.sh
 ```
 
-## Rating questions
+## Review questions
 
-Besides the standard criteria:
+Besides the general review:
 
 - Does it fit the canon and tone in `docs/STORY.md`?
 - Is it concise, clear and free of spelling mistakes?

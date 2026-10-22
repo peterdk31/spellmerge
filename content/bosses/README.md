@@ -4,7 +4,7 @@
 
 Boss fights with several phases. A boss is the high point of a biome: spectacle that stays fair and readable for 1 to 4 players.
 
-**Opens for PRs in M3** (Run structure; see "Opens for PRs" in docs/ROADMAP.md). **The example to copy arrives with Claude's first boss in M3**; this README is updated then with its path.
+**Built in M3** (Run structure; see docs/ROADMAP.md). **The example to copy arrives with Claude's first boss in M3**; this README is updated then with its path.
 
 ## Contract
 
@@ -20,11 +20,10 @@ Boss fights with several phases. A boss is the high point of a biome: spectacle 
 
 ## Steps
 
-1. Pick an issue labelled `now` in this area and comment `/claim`.
-2. Copy the example folder and rename it.
-3. Define the phases in the `.tres` and the patterns in the `.gd`.
-4. Replace the sprites; add each to `art/manifest.json`; commit `.uid` files.
-5. Run the checks below, then open a PR with a GIF or video of the whole fight.
+1. Copy the example folder and rename it.
+2. Define the phases in the `.tres` and the patterns in the `.gd`.
+3. Replace the sprites; add each to `art/manifest.json`; commit `.uid` files.
+4. Run the checks below, then open a PR with a GIF or video of the whole fight.
 
 ## Example to copy
 
@@ -37,12 +36,10 @@ tools/check.sh
 ci/build/build.sh --quick --tests
 ```
 
-## Rating questions
+## Review questions
 
-Besides the standard criteria:
+Besides the general review:
 
 - Is the fight fair: are all attacks telegraphed and avoidable?
 - Does it have spectacle and distinct phases?
 - Does it scale from 1 to 4 players?
-
-Art changes (sprites) also need the community vote (👍/👎, 24 hours).

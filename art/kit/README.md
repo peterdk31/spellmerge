@@ -23,7 +23,7 @@ The source files of the art starter kit (docs/PLAN.md, "Art and music"): what an
 
 The templates are drawn at a larger scale than the art, on purpose: they are for looking at, not for exporting. Export your art without the grid at its real size.
 
-Not here: Aseprite `.ase`, Photoshop `.aco`/`.act` and Krita `.kpl` palette files are binary, which sessions and outside contributors cannot add. Most editors read the `.gpl` palette or the hex list; the owner can add binary palettes in the zip build (docs/BACKLOG.md).
+Not here: Aseprite `.ase`, Photoshop `.aco`/`.act` and Krita `.kpl` palette files are binary, which sessions cannot add. Most editors read the `.gpl` palette or the hex list; the owner can add binary palettes in the zip build (docs/BACKLOG.md).
 
 ## Allowed files
 

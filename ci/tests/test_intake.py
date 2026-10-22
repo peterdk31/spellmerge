@@ -49,7 +49,7 @@ class FakeGitHub:
         if "/comments" in path:
             return self.comments.get(int(path.split("/issues/")[1].split("/")[0]), [])
         if "/labels?" in path:
-            return [{"name": n} for n in intake.LABELS]
+            return [{"name": n} for n in intake.labels_mod.definitions()]
         for label, issues in self.queue.items():
             if f"labels={label}" in path:
                 return issues
@@ -189,6 +189,23 @@ class IntakeTest(unittest.TestCase):
         self.assertIn("issue #4, p3", tasks[1])
         self.assertTrue(tasks[2].startswith("**Fix doors.** Doors stop bolts. (issue #9, p3;"))
         self.assertIn("Put `Closes #9` in `pr_body`", tasks[2])
+
+    def test_inert_removes_secrets_and_sneaky_links(self) -> None:
+        text = intake.inert(f"token sk-ant-oat01-abc_DEF and ghs_{'a' * 36} see [x](HTTPS://evil.example) "
+                            f"www.evil.example https://github.com/{CFG.repo}-fake/x https://github.com/{CFG.repo}/issues/1")
+        for bad in ("sk-ant", "ghs_", "evil.example", f"{CFG.repo}-fake"):
+            self.assertNotIn(bad, text)
+        self.assertIn(f"https://github.com/{CFG.repo}/issues/1", text)
+
+    def test_the_log_line_never_carries_a_raw_title(self) -> None:
+        gh = FakeGitHub()
+        item = {**ISSUE_ITEM, "title": "@someone see https://evil.example"}
+        log, _, _ = self.run_apply(gh, {"items": [{"ref": "issue:12", "kind": "question", "decision": "answer",
+                                                   "reply": "Yes."}], "concerns": []}, gathered(item))
+        self.assertNotIn("@someone", log[0])
+        self.assertNotIn("evil.example", log[0])
+        self.assertIn((f"repos/{CFG.repo}/issues/12", ("-X", "PATCH"),
+                       {"state": "closed", "state_reason": "completed"}), gh.writes)
 
     def test_replies_are_inert(self) -> None:
         reply = intake.inert(f"Great idea @everyone! See https://evil.example/x and "

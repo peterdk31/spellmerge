@@ -4,8 +4,6 @@
 
 Tests for the whole game. The tree mirrors the code: a test for `gameplay/combat/` lives in `tests/gameplay/combat/`. Three special folders hold the checks that run on every build: `smoke/`, `benchmark/` and `bots/`.
 
-**Outside PRs are accepted only as tests that accompany content.** A contributor who adds content may add a test at the mirrored path; it is welcome but never required (Claude adds a missing test in a follow-up). Claude owns the rest of the tree.
-
 ## Contract
 
 - Every code change comes with tests. Every bug fix comes with a regression test that would have caught it.
@@ -77,9 +75,9 @@ tools/check.sh
 ci/build/build.sh --quick
 ```
 
-## Rating questions
+## Review questions
 
-Besides the standard criteria (fit, fun, quality, value, performance, risk, scope):
+Besides the general review (bugs, edge cases, 1–4 players, performance, clarity, fun):
 
 - Does it cover more than one player index where it matters?
 - Is it fast and deterministic (no real-time waits, fixed seed)?

@@ -4,8 +4,6 @@
 
 Everything the players see and click: panels, the spell builder UI, menus, shared widgets and the one theme. It must stay readable with 4 players on one screen and fully usable with a gamepad.
 
-**Opens for PRs in M4** (Polish and variety; see "Opens for PRs" in docs/ROADMAP.md). Until then Claude builds it.
-
 ## Contract
 
 - **Sub-folders:** `panels/` (per-player panels), `builder/` (the spell builder), `menus/` (main menu, pause, summary), `widgets/` (shared, reusable controls), `theme/` (the single theme).
@@ -32,10 +30,9 @@ Everything the players see and click: panels, the spell builder UI, menus, share
 
 ## Steps
 
-1. Pick an issue labelled `now` in this area (once open) and comment `/claim`.
-2. Reuse widgets from `widgets/` before adding new ones.
-3. Add UI art lines to `art/manifest.json`.
-4. Run the checks below, then open a PR using the template, with a screenshot or short GIF.
+1. Reuse widgets from `widgets/` before adding new ones.
+2. Add UI art lines to `art/manifest.json`.
+3. Run the checks below, then open a PR using the template, with a screenshot or short GIF.
 
 ## Example to copy
 
@@ -48,9 +45,9 @@ tools/check.sh
 ci/build/build.sh --quick --tests
 ```
 
-## Rating questions
+## Review questions
 
-Besides the standard criteria:
+Besides the general review:
 
 - Is it readable with 4 players at 1× on a small screen?
 - Can it be fully used with a gamepad, and does each panel respond only to its owner?

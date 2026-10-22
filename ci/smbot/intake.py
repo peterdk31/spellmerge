@@ -33,6 +33,7 @@ from pathlib import Path
 from typing import Any
 
 from . import config as config_mod
+from . import labels as labels_mod
 from . import dailylog, gh, state
 
 INPUT = Path("intake-input.json")
@@ -43,22 +44,8 @@ NEEDS_INFO = "needs-info"
 PRIORITIES = ("p1", "p2", "p3")
 KINDS = ("bug", "idea", "question", "feedback", "copyright", "spam", "other")
 KIND_LABELS = {"bug": "bug", "idea": "idea", "question": "question", "feedback": "feedback", "copyright": "copyright"}
-LABELS = {
-    TRIAGED: ("ededed", "Read and decided by the bot"),
-    SCHEDULED: ("0e8a16", "In the bot's work queue"),
-    BACKLOG: ("c5def5", "A good idea for later; weekly planning may schedule it"),
-    NEEDS_INFO: ("fbca04", "Waiting for the poster to add details"),
-    "bug": ("d73a4a", "Something is broken"),
-    "idea": ("a2eeef", "An idea for the game"),
-    "question": ("d876e3", "A question"),
-    "feedback": ("bfdadc", "Feedback on the game"),
-    "copyright": ("b60205", "A copyright concern"),
-    "p1": ("b60205", "Priority 1: crashes, blockers and copyright"),
-    "p2": ("d93f0b", "Priority 2"),
-    "p3": ("fbca04", "Priority 3"),
-}
 # Issues the bot or the owner keep for themselves; never triaged.
-INTERNAL = {"owner-question", "owner-change", "daily-log", "alarm", "playtest", TRIAGED}
+INTERNAL = {"owner-question", "owner-change", "daily-log", "alarm", "playtest", "checkpoint", TRIAGED}
 MAX_ITEMS = 25  # per run, oldest first; the rest wait for the next run
 MAX_SCHEDULED = 5  # new scheduled items per run; more become backlog
 MAX_REPLY = 1500
@@ -167,12 +154,18 @@ def gather(cfg: config_mod.Config) -> dict[str, Any]:
 
 @functools.cache
 def _foreign_links() -> re.Pattern[str]:
-    return re.compile(r"https?://(?!github\.com/" + re.escape(config_mod.load().repo) + r"\b)\S+")
+    own = r"github\.com/" + re.escape(config_mod.load().repo) + r"(?=[/#?\s)]|$)"
+    return re.compile(r"(?:https?://(?!" + own + r")|www\.)\S+", re.IGNORECASE)
+
+
+# Credentials a prompt-injected Claude could be tricked into quoting (its own token, a GitHub token, a key).
+_SECRETS = re.compile(r"sk-ant-[\w-]+|\bgh[opsur]_\w{20,}|github_pat_\w+|-----BEGIN [A-Z ]*PRIVATE KEY-----", re.I)
 
 
 def inert(text: str, limit: int = MAX_REPLY) -> str:
-    """Claude wrote this from untrusted text: no @mentions, no links outside the repository."""
-    text = re.sub(r"@(?=[\w-])", "@​", str(text or "").strip())
+    """Claude wrote this from untrusted text: no secrets, no @mentions, no links outside the repository."""
+    text = _SECRETS.sub("(removed)", str(text or "").strip())
+    text = re.sub(r"@(?=[\w-])", "@\u200b", text)
     return _foreign_links().sub("(link removed)", text)[:limit]
 
 
@@ -216,23 +209,17 @@ def normalise(decision: dict[str, Any], known: dict[str, dict[str, Any]], open_n
     return d
 
 
-def _ensure_labels(cfg: config_mod.Config) -> None:
-    existing = {lab["name"] for lab in gh.api_paginated(f"repos/{cfg.repo}/labels?per_page=100")}
-    for name, (color, description) in LABELS.items():
-        if name not in existing:
-            gh.api(f"repos/{cfg.repo}/labels", "-X", "POST",
-                   input={"name": name, "color": color, "description": description})
-
-
-def _reply_text(d: dict[str, Any], tracking: int | None) -> str:
+def _reply_text(d: dict[str, Any], tracking: int | None, closed_pr: bool = False) -> str:
     parts = [inert(d.get("reply", ""))]
     if tracking:
         parts.append(f"Tracked in #{tracking}.")
     if d["decision"] == "duplicate":
         parts.append(f"Following up in #{d['duplicate_of']}.")
-    if FOOTER[d["decision"]]:
+    if closed_pr and d["decision"] == "needs_info":
+        parts.append("Please open an issue with the details, since this pull request is closed.")
+    elif FOOTER[d["decision"]]:
         parts.append(FOOTER[d["decision"]])
-    if d["decision"] == "needs_info":
+    if d["decision"] == "needs_info" and not closed_pr:
         parts.append(NEEDS_INFO_MARKER)
     return "\n\n".join(p for p in parts if p) + "\n\n" + SIGNATURE
 
@@ -275,7 +262,7 @@ def apply_one(cfg: config_mod.Config, d: dict[str, Any], item: dict[str, Any], d
         gh.api(f"repos/{cfg.repo}/issues/{n}/comments", "-X", "POST", input={"body": _reply_text(d, None)})
         if d["decision"] in ("schedule", "backlog"):
             tasks[str(n)] = _task_entry(d, item)
-        elif d["decision"] in ("decline", "duplicate") or (d["decision"] == "answer" and d["kind"] == "question"):
+        elif d["decision"] in ("decline", "duplicate", "answer"):  # an answered post needs no more work
             reason = "completed" if d["decision"] == "answer" else "not_planned"
             gh.api(f"repos/{cfg.repo}/issues/{n}", "-X", "PATCH", input={"state": "closed", "state_reason": reason})
         target = f"#{n}"
@@ -283,7 +270,7 @@ def apply_one(cfg: config_mod.Config, d: dict[str, Any], item: dict[str, Any], d
         if d["decision"] in ("schedule", "backlog"):
             tracking = _open_tracking_issue(cfg, d, item)
             tasks[str(tracking)] = _task_entry(d, item)
-        text = _reply_text(d, tracking)
+        text = _reply_text(d, tracking, closed_pr=kind == "pr")
         if kind == "pr":
             n = int(number)
             gh.api(f"repos/{cfg.repo}/issues/{n}/labels", "-X", "POST", input={"labels": [TRIAGED]})
@@ -295,7 +282,7 @@ def apply_one(cfg: config_mod.Config, d: dict[str, Any], item: dict[str, Any], d
             target = f"discussion #{number}"
     where = f" → #{tracking}" if tracking else ""
     dup = f" of #{d['duplicate_of']}" if d["decision"] == "duplicate" else ""
-    title = dailylog.shorten(d.get("title") or item["title"], 100)
+    title = inert(dailylog.shorten(d.get("title") or item["title"], 100), 120)
     return f"{target} {d['kind']}: {d['decision'].replace('_', ' ')}{dup}{where} ({d['priority']}) {title}"
 
 
@@ -310,7 +297,7 @@ def apply(cfg: config_mod.Config, decisions: dict[str, Any], gathered: dict[str,
     tasks: dict[str, dict[str, str]] = {}
     scheduled = 0
     if decisions.get("items"):
-        _ensure_labels(cfg)
+        labels_mod.ensure(cfg, [TRIAGED, SCHEDULED, BACKLOG, NEEDS_INFO, *KIND_LABELS.values(), *PRIORITIES])
     for raw in decisions.get("items", []):
         d = normalise(raw, known, open_numbers, scheduled)
         if d is None:
@@ -345,11 +332,16 @@ def apply(cfg: config_mod.Config, decisions: dict[str, Any], gathered: dict[str,
 # --- The work queue ------------------------------------------------------------
 
 
-def queue_tasks(cfg: config_mod.Config, st: dict[str, Any]) -> list[str]:
-    """The scheduled issues as task lines for the development session, priority first, oldest first."""
+def queue_tasks(cfg: config_mod.Config, st: dict[str, Any], strict: bool = False) -> list[str]:
+    """The scheduled issues as task lines for the development session, priority first, oldest first.
+
+    An API error gives an empty list (the gate then works from docs/NEXT.md), or raises with `strict`.
+    """
     try:
         issues = gh.api_paginated(f"repos/{cfg.repo}/issues?state=open&labels={SCHEDULED}&per_page=100")
     except gh.GhError:
+        if strict:
+            raise
         return []
     known = st.get("intake_tasks", {})
     out = []

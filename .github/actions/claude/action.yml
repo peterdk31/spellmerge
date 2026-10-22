@@ -1,9 +1,11 @@
 # One Claude step, the same everywhere: the sandbox (bubblewrap and socat isolate Claude's
 # commands and scrub secrets), then claude-code-action as the bot, with a JSON schema for
-# the answer. The step never fails the job: callers read `outcome` and the execution file
+# the answer. Claude may never read process environments or its own
+# config, where its own token lives (the sandbox covers commands, not the Read tool). The step never fails the job: callers read `outcome` and the execution file
 # (smbot.session account/usage) to tell a usage limit, a rejected token and an error apart.
 #
-# Only use it after checking out main: a local action runs from the checked-out files.
+# Only use it from main's files: a local action runs from the checked-out files, so a job that
+# switches branches first copies it aside (session.yml).
 name: claude
 description: Run Claude in the sandbox with a prompt, tools and an answer schema
 inputs:
@@ -57,5 +59,5 @@ runs:
         claude_args: >-
           --max-turns ${{ inputs.max-turns }}
           --allowedTools "${{ inputs.allowed-tools }}"
-          --disallowedTools "${{ inputs.disallowed-tools }}"
+          --disallowedTools "${{ inputs.disallowed-tools }},Read(//proc/**),Read(//sys/**),Read(//home/runner/.claude/**)"
           --json-schema '${{ inputs.schema }}'

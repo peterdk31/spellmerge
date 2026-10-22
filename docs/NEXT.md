@@ -9,11 +9,11 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
 - [ ] **Bots build spells (M2 part 20).** (`tests/bots`) Seeded random builds, bot 4 staying in its builder in the 4-bot test, `test_spell_fuzz.gd`; **the weekly playtest asks about building from here**.
 - [ ] **Combos to 20+ (M2 part 21).** (`combos.json`) At least 20 combos passing, each component in two non-refusal combos; done-when item 2.
 - [ ] **Story canon (M2 part 22).** (`docs/STORY.md`) Canon and tone, short; listed in `llms.txt`.
-- [ ] **The first lore; Story opens (M2 part 23).** (`content/story/lore/components/`) One description per component, its validator, the Story README's example and schema; the builder shows them.
+- [ ] **The first lore (M2 part 23).** (`content/story/lore/components/`) One description per component, its validator, the Story README's example and schema; the builder shows them.
 - [ ] **Stress scene (M2 part 24).** (`tests/benchmark`) The stress scene (4 bots with built spells, 100 or 200 enemies, 1,000 or 3,000 shots, full effects) in the editor run, `BENCH:` lines, `STRESS OK`.
 - [ ] **Stress in the exports and the limits (M2 part 25).** (`tests/benchmark`, `core/spells/limits.gd`) The stress run and M1's WASM projectile timing runner in the Linux Test and Web Test exports (a node the main menu adds on `--stress` or `--projectile-timing`, like the 4-bot runner); the limits confirmed or lowered from the numbers; the `ci/` gate asked as an owner issue.
-- [ ] **Component icons and art pass (M2 part 26).** (`art/`, `content/spells/`) Icons for all 18, element shot tints and the vfx checked together in one screenshot sheet against docs/STYLE.md; Art `now` issues for replacements.
-- [ ] **Art direction call (M2 part 27).** The call text, the owner issue to post it and to lock the winner in DESIGN.md; nothing in the game waits on it.
+- [ ] **Component icons and art pass (M2 part 26).** (`art/`, `content/spells/`) Icons for all 18, element shot tints and the vfx checked together in one screenshot sheet against docs/STYLE.md; whatever falls short becomes Claude's own replacement task in `docs/NEXT.md`.
+- [ ] **Art direction choice (M2 part 27).** Claude drafts the style samples itself and asks the owner in one `owner` issue to pick one (optionally after asking players for feedback in Discussions) and to lock it in DESIGN.md; nothing in the game waits on it.
 - [ ] **Stabilisation and C2 (M2 part 28).** Only bug fixing, polish and performance until no known crash or blocker remains; then the C2 issue with a build link, bot data (fuzz and stress numbers, which recipes bots build), Claude's honest assessment and questions.
 
 ## Blocked

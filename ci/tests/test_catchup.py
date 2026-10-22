@@ -16,9 +16,6 @@ class CatchupTest(unittest.TestCase):
     def test_last_due(self) -> None:
         self.assertEqual(catchup.last_due(t(17, 2), "daily.yml"), t(16, 3))
         self.assertEqual(catchup.last_due(t(17, 3), "daily.yml"), t(17, 3))
-        self.assertEqual(catchup.last_due(t(18, 5), "weekly.yml"), t(11, 6))
-        self.assertEqual(catchup.last_due(t(18, 7), "weekly.yml"), t(18, 6))
-        self.assertEqual(catchup.last_due(t(21, 12), "weekly.yml"), t(18, 6))
 
     def test_missed(self) -> None:
         added = t(16, 16)

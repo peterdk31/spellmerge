@@ -4,7 +4,7 @@ Oct 16, 2026 · peterdk31
 
 ## Overview
 
-Spellmerge is a 2D top-down roguelite about building deep, combinable spells, for 1–4 local co-op players. Claude writes the code, reviews and merges community PRs, and ships a new playable web build every day, all on GitHub's servers with no PC running.
+Spellmerge is a 2D top-down roguelite about building deep, combinable spells, for 1–4 local co-op players. Claude writes the code and the assets, turns players' bug reports and ideas into work, and ships a new playable web build every day, all on GitHub's servers with no PC running.
 
 **Tagline:** *Merge spells. Cause chaos. Together.* On GitHub and in developer communities, a second line: *Every spell is a merge request.*
 
@@ -12,9 +12,9 @@ Spellmerge is a 2D top-down roguelite about building deep, combinable spells, fo
 - **Engine:** Godot 4.x (one pinned stable version), GDScript only.
 - **Art:** 32×32 pixel art. AI-made and human-made assets are both allowed, and each asset's origin is tracked.
 - **Platforms:** Daily web build (a free demo and showcase) plus daily full desktop builds for Windows and Linux; Steam later.
-- **License:** GPL-3.0-or-later code, CC-BY-SA assets, CLA for contributors.
+- **License:** GPL-3.0-or-later code, CC-BY-SA assets. Players send ideas, not files, so no contributor licenses are needed (see Protection).
 - **Budget:** Claude Pro (about $20/month). Everything else is free.
-- **Autonomy:** Claude plans, builds and merges on its own. The owner only controls the vision in `DESIGN.md` and the protected infrastructure.
+- **Autonomy:** Claude plans, builds and merges on its own. The owner only controls the vision in `DESIGN.md`, the protected infrastructure and the milestone checkpoints.
 
 ## Quality bar
 
@@ -41,7 +41,7 @@ Development keeps going; checks inform rather than block (owner, 2026-10-21).
 
 - **Hard gates are few:** a broken build (it doesn't build, a test or smoke test fails, errors in the log) and the security and copyright rules. Only these stop a release or revert a merge.
 - **Development itself always flows.** After each session the next one starts at once. An empty queue (the end of a milestone, say) starts a planning session instead of stopping, and a session that ends in an error is retried.
-- **What stops development:** a milestone checkpoint (below), the owner's switches (kill switch, Control panel pauses, `/pause`, quiet hours), a usage limit (it resumes by itself at the reset), a rejected Claude token, 3 errors in a row, and planning that finds nothing left to do.
+- **What stops development:** a milestone checkpoint (below), the owner's switches (kill switch, Control panel pauses, `/pause`, quiet hours), a usage limit (it resumes by itself at the reset), a rejected Claude token, 3 errors in a row (until `/resume`), and planning that finds nothing left to do (until new work arrives or the Sunday planning). A cooldown or a usage limit schedules its own wake-up, so nothing depends on GitHub's unreliable hourly schedule.
 - **Every hard gate and every stop notifies the owner** when it trips: the Daily log post, an alarm issue or the checkpoint issue mentions them. A usage limit is the exception: it resumes by itself and is only logged.
 - **The end of a milestone is a gate:** the planning session marks the milestone done and opens a checkpoint issue with its assessment and recommendation. No milestone work starts until the owner answers `/go`, `/iterate <what>` or `/pivot <how>`; scheduled bug fixes from players keep going meanwhile. The answer starts a planning session at once, and its PR closes the checkpoint.
 - **Budgets warn:** load time, download size, frame time and the stress benchmark print a warning in the build log, with likely fixes. A warning that repeats becomes a normal task in `NEXT.md`, never a revert.
@@ -58,17 +58,17 @@ Development keeps going; checks inform rather than block (owner, 2026-10-21).
 
 - `docs/STYLE.md` defines the art direction: palette, lighting direction, outline rules, animation frame counts, UI style, and a set of reference images for the intended look.
 - Every asset has a quality tier in the manifest: `placeholder`, `good`, `final`. Nothing ships in Steam Early Access with `placeholder` in a player-facing spot.
-- **Honest limit:** Claude's code-generated pixel art and chiptune are fine as placeholders and some final SFX, but professional-quality art and especially music need skilled humans. The plan is to attract artists and musicians through the contribute pages and, once there is income (Sponsors, itch.io, Steam), to commission key art, the main character, the tileset and the soundtrack.
-- Claude reviews art critically against `STYLE.md` and asks for revisions rather than accepting "good enough"; music is judged by community votes plus technical checks.
+- **Honest limit:** Claude's code-generated pixel art and chiptune are fine as placeholders and some final SFX, but professional-quality art and especially music need skilled humans. The plan is, once there is income (Sponsors, itch.io, Steam), to commission key art, the main character, the tileset and the soundtrack.
+- Claude reviews art critically against `STYLE.md` and asks for revisions rather than accepting "good enough"; music is judged by the owner and player feedback in Discussions, plus technical checks.
 
 ### Making the art direction easy to see
 
-- **Style Guide page** on the website, generated from `docs/STYLE.md` and linked from every art issue, the README and the Contribute page: an in-game screenshot of the look, palette swatches with downloads, sizes, the key rules (light from top-left, 1px dark outline, no gradients, max 3 shades per material), animated frame-count examples, do/don't comparisons, and the golden examples.
+- **Style Guide page** on the website, generated from `docs/STYLE.md` and linked from every art task, the README and the Contribute page: an in-game screenshot of the look, palette swatches with downloads, sizes, the key rules (light from top-left, 1px dark outline, no gradients, max 3 shades per material), animated frame-count examples, do/don't comparisons, and the golden examples.
 - **Golden examples:** a small set of approved `final` assets that are the official reference everything should match.
 - **Starter kit** (one zip): palette files for Aseprite, LibreSprite, Photoshop and Krita; 32×32 grid templates and sprite sheet templates; golden examples as source files; a one-page checklist.
-- **Art preview page** (runs in the browser, nothing uploaded): drop a PNG to see it in an in-game scene at real size next to the golden examples, with automatic palette, size and frame-count checks that highlight off-palette pixels. The same checks run on submission with the same messages.
-- **Every art issue** shows the style guide link, the current placeholder, the 2–3 closest golden examples, size, frame count and the relevant rules.
-- **Who sets the direction:** in M1 Claude drafts a provisional style and guide with code-generated assets. In M2 an art direction call in Discussions invites style samples (wizard, a tile, a spell icon); the community votes and the owner picks the winner, or commissions an artist. The chosen style becomes the golden examples and is locked in an owner-only part of `DESIGN.md` so it cannot drift.
+- **Art preview page** (runs in the browser, nothing uploaded): drop a PNG to see it in an in-game scene at real size next to the golden examples, with automatic palette, size and frame-count checks that highlight off-palette pixels. The same checks run in review with the same messages.
+- **Every art task** (Claude's own, or a commission brief) shows the style guide link, the current placeholder, the 2–3 closest golden examples, size, frame count and the relevant rules.
+- **Who sets the direction:** in M1 Claude drafts a provisional style and guide with code-generated assets. In M2 Claude draws style samples (wizard, a tile, a spell icon) and the owner picks one, optionally after asking players for feedback in Discussions, or commissions an artist. The chosen style becomes the golden examples and is locked in an owner-only part of `DESIGN.md` so it cannot drift.
 
 ### Gameplay
 
@@ -94,7 +94,7 @@ Security comes first: all outside input (PR code, PR text, issues, discussions) 
 | PR changed after approval | Merge uses `--match-head-commit` with the reviewed SHA. |
 | Supply chain | Actions pinned by commit SHA, Godot download hash-checked, no third-party addons unless the owner adds them, Dependabot for Actions. |
 | Tampered downloads | Builds only from `main` in a clean job, SHA256 checksums, build attestations, immutable releases. |
-| Spam and AI-slop PRs | Free rules filter first, size limit, per-author daily cap, capped AI reviews per day. |
+| Spam posts and AI-slop PRs | Outside PRs are never merged, only read as suggestions; the intake takes at most 25 posts a run and declines spam. |
 | Owner account compromised | 2FA/passkey; no personal access token given to the AI; the bot acts through a custom GitHub App installed only on this repo, with only Contents, Issues and Pull requests access. |
 
 ### Path tiers
@@ -103,7 +103,6 @@ Security comes first: all outside input (PR code, PR text, issues, discussions) 
 | --- | --- | --- |
 | Owner only | `.github/` (incl. `.github/maintainer/` prompts), `ci/`, `.claude/`, `docs/DESIGN.md`, `LICENSE`, `CLA.md`, `setup.sh`, `REUSE.toml`, `docs/SECURITY-CHECKLIST.md`, `docs/SETUP-APP.md`, `addons/` | Owner review required |
 | Bot maintained | `docs/ROADMAP.md`, `docs/NEXT.md`, `docs/BACKLOG.md`, `docs/DECISIONS.md`, `docs/LOG.md`, `docs/milestones/`, `docs/STYLE.md`, `docs/STORY.md`, area `README.md` files, `AGENTS.md`, `CLAUDE.md`, `llms.txt`, `docs/cla-signatures.json`, `core/`, `project.godot`, `export_presets.cfg` | Claude's own PRs only |
-| Open | Content areas that are open in the current milestone | Anyone, through the rating pipeline |
 
 **Kill switch:** set the repo variable `AUTOMATION_ENABLED=false`, or disable the workflow in the Actions tab. The Control panel issue also has a kill-switch checkbox usable from the GitHub mobile app. Every bot action is posted to that day's "Daily log YYYY-MM-DD" issue (label `daily-log`; the next day's log closes it), and every merge can be reverted.
 
@@ -126,7 +125,7 @@ Runs the hard rules check and the automation's unit tests. There is no build per
 
 ### Weekly planning run (Sundays)
 
-Reviews milestone progress against its done-when criteria, reorders `NEXT.md`, moves community issues between the work queue and the backlog, writes the devlog and the owner's playtest. The same planning session also runs whenever the work queue runs empty (at most every 3 hours) and right after the owner answers a checkpoint. When a milestone is done, it opens the checkpoint and waits; after `/go` it writes the next milestone's design document and first tasks, which must pass the independent self-critique review before merging, and development carries on with them.
+Not a workflow of its own: from Sunday 06:00 UTC the develop gate runs the next session as the weekly planning, so it never waits behind (or gets cancelled by) a running session. It reviews milestone progress against its done-when criteria, reorders `NEXT.md`, moves community issues between the work queue and the backlog, writes the devlog and the owner's playtest. The same planning session also runs whenever the work queue runs empty (at most every 3 hours) and right after the owner answers a checkpoint. When a milestone is done, it opens the checkpoint and waits; after `/go` it writes the next milestone's design document and first tasks, which must pass the independent self-critique review before merging, and development carries on with them.
 
 ### Limits
 
@@ -240,7 +239,7 @@ Fun comes from proven design rules, bot playtesting that catches what kills fun,
 
 ## Codebase architecture and areas
 
-The codebase is split into self-contained areas that talk only through `core/`, so contributors can add content by adding files, without touching shared code.
+The codebase is split into self-contained areas that talk only through `core/`, so new content is added by adding files, without touching shared code.
 
 ### Principles
 
@@ -254,7 +253,7 @@ The codebase is split into self-contained areas that talk only through `core/`, 
 
 ```
 spellmerge/
-├─ core/             closed to outside PRs
+├─ core/             shared services
 │  └─ events/ registry/ input/ ui_focus/ save/ base/ projectiles/ pools/
 ├─ gameplay/         code systems, one sub-area each (see below)
 │  └─ run/ flow/ player/ combat/ rewards/ difficulty/ coop/ ai/ feel/ progression/
@@ -275,7 +274,7 @@ spellmerge/
 
 ### Areas
 
-| Area | Contributors add | Allowed files | Extra rating questions |
+| Area | Holds | Allowed files | Extra review questions |
 | --- | --- | --- | --- |
 | Spells | Forms, elements, modifiers, triggers | `.tres`, `.gd`, icon, SFX | Creative interactions, power budget |
 | Relics | Passive items | `.tres`, `.gd`, icon | Build diversity, balance |
@@ -286,46 +285,46 @@ spellmerge/
 | Gameplay | Changes to one of the 10 gameplay sub-areas (below) | `.gd`, `.tres` | No-waiting pillar, no regressions |
 | HUD | Widgets, menus, accessibility | `.gd`, `.tscn`, UI art | Readable with 4 players, gamepad navigation |
 | Art | Sprites, tilesets, VFX | `.png`, `.svg` | `STYLE.md` palette, readability at 1× |
-| Audio | Music, SFX | `.ogg` only | Format, loudness, length, plus votes |
+| Audio | Music, SFX | `.ogg` only | Format, loudness, length |
 | Story | Dialogue, lore, descriptions | `.json` | Fits `STORY.md` canon and tone |
-| Core | (no outside PRs) | – | Outside PRs closed with "open an issue" |
+| Core | Shared services | `.gd`, `.tscn`, `.tres` (Claude only) | Needed by more than one area, dependency direction, budgets |
 
 ### Structure rules
 
-Code gets structure; content and assets stay flat and simple. Structure exists to keep the codebase tidy, not to make contributing harder: contributors get guidance, and Claude does the tidying.
+Code gets structure; content and assets stay flat and simple. Structure exists to keep the codebase tidy and easy for a fresh session to find its way in.
 
 | Folder | Structure | Why |
 | --- | --- | --- |
-| `core/` | Sub-folders per service | Closed to outside PRs; only Claude needs to navigate it |
+| `core/` | Sub-folders per service | Shared by every area; changed rarely and carefully |
 | `gameplay/` | 10 sub-areas, each with a public entry script, README and mirrored tests | The most code, and the most likely to tangle |
 | `hud/` | panels, builder, menus, shared widgets, theme | Widgets are reused across panels; one theme keeps 4-player UI consistent |
-| `content/` | Flat: one folder per item, copied from an example | Easiest possible contribution: add a folder, done |
-| `art/`, `audio/` | Shared assets only; item-specific assets live with the item | Contributors find an item's files in one place |
+| `content/` | Flat: one folder per item, copied from an example | Easiest possible addition: add a folder, done |
+| `art/`, `audio/` | Shared assets only; item-specific assets live with the item | An item's files are in one place |
 | `tests/` | Mirrors the tree | Easy to find the tests for anything |
 
 ### Gameplay sub-areas
 
-| Sub-area | Job | Built | Open for PRs |
-| --- | --- | --- | --- |
-| `player` | Wizard controller: move, dodge, cast, mana, health, downed/revive | M1 | M4 |
-| `combat` | Damage pipeline, hit/hurt boxes, knockback, status effects, applying element reactions | M1 | M4 |
-| `feel` | Hit-stop, screen shake, juice presets | M1 | M4 |
-| `coop` | Join/leave mid-run, friendly fire, shared camera | M1 | M4 |
-| `ai` | Shared enemy behaviours: steering, targeting, attack patterns | M1–M3 | M3 |
-| `run` | Run lifecycle: start, seed, end, summary screen | M3 | M5 |
-| `flow` | Room sequence, door voting, transitions, waiting for builders | M3 | M5 |
-| `rewards` | Per-player rolls from loot tables, unspent rewards, shops | M3 | M5 |
-| `difficulty` | Scaling by player count, depth and setting | M3 | M5 |
-| `progression` | Hub, unlocks, currency, codex | M5 | M6 |
+| Sub-area | Job | Built |
+| --- | --- | --- |
+| `player` | Wizard controller: move, dodge, cast, mana, health, downed/revive | M1 |
+| `combat` | Damage pipeline, hit/hurt boxes, knockback, status effects, applying element reactions | M1 |
+| `feel` | Hit-stop, screen shake, juice presets | M1 |
+| `coop` | Join/leave mid-run, friendly fire, shared camera | M1 |
+| `ai` | Shared enemy behaviours: steering, targeting, attack patterns | M1–M3 |
+| `run` | Run lifecycle: start, seed, end, summary screen | M3 |
+| `flow` | Room sequence, door voting, transitions, waiting for builders | M3 |
+| `rewards` | Per-player rolls from loot tables, unspent rewards, shops | M3 |
+| `difficulty` | Scaling by player count, depth and setting | M3 |
+| `progression` | Hub, unlocks, currency, codex | M5 |
 
 - **Public interface:** each sub-area has one entry script (e.g. `combat/combat.gd`) plus the events it sends and listens to; other code uses only those.
 - **One dependency direction:** `core` ← `gameplay` ← `content` data via the registry; sub-areas talk through events, with direct calls only in documented directions.
-- **Data apart from rules:** element reactions and loot tables are content data, so contributors can add them without touching gameplay code.
-- **Checked, but kindly:** the rules check reports dependency violations as warnings on outside PRs; Claude fixes them after merging. Claude's own code must follow them strictly.
+- **Data apart from rules:** element reactions and loot tables are content data, so new ones are added without touching gameplay code.
+- **Checked:** the rules check reports dependency violations as warnings, and Claude's code must follow them strictly.
 
 ### Asset origin manifest
 
-`art/manifest.json` and `audio/manifest.json` list every asset with origin (`placeholder`, `ai`, `human`), author and license. Validators reject assets missing from the manifest. It drives Steam's AI disclosure and the auto-generated replacement issues.
+`art/manifest.json` and `audio/manifest.json` list every asset with origin (`placeholder`, `ai`, `human`), author and license. Validators reject assets missing from the manifest. It drives Steam's AI disclosure and the list of placeholders still to replace.
 
 ### Co-op technology (built in M1)
 
@@ -396,15 +395,15 @@ Claude has no memory between runs, so the repo is its memory: a fixed set of pla
 - One milestone at a time; nothing from later milestones is built early.
 - Each milestone goes design document → tasks → code.
 - Discoveries go to the backlog unless they block the current milestone.
-- Community PRs for future milestones are closed with thanks and saved as backlog issues.
+- Player ideas for future milestones wait as backlog issues (label `backlog`).
 
 ### Autonomy
 
-Claude runs fully on its own, including starting milestones. The safeguard is an independent self-critique: a second Claude review with fresh context checks each new milestone design against `DESIGN.md` for contradictions, scope creep and breaks of the no-waiting pillar. The owner gets a notification issue when a milestone starts and only acts to change direction.
+Claude runs fully on its own within a milestone; the next milestone starts after the owner's `/go` at the checkpoint. The safeguard is an independent self-critique: a second Claude review with fresh context checks each new milestone design against `DESIGN.md` for contradictions, scope creep and breaks of the no-waiting pillar. Besides the checkpoints, the owner only acts to change direction.
 
 ## Self-driven progress
 
-Claude's own development is the main engine and outside PRs are a bonus, so the game progresses at full speed even with zero contributors.
+Claude's own development is the only engine and players steer it with bug reports and ideas, so the game progresses at full speed even when nobody posts.
 
 ### Capacity
 
@@ -412,7 +411,7 @@ Claude's own development is the main engine and outside PRs are a bonus, so the 
 - **A session keeps working** while tasks remain: when one session ends, the next starts right away, whether or not its PR merged. It stops on an error, a usage limit or paused merging, and the hourly check picks up from there.
 - **Back-off:** when Claude reports a usage limit, it is recorded and hourly checks pause until the reset time the limit names (about 5 hours if it names none).
 - **One session at a time** to avoid conflicts; parallel sessions in clearly separate areas are a later option.
-- **PR reviews and the release** run once a day at 03:00 UTC.
+- **PR reviews** run inside each development session (critique, revision, final review). **The community intake and the release** run once a day at 03:00 UTC.
 - **No usage estimates:** each run records its token usage, and the daily log reports the tokens used in the last 5 hours and the last week. Runs are not gated by estimated quota, since the exact remaining quota isn't available to automation and estimates from token counts proved unreliable. Only a real usage limit stops them.
 - **More quota, more speed:** upgrading to Claude Max is used automatically with no changes.
 
@@ -426,7 +425,7 @@ Claude's own development is the main engine and outside PRs are a bonus, so the 
 - **Tasks sized to one session;** the weekly planning run splits larger ones.
 - **Never stuck:** a task that fails twice or is reported blocked is set aside for a week with the reason logged, and work moves on to the next task; blocked tasks are revisited weekly. A task whose approved PR waits on GitHub or the owner is set aside for a day the same way.
 - **Never waiting for humans:** unclear points are decided by Claude and recorded in `DECISIONS.md`; only `DESIGN.md` needs the owner.
-- **Milestones never depend on contributors:** all content targets are planned as Claude's work, and a contribution simply removes a task.
+- **Milestones never depend on players:** all content targets are planned as Claude's work; a player's idea that fits shapes or replaces a task.
 
 ### Measurement and alarms
 
@@ -454,7 +453,7 @@ A pinned issue that every run reads before starting. Edits take effect from the 
 SPELLMERGE CONTROL PANEL
 
 - [x] Automation enabled     (untick = full stop, the kill switch)
-- [ ] Pause development      (still review PRs and release, build nothing new)
+- [ ] Pause development      (still take in posts and release, build nothing new)
 - [ ] Pause PR merging
 
 QUIET_HOURS:
@@ -464,7 +463,7 @@ FOCUS: (optional, e.g. "fix bugs before new features this week")
 - **Verified by user ID:** runs only trust panel values from a revision whose editor is the owner's fixed numeric GitHub user ID (not the username). The bot never edits the panel.
 - **Trusted values come from GitHub's own edit history** (the owner's latest revision), never from storage the bot could change.
 - **Fail closed:** if no owner revision can be verified (history deleted, API error), automation pauses and the owner is notified.
-- **Strict parsing:** unknown fields (such as the old `VOTE_` line) are ignored, unreadable values fall back to the owner's last verified revision.
+- **Strict parsing:** unknown fields (such as lines from older panel versions) are ignored, unreadable values fall back to the owner's last verified revision.
 - **Locked issue:** only the owner can comment on the panel; the panel holds only harmless settings, never secrets.
 - **Audit:** every applied change is written to the daily log, e.g. "QUIET_HOURS none → 22-07 (by peterdk31)".
 - **Worst case** of a successful attack on the panel: the bot pauses or changes pace; it cannot touch code, secrets or releases.
@@ -491,20 +490,18 @@ The Claude Android app (private account) is for discussing ideas and design. Rec
 
 ## Roadmap
 
-The game is built in eight strictly sequential milestones. Art and Audio open to contributors from M1, and every area is open by M6.
+The game is built in eight strictly sequential milestones, each ending with a checkpoint the owner answers.
 
-| # | Milestone | Content | Done when | Opens for PRs |
-| --- | --- | --- | --- | --- |
-| M0 | Foundation | Full infrastructure: security, releases, autonomy, owner control, contribution pipeline, voting, onboarding; empty game | 3 daily releases in a row work and every pipeline part passes its dry run | No areas yet |
-| M1 | Core loop prototype | 1 spell, 1 enemy, 1 room, 4-player join, game feel, pools | 4-bot smoke test passes on web | Art, Audio |
-| M2 | Spell system | Components, spell builder, spell limits, stress benchmark | Validators pass, 20+ combos work | Spells, Story |
-| M3 | Run structure | 5 rooms, 3 enemies, boss, relics, staffs, bot playtests | A full run can be completed | Rooms, Enemies, Bosses, Relics, AI |
-| M4 | Polish and variety | HUD polish, cosmetics, story intro, more content | Polished enough to show off | HUD, Wizard, core gameplay systems |
-| M5 | Meta-progression | Hub, unlocks, saving | Runs give lasting progression | Run, flow, rewards, difficulty |
-| M6 | Content expansion | 2 more biomes, more bosses, Steam Coming Soon page | 3 biomes, 3 bosses, Steam page | All areas |
-| M7 | Early Access ready | Desktop exports, Steamworks, settings, polish | Ready to launch on Steam | Steam Early Access launch |
-
-An area that is not yet open still has folders, contracts and Claude's example content from M1, so contributors can study it before it opens.
+| # | Milestone | Content | Done when |
+| --- | --- | --- | --- |
+| M0 | Foundation | Full infrastructure: security, releases, autonomy, owner control, contribution pipeline and voting (built in M0, replaced by the community intake on 2026-10-22), onboarding; empty game | 3 daily releases in a row work and every pipeline part passes its dry run |
+| M1 | Core loop prototype | 1 spell, 1 enemy, 1 room, 4-player join, game feel, pools | 4-bot smoke test passes on web |
+| M2 | Spell system | Components, spell builder, spell limits, stress benchmark | Validators pass, 20+ combos work |
+| M3 | Run structure | 5 rooms, 3 enemies, boss, relics, staffs, bot playtests | A full run can be completed |
+| M4 | Polish and variety | HUD polish, cosmetics, story intro, more content | Polished enough to show off |
+| M5 | Meta-progression | Hub, unlocks, saving | Runs give lasting progression |
+| M6 | Content expansion | 2 more biomes, more bosses, Steam Coming Soon page | 3 biomes, 3 bosses, Steam page |
+| M7 | Early Access ready | Desktop exports, Steamworks, settings, polish | Ready to launch on Steam |
 
 ## Infrastructure, checkpoints and playtests
 
@@ -518,16 +515,16 @@ M0 builds the complete infrastructure before any gameplay, in this order:
 2. **Build and release:** CI, daily release (web demo + desktop), smoke test, nightly/stable channels.
 3. **Autonomy:** plan files, hourly adaptive development sessions, Daily log issue, stall and token alarms.
 4. **Owner control:** full Control panel and owner commands.
-5. **Contribution pipeline:** PR rating and merge pipeline, CLA, PR template, issue templates and no-git submission forms, claims, labels and project board.
-6. **Community:** scaling community voting (dormant until there are voters), Discussions categories, copyright report form and quarantine, bug report form.
+5. **Contribution pipeline:** PR rating and merge pipeline, CLA, PR and issue templates, submission forms, claims, labels and project board. Built in M0, replaced by the community intake on 2026-10-22 (the issue forms and labels stay).
+6. **Community:** community voting, Discussions categories, copyright report form and quarantine, bug report form. Voting and quarantine were built in M0 and replaced by the community intake on 2026-10-22; the forms and categories stay.
 7. **Onboarding:** AGENTS.md, CLAUDE.md, llms.txt, CONTRIBUTING.md, area READMEs, local check script, Contribute page.
 
-Every part is verified end to end with dry runs (for example a fake PR that breaks a rule, a fake vote, a fake copyright report) before M0 counts as done. Only the parts that need a working game come later:
+Every part is verified end to end with dry runs (for example a fake PR that breaks a rule, a fake bug report, a fake copyright report) before M0 counts as done. Only the parts that need a working game come later:
 
 | When | What |
 | --- | --- |
 | M1 | Provisional Style Guide page and starter kit (first art exists); weekly owner playtest starts |
-| M2 | Stress benchmark (spells exist), art direction call |
+| M2 | Stress benchmark (spells exist), art direction choice |
 | M3 | Bot playtesting and balance report (full runs exist) |
 | M6 | Steam page, trademark search |
 
@@ -549,7 +546,7 @@ Every part is verified end to end with dry runs (for example a fake PR that brea
 
 - Every Sunday the weekly planning run opens a "Playtest of the week" issue: the build link, what changed, and 3–5 specific questions (for example "does the new dodge feel responsive?").
 - About 30 minutes of play, answered in a few lines from the phone.
-- The owner's feedback is the highest-priority input on feel, fun and direction; community votes decide on individual contributions.
+- The owner's feedback is the highest-priority input on feel, fun and direction, above player posts.
 - A skipped week blocks nothing.
 
 ### Scope
@@ -598,7 +595,7 @@ The plan follows the Mindustry model: free and open source on GitHub and the web
 | Early Access | M7 | Steam Early Access at about $5–8; nightly beta branch, weekly stable default branch | Main income |
 | Full release | Later | Soundtrack, supporter pack DLC | Extra |
 
-The web demo stays free, and daily desktop builds stay free on GitHub Releases, as with Mindustry; Steam sells convenience, automatic updates, achievements and supporting the project. No ads or microtransactions. The "built and maintained by an AI with community PRs" story is the marketing hook.
+The web demo stays free, and daily desktop builds stay free on GitHub Releases, as with Mindustry; Steam sells convenience, automatic updates, achievements and supporting the project. No ads or microtransactions. The "built and maintained by an AI, steered by its players" story is the marketing hook.
 
 ### Protection
 
@@ -620,7 +617,7 @@ The README states "Free on the web forever; the Steam version funds development.
 
 ## Copyright and licensing
 
-Copyright infringement is treated like a security risk: when in doubt, leave it out. Rules are strict but cost contributors one line, and disputed content never ships.
+Copyright infringement is treated like a security risk: when in doubt, leave it out. Rules are strict but cheap to follow, and disputed content never ships.
 
 ### Rules (hard, checked automatically)
 
@@ -632,16 +629,16 @@ Copyright infringement is treated like a security risk: when in doubt, leave it 
 | AI assets | Tools whose terms allow commercial use; tool and prompt recorded | Prompts naming living artists or existing franchises |
 | Names and text | Generic names (Fireball, Frost Nova) | Names from other works (Hadouken, Avada Kedavra) |
 
-- **Every file carries license info** following the REUSE standard; `reuse lint` runs in the rules check. For contributors it is one line in the PR template or issue form; Claude fills it in for its own files.
+- **Every file carries license info** following the REUSE standard; `reuse lint` runs in the rules check. Claude fills it in for every file it makes.
 - **The origin manifest records** author, license, source link, and for AI assets the tool and prompt.
-- **The CLA includes a statement** that the contributor has the right to submit the work.
+- **Commissioned work** comes with the CLA's statement that the artist has the right to submit it.
 
 ### Checks in review
 
 - **Code:** ScanCode finds license texts and known copied code; Claude flags code that looks pasted from elsewhere.
 - **Images:** Claude inspects every image for known characters, logos or game sprites.
 - **Names and text:** checked against well-known brands and works.
-- **Audio:** license rules and community votes; audio fingerprinting (e.g. AcoustID) only if its terms allow commercial use, to be confirmed.
+- **Audio:** license rules and the owner's listen; audio fingerprinting (e.g. AcoustID) only if its terms allow commercial use, to be confirmed.
 - No automated check catches everything, which is why fast response matters.
 
 ### Response to a concern
@@ -693,7 +690,7 @@ Actions artifact and cache storage terms for public repos were not confirmed in 
 1. Turn on 2FA or a passkey on GitHub account `peterdk31`.
 2. Buy Claude Pro and install Claude Code.
 3. Run `gh auth login`.
-4. Run `./setup.sh` (written by Claude). It creates `peterdk31/spellmerge` and applies all settings as code: rulesets, CODEOWNERS enforcement, read-only default workflow token, protected environment, Pages, Discussions, labels, project board and immutable releases. Discussions categories and project views have no API and are created by hand once (setup.sh lists them); `./setup.sh --check` verifies the live settings at any time.
+4. Run `./setup.sh` (written by Claude). It creates `peterdk31/spellmerge` and applies all settings as code: rulesets, CODEOWNERS enforcement, read-only default workflow token, protected environment, Pages, Discussions, labels and immutable releases. Discussions categories have no API and are created by hand once (setup.sh lists them); `./setup.sh --check` verifies the live settings at any time.
 5. Create the custom "Spellmerge Bot" GitHub App following `docs/SETUP-APP.md` (about 5 minutes): permissions Contents, Issues and Pull requests only, with no Workflows permission. Store its app ID and private key as secrets in the protected environment.
 6. Run `claude setup-token` and store the token as the `CLAUDE_CODE_OAUTH_TOKEN` secret in the protected environment.
 7. Create a free itch.io page with an API key stored as a secret in the protected environment.
@@ -707,13 +704,13 @@ The biggest risks are Pro usage limits and slow quality drift; both have fallbac
 
 | Risk | Mitigation |
 | --- | --- |
-| Pro limits too tight for daily dev plus reviews | Cap reviews per day; prioritise milestone work; switch to a pay-per-use API budget if needed. |
+| Pro limits too tight for daily dev plus reviews | Cap intake posts per run; prioritise milestone work; switch to a pay-per-use API budget if needed. |
 | Subscription token expires, is rejected in CI, or terms change | Failure opens an issue to regenerate the token; scripted steps keep shipping; check Anthropic's terms at setup; switching to an API key is a one-line change. |
 | Code quality drifts over months | Tests and validators for every content type, weekly self-review of `DECISIONS.md`, refactor tasks added to `NEXT.md` when needed. |
-| Residual prompt injection gets a weak PR merged | Hard rules limit the damage to game content; daily smoke test; one-click revert. |
-| Players or contributors dislike AI-made games | Full transparency in README and on Steam; human assets credited. |
+| Residual prompt injection in a post steers the intake or a session | The intake's decisions are applied by a script within fixed rules; sessions see only Claude's restatement of an issue; hard rules limit the damage to game content; daily smoke test; one-click revert. |
+| Players dislike AI-made games | Full transparency in README and on Steam; human assets credited. |
 | Web export limits (single-threaded build, browser gamepad quirks, performance) | Web build becomes a curated demo via content flags; the full game ships as daily desktop builds; performance budgets checked daily. |
-| Spam waves | Rules filter, per-author caps, and GitHub's option to limit PRs to prior contributors. |
+| Spam waves | The intake's cap of 25 posts a run, spam declined and closed, and GitHub's interaction limits. |
 
 ### Open questions
 

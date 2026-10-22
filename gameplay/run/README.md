@@ -4,7 +4,7 @@
 
 Run lifecycle: start, seed, end and the summary screen.
 
-**Closed until M5.** Built in M3, opens for PRs in M5 (see "Gameplay sub-areas" in docs/PLAN.md and "Opens for PRs" in docs/ROADMAP.md). Until then Claude maintains it; an outside PR is a gamble.
+Built in M3 (see "Gameplay sub-areas" in docs/PLAN.md).
 
 A run has one seed, so the same seed gives the same rooms and rolls.
 
@@ -23,7 +23,7 @@ A run has one seed, so the same seed gives the same rooms and rolls.
 
 ## Steps
 
-Not open yet. When it opens, follow the steps and test layout in [gameplay/README.md](../README.md).
+Follow the steps and test layout in [gameplay/README.md](../README.md).
 
 ## Example to copy
 
@@ -36,9 +36,9 @@ tools/check.sh
 ci/build/build.sh --quick
 ```
 
-## Rating questions
+## Review questions
 
-A good PR here changes how a run starts, ends or is summarised, keeps runs reproducible from their seed, and works for 1–4 players. Besides the standard criteria:
+A good PR here changes how a run starts, ends or is summarised, keeps runs reproducible from their seed, and works for 1–4 players. Besides the general review:
 
 - Is a run reproducible from its seed? Does the summary cover every player and never wait for one?
 - Does it keep to the dependency direction, without calling another area directly?

@@ -4,6 +4,8 @@ What each run did, newest first. Claude appends a short entry after each develop
 
 ## 2026-10-22
 
+- Element colours and icon recolour. Frost, void and homing icons recoloured with the new Ice and Void ramps (no player colours left in any of the 18 icons); frost and void tints set. `on_hit` and `on_expire` redrawn with different silhouettes (star burst vs ring) and the outline they were missing. Audit of the 18 icons, done by reading the rects (shell scripts were not available): all 18 use only palette colours (checked by `test_svg_art.gd`), and none uses a player colour. Outlines: 16 had one; `on_hit` and `on_expire` had none and now do. `timer` and the bolt/beam/chain icons were not pixel-traced for closed corners; a closed-outline check in `test_svg_art.gd` is a possible follow-up.
+
 - M2 part 26: the art pass. New shot `shot_art_pass.gd` (18 icons, element tints against player colours, vfx sprites) looked at against STYLE.md. Findings: the frost, void and homing icons and the frost and void tints use player colours; the orange bolt multiplied by a colour goes olive or brown and shows no element. Both are queued in `docs/NEXT.md`; no art changed.
 
 - M2 part 25: stress in the exports. `--stress` and `--projectile-timing` start the stress run and the projectile timings from the main menu in the Linux Test and Web Test exports (`projectile_timing_runner.gd` is now a node; `test_projectile_timing.gd` starts it from the command line). Spell limits hold on the headless numbers (WASM pending), none lowered. The runner prints `TIMING OK` for the existing web timing step in `build.sh` (not run yet); the `--stress` step is an owner question (#166). Main menu test extended.

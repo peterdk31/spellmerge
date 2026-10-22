@@ -542,6 +542,26 @@ def unchecked_commits(tip: str, main: str, pinned: str, bot_email: str) -> list[
     return [line.split(" ")[0] for line in out if line and line.split(" ", 1)[1] != bot_email]
 
 
+_CLOSES = re.compile(r"\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+#(\d+)", re.IGNORECASE)
+
+
+def with_closes(cfg: config_mod.Config, body: str) -> str:
+    """The PR body, closing every open owner question this session was given a `/claude` answer to.
+
+    Sessions are told to write `Closes #N` themselves, but #191 forgot, so the answered round of the
+    art direction question (#190) stayed open next to the new one.
+    """
+    try:  # a nicety: the PR opens with the session's own body if the state or the questions can't be read
+        st, _ = state.load(cfg)
+        answered = {int(p["number"]) for p in st.get("pending_instructions", []) if p.get("kind") == "claude"}
+        questions = {int(i["number"]) for i in inbox.open_questions(cfg)} if answered else set()
+    except (gh.GhError, KeyError, TypeError, ValueError):
+        return body
+    already = {int(n) for n in _CLOSES.findall(body)}
+    missing = sorted((answered & questions) - already)
+    return body + "".join(f"\n\nCloses #{n}" for n in missing)
+
+
 def publish(cfg: config_mod.Config, bundle: Path, branch: str, mode: str, result: dict[str, Any],
             pr_number: int | None, token: str, unfinished: str = "", task: str = "") -> dict[str, str]:
     """Pushes Claude's bundled commits from a clean checkout of main and opens or updates the PR.
@@ -601,27 +621,28 @@ def publish(cfg: config_mod.Config, bundle: Path, branch: str, mode: str, result
         gh.api(f"repos/{cfg.repo}/issues/{pr_number}/comments", "-X", "POST",
                input={"body": f"{note}\n\nPushed {pushed[:7]}."})
         return {"saved_pr": str(pr_number), "branch": branch}
+    body = with_closes(cfg, result["pr_body"]) if result.get("pr_body") else ""
     if mode == "new":
         existing = gh.api(f"repos/{cfg.repo}/pulls?state=open&head={cfg.repo.split('/')[0]}:{branch}")
         if existing:
             pr_number = existing[0]["number"]
             gh.api(f"repos/{cfg.repo}/pulls/{pr_number}", "-X", "PATCH",
                    input={"title": result.get("pr_title") or existing[0]["title"],
-                          "body": result.get("pr_body") or existing[0]["body"]})
+                          "body": body or existing[0]["body"]})
             if existing[0].get("draft"):  # an unfinished PR the session has now finished
                 gh.run("pr", "ready", str(pr_number), "--repo", cfg.repo)
         else:
             created = gh.api(f"repos/{cfg.repo}/pulls", "-X", "POST", input={
                 "title": (result.get("pr_title") or result.get("summary", "Claude's work"))[:200],
                 "head": branch, "base": "main",
-                "body": result.get("pr_body") or result.get("summary", ""),
+                "body": body or with_closes(cfg, result.get("summary", "")),
             })
             pr_number = created["number"]
     else:
         # The final review reads the PR body, so a revision replaces it: a stale "not verified" would
         # otherwise block a PR whose revision did verify it.
-        if result.get("pr_body"):
-            gh.api(f"repos/{cfg.repo}/pulls/{pr_number}", "-X", "PATCH", input={"body": result["pr_body"]})
+        if body:
+            gh.api(f"repos/{cfg.repo}/pulls/{pr_number}", "-X", "PATCH", input={"body": body})
         if result.get("comment"):
             gh.api(f"repos/{cfg.repo}/issues/{pr_number}/comments", "-X", "POST",
                    input={"body": f"**Revised after the critique.**\n\n{result['comment']}"})

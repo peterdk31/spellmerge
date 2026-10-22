@@ -510,6 +510,7 @@ class PublishTest(unittest.TestCase):
         api = mock.Mock(side_effect=[pr, {}, {}])
         with mock.patch.object(session.subprocess, "run", return_value=done), \
                 mock.patch.object(session, "workflow_changes", return_value=[]), \
+                mock.patch.object(session, "with_closes", lambda cfg, body: body), \
                 mock.patch.object(session.gh, "api", api):
             out = session.publish(CFG, Path("work.bundle"), "claude/20261017-x", "update",
                                   {"pr_body": "Tests passed.", "comment": "Fixed."}, 19, "t")
@@ -589,6 +590,22 @@ class PublishTest(unittest.TestCase):
                 self.assertEqual(session.workflow_changes("pushed", ["main"]), [".github/workflows/w.yml"])
             finally:
                 os.chdir(old)
+
+    def test_the_pr_closes_the_owner_questions_it_answers(self) -> None:
+        """#191 carried out the answer on #190 without `Closes #190`, so #190 stayed open next to #192."""
+        st = copy.deepcopy(state.DEFAULT)
+        st["pending_instructions"] = [
+            {"kind": "claude", "number": 190, "text": "more options", "url": "u", "at": "t"},
+            {"kind": "claude", "number": 192, "text": "more", "url": "u", "at": "t"},
+            {"kind": "claude", "number": 50, "text": "fix it", "url": "u", "at": "t"},  # not a question
+            {"kind": "ask", "number": 193, "text": "why?", "url": "u", "at": "t"}]
+        with mock.patch.object(session.state, "load", lambda cfg: (st, "sha")), \
+                mock.patch.object(session.inbox, "open_questions",
+                                  lambda cfg: [{"number": 190}, {"number": 192}, {"number": 193}]):
+            self.assertEqual(session.with_closes(CFG, "Round three. Fixes #192."), "Round three. Fixes #192.\n\nCloses #190")
+            self.assertEqual(session.with_closes(CFG, "x"), "x\n\nCloses #190\n\nCloses #192")
+        with mock.patch.object(session.state, "load", lambda cfg: (copy.deepcopy(state.DEFAULT), "sha")):
+            self.assertEqual(session.with_closes(CFG, "x"), "x")
 
     def test_branch_names(self) -> None:
         self.assertTrue(session.valid_branch("claude/20261017-area-readmes"))

@@ -76,9 +76,16 @@ _BOT_LOGINS = {"github-actions"}
 # --- Gather --------------------------------------------------------------------
 
 
-def _people(cfg: config_mod.Config) -> set[str]:
-    """Accounts whose posts are never triaged: the owner and the bots."""
-    return {cfg.owner.login, cfg.bot.login, *cfg.dependency_bots, *_BOT_LOGINS, *(f"{b}[bot]" for b in _BOT_LOGINS)}
+def _bots(cfg: config_mod.Config) -> set[str]:
+    """Accounts whose posts are never triaged: the bots."""
+    return {cfg.bot.login, *cfg.dependency_bots, *_BOT_LOGINS, *(f"{b}[bot]" for b in _BOT_LOGINS)}
+
+
+def _owners_own(cfg: config_mod.Config, issue: dict[str, Any], labels: set[str]) -> bool:
+    """The owner's own PRs (their work, merged by hand), the Control panel, the old pinned Daily log, and
+    issues the owner already queued by labelling them: none of these is for the intake."""
+    return ("pull_request" in issue or issue["number"] == cfg.control_panel_issue
+            or issue["title"] == "Daily log" or bool(labels & {SCHEDULED, BACKLOG}))
 
 
 def _login(node: dict[str, Any] | None) -> str:
@@ -100,12 +107,14 @@ def answered_since_bot(cfg: config_mod.Config, author: str, comments: list[dict[
 
 
 def gather(cfg: config_mod.Config) -> dict[str, Any]:
-    people = _people(cfg)
+    bots = _bots(cfg)
     items: list[dict[str, Any]] = []
     for issue in gh.api_paginated(f"repos/{cfg.repo}/issues?state=open&sort=created&direction=asc&per_page=100"):
         author = _login(issue.get("user"))
         labels = {lab["name"] for lab in issue.get("labels", [])}
-        if author in people or labels & (INTERNAL - {TRIAGED}):
+        if author in bots or labels & (INTERNAL - {TRIAGED}):
+            continue
+        if author == cfg.owner.login and _owners_own(cfg, issue, labels):
             continue
         is_pr = "pull_request" in issue
         comments: list[dict[str, Any]] = []
@@ -121,16 +130,18 @@ def gather(cfg: config_mod.Config) -> dict[str, Any]:
         items.append({
             "ref": f"{'pr' if is_pr else 'issue'}:{issue['number']}", "title": issue["title"][:200],
             "body": (issue.get("body") or "")[:MAX_BODY], "author": author, "url": issue["html_url"],
-            "labels": sorted(labels), "comments": _brief(comments),
+            "from_owner": author == cfg.owner.login, "labels": sorted(labels), "comments": _brief(comments),
         })
     owner, name = cfg.repo.split("/")
     data = gh.graphql(_DISCUSSIONS, owner=owner, name=name)["repository"]
     for d in reversed(data["discussions"]["nodes"]):
         author = _login(d.get("author"))
-        if author in people or d["category"]["name"].lower() == "announcements":
+        if author in bots or d["category"]["name"].lower() == "announcements":
             continue
         comments = d["comments"]["nodes"]
-        replies = [i for i, c in enumerate(comments) if _login(c.get("author")) in people]
+        # Answered by the bot, or by the owner on someone else's post.
+        answerers = bots | ({cfg.owner.login} if author != cfg.owner.login else set())
+        replies = [i for i, c in enumerate(comments) if _login(c.get("author")) in answerers]
         if replies:
             # Answered by the bot or the owner. Only a needs-info reply the poster answered comes back.
             last = replies[-1]
@@ -140,7 +151,7 @@ def gather(cfg: config_mod.Config) -> dict[str, Any]:
         items.append({
             "ref": f"discussion:{d['number']}", "id": d["id"], "category": d["category"]["name"],
             "title": d["title"][:200], "body": (d.get("body") or "")[:MAX_BODY], "author": author, "url": d["url"],
-            "comments": _brief(comments, "author"),
+            "from_owner": author == cfg.owner.login, "comments": _brief(comments, "author"),
         })
     queue = [{"number": i["number"], "title": i["title"][:200],
               "label": SCHEDULED if any(lab["name"] == SCHEDULED for lab in i["labels"]) else BACKLOG}
@@ -202,7 +213,10 @@ def normalise(decision: dict[str, Any], known: dict[str, dict[str, Any]], open_n
         d["decision"] = "backlog" if d["kind"] in ("bug", "idea") else "answer"
     if d.get("decision") not in FOOTER:
         d["decision"] = "needs_info"
-    if d["decision"] == "schedule" and scheduled_so_far >= MAX_SCHEDULED and d["kind"] != "copyright":
+    if item.get("from_owner") and d["decision"] in ("decline", "answer") and d["kind"] in ("bug", "idea"):
+        d["decision"] = "needs_info"  # the owner's ideas are never turned down; Claude asks instead
+    if (d["decision"] == "schedule" and scheduled_so_far >= MAX_SCHEDULED and d["kind"] != "copyright"
+            and not item.get("from_owner")):
         d["decision"] = "backlog"
     if d["decision"] in ("schedule", "backlog") and not (d.get("title") and d.get("task")):
         d["decision"] = "needs_info"
@@ -309,7 +323,7 @@ def apply(cfg: config_mod.Config, decisions: dict[str, Any], gathered: dict[str,
             log.append(f"Could not carry out the decision on {d['ref']}: {dailylog.shorten(str(e), 200)}")
             attention = True
             continue
-        scheduled += d["decision"] == "schedule"
+        scheduled += d["decision"] == "schedule" and not item.get("from_owner")
         if d["kind"] == "copyright":
             attention = True
     if known:

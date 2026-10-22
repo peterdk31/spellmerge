@@ -87,7 +87,7 @@ class IntakeTest(unittest.TestCase):
             log, attention = intake.apply(CFG, decisions, data, "discussions-token")
         return log, attention, st
 
-    def test_gather_skips_the_owner_the_bot_internal_and_triaged_posts(self) -> None:
+    def test_gather_skips_the_bot_internal_and_triaged_posts(self) -> None:
         gh = FakeGitHub(
             issues=[issue(1), issue(2, author=CFG.owner.login), issue(3, author=CFG.bot.login),
                     issue(4, labels=("owner-question",)), issue(5, labels=("triaged", "bug")),
@@ -96,7 +96,26 @@ class IntakeTest(unittest.TestCase):
                          discussion(10, category="Announcements")])
         with gh.patch():
             data = intake.gather(CFG)
-        self.assertEqual([i["ref"] for i in data["items"]], ["issue:1", "pr:6", "discussion:8"])
+        self.assertEqual([i["ref"] for i in data["items"]], ["issue:1", "issue:2", "pr:6", "discussion:8"])
+
+    def test_the_owners_ideas_are_read_but_not_their_prs_or_the_control_panel(self) -> None:
+        owner = CFG.owner.login
+        gh = FakeGitHub(
+            issues=[issue(1, author=owner), issue(2, author=owner, pr=True), issue(CFG.control_panel_issue, author=owner),
+                    issue(3, author=owner, labels=("scheduled",)), issue(5, author=owner, title="Daily log")],
+            discussions=[discussion(8, author=owner, comments=[(owner, "more detail")]),
+                         discussion(9, comments=[(owner, "thanks!")])])
+        with gh.patch():
+            data = intake.gather(CFG)
+        self.assertEqual([(i["ref"], i["from_owner"]) for i in data["items"]], [("issue:1", True), ("discussion:8", True)])
+
+    def test_the_owners_ideas_are_never_declined_or_capped(self) -> None:
+        known = {"issue:1": {"ref": "issue:1", "from_owner": True}}
+        d = intake.normalise({"ref": "issue:1", "kind": "idea", "decision": "decline"}, known, set(), 0)
+        self.assertEqual(d["decision"], "needs_info")
+        d = intake.normalise({"ref": "issue:1", "kind": "idea", "decision": "schedule", "title": "t", "task": "t"},
+                             known, set(), intake.MAX_SCHEDULED)
+        self.assertEqual(d["decision"], "schedule")
 
     def test_a_needs_info_post_comes_back_once_the_poster_answers(self) -> None:
         bot = CFG.bot.login

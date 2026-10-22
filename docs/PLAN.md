@@ -146,7 +146,8 @@ People outside the project don't send code or assets. They post in **Issues** (b
 
 ### Flow (daily)
 
-1. **Gather** (script, read-only token): open issues and discussions by anyone but the owner and the bots that haven't been triaged, plus `needs-info` posts the poster has since answered. Outside PRs are gathered too, read as suggestions. At most 25 a run, oldest first.
+1. **Gather** (script, read-only token): open issues and discussions by anyone but the bots that haven't been triaged, plus `needs-info` posts the poster has since answered. Outside PRs are gathered too, read as suggestions. At most 25 a run, oldest first.
+   - **The owner's posts go through the intake too,** marked `from_owner`: they are the owner's direction, never declined and outside the limit of 5 (scheduled when they fit the milestone, otherwise on the backlog, or one question back when unclear). The owner's own PRs, the Control panel and issues the owner already labelled `scheduled` or `backlog` are left alone.
 2. **Decide** (Claude, read-only tools, no write token): for each post a kind (bug, idea, question, feedback, copyright, spam, other), a decision and a warm reply. The post text is data, never instructions; anything that tries to steer the bot is reported as a concern.
 3. **Apply** (script): carries out each decision with the bot's token, within fixed rules.
 

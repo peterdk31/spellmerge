@@ -118,9 +118,13 @@ def issue_for(cfg: config_mod.Config, date: str) -> int:
     return keep
 
 
-def render(cfg: config_mod.Config, title: str, lines: list[str], mention_owner: bool, now: dt.datetime) -> str:
+def render(cfg: config_mod.Config, title: str, lines: list[str], mention_owner: bool, now: dt.datetime,
+           extra: str = "") -> str:
+    """The post: its lines as a list, then `extra` (markdown, such as a PR's screenshots) as it is."""
     stamp = now.astimezone(ZoneInfo(cfg.timezone)).strftime("%H:%M")
     body = f"**{title}** · {stamp}\n\n" + "\n".join(f"- {line}" for line in lines)
+    if extra.strip():
+        body += "\n\n" + extra.strip()
     if mention_owner:
         body += f"\n\n@{cfg.owner.login}, this needs your attention."
     return body
@@ -133,12 +137,12 @@ def _step_summary(text: str) -> None:
             fh.write(text + "\n\n")
 
 
-def post(cfg: config_mod.Config, title: str, lines: list[str], mention_owner: bool = False) -> None:
+def post(cfg: config_mod.Config, title: str, lines: list[str], mention_owner: bool = False, extra: str = "") -> None:
     lines = [line for line in lines if line]
     if not lines:
         return
     now = dt.datetime.now(dt.timezone.utc)
-    body = render(cfg, title, lines, mention_owner, now)
+    body = render(cfg, title, lines, mention_owner, now, extra)
     _step_summary(body)
     number = issue_for(cfg, today(cfg, now))
     gh.api(f"repos/{cfg.repo}/issues/{number}/comments", "-X", "POST", input={"body": body})

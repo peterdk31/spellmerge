@@ -153,6 +153,12 @@ class DailyLogTest(unittest.TestCase):
         self.assertNotIn("@", dailylog.render(CFG, "T", ["a"], False, now))
         self.assertIn(f"@{CFG.owner.login}", dailylog.render(CFG, "T", ["a"], True, now))
 
+    def test_render_puts_extra_markdown_after_the_lines(self) -> None:
+        now = dt.datetime(2026, 10, 22, 8, 0, tzinfo=dt.timezone.utc)
+        body = dailylog.render(CFG, "T", ["a"], True, now, "![shot](https://example.org/s.png)\n")
+        self.assertIn("- a\n\n![shot](https://example.org/s.png)\n\n@", body)
+        self.assertEqual(dailylog.render(CFG, "T", ["a"], False, now, "  "), dailylog.render(CFG, "T", ["a"], False, now))
+
 
 if __name__ == "__main__":
     unittest.main()

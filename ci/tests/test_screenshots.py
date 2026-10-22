@@ -39,6 +39,16 @@ class ScreenshotsTest(unittest.TestCase):
             (root / side / "shots.txt").write_text("\n".join(lines) + "\n")
         return root
 
+    def test_the_log_repeats_the_bots_latest_screenshots_comment(self) -> None:
+        comments = [{"user": {"login": CFG.bot.login}, "body": screenshots.HEADING + " (old1234 against `main`)"},
+                    {"user": {"login": "someone"}, "body": screenshots.HEADING + " ![x](https://evil.example/x.png)"},
+                    {"user": {"login": CFG.bot.login}, "body": "**Revised after the critique.**"},
+                    {"user": {"login": CFG.bot.login}, "body": screenshots.HEADING + " (new1234 against `main`)"}]
+        with mock.patch.object(screenshots.gh, "api_paginated", lambda path: comments):
+            self.assertEqual(screenshots.for_log(CFG, 7), "**What #7 changes on screen** (new1234 against `main`)")
+        with mock.patch.object(screenshots.gh, "api_paginated", lambda path: comments[1:3]):
+            self.assertEqual(screenshots.for_log(CFG, 7), "")
+
     def test_only_chosen_shots_that_changed_are_shown_before_and_after(self) -> None:
         changed, same = PNG + b"new", PNG
         with tempfile.TemporaryDirectory() as tmp:

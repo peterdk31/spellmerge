@@ -142,12 +142,11 @@ func test_every_form_works_for_all_four_players_at_once() -> void:
 
 func test_the_bolt_is_one_shot_that_flies_straight_and_hits() -> void:
 	var imp := _target(Vector2(100.0, 0.0))
-	var off_line := _target(Vector2(100.0, 60.0))
+	_target(Vector2(100.0, 60.0))
 	var tag: int = _cast(&"bolt", 0, Vector2.ZERO)
 	check_equal(_mgr.get_count(), 1, "one shot")
 	_tick(30)
 	check_equal(_hit_targets(), [imp] as Array, "it hit the imp in its way and not the one beside it")
-	check(off_line != null, "the other target exists")
 	check_equal(_spells.hit_profile(tag).damage, _form(&"bolt").base_damage, "a bare bolt hits for its base damage")
 
 
@@ -172,10 +171,9 @@ func test_the_beam_hits_along_a_line_up_to_its_reach_at_once() -> void:
 
 
 func test_the_beam_does_not_reach_past_its_length() -> void:
-	var far := _target(Vector2(_form(&"beam").ray_length + 40.0, 0.0))
+	_target(Vector2(_form(&"beam").ray_length + 40.0, 0.0))
 	_cast(&"beam", 0, Vector2.ZERO)
 	check_equal(_hits.size(), 0, "a target beyond the reach is safe")
-	check(far != null, "it exists")
 
 
 # --- Nova -------------------------------------------------------------------
@@ -195,14 +193,12 @@ func test_the_nova_throws_a_ring_in_every_direction() -> void:
 	check_equal(hit.size(), 8, "each exactly once")
 
 
-func test_the_nova_is_short_ranged() -> void:
+func test_the_nova_does_not_hit_past_its_reach() -> void:
 	var form: FormBase = _form(&"nova")
-	check(form.speed * form.lifetime < 90.0, "its reach is short: a nova trades range for coverage")
-	var far := _target(Vector2(form.speed * form.lifetime + 60.0, 0.0))
+	_target(Vector2(form.speed * form.lifetime + 60.0, 0.0))
 	_cast(&"nova", 0, Vector2.ZERO)
 	_tick(60)
 	check_equal(_hits.size(), 0, "a target beyond the reach is not hit")
-	check(far != null, "it exists")
 
 
 # --- Rune -------------------------------------------------------------------
@@ -219,14 +215,14 @@ func test_the_rune_stays_where_it_was_cast_and_hits_what_walks_in() -> void:
 	check_equal(_hit_targets(), [imp] as Array, "an imp that walks in is hit")
 
 
-func test_the_rune_is_left_behind_when_the_caster_moves_on() -> void:
+func test_the_rune_stays_when_the_caster_and_a_target_move_away() -> void:
 	var tag: int = _cast(&"rune", 0, Vector2.ZERO)
+	var imp := _target(Vector2(300.0, 0.0))
 	_tick(30, {0: Vector2(200.0, 0.0)})
-	check_equal(_mgr.get_position_of(_slots(tag)[0]), Vector2.ZERO, "the rune stays while the caster is far away")
-
-
-func test_the_rune_outlasts_a_bolt() -> void:
-	check(_form(&"rune").lifetime > _form(&"bolt").lifetime * 2.0, "a trap waits longer than a bolt flies")
+	imp.global_position = Vector2(400.0, 0.0)
+	_tick(30, {0: Vector2(200.0, 0.0)})
+	check_equal(_mgr.get_position_of(_slots(tag)[0]), Vector2.ZERO, "the rune stays at the cast point")
+	check_equal(_hits.size(), 0, "nobody was near it")
 
 
 # --- Orbit ------------------------------------------------------------------

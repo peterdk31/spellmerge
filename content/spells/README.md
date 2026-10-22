@@ -31,7 +31,9 @@ The spell components that players assemble into spells: **forms** (bolt, beam, n
 
 ## Example to copy
 
-`content/spells/forms/bolt/` is the M2 example: `bolt.tres` on `FormBase` and an `icon.svg`, no script. The M1 one below, now `content/spells/legacy/fire_bolt/`: `fire_bolt.tres` (the values: id, mana cost, cooldown, damage, speed, lifetime) on `fire_bolt.gd`, which extends `SpellBase` and overrides `_fire()` to spawn a shot through `Projectiles.spawn` (returning `false` when it could not, so the cast costs nothing) and answers `hit_tag()` and `hit_knockback()`; `Combat` reads the hit profile from those after the `spell_cast` event, so the bolt never calls it. Players and bots never read these fields; they only call `cast()`. The registry shares one resource, so its cooldowns are shared: `flow` calls `reset_cooldowns()` on a new run. `tests/content/spells/test_bolt.gd` fails if any script outside `content/spells/` and `core/base/` reads one. M2 replaces this with the real component classes and migrates the bolt.
+`content/spells/forms/bolt/` is the M2 example: `bolt.tres` on `FormBase` and an `icon.svg`, no script. Copy it for a new form and change the values.
+
+Legacy until part 11: the M1 bolt in `content/spells/legacy/fire_bolt/`: `fire_bolt.tres` (the values: id, mana cost, cooldown, damage, speed, lifetime) on `fire_bolt.gd`, which extends `SpellBase` and overrides `_fire()` to spawn a shot through `Projectiles.spawn` (returning `false` when it could not, so the cast costs nothing) and answers `hit_tag()` and `hit_knockback()`; `Combat` reads the hit profile from those after the `spell_cast` event, so the bolt never calls it. Players and bots never read these fields; they only call `cast()`. The registry shares one resource, so its cooldowns are shared: `flow` calls `reset_cooldowns()` on a new run. `tests/content/spells/test_fire_bolt_m1.gd` fails if any script outside `content/spells/` and `core/base/` reads one. Part 11 deletes this folder and its test.
 
 ## Validate
 

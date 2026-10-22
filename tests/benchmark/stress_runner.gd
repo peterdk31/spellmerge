@@ -17,12 +17,14 @@ extends Node
 ## players in turn (at most TOP_UP_PER_STEP a step); the manager's cap is set to the
 ## target, so the oldest shot of the richest owner is dropped past it, as in play.
 ##
-## Pass (`STRESS OK`): in each scenario the enemies and the shots reached at least 90% of
-## the target, every bot cast, frames were measured, no build was refused and the log has
-## no error. Frame time never fails the run: past 16.7 ms it prints a `BENCH WARNING:`
+## Pass (`STRESS OK`): in each scenario the enemies and the shots averaged at least 90% of
+## the target over the measured window, every bot cast during it, spell shots (not
+## fillers) hit something, frames were measured, no build was refused and the log has no
+## error. The fillers are load only; the hit and reaction paths are exercised by the
+## bots' real spells. Frame time never fails the run: past 16.7 ms it prints a `BENCH WARNING:`
 ## with likely fixes (docs/PLAN.md, "Gates are sparse"). `BENCH:` lines carry the numbers.
 ##
-## Started by `stress.gd` (a SceneTree script, the editor run) or, shortened, by
+## Started by `stress.gd` (a SceneTree script run from the command line) or, shortened, by
 ## `test_stress.gd` (`build.sh --quick --tests`). Part 25 adds the exports. The node prints
 ## `STRESS OK` or `STRESS FAILED` and quits with 0 or 1.
 ##
@@ -116,6 +118,12 @@ var _active: bool = false
 var _default_cap: int = 0
 var _peak_enemies: int = 0
 var _peak_shots: int = 0
+var _enemy_sum: int = 0
+var _enemy_samples: int = 0
+var _shot_sum: int = 0
+var _shot_samples: int = 0
+var _hits: int = 0
+var _reactions: int = 0
 var _refused: int = 0
 
 
@@ -133,6 +141,8 @@ func _ready() -> void:
 	_default_cap = int(_projectiles.call("get_cap"))
 	_events.connect("spell_cast", _on_spell_cast)
 	_events.connect("build_refused", _on_build_refused)
+	_events.connect("projectile_hit", _on_projectile_hit)
+	_events.connect("reaction_triggered", _on_reaction_triggered)
 	_next_scenario()
 
 
@@ -159,6 +169,12 @@ func _next_scenario() -> void:
 	_casts = [0, 0, 0, 0]
 	_peak_enemies = 0
 	_peak_shots = 0
+	_enemy_sum = 0
+	_enemy_samples = 0
+	_shot_sum = 0
+	_shot_samples = 0
+	_hits = 0
+	_reactions = 0
 	_elapsed = 0.0
 	_swap_left = SWAP_EVERY
 	_measuring = false
@@ -221,6 +237,7 @@ func _process(delta: float) -> void:
 	_top_up_enemies()
 	if not _measuring and _elapsed >= warm_up:
 		_measuring = true
+		_casts = [0, 0, 0, 0]
 		_probe = ProbeScript.new()
 		add_child(_probe)
 	if _elapsed >= warm_up + measure:
@@ -231,7 +248,11 @@ func _physics_process(_delta: float) -> void:
 	if not _active:
 		return
 	_top_up_shots()
-	_peak_shots = maxi(_peak_shots, int(_projectiles.call("get_count")))
+	var count: int = int(_projectiles.call("get_count"))
+	_peak_shots = maxi(_peak_shots, count)
+	if _measuring:
+		_shot_sum += count
+		_shot_samples += 1
 
 
 ## Nobody dies and nobody runs dry: this is a stress scene, not a balance test.
@@ -268,6 +289,9 @@ func _top_up_enemies() -> void:
 		_enemies.append(enemy)
 		alive += 1
 	_peak_enemies = maxi(_peak_enemies, alive)
+	if _measuring:
+		_enemy_sum += alive
+		_enemy_samples += 1
 
 
 ## Fill the manager up to the target with plain shots, owned by the players in turn.
@@ -289,6 +313,16 @@ func _on_spell_cast(player: int, _spell_id: StringName, _origin: Vector2, _direc
 		_casts[player] += 1
 
 
+## Only shots made by spells have a tag; the fillers have tag 0.
+func _on_projectile_hit(_player: int, _target: Node, _position: Vector2, tag: int) -> void:
+	if tag != 0:
+		_hits += 1
+
+
+func _on_reaction_triggered(_player: int, _reaction_id: StringName, _position: Vector2) -> void:
+	_reactions += 1
+
+
 func _on_build_refused(_player: int, _reason: String) -> void:
 	_refused += 1
 
@@ -302,14 +336,18 @@ func _end_scenario() -> void:
 		print("BENCH: stress %s results" % label)
 		_probe.call("report")
 		_warn_when_slow(label)
-	print("BENCH: stress %s: peak enemies %d of %d, peak shots %d of %d, casts per player %s" % [label, _peak_enemies, _target_enemies, _peak_shots, _target_shots, str(_casts)])
-	if _peak_enemies < int(float(_target_enemies) * REACH):
-		_failures.append("%s: only %d of %d enemies stood at once" % [label, _peak_enemies, _target_enemies])
-	if _peak_shots < int(float(_target_shots) * REACH):
-		_failures.append("%s: only %d of %d shots flew at once" % [label, _peak_shots, _target_shots])
+	var mean_enemies: float = float(_enemy_sum) / maxf(1.0, float(_enemy_samples))
+	var mean_shots: float = float(_shot_sum) / maxf(1.0, float(_shot_samples))
+	print("BENCH: stress %s: enemies mean %.0f peak %d of %d, shots mean %.0f peak %d of %d, spell hits %d, reactions %d, casts per player (measured window) %s" % [label, mean_enemies, _peak_enemies, _target_enemies, mean_shots, _peak_shots, _target_shots, _hits, _reactions, str(_casts)])
+	if mean_enemies < float(_target_enemies) * REACH:
+		_failures.append("%s: on average only %.0f of %d enemies stood" % [label, mean_enemies, _target_enemies])
+	if mean_shots < float(_target_shots) * REACH:
+		_failures.append("%s: on average only %.0f of %d shots flew" % [label, mean_shots, _target_shots])
+	if _hits == 0:
+		_failures.append("%s: no spell shot hit anything" % label)
 	for index in PLAYERS:
 		if _casts[index] == 0:
-			_failures.append("%s: bot %d never cast a spell" % [label, index + 1])
+			_failures.append("%s: bot %d never cast a spell while measured" % [label, index + 1])
 	if _probe == null or int(_probe.call("frame_count")) == 0:
 		_failures.append("%s: no frames were measured" % label)
 	_teardown_scenario()

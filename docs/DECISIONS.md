@@ -5,7 +5,7 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 ## 2026-10-22: Multimesh batches are sized by use, not cut mid-buffer
 
 - **Why.** `MultiMesh.buffer` must hold exactly instance_count x 16 floats, so a partial upload is not possible; the only way to send less is a smaller MultiMesh.
-- **Now.** Each batch's room is the shots it draws rounded up to a power of two (at least 64, at most the cap); it grows at once and shrinks only when use is under a quarter of it, so the MultiMesh is rebuilt rarely. No shot is dropped by it; the cap is unchanged. An empty batch above the smallest size drops to nothing.
+- **Now.** Each batch's room is the shots it draws rounded up to a power of two (at least 64, at most the cap); it grows at once and shrinks only when use is under a quarter of it, so the MultiMesh is rebuilt rarely. No shot is dropped by it; the cap is unchanged. An empty batch keeps its room (it uploads nothing), so a batch that empties between volleys never reallocates. Sizing costs one extra read-only pass over the live shots per frame; keeping per-batch counts at every spawn and free was judged riskier than that pass.
 
 ## 2026-10-22: One decision keeps one issue until it's made
 

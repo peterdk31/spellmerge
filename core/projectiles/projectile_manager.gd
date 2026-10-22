@@ -318,9 +318,9 @@ var _draw_node: MultiMeshInstance2D = null
 var _draw_room: int = 0
 var _rune_room: int = 0
 var _orbit_room: int = 0
+var _hostile_room: int = 0
 ## Live shots per batch this frame (BATCH_*), refilled by _count_batches; a member so no array is made per frame.
 var _batch_counts: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
-var _hostile_room: int = 0
 var _draw_buffer: PackedFloat32Array = PackedFloat32Array()
 ## The batches of runes and orbit shots, beside the bolts' `_draw_node`.
 var _rune_node: MultiMeshInstance2D = null
@@ -1061,22 +1061,10 @@ func update_draw() -> void:
 	var fraction: float = clampf(Engine.get_physics_interpolation_fraction(), 0.0, 1.0)
 	_count_batches()
 	var counts: PackedInt32Array = _batch_counts
-	var new_room: int = _batch_room(multimesh, _draw_room, counts[BATCH_BOLT])
-	if new_room != _draw_room:
-		_draw_room = new_room
-		_draw_buffer.resize(_draw_room * DRAW_STRIDE)
-	new_room = _batch_room(_rune_node.multimesh, _rune_room, counts[BATCH_RUNE])
-	if new_room != _rune_room:
-		_rune_room = new_room
-		_rune_buffer.resize(_rune_room * DRAW_STRIDE)
-	new_room = _batch_room(_orbit_node.multimesh, _orbit_room, counts[BATCH_ORBIT])
-	if new_room != _orbit_room:
-		_orbit_room = new_room
-		_orbit_buffer.resize(_orbit_room * DRAW_STRIDE)
-	new_room = _batch_room(hostile_multimesh, _hostile_room, counts[BATCH_HOSTILE])
-	if new_room != _hostile_room:
-		_hostile_room = new_room
-		_hostile_buffer.resize(_hostile_room * DRAW_STRIDE)
+	_draw_room = _fit_batch(multimesh, _draw_buffer, _draw_room, counts[BATCH_BOLT])
+	_rune_room = _fit_batch(_rune_node.multimesh, _rune_buffer, _rune_room, counts[BATCH_RUNE])
+	_orbit_room = _fit_batch(_orbit_node.multimesh, _orbit_buffer, _orbit_room, counts[BATCH_ORBIT])
+	_hostile_room = _fit_batch(hostile_multimesh, _hostile_buffer, _hostile_room, counts[BATCH_HOSTILE])
 	var out: int = 0
 	var rune_out: int = 0
 	var orbit_out: int = 0
@@ -1131,6 +1119,7 @@ func _batch_of(slot: int) -> int:
 
 
 ## Count the live shots each batch will draw into _batch_counts, indexed by BATCH_*.
+## One extra pass over the live slots (reads only): the price of sizing before writing.
 func _count_batches() -> void:
 	_batch_counts.fill(0)
 	for slot in _high:
@@ -1138,19 +1127,15 @@ func _count_batches() -> void:
 			_batch_counts[_batch_of(slot)] += 1
 
 
-## The room (in shots) a batch needs to draw `used`: `room` while that fits and is not
-## more than four times too big, else `used` rounded up to a power of two (at least
-## MIN_BATCH, at most the cap). An empty batch keeps at most MIN_BATCH, else it drops
-## to 0. Resizes the MultiMesh to match when it changes; the caller resizes the buffer.
-## The MultiMesh buffer must be exactly instance_count x DRAW_STRIDE floats, so a
-## smaller upload means a smaller MultiMesh.
-func _batch_room(multimesh: MultiMesh, room: int, used: int) -> int:
-	if used == 0:
-		if room <= MIN_BATCH:
-			return room
-		multimesh.instance_count = 0
-		return 0
-	if used <= room and used * 4 > room:
+## Size a batch's MultiMesh and buffer to draw `used` shots; returns the new room.
+## The room stays while `used` fits and is more than a quarter of it, else it becomes
+## `used` rounded up to a power of two (at least MIN_BATCH, at most the cap). An empty
+## batch keeps its room: nothing is uploaded for it, and it does not reallocate when it
+## flickers between empty and busy. The MultiMesh buffer must be exactly instance_count
+## x DRAW_STRIDE floats, so a smaller upload means a smaller MultiMesh. The buffer is
+## shared, not copied, so resizing it here resizes the caller's.
+func _fit_batch(multimesh: MultiMesh, buffer: PackedFloat32Array, room: int, used: int) -> int:
+	if used == 0 or (used <= room and used * 4 > room):
 		return room
 	var wanted: int = MIN_BATCH
 	while wanted < used:
@@ -1158,6 +1143,7 @@ func _batch_room(multimesh: MultiMesh, room: int, used: int) -> int:
 	wanted = mini(wanted, _cap)
 	if wanted != room:
 		multimesh.instance_count = wanted
+		buffer.resize(wanted * DRAW_STRIDE)
 	return wanted
 
 

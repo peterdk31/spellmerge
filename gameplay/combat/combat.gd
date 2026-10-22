@@ -369,6 +369,13 @@ func speed_factor(enemy: Node2D) -> float:
 ## `damage_dealt` was sent. A hit on an unknown node, a dead target, a dodging
 ## or downed wizard or for 0 or less does nothing.
 func hit(player: int, target: Node, amount: int, direction: Vector2 = Vector2.ZERO, strength: float = 0.0) -> bool:
+	return _hit(player, target, amount, direction, strength, false)
+
+
+## hit() with a switch: a `quiet` hit (burn ticks) takes the whole pipeline, deaths
+## included, but sends no `damage_dealt` for an enemy that survives, so Feel and the
+## AI do not stutter, shake or flinch twice a second per burning enemy.
+func _hit(player: int, target: Node, amount: int, direction: Vector2, strength: float, quiet: bool) -> bool:
 	if amount <= 0 or target == null or not is_instance_valid(target):
 		return false
 	var at: int = _enemies.find(target)
@@ -381,7 +388,7 @@ func hit(player: int, target: Node, amount: int, direction: Vector2 = Vector2.ZE
 	_health[at] = maxi(_health[at] - amount, 0)
 	if strength > 0.0:
 		_knock[at] = direction * strength
-	if events != null:
+	if events != null and not (quiet and _health[at] > 0):
 		events.damage_dealt.emit(player, enemy, amount, where)
 		# A listener may have changed the registrations; find the row again.
 		at = _enemies.find(enemy)
@@ -450,7 +457,7 @@ func _send_burns() -> void:
 	var sent: int = 0
 	while sent < _due_enemy.size():
 		if is_instance_valid(_due_enemy[sent]):
-			hit(_due_player[sent], _due_enemy[sent], _due_amount[sent])
+			_hit(_due_player[sent], _due_enemy[sent], _due_amount[sent], Vector2.ZERO, 0.0, true)
 		sent += 1
 	_due_enemy.clear()
 	_due_player.clear()
@@ -573,10 +580,12 @@ func _on_projectile_hit(player: int, target: Node, position: Vector2, tag: int) 
 		if _shock_left[at] > 0.0:
 			jump_share = _shock_share[at]
 			jump_from = _position_of(enemy) + _hurt_offset[at]
-			_shock_left[at] = 0.0
-			_shock_share[at] = 0.0
 	if not hit(player, enemy, damage, direction, strength):
 		return
+	var spent: int = _enemies.find(enemy)
+	if spent >= 0:
+		_shock_left[spent] = 0.0
+		_shock_share[spent] = 0.0
 	if jump_share > 0.0:
 		_shock_jump(player, enemy, jump_from, roundi(float(damage) * jump_share / 100.0))
 	if profile != null and profile.status_id != &"" and is_instance_valid(enemy):

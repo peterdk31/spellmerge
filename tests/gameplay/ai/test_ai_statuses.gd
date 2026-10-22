@@ -5,6 +5,7 @@ extends "res://tests/support/suite.gd"
 
 const Fixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 const AiScript := preload("res://gameplay/ai/ai.gd")
+const CombatScript := preload("res://gameplay/combat/combat.gd")
 
 var fx: Fixture
 
@@ -32,7 +33,6 @@ func test_a_chilled_imp_walks_slower() -> void:
 func test_a_frozen_imp_stands_still() -> void:
 	fx.players[0].position = Vector2(1000.0, 0.0)
 	var imp: AiScript = fx.imp()
-	fx.combat.apply_status(0, imp, &"chill", 3.0, 50.0)
 	for i in 3:
 		fx.combat.apply_status(0, imp, &"chill", 3.0, 50.0)
 	check(fx.combat.has_status(imp, &"freeze"), "frozen")
@@ -54,7 +54,9 @@ func test_a_frozen_imp_holds_its_attack_and_then_goes_on() -> void:
 	while imp.is_telegraphing() and steps < 60:
 		fx.run(imp, 1)
 		steps += 1
-	check(steps > 16 - 8, "it waited out the freeze")
+	var frozen_steps: int = int(CombatScript.FREEZE_TIME / Fixture.STEP) - 8
+	var windup_steps: int = ceili(imp.windup_time * (1.0 - before) / Fixture.STEP)
+	check(absi(steps - (frozen_steps + windup_steps)) <= 2, "it waited out the freeze, then the rest of the windup")
 	check(not imp.is_telegraphing(), "after the thaw the windup ended")
 	check_equal(fx.projectiles.get_count(), 1, "and the shot left")
 

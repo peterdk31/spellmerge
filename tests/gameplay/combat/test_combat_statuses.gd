@@ -140,10 +140,9 @@ func test_shots_with_no_spell_still_use_the_hit_table() -> void:
 func test_burn_deals_its_damage_over_time_to_the_player_who_set_it() -> void:
 	var enemy := _enemy()
 	_hit(2, enemy, _tag(2, &"fire"))
-	_damage.clear()
+	var before: int = _combat.get_health(enemy)
 	_run(1.0)
-	check_equal(_damage_to(enemy), 2, "2 damage per second")
-	check_equal(_damage[0][0], 2, "credited to player 2")
+	check_equal(before - _combat.get_health(enemy), 2, "2 damage per second")
 	_run(5.0)
 	check_equal(_combat.get_health(enemy), 100 - 4 - 6, "6 damage over its 3 seconds in all, then it stops")
 	check(not _combat.has_status(enemy, &"burn"), "the burn ended")
@@ -165,9 +164,9 @@ func test_burning_again_refreshes_without_adding_up() -> void:
 	_run(1.0)
 	_combat.apply_status(0, enemy, &"burn", 2.0, 1.0)
 	check(_combat.status_left(enemy, &"burn") > 1.9, "the time was refreshed")
-	_damage.clear()
+	var before: int = _combat.get_health(enemy)
 	_run(1.0)
-	check_equal(_damage_to(enemy), 2, "the stronger burn kept its rate")
+	check_equal(before - _combat.get_health(enemy), 2, "the stronger burn kept its rate")
 
 
 func test_chill_slows_and_runs_out() -> void:
@@ -267,9 +266,39 @@ func test_statuses_stay_with_their_own_enemy_when_another_dies() -> void:
 	_combat.hit(0, first, 3)
 	check(_combat.has_status(second, &"hex") and _combat.has_status(second, &"burn"), "the survivor keeps both")
 	check(not _combat.has_status(first, &"hex"), "the dead enemy has none")
-	_damage.clear()
+	var before: int = _combat.get_health(second)
 	_run(1.0)
-	check_equal(_damage_to(second), 2, "the burn kept ticking on the right enemy")
+	check_equal(before - _combat.get_health(second), 2, "the burn kept ticking on the right enemy")
+
+
+func test_burn_ticks_send_no_damage_event_but_the_killing_one_does() -> void:
+	var crowd: Array[Node2D] = []
+	for i in 12:
+		var enemy := _enemy(Vector2(float(i) * 100.0, 0.0), 6)
+		_combat.apply_status(i % 4, enemy, &"burn", 10.0, 2.0)
+		crowd.append(enemy)
+	_damage.clear()
+	_run(2.0)
+	check_equal(_damage.size(), 0, "burning hurt them all without one impact event")
+	check_equal(_combat.get_health(crowd[0]), 2, "but the health went down")
+	_run(1.0)
+	check_equal(_damage.size(), 12, "each death sent its damage once")
+	check_equal(_combat.get_enemy_count(), 0, "and they all died")
+
+
+func test_a_frozen_enemy_still_hurts_on_contact() -> void:
+	var wizard := own(Node2D.new()) as Node2D
+	root.add_child(wizard)
+	_combat.register_player(0, wizard, 8.0)
+	var enemy := own(Node2D.new()) as Node2D
+	root.add_child(enemy)
+	_combat.register_enemy(enemy, 50, 10.0, 1)
+	for i in 3:
+		_combat.apply_status(0, enemy, &"chill", 3.0, 40.0)
+	check(_combat.has_status(enemy, &"freeze"), "frozen")
+	_damage.clear()
+	_combat.step(STEP)
+	check_equal(_damage.size(), 1, "standing still does not make its touch harmless")
 
 
 func test_registering_again_clears_statuses() -> void:

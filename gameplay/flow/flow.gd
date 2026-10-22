@@ -5,8 +5,8 @@ extends Node
 ## run lifecycle.
 ##
 ## Starting: the main menu sends `play_requested(player)` and nothing else. Flow
-## asks `core/registry` for the room (`rooms` / `arena_01`), the enemy and the
-## bolt, builds one `Node2D` world (room scene, a wizard for every joined player,
+## asks `core/registry` for the room (`rooms` / `arena_01`) and the enemy, checks that
+## the start recipes compile, builds one `Node2D` world (room scene, a wizard for every joined player,
 ## the wave, a camera) and makes it the current scene, so the menu goes away. The
 ## whole thing is built in the same frame, far inside the 10 seconds allowed.
 ##
@@ -26,8 +26,11 @@ extends Node
 ##
 ## Restart: when every wizard is down, a timer of RESTART_DELAY seconds runs, then
 ## a fresh world replaces the old one: new wizards at full health, wave 1, no
-## projectiles left, and the bolt's cooldowns reset (the registry hands out one
-## shared bolt resource, so a new run must forget its cooldowns).
+## projectiles left, and `Spells` cleared (every cooldown and build is forgotten; each
+## new wizard builds its two start spells again).
+##
+## Spells: every wizard gets `start_recipe_a` and `start_recipe_b` (component ids, see
+## `core/spells`) and builds them itself; flow never touches a spell.
 ##
 ## All timing runs in step(delta), so tests drive it with fixed deltas.
 
@@ -38,17 +41,19 @@ const ProjectileManagerScript := preload("res://core/projectiles/projectile_mana
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const AiScript := preload("res://gameplay/ai/ai.gd")
 const PlayerScript := preload("res://gameplay/player/player.gd")
+const SpellsScript := preload("res://core/spells/spells.gd")
 const DefaultWizardScene: PackedScene = preload("res://content/wizard/base/wizard.tscn")
 
 const PLAYER_SLOTS: int = 4
 ## Registry folders, and the ids of the M1 content a run uses unless `room_id_to_play`,
-## `enemy_id_to_play` or `spell_id_to_play` say otherwise.
+## `enemy_id_to_play` say otherwise.
 const ROOM_FOLDER: StringName = &"rooms"
 const DEFAULT_ROOM_ID: StringName = &"arena_01"
 const ENEMY_FOLDER: StringName = &"enemies"
 const DEFAULT_ENEMY_ID: StringName = &"ember_imp"
-const SPELL_FOLDER: StringName = &"spells"
-const DEFAULT_SPELL_ID: StringName = &"bolt"
+## The two spells every wizard starts with: A is a fire bolt (M1's bolt plus burn), B a plain bolt.
+const DEFAULT_START_RECIPE_A: Dictionary = {"form": &"bolt", "element": &"fire"}
+const DEFAULT_START_RECIPE_B: Dictionary = {"form": &"bolt"}
 ## The wave, sized for four players: one enemy per entry, placed at the room's
 ## enemy spawn with that index (wrapped if the room has fewer). An index used
 ## again puts the enemy a step further along the diagonal.
@@ -81,15 +86,18 @@ var registry: RegistryScript = null
 var input: InputManagerScript = null
 var combat: CombatScript = null
 var projectiles: ProjectileManagerScript = null
+var spells: SpellsScript = null
 ## Where the world goes. Only tests set this; otherwise the world becomes the
 ## current scene (the main menu is freed).
 var world_parent: Node = null
 ## What the next run is made of, by registry id. Later features (a room picker, a loadout)
-## set these; the room, enemy and spell themselves are content found by folder, so a new one
-## needs no change here. `wizard_scene` is the wizard every player gets (its art is in the scene).
+## set these; the room, enemy and spell components themselves are content found by folder, so a
+## new one needs no change here. `wizard_scene` is the wizard every player gets (its art is in
+## the scene). The start recipes are component ids (a recipe as in `core/spells`).
 var room_id_to_play: StringName = DEFAULT_ROOM_ID
 var enemy_id_to_play: StringName = DEFAULT_ENEMY_ID
-var spell_id_to_play: StringName = DEFAULT_SPELL_ID
+var start_recipe_a: Dictionary = DEFAULT_START_RECIPE_A.duplicate(true)
+var start_recipe_b: Dictionary = DEFAULT_START_RECIPE_B.duplicate(true)
 var wizard_scene: PackedScene = DefaultWizardScene
 
 var state: State = State.IDLE
@@ -102,7 +110,6 @@ var wave: int = 0
 
 var _starter: int = 0
 var _room: RoomBase = null
-var _bolt: SpellBase = null
 ## The wizard scene the run in progress started with (joiners get the same one).
 var _wizard_scene: PackedScene = null
 var _enemies: Array[Node] = []
@@ -124,6 +131,8 @@ func _ready() -> void:
 		combat = get_node_or_null("/root/Combat") as CombatScript
 	if projectiles == null:
 		projectiles = get_node_or_null("/root/Projectiles") as ProjectileManagerScript
+	if spells == null:
+		spells = get_node_or_null("/root/Spells") as SpellsScript
 	if events == null:
 		push_warning("Flow: the Events autoload is missing, so the game cannot be started.")
 		return
@@ -194,10 +203,17 @@ func get_wizard(index: int) -> Node2D:
 func start_run(requester: int) -> bool:
 	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id_to_play) as RoomBase if registry != null else null
 	var enemy_data: EnemyBase = registry.get_resource(ENEMY_FOLDER, enemy_id_to_play) as EnemyBase if registry != null else null
-	var bolt: SpellBase = registry.get_resource(SPELL_FOLDER, spell_id_to_play) as SpellBase if registry != null else null
-	if room == null or room.scene == null or enemy_data == null or enemy_data.scene == null or bolt == null:
-		push_warning("Flow: the room, the enemy or the spell is missing from the registry, so no run starts.")
+	if room == null or room.scene == null or enemy_data == null or enemy_data.scene == null:
+		push_warning("Flow: the room or the enemy is missing from the registry, so no run starts.")
 		return false
+	if spells == null:
+		push_warning("Flow: the Spells autoload is missing, so no run starts.")
+		return false
+	for recipe: Dictionary in [start_recipe_a, start_recipe_b]:
+		var compiled: CompiledSpell = spells.compile(recipe)
+		if not compiled.valid:
+			push_warning("Flow: a start spell does not compile (%s), so no run starts." % compiled.reason)
+			return false
 	if not _is_wizard_scene(wizard_scene):
 		push_warning("Flow: the wizard scene is missing or has no player script, so no run starts.")
 		return false
@@ -212,18 +228,18 @@ func start_run(requester: int) -> bool:
 	_clear_run()
 	_room = room
 	_enemy_data = enemy_data
-	_bolt = bolt
 	_wizard_scene = wizard_scene
-	bolt.reset_cooldowns()
 	if projectiles != null:
 		projectiles.clear()
+	spells.clear()
+	if projectiles != null:
 		var bounds := Rect2(Vector2.ZERO, _room_size(room)).grow(PROJECTILE_MARGIN)
 		projectiles.set_bounds(bounds)
 	var new_world := Node2D.new()
 	new_world.name = WORLD_NAME
 	new_world.add_child(room.scene.instantiate())
 	_add_camera(new_world, room)
-	_spawn_players(new_world, room, players, bolt)
+	_spawn_players(new_world, room, players)
 	wave = 1
 	_spawn_wave(new_world, room, enemy_data, wave)
 	world = new_world
@@ -260,7 +276,7 @@ func _on_player_joined(player: int) -> void:
 		return
 	if get_wizard(player) != null:
 		return
-	_add_wizard(world, _room, player, _bolt, _joiner_spawn(_room, player))
+	_add_wizard(world, _room, player, _joiner_spawn(_room, player))
 	var joiner := get_wizard(player) as PlayerScript
 	if joiner != null:
 		joiner.protect(PlayerScript.JOIN_PROTECTION)
@@ -402,12 +418,12 @@ func _add_camera(parent: Node2D, room: RoomBase) -> void:
 	parent.add_child(camera)
 
 
-func _spawn_players(parent: Node2D, room: RoomBase, players: Array[int], bolt: SpellBase) -> void:
+func _spawn_players(parent: Node2D, room: RoomBase, players: Array[int]) -> void:
 	_wizards.clear()
 	for index in PLAYER_SLOTS:
 		_downed[index] = false
 	for index: int in players:
-		_add_wizard(parent, room, index, bolt)
+		_add_wizard(parent, room, index)
 
 
 ## The player spawn for a mid-run joiner: the one farthest from every enemy and
@@ -441,10 +457,11 @@ func _is_wizard_scene(scene: PackedScene) -> bool:
 	return ok
 
 
-func _add_wizard(parent: Node2D, room: RoomBase, index: int, bolt: SpellBase, at: Vector2 = Vector2.INF) -> void:
+func _add_wizard(parent: Node2D, room: RoomBase, index: int, at: Vector2 = Vector2.INF) -> void:
 	var wizard := _wizard_scene.instantiate() as PlayerScript
 	wizard.index = index
-	wizard.spell = bolt
+	wizard.start_recipe_a = start_recipe_a.duplicate(true)
+	wizard.start_recipe_b = start_recipe_b.duplicate(true)
 	if at != Vector2.INF:
 		wizard.position = at
 	elif index < room.player_spawns.size():

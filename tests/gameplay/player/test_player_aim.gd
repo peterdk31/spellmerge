@@ -11,13 +11,14 @@ const PlayerScript := preload("res://gameplay/player/player.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const WizardScene := preload("res://content/wizard/base/wizard.tscn")
-const AimSpell := preload("res://tests/gameplay/player/fixtures/aim_spell.gd")
+const FakeSpells := preload("res://tests/gameplay/player/fixtures/fake_spells.gd")
 
 const STEP: float = 0.0625
 
 var _failures: Array[String] = []
 var _bus: Node
 var _input: Node
+var _fake: FakeSpells
 var _players: Array[PlayerScript] = []
 
 
@@ -61,6 +62,7 @@ func _setup(count: int, keyboard: bool = false) -> void:
 	_bus = EventsScript.new()
 	_input = InputManagerScript.new()
 	_input.events = _bus
+	_fake = FakeSpells.new()
 	for index in count:
 		if keyboard and index == 0:
 			_input.join(InputManagerScript.KEYBOARD)
@@ -70,8 +72,9 @@ func _setup(count: int, keyboard: bool = false) -> void:
 		player.index = index
 		player.input = _input
 		player.events = _bus
-		player.spell = AimSpell.new()
+		player.spells = _fake
 		player._ready()
+		player.set_recipe(0, {"form": &"bolt"})
 		_players.append(player)
 
 
@@ -79,11 +82,12 @@ func _teardown() -> void:
 	for player in _players:
 		player.free()
 	_players.clear()
-	for node: Node in [_input, _bus]:
+	for node: Node in [_input, _bus, _fake]:
 		if node != null:
 			node.free()
 	_input = null
 	_bus = null
+	_fake = null
 
 
 func _run(count: int) -> void:
@@ -168,8 +172,7 @@ func _test_cast_goes_along_the_aim() -> void:
 	_input.send_virtual_aim(0, Vector2.UP)
 	_run(1)
 	_check(_players[0].cast(), "the wizard casts")
-	var spell: AimSpell = _players[0].spell
-	_check(spell.directions.size() == 1 and _near(spell.directions[0], Vector2.UP), "the spell got the aim, not the walk direction")
+	_check(_fake.directions.size() == 1 and _near(_fake.directions[0], Vector2.UP), "the spell got the aim, not the walk direction")
 
 
 func _test_four_players_aim_alone() -> void:
@@ -258,9 +261,8 @@ func _test_muzzle_is_the_staff_tip() -> void:
 	_input.send_virtual_aim(0, Vector2.RIGHT)
 	_input.send_virtual(0, &"cast", 1.0)
 	_run(1)
-	var spell := _players[0].spell as AimSpell
 	var expected := Vector2(100.0 + PlayerScript.STAFF_REACH, 100.0 - PlayerScript.HAND_HEIGHT)
-	_check(spell.origins.size() > 0 and _near(spell.origins[0], expected), "the shot starts at the staff tip, got %s" % [spell.origins])
+	_check(_fake.origins.size() > 0 and _near(_fake.origins[0], expected), "the shot starts at the staff tip, got %s" % [_fake.origins])
 	_check(_near(_players[0].muzzle_position(), expected), "muzzle_position is hand height plus the reach along the aim")
 
 
@@ -296,14 +298,13 @@ func _test_shot_and_reticle_line_up_with_the_mouse() -> void:
 	for mouse: Vector2 in [Vector2(220, 60), Vector2(40, 150), Vector2(130, 20), Vector2(160, 104)]:
 		wizard.mouse_world_override = mouse
 		_run(1)
-		var spell := wizard.spell as AimSpell
-		spell.origins.clear()
-		spell.directions.clear()
+		_fake.origins.clear()
+		_fake.directions.clear()
 		_check(wizard.cast(), "the wizard casts at %s" % mouse)
-		if spell.origins.is_empty():
+		if _fake.origins.is_empty():
 			continue
-		var origin: Vector2 = spell.origins[0]
-		var direction: Vector2 = spell.directions[0]
+		var origin: Vector2 = _fake.origins[0]
+		var direction: Vector2 = _fake.directions[0]
 		var to_mouse: Vector2 = mouse - origin
 		_check(absf(direction.cross(to_mouse)) < 0.01 and direction.dot(to_mouse) > 0.0,
 				"the shot from %s along %s passes through the mouse at %s" % [origin, direction, mouse])

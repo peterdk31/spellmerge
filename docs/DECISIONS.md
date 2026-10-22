@@ -2,6 +2,14 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-22: The M1 fire bolt moves to `legacy/fire_bolt`; the new bolt takes the id `bolt`
+
+**Decided by:** Claude (M2 part 10).
+**Decision:** The M2 form `bolt` lives in `content/spells/forms/bolt/` with id `bolt` (the id equals the folder, and the design's recipes say `bolt`). The M1 `SpellBase` bolt, which `flow` hands to the wizards and `combat` profiles until part 11, moved to `content/spells/legacy/fire_bolt/` with id `fire_bolt`; `Flow.DEFAULT_SPELL_ID` and the tests that named it follow. Part 11 deletes the `legacy/` folder with `SpellBase`.
+**Why:** two resources cannot share an id (the registry keeps one), and migrating the bolt in place would have broken the playable game for a whole task.
+**Forms' numbers (first tuning, from the M2 design table):** bolt 1 complexity (damage 5, 5 mana, 0.35 s), the others 2: beam (4 damage, pierce 1, reach 240, 0.8 s), nova (8 shots of 3 over 360°, reach about 60 px, 1 s), rune (8 damage, waits 8 s, radius 14, 1.2 s), orbit (3 orbs of 3 damage at 36 px turning 4 rad/s for 3 s, pierce 4, 3.5 s). The stress benchmark and playtests will retune them.
+**Not seen in the game yet:** the beam's `lifetime = 0.15` is the time the drawn beam stays on screen (the hit itself is instant), for the part-26 art pass. The four vfx sprites in `art/vfx/` (beam, nova ring, rune, orbit orb) are not wired to anything yet, so nobody should expect them in the game.
+
 ## 2026-10-21: Gates are sparse; hard gates notify the owner
 
 **Decided by:** the owner ("Gating should in general be sparse. Development should be prioritized to continue instead of gating stuff. Of course a hard gate can happen, in that case I should be notified").
@@ -16,6 +24,30 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 **Decided by:** the owner ("loosen up a bit on the load timing. It should not hinder development ... it should just give warnings and potential fixes").
 **Decision:** `smbot.websmoke --warn-load 10` prints `WEB LOAD: N s` and, over 10 s, a `::warning::` that lists likely fixes: the zip size, big new assets, work at start (autoloads, `Registry.scan`), trimming demo content, and a slow runner. The web smoke test still fails on errors, exceptions and a missing expected line. `--max-load` is gone. The 10 s load in docs/PLAN.md stays a target, not a gate.
 **Consequence:** a slow web start shows up in the daily build log and never reverts a merge. Acting on the warning is a normal task, filed when it repeats.
+
+## 2026-10-22: Reactions (M2 part 8)
+
+**Decided by:** Claude.
+
+- **Six reactions, twelve rows.** The table is looked up by (status on the target, element of the hit), so each pair has a row for each direction and both carry the same `reaction_id`. In the other direction the reaction works on the other status: Shatter eats shock when frost hits a shocked enemy, Kindle spreads hex when fire hits a hexed one. Without that, a pair would only react one way round.
+- **Two new row fields:** `pull` (Rift) and `consume_status` (Thaw uses the burn up). The design's "consume, then a burst" for Thaw is a BURST with `consume_status`, so no fifth effect kind. A burst includes the struck enemy.
+- **Order:** the reaction is picked from the statuses the target had when the shot arrived (first of burn, chill, shock, hex with a row for that element); the hit's damage lands first; the reaction runs only if the enemy lived, and replaces the hit's own status. A frozen enemy counts as chilled. A shock is still spent by the hit, so the shock jump and a shock reaction can both happen.
+- **No chains:** reaction damage and spread statuses go through `hit` and `apply_status`, never through `projectile_hit`, so a reaction can't set off another one.
+- **Stillness** freezes a chilled enemy for 2 s and lengthens a freeze by 2 s (a long freeze, as designed); on hex it adds 2 s and +25 %.
+- **Limits (review fix).** Flare, Rift, Kindle and Stillness leave the status on the target, so without a limit every later hit of that element would react again. Decided: each enemy reacts at most once per `REACTION_WAIT` (0.5 s); a hit inside the wait does its own status instead. A per-enemy wait rather than consuming the status, because Kindle must keep the burn it spreads and Stillness must keep the freeze it extends. EXTEND is capped (`MAX_FREEZE` 4 s; other statuses 8 s; hex and shock extra damage 100 %; burn rate 20), so rapid fire cannot freeze for ever or stack hex without end. Shatter doubles whenever the target is frozen (not only on the chill row) and then ends the freeze. Feel plays a reaction's sound and shake at most once per 0.3 s per id, and skips a name already rising within 40 px.
+- **Numbers** (Shatter 6, doubled when frozen; Thaw 3 in 40 px; Flare 2 in 56 px; Rift 2 in 48 px with a 120 px/s pull; Kindle 48 px) are first tuning for the playtest.
+- **Feel** gets a flash, a burst, the reaction's name as a rising label and the sound `reaction_<id>` from the preset (`reaction_colors`, `reaction_sound_prefix`). The "number" is the name: the damage already shows through `damage_dealt`.
+
+## 2026-10-22: The validator (M2 part 9)
+
+**Decided by:** Claude.
+
+- **It is a class of static functions fed with resources** (`SpellValidator`), not a scanner. The registry is the only script that loads from computed paths, so it hands the validator what it found (`validate_spells()`); a test can hand it any fixture the same way.
+- **Known statuses are a list in the validator** (burn, chill, shock, hex), because `core/` may not depend on `gameplay/combat`. A test compares it with combat's `REACTING_STATUSES`. `freeze` is left out: no element sets it.
+- **Duplicate ids are seen through the registry,** which keeps the first file and used to only warn; it now also remembers the duplicates under `spells`, and the validator reports them. Ids are unique across all four kinds because they share the `spells` folder.
+- **Beyond the design's list,** a form must have the number its motion uses (speed, orbit radius or ray length), an element with a status needs a duration, a homing or chain modifier needs a strength and a timer trigger needs an interval: a component that does nothing is a mistake, not a choice. Reaction rows get ranges of their own (`REACTION_RANGES`), wide sanity bounds like the component ones.
+- **Resources in `spells` that are not components** (M1's `SpellBase` bolt, until part 10) are skipped.
+- **`tools/check.sh`:** asked of the owner (issue #140). The validator already runs in `ci/build/build.sh --quick --tests`; `check.sh` needs only git and Python, and Godot may only be run through `build.sh`.
 
 ## 2026-10-21: Spell component base classes (M2 part 1)
 
@@ -775,3 +807,79 @@ The HUD screenshot cannot be taken in a session (no display, `docs/BACKLOG.md`),
 - New events: `spell_swap_requested(player)` (HUD, heard by `player`), `projectile_expired(player, position, tag)` (`core/projectiles`), `spell_changed(player, spell, description)` and `build_refused(player, reason)` (`player`), `reaction_triggered(player, reaction_id, position)` (`combat`). Each has one sender; the senders arrive in parts 3, 8 and 11, so their listeners are "none yet" in the table until then.
 - `build_refused` has exactly `(player, reason)`, as in the design: the HUD shows only the reason in plain words.
 - The `swap` action is bound to Q and the left shoulder, which were free. It is in `CAPTURED_ACTIONS`, so a player in the overlay or builder does not swap spells by accident.
+
+## M2 part 3: projectile manager, part 1
+
+- `projectile_expired` is sent only when a shot's life runs out or it ends on a wall, after the shot is removed (a handler may spawn at that spot). A hit, leaving the bounds and a cap drop send nothing: an on-expire trigger should not fire for a shot that did its job or was evicted.
+- `still` is a `motion` argument at the end of `spawn` (velocity ignored), so part 4's `orbit` fits the same argument.
+- The queries count a target when its hit circle overlaps the query circle (the rule of a hit) and return the nearest by centre distance. They read the grid of the latest step; `add_target` and `remove_target` outside a step mark it stale and the next query refills it. A target freed since the last step is skipped.
+
+## M2 part 4: projectile manager, part 2
+
+**Decided by:** Claude, following the M2 design ("`core/projectiles` grows only what the forms and modifiers need").
+
+- Orbit and homing are separate calls, not more `spawn` arguments: `spawn_orbit(player, orbit_radius, angle, angular_speed, lifetime, ...)` and `set_homing(slot, turn_rate)`. `spawn` already takes nine arguments, and an orbit needs three more numbers. `spawn` still refuses `MOTION_ORBIT`.
+- An orbit shot ignores walls (its caster holds it, and a wizard against a wall would lose the half of the ring in the wall) and ends quietly when its owner's anchor is cleared, so a wizard who leaves or falls drops their ring. A player with no anchor cannot spawn one.
+- Homing keeps the speed and only turns it, toward the point found by the last search (every `HOMING_PERIOD` = 4th step, staggered by slot so a full cap does not search all at once). Range `HOMING_RANGE` = 160 px. It skips the shooter's own body and targets the shot remembers hitting; the search costs 1 work unit per target examined, so a spent budget only delays the next search. Only straight shots can home.
+- `ray()` has one more optional argument than the design, `width`, so "bigger" can widen a beam. It returns the pixels reached (to the last target when `pierce + 1` were hit, else the wall or the length) and sends `projectile_impact` before each `projectile_hit`; a beam that ends on a wall sends a wall impact (not counted in `wall_hits`, which counts shots). At most `RAY_MAX_HITS` = 64 targets. Hits are found first and sent after, so a handler may free targets or fire a ray itself (an on-hit beam trigger): scratch is kept per nesting level, up to `RAY_MAX_DEPTH` = 4, deeper returns 0.
+- `homing_aim(player, origin, direction, max_angle, layers)` is the beam's homing: it returns the direction bent to the nearest target in the cone, for the spell runtime to call before `ray`.
+- Review of part 4: an orbit shot is an ordinary piercing shot. `pierce` is how many hits it survives (0 ends it on its first touch) and it remembers only its last `HIT_MEMORY` = 3 targets, so a ring over more than 3 enemies hits some again. There is no once-per-revolution rule: a per-target timer would need memory per shot and target, which the pool has no room for, and the orbit form (part 10) can pick `pierce` for the effect it wants. The test `_test_orbit_ring_over_a_crowd` pins this.
+- Homing (shots and `homing_aim`) never picks a `LAYER_PLAYER` target, even with friendly fire on: a seeking shot should not curve into a teammate. A freed target is skipped.
+- `ray()` cuts `length` to `RAY_MAX_LENGTH` = 360 px (what the 64-cell wall walk covers on a diagonal) and is not charged to the hit-work budget; the spell runtime's fire cap (part 6) bounds how many rays a spell and its nested handlers fire.
+- `set_homing` returns true whenever the rate was applied, 0 included; false only for a refusal.
+
+## M2 part 5: the compiler and limits
+
+**Decided by:** Claude, following the M2 design ("The spell runtime lives in `core/spells/`", "Tags", "The spell limits are the performance limits").
+
+- A recipe is a plain Dictionary (`form`, `element`, `modifiers`, `trigger`, `held`), so it can come from JSON (the combo catalogue) and from the builder alike; ids may be Strings or StringNames. `compile` never errors: bad input gives `valid == false` with a reason in plain words.
+- Refused (nothing can fix it by clamping): no form, unknown id, wrong kind in a slot, more than 3 modifiers, a held spell without a trigger, nesting below depth 2, complexity over 12. Clamped and said in the description: shots over 24; speed, radius, pierce and the cooldown floor are clamped silently to the form ranges. A trigger with nothing held is valid (it costs complexity and fires nothing), so the builder can place a trigger before the spell it holds.
+- Number rules: damage is form x element scale x modifier multipliers, rounded, at least 1; mana, cooldown, speed and radius multiply; shots multiply and pierce adds; homing keeps the largest turn rate; chain jumps add. More than one shot with no spread of its own opens a 30 degree fan (`SPLIT_SPREAD`), except an orbit.
+- Tag layout: bit 8 is always set so no tag is 0 (combat treats 0 as "no tag"), then player (2 bits), slot (1), depth (2) and generation (3). A built spell registers its held spells at depth 1 and 2 under the same generation.
+- Ring wrap: when the generation about to be reused still has live shots, its tags go into `revoked_tags` and its counts are cleared before the new spell takes the tag; the caller removes those shots. `Projectiles` gets no remove-by-tag in this part; part 6, the first caller, adds it (queued in `docs/NEXT.md`).
+- Review fix: live shots are counted per generation across all depths, and a generation's profiles are freed together, because a shot that fires a held spell on its hit needs the depth 1 and 2 profiles after the rebuild. Part 6 starts a child's shot before it ends the parent's, and removes the shots of `revoked_tags` before the next `begin_generation` or `shot_ended`. New limits in `SpellLimits`: chain jumps 6, timer interval 0.1 to 10 s, lifetime 0.05 to 20 s. A malformed recipe field (wrong type) is refused with a reason. The compiled spell keeps its form and element display names, so the description needs no second registry look-up.
+- `Spells.registry` can be set to a stand-in with `get_resource(folder, id)`, so the tests need no content files.
+
+## M2 part 6: casting and triggers
+
+**Decided by:** Claude, following the M2 design ("How a held spell fires", "Tags", "Hits, statuses and reactions").
+
+- **The end of a shot is a signal of the manager, not an event.** `Projectiles.shot_ended(tag)` is sent for every tagged shot that ends, after its `projectile_hit` or `projectile_expired` handlers, so a held spell is started before its parent is counted out (the order part 5 asked for). It is not on the bus (`core/events` is for areas talking to each other; this is core talking to core) and it needs no change in the events table. `remove_by_tag` is the one silent removal, because the caller revoked those tags.
+- **Per-shot state lives in `Spells`, keyed by projectile slot.** The manager keeps no spell data. `Spells` has packed arrays (fires left, chain left, previous target, timer clock) indexed by slot and valid only while the shot's spawn number (`get_seq_of`) matches; the manager sets `event_slot` while a hit or expiry event is sent so the handler knows which shot it is. The record is written back before any child is spawned, because a child can take the slot of a shot that just ended.
+- **A beam is one shot, fired and ended inside the call.** Its context (tag, direction, fires left) is kept in fields while `ray()` runs and restored afterwards, so a held beam fired from a hit handler nests. A beam's chain jumps do not nest: `ray()` allows only 4 levels but a chain may have 6 jumps (and split or pierce beams jump from several hits), so a jump is put in a fixed 64-entry queue and the outermost beam casts the queue, in order, after its own `ray()` returns. A full queue drops the jump and counts it in `chains_dropped`. A beam whose `ray()` did nothing fires no on-expire spell. A beam fires an on-expire spell at its end, has no timer, and passes the target that fired it to `ray(..., exclude)` instead of waiting 0.1 s.
+- **Where a held spell goes.** From the hit point (expiry: 2 px back along the path, so a shot that died on a wall fires in front of it; timer: the shot's place); along the shot's velocity, or outward from the caster's anchor for an orbit or still shot; the source target is excluded for 0.1 s (`Projectiles.exclude`, one target per shot).
+- **Fire cap.** `MAX_FIRES_PER_STEP` (32) is per player and counts held spells fired, from every slot and depth. The window is one `Spells.step` to the next (hits of the projectile step in between count). A dropped fire consumes nothing: the shot keeps its fires and a timer waits its next interval.
+- **Chain** picks the nearest other target within 96 px that is neither the one just hit nor the one before it, so two enemies are not bounced between. The chain shot is a plain straight shot of the same tag (speed at least 300 px/s) that carries the trigger's fires left.
+- **`hit_profile(tag)` returns a `HitProfile`** (damage, knockback, element, status) made once per compiled spell, so a hit allocates nothing and `combat` reads no spell field. Knockback is one constant (120, M1's value) until a form or modifier needs its own. `combat` is switched over in part 7; M1's table stays until then.
+- **`install` is the call for a build.** `begin_generation` stays as in part 5; `install` also removes the revoked shots, so no caller can forget to.
+
+## M2 part 7: elements and statuses
+
+**Decided by:** Claude, following the M2 design ("Hits, statuses and reactions").
+
+- **Status numbers are in the element, the rules are in `combat`.** `status_strength` means: burn damage per second; the percent of speed chill takes (capped at 90%); the percent of the hit's damage a shock jump deals; the percent of extra damage a hex adds. First values: fire burn 2/s for 3 s, frost chill 40% for 3 s, storm shock 75% for 4 s, void hex 25% for 4 s. All elements keep `damage_scale` 1.0 until the combo test retunes them.
+- **Stacking.** Burn, shock and hex refresh their time and keep the stronger number; they do not add up. Chill adds a stack; the third freezes for 1 s (`FREEZE_TIME`) and clears the chill; a frozen enemy takes no more chill, so hitting it cannot extend the freeze (Stillness, part 8, extends it on purpose).
+- **Order in one hit:** hex raises the damage and turns the knockback into a half-strength pull toward the hit; a shock is used up and jumps after the damage (also when the hit kills); then the hit's own status goes on, only if the target survived. So the hit that applies a status never feels it itself.
+- **The jump** goes to the nearest other enemy within 64 px, deals the damage times the share (at least 1), pushes nothing and puts on no status, so shock cannot chain forever. The neighbour comes from the projectile manager's target grid, rebuilt each step: an enemy that joined this frame is found next frame.
+- **Burn** deals whole points of damage (a fraction is carried) through the same pipeline as `hit()`, so a hex raises it and the caster gets the kill credit. It is quiet: a tick that leaves the enemy alive sends no `damage_dealt`, so Feel's hit-stop, shake, spray and sound and the AI's hurt pose do not fire twice a second per burning enemy. The tick that kills sends `damage_dealt` and `enemy_died` as any kill does.
+- **A frozen enemy still hurts on contact.** Freeze stops it moving and attacking with shots, not touching; a wizard must not stand in it. Tested.
+- **A shock is spent only by a hit that counted.** Burn is collected during the status loop and sent after it, as contact hits are.
+- **The AI is slowed by `Combat.speed_factor(enemy)`** (1 free, less when chilled, 0 frozen), applied to walking and to the windup and recover timers, so a frozen imp's telegraph stops where it is and the warning stays honest. Knockback is not scaled.
+- **Players get no statuses** from player spells (friendly fire is damage only), as the design says.
+- **Tints and icons use palette colours only** (STYLE.md has no ice or storm colour): fire is Fire base, frost is Player 1 light blue, storm is Spark gold, void is Player 4 light purple. Frost and void are close in hue to players 1 and 4, which STYLE.md warns about for base colours; the art pass (M2 part 26) checks this on one sheet and may ask for new palette entries (an owner decision).
+
+## M2 part 11: player and flow on the new runtime
+
+**Decided by:** Claude, following the M2 design ("Building spells, without anyone waiting", "The fire bolt migrates").
+
+- **Slot numbers in `build_change_requested`.** The design left the meaning of `slot` open. It is the position in a spell's chain: 0 form, 1 element, 2 to 4 modifiers, 5 trigger; an empty `component_id` clears the slot. Modifiers stay in a compact list: a new one goes in the first free place, clearing one closes the gap. Clearing the trigger drops the held spell with it, as a held spell without a trigger does not compile.
+- **A held spell is reached by the path** (`[0, 0]`), and the held part is created by the first request that names it (it still needs a trigger, or the compile refuses it).
+- **A change is made on a copy of the recipe** and kept only if `Spells.compile` accepts the whole thing, so a refusal changes nothing and the old spell keeps casting. The bag and the component's `kind()` are checked first, each with its own reason.
+- **`spell_changed` always names the prepared spell** (`[0]` or `[1]`), also when the change was made in a held spell, because the whole chain is recompiled and its description covers it.
+- **`player` reads no field of a compiled spell except `valid`, `reason` and `description`**, which are the answer to a compile. `spell_cast` now carries the form id of the recipe (what M1 sent as the spell id).
+- **The bag is every visible component in the registry** (so the web demo offers only demo components), filled when the wizard enters the tree. M3's rewards change who fills it.
+- **Cooldowns belong to `Spells`,** per player and slot, and tick on the autoload's physics step. The wizard ticks nothing, so a downed wizard's cooldown now runs on (it cannot cast anyway). A rebuild does not reset its slot's cooldown. `Flow` calls `Spells.clear()` on a new run, after `Projectiles.clear()` (which ends every counted shot), so a restart forgets all builds and cooldowns.
+- **Start recipes are in `flow`:** `start_recipe_a` = bolt + fire (M1's bolt plus burn) and `start_recipe_b` = bolt, as the design says. Flow checks that both compile before it starts a run (a missing component or a refused recipe logs a warning and keeps flow idle, as a missing room does) and hands each wizard a copy. A player who leaves and rejoins mid-run gets the start spells again; builds last for a run and are not kept per slot yet (saving is `core/save`, M5).
+- **The orbit anchor is the player's job** (as the M2 design says): each step the wizard calls `Projectiles.set_anchor(index, body position)`, and `clear_anchor` when it is downed or leaves the tree. The body offset is the hit circle's.
+- **`SpellBase` and the legacy bolt are removed** together with `Combat`'s learning of hit profiles from `spell_cast` (every player shot now carries a tag that `Spells.hit_profile` knows). Combat keeps `set_hit_profile` for enemy shots. The scan that no script reads a spell field moved to `tests/core/test_spell_field_reads.gd` and covers the component classes and `CompiledSpell`; `HitProfile` is left out because combat reads it by design. The registry test fixtures became `FormBase` resources.
+- **No event for a swap yet.** Part 18 (the corner panel shows A or B) needs one; `core/events` gets it then, with `player` as the sender.

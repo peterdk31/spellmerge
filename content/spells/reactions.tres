@@ -1,0 +1,121 @@
+[gd_resource type="Resource" script_class="ReactionTable" load_steps=15 format=3]
+
+[ext_resource type="Script" path="res://core/base/reaction_table.gd" id="1_table"]
+[ext_resource type="Script" path="res://core/base/reaction_row.gd" id="2_row"]
+
+[sub_resource type="Resource" id="Resource_shatter_chill"]
+script = ExtResource("2_row")
+reaction_id = &"shatter"
+display_name = "Shatter"
+status_id = &"chill"
+element_id = &"storm"
+effect = 1
+damage = 6
+
+[sub_resource type="Resource" id="Resource_shatter_shock"]
+script = ExtResource("2_row")
+reaction_id = &"shatter"
+display_name = "Shatter"
+status_id = &"shock"
+element_id = &"frost"
+effect = 1
+damage = 6
+
+[sub_resource type="Resource" id="Resource_thaw_burn"]
+script = ExtResource("2_row")
+reaction_id = &"thaw"
+display_name = "Thaw"
+status_id = &"burn"
+element_id = &"frost"
+damage = 3
+radius = 40.0
+consume_status = true
+
+[sub_resource type="Resource" id="Resource_thaw_chill"]
+script = ExtResource("2_row")
+reaction_id = &"thaw"
+display_name = "Thaw"
+status_id = &"chill"
+element_id = &"fire"
+damage = 3
+radius = 40.0
+consume_status = true
+
+[sub_resource type="Resource" id="Resource_flare_burn"]
+script = ExtResource("2_row")
+reaction_id = &"flare"
+display_name = "Flare"
+status_id = &"burn"
+element_id = &"storm"
+damage = 2
+radius = 56.0
+
+[sub_resource type="Resource" id="Resource_flare_shock"]
+script = ExtResource("2_row")
+reaction_id = &"flare"
+display_name = "Flare"
+status_id = &"shock"
+element_id = &"fire"
+damage = 2
+radius = 56.0
+
+[sub_resource type="Resource" id="Resource_kindle_burn"]
+script = ExtResource("2_row")
+reaction_id = &"kindle"
+display_name = "Kindle"
+status_id = &"burn"
+element_id = &"void"
+effect = 3
+radius = 48.0
+
+[sub_resource type="Resource" id="Resource_kindle_hex"]
+script = ExtResource("2_row")
+reaction_id = &"kindle"
+display_name = "Kindle"
+status_id = &"hex"
+element_id = &"fire"
+effect = 3
+radius = 48.0
+
+[sub_resource type="Resource" id="Resource_stillness_chill"]
+script = ExtResource("2_row")
+reaction_id = &"stillness"
+display_name = "Stillness"
+status_id = &"chill"
+element_id = &"void"
+effect = 2
+duration = 2.0
+
+[sub_resource type="Resource" id="Resource_stillness_hex"]
+script = ExtResource("2_row")
+reaction_id = &"stillness"
+display_name = "Stillness"
+status_id = &"hex"
+element_id = &"frost"
+effect = 2
+duration = 2.0
+strength = 25.0
+
+[sub_resource type="Resource" id="Resource_rift_shock"]
+script = ExtResource("2_row")
+reaction_id = &"rift"
+display_name = "Rift"
+status_id = &"shock"
+element_id = &"void"
+damage = 2
+radius = 48.0
+pull = 120.0
+
+[sub_resource type="Resource" id="Resource_rift_hex"]
+script = ExtResource("2_row")
+reaction_id = &"rift"
+display_name = "Rift"
+status_id = &"hex"
+element_id = &"storm"
+damage = 2
+radius = 48.0
+pull = 120.0
+
+[resource]
+script = ExtResource("1_table")
+rows = Array[ExtResource("2_row")]([SubResource("Resource_shatter_chill"), SubResource("Resource_shatter_shock"), SubResource("Resource_thaw_burn"), SubResource("Resource_thaw_chill"), SubResource("Resource_flare_burn"), SubResource("Resource_flare_shock"), SubResource("Resource_kindle_burn"), SubResource("Resource_kindle_hex"), SubResource("Resource_stillness_chill"), SubResource("Resource_stillness_hex"), SubResource("Resource_rift_shock"), SubResource("Resource_rift_hex")])

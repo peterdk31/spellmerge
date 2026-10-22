@@ -1,14 +1,22 @@
-[gd_resource type="Resource" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="FormBase" load_steps=3 format=3]
 
-[ext_resource type="Script" path="res://content/spells/forms/bolt/bolt.gd" id="1_bolt"]
+[ext_resource type="Script" path="res://core/base/form_base.gd" id="1_base"]
+[ext_resource type="Texture2D" path="res://content/spells/forms/bolt/icon.svg" id="2_icon"]
 
 [resource]
-script = ExtResource("1_bolt")
+script = ExtResource("1_base")
 id = &"bolt"
 demo = true
-display_name = "Fire Bolt"
+display_name = "Bolt"
+complexity = 1
+icon = ExtResource("2_icon")
+base_damage = 5
 mana_cost = 5.0
 cooldown = 0.35
-damage = 5
 speed = 220.0
 lifetime = 1.2
+radius = 5.0
+shots = 1
+spread = 0.0
+motion = 0
+pierce = 0

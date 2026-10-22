@@ -72,6 +72,57 @@ extends Node2D
 ## their own old shots. `dropped` counts these. Spell limits (projectiles per
 ## cast, trigger depth) keep the cap from being reached often.
 ##
+## Expiry: a shot that ends because its life ran out, or on a wall, sends
+## `Events.projectile_expired(player, position, tag)` once, after it is removed (so a
+## handler may spawn at that spot). A shot that ends on a hit (`projectile_hit`), that
+## leaves the bounds, or that the cap drops sends nothing: those did not run out.
+##
+## Motion: `MOTION_STRAIGHT` (default) flies on its velocity; `MOTION_STILL` (the
+## rune) never moves: its velocity is ignored and it waits for a target to enter its
+## circle. It still ends by life or by a hit, as any shot does.
+##
+## Queries: `nearest_target(point, radius, layers, exclude)` and `targets_in(point,
+## radius, layers, out)` use the same grid as hits, so chain, homing and area effects
+## never loop over every enemy. A target counts when its hit circle overlaps the
+## circle (point, radius). They see the target positions of the start of the latest
+## step (a query after `add_target` and before the next step refreshes the grid
+## first), so inside a hit handler they are exact for that step.
+##
+## Orbit: `spawn_orbit` starts a shot that circles its owner. The owner's position comes
+## from a per-player anchor that `set_anchor(player, position)` is given every physics step
+## (by `player`), so the manager never looks up a node. The shot's place is the anchor plus
+## a turning offset, so it follows a walking wizard; its velocity is the tangent, for the
+## drawing. An orbit shot ignores walls (it is held by its caster, who is never inside one)
+## and ends quietly, with no event, when its owner's anchor is cleared (`clear_anchor`:
+## the wizard left or fell). A step in which the anchor jumped far makes a long path, which
+## the hit-work budget bounds as it does for any fast shot.
+##
+## Homing: `set_homing(slot, turn_rate)` makes a straight shot turn toward the nearest
+## target within HOMING_RANGE, at most `turn_rate` radians a second, keeping its speed.
+## The search runs on the grid and only every HOMING_PERIOD-th step of a shot (slots take
+## turns, so the cost is spread); in between the shot keeps turning toward the point it
+## found. It never homes on its shooter's own body or on targets it just hit. The search
+## is charged to the step's hit-work budget (1 per target examined); when the budget is
+## spent the search waits for the shot's next turn. `homing_aim` does the same for a ray.
+##
+## An orbit shot is an ordinary piercing shot: `pierce` is how many hits it survives, and
+## it remembers only its last HIT_MEMORY targets, so a ring that overlaps more than
+## HIT_MEMORY enemies at once hits some of them again on later steps. There is no
+## once-per-revolution rule; the orbit form (part 10) picks `pierce` for what it wants.
+##
+## Rays: `ray(...)` is an instant beam. It holds no row; see its comment.
+##
+## Ends: `shot_ended(tag)`, a signal of the manager itself (not on the event bus), is sent
+## once for every shot with a non-zero tag when it ends for any reason: a hit that spends it,
+## its life, a wall, the bounds, the cap dropping it, a cleared anchor, `clear()`. It is sent
+## after that shot's `projectile_hit` or `projectile_expired` handlers have run, so a handler
+## can spawn children first. `remove_by_tag` is the exception: it is silent, because its
+## caller is the one that revoked the tag. While a `projectile_hit` or `projectile_expired`
+## event of a shot is being sent, `event_slot` is that shot's slot (-1 otherwise, and for a
+## ray), so a listener can read per-shot state with `get_seq_of` and `get_velocity_of`; a
+## slot that just ended is not reused until the next spawn. `exclude(slot, node, seconds)`
+## keeps one shot from hitting one target for a while.
+##
 ## Nothing here allocates per frame: the arrays are sized when the cap is set,
 ## and the grid is reused. Coordinates are world coordinates (the manager sits
 ## at the origin). A handler of `projectile_hit` may spawn more projectiles;
@@ -79,7 +130,15 @@ extends Node2D
 
 const EventsScript := preload("res://core/events/events.gd")
 
+## A shot with a non-zero tag ended; see "Ends" above.
+signal shot_ended(tag: int)
+
 const MAX_PLAYERS: int = 4
+## Motion modes of a shot (see the class doc).
+const MOTION_STRAIGHT: int = 0
+const MOTION_STILL: int = 1
+## Only `spawn_orbit` makes this one.
+const MOTION_ORBIT: int = 2
 ## Default global caps on live projectiles: the PLAN budgets for each platform.
 const DEFAULT_CAP_WEB: int = 1000
 const DEFAULT_CAP_DESKTOP: int = 3000
@@ -95,6 +154,20 @@ const WORK_PER_STEP: int = 8000
 const MAX_WALL_VISITS: int = 64
 ## The work one hit counts for: the event, its handlers and the bookkeeping.
 const HIT_WORK: int = 40
+## A homing shot looks for a target one step in this many (slots take turns).
+const HOMING_PERIOD: int = 4
+## How far from a homing shot (or a beam's origin) a target can be and still be homed on.
+const HOMING_RANGE: float = 160.0
+## The most targets one ray can hit.
+const RAY_MAX_HITS: int = 64
+## How many rays can be in progress at once: a hit handler that fires another ray (an
+## on-hit trigger) nests one level. A deeper one returns 0.0.
+const RAY_MAX_DEPTH: int = 4
+## The longest beam in pixels: what the wall walk (MAX_WALL_VISITS cells) covers even on
+## a diagonal. A longer `length` is cut to this, so a beam never ends on a wall it did
+## not look at. Rays are not charged to the hit-work budget; how many a spell fires (and
+## so how far a handler's own rays fan out) is bounded by the spell runtime's fire cap.
+const RAY_MAX_LENGTH: float = 360.0
 ## Floats per projectile in the MultiMesh buffer: 8 transform, 4 colour.
 const DRAW_STRIDE: int = 12
 ## Draw order of the shots: above the room and the wizards. The autoload is drawn
@@ -136,6 +209,8 @@ var hostile_texture: Texture2D = null:
 var events: EventsScript = null
 ## How many projectiles were dropped because the cap was full, since start.
 var dropped: int = 0
+## The slot of the shot whose hit or expiry event is being sent, else -1. See "Ends".
+var event_slot: int = -1
 ## How many projectiles ended on a wall, since start.
 var wall_hits: int = 0
 ## Projectiles written into the batch by the last update_draw().
@@ -161,6 +236,15 @@ var _layers: PackedInt32Array = PackedInt32Array()
 var _pierce: PackedInt32Array = PackedInt32Array()
 ## The opaque value given to spawn(), sent with every hit.
 var _tag: PackedInt64Array = PackedInt64Array()
+## MOTION_STRAIGHT or MOTION_STILL per slot.
+var _motion: PackedByteArray = PackedByteArray()
+## Orbit shots: radius from the anchor, current angle and angular speed (rad/s).
+var _orbit_radius: PackedFloat32Array = PackedFloat32Array()
+var _orbit_angle: PackedFloat32Array = PackedFloat32Array()
+var _orbit_speed: PackedFloat32Array = PackedFloat32Array()
+## Homing: turn rate in rad/s (0 for none) and the point last found (INF for none).
+var _turn: PackedFloat32Array = PackedFloat32Array()
+var _home_at: PackedVector2Array = PackedVector2Array()
 ## Spawn order, so "oldest" is the lowest.
 var _seq: PackedInt64Array = PackedInt64Array()
 ## HIT_MEMORY target ids per slot, newest first (0 for none).
@@ -194,6 +278,8 @@ var _cell_head: PackedInt32Array = PackedInt32Array()
 var _target_next: PackedInt32Array = PackedInt32Array()
 ## The largest radius of any registered target; sets how far hits are searched.
 var _max_target_radius: float = 0.0
+## True when targets were added since the grid was filled (a query refreshes it).
+var _grid_stale: bool = false
 
 ## The wall grid over the bounds: one byte per WALL_CELL cell, 1 for solid.
 var _wall_w: int = 1
@@ -215,9 +301,25 @@ var _stepping: bool = false
 ## (the first one that went untested when the budget ran out).
 var _work_left: int = 0
 var _resume: int = 0
+## Steps taken so far (staggers the homing searches).
+var _step_index: int = 0
+## Where each player's orbit shots circle (INF for no anchor), see `set_anchor`.
+## Per slot: the target a shot must not hit, and the seconds left of that.
+var _skip_id: PackedInt64Array = PackedInt64Array()
+var _skip_left: PackedFloat32Array = PackedFloat32Array()
+var _anchors: PackedVector2Array = PackedVector2Array([Vector2.INF, Vector2.INF, Vector2.INF, Vector2.INF])
+## Scratch for `ray`, RAY_MAX_HITS rows per nesting level: the best hits so far, nearest
+## first (reused, never grows). `_ray_depth` is how many rays are in progress.
+var _ray_nodes: Array = []
+var _ray_along: PackedFloat32Array = PackedFloat32Array()
+var _ray_points: PackedVector2Array = PackedVector2Array()
+var _ray_depth: int = 0
 
 
 func _init() -> void:
+	_ray_nodes.resize(RAY_MAX_HITS * RAY_MAX_DEPTH)
+	_ray_along.resize(RAY_MAX_HITS * RAY_MAX_DEPTH)
+	_ray_points.resize(RAY_MAX_HITS * RAY_MAX_DEPTH)
 	set_cap(DEFAULT_CAP_WEB if OS.has_feature("web") else DEFAULT_CAP_DESKTOP)
 	set_bounds(_bounds)
 
@@ -275,7 +377,15 @@ func set_cap(value: int) -> void:
 	_layers.resize(_cap)
 	_pierce.resize(_cap)
 	_tag.resize(_cap)
+	_motion.resize(_cap)
+	_orbit_radius.resize(_cap)
+	_orbit_angle.resize(_cap)
+	_orbit_speed.resize(_cap)
+	_turn.resize(_cap)
+	_home_at.resize(_cap)
 	_seq.resize(_cap)
+	_skip_id.resize(_cap)
+	_skip_left.resize(_cap)
 	_last_hit.resize(_cap * HIT_MEMORY)
 	_own_prev.resize(_cap)
 	_own_next.resize(_cap)
@@ -300,6 +410,8 @@ func set_bounds(rect: Rect2) -> void:
 	_grid_w = maxi(ceili(rect.size.x / GRID_CELL), 1)
 	_grid_h = maxi(ceili(rect.size.y / GRID_CELL), 1)
 	_cell_head.resize(_grid_w * _grid_h)
+	_cell_head.fill(-1)
+	_grid_stale = true
 	_wall_w = maxi(ceili(rect.size.x / WALL_CELL), 1)
 	_wall_h = maxi(ceili(rect.size.y / WALL_CELL), 1)
 	_wall_cells.resize(_wall_w * _wall_h)
@@ -429,6 +541,9 @@ func _fit_draw_bounds() -> void:
 
 ## Remove every projectile (targets stay registered).
 func clear() -> void:
+	for slot in _high:
+		if _alive[slot] != 0 and _tag[slot] != 0:
+			shot_ended.emit(_tag[slot])
 	_alive.fill(0)
 	for i in _cap:
 		_free_slots[i] = _cap - 1 - i
@@ -479,6 +594,7 @@ func add_target(node: Node2D, radius: float, layer: int = LAYER_ENEMY, owner: in
 	_target_pos.append(Vector2.ZERO)
 	_target_offset.append(offset)
 	_target_next.append(-1)
+	_grid_stale = true
 	_max_target_radius = maxf(_max_target_radius, radius)
 
 
@@ -492,6 +608,7 @@ func remove_target(node: Node2D) -> void:
 		_target_layer[at] = 0
 	else:
 		_remove_target_at(at)
+		_grid_stale = true
 
 
 func get_target_count() -> int:
@@ -502,13 +619,67 @@ func get_target_count() -> int:
 ## `origin`, moving `velocity` pixels per second for `lifetime` seconds.
 ## `pierce` is how many targets it passes through before it ends. Returns its
 ## slot, or -1 for bad arguments or an origin inside a wall.
+## `motion` is MOTION_STRAIGHT or MOTION_STILL (then `velocity` is ignored).
 ## `tag` is stored and sent back with every hit of this projectile. A full cap never refuses: see the class doc.
-func spawn(player: int, origin: Vector2, velocity: Vector2, lifetime: float, radius: float = 4.0, hit_layers: int = LAYER_ENEMY, pierce: int = 0, tag: int = 0) -> int:
+func spawn(player: int, origin: Vector2, velocity: Vector2, lifetime: float, radius: float = 4.0, hit_layers: int = LAYER_ENEMY, pierce: int = 0, tag: int = 0, motion: int = MOTION_STRAIGHT) -> int:
+	if motion != MOTION_STRAIGHT and motion != MOTION_STILL:
+		return -1
 	if player < EventsScript.NO_PLAYER or player >= MAX_PLAYERS:
 		return -1
 	if not (lifetime > 0.0) or not origin.is_finite() or not velocity.is_finite():
 		return -1
-	if _has_walls and _wall_hit(origin, origin) >= 0.0:
+	return _spawn_row(player, origin, velocity, lifetime, radius, hit_layers, pierce, tag, motion)
+
+
+## Start a shot that circles `player`'s anchor (see `set_anchor`) at `orbit_radius`
+## pixels, starting at `angle` (radians, 0 = east of the owner) and turning
+## `angular_speed` radians a second (negative turns the other way). The other arguments
+## are those of `spawn`. Returns its slot, or -1 for bad arguments, a player outside 0-3
+## or a player with no anchor.
+func spawn_orbit(player: int, orbit_radius: float, angle: float, angular_speed: float, lifetime: float, radius: float = 4.0, hit_layers: int = LAYER_ENEMY, pierce: int = 0, tag: int = 0) -> int:
+	if player < 0 or player >= MAX_PLAYERS or not _anchors[player].is_finite():
+		return -1
+	if not (lifetime > 0.0) or not is_finite(orbit_radius) or not is_finite(angle) or not is_finite(angular_speed):
+		return -1
+	var offset: Vector2 = Vector2.from_angle(angle) * maxf(orbit_radius, 0.0)
+	var slot: int = _spawn_row(player, _anchors[player] + offset, Vector2.ZERO, lifetime, radius, hit_layers, pierce, tag, MOTION_ORBIT)
+	_orbit_radius[slot] = maxf(orbit_radius, 0.0)
+	_orbit_angle[slot] = angle
+	_orbit_speed[slot] = angular_speed
+	_vel[slot] = _orbit_tangent(slot)
+	return slot
+
+
+## Tell the manager where `player`'s wizard is, for its orbit shots. Call it every physics
+## step before the manager's (the owner of the wizard does).
+func set_anchor(player: int, position: Vector2) -> void:
+	if player >= 0 and player < MAX_PLAYERS and position.is_finite():
+		_anchors[player] = position
+
+
+## The wizard is gone: its orbit shots end at the next step, quietly.
+func clear_anchor(player: int) -> void:
+	if player >= 0 and player < MAX_PLAYERS:
+		_anchors[player] = Vector2.INF
+
+
+## Make the straight shot in `slot` home on targets, turning at most `turn_rate` radians
+## a second. Returns false for an empty slot, a shot that is not straight, or a rate
+## that is negative or not finite; true when the rate was applied, 0 included (0 stops
+## homing).
+func set_homing(slot: int, turn_rate: float) -> bool:
+	if slot < 0 or slot >= _cap or _alive[slot] == 0 or _motion[slot] != MOTION_STRAIGHT:
+		return false
+	if not is_finite(turn_rate) or turn_rate < 0.0:
+		return false
+	_turn[slot] = turn_rate
+	_home_at[slot] = Vector2.INF
+	return true
+
+
+func _spawn_row(player: int, origin: Vector2, velocity: Vector2, lifetime: float, radius: float, hit_layers: int, pierce: int, tag: int, motion: int) -> int:
+	# An orbit shot is held by its caster and ignores walls.
+	if motion != MOTION_ORBIT and _has_walls and _wall_hit(origin, origin) >= 0.0:
 		# Born inside a wall it would end in the next step: count it as ended, but
 		# take no pool slot (at the cap that would evict another shot).
 		# No shot existed, so no impact is shown (the staff tip is inside the wall).
@@ -520,7 +691,10 @@ func spawn(player: int, origin: Vector2, velocity: Vector2, lifetime: float, rad
 	var slot: int = _free_slots[_free_count]
 	_pos[slot] = origin
 	_prev[slot] = origin
-	_vel[slot] = velocity
+	_vel[slot] = velocity if motion == MOTION_STRAIGHT else Vector2.ZERO
+	_motion[slot] = motion
+	_turn[slot] = 0.0
+	_home_at[slot] = Vector2.INF
 	_life[slot] = lifetime
 	_radius[slot] = maxf(radius, 0.0)
 	_player[slot] = player
@@ -529,6 +703,7 @@ func spawn(player: int, origin: Vector2, velocity: Vector2, lifetime: float, rad
 	_tag[slot] = tag
 	_seq[slot] = _next_seq
 	_next_seq += 1
+	_skip_left[slot] = 0.0
 	for i in HIT_MEMORY:
 		_last_hit[slot * HIT_MEMORY + i] = 0
 	_alive[slot] = 1
@@ -566,18 +741,28 @@ func step(delta: float) -> void:
 		if _alive[slot] == 0 or _seq[slot] >= first_new:
 			continue
 		_life[slot] -= delta
+		_skip_left[slot] -= delta
 		if _life[slot] <= 0.0:
-			_kill(slot)
+			_expire(slot)
 			continue
 		_prev[slot] = _pos[slot]
-		_pos[slot] += _vel[slot] * delta
+		var orbiting: bool = _motion[slot] == MOTION_ORBIT
+		if orbiting:
+			if not _anchors[_player[slot]].is_finite():
+				_kill(slot)
+				continue
+			_orbit_move(slot, delta)
+		else:
+			if _turn[slot] > 0.0:
+				_steer(slot, delta)
+			_pos[slot] += _vel[slot] * delta
 		if not limit.has_point(_pos[slot]):
 			_kill(slot)
 			continue
 		# A shot that meets a wall is cut short there: it can still hit what is
-		# in front of the wall, then it ends.
+		# in front of the wall, then it ends. An orbit shot ignores walls.
 		var walled: bool = false
-		if _has_walls:
+		if _has_walls and not orbiting:
 			var cut: float = _wall_hit(_prev[slot], _pos[slot])
 			if cut >= 0.0:
 				walled = true
@@ -587,7 +772,7 @@ func step(delta: float) -> void:
 				if walled:
 					wall_hits += 1
 					_emit_wall_impact(_player[slot], _pos[slot], _vel[slot])
-					_kill(slot)
+					_expire(slot)
 				elif starved_at < 0:
 					starved_at = slot
 				continue
@@ -600,9 +785,188 @@ func step(delta: float) -> void:
 		if walled and _alive[slot] != 0:
 			wall_hits += 1
 			_emit_wall_impact(_player[slot], _pos[slot], _vel[slot])
-			_kill(slot)
+			_expire(slot)
 	_resume = maxi(starved_at, 0)
+	_step_index += 1
 	_stepping = false
+
+
+## Advance an orbit shot: turn its angle and place it round the anchor.
+func _orbit_move(slot: int, delta: float) -> void:
+	_orbit_angle[slot] = wrapf(_orbit_angle[slot] + _orbit_speed[slot] * delta, -PI, PI)
+	_pos[slot] = _anchors[_player[slot]] + Vector2.from_angle(_orbit_angle[slot]) * _orbit_radius[slot]
+	_vel[slot] = _orbit_tangent(slot)
+
+
+func _orbit_tangent(slot: int) -> Vector2:
+	var away: Vector2 = Vector2.from_angle(_orbit_angle[slot])
+	return Vector2(-away.y, away.x) * (_orbit_radius[slot] * _orbit_speed[slot])
+
+
+## Turn a homing shot toward the point it last found, and look for a new one when it is
+## this shot's turn (and there is hit work left).
+func _steer(slot: int, delta: float) -> void:
+	if ((slot + _step_index) % HOMING_PERIOD) == 0 and _work_left > 0:
+		_home_at[slot] = _homing_point(slot)
+	var goal: Vector2 = _home_at[slot]
+	var velocity: Vector2 = _vel[slot]
+	if not goal.is_finite() or velocity.is_zero_approx():
+		return
+	var want: Vector2 = goal - _pos[slot]
+	if want.is_zero_approx():
+		return
+	var most: float = _turn[slot] * delta
+	_vel[slot] = velocity.rotated(clampf(velocity.angle_to(want), -most, most))
+
+
+## The centre of the nearest target within HOMING_RANGE of a shot that it may home on
+## (not its shooter's body, not one it just hit), or INF. Charges the work budget.
+func _homing_point(slot: int) -> Vector2:
+	var point: Vector2 = _pos[slot]
+	# Homing never picks a wizard, even with friendly fire on.
+	var layers: int = _layers[slot] & ~LAYER_PLAYER
+	var shooter: int = _player[slot]
+	var best: int = -1
+	var best_sq: float = INF
+	var cells: Vector4i = _query_cells(point, HOMING_RANGE)
+	for y in range(cells.y, cells.w + 1):
+		for x in range(cells.x, cells.z + 1):
+			var t: int = _cell_head[y * _grid_w + x]
+			while t >= 0:
+				_work_left -= 1
+				if (_target_layer[t] & layers) != 0 and (shooter < 0 or _target_owner[t] != shooter) and not _remembers(slot, _target_id[t]) and is_instance_valid(_targets[t]):
+					var reach: float = HOMING_RANGE + _target_radius[t]
+					var d: float = _target_pos[t].distance_squared_to(point)
+					if d <= reach * reach and d < best_sq:
+						best_sq = d
+						best = t
+				t = _target_next[t]
+	return _target_pos[best] if best >= 0 else Vector2.INF
+
+
+## For a beam, which cannot turn: `direction` (a unit vector) bent toward the nearest
+## target on `layers` within HOMING_RANGE of `origin` whose centre lies within
+## `max_angle` radians of it, or `direction` unchanged when there is none. Targets
+## owned by `player` are skipped, and so are wizards (LAYER_PLAYER). Allocation-free.
+func homing_aim(player: int, origin: Vector2, direction: Vector2, max_angle: float, layers: int) -> Vector2:
+	if not origin.is_finite() or not direction.is_finite() or direction.is_zero_approx() or not is_finite(max_angle):
+		return direction
+	_query_ready()
+	layers &= ~LAYER_PLAYER
+	var best: int = -1
+	var best_sq: float = INF
+	var cells: Vector4i = _query_cells(origin, HOMING_RANGE)
+	for y in range(cells.y, cells.w + 1):
+		for x in range(cells.x, cells.z + 1):
+			var t: int = _cell_head[y * _grid_w + x]
+			while t >= 0:
+				if (_target_layer[t] & layers) != 0 and (player < 0 or _target_owner[t] != player) and is_instance_valid(_targets[t]):
+					var to_target: Vector2 = _target_pos[t] - origin
+					var reach: float = HOMING_RANGE + _target_radius[t]
+					var d: float = to_target.length_squared()
+					if d <= reach * reach and d < best_sq and not to_target.is_zero_approx() and absf(direction.angle_to(to_target)) <= max_angle:
+						best_sq = d
+						best = t
+				t = _target_next[t]
+	if best < 0:
+		return direction
+	return origin.direction_to(_target_pos[best])
+
+
+## An instant beam from `origin` along `direction` for up to `length` pixels, fired by
+## `player`. It holds no row in the pool. It stops at the first wall and hits the
+## nearest `pierce + 1` targets on `layers` (at most RAY_MAX_HITS) whose circle the beam
+## touches (`width` pixels either side of the line; `exclude` is a target it never hits,
+## for a beam that starts on the one that fired it). For each, nearest first, it sends
+## `projectile_impact` and `projectile_hit(player, target, point, tag)`, the point being
+## where the beam passes closest to the target; a beam that ends on a wall sends an
+## impact with a `null` target there. Targets owned by `player` are skipped and, as in
+## `spawn`, friendly fire adds LAYER_PLAYER. Returns how far the beam got in pixels: the
+## length, the distance to the wall, or the distance to the last target it could hit.
+## 0.0 for bad arguments or an origin inside a wall. The hits are found before any event
+## is sent, so a handler may remove or free targets, or fire another ray (up to
+## RAY_MAX_DEPTH deep, a deeper one returns 0.0). A `length` over RAY_MAX_LENGTH is cut
+## to it. Allocation-free.
+func ray(player: int, origin: Vector2, direction: Vector2, length: float, pierce: int = 0, layers: int = LAYER_ENEMY, tag: int = 0, width: float = 0.0, exclude: Node = null) -> float:
+	if player < EventsScript.NO_PLAYER or player >= MAX_PLAYERS:
+		return 0.0
+	if not origin.is_finite() or not direction.is_finite() or direction.is_zero_approx() or not is_finite(length) or length <= 0.0:
+		return 0.0
+	if _ray_depth >= RAY_MAX_DEPTH:
+		return 0.0
+	length = minf(length, RAY_MAX_LENGTH)
+	var base: int = _ray_depth * RAY_MAX_HITS
+	var heading: Vector2 = direction.normalized()
+	var reach: float = length
+	var walled: bool = false
+	if _has_walls:
+		var cut: float = _wall_hit(origin, origin + heading * length)
+		if cut >= 0.0:
+			walled = true
+			reach = length * cut
+	var end: Vector2 = origin + heading * reach
+	var wanted: int = mini(maxi(pierce, 0) + 1, RAY_MAX_HITS)
+	var found: int = 0
+	var skip: int = exclude.get_instance_id() if exclude != null else 0
+	if not _targets.is_empty():
+		_query_ready()
+		if friendly_fire and player >= 0:
+			layers |= LAYER_PLAYER
+		var wide: float = maxf(width, 0.0)
+		var pad: Vector2 = Vector2.ONE * (wide + _max_target_radius)
+		var low: Vector2 = origin.min(end) - pad
+		var high: Vector2 = origin.max(end) + pad
+		var x0: int = clampi(floori((low.x - _bounds.position.x) / GRID_CELL), 0, _grid_w - 1)
+		var x1: int = clampi(floori((high.x - _bounds.position.x) / GRID_CELL), 0, _grid_w - 1)
+		var y0: int = clampi(floori((low.y - _bounds.position.y) / GRID_CELL), 0, _grid_h - 1)
+		var y1: int = clampi(floori((high.y - _bounds.position.y) / GRID_CELL), 0, _grid_h - 1)
+		for y in range(y0, y1 + 1):
+			for x in range(x0, x1 + 1):
+				var t: int = _cell_head[y * _grid_w + x]
+				while t >= 0:
+					if (_target_layer[t] & layers) != 0 and (player < 0 or _target_owner[t] != player) and _target_id[t] != skip and is_instance_valid(_targets[t]):
+						var along: float = clampf((_target_pos[t] - origin).dot(heading), 0.0, reach)
+						var closest: Vector2 = origin + heading * along
+						var touch: float = wide + _target_radius[t]
+						if closest.distance_squared_to(_target_pos[t]) <= touch * touch:
+							found = _ray_keep(base, found, wanted, t, along, closest)
+					t = _target_next[t]
+	var got: float = reach
+	if found > 0 and found == maxi(pierce, 0) + 1:
+		# The beam is spent on its last target.
+		got = _ray_along[base + found - 1]
+		walled = false
+	_ray_depth += 1
+	var outer_slot: int = event_slot
+	event_slot = -1
+	for i in found:
+		var node: Variant = _ray_nodes[base + i]
+		if events != null and is_instance_valid(node):
+			events.projectile_impact.emit(player, node, _ray_points[base + i], heading)
+			events.projectile_hit.emit(player, node, _ray_points[base + i], tag)
+		_ray_nodes[base + i] = null
+	_ray_depth -= 1
+	event_slot = outer_slot
+	if walled and events != null:
+		events.projectile_impact.emit(player, null, origin + heading * got, heading)
+	return got
+
+
+## Put target `t` (at `along` pixels, nearest point `closest`) into the sorted scratch of
+## the best hits if it is among the `wanted` nearest; returns the new count.
+func _ray_keep(base: int, found: int, wanted: int, t: int, along: float, closest: Vector2) -> int:
+	if found == wanted and along >= _ray_along[base + found - 1]:
+		return found
+	var at: int = mini(found, wanted - 1)
+	while at > 0 and _ray_along[base + at - 1] > along:
+		_ray_along[base + at] = _ray_along[base + at - 1]
+		_ray_points[base + at] = _ray_points[base + at - 1]
+		_ray_nodes[base + at] = _ray_nodes[base + at - 1]
+		at -= 1
+	_ray_along[base + at] = along
+	_ray_points[base + at] = closest
+	_ray_nodes[base + at] = _targets[t]
+	return mini(found + 1, wanted)
 
 
 ## Copy the live projectiles into the one batched draw (a single buffer write).
@@ -678,7 +1042,9 @@ func _color_of(player: int) -> Color:
 	return Color.WHITE.lerp(PLAYER_COLORS[player], TINT_STRENGTH)
 
 
-func _kill(slot: int) -> void:
+func _kill(slot: int, announce: bool = true) -> void:
+	if announce and _tag[slot] != 0:
+		shot_ended.emit(_tag[slot])
 	_alive[slot] = 0
 	_free_slots[_free_count] = slot
 	_free_count += 1
@@ -697,6 +1063,64 @@ func _kill(slot: int) -> void:
 		_own_tail[owner_index] = before
 	while _high > 0 and _alive[_high - 1] == 0:
 		_high -= 1
+
+
+## End a shot whose life ran out or that met a wall, and say so.
+func _expire(slot: int) -> void:
+	var player: int = _player[slot]
+	var at: Vector2 = _pos[slot]
+	var tag: int = _tag[slot]
+	_kill(slot, false)
+	if events != null:
+		event_slot = slot
+		events.projectile_expired.emit(player, at, tag)
+		event_slot = -1
+	if tag != 0:
+		shot_ended.emit(tag)
+
+
+## Remove, quietly (no event, no `shot_ended`), every shot carrying `tag`. Returns how
+## many. For the spell runtime, when a tag is revoked. Walks the pool: not for every frame.
+func remove_by_tag(tag: int) -> int:
+	var removed: int = 0
+	for slot in _high:
+		if _alive[slot] != 0 and _tag[slot] == tag:
+			_kill(slot, false)
+			removed += 1
+	return removed
+
+
+## Keep the shot in `slot` from hitting `node` for `seconds` (a held spell must not hit the
+## target that fired it). One target per shot; a later call replaces it.
+func exclude(slot: int, node: Node, seconds: float) -> void:
+	if slot >= 0 and slot < _cap and _alive[slot] != 0 and node != null:
+		_skip_id[slot] = node.get_instance_id()
+		_skip_left[slot] = seconds
+
+
+## The spawn number of the shot in `slot`: it changes when the slot is reused, so a
+## listener can tell a shot it knows from a newer one in the same slot.
+func get_seq_of(slot: int) -> int:
+	return _seq[slot] if slot >= 0 and slot < _cap else -1
+
+
+## The tag of the shot in `slot` (kept after it ended, until the slot is reused).
+func get_tag_of(slot: int) -> int:
+	return _tag[slot] if slot >= 0 and slot < _cap else 0
+
+
+## The velocity of the shot in `slot` (kept after it ended, until the slot is reused).
+func get_velocity_of(slot: int) -> Vector2:
+	return _vel[slot] if slot >= 0 and slot < _cap else Vector2.ZERO
+
+
+## Where `player`'s anchor is (see `set_anchor`), or `Vector2.INF` when it has none.
+func get_anchor(player: int) -> Vector2:
+	return _anchors[player] if player >= 0 and player < MAX_PLAYERS else Vector2.INF
+
+
+## Where the target `nearest_target` last returned is (its hit circle's centre).
+var nearest_point: Vector2 = Vector2.INF
 
 
 ## Make room: drop the oldest projectile of the owner with the most.
@@ -731,6 +1155,8 @@ func _remove_target_at(at: int) -> void:
 ## Drop freed targets, read the positions of the rest and fill the grid.
 func _refresh_targets() -> void:
 	if _targets.is_empty():
+		_cell_head.fill(-1)
+		_grid_stale = false
 		return
 	var at: int = 0
 	while at < _targets.size():
@@ -740,6 +1166,7 @@ func _refresh_targets() -> void:
 			continue
 		at += 1
 	_cell_head.fill(-1)
+	_grid_stale = false
 	for i in _targets.size():
 		var node: Node2D = _targets[i]
 		_target_next[i] = -1
@@ -750,6 +1177,82 @@ func _refresh_targets() -> void:
 		var cell: int = _cell_of(_target_pos[i])
 		_target_next[i] = _cell_head[cell]
 		_cell_head[cell] = i
+
+
+## The nearest target on `layers` whose hit circle overlaps the circle (`point`,
+## `radius`), by distance to its centre, or null. `exclude` is skipped (the target
+## just hit, for a chain) and so is `exclude_also`. The hit circle's centre of the target
+## returned is left in `nearest_point`. Allocation-free.
+func nearest_target(point: Vector2, radius: float, layers: int, exclude: Node2D = null, exclude_also: Node2D = null) -> Node2D:
+	nearest_point = Vector2.INF
+	if not point.is_finite() or not is_finite(radius):
+		return null
+	var best: int = -1
+	var best_sq: float = INF
+	var skip: int = exclude.get_instance_id() if exclude != null else 0
+	var skip_also: int = exclude_also.get_instance_id() if exclude_also != null else 0
+	_query_ready()
+	var cells: Vector4i = _query_cells(point, radius)
+	for y in range(cells.y, cells.w + 1):
+		for x in range(cells.x, cells.z + 1):
+			var t: int = _cell_head[y * _grid_w + x]
+			while t >= 0:
+				if _query_match(t, point, radius, layers, skip) and (skip_also == 0 or _target_id[t] != skip_also):
+					var d: float = _target_pos[t].distance_squared_to(point)
+					if d < best_sq:
+						best_sq = d
+						best = t
+				t = _target_next[t]
+	if best < 0:
+		return null
+	nearest_point = _target_pos[best]
+	return _targets[best]
+
+
+## Fill `out` (cleared first) with the targets on `layers` whose hit circle overlaps
+## the circle (`point`, `radius`), and return how many. Pass the same array each time
+## so nothing is allocated. Order is not defined.
+func targets_in(point: Vector2, radius: float, layers: int, out: Array[Node2D]) -> int:
+	out.clear()
+	if not point.is_finite() or not is_finite(radius):
+		return 0
+	_query_ready()
+	var cells: Vector4i = _query_cells(point, radius)
+	for y in range(cells.y, cells.w + 1):
+		for x in range(cells.x, cells.z + 1):
+			var t: int = _cell_head[y * _grid_w + x]
+			while t >= 0:
+				if _query_match(t, point, radius, layers, 0):
+					out.append(_targets[t])
+				t = _target_next[t]
+	return out.size()
+
+
+## Fill the grid when targets were added since it was last filled. Never inside a
+## step, where the grid is in use and already current.
+func _query_ready() -> void:
+	if _grid_stale and not _stepping:
+		_refresh_targets()
+
+
+## The grid cells (x0, y0, x1, y1) a query circle can reach.
+func _query_cells(point: Vector2, radius: float) -> Vector4i:
+	var pad: Vector2 = Vector2.ONE * (maxf(radius, 0.0) + _max_target_radius)
+	var low: Vector2 = point - pad
+	var high: Vector2 = point + pad
+	return Vector4i(
+		clampi(floori((low.x - _bounds.position.x) / GRID_CELL), 0, _grid_w - 1),
+		clampi(floori((low.y - _bounds.position.y) / GRID_CELL), 0, _grid_h - 1),
+		clampi(floori((high.x - _bounds.position.x) / GRID_CELL), 0, _grid_w - 1),
+		clampi(floori((high.y - _bounds.position.y) / GRID_CELL), 0, _grid_h - 1))
+
+
+func _query_match(t: int, point: Vector2, radius: float, layers: int, skip: int) -> bool:
+	# A target freed since the grid was filled is skipped, never returned.
+	if (_target_layer[t] & layers) == 0 or _target_id[t] == skip or not is_instance_valid(_targets[t]):
+		return false
+	var reach: float = maxf(radius, 0.0) + _target_radius[t]
+	return _target_pos[t].distance_squared_to(point) <= reach * reach
 
 
 func _cell_of(point: Vector2) -> int:
@@ -785,7 +1288,7 @@ func _hit_test(slot: int) -> bool:
 				var next_target: int = _target_next[t]
 				_work_left -= 1
 				# Skip other layers, the shooter's own body, and targets already hit.
-				if (_target_layer[t] & layers) == 0 or (shooter >= 0 and _target_owner[t] == shooter) or _remembers(slot, _target_id[t]):
+				if (_target_layer[t] & layers) == 0 or (shooter >= 0 and _target_owner[t] == shooter) or _remembers(slot, _target_id[t]) or (_skip_left[slot] > 0.0 and _skip_id[slot] == _target_id[t]):
 					t = next_target
 					continue
 				var along: float = 0.0
@@ -823,6 +1326,12 @@ func _register_hit(slot: int, target: int, at: Vector2) -> void:
 	var player: int = _player[slot]
 	var tag: int = _tag[slot]
 	var heading: Vector2 = _vel[slot].normalized()
+	if heading == Vector2.ZERO:
+		# A still shot has no heading: point from the shot to the target instead.
+		heading = at.direction_to(_target_pos[target])
+		if heading == Vector2.ZERO:
+			heading = Vector2.RIGHT
+	var spent: bool = false
 	if _pierce[slot] > 0:
 		_pierce[slot] -= 1
 		var memory: int = slot * HIT_MEMORY
@@ -830,7 +1339,12 @@ func _register_hit(slot: int, target: int, at: Vector2) -> void:
 			_last_hit[memory + i] = _last_hit[memory + i - 1]
 		_last_hit[memory] = _target_id[target]
 	else:
-		_kill(slot)
+		spent = true
+		_kill(slot, false)
 	if events != null and is_instance_valid(node):
 		events.projectile_impact.emit(player, node, at, heading)
+		event_slot = slot
 		events.projectile_hit.emit(player, node, at, tag)
+		event_slot = -1
+	if spent and tag != 0:
+		shot_ended.emit(tag)

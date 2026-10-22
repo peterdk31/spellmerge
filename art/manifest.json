@@ -287,6 +287,123 @@
       "tier": "placeholder",
       "tool": "Claude (hand-written SVG rects)",
       "prompt": "The same dash strip as wizard_p1_dash.svg with the robe and hat recoloured to the Player 4 (purple) ramp. Only rect elements, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "content/spells/elements/fire/icon.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 16x16 icon of a flame for the Fire element: a Fire base body with Fire light inside and a Spark light core, a 1 px outline, light from the top-left. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "content/spells/elements/frost/icon.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 16x16 icon of an ice crystal (a pointed diamond) for the Frost element: Player 1 light blue body with a Bone light core line, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "content/spells/elements/storm/icon.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 16x16 icon of a zigzag lightning bolt for the Storm element: Spark base with Spark light on its left edge, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "content/spells/elements/void/icon.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 16x16 icon of a dark hole in a purple ring for the Void element: Player 4 light and dark purple ring, an outlined black centre and a Bone light glint, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "content/spells/forms/bolt/icon.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 16x16 icon of a comet flying right for the Bolt form: a round Bone head with a Spark core and a tapering Bone tail, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "content/spells/forms/beam/icon.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 16x16 icon of a horizontal ray for the Beam form: a Spark band with a Spark light core, small flares above and below its middle, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "content/spells/forms/nova/icon.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 16x16 icon of an expanding ring for the Nova form: a Bone octagonal ring lit from the top-left, a Spark glint in the middle, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "content/spells/forms/rune/icon.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 16x16 icon of a diamond-shaped floor rune for the Rune form: a Spark diamond with a Spark shadow inner diamond and a Spark light centre, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "content/spells/forms/orbit/icon.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 16x16 icon of one Bone orb in the middle and three smaller Bone orbs circling it for the Orbit form, Spark dots on the path, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/vfx/beam.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 32x32 horizontal beam segment that repeats along its length, for the Beam form: a Spark light core, Spark base edges and Spark shadow rims, no outline so it glows. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/vfx/nova_ring.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 32x32 expanding octagonal ring for the Nova form: a Bone base band with a Bone shadow rim on both edges, hollow in the middle. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/vfx/rune.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 32x32 floor rune seen from above for the Rune form: a square Spark frame with a Spark shadow rim and a plus-shaped glyph with a Spark light centre. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/vfx/orbit_orb.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 32x32 Bone orb with a Spark light glint and a short fading trail of Bone shapes behind it on the left, for the Orbit form. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
     }
   ]
 }

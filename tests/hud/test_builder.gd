@@ -599,7 +599,7 @@ func test_a_refusal_reason_is_shown_as_text_and_cleared_by_the_next_change() -> 
 	check_equal(_builder(1).note_text(), _spells.component_description(&"bolt"), "another player's builder shows no refusal, only its own focus")
 	_choose(0, BuilderScript.SLOT_FORM, "Bolt")
 	check_equal(builder.refusal_reason(), "", "a change that works clears it")
-	check_equal(builder.note_text(), _spells.component_description(&"bolt"), "and the note describes the bolt again")
+	check_equal(builder.note_text(), _spells.component_description(&"fire"), "and the note describes what is in focus (the form moved on to the element bag, on Fire)")
 
 
 func test_an_over_complex_spell_is_refused_with_the_compilers_reason() -> void:
@@ -707,3 +707,98 @@ func test_the_info_of_each_player_shows_that_players_spell() -> void:
 	check_equal(_builder(2).preview_pattern(), "ring", "player 3 built a nova")
 	check_equal(_builder(0).preview_pattern(), "fan", "player 1 still has a bolt")
 	check_equal(_builder(3).complexity_value(), 2.0, "player 4's bar is its own")
+
+
+# --- The walkthrough (M2 part 29): focus order and presses ---------------------
+
+func test_the_builder_opens_on_the_form_slot_and_close_follows_the_tabs() -> void:
+	_start(1)
+	_open(0)
+	var builder: BuilderScript = _builder(0)
+	check_equal(_focus.focused(0), builder.slot_button(BuilderScript.SLOT_FORM), "it opens on the form slot, ready to pick")
+	var controls: Array[Control] = builder.controls()
+	check_equal(controls[2], builder.close_button(), "Close is third, right after the tabs it sits beside")
+	_tap(0, &"dodge")
+	_frame()
+	check(not builder.is_open(), "cancel on the first slot closes it")
+
+
+func test_replacing_a_form_stays_on_the_form() -> void:
+	_start(1)
+	_open(0)
+	var builder: BuilderScript = _builder(0)
+	_choose(0, BuilderScript.SLOT_FORM, "Beam")
+	check_equal(builder.selected_slot(), BuilderScript.SLOT_FORM, "replacing a form stays on the form")
+
+
+func test_a_form_into_an_empty_slot_moves_on_to_the_element() -> void:
+	_start(1)
+	_open(0)
+	var builder: BuilderScript = _builder(0)
+	_choose(0, BuilderScript.SLOT_TRIGGER, "On Hit")
+	_press(0, builder.held_button())
+	_choose(0, BuilderScript.SLOT_FORM, "Nova")
+	check(builder.recipe_of(0).has("held"), "the held spell got its form")
+	check_equal(builder.selected_slot(), BuilderScript.SLOT_ELEMENT, "the element is next")
+	check(builder.shown_rows().has(_focus.focused(0)), "with focus already in its bag")
+
+
+func test_an_element_into_an_empty_slot_moves_on_to_the_first_modifier() -> void:
+	_start(1)
+	_open(0)
+	var builder: BuilderScript = _builder(0)
+	# Spell B is a bolt: take the element-less spell B, and put an element in with two presses.
+	_press(0, builder.tab_button(1))
+	_press(0, builder.slot_button(BuilderScript.SLOT_ELEMENT))
+	check(builder.shown_rows().has(_focus.focused(0)), "the element's bag is in focus")
+	_tap(0, &"cast")
+	_frame()
+	check(builder.recipe_of(1).has("element"), "one press on the first row built it")
+	check_equal(builder.selected_slot(), BuilderScript.SLOT_FIRST_MODIFIER, "and the first free modifier is next")
+	check(builder.shown_rows().has(_focus.focused(0)), "with focus already in its bag")
+
+
+func test_a_refused_or_replaced_choice_stays_on_its_bag() -> void:
+	_start(1)
+	_open(0)
+	var builder: BuilderScript = _builder(0)
+	# The element slot already holds Fire: choosing another one replaces it and stays here.
+	_press(0, builder.slot_button(BuilderScript.SLOT_ELEMENT))
+	_press(0, _row_named(builder, "Frost"))
+	check_equal(builder.selected_slot(), BuilderScript.SLOT_ELEMENT, "a replaced element stays selected")
+	check(builder.shown_rows().has(_focus.focused(0)), "and focus stays in its bag")
+
+
+func test_a_tab_and_the_held_level_put_focus_on_the_form_slot() -> void:
+	_start(1)
+	_open(0)
+	var builder: BuilderScript = _builder(0)
+	_press(0, builder.tab_button(1))
+	check_equal(_focus.focused(0), builder.slot_button(BuilderScript.SLOT_FORM), "choosing spell B lands on its form slot")
+	_choose(0, BuilderScript.SLOT_TRIGGER, "On Hit")
+	_press(0, builder.held_button())
+	check_equal(builder.level(), 1, "one level down")
+	check_equal(_focus.focused(0), builder.slot_button(BuilderScript.SLOT_FORM), "the held spell starts on its form slot")
+
+
+func test_the_refusal_texts_say_what_to_do() -> void:
+	_start(1)
+	_open(0)
+	await process_frame
+	await process_frame
+	var builder: BuilderScript = _builder(0)
+	_choose(0, BuilderScript.SLOT_TRIGGER, "On Hit")
+	_press(0, builder.held_button())
+	_choose(0, BuilderScript.SLOT_ELEMENT, "Frost")
+	check(builder.note_text().contains("Pick a form (F) first"), "got '%s'" % builder.note_text())
+	check(builder.note_lines_for(builder.note_text()) <= BuilderScript.NOTE_LINES, "it fits the note")
+	_press(0, builder.up_button())
+	_choose(0, BuilderScript.SLOT_FORM, "Nova")
+	_choose(0, BuilderScript.SLOT_FIRST_MODIFIER, "Split")
+	_choose(0, BuilderScript.SLOT_FIRST_MODIFIER + 1, "Chain")
+	_choose(0, BuilderScript.SLOT_FIRST_MODIFIER + 2, "Homing")
+	_choose(0, BuilderScript.SLOT_TRIGGER, "Timer")
+	_press(0, builder.held_button())
+	_choose(0, BuilderScript.SLOT_FORM, "Nova")
+	check(builder.note_text().contains("Too complex"), "got '%s'" % builder.note_text())
+	check(builder.note_lines_for(builder.note_text()) <= BuilderScript.NOTE_LINES, "the complexity refusal fits the note too")

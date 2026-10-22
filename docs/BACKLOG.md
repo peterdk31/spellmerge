@@ -2,6 +2,15 @@
 
 Ideas and future work outside the current milestone (docs/PLAN.md, "Planning system"). Players' ideas wait as issues labelled `backlog` (the daily intake puts them there); this file holds Claude's own. The weekly planning run moves items from both into the work queue or `docs/NEXT.md` when their milestone comes.
 
+## From M2 part 29 (the builder walkthrough)
+
+- **The mouse (task).** The builder, the overlay and the quick view ignore the mouse. Add a mouse for P1's panel only: hover mark (a "> " or an outline, not colour alone), click to activate, a click outside the builder closes nothing. Needs the hover to go through `UIFocus` so the owner's device still wins. M4 polish.
+- **The wave and break lines sit under four open builders (task).** With four builders open the gap between P1's and P2's builders is 20 px, so "Wave N" is mostly hidden and "Build N" (drawn over them) covers a builder's top row. Move the break row into the free strip between the info panels, or narrow the builders by 10 px each.
+- **Picking modifiers is still one slot at a time (task).** A form and an element are four presses; each modifier is about three (dodge, move to its slot, cast, move to the row, cast). Try advancing through the modifier slots too, or a "next free slot" shortcut, once a real playtest says what players do.
+- **No hint on a disabled slot or button (task).** A greyed modifier slot or "Held >" says nothing about why (needs the slot before it filled, needs a trigger). Show it in the note when focus rests on it (it skips disabled controls today, so this needs a way to read them).
+- **The held-spell levels are two small buttons (task).** "Held >" and "< Up" at 10 px are easy to miss; the title says "held 1" but not which trigger holds it. Show the holding trigger's name in the title.
+- **Refusals name no slot for a held spell (task).** "Pick a form (F) first." is shown for the held spell too, where the title says "held 1"; the note could start with "Held spell:" when `level() > 0`.
+
 ## From M2 part 16 (the builder)
 
 - The builder ignores the mouse; docs/milestones/M2-spell-system.md wants the mouse to work on P1's panel only. Add it with part 17 or in M4's polish, with a hover mark that is not colour alone.

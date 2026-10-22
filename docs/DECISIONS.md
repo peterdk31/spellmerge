@@ -1120,6 +1120,12 @@ An independent review of the branch found these, all fixed with a regression tes
 - **Why:** the sheet showed that the frost and void colours need new palette ramps (STYLE.md says element colours are added to its table first), and element-coloured shots need a neutral bolt sprite. Both touch the palette and the art direction choice (part 27), so changing icons now would likely be redone.
 - **Now:** two replacement tasks in `docs/NEXT.md`, to run after or together with the direction choice. Nothing in the game waits on them.
 
+## M2 part 29: the builder walkthrough (four players)
+
+- **Why:** the builder had only had tests and bot input. Walking it with real input at 640x360 (`shot_builder.gd`: overlay, Build, slot, component, tab, refusal, wave, break; one and four players) showed a clumsy order: it opened on tab A (two presses from the form slot), "Close" sat in the tabs row but was reached last, picking a form walked back to the chain for the element, and tabs and "Held >" left focus on themselves.
+- **Now:** it opens on the form slot; "Close" follows the tabs in the focus order (the quick view keeps "Drop component", rows, "Close"); a tab, "< Up" and "Held >" put focus on the form slot of what they show; a form or element put into an empty slot moves on to the next slot's bag (the element, then the first free modifier), while a replacement or a refusal stays, so a second try is one press. A form plus an element is four presses after opening, not nine. Refusal texts say what to do: "Pick a form (F) first." and "Too complex: 13 of 12. Remove one." (three lines at most in the note).
+- **Not done:** the mouse, and the wave line hidden under four open builders: see `docs/BACKLOG.md`, "From M2 part 29".
+
 ## Owner: Ice and Void ramps; the palette is the bot's to change
 
 - **Why:** the frost, void and homing icons and the frost and void tints borrowed Player 1 and Player 4 colours, which STYLE.md keeps for players (#178, #179).

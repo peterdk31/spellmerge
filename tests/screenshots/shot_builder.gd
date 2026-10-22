@@ -32,6 +32,7 @@ func _initialize() -> void:
 	await _settle()
 	await _open_builder(0)
 	var builder: Node = _hud.call("get_builder", 0)
+	await _shot("builder_opened")
 	await _press(0, builder.call("slot_button", 1))
 	if not _hud.call("get_builder", 0).call("is_open"):
 		_fail("the builder of player 1 is not open")
@@ -73,6 +74,19 @@ func _initialize() -> void:
 			_fail("the builder of player %d is not open in builder_four_players (focus panel open: %s)" % [index + 1, _focus.call("is_open", index)])
 			return
 	await _shot("builder_four_players")
+	# The wave starts with the builders open: they fold into the quick view; then the break
+	# comes back and they unfold with the same choices.
+	var events: Node = root.get_node("Events")
+	events.emit_signal("wave_started", 2)
+	await _settle()
+	await _shot("builder_four_players_wave")
+	events.emit_signal("room_cleared", &"shot")
+	events.emit_signal("build_break_started", 20.0)
+	await _settle()
+	await _shot("builder_four_players_break_again")
+	for index in 4:
+		_tap(index, &"overlay")
+	await _settle()
 	flow.call("stop_run")
 	await create_timer(0.3).timeout
 	quit(0)

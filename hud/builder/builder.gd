@@ -12,13 +12,15 @@ extends PanelContainer
 ##
 ## Controls (through `core/ui_focus`, so only the owner's device works them): up/left and
 ## down/right move through the controls in order, `cast` activates and `dodge` goes back.
-## Order: the spell tabs (A, B), the six slots (form, element, three modifiers, trigger),
-## "< Up" and "Held >" (the spell a trigger holds, at most two levels down), the bag rows
-## and "Close". Activating a slot selects it and moves focus to the bag row list, which
-## shows only the components that fit the slot (plus "None" to empty a filled slot);
-## activating a row sends the request. `dodge` on a bag row goes back to its slot, and
-## anywhere else closes the builder. The focused control is marked with "> " and the
-## selected slot is shown in brackets, so nothing is shown by colour alone.
+## Order: the spell tabs (A, B), "Close" (drawn beside them), the six slots (form, element,
+## three modifiers, trigger), "< Up" and "Held >" (the spell a trigger holds, at most two
+## levels down) and the bag rows. It opens on the form slot; a tab, "< Up" and "Held >" put
+## focus on the form slot of the spell they show. Activating a slot selects it and moves focus
+## to the bag row list, which shows only the components that fit the slot (plus "None" to
+## empty a filled slot); activating a row sends the request, and a form or element that went
+## into an empty slot moves on to the next slot's bag (so form + element is four presses).
+## `dodge` on a bag row goes back to its slot, and anywhere else closes the builder. The focused control is marked
+## with "> " and the selected slot is shown in brackets, so nothing is shown by colour alone.
 ##
 ## The quick view (M2 part 18): when a wave starts (`set_quick(true)`, called by `panels.gd`) an
 ## open builder folds into the quick view, and one opened during a wave starts as it. It keeps the
@@ -247,6 +249,9 @@ func open_builder() -> bool:
 	_open = true
 	_synced_controls = _controls.size()
 	_focused = _ui_focus.focused(index)
+	# A normal visit is "pick a slot": start on the form slot, not on the tabs.
+	if not _quick:
+		_focus_control(_slots[_slot])
 	_apply_marks()
 	return true
 
@@ -686,13 +691,16 @@ func _rebuild_controls() -> void:
 	else:
 		for tab in _tabs:
 			_controls.append(tab)
+		# Close is drawn right of the tabs, so it is reached right after them.
+		_controls.append(_close)
 		for slot_button_node in _slots:
 			_controls.append(slot_button_node)
 		_controls.append(_up)
 		_controls.append(_held)
 	for row in _rows:
 		_controls.append(row)
-	_controls.append(_close)
+	if _quick:
+		_controls.append(_close)
 
 
 func _set_text(button: Button, text: String) -> void:
@@ -818,6 +826,7 @@ func _on_activated(player: int, control: Control) -> void:
 		_level = 0
 		_slot = SLOT_FORM
 		_render()
+		_focus_control(_slots[_slot])
 	elif _slots.has(control as Button):
 		_slot = _slots.find(control as Button)
 		_render()
@@ -826,16 +835,39 @@ func _on_activated(player: int, control: Control) -> void:
 		_level -= 1
 		_slot = SLOT_FORM
 		_render()
+		_focus_control(_slots[_slot])
 	elif control == _held:
 		_level += 1
 		_slot = SLOT_FORM
 		_render()
+		_focus_control(_slots[_slot])
 	elif _rows.has(control as Button):
 		var row: int = _rows.find(control as Button)
 		if row < _row_ids.size():
 			var chosen: StringName = _row_ids[row]
-			_ask(_row_slots[row], chosen)
-			_keep_focus_on(chosen)
+			var asked: int = _row_slots[row]
+			var was_empty: bool = _id_in(_node_at(_level), asked) == NO_COMPONENT
+			_ask(asked, chosen)
+			if not _advance_after(asked, chosen, was_empty):
+				_keep_focus_on(chosen)
+
+
+## After a form or an element went into an empty slot (and the player took it), move on to the
+## next slot, so a normal spell is a form, an element and a few modifiers without walking back
+## to the chain each time. A refused or replaced choice stays where it is, for a second try.
+## Returns whether it moved.
+func _advance_after(slot: int, id: StringName, was_empty: bool) -> bool:
+	if _quick or not was_empty or id == NO_COMPONENT or slot > SLOT_ELEMENT:
+		return false
+	if _id_in(_node_at(_level), slot) != id:
+		return false
+	_slot = slot + 1
+	if _slot == SLOT_FIRST_MODIFIER:
+		# The first free modifier slot, or the last one when all are filled.
+		_slot = mini(SLOT_FIRST_MODIFIER + _modifiers_of(_node_at(_level)).size(), SLOT_TRIGGER - 1)
+	_render()
+	_focus_control(_first_row())
+	return true
 
 
 ## After a choice the rows may have shifted ("None" appears or goes): put focus back on the row

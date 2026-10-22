@@ -45,8 +45,9 @@ const FeelPresetScript := preload("res://gameplay/feel/presets/feel_preset.gd")
 const FLASH_SHADER: Shader = preload("res://gameplay/feel/hit_flash.gdshader")
 ## Draws the beam and the nova ring like a shot: bone body tinted by the player, core by the element.
 const CORE_SHADER: Shader = preload("res://core/projectiles/shot_core.gdshader")
-## Beams and nova rings on screen at once; past that the oldest slot is taken over.
-const FORMS_PER_PLAYER: int = 4
+## Beams and nova rings on screen per player: one cast makes at most 24 shots (the spell limit),
+## so a split fan is drawn whole; past that the player's oldest slot is taken over.
+const FORMS_PER_PLAYER: int = 24
 const FORM_SLOTS: int = FORMS_PER_PLAYER * 4
 ## Beams and rings draw above the room, under the shots (50) and the flashes (20).
 const FORM_Z: int = 18
@@ -706,8 +707,11 @@ func _on_form_shown(player: int, form: StringName, origin: Vector2, direction: V
 	var seconds: float = preset.nova_seconds if ring else preset.beam_seconds
 	if seconds <= 0.0 or not origin.is_finite():
 		return
+	# Only players cast beams and rings; an enemy (negative index) has no slots, so it is ignored.
+	if player < 0:
+		return
 	# Each player reuses only their own oldest slots, so nobody's beams push out another's.
-	var who: int = clampi(player, 0, 3)
+	var who: int = mini(player, 3)
 	var slot: int = who * FORMS_PER_PLAYER + _next_form[who]
 	_next_form[who] = (_next_form[who] + 1) % FORMS_PER_PLAYER
 	var sprite: Sprite2D = _forms[slot]

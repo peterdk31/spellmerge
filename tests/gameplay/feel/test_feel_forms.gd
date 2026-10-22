@@ -111,6 +111,17 @@ func test_one_players_many_beams_never_push_out_another_players_beam() -> void:
 	check_equal(feel._forms[FeelScript.FORMS_PER_PLAYER].global_position, Vector2(10, 0), "player 1's beam is untouched")
 
 
+func test_one_cast_with_many_rays_shows_every_ray() -> void:
+	for ray in 24:
+		bus.form_shown.emit(1, &"beam", Vector2.ZERO, Vector2.RIGHT.rotated(ray * 0.1), 100.0, FROST)
+	check_equal(_shown().size(), 24, "a fan of 24 rays is drawn whole")
+
+
+func test_a_form_with_no_player_is_ignored() -> void:
+	bus.form_shown.emit(-1, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, FROST)
+	check_equal(_shown().size(), 0, "an enemy's beam takes no player's slot")
+
+
 func test_the_shipped_preset_has_the_form_art() -> void:
 	var shipped := load("res://gameplay/feel/presets/punchy.tres") as FeelPresetScript
 	check(shipped.beam_texture != null and shipped.nova_texture != null, "beam and ring art")

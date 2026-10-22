@@ -488,6 +488,7 @@ Comments by the owner's user ID on any issue or PR are carried out by the next r
 | `/ask <question>` | Claude replies in the thread |
 | `/pause`, `/resume` | Same as the panel checkboxes |
 | `/go`, `/iterate <what>`, `/pivot <how>` | Answer a milestone checkpoint (only in its checkpoint issue); planning starts at once |
+| `/retry` | On a parked task's PR or issue: back in the queue now, with two fresh attempts |
 
 `/claude` instructions follow the same rules as all of Claude's work: they cannot change protected paths or override security, copyright or quality rules.
 

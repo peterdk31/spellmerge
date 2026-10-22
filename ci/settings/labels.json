@@ -98,5 +98,10 @@
     "name": "checkpoint",
     "color": "5319e7",
     "description": "A milestone is done: development waits for /go, /iterate or /pivot"
+  },
+  {
+    "name": "parked",
+    "color": "fbca04",
+    "description": "Set aside for now; the bot's comment says why and until when. /retry brings it back"
   }
 ]

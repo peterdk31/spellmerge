@@ -345,6 +345,7 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           RESULT: ${{ needs.revise.outputs.result }}
+          FIRST: ${{ needs.implement.outputs.result }} # its next rounds keep their questions open
           BRANCH: ${{ needs.publish.outputs.branch }}
           PR: ${{ needs.publish.outputs.pr }}
           TASK: ${{ needs.implement.outputs.task }}

@@ -137,7 +137,40 @@ class InboxTest(unittest.TestCase):
             log = inbox.ask(CFG, [rephrased, same_key, next_round])
         self.assertEqual(log, [f'Not asked again: "{rephrased["title"]}" is #81, still waiting for the owner',
                                f'Not asked again: "{same_key["title"]}" is #80, still waiting for the owner',
-                               "Question for the owner: #99 Pick an art direction?"])
+                               "Next round for the owner: #190 Pick an art direction?"])
+
+    def test_a_next_round_is_posted_in_the_answered_question(self) -> None:
+        """One decision keeps one issue until it's made, instead of #190, then #192."""
+        issue = {"number": 190, "title": "Pick an art direction?", "state": "open",
+                 "body": "text\n<!-- smbot:question key=art-direction-pick -->"}
+        calls: list = []
+
+        def api(path: str, *args: str, input: dict | None = None, token: object = None) -> object:
+            if "issues?state=open" in path:
+                return [issue]
+            if "issues?state=closed" in path:
+                return []
+            calls.append((path, args, input))
+            return {}
+
+        st = {"pending_instructions": [{"kind": "claude", "number": 190, "url": "u"}]}
+        # Matched by title, under a new key; then the new key alone finds the same issue.
+        rounds = [{**Q, "title": "Pick an art direction, round two?", "key": "art-direction-pick-2", "owner_change": False},
+                  {**Q, "title": "Which of D, E or F, then?", "key": "art-direction-pick-2"}]
+        with mock.patch.object(inbox.gh, "api", api), mock.patch.object(inbox.state, "load", return_value=(st, "sha")):
+            log = inbox.ask(CFG, rounds, pictures=lambda q: "![D](https://x/d.png)")
+            # Asked again, #190 waits for the owner under both keys once this session's answer is used up.
+            self.assertEqual(inbox.answered_keys(CFG, {"pending_instructions": []}), set())
+        self.assertEqual(log, ["Next round for the owner: #190 Pick an art direction?",
+                               'Not asked again: "Which of D, E or F, then?" is #190, still waiting for the owner'])
+        comment, patch = calls
+        self.assertEqual(comment[0], f"repos/{CFG.repo}/issues/190/comments")
+        self.assertTrue(comment[2]["body"].startswith(f"@{CFG.owner.login}, the next round of this decision"))
+        self.assertIn("![D](https://x/d.png)", comment[2]["body"])
+        self.assertNotIn("smbot:question key", comment[2]["body"])
+        # The task blocked on the new key waits on #190, which keeps its old key too.
+        self.assertEqual(patch[0], f"repos/{CFG.repo}/issues/190")
+        self.assertEqual(inbox.keys_of(patch[2]), {"art-direction-pick", "art-direction-pick-2"})
 
     def test_a_closed_question_never_stops_a_new_one(self) -> None:
         def api(path: str, *args: str, input: object = None, token: object = None) -> object:

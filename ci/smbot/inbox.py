@@ -5,11 +5,12 @@
 
 A session that needs the owner puts the question in `owner_questions` instead of a file.
 Each becomes an issue labelled `owner-question` that mentions the owner, with the options,
-Claude's recommendation and what happens meanwhile. A question still waiting for the owner (open,
-with no `/claude` answer yet) under the same `key` or a similar title is not asked again; once
-the owner has answered, a next round of the same decision is a new question. The owner answers with `/claude <answer>`
+Claude's recommendation and what happens meanwhile. The owner answers with `/claude <answer>`
 in the issue (a verified owner command); the next session carries it out and its PR closes
-the issue. A question whose answer needs an owner-only change (`.github/`, `ci/`, ...) also
+the issue. One issue holds one decision until it's made: when the answer asks for more (more
+options, another round), the session's next question under the same `key` or a similar title is
+posted in that issue as the next round, which mentions the owner again, and the PR leaves it
+open (smbot.session.with_closes). A question still waiting for its answer is not asked again. A question whose answer needs an owner-only change (`.github/`, `ci/`, ...) also
 gets `owner-change` and the exact change, so an interactive session can apply it.
 
 A question shows what it's about: the shots it names (`screenshots`), or else the screenshots
@@ -50,8 +51,10 @@ MAX_PICTURES = 30_000  # characters of image markdown; an issue body holds 65,53
 
 
 def render(cfg: config_mod.Config, q: dict[str, Any], source: str = "", pr: int | None = None,
-           pictures: str = "") -> str:
-    parts = [f"@{cfg.owner.login}, the bot needs your decision.", "", "## Question", "", _inert(q["question"], 4000)]
+           pictures: str = "", next_round: bool = False) -> str:
+    """An issue body; with `next_round`, a comment in the question's own issue."""
+    lead = "the next round of this decision, after your answer." if next_round else "the bot needs your decision."
+    parts = [f"@{cfg.owner.login}, {lead}", "", "## Question", "", _inert(q["question"], 4000)]
     if pictures:  # made by smbot.screenshots, captions already inert
         parts += ["", "## What it looks like", "", pictures[:MAX_PICTURES]]
     options = [o for o in q.get("options") or [] if str(o).strip()][:6]
@@ -65,30 +68,31 @@ def render(cfg: config_mod.Config, q: dict[str, Any], source: str = "", pr: int 
                   "\"do issue #<this issue>\".", ""]
         if q.get("change"):
             parts += ["```", _inert(q["change"], 8000).replace("```", "'''"), "```"]
-    parts += ["", "---", "**To answer:** comment `/claude <your answer>` here, for example `/claude option 1`. "
-              "The next development session carries it out, and its PR closes this issue."]
+    parts += ["", "---", "**To answer:** comment `/claude <your answer>` here, for example `/claude option 1`, "
+              "or ask for more (`/claude more options`). The next development session carries it out; its PR "
+              "closes this issue once the decision is made, and a next round comes here."]
     if source:
         parts.append(f"Raised by {source}" + (f", in PR #{pr}." if pr and f"#{pr}" not in source else "."))
-    parts.append(f"<!-- smbot:question key={_key(q.get('key', ''))} -->")
+    if not next_round:
+        parts.append(_marker(q.get("key", "")))
     return "\n".join(parts)
+
+
+def _marker(key: str) -> str:
+    return f"<!-- smbot:question key={_key(key)} -->"
 
 
 def open_questions(cfg: config_mod.Config) -> list[dict[str, Any]]:
     return gh.api(f"repos/{cfg.repo}/issues?state=open&labels={LABEL}&per_page=100")
 
 
-def waiting_questions(cfg: config_mod.Config) -> list[dict[str, Any]]:
-    """The open questions the owner hasn't answered with `/claude` yet.
-
-    An answered question stays open until the PR that carries out the answer merges, and that
-    session may need to ask the next round (#190, then #192): that one must get through.
-    """
+def replied(cfg: config_mod.Config) -> set[int]:
+    """The questions with an owner `/claude` answer waiting for this session (none if the state can't be read)."""
     try:
         st, _ = state.load(cfg)
-        replied = {int(i["number"]) for i in st.get("pending_instructions", []) if i.get("kind") == "claude"}
+        return {int(i["number"]) for i in st.get("pending_instructions", []) if i.get("kind") == "claude"}
     except (gh.GhError, KeyError, TypeError, ValueError):
-        replied = set()
-    return [i for i in open_questions(cfg) if int(i["number"]) not in replied]
+        return set()
 
 
 def answered_keys(cfg: config_mod.Config, st: dict[str, Any]) -> set[str]:
@@ -105,8 +109,9 @@ def answered_keys(cfg: config_mod.Config, st: dict[str, Any]) -> set[str]:
     except gh.GhError:
         return set()
     replied = {int(i["number"]) for i in st.get("pending_instructions", []) if i.get("kind") == "claude"}
-    waiting = {key_of(i) for i in open_ if int(i["number"]) not in replied}
-    keys = {key_of(i) for i in closed} | {key_of(i) for i in open_ if int(i["number"]) in replied}
+    waiting = {k for i in open_ if int(i["number"]) not in replied for k in keys_of(i)}
+    keys = ({k for i in closed for k in keys_of(i)}
+            | {k for i in open_ if int(i["number"]) in replied for k in keys_of(i)})
     return {k for k in keys - waiting if k}
 
 
@@ -123,10 +128,15 @@ def key_of(issue: dict[str, Any]) -> str:
     return m.group(1) if m else ""
 
 
+def keys_of(issue: dict[str, Any]) -> set[str]:
+    """Every key of a question: a next round under a new key adds one."""
+    return set(_KEY_MARKER.findall(issue.get("body") or ""))
+
+
 def same_question(q: dict[str, Any], issue: dict[str, Any]) -> bool:
     """The same key, or titles that share most of their words (sessions reword the same question)."""
     key = _key(q.get("key", ""))
-    if key and key == key_of(issue):
+    if key and key in keys_of(issue):
         return True
     a, b = _words(q["title"]), _words(issue["title"])
     if not (a and b):
@@ -138,37 +148,56 @@ def same_question(q: dict[str, Any], issue: dict[str, Any]) -> bool:
 
 def ask(cfg: config_mod.Config, questions: list[dict[str, Any]], source: str = "", pr: int | None = None,
         pictures: Callable[[dict[str, Any]], str] | None = None) -> list[str]:
-    """Opens an issue per new question, showing `pictures(question)` (markdown) when given.
+    """Asks each question, showing `pictures(question)` (markdown) when given.
 
-    A question is new unless one still waiting for the owner has the same key or a similar title
-    (sessions that hit the same blocker ask it again in other words: #72/#73, #79/#80/#83): then
-    it's only noted in the log.
+    An open question with the same key or a similar title is the same decision. If the owner has
+    answered it (a `/claude` waiting for this session), this is its next round: a comment in that
+    issue (#190 led to a new issue, #192, for the next round). If not, it's still waiting and this
+    is only noted in the log (sessions that hit the same blocker ask it again in other words:
+    #72/#73, #79/#80/#83). Anything else gets a new issue.
     """
     questions = [q for q in questions if q.get("title") and q.get("question")][:MAX_PER_SESSION]
     if not questions:
         return []
     labels_mod.ensure(cfg, [LABEL, CHANGE_LABEL])
-    known = waiting_questions(cfg)
+    known, answered = open_questions(cfg), replied(cfg)
     log = []
     for q in questions:
         title = _inert(q["title"], 120)
         q = {**q, "title": title}
         twin = next((i for i in known if same_question(q, i)), None)
-        if twin:
+        if twin and int(twin["number"]) not in answered:
             log.append(f"Not asked again: \"{title}\" is #{twin['number']}, still waiting for the owner")
             continue
-        labels = [LABEL] + ([CHANGE_LABEL] if q.get("owner_change") else [])
         try:  # a question without its pictures is still asked
             shown = pictures(q) if pictures else ""
         except (gh.GhError, OSError, subprocess.SubprocessError) as e:
             print(f"couldn't show the screenshots of \"{title}\": {e}")
             shown = ""
+        if twin:
+            number = int(twin["number"])
+            gh.api(f"repos/{cfg.repo}/issues/{number}/comments", "-X", "POST",
+                   input={"body": render(cfg, q, source, pr, shown, next_round=True)})
+            key = _key(q.get("key", ""))
+            if key and key not in keys_of(twin):  # the task blocked on the new key waits on this issue
+                twin["body"] = f"{twin.get('body') or ''}\n{_marker(key)}"
+                gh.api(f"repos/{cfg.repo}/issues/{number}", "-X", "PATCH", input={"body": twin["body"]})
+            answered.discard(number)  # waiting for the owner again
+            log.append(f"Next round for the owner: #{number} {twin['title']}")
+            continue
+        labels = [LABEL] + ([CHANGE_LABEL] if q.get("owner_change") else [])
         created = gh.api(f"repos/{cfg.repo}/issues", "-X", "POST",
                          input={"title": title, "body": render(cfg, q, source, pr, shown), "labels": labels})
-        known.append({"number": created["number"], "title": title, "state": "open",
-                      "body": f"<!-- smbot:question key={_key(q.get('key', ''))} -->"})
+        known.append({"number": created["number"], "title": title, "state": "open", "body": _marker(q.get("key", ""))})
         log.append(f"Question for the owner: #{created['number']} {title}")
     return log
+
+
+def continued(cfg: config_mod.Config, questions: list[dict[str, Any]], answered: set[int]) -> set[int]:
+    """The answered open questions that `questions` ask a next round of: their PR must leave them open."""
+    asked = [q for q in questions if isinstance(q, dict) and q.get("title") and q.get("question")]
+    return {int(i["number"]) for i in open_questions(cfg)
+            if int(i["number"]) in answered and any(same_question(q, i) for q in asked)} if asked else set()
 
 
 def pictures_for(cfg: config_mod.Config, token: str, folder: Path | None, sha: str,

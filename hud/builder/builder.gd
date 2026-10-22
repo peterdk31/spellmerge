@@ -36,7 +36,9 @@ const SLOT_FIRST_MODIFIER: int = 2
 const SLOT_TRIGGER: int = 5
 const SLOT_COUNT: int = 6
 const SLOT_KINDS: Array[StringName] = [&"form", &"element", &"modifier", &"modifier", &"modifier", &"trigger"]
-const SLOT_NAMES: Array[String] = ["Form", "Elem", "Mod 1", "Mod 2", "Mod 3", "Trig"]
+## Short on purpose: the slot column is narrow and the component name must stay readable
+## with the focus mark and brackets added.
+const SLOT_NAMES: Array[String] = ["F", "E", "M1", "M2", "M3", "T"]
 ## A trigger may hold a spell that holds another: two levels below the cast.
 const MAX_LEVEL: int = 2
 const SPELL_COUNT: int = 2
@@ -60,6 +62,9 @@ const BASE_TEXT_META: StringName = &"base_text"
 
 var _events: EventsScript = null
 var _ui_focus: UIFocusScript = null
+## How many controls UIFocus was given, and whether we are giving them again (not a real close).
+var _synced_controls: int = 0
+var _reopening: bool = false
 var _spells: SpellsScript = null
 
 ## Mirrors of what the player announced.
@@ -175,6 +180,7 @@ func open_builder() -> bool:
 		visible = false
 		return false
 	_open = true
+	_synced_controls = _controls.size()
 	_focused = _ui_focus.focused(index)
 	_apply_marks()
 	return true
@@ -328,7 +334,10 @@ func _id_in(node: Dictionary, slot: int) -> StringName:
 
 ## Whether the slot can be filled now: a modifier only goes in the first free place.
 func _slot_usable(node: Dictionary, slot: int) -> bool:
-	if slot < SLOT_FIRST_MODIFIER or slot >= SLOT_TRIGGER:
+	if slot == SLOT_TRIGGER:
+		# The compiler refuses a trigger on the deepest level, so it is not offered there.
+		return _level < MAX_LEVEL
+	if slot < SLOT_FIRST_MODIFIER:
 		return true
 	return slot - SLOT_FIRST_MODIFIER <= _modifiers_of(node).size()
 
@@ -339,7 +348,7 @@ func _clamp_view() -> void:
 		_level -= 1
 	var node: Dictionary = _node_at(_level)
 	if not _slot_usable(node, _slot):
-		_slot = SLOT_FIRST_MODIFIER + _modifiers_of(node).size()
+		_slot = SLOT_FORM if _slot == SLOT_TRIGGER else SLOT_FIRST_MODIFIER +_modifiers_of(node).size()
 
 
 func _render() -> void:
@@ -433,10 +442,31 @@ func _on_bag_changed(player: int, bag: Array[StringName]) -> void:
 		return
 	_bag = bag.duplicate()
 	_render()
+	_resync_focus()
+
+
+## UIFocus keeps its own copy of the controls: when a bigger bag made more rows, give it the new
+## list and put focus back where it was.
+func _resync_focus() -> void:
+	if not _open or _controls.size() == _synced_controls:
+		return
+	var keep: Control = _focused
+	_reopening = true
+	var again: bool = _ui_focus.open(index, _controls)
+	_reopening = false
+	if not again:
+		_open = false
+		_focused = null
+		visible = false
+		return
+	_synced_controls = _controls.size()
+	_focused = _ui_focus.focused(index)
+	_focus_control(keep)
+	_apply_marks()
 
 
 func _on_closed(player: int) -> void:
-	if player != index:
+	if player != index or _reopening:
 		return
 	_open = false
 	_focused = null
@@ -483,7 +513,23 @@ func _on_activated(player: int, control: Control) -> void:
 	elif _rows.has(control as Button):
 		var row: int = _rows.find(control as Button)
 		if row < _row_ids.size():
-			_ask(_slot, _row_ids[row])
+			var chosen: StringName = _row_ids[row]
+			_ask(_slot, chosen)
+			_keep_focus_on(chosen)
+
+
+## After a choice the rows may have shifted ("None" appears or goes): put focus back on the row
+## of the component just chosen, or on the first row if that row is gone.
+func _keep_focus_on(id: StringName) -> void:
+	if not _open:
+		return
+	var at: int = _row_ids.find(id)
+	if at >= 0:
+		_focus_control(_rows[at])
+	elif not _row_ids.is_empty():
+		_focus_control(_rows[0])
+	else:
+		_focus_control(_slots[_slot])
 
 
 ## The first bag row shown, or the selected slot if the bag has nothing for it.

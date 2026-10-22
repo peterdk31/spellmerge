@@ -6,7 +6,7 @@ The ordered task queue for the current milestone, M2 (its design, [M2-spell-syst
 
 M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97). Each task's details are the matching row and sections of the M2 design. Nothing from M3+ is built (rewards, relics, staffs, rooms, the door rule).
 
-- [ ] **Builder, part 2 (M2 part 17).** (`hud/builder`) Live stats, the complexity bar, the refusal reason, the mini-preview and the descriptions (empty until part 23); screenshot shots for 1 and 4 players.
+- [ ] **Builder, part 2 (M2 part 17).** (`hud/builder`) Live stats, the complexity bar, the refusal reason (as text beside the chain, never colour alone: until then a refused pick shows nothing; part 16 only hides the trigger slot at the deepest level), the mini-preview and the descriptions (empty until part 23); screenshot shots for 1 and 4 players.
 - [ ] **The quick view and quick actions (M2 part 18).** (`hud/builder`, `hud/panels`, `gameplay/player`) The builder folds into the quick view when a wave starts; swap shown on the corner panel (active spell A or B); the HUD turns a `swap` press into `spell_swap_requested` (player index) and `player` (part 11) handles it; "Drop component" in the overlay and the quick view; tests.
 - [ ] **The build break (M2 part 19).** (`gameplay/flow`, `hud/panels`) `BUILD_BREAK` instead of `NEXT_WAVE_DELAY`, the countdown, the hammer icon (display only); tests that the wave starts on time with one, two and four players, whoever is building.
 - [ ] **Bots build spells (M2 part 20).** (`tests/bots`) Seeded random builds, bot 4 staying in its builder in the 4-bot test, `test_spell_fuzz.gd`; **the weekly playtest asks about building from here**.

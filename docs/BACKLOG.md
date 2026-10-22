@@ -5,7 +5,7 @@ Ideas and future work outside the current milestone (docs/PLAN.md, "Planning sys
 ## From M2 part 16 (the builder)
 
 - The builder ignores the mouse; docs/milestones/M2-spell-system.md wants the mouse to work on P1's panel only. Add it with part 17 or in M4's polish, with a hover mark that is not colour alone.
-- Bag rows are made when a builder opens. If a bag grows past the biggest group while it is open (M3's rewards), the extra rows are not reachable until it is opened again; then re-open through `UIFocus` or give it a way to replace its controls.
+- The builder gives `UIFocus` a fresh control list (and restores focus) when a bag that grows while it is open needs more rows; `UIFocus` has no "replace controls" call, so this re-opens the panel quietly. Give `UIFocus` one if M3's rewards make it flicker.
 - `Flow.stop_run()` leaves open overlays and builders as they are (only `run_ended` closes them), so a stopped run in a test or a screenshot needs the owner to close them first.
 - The builder panel is as translucent as the corner panels (the game shows through); if it reads badly over busy rooms, give it an opaque `PanelContainer` variation in the theme.
 

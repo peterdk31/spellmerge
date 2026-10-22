@@ -362,7 +362,7 @@ func test_held_spells_go_two_levels_deep_and_no_further() -> void:
 	_press(0, builder.held_button())
 	check_equal(builder.level(), 2, "two levels down")
 	_choose(0, BuilderScript.SLOT_FORM, "Bolt")
-	_choose(0, BuilderScript.SLOT_TRIGGER, "On Hit")
+	check(builder.slot_button(BuilderScript.SLOT_TRIGGER).disabled, "the deepest level has no trigger slot")
 	check(builder.held_button().disabled, "there is no third level to open")
 	check_equal(builder.spell_path(), PackedInt32Array([0, 0, 0]), "the path has one 0 per level")
 
@@ -377,6 +377,55 @@ func test_removing_the_trigger_below_closes_the_held_level() -> void:
 	_players[0].set_recipe(0, BOLT_FIRE)
 	check_equal(builder.level(), 0, "the builder is back at the spell")
 	check(builder.held_button().disabled, "and the held spell cannot be opened")
+
+
+# --- Focus and layout details -----------------------------------------------
+
+func test_focus_stays_on_the_chosen_component_when_rows_shift() -> void:
+	_start(1)
+	_open(0)
+	var builder: BuilderScript = _builder(0)
+	# An empty modifier slot gains a "None" row at the top once filled.
+	_choose(0, BuilderScript.SLOT_FIRST_MODIFIER, "Split")
+	var focused: Button = _focus.focused(0) as Button
+	check(focused != null and focused.text.contains("Split"), "focus is still on Split after the rows shifted")
+	# Emptying the slot removes the "None" row; focus goes to the first row left.
+	_press(0, _row_named(builder, "None"))
+	focused = _focus.focused(0) as Button
+	check(focused != null and builder.shown_rows().has(focused), "focus stays in the bag after emptying a slot")
+
+
+func test_the_longest_slot_text_fits_when_selected_and_focused() -> void:
+	_start(1)
+	_open(0)
+	var button: Button = _builder(0).slot_button(BuilderScript.SLOT_TRIGGER)
+	var font: Font = button.get_theme_font(&"font")
+	var size: int = button.get_theme_font_size(&"font_size")
+	var room: float = BuilderScript.LEFT_WIDTH - button.get_theme_stylebox(&"normal").get_minimum_size().x
+	var longest: String = ""
+	for id in _registry.get_ids(&"spells"):
+		var component := _registry.get_resource(&"spells", id) as SpellComponent
+		if component != null and component.display_name.length() > longest.length():
+			longest = component.display_name
+	for slot_name in BuilderScript.SLOT_NAMES:
+		var text: String = "%s[%s: %s]" % [BuilderScript.FOCUS_MARK, slot_name, longest]
+		var wide: float = font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+		check(wide <= room, "'%s' is %.0f px wide, the column has %.0f" % [text, wide, room])
+
+
+func test_the_builder_follows_a_bag_that_grows_while_open() -> void:
+	_start(1)
+	_bus.bag_changed.emit(0, [&"bolt", &"fire"] as Array[StringName])
+	_open(0)
+	var builder: BuilderScript = _builder(0)
+	_press(0, builder.slot_button(BuilderScript.SLOT_FORM))
+	_bus.bag_changed.emit(0, [&"bolt", &"beam", &"nova", &"rune", &"fire"] as Array[StringName])
+	check_equal(builder.row_ids().size(), 4, "four forms are listed")
+	check(_focus.is_open(0) and builder.is_open(), "the builder is still open")
+	check(_focus_on(0, builder.shown_rows()[3]), "the owner can reach the new last row")
+	_tap(0, &"cast")
+	_frame()
+	check_equal(_requests[_requests.size() - 1][3], &"rune", "and choose it")
 
 
 # --- Four players -----------------------------------------------------------

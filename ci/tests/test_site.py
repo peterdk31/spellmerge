@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import tempfile
 import unittest
+import zipfile
 from pathlib import Path
+from unittest import mock
 
-from smbot import config, contribute
+from smbot import config, contribute, site
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -37,6 +40,62 @@ class ContributePageTest(unittest.TestCase):
         cfg = config.load()
         item = {"user": {"login": cfg.bot.login}, "title": "Submission from @ann-b: art/x.png"}
         self.assertEqual(contribute.contributor_of(item, cfg), "ann-b")
+
+
+def web_zip(folder: Path, version: str) -> Path:
+    path = folder / f"spellmerge-web-{version}.zip"
+    with zipfile.ZipFile(path, "w") as zf:
+        zf.writestr("index.html", version)
+    return path
+
+
+class PreviewSiteTest(unittest.TestCase):
+    def setUp(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.root = Path(tmp.name)
+        (self.root / "dist").mkdir()
+        (self.root / "releases").mkdir()
+        web_zip(self.root / "dist", "v0.20261022.1042")
+        for patch in (mock.patch.object(contribute, "gather", return_value=contribute.PageData()),
+                      mock.patch.object(site.styleguide, "build")):
+            patch.start()
+            self.addCleanup(patch.stop)
+
+    def page(self, name: str) -> str:
+        return (self.root / "site" / name / "index.html").read_text()
+
+    def test_preview_keeps_the_releases_on_nightly_and_play(self) -> None:
+        nightly = ("v0.20261022", "nightly", web_zip(self.root / "releases", "v0.20261022"))
+        stable = ("v0.20261020", web_zip(self.root / "releases", "v0.20261020"))
+        with mock.patch.object(site, "newest_release_web_zip", return_value=nightly), \
+                mock.patch.object(site, "latest_stable_web_zip", return_value=stable):
+            site.build_preview("o/r", self.root / "dist", "v0.20261022.1042", self.root / "site")
+        self.assertEqual(self.page("preview"), "v0.20261022.1042")
+        self.assertEqual(self.page("nightly"), "v0.20261022")
+        self.assertEqual(self.page("play"), "v0.20261020")
+        index = (self.root / "site" / "index.html").read_text()
+        self.assertIn("Today's build (v0.20261022, nightly)", index)
+        self.assertIn('href="preview/">Latest preview (v0.20261022.1042)', index)
+
+    def test_preview_before_any_release(self) -> None:
+        with mock.patch.object(site, "newest_release_web_zip", return_value=None), \
+                mock.patch.object(site, "latest_stable_web_zip", return_value=None):
+            site.build_preview("o/r", self.root / "dist", "v0.20261022.1042", self.root / "site")
+        for name in ("preview", "nightly", "play"):
+            self.assertEqual(self.page(name), "v0.20261022.1042")
+
+    def test_daily_site_also_fills_preview(self) -> None:
+        web_zip(self.root / "dist", "v0.20261022")
+        site.build("o/r", self.root / "dist", "v0.20261022", "stable", self.root / "site")
+        for name in ("preview", "nightly", "play"):
+            self.assertEqual(self.page(name), "v0.20261022")
+
+    def test_cli_needs_channel_or_preview(self) -> None:
+        with self.assertRaises(SystemExit), mock.patch("sys.stderr"):
+            site.main(["--version", "v0"])
+        with self.assertRaises(SystemExit), mock.patch("sys.stderr"):
+            site.main(["--version", "v0", "--channel", "stable", "--preview"])
 
 
 if __name__ == "__main__":

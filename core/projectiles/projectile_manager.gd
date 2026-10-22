@@ -171,6 +171,10 @@ const RAY_MAX_LENGTH: float = 360.0
 ## Floats per projectile in the MultiMesh buffer: 8 transform, 4 colour, 4 custom data
 ## (the colour of the shot's core, read by `shot_core.gdshader`).
 const DRAW_STRIDE: int = 16
+## The smallest a batch's MultiMesh buffer gets, in shots. A batch holds as many shots
+## as the busiest recent frame needed, rounded up to a power of two (never above the
+## cap), so a quiet batch uploads a few KB a frame rather than cap x 16 floats.
+const MIN_BATCH: int = 64
 ## Draws the neutral sprites: the bone body takes the owner's tint, the Spark-coloured
 ## core takes the element's colour (`set_core`).
 const CORE_SHADER: Shader = preload("res://core/projectiles/shot_core.gdshader")
@@ -305,6 +309,11 @@ var _has_walls: bool = false
 ## The colour of each shot's core (white for a plain shot), see `set_core`.
 var _core: PackedColorArray = PackedColorArray()
 var _draw_node: MultiMeshInstance2D = null
+## Shots each batch's MultiMesh and buffer have room for now (see `_batch_room`).
+var _draw_room: int = 0
+var _rune_room: int = 0
+var _orbit_room: int = 0
+var _hostile_room: int = 0
 var _draw_buffer: PackedFloat32Array = PackedFloat32Array()
 ## The batches of runes and orbit shots, beside the bolts' `_draw_node`.
 var _rune_node: MultiMeshInstance2D = null
@@ -371,7 +380,7 @@ func _make_batch(z: int, cored: bool) -> MultiMeshInstance2D:
 		material.shader = CORE_SHADER
 		node.material = material
 	multimesh.mesh = quad
-	multimesh.instance_count = _cap
+	multimesh.instance_count = 0
 	multimesh.visible_instance_count = 0
 	node.multimesh = multimesh
 	node.z_index = z
@@ -421,18 +430,22 @@ func set_cap(value: int) -> void:
 	_own_prev.resize(_cap)
 	_own_next.resize(_cap)
 	_core.resize(_cap)
-	_draw_buffer.resize(_cap * DRAW_STRIDE)
-	_rune_buffer.resize(_cap * DRAW_STRIDE)
-	_orbit_buffer.resize(_cap * DRAW_STRIDE)
-	_hostile_buffer.resize(_cap * DRAW_STRIDE)
+	_draw_buffer.resize(0)
+	_rune_buffer.resize(0)
+	_orbit_buffer.resize(0)
+	_hostile_buffer.resize(0)
+	_draw_room = 0
+	_rune_room = 0
+	_orbit_room = 0
+	_hostile_room = 0
 	_alive.resize(_cap)
 	_free_slots.resize(_cap)
 	clear()
 	if _draw_node != null:
-		_draw_node.multimesh.instance_count = _cap
-		_rune_node.multimesh.instance_count = _cap
-		_orbit_node.multimesh.instance_count = _cap
-		_hostile_node.multimesh.instance_count = _cap
+		_draw_node.multimesh.instance_count = 0
+		_rune_node.multimesh.instance_count = 0
+		_orbit_node.multimesh.instance_count = 0
+		_hostile_node.multimesh.instance_count = 0
 
 
 func get_cap() -> int:
@@ -1039,6 +1052,19 @@ func update_draw() -> void:
 	var multimesh: MultiMesh = _draw_node.multimesh
 	var hostile_multimesh: MultiMesh = _hostile_node.multimesh
 	var fraction: float = clampf(Engine.get_physics_interpolation_fraction(), 0.0, 1.0)
+	var counts: Vector4i = _count_batches()
+	if counts.x > 0:
+		_draw_room = _batch_room(multimesh, _draw_room, counts.x)
+		_draw_buffer.resize(_draw_room * DRAW_STRIDE)
+	if counts.y > 0:
+		_rune_room = _batch_room(_rune_node.multimesh, _rune_room, counts.y)
+		_rune_buffer.resize(_rune_room * DRAW_STRIDE)
+	if counts.z > 0:
+		_orbit_room = _batch_room(_orbit_node.multimesh, _orbit_room, counts.z)
+		_orbit_buffer.resize(_orbit_room * DRAW_STRIDE)
+	if counts.w > 0:
+		_hostile_room = _batch_room(hostile_multimesh, _hostile_room, counts.w)
+		_hostile_buffer.resize(_hostile_room * DRAW_STRIDE)
 	var out: int = 0
 	var rune_out: int = 0
 	var orbit_out: int = 0
@@ -1077,6 +1103,43 @@ func update_draw() -> void:
 	hostile_multimesh.visible_instance_count = hostile_out
 	drawn_hostile = hostile_out
 	drawn = out + rune_out + orbit_out + hostile_out
+
+
+## How many live shots each batch will draw: x bolts, y runes, z orbit shots, w enemy shots.
+func _count_batches() -> Vector4i:
+	var bolts: int = 0
+	var runes: int = 0
+	var orbits: int = 0
+	var hostile: int = 0
+	for slot in _high:
+		if _alive[slot] == 0:
+			continue
+		if _player[slot] < 0:
+			hostile += 1
+		elif _motion[slot] == MOTION_STILL:
+			runes += 1
+		elif _motion[slot] == MOTION_ORBIT:
+			orbits += 1
+		else:
+			bolts += 1
+	return Vector4i(bolts, runes, orbits, hostile)
+
+
+## The room (in shots) a batch needs to draw `used`: `room` while that fits and is not
+## more than four times too big, else `used` rounded up to a power of two (at least
+## MIN_BATCH, at most the cap). Resizes the MultiMesh to match when it changes; the
+## caller resizes the buffer. The MultiMesh buffer must be exactly instance_count x
+## DRAW_STRIDE floats, so a smaller upload means a smaller MultiMesh.
+func _batch_room(multimesh: MultiMesh, room: int, used: int) -> int:
+	if used <= room and used * 4 > room:
+		return room
+	var wanted: int = MIN_BATCH
+	while wanted < used:
+		wanted *= 2
+	wanted = mini(wanted, _cap)
+	if wanted != room:
+		multimesh.instance_count = wanted
+	return wanted
 
 
 ## Write one quad at float index `i` of `buffer` (packed arrays are shared, not copied):

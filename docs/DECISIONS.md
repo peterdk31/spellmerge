@@ -2,6 +2,11 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-22: Multimesh batches are sized by use, not cut mid-buffer
+
+- **Why.** `MultiMesh.buffer` must hold exactly instance_count x 16 floats, so a partial upload is not possible; the only way to send less is a smaller MultiMesh.
+- **Now.** Each batch's room is the shots it draws rounded up to a power of two (at least 64, at most the cap); it grows at once and shrinks only when use is under a quarter of it, so the MultiMesh is rebuilt rarely. No shot is dropped by it; the cap is unchanged.
+
 ## Planning 2026-10-22: queue empty, M2 not done
 
 - **Why:** the queue held only the WASM numbers task (parked: no web `BENCH:` post exists yet), the art recording task (waits on `art-direction-pick-3`) and stabilisation. M2 is not done: done-when items 3 (WASM numbers), 5 (owner items) and 6 (stabilisation) are open, so no checkpoint yet.

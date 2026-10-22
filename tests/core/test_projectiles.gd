@@ -46,6 +46,7 @@ func _initialize() -> void:
 	_test_one_thousand_run_and_draw()
 	_test_enemy_shots_have_their_own_batch()
 	_test_shot_core_colour_and_batches()
+	_test_batches_upload_only_the_used_slice()
 	_test_shot_colours_differ_and_stay_bright()
 	_test_freed_target_is_dropped()
 	_test_target_removed_by_a_hit_handler()
@@ -549,6 +550,41 @@ func _test_enemy_shots_have_their_own_batch() -> void:
 	_mgr.clear()
 	_mgr.update_draw()
 	_check(_mgr.drawn == 0 and _mgr._hostile_node.multimesh.visible_instance_count == 0, "clear empties the enemy batch too")
+	root.remove_child(_mgr)
+
+
+## A batch uploads only the room its shots need (a power of two from MIN_BATCH up to the
+## cap), not cap x DRAW_STRIDE floats, and draws the same shots at 0, 1 and the cap.
+func _test_batches_upload_only_the_used_slice() -> void:
+	_setup()
+	root.add_child(_mgr)
+	_mgr.set_cap(200)
+	var stride: int = ManagerScript.DRAW_STRIDE
+	_mgr.update_draw()
+	_check(_mgr.drawn == 0 and _mgr._draw_node.multimesh.instance_count == 0, "nothing live: nothing is uploaded")
+	for count: int in [1, 200]:
+		_mgr.clear()
+		for i in count:
+			_mgr.spawn(0, Vector2(float(i) + 1.0, 0.0), Vector2(1.0, 0.0), 5.0)
+		_mgr.update_draw()
+		var multimesh: MultiMesh = _mgr._draw_node.multimesh
+		_check(_mgr.drawn == count and multimesh.visible_instance_count == count, "%d shots are drawn (%d)" % [count, _mgr.drawn])
+		var buffer: PackedFloat32Array = multimesh.buffer
+		var room: int = multimesh.instance_count
+		_check(room >= count and room <= 200 and buffer.size() == room * stride, "the upload holds %d shots in room for %d" % [room, count])
+		_check(count > 1 or room == ManagerScript.MIN_BATCH, "one shot uploads only the smallest batch (%d)" % room)
+		var seen: int = 0
+		for i in count:
+			if is_equal_approx(buffer[i * stride + 3], float(i) + 1.0):
+				seen += 1
+		_check(seen == count, "all %d shots are in the upload at their places (%d)" % [count, seen])
+	_mgr.clear()
+	_mgr.update_draw()
+	_check(_mgr.drawn == 0 and _mgr._draw_node.multimesh.visible_instance_count == 0, "no shots are visible after clear")
+	# A few shots after a crowd shrink the batch back down.
+	_mgr.spawn(0, Vector2(5.0, 0.0), Vector2(1.0, 0.0), 5.0)
+	_mgr.update_draw()
+	_check(_mgr._draw_node.multimesh.instance_count == ManagerScript.MIN_BATCH, "the batch shrinks once the crowd is gone")
 	root.remove_child(_mgr)
 
 

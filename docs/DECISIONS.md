@@ -5,7 +5,7 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 ## 2026-10-22: Art direction samples live in `art/samples/`
 
 - **Three options, one of them the status quo.** A (chunky) and C (grim) are new; B is the current placeholder files, so "keep and polish" is a real choice. All use the existing palette: the choice is about proportions, shading and mood, not colour.
-- **Folder.** `art/kit/` has a `.gdignore`, so Godot would not import files there and the shot script could not load them; the samples are in `art/samples/` instead. `test_svg_art.gd` does not scan it (the samples may bend a rule on purpose, for example joints on a floor tile's edge), and the files are in `art/manifest.json` as placeholders.
+- **Folder.** `art/kit/` has a `.gdignore`, so Godot would not import files there and the shot script could not load them; the samples are in `art/samples/` instead. `test_svg_art.gd` does scan it (rects only, whole numbers, palette, no overlaps, manifest entry, closed icon outline). The edge-touching floor joints still pass, because no test checks that STYLE.md rule. The files are in `art/manifest.json` as placeholders.
 - **Not asked of the owner here:** the pick itself and the lock in `docs/DESIGN.md` (owner-only); the question key is `art-direction-pick`. Until it is answered nothing changes: STYLE.md stays provisional and the golden examples stay candidates.
 
 ## 2026-10-22: What "closed outline" means in the icon test

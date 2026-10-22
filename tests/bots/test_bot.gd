@@ -90,6 +90,33 @@ func _test_builder_walk() -> void:
 	bot.leave()
 
 
+## With a wizard, `build_random` sends the clearing calls first, then the recipe's calls, all
+## for its own player, and a swap only when the active slot is not spell B.
+func _test_build_random(events: Node, bot: BotScript, wizard: Node) -> void:
+	var builds: Array = []
+	var swaps: Array = []
+	var on_build := func(player: int, _path: PackedInt32Array, slot: int, id: StringName) -> void: builds.append([player, slot, id])
+	var on_swap := func(player: int) -> void: swaps.append(player)
+	events.connect("build_change_requested", on_build)
+	events.connect("spell_swap_requested", on_swap)
+	var swap_expected: bool = int(wizard.get("active_slot")) != BotScript.BUILD_SPELL
+	var before: int = bot.requests_sent
+	_check(bot.build_random(5), "a bot with a wizard builds")
+	events.disconnect("build_change_requested", on_build)
+	events.disconnect("spell_swap_requested", on_swap)
+	_check(bot.requests_sent - before == builds.size() and builds.size() > 5, "every build request is counted and sent")
+	var clearing: int = BotScript.FuzzerScript.new({}).clear_steps(BotScript.BUILD_SPELL).size()
+	var cleared_first: bool = builds.size() >= clearing
+	for i in mini(clearing, builds.size()):
+		cleared_first = cleared_first and (builds[i] as Array)[2] == &""
+	_check(cleared_first, "the clearing calls come first")
+	var own: bool = true
+	for entry: Array in builds:
+		own = own and entry[0] == 0
+	_check(own, "all build calls are for the bot's own player")
+	_check(swaps.size() == (1 if swap_expected else 0) and (swaps.is_empty() or swaps[0] == 0), "the swap is sent once, and only when the active slot is not spell B")
+
+
 func _test_idler_sends_nothing() -> void:
 	var idler := BotScript.new()
 	idler.join(2, BotScript.Mode.IDLER, _input, _flow)
@@ -119,6 +146,7 @@ func _test_fighter(events: Node) -> void:
 		_check(wizard.global_position.distance_to(before) > 1.0, "a fighter walks toward the enemies")
 		var other := _flow.call("get_wizard", 1) as Node2D
 		_check(other != null and other.global_position != wizard.global_position, "each bot steers its own wizard")
+		_test_build_random(events, bots[0], wizard)
 	_flow.call("stop_run")
 	for bot in bots:
 		bot.step(0.016)

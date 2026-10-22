@@ -55,7 +55,7 @@ func candidate(rng: RandomNumberGenerator, depth: int = 0) -> Dictionary:
 		recipe["element"] = _pick(rng, elements)
 	var pool: Array = (_ids.get(&"modifier", []) as Array).duplicate()
 	var modifiers: Array[StringName] = []
-	for slot in 3:
+	for _slot: int in 3:
 		if pool.is_empty() or rng.randi_range(1, 100) > MODIFIER_CHANCE:
 			continue
 		var at: int = rng.randi_range(0, pool.size() - 1)
@@ -73,7 +73,7 @@ func candidate(rng: RandomNumberGenerator, depth: int = 0) -> Dictionary:
 ## A random recipe for which `compiles` (Callable(recipe: Dictionary) -> bool) is true; just
 ## the first form when none was found in ATTEMPTS tries.
 func random_recipe(rng: RandomNumberGenerator, compiles: Callable) -> Dictionary:
-	for attempt in ATTEMPTS:
+	for _attempt: int in ATTEMPTS:
 		var recipe: Dictionary = candidate(rng)
 		if not recipe.is_empty() and bool(compiles.call(recipe)):
 			return recipe

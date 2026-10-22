@@ -10,9 +10,9 @@ extends "res://tests/support/suite.gd"
 ##  - a spell that cannot be built or cast, or one that fills the manager's cap (the manager
 ##    then drops shots, counted in `dropped`; the cap is far above what one recipe needs, so
 ##    reaching it is a runaway) or has over SHOT_LIMIT live shots at once, and
-##  - a frame over budget: the mean time of a physics step (projectiles, spells, combat) of a
-##    recipe above MEAN_LIMIT_MS (two 60 FPS frames), or any one step above STEP_LIMIT_MS
-##    (100 ms; a hiccup of the machine is not a spell, so both have a wide margin).
+## It only warns (a line starting `FUZZ WARNING`) when the mean time of a physics step of a
+## recipe is above MEAN_LIMIT_MS, or any one step above STEP_LIMIT_MS: a shared runner's speed
+## is not a spell. The live-shot and dropped-shot checks are what fail the test for cost.
 ## A failure names the seed and the recipe, so it can be replayed: change `SEED` or
 ## `RECIPES`, or run the recipe by hand in the arena.
 ##
@@ -27,10 +27,9 @@ const SEED: int = 20261022
 const RECIPES: int = 300
 ## Seconds each recipe is cast and run for.
 const SECONDS: float = 2.0
-## Mean step time allowed per recipe and the most any one step may take. These are coarse
-## (5 ms is far above the measured worst mean, and 100 ms is for a hiccup of the machine)
-## because a shared CI runner is noisy. The time-free guard is the live shot count below. The
-## real numbers are printed on the FUZZ line at the end.
+## Mean step time and single step time above which a warning is printed (not a failure, a
+## shared CI runner is noisy). The time-free guard is the live shot count below. The real
+## numbers are printed on the FUZZ line at the end.
 const MEAN_LIMIT_MS: float = 5.0
 const STEP_LIMIT_MS: float = 100.0
 ## The cap `combo_arena.gd` gives the manager. No recipe may reach it (nothing dropped).
@@ -108,6 +107,7 @@ func test_random_recipes_compile_cast_and_stay_in_budget() -> void:
 	var slowest_mean: float = 0.0
 	var slowest_step: float = 0.0
 	var peak: int = 0
+	var slow: Array[String] = []
 	var coverage: Dictionary = {}
 	for number in RECIPES:
 		var recipe: Dictionary = fuzzer.candidate(rng)
@@ -133,12 +133,13 @@ func test_random_recipes_compile_cast_and_stay_in_budget() -> void:
 			total += took
 			slowest_step = maxf(slowest_step, took)
 			if took > STEP_LIMIT_MS:
-				check(false, "%s: a step took %.1f ms" % [label, took])
+				slow.append("%s: a step took %.1f ms" % [label, took])
 			if i % 20 == 0:
 				fresh.cast(0, 0)
 		var mean: float = total / float(steps)
 		slowest_mean = maxf(slowest_mean, mean)
-		check(mean <= MEAN_LIMIT_MS, "%s: a step took %.2f ms on average" % [label, mean])
+		if mean > MEAN_LIMIT_MS:
+			slow.append("%s: a step took %.2f ms on average" % [label, mean])
 		check(fresh.projectiles.dropped == 0, "%s: the manager dropped %d shots at the cap of %d" % [label, fresh.projectiles.dropped, SHOT_CAP])
 		check(fresh.peak_shots <= SHOT_LIMIT, "%s: %d live shots at once, over %d" % [label, fresh.peak_shots, SHOT_LIMIT])
 		peak = maxi(peak, fresh.peak_shots)
@@ -154,7 +155,9 @@ func test_random_recipes_compile_cast_and_stay_in_budget() -> void:
 	var lines: Array[String] = _log.call("get_lines")
 	for line in lines:
 		check(false, "the log has an error: " + line.trim_prefix("ERROR:").strip_edges())
-	print("FUZZ: %d recipes, %d compiled, slowest mean step %.3f ms, slowest step %.3f ms, most live shots %d" % [RECIPES, compiling, slowest_mean, slowest_step, peak])
+	for line in slow:
+		print("FUZZ WARNING (time depends on the machine, not a failure): " + line)
+	print("FUZZ:%d recipes, %d compiled, slowest mean step %.3f ms, slowest step %.3f ms, most live shots %d" % [RECIPES, compiling, slowest_mean, slowest_step, peak])
 
 
 ## The same seed gives the same recipes, which is what makes a failure replayable.

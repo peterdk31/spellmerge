@@ -344,3 +344,19 @@ func test_leaving_the_tree_clears_the_anchor_and_stops_listening() -> void:
 	_changed.clear()
 	_build(0, [0], PlayerScript.SLOT_ELEMENT, &"fire")
 	check(_changed.is_empty() and _refused.is_empty(), "a wizard that left no longer answers build requests")
+
+
+func test_a_wizard_with_only_spell_b_starts_on_it() -> void:
+	var player := _wizard(0, {}, BOLT)
+	check_equal(player.active_slot, 1, "the active slot is the one with a spell")
+	check(player.has_spell(), "so the wizard can cast at once")
+
+
+func test_a_wizard_put_back_in_the_tree_hears_requests_again() -> void:
+	var player := _wizard(0)
+	root.add_child(player)
+	root.remove_child(player)
+	root.add_child(player)
+	_changed.clear()
+	_build(0, [0], PlayerScript.SLOT_ELEMENT, &"fire")
+	check_equal(_changed.size(), 1, "the build request is answered after re-entering the tree")

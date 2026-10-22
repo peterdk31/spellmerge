@@ -346,15 +346,15 @@ func _ready() -> void:
 		projectiles = get_node_or_null("/root/Projectiles") as ProjectileManagerScript
 	if spells == null and in_tree:
 		spells = get_node_or_null("/root/Spells") as SpellsScript
-	if events != null and not events.build_change_requested.is_connected(_on_build_change_requested):
-		events.build_change_requested.connect(_on_build_change_requested)
-	if events != null and not events.spell_swap_requested.is_connected(_on_spell_swap_requested):
-		events.spell_swap_requested.connect(_on_spell_swap_requested)
+	_connect_build_events()
 	_fill_bag()
 	if not start_recipe_a.is_empty():
 		set_recipe(0, start_recipe_a)
 	if not start_recipe_b.is_empty():
 		set_recipe(1, start_recipe_b)
+	# Start on the slot that has a spell, so a wizard with only B can cast at once.
+	if _built[active_slot] == null and _built[1 - active_slot] != null:
+		active_slot = 1 - active_slot
 	if _overlay == null:
 		_overlay = Node2D.new()
 		_overlay.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -367,6 +367,20 @@ func _ready() -> void:
 		_seen_dodge_presses = input.get_press_count(index, &"dodge")
 		_seen_cast_presses = input.get_press_count(index, &"cast")
 	_announce_stats()
+
+
+## Listen again if the wizard is put back in the tree (_ready runs only once).
+func _enter_tree() -> void:
+	_connect_build_events()
+
+
+func _connect_build_events() -> void:
+	if events == null:
+		return
+	if not events.build_change_requested.is_connected(_on_build_change_requested):
+		events.build_change_requested.connect(_on_build_change_requested)
+	if not events.spell_swap_requested.is_connected(_on_spell_swap_requested):
+		events.spell_swap_requested.connect(_on_spell_swap_requested)
 
 
 ## Stop listening to build requests (a wizard that left is freed a frame later) and stop

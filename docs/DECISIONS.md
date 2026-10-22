@@ -2,6 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-22: Stress in the exports, and the limits (M2 part 25)
+
+- **Both benchmarks are nodes the main menu adds on a user argument** (`--stress`, `--projectile-timing`), exactly like `--four-bot`, so the Linux Test and Web Test exports (which keep `tests/`) can run them. The projectile timing script became `projectile_timing_runner.gd` (a node); `test_projectile_timing.gd` is now a thin SceneTree starter, so the command line and `build.sh --tests` behave as before. The menu has one `_start_runner` for all three, with literal `load` paths.
+- **The limits hold headless; WASM is pending.** Headless stress with four heavy builds: p95 13.9 ms (100 enemies, 1,000 shots) and 15.4 ms (200, 3,000), inside 16.7 ms; nothing lowered. Game logic only, not WASM: the web numbers need the export run. If they are over, the first things to lower are `DEFAULT_CAP_WEB`, `MAX_SHOTS` and `MAX_FIRES_PER_STEP`.
+- **The web projectile timing step already exists in `build.sh`** and waits for `TIMING OK`; the runner prints it (and `TIMING FAILED`). That step is untested until the daily build runs it. The `--stress` step is missing and is an owner question (#166); it only prints and warns.
+- **If the first daily web timing run fails or times out:** first check the 240 s timeout in `ci/build/build.sh` (owner-only) and whether the web run should time only the web cap (1,000 shots) instead of the desktop 3,000. Then read the first real WASM `BENCH:` lines and confirm or lower the limits (task "Read the first WASM numbers" in `docs/NEXT.md`).
+
 ## 2026-10-22: The stress scene (M2 part 24)
 
 - **Real game, topped-up shots.** The scene is the real Flow, Combat, spell runtime and Feel with four bots, not a stand-in. Spells alone never make 1,000 or 3,000 shots, so each physics step the runner adds plain filler shots (load only, no spell effects; the effects come from the bots' real spells; fixed seed, owned by the players in turn) up to the target; the manager's cap is set to the target, so dropping the oldest shot is part of the load. Enemies are added whenever fewer than the target stand, with 120 health instead of the imp's 20, so the crowd lasts. Wizards stay protected with full mana: it is a stress scene, not a balance test.

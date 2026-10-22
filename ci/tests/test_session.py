@@ -516,7 +516,7 @@ class PublishTest(unittest.TestCase):
         api = mock.Mock(side_effect=[pr, {}, {}])
         with mock.patch.object(session.subprocess, "run", return_value=done), \
                 mock.patch.object(session, "workflow_changes", return_value=[]), \
-                mock.patch.object(session, "with_closes", lambda cfg, body: body), \
+                mock.patch.object(session, "with_closes", lambda cfg, body, asked=None: body), \
                 mock.patch.object(session.gh, "api", api):
             out = session.publish(CFG, Path("work.bundle"), "claude/20261017-x", "update",
                                   {"pr_body": "Tests passed.", "comment": "Fixed."}, 19, "t")
@@ -612,6 +612,21 @@ class PublishTest(unittest.TestCase):
             self.assertEqual(session.with_closes(CFG, "x"), "x\n\nCloses #190\n\nCloses #192")
         with mock.patch.object(session.state, "load", lambda cfg: (copy.deepcopy(state.DEFAULT), "sha")):
             self.assertEqual(session.with_closes(CFG, "x"), "x")
+
+    def test_a_question_asked_a_next_round_of_stays_open(self) -> None:
+        """One decision keeps one issue: "more options" on #190 gets its next round in #190, not a new issue."""
+        st = copy.deepcopy(state.DEFAULT)
+        st["pending_instructions"] = [{"kind": "claude", "number": 190, "text": "more options", "url": "u", "at": "t"},
+                                      {"kind": "claude", "number": 191, "text": "option 2", "url": "u", "at": "t"}]
+        issues = [{"number": 190, "title": "Pick an art direction?", "body": "<!-- smbot:question key=art-pick -->"},
+                  {"number": 191, "title": "Pick a palette?", "body": "<!-- smbot:question key=palette -->"}]
+        asked = [{"title": "Which of D, E and F?", "key": "art-pick", "question": "q"}]
+        with mock.patch.object(session.state, "load", lambda cfg: (st, "sha")), \
+                mock.patch.object(session.inbox, "open_questions", lambda cfg: issues):
+            self.assertEqual(session.with_closes(CFG, "Round two. Closes #190.", asked),
+                             "Round two. Continues #190.\n\nCloses #191")
+            self.assertEqual(session.with_closes(CFG, "x", [{"title": "Pick an art direction?", "question": "q"}]),
+                             "x\n\nCloses #191")  # the same title is the same decision too
 
     def test_branch_names(self) -> None:
         self.assertTrue(session.valid_branch("claude/20261017-area-readmes"))

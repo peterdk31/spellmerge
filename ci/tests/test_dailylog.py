@@ -134,6 +134,20 @@ class DailyLogTest(unittest.TestCase):
                 mock.patch.object(dailylog.state_mod, "update", denied), mock.patch.object(dailylog.gh, "api", api):
             self.assertEqual(dailylog.issue_for(CFG, "2026-10-22"), 44)
 
+    def test_the_recorded_log_of_yesterday_is_closed_even_when_the_list_leaves_it_out(self) -> None:
+        self.state["daily_log"] = {"date": "2026-10-21", "number": 40}
+        calls: list = []
+
+        def api(path: str, *args: str, input: object = None, token: object = None) -> object:
+            calls.append((path, input))
+            if "issues?state=open" in path:
+                return []  # leaves out yesterday's #40
+            return {"number": 41, "title": input["title"]} if path.endswith("/issues") else {}
+
+        with mock.patch.object(dailylog.gh, "api", api):
+            self.assertEqual(dailylog.issue_for(CFG, "2026-10-22"), 41)
+        self.assertEqual([i["state_reason"] for p, i in calls if p.endswith("/issues/40")], ["completed"])
+
     def test_render_mentions_the_owner_only_when_asked(self) -> None:
         now = dt.datetime(2026, 10, 22, 8, 0, tzinfo=dt.timezone.utc)
         self.assertNotIn("@", dailylog.render(CFG, "T", ["a"], False, now))

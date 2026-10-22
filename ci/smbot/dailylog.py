@@ -105,8 +105,13 @@ def issue_for(cfg: config_mod.Config, date: str) -> int:
         keep = _remember(cfg, date, int(created["number"]), stale)
         if keep != created["number"]:
             logs = [*logs, {"number": created["number"], "title": title}]
+    if recorded.get("number") and recorded.get("date") != date and int(recorded["number"]) != keep:
+        # The day before's log, closed by number too: the list can leave it out.
+        logs = [*logs, {"number": int(recorded["number"]), "title": ""}]
+    closed: set[int] = set()
     for issue in logs:
-        if issue["number"] != keep:
+        if issue["number"] != keep and issue["number"] not in closed:
+            closed.add(issue["number"])
             reason = "duplicate" if issue["title"] == title else "completed"
             gh.api(f"repos/{cfg.repo}/issues/{issue['number']}", "-X", "PATCH",
                    input={"state": "closed", "state_reason": "not_planned" if reason == "duplicate" else reason})

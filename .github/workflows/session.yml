@@ -1,5 +1,5 @@
 # One Claude work session (docs/PLAN.md, "Claude's self-critique loop"),
-# called by develop.yml (mode develop, hourly) and weekly.yml (mode plan).
+# called by develop.yml with mode develop or plan (the gate decides; see smbot.control).
 #
 # implement   Claude does the task with a shell but only a READ-ONLY token, and
 #             commits locally; the commits leave the runner as a git bundle (data)
@@ -10,7 +10,7 @@
 # final       a fresh Claude session decides: approve or not (a verdict as data)
 # merge       a plain script merges only if the verdict, checks and hard rules
 #             all pass, pinned to the reviewed commit
-# finish      Daily log, task failures, weekly outputs, and the next session
+# finish      Daily log, task failures, planning outputs, and the next session
 #
 # Claude never holds a write token where it has a shell, and every job that
 # writes runs on a fresh runner with scripts from a clean checkout of main.
@@ -23,12 +23,12 @@ on:
       mode:
         type: string # develop or plan
         default: develop
+      weekly:
+        type: boolean # the Sunday planning run, which also posts the devlog and the playtest
+        default: false
       focus:
         type: string
         default: ""
-      settings:
-        type: string
-        default: "{}"
       merge:
         type: string # "true" when the gate allows merging
         default: "false"
@@ -46,7 +46,7 @@ env:
 
 jobs:
   implement:
-    name: ${{ inputs.mode == 'plan' && 'weekly planning' || 'implement the next task' }}
+    name: ${{ inputs.mode == 'plan' && 'planning' || 'implement the next task' }}
     runs-on: ubuntu-latest
     timeout-minutes: 240 # the Claude step stops at 200, so its commits are still packaged and kept
     environment: automation
@@ -74,6 +74,10 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Keep main's Claude action (the session may switch to an older branch before it runs)
+        run: |
+          cp -r .github/actions/claude .ci-claude-action
+          echo .ci-claude-action >> .git/info/exclude
       - name: Git identity of the bot
         run: |
           git config --global user.name "spellmerge-bot[bot]"
@@ -91,37 +95,25 @@ jobs:
           GH_TOKEN: ${{ steps.read-token.outputs.token }}
           FOCUS: ${{ inputs.focus }}
           MODE: ${{ inputs.mode }}
+          WEEKLY: ${{ inputs.weekly }}
         run: python3 -m smbot.session prepare --mode "$MODE"
-      - name: Install the sandbox (bubblewrap and socat isolate Claude's commands and scrub secrets)
-        run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq bubblewrap socat
-          # Ubuntu 24.04 blocks the unprivileged user namespaces bubblewrap needs.
-          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
-          bwrap --ro-bind / / --dev /dev --proc /proc true
-          command -v socat
       - id: claude
-        continue-on-error: true
+        continue-on-error: true # the outcome output says how it went; a timeout must not skip the steps after
         timeout-minutes: 200
-        uses: anthropics/claude-code-action@1d6de8cb0c237e7c15e9e1bdf973826ebae490cc # v1.0.248
+        uses: ./.ci-claude-action
         with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          github_token: ${{ steps.read-token.outputs.token }}
-          bot_id: "343592621"
-          bot_name: "spellmerge-bot[bot]"
-          # The next session in a chain, and the run after a merge, are started by
-          # github-actions[bot] (workflow_dispatch from finish or develop.yml's kick).
-          allowed_bots: "github-actions[bot]"
+          claude-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github-token: ${{ steps.read-token.outputs.token }}
           prompt: ${{ steps.prepare.outputs.prompt }}
-          claude_args: >-
-            --max-turns 400
-            --allowedTools "Read,Write,Edit,MultiEdit,Glob,Grep,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git switch:*),Bash(git checkout:*),Bash(git add:*),Bash(git rm:*),Bash(git mv:*),Bash(git commit:*),Bash(git restore:*),Bash(git branch:*),Bash(git fetch:*),Bash(git merge:*),Bash(git rev-parse:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr list:*),Bash(gh pr checkout:*),Bash(gh issue view:*),Bash(gh issue list:*),Bash(tools/check.sh:*),Bash(ci/build/build.sh --quick),Bash(ci/build/build.sh --quick --tests),Bash(ci/build/build.sh --quick --screenshots),Bash(ls:*),Bash(mkdir:*),Bash(mv:*),Bash(cp:*),Bash(rm:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(diff:*),Bash(sort:*)"
-            --disallowedTools "WebFetch,WebSearch,Edit(/.git/**),Write(/.git/**),MultiEdit(/.git/**),Edit(/ci/**),Write(/ci/**),MultiEdit(/ci/**),Edit(/.github/**),Write(/.github/**),MultiEdit(/.github/**),Edit(/tools/**),Write(/tools/**),MultiEdit(/tools/**)"
-            --json-schema '${{ steps.prepare.outputs.schema }}'
+          schema: ${{ steps.prepare.outputs.schema }}
+          max-turns: 400
+          allowed-tools: "Read,Write,Edit,MultiEdit,Glob,Grep,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git switch:*),Bash(git checkout:*),Bash(git add:*),Bash(git rm:*),Bash(git mv:*),Bash(git commit:*),Bash(git restore:*),Bash(git branch:*),Bash(git fetch:*),Bash(git merge:*),Bash(git rev-parse:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr list:*),Bash(gh pr checkout:*),Bash(gh issue view:*),Bash(gh issue list:*),Bash(tools/check.sh:*),Bash(ci/build/build.sh --quick),Bash(ci/build/build.sh --quick --tests),Bash(ci/build/build.sh --quick --screenshots),Bash(ls:*),Bash(mkdir:*),Bash(mv:*),Bash(cp:*),Bash(rm:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(diff:*),Bash(sort:*)"
+          disallowed-tools: "WebFetch,WebSearch,Edit(/.git/**),Write(/.git/**),MultiEdit(/.git/**),Edit(/ci/**),Write(/ci/**),MultiEdit(/ci/**),Edit(/.github/**),Write(/.github/**),MultiEdit(/.github/**),Edit(/tools/**),Write(/tools/**),MultiEdit(/tools/**)"
       - id: usage
         if: always()
         env:
           EXEC_FILE: ${{ steps.claude.outputs.execution_file }}
-          FAILED: ${{ steps.claude.outcome != 'success' }}
+          FAILED: ${{ steps.claude.outputs.outcome != 'success' }}
         run: python3 -m smbot.session usage --file "${EXEC_FILE:-/nonexistent}" $([ "$FAILED" = true ] && echo --step-failed)
       - id: package
         if: always()
@@ -185,14 +177,23 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           RESULT: ${{ needs.implement.outputs.result }}
           BRANCH: ${{ needs.implement.outputs.branch }}
+          TASK: ${{ needs.implement.outputs.task }}
         run: python3 -m smbot.session publish --bundle work/work.bundle --branch "$BRANCH" --mode new
       - name: Questions for the owner
+        continue-on-error: true # a failed comment must not skip saving or reviewing the work
         if: steps.record.outputs.status == 'ok' && needs.implement.outputs.result != ''
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           RESULT: ${{ needs.implement.outputs.result }}
           SOURCE: the session working on "${{ needs.implement.outputs.task }}"
         run: python3 -m smbot.inbox ask
+      - name: Answers to /ask
+        continue-on-error: true # a failed comment must not skip saving or reviewing the work
+        if: steps.record.outputs.status == 'ok' && needs.implement.outputs.result != ''
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          RESULT: ${{ needs.implement.outputs.result }}
+        run: python3 -m smbot.session answers
       - id: existing
         if: >-
           steps.record.outputs.status == 'ok' && (needs.implement.outputs.commits == '0' || needs.implement.outputs.commits == '')
@@ -253,6 +254,10 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Keep main's Claude action (the session may switch to an older branch before it runs)
+        run: |
+          cp -r .github/actions/claude .ci-claude-action
+          echo .ci-claude-action >> .git/info/exclude
       - name: Git identity of the bot
         run: |
           git config --global user.name "spellmerge-bot[bot]"
@@ -273,36 +278,23 @@ jobs:
         run: |
           python3 -m smbot.session revise-prompt --pr "$PR" --branch "$BRANCH"
           echo "schema=$(jq -c . .github/maintainer/schemas/session.json)" >> "$GITHUB_OUTPUT"
-      - name: Install the sandbox (bubblewrap and socat isolate Claude's commands and scrub secrets)
-        run: |
-          sudo apt-get update -qq && sudo apt-get install -y -qq bubblewrap socat
-          # Ubuntu 24.04 blocks the unprivileged user namespaces bubblewrap needs.
-          sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
-          bwrap --ro-bind / / --dev /dev --proc /proc true
-          command -v socat
       - id: claude
-        continue-on-error: true
+        continue-on-error: true # the outcome output says how it went; a timeout must not skip the steps after
         timeout-minutes: 150
-        uses: anthropics/claude-code-action@1d6de8cb0c237e7c15e9e1bdf973826ebae490cc # v1.0.248
+        uses: ./.ci-claude-action
         with:
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          github_token: ${{ steps.read-token.outputs.token }}
-          bot_id: "343592621"
-          bot_name: "spellmerge-bot[bot]"
-          # The next session in a chain, and the run after a merge, are started by
-          # github-actions[bot] (workflow_dispatch from finish or develop.yml's kick).
-          allowed_bots: "github-actions[bot]"
+          claude-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          github-token: ${{ steps.read-token.outputs.token }}
           prompt: ${{ steps.prepare.outputs.prompt }}
-          claude_args: >-
-            --max-turns 250
-            --allowedTools "Read,Write,Edit,MultiEdit,Glob,Grep,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git switch:*),Bash(git checkout:*),Bash(git add:*),Bash(git rm:*),Bash(git mv:*),Bash(git commit:*),Bash(git restore:*),Bash(git branch:*),Bash(git fetch:*),Bash(git merge:*),Bash(git rev-parse:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr checkout:*),Bash(gh issue view:*),Bash(gh issue list:*),Bash(tools/check.sh:*),Bash(ci/build/build.sh --quick),Bash(ci/build/build.sh --quick --tests),Bash(ci/build/build.sh --quick --screenshots),Bash(ls:*),Bash(mkdir:*),Bash(mv:*),Bash(cp:*),Bash(rm:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(diff:*),Bash(sort:*)"
-            --disallowedTools "WebFetch,WebSearch,Edit(/.git/**),Write(/.git/**),MultiEdit(/.git/**),Edit(/ci/**),Write(/ci/**),MultiEdit(/ci/**),Edit(/.github/**),Write(/.github/**),MultiEdit(/.github/**),Edit(/tools/**),Write(/tools/**),MultiEdit(/tools/**)"
-            --json-schema '${{ steps.prepare.outputs.schema }}'
+          schema: ${{ steps.prepare.outputs.schema }}
+          max-turns: 250
+          allowed-tools: "Read,Write,Edit,MultiEdit,Glob,Grep,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git switch:*),Bash(git checkout:*),Bash(git add:*),Bash(git rm:*),Bash(git mv:*),Bash(git commit:*),Bash(git restore:*),Bash(git branch:*),Bash(git fetch:*),Bash(git merge:*),Bash(git rev-parse:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr checkout:*),Bash(gh issue view:*),Bash(gh issue list:*),Bash(tools/check.sh:*),Bash(ci/build/build.sh --quick),Bash(ci/build/build.sh --quick --tests),Bash(ci/build/build.sh --quick --screenshots),Bash(ls:*),Bash(mkdir:*),Bash(mv:*),Bash(cp:*),Bash(rm:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(diff:*),Bash(sort:*)"
+          disallowed-tools: "WebFetch,WebSearch,Edit(/.git/**),Write(/.git/**),MultiEdit(/.git/**),Edit(/ci/**),Write(/ci/**),MultiEdit(/ci/**),Edit(/.github/**),Write(/.github/**),MultiEdit(/.github/**),Edit(/tools/**),Write(/tools/**),MultiEdit(/tools/**)"
       - id: usage
         if: always()
         env:
           EXEC_FILE: ${{ steps.claude.outputs.execution_file }}
-          FAILED: ${{ steps.claude.outcome != 'success' }}
+          FAILED: ${{ steps.claude.outputs.outcome != 'success' }}
         run: python3 -m smbot.session usage --file "${EXEC_FILE:-/nonexistent}" $([ "$FAILED" = true ] && echo --step-failed)
       - id: package
         if: always()
@@ -361,6 +353,7 @@ jobs:
           RESULT: ${{ needs.revise.outputs.result }}
           BRANCH: ${{ needs.publish.outputs.branch }}
           PR: ${{ needs.publish.outputs.pr }}
+          TASK: ${{ needs.implement.outputs.task }}
         run: python3 -m smbot.session publish --bundle work/work.bundle --branch "$BRANCH" --mode update --pr "$PR"
       # An unfinished revision: push it to the PR so it isn't lost, but give no sha, so the
       # final review is skipped and the next session continues the PR.
@@ -371,54 +364,110 @@ jobs:
           BRANCH: ${{ needs.publish.outputs.branch }}
           PR: ${{ needs.publish.outputs.pr }}
           REASON: ${{ steps.record.outputs.status }}
+          TASK: ${{ needs.implement.outputs.task }}
         run: python3 -m smbot.session publish --bundle work/work.bundle --branch "$BRANCH" --mode update --pr "$PR" --unfinished "$REASON"
       - name: Questions for the owner
+        continue-on-error: true # a failed comment must not skip saving or reviewing the work
         if: steps.record.outputs.status == 'ok' && needs.revise.outputs.result != ''
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           RESULT: ${{ needs.revise.outputs.result }}
           SOURCE: the revision of PR #${{ needs.publish.outputs.pr }}
         run: python3 -m smbot.inbox ask
+      - name: Answers to /ask
+        continue-on-error: true # a failed comment must not skip saving or reviewing the work
+        if: steps.record.outputs.status == 'ok' && needs.revise.outputs.result != ''
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          RESULT: ${{ needs.revise.outputs.result }}
+        run: python3 -m smbot.session answers
 
-  # Screenshots of the PR's latest commit, for the owner and voters to see. The game code
-  # runs here with no secrets, no environment and a read-only token; posting is separate.
+  # Before/after screenshots of what the PR changes: only the shot scripts the session named
+  # (`screenshots` in its result) run, on the PR's commit and on main. The game code runs here
+  # with no secrets, no environment and a read-only token; posting is separate.
   screenshots:
-    name: screenshots (no secrets)
-    needs: [publish, publish-revision]
+    name: before/after screenshots (no secrets)
+    needs: [implement, revise, publish, publish-revision]
     if: always() && needs.publish.outputs.pr != ''
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 40
     permissions:
       contents: read
     outputs:
-      sha: ${{ steps.sha.outputs.sha }}
+      sha: ${{ steps.pick.outputs.sha }}
+      scripts: ${{ steps.pick.outputs.scripts }}
     steps:
-      - id: sha
+      - id: pick
         env:
           SHA: ${{ needs.publish-revision.outputs.sha || needs.publish.outputs.sha }}
-        run: echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          FIRST: ${{ needs.implement.outputs.result }}
+          REVISED: ${{ needs.revise.outputs.result }}
+        # The revision's choice wins when it made one; names are checked before they reach build.sh.
+        run: |
+          python3 - <<'PY'
+          import json, os, re
+          def shots(raw):
+              try:
+                  value = json.loads(raw or "{}").get("screenshots")
+              except (ValueError, AttributeError):
+                  return None
+              return value if isinstance(value, list) else None
+          chosen = shots(os.environ["REVISED"])
+          chosen = chosen if chosen is not None else (shots(os.environ["FIRST"]) or [])
+          names = sorted({c.get("script") for c in chosen if isinstance(c, dict)
+                          and re.fullmatch(r"shot_[a-z0-9_]{1,60}", str(c.get("script")))})[:6]
+          os.makedirs("shots", exist_ok=True)
+          with open("shots/list.json", "w") as fh:
+              json.dump(chosen, fh)
+          with open(os.environ["GITHUB_OUTPUT"], "a") as fh:
+              fh.write(f"sha={os.environ['SHA']}\nscripts={' '.join(names)}\n")
+          print("Shot scripts chosen by the session:", " ".join(names) or "none")
+          PY
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.pick.outputs.scripts != ''
         with:
-          ref: ${{ steps.sha.outputs.sha }}
+          ref: ${{ steps.pick.outputs.sha }}
+          path: after
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.pick.outputs.scripts != ''
+        with:
+          ref: main
+          path: before
           persist-credentials: false
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: steps.pick.outputs.scripts != ''
         with:
           path: ~/.cache/spellmerge-godot
-          key: godot-${{ hashFiles('ci/build/godot.env') }}
+          key: godot-${{ hashFiles('after/ci/build/godot.env') }}
       - name: Virtual display
+        if: steps.pick.outputs.scripts != ''
         run: sudo apt-get update -qq && sudo apt-get install -y -qq xvfb
-      - run: ci/build/build.sh --quick --screenshots
+      - name: After (this PR)
+        if: steps.pick.outputs.scripts != ''
+        working-directory: after
+        env:
+          SHOTS_ONLY: ${{ steps.pick.outputs.scripts }}
+        run: ci/build/build.sh --quick --screenshots && mv build/screenshots ../shots/after
+      - name: Before (main; a script the PR adds has no before)
+        if: steps.pick.outputs.scripts != ''
+        continue-on-error: true
+        working-directory: before
+        env:
+          SHOTS_ONLY: ${{ steps.pick.outputs.scripts }}
+        run: ci/build/build.sh --quick --screenshots; mv build/screenshots ../shots/before
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: steps.pick.outputs.scripts != ''
         with:
           name: screenshots
-          path: build/screenshots
+          path: shots
           retention-days: 1
           if-no-files-found: ignore
 
   post-screenshots:
     name: post the screenshots on the PR
     needs: [publish, screenshots]
-    if: always() && needs.screenshots.result == 'success'
+    if: always() && needs.screenshots.result == 'success' && needs.screenshots.outputs.scripts != ''
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: automation
@@ -428,7 +477,6 @@ jobs:
         with:
           persist-credentials: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        continue-on-error: true # the PR had no screenshot scripts
         with:
           name: screenshots
           path: shots
@@ -521,6 +569,7 @@ jobs:
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-issues: write
+          permission-pull-requests: write # close an outside PR the session finished
       - id: finish
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -532,25 +581,28 @@ jobs:
           FINAL_REVIEW: ${{ needs.final.outputs.review }}
           MERGED: ${{ needs.merge.outputs.merged }}
           MERGE_RESULT: ${{ needs.merge.outputs.message }}
-          SETTINGS: ${{ inputs.settings }}
+          WEEKLY: ${{ inputs.weekly }}
           CHAIN_STARTED: ${{ inputs.chain_started }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: python3 -m smbot.session finish
-      - name: Devlog, task issues and playtest (weekly planning)
+      - name: Owner issues, checkpoint, queue moves, devlog and playtest (planning)
         if: inputs.mode == 'plan' && needs.implement.outputs.result != ''
+        continue-on-error: true # never keep the next session from starting
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           DISCUSSIONS_TOKEN: ${{ github.token }}
+          WEEKLY: ${{ inputs.weekly }}
+          MERGED: ${{ needs.merge.outputs.merged }}
           PLAN: ${{ needs.implement.outputs.result }}
         run: python3 -m smbot.weekly publish-plan
       - name: Start the next session
-        if: steps.finish.outputs.again == 'true'
+        if: always() && steps.finish.outputs.again == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           STARTED: ${{ steps.finish.outputs.chain_started }}
         run: gh workflow run develop.yml --ref main -f chain_started="$STARTED"
       - name: Start develop again when the usage limit resets
-        if: steps.finish.outputs.again != 'true' && steps.finish.outputs.resume_at != ''
+        if: always() && steps.finish.outputs.again != 'true' && steps.finish.outputs.resume_at != ''
         env:
           GH_TOKEN: ${{ github.token }}
           AT: ${{ steps.finish.outputs.resume_at }}

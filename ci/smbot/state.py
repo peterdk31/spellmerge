@@ -25,17 +25,23 @@ DEFAULT: dict[str, Any] = {
     "version": 1,
     "paused_by_command": False,
     "backoff_until": None,
-    "usage": [],  # [{"at": iso, "tokens": n, "kind": "dev" | "review" | "rate" | "plan"}]
+    "usage": [],  # [{"at": iso, "tokens": n, "kind": "dev" | "review" | "intake" | "plan"}]
     "processed_comments": [],
     "pending_instructions": [],  # verified owner instructions for Claude
     "panel_applied": None,
     "panel_problems": [],
     "alarms": {},  # alarm name -> issue number
     "last_own_merge": None,
+    "last_plan": None,  # when the last planning session finished
+    "last_weekly": None,  # when the last weekly planning finished (smbot.control starts the next one)
+    "errors_in_a_row": 0,  # sessions that ended in an error since the last one that made progress
+    "idle": None,  # when planning last found nothing to do; cleared by the next progress
+    "checkpoint_answers": {},  # checkpoint issue number -> the owner's verified /go, /iterate or /pivot
+    "intake_tasks": {},  # issue number -> the intake's neutral task for it (smbot.intake)
 }
 
 MAX_PROCESSED = 1000
-MAX_USAGE_DAYS = 8
+MAX_ERRORS_IN_A_ROW = 3  # sessions ending in an error are retried this often; then development stops
 
 
 def _url(cfg: config_mod.Config) -> str:

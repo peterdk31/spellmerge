@@ -2,7 +2,7 @@
 
 The art rules for Spellmerge, written so a person, an agent or a script can check an asset against them. The vision is in [DESIGN.md](DESIGN.md) (pillar 4, "Readable chaos"); the plan is in [PLAN.md](PLAN.md) ("Art and music").
 
-**Status: provisional.** Claude drafted this style in M1 so Art contributors have something to follow. In M2 an art direction call picks the final style; its golden examples are then recorded in `docs/DESIGN.md` and this file is updated to match. Until then these rules are the ones art is rated against.
+**Status: provisional.** Claude drafted this style in M1 so whoever makes art (the bot, or an artist the owner commissions) has something to follow. In M2 the owner picks the final style from Claude's samples; its golden examples are then recorded in `docs/DESIGN.md` and this file is updated to match. Until then these rules are the ones art is reviewed against.
 
 ## The short version
 
@@ -95,7 +95,7 @@ The art only shows timing; it doesn't set it. The telegraph's length and the mom
 
 ## Placeholder SVGs
 
-Sessions and contributors without an image editor may write a pixel sprite as an SVG, listed in the manifest with tier `placeholder`. They follow every rule above and these:
+Sessions and anyone else without an image editor may write a pixel sprite as an SVG, listed in the manifest with tier `placeholder`. They follow every rule above and these:
 
 - The root element is `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" shape-rendering="crispEdges">`. The size is exactly the grid (or a whole multiple), and `shape-rendering="crispEdges"` is always set.
 - **Only `<rect>` elements**, with whole-number `x`, `y`, `width` and `height`, one rect per run of pixels. No `<path>`, `<circle>`, `<ellipse>`, `<polygon>`, `<text>` or `<image>`, because curves and diagonals are antialiased.
@@ -128,7 +128,7 @@ Provisional, like the rest. The HUD (M1 parts 18 and 19) and the Style Guide pag
 
 ## Golden examples
 
-Candidates for the pieces the Style Guide page shows as "this is the look". They are the best placeholder art so far, listed with what each one shows in [art/kit/golden.json](../art/kit/golden.json). In M2 the art direction call confirms or replaces them. Copy their approach, not their pixels.
+Candidates for the pieces the Style Guide page shows as "this is the look". They are the best placeholder art so far, listed with what each one shows in [art/kit/golden.json](../art/kit/golden.json). In M2 the owner's art direction choice confirms or replaces them. Copy their approach, not their pixels.
 
 | Kind | File | What to learn from it |
 | --- | --- | --- |
@@ -145,7 +145,7 @@ The source files are in [art/kit/](../art/kit/README.md): the palette (`spellmer
 
 ## Checklist
 
-Before opening an art PR:
+Before an art PR is opened, by the bot or a commissioned artist:
 
 - [ ] 32×32 per frame (or a whole multiple); strips have the frame count from the table.
 - [ ] Only palette colours; no gradients, no antialiasing, no partial transparency.

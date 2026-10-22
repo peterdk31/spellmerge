@@ -4,7 +4,7 @@
 
 Everything that customises the single base wizard. **Cosmetics** (`cosmetics/`) change looks only: hat, robe, colours, staff look. **Staffs** (`staffs/`) are chosen before a run and set the basic attack and a small bonus.
 
-**Opens for PRs in M4** (Polish and variety; see "Opens for PRs" in docs/ROADMAP.md). **The example to copy arrives with Claude's first wizard content in M4**; this README is updated then with its path.
+**Built in M4** (Polish and variety; see docs/ROADMAP.md). **The example to copy arrives with Claude's first wizard content in M4**; this README is updated then with its path.
 
 ## Contract
 
@@ -20,11 +20,10 @@ Everything that customises the single base wizard. **Cosmetics** (`cosmetics/`) 
 
 ## Steps
 
-1. Pick an issue labelled `now` in this area and comment `/claim`.
-2. Copy the example folder into `cosmetics/` or `staffs/` and rename it.
-3. Edit the `.tres` values; replace the sprites using the palette in `docs/STYLE.md`.
-4. Add a line per asset to `art/manifest.json` (path, origin `human` or `ai`, author, license; for AI also tool and prompt).
-5. Run the checks below, then open a PR using the template, with an image or short GIF.
+1. Copy the example folder into `cosmetics/` or `staffs/` and rename it.
+2. Edit the `.tres` values; replace the sprites using the palette in `docs/STYLE.md`.
+3. Add a line per asset to `art/manifest.json` (path, origin `human` or `ai`, author, license; for AI also tool and prompt).
+4. Run the checks below, then open a PR using the template, with an image or short GIF.
 
 ## Example to copy
 
@@ -37,12 +36,10 @@ tools/check.sh
 ci/build/build.sh --quick --tests
 ```
 
-## Rating questions
+## Review questions
 
-Besides the standard criteria:
+Besides the general review:
 
 - Is the look or playstyle distinct from existing cosmetics and staffs?
 - Does it follow the style guide (`docs/STYLE.md`) and read well at 1×?
 - For staffs: is the basic attack fun, and is the bonus small enough not to dominate spells?
-
-Art changes (sprites) also need the community vote (👍/👎, 24 hours).

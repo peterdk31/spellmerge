@@ -4,7 +4,7 @@
 
 Wizard controller: move, dodge, cast, mana, health, downed and revive.
 
-**Closed until M4.** Built in M1, opens for PRs in M4 (see "Gameplay sub-areas" in docs/PLAN.md and "Opens for PRs" in docs/ROADMAP.md). Until then Claude maintains it; an outside PR is a gamble.
+Built in M1 (see "Gameplay sub-areas" in docs/PLAN.md).
 
 Every player is an index 0–3 with their own device, mana, health and downed state. A downed player can be revived by a teammate; nobody ever waits for another player.
 
@@ -25,7 +25,7 @@ Every player is an index 0–3 with their own device, mana, health and downed st
 
 ## Steps
 
-Not open yet. When it opens, follow the steps and test layout in [gameplay/README.md](../README.md).
+Follow the steps and test layout in [gameplay/README.md](../README.md).
 
 ## Physics layers
 
@@ -42,9 +42,9 @@ tools/check.sh
 ci/build/build.sh --quick
 ```
 
-## Rating questions
+## Review questions
 
-A good PR here changes how one wizard moves, dodges, casts or recovers, works the same for player 0 and player 3, and keeps input responsive with full effects on screen. Besides the standard criteria:
+A good PR here changes how one wizard moves, dodges, casts or recovers, works the same for player 0 and player 3, and keeps input responsive with full effects on screen. Besides the general review:
 
 - Does it work for 1 and for 4 players at once? Do moving, dodging and casting stay responsive with full effects on screen?
 - Does it keep to the dependency direction, without calling another area directly?

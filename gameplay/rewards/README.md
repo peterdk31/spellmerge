@@ -4,9 +4,9 @@
 
 Per-player rolls from loot tables, unspent rewards and shops.
 
-**Closed until M5.** Built in M3, opens for PRs in M5 (see "Gameplay sub-areas" in docs/PLAN.md and "Opens for PRs" in docs/ROADMAP.md). Until then Claude maintains it; an outside PR is a gamble.
+Built in M3 (see "Gameplay sub-areas" in docs/PLAN.md).
 
-Loot tables are content data read through the registry, so contributors add them without touching this code. Each player rolls their own rewards.
+Loot tables are content data read through the registry, so new ones are added without touching this code. Each player rolls their own rewards.
 
 ## Contract
 
@@ -23,7 +23,7 @@ Loot tables are content data read through the registry, so contributors add them
 
 ## Steps
 
-Not open yet. When it opens, follow the steps and test layout in [gameplay/README.md](../README.md).
+Follow the steps and test layout in [gameplay/README.md](../README.md).
 
 ## Example to copy
 
@@ -36,9 +36,9 @@ tools/check.sh
 ci/build/build.sh --quick
 ```
 
-## Rating questions
+## Review questions
 
-A good PR here changes how rewards are rolled, kept or bought for each player, reads tables from data, and never makes one player wait for another's choice. Besides the standard criteria:
+A good PR here changes how rewards are rolled, kept or bought for each player, reads tables from data, and never makes one player wait for another's choice. Besides the general review:
 
 - Does each player get an independent roll? Are unspent rewards kept and never lost?
 - Does it keep to the dependency direction, without calling another area directly?

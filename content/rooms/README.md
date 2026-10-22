@@ -4,7 +4,7 @@
 
 Room templates, one folder per biome. A room is a tile-based arena where a wave of enemies is fought, a reward is picked or a story event happens.
 
-**Opens for PRs in M3** (Run structure; see "Opens for PRs" in docs/ROADMAP.md). A small M1 base class already exists (`core/base/room_base.gd`, `RoomBase`); M3 extends it. The example to copy is the M1 crypt arena (see "Example to copy"); M3 adds more rooms.
+**Built in M3** (Run structure; see docs/ROADMAP.md). A small M1 base class already exists (`core/base/room_base.gd`, `RoomBase`); M3 extends it. The example to copy is the M1 crypt arena (see "Example to copy"); M3 adds more rooms.
 
 ## Contract
 
@@ -21,11 +21,10 @@ Room templates, one folder per biome. A room is a tile-based arena where a wave 
 
 ## Steps
 
-1. Pick an issue labelled `now` in this area and comment `/claim`.
-2. Copy the example room into the right biome folder and rename it.
-3. Paint the layout with the shared tileset; place doors and spawn points.
-4. Edit the `.tres` values. Commit the `.uid` files Godot creates.
-5. Run the checks below, then open a PR with a screenshot of the room.
+1. Copy the example room into the right biome folder and rename it.
+2. Paint the layout with the shared tileset; place doors and spawn points.
+3. Edit the `.tres` values. Commit the `.uid` files Godot creates.
+4. Run the checks below, then open a PR with a screenshot of the room.
 
 ## Example to copy
 
@@ -38,9 +37,9 @@ tools/check.sh
 ci/build/build.sh --quick --tests
 ```
 
-## Rating questions
+## Review questions
 
-Besides the standard criteria:
+Besides the general review:
 
 - Is there space for 4 players to move and dodge?
 - Are doors and spawns valid and reachable?

@@ -1,6 +1,6 @@
 # Backlog
 
-Ideas and future work outside the current milestone (docs/PLAN.md, "Planning system"). The weekly planning run triages Discussions ideas into this file and moves items into `docs/NEXT.md` when their milestone comes.
+Ideas and future work outside the current milestone (docs/PLAN.md, "Planning system"). Players' ideas wait as issues labelled `backlog` (the daily intake puts them there); this file holds Claude's own. The weekly planning run moves items from both into the work queue or `docs/NEXT.md` when their milestone comes.
 
 ## From M2 part 16 (the builder)
 
@@ -25,7 +25,7 @@ Not kept here any more: each question is an issue labelled `owner-question` (doc
 
 ## Audio needs
 
-Sounds the game asks for by id and does not have yet. A missing sound is silent (`Registry.get_sound` returns `null`), never an error. The weekly run opens one `now` issue per line for Audio contributors. Files are `.ogg` in `audio/`, listed in `audio/manifest.json`; the id is the file name without the extension.
+Sounds the game asks for by id and does not have yet. A missing sound is silent (`Registry.get_sound` returns `null`), never an error. Claude makes each one itself (synthesised from code) or the owner commissions it; a player's suggestion for one comes in through the intake. Files are `.ogg` in `audio/`, listed in `audio/manifest.json`; the id is the file name without the extension.
 
 - **`cast`** (M1 part 10). The sound of a wizard releasing a spell: a short, soft whoosh, under 0.5 s. Heard every cast, from up to four players, so it must not tire the ear.
 - **`hit`** (M1 part 16). A projectile or spell landing on an enemy: a short, dry impact, under 0.3 s. Heard many times a second in a fight.
@@ -55,7 +55,7 @@ Weak spots found in the architecture review of 2026-10-20 (docs/ARCHITECTURE.md)
 - **A downed mid-run joiner.** A joiner has 2 s of protection; once downed they are revived like anyone else (`coop`).
 
 - **Egress firewall for Claude's shell sessions.** Allow only GitHub and the Anthropic API from the implement and revise runners (for example with iptables and GitHub's published IP ranges), so a misled session can't send its read-only or Claude token anywhere else. This needs care, because the action installs Claude Code at start-up.
-- **Manifest validator (M1).** Outside PRs may add lines to `art/manifest.json` and `audio/manifest.json`, so a PR could also change other assets' records. A validator should allow only entries for files the PR adds.
+- **Manifest validator (M1).** Every asset needs a line in `art/manifest.json` or `audio/manifest.json`, but nothing checks it yet, and a PR could change other assets' records by mistake. A validator should require an entry for every asset and allow only changed entries for files the PR adds or changes.
 - **llms.txt link check.** A small check (in `tools/` or `ci/`, so owner-added) that every relative link in `llms.txt` exists and every `README.md` in the repo is listed, so the index can't drift. Until then, a PR that adds or removes a doc updates `llms.txt` by hand.
 - Cross-player spell linking (one player's frost plus another's storm), asynchronous, with no waiting (docs/PLAN.md, "Co-op rules").
 - Windows code signing, before Steam (M7).

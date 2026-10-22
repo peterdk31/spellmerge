@@ -1,15 +1,17 @@
 # Hourly check and development session (docs/PLAN.md, "Self-driven progress").
 #
-# control  every hour: verified Control panel, owner commands, claims, the gate
-# session  when the gate allows: one Claude work session (session.yml)
+# control  every hour: verified Control panel, owner commands, the gate
+# session  when the gate allows: one Claude work session (session.yml), developing the next
+#          task or planning (when the queue is empty, after a checkpoint answer, and the
+#          weekly planning, which the gate starts once it's due on Sunday)
 #
 # Runs on main only: hourly, by hand, and when a session starts the next one. A push to
 # main (a merge) only dispatches a run when none is running or queued, so work restarts
 # even when GitHub doesn't fire the schedule (claude-code-action doesn't accept push
 # events). A new owner comment starting with "/" dispatches a run unless one is already
 # queued, so commands are seen within minutes, not when GitHub gets round to the hourly
-# schedule (it often skips it for hours). Every run also starts daily.yml and weekly.yml
-# if GitHub missed their schedule (smbot.catchup). Nothing here runs PR code.
+# schedule (it often skips it for hours). Every run also starts daily.yml if GitHub missed
+# its schedule (smbot.catchup). Nothing here runs PR code.
 name: develop
 
 on:
@@ -77,7 +79,7 @@ jobs:
           fi
 
   catch-up:
-    name: start daily and weekly if GitHub missed their schedule
+    name: start daily if GitHub missed its schedule
     if: github.event_name != 'issue_comment' && github.ref == 'refs/heads/main' && vars.AUTOMATION_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -86,7 +88,7 @@ jobs:
       cancel-in-progress: false
     permissions:
       contents: read
-      actions: write # start daily.yml and weekly.yml
+      actions: write # start daily.yml
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -103,12 +105,13 @@ jobs:
     environment: automation
     permissions:
       contents: read
-      actions: write # start resume.yml after a usage limit
+      actions: write # start resume.yml after a usage limit or a planning cooldown
     outputs:
       develop: ${{ steps.gate.outputs.develop }}
+      mode: ${{ steps.gate.outputs.mode }}
+      weekly: ${{ steps.gate.outputs.weekly }}
       merge: ${{ steps.gate.outputs.merge }}
       focus: ${{ steps.gate.outputs.focus }}
-      settings: ${{ steps.gate.outputs.settings }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -126,17 +129,12 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           AUTOMATION_ENABLED: ${{ vars.AUTOMATION_ENABLED }}
         run: python3 -m smbot.control --commands --log-title "Hourly check"
-      - name: Claims (/claim comments)
-        if: steps.gate.outputs.automation == 'true'
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: python3 -m smbot.claims hourly
-      - name: Start develop again when the usage limit resets
-        if: steps.gate.outputs.backoff_until != ''
+      - name: Start develop again later (a usage limit resets, or planning may run again)
+        if: steps.gate.outputs.wake_at != ''
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          AT: ${{ steps.gate.outputs.backoff_until }}
+          AT: ${{ steps.gate.outputs.wake_at }}
         run: gh workflow run resume.yml --ref main -f at="$AT"
 
   session:
@@ -145,9 +143,9 @@ jobs:
     if: needs.control.outputs.develop == 'true'
     uses: ./.github/workflows/session.yml
     with:
-      mode: develop
+      mode: ${{ needs.control.outputs.mode }}
+      weekly: ${{ needs.control.outputs.weekly == 'true' }}
       focus: ${{ needs.control.outputs.focus }}
-      settings: ${{ needs.control.outputs.settings }}
       merge: ${{ needs.control.outputs.merge }}
       chain_started: ${{ inputs.chain_started }}
     secrets: inherit

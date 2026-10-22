@@ -13,13 +13,13 @@ ROOT = Path(__file__).resolve().parents[2]
 
 class ContributePageTest(unittest.TestCase):
     def test_parse_roadmap(self) -> None:
-        text = ("| # | Milestone | Status | Done when | Opens for PRs |\n| --- | --- | --- | --- | --- |\n"
-                "| M0 | [Foundation](milestones/M0-foundation.md) | **Closed early** on 2026-10-16 | a | No areas yet |\n"
-                "| M1 | [Core loop](milestones/M1-core-loop.md) | **In progress** since 2026-10-16 | b | Art, Audio |\n"
-                "| M2 | Spell system | Not started | c | Spells, Story |\n")
+        text = ("| # | Milestone | Status | Done when |\n| --- | --- | --- | --- |\n"
+                "| M0 | [Foundation](milestones/M0-foundation.md) | **Closed early** on 2026-10-16 | a |\n"
+                "| M1 | [Core loop](milestones/M1-core-loop.md) | **In progress** since 2026-10-16 | b |\n"
+                "| M2 | Spell system | Not started | c |\n")
         current, upcoming = contribute.parse_roadmap(text)
         self.assertEqual((current.code, current.name, current.design), ("M1", "Core loop", "milestones/M1-core-loop.md"))
-        self.assertEqual(upcoming, [("M2", "Spell system", "c", "Spells, Story")])
+        self.assertEqual(upcoming, [("M2", "Spell system", "c")])
 
     def test_the_real_plan_files_parse(self) -> None:
         """Doesn't depend on which milestone is current today."""
@@ -34,12 +34,15 @@ class ContributePageTest(unittest.TestCase):
         data = contribute.PageData(merged=[{"title": "<script>x</script>", "url": "https://x", "author": "a"}])
         page = contribute.render(config.load(), data, "v0.1", "nightly", "v0.0")
         self.assertIn("&lt;script&gt;", page)
-        self.assertIn("Couldn't load the task list", page)
+        self.assertIn("Couldn't load the queue", page)
 
-    def test_submission_credit(self) -> None:
-        cfg = config.load()
-        item = {"user": {"login": cfg.bot.login}, "title": "Submission from @ann-b: art/x.png"}
-        self.assertEqual(contribute.contributor_of(item, cfg), "ann-b")
+    def test_render_shows_the_queue_and_done_reports(self) -> None:
+        data = contribute.PageData(queue={"scheduled": 3, "backlog": 7}, merged=[],
+                                   done=[{"title": "Doors stop bolts", "url": "https://x", "author": "ann-b"}])
+        page = contribute.render(config.load(), data, "v0.1", "nightly", "v0.0")
+        self.assertIn("3 in the work queue", page)
+        self.assertIn("7 on the backlog", page)
+        self.assertIn("reported by @ann-b", page)
 
 
 def web_zip(folder: Path, version: str) -> Path:

@@ -15,93 +15,19 @@
     "progress_post": {
       "type": "string"
     },
-    "task_issues": {
+    "schedule_issues": {
       "type": "array",
       "items": {
-        "type": "object",
-        "properties": {
-          "title": {
-            "type": "string"
-          },
-          "milestone": {
-            "type": "string"
-          },
-          "area": {
-            "type": "string",
-            "enum": [
-              "spells",
-              "relics",
-              "wizard",
-              "enemies",
-              "bosses",
-              "rooms",
-              "gameplay",
-              "hud",
-              "art",
-              "audio",
-              "story"
-            ]
-          },
-          "skill": {
-            "type": "string",
-            "enum": [
-              "code",
-              "pixel-art",
-              "music",
-              "sfx",
-              "writing",
-              "level-design"
-            ]
-          },
-          "size": {
-            "type": "string",
-            "enum": [
-              "good first issue",
-              "S",
-              "M",
-              "L"
-            ]
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "now",
-              "soon",
-              "later"
-            ]
-          },
-          "what": {
-            "type": "string"
-          },
-          "where": {
-            "type": "string"
-          },
-          "specs": {
-            "type": "string"
-          },
-          "example": {
-            "type": "string"
-          },
-          "placeholder": {
-            "type": "string"
-          },
-          "done_when": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "title",
-          "milestone",
-          "area",
-          "skill",
-          "size",
-          "status",
-          "what",
-          "where",
-          "done_when"
-        ],
-        "additionalProperties": false
-      }
+        "type": "integer"
+      },
+      "description": "Backlog issues to move into the work queue now"
+    },
+    "unschedule_issues": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      },
+      "description": "Scheduled issues to move back to the backlog"
     },
     "owner_issues": {
       "type": "array",
@@ -121,6 +47,40 @@
         ],
         "additionalProperties": false
       }
+    },
+    "checkpoint": {
+      "type": "object",
+      "description": "Only when the current milestone is done: the checkpoint issue that asks the owner to go, iterate or pivot",
+      "properties": {
+        "milestone": {
+          "type": "string",
+          "description": "e.g. M2 (the spell system)"
+        },
+        "built": {
+          "type": "string"
+        },
+        "cut": {
+          "type": "string"
+        },
+        "assessment": {
+          "type": "string"
+        },
+        "question": {
+          "type": "string",
+          "description": "The checkpoint question of the milestone from docs/ROADMAP.md, if it has one"
+        },
+        "recommendation": {
+          "type": "string",
+          "description": "go, iterate on what, or pivot to what, and why"
+        }
+      },
+      "required": [
+        "milestone",
+        "built",
+        "assessment",
+        "recommendation"
+      ],
+      "additionalProperties": false
     },
     "playtest": {
       "type": "object",
@@ -156,6 +116,10 @@
           "title": {
             "type": "string",
             "description": "A short question, for example: Allow sessions to run the Godot binary?"
+          },
+          "key": {
+            "type": "string",
+            "description": "A short, stable kebab-case id for the decision, e.g. build-sh-four-bot-step. Use the same key whenever the same decision comes up again."
           },
           "question": {
             "type": "string",
@@ -198,7 +162,6 @@
     "status",
     "summary",
     "progress_post",
-    "task_issues",
     "owner_issues"
   ],
   "additionalProperties": false

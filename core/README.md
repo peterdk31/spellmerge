@@ -4,8 +4,6 @@
 
 The shared services every other area stands on: the event bus, the content registry, input, per-player UI focus, saving, base classes, the projectile manager and object pools. Gameplay, HUD and content build on it; it builds on nothing of theirs.
 
-**Closed to outside PRs.** Claude maintains `core/` alone. An outside PR touching it is closed with "open an issue": describe the problem or the missing hook there, and Claude decides how `core/` should change.
-
 ## Contract
 
 - **Dependency direction:** `core` ← `gameplay` ← `content`. `core/` depends on none of `gameplay/`, `hud/` or `content/`. It finds content by folder through `core/registry`.
@@ -29,11 +27,11 @@ Claude only. Typed GDScript, no banned APIs, file access only in `user://`. Test
 
 ## Steps
 
-Outside contributors: open an issue instead of a PR. Claude: follow docs/NEXT.md.
+Take the task from the work queue (scheduled issues first, then docs/NEXT.md).
 
 ## Example to copy
 
-None: `core/` is closed, so there is nothing for outside PRs to copy.
+None: each service is its own pattern. Follow the service you are changing and its tests under `tests/core/`.
 
 ## Validate
 
@@ -42,6 +40,6 @@ tools/check.sh
 ci/build/build.sh --quick
 ```
 
-## Rating questions
+## Review questions
 
-Not applicable to outside PRs, which are closed. For Claude's own changes: is it needed by more than one area, does it keep the dependency direction, and does it stay inside the performance budgets?
+Is it needed by more than one area, does it keep the dependency direction, and does it stay inside the performance budgets?

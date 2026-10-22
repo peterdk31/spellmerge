@@ -8,9 +8,9 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
 
 - [ ] **Bots build spells (M2 part 20).** (`tests/bots`) Seeded random builds, bot 4 staying in its builder in the 4-bot test, `test_spell_fuzz.gd`; **the weekly playtest asks about building from here**.
 - [ ] **Stress in the exports and the limits (M2 part 25).** (`tests/benchmark`, `core/spells/limits.gd`) The stress run and M1's WASM projectile timing runner in the Linux Test and Web Test exports (a node the main menu adds on `--stress` or `--projectile-timing`, like the 4-bot runner); the limits confirmed or lowered from the numbers; the `ci/` gate asked as an owner issue.
-- [ ] **Component icons and art pass (M2 part 26).** (`art/`, `content/spells/`) Icons for all 18, element shot tints and the vfx checked together in one screenshot sheet against docs/STYLE.md; Art `now` issues for replacements.
-- [ ] **Art direction call (M2 part 27).** The call text, the owner issue to post it and to lock the winner in DESIGN.md; nothing in the game waits on it.
-- [ ] **Stabilisation and C2 (M2 part 28).** Only bug fixing, polish and performance until no known crash or blocker remains; then the C2 issue with a build link, bot data (fuzz and stress numbers, which recipes bots build), Claude's honest assessment and questions.
+- [ ] **Component icons and art pass (M2 part 26).** (`art/`, `content/spells/`) Icons for all 18, element shot tints and the vfx checked together in one screenshot sheet against docs/STYLE.md; whatever falls short becomes Claude's own replacement task in `docs/NEXT.md`.
+- [ ] **Art direction choice (M2 part 27).** Claude drafts the style samples itself and asks the owner in one `owner` issue to pick one (optionally after asking players for feedback in Discussions) and to lock it in DESIGN.md; nothing in the game waits on it.
+- [ ] **Stabilisation and C2 (M2 part 28).** Only bug fixing, polish and performance until no known crash or blocker remains; then the planning session ends M2 with the C2 checkpoint issue (build link, bot data such as fuzz and stress numbers and which recipes bots build, Claude's honest assessment and the C2 question), and development waits for the owner's /go, /iterate or /pivot.
 
 ## Blocked
 

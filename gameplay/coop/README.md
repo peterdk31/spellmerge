@@ -4,7 +4,7 @@
 
 Join and leave mid-run, friendly fire and the shared camera.
 
-**Closed until M4.** Built in M1, opens for PRs in M4 (see "Gameplay sub-areas" in docs/PLAN.md and "Opens for PRs" in docs/ROADMAP.md). Until then Claude maintains it; an outside PR is a gamble.
+Built in M1 (see "Gameplay sub-areas" in docs/PLAN.md).
 
 Players join with a button press on their own device and can leave at any time. The shared camera fits all players. Nobody ever waits for another player.
 
@@ -27,7 +27,7 @@ Players join with a button press on their own device and can leave at any time. 
 
 ## Steps
 
-Not open yet. When it opens, follow the steps and test layout in [gameplay/README.md](../README.md).
+Follow the steps and test layout in [gameplay/README.md](../README.md).
 
 ## Example to copy
 
@@ -40,9 +40,9 @@ tools/check.sh
 ci/build/build.sh --quick
 ```
 
-## Rating questions
+## Review questions
 
-A good PR here improves joining or leaving mid-run, the friendly-fire rules or the shared camera, and is checked with 1, 2, 3 and 4 players. Besides the standard criteria:
+A good PR here improves joining or leaving mid-run, the friendly-fire rules or the shared camera, and is checked with 1, 2, 3 and 4 players. Besides the general review:
 
 - Does it work for any join order of 1–4 players, and does the camera keep everyone on screen?
 - Does it keep to the dependency direction, without calling another area directly?

@@ -4,7 +4,7 @@
 
 Hub, unlocks, currency and the codex.
 
-**Closed until M6.** Built in M5, opens for PRs in M6 (see "Gameplay sub-areas" in docs/PLAN.md and "Opens for PRs" in docs/ROADMAP.md). Until then Claude maintains it; an outside PR is a gamble.
+Built in M5 (see "Gameplay sub-areas" in docs/PLAN.md).
 
 Saving goes through `core/save`, under `user://` only.
 
@@ -23,7 +23,7 @@ Saving goes through `core/save`, under `user://` only.
 
 ## Steps
 
-Not open yet. When it opens, follow the steps and test layout in [gameplay/README.md](../README.md).
+Follow the steps and test layout in [gameplay/README.md](../README.md).
 
 ## Example to copy
 
@@ -36,9 +36,9 @@ tools/check.sh
 ci/build/build.sh --quick
 ```
 
-## Rating questions
+## Review questions
 
-A good PR here changes the hub, an unlock rule, currency or the codex, keeps saves under `user://` and does not break older saves. Besides the standard criteria:
+A good PR here changes the hub, an unlock rule, currency or the codex, keeps saves under `user://` and does not break older saves. Besides the general review:
 
 - Does it keep older saves working?
 - Does it keep to the dependency direction, without calling another area directly?

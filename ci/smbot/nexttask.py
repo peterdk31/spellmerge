@@ -1,7 +1,8 @@
-"""Reads docs/NEXT.md, the ordered task queue (docs/PLAN.md, "Planning system").
+"""The ordered task queue (docs/PLAN.md, "Planning system").
 
-Format: under the "## Queue" heading, one task per line as "- [ ] ...". The
-first unchecked task that isn't parked is the next one.
+Scheduled issues from the community intake go first (smbot.intake.queue_tasks, priority
+order), then docs/NEXT.md: under its "## Queue" heading, one task per line as "- [ ] ...".
+The first task that isn't parked is the next one.
 
 A task is parked when it can't move without someone else: it was reported
 blocked, failed review too often, or its approved PR waits on GitHub or the
@@ -14,7 +15,7 @@ from __future__ import annotations
 import datetime as dt
 import re
 from pathlib import Path
-from typing import Any, Collection
+from typing import Any, Collection, Sequence
 
 from . import pacing
 
@@ -39,7 +40,11 @@ def parked(state: dict[str, Any], now: dt.datetime) -> set[str]:
             if f.get("parked_until") and now < pacing.parse_time(f["parked_until"])}
 
 
-def next_task(path: Path = Path("docs/NEXT.md"), skip: Collection[str] = ()) -> str | None:
-    if not path.exists():
-        return None
-    return next((t for t in queue(path.read_text()) if t not in skip), None)
+def next_task(path: Path = Path("docs/NEXT.md"), skip: Collection[str] = (),
+              first: Sequence[str] = (), milestone: bool = True) -> str | None:
+    """The first task of `first` (the scheduled issues), then of docs/NEXT.md, that isn't in `skip`.
+
+    With `milestone` False (a checkpoint waits for the owner) only `first` counts.
+    """
+    tasks = [*first, *(queue(path.read_text()) if milestone and path.exists() else [])]
+    return next((t for t in tasks if t not in skip), None)

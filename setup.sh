@@ -19,7 +19,6 @@ REPO_NAME="spellmerge"
 REPO="$OWNER/$REPO_NAME"
 ENV_NAME="automation"          # protected environment that holds every secret
 RELEASE_BRANCH="main"          # the only branch allowed to use $ENV_NAME
-PROJECT_TITLE="Spellmerge"
 SETTINGS="ci/settings"
 DESCRIPTION="Merge spells. Cause chaos. Together. A 1-4 player co-op roguelite built by Claude and the community."
 HOMEPAGE="https://$OWNER.github.io/$REPO_NAME/"
@@ -86,8 +85,6 @@ preflight() {
   if [[ -n "$scopes" ]]; then
     [[ ",${scopes// /}," == *",repo,"* ]] \
       || die "gh token lacks the 'repo' scope: run 'gh auth refresh -h github.com -s repo'"
-    [[ ",${scopes// /}," == *",project,"* ]] \
-      || die "gh token lacks the 'project' scope: run 'gh auth refresh -h github.com -s project'"
     ok "gh token scopes: $scopes"
   else
     warn "could not read gh token scopes; continuing"
@@ -219,22 +216,6 @@ apply_labels() {
   ok "$(jq length "$SETTINGS/labels.json") labels from $SETTINGS/labels.json"
 }
 
-apply_project() {
-  bold "Project board"
-  local num
-  num=$(gh project list --owner "$OWNER" --format json --limit 200 \
-    | jq -r --arg t "$PROJECT_TITLE" '.projects[] | select(.title == $t) | .number' | head -n1)
-  if [[ -z "$num" ]]; then
-    num=$(gh project create --owner "$OWNER" --title "$PROJECT_TITLE" --format json | jq -r .number)
-    ok "created project '$PROJECT_TITLE' (#$num)"
-  else
-    ok "project '$PROJECT_TITLE' exists (#$num)"
-  fi
-  try "project linked to $REPO" gh project link "$num" --owner "$OWNER" --repo "$REPO"
-  run "project is public" gh project edit "$num" --owner "$OWNER" --visibility PUBLIC \
-    --description "What is wanted now, what is coming next, and who is working on what."
-}
-
 # ---------------------------------------------------------------------------
 
 check_all() {
@@ -313,28 +294,19 @@ check_all() {
   expect "immutable releases" "$(get "repos/$REPO/immutable-releases" --jq .enabled)" true
   expect "Pages build type" "$(get "repos/$REPO/pages" --jq .build_type)" workflow
 
-  bold "Labels and project"
+  bold "Labels"
   local labels missing
   labels=$(gh label list --repo "$REPO" --limit 500 --json name --jq '.[].name' 2>/dev/null || true)
   missing=$(jq -r '.[].name' "$SETTINGS/labels.json" | grep -vxF -f <(printf '%s\n' "$labels") || true)
   if [[ -z "$missing" ]]; then ok "all labels exist"; else fail "missing labels: $(paste -sd, <<<"$missing")"; fi
-  if gh project list --owner "$OWNER" --format json 2>/dev/null \
-      | jq -e --arg t "$PROJECT_TITLE" 'any(.projects[]; .title == $t)' >/dev/null; then
-    ok "project '$PROJECT_TITLE' exists"
-  else
-    fail "project '$PROJECT_TITLE' is missing"
-  fi
 }
 
 manual_steps() {
   bold "Do these by hand (no API exists for them)"
   cat <<EOF
-  1. Discussions categories: Ideas, Spell combos, Art feedback
+  1. Discussions categories: Ideas, Spell combos, Art feedback, Art submissions
      https://github.com/$REPO/discussions/categories
-  2. Project board: turn on the built-in "Auto-add to project" workflow for
-     $REPO, and create the views from docs/PLAN.md ("Project board views").
-     https://github.com/users/$OWNER/projects
-  3. Continue with docs/SETUP-APP.md, then docs/SECURITY-CHECKLIST.md.
+  2. Continue with docs/SETUP-APP.md, then docs/SECURITY-CHECKLIST.md.
 EOF
 }
 
@@ -369,7 +341,6 @@ if [[ "$MODE" == apply ]]; then
   apply_rulesets
   apply_releases_and_pages
   apply_labels
-  apply_project
   manual_steps
 fi
 bold "Verifying"

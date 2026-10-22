@@ -1,4 +1,6 @@
-"""Starts daily.yml and weekly.yml when GitHub misses their schedule.
+"""Starts daily.yml when GitHub misses its schedule.
+
+(The weekly planning is not a workflow of its own: the develop gate starts it when it's due.)
 
   python3 -m smbot.catchup                                 start missed runs
   python3 -m smbot.catchup --already-ran daily.yml --self ID
@@ -26,13 +28,10 @@ from .pacing import iso, parse_time
 GRACE = dt.timedelta(minutes=20)  # a late scheduled run still counts
 
 
-def last_due(now: dt.datetime, workflow: str) -> dt.datetime:
-    """The latest scheduled time at or before now: daily 03:00 UTC, weekly Sunday 06:00 UTC."""
-    if workflow == "daily.yml":
-        due = now.replace(hour=3, minute=0, second=0, microsecond=0)
-        return due if due <= now else due - dt.timedelta(days=1)
-    due = (now - dt.timedelta(days=(now.weekday() + 1) % 7)).replace(hour=6, minute=0, second=0, microsecond=0)
-    return due if due <= now else due - dt.timedelta(days=7)
+def last_due(now: dt.datetime, workflow: str = "daily.yml") -> dt.datetime:
+    """The latest scheduled time at or before now: 03:00 UTC."""
+    due = now.replace(hour=3, minute=0, second=0, microsecond=0)
+    return due if due <= now else due - dt.timedelta(days=1)
 
 
 def missed(now: dt.datetime, due: dt.datetime, added: dt.datetime, run_times: list[dt.datetime]) -> bool:
@@ -47,7 +46,7 @@ def already_ran(due: dt.datetime, runs: list[dict], self_id: int) -> bool:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--already-ran", metavar="WORKFLOW", choices=("daily.yml", "weekly.yml"))
+    ap.add_argument("--already-ran", metavar="WORKFLOW", choices=("daily.yml",))
     ap.add_argument("--self", type=int, default=0, help="this run's id, which doesn't count")
     args = ap.parse_args(argv)
     cfg = config_mod.load()
@@ -61,7 +60,7 @@ def main(argv: list[str] | None = None) -> int:
             with open(path, "a") as fh:
                 fh.write(f"done={str(done).lower()}\n")
         return 0
-    for workflow in ("daily.yml", "weekly.yml"):
+    for workflow in ("daily.yml",):
         info = gh.api(f"repos/{cfg.repo}/actions/workflows/{workflow}")
         runs = gh.api(f"repos/{cfg.repo}/actions/workflows/{workflow}/runs?per_page=10")["workflow_runs"]
         due = last_due(now, workflow)

@@ -567,7 +567,7 @@ Players shape the game by reporting bugs and sharing ideas; every post gets an a
 ### Where to post
 
 - **Report a bug** (issue form): build version, platform, players, steps, what happened, severity.
-- **Spell idea** (issue form) or **Discussions** (Ideas, Spell combos, Art feedback): ideas and feedback.
+- **Spell idea** (issue form) or **Discussions** (Ideas, Spell combos, Art submissions): ideas, feedback, and art or sound as attachments. Announcements holds the weekly devlog.
 - **Report a copyright concern** (issue form).
 
 ### Contribute page

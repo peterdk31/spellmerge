@@ -1026,3 +1026,7 @@ An independent review of the branch found these, all fixed with a regression tes
 
 - **Every PR used to get the first 12 shots of every shot script,** whatever it changed. Now the session names the shot scripts that show its change (`screenshots` in its result, each with a caption; a revision may change the choice) and writes a new shot when none shows it. Only those run, on the PR and on `main`, and the comment shows each shot before and after (a new one alone), leaving out shots that came out identical. A change with nothing visible posts no screenshots.
 - `build.sh --screenshots` writes `shots.txt` (which script made which PNG) and runs only `SHOTS_ONLY` when set. The daily Pages gallery is unchanged.
+
+## Owner: four Discussions categories
+
+- **Announcements** (the weekly devlog; the intake skips it), **Ideas**, **Spell combos** and **Art submissions** (attachments the intake can take as assets). Art feedback (never used; feedback goes in Ideas, art in Art submissions) and GitHub's defaults (General, Polls, Q&A, Show and tell) are removed by hand, since GitHub has no API for categories. The first devlog post (#101) was deleted; the weekly devlog continues.

@@ -7,7 +7,6 @@
   "checkpoint_answers": {},
   "cla_signatures": {},
   "errors_in_a_row": 0,
-  "idle": null,
   "intake_tasks": {},
   "last_own_merge": "2026-10-22T15:37:17Z",
   "last_plan": null,
@@ -41,7 +40,13 @@
     6316162579,
     6334365507
   ],
-  "task_failures": {},
+  "task_failures": {
+    "**Read the first WASM numbers (M2 part 25 follow-up).** (`tests/benchmark/`, `docs/`) Once a daily build has run the web projectile timing step, read its `BENCH:` lines (or why it failed or timed out; see `docs/DECISIONS.md`, 2026-10-22) and either confirm the limits or lower them. \"WASM pending\" stays open until then.": {
+      "count": 0,
+      "parked_reason": "No WASM numbers exist yet. The web projectile timing step merged today (#165, 2026-10-22), and no daily build has run it. No `BENCH:` lines from a web run are recorded in the docs. This session also can't read CI runs: `gh run list` needs approval and was refused. The task stays open in `docs/NEXT.md`, and nothing was changed. A later session should retry once a daily build has run the step.",
+      "parked_until": "2026-10-23T15:39:23Z"
+    }
+  },
   "usage": [
     {
       "at": "2026-10-16T17:33:54Z",

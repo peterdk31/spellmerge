@@ -63,6 +63,8 @@ func _initialize() -> void:
 	_test_wave_size_is_capped()
 	_test_next_wave_stands_up_downed_wizards()
 	_test_restart_goes_back_to_wave_one()
+	_test_build_break_is_fixed()
+	_test_build_break_ignores_builders()
 	_test_main_menu_only_sends_play_requested()
 	_stop()
 	if _failures.is_empty():
@@ -361,7 +363,7 @@ func _kill_wave() -> void:
 		_events.emit_signal("enemy_died", 0, enemy, Vector2.ZERO)
 
 
-## After a clear and NEXT_WAVE_DELAY the next, bigger wave stands in the same world.
+## After a clear and BUILD_BREAK the next, bigger wave stands in the same world.
 func _test_waves_grow_in_the_same_room() -> void:
 	for count: int in [1, 4]:
 		_setup(count)
@@ -371,7 +373,7 @@ func _test_waves_grow_in_the_same_room() -> void:
 		_check(_flow.enemies_left() == FlowScript.wave_size(1), "%d players: wave 1 has %d enemies" % [count, FlowScript.wave_size(1)])
 		_kill_wave()
 		_check(_flow.state == FlowScript.State.CLEARED and _waves == [1], "%d players: a cleared wave waits before the next" % count)
-		_flow.step(FlowScript.NEXT_WAVE_DELAY - 0.5)
+		_flow.step(FlowScript.BUILD_BREAK - 0.5)
 		_check(_flow.enemies_left() == 0 and _waves == [1], "%d players: no next wave before the delay" % count)
 		_flow.step(0.5)
 		_check(_flow.world == world, "%d players: wave 2 stands in the same world" % count)
@@ -382,8 +384,55 @@ func _test_waves_grow_in_the_same_room() -> void:
 		_check(_entered.size() == 1, "%d players: room_entered is not sent again for a new wave" % count)
 		_kill_wave()
 		_check(_cleared.size() == 2, "%d players: room_cleared is sent for every wave, got %d" % [count, _cleared.size()])
-		_flow.step(FlowScript.NEXT_WAVE_DELAY)
+		_flow.step(FlowScript.BUILD_BREAK)
 		_check(_flow.wave == 3 and _flow.enemies_left() == FlowScript.wave_size(3), "%d players: wave 3 follows" % count)
+		_stop()
+
+
+## The break is BUILD_BREAK seconds, announced once with its length, and counted by `build_break_left`.
+func _test_build_break_is_fixed() -> void:
+	_check(FlowScript.BUILD_BREAK > 3.0, "the build break is longer than M1's 3 s delay")
+	_setup(1)
+	var announced: Array[float] = []
+	var listener := func(seconds: float) -> void: announced.append(seconds)
+	_events.connect("build_break_started", listener)
+	_play()
+	_check(announced.is_empty() and _flow.build_break_left() == 0.0, "no break during a wave")
+	_kill_wave()
+	_check(announced == [FlowScript.BUILD_BREAK], "build_break_started is sent once with BUILD_BREAK, got %s" % [announced])
+	_check(is_equal_approx(_flow.build_break_left(), FlowScript.BUILD_BREAK), "the whole break is left at its start")
+	_flow.step(4.0)
+	_check(is_equal_approx(_flow.build_break_left(), FlowScript.BUILD_BREAK - 4.0), "the break counts down")
+	_flow.step(FlowScript.BUILD_BREAK)
+	_check(_flow.wave == 2 and _flow.build_break_left() == 0.0, "the wave started and no break is left")
+	_events.disconnect("build_break_started", listener)
+	_stop()
+
+
+## Whoever is building, the next wave starts after BUILD_BREAK, for 1, 2 and 4 players: no builder
+## (open overlay focus, build requests in flight) holds it back or speeds it up.
+func _test_build_break_ignores_builders() -> void:
+	var focus: Node = root.get_node_or_null("UIFocus")
+	for count: int in [1, 2, 4]:
+		_setup(count)
+		_play()
+		_kill_wave()
+		var builder: Control = Control.new()
+		root.add_child(builder)
+		if focus != null:
+			# The last player sits in a menu for the whole break.
+			focus.call("open", count - 1, [builder] as Array[Control])
+		_events.emit_signal("build_change_requested", count - 1, [0], 1, &"fire")
+		_flow.step(FlowScript.BUILD_BREAK - 0.1)
+		_check(_flow.wave == 1 and _flow.state == FlowScript.State.CLEARED, "%d players: the wave is not early while someone builds" % count)
+		_flow.step(0.1)
+		_check(_flow.wave == 2 and _flow.state == FlowScript.State.RUNNING, "%d players: the wave starts on time while someone builds" % count)
+		_check(_flow.enemies_left() == FlowScript.wave_size(2), "%d players: the next wave is whole" % count)
+		for wizard: PlayerScript in _wizards():
+			_check(not wizard.is_downed(), "%d players: every wizard stands for the wave" % count)
+		if focus != null:
+			focus.call("close", count - 1)
+		builder.free()
 		_stop()
 
 
@@ -404,7 +453,7 @@ func _test_next_wave_stands_up_downed_wizards() -> void:
 	(_flow.get_wizard(1) as PlayerScript).take_damage(PlayerScript.MAX_HEALTH)
 	_check(not _flow.is_restarting(), "one of two down: no restart")
 	_kill_wave()
-	_flow.step(FlowScript.NEXT_WAVE_DELAY)
+	_flow.step(FlowScript.BUILD_BREAK)
 	var wizard := _flow.get_wizard(1) as PlayerScript
 	_check(not wizard.is_downed() and wizard.health > 0, "the downed wizard is up for wave 2")
 	_check(wizard.is_invulnerable(), "the wizard is protected for a moment at the start of wave 2")
@@ -417,7 +466,7 @@ func _test_restart_goes_back_to_wave_one() -> void:
 	_setup(1)
 	_play()
 	_kill_wave()
-	_flow.step(FlowScript.NEXT_WAVE_DELAY)
+	_flow.step(FlowScript.BUILD_BREAK)
 	_check(_flow.wave == 2, "the test reached wave 2")
 	var wizard := _flow.get_wizard(0) as PlayerScript
 	wizard._invulnerable_left = 0.0 # the wave-start protection would absorb the hit
@@ -426,7 +475,7 @@ func _test_restart_goes_back_to_wave_one() -> void:
 	_check(_flow.wave == 1 and _waves.back() == 1, "the restart begins at wave 1, got %d" % _flow.wave)
 	_check(_flow.enemies_left() == FlowScript.wave_size(1), "the restart has the wave 1 size")
 	# A pending next wave of the old run must not fire in the new one.
-	_flow.step(FlowScript.NEXT_WAVE_DELAY)
+	_flow.step(FlowScript.BUILD_BREAK)
 	_check(_flow.wave == 1, "no stray wave timer survives the restart")
 	_stop()
 

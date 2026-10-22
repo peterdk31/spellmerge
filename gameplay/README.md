@@ -41,7 +41,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `run_started`, `run_ended` | `run` | `run_started`: `difficulty`, `flow`; `run_ended`: `progression` |
 | `room_entered` | `flow` | `ai`, `coop`, `difficulty`, `hud` |
 | `room_cleared` | `flow` | `rewards`, `run` |
-| `wave_started` | `flow` | `hud` |
+| `wave_started`, `build_break_started` | `flow` | `hud` |
 | `door_voted` | `flow` | none yet |
 | `difficulty_changed` | `difficulty` | none yet |
 | `reward_rolled`, `reward_taken` | `rewards` | none yet |

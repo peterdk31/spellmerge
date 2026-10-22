@@ -186,8 +186,13 @@ func _outline_problems(text: String) -> Array[String]:
 			values[pair.get_string(1)] = pair.get_string(2)
 		var x0: int = String(values.get("x", "0")).to_int()
 		var y0: int = String(values.get("y", "0")).to_int()
-		for y in range(y0, mini(y0 + String(values.get("height", "0")).to_int(), height)):
-			for x in range(x0, mini(x0 + String(values.get("width", "0")).to_int(), width)):
+		var rect_width: int = String(values.get("width", "0")).to_int()
+		var rect_height: int = String(values.get("height", "0")).to_int()
+		if x0 < 0 or y0 < 0 or x0 + rect_width > width or y0 + rect_height > height:
+			problems.append("rect %s reaches outside the icon" % rect.get_string(1))
+			continue
+		for y in range(y0, y0 + rect_height):
+			for x in range(x0, x0 + rect_width):
 				cells[y * width + x] = String(values.get("fill", ""))
 	for y in height:
 		for x in width:

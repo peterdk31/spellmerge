@@ -194,6 +194,16 @@ export_all() {
   grep -q '^SMOKE OK' build/logs/four-bot-linux.log \
     || { echo "::error::the 4-bot test did not print SMOKE OK in the Linux Test export"; exit 1; }
 
+  # The stress run and the projectile timings (tests/benchmark/, #166), started by the main menu
+  # on --stress and --projectile-timing. They print BENCH lines and only warn on frame time.
+  step "Stress run and projectile timing (exported Linux build with tests)"
+  godot_checked stress-linux timeout 300 build/linux-test/Spellmerge.x86_64 --headless -- --stress
+  grep -q '^STRESS OK' build/logs/stress-linux.log \
+    || { echo "::error::the stress run did not print STRESS OK in the Linux Test export"; exit 1; }
+  godot_checked timing-linux timeout 300 build/linux-test/Spellmerge.x86_64 --headless -- --projectile-timing
+  grep -q '^test_projectile_timing: OK' build/logs/timing-linux.log \
+    || { echo "::error::the projectile timing did not print test_projectile_timing: OK in the Linux Test export"; exit 1; }
+
   step "Boot smoke test (web build in headless Chrome)"
   local status=0
   PYTHONPATH=ci python3 -m smbot.websmoke build/web --expect "main menu ready" --warn-load "$WEB_LOAD_WARN" \
@@ -213,13 +223,16 @@ export_all() {
   [[ -s build/web-test/index.html ]] || { echo "::error::Web Test export produced no index.html"; exit 1; }
   PYTHONPATH=ci python3 -m smbot.websmoke build/web-test --page-args=--four-bot --expect "SMOKE OK" --timeout 240
 
-  # Projectile timing in WASM (#91). Runs once the game has the runner the main menu starts on
-  # --projectile-timing (an exported build can't run a --script); it prints BENCH lines, then TIMING OK.
-  if [[ -f tests/benchmark/projectile_timing_runner.gd ]]; then
-    step "Projectile timing (exported web build, headless Chrome)"
-    PYTHONPATH=ci python3 -m smbot.websmoke build/web-test --page-args=--projectile-timing --expect "TIMING OK" \
-      --timeout 240
-  fi
+  # Projectile timing (#91) and the stress run (#166) in WASM, the numbers the web limits rest on.
+  # The main menu starts them on --projectile-timing and --stress (an exported build can't run a
+  # --script); they print BENCH lines, then TIMING OK or STRESS OK, and only warn on frame time.
+  # Their logs go to build/logs like the Linux ones, so the Daily log can quote them (smbot.summary).
+  step "Projectile timing (exported web build, headless Chrome)"
+  PYTHONPATH=ci python3 -m smbot.websmoke build/web-test --page-args=--projectile-timing --expect "TIMING OK" \
+    --timeout 240 2>&1 | tee build/logs/timing-web.log
+  step "Stress run (exported web build, headless Chrome)"
+  PYTHONPATH=ci python3 -m smbot.websmoke build/web-test --page-args=--stress --expect "STRESS OK" --timeout 600 \
+    2>&1 | tee build/logs/stress-web.log
 }
 
 zip_dir() { # zip_dir <dir> <zip>: sorted entries, fixed timestamps, file modes kept

@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="TriggerBase" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/trigger_base.gd" id="1_trigger"]
+
+[resource]
+script = ExtResource("1_trigger")
+id = &"broken_trigger"
+display_name = "Broken"
+event = 7
+interval = 0.0
+max_fires = 9

@@ -18,6 +18,7 @@ import re
 import struct
 import subprocess
 import sys
+import urllib.parse
 import urllib.request
 import zlib
 from pathlib import Path, PurePosixPath
@@ -61,8 +62,12 @@ def find_signature(comments: list[dict[str, Any]], author: str, version: str) ->
 
 # --- Attachments -------------------------------------------------------------------
 
-ATTACHMENT = re.compile(r"https://(?:github\.com/user-attachments/(?:assets|files)/[\w./%-]+|"
-                        r"user-images\.githubusercontent\.com/[\w./%-]+)")
+ATTACHMENT = re.compile(r"https://(?:github\.com/user-attachments/(?:assets|files)/[\w-]+(?:/[\w.-]+)?|"
+                        r"user-images\.githubusercontent\.com/[\w-]+(?:/[\w.-]+)*)")
+ASSET_PATH = re.compile(r"(?:art|audio|content)(?:/[a-z0-9_-]+)+\.(?:png|ogg)")
+DOWNLOAD_HOSTS = {"github.com", "objects.githubusercontent.com", "user-images.githubusercontent.com",
+                  "private-user-images.githubusercontent.com"}
+MAX_PIXELS_BYTES = 4096 * 4096 * 8  # the largest decoded image accepted
 MAX_BYTES = {".png": 1_000_000, ".ogg": 5_000_000}
 ASSET_DIRS = ("art/", "audio/", "content/")
 OUT = Path("submissions")
@@ -76,11 +81,10 @@ class Invalid(ValueError):
 
 
 def check_path(path: str) -> str:
-    """A target path inside the asset folders, with an allowed extension."""
-    p = PurePosixPath(path)
-    if p.is_absolute() or ".." in p.parts or p.suffix not in MAX_BYTES or not path.startswith(ASSET_DIRS):
-        raise Invalid(f"{path!r} must be a .png or .ogg path under {', '.join(ASSET_DIRS)}")
-    return str(p)
+    """A target path inside the asset folders: lowercase names, a .png or .ogg file, nothing else."""
+    if not isinstance(path, str) or not ASSET_PATH.fullmatch(path) or ".." in PurePosixPath(path).parts:
+        raise Invalid(f"{str(path)[:80]!r} must be a lowercase .png or .ogg path under {', '.join(ASSET_DIRS)}")
+    return path
 
 
 def _chunks(data: bytes) -> list[tuple[bytes, bytes]]:
@@ -113,12 +117,18 @@ def reencode_png(data: bytes, max_side: int = 4096) -> tuple[bytes, int, int]:
     chunks = _chunks(data)
     if not chunks or chunks[0][0] != b"IHDR":
         raise Invalid("PNG without a header")
+    if len(chunks[0][1]) != 13:
+        raise Invalid("PNG header has the wrong length")
     width, height, depth, color, comp, filt, interlace = struct.unpack(">IIBBBBB", chunks[0][1])
     if not (0 < width <= max_side and 0 < height <= max_side):
         raise Invalid(f"image size {width}×{height} is out of range")
-    if color not in CHANNELS or comp != 0 or filt != 0 or interlace != 0:
+    valid_depths = {0: (1, 2, 4, 8, 16), 2: (8, 16), 3: (1, 2, 4, 8), 4: (8, 16), 6: (8, 16)}
+    if color not in CHANNELS or depth not in valid_depths[color] or comp != 0 or filt != 0 or interlace != 0:
         raise Invalid("unsupported PNG format (save as a non-interlaced RGBA or indexed PNG)")
-    raw = zlib.decompress(b"".join(body for kind, body in chunks if kind == b"IDAT"))
+    inflater = zlib.decompressobj()
+    raw = inflater.decompress(b"".join(body for kind, body in chunks if kind == b"IDAT"), MAX_PIXELS_BYTES)
+    if inflater.unconsumed_tail:
+        raise Invalid("PNG pixel data is too large")
     row_bytes = (width * CHANNELS[color] * depth + 7) // 8
     if len(raw) != height * (row_bytes + 1):
         raise Invalid("PNG pixel data has the wrong length")
@@ -130,15 +140,28 @@ def reencode_png(data: bytes, max_side: int = 4096) -> tuple[bytes, int, int]:
     return out, width, height
 
 
+def _github_host(url: str) -> bool:
+    parts = urllib.parse.urlsplit(url)
+    host = parts.hostname or ""
+    return parts.scheme == "https" and (host in DOWNLOAD_HOSTS or re.fullmatch(
+        r"github-production-user-asset-[a-z0-9]+\.s3\.amazonaws\.com", host) is not None)
+
+
+class _GitHubOnly(urllib.request.HTTPRedirectHandler):
+    """Follows a redirect only to GitHub's own file hosts, checked at every hop."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: ANN001, ANN201
+        if not _github_host(newurl):
+            raise Invalid("the attachment didn't come from GitHub")
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
 def download(url: str, limit: int) -> bytes:
-    if not ATTACHMENT.fullmatch(url):
+    if not isinstance(url, str) or not ATTACHMENT.fullmatch(url):
         raise Invalid("only files attached on GitHub can be used")
     req = urllib.request.Request(url, headers={"User-Agent": "spellmerge-intake"})
-    with urllib.request.urlopen(req, timeout=60) as resp:  # noqa: S310 (hosts checked above and below)
-        final = resp.geturl()
-        if not final.startswith(("https://github.com/", "https://objects.githubusercontent.com/",
-                                 "https://github-production-user-asset-", "https://user-images.githubusercontent.com/",
-                                 "https://private-user-images.githubusercontent.com/")):
+    with urllib.request.build_opener(_GitHubOnly).open(req, timeout=60) as resp:  # noqa: S310 (hosts checked)
+        if not _github_host(resp.geturl()):
             raise Invalid("the attachment didn't come from GitHub")
         data = resp.read(limit + 1)
     if len(data) > limit:
@@ -168,6 +191,18 @@ def prepare_asset(url: str, path: str, out: Path) -> str:
     return f"{path} (OGG)"
 
 
+def recheck(path: Path) -> None:
+    """Checks a prepared file again where it's used: size, type, and a PNG's pixels only."""
+    data = path.read_bytes()
+    if len(data) > MAX_BYTES.get(path.suffix, 0):
+        raise Invalid(f"{path.name} is too large")
+    if path.suffix == ".png":
+        clean, _, _ = reencode_png(data)
+        path.write_bytes(clean)
+    elif not data.startswith(b"OggS"):
+        raise Invalid(f"{path.name} is not an OGG file")
+
+
 def prepare_assets(decisions: dict[str, Any], gathered: dict[str, Any], out: Path = OUT) -> dict[str, Any]:
     """For each scheduled discussion with assets: {ref: {"files": [...]} or {"error": ...}}, files under out/<n>/."""
     known = {item["ref"]: item for item in gathered["items"]}
@@ -180,16 +215,18 @@ def prepare_assets(decisions: dict[str, Any], gathered: dict[str, Any], out: Pat
         number = item["ref"].split(":")[1]
         allowed = set(item.get("attachments", []))
         try:
-            if len(d["assets"]) > MAX_ASSETS:
+            if not isinstance(d["assets"], list) or len(d["assets"]) > MAX_ASSETS:
                 raise Invalid(f"at most {MAX_ASSETS} files a discussion")
             files = []
             for a in d["assets"]:
-                if a.get("url") not in allowed:
+                if not isinstance(a, dict) or a.get("url") not in allowed:
                     raise Invalid("an asset must be a file the poster attached")
                 files.append(prepare_asset(a["url"], a.get("path", ""), out / number))
             results[item["ref"]] = {"files": files}
-        except (Invalid, OSError, zlib.error, subprocess.TimeoutExpired) as e:
+        except Invalid as e:
             results[item["ref"]] = {"error": str(e)}
+        except Exception as e:  # noqa: BLE001 (one bad file must never stop the other posts)
+            results[item["ref"]] = {"error": f"the file couldn't be read ({type(e).__name__})"}
     return results
 
 

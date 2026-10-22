@@ -65,6 +65,20 @@ class WeeklyTest(unittest.TestCase):
         self.assertIn("snappier dodge", text)
         self.assertIn("Closes #50", text)
 
+    def test_a_backlog_pr_goes_back_to_the_intake_instead_of_the_queue(self) -> None:
+        calls: list = []
+
+        def paginated(path: str, *args: str, token: object = None) -> list:
+            if "labels=backlog" in path:
+                return [{"number": 8, "pull_request": {}, "labels": [{"name": "backlog"}, {"name": "triaged"}]}]
+            return []
+
+        with mock.patch.object(weekly.gh, "api_paginated", paginated), \
+                mock.patch.object(weekly.gh, "api", lambda path, *a, **k: calls.append((path, a, k.get("input")))):
+            log = weekly.move_issues(CFG, schedule=[8], unschedule=[])
+        self.assertIn("back to the intake", log[0])
+        self.assertFalse(any(c[2] and "scheduled" in str(c[2]) for c in calls))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -469,6 +469,20 @@ def workflow_changes(tip: str, bases: list[str]) -> list[str]:
     return sorted(changed or ())
 
 
+def unchecked_commits(tip: str, main: str, pinned: str, bot_email: str) -> list[str]:
+    """Commits on `tip` that aren't on main, aren't in the checked PR head's history and aren't the bot's.
+
+    Finishing an outside PR, a session may only build on the commit the intake checked (`pinned`); anything
+    the contributor pushed later never went through the rules or the CLA check.
+    """
+    has_pinned = bool(re.fullmatch(r"[0-9a-f]{40}", pinned or "")) and subprocess.run(
+        ["git", "merge-base", "--is-ancestor", pinned, tip], capture_output=True).returncode == 0
+    excluded = [f"^{main}"] + ([f"^{pinned}"] if has_pinned else [])
+    out = subprocess.run(["git", "log", "--format=%H %ae", tip, *excluded], check=True, capture_output=True,
+                         text=True).stdout.split("\n")
+    return [line.split(" ")[0] for line in out if line and line.split(" ", 1)[1] != bot_email]
+
+
 def publish(cfg: config_mod.Config, bundle: Path, branch: str, mode: str, result: dict[str, Any],
             pr_number: int | None, token: str, unfinished: str = "", task: str = "") -> dict[str, str]:
     """Pushes Claude's bundled commits from a clean checkout of main and opens or updates the PR.
@@ -500,6 +514,13 @@ def publish(cfg: config_mod.Config, bundle: Path, branch: str, mode: str, result
                                capture_output=True).returncode == 0
     changed = workflow_changes(f"refs/remotes/work/{branch}",
                                ["refs/remotes/current/main"] + ([f"refs/remotes/current/{branch}"] if on_remote else []))
+    if (m := intake.PR_TASK.search(task)):
+        st, _ = state.load(cfg)
+        pinned = st.get("intake_tasks", {}).get(m.group(1), {}).get("head", "")
+        if foreign := unchecked_commits(f"refs/remotes/work/{branch}", "refs/remotes/current/main", pinned,
+                                        f"{cfg.bot.id}+{cfg.bot.login}@users.noreply.github.com"):
+            raise ValueError(f"refusing to push {branch}: commits by others that the intake didn't check "
+                             f"(PR #{m.group(1)} at {pinned[:7] or '?'}): {', '.join(c[:7] for c in foreign)}")
     if changed:
         raise ValueError(f"refusing to push {branch}: it changes {', '.join(changed)} (owner-only), "
                          "which is neither main's version nor the branch's")

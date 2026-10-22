@@ -51,9 +51,26 @@ class AssetTest(unittest.TestCase):
         with self.assertRaises(contrib.Invalid):
             contrib.reencode_png(b"GIF89a")
 
+    def test_a_malformed_png_is_refused_not_crashed_on(self) -> None:
+        bad_header = contrib.PNG_SIG + contrib._chunk(b"IHDR", b"\x00" * 12) + contrib._chunk(b"IEND", b"")
+        with self.assertRaises(contrib.Invalid):
+            contrib.reencode_png(bad_header)
+        gathered = {"items": [{"ref": "discussion:7", "attachments": [URL]}]}
+        decision = {"items": [{"ref": "discussion:7", "decision": "schedule", "assets": ["not a dict"]}]}
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertIn("error", contrib.prepare_assets(decision, gathered, Path(tmp))["discussion:7"])
+
+    def test_attachment_urls_and_hosts_are_strict(self) -> None:
+        self.assertTrue(contrib.ATTACHMENT.fullmatch(URL))
+        self.assertIsNone(contrib.ATTACHMENT.fullmatch("https://github.com/user-attachments/assets/../../x"))
+        self.assertTrue(contrib._github_host("https://objects.githubusercontent.com/a"))
+        self.assertFalse(contrib._github_host("https://github-production-user-asset-evil.com/a"))
+        self.assertFalse(contrib._github_host("http://github.com/a"))
+
     def test_target_paths_stay_in_the_asset_folders(self) -> None:
         self.assertEqual(contrib.check_path("art/enemies/slime.png"), "art/enemies/slime.png")
-        for bad in ("ci/x.png", "art/../ci/x.png", "/art/x.png", "art/x.gd"):
+        for bad in ("ci/x.png", "art/../ci/x.png", "/art/x.png", "art/x.gd", "art/%2e%2e/x.png",
+                    "art/a?ref=main#.png", "art/Slime.png", 7):
             with self.assertRaises(contrib.Invalid):
                 contrib.check_path(bad)
 

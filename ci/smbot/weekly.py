@@ -55,11 +55,20 @@ def backlog_text(cfg: config_mod.Config, st: dict[str, Any]) -> str:
     return json.dumps(out, indent=2) if out else "[]"
 
 
-def _move(cfg: config_mod.Config, number: int, to: str, open_labels: dict[int, set[str]]) -> str | None:
-    """Moves an open issue between the queue and the backlog; only issues already on one of them."""
+def _move(cfg: config_mod.Config, number: int, to: str, open_labels: dict[int, set[str]],
+          prs: set[int] = frozenset()) -> str | None:
+    """Moves an open issue between the queue and the backlog; only issues already on one of them.
+
+    A pull request is never scheduled from here: it goes back to the intake, which checks the hard
+    rules and the CLA again on its current head before scheduling it.
+    """
     labels = open_labels.get(number)
     if labels is None:
         return None
+    if number in prs and to == intake.SCHEDULED:
+        for label in {intake.BACKLOG, intake.TRIAGED} & labels:
+            gh.api(f"repos/{cfg.repo}/issues/{number}/labels/{label}", "-X", "DELETE")
+        return f"PR #{number} goes back to the intake, which checks it again before scheduling it"
     frm = intake.BACKLOG if to == intake.SCHEDULED else intake.SCHEDULED
     if frm in labels:
         gh.api(f"repos/{cfg.repo}/issues/{number}/labels/{frm}", "-X", "DELETE")
@@ -69,11 +78,14 @@ def _move(cfg: config_mod.Config, number: int, to: str, open_labels: dict[int, s
 
 def move_issues(cfg: config_mod.Config, schedule: list[int], unschedule: list[int]) -> list[str]:
     open_labels: dict[int, set[str]] = {}
+    prs: set[int] = set()
     for label in (intake.SCHEDULED, intake.BACKLOG):
         for issue in gh.api_paginated(f"repos/{cfg.repo}/issues?state=open&labels={label}&per_page=100"):
             open_labels[issue["number"]] = {lab["name"] for lab in issue.get("labels", [])}
+            if "pull_request" in issue:
+                prs.add(issue["number"])
     moves = [(n, intake.SCHEDULED) for n in schedule] + [(n, intake.BACKLOG) for n in unschedule]
-    log = [_move(cfg, n, to, open_labels) for n, to in moves[:MAX_MOVES] if isinstance(n, int)]
+    log = [_move(cfg, n, to, open_labels, prs) for n, to in moves[:MAX_MOVES] if isinstance(n, int)]
     return [line for line in log if line]
 
 

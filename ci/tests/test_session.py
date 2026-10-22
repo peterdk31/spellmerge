@@ -3,6 +3,8 @@ from __future__ import annotations
 import copy
 import datetime as dt
 import json
+import os
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -432,6 +434,30 @@ class PublishTest(unittest.TestCase):
                 session.publish(CFG, Path("work.bundle"), "claude/20261017-x", "new", {}, None, "t")
         self.assertFalse([c for c in run.call_args_list if "push" in c.args[0]])
         api.assert_not_called()
+
+    def test_only_the_checked_head_of_an_outside_pr_may_be_published(self) -> None:
+        bot = f"{CFG.bot.id}+{CFG.bot.login}@users.noreply.github.com"
+        with tempfile.TemporaryDirectory() as tmp:
+            def git(*args: str, email: str = "x@example.com") -> str:
+                return subprocess.run(["git", "-C", tmp, "-c", "user.name=x", "-c", f"user.email={email}", *args],
+                                      check=True, capture_output=True, text=True).stdout.strip()
+
+            git("init", "-q", "-b", "main")
+            git("commit", "-q", "--allow-empty", "-m", "main")
+            git("switch", "-q", "-c", "work")
+            git("commit", "-q", "--allow-empty", "-m", "contributor", email="ann@example.com")
+            checked = git("rev-parse", "HEAD")
+            git("commit", "-q", "--allow-empty", "-m", "bot fix", email=bot)
+            cwd = os.getcwd()
+            os.chdir(tmp)
+            try:
+                self.assertEqual(session.unchecked_commits("work", "main", checked, bot), [])
+                git("commit", "-q", "--allow-empty", "-m", "pushed later", email="ann@example.com")
+                later = git("rev-parse", "HEAD")
+                self.assertEqual(session.unchecked_commits("work", "main", checked, bot), [later])
+                self.assertEqual(len(session.unchecked_commits("work", "main", "", bot)), 2)  # nothing was checked
+            finally:
+                os.chdir(cwd)
 
     def test_workflow_changes_allows_only_mains_the_forks_or_the_branchs_version(self) -> None:
         import os

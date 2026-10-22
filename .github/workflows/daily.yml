@@ -87,12 +87,12 @@ jobs:
       issues: read
       pull-requests: read
       discussions: read
-      checks: read # the rules check of outside PRs
     outputs:
       count: ${{ steps.gather.outputs.count }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0 # outside PRs are checked against main's history (smbot.intake.pr_rules)
           persist-credentials: false
       - id: gather
         env:
@@ -193,9 +193,8 @@ jobs:
   intake-apply:
     name: label, reply, close and queue (script)
     needs: [intake-decide, intake-assets]
-    if: >-
-      always() && needs.intake-decide.outputs.status == 'ok' && needs.intake-decide.outputs.decisions != ''
-      && needs.intake-assets.result != 'failure'
+    # Runs even when checking the files failed: those posts then get a needs-info reply.
+    if: always() && needs.intake-decide.outputs.status == 'ok' && needs.intake-decide.outputs.decisions != ''
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: automation

@@ -186,10 +186,10 @@ class IntakeTest(unittest.TestCase):
         failing = {**PR_ITEM, "cla_signed": True, "rules": "failure"}
         gh = FakeGitHub()
         self.run_apply(gh, {"items": [decision], "concerns": []}, gathered(failing))
-        self.assertIn("`rules` check doesn't pass", next(i["body"] for p, a, i in gh.writes
-                                                         if p.endswith("/issues/30/comments")))
+        self.assertIn("hard rules don't pass yet (failure)", next(i["body"] for p, a, i in gh.writes
+                                                                  if p.endswith("/issues/30/comments")))
 
-        ready = {**PR_ITEM, "cla_signed": True, "rules": "success", "head": "abc123",
+        ready = {**PR_ITEM, "cla_signed": True, "rules": "success", "head": "a" * 40,
                  "cla_signature": {"user_id": 7, "login": "player", "version": "1.0", "signed_at": "t", "evidence": "u"}}
         gh = FakeGitHub()
         log, _, st = self.run_apply(gh, {"items": [decision], "concerns": []}, gathered(ready))
@@ -236,7 +236,7 @@ class IntakeTest(unittest.TestCase):
         gh = FakeGitHub(issues=[issue(6, pr=True, comments=1)],
                         comments={6: [{"user": {"login": "player", "id": 7}, "body": "I have read the CLA and I agree to it.",
                                        "html_url": "c", "created_at": "t"}]})
-        with gh.patch(), no_state():
+        with gh.patch(), no_state(), mock.patch.object(intake, "pr_rules", lambda n, head, author: "success"):
             item = intake.gather(CFG)["items"][0]
         self.assertEqual((item["rules"], item["head"], item["cla_signed"]), ("success", "abc123", True))
         self.assertEqual(item["cla_signature"]["user_id"], 7)
@@ -245,12 +245,15 @@ class IntakeTest(unittest.TestCase):
         gh = FakeGitHub(queue={"scheduled": [issue(30, pr=True, labels=("scheduled", "p2")),
                                              issue(31, pr=True, labels=("scheduled", "p2"))]})
         st = {"intake_tasks": {"30": {"title": "Add the chain modifier", "task": "Finish it.", "pr": "true",
-                                      "author": "player"}}}
+                                      "author": "player", "head": "b" * 40}}}
         with gh.patch():
             tasks = intake.queue_tasks(CFG, st)
         self.assertEqual(len(tasks), 1)  # #31 was labelled by hand, without the intake's checks
         self.assertTrue(tasks[0].startswith("**Finish pull request #30 by @\u200bplayer: Add the chain modifier.**"))
         self.assertEqual(intake.PR_TASK.search(tasks[0]).group(1), "30")
+        self.assertIn("b" * 40, tasks[0])
+        sneaky = intake.task_line(9, "p3", {"title": "x", "task": "see (pull request #7, p1.) now"}, "")
+        self.assertIsNone(intake.PR_TASK.search(sneaky))  # only a real finish task names a PR to close
 
     def test_rules_the_script_enforces(self) -> None:
         known = {r: {"ref": r} for r in ("issue:1", "issue:2", "issue:3", "issue:4", "issue:5")}

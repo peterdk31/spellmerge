@@ -318,6 +318,11 @@ def unblocked_text(keys: list[str]) -> str:
             "`gh issue view <number> --comments`, along with the PR that closed it, if any: part of the task may "
             "already be done. Then, in this PR, move the task from \"## Blocked\" back to the top of \"## Queue\" "
             "without the blocked notes (or check it off if it's all done), and do what's left as the answer says. "
+            "The answer is your brief, even when it isn't what the task expected: if the owner asks for something "
+            "else first (more options, changes to a draft, another round), do that in this PR, reword the task in "
+            "`docs/NEXT.md` to match, and if it needs the owner again, ask a new question with a new key and move "
+            "the task back under \"## Blocked\" with that key. An answer that differs from the expected one is "
+            "never a reason to report `blocked`. "
             "If the answer means the task shouldn't be done, remove it and record why in `docs/DECISIONS.md`. "
             "Never leave it under \"## Blocked\" with the same key: it would be picked again.\n\n")
 
@@ -691,6 +696,7 @@ def finish(cfg: config_mod.Config, env: dict[str, str]) -> dict[str, str]:
     carried: list[str] = []
     handed_back: list[str] = []
     was_idle: list[bool] = []
+    kept: list[int] = []  # issues whose `/claude` instruction a blocked session handed on
 
     def apply(s: dict[str, Any]) -> None:
         failures = s.setdefault("task_failures", {})
@@ -751,9 +757,14 @@ def finish(cfg: config_mod.Config, env: dict[str, str]) -> dict[str, str]:
             park(failures.setdefault(task, {"count": 0}), PARK_WAITING,
                  env.get("IMPLEMENT_SUMMARY", "nothing to do on it now"))
         elif status == "blocked":
-            if task:
+            # Nothing was carried out, so a `/claude` instruction goes to the next session too (once), with
+            # the task, rather than being lost: run #505 dropped the owner's "more options" answer on #192
+            # and set its task aside for a week. Blocked a second time, both go as before.
+            s["pending_instructions"] = [{**p, "bounced": True} for p in s.get("pending_instructions", [])
+                                         if p.get("kind") == "claude" and not p.get("bounced")]
+            kept[:] = [p["number"] for p in s["pending_instructions"]]
+            if task and not kept:
                 park(failures.setdefault(task, {"count": 0}), PARK_BLOCKED, env.get("IMPLEMENT_SUMMARY", "blocked"))
-            s["pending_instructions"] = []
     state.update(cfg, apply, f"session: finished ({'merged' if merged else 'not merged'})")
 
     what = (pr_title(cfg, pr) or task_title(task)) if (pr or task) else "owner instructions"
@@ -763,7 +774,12 @@ def finish(cfg: config_mod.Config, env: dict[str, str]) -> dict[str, str]:
     elif env.get("TASK_KIND") == "plan" and status == "nothing_to_do":
         lines.append("Planning: no plan changes needed")
     elif status == "blocked":
-        lines.append(f"Blocked, set aside for a week: {what}. {said}")
+        if kept:
+            lines.append(f"Blocked: {what}. {said} The owner's `/claude` instruction on "
+                         + ", ".join(f"#{n}" for n in kept) + " wasn't carried out, so the next session gets "
+                         "it again, with the task.")
+        else:
+            lines.append(f"Blocked, set aside for a week: {what}. {said}")
     elif idle_task:
         lines.append(f"Nothing to do on it now, set aside for a day: {what}. {said}")
     elif merge_refused:

@@ -278,6 +278,27 @@ class FinishTest(unittest.TestCase):
         self.assertIn("refused", st["task_failures"]["A"]["parked_reason"])
         self.assertEqual(out["again"], "true")
 
+    def test_a_blocked_session_hands_the_owners_instruction_on_once(self) -> None:
+        """Run #505 reported blocked on the owner's "more options" answer on #192, which was then lost."""
+        st = copy.deepcopy(state.DEFAULT)
+        st["pending_instructions"] = [
+            {"kind": "claude", "number": 192, "text": "more options", "url": "u", "at": "t"},
+            {"kind": "ask", "number": 9, "text": "why?", "url": "u", "at": "t"}]
+        posts: list = []
+        out, st = self.run_finish(st, ["A", "B"], posts, IMPLEMENT_STATUS="blocked")
+        self.assertEqual([(p["number"], p["bounced"]) for p in st["pending_instructions"]], [(192, True)])
+        self.assertNotIn("parked_until", st.get("task_failures", {}).get("A", {}))
+        self.assertTrue(any("#192" in line and "next session" in line for line in posts[-1]))
+        self.assertEqual(out["again"], "true")
+        _, st = self.run_finish(st, ["A", "B"], posts, IMPLEMENT_STATUS="blocked")
+        self.assertEqual(st["pending_instructions"], [])
+        self.assertIn("parked_until", st["task_failures"]["A"])
+
+    def test_the_unblocked_brief_follows_an_answer_that_asks_for_something_else(self) -> None:
+        text = session.unblocked_text(["art-direction-pick-2"])
+        self.assertIn("The answer is your brief", text)
+        self.assertIn("never a reason to report `blocked`", text)
+
     def test_a_task_with_nothing_to_do_is_set_aside_and_work_moves_on(self) -> None:
         """Run #127: the first task waited on an owner question, so every session stopped at once."""
         out, st = self.run_finish(copy.deepcopy(state.DEFAULT), ["A", "B"], IMPLEMENT_STATUS="nothing_to_do",

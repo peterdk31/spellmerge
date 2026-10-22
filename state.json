@@ -24,7 +24,15 @@
   },
   "panel_problems": [],
   "paused_by_command": false,
-  "pending_instructions": [],
+  "pending_instructions": [
+    {
+      "at": "2026-10-22T06:31:14Z",
+      "kind": "claude",
+      "number": 140,
+      "text": "option 1",
+      "url": "https://github.com/peterdk31/spellmerge/issues/140#issuecomment-6334365507"
+    }
+  ],
   "processed_comments": [
     6241847784,
     6251160604,
@@ -41,7 +49,8 @@
     6316159701,
     6316160783,
     6316161824,
-    6316162579
+    6316162579,
+    6334365507
   ],
   "task_failures": {
     "**1. Playtest report of round 2.** The weekly planning run opens a \"Playtest of the week\" issue for the owner (build link, what changed in round 2: revive, shots stop at walls, dodge and cast feel, enemy readability, wave pacing, muzzle flash fix) with 3-5 questions: does the dodge feel responsive; can you read the imp's attack in time; does a wave feel too easy or too hard; does reviving feel fair; what is the one thing you would change first? Also ask for a controller and a 2+ player try. Do no feel work before the answers are in, except a bug the owner reports.": {

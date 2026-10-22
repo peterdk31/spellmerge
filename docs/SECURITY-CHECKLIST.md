@@ -112,7 +112,7 @@ See `docs/SETUP-APP.md`. Check at https://github.com/settings/apps → Spellmerg
 
 There is no API for these, so they are done by hand once:
 
-- [ ] Discussions categories exist: Ideas, Spell combos, Art feedback.
+- [ ] Discussions categories are exactly: Announcements, Ideas, Spell combos, Art submissions.
 
 ## 10. Copyright and licensing
 

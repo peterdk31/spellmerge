@@ -44,37 +44,7 @@
     6316162579,
     6334365507
   ],
-  "task_failures": {
-    "**1. Playtest report of round 2.** The weekly planning run opens a \"Playtest of the week\" issue for the owner (build link, what changed in round 2: revive, shots stop at walls, dodge and cast feel, enemy readability, wave pacing, muzzle flash fix) with 3-5 questions: does the dodge feel responsive; can you read the imp's attack in time; does a wave feel too easy or too hard; does reviving feel fair; what is the one thing you would change first? Also ask for a controller and a 2+ player try. Do no feel work before the answers are in, except a bug the owner reports.": {
-      "count": 0,
-      "parked_reason": "I made no changes and no branch. Task 1 is the weekly planning run's job: it opens the \"Playtest of the week\" issue for the owner, and a development session has no way to create issues. `docs/NEXT.md` says to do no feel work until the owner's answers are in, except for bugs the owner reports. There are no owner instructions this session and I know of no reported bug. The Blocked items already have open owner-question issues (#91, #93, #95), so I added no new ones.",
-      "parked_until": "2026-10-22T07:59:53Z"
-    },
-    "**2. The top items from the report.** When the answers arrive, turn them into at most three tasks here, ordered by the owner's priority, each with a done-when. Until then, pick no feel or backlog work. A daily session while waiting does only: bugs the owner reports, reminders for the Blocked items below, and doc upkeep; if none apply it may do nothing.": {
-      "count": 0,
-      "parked_reason": "Task 2 waits on the owner's answers to the round-2 playtest report (task 1). The only \"Playtest of the week\" issue is #102 from 2026-10-18, which is the round-1 playtest and has already been handled. There is no new owner bug report, no owner instruction, and no Blocked item that needs a reminder (all of them still wait on open owner-question issues #91, #93 and #95). Docs are current, so I made no changes.",
-      "parked_until": "2026-10-22T08:02:07Z"
-    },
-    "**Area READMEs for shared assets and tests.** The same for `art/`, `audio/`, `tests/` and `tools/`, including the asset size limits, `.ogg`-only audio, the origin manifest (`art/manifest.json`, `audio/manifest.json`) and how to run `tools/check.sh`.": {
-      "count": 1,
-      "parked_reason": "I could not continue PR #27 and made no commits. `git switch` to the PR branch failed because `.github/` is read-only in this sandbox, and I cleared the half-applied index with `git reset -q`. Later git commands stopped for approval that nobody could give. The PR branch is behind `origin/main`, and merging it needs to rewrite `.github/workflows/*`, which this sandbox cannot do. From what I read, the branch already has the Steps, Example to copy and Rating questions sections (I read `audio/README",
-      "parked_until": "2026-10-23T22:31:36Z",
-      "pr": "27",
-      "problems": "- The README is missing the fixed `Steps`, `Example to copy` and `Rating questions` sections required by docs/PLAN.md line 662. The PR description says the fixed sections are there. The page has custom `Folders` and `Run` sections instead. The `content/spells/README.md` pattern has all seven. Fix: Add `## Steps` (for example: add a test at the mirrored path, run it, run `tools/check.sh`), `## Example to copy` (point to `tests/smoke/boot_smoke.gd`) and `## Rating questions` (for example: does it cover more than one player index, is it deterministic and fast, is there a regression test for a fix). Keep `Folders` as extra content.\n- There is no `## Example to copy` heading, which PLAN.md line 662 requires. The text is folded into the Purpose paragraph, which breaks the fixed layout other READMEs follow. The same applies to audio/README.md line 7. Fix: Add a short `## Example to copy` section between Steps and Validate in both files. It should say that the example arrives with Claude's first art/audio in M1 and that this README will then be updated with its path. Remove that sentence from Purpose."
-    },
-    "**Bots build spells (M2 part 20).** (`tests/bots`) Seeded random builds, bot 4 staying in its builder in the 4-bot test, `test_spell_fuzz.gd`; **the weekly playtest asks about building from here**.": {
-      "count": 2,
-      "parked_reason": "failed review 2 times",
-      "parked_until": "2026-10-29T11:08:02Z",
-      "pr": "156",
-      "problems": "- `MEAN_LIMIT_MS` is 5.0, not the `2000/60` that the PR text says this revision set. The header comment (line 375) still says \"two 60 FPS frames\", which is 33.3 ms. The comment above the constant says \"5 ms is far above the measured worst mean\", but the measured means are 0.37 ms (PR text) and 0.5 ms (DECISIONS). That is a margin of only about 10x on noisy shared CI runners, so the check could fail for reasons unrelated to any spell. The stated aim was a wide margin. Fix: Set `MEAN_LIMIT_MS: float = 2000.0 / 60.0`, as the PR describes. Alternatively keep 5.0 and change the header comment, the PR text and the \"Fuzz budgets\" bullet in docs/DECISIONS.md so all of them say the same thing.\n- The new header text keeps `Bot 4 stands still and can be downed; it is not checked for that, and` on one over-long line, which is inconsistent with the wrapped comment lines around it. Fix: Re-wrap the comment lines."
-    },
-    "**Placeholder art (M1 part 4).** Hand-written SVGs that follow `docs/STYLE.md`, with manifest entries (`origin: ai`, tier `placeholder`, tool and prompt): floor and wall tiles in `art/tilesets/crypt/`, a wizard idle sprite in four player colours in `content/wizard/base/`, the enemy sprite in `content/enemies/ember_imp/`, a fire bolt and a hit spark in `art/vfx/`. Done when: each SVG uses only palette colours from `docs/STYLE.md`; each imports at exactly 32\u00d732 with filtering off (set in its `.import` file) so pixel edges stay crisp; and the four player colours are clearly distinguishable (compare the colour values, and look at a rendered screenshot if the environment can make one). Update the Art README's \"Example to copy\" with the real path. No sounds: they are Audio contributors' work; list the cast, hit and enemy-death sounds under \"Audio needs\" in `docs/BACKLOG.md` so the weekly run opens `now` issues for them, and leave the Audio README's example as it is until the first one merges.": {
-      "count": 0,
-      "parked_reason": "I did not create the placeholder art. In this session every Python command needs an approval nobody can give, so I couldn't run my SVG generator or `tools/check.sh`. The branch `claude/20261017-placeholder-art-m1-part-4-hand` exists with no commits, and no repo files changed. A re-run with Python allowed can do the whole task.",
-      "parked_until": "2026-10-24T00:38:16Z"
-    }
-  },
+  "task_failures": {},
   "triage_closed": {
     "2026-10-22": {}
   },

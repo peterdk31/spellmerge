@@ -1,0 +1,5 @@
+{
+ "id": "on_hit",
+ "about": "component",
+ "text": "Holds a spell and casts it where the shot hits. A thank-you, with fire."
+}

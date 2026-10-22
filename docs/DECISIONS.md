@@ -2,6 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-22: The first lore (M2 part 23)
+
+- **One JSON file per component** (`lore/components/<id>.json`, keys `id`, `about`, `text`) rather than one big file: contributors add content as new files and conflicts cannot happen. `about` is there so relic, item and enemy lore can share the schema later without a new folder rule.
+- **The registry reads the lore** (it is the one script allowed to load from computed paths); `Spells.component_description` asks it, so the HUD still reads no component field. Invalid lore files are never given out.
+- **Validator in `core/story/`**, not in the spells validator: story belongs to its own area. It runs in tests and as debug-build warnings (`tools/check.sh` is owner-protected, see #140). A missing lore file for any spell component is a problem, so a new component cannot ship without a description.
+- **Descriptions state the real numbers only where they are fixed** (eight shots, three orbs, up to twice, every half second, up to four times); other effects are said in words so a retune does not make them lie.
+
 ## 2026-10-22: Story canon (M2 part 22)
 
 - **Short, with seven fixed points.** `docs/STORY.md` fixes only what the game already shows or needs (the wizards as guild apprentices, the build-from-parts magic, the four elements' characters, the crypt, imps, the stakes, relics). Biomes after the crypt, bosses, hub and dialogue are left open, so later writing and contributors add canon instead of fighting it.

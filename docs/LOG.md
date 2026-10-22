@@ -4,6 +4,8 @@ What each run did, newest first. Claude appends a short entry after each develop
 
 ## 2026-10-22
 
+- M2 part 23: the first lore; Story opens. 18 component descriptions in `content/story/lore/components/`, `StoryValidator` (keys, types, id equals file name, 90-character one-line text, duplicates, a file for every component), registry `get_lore`/`validate_story`, `Spells.component_description` now returns the text so the builder shows it. Story README has the schema and example; Story is open for PRs. New `test_lore.gd`; builder tests adjusted. `build.sh --quick --tests` run.
+
 - M2 part 22: story canon. New `docs/STORY.md` (tone, seven canon points, writing rules, what is still open), listed in `llms.txt`. Docs only; part 23 writes the first lore to fit it.
 
 - M2 part 21: combos to 20+. Nine new rows in `content/spells/combos.json` (21 in all) so that every one of the 18 components is in at least two combos; `test_combos.gd` wants 20 and has a new test for the two-per-component rule. Two catalogue drafts did not work as written and were changed (see `docs/DECISIONS.md`): a held bolt re-hits the imp that fired it, and a rune is used up by its first hit so it never expires on a target. `build.sh --quick --tests` passes.

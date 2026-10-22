@@ -97,6 +97,20 @@ func test_four_players_firing_at_once_stay_inside_the_pool() -> void:
 	check_equal(feel._forms.size(), FeelScript.FORM_SLOTS, "and no sprite is made on the way")
 
 
+func test_one_players_many_beams_never_push_out_another_players_beam() -> void:
+	for player in 4:
+		bus.form_shown.emit(player, &"beam", Vector2(player * 10, 0), Vector2.RIGHT, 100.0, FROST)
+	for ray in 20:
+		bus.form_shown.emit(0, &"beam", Vector2(0, ray), Vector2.UP, 100.0, FROST)
+	for player in 4:
+		var seen: int = 0
+		for slot in range(player * FeelScript.FORMS_PER_PLAYER, (player + 1) * FeelScript.FORMS_PER_PLAYER):
+			if feel._forms[slot].visible:
+				seen += 1
+		check(seen >= 1, "player %d still has a visible beam" % player)
+	check_equal(feel._forms[FeelScript.FORMS_PER_PLAYER].global_position, Vector2(10, 0), "player 1's beam is untouched")
+
+
 func test_the_shipped_preset_has_the_form_art() -> void:
 	var shipped := load("res://gameplay/feel/presets/punchy.tres") as FeelPresetScript
 	check(shipped.beam_texture != null and shipped.nova_texture != null, "beam and ring art")

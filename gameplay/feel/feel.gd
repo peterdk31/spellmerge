@@ -46,7 +46,8 @@ const FLASH_SHADER: Shader = preload("res://gameplay/feel/hit_flash.gdshader")
 ## Draws the beam and the nova ring like a shot: bone body tinted by the player, core by the element.
 const CORE_SHADER: Shader = preload("res://core/projectiles/shot_core.gdshader")
 ## Beams and nova rings on screen at once; past that the oldest slot is taken over.
-const FORM_SLOTS: int = 8
+const FORMS_PER_PLAYER: int = 4
+const FORM_SLOTS: int = FORMS_PER_PLAYER * 4
 ## Beams and rings draw above the room, under the shots (50) and the flashes (20).
 const FORM_Z: int = 18
 
@@ -160,7 +161,7 @@ var _form_total: PackedFloat32Array = PackedFloat32Array()
 var _form_is_ring: PackedByteArray = PackedByteArray()
 var _form_body: PackedColorArray = PackedColorArray()
 var _form_length: PackedFloat32Array = PackedFloat32Array()
-var _next_form: int = 0
+var _next_form: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 var _next_puff: int = MUZZLE_SLOTS
 var _next_spark: int = FLASH_SLOTS
 ## Reaction names: one label per reaction flash slot, with where it starts and seconds left.
@@ -292,7 +293,9 @@ func _ready() -> void:
 		projectiles = get_node_or_null("/root/Projectiles")
 	if projectiles != null and "texture" in projectiles and projectiles.texture == null:
 		projectiles.texture = preset.bolt_texture
+	if projectiles != null and "rune_texture" in projectiles and projectiles.rune_texture == null:
 		projectiles.rune_texture = preset.rune_texture
+	if projectiles != null and "orbit_texture" in projectiles and projectiles.orbit_texture == null:
 		projectiles.orbit_texture = preset.orbit_texture
 	# Enemy shots look different (a spiky orb, not a comet), so they are never taken for a spell.
 	if projectiles != null and "hostile_texture" in projectiles and projectiles.hostile_texture == null:
@@ -703,8 +706,10 @@ func _on_form_shown(player: int, form: StringName, origin: Vector2, direction: V
 	var seconds: float = preset.nova_seconds if ring else preset.beam_seconds
 	if seconds <= 0.0 or not origin.is_finite():
 		return
-	var slot: int = _next_form
-	_next_form = (_next_form + 1) % FORM_SLOTS
+	# Each player reuses only their own oldest slots, so nobody's beams push out another's.
+	var who: int = clampi(player, 0, 3)
+	var slot: int = who * FORMS_PER_PLAYER + _next_form[who]
+	_next_form[who] = (_next_form[who] + 1) % FORMS_PER_PLAYER
 	var sprite: Sprite2D = _forms[slot]
 	sprite.global_position = origin
 	if ring:

@@ -430,8 +430,6 @@ func _launch(spell: CompiledSpell, tag: int, player: int, origin: Vector2, direc
 	if spell.motion == FormBase.Motion.RAY and spell.homing_turn > 0.0:
 		direction = projectiles.homing_aim(player, origin, direction, deg_to_rad(30.0), ProjectilesScript.LAYER_ENEMY)
 		base = direction.angle()
-	if events != null and count > 1 and spell.spread >= 360.0 and spell.motion == FormBase.Motion.STRAIGHT:
-		events.form_shown.emit(player, &"nova", origin, direction, 0.0, spell.tint)
 	for n in count:
 		var angle: float = base + _fan_angle(n, count, spell)
 		var heading: Vector2 = Vector2.from_angle(angle)
@@ -459,6 +457,9 @@ func _launch(spell: CompiledSpell, tag: int, player: int, origin: Vector2, direc
 		_register(slot, tag, spell, spell.trigger_max_fires, carried, prev)
 		if source != null:
 			projectiles.exclude(slot, source, SpellLimits.SOURCE_EXCLUSION)
+	# The ring is only a cue, drawn once, and only when a shot really flew.
+	if events != null and made > 0 and count > 1 and spell.spread >= 360.0 and spell.motion == FormBase.Motion.STRAIGHT:
+		events.form_shown.emit(player, &"nova", origin, direction, 0.0, spell.tint)
 	return made
 
 

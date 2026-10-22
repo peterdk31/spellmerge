@@ -378,7 +378,14 @@ def task_title(task: str) -> str:
 
 
 def workflow_changes(tip: str, bases: list[str]) -> list[str]:
-    """Files under .github/ whose version at `tip` matches none of `bases` (main, the branch as pushed)."""
+    """Files under .github/ whose version at `tip` matches none of `bases` (main, the branch as pushed).
+
+    The point where `tip` left main counts too: a branch that started before main changed a workflow
+    still has the old version, and merging it keeps main's, so it changes nothing.
+    """
+    fork = subprocess.run(["git", "merge-base", bases[0], tip], check=True, capture_output=True,
+                          text=True).stdout.strip()
+    bases = [*bases, fork]
     changed: set[str] | None = None
     for base in bases:
         names = set(subprocess.run(["git", "diff", "--name-only", "--no-renames", base, tip, "--", ".github/"],

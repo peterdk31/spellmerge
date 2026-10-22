@@ -11,6 +11,7 @@
     "number": 202
   },
   "errors_in_a_row": 0,
+  "idle": null,
   "intake_tasks": {},
   "last_own_merge": "2026-10-22T22:28:30Z",
   "last_plan": "2026-10-22T21:56:17Z",
@@ -2494,6 +2495,11 @@
       "at": "2026-10-22T22:28:03Z",
       "kind": "review",
       "tokens": 40609
+    },
+    {
+      "at": "2026-10-22T22:44:32Z",
+      "kind": "dev",
+      "tokens": 677608
     }
   ],
   "version": 1

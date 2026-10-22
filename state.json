@@ -4,7 +4,7 @@
   },
   "automation_started": "2026-10-16T16:49:06Z",
   "backoff_until": "2026-10-22T00:20:00Z",
-  "last_own_merge": "2026-10-22T12:37:23Z",
+  "last_own_merge": "2026-10-22T13:15:51Z",
   "limits": {
     "week_tokens": 44131848,
     "window_tokens": 7593823

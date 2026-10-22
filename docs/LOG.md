@@ -4,6 +4,8 @@ What each run did, newest first. Claude appends a short entry after each develop
 
 ## 2026-10-22
 
+- M2 part 22: story canon. New `docs/STORY.md` (tone, seven canon points, writing rules, what is still open), listed in `llms.txt`. Docs only; part 23 writes the first lore to fit it.
+
 - M2 part 21: combos to 20+. Nine new rows in `content/spells/combos.json` (21 in all) so that every one of the 18 components is in at least two combos; `test_combos.gd` wants 20 and has a new test for the two-per-component rule. Two catalogue drafts did not work as written and were changed (see `docs/DECISIONS.md`): a held bolt re-hits the imp that fired it, and a rune is used up by its first hit so it never expires on a target. `build.sh --quick --tests` passes.
 
 - M2 part 19: the build break. `BUILD_BREAK` (12 s) replaces `NEXT_WAVE_DELAY` in `flow`; the new event `build_break_started(seconds)` follows `room_cleared`, and the HUD shows a hammer (drawn in code) and "Build N" under the wave line, over the builders, counting down by itself (display only). Tests: `test_flow.gd` (the break is fixed; the wave starts on time for 1, 2 and 4 players while someone builds), `test_panels.gd` (the line), `test_events.gd`; `shot_quick.gd` has a `build_break` shot. `build.sh --quick --tests` and the screenshots pass.

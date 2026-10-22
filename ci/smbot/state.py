@@ -40,6 +40,7 @@ DEFAULT: dict[str, Any] = {
     "idle": None,  # when planning last found nothing to do; cleared by the next progress
     "checkpoint_answers": {},  # checkpoint issue number -> the owner's verified /go, /iterate or /pivot
     "intake_tasks": {},  # issue number -> the intake's neutral task for it (smbot.intake)
+    "daily_log": None,  # {"date", "number"}: today's Daily log issue (smbot.dailylog)
     "cla_signatures": {},  # "user_id:version" -> a contributor's CLA signature and its comment (smbot.contrib)
 }
 

@@ -8,6 +8,17 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - **What.** A question can name up to three shot scripts (`screenshots` in `owner_questions`), staged to show exactly what is being decided. They run in the screenshots job with the PR's, on the same commit (on `main` when there is no PR), and appear under "What it looks like", right after the question. A question that names none shows the PR's screenshots instead.
 - **Order.** Questions are asked by a new `ask` job after the screenshots are posted, not when the PR opens, so the issue is created with its pictures. The revision is told the first session's questions, since they aren't issues yet, so it doesn't ask them twice; `finish` waits for `ask`, so the next session sees them.
 
+## Planning 2026-10-22: queue empty, M2 not done
+
+- **Why:** the queue held only the WASM numbers task (parked: no web `BENCH:` post exists yet), the art recording task (waits on `art-direction-pick-3`) and stabilisation. M2 is not done: done-when items 3 (WASM numbers), 5 (owner items) and 6 (stabilisation) are open, so no checkpoint yet.
+- **Now:** the WASM task is under Blocked with its trigger; the multimesh slice upload is split out as a task that needs no data; a builder walkthrough is added as the polish re-examination (the builder is what C2 asks about and only has tests so far); stabilisation follows. No scope was cut; no issues were in the queue or backlog.
+
+## 2026-10-22: A third round of art samples: the hat is its own layer
+
+- **Why.** The owner answered #192 (key `art-direction-pick-2`) with "F's hat is nice, the body needs work, maybe only the hat changes colour per player, give me more options, maybe the palette needs work", and re-posted it as "not a pick" after the first session dropped it. So the question is asked again, with a new key `art-direction-pick-3`, as the owner asked.
+- **What.** F's hat is kept as it is and split from the body: a body sprite with no player colour plus one hat sprite per player. That keeps "a colour on screen means a player" (STYLE.md) and cuts per-player art to the hat. G (brown robe) and H (cream robe) are two bodies; I is H with a palette proposal (brighter player ramps, a warm floor). The proposal's colours are allowed only in `art/samples/i_warm/` and `hats_vivid/`; they are not in STYLE.md or the palette test until the owner picks I.
+- **Cost if picked.** A hat layer means two sprites per wizard frame (or a baked sheet per player); the animation task has to decide which. Not decided here.
+
 ## 2026-10-22: A second round of art direction samples, and a second owner question
 
 - **Why.** The owner answered #190 (key `art-direction-pick`) with a lean towards A, a liking for C's robe, and a request for more options, a new style included. That is not a pick, so the task "record the chosen art direction" cannot be done yet and the first question is answered, not repeated.

@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="ModifierBase" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/modifier_base.gd" id="1_modifier"]
+
+[resource]
+script = ExtResource("1_modifier")
+id = &"broken_modifier"
+display_name = "Broken"
+damage_mult = 0.0
+behaviour = 5
+behaviour_strength = 0.0

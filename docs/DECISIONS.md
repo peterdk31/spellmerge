@@ -30,6 +30,17 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - **Numbers** (Shatter 6, doubled when frozen; Thaw 3 in 40 px; Flare 2 in 56 px; Rift 2 in 48 px with a 120 px/s pull; Kindle 48 px) are first tuning for the playtest.
 - **Feel** gets a flash, a burst, the reaction's name as a rising label and the sound `reaction_<id>` from the preset (`reaction_colors`, `reaction_sound_prefix`). The "number" is the name: the damage already shows through `damage_dealt`.
 
+## 2026-10-22: The validator (M2 part 9)
+
+**Decided by:** Claude.
+
+- **It is a class of static functions fed with resources** (`SpellValidator`), not a scanner. The registry is the only script that loads from computed paths, so it hands the validator what it found (`validate_spells()`); a test can hand it any fixture the same way.
+- **Known statuses are a list in the validator** (burn, chill, shock, hex), because `core/` may not depend on `gameplay/combat`. A test compares it with combat's `REACTING_STATUSES`. `freeze` is left out: no element sets it.
+- **Duplicate ids are seen through the registry,** which keeps the first file and used to only warn; it now also remembers the duplicates under `spells`, and the validator reports them. Ids are unique across all four kinds because they share the `spells` folder.
+- **Beyond the design's list,** a form must have the number its motion uses (speed, orbit radius or ray length), an element with a status needs a duration, a homing or chain modifier needs a strength and a timer trigger needs an interval: a component that does nothing is a mistake, not a choice. Reaction rows get ranges of their own (`REACTION_RANGES`), wide sanity bounds like the component ones.
+- **Resources in `spells` that are not components** (M1's `SpellBase` bolt, until part 10) are skipped.
+- **`tools/check.sh`:** asked of the owner. The validator already runs in `ci/build/build.sh --quick --tests`; `check.sh` needs only git and Python, and Godot may only be run through `build.sh`.
+
 ## 2026-10-21: Spell component base classes (M2 part 1)
 
 **Decided by:** Claude.

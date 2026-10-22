@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="ReactionTable" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://core/base/reaction_table.gd" id="1_table"]
+[ext_resource type="Script" path="res://core/base/reaction_row.gd" id="2_row"]
+
+[sub_resource type="Resource" id="Resource_unknown"]
+script = ExtResource("2_row")
+reaction_id = &"mystery"
+display_name = "Mystery"
+status_id = &"soggy"
+element_id = &"water"
+effect = 7
+damage = 500
+
+[sub_resource type="Resource" id="Resource_empty"]
+script = ExtResource("2_row")
+status_id = &"burn"
+element_id = &"frost"
+
+[sub_resource type="Resource" id="Resource_twin"]
+script = ExtResource("2_row")
+reaction_id = &"twin"
+display_name = "Twin"
+status_id = &"burn"
+element_id = &"frost"
+radius = 10.0
+
+[resource]
+script = ExtResource("1_table")
+rows = Array[ExtResource("2_row")]([SubResource("Resource_unknown"), SubResource("Resource_empty"), SubResource("Resource_twin")])

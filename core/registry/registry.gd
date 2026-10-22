@@ -21,6 +21,9 @@ extends Node
 ## tag `demo`), resources whose `demo` is false are hidden from every question.
 ## Resources with no `demo` property are always visible.
 ##
+## In a debug build the registry runs the spell validator at start (`validate_spells()`) and
+## pushes one warning per problem, so broken spell content shows up on the first run.
+##
 ## Sounds are `.ogg` files anywhere under the audio root; the id is the file
 ## name without extension. An unknown id returns `null`, never an error.
 
@@ -32,6 +35,10 @@ const FEATURE_DEMO: String = "demo"
 ## `demo` feature tag. Changing it takes effect at once, no rescan needed.
 var demo_only: bool = false
 
+## The content root of the last scan, and the duplicate spell ids it found (one line each,
+## naming both files), for the validator.
+var _content_root: String = DEFAULT_CONTENT_ROOT
+var _duplicates: PackedStringArray = PackedStringArray()
 ## folder -> { id -> Resource }
 var _resources: Dictionary = {}
 ## folder -> sorted Array[StringName] of every id (demo or not)
@@ -45,11 +52,16 @@ var _sounds: Dictionary = {}
 func _ready() -> void:
 	demo_only = OS.has_feature(FEATURE_DEMO)
 	scan()
+	if OS.is_debug_build():
+		for problem: Dictionary in validate_spells():
+			push_warning("Registry: " + SpellValidator.format(problem))
 
 
 ## Reads the content and audio folders again. The roots can be changed so
 ## tests can scan a fixture folder; `sound_extensions` is for tests as well.
 func scan(content_root: String = DEFAULT_CONTENT_ROOT, audio_root: String = DEFAULT_AUDIO_ROOT, sound_extensions: PackedStringArray = PackedStringArray(["ogg"])) -> void:
+	_content_root = content_root
+	_duplicates.clear()
 	_resources.clear()
 	_ids.clear()
 	_sound_paths.clear()
@@ -66,6 +78,8 @@ func scan(content_root: String = DEFAULT_CONTENT_ROOT, audio_root: String = DEFA
 				continue
 			if found.has(id):
 				push_warning("Registry: duplicate id '%s' in %s (kept %s)" % [id, path, (found[id] as Resource).resource_path])
+				if folder == &"spells":
+					_duplicates.append("'%s' in %s, kept %s" % [id, path, (found[id] as Resource).resource_path])
 				continue
 			found[id] = res
 		if not found.is_empty():
@@ -81,6 +95,21 @@ func scan(content_root: String = DEFAULT_CONTENT_ROOT, audio_root: String = DEFA
 			push_warning("Registry: duplicate sound '%s' in %s (kept %s)" % [sound_id, path, _sound_paths[sound_id]])
 			continue
 		_sound_paths[sound_id] = path
+
+
+## Runs the spell validator on everything found under `spells` (demo or not) and on the
+## reaction table `<content root>/spells/reactions.tres`, which is skipped when there is
+## none. Returns the problems as `SpellValidator` describes them; empty when all is well.
+func validate_spells() -> Array[Dictionary]:
+	var spells: Array[Resource] = []
+	var found: Dictionary = _resources.get(&"spells", {})
+	for id: StringName in found:
+		spells.append(found[id] as Resource)
+	var reactions: ReactionTable = null
+	var table_path: String = _content_root.path_join("spells/reactions.tres")
+	if ResourceLoader.exists(table_path):
+		reactions = ResourceLoader.load(table_path) as ReactionTable
+	return SpellValidator.check_all(spells, reactions, SpellValidator.load_manifest(), _duplicates)
 
 
 ## The resource with this id in this folder, or `null` when there is none (or

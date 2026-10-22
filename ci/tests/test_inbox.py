@@ -24,6 +24,23 @@ class InboxTest(unittest.TestCase):
         self.assertIn("/claude <your answer>", body)
         self.assertIn("a diff", body)
 
+    def test_a_question_names_the_pr_it_was_raised_in(self) -> None:
+        body = inbox.render(CFG, Q, "the session working on \"X\"", pr=12)
+        self.assertIn("Raised by the session working on \"X\", in PR #12.", body)
+        self.assertIn("<!-- smbot:question pr=12 -->", body)
+        self.assertIn("<!-- smbot:question key= -->", body)
+        body = inbox.render(CFG, Q, "the revision of PR #12", pr=12)
+        self.assertIn("Raised by the revision of PR #12.", body)
+        self.assertNotIn("smbot:question pr=", inbox.render(CFG, Q, "a session"))
+
+    def test_asked_in_finds_the_open_questions_of_a_pr(self) -> None:
+        issues = [{"number": 1, "body": inbox.render(CFG, Q, "s", pr=12)},
+                  {"number": 2, "body": inbox.render(CFG, Q, "s", pr=120)},
+                  {"number": 3, "body": inbox.render(CFG, Q, "s")}, {"number": 4, "body": None}]
+        with mock.patch.object(inbox.gh, "api", lambda path: issues):
+            self.assertEqual(inbox.asked_in(CFG, 12), [1])
+            self.assertEqual(inbox.key_of(issues[0]), "")
+
     def test_ask_skips_questions_already_open(self) -> None:
         calls = []
 

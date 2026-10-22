@@ -31,6 +31,7 @@ RECENT_DAYS = 30  # a question closed this recently is not asked again
 SIMILAR = 0.75  # share of title words two questions must have in common to be the same one
 CONTAINED = 0.85  # or the share of the shorter title's words found in the longer one
 _KEY_MARKER = re.compile(r"<!-- smbot:question key=([a-z0-9-]*) -->")
+_PR_MARKER = re.compile(r"<!-- smbot:question pr=(\d+) -->")
 _STOP = {"a", "an", "the", "to", "of", "and", "or", "in", "on", "for", "it", "is", "be", "should", "we",
          "do", "does", "make", "add", "also", "once", "with", "this", "that"}
 
@@ -40,7 +41,7 @@ def _inert(text: str, limit: int) -> str:
     return re.sub(r"@(?=[\w-])", "@​", str(text or "").strip())[:limit]
 
 
-def render(cfg: config_mod.Config, q: dict[str, Any], source: str = "") -> str:
+def render(cfg: config_mod.Config, q: dict[str, Any], source: str = "", pr: int | None = None) -> str:
     parts = [f"@{cfg.owner.login}, the bot needs your decision.", "", "## Question", "", _inert(q["question"], 4000)]
     options = [o for o in q.get("options") or [] if str(o).strip()][:6]
     if options:
@@ -56,7 +57,9 @@ def render(cfg: config_mod.Config, q: dict[str, Any], source: str = "") -> str:
     parts += ["", "---", "**To answer:** comment `/claude <your answer>` here, for example `/claude option 1`. "
               "The next development session carries it out, and its PR closes this issue."]
     if source:
-        parts.append(f"Raised by {source}.")
+        parts.append(f"Raised by {source}" + (f", in PR #{pr}." if pr and f"#{pr}" not in source else "."))
+    if pr:
+        parts.append(f"<!-- smbot:question pr={pr} -->")  # its screenshots are copied here (smbot.screenshots)
     parts.append(f"<!-- smbot:question key={_key(q.get('key', ''))} -->")
     return "\n".join(parts)
 
@@ -118,7 +121,7 @@ def same_question(q: dict[str, Any], issue: dict[str, Any]) -> bool:
 
 
 def ask(cfg: config_mod.Config, questions: list[dict[str, Any]], source: str = "",
-        now: dt.datetime | None = None) -> list[str]:
+        now: dt.datetime | None = None, pr: int | None = None) -> list[str]:
     """Opens an issue per new question.
 
     A question is new unless an open question, or one closed in the last RECENT_DAYS, has the
@@ -140,11 +143,17 @@ def ask(cfg: config_mod.Config, questions: list[dict[str, Any]], source: str = "
             continue
         labels = [LABEL] + ([CHANGE_LABEL] if q.get("owner_change") else [])
         created = gh.api(f"repos/{cfg.repo}/issues", "-X", "POST",
-                         input={"title": title, "body": render(cfg, q, source), "labels": labels})
+                         input={"title": title, "body": render(cfg, q, source, pr), "labels": labels})
         known.append({"number": created["number"], "title": title, "state": "open",
                       "body": f"<!-- smbot:question key={_key(q.get('key', ''))} -->"})
         log.append(f"Question for the owner: #{created['number']} {title}")
     return log
+
+
+def asked_in(cfg: config_mod.Config, pr: int) -> list[int]:
+    """The open questions raised by the session (or revision) that made PR #`pr`."""
+    return [int(i["number"]) for i in open_questions(cfg)
+            if (m := _PR_MARKER.search(i.get("body") or "")) and int(m.group(1)) == pr]
 
 
 def reminder(cfg: config_mod.Config) -> str:
@@ -161,7 +170,9 @@ def main(argv: list[str] | None = None) -> int:
     cfg = config_mod.load()
     if cmd == "ask":
         result = json.loads(os.environ.get("RESULT") or "{}")
-        log = ask(cfg, result.get("owner_questions") or [], os.environ.get("SOURCE", ""))
+        pr = os.environ.get("PR", "")
+        log = ask(cfg, result.get("owner_questions") or [], os.environ.get("SOURCE", ""),
+                  pr=int(pr) if pr.isdigit() else None)
         print("\n".join(log) or "no new questions for the owner")
         if log:
             dailylog.post(cfg, "Questions for the owner", log)

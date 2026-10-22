@@ -14,7 +14,15 @@ extends "res://tests/support/suite.gd"
 
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const CATALOGUE: String = "res://content/spells/combos.json"
-const MIN_COMBOS: int = 12
+const MIN_COMBOS: int = 20
+## Every shipped component; each must be in at least two combos. A new component is added here
+## together with its rows (the spells README, "The combo row rule").
+const COMPONENTS: Array[String] = [
+	"bolt", "beam", "nova", "rune", "orbit",
+	"fire", "frost", "storm", "void",
+	"split", "pierce", "homing", "chain", "bigger", "faster",
+	"on_hit", "on_expire", "timer",
+]
 const CHECK_KINDS: Array[String] = ["damaged", "status", "status_count", "keeps_burning", "reaction", "max_shots"]
 
 var _combos: Array = []
@@ -86,8 +94,22 @@ func _problem_with(arena: ArenaScript, check_row: Dictionary) -> String:
 
 # --- The catalogue ----------------------------------------------------------
 
-func test_the_catalogue_has_the_first_twelve_combos() -> void:
+func test_the_catalogue_has_twenty_combos() -> void:
 	check(_combos.size() >= MIN_COMBOS, "at least %d combos (got %d)" % [MIN_COMBOS, _combos.size()])
+
+
+func test_every_component_is_in_two_combos() -> void:
+	var uses: Dictionary = {}
+	for combo: Dictionary in _combos:
+		var in_combo: Dictionary = {}
+		for entry: Dictionary in combo["casts"]:
+			for id: StringName in _recipe_ids(entry["recipe"] as Dictionary):
+				in_combo[id] = true
+		for id: StringName in in_combo:
+			uses[id] = int(uses.get(id, 0)) + 1
+	for component: String in COMPONENTS:
+		var count: int = int(uses.get(StringName(component), 0))
+		check(count >= 2, "%s is in at least two combos (got %d)" % [component, count])
 
 
 func test_every_row_has_its_fields_and_an_unseen_id() -> void:

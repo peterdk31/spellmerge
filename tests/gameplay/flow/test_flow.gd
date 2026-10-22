@@ -413,25 +413,27 @@ func _test_build_break_is_fixed() -> void:
 ## (open overlay focus, build requests in flight) holds it back or speeds it up.
 func _test_build_break_ignores_builders() -> void:
 	var focus: Node = root.get_node_or_null("UIFocus")
+	_check(focus != null, "the UIFocus autoload exists")
+	if focus == null:
+		return
 	for count: int in [1, 2, 4]:
 		_setup(count)
 		_play()
 		_kill_wave()
 		var builder: Control = Control.new()
 		root.add_child(builder)
-		if focus != null:
-			# The last player sits in a menu for the whole break.
-			focus.call("open", count - 1, [builder] as Array[Control])
+		# The last player sits in a menu for the whole break.
+		_check(focus.call("open", count - 1, [builder] as Array[Control]) == true, "%d players: the last player opened a menu" % count)
 		_events.emit_signal("build_change_requested", count - 1, [0], 1, &"fire")
 		_flow.step(FlowScript.BUILD_BREAK - 0.1)
+		_check(focus.call("is_open", count - 1) == true, "%d players: the menu is still open late in the break" % count)
 		_check(_flow.wave == 1 and _flow.state == FlowScript.State.CLEARED, "%d players: the wave is not early while someone builds" % count)
 		_flow.step(0.1)
 		_check(_flow.wave == 2 and _flow.state == FlowScript.State.RUNNING, "%d players: the wave starts on time while someone builds" % count)
 		_check(_flow.enemies_left() == FlowScript.wave_size(2), "%d players: the next wave is whole" % count)
 		for wizard: PlayerScript in _wizards():
 			_check(not wizard.is_downed(), "%d players: every wizard stands for the wave" % count)
-		if focus != null:
-			focus.call("close", count - 1)
+		focus.call("close", count - 1)
 		builder.free()
 		_stop()
 

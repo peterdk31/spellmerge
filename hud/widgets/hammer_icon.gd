@@ -14,7 +14,8 @@ func _init() -> void:
 
 
 func _draw() -> void:
-	var scale_to_size: Vector2 = size / ICON_SIZE
+	var factor: float = minf(size.x / ICON_SIZE.x, size.y / ICON_SIZE.y)
+	var scale_to_size := Vector2(factor, factor)
 	var handle := Rect2(Vector2(5.0, 3.0) * scale_to_size, Vector2(2.0, 9.0) * scale_to_size)
 	var head := Rect2(Vector2(1.0, 0.0) * scale_to_size, Vector2(10.0, 4.0) * scale_to_size)
 	draw_rect(handle.grow(1.0), OUTLINE_COLOR)

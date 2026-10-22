@@ -37,3 +37,26 @@ The owner leaned towards A, liked C's robe, and asked for more options, new styl
 - **D reuses A's floor and icon;** only the wizard is new. D's floor and icon would be A's.
 - **E's checkerboard and F's beveled tiles are plain on purpose:** calm floors keep the busy part of the screen for the wizards and spells (pillar 4). F's tiles also leave STYLE.md's "nothing on the outer edge" rule, like A and C.
 - The owner liked C's robe: that is D. C itself is unchanged (`c_grim/`).
+
+## Round three: G, H and I (after the owner's answer on #192)
+
+The owner liked F's hat, found its body weak, and asked that only the hat take the player's colour, for more options, and for a look at the palette. Sheet: `tests/screenshots/shot_art_direction_3.gd` (`art_direction_sheet_3.png`, in `build/screenshots/` after `ci/build/build.sh --quick --screenshots`): F again for reference, then G, H and I. Each column has the floor, the wizard at 4×, four players overlapping at 1× and 2×, and the four players apart at 1×. As before, "Reads at 1×" and "Mood" are the author's opinion, not a verdict.
+
+**How the hat-only colour works.** F is one sprite in Player 1's blue. G, H and I are two layers of the same 32×32 canvas: a `body.svg` with no player colour, and a `hat_pN.svg` (the hat and its brim) drawn on top in player N's ramp. Everything else, robe, beard, boots, staff, is the same for all four players, so a colour on screen still means a player, and only the hat has to be redrawn per player (the game would tint nothing: it picks the right hat file by player index). The hat is F's hat, unchanged; only the body is new.
+
+| | F: Big hat (`f_bighat/`) | G: Brown robe (`g_brown/`) | H: Cream robe (`h_cream/`) | I: New palette (`h_cream/` + `hats_vivid/` + `i_warm/`) |
+| --- | --- | --- | --- | --- |
+| Body | 12 px wide box, all blue | A bell robe in Wood with a gold belt and hem, a white beard, both hands, boots | A cream robe with wide shoulders, a Wood belt, cuff and hem, a golden beard, both hands, boots | H's body |
+| Hat | Blue | The player's colour, standard palette | The player's colour, standard palette | The player's colour, more vivid ramps (below) |
+| Floor | Four beveled Stone tiles | F's | F's | Four beveled tiles in a warm brown |
+| Reads at 1× | One colour for all four players | Hats separate the players clearly; the brown robe is dark but sits apart from the Stone floor | Brightest body, so the wizard pops most against the dark floor; the hats are the only colour | Same as H, and the warm floor makes the cool hats (blue, green, purple) stand out more; rose is closest to the floor's warmth |
+| Mood | Whimsical | Cosy, traveller | Classic white-robed wizard | Warmer, a lit crypt |
+
+**The palette option (I) is a proposal, not an edit of STYLE.md.** It changes two things: the four player ramps are brighter and more saturated (Player 1 `#1b3a8c / #3b7bf0 / #8ec8ff`, Player 2 `#8c1f48 / #f0457f / #ffa0c0`, Player 3 `#1d5a2e / #3fc060 / #a6f08a`, Player 4 `#4f2090 / #9a55f0 / #d4a8ff`), so the four hats are easier to tell apart at 1×; and the floor ramp is warm (`#4d3c3a / #6e5a50 / #93806e`) instead of the violet-grey Stone, so the dark outlines and the cool hats have more contrast. These colours are allowed only in `i_warm/` and `hats_vivid/` (`tests/core/test_svg_art.gd`); picking I means `docs/STYLE.md`, `art/kit/palette.hex.txt` and the styleguide test's palette count change with it, and the walls and props would need a warm ramp too.
+
+Notes for whoever picks:
+
+- G and H differ only in the robe; the pick between them is mostly colour. H has the clearest contrast against the current floor.
+- The two pale eyes sit in the dark under the brim (as in F) and are hard to see at 1×; at that size the hat, the beard and the staff are what is read.
+- The hat covers the face, so the body layer has no face to share between players; if a face or the beard is ever player-specific it needs its own layer.
+- D, E and C are not redrawn in this round; the owner moved on from them.

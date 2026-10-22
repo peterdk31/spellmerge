@@ -11,6 +11,11 @@ const KNOWN: Array[String] = [
 	"res://content/enemies/ember_imp/idle.svg",
 	"res://art/samples/a_chunky/wizard.svg",
 	"res://art/samples/c_grim/spell_icon.svg",
+	"res://art/samples/hats_std/hat_p1.svg",
+	"res://art/samples/hats_vivid/hat_p4.svg",
+	"res://art/samples/g_brown/body.svg",
+	"res://art/samples/h_cream/body.svg",
+	"res://art/samples/i_warm/floor.svg",
 ]
 const PALETTE: Array[String] = [
 	"#14121f",
@@ -34,6 +39,21 @@ const SOFT_OUTLINE: String = "#8f2d2a"
 const SAMPLE_OUTLINES: Dictionary = {"e_soft": SOFT_OUTLINE}
 ## Icons need a closed outline; vfx may outline in their own shadow shade instead.
 const ICON_ROOT: String = "res://content/spells"
+## Colours of the new-palette sample (art/samples/i_warm/ and hats_vivid/), allowed there only.
+## They are a proposal; they join PALETTE and docs/STYLE.md only if the owner picks them.
+const SAMPLE_PALETTE_COLOURS: Array[String] = [
+	"#93806e", "#6e5a50", "#4d3c3a",
+	"#1b3a8c", "#3b7bf0", "#8ec8ff",
+	"#8c1f48", "#f0457f", "#ffa0c0",
+	"#1d5a2e", "#3fc060", "#a6f08a",
+	"#4f2090", "#9a55f0", "#d4a8ff",
+]
+const SAMPLE_PALETTE_FOLDERS: Array[String] = ["i_warm", "hats_vivid"]
+## The player colours of the standard palette; the body sprites of G, H and I must not use them.
+const PLAYER_COLOURS: Array[String] = [
+	"#1d3a6b", "#3b73c9", "#7fc0f0", "#7a2347", "#d9477a", "#f59ab8",
+	"#1f4a3a", "#3f8f4f", "#8fd46a", "#4a2a6b", "#8a4fc4", "#c99af0",
+]
 const RECT_ATTRIBUTES: Array[String] = ["x", "y", "width", "height", "fill"]
 
 var _files: Array[String] = []
@@ -61,7 +81,10 @@ func test_the_checker_catches_a_bad_file() -> void:
 
 func test_every_svg_follows_the_style_rules() -> void:
 	for path in _files:
-		for problem in _problems(FileAccess.get_file_as_string(path)):
+		var extra: Array[String] = []
+		if SAMPLE_PALETTE_FOLDERS.has(path.get_base_dir().get_file()):
+			extra = SAMPLE_PALETTE_COLOURS
+		for problem in _problems(FileAccess.get_file_as_string(path), extra):
 			check(false, "%s: %s" % [path, problem])
 
 
@@ -120,6 +143,30 @@ func test_the_soft_sample_has_no_black_and_the_big_hat_keeps_it() -> void:
 	check(big.contains(OUTLINE), "F's wizard lost its black outline")
 
 
+## In G, H and I only the hat takes the player's colour: the body sprites use no player colour,
+## and each hat uses exactly one player's ramp (standard or vivid).
+func test_only_the_hat_has_the_player_colour() -> void:
+	for body: String in ["g_brown", "h_cream"]:
+		var text: String = FileAccess.get_file_as_string("res://art/samples/%s/body.svg" % body)
+		for colour: String in PLAYER_COLOURS + SAMPLE_PALETTE_COLOURS:
+			check(not text.contains(colour), "%s/body.svg uses the player colour %s" % [body, colour])
+	var ramps: Array[Array] = [
+		["#7fc0f0", "#3b73c9", "#1d3a6b"], ["#f59ab8", "#d9477a", "#7a2347"],
+		["#8fd46a", "#3f8f4f", "#1f4a3a"], ["#c99af0", "#8a4fc4", "#4a2a6b"],
+		["#8ec8ff", "#3b7bf0", "#1b3a8c"], ["#ffa0c0", "#f0457f", "#8c1f48"],
+		["#a6f08a", "#3fc060", "#1d5a2e"], ["#d4a8ff", "#9a55f0", "#4f2090"],
+	]
+	for n in 8:
+		var folder: String = "hats_std" if n < 4 else "hats_vivid"
+		var text: String = FileAccess.get_file_as_string("res://art/samples/%s/hat_p%d.svg" % [folder, n % 4 + 1])
+		for colour: String in ramps[n]:
+			check(text.contains(colour), "%s/hat_p%d.svg is missing %s" % [folder, n % 4 + 1, colour])
+		for other in range(8):
+			if other != n:
+				var other_base: String = ramps[other][1]
+				check(not text.contains(other_base), "%s/hat_p%d.svg uses another player's colour %s" % [folder, n % 4 + 1, other_base])
+
+
 func test_every_svg_is_in_the_manifest() -> void:
 	var manifest: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://art/manifest.json"))
 	check(manifest is Dictionary, "art/manifest.json is a JSON object")
@@ -134,7 +181,7 @@ func test_every_svg_is_in_the_manifest() -> void:
 
 
 ## Every problem in one SVG text; empty when it is valid.
-func _problems(text: String) -> Array[String]:
+func _problems(text: String, extra_colours: Array[String] = []) -> Array[String]:
 	var problems: Array[String] = []
 	var header: RegExMatch = RegEx.create_from_string('<svg[^>]*width="(\\d+)"[^>]*height="(\\d+)"').search(text)
 	if header == null:
@@ -169,7 +216,7 @@ func _problems(text: String) -> Array[String]:
 			elif not RECT_ATTRIBUTES.has(key):
 				problems.append("a rect has the attribute %s" % key)
 		var fill: String = String(values.get("fill", ""))
-		if not PALETTE.has(fill):
+		if not PALETTE.has(fill) and not extra_colours.has(fill):
 			problems.append("fill %s is not a palette colour (lower-case #rrggbb)" % fill)
 		var box: Array[int] = []
 		for key in ["x", "y", "width", "height"]:

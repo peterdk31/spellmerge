@@ -2,6 +2,12 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-22: A third round of art samples: the hat is its own layer
+
+- **Why.** The owner answered #192 (key `art-direction-pick-2`) with "F's hat is nice, the body needs work, maybe only the hat changes colour per player, give me more options, maybe the palette needs work", and re-posted it as "not a pick" after the first session dropped it. So the question is asked again, with a new key `art-direction-pick-3`, as the owner asked.
+- **What.** F's hat is kept as it is and split from the body: a body sprite with no player colour plus one hat sprite per player. That keeps "a colour on screen means a player" (STYLE.md) and cuts per-player art to the hat. G (brown robe) and H (cream robe) are two bodies; I is H with a palette proposal (brighter player ramps, a warm floor). The proposal's colours are allowed only in `art/samples/i_warm/` and `hats_vivid/`; they are not in STYLE.md or the palette test until the owner picks I.
+- **Cost if picked.** A hat layer means two sprites per wizard frame (or a baked sheet per player); the animation task has to decide which. Not decided here.
+
 ## 2026-10-22: A second round of art direction samples, and a second owner question
 
 - **Why.** The owner answered #190 (key `art-direction-pick`) with a lean towards A, a liking for C's robe, and a request for more options, a new style included. That is not a pick, so the task "record the chosen art direction" cannot be done yet and the first question is answered, not repeated.

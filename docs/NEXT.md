@@ -12,9 +12,11 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
 ## Blocked
 
 - [ ] **Record the chosen art direction (M2 part 27 follow-up).** Replace the golden example candidates in `art/kit/golden.json` and `docs/STYLE.md` with the chosen style's files, and say in `docs/STYLE.md` that the style is no longer provisional. Redrawing the placeholders in that style is spread over later milestones (M2 design, "Art and the art direction"), one area at a time.
-  - **Waits on:** the owner question with key `art-direction-pick-2` (the owner picks from A to F and locks it in `docs/DESIGN.md`; round one, #190, was answered with "more options").
+  - **Waits on:** the owner question with key `art-direction-pick-3` (the owner picks from A to I and locks it in `docs/DESIGN.md`; rounds one and two, #190 and #192, were answered with "more options").
 
 ## Done recently
+
+- [x] **Third art direction round (M2 part 27, owner `/claude` on #192).** The owner liked F's hat, wanted a better body, only the hat in the player's colour, and a look at the palette. In `art/samples/`: G (brown robe) and H (cream robe), each a `body.svg` with no player colour plus four `hat_pN.svg` (`hats_std/`, F's hat in each player's ramp), and I (H with brighter player ramps in `hats_vivid/` and a warm floor in `i_warm/`, a palette proposal). `tests/screenshots/shot_art_direction_3.gd` makes `art_direction_sheet_3.png`; `art/samples/README.md` compares them. `test_svg_art.gd` allows I's colours only in its two folders and checks that bodies carry no player colour and each hat exactly one player's. The pick is asked again as `art-direction-pick-3`.
 
 - [x] **More art direction options (M2 part 27, round two).** The owner's answer on #190 ("heading towards option 1, also like nr. 3's robe; give me more options, a completely new style is fine") is done: D (A's proportions with C's hooded robe), E (soft, no black outline) and F (big hat, beveled tiles) are in `art/samples/`, each with a wizard; E and F also have a floor and an icon (D reuses A's). `tests/screenshots/shot_art_direction_2.gd` makes `art_direction_sheet_2.png`; `art/samples/README.md` compares them. The pick is asked again as owner question `art-direction-pick-2`. The test for sample icons now expects four, and E's is checked against its own outline colour.
 

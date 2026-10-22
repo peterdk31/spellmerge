@@ -318,6 +318,8 @@ var _draw_node: MultiMeshInstance2D = null
 var _draw_room: int = 0
 var _rune_room: int = 0
 var _orbit_room: int = 0
+## Live shots per batch this frame (BATCH_*), refilled by _count_batches; a member so no array is made per frame.
+var _batch_counts: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 var _hostile_room: int = 0
 var _draw_buffer: PackedFloat32Array = PackedFloat32Array()
 ## The batches of runes and orbit shots, beside the bolts' `_draw_node`.
@@ -1057,7 +1059,8 @@ func update_draw() -> void:
 	var multimesh: MultiMesh = _draw_node.multimesh
 	var hostile_multimesh: MultiMesh = _hostile_node.multimesh
 	var fraction: float = clampf(Engine.get_physics_interpolation_fraction(), 0.0, 1.0)
-	var counts: PackedInt32Array = _count_batches()
+	_count_batches()
+	var counts: PackedInt32Array = _batch_counts
 	var new_room: int = _batch_room(multimesh, _draw_room, counts[BATCH_BOLT])
 	if new_room != _draw_room:
 		_draw_room = new_room
@@ -1127,13 +1130,12 @@ func _batch_of(slot: int) -> int:
 	return BATCH_BOLT
 
 
-## How many live shots each batch will draw, indexed by BATCH_*.
-func _count_batches() -> PackedInt32Array:
-	var counts: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
+## Count the live shots each batch will draw into _batch_counts, indexed by BATCH_*.
+func _count_batches() -> void:
+	_batch_counts.fill(0)
 	for slot in _high:
 		if _alive[slot] != 0:
-			counts[_batch_of(slot)] += 1
-	return counts
+			_batch_counts[_batch_of(slot)] += 1
 
 
 ## The room (in shots) a batch needs to draw `used`: `room` while that fits and is not

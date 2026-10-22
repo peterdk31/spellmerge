@@ -47,6 +47,8 @@ func _initialize() -> void:
 	_test_enemy_shots_have_their_own_batch()
 	_test_shot_core_colour_and_batches()
 	_test_batches_upload_only_the_used_slice()
+	_test_every_batch_is_sized_to_its_own_shots()
+	_test_batch_room_grows_and_shrinks_with_hysteresis()
 	_test_shot_colours_differ_and_stay_bright()
 	_test_freed_target_is_dropped()
 	_test_target_removed_by_a_hit_handler()

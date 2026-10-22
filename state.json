@@ -11,7 +11,6 @@
     "number": 202
   },
   "errors_in_a_row": 0,
-  "idle": null,
   "intake_tasks": {},
   "last_own_merge": "2026-10-22T22:53:25Z",
   "last_plan": "2026-10-22T21:56:17Z",
@@ -73,6 +72,11 @@
       "count": 0,
       "parked_reason": "I found no known crash or blocker to fix, so I made no changes and no commits. `ci/build/build.sh --quick --tests` passes. That covers the import, the smoke test, every unit test, the 300-recipe spell fuzz, the stress run and the 4-bot run. In the 4-bot run, all 4 bots cleared the room, bots 1-3 built spells, bot 4 stayed in its builder, and no errors were logged. The only warning in the output is the expected \"--four-bot needs a build that includes tests/\" line from the main-menu test. The only",
       "parked_until": "2026-10-23T18:42:47Z"
+    },
+    "**Stabilisation and C2 (M2 part 28).** Only bug fixing, polish and performance until no known crash or blocker remains; then the planning session ends M2 with the C2 checkpoint issue (build link, bot data such as fuzz and stress numbers and which recipes bots build, Claude's honest assessment and the C2 question), and development waits for the owner's /go, /iterate or /pivot. **Before closing M2, check the Blocked WASM task:** if a \"Daily run\" post with \"Stress and timing results\" exists, move that task back to the Queue and finish it first.": {
+      "count": 0,
+      "parked_reason": "I found no known crash or blocker to fix, so I made no changes and left no commits. `ci/build/build.sh --quick --tests` passes in full: import, every unit test, and the 4-bot smoke test (frame time p95 7.7 ms, no errors logged). The only warning in the output is the expected \"--four-bot needs a build that includes tests/\" from the main-menu test. `docs/BACKLOG.md` has no crash or blocker entries, and no open issue carries the bug label. The Blocked WASM task still can't move: none of the daily-l",
+      "parked_until": "2026-10-23T23:01:41Z"
     }
   },
   "usage": [

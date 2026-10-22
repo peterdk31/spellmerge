@@ -1,9 +1,10 @@
-"""The Contribute page, rebuilt daily (docs/PLAN.md, "Contribute page").
+"""The project's home page, rebuilt daily (docs/PLAN.md, "Contribute page").
 
-Shows: play today's build, current milestone progress, wanted-now counts per
-skill, coming next, recently merged, and top contributors. Data comes from the
-plan files in this checkout and from GitHub (read-only token); a section whose
-data can't be read says so instead of failing the deploy.
+Shows: play today's build, current milestone progress, how to report a bug or
+share an idea with the community queue's size, coming next, recently merged, and
+community reports done recently. Data comes from the plan files in this checkout
+and from GitHub (read-only token); a section whose data can't be read says so
+instead of failing the deploy.
 """
 
 from __future__ import annotations
@@ -13,14 +14,11 @@ import html
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
 
 from . import config as config_mod
 from . import gh
 
-SKILLS = {"code": "Coders", "pixel-art": "Pixel artists", "music": "Musicians", "sfx": "Sound designers",
-          "writing": "Writers", "level-design": "Level designers"}
-TOP_DAYS = 90
+RECENT_DAYS = 90
 
 
 @dataclass
@@ -38,25 +36,25 @@ class Milestone:
 @dataclass
 class PageData:
     current: Milestone = field(default_factory=Milestone)
-    upcoming: list[tuple[str, str, str, str]] = field(default_factory=list)  # code, name, done when, opens
-    wanted: dict[str, int] | None = None
+    upcoming: list[tuple[str, str, str]] = field(default_factory=list)  # code, name, done when
+    queue: dict[str, int] | None = None  # scheduled and backlog community issues
     merged: list[dict[str, str]] | None = None
-    top: list[tuple[str, int]] | None = None
+    done: list[dict[str, str]] | None = None  # community reports done recently
 
 
-def parse_roadmap(text: str) -> tuple[Milestone, list[tuple[str, str, str, str]]]:
+def parse_roadmap(text: str) -> tuple[Milestone, list[tuple[str, str, str]]]:
     current, upcoming = Milestone(), []
     for line in text.splitlines():
         cells = [c.strip() for c in line.strip().strip("|").split("|")]
-        if len(cells) != 5 or not re.fullmatch(r"M\d", cells[0]):
+        if len(cells) != 4 or not re.fullmatch(r"M\d", cells[0]):
             continue
-        code, name_cell, status, done_when, opens = cells
+        code, name_cell, status, done_when = cells
         link = re.search(r"\[([^\]]+)\]\(([^)]+)\)", name_cell)
         name = link.group(1) if link else name_cell
         if "In progress" in status:
             current = Milestone(code, name, link.group(2) if link else "", done_when)
         elif current.code != "?" and status.startswith("Not started"):
-            upcoming.append((code, name, done_when, opens))
+            upcoming.append((code, name, done_when))
     return current, upcoming
 
 
@@ -78,37 +76,25 @@ def gather(cfg: config_mod.Config, root: Path = Path("."), now: dt.datetime | No
         if data.current.design and design.exists():
             parse_progress(data.current, design.read_text())
     try:
-        wanted = {skill: 0 for skill in SKILLS}
-        for issue in gh.api_paginated(f"repos/{cfg.repo}/issues?state=open&labels=now&per_page=100"):
-            if "pull_request" in issue:
-                continue
-            for label in issue["labels"]:
-                if label["name"] in wanted:
-                    wanted[label["name"]] += 1
-        data.wanted = wanted
+        data.queue = {label: len([i for i in gh.api_paginated(
+            f"repos/{cfg.repo}/issues?state=open&labels={label}&per_page=100") if "pull_request" not in i])
+            for label in ("scheduled", "backlog")}
+    except gh.GhError:
+        pass
+    since = (now - dt.timedelta(days=RECENT_DAYS)).date().isoformat()
+    try:
+        found = gh.api(f"search/issues?q=repo:{cfg.repo}+is:pr+is:merged+merged:>={since}&sort=updated&per_page=10")
+        data.merged = [{"title": i["title"], "url": i["html_url"]} for i in found.get("items", [])[:10]]
     except gh.GhError:
         pass
     try:
-        since = (now - dt.timedelta(days=TOP_DAYS)).date().isoformat()
-        found = gh.api(f"search/issues?q=repo:{cfg.repo}+is:pr+is:merged+merged:>={since}&sort=updated&per_page=100")
-        items = found.get("items", [])
-        data.merged = [{"title": i["title"], "url": i["html_url"], "author": contributor_of(i, cfg)}
-                       for i in items[:10]]
-        counts: dict[str, int] = {}
-        for i in items:
-            who = contributor_of(i, cfg)
-            if who and who != cfg.owner.login and not who.endswith("[bot]"):
-                counts[who] = counts.get(who, 0) + 1
-        data.top = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))[:10]
+        found = gh.api(f"search/issues?q=repo:{cfg.repo}+is:issue+is:closed+reason:completed+label:triaged"
+                       f"+closed:>={since}&sort=updated&per_page=10")
+        data.done = [{"title": i["title"], "url": i["html_url"], "author": (i.get("user") or {}).get("login", "")}
+                     for i in found.get("items", [])[:10]]
     except gh.GhError:
         pass
     return data
-
-
-def contributor_of(item: dict[str, Any], cfg: config_mod.Config) -> str:
-    login = (item.get("user") or {}).get("login", "")
-    m = re.match(r"Submission from @([\w-]+):", item.get("title", ""))
-    return m.group(1) if login == cfg.bot.login and m else login
 
 
 def _bar(done: int, total: int) -> str:
@@ -122,29 +108,22 @@ def render(cfg: config_mod.Config, data: PageData, version: str, channel: str, s
     e = html.escape
     repo_url = f"https://github.com/{cfg.repo}"
     m = data.current
-    issues_url = f"{repo_url}/issues?q=is%3Aopen+label%3Anow"
     preview_link = f'<a href="preview/">Latest preview ({e(preview)})</a>' if preview else ""
 
-    if data.wanted is None:
-        wanted = "<p class='small'>Couldn't load the task list today.</p>"
-    elif not any(data.wanted.values()):
-        wanted = ("<p>No open tasks yet: areas open for contributions milestone by milestone (Art and Audio first, "
-                  f"in M1). Ideas and feedback are always welcome in <a href='{repo_url}/discussions'>Discussions</a>."
-                  "</p>")
-    else:
-        wanted = "<ul class='skills'>" + "".join(
-            f"<li><a href='{issues_url}+label%3A{e(skill)}'><strong>{n}</strong> for {e(label.lower())}</a></li>"
-            for skill, label in SKILLS.items() if (n := data.wanted.get(skill, 0))) + "</ul>"
+    queue = ("<p class='small'>Couldn't load the queue today.</p>" if data.queue is None else
+             f"<p class='small'><a href='{repo_url}/issues?q=is%3Aopen+label%3Ascheduled'>{data.queue['scheduled']} "
+             f"in the work queue</a> &middot; <a href='{repo_url}/issues?q=is%3Aopen+label%3Abacklog'>"
+             f"{data.queue['backlog']} on the backlog</a></p>")
 
     merged = ("<p class='small'>Nothing merged in the last 90 days yet.</p>" if data.merged == [] else
               "<p class='small'>Couldn't load recent merges today.</p>" if data.merged is None else
-              "<ul>" + "".join(f"<li><a href='{e(p['url'])}'>{e(p['title'])}</a> <span class='small'>by "
-                               f"@{e(p['author'])}</span></li>" for p in data.merged) + "</ul>")
-    top = ("<p class='small'>Be the first!</p>" if not data.top else
-           "<ol>" + "".join(f"<li><a href='https://github.com/{e(login)}'>@{e(login)}</a> "
-                            f"<span class='small'>{n} merged</span></li>" for login, n in data.top) + "</ol>")
-    upcoming = "".join(f"<li><strong>{e(code)}: {e(name)}</strong>. Done when: {e(done)}. Opens: {e(opens)}.</li>"
-                       for code, name, done, opens in data.upcoming[:3])
+              "<ul>" + "".join(f"<li><a href='{e(p['url'])}'>{e(p['title'])}</a></li>" for p in data.merged) + "</ul>")
+    done = ("<p class='small'>Couldn't load them today.</p>" if data.done is None else
+            "<p class='small'>None yet: be the first to report a bug or share an idea!</p>" if not data.done else
+            "<ul>" + "".join(f"<li><a href='{e(p['url'])}'>{e(p['title'])}</a> <span class='small'>reported by "
+                             f"@{e(p['author'])}</span></li>" for p in data.done) + "</ul>")
+    upcoming = "".join(f"<li><strong>{e(code)}: {e(name)}</strong>. Done when: {e(done)}.</li>"
+                       for code, name, done in data.upcoming[:3])
     design_link = f"{repo_url}/blob/main/docs/{e(m.design)}" if m.design else f"{repo_url}/blob/main/docs/ROADMAP.md"
 
     return f"""<!doctype html>
@@ -183,7 +162,7 @@ def render(cfg: config_mod.Config, data: PageData, version: str, channel: str, s
   <h1>Spellmerge</h1>
   <p class="tag">Merge spells. Cause chaos. Together. &middot; Every spell is a merge request.</p>
   <p>A 2D roguelite about building deep, combinable spells, for 1&ndash;4 local co-op players. Claude, an AI, writes the
-     code, reviews every contribution and ships a new build every day, together with the community.</p>
+     code and ships a new build every day. Players shape it: every bug report and idea is read and answered.</p>
   <div class="buttons">
     <a class="primary" href="play/">Play {e(stable)}</a>
     <a href="nightly/">Today's build ({e(version)}, {e(channel)})</a>
@@ -201,11 +180,13 @@ def render(cfg: config_mod.Config, data: PageData, version: str, channel: str, s
          <a href="{repo_url}/blob/main/docs/NEXT.md">What Claude does next</a></p>
     </section>
     <section>
-      <h2>Wanted now</h2>
-      {wanted}
-      <p class="small"><a href="{repo_url}/blob/main/CONTRIBUTING.md">How to contribute</a> (no git needed for art,
-         sound and writing) &middot; <a href="{repo_url}/blob/main/AGENTS.md">for coding agents</a> &middot;
-         <a href="style-guide/">Style Guide and art starter kit</a></p>
+      <h2>Help shape the game</h2>
+      <p><a href="{repo_url}/issues/new/choose">Report a bug</a> &middot;
+         <a href="{repo_url}/discussions">Share an idea or a combo</a></p>
+      {queue}
+      <p class="small">Claude reads every new post once a day, answers it, and schedules bugs and good ideas.
+         <a href="{repo_url}/blob/main/CONTRIBUTING.md">How it works</a> &middot;
+         <a href="style-guide/">Style Guide</a></p>
     </section>
     <section>
       <h2>Coming next</h2>
@@ -217,8 +198,8 @@ def render(cfg: config_mod.Config, data: PageData, version: str, channel: str, s
       {merged}
     </section>
     <section>
-      <h2>Top contributors (90 days)</h2>
-      {top}
+      <h2>Done from your reports</h2>
+      {done}
     </section>
   </div>
 

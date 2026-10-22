@@ -2,6 +2,30 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-22: The stress scene (M2 part 24)
+
+- **Real game, topped-up shots.** The scene is the real Flow, Combat, spell runtime and Feel with four bots, not a stand-in. Spells alone never make 1,000 or 3,000 shots, so each physics step the runner adds plain filler shots (load only, no spell effects; the effects come from the bots' real spells; fixed seed, owned by the players in turn) up to the target; the manager's cap is set to the target, so dropping the oldest shot is part of the load. Enemies are added whenever fewer than the target stand, with 120 health instead of the imp's 20, so the crowd lasts. Wizards stay protected with full mana: it is a stress scene, not a balance test.
+- **Pass means the load was real, not fast.** `STRESS OK` needs the mean of enemies and shots over the measured window at 90% of the target (not one peak frame), every bot casting in that window, spell shots (tag not 0) hitting something, no refused build and no logged error. Frame time only prints (`BENCH WARNING:` past 16.7 ms p95), as PLAN says ("Gates are sparse"). The build runs a short version (`test_stress.gd`); the full one is `stress.gd`. Part 25 puts it in the exports.
+
+## 2026-10-22: The first lore (M2 part 23)
+
+- **One JSON file per component** (`lore/components/<id>.json`, keys `id`, `about`, `text`) rather than one big file: contributors add content as new files and conflicts cannot happen. `about` is there so relic, item and enemy lore can share the schema later without a new folder rule.
+- **The registry reads the lore** (it is the one script allowed to load from computed paths); `Spells.component_description` asks it, so the HUD still reads no component field. Invalid lore files are never given out.
+- **Validator in `core/story/`**, not in the spells validator: story belongs to its own area. It runs in tests and as debug-build warnings (`tools/check.sh` is owner-protected, see #140). A missing lore file for any spell component is reported as `missing-lore` in the debug-build warnings, but the test does not fail on it: a Spells PR must not fail CI for a rule outside its area. The builder shows an empty note and Story or Claude fills the gap; `content/spells/README.md` lists the file as a step.
+- **Descriptions state the real numbers only where they are fixed** (eight shots, three orbs, up to twice, every half second, up to four times); other effects are said in words so a retune does not make them lie.
+
+## 2026-10-22: Story canon (M2 part 22)
+
+- **Short, with seven fixed points.** `docs/STORY.md` fixes only what the game already shows or needs (the wizards as guild apprentices, the build-from-parts magic, the four elements' characters, the crypt, imps, the stakes, relics). Biomes after the crypt, bosses, hub and dialogue are left open, so later writing and contributors add canon instead of fighting it.
+- **Tone reading of pillar 3:** dry rather than silly, with the danger never made small. Descriptions follow the 60-character limit that part 23 validates.
+- **Component names are quoted from the registry** (Bolt, Frost, On Hit, ...), so lore and builder agree.
+
+## 2026-10-22: Combos to 20+ (M2 part 21)
+
+- **Nine rows added, two changed from the draft.** Draft row 13 (nova + void, on hit → fire *bolt*) became a fire *nova*: a held bolt starts inside the hexed imp and, since the 0.1 s exclusion ends before it has crossed the imp, hits it again and is used up, so it never reached the imps behind (the known issue in `docs/BACKLOG.md`). Draft row 21 (fire rune that ends in a frost nova, Thaw) became a fire rune that bursts into a fire nova on expiry: a rune has no pierce, so its first hit uses it up and it never expires on a target. A rune that expires needs imps standing just outside its reach, which the nova then burns. Both stay faithful to the pillar (small parts, deep results) and avoid pinning a bug.
+- **Two drafts are not rows yet.** Draft rows 16 (clamp refusal) and 17 (depth 3) stay with `test_spells_cast.gd` and `test_triggers.gd`, which already cover them; rows 20 to 24 beyond the two-player one are not needed for the two-per-component rule. More rows can be added any time.
+- **The two-per-component rule is a test.** `test_every_component_is_in_two_combos` reads a `COMPONENTS` list in the test; a new component is added to it together with its rows, as the spells README asks; a second test compares the list with the registry, so a missed component fails. Rows for chain, pierce, faster and on expire also have a control: the same row without that component must fail a check. The control showed that a bolt that hits ends by hit, not by expiry, so "Seeking frost burst" now pierces and bursts where its flight ends.
+
 ## 2026-10-22: The build break
 
 **Decided by:** Claude (M2 part 19).
@@ -542,7 +566,7 @@ The `Linux Test` binary hangs on `--script` while the autoloads start, so it can
 
 - **Triage** (daily, script): the hard rules are re-run from `main` against each PR head, with no PR code run. Closing comments list rule, file, line and fix. After 2 closed PRs in a day, an author's further PRs that day are closed. Unsigned authors get one CLA reminder, and the PR closes after 7 days. Area and skill labels come from the changed paths.
 - **CLA records:** new signatures go into `docs/cla-signatures.json` through an `automated` bot PR that the merge step merges after checks. `automated` PRs may only change that file, or, for a quarantine, the reported asset and the manifests.
-- **Rating:** one fresh Claude session per PR (matrix job, at most 8 a day, within about 30% of the window budget). It has read-only tools and a read-only token, and the PR's files are checked out without being run. A script holds Claude's decision to the plan's thresholds (merge needs an average of at least 3.5 and no criterion below 2) and posts the comment, with a marker recording the rated SHA. A push means a new rating.
+- **Rating:** one fresh Claude session per PR (matrix job, at most 8 a day). It has read-only tools and a read-only token, and the PR's files are checked out without being run. A script holds Claude's decision to the plan's thresholds (merge needs an average of at least 3.5 and no criterion below 2) and posts the comment, with a marker recording the rated SHA. A push means a new rating.
 - **Merging:** the rated SHA must still be the head. Votable PRs (art, audio, gameplay, spells) wait for the vote, and the rating comment's vote line is updated daily. Candidates are test-merged in score order on a local `staging` branch, with the quick build after each, in a job without secrets. Then the merge script merges each one (checks, hard rules, `--match-head-commit`). On a conflict, the higher-rated PR wins and the other gets a rebase request.
 - **Follow-ups:** the rating's fix-ups for merged PRs become the next development session's task, crediting the contributor. They are treated as suggestions, not instructions.
 - **Broken daily build:** in a job without secrets, the day's merges are reverted newest first until the build passes. The culprits are then reverted on `main` through bot PRs, with a comment on each, and the daily run starts again once (no second round of reverts).
@@ -570,8 +594,8 @@ The `Linux Test` binary hangs on `--script` while the autoloads start, so it can
 - **Panel trust:** values come from GitHub's edit history (each `userContentEdits` entry holds the full body of that revision), from the newest revision whose editor is the owner's numeric ID. A newer edit by anyone else is ignored and reported in the Daily log with a mention of the owner. If no owner revision exists, the gate fails closed.
 - **Owner commands:** processed only by the hourly run, so two runs never act on one command. `/pause` pauses development and PR merging; releases continue, because only the kill switch stops releases. `/merge` refuses if the PR head was pushed after the command, judged by when GitHub started that commit's checks run, since commit dates can be faked. `/priority`, `/claude` and `/ask` are queued for the next Claude session.
 - **Merge method:** squash for every merge, so each PR is one commit that one `git revert` undoes. The PR author stays the commit author.
-- **State:** bookkeeping lives in `state.json` on the `automation-state` branch: token usage, learned limits, back-off, processed commands and alarm issues. Writes use the file's SHA, so concurrent runs can't silently overwrite each other. It is never trusted for security decisions.
-- **Pacing:** each run records its tokens. When a usage limit is hit, the tokens used in the last 5 hours (or 7 days) become the learned window (or week) size, and runs back off until the reset. After that, runs stop at `DEV_INTENSITY`% of a window and at `WEEKLY_SHARE`% of a week, spread evenly at a seventh per day.
+- **State:** bookkeeping lives in `state.json` on the `automation-state` branch: token usage, back-off, processed commands and alarm issues. Writes use the file's SHA, so concurrent runs can't silently overwrite each other. It is never trusted for security decisions.
+- **Pacing:** each run records its tokens for the Daily log. Runs are not gated by estimated quota: learning the window size from token counts disagreed with the real usage (it stopped at an estimated 104% when the account showed 69%), so `DEV_INTENSITY`, `WEEKLY_SHARE` and the 30% review cap were removed (2026-10-22). When Claude reports a usage limit, runs back off until the reset it names.
 - **Schedule:** the hourly run starts at minute 35, away from the busy top of the hour.
 - **Alarms:** each alarm is an issue labelled `alarm` that mentions the owner, opened once and closed automatically when the problem is resolved.
 - The bot app's token is minted with `app-id`, which is deprecated in favour of `client-id` (see `docs/BACKLOG.md`).
@@ -954,3 +978,69 @@ The HUD screenshot cannot be taken in a session (no display, `docs/BACKLOG.md`),
 
 - **`preview.yml` builds main after each merge and puts the web build at `/preview/`.** The owner wanted to see progress more often than once a day. Sessions merge about hourly, so that is about one preview an hour, and only when something changed; a newer merge cancels a build still running. It runs the same `build.sh` as the daily run (tests and smoke tests included, about 4 minutes), with no release, no itch.io, no AI and no secrets. Public-repo Actions minutes cost nothing.
 - **`/nightly/` and `/play/` stay the daily releases.** Pages replaces the whole site on each deploy, so the preview rebuilds it (`smbot.site --preview`): `/nightly/` from the newest release, `/play/` from the latest stable one. The daily run puts its build at `/preview/` too, and both Pages jobs share one concurrency group so deploys never overlap.
+
+## Owner: clearer logging
+
+- **One Daily log issue per day** ("Daily log YYYY-MM-DD" in the owner's time zone, label `daily-log`) instead of the pinned #5, which had grown past 100 comments. The first post of a day opens it and closes the older logs, so the open log is always today's and a past day is easy to find. Each post also goes to the run's job summary in the Actions tab. `ci/config.json` no longer names a log issue.
+- **Owner questions are not asked twice.** Each has a stable `key` (kept as a hidden marker in the issue), and a question with the same key or a similar title (most words shared, or one title contained in the other) as one that is open or was closed in the last 30 days is dropped and only noted in the log. #72/#73 and #79/#80/#83 were the same questions in other words.
+- **Session log lines name the PR by its title** and cut summaries at a sentence end, not mid-word. The token usage line is in the daily run's summary only, not in every session's post.
+
+## Owner: the community intake replaces outside PRs
+
+- **People outside the project post in Issues and Discussions; the bot writes all code and assets.** Rating, voting on and merging outside PRs, the CLA check, claims, no-git submissions and the copyright quarantine are removed (`triage`, `rate`, `votes`, `community`, `communitymerge`, `cla`, `claims`, `submissions`, `quarantine`). That was about half the automation, and with no outside files there is nothing to sandbox, license or vote on.
+- **A daily intake decides each new post** (`smbot.intake`, `daily.yml`): a script gathers new issues, discussions and outside PRs with a read-only token; Claude decides each one with read-only tools and no write token (`.github/maintainer/intake.md`); a script carries the decisions out within fixed rules (at most 5 newly scheduled a run, spam always declined, copyright always `p1`, duplicates only of open issues). Outside PRs are read as suggestions and closed with a pointer to Issues and Discussions.
+- **Scheduled issues are the top of the work queue,** before `docs/NEXT.md`, by priority then age. The session sees the intake's neutral restatement (kept in the automation state as `intake_tasks`), not the poster's words, and its PR closes the issue. Weekly planning moves issues between the queue and the backlog (`schedule_issues`, `unschedule_issues`) instead of reading a digest and creating contributor task issues.
+- **The vote settings leave the Control panel;** an old panel's `VOTE_` line is ignored. The Contribute page shows the queue, the backlog and community reports done, instead of wanted-now counts and top contributors.
+
+## Owner: development always flows
+
+- **An empty queue plans instead of stopping.** The gate (`smbot.control`) runs a planning session when no scheduled issue or `NEXT.md` task is left, at most every 3 hours; before, development waited for Sunday's planning. Planning branches carry the time (`claude/YYYYMMDD-HHMM-planning`), since there can be several a day.
+- **A milestone end is the one gate that waits for the owner** (owner, 2026-10-22). Planning marks the milestone done and outputs a `checkpoint`; once that PR merges, a `checkpoint` issue asks for `/go`, `/iterate <what>` or `/pivot <how>` (verified owner commands, only in that issue). Until then the gate starts no planning and no milestone work, but scheduled issues still run. The answer starts a planning session at once (`smbot.checkpoint`), which writes the next milestone, the rework tasks or the new direction; when it merges, the issue closes. No timeout: the old 7-day default to iterate is gone.
+- **Errors are retried, then alarm.** A session that ends in an error starts the next one at once; after 3 in a row the bot stops and opens the "Development stopped" alarm, which closes after the next session that makes progress. A merged planning PR chains into development too.
+- **What still stops development:** a checkpoint, the owner's switches, a usage limit (resumes at the reset), a rejected token, 3 errors in a row, and planning that finds nothing to do. Each, except the usage limit, mentions the owner.
+
+## Owner: review of the reworked harness
+
+An independent review of the branch found these, all fixed with a regression test each:
+
+- **Every planning session crashed:** `prepare_plan`'s `weekly` parameter hid the `weekly` module. Renamed to `weekly_run`.
+- **The weekly planning is started by the gate,** not `weekly.yml` (deleted). With development always running, the separate workflow sat behind a session in the shared concurrency group and was cancelled, and catch-up counted the cancelled run as done. The gate now runs the next session as the weekly planning once Sunday 06:00 UTC has passed (`last_weekly` in the state).
+- **"Stopped after 3 errors" stops for real:** the gate refuses to develop until `/resume`, which resets the count; the alarm is posted once, not on every later failure.
+- **Idle is said once:** planning that finds nothing sets `idle`; the gate then waits for new work or the Sunday planning instead of planning (and pinging the owner) every 3 hours.
+- **An `/ask` with an empty queue looped,** because instructions were only cleared on a merge and the answers were only posted with commits. Answers now post in their own step, and a session that ends with nothing to do clears its instructions.
+- **A checkpoint really holds milestone work:** while it waits, only scheduled issues count as tasks (the gate and the session both); a carried-out answer closes the issue even when the PR's `Closes #N` closed it first.
+- **Cooldowns and limits wake the bot by themselves** (`wake_at` → `resume.yml`). Failed planning PRs are continued instead of piling up.
+- **The Claude action is copied aside before a session switches branches,** so an older PR branch without it can't break the step; the next session starts even if a planning step fails.
+- **Intake text is safer:** `inert()` also removes secrets (tokens, private keys), uppercase and `www.` links and look-alike repository links; raw titles never reach the log; Claude may not read `/proc`, `/sys` or its own config. An answered post is closed; a needs-info reply on a closed PR asks for an issue.
+- **Simpler:** one label list (`ci/settings/labels.json`, `smbot.labels`), no project board, no `settings` plumbing, no unused CLI commands; owner questions only merge on a close match (0.75).
+
+## Owner: contributions come back, through the intake
+
+- **Anyone may send a pull request or attach art and sound to a discussion** (owner, 2026-10-22), and the owner's own issues and discussions go through the intake as direction (`from_owner`). The intake handles PRs like other posts: schedule, backlog, needs info, duplicate or decline.
+- **A scheduled PR is finished by the bot, not merged as is.** It stays open and becomes the task "finish PR #N by @x": a session builds on the contributor's commits (authorship stays), reviews and finishes them, and the normal critique, final review and merge script apply. When that merges, the contributor's PR closes with credit. This keeps one merge path (the bot's own) instead of bringing back rating, votes and a staging merge.
+- **The CLA is back, once per contributor** (owner's choice over inbound=outbound licensing, to keep the Steam and console option): the signing comment on the PR or discussion, kept in the automation state with a link next to `docs/cla-signatures.json`. No signature, no schedule or backlog: the reply asks for it.
+- **A PR is only scheduled when the `rules` check passes,** so outside GDScript only runs in a session's sandbox after the banned-API rules have passed. That is a step up from "no outside code ever runs"; the sandbox, the read-only session token and the reviews are the guard.
+- **Files from Discussions** (`smbot.contrib`): Claude names the target paths, a job with no secrets downloads (GitHub attachments only, the poster's own), re-encodes and size-checks them, and the apply step puts them on `submissions/discussion-N` for the session to take. An "Art submissions" Discussions category is added by hand (setup.sh lists it).
+
+## Owner: contributions, hardened after a security review
+
+- **The hard rules are run by the intake itself, on the exact head commit,** as an outside contributor, from main's scripts in the gather job (`intake.pr_rules`). The PR's own `rules` check can't be trusted for this: a fork can rewrite the workflow that runs it. Backlog needs passing rules too.
+- **A session may only build on the checked commit.** The task names it, and publishing refuses any commit that isn't on main, isn't in that commit's history and isn't the bot's own (`session.unchecked_commits`). Commits the contributor pushes later never reach the bot's PR without a new intake check.
+- **Weekly planning can't schedule a backlog PR;** it sends it back to the intake, which checks the rules and the CLA again on its current head.
+- **The PR to close after a merge is only read from the fixed start of a finish task,** so text inside a task can't name another PR.
+- **Attachments are handled defensively:** strict asset paths (`art|audio|content/…/lowercase.png|ogg`), URL-encoded API paths, downloads only from GitHub's file hosts (checked on every redirect), a bounded PNG decode with a checked header, one bad file only affects its own post, and the apply step checks (and re-encodes) every prepared file again.
+
+## Owner: screenshots show what a PR changes
+
+- **Every PR used to get the first 12 shots of every shot script,** whatever it changed. Now the session names the shot scripts that show its change (`screenshots` in its result, each with a caption; a revision may change the choice) and writes a new shot when none shows it. Only those run, on the PR and on `main`, and the comment shows each shot before and after (a new one alone), leaving out shots that came out identical. A change with nothing visible posts no screenshots.
+- `build.sh --screenshots` writes `shots.txt` (which script made which PNG) and runs only `SHOTS_ONLY` when set. The daily Pages gallery is unchanged.
+
+## Owner: four Discussions categories
+
+- **Announcements** (the weekly devlog; the intake skips it), **Ideas**, **Spell combos** and **Art submissions** (attachments the intake can take as assets). Art feedback (never used; feedback goes in Ideas, art in Art submissions) and GitHub's defaults (General, Polls, Q&A, Show and tell) are removed by hand, since GitHub has no API for categories. The first devlog post (#101) was deleted; the weekly devlog continues.
+
+## Owner: parked tasks are visible, and park for a day first
+
+- **Why:** PR #156 (M2 part 20) failed the final review twice on consistency points (numbers in comments and docs that didn't match the code) and was parked for 7 days. Nothing said so where the owner looks, "revisited by the weekly planning run" wasn't true (planning can't clear a park), and the PR drifted into conflicts while the queue moved on.
+- **Now:** two failed reviews (or conflicts) park a task for **1 day**; a third failure parks it for a week and mentions the owner. Every park is announced on the task's PR (a comment with the reason, the date and the review's points, plus the `parked` label) and in the Daily log; the daily summary lists all parked tasks. **`/retry`** on the PR (or the issue a task comes from) puts it back in the queue with two fresh attempts, the last review's points as its brief.
+- #156 and four stale parks (tasks done or gone) were cleared by hand on 2026-10-22.

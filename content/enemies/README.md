@@ -4,7 +4,7 @@
 
 Regular enemies and their attack patterns. Enemies create the "readable chaos" of the game: clear telegraphs, distinct roles, fair at any player count.
 
-**Opens for PRs in M3** (Run structure; see "Opens for PRs" in docs/ROADMAP.md). A small M1 base class already exists (`core/base/enemy_base.gd`, `EnemyBase`); M3 extends it. The example to copy is the M1 ember imp, `content/enemies/ember_imp/`.
+**Built in M3** (Run structure; see docs/ROADMAP.md). A small M1 base class already exists (`core/base/enemy_base.gd`, `EnemyBase`); M3 extends it. The example to copy is the M1 ember imp, `content/enemies/ember_imp/`.
 
 ## Contract
 
@@ -21,12 +21,11 @@ Regular enemies and their attack patterns. Enemies create the "readable chaos" o
 
 ## Steps
 
-1. Pick an issue labelled `now` in this area and comment `/claim`.
-2. Copy the example folder and rename it.
-3. Edit the `.tres` values and the scene; replace the sprites (see `docs/STYLE.md`).
-4. Add an attack pattern `.gd` only if the existing ones do not fit.
-5. Add each asset to `art/manifest.json`; commit the `.uid` files Godot creates.
-6. Run the checks below, then open a PR with a short GIF of the enemy in action.
+1. Copy the example folder and rename it.
+2. Edit the `.tres` values and the scene; replace the sprites (see `docs/STYLE.md`).
+3. Add an attack pattern `.gd` only if the existing ones do not fit.
+4. Add each asset to `art/manifest.json`; commit the `.uid` files Godot creates.
+5. Run the checks below, then open a PR with a short GIF of the enemy in action.
 
 ## Example to copy
 
@@ -39,12 +38,10 @@ tools/check.sh
 ci/build/build.sh --quick --tests
 ```
 
-## Rating questions
+## Review questions
 
-Besides the standard criteria:
+Besides the general review:
 
 - Are the telegraphs readable at 1× with 4 players and many projectiles on screen?
 - Does it scale sensibly from 1 to 4 players?
 - Is it a distinct role, not a re-skin of an existing enemy?
-
-Art changes (sprites) also need the community vote (👍/👎, 24 hours).

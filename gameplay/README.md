@@ -2,9 +2,7 @@
 
 ## Purpose
 
-The rules of the game, in 10 sub-areas: `player`, `combat`, `feel`, `coop`, `ai`, `run`, `flow`, `rewards`, `difficulty` and `progression`. Each has its own README with its job, when it is built and when it opens for PRs (docs/PLAN.md, "Gameplay sub-areas"). This file holds the text they share.
-
-Which sub-areas are open for PRs is in docs/ROADMAP.md ("Opens for PRs"). A PR to a closed area may still be merged, but it's a gamble.
+The rules of the game, in 10 sub-areas: `player`, `combat`, `feel`, `coop`, `ai`, `run`, `flow`, `rewards`, `difficulty` and `progression`. Each has its own README with its job and when it is built (docs/PLAN.md, "Gameplay sub-areas"). This file holds the text they share.
 
 ## Contract shared by every sub-area
 
@@ -58,12 +56,11 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 
 `.gd`, `.tres`, plus `.uid`, `.import` and `.license` files. Limit: 1 MB per file. This list follows the Areas table in docs/PLAN.md. `gameplay/` is script-only: it has no scenes. The scenes that gameplay scripts drive live with their content in `content/` (the wizard in `content/wizard/base/`, enemies in `content/enemies/`, rooms in `content/rooms/`) and in `hud/`; the scene's root node carries the gameplay script, and gameplay gets scenes through `core/registry`. Typed GDScript only (types on every variable, parameter and return); no banned APIs (see AGENTS.md, hard rules).
 
-## Steps (once the area is open)
+## Steps
 
-1. Pick an issue labelled `now` in the area and comment `/claim`.
-2. Read the area's README and make one focused change.
-3. Add or update tests in `tests/gameplay/<area>/`. The test runner and file naming are documented in `tests/README.md`, which is written by a later task; until it exists, don't invent a layout.
-4. Run the checks below, then open a PR using the template. For gameplay changes, add a short GIF or video.
+1. Read the area's README and make one focused change.
+2. Add or update tests in `tests/gameplay/<area>/`. The test runner and file naming are documented in `tests/README.md`, which is written by a later task; until it exists, don't invent a layout.
+3. Run the checks below, then open a PR using the template. For gameplay changes, add a short GIF or video.
 
 ## Validate
 

@@ -4,7 +4,7 @@
 
 Shared enemy behaviours: steering, targeting and attack patterns.
 
-**Closed until M3.** Built across M1 to M3 (the plan gives the range, not one milestone), opens for PRs in M3 (see "Gameplay sub-areas" in docs/PLAN.md and "Opens for PRs" in docs/ROADMAP.md). Until then Claude maintains it; an outside PR is a gamble.
+Built across M1 to M3 (the plan gives the range, not one milestone; see "Gameplay sub-areas" in docs/PLAN.md).
 
 Enemies in `content/enemies/` pick and configure behaviours from here instead of writing their own. Targeting chooses among all active players, never "the player".
 
@@ -23,7 +23,7 @@ Enemies in `content/enemies/` pick and configure behaviours from here instead of
 
 ## Steps
 
-Not open yet. When it opens, follow the steps and test layout in [gameplay/README.md](../README.md).
+Follow the steps and test layout in [gameplay/README.md](../README.md).
 
 ## Example to copy
 
@@ -36,9 +36,9 @@ tools/check.sh
 ci/build/build.sh --quick
 ```
 
-## Rating questions
+## Review questions
 
-A good PR here adds or improves one reusable behaviour that several enemies can configure, targets any of the 1–4 players, and stays cheap with 100–200 enemies. Besides the standard criteria:
+A good PR here adds or improves one reusable behaviour that several enemies can configure, targets any of the 1–4 players, and stays cheap with 100–200 enemies. Besides the general review:
 
 - Are behaviours reusable by several enemies? Do 100–200 enemies stay within the frame budget?
 - Does it keep to the dependency direction, without calling another area directly?

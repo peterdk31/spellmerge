@@ -243,10 +243,14 @@ func builder_view(recipe: Dictionary, level: int) -> Dictionary:
 	return view
 
 
-## The one-line description of the component `id` for the builder. Empty until the first lore
-## exists (M2 part 23 reads it from Story); the builder shows nothing for an empty one.
-func component_description(_id: StringName) -> String:
-	return ""
+## The one-line description of the component `id` for the builder, from its lore file in
+## `content/story/lore/components/`. Empty for an unknown id or a missing file; the builder
+## shows nothing for an empty one.
+func component_description(id: StringName) -> String:
+	var source: Node = registry if registry != null else get_node_or_null("/root/Registry")
+	if source == null:
+		return ""
+	return source.call("get_lore", &"component", id)
 
 
 func component_kind(id: StringName) -> StringName:

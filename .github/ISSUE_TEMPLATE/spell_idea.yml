@@ -1,6 +1,6 @@
 name: Spell idea
 description: Suggest a spell component (form, element, modifier or trigger) or a combo.
-labels: ["idea:spell"]
+labels: ["idea"]
 body:
   - type: dropdown
     id: kind

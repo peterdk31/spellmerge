@@ -4,9 +4,9 @@
 
 Damage pipeline, hit and hurt boxes, knockback, status effects, and applying element reactions.
 
-**Closed until M4.** Built in M1, opens for PRs in M4 (see "Gameplay sub-areas" in docs/PLAN.md and "Opens for PRs" in docs/ROADMAP.md). Until then Claude maintains it; an outside PR is a gamble.
+Built in M1 (see "Gameplay sub-areas" in docs/PLAN.md).
 
-Element reactions are content data, so contributors add them without touching this code. Projectiles themselves come from `core/projectiles`; this area decides what a hit does.
+Element reactions are content data, so new ones are added without touching this code. Projectiles themselves come from `core/projectiles`; this area decides what a hit does.
 
 ## Contract
 
@@ -25,7 +25,7 @@ Element reactions are content data, so contributors add them without touching th
 
 ## Steps
 
-Not open yet. When it opens, follow the steps and test layout in [gameplay/README.md](../README.md).
+Follow the steps and test layout in [gameplay/README.md](../README.md).
 
 ## Example to copy
 
@@ -38,9 +38,9 @@ tools/check.sh
 ci/build/build.sh --quick
 ```
 
-## Rating questions
+## Review questions
 
-A good PR here changes one step of the damage pipeline (a status effect, knockback, a hit or hurt box rule), reads reactions from data, and does not allocate per hit. Besides the standard criteria:
+A good PR here changes one step of the damage pipeline (a status effect, knockback, a hit or hurt box rule), reads reactions from data, and does not allocate per hit. Besides the general review:
 
 - Is damage applied the same for any player index and any enemy? Does it stay within the frame budget with 1,000+ projectiles?
 - Does it keep to the dependency direction, without calling another area directly?

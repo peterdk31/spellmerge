@@ -4,7 +4,7 @@
 
 Hit-stop, screen shake and juice presets.
 
-**Closed until M4.** Built in M1, opens for PRs in M4 (see "Gameplay sub-areas" in docs/PLAN.md and "Opens for PRs" in docs/ROADMAP.md). Until then Claude maintains it; an outside PR is a gamble.
+Built in M1 (see "Gameplay sub-areas" in docs/PLAN.md).
 
 Feel only reacts: it never changes damage or outcomes. Hit-stop is its only effect on timing; it is short and the same for every player.
 
@@ -26,7 +26,7 @@ Feel only reacts: it never changes damage or outcomes. Hit-stop is its only effe
 
 ## Steps
 
-Not open yet (the first preset is `presets/punchy.tres`). When it opens, follow the steps and test layout in [gameplay/README.md](../README.md).
+The first preset is `presets/punchy.tres`. Follow the steps and test layout in [gameplay/README.md](../README.md).
 
 ## Example to copy
 
@@ -39,9 +39,9 @@ tools/check.sh
 ci/build/build.sh --quick
 ```
 
-## Rating questions
+## Review questions
 
-A good PR here adds or tunes one juice preset (hit-stop length, shake strength), stays readable with four players hitting at once, and never changes damage or outcomes, with hit-stop kept short and the same for every player. Besides the standard criteria:
+A good PR here adds or tunes one juice preset (hit-stop length, shake strength), stays readable with four players hitting at once, and never changes damage or outcomes, with hit-stop kept short and the same for every player. Besides the general review:
 
 - Is the effect readable with 4 players on screen? Does it avoid per-frame allocations and stay within the particle limits?
 - Does it keep to the dependency direction, without calling another area directly?

@@ -2,7 +2,10 @@ blank_issues_enabled: false
 contact_links:
   - name: Ideas and suggestions
     url: https://github.com/peterdk31/spellmerge/discussions/categories/ideas
-    about: Share an idea for the game. The weekly planning run reads every idea and replies.
+    about: Share an idea for the game. Claude reads every new idea once a day and replies.
+  - name: Art and sound submissions
+    url: https://github.com/peterdk31/spellmerge/discussions/categories/art-submissions
+    about: Share art (PNG) or sound (OGG) you made for the game, as an attachment.
   - name: Spell combos
     url: https://github.com/peterdk31/spellmerge/discussions/categories/spell-combos
     about: Show off a combo you found, or one you wish existed.

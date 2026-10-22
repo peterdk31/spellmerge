@@ -9,7 +9,9 @@
 #   ci/build/build.sh --quick     import and editor smoke test only (for development)
 #   ci/build/build.sh --quick --tests   the same, then every tests/**/test_*.gd unit test
 #   ci/build/build.sh --quick --screenshots   the same, then every tests/screenshots/shot_*.gd
-#                                     on a virtual display (xvfb-run); PNGs in build/screenshots/
+#                                     on a virtual display (xvfb-run); PNGs in build/screenshots/,
+#                                     and shots.txt there saying which script made each one.
+#                                     SHOTS_ONLY="shot_a shot_b" runs only those scripts.
 #
 # A full build runs the unit tests and takes the screenshots too.
 #
@@ -144,16 +146,22 @@ screenshots() {
     echo "warning: xvfb-run is not installed, so no screenshots were taken"
     return 0
   fi
-  local saved="$XDG_DATA_HOME/godot/app_userdata/Spellmerge/screenshots" script failed=()
-  rm -rf "$saved" build/screenshots && mkdir -p build/screenshots
+  local saved="$XDG_DATA_HOME/godot/app_userdata/Spellmerge/screenshots" script name png failed=()
+  rm -rf build/screenshots && mkdir -p build/screenshots
+  : > build/screenshots/shots.txt
   while IFS= read -r script; do
-    godot_checked "shot-$(basename "$script" .gd)" xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24" \
+    name=$(basename "$script" .gd)
+    if [[ -n "${SHOTS_ONLY:-}" && " $SHOTS_ONLY " != *" $name "* ]]; then continue; fi
+    rm -rf "$saved"
+    godot_checked "shot-$name" xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24" \
       "$GODOT" --path . --rendering-driver opengl3 --audio-driver Dummy --script "res://$script" \
       || failed+=("$script")
+    for png in "$saved"/*.png; do
+      [[ -f "$png" ]] || continue
+      cp "$png" build/screenshots/
+      echo "$name $(basename "$png")" >> build/screenshots/shots.txt
+    done
   done < <(find tests/screenshots -name 'shot_*.gd' 2>/dev/null | sort)
-  if [[ -d "$saved" ]]; then
-    cp "$saved"/*.png build/screenshots/ 2>/dev/null || true
-  fi
   ls -l build/screenshots
   if ((${#failed[@]})); then
     echo "::error::${#failed[@]} screenshot script(s) failed: ${failed[*]}"

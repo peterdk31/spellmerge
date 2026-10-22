@@ -1,0 +1,63 @@
+# One Claude step, the same everywhere: the sandbox (bubblewrap and socat isolate Claude's
+# commands and scrub secrets), then claude-code-action as the bot, with a JSON schema for
+# the answer. Claude may never read process environments or its own
+# config, where its own token lives (the sandbox covers commands, not the Read tool). The step never fails the job: callers read `outcome` and the execution file
+# (smbot.session account/usage) to tell a usage limit, a rejected token and an error apart.
+#
+# Only use it from main's files: a local action runs from the checked-out files, so a job that
+# switches branches first copies it aside (session.yml).
+name: claude
+description: Run Claude in the sandbox with a prompt, tools and an answer schema
+inputs:
+  prompt:
+    required: true
+  schema:
+    description: The JSON schema of the answer, compact (jq -c)
+    required: true
+  max-turns:
+    required: true
+  allowed-tools:
+    required: true
+  disallowed-tools:
+    required: true
+  claude-token:
+    description: secrets.CLAUDE_CODE_OAUTH_TOKEN
+    required: true
+  github-token:
+    description: A read-only token; Claude never holds a write token
+    required: true
+outputs:
+  structured_output:
+    value: ${{ steps.claude.outputs.structured_output }}
+  execution_file:
+    value: ${{ steps.claude.outputs.execution_file }}
+  outcome:
+    value: ${{ steps.claude.outcome }}
+runs:
+  using: composite
+  steps:
+    - name: Install the sandbox
+      shell: bash
+      run: |
+        sudo apt-get update -qq && sudo apt-get install -y -qq bubblewrap socat
+        # Ubuntu 24.04 blocks the unprivileged user namespaces bubblewrap needs.
+        sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+        bwrap --ro-bind / / --dev /dev --proc /proc true
+        command -v socat
+    - id: claude
+      continue-on-error: true
+      uses: anthropics/claude-code-action@1d6de8cb0c237e7c15e9e1bdf973826ebae490cc # v1.0.248
+      with:
+        claude_code_oauth_token: ${{ inputs.claude-token }}
+        github_token: ${{ inputs.github-token }}
+        bot_id: "343592621"
+        bot_name: "spellmerge-bot[bot]"
+        # Chained sessions, the run after a merge and catch-up runs are started by
+        # github-actions[bot] (workflow_dispatch from finish, develop.yml's kick or smbot.catchup).
+        allowed_bots: "github-actions[bot]"
+        prompt: ${{ inputs.prompt }}
+        claude_args: >-
+          --max-turns ${{ inputs.max-turns }}
+          --allowedTools "${{ inputs.allowed-tools }}"
+          --disallowedTools "${{ inputs.disallowed-tools }},Read(//proc/**),Read(//sys/**),Read(//home/runner/.claude/**)"
+          --json-schema '${{ inputs.schema }}'

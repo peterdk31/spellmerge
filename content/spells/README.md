@@ -4,7 +4,7 @@
 
 The spell components that players assemble into spells: **forms** (bolt, beam, nova, rune, orbit), **elements** (fire, frost, storm, void), **modifiers** (split, pierce, homing, chain, bigger, faster) and **triggers** (on hit, on expire, timer). A spell is built as form → element → up to three modifiers → trigger, and a trigger holds another spell, built from the same slots. Few components, many combinations: this is the game's first pillar (docs/DESIGN.md).
 
-**Open for PRs since M2 part 15** (Spell system, see docs/milestones/M2-spell-system.md). All four kinds, the validator and the combo test exist. The component icons are placeholders until the art pass (part 26); better ones are welcome in Art.
+**Built in M2** (Spell system, see docs/milestones/M2-spell-system.md). All four kinds, the validator and the combo test exist since part 15. The component icons are placeholders until the art pass (part 26).
 
 ## Contract
 
@@ -50,12 +50,12 @@ Element interactions go in `reactions.tres` (a `ReactionTable` of `ReactionRow`s
 
 ## Steps
 
-1. Pick an issue labelled `now` in this area and comment `/claim`.
-2. Copy the example folder of the same kind into `forms/`, `elements/`, `modifiers/` or `triggers/` and rename the folder.
-3. Edit the `.tres`: `id` (equal to the folder), `display_name`, `complexity` and the numbers. Write a `.gd` only if the behaviour is new.
-4. Replace the icon (16×16, palette from docs/STYLE.md) and the optional SFX. Add a line for each to `art/manifest.json` or `audio/manifest.json` (path, origin `human` or `ai`, author, license; for AI also tool and prompt). Commit the `.uid` and `.import` files Godot creates.
-5. If it interacts with other elements, add the rows to `reactions.tres`.
-6. Add the combo row(s) to `combos.json`.
+1. Copy the example folder of the same kind into `forms/`, `elements/`, `modifiers/` or `triggers/` and rename the folder.
+2. Edit the `.tres`: `id` (equal to the folder), `display_name`, `complexity` and the numbers. Write a `.gd` only if the behaviour is new.
+3. Replace the icon (16×16, palette from docs/STYLE.md) and the optional SFX. Add a line for each to `art/manifest.json` or `audio/manifest.json` (path, origin `human` or `ai`, author, license; for AI also tool and prompt). Commit the `.uid` and `.import` files Godot creates.
+4. If it interacts with other elements, add the rows to `reactions.tres`.
+5. Add the combo row(s) to `combos.json`.
+6. Add the builder description: copy `content/story/lore/components/bolt.json` to `content/story/lore/components/<id>.json` and write one honest line (at most 60 characters; say only what the component really does). Without it the builder shows no description and a debug build warns, but nothing fails.
 7. Run the checks below, then open a PR using the template.
 
 ## Examples to copy
@@ -76,13 +76,11 @@ ci/build/build.sh --quick --tests   # import, smoke test and every unit test, in
 
 The registry's check in debug builds and `tests/content/spells/test_validators.gd` report problems as rule, file, field and fix (ids, icons, ranges, complexity, reactions). Fix every one. For a gameplay-visible component, add a short GIF or video to the PR.
 
-## Rating questions
+## Review questions
 
-Besides the standard criteria (fit, fun, quality, value, performance, risk, scope):
+Besides the general review (bugs, edge cases, 1–4 players, performance, clarity, fun):
 
 - Does it create creative, surprising interactions with existing components?
 - Is its power in line with its complexity cost (power budget)?
 - Does it avoid making another component obsolete?
 - Does it come with a combo row that works?
-
-Spell components also need the community vote (👍/👎, 24 hours).

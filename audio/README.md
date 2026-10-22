@@ -4,8 +4,6 @@
 
 Shared sound used by more than one thing: music (`music/`) and sound effects (`sfx/`). Sound that belongs to a single item (a spell's cast sound) lives in that item's folder under `content/`, not here.
 
-**Opens for PRs in M1** (see "Opens for PRs" in docs/ROADMAP.md). Until then, PRs to this folder are a gamble.
-
 ## Contract
 
 - Audio depends on nothing. It holds files only, no logic.
@@ -41,16 +39,15 @@ Shared sound used by more than one thing: music (`music/`) and sound effects (`s
 - `license`: an SPDX identifier allowed for assets.
 - `tier`: `placeholder`, `good` or `final`.
 - For `origin: "ai"` also `tool` and `prompt`. The tool's terms must allow commercial use, and the prompt must not name living artists or franchises.
-- Optional: `github` and `source`. A `quarantined` field is set by the copyright process; don't touch it.
+- Optional: `github` and `source`. A `quarantined` field marks an asset taken out after a copyright report; don't touch it.
 
-The manifest drives the Steam AI disclosure and the "Replace placeholder" issues.
+The manifest drives the Steam AI disclosure and the list of placeholders still to replace.
 
 ## Steps
 
-1. Pick an issue labelled `now` in this area and comment `/claim`.
-2. Add the `.ogg` in `sfx/` or `music/`.
-3. Add its entry to `audio/manifest.json`.
-4. Run the checks below, then open a PR using the template.
+1. Add the `.ogg` in `sfx/` or `music/`.
+2. Add its entry to `audio/manifest.json`.
+3. Run the checks below, then open a PR using the template.
 
 ## Example to copy
 
@@ -63,16 +60,14 @@ tools/check.sh                     # the hard rules (file types, sizes, licenses
 ci/build/build.sh --quick --tests  # import, smoke test and every unit test in Godot
 ```
 
-`tools/check.sh` does not yet check that every asset has a manifest entry. Until that validator exists, the reviewer checks it (see the rating questions below), so don't skip the entry.
+`tools/check.sh` does not yet check that every asset has a manifest entry. Until that validator exists, the reviewer checks it (see the review questions below), so don't skip the entry.
 
 Add a short video, or a note saying where the sound plays in the game, how loud it is and how it loops, to the PR.
 
-## Rating questions
+## Review questions
 
-Besides the standard criteria (fit, fun, quality, value, performance, risk, scope):
+Besides the general review (bugs, edge cases, 1–4 players, performance, clarity, fun):
 
 - Does it fit the game's mood, and is it still pleasant on the hundredth listen?
 - Is the volume balanced with the other sounds, and does music loop cleanly?
 - Is the origin recorded honestly in the manifest?
-
-Audio also needs the community vote (👍/👎, 24 hours).

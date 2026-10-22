@@ -4,8 +4,6 @@
 
 Shared pixel art used by more than one thing: tilesets (`tilesets/`), UI art (`ui/`) and visual effects (`vfx/`). Art that belongs to a single item (a spell icon, an enemy sprite) lives in that item's folder under `content/`, not here. The look is 32×32 pixel art; the vision is in docs/DESIGN.md, and the rules are in [docs/STYLE.md](../docs/STYLE.md) (provisional until M2): the palette, light from the top-left, 1px dark outline, no gradients, at most 3 shades per material, frame counts.
 
-**Opens for PRs in M1** (see "Opens for PRs" in docs/ROADMAP.md). Until then, PRs to this folder are a gamble.
-
 Palette files, grid templates and the one-page checklist are in [kit/](kit/README.md).
 
 ## Contract
@@ -40,16 +38,15 @@ Palette files, grid templates and the one-page checklist are in [kit/](kit/READM
 - `license`: an SPDX identifier allowed for assets.
 - `tier`: `placeholder`, `good` or `final`. Nothing with `placeholder` ships in a player-facing spot in Early Access.
 - For `origin: "ai"` also `tool` (the generator) and `prompt` (the full prompt). Prompts must not name living artists or franchises.
-- Optional: `github` (the author's login) and `source` (the issue or PR). A `quarantined` field is set by the copyright process; don't touch it.
+- Optional: `github` (the author's login) and `source` (the issue or PR). A `quarantined` field marks an asset taken out after a copyright report; don't touch it.
 
-The manifest drives the Steam AI disclosure and the "Replace placeholder" issues.
+The manifest drives the Steam AI disclosure and the list of placeholders still to replace.
 
 ## Steps
 
-1. Pick an issue labelled `now` in this area and comment `/claim`.
-2. Add the file in the right sub-folder (`tilesets/`, `ui/` or `vfx/`).
-3. Add its entry to `art/manifest.json`.
-4. Run the checks below, then open a PR using the template.
+1. Add the file in the right sub-folder (`tilesets/`, `ui/` or `vfx/`).
+2. Add its entry to `art/manifest.json`.
+3. Run the checks below, then open a PR using the template.
 
 ## Example to copy
 
@@ -62,16 +59,14 @@ tools/check.sh                   # the hard rules (file types, sizes, licenses),
 ci/build/build.sh --quick        # import and smoke test in Godot
 ```
 
-`tools/check.sh` does not yet check that every asset has a manifest entry. Until that validator exists, the reviewer checks it (see the rating questions below), so don't skip the entry.
+`tools/check.sh` does not yet check that every asset has a manifest entry. Until that validator exists, the reviewer checks it (see the review questions below), so don't skip the entry.
 
 Add a screenshot of the asset in the game to the PR.
 
-## Rating questions
+## Review questions
 
-Besides the standard criteria (fit, fun, quality, value, performance, risk, scope):
+Besides the general review (bugs, edge cases, 1–4 players, performance, clarity, fun):
 
 - Does it match the style guide: palette, light from the top-left, outline rules, frame counts?
 - Is it readable at 32×32, next to other art and with four players on screen?
 - Is the origin recorded honestly in the manifest?
-
-Art also needs the community vote (👍/👎, 24 hours).

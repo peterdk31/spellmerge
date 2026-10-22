@@ -1,6 +1,6 @@
 """Automation state: a JSON file on the automation-state branch.
 
-Holds pacing data (token usage, learned limits, back-off), processed owner
+Holds pacing data (token usage, back-off), processed owner
 commands, alarm issues and the last applied Control panel values. It is only
 ever trusted for pacing and bookkeeping, never for security decisions: those
 come from the Control panel's edit history and ci/config.json.
@@ -25,18 +25,26 @@ DEFAULT: dict[str, Any] = {
     "version": 1,
     "paused_by_command": False,
     "backoff_until": None,
-    "usage": [],  # [{"at": iso, "tokens": n, "kind": "dev" | "review" | "rate" | "plan"}]
-    "limits": {"window_tokens": None, "week_tokens": None},
+    "usage": [],  # [{"at": iso, "tokens": n, "kind": "dev" | "review" | "intake" | "plan"}]
     "processed_comments": [],
     "pending_instructions": [],  # verified owner instructions for Claude
     "panel_applied": None,
     "panel_problems": [],
     "alarms": {},  # alarm name -> issue number
+    "automation_started": None,  # when the alarms first ran (the stall alarm's starting point)
+    "task_failures": {},  # task -> failed reviews, its PR, the review's problems, parked_until and why
     "last_own_merge": None,
+    "last_plan": None,  # when the last planning session finished
+    "last_weekly": None,  # when the last weekly planning finished (smbot.control starts the next one)
+    "errors_in_a_row": 0,  # sessions that ended in an error since the last one that made progress
+    "idle": None,  # when planning last found nothing to do; cleared by the next progress
+    "checkpoint_answers": {},  # checkpoint issue number -> the owner's verified /go, /iterate or /pivot
+    "intake_tasks": {},  # issue number -> the intake's neutral task for it (smbot.intake)
+    "cla_signatures": {},  # "user_id:version" -> a contributor's CLA signature and its comment (smbot.contrib)
 }
 
 MAX_PROCESSED = 1000
-MAX_USAGE_DAYS = 8
+MAX_ERRORS_IN_A_ROW = 3  # sessions ending in an error are retried this often; then development stops
 
 
 def _url(cfg: config_mod.Config) -> str:

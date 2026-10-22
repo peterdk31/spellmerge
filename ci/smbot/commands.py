@@ -4,8 +4,11 @@ A comment counts only if its author is the owner's numeric user ID and every
 revision in its edit history is by the owner too. Commands from anyone else are
 ignored and never treated as instructions.
 
-Carried out here, by script: /pause, /resume, /close, /merge and /revert.
+Carried out here, by script: /pause, /resume, /close, /merge, /revert and /retry (puts a parked
+task back in the queue: on its PR, or on the issue it comes from).
 Queued for the next Claude session: /priority, /claude <text> and /ask <question>.
+Checkpoint answers, only in an open `checkpoint` issue: /go, /iterate <what> and /pivot <how>
+(smbot.checkpoint); the gate starts a planning session that carries them out.
 """
 
 from __future__ import annotations
@@ -14,14 +17,16 @@ import datetime as dt
 import re
 import subprocess
 import tempfile
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
+from . import checkpoint
 from . import config as config_mod
 from . import gh
 from .pacing import iso, parse_time
 
-COMMANDS = ("merge", "close", "revert", "priority", "claude", "ask", "pause", "resume")
+COMMANDS = ("merge", "close", "revert", "priority", "claude", "ask", "pause", "resume", "go", "iterate", "pivot",
+            "retry")
 _COMMAND = re.compile(r"^/(" + "|".join(COMMANDS) + r")\b[ \t]*(.*)", re.DOTALL)
 SCAN_DAYS = 3
 
@@ -170,14 +175,26 @@ class Effects:
     processed: list[int]
     paused: bool | None
     instructions: list[dict[str, Any]]
+    checkpoints: list[dict[str, Any]] = field(default_factory=list)  # answers: issue, verdict, text, url, at
+    retries: list[int] = field(default_factory=list)  # PRs or issues whose parked task goes back in the queue
 
     def apply(self, state: dict[str, Any]) -> None:
         seen = set(state["processed_comments"])
         state["processed_comments"] += [i for i in self.processed if i not in seen]
         if self.paused is not None:
             state["paused_by_command"] = self.paused
+            if not self.paused:
+                state["errors_in_a_row"] = 0  # /resume also restarts development stopped by errors
         known = {i["url"] for i in state["pending_instructions"]}
         state["pending_instructions"] += [i for i in self.instructions if i["url"] not in known]
+        for a in self.checkpoints:
+            checkpoint.record(state, a["issue"], a["verdict"], a["text"], a["url"], a["at"])
+        for number in self.retries:
+            for task, entry in state.get("task_failures", {}).items():
+                if str(entry.get("pr")) == str(number) or f"#{number}," in task or f"#{number} " in task[:60]:
+                    entry.pop("parked_until", None)
+                    entry.pop("parked_reason", None)
+                    entry["count"] = 0  # two fresh attempts; the last review's problems stay as the brief
 
 
 def queue_instruction(effects: Effects, cmd: Command) -> str:
@@ -189,6 +206,20 @@ def queue_instruction(effects: Effects, cmd: Command) -> str:
     if cmd.name == "priority":
         return "Got it. This goes to the top of `docs/NEXT.md` in the next development session."
     return "Got it. Claude will act on this in the next development session."
+
+
+def answer_checkpoint(cfg: config_mod.Config, effects: Effects, cmd: Command) -> str:
+    issue = gh.api(f"repos/{cfg.repo}/issues/{cmd.number}")
+    labels = {lab["name"] for lab in issue.get("labels", [])}
+    if cmd.is_pr or issue["state"] != "open" or checkpoint.LABEL not in labels:
+        return f"`/{cmd.name}` only works in an open checkpoint issue."
+    if cmd.name != "go" and not cmd.text:
+        return f"Say what you want after `/{cmd.name}`, for example `/{cmd.name} make the dodge snappier`."
+    effects.checkpoints.append({"issue": cmd.number, "verdict": cmd.name, "text": cmd.text, "url": cmd.url,
+                                "at": cmd.created_at})
+    return {"go": "Got it: go. A planning session starts the next milestone now.",
+            "iterate": "Got it: iterate. A planning session turns this into tasks now.",
+            "pivot": "Got it: pivot. A planning session works out the new direction now."}[cmd.name]
 
 
 def run(cfg: config_mod.Config, processed: set[int], now: dt.datetime, token: str) -> tuple[list[str], Effects]:
@@ -210,6 +241,16 @@ def run(cfg: config_mod.Config, processed: set[int], now: dt.datetime, token: st
                 result = do_close(cfg, cmd)
             elif cmd.name == "revert":
                 result = do_revert(cfg, cmd, token)
+            elif cmd.name in checkpoint.VERDICTS:
+                result = answer_checkpoint(cfg, effects, cmd)
+            elif cmd.name == "retry":
+                effects.retries.append(cmd.number)
+                try:
+                    gh.api(f"repos/{cfg.repo}/issues/{cmd.number}/labels/parked", "-X", "DELETE")
+                except gh.GhError:
+                    pass  # it wasn't labelled
+                result = ("Back in the queue: if this task was parked, the next session takes it up again, with "
+                          "two fresh attempts and the last review's points as its brief.")
             else:
                 result = queue_instruction(effects, cmd)
         except (gh.GhError, subprocess.CalledProcessError) as e:

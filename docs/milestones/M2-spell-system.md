@@ -1,6 +1,6 @@
 # M2: Spell system
 
-**Goal:** make spell building the heart of the game (docs/DESIGN.md, pillar 1: few components, many combinations). The 18 starting components (5 forms, 4 elements, 6 modifiers, 3 triggers) are built as data on small base classes. A spell is assembled from them as form → element → modifiers → trigger, and a trigger holds another spell. A complexity budget keeps every spell inside the performance limits. Each player builds in their own corner panel and nobody waits for anyone (pillar 2). The stress benchmark starts gating the daily build, the art direction call picks the game's look, and the Spells and Story areas open to contributors.
+**Goal:** make spell building the heart of the game (docs/DESIGN.md, pillar 1: few components, many combinations). The 18 starting components (5 forms, 4 elements, 6 modifiers, 3 triggers) are built as data on small base classes. A spell is assembled from them as form → element → modifiers → trigger, and a trigger holds another spell. A complexity budget keeps every spell inside the performance limits. Each player builds in their own corner panel and nobody waits for anyone (pillar 2). The stress benchmark starts gating the daily build, and the owner picks the game's look from Claude's style samples.
 
 **Status (2026-10-21):** started by the owner ("Start milestone 2"), which is the **go** verdict at C1 (#97) after two iterate rounds. M1's done-when items that are still open carry into M2 (see "Carried over from M1"), the way M0's dry runs carried into M1.
 
@@ -14,8 +14,6 @@
 6. The **stabilisation phase** is over: no known crash or blocker in M2's scope.
 7. Checkpoint **C2** has a verdict (below).
 
-**Opens for PRs:** Spells from part 15, once all four component kinds, the validator and the README exist. Story from part 23. Neither opens earlier, so no contributor copies a shape that is about to change. Art and Audio stay open. All other areas stay closed.
-
 ## Carried over from M1
 
 The owner said go at C1 on 2026-10-21 while these were still open. They are not dropped; they are part of M2's done-when (item 5):
@@ -27,9 +25,9 @@ The owner said go at C1 on 2026-10-21 while these were still open. They are not 
 
 ## Who builds what
 
-- **Claude** builds everything in bot-maintained and open paths: `core/`, `gameplay/`, `hud/`, `content/`, `art/`, `tests/`, `project.godot`, `export_presets.cfg`, and `docs/` except the owner-only `docs/DESIGN.md`, `docs/SECURITY-CHECKLIST.md` and `docs/SETUP-APP.md`. One part is one session and one PR.
-- **The owner** makes the changes in owner-only paths: the stress benchmark step and its 7-day trend warning in `ci/build/build.sh` (part 25), calling the validator from `tools/check.sh` if wanted (part 9), merging PR #98, posting the art direction call in Discussions if the bot cannot (part 27), locking the chosen art direction in `docs/DESIGN.md` (part 27), and the C2 verdict. Each is asked as one `owner` issue with the exact change when its part starts. The queue goes on meanwhile.
-- **The community** adds spell components and story text once those areas open, plus art and sound. The weekly planning run turns the milestone's needs (component icons, element sounds, component descriptions) into `now` issues with a "Brief for your AI".
+- **Claude** builds everything in bot-maintained paths: `core/`, `gameplay/`, `hud/`, `content/`, `art/`, `tests/`, `project.godot`, `export_presets.cfg`, and `docs/` except the owner-only `docs/DESIGN.md`, `docs/SECURITY-CHECKLIST.md` and `docs/SETUP-APP.md`. One part is one session and one PR.
+- **The owner** makes the changes in owner-only paths: the stress benchmark step and its 7-day trend warning in `ci/build/build.sh` (part 25), calling the validator from `tools/check.sh` if wanted (part 9), merging PR #98, picking the art direction (part 27), locking it in `docs/DESIGN.md` (part 27), and the C2 verdict. Each is asked as one `owner` issue with the exact change when its part starts. The queue goes on meanwhile.
+- **Players** report bugs and share ideas (new components, combos, feedback on the look) in Issues and Discussions. The daily intake schedules them or puts them on the backlog; Claude makes every component, story text, icon and sound itself.
 - **The weekly owner playtest** goes on. From the first Sunday after the builder works (part 20), the "Playtest of the week" asks about building, not only feel.
 
 ## Design decisions for M2
@@ -170,33 +168,32 @@ Every combo in the catalogue below fits under 12 with these numbers. Its largest
   - no unknown status or effect kind appears;
   - no reaction row names an element that doesn't exist;
   - each component's `complexity` fits the budget on its own.
-- It returns its problems as rule, file, field and fix (the same shape as `tools/check.sh`), so a contributor's agent can act on them.
+- It returns its problems as rule, file, field and fix (the same shape as `tools/check.sh`), so a session's agent can act on them.
 - The registry runs it at start in debug builds and pushes a warning per problem. The test fails on any problem.
-- Calling it from `tools/check.sh` is an owner question asked in part 9. Until then, contributors run `ci/build/build.sh --quick --tests`.
+- Calling it from `tools/check.sh` is an owner question asked in part 9. Until then, sessions run `ci/build/build.sh --quick --tests`.
 
 ### The combo catalogue
 
 - `content/spells/combos.json` lists named combos. Each has a recipe (ids per slot), what it should do in plain words, and the check the combo test runs (for example: kills N imps, triggers reaction X, never exceeds K shots).
 - It doubles as the start of the codex (docs/DESIGN.md, "Discovery"), which is `progression`'s job in M5. In M2 it is only data and a test.
-- There are at least 20 combos by the end of M2, with each component in at least two. Contributors add a combo row with every new component; the spells README says so.
+- There are at least 20 combos by the end of M2, with each component in at least two. Every new component comes with a combo row; the spells README says so.
 
-### Story opens with words the game shows
+### Story starts with words the game shows
 
-- Claude writes `docs/STORY.md` (canon and tone, short) before the area opens: a self-aware, slightly comic magic world with real stakes (docs/DESIGN.md, pillar 3).
+- Claude writes `docs/STORY.md` (canon and tone, short) before the first lore: a self-aware, slightly comic magic world with real stakes (docs/DESIGN.md, pillar 3).
 - The first story content is a one-line **description per component**, in `content/story/lore/components/<id>.json`.
-  - Fields: `id`, `refers_to` (`spell:<component id>`), `title` and `text`. `text` has at most 90 characters, so it fits a corner panel.
+  - Fields: `id`, `refers_to` (`spell:<component id>`), `title` and `text`. `text` has at most 60 characters, so it fits the builder's three-line note.
   - The builder shows it.
   - A validator checks the fields, the length, and that `refers_to` names real content.
 - Dialogue and in-run events stay empty until a later milestone has a place to show them.
 
-### Art and the art direction call
+### Art and the art direction
 
 - Each component gets a 16×16 placeholder icon: hand-written SVG following docs/STYLE.md (rects only, palette only). Each element gets a shot tint from the palette. Forms that draw something new (the beam line, rune circle, orbit trail and nova ring) get a placeholder sprite in `art/vfx/`. All are listed in `art/manifest.json` as `ai`, tier `placeholder`.
-- **The art direction call** (docs/PLAN.md, "Who sets the direction"):
-  - Claude writes the call: what to submit (a wizard, a crypt tile and one spell icon, in the palette and on the grid), the deadline, and how voting works.
-  - If the bot app has no Discussions access, Claude asks the owner to post it.
-  - The community votes, and the owner picks the winner or commissions an artist.
-  - The winner's files become the golden examples in `docs/STYLE.md` and `art/kit/golden.json`. The owner locks the choice in `docs/DESIGN.md` ("Art direction (locked)").
+- **The art direction choice** (docs/PLAN.md, "Who sets the direction"):
+  - Claude draws two or three style samples itself (a wizard, a crypt tile and one spell icon each, in the palette and on the grid) and puts them on one screenshot sheet.
+  - It asks the owner in an `owner` issue to pick one, or to commission an artist. The owner may first ask players for feedback in Discussions; the intake reads it like any other post.
+  - The chosen files become the golden examples in `docs/STYLE.md` and `art/kit/golden.json`. The owner locks the choice in `docs/DESIGN.md` ("Art direction (locked)").
   - Replacing the placeholders with the chosen style is spread over later milestones, not done in M2.
 
 ### Bots build spells
@@ -226,7 +223,7 @@ Each part ends with tests and a green `tools/check.sh` and `ci/build/build.sh --
 | 12 | **The six modifiers:** `content/spells/modifiers/` | Split, pierce, homing, chain, bigger and faster, with icons; tests per modifier |
 | 13 | **The three triggers:** `content/spells/triggers/` | On hit, on expire and timer, with icons; tests including depth 3 and the fire cap |
 | 14 | **The combo catalogue and test:** `content/spells/combos.json`, `tests/content/spells/test_combos.gd` | The test arena fixture and the first 12 combos passing |
-| 15 | **Spells README and example; Spells opens** | The README rewritten for the component classes (fields, ranges, complexity, the combo row rule), with the bolt, frost, split and on hit as examples; the weekly run may now open `now` issues for spells |
+| 15 | **Spells README and example** | The README rewritten for the component classes (fields, ranges, complexity, the combo row rule), with the bolt, frost, split and on hit as examples |
 | 16 | **Builder, part 1:** `hud/builder` | The expanded corner panel, the slot chain and the bag, per-player focus through `core/ui_focus`, opened from the overlay; sends `build_change_requested`; tests with four builders open at once |
 | 17 | **Builder, part 2:** `hud/builder` | Live stats, the complexity bar, the refusal reason, the mini-preview and the descriptions (empty until part 23); screenshot shots for 1 and 4 players |
 | 18 | **The quick view and quick actions:** `hud/builder`, `hud/panels`, `gameplay/player` | The builder folds into the quick view when a wave starts; swap shown on the corner panel (active spell A or B); "Drop component" in the overlay and the quick view; tests |
@@ -234,16 +231,16 @@ Each part ends with tests and a green `tools/check.sh` and `ci/build/build.sh --
 | 20 | **Bots build spells:** `tests/bots` | Seeded random builds, bot 4 staying in its builder in the 4-bot test, `test_spell_fuzz.gd`; **the weekly playtest asks about building from here** |
 | 21 | **Combos to 20+:** `combos.json` | At least 20 combos passing, each component in two non-refusal combos; done-when item 2 |
 | 22 | **Story canon:** `docs/STORY.md` | Canon and tone, short; listed in `llms.txt` |
-| 23 | **The first lore; Story opens:** `content/story/lore/components/` | One description per component, its validator, the Story README's example and schema; the builder shows them |
+| 23 | **The first lore:** `content/story/lore/components/` | One description per component, its validator, the Story README's example and schema; the builder shows them |
 | 24 | **Stress scene:** `tests/benchmark` | The stress scene (4 bots with built spells, 100 or 200 enemies, 1,000 or 3,000 shots, full effects) in the editor run, `BENCH:` lines, `STRESS OK` |
 | 25 | **Stress in the exports and the limits:** `tests/benchmark`, `core/spells/limits.gd` | The stress run and M1's WASM projectile timing runner in the Linux Test and Web Test exports (a node the main menu adds on `--stress` or `--projectile-timing`, like the 4-bot runner); the limits confirmed or lowered from the numbers; the `ci/` step (a warning over budget, not a gate) asked as an owner issue |
-| 26 | **Component icons and art pass:** `art/`, `content/spells/` | Icons for all 18, element shot tints and the vfx checked together in one screenshot sheet against docs/STYLE.md; Art `now` issues for replacements |
-| 27 | **Art direction call** | The call text, the owner issue to post it and to lock the winner in DESIGN.md; nothing in the game waits on it |
+| 26 | **Component icons and art pass:** `art/`, `content/spells/` | Icons for all 18, element shot tints and the vfx checked together in one screenshot sheet against docs/STYLE.md; whatever falls short becomes Claude's own replacement task in `docs/NEXT.md` |
+| 27 | **Art direction choice** | Claude drafts the style samples itself and asks the owner in one `owner` issue to pick one (optionally after asking players for feedback in Discussions) and to lock it in DESIGN.md; nothing in the game waits on it |
 | 28 | **Stabilisation and C2** | Only bug fixing, polish and performance until no known crash or blocker remains; then the C2 issue with a build link, bot data (fuzz and stress numbers, which recipes bots build), Claude's honest assessment and questions |
 
 - Parts 1–6 are the engine, 7–15 the content, 16–19 the builder, and 20–25 the proof.
-- Spells opens at part 15, after all four kinds, the validator and the example exist. Story opens at part 23.
-- The art call (part 27) only needs the game's current look, so a session with spare room may do it earlier.
+- The Spells README and examples come at part 15, after all four kinds and the validator exist; the Story README's example at part 23.
+- The art direction choice (part 27) only needs the game's current look, so a session with spare room may do it earlier.
 
 ## Combo catalogue (first draft)
 

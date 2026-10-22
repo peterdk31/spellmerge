@@ -3,6 +3,8 @@ from __future__ import annotations
 import copy
 import datetime as dt
 import json
+import os
+import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -82,6 +84,8 @@ FIXTURE_TASK = "**Area READMEs for the content areas.** Write the READMEs."
 
 
 @mock.patch.object(session.nexttask, "next_task", lambda *a, **k: FIXTURE_TASK)
+@mock.patch.object(session, "queue", lambda cfg, st, strict=False: [])
+@mock.patch.object(session, "open_checkpoint", lambda cfg: None)
 class PromptTest(unittest.TestCase):
     """Uses a fixed task, so the tests don't depend on what docs/NEXT.md says today."""
 
@@ -118,6 +122,27 @@ class PromptTest(unittest.TestCase):
         self.assertIn("PR #12", prompt)
         self.assertIn("last attempt", prompt)
 
+    def test_prepare_plan_builds_the_planning_prompt(self) -> None:
+        """A parameter named `weekly` once hid the weekly module, so every planning session crashed."""
+        st = copy.deepcopy(state.DEFAULT)
+        with mock.patch.object(session.weekly, "backlog_text", lambda cfg, st: "[]"), \
+                mock.patch.object(session, "open_pr_for", lambda cfg, slug: None):
+            out = session.prepare_plan(CFG, st, "", dt.date(2026, 10, 22), weekly_run=False)
+            weekly_out = session.prepare_plan(CFG, st, "", dt.date(2026, 10, 25), weekly_run=True)
+        self.assertEqual((out["kind"], out["task"]), ("plan", "Planning"))
+        self.assertRegex(out["branch"], r"^claude/\d{8}-\d{4}-planning$")
+        self.assertIn("the work queue is empty", out["prompt"])
+        self.assertIn("weekly run on Sunday", weekly_out["prompt"])
+        self.assertNotIn("{{", out["prompt"])
+
+    def test_prepare_plan_continues_an_open_planning_pr(self) -> None:
+        pr = {"number": 12, "head": {"ref": "claude/20261022-0900-planning"}}
+        with mock.patch.object(session.weekly, "backlog_text", lambda cfg, st: "[]"), \
+                mock.patch.object(session, "open_pr_for", lambda cfg, slug: pr if slug == "planning" else None):
+            out = session.prepare_plan(CFG, copy.deepcopy(state.DEFAULT), "", dt.date(2026, 10, 22))
+        self.assertEqual(out["branch"], "claude/20261022-0900-planning")
+        self.assertIn("PR #12", out["prompt"])
+
     def test_review_and_revise_prompts(self) -> None:
         self.assertIn("#7 at commit abc", session.review_prompt(CFG, 7, "abc", "final"))
         p = session.revise_prompt(CFG, 7, {"summary": "s", "problems": [
@@ -145,7 +170,8 @@ class FinishTest(unittest.TestCase):
     APPROVE = json.dumps({"verdict": "approve", "problems": []})
     REVISE = json.dumps({"verdict": "revise", "problems": [{"severity": "major", "problem": "p", "fix": "f"}]})
 
-    def run_finish(self, st: dict, queue: list[str], **env: str) -> tuple[dict[str, str], dict]:
+    def run_finish(self, st: dict, queue: list[str], posts: list | None = None, checkpoint_issue: int | None = None,
+                   **env: str) -> tuple[dict[str, str], dict]:
         base = {"TASK": "A", "TASK_KIND": "next", "PR": "", "IMPLEMENT_STATUS": "ready", "FINAL_REVIEW": "",
                 "MERGED": "", "SETTINGS": "{}"}
         base.update(env)
@@ -160,14 +186,45 @@ class FinishTest(unittest.TestCase):
             real = session.nexttask.next_task
             with mock.patch.object(session.state, "update", update), \
                     mock.patch.object(session.state, "load", lambda cfg: (st, "sha")), \
-                    mock.patch.object(session.dailylog, "post"), \
-                    mock.patch.object(session.nexttask, "next_task", lambda path_=None, skip=(): real(path, skip)):
+                    mock.patch.object(session.dailylog, "post",
+                                      lambda cfg, title, lines, **k: (posts if posts is not None else []).append(lines)), \
+                    mock.patch.object(session, "pr_title", lambda cfg, pr: f"Title of #{pr}" if pr else ""), \
+                    mock.patch.object(session, "announce_park",
+                                      lambda cfg, task, e: f"Parked until {e['parked_until']}: {e['parked_reason']}"), \
+                    mock.patch.object(session, "unlabel_parked", lambda cfg, pr: None), \
+                    mock.patch.object(session, "queue", lambda cfg, st, strict=False: []), \
+                    mock.patch.object(session, "open_checkpoint", lambda cfg: checkpoint_issue), \
+                    mock.patch.object(session.nexttask, "next_task",
+                                      lambda path_=None, skip=(), first=(): real(path, skip, first)):
                 return session.finish(CFG, base), st
 
     def test_continues_after_a_merge(self) -> None:
         out, _ = self.run_finish(copy.deepcopy(state.DEFAULT), ["B"], PR="5", FINAL_REVIEW=self.APPROVE,
                                  MERGED="true")
         self.assertEqual(out["again"], "true")
+
+    def test_log_lines_name_the_pr_and_stay_short(self) -> None:
+        posts: list = []
+        self.run_finish(copy.deepcopy(state.DEFAULT), ["B"], posts, PR="5", FINAL_REVIEW=self.APPROVE, MERGED="true")
+        self.run_finish(copy.deepcopy(state.DEFAULT), ["A", "B"], posts, IMPLEMENT_STATUS="blocked",
+                        TASK="**Do the thing.** With a long description", IMPLEMENT_SUMMARY="It waits. " * 100)
+        self.assertEqual(posts[0][0], "Merged #5: Title of #5")
+        self.assertTrue(posts[1][0].startswith("Blocked, set aside for a week: Do the thing. It waits."))
+        self.assertLess(len(posts[1][0]), 400)
+        self.assertTrue(posts[1][0].endswith("It waits."))
+
+    def test_two_failed_reviews_park_for_a_day_three_for_a_week_and_say_so(self) -> None:
+        st = copy.deepcopy(state.DEFAULT)
+        st["task_failures"] = {"A": {"count": 1, "pr": 5}}
+        posts: list = []
+        _, st = self.run_finish(st, ["A", "B"], posts, PR="5", FINAL_REVIEW=self.REVISE)
+        until = dt.datetime.fromisoformat(st["task_failures"]["A"]["parked_until"].replace("Z", "+00:00"))
+        self.assertLess(until - dt.datetime.now(dt.timezone.utc), dt.timedelta(days=1, minutes=1))
+        self.assertTrue(any("Parked until" in line for line in posts[-1]))
+        st["task_failures"]["A"].pop("parked_until")
+        _, st = self.run_finish(st, ["A", "B"], posts, PR="5", FINAL_REVIEW=self.REVISE)
+        until = dt.datetime.fromisoformat(st["task_failures"]["A"]["parked_until"].replace("Z", "+00:00"))
+        self.assertGreater(until - dt.datetime.now(dt.timezone.utc), dt.timedelta(days=6))
 
     def test_continues_after_a_failed_review_without_waiting(self) -> None:
         out, st = self.run_finish(copy.deepcopy(state.DEFAULT), ["A", "B"], PR="5", FINAL_REVIEW=self.REVISE)
@@ -182,7 +239,7 @@ class FinishTest(unittest.TestCase):
         self.assertIn("parked_until", st["task_failures"]["A"])
         self.assertEqual(out["again"], "true")
         out, _ = self.run_finish(st, ["A"], PR="5", FINAL_REVIEW=self.REVISE)
-        self.assertEqual(out["again"], "false")  # only the parked task is left
+        self.assertEqual(out["again"], "true")  # only the parked task is left: the next run plans
 
     def test_blocked_and_refused_merges_are_parked(self) -> None:
         out, st = self.run_finish(copy.deepcopy(state.DEFAULT), ["A", "B"], IMPLEMENT_STATUS="blocked")
@@ -200,9 +257,9 @@ class FinishTest(unittest.TestCase):
         self.assertIn("#84", st["task_failures"]["A"]["parked_reason"])
         self.assertEqual(out["again"], "true")
         out, _ = self.run_finish(st, ["A"], IMPLEMENT_STATUS="nothing_to_do")
-        self.assertEqual(out["again"], "false")  # only the parked task is left
+        self.assertEqual(out["again"], "true")  # only the parked task is left: the next run plans
         out, st = self.run_finish(copy.deepcopy(state.DEFAULT), ["B"], TASK="", IMPLEMENT_STATUS="nothing_to_do")
-        self.assertEqual(out["again"], "false")  # an empty queue is not a task to set aside
+        self.assertEqual(out["again"], "true")  # an empty queue: the next run plans
         self.assertEqual(st.get("task_failures", {}), {})
 
     def test_a_conflict_sends_the_pr_back_instead_of_parking_it(self) -> None:
@@ -223,16 +280,140 @@ class FinishTest(unittest.TestCase):
         out, _ = self.run_finish(copy.deepcopy(state.DEFAULT), ["A"], IMPLEMENT_STATUS="error")
         self.assertEqual(out["resume_at"], "")
 
-    def test_stops_on_errors_paused_merging_and_plan_runs(self) -> None:
-        for env in ({"IMPLEMENT_STATUS": "error"}, {"IMPLEMENT_STATUS": "limit"},
-                    {"TASK": "", "IMPLEMENT_STATUS": "nothing_to_do"},
+    def test_stops_only_for_limits_pauses_the_token_and_idle_planning(self) -> None:
+        for env in ({"IMPLEMENT_STATUS": "limit"}, {"IMPLEMENT_STATUS": "auth"},
                     {"PR": "5", "FINAL_REVIEW": self.APPROVE, "MERGED": ""},
-                    {"TASK_KIND": "plan", "PR": "5", "FINAL_REVIEW": self.APPROVE, "MERGED": "true"}):
-            out, _ = self.run_finish(copy.deepcopy(state.DEFAULT), ["A", "B"], **env)
+                    {"TASK_KIND": "plan", "TASK": "Weekly planning", "IMPLEMENT_STATUS": "nothing_to_do"}):
+            out, _ = self.run_finish(copy.deepcopy(state.DEFAULT), [], **env)
             self.assertEqual(out["again"], "false", env)
+
+    def test_a_merged_plan_flows_into_development(self) -> None:
+        out, st = self.run_finish(copy.deepcopy(state.DEFAULT), [], TASK_KIND="plan", TASK="Planning",
+                                  PR="7", FINAL_REVIEW=self.APPROVE, MERGED="true")
+        self.assertEqual(out["again"], "true")
+        self.assertIsNotNone(st["last_plan"])
+
+    def test_weekly_planning_with_no_changes_is_not_idle_while_tasks_remain(self) -> None:
+        posts: list = []
+        out, _ = self.run_finish(copy.deepcopy(state.DEFAULT), ["A"], posts, TASK_KIND="plan",
+                                 TASK="Planning", IMPLEMENT_STATUS="nothing_to_do")
+        self.assertFalse(any("idle" in line for lines in posts for line in lines))
+
+    def test_idle_planning_tells_the_owner(self) -> None:
+        posts: list = []
+        self.run_finish(copy.deepcopy(state.DEFAULT), [], posts, TASK_KIND="plan", TASK="Planning",
+                        IMPLEMENT_STATUS="nothing_to_do")
+        self.assertTrue(any("Development is idle" in line for lines in posts for line in lines))
+
+    def test_idle_is_told_once_and_cleared_by_progress(self) -> None:
+        st = copy.deepcopy(state.DEFAULT)
+        posts: list = []
+        for _ in range(2):
+            out, st = self.run_finish(st, [], posts, TASK_KIND="plan", TASK="Planning", IMPLEMENT_STATUS="nothing_to_do")
+            self.assertEqual(out["again"], "false")
+        self.assertEqual(sum("Development is idle" in line for lines in posts for line in lines), 1)
+        self.assertIsNotNone(st["idle"])
+        _, st = self.run_finish(st, ["A"], PR="5", FINAL_REVIEW=self.APPROVE, MERGED="true")
+        self.assertIsNone(st.get("idle"))
+
+    def test_an_empty_session_clears_its_instructions(self) -> None:
+        """An /ask with an empty queue used to start the same session again and again."""
+        st = copy.deepcopy(state.DEFAULT)
+        st["pending_instructions"] = [{"kind": "ask", "number": 3, "url": "u", "text": "how is M2?"}]
+        out, st = self.run_finish(st, [], TASK="", IMPLEMENT_STATUS="nothing_to_do")
+        self.assertEqual(st["pending_instructions"], [])
+
+    def test_planning_keeps_the_owners_instructions_for_development(self) -> None:
+        st = copy.deepcopy(state.DEFAULT)
+        st["pending_instructions"] = [{"kind": "ask", "number": 3, "url": "u", "text": "how is M2?"}]
+        _, st = self.run_finish(st, ["A"], TASK_KIND="plan", TASK="Planning", IMPLEMENT_STATUS="nothing_to_do")
+        _, st = self.run_finish(st, ["A"], TASK_KIND="plan", TASK="Planning", PR="7", FINAL_REVIEW=self.APPROVE,
+                                MERGED="true")
+        self.assertEqual(len(st["pending_instructions"]), 1)
+
+    def test_the_weekly_planning_stays_due_after_a_usage_limit(self) -> None:
+        st = copy.deepcopy(state.DEFAULT)
+        _, st = self.run_finish(st, ["A"], TASK_KIND="plan", TASK="Planning", WEEKLY="true", IMPLEMENT_STATUS="limit")
+        self.assertIsNone(st["last_weekly"])
+        _, st = self.run_finish(st, ["A"], TASK_KIND="plan", TASK="Planning", WEEKLY="true",
+                                IMPLEMENT_STATUS="nothing_to_do")
+        self.assertIsNotNone(st["last_weekly"])
+
+    def test_planning_with_nothing_to_change_carries_on_while_work_remains(self) -> None:
+        out, _ = self.run_finish(copy.deepcopy(state.DEFAULT), ["A"], TASK_KIND="plan", TASK="Planning",
+                                 IMPLEMENT_STATUS="nothing_to_do")
+        self.assertEqual(out["again"], "true")
+
+    def test_an_answer_planning_couldnt_carry_out_goes_back_to_the_owner(self) -> None:
+        st = copy.deepcopy(state.DEFAULT)
+        session.checkpoint.record(st, 50, "iterate", "x", "u", "2026-10-22T10:00:00Z")
+        handed: list = []
+        posts: list = []
+        with mock.patch.object(session, "checkpoint_not_carried_out",
+                               lambda cfg, n, summary: handed.append(n) or ["back to you"]):
+            _, st = self.run_finish(st, [], posts, checkpoint_issue=50, TASK_KIND="plan", TASK="Planning",
+                                    IMPLEMENT_STATUS="nothing_to_do", IMPLEMENT_SUMMARY="unclear")
+        self.assertEqual((handed, st["checkpoint_answers"]), ([50], {}))
+
+    def test_a_merged_plan_leaves_a_checkpoint_closed_by_hand_alone(self) -> None:
+        calls: list = []
+
+        def api(path: str, *args: str, input: object = None, token: object = None) -> object:
+            calls.append((path, input))
+            return {"state": "closed"}
+
+        with mock.patch.object(session.gh, "api", api):
+            self.assertEqual(session.close_checkpoint(CFG, 50, "8"), [])
+        self.assertEqual([c for c in calls if c[1]], [])
+
+    def test_no_idle_alarm_while_a_checkpoint_waits(self) -> None:
+        posts: list = []
+        self.run_finish(copy.deepcopy(state.DEFAULT), [], posts, checkpoint_issue=50, TASK_KIND="plan",
+                        TASK="Planning", IMPLEMENT_STATUS="nothing_to_do")
+        self.assertFalse(any("idle" in line for lines in posts for line in lines))
+
+    def test_a_merged_plan_that_answers_the_checkpoint_closes_it(self) -> None:
+        st = copy.deepcopy(state.DEFAULT)
+        session.checkpoint.record(st, 50, "go", "", "u", "2026-10-22T10:00:00Z")
+        closed: list = []
+        with mock.patch.object(session, "close_checkpoint", lambda cfg, n, pr: closed.append((n, pr)) or ["x"]):
+            out, _ = self.run_finish(st, [], checkpoint_issue=50, TASK_KIND="plan", TASK="Planning", PR="8",
+                                     FINAL_REVIEW=self.APPROVE, MERGED="true")
+        self.assertEqual((closed, out["again"]), ([(50, "8")], "true"))
+
+    def test_errors_are_retried_then_raise_an_alarm(self) -> None:
+        st = copy.deepcopy(state.DEFAULT)
+        raised: list = []
+        with mock.patch.object(session.alarms, "raise_alarm",
+                               lambda cfg, st_, name, **k: raised.append(name) or "Alarm raised: #9"):
+            for attempt in range(1, state.MAX_ERRORS_IN_A_ROW + 1):
+                out, st = self.run_finish(st, ["A"], IMPLEMENT_STATUS="error")
+                self.assertEqual(st["errors_in_a_row"], attempt)
+                self.assertEqual(out["again"], "true" if attempt < state.MAX_ERRORS_IN_A_ROW else "false")
+        self.assertEqual(raised, ["stopped"])
+        posts: list = []
+        with mock.patch.object(session.alarms, "raise_alarm", lambda *a, **k: None):  # already open
+            self.run_finish(st, ["A"], posts, IMPLEMENT_STATUS="error")
+        self.assertFalse(any(lines for lines in posts if "Development stopped" in str(lines)))
+        _, st = self.run_finish(st, ["A", "B"], PR="5", FINAL_REVIEW=self.APPROVE, MERGED="true")
+        self.assertEqual(st["errors_in_a_row"], 0)
 
 
 class PublishTest(unittest.TestCase):
+    def test_a_park_is_announced_on_the_pr_with_the_reviews_points(self) -> None:
+        calls: list = []
+        entry = {"pr": "156", "parked_until": "2026-10-23T11:08:02Z", "long": False, "problems": "- Fix the comment.",
+                 "parked_reason": "the final review didn't approve it 2 times in a row"}
+        with mock.patch.object(session.gh, "api", lambda path, *a, input=None, **k: calls.append((path, input)) or {}), \
+                mock.patch.object(session.labels_mod, "ensure"):
+            line = session.announce_park(CFG, "**Bots build spells (M2 part 20).** more", entry)
+        comment = next(i["body"] for p, i in calls if p.endswith("/issues/156/comments"))
+        self.assertIn("**Parked until 2026-10-23 11:08 UTC:**", comment)
+        self.assertIn("- Fix the comment.", comment)
+        self.assertIn("`/retry`", comment)
+        self.assertIn((f"repos/{CFG.repo}/issues/156/labels", {"labels": ["parked"]}), calls)
+        self.assertTrue(line.startswith("Parked until 2026-10-23 11:08 UTC: Bots build spells (M2 part 20) (#156"))
+
     def test_open_pr_finds_only_the_bots_pr(self) -> None:
         own = {"number": 19, "user": {"login": CFG.bot.login}, "head": {"sha": "abc", "repo": {"full_name": CFG.repo}}}
         other = {"number": 20, "user": {"login": "someone"}, "head": {"sha": "def", "repo": {"full_name": CFG.repo}}}
@@ -283,6 +464,30 @@ class PublishTest(unittest.TestCase):
                 session.publish(CFG, Path("work.bundle"), "claude/20261017-x", "new", {}, None, "t")
         self.assertFalse([c for c in run.call_args_list if "push" in c.args[0]])
         api.assert_not_called()
+
+    def test_only_the_checked_head_of_an_outside_pr_may_be_published(self) -> None:
+        bot = f"{CFG.bot.id}+{CFG.bot.login}@users.noreply.github.com"
+        with tempfile.TemporaryDirectory() as tmp:
+            def git(*args: str, email: str = "x@example.com") -> str:
+                return subprocess.run(["git", "-C", tmp, "-c", "user.name=x", "-c", f"user.email={email}", *args],
+                                      check=True, capture_output=True, text=True).stdout.strip()
+
+            git("init", "-q", "-b", "main")
+            git("commit", "-q", "--allow-empty", "-m", "main")
+            git("switch", "-q", "-c", "work")
+            git("commit", "-q", "--allow-empty", "-m", "contributor", email="ann@example.com")
+            checked = git("rev-parse", "HEAD")
+            git("commit", "-q", "--allow-empty", "-m", "bot fix", email=bot)
+            cwd = os.getcwd()
+            os.chdir(tmp)
+            try:
+                self.assertEqual(session.unchecked_commits("work", "main", checked, bot), [])
+                git("commit", "-q", "--allow-empty", "-m", "pushed later", email="ann@example.com")
+                later = git("rev-parse", "HEAD")
+                self.assertEqual(session.unchecked_commits("work", "main", checked, bot), [later])
+                self.assertEqual(len(session.unchecked_commits("work", "main", "", bot)), 2)  # nothing was checked
+            finally:
+                os.chdir(cwd)
 
     def test_workflow_changes_allows_only_mains_the_forks_or_the_branchs_version(self) -> None:
         import os

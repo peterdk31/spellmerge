@@ -560,6 +560,7 @@ jobs:
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-issues: write
+          permission-pull-requests: read # without it, the search for merged own PRs comes back empty
       - env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: python3 -m smbot.alarms check

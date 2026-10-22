@@ -2,7 +2,7 @@
   "alarms": {},
   "automation_started": "2026-10-16T16:49:06Z",
   "backoff_until": "2026-10-22T00:20:00Z",
-  "last_own_merge": "2026-10-22T02:50:45Z",
+  "last_own_merge": "2026-10-22T03:10:19Z",
   "limits": {
     "week_tokens": 44131848,
     "window_tokens": 7593823

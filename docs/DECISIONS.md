@@ -2,6 +2,11 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## Planning 2026-10-22: queue empty, M2 not done
+
+- **Why:** the queue held only the WASM numbers task (parked: no web `BENCH:` post exists yet), the art recording task (waits on `art-direction-pick-3`) and stabilisation. M2 is not done: done-when items 3 (WASM numbers), 5 (owner items) and 6 (stabilisation) are open, so no checkpoint yet.
+- **Now:** the WASM task is under Blocked with its trigger; the multimesh slice upload is split out as a task that needs no data; a builder walkthrough is added as the polish re-examination (the builder is what C2 asks about and only has tests so far); stabilisation follows. No scope was cut; no issues were in the queue or backlog.
+
 ## 2026-10-22: A third round of art samples: the hat is its own layer
 
 - **Why.** The owner answered #192 (key `art-direction-pick-2`) with "F's hat is nice, the body needs work, maybe only the hat changes colour per player, give me more options, maybe the palette needs work", and re-posted it as "not a pick" after the first session dropped it. So the question is asked again, with a new key `art-direction-pick-3`, as the owner asked.

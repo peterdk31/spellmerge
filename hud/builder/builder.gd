@@ -19,8 +19,8 @@ extends PanelContainer
 ## to the bag row list, which shows only the components that fit the slot (plus "None" to
 ## empty a filled slot); activating a row sends the request, and a form or element that went
 ## into an empty slot moves on to the next slot's bag (so form + element is four presses).
-## `dodge` on a bag row goes back to its slot, and anywhere else closes the builder. The focused control is marked with "> " and the
-## selected slot is shown in brackets, so nothing is shown by colour alone.
+## `dodge` on a bag row goes back to its slot, and anywhere else closes the builder. The focused control is marked
+## with "> " and the selected slot is shown in brackets, so nothing is shown by colour alone.
 ##
 ## The quick view (M2 part 18): when a wave starts (`set_quick(true)`, called by `panels.gd`) an
 ## open builder folds into the quick view, and one opened during a wave starts as it. It keeps the
@@ -862,6 +862,9 @@ func _advance_after(slot: int, id: StringName, was_empty: bool) -> bool:
 	if _id_in(_node_at(_level), slot) != id:
 		return false
 	_slot = slot + 1
+	if _slot == SLOT_FIRST_MODIFIER:
+		# The first free modifier slot, or the last one when all are filled.
+		_slot = mini(SLOT_FIRST_MODIFIER + _modifiers_of(_node_at(_level)).size(), SLOT_TRIGGER - 1)
 	_render()
 	_focus_control(_first_row())
 	return true

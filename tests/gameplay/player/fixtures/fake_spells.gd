@@ -21,7 +21,7 @@ var _has: PackedByteArray = PackedByteArray([0, 0, 0, 0, 0, 0, 0, 0])
 func compile(recipe: Dictionary) -> CompiledSpell:
 	var spell := CompiledSpell.new()
 	spell.valid = recipe.has("form")
-	spell.reason = "" if spell.valid else "A spell needs a form."
+	spell.reason = "" if spell.valid else "Pick a form (F) first."
 	spell.description = "A fake spell."
 	return spell
 

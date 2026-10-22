@@ -735,6 +735,18 @@ func test_a_form_into_an_empty_slot_moves_on_to_the_element() -> void:
 	_start(1)
 	_open(0)
 	var builder: BuilderScript = _builder(0)
+	_choose(0, BuilderScript.SLOT_TRIGGER, "On Hit")
+	_press(0, builder.held_button())
+	_choose(0, BuilderScript.SLOT_FORM, "Nova")
+	check(builder.recipe_of(0).has("held"), "the held spell got its form")
+	check_equal(builder.selected_slot(), BuilderScript.SLOT_ELEMENT, "the element is next")
+	check(builder.shown_rows().has(_focus.focused(0)), "with focus already in its bag")
+
+
+func test_an_element_into_an_empty_slot_moves_on_to_the_first_modifier() -> void:
+	_start(1)
+	_open(0)
+	var builder: BuilderScript = _builder(0)
 	# Spell B is a bolt: take the element-less spell B, and put an element in with two presses.
 	_press(0, builder.tab_button(1))
 	_press(0, builder.slot_button(BuilderScript.SLOT_ELEMENT))

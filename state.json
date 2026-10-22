@@ -11,7 +11,6 @@
     "number": 175
   },
   "errors_in_a_row": 0,
-  "idle": null,
   "intake_tasks": {},
   "last_own_merge": "2026-10-22T16:17:04Z",
   "last_plan": null,
@@ -46,6 +45,11 @@
     6334365507
   ],
   "task_failures": {
+    "**Element shots need a neutral bolt (from the part-26 art pass).** (`art/vfx/`, `core/projectiles/`, `gameplay/feel/`) The projectile manager multiplies the orange `fire_bolt.svg` by the owner's colour, so frost reads olive, storm orange and void brown, and no shot shows its element (the tint only reaches the builder preview). Draw a bone/white bolt, tint it by the player colour as now and give it an element-coloured core (`CompiledSpell.tint`), keeping the four players apart from each other and from the elements. The beam, nova ring, rune and orbit orb sprites are unwired placeholders: wire them to `feel` then, tinted the same way.": {
+      "count": 1,
+      "pr": "182",
+      "problems": "- The PR says it increases per-frame GPU upload (`DRAW_STRIDE` 16, four batches). It also says no `--projectile-timing` or `--stress` run was done. docs/PLAN.md has a performance budget, and this change is on the hot path for all four players. Fix: Run `--projectile-timing` and `--stress` (or the CI equivalent) on this commit and put the numbers in the PR. Confirm they are within the PLAN budget before merging.\n- The review is incomplete. I did not read the code, shader, SVG or test diffs. I could not check correctness, 1\u20134 player handling, pooling or allocations, typed GDScript, banned APIs, the rename's `.uid` and `.import` files, or whether the tests fit the code. Fix: Re-run the final review with access to the PR diff or commit 37e3e16. Do not merge on this result alone."
+    },
     "**Read the first WASM numbers (M2 part 25 follow-up).** (`tests/benchmark/`, `docs/`) Once a daily build has run the web projectile timing step, read its `BENCH:` lines (or why it failed or timed out; see `docs/DECISIONS.md`, 2026-10-22) and either confirm the limits or lower them. \"WASM pending\" stays open until then.": {
       "count": 0,
       "parked_reason": "No WASM numbers exist yet. The web projectile timing step merged today (#165, 2026-10-22), and no daily build has run it. No `BENCH:` lines from a web run are recorded in the docs. This session also can't read CI runs: `gh run list` needs approval and was refused. The task stays open in `docs/NEXT.md`, and nothing was changed. A later session should retry once a daily build has run the step.",

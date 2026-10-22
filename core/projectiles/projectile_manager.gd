@@ -171,6 +171,15 @@ const RAY_MAX_LENGTH: float = 360.0
 ## Floats per projectile in the MultiMesh buffer: 8 transform, 4 colour, 4 custom data
 ## (the colour of the shot's core, read by `shot_core.gdshader`).
 const DRAW_STRIDE: int = 16
+## The smallest a batch's MultiMesh buffer gets, in shots. A batch holds as many shots
+## as the busiest recent frame needed, rounded up to a power of two (never above the
+## cap), so a quiet batch uploads a few KB a frame rather than cap x 16 floats.
+const MIN_BATCH: int = 64
+## The draw batches: player bolts, runes (still), orbit shots, enemy shots.
+const BATCH_BOLT: int = 0
+const BATCH_RUNE: int = 1
+const BATCH_ORBIT: int = 2
+const BATCH_HOSTILE: int = 3
 ## Draws the neutral sprites: the bone body takes the owner's tint, the Spark-coloured
 ## core takes the element's colour (`set_core`).
 const CORE_SHADER: Shader = preload("res://core/projectiles/shot_core.gdshader")
@@ -305,6 +314,13 @@ var _has_walls: bool = false
 ## The colour of each shot's core (white for a plain shot), see `set_core`.
 var _core: PackedColorArray = PackedColorArray()
 var _draw_node: MultiMeshInstance2D = null
+## Shots each batch's MultiMesh and buffer have room for now (see `_batch_room`).
+var _draw_room: int = 0
+var _rune_room: int = 0
+var _orbit_room: int = 0
+var _hostile_room: int = 0
+## Live shots per batch this frame (BATCH_*), refilled by _count_batches; a member so no array is made per frame.
+var _batch_counts: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 var _draw_buffer: PackedFloat32Array = PackedFloat32Array()
 ## The batches of runes and orbit shots, beside the bolts' `_draw_node`.
 var _rune_node: MultiMeshInstance2D = null
@@ -371,7 +387,7 @@ func _make_batch(z: int, cored: bool) -> MultiMeshInstance2D:
 		material.shader = CORE_SHADER
 		node.material = material
 	multimesh.mesh = quad
-	multimesh.instance_count = _cap
+	multimesh.instance_count = 0
 	multimesh.visible_instance_count = 0
 	node.multimesh = multimesh
 	node.z_index = z
@@ -421,18 +437,22 @@ func set_cap(value: int) -> void:
 	_own_prev.resize(_cap)
 	_own_next.resize(_cap)
 	_core.resize(_cap)
-	_draw_buffer.resize(_cap * DRAW_STRIDE)
-	_rune_buffer.resize(_cap * DRAW_STRIDE)
-	_orbit_buffer.resize(_cap * DRAW_STRIDE)
-	_hostile_buffer.resize(_cap * DRAW_STRIDE)
+	_draw_buffer.resize(0)
+	_rune_buffer.resize(0)
+	_orbit_buffer.resize(0)
+	_hostile_buffer.resize(0)
+	_draw_room = 0
+	_rune_room = 0
+	_orbit_room = 0
+	_hostile_room = 0
 	_alive.resize(_cap)
 	_free_slots.resize(_cap)
 	clear()
 	if _draw_node != null:
-		_draw_node.multimesh.instance_count = _cap
-		_rune_node.multimesh.instance_count = _cap
-		_orbit_node.multimesh.instance_count = _cap
-		_hostile_node.multimesh.instance_count = _cap
+		_draw_node.multimesh.instance_count = 0
+		_rune_node.multimesh.instance_count = 0
+		_orbit_node.multimesh.instance_count = 0
+		_hostile_node.multimesh.instance_count = 0
 
 
 func get_cap() -> int:
@@ -1039,6 +1059,12 @@ func update_draw() -> void:
 	var multimesh: MultiMesh = _draw_node.multimesh
 	var hostile_multimesh: MultiMesh = _hostile_node.multimesh
 	var fraction: float = clampf(Engine.get_physics_interpolation_fraction(), 0.0, 1.0)
+	_count_batches()
+	var counts: PackedInt32Array = _batch_counts
+	_draw_room = _fit_batch(multimesh, _draw_buffer, _draw_room, counts[BATCH_BOLT])
+	_rune_room = _fit_batch(_rune_node.multimesh, _rune_buffer, _rune_room, counts[BATCH_RUNE])
+	_orbit_room = _fit_batch(_orbit_node.multimesh, _orbit_buffer, _orbit_room, counts[BATCH_ORBIT])
+	_hostile_room = _fit_batch(hostile_multimesh, _hostile_buffer, _hostile_room, counts[BATCH_HOSTILE])
 	var out: int = 0
 	var rune_out: int = 0
 	var orbit_out: int = 0
@@ -1051,13 +1077,14 @@ func update_draw() -> void:
 		if _vel[slot].length_squared() > 0.0:
 			dir = _vel[slot].normalized()
 		var at: Vector2 = _prev[slot].lerp(_pos[slot], fraction)
-		if _player[slot] < 0:
+		var batch: int = _batch_of(slot)
+		if batch == BATCH_HOSTILE:
 			_write_quad(_hostile_buffer, hostile_out * DRAW_STRIDE, dir, diameter, at, Color.WHITE, Color.WHITE)
 			hostile_out += 1
-		elif _motion[slot] == MOTION_STILL:
+		elif batch == BATCH_RUNE:
 			_write_quad(_rune_buffer, rune_out * DRAW_STRIDE, dir, diameter, at, _color_of(_player[slot]), _core[slot])
 			rune_out += 1
-		elif _motion[slot] == MOTION_ORBIT:
+		elif batch == BATCH_ORBIT:
 			_write_quad(_orbit_buffer, orbit_out * DRAW_STRIDE, dir, diameter, at, _color_of(_player[slot]), _core[slot])
 			orbit_out += 1
 		else:
@@ -1077,6 +1104,47 @@ func update_draw() -> void:
 	hostile_multimesh.visible_instance_count = hostile_out
 	drawn_hostile = hostile_out
 	drawn = out + rune_out + orbit_out + hostile_out
+
+
+## Which draw batch a live slot belongs to (BATCH_*). The one rule both the counting and
+## the writing use, so a batch always has the room its writes need.
+func _batch_of(slot: int) -> int:
+	if _player[slot] < 0:
+		return BATCH_HOSTILE
+	if _motion[slot] == MOTION_STILL:
+		return BATCH_RUNE
+	if _motion[slot] == MOTION_ORBIT:
+		return BATCH_ORBIT
+	return BATCH_BOLT
+
+
+## Count the live shots each batch will draw into _batch_counts, indexed by BATCH_*.
+## One extra pass over the live slots (reads only): the price of sizing before writing.
+func _count_batches() -> void:
+	_batch_counts.fill(0)
+	for slot in _high:
+		if _alive[slot] != 0:
+			_batch_counts[_batch_of(slot)] += 1
+
+
+## Size a batch's MultiMesh and buffer to draw `used` shots; returns the new room.
+## The room stays while `used` fits and is more than a quarter of it, else it becomes
+## `used` rounded up to a power of two (at least MIN_BATCH, at most the cap). An empty
+## batch keeps its room: nothing is uploaded for it, and it does not reallocate when it
+## flickers between empty and busy. The MultiMesh buffer must be exactly instance_count
+## x DRAW_STRIDE floats, so a smaller upload means a smaller MultiMesh. The buffer is
+## shared, not copied, so resizing it here resizes the caller's.
+func _fit_batch(multimesh: MultiMesh, buffer: PackedFloat32Array, room: int, used: int) -> int:
+	if used == 0 or (used <= room and used * 4 > room):
+		return room
+	var wanted: int = MIN_BATCH
+	while wanted < used:
+		wanted *= 2
+	wanted = mini(wanted, _cap)
+	if wanted != room:
+		multimesh.instance_count = wanted
+		buffer.resize(wanted * DRAW_STRIDE)
+	return wanted
 
 
 ## Write one quad at float index `i` of `buffer` (packed arrays are shared, not copied):

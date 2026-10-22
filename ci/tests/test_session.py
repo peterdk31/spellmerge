@@ -455,6 +455,20 @@ class PublishTest(unittest.TestCase):
         api = mock.Mock(side_effect=[pr, {}])
         self.assertEqual(self._publish(api, "update", 19), {"saved_pr": "19", "branch": "claude/20261017-x"})
 
+    def test_a_revision_replaces_the_pr_body(self) -> None:
+        pr = {"head": {"ref": "claude/20261017-x"}, "user": {"login": CFG.bot.login}, "state": "open"}
+        done = mock.Mock(returncode=0, stdout="abcdef1234\n")
+        api = mock.Mock(side_effect=[pr, {}, {}])
+        with mock.patch.object(session.subprocess, "run", return_value=done), \
+                mock.patch.object(session, "workflow_changes", return_value=[]), \
+                mock.patch.object(session.gh, "api", api):
+            out = session.publish(CFG, Path("work.bundle"), "claude/20261017-x", "update",
+                                  {"pr_body": "Tests passed.", "comment": "Fixed."}, 19, "t")
+        self.assertEqual(out, {"pr": "19", "sha": "abcdef1234", "branch": "claude/20261017-x"})
+        self.assertEqual(api.call_args_list[1].args[0], f"repos/{CFG.repo}/pulls/19")
+        self.assertEqual(api.call_args_list[1].kwargs["input"], {"body": "Tests passed."})
+        self.assertIn("Fixed.", api.call_args_list[2].kwargs["input"]["body"])
+
     def test_publish_refuses_the_bots_own_workflow_changes(self) -> None:
         done = mock.Mock(returncode=0, stdout="")
         with mock.patch.object(session.subprocess, "run", return_value=done) as run, \

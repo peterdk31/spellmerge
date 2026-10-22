@@ -14,4 +14,4 @@ status_id = &"hex"
 status_duration = 4.0
 status_strength = 25.0
 damage_scale = 1.0
-tint = Color(0.7882, 0.6039, 0.9412, 1)
+tint = Color(0.8784, 0.5412, 0.8471, 1)

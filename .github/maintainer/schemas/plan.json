@@ -15,93 +15,19 @@
     "progress_post": {
       "type": "string"
     },
-    "task_issues": {
+    "schedule_issues": {
       "type": "array",
       "items": {
-        "type": "object",
-        "properties": {
-          "title": {
-            "type": "string"
-          },
-          "milestone": {
-            "type": "string"
-          },
-          "area": {
-            "type": "string",
-            "enum": [
-              "spells",
-              "relics",
-              "wizard",
-              "enemies",
-              "bosses",
-              "rooms",
-              "gameplay",
-              "hud",
-              "art",
-              "audio",
-              "story"
-            ]
-          },
-          "skill": {
-            "type": "string",
-            "enum": [
-              "code",
-              "pixel-art",
-              "music",
-              "sfx",
-              "writing",
-              "level-design"
-            ]
-          },
-          "size": {
-            "type": "string",
-            "enum": [
-              "good first issue",
-              "S",
-              "M",
-              "L"
-            ]
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "now",
-              "soon",
-              "later"
-            ]
-          },
-          "what": {
-            "type": "string"
-          },
-          "where": {
-            "type": "string"
-          },
-          "specs": {
-            "type": "string"
-          },
-          "example": {
-            "type": "string"
-          },
-          "placeholder": {
-            "type": "string"
-          },
-          "done_when": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "title",
-          "milestone",
-          "area",
-          "skill",
-          "size",
-          "status",
-          "what",
-          "where",
-          "done_when"
-        ],
-        "additionalProperties": false
-      }
+        "type": "integer"
+      },
+      "description": "Backlog issues to move into the work queue now"
+    },
+    "unschedule_issues": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      },
+      "description": "Scheduled issues to move back to the backlog"
     },
     "owner_issues": {
       "type": "array",
@@ -202,7 +128,6 @@
     "status",
     "summary",
     "progress_post",
-    "task_issues",
     "owner_issues"
   ],
   "additionalProperties": false

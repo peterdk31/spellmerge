@@ -27,10 +27,6 @@ class Settings:
     pause_development: bool = False
     pause_merging: bool = False
     quiet_hours: tuple[int, int] | None = None
-    vote_share: int = 15
-    vote_min: int = 2
-    vote_max: int = 25
-    vote_approval: int = 60
     focus: str = ""
 
 
@@ -40,14 +36,6 @@ _CHECKBOXES = {
     "automation_enabled": "Automation enabled",
     "pause_development": "Pause development",
     "pause_merging": "Pause PR merging",
-}
-_PERCENTS = {  # field: (label, min, max)
-    "vote_share": ("VOTE_SHARE", 1, 100),
-    "vote_approval": ("VOTE_APPROVAL", 50, 100),
-}
-_COUNTS = {
-    "vote_min": ("VOTE_MIN", 0, 100),
-    "vote_max": ("VOTE_MAX", 1, 1000),
 }
 FOCUS_MAX = 500
 
@@ -61,17 +49,6 @@ def _checkbox(label: str) -> Callable[[str], bool | None]:
     return parse
 
 
-def _number(label: str, lo: int, hi: int) -> Callable[[str], int | None]:
-    rx = re.compile(r"\b" + label + r":[ \t]*([^\s%]*)%?")
-
-    def parse(text: str) -> int | None:
-        m = rx.search(text)
-        if m is None or not m.group(1).isdigit():
-            return None
-        return max(lo, min(hi, int(m.group(1))))
-    return parse
-
-
 _QUIET = re.compile(r"\bQUIET_HOURS:[ \t]*(\S*)")
 _FOCUS = re.compile(r"^FOCUS:[ \t]*(.*)$", re.MULTILINE)
 
@@ -82,6 +59,7 @@ def _quiet_hours(text: str) -> tuple[int, int] | None | str:
     if m is None:
         return "missing"
     value = m.group(1)
+    # VOTE_ lines are from panels written before community voting was removed.
     if value == "" or value.startswith("VOTE_") or value.startswith("FOCUS"):
         return None
     hm = re.fullmatch(r"(\d{1,2})(?::00)?-(\d{1,2})(?::00)?", value)
@@ -107,10 +85,6 @@ def parse_field(name: str, text: str) -> Any:
     """The field's value in one revision, or the sentinel _UNREADABLE."""
     if name in _CHECKBOXES:
         value = _checkbox(_CHECKBOXES[name])(text)
-    elif name in _PERCENTS:
-        value = _number(*_PERCENTS[name])(text)
-    elif name in _COUNTS:
-        value = _number(*_COUNTS[name])(text)
     elif name == "quiet_hours":
         q = _quiet_hours(text)
         return _UNREADABLE if isinstance(q, str) else q
@@ -212,8 +186,6 @@ def read(cfg: config_mod.Config) -> PanelResult:
 
 
 def describe(name: str, value: Any) -> str:
-    if name in _PERCENTS:
-        return f"{value}%"
     if name == "quiet_hours":
         return "none" if value is None else f"{value[0]:02d}-{value[1]:02d}"
     if isinstance(value, bool):
@@ -221,12 +193,11 @@ def describe(name: str, value: Any) -> str:
     return repr(value) if name == "focus" else str(value)
 
 
-LABELS = {**_CHECKBOXES, **{k: v[0] for k, v in _PERCENTS.items()}, **{k: v[0] for k, v in _COUNTS.items()},
-          "quiet_hours": "QUIET_HOURS", "focus": "FOCUS"}
+LABELS = {**_CHECKBOXES, "quiet_hours": "QUIET_HOURS", "focus": "FOCUS"}
 
 
 def changes(old: dict | None, new: Settings, owner_login: str) -> list[str]:
-    """Audit lines for the Daily log, e.g. 'VOTE_SHARE 15% → 20% (by peterdk31)'."""
+    """Audit lines for the Daily log, e.g. 'QUIET_HOURS none → 07-17 (by peterdk31)'."""
     if old is None:
         return []
     new_d = asdict(new)

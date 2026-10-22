@@ -16,7 +16,6 @@ PANEL = """**SPELLMERGE CONTROL PANEL**
 - [ ] Pause PR merging
 
 QUIET_HOURS:
-VOTE_SHARE: 15%   VOTE_MIN: 2   VOTE_MAX: 25   VOTE_APPROVAL: 60%
 FOCUS:
 """
 NOW = dt.datetime(2026, 10, 17, 12, 0, tzinfo=dt.timezone.utc)
@@ -42,26 +41,25 @@ class PanelTest(unittest.TestCase):
 
     def test_values(self) -> None:
         text = (PANEL.replace("- [ ] Pause development", "- [x] Pause development")
-                .replace("VOTE_SHARE: 15%", "VOTE_SHARE: 50%").replace("QUIET_HOURS:", "QUIET_HOURS: 07-17")
-                .replace("VOTE_MAX: 25", "VOTE_MAX: 30").replace("FOCUS:", "FOCUS: fix bugs first"))
+                .replace("QUIET_HOURS:", "QUIET_HOURS: 07-17").replace("FOCUS:", "FOCUS: fix bugs first"))
         s, _ = panel.settings_from_revisions([text])
         self.assertTrue(s.pause_development)
-        self.assertEqual((s.vote_share, s.quiet_hours, s.vote_max, s.focus), (50, (7, 17), 30, "fix bugs first"))
+        self.assertEqual((s.quiet_hours, s.focus), ((7, 17), "fix bugs first"))
 
-    def test_values_are_clamped(self) -> None:
-        s, _ = panel.settings_from_revisions([PANEL.replace("VOTE_SHARE: 15%", "VOTE_SHARE: 400%")
-                                              .replace("VOTE_APPROVAL: 60%", "VOTE_APPROVAL: 10%")])
-        self.assertEqual((s.vote_share, s.vote_approval), (100, 50))
+    def test_an_old_panel_with_vote_lines_still_reads(self) -> None:
+        old = PANEL.replace("QUIET_HOURS:\n", "QUIET_HOURS:\nVOTE_SHARE: 15%   VOTE_MIN: 2\n")
+        s, fallbacks = panel.settings_from_revisions([old])
+        self.assertEqual((s.quiet_hours, fallbacks), (None, []))
 
     def test_unreadable_value_falls_back_to_older_owner_revision(self) -> None:
-        older = PANEL.replace("VOTE_SHARE: 15%", "VOTE_SHARE: 40%")
-        newer = PANEL.replace("VOTE_SHARE: 15%", "VOTE_SHARE: lots")
+        older = PANEL.replace("QUIET_HOURS:", "QUIET_HOURS: 22-07")
+        newer = PANEL.replace("QUIET_HOURS:", "QUIET_HOURS: lots")
         s, fallbacks = panel.settings_from_revisions([newer, older])
-        self.assertEqual(s.vote_share, 40)
-        self.assertEqual(fallbacks, ["vote_share"])
+        self.assertEqual(s.quiet_hours, (22, 7))
+        self.assertEqual(fallbacks, ["quiet_hours"])
 
     def test_missing_kill_switch_means_off(self) -> None:
-        s, _ = panel.settings_from_revisions(["VOTE_SHARE: 15%"])
+        s, _ = panel.settings_from_revisions(["QUIET_HOURS:"])
         self.assertFalse(s.automation_enabled)
 
     def test_edit_by_someone_else_is_ignored_and_reported(self) -> None:
@@ -82,9 +80,9 @@ class PanelTest(unittest.TestCase):
 
     def test_audit_lines(self) -> None:
         old = panel.to_json(panel.Settings())
-        new = panel.Settings(vote_share=50, quiet_hours=(7, 17))
+        new = panel.Settings(pause_merging=True, quiet_hours=(7, 17))
         self.assertEqual(panel.changes(old, new, "peterdk31"),
-                         ["QUIET_HOURS none → 07-17 (by peterdk31)", "VOTE_SHARE 15% → 50% (by peterdk31)"])
+                         ["Pause PR merging off → on (by peterdk31)", "QUIET_HOURS none → 07-17 (by peterdk31)"])
 
 
 class PacingTest(unittest.TestCase):

@@ -16,6 +16,7 @@ from . import config as config_mod
 from . import dailylog, gh, inbox, pacing, state
 
 JOBS = {  # job id -> what it does, for the summary
+    "intake": "Community intake",
     "build": "Build and smoke tests",
     "release": "Release",
     "pages": "Web build on GitHub Pages",
@@ -36,6 +37,9 @@ def lines_for(env: dict[str, str], repo: str) -> list[str]:
         result = env.get(f"RESULT_{job.upper()}", "skipped")
         if job == "itch" and result == "skipped":
             continue  # not set up yet
+        if job == "intake" and env.get("INTAKE_COUNT") == "0":
+            out.append(f"{ICONS['success']} {label}: no new posts")
+            continue
         out.append(f"{ICONS.get(result, '•')} {label}: {result}")
     if env.get("RUN_URL"):
         out.append(f"[Workflow run]({env['RUN_URL']})")

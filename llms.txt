@@ -1,22 +1,22 @@
 # Spellmerge
 
-> A 2D top-down roguelite about building deep, combinable spells, for 1–4 local co-op players. Made in Godot 4.7 with typed GDScript only, in 32×32 pixel art. Claude, an AI, maintains it and outside contributors send PRs. Links are paths relative to the repository root.
+> A 2D top-down roguelite about building deep, combinable spells, for 1–4 local co-op players. Made in Godot 4.7 with typed GDScript only, in 32×32 pixel art. Claude, an AI, writes and maintains it; players shape it through Issues and Discussions. Links are paths relative to the repository root.
 
 Start with AGENTS.md for the hard rules, then docs/DESIGN.md (nothing may contradict it) and the README of the area you will touch.
 
 ## Start here
 
 - [README.md](README.md): what the project is, how to play and how to join in.
-- [AGENTS.md](AGENTS.md): the guide for coding agents: hard rules, how to find a task, checks to run, how PRs are rated and merged.
+- [AGENTS.md](AGENTS.md): the guide for coding agents: hard rules, untrusted text, how to work, checks to run.
 - [CLAUDE.md](CLAUDE.md): Claude Code entry point; it only imports AGENTS.md.
-- [CONTRIBUTING.md](CONTRIBUTING.md): the friendlier guide for people, with the same rules as AGENTS.md.
-- [CLA.md](CLA.md): the Contributor License Agreement every PR author signs once.
+- [CONTRIBUTING.md](CONTRIBUTING.md): for players: how to report a bug or share an idea, and what happens next.
+- [CLA.md](CLA.md): the Contributor License Agreement signed by contributors before the community intake (2026-10-22).
 
 ## Plan and design
 
 - [docs/DESIGN.md](docs/DESIGN.md): the vision and pillars; owner-only, and every task is checked against it.
 - [docs/PLAN.md](docs/PLAN.md): the full owner-approved project plan: security model, path tiers, roadmap, quality bar.
-- [docs/ROADMAP.md](docs/ROADMAP.md): the eight sequential milestones and which areas are open for PRs in each.
+- [docs/ROADMAP.md](docs/ROADMAP.md): the eight sequential milestones and what each builds.
 - [docs/milestones/M0-foundation.md](docs/milestones/M0-foundation.md): design of M0, the infrastructure before any gameplay; closed early, its dry runs carry into M1.
 - [docs/milestones/M1-core-loop.md](docs/milestones/M1-core-loop.md): design of M1, the core loop prototype (one spell, one enemy, one room, 4-player co-op), its parts in build order and checkpoint C1; closed by the owner's go at C1, its open items carry into M2.
 - [docs/milestones/M2-spell-system.md](docs/milestones/M2-spell-system.md): design of M2, the spell system (18 components, the runtime in `core/spells`, reactions, limits, the builder, validators, combos, stress benchmark, Story), its parts in build order and checkpoint C2.
@@ -31,13 +31,13 @@ Start with AGENTS.md for the hard rules, then docs/DESIGN.md (nothing may contra
 
 - [docs/SETUP-APP.md](docs/SETUP-APP.md): how to set up the Spellmerge Bot GitHub App (owner-only).
 - [docs/SECURITY-CHECKLIST.md](docs/SECURITY-CHECKLIST.md): checklist for verifying the security model after setup or a settings change (owner-only).
-- [.github/pull_request_template.md](.github/pull_request_template.md): the PR template contributors fill in.
+- [.github/pull_request_template.md](.github/pull_request_template.md): the PR template for the bot's and the owner's PRs.
 
 ## Area contracts
 
 Each area README states the area's job, the milestone that builds and opens it, the file types allowed, an entry script and the dependency direction `core` ← `gameplay` ← `content`.
 
-- [core/README.md](core/README.md): shared services: event bus, registry, input, saving, base classes, projectile manager, pools; closed to outside PRs.
+- [core/README.md](core/README.md): shared services: event bus, registry, input, saving, base classes, projectile manager, pools.
 - [hud/README.md](hud/README.md): panels, spell builder UI, menus, widgets and the one theme.
 - [gameplay/README.md](gameplay/README.md): shared rules for the gameplay sub-areas and an events-at-a-glance table.
 - [gameplay/ai/README.md](gameplay/ai/README.md): shared enemy behaviours: steering, targeting, attack patterns.
@@ -65,7 +65,7 @@ Each area README states the area's job, the milestone that builds and opens it, 
 
 ## Tools and checks
 
-- [tools/check.sh](tools/check.sh): runs the hard rules CI enforces on your changes; run it before opening a PR.
+- [tools/check.sh](tools/check.sh): runs the hard rules CI enforces on your changes; run it before committing.
 - [art/manifest.json](art/manifest.json): origin record (human or ai, author, license) for every art asset.
 - [audio/manifest.json](audio/manifest.json): origin record for every audio asset.
 - [REUSE.toml](REUSE.toml): default licenses: GPL-3.0-or-later for code, CC-BY-SA-4.0 for assets.
@@ -74,7 +74,6 @@ Each area README states the area's job, the milestone that builds and opens it, 
 
 - [.github/maintainer/develop.md](.github/maintainer/develop.md): prompt for Claude's daily development session.
 - [.github/maintainer/plan.md](.github/maintainer/plan.md): prompt for the weekly planning session.
-- [.github/maintainer/rate.md](.github/maintainer/rate.md): prompt for rating outside PRs.
+- [.github/maintainer/intake.md](.github/maintainer/intake.md): prompt for deciding each new issue, discussion and outside PR (the daily community intake).
 - [.github/maintainer/review.md](.github/maintainer/review.md): prompt for the independent PR review.
 - [.github/maintainer/revise.md](.github/maintainer/revise.md): prompt for revising a PR after review.
-- [.github/maintainer/digest.md](.github/maintainer/digest.md): prompt for summarising weekly community input.

@@ -34,12 +34,15 @@ class ContributePageTest(unittest.TestCase):
         data = contribute.PageData(merged=[{"title": "<script>x</script>", "url": "https://x", "author": "a"}])
         page = contribute.render(config.load(), data, "v0.1", "nightly", "v0.0")
         self.assertIn("&lt;script&gt;", page)
-        self.assertIn("Couldn't load the task list", page)
+        self.assertIn("Couldn't load the queue", page)
 
-    def test_submission_credit(self) -> None:
-        cfg = config.load()
-        item = {"user": {"login": cfg.bot.login}, "title": "Submission from @ann-b: art/x.png"}
-        self.assertEqual(contribute.contributor_of(item, cfg), "ann-b")
+    def test_render_shows_the_queue_and_done_reports(self) -> None:
+        data = contribute.PageData(queue={"scheduled": 3, "backlog": 7}, merged=[],
+                                   done=[{"title": "Doors stop bolts", "url": "https://x", "author": "ann-b"}])
+        page = contribute.render(config.load(), data, "v0.1", "nightly", "v0.0")
+        self.assertIn("3 in the work queue", page)
+        self.assertIn("7 on the backlog", page)
+        self.assertIn("reported by @ann-b", page)
 
 
 def web_zip(folder: Path, version: str) -> Path:

@@ -1,6 +1,6 @@
 # Hourly check and development session (docs/PLAN.md, "Self-driven progress").
 #
-# control  every hour: verified Control panel, owner commands, claims, the gate
+# control  every hour: verified Control panel, owner commands, the gate
 # session  when the gate allows: one Claude work session (session.yml)
 #
 # Runs on main only: hourly, by hand, and when a session starts the next one. A push to
@@ -126,11 +126,6 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           AUTOMATION_ENABLED: ${{ vars.AUTOMATION_ENABLED }}
         run: python3 -m smbot.control --commands --log-title "Hourly check"
-      - name: Claims (/claim comments)
-        if: steps.gate.outputs.automation == 'true'
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: python3 -m smbot.claims hourly
       - name: Start develop again when the usage limit resets
         if: steps.gate.outputs.backoff_until != ''
         env:

@@ -23,7 +23,7 @@ import sys
 from dataclasses import dataclass, field
 from zoneinfo import ZoneInfo
 
-from . import commands, dailylog, nexttask, pacing, panel, state
+from . import commands, dailylog, intake, nexttask, pacing, panel, state
 from . import config as config_mod
 
 
@@ -70,9 +70,9 @@ def decide(kill_switch_on: bool, result: panel.PanelResult, st: dict, now: dt.da
     if develop and (until := pacing.backing_off_until(st, now)):
         develop = False
         reasons.append(f"backing off after a usage limit until {until}")
-    if develop and not has_task and not st.get("pending_instructions") and not st.get("followups"):
+    if develop and not has_task and not st.get("pending_instructions"):
         develop = False
-        reasons.append("no task in docs/NEXT.md, no follow-ups and no owner instructions")
+        reasons.append("no scheduled issue, no task in docs/NEXT.md and no owner instructions")
     return Decision(True, develop, merge, reasons)
 
 
@@ -124,7 +124,7 @@ def main(argv: list[str] | None = None) -> int:
         if changed:
             st = state.update(cfg, apply, "control: panel and owner commands")
 
-    task = nexttask.next_task(skip=nexttask.parked(st, now))
+    task = nexttask.next_task(skip=nexttask.parked(st, now), first=intake.queue_tasks(cfg, st))
     decision = decide(kill_switch_on, result, st, now, cfg.timezone, task is not None or args.planning)
     if log:
         dailylog.post(cfg, args.log_title, log, mention_owner=mention)

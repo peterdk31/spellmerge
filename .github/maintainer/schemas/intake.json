@@ -1,0 +1,26 @@
+{
+  "type": "object",
+  "properties": {
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "ref": { "type": "string", "description": "The ref of the item, exactly as in intake-input.json" },
+          "kind": { "type": "string", "enum": ["bug", "idea", "question", "feedback", "copyright", "spam", "other"] },
+          "decision": { "type": "string", "enum": ["schedule", "backlog", "needs_info", "answer", "duplicate", "decline"] },
+          "priority": { "type": "string", "enum": ["p1", "p2", "p3"] },
+          "title": { "type": "string", "description": "For schedule and backlog: a neutral task title" },
+          "task": { "type": "string", "description": "For schedule and backlog: the task in your own words" },
+          "duplicate_of": { "type": "integer" },
+          "reply": { "type": "string" }
+        },
+        "required": ["ref", "kind", "decision", "reply"],
+        "additionalProperties": false
+      }
+    },
+    "concerns": { "type": "array", "items": { "type": "string" } }
+  },
+  "required": ["items", "concerns"],
+  "additionalProperties": false
+}

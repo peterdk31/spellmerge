@@ -110,22 +110,20 @@ Everything runs as GitHub Actions on GitHub's servers, free for public repos; no
 
 ### Per PR (`checks.yml`, seconds, no secrets)
 
-Runs only the hard rules check (see PR filtering). There is no build per PR: results show up in the next daily release.
+Runs the hard rules check and the automation's unit tests. There is no build per PR: results show up in the preview build after each merge and in the next daily release.
 
 ### Daily run (`daily.yml`, 03:00 UTC, `main` only, has the Claude token)
 
-1. **Triage** (script): close PRs that break hard rules, with a reason; auto-label by area and skill.
-2. **Claims** (script): release claims older than 2 days with no PR.
-3. **Rate** (Claude, read-only tools): score up to about 8 eligible PRs; post scores as a PR comment.
-4. **Merge** (script): in score order, test-merge approved PRs together on a throwaway `staging` branch and run content validators there; merge each passing PR into `main`, pinned to its reviewed commit; skip failures and conflicts with a comment. The bot is never a bypass actor on `main`.
-5. **Develop** (Claude): take the top task from `docs/NEXT.md`, implement it with tests, update the plan files, open its own PR, which merges the same day after all checks plus an independent fresh-context review. Further adaptive development sessions start hourly whenever quota allows (see Self-driven progress).
-6. **Build and smoke test** (script): export the web demo and the full Windows and Linux builds, run the 1-player and 4-bot smoke tests and the stress benchmark (a frame-time regression over 10% is a warning, not a break; see "Gates are sparse"). If broken, revert the day's merges newest first (through bot revert PRs) until it passes and comment on the culprit.
-7. **Release** (script): tag the tested `main` as `v0.YYYYMMDD`, attach build and checksums with attestation, deploy the web build to GitHub Pages and itch.io, regenerate the Contribute page.
-8. **Log**: post a summary to the day's Daily log issue.
+1. **Community intake** (see Community intake): new issues, discussions and outside PRs are gathered, Claude decides each one with read-only tools, and a script labels, replies, closes and queues.
+2. **Build and smoke test** (script): export the web demo and the full Windows and Linux builds, run the 1-player and 4-bot smoke tests and the stress benchmark (a frame-time regression over 10% is a warning, not a break; see "Gates are sparse"). If broken, revert the day's merges newest first (through bot revert PRs) until it passes and comment on the culprit.
+3. **Release** (script): tag the tested `main` as `v0.YYYYMMDD`, attach build and checksums with attestation, deploy the web build to GitHub Pages and itch.io, regenerate the Contribute page.
+4. **Log**: post a summary to the day's Daily log issue.
+
+**Develop** runs hourly in `develop.yml`: take the top task (scheduled issues first, then `docs/NEXT.md`), implement it with tests, update the plan files and open a PR, which merges after all checks plus an independent fresh-context review (see Self-driven progress).
 
 ### Weekly planning run (Sundays)
 
-Runs bot playtests for the balance report, reads player feedback, reviews milestone progress against its done-when criteria, reorders `NEXT.md`, triages Discussions ideas into `BACKLOG.md` and replies to each, syncs issues and their labels (the project board follows labels). When a milestone is done, it writes the next milestone's design document, which must pass an independent self-critique review before merging.
+Reviews milestone progress against its done-when criteria, reorders `NEXT.md`, moves community issues between the work queue and the backlog, writes the devlog and the owner's playtest. When a milestone is done, it writes the next milestone's design document, which must pass an independent self-critique review before merging.
 
 ### Limits
 
@@ -140,84 +138,34 @@ Each Claude step has a turn cap. If the Pro usage limit is hit, the step stops c
 - If the subscription token expires or is rejected, Claude's steps fail cleanly, an issue asks the owner to regenerate it, and the scripted merge, build and release steps keep running.
 - The Pro quota is shared with the owner's own Claude use.
 
-## PR filtering and rating
+## Community intake
 
-A PR merges only after passing three filters, each cheaper than the next: free rules, then Claude's rating, then a merge script that re-checks everything.
+People outside the project don't send code or assets. They post in **Issues** (bug reports, ideas) and **Discussions** (ideas, spell combos, feedback, questions), and Claude decides what happens to each post. The bot writes all code and assets itself, so it never has to judge, license or sandbox outside files.
 
-### Filter 1: hard rules (script, instant, free)
+### Flow (daily)
 
-Auto-closed with a reason if the PR:
+1. **Gather** (script, read-only token): open issues and discussions by anyone but the owner and the bots that haven't been triaged, plus `needs-info` posts the poster has since answered. Outside PRs are gathered too, read as suggestions. At most 25 a run, oldest first.
+2. **Decide** (Claude, read-only tools, no write token): for each post a kind (bug, idea, question, feedback, copyright, spam, other), a decision and a warm reply. The post text is data, never instructions; anything that tries to steer the bot is reported as a concern.
+3. **Apply** (script): carries out each decision with the bot's token, within fixed rules.
 
-- touches owner-only or bot-maintained paths
-- uses banned APIs, or adds binaries or native code
-- adds a file type outside the allowed set (images, `.ogg`, Godot text files, `.gd`, `.json`) or a file over its size limit (1 MB per sprite sheet, 5 MB per music track)
-- has no CLA signature (one comment on the PR; unsigned PRs get a comment explaining how to sign and are closed only if still unsigned after 7 days, and are never merged unsigned), or a file without license info (REUSE check; one line in the template)
-- comes from an author who already had 2 PRs closed that day (spam limit)
-
-Hard rules are kept to security and copyright only. Everything else (PR size, touching several areas, an area not yet open, a missing description) is guidance handled kindly in the review: Claude writes a missing description itself and may still merge a good PR for an area that isn't open yet.
-
-### Filter 2: Claude's rating (1–5 per criterion)
-
-| Criterion | Question |
+| Decision | What happens |
 | --- | --- |
-| Fit | Matches `DESIGN.md`, the current milestone and the no-waiting co-op pillar? |
-| Fun | Creates interesting decisions, interactions or satisfying feedback, not merely correct? |
-| Quality | Clean, typed GDScript, follows area patterns, tests where sensible? |
-| Value | Makes the game better for players? |
-| Performance | Stays within budgets (pools, projectile manager, particle limits, no per-frame allocations)? |
-| Risk | Safe to merge? (5 = safe) |
-| Scope | One clear thing? |
+| `schedule` | Labelled `scheduled` and a priority; it joins the work queue. At most 5 new a run, the rest go to the backlog. |
+| `backlog` | Labelled `backlog`; weekly planning schedules it when it fits a milestone. |
+| `needs_info` | A reply asks for exactly what's missing; the poster's answer brings it back. |
+| `answer` | Answered; a question issue is closed. |
+| `duplicate` | Closed in favour of the open issue. |
+| `decline` | Closed with a kind reason (off-vision, already built, spam). |
 
-Each area adds its own questions (see Areas). Art is judged by looking at the images; audio by technical checks plus votes.
+A discussion or PR that is scheduled or put on the backlog gets its own issue, linked in the reply; an outside PR is then closed with a note that ideas are welcome as issues. A **copyright** report is always scheduled at priority 1 (take the asset out until the owner has looked) and mentions the owner.
 
-- **Merge:** average ≥ 3.5 and no criterion below 2, as long as any remaining issues are ones Claude can fix itself.
-- **Request changes:** fixable PRs get concrete feedback and are re-rated after updates.
-- **Close:** off-direction or low-value, with a polite reason.
-- PRs that advance the current milestone are rated first.
+### The work queue
 
-### Review stance: open and helpful
+Scheduled issues go before `docs/NEXT.md`, by priority (`p1` crashes, blockers and copyright; `p2` what matters for the current milestone; `p3` the rest), then oldest first. The development session sees Claude's neutral restatement of the issue, kept in the automation state, never the poster's own words. Its PR says `Closes #N`, so the issue closes when it merges and the poster is notified. The owner can schedule an issue by hand by labelling it `scheduled`.
 
-- **Idea first, polish second.** A good idea with rough edges is a merge, not a rejection.
-- **Merge and polish:** small issues (naming, wrong folder, missing manifest line, untyped variables, missing tests, a dependency warning) don't block a merge; Claude fixes them in its own follow-up PR the same day and credits the contributor.
-- **Never relaxed:** security rules, copyright rules, the smoke test and performance budgets.
-- **Change requests are short:** at most 3 concrete points, never nitpicks alone.
-- **First-time contributors** get extra help and a warm welcome.
-- Every review thanks the contributor and explains the decision in plain words.
+### Merge script
 
-### Community voting (scales with the community)
-
-Votes are 👍/👎 reactions on art, audio and core gameplay PRs (the `gameplay/` sub-areas and spell components), and on the art direction call. The number of 👍 needed grows automatically with the number of active voters, so early on a couple of votes are enough and later a real share of the community must agree.
-
-**Who can vote** loosens or tightens with the size of the community, just like the number of votes needed:
-
-| Phase | When | Who can vote |
-| --- | --- | --- |
-| Open | Fewer than 20 active contributors | Any GitHub account older than 30 days with some public activity, so playtesters and followers can vote from day 1 |
-| Community | 20 or more active contributors | Accounts that have taken part in the project at least 7 days before the vote: a merged contribution, an accepted bug report, or feedback and discussion posts |
-
-**Active voters (N):** eligible accounts with any activity in the project (vote, PR, bug report, discussion post) in the last 30 days, recounted daily. The phase switches back to Open if active contributors drop below 20.
-
-**Anti-gaming:** Claude may discount votes that look coordinated (for example many accounts with no prior activity voting on the same PR within minutes) and says so openly in the PR comment.
-
-| Active voters (N) | 👍 needed | Notes |
-| --- | --- | --- |
-| 0–2 | none | Votes are advisory; Claude decides with its normal bar |
-| 3–13 | 2 | |
-| 14–20 | 3 | 15% of N, rounded up |
-| 50 | 8 | |
-| 100 | 15 | |
-| 167+ | 25 | Cap, so votes stay reachable in a large community |
-
-- **Approval:** 👍 reaches the needed number **and** at least 60% of cast votes are 👍. Claude's rating must still pass; votes can block or confirm, never force in something that breaks the rules.
-- **Window:** 24 hours. If the needed number isn't reached, it extends once by 24 hours; after 48 hours Claude decides alone with the stricter bar (average ≥ 3.8), so nothing stalls. With 0–2 active voters there is no waiting at all.
-- **Gameplay PRs show what they do:** a short GIF or video (or a clear description) is requested so voters can judge without building the game; Claude adds a plain-language summary of the gameplay effect.
-- **Claude's own gameplay changes** still merge the same day, but are listed in that day's "Try this today" thread. If voters reach the needed number of 👎 with at least 60% 👎, Claude reworks or reverts the change.
-- **Transparent:** the PR comment always shows the state, e.g. "4 👍 / 1 👎, needs 3 👍 (15% of 18 active voters), 14 hours left".
-- **Tunable settings (Control panel):** `VOTE_SHARE` (15%), `VOTE_MIN` (2), `VOTE_MAX` (25), `VOTE_APPROVAL` (60%).
-
-### Filter 3: merge script
-
-Merges only if the verdict is merge, rules still pass, the head commit is unchanged, and content validators pass on `staging`. On conflicts, the higher-rated PR wins and the other gets a rebase request. A PR that breaks the daily smoke test is reverted automatically, with a comment explaining why.
+Claude's own PRs merge only through the merge script: the final review approved, the hard rules still pass from main's copy of the rules, the head commit is unchanged, and the required checks passed. A PR that breaks the daily smoke test is reverted automatically, with a comment explaining why.
 
 ## Game design
 
@@ -507,16 +455,15 @@ SPELLMERGE CONTROL PANEL
 - [ ] Pause PR merging
 
 QUIET_HOURS:
-VOTE_SHARE: 15%   VOTE_MIN: 2   VOTE_MAX: 25   VOTE_APPROVAL: 60%
 FOCUS: (optional, e.g. "fix bugs before new features this week")
 ```
 
 - **Verified by user ID:** runs only trust panel values from a revision whose editor is the owner's fixed numeric GitHub user ID (not the username). The bot never edits the panel.
 - **Trusted values come from GitHub's own edit history** (the owner's latest revision), never from storage the bot could change.
 - **Fail closed:** if no owner revision can be verified (history deleted, API error), automation pauses and the owner is notified.
-- **Strict parsing:** numbers are capped to valid ranges, unknown fields are ignored, unreadable values fall back to the owner's last verified revision.
+- **Strict parsing:** unknown fields (such as the old `VOTE_` line) are ignored, unreadable values fall back to the owner's last verified revision.
 - **Locked issue:** only the owner can comment on the panel; the panel holds only harmless settings, never secrets.
-- **Audit:** every applied change is written to the daily log, e.g. "VOTE_SHARE 15% → 20% (by peterdk31)".
+- **Audit:** every applied change is written to the daily log, e.g. "QUIET_HOURS none → 22-07 (by peterdk31)".
 - **Worst case** of a successful attack on the panel: the bot pauses or changes pace; it cannot touch code, secrets or releases.
 
 ### Owner commands in comments
@@ -607,80 +554,32 @@ Small and excellent beats big and mediocre. The first real target is one biome, 
 
 ## Contributor experience
 
-Contributors always see what is wanted now, what is coming next, and who is working on what, through issues, a project board and a Contribute page that are all kept up to date automatically.
+Players shape the game by reporting bugs and sharing ideas; every post gets an answer within a day, and they can follow it to the PR that does it.
 
-**Principle: contributing must stay easy.** Hard rules exist only for security; everything else is guidance, and Claude polishes good-but-imperfect PRs itself.
+### Where to post
 
-### Contributing without git
-
-Artists, musicians and writers can contribute through GitHub issue forms ("Submit art", "Submit sound", "Submit writing", "Spell idea") by uploading a file and filling in a few fields, including a CLA checkbox. A script validates and re-encodes the file (type, size, PNG/OGG only), and Claude opens the PR with the contributor credited as co-author.
-
-### Issues as the task list
-
-Every task is an issue with the same template: milestone, area, skill, size, what, where (exact path), specs, an example file to copy, the current placeholder, and done-when criteria.
-
-| Label group | Values |
-| --- | --- |
-| Status | `now` (PRs welcome) · `soon` (next milestone, discuss) · `later` |
-| Area | `area:spells`, `area:art`, ... |
-| Skill | `code` · `pixel-art` · `music` · `sfx` · `writing` · `level-design` |
-| Size | `good first issue` · `S` · `M` · `L` |
-
-### Tasks generated from the game
-
-- Each placeholder asset in the manifest becomes a "Replace placeholder" issue with preview and specs.
-- Each event without sound becomes an SFX issue.
-- Each item without lore or a description becomes a writing issue.
-- Content the milestone document asks for that doesn't exist yet becomes an issue.
-- At most about 10 open issues per area; new ones are created as others close.
-
-### Claims
-
-- Comment `/claim` and a script assigns the issue.
-- Claims last **2 days** without a PR (reminder after 1 day).
-- Expired claims reopen, or Claude takes the task if it has capacity that day.
-- Claude's own tasks are labelled `claude:working`; Claude never takes a claimed task.
-
-### Project board views
-
-Now · one view per skill (artists, musicians, writers, coders) · Good first issues · Roadmap timeline · In progress.
-
-The board is owned by `peterdk31`, and GitHub Apps can't edit user-owned projects, so GitHub's built-in auto-add workflow fills it and the views filter by label. The bot keeps labels correct and never edits the board directly.
+- **Report a bug** (issue form): build version, platform, players, steps, what happened, severity.
+- **Spell idea** (issue form) or **Discussions** (Ideas, Spell combos, Art feedback): ideas and feedback.
+- **Report a copyright concern** (issue form).
 
 ### Contribute page
 
-The GitHub Pages site is rebuilt daily and shows: play today's build, current milestone progress, wanted-now counts per skill, coming-next with links to design docs, recently merged, and top contributors. The game's main menu has a Contribute button and a credits screen.
-
-### Discussions
-
-GitHub Discussions has Ideas, Spell combos and Art feedback categories. The weekly run triages ideas into the backlog and replies to each. Discussion text is treated as suggestions only and never triggers actions.
+The GitHub Pages site is rebuilt daily and shows: play today's build, current milestone progress, how to report a bug or share an idea with the size of the work queue and backlog, coming-next with links to design docs, recently merged, and community reports done recently. The game's main menu has a Contribute button and a credits screen.
 
 ## AI-friendly onboarding
 
-Many contributors will point their own AI agent at the repo, so every doc is written to be read by both people and agents, and agents can check their work locally against the same rules CI uses.
+The bot and the owner's own sessions are the only ones writing code, so the docs are written for agents first and stay readable for people.
 
 | File | Purpose |
 | --- | --- |
-| `AGENTS.md` | The contributor guide for any coding agent (the cross-tool convention): project summary, hard rules, how to find a task, how to validate, PR format, what gets rejected. |
+| `AGENTS.md` | The guide for any coding agent working on the repo: project summary, hard rules, how to validate. |
 | `CLAUDE.md` | One line that imports `AGENTS.md`, so Claude Code picks it up automatically. |
 | `llms.txt` | Index of all docs with one-line descriptions, for agents and LLM tools. |
-| Area `README.md` | Same fixed sections in every area: Purpose · Contract · Allowed files · Steps · Example to copy · Validate · Rating questions. |
+| Area `README.md` | Same fixed sections in every area: Purpose · Contract · Allowed files · Steps · Example to copy · Validate. |
 | `docs/STYLE.md` | Machine-checkable specs: palette hex list, sprite sizes, frame counts, audio format and loudness targets. |
-| `CONTRIBUTING.md` | Human-friendly version: rules, rating, CLA, AI disclosure. |
+| `CONTRIBUTING.md` | For players: how to report a bug or share an idea, and what happens next. |
 
-### Making agent PRs succeed the first time
-
-- **Local check:** `tools/check.sh` runs the same rules and content validators as CI, with error messages that say exactly what to fix and where.
-- **Typed content:** every content type has a base class with documented fields; validators reject missing or out-of-range values.
-- **Copy-paste task brief:** every issue ends with a "Brief for your AI" block containing the task spec, paths, constraints and done-when criteria.
-- **PR template:** required fields for issue link, area, asset origin (`ai` or `human`), and "ran `tools/check.sh`".
-- **Godot gotchas spelled out:** commit `.uid` files, scenes as text (`.tscn`), no editor-only plugins.
-- **Guidance:** keep PRs focused, no refactors outside the task, no `core/` changes, small PRs are reviewed fastest. These are guidance, not hard rules.
-- **Actionable rejections:** rejection and change-request comments follow a fixed format (rule, file, line, fix) so an agent can iterate on them.
-
-### Security
-
-`AGENTS.md`, `CLAUDE.md`, `llms.txt` and area READMEs are bot-maintained, so outside PRs cannot change them. The maintainer's own instructions live separately in owner-only `.github/maintainer/`. Instructions inside a PR are never followed by the reviewer.
+`tools/check.sh` runs the same hard rules as CI, with messages that say exactly what to fix and where. The maintainer's own instructions live in owner-only `.github/maintainer/`.
 
 ## Monetization and licensing
 
@@ -701,14 +600,12 @@ The web demo stays free, and daily desktop builds stay free on GitHub Releases, 
 
 - **Code: GPL-3.0.** Anyone selling a fork must publish its source.
 - **Assets: CC-BY-SA 4.0.** Music or key art can be kept proprietary if commissioned.
-- **CLA** (`CLA.md`, adapted from the Apache Individual CLA, checked in Filter 1): lets the owner also license contributions under other terms, which a future console port needs. No third-party CLA service is used, so no outside service holds a token for the owner's account.
-  - **Signing:** the contributor comments `I have read the CLA and I agree to it.` on their PR once; for no-git submissions, the CLA checkbox in the issue form counts.
-  - **Record:** the daily run stores each signature in the bot-maintained `docs/cla-signatures.json` (numeric user ID, login, CLA version, link to the comment or issue, date). A new CLA version needs a new signature.
+- **No outside code or assets:** the bot writes everything from issues and discussions, so no contributor licenses are needed. `CLA.md` and `docs/cla-signatures.json` stay for the contributions merged before the intake (2026-10-22) and for commissioned work.
 - **Trademark "Spellmerge"** once there is traction (EU trademark about €850). It is the real moat, since mostly AI-generated code has weak copyright protection.
 
 ### Fair deal for contributors
 
-The README states "Free on the web forever; the Steam version funds development." Every merged contributor gets a free Steam key, a place on the in-game credits screen, and top contributors may name a spell.
+The README states "Free on the web forever; the Steam version funds development." Players whose bug reports or ideas made it into the game get a place on the in-game credits screen, and the most helpful may name a spell.
 
 ### Checks before selling (not legal or tax advice)
 
@@ -746,8 +643,8 @@ Copyright infringement is treated like a security risk: when in doubt, leave it 
 ### Response to a concern
 
 - A "Report a copyright concern" issue form, plus a contact address in the README and the game; GitHub's DMCA process also applies.
-- On a report, the asset is quarantined automatically: replaced by a placeholder and excluded from the next build while it is investigated.
-- If copying is confirmed, the asset is removed, the contributor's other submissions are re-reviewed, and the contributor may be blocked.
+- On a report, the intake schedules taking the asset out at priority 1 and notifies the owner; it stays out while it is investigated.
+- If copying is confirmed, the asset is removed for good and the way it was made is reviewed.
 
 ### Third-party parts and credits
 

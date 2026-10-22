@@ -1,21 +1,19 @@
 # Daily run (docs/PLAN.md, "Daily run"), 03:00 UTC on main.
 #
 #  1. control      kill switch and the owner's verified Control panel
-#  2. triage       copyright quarantine, claims, hard rules, spam limit, CLA,
-#                  labels, no-git submissions
-#  3. rate         Claude rates eligible PRs (read-only tools, no write token)
-#  4. merge        votes -> test-merge on a throwaway staging branch (no secrets)
-#                  -> the merge script merges what passed
-#  5. build        build and smoke tests; if broken, revert the day's merges
+#  2. intake       new issues, discussions and outside PRs: gathered (read-only),
+#                  decided by Claude (read-only tools, no write token), carried
+#                  out by a script (labels, replies, the work queue)
+#  3. build        build and smoke tests; if broken, revert the day's merges
 #                  newest first until it passes, then run again
-#  6. release      attested immutable release, GitHub Pages, itch.io
-#  7. log          alarms and the Daily log summary
+#  4. release      attested immutable release, GitHub Pages, itch.io
+#  5. log          alarms and the Daily log summary
 # Development runs hourly in develop.yml.
 #
 # Nothing runs unless the kill switch is "true" and the Control panel allows
 # it. Only jobs that need a secret use the protected "automation" environment;
-# jobs that run PR code (staging, revert bisect, submission sandbox) have no
-# secrets and a read-only token.
+# the revert bisect, which runs the merged code, has no secrets and a read-only
+# token. No outside PR code runs anywhere.
 name: daily
 
 on:
@@ -51,7 +49,6 @@ jobs:
       actions: read # smbot.catchup --already-ran
     outputs:
       automation: ${{ steps.gate.outputs.automation }}
-      merge: ${{ steps.gate.outputs.merge }}
       settings: ${{ steps.gate.outputs.settings }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -79,130 +76,65 @@ jobs:
           AUTOMATION_ENABLED: ${{ vars.AUTOMATION_ENABLED }}
         run: python3 -m smbot.control --log-title "Daily run"
 
-  triage:
-    name: triage, claims, copyright, submissions
+  intake-gather:
+    name: gather new issues, discussions and outside PRs
     needs: control
     if: needs.control.outputs.automation == 'true' && !inputs.retry
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+      discussions: read
+    outputs:
+      count: ${{ steps.gather.outputs.count }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: gather
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -m smbot.intake gather
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: steps.gather.outputs.count != '0'
+        with:
+          name: intake-input
+          path: intake-input.json
+          retention-days: 1
+
+  intake-decide:
+    name: decide each post (read-only Claude)
+    needs: intake-gather
+    if: needs.intake-gather.outputs.count != '0' && needs.intake-gather.outputs.count != ''
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: automation
     outputs:
-      rate: ${{ steps.triage.outputs.rate }}
-      submissions: ${{ steps.collect.outputs.issues }}
-      submission_count: ${{ steps.collect.outputs.count }}
+      decisions: ${{ steps.claude.outputs.structured_output }}
+      status: ${{ steps.account.outputs.status }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0
-          persist-credentials: false
-      - id: app-token
-        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
-        with:
-          client-id: Iv23lirdyRvc0KC6625s # the bot app's Client ID (public)
-          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
-          permission-contents: write
-          permission-issues: write
-          permission-pull-requests: write
-      - name: Copyright quarantine
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: python3 -m smbot.quarantine
-      - name: Claims (reminders and expiry)
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: python3 -m smbot.claims daily
-      - id: triage
-        name: Hard rules, spam limit, CLA, labels
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          SETTINGS: ${{ needs.control.outputs.settings }}
-        run: python3 -m smbot.triage
-      - id: collect
-        name: Find no-git submissions
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: python3 -m smbot.submissions collect
-
-  submissions-sandbox:
-    name: check submitted files (sandbox, no secrets)
-    needs: triage
-    if: needs.triage.outputs.submission_count != '0' && needs.triage.outputs.submission_count != ''
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Install ffmpeg (re-encodes audio)
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
-      - env:
-          ISSUES: ${{ needs.triage.outputs.submissions }}
-        run: python3 -m smbot.submissions sandbox
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: submissions
-          path: submissions
-          retention-days: 1
-
-  submissions-publish:
-    name: open PRs for submissions
-    needs: [triage, submissions-sandbox]
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    environment: automation
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
           persist-credentials: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: submissions
-          path: submissions
-      - id: app-token
-        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
-        with:
-          client-id: Iv23lirdyRvc0KC6625s # the bot app's Client ID (public)
-          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
-          permission-contents: write
-          permission-issues: write
-          permission-pull-requests: write
-      - env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          ISSUES: ${{ needs.triage.outputs.submissions }}
-        run: python3 -m smbot.submissions publish
-
-  rate:
-    name: rate PR #${{ matrix.pr }}
-    needs: [control, triage]
-    if: needs.triage.outputs.rate != '[]' && needs.triage.outputs.rate != ''
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    environment: automation
-    strategy:
-      fail-fast: false
-      max-parallel: 2
-      matrix:
-        pr: ${{ fromJSON(needs.triage.outputs.rate) }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
+          name: intake-input
       - id: read-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           client-id: Iv23lirdyRvc0KC6625s # the bot app's Client ID (public)
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           permission-contents: read
-          permission-pull-requests: read
-          permission-issues: read
       - id: prepare
-        name: Check out the PR's files read-only and build the prompt
-        env:
-          GH_TOKEN: ${{ steps.read-token.outputs.token }}
-          PR: ${{ matrix.pr }}
-        run: python3 -m smbot.rate prepare --pr "$PR"
+        run: |
+          {
+            echo "prompt<<__END__"
+            sed "s|{{REPO}}|${GITHUB_REPOSITORY}|g" .github/maintainer/intake.md
+            echo "__END__"
+            echo "schema=$(jq -c . .github/maintainer/schemas/intake.json)"
+          } >> "$GITHUB_OUTPUT"
       - name: Install the sandbox (bubblewrap and socat isolate Claude's commands and scrub secrets)
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq bubblewrap socat
@@ -220,11 +152,11 @@ jobs:
           allowed_bots: "github-actions[bot]"
           prompt: ${{ steps.prepare.outputs.prompt }}
           claude_args: >-
-            --max-turns 80
-            --allowedTools "Read,Glob,Grep,Bash(gh pr view:*),Bash(gh pr diff:*)"
-            --disallowedTools "Write,Edit,MultiEdit,NotebookEdit,WebFetch,WebSearch"
+            --max-turns 60
+            --allowedTools "Read,Glob,Grep"
+            --disallowedTools "Bash,Write,Edit,MultiEdit,NotebookEdit,WebFetch,WebSearch"
             --json-schema '${{ steps.prepare.outputs.schema }}'
-      - id: write-token
+      - id: account-token
         if: always()
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
@@ -232,111 +164,48 @@ jobs:
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-issues: write
-          permission-pull-requests: write
       - id: account
         if: always()
         env:
-          GH_TOKEN: ${{ steps.write-token.outputs.token }}
+          GH_TOKEN: ${{ steps.account-token.outputs.token }}
           EXEC_FILE: ${{ steps.claude.outputs.execution_file }}
           FAILED: ${{ steps.claude.outcome != 'success' }}
-        run: python3 -m smbot.session account --file "${EXEC_FILE:-/nonexistent}" --kind rate $([ "$FAILED" = true ] && echo --step-failed)
-      - name: Post the rating
-        if: steps.account.outputs.status == 'ok' && steps.claude.outputs.structured_output != ''
-        env:
-          GH_TOKEN: ${{ steps.write-token.outputs.token }}
-          RATING: ${{ steps.claude.outputs.structured_output }}
-          PR: ${{ matrix.pr }}
-          SHA: ${{ steps.prepare.outputs.sha }}
-        run: python3 -m smbot.rate post --pr "$PR" --sha "$SHA"
+        run: python3 -m smbot.session account --file "${EXEC_FILE:-/nonexistent}" --kind intake $([ "$FAILED" = true ] && echo --step-failed)
 
-  merge-candidates:
-    name: votes and merge candidates
-    needs: [control, triage, rate, submissions-publish]
-    if: >-
-      always() && needs.control.outputs.automation == 'true' && needs.control.outputs.merge == 'true'
-      && needs.triage.result == 'success'
+  intake-apply:
+    name: label, reply, close and queue (script)
+    needs: intake-decide
+    if: needs.intake-decide.outputs.status == 'ok' && needs.intake-decide.outputs.decisions != ''
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     environment: automation
     permissions:
       contents: read
-      discussions: read # Discussions posts count as community activity for votes
-    outputs:
-      candidates: ${{ steps.candidates.outputs.candidates }}
+      discussions: write # replies in Discussions (the bot app has no Discussions permission)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: intake-input
       - id: app-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           client-id: Iv23lirdyRvc0KC6625s # the bot app's Client ID (public)
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
-          permission-contents: read
-          permission-issues: write # update the vote count in rating comments
-          permission-pull-requests: write # close PRs the vote rejected
-      - id: candidates
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          DISCUSSIONS_TOKEN: ${{ github.token }}
-          SETTINGS: ${{ needs.control.outputs.settings }}
-        run: python3 -m smbot.communitymerge candidates
-
-  stage:
-    name: test-merge on staging (runs PR code, no secrets)
-    needs: merge-candidates
-    if: always() && needs.merge-candidates.outputs.candidates != '[]' && needs.merge-candidates.outputs.candidates != ''
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    outputs:
-      result: ${{ steps.stage.outputs.result }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/spellmerge-godot
-          key: godot-${{ hashFiles('ci/build/godot.env') }}
-      - id: stage
-        env:
-          CANDIDATES: ${{ needs.merge-candidates.outputs.candidates }}
-        run: python3 -m smbot.communitymerge stage
-
-  merge:
-    name: merge (script, no AI)
-    needs: [control, stage]
-    if: always() && needs.stage.result == 'success'
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    environment: automation
-    permissions:
-      contents: read
-      checks: read # READ_TOKEN reads check results; the app has no Checks permission
-    steps:
-      - name: Clean checkout of main (the merge script and rules come from here)
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - id: app-token
-        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
-        with:
-          client-id: Iv23lirdyRvc0KC6625s # the bot app's Client ID (public)
-          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
-          permission-contents: write
+          permission-contents: write # the automation-state branch
           permission-issues: write
-          permission-pull-requests: write
+          permission-pull-requests: write # close outside PRs
       - env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          READ_TOKEN: ${{ github.token }}
-          RESULT: ${{ needs.stage.outputs.result }}
-        run: python3 -m smbot.communitymerge finish
+          DISCUSSIONS_TOKEN: ${{ github.token }}
+          DECISIONS: ${{ needs.intake-decide.outputs.decisions }}
+        run: python3 -m smbot.intake apply
 
   build:
     name: build and smoke test
-    needs: [control, merge]
+    needs: control
     if: always() && needs.control.outputs.automation == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -571,7 +440,7 @@ jobs:
 
   summary:
     name: post to the Daily log
-    needs: [control, build, release, pages, itch, alarms, revert-apply]
+    needs: [control, intake-gather, intake-apply, build, release, pages, itch, alarms, revert-apply]
     if: always() && needs.control.outputs.automation == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -592,6 +461,8 @@ jobs:
           VERSION: ${{ needs.build.outputs.version }}
           CHANNEL: ${{ needs.build.outputs.channel }}
           SETTINGS: ${{ needs.control.outputs.settings }}
+          INTAKE_COUNT: ${{ needs.intake-gather.outputs.count }}
+          RESULT_INTAKE: ${{ needs.intake-apply.result }}
           RESULT_BUILD: ${{ needs.build.result }}
           RESULT_RELEASE: ${{ needs.release.result }}
           RESULT_PAGES: ${{ needs.pages.result }}

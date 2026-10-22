@@ -59,26 +59,3 @@ jobs:
       - name: Unit tests for the automation scripts
         run: python3 -m unittest discover -s ci/tests -t ci
 
-  cla:
-    # Informational, not required: the daily triage is what enforces the CLA.
-    name: cla
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      contents: read
-      pull-requests: read
-      issues: read
-    steps:
-      - name: Check out the CLA files from main
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          ref: ${{ github.event.repository.default_branch }}
-          persist-credentials: false
-      - name: Has the author signed the CLA?
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PYTHONPATH: ci
-          PR: ${{ github.event.pull_request.number }}
-        run: |
-          if [ ! -f ci/smbot/cla.py ]; then echo "The CLA check is not on main yet."; exit 0; fi
-          python3 -m smbot.cla check --pr "$PR"

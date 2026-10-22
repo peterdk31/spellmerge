@@ -25,13 +25,14 @@ DEFAULT: dict[str, Any] = {
     "version": 1,
     "paused_by_command": False,
     "backoff_until": None,
-    "usage": [],  # [{"at": iso, "tokens": n, "kind": "dev" | "review" | "rate" | "plan"}]
+    "usage": [],  # [{"at": iso, "tokens": n, "kind": "dev" | "review" | "intake" | "plan"}]
     "processed_comments": [],
     "pending_instructions": [],  # verified owner instructions for Claude
     "panel_applied": None,
     "panel_problems": [],
     "alarms": {},  # alarm name -> issue number
     "last_own_merge": None,
+    "intake_tasks": {},  # issue number -> the intake's neutral task for it (smbot.intake)
 }
 
 MAX_PROCESSED = 1000

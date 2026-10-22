@@ -82,6 +82,7 @@ FIXTURE_TASK = "**Area READMEs for the content areas.** Write the READMEs."
 
 
 @mock.patch.object(session.nexttask, "next_task", lambda *a, **k: FIXTURE_TASK)
+@mock.patch.object(session, "queue", lambda cfg, st: [])
 class PromptTest(unittest.TestCase):
     """Uses a fixed task, so the tests don't depend on what docs/NEXT.md says today."""
 
@@ -164,7 +165,9 @@ class FinishTest(unittest.TestCase):
                     mock.patch.object(session.dailylog, "post",
                                       lambda cfg, title, lines, **k: (posts if posts is not None else []).append(lines)), \
                     mock.patch.object(session, "pr_title", lambda cfg, pr: f"Title of #{pr}" if pr else ""), \
-                    mock.patch.object(session.nexttask, "next_task", lambda path_=None, skip=(): real(path, skip)):
+                    mock.patch.object(session, "queue", lambda cfg, st: []), \
+                    mock.patch.object(session.nexttask, "next_task",
+                                      lambda path_=None, skip=(), first=(): real(path, skip, first)):
                 return session.finish(CFG, base), st
 
     def test_continues_after_a_merge(self) -> None:

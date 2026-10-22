@@ -14,7 +14,7 @@ The source files of the art starter kit (docs/PLAN.md, "Art and music"): what an
 
 | File | What it is |
 | --- | --- |
-| `spellmerge.gpl.txt` | The 31 colours as a GIMP palette (`.gpl` files can't be added to the repository, so it carries a `.txt` ending: the kit zip ships it as `spellmerge.gpl`; if you use it from the repository, rename it). Opens in GIMP, Krita, Aseprite, LibreSprite and Inkscape. |
+| `spellmerge.gpl.txt` | The 37 colours as a GIMP palette (`.gpl` files can't be added to the repository, so it carries a `.txt` ending: the kit zip ships it as `spellmerge.gpl`; if you use it from the repository, rename it). Opens in GIMP, Krita, Aseprite, LibreSprite and Inkscape. |
 | `palette.hex.txt` | The same colours, one lower-case hex value per line, no `#`, outline first. Imports in Lospec-style palette loaders and Photoshop-like tools that read hex lists. |
 | `grid_32.svg` | A 32×32 grid template shown at 16×. Guide lines: Outline-coloured border = the cell; Spark-yellow lines = the centre; Fire-orange line = where a character's feet stand (about 2–3 px above the bottom); light-blue square = the 1 px empty border to leave where you can (blue is only a guide colour here, not a player marker). |
 | `sheet_template.svg` | Animation strip layouts at 4× for all 11 animations of the frame-count table (idle, walk, hurt, dodge, cast, downed, death, enemy attack, projectile 2–4, impact, animated tile), with the unused cells darkened. The orange line is the feet line in character rows. |

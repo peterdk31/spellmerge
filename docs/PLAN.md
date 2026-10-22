@@ -430,7 +430,7 @@ Claude's own development is the only engine and players steer it with bug report
 
 - **Same-day merge of Claude's own PRs:** rules, tests, smoke test and benchmark, plus an independent review by a separate Claude session with fresh context. If all pass, it merges immediately and the next session builds on it.
 - **Tasks sized to one session;** the weekly planning run splits larger ones.
-- **Never stuck:** a task that fails twice or is reported blocked is set aside for a week with the reason logged, and work moves on to the next task; blocked tasks are revisited weekly. A task whose approved PR waits on GitHub or the owner is set aside for a day the same way.
+- **Never stuck:** a task that fails twice or is reported blocked is set aside for a week with the reason logged, and work moves on to the next task; blocked tasks are revisited weekly. A task blocked on an owner question names the question's key under `## Blocked` in `docs/NEXT.md`, and goes before the queue by itself once that question is closed or answered with `/claude` (`smbot.nexttask.unblocked`). A task whose approved PR waits on GitHub or the owner is set aside for a day the same way.
 - **Never waiting for humans:** unclear points are decided by Claude and recorded in `DECISIONS.md`; only `DESIGN.md` needs the owner.
 - **Milestones never depend on players:** all content targets are planned as Claude's work; a player's idea that fits shapes or replaces a task.
 

@@ -19,7 +19,7 @@ Owner's current focus: {{FOCUS}}
 
 1. **Milestone progress.** Check the current milestone against its done-when criteria and update its status in the milestone design. If it is running over twice its estimate, cut scope: move features to `docs/BACKLOG.md` rather than letting it drag.
 2. **The queue.** Scheduled issues run before `docs/NEXT.md`, highest priority first. Check them against the milestone: move what doesn't fit now to the backlog (`unschedule_issues`), and schedule backlog issues that fit the current milestone (`schedule_issues`), at most 10 moves. Bugs that crash or block play stay scheduled.
-3. **`docs/NEXT.md`.** Reorder it so the top task is the right next one: milestone work, with about every 5th task cleanup or polish. Every task fits one session; split larger ones. Revisit blocked tasks: unblock what can now be done. Only tasks in paths you may change belong here.
+3. **`docs/NEXT.md`.** Reorder it so the top task is the right next one: milestone work, with about every 5th task cleanup or polish. Every task fits one session; split larger ones. Revisit blocked tasks: unblock what can now be done. (Tasks blocked on an owner question, named by `key \`<key>\``, come back by themselves once it's answered; give any blocked task that waits on a question without one its key.) Only tasks in paths you may change belong here.
 4. **Re-examine one recently finished feature** (code, any bot playtest data, player feedback). If it is only "OK", add a polish task.
 5. **Milestone end: the checkpoint.** The end of a milestone is the one place development waits for the owner.
 

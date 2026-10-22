@@ -17,7 +17,7 @@ import subprocess
 import sys
 
 from . import config as config_mod
-from . import dailylog, gh, intake, nexttask, state
+from . import dailylog, gh, inbox, intake, nexttask, state
 from .pacing import iso
 
 STALL_DAYS = 3
@@ -119,7 +119,8 @@ def main(argv: list[str] | None = None) -> int:
     # Alarms change issues, so they run once and only their bookkeeping is retried.
     st, _ = state.load(cfg)
     started = st.setdefault("automation_started", iso(now))
-    has_task = nexttask.next_task(skip=nexttask.parked(st, now), first=intake.queue_tasks(cfg, st)) is not None
+    has_task = nexttask.next_task(skip=nexttask.parked(st, now), first=intake.queue_tasks(cfg, st),
+                                answered=inbox.answered_keys(cfg, st)) is not None
     log = check(cfg, st, now, has_task, last_main_commit(), last_own_merge(cfg),
                 dt.datetime.fromisoformat(started.replace("Z", "+00:00")))
 

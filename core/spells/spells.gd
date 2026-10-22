@@ -123,6 +123,23 @@ var _ray_dir: Vector2 = Vector2.ZERO
 var _ray_fires: int = 0
 var _ray_chain: int = 0
 var _ray_prev: int = 0
+## Beam jumps waiting to be cast. A jump is made in a hit handler, i.e. inside the previous
+## beam's `ray()`, so casting it there would nest one `ray()` deeper per jump and the
+## manager stops at RAY_MAX_DEPTH. The outermost beam casts them, first in first out, once
+## its own `ray()` has returned. Fixed size, so nothing is allocated per frame.
+const JUMP_QUEUE: int = SpellLimits.MAX_CHAINS_PER_STEP * SpellLimits.PLAYERS
+var _jq_spell: Array[CompiledSpell] = []
+var _jq_target: Array[Node2D] = []
+var _jq_tag: PackedInt64Array = PackedInt64Array()
+var _jq_player: PackedInt32Array = PackedInt32Array()
+var _jq_pos: PackedVector2Array = PackedVector2Array()
+var _jq_dir: PackedVector2Array = PackedVector2Array()
+var _jq_len: PackedFloat32Array = PackedFloat32Array()
+var _jq_chain: PackedInt32Array = PackedInt32Array()
+var _jq_prev: PackedInt64Array = PackedInt64Array()
+var _jq_head: int = 0
+var _jq_count: int = 0
+var _jq_busy: bool = false
 
 
 func _init() -> void:
@@ -131,6 +148,15 @@ func _init() -> void:
 	_cooldown.resize(SpellLimits.PLAYERS * SpellLimits.SLOTS)
 	_fires_used.resize(SpellLimits.PLAYERS)
 	_chains_used.resize(SpellLimits.PLAYERS)
+	_jq_spell.resize(JUMP_QUEUE)
+	_jq_target.resize(JUMP_QUEUE)
+	_jq_tag.resize(JUMP_QUEUE)
+	_jq_player.resize(JUMP_QUEUE)
+	_jq_pos.resize(JUMP_QUEUE)
+	_jq_dir.resize(JUMP_QUEUE)
+	_jq_len.resize(JUMP_QUEUE)
+	_jq_chain.resize(JUMP_QUEUE)
+	_jq_prev.resize(JUMP_QUEUE)
 	_timers.resize(64)
 
 
@@ -306,6 +332,9 @@ func cast(player: int, slot: int, origin: Vector2, direction: Vector2, mana: flo
 ## Runs the cooldowns and the timer triggers by `delta` seconds, and opens a new step for
 ## the fire and jump caps. The autoload calls it every physics step; the order of the two
 ## autoloads in project.godot (Projectiles first) is what makes it run after the manager.
+## So a cap's window is this step's timer fires plus the next step's hits, and a `cast` made
+## between the two (a beam's on-expire spell, a player's own cast) counts against whichever
+## window is open.
 func step(delta: float) -> void:
 	for c in _cooldown.size():
 		_cooldown[c] = maxf(_cooldown[c] - delta, 0.0)
@@ -424,7 +453,8 @@ func _shoot_ray(spell: CompiledSpell, tag: int, player: int, origin: Vector2, he
 	_ray_prev = prev
 	var reach: float = spell.ray_length if length < 0.0 else length
 	var got: float = projectiles.ray(player, origin, heading, reach, spell.pierce if pierce < 0 else pierce, ProjectilesScript.LAYER_ENEMY, tag, spell.radius * 0.5, source)
-	if spell.held != null and spell.trigger_event == TriggerBase.Event.EXPIRE and _ray_fires > 0 and _take_fire(player):
+	# A `ray()` that did nothing (too deep, or a bad aim) has no end to fire the held spell from.
+	if got > 0.0 and spell.held != null and spell.trigger_event == TriggerBase.Event.EXPIRE and _ray_fires > 0 and _take_fire(player):
 		_ray_fires -= 1
 		_launch(spell.held, _held_tag(tag), player, origin + heading * got, heading, null)
 	_ray_tag = saved_tag
@@ -433,6 +463,27 @@ func _shoot_ray(spell: CompiledSpell, tag: int, player: int, origin: Vector2, he
 	_ray_chain = saved_chain
 	_ray_prev = saved_prev
 	shot_ended(tag)
+	_cast_jumps()
+
+
+## Casts the queued beam jumps, if this is the outermost beam. Each jump's own jumps join the
+## end of the queue, so the chain runs as a loop, one `ray()` deep per jump.
+func _cast_jumps() -> void:
+	if _jq_busy:
+		return
+	_jq_busy = true
+	while _jq_count > 0:
+		var at: int = _jq_head
+		_jq_head = (_jq_head + 1) % JUMP_QUEUE
+		_jq_count -= 1
+		var spell: CompiledSpell = _jq_spell[at]
+		var target: Node2D = _jq_target[at]
+		_jq_spell[at] = null
+		_jq_target[at] = null
+		if spell == null or not is_instance_valid(target):
+			continue
+		_shoot_ray(spell, _jq_tag[at], _jq_player[at], _jq_pos[at], _jq_dir[at], _jq_chain[at], _jq_prev[at], target, _jq_len[at], 0)
+	_jq_busy = false
 
 
 ## True when the shot in `slot` fires its held spell on a timer.
@@ -549,7 +600,20 @@ func _jump(spell: CompiledSpell, tag: int, player: int, position: Vector2, targe
 	var along: Vector2 = position.direction_to(aim)
 	var distance: float = position.distance_to(aim)
 	if by_ray:
-		_shoot_ray(spell, tag, player, position, along, chain, struck, target, distance + spell.radius + 8.0, 0)
+		if _jq_count >= JUMP_QUEUE:
+			chains_dropped += 1
+			return
+		var end: int = (_jq_head + _jq_count) % JUMP_QUEUE
+		_jq_count += 1
+		_jq_spell[end] = spell
+		_jq_target[end] = target
+		_jq_tag[end] = tag
+		_jq_player[end] = player
+		_jq_pos[end] = position
+		_jq_dir[end] = along
+		_jq_len[end] = distance + spell.radius + 8.0
+		_jq_chain[end] = chain
+		_jq_prev[end] = struck
 		return
 	var speed: float = maxf(spell.speed, SpellLimits.CHAIN_MIN_SPEED)
 	var life: float = (distance + 16.0) / speed * 1.5 + 0.05
@@ -583,6 +647,8 @@ func clear() -> void:
 	_cooldown.fill(0.0)
 	_fires_used.fill(0)
 	_chains_used.fill(0)
+	_jq_head = 0
+	_jq_count = 0
 	_timer_count = 0
 	_rec_seq.fill(-1)
 	_rec_timed.fill(0)

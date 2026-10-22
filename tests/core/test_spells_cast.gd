@@ -388,9 +388,37 @@ func test_a_beam_chains_with_another_beam() -> void:
 	var order: Array = []
 	for hit in _hits:
 		order.append(hit[1])
-	# The jump is made inside the first hit's handler, so its hit is recorded first.
+	# The jump is queued by the first hit's handler and cast after that beam returns.
 	check_equal(order.size(), 2, "the beam hit two targets, though a jump could have hit the first again")
 	check(order.has(a) and order.has(b), "one directly, the other by the jump")
+
+
+func test_a_beam_makes_all_six_jumps() -> void:
+	var line: Array[Node2D] = []
+	for i in 8:
+		line.append(_target(Vector2(60 + 40 * i, 0)))
+	var recipe: Dictionary = {"form": &"beam", "modifiers": [&"chain", &"chain", &"chain"]}
+	var spell: CompiledSpell = _compile(recipe)
+	check_equal(spell.chain_jumps, SpellLimits.MAX_CHAIN_JUMPS, "three chain runes give the most jumps")
+	_build(0, 0, recipe)
+	_cast(0)
+	check_equal(_hits.size(), SpellLimits.MAX_CHAIN_JUMPS + 1, "the beam and all six jumps hit, deeper than the ray nesting limit")
+	for i in 7:
+		check_equal(_hits[i][1], line[i], "target %d was hit in order" % i)
+	check_equal(_spells.live_shots(_spells.current_tag(0, 0, 0)), 0, "every beam was counted as ended")
+
+
+func test_split_beams_chain_past_the_ray_depth() -> void:
+	for x in range(40, 330, 30):
+		for y in range(-60, 61, 30):
+			_target(Vector2(x, y))
+	var recipe: Dictionary = {"form": &"beam", "modifiers": [&"split", &"chain", &"chain"]}
+	_build(0, 0, recipe)
+	_cast(0)
+	check(_hits.size() > 0, "the beams hit")
+	var spell: CompiledSpell = _compile(recipe)
+	check(_hits.size() > spell.shots * (spell.pierce + 1), "the jumps added hits beyond the first beams: %d" % _hits.size())
+	check_equal(_spells.live_shots(_spells.current_tag(0, 0, 0)), 0, "every beam was counted as ended")
 
 
 func test_a_beams_held_spell_flies_along_the_beam_from_the_hit() -> void:

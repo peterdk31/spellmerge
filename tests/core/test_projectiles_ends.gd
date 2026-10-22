@@ -162,9 +162,6 @@ func test_the_readers_follow_a_slot() -> void:
 	check_equal(_mgr.get_anchor(0), Vector2.INF, "no anchor yet")
 	_mgr.set_anchor(0, Vector2(1, 2))
 	check_equal(_mgr.get_anchor(0), Vector2(1, 2), "the anchor")
-	var node: Node2D = _target(Vector2(40, 50))
-	check_equal(_mgr.get_target_point(node), Vector2(40, 50), "a target's place, right after add_target")
-	check_equal(_mgr.get_target_point(null), Vector2.INF, "null")
 
 
 func test_exclude_blocks_one_target_for_a_while() -> void:
@@ -175,6 +172,19 @@ func test_exclude_blocks_one_target_for_a_while() -> void:
 	check_equal(_hits, 0, "inside the circle but excluded")
 	_step(3)
 	check_equal(_hits, 1, "hit once the time is over")
+
+
+## Pins a known gap (BACKLOG, casting part 10): the exclusion is a timer, not "until the shot
+## has left the circle", so a slow shot born on its source hits it once the time is over.
+## When the exclusion is made to last until the shot is clear, change this to expect 0.
+func test_a_slow_excluded_shot_still_hits_its_source_after_the_time() -> void:
+	var node: Node2D = _target(Vector2(0, 0))
+	var slot: int = _mgr.spawn(0, Vector2(0, 0), Vector2(20, 0), 5.0, 4.0, ManagerScript.LAYER_ENEMY, 0, TAG)
+	_mgr.exclude(slot, node, 0.1)
+	_step(5)
+	check_equal(_hits, 0, "excluded while the time lasts")
+	_step(3)
+	check_equal(_hits, 1, "hit its source once the time is over, though it has not left the circle")
 
 
 func test_exclude_is_cleared_when_the_slot_is_reused() -> void:

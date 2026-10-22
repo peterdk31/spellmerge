@@ -1123,16 +1123,6 @@ func get_anchor(player: int) -> Vector2:
 var nearest_point: Vector2 = Vector2.INF
 
 
-## The place of `node` as the target grid knows it (its hit circle's centre), or
-## `Vector2.INF` when it is not a target.
-func get_target_point(node: Node2D) -> Vector2:
-	if node == null:
-		return Vector2.INF
-	_query_ready()
-	var at: int = _target_id.find(node.get_instance_id())
-	return _target_pos[at] if at >= 0 else Vector2.INF
-
-
 ## Make room: drop the oldest projectile of the owner with the most.
 func _drop_one() -> void:
 	var richest: int = 0

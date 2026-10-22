@@ -32,7 +32,7 @@ Weak spots found in the architecture review of 2026-10-20 (docs/ARCHITECTURE.md)
 
 ## Spell runtime (found in M2 part 6)
 
-- **Held spells of a rune start inside their target.** A held rune (or any slow shot) born on a hit overlaps the target that fired it, and the 0.1 s exclusion ends before a slow shot has left it, so it hits the source after all. Part 10's rune form should be tuned (or the exclusion made "until clear of the target") when the forms exist.
+- **Held spells of a rune start inside their target.** A held rune (or any slow shot) born on a hit overlaps the target that fired it, and the 0.1 s exclusion ends before a slow shot has left it, so it hits the source after all (pinned by `test_a_slow_excluded_shot_still_hits_its_source_after_the_time`; change that test when this is fixed). Part 10's rune form should be tuned (or the exclusion made "until clear of the target") when the forms exist.
 - **A beam has no timer trigger and no exclusion in time.** A ray is instant, so its timer never ticks; an on-expire trigger fires at the beam's end. Fine for the first combos; revisit if a combo wants a beam that "keeps firing".
 - **`tests/bots/test_wave_balance.gd` is timing-dependent.** The 1-player bot cleared the room in 39 s in one run and was not done after 120 game seconds (37 casts) in another, on unchanged gameplay code. It follows real frame time; make it deterministic (seeded, fixed step) in part 20.
 - **`player` must feed `Projectiles.set_anchor` every physics step** for orbit spells to cast (part 11); `Spells.cast` refuses an orbit with no anchor.

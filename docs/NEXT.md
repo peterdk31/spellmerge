@@ -6,7 +6,6 @@ The ordered task queue for the current milestone, M2 (its design, [M2-spell-syst
 
 M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97). Each task's details are the matching row and sections of the M2 design. Nothing from M3+ is built (rewards, relics, staffs, rooms, the door rule).
 
-- [ ] **Bots build spells (M2 part 20).** (`tests/bots`) Seeded random builds, bot 4 staying in its builder in the 4-bot test, `test_spell_fuzz.gd`; **the weekly playtest asks about building from here**.
 - [ ] **Combos to 20+ (M2 part 21).** (`combos.json`) At least 20 combos passing, each component in two non-refusal combos; done-when item 2.
 - [ ] **Story canon (M2 part 22).** (`docs/STORY.md`) Canon and tone, short; listed in `llms.txt`.
 - [ ] **The first lore; Story opens (M2 part 23).** (`content/story/lore/components/`) One description per component, its validator, the Story README's example and schema; the builder shows them.
@@ -22,6 +21,7 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
 
 ## Done recently
 
+- [x] **Bots build spells (M2 part 20).** `tests/bots/recipe_fuzzer.gd` (seeded recipes, slot-by-slot build calls); `Bot.build_random(seed)` builds into spell B through `build_change_requested` and swaps; `Bot.open_builder()` walks overlay → "Build" with real input. In the 4-bot test bots 1-3 build (seeds 2026-2028) and bot 4 must open its builder and stay in it. `test_spell_fuzz.gd`: 300 seeded recipes compiled and cast in the combo arena (error lines, `SpellLimits`, live shots, frame time). **The weekly playtest should ask about building from here** (recorded in `docs/DECISIONS.md`). `build.sh --quick --tests` passes.
 - [x] **The build break (M2 part 19).** `gameplay/flow`: `BUILD_BREAK` (12 s, fixed) instead of `NEXT_WAVE_DELAY`, `build_break_started(seconds)` after `room_cleared`, `build_break_left()`. `hud/panels`: the hammer (`widgets/hammer_icon.gd`, code-drawn) and "Build N" under the wave line, over the builders, display only. Tests: the wave starts on time for 1, 2 and 4 players while someone builds (`test_flow.gd`), the line (`test_panels.gd`), the event (`test_events.gd`); `build_break` shot in `shot_quick.gd`. `build.sh --quick --tests` and the screenshots pass. Details in `docs/DECISIONS.md`.
 - [x] **The quick view and quick actions (M2 part 18).** The builder folds into the quick view on `wave_started` (chain read only, "Drop component", "Close") and unfolds on `room_cleared`; the corner panel shows the active spell (new event `active_spell_changed`, from `player`); `panels.gd` turns `swap` presses into `spell_swap_requested`; "Drop component" in the overlay and the quick view (`hud/widgets/drop_choices.gd`) puts a bag component into the empty element slot or the first free modifier slot of the active spell. `tests/hud/test_quick.gd` and `shot_quick.gd`; `build.sh --quick --tests` and the screenshots pass. Details in `docs/DECISIONS.md`.
 

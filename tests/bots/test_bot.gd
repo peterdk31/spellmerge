@@ -25,6 +25,7 @@ func _initialize() -> void:
 	_test_names_exist(events)
 	_test_join_and_leave()
 	_test_idler_sends_nothing()
+	_test_builder_walk()
 	await _test_fighter(events)
 	if _failures.is_empty():
 		print("TEST OK: tests/bots")
@@ -67,6 +68,22 @@ func _test_join_and_leave() -> void:
 	first.leave()
 	second.leave()
 	_check(not _input.call("is_joined", 0) and not _input.call("is_joined", 3), "leaving frees the slots")
+
+
+## The way into the builder is the overlay tap, then one `move_down` and one `cast` press on
+## later steps; without a wizard a bot cannot build and sends nothing.
+func _test_builder_walk() -> void:
+	var bot := BotScript.new()
+	bot.join(1, BotScript.Mode.IDLER, _input, _flow)
+	_check(not bot.build_random(1), "a bot without a wizard cannot build")
+	_check(bot.requests_sent == 0, "a refused build sends no request")
+	bot.open_builder()
+	_check(int(_input.call("get_press_count", 1, &"overlay")) == 1, "the way into the builder starts with the overlay")
+	for i in 6:
+		bot.step(0.016)
+	_check(int(_input.call("get_press_count", 1, &"move_down")) == 1, "one move_down press on the way")
+	_check(int(_input.call("get_press_count", 1, &"cast")) == 1, "one cast press on the way, on Build")
+	bot.leave()
 
 
 func _test_idler_sends_nothing() -> void:

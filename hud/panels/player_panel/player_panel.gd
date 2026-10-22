@@ -14,6 +14,7 @@ extends PanelContainer
 const PLAYER_COUNT: int = 4
 const DOWN_TEXT: String = "DOWN"
 const MENU_TEXT: String = "MENU"
+const SPELL_NAMES: Array[String] = ["A", "B"]
 
 ## The player index 0-3. Set before adding the node to the tree.
 @export var index: int = 0
@@ -22,8 +23,10 @@ var _health: int = -1
 var _mana: int = -1
 var _downed: bool = false
 var _menu_open: bool = false
+var _active_spell: int = 0
 
 @onready var _name: Label = %Name
+@onready var _spell: Label = %Spell
 @onready var _status: Label = %Status
 @onready var _health_bar: ProgressBar = %HealthBar
 @onready var _health_value: Label = %HealthValue
@@ -36,6 +39,7 @@ func _ready() -> void:
 	theme_type_variation = StringName("PlayerPanel%d" % (player + 1))
 	_name.theme_type_variation = StringName("PlayerLabel%d" % (player + 1))
 	_name.text = "P%d" % (player + 1)
+	_refresh_spell()
 	_refresh_status()
 
 
@@ -65,9 +69,28 @@ func set_menu_open(open: bool) -> void:
 		_refresh_status()
 
 
-## Back to the empty state (no numbers, not down, no menu word), for a player who
+## Show which prepared spell `cast` fires: 0 is "Spell A", 1 is "Spell B".
+func set_active_spell(slot: int) -> void:
+	if slot != _active_spell and slot >= 0 and slot < SPELL_NAMES.size():
+		_active_spell = slot
+		_refresh_spell()
+
+
+## The active prepared spell shown, 0 (A) or 1 (B).
+func active_spell() -> int:
+	return _active_spell
+
+
+## The spell word in the header, for example "Spell A".
+func spell_text() -> String:
+	return _spell.text
+
+
+## Back to the empty state (no numbers, not down, no menu word, spell A), for a player who
 ## left or a run that ended. The next `player_stats_changed` fills it again.
 func reset() -> void:
+	_active_spell = 0
+	_refresh_spell()
 	_health = -1
 	_mana = -1
 	_downed = false
@@ -91,6 +114,10 @@ func is_downed() -> bool:
 ## The word in the corner of the panel; empty when nothing special.
 func status_text() -> String:
 	return _status.text
+
+
+func _refresh_spell() -> void:
+	_spell.text = " Spell %s" % SPELL_NAMES[_active_spell]
 
 
 func _refresh_status() -> void:

@@ -29,6 +29,7 @@ const EVENTS: Dictionary = {
 	&"spell_changed": [["player", TYPE_INT], ["spell", TYPE_PACKED_INT32_ARRAY], ["description", TYPE_STRING]],
 	&"build_refused": [["player", TYPE_INT], ["reason", TYPE_STRING]],
 	&"recipe_changed": [["player", TYPE_INT], ["slot", TYPE_INT], ["recipe", TYPE_DICTIONARY]],
+	&"active_spell_changed": [["player", TYPE_INT], ["slot", TYPE_INT]],
 	&"bag_changed": [["player", TYPE_INT], ["bag", TYPE_ARRAY]],
 	&"reaction_triggered": [["player", TYPE_INT], ["reaction_id", TYPE_STRING_NAME], ["position", TYPE_VECTOR2]],
 	&"damage_dealt": [["player", TYPE_INT], ["target", TYPE_OBJECT], ["amount", TYPE_INT], ["position", TYPE_VECTOR2]],

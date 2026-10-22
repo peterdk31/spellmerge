@@ -57,7 +57,8 @@ extends CharacterBody2D
 ## Spells (M2 part 11): two prepared spells, slot 0 (A) and 1 (B), each a recipe of component
 ## ids (see `core/spells`) compiled and installed by `Spells`. `start_recipe_a`/`_b` are built
 ## when the wizard enters the tree (flow sets them). `swap()` (or `spell_swap_requested`)
-## switches the active slot. `build_change_requested` for this player is checked with
+## switches the active slot, and `active_spell_changed` says which one (also when the wizard
+## appears). `build_change_requested` for this player is checked with
 ## `Spells.compile` on a copy of the recipe: if it compiles the copy replaces the spell and
 ## `spell_changed` is sent, else `build_refused` says why and nothing changes. The `bag` holds
 ## the ids the player may build with (every component in the registry until M3's rewards
@@ -355,6 +356,8 @@ func _ready() -> void:
 	# Start on the slot that has a spell, so a wizard with only B can cast at once.
 	if _built[active_slot] == null and _built[1 - active_slot] != null:
 		active_slot = 1 - active_slot
+	if events != null:
+		events.active_spell_changed.emit(index, active_slot)
 	if _overlay == null:
 		_overlay = Node2D.new()
 		_overlay.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -710,6 +713,8 @@ func swap() -> bool:
 	if _downed or _built[other] == null:
 		return false
 	active_slot = other
+	if events != null:
+		events.active_spell_changed.emit(index, active_slot)
 	return true
 
 

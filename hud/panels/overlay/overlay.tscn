@@ -29,3 +29,10 @@ layout_mode = 2
 focus_mode = 0
 mouse_filter = 2
 text = "Build"
+
+[node name="Drop" type="Button" parent="Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+focus_mode = 0
+mouse_filter = 2
+text = "Drop component"

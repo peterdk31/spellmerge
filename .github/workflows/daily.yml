@@ -480,8 +480,15 @@ jobs:
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           permission-contents: read
           permission-issues: write
+      - name: The build logs (stress and timing results for the log)
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        continue-on-error: true # no build, no logs: the summary goes out without them
+        with:
+          name: build-logs
+          path: build-logs
       - env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          BUILD_LOGS: build-logs
           VERSION: ${{ needs.build.outputs.version }}
           CHANNEL: ${{ needs.build.outputs.channel }}
           INTAKE_COUNT: ${{ needs.intake-gather.outputs.count }}

@@ -226,11 +226,13 @@ export_all() {
   # Projectile timing (#91) and the stress run (#166) in WASM, the numbers the web limits rest on.
   # The main menu starts them on --projectile-timing and --stress (an exported build can't run a
   # --script); they print BENCH lines, then TIMING OK or STRESS OK, and only warn on frame time.
+  # Their logs go to build/logs like the Linux ones, so the Daily log can quote them (smbot.summary).
   step "Projectile timing (exported web build, headless Chrome)"
   PYTHONPATH=ci python3 -m smbot.websmoke build/web-test --page-args=--projectile-timing --expect "TIMING OK" \
-    --timeout 240
+    --timeout 240 2>&1 | tee build/logs/timing-web.log
   step "Stress run (exported web build, headless Chrome)"
-  PYTHONPATH=ci python3 -m smbot.websmoke build/web-test --page-args=--stress --expect "STRESS OK" --timeout 600
+  PYTHONPATH=ci python3 -m smbot.websmoke build/web-test --page-args=--stress --expect "STRESS OK" --timeout 600 \
+    2>&1 | tee build/logs/stress-web.log
 }
 
 zip_dir() { # zip_dir <dir> <zip>: sorted entries, fixed timestamps, file modes kept

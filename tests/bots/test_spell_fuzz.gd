@@ -10,8 +10,8 @@ extends "res://tests/support/suite.gd"
 ##  - a spell that cannot be built or cast, or that leaves more live shots than the manager's
 ##    cap, and
 ##  - a frame over budget: the mean time of a physics step (projectiles, spells, combat) of a
-##    recipe above one 60 FPS frame, or any one step above STEP_LIMIT_MS (a hiccup of the
-##    machine is not a spell, so the single step has a wide margin).
+##    recipe above MEAN_LIMIT_MS (two 60 FPS frames), or any one step above STEP_LIMIT_MS
+##    (100 ms; a hiccup of the machine is not a spell, so both have a wide margin).
 ## A failure names the seed and the recipe, so it can be replayed: change `SEED` or
 ## `RECIPES`, or run the recipe by hand in the arena.
 ##

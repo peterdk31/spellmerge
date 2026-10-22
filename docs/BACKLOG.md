@@ -15,6 +15,10 @@ Ideas and future work outside the current milestone (docs/PLAN.md, "Planning sys
 - `Combat` status reads (`speed_factor`, `status_left`, `chill_stacks`, `apply_status`) each do a linear `_enemies.find`, and the AI calls `speed_factor` per imp per step: O(n²) at 100–200 enemies. Native `find` is probably fine; measure it in the M2 part 24 stress scene, and if it shows, let the enemy cache its row or id.
 - `Combat.speed_factor` is the one reader of slow and freeze. M3's enemy base should multiply walking and attack timers by it once, so every enemy type respects it.
 
+## From M2 part 20
+
+- **Building questions in the weekly playtest.** Nothing makes the weekly run ask about building; it writes from what changed. If the next weekly playtest has no building questions (is the builder readable, are refusals clear), ask the owner to add a line to `.github/maintainer/plan.md`.
+
 ## Questions for the owner
 
 Not kept here any more: each question is an issue labelled `owner-question` (docs/DECISIONS.md, "The owner inbox").

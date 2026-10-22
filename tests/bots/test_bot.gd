@@ -25,6 +25,7 @@ func _initialize() -> void:
 	_test_names_exist(events)
 	_test_join_and_leave()
 	_test_idler_sends_nothing()
+	_test_builder_walk()
 	await _test_fighter(events)
 	if _failures.is_empty():
 		print("TEST OK: tests/bots")
@@ -69,6 +70,53 @@ func _test_join_and_leave() -> void:
 	_check(not _input.call("is_joined", 0) and not _input.call("is_joined", 3), "leaving frees the slots")
 
 
+## The way into the builder is the overlay tap, then one `move_down` and one `cast` press on
+## later steps; without a wizard a bot cannot build and sends nothing.
+func _test_builder_walk() -> void:
+	var bot := BotScript.new()
+	bot.join(1, BotScript.Mode.IDLER, _input, _flow)
+	_check(not bot.build_random(1), "a bot without a wizard cannot build")
+	_check(bot.requests_sent == 0, "a refused build sends no request")
+	bot.open_builder()
+	_check(int(_input.call("get_press_count", 1, &"overlay")) == 1, "the way into the builder starts with the overlay")
+	var cast_before_down: bool = false
+	for i in 6:
+		bot.step(0.016)
+		if int(_input.call("get_press_count", 1, &"cast")) > 0 and int(_input.call("get_press_count", 1, &"move_down")) == 0:
+			cast_before_down = true
+	_check(not cast_before_down, "move_down is pressed before cast on the way to Build")
+	_check(int(_input.call("get_press_count", 1, &"move_down")) == 1, "one move_down press on the way")
+	_check(int(_input.call("get_press_count", 1, &"cast")) == 1, "one cast press on the way, on Build")
+	bot.leave()
+
+
+## With a wizard, `build_random` sends the clearing calls first, then the recipe's calls, all
+## for its own player, and a swap only when the active slot is not spell B.
+func _test_build_random(events: Node, bot: BotScript, wizard: Node) -> void:
+	var builds: Array = []
+	var swaps: Array = []
+	var on_build := func(player: int, _path: PackedInt32Array, slot: int, id: StringName) -> void: builds.append([player, slot, id])
+	var on_swap := func(player: int) -> void: swaps.append(player)
+	events.connect("build_change_requested", on_build)
+	events.connect("spell_swap_requested", on_swap)
+	var swap_expected: bool = int(wizard.get("active_slot")) != BotScript.BUILD_SPELL
+	var before: int = bot.requests_sent
+	_check(bot.build_random(5), "a bot with a wizard builds")
+	events.disconnect("build_change_requested", on_build)
+	events.disconnect("spell_swap_requested", on_swap)
+	_check(bot.requests_sent - before == builds.size() and builds.size() > 5, "every build request is counted and sent")
+	var clearing: int = BotScript.FuzzerScript.new({}).clear_steps(BotScript.BUILD_SPELL).size()
+	var cleared_first: bool = builds.size() >= clearing
+	for i in mini(clearing, builds.size()):
+		cleared_first = cleared_first and (builds[i] as Array)[2] == &""
+	_check(cleared_first, "the clearing calls come first")
+	var own: bool = true
+	for entry: Array in builds:
+		own = own and entry[0] == 0
+	_check(own, "all build calls are for the bot's own player")
+	_check(swaps.size() == (1 if swap_expected else 0) and (swaps.is_empty() or swaps[0] == 0), "the swap is sent once, and only when the active slot is not spell B")
+
+
 func _test_idler_sends_nothing() -> void:
 	var idler := BotScript.new()
 	idler.join(2, BotScript.Mode.IDLER, _input, _flow)
@@ -98,6 +146,7 @@ func _test_fighter(events: Node) -> void:
 		_check(wizard.global_position.distance_to(before) > 1.0, "a fighter walks toward the enemies")
 		var other := _flow.call("get_wizard", 1) as Node2D
 		_check(other != null and other.global_position != wizard.global_position, "each bot steers its own wizard")
+		_test_build_random(events, bots[0], wizard)
 	_flow.call("stop_run")
 	for bot in bots:
 		bot.step(0.016)

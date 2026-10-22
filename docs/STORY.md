@@ -8,7 +8,7 @@ The canon and tone for every word in Spellmerge. Story text (`content/story/`), 
 
 - **Dry, not silly.** The jokes come from magic being a bit of a mess, wizards being sure of themselves and rules being applied too literally. No pun in every line, no winking at the player every sentence, no memes.
 - **The stakes are real.** The crypt is dangerous, people have been lost in it, and a downed wizard needs a friend. A joke may make a danger funnier; it never makes it small.
-- **Short.** One idea per line. Text is read by four players at once, mid-fight. A description is one sentence (at most 90 characters) that says what the thing does and, if there is room, how it feels.
+- **Short.** One idea per line. Text is read by four players at once, mid-fight. A description is one sentence (at most 60 characters, what the builder's note shows in three lines) that says what the thing does and, if there is room, how it feels.
 - **Plain words.** Say what the thing does in words a player already knows. Keep invented words to the few in the canon below.
 - **Together.** Magic is better with company. Nothing in the story needs one player to wait for another, and no line talks about "the player" or "the hero". Several wizards are always possible.
 - **Original.** No names, quotes, characters or places from other works, and no real people (AGENTS.md, copyright).
@@ -30,7 +30,7 @@ The canon and tone for every word in Spellmerge. Story text (`content/story/`), 
 - Humour is aimed at the in-world guild, its wizards and the magic. It never mocks the real player for playing badly or losing, and never targets real groups of people.
 - No swearing, no real-world politics or religion, no graphic violence; fights are about spells and imps.
 - Speech, if there is any, is in short lines of at most 60 characters.
-- The 90-character description limit and the 60-character speech limit are enforced by the story validator in M2 part 23, and the Story README is to cite them then. Until then they are guidance.
+- The 60-character description limit and the 60-character speech limit are constants of the story validator (`core/story/story_validator.gd`). The description limit is enforced since M2 part 23; the speech limit applies once dialogue exists. The first lore is `content/story/lore/components/`; the Story README has the schema.
 
 ## Not fixed yet
 

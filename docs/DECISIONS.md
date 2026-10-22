@@ -2,10 +2,17 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-22: The first lore (M2 part 23)
+
+- **One JSON file per component** (`lore/components/<id>.json`, keys `id`, `about`, `text`) rather than one big file: contributors add content as new files and conflicts cannot happen. `about` is there so relic, item and enemy lore can share the schema later without a new folder rule.
+- **The registry reads the lore** (it is the one script allowed to load from computed paths); `Spells.component_description` asks it, so the HUD still reads no component field. Invalid lore files are never given out.
+- **Validator in `core/story/`**, not in the spells validator: story belongs to its own area. It runs in tests and as debug-build warnings (`tools/check.sh` is owner-protected, see #140). A missing lore file for any spell component is reported as `missing-lore` in the debug-build warnings, but the test does not fail on it: a Spells PR must not fail CI for a rule outside its area. The builder shows an empty note and Story or Claude fills the gap; `content/spells/README.md` lists the file as a step.
+- **Descriptions state the real numbers only where they are fixed** (eight shots, three orbs, up to twice, every half second, up to four times); other effects are said in words so a retune does not make them lie.
+
 ## 2026-10-22: Story canon (M2 part 22)
 
 - **Short, with seven fixed points.** `docs/STORY.md` fixes only what the game already shows or needs (the wizards as guild apprentices, the build-from-parts magic, the four elements' characters, the crypt, imps, the stakes, relics). Biomes after the crypt, bosses, hub and dialogue are left open, so later writing and contributors add canon instead of fighting it.
-- **Tone reading of pillar 3:** dry rather than silly, with the danger never made small. Descriptions follow the 90-character limit that part 23 validates.
+- **Tone reading of pillar 3:** dry rather than silly, with the danger never made small. Descriptions follow the 60-character limit that part 23 validates.
 - **Component names are quoted from the registry** (Bolt, Frost, On Hit, ...), so lore and builder agree.
 
 ## 2026-10-22: Combos to 20+ (M2 part 21)

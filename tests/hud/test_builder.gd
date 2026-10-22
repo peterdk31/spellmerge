@@ -587,7 +587,7 @@ func test_a_refusal_reason_is_shown_as_text_and_cleared_by_the_next_change() -> 
 	_open(0)
 	_open(1)
 	var builder: BuilderScript = _builder(0)
-	check_equal(builder.note_text(), "", "nothing is refused at first")
+	check_equal(builder.note_text(), _spells.component_description(&"bolt"), "nothing is refused at first: the note describes the bolt in focus")
 	_choose(0, BuilderScript.SLOT_TRIGGER, "On Hit")
 	_press(0, builder.held_button())
 	_choose(0, BuilderScript.SLOT_ELEMENT, "Frost")
@@ -596,10 +596,10 @@ func test_a_refusal_reason_is_shown_as_text_and_cleared_by_the_next_change() -> 
 	check(reason != "", "with a reason")
 	check_equal(builder.refusal_reason(), reason, "the builder keeps it")
 	check_equal(builder.note_text(), BuilderScript.REFUSED_PREFIX + reason, "and shows it as words, with its label")
-	check_equal(_builder(1).note_text(), "", "another player's builder shows nothing")
+	check_equal(_builder(1).note_text(), _spells.component_description(&"bolt"), "another player's builder shows no refusal, only its own focus")
 	_choose(0, BuilderScript.SLOT_FORM, "Bolt")
 	check_equal(builder.refusal_reason(), "", "a change that works clears it")
-	check_equal(builder.note_text(), "", "and the text is gone")
+	check_equal(builder.note_text(), _spells.component_description(&"bolt"), "and the note describes the bolt again")
 
 
 func test_an_over_complex_spell_is_refused_with_the_compilers_reason() -> void:
@@ -645,14 +645,26 @@ func test_the_preview_caps_the_drawn_shots() -> void:
 	preview.free()
 
 
-func test_the_description_is_empty_until_the_lore_exists() -> void:
+func test_the_note_shows_the_lore_of_the_component_in_focus() -> void:
 	_start(1)
 	_open(0)
 	var builder: BuilderScript = _builder(0)
-	_press(0, builder.slot_button(BuilderScript.SLOT_ELEMENT))
-	check_equal(builder.note_text(), "", "nothing to say about a component yet")
-	check_equal(_spells.component_description(&"fire"), "", "the runtime has no description yet")
-	check_equal(_spells.component_description(&"nothing_like_it"), "", "and an unknown id has none")
+	check_equal(builder.note_text(), _spells.component_description(&"bolt"), "the form slot holds a bolt: its lore")
+	_choose(0, BuilderScript.SLOT_ELEMENT, "Fire")
+	check_equal(builder.note_text(), _spells.component_description(&"fire"), "fire is chosen: its lore")
+	check(_spells.component_description(&"fire").begins_with("Burns"), "fire has its lore")
+	check_equal(_spells.component_description(&"nothing_like_it"), "", "an unknown id has none")
+
+
+func test_every_description_fits_the_note_without_being_trimmed() -> void:
+	_start(1)
+	_open(0)
+	await process_frame
+	await process_frame
+	var builder: BuilderScript = _builder(0)
+	for id in _registry.get_ids(&"spells"):
+		var text: String = _spells.component_description(id)
+		check(builder.note_lines_for(text) <= BuilderScript.NOTE_LINES, "%s fits %d lines: %s" % [id, BuilderScript.NOTE_LINES, text])
 
 
 func test_the_info_panels_of_four_builders_fit_the_screen_beside_everything() -> void:

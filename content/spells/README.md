@@ -56,7 +56,8 @@ Element interactions go in `reactions.tres` (a `ReactionTable` of `ReactionRow`s
 4. Replace the icon (16×16, palette from docs/STYLE.md) and the optional SFX. Add a line for each to `art/manifest.json` or `audio/manifest.json` (path, origin `human` or `ai`, author, license; for AI also tool and prompt). Commit the `.uid` and `.import` files Godot creates.
 5. If it interacts with other elements, add the rows to `reactions.tres`.
 6. Add the combo row(s) to `combos.json`.
-7. Run the checks below, then open a PR using the template.
+7. Add the builder description: copy `content/story/lore/components/bolt.json` to `content/story/lore/components/<id>.json` and write one honest line (at most 60 characters; say only what the component really does). Without it the builder shows no description and a debug build warns, but nothing fails; Claude writes a missing one in a follow-up.
+8. Run the checks below, then open a PR using the template.
 
 ## Examples to copy
 

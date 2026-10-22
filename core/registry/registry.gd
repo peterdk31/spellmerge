@@ -47,6 +47,10 @@ var _ids: Dictionary = {}
 var _sound_paths: Dictionary = {}
 ## sound id -> AudioStream already loaded
 var _sounds: Dictionary = {}
+## Lore files of the last scan: path -> parsed JSON (null if it did not parse).
+var _lore_files: Dictionary = {}
+## about -> { id -> text } of the lore files that are valid, for `get_lore()`.
+var _lore: Dictionary = {}
 
 
 func _ready() -> void:
@@ -54,6 +58,7 @@ func _ready() -> void:
 	scan()
 	if OS.is_debug_build():
 		warn_spell_problems()
+		warn_story_problems()
 
 
 ## Reads the content and audio folders again. The roots can be changed so
@@ -65,6 +70,7 @@ func scan(content_root: String = DEFAULT_CONTENT_ROOT, audio_root: String = DEFA
 	_ids.clear()
 	_sound_paths.clear()
 	_sounds.clear()
+	_scan_lore(content_root.path_join("story/lore"))
 	for folder_name: String in _list_dir(content_root, true):
 		var folder: StringName = StringName(folder_name)
 		var found: Dictionary = {}
@@ -104,6 +110,14 @@ func warn_spell_problems() -> int:
 	return problems.size()
 
 
+## Pushes one warning per problem `validate_story()` finds, and returns how many.
+func warn_story_problems() -> int:
+	var problems: Array[Dictionary] = validate_story()
+	for problem: Dictionary in problems:
+		push_warning("Registry: " + StoryValidator.format(problem))
+	return problems.size()
+
+
 ## Runs the spell validator on everything found under `spells` (demo or not) and on the
 ## reaction table `<content root>/spells/reactions.tres`, which is skipped when there is
 ## none. Returns the problems as `SpellValidator` describes them; empty when all is well.
@@ -117,6 +131,45 @@ func validate_spells() -> Array[Dictionary]:
 	if ResourceLoader.exists(table_path):
 		reactions = ResourceLoader.load(table_path) as ReactionTable
 	return SpellValidator.check_all(spells, reactions, SpellValidator.load_manifest(), _duplicates)
+
+
+## Reads every lore `.json` below `root` (`content/story/lore`). A file that fails the story
+## validator is kept for `validate_story()` but never given out by `get_lore()`.
+func _scan_lore(root: String) -> void:
+	_lore_files.clear()
+	_lore.clear()
+	for path: String in _find_files(root, PackedStringArray(["json"])):
+		var file: FileAccess = FileAccess.open(path, FileAccess.READ)
+		var data: Variant = JSON.parse_string(file.get_as_text()) if file != null else null
+		_lore_files[path] = data
+		if not StoryValidator.check_lore(path, data).is_empty():
+			continue
+		var entry: Dictionary = data
+		var about: StringName = StringName(entry["about"])
+		var texts: Dictionary = _lore.get(about, {})
+		if not texts.has(entry["id"]):
+			texts[StringName(entry["id"])] = entry["text"]
+		_lore[about] = texts
+
+
+## The lore text about `about` (`&"component"`) with this id, or "" when there is none.
+func get_lore(about: StringName, id: StringName) -> String:
+	var texts: Dictionary = _lore.get(about, {})
+	return texts.get(id, "")
+
+
+## Runs the story validator on the component lore files and checks that every spell component
+## has one (demo or not). Problems come back as `StoryValidator` describes them.
+func validate_story() -> Array[Dictionary]:
+	var entries: Dictionary = {}
+	for path: String in _lore_files:
+		if path.begins_with(_content_root.path_join("story/lore/components/")):
+			entries[path] = _lore_files[path]
+	var ids: Array[StringName] = []
+	for id: StringName in _resources.get(&"spells", {}):
+		ids.append(id)
+	ids.sort_custom(_name_less)
+	return StoryValidator.check_component_lore(entries, ids)
 
 
 ## The resource with this id in this folder, or `null` when there is none (or

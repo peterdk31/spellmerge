@@ -11,7 +11,6 @@
     "number": 175
   },
   "errors_in_a_row": 0,
-  "idle": null,
   "intake_tasks": {},
   "last_own_merge": "2026-10-22T20:15:03Z",
   "last_plan": "2026-10-22T18:46:08Z",
@@ -25,15 +24,7 @@
   },
   "panel_problems": [],
   "paused_by_command": false,
-  "pending_instructions": [
-    {
-      "at": "2026-10-22T20:50:46Z",
-      "kind": "claude",
-      "number": 192,
-      "text": "option F is nice! I like the hat! But the body needs some work.\nMaybe only the hat needs to change color depending on the player.\nGive me some more options to choose from - maybe the palette needs some work, too",
-      "url": "https://github.com/peterdk31/spellmerge/issues/192#issuecomment-6351024487"
-    }
-  ],
+  "pending_instructions": [],
   "processed_comments": [
     6241847784,
     6251160604,
@@ -72,6 +63,11 @@
       "count": 0,
       "parked_reason": "I made no changes. This task needs the `BENCH:` lines from a daily build's web projectile timing step, or its failure or timeout. This session can't read them: `gh run list` was refused for needing approval, so I couldn't fetch CI logs. The repo has no recorded web numbers either. `docs/LOG.md` and `docs/DECISIONS.md` hold only the headless results (p95 13.9 ms and 15.4 ms), which are not WASM. Confirming or lowering the limits, or changing the `multimesh.buffer` upload, would be guesswork, so \"",
       "parked_until": "2026-10-23T17:31:36Z"
+    },
+    "**Record the chosen art direction (M2 part 27 follow-up).** Replace the golden example candidates in `art/kit/golden.json` and `docs/STYLE.md` with the chosen style's files, and say in `docs/STYLE.md` that the style is no longer provisional. Redrawing the placeholders in that style is spread over later milestones (M2 design, \"Art and the art direction\"), one area at a time.": {
+      "count": 0,
+      "parked_reason": "Nothing is committed on the branch `claude/20261022-record-the-chosen-art-direction-m2`. The owner's answer on #192 is not a pick. It says F's hat is nice, the body needs work, only the hat should change colour per player, and the palette may need work too, so they want more options. Recording a style in `art/kit/golden.json` and `docs/STYLE.md` is therefore premature. The right work is a third round of samples: G with a Bone robe, H with a Wood robe, and I with a bell body and bent hat on a new",
+      "parked_until": "2026-10-29T20:55:27Z"
     },
     "**Stabilisation and C2 (M2 part 28).** Only bug fixing, polish and performance until no known crash or blocker remains; then the planning session ends M2 with the C2 checkpoint issue (build link, bot data such as fuzz and stress numbers and which recipes bots build, Claude's honest assessment and the C2 question), and development waits for the owner's /go, /iterate or /pivot.": {
       "count": 0,

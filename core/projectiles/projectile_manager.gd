@@ -175,6 +175,11 @@ const DRAW_STRIDE: int = 16
 ## as the busiest recent frame needed, rounded up to a power of two (never above the
 ## cap), so a quiet batch uploads a few KB a frame rather than cap x 16 floats.
 const MIN_BATCH: int = 64
+## The draw batches: player bolts, runes (still), orbit shots, enemy shots.
+const BATCH_BOLT: int = 0
+const BATCH_RUNE: int = 1
+const BATCH_ORBIT: int = 2
+const BATCH_HOSTILE: int = 3
 ## Draws the neutral sprites: the bone body takes the owner's tint, the Spark-coloured
 ## core takes the element's colour (`set_core`).
 const CORE_SHADER: Shader = preload("res://core/projectiles/shot_core.gdshader")
@@ -1052,18 +1057,22 @@ func update_draw() -> void:
 	var multimesh: MultiMesh = _draw_node.multimesh
 	var hostile_multimesh: MultiMesh = _hostile_node.multimesh
 	var fraction: float = clampf(Engine.get_physics_interpolation_fraction(), 0.0, 1.0)
-	var counts: Vector4i = _count_batches()
-	if counts.x > 0:
-		_draw_room = _batch_room(multimesh, _draw_room, counts.x)
+	var counts: PackedInt32Array = _count_batches()
+	var new_room: int = _batch_room(multimesh, _draw_room, counts[BATCH_BOLT])
+	if new_room != _draw_room:
+		_draw_room = new_room
 		_draw_buffer.resize(_draw_room * DRAW_STRIDE)
-	if counts.y > 0:
-		_rune_room = _batch_room(_rune_node.multimesh, _rune_room, counts.y)
+	new_room = _batch_room(_rune_node.multimesh, _rune_room, counts[BATCH_RUNE])
+	if new_room != _rune_room:
+		_rune_room = new_room
 		_rune_buffer.resize(_rune_room * DRAW_STRIDE)
-	if counts.z > 0:
-		_orbit_room = _batch_room(_orbit_node.multimesh, _orbit_room, counts.z)
+	new_room = _batch_room(_orbit_node.multimesh, _orbit_room, counts[BATCH_ORBIT])
+	if new_room != _orbit_room:
+		_orbit_room = new_room
 		_orbit_buffer.resize(_orbit_room * DRAW_STRIDE)
-	if counts.w > 0:
-		_hostile_room = _batch_room(hostile_multimesh, _hostile_room, counts.w)
+	new_room = _batch_room(hostile_multimesh, _hostile_room, counts[BATCH_HOSTILE])
+	if new_room != _hostile_room:
+		_hostile_room = new_room
 		_hostile_buffer.resize(_hostile_room * DRAW_STRIDE)
 	var out: int = 0
 	var rune_out: int = 0
@@ -1077,13 +1086,14 @@ func update_draw() -> void:
 		if _vel[slot].length_squared() > 0.0:
 			dir = _vel[slot].normalized()
 		var at: Vector2 = _prev[slot].lerp(_pos[slot], fraction)
-		if _player[slot] < 0:
+		var batch: int = _batch_of(slot)
+		if batch == BATCH_HOSTILE:
 			_write_quad(_hostile_buffer, hostile_out * DRAW_STRIDE, dir, diameter, at, Color.WHITE, Color.WHITE)
 			hostile_out += 1
-		elif _motion[slot] == MOTION_STILL:
+		elif batch == BATCH_RUNE:
 			_write_quad(_rune_buffer, rune_out * DRAW_STRIDE, dir, diameter, at, _color_of(_player[slot]), _core[slot])
 			rune_out += 1
-		elif _motion[slot] == MOTION_ORBIT:
+		elif batch == BATCH_ORBIT:
 			_write_quad(_orbit_buffer, orbit_out * DRAW_STRIDE, dir, diameter, at, _color_of(_player[slot]), _core[slot])
 			orbit_out += 1
 		else:
@@ -1105,32 +1115,39 @@ func update_draw() -> void:
 	drawn = out + rune_out + orbit_out + hostile_out
 
 
-## How many live shots each batch will draw: x bolts, y runes, z orbit shots, w enemy shots.
-func _count_batches() -> Vector4i:
-	var bolts: int = 0
-	var runes: int = 0
-	var orbits: int = 0
-	var hostile: int = 0
+## Which draw batch a live slot belongs to (BATCH_*). The one rule both the counting and
+## the writing use, so a batch always has the room its writes need.
+func _batch_of(slot: int) -> int:
+	if _player[slot] < 0:
+		return BATCH_HOSTILE
+	if _motion[slot] == MOTION_STILL:
+		return BATCH_RUNE
+	if _motion[slot] == MOTION_ORBIT:
+		return BATCH_ORBIT
+	return BATCH_BOLT
+
+
+## How many live shots each batch will draw, indexed by BATCH_*.
+func _count_batches() -> PackedInt32Array:
+	var counts: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 	for slot in _high:
-		if _alive[slot] == 0:
-			continue
-		if _player[slot] < 0:
-			hostile += 1
-		elif _motion[slot] == MOTION_STILL:
-			runes += 1
-		elif _motion[slot] == MOTION_ORBIT:
-			orbits += 1
-		else:
-			bolts += 1
-	return Vector4i(bolts, runes, orbits, hostile)
+		if _alive[slot] != 0:
+			counts[_batch_of(slot)] += 1
+	return counts
 
 
 ## The room (in shots) a batch needs to draw `used`: `room` while that fits and is not
 ## more than four times too big, else `used` rounded up to a power of two (at least
-## MIN_BATCH, at most the cap). Resizes the MultiMesh to match when it changes; the
-## caller resizes the buffer. The MultiMesh buffer must be exactly instance_count x
-## DRAW_STRIDE floats, so a smaller upload means a smaller MultiMesh.
+## MIN_BATCH, at most the cap). An empty batch keeps at most MIN_BATCH, else it drops
+## to 0. Resizes the MultiMesh to match when it changes; the caller resizes the buffer.
+## The MultiMesh buffer must be exactly instance_count x DRAW_STRIDE floats, so a
+## smaller upload means a smaller MultiMesh.
 func _batch_room(multimesh: MultiMesh, room: int, used: int) -> int:
+	if used == 0:
+		if room <= MIN_BATCH:
+			return room
+		multimesh.instance_count = 0
+		return 0
 	if used <= room and used * 4 > room:
 		return room
 	var wanted: int = MIN_BATCH

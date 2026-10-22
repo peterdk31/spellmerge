@@ -585,6 +585,89 @@ func _test_batches_upload_only_the_used_slice() -> void:
 	_mgr.spawn(0, Vector2(5.0, 0.0), Vector2(1.0, 0.0), 5.0)
 	_mgr.update_draw()
 	_check(_mgr._draw_node.multimesh.instance_count == ManagerScript.MIN_BATCH, "the batch shrinks once the crowd is gone")
+	# With no shots at all, a big idle batch is released, not kept.
+	_mgr.clear()
+	_mgr.update_draw()
+	var idle: MultiMesh = _mgr._draw_node.multimesh
+	_check(idle.instance_count == ManagerScript.MIN_BATCH, "a small idle batch is kept (%d)" % idle.instance_count)
+	for i in 100:
+		_mgr.spawn(0, Vector2(float(i) + 1.0, 0.0), Vector2(1.0, 0.0), 5.0)
+	_mgr.update_draw()
+	_check(idle.instance_count == 128, "100 shots need a batch of 128 (%d)" % idle.instance_count)
+	_mgr.clear()
+	_mgr.update_draw()
+	_check(idle.instance_count == 0 and _mgr._draw_buffer.size() == 0 and _mgr._draw_room == 0, "an empty big batch drops to nothing")
+	root.remove_child(_mgr)
+
+
+## Bolts, runes, orbit shots and enemy shots at once: each batch has the room, the
+## buffer size and the positions of its own shots, and none is dropped.
+func _test_every_batch_is_sized_to_its_own_shots() -> void:
+	_setup()
+	root.add_child(_mgr)
+	_mgr.set_cap(300)
+	var stride: int = ManagerScript.DRAW_STRIDE
+	_mgr.set_anchor(3, Vector2(100.0, 100.0))
+	var bolts: int = 70
+	var runes: int = 5
+	var orbits: int = 3
+	var hostile: int = 2
+	for i in bolts:
+		_mgr.spawn(0, Vector2(float(i) + 1.0, 0.0), Vector2(1.0, 0.0), 5.0)
+	for i in runes:
+		_mgr.spawn(2, Vector2(float(i) + 1.0, 50.0), Vector2.ZERO, 5.0, 8.0, ManagerScript.LAYER_ENEMY, 0, 0, ManagerScript.MOTION_STILL)
+	var orbit_slots: Array[int] = []
+	for i in orbits:
+		orbit_slots.append(_mgr.spawn_orbit(3, 20.0 + float(i) * 10.0, float(i), 1.0, 1.0))
+	for i in hostile:
+		_mgr.spawn(EventsScript.NO_PLAYER, Vector2(float(i) + 1.0, 90.0), Vector2(0.0, 1.0), 5.0, 5.0, ManagerScript.LAYER_PLAYER)
+	_mgr.update_draw()
+	_check(_mgr.drawn == bolts + runes + orbits + hostile, "every shot is drawn (%d)" % _mgr.drawn)
+	var wanted: Array = [
+		[_mgr._draw_node, bolts, 128],
+		[_mgr._rune_node, runes, ManagerScript.MIN_BATCH],
+		[_mgr._orbit_node, orbits, ManagerScript.MIN_BATCH],
+		[_mgr._hostile_node, hostile, ManagerScript.MIN_BATCH],
+	]
+	for row: Array in wanted:
+		var multimesh: MultiMesh = (row[0] as MultiMeshInstance2D).multimesh
+		var used: int = row[1]
+		_check(multimesh.visible_instance_count == used, "%d shots in the batch (%d)" % [used, multimesh.visible_instance_count])
+		_check(multimesh.instance_count == row[2], "the batch has room for %d (%d)" % [row[2], multimesh.instance_count])
+		_check(multimesh.buffer.size() == multimesh.instance_count * stride, "its buffer is instance_count x stride")
+	var bolt_buffer: PackedFloat32Array = _mgr._draw_node.multimesh.buffer
+	var rune_buffer: PackedFloat32Array = _mgr._rune_node.multimesh.buffer
+	var hostile_buffer: PackedFloat32Array = _mgr._hostile_node.multimesh.buffer
+	var orbit_buffer: PackedFloat32Array = _mgr._orbit_node.multimesh.buffer
+	_check(is_equal_approx(bolt_buffer[(bolts - 1) * stride + 3], float(bolts)), "the last bolt is at its place")
+	_check(is_equal_approx(rune_buffer[(runes - 1) * stride + 3], float(runes)) and is_equal_approx(rune_buffer[7], 50.0), "the last rune is at its place")
+	_check(is_equal_approx(hostile_buffer[stride + 3], 2.0) and is_equal_approx(hostile_buffer[stride + 7], 90.0), "the last enemy shot is at its place")
+	var orbit_ok: bool = true
+	for i in orbits:
+		orbit_ok = orbit_ok and is_equal_approx(orbit_buffer[i * stride + 3], _mgr._pos[orbit_slots[i]].x)
+		orbit_ok = orbit_ok and is_equal_approx(orbit_buffer[i * stride + 7], _mgr._pos[orbit_slots[i]].y)
+	_check(orbit_ok, "the orbit shots are at their places")
+	root.remove_child(_mgr)
+
+
+## A batch grows at once past a power of two, and shrinks only when use falls to a
+## quarter of its room (the MultiMesh is rebuilt rarely).
+func _test_batch_room_grows_and_shrinks_with_hysteresis() -> void:
+	_setup()
+	root.add_child(_mgr)
+	_mgr.set_cap(300)
+	var min_batch: int = ManagerScript.MIN_BATCH
+	# [shots drawn, expected room]: room 64 at 64, 128 at 65, 256 at 129, the cap at 257.
+	var steps: Array = [[1, min_batch], [64, min_batch], [65, 128], [129, 256], [257, 300], [300, 300],
+		[76, 300], [75, 128], [33, 128], [32, 64], [1, 64]]
+	for step: Array in steps:
+		_mgr.clear()
+		for i in int(step[0]):
+			_mgr.spawn(0, Vector2(float(i) + 1.0, 0.0), Vector2(1.0, 0.0), 5.0)
+		_mgr.update_draw()
+		var room: int = _mgr._draw_node.multimesh.instance_count
+		_check(room == step[1], "%d shots: room %d (%d)" % [step[0], step[1], room])
+		_check(_mgr._draw_node.multimesh.visible_instance_count == step[0], "%d shots are drawn" % step[0])
 	root.remove_child(_mgr)
 
 

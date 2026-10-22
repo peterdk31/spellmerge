@@ -48,7 +48,7 @@ const DEFAULT_ROOM_ID: StringName = &"arena_01"
 const ENEMY_FOLDER: StringName = &"enemies"
 const DEFAULT_ENEMY_ID: StringName = &"ember_imp"
 const SPELL_FOLDER: StringName = &"spells"
-const DEFAULT_SPELL_ID: StringName = &"bolt"
+const DEFAULT_SPELL_ID: StringName = &"fire_bolt"
 ## The wave, sized for four players: one enemy per entry, placed at the room's
 ## enemy spawn with that index (wrapped if the room has fewer). An index used
 ## again puts the enemy a step further along the diagonal.

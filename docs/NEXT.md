@@ -6,7 +6,6 @@ The ordered task queue for the current milestone, M2 (its design, [M2-spell-syst
 
 M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97). Each task's details are the matching row and sections of the M2 design. Nothing from M3+ is built (rewards, relics, staffs, rooms, the door rule).
 
-- [ ] **The five forms (M2 part 10).** (`content/spells/forms/`) Bolt (migrated), beam, nova, rune and orbit as `.tres` (plus a `.gd` where needed), placeholder vfx, manifest lines; a test per form.
 - [ ] **Player and flow on the new runtime (M2 part 11).** (`gameplay/player`, `gameplay/flow`) Two prepared spells, `swap`, the per-player bag from the registry, `build_change_requested` checked and applied, `spell_changed` and `build_refused`; flow's start recipes instead of a spell id; `SpellBase` removed; the field-read test widened; ARCHITECTURE.md updated; the 4-bot test still green.
 - [ ] **The six modifiers (M2 part 12).** (`content/spells/modifiers/`) Split, pierce, homing, chain, bigger and faster, with icons; tests per modifier.
 - [ ] **The three triggers (M2 part 13).** (`content/spells/triggers/`) On hit, on expire and timer, with icons; tests including depth 3 and the fire cap.
@@ -31,6 +30,8 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
 (none)
 
 ## Done recently
+
+- [x] **The five forms (M2 part 10).** `content/spells/forms/`: bolt, beam, nova, rune and orbit as `FormBase` `.tres` (no `.gd` was needed), each with a 16×16 placeholder icon, and four placeholder vfx sprites in `art/vfx/` (beam, nova ring, rune, orbit orb); nine manifest lines. `tests/content/spells/test_forms.gd` loads each form through the registry, runs the validator on it and casts it through the real spell runtime (bolt flies straight, beam hits along a line up to its reach, nova rings eight shots, rune waits, orbit circles its caster), also for four players at once. `shot_forms.gd` shows the art. The M1 `SpellBase` fire bolt moved to `content/spells/legacy/fire_bolt/` (id `fire_bolt`) so the game keeps running until part 11; see `docs/DECISIONS.md`. Nothing draws the vfx sprites yet: `feel` is wired to them with the part-26 art pass.
 
 - [x] **The validator (M2 part 9).** `core/spells/validator.gd` (`SpellValidator`): per component the id (set, equal to the folder, unique across kinds), name, icon (present and in `art/manifest.json`), ranges, complexity against the whole-spell budget and the fields its kind needs; for the reaction table the status, element, effect, numbers and pairs. Problems come back as rule, file, field and fix. `Registry.validate_spells()` runs it and warns per problem at start in debug builds. `tests/content/spells/test_validators.gd` has a broken fixture of each kind and of the table. The `tools/check.sh` question is owner issue #140.
 - [x] **Reactions (M2 part 8).** `content/spells/reactions.tres`: shatter, thaw, flare, kindle, stillness and rift as twelve rows (one per direction). `gameplay/combat` implements burst, consume, extend and spread once and sends `reaction_triggered`; a reaction replaces the hit's own status and never chains. `gameplay/feel` flashes, bursts, shows the reaction's name and plays `reaction_<id>` (silent until Audio). Tests: `test_combat_reactions.gd`, `test_feel_reactions.gd`. Numbers are first tuning; see `docs/DECISIONS.md`.

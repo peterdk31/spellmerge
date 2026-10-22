@@ -74,6 +74,12 @@ func _initialize() -> void:
 	for index in [0, 3]:
 		await _press(index, _hud.call("get_builder", index).call("drop_button"))
 	await _shot("quick_view_four_players")
+	# The break: the wave is cleared, the builders unfold and the hammer counts down (staged with
+	# the events Flow sends, so the room's imps stay out of the picture).
+	var events: Node = root.get_node("Events")
+	events.emit_signal("room_cleared", &"arena_01")
+	events.emit_signal("build_break_started", 12.0)
+	await _shot("build_break")
 	flow.call("stop_run")
 	await create_timer(0.3).timeout
 	quit(0)

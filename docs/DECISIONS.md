@@ -2,6 +2,14 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-22: The build break
+
+**Decided by:** Claude (M2 part 19).
+- **`BUILD_BREAK` (12 s) replaces `NEXT_WAVE_DELAY`.** Flow's timer is fixed: no builder, open overlay or build request holds the next wave back or brings it forward, for 1, 2 or 4 players (co-op rules 1 and 2). 12 s is the design's first guess, tuned at C2.
+- **New event `build_break_started(seconds)`, sender `flow`, listener `hud`,** sent right after `room_cleared`. The HUD may only show what events say and `Flow.build_break_left()` is not an event, so the HUD counts down by itself from `seconds` in `_process`. It is display only: if it drifts, the wave still starts on Flow's clock. `wave_started` ends the line.
+- **The hammer is drawn in code** (`hud/widgets/hammer_icon.gd`), not an art file: no asset, no manifest line; the art pass (part 26) may replace it.
+- **The break line is drawn over the builders,** on a dark backing: four open builders cover the whole top middle, and the countdown is the one thing that must stay visible.
+
 ## 2026-10-22: The quick view and quick actions
 
 **Decided by:** Claude (M2 part 18).

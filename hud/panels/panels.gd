@@ -37,6 +37,7 @@ const SpellsScript := preload("res://core/spells/spells.gd")
 const BuilderScript := preload("res://hud/builder/builder.gd")
 const PlayerPanelScript := preload("res://hud/panels/player_panel/player_panel.gd")
 const VignetteScript := preload("res://hud/panels/vignette/vignette.gd")
+const HammerIconScript := preload("res://hud/widgets/hammer_icon.gd")
 
 const PLAYER_COUNT: int = 4
 const OVERLAY_ACTION: StringName = &"overlay"
@@ -52,6 +53,9 @@ const BUILDER_GAP: float = 2.0
 const WAVE_LABEL_WIDTH: float = 96.0
 const WAVE_LABEL_FONT_SIZE: int = 16
 const WAVE_LABEL_OUTLINE: int = 4
+## The build break line (hammer and "Build 12") under the wave line.
+const BREAK_FONT_SIZE: int = 12
+const BREAK_GAP: float = 2.0
 
 ## The event bus, the UI focus service, the input manager and the spell runtime (the
 ## builders ask it for names and icons). Only tests set these, before adding the
@@ -74,6 +78,11 @@ var _joined: Array[bool] = [false, false, false, false]
 var _in_room: bool = false
 var _vignette: VignetteScript = null
 var _wave_label: Label = null
+## The build break line: a row (hidden outside a break) with the hammer and the countdown.
+var _break_row: PanelContainer = null
+var _break_label: Label = null
+## Seconds of the break left; counted down here from `build_break_started`, display only.
+var _break_left: float = 0.0
 
 
 func _ready() -> void:
@@ -99,6 +108,32 @@ func _ready() -> void:
 	root_control.add_child(_wave_label)
 	# Above the vignette, below the panels and the builders, which may cover it.
 	root_control.move_child(_wave_label, 1)
+	_break_row = PanelContainer.new()
+	_break_row.name = "BreakRow"
+	_break_row.visible = false
+	_break_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var backing := StyleBoxFlat.new()
+	backing.bg_color = Color(0.0, 0.0, 0.0, 0.7)
+	backing.set_content_margin_all(2.0)
+	_break_row.add_theme_stylebox_override("panel", backing)
+	_break_row.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP, Control.PRESET_MODE_MINSIZE)
+	_break_row.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_break_row.offset_top = EDGE_MARGIN + float(WAVE_LABEL_FONT_SIZE) + float(WAVE_LABEL_OUTLINE) + BREAK_GAP
+	var box := HBoxContainer.new()
+	box.name = "Box"
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_theme_constant_override("separation", 4)
+	_break_row.add_child(box)
+	var hammer: Control = HammerIconScript.new()
+	hammer.name = "Hammer"
+	box.add_child(hammer)
+	_break_label = Label.new()
+	_break_label.name = "BreakLabel"
+	_break_label.add_theme_font_size_override("font_size", BREAK_FONT_SIZE)
+	_break_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(_break_label)
+	# Last child, over the builders: four open ones leave no gap at the top middle.
+	root_control.add_child(_break_row)
 	for player in PLAYER_COUNT:
 		var panel := get_node("Root/Panel%d" % (player + 1)) as PlayerPanelScript
 		panel.visible = false
@@ -134,6 +169,7 @@ func _ready() -> void:
 		events.room_entered.connect(_on_room_entered)
 		events.wave_started.connect(_on_wave_started)
 		events.room_cleared.connect(_on_room_cleared)
+		events.build_break_started.connect(_on_build_break_started)
 		events.active_spell_changed.connect(_on_active_spell_changed)
 		events.run_started.connect(_on_run_started)
 		events.run_ended.connect(_on_run_ended)
@@ -145,6 +181,20 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	poll()
 	_vignette.step(delta)
+	step_break(delta)
+
+
+## Count the break line down by `delta` seconds. It only draws; Flow decides when the wave
+## starts, so a drift here never moves the wave. Called every frame; tests call it directly.
+func step_break(delta: float) -> void:
+	if not _break_row.visible:
+		return
+	_break_left = maxf(_break_left - delta, 0.0)
+	_show_break_seconds()
+
+
+func _show_break_seconds() -> void:
+	_break_label.text = "Build %d" % ceili(_break_left)
 
 
 ## Toggle the overlay of every joined player who pressed `overlay` since the
@@ -262,7 +312,25 @@ func _on_room_entered(_room_id: StringName) -> void:
 func _on_wave_started(wave: int) -> void:
 	_wave_label.text = "Wave %d" % wave
 	_wave_label.visible = true
+	_break_row.visible = false
 	_set_quick(true)
+
+
+## The build break began: the hammer and a countdown of `seconds` show until the next wave.
+func _on_build_break_started(seconds: float) -> void:
+	_break_left = maxf(seconds, 0.0)
+	_show_break_seconds()
+	_break_row.visible = true
+
+
+## The build break line (hammer and countdown), or null before `_ready`.
+func get_break_row() -> PanelContainer:
+	return _break_row
+
+
+## The countdown text of the build break line.
+func get_break_label() -> Label:
+	return _break_label
 
 
 ## The wave is cleared: the builders unfold into the full view for the break.
@@ -305,6 +373,7 @@ func _reset_all() -> void:
 	_in_room = false
 	_set_quick(false)
 	_wave_label.visible = false
+	_break_row.visible = false
 	_vignette.clear()
 	for player in PLAYER_COUNT:
 		_overlays[player].close_overlay()

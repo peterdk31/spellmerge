@@ -48,6 +48,7 @@ const EVENTS: Dictionary = {
 	&"room_entered": [["room_id", TYPE_STRING_NAME]],
 	&"room_cleared": [["room_id", TYPE_STRING_NAME]],
 	&"wave_started": [["wave", TYPE_INT]],
+	&"build_break_started": [["seconds", TYPE_FLOAT]],
 	&"door_voted": [["player", TYPE_INT], ["door", TYPE_INT]],
 	&"difficulty_changed": [["level", TYPE_FLOAT]],
 	# Rewards and progression.
@@ -60,7 +61,7 @@ const EVENTS: Dictionary = {
 ## Events about the run, a room or the account, with no player index.
 const NOT_PER_PLAYER: Array[StringName] = [
 	&"run_started", &"run_ended", &"room_entered", &"room_cleared", &"wave_started",
-	&"difficulty_changed", &"reward_rolled", &"unlock_gained", &"currency_changed",
+	&"build_break_started", &"difficulty_changed", &"reward_rolled", &"unlock_gained", &"currency_changed",
 ]
 
 var _failures: Array[String] = []

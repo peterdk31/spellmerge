@@ -90,6 +90,8 @@ signal room_entered(room_id: StringName)
 signal room_cleared(room_id: StringName)
 ## Sender: flow. Wave number `wave` (1 for the first of a run) of the room began.
 signal wave_started(wave: int)
+## Sender: flow. The build break between waves began and lasts `seconds`; the next wave starts when it ends, whoever is building. Follows `room_cleared`; `wave_started` ends it.
+signal build_break_started(seconds: float)
 ## Sender: flow. The result of a door vote: `player` voted for `door`.
 signal door_voted(player: int, door: int)
 ## Sender: difficulty. The difficulty level changed to `level`.

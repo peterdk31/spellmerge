@@ -19,8 +19,8 @@ extends Node
 ## Waves: wave 1 is WAVE (sized for four players); each wave after it has
 ## WAVE_GROWTH more enemies, up to WAVE_MAX, from the same spawns and with the same
 ## single enemy type. `wave_started(wave)` is sent as each begins. `room_cleared`
-## is sent when the last enemy of a wave has died; NEXT_WAVE_DELAY seconds later
-## the next wave stands in the same room (the world is kept; shots in flight are
+## is sent when the last enemy of a wave has died, followed by `build_break_started`;
+## BUILD_BREAK seconds later, whoever is still building, the next wave stands in the same room (the world is kept; shots in flight are
 ## cleared) and every downed wizard is back up, so a long run is "how many waves".
 ## `difficulty` scales this properly in M3.
 ##
@@ -64,8 +64,10 @@ const WAVE_LAP_OFFSET: Vector2 = Vector2(-14.0, 14.0)
 ## Enemies added by each wave after the first, and the most one wave holds.
 const WAVE_GROWTH: int = 2
 const WAVE_MAX: int = 24
-## Seconds from a cleared wave until the next one stands.
-const NEXT_WAVE_DELAY: float = 3.0
+## Seconds from a cleared wave until the next one stands: the build break. A fixed
+## length, so nobody's building holds the wave back or speeds it up (a first guess,
+## tuned at C2).
+const BUILD_BREAK: float = 12.0
 ## Seconds from the last wizard going down until the room restarts (under 3).
 const RESTART_DELAY: float = 1.5
 ## Hit circle of a wizard for enemy contact and shots, in pixels, and where it sits
@@ -164,6 +166,11 @@ func step(delta: float) -> void:
 			# A warning, not an error: the run ends cleanly and a test provokes this on purpose.
 			push_warning("Flow: the restart failed, so the run is over; Play starts a new one.")
 			stop_run()
+
+
+## Seconds of the build break left, or 0 when there is none.
+func build_break_left() -> float:
+	return maxf(_next_wave_left, 0.0)
 
 
 ## True while a restart is counting down.
@@ -312,9 +319,10 @@ func _on_enemy_died(_player: int, enemy: Node, _position: Vector2) -> void:
 	_enemies.remove_at(at)
 	if _enemies.is_empty() and state == State.RUNNING:
 		state = State.CLEARED
+		_next_wave_left = BUILD_BREAK
 		if events != null:
 			events.room_cleared.emit(room_id)
-		_next_wave_left = NEXT_WAVE_DELAY
+			events.build_break_started.emit(BUILD_BREAK)
 
 
 ## The next wave in the same room: downed wizards stand up (and are protected for

@@ -157,7 +157,10 @@ class PromptTest(unittest.TestCase):
         self.assertIn("PR #12", out["prompt"])
 
     def test_review_and_revise_prompts(self) -> None:
-        self.assertIn("#7 at commit abc", session.review_prompt(CFG, 7, "abc", "final"))
+        r = session.review_prompt(CFG, 7, "abc", "final")
+        self.assertIn("#7 at commit abc", r)
+        self.assertIn(".review/pr.diff", r)  # the saved diff, not `gh pr diff`'s unreadable overflow
+        self.assertIn("git show abc:", r)
         p = session.revise_prompt(CFG, 7, {"summary": "s", "problems": [
             {"severity": "major", "file": "a.gd", "line": 3, "problem": "p", "fix": "f"}]})
         self.assertIn("[major] a.gd:3: p Fix: f", p)

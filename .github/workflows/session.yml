@@ -186,6 +186,7 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           RESULT: ${{ needs.implement.outputs.result }}
           SOURCE: the session working on "${{ needs.implement.outputs.task }}"
+          PR: ${{ steps.publish.outputs.pr }} # the questions get the PR's screenshots (smbot.screenshots)
         run: python3 -m smbot.inbox ask
       - name: Answers to /ask
         continue-on-error: true # a failed comment must not skip saving or reviewing the work
@@ -373,6 +374,7 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           RESULT: ${{ needs.revise.outputs.result }}
           SOURCE: the revision of PR #${{ needs.publish.outputs.pr }}
+          PR: ${{ needs.publish.outputs.pr }}
         run: python3 -m smbot.inbox ask
       - name: Answers to /ask
         continue-on-error: true # a failed comment must not skip saving or reviewing the work
@@ -487,6 +489,7 @@ jobs:
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-pull-requests: write
+          permission-issues: write # the shots are copied to the PR's owner questions
       - env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           PR: ${{ needs.publish.outputs.pr }}

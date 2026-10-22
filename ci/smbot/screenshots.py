@@ -9,7 +9,8 @@ scripts run, on the PR's commit (after/) and on main (before/), with
 `ci/build/build.sh --quick --screenshots` in a job with no secrets; shots.txt in each folder
 says which script made which PNG. The comment shows each shot before and after, a new shot
 alone, and leaves out shots that came out identical. With no scripts named, nothing is posted.
-The session's Daily log post repeats the comment (`for_log`), since bot PRs merge on their own.
+The session's Daily log post repeats the comment (`for_log`), since bot PRs merge on their own,
+and so does each open owner question the PR's session raised (smbot.inbox.asked_in).
 
 The files are only data here: each must be a PNG under the size limit with a plain name, or
 it is left out. The images live on an orphan branch so the PR comment can show them (the
@@ -31,7 +32,7 @@ import tempfile
 from pathlib import Path
 
 from . import config as config_mod
-from . import gh
+from . import gh, inbox
 
 BRANCH = "screenshots"
 NAME = re.compile(r"^[a-z0-9_]{1,60}\.png$")
@@ -166,9 +167,17 @@ def post(cfg: config_mod.Config, token: str, pr: int, sha: str, folder: Path) ->
     files = [(after, f"after/{name}") for _, name, after, _ in shown]
     files += [(old, f"before/{name}") for _, name, _, old in shown if old is not None]
     commit = push(cfg, token, [f for f, _ in files], prefix, names=[n for _, n in files])
-    gh.api(f"repos/{cfg.repo}/issues/{pr}/comments", "-X", "POST",
-           input={"body": comment(cfg, commit, prefix, shown, sha)})
+    body = comment(cfg, commit, prefix, shown, sha)
+    gh.api(f"repos/{cfg.repo}/issues/{pr}/comments", "-X", "POST", input={"body": body})
     print(f"posted {len(shown)} screenshot(s) on #{pr}")
+    # The owner reads a question after its PR has merged, so the question shows the shots too.
+    try:
+        for number in inbox.asked_in(cfg, pr):
+            gh.api(f"repos/{cfg.repo}/issues/{number}/comments", "-X", "POST",
+                   input={"body": body.replace(HEADING, f"**What #{pr} changes on screen**", 1)})
+            print(f"copied them to question #{number}")
+    except gh.GhError as e:
+        print(f"couldn't copy the screenshots to the questions of #{pr}: {e}")
 
 
 def gallery(folder: Path, out: Path, version: str) -> bool:

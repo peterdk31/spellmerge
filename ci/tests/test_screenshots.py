@@ -80,16 +80,41 @@ class ScreenshotsTest(unittest.TestCase):
         api.assert_not_called()
         push.assert_not_called()
 
-    def test_post_pushes_then_comments(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(screenshots.gh, "api") as api, \
+    def test_post_pushes_then_comments_on_the_pr_and_its_questions(self) -> None:
+        """The owner reads a question after its PR merged, so the question gets the shots too."""
+        posted: list = []
+
+        def api(path: str, *args: str, input: dict | None = None) -> object:
+            if "labels=owner-question" in path:
+                return [{"number": 9, "body": "Q\n<!-- smbot:question pr=7 -->"},
+                        {"number": 10, "body": "Q\n<!-- smbot:question pr=70 -->"}, {"number": 11, "body": None}]
+            posted.append((path, input["body"]))
+            return {}
+
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(screenshots.gh, "api", api), \
                 mock.patch.object(screenshots, "push", return_value="c0ffee") as push:
             root = self.shots(tmp, [{"script": "shot_m1", "caption": "The menu"}],
                               after={"shot_m1": {"main_menu.png": PNG + b"x"}}, before={"shot_m1": {"main_menu.png": PNG}})
             screenshots.post(CFG, "t", 7, "abc1234def", root)
         self.assertEqual(push.call_args.args[3], "pr-7/abc1234")
         self.assertEqual(push.call_args.kwargs["names"], ["after/main_menu.png", "before/main_menu.png"])
-        self.assertIn("issues/7/comments", api.call_args.args[0])
-        self.assertIn("/c0ffee/pr-7/abc1234/after/main_menu.png", api.call_args.kwargs["input"]["body"])
+        self.assertEqual([path for path, _ in posted], [f"repos/{CFG.repo}/issues/7/comments",
+                                                        f"repos/{CFG.repo}/issues/9/comments"])
+        self.assertIn("/c0ffee/pr-7/abc1234/after/main_menu.png", posted[0][1])
+        self.assertTrue(posted[1][1].startswith("**What #7 changes on screen**"))
+        self.assertIn("/c0ffee/pr-7/abc1234/after/main_menu.png", posted[1][1])
+
+    def test_post_still_comments_on_the_pr_when_the_questions_cant_be_read(self) -> None:
+        def api(path: str, *args: str, input: dict | None = None) -> object:
+            if "labels=owner-question" in path:
+                raise screenshots.gh.GhError("403")
+            return {}
+
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(screenshots.gh, "api", api), \
+                mock.patch.object(screenshots, "push", return_value="c0ffee"):
+            root = self.shots(tmp, [{"script": "shot_m1", "caption": "The menu"}],
+                              after={"shot_m1": {"main_menu.png": PNG + b"x"}}, before={"shot_m1": {"main_menu.png": PNG}})
+            screenshots.post(CFG, "t", 7, "abc1234def", root)  # no exception
 
     def test_push_adds_to_the_branch(self) -> None:
         import subprocess

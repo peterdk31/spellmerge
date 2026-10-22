@@ -9,6 +9,7 @@ scripts run, on the PR's commit (after/) and on main (before/), with
 `ci/build/build.sh --quick --screenshots` in a job with no secrets; shots.txt in each folder
 says which script made which PNG. The comment shows each shot before and after, a new shot
 alone, and leaves out shots that came out identical. With no scripts named, nothing is posted.
+The session's Daily log post repeats the comment (`for_log`), since bot PRs merge on their own.
 
 The files are only data here: each must be a PNG under the size limit with a plain name, or
 it is left out. The images live on an orphan branch so the PR comment can show them (the
@@ -37,6 +38,7 @@ NAME = re.compile(r"^[a-z0-9_]{1,60}\.png$")
 PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
 MAX_BYTES = 1_000_000
 MAX_SHOTS = 12
+HEADING = "**What this PR changes on screen**"
 
 
 def valid_shots(folder: Path) -> list[Path]:
@@ -133,7 +135,7 @@ def pairs(folder: Path) -> list[tuple[str, str, Path, Path | None]]:
 def comment(cfg: config_mod.Config, commit: str, prefix: str, shown: list[tuple[str, str, Path, Path | None]],
             sha: str) -> str:
     base = f"https://raw.githubusercontent.com/{cfg.repo}/{commit}/{prefix}"
-    parts = [f"**What this PR changes on screen** ({sha[:7]} against `main`, 640×360)", ""]
+    parts = [f"{HEADING} ({sha[:7]} against `main`, 640×360)", ""]
     caption = None
     for text, name, _, old in shown:
         if text != caption:
@@ -145,6 +147,14 @@ def comment(cfg: config_mod.Config, commit: str, prefix: str, shown: list[tuple[
             parts += [f"*{title(Path(name))}*", "", "| Before (`main`) | After (this PR) |", "| --- | --- |",
                       f"| ![before]({base}/before/{name}) | ![after]({base}/after/{name}) |", ""]
     return "\n".join(parts)
+
+
+def for_log(cfg: config_mod.Config, pr: int | str) -> str:
+    """The bot's latest screenshots comment on PR #`pr`, worded for the Daily log; "" when there is none."""
+    comments = gh.api_paginated(f"repos/{cfg.repo}/issues/{pr}/comments?per_page=100")
+    mine = [c.get("body") or "" for c in comments
+            if (c.get("user") or {}).get("login") == cfg.bot.login and (c.get("body") or "").startswith(HEADING)]
+    return mine[-1].replace(HEADING, f"**What #{pr} changes on screen**", 1) if mine else ""
 
 
 def post(cfg: config_mod.Config, token: str, pr: int, sha: str, folder: Path) -> None:

@@ -32,7 +32,7 @@ from pathlib import Path
 from typing import Any, Callable
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from . import alarms, checkpoint, dailylog, gh, inbox, intake, nexttask, pacing, state, weekly
+from . import alarms, checkpoint, dailylog, gh, inbox, intake, nexttask, pacing, screenshots, state, weekly
 from . import labels as labels_mod
 from . import merge as merge_mod
 from . import config as config_mod
@@ -781,7 +781,11 @@ def finish(cfg: config_mod.Config, env: dict[str, str]) -> dict[str, str]:
         unlabel_parked(cfg, pr)  # worked on again, or merged
     if env.get("RUN_URL"):
         lines.append(f"[Workflow run]({env['RUN_URL']})")
-    dailylog.post(cfg, "Development session", lines, mention_owner=any(e["long"] for e in parked_now))
+    try:
+        shots = screenshots.for_log(cfg, pr) if pr else ""  # bot PRs merge on their own: show them here
+    except gh.GhError:
+        shots = ""
+    dailylog.post(cfg, "Development session", lines, mention_owner=any(e["long"] for e in parked_now), extra=shots)
 
     # Development flows: after progress, after an empty queue (the next run plans) and after an
     # error (retried) the next session starts at once. It stops for the owner's pauses, a usage

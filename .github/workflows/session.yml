@@ -549,7 +549,8 @@ jobs:
 
   finish:
     name: Daily log and next session
-    needs: [implement, publish, critique, revise, publish-revision, final, merge]
+    # post-screenshots too: the log repeats them, since the owner rarely sees a PR before it merges.
+    needs: [implement, publish, critique, revise, publish-revision, post-screenshots, final, merge]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 10

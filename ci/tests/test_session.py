@@ -187,7 +187,7 @@ class FinishTest(unittest.TestCase):
     REVISE = json.dumps({"verdict": "revise", "problems": [{"severity": "major", "problem": "p", "fix": "f"}]})
 
     def run_finish(self, st: dict, queue: list[str], posts: list | None = None, checkpoint_issue: int | None = None,
-                   **env: str) -> tuple[dict[str, str], dict]:
+                   extras: list | None = None, shots: str = "", **env: str) -> tuple[dict[str, str], dict]:
         base = {"TASK": "A", "TASK_KIND": "next", "PR": "", "IMPLEMENT_STATUS": "ready", "FINAL_REVIEW": "",
                 "MERGED": "", "SETTINGS": "{}"}
         base.update(env)
@@ -203,7 +203,10 @@ class FinishTest(unittest.TestCase):
             with mock.patch.object(session.state, "update", update), \
                     mock.patch.object(session.state, "load", lambda cfg: (st, "sha")), \
                     mock.patch.object(session.dailylog, "post",
-                                      lambda cfg, title, lines, **k: (posts if posts is not None else []).append(lines)), \
+                                      lambda cfg, title, lines, **k: ((posts if posts is not None else []).append(lines),
+                                                                      (extras if extras is not None else []).append(
+                                                                          k.get("extra", "")))), \
+                    mock.patch.object(session.screenshots, "for_log", lambda cfg, pr: shots), \
                     mock.patch.object(session, "pr_title", lambda cfg, pr: f"Title of #{pr}" if pr else ""), \
                     mock.patch.object(session, "announce_park",
                                       lambda cfg, task, e: f"Parked until {e['parked_until']}: {e['parked_reason']}"), \
@@ -230,6 +233,13 @@ class FinishTest(unittest.TestCase):
         self.assertTrue(posts[1][0].startswith("Blocked, set aside for a week: Do the thing. It waits."))
         self.assertLess(len(posts[1][0]), 400)
         self.assertTrue(posts[1][0].endswith("It waits."))
+
+    def test_the_log_shows_the_prs_screenshots(self) -> None:
+        extras: list = []
+        self.run_finish(copy.deepcopy(state.DEFAULT), ["B"], extras=extras, shots="**What #5 changes on screen**",
+                        PR="5", FINAL_REVIEW=self.APPROVE, MERGED="true")
+        self.run_finish(copy.deepcopy(state.DEFAULT), ["A", "B"], extras=extras, IMPLEMENT_STATUS="blocked")
+        self.assertEqual(extras, ["**What #5 changes on screen**", ""])
 
     def test_two_failed_reviews_park_for_a_day_three_for_a_week_and_say_so(self) -> None:
         st = copy.deepcopy(state.DEFAULT)

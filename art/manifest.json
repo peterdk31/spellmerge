@@ -404,6 +404,87 @@
       "tier": "placeholder",
       "tool": "Claude (hand-written SVG rects)",
       "prompt": "A 32x32 Bone orb with a Spark light glint and a short fading trail of Bone shapes behind it on the left, for the Orbit form. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "content/spells/modifiers/split/icon.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 16x16 icon of one Bone orb on the left joined by thin lines to two Bone orbs on the right, for the Split modifier, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "content/spells/modifiers/pierce/icon.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 16x16 icon of a Bone arrow flying right through a Stone slab, for the Pierce modifier, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "content/spells/modifiers/homing/icon.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 16x16 icon of a Bone orb on the left with a Player 1 light blue curved path arcing up and over to a Fire coloured target with a Spark centre, for the Homing modifier, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "content/spells/modifiers/chain/icon.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 16x16 icon of two Bone chain links, the right one lower, joined by a Spark connector, for the Chain modifier, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "content/spells/modifiers/bigger/icon.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 16x16 icon of one large round Fire coloured orb with a Spark light core filling the tile, for the Bigger modifier, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "content/spells/modifiers/faster/icon.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 16x16 icon of two Spark coloured chevrons pointing right, for the Faster modifier, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "content/spells/triggers/on_hit/icon.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 16x16 icon of a Bone shot flying in from the left and a Bone burst of rays where it lands on the right, for the On Hit trigger. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "content/spells/triggers/on_expire/icon.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 16x16 icon of a fading Bone shot trail ending in a small Bone spark that opens into a burst on the right, for the On Expire trigger. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "content/spells/triggers/timer/icon.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 16x16 icon of a Bone clock face with a 1 px outline and two dark hands, for the Timer trigger. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
     }
   ]
 }

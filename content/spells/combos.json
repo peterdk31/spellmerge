@@ -1,0 +1,116 @@
+{
+	"about": "Named spell combos: a recipe, what it does in plain words, and the check tests/content/spells/test_combos.gd runs on it in the test arena. Positions are pixels from the caster, who stands at (0, 0) and aims along +x. See docs/milestones/M2-spell-system.md, 'The combo catalogue'.",
+	"combos": [
+		{
+			"id": "burning_bolt",
+			"name": "Burning bolt",
+			"does": "A fire bolt; the imp keeps losing health after the hit.",
+			"casts": [{"slot": 0, "recipe": {"form": "bolt", "element": "fire"}}],
+			"imps": [[100, 0]],
+			"seconds": 2.5,
+			"checks": [{"kind": "keeps_burning", "imp": 0}]
+		},
+		{
+			"id": "shatter",
+			"name": "Shatter",
+			"does": "A frost bolt chills the imp, then a storm bolt on it sets off Shatter.",
+			"casts": [
+				{"slot": 0, "recipe": {"form": "bolt", "element": "frost"}},
+				{"slot": 1, "recipe": {"form": "bolt", "element": "storm"}, "at": 0.3}
+			],
+			"imps": [[100, 0]],
+			"seconds": 2.0,
+			"checks": [{"kind": "reaction", "reaction": "shatter"}]
+		},
+		{
+			"id": "big_fire_ring",
+			"name": "Big fire ring",
+			"does": "One ring hits every imp within reach around the caster.",
+			"casts": [{"slot": 0, "recipe": {"form": "nova", "element": "fire", "modifiers": ["bigger"]}}],
+			"imps": [[36, 0], [0, 36], [-36, 0], [0, -36]],
+			"seconds": 1.0,
+			"checks": [{"kind": "damaged", "imps": [0, 1, 2, 3]}, {"kind": "status", "imps": [0, 1, 2, 3], "status": "burn"}]
+		},
+		{
+			"id": "storm_lance",
+			"name": "Storm lance",
+			"does": "A ray through three imps in a line.",
+			"casts": [{"slot": 0, "recipe": {"form": "beam", "element": "storm", "modifiers": ["pierce"]}}],
+			"imps": [[60, 0], [110, 0], [160, 0]],
+			"seconds": 1.0,
+			"checks": [{"kind": "damaged", "imps": [0, 1, 2]}]
+		},
+		{
+			"id": "frost_pulse_rune",
+			"name": "Frost pulse rune",
+			"does": "A frost rune that pulses a frost nova every half second; imps standing round it freeze.",
+			"casts": [{"slot": 0, "recipe": {"form": "rune", "element": "frost", "trigger": "timer", "held": {"form": "nova", "element": "frost"}}}],
+			"imps": [[30, 0], [0, 30], [-30, 0]],
+			"seconds": 2.6,
+			"checks": [{"kind": "status", "imps": [0, 1, 2], "status": "freeze"}]
+		},
+		{
+			"id": "void_ring",
+			"name": "Void ring",
+			"does": "Circling shots hex every imp that crosses the orbit.",
+			"casts": [{"slot": 0, "recipe": {"form": "orbit", "element": "void"}}],
+			"imps": [[36, 0], [0, -36], [-36, 0]],
+			"seconds": 3.0,
+			"checks": [{"kind": "status", "imps": [0, 1, 2], "status": "hex"}]
+		},
+		{
+			"id": "homing_fan",
+			"name": "Homing fan",
+			"does": "Three homing bolts bend toward imps well off the aim, beyond what a plain fan of three reaches.",
+			"casts": [{"slot": 0, "recipe": {"form": "bolt", "modifiers": ["split", "homing"]}}],
+			"imps": [[110, -60], [110, 60]],
+			"seconds": 1.5,
+			"checks": [{"kind": "damaged", "imps": [0, 1]}]
+		},
+		{
+			"id": "storm_chain",
+			"name": "Storm chain",
+			"does": "A hit jumps to the next imp, and that imp's shock makes the next hit jump once more.",
+			"casts": [{"slot": 0, "recipe": {"form": "bolt", "element": "storm", "modifiers": ["chain"]}}],
+			"imps": [[100, 0], [150, 40], [200, 80]],
+			"seconds": 1.5,
+			"checks": [{"kind": "damaged", "imps": [0, 1, 2]}]
+		},
+		{
+			"id": "blast_at_the_end",
+			"name": "Blast at the end",
+			"does": "A fire blast where the bolt ends, with nothing in its way.",
+			"casts": [{"slot": 0, "recipe": {"form": "bolt", "trigger": "on_expire", "held": {"form": "nova", "element": "fire"}}}],
+			"imps": [[264, 25], [264, -25]],
+			"seconds": 2.0,
+			"checks": [{"kind": "status", "imps": [0, 1], "status": "burn"}]
+		},
+		{
+			"id": "swift_line",
+			"name": "Swift line",
+			"does": "A fast line through the room that hits every imp on it.",
+			"casts": [{"slot": 0, "recipe": {"form": "bolt", "modifiers": ["faster", "pierce"]}}],
+			"imps": [[80, 0], [140, 0], [200, 0]],
+			"seconds": 1.5,
+			"checks": [{"kind": "damaged", "imps": [0, 1, 2]}]
+		},
+		{
+			"id": "wide_frost_lane",
+			"name": "Wide frost lane",
+			"does": "A wide ray that chills the imp in its lane.",
+			"casts": [{"slot": 0, "recipe": {"form": "beam", "element": "frost", "modifiers": ["bigger"]}}],
+			"imps": [[100, 0]],
+			"seconds": 1.0,
+			"checks": [{"kind": "status", "imps": [0], "status": "chill"}]
+		},
+		{
+			"id": "fire_fan_orbit",
+			"name": "Fire fan orbit",
+			"does": "A ring that throws a fan of three fire bolts outward every half second.",
+			"casts": [{"slot": 0, "recipe": {"form": "orbit", "element": "fire", "trigger": "timer", "held": {"form": "bolt", "element": "fire", "modifiers": ["split"]}}}],
+			"imps": [[110, 0], [55, 95], [-55, 95], [-110, 0], [-55, -95], [55, -95]],
+			"seconds": 3.0,
+			"checks": [{"kind": "status_count", "status": "burn", "min": 3}, {"kind": "max_shots", "max": 120}]
+		}
+	]
+}

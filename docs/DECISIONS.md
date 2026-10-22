@@ -883,3 +883,47 @@ The HUD screenshot cannot be taken in a session (no display, `docs/BACKLOG.md`),
 - **The orbit anchor is the player's job** (as the M2 design says): each step the wizard calls `Projectiles.set_anchor(index, body position)`, and `clear_anchor` when it is downed or leaves the tree. The body offset is the hit circle's.
 - **`SpellBase` and the legacy bolt are removed** together with `Combat`'s learning of hit profiles from `spell_cast` (every player shot now carries a tag that `Spells.hit_profile` knows). Combat keeps `set_hit_profile` for enemy shots. The scan that no script reads a spell field moved to `tests/core/test_spell_field_reads.gd` and covers the component classes and `CompiledSpell`; `HitProfile` is left out because combat reads it by design. The registry test fixtures became `FormBase` resources.
 - **No event for a swap yet.** Part 18 (the corner panel shows A or B) needs one; `core/events` gets it then, with `player` as the sender.
+
+## M2 part 12: the six modifiers
+
+- **The modifiers are plain `ModifierBase` `.tres` files with an icon, no scripts.** Split's fan, pierce's extra targets, homing's turn and chain's jumps are all expressed by fields the compiler and the runtime already read. First numbers (the combo test and playtests retune them): split ×3 shots, ×0.5 damage, ×1.5 mana, complexity 2; pierce +2 pierce, ×0.9 damage, complexity 1; homing 3 rad/s, ×0.9 damage, complexity 2; chain 2 jumps, ×0.8 damage, complexity 2; bigger ×1.6 radius, ×1.3 damage, ×0.85 speed, ×1.15 cooldown, complexity 1; faster ×1.5 speed, ×0.75 cooldown, ×0.85 damage, complexity 1 (a review found faster free at first; the damage cost leaves it about 13% more damage per second, and two stack to about 28%). Every modifier that adds power costs something (split: damage per shot and mana; homing and chain: damage; bigger: speed and cooldown; faster: damage), so none makes another obsolete. Complexities are the design table's.
+- **Owner answer on #140: option 1, no change.** `tools/check.sh` stays free of Godot; the spell validator keeps running in `ci/build/build.sh --quick --tests`, which AGENTS.md already asks contributors to run.
+- **The icons are placeholders** drawn as non-overlapping SVG rects like the forms' and elements'; the part-26 art pass looks at all 18 together.
+
+## M2 part 13: the three triggers
+
+- **The triggers are plain `TriggerBase` `.tres` files with an icon, no scripts;** the runtime already fires them from the fields. Ids `on_hit`, `on_expire` and `timer`. First numbers from the design table (the combo test and playtests retune them): on hit and on expire fire once per shot (`max_fires` 1), complexity 1 each; timer every 0.5 s (the combos' "every half second") with `max_fires` 4, the limit, complexity 2.
+- **A rune dropped by an on-hit trigger on a living target is used up on it** (it does not pierce, and the 0.1 s source exclusion ends), so a pulsing rune works best where its target moved or died. Left as is; the combo test (part 14) will show whether runes need a longer ignore time for their own source.
+- **The icons are placeholders** drawn as rects like the other components'; the part-26 art pass looks at all 18 together.
+
+## M2 part 14: the combo catalogue and test
+
+- **The catalogue is data, the checks are a few kinds.** A row in `content/spells/combos.json` holds the recipe(s), the imps' positions, the seconds to run and a list of checks (`damaged`, `status`, `status_count`, `keeps_burning`, `reaction`, `max_shots`). One data-driven test runs every row, so a new combo (part 21, and contributors) needs a JSON row and no code, unless it needs a new check kind.
+- **The arena is the real thing, not a mock:** `tests/content/spells/combo_arena.gd` wires the real registry, projectile manager, spell runtime and combat, and steps them in `project.godot`'s order. Imps are plain `Node2D`s with 400 health, so no combo kills one by accident.
+- **Two draft combos reworded to what the runtime does.** "Three homing bolts that find three different imps" is now "bend toward imps well off the aim" (each shot picks the nearest target, so they may share one; a control test shows a plain fan misses those imps), and "a wide ray that reaches an imp a plain ray misses" is now "chills the imp in its lane" (the widening is about a pixel, a tuning number not worth a test).
+- **The first 12 are the design's draft rows 1-12.** "Blast at the end" runs in open space; the wall case stays with `test_spells_cast.gd`. Part 21 adds the rest and makes sure each component is in two combos.
+
+## M2 part 15: Spells opens
+
+- **Spells is open for PRs from this part.** The README states that every new component needs at least one combo row (the combo test runs it without new test code), so the catalogue grows with the content. The ROADMAP row said "from part 11, Story from part 21", left over from before the design review; it now matches the design (15 and 23).
+
+## M2 part 16: the builder, part 1
+
+- **The builder sits beside the corner panel, not over it.** The design says it "expands the corner panel toward the middle"; a panel under or over the corner panel would leave about 120 px of height in a four-player quarter, too little for the chain and the bag. Beside it (about 200×170 px) a player keeps seeing their health and mana while building, and four builders and four panels fit 640×360 without touching (tested).
+- **Two new events, `recipe_changed(player, slot, recipe)` and `bag_changed(player, ids)`, both from `player`.** The HUD may only show what events say, and `spell_changed` carries a description, not the chain. Sending the recipe next to `spell_changed` keeps `spell_changed` as the design has it and each event with one sender. `bag_changed` is sent when the wizard appears, so M3's rewards change who fills the bag without changing the builder.
+- **Names, icons and kinds come from `Spells`** (`component_name`, `component_icon`, `component_kind`). `test_spell_field_reads.gd` rightly forbids the HUD reading a component's fields; a small accessor set in the runtime keeps that rule and gives the builder what the design asks it to show.
+- **One linear focus list, with focus helping.** `core/ui_focus` moves through a plain list, so the builder lists tabs, slots, held buttons, bag rows and Close in that order, moves focus to the bag after a slot is chosen and back to the slot on `dodge`. Rows that cannot be used are disabled or hidden, and UIFocus skips them.
+- **A modifier slot opens only in the first free place,** as `player` fills modifiers (a new one goes in the first free place; clearing one closes the gap). A held spell's form must be chosen first, since the compiler refuses a held spell without one; the refusal reason is shown from part 17.
+- **The builder opens at any time for now.** Part 18 folds it into the quick view and part 19 makes the break between waves, as the design says.
+
+## M2 part 17: the builder, part 2
+
+- **The info panel sits in the quarter's free strip, not in the builder.** The builder (about 190×168) already fills the space beside the corner panel, but the strip at the screen edge under (P1, P2) or over (P3, P4) the corner panel was empty. A 112×112 panel there keeps all builders, corner panels and info panels apart (tested at 640×360). It is a top-level child of the builder, so it shows and hides with it and the builder's own layout is unchanged.
+- **`Spells.builder_view` gives plain values.** `test_spell_field_reads.gd` forbids the HUD reading a `CompiledSpell`; the view returns a Dictionary (complexity of the whole spell, numbers and shot pattern of the spell at the shown level), so the compiler can change without touching the HUD. It compiles the recipe on each render (on events and key presses, never per frame).
+- **The refusal reason is text and lasts until the next try.** It comes from `build_refused` for the owner only and clears on the next request, the next successful change or the next opening. It shares one text line with the component description; the reason wins while it is set.
+- **Descriptions are empty until part 23:** `Spells.component_description(id)` returns "" for now; part 23 reads Story there.
+
+## Owner: a web preview after each merge
+
+- **`preview.yml` builds main after each merge and puts the web build at `/preview/`.** The owner wanted to see progress more often than once a day. Sessions merge about hourly, so that is about one preview an hour, and only when something changed; a newer merge cancels a build still running. It runs the same `build.sh` as the daily run (tests and smoke tests included, about 4 minutes), with no release, no itch.io, no AI and no secrets. Public-repo Actions minutes cost nothing.
+- **`/nightly/` and `/play/` stay the daily releases.** Pages replaces the whole site on each deploy, so the preview rebuilds it (`smbot.site --preview`): `/nightly/` from the newest release, `/play/` from the latest stable one. The daily run puts its build at `/preview/` too, and both Pages jobs share one concurrency group so deploys never overlap.

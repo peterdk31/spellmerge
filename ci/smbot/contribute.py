@@ -117,11 +117,13 @@ def _bar(done: int, total: int) -> str:
             f'<span style="width:{pct}%"></span></div><p class="small">{done} of {total} ({pct}%)</p>')
 
 
-def render(cfg: config_mod.Config, data: PageData, version: str, channel: str, stable: str) -> str:
+def render(cfg: config_mod.Config, data: PageData, version: str, channel: str, stable: str,
+           preview: str = "") -> str:
     e = html.escape
     repo_url = f"https://github.com/{cfg.repo}"
     m = data.current
     issues_url = f"{repo_url}/issues?q=is%3Aopen+label%3Anow"
+    preview_link = f'<a href="preview/">Latest preview ({e(preview)})</a>' if preview else ""
 
     if data.wanted is None:
         wanted = "<p class='small'>Couldn't load the task list today.</p>"
@@ -185,6 +187,7 @@ def render(cfg: config_mod.Config, data: PageData, version: str, channel: str, s
   <div class="buttons">
     <a class="primary" href="play/">Play {e(stable)}</a>
     <a href="nightly/">Today's build ({e(version)}, {e(channel)})</a>
+    {preview_link}
     <a href="{repo_url}/releases">Windows &amp; Linux</a>
   </div>
 

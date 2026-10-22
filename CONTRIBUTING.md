@@ -14,7 +14,7 @@ Using a coding agent? Point it at [AGENTS.md](AGENTS.md): same rules, written fo
 | A writer | Lore, dialogue, item descriptions | A pull request, or the **Submit writing** form (no git needed) |
 | A player | Bug reports, ideas, feedback | The **Report a bug** form, [Discussions](https://github.com/peterdk31/spellmerge/discussions), the feedback button after a run |
 
-Areas open over time, milestone by milestone (see [docs/ROADMAP.md](docs/ROADMAP.md)). Art and Audio are open. M2 (the spell system) has started: Spells opens once the component classes and their example exist, and Story once `docs/STORY.md` and the first descriptions exist.
+Areas open over time, milestone by milestone (see [docs/ROADMAP.md](docs/ROADMAP.md)). Art, Audio and Spells are open. M2 (the spell system) is in progress: Story opens once `docs/STORY.md` and the first descriptions exist.
 
 ## Finding something to do
 

@@ -23,13 +23,18 @@ extends CanvasLayer
 ## with the owner's `overlay` action. The toggle is read here, from the press
 ## counter of `core/input` (a tap released within a frame is not lost); each
 ## overlay then takes its input through `core/ui_focus`. Nothing is paused. The
-## only event the HUD sends from here is `build_change_requested`, by the stub
-## button of an overlay.
+## overlay's "Build" opens that player's spell builder (`hud/builder/`, nodes
+## Root/Builder1 to Root/Builder4), which sits beside the corner panel toward the
+## middle of the screen and takes the player's focus over from the overlay; the
+## `overlay` action closes an open builder. The only event the HUD sends from here
+## is `build_change_requested`, by a builder.
 
 const EventsScript := preload("res://core/events/events.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 const OverlayScript := preload("res://hud/panels/overlay/overlay.gd")
+const SpellsScript := preload("res://core/spells/spells.gd")
+const BuilderScript := preload("res://hud/builder/builder.gd")
 const PlayerPanelScript := preload("res://hud/panels/player_panel/player_panel.gd")
 const VignetteScript := preload("res://hud/panels/vignette/vignette.gd")
 
@@ -38,20 +43,24 @@ const OVERLAY_ACTION: StringName = &"overlay"
 ## Space between the screen edge and a panel, and between a panel and its overlay.
 const EDGE_MARGIN: float = 4.0
 const OVERLAY_GAP: float = 2.0
+## Space between a corner panel and its builder, which sits beside it.
+const BUILDER_GAP: float = 2.0
 ## The "Wave N" line at the top middle of the view (between the P1 and P2 panels).
 const WAVE_LABEL_WIDTH: float = 96.0
 const WAVE_LABEL_FONT_SIZE: int = 16
 const WAVE_LABEL_OUTLINE: int = 4
 
-## The event bus, the UI focus service and the input manager. Only tests set
-## these, before adding the node; otherwise the "Events", "UIFocus" and
-## "PlayerInput" autoloads.
+## The event bus, the UI focus service, the input manager and the spell runtime (the
+## builders ask it for names and icons). Only tests set these, before adding the
+## node; otherwise the "Events", "UIFocus", "PlayerInput" and "Spells" autoloads.
 var events: EventsScript = null
 var ui_focus: UIFocusScript = null
 var input: InputManagerScript = null
+var spells: SpellsScript = null
 
 var _panels: Array[PlayerPanelScript] = []
 var _overlays: Array[OverlayScript] = []
+var _builders: Array[BuilderScript] = []
 ## Per player: the `overlay` press count at the last poll.
 var _seen_overlay: Array[int] = [0, 0, 0, 0]
 var _joined: Array[bool] = [false, false, false, false]
@@ -81,25 +90,35 @@ func _ready() -> void:
 	_wave_label.offset_right = WAVE_LABEL_WIDTH * 0.5
 	_wave_label.offset_top = EDGE_MARGIN
 	root_control.add_child(_wave_label)
+	# Above the vignette, below the panels and the builders, which may cover it.
+	root_control.move_child(_wave_label, 1)
 	for player in PLAYER_COUNT:
 		var panel := get_node("Root/Panel%d" % (player + 1)) as PlayerPanelScript
 		panel.visible = false
 		_panels.append(panel)
 		_overlays.append(get_node("Root/Overlay%d" % (player + 1)) as OverlayScript)
+		_builders.append(get_node("Root/Builder%d" % (player + 1)) as BuilderScript)
 	if events == null:
 		events = get_node_or_null("/root/Events") as EventsScript
 	if ui_focus == null:
 		ui_focus = get_node_or_null("/root/UIFocus") as UIFocusScript
 	if input == null:
 		input = get_node_or_null("/root/PlayerInput") as InputManagerScript
+	if spells == null:
+		spells = get_node_or_null("/root/Spells") as SpellsScript
 	for player in PLAYER_COUNT:
 		_panels[player].minimum_size_changed.connect(_place_overlay.bind(player))
+		_panels[player].minimum_size_changed.connect(_place_builder.bind(player))
 		_place_overlay(player)
+		_place_builder(player)
 	if input != null:
 		for player in PLAYER_COUNT:
 			_seen_overlay[player] = input.get_press_count(player, OVERLAY_ACTION)
 	for overlay in _overlays:
 		overlay.bind(events, ui_focus)
+		overlay.build_pressed.connect(_on_build_pressed)
+	for builder in _builders:
+		builder.bind(events, ui_focus, spells)
 	if events != null:
 		events.player_joined.connect(_on_player_joined)
 		events.player_left.connect(_on_player_left)
@@ -131,7 +150,9 @@ func poll() -> void:
 		_seen_overlay[player] = count
 		if presses <= 0 or not input.is_joined(player):
 			continue
-		if _overlays[player].is_open():
+		if _builders[player].is_open():
+			_builders[player].close_builder()
+		elif _overlays[player].is_open():
 			_overlays[player].close_overlay()
 		elif _in_room and not _panels[player].is_downed():
 			_overlays[player].open_overlay()
@@ -142,6 +163,13 @@ func get_overlay(player: int) -> OverlayScript:
 	if player < 0 or player >= PLAYER_COUNT:
 		return null
 	return _overlays[player]
+
+
+## The spell builder of `player`, or null for a bad index.
+func get_builder(player: int) -> BuilderScript:
+	if player < 0 or player >= PLAYER_COUNT:
+		return null
+	return _builders[player]
 
 
 ## The red vignette (for tests).
@@ -163,6 +191,21 @@ func _place_overlay(player: int) -> void:
 	var y: float = offset if player < 2 else -offset
 	_overlays[player].offset_top = y
 	_overlays[player].offset_bottom = y
+
+
+## Put the builder of `player` beside that player's panel, toward the middle of the
+## screen (right of the left panels, left of the right ones), from the panel's width.
+func _place_builder(player: int) -> void:
+	var offset: float = EDGE_MARGIN + _panels[player].get_combined_minimum_size().x + BUILDER_GAP
+	var x: float = offset if player % 2 == 0 else -offset
+	_builders[player].offset_left = x
+	_builders[player].offset_right = x
+
+
+## The overlay's "Build" was activated: the builder takes the owner's focus over.
+func _on_build_pressed(player: int) -> void:
+	if player >= 0 and player < PLAYER_COUNT:
+		_builders[player].open_builder()
 
 
 func _refresh(player: int) -> void:
@@ -216,6 +259,7 @@ func _reset_all() -> void:
 	_vignette.clear()
 	for player in PLAYER_COUNT:
 		_overlays[player].close_overlay()
+		_builders[player].close_builder()
 		_panels[player].reset()
 		_refresh(player)
 
@@ -228,6 +272,7 @@ func _on_stats_changed(player: int, health: int, max_health: int, mana: float, m
 			_vignette.flash_hit(player, float(before - health) / float(maxi(max_health, 1)), _joined.count(true))
 		if health <= 0:
 			_overlays[player].close_overlay()
+			_builders[player].close_builder()
 
 
 func _on_overlay_opened(player: int) -> void:

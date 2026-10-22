@@ -1,4 +1,4 @@
-[gd_resource type="Theme" load_steps=13 format=3]
+[gd_resource type="Theme" load_steps=16 format=3]
 
 [sub_resource type="StyleBoxFlat" id="panel_p1"]
 content_margin_left = 4.0
@@ -54,6 +54,9 @@ bg_color = Color(0.0784314, 0.0705882, 0.121569, 0.7)
 [sub_resource type="StyleBoxFlat" id="bar_health"]
 bg_color = Color(0.878431, 0.34902, 0.184314, 1)
 
+[sub_resource type="StyleBoxFlat" id="bar_complexity"]
+bg_color = Color(0.639216, 0.623529, 0.721569, 1)
+
 [sub_resource type="StyleBoxFlat" id="bar_mana"]
 bg_color = Color(0.94902, 0.760784, 0.188235, 1)
 
@@ -101,6 +104,30 @@ border_width_right = 2
 border_width_bottom = 2
 border_color = Color(0.94902, 0.760784, 0.188235, 1)
 
+[sub_resource type="StyleBoxFlat" id="button_small"]
+content_margin_left = 3.0
+content_margin_top = 1.0
+content_margin_right = 3.0
+content_margin_bottom = 1.0
+bg_color = Color(0.290196, 0.27451, 0.388235, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.0784314, 0.0705882, 0.121569, 1)
+
+[sub_resource type="StyleBoxFlat" id="button_small_dark"]
+content_margin_left = 3.0
+content_margin_top = 1.0
+content_margin_right = 3.0
+content_margin_bottom = 1.0
+bg_color = Color(0.168627, 0.156863, 0.25098, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.0784314, 0.0705882, 0.121569, 1)
+
 [sub_resource type="StyleBoxFlat" id="panel_plain"]
 content_margin_left = 6.0
 content_margin_top = 4.0
@@ -123,6 +150,17 @@ Button/styles/focus = SubResource("button_focus")
 Button/styles/hover = SubResource("button_hover")
 Button/styles/normal = SubResource("button_normal")
 Button/styles/pressed = SubResource("button_pressed")
+BuilderButton/base_type = &"Button"
+BuilderButton/font_sizes/font_size = 10
+BuilderButton/styles/disabled = SubResource("button_small_dark")
+BuilderButton/styles/hover = SubResource("button_small")
+BuilderButton/styles/normal = SubResource("button_small")
+BuilderButton/styles/pressed = SubResource("button_small_dark")
+BuilderLabel/base_type = &"Label"
+BuilderLabel/font_sizes/font_size = 10
+ComplexityBar/base_type = &"ProgressBar"
+ComplexityBar/styles/background = SubResource("bar_back")
+ComplexityBar/styles/fill = SubResource("bar_complexity")
 HealthBar/base_type = &"ProgressBar"
 HealthBar/styles/background = SubResource("bar_back")
 HealthBar/styles/fill = SubResource("bar_health")

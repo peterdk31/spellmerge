@@ -11,22 +11,20 @@ extends PanelContainer
 ## any index 0-3. The focused control is marked with "> " in front of its text,
 ## so the focus is never shown by colour alone.
 ##
-## "Build slot 1" is a stub (M1 has no spell builder yet): it only sends
-## `build_change_requested(player, [0], 0, STUB_COMPONENT)` and changes nothing here.
-## Gameplay checks the request and refuses what it does not know.
+## "Build" asks for this player's spell builder: it only sends the local signal
+## `build_pressed(player)`, and `hud/panels/panels.gd` opens the builder (which takes the
+## player's focus over from this overlay). The overlay sends no event for it.
 
 const EventsScript := preload("res://core/events/events.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
 
 const PLAYER_COUNT: int = 4
-## The slot and the component the stub button asks for.
-## The spell path `[0]`: spell A.
-const STUB_SPELL: PackedInt32Array = [0]
-const STUB_SLOT: int = 0
-const STUB_COMPONENT: StringName = &"stub"
 const RESUME_TEXT: String = "Resume"
-const BUILD_TEXT: String = "Build slot 1"
+const BUILD_TEXT: String = "Build"
 const FOCUS_MARK: String = "> "
+
+## The owner activated "Build". Carries the index of this overlay.
+signal build_pressed(player: int)
 
 ## The player index 0-3. Set before adding the node to the tree.
 @export var index: int = 0
@@ -118,8 +116,8 @@ func _on_activated(player: int, control: Control) -> void:
 		return
 	if control == _resume:
 		close_overlay()
-	elif control == _build and _events != null:
-		_events.build_change_requested.emit(index, STUB_SPELL, STUB_SLOT, STUB_COMPONENT)
+	elif control == _build:
+		build_pressed.emit(index)
 
 
 func _on_cancelled(player: int) -> void:

@@ -2,6 +2,13 @@
 
 Ideas and future work outside the current milestone (docs/PLAN.md, "Planning system"). The weekly planning run triages Discussions ideas into this file and moves items into `docs/NEXT.md` when their milestone comes.
 
+## From M2 part 16 (the builder)
+
+- The builder ignores the mouse; docs/milestones/M2-spell-system.md wants the mouse to work on P1's panel only. Add it with part 17 or in M4's polish, with a hover mark that is not colour alone.
+- Bag rows are made when a builder opens. If a bag grows past the biggest group while it is open (M3's rewards), the extra rows are not reachable until it is opened again; then re-open through `UIFocus` or give it a way to replace its controls.
+- `Flow.stop_run()` leaves open overlays and builders as they are (only `run_ended` closes them), so a stopped run in a test or a screenshot needs the owner to close them first.
+- The builder panel is as translucent as the corner panels (the game shows through); if it reads badly over busy rooms, give it an opaque `PanelContainer` variation in the theme.
+
 ## From M2 part 7
 
 - Nothing shows a status on an enemy (no tint, icon or sound). Part 8 adds a flash, a number and a sound by id through `Feel`; a lasting look (blue while chilled, flames while burning) is not planned yet.

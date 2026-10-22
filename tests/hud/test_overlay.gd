@@ -1,8 +1,8 @@
 extends SceneTree
 ## Tests for the per-player overlay in hud/panels: the `overlay` action opens
 ## and closes it for its owner only; only the owner's device works its controls
-## (through core/ui_focus); it never pauses the game; the build button is a stub
-## that sends `build_change_requested`; and, the point of it all, with one
+## (through core/ui_focus); it never pauses the game; the build button opens the
+## player's builder (tested in test_builder.gd); and, the point of it all, with one
 ## player's overlay open the other three wizards still move. Input goes through
 ## the real input manager's virtual devices.
 ##
@@ -42,7 +42,7 @@ func _initialize() -> void:
 	_test_player_without_device_cannot_open()
 	_test_only_the_owner_works_the_controls()
 	_test_resume_and_cancel_close()
-	_test_build_button_is_a_stub()
+	_test_build_button_opens_the_builder()
 	_test_focus_is_marked_with_text()
 	_test_game_is_never_paused()
 	_test_others_still_move()
@@ -302,7 +302,7 @@ func _test_resume_and_cancel_close() -> void:
 	_check(not _overlay(0).is_open(), "dodge (cancel) closes the overlay")
 
 
-func _test_build_button_is_a_stub() -> void:
+func _test_build_button_opens_the_builder() -> void:
 	_setup(4)
 	_tap(3, &"overlay")
 	_frame()
@@ -310,13 +310,12 @@ func _test_build_button_is_a_stub() -> void:
 	_frame()
 	_tap(3, &"cast")
 	_frame()
-	_check(_requests.size() == 1, "the build button sends exactly one request, got %d" % _requests.size())
-	if _requests.size() == 1:
-		var request: Array = _requests[0]
-		_check(request[0] == 3, "the request names its owner (player index 3)")
-		_check(request[1] == OverlayScript.STUB_SLOT and request[2] == OverlayScript.STUB_COMPONENT, "the stub asks for slot %d and component %s" % [OverlayScript.STUB_SLOT, OverlayScript.STUB_COMPONENT])
-		_check(request[3] == PackedInt32Array([0]), "the stub asks for spell A, path [0]")
-	_check(_overlay(3).is_open(), "the overlay stays open after the stub request")
+	_check(_requests.is_empty(), "the build button sends no build request itself, got %d" % _requests.size())
+	_check(_hud.get_builder(3).is_open(), "the build button opens the owner's builder")
+	_check(not _overlay(3).is_open() and not _overlay(3).visible, "which takes the place of the overlay")
+	_check(_focus.is_open(3) and _input.is_captured(3), "and the owner's focus and input stay captured")
+	for player in 3:
+		_check(not _hud.get_builder(player).is_open(), "player %d's builder stays closed" % (player + 1))
 
 
 func _test_focus_is_marked_with_text() -> void:

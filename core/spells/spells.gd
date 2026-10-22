@@ -196,6 +196,25 @@ func compile(recipe: Dictionary) -> CompiledSpell:
 	return spell
 
 
+## What the builder shows of the component `id`: its name (the id when it has none, "" for
+## an unknown id), its 16x16 icon (null when unknown) and its kind (`&"form"`, `&"element"`,
+## `&"modifier"` or `&"trigger"`, `&""` when unknown). Scripts outside `core/` and
+## `content/spells/` learn these here and never read the component's fields.
+func component_name(id: StringName) -> String:
+	var component: SpellComponent = _component(id)
+	return _name_of(component) if component != null else ""
+
+
+func component_icon(id: StringName) -> Texture2D:
+	var component: SpellComponent = _component(id)
+	return component.icon if component != null else null
+
+
+func component_kind(id: StringName) -> StringName:
+	var component: SpellComponent = _component(id)
+	return component.kind() if component != null else &""
+
+
 ## The spell registered under `tag`, or null when its generation is gone.
 func profile(tag: int) -> CompiledSpell:
 	return _profiles.get(tag)

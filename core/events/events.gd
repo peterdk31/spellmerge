@@ -48,6 +48,10 @@ signal projectile_expired(player: int, position: Vector2, tag: int)
 signal spell_changed(player: int, spell: PackedInt32Array, description: String)
 ## Sender: player. A build change asked for by `player` was refused; `reason` says why in plain words.
 signal build_refused(player: int, reason: String)
+## Sender: player. The prepared spell `slot` (0 is A, 1 is B) of `player` now has this `recipe` (component ids by key, as `Spells.compile` reads them: `form`, `element`, `modifiers`, `trigger`, and `held` for the spell the trigger holds). Sent with `spell_changed`, so the builder can show the chain without reading the player.
+signal recipe_changed(player: int, slot: int, recipe: Dictionary)
+## Sender: player. The component ids `player` may build with, in registry order. Sent when the wizard appears and whenever the bag changes.
+signal bag_changed(player: int, bag: Array[StringName])
 ## Sender: combat. The reaction `reaction_id` (for example &"shatter") fired for `player` (or NO_PLAYER) at `position`.
 signal reaction_triggered(player: int, reaction_id: StringName, position: Vector2)
 ## Sender: combat. `player` (or NO_PLAYER) dealt `amount` damage to `target`.

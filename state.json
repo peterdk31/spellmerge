@@ -4,7 +4,7 @@
   },
   "automation_started": "2026-10-16T16:49:06Z",
   "backoff_until": "2026-10-22T00:20:00Z",
-  "last_own_merge": "2026-10-22T04:03:43Z",
+  "last_own_merge": "2026-10-22T06:53:53Z",
   "limits": {
     "week_tokens": 44131848,
     "window_tokens": 7593823
@@ -24,15 +24,7 @@
   },
   "panel_problems": [],
   "paused_by_command": false,
-  "pending_instructions": [
-    {
-      "at": "2026-10-22T06:31:14Z",
-      "kind": "claude",
-      "number": 140,
-      "text": "option 1",
-      "url": "https://github.com/peterdk31/spellmerge/issues/140#issuecomment-6334365507"
-    }
-  ],
+  "pending_instructions": [],
   "processed_comments": [
     6241847784,
     6251160604,

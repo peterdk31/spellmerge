@@ -28,6 +28,8 @@ func _initialize() -> void:
 	_input.call("add_virtual_device", 0)
 	flow.call("start_run", 0)
 	await _settle()
+	_end_wave()
+	await _settle()
 	await _open_builder(0)
 	var builder: Node = _hud.call("get_builder", 0)
 	await _press(0, builder.call("slot_button", 1))
@@ -56,6 +58,8 @@ func _initialize() -> void:
 	# The room is entered a little after the run starts; the overlay opens only inside it.
 	for i in 4:
 		await _settle()
+	_end_wave()
+	await _settle()
 	for index in 4:
 		await _open_builder(index)
 	# P1: the element bag. P2: a modifier. P3: a trigger and its held spell. P4: spell B.
@@ -72,6 +76,12 @@ func _initialize() -> void:
 	flow.call("stop_run")
 	await create_timer(0.3).timeout
 	quit(0)
+
+
+## A wave is on from the start of a run and the builder is then the quick view; the full builder is
+## for the break, so end the wave the way the flow does.
+func _end_wave() -> void:
+	root.get_node("Events").emit_signal("room_cleared", &"shot")
 
 
 func _tap(player: int, action: StringName) -> void:

@@ -27,7 +27,8 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `projectile_impact` | `core/projectiles` | `feel` |
 | `projectile_expired` | `core/projectiles` | none yet (`core/spells` from M2 part 6) |
 | `spell_changed`, `build_refused` | `player` | none yet (`hud` shows them from M2 part 17) |
-| `recipe_changed`, `bag_changed` | `player` | `hud` (the builder) |
+| `recipe_changed`, `bag_changed` | `player` | `hud` (the builders, the overlay) |
+| `active_spell_changed` | `player` | `hud` (the corner panel, the quick view, the overlay) |
 | `reaction_triggered` | `combat` | `feel` |
 | `damage_dealt` | `combat` | `feel`, `player` |
 | `status_applied` | `combat` | none yet |

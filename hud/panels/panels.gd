@@ -40,6 +40,9 @@ const VignetteScript := preload("res://hud/panels/vignette/vignette.gd")
 
 const PLAYER_COUNT: int = 4
 const OVERLAY_ACTION: StringName = &"overlay"
+const SWAP_ACTION: StringName = &"swap"
+## Swap presses turned into requests in one poll at most (a stuck button never floods the bus).
+const MAX_SWAPS_PER_POLL: int = 2
 ## Space between the screen edge and a panel, and between a panel and its overlay.
 const EDGE_MARGIN: float = 4.0
 const OVERLAY_GAP: float = 2.0
@@ -63,6 +66,10 @@ var _overlays: Array[OverlayScript] = []
 var _builders: Array[BuilderScript] = []
 ## Per player: the `overlay` press count at the last poll.
 var _seen_overlay: Array[int] = [0, 0, 0, 0]
+## Per player: the `swap` press count at the last poll.
+var _seen_swap: Array[int] = [0, 0, 0, 0]
+## A wave is in progress: the builders show their quick view.
+var _wave_active: bool = false
 var _joined: Array[bool] = [false, false, false, false]
 var _in_room: bool = false
 var _vignette: VignetteScript = null
@@ -114,8 +121,9 @@ func _ready() -> void:
 	if input != null:
 		for player in PLAYER_COUNT:
 			_seen_overlay[player] = input.get_press_count(player, OVERLAY_ACTION)
+			_seen_swap[player] = input.get_press_count(player, SWAP_ACTION)
 	for overlay in _overlays:
-		overlay.bind(events, ui_focus)
+		overlay.bind(events, ui_focus, spells)
 		overlay.build_pressed.connect(_on_build_pressed)
 	for builder in _builders:
 		builder.bind(events, ui_focus, spells)
@@ -125,6 +133,8 @@ func _ready() -> void:
 		events.player_stats_changed.connect(_on_stats_changed)
 		events.room_entered.connect(_on_room_entered)
 		events.wave_started.connect(_on_wave_started)
+		events.room_cleared.connect(_on_room_cleared)
+		events.active_spell_changed.connect(_on_active_spell_changed)
 		events.run_started.connect(_on_run_started)
 		events.run_ended.connect(_on_run_ended)
 	if ui_focus != null:
@@ -145,6 +155,7 @@ func poll() -> void:
 	if input == null:
 		return
 	for player in PLAYER_COUNT:
+		_poll_swap(player)
 		var count: int = input.get_press_count(player, OVERLAY_ACTION)
 		var presses: int = count - _seen_overlay[player]
 		_seen_overlay[player] = count
@@ -156,6 +167,21 @@ func poll() -> void:
 			_overlays[player].close_overlay()
 		elif _in_room and not _panels[player].is_downed():
 			_overlays[player].open_overlay()
+
+
+## A `swap` press of `player` becomes `spell_swap_requested(player)`, the player's wizard
+## decides. Not while the player works a menu (`swap` is captured there too), outside a room,
+## for a player who is not joined or is down. Presses in those states are dropped, not kept.
+func _poll_swap(player: int) -> void:
+	var count: int = input.get_press_count(player, SWAP_ACTION)
+	var presses: int = count - _seen_swap[player]
+	_seen_swap[player] = count
+	if presses <= 0 or events == null or not _in_room or not input.is_joined(player):
+		return
+	if _panels[player].is_downed() or (ui_focus != null and ui_focus.is_open(player)):
+		return
+	for _press in mini(presses, MAX_SWAPS_PER_POLL):
+		events.spell_swap_requested.emit(player)
 
 
 ## The overlay of `player`, or null for a bad index.
@@ -236,6 +262,28 @@ func _on_room_entered(_room_id: StringName) -> void:
 func _on_wave_started(wave: int) -> void:
 	_wave_label.text = "Wave %d" % wave
 	_wave_label.visible = true
+	_set_quick(true)
+
+
+## The wave is cleared: the builders unfold into the full view for the break.
+func _on_room_cleared(_room_id: StringName) -> void:
+	_set_quick(false)
+
+
+## Whether a wave is in progress, so the builders show their quick view (for tests).
+func is_wave_active() -> bool:
+	return _wave_active
+
+
+func _set_quick(quick: bool) -> void:
+	_wave_active = quick
+	for builder in _builders:
+		builder.set_quick(quick)
+
+
+func _on_active_spell_changed(player: int, slot: int) -> void:
+	if player >= 0 and player < PLAYER_COUNT:
+		_panels[player].set_active_spell(slot)
 
 
 ## The "Wave N" line, or null before the script's `_ready`.
@@ -255,6 +303,7 @@ func _on_run_ended(_victory: bool) -> void:
 
 func _reset_all() -> void:
 	_in_room = false
+	_set_quick(false)
 	_wave_label.visible = false
 	_vignette.clear()
 	for player in PLAYER_COUNT:

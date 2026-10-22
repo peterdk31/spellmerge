@@ -20,6 +20,15 @@ extends PanelContainer
 ## anywhere else closes the builder. The focused control is marked with "> " and the
 ## selected slot is shown in brackets, so nothing is shown by colour alone.
 ##
+## The quick view (M2 part 18): when a wave starts (`set_quick(true)`, called by `panels.gd`) an
+## open builder folds into the quick view, and one opened during a wave starts as it. It keeps the
+## slot chain of the active spell on show (read only), hides the tabs, the held levels, the bag
+## and the info panel, and offers "Drop component" and "Close". "Drop component" lists the bag
+## components that fit a free slot (the empty element slot, the first free modifier slot; see
+## `hud/widgets/drop_choices.gd`) and activating one asks for it with `build_change_requested`
+## like the full builder. When the wave is cleared (`set_quick(false)`) it unfolds again. The
+## choices so far are kept, since they live in the player's recipes, not here.
+##
 ## Part 17 adds an info panel (`Info`, in the free strip of the player's quarter): the complexity
 ## bar, the stats and a mini-preview of the spell shown (from `Spells.builder_view`), and a text
 ## line with the refusal reason (from `build_refused`) or the focused component's description.
@@ -32,6 +41,7 @@ const EventsScript := preload("res://core/events/events.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const SpellPreviewScript := preload("res://hud/builder/spell_preview.gd")
+const DropChoicesScript := preload("res://hud/widgets/drop_choices.gd")
 
 const PLAYER_COUNT: int = 4
 ## The slot numbers of `build_change_requested` (the contract of `gameplay/player`).
@@ -50,6 +60,7 @@ const SPELL_COUNT: int = 2
 const SPELL_NAMES: Array[String] = ["A", "B"]
 const NO_COMPONENT: StringName = &""
 
+const DROP_TEXT: String = "Drop component"
 const NONE_TEXT: String = "None"
 const EMPTY_SLOT_TEXT: String = "-"
 const FOCUS_MARK: String = "> "
@@ -57,6 +68,7 @@ const CURRENT_MARK: String = " *"
 ## The look of every control: the BuilderButton theme variation.
 const BUTTON_VARIATION: StringName = &"BuilderButton"
 const ROW_HEIGHT: float = 18.0
+const QUICK_ROW_HEIGHT: float = 14.0
 const LEFT_WIDTH: float = 100.0
 const RIGHT_WIDTH: float = 80.0
 ## The meta key that keeps a button's text without the focus mark.
@@ -94,6 +106,13 @@ var _bag: Array[StringName] = []
 var _reason: String = ""
 
 var _open: bool = false
+## The quick view is on (a wave is in progress), and its "Drop component" list is shown.
+var _quick: bool = false
+var _dropping: bool = false
+## Whether the bag has a component that fits a free slot of the spell shown (quick view only).
+var _can_drop: bool = false
+## The active prepared spell of the player (from `active_spell_changed`), which the quick view shows.
+var _active: int = 0
 ## The prepared spell shown (0 is A), how many held spells below it, the selected slot.
 var _viewed: int = 0
 var _level: int = 0
@@ -106,6 +125,9 @@ var _close: Button = null
 var _slots: Array[Button] = []
 var _up: Button = null
 var _held: Button = null
+var _drop: Button = null
+var _levels_row: Control = null
+var _bag_column: Control = null
 var _info: PanelContainer = null
 var _complexity_label: Label = null
 var _complexity_bar: ProgressBar = null
@@ -115,6 +137,8 @@ var _note: Label = null
 var _rows: Array[Button] = []
 ## The component id each shown bag row asks for, in row order (`NO_COMPONENT` is "None").
 var _row_ids: Array[StringName] = []
+## The slot each shown bag row asks for: the selected slot, or in the drop list the free slot.
+var _row_slots: Array[int] = []
 ## The controls given to UIFocus, in order.
 var _controls: Array[Control] = []
 
@@ -135,6 +159,7 @@ func _ready() -> void:
 	columns.add_child(left)
 	var right := VBoxContainer.new()
 	right.name = "Bag"
+	_bag_column = right
 	right.custom_minimum_size = Vector2(RIGHT_WIDTH, 0.0)
 	right.add_theme_constant_override("separation", 2)
 	columns.add_child(right)
@@ -159,12 +184,15 @@ func _ready() -> void:
 		_slots.append(button)
 	var levels := HBoxContainer.new()
 	levels.name = "Levels"
+	_levels_row = levels
 	levels.add_theme_constant_override("separation", 2)
 	left.add_child(levels)
 	_up = _make_button(levels, "Up")
 	_up.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_held = _make_button(levels, "Held")
 	_held.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_drop = _make_button(left, "Drop")
+	_drop.visible = false
 	_make_info(player)
 	visible = false
 	_render()
@@ -180,6 +208,7 @@ func bind(events: EventsScript, ui_focus: UIFocusScript, spells: SpellsScript) -
 		_events.recipe_changed.connect(_on_recipe_changed)
 		_events.bag_changed.connect(_on_bag_changed)
 		_events.build_refused.connect(_on_build_refused)
+		_events.active_spell_changed.connect(_on_active_spell_changed)
 	if _ui_focus != null:
 		_ui_focus.closed.connect(_on_closed)
 		_ui_focus.activated.connect(_on_activated)
@@ -196,9 +225,10 @@ func is_open() -> bool:
 func open_builder() -> bool:
 	if _open or _ui_focus == null:
 		return false
-	_viewed = 0
+	_viewed = _active if _quick else 0
 	_level = 0
 	_slot = SLOT_FORM
+	_dropping = false
 	_focused = null
 	_reason = ""
 	_place_info()
@@ -223,6 +253,42 @@ func close_builder() -> bool:
 	if not _open or _ui_focus == null:
 		return false
 	return _ui_focus.close(index)
+
+
+## Fold into the quick view (`true`, a wave is in progress) or unfold into the full builder
+## (`false`). An open builder keeps its focus on the nearest control that still exists.
+func set_quick(quick: bool) -> void:
+	if quick == _quick:
+		return
+	_quick = quick
+	_dropping = false
+	_level = 0
+	_slot = SLOT_FORM
+	if quick:
+		_viewed = _active
+	_render()
+	if _open:
+		_resync_focus(true)
+		_focus_control(_drop if quick else _slots[_slot])
+		_apply_marks()
+
+
+func is_quick() -> bool:
+	return _quick
+
+
+## Whether the quick view's "Drop component" list is shown.
+func is_dropping() -> bool:
+	return _dropping
+
+
+func drop_button() -> Button:
+	return _drop
+
+
+## The slot each shown bag row asks for, in order.
+func row_slots() -> Array[int]:
+	return _row_slots.duplicate()
 
 
 ## The prepared spell shown: 0 (A) or 1 (B).
@@ -525,30 +591,55 @@ func _render() -> void:
 	_title.text = title
 	for spell in SPELL_COUNT:
 		_set_text(_tabs[spell], SPELL_NAMES[spell] if spell != _viewed else "[%s]" % SPELL_NAMES[spell])
+		_tabs[spell].visible = not _quick
+	_levels_row.visible = not _quick
+	_info.visible = not _quick
+	_drop.visible = _quick
+	_set_text(_drop, DROP_TEXT)
 	_set_text(_close, "Close")
 	for slot in SLOT_COUNT:
 		var id: StringName = _id_in(node, slot)
 		var text: String = "%s: %s" % [SLOT_NAMES[slot], _name_of(id) if id != NO_COMPONENT else EMPTY_SLOT_TEXT]
 		_set_text(_slots[slot], "[%s]" % text if slot == _slot else text)
-		_slots[slot].disabled = not _slot_usable(node, slot)
+		_slots[slot].disabled = _quick or not _slot_usable(node, slot)
 	_up.disabled = _level == 0
 	_set_text(_up, "< Up")
 	_held.disabled = _level >= MAX_LEVEL or _id_in(node, SLOT_TRIGGER) == NO_COMPONENT
 	_set_text(_held, "Held >")
 	_render_rows(node)
+	_bag_column.visible = not _quick or _dropping
+	_bag_column.add_theme_constant_override("separation", 0 if _quick else 2)
+	_drop.disabled = _quick and not _can_drop
 	_rebuild_controls()
 	_apply_marks()
 	_render_info()
+	_fit_size()
 
 
 func _render_rows(node: Dictionary) -> void:
 	var current: StringName = _id_in(node, _slot)
 	_row_ids.clear()
-	if current != NO_COMPONENT and _slot != SLOT_FORM:
-		_row_ids.append(NO_COMPONENT)
-	for id in _bag:
-		if _kind_of(id) == SLOT_KINDS[_slot]:
-			_row_ids.append(id)
+	_row_slots.clear()
+	if _quick:
+		current = NO_COMPONENT
+		var offered: Dictionary = DropChoicesScript.choices(node, _bag, _spells)
+		_row_ids.assign(offered["ids"])
+		_row_slots.assign(offered["slots"])
+		# Nothing left to drop: the list is over, whatever caused it.
+		_can_drop = not _row_ids.is_empty()
+		if not _can_drop:
+			_dropping = false
+		if not _dropping:
+			_row_ids.clear()
+			_row_slots.clear()
+	else:
+		if current != NO_COMPONENT and _slot != SLOT_FORM:
+			_row_ids.append(NO_COMPONENT)
+			_row_slots.append(_slot)
+		for id in _bag:
+			if _kind_of(id) == SLOT_KINDS[_slot]:
+				_row_ids.append(id)
+				_row_slots.append(_slot)
 	_grow_rows(_row_ids.size())
 	for row in _rows.size():
 		var button: Button = _rows[row]
@@ -557,22 +648,36 @@ func _render_rows(node: Dictionary) -> void:
 			continue
 		var id: StringName = _row_ids[row]
 		button.visible = true
+		# The quick view's list can hold every element and modifier at once, so its rows have no
+		# icon and are lower, to stay inside the builder's quarter of the screen.
+		button.custom_minimum_size = Vector2(0.0, QUICK_ROW_HEIGHT if _quick else ROW_HEIGHT)
 		if id == NO_COMPONENT:
 			button.icon = null
 			_set_text(button, NONE_TEXT)
 		else:
-			button.icon = _spells.component_icon(id) if _spells != null else null
+			button.icon = _spells.component_icon(id) if _spells != null and not _quick else null
 			_set_text(button, _name_of(id) + (CURRENT_MARK if id == current else ""))
+
+
+## The quick view is narrower until its drop list is shown. The offsets of the builder make its
+## base size zero (`panels.gd`), so it follows the minimum size, its anchored corner staying put.
+func _fit_size() -> void:
+	var width: float = LEFT_WIDTH + 8.0 if _quick and not _dropping else LEFT_WIDTH + RIGHT_WIDTH + 4.0 + 8.0
+	if custom_minimum_size.x != width:
+		custom_minimum_size = Vector2(width, 0.0)
 
 
 func _rebuild_controls() -> void:
 	_controls.clear()
-	for tab in _tabs:
-		_controls.append(tab)
-	for slot_button_node in _slots:
-		_controls.append(slot_button_node)
-	_controls.append(_up)
-	_controls.append(_held)
+	if _quick:
+		_controls.append(_drop)
+	else:
+		for tab in _tabs:
+			_controls.append(tab)
+		for slot_button_node in _slots:
+			_controls.append(slot_button_node)
+		_controls.append(_up)
+		_controls.append(_held)
 	for row in _rows:
 		_controls.append(row)
 	_controls.append(_close)
@@ -623,8 +728,8 @@ func _on_bag_changed(player: int, bag: Array[StringName]) -> void:
 
 ## UIFocus keeps its own copy of the controls: when a bigger bag made more rows, give it the new
 ## list and put focus back where it was.
-func _resync_focus() -> void:
-	if not _open or _controls.size() == _synced_controls:
+func _resync_focus(force: bool = false) -> void:
+	if not _open or (_controls.size() == _synced_controls and not force):
 		return
 	var keep: Control = _focused
 	_reopening = true
@@ -660,9 +765,31 @@ func _on_cancelled(player: int) -> void:
 	if player != index or not _open:
 		return
 	if _rows.has(_focused as Button):
-		_focus_control(_slots[_slot])
+		if _quick:
+			_stop_dropping()
+		else:
+			_focus_control(_slots[_slot])
 	else:
 		close_builder()
+
+
+## Leave the quick view's drop list and put focus back on "Drop component".
+func _stop_dropping() -> void:
+	_dropping = false
+	_render()
+	_focus_control(_drop if not _drop.disabled else _close)
+
+
+func _on_active_spell_changed(player: int, slot: int) -> void:
+	if player != index or slot < 0 or slot >= SPELL_COUNT:
+		return
+	_active = slot
+	if _quick and _viewed != slot:
+		_viewed = slot
+		_dropping = false
+		_render()
+		if _open:
+			_focus_control(_drop if not _drop.disabled else _close)
 
 
 func _on_activated(player: int, control: Control) -> void:
@@ -670,6 +797,10 @@ func _on_activated(player: int, control: Control) -> void:
 		return
 	if control == _close:
 		close_builder()
+	elif control == _drop:
+		_dropping = true
+		_render()
+		_focus_control(_first_row())
 	elif _tabs.has(control as Button):
 		_viewed = _tabs.find(control as Button)
 		_level = 0
@@ -691,7 +822,7 @@ func _on_activated(player: int, control: Control) -> void:
 		var row: int = _rows.find(control as Button)
 		if row < _row_ids.size():
 			var chosen: StringName = _row_ids[row]
-			_ask(_slot, chosen)
+			_ask(_row_slots[row], chosen)
 			_keep_focus_on(chosen)
 
 
@@ -706,12 +837,17 @@ func _keep_focus_on(id: StringName) -> void:
 	elif not _row_ids.is_empty():
 		_focus_control(_rows[0])
 	else:
-		_focus_control(_slots[_slot])
+		_focus_control(_first_row())
 
 
-## The first bag row shown, or the selected slot if the bag has nothing for it.
+## The first bag row shown, or (with no rows) the selected slot, or in the quick view "Drop
+## component" (or "Close" when nothing is left to drop).
 func _first_row() -> Control:
-	return _rows[0] if not _row_ids.is_empty() else _slots[_slot]
+	if not _row_ids.is_empty():
+		return _rows[0]
+	if _quick:
+		return _drop if not _drop.disabled else _close
+	return _slots[_slot]
 
 
 ## Move this player's focus to `target` by single steps (the focus service has no jump).

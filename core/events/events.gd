@@ -50,6 +50,8 @@ signal spell_changed(player: int, spell: PackedInt32Array, description: String)
 signal build_refused(player: int, reason: String)
 ## Sender: player. The prepared spell `slot` (0 is A, 1 is B) of `player` now has this `recipe` (component ids by key, as `Spells.compile` reads them: `form`, `element`, `modifiers`, `trigger`, and `held` for the spell the trigger holds). Sent with `spell_changed`, so the builder can show the chain without reading the player.
 signal recipe_changed(player: int, slot: int, recipe: Dictionary)
+## Sender: player. The active prepared spell of `player` is now `slot` (0 is A, 1 is B). Sent when the wizard appears and after every swap, so the HUD shows which spell `cast` fires.
+signal active_spell_changed(player: int, slot: int)
 ## Sender: player. The component ids `player` may build with, in registry order. Sent when the wizard appears and whenever the bag changes.
 signal bag_changed(player: int, bag: Array[StringName])
 ## Sender: combat. The reaction `reaction_id` (for example &"shatter") fired for `player` (or NO_PLAYER) at `position`.

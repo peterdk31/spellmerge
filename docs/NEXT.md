@@ -6,7 +6,6 @@ The ordered task queue for the current milestone, M2 (its design, [M2-spell-syst
 
 M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97). Each task's details are the matching row and sections of the M2 design. Nothing from M3+ is built (rewards, relics, staffs, rooms, the door rule).
 
-- [ ] **The quick view and quick actions (M2 part 18).** (`hud/builder`, `hud/panels`, `gameplay/player`) The builder folds into the quick view when a wave starts; swap shown on the corner panel (active spell A or B); the HUD turns a `swap` press into `spell_swap_requested` (player index) and `player` (part 11) handles it; "Drop component" in the overlay and the quick view; tests.
 - [ ] **The build break (M2 part 19).** (`gameplay/flow`, `hud/panels`) `BUILD_BREAK` instead of `NEXT_WAVE_DELAY`, the countdown, the hammer icon (display only); tests that the wave starts on time with one, two and four players, whoever is building.
 - [ ] **Bots build spells (M2 part 20).** (`tests/bots`) Seeded random builds, bot 4 staying in its builder in the 4-bot test, `test_spell_fuzz.gd`; **the weekly playtest asks about building from here**.
 - [ ] **Combos to 20+ (M2 part 21).** (`combos.json`) At least 20 combos passing, each component in two non-refusal combos; done-when item 2.
@@ -23,6 +22,8 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
 (none)
 
 ## Done recently
+
+- [x] **The quick view and quick actions (M2 part 18).** The builder folds into the quick view on `wave_started` (chain read only, "Drop component", "Close") and unfolds on `room_cleared`; the corner panel shows the active spell (new event `active_spell_changed`, from `player`); `panels.gd` turns `swap` presses into `spell_swap_requested`; "Drop component" in the overlay and the quick view (`hud/widgets/drop_choices.gd`) puts a bag component into the empty element slot or the first free modifier slot of the active spell. `tests/hud/test_quick.gd` and `shot_quick.gd`; `build.sh --quick --tests` and the screenshots pass. Details in `docs/DECISIONS.md`.
 
 - [x] **Builder, part 2 (M2 part 17).** `hud/builder/`: an info panel per builder in the free strip of the player's quarter with the complexity bar and "Complexity N/12", damage, shots, cooldown and mana of the shown spell and held level, a code-drawn mini-preview (`spell_preview.gd`) and a text line with "Refused: <reason>" (from `build_refused`) or the focused component's description (empty until part 23). `Spells.builder_view(recipe, level)` and `component_description(id)` give the HUD plain values; theme variations `BuilderLabel` and `ComplexityBar`. Eight new tests in `test_builder.gd`; `shot_builder.gd` has the one-player, refused and four-player shots. `build.sh --quick --tests` and the screenshots pass.
 

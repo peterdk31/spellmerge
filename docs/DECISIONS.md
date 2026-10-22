@@ -2,6 +2,17 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-22: The quick view and quick actions
+
+**Decided by:** Claude (M2 part 18).
+- **A wave is "in progress" from `wave_started` to `room_cleared`.** `panels.gd` folds every builder into the quick view on `wave_started` and unfolds it on `room_cleared`, `run_started` and `run_ended`. No new event: the break between waves is exactly the time after `room_cleared` until the next `wave_started`, which part 19 (`BUILD_BREAK`) makes longer without changing this.
+- **New event `active_spell_changed(player, slot)`, sender `player`.** The HUD may only show what events say, and `swap` changed a private variable. The wizard sends it when it appears and after each swap; the corner panel shows "Spell A"/"Spell B" from it, and the quick view and overlay follow it.
+- **The HUD turns `swap` presses into `spell_swap_requested`** in `panels.gd` (like the `overlay` toggle, from the press counter). Presses are dropped, not kept, when the player is in a menu (`swap` is captured there like `cast`), down, not joined or outside a room. At most two requests per poll.
+- **Drop component offers the empty element slot and the first free modifier slot only** (`hud/widgets/drop_choices.gd`, shared by the overlay and the quick view). The form and the trigger need the full builder; the design says "a free modifier slot, or the empty element slot". It always acts on the active spell, level 0, with `build_change_requested(player, [active], slot, id)`; `player` checks it like every request.
+- **The quick view keeps the slot chain read only and hides tabs, held levels, bag and info panel.** It follows the active spell. Its drop list has no icons and tighter rows, and the overlay's list is two columns that replace the three buttons while it is shown, so the longest list (spell B: four elements and six modifiers) fits each player's quarter of 640×360. Tested with four players.
+- **`Build` pressed during a wave opens the quick view.** The full builder is for the break, as in the design.
+- Left for later: the hammer icon on a building player's panel is part 19.
+
 ## 2026-10-22: The M1 fire bolt moves to `legacy/fire_bolt`; the new bolt takes the id `bolt`
 
 **Decided by:** Claude (M2 part 10).

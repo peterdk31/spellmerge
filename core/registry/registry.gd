@@ -53,8 +53,7 @@ func _ready() -> void:
 	demo_only = OS.has_feature(FEATURE_DEMO)
 	scan()
 	if OS.is_debug_build():
-		for problem: Dictionary in validate_spells():
-			push_warning("Registry: " + SpellValidator.format(problem))
+		warn_spell_problems()
 
 
 ## Reads the content and audio folders again. The roots can be changed so
@@ -95,6 +94,14 @@ func scan(content_root: String = DEFAULT_CONTENT_ROOT, audio_root: String = DEFA
 			push_warning("Registry: duplicate sound '%s' in %s (kept %s)" % [sound_id, path, _sound_paths[sound_id]])
 			continue
 		_sound_paths[sound_id] = path
+
+
+## Pushes one warning per problem `validate_spells()` finds, and returns how many.
+func warn_spell_problems() -> int:
+	var problems: Array[Dictionary] = validate_spells()
+	for problem: Dictionary in problems:
+		push_warning("Registry: " + SpellValidator.format(problem))
+	return problems.size()
 
 
 ## Runs the spell validator on everything found under `spells` (demo or not) and on the

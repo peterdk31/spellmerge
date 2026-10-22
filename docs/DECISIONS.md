@@ -39,7 +39,7 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - **Duplicate ids are seen through the registry,** which keeps the first file and used to only warn; it now also remembers the duplicates under `spells`, and the validator reports them. Ids are unique across all four kinds because they share the `spells` folder.
 - **Beyond the design's list,** a form must have the number its motion uses (speed, orbit radius or ray length), an element with a status needs a duration, a homing or chain modifier needs a strength and a timer trigger needs an interval: a component that does nothing is a mistake, not a choice. Reaction rows get ranges of their own (`REACTION_RANGES`), wide sanity bounds like the component ones.
 - **Resources in `spells` that are not components** (M1's `SpellBase` bolt, until part 10) are skipped.
-- **`tools/check.sh`:** asked of the owner. The validator already runs in `ci/build/build.sh --quick --tests`; `check.sh` needs only git and Python, and Godot may only be run through `build.sh`.
+- **`tools/check.sh`:** asked of the owner (issue #140). The validator already runs in `ci/build/build.sh --quick --tests`; `check.sh` needs only git and Python, and Godot may only be run through `build.sh`.
 
 ## 2026-10-21: Spell component base classes (M2 part 1)
 

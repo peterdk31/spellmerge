@@ -178,10 +178,24 @@ func test_an_icon_missing_from_the_manifest_is_reported() -> void:
 	check(String(problems[0]["fix"]).contains("art/manifest.json"), "the fix names the manifest")
 
 
-func test_complexity_above_the_whole_spell_budget_is_reported() -> void:
+func test_complexity_above_the_whole_spell_budget_is_reported_once_as_a_range() -> void:
 	var element := _fine(ElementBase.new())
 	element.complexity = SpellLimits.MAX_COMPLEXITY + 1
-	check(_has_rule(SpellValidator.check_component(element, _listed()), "complexity"), "a component dearer than a whole spell")
+	var problems := SpellValidator.check_component(element, _listed())
+	check_equal(_fields(problems, "range"), ["complexity"] as Array[String], "one range problem")
+	check_equal(problems.size(), 1, "and no second one")
+
+
+func test_a_missing_manifest_is_empty() -> void:
+	check(SpellValidator.load_manifest("res://tests/content/spells/no_such_manifest.json").is_empty(), "empty")
+
+
+func test_the_registry_warns_once_per_problem() -> void:
+	var registry := _registry()
+	registry.scan(DUPLICATES, "res://tests/content/spells/no_audio")
+	var expected: int = registry.validate_spells().size()
+	check(expected > 0, "the duplicate fixture has a problem")
+	check_equal(registry.warn_spell_problems(), expected, "one warning per problem")
 
 
 func test_an_id_used_twice_is_reported() -> void:

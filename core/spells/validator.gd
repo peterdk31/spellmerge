@@ -15,8 +15,8 @@ extends RefCounted
 ##         push_warning(SpellValidator.format(problem))
 ##
 ## What it checks, per component: `id` set and equal to the folder name; a name; an icon that
-## is listed in the art manifest; every number inside `ranges()`; `complexity` within the
-## whole-spell budget; and the fields its kind needs (a form's speed, orbit radius or ray
+## is listed in the art manifest; every number inside `ranges()` (which keeps a component's
+## `complexity` to 1-4, well inside the whole-spell budget); and the fields its kind needs (a form's speed, orbit radius or ray
 ## length for its motion; an element's known status and duration; a modifier's strength
 ## for its behaviour; a timer trigger's interval). Across the list: no id twice. For the
 ## reaction table: each row names a known status, an existing element and a real effect,
@@ -46,6 +46,8 @@ const REACTION_RANGES: Dictionary = {
 ## or is not a manifest, so every icon then reports as unlisted.
 static func load_manifest(path: String = MANIFEST_PATH) -> Dictionary:
 	var listed: Dictionary = {}
+	if not FileAccess.file_exists(path):
+		return listed
 	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
 	if not (parsed is Dictionary):
 		return listed
@@ -79,7 +81,9 @@ static func check_all(resources: Array[Resource], reactions: ReactionTable, mani
 	return problems
 
 
-## The problems of each component and the ids used twice in the list.
+## The problems of each component and the ids used twice in the list. The registry keeps
+## only the first file per id, so in the game duplicates arrive through `check_all`'s
+## `duplicates` instead; this check is for a list that holds both.
 static func check_components(components: Array[SpellComponent], manifest: Dictionary) -> Array[Dictionary]:
 	var problems: Array[Dictionary] = []
 	var seen: Dictionary = {}
@@ -114,8 +118,6 @@ static func check_component(component: SpellComponent, manifest: Dictionary) -> 
 	for line in component.range_problems():
 		var field: String = line.get_slice(":", 0)
 		problems.append(_problem("range", file, field, "%s. Change it to a value inside the range (documented next to the field)." % line))
-	if component.complexity > SpellLimits.MAX_COMPLEXITY:
-		problems.append(_problem("complexity", file, "complexity", "A component costs %d but a whole spell may only cost %d. Lower it." % [component.complexity, SpellLimits.MAX_COMPLEXITY]))
 	if component is FormBase:
 		problems.append_array(_check_form(component as FormBase))
 	elif component is ElementBase:

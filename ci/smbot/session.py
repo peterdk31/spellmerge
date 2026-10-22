@@ -566,23 +566,22 @@ def finish(cfg: config_mod.Config, env: dict[str, str]) -> dict[str, str]:
         lines.append(f"Not merged: #{pr} ({task}). {reason[:400]}")
     elif status and status != "ok":
         lines.append(f"Development session stopped: {status}. {env.get('IMPLEMENT_SUMMARY', '')[:300]}")
-    settings = json.loads(env.get("SETTINGS") or "{}")
     st, _ = state.load(cfg)
-    lines.append(pacing.usage_line(st, now, settings.get("dev_intensity", 90), settings.get("weekly_share", 90)))
+    lines.append(pacing.usage_line(st, now))
     if env.get("RUN_URL"):
         lines.append(f"[Workflow run]({env['RUN_URL']})")
     dailylog.post(cfg, "Development session", lines)
 
-    # Start the next session right away while there is work and budget. A task that waits on
-    # someone is parked above, so the next session takes another one. Stop when the session
-    # made no progress (an error or usage limit: the hourly check retries) or merging is paused.
+    # Start the next session right away while there is work. A task that waits on someone is
+    # parked above, so the next session takes another one. Stop when the session made no
+    # progress (an error or usage limit: the hourly check retries), merging is paused, or
+    # Claude reported a usage limit.
     started = env.get("CHAIN_STARTED") or pacing.iso(now)
-    budget = pacing.budget(st, now, settings.get("dev_intensity", 90), settings.get("weekly_share", 90))
     progressed = merged or bool(pr) or status == "blocked" or idle_task
     has_work = (nexttask.next_task(skip=nexttask.parked(st, now)) is not None
                 or bool(st.get("followups")) or bool(st.get("pending_instructions")))
     again = (env.get("TASK_KIND") != "plan" and progressed and not merge_skipped
-             and budget.allowed and has_work)
+             and not pacing.backing_off_until(st, now) and has_work)
     # Stopped by a usage limit: resume.yml starts develop again when it resets.
     resume_at = pacing.backing_off_until(st, now) if env.get("TASK_KIND") != "plan" and has_work else ""
     return {"again": str(again).lower(), "chain_started": started, "resume_at": resume_at}

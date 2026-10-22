@@ -223,20 +223,14 @@ def has_signed_or_record(cfg: config_mod.Config, number: int, user_id: int, vers
     return False
 
 
-def rating_budget(cfg: config_mod.Config, now: dt.datetime, settings: dict[str, Any]) -> pacing.Budget:
-    """Reviews may use about 30% of the window budget (docs/PLAN.md, "Capacity")."""
-    st, _ = state.load(cfg)
-    return pacing.budget(st, now, settings.get("dev_intensity", 90), settings.get("weekly_share", 90),
-                         kinds=("review", "rate"), share_of_window=pacing.REVIEW_SHARE)
-
-
 def main() -> int:
     cfg = config_mod.load()
     now = dt.datetime.now(dt.timezone.utc)
     rate, log, signatures_pr = triage(cfg, now)
-    budget = rating_budget(cfg, now, json.loads(os.environ.get("SETTINGS") or "{}"))
-    if rate and not budget.allowed:
-        log.append(f"No PR ratings today: {budget.reason}. {len(rate)} PR(s) wait until tomorrow.")
+    until = pacing.backing_off_until(state.load(cfg)[0], now)
+    if rate and until:
+        log.append(f"No PR ratings today: backing off after a usage limit until {until}. "
+                   f"{len(rate)} PR(s) wait until tomorrow.")
         rate = []
     print(json.dumps({"rate": rate, "signatures_pr": signatures_pr}))
     path = os.environ.get("GITHUB_OUTPUT")

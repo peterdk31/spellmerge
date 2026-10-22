@@ -26,8 +26,6 @@ class Settings:
     automation_enabled: bool = True
     pause_development: bool = False
     pause_merging: bool = False
-    dev_intensity: int = 90
-    weekly_share: int = 90
     quiet_hours: tuple[int, int] | None = None
     vote_share: int = 15
     vote_min: int = 2
@@ -44,8 +42,6 @@ _CHECKBOXES = {
     "pause_merging": "Pause PR merging",
 }
 _PERCENTS = {  # field: (label, min, max)
-    "dev_intensity": ("DEV_INTENSITY", 0, 100),
-    "weekly_share": ("WEEKLY_SHARE", 0, 100),
     "vote_share": ("VOTE_SHARE", 1, 100),
     "vote_approval": ("VOTE_APPROVAL", 50, 100),
 }
@@ -230,7 +226,7 @@ LABELS = {**_CHECKBOXES, **{k: v[0] for k, v in _PERCENTS.items()}, **{k: v[0] f
 
 
 def changes(old: dict | None, new: Settings, owner_login: str) -> list[str]:
-    """Audit lines for the Daily log, e.g. 'DEV_INTENSITY 90% → 50% (by peterdk31)'."""
+    """Audit lines for the Daily log, e.g. 'VOTE_SHARE 15% → 20% (by peterdk31)'."""
     if old is None:
         return []
     new_d = asdict(new)

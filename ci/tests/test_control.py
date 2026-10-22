@@ -15,8 +15,6 @@ PANEL = """**SPELLMERGE CONTROL PANEL**
 - [ ] Pause development (still review PRs and release, build nothing new)
 - [ ] Pause PR merging
 
-DEV_INTENSITY: 90%
-WEEKLY_SHARE: 90%
 QUIET_HOURS:
 VOTE_SHARE: 15%   VOTE_MIN: 2   VOTE_MAX: 25   VOTE_APPROVAL: 60%
 FOCUS:
@@ -44,26 +42,26 @@ class PanelTest(unittest.TestCase):
 
     def test_values(self) -> None:
         text = (PANEL.replace("- [ ] Pause development", "- [x] Pause development")
-                .replace("DEV_INTENSITY: 90%", "DEV_INTENSITY: 50%").replace("QUIET_HOURS:", "QUIET_HOURS: 07-17")
+                .replace("VOTE_SHARE: 15%", "VOTE_SHARE: 50%").replace("QUIET_HOURS:", "QUIET_HOURS: 07-17")
                 .replace("VOTE_MAX: 25", "VOTE_MAX: 30").replace("FOCUS:", "FOCUS: fix bugs first"))
         s, _ = panel.settings_from_revisions([text])
         self.assertTrue(s.pause_development)
-        self.assertEqual((s.dev_intensity, s.quiet_hours, s.vote_max, s.focus), (50, (7, 17), 30, "fix bugs first"))
+        self.assertEqual((s.vote_share, s.quiet_hours, s.vote_max, s.focus), (50, (7, 17), 30, "fix bugs first"))
 
     def test_values_are_clamped(self) -> None:
-        s, _ = panel.settings_from_revisions([PANEL.replace("DEV_INTENSITY: 90%", "DEV_INTENSITY: 400%")
+        s, _ = panel.settings_from_revisions([PANEL.replace("VOTE_SHARE: 15%", "VOTE_SHARE: 400%")
                                               .replace("VOTE_APPROVAL: 60%", "VOTE_APPROVAL: 10%")])
-        self.assertEqual((s.dev_intensity, s.vote_approval), (100, 50))
+        self.assertEqual((s.vote_share, s.vote_approval), (100, 50))
 
     def test_unreadable_value_falls_back_to_older_owner_revision(self) -> None:
-        older = PANEL.replace("DEV_INTENSITY: 90%", "DEV_INTENSITY: 40%")
-        newer = PANEL.replace("DEV_INTENSITY: 90%", "DEV_INTENSITY: lots")
+        older = PANEL.replace("VOTE_SHARE: 15%", "VOTE_SHARE: 40%")
+        newer = PANEL.replace("VOTE_SHARE: 15%", "VOTE_SHARE: lots")
         s, fallbacks = panel.settings_from_revisions([newer, older])
-        self.assertEqual(s.dev_intensity, 40)
-        self.assertEqual(fallbacks, ["dev_intensity"])
+        self.assertEqual(s.vote_share, 40)
+        self.assertEqual(fallbacks, ["vote_share"])
 
     def test_missing_kill_switch_means_off(self) -> None:
-        s, _ = panel.settings_from_revisions(["DEV_INTENSITY: 90%"])
+        s, _ = panel.settings_from_revisions(["VOTE_SHARE: 15%"])
         self.assertFalse(s.automation_enabled)
 
     def test_edit_by_someone_else_is_ignored_and_reported(self) -> None:
@@ -84,57 +82,42 @@ class PanelTest(unittest.TestCase):
 
     def test_audit_lines(self) -> None:
         old = panel.to_json(panel.Settings())
-        new = panel.Settings(dev_intensity=50, quiet_hours=(7, 17))
+        new = panel.Settings(vote_share=50, quiet_hours=(7, 17))
         self.assertEqual(panel.changes(old, new, "peterdk31"),
-                         ["DEV_INTENSITY 90% → 50% (by peterdk31)", "QUIET_HOURS none → 07-17 (by peterdk31)"])
+                         ["QUIET_HOURS none → 07-17 (by peterdk31)", "VOTE_SHARE 15% → 50% (by peterdk31)"])
 
 
 class PacingTest(unittest.TestCase):
     def fresh(self) -> dict:
         return copy.deepcopy(state.DEFAULT)
 
-    def test_unknown_limits_allow_runs(self) -> None:
+    def test_heavy_usage_does_not_stop_development(self) -> None:
         st = self.fresh()
-        pacing.record(st, NOW, 5_000_000, "dev")
-        self.assertTrue(pacing.budget(st, NOW, 90, 90).allowed)
+        pacing.record(st, NOW - dt.timedelta(hours=1), 50_000_000, "dev")
+        d = control.decide(True, panel.PanelResult(panel.Settings(), True), st, NOW, "Europe/Copenhagen", True)
+        self.assertTrue(d.develop)
 
-    def test_limit_hit_learns_window_and_backs_off(self) -> None:
+    def test_limit_backs_off_until_the_reset(self) -> None:
         st = self.fresh()
-        pacing.record(st, NOW - dt.timedelta(hours=1), 1_000_000, "dev")
+        reset = NOW + dt.timedelta(hours=2)
+        pacing.limit_hit(st, NOW, weekly=False, resets_at=reset)
+        self.assertEqual(pacing.backing_off_until(st, reset - dt.timedelta(minutes=1)), pacing.iso(reset))
+        self.assertEqual(pacing.backing_off_until(st, reset + dt.timedelta(minutes=1)), "")
+        d = control.decide(True, panel.PanelResult(panel.Settings(), True), st, NOW, "Europe/Copenhagen", True)
+        self.assertFalse(d.develop)
+        self.assertIn("backing off", d.reasons[-1])
+
+    def test_limit_without_reset_time_backs_off_a_window(self) -> None:
+        st = self.fresh()
         pacing.limit_hit(st, NOW, weekly=False)
-        self.assertEqual(st["limits"]["window_tokens"], 1_000_000)
-        self.assertFalse(pacing.budget(st, NOW + dt.timedelta(hours=1), 90, 90).allowed)
-        later = NOW + dt.timedelta(hours=6)  # window reset, earlier usage aged out
-        self.assertTrue(pacing.budget(st, later, 90, 90).allowed)
-
-    def test_dev_intensity_caps_the_window(self) -> None:
-        st = self.fresh()
-        st["limits"]["window_tokens"] = 1_000_000
-        pacing.record(st, NOW - dt.timedelta(hours=1), 850_000, "dev")
-        self.assertTrue(pacing.budget(st, NOW, 90, 90).allowed)
-        self.assertFalse(pacing.budget(st, NOW, 80, 90).allowed)
-
-    def test_weekly_share_is_reported_not_gated(self) -> None:
-        st = self.fresh()
-        st["limits"]["week_tokens"] = 1_000_000
-        pacing.record(st, NOW - dt.timedelta(hours=2), 1_800_000, "dev")
-        b = pacing.budget(st, NOW, 100, 90)
-        self.assertTrue(b.allowed)
-        self.assertEqual(round(b.week_pct), 200)
-
-    def test_weekly_limit_backs_off_until_the_reset(self) -> None:
-        st = self.fresh()
-        pacing.record(st, NOW - dt.timedelta(hours=1), 800_000, "dev")
-        reset = NOW + dt.timedelta(hours=6)
-        pacing.limit_hit(st, NOW, weekly=True, resets_at=reset)
-        self.assertFalse(pacing.budget(st, reset - dt.timedelta(minutes=1), 90, 90).allowed)
-        self.assertTrue(pacing.budget(st, reset + dt.timedelta(minutes=1), 90, 90).allowed)
+        self.assertEqual(st["backoff_until"], pacing.iso(NOW + dt.timedelta(hours=5)))
 
     def test_usage_line(self) -> None:
         st = self.fresh()
-        st["limits"]["window_tokens"] = 1_000_000
+        pacing.record(st, NOW - dt.timedelta(hours=6), 1_000_000, "dev")
         pacing.record(st, NOW, 450_000, "dev")
-        self.assertIn("~50% of window budget", pacing.usage_line(st, NOW, 90, 90))
+        self.assertEqual(pacing.usage_line(st, NOW),
+                         "Claude usage: 450,000 tokens in the last 5 h, 1,450,000 tokens this week")
 
 
 class DecideTest(unittest.TestCase):

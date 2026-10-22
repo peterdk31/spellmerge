@@ -1,6 +1,6 @@
 """Automation state: a JSON file on the automation-state branch.
 
-Holds pacing data (token usage, learned limits, back-off), processed owner
+Holds pacing data (token usage, back-off), processed owner
 commands, alarm issues and the last applied Control panel values. It is only
 ever trusted for pacing and bookkeeping, never for security decisions: those
 come from the Control panel's edit history and ci/config.json.
@@ -26,7 +26,6 @@ DEFAULT: dict[str, Any] = {
     "paused_by_command": False,
     "backoff_until": None,
     "usage": [],  # [{"at": iso, "tokens": n, "kind": "dev" | "review" | "rate" | "plan"}]
-    "limits": {"window_tokens": None, "week_tokens": None},
     "processed_comments": [],
     "pending_instructions": [],  # verified owner instructions for Claude
     "panel_applied": None,

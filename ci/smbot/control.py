@@ -67,11 +67,9 @@ def decide(kill_switch_on: bool, result: panel.PanelResult, st: dict, now: dt.da
     if develop and in_quiet_hours(s.quiet_hours, now, tz):
         develop = False
         reasons.append(f"quiet hours {panel.describe('quiet_hours', s.quiet_hours)} ({tz})")
-    if develop:
-        b = pacing.budget(st, now, s.dev_intensity, s.weekly_share)
-        if not b.allowed:
-            develop = False
-            reasons.append(b.reason)
+    if develop and (until := pacing.backing_off_until(st, now)):
+        develop = False
+        reasons.append(f"backing off after a usage limit until {until}")
     if develop and not has_task and not st.get("pending_instructions") and not st.get("followups"):
         develop = False
         reasons.append("no task in docs/NEXT.md, no follow-ups and no owner instructions")

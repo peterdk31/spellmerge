@@ -458,18 +458,16 @@ Claude's own development is the main engine and outside PRs are a bonus, so the 
 ### Capacity
 
 - **Adaptive sessions:** an hourly check starts a development session when `NEXT.md` has a task and no session is running; it costs nothing when there is nothing to do.
-- **A session keeps working** while quota and tasks remain: when one session ends, the next starts right away, whether or not its PR merged. It stops on an error, a usage limit or paused merging, and the hourly check picks up from there.
-- **Back-off:** when a usage limit is hit, it is recorded and hourly checks pause until the usage window resets (about 5 hours).
+- **A session keeps working** while tasks remain: when one session ends, the next starts right away, whether or not its PR merged. It stops on an error, a usage limit or paused merging, and the hourly check picks up from there.
+- **Back-off:** when Claude reports a usage limit, it is recorded and hourly checks pause until the reset time the limit names (about 5 hours if it names none).
 - **One session at a time** to avoid conflicts; parallel sessions in clearly separate areas are a later option.
-- **Reviews are capped** at about 30% of the quota; unused review quota goes to development. PR reviews and the release run once a day at 03:00 UTC.
-- **Pacing:** each run records its token usage. Each time a limit is hit, the bot learns how many tokens a full window and a full week hold, and stops at its DEV\_INTENSITY percentage of the window. The week is not gated by estimate: the bot just runs, and a weekly limit backs it off until the reset time the limit names. The daily log reports usage as percentages, e.g. "used \~62% of window budget, 41% of weekly share". These are estimates, since the exact remaining quota isn't available to automation.
+- **PR reviews and the release** run once a day at 03:00 UTC.
+- **No usage estimates:** each run records its token usage, and the daily log reports the tokens used in the last 5 hours and the last week. Runs are not gated by estimated quota, since the exact remaining quota isn't available to automation and estimates from token counts proved unreliable. Only a real usage limit stops them.
 - **More quota, more speed:** upgrading to Claude Max is used automatically with no changes.
 
 | Control panel setting | Default | Effect |
 | --- | --- | --- |
-| `DEV_INTENSITY` | `90%` | Share of each \~5-hour usage window the bot may use; the rest stays free for the owner |
 | `QUIET_HOURS` | Unset (no quiet hours) | Hours with no development sessions, e.g. `07-17` Danish time; set later by the owner |
-| `WEEKLY_SHARE` | `90%` | Reported only: the Daily log shows usage as a share of this part of the learned weekly cap |
 
 ### Flow
 
@@ -508,8 +506,6 @@ SPELLMERGE CONTROL PANEL
 - [ ] Pause development      (still review PRs and release, build nothing new)
 - [ ] Pause PR merging
 
-DEV_INTENSITY: 90%
-WEEKLY_SHARE: 90%
 QUIET_HOURS:
 VOTE_SHARE: 15%   VOTE_MIN: 2   VOTE_MAX: 25   VOTE_APPROVAL: 60%
 FOCUS: (optional, e.g. "fix bugs before new features this week")
@@ -520,7 +516,7 @@ FOCUS: (optional, e.g. "fix bugs before new features this week")
 - **Fail closed:** if no owner revision can be verified (history deleted, API error), automation pauses and the owner is notified.
 - **Strict parsing:** numbers are capped to valid ranges, unknown fields are ignored, unreadable values fall back to the owner's last verified revision.
 - **Locked issue:** only the owner can comment on the panel; the panel holds only harmless settings, never secrets.
-- **Audit:** every applied change is written to the daily log, e.g. "DEV_INTENSITY 90% → 50% (by peterdk31)".
+- **Audit:** every applied change is written to the daily log, e.g. "VOTE_SHARE 15% → 20% (by peterdk31)".
 - **Worst case** of a successful attack on the panel: the bot pauses or changes pace; it cannot touch code, secrets or releases.
 
 ### Owner commands in comments

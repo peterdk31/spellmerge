@@ -3,13 +3,12 @@
   python3 -m smbot.summary
 
 Reads the job results from environment variables set by daily.yml
-(RESULT_<JOB>, VERSION, CHANNEL, SETTINGS) and adds the Claude usage estimate.
+(RESULT_<JOB>, VERSION, CHANNEL) and adds the Claude token usage.
 """
 
 from __future__ import annotations
 
 import datetime as dt
-import json
 import os
 import sys
 
@@ -47,10 +46,8 @@ def main() -> int:
     cfg = config_mod.load()
     env = dict(os.environ)
     lines = lines_for(env, cfg.repo)
-    settings = json.loads(env.get("SETTINGS") or "{}")
     st, _ = state.load(cfg)
-    lines.append(pacing.usage_line(st, dt.datetime.now(dt.timezone.utc),
-                                   settings.get("dev_intensity", 90), settings.get("weekly_share", 90)))
+    lines.append(pacing.usage_line(st, dt.datetime.now(dt.timezone.utc)))
     try:
         waiting = inbox.reminder(cfg)
     except gh.GhError:

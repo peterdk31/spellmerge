@@ -72,6 +72,25 @@ def recent_questions(cfg: config_mod.Config, now: dt.datetime) -> list[dict[str,
     return open_questions(cfg) + [i for i in closed if (i.get("closed_at") or "") >= since]
 
 
+def answered_keys(cfg: config_mod.Config, st: dict[str, Any]) -> set[str]:
+    """Keys of the owner questions that are answered, so the tasks blocked on them can go again.
+
+    A question is answered once it's closed (its PR merged, or the owner closed it), or while it's
+    open with an owner `/claude` answer waiting in the state. A key that still has an open,
+    unanswered question isn't answered, even if a duplicate of it was closed. When GitHub can't be
+    read nothing counts as answered, which is how it was before.
+    """
+    try:
+        open_ = open_questions(cfg)
+        closed = gh.api(f"repos/{cfg.repo}/issues?state=closed&labels={LABEL}&per_page=100")
+    except gh.GhError:
+        return set()
+    replied = {int(i["number"]) for i in st.get("pending_instructions", []) if i.get("kind") == "claude"}
+    waiting = {key_of(i) for i in open_ if int(i["number"]) not in replied}
+    keys = {key_of(i) for i in closed} | {key_of(i) for i in open_ if int(i["number"]) in replied}
+    return {k for k in keys - waiting if k}
+
+
 def _key(text: str) -> str:
     return "-".join(re.sub(r"[^a-z0-9]+", " ", str(text or "").lower()).split())[:80]
 

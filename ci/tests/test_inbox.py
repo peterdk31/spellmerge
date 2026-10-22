@@ -43,6 +43,29 @@ class InboxTest(unittest.TestCase):
         self.assertIn("<!-- smbot:question key= -->", created[-1][2]["body"])
         self.assertEqual(created[-1][2]["labels"], [inbox.LABEL])
 
+    def test_answered_keys(self) -> None:
+        def q(number: int, key: str, state: str = "open") -> dict:
+            return {"number": number, "title": f"Q{number}", "state": state,
+                    "body": f"text\n<!-- smbot:question key={key} -->"}
+
+        open_ = [q(1, "still-open"), q(2, "replied"), q(3, "dup-open")]
+        closed = [q(4, "closed-by-pr", "closed"), q(5, "dup-open", "closed"), q(6, "", "closed")]
+
+        def api(path: str, *args: str, input: object = None, token: object = None) -> object:
+            return open_ if "state=open" in path else closed
+
+        st = {"pending_instructions": [{"kind": "claude", "number": 2, "url": "u"},
+                                       {"kind": "ask", "number": 1, "url": "v"}]}
+        with mock.patch.object(inbox.gh, "api", api):
+            # A closed duplicate doesn't answer a key whose question is still open (#178/#179 were twins).
+            self.assertEqual(inbox.answered_keys(CFG, st), {"closed-by-pr", "replied"})
+
+        def broken(*a: object, **k: object) -> object:
+            raise inbox.gh.GhError("down")
+
+        with mock.patch.object(inbox.gh, "api", broken):
+            self.assertEqual(inbox.answered_keys(CFG, st), set())
+
     def test_rephrased_or_recently_answered_questions_are_not_asked_again(self) -> None:
         """#72/#73 and #79/#80/#83 asked the same thing in other words."""
         answered = {"number": 73, "title": "Make the daily build run the unit tests?", "state": "closed",

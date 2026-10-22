@@ -122,6 +122,19 @@ class PromptTest(unittest.TestCase):
         self.assertIn("PR #12", prompt)
         self.assertIn("last attempt", prompt)
 
+    def test_prepare_briefs_an_unblocked_task(self) -> None:
+        st = copy.deepcopy(state.DEFAULT)
+        with mock.patch.object(session.gh, "api", return_value=[]), \
+                mock.patch.object(session.inbox, "answered_keys", lambda cfg, st: {"some-key"}), \
+                mock.patch.object(session.nexttask, "blocked", lambda text: {FIXTURE_TASK: {"some-key"}}):
+            prompt = session.prepare(CFG, st, "", dt.date(2026, 10, 22))["prompt"]
+        self.assertIn("waiting on the owner question(s) with key `some-key`", prompt)
+        self.assertIn("back to the top of \"## Queue\"", prompt)
+        with mock.patch.object(session.gh, "api", return_value=[]), \
+                mock.patch.object(session.inbox, "answered_keys", lambda cfg, st: set()), \
+                mock.patch.object(session.nexttask, "blocked", lambda text: {FIXTURE_TASK: {"some-key"}}):
+            self.assertNotIn("owner question(s)", session.prepare(CFG, st, "", dt.date(2026, 10, 22))["prompt"])
+
     def test_prepare_plan_builds_the_planning_prompt(self) -> None:
         """A parameter named `weekly` once hid the weekly module, so every planning session crashed."""
         st = copy.deepcopy(state.DEFAULT)
@@ -194,8 +207,10 @@ class FinishTest(unittest.TestCase):
                     mock.patch.object(session, "unlabel_parked", lambda cfg, pr: None), \
                     mock.patch.object(session, "queue", lambda cfg, st, strict=False: []), \
                     mock.patch.object(session, "open_checkpoint", lambda cfg: checkpoint_issue), \
+                    mock.patch.object(session.inbox, "answered_keys", lambda cfg, st: set()), \
                     mock.patch.object(session.nexttask, "next_task",
-                                      lambda path_=None, skip=(), first=(): real(path, skip, first)):
+                                      lambda path_=None, skip=(), first=(), answered=(): real(path, skip, first,
+                                                                                              answered=answered)):
                 return session.finish(CFG, base), st
 
     def test_continues_after_a_merge(self) -> None:

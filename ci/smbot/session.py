@@ -592,9 +592,14 @@ def publish(cfg: config_mod.Config, bundle: Path, branch: str, mode: str, result
                 "body": result.get("pr_body") or result.get("summary", ""),
             })
             pr_number = created["number"]
-    elif result.get("comment"):
-        gh.api(f"repos/{cfg.repo}/issues/{pr_number}/comments", "-X", "POST",
-               input={"body": f"**Revised after the critique.**\n\n{result['comment']}"})
+    else:
+        # The final review reads the PR body, so a revision replaces it: a stale "not verified" would
+        # otherwise block a PR whose revision did verify it.
+        if result.get("pr_body"):
+            gh.api(f"repos/{cfg.repo}/pulls/{pr_number}", "-X", "PATCH", input={"body": result["pr_body"]})
+        if result.get("comment"):
+            gh.api(f"repos/{cfg.repo}/issues/{pr_number}/comments", "-X", "POST",
+                   input={"body": f"**Revised after the critique.**\n\n{result['comment']}"})
     # The commit we pushed, not the API's view of the PR head, which can lag right after a push.
     return {"pr": str(pr_number), "sha": pushed, "branch": branch}
 

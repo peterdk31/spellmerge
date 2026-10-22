@@ -4,8 +4,7 @@ extends Node
 ##
 ## Casting: `install(player, slot, spell)` makes a compiled spell the build of a slot
 ## (and removes the shots a full generation ring revoked); `cast(player, slot, origin,
-## direction, mana)` fires it and returns the mana spent or `REFUSED`, the contract of M1's
-## `SpellBase.cast`. Cooldowns are per player and slot and tick in `step` (physics). The
+## direction, mana)` fires it and returns the mana spent or `REFUSED`. Cooldowns are per player and slot and tick in `step` (physics). The
 ## form decides the shots (a fan for straight, a ring for orbit, still ones, or rays), split
 ## and nova have already multiplied them in `compile`, homing is set on each shot.
 ##

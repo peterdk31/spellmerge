@@ -50,9 +50,19 @@ extends CharacterBody2D
 ## Cast: a press of `cast` is buffered like the dodge (INPUT_BUFFER seconds), so a tap
 ## just before the spell's cooldown ends still fires.
 ##
-## While `cast` is held the wizard calls `spell.cast(index, origin, aim, mana)`
-## and reads no spell field. If the spell fired it takes the mana returned, sends
-## `spell_cast` and plays the sound `cast` from `core/registry` (nothing on null).
+## While `cast` is held the wizard calls `Spells.cast(index, slot, origin, aim, mana)` for
+## its active slot and reads no spell field. If the spell fired it takes the mana returned,
+## sends `spell_cast` and plays the sound `cast` from `core/registry` (nothing on null).
+##
+## Spells (M2 part 11): two prepared spells, slot 0 (A) and 1 (B), each a recipe of component
+## ids (see `core/spells`) compiled and installed by `Spells`. `start_recipe_a`/`_b` are built
+## when the wizard enters the tree (flow sets them). `swap()` (or `spell_swap_requested`)
+## switches the active slot. `build_change_requested` for this player is checked with
+## `Spells.compile` on a copy of the recipe: if it compiles the copy replaces the spell and
+## `spell_changed` is sent, else `build_refused` says why and nothing changes. The `bag` holds
+## the ids the player may build with (every component in the registry until M3's rewards
+## fill it). Orbit shots circle the body: the anchor is pushed to the projectile manager each
+## step and cleared when the wizard is downed or leaves.
 ##
 ## All timing runs in step(delta), so tests drive it with fixed deltas and no
 ## real-time waits. Nothing here allocates per frame.
@@ -61,6 +71,7 @@ const InputManagerScript := preload("res://core/input/input_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
+const SpellsScript := preload("res://core/spells/spells.gd")
 
 ## Walking speed in pixels per second (the view is 640x360).
 const MOVE_SPEED: float = 90.0
@@ -132,6 +143,15 @@ const REVIVE_RING_HEIGHT: float = 34.0
 const REVIVE_RING_BACK: Color = Color("5a5a6e")
 ## Id of the cast sound (looked up in core/registry; a missing sound is silent).
 const CAST_SOUND_ID: StringName = &"cast"
+## The slots of a spell in `build_change_requested`: 0 form, 1 element, 2-4 modifiers, 5 trigger.
+const SLOT_FORM: int = 0
+const SLOT_ELEMENT: int = 1
+const SLOT_FIRST_MODIFIER: int = 2
+const SLOT_TRIGGER: int = SLOT_FIRST_MODIFIER + SpellLimits.MAX_MODIFIERS
+## The kind of component each slot takes (`SpellComponent.kind()`).
+const SLOT_KINDS: Array[StringName] = [&"form", &"element", &"modifier", &"modifier", &"modifier", &"trigger"]
+## Where orbit shots circle, above the feet (the same body offset as the hit circle).
+const ORBIT_ANCHOR_OFFSET: Vector2 = Vector2(0.0, -12.0)
 ## Physics layers (the plan: 1 walls, 2 players, 3 enemies, 4 projectiles and
 ## hit boxes; see gameplay/player/README.md): players are on layer 2 and collide only with walls on layer 1,
 ## so wizards walk through each other and never block a teammate.
@@ -165,8 +185,19 @@ var events: EventsScript = null
 var registry: RegistryScript = null
 var projectiles: ProjectileManagerScript = null
 
-## The equipped spell. The wizard only calls its cast() method.
-var spell: SpellBase = null
+## The spell runtime. Only tests set this, before adding the node; otherwise the "Spells"
+## autoload is used.
+var spells: SpellsScript = null
+
+## The recipes built when the wizard enters the tree (`{}` for none). Flow sets them.
+var start_recipe_a: Dictionary = {}
+var start_recipe_b: Dictionary = {}
+
+## The component ids this player may build with. Filled from the registry in `_ready`.
+var bag: Array[StringName] = []
+
+## The prepared spell that `cast` fires: 0 (A) or 1 (B).
+var active_slot: int = 0
 
 var health: int = MAX_HEALTH
 var mana: float = MAX_MANA
@@ -215,6 +246,9 @@ var _downed: bool = false
 var _revive_progress: float = 0.0
 var _sound_player: AudioStreamPlayer = null
 ## What the last `player_stats_changed` said, to send it only on a change.
+## The recipe and the compiled spell of slots A and B (null when the slot has no spell).
+var _recipes: Array[Dictionary] = [{}, {}]
+var _built: Array[CompiledSpell] = [null, null]
 var _sent_health: int = -1
 var _sent_mana: int = -1
 
@@ -310,6 +344,17 @@ func _ready() -> void:
 		registry = get_node_or_null("/root/Registry") as RegistryScript
 	if projectiles == null and in_tree:
 		projectiles = get_node_or_null("/root/Projectiles") as ProjectileManagerScript
+	if spells == null and in_tree:
+		spells = get_node_or_null("/root/Spells") as SpellsScript
+	if events != null and not events.build_change_requested.is_connected(_on_build_change_requested):
+		events.build_change_requested.connect(_on_build_change_requested)
+	if events != null and not events.spell_swap_requested.is_connected(_on_spell_swap_requested):
+		events.spell_swap_requested.connect(_on_spell_swap_requested)
+	_fill_bag()
+	if not start_recipe_a.is_empty():
+		set_recipe(0, start_recipe_a)
+	if not start_recipe_b.is_empty():
+		set_recipe(1, start_recipe_b)
 	if _overlay == null:
 		_overlay = Node2D.new()
 		_overlay.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -324,6 +369,18 @@ func _ready() -> void:
 	_announce_stats()
 
 
+## Stop listening to build requests (a wizard that left is freed a frame later) and stop
+## the orbit shots that circled it.
+func _exit_tree() -> void:
+	if events != null:
+		if events.build_change_requested.is_connected(_on_build_change_requested):
+			events.build_change_requested.disconnect(_on_build_change_requested)
+		if events.spell_swap_requested.is_connected(_on_spell_swap_requested):
+			events.spell_swap_requested.disconnect(_on_spell_swap_requested)
+	if projectiles != null:
+		projectiles.clear_anchor(index)
+
+
 func _physics_process(delta: float) -> void:
 	step(delta)
 	move_and_slide()
@@ -332,6 +389,11 @@ func _physics_process(delta: float) -> void:
 ## Advance the wizard by `delta` seconds: read input, start a dodge, set
 ## `velocity`. The caller moves the body (_physics_process does).
 func step(delta: float) -> void:
+	if projectiles != null:
+		if _downed:
+			projectiles.clear_anchor(index)
+		else:
+			projectiles.set_anchor(index, global_position + ORBIT_ANCHOR_OFFSET)
 	if _downed:
 		velocity = Vector2.ZERO
 		if input != null:
@@ -344,8 +406,6 @@ func step(delta: float) -> void:
 		return
 	mana = minf(mana + MANA_REGEN * delta, MAX_MANA)
 	_announce_stats()
-	if spell != null:
-		spell.tick(index, delta)
 	_dodge_left = maxf(_dodge_left - delta, 0.0)
 	_invulnerable_left = maxf(_invulnerable_left - delta, 0.0)
 	_cooldown_left = maxf(_cooldown_left - delta, 0.0)
@@ -393,7 +453,7 @@ func step(delta: float) -> void:
 		_seen_cast_presses = cast_presses
 		if not captured:
 			_cast_buffer_left = INPUT_BUFFER
-	if spell == null:
+	if not has_spell():
 		return
 	if input.is_action_pressed(index, &"cast"):
 		if cast():
@@ -619,23 +679,152 @@ func _reticle_visible() -> bool:
 	return not _downed and aim != Vector2.ZERO
 
 
-## Fire the equipped spell now. Returns true if it fired. Does nothing when
+## True when the active slot holds a built spell.
+func has_spell() -> bool:
+	return spells != null and _built[active_slot] != null
+
+
+## The recipe (component ids) of slot 0 or 1 as a copy, `{}` when it has none.
+func recipe_of(slot: int) -> Dictionary:
+	return _recipes[slot].duplicate(true) if slot >= 0 and slot < _recipes.size() else {}
+
+
+## Switch between the two prepared spells. Does nothing when downed or when the other slot
+## has no spell. Returns true when the active slot changed.
+func swap() -> bool:
+	var other: int = 1 - active_slot
+	if _downed or _built[other] == null:
+		return false
+	active_slot = other
+	return true
+
+
+## Build `recipe` into slot 0 or 1 (a full recipe, see `core/spells`). If `Spells.compile`
+## refuses it, sends `build_refused` with the reason and changes nothing. Otherwise the slot
+## now holds it and `spell_changed` says in words what it does. Returns true when built.
+func set_recipe(slot: int, recipe: Dictionary) -> bool:
+	if spells == null or slot < 0 or slot >= _recipes.size():
+		return _refuse("No spell slot here.")
+	var compiled: CompiledSpell = spells.compile(recipe)
+	if not compiled.valid:
+		return _refuse(compiled.reason)
+	if spells.install(index, slot, compiled) == 0:
+		return _refuse("The spell could not be built.")
+	_recipes[slot] = recipe.duplicate(true)
+	_built[slot] = compiled
+	if events != null:
+		events.spell_changed.emit(index, PackedInt32Array([slot]), compiled.description)
+	return true
+
+
+func _refuse(reason: String) -> bool:
+	if events != null:
+		events.build_refused.emit(index, reason)
+	return false
+
+
+func _fill_bag() -> void:
+	bag.clear()
+	if registry == null:
+		return
+	for id: StringName in registry.get_ids(&"spells"):
+		if registry.get_resource(&"spells", id) is SpellComponent:
+			bag.append(id)
+
+
+func _on_spell_swap_requested(player: int) -> void:
+	if player == index:
+		swap()
+
+
+## A build change for this player: put `component_id` in `slot` of the spell at path `spell`
+## (`&""` empties the slot). The change is made on a copy and only kept if it compiles.
+## `spell_changed` names the prepared spell the path starts at, since a change in a held spell
+## rebuilds the whole chain.
+func _on_build_change_requested(player: int, spell: PackedInt32Array, slot: int, component_id: StringName) -> void:
+	if player != index:
+		return
+	if spell.is_empty() or spell[0] < 0 or spell[0] >= _recipes.size():
+		_refuse("There is no such spell.")
+		return
+	var top: int = spell[0]
+	var recipe: Dictionary = _recipes[top].duplicate(true)
+	var node: Dictionary = recipe
+	for depth in range(1, spell.size()):
+		if spell[depth] != 0:
+			_refuse("There is no such spell.")
+			return
+		var held: Variant = node.get("held")
+		if not held is Dictionary:
+			held = {}
+			node["held"] = held
+		node = held as Dictionary
+	var problem: String = _put(node, slot, component_id)
+	if problem != "":
+		_refuse(problem)
+		return
+	set_recipe(top, recipe)
+
+
+## Put `id` into `slot` of the recipe `node`. Returns why it cannot, or `""`.
+func _put(node: Dictionary, slot: int, id: StringName) -> String:
+	if slot < 0 or slot >= SLOT_KINDS.size():
+		return "There is no such slot."
+	if id != &"":
+		if not bag.has(id):
+			return "You do not have that component."
+		var component: SpellComponent = registry.get_resource(&"spells", id) as SpellComponent if registry != null else null
+		if component == null or component.kind() != SLOT_KINDS[slot]:
+			return "That component does not fit this slot."
+	if slot == SLOT_FORM:
+		_set_or_erase(node, "form", id)
+	elif slot == SLOT_ELEMENT:
+		_set_or_erase(node, "element", id)
+	elif slot == SLOT_TRIGGER:
+		_set_or_erase(node, "trigger", id)
+		if id == &"":
+			node.erase("held")
+	else:
+		var modifiers: Array = node.get("modifiers", []) as Array
+		var at: int = slot - SLOT_FIRST_MODIFIER
+		if id == &"":
+			if at < modifiers.size():
+				modifiers.remove_at(at)
+		elif at < modifiers.size():
+			modifiers[at] = id
+		else:
+			modifiers.append(id)
+		if modifiers.is_empty():
+			node.erase("modifiers")
+		else:
+			node["modifiers"] = modifiers
+	return ""
+
+
+func _set_or_erase(node: Dictionary, key: String, id: StringName) -> void:
+	if id == &"":
+		node.erase(key)
+	else:
+		node[key] = id
+
+
+## Fire the active spell now. Returns true if it fired. Does nothing when
 ## downed or without a spell.
 func cast() -> bool:
-	if _downed or spell == null:
+	if _downed or not has_spell():
 		return false
 	var origin: Vector2 = muzzle_position()
 	if projectiles != null:
 		# A staff tip behind a wall: the shot starts at the wall and ends on it
 		# (the manager takes no pool slot for a shot that starts inside a wall).
 		origin = projectiles.clip_to_walls(global_position, origin)
-	var spent: float = spell.cast(index, origin, aim, mana)
-	if spent == SpellBase.REFUSED:
+	var spent: float = spells.cast(index, active_slot, origin, aim, mana)
+	if spent == SpellsScript.REFUSED:
 		return false
 	mana -= spent
 	_announce_stats()
 	if events != null:
-		events.spell_cast.emit(index, spell.spell_id(), origin, aim)
+		events.spell_cast.emit(index, _recipes[active_slot].get("form", &"") as StringName, origin, aim)
 		events.wizard_cast.emit(index, self)
 	_play_cast_sound()
 	return true

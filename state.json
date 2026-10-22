@@ -11,7 +11,6 @@
   },
   "panel_applied": {
     "automation_enabled": true,
-    "dev_intensity": 90,
     "focus": "",
     "pause_development": false,
     "pause_merging": false,
@@ -19,8 +18,7 @@
     "vote_approval": 60,
     "vote_max": 25,
     "vote_min": 2,
-    "vote_share": 15,
-    "weekly_share": 90
+    "vote_share": 15
   },
   "panel_problems": [],
   "paused_by_command": false,

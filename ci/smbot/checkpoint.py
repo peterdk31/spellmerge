@@ -7,8 +7,9 @@ once that plan's PR merges, an issue labelled `checkpoint` asks the owner to dec
   /iterate <what>   rework parts of this milestone first
   /pivot <how>      change direction (the design, the scope, the core mechanic)
 
-While a checkpoint issue is open and unanswered, no milestone work starts and planning
-doesn't run; scheduled issues (bug fixes from players) still do. The answer is a verified
+While a checkpoint issue is open and unanswered, no milestone work starts and the only
+planning is the weekly one, which is told not to start the next milestone; scheduled issues
+(bug fixes from players) still run. The answer is a verified
 owner command (smbot.commands) stored in the state; the gate then starts a planning
 session that carries it out, and that plan's PR closes the issue.
 """

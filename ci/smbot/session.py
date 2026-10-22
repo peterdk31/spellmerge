@@ -168,16 +168,33 @@ def open_checkpoint(cfg: config_mod.Config) -> int | None:
 
 
 def close_checkpoint(cfg: config_mod.Config, number: int, pr: str) -> list[str]:
-    """The plan that carries out the owner's checkpoint answer merged: the checkpoint is done.
+    """A merged plan carried out the owner's answer to checkpoint #number: close it if it's still open.
 
-    Its PR usually closed the issue already (`Closes #N`); the comment says where it went either way.
+    Usually the PR's `Closes #N` closed it already; a checkpoint closed by any other means is left alone.
     """
-    gh.api(f"repos/{cfg.repo}/issues/{number}/comments", "-X", "POST",
-           input={"body": f"Carried out in #{pr}. Development continues."})
-    if gh.api(f"repos/{cfg.repo}/issues/{number}").get("state") == "open":
+    try:
+        if gh.api(f"repos/{cfg.repo}/issues/{number}").get("state") != "open":
+            return []
+        gh.api(f"repos/{cfg.repo}/issues/{number}/comments", "-X", "POST",
+               input={"body": f"Carried out in #{pr}. Development continues."})
         gh.api(f"repos/{cfg.repo}/issues/{number}", "-X", "PATCH",
                input={"state": "closed", "state_reason": "completed"})
+    except gh.GhError as e:
+        return [f"Couldn't close checkpoint #{number} after #{pr}: {dailylog.shorten(str(e), 200)}"]
     return [f"Checkpoint #{number} carried out in #{pr}; development continues."]
+
+
+def checkpoint_not_carried_out(cfg: config_mod.Config, number: int, summary: str) -> list[str]:
+    """Planning ended with nothing to do on the owner's answer: hand the checkpoint back to the owner."""
+    text = dailylog.shorten(summary, 600) or "No reason given."
+    try:
+        gh.api(f"repos/{cfg.repo}/issues/{number}/comments", "-X", "POST", input={"body": (
+            f"@{cfg.owner.login}, planning couldn't turn your answer into changes. Claude's summary: {text}\n\n"
+            "The checkpoint is waiting again: answer with `/go`, `/iterate <what>` or `/pivot <how>`, "
+            "with more detail if needed.")})
+    except gh.GhError:
+        pass
+    return [f"Checkpoint #{number}: planning couldn't carry out your answer, so it waits for you again. {text}"]
 
 
 def checkpoint_allows_milestone_work(cfg: config_mod.Config, st: dict[str, Any]) -> bool:
@@ -571,15 +588,18 @@ def finish(cfg: config_mod.Config, env: dict[str, str]) -> dict[str, str]:
         entry["parked_until"] = pacing.iso(now + span)
         entry["parked_reason"] = reason[:500]
 
-    carried: list[str] = []  # checkpoint answers this merged plan carried out
+    # Answers to the open checkpoint: carried out by a merged plan, or handed back when planning did nothing.
+    checkpoint_now = open_checkpoint(cfg) if planning else None
+    carried: list[str] = []
+    handed_back: list[str] = []
     was_idle: list[bool] = []
 
     def apply(s: dict[str, Any]) -> None:
         failures = s.setdefault("task_failures", {})
         if planning:
             s["last_plan"] = pacing.iso(now)
-            if env.get("WEEKLY") == "true" and not failed:
-                s["last_weekly"] = pacing.iso(now)
+            if env.get("WEEKLY") == "true" and (progressed or status == "nothing_to_do"):
+                s["last_weekly"] = pacing.iso(now)  # it ran; a limit or an error leaves it due
         if failed:
             s["errors_in_a_row"] = s.get("errors_in_a_row", 0) + 1
         elif progressed:
@@ -589,14 +609,21 @@ def finish(cfg: config_mod.Config, env: dict[str, str]) -> dict[str, str]:
             s["idle"] = s.get("idle") or pacing.iso(now)
         elif progressed:
             s.pop("idle", None)
+        answers = s.setdefault("checkpoint_answers", {})
         if planning and merged:
-            carried[:] = list(s.get("checkpoint_answers", {}))
-            s["checkpoint_answers"] = {}
-        if status == "nothing_to_do" and not pr:
+            # The open checkpoint's answer, and answers to checkpoints that are closed by now.
+            carried[:] = [n for n in answers if checkpoint_now is None or n == str(checkpoint_now)]
+        elif planning and status == "nothing_to_do" and not pr and str(checkpoint_now) in answers:
+            handed_back[:] = [str(checkpoint_now)]
+        for n in carried + handed_back:
+            answers.pop(n, None)
+        # Instructions are carried out by development sessions (planning can't answer /ask).
+        if not planning and status == "nothing_to_do" and not pr:
             s["pending_instructions"] = []  # handled: answered, or nothing to do for them
         if merged:
             failures.pop(task, None)
-            s["pending_instructions"] = []
+            if not planning:
+                s["pending_instructions"] = []
             s["last_own_merge"] = pacing.iso(now)
         elif pr and review and not mergeable(review):
             entry = failures.setdefault(task, {"count": 0})
@@ -661,10 +688,16 @@ def finish(cfg: config_mod.Config, env: dict[str, str]) -> dict[str, str]:
     errors = st.get("errors_in_a_row", 0)
     backing_off = pacing.backing_off_until(st, now)
     empty_queue = env.get("TASK_KIND") == "next" and not task and status == "nothing_to_do"
+    # Planning with nothing to change while work remains (a weekly run mid-milestone, say): carry on.
+    planned_nothing = planning and status == "nothing_to_do" and not plan_idle
     again = (not backing_off and not merge_skipped and not plan_idle and status != "auth"
-             and (progressed or empty_queue or (failed and errors < state.MAX_ERRORS_IN_A_ROW)))
+             and (progressed or empty_queue or planned_nothing or (failed and errors < state.MAX_ERRORS_IN_A_ROW)))
     for number in carried:
-        dailylog.post(cfg, "Checkpoint", close_checkpoint(cfg, int(number), pr))
+        if lines_cp := close_checkpoint(cfg, int(number), pr):
+            dailylog.post(cfg, "Checkpoint", lines_cp)
+    for number in handed_back:
+        dailylog.post(cfg, "Checkpoint", checkpoint_not_carried_out(cfg, int(number), env.get("IMPLEMENT_SUMMARY", "")),
+                      mention_owner=True)
     stop: list[str] = []
     if failed and errors >= state.MAX_ERRORS_IN_A_ROW:
         stop.append(alarms.raise_alarm(cfg, st, "stopped", errors=errors, run=env.get("RUN_URL", "the Actions tab"))

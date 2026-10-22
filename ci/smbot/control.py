@@ -10,8 +10,9 @@
    automation, develop, mode, merge, focus, next_task, and reasons.
    With nothing in the queue the session plans (mode plan) instead of
    stopping. The one wait is a milestone checkpoint (smbot.checkpoint): while
-   its issue is unanswered there is no planning, and the owner's answer
-   starts a planning session at once.
+   its issue is unanswered only scheduled issues and the weekly planning run
+   (which won't start the next milestone), and the owner's answer starts a
+   planning session at once.
 
 Needs GH_TOKEN with issues read; --commands and Daily log posts need the bot
 app's token (Contents, Issues and Pull requests write).
@@ -98,7 +99,7 @@ def decide(kill_switch_on: bool, result: panel.PanelResult, st: dict, now: dt.da
     cooled = last + PLAN_COOLDOWN if last else None
     weekly = st.get("last_weekly")
     answer = checkpoint.answer(st, checkpoint_issue)
-    if weekly and pacing.parse_time(weekly) < weekly_due_since(now):
+    if weekly and pacing.parse_time(weekly) < weekly_due_since(now) and not st.get("pending_instructions"):
         return Decision(True, True, merge, reasons + ["the weekly planning is due"], "plan", weekly=True)
     if answer and not (last and last > pacing.parse_time(answer["at"]) and now < cooled):
         return Decision(True, True, merge,

@@ -179,6 +179,7 @@ jobs:
           BRANCH: ${{ needs.implement.outputs.branch }}
         run: python3 -m smbot.session publish --bundle work/work.bundle --branch "$BRANCH" --mode new
       - name: Questions for the owner
+        continue-on-error: true # a failed comment must not skip saving or reviewing the work
         if: steps.record.outputs.status == 'ok' && needs.implement.outputs.result != ''
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -186,6 +187,7 @@ jobs:
           SOURCE: the session working on "${{ needs.implement.outputs.task }}"
         run: python3 -m smbot.inbox ask
       - name: Answers to /ask
+        continue-on-error: true # a failed comment must not skip saving or reviewing the work
         if: steps.record.outputs.status == 'ok' && needs.implement.outputs.result != ''
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -362,6 +364,7 @@ jobs:
           REASON: ${{ steps.record.outputs.status }}
         run: python3 -m smbot.session publish --bundle work/work.bundle --branch "$BRANCH" --mode update --pr "$PR" --unfinished "$REASON"
       - name: Questions for the owner
+        continue-on-error: true # a failed comment must not skip saving or reviewing the work
         if: steps.record.outputs.status == 'ok' && needs.revise.outputs.result != ''
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -369,6 +372,7 @@ jobs:
           SOURCE: the revision of PR #${{ needs.publish.outputs.pr }}
         run: python3 -m smbot.inbox ask
       - name: Answers to /ask
+        continue-on-error: true # a failed comment must not skip saving or reviewing the work
         if: steps.record.outputs.status == 'ok' && needs.revise.outputs.result != ''
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}

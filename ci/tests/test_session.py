@@ -305,6 +305,49 @@ class FinishTest(unittest.TestCase):
         out, st = self.run_finish(st, [], TASK="", IMPLEMENT_STATUS="nothing_to_do")
         self.assertEqual(st["pending_instructions"], [])
 
+    def test_planning_keeps_the_owners_instructions_for_development(self) -> None:
+        st = copy.deepcopy(state.DEFAULT)
+        st["pending_instructions"] = [{"kind": "ask", "number": 3, "url": "u", "text": "how is M2?"}]
+        _, st = self.run_finish(st, ["A"], TASK_KIND="plan", TASK="Planning", IMPLEMENT_STATUS="nothing_to_do")
+        _, st = self.run_finish(st, ["A"], TASK_KIND="plan", TASK="Planning", PR="7", FINAL_REVIEW=self.APPROVE,
+                                MERGED="true")
+        self.assertEqual(len(st["pending_instructions"]), 1)
+
+    def test_the_weekly_planning_stays_due_after_a_usage_limit(self) -> None:
+        st = copy.deepcopy(state.DEFAULT)
+        _, st = self.run_finish(st, ["A"], TASK_KIND="plan", TASK="Planning", WEEKLY="true", IMPLEMENT_STATUS="limit")
+        self.assertIsNone(st["last_weekly"])
+        _, st = self.run_finish(st, ["A"], TASK_KIND="plan", TASK="Planning", WEEKLY="true",
+                                IMPLEMENT_STATUS="nothing_to_do")
+        self.assertIsNotNone(st["last_weekly"])
+
+    def test_planning_with_nothing_to_change_carries_on_while_work_remains(self) -> None:
+        out, _ = self.run_finish(copy.deepcopy(state.DEFAULT), ["A"], TASK_KIND="plan", TASK="Planning",
+                                 IMPLEMENT_STATUS="nothing_to_do")
+        self.assertEqual(out["again"], "true")
+
+    def test_an_answer_planning_couldnt_carry_out_goes_back_to_the_owner(self) -> None:
+        st = copy.deepcopy(state.DEFAULT)
+        session.checkpoint.record(st, 50, "iterate", "x", "u", "2026-10-22T10:00:00Z")
+        handed: list = []
+        posts: list = []
+        with mock.patch.object(session, "checkpoint_not_carried_out",
+                               lambda cfg, n, summary: handed.append(n) or ["back to you"]):
+            _, st = self.run_finish(st, [], posts, checkpoint_issue=50, TASK_KIND="plan", TASK="Planning",
+                                    IMPLEMENT_STATUS="nothing_to_do", IMPLEMENT_SUMMARY="unclear")
+        self.assertEqual((handed, st["checkpoint_answers"]), ([50], {}))
+
+    def test_a_merged_plan_leaves_a_checkpoint_closed_by_hand_alone(self) -> None:
+        calls: list = []
+
+        def api(path: str, *args: str, input: object = None, token: object = None) -> object:
+            calls.append((path, input))
+            return {"state": "closed"}
+
+        with mock.patch.object(session.gh, "api", api):
+            self.assertEqual(session.close_checkpoint(CFG, 50, "8"), [])
+        self.assertEqual([c for c in calls if c[1]], [])
+
     def test_no_idle_alarm_while_a_checkpoint_waits(self) -> None:
         posts: list = []
         self.run_finish(copy.deepcopy(state.DEFAULT), [], posts, checkpoint_issue=50, TASK_KIND="plan",

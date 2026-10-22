@@ -4,7 +4,13 @@
   },
   "automation_started": "2026-10-16T16:49:06Z",
   "backoff_until": "2026-10-22T00:20:00Z",
+  "checkpoint_answers": {},
+  "errors_in_a_row": 0,
+  "idle": null,
+  "intake_tasks": {},
   "last_own_merge": "2026-10-22T13:33:06Z",
+  "last_plan": null,
+  "last_weekly": "2026-10-22T13:49:44Z",
   "limits": {
     "week_tokens": 44131848,
     "window_tokens": 7593823
@@ -14,11 +20,7 @@
     "focus": "",
     "pause_development": false,
     "pause_merging": false,
-    "quiet_hours": null,
-    "vote_approval": 60,
-    "vote_max": 25,
-    "vote_min": 2,
-    "vote_share": 15
+    "quiet_hours": null
   },
   "panel_problems": [],
   "paused_by_command": false,

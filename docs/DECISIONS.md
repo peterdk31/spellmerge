@@ -1056,3 +1056,8 @@ An independent review of the branch found these, all fixed with a regression tes
 
 - **Why:** the sheet showed that the frost and void colours need new palette ramps (STYLE.md says element colours are added to its table first), and element-coloured shots need a neutral bolt sprite. Both touch the palette and the art direction choice (part 27), so changing icons now would likely be redone.
 - **Now:** two replacement tasks in `docs/NEXT.md`, to run after or together with the direction choice. Nothing in the game waits on them.
+
+## Owner: Ice and Void ramps; the palette is the bot's to change
+
+- **Why:** the frost, void and homing icons and the frost and void tints borrowed Player 1 and Player 4 colours, which STYLE.md keeps for players (#178, #179).
+- **Now:** `docs/STYLE.md`, the `art/kit` palette files and the SVG art test carry an Ice ramp (`#1f7080` `#4fd6dc` `#c4f6f2`) and a Void ramp (`#4a1450` `#a0309a` `#e08ad8`), giving 37 colours. `ci/tests/test_styleguide.py` no longer pins the palette's size: it only checks that STYLE.md's table, both `art/kit` palette files and the SVG art test's list match. So the bot may add, change or remove colours without asking the owner, as long as it updates every copy. Recolouring the icons and tints is still the element colours task in `docs/NEXT.md`.

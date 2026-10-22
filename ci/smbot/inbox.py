@@ -1,6 +1,7 @@
 """The owner inbox: questions only the owner can answer, as labelled issues.
 
-  python3 -m smbot.inbox ask        opens the questions in $RESULT (a session's structured output)
+  python3 -m smbot.inbox ask        opens the questions in $RESULT (a session's structured output),
+                                    with the screenshots in $SHOTS (taken on $SHA) and those of PR $PR
 
 A session that needs the owner puts the question in `owner_questions` instead of a file.
 Each becomes an issue labelled `owner-question` that mentions the owner, with the options,
@@ -9,6 +10,10 @@ was closed in the last 30 days, under the same `key` or a similar title is not a
 in the issue (a verified owner command); the next session carries it out and its PR closes
 the issue. A question whose answer needs an owner-only change (`.github/`, `ci/`, ...) also
 gets `owner-change` and the exact change, so an interactive session can apply it.
+
+A question shows what it's about: the shots it names (`screenshots`), or else the screenshots
+of the PR it was raised in. That's why questions are asked after the screenshots are taken,
+not when the PR opens: the notification the owner gets carries them.
 """
 
 from __future__ import annotations
@@ -17,12 +22,14 @@ import datetime as dt
 import json
 import os
 import re
+import subprocess
 import sys
-from typing import Any
+from pathlib import Path
+from typing import Any, Callable
 
 from . import config as config_mod
 from . import labels as labels_mod
-from . import dailylog, gh
+from . import dailylog, gh, screenshots
 
 LABEL = "owner-question"
 CHANGE_LABEL = "owner-change"
@@ -31,7 +38,6 @@ RECENT_DAYS = 30  # a question closed this recently is not asked again
 SIMILAR = 0.75  # share of title words two questions must have in common to be the same one
 CONTAINED = 0.85  # or the share of the shorter title's words found in the longer one
 _KEY_MARKER = re.compile(r"<!-- smbot:question key=([a-z0-9-]*) -->")
-_PR_MARKER = re.compile(r"<!-- smbot:question pr=(\d+) -->")
 _STOP = {"a", "an", "the", "to", "of", "and", "or", "in", "on", "for", "it", "is", "be", "should", "we",
          "do", "does", "make", "add", "also", "once", "with", "this", "that"}
 
@@ -41,8 +47,14 @@ def _inert(text: str, limit: int) -> str:
     return re.sub(r"@(?=[\w-])", "@​", str(text or "").strip())[:limit]
 
 
-def render(cfg: config_mod.Config, q: dict[str, Any], source: str = "", pr: int | None = None) -> str:
+MAX_PICTURES = 30_000  # characters of image markdown; an issue body holds 65,536
+
+
+def render(cfg: config_mod.Config, q: dict[str, Any], source: str = "", pr: int | None = None,
+           pictures: str = "") -> str:
     parts = [f"@{cfg.owner.login}, the bot needs your decision.", "", "## Question", "", _inert(q["question"], 4000)]
+    if pictures:  # made by smbot.screenshots, captions already inert
+        parts += ["", "## What it looks like", "", pictures[:MAX_PICTURES]]
     options = [o for o in q.get("options") or [] if str(o).strip()][:6]
     if options:
         parts += ["", "## Options", ""] + [f"{i + 1}. {_inert(o, 1000)}" for i, o in enumerate(options)]
@@ -58,8 +70,6 @@ def render(cfg: config_mod.Config, q: dict[str, Any], source: str = "", pr: int 
               "The next development session carries it out, and its PR closes this issue."]
     if source:
         parts.append(f"Raised by {source}" + (f", in PR #{pr}." if pr and f"#{pr}" not in source else "."))
-    if pr:
-        parts.append(f"<!-- smbot:question pr={pr} -->")  # its screenshots are copied here (smbot.screenshots)
     parts.append(f"<!-- smbot:question key={_key(q.get('key', ''))} -->")
     return "\n".join(parts)
 
@@ -121,8 +131,9 @@ def same_question(q: dict[str, Any], issue: dict[str, Any]) -> bool:
 
 
 def ask(cfg: config_mod.Config, questions: list[dict[str, Any]], source: str = "",
-        now: dt.datetime | None = None, pr: int | None = None) -> list[str]:
-    """Opens an issue per new question.
+        now: dt.datetime | None = None, pr: int | None = None,
+        pictures: Callable[[dict[str, Any]], str] | None = None) -> list[str]:
+    """Opens an issue per new question, showing `pictures(question)` (markdown) when given.
 
     A question is new unless an open question, or one closed in the last RECENT_DAYS, has the
     same key or a similar title: then it's only noted in the log, never asked again.
@@ -142,18 +153,26 @@ def ask(cfg: config_mod.Config, questions: list[dict[str, Any]], source: str = "
             log.append(f"Not asked again: \"{title}\" is #{twin['number']} ({state})")
             continue
         labels = [LABEL] + ([CHANGE_LABEL] if q.get("owner_change") else [])
+        try:  # a question without its pictures is still asked
+            shown = pictures(q) if pictures else ""
+        except (gh.GhError, OSError, subprocess.SubprocessError) as e:
+            print(f"couldn't show the screenshots of \"{title}\": {e}")
+            shown = ""
         created = gh.api(f"repos/{cfg.repo}/issues", "-X", "POST",
-                         input={"title": title, "body": render(cfg, q, source, pr), "labels": labels})
+                         input={"title": title, "body": render(cfg, q, source, pr, shown), "labels": labels})
         known.append({"number": created["number"], "title": title, "state": "open",
                       "body": f"<!-- smbot:question key={_key(q.get('key', ''))} -->"})
         log.append(f"Question for the owner: #{created['number']} {title}")
     return log
 
 
-def asked_in(cfg: config_mod.Config, pr: int) -> list[int]:
-    """The open questions raised by the session (or revision) that made PR #`pr`."""
-    return [int(i["number"]) for i in open_questions(cfg)
-            if (m := _PR_MARKER.search(i.get("body") or "")) and int(m.group(1)) == pr]
+def pictures_for(cfg: config_mod.Config, token: str, folder: Path | None, sha: str,
+                 pr: int | None) -> Callable[[dict[str, Any]], str]:
+    """What a question shows: the shots it names, taken on `sha`, or else the screenshots of PR #`pr`."""
+    def pictures(q: dict[str, Any]) -> str:
+        own = screenshots.for_question(cfg, token, q, folder, sha) if folder and folder.is_dir() and sha else ""
+        return own or (screenshots.for_log(cfg, pr) if pr else "")
+    return pictures
 
 
 def reminder(cfg: config_mod.Config) -> str:
@@ -170,9 +189,12 @@ def main(argv: list[str] | None = None) -> int:
     cfg = config_mod.load()
     if cmd == "ask":
         result = json.loads(os.environ.get("RESULT") or "{}")
-        pr = os.environ.get("PR", "")
-        log = ask(cfg, result.get("owner_questions") or [], os.environ.get("SOURCE", ""),
-                  pr=int(pr) if pr.isdigit() else None)
+        pr = int(os.environ["PR"]) if os.environ.get("PR", "").isdigit() else None
+        sha = os.environ.get("SHA", "")
+        sha = sha if re.fullmatch(r"[0-9a-f]{7,40}", sha) else ""
+        folder = Path(os.environ["SHOTS"]) if os.environ.get("SHOTS") else None
+        log = ask(cfg, result.get("owner_questions") or [], os.environ.get("SOURCE", ""), pr=pr,
+                  pictures=pictures_for(cfg, os.environ.get("GH_TOKEN", ""), folder, sha, pr))
         print("\n".join(log) or "no new questions for the owner")
         if log:
             dailylog.post(cfg, "Questions for the owner", log)

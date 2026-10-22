@@ -5,6 +5,7 @@
 #             commits locally; the commits leave the runner as a git bundle (data)
 # publish     a fresh runner pushes the bundle from a clean checkout of main and
 #             opens the PR, records usage, posts /ask answers
+# ask         once the screenshots are taken, opens the owner questions with them
 # critique    a separate Claude session with fresh context reviews it critically
 # revise      Claude revises (read-only token again); publish-revision pushes it
 # final       a fresh Claude session decides: approve or not (a verdict as data)
@@ -179,15 +180,6 @@ jobs:
           BRANCH: ${{ needs.implement.outputs.branch }}
           TASK: ${{ needs.implement.outputs.task }}
         run: python3 -m smbot.session publish --bundle work/work.bundle --branch "$BRANCH" --mode new
-      - name: Questions for the owner
-        continue-on-error: true # a failed comment must not skip saving or reviewing the work
-        if: steps.record.outputs.status == 'ok' && needs.implement.outputs.result != ''
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          RESULT: ${{ needs.implement.outputs.result }}
-          SOURCE: the session working on "${{ needs.implement.outputs.task }}"
-          PR: ${{ steps.publish.outputs.pr }} # the questions get the PR's screenshots (smbot.screenshots)
-        run: python3 -m smbot.inbox ask
       - name: Answers to /ask
         continue-on-error: true # a failed comment must not skip saving or reviewing the work
         if: steps.record.outputs.status == 'ok' && needs.implement.outputs.result != ''
@@ -274,6 +266,7 @@ jobs:
       - id: prepare
         env:
           REVIEW: ${{ needs.critique.outputs.review }}
+          FIRST: ${{ needs.implement.outputs.result }} # its owner questions aren't asked yet (see ask)
           PR: ${{ needs.publish.outputs.pr }}
           BRANCH: ${{ needs.publish.outputs.branch }}
         run: |
@@ -367,15 +360,6 @@ jobs:
           REASON: ${{ steps.record.outputs.status }}
           TASK: ${{ needs.implement.outputs.task }}
         run: python3 -m smbot.session publish --bundle work/work.bundle --branch "$BRANCH" --mode update --pr "$PR" --unfinished "$REASON"
-      - name: Questions for the owner
-        continue-on-error: true # a failed comment must not skip saving or reviewing the work
-        if: steps.record.outputs.status == 'ok' && needs.revise.outputs.result != ''
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          RESULT: ${{ needs.revise.outputs.result }}
-          SOURCE: the revision of PR #${{ needs.publish.outputs.pr }}
-          PR: ${{ needs.publish.outputs.pr }}
-        run: python3 -m smbot.inbox ask
       - name: Answers to /ask
         continue-on-error: true # a failed comment must not skip saving or reviewing the work
         if: steps.record.outputs.status == 'ok' && needs.revise.outputs.result != ''
@@ -385,54 +369,71 @@ jobs:
         run: python3 -m smbot.session answers
 
   # Before/after screenshots of what the PR changes: only the shot scripts the session named
-  # (`screenshots` in its result) run, on the PR's commit and on main. The game code runs here
-  # with no secrets, no environment and a read-only token; posting is separate.
+  # (`screenshots` in its result) run, on the PR's commit and on main. The scripts its owner
+  # questions name run too, on the same commit (on main when there is no PR), for the questions
+  # to show. The game code runs here with no secrets, no environment and a read-only token;
+  # posting is separate.
   screenshots:
     name: before/after screenshots (no secrets)
     needs: [implement, revise, publish, publish-revision]
-    if: always() && needs.publish.outputs.pr != ''
+    if: always() && needs.implement.result != 'skipped'
     runs-on: ubuntu-latest
     timeout-minutes: 40
     permissions:
       contents: read
     outputs:
-      sha: ${{ steps.pick.outputs.sha }}
+      sha: ${{ steps.sha.outputs.sha }}
       scripts: ${{ steps.pick.outputs.scripts }}
+      pr_scripts: ${{ steps.pick.outputs.pr_scripts }}
     steps:
       - id: pick
         env:
-          SHA: ${{ needs.publish-revision.outputs.sha || needs.publish.outputs.sha }}
+          PR: ${{ needs.publish.outputs.pr }}
           FIRST: ${{ needs.implement.outputs.result }}
           REVISED: ${{ needs.revise.outputs.result }}
         # The revision's choice wins when it made one; names are checked before they reach build.sh.
         run: |
           python3 - <<'PY'
           import json, os, re
-          def shots(raw):
+          def result(raw):
               try:
-                  value = json.loads(raw or "{}").get("screenshots")
-              except (ValueError, AttributeError):
-                  return None
+                  value = json.loads(raw or "{}")
+              except ValueError:
+                  return {}
+              return value if isinstance(value, dict) else {}
+          def shots(res):
+              value = res.get("screenshots")
               return value if isinstance(value, list) else None
-          chosen = shots(os.environ["REVISED"])
-          chosen = chosen if chosen is not None else (shots(os.environ["FIRST"]) or [])
-          names = sorted({c.get("script") for c in chosen if isinstance(c, dict)
-                          and re.fullmatch(r"shot_[a-z0-9_]{1,60}", str(c.get("script")))})[:6]
+          def names(chosen, limit):
+              return sorted({c.get("script") for c in chosen if isinstance(c, dict)
+                             and re.fullmatch(r"shot_[a-z0-9_]{1,60}", str(c.get("script")))})[:limit]
+          first, revised = result(os.environ["FIRST"]), result(os.environ["REVISED"])
+          chosen = shots(revised)
+          chosen = chosen if chosen is not None else (shots(first) or [])
+          chosen = chosen if os.environ["PR"] else []  # no PR to show them on
+          asked = [s for res in (first, revised) for q in res.get("owner_questions") or [] if isinstance(q, dict)
+                   for s in (q.get("screenshots") if isinstance(q.get("screenshots"), list) else [])[:3]]
+          pr_names = names(chosen, 6)
+          all_names = sorted(set(pr_names) | set(names(asked, 9)))
           os.makedirs("shots", exist_ok=True)
           with open("shots/list.json", "w") as fh:
               json.dump(chosen, fh)
           with open(os.environ["GITHUB_OUTPUT"], "a") as fh:
-              fh.write(f"sha={os.environ['SHA']}\nscripts={' '.join(names)}\n")
-          print("Shot scripts chosen by the session:", " ".join(names) or "none")
+              fh.write(f"pr_scripts={' '.join(pr_names)}\nscripts={' '.join(all_names)}\n")
+          print("Shot scripts chosen for the PR:", " ".join(pr_names) or "none")
+          print("All shot scripts, the owner questions' included:", " ".join(all_names) or "none")
           PY
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: steps.pick.outputs.scripts != ''
         with:
-          ref: ${{ steps.pick.outputs.sha }}
+          ref: ${{ needs.publish-revision.outputs.sha || needs.publish.outputs.sha || 'main' }}
           path: after
           persist-credentials: false
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: sha
         if: steps.pick.outputs.scripts != ''
+        run: echo "sha=$(git -C after rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.pick.outputs.pr_scripts != ''
         with:
           ref: main
           path: before
@@ -452,11 +453,11 @@ jobs:
           SHOTS_ONLY: ${{ steps.pick.outputs.scripts }}
         run: ci/build/build.sh --quick --screenshots && mv build/screenshots ../shots/after
       - name: Before (main; a script the PR adds has no before)
-        if: steps.pick.outputs.scripts != ''
+        if: steps.pick.outputs.pr_scripts != ''
         continue-on-error: true
         working-directory: before
         env:
-          SHOTS_ONLY: ${{ steps.pick.outputs.scripts }}
+          SHOTS_ONLY: ${{ steps.pick.outputs.pr_scripts }}
         run: ci/build/build.sh --quick --screenshots; mv build/screenshots ../shots/before
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: steps.pick.outputs.scripts != ''
@@ -469,7 +470,9 @@ jobs:
   post-screenshots:
     name: post the screenshots on the PR
     needs: [publish, screenshots]
-    if: always() && needs.screenshots.result == 'success' && needs.screenshots.outputs.scripts != ''
+    if: >-
+      always() && needs.screenshots.result == 'success' && needs.screenshots.outputs.pr_scripts != ''
+      && needs.publish.outputs.pr != ''
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: automation
@@ -489,12 +492,63 @@ jobs:
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-pull-requests: write
-          permission-issues: write # the shots are copied to the PR's owner questions
       - env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           PR: ${{ needs.publish.outputs.pr }}
           SHA: ${{ needs.screenshots.outputs.sha }}
         run: python3 -m smbot.screenshots post --pr "$PR" --sha "$SHA" --dir shots
+
+  # The owner questions, asked once the screenshots exist, so each shows the shots it names (or
+  # the PR's) in its own body, and the owner's notification carries them. A question without its
+  # pictures is still asked.
+  ask:
+    name: questions for the owner
+    needs: [implement, publish, revise, publish-revision, screenshots, post-screenshots]
+    if: always() && needs.publish.result != 'skipped'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: automation
+    steps:
+      - name: Clean checkout of main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: needs.screenshots.result == 'success' && needs.screenshots.outputs.scripts != ''
+        continue-on-error: true # the questions are asked without their own shots
+        with:
+          name: screenshots
+          path: shots
+      - id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: Iv23lirdyRvc0KC6625s # the bot app's Client ID (public)
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+          permission-contents: write # the questions' shots go on the screenshots branch
+          permission-issues: write
+          permission-pull-requests: read # the PR's screenshots comment
+      - name: The session's questions
+        continue-on-error: true # never keep the revision's questions or the next session from going
+        if: needs.publish.outputs.status == 'ok' && needs.implement.outputs.result != ''
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          RESULT: ${{ needs.implement.outputs.result }}
+          SOURCE: the session working on "${{ needs.implement.outputs.task }}"
+          PR: ${{ needs.publish.outputs.pr }}
+          SHA: ${{ needs.screenshots.outputs.sha }}
+          SHOTS: shots
+        run: python3 -m smbot.inbox ask
+      - name: The revision's questions
+        continue-on-error: true
+        if: needs.publish-revision.outputs.status == 'ok' && needs.revise.outputs.result != ''
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          RESULT: ${{ needs.revise.outputs.result }}
+          SOURCE: the revision of PR #${{ needs.publish.outputs.pr }}
+          PR: ${{ needs.publish.outputs.pr }}
+          SHA: ${{ needs.screenshots.outputs.sha }}
+          SHOTS: shots
+        run: python3 -m smbot.inbox ask
 
   final:
     name: final review (fresh context)
@@ -553,7 +607,8 @@ jobs:
   finish:
     name: Daily log and next session
     # post-screenshots too: the log repeats them, since the owner rarely sees a PR before it merges.
-    needs: [implement, publish, critique, revise, publish-revision, post-screenshots, final, merge]
+    # ask too: the next session must see the questions this one raised, so it doesn't ask them again.
+    needs: [implement, publish, critique, revise, publish-revision, post-screenshots, ask, final, merge]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 10

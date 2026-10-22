@@ -80,14 +80,10 @@ class ScreenshotsTest(unittest.TestCase):
         api.assert_not_called()
         push.assert_not_called()
 
-    def test_post_pushes_then_comments_on_the_pr_and_its_questions(self) -> None:
-        """The owner reads a question after its PR merged, so the question gets the shots too."""
+    def test_post_pushes_then_comments_on_the_pr(self) -> None:
         posted: list = []
 
         def api(path: str, *args: str, input: dict | None = None) -> object:
-            if "labels=owner-question" in path:
-                return [{"number": 9, "body": "Q\n<!-- smbot:question pr=7 -->"},
-                        {"number": 10, "body": "Q\n<!-- smbot:question pr=70 -->"}, {"number": 11, "body": None}]
             posted.append((path, input["body"]))
             return {}
 
@@ -98,23 +94,27 @@ class ScreenshotsTest(unittest.TestCase):
             screenshots.post(CFG, "t", 7, "abc1234def", root)
         self.assertEqual(push.call_args.args[3], "pr-7/abc1234")
         self.assertEqual(push.call_args.kwargs["names"], ["after/main_menu.png", "before/main_menu.png"])
-        self.assertEqual([path for path, _ in posted], [f"repos/{CFG.repo}/issues/7/comments",
-                                                        f"repos/{CFG.repo}/issues/9/comments"])
+        self.assertEqual([path for path, _ in posted], [f"repos/{CFG.repo}/issues/7/comments"])
         self.assertIn("/c0ffee/pr-7/abc1234/after/main_menu.png", posted[0][1])
-        self.assertTrue(posted[1][1].startswith("**What #7 changes on screen**"))
-        self.assertIn("/c0ffee/pr-7/abc1234/after/main_menu.png", posted[1][1])
 
-    def test_post_still_comments_on_the_pr_when_the_questions_cant_be_read(self) -> None:
-        def api(path: str, *args: str, input: dict | None = None) -> object:
-            if "labels=owner-question" in path:
-                raise screenshots.gh.GhError("403")
-            return {}
-
-        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(screenshots.gh, "api", api), \
-                mock.patch.object(screenshots, "push", return_value="c0ffee"):
-            root = self.shots(tmp, [{"script": "shot_m1", "caption": "The menu"}],
-                              after={"shot_m1": {"main_menu.png": PNG + b"x"}}, before={"shot_m1": {"main_menu.png": PNG}})
-            screenshots.post(CFG, "t", 7, "abc1234def", root)  # no exception
+    def test_a_question_shows_the_shots_it_names(self) -> None:
+        """#192 asked the owner to pick an art direction; the samples belong in the question itself."""
+        question = {"title": "Pick a style?", "screenshots": [
+            {"script": "shot_samples", "caption": "Samples A–F side by side @everyone"},
+            {"script": "../evil", "caption": "x"}, {"script": "shot_missing", "caption": "Not made"}]}
+        with tempfile.TemporaryDirectory() as tmp, \
+                mock.patch.object(screenshots, "push", return_value="c0ffee") as push:
+            root = self.shots(tmp, [], after={"shot_samples": {"samples_a_c.png": PNG, "samples_d_f.png": PNG},
+                                              "shot_m1": {"arena.png": PNG}}, before={})
+            body = screenshots.for_question(CFG, "t", question, root, "abc1234def")
+            self.assertEqual(screenshots.for_question(CFG, "t", {"title": "No shots"}, root, "abc1234def"), "")
+        self.assertEqual(push.call_count, 1)
+        self.assertEqual([p.name for p in push.call_args.args[2]], ["samples_a_c.png", "samples_d_f.png"])
+        self.assertEqual(push.call_args.args[3], "questions/abc1234")
+        self.assertTrue(body.startswith("**Samples A–F side by side @\u200beveryone**"))
+        self.assertIn(f"![Samples a c](https://raw.githubusercontent.com/{CFG.repo}/c0ffee/questions/abc1234/samples_a_c.png)", body)
+        self.assertIn("/samples_d_f.png)", body)
+        self.assertNotIn("arena.png", body)
 
     def test_push_adds_to_the_branch(self) -> None:
         import subprocess

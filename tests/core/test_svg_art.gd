@@ -28,6 +28,10 @@ const PALETTE: Array[String] = [
 	"#4a2a6b", "#8a4fc4", "#c99af0",
 ]
 const OUTLINE: String = "#14121f"
+## The outline of the soft art direction sample (art/samples/e_soft/): Fire's shadow shade.
+const SOFT_OUTLINE: String = "#8f2d2a"
+## Outline colour per art direction sample folder; a folder not listed uses OUTLINE.
+const SAMPLE_OUTLINES: Dictionary = {"e_soft": SOFT_OUTLINE}
 ## Icons need a closed outline; vfx may outline in their own shadow shade instead.
 const ICON_ROOT: String = "res://content/spells"
 const RECT_ATTRIBUTES: Array[String] = ["x", "y", "width", "height", "fill"]
@@ -95,15 +99,25 @@ func test_every_icon_has_a_closed_outline() -> void:
 	check_equal(icons, 18, "the scan found 18 spell component icons")
 
 
-## The art direction samples (art/samples/) hold two icons; they follow the same closed-outline rule.
+## The art direction samples (art/samples/) hold four icons; they follow the same closed-outline
+## rule. The soft sample (E) outlines in the dark red instead of the black.
 func test_the_sample_icons_have_a_closed_outline() -> void:
 	var icons: int = 0
 	for path in _files:
 		if path.begins_with("res://art/samples/") and path.ends_with("/spell_icon.svg"):
 			icons += 1
-			for problem in _outline_problems(FileAccess.get_file_as_string(path)):
+			var outline: String = SAMPLE_OUTLINES.get(path.get_base_dir().get_file(), OUTLINE)
+			for problem in _outline_problems(FileAccess.get_file_as_string(path), outline):
 				check(false, "%s: %s" % [path, problem])
-	check_equal(icons, 2, "the scan found the 2 sample icons")
+	check_equal(icons, 4, "the scan found the 4 sample icons")
+
+
+## E has no black outline anywhere; F's wizard keeps it.
+func test_the_soft_sample_has_no_black_and_the_big_hat_keeps_it() -> void:
+	var soft: String = FileAccess.get_file_as_string("res://art/samples/e_soft/wizard.svg")
+	check(not soft.contains(OUTLINE), "E's wizard uses the black outline")
+	var big: String = FileAccess.get_file_as_string("res://art/samples/f_bighat/wizard.svg")
+	check(big.contains(OUTLINE), "F's wizard lost its black outline")
 
 
 func test_every_svg_is_in_the_manifest() -> void:
@@ -182,7 +196,7 @@ func _problems(text: String) -> Array[String]:
 
 
 ## Problems with the outline of an icon; empty when it is closed.
-func _outline_problems(text: String) -> Array[String]:
+func _outline_problems(text: String, outline: String = OUTLINE) -> Array[String]:
 	var problems: Array[String] = []
 	var header: RegExMatch = RegEx.create_from_string('<svg[^>]*width="(\\d+)"[^>]*height="(\\d+)"').search(text)
 	if header == null:
@@ -210,7 +224,7 @@ func _outline_problems(text: String) -> Array[String]:
 	for y in height:
 		for x in width:
 			var colour: String = cells[y * width + x]
-			if colour.is_empty() or colour == OUTLINE:
+			if colour.is_empty() or colour == outline:
 				continue
 			for step in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
 				var nx: int = x + step.x

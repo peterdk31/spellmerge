@@ -11,7 +11,6 @@
     "number": 175
   },
   "errors_in_a_row": 0,
-  "idle": null,
   "intake_tasks": {},
   "last_own_merge": "2026-10-22T17:58:08Z",
   "last_plan": null,
@@ -48,6 +47,11 @@
     6345707847
   ],
   "task_failures": {
+    "**Art direction choice (M2 part 27).** Claude drafts the style samples itself and asks the owner in one `owner` issue to pick one (optionally after asking players for feedback in Discussions) and to lock it in DESIGN.md; nothing in the game waits on it.": {
+      "count": 1,
+      "pr": "189",
+      "problems": "- The new entry says `test_svg_art.gd` does not scan `art/samples/`, because the samples may bend a rule on purpose. The same PR adds `res://art/samples` to ROOTS in `tests/core/test_svg_art.gd`, so the test does scan it, and it also adds a sample-icon outline test. DECISIONS.md exists so decisions aren't reversed by accident, and this entry gives the wrong reason and the wrong behaviour. The LOG entry says the opposite, so the two disagree. Fix: Rewrite the Folder bullet. The test scans `art/samples/` (rects only, whole numbers, palette, no overlaps, manifest, closed icon outline). The edge-touching floor joints still pass, because no test checks that STYLE.md rule. Drop the claim that the test skips the folder."
+    },
     "**Read the first WASM numbers (M2 part 25 follow-up).** (`tests/benchmark/`, `docs/`) Once a daily build has run the web projectile timing and stress steps, read their `BENCH:` lines (or why they failed or timed out; see `docs/DECISIONS.md`, 2026-10-22). Sessions can't read CI logs: the \"Daily run\" post in that day's Daily log quotes them under \"Stress and timing results\" (`gh issue list --label daily-log --state all`, then `gh issue view N --comments`). Then either confirm the limits or lower them. Also read what the per-frame `multimesh.buffer` upload costs there (bolt, rune and orbit batches each hand over the whole cap x 16 floats, up to 192 KB per batch at 3,000); if it is tight, upload only the used slice or size the rune and orbit batches smaller. \"WASM pending\" stays open until then.": {
       "count": 0,
       "parked_reason": "No web `BENCH:` numbers exist yet, so I made no changes. None of the daily-log issues (#167, #169, #171, #172, #175) has a \"Daily run\" post with a \"Stress and timing results\" section. The only comment in #175 that matches is an earlier development session's note that it was parked for the same reason. The repo records no web numbers either. Without them I can't confirm or lower the limits, and I can't judge the `multimesh.buffer` upload cost. \"WASM pending\" stays open. Retry once a Daily run pos",

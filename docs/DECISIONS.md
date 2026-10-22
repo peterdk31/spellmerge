@@ -2,6 +2,18 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-22: Story canon (M2 part 22)
+
+- **Short, with seven fixed points.** `docs/STORY.md` fixes only what the game already shows or needs (the wizards as guild apprentices, the build-from-parts magic, the four elements' characters, the crypt, imps, the stakes, relics). Biomes after the crypt, bosses, hub and dialogue are left open, so later writing and contributors add canon instead of fighting it.
+- **Tone reading of pillar 3:** dry rather than silly, with the danger never made small. Descriptions follow the 90-character limit that part 23 validates.
+- **Component names are quoted from the registry** (Bolt, Frost, On Hit, ...), so lore and builder agree.
+
+## 2026-10-22: Combos to 20+ (M2 part 21)
+
+- **Nine rows added, two changed from the draft.** Draft row 13 (nova + void, on hit → fire *bolt*) became a fire *nova*: a held bolt starts inside the hexed imp and, since the 0.1 s exclusion ends before it has crossed the imp, hits it again and is used up, so it never reached the imps behind (the known issue in `docs/BACKLOG.md`). Draft row 21 (fire rune that ends in a frost nova, Thaw) became a fire rune that bursts into a fire nova on expiry: a rune has no pierce, so its first hit uses it up and it never expires on a target. A rune that expires needs imps standing just outside its reach, which the nova then burns. Both stay faithful to the pillar (small parts, deep results) and avoid pinning a bug.
+- **Two drafts are not rows yet.** Draft rows 16 (clamp refusal) and 17 (depth 3) stay with `test_spells_cast.gd` and `test_triggers.gd`, which already cover them; rows 20 to 24 beyond the two-player one are not needed for the two-per-component rule. More rows can be added any time.
+- **The two-per-component rule is a test.** `test_every_component_is_in_two_combos` reads a `COMPONENTS` list in the test; a new component is added to it together with its rows, as the spells README asks; a second test compares the list with the registry, so a missed component fails. Rows for chain, pierce, faster and on expire also have a control: the same row without that component must fail a check. The control showed that a bolt that hits ends by hit, not by expiry, so "Seeking frost burst" now pierces and bursts where its flight ends.
+
 ## 2026-10-22: The build break
 
 **Decided by:** Claude (M2 part 19).

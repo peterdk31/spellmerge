@@ -95,6 +95,8 @@ func tap_overlay() -> void:
 
 ## Build a random spell into spell B and swap to it. The recipe is chosen from the wizard's
 ## bag with `build_seed`. Returns false when the bot has no wizard or the bag has no form.
+## True means the requests were sent, not that they were accepted (a swap may be refused at
+## some moments, such as in a wave): check the wizard's `recipe_of` and `active_slot`.
 func build_random(build_seed: int) -> bool:
 	var root: Node = _flow.get_tree().root
 	var events: Node = root.get_node_or_null("Events")

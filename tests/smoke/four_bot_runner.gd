@@ -207,6 +207,8 @@ func _check() -> Array[String]:
 		var bot: BotScript = _bots[index]
 		if wizard != null and not bot.built_recipe.is_empty() and wizard.call("recipe_of", BotScript.BUILD_SPELL) != bot.built_recipe:
 			failed.append("bot %d: spell B is not the recipe it built" % (index + 1))
+		if wizard != null and not bot.built_recipe.is_empty() and int(wizard.get("active_slot")) != BotScript.BUILD_SPELL:
+			failed.append("bot %d: still not on spell B, the swap did not happen" % (index + 1))
 	if not _overlay_seen_open:
 		failed.append("the overlay of bot %d never opened" % (IDLER + 1))
 	elif not _builder_seen_open:

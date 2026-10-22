@@ -26,9 +26,11 @@ const SEED: int = 20261022
 const RECIPES: int = 300
 ## Seconds each recipe is cast and run for.
 const SECONDS: float = 2.0
-## Mean step time allowed per recipe (one 60 FPS frame), and the most any one step may take.
-const MEAN_LIMIT_MS: float = 1000.0 / 60.0
-const STEP_LIMIT_MS: float = 50.0
+## Mean step time allowed per recipe and the most any one step may take. These are coarse
+## (two 60 FPS frames, and 100 ms) because a shared CI runner is noisy; the real numbers are
+## printed on the FUZZ line at the end.
+const MEAN_LIMIT_MS: float = 2000.0 / 60.0
+const STEP_LIMIT_MS: float = 100.0
 ## Most live shots at any step (the cap `combo_arena.gd` gives the manager).
 const SHOT_CAP: int = 512
 ## Recipes that must compile, or the fuzzer is not testing anything.

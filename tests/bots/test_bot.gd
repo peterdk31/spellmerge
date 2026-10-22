@@ -79,8 +79,12 @@ func _test_builder_walk() -> void:
 	_check(bot.requests_sent == 0, "a refused build sends no request")
 	bot.open_builder()
 	_check(int(_input.call("get_press_count", 1, &"overlay")) == 1, "the way into the builder starts with the overlay")
+	var cast_before_down: bool = false
 	for i in 6:
 		bot.step(0.016)
+		if int(_input.call("get_press_count", 1, &"cast")) > 0 and int(_input.call("get_press_count", 1, &"move_down")) == 0:
+			cast_before_down = true
+	_check(not cast_before_down, "move_down is pressed before cast on the way to Build")
 	_check(int(_input.call("get_press_count", 1, &"move_down")) == 1, "one move_down press on the way")
 	_check(int(_input.call("get_press_count", 1, &"cast")) == 1, "one cast press on the way, on Build")
 	bot.leave()

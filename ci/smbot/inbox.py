@@ -5,8 +5,9 @@
 
 A session that needs the owner puts the question in `owner_questions` instead of a file.
 Each becomes an issue labelled `owner-question` that mentions the owner, with the options,
-Claude's recommendation and what happens meanwhile. A question that is already open, or
-was closed in the last 30 days, under the same `key` or a similar title is not asked again. The owner answers with `/claude <answer>`
+Claude's recommendation and what happens meanwhile. A question still waiting for the owner (open,
+with no `/claude` answer yet) under the same `key` or a similar title is not asked again; once
+the owner has answered, a next round of the same decision is a new question. The owner answers with `/claude <answer>`
 in the issue (a verified owner command); the next session carries it out and its PR closes
 the issue. A question whose answer needs an owner-only change (`.github/`, `ci/`, ...) also
 gets `owner-change` and the exact change, so an interactive session can apply it.
@@ -18,7 +19,6 @@ not when the PR opens: the notification the owner gets carries them.
 
 from __future__ import annotations
 
-import datetime as dt
 import json
 import os
 import re
@@ -29,12 +29,11 @@ from typing import Any, Callable
 
 from . import config as config_mod
 from . import labels as labels_mod
-from . import dailylog, gh, screenshots
+from . import dailylog, gh, screenshots, state
 
 LABEL = "owner-question"
 CHANGE_LABEL = "owner-change"
 MAX_PER_SESSION = 3
-RECENT_DAYS = 30  # a question closed this recently is not asked again
 SIMILAR = 0.75  # share of title words two questions must have in common to be the same one
 CONTAINED = 0.85  # or the share of the shorter title's words found in the longer one
 _KEY_MARKER = re.compile(r"<!-- smbot:question key=([a-z0-9-]*) -->")
@@ -78,11 +77,18 @@ def open_questions(cfg: config_mod.Config) -> list[dict[str, Any]]:
     return gh.api(f"repos/{cfg.repo}/issues?state=open&labels={LABEL}&per_page=100")
 
 
-def recent_questions(cfg: config_mod.Config, now: dt.datetime) -> list[dict[str, Any]]:
-    """Open questions plus those closed in the last RECENT_DAYS (answered or dropped)."""
-    since = (now - dt.timedelta(days=RECENT_DAYS)).strftime("%Y-%m-%dT%H:%M:%SZ")
-    closed = gh.api(f"repos/{cfg.repo}/issues?state=closed&labels={LABEL}&since={since}&per_page=100")
-    return open_questions(cfg) + [i for i in closed if (i.get("closed_at") or "") >= since]
+def waiting_questions(cfg: config_mod.Config) -> list[dict[str, Any]]:
+    """The open questions the owner hasn't answered with `/claude` yet.
+
+    An answered question stays open until the PR that carries out the answer merges, and that
+    session may need to ask the next round (#190, then #192): that one must get through.
+    """
+    try:
+        st, _ = state.load(cfg)
+        replied = {int(i["number"]) for i in st.get("pending_instructions", []) if i.get("kind") == "claude"}
+    except (gh.GhError, KeyError, TypeError, ValueError):
+        replied = set()
+    return [i for i in open_questions(cfg) if int(i["number"]) not in replied]
 
 
 def answered_keys(cfg: config_mod.Config, st: dict[str, Any]) -> set[str]:
@@ -130,27 +136,26 @@ def same_question(q: dict[str, Any], issue: dict[str, Any]) -> bool:
     return shared / len(a | b) >= SIMILAR or (min(len(a), len(b)) >= 3 and shared / min(len(a), len(b)) >= CONTAINED)
 
 
-def ask(cfg: config_mod.Config, questions: list[dict[str, Any]], source: str = "",
-        now: dt.datetime | None = None, pr: int | None = None,
+def ask(cfg: config_mod.Config, questions: list[dict[str, Any]], source: str = "", pr: int | None = None,
         pictures: Callable[[dict[str, Any]], str] | None = None) -> list[str]:
     """Opens an issue per new question, showing `pictures(question)` (markdown) when given.
 
-    A question is new unless an open question, or one closed in the last RECENT_DAYS, has the
-    same key or a similar title: then it's only noted in the log, never asked again.
+    A question is new unless one still waiting for the owner has the same key or a similar title
+    (sessions that hit the same blocker ask it again in other words: #72/#73, #79/#80/#83): then
+    it's only noted in the log.
     """
     questions = [q for q in questions if q.get("title") and q.get("question")][:MAX_PER_SESSION]
     if not questions:
         return []
     labels_mod.ensure(cfg, [LABEL, CHANGE_LABEL])
-    known = recent_questions(cfg, now or dt.datetime.now(dt.timezone.utc))
+    known = waiting_questions(cfg)
     log = []
     for q in questions:
         title = _inert(q["title"], 120)
         q = {**q, "title": title}
         twin = next((i for i in known if same_question(q, i)), None)
         if twin:
-            state = "open" if twin.get("state") == "open" else "answered or closed"
-            log.append(f"Not asked again: \"{title}\" is #{twin['number']} ({state})")
+            log.append(f"Not asked again: \"{title}\" is #{twin['number']}, still waiting for the owner")
             continue
         labels = [LABEL] + ([CHANGE_LABEL] if q.get("owner_change") else [])
         try:  # a question without its pictures is still asked

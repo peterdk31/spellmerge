@@ -2,6 +2,11 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-22: Only questions still waiting for the owner stop a new one
+
+- **Why.** A question that matched one closed in the last 30 days was dropped, and an answered question stays open until the PR carrying out the answer merges. So the next round of a decision (#190, then #192) could be dropped with only a line in the log, and the owner would never see it.
+- **What.** A question is only not asked when one with the same key or a similar title is open and has no `/claude` answer yet. That still stops sessions that hit the same blocker from asking it again in other words (#72/#73, #79/#80/#83). Closed and answered questions never stop a new one; a next round gets a new key and says which issue it follows.
+
 ## 2026-10-22: Owner questions carry their own screenshots, in the question
 
 - **Why.** The owner reads a question after its PR has merged. Copying the PR's before/after comment onto the question afterwards put the pictures in a later comment, missing from the notification, and they showed what the PR changed rather than what the question asks.

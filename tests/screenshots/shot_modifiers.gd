@@ -1,6 +1,6 @@
 extends SceneTree
 ## A sheet of the six modifiers' placeholder icons on the crypt floor, to look at: the 16x16
-## icons at 4x (split, pierce, homing, chain, bigger, faster), and again at 1x as the builder
+## icons at 6x (split, pierce, homing, chain, bigger, faster), and again at 1x as the builder
 ## shows them. Needs a display, so it runs only through
 ## `ci/build/build.sh --quick --screenshots`; the shot is saved as
 ## user://screenshots/modifiers_sheet.png and copied to build/screenshots/.

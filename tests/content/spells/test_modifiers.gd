@@ -130,15 +130,31 @@ func test_the_behaviours_are_on_the_right_modifiers() -> void:
 
 
 func test_every_modifier_works_for_all_four_players_at_once() -> void:
-	for id in MODIFIERS:
+	for index in MODIFIERS.size():
+		var id: StringName = MODIFIERS[index]
 		_spells.clear()
 		_mgr.clear()
+		_hits.clear()
+		# Each player has a target of their own straight ahead; the rows are 400 px apart so
+		# that no homing or chain reach can leak from one player's shot to another's target. Each
+		# modifier gets its own column, inside the projectile bounds.
+		var targets: Array[Node2D] = []
 		for player in 4:
-			var origin := Vector2(0.0, 300.0 * player)
-			_mgr.set_anchor(player, origin)
+			var origin := Vector2(-900.0 + 300.0 * index, -900.0 + 400.0 * player)
+			targets.append(_target(origin + Vector2(100.0, 0.0)))
 			_cast(&"bolt", [id], player, origin)
 		for player in 4:
 			check(_mgr.get_count_for(player) > 0, "%s: player %d has shots" % [id, player])
+		_tick(60)
+		for player in 4:
+			var credited: bool = false
+			var stolen: bool = false
+			for hit: Array in _hits:
+				if hit[1] == targets[player]:
+					credited = credited or hit[0] == player
+					stolen = stolen or hit[0] != player
+			check(credited, "%s: player %d hit their own target" % [id, player])
+			check(not stolen, "%s: nobody else hit player %d's target" % [id, player])
 		_spells.clear()
 
 
@@ -312,7 +328,8 @@ func test_faster_compiles_to_a_quicker_shot_and_cooldown() -> void:
 	var faster: CompiledSpell = _compile(&"bolt", [&"faster"])
 	check(faster.speed > bare.speed, "quicker shot")
 	check(faster.cooldown < bare.cooldown, "shorter cooldown")
-	check_equal(faster.damage, bare.damage, "the same damage")
+	check(faster.damage < bare.damage, "but each shot is a little weaker")
+	check(faster.damage / faster.cooldown > bare.damage / bare.cooldown, "and it is still worth more per second")
 
 
 func test_faster_arrives_sooner() -> void:

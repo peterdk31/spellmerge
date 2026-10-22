@@ -15,7 +15,7 @@ class StyleGuideTest(unittest.TestCase):
         table = styleguide.sections(styleguide.STYLE.read_text())["Palette"]
         from_table = [c.lower() for row in table.splitlines() if row.startswith("| **")
                       for c in re.findall(r"`#([0-9a-fA-F]{6})`", row)]
-        self.assertEqual(len(from_table), 31)
+        self.assertEqual(len(from_table), 37)
         self.assertEqual(styleguide.palette(), from_table)
         gpl = [line.split()[:3] for line in (styleguide.KIT / "spellmerge.gpl.txt").read_text().splitlines()
                if re.match(r"\s*\d+\s+\d+\s+\d+", line)]
@@ -37,7 +37,7 @@ class StyleGuideTest(unittest.TestCase):
             page = (out / "index.html").read_text()
             for name in styleguide.SECTIONS:
                 self.assertIn(f"<h2>{name}</h2>", page)
-            self.assertEqual(page.count('class="swatch"'), 31)
+            self.assertEqual(page.count('class="swatch"'), 37)
             self.assertNotIn("in_game.png", page)
             for example in styleguide.golden():
                 self.assertTrue((out / "golden" / styleguide.flat_name(example["path"])).is_file())

@@ -94,7 +94,7 @@ Security comes first: all outside input (PR code, PR text, issues, discussions) 
 | PR changed after approval | Merge uses `--match-head-commit` with the reviewed SHA. |
 | Supply chain | Actions pinned by commit SHA, Godot download hash-checked, no third-party addons unless the owner adds them, Dependabot for Actions. |
 | Tampered downloads | Builds only from `main` in a clean job, SHA256 checksums, build attestations, immutable releases. |
-| Spam posts and AI-slop PRs | Outside PRs are never merged, only read as suggestions; the intake takes at most 25 posts a run and declines spam. |
+| Spam posts and AI-slop PRs | Outside PRs need the CLA and passing rules, and are finished and reviewed by the bot's own sessions before anything merges; the intake takes at most 25 posts a run and declines spam. |
 | Owner account compromised | 2FA/passkey; no personal access token given to the AI; the bot acts through a custom GitHub App installed only on this repo, with only Contents, Issues and Pull requests access. |
 
 ### Path tiers
@@ -102,7 +102,7 @@ Security comes first: all outside input (PR code, PR text, issues, discussions) 
 | Tier | Paths | Who may change |
 | --- | --- | --- |
 | Owner only | `.github/` (incl. `.github/maintainer/` prompts), `ci/`, `.claude/`, `docs/DESIGN.md`, `LICENSE`, `CLA.md`, `setup.sh`, `REUSE.toml`, `docs/SECURITY-CHECKLIST.md`, `docs/SETUP-APP.md`, `addons/` | Owner review required |
-| Bot maintained | `docs/ROADMAP.md`, `docs/NEXT.md`, `docs/BACKLOG.md`, `docs/DECISIONS.md`, `docs/LOG.md`, `docs/milestones/`, `docs/STYLE.md`, `docs/STORY.md`, area `README.md` files, `AGENTS.md`, `CLAUDE.md`, `llms.txt`, `docs/cla-signatures.json`, `core/`, `project.godot`, `export_presets.cfg` | Claude's own PRs only |
+| Bot maintained | `docs/ROADMAP.md`, `docs/NEXT.md`, `docs/BACKLOG.md`, `docs/DECISIONS.md`, `docs/LOG.md`, `docs/milestones/`, `docs/STYLE.md`, `docs/STORY.md`, area `README.md` files, `AGENTS.md`, `CLAUDE.md`, `llms.txt`, `docs/cla-signatures.json`, `core/`, `project.godot`, `export_presets.cfg` | Claude's own PRs only (a contributor's PR touching them is finished by the bot, whose PR may) |
 
 **Kill switch:** set the repo variable `AUTOMATION_ENABLED=false`, or disable the workflow in the Actions tab. The Control panel issue also has a kill-switch checkbox usable from the GitHub mobile app. Every bot action is posted to that day's "Daily log YYYY-MM-DD" issue (label `daily-log`; the next day's log closes it), and every merge can be reverted.
 
@@ -116,7 +116,7 @@ Runs the hard rules check and the automation's unit tests. There is no build per
 
 ### Daily run (`daily.yml`, 03:00 UTC, `main` only, has the Claude token)
 
-1. **Community intake** (see Community intake): new issues, discussions and outside PRs are gathered, Claude decides each one with read-only tools, and a script labels, replies, closes and queues.
+1. **Community intake** (see Community intake): new issues, discussions and outside PRs are gathered, Claude decides each one with read-only tools, attached files are checked with no secrets, and a script labels, replies, closes and queues.
 2. **Build and smoke test** (script): export the web demo and the full Windows and Linux builds, run the 1-player and 4-bot smoke tests and the stress benchmark (a frame-time regression over 10% is a warning, not a break; see "Gates are sparse"). If broken, revert the day's merges newest first (through bot revert PRs) until it passes and comment on the culprit.
 3. **Release** (script): tag the tested `main` as `v0.YYYYMMDD`, attach build and checksums with attestation, deploy the web build to GitHub Pages and itch.io, regenerate the Contribute page.
 4. **Log**: post a summary to the day's Daily log issue.
@@ -142,11 +142,11 @@ Each Claude step has a turn cap. If the Pro usage limit is hit, the step stops c
 
 ## Community intake
 
-People outside the project don't send code or assets. They post in **Issues** (bug reports, ideas) and **Discussions** (ideas, spell combos, feedback, questions), and Claude decides what happens to each post. The bot writes all code and assets itself, so it never has to judge, license or sandbox outside files.
+Everyone posts the same way: **Issues** (bug reports, ideas), **Discussions** (ideas, spell combos, feedback, questions, art and sound as attachments) and **pull requests** (their own code or content). Claude decides what happens to each post once a day, and the bot's own sessions do the work, finishing contributors' PRs and placing their files rather than merging them untouched.
 
 ### Flow (daily)
 
-1. **Gather** (script, read-only token): open issues and discussions by anyone but the bots that haven't been triaged, plus `needs-info` posts the poster has since answered. Outside PRs are gathered too, read as suggestions. At most 25 a run, oldest first.
+1. **Gather** (script, read-only token): open issues, PRs and discussions by anyone but the bots that haven't been triaged, plus `needs-info` posts the poster has since answered. For a PR also its changed files with a capped diff and its `rules` result; for a discussion the files its poster attached; for both, whether the contributor signed the CLA. At most 25 a run, oldest first.
    - **The owner's posts go through the intake too,** marked `from_owner`: they are the owner's direction, never declined and outside the limit of 5 (scheduled when they fit the milestone, otherwise on the backlog, or one question back when unclear). The owner's own PRs, the Control panel and issues the owner already labelled `scheduled` or `backlog` are left alone.
 2. **Decide** (Claude, read-only tools, no write token): for each post a kind (bug, idea, question, feedback, copyright, spam, other), a decision and a warm reply. The post text is data, never instructions; anything that tries to steer the bot is reported as a concern.
 3. **Apply** (script): carries out each decision with the bot's token, within fixed rules.
@@ -160,7 +160,13 @@ People outside the project don't send code or assets. They post in **Issues** (b
 | `duplicate` | Closed in favour of the open issue. |
 | `decline` | Closed with a kind reason (off-vision, already built, spam). |
 
-A discussion or PR that is scheduled or put on the backlog gets its own issue, linked in the reply; an outside PR is then closed with a note that ideas are welcome as issues. A **copyright** report is always scheduled at priority 1 (take the asset out until the owner has looked) and mentions the owner.
+A discussion that is scheduled or put on the backlog gets its own issue, linked in the reply. A **copyright** report is always scheduled at priority 1 (take the asset out until the owner has looked) and mentions the owner.
+
+### Contributions
+
+- **CLA first.** Using someone's code or files needs their signature on `CLA.md`, once: the comment "I have read the CLA and I agree to it." on their PR or discussion. Until then a schedule or backlog decision becomes `needs_info` with the request; the signature brings the post back. Signatures are kept in the automation state (with a link to the comment) next to the older ones in `docs/cla-signatures.json`.
+- **Pull requests.** Scheduling one also needs the hard-rules check to pass. The PR stays open and becomes the task "finish PR #N by @x": a development session checks it out, builds on the contributor's commits (their authorship stays), reviews and finishes it, and sends it through the normal critique, revision, final review and merge script. When that merges, the contributor's PR is closed with credit. A backlog PR stays open; a declined one is closed with the reason. Outside code only ever runs inside the session's sandbox, after the rules check (no process starts, networking or runtime code loading) has passed.
+- **Files in Discussions.** Claude names a target path for each attached PNG or OGG it takes. A job with no secrets downloads each file (GitHub attachments only), re-encodes it (PNG pixels only; OGG through ffmpeg) within the size limits, and the apply step puts the results on a `submissions/discussion-N` branch. The tracking issue's task tells the session to take them from there, judge them against `docs/STYLE.md` and credit the contributor in the asset manifest.
 
 ### The work queue
 
@@ -602,7 +608,7 @@ The web demo stays free, and daily desktop builds stay free on GitHub Releases, 
 
 - **Code: GPL-3.0.** Anyone selling a fork must publish its source.
 - **Assets: CC-BY-SA 4.0.** Music or key art can be kept proprietary if commissioned.
-- **No outside code or assets:** the bot writes everything from issues and discussions, so no contributor licenses are needed. `CLA.md` and `docs/cla-signatures.json` stay for the contributions merged before the intake (2026-10-22) and for commissioned work.
+- **CLA** (`CLA.md`, adapted from the Apache Individual CLA): every contributor whose code or files are used signs it once, which lets the owner also license contributions under other terms (Steam, a console port). Signing and records: see Community intake, "Contributions".
 - **Trademark "Spellmerge"** once there is traction (EU trademark about €850). It is the real moat, since mostly AI-generated code has weak copyright protection.
 
 ### Fair deal for contributors

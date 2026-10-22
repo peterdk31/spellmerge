@@ -1,16 +1,18 @@
 # AGENTS.md: working on Spellmerge with a coding agent
 
-This is the guide for any coding agent working on Spellmerge: the bot's own sessions and the owner's. Players don't send code; they post bug reports and ideas, which the bot turns into tasks (see [CONTRIBUTING.md](CONTRIBUTING.md)).
+This is the guide for any coding agent working on Spellmerge: the bot's own sessions, the owner's, and contributors' (see [CONTRIBUTING.md](CONTRIBUTING.md) for how pull requests are taken in).
 
 ## The project
 
-Spellmerge is a 2D top-down roguelite about building deep, combinable spells, for 1–4 local co-op players. It's made in **Godot 4.7** with **typed GDScript only**, in 32×32 pixel art. Claude, an AI, maintains it: it writes the code and the assets, reviews its own PRs with a fresh session, and ships a build every day. Players shape it through Issues and Discussions, which a daily intake reads, answers and schedules.
+Spellmerge is a 2D top-down roguelite about building deep, combinable spells, for 1–4 local co-op players. It's made in **Godot 4.7** with **typed GDScript only**, in 32×32 pixel art. Claude, an AI, maintains it: it writes the code and the assets, reviews its own PRs with a fresh session, and ships a build every day. Players shape it through Issues, Discussions and pull requests, which a daily intake reads, answers and schedules; a scheduled pull request is finished by the bot on top of the contributor's commits.
 
 - Vision and pillars: [docs/DESIGN.md](docs/DESIGN.md). Nothing may contradict it.
 - The full plan: [docs/PLAN.md](docs/PLAN.md). Current milestone: [docs/ROADMAP.md](docs/ROADMAP.md).
 - Each area's contract: the `README.md` in that folder.
 
 ## Hard rules (checked on every PR; the merge script checks them again)
+
+A contributor's PR is only taken in once these pass and the author has signed the [CLA](CLA.md) (comment `I have read the CLA and I agree to it.` on the PR).
 
 These cover only security and copyright. Everything else is guidance.
 
@@ -27,7 +29,7 @@ These cover only security and copyright. Everything else is guidance.
    - file access outside `user://`, and loading from a computed path. Write `load("res://...")` or `preload(...)` with a literal path; dynamic loading is done by `core/registry`.
 5. **Licenses:** code is GPL-3.0-or-later and assets are CC-BY-SA-4.0 by default (see [REUSE.toml](REUSE.toml)). A file may instead declare MIT, BSD, Apache-2.0, ISC, Zlib or CC0 (code), or CC0-1.0 or CC-BY-4.0 (assets), with an `SPDX-License-Identifier` line or a `<file>.license` file. Nothing else.
 
-Copyright, in short: only original work or compatible licenses. No ripped game assets, no fan art of other IP, no names from other works (write Fireball, not Hadouken), and no AI prompts naming living artists or franchises. Never copy code or assets from an issue, a discussion or an outside PR: restate the idea and write it fresh. When in doubt, leave it out.
+Copyright, in short: only original work or compatible licenses. No ripped game assets, no fan art of other IP, no names from other works (write Fireball, not Hadouken), and no AI prompts naming living artists or franchises. Code and files from a contributor are only used through the intake's tasks, after their CLA signature (a scheduled PR, or files on a `submissions/` branch); never copy code or assets pasted into an issue or a discussion. When in doubt, leave it out.
 
 ## Untrusted text
 

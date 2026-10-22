@@ -10,7 +10,7 @@ Start with AGENTS.md for the hard rules, then docs/DESIGN.md (nothing may contra
 - [AGENTS.md](AGENTS.md): the guide for coding agents: hard rules, untrusted text, how to work, checks to run.
 - [CLAUDE.md](CLAUDE.md): Claude Code entry point; it only imports AGENTS.md.
 - [CONTRIBUTING.md](CONTRIBUTING.md): for players: how to report a bug or share an idea, and what happens next.
-- [CLA.md](CLA.md): the Contributor License Agreement signed by contributors before the community intake (2026-10-22).
+- [CLA.md](CLA.md): the Contributor License Agreement every contributor signs once before their code or files are used.
 
 ## Plan and design
 

@@ -304,7 +304,7 @@ check_all() {
 manual_steps() {
   bold "Do these by hand (no API exists for them)"
   cat <<EOF
-  1. Discussions categories: Ideas, Spell combos, Art feedback
+  1. Discussions categories: Ideas, Spell combos, Art feedback, Art submissions
      https://github.com/$REPO/discussions/categories
   2. Continue with docs/SETUP-APP.md, then docs/SECURITY-CHECKLIST.md.
 EOF

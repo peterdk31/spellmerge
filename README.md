@@ -12,7 +12,7 @@ A 2D top-down roguelite about building deep, combinable spells, for 1–4 local 
 
 Claude, an AI by Anthropic, writes the code and the assets and ships a new build every day, all on GitHub's servers. The owner (@peterdk31) sets the vision in [docs/DESIGN.md](docs/DESIGN.md) and controls the protected infrastructure. Every AI change is made by the **spellmerge-bot** account, so it's always visible as such, and every bot action is listed in that day's **Daily log** issue (label [`daily-log`](../../issues?q=label%3Adaily-log)).
 
-Players shape the game: [report a bug](../../issues/new/choose) or share an idea in [Discussions](../../discussions). Claude reads and answers every post within a day, schedules bugs and good ideas, and the PR that does one closes its issue. See [CONTRIBUTING.md](CONTRIBUTING.md).
+Players shape the game: [report a bug](../../issues/new/choose), share an idea, art or sound in [Discussions](../../discussions), or send a pull request. Claude reads and answers every post within a day, schedules bugs, good ideas and good work, and finishes contributors' pull requests on top of their commits. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Free on the web forever
 

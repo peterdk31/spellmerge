@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import unittest
+from pathlib import Path
 from typing import Any
 from unittest import mock
 
@@ -38,14 +39,22 @@ class FakeGitHub:
         self.replies: list[tuple[str, str]] = []
         self.next_number = 500
 
+    rules = "success"
+
     def api(self, path: str, *args: str, input: Any = None, token: Any = None) -> Any:
         self.writes.append((path, args, input))
         if path.endswith("/issues") and input:
             self.next_number += 1
             return {"number": self.next_number}
+        if "/check-runs" in path:
+            return {"check_runs": [{"name": "rules", "conclusion": self.rules}]}
+        if "/pulls/" in path and not input:
+            return {"head": {"sha": "abc123"}, "draft": False}
         return {}
 
     def paginated(self, path: str, *args: str, token: Any = None) -> list:
+        if "/files" in path:
+            return [{"filename": "content/spells/chain/chain.gd", "status": "added", "additions": 3, "patch": "+x"}]
         if "/comments" in path:
             return self.comments.get(int(path.split("/issues/")[1].split("/")[0]), [])
         if "/labels?" in path:
@@ -63,6 +72,10 @@ class FakeGitHub:
 
     def patch(self):  # noqa: ANN201
         return mock.patch.multiple(intake.gh, api=self.api, api_paginated=self.paginated, graphql=self.graphql)
+
+
+def no_state():  # noqa: ANN201
+    return mock.patch.object(intake.state, "load", lambda cfg: (copy.deepcopy(state.DEFAULT), None))
 
 
 def gathered(*items: dict, queue: list[dict] = ()) -> dict[str, Any]:
@@ -94,7 +107,7 @@ class IntakeTest(unittest.TestCase):
                     issue(6, pr=True), issue(7, author="dependabot[bot]", pr=True)],
             discussions=[discussion(8), discussion(9, comments=[("github-actions", "Thanks!")]),
                          discussion(10, category="Announcements")])
-        with gh.patch():
+        with gh.patch(), no_state():
             data = intake.gather(CFG)
         self.assertEqual([i["ref"] for i in data["items"]], ["issue:1", "issue:2", "pr:6", "discussion:8"])
 
@@ -105,7 +118,7 @@ class IntakeTest(unittest.TestCase):
                     issue(3, author=owner, labels=("scheduled",)), issue(5, author=owner, title="Daily log")],
             discussions=[discussion(8, author=owner, comments=[(owner, "more detail")]),
                          discussion(9, comments=[(owner, "thanks!")])])
-        with gh.patch():
+        with gh.patch(), no_state():
             data = intake.gather(CFG)
         self.assertEqual([(i["ref"], i["from_owner"]) for i in data["items"]], [("issue:1", True), ("discussion:8", True)])
 
@@ -126,7 +139,7 @@ class IntakeTest(unittest.TestCase):
             discussions=[discussion(3, comments=[("github-actions", "Which build? " + intake.NEEDS_INFO_MARKER),
                                                  ("player", "v0.1")]),
                          discussion(4, comments=[("github-actions", "Which build? " + intake.NEEDS_INFO_MARKER)])])
-        with gh.patch():
+        with gh.patch(), no_state():
             data = intake.gather(CFG)
         self.assertEqual([i["ref"] for i in data["items"]], ["issue:1", "discussion:3"])
 
@@ -146,18 +159,98 @@ class IntakeTest(unittest.TestCase):
         self.assertFalse(attention)
         self.assertIn("#12 bug: schedule (p2)", log[0])
 
-    def test_a_discussion_or_pr_gets_a_tracking_issue_and_a_pr_is_closed(self) -> None:
+    def test_a_discussion_idea_gets_a_tracking_issue(self) -> None:
         gh = FakeGitHub()
         decision = {"kind": "idea", "decision": "backlog", "priority": "p3", "title": "Chain lightning modifier",
                     "task": "A modifier that jumps.", "reply": "Nice idea."}
-        log, _, st = self.run_apply(gh, {"items": [{**decision, "ref": "discussion:7"}, {**decision, "ref": "pr:30"}],
-                                         "concerns": []}, gathered(DISCUSSION_ITEM, PR_ITEM))
+        log, _, st = self.run_apply(gh, {"items": [{**decision, "ref": "discussion:7"}], "concerns": []},
+                                    gathered(DISCUSSION_ITEM))
         created = [i for p, a, i in gh.writes if p.endswith("/issues") and i]
-        self.assertEqual([c["labels"] for c in created], [["triaged", "idea", "backlog", "p3"]] * 2)
-        self.assertEqual(sorted(st["intake_tasks"]), ["501", "502"])
+        self.assertEqual([c["labels"] for c in created], [["triaged", "idea", "backlog", "p3"]])
+        self.assertEqual(list(st["intake_tasks"]), ["501"])
         self.assertIn("Tracked in #501.", gh.replies[0][1])
+        self.assertIn("→ #501", log[0])
+
+    def test_a_pr_needs_the_cla_and_passing_rules_before_it_is_scheduled(self) -> None:
+        decision = {"ref": "pr:30", "kind": "idea", "decision": "schedule", "priority": "p2",
+                    "title": "Add the chain modifier", "task": "Finish the chain modifier.", "reply": "Thanks!"}
+        unsigned = {**PR_ITEM, "cla_signed": False, "rules": "success"}
+        gh = FakeGitHub()
+        _, _, st = self.run_apply(gh, {"items": [decision], "concerns": []}, gathered(unsigned))
+        reply = next(i["body"] for p, a, i in gh.writes if p.endswith("/issues/30/comments"))
+        self.assertIn("I have read the CLA and I agree to it.", reply)
+        self.assertIn(intake.NEEDS_INFO_MARKER, reply)
+        self.assertNotIn((f"repos/{CFG.repo}/pulls/30", ("-X", "PATCH"), {"state": "closed"}), gh.writes)
+        self.assertEqual(st["intake_tasks"], {})
+
+        failing = {**PR_ITEM, "cla_signed": True, "rules": "failure"}
+        gh = FakeGitHub()
+        self.run_apply(gh, {"items": [decision], "concerns": []}, gathered(failing))
+        self.assertIn("`rules` check doesn't pass", next(i["body"] for p, a, i in gh.writes
+                                                         if p.endswith("/issues/30/comments")))
+
+        ready = {**PR_ITEM, "cla_signed": True, "rules": "success", "head": "abc123",
+                 "cla_signature": {"user_id": 7, "login": "player", "version": "1.0", "signed_at": "t", "evidence": "u"}}
+        gh = FakeGitHub()
+        log, _, st = self.run_apply(gh, {"items": [decision], "concerns": []}, gathered(ready))
+        labels = next(i for p, a, i in gh.writes if p.endswith("/issues/30/labels"))
+        self.assertEqual(labels["labels"], ["triaged", "idea", "scheduled", "p2"])
+        self.assertEqual((st["intake_tasks"]["30"]["pr"], st["intake_tasks"]["30"]["author"]), ("true", "player"))
+        self.assertIn("7:1.0", st["cla_signatures"])
+        self.assertTrue(any(line.startswith("CLA signed by") for line in log))
+
+    def test_attached_files_go_on_a_branch_for_the_session(self) -> None:
+        item = {**DISCUSSION_ITEM, "attachments": ["https://github.com/user-attachments/assets/1"], "cla_signed": True}
+        decision = {"ref": "discussion:7", "kind": "idea", "decision": "schedule", "priority": "p3",
+                    "title": "Use the slime sprite", "task": "Use it for the slime.", "reply": "Lovely!",
+                    "assets": [{"url": "https://github.com/user-attachments/assets/1", "path": "art/slime.png"}]}
+        gh = FakeGitHub()
+        with mock.patch.object(intake, "push_assets", lambda cfg, n, folder: f"submissions/discussion-{n}"):
+            st = self.run_apply_with_assets(gh, decision, item, {"discussion:7": {"files": ["art/slime.png (32×32 PNG)"]}})
+        entry = st["intake_tasks"]["501"]
+        self.assertEqual(entry["branch"], "submissions/discussion-7")
+        self.assertIn("submissions/discussion-7", intake.task_line(501, "p3", entry, ""))
+        gh = FakeGitHub()
+        st = self.run_apply_with_assets(gh, decision, item, {"discussion:7": {"error": "not a PNG file"}})
+        self.assertEqual(st["intake_tasks"], {})
+        self.assertIn("not a PNG file", gh.replies[0][1])
+
+    def run_apply_with_assets(self, gh: FakeGitHub, decision: dict, item: dict, assets: dict) -> dict:
+        st = copy.deepcopy(state.DEFAULT)
+
+        def update(cfg: object, change, message: str) -> dict:
+            change(st)
+            return st
+
+        with gh.patch(), mock.patch.object(intake.state, "update", update):
+            intake.apply(CFG, {"items": [decision], "concerns": []}, gathered(item), "t", assets, Path("."))
+        return st
+
+    def test_a_declined_pr_is_closed(self) -> None:
+        gh = FakeGitHub()
+        self.run_apply(gh, {"items": [{"ref": "pr:30", "kind": "idea", "decision": "decline", "reply": "No."}],
+                            "concerns": []}, gathered(PR_ITEM))
         self.assertIn((f"repos/{CFG.repo}/pulls/30", ("-X", "PATCH"), {"state": "closed"}), gh.writes)
-        self.assertIn("→ #502", log[1])
+
+    def test_gather_reads_a_prs_diff_rules_and_cla(self) -> None:
+        gh = FakeGitHub(issues=[issue(6, pr=True, comments=1)],
+                        comments={6: [{"user": {"login": "player", "id": 7}, "body": "I have read the CLA and I agree to it.",
+                                       "html_url": "c", "created_at": "t"}]})
+        with gh.patch(), no_state():
+            item = intake.gather(CFG)["items"][0]
+        self.assertEqual((item["rules"], item["head"], item["cla_signed"]), ("success", "abc123", True))
+        self.assertEqual(item["cla_signature"]["user_id"], 7)
+
+    def test_a_scheduled_pr_becomes_a_finish_task(self) -> None:
+        gh = FakeGitHub(queue={"scheduled": [issue(30, pr=True, labels=("scheduled", "p2")),
+                                             issue(31, pr=True, labels=("scheduled", "p2"))]})
+        st = {"intake_tasks": {"30": {"title": "Add the chain modifier", "task": "Finish it.", "pr": "true",
+                                      "author": "player"}}}
+        with gh.patch():
+            tasks = intake.queue_tasks(CFG, st)
+        self.assertEqual(len(tasks), 1)  # #31 was labelled by hand, without the intake's checks
+        self.assertTrue(tasks[0].startswith("**Finish pull request #30 by @\u200bplayer: Add the chain modifier.**"))
+        self.assertEqual(intake.PR_TASK.search(tasks[0]).group(1), "30")
 
     def test_rules_the_script_enforces(self) -> None:
         known = {r: {"ref": r} for r in ("issue:1", "issue:2", "issue:3", "issue:4", "issue:5")}

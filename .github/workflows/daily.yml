@@ -2,8 +2,9 @@
 #
 #  1. control      kill switch and the owner's verified Control panel
 #  2. intake       new issues, discussions and outside PRs: gathered (read-only),
-#                  decided by Claude (read-only tools, no write token), carried
-#                  out by a script (labels, replies, the work queue)
+#                  decided by Claude (read-only tools, no write token), attached
+#                  files checked with no secrets, carried out by a script
+#                  (labels, replies, the work queue, CLA signatures)
 #  3. build        build and smoke tests; if broken, revert the day's merges
 #                  newest first until it passes, then run again
 #  4. release      attested immutable release, GitHub Pages, itch.io
@@ -86,6 +87,7 @@ jobs:
       issues: read
       pull-requests: read
       discussions: read
+      checks: read # the rules check of outside PRs
     outputs:
       count: ${{ steps.gather.outputs.count }}
     steps:
@@ -162,10 +164,38 @@ jobs:
           FAILED: ${{ steps.claude.outputs.outcome != 'success' }}
         run: python3 -m smbot.session account --file "${EXEC_FILE:-/nonexistent}" --kind intake $([ "$FAILED" = true ] && echo --step-failed)
 
+  intake-assets:
+    name: check files attached to discussions (sandbox, no secrets)
+    needs: intake-decide
+    if: needs.intake-decide.outputs.status == 'ok' && contains(needs.intake-decide.outputs.decisions, '"assets"')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: intake-input
+      - name: Install ffmpeg (re-encodes audio)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+      - env:
+          DECISIONS: ${{ needs.intake-decide.outputs.decisions }}
+        run: python3 -m smbot.contrib assets
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: intake-assets
+          path: submissions
+          retention-days: 1
+
   intake-apply:
     name: label, reply, close and queue (script)
-    needs: intake-decide
-    if: needs.intake-decide.outputs.status == 'ok' && needs.intake-decide.outputs.decisions != ''
+    needs: [intake-decide, intake-assets]
+    if: >-
+      always() && needs.intake-decide.outputs.status == 'ok' && needs.intake-decide.outputs.decisions != ''
+      && needs.intake-assets.result != 'failure'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: automation
@@ -179,14 +209,19 @@ jobs:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: intake-input
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: needs.intake-assets.result == 'success'
+        with:
+          name: intake-assets
+          path: submissions
       - id: app-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           client-id: Iv23lirdyRvc0KC6625s # the bot app's Client ID (public)
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
-          permission-contents: write # the automation-state branch
+          permission-contents: write # the automation-state branch, submissions/ branches
           permission-issues: write
-          permission-pull-requests: write # close outside PRs
+          permission-pull-requests: write # label and close outside PRs
       - env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           DISCUSSIONS_TOKEN: ${{ github.token }}

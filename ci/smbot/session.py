@@ -184,6 +184,21 @@ def close_checkpoint(cfg: config_mod.Config, number: int, pr: str) -> list[str]:
     return [f"Checkpoint #{number} carried out in #{pr}; development continues."]
 
 
+def close_finished_pr(cfg: config_mod.Config, number: int, pr: str) -> list[str]:
+    """The bot's PR that finished an outside PR merged: close theirs with credit."""
+    try:
+        theirs = gh.api(f"repos/{cfg.repo}/pulls/{number}")
+        if theirs.get("state") != "open":
+            return []
+        who = theirs.get("user", {}).get("login", "")
+        gh.api(f"repos/{cfg.repo}/issues/{number}/comments", "-X", "POST", input={"body": (
+            f"Merged as part of #{pr}, with your commits and your name on them. Thank you, @{who}!")})
+        gh.api(f"repos/{cfg.repo}/pulls/{number}", "-X", "PATCH", input={"state": "closed"})
+    except gh.GhError as e:
+        return [f"Couldn't close #{number} after #{pr}: {dailylog.shorten(str(e), 200)}"]
+    return [f"#{number} by @{who} merged as part of #{pr}"]
+
+
 def checkpoint_not_carried_out(cfg: config_mod.Config, number: int, summary: str) -> list[str]:
     """Planning ended with nothing to do on the owner's answer: hand the checkpoint back to the owner."""
     text = dailylog.shorten(summary, 600) or "No reason given."
@@ -692,6 +707,8 @@ def finish(cfg: config_mod.Config, env: dict[str, str]) -> dict[str, str]:
     planned_nothing = planning and status == "nothing_to_do" and not plan_idle
     again = (not backing_off and not merge_skipped and not plan_idle and status != "auth"
              and (progressed or empty_queue or planned_nothing or (failed and errors < state.MAX_ERRORS_IN_A_ROW)))
+    if merged and (m := intake.PR_TASK.search(task)):
+        dailylog.post(cfg, "Contribution merged", close_finished_pr(cfg, int(m.group(1)), pr))
     for number in carried:
         if lines_cp := close_checkpoint(cfg, int(number), pr):
             dailylog.post(cfg, "Checkpoint", lines_cp)

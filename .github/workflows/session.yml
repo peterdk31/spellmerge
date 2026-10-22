@@ -520,6 +520,7 @@ jobs:
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-issues: write
+          permission-pull-requests: write # close an outside PR the session finished
       - id: finish
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}

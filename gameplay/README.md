@@ -27,9 +27,9 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `projectile_impact` | `core/projectiles` | `feel` |
 | `projectile_expired` | `core/projectiles` | none yet (`core/spells` from M2 part 6) |
 | `spell_changed`, `build_refused` | `player` | none yet (`hud`, M2 part 16) |
-| `reaction_triggered` | `combat` | none yet (`feel`, M2 part 8) |
+| `reaction_triggered` | `combat` | `feel` |
 | `damage_dealt` | `combat` | `feel`, `player` |
-| `status_applied` | `combat` | none yet (`feel` from M2 part 8) |
+| `status_applied` | `combat` | none yet |
 | `enemy_died` | `combat` | `feel`, `flow` |
 | `player_downed` | `player` | `ai`, `feel`, `flow`, `run` |
 | `player_revived` | `player` | none yet |

@@ -58,7 +58,16 @@ const MUZZLE_SLOTS: int = 4
 const FLASH_SLOTS: int = 8
 ## Wall-impact sparks come after them (slots FLASH_SLOTS up to ALL_FLASH_SLOTS).
 const SPARK_SLOTS: int = 4
-const ALL_FLASH_SLOTS: int = FLASH_SLOTS + SPARK_SLOTS
+## Reaction flashes (and a name label each) come last, so reactions never take a muzzle
+## flash, puff or spark.
+const REACTION_SLOTS: int = 4
+const ALL_FLASH_SLOTS: int = FLASH_SLOTS + SPARK_SLOTS + REACTION_SLOTS
+## How far a reaction's name rises while it shows, in pixels.
+const REACTION_RISE: float = 10.0
+## The same reaction makes its sound and shake at most this often, and its name is not shown
+## again while the first still rises within `REACTION_LABEL_NEAR` pixels.
+const REACTION_REPEAT: float = 0.3
+const REACTION_LABEL_NEAR: float = 40.0
 ## Hit bursts always left free: wall dust never takes the last slots from a hit on a character.
 const WALL_RESERVE: int = 2
 ## Bursts draw above the room and the pillar tops (z 5), below the flashes (20).
@@ -139,6 +148,20 @@ var _flash_size: PackedFloat32Array = PackedFloat32Array()
 var _flash_aspect: PackedVector2Array = PackedVector2Array()
 var _next_puff: int = MUZZLE_SLOTS
 var _next_spark: int = FLASH_SLOTS
+## Reaction names: one label per reaction flash slot, with where it starts and seconds left.
+var _labels: Array[Label] = []
+var _label_left: PackedFloat32Array = PackedFloat32Array()
+var _label_start: PackedVector2Array = PackedVector2Array()
+var _next_reaction: int = 0
+## Sound ids by reaction id, built the first time a reaction is heard (so it allocates once).
+var _reaction_sounds: Dictionary = {}
+## Display names by reaction id, built the same way.
+var _reaction_names: Dictionary = {}
+## Real seconds since feel started, and when each reaction id last gave a sound and a shake.
+var _clock: float = 0.0
+var _reaction_heard: Dictionary = {}
+## The reaction id each name label shows.
+var _label_id: Array[StringName] = []
 ## Where, along which way and in whom the latest shot on a character struck, from
 ## `projectile_impact` (sent just before the damage), so the damage can aim its spray.
 var _impact_target: int = 0
@@ -186,6 +209,20 @@ func _ready() -> void:
 		flash.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		add_child(flash)
 		_flashes.append(flash)
+	for i in REACTION_SLOTS:
+		var label := Label.new()
+		label.top_level = true
+		label.visible = false
+		label.z_index = 22
+		label.add_theme_font_size_override("font_size", 8)
+		label.add_theme_color_override("font_outline_color", Color.BLACK)
+		label.add_theme_constant_override("outline_size", 3)
+		label.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		add_child(label)
+		_labels.append(label)
+		_label_id.append(&"")
+	_label_left.resize(REACTION_SLOTS)
+	_label_start.resize(REACTION_SLOTS)
 	_flash_left.resize(ALL_FLASH_SLOTS)
 	_flash_total.resize(ALL_FLASH_SLOTS)
 	_flash_size.resize(ALL_FLASH_SLOTS)
@@ -216,6 +253,7 @@ func _ready() -> void:
 	events.spell_cast.connect(_on_spell_cast)
 	events.wizard_cast.connect(_on_wizard_cast)
 	events.projectile_impact.connect(_on_projectile_impact)
+	events.reaction_triggered.connect(_on_reaction_triggered)
 	if projectiles == null:
 		projectiles = get_node_or_null("/root/Projectiles")
 	if projectiles != null and "texture" in projectiles and projectiles.texture == null:
@@ -246,6 +284,7 @@ func _process(delta: float) -> void:
 func step(real_delta: float) -> void:
 	_hit_burst = null
 	_hit_voice = -1
+	_clock += real_delta
 	rest_left = maxf(rest_left - real_delta, 0.0)
 	if stop_left > 0.0:
 		stop_left = maxf(stop_left - real_delta, 0.0)
@@ -263,6 +302,7 @@ func step(real_delta: float) -> void:
 		_apply_camera()
 	_step_reactions(real_delta)
 	_step_flashes(real_delta)
+	_step_labels(real_delta)
 	_step_ghosts(real_delta)
 	var at: int = _active.size() - 1
 	while at >= 0:
@@ -497,6 +537,72 @@ func _on_damage_dealt(player: int, target: Node, amount: int, position: Vector2)
 			size = clampf(1.0 + float(amount - SPRAY_REF_DAMAGE) * preset.hit_spray_per_damage, SPRAY_MIN_SIZE, SPRAY_MAX_SIZE)
 	_impact_target = 0
 	_juice(position, preset.hit_stop_seconds, false, preset.hit_shake, preset.hit_sound, aim, tint, size, at)
+
+
+## An element reaction fired at `position`: a flash and a burst in the reaction's colour, its
+## name rising from the spot, a little shake and the sound `reaction_<id>`. The same for every
+## player; it changes nothing in the fight.
+func _on_reaction_triggered(_player: int, reaction_id: StringName, position: Vector2) -> void:
+	var tint: Color = preset.reaction_colors.get(reaction_id, Color.WHITE) as Color
+	var slot: int = _next_reaction
+	_next_reaction = (_next_reaction + 1) % REACTION_SLOTS
+	_show_flash(FLASH_SLOTS + SPARK_SLOTS + slot, position, preset.reaction_seconds, preset.reaction_flash_size, tint)
+	if _active.size() < BURST_SLOTS - WALL_RESERVE:
+		_burst(position, 1.2, Vector2.ZERO, tint)
+	if not _reaction_names.has(reaction_id):
+		_reaction_names[reaction_id] = String(reaction_id).capitalize()
+		_reaction_sounds[reaction_id] = StringName(preset.reaction_sound_prefix + String(reaction_id))
+	if not _label_showing(reaction_id, position):
+		var label: Label = _labels[slot]
+		var shown: String = _reaction_names[reaction_id] as String
+		if label.text != shown:
+			label.text = shown
+		label.modulate = tint
+		_label_start[slot] = position + Vector2(-label.get_minimum_size().x * 0.5, -18.0)
+		label.global_position = _label_start[slot]
+		label.visible = true
+		_label_left[slot] = preset.reaction_seconds * 3.0
+		_label_id[slot] = reaction_id
+	if _clock - (_reaction_heard.get(reaction_id, -REACTION_REPEAT) as float) < REACTION_REPEAT:
+		return
+	_reaction_heard[reaction_id] = _clock
+	if shake_enabled:
+		_refresh_camera()
+		_trauma = minf(_trauma + preset.reaction_shake, 1.0)
+	_play(_reaction_sounds[reaction_id] as StringName)
+
+
+## Is the name of `reaction_id` already rising near `position`?
+func _label_showing(reaction_id: StringName, position: Vector2) -> bool:
+	for i in REACTION_SLOTS:
+		if _label_left[i] > 0.0 and _label_id[i] == reaction_id \
+				and _label_start[i].distance_to(position) < REACTION_LABEL_NEAR:
+			return true
+	return false
+
+
+## Raise and fade the reaction names.
+func _step_labels(real_delta: float) -> void:
+	for i in REACTION_SLOTS:
+		if _label_left[i] <= 0.0:
+			continue
+		_label_left[i] -= real_delta
+		var label: Label = _labels[i]
+		if _label_left[i] <= 0.0:
+			label.visible = false
+			continue
+		var t: float = _label_left[i] / (preset.reaction_seconds * 3.0)
+		label.global_position = _label_start[i] + Vector2(0.0, -REACTION_RISE * (1.0 - t))
+		label.modulate.a = minf(t * 2.0, 1.0)
+
+
+## Reaction names showing right now (for tests).
+func live_labels() -> int:
+	var count: int = 0
+	for i in REACTION_SLOTS:
+		if _label_left[i] > 0.0:
+			count += 1
+	return count
 
 
 ## A shot struck. On a character, remember how, for the damage event that follows at once;

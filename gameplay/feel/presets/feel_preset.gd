@@ -62,6 +62,21 @@ extends Resource
 ## Camera kick of a cast: pixels pushed against the aim, and pixels given back per second.
 @export_range(0.0, 8.0, 0.1) var cast_kick_pixels: float = 1.5
 @export_range(1.0, 200.0, 1.0) var cast_kick_decay: float = 40.0
+## An element reaction (`reaction_triggered`): the flash and the name's size and seconds, the
+## shake it adds, and the colour of each reaction by its id (a reaction not listed is white).
+## The sound is `reaction_sound_prefix` + the reaction id, for example `reaction_shatter`.
+@export_range(0.0, 0.5, 0.01) var reaction_seconds: float = 0.25
+@export_range(0.1, 6.0, 0.1) var reaction_flash_size: float = 1.4
+@export_range(0.0, 1.0, 0.01) var reaction_shake: float = 0.2
+@export var reaction_colors: Dictionary = {
+	&"shatter": Color("bfe6ff"),
+	&"thaw": Color("e8e0d0"),
+	&"flare": Color("f2a030"),
+	&"kindle": Color("e0592f"),
+	&"stillness": Color("7fc0f0"),
+	&"rift": Color("c99af0"),
+}
+@export var reaction_sound_prefix: String = "reaction_"
 ## Sound ids asked from `core/registry`. A missing sound is silent.
 @export var hit_sound: StringName = &"hit"
 @export var death_sound: StringName = &"enemy_death"

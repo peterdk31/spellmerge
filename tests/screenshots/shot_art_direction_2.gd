@@ -1,7 +1,7 @@
 extends SceneTree
 ## The second art direction sheet (M2 part 27, after the owner's answer on #190): A again for
 ## reference, then D (A's proportions with a hooded robe), E (soft, no black outline) and F (big
-## hat, cobble tiles). Each column shows the floor tiled, the wizard and the icon at 4x, and
+## hat, beveled tiles). Each column shows the floor tiled, the wizard and the icon at 4x, and
 ## four overlapping wizards plus the icon at 1x and 2x (the sizes the game draws them).
 ## Needs a display, so it runs only through `ci/build/build.sh --quick --screenshots`; the shot
 ## is saved as user://screenshots/art_direction_sheet_2.png and copied to build/screenshots/.

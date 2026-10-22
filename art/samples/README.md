@@ -22,7 +22,7 @@ Notes for whoever picks:
 
 ## Round two: D, E and F (after the owner's answer on #190)
 
-The owner leaned towards A, liked C's robe, and asked for more options, new styles included. Sheet: `tests/screenshots/shot_art_direction_2.gd` (`art_direction_sheet_2.png`): A again for reference, then D, E and F. Same palette, same 32×32 grid. As before, "Reads at 1×" and "Mood" are the author's opinion of its own drafts, not a verdict.
+The owner leaned towards A, liked C's robe, and asked for more options, new styles included. Sheet: `tests/screenshots/shot_art_direction_2.gd` (`art_direction_sheet_2.png`, not committed: it is in `build/screenshots/` after `ci/build/build.sh --quick --screenshots`, and in the CI screenshots artifact of this PR): A again for reference, then D, E and F. Same palette, same 32×32 grid. As before, "Reads at 1×" and "Mood" are the author's opinion of its own drafts, not a verdict.
 
 | | D: Chunky hood (`d_hood/`) | E: Soft (`e_soft/`) | F: Big hat (`f_bighat/`) |
 | --- | --- | --- | --- |

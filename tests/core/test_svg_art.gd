@@ -30,6 +30,8 @@ const PALETTE: Array[String] = [
 const OUTLINE: String = "#14121f"
 ## The outline of the soft art direction sample (art/samples/e_soft/): Fire's shadow shade.
 const SOFT_OUTLINE: String = "#8f2d2a"
+## Outline colour per art direction sample folder; a folder not listed uses OUTLINE.
+const SAMPLE_OUTLINES: Dictionary = {"e_soft": SOFT_OUTLINE}
 ## Icons need a closed outline; vfx may outline in their own shadow shade instead.
 const ICON_ROOT: String = "res://content/spells"
 const RECT_ATTRIBUTES: Array[String] = ["x", "y", "width", "height", "fill"]
@@ -104,10 +106,18 @@ func test_the_sample_icons_have_a_closed_outline() -> void:
 	for path in _files:
 		if path.begins_with("res://art/samples/") and path.ends_with("/spell_icon.svg"):
 			icons += 1
-			var outline: String = SOFT_OUTLINE if path.contains("/e_soft/") else OUTLINE
+			var outline: String = SAMPLE_OUTLINES.get(path.get_base_dir().get_file(), OUTLINE)
 			for problem in _outline_problems(FileAccess.get_file_as_string(path), outline):
 				check(false, "%s: %s" % [path, problem])
 	check_equal(icons, 4, "the scan found the 4 sample icons")
+
+
+## E has no black outline anywhere; F's wizard keeps it.
+func test_the_soft_sample_has_no_black_and_the_big_hat_keeps_it() -> void:
+	var soft: String = FileAccess.get_file_as_string("res://art/samples/e_soft/wizard.svg")
+	check(not soft.contains(OUTLINE), "E's wizard uses the black outline")
+	var big: String = FileAccess.get_file_as_string("res://art/samples/f_bighat/wizard.svg")
+	check(big.contains(OUTLINE), "F's wizard lost its black outline")
 
 
 func test_every_svg_is_in_the_manifest() -> void:

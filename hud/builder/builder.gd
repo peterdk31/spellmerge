@@ -84,6 +84,9 @@ const INFO_EDGE: float = 4.0
 const INFO_CORNER: float = 59.0
 const PREVIEW_HEIGHT: float = 16.0
 const NOTE_HEIGHT: float = 36.0
+## Lines the note shows before it trims with an ellipsis (112 px wide, about 20 characters a line); a description must fit them
+## (`test_builder.gd` checks every real one, and `StoryValidator.MAX_LORE_CHARS` caps the length).
+const NOTE_LINES: int = 3
 const LABEL_VARIATION: StringName = &"BuilderLabel"
 const BAR_VARIATION: StringName = &"ComplexityBar"
 const REFUSED_PREFIX: String = "Refused: "
@@ -381,6 +384,15 @@ func note_text() -> String:
 	return _note.text
 
 
+## How many lines `text` takes in the note at its real width and font (the note shows at most
+## `NOTE_LINES`; more is trimmed).
+func note_lines_for(text: String) -> int:
+	var font: Font = _note.get_theme_font("font")
+	var font_size: int = _note.get_theme_font_size("font_size")
+	var wrapped: Vector2 = font.get_multiline_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, _note.size.x, font_size)
+	return ceili(wrapped.y / font.get_height(font_size))
+
+
 ## The reason the last refused change gave, "" after the next request or change.
 func refusal_reason() -> String:
 	return _reason
@@ -426,7 +438,7 @@ func _make_info(player: int) -> void:
 	column.add_child(_preview)
 	_note = _make_info_label(column, "Note")
 	_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_note.max_lines_visible = 3
+	_note.max_lines_visible = NOTE_LINES
 	_note.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	_note.custom_minimum_size = Vector2(0.0, NOTE_HEIGHT)
 

@@ -2,6 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-22: The M1 fire bolt moves to `legacy/fire_bolt`; the new bolt takes the id `bolt`
+
+**Decided by:** Claude (M2 part 10).
+**Decision:** The M2 form `bolt` lives in `content/spells/forms/bolt/` with id `bolt` (the id equals the folder, and the design's recipes say `bolt`). The M1 `SpellBase` bolt, which `flow` hands to the wizards and `combat` profiles until part 11, moved to `content/spells/legacy/fire_bolt/` with id `fire_bolt`; `Flow.DEFAULT_SPELL_ID` and the tests that named it follow. Part 11 deletes the `legacy/` folder with `SpellBase`.
+**Why:** two resources cannot share an id (the registry keeps one), and migrating the bolt in place would have broken the playable game for a whole task.
+**Forms' numbers (first tuning, from the M2 design table):** bolt 1 complexity (damage 5, 5 mana, 0.35 s), the others 2: beam (4 damage, pierce 1, reach 240, 0.8 s), nova (8 shots of 3 over 360°, reach about 60 px, 1 s), rune (8 damage, waits 8 s, radius 14, 1.2 s), orbit (3 orbs of 3 damage at 36 px turning 4 rad/s for 3 s, pierce 4, 3.5 s). The stress benchmark and playtests will retune them.
+
 ## 2026-10-21: Gates are sparse; hard gates notify the owner
 
 **Decided by:** the owner ("Gating should in general be sparse. Development should be prioritized to continue instead of gating stuff. Of course a hard gate can happen, in that case I should be notified").

@@ -1,16 +1,16 @@
 extends SceneTree
-## Tests for the fire bolt (content/spells/forms/bolt): it loads on SpellBase, fires through
+## Tests for the M1 fire bolt (content/spells/legacy/fire_bolt): it loads on SpellBase, fires through
 ## core/projectiles, hits and kills the ember imp through Combat, works for players 0-3, and
 ## no script outside content/spells, core/base and core/spells reads a spell field.
 ##
-## godot --headless --path . --script res://tests/content/spells/test_bolt.gd
+## godot --headless --path . --script res://tests/content/spells/test_fire_bolt_m1.gd
 
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const PlayerScript := preload("res://gameplay/player/player.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
-const BoltResource := preload("res://content/spells/forms/bolt/bolt.tres")
+const BoltResource := preload("res://content/spells/legacy/fire_bolt/fire_bolt.tres")
 const ImpData := preload("res://content/enemies/ember_imp/ember_imp.tres")
 
 const STEP: float = 0.0625
@@ -48,7 +48,7 @@ func _initialize() -> void:
 	_test_no_script_reads_spell_fields()
 	_teardown()
 	if _failures.is_empty():
-		print("TEST OK: content/spells/forms/bolt (fire bolt, hits, no field reads)")
+		print("TEST OK: content/spells/legacy/fire_bolt (fire bolt, hits, no field reads)")
 		quit(0)
 	else:
 		for failure in _failures:
@@ -132,7 +132,7 @@ func _run(count: int) -> void:
 func _test_resource_is_a_spell() -> void:
 	var spell: SpellBase = BoltResource as SpellBase
 	_check(spell != null, "bolt.tres loads as a SpellBase")
-	_check(spell.spell_id() == &"bolt", "the id is bolt")
+	_check(spell.spell_id() == &"fire_bolt", "the id is fire_bolt")
 	_check(spell.demo and spell.mana_cost > 0.0 and spell.cooldown > 0.0, "demo, with a cost and a cooldown")
 	_check(spell.damage > 0 and spell.speed > 0.0 and spell.lifetime > 0.0, "damage, speed and lifetime are set")
 	_check(ceili(float(ImpData.max_health) / float(spell.damage)) <= 8, "an imp dies in a handful of bolts")
@@ -266,8 +266,8 @@ func _test_player_casts_the_bolt() -> void:
 func _test_registry_finds_the_bolt() -> void:
 	var registry: Node = RegistryScript.new()
 	registry.call("scan")
-	var found: Resource = registry.call("get_resource", &"spells", &"bolt") as Resource
-	_check(found is SpellBase and (found as SpellBase).spell_id() == &"bolt", "Registry finds the bolt under spells/forms/bolt")
+	var found: Resource = registry.call("get_resource", &"spells", &"fire_bolt") as Resource
+	_check(found is SpellBase and (found as SpellBase).spell_id() == &"fire_bolt", "Registry finds the fire bolt under spells/legacy/fire_bolt")
 	registry.free()
 
 

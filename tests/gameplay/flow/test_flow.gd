@@ -35,7 +35,7 @@ func _initialize() -> void:
 		printerr("TEST FAILED: the Events, Registry, PlayerInput, Combat and Flow autoloads must exist")
 		quit(1)
 		return
-	_bolt = registry.call("get_resource", &"spells", &"bolt") as SpellBase
+	_bolt = registry.call("get_resource", &"spells", &"fire_bolt") as SpellBase
 	_events.connect("room_entered", func(id: StringName) -> void: _entered.append(id))
 	_events.connect("room_cleared", func(id: StringName) -> void: _cleared.append(id))
 	_events.connect("wave_started", func(number: int) -> void: _waves.append(number))

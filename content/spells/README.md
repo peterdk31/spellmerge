@@ -4,7 +4,7 @@
 
 The spell components that players assemble into spells: **forms** (bolt, beam, nova, rune, orbit), **elements** (fire, frost, storm, void), **modifiers** (split, pierce, homing, chain, bigger, faster) and **triggers** (on hit, on expire, timer). A spell is built as form → element → modifiers → trigger, and a trigger holds another spell. Few components, many combinations: this is the game's first pillar (docs/DESIGN.md).
 
-**Opens for PRs in M2, from part 15** (Spell system, which has started; see docs/milestones/M2-spell-system.md). Until the component classes, the validator and this README's new example exist, PRs to this folder are a gamble. A small M1 base class already exists (`core/base/spell_base.gd`, `SpellBase`); M2 replaces or extends it with the real component classes. The example to copy is the M1 fire bolt, `content/spells/forms/bolt/`.
+**Opens for PRs in M2, from part 15** (Spell system, which has started; see docs/milestones/M2-spell-system.md). Until the component classes, the validator and this README's new example exist, PRs to this folder are a gamble. A small M1 base class already exists (`core/base/spell_base.gd`, `SpellBase`); M2 replaces or extends it with the real component classes. The five forms (`forms/bolt`, `beam`, `nova`, `rune`, `orbit`) are plain `FormBase` `.tres` files with an icon: copy `forms/bolt/` for a new form. The M1 fire bolt lives on in `legacy/fire_bolt/` until part 11.
 
 ## Contract
 
@@ -31,7 +31,7 @@ The spell components that players assemble into spells: **forms** (bolt, beam, n
 
 ## Example to copy
 
-`content/spells/forms/bolt/`: `bolt.tres` (the values: id, mana cost, cooldown, damage, speed, lifetime) on `bolt.gd`, which extends `SpellBase` and overrides `_fire()` to spawn a shot through `Projectiles.spawn` (returning `false` when it could not, so the cast costs nothing) and answers `hit_tag()` and `hit_knockback()`; `Combat` reads the hit profile from those after the `spell_cast` event, so the bolt never calls it. Players and bots never read these fields; they only call `cast()`. The registry shares one resource, so its cooldowns are shared: `flow` calls `reset_cooldowns()` on a new run. `tests/content/spells/test_bolt.gd` fails if any script outside `content/spells/` and `core/base/` reads one. M2 replaces this with the real component classes and migrates the bolt.
+`content/spells/forms/bolt/` is the M2 example: `bolt.tres` on `FormBase` and an `icon.svg`, no script. The M1 one below, now `content/spells/legacy/fire_bolt/`: `fire_bolt.tres` (the values: id, mana cost, cooldown, damage, speed, lifetime) on `fire_bolt.gd`, which extends `SpellBase` and overrides `_fire()` to spawn a shot through `Projectiles.spawn` (returning `false` when it could not, so the cast costs nothing) and answers `hit_tag()` and `hit_knockback()`; `Combat` reads the hit profile from those after the `spell_cast` event, so the bolt never calls it. Players and bots never read these fields; they only call `cast()`. The registry shares one resource, so its cooldowns are shared: `flow` calls `reset_cooldowns()` on a new run. `tests/content/spells/test_bolt.gd` fails if any script outside `content/spells/` and `core/base/` reads one. M2 replaces this with the real component classes and migrates the bolt.
 
 ## Validate
 

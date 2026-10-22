@@ -29,7 +29,7 @@ func after_each() -> void:
 func test_the_defaults_are_the_m1_content() -> void:
 	check_equal(flow.room_id_to_play, &"arena_01", "default room")
 	check_equal(flow.enemy_id_to_play, &"ember_imp", "default enemy")
-	check_equal(flow.spell_id_to_play, &"bolt", "default spell")
+	check_equal(flow.spell_id_to_play, &"fire_bolt", "default spell")
 
 
 func test_an_unknown_room_starts_no_run() -> void:

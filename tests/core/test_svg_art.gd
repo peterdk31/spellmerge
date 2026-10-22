@@ -25,6 +25,9 @@ const PALETTE: Array[String] = [
 	"#1f4a3a", "#3f8f4f", "#8fd46a",
 	"#4a2a6b", "#8a4fc4", "#c99af0",
 ]
+const OUTLINE: String = "#14121f"
+## Icons need a closed outline; vfx may outline in their own shadow shade instead.
+const ICON_ROOT: String = "res://content/spells"
 const RECT_ATTRIBUTES: Array[String] = ["x", "y", "width", "height", "fill"]
 
 var _files: Array[String] = []
@@ -54,6 +57,40 @@ func test_every_svg_follows_the_style_rules() -> void:
 	for path in _files:
 		for problem in _problems(FileAccess.get_file_as_string(path)):
 			check(false, "%s: %s" % [path, problem])
+
+
+func test_the_outline_checker_catches_an_open_outline() -> void:
+	var open_edge: String = _icon_svg([
+		"OFFO",
+		"OFFO",
+	])
+	check(not _outline_problems(open_edge).is_empty(), "fill at the icon edge passed")
+	var closed: String = _icon_svg([
+		".OO.",
+		"OFFO",
+		"OFFO",
+		".OO.",
+	])
+	check_equal(_outline_problems(closed), [] as Array[String], "a closed outline was rejected")
+	var gap: String = _icon_svg([
+		".OO.",
+		"OFF.",
+		"OFFO",
+		".OO.",
+	])
+	check(not _outline_problems(gap).is_empty(), "an outline with a gap passed")
+
+
+## Every icon is closed: each pixel that is not outline has a filled pixel on each of its four
+## sides, and none sits on the icon edge. Diagonal steps of the outline are fine (docs/STYLE.md).
+func test_every_icon_has_a_closed_outline() -> void:
+	var icons: int = 0
+	for path in _files:
+		if path.begins_with(ICON_ROOT) and path.ends_with("/icon.svg"):
+			icons += 1
+			for problem in _outline_problems(FileAccess.get_file_as_string(path)):
+				check(false, "%s: %s" % [path, problem])
+	check_equal(icons, 18, "the scan found 18 spell component icons")
 
 
 func test_every_svg_is_in_the_manifest() -> void:
@@ -129,6 +166,53 @@ func _problems(text: String) -> Array[String]:
 		if overlapped:
 			problems.append("rect %s overlaps another rect" % str(box))
 	return problems
+
+
+## Problems with the outline of an icon; empty when it is closed.
+func _outline_problems(text: String) -> Array[String]:
+	var problems: Array[String] = []
+	var header: RegExMatch = RegEx.create_from_string('<svg[^>]*width="(\\d+)"[^>]*height="(\\d+)"').search(text)
+	if header == null:
+		problems.append("no <svg> with a width and a height")
+		return problems
+	var width: int = header.get_string(1).to_int()
+	var height: int = header.get_string(2).to_int()
+	var cells: PackedStringArray = PackedStringArray()
+	cells.resize(width * height)
+	var attribute_pattern: RegEx = RegEx.create_from_string('([A-Za-z-]+)="([^"]*)"')
+	for rect in RegEx.create_from_string("<rect ([^>]*)/>").search_all(text):
+		var values: Dictionary = {}
+		for pair in attribute_pattern.search_all(rect.get_string(1)):
+			values[pair.get_string(1)] = pair.get_string(2)
+		var x0: int = String(values.get("x", "0")).to_int()
+		var y0: int = String(values.get("y", "0")).to_int()
+		for y in range(y0, mini(y0 + String(values.get("height", "0")).to_int(), height)):
+			for x in range(x0, mini(x0 + String(values.get("width", "0")).to_int(), width)):
+				cells[y * width + x] = String(values.get("fill", ""))
+	for y in height:
+		for x in width:
+			var colour: String = cells[y * width + x]
+			if colour.is_empty() or colour == OUTLINE:
+				continue
+			for step in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+				var nx: int = x + step.x
+				var ny: int = y + step.y
+				if nx < 0 or ny < 0 or nx >= width or ny >= height:
+					problems.append("pixel (%d,%d) is open at the icon edge" % [x, y])
+				elif cells[ny * width + nx].is_empty():
+					problems.append("pixel (%d,%d) touches the empty pixel (%d,%d): the outline has a gap" % [x, y, nx, ny])
+	return problems
+
+
+## A tiny SVG from rows of characters: "." empty, "O" outline, "F" fill.
+func _icon_svg(rows: Array[String]) -> String:
+	var text: String = '<svg width="%d" height="%d" shape-rendering="crispEdges">' % [rows[0].length(), rows.size()]
+	for y in rows.size():
+		for x in rows[y].length():
+			var c: String = rows[y][x]
+			if c != ".":
+				text += '<rect x="%d" y="%d" width="1" height="1" fill="%s"/>' % [x, y, OUTLINE if c == "O" else "#f4f1ea"]
+	return text + "</svg>"
 
 
 func _find(dir_path: String) -> void:

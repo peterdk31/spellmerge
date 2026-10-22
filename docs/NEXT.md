@@ -6,6 +6,7 @@ The ordered task queue for the current milestone, M2 (its design, [M2-spell-syst
 
 M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97). Each task's details are the matching row and sections of the M2 design. Nothing from M3+ is built (rewards, relics, staffs, rooms, the door rule).
 
+- [ ] **Read the first WASM numbers (M2 part 25 follow-up).** (`tests/benchmark/`, `docs/`) Once a daily build has run the web projectile timing step, read its `BENCH:` lines (or why it failed or timed out; see `docs/DECISIONS.md`, 2026-10-22) and either confirm the limits or lower them. "WASM pending" stays open until then.
 - [ ] **Component icons and art pass (M2 part 26).** (`art/`, `content/spells/`) Icons for all 18, element shot tints and the vfx checked together in one screenshot sheet against docs/STYLE.md; whatever falls short becomes Claude's own replacement task in `docs/NEXT.md`.
 - [ ] **Art direction choice (M2 part 27).** Claude drafts the style samples itself and asks the owner in one `owner` issue to pick one (optionally after asking players for feedback in Discussions) and to lock it in DESIGN.md; nothing in the game waits on it.
 - [ ] **Stabilisation and C2 (M2 part 28).** Only bug fixing, polish and performance until no known crash or blocker remains; then the planning session ends M2 with the C2 checkpoint issue (build link, bot data such as fuzz and stress numbers and which recipes bots build, Claude's honest assessment and the C2 question), and development waits for the owner's /go, /iterate or /pivot.

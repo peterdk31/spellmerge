@@ -68,6 +68,13 @@ func _initialize() -> void:
 		var script: GDScript = menu.call("_runner_script", pair[0]) as GDScript
 		_expect(script != null and script.resource_path == String(menu.get(pair[1])), "%s does not load %s" % [pair[0], pair[1]])
 
+	# One real runner through the real path, freed before it enters the tree (it starts its
+	# work only once added), so a typo in a `load` literal fails here.
+	var real: Node = menu.call("_make_runner", "ProjectileTimingRunner") as Node
+	_expect(real != null, "the real timing runner was not made")
+	if real != null:
+		real.free()
+
 	# `_ready` is the only caller of the command line lookup, which merges the user
 	# arguments (after "--") with the plain ones (the web page `args`). The test run
 	# has the script path and no `--four-bot`, so the merge must hold the former only.

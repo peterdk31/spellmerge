@@ -164,6 +164,12 @@ class PromptTest(unittest.TestCase):
         p = session.revise_prompt(CFG, 7, {"summary": "s", "problems": [
             {"severity": "major", "file": "a.gd", "line": 3, "problem": "p", "fix": "f"}]})
         self.assertIn("[major] a.gd:3: p Fix: f", p)
+        self.assertIn("so don't ask them again either:\n(none)", p)
+        # The first session's questions are only asked after the revision, so it is told about them.
+        p = session.revise_prompt(CFG, 7, {}, first={"owner_questions": [
+            {"title": "Pick a style?", "key": "art-direction-pick"}, {"question": "no title"}, "junk"]})
+        self.assertIn("- Pick a style? (key `art-direction-pick`)", p)
+        self.assertNotIn("{{", p)
 
     def test_mergeable(self) -> None:
         self.assertTrue(session.mergeable({"verdict": "approve", "problems": [{"severity": "minor"}]}))

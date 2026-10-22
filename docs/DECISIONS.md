@@ -5,7 +5,13 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 ## 2026-10-22: Multimesh batches are sized by use, not cut mid-buffer
 
 - **Why.** `MultiMesh.buffer` must hold exactly instance_count x 16 floats, so a partial upload is not possible; the only way to send less is a smaller MultiMesh.
-- **Now.** Each batch's room is the shots it draws rounded up to a power of two (at least 64, at most the cap); it grows at once and shrinks only when use is under a quarter of it, so the MultiMesh is rebuilt rarely. No shot is dropped by it; the cap is unchanged.
+- **Now.** Each batch's room is the shots it draws rounded up to a power of two (at least 64, at most the cap); it grows at once and shrinks only when use is under a quarter of it, so the MultiMesh is rebuilt rarely. No shot is dropped by it; the cap is unchanged. An empty batch above the smallest size drops to nothing.
+
+## 2026-10-22: Owner questions carry their own screenshots, in the question
+
+- **Why.** The owner reads a question after its PR has merged. Copying the PR's before/after comment onto the question afterwards put the pictures in a later comment, missing from the notification, and they showed what the PR changed rather than what the question asks.
+- **What.** A question can name up to three shot scripts (`screenshots` in `owner_questions`), staged to show exactly what is being decided. They run in the screenshots job with the PR's, on the same commit (on `main` when there is no PR), and appear under "What it looks like", right after the question. A question that names none shows the PR's screenshots instead.
+- **Order.** Questions are asked by a new `ask` job after the screenshots are posted, not when the PR opens, so the issue is created with its pictures. The revision is told the first session's questions, since they aren't issues yet, so it doesn't ask them twice; `finish` waits for `ask`, so the next session sees them.
 
 ## Planning 2026-10-22: queue empty, M2 not done
 

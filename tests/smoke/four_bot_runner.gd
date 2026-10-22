@@ -205,7 +205,7 @@ func _check() -> Array[String]:
 	for index in IDLER:
 		var wizard := _flow.call("get_wizard", index) as Node
 		var bot: BotScript = _bots[index]
-		if wizard != null and not bot.built_recipe.is_empty() and wizard.call("recipe_of", BotScript.BUILD_SPELL) != bot.built_recipe:
+		if wizard != null and not bot.built_recipe.is_empty() and _plain(wizard.call("recipe_of", BotScript.BUILD_SPELL)) != _plain(bot.built_recipe):
 			failed.append("bot %d: spell B is not the recipe it built" % (index + 1))
 		if wizard != null and not bot.built_recipe.is_empty() and int(wizard.get("active_slot")) != BotScript.BUILD_SPELL:
 			failed.append("bot %d: still not on spell B, the swap did not happen" % (index + 1))
@@ -220,6 +220,24 @@ func _check() -> Array[String]:
 		else:
 			failed.append(message + " while it was not downed")
 	return failed
+
+
+## A recipe with every id a String and every array untyped, so StringName against String or a
+## typed array against an untyped one cannot make equal recipes differ.
+func _plain(value: Variant) -> Variant:
+	if value is Dictionary:
+		var out: Dictionary = {}
+		for key: Variant in value:
+			out[str(key)] = _plain(value[key])
+		return out
+	if value is Array:
+		var list: Array = []
+		for item: Variant in value:
+			list.append(_plain(item))
+		return list
+	if value is StringName:
+		return str(value)
+	return value
 
 
 func _finish(failed: Array[String]) -> void:

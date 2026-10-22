@@ -7,8 +7,9 @@ extends "res://tests/support/suite.gd"
 ##  - a recipe the compiler neither accepts nor refuses with a reason, or one it accepts that
 ##    breaks a limit of `SpellLimits` (complexity, shots, depth, modifiers, speed, radius,
 ##    pierce, cooldown, damage),
-##  - a spell that cannot be built or cast, or that leaves more live shots than the manager's
-##    cap, and
+##  - a spell that cannot be built or cast, or one that fills the manager's cap (the manager
+##    then drops shots, counted in `dropped`; the cap is far above what one recipe needs, so
+##    reaching it is a runaway) or has over SHOT_LIMIT live shots at once, and
 ##  - a frame over budget: the mean time of a physics step (projectiles, spells, combat) of a
 ##    recipe above MEAN_LIMIT_MS (two 60 FPS frames), or any one step above STEP_LIMIT_MS
 ##    (100 ms; a hiccup of the machine is not a spell, so both have a wide margin).
@@ -27,14 +28,22 @@ const RECIPES: int = 300
 ## Seconds each recipe is cast and run for.
 const SECONDS: float = 2.0
 ## Mean step time allowed per recipe and the most any one step may take. These are coarse
-## (two 60 FPS frames, and 100 ms) because a shared CI runner is noisy; the real numbers are
-## printed on the FUZZ line at the end.
-const MEAN_LIMIT_MS: float = 2000.0 / 60.0
+## (5 ms is far above the measured worst mean, and 100 ms is for a hiccup of the machine)
+## because a shared CI runner is noisy. The time-free guard is the live shot count below. The
+## real numbers are printed on the FUZZ line at the end.
+const MEAN_LIMIT_MS: float = 5.0
 const STEP_LIMIT_MS: float = 100.0
-## Most live shots at any step (the cap `combo_arena.gd` gives the manager).
+## The cap `combo_arena.gd` gives the manager. No recipe may reach it (nothing dropped).
 const SHOT_CAP: int = 512
+## Live shots at once one recipe may have: a little under the cap, so a spell that grows past
+## today's worst case (456, a nova with split holding a split chain nova) fails before the
+## manager starts dropping. Hit work grows with live shots, so this also guards cost without
+## depending on the runner's speed.
+const SHOT_LIMIT: int = 480
 ## Recipes that must compile, or the fuzzer is not testing anything.
 const MIN_COMPILING: int = 100
+## Compiled recipes the run must include per feature, so the rare shapes are really reached.
+const MIN_COVERAGE: Dictionary = {"held": 5, "three_modifiers": 5, "trigger": 5, "element": 20}
 
 var _log: Logger = ErrorLogScript.new()
 
@@ -55,6 +64,17 @@ func _ids_by_kind(arena: ArenaScript) -> Dictionary:
 func _populate(arena: ArenaScript) -> void:
 	for at: Vector2 in [Vector2(60, 0), Vector2(110, 20), Vector2(110, -20), Vector2(160, 0), Vector2(-50, 30), Vector2(0, 70), Vector2(0, -70)]:
 		arena.add_imp(at)
+
+
+## Which features a recipe has (0 or 1 each), under the keys of MIN_COVERAGE.
+func _coverage(recipe: Dictionary) -> Dictionary:
+	var modifiers: Array = recipe.get("modifiers", [])
+	return {
+		"held": 1 if recipe.has("held") else 0,
+		"three_modifiers": 1 if modifiers.size() >= 3 else 0,
+		"trigger": 1 if recipe.has("trigger") else 0,
+		"element": 1 if recipe.has("element") else 0,
+	}
 
 
 ## What is wrong with a compiled spell's numbers, or "" (`spell` and every held one).
@@ -87,6 +107,8 @@ func test_random_recipes_compile_cast_and_stay_in_budget() -> void:
 	var compiling: int = 0
 	var slowest_mean: float = 0.0
 	var slowest_step: float = 0.0
+	var peak: int = 0
+	var coverage: Dictionary = {}
 	for number in RECIPES:
 		var recipe: Dictionary = fuzzer.candidate(rng)
 		var label: String = "seed %d, recipe %d %s" % [SEED, number, str(recipe)]
@@ -117,15 +139,22 @@ func test_random_recipes_compile_cast_and_stay_in_budget() -> void:
 		var mean: float = total / float(steps)
 		slowest_mean = maxf(slowest_mean, mean)
 		check(mean <= MEAN_LIMIT_MS, "%s: a step took %.2f ms on average" % [label, mean])
-		check(fresh.peak_shots <= SHOT_CAP, "%s: %d live shots at once, over the cap of %d" % [label, fresh.peak_shots, SHOT_CAP])
+		check(fresh.projectiles.dropped == 0, "%s: the manager dropped %d shots at the cap of %d" % [label, fresh.projectiles.dropped, SHOT_CAP])
+		check(fresh.peak_shots <= SHOT_LIMIT, "%s: %d live shots at once, over %d" % [label, fresh.peak_shots, SHOT_LIMIT])
+		peak = maxi(peak, fresh.peak_shots)
+		var counted: Dictionary = _coverage(recipe)
+		for key: String in counted:
+			coverage[key] = int(coverage.get(key, 0)) + int(counted[key])
 		fresh.free_all()
 	OS.remove_logger(_log)
 	arena.free_all()
 	check(compiling >= MIN_COMPILING, "only %d of %d random recipes compile; the fuzzer tests too little" % [compiling, RECIPES])
+	for key: String in MIN_COVERAGE:
+		check(int(coverage.get(key, 0)) >= int(MIN_COVERAGE[key]), "only %d compiled recipes with %s (want %d); the fuzzer misses it" % [int(coverage.get(key, 0)), key, int(MIN_COVERAGE[key])])
 	var lines: Array[String] = _log.call("get_lines")
 	for line in lines:
 		check(false, "the log has an error: " + line.trim_prefix("ERROR:").strip_edges())
-	print("FUZZ: %d recipes, %d compiled, slowest mean step %.3f ms, slowest step %.3f ms" % [RECIPES, compiling, slowest_mean, slowest_step])
+	print("FUZZ: %d recipes, %d compiled, slowest mean step %.3f ms, slowest step %.3f ms, most live shots %d" % [RECIPES, compiling, slowest_mean, slowest_step, peak])
 
 
 ## The same seed gives the same recipes, which is what makes a failure replayable.

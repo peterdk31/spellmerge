@@ -119,14 +119,14 @@
 			"casts": [{"slot": 0, "recipe": {"form": "nova", "element": "void", "trigger": "on_hit", "held": {"form": "nova", "element": "fire"}}}],
 			"imps": [[36, 0], [36, 45], [-36, 0], [-36, 45]],
 			"seconds": 2.0,
-			"checks": [{"kind": "status", "imps": [0, 2], "status": "hex"}, {"kind": "status", "imps": [1, 3], "status": "burn"}]
+			"checks": [{"kind": "status", "imps": [0, 1, 2, 3], "status": "hex"}, {"kind": "status", "imps": [1, 3], "status": "burn"}]
 		},
 		{
 			"id": "storm_mine",
 			"name": "Storm mine",
-			"does": "A storm rune on the floor; its hit jumps between the imps standing round it.",
+			"does": "A storm rune on the floor; an imp that steps on it is hit, and the hit jumps on to the imps standing farther off.",
 			"casts": [{"slot": 0, "recipe": {"form": "rune", "element": "storm", "modifiers": ["chain"]}}],
-			"imps": [[20, 0], [0, 26], [-26, 0]],
+			"imps": [[20, 0], [0, 80], [-60, 60]],
 			"seconds": 1.5,
 			"checks": [{"kind": "damaged", "imps": [0, 1, 2]}]
 		},
@@ -142,11 +142,11 @@
 		{
 			"id": "frost_carousel",
 			"name": "Frost carousel",
-			"does": "A frost ring that chills everything it passes.",
+			"does": "A frost ring that goes through a packed crowd and chills nearly every imp it passes.",
 			"casts": [{"slot": 0, "recipe": {"form": "orbit", "element": "frost", "modifiers": ["pierce"]}}],
-			"imps": [[36, 0], [0, 36], [-36, 0]],
+			"imps": [[36, 0], [34, 12], [28, 23], [18, 31], [6, 35], [-6, 35], [-18, 31], [-28, 23], [-34, 12], [-36, 0], [-34, -12], [-28, -23], [-18, -31], [-6, -35], [6, -35], [18, -31], [28, -23], [34, -12]],
 			"seconds": 3.0,
-			"checks": [{"kind": "status", "imps": [0, 1, 2], "status": "chill"}]
+			"checks": [{"kind": "status_count", "status": "chill", "min": 16}]
 		},
 		{
 			"id": "seeking_void_ray",
@@ -169,20 +169,20 @@
 		{
 			"id": "quick_shock_ring",
 			"name": "Quick shock ring",
-			"does": "A quick ring of shock that recharges fast.",
-			"casts": [{"slot": 0, "recipe": {"form": "nova", "element": "storm", "modifiers": ["faster"]}}],
-			"imps": [[40, 0], [0, 40], [-40, 0]],
+			"does": "A quick ring of shock that flies farther and is ready again before a plain ring is (the second cast, at 0.8 s, is refused without Faster).",
+			"casts": [{"slot": 0, "recipe": {"form": "nova", "element": "storm", "modifiers": ["faster"]}}, {"slot": 0, "at": 0.8, "recipe": {"form": "nova", "element": "storm", "modifiers": ["faster"]}}],
+			"imps": [[40, 0], [0, 40], [-40, 0], [60, 60]],
 			"seconds": 1.5,
-			"checks": [{"kind": "status", "imps": [0, 1, 2], "status": "shock"}]
+			"checks": [{"kind": "status", "imps": [0, 1, 2, 3], "status": "shock"}]
 		},
 		{
 			"id": "seeking_frost_burst",
 			"name": "Seeking frost burst",
-			"does": "A bolt that finds its target and ends in a frost burst.",
-			"casts": [{"slot": 0, "recipe": {"form": "bolt", "element": "frost", "modifiers": ["homing"], "trigger": "on_expire", "held": {"form": "nova", "element": "frost"}}}],
-			"imps": [[150, 50], [160, 60]],
+			"does": "A bolt that turns toward an imp, goes through it, and at the end of its flight bursts into frost on the imp waiting there.",
+			"casts": [{"slot": 0, "recipe": {"form": "bolt", "element": "frost", "modifiers": ["homing", "pierce"], "trigger": "on_expire", "held": {"form": "nova", "element": "frost"}}}],
+			"imps": [[150, 40], [300, 0]],
 			"seconds": 2.5,
-			"checks": [{"kind": "status", "imps": [0], "status": "chill"}]
+			"checks": [{"kind": "status", "imps": [0, 1], "status": "chill"}]
 		},
 		{
 			"id": "storm_on_flame",

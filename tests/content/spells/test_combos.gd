@@ -36,21 +36,26 @@ func before_each() -> void:
 
 
 ## Builds the arena for `combo`, casts it as the row says and runs it. The caller frees it.
-func _play(combo: Dictionary) -> ArenaScript:
+## With `quiet`, a recipe that does not build or a cast that is refused is not a failure (the
+## control runs below drop a component on purpose).
+func _play(combo: Dictionary, quiet: bool = false) -> ArenaScript:
 	var arena := ArenaScript.new(root)
 	for at: Array in combo.get("imps", []):
 		arena.add_imp(Vector2(float(at[0]), float(at[1])))
 	var casts: Array = (combo.get("casts", []) as Array).duplicate()
 	for entry: Dictionary in casts:
 		var built: CompiledSpell = arena.install(int(entry.get("player", 0)), int(entry["slot"]), entry["recipe"] as Dictionary)
-		check(built.valid, "%s: the recipe builds: %s" % [combo["id"], built.reason])
+		if not quiet:
+			check(built.valid, "%s: the recipe builds: %s" % [combo["id"], built.reason])
 	casts.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a.get("at", 0.0)) < float(b.get("at", 0.0)))
 	var seconds: float = float(combo.get("seconds", 1.0))
 	for entry: Dictionary in casts:
 		var at: float = float(entry.get("at", 0.0))
 		if at > arena.time:
 			arena.run(at - arena.time)
-		check(arena.cast(int(entry.get("player", 0)), int(entry["slot"])), "%s: the cast in slot %d is made" % [combo["id"], int(entry["slot"])])
+		var made: bool = arena.cast(int(entry.get("player", 0)), int(entry["slot"]))
+		if not quiet:
+			check(made, "%s: the cast in slot %d is made" % [combo["id"], int(entry["slot"])])
 	arena.run(maxf(seconds - arena.time, 0.0))
 	return arena
 
@@ -112,6 +117,18 @@ func test_every_component_is_in_two_combos() -> void:
 		check(count >= 2, "%s is in at least two combos (got %d)" % [component, count])
 
 
+func test_the_component_list_is_every_spell_component() -> void:
+	var arena := ArenaScript.new(root)
+	var known: Array[String] = []
+	for id: StringName in arena.registry.call("get_ids", &"spells"):
+		known.append(String(id))
+	for id: String in known:
+		check(COMPONENTS.has(id), "%s is a component: add it to COMPONENTS with its two combos" % id)
+	for id: String in COMPONENTS:
+		check(known.has(id), "%s in COMPONENTS is in the registry" % id)
+	arena.free_all()
+
+
 func test_every_row_has_its_fields_and_an_unseen_id() -> void:
 	var seen: Dictionary = {}
 	for combo: Dictionary in _combos:
@@ -169,6 +186,47 @@ func test_every_combo_does_what_it_promises() -> void:
 			var problem: String = _problem_with(arena, row)
 			check(problem == "", "%s (%s): %s" % [combo["id"], combo["does"], problem])
 		arena.free_all()
+
+
+## Rows whose point is one component: with it dropped, some check of the row must fail.
+const CONTROLS: Dictionary = {
+	"storm_mine": "chain",
+	"frost_carousel": "pierce",
+	"quick_shock_ring": "faster",
+	"seeking_frost_burst": "on_expire",
+}
+
+
+func _without(recipe: Dictionary, component: String) -> Dictionary:
+	var out: Dictionary = recipe.duplicate(true)
+	if out.get("trigger", "") == component:
+		out.erase("trigger")
+		out.erase("held")
+	if out.has("modifiers"):
+		(out["modifiers"] as Array).erase(component)
+	if out.has("held"):
+		out["held"] = _without(out["held"] as Dictionary, component)
+	return out
+
+
+func test_a_combo_row_fails_without_the_component_it_is_for() -> void:
+	for combo: Dictionary in _combos:
+		if not CONTROLS.has(combo["id"]):
+			continue
+		var plain: Dictionary = combo.duplicate(true)
+		for entry: Dictionary in plain["casts"]:
+			entry["recipe"] = _without(entry["recipe"] as Dictionary, CONTROLS[combo["id"]])
+		var arena: ArenaScript = _play(plain, true)
+		var failed: bool = false
+		for row: Dictionary in combo["checks"]:
+			failed = failed or _problem_with(arena, row) != ""
+		check(failed, "%s: its checks fail without %s" % [combo["id"], CONTROLS[combo["id"]]])
+		arena.free_all()
+	for id: String in CONTROLS:
+		var found: bool = false
+		for combo: Dictionary in _combos:
+			found = found or combo["id"] == id
+		check(found, "the control row %s exists" % id)
 
 
 func test_a_combo_check_that_fails_is_reported() -> void:

@@ -1,4 +1,4 @@
-[gd_resource type="Theme" load_steps=15 format=3]
+[gd_resource type="Theme" load_steps=16 format=3]
 
 [sub_resource type="StyleBoxFlat" id="panel_p1"]
 content_margin_left = 4.0
@@ -53,6 +53,9 @@ bg_color = Color(0.0784314, 0.0705882, 0.121569, 0.7)
 
 [sub_resource type="StyleBoxFlat" id="bar_health"]
 bg_color = Color(0.878431, 0.34902, 0.184314, 1)
+
+[sub_resource type="StyleBoxFlat" id="bar_complexity"]
+bg_color = Color(0.639216, 0.623529, 0.721569, 1)
 
 [sub_resource type="StyleBoxFlat" id="bar_mana"]
 bg_color = Color(0.94902, 0.760784, 0.188235, 1)
@@ -153,6 +156,11 @@ BuilderButton/styles/disabled = SubResource("button_small_dark")
 BuilderButton/styles/hover = SubResource("button_small")
 BuilderButton/styles/normal = SubResource("button_small")
 BuilderButton/styles/pressed = SubResource("button_small_dark")
+BuilderLabel/base_type = &"Label"
+BuilderLabel/font_sizes/font_size = 10
+ComplexityBar/base_type = &"ProgressBar"
+ComplexityBar/styles/background = SubResource("bar_back")
+ComplexityBar/styles/fill = SubResource("bar_complexity")
 HealthBar/base_type = &"ProgressBar"
 HealthBar/styles/background = SubResource("bar_back")
 HealthBar/styles/fill = SubResource("bar_health")

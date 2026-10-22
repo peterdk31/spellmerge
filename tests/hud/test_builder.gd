@@ -16,6 +16,7 @@ const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const PlayerScript := preload("res://gameplay/player/player.gd")
 const HudScript := preload("res://hud/panels/panels.gd")
 const BuilderScript := preload("res://hud/builder/builder.gd")
+const PreviewScript := preload("res://hud/builder/spell_preview.gd")
 ## Loaded when needed, not preloaded: this scene is also the "Hud" autoload.
 const HUD_SCENE_PATH: String = "res://hud/panels/panels.tscn"
 
@@ -532,3 +533,165 @@ func test_the_builder_sends_no_event_but_build_change_requested() -> void:
 	for other in ["spell_swap_requested.emit", "spell_changed.emit", "recipe_changed.emit", "bag_changed.emit", "build_refused.emit"]:
 		check(not source.contains(other), "it never sends %s" % other)
 	check(not source.contains("res://gameplay"), "it never loads anything from gameplay")
+
+
+# --- Live stats, complexity, refusal reason, preview, descriptions (part 17) ---
+
+func test_the_complexity_bar_follows_the_whole_spell() -> void:
+	_start(1)
+	_open(0)
+	var builder: BuilderScript = _builder(0)
+	check_equal(builder.complexity_limit(), float(SpellLimits.MAX_COMPLEXITY), "the bar ends at the limit")
+	check_equal(builder.complexity_value(), 2.0, "bolt and fire cost 2")
+	check_equal(builder.complexity_text(), "Complexity 2/%d" % SpellLimits.MAX_COMPLEXITY, "and the number is in words")
+	_choose(0, BuilderScript.SLOT_FIRST_MODIFIER, "Split")
+	check_equal(builder.complexity_value(), 4.0, "split adds 2")
+	# The held spell counts toward the whole spell, whichever level is shown.
+	_choose(0, BuilderScript.SLOT_TRIGGER, "On Hit")
+	check_equal(builder.complexity_value(), 5.0, "the trigger adds 1")
+	_press(0, builder.held_button())
+	_choose(0, BuilderScript.SLOT_FORM, "Nova")
+	check_equal(builder.level(), 1, "the held level is shown")
+	check_equal(builder.complexity_value(), 7.0, "a held nova adds 2 to the whole spell")
+	_press(0, builder.tab_button(1))
+	check_equal(builder.complexity_value(), 1.0, "spell B shows its own cost")
+
+
+func test_the_stats_come_from_the_compiled_spell_shown() -> void:
+	_start(1)
+	_open(0)
+	var builder: BuilderScript = _builder(0)
+	var plain: Dictionary = _spells.builder_view(builder.recipe_of(0), 0)
+	check(builder.stats_text().contains("Dmg %d" % plain["damage"]), "the damage is shown, got '%s'" % builder.stats_text())
+	check(builder.stats_text().contains("Shots %d" % plain["shots"]), "the shots are shown")
+	check(builder.stats_text().contains("Mana"), "and the mana")
+	_choose(0, BuilderScript.SLOT_FIRST_MODIFIER, "Split")
+	var split: Dictionary = _spells.builder_view(builder.recipe_of(0), 0)
+	check(int(split["shots"]) > int(plain["shots"]), "split makes more shots")
+	check(builder.stats_text().contains("Shots %d" % split["shots"]), "the stats follow the change, got '%s'" % builder.stats_text())
+	_choose(0, BuilderScript.SLOT_FORM, "Beam")
+	check(builder.stats_text().contains("Ray"), "a beam is a ray, not a shot count")
+	# The held level shows the held spell's own numbers.
+	_choose(0, BuilderScript.SLOT_TRIGGER, "On Hit")
+	_press(0, builder.held_button())
+	check_equal(builder.stats_text(), BuilderScript.NO_STATS_TEXT, "an empty held spell has no stats")
+	_choose(0, BuilderScript.SLOT_FORM, "Nova")
+	var held: Dictionary = _spells.builder_view(builder.recipe_of(0), 1)
+	check(builder.stats_text().contains("Dmg %d" % held["damage"]), "the held spell's damage is shown, got '%s'" % builder.stats_text())
+	var cast: Dictionary = _spells.builder_view(builder.recipe_of(0), 0)
+	check(int(held["damage"]) != int(cast["damage"]) or int(held["shots"]) != int(cast["shots"]), "and it is not the cast's numbers")
+
+
+func test_a_refusal_reason_is_shown_as_text_and_cleared_by_the_next_change() -> void:
+	_start(2)
+	_open(0)
+	_open(1)
+	var builder: BuilderScript = _builder(0)
+	check_equal(builder.note_text(), "", "nothing is refused at first")
+	_choose(0, BuilderScript.SLOT_TRIGGER, "On Hit")
+	_press(0, builder.held_button())
+	_choose(0, BuilderScript.SLOT_ELEMENT, "Frost")
+	check(not _refused.is_empty(), "the player refused it")
+	var reason: String = _refused[0][1]
+	check(reason != "", "with a reason")
+	check_equal(builder.refusal_reason(), reason, "the builder keeps it")
+	check_equal(builder.note_text(), BuilderScript.REFUSED_PREFIX + reason, "and shows it as words, with its label")
+	check_equal(_builder(1).note_text(), "", "another player's builder shows nothing")
+	_choose(0, BuilderScript.SLOT_FORM, "Bolt")
+	check_equal(builder.refusal_reason(), "", "a change that works clears it")
+	check_equal(builder.note_text(), "", "and the text is gone")
+
+
+func test_an_over_complex_spell_is_refused_with_the_compilers_reason() -> void:
+	_start(1)
+	_open(0)
+	var builder: BuilderScript = _builder(0)
+	_choose(0, BuilderScript.SLOT_FORM, "Nova")
+	_choose(0, BuilderScript.SLOT_FIRST_MODIFIER, "Split")
+	_choose(0, BuilderScript.SLOT_FIRST_MODIFIER + 1, "Chain")
+	_choose(0, BuilderScript.SLOT_FIRST_MODIFIER + 2, "Homing")
+	_choose(0, BuilderScript.SLOT_TRIGGER, "Timer")
+	check(_refused.is_empty(), "11 of 12 is still fine")
+	_press(0, builder.held_button())
+	_choose(0, BuilderScript.SLOT_FORM, "Nova")
+	check(not _refused.is_empty(), "a held nova goes over the budget")
+	check(builder.note_text().begins_with(BuilderScript.REFUSED_PREFIX + "Too complex"), "the reason says so, got '%s'" % builder.note_text())
+	check(builder.complexity_value() <= float(SpellLimits.MAX_COMPLEXITY), "the bar still shows the last built spell")
+
+
+func test_the_preview_draws_the_pattern_of_the_form() -> void:
+	_start(1)
+	_open(0)
+	var builder: BuilderScript = _builder(0)
+	check_equal(builder.preview_pattern(), "fan", "a bolt")
+	var expected: Dictionary = {"Nova": "ring", "Beam": "ray", "Orbit": "orbit", "Rune": "rune", "Bolt": "fan"}
+	for form_name: String in expected:
+		_choose(0, BuilderScript.SLOT_FORM, form_name)
+		check_equal(builder.preview_pattern(), expected[form_name], "the preview of %s" % form_name)
+
+
+func test_the_preview_caps_the_drawn_shots() -> void:
+	var preview := PreviewScript.new()
+	var view: Dictionary = {"shown": true, "pattern": "ring", "shots": 99, "spread": 360.0, "tint": Color.RED, "pierce": 0}
+	preview.show_view(view)
+	check_equal(preview.shots(), PreviewScript.MAX_DRAWN, "99 shots are kept at the cap")
+	check_equal(preview.pattern(), "ring", "the pattern is kept")
+	check(preview.drawn_limit(6.0) < PreviewScript.MAX_DRAWN, "a small circle draws fewer dots than the cap")
+	view["shots"] = 0
+	preview.show_view(view)
+	check_equal(preview.shots(), 1, "at least one shot")
+	preview.show_view({})
+	check_equal(preview.pattern(), "none", "no spell draws only the wizard")
+	preview.free()
+
+
+func test_the_description_is_empty_until_the_lore_exists() -> void:
+	_start(1)
+	_open(0)
+	var builder: BuilderScript = _builder(0)
+	_press(0, builder.slot_button(BuilderScript.SLOT_ELEMENT))
+	check_equal(builder.note_text(), "", "nothing to say about a component yet")
+	check_equal(_spells.component_description(&"fire"), "", "the runtime has no description yet")
+	check_equal(_spells.component_description(&"nothing_like_it"), "", "and an unknown id has none")
+
+
+func test_the_info_panels_of_four_builders_fit_the_screen_beside_everything() -> void:
+	_start(4)
+	root.size = Vector2i(640, 360)
+	for player in 4:
+		_open(player)
+		_choose(player, BuilderScript.SLOT_FIRST_MODIFIER, "Split")
+		_press(player, _builder(player).slot_button(BuilderScript.SLOT_FIRST_MODIFIER))
+	await process_frame
+	await process_frame
+	var screen := Rect2(0, 0, 640, 360)
+	var rects: Array[Rect2] = []
+	var names: Array[String] = []
+	for player in 4:
+		rects.append(_hud.get_panel(player).get_global_rect())
+		names.append("panel %d" % (player + 1))
+		rects.append(_builder(player).get_global_rect())
+		names.append("builder %d" % (player + 1))
+		rects.append(_builder(player).info_panel().get_global_rect())
+		names.append("info %d" % (player + 1))
+	for i in rects.size():
+		check(screen.encloses(rects[i]), "%s is inside the 640x360 view, got %s" % [names[i], rects[i]])
+		for j in range(i + 1, rects.size()):
+			check(not rects[i].intersects(rects[j]), "%s and %s do not overlap, got %s and %s" % [names[i], names[j], rects[i], rects[j]])
+	for player in 4:
+		var info: Control = _builder(player).info_panel()
+		check(info.is_visible_in_tree(), "info %d is shown with its builder" % (player + 1))
+		check(info.get_global_rect().size.y <= BuilderScript.INFO_HEIGHT + 0.5, "info %d keeps its size, got %s" % [player + 1, info.get_global_rect()])
+	_press(0, _builder(0).close_button())
+	check(not _builder(0).info_panel().is_visible_in_tree(), "closing the builder hides its info")
+	check(_builder(1).info_panel().is_visible_in_tree(), "another player's stays")
+
+
+func test_the_info_of_each_player_shows_that_players_spell() -> void:
+	_start(4)
+	for player in 4:
+		_open(player)
+	_choose(2, BuilderScript.SLOT_FORM, "Nova")
+	check_equal(_builder(2).preview_pattern(), "ring", "player 3 built a nova")
+	check_equal(_builder(0).preview_pattern(), "fan", "player 1 still has a bolt")
+	check_equal(_builder(3).complexity_value(), 2.0, "player 4's bar is its own")

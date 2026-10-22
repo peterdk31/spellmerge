@@ -210,6 +210,45 @@ func component_icon(id: StringName) -> Texture2D:
 	return component.icon if component != null else null
 
 
+## What the builder shows of `recipe` at held level `level` (0 is the cast), as plain values so
+## that nothing outside `core/spells` reads a `CompiledSpell`. Always has `valid` and
+## `complexity` (of the whole spell, held spells included; 0 when invalid). When the recipe is
+## valid and has a spell at `level` it also has `shown` true and `damage`, `shots`, `ray` (a beam:
+## no shot count), `cooldown`, `mana`, `pattern` (`&"fan"`, `&"ring"`, `&"orbit"`, `&"rune"` or
+## `&"ray"`), `spread` (degrees), `pierce` and `tint`; otherwise `shown` is false.
+func builder_view(recipe: Dictionary, level: int) -> Dictionary:
+	var whole: CompiledSpell = compile(recipe)
+	var view: Dictionary = {"valid": whole.valid, "complexity": whole.complexity if whole.valid else 0, "shown": false}
+	var spell: CompiledSpell = whole.at_depth(level) if whole.valid else null
+	if spell == null:
+		return view
+	view["shown"] = true
+	view["damage"] = spell.damage
+	view["shots"] = spell.shots
+	view["ray"] = spell.motion == FormBase.Motion.RAY
+	view["cooldown"] = spell.cooldown
+	view["mana"] = spell.mana_cost
+	view["spread"] = spell.spread
+	view["pierce"] = spell.pierce
+	view["tint"] = spell.tint
+	match spell.motion:
+		FormBase.Motion.RAY:
+			view["pattern"] = &"ray"
+		FormBase.Motion.ORBIT:
+			view["pattern"] = &"orbit"
+		FormBase.Motion.STILL:
+			view["pattern"] = &"rune"
+		_:
+			view["pattern"] = &"ring" if spell.spread >= 360.0 else &"fan"
+	return view
+
+
+## The one-line description of the component `id` for the builder. Empty until the first lore
+## exists (M2 part 23 reads it from Story); the builder shows nothing for an empty one.
+func component_description(_id: StringName) -> String:
+	return ""
+
+
 func component_kind(id: StringName) -> StringName:
 	var component: SpellComponent = _component(id)
 	return component.kind() if component != null else &""

@@ -3,15 +3,19 @@
   python3 -m smbot.summary
 
 Reads the job results from environment variables set by daily.yml
-(RESULT_<JOB>, VERSION, CHANNEL) and adds the Claude token usage.
+(RESULT_<JOB>, VERSION, CHANNEL) and adds the Claude token usage. With BUILD_LOGS (the
+build's logs folder) it also quotes the stress and timing results, BENCH lines included, so
+development sessions (which can't read CI logs) and the owner find the numbers in the log.
 """
 
 from __future__ import annotations
 
 import datetime as dt
+import html
 import os
 import re
 import sys
+from pathlib import Path
 
 from . import config as config_mod
 from . import dailylog, gh, inbox, pacing, state
@@ -49,6 +53,34 @@ def lines_for(env: dict[str, str], repo: str) -> list[str]:
     return out
 
 
+BENCH_LOGS = {  # build/logs name -> what ran
+    "stress-linux": "Linux Test, stress",
+    "timing-linux": "Linux Test, projectile timing",
+    "timing-web": "Web Test (WASM), projectile timing",
+    "stress-web": "Web Test (WASM), stress",
+}
+BENCH_LINE = re.compile(r"BENCH|(STRESS|TIMING|WEB SMOKE) (OK|FAILED)|FAILED|::error::")
+MAX_BENCH_LINES = 40  # per log; 4 logs of at most 40 lines of 300 characters fit in a comment
+
+
+def bench_line(logs: Path) -> str:
+    """The stress and timing results from the build's logs, as one collapsed Daily log line; "" if none ran."""
+    out: list[str] = []
+    for name, label in BENCH_LOGS.items():
+        try:
+            text = (logs / f"{name}.log").read_text(errors="replace")
+        except OSError:
+            continue
+        found = [re.sub(r"^console\.[a-z]+: ", "", line.strip())[:300]
+                 for line in text.splitlines() if BENCH_LINE.search(line)][-MAX_BENCH_LINES:]
+        out.append(f"<b>{label}</b>")
+        out += [html.escape(line, quote=False) for line in found] or ["(no result lines)"]
+    if not out:
+        return ""
+    return ("<details><summary>Stress and timing results (BENCH lines)</summary>"
+            + "<br>".join(out) + "</details>")
+
+
 def parked_lines(st: dict, now: dt.datetime) -> list[str]:
     """Every task that is set aside now: why, until when, and how to bring it back."""
     out = []
@@ -71,6 +103,8 @@ def main() -> int:
     now = dt.datetime.now(dt.timezone.utc)
     lines.append(pacing.usage_line(st, now))
     lines += parked_lines(st, now)
+    if env.get("BUILD_LOGS"):
+        lines.append(bench_line(Path(env["BUILD_LOGS"])))
     try:
         waiting = inbox.reminder(cfg)
     except gh.GhError:

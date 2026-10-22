@@ -17,6 +17,18 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 **Decision:** `smbot.websmoke --warn-load 10` prints `WEB LOAD: N s` and, over 10 s, a `::warning::` that lists likely fixes: the zip size, big new assets, work at start (autoloads, `Registry.scan`), trimming demo content, and a slow runner. The web smoke test still fails on errors, exceptions and a missing expected line. `--max-load` is gone. The 10 s load in docs/PLAN.md stays a target, not a gate.
 **Consequence:** a slow web start shows up in the daily build log and never reverts a merge. Acting on the warning is a normal task, filed when it repeats.
 
+## 2026-10-22: Reactions (M2 part 8)
+
+**Decided by:** Claude.
+
+- **Six reactions, twelve rows.** The table is looked up by (status on the target, element of the hit), so each pair has a row for each direction and both carry the same `reaction_id`. In the other direction the reaction works on the other status: Shatter eats shock when frost hits a shocked enemy, Kindle spreads hex when fire hits a hexed one. Without that, a pair would only react one way round.
+- **Two new row fields:** `pull` (Rift) and `consume_status` (Thaw uses the burn up). The design's "consume, then a burst" for Thaw is a BURST with `consume_status`, so no fifth effect kind. A burst includes the struck enemy.
+- **Order:** the reaction is picked from the statuses the target had when the shot arrived (first of burn, chill, shock, hex with a row for that element); the hit's damage lands first; the reaction runs only if the enemy lived, and replaces the hit's own status. A frozen enemy counts as chilled. A shock is still spent by the hit, so the shock jump and a shock reaction can both happen.
+- **No chains:** reaction damage and spread statuses go through `hit` and `apply_status`, never through `projectile_hit`, so a reaction can't set off another one.
+- **Stillness** freezes a chilled enemy for 2 s and lengthens a freeze by 2 s (a long freeze, as designed); on hex it adds 2 s and +25 %.
+- **Numbers** (Shatter 6, doubled when frozen; Thaw 3 in 40 px; Flare 2 in 56 px; Rift 2 in 48 px with a 120 px/s pull; Kindle 48 px) are first tuning for the playtest.
+- **Feel** gets a flash, a burst, the reaction's name as a rising label and the sound `reaction_<id>` from the preset (`reaction_colors`, `reaction_sound_prefix`). The "number" is the name: the damage already shows through `damage_dealt`.
+
 ## 2026-10-21: Spell component base classes (M2 part 1)
 
 **Decided by:** Claude.

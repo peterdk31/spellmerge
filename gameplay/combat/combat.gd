@@ -41,6 +41,8 @@ const EventsScript := preload("res://core/events/events.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
+## The element reactions, loaded by their literal path (the registry skips the table).
+const REACTIONS: ReactionTable = preload("res://content/spells/reactions.tres")
 
 ## The statuses an element can put on an enemy (`ElementBase.status_id`), and `freeze`,
 ## which three stacks of chill make.
@@ -65,6 +67,10 @@ const SHOCK_JUMP_RANGE: float = 64.0
 ## A hit on a hexed enemy pulls it toward the hit point with this share of the push it
 ## would have had away from it.
 const HEX_PULL_SHARE: float = 0.5
+## The statuses a reaction can start from, in the order they are looked at.
+const REACTING_STATUSES: Array[StringName] = [BURN, CHILL, SHOCK, HEX]
+## A consume reaction does this many times its damage to a frozen enemy.
+const FROZEN_BONUS: int = 2
 
 ## The event bus, the projectile manager and the registry. Only tests set these, before
 ## adding the node; otherwise the "Events", "Projectiles" and "Registry" autoloads are used.
@@ -73,6 +79,11 @@ var projectiles: ProjectileManagerScript = null
 var registry: RegistryScript = null
 ## The spell runtime, which tells what a spell's shot does (`hit_profile`). Same rule.
 var spells: SpellsScript = null
+## The reaction table. Tests may set another one; null means REACTIONS.
+var reactions: ReactionTable = null
+
+# Scratch list for the targets of a burst or a spread (reused, so a reaction allocates nothing).
+var _near: Array[Node2D] = []
 
 # Hit profiles: tag -> damage and knockback strength.
 var _profile_damage: Dictionary = {}
@@ -135,6 +146,8 @@ func _ready() -> void:
 		registry = get_node_or_null("/root/Registry") as RegistryScript
 	if spells == null and in_tree:
 		spells = get_node_or_null("/root/Spells") as SpellsScript
+	if reactions == null:
+		reactions = REACTIONS
 	if events != null and not events.projectile_hit.is_connected(_on_projectile_hit):
 		events.projectile_hit.connect(_on_projectile_hit)
 	if events != null:
@@ -580,6 +593,10 @@ func _on_projectile_hit(player: int, target: Node, position: Vector2, tag: int) 
 		if _shock_left[at] > 0.0:
 			jump_share = _shock_share[at]
 			jump_from = _position_of(enemy) + _hurt_offset[at]
+	# The reaction is chosen from the statuses the target had when the shot arrived.
+	var reaction: ReactionRow = null
+	if at >= 0 and profile != null and profile.element_id != &"":
+		reaction = _reaction_for(at, profile.element_id)
 	if not hit(player, enemy, damage, direction, strength):
 		return
 	var spent: int = _enemies.find(enemy)
@@ -588,8 +605,159 @@ func _on_projectile_hit(player: int, target: Node, position: Vector2, tag: int) 
 		_shock_share[spent] = 0.0
 	if jump_share > 0.0:
 		_shock_jump(player, enemy, jump_from, roundi(float(damage) * jump_share / 100.0))
-	if profile != null and profile.status_id != &"" and is_instance_valid(enemy):
+	if reaction != null:
+		# The reaction runs instead of the hit's own status, and only on a target that lived.
+		_react(player, enemy, reaction)
+	elif profile != null and profile.status_id != &"" and is_instance_valid(enemy):
 		apply_status(player, enemy, profile.status_id, profile.status_duration, profile.status_strength)
+
+
+## The reaction a hit of `element_id` sets off on enemy row `at`, from the first of its
+## statuses that has a row for that element; null when none does. A frozen enemy counts as
+## chilled. Allocation-free.
+func _reaction_for(at: int, element_id: StringName) -> ReactionRow:
+	var table: ReactionTable = reactions if reactions != null else REACTIONS
+	for status in REACTING_STATUSES:
+		if _status_on(at, status):
+			var row: ReactionRow = table.find(status, element_id)
+			if row != null:
+				return row
+	return null
+
+
+func _status_on(at: int, status_id: StringName) -> bool:
+	match status_id:
+		BURN:
+			return _burn_left[at] > 0.0
+		CHILL:
+			return _chill_left[at] > 0.0 or _freeze_left[at] > 0.0
+		SHOCK:
+			return _shock_left[at] > 0.0
+		HEX:
+			return _hex_left[at] > 0.0
+	return false
+
+
+## Run `row` on `enemy`: announce it (`reaction_triggered`, at the enemy), then do its effect
+## kind. Reactions only start from a projectile hit; the damage they deal sets off no more.
+func _react(player: int, enemy: Node2D, row: ReactionRow) -> void:
+	var at: int = _enemies.find(enemy)
+	if at < 0:
+		return
+	var centre: Vector2 = _position_of(enemy) + _hurt_offset[at]
+	if events != null:
+		events.reaction_triggered.emit(player, row.reaction_id, centre)
+		at = _enemies.find(enemy)
+		if at < 0:
+			return
+	match row.effect:
+		ReactionRow.Effect.CONSUME:
+			var amount: int = row.damage
+			if row.status_id == CHILL and _freeze_left[at] > 0.0:
+				amount *= FROZEN_BONUS
+			_remove_status(at, row.status_id)
+			hit(player, enemy, amount)
+		ReactionRow.Effect.BURST:
+			if row.consume_status:
+				_remove_status(at, row.status_id)
+			_burst(player, enemy, centre, row)
+		ReactionRow.Effect.EXTEND:
+			_extend(player, at, row)
+		ReactionRow.Effect.SPREAD:
+			_spread(player, at, centre, row)
+
+
+## BURST: `row.damage` to every enemy in the circle, the struck one included, and a pull
+## toward the centre when the row has one.
+func _burst(player: int, enemy: Node2D, centre: Vector2, row: ReactionRow) -> void:
+	if projectiles == null:
+		hit(player, enemy, row.damage)
+		return
+	var count: int = projectiles.targets_in(centre, row.radius, ProjectileManagerScript.LAYER_ENEMY, _near)
+	for i in count:
+		var near: Node2D = _near[i]
+		if not is_instance_valid(near):
+			continue
+		var toward: Vector2 = (centre - _position_of(near)).normalized() if row.pull > 0.0 else Vector2.ZERO
+		hit(player, near, row.damage, toward, row.pull)
+	_near.clear()
+
+
+## EXTEND: the status lasts longer and is stronger. A chilled enemy freezes for the row's
+## duration; a frozen one stays frozen that much longer.
+func _extend(player: int, at: int, row: ReactionRow) -> void:
+	var enemy: Node2D = _enemies[at]
+	match row.status_id:
+		BURN:
+			_burn_left[at] += row.duration
+			_burn_rate[at] += row.strength
+		CHILL:
+			var newly: bool = _freeze_left[at] <= 0.0
+			_chill_left[at] = 0.0
+			_chill_slow[at] = 0.0
+			_chill_stacks[at] = 0
+			_freeze_left[at] += row.duration
+			if newly and events != null:
+				events.status_applied.emit(player, enemy, FREEZE)
+		SHOCK:
+			_shock_left[at] += row.duration
+			_shock_share[at] += row.strength
+		HEX:
+			_hex_left[at] += row.duration
+			_hex_extra[at] += row.strength
+
+
+## SPREAD: the status, as it is now, goes on every other enemy in the circle.
+func _spread(player: int, at: int, centre: Vector2, row: ReactionRow) -> void:
+	if projectiles == null:
+		return
+	var enemy: Node2D = _enemies[at]
+	var left: float = status_left(enemy, row.status_id)
+	var strength: float = _strength_of(at, row.status_id)
+	if row.consume_status:
+		_remove_status(at, row.status_id)
+	if left <= 0.0:
+		return
+	var count: int = projectiles.targets_in(centre, row.radius, ProjectileManagerScript.LAYER_ENEMY, _near)
+	for i in count:
+		var near: Node2D = _near[i]
+		if near != enemy and is_instance_valid(near):
+			apply_status(player, near, row.status_id, left, strength)
+	_near.clear()
+
+
+## The number `apply_status` takes as strength for the status on row `at`.
+func _strength_of(at: int, status_id: StringName) -> float:
+	match status_id:
+		BURN:
+			return _burn_rate[at]
+		CHILL:
+			return _chill_slow[at] * 100.0
+		SHOCK:
+			return _shock_share[at]
+		HEX:
+			return _hex_extra[at]
+	return 0.0
+
+
+## Switch `status_id` off on row `at` (a frozen enemy loses its freeze with its chill).
+func _remove_status(at: int, status_id: StringName) -> void:
+	match status_id:
+		BURN:
+			_burn_left[at] = 0.0
+			_burn_rate[at] = 0.0
+			_burn_carry[at] = 0.0
+		CHILL:
+			_chill_left[at] = 0.0
+			_chill_slow[at] = 0.0
+			_chill_stacks[at] = 0
+			_freeze_left[at] = 0.0
+		SHOCK:
+			_shock_left[at] = 0.0
+			_shock_share[at] = 0.0
+		HEX:
+			_hex_left[at] = 0.0
+			_hex_extra[at] = 0.0
 
 
 ## The hit on `from_enemy` jumps from `from` to the nearest other enemy in reach, for `amount`

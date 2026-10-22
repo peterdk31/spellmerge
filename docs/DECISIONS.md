@@ -2,6 +2,10 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-22: What "closed outline" means in the icon test
+
+- Every non-outline pixel needs a filled pixel on its four sides (not the diagonals), and none may touch the icon edge. STYLE.md allows diagonal steps in an outline, so diagonals are not checked. Only the spell icons are checked; vfx may outline in their own shadow shade.
+
 ## 2026-10-22: A neutral bolt with an element core
 
 - **One shader, no new palette colour.** The bolt, rune, orbit orb, beam and ring are Bone art whose Spark pixels are the "core"; `shot_core.gdshader` treats warm pixels (red well above blue) as core and keeps their three shades as dark, mid and light. Bone is near neutral, so the test of the palette (`test_svg_art.gd`) needed no change.

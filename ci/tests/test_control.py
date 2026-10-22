@@ -292,6 +292,39 @@ class NextTaskTest(unittest.TestCase):
             self.assertEqual(nexttask.next_task(path, skip={"First"}), "Second")
             self.assertIsNone(nexttask.next_task(path, skip={"First", "Second"}))
 
+    # The element colours task as it was blocked on 2026-10-22 (#177): its question's key is in a sub-bullet.
+    BLOCKED = ("## Queue\n\n- [ ] Next one\n\n## Blocked\n\n"
+               "- [ ] **Element colours.** Add the ramps.\n"
+               "  - **Blocked on the owner:** the owner question (key `palette-count-in-styleguide-test`, label\n"
+               "    `owner-question`) asks for the change.\n"
+               "  - **Unblocks when** the owner changes both numbers.\n"
+               "- [ ] **Two questions.** key `a` and key `b`.\n"
+               "- [ ] **No question.** Waits for planning.\n\n"
+               "Text after the list.\n  - key `stray`\n\n## Done\n\n- [ ] key `done-key`\n")
+
+    def test_blocked_tasks_name_the_questions_they_wait_on(self) -> None:
+        self.assertEqual(nexttask.blocked(self.BLOCKED), {
+            "**Element colours.** Add the ramps.": {"palette-count-in-styleguide-test"},
+            "**Two questions.** key `a` and key `b`.": {"a", "b"},
+            "**No question.** Waits for planning.": set(),
+        })
+
+    def test_a_blocked_task_goes_first_once_its_questions_are_answered(self) -> None:
+        """#178/#179 were answered and closed by #180, but the task stayed blocked: nothing moved it back."""
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp, "NEXT.md")
+            path.write_text(self.BLOCKED)
+            self.assertEqual(nexttask.next_task(path), "Next one")
+            self.assertEqual(nexttask.next_task(path, answered={"palette-count-in-styleguide-test"}),
+                             "**Element colours.** Add the ramps.")
+            self.assertEqual(nexttask.next_task(path, answered={"a"}), "Next one")  # b is still open
+            self.assertEqual(nexttask.next_task(path, answered={"a", "b", "palette-count-in-styleguide-test"},
+                                                skip={"**Element colours.** Add the ramps."}),
+                             "**Two questions.** key `a` and key `b`.")
+            self.assertEqual(nexttask.next_task(path, first=["Scheduled"], answered={"a", "b"}), "Scheduled")
+            self.assertEqual(nexttask.next_task(path, milestone=False, answered={"a", "b"}), None)
+            self.assertEqual(nexttask.next_task(path, answered={"stray", "done-key"}), "Next one")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -27,7 +27,7 @@ import sys
 from dataclasses import dataclass, field
 from zoneinfo import ZoneInfo
 
-from . import checkpoint, commands, dailylog, gh, intake, nexttask, pacing, panel, state
+from . import checkpoint, commands, dailylog, gh, inbox, intake, nexttask, pacing, panel, state
 from . import config as config_mod
 
 
@@ -178,7 +178,7 @@ def main(argv: list[str] | None = None) -> int:
     # While a checkpoint waits for the owner, only scheduled issues (fixes from players) run.
     milestone_work = not open_checkpoint or checkpoint.answer(st, open_checkpoint) is not None
     task = nexttask.next_task(skip=nexttask.parked(st, now), first=intake.queue_tasks(cfg, st),
-                              milestone=milestone_work)
+                              milestone=milestone_work, answered=inbox.answered_keys(cfg, st))
     decision = decide(kill_switch_on, result, st, now, cfg.timezone, task is not None, open_checkpoint)
     if log:
         dailylog.post(cfg, args.log_title, log, mention_owner=mention)

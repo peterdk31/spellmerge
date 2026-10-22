@@ -32,7 +32,7 @@ from pathlib import Path
 from typing import Any, Callable
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from . import alarms, checkpoint, dailylog, gh, intake, nexttask, pacing, state, weekly
+from . import alarms, checkpoint, dailylog, gh, inbox, intake, nexttask, pacing, state, weekly
 from . import labels as labels_mod
 from . import merge as merge_mod
 from . import config as config_mod
@@ -261,7 +261,8 @@ def nothing_queued(cfg: config_mod.Config, now: dt.datetime) -> bool:
         scheduled = queue(cfg, st, strict=True)
     except gh.GhError:
         return False
-    return nexttask.next_task(skip=nexttask.parked(st, now), first=scheduled) is None
+    return nexttask.next_task(skip=nexttask.parked(st, now), first=scheduled,
+                              answered=inbox.answered_keys(cfg, st)) is None
 
 
 def open_pr_for(cfg: config_mod.Config, task_slug: str) -> dict[str, Any] | None:
@@ -307,21 +308,40 @@ def sync_with_main(branch: str) -> str:
             "Don't merge, rebase or abort yourself.")
 
 
+def unblocked_text(keys: list[str]) -> str:
+    """The brief for a blocked task whose owner questions are answered (smbot.nexttask.unblocked)."""
+    named = ", ".join(f"`{k}`" for k in keys)
+    return (f"This task is under \"## Blocked\" in `docs/NEXT.md`, waiting on the owner question(s) with key {named}. "
+            "They are answered now (closed, or answered with `/claude`). Find them with "
+            "`gh issue list --label owner-question --state all --json number,title,body` (the key is in each body) "
+            "and read each with "
+            "`gh issue view <number> --comments`, along with the PR that closed it, if any: part of the task may "
+            "already be done. Then, in this PR, move the task from \"## Blocked\" back to the top of \"## Queue\" "
+            "without the blocked notes (or check it off if it's all done), and do what's left as the answer says. "
+            "If the answer means the task shouldn't be done, remove it and record why in `docs/DECISIONS.md`. "
+            "Never leave it under \"## Blocked\" with the same key: it would be picked again.\n\n")
+
+
 def prepare(cfg: config_mod.Config, st: dict[str, Any], focus: str, today: dt.date,
             now: dt.datetime | None = None, sync: Callable[[str], str] | None = None) -> dict[str, str]:
     now = now or dt.datetime.now(dt.timezone.utc)
+    answered = inbox.answered_keys(cfg, st)
     task, kind = nexttask.next_task(skip=nexttask.parked(st, now), first=queue(cfg, st),
-                                    milestone=checkpoint_allows_milestone_work(cfg, st)), "next"
+                                    milestone=checkpoint_allows_milestone_work(cfg, st), answered=answered), "next"
     failures = st.get("task_failures", {}).get(task or "", {})
     previous = ""
+    plan = Path("docs/NEXT.md")
+    keys = nexttask.blocked(plan.read_text()).get(task or "", set()) if plan.exists() else set()
+    if keys and keys <= answered:
+        previous = unblocked_text(sorted(keys))
     if failures.get("count") or failures.get("problems"):
-        previous = (f"This task failed review {failures.get('count', 0)} time(s) since it was last retried. The last "
-                    f"attempt is PR #{failures.get('pr')}; the problems its review found were:\n\n"
-                    f"{failures.get('problems', '(not recorded)')}\n\n"
-                    + ("This is the last attempt before the owner is asked to look: if it can't be done properly, "
-                       "mark the task blocked in docs/NEXT.md with the reason and report status `blocked`."
-                       if failures.get("count", 0) >= GIVE_UP - 1 else
-                       "Continue on that PR's branch and fix exactly these problems first."))
+        previous += (f"This task failed review {failures.get('count', 0)} time(s) since it was last retried. The last "
+                     f"attempt is PR #{failures.get('pr')}; the problems its review found were:\n\n"
+                     f"{failures.get('problems', '(not recorded)')}\n\n"
+                     + ("This is the last attempt before the owner is asked to look: if it can't be done properly, "
+                        "mark the task blocked in docs/NEXT.md with the reason and report status `blocked`."
+                        if failures.get("count", 0) >= GIVE_UP - 1 else
+                        "Continue on that PR's branch and fix exactly these problems first."))
     branch = f"claude/{today:%Y%m%d}-{slug(task or 'owner-instructions')}"
     existing = open_pr_for(cfg, branch.split("-", 1)[1]) if task else None
     if existing:

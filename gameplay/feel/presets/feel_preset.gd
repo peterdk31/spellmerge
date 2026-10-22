@@ -86,5 +86,18 @@ extends Resource
 ## The hit spark, also used for the white flashes and puffs.
 @export var spark_texture: Texture2D = preload("res://art/vfx/hit_spark.svg")
 ## A player's spell shot, and an enemy's shot (drawn apart, so it never reads as a spell).
-@export var bolt_texture: Texture2D = preload("res://art/vfx/fire_bolt.svg")
+## The bolt is neutral bone with a Spark core: the owner tints the bone, the element
+## colours the core (see `core/projectiles`). The rune and the orbit orb are drawn the same way.
+@export var bolt_texture: Texture2D = preload("res://art/vfx/bolt.svg")
+@export var rune_texture: Texture2D = preload("res://art/vfx/rune.svg")
+@export var orbit_texture: Texture2D = preload("res://art/vfx/orbit_orb.svg")
 @export var hostile_texture: Texture2D = preload("res://art/vfx/imp_fireball.svg")
+## The beam (a 32 px segment that repeats along its length) and the nova ring, drawn from
+## `form_shown`, tinted like the bolt.
+@export var beam_texture: Texture2D = preload("res://art/vfx/beam.svg")
+@export var nova_texture: Texture2D = preload("res://art/vfx/nova_ring.svg")
+## How long a beam stays on screen, and how long a nova ring takes to grow to
+## `nova_ring_size` pixels across.
+@export_range(0.0, 0.5, 0.01) var beam_seconds: float = 0.14
+@export_range(0.0, 1.0, 0.01) var nova_seconds: float = 0.25
+@export_range(8.0, 400.0, 1.0) var nova_ring_size: float = 120.0

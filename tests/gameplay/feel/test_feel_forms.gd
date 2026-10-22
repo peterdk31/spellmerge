@@ -1,0 +1,104 @@
+extends "res://tests/support/suite.gd"
+## Beams and nova rings in gameplay/feel: `form_shown` shows a beam along the aim or a ring
+## at the caster, in the owner's tint with the element's colour in the core. They fade out,
+## stay inside the pool with four players, and ignore what is not a beam or a nova.
+
+const EventsScript := preload("res://core/events/events.gd")
+const FeelScript := preload("res://gameplay/feel/feel.gd")
+const FeelPresetScript := preload("res://gameplay/feel/presets/feel_preset.gd")
+const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
+
+const FROST := Color(0.5, 0.75, 0.94)
+
+var bus: EventsScript
+var feel: FeelScript
+var preset: FeelPresetScript
+var projectiles: ProjectilesScript
+
+
+func before_each() -> void:
+	bus = own(EventsScript.new()) as EventsScript
+	feel = own(FeelScript.new()) as FeelScript
+	projectiles = own(ProjectilesScript.new()) as ProjectilesScript
+	preset = FeelPresetScript.new()
+	preset.hit_sound = &""
+	feel.events = bus
+	feel.projectiles = projectiles
+	feel.drive_engine = false
+	feel.preset = preset
+	root.add_child(feel)
+
+
+func _shown() -> Array[Sprite2D]:
+	var found: Array[Sprite2D] = []
+	for sprite in feel._forms:
+		if sprite.visible:
+			found.append(sprite)
+	return found
+
+
+func _param(sprite: Sprite2D, name: StringName) -> Color:
+	return (sprite.material as ShaderMaterial).get_shader_parameter(name) as Color
+
+
+func test_a_beam_is_drawn_along_the_aim_as_long_as_it_got() -> void:
+	bus.form_shown.emit(1, &"beam", Vector2(10, 20), Vector2.DOWN, 150.0, FROST)
+	var shown: Array[Sprite2D] = _shown()
+	check_equal(shown.size(), 1, "one beam on screen")
+	var beam: Sprite2D = shown[0]
+	check_equal(beam.global_position, Vector2(10, 20), "from the staff")
+	check(is_equal_approx(beam.rotation, PI / 2.0), "turned along the aim")
+	check_equal(beam.region_rect.size.x, 150.0, "as long as it got")
+	check(beam.texture == preset.beam_texture, "with the beam art")
+
+
+func test_the_core_has_the_element_colour_and_the_body_the_owners() -> void:
+	bus.form_shown.emit(2, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, FROST)
+	var beam: Sprite2D = _shown()[0]
+	var core: Color = _param(beam, &"core_override")
+	check(core.is_equal_approx(Color(FROST.r, FROST.g, FROST.b, 1.0)), "the core is frost")
+	var body: Color = _param(beam, &"body_tint")
+	var owner_tint: Color = projectiles.tint_of(2)
+	check(is_equal_approx(body.r, owner_tint.r) and is_equal_approx(body.g, owner_tint.g) and is_equal_approx(body.b, owner_tint.b), "the body has the owner's tint")
+	check(not core.is_equal_approx(body), "the two are not the same colour")
+
+
+func test_a_nova_is_a_ring_at_the_caster_that_grows() -> void:
+	bus.form_shown.emit(0, &"nova", Vector2(50, 60), Vector2.RIGHT, 0.0, FROST)
+	var ring: Sprite2D = _shown()[0]
+	check(ring.texture == preset.nova_texture, "with the ring art")
+	check_equal(ring.global_position, Vector2(50, 60), "at the caster")
+	check(ring.centered and not ring.region_enabled, "centred, not stretched")
+	var before: float = ring.scale.x
+	feel.step(preset.nova_seconds * 0.5)
+	check(ring.scale.x > before, "the ring grows")
+	check(_param(ring, &"body_tint").a < 1.0, "and fades")
+
+
+func test_forms_end() -> void:
+	bus.form_shown.emit(0, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, FROST)
+	bus.form_shown.emit(0, &"nova", Vector2.ZERO, Vector2.RIGHT, 0.0, FROST)
+	feel.step(1.0)
+	check_equal(_shown().size(), 0, "after their seconds both are gone")
+
+
+func test_other_forms_and_empty_beams_show_nothing() -> void:
+	bus.form_shown.emit(0, &"bolt", Vector2.ZERO, Vector2.RIGHT, 100.0, FROST)
+	bus.form_shown.emit(0, &"beam", Vector2.ZERO, Vector2.RIGHT, 0.0, FROST)
+	bus.form_shown.emit(0, &"beam", Vector2.ZERO, Vector2.ZERO, 100.0, FROST)
+	check_equal(_shown().size(), 0, "none of them is drawn")
+
+
+func test_four_players_firing_at_once_stay_inside_the_pool() -> void:
+	for round in 4:
+		for player in 4:
+			bus.form_shown.emit(player, &"beam", Vector2(player * 10, 0), Vector2.RIGHT, 100.0, FROST)
+	check(_shown().size() <= FeelScript.FORM_SLOTS, "never more sprites than the pool holds")
+	check_equal(feel._forms.size(), FeelScript.FORM_SLOTS, "and no sprite is made on the way")
+
+
+func test_the_shipped_preset_has_the_form_art() -> void:
+	var shipped := load("res://gameplay/feel/presets/punchy.tres") as FeelPresetScript
+	check(shipped.beam_texture != null and shipped.nova_texture != null, "beam and ring art")
+	check(shipped.rune_texture != null and shipped.orbit_texture != null, "rune and orbit art")
+	check(projectiles.rune_texture == preset.rune_texture and projectiles.orbit_texture == preset.orbit_texture, "the manager draws runes and orbs with the preset's art")

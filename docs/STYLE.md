@@ -136,7 +136,7 @@ Candidates for the pieces the Style Guide page shows as "this is the look". They
 | Enemy | `content/enemies/ember_imp/idle.svg` | Fire body, Bone horns and Spark eyes, no player colour, a bold silhouette |
 | Raised tile | `art/tilesets/crypt/wall.svg` | Lit top and left edge, shaded bottom and right edge |
 | Flat tile | `art/tilesets/crypt/floor.svg` | Stone base, a few inner details, nothing on the outer edge |
-| Projectile | `art/vfx/fire_bolt.svg` | Fire streak with a Spark core, outlined in its own shadow shade |
+| Projectile | `art/vfx/bolt.svg` | Neutral Bone streak with a Spark core (the owner tints the Bone, the element colours the core), outlined in its own shadow shade |
 | Impact | `art/vfx/hit_spark.svg` | A flat Spark burst, no glow halo |
 
 ## The starter kit

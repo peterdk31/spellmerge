@@ -31,7 +31,7 @@ const TORCH := preload("res://art/tilesets/crypt/torch.svg")
 const RUBBLE := preload("res://art/tilesets/crypt/rubble.svg")
 const SKULL := preload("res://art/tilesets/crypt/skull.svg")
 const DASH := preload("res://art/vfx/telegraph_dash.svg")
-const BOLT := preload("res://art/vfx/fire_bolt.svg")
+const BOLT := preload("res://art/vfx/bolt.svg")
 const SPARK := preload("res://art/vfx/hit_spark.svg")
 
 

@@ -23,8 +23,8 @@
       "rules": ["seamless tile", "flat floor"]
     },
     {
-      "path": "art/vfx/fire_bolt.svg",
-      "shows": "A projectile: a streak in Fire materials with a Spark core, outlined in its own shadow shade",
+      "path": "art/vfx/bolt.svg",
+      "shows": "A projectile: a streak in Bone materials with a Spark core, outlined in its own shadow shade",
       "rules": ["effects outline", "no glow halo", "readable at speed"]
     },
     {

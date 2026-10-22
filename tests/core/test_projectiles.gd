@@ -45,6 +45,7 @@ func _initialize() -> void:
 	_test_one_thousand_match_brute_force()
 	_test_one_thousand_run_and_draw()
 	_test_enemy_shots_have_their_own_batch()
+	_test_shot_core_colour_and_batches()
 	_test_shot_colours_differ_and_stay_bright()
 	_test_freed_target_is_dropped()
 	_test_target_removed_by_a_hit_handler()
@@ -477,6 +478,52 @@ func _test_one_thousand_run_and_draw() -> void:
 	root.remove_child(_mgr)
 
 
+## A shot's body is tinted by its owner and its core takes the element's colour
+## (`set_core`), so no shot is only the owner's colour; runes and orbit shots have batches
+## (and art) of their own.
+func _test_shot_core_colour_and_batches() -> void:
+	_setup()
+	root.add_child(_mgr)
+	var frost := Color(0.5, 0.75, 0.94)
+	var bolt: int = _mgr.spawn(1, Vector2(10.0, 0.0), Vector2(100.0, 0.0), 1.0)
+	var rune: int = _mgr.spawn(2, Vector2(20.0, 0.0), Vector2.ZERO, 1.0, 8.0, ManagerScript.LAYER_ENEMY, 0, 0, ManagerScript.MOTION_STILL)
+	_mgr.set_anchor(3, Vector2(100.0, 100.0))
+	var orb: int = _mgr.spawn_orbit(3, 20.0, 0.0, 1.0, 1.0)
+	_check(_mgr.set_core(bolt, frost) and _mgr.set_core(rune, frost) and _mgr.set_core(orb, frost), "set_core takes a colour for a live shot")
+	_check(not _mgr.set_core(-1, frost) and not _mgr.set_core(999999, frost), "set_core refuses a slot out of range")
+	_check(not _mgr.set_core(bolt, Color(NAN, 0.0, 0.0)), "set_core refuses a colour that is not finite")
+	_mgr.update_draw()
+	_check(_mgr.drawn == 3, "the three shots are drawn (%d)" % _mgr.drawn)
+	_check(_mgr._draw_node.multimesh.visible_instance_count == 1, "the bolt is in the bolt batch")
+	_check(_mgr._rune_node.multimesh.visible_instance_count == 1, "the rune is in the rune batch")
+	_check(_mgr._orbit_node.multimesh.visible_instance_count == 1, "the orbit shot is in the orbit batch")
+	for node: MultiMeshInstance2D in [_mgr._draw_node, _mgr._rune_node, _mgr._orbit_node]:
+		var buffer: PackedFloat32Array = node.multimesh.buffer
+		_check(is_equal_approx(buffer[12], frost.r) and is_equal_approx(buffer[13], frost.g) and is_equal_approx(buffer[14], frost.b), "the core colour is in the custom data")
+	var body: PackedFloat32Array = _mgr._draw_node.multimesh.buffer
+	var owner_tint: Color = _mgr.tint_of(1)
+	_check(is_equal_approx(body[8], owner_tint.r) and is_equal_approx(body[10], owner_tint.b), "the body keeps the owner's tint")
+	_check(owner_tint != frost, "the owner's tint and the element's colour are separate")
+	var seen: Array[Color] = []
+	for player in 4:
+		var tint: Color = _mgr.tint_of(player)
+		_check(not seen.has(tint), "player %d has a tint of their own" % player)
+		seen.append(tint)
+	# A reused slot starts plain again.
+	_mgr.clear()
+	var again: int = _mgr.spawn(0, Vector2(10.0, 0.0), Vector2(100.0, 0.0), 1.0)
+	_mgr.update_draw()
+	var plain: PackedFloat32Array = _mgr._draw_node.multimesh.buffer
+	_check(again >= 0 and is_equal_approx(plain[12], 1.0) and is_equal_approx(plain[13], 1.0) and is_equal_approx(plain[14], 1.0), "a new shot has a white core, not the last one's")
+	var art := PlaceholderTexture2D.new()
+	var rune_art := PlaceholderTexture2D.new()
+	_mgr.texture = art
+	_check(_mgr._rune_node.texture == art and _mgr._orbit_node.texture == art, "rune and orbit shots use the shared art without their own")
+	_mgr.rune_texture = rune_art
+	_check(_mgr._rune_node.texture == rune_art and _mgr._orbit_node.texture == art, "a rune gets its own art")
+	root.remove_child(_mgr)
+
+
 ## Enemy shots are drawn in a batch of their own: other texture, untinted, one layer
 ## above the players' shots (task "Enemy readability": shots must not read as a spell).
 func _test_enemy_shots_have_their_own_batch() -> void:
@@ -497,7 +544,7 @@ func _test_enemy_shots_have_their_own_batch() -> void:
 	_check(_mgr._draw_node.multimesh.visible_instance_count == 1, "the player batch holds the one player shot")
 	_check(_mgr._hostile_node.multimesh.visible_instance_count == 2, "the enemy batch holds the two enemy shots")
 	var buffer: PackedFloat32Array = _mgr._hostile_node.multimesh.buffer
-	_check(buffer.size() > 12 and is_equal_approx(buffer[3], 20.0) and is_equal_approx(buffer[15], 30.0), "the enemy batch has the enemy shots' positions")
+	_check(buffer.size() > ManagerScript.DRAW_STRIDE and is_equal_approx(buffer[3], 20.0) and is_equal_approx(buffer[ManagerScript.DRAW_STRIDE + 3], 30.0), "the enemy batch has the enemy shots' positions")
 	_check(is_equal_approx(buffer[8], 1.0) and is_equal_approx(buffer[9], 1.0) and is_equal_approx(buffer[10], 1.0), "enemy shots are not tinted")
 	_mgr.clear()
 	_mgr.update_draw()

@@ -2,6 +2,15 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-22: A neutral bolt with an element core
+
+- **One shader, no new palette colour.** The bolt, rune, orbit orb, beam and ring are Bone art whose Spark pixels are the "core"; `shot_core.gdshader` treats warm pixels (red well above blue) as core and keeps their three shades as dark, mid and light. Bone is near neutral, so the test of the palette (`test_svg_art.gd`) needed no change.
+- **Body = player, core = element.** The body tint stays the 45% mix with the owner's colour, so the four players stay apart; the element shows only in the core. Frost and void still share a colour with Player 1 and Player 4 until the blocked recolour task changes the elements' ramps; the core's position (the centre) keeps them apart meanwhile.
+- **Per-shot core in the MultiMesh custom data** (`DRAW_STRIDE` 16), set with `set_core(slot, color)` after `spawn` rather than a new `spawn` argument, like `set_homing`. The runtime sets it in `_register`, so chain jumps and held spells get it too.
+- **Runes and orbit shots have batches of their own** (chosen by motion, so `spawn` is unchanged), with `rune_texture` and `orbit_texture` falling back to `texture`.
+- **Beam and nova ring through a new event, `form_shown`** (sender `core/spells`, listener `feel`): a beam holds no row and a nova is ordinary shots, so nothing else tells feel about them. A nova sends one event for the whole ring; a beam one per ray (a chain's jumps included), inside Feel's pool of 8.
+- **`fire_bolt.svg` renamed `bolt.svg`**, since it is no longer fire.
+
 ## 2026-10-22: Stress in the exports, and the limits (M2 part 25)
 
 - **Both benchmarks are nodes the main menu adds on a user argument** (`--stress`, `--projectile-timing`), exactly like `--four-bot`, so the Linux Test and Web Test exports (which keep `tests/`) can run them. The projectile timing script became `projectile_timing_runner.gd` (a node); `test_projectile_timing.gd` is now a thin SceneTree starter, so the command line and `build.sh --tests` behave as before. The menu has one `_start_runner` for all three, with literal `load` paths.

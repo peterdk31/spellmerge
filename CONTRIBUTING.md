@@ -30,7 +30,7 @@ Areas open over time, milestone by milestone (see [docs/ROADMAP.md](docs/ROADMAP
 4. Only your own work, or work under a compatible license. Code: GPL-3.0-or-later (the default), MIT, BSD, Apache-2.0. Assets: CC-BY-SA-4.0 (the default), CC-BY-4.0, CC0. No ripped game assets, no fan art of other games or films, no names from other works.
 5. Sign the [CLA](CLA.md) once: comment `I have read the CLA and I agree to it.` on your first pull request (or tick the box in a submission form). You keep the copyright; the project may use and relicense your work, for example for Steam.
 
-Run `tools/check.sh` before opening a pull request to check rules 1–4 yourself. Every problem it finds says what to fix.
+Run `tools/check.sh` before opening a pull request to check rules 1–4 yourself. Every problem it finds says what to fix. Then run `ci/build/build.sh --quick --tests`: it downloads the pinned Godot once, imports the project, and runs the smoke test and every unit test, including the spell validator.
 
 ## Using AI tools
 

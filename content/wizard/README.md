@@ -34,7 +34,7 @@ Everything that customises the single base wizard. **Cosmetics** (`cosmetics/`) 
 
 ```sh
 tools/check.sh
-ci/build/build.sh --quick
+ci/build/build.sh --quick --tests
 ```
 
 ## Rating questions

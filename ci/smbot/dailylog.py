@@ -4,6 +4,8 @@ Each day's log is its own issue, "Daily log YYYY-MM-DD" (the owner's time zone),
 labelled `daily-log`. Each post is a comment on it, so the owner can follow
 everything from the GitHub app's notifications. The first post of a day opens
 the new issue and closes the older ones, so the open log is always today's.
+The day's issue number is kept in the state, so each post finds it without
+trusting the (lagging) list of open issues.
 Posts also go to the run's job summary, so the Actions tab shows them next to
 the logs.
 
@@ -20,6 +22,7 @@ from zoneinfo import ZoneInfo
 from . import config as config_mod
 from . import labels as labels_mod
 from . import gh
+from . import state as state_mod
 
 LABEL = "daily-log"
 TITLE = "Daily log {date}"
@@ -46,22 +49,62 @@ def _open_logs(cfg: config_mod.Config) -> list[dict]:
     return gh.api(f"repos/{cfg.repo}/issues?state=open&labels={LABEL}&per_page=100")
 
 
+def _is_open_log(cfg: config_mod.Config, number: int, title: str) -> bool:
+    """Whether issue `number` is open and titled `title`. Fetching one issue is consistent, the list isn't."""
+    try:
+        issue = gh.api(f"repos/{cfg.repo}/issues/{number}")
+    except gh.GhError:
+        return False
+    return issue.get("state") == "open" and issue.get("title") == title
+
+
+def _remember(cfg: config_mod.Config, date: str, number: int, stale: int | None) -> int:
+    """Records `number` as `date`'s log, unless another run already recorded a live one; returns the one kept.
+
+    Best effort: a run whose token can't write the state keeps its own issue.
+    """
+    def apply(st: dict) -> None:
+        current = st.get("daily_log") or {}
+        if current.get("date") != date or current.get("number") in (None, stale):
+            st["daily_log"] = {"date": date, "number": number}
+
+    try:
+        return int(state_mod.update(cfg, apply, f"daily log: {date} is #{number}")["daily_log"]["number"])
+    except (gh.GhError, KeyError, TypeError, ValueError):
+        return number
+
+
 def issue_for(cfg: config_mod.Config, date: str) -> int:
-    """Today's log issue: found, or opened now (closing the older ones)."""
+    """Today's log issue: found, or opened now (closing the older ones).
+
+    The day's number is kept in the state, because the list of open issues lags behind:
+    a log opened minutes ago can be missing from it, and every miss opened another log.
+    """
     title = TITLE.format(date=date)
+    try:
+        recorded = (state_mod.load(cfg)[0].get("daily_log") or {})
+    except gh.GhError:
+        recorded = {}
+    stale = None
+    if recorded.get("date") == date and recorded.get("number"):
+        if _is_open_log(cfg, int(recorded["number"]), title):
+            return int(recorded["number"])
+        stale = int(recorded["number"])
     logs = _open_logs(cfg)
-    mine = sorted(i["number"] for i in logs if i["title"] == title)
-    if not mine:
+    mine = sorted(i["number"] for i in logs if i["title"] == title and i["number"] != stale)
+    if mine:
+        keep = _remember(cfg, date, mine[0], stale)
+    else:
         labels_mod.ensure(cfg, [LABEL])
-        gh.api(f"repos/{cfg.repo}/issues", "-X", "POST", input={
+        created = gh.api(f"repos/{cfg.repo}/issues", "-X", "POST", input={
             "title": title, "labels": [LABEL],
             "body": f"What the bot did on {date} ({cfg.timezone}). Every action is a comment below; posts that "
                     f"need @{cfg.owner.login} mention them. Tomorrow's log closes this one.",
         })
-        # Two runs can open the day's log at the same moment: the lowest number wins.
-        logs = _open_logs(cfg)
-        mine = sorted(i["number"] for i in logs if i["title"] == title)
-    keep = mine[0]
+        # Two runs can open the day's log at the same moment: the one recorded first wins.
+        keep = _remember(cfg, date, int(created["number"]), stale)
+        if keep != created["number"]:
+            logs = [*logs, {"number": created["number"], "title": title}]
     for issue in logs:
         if issue["number"] != keep:
             reason = "duplicate" if issue["title"] == title else "completed"

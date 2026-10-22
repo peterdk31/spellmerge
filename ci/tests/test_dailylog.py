@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import copy
 import datetime as dt
 import unittest
 from unittest import mock
 
-from smbot import config, dailylog
+from smbot import config, dailylog, gh, state
 
 CFG = config.load()
 
@@ -14,6 +15,16 @@ class DailyLogTest(unittest.TestCase):
         patcher = mock.patch("smbot.labels.ensure")  # labels are covered in test_intake
         patcher.start()
         self.addCleanup(patcher.stop)
+        self.state = copy.deepcopy(state.DEFAULT)
+
+        def update(cfg: object, change: object, message: str) -> dict:
+            change(self.state)
+            return self.state
+
+        for name, fake in (("load", lambda cfg: (self.state, "sha")), ("update", update)):
+            patcher = mock.patch.object(dailylog.state_mod, name, fake)
+            patcher.start()
+            self.addCleanup(patcher.stop)
 
     def test_shorten_cuts_at_a_sentence_or_a_word(self) -> None:
         self.assertEqual(dailylog.shorten("Short.  Fine"), "Short. Fine")
@@ -34,7 +45,9 @@ class DailyLogTest(unittest.TestCase):
                 return list(issues)
             if path.endswith("/issues"):
                 issues.append({"number": 41, "title": input["title"]})
-                return {"number": 41}
+                return {"number": 41, "title": input["title"]}
+            if path.endswith("/issues/41"):
+                return {"number": 41, "title": "Daily log 2026-10-22", "state": "open"}
             return {}
 
         with mock.patch.object(dailylog.gh, "api", api):
@@ -55,6 +68,71 @@ class DailyLogTest(unittest.TestCase):
         with mock.patch.object(dailylog.gh, "api", api):
             self.assertEqual(dailylog.issue_for(CFG, "2026-10-22"), 41)
         self.assertEqual([p for p, i in calls if i], [f"repos/{CFG.repo}/issues/42"])
+
+    def test_a_log_missing_from_the_lagging_list_is_still_found(self) -> None:
+        # 2026-10-22: the open-issues list left out the day's log, and each post opened another one.
+        listed: list = []
+        calls: list = []
+        created = iter(range(41, 50))
+
+        def api(path: str, *args: str, input: object = None, token: object = None) -> object:
+            calls.append((path, input))
+            if "issues?state=open" in path:
+                return list(listed)  # never shows the new log
+            if path.endswith("/issues"):
+                return {"number": next(created), "title": input["title"]}
+            if path.endswith("/issues/41"):
+                return {"number": 41, "title": "Daily log 2026-10-22", "state": "open"}
+            return {}
+
+        with mock.patch.object(dailylog.gh, "api", api):
+            self.assertEqual([dailylog.issue_for(CFG, "2026-10-22") for _ in range(3)], [41, 41, 41])
+        self.assertEqual(sum(1 for p, i in calls if p.endswith("/issues") and i), 1)
+
+    def test_a_second_run_closes_the_log_it_opened_when_another_was_recorded_first(self) -> None:
+        def api(path: str, *args: str, input: object = None, token: object = None) -> object:
+            calls.append((path, input))
+            if "issues?state=open" in path:
+                return []
+            if path.endswith("/issues"):
+                self.state["daily_log"] = {"date": "2026-10-22", "number": 41}  # the other run got there first
+                return {"number": 42, "title": input["title"]}
+            return {}
+
+        calls: list = []
+        with mock.patch.object(dailylog.gh, "api", api):
+            self.assertEqual(dailylog.issue_for(CFG, "2026-10-22"), 41)
+        self.assertEqual([(p, i["state_reason"]) for p, i in calls if p.endswith("/issues/42")],
+                         [(f"repos/{CFG.repo}/issues/42", "not_planned")])
+
+    def test_a_recorded_log_the_owner_closed_is_replaced(self) -> None:
+        self.state["daily_log"] = {"date": "2026-10-22", "number": 41}
+
+        def api(path: str, *args: str, input: object = None, token: object = None) -> object:
+            if "issues?state=open" in path:
+                return []
+            if path.endswith("/issues"):
+                return {"number": 43, "title": input["title"]}
+            if path.endswith("/issues/41"):
+                return {"number": 41, "title": "Daily log 2026-10-22", "state": "closed"}
+            return {}
+
+        with mock.patch.object(dailylog.gh, "api", api):
+            self.assertEqual(dailylog.issue_for(CFG, "2026-10-22"), 43)
+        self.assertEqual(self.state["daily_log"], {"date": "2026-10-22", "number": 43})
+
+    def test_without_state_access_the_log_is_still_opened(self) -> None:
+        def denied(*args: object, **kwargs: object) -> None:
+            raise gh.GhError("HTTP 403")
+
+        def api(path: str, *args: str, input: object = None, token: object = None) -> object:
+            if "issues?state=open" in path:
+                return []
+            return {"number": 44, "title": input["title"]} if path.endswith("/issues") else {}
+
+        with mock.patch.object(dailylog.state_mod, "load", denied), \
+                mock.patch.object(dailylog.state_mod, "update", denied), mock.patch.object(dailylog.gh, "api", api):
+            self.assertEqual(dailylog.issue_for(CFG, "2026-10-22"), 44)
 
     def test_render_mentions_the_owner_only_when_asked(self) -> None:
         now = dt.datetime(2026, 10, 22, 8, 0, tzinfo=dt.timezone.utc)

@@ -485,6 +485,60 @@
       "tier": "placeholder",
       "tool": "Claude (hand-written SVG rects)",
       "prompt": "A 16x16 icon of a Bone clock face with a 1 px outline and two dark hands, for the Timer trigger. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/samples/a_chunky/wizard.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "Style sample A (chunky): a 32x32 wizard with an oversized head, a big pointed hat, a white beard and a short bell robe in the Player 1 ramp, holding a staff with a Spark gem. 1 px outline, light from the top-left, only non-overlapping rect elements, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/samples/a_chunky/crypt_floor.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "Style sample A (chunky): a seamless 32x32 crypt floor of bold offset stone bricks, each joint a Stone shadow line with a Stone light line beside it, a few light specks. Only non-overlapping rect elements, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/samples/a_chunky/spell_icon.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "Style sample A (chunky): a 16x16 fire spell icon, one big round flame with a Spark core, Fire shades and a 1 px outline. Only non-overlapping rect elements, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/samples/c_grim/wizard.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "Style sample C (grim): a 32x32 tall hooded wizard in a dark Player 1 cloak with a lit left edge, no face but two Fire-light eyes in the hood, a small rune on the chest and a wooden staff. 1 px outline, only non-overlapping rect elements, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/samples/c_grim/crypt_floor.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "Style sample C (grim): a seamless 32x32 crypt floor of large flagstones with thin Stone shadow joints, a light edge on each joint and two hairline cracks. Only non-overlapping rect elements, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/samples/c_grim/spell_icon.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "Style sample C (grim): a 16x16 fire spell icon, a narrow two-tipped flame with a dark skull-like face in its Spark core, Fire shades and a 1 px outline. Only non-overlapping rect elements, palette colours from docs/STYLE.md."
     }
   ]
 }

@@ -7,13 +7,16 @@ The ordered task queue for the current milestone, M2 (its design, [M2-spell-syst
 M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97). Each task's details are the matching row and sections of the M2 design. Nothing from M3+ is built (rewards, relics, staffs, rooms, the door rule).
 
 - [ ] **Read the first WASM numbers (M2 part 25 follow-up).** (`tests/benchmark/`, `docs/`) Once a daily build has run the web projectile timing and stress steps, read their `BENCH:` lines (or why they failed or timed out; see `docs/DECISIONS.md`, 2026-10-22). Sessions can't read CI logs: the "Daily run" post in that day's Daily log quotes them under "Stress and timing results" (`gh issue list --label daily-log --state all`, then `gh issue view N --comments`). Then either confirm the limits or lower them. Also read what the per-frame `multimesh.buffer` upload costs there (bolt, rune and orbit batches each hand over the whole cap x 16 floats, up to 192 KB per batch at 3,000); if it is tight, upload only the used slice or size the rune and orbit batches smaller. "WASM pending" stays open until then.
-- [ ] **Art direction choice (M2 part 27).** Claude drafts the style samples itself and asks the owner in one `owner` issue to pick one (optionally after asking players for feedback in Discussions) and to lock it in DESIGN.md; nothing in the game waits on it.
 - [ ] **Stabilisation and C2 (M2 part 28).** Only bug fixing, polish and performance until no known crash or blocker remains; then the planning session ends M2 with the C2 checkpoint issue (build link, bot data such as fuzz and stress numbers and which recipes bots build, Claude's honest assessment and the C2 question), and development waits for the owner's /go, /iterate or /pivot.
 
 ## Blocked
 
+- [ ] **Record the chosen art direction (M2 part 27 follow-up).** Replace the golden example candidates in `art/kit/golden.json` and `docs/STYLE.md` with the chosen style's files, and say in `docs/STYLE.md` that the style is no longer provisional. Redrawing the placeholders in that style is spread over later milestones (M2 design, "Art and the art direction"), one area at a time.
+  - **Waits on:** owner question #190 (key `art-direction-pick`) (the owner picks A, B or C and locks it in `docs/DESIGN.md`).
 
 ## Done recently
+
+- [x] **Art direction choice (M2 part 27).** Three style samples (A Chunky, B Current, C Grim), each a wizard, a crypt floor and a fire icon, are in `art/samples/` (B is the existing placeholder files); `tests/screenshots/shot_art_direction.gd` puts them side by side in `art_direction_sheet.png`, and `art/samples/README.md` compares them. The owner is asked to pick one, optionally after asking players in Discussions, and to lock it in `docs/DESIGN.md` (owner question #190, key `art-direction-pick`, open and not yet answered). Nothing in the game uses the samples.
 
 - [x] **Closed-outline audit of the other icons.** `test_svg_art.gd` now checks every spell icon: each non-outline pixel has a filled pixel on all four sides and none sits on the icon edge. It found seven icons with open outlines (storm, orbit, chain, homing, pierce, split, timer); all are fixed and the 1x sheet (`art_pass_sheet.png`) was looked at again. Overlapping rects were already checked for all SVGs.
 

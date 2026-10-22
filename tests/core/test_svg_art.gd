@@ -4,11 +4,13 @@ extends "res://tests/support/suite.gd"
 ## entry in art/manifest.json. Every file is checked on its own and the message names it, so
 ## one bad sprite never hides another.
 
-const ROOTS: Array[String] = ["res://art/tilesets", "res://art/vfx", "res://art/ui", "res://content"]
+const ROOTS: Array[String] = ["res://art/tilesets", "res://art/vfx", "res://art/ui", "res://art/samples", "res://content"]
 ## Files that must be found, so a broken scan cannot pass by finding nothing.
 const KNOWN: Array[String] = [
 	"res://art/tilesets/crypt/floor.svg",
 	"res://content/enemies/ember_imp/idle.svg",
+	"res://art/samples/a_chunky/wizard.svg",
+	"res://art/samples/c_grim/spell_icon.svg",
 ]
 const PALETTE: Array[String] = [
 	"#14121f",
@@ -91,6 +93,17 @@ func test_every_icon_has_a_closed_outline() -> void:
 			for problem in _outline_problems(FileAccess.get_file_as_string(path)):
 				check(false, "%s: %s" % [path, problem])
 	check_equal(icons, 18, "the scan found 18 spell component icons")
+
+
+## The art direction samples (art/samples/) hold two icons; they follow the same closed-outline rule.
+func test_the_sample_icons_have_a_closed_outline() -> void:
+	var icons: int = 0
+	for path in _files:
+		if path.begins_with("res://art/samples/") and path.ends_with("/spell_icon.svg"):
+			icons += 1
+			for problem in _outline_problems(FileAccess.get_file_as_string(path)):
+				check(false, "%s: %s" % [path, problem])
+	check_equal(icons, 2, "the scan found the 2 sample icons")
 
 
 func test_every_svg_is_in_the_manifest() -> void:

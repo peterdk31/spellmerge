@@ -34,6 +34,9 @@ extends CharacterBody2D
 ## is lost, and once at the first step; with no explicit `targets` it reads the
 ## `players` group then. With nobody to chase it looks only every RETARGET_TIME.
 ##
+## Statuses: a chilled enemy walks and winds up slower, a frozen one stands still and its
+## attack waits (`Combat.speed_factor`); knockback still moves it.
+##
 ## All timing runs in step(delta), so tests drive it with fixed deltas.
 ## _physics_process() calls step() and then move_and_slide().
 
@@ -211,19 +214,21 @@ func step(delta: float) -> void:
 		_looked = true
 		target = _find_target()
 		_target_id = target.get_instance_id() if target != null else 0
+	# Chill slows the walk and the attack timers, freeze stops them (Combat's `speed_factor`).
+	var pace: float = combat.speed_factor(self) if combat != null else 1.0
 	match state:
 		State.CHASE:
-			_step_chase()
+			_step_chase(pace)
 		State.WINDUP:
 			velocity = Vector2.ZERO
-			_state_left -= delta
+			_state_left -= delta * pace
 			if _state_left <= 0.0:
 				_attack()
 			else:
 				_update_telegraph()
 		State.RECOVER:
 			velocity = Vector2.ZERO
-			_state_left -= delta
+			_state_left -= delta * pace
 			if _state_left <= 0.0:
 				state = State.CHASE
 	_hurt_left = maxf(_hurt_left - delta, 0.0)
@@ -244,7 +249,7 @@ func telegraph_progress() -> float:
 	return clampf(1.0 - _state_left / windup_time, 0.0, 1.0)
 
 
-func _step_chase() -> void:
+func _step_chase(pace: float) -> void:
 	_show_telegraph(false)
 	if target == null or data == null:
 		velocity = Vector2.ZERO
@@ -258,7 +263,7 @@ func _step_chase() -> void:
 		velocity = Vector2.ZERO
 		_show_telegraph(true)
 		return
-	velocity = to_target.normalized() * data.move_speed
+	velocity = to_target.normalized() * data.move_speed * pace
 
 
 func _attack() -> void:

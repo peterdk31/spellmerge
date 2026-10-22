@@ -820,3 +820,16 @@ The HUD screenshot cannot be taken in a session (no display, `docs/BACKLOG.md`),
 - **Chain** picks the nearest other target within 96 px that is neither the one just hit nor the one before it, so two enemies are not bounced between. The chain shot is a plain straight shot of the same tag (speed at least 300 px/s) that carries the trigger's fires left.
 - **`hit_profile(tag)` returns a `HitProfile`** (damage, knockback, element, status) made once per compiled spell, so a hit allocates nothing and `combat` reads no spell field. Knockback is one constant (120, M1's value) until a form or modifier needs its own. `combat` is switched over in part 7; M1's table stays until then.
 - **`install` is the call for a build.** `begin_generation` stays as in part 5; `install` also removes the revoked shots, so no caller can forget to.
+
+## M2 part 7: elements and statuses
+
+**Decided by:** Claude, following the M2 design ("Hits, statuses and reactions").
+
+- **Status numbers are in the element, the rules are in `combat`.** `status_strength` means: burn damage per second; the percent of speed chill takes (capped at 90%); the percent of the hit's damage a shock jump deals; the percent of extra damage a hex adds. First values: fire burn 2/s for 3 s, frost chill 40% for 3 s, storm shock 75% for 4 s, void hex 25% for 4 s. All elements keep `damage_scale` 1.0 until the combo test retunes them.
+- **Stacking.** Burn, shock and hex refresh their time and keep the stronger number; they do not add up. Chill adds a stack; the third freezes for 1 s (`FREEZE_TIME`) and clears the chill; a frozen enemy takes no more chill, so hitting it cannot extend the freeze (Stillness, part 8, extends it on purpose).
+- **Order in one hit:** hex raises the damage and turns the knockback into a half-strength pull toward the hit; a shock is used up and jumps after the damage (also when the hit kills); then the hit's own status goes on, only if the target survived. So the hit that applies a status never feels it itself.
+- **The jump** goes to the nearest other enemy within 64 px, deals the damage times the share (at least 1), pushes nothing and puts on no status, so shock cannot chain forever. The neighbour comes from the projectile manager's target grid, rebuilt each step: an enemy that joined this frame is found next frame.
+- **Burn** deals whole points of damage (a fraction is carried) through `hit()`, so a hex raises it, `damage_dealt` and `enemy_died` are sent, and the caster gets the kill credit. It is collected during the status loop and sent after it, as contact hits are.
+- **The AI is slowed by `Combat.speed_factor(enemy)`** (1 free, less when chilled, 0 frozen), applied to walking and to the windup and recover timers, so a frozen imp's telegraph stops where it is and the warning stays honest. Knockback is not scaled.
+- **Players get no statuses** from player spells (friendly fire is damage only), as the design says.
+- **Tints and icons use palette colours only** (STYLE.md has no ice or storm colour): fire is Fire base, frost is Player 1 light blue, storm is Spark gold, void is Player 4 light purple. Frost and void are close in hue to players 1 and 4, which STYLE.md warns about for base colours; the art pass (M2 part 26) checks this on one sheet and may ask for new palette entries (an owner decision).

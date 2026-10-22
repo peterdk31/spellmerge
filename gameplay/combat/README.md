@@ -14,6 +14,7 @@ Element reactions are content data, so contributors add them without touching th
 - **Dependency direction:** `core` ← `gameplay` ← `content`. This area may use `core/` and the registry. `core/` never depends on it, and content never reaches into it.
 - **Events** (`core/events/events.gd` owns the definitions; this list matches it and the table in [gameplay/README.md](../README.md)):
   - Sends: `enemy_died`, `damage_dealt`, `status_applied`, and from M2 part 8 `reaction_triggered`.
+  - Statuses (M2 part 7): `Combat.apply_status(player, enemy, id, duration, strength)` for burn, chill, shock and hex (three chills make `freeze`); `status_left`, `has_status`, `chill_stacks`, and `speed_factor(enemy)` for whoever moves an enemy (multiply walking and attack timers by it: 0 when frozen). A spell's hit comes with `Spells.hit_profile(tag)` (damage, knockback, status); other shots use `set_hit_profile`.
   - Listens to: `projectile_hit` (from `core/projectiles`) and `spell_cast` (from `player`). On the first `spell_cast` of a spell id it asks `core/registry` for that spell and sets a hit profile from its `hit_tag()`, `hit_damage()` and `hit_knockback()`, so spells never call Combat.
 - Areas never call each other directly; they talk through events. [gameplay/README.md](../README.md) has the rules every sub-area shares.
 

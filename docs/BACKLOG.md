@@ -2,6 +2,11 @@
 
 Ideas and future work outside the current milestone (docs/PLAN.md, "Planning system"). The weekly planning run triages Discussions ideas into this file and moves items into `docs/NEXT.md` when their milestone comes.
 
+## From M2 part 7
+
+- Nothing shows a status on an enemy (no tint, icon or sound). Part 8 adds a flash, a number and a sound by id through `Feel`; a lasting look (blue while chilled, flames while burning) is not planned yet.
+- `Combat.speed_factor` is the one reader of slow and freeze. M3's enemy base should multiply walking and attack timers by it once, so every enemy type respects it.
+
 ## Questions for the owner
 
 Not kept here any more: each question is an issue labelled `owner-question` (docs/DECISIONS.md, "The owner inbox").

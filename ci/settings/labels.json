@@ -158,5 +158,10 @@
     "name": "playtest",
     "color": "5319e7",
     "description": "The owner's playtest of the week"
+  },
+  {
+    "name": "checkpoint",
+    "color": "5319e7",
+    "description": "A milestone is done: development waits for /go, /iterate or /pivot"
   }
 ]

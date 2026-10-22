@@ -141,7 +141,8 @@ def ask(cfg: config_mod.Config, questions: list[dict[str, Any]], source: str = "
 
 def reminder(cfg: config_mod.Config) -> str:
     """e.g. 'Waiting for you: #61 Allow X, #62 Pick Y' (empty when the inbox is empty)."""
-    issues = sorted(open_questions(cfg), key=lambda i: i["number"])
+    checkpoints = gh.api(f"repos/{cfg.repo}/issues?state=open&labels=checkpoint&per_page=20")
+    issues = sorted(open_questions(cfg) + checkpoints, key=lambda i: i["number"])
     if not issues:
         return ""
     return "**Waiting for you:** " + ", ".join(f"#{i['number']} {i['title']}" for i in issues[:10])

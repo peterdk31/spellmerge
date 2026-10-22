@@ -48,6 +48,40 @@
         "additionalProperties": false
       }
     },
+    "checkpoint": {
+      "type": "object",
+      "description": "Only when the current milestone is done: the checkpoint issue that asks the owner to go, iterate or pivot",
+      "properties": {
+        "milestone": {
+          "type": "string",
+          "description": "e.g. M2 (the spell system)"
+        },
+        "built": {
+          "type": "string"
+        },
+        "cut": {
+          "type": "string"
+        },
+        "assessment": {
+          "type": "string"
+        },
+        "question": {
+          "type": "string",
+          "description": "The checkpoint question of the milestone from docs/ROADMAP.md, if it has one"
+        },
+        "recommendation": {
+          "type": "string",
+          "description": "go, iterate on what, or pivot to what, and why"
+        }
+      },
+      "required": [
+        "milestone",
+        "built",
+        "assessment",
+        "recommendation"
+      ],
+      "additionalProperties": false
+    },
     "playtest": {
       "type": "object",
       "properties": {

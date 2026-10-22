@@ -83,6 +83,7 @@ FIXTURE_TASK = "**Area READMEs for the content areas.** Write the READMEs."
 
 @mock.patch.object(session.nexttask, "next_task", lambda *a, **k: FIXTURE_TASK)
 @mock.patch.object(session, "queue", lambda cfg, st: [])
+@mock.patch.object(session, "open_checkpoint", lambda cfg: None)
 class PromptTest(unittest.TestCase):
     """Uses a fixed task, so the tests don't depend on what docs/NEXT.md says today."""
 
@@ -146,7 +147,7 @@ class FinishTest(unittest.TestCase):
     APPROVE = json.dumps({"verdict": "approve", "problems": []})
     REVISE = json.dumps({"verdict": "revise", "problems": [{"severity": "major", "problem": "p", "fix": "f"}]})
 
-    def run_finish(self, st: dict, queue: list[str], posts: list | None = None,
+    def run_finish(self, st: dict, queue: list[str], posts: list | None = None, checkpoint_issue: int | None = None,
                    **env: str) -> tuple[dict[str, str], dict]:
         base = {"TASK": "A", "TASK_KIND": "next", "PR": "", "IMPLEMENT_STATUS": "ready", "FINAL_REVIEW": "",
                 "MERGED": "", "SETTINGS": "{}"}
@@ -166,6 +167,7 @@ class FinishTest(unittest.TestCase):
                                       lambda cfg, title, lines, **k: (posts if posts is not None else []).append(lines)), \
                     mock.patch.object(session, "pr_title", lambda cfg, pr: f"Title of #{pr}" if pr else ""), \
                     mock.patch.object(session, "queue", lambda cfg, st: []), \
+                    mock.patch.object(session, "open_checkpoint", lambda cfg: checkpoint_issue), \
                     mock.patch.object(session.nexttask, "next_task",
                                       lambda path_=None, skip=(), first=(): real(path, skip, first)):
                 return session.finish(CFG, base), st
@@ -263,6 +265,21 @@ class FinishTest(unittest.TestCase):
         self.run_finish(copy.deepcopy(state.DEFAULT), [], posts, TASK_KIND="plan", TASK="Planning",
                         IMPLEMENT_STATUS="nothing_to_do")
         self.assertTrue(any("Development is idle" in line for lines in posts for line in lines))
+
+    def test_no_idle_alarm_while_a_checkpoint_waits(self) -> None:
+        posts: list = []
+        self.run_finish(copy.deepcopy(state.DEFAULT), [], posts, checkpoint_issue=50, TASK_KIND="plan",
+                        TASK="Planning", IMPLEMENT_STATUS="nothing_to_do")
+        self.assertFalse(any("idle" in line for lines in posts for line in lines))
+
+    def test_a_merged_plan_that_answers_the_checkpoint_closes_it(self) -> None:
+        st = copy.deepcopy(state.DEFAULT)
+        session.checkpoint.record(st, 50, "go", "", "u", "2026-10-22T10:00:00Z")
+        closed: list = []
+        with mock.patch.object(session, "close_checkpoint", lambda cfg, n, pr: closed.append((n, pr)) or ["x"]):
+            out, _ = self.run_finish(st, [], checkpoint_issue=50, TASK_KIND="plan", TASK="Planning", PR="8",
+                                     FINAL_REVIEW=self.APPROVE, MERGED="true")
+        self.assertEqual((closed, out["again"]), ([(50, "8")], "true"))
 
     def test_errors_are_retried_then_raise_an_alarm(self) -> None:
         st = copy.deepcopy(state.DEFAULT)

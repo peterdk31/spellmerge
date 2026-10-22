@@ -9,7 +9,9 @@
 4. Decides what this run may do and writes it to $GITHUB_OUTPUT:
    automation, develop, mode, merge, focus, next_task, and reasons.
    With nothing in the queue the session plans (mode plan) instead of
-   stopping, so the end of a milestone flows straight into the next one.
+   stopping. The one wait is a milestone checkpoint (smbot.checkpoint): while
+   its issue is unanswered there is no planning, and the owner's answer
+   starts a planning session at once.
 
 Needs GH_TOKEN with issues read; --commands and Daily log posts need the bot
 app's token (Contents, Issues and Pull requests write).
@@ -25,7 +27,7 @@ import sys
 from dataclasses import dataclass, field
 from zoneinfo import ZoneInfo
 
-from . import commands, dailylog, intake, nexttask, pacing, panel, state
+from . import checkpoint, commands, dailylog, gh, intake, nexttask, pacing, panel, state
 from . import config as config_mod
 
 
@@ -50,7 +52,7 @@ def in_quiet_hours(quiet: tuple[int, int] | None, now: dt.datetime, tz: str) -> 
 
 
 def decide(kill_switch_on: bool, result: panel.PanelResult, st: dict, now: dt.datetime, tz: str,
-           has_task: bool) -> Decision:
+           has_task: bool, checkpoint_issue: int | None = None) -> Decision:
     s = result.settings
     reasons: list[str] = []
     if not kill_switch_on:
@@ -77,9 +79,22 @@ def decide(kill_switch_on: bool, result: panel.PanelResult, st: dict, now: dt.da
         develop = False
         reasons.append(f"backing off after a usage limit until {until}")
     mode = "develop"
-    if develop and not has_task and not st.get("pending_instructions"):
-        last = pacing.parse_time(st["last_plan"]) if st.get("last_plan") else None
-        if last and now - last < PLAN_COOLDOWN:
+    last = pacing.parse_time(st["last_plan"]) if st.get("last_plan") else None
+    answer = checkpoint.answer(st, checkpoint_issue)
+    if develop and answer:
+        # Plan at once after the answer; a plan that didn't merge is retried after the cooldown.
+        if last and last > pacing.parse_time(answer["at"]) and now - last < PLAN_COOLDOWN:
+            develop = False
+            reasons.append(f"planning your answer to checkpoint #{checkpoint_issue} again after "
+                           f"{pacing.iso(last + PLAN_COOLDOWN)}")
+        else:
+            mode = "plan"
+            reasons.append(f"carrying out your answer to checkpoint #{checkpoint_issue} ({answer['verdict']})")
+    elif develop and not has_task and not st.get("pending_instructions"):
+        if checkpoint_issue:
+            develop = False
+            reasons.append(f"waiting for your answer to checkpoint #{checkpoint_issue} (/go, /iterate or /pivot)")
+        elif last and now - last < PLAN_COOLDOWN:
             develop = False
             reasons.append(f"the queue is empty and planning ran at {st['last_plan']}; "
                            f"it plans again after {pacing.iso(last + PLAN_COOLDOWN)}")
@@ -138,7 +153,12 @@ def main(argv: list[str] | None = None) -> int:
             st = state.update(cfg, apply, "control: panel and owner commands")
 
     task = nexttask.next_task(skip=nexttask.parked(st, now), first=intake.queue_tasks(cfg, st))
-    decision = decide(kill_switch_on, result, st, now, cfg.timezone, task is not None or args.planning)
+    try:
+        open_checkpoint = checkpoint.open_issue(cfg)
+    except gh.GhError:
+        open_checkpoint = None
+    decision = decide(kill_switch_on, result, st, now, cfg.timezone, task is not None or args.planning,
+                      open_checkpoint)
     if log:
         dailylog.post(cfg, args.log_title, log, mention_owner=mention)
 

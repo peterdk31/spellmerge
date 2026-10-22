@@ -33,7 +33,8 @@ DEFAULT: dict[str, Any] = {
     "alarms": {},  # alarm name -> issue number
     "last_own_merge": None,
     "last_plan": None,  # when the last planning session finished
-    "errors_in_a_row": 0,  # sessions that ended in an error since the last one that made progress
+    "errors_in_a_row": 0,
+    "checkpoint_answers": {},  # checkpoint issue number -> the owner's verified /go, /iterate or /pivot  # sessions that ended in an error since the last one that made progress
     "intake_tasks": {},  # issue number -> the intake's neutral task for it (smbot.intake)
 }
 

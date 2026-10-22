@@ -17,7 +17,7 @@ import sys
 from typing import Any
 
 from . import config as config_mod
-from . import dailylog, gh, intake
+from . import checkpoint, dailylog, gh, intake
 
 MAX_MOVES = 10  # issues moved between the backlog and the queue per week
 
@@ -102,6 +102,8 @@ def publish_plan(cfg: config_mod.Config, plan: dict[str, Any], discussions_token
     if not merged:
         plan = {k: v for k, v in plan.items() if k != "owner_issues"}
     log = []
+    if plan.get("checkpoint") and merged:
+        log.append(checkpoint.open_checkpoint(cfg, plan["checkpoint"]))
     if plan.get("progress_post") and discussions_token:
         log.append(post_devlog(cfg, plan["progress_post"], discussions_token))
     log += move_issues(cfg, plan.get("schedule_issues", []), plan.get("unschedule_issues", []))

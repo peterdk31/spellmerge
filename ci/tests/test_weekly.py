@@ -46,6 +46,25 @@ class WeeklyTest(unittest.TestCase):
         self.assertEqual(log[0], "Devlog posted")
         self.assertTrue(log[-1].startswith("Playtest of the week"))
 
+    def test_a_merged_plan_opens_the_checkpoint(self) -> None:
+        cp = {"milestone": "M2", "built": "b", "assessment": "a", "recommendation": "go"}
+        with mock.patch.object(weekly.gh, "api_paginated", lambda *a, **k: []), \
+                mock.patch.object(weekly.checkpoint, "open_checkpoint", lambda cfg, c: f"Checkpoint for {c['milestone']}"):
+            self.assertEqual(weekly.publish_plan(CFG, {"checkpoint": cp}, None, merged=False), [])
+            self.assertEqual(weekly.publish_plan(CFG, {"checkpoint": cp}, None, merged=True), ["Checkpoint for M2"])
+
+    def test_checkpoint_issue_and_prompt(self) -> None:
+        body = weekly.checkpoint.body(CFG, {"milestone": "M2", "built": "b", "assessment": "a",
+                                            "recommendation": "go"})
+        for part in (f"@{CFG.owner.login}", "`/go`", "`/iterate <what to rework>`", "`/pivot <the new direction>`"):
+            self.assertIn(part, body)
+        st: dict = {}
+        self.assertIn("Don't start the next milestone", weekly.checkpoint.prompt_text(st, 50))
+        weekly.checkpoint.record(st, 50, "iterate", "snappier dodge", "u", "t")
+        text = weekly.checkpoint.prompt_text(st, 50)
+        self.assertIn("snappier dodge", text)
+        self.assertIn("Closes #50", text)
+
 
 if __name__ == "__main__":
     unittest.main()

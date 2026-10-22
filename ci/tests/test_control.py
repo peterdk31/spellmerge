@@ -5,10 +5,12 @@ import datetime as dt
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
-from smbot import commands, control, nexttask, pacing, panel, state
+from smbot import checkpoint, commands, config, control, nexttask, pacing, panel, state
 
 OWNER = 13425287
+CFG = config.load()
 PANEL = """**SPELLMERGE CONTROL PANEL**
 
 - [x] Automation enabled (untick = full stop, the kill switch)
@@ -153,6 +155,23 @@ class DecideTest(unittest.TestCase):
         self.assertEqual((d.develop, d.mode), (True, "plan"))
         self.assertEqual(control.decide(True, self.ok_panel(), st, NOW, "UTC", True).mode, "develop")
 
+    def test_an_unanswered_checkpoint_waits_but_scheduled_fixes_go_on(self) -> None:
+        st = copy.deepcopy(state.DEFAULT)
+        d = control.decide(True, self.ok_panel(), st, NOW, "UTC", False, checkpoint_issue=50)
+        self.assertFalse(d.develop)
+        self.assertIn("checkpoint #50", d.reasons[-1])
+        d = control.decide(True, self.ok_panel(), st, NOW, "UTC", True, checkpoint_issue=50)
+        self.assertEqual((d.develop, d.mode), (True, "develop"))
+
+    def test_a_checkpoint_answer_plans_at_once(self) -> None:
+        st = copy.deepcopy(state.DEFAULT)
+        st["last_plan"] = pacing.iso(NOW - dt.timedelta(minutes=30))
+        checkpoint.record(st, 50, "go", "", "u", pacing.iso(NOW - dt.timedelta(minutes=5)))
+        d = control.decide(True, self.ok_panel(), st, NOW, "UTC", True, checkpoint_issue=50)
+        self.assertEqual((d.develop, d.mode), (True, "plan"))
+        st["last_plan"] = pacing.iso(NOW - dt.timedelta(minutes=1))  # that plan didn't merge: wait
+        self.assertFalse(control.decide(True, self.ok_panel(), st, NOW, "UTC", True, checkpoint_issue=50).develop)
+
     def test_planning_on_an_empty_queue_waits_for_its_cooldown(self) -> None:
         st = copy.deepcopy(state.DEFAULT)
         st["last_plan"] = pacing.iso(NOW - dt.timedelta(hours=1))
@@ -176,6 +195,23 @@ class CommandsTest(unittest.TestCase):
         node["userContentEdits"]["nodes"].append({"editor": {"databaseId": 5}})
         self.assertFalse(commands.only_owner_edited(node, OWNER))
         self.assertFalse(commands.only_owner_edited({"author": {"databaseId": 5}, "userContentEdits": {"nodes": []}}, OWNER))
+
+    def test_checkpoint_answers_only_in_an_open_checkpoint_issue(self) -> None:
+        def cmd(name: str, text: str = "", number: int = 50) -> commands.Command:
+            return commands.Command(name, text, 1, "n", number, False, "u", "2026-10-22T10:00:00Z")
+
+        issues = {50: {"state": "open", "labels": [{"name": "checkpoint"}]},
+                  51: {"state": "open", "labels": [{"name": "bug"}]}}
+        effects = commands.Effects([], None, [])
+        with mock.patch.object(commands.gh, "api", lambda path, *a, **k: issues[int(path.rsplit("/", 1)[1])]):
+            self.assertIn("only works", commands.answer_checkpoint(CFG, effects, cmd("go", number=51)))
+            self.assertIn("Say what", commands.answer_checkpoint(CFG, effects, cmd("iterate")))
+            self.assertIn("go", commands.answer_checkpoint(CFG, effects, cmd("go")))
+            commands.answer_checkpoint(CFG, effects, cmd("pivot", "drop the builder"))
+        st = copy.deepcopy(state.DEFAULT)
+        effects.apply(st)
+        self.assertEqual(checkpoint.answer(st, 50)["verdict"], "pivot")  # the newest answer wins
+        self.assertEqual(commands.parse("/iterate the dodge"), ("iterate", "the dodge"))
 
     def test_effects_are_idempotent(self) -> None:
         st = copy.deepcopy(state.DEFAULT)

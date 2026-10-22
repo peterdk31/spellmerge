@@ -31,7 +31,7 @@ from pathlib import Path
 from typing import Any, Callable
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from . import alarms, dailylog, gh, intake, nexttask, pacing, state, weekly
+from . import alarms, checkpoint, dailylog, gh, intake, nexttask, pacing, state, weekly
 from . import merge as merge_mod
 from . import config as config_mod
 
@@ -160,6 +160,23 @@ def queue(cfg: config_mod.Config, st: dict[str, Any]) -> list[str]:
     return intake.queue_tasks(cfg, st)
 
 
+def open_checkpoint(cfg: config_mod.Config) -> int | None:
+    try:
+        return checkpoint.open_issue(cfg)
+    except gh.GhError:
+        return None
+
+
+def close_checkpoint(cfg: config_mod.Config, number: int, pr: str) -> list[str]:
+    """The plan that carries out the owner's checkpoint answer merged: the checkpoint is done."""
+    gh.api(f"repos/{cfg.repo}/issues/{number}/comments", "-X", "POST",
+           input={"body": f"Carried out in #{pr}. Development continues."})
+    gh.api(f"repos/{cfg.repo}/issues/{number}", "-X", "PATCH", input={"state": "closed", "state_reason": "completed"})
+    state.update(cfg, lambda s: s.get("checkpoint_answers", {}).pop(str(number), None),
+                 f"session: checkpoint #{number} carried out")
+    return [f"Checkpoint #{number} carried out in #{pr}; development continues."]
+
+
 def nothing_queued(cfg: config_mod.Config, now: dt.datetime) -> bool:
     """No task a session could take now: no scheduled issue and nothing unparked in docs/NEXT.md."""
     st, _ = state.load(cfg)
@@ -252,6 +269,7 @@ def prepare_plan(cfg: config_mod.Config, st: dict[str, Any], focus: str, today: 
     branch = f"claude/{dt.datetime.now(dt.timezone.utc):%Y%m%d-%H%M}-planning"
     prompt = render((MAINTAINER / "plan.md").read_text(), {
         "BACKLOG": backlog.replace(FENCE, "` ` `"),  # keep it inside its code block
+        "CHECKPOINT": checkpoint.prompt_text(st, open_checkpoint(cfg)),
         "RUN": ("This is the weekly run on Sunday: do every step." if weekly else
                 "This run started because the work queue is empty. Do steps 1 to 5 only: leave `progress_post` "
                 "empty and omit `playtest`; the Sunday run writes those."),
@@ -603,12 +621,16 @@ def finish(cfg: config_mod.Config, env: dict[str, str]) -> dict[str, str]:
     again = (not backing_off and not merge_skipped and not plan_idle and status != "auth"
              and (progressed or empty_queue or (failed and errors < MAX_ERRORS_IN_A_ROW)))
     stop: list[str] = []
+    waiting = open_checkpoint(cfg) if planning else None
+    if planning and merged and checkpoint.answer(st, waiting):
+        dailylog.post(cfg, "Checkpoint", close_checkpoint(cfg, waiting, pr))
+        waiting = None
     if failed and errors >= MAX_ERRORS_IN_A_ROW:
         line = alarms.raise_alarm(cfg, st, "stopped", errors=errors, run=env.get("RUN_URL", "the Actions tab"))
         stop.append(line or f"Development stopped after {errors} errors in a row.")
     elif progressed and "stopped" in st.get("alarms", {}):
         stop.append(alarms.clear_alarm(cfg, st, "stopped") or "")
-    if plan_idle:
+    if plan_idle and not waiting:
         stop.append("Development is idle: planning found no more tasks for now. It plans again on Sunday, "
                     "after a new scheduled issue, or when you give it work with `/claude`.")
     stop = [line for line in stop if line]

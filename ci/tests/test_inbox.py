@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import datetime as dt
 import tempfile
 import unittest
 from pathlib import Path
@@ -15,9 +14,10 @@ Q = {"title": "Allow X?", "question": "Why @someone needs X.", "options": ["Yes"
 
 class InboxTest(unittest.TestCase):
     def setUp(self) -> None:
-        patcher = mock.patch("smbot.labels.ensure")  # labels are covered in test_intake
-        patcher.start()
-        self.addCleanup(patcher.stop)
+        for patcher in (mock.patch("smbot.labels.ensure"),  # labels are covered in test_intake
+                        mock.patch("smbot.state.load", return_value=({"pending_instructions": []}, "sha"))):
+            patcher.start()
+            self.addCleanup(patcher.stop)
 
     def test_render_mentions_only_the_owner(self) -> None:
         body = inbox.render(CFG, Q, "a session")
@@ -86,7 +86,7 @@ class InboxTest(unittest.TestCase):
             return {"number": 8}
 
         with mock.patch.object(inbox.gh, "api", api):
-            self.assertEqual(inbox.ask(CFG, [Q]), ['Not asked again: "Allow X?" is #7 (open)'])
+            self.assertEqual(inbox.ask(CFG, [Q]), ['Not asked again: "Allow X?" is #7, still waiting for the owner'])
             log = inbox.ask(CFG, [{**Q, "title": "Pick Y?", "owner_change": False}, {"title": "", "question": "x"}])
         self.assertEqual(log, ["Question for the owner: #8 Pick Y?"])
         created = [c for c in calls if c[0].endswith("/issues") and c[2]]
@@ -116,30 +116,37 @@ class InboxTest(unittest.TestCase):
         with mock.patch.object(inbox.gh, "api", broken):
             self.assertEqual(inbox.answered_keys(CFG, st), set())
 
-    def test_rephrased_or_recently_answered_questions_are_not_asked_again(self) -> None:
-        """#72/#73 and #79/#80/#83 asked the same thing in other words."""
-        answered = {"number": 73, "title": "Make the daily build run the unit tests?", "state": "closed",
-                    "closed_at": "2026-10-20T10:00:00Z", "body": ""}
+    def test_only_questions_still_waiting_for_the_owner_stop_a_new_one(self) -> None:
+        """#72/#73 and #79/#80/#83 asked the same open question in other words; #192 was a next round of #190."""
         keyed = {"number": 80, "title": "Something else entirely", "state": "open",
                  "body": "text\n<!-- smbot:question key=build-sh-four-bot -->"}
+        reworded = {"number": 81, "title": "Make the daily build run the unit tests?", "state": "open", "body": ""}
+        answered = {"number": 190, "title": "Pick an art direction?", "state": "open",
+                    "body": "text\n<!-- smbot:question key=art-direction-pick -->"}
 
         def api(path: str, *args: str, input: object = None, token: object = None) -> object:
             if "issues?state=open" in path:
-                return [keyed]
-            if "issues?state=closed" in path:
-                return [answered]
+                return [keyed, reworded, answered]
             return {"number": 99}
 
-        now = dt.datetime(2026, 10, 22, tzinfo=dt.timezone.utc)
+        st = {"pending_instructions": [{"kind": "claude", "number": 190, "url": "u"}]}
         rephrased = {**Q, "title": "Make the daily build run the unit tests and fail when one fails?"}
         same_key = {**Q, "title": "Add the 4-bot step to ci/build/build.sh?", "key": "Build-sh four bot"}
-        new = {**Q, "title": "Pick a palette for the ice biome?"}
-        with mock.patch.object(inbox.gh, "api", api):
-            log = inbox.ask(CFG, [rephrased, same_key, new], now=now)
-        self.assertEqual(log, [f'Not asked again: "{rephrased["title"]}" is #73 (answered or closed)',
-                               f'Not asked again: "{same_key["title"]}" is #80 (open)',
-                               "Question for the owner: #99 Pick a palette for the ice biome?"])
+        next_round = {**Q, "title": "Pick an art direction?", "key": "art-direction-pick"}
+        with mock.patch.object(inbox.gh, "api", api), mock.patch.object(inbox.state, "load", return_value=(st, "sha")):
+            log = inbox.ask(CFG, [rephrased, same_key, next_round])
+        self.assertEqual(log, [f'Not asked again: "{rephrased["title"]}" is #81, still waiting for the owner',
+                               f'Not asked again: "{same_key["title"]}" is #80, still waiting for the owner',
+                               "Question for the owner: #99 Pick an art direction?"])
 
+    def test_a_closed_question_never_stops_a_new_one(self) -> None:
+        def api(path: str, *args: str, input: object = None, token: object = None) -> object:
+            if "issues?state=closed" in path:
+                raise AssertionError("closed questions aren't read")
+            return [] if "issues?state=open" in path else {"number": 99}
+
+        with mock.patch.object(inbox.gh, "api", api):
+            self.assertEqual(inbox.ask(CFG, [Q]), ["Question for the owner: #99 Allow X?"])
 
 if __name__ == "__main__":
     unittest.main()

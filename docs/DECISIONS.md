@@ -7,6 +7,12 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - **Why.** `MultiMesh.buffer` must hold exactly instance_count x 16 floats, so a partial upload is not possible; the only way to send less is a smaller MultiMesh.
 - **Now.** Each batch's room is the shots it draws rounded up to a power of two (at least 64, at most the cap); it grows at once and shrinks only when use is under a quarter of it, so the MultiMesh is rebuilt rarely. No shot is dropped by it; the cap is unchanged. An empty batch above the smallest size drops to nothing.
 
+## 2026-10-22: One decision keeps one issue until it's made
+
+- **Why.** When the owner answered a question with "more options", the next round became a new issue (#190, then #192, then the next), and the PR closed the old one. The owner had to follow a decision across issues, and their answers were split between them.
+- **What.** A session's question that matches an open question the owner has answered (same key or a similar title) is its next round: it's posted as a comment in that issue, mentioning the owner, with its own screenshots. The PR leaves that issue open: `with_closes` doesn't add `Closes #N` for it and turns a `Closes #N` the session wrote into `Continues #N`. The issue is closed only by the PR that carries out the final answer.
+- **Keys.** A next round under a new key adds that key to the issue, so a task blocked on either key waits on the same issue. After the round is posted the issue waits for the owner again, so the blocked task stays blocked until the next `/claude`.
+
 ## 2026-10-22: Only questions still waiting for the owner stop a new one
 
 - **Why.** A question that matched one closed in the last 30 days was dropped, and an answered question stays open until the PR carrying out the answer merges. So the next round of a decision (#190, then #192) could be dropped with only a line in the log, and the owner would never see it.

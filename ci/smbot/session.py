@@ -552,25 +552,30 @@ def unchecked_commits(tip: str, main: str, pinned: str, bot_email: str) -> list[
 _CLOSES = re.compile(r"\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+#(\d+)", re.IGNORECASE)
 
 
-def with_closes(cfg: config_mod.Config, body: str) -> str:
+def with_closes(cfg: config_mod.Config, body: str, asked: list[dict[str, Any]] | None = None) -> str:
     """The PR body, closing every open owner question this session was given a `/claude` answer to.
 
     Sessions are told to write `Closes #N` themselves, but #191 forgot, so the answered round of the
-    art direction question (#190) stayed open next to the new one.
+    art direction question (#190) stayed open next to the new one. A question the session asks a next
+    round of (`asked`, its owner_questions) stays open instead, even if the body says to close it:
+    the next round is posted in it (smbot.inbox.ask).
     """
     try:  # a nicety: the PR opens with the session's own body if the state or the questions can't be read
         st, _ = state.load(cfg)
         answered = {int(p["number"]) for p in st.get("pending_instructions", []) if p.get("kind") == "claude"}
         questions = {int(i["number"]) for i in inbox.open_questions(cfg)} if answered else set()
+        open_ = inbox.continued(cfg, asked or [], answered) if answered else set()
     except (gh.GhError, KeyError, TypeError, ValueError):
         return body
+    body = _CLOSES.sub(lambda m: f"Continues #{m.group(1)}" if int(m.group(1)) in open_ else m.group(0), body)
     already = {int(n) for n in _CLOSES.findall(body)}
-    missing = sorted((answered & questions) - already)
+    missing = sorted((answered & questions) - already - open_)
     return body + "".join(f"\n\nCloses #{n}" for n in missing)
 
 
 def publish(cfg: config_mod.Config, bundle: Path, branch: str, mode: str, result: dict[str, Any],
-            pr_number: int | None, token: str, unfinished: str = "", task: str = "") -> dict[str, str]:
+            pr_number: int | None, token: str, unfinished: str = "", task: str = "",
+            first: dict[str, Any] | None = None) -> dict[str, str]:
     """Pushes Claude's bundled commits from a clean checkout of main and opens or updates the PR.
 
     With `unfinished` (why the session stopped: a usage limit, an error, a timeout), the commits
@@ -628,7 +633,8 @@ def publish(cfg: config_mod.Config, bundle: Path, branch: str, mode: str, result
         gh.api(f"repos/{cfg.repo}/issues/{pr_number}/comments", "-X", "POST",
                input={"body": f"{note}\n\nPushed {pushed[:7]}."})
         return {"saved_pr": str(pr_number), "branch": branch}
-    body = with_closes(cfg, result["pr_body"]) if result.get("pr_body") else ""
+    asked = [*(result.get("owner_questions") or []), *((first or {}).get("owner_questions") or [])]
+    body = with_closes(cfg, result["pr_body"], asked) if result.get("pr_body") else ""
     if mode == "new":
         existing = gh.api(f"repos/{cfg.repo}/pulls?state=open&head={cfg.repo.split('/')[0]}:{branch}")
         if existing:
@@ -642,7 +648,7 @@ def publish(cfg: config_mod.Config, bundle: Path, branch: str, mode: str, result
             created = gh.api(f"repos/{cfg.repo}/pulls", "-X", "POST", input={
                 "title": (result.get("pr_title") or result.get("summary", "Claude's work"))[:200],
                 "head": branch, "base": "main",
-                "body": body or with_closes(cfg, result.get("summary", "")),
+                "body": body or with_closes(cfg, result.get("summary", ""), asked),
             })
             pr_number = created["number"]
     else:
@@ -936,8 +942,12 @@ def main(argv: list[str] | None = None) -> int:
         write_outputs(package(args.out, args.branch))
     elif args.cmd == "publish":
         result = json.loads(os.environ.get("RESULT") or "{}")
+        try:  # a revision: the first session's questions keep their issues open too
+            first = json.loads(os.environ.get("FIRST") or "{}")
+        except ValueError:
+            first = {}
         write_outputs(publish(cfg, args.bundle, args.branch, args.mode, result, args.pr, os.environ["GH_TOKEN"],
-                              args.unfinished, os.environ.get("TASK", "")))
+                              args.unfinished, os.environ.get("TASK", ""), first if isinstance(first, dict) else {}))
     elif args.cmd == "answers":
         st, _ = state.load(cfg)
         post_answers(cfg, json.loads(os.environ.get("RESULT") or "{}").get("answers", []),

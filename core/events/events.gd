@@ -44,6 +44,8 @@ signal projectile_hit(player: int, target: Node, position: Vector2, tag: int)
 signal projectile_impact(player: int, target: Node, position: Vector2, direction: Vector2)
 ## Sender: core/projectiles. A projectile fired by `player` ended without a hit: its life ran out or it struck a wall. `tag` is the value given to `Projectiles.spawn()`.
 signal projectile_expired(player: int, position: Vector2, tag: int)
+## Sender: core/spells. A beam or a nova of `player` just fired, for looks only (they have no shot to draw). `form` is `&"beam"` (`length` is how far it got, along `direction`) or `&"nova"` (a ring of shots leaves `origin`; `length` is 0). `tint` is the colour of the spell's element (white for plain arcane).
+signal form_shown(player: int, form: StringName, origin: Vector2, direction: Vector2, length: float, tint: Color)
 ## Sender: player. The spell of `player` at `spell` (a path as in `build_change_requested`) was built or changed; `description` says in plain words what it does now.
 signal spell_changed(player: int, spell: PackedInt32Array, description: String)
 ## Sender: player. A build change asked for by `player` was refused; `reason` says why in plain words.

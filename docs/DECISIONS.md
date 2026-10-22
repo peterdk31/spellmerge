@@ -2,6 +2,15 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-22: A neutral bolt with an element core
+
+- **One shader, no new palette colour.** The bolt, rune, orbit orb, beam and ring are Bone art whose Spark pixels are the "core"; `shot_core.gdshader` treats warm pixels (red well above blue) as core and keeps their three shades as dark, mid and light. Bone is near neutral, so the test of the palette (`test_svg_art.gd`) needed no change.
+- **Body = player, core = element.** The body tint stays the 45% mix with the owner's colour, so the four players stay apart; the element shows only in the core. Frost and void still share a colour with Player 1 and Player 4 until the blocked recolour task changes the elements' ramps; the core's position (the centre) keeps them apart meanwhile.
+- **Per-shot core in the MultiMesh custom data** (`DRAW_STRIDE` 16), set with `set_core(slot, color)` after `spawn` rather than a new `spawn` argument, like `set_homing`. The runtime sets it in `_register`, so chain jumps and held spells get it too.
+- **Runes and orbit shots have batches of their own** (chosen by motion, so `spawn` is unchanged), with `rune_texture` and `orbit_texture` falling back to `texture`.
+- **Beam and nova ring through a new event, `form_shown`** (sender `core/spells`, listener `feel`): a beam holds no row and a nova is ordinary shots, so nothing else tells feel about them. A nova sends one event for the whole ring; a beam one per ray (a chain's jumps included), inside Feel's pool: 24 slots per player, so a split fan is drawn whole, and a player's oldest is taken over. A plain spell (no element) has a white core on purpose: the core shows the element, and arcane has none.
+- **`fire_bolt.svg` renamed `bolt.svg`**, since it is no longer fire.
+
 ## 2026-10-22: Element tints use Ice base and Void light
 
 The frost tint is Ice base (`#4fd6dc`), not Ice light (`#c4f6f2`, nearly white); the void tint is Void light (`#e08ad8`), not base (`#a0309a`, too dark on the Stone floor). The icons keep the shadow, base and light of each ramp. The on_hit icon is a star burst and on_expire a ring so they differ in a black silhouette.

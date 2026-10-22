@@ -168,8 +168,12 @@ const RAY_MAX_DEPTH: int = 4
 ## not look at. Rays are not charged to the hit-work budget; how many a spell fires (and
 ## so how far a handler's own rays fan out) is bounded by the spell runtime's fire cap.
 const RAY_MAX_LENGTH: float = 360.0
-## Floats per projectile in the MultiMesh buffer: 8 transform, 4 colour.
-const DRAW_STRIDE: int = 12
+## Floats per projectile in the MultiMesh buffer: 8 transform, 4 colour, 4 custom data
+## (the colour of the shot's core, read by `shot_core.gdshader`).
+const DRAW_STRIDE: int = 16
+## Draws the neutral sprites: the bone body takes the owner's tint, the Spark-coloured
+## core takes the element's colour (`set_core`).
+const CORE_SHADER: Shader = preload("res://core/projectiles/shot_core.gdshader")
 ## Draw order of the shots: above the room and the wizards. The autoload is drawn
 ## before the current scene, so at z_index 0 the room's floor hid every shot.
 const DRAW_Z: int = 50
@@ -195,10 +199,21 @@ const PLAYER_COLORS: Array[Color] = [
 ]
 const ENEMY_COLOR: Color = Color("#e0592f")
 
-## Drawn tinted with the colour of the owner. Set a texture for the real art.
+## Drawn tinted with the colour of the owner. Set a texture for the real art. Neutral
+## (bone) art with a Spark-coloured core shows the element in the core (see `set_core`).
 var texture: Texture2D = null:
 	set(value):
 		texture = value
+		_apply_textures()
+## The art of runes (MOTION_STILL) and of orbit shots, drawn like `texture`. Left empty,
+## they use `texture`.
+var rune_texture: Texture2D = null:
+	set(value):
+		rune_texture = value
+		_apply_textures()
+var orbit_texture: Texture2D = null:
+	set(value):
+		orbit_texture = value
 		_apply_textures()
 ## The art of enemy shots (owner NO_PLAYER), drawn apart from the players' shots: other
 ## shape, no tint, on top. Left empty, they use `texture`.
@@ -287,8 +302,15 @@ var _wall_h: int = 1
 var _wall_cells: PackedByteArray = PackedByteArray()
 var _has_walls: bool = false
 
+## The colour of each shot's core (white for a plain shot), see `set_core`.
+var _core: PackedColorArray = PackedColorArray()
 var _draw_node: MultiMeshInstance2D = null
 var _draw_buffer: PackedFloat32Array = PackedFloat32Array()
+## The batches of runes and orbit shots, beside the bolts' `_draw_node`.
+var _rune_node: MultiMeshInstance2D = null
+var _rune_buffer: PackedFloat32Array = PackedFloat32Array()
+var _orbit_node: MultiMeshInstance2D = null
+var _orbit_buffer: PackedFloat32Array = PackedFloat32Array()
 ## The second batch, for enemy shots (see `hostile_texture`).
 var _hostile_node: MultiMeshInstance2D = null
 var _hostile_buffer: PackedFloat32Array = PackedFloat32Array()
@@ -327,20 +349,27 @@ func _init() -> void:
 func _ready() -> void:
 	if events == null:
 		events = get_node_or_null("/root/Events") as EventsScript
-	_draw_node = _make_batch(DRAW_Z)
-	_hostile_node = _make_batch(DRAW_Z + 1)
+	_draw_node = _make_batch(DRAW_Z, true)
+	_rune_node = _make_batch(DRAW_Z, true)
+	_orbit_node = _make_batch(DRAW_Z, true)
+	_hostile_node = _make_batch(DRAW_Z + 1, false)
 	_apply_textures()
 	_fit_draw_bounds()
 
 
 ## One batched draw of up to `_cap` quads (TRANSFORM_2D plus a colour each), added as a child.
-func _make_batch(z: int) -> MultiMeshInstance2D:
+func _make_batch(z: int, cored: bool) -> MultiMeshInstance2D:
 	var node := MultiMeshInstance2D.new()
 	var quad := QuadMesh.new()
 	quad.size = Vector2.ONE
 	var multimesh := MultiMesh.new()
 	multimesh.transform_format = MultiMesh.TRANSFORM_2D
 	multimesh.use_colors = true
+	multimesh.use_custom_data = true
+	if cored:
+		var material := ShaderMaterial.new()
+		material.shader = CORE_SHADER
+		node.material = material
 	multimesh.mesh = quad
 	multimesh.instance_count = _cap
 	multimesh.visible_instance_count = 0
@@ -353,6 +382,8 @@ func _make_batch(z: int) -> MultiMeshInstance2D:
 func _apply_textures() -> void:
 	if _draw_node != null:
 		_draw_node.texture = texture
+		_rune_node.texture = rune_texture if rune_texture != null else texture
+		_orbit_node.texture = orbit_texture if orbit_texture != null else texture
 	if _hostile_node != null:
 		_hostile_node.texture = hostile_texture if hostile_texture != null else texture
 
@@ -389,13 +420,18 @@ func set_cap(value: int) -> void:
 	_last_hit.resize(_cap * HIT_MEMORY)
 	_own_prev.resize(_cap)
 	_own_next.resize(_cap)
+	_core.resize(_cap)
 	_draw_buffer.resize(_cap * DRAW_STRIDE)
+	_rune_buffer.resize(_cap * DRAW_STRIDE)
+	_orbit_buffer.resize(_cap * DRAW_STRIDE)
 	_hostile_buffer.resize(_cap * DRAW_STRIDE)
 	_alive.resize(_cap)
 	_free_slots.resize(_cap)
 	clear()
 	if _draw_node != null:
 		_draw_node.multimesh.instance_count = _cap
+		_rune_node.multimesh.instance_count = _cap
+		_orbit_node.multimesh.instance_count = _cap
 		_hostile_node.multimesh.instance_count = _cap
 
 
@@ -536,6 +572,8 @@ func _fit_draw_bounds() -> void:
 	var box: Rect2 = _bounds.grow(BOUNDS_MARGIN)
 	var aabb := AABB(Vector3(box.position.x, box.position.y, -1.0), Vector3(box.size.x, box.size.y, 2.0))
 	_draw_node.multimesh.custom_aabb = aabb
+	_rune_node.multimesh.custom_aabb = aabb
+	_orbit_node.multimesh.custom_aabb = aabb
 	_hostile_node.multimesh.custom_aabb = aabb
 
 
@@ -677,6 +715,24 @@ func set_homing(slot: int, turn_rate: float) -> bool:
 	return true
 
 
+## Give the shot in `slot` the colour of its core: the element's tint (`CompiledSpell.tint`).
+## A plain shot keeps white. Returns false for an empty slot or a colour that is not finite.
+func set_core(slot: int, color: Color) -> bool:
+	if slot < 0 or slot >= _cap or _alive[slot] == 0:
+		return false
+	if not (is_finite(color.r) and is_finite(color.g) and is_finite(color.b)):
+		return false
+	_core[slot] = Color(color.r, color.g, color.b, 1.0)
+	return true
+
+
+## The core colour of the shot in `slot`, white for an empty slot or a plain shot.
+func get_core_of(slot: int) -> Color:
+	if slot < 0 or slot >= _cap or _alive[slot] == 0:
+		return Color.WHITE
+	return _core[slot]
+
+
 func _spawn_row(player: int, origin: Vector2, velocity: Vector2, lifetime: float, radius: float, hit_layers: int, pierce: int, tag: int, motion: int) -> int:
 	# An orbit shot is held by its caster and ignores walls.
 	if motion != MOTION_ORBIT and _has_walls and _wall_hit(origin, origin) >= 0.0:
@@ -701,6 +757,7 @@ func _spawn_row(player: int, origin: Vector2, velocity: Vector2, lifetime: float
 	_layers[slot] = (hit_layers | LAYER_PLAYER) if friendly_fire and player >= 0 else hit_layers
 	_pierce[slot] = maxi(pierce, 0)
 	_tag[slot] = tag
+	_core[slot] = Color.WHITE
 	_seq[slot] = _next_seq
 	_next_seq += 1
 	_skip_left[slot] = 0.0
@@ -983,6 +1040,8 @@ func update_draw() -> void:
 	var hostile_multimesh: MultiMesh = _hostile_node.multimesh
 	var fraction: float = clampf(Engine.get_physics_interpolation_fraction(), 0.0, 1.0)
 	var out: int = 0
+	var rune_out: int = 0
+	var orbit_out: int = 0
 	var hostile_out: int = 0
 	for slot in _high:
 		if _alive[slot] == 0:
@@ -993,24 +1052,37 @@ func update_draw() -> void:
 			dir = _vel[slot].normalized()
 		var at: Vector2 = _prev[slot].lerp(_pos[slot], fraction)
 		if _player[slot] < 0:
-			_write_quad(_hostile_buffer, hostile_out * DRAW_STRIDE, dir, diameter, at, Color.WHITE)
+			_write_quad(_hostile_buffer, hostile_out * DRAW_STRIDE, dir, diameter, at, Color.WHITE, Color.WHITE)
 			hostile_out += 1
+		elif _motion[slot] == MOTION_STILL:
+			_write_quad(_rune_buffer, rune_out * DRAW_STRIDE, dir, diameter, at, _color_of(_player[slot]), _core[slot])
+			rune_out += 1
+		elif _motion[slot] == MOTION_ORBIT:
+			_write_quad(_orbit_buffer, orbit_out * DRAW_STRIDE, dir, diameter, at, _color_of(_player[slot]), _core[slot])
+			orbit_out += 1
 		else:
-			_write_quad(_draw_buffer, out * DRAW_STRIDE, dir, diameter, at, _color_of(_player[slot]))
+			_write_quad(_draw_buffer, out * DRAW_STRIDE, dir, diameter, at, _color_of(_player[slot]), _core[slot])
 			out += 1
 	if out > 0:
 		multimesh.buffer = _draw_buffer
 	multimesh.visible_instance_count = out
+	if rune_out > 0:
+		_rune_node.multimesh.buffer = _rune_buffer
+	_rune_node.multimesh.visible_instance_count = rune_out
+	if orbit_out > 0:
+		_orbit_node.multimesh.buffer = _orbit_buffer
+	_orbit_node.multimesh.visible_instance_count = orbit_out
 	if hostile_out > 0:
 		hostile_multimesh.buffer = _hostile_buffer
 	hostile_multimesh.visible_instance_count = hostile_out
 	drawn_hostile = hostile_out
-	drawn = out + hostile_out
+	drawn = out + rune_out + orbit_out + hostile_out
 
 
 ## Write one quad at float index `i` of `buffer` (packed arrays are shared, not copied):
-## Transform2D(dir * d, dir.orthogonal() * d, at), row by row, then the colour.
-func _write_quad(buffer: PackedFloat32Array, i: int, dir: Vector2, diameter: float, at: Vector2, color: Color) -> void:
+## Transform2D(dir * d, dir.orthogonal() * d, at), row by row, then the colour and the
+## colour of the core (custom data).
+func _write_quad(buffer: PackedFloat32Array, i: int, dir: Vector2, diameter: float, at: Vector2, color: Color, core: Color) -> void:
 	buffer[i] = dir.x * diameter
 	buffer[i + 1] = dir.y * diameter
 	buffer[i + 2] = 0.0
@@ -1023,6 +1095,10 @@ func _write_quad(buffer: PackedFloat32Array, i: int, dir: Vector2, diameter: flo
 	buffer[i + 9] = color.g
 	buffer[i + 10] = color.b
 	buffer[i + 11] = color.a
+	buffer[i + 12] = core.r
+	buffer[i + 13] = core.g
+	buffer[i + 14] = core.b
+	buffer[i + 15] = 1.0
 
 
 ## Position of a live projectile, or Vector2.INF if the slot is empty.
@@ -1034,6 +1110,12 @@ func get_position_of(slot: int) -> Vector2:
 
 func is_alive(slot: int) -> bool:
 	return slot >= 0 and slot < _cap and _alive[slot] != 0
+
+
+## The tint of the bone body of `player`'s shots (the enemy's colour for NO_PLAYER), also
+## used for the beams and rings `feel` draws.
+func tint_of(player: int) -> Color:
+	return _color_of(clampi(player, EventsScript.NO_PLAYER, MAX_PLAYERS - 1))
 
 
 func _color_of(player: int) -> Color:

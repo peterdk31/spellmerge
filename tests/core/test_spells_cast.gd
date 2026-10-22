@@ -71,6 +71,7 @@ func before_each() -> void:
 	fire.status_id = &"burn"
 	fire.status_duration = 3.0
 	fire.damage_scale = 2.0
+	fire.tint = Color(0.88, 0.35, 0.18)
 	_put(fire, &"fire")
 	var split: ModifierBase = ModifierBase.new()
 	split.shot_mult = 3
@@ -235,6 +236,49 @@ func test_still_and_orbit_shots_and_a_missing_anchor() -> void:
 	_tick(10)
 	var orbit_slot: int = _slots(_spells.current_tag(1, 0))[0]
 	check(is_equal_approx(_mgr.get_position_of(orbit_slot).distance_to(Vector2(100, 100)), 40.0), "it circles the anchor at the form's radius")
+
+
+func test_every_shot_takes_the_colour_of_its_element_in_its_core() -> void:
+	_build(0, 0, {"form": &"nova", "element": &"fire"})
+	_cast(0)
+	var shots: Array[int] = _slots()
+	check_equal(shots.size(), 8, "the nova made its ring")
+	for slot in shots:
+		check_equal(_mgr.get_core_of(slot), Color(0.88, 0.35, 0.18), "a shot of the ring has the element's core")
+	_build(1, 0, {"form": &"bolt"})
+	_cast(1)
+	var plain: int = _slots(_spells.current_tag(1, 0))[0]
+	check_equal(_mgr.get_core_of(plain), Color.WHITE, "a spell with no element has a plain core")
+	_build(2, 0, {"form": &"rune", "element": &"fire"})
+	_cast(2, 0, 10.0, Vector2(30, 30))
+	check_equal(_mgr.get_core_of(_slots(_spells.current_tag(2, 0))[0]), Color(0.88, 0.35, 0.18), "a rune has it too")
+	_mgr.set_anchor(3, Vector2(100, 100))
+	_build(3, 0, {"form": &"orb", "element": &"fire"})
+	_cast(3)
+	check_equal(_mgr.get_core_of(_slots(_spells.current_tag(3, 0))[0]), Color(0.88, 0.35, 0.18), "and an orbit shot")
+
+
+func test_a_beam_and_a_nova_announce_themselves_for_looks() -> void:
+	var seen: Array = []
+	_bus.form_shown.connect(func(player: int, form: StringName, origin: Vector2, direction: Vector2, length: float, tint: Color) -> void: seen.append([player, form, origin, direction, length, tint]))
+	_build(2, 0, {"form": &"beam", "element": &"fire"})
+	_cast(2, 0, 10.0, Vector2(5, 6), Vector2.DOWN)
+	check_equal(seen.size(), 1, "one beam, one announcement")
+	check_equal(seen[0][0], 2, "from the caster")
+	check_equal(seen[0][1], &"beam", "as a beam")
+	check_equal(seen[0][2], Vector2(5, 6), "from the staff")
+	check((seen[0][3] as Vector2).is_equal_approx(Vector2.DOWN), "along the aim")
+	check(is_equal_approx(seen[0][4], 200.0), "as long as it got (%s)" % str(seen[0][4]))
+	check_equal(seen[0][5], Color(0.88, 0.35, 0.18), "in the element's colour")
+	seen.clear()
+	_build(1, 0, {"form": &"nova"})
+	_cast(1)
+	check_equal(seen.size(), 1, "one nova, one announcement, not one per shot")
+	check_equal(seen[0][1], &"nova", "as a nova")
+	seen.clear()
+	_build(0, 0, {"form": &"bolt"})
+	_cast(0)
+	check_equal(seen.size(), 0, "a bolt has no announcement, it is drawn as a shot")
 
 
 func test_a_beam_hits_instantly_and_counts_as_a_shot() -> void:

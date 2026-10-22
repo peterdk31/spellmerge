@@ -43,6 +43,14 @@ const PoolScript := preload("res://core/pools/pool.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const FeelPresetScript := preload("res://gameplay/feel/presets/feel_preset.gd")
 const FLASH_SHADER: Shader = preload("res://gameplay/feel/hit_flash.gdshader")
+## Draws the beam and the nova ring like a shot: bone body tinted by the player, core by the element.
+const CORE_SHADER: Shader = preload("res://core/projectiles/shot_core.gdshader")
+## Beams and nova rings on screen per player: one cast makes at most 24 shots (the spell limit),
+## so a split fan is drawn whole; past that the player's oldest slot is taken over.
+const FORMS_PER_PLAYER: int = 24
+const FORM_SLOTS: int = FORMS_PER_PLAYER * 4
+## Beams and rings draw above the room, under the shots (50) and the flashes (20).
+const FORM_Z: int = 18
 
 ## Most hit particles alive at once, across all players (one limit for the "hit" effect).
 const PARTICLE_LIMIT: int = 48
@@ -146,6 +154,15 @@ var _flash_left: PackedFloat32Array = PackedFloat32Array()
 var _flash_total: PackedFloat32Array = PackedFloat32Array()
 var _flash_size: PackedFloat32Array = PackedFloat32Array()
 var _flash_aspect: PackedVector2Array = PackedVector2Array()
+## Beams and nova rings (sprites made once): seconds left and in all, whether it is a ring,
+## the owner's body tint and the beam's length in pixels.
+var _forms: Array[Sprite2D] = []
+var _form_left: PackedFloat32Array = PackedFloat32Array()
+var _form_total: PackedFloat32Array = PackedFloat32Array()
+var _form_is_ring: PackedByteArray = PackedByteArray()
+var _form_body: PackedColorArray = PackedColorArray()
+var _form_length: PackedFloat32Array = PackedFloat32Array()
+var _next_form: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 var _next_puff: int = MUZZLE_SLOTS
 var _next_spark: int = FLASH_SLOTS
 ## Reaction names: one label per reaction flash slot, with where it starts and seconds left.
@@ -209,6 +226,24 @@ func _ready() -> void:
 		flash.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		add_child(flash)
 		_flashes.append(flash)
+	for i in FORM_SLOTS:
+		var form := Sprite2D.new()
+		var material := ShaderMaterial.new()
+		material.shader = CORE_SHADER
+		form.material = material
+		form.top_level = true
+		form.visible = false
+		form.z_index = FORM_Z
+		form.centered = false
+		form.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		form.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
+		add_child(form)
+		_forms.append(form)
+	_form_left.resize(FORM_SLOTS)
+	_form_total.resize(FORM_SLOTS)
+	_form_is_ring.resize(FORM_SLOTS)
+	_form_body.resize(FORM_SLOTS)
+	_form_length.resize(FORM_SLOTS)
 	for i in REACTION_SLOTS:
 		var label := Label.new()
 		label.top_level = true
@@ -253,11 +288,16 @@ func _ready() -> void:
 	events.spell_cast.connect(_on_spell_cast)
 	events.wizard_cast.connect(_on_wizard_cast)
 	events.projectile_impact.connect(_on_projectile_impact)
+	events.form_shown.connect(_on_form_shown)
 	events.reaction_triggered.connect(_on_reaction_triggered)
 	if projectiles == null:
 		projectiles = get_node_or_null("/root/Projectiles")
 	if projectiles != null and "texture" in projectiles and projectiles.texture == null:
 		projectiles.texture = preset.bolt_texture
+	if projectiles != null and "rune_texture" in projectiles and projectiles.rune_texture == null:
+		projectiles.rune_texture = preset.rune_texture
+	if projectiles != null and "orbit_texture" in projectiles and projectiles.orbit_texture == null:
+		projectiles.orbit_texture = preset.orbit_texture
 	# Enemy shots look different (a spiky orb, not a comet), so they are never taken for a spell.
 	if projectiles != null and "hostile_texture" in projectiles and projectiles.hostile_texture == null:
 		projectiles.hostile_texture = preset.hostile_texture
@@ -302,6 +342,7 @@ func step(real_delta: float) -> void:
 		_apply_camera()
 	_step_reactions(real_delta)
 	_step_flashes(real_delta)
+	_step_forms(real_delta)
 	_step_labels(real_delta)
 	_step_ghosts(real_delta)
 	var at: int = _active.size() - 1
@@ -656,6 +697,74 @@ func _on_spell_cast(player: int, _spell_id: StringName, origin: Vector2, directi
 	if shake_enabled and direction != Vector2.ZERO:
 		_refresh_camera()
 		_kick = (_kick - direction.normalized() * preset.cast_kick_pixels).limit_length(MAX_KICK_PIXELS)
+
+
+## A beam or a nova ring, drawn in the owner's tint with the element's colour in its core.
+func _on_form_shown(player: int, form: StringName, origin: Vector2, direction: Vector2, length: float, tint: Color) -> void:
+	var ring: bool = form == &"nova"
+	if not ring and (form != &"beam" or length <= 0.0 or direction == Vector2.ZERO):
+		return
+	var seconds: float = preset.nova_seconds if ring else preset.beam_seconds
+	if seconds <= 0.0 or not origin.is_finite():
+		return
+	# Only players cast beams and rings; an enemy (negative index) has no slots, so it is ignored.
+	if player < 0:
+		return
+	# Each player reuses only their own oldest slots, so nobody's beams push out another's.
+	var who: int = mini(player, 3)
+	var slot: int = who * FORMS_PER_PLAYER + _next_form[who]
+	_next_form[who] = (_next_form[who] + 1) % FORMS_PER_PLAYER
+	var sprite: Sprite2D = _forms[slot]
+	sprite.global_position = origin
+	if ring:
+		sprite.texture = preset.nova_texture
+		sprite.centered = true
+		sprite.region_enabled = false
+		sprite.offset = Vector2.ZERO
+		sprite.rotation = 0.0
+	else:
+		sprite.texture = preset.beam_texture
+		sprite.centered = false
+		sprite.offset = Vector2(0.0, -16.0)
+		sprite.region_enabled = true
+		sprite.region_rect = Rect2(0.0, 0.0, length, 32.0)
+		sprite.rotation = direction.angle()
+		sprite.scale = Vector2.ONE
+	var material: ShaderMaterial = sprite.material as ShaderMaterial
+	material.set_shader_parameter(&"core_override", Color(tint.r, tint.g, tint.b, 1.0))
+	var body: Color = Color.WHITE
+	if projectiles != null and projectiles.has_method("tint_of"):
+		body = projectiles.call("tint_of", player) as Color
+	_form_body[slot] = body
+	_form_is_ring[slot] = 1 if ring else 0
+	_form_left[slot] = seconds
+	_form_total[slot] = seconds
+	sprite.visible = true
+	_pose_form(slot, 1.0)
+
+
+## Fade the beams and grow the rings.
+func _step_forms(real_delta: float) -> void:
+	for i in FORM_SLOTS:
+		if _form_left[i] <= 0.0:
+			continue
+		_form_left[i] -= real_delta
+		if _form_left[i] <= 0.0:
+			_forms[i].visible = false
+			continue
+		_pose_form(i, _form_left[i] / _form_total[i])
+
+
+## Show form `slot` at `t` (1 just shown, 0 gone): faded, and a ring wider, a beam thinner.
+func _pose_form(slot: int, t: float) -> void:
+	var sprite: Sprite2D = _forms[slot]
+	var body: Color = _form_body[slot]
+	(sprite.material as ShaderMaterial).set_shader_parameter(&"body_tint", Color(body.r, body.g, body.b, t))
+	if _form_is_ring[slot] != 0:
+		var across: float = preset.nova_ring_size * (0.25 + 0.75 * (1.0 - t))
+		sprite.scale = Vector2.ONE * (across / 32.0)
+	else:
+		sprite.scale = Vector2(1.0, t)
 
 
 func _on_wizard_cast(_player: int, wizard: Node) -> void:

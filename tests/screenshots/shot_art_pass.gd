@@ -41,9 +41,9 @@ const ELEMENTS: Array[Resource] = [
 	preload("res://content/spells/elements/storm/storm.tres"),
 	preload("res://content/spells/elements/void/void.tres"),
 ]
-const BOLT := preload("res://art/vfx/fire_bolt.svg")
+const BOLT := preload("res://art/vfx/bolt.svg")
 const VFX: Array[Texture2D] = [
-	preload("res://art/vfx/fire_bolt.svg"),
+	preload("res://art/vfx/bolt.svg"),
 	preload("res://art/vfx/imp_fireball.svg"),
 	preload("res://art/vfx/hit_spark.svg"),
 	preload("res://art/vfx/telegraph_dash.svg"),

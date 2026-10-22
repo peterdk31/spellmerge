@@ -3,15 +3,15 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://b2uar4e7k0mwd"
-path="res://.godot/imported/fire_bolt.svg-8a3d1acb8000c21b5c9c12973385bffe.ctex"
+path="res://.godot/imported/bolt.svg-1ba33ad32f7a4db06cea7d46cc673b54.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://art/vfx/fire_bolt.svg"
-dest_files=["res://.godot/imported/fire_bolt.svg-8a3d1acb8000c21b5c9c12973385bffe.ctex"]
+source_file="res://art/vfx/bolt.svg"
+dest_files=["res://.godot/imported/bolt.svg-1ba33ad32f7a4db06cea7d46cc673b54.ctex"]
 
 [params]
 

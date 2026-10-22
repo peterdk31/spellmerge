@@ -457,6 +457,9 @@ func _launch(spell: CompiledSpell, tag: int, player: int, origin: Vector2, direc
 		_register(slot, tag, spell, spell.trigger_max_fires, carried, prev)
 		if source != null:
 			projectiles.exclude(slot, source, SpellLimits.SOURCE_EXCLUSION)
+	# The ring is only a cue, drawn once, and only when a shot really flew.
+	if events != null and made > 0 and count > 1 and spell.spread >= 360.0 and spell.motion == FormBase.Motion.STRAIGHT:
+		events.form_shown.emit(player, &"nova", origin, direction, 0.0, spell.tint)
 	return made
 
 
@@ -472,6 +475,7 @@ func _fan_angle(n: int, count: int, spell: CompiledSpell) -> float:
 
 ## Gives the manager's shot in `slot` its record and counts it.
 func _register(slot: int, tag: int, spell: CompiledSpell, fires: int, chain: int, prev: int) -> void:
+	projectiles.set_core(slot, spell.tint)
 	if _rec_seq.size() < projectiles.get_cap():
 		var size: int = projectiles.get_cap()
 		var old_size: int = _rec_seq.size()
@@ -514,6 +518,8 @@ func _shoot_ray(spell: CompiledSpell, tag: int, player: int, origin: Vector2, he
 	_ray_prev = prev
 	var reach: float = spell.ray_length if length < 0.0 else length
 	var got: float = projectiles.ray(player, origin, heading, reach, spell.pierce if pierce < 0 else pierce, ProjectilesScript.LAYER_ENEMY, tag, spell.radius * 0.5, source)
+	if got > 0.0 and events != null:
+		events.form_shown.emit(player, &"beam", origin, heading, got, spell.tint)
 	# A `ray()` that did nothing (too deep, or a bad aim) has no end to fire the held spell from.
 	if got > 0.0 and spell.held != null and spell.trigger_event == TriggerBase.Event.EXPIRE and _ray_fires > 0 and _take_fire(player):
 		_ray_fires -= 1

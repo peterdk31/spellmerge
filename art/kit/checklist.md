@@ -61,6 +61,6 @@ Copy their approach, not their pixels. The list is `art/kit/golden.json`.
 - Player character: `content/wizard/base/wizard_p1_idle.svg`
 - Enemy: `content/enemies/ember_imp/idle.svg`
 - Raised tile: `art/tilesets/crypt/wall.svg`; flat tile: `art/tilesets/crypt/floor.svg`
-- Projectile: `art/vfx/fire_bolt.svg`; impact: `art/vfx/hit_spark.svg`
+- Projectile: `art/vfx/bolt.svg`; impact: `art/vfx/hit_spark.svg`
 
 Art is CC-BY-SA-4.0 by default. Only original work: no ripped assets, no fan art, no names from other works.

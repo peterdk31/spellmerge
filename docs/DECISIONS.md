@@ -1051,3 +1051,8 @@ An independent review of the branch found these, all fixed with a regression tes
 - **Why:** PR #156 (M2 part 20) failed the final review twice on consistency points (numbers in comments and docs that didn't match the code) and was parked for 7 days. Nothing said so where the owner looks, "revisited by the weekly planning run" wasn't true (planning can't clear a park), and the PR drifted into conflicts while the queue moved on.
 - **Now:** two failed reviews (or conflicts) park a task for **1 day**; a third failure parks it for a week and mentions the owner. Every park is announced on the task's PR (a comment with the reason, the date and the review's points, plus the `parked` label) and in the Daily log; the daily summary lists all parked tasks. **`/retry`** on the PR (or the issue a task comes from) puts it back in the queue with two fresh attempts, the last review's points as its brief.
 - #156 and four stale parks (tasks done or gone) were cleared by hand on 2026-10-22.
+
+## M2 part 26: the art pass found two replacements, not quick fixes
+
+- **Why:** the sheet showed that the frost and void colours need new palette ramps (STYLE.md says element colours are added to its table first), and element-coloured shots need a neutral bolt sprite. Both touch the palette and the art direction choice (part 27), so changing icons now would likely be redone.
+- **Now:** two replacement tasks in `docs/NEXT.md`, to run after or together with the direction choice. Nothing in the game waits on them.

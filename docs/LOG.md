@@ -4,6 +4,8 @@ What each run did, newest first. Claude appends a short entry after each develop
 
 ## 2026-10-22
 
+- M2 part 26: the art pass. New shot `shot_art_pass.gd` (18 icons, element tints against player colours, vfx sprites) looked at against STYLE.md. Findings: the frost, void and homing icons and the frost and void tints use player colours; the orange bolt multiplied by a colour goes olive or brown and shows no element. Both are queued in `docs/NEXT.md`; no art changed.
+
 - M2 part 25: stress in the exports. `--stress` and `--projectile-timing` start the stress run and the projectile timings from the main menu in the Linux Test and Web Test exports (`projectile_timing_runner.gd` is now a node; `test_projectile_timing.gd` starts it from the command line). Spell limits hold on the headless numbers (WASM pending), none lowered. The runner prints `TIMING OK` for the existing web timing step in `build.sh` (not run yet); the `--stress` step is an owner question (#166). Main menu test extended.
 
 - M2 part 20: bots build spells. `tests/bots/recipe_fuzzer.gd` (seeded random recipes and the slot-by-slot build calls), `Bot.build_random(seed)` (spell B, through `build_change_requested`, then a swap) and `Bot.open_builder()` (overlay, `move_down`, `cast`). The 4-bot test has bots 1-3 build with seeds 2026-2028 and bot 4 stay in its builder; it fails on a refused build or a closed builder. New `tests/bots/test_spell_fuzz.gd`: 300 seeded recipes compiled and cast in the combo arena, failing on error lines, broken limits and runaway shot counts (frame time only warns; 244 compile, slowest mean step under 1 ms, 0.8 ms measured). `build.sh --quick --tests` passes.

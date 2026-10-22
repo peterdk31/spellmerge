@@ -11,6 +11,10 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - **Beam and nova ring through a new event, `form_shown`** (sender `core/spells`, listener `feel`): a beam holds no row and a nova is ordinary shots, so nothing else tells feel about them. A nova sends one event for the whole ring; a beam one per ray (a chain's jumps included), inside Feel's pool of 8.
 - **`fire_bolt.svg` renamed `bolt.svg`**, since it is no longer fire.
 
+## 2026-10-22: Element tints use Ice base and Void light
+
+The frost tint is Ice base (`#4fd6dc`), not Ice light (`#c4f6f2`, nearly white); the void tint is Void light (`#e08ad8`), not base (`#a0309a`, too dark on the Stone floor). The icons keep the shadow, base and light of each ramp. The on_hit icon is a star burst and on_expire a ring so they differ in a black silhouette.
+
 ## 2026-10-22: Stress in the exports, and the limits (M2 part 25)
 
 - **Both benchmarks are nodes the main menu adds on a user argument** (`--stress`, `--projectile-timing`), exactly like `--four-bot`, so the Linux Test and Web Test exports (which keep `tests/`) can run them. The projectile timing script became `projectile_timing_runner.gd` (a node); `test_projectile_timing.gd` is now a thin SceneTree starter, so the command line and `build.sh --tests` behave as before. The menu has one `_start_runner` for all three, with literal `load` paths.

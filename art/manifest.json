@@ -304,7 +304,7 @@
       "license": "CC-BY-SA-4.0",
       "tier": "placeholder",
       "tool": "Claude (hand-written SVG rects)",
-      "prompt": "A 16x16 icon of an ice crystal (a pointed diamond) for the Frost element: Player 1 light blue body with a Bone light core line, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+      "prompt": "A 16x16 icon of an ice crystal (a pointed diamond) for the Frost element: Ice base body with an Ice light core line, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
     },
     {
       "path": "content/spells/elements/storm/icon.svg",
@@ -322,7 +322,7 @@
       "license": "CC-BY-SA-4.0",
       "tier": "placeholder",
       "tool": "Claude (hand-written SVG rects)",
-      "prompt": "A 16x16 icon of a dark hole in a purple ring for the Void element: Player 4 light and dark purple ring, an outlined black centre and a Bone light glint, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+      "prompt": "A 16x16 icon of a dark hole in a purple ring for the Void element: Void base and shadow ring, an outlined black centre and a Void light glint, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
     },
     {
       "path": "content/spells/forms/bolt/icon.svg",
@@ -430,7 +430,7 @@
       "license": "CC-BY-SA-4.0",
       "tier": "placeholder",
       "tool": "Claude (hand-written SVG rects)",
-      "prompt": "A 16x16 icon of a Bone orb on the left with a Player 1 light blue curved path arcing up and over to a Fire coloured target with a Spark centre, for the Homing modifier, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+      "prompt": "A 16x16 icon of a Bone orb on the left with an Ice base curved path arcing up and over to a Fire coloured target with a Spark centre, for the Homing modifier, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
     },
     {
       "path": "content/spells/modifiers/chain/icon.svg",
@@ -466,7 +466,7 @@
       "license": "CC-BY-SA-4.0",
       "tier": "placeholder",
       "tool": "Claude (hand-written SVG rects)",
-      "prompt": "A 16x16 icon of a Bone shot flying in from the left and a Bone burst of rays where it lands on the right, for the On Hit trigger. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+      "prompt": "A 16x16 icon of a Bone shot flying in from the left and a solid Bone star burst (spikes up, down and right) where it lands on the right, for the On Hit trigger, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
     },
     {
       "path": "content/spells/triggers/on_expire/icon.svg",
@@ -475,7 +475,7 @@
       "license": "CC-BY-SA-4.0",
       "tier": "placeholder",
       "tool": "Claude (hand-written SVG rects)",
-      "prompt": "A 16x16 icon of a fading Bone shot trail ending in a small Bone spark that opens into a burst on the right, for the On Expire trigger. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+      "prompt": "A 16x16 icon of a small dim Bone shadow dot fading out on the left and a hollow Bone ring with a dark centre on the right, for the On Expire trigger, a 1 px outline. Its silhouette is a ring, unlike On Hit's star. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
     },
     {
       "path": "content/spells/triggers/timer/icon.svg",

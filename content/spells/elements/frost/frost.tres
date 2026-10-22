@@ -14,4 +14,4 @@ status_id = &"chill"
 status_duration = 3.0
 status_strength = 40.0
 damage_scale = 1.0
-tint = Color(0.4980, 0.7529, 0.9412, 1)
+tint = Color(0.3098, 0.8392, 0.8627, 1)

@@ -469,6 +469,16 @@ def publish(cfg: config_mod.Config, bundle: Path, branch: str, mode: str, result
     return {"pr": str(pr_number), "sha": pushed, "branch": branch}
 
 
+def pr_title(cfg: config_mod.Config, pr: str) -> str:
+    """The PR's title for the log, "" if it can't be read."""
+    if not pr:
+        return ""
+    try:
+        return gh.api(f"repos/{cfg.repo}/pulls/{pr}")["title"]
+    except (gh.GhError, KeyError, TypeError):
+        return ""
+
+
 def open_pr(cfg: config_mod.Config, branch: str) -> dict[str, str]:
     """The bot's open PR for a branch, for a session that continued it without new commits."""
     if not valid_branch(branch):
@@ -548,26 +558,25 @@ def finish(cfg: config_mod.Config, env: dict[str, str]) -> dict[str, str]:
             s["pending_instructions"] = []
     state.update(cfg, apply, f"session: finished ({'merged' if merged else 'not merged'})")
 
+    what = (pr_title(cfg, pr) or task_title(task)) if (pr or task) else "owner instructions"
+    said = dailylog.shorten(env.get("IMPLEMENT_SUMMARY", ""), 300)
     if merged:
-        lines.append(f"Merged #{pr}: {task or 'owner instructions'}")
+        lines.append(f"Merged #{pr}: {what}")
     elif env.get("TASK_KIND") == "plan" and status == "nothing_to_do":
         lines.append("Weekly planning: no plan changes needed this week")
     elif status == "blocked":
-        lines.append(f"Reported blocked, so it's set aside for a week and the next task goes first: {task[:200]}. "
-                     f"Claude's summary: {env.get('IMPLEMENT_SUMMARY', '')[:600]}")
+        lines.append(f"Blocked, set aside for a week: {what}. {said}")
     elif idle_task:
-        lines.append(f"Nothing to do on this task now, so it's set aside for a day and the next task goes first: "
-                     f"{task[:200]}. Claude's summary: {env.get('IMPLEMENT_SUMMARY', '')[:600]}")
+        lines.append(f"Nothing to do on it now, set aside for a day: {what}. {said}")
     elif merge_refused:
-        lines.append(f"Approved but not merged: #{pr} ({task[:200]}). {env.get('MERGE_RESULT', '')[:400]} "
-                     "It's set aside for a day and the next task goes first.")
+        lines.append(f"Approved but not merged, set aside for a day: #{pr} {what}. "
+                     f"{dailylog.shorten(env.get('MERGE_RESULT', ''), 300)}")
     elif pr:
         reason = env.get("MERGE_RESULT") or review.get("summary", "the final review did not approve it")
-        lines.append(f"Not merged: #{pr} ({task}). {reason[:400]}")
+        lines.append(f"Not merged yet: #{pr} {what}. {dailylog.shorten(reason, 300)}")
     elif status and status != "ok":
-        lines.append(f"Development session stopped: {status}. {env.get('IMPLEMENT_SUMMARY', '')[:300]}")
+        lines.append(f"Session stopped ({status}): {what}. {said}")
     st, _ = state.load(cfg)
-    lines.append(pacing.usage_line(st, now))
     if env.get("RUN_URL"):
         lines.append(f"[Workflow run]({env['RUN_URL']})")
     dailylog.post(cfg, "Development session", lines)

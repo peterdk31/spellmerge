@@ -145,7 +145,8 @@ class FinishTest(unittest.TestCase):
     APPROVE = json.dumps({"verdict": "approve", "problems": []})
     REVISE = json.dumps({"verdict": "revise", "problems": [{"severity": "major", "problem": "p", "fix": "f"}]})
 
-    def run_finish(self, st: dict, queue: list[str], **env: str) -> tuple[dict[str, str], dict]:
+    def run_finish(self, st: dict, queue: list[str], posts: list | None = None,
+                   **env: str) -> tuple[dict[str, str], dict]:
         base = {"TASK": "A", "TASK_KIND": "next", "PR": "", "IMPLEMENT_STATUS": "ready", "FINAL_REVIEW": "",
                 "MERGED": "", "SETTINGS": "{}"}
         base.update(env)
@@ -160,7 +161,9 @@ class FinishTest(unittest.TestCase):
             real = session.nexttask.next_task
             with mock.patch.object(session.state, "update", update), \
                     mock.patch.object(session.state, "load", lambda cfg: (st, "sha")), \
-                    mock.patch.object(session.dailylog, "post"), \
+                    mock.patch.object(session.dailylog, "post",
+                                      lambda cfg, title, lines, **k: (posts if posts is not None else []).append(lines)), \
+                    mock.patch.object(session, "pr_title", lambda cfg, pr: f"Title of #{pr}" if pr else ""), \
                     mock.patch.object(session.nexttask, "next_task", lambda path_=None, skip=(): real(path, skip)):
                 return session.finish(CFG, base), st
 
@@ -168,6 +171,16 @@ class FinishTest(unittest.TestCase):
         out, _ = self.run_finish(copy.deepcopy(state.DEFAULT), ["B"], PR="5", FINAL_REVIEW=self.APPROVE,
                                  MERGED="true")
         self.assertEqual(out["again"], "true")
+
+    def test_log_lines_name_the_pr_and_stay_short(self) -> None:
+        posts: list = []
+        self.run_finish(copy.deepcopy(state.DEFAULT), ["B"], posts, PR="5", FINAL_REVIEW=self.APPROVE, MERGED="true")
+        self.run_finish(copy.deepcopy(state.DEFAULT), ["A", "B"], posts, IMPLEMENT_STATUS="blocked",
+                        TASK="**Do the thing.** With a long description", IMPLEMENT_SUMMARY="It waits. " * 100)
+        self.assertEqual(posts[0][0], "Merged #5: Title of #5")
+        self.assertTrue(posts[1][0].startswith("Blocked, set aside for a week: Do the thing. It waits."))
+        self.assertLess(len(posts[1][0]), 400)
+        self.assertTrue(posts[1][0].endswith("It waits."))
 
     def test_continues_after_a_failed_review_without_waiting(self) -> None:
         out, st = self.run_finish(copy.deepcopy(state.DEFAULT), ["A", "B"], PR="5", FINAL_REVIEW=self.REVISE)

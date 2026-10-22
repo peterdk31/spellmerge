@@ -157,6 +157,10 @@
             "type": "string",
             "description": "A short question, for example: Allow sessions to run the Godot binary?"
           },
+          "key": {
+            "type": "string",
+            "description": "A short, stable kebab-case id for the decision, e.g. build-sh-four-bot-step. Use the same key whenever the same decision comes up again."
+          },
           "question": {
             "type": "string",
             "description": "What is needed and why, in plain words"

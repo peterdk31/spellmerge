@@ -102,7 +102,7 @@ Security comes first: all outside input (PR code, PR text, issues, discussions) 
 | Bot maintained | `docs/ROADMAP.md`, `docs/NEXT.md`, `docs/BACKLOG.md`, `docs/DECISIONS.md`, `docs/LOG.md`, `docs/milestones/`, `docs/STYLE.md`, `docs/STORY.md`, area `README.md` files, `AGENTS.md`, `CLAUDE.md`, `llms.txt`, `docs/cla-signatures.json`, `core/`, `project.godot`, `export_presets.cfg` | Claude's own PRs only |
 | Open | Content areas that are open in the current milestone | Anyone, through the rating pipeline |
 
-**Kill switch:** set the repo variable `AUTOMATION_ENABLED=false`, or disable the workflow in the Actions tab. The Control panel issue also has a kill-switch checkbox usable from the GitHub mobile app. Every bot action is posted to a pinned "Daily log" issue, and every merge can be reverted.
+**Kill switch:** set the repo variable `AUTOMATION_ENABLED=false`, or disable the workflow in the Actions tab. The Control panel issue also has a kill-switch checkbox usable from the GitHub mobile app. Every bot action is posted to that day's "Daily log YYYY-MM-DD" issue (label `daily-log`; the next day's log closes it), and every merge can be reverted.
 
 ## Automation pipeline
 
@@ -121,7 +121,7 @@ Runs only the hard rules check (see PR filtering). There is no build per PR: res
 5. **Develop** (Claude): take the top task from `docs/NEXT.md`, implement it with tests, update the plan files, open its own PR, which merges the same day after all checks plus an independent fresh-context review. Further adaptive development sessions start hourly whenever quota allows (see Self-driven progress).
 6. **Build and smoke test** (script): export the web demo and the full Windows and Linux builds, run the 1-player and 4-bot smoke tests and the stress benchmark (a frame-time regression over 10% is a warning, not a break; see "Gates are sparse"). If broken, revert the day's merges newest first (through bot revert PRs) until it passes and comment on the culprit.
 7. **Release** (script): tag the tested `main` as `v0.YYYYMMDD`, attach build and checksums with attestation, deploy the web build to GitHub Pages and itch.io, regenerate the Contribute page.
-8. **Log**: post a summary to the Daily log issue.
+8. **Log**: post a summary to the day's Daily log issue.
 
 ### Weekly planning run (Sundays)
 

@@ -10,7 +10,7 @@ A 2D top-down roguelite about building deep, combinable spells, for 1–4 local 
 
 ## Built by an AI, in the open
 
-Claude, an AI by Anthropic, writes the code, reviews every pull request and ships a new build every day, all on GitHub's servers. The owner (@peterdk31) sets the vision in [docs/DESIGN.md](docs/DESIGN.md) and controls the protected infrastructure. Every AI change is made by the **spellmerge-bot** account, so it's always visible as such, and every bot action is listed in the pinned **Daily log** issue.
+Claude, an AI by Anthropic, writes the code, reviews every pull request and ships a new build every day, all on GitHub's servers. The owner (@peterdk31) sets the vision in [docs/DESIGN.md](docs/DESIGN.md) and controls the protected infrastructure. Every AI change is made by the **spellmerge-bot** account, so it's always visible as such, and every bot action is listed in that day's **Daily log** issue (label [`daily-log`](../../issues?q=label%3Adaily-log)).
 
 Human contributors are welcome and credited: code, pixel art, music, sound and writing. Art, music and text can be submitted without git, through issue forms. See [CONTRIBUTING.md](CONTRIBUTING.md), or [AGENTS.md](AGENTS.md) if you use a coding agent.
 

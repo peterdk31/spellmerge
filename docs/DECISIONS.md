@@ -946,3 +946,9 @@ The HUD screenshot cannot be taken in a session (no display, `docs/BACKLOG.md`),
 
 - **`preview.yml` builds main after each merge and puts the web build at `/preview/`.** The owner wanted to see progress more often than once a day. Sessions merge about hourly, so that is about one preview an hour, and only when something changed; a newer merge cancels a build still running. It runs the same `build.sh` as the daily run (tests and smoke tests included, about 4 minutes), with no release, no itch.io, no AI and no secrets. Public-repo Actions minutes cost nothing.
 - **`/nightly/` and `/play/` stay the daily releases.** Pages replaces the whole site on each deploy, so the preview rebuilds it (`smbot.site --preview`): `/nightly/` from the newest release, `/play/` from the latest stable one. The daily run puts its build at `/preview/` too, and both Pages jobs share one concurrency group so deploys never overlap.
+
+## Owner: clearer logging
+
+- **One Daily log issue per day** ("Daily log YYYY-MM-DD" in the owner's time zone, label `daily-log`) instead of the pinned #5, which had grown past 100 comments. The first post of a day opens it and closes the older logs, so the open log is always today's and a past day is easy to find. Each post also goes to the run's job summary in the Actions tab. `ci/config.json` no longer names a log issue.
+- **Owner questions are not asked twice.** Each has a stable `key` (kept as a hidden marker in the issue), and a question with the same key or a similar title (most words shared, or one title contained in the other) as one that is open or was closed in the last 30 days is dropped and only noted in the log. #72/#73 and #79/#80/#83 were the same questions in other words.
+- **Session log lines name the PR by its title** and cut summaries at a sentence end, not mid-word. The token usage line is in the daily run's summary only, not in every session's post.

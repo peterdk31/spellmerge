@@ -12,8 +12,7 @@
     "dependabot[bot]"
   ],
   "issues": {
-    "control_panel": 4,
-    "daily_log": 5
+    "control_panel": 4
   },
   "timezone": "Europe/Copenhagen",
   "state_branch": "automation-state"

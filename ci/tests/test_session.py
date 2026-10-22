@@ -284,7 +284,7 @@ class PublishTest(unittest.TestCase):
         self.assertFalse([c for c in run.call_args_list if "push" in c.args[0]])
         api.assert_not_called()
 
-    def test_workflow_changes_allows_only_mains_or_the_branchs_version(self) -> None:
+    def test_workflow_changes_allows_only_mains_the_forks_or_the_branchs_version(self) -> None:
         import os
         import subprocess
         env = {**os.environ, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t",
@@ -311,10 +311,14 @@ class PublishTest(unittest.TestCase):
             os.chdir(tmp)
             try:
                 self.assertEqual(session.workflow_changes("pr", ["main", "pushed"]), [])
-                self.assertEqual(session.workflow_changes("pushed", ["main"]), [".github/workflows/w.yml"])
+                # A new branch that started before main changed the workflow keeps the old version.
+                self.assertEqual(session.workflow_changes("pushed", ["main"]), [])
                 self.assertEqual(session.workflow_changes("pushed", ["main", "pushed"]), [])
                 commit(".github/workflows/w.yml", "evil\n", "the bot edits a workflow")
                 self.assertEqual(session.workflow_changes("pr", ["main", "pushed"]), [".github/workflows/w.yml"])
+                run("switch", "-q", "pushed")
+                commit(".github/workflows/w.yml", "evil\n", "the bot edits a workflow on the old base")
+                self.assertEqual(session.workflow_changes("pushed", ["main"]), [".github/workflows/w.yml"])
             finally:
                 os.chdir(old)
 

@@ -906,3 +906,12 @@ The HUD screenshot cannot be taken in a session (no display, `docs/BACKLOG.md`),
 ## M2 part 15: Spells opens
 
 - **Spells is open for PRs from this part.** The README states that every new component needs at least one combo row (the combo test runs it without new test code), so the catalogue grows with the content. The ROADMAP row said "from part 11, Story from part 21", left over from before the design review; it now matches the design (15 and 23).
+
+## M2 part 16: the builder, part 1
+
+- **The builder sits beside the corner panel, not over it.** The design says it "expands the corner panel toward the middle"; a panel under or over the corner panel would leave about 120 px of height in a four-player quarter, too little for the chain and the bag. Beside it (about 200×170 px) a player keeps seeing their health and mana while building, and four builders and four panels fit 640×360 without touching (tested).
+- **Two new events, `recipe_changed(player, slot, recipe)` and `bag_changed(player, ids)`, both from `player`.** The HUD may only show what events say, and `spell_changed` carries a description, not the chain. Sending the recipe next to `spell_changed` keeps `spell_changed` as the design has it and each event with one sender. `bag_changed` is sent when the wizard appears, so M3's rewards change who fills the bag without changing the builder.
+- **Names, icons and kinds come from `Spells`** (`component_name`, `component_icon`, `component_kind`). `test_spell_field_reads.gd` rightly forbids the HUD reading a component's fields; a small accessor set in the runtime keeps that rule and gives the builder what the design asks it to show.
+- **One linear focus list, with focus helping.** `core/ui_focus` moves through a plain list, so the builder lists tabs, slots, held buttons, bag rows and Close in that order, moves focus to the bag after a slot is chosen and back to the slot on `dodge`. Rows that cannot be used are disabled or hidden, and UIFocus skips them.
+- **A modifier slot opens only in the first free place,** as `player` fills modifiers (a new one goes in the first free place; clearing one closes the gap). A held spell's form must be chosen first, since the compiler refuses a held spell without one; the refusal reason is shown from part 17.
+- **The builder opens at any time for now.** Part 18 folds it into the quick view and part 19 makes the break between waves, as the design says.

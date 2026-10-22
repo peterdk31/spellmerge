@@ -728,6 +728,7 @@ func set_recipe(slot: int, recipe: Dictionary) -> bool:
 	_built[slot] = compiled
 	if events != null:
 		events.spell_changed.emit(index, PackedInt32Array([slot]), compiled.description)
+		events.recipe_changed.emit(index, slot, _recipes[slot].duplicate(true))
 	return true
 
 
@@ -744,6 +745,8 @@ func _fill_bag() -> void:
 	for id: StringName in registry.get_ids(&"spells"):
 		if registry.get_resource(&"spells", id) is SpellComponent:
 			bag.append(id)
+	if events != null:
+		events.bag_changed.emit(index, bag.duplicate())
 
 
 func _on_spell_swap_requested(player: int) -> void:

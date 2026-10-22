@@ -38,5 +38,5 @@ enum Effect {
 @export var strength: float = 0.0
 ## For BURST: pixels per second that pull the targets in the circle toward its centre.
 @export var pull: float = 0.0
-## For BURST and SPREAD: also remove `status_id` from the target (a thaw uses the burn up).
+## For BURST (and SPREAD, should a row want it): also remove `status_id` from the target (a thaw uses the burn up).
 @export var consume_status: bool = false

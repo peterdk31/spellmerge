@@ -91,3 +91,15 @@ func test_a_reaction_does_not_touch_combat_events() -> void:
 	_bus.damage_dealt.connect(func(_p: int, _t: Node, _a: int, _at: Vector2) -> void: seen.append(1))
 	_bus.reaction_triggered.emit(0, &"shatter", Vector2.ZERO)
 	check(seen.is_empty(), "feel sends no damage")
+
+
+func test_the_same_reaction_on_the_same_spot_shows_one_name_and_one_sound() -> void:
+	for i in 5:
+		_bus.reaction_triggered.emit(0, &"flare", Vector2(10.0, 10.0))
+		_feel.step(STEP * 0.5)
+	check_equal(_feel.live_labels(), 1, "one name, not five")
+	check_equal(_registry.asked.count(&"reaction_flare"), 1, "one sound inside the repeat time")
+	for i in 10:
+		_feel.step(STEP)
+	_bus.reaction_triggered.emit(0, &"flare", Vector2(10.0, 10.0))
+	check_equal(_registry.asked.count(&"reaction_flare"), 2, "and the sound comes back later")

@@ -71,6 +71,15 @@ const HEX_PULL_SHARE: float = 0.5
 const REACTING_STATUSES: Array[StringName] = [BURN, CHILL, SHOCK, HEX]
 ## A consume reaction does this many times its damage to a frozen enemy.
 const FROZEN_BONUS: int = 2
+## An enemy reacts at most once per this many seconds; a hit inside the wait does its own
+## status instead. Keeps fast spells from setting the same reaction off on every hit.
+const REACTION_WAIT: float = 0.5
+## Limits for the reaction EXTEND effect: the longest freeze, the longest any other extended
+## status, the largest extra damage share of hex or shock in per cent, and the fastest burn.
+const MAX_FREEZE: float = 4.0
+const MAX_EXTENDED_TIME: float = 8.0
+const MAX_EXTENDED_PERCENT: float = 100.0
+const MAX_EXTENDED_BURN: float = 20.0
 
 ## The event bus, the projectile manager and the registry. Only tests set these, before
 ## adding the node; otherwise the "Events", "Projectiles" and "Registry" autoloads are used.
@@ -116,6 +125,8 @@ var _shock_share: PackedFloat32Array = PackedFloat32Array()
 # Hex: seconds left and the percent of extra damage taken.
 var _hex_left: PackedFloat32Array = PackedFloat32Array()
 var _hex_extra: PackedFloat32Array = PackedFloat32Array()
+## Seconds until this enemy may react again.
+var _react_wait: PackedFloat32Array = PackedFloat32Array()
 
 # Burn damage due this step, sent after the status loop: enemy, player and points.
 var _due_enemy: Array[Node2D] = []
@@ -214,6 +225,7 @@ func register_enemy(enemy: Node2D, health: int, hurt_radius: float, contact_dama
 	_shock_share.append(0.0)
 	_hex_left.append(0.0)
 	_hex_extra.append(0.0)
+	_react_wait.append(0.0)
 	if projectiles != null:
 		projectiles.add_target(enemy, hurt_radius, ProjectileManagerScript.LAYER_ENEMY, -1, hurt_offset)
 
@@ -463,6 +475,7 @@ func _tick_statuses(row: int, delta: float) -> void:
 	_freeze_left[row] = maxf(_freeze_left[row] - delta, 0.0)
 	_shock_left[row] = maxf(_shock_left[row] - delta, 0.0)
 	_hex_left[row] = maxf(_hex_left[row] - delta, 0.0)
+	_react_wait[row] = maxf(_react_wait[row] - delta, 0.0)
 
 
 ## Deal the burn damage counted this step. After the loop, because hit() can remove rows.
@@ -595,7 +608,7 @@ func _on_projectile_hit(player: int, target: Node, position: Vector2, tag: int) 
 			jump_from = _position_of(enemy) + _hurt_offset[at]
 	# The reaction is chosen from the statuses the target had when the shot arrived.
 	var reaction: ReactionRow = null
-	if at >= 0 and profile != null and profile.element_id != &"":
+	if at >= 0 and profile != null and profile.element_id != &"" and _react_wait[at] <= 0.0:
 		reaction = _reaction_for(at, profile.element_id)
 	if not hit(player, enemy, damage, direction, strength):
 		return
@@ -645,6 +658,7 @@ func _react(player: int, enemy: Node2D, row: ReactionRow) -> void:
 	if at < 0:
 		return
 	var centre: Vector2 = _position_of(enemy) + _hurt_offset[at]
+	_react_wait[at] = REACTION_WAIT
 	if events != null:
 		events.reaction_triggered.emit(player, row.reaction_id, centre)
 		at = _enemies.find(enemy)
@@ -653,8 +667,9 @@ func _react(player: int, enemy: Node2D, row: ReactionRow) -> void:
 	match row.effect:
 		ReactionRow.Effect.CONSUME:
 			var amount: int = row.damage
-			if row.status_id == CHILL and _freeze_left[at] > 0.0:
+			if _freeze_left[at] > 0.0:
 				amount *= FROZEN_BONUS
+				_remove_status(at, CHILL)
 			_remove_status(at, row.status_id)
 			hit(player, enemy, amount)
 		ReactionRow.Effect.BURST:
@@ -689,22 +704,22 @@ func _extend(player: int, at: int, row: ReactionRow) -> void:
 	var enemy: Node2D = _enemies[at]
 	match row.status_id:
 		BURN:
-			_burn_left[at] += row.duration
-			_burn_rate[at] += row.strength
+			_burn_left[at] = minf(_burn_left[at] + row.duration, MAX_EXTENDED_TIME)
+			_burn_rate[at] = minf(_burn_rate[at] + row.strength, MAX_EXTENDED_BURN)
 		CHILL:
 			var newly: bool = _freeze_left[at] <= 0.0
 			_chill_left[at] = 0.0
 			_chill_slow[at] = 0.0
 			_chill_stacks[at] = 0
-			_freeze_left[at] += row.duration
+			_freeze_left[at] = minf(_freeze_left[at] + row.duration, MAX_FREEZE)
 			if newly and events != null:
 				events.status_applied.emit(player, enemy, FREEZE)
 		SHOCK:
-			_shock_left[at] += row.duration
-			_shock_share[at] += row.strength
+			_shock_left[at] = minf(_shock_left[at] + row.duration, MAX_EXTENDED_TIME)
+			_shock_share[at] = minf(_shock_share[at] + row.strength, MAX_EXTENDED_PERCENT)
 		HEX:
-			_hex_left[at] += row.duration
-			_hex_extra[at] += row.strength
+			_hex_left[at] = minf(_hex_left[at] + row.duration, MAX_EXTENDED_TIME)
+			_hex_extra[at] = minf(_hex_extra[at] + row.strength, MAX_EXTENDED_PERCENT)
 
 
 ## SPREAD: the status, as it is now, goes on every other enemy in the circle.
@@ -791,6 +806,7 @@ func _remove_enemy_at(at: int) -> void:
 	_shock_share.remove_at(at)
 	_hex_left.remove_at(at)
 	_hex_extra.remove_at(at)
+	_react_wait.remove_at(at)
 
 
 func _position_of(node: Node2D) -> Vector2:

@@ -394,3 +394,71 @@ func test_a_busy_reaction_leaves_nothing_behind() -> void:
 	_run(1.0)
 	check_equal(_reacted.size(), 1, "one reaction for one hit")
 	check(_combat._near.is_empty(), "the scratch list is empty again")
+
+
+# --- limits: a reaction cannot be repeated for ever ---
+
+
+func test_an_enemy_reacts_once_per_wait_and_the_next_hit_does_its_own_status() -> void:
+	var enemy := _enemy()
+	_combat.apply_status(0, enemy, &"shock", 5.0, 50.0)
+	_hit(0, enemy, &"fire")
+	_hit(0, enemy, &"fire")
+	check_equal(_ids(), [&"flare"], "the second hit inside the wait did not react")
+	check(_combat.has_status(enemy, &"burn"), "it burned the enemy instead")
+	_run(CombatScript.REACTION_WAIT + STEP)
+	_combat.apply_status(0, enemy, &"shock", 5.0, 50.0)
+	_hit(0, enemy, &"fire")
+	check_equal(_ids(), [&"flare", &"flare"], "after the wait it reacts again")
+
+
+func test_twenty_stillness_hits_freeze_for_no_more_than_the_limit() -> void:
+	var enemy := _enemy(Vector2.ZERO, 1000)
+	_combat.apply_status(0, enemy, &"chill", 3.0, 40.0)
+	for i in 20:
+		_hit(0, enemy, &"void")
+		check(_combat.status_left(enemy, &"freeze") <= CombatScript.MAX_FREEZE, "frozen no longer than the cap")
+		_run(CombatScript.REACTION_WAIT + STEP)
+	check(_combat.has_status(enemy, &"freeze"), "still frozen: the cap is a ceiling")
+
+
+func test_twenty_stillness_hits_on_hex_stay_under_the_caps() -> void:
+	var enemy := _enemy(Vector2.ZERO, 100000)
+	_combat.apply_status(0, enemy, &"hex", 4.0, 25.0)
+	for i in 20:
+		_hit(0, enemy, &"frost")
+		_run(CombatScript.REACTION_WAIT + STEP)
+	check(_combat.status_left(enemy, &"hex") <= CombatScript.MAX_EXTENDED_TIME, "hex time under its cap")
+	var before: int = _combat.get_health(enemy)
+	_combat.hit(0, enemy, 100)
+	check(before - _combat.get_health(enemy) <= 100 + 100, "hex adds at most 100 per cent")
+
+
+func test_shatter_doubles_for_a_frozen_and_shocked_enemy() -> void:
+	var enemy := _enemy()
+	for i in 3:
+		_combat.apply_status(0, enemy, &"chill", 3.0, 40.0)
+	_combat.apply_status(0, enemy, &"shock", 5.0, 50.0)
+	_hit(0, enemy, &"frost")
+	check_equal(_ids(), [&"shatter"], "frost on shock shatters")
+	check_equal(_combat.get_health(enemy), 100 - BOLT - 12, "twice the bonus, as for a frozen chill")
+	check(not _combat.has_status(enemy, &"freeze"), "the freeze is broken")
+
+
+func test_a_spread_row_can_use_up_the_status() -> void:
+	var table := ReactionTable.new()
+	var row := ReactionRow.new()
+	row.reaction_id = &"test_spread"
+	row.status_id = &"burn"
+	row.element_id = &"storm"
+	row.effect = ReactionRow.Effect.SPREAD
+	row.radius = 48.0
+	row.consume_status = true
+	table.rows.append(row)
+	_combat.reactions = table
+	var enemy := _enemy()
+	var near := _enemy(Vector2(30.0, 0.0))
+	_combat.apply_status(0, enemy, &"burn", 3.0, 2.0)
+	_hit(0, enemy, &"storm")
+	check(not _combat.has_status(enemy, &"burn"), "the struck enemy lost its burn")
+	check(_combat.has_status(near, &"burn"), "the neighbour caught it")

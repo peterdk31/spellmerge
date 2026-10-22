@@ -64,6 +64,10 @@ const REACTION_SLOTS: int = 4
 const ALL_FLASH_SLOTS: int = FLASH_SLOTS + SPARK_SLOTS + REACTION_SLOTS
 ## How far a reaction's name rises while it shows, in pixels.
 const REACTION_RISE: float = 10.0
+## The same reaction makes its sound and shake at most this often, and its name is not shown
+## again while the first still rises within `REACTION_LABEL_NEAR` pixels.
+const REACTION_REPEAT: float = 0.3
+const REACTION_LABEL_NEAR: float = 40.0
 ## Hit bursts always left free: wall dust never takes the last slots from a hit on a character.
 const WALL_RESERVE: int = 2
 ## Bursts draw above the room and the pillar tops (z 5), below the flashes (20).
@@ -151,6 +155,13 @@ var _label_start: PackedVector2Array = PackedVector2Array()
 var _next_reaction: int = 0
 ## Sound ids by reaction id, built the first time a reaction is heard (so it allocates once).
 var _reaction_sounds: Dictionary = {}
+## Display names by reaction id, built the same way.
+var _reaction_names: Dictionary = {}
+## Real seconds since feel started, and when each reaction id last gave a sound and a shake.
+var _clock: float = 0.0
+var _reaction_heard: Dictionary = {}
+## The reaction id each name label shows.
+var _label_id: Array[StringName] = []
 ## Where, along which way and in whom the latest shot on a character struck, from
 ## `projectile_impact` (sent just before the damage), so the damage can aim its spray.
 var _impact_target: int = 0
@@ -209,6 +220,7 @@ func _ready() -> void:
 		label.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		add_child(label)
 		_labels.append(label)
+		_label_id.append(&"")
 	_label_left.resize(REACTION_SLOTS)
 	_label_start.resize(REACTION_SLOTS)
 	_flash_left.resize(ALL_FLASH_SLOTS)
@@ -272,6 +284,7 @@ func _process(delta: float) -> void:
 func step(real_delta: float) -> void:
 	_hit_burst = null
 	_hit_voice = -1
+	_clock += real_delta
 	rest_left = maxf(rest_left - real_delta, 0.0)
 	if stop_left > 0.0:
 		stop_left = maxf(stop_left - real_delta, 0.0)
@@ -536,19 +549,36 @@ func _on_reaction_triggered(_player: int, reaction_id: StringName, position: Vec
 	_show_flash(FLASH_SLOTS + SPARK_SLOTS + slot, position, preset.reaction_seconds, preset.reaction_flash_size, tint)
 	if _active.size() < BURST_SLOTS - WALL_RESERVE:
 		_burst(position, 1.2, Vector2.ZERO, tint)
-	var label: Label = _labels[slot]
-	label.text = String(reaction_id).capitalize()
-	label.modulate = tint
-	_label_start[slot] = position + Vector2(-label.get_minimum_size().x * 0.5, -18.0)
-	label.global_position = _label_start[slot]
-	label.visible = true
-	_label_left[slot] = preset.reaction_seconds * 3.0
+	if not _reaction_names.has(reaction_id):
+		_reaction_names[reaction_id] = String(reaction_id).capitalize()
+		_reaction_sounds[reaction_id] = StringName(preset.reaction_sound_prefix + String(reaction_id))
+	if not _label_showing(reaction_id, position):
+		var label: Label = _labels[slot]
+		var shown: String = _reaction_names[reaction_id] as String
+		if label.text != shown:
+			label.text = shown
+		label.modulate = tint
+		_label_start[slot] = position + Vector2(-label.get_minimum_size().x * 0.5, -18.0)
+		label.global_position = _label_start[slot]
+		label.visible = true
+		_label_left[slot] = preset.reaction_seconds * 3.0
+		_label_id[slot] = reaction_id
+	if _clock - (_reaction_heard.get(reaction_id, -REACTION_REPEAT) as float) < REACTION_REPEAT:
+		return
+	_reaction_heard[reaction_id] = _clock
 	if shake_enabled:
 		_refresh_camera()
 		_trauma = minf(_trauma + preset.reaction_shake, 1.0)
-	if not _reaction_sounds.has(reaction_id):
-		_reaction_sounds[reaction_id] = StringName(preset.reaction_sound_prefix + String(reaction_id))
 	_play(_reaction_sounds[reaction_id] as StringName)
+
+
+## Is the name of `reaction_id` already rising near `position`?
+func _label_showing(reaction_id: StringName, position: Vector2) -> bool:
+	for i in REACTION_SLOTS:
+		if _label_left[i] > 0.0 and _label_id[i] == reaction_id \
+				and _label_start[i].distance_to(position) < REACTION_LABEL_NEAR:
+			return true
+	return false
 
 
 ## Raise and fade the reaction names.

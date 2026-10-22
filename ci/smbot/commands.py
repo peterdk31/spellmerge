@@ -4,7 +4,8 @@ A comment counts only if its author is the owner's numeric user ID and every
 revision in its edit history is by the owner too. Commands from anyone else are
 ignored and never treated as instructions.
 
-Carried out here, by script: /pause, /resume, /close, /merge and /revert.
+Carried out here, by script: /pause, /resume, /close, /merge, /revert and /retry (puts a parked
+task back in the queue: on its PR, or on the issue it comes from).
 Queued for the next Claude session: /priority, /claude <text> and /ask <question>.
 Checkpoint answers, only in an open `checkpoint` issue: /go, /iterate <what> and /pivot <how>
 (smbot.checkpoint); the gate starts a planning session that carries them out.
@@ -24,7 +25,8 @@ from . import config as config_mod
 from . import gh
 from .pacing import iso, parse_time
 
-COMMANDS = ("merge", "close", "revert", "priority", "claude", "ask", "pause", "resume", "go", "iterate", "pivot")
+COMMANDS = ("merge", "close", "revert", "priority", "claude", "ask", "pause", "resume", "go", "iterate", "pivot",
+            "retry")
 _COMMAND = re.compile(r"^/(" + "|".join(COMMANDS) + r")\b[ \t]*(.*)", re.DOTALL)
 SCAN_DAYS = 3
 
@@ -174,6 +176,7 @@ class Effects:
     paused: bool | None
     instructions: list[dict[str, Any]]
     checkpoints: list[dict[str, Any]] = field(default_factory=list)  # answers: issue, verdict, text, url, at
+    retries: list[int] = field(default_factory=list)  # PRs or issues whose parked task goes back in the queue
 
     def apply(self, state: dict[str, Any]) -> None:
         seen = set(state["processed_comments"])
@@ -186,6 +189,12 @@ class Effects:
         state["pending_instructions"] += [i for i in self.instructions if i["url"] not in known]
         for a in self.checkpoints:
             checkpoint.record(state, a["issue"], a["verdict"], a["text"], a["url"], a["at"])
+        for number in self.retries:
+            for task, entry in state.get("task_failures", {}).items():
+                if str(entry.get("pr")) == str(number) or f"#{number}," in task or f"#{number} " in task[:60]:
+                    entry.pop("parked_until", None)
+                    entry.pop("parked_reason", None)
+                    entry["count"] = 0  # two fresh attempts; the last review's problems stay as the brief
 
 
 def queue_instruction(effects: Effects, cmd: Command) -> str:
@@ -234,6 +243,14 @@ def run(cfg: config_mod.Config, processed: set[int], now: dt.datetime, token: st
                 result = do_revert(cfg, cmd, token)
             elif cmd.name in checkpoint.VERDICTS:
                 result = answer_checkpoint(cfg, effects, cmd)
+            elif cmd.name == "retry":
+                effects.retries.append(cmd.number)
+                try:
+                    gh.api(f"repos/{cfg.repo}/issues/{cmd.number}/labels/parked", "-X", "DELETE")
+                except gh.GhError:
+                    pass  # it wasn't labelled
+                result = ("Back in the queue: if this task was parked, the next session takes it up again, with "
+                          "two fresh attempts and the last review's points as its brief.")
             else:
                 result = queue_instruction(effects, cmd)
         except (gh.GhError, subprocess.CalledProcessError) as e:

@@ -87,21 +87,26 @@ func _start_runner(args: PackedStringArray, argument: String, node_name: String)
 	return true
 
 
-## The runner of a node name, or null when its script is not in the build. Literal paths
-## only (computed ones are not allowed here): keep them equal to the *_RUNNER constants.
+## The runner of a node name, or null when its script is not in the build.
 func _make_runner(node_name: String) -> Node:
-	var script: GDScript = null
+	var script: GDScript = _runner_script(node_name)
+	return script.new() as Node if script != null else null
+
+
+## The script of a runner, or null. Literal paths only (computed ones are not allowed
+## here): the main menu test checks each equals its *_RUNNER constant.
+func _runner_script(node_name: String) -> GDScript:
 	match node_name:
 		FOUR_BOT_NODE:
 			if ResourceLoader.exists(FOUR_BOT_RUNNER):
-				script = load("res://tests/smoke/four_bot_runner.gd") as GDScript
+				return load("res://tests/smoke/four_bot_runner.gd") as GDScript
 		STRESS_NODE:
 			if ResourceLoader.exists(STRESS_RUNNER):
-				script = load("res://tests/benchmark/stress_runner.gd") as GDScript
+				return load("res://tests/benchmark/stress_runner.gd") as GDScript
 		TIMING_NODE:
 			if ResourceLoader.exists(TIMING_RUNNER):
-				script = load("res://tests/benchmark/projectile_timing_runner.gd") as GDScript
-	return script.new() as Node if script != null else null
+				return load("res://tests/benchmark/projectile_timing_runner.gd") as GDScript
+	return null
 
 
 ## Only one runner is ever added with a name, even if the menu is entered again.

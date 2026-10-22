@@ -21,7 +21,7 @@ Not kept here any more: each question is an issue labelled `owner-question` (doc
 
 ## Needs an owner decision
 
-(none: the web 4-bot run, the web load time and the Style Guide page were added in an owner session on 2026-10-17; the WASM projectile timing and the stress run now have their runners (`--projectile-timing`, `--stress`); they wait only on the `ci/` step asked as an owner issue)
+(none: the web 4-bot run, the web load time and the Style Guide page were added in an owner session on 2026-10-17; the WASM projectile timing and the stress run now have their runners (`--projectile-timing`, `--stress`); the web projectile timing step already exists in `build.sh` and waits for `TIMING OK`, which the runner prints, but it has not been run yet; only the `--stress` step is missing, asked in #166)
 
 ## Audio needs
 

@@ -28,7 +28,8 @@ extends Node
 ## godot --headless --path . --script res://tests/benchmark/test_projectile_timing.gd
 ## build/linux-test/Spellmerge.x86_64 --headless -- --projectile-timing
 ##
-## The node prints `test_projectile_timing: OK` or `... FAILED` lines and quits with 0 or 1.
+## The node prints `test_projectile_timing: OK` and `TIMING OK` (what the web CI step waits
+## for), or the `... FAILED` lines and `TIMING FAILED`, and quits with 0 or 1.
 
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
@@ -59,10 +60,12 @@ func _ready() -> void:
 	_teardown()
 	if _failures.is_empty():
 		print("test_projectile_timing: OK")
+		print("TIMING OK")
 		get_tree().quit(0)
 	else:
 		for failure in _failures:
 			printerr("test_projectile_timing FAILED: " + failure)
+		print("TIMING FAILED")
 		get_tree().quit(1)
 
 

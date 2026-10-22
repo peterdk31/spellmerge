@@ -84,7 +84,10 @@ def last_main_commit() -> dt.datetime:
 def check(cfg: config_mod.Config, st: dict, now: dt.datetime, has_task: bool, main_commit: dt.datetime,
           own_merge: dt.datetime | None, automation_started: dt.datetime) -> list[str]:
     log = []
-    reference = own_merge or automation_started
+    # Sessions record their merges in the state too, so one empty search can't raise the alarm.
+    saved = st.get("last_own_merge")
+    merges = [d for d in (own_merge, saved and dt.datetime.fromisoformat(saved.replace("Z", "+00:00"))) if d]
+    reference = max(merges) if merges else automation_started
     if has_task and now - reference > dt.timedelta(days=STALL_DAYS):
         log.append(raise_alarm(cfg, st, "stall", days=(now - reference).days))
     else:
@@ -93,8 +96,8 @@ def check(cfg: config_mod.Config, st: dict, now: dt.datetime, has_task: bool, ma
         log.append(raise_alarm(cfg, st, "inactive", days=(now - main_commit).days))
     else:
         log.append(clear_alarm(cfg, st, "inactive"))
-    if own_merge:
-        st["last_own_merge"] = iso(own_merge)
+    if merges:
+        st["last_own_merge"] = iso(max(merges))
     return [line for line in log if line]
 
 

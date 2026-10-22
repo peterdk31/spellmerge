@@ -17,10 +17,22 @@ extends RefCounted
 ## is past DODGE_FROM, the bot steps off the line of the shot and taps `dodge` (once
 ## per windup). Idler: stands still; it only opens its overlay.
 ##
+## Builder: `build_random(seed)` builds a random spell that compiles into the prepared spell
+## B with the same `build_change_requested` events a person sends (slot by slot, from the
+## bag of the wizard), then asks for the swap to it. The recipe comes from
+## `recipe_fuzzer.gd`, seeded, so a failing run can be replayed. `open_builder()` is how bot
+## 4 of the 4-bot test works: the overlay, then "Build" with `move_down` and `cast`, and it
+## stays there (the builder folds into the quick view in waves by itself).
+##
 ## Everything is driven by step(delta), so a run with the same frames repeats. A
 ## bot sends an input only when it changes.
 
 enum Mode { FIGHTER, IDLER }
+
+const FuzzerScript := preload("res://tests/bots/recipe_fuzzer.gd")
+
+## The prepared spell a bot builds into (spell B; spell A stays the start spell).
+const BUILD_SPELL: int = 1
 
 ## Closer than this (pixels) the bot holds `cast`.
 const FIRE_RANGE: float = 170.0
@@ -54,6 +66,14 @@ var _sidestep_sign: float = 1.0
 var _detour: Vector2 = Vector2.ZERO
 var _detour_left: int = 0
 var _dodged_enemy: int = 0
+## Steps before the next press of the way into the builder; -1 when not on the way.
+var _open_wait: int = -1
+var _open_stage: int = 0
+
+## The recipe of the last `build_random`, `{}` before the first.
+var built_recipe: Dictionary = {}
+## How many `build_change_requested` events the bot has sent.
+var requests_sent: int = 0
 
 
 ## `input` is the `PlayerInput` autoload and `flow` the `Flow` autoload. Takes the
@@ -73,6 +93,47 @@ func tap_overlay() -> void:
 	_input.call("send_virtual", player, &"overlay", 0.0)
 
 
+## Build a random spell into spell B and swap to it. The recipe is chosen from the wizard's
+## bag with `build_seed`. Returns false when the bot has no wizard or the bag has no form.
+## True means the requests were sent, not that they were accepted (a swap may be refused at
+## some moments, such as in a wave): check the wizard's `recipe_of` and `active_slot`.
+func build_random(build_seed: int) -> bool:
+	var root: Node = _flow.get_tree().root
+	var events: Node = root.get_node_or_null("Events")
+	var spells: Node = root.get_node_or_null("Spells")
+	var wizard: Node = _flow.call("get_wizard", player) as Node
+	if events == null or spells == null or wizard == null:
+		return false
+	var ids: Dictionary = {}
+	for id: StringName in wizard.get("bag"):
+		var kind: StringName = spells.call("component_kind", id)
+		if not ids.has(kind):
+			ids[kind] = []
+		(ids[kind] as Array).append(id)
+	var fuzzer := FuzzerScript.new(ids)
+	if not fuzzer.can_build():
+		return false
+	var rng := RandomNumberGenerator.new()
+	rng.seed = build_seed
+	var compiles := func(recipe: Dictionary) -> bool: return bool((spells.call("compile", recipe) as CompiledSpell).valid)
+	built_recipe = fuzzer.random_recipe(rng, compiles)
+	var calls: Array = fuzzer.clear_steps(BUILD_SPELL) + fuzzer.steps(built_recipe, BUILD_SPELL)
+	for step_call: Array in calls:
+		events.emit_signal("build_change_requested", player, step_call[0], step_call[1], step_call[2])
+		requests_sent += 1
+	if int(wizard.get("active_slot")) != BUILD_SPELL:
+		events.emit_signal("spell_swap_requested", player)
+	return true
+
+
+## Start the way into the builder: tap the overlay; `step` then presses `move_down` and
+## `cast` on the following steps, as a person does.
+func open_builder() -> void:
+	tap_overlay()
+	_open_stage = 0
+	_open_wait = 1
+
+
 ## Let go of everything the bot holds and free the slot.
 func leave() -> void:
 	_release()
@@ -81,6 +142,7 @@ func leave() -> void:
 
 ## One decision. An idler does nothing.
 func step(_delta: float) -> void:
+	_walk_into_builder()
 	if mode == Mode.IDLER:
 		return
 	var wizard := _flow.call("get_wizard", player) as Node2D
@@ -124,6 +186,20 @@ func step(_delta: float) -> void:
 		_input.call("send_virtual", player, &"dodge", 1.0)
 		_input.call("send_virtual", player, &"dodge", 0.0)
 	_hold_cast(in_range and sees)
+
+
+## The presses after `open_builder`, one per step, with a step between so the focus moves.
+func _walk_into_builder() -> void:
+	if _open_wait < 0:
+		return
+	if _open_wait > 0:
+		_open_wait -= 1
+		return
+	var action: StringName = &"move_down" if _open_stage == 0 else &"cast"
+	_input.call("send_virtual", player, action, 1.0)
+	_input.call("send_virtual", player, action, 0.0)
+	_open_stage += 1
+	_open_wait = 1 if _open_stage < 2 else -1
 
 
 ## False when a wall (physics layer 1) is between the wizard and the enemy: shots

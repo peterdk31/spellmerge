@@ -50,6 +50,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          fetch-depth: 0 # the merge base, for the PR's diff below
       - id: read-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
@@ -58,6 +59,24 @@ jobs:
           permission-contents: read
           permission-pull-requests: read
           permission-issues: read
+      # The reviewer reads the PR from these files. A tool result too long to show is saved
+      # under ~/.claude, which Claude may not read, so a large `gh pr diff` was unreadable;
+      # and only main was checked out, so `git show <sha>` had nothing to show.
+      - id: fetch-pr
+        env:
+          GH_TOKEN: ${{ steps.read-token.outputs.token }}
+          PR: ${{ inputs.pr }}
+          SHA: ${{ inputs.sha }}
+        run: |
+          base=$(gh pr view "$PR" --json baseRefName --jq .baseRefName)
+          auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic $auth" fetch --no-tags origin \
+            "+refs/pull/$PR/head:refs/remotes/pr/$PR" "+refs/heads/$base:refs/remotes/origin/$base"
+          git cat-file -e "$SHA^{commit}"
+          mkdir -p .review
+          git diff --stat=200 "origin/$base...$SHA" > .review/files.txt
+          git diff "origin/$base...$SHA" > .review/pr.diff
+          wc -l .review/files.txt .review/pr.diff
       - id: prepare
         env:
           GH_TOKEN: ${{ steps.read-token.outputs.token }}

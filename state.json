@@ -11,7 +11,6 @@
     "number": 175
   },
   "errors_in_a_row": 0,
-  "idle": null,
   "intake_tasks": {},
   "last_own_merge": "2026-10-22T17:27:57Z",
   "last_plan": null,
@@ -52,6 +51,11 @@
       "count": 0,
       "parked_reason": "No WASM numbers exist yet. The web projectile timing step merged today (#165, 2026-10-22), and no daily build has run it. No `BENCH:` lines from a web run are recorded in the docs. This session also can't read CI runs: `gh run list` needs approval and was refused. The task stays open in `docs/NEXT.md`, and nothing was changed. A later session should retry once a daily build has run the step.",
       "parked_until": "2026-10-23T15:39:23Z"
+    },
+    "**Read the first WASM numbers (M2 part 25 follow-up).** (`tests/benchmark/`, `docs/`) Once a daily build has run the web projectile timing step, read its `BENCH:` lines (or why it failed or timed out; see `docs/DECISIONS.md`, 2026-10-22) and either confirm the limits or lower them. Also read what the per-frame `multimesh.buffer` upload costs there (bolt, rune and orbit batches each hand over the whole cap x 16 floats, up to 192 KB per batch at 3,000); if it is tight, upload only the used slice or size the rune and orbit batches smaller. \"WASM pending\" stays open until then.": {
+      "count": 0,
+      "parked_reason": "I made no changes. This task needs the `BENCH:` lines from a daily build's web projectile timing step, or its failure or timeout. This session can't read them: `gh run list` was refused for needing approval, so I couldn't fetch CI logs. The repo has no recorded web numbers either. `docs/LOG.md` and `docs/DECISIONS.md` hold only the headless results (p95 13.9 ms and 15.4 ms), which are not WASM. Confirming or lowering the limits, or changing the `multimesh.buffer` upload, would be guesswork, so \"",
+      "parked_until": "2026-10-23T17:31:36Z"
     }
   },
   "usage": [

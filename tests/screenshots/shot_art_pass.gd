@@ -1,15 +1,18 @@
 extends SceneTree
 ## The part-26 art pass sheet on the crypt floor: all 18 component icons (2x, and 1x as the
-## builder shows them), the four element tints against the four player colours with the
-## bolt sprite drawn the way the projectile manager draws it, and every vfx sprite at 1x.
+## builder shows them), the four element tints against the four player colours, and every
+## vfx sprite at 1x. Icon order: bolt beam nova rune orbit | fire frost storm void | split
+## pierce homing chain bigger faster | on_hit on_expire timer. The player groups are "as
+## shipped": the manager mixes the owner colour with white. The element groups are
+## hypothetical: the manager does not tint by element, so they show what the same mix
+## would look like. Colours are read from the manager and the element resources.
 ## Looked at against docs/STYLE.md. Needs a display, so it runs only through
 ## `ci/build/build.sh --quick --screenshots`; the shot is saved as
 ## user://screenshots/art_pass_sheet.png and copied to build/screenshots/.
 
 const SHOTS_DIR := "user://screenshots"
 const SETTLE_FRAMES := 10
-## The projectile manager's mix of owner colour and white (TINT_STRENGTH).
-const TINT_STRENGTH := 0.45
+const MANAGER := preload("res://core/projectiles/projectile_manager.gd")
 
 const FLOOR := preload("res://art/tilesets/crypt/floor.svg")
 const ICONS: Array[Texture2D] = [
@@ -32,14 +35,11 @@ const ICONS: Array[Texture2D] = [
 	preload("res://content/spells/triggers/on_expire/icon.svg"),
 	preload("res://content/spells/triggers/timer/icon.svg"),
 ]
-const ELEMENT_TINTS: Array[Color] = [
-	Color(0.8784, 0.3490, 0.1843, 1), # fire
-	Color(0.4980, 0.7529, 0.9412, 1), # frost
-	Color(0.9490, 0.7608, 0.1882, 1), # storm
-	Color(0.7882, 0.6039, 0.9412, 1), # void
-]
-const PLAYER_COLORS: Array[Color] = [
-	Color("#3b73c9"), Color("#d9477a"), Color("#3f8f4f"), Color("#8a4fc4"),
+const ELEMENTS: Array[Resource] = [
+	preload("res://content/spells/elements/fire/fire.tres"),
+	preload("res://content/spells/elements/frost/frost.tres"),
+	preload("res://content/spells/elements/storm/storm.tres"),
+	preload("res://content/spells/elements/void/void.tres"),
 ]
 const BOLT := preload("res://art/vfx/fire_bolt.svg")
 const VFX: Array[Texture2D] = [
@@ -68,12 +68,14 @@ func _initialize() -> void:
 	for i in ICONS.size():
 		_place(ICONS[i], 2.0, 8.0 + i * 35.0, 8.0, Color.WHITE)
 		_place(ICONS[i], 1.0, 16.0 + i * 35.0, 46.0, Color.WHITE)
-	# Rows 3-4: per element, its tint as a swatch, then the bolt mixed as the manager mixes
-	# an owner colour and in the full colour; the four player colours the same way.
-	for e in ELEMENT_TINTS.size():
-		_tint_group(8.0 + e * 76.0, ELEMENT_TINTS[e])
-	for p in PLAYER_COLORS.size():
-		_tint_group(330.0 + p * 76.0, PLAYER_COLORS[p])
+	# Rows 3-4: per colour, a swatch, the bolt mixed with white as the manager mixes an owner
+	# colour, and the bolt in the full colour. Left: elements (hypothetical); right: players.
+	_label("elements (hypothetical): fire frost storm void", 8.0, 336.0)
+	_label("players (as shipped): 1 2 3 4", 330.0, 336.0)
+	for e in ELEMENTS.size():
+		_tint_group(8.0 + e * 76.0, ELEMENTS[e].get("tint"))
+	for p in MANAGER.PLAYER_COLORS.size():
+		_tint_group(330.0 + p * 76.0, MANAGER.PLAYER_COLORS[p])
 	# Rows 5-6: every vfx sprite at 1x, then the first four at 2x.
 	var vx: float = 8.0
 	for tex: Texture2D in VFX:
@@ -101,8 +103,16 @@ func _tint_group(x: float, tint: Color) -> void:
 	swatch.size = Vector2(16.0, 16.0)
 	swatch.color = tint
 	root.add_child(swatch)
-	_place(BOLT, 2.0, x + 20.0, 66.0, Color.WHITE.lerp(tint, TINT_STRENGTH))
+	_place(BOLT, 2.0, x + 20.0, 66.0, Color.WHITE.lerp(tint, MANAGER.TINT_STRENGTH))
 	_place(BOLT, 2.0, x + 20.0, 94.0, tint)
+
+
+func _label(text: String, x: float, y: float) -> void:
+	var label := Label.new()
+	label.text = text
+	label.position = Vector2(x, y)
+	label.add_theme_font_size_override("font_size", 8)
+	root.add_child(label)
 
 
 func _place(texture: Texture2D, scale: float, x: float, y: float, tint: Color) -> void:

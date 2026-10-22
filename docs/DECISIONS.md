@@ -915,3 +915,10 @@ The HUD screenshot cannot be taken in a session (no display, `docs/BACKLOG.md`),
 - **One linear focus list, with focus helping.** `core/ui_focus` moves through a plain list, so the builder lists tabs, slots, held buttons, bag rows and Close in that order, moves focus to the bag after a slot is chosen and back to the slot on `dodge`. Rows that cannot be used are disabled or hidden, and UIFocus skips them.
 - **A modifier slot opens only in the first free place,** as `player` fills modifiers (a new one goes in the first free place; clearing one closes the gap). A held spell's form must be chosen first, since the compiler refuses a held spell without one; the refusal reason is shown from part 17.
 - **The builder opens at any time for now.** Part 18 folds it into the quick view and part 19 makes the break between waves, as the design says.
+
+## M2 part 17: the builder, part 2
+
+- **The info panel sits in the quarter's free strip, not in the builder.** The builder (about 190×168) already fills the space beside the corner panel, but the strip at the screen edge under (P1, P2) or over (P3, P4) the corner panel was empty. A 112×112 panel there keeps all builders, corner panels and info panels apart (tested at 640×360). It is a top-level child of the builder, so it shows and hides with it and the builder's own layout is unchanged.
+- **`Spells.builder_view` gives plain values.** `test_spell_field_reads.gd` forbids the HUD reading a `CompiledSpell`; the view returns a Dictionary (complexity of the whole spell, numbers and shot pattern of the spell at the shown level), so the compiler can change without touching the HUD. It compiles the recipe on each render (on events and key presses, never per frame).
+- **The refusal reason is text and lasts until the next try.** It comes from `build_refused` for the owner only and clears on the next request, the next successful change or the next opening. It shares one text line with the component description; the reason wins while it is set.
+- **Descriptions are empty until part 23:** `Spells.component_description(id)` returns "" for now; part 23 reads Story there.

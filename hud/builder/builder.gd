@@ -20,6 +20,10 @@ extends PanelContainer
 ## anywhere else closes the builder. The focused control is marked with "> " and the
 ## selected slot is shown in brackets, so nothing is shown by colour alone.
 ##
+## Part 17 adds an info panel (`Info`, in the free strip of the player's quarter): the complexity
+## bar, the stats and a mini-preview of the spell shown (from `Spells.builder_view`), and a text
+## line with the refusal reason (from `build_refused`) or the focused component's description.
+##
 ## Every UIFocus signal carries a player index and this node ignores all but its own, so it
 ## is the same for any index 0-3. Buttons are made once; opening and activating only change
 ## their text and visibility (the bag rows grow, once, if the bag needs more of them).
@@ -27,6 +31,7 @@ extends PanelContainer
 const EventsScript := preload("res://core/events/events.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
+const SpellPreviewScript := preload("res://hud/builder/spell_preview.gd")
 
 const PLAYER_COUNT: int = 4
 ## The slot numbers of `build_change_requested` (the contract of `gameplay/player`).
@@ -57,6 +62,21 @@ const RIGHT_WIDTH: float = 80.0
 ## The meta key that keeps a button's text without the focus mark.
 const BASE_TEXT_META: StringName = &"base_text"
 
+## The info panel (stats, complexity bar, mini-preview, refusal reason, description) sits in
+## the strip of the player's quarter under (P1, P2) or over (P3, P4) the corner panel, so it
+## covers nothing the builder or another player uses.
+const INFO_WIDTH: float = 112.0
+const INFO_HEIGHT: float = 112.0
+const INFO_EDGE: float = 4.0
+## Height of the corner panel plus its gap: where the strip starts.
+const INFO_CORNER: float = 59.0
+const PREVIEW_HEIGHT: float = 16.0
+const NOTE_HEIGHT: float = 36.0
+const LABEL_VARIATION: StringName = &"BuilderLabel"
+const BAR_VARIATION: StringName = &"ComplexityBar"
+const REFUSED_PREFIX: String = "Refused: "
+const NO_STATS_TEXT: String = "-"
+
 ## The player index 0-3. Set before adding the node to the tree.
 @export var index: int = 0
 
@@ -70,6 +90,8 @@ var _spells: SpellsScript = null
 ## Mirrors of what the player announced.
 var _recipes: Array[Dictionary] = [{}, {}]
 var _bag: Array[StringName] = []
+## The reason the player gave for the last refused change (cleared by the next request or change).
+var _reason: String = ""
 
 var _open: bool = false
 ## The prepared spell shown (0 is A), how many held spells below it, the selected slot.
@@ -84,6 +106,12 @@ var _close: Button = null
 var _slots: Array[Button] = []
 var _up: Button = null
 var _held: Button = null
+var _info: PanelContainer = null
+var _complexity_label: Label = null
+var _complexity_bar: ProgressBar = null
+var _stats: Label = null
+var _preview: Control = null
+var _note: Label = null
 var _rows: Array[Button] = []
 ## The component id each shown bag row asks for, in row order (`NO_COMPONENT` is "None").
 var _row_ids: Array[StringName] = []
@@ -137,6 +165,7 @@ func _ready() -> void:
 	_up.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_held = _make_button(levels, "Held")
 	_held.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_make_info(player)
 	visible = false
 	_render()
 
@@ -150,6 +179,7 @@ func bind(events: EventsScript, ui_focus: UIFocusScript, spells: SpellsScript) -
 	if _events != null:
 		_events.recipe_changed.connect(_on_recipe_changed)
 		_events.bag_changed.connect(_on_bag_changed)
+		_events.build_refused.connect(_on_build_refused)
 	if _ui_focus != null:
 		_ui_focus.closed.connect(_on_closed)
 		_ui_focus.activated.connect(_on_activated)
@@ -170,6 +200,8 @@ func open_builder() -> bool:
 	_level = 0
 	_slot = SLOT_FORM
 	_focused = null
+	_reason = ""
+	_place_info()
 	_grow_rows(_most_rows())
 	_render()
 	# Close the overlay's panel first: its `closed` would hide this node if it came during open.
@@ -258,6 +290,139 @@ func recipe_of(spell: int) -> Dictionary:
 ## The controls UIFocus walks, in order.
 func controls() -> Array[Control]:
 	return _controls.duplicate()
+
+
+## The text of the info panel, as shown now (for tests and screenshots).
+func stats_text() -> String:
+	return _stats.text
+
+
+func complexity_text() -> String:
+	return _complexity_label.text
+
+
+## The complexity bar's value and its largest value (the limit).
+func complexity_value() -> float:
+	return _complexity_bar.value
+
+
+func complexity_limit() -> float:
+	return _complexity_bar.max_value
+
+
+## The refusal reason or, with none, the description of the component in focus ("" if neither).
+func note_text() -> String:
+	return _note.text
+
+
+## The reason the last refused change gave, "" after the next request or change.
+func refusal_reason() -> String:
+	return _reason
+
+
+func preview_pattern() -> String:
+	return _preview.call("pattern")
+
+
+func info_panel() -> PanelContainer:
+	return _info
+
+
+func _make_info(player: int) -> void:
+	_info = PanelContainer.new()
+	_info.name = "Info"
+	_info.theme_type_variation = StringName("PlayerPanel%d" % (player + 1))
+	_info.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_info.top_level = true
+	_info.custom_minimum_size = Vector2(INFO_WIDTH, INFO_HEIGHT)
+	add_child(_info)
+	var column := VBoxContainer.new()
+	column.name = "Column"
+	column.add_theme_constant_override("separation", 1)
+	_info.add_child(column)
+	_complexity_label = _make_info_label(column, "Complexity")
+	_complexity_bar = ProgressBar.new()
+	_complexity_bar.name = "ComplexityBar"
+	_complexity_bar.theme_type_variation = BAR_VARIATION
+	_complexity_bar.show_percentage = false
+	_complexity_bar.min_value = 0.0
+	_complexity_bar.max_value = float(SpellLimits.MAX_COMPLEXITY)
+	_complexity_bar.step = 1.0
+	_complexity_bar.custom_minimum_size = Vector2(0.0, 5.0)
+	_complexity_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	column.add_child(_complexity_bar)
+	_stats = _make_info_label(column, "Stats")
+	_stats.custom_minimum_size = Vector2(0.0, 24.0)
+	_preview = SpellPreviewScript.new()
+	_preview.name = "Preview"
+	_preview.custom_minimum_size = Vector2(0.0, PREVIEW_HEIGHT)
+	_preview.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	column.add_child(_preview)
+	_note = _make_info_label(column, "Note")
+	_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_note.max_lines_visible = 3
+	_note.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	_note.custom_minimum_size = Vector2(0.0, NOTE_HEIGHT)
+
+
+func _make_info_label(parent: Node, node_name: String) -> Label:
+	var label := Label.new()
+	label.name = node_name
+	label.theme_type_variation = LABEL_VARIATION
+	label.clip_text = true
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(label)
+	return label
+
+
+## Put the info panel in the free strip of this player's quarter: the screen's left edge for
+## P1 and P3, the right edge for P2 and P4, under the corner panel at the top and over it at
+## the bottom.
+func _place_info() -> void:
+	var view: Vector2 = get_viewport_rect().size
+	var x: float = INFO_EDGE if index % 2 == 0 else view.x - INFO_EDGE - INFO_WIDTH
+	var y: float = INFO_CORNER + INFO_EDGE if index < 2 else view.y - INFO_CORNER - INFO_EDGE - INFO_HEIGHT
+	_info.position = Vector2(x, y)
+	_info.size = Vector2(INFO_WIDTH, INFO_HEIGHT)
+
+
+## The stats, the bar and the preview of the spell shown, from `Spells.builder_view`.
+func _render_info() -> void:
+	var view: Dictionary = {}
+	if _spells != null:
+		view = _spells.builder_view(_recipes[_viewed], _level)
+	var complexity: int = int(view.get("complexity", 0))
+	_complexity_label.text = "Complexity %d/%d" % [complexity, SpellLimits.MAX_COMPLEXITY]
+	_complexity_bar.value = float(complexity)
+	_preview.call("show_view", view)
+	if not bool(view.get("shown", false)):
+		_stats.text = NO_STATS_TEXT
+	else:
+		var shots: String = "Ray" if bool(view["ray"]) else str(view["shots"])
+		_stats.text = "Dmg %d  Shots %s\nCool %s s  Mana %s" % [int(view["damage"]), shots, String.num(float(view["cooldown"]), 2), String.num(float(view["mana"]), 1)]
+	_render_note()
+
+
+## The refusal reason, else the description of what the player points at.
+func _render_note() -> void:
+	if _reason != "":
+		_note.text = REFUSED_PREFIX + _reason
+	else:
+		_note.text = _description_in_focus()
+
+
+## The one-line description of the component the player points at: the bag row in focus, else
+## the component in the selected slot.
+func _description_in_focus() -> String:
+	if _spells == null:
+		return ""
+	var id: StringName = NO_COMPONENT
+	var at: int = _rows.find(_focused as Button)
+	if at >= 0 and at < _row_ids.size():
+		id = _row_ids[at]
+	else:
+		id = _id_in(_node_at(_level), _slot)
+	return _spells.component_description(id) if id != NO_COMPONENT else ""
 
 
 func _make_button(parent: Node, node_name: String) -> Button:
@@ -373,6 +538,7 @@ func _render() -> void:
 	_render_rows(node)
 	_rebuild_controls()
 	_apply_marks()
+	_render_info()
 
 
 func _render_rows(node: Dictionary) -> void:
@@ -426,6 +592,7 @@ func _apply_marks() -> void:
 
 
 func _ask(slot: int, id: StringName) -> void:
+	_reason = ""
 	if _events != null:
 		_events.build_change_requested.emit(index, spell_path(), slot, id)
 
@@ -434,7 +601,16 @@ func _on_recipe_changed(player: int, slot: int, recipe: Dictionary) -> void:
 	if player != index or slot < 0 or slot >= SPELL_COUNT:
 		return
 	_recipes[slot] = recipe.duplicate(true)
+	_reason = ""
 	_render()
+
+
+## The player refused a change: show why, as words (the picture itself stays as it was).
+func _on_build_refused(player: int, reason: String) -> void:
+	if player != index:
+		return
+	_reason = reason
+	_render_note()
 
 
 func _on_bag_changed(player: int, bag: Array[StringName]) -> void:
@@ -477,6 +653,7 @@ func _on_focus_changed(player: int, control: Control) -> void:
 	if player == index and _open:
 		_focused = control
 		_apply_marks()
+		_render_note()
 
 
 func _on_cancelled(player: int) -> void:

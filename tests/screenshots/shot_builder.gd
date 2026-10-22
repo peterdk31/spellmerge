@@ -35,6 +35,16 @@ func _initialize() -> void:
 		_fail("the builder of player 1 is not open")
 		return
 	await _shot("builder_one_player")
+	# A trigger, its held spell, then an element for it: refused (no form), so the reason shows.
+	await _press(0, builder.call("slot_button", 5))
+	await _press(0, builder.call("shown_rows")[0])
+	await _press(0, builder.call("held_button"))
+	await _press(0, builder.call("slot_button", 1))
+	await _press(0, builder.call("shown_rows")[0])
+	if str(builder.call("note_text")) == "":
+		_fail("the refused pick showed no reason")
+		return
+	await _shot("builder_refused")
 	# A stopped run leaves the HUD as it is, so close the builder as its owner would.
 	_tap(0, &"overlay")
 	await _settle()

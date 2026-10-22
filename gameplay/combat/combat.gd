@@ -97,8 +97,6 @@ var _near: Array[Node2D] = []
 # Hit profiles: tag -> damage and knockback strength.
 var _profile_damage: Dictionary = {}
 var _profile_knockback: Dictionary = {}
-# Spell ids whose hit profile was already read after a `spell_cast`.
-var _profiled_spells: Dictionary = {}
 
 # Enemies, one row each.
 var _enemies: Array[Node2D] = []
@@ -162,8 +160,6 @@ func _ready() -> void:
 	if events != null and not events.projectile_hit.is_connected(_on_projectile_hit):
 		events.projectile_hit.connect(_on_projectile_hit)
 	if events != null:
-		if not events.spell_cast.is_connected(_on_spell_cast):
-			events.spell_cast.connect(_on_spell_cast)
 		if not events.player_downed.is_connected(_on_player_downed):
 			events.player_downed.connect(_on_player_downed)
 		if not events.player_revived.is_connected(_on_player_revived):
@@ -561,22 +557,8 @@ func _on_player_revived(player: int, _reviver: int) -> void:
 			projectiles.add_target(wizard, _player_radius[player], ProjectileManagerScript.LAYER_PLAYER, player, _player_offset[player])
 
 
-## The first time a spell is cast, ask it (through the registry) what its shots do and
-## keep that as a hit profile. Content never calls Combat; the spell only answers.
-func _on_spell_cast(_player: int, spell_id: StringName, _origin: Vector2, _direction: Vector2) -> void:
-	if registry == null or _profiled_spells.has(spell_id):
-		return
-	var spell: SpellBase = registry.get_resource(&"spells", spell_id) as SpellBase
-	if spell == null:
-		return
-	_profiled_spells[spell_id] = true
-	var tag: int = spell.hit_tag()
-	if tag != 0:
-		set_hit_profile(tag, spell.hit_damage(), spell.hit_knockback())
-
-
 ## A shot landed. A spell's shot is described by `Spells.hit_profile(tag)` (damage, knockback,
-## status); any other shot (an enemy's, or M1's bolt) by the table of `set_hit_profile`. A
+## status); any other shot (an enemy's) by the table of `set_hit_profile`. A
 ## shocked target also sends the hit on to its nearest neighbour; a hexed one is pulled toward
 ## the hit instead of pushed away. The hit's own status goes on after the damage, on a target
 ## that survived.

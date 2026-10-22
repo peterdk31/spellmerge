@@ -10,7 +10,7 @@ const PlayerScript := preload("res://gameplay/player/player.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
-const CountingSpell := preload("res://tests/gameplay/player/fixtures/counting_spell.gd")
+const FakeSpells := preload("res://tests/gameplay/player/fixtures/fake_spells.gd")
 
 const STEP: float = 0.0625
 
@@ -19,6 +19,7 @@ var _bus: Node
 var _input: Node
 var _registry: Node
 var _players: Array[PlayerScript] = []
+var _fakes: Array[Node] = []
 ## Every event as [player, health, max_health, mana, max_mana].
 var _stats: Array[Array] = []
 
@@ -50,6 +51,9 @@ func _teardown() -> void:
 	for player in _players:
 		player.free()
 	_players.clear()
+	for fake in _fakes:
+		fake.free()
+	_fakes.clear()
 	for node: Node in [_input, _registry, _bus]:
 		if node != null:
 			node.free()
@@ -110,11 +114,11 @@ func _test_nothing_changed_sends_nothing() -> void:
 
 func _test_mana_spent_and_regenerated() -> void:
 	_setup(1)
-	var spell: CountingSpell = CountingSpell.new()
-	spell.id = &"test_spell"
-	spell.mana_cost = 25.0
-	spell.cooldown = 0.0
-	_players[0].spell = spell
+	var spells: FakeSpells = FakeSpells.new()
+	spells.cost = 25.0
+	_players[0].spells = spells
+	_players[0].set_recipe(0, {"form": &"bolt"})
+	_fakes.append(spells)
 	_stats.clear()
 	_check(_players[0].cast(), "the cast fires")
 	_check(_stats.size() == 1 and _stats[0][3] == 75.0, "spending 25 mana sends mana 75, got %s" % [_stats])

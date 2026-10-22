@@ -1,7 +1,7 @@
 extends SceneTree
 ## Tests for gameplay/flow (the M1 arena glue), on the real autoloads: Play starts
 ## the room with 1, 2 and 4 players, the wave is fixed, `room_entered` and
-## `room_cleared` are sent once, the bolt's shared cooldowns are reset on a new run,
+## `room_cleared` are sent once, every wizard builds the two start spells, the cooldowns are reset on a new run,
 ## the room restarts in under 3 seconds when every player is down (and not while
 ## one still stands), and the first room is up in the same call. Time moves by
 ## fixed deltas through Flow.step(); nothing waits.
@@ -11,13 +11,14 @@ extends SceneTree
 const FlowScript := preload("res://gameplay/flow/flow.gd")
 const PlayerScript := preload("res://gameplay/player/player.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
+const SpellsScript := preload("res://core/spells/spells.gd")
 
 var _failures: Array[String] = []
 var _events: Node
 var _flow: FlowScript
 var _input: InputManagerScript
 var _combat: Node
-var _bolt: SpellBase
+var _spells: SpellsScript
 var _entered: Array[StringName] = []
 var _cleared: Array[StringName] = []
 var _waves: Array[int] = []
@@ -35,7 +36,7 @@ func _initialize() -> void:
 		printerr("TEST FAILED: the Events, Registry, PlayerInput, Combat and Flow autoloads must exist")
 		quit(1)
 		return
-	_bolt = registry.call("get_resource", &"spells", &"fire_bolt") as SpellBase
+	_spells = root.get_node_or_null("Spells") as SpellsScript
 	_events.connect("room_entered", func(id: StringName) -> void: _entered.append(id))
 	_events.connect("room_cleared", func(id: StringName) -> void: _cleared.append(id))
 	_events.connect("wave_started", func(number: int) -> void: _waves.append(number))
@@ -124,7 +125,8 @@ func _test_play_starts_the_room(count: int) -> void:
 	_check(_wizards().size() == count, "%d players: %d wizards spawned" % [count, _wizards().size()])
 	for index in count:
 		var wizard := _flow.get_wizard(index) as PlayerScript
-		_check(wizard != null and wizard.index == index and wizard.spell == _bolt, "%d players: wizard %d has its index and the bolt" % [count, index])
+		_check(wizard != null and wizard.index == index and wizard.has_spell(), "%d players: wizard %d has its index and a spell" % [count, index])
+		_check(wizard != null and wizard.recipe_of(0) == FlowScript.DEFAULT_START_RECIPE_A and wizard.recipe_of(1) == FlowScript.DEFAULT_START_RECIPE_B, "%d players: wizard %d has both start spells" % [count, index])
 		_check(wizard != null and wizard.position == Vector2(224.0 + 64.0 * index, 320.0), "%d players: wizard %d stands on its spawn" % [count, index])
 	_check(_flow.enemies_left() == FlowScript.WAVE.size(), "%d players: the wave has %d enemies, got %d" % [count, FlowScript.WAVE.size(), _flow.enemies_left()])
 	_check(_combat.call("get_enemy_count") == FlowScript.WAVE.size(), "%d players: every enemy is registered with combat" % count)
@@ -162,11 +164,13 @@ func _test_cooldowns_reset_on_a_new_run() -> void:
 	_setup(2)
 	_play()
 	var wizard := _flow.get_wizard(1) as PlayerScript
-	_check(_bolt.cast(1, Vector2(100.0, 100.0), Vector2.RIGHT, 100.0) != SpellBase.REFUSED, "the bolt fires for player 2")
-	_check(_bolt.cast(1, Vector2(100.0, 100.0), Vector2.RIGHT, 100.0) == SpellBase.REFUSED, "the bolt cools down for player 2")
+	var at := Vector2(100.0, 100.0)
+	_check(_spells.cast(1, 0, at, Vector2.RIGHT, 100.0) != SpellsScript.REFUSED, "spell A fires for player 2")
+	_check(_spells.cast(1, 0, at, Vector2.RIGHT, 100.0) == SpellsScript.REFUSED, "spell A cools down for player 2")
+	_check(_spells.cast(1, 1, at, Vector2.RIGHT, 100.0) != SpellsScript.REFUSED, "spell B has its own cooldown")
 	_flow.stop_run()
 	_play()
-	_check(_bolt.cast(1, Vector2(100.0, 100.0), Vector2.RIGHT, 100.0) != SpellBase.REFUSED, "a new run forgot the bolt cooldown (the shared resource)")
+	_check(_spells.cast(1, 0, at, Vector2.RIGHT, 100.0) != SpellsScript.REFUSED, "a new run forgot the cooldowns")
 	_check(wizard != null, "the wizard of player 2 existed")
 	_stop()
 

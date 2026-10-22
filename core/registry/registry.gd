@@ -6,7 +6,7 @@ extends Node
 ## This is the only script allowed to load from a computed path. Everyone else
 ## writes `load("res://...")` or `preload(...)` with a literal path.
 ##
-##     var bolt := Registry.get_resource(&"spells", &"bolt") as SpellBase
+##     var bolt := Registry.get_resource(&"spells", &"bolt") as FormBase
 ##     var sound: AudioStream = Registry.get_sound(&"fire_cast")
 ##     if sound != null:
 ##         ...  # plays nothing on null, so a missing sound is silent

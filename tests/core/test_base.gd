@@ -30,17 +30,17 @@ func _check(condition: bool, message: String) -> void:
 
 
 func _test_spell() -> void:
-	var spell := SpellBase.new()
+	var spell := FormBase.new()
 	spell.id = &"fire_bolt"
 	spell.display_name = "Fire Bolt"
 	spell.mana_cost = 5.0
 	spell.cooldown = 0.4
-	spell.damage = 3
+	spell.base_damage = 3
 	spell.speed = 220.0
 	spell.lifetime = 1.5
 	_check(spell.id == &"fire_bolt" and spell.display_name == "Fire Bolt", "spell id and name")
 	_check(spell.mana_cost == 5.0 and spell.cooldown == 0.4, "spell cost and cooldown")
-	_check(spell.damage == 3 and spell.speed == 220.0 and spell.lifetime == 1.5, "spell damage, speed, lifetime")
+	_check(spell.base_damage == 3 and spell.speed == 220.0 and spell.lifetime == 1.5, "spell damage, speed, lifetime")
 
 
 func _test_enemy() -> void:
@@ -65,23 +65,23 @@ func _test_room() -> void:
 
 
 func _test_demo_defaults_to_false() -> void:
-	_check(not SpellBase.new().demo, "spell: demo is false by default")
+	_check(not FormBase.new().demo, "spell: demo is false by default")
 	_check(not EnemyBase.new().demo, "enemy: demo is false by default")
 	_check(not RoomBase.new().demo, "room: demo is false by default")
-	_check(SpellBase.new().id == &"", "spell: id is empty by default")
+	_check(FormBase.new().id == &"", "spell: id is empty by default")
 
 
 func _test_round_trip() -> void:
-	var spell := SpellBase.new()
+	var spell := FormBase.new()
 	spell.id = &"fire_bolt"
 	spell.demo = true
-	spell.damage = 4
+	spell.base_damage = 4
 	var path := "user://test_base_spell.tres"
 	_check(ResourceSaver.save(spell, path) == OK, "spell saves as text")
-	var loaded := ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE) as SpellBase
-	_check(loaded != null, "spell loads back as SpellBase")
+	var loaded := ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE) as FormBase
+	_check(loaded != null, "spell loads back as FormBase")
 	if loaded != null:
-		_check(loaded.id == &"fire_bolt" and loaded.demo and loaded.damage == 4, "spell keeps its values")
+		_check(loaded.id == &"fire_bolt" and loaded.demo and loaded.base_damage == 4, "spell keeps its values")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
 
 

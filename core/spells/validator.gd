@@ -60,8 +60,7 @@ static func load_manifest(path: String = MANIFEST_PATH) -> Dictionary:
 	return listed
 
 
-## Every problem in `resources` (resources that are not spell components, such as M1's
-## `SpellBase`, are skipped), in `reactions` (null skips the table), and in the duplicate
+## Every problem in `resources` (resources that are not spell components are skipped), in `reactions` (null skips the table), and in the duplicate
 ## ids the registry reported while scanning (`duplicates`: one line each, naming the id and
 ## both files).
 static func check_all(resources: Array[Resource], reactions: ReactionTable, manifest: Dictionary, duplicates: PackedStringArray = PackedStringArray()) -> Array[Dictionary]:

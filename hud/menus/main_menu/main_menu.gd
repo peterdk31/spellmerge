@@ -13,6 +13,14 @@ const MENU_PLAYER: int = 0
 const FOUR_BOT_ARGUMENT: String = "--four-bot"
 const FOUR_BOT_RUNNER: String = "res://tests/smoke/four_bot_runner.gd"
 const FOUR_BOT_NODE: String = "FourBotRunner"
+## The user arguments that start the stress run and the projectile timings (tests/benchmark/),
+## with the scripts and node names of their runners. Same rules as the 4-bot test.
+const STRESS_ARGUMENT: String = "--stress"
+const STRESS_RUNNER: String = "res://tests/benchmark/stress_runner.gd"
+const STRESS_NODE: String = "StressRunner"
+const TIMING_ARGUMENT: String = "--projectile-timing"
+const TIMING_RUNNER: String = "res://tests/benchmark/projectile_timing_runner.gd"
+const TIMING_NODE: String = "ProjectileTimingRunner"
 
 ## The event bus. Only tests set this, before adding the node; otherwise the
 ## "Events" autoload is used.
@@ -32,7 +40,10 @@ func _ready() -> void:
 	_play.pressed.connect(_on_play_pressed)
 	_play.grab_focus()
 	print("Spellmerge %s: main menu ready" % BuildInfo.describe())
-	_start_four_bot_test(_cmdline_arguments())
+	var args: PackedStringArray = _cmdline_arguments()
+	_start_four_bot_test(args)
+	_start_stress_test(args)
+	_start_timing_test(args)
 
 
 ## Every command line argument, with or without a "--" before it. The web page
@@ -46,26 +57,57 @@ func _cmdline_arguments() -> PackedStringArray:
 ## every other build the argument logs a warning and does nothing. Returns true if
 ## a runner was queued. Only one is ever added, even if the menu is entered again.
 func _start_four_bot_test(args: PackedStringArray) -> bool:
-	if not FOUR_BOT_ARGUMENT in args:
+	return _start_runner(args, FOUR_BOT_ARGUMENT, FOUR_BOT_NODE)
+
+
+## The same for the stress run (`--stress`, tests/benchmark/stress_runner.gd).
+func _start_stress_test(args: PackedStringArray) -> bool:
+	return _start_runner(args, STRESS_ARGUMENT, STRESS_NODE)
+
+
+## The same for the projectile timings (`--projectile-timing`).
+func _start_timing_test(args: PackedStringArray) -> bool:
+	return _start_runner(args, TIMING_ARGUMENT, TIMING_NODE)
+
+
+func _start_runner(args: PackedStringArray, argument: String, node_name: String) -> bool:
+	if not argument in args:
 		return false
 	var runner: Node = null
 	if runner_factory.is_valid():
 		runner = runner_factory.call() as Node
-	elif ResourceLoader.exists(FOUR_BOT_RUNNER):
-		# A literal path (computed ones are not allowed here): keep it equal to FOUR_BOT_RUNNER.
-		runner = (load("res://tests/smoke/four_bot_runner.gd") as GDScript).new() as Node
+	else:
+		runner = _make_runner(node_name)
 	if runner == null:
-		push_warning("Main menu: %s needs a build that includes tests/; ignored." % FOUR_BOT_ARGUMENT)
+		push_warning("Main menu: %s needs a build that includes tests/; ignored." % argument)
 		return false
-	runner.name = FOUR_BOT_NODE
+	runner.name = node_name
 	# On the root, so the node outlives this menu when the flow swaps the scene.
 	_add_runner.call_deferred(runner)
 	return true
 
 
+## The runner of a node name, or null when its script is not in the build. Literal paths
+## only (computed ones are not allowed here): keep them equal to the *_RUNNER constants.
+func _make_runner(node_name: String) -> Node:
+	var script: GDScript = null
+	match node_name:
+		FOUR_BOT_NODE:
+			if ResourceLoader.exists(FOUR_BOT_RUNNER):
+				script = load("res://tests/smoke/four_bot_runner.gd") as GDScript
+		STRESS_NODE:
+			if ResourceLoader.exists(STRESS_RUNNER):
+				script = load("res://tests/benchmark/stress_runner.gd") as GDScript
+		TIMING_NODE:
+			if ResourceLoader.exists(TIMING_RUNNER):
+				script = load("res://tests/benchmark/projectile_timing_runner.gd") as GDScript
+	return script.new() as Node if script != null else null
+
+
+## Only one runner is ever added with a name, even if the menu is entered again.
 func _add_runner(runner: Node) -> void:
 	var root: Node = get_tree().root
-	if root.has_node(NodePath(FOUR_BOT_NODE)):
+	if root.has_node(NodePath(runner.name)):
 		runner.free()
 		return
 	root.add_child(runner)

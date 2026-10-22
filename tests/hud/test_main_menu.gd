@@ -44,6 +44,24 @@ func _initialize() -> void:
 	await process_frame
 	_expect(_count_runners() == 0, "a missing runner still added a node")
 
+	# The stress run and the projectile timings start the same way, each under its own
+	# name, and an argument of one never starts another.
+	var stress: PackedStringArray = PackedStringArray(["--stress"])
+	var timing: PackedStringArray = PackedStringArray(["--projectile-timing"])
+	_expect(not bool(menu.call("_start_stress_test", timing)), "--projectile-timing started the stress run")
+	_expect(not bool(menu.call("_start_timing_test", stress)), "--stress started the timings")
+	_expect(bool(menu.call("_start_stress_test", stress)), "--stress did not start the run")
+	_expect(bool(menu.call("_start_timing_test", timing)), "--projectile-timing did not start the timings")
+	menu.call("_start_stress_test", stress)
+	await process_frame
+	_expect(root.has_node("StressRunner") and root.has_node("ProjectileTimingRunner"), "a benchmark runner is missing from the root")
+	_expect(_count_named("StressRunner") == 1 and _count_named("ProjectileTimingRunner") == 1, "a repeated start left a second benchmark runner")
+	root.get_node("StressRunner").free()
+	root.get_node("ProjectileTimingRunner").free()
+	for constant in ["STRESS_RUNNER", "TIMING_RUNNER"]:
+		_expect(ResourceLoader.exists(String(menu.get(constant))), "%s does not exist" % constant)
+	_expect(menu.call("_make_runner", "Nothing") == null, "an unknown runner name made a node")
+
 	# `_ready` is the only caller of the command line lookup, which merges the user
 	# arguments (after "--") with the plain ones (the web page `args`). The test run
 	# has the script path and no `--four-bot`, so the merge must hold the former only.
@@ -74,9 +92,13 @@ func _make_nothing() -> Node:
 
 
 func _count_runners() -> int:
+	return _count_named(RUNNER_NODE)
+
+
+func _count_named(node_name: String) -> int:
 	var count: int = 0
 	for child in root.get_children():
-		if child.name == RUNNER_NODE:
+		if child.name == node_name:
 			count += 1
 	return count
 

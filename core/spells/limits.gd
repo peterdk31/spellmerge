@@ -1,8 +1,12 @@
 class_name SpellLimits
 extends RefCounted
 ## The spell limits, which are also the performance limits (docs/milestones/M2-spell-system.md,
-## "The spell limits are the performance limits"). Every number is a first guess that the
-## stress benchmark (M2 part 25) confirms or lowers, so they live here and nowhere else.
+## "The spell limits are the performance limits"). Every number was a first guess that the
+## stress benchmark (tests/benchmark/stress_runner.gd) confirms or lowers, so they live here
+## and nowhere else. M2 part 25 confirmed them on the headless numbers (4 bots with heavy
+## builds, 100 enemies and 1,000 shots, then 200 and 3,000: p95 13.9 and 15.4 ms, inside
+## 16.7); nothing was lowered. The WASM numbers come from the Web Test export once the daily
+## build runs `--stress` and `--projectile-timing` (an owner issue); lower a limit if they are over.
 
 ## Complexity a whole spell may cost, counting the spell its trigger holds.
 const MAX_COMPLEXITY: int = 12

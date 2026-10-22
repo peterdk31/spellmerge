@@ -2,6 +2,12 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-22: Stress in the exports, and the limits (M2 part 25)
+
+- **Both benchmarks are nodes the main menu adds on a user argument** (`--stress`, `--projectile-timing`), exactly like `--four-bot`, so the Linux Test and Web Test exports (which keep `tests/`) can run them. The projectile timing script became `projectile_timing_runner.gd` (a node); `test_projectile_timing.gd` is now a thin SceneTree starter, so the command line and `build.sh --tests` behave as before. The menu has one `_start_runner` for all three, with literal `load` paths.
+- **The limits are confirmed, none lowered.** Headless stress with four heavy builds: p95 13.9 ms (100 enemies, 1,000 shots) and 15.4 ms (200, 3,000), inside 16.7 ms; shots and enemies reach their targets and no error is logged. Game logic only, not WASM: the web numbers need the export run. If they are over, the first things to lower are `DEFAULT_CAP_WEB`, `MAX_SHOTS` and `MAX_FIRES_PER_STEP`.
+- **The `ci/` step is an owner question** (`build.sh` runs `--stress` and `--projectile-timing` in the Linux Test and Web Test exports; `websmoke.py --page-args`), as the plan says; it only prints and warns.
+
 ## 2026-10-22: The stress scene (M2 part 24)
 
 - **Real game, topped-up shots.** The scene is the real Flow, Combat, spell runtime and Feel with four bots, not a stand-in. Spells alone never make 1,000 or 3,000 shots, so each physics step the runner adds plain filler shots (load only, no spell effects; the effects come from the bots' real spells; fixed seed, owned by the players in turn) up to the target; the manager's cap is set to the target, so dropping the oldest shot is part of the load. Enemies are added whenever fewer than the target stand, with 120 health instead of the imp's 20, so the crowd lasts. Wizards stay protected with full mana: it is a stress scene, not a balance test.

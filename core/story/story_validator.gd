@@ -12,7 +12,7 @@ extends RefCounted
 ## at most `MAX_LORE_CHARS` characters). `check_component_lore()` also wants a file for every
 ## spell component id it is given.
 
-const MAX_LORE_CHARS: int = 90
+const MAX_LORE_CHARS: int = 60
 ## The speech limit of docs/STORY.md. No dialogue file exists yet; its validator comes with them.
 const MAX_SPEECH_CHARS: int = 60
 const ABOUT_COMPONENT: String = "component"

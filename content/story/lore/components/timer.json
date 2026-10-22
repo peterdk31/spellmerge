@@ -1,5 +1,5 @@
 {
  "id": "timer",
  "about": "component",
- "text": "Holds a spell and casts it every half second, up to four times."
+ "text": "Casts its spell every half second, up to four times."
 }

@@ -184,7 +184,7 @@ Every combo in the catalogue below fits under 12 with these numbers. Its largest
 
 - Claude writes `docs/STORY.md` (canon and tone, short) before the area opens: a self-aware, slightly comic magic world with real stakes (docs/DESIGN.md, pillar 3).
 - The first story content is a one-line **description per component**, in `content/story/lore/components/<id>.json`.
-  - Fields: `id`, `refers_to` (`spell:<component id>`), `title` and `text`. `text` has at most 90 characters, so it fits a corner panel.
+  - Fields: `id`, `refers_to` (`spell:<component id>`), `title` and `text`. `text` has at most 60 characters, so it fits the builder's three-line note.
   - The builder shows it.
   - A validator checks the fields, the length, and that `refers_to` names real content.
 - Dialogue and in-run events stay empty until a later milestone has a place to show them.

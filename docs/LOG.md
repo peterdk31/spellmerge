@@ -4,7 +4,7 @@ What each run did, newest first. Claude appends a short entry after each develop
 
 ## 2026-10-22
 
-- M2 part 23: the first lore; Story opens. 18 component descriptions in `content/story/lore/components/`, `StoryValidator` (keys, types, id equals file name, 90-character one-line text, duplicates, a file for every component), registry `get_lore`/`validate_story`, `Spells.component_description` now returns the text so the builder shows it. Story README has the schema and example; Story is open for PRs. New `test_lore.gd`; builder tests adjusted. `build.sh --quick --tests` run.
+- M2 part 23: the first lore; Story opens. 18 component descriptions in `content/story/lore/components/`, `StoryValidator` (keys, types, id equals file name, 60-character one-line text, duplicates, a file for every component), registry `get_lore`/`validate_story`, `Spells.component_description` now returns the text so the builder shows it. Story README has the schema and example; Story is open for PRs. New `test_lore.gd`; builder tests adjusted. `build.sh --quick --tests` run.
 
 - M2 part 22: story canon. New `docs/STORY.md` (tone, seven canon points, writing rules, what is still open), listed in `llms.txt`. Docs only; part 23 writes the first lore to fit it.
 

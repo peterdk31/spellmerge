@@ -12,11 +12,11 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
 ## Blocked
 
 - [ ] **Record the chosen art direction (M2 part 27 follow-up).** Replace the golden example candidates in `art/kit/golden.json` and `docs/STYLE.md` with the chosen style's files, and say in `docs/STYLE.md` that the style is no longer provisional. Redrawing the placeholders in that style is spread over later milestones (M2 design, "Art and the art direction"), one area at a time.
-  - **Waits on:** the owner question with key `art-direction-pick` (the owner picks A, B or C and locks it in `docs/DESIGN.md`).
+  - **Waits on:** owner question #190 (key `art-direction-pick`) (the owner picks A, B or C and locks it in `docs/DESIGN.md`).
 
 ## Done recently
 
-- [x] **Art direction choice (M2 part 27).** Three style samples (A Chunky, B Current, C Grim), each a wizard, a crypt floor and a fire icon, are in `art/samples/` (B is the existing placeholder files); `tests/screenshots/shot_art_direction.gd` puts them side by side in `art_direction_sheet.png`, and `art/samples/README.md` compares them. The owner is asked to pick one, optionally after asking players in Discussions, and to lock it in `docs/DESIGN.md` (owner question `art-direction-pick`). Nothing in the game uses the samples.
+- [x] **Art direction choice (M2 part 27).** Three style samples (A Chunky, B Current, C Grim), each a wizard, a crypt floor and a fire icon, are in `art/samples/` (B is the existing placeholder files); `tests/screenshots/shot_art_direction.gd` puts them side by side in `art_direction_sheet.png`, and `art/samples/README.md` compares them. The owner is asked to pick one, optionally after asking players in Discussions, and to lock it in `docs/DESIGN.md` (owner question #190, key `art-direction-pick`, open and not yet answered). Nothing in the game uses the samples.
 
 - [x] **Closed-outline audit of the other icons.** `test_svg_art.gd` now checks every spell icon: each non-outline pixel has a filled pixel on all four sides and none sits on the icon edge. It found seven icons with open outlines (storm, orbit, chain, homing, pierce, split, timer); all are fixed and the 1x sheet (`art_pass_sheet.png`) was looked at again. Overlapping rects were already checked for all SVGs.
 

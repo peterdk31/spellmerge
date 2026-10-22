@@ -1,13 +1,13 @@
 # Art direction samples
 
-Three looks for the game, each a wizard, a crypt floor tile and a fire spell icon, all on the 32×32 grid and in the shared palette ([docs/STYLE.md](../../docs/STYLE.md)). They exist so the owner can pick one (M2 part 27); nothing in the game uses them. Sheet: `tests/screenshots/shot_art_direction.gd` (`art_direction_sheet.png`).
+Three looks for the game, each a wizard, a crypt floor tile and a fire spell icon, all on the 32×32 grid and in the shared palette ([docs/STYLE.md](../../docs/STYLE.md)). They exist so the owner can pick one (M2 part 27); nothing in the game uses them. Sheet: `tests/screenshots/shot_art_direction.gd` (`art_direction_sheet.png`, in `build/screenshots/` after `ci/build/build.sh --quick --screenshots`; the owner question is #190). The "Reads at 1×" and "Mood" rows are the author's opinion, not a verdict.
 
 | | A: Chunky (`a_chunky/`) | B: Current | C: Grim (`c_grim/`) |
 | --- | --- | --- | --- |
 | Wizard | Big head and face, short bell robe, 16×22 px | The game's placeholder: `content/wizard/base/wizard_p1_idle.svg` | Tall hooded cloak, no face, two glowing eyes, 16×20 px |
 | Floor | Bold offset bricks, clear joints | `art/tilesets/crypt/floor.svg`: flagstones with fine cracks | Large slabs, thin joints, two cracks |
 | Icon | One big round flame | `content/spells/elements/fire/icon.svg` | Narrow flame with a skull-like face |
-| Reads at 1× | Best: the face and hat stay clear when four players overlap | Good | Weakest: the dark cloak melts into a dark floor; needs a lighter rim |
+| Reads at 1× (the author's look at the sheet's 1× row, four wizards overlapping; judge it yourself) | The face and the hat stay apart when four overlap | The four hats stay apart; the fine floor cracks are busy | The dark cloak is close to the dark floor; four overlapping are a dark clump |
 | Mood | Friendly, bright, close to a cartoon | Classic fantasy, a little plain | Moody, a dark crypt |
 | Fits "readable chaos" (pillar 4) | Yes | Yes | Needs care: the four player colours are the only bright spots |
 

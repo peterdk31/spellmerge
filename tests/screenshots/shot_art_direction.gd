@@ -69,9 +69,9 @@ func _column(index: int) -> void:
 	var wizard: Texture2D = _frame(WIZARDS[index], index == 1)
 	_place(wizard, 4.0, left + 8.0, PANEL_TOP + 8.0)
 	_place(ICONS[index], 4.0, left + 8.0 + 128.0 + 8.0, PANEL_TOP + 8.0)
-	# The same two at the size the game draws them, on the floor, twice over.
-	for n in 3:
-		_place(wizard, 1.0, left + 8.0 + n * 40.0, PANEL_TOP + 150.0)
+	# The same two at the size the game draws them, on the floor: four wizards close enough to overlap, as four players do in a fight.
+	for n in 4:
+		_place(wizard, 1.0, left + 8.0 + n * 12.0, PANEL_TOP + 150.0)
 	_place(ICONS[index], 1.0, left + 8.0 + 128.0 + 8.0, PANEL_TOP + 150.0)
 	_place(ICONS[index], 2.0, left + 8.0 + 128.0 + 8.0 + 24.0, PANEL_TOP + 150.0)
 

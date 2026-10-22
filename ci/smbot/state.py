@@ -31,6 +31,8 @@ DEFAULT: dict[str, Any] = {
     "panel_applied": None,
     "panel_problems": [],
     "alarms": {},  # alarm name -> issue number
+    "automation_started": None,  # when the alarms first ran (the stall alarm's starting point)
+    "task_failures": {},  # task -> failed reviews, its PR, the review's problems, parked_until and why
     "last_own_merge": None,
     "last_plan": None,  # when the last planning session finished
     "last_weekly": None,  # when the last weekly planning finished (smbot.control starts the next one)
@@ -38,6 +40,7 @@ DEFAULT: dict[str, Any] = {
     "idle": None,  # when planning last found nothing to do; cleared by the next progress
     "checkpoint_answers": {},  # checkpoint issue number -> the owner's verified /go, /iterate or /pivot
     "intake_tasks": {},  # issue number -> the intake's neutral task for it (smbot.intake)
+    "cla_signatures": {},  # "user_id:version" -> a contributor's CLA signature and its comment (smbot.contrib)
 }
 
 MAX_PROCESSED = 1000

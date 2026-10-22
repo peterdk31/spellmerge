@@ -488,6 +488,7 @@ Comments by the owner's user ID on any issue or PR are carried out by the next r
 | `/ask <question>` | Claude replies in the thread |
 | `/pause`, `/resume` | Same as the panel checkboxes |
 | `/go`, `/iterate <what>`, `/pivot <how>` | Answer a milestone checkpoint (only in its checkpoint issue); planning starts at once |
+| `/retry` | On a parked task's PR or issue: back in the queue now, with two fresh attempts |
 
 `/claude` instructions follow the same rules as all of Claude's work: they cannot change protected paths or override security, copyright or quality rules.
 
@@ -567,7 +568,7 @@ Players shape the game by reporting bugs and sharing ideas; every post gets an a
 ### Where to post
 
 - **Report a bug** (issue form): build version, platform, players, steps, what happened, severity.
-- **Spell idea** (issue form) or **Discussions** (Ideas, Spell combos, Art feedback): ideas and feedback.
+- **Spell idea** (issue form) or **Discussions** (Ideas, Spell combos, Art submissions): ideas, feedback, and art or sound as attachments. Announcements holds the weekly devlog.
 - **Report a copyright concern** (issue form).
 
 ### Contribute page

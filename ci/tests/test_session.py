@@ -189,6 +189,9 @@ class FinishTest(unittest.TestCase):
                     mock.patch.object(session.dailylog, "post",
                                       lambda cfg, title, lines, **k: (posts if posts is not None else []).append(lines)), \
                     mock.patch.object(session, "pr_title", lambda cfg, pr: f"Title of #{pr}" if pr else ""), \
+                    mock.patch.object(session, "announce_park",
+                                      lambda cfg, task, e: f"Parked until {e['parked_until']}: {e['parked_reason']}"), \
+                    mock.patch.object(session, "unlabel_parked", lambda cfg, pr: None), \
                     mock.patch.object(session, "queue", lambda cfg, st, strict=False: []), \
                     mock.patch.object(session, "open_checkpoint", lambda cfg: checkpoint_issue), \
                     mock.patch.object(session.nexttask, "next_task",
@@ -209,6 +212,19 @@ class FinishTest(unittest.TestCase):
         self.assertTrue(posts[1][0].startswith("Blocked, set aside for a week: Do the thing. It waits."))
         self.assertLess(len(posts[1][0]), 400)
         self.assertTrue(posts[1][0].endswith("It waits."))
+
+    def test_two_failed_reviews_park_for_a_day_three_for_a_week_and_say_so(self) -> None:
+        st = copy.deepcopy(state.DEFAULT)
+        st["task_failures"] = {"A": {"count": 1, "pr": 5}}
+        posts: list = []
+        _, st = self.run_finish(st, ["A", "B"], posts, PR="5", FINAL_REVIEW=self.REVISE)
+        until = dt.datetime.fromisoformat(st["task_failures"]["A"]["parked_until"].replace("Z", "+00:00"))
+        self.assertLess(until - dt.datetime.now(dt.timezone.utc), dt.timedelta(days=1, minutes=1))
+        self.assertTrue(any("Parked until" in line for line in posts[-1]))
+        st["task_failures"]["A"].pop("parked_until")
+        _, st = self.run_finish(st, ["A", "B"], posts, PR="5", FINAL_REVIEW=self.REVISE)
+        until = dt.datetime.fromisoformat(st["task_failures"]["A"]["parked_until"].replace("Z", "+00:00"))
+        self.assertGreater(until - dt.datetime.now(dt.timezone.utc), dt.timedelta(days=6))
 
     def test_continues_after_a_failed_review_without_waiting(self) -> None:
         out, st = self.run_finish(copy.deepcopy(state.DEFAULT), ["A", "B"], PR="5", FINAL_REVIEW=self.REVISE)
@@ -384,6 +400,20 @@ class FinishTest(unittest.TestCase):
 
 
 class PublishTest(unittest.TestCase):
+    def test_a_park_is_announced_on_the_pr_with_the_reviews_points(self) -> None:
+        calls: list = []
+        entry = {"pr": "156", "parked_until": "2026-10-23T11:08:02Z", "long": False, "problems": "- Fix the comment.",
+                 "parked_reason": "the final review didn't approve it 2 times in a row"}
+        with mock.patch.object(session.gh, "api", lambda path, *a, input=None, **k: calls.append((path, input)) or {}), \
+                mock.patch.object(session.labels_mod, "ensure"):
+            line = session.announce_park(CFG, "**Bots build spells (M2 part 20).** more", entry)
+        comment = next(i["body"] for p, i in calls if p.endswith("/issues/156/comments"))
+        self.assertIn("**Parked until 2026-10-23 11:08 UTC:**", comment)
+        self.assertIn("- Fix the comment.", comment)
+        self.assertIn("`/retry`", comment)
+        self.assertIn((f"repos/{CFG.repo}/issues/156/labels", {"labels": ["parked"]}), calls)
+        self.assertTrue(line.startswith("Parked until 2026-10-23 11:08 UTC: Bots build spells (M2 part 20) (#156"))
+
     def test_open_pr_finds_only_the_bots_pr(self) -> None:
         own = {"number": 19, "user": {"login": CFG.bot.login}, "head": {"sha": "abc", "repo": {"full_name": CFG.repo}}}
         other = {"number": 20, "user": {"login": "someone"}, "head": {"sha": "def", "repo": {"full_name": CFG.repo}}}

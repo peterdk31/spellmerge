@@ -252,6 +252,20 @@ class CommandsTest(unittest.TestCase):
         self.assertEqual(checkpoint.answer(st, 50)["verdict"], "pivot")  # the newest answer wins
         self.assertEqual(commands.parse("/iterate the dodge"), ("iterate", "the dodge"))
 
+    def test_retry_unparks_the_task_of_that_pr_or_issue(self) -> None:
+        st = copy.deepcopy(state.DEFAULT)
+        st["task_failures"] = {"**Bots build spells.**": {"count": 2, "pr": "156", "parked_until": "2099-01-01T00:00:00Z"},
+                               "**Fix doors.** x (issue #40, p2; ...)": {"count": 1, "parked_until": "2099-01-01T00:00:00Z"},
+                               "**Other.**": {"count": 2, "pr": "9", "parked_until": "2099-01-01T00:00:00Z"}}
+        effects = commands.Effects([1], None, [])
+        effects.retries += [156, 40]
+        effects.apply(st)
+        f = st["task_failures"]
+        self.assertEqual((f["**Bots build spells.**"].get("parked_until"), f["**Bots build spells.**"]["count"]), (None, 0))
+        self.assertNotIn("parked_until", f["**Fix doors.** x (issue #40, p2; ...)"])
+        self.assertIn("parked_until", f["**Other.**"])
+        self.assertEqual(commands.parse("/retry"), ("retry", ""))
+
     def test_effects_are_idempotent(self) -> None:
         st = copy.deepcopy(state.DEFAULT)
         eff = commands.Effects([1, 2], True, [{"url": "u1", "kind": "ask"}])

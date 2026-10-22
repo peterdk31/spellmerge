@@ -304,7 +304,8 @@ check_all() {
 manual_steps() {
   bold "Do these by hand (no API exists for them)"
   cat <<EOF
-  1. Discussions categories: Ideas, Spell combos, Art feedback, Art submissions
+  1. Discussions categories: Announcements, Ideas, Spell combos, Art submissions
+     (delete GitHub's defaults: General, Polls, Q&A, Show and tell)
      https://github.com/$REPO/discussions/categories
   2. Continue with docs/SETUP-APP.md, then docs/SECURITY-CHECKLIST.md.
 EOF

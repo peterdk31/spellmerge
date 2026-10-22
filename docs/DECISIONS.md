@@ -1032,3 +1032,13 @@ An independent review of the branch found these, all fixed with a regression tes
 
 - **Every PR used to get the first 12 shots of every shot script,** whatever it changed. Now the session names the shot scripts that show its change (`screenshots` in its result, each with a caption; a revision may change the choice) and writes a new shot when none shows it. Only those run, on the PR and on `main`, and the comment shows each shot before and after (a new one alone), leaving out shots that came out identical. A change with nothing visible posts no screenshots.
 - `build.sh --screenshots` writes `shots.txt` (which script made which PNG) and runs only `SHOTS_ONLY` when set. The daily Pages gallery is unchanged.
+
+## Owner: four Discussions categories
+
+- **Announcements** (the weekly devlog; the intake skips it), **Ideas**, **Spell combos** and **Art submissions** (attachments the intake can take as assets). Art feedback (never used; feedback goes in Ideas, art in Art submissions) and GitHub's defaults (General, Polls, Q&A, Show and tell) are removed by hand, since GitHub has no API for categories. The first devlog post (#101) was deleted; the weekly devlog continues.
+
+## Owner: parked tasks are visible, and park for a day first
+
+- **Why:** PR #156 (M2 part 20) failed the final review twice on consistency points (numbers in comments and docs that didn't match the code) and was parked for 7 days. Nothing said so where the owner looks, "revisited by the weekly planning run" wasn't true (planning can't clear a park), and the PR drifted into conflicts while the queue moved on.
+- **Now:** two failed reviews (or conflicts) park a task for **1 day**; a third failure parks it for a week and mentions the owner. Every park is announced on the task's PR (a comment with the reason, the date and the review's points, plus the `parked` label) and in the Daily log; the daily summary lists all parked tasks. **`/retry`** on the PR (or the issue a task comes from) puts it back in the queue with two fresh attempts, the last review's points as its brief.
+- #156 and four stale parks (tasks done or gone) were cleared by hand on 2026-10-22.

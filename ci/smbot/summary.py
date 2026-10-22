@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import datetime as dt
 import os
+import re
 import sys
 
 from . import config as config_mod
@@ -48,12 +49,28 @@ def lines_for(env: dict[str, str], repo: str) -> list[str]:
     return out
 
 
+def parked_lines(st: dict, now: dt.datetime) -> list[str]:
+    """Every task that is set aside now: why, until when, and how to bring it back."""
+    out = []
+    for task, entry in sorted(st.get("task_failures", {}).items(), key=lambda kv: kv[1].get("parked_until", "")):
+        until = entry.get("parked_until")
+        if not until or pacing.parse_time(until) <= now:
+            continue
+        title = (re.match(r"\*\*(.+?)\*\*", task) or re.match(r"(.{1,80})", task)).group(1).rstrip(".")
+        where = f" (#{entry['pr']}: `/retry` there brings it back)" if entry.get("pr") else ""
+        out.append(f"Parked until {until[:16].replace('T', ' ')} UTC: {title}{where}. "
+                   f"Why: {dailylog.shorten(entry.get('parked_reason', ''), 160)}")
+    return out
+
+
 def main() -> int:
     cfg = config_mod.load()
     env = dict(os.environ)
     lines = lines_for(env, cfg.repo)
     st, _ = state.load(cfg)
-    lines.append(pacing.usage_line(st, dt.datetime.now(dt.timezone.utc)))
+    now = dt.datetime.now(dt.timezone.utc)
+    lines.append(pacing.usage_line(st, now))
+    lines += parked_lines(st, now)
     try:
         waiting = inbox.reminder(cfg)
     except gh.GhError:

@@ -33,14 +33,18 @@ from typing import Any, Callable
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from . import alarms, checkpoint, dailylog, gh, intake, nexttask, pacing, state, weekly
+from . import labels as labels_mod
 from . import merge as merge_mod
 from . import config as config_mod
 
 MAINTAINER = Path(".github/maintainer")
 FENCE = "`" * 3
-MAX_FAILURES = 2
-PARK_BLOCKED = dt.timedelta(days=7)  # blocked or failed too often: revisited by the weekly planning run
+MAX_FAILURES = 2  # failed reviews (or conflicts) before a task is set aside for a day
+GIVE_UP = 3  # ... and before it is set aside for a week, with the owner told
+PARK_RETRY = dt.timedelta(days=1)  # failed twice: other tasks go first, then it's tried again
+PARK_BLOCKED = dt.timedelta(days=7)  # reported blocked or failed again: the owner is told; /retry brings it back
 PARK_WAITING = dt.timedelta(days=1)  # approved, but the merge waits on GitHub or the owner
+PARKED_LABEL = "parked"
 
 _LIMIT = re.compile(r"usage limit|limit reached|reached (?:your |the )?(?:\w+ )?limit|hit (?:your |the )?(?:\w+ )?limit|"
                     r"session limit|rate[ _-]?limit|\b429\b|quota|out of (?:extra )?usage|resets? (?:at |in )?\d",
@@ -184,6 +188,35 @@ def close_checkpoint(cfg: config_mod.Config, number: int, pr: str) -> list[str]:
     return [f"Checkpoint #{number} carried out in #{pr}; development continues."]
 
 
+def announce_park(cfg: config_mod.Config, task: str, entry: dict[str, Any]) -> str:
+    """Says why a task is parked where the owner looks: on its PR (comment and label) and in the log."""
+    until = entry["parked_until"][:16].replace("T", " ") + " UTC"
+    pr = entry.get("pr")
+    if pr:
+        body = (f"**Parked until {until}:** {entry['parked_reason']}. Other tasks go first meanwhile, and this one "
+                "comes back by itself then" + (" (a week, because it kept failing: please take a look)"
+                                               if entry["long"] else "") + ".\n\n")
+        if entry.get("problems"):
+            body += f"What the last review asked for:\n\n{entry['problems']}\n\n"
+        body += "Comment `/retry` here to put it back in the queue now."
+        try:
+            gh.api(f"repos/{cfg.repo}/issues/{pr}/comments", "-X", "POST", input={"body": body})
+            labels_mod.ensure(cfg, [PARKED_LABEL])
+            gh.api(f"repos/{cfg.repo}/issues/{pr}/labels", "-X", "POST", input={"labels": [PARKED_LABEL]})
+        except gh.GhError:
+            pass  # the log line below still says it
+    where = f" (#{pr}; `/retry` there brings it back)" if pr else ""
+    mention = f" @{cfg.owner.login}, this one needs a look." if entry["long"] else ""
+    return f"Parked until {until}: {task_title(task)}{where}. Why: {dailylog.shorten(entry['parked_reason'], 200)}{mention}"
+
+
+def unlabel_parked(cfg: config_mod.Config, pr: str | int) -> None:
+    try:
+        gh.api(f"repos/{cfg.repo}/issues/{pr}/labels/{PARKED_LABEL}", "-X", "DELETE")
+    except gh.GhError:
+        pass  # it didn't have the label
+
+
 def close_finished_pr(cfg: config_mod.Config, number: int, pr: str) -> list[str]:
     """The bot's PR that finished an outside PR merged: close theirs with credit."""
     try:
@@ -281,13 +314,14 @@ def prepare(cfg: config_mod.Config, st: dict[str, Any], focus: str, today: dt.da
                                     milestone=checkpoint_allows_milestone_work(cfg, st)), "next"
     failures = st.get("task_failures", {}).get(task or "", {})
     previous = ""
-    if failures:
-        previous = (f"This task failed review {failures['count']} time(s) before. The last attempt is PR "
-                    f"#{failures.get('pr')}; its problems were:\n\n{failures.get('problems', '(not recorded)')}\n\n"
-                    + ("This is the last attempt: if it can't be done properly, mark the task blocked in "
-                       "docs/NEXT.md with the reason, close the old PR, and report status `blocked`."
-                       if failures["count"] >= MAX_FAILURES - 1 else
-                       "Continue on that PR's branch if it is still useful, otherwise start fresh."))
+    if failures.get("count") or failures.get("problems"):
+        previous = (f"This task failed review {failures.get('count', 0)} time(s) since it was last retried. The last "
+                    f"attempt is PR #{failures.get('pr')}; the problems its review found were:\n\n"
+                    f"{failures.get('problems', '(not recorded)')}\n\n"
+                    + ("This is the last attempt before the owner is asked to look: if it can't be done properly, "
+                       "mark the task blocked in docs/NEXT.md with the reason and report status `blocked`."
+                       if failures.get("count", 0) >= GIVE_UP - 1 else
+                       "Continue on that PR's branch and fix exactly these problems first."))
     branch = f"claude/{today:%Y%m%d}-{slug(task or 'owner-instructions')}"
     existing = open_pr_for(cfg, branch.split("-", 1)[1]) if task else None
     if existing:
@@ -620,9 +654,12 @@ def finish(cfg: config_mod.Config, env: dict[str, str]) -> dict[str, str]:
     # session that ends without progress is an error, retried a few times before the owner is told.
     failed = (not progressed and not plan_idle and status not in ("nothing_to_do", "limit", "limit-weekly", "auth"))
 
+    parked_now: list[dict[str, Any]] = []  # copies of the entries parked by this session, for the notices
+
     def park(entry: dict[str, Any], span: dt.timedelta, reason: str) -> None:
         entry["parked_until"] = pacing.iso(now + span)
         entry["parked_reason"] = reason[:500]
+        parked_now.append({**entry, "long": span >= PARK_BLOCKED})
 
     # Answers to the open checkpoint: carried out by a merged plan, or handed back when planning did nothing.
     checkpoint_now = open_checkpoint(cfg) if planning else None
@@ -668,7 +705,8 @@ def finish(cfg: config_mod.Config, env: dict[str, str]) -> dict[str, str]:
             entry["problems"] = "\n".join(f"- {p.get('problem')} Fix: {p.get('fix')}"
                                           for p in review.get("problems", []))[:4000]
             if entry["count"] >= MAX_FAILURES and task:
-                park(entry, PARK_BLOCKED, f"failed review {entry['count']} times")
+                park(entry, PARK_BLOCKED if entry["count"] >= GIVE_UP else PARK_RETRY,
+                     f"the final review didn't approve it {entry['count']} times in a row")
         elif conflict and task:
             # Like a failed review: the next session continues the PR and merges main into it.
             entry = failures.setdefault(task, {"count": 0})
@@ -678,7 +716,8 @@ def finish(cfg: config_mod.Config, env: dict[str, str]) -> dict[str, str]:
                                  "`git fetch origin main && git merge origin/main`, resolve the conflicts, "
                                  "and keep both sides' entries in the plan files.")
             if entry["count"] >= MAX_FAILURES:
-                park(entry, PARK_BLOCKED, f"conflicted with main {entry['count']} times")
+                park(entry, PARK_BLOCKED if entry["count"] >= GIVE_UP else PARK_RETRY,
+                     f"it conflicted with main {entry['count']} times")
         elif merge_refused and task:
             entry = failures.setdefault(task, {"count": 0})
             entry["pr"] = pr
@@ -711,9 +750,13 @@ def finish(cfg: config_mod.Config, env: dict[str, str]) -> dict[str, str]:
     elif status and status != "ok":
         lines.append(f"Session stopped ({status}): {what}. {said}")
     st, _ = state.load(cfg)
+    for entry in parked_now:
+        lines.append(announce_park(cfg, task, entry))
+    if pr and not parked_now:
+        unlabel_parked(cfg, pr)  # worked on again, or merged
     if env.get("RUN_URL"):
         lines.append(f"[Workflow run]({env['RUN_URL']})")
-    dailylog.post(cfg, "Development session", lines)
+    dailylog.post(cfg, "Development session", lines, mention_owner=any(e["long"] for e in parked_now))
 
     # Development flows: after progress, after an empty queue (the next run plans) and after an
     # error (retried) the next session starts at once. It stops for the owner's pauses, a usage

@@ -173,7 +173,7 @@ func test_complexity_over_the_limit_is_refused_with_the_reason() -> void:
 	var recipe: Dictionary = {"form": &"nova", "element": &"fire", "modifiers": [&"split", &"homing", &"chain"], "trigger": &"on_hit", "held": {"form": &"bolt", "element": &"fire", "modifiers": [&"pierce"]}}
 	var spell: CompiledSpell = _compile(recipe)
 	check(not spell.valid, "13 of 12 is refused")
-	check_equal(spell.reason, "Too complex: 13 of 12.", "the reason says how much")
+	check_equal(spell.reason, "Too complex: 13 of 12. Remove one.", "the reason says how much")
 	var heavy: CompiledSpell = _compile({"form": &"heavy", "modifiers": [&"split", &"homing"], "trigger": &"timer", "held": {"form": &"heavy"}})
 	check(not heavy.valid and heavy.reason.begins_with("Too complex"), "a held spell counts toward the budget")
 
@@ -251,7 +251,7 @@ func test_modifier_count_at_and_over_the_limit() -> void:
 
 
 func test_bad_recipes_are_refused_with_a_reason() -> void:
-	check_equal(_compile({}).reason, "A spell needs a form.", "no form")
+	check_equal(_compile({}).reason, "Pick a form (F) first.", "no form")
 	check_equal(_compile({"form": &"nope"}).reason, "Unknown component 'nope'.", "unknown id")
 	check_equal(_compile({"form": &"fire"}).reason, "'fire' is an element, not a form.", "wrong kind in the form slot")
 	check(not _compile({"form": &"bolt", "element": &"pierce"}).valid, "a modifier is not an element")
@@ -266,7 +266,7 @@ func test_bad_recipes_are_refused_with_a_reason() -> void:
 
 
 func test_malformed_recipes_are_refused_not_crashed() -> void:
-	check(_compile({"form": null}).reason == "A spell needs a form.", "a null form is a missing form")
+	check(_compile({"form": null}).reason == "Pick a form (F) first.", "a null form is a missing form")
 	check(not _compile({"form": 5}).valid, "a number is no form id")
 	check(not _compile({"form": &"bolt", "modifiers": "pierce"}).valid, "modifiers as a String")
 	check(not _compile({"form": &"bolt", "modifiers": [3]}).valid, "a number in the modifiers")

@@ -191,7 +191,7 @@ func compile(recipe: Dictionary) -> CompiledSpell:
 	if not spell.valid:
 		return spell
 	if spell.complexity > SpellLimits.MAX_COMPLEXITY:
-		return _refused("Too complex: %d of %d." % [spell.complexity, SpellLimits.MAX_COMPLEXITY])
+		return _refused("Too complex: %d of %d. Remove one." % [spell.complexity, SpellLimits.MAX_COMPLEXITY])
 	_describe(spell)
 	return spell
 
@@ -833,7 +833,7 @@ func _compile(recipe: Dictionary, depth: int) -> CompiledSpell:
 	if not problem.is_empty():
 		return _refused(problem[0])
 	if form_id == &"":
-		return _refused("A spell needs a form.")
+		return _refused("Pick a form (F) first.")
 	if modifier_ids.size() > SpellLimits.MAX_MODIFIERS:
 		return _refused("A spell holds at most %d modifiers." % SpellLimits.MAX_MODIFIERS)
 	form = _pick(form_id, &"form", problem) as FormBase

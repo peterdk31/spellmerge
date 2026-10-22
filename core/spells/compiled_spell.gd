@@ -7,7 +7,7 @@ extends RefCounted
 
 ## False when the recipe broke a rule that clamping cannot fix.
 var valid: bool = true
-## Plain words for the builder when `valid` is false, for example "Too complex: 13 of 12."
+## Plain words for the builder when `valid` is false, for example "Too complex: 13 of 12. Remove one."
 var reason: String = ""
 ## What the player reads in the builder: the stats, anything clamped, and the held spell.
 var description: String = ""

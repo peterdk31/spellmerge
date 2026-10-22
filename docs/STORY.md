@@ -20,16 +20,17 @@ The canon and tone for every word in Spellmerge. Story text (`content/story/`), 
 3. **The four elements:** fire, frost, storm and void. Fire burns and is eager; frost slows and is patient; storm is quick and spreads; void is quiet and a little rude (it takes things away). Elements react with each other, and the world finds this normal.
 4. **The place.** The first setting is **the crypt**: the old cellar of an abandoned tower, deeper than the tower is tall. Its rooms are not the same from one visit to the next. Nobody knows who built it. A later biome may be added; it follows the same tone.
 5. **The foes.** Creatures of the crypt are called **imps** in general; the first is the **ember imp**. They are not evil, just territorial, and they were here first. Larger, named enemies are **guardians** of a room or a floor, and each guardian has a reason to be there, which a line of lore can give.
-6. **The stakes.** Something below the crypt is waking up, and spells there go wrong a little more every year. That is the reason to go down, and the early game never fully explains it. A run ends when all wizards have fallen; then the guild sends the next apprentices. The guild is quietly embarrassed by this.
+6. **The stakes.** Something below the crypt is waking up, and spells there go wrong a little more every year. That is the reason to go down, and the early game never fully explains it. How runs and progress work is set in PLAN, not here; if a run ends, the story explains it as the guild sending the next apprentices, which the guild is quietly embarrassed by.
 7. **Relics** are things left in the crypt that change how spells behave. Each has a short, odd history of who lost it and how.
 
 ## Writing rules
 
 - Names are plain nouns, two words at most ("Hexed Bolt", not "The Bolt of Eternal Hexing"). Spell parts keep the names of the registry: Bolt, Beam, Nova, Rune, Orbit; Fire, Frost, Storm, Void; Split, Pierce, Homing, Chain, Bigger, Faster; On Hit, On Expire, Timer.
 - Describe the effect truthfully first. A description must never promise something the component does not do.
-- Humour at the expense of the guild, the wizards or the magic. Not the player's, and never at real groups of people.
+- Humour is aimed at the in-world guild, its wizards and the magic. It never mocks the real player for playing badly or losing, and never targets real groups of people.
 - No swearing, no real-world politics or religion, no graphic violence; fights are about spells and imps.
 - Speech, if there is any, is in short lines of at most 60 characters.
+- The 90-character description limit and the 60-character speech limit are enforced by the story validator in M2 part 23, and the Story README is to cite them then. Until then they are guidance.
 
 ## Not fixed yet
 

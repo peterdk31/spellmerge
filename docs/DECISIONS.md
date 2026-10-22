@@ -902,3 +902,7 @@ The HUD screenshot cannot be taken in a session (no display, `docs/BACKLOG.md`),
 - **The arena is the real thing, not a mock:** `tests/content/spells/combo_arena.gd` wires the real registry, projectile manager, spell runtime and combat, and steps them in `project.godot`'s order. Imps are plain `Node2D`s with 400 health, so no combo kills one by accident.
 - **Two draft combos reworded to what the runtime does.** "Three homing bolts that find three different imps" is now "bend toward imps well off the aim" (each shot picks the nearest target, so they may share one; a control test shows a plain fan misses those imps), and "a wide ray that reaches an imp a plain ray misses" is now "chills the imp in its lane" (the widening is about a pixel, a tuning number not worth a test).
 - **The first 12 are the design's draft rows 1-12.** "Blast at the end" runs in open space; the wall case stays with `test_spells_cast.gd`. Part 21 adds the rest and makes sure each component is in two combos.
+
+## M2 part 15: Spells opens
+
+- **Spells is open for PRs from this part.** The README states that every new component needs at least one combo row (the combo test runs it without new test code), so the catalogue grows with the content. The ROADMAP row said "from part 11, Story from part 21", left over from before the design review; it now matches the design (15 and 23).

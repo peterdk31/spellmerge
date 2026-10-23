@@ -99,4 +99,4 @@ Notes:
 - The eyes carry the cuteness: at 1× they are two dark dots under the brim, so the face still reads as a face.
 - Gold (the placket and hem of M and N) is also the Spark colour of pickups and the gold UI text; here it is a thin line, not a large patch like L.
 - O's teal is the Ice ramp, used by frost spells and icons. It is a body colour here, never a player colour, but it could blur the line between a player and an ice effect.
-- Picking one still leaves the hat file and sheet questions in `docs/NEXT.md` ("Record the chosen art direction").
+- **N was chosen** (owner, #206). The hat stays a separate layer in the player's colour, and `n_dusk/blink.svg` is the blink layer (closed eyes) drawn over the body's eyes. See "The wizard" in `docs/STYLE.md`. The other samples stay here for reference.

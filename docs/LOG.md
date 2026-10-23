@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-23: The art direction is recorded (M2 part 27 follow-up, owner `/claude` on #206)
+
+The owner chose N ("lets go with N") and asked for an eye blink in idle and something that makes the wizard feel alive. `art/kit/golden.json` and `docs/STYLE.md` now list N's body, hat and a new blink layer (`art/samples/n_dusk/blink.svg`, closed eyes) as the wizard's golden examples; STYLE.md says the style is chosen and has a "The wizard" section (layers, blink every 2 to 5 s, 1 px bob timed in the scene). The kit checklist and READMEs match. Test: `test_the_blink_layer_covers_exactly_the_eyes`. `build.sh --quick --tests` passes. Not done: moving N into `content/wizard/` (BACKLOG), and the owner-only `docs/DESIGN.md` and `ci/smbot/styleguide.py` text (owner question and BACKLOG).
+
 ## 2026-10-23: Fifth art direction round (M2 part 27, owner `/claude` on #206)
 
 The owner answered round four with "4: keep the hat style, add a robe as the clothes, the face just two big eyes, no mouth; give me some examples". Added M (cream robe), N (dusk robe) and O (teal robe) in `art/samples/` (`m_cream/`, `n_dusk/`, `o_teal/`, each a `body.svg` under the existing hats), `tests/screenshots/shot_art_direction_5.gd` and a README section. `test_svg_art.gd` checks them, plus that the face has no cheeks or mouth. `build.sh --quick --tests` passes; the sheet was looked at. The pick is asked again (`art-direction-pick-3`); the record task stays blocked.

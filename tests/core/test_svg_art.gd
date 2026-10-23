@@ -219,6 +219,31 @@ func test_the_round_five_faces_are_just_two_big_eyes() -> void:
 		check(text.contains('<rect x="16" y="17" width="2" height="2" fill="#14121f"/>'), "%s/body.svg lost its right eye" % body)
 
 
+## The chosen style's blink layer (N) covers exactly the two eyes (x 12-13 and 16-17, rows 16 to 18)
+## and uses only Skin and the outline colour, so drawing it over the body closes the eyes and
+## touches nothing else; it carries no player colour.
+func test_the_blink_layer_covers_exactly_the_eyes() -> void:
+	var text: String = FileAccess.get_file_as_string("res://art/samples/n_dusk/blink.svg")
+	var rect_pattern: RegEx = RegEx.create_from_string('<rect x="(\\d+)" y="(\\d+)" width="(\\d+)" height="(\\d+)" fill="(#[0-9a-f]+)"')
+	var covered: Dictionary = {}
+	for rect in rect_pattern.search_all(text):
+		var fill: String = rect.get_string(5)
+		check(fill == "#f5cfa8" or fill == OUTLINE, "blink.svg uses %s, only Skin light and the outline are allowed" % fill)
+		for dx in rect.get_string(3).to_int():
+			for dy in rect.get_string(4).to_int():
+				covered[Vector2i(rect.get_string(1).to_int() + dx, rect.get_string(2).to_int() + dy)] = true
+	var expected: Dictionary = {}
+	for eye_x: int in [12, 16]:
+		for dx in 2:
+			for dy in 3:
+				expected[Vector2i(eye_x + dx, 16 + dy)] = true
+	check_equal(covered.keys().size(), expected.size(), "blink.svg covers 12 pixels, the two eyes")
+	for cell: Vector2i in expected:
+		check(covered.has(cell), "blink.svg leaves the eye pixel %s open" % cell)
+	for colour: String in PLAYER_COLOURS:
+		check(not text.contains(colour), "blink.svg uses the player colour %s" % colour)
+
+
 func test_every_svg_is_in_the_manifest() -> void:
 	var manifest: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://art/manifest.json"))
 	check(manifest is Dictionary, "art/manifest.json is a JSON object")

@@ -10,7 +10,16 @@
   },
   "errors_in_a_row": 0,
   "idle": null,
-  "intake_tasks": {},
+  "intake_tasks": {
+    "208": {
+      "author": "Brianmanden",
+      "kind": "idea",
+      "priority": "p3",
+      "source": "https://github.com/peterdk31/spellmerge/discussions/121",
+      "task": "A player idea: after a kill milestone (for example 100 kills) a wizard unlocks a small companion, such as a little dragon, that follows them, pulls enemy shots toward itself, has its own health, and disappears at 0 health. Nothing like it exists yet (no summons, no taunt or aggro targeting for enemies). It needs a per-player pet that takes player index 0-3, an enemy targeting rule that can prefer it, a health bar, and a say in how a kill-count unlock fits with runs and progression (M3 run structure and M5 meta-progression). It must not make co-op worse: with four players there could be four pets, so shot and particle budgets must hold. It must also fit DESIGN.md's focus on building spells; one option is to make the pet a spell form or relic rather than a separate system. Done when the weekly planning has weighed it against the M3 and M5 designs and either scheduled it or declined it with a reason. Not for M2.",
+      "title": "Idea: summonable pet that draws enemy fire"
+    }
+  },
   "last_own_merge": "2026-10-23T01:34:11Z",
   "last_plan": "2026-10-23T01:05:32Z",
   "last_weekly": "2026-10-22T13:49:44Z",

@@ -4,7 +4,7 @@
 
 **Status (2026-10-21):** started by the owner ("Start milestone 2"), which is the **go** verdict at C1 (#97) after two iterate rounds. M1's done-when items that are still open carry into M2 (see "Carried over from M1"), the way M0's dry runs carried into M1.
 
-**Status (2026-10-23):** done, waiting for the owner's verdict at C2. All parts are built; the web stress physics step is 7.6 ms with the cap of 500 (docs/DECISIONS.md, 2026-10-23). The web run still warns about frame time in the CI browser, which has no GPU.
+**Status (2026-10-23):** done; the C2 checkpoint issue is still to be opened, then the owner's verdict. All parts are built; the web stress physics step is 7.6 ms with the cap of 500 (docs/DECISIONS.md, 2026-10-23). The web run still warns about frame time in the CI browser, which has no GPU.
 
 **Done when:**
 

@@ -38,9 +38,11 @@ const _KEYS: Dictionary = {
 }
 
 ## Name fragments (lower case) of a gamepad's name, per family.
-const _XBOX_NAMES: Array[String] = ["xbox", "x-box", "xinput", "microsoft"]
-const _PLAYSTATION_NAMES: Array[String] = ["playstation", "ps3", "ps4", "ps5", "dualshock", "dualsense", "sony"]
-const _SWITCH_NAMES: Array[String] = ["nintendo", "switch", "joy-con", "joycon", "pro controller"]
+## Browsers name a pad like "Wireless Controller (STANDARD GAMEPAD Vendor: 054c Product: 09cc)",
+## so the vendor ids (Microsoft 045e, Sony 054c, Nintendo 057e) are matched too.
+const _XBOX_NAMES: Array[String] = ["xbox", "x-box", "xinput", "microsoft", "vendor: 045e"]
+const _PLAYSTATION_NAMES: Array[String] = ["playstation", "ps3", "ps4", "ps5", "dualshock", "dualsense", "sony", "vendor: 054c"]
+const _SWITCH_NAMES: Array[String] = ["nintendo", "switch", "joy-con", "joycon", "pro controller", "vendor: 057e"]
 
 
 ## The family of a gamepad from the name the system gives it (`Input.get_joy_name`).

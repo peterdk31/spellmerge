@@ -53,7 +53,7 @@ func _initialize() -> void:
 			x += glyph.custom_minimum_size.x + 8.0
 		var hint: HintLineScript = HintLineScript.new()
 		hint.bind(manager)
-		hint.position = Vector2(540.0,8.0 + ROW_HEIGHT * row)
+		hint.position = Vector2(540.0, 8.0 + ROW_HEIGHT * row)
 		root.add_child(hint)
 		hint.show_hint(player, &"cast", "Use", &"dodge", "back")
 	await _settle()

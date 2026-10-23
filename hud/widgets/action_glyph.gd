@@ -68,6 +68,12 @@ func current_glyph() -> Dictionary:
 	return _glyph
 
 
+func _notification(what: int) -> void:
+	# The HUD theme's font is known only inside the tree, so measure again there.
+	if what == NOTIFICATION_ENTER_TREE or what == NOTIFICATION_THEME_CHANGED:
+		_refresh()
+
+
 func _on_kind_changed(player: int) -> void:
 	if player == _player:
 		_refresh()

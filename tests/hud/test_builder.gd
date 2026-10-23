@@ -942,13 +942,26 @@ func test_the_focused_control_has_its_own_look_and_the_hint_says_what_cast_does(
 func test_every_hint_fits_the_info_panel() -> void:
 	_start(1)
 	_open(0)
-	var line: HintLineScript = own(HintLineScript.new()) as HintLineScript
-	line.bind(_input)
-	root.add_child(line)
 	var room: float = BuilderScript.INFO_WIDTH - 12.0
-	for hint in [BuilderScript.HINT_SLOT, BuilderScript.HINT_ROW, BuilderScript.HINT_TAB, BuilderScript.HINT_CLOSE, BuilderScript.HINT_UP, BuilderScript.HINT_HELD, BuilderScript.HINT_DROP]:
-		var back: String = BuilderScript.HINT_BACK if hint == BuilderScript.HINT_ROW else ""
-		line.show_hint(0, &"cast", hint, &"dodge", back)
-		var wide: float = line.get_combined_minimum_size().x
-		check(wide <= room, "'%s' is %.0f px wide, the panel has %.0f" % [hint, wide, room])
-		check(wide <= BuilderScript.LEFT_WIDTH, "'%s' is %.0f px wide, the quick view's column has %.0f" % [hint, wide, BuilderScript.LEFT_WIDTH])
+	# The widest glyphs are the key caps and the longest pad labels, so measure every kind.
+	for held in ["keyboard", "mouse", "Xbox One Controller", "PS5 Controller", "Nintendo Switch Pro Controller", "Generic Pad"]:
+		var input: InputManagerScript = own(InputManagerScript.new()) as InputManagerScript
+		input.joy_name_provider = func(_device: int) -> String: return held
+		if held == "keyboard" or held == "mouse":
+			input.join(InputManagerScript.KEYBOARD)
+		else:
+			input.join(0)
+		if held == "mouse":
+			var click := InputEventMouseButton.new()
+			click.button_index = MOUSE_BUTTON_LEFT
+			click.pressed = true
+			input.handle_event(click)
+		var line: HintLineScript = own(HintLineScript.new()) as HintLineScript
+		line.bind(input)
+		root.add_child(line)
+		for hint in [BuilderScript.HINT_SLOT, BuilderScript.HINT_ROW, BuilderScript.HINT_TAB, BuilderScript.HINT_CLOSE, BuilderScript.HINT_UP, BuilderScript.HINT_HELD, BuilderScript.HINT_DROP]:
+			var back: String = BuilderScript.HINT_BACK if hint == BuilderScript.HINT_ROW else ""
+			line.show_hint(0, &"cast", hint, &"dodge", back)
+			var wide: float = line.get_combined_minimum_size().x
+			check(wide <= room, "'%s' with %s is %.0f px wide, the panel has %.0f" % [hint, held, wide, room])
+			check(wide <= BuilderScript.LEFT_WIDTH, "'%s' with %s is %.0f px wide, the quick view's column has %.0f" % [hint, held, wide, BuilderScript.LEFT_WIDTH])

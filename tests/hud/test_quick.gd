@@ -279,7 +279,7 @@ func test_the_quick_view_shows_a_hint_for_the_focused_control() -> void:
 	check(label.is_visible_in_tree(), "the quick view shows a hint line")
 	check_equal(label.text(), BuilderScript.HINT_DROP, "on Bag it says what Cast does")
 	_focus_on(0, builder.close_button())
-	check_equal(label.text(), BuilderScript.HINT_CLOSE,"on Close it follows the focus")
+	check_equal(label.text(), BuilderScript.HINT_CLOSE, "on Close it follows the focus")
 	_wave_end()
 	check(not label.is_visible_in_tree(), "the hint line goes with the quick view")
 	_wave_start(2)

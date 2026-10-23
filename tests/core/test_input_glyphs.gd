@@ -42,6 +42,9 @@ func test_a_pad_is_told_apart_by_its_name() -> void:
 	check_equal(GlyphsScript.kind_of_pad("PS5 Controller"), GlyphsScript.Kind.PLAYSTATION, "ps5")
 	check_equal(GlyphsScript.kind_of_pad("Sony DualSense"), GlyphsScript.Kind.PLAYSTATION, "dualsense")
 	check_equal(GlyphsScript.kind_of_pad("Nintendo Switch Pro Controller"), GlyphsScript.Kind.SWITCH, "switch")
+	check_equal(GlyphsScript.kind_of_pad("Wireless Controller (STANDARD GAMEPAD Vendor: 054c Product: 09cc)"), GlyphsScript.Kind.PLAYSTATION, "web playstation")
+	check_equal(GlyphsScript.kind_of_pad("Pro Controller (STANDARD GAMEPAD Vendor: 057e Product: 2009)"), GlyphsScript.Kind.SWITCH, "web switch")
+	check_equal(GlyphsScript.kind_of_pad("Controller (STANDARD GAMEPAD Vendor: 045e Product: 028e)"), GlyphsScript.Kind.XBOX, "web xbox")
 	check_equal(GlyphsScript.kind_of_pad("Some Generic Pad"), GlyphsScript.Kind.GAMEPAD, "unknown")
 	check_equal(GlyphsScript.kind_of_pad(""), GlyphsScript.Kind.GAMEPAD, "no name")
 

@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-23: Fifth art direction round (M2 part 27, owner `/claude` on #206)
+
+The owner answered round four with "4: keep the hat style, add a robe as the clothes, the face just two big eyes, no mouth; give me some examples". Added M (cream robe), N (dusk robe) and O (teal robe) in `art/samples/` (`m_cream/`, `n_dusk/`, `o_teal/`, each a `body.svg` under the existing hats), `tests/screenshots/shot_art_direction_5.gd` and a README section. `test_svg_art.gd` checks them, plus that the face has no cheeks or mouth. `build.sh --quick --tests` passes; the sheet was looked at. The pick is asked again (`art-direction-pick-3`); the record task stays blocked.
+
 ## 2026-10-23: Fourth art direction round (M2 part 27, owner `/claude` on #206)
 
 The owner liked F's hat, found the body too wide and wanted a cuter wizard. Added J (tiny cream), K (bean brown) and L (gold, bigger head) in `art/samples/` (`j_tiny/`, `k_bean/`, `l_gold/`, each a `body.svg` under the existing hats), `tests/screenshots/shot_art_direction_4.gd` and a README section. `test_svg_art.gd` checks the new bodies. `build.sh --quick --tests` passes; the sheet was looked at. The pick is asked again (`art-direction-pick-3`); the record task stays blocked.

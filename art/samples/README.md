@@ -81,3 +81,22 @@ Notes:
 - L's gold robe is the Spark gold (`#f2c230`), the same as the Spark pickups and the gold UI text. In the game the robe is a large 8 px patch with a Bone collar and a Wood belt, so it would not be mistaken for a 2–4 px pickup, but a figure that is mostly the pickup colour could make pickups harder to spot near it. This is a judgement from the colours, not from playing it; it is a point against L, not a blocker.
 - Where to see the sheet: `art_direction_sheet_4.png` is in `build/screenshots/` after `ci/build/build.sh --quick --screenshots`, and the PR shows it as a screenshot, so nobody has to run the build to judge the look.
 - Picking one of these still leaves the hat file and sheet questions in `docs/NEXT.md` ("Record the chosen art direction").
+
+## Round five: M, N and O (after the owner's second answer on #206)
+
+The owner kept F's hat and asked for a robe as the clothes and a face of just two big eyes, no mouth, with more examples. Sheet: `tests/screenshots/shot_art_direction_5.gd` (`art_direction_sheet_5.png`, in `build/screenshots/` after `ci/build/build.sh --quick --screenshots`, and shown in the question): J again for reference, then M, N and O, each with the same four views as before. The hat is F's hat in each player's colour; the body has no player colour. As before, "Reads at 1×" and "Mood" are the author's opinion, not a verdict.
+
+What changed from J, K and L: the face is two big tall eyes (2×3 px, black, with a white highlight) on plain skin, with no mouth and no cheeks. The clothes read as a robe: a front placket down the middle, a belt with a buckle, sleeves down to the hands, and a hem band. The body is the same narrow size as J (10 px at the chest, 12 px at the hem).
+
+| | M: Cream robe (`m_cream/`) | N: Dusk robe (`n_dusk/`) | O: Teal robe (`o_teal/`) |
+| --- | --- | --- | --- |
+| Robe | Bone, Spark placket and hem, Wood belt | Stone violet-grey, Spark placket and hem, dark belt | Ice teal, Bone placket and hem, Wood belt |
+| Reads at 1× | Brightest body: pops most against the floor; the gold placket is a clear mark | Darkest body, close to the floor's value by eye (not measured); the gold trim and the hat carry it | Bright and cool, but the same teal as the Ice element and the frost tint |
+| Mood | Apprentice, classic | Night wizard, mysterious | Fresh, a water mage |
+
+Notes:
+
+- The eyes carry the cuteness: at 1× they are two dark dots under the brim, so the face still reads as a face.
+- Gold (the placket and hem of M and N) is also the Spark colour of pickups and the gold UI text; here it is a thin line, not a large patch like L.
+- O's teal is the Ice ramp, used by frost spells and icons. It is a body colour here, never a player colour, but it could blur the line between a player and an ice effect.
+- Picking one still leaves the hat file and sheet questions in `docs/NEXT.md` ("Record the chosen art direction").

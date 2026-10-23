@@ -2,6 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-23: A fifth art direction round (M, N, O), the pick asked again
+
+- **Why:** the owner answered round four (#206, key `art-direction-pick-3`) with "4: keep the hat style, but maybe add a robe as the clothes and the face just needs two big eyes, no mouth. Give me some examples". Option 4 is "another round", not a pick, so the record task cannot be done yet.
+- **Done:** F's hat stays; three new bodies under the four hats, all with a face of two big tall eyes (2x3 px, with a highlight) and no mouth, no cheeks, and a clearer robe than J to L: a front placket, a belt with a buckle, long sleeves and a hem band. M cream, N dusk (Stone violet-grey), O teal (Ice). Standard palette only. Sheet `art_direction_sheet_5.png`; comparison in `art/samples/README.md`.
+- **Same key:** the pick is asked again as `art-direction-pick-3`, and the task stays under "Blocked".
+- **Hand-written SVGs again:** written as rects by hand from J's body; `test_svg_art` checks them.
+
 ## 2026-10-23: A fourth art direction round (J, K, L), the pick asked again
 
 - **Why:** the owner answered #206 (key `art-direction-pick-3`) with "the body is too wide, I like the hat, the wizard needs to be more cute, give me some more examples". That is not a pick, so the record task cannot be done and nothing in `golden.json` or `STYLE.md` changes.

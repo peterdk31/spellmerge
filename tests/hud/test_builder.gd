@@ -17,6 +17,7 @@ const PlayerScript := preload("res://gameplay/player/player.gd")
 const HudScript := preload("res://hud/panels/panels.gd")
 const BuilderScript := preload("res://hud/builder/builder.gd")
 const PreviewScript := preload("res://hud/builder/spell_preview.gd")
+const HintLineScript := preload("res://hud/widgets/hint_line.gd")
 ## Loaded when needed, not preloaded: this scene is also the "Hud" autoload.
 const HUD_SCENE_PATH: String = "res://hud/panels/panels.tscn"
 
@@ -934,18 +935,20 @@ func test_the_focused_control_has_its_own_look_and_the_hint_says_what_cast_does(
 			marked += 1
 	check_equal(marked, 1, "exactly one control has it")
 	_press(0, builder.slot_button(BuilderScript.SLOT_ELEMENT))
-	check_equal(builder.hint_text(), BuilderScript.HINT_ROW, "on a bag row, Cast uses it and Dodge goes back")
+	check_equal(builder.hint_text(), "%s, %s" % [BuilderScript.HINT_ROW, BuilderScript.HINT_BACK], "on a bag row, Cast uses it and Dodge goes back")
 	check_equal(builder.slot_button(BuilderScript.SLOT_FORM).theme_type_variation, BuilderScript.BUTTON_VARIATION, "the control left behind is plain again")
 
 
 func test_every_hint_fits_the_info_panel() -> void:
 	_start(1)
 	_open(0)
-	var label: Label = _builder(0).info_panel().find_child("Hint", true, false) as Label
-	var font: Font = label.get_theme_font(&"font")
-	var size: int = label.get_theme_font_size(&"font_size")
+	var line: HintLineScript = own(HintLineScript.new()) as HintLineScript
+	line.bind(_input)
+	root.add_child(line)
 	var room: float = BuilderScript.INFO_WIDTH - 12.0
 	for hint in [BuilderScript.HINT_SLOT, BuilderScript.HINT_ROW, BuilderScript.HINT_TAB, BuilderScript.HINT_CLOSE, BuilderScript.HINT_UP, BuilderScript.HINT_HELD, BuilderScript.HINT_DROP]:
-		var wide: float = font.get_string_size(hint, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+		var back: String = BuilderScript.HINT_BACK if hint == BuilderScript.HINT_ROW else ""
+		line.show_hint(0, &"cast", hint, &"dodge", back)
+		var wide: float = line.get_combined_minimum_size().x
 		check(wide <= room, "'%s' is %.0f px wide, the panel has %.0f" % [hint, wide, room])
 		check(wide <= BuilderScript.LEFT_WIDTH, "'%s' is %.0f px wide, the quick view's column has %.0f" % [hint, wide, BuilderScript.LEFT_WIDTH])

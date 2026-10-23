@@ -172,7 +172,7 @@ func _ready() -> void:
 		overlay.bind(events, ui_focus, spells)
 		overlay.build_pressed.connect(_on_build_pressed)
 	for builder in _builders:
-		builder.bind(events, ui_focus, spells)
+		builder.bind(events, ui_focus, spells, input)
 	if events != null:
 		events.player_joined.connect(_on_player_joined)
 		events.player_left.connect(_on_player_left)

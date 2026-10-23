@@ -9,7 +9,6 @@
     "number": 202
   },
   "errors_in_a_row": 0,
-  "idle": null,
   "intake_tasks": {
     "208": {
       "author": "Brianmanden",
@@ -20,7 +19,7 @@
       "title": "Idea: summonable pet that draws enemy fire"
     }
   },
-  "last_own_merge": "2026-10-23T09:54:58Z",
+  "last_own_merge": "2026-10-23T10:18:34Z",
   "last_plan": "2026-10-23T07:30:19Z",
   "last_weekly": "2026-10-22T13:49:44Z",
   "panel_applied": {
@@ -32,15 +31,7 @@
   },
   "panel_problems": [],
   "paused_by_command": false,
-  "pending_instructions": [
-    {
-      "at": "2026-10-23T09:57:49Z",
-      "kind": "claude",
-      "number": 206,
-      "text": "4: keep the hat style, but maybe add a robe as the clothes and the face just need two big eyes, no mouth. Give me some examples",
-      "url": "https://github.com/peterdk31/spellmerge/issues/206#issuecomment-6362314527"
-    }
-  ],
+  "pending_instructions": [],
   "processed_comments": [
     6241847784,
     6251160604,

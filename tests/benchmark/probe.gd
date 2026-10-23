@@ -160,5 +160,5 @@ func report() -> void:
 	print("BENCH: peak nodes %d, peak projectiles %d (cap %d, dropped %d), peak static memory %.1f MiB (budgets %d web, %d desktop)" % [_peak_nodes, _peak_projectiles, cap, dropped, _peak_memory / 1048576.0, MEMORY_BUDGET_WEB_MIB, MEMORY_BUDGET_DESKTOP_MIB])
 	if _parts_frames > 0:
 		var n: float = float(_parts_frames)
-		print("BENCH: frame parts: physics steps per frame avg %.1f max %d; physics process avg %.2f ms max %.2f ms; process avg %.2f ms max %.2f ms; renderer CPU avg %.2f ms max %.2f ms; peak draw calls %d" % [steps_per_frame_average(), _steps_max, _physics_sum_ms / n, _physics_max_ms, _process_sum_ms / n, _process_max_ms, _render_sum_ms / n, _render_max_ms, _peak_draw_calls])
+		print("BENCH: frame parts: physics steps per frame avg %.1f max %d; physics step (last of the frame) avg %.2f ms max %.2f ms; process (previous frame) avg %.2f ms max %.2f ms; renderer CPU avg %.2f ms max %.2f ms; peak draw calls %d" % [steps_per_frame_average(), _steps_max, _physics_sum_ms / n, _physics_max_ms, _process_sum_ms / n, _process_max_ms, _render_sum_ms / n, _render_max_ms, _peak_draw_calls])
 	print("BENCH: peak live hit particles %d (limit %d, Feel.PARTICLE_LIMIT)" % [_peak_particles, FeelScript.PARTICLE_LIMIT])

@@ -8,8 +8,9 @@ extends Node
 ## both with four players and full effects (every hit sends its particles, reactions
 ## and numbers). Between them run two diagnostic variants of the web scenario, to explain the
 ## web frame time (docs/DECISIONS.md, 2026-10-23): one with the render loop off (nothing is
-## drawn, so the frame is game logic only) and one with the hit particles off. The scenarios
-## run one after the other.
+## drawn, so the frame is game logic only) and one with the hit particles off. The four
+## scenarios (web, web with the render loop off, web with hit particles off, desktop) run one
+## after the other.
 ##
 ## How the numbers are held. The bots cast their built spells through the real input
 ## path (`cast`, and `swap` every SWAP_EVERY seconds so both spells are used). Their
@@ -65,6 +66,8 @@ const TOP_UP_PER_STEP: int = 120
 const ENEMY_AREA: Rect2 = Rect2(48.0, 48.0, 544.0, 264.0)
 ## Seconds between the bots' `swap` presses.
 const SWAP_EVERY: float = 4.0
+## The timing pass over the crowd (`_time_parts`) runs on every PARTS_EVERY-th drawn frame.
+const PARTS_EVERY: int = 30
 ## Filler shots: speed range (px/s), life (s), radius and pierce.
 const FILLER_SPEED_MIN: float = 80.0
 const FILLER_SPEED_MAX: float = 260.0
@@ -142,6 +145,7 @@ var _feel_step_usec: int = 0
 var _enemy_step_max_usec: int = 0
 var _lookup_max_usec: int = 0
 var _parts_frames: int = 0
+var _process_frames: int = 0
 
 
 func _ready() -> void:
@@ -262,7 +266,8 @@ func _process(delta: float) -> void:
 			_input.call("send_virtual", bot.player, &"swap", 1.0)
 			_input.call("send_virtual", bot.player, &"swap", 0.0)
 	_top_up_enemies()
-	if _measuring:
+	_process_frames += 1
+	if _measuring and _process_frames % PARTS_EVERY == 0:
 		_time_parts()
 	if not _measuring and _elapsed >= warm_up:
 		_measuring = true
@@ -274,8 +279,11 @@ func _process(delta: float) -> void:
 
 
 ## Time one pass over the crowd of each part the web frame might be spent on, apart from the
-## engine's own work, which probe.gd reads from the monitors. A step with delta 0 changes
-## nothing but the reading of the clock. Per pass, not per physics step: the engine runs
+## engine's own work, which probe.gd reads from the monitors. It is an extra pass on top of
+## the real steps (about 1.5 ms or more in WASM), so it adds to the frame it runs in; it runs
+## on only every PARTS_EVERY-th frame to keep that out of the averages (a maximum or p95 can
+## still contain it). A step with delta 0 is nearly a no-op, but not exactly: an enemy may
+## retarget or start a windup, and the knockback and Feel's step move their own state. Per pass, not per physics step: the engine runs
 ## several steps in a late frame.
 func _time_parts() -> void:
 	var start: int = Time.get_ticks_usec()

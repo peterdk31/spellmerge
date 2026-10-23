@@ -27,7 +27,7 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 ## Planning 2026-10-23: queue nearly empty, M2 still not done
 
 - **Why:** only stabilisation was queued. No "Daily run" post with "Stress and timing results" exists yet (#202 is the newest daily log), so the WASM task stays blocked. The art recording task still waits on `art-direction-pick-3`; no issue for that key is open (#190 and #192 are closed), so it is asked again. No issues were in the queue or backlog.
-- **Now:** a reactions walkthrough is added as the polish re-examination (reactions are what make combos surprising, and they only have unit tests). Stabilisation follows it. M2 is not done (done-when items 3, 5 and 6 are open), so no checkpoint.
+- **Now:** a reactions walkthrough is added as the polish re-examination (reactions are what make combos surprising). `shot_reactions.gd` already shows four of the six by hand-sent events; the task extends it to all six by real hits and checks that they can be told apart at 1x, with at most two fix passes. Stabilisation follows it. M2 is not done (done-when items 3, 5 and 6 are open), so no checkpoint.
 
 ## Planning 2026-10-22: queue empty, M2 not done
 

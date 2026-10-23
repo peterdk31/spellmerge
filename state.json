@@ -9,7 +9,6 @@
     "number": 202
   },
   "errors_in_a_row": 0,
-  "idle": null,
   "intake_tasks": {
     "208": {
       "author": "Brianmanden",
@@ -88,6 +87,11 @@
       "parked_until": "2026-10-24T11:16:25Z",
       "pr": "219",
       "problems": "- The body says \"Refs #206. This PR does not close it, because the blink and the bob are not in the game yet.\" The last line is `Closes #206`. Merging would auto-close the issue and tell the owner it is done, while the blink and bob are only queued as NEXT part 29. Fix: Delete the trailing `Closes #206` line so the PR only refs the issue. If the owner's pick on #206 should be closed out on merge, say so in the body instead."
+    },
+    "**Stabilisation and C2 (M2 part 28).** (The evidence task is done; its section \"C2 evidence\" is in `docs/LOG.md`. The web stress check in Blocked must be done before M2 closes: the web cap went to 500 on 2026-10-23 and the next daily run has to show the step under budget.) Only bug fixing, polish and performance until no known crash or blocker remains; then the planning session ends M2 with the C2 checkpoint issue (build link, bot data such as fuzz and stress numbers and which recipes bots build, Claude's honest assessment and the C2 question), and development waits for the owner's /go, /iterate or /pivot. **Before closing M2, check the Blocked WASM task:** if a \"Daily run\" post newer than 11:23 UTC on 2026-10-23 with \"Stress and timing results\" exists, move that task back to the Queue and finish it first. **If that task is still waiting** (no such post with the `BENCH: frame parts` lines), there is nothing to do yet: answer `nothing_to_do`, do not close M2 and do not write the C2 checkpoint.": {
+      "count": 0,
+      "parked_reason": "The Blocked web stress task is still waiting, so I did nothing. It needs a \"Daily run\" post newer than 11:23 UTC on 2026-10-23 with the `BENCH: frame parts` lines. The newest Daily run issue is #202, created 2026-10-22 22:14 UTC, and I found no newer post. #4 has a 12:04 UTC comment containing the string. It is a `/claude` comment saying the 11:23 post in #202 already had the web lines, not a Daily run post. It is also not listed under this session's verified owner instructions. The web cap was ",
+      "parked_until": "2026-10-24T12:21:04Z"
     },
     "**Stabilisation and C2 (M2 part 28).** (The evidence task is done; its section \"C2 evidence\" is in `docs/LOG.md`. The web stress task in Blocked must be done before M2 closes: no bug is known, and the daily run found nothing to fix on 2026-10-23.) Only bug fixing, polish and performance until no known crash or blocker remains; then the planning session ends M2 with the C2 checkpoint issue (build link, bot data such as fuzz and stress numbers and which recipes bots build, Claude's honest assessment and the C2 question), and development waits for the owner's /go, /iterate or /pivot. **Before closing M2, check the Blocked WASM task:** if a \"Daily run\" post with \"Stress and timing results\" exists, move that task back to the Queue and finish it first. **If that task is still waiting** (no post newer than #202 with the `BENCH: frame parts` lines), there is nothing to do yet: answer `nothing_to_do`, do not close M2 and do not write the C2 checkpoint.": {
       "count": 0,

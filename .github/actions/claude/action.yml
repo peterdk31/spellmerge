@@ -26,6 +26,12 @@ inputs:
   github-token:
     description: A read-only token; Claude never holds a write token
     required: true
+  bot-id:
+    description: vars.BOT_ID, the bot app's user ID (commits are attributed to it)
+    required: true
+  bot-login:
+    description: vars.BOT_LOGIN, e.g. spellmerge-bot[bot]
+    required: true
 outputs:
   structured_output:
     value: ${{ steps.claude.outputs.structured_output }}
@@ -50,8 +56,8 @@ runs:
       with:
         claude_code_oauth_token: ${{ inputs.claude-token }}
         github_token: ${{ inputs.github-token }}
-        bot_id: "343592621"
-        bot_name: "spellmerge-bot[bot]"
+        bot_id: ${{ inputs.bot-id }}
+        bot_name: ${{ inputs.bot-login }}
         # Chained sessions, the run after a merge and catch-up runs are started by
         # github-actions[bot] (workflow_dispatch from finish, develop.yml's kick or smbot.catchup).
         allowed_bots: "github-actions[bot]"

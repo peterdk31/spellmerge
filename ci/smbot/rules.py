@@ -392,8 +392,12 @@ def _line_of(text: str, index: int) -> int:
 # The one place the game may open a web page (docs/DECISIONS.md, "Opening web links, narrowly"):
 # a bot-maintained file that opens only entries of its own constant table of known addresses.
 LINKS_FILE = "core/links/links.gd"
-LINK_PREFIXES = ("https://github.com/peterdk31/spellmerge", "https://peterdk31.github.io/spellmerge",
-                 "https://peterdk31.itch.io/spellmerge")
+def link_prefixes(cfg: config_mod.Config) -> tuple[str, ...]:
+    """The project's own addresses: the repository, its Pages site and its itch.io page."""
+    return tuple(p for p in (f"https://github.com/{cfg.repo}", cfg.pages, cfg.game.itch) if p)
+
+
+LINK_PREFIXES = link_prefixes(config_mod.load())
 _SHELL_OPEN = re.compile(r"\bOS\s*\.\s*shell_open\b")
 _SHELL_OPEN_FROM_TABLE = re.compile(r"\bOS\s*\.\s*shell_open\s*\(\s*URLS\s*\[\s*\w+\s*\]\s*\)")
 _URL_LITERAL = re.compile(r"[\"']([a-zA-Z][\w+.-]*://[^\"']*)[\"']")

@@ -77,13 +77,15 @@ shred -u ~/Downloads/spellmerge-bot.*.private-key.pem
 
 You don't need a backup: if the key is ever needed again, generate a new one (see [Rotating the key](#rotating-the-key)).
 
-## 5. Record the bot's login
+## 5. Record the bot's identity
 
-The rules script uses the bot's login to recognise the bot's own PRs, which are the only PRs allowed to change bot-maintained paths. If you used a different app name, replace `spellmerge-bot` with your app's slug, which is the last part of the app's public URL, `https://github.com/apps/<slug>`.
+The workflows sign in as the app with its **Client ID**, commit as its bot user, and the rules script uses the bot's login to recognise the bot's own PRs, which are the only PRs allowed to change bot-maintained paths. All three live in `.bot` in `ci/config.json`; `./setup.sh` copies them into the repository variables `BOT_CLIENT_ID`, `BOT_ID` and `BOT_LOGIN`.
 
-```sh
-gh variable set BOT_LOGIN --repo peterdk31/spellmerge --body 'spellmerge-bot[bot]'
-```
+1. The **Client ID** is on the app's settings page, next to the App ID (it starts with `Iv`).
+2. The login is your app's slug, the last part of its public URL `https://github.com/apps/<slug>`, followed by `[bot]`, e.g. `spellmerge-bot[bot]`.
+3. The bot user's ID: `gh api 'users/<slug>[bot]' --jq .id`.
+
+Put them in `ci/config.json` (`"bot": {"login": ..., "id": ..., "client_id": ...}`), commit, and run `./setup.sh` again.
 
 ## 6. The other secrets in the same environment
 
@@ -104,7 +106,7 @@ gh secret set BUTLER_API_KEY --env automation --repo peterdk31/spellmerge
 ./setup.sh --check
 ```
 
-All four secrets and `BOT_LOGIN` should show a green tick. Then work through `docs/SECURITY-CHECKLIST.md`.
+All four secrets and the three `BOT_` variables should show a green tick. Then work through `docs/SECURITY-CHECKLIST.md`.
 
 ## How the workflows use the app
 

@@ -272,7 +272,8 @@ PR_FOOTER = {
     "backlog": "It stays open on the backlog: the weekly planning picks it up when it fits the current milestone.",
 }
 NEEDS_INFO_MARKER = "<!-- smbot:needs-info -->"
-SIGNATURE = "<sub>Claude, Spellmerge's AI maintainer, reads every new issue, discussion and pull request once a day.</sub>"
+SIGNATURE = (f"<sub>Claude, {config_mod.load().game.name}'s AI maintainer, reads every new issue, discussion and pull "
+             "request once a day.</sub>")
 
 
 def normalise(decision: dict[str, Any], known: dict[str, dict[str, Any]], open_numbers: set[int],

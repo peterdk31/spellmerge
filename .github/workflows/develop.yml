@@ -44,11 +44,11 @@ env:
 jobs:
   kick:
     name: start develop after a merge or an owner command, unless it's already running
-    # 13425287 is the owner's user ID (ci/config.json). smbot.commands checks the comment
+    # OWNER_ID is the owner's user ID (setup.sh sets it). smbot.commands checks the comment
     # again, edits included; this only decides whether to start a run.
     if: >-
       vars.AUTOMATION_ENABLED == 'true' && (github.event_name == 'push' ||
-      (github.event_name == 'issue_comment' && github.event.comment.user.id == 13425287 &&
+      (github.event_name == 'issue_comment' && github.event.comment.user.id == fromJSON(vars.OWNER_ID) &&
       startsWith(github.event.comment.body, '/')))
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -119,7 +119,7 @@ jobs:
       - id: app-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          client-id: Iv23lirdyRvc0KC6625s # the bot app's Client ID (public)
+          client-id: ${{ vars.BOT_CLIENT_ID }} # the bot app's Client ID (public; setup.sh sets it from ci/config.json)
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           permission-contents: write # automation-state branch, /revert branches
           permission-issues: write # replies, Daily log

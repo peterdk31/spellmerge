@@ -159,7 +159,7 @@ class _GitHubOnly(urllib.request.HTTPRedirectHandler):
 def download(url: str, limit: int) -> bytes:
     if not isinstance(url, str) or not ATTACHMENT.fullmatch(url):
         raise Invalid("only files attached on GitHub can be used")
-    req = urllib.request.Request(url, headers={"User-Agent": "spellmerge-intake"})
+    req = urllib.request.Request(url, headers={"User-Agent": "smbot-intake"})
     with urllib.request.build_opener(_GitHubOnly).open(req, timeout=60) as resp:  # noqa: S310 (hosts checked)
         if not _github_host(resp.geturl()):
             raise Invalid("the attachment didn't come from GitHub")

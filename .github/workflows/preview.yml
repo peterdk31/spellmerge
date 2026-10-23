@@ -39,7 +39,7 @@ jobs:
       - name: Cache Godot (hash-checked again after restore)
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: ~/.cache/spellmerge-godot
+          path: ~/.cache/pinned-godot
           key: godot-${{ hashFiles('ci/build/godot.env') }}
       - name: Virtual display for the screenshots
         run: sudo apt-get update -qq && sudo apt-get install -y -qq xvfb
@@ -64,7 +64,7 @@ jobs:
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: web
-          path: dist/spellmerge-web-${{ steps.plan.outputs.version }}.zip
+          path: dist/*-web-${{ steps.plan.outputs.version }}.zip
           retention-days: 1
           if-no-files-found: error
 

@@ -148,7 +148,7 @@ def render(cfg: config_mod.Config, data: PageData, version: str, channel: str, s
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Spellmerge</title>
+<title>{e(cfg.game.name)}</title>
 <meta name="description" content="Merge spells. Cause chaos. Together. A 1-4 player co-op roguelite built by an AI and its community.">
 <style>
   :root {{ color-scheme: dark; --bg: #1b1830; --panel: #252141; --fg: #e8e6f5; --muted: #9a98b8; --accent: #f2c14e;
@@ -176,8 +176,8 @@ def render(cfg: config_mod.Config, data: PageData, version: str, channel: str, s
 </head>
 <body>
 <main>
-  <h1>Spellmerge</h1>
-  <p class="tag">Merge spells. Cause chaos. Together. &middot; Every spell is a merge request.</p>
+  <h1>{e(cfg.game.name)}</h1>
+  <p class="tag">{e(cfg.game.tagline)}</p>
   <p>A 2D roguelite about building deep, combinable spells, for 1&ndash;4 local co-op players. Claude, an AI, writes the
      code and ships a new build every day. Players shape it: every bug report and idea is read and answered.</p>
   <div class="buttons">

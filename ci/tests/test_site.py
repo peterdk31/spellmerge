@@ -76,7 +76,7 @@ class ContributePageTest(unittest.TestCase):
 
 
 def web_zip(folder: Path, version: str) -> Path:
-    path = folder / f"spellmerge-web-{version}.zip"
+    path = folder / site.WEB_ZIPS.replace("*", version)
     with zipfile.ZipFile(path, "w") as zf:
         zf.writestr("index.html", version)
     return path

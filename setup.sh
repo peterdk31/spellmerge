@@ -2,8 +2,8 @@
 # SPDX-FileCopyrightText: 2026 peterdk31 and Spellmerge contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Creates peterdk31/spellmerge and applies every repository setting as code
-# (docs/PLAN.md, "Setup steps", step 4). Safe to re-run: each step converges
+# Creates the repository named in ci/config.json and applies every repository
+# setting as code (docs/PLAN.md, "Setup steps", step 4). Safe to re-run: each step converges
 # the live setting to the value defined here or in ci/settings/.
 #
 #   ./setup.sh           create the repo if needed, then apply all settings
@@ -14,17 +14,22 @@
 
 set -euo pipefail
 
-OWNER="peterdk31"
-REPO_NAME="spellmerge"
-REPO="$OWNER/$REPO_NAME"
+cd "$(dirname "$0")"
+command -v jq >/dev/null || { echo "error: 'jq' is not installed" >&2; exit 1; }
+CONFIG="ci/config.json"
+REPO=$(jq -r .repo "$CONFIG")
+OWNER=${REPO%%/*}
+REPO_NAME=${REPO#*/}
 ENV_NAME="automation"          # protected environment that holds every secret
 RELEASE_BRANCH="main"          # the only branch allowed to use $ENV_NAME
 SETTINGS="ci/settings"
-DESCRIPTION="Merge spells. Cause chaos. Together. A 1-4 player co-op roguelite built by Claude and the community."
+DESCRIPTION=$(jq -r .game.description "$CONFIG")
 HOMEPAGE="https://$OWNER.github.io/$REPO_NAME/"
 ENV_SECRETS=(BOT_APP_ID BOT_APP_PRIVATE_KEY CLAUDE_CODE_OAUTH_TOKEN BUTLER_API_KEY)
-
-cd "$(dirname "$0")"
+# The bot app's identity, which the workflows read as variables (docs/SETUP-APP.md fills them in).
+BOT_LOGIN=$(jq -r .bot.login "$CONFIG")
+BOT_ID=$(jq -r .bot.id "$CONFIG")
+BOT_CLIENT_ID=$(jq -r .bot.client_id "$CONFIG")
 
 WARNINGS=()
 FAILURES=()
@@ -180,6 +185,16 @@ apply_variables() {
     run "AUTOMATION_ENABLED=true (the kill switch)" \
       gh variable set AUTOMATION_ENABLED --repo "$REPO" --body true
   fi
+  # Empty until the bot app exists (docs/SETUP-APP.md); then re-run setup.
+  local name value
+  for name in BOT_LOGIN BOT_ID BOT_CLIENT_ID; do
+    value=${!name}
+    if [[ -n "$value" && "$value" != 0 && "$value" != null ]]; then
+      run "$name=$value (the bot app, from $CONFIG)" gh variable set "$name" --repo "$REPO" --body "$value"
+    else
+      warn "$name is empty in $CONFIG: create the bot app (docs/SETUP-APP.md), fill in .bot, re-run setup"
+    fi
+  done
 }
 
 apply_rulesets() {
@@ -267,8 +282,10 @@ check_all() {
     false) warn "AUTOMATION_ENABLED=false: the kill switch is engaged" ;;
     *)     fail "AUTOMATION_ENABLED is missing or invalid ('$kill')" ;;
   esac
-  local bot; bot=$(get "repos/$REPO/actions/variables/BOT_LOGIN" --jq .value)
-  if [[ "$bot" == *"[bot]" ]]; then ok "BOT_LOGIN=$bot"; else warn "BOT_LOGIN is not set yet (docs/SETUP-APP.md)"; fi
+  local name
+  for name in BOT_LOGIN BOT_ID BOT_CLIENT_ID; do
+    expect "$name (from $CONFIG)" "$(get "repos/$REPO/actions/variables/$name" --jq .value)" "${!name}"
+  done
 
   bold "Rulesets and CODEOWNERS"
   local file name id live

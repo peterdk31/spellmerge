@@ -18,6 +18,9 @@ const KNOWN: Array[String] = [
 	"res://art/samples/j_tiny/body.svg",
 	"res://art/samples/k_bean/body.svg",
 	"res://art/samples/l_gold/body.svg",
+	"res://art/samples/m_cream/body.svg",
+	"res://art/samples/n_dusk/body.svg",
+	"res://art/samples/o_teal/body.svg",
 	"res://art/samples/i_warm/floor.svg",
 ]
 const PALETTE: Array[String] = [
@@ -149,7 +152,7 @@ func test_the_soft_sample_has_no_black_and_the_big_hat_keeps_it() -> void:
 ## In G, H and I only the hat takes the player's colour: the body sprites use no player colour,
 ## and each hat uses exactly one player's ramp (standard or vivid).
 func test_only_the_hat_has_the_player_colour() -> void:
-	for body: String in ["g_brown", "h_cream", "j_tiny", "k_bean", "l_gold"]:
+	for body: String in ["g_brown", "h_cream", "j_tiny", "k_bean", "l_gold", "m_cream", "n_dusk", "o_teal"]:
 		var text: String = FileAccess.get_file_as_string("res://art/samples/%s/body.svg" % body)
 		for colour: String in PLAYER_COLOURS + SAMPLE_PALETTE_COLOURS:
 			check(not text.contains(colour), "%s/body.svg uses the player colour %s" % [body, colour])
@@ -182,7 +185,7 @@ func test_only_the_hat_has_the_player_colour() -> void:
 ## staff, x < 24) sits above y=15, and the chest row (y=21, outline included) is at most 10 px wide.
 func test_the_round_four_bodies_are_narrow_and_below_the_brim() -> void:
 	var rect_pattern: RegEx = RegEx.create_from_string('<rect x="(\\d+)" y="(\\d+)" width="(\\d+)" height="(\\d+)"')
-	for body: String in ["j_tiny", "k_bean", "l_gold"]:
+	for body: String in ["j_tiny", "k_bean", "l_gold", "m_cream", "n_dusk", "o_teal"]:
 		var text: String = FileAccess.get_file_as_string("res://art/samples/%s/body.svg" % body)
 		var chest_left: int = 99
 		for rect in rect_pattern.search_all(text):
@@ -197,6 +200,17 @@ func test_the_round_four_bodies_are_narrow_and_below_the_brim() -> void:
 				chest_left = mini(chest_left, x0)
 		# The chest ends at x=19 (outline), so starting at x=10 or later is 10 px or less.
 		check(chest_left >= 10, "%s/body.svg is wider than 10 px at the chest (starts at x=%d)" % [body, chest_left])
+
+
+## M, N and O have two big eyes and nothing else on the face: no cheeks (Fire light) and no mouth
+## (the Wood mouth colour of J and K), and the eyes are two 2x2 black blocks at rows 17 and 18.
+func test_the_round_five_faces_are_just_two_big_eyes() -> void:
+	for body: String in ["m_cream", "n_dusk", "o_teal"]:
+		var text: String = FileAccess.get_file_as_string("res://art/samples/%s/body.svg" % body)
+		check(not text.contains("#ffa23c"), "%s/body.svg has cheeks" % body)
+		check(not text.contains('y="18" width="2" height="1" fill="#8a5a44"'), "%s/body.svg has a mouth" % body)
+		check(text.contains('<rect x="12" y="17" width="2" height="2" fill="#14121f"/>'), "%s/body.svg lost its left eye" % body)
+		check(text.contains('<rect x="16" y="17" width="2" height="2" fill="#14121f"/>'), "%s/body.svg lost its right eye" % body)
 
 
 func test_every_svg_is_in_the_manifest() -> void:

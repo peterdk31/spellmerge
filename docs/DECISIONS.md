@@ -1141,3 +1141,8 @@ An independent review of the branch found these, all fixed with a regression tes
 
 - **Why:** the frost, void and homing icons and the frost and void tints borrowed Player 1 and Player 4 colours, which STYLE.md keeps for players (#178, #179).
 - **Now:** `docs/STYLE.md`, the `art/kit` palette files and the SVG art test carry an Ice ramp (`#1f7080` `#4fd6dc` `#c4f6f2`) and a Void ramp (`#4a1450` `#a0309a` `#e08ad8`), giving 37 colours. `ci/tests/test_styleguide.py` no longer pins the palette's size: it only checks that STYLE.md's table, both `art/kit` palette files and the SVG art test's list match. So the bot may add, change or remove colours without asking the owner, as long as it updates every copy. Recolouring the icons and tints is still the element colours task in `docs/NEXT.md`.
+
+## 2026-10-23: Planning with an empty queue, M2 not closed yet
+
+**Context:** Only the stabilisation task was left, and the daily run found no bug (`build.sh --quick --tests` passes, 4-bot p95 7.7 ms). M2's done-when item 3 (stress within budget on web) still has no WASM numbers: no "Daily run" post with "Stress and timing results" exists as of the 2026-10-23 daily log (#202). The art direction pick (#206) is open; nothing waits on it.
+**Decision:** M2 stays in progress and no C2 issue is opened: closing it with the web numbers unread would put an unchecked done-when item in front of the owner. Two polish tasks go first (the wave and break lines hidden under four builders, a quick view walkthrough as the re-examination of part 18), so sessions have useful work while the next daily build runs. If the numbers still do not appear after a few more daily builds, the next planning run should ask the owner whether the web stress step runs.

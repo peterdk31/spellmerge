@@ -188,6 +188,24 @@ class RepoTest(unittest.TestCase):
         self.assertEqual([f for f in found if f[2] != "ci/evil.py"], [])
         self.assertIn(("protected-path", "error", "ci/evil.py"), found)
 
+    def test_bot_may_draft_the_design_only_while_mains_copy_is_a_draft(self) -> None:
+        idea = f"# Design\n\n{rules.DESIGN_DRAFT_MARKER}\nA game about bees.\n"
+        self.git("switch", "-q", "main")
+        self.write(rules.DESIGN, idea)
+        self.commit("idea")
+        self.git("switch", "-q", "pr")
+        self.git("merge", "-q", "main")
+        self.write(rules.DESIGN, "# Design\n\nBees, in depth.\n")
+        self.commit()
+        locked = ("protected-path", "error", rules.DESIGN)
+        self.assertNotIn(locked, self.check(BOT))  # main's copy is a draft; the PR's isn't
+        self.assertIn(locked, self.check(CONTRIBUTOR))  # only the bot drafts it
+        self.git("switch", "-q", "main")
+        self.write(rules.DESIGN, "# Design\n\nLocked.\n")
+        self.commit("accepted")
+        self.git("switch", "-q", "pr")
+        self.assertIn(locked, self.check(BOT))  # once main's copy is accepted, it's owner-only
+
     def test_deleting_protected_files_is_a_change_too(self) -> None:
         self.git("rm", "-q", ".github/CODEOWNERS")
         self.commit()
@@ -250,15 +268,14 @@ class RepoTest(unittest.TestCase):
         self.assertEqual(self.check(worktree=True), [("unreadable", "warning", "content/relics/a/locked.json")])
 
     def test_links_file_may_open_only_its_own_table(self) -> None:
-        good = ('extends Node\n\nconst URLS := {\n\t"feedback": "https://github.com/peterdk31/spellmerge/discussions",\n'
-                '\t"contribute": "https://peterdk31.github.io/spellmerge/contribute/",\n}\n\n'
+        good = (f'extends Node\n\nconst URLS := {{\n\t"feedback": "https://github.com/{CFG.repo}/discussions",\n'
+                f'\t"contribute": "{CFG.pages}/contribute/",\n}}\n\n'
                 'func open(key: String) -> void:\n\tif URLS.has(key):\n\t\tOS.shell_open(URLS[key])\n')
         self.assertEqual(banned(good, rules.LINKS_FILE), [])
         self.assertTrue(banned(good, "core/menu/menu.gd"))  # anywhere else it stays banned
         self.assertTrue(banned(good.replace("OS.shell_open(URLS[key])", "OS.shell_open(key)"), rules.LINKS_FILE))
-        self.assertTrue(banned(good.replace("https://peterdk31.github.io/spellmerge/contribute/",
-                                            "https://evil.example/x"), rules.LINKS_FILE))
-        self.assertTrue(banned(good + '\nfunc x() -> void:\n\tURLS["a"] = "https://github.com/peterdk31/spellmerge"\n',
+        self.assertTrue(banned(good.replace(f"{CFG.pages}/contribute/", "https://evil.example/x"), rules.LINKS_FILE))
+        self.assertTrue(banned(good + f'\nfunc x() -> void:\n\tURLS["a"] = "https://github.com/{CFG.repo}"\n',
                                rules.LINKS_FILE))
         self.assertTrue(banned(good.replace("const URLS", "var URLS"), rules.LINKS_FILE))
         self.assertTrue(banned(good + '\nfunc y() -> void:\n\tOS.execute("sh", [])\n', rules.LINKS_FILE))

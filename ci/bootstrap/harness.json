@@ -1,0 +1,51 @@
+{
+  "copy": [
+    ".github/",
+    "ci/",
+    "tools/",
+    "setup.sh",
+    "LICENSE",
+    "LICENSES/",
+    "CLA.md",
+    "REUSE.toml",
+    "CONTRIBUTING.md",
+    "CLAUDE.md",
+    "docs/SECURITY-CHECKLIST.md",
+    "docs/SETUP-APP.md",
+    ".gitignore",
+    ".gitattributes",
+    "export_presets.cfg",
+    "core/base/build_info.gd",
+    "tests/smoke/boot_smoke.gd"
+  ],
+  "skip": [
+    "ci/bootstrap/",
+    "ci/config.json",
+    ".github/ISSUE_TEMPLATE/spell_idea.yml",
+    ".github/ISSUE_TEMPLATE/config.yml"
+  ],
+  "rename_in": [
+    ".md",
+    ".yml",
+    ".toml",
+    ".cfg",
+    "CODEOWNERS"
+  ],
+  "plan_sections": [
+    "Quality bar",
+    "Security model",
+    "Automation pipeline",
+    "Community intake",
+    "Planning system",
+    "Self-driven progress",
+    "Owner control from the phone",
+    "Infrastructure, checkpoints and playtests",
+    "Contributor experience",
+    "AI-friendly onboarding",
+    "Copyright and licensing",
+    "Costs and owner setup"
+  ],
+  "plan_replace": {
+    "Name check": "Not done yet for {{GAME}}: the planning task searches for games, apps and trademarks with the same name and records what it found here."
+  }
+}

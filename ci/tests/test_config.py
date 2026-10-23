@@ -1,3 +1,4 @@
+import re
 import unittest
 from pathlib import Path
 
@@ -27,7 +28,8 @@ class ConfigTest(unittest.TestCase):
 
     def test_the_harness_does_not_hardcode_the_identities(self) -> None:
         """They come from ci/config.json and the repository variables, so the harness can start another game."""
-        values = [CFG.bot_client_id, str(CFG.bot.id), str(CFG.owner.id), CFG.bot.login]
+        values = [v for v in (CFG.bot_client_id, str(CFG.bot.id), str(CFG.owner.id), CFG.bot.login)
+                  if v not in ("", "0")]  # a new game's bot is filled in by ci/bootstrap's launch
         files = [*(ROOT / ".github" / "workflows").glob("*.yml"), ROOT / ".github" / "actions" / "claude" / "action.yml",
                  *(ROOT / ".github" / "maintainer").glob("*.md")]
         for path in files:
@@ -35,7 +37,8 @@ class ConfigTest(unittest.TestCase):
             if path.name == "action.yml":
                 text = "\n".join(line for line in text.splitlines() if "description:" not in line)
             for value in values:
-                self.assertNotIn(value, text, f"{path.relative_to(ROOT)} hardcodes {value}")
+                self.assertIsNone(re.search(rf"(?<![\w-]){re.escape(value)}(?![\w-])", text),
+                                  f"{path.relative_to(ROOT)} hardcodes {value}")
         for path in (ROOT / ".github" / "maintainer").glob("*.md"):
             self.assertNotIn(CFG.game.name, path.read_text(), f"{path.name}: use {{{{GAME}}}}")
 

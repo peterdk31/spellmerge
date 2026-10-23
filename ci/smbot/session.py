@@ -784,7 +784,9 @@ def finish(cfg: config_mod.Config, env: dict[str, str]) -> dict[str, str]:
         elif merge_refused and task:
             entry = failures.setdefault(task, {"count": 0})
             entry["pr"] = pr
-            park(entry, PARK_WAITING, env.get("MERGE_RESULT") or "the merge was refused")
+            # Waiting for the owner's review can take days; parked as blocked, the owner is told.
+            owner = merge_mod.OWNER_REVIEW in env.get("MERGE_RESULT", "")
+            park(entry, PARK_BLOCKED if owner else PARK_WAITING, env.get("MERGE_RESULT") or "the merge was refused")
         elif idle_task:
             park(failures.setdefault(task, {"count": 0}), PARK_WAITING,
                  env.get("IMPLEMENT_SUMMARY", "nothing to do on it now"))

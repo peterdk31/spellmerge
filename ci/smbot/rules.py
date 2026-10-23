@@ -259,6 +259,22 @@ def read_file(repo: Path, change: Change, worktree: bool) -> bytes:
 # --- Path tiers -------------------------------------------------------------------
 
 
+# A new game starts with only its idea in docs/DESIGN.md and this marker (ci/bootstrap). While the
+# base's copy has it, the bot may write the file: its first session drafts the design there. CODEOWNERS
+# still makes GitHub wait for the owner's approving review, so the owner accepts the design by
+# approving and merging that PR, which removes the marker.
+DESIGN = "docs/DESIGN.md"
+DESIGN_DRAFT_MARKER = "<!-- smbot:design-draft -->"
+
+
+def design_is_draft(repo: Path, base: str) -> bool:
+    """Whether the base (main) still has the marker; the PR's own copy removes it."""
+    try:
+        return DESIGN_DRAFT_MARKER.encode() in _git(repo, "show", f"{base}:{DESIGN}")
+    except subprocess.CalledProcessError:
+        return False
+
+
 def owner_only_patterns(codeowners: str, owner: str) -> list[str]:
     patterns = []
     for line in codeowners.splitlines():
@@ -508,10 +524,12 @@ def run(repo: Path, policy: Path, base: str, author: str | None, worktree: bool)
     role = role_for(author, cfg)
     codeowners = (policy / ".github" / "CODEOWNERS").read_text()
     owner_only = owner_only_patterns(codeowners, cfg.owner.login)
+    draft = role == BOT and design_is_draft(repo, base)
 
     findings: list[Finding] = []
     for change in changes_between(repo, base, worktree):
-        findings += check_paths(change, role, owner_only)
+        if not (draft and change.path == DESIGN and change.status == "M"):
+            findings += check_paths(change, role, owner_only)
         findings += check_file_type(change, role)
         findings += check_mode(change, role)
         if change.status != "D" and change.mode not in ("120000", "160000") and role != DEPENDENCY_BOT:

@@ -2,6 +2,7 @@
 
   python3 -m smbot.config get game.slug              -> one value, for shell scripts
   python3 -m smbot.config render PROMPT.md           -> the prompt with {{REPO}}, {{GAME}}, {{PITCH}}, {{BOT}}
+  python3 -m smbot.config runs                       -> the exported-build test runs, one per line (build.sh)
 """
 
 from __future__ import annotations
@@ -33,6 +34,18 @@ class Game:
 
 
 @dataclass(frozen=True)
+class Run:
+    """A test the exported "Linux Test" and "Web Test" builds run, started by a user argument (build.sh)."""
+    name: str  # build/logs/<name>-linux.log and <name>-web.log
+    arg: str  # e.g. --stress; the game starts the runner on it
+    label: str
+    linux_ok: str  # a grep pattern the Linux log must match
+    web_ok: str  # the line websmoke waits for
+    web_timeout: int
+    bench: bool  # its result lines go into the Daily log (smbot.summary)
+
+
+@dataclass(frozen=True)
 class Config:
     repo: str
     game: Game
@@ -43,6 +56,8 @@ class Config:
     control_panel_issue: int
     timezone: str
     state_branch: str
+    ready_line: str  # the line the game prints once its first screen is up (the web smoke test waits for it)
+    runs: tuple[Run, ...]
 
     @property
     def pages(self) -> str:
@@ -66,6 +81,8 @@ def load(path: Path | None = None) -> Config:
         control_panel_issue=data["issues"]["control_panel"],
         timezone=data["timezone"],
         state_branch=data["state_branch"],
+        ready_line=data["build"]["ready"],
+        runs=tuple(Run(**r) for r in data["build"]["runs"]),
     )
 
 
@@ -92,9 +109,13 @@ def main() -> None:
     sub = parser.add_subparsers(dest="cmd", required=True)
     sub.add_parser("get").add_argument("key")
     sub.add_parser("render").add_argument("template", type=Path)
+    sub.add_parser("runs")
     args = parser.parse_args()
     if args.cmd == "get":
         print(get(raw(), args.key))
+    elif args.cmd == "runs":
+        for run in load().runs:
+            print("\t".join((run.name, run.arg, run.label, run.linux_ok, run.web_ok, str(run.web_timeout))))
     else:
         print(render(args.template.read_text(), prompt_values(load())), end="")
 

@@ -28,6 +28,7 @@ source ci/build/godot.env
 # The game's name (project.godot, the export paths) and slug (the zips), from ci/config.json.
 GAME_NAME=$(PYTHONPATH=ci python3 -m smbot.config get game.name)
 SLUG=$(PYTHONPATH=ci python3 -m smbot.config get game.slug)
+READY_LINE=$(PYTHONPATH=ci python3 -m smbot.config get build.ready)
 
 VERSION="dev"
 CHANNEL="dev"
@@ -187,29 +188,26 @@ export_all() {
   godot_checked smoke-linux build/linux/"$GAME_NAME".x86_64 --headless --quit-after 300
 
   # The shipped presets leave tests/ out; "Linux Test" is the Linux preset with tests, never
-  # packaged. An exported build can't run a --script, so the main menu starts the 4-bot runner
-  # on the --four-bot user argument (tests/smoke/four_bot_runner.gd).
-  step "4-bot test (exported Linux build with tests)"
-  rm -rf build/linux-test && mkdir -p build/linux-test
-  godot_checked export-linux-test "$GODOT" --headless --path . --export-release "Linux Test" build/linux-test/"$GAME_NAME".x86_64
-  [[ -s build/linux-test/"$GAME_NAME".x86_64 ]] || { echo "::error::Linux Test export produced no binary"; exit 1; }
-  godot_checked four-bot-linux timeout 300 build/linux-test/"$GAME_NAME".x86_64 --headless -- --four-bot
-  grep -q '^SMOKE OK' build/logs/four-bot-linux.log \
-    || { echo "::error::the 4-bot test did not print SMOKE OK in the Linux Test export"; exit 1; }
-
-  # The stress run and the projectile timings (tests/benchmark/, #166), started by the main menu
-  # on --stress and --projectile-timing. They print BENCH lines and only warn on frame time.
-  step "Stress run and projectile timing (exported Linux build with tests)"
-  godot_checked stress-linux timeout 300 build/linux-test/"$GAME_NAME".x86_64 --headless -- --stress
-  grep -q '^STRESS OK' build/logs/stress-linux.log \
-    || { echo "::error::the stress run did not print STRESS OK in the Linux Test export"; exit 1; }
-  godot_checked timing-linux timeout 300 build/linux-test/"$GAME_NAME".x86_64 --headless -- --projectile-timing
-  grep -q '^test_projectile_timing: OK' build/logs/timing-linux.log \
-    || { echo "::error::the projectile timing did not print test_projectile_timing: OK in the Linux Test export"; exit 1; }
+  # packaged. An exported build can't run a --script, so the game starts each test runner on its
+  # user argument. The runs are the game's own (.build.runs in ci/config.json: for Spellmerge the
+  # 4-bot test, the stress run and the projectile timing); a game with none skips this.
+  local runs name arg label linux_ok web_ok web_timeout
+  runs=$(PYTHONPATH=ci python3 -m smbot.config runs)
+  if [[ -n "$runs" ]]; then
+    rm -rf build/linux-test && mkdir -p build/linux-test
+    godot_checked export-linux-test "$GODOT" --headless --path . --export-release "Linux Test" build/linux-test/"$GAME_NAME".x86_64
+    [[ -s build/linux-test/"$GAME_NAME".x86_64 ]] || { echo "::error::Linux Test export produced no binary"; exit 1; }
+    while IFS=$'\t' read -r name arg label linux_ok web_ok web_timeout; do
+      step "$label (exported Linux build with tests)"
+      godot_checked "$name-linux" timeout 300 build/linux-test/"$GAME_NAME".x86_64 --headless -- "$arg"
+      grep -q -- "$linux_ok" "build/logs/$name-linux.log" \
+        || { echo "::error::$label did not print '$linux_ok' in the Linux Test export"; exit 1; }
+    done <<<"$runs"
+  fi
 
   step "Boot smoke test (web build in headless Chrome)"
   local status=0
-  PYTHONPATH=ci python3 -m smbot.websmoke build/web --expect "main menu ready" --warn-load "$WEB_LOAD_WARN" \
+  PYTHONPATH=ci python3 -m smbot.websmoke build/web --expect "$READY_LINE" --warn-load "$WEB_LOAD_WARN" \
     --screenshot build/logs/web.png || status=$?
   if ((status == 2)) && [[ -z "${CI:-}" ]]; then
     echo "warning: Chrome is not installed, so the web build was not smoke-tested"
@@ -218,24 +216,18 @@ export_all() {
     return 1
   fi
 
-  # "Web Test" is the Web preset with tests/, never zipped or deployed. The game reads
-  # --four-bot from the page's start config, which websmoke fills in.
-  step "4-bot test (exported web build with tests, headless Chrome)"
+  # "Web Test" is the Web preset with tests/, never zipped or deployed. The game reads the run's
+  # argument from the page's start config, which websmoke fills in. The logs go to build/logs like
+  # the Linux ones, so the Daily log can quote them (smbot.summary).
+  [[ -n "$runs" ]] || return 0
   rm -rf build/web-test && mkdir -p build/web-test
   godot_checked export-web-test "$GODOT" --headless --path . --export-release "Web Test" build/web-test/index.html
   [[ -s build/web-test/index.html ]] || { echo "::error::Web Test export produced no index.html"; exit 1; }
-  PYTHONPATH=ci python3 -m smbot.websmoke build/web-test --page-args=--four-bot --expect "SMOKE OK" --timeout 240
-
-  # Projectile timing (#91) and the stress run (#166) in WASM, the numbers the web limits rest on.
-  # The main menu starts them on --projectile-timing and --stress (an exported build can't run a
-  # --script); they print BENCH lines, then TIMING OK or STRESS OK, and only warn on frame time.
-  # Their logs go to build/logs like the Linux ones, so the Daily log can quote them (smbot.summary).
-  step "Projectile timing (exported web build, headless Chrome)"
-  PYTHONPATH=ci python3 -m smbot.websmoke build/web-test --page-args=--projectile-timing --expect "TIMING OK" \
-    --timeout 240 2>&1 | tee build/logs/timing-web.log
-  step "Stress run (exported web build, headless Chrome)"
-  PYTHONPATH=ci python3 -m smbot.websmoke build/web-test --page-args=--stress --expect "STRESS OK" --timeout 600 \
-    2>&1 | tee build/logs/stress-web.log
+  while IFS=$'\t' read -r name arg label linux_ok web_ok web_timeout; do
+    step "$label (exported web build with tests, headless Chrome)"
+    PYTHONPATH=ci python3 -m smbot.websmoke build/web-test --page-args="$arg" --expect "$web_ok" \
+      --timeout "$web_timeout" 2>&1 | tee "build/logs/$name-web.log"
+  done <<<"$runs"
 }
 
 zip_dir() { # zip_dir <dir> <zip>: sorted entries, fixed timestamps, file modes kept

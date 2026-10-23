@@ -9,6 +9,7 @@ from pathlib import Path
 from smbot import styleguide
 
 
+@unittest.skipUnless(styleguide.STYLE.exists(), "no docs/STYLE.md yet (a new game)")
 class StyleGuideTest(unittest.TestCase):
     def test_the_palette_files_match_the_style_table(self) -> None:
         """art/kit's palette files and the SVG art test copy docs/STYLE.md's table; this keeps them

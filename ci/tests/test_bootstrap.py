@@ -74,6 +74,55 @@ class ScaffoldTest(unittest.TestCase):
             bootstrap.scaffold(GAME, self.dest, ROOT)
 
 
+class WizardTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.dest = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.dest)
+        (self.dest / ".git").mkdir()
+        (self.dest / "ci").mkdir()
+        shutil.copy(ROOT / "ci" / "config.json", self.dest / "ci" / "config.json")
+
+    def steps(self, fail: str = "") -> tuple[tuple[str, str, object], ...]:
+        self.ran: list[str] = []
+
+        def make(key: str):  # noqa: ANN202
+            def run(dest: Path, cfg: config.Config, data: dict) -> None:
+                if key == fail:
+                    raise bootstrap.StepFailed("no network")
+                self.ran.append(key)
+                data[key] = True
+            return run
+        return tuple((k, f"Step {k}", make(k)) for k in ("a", "b", "c"))
+
+    def test_a_failed_step_keeps_what_was_done_and_the_next_run_carries_on(self) -> None:
+        with mock.patch.object(bootstrap, "STEPS", self.steps(fail="b")), mock.patch("builtins.print"):
+            with self.assertRaises(bootstrap.StepFailed) as failed:
+                bootstrap.launch(self.dest)
+        self.assertIn("Step b didn't work", str(failed.exception))
+        self.assertEqual(bootstrap.progress(self.dest)["done"], ["a"])
+        with mock.patch.object(bootstrap, "STEPS", self.steps()), mock.patch("builtins.print"):
+            bootstrap.launch(self.dest)
+        self.assertEqual(self.ran, ["b", "c"])  # a is not run again
+        self.assertEqual(bootstrap.progress(self.dest)["done"], ["a", "b", "c"])
+
+    def test_questions_take_the_default_and_ask_again_until_valid(self) -> None:
+        with mock.patch("builtins.input", side_effect=[""]), mock.patch("builtins.print"):
+            self.assertEqual(bootstrap.ask("Repo", "me/bees"), "me/bees")
+        with mock.patch("builtins.input", side_effect=["a", "ab"]), mock.patch("builtins.print") as out:
+            self.assertEqual(bootstrap.ask("Name", check=lambda a: "" if len(a) > 1 else "too short"), "ab")
+        self.assertIn("too short", str(out.call_args_list))
+        with mock.patch("builtins.input", side_effect=["", "Bees.", "  More.", ""]), mock.patch("builtins.print"):
+            self.assertEqual(bootstrap.ask_idea(), "Bees.\n  More.\n")
+        self.assertEqual(bootstrap.slugify("Bee Keeper: Hive!"), "bee-keeper-hive")
+
+    def test_missing_tools_are_named_with_how_to_get_them(self) -> None:
+        with mock.patch.object(bootstrap.shutil, "which", lambda cmd: None if cmd == "jq" else "/bin/x"):
+            with self.assertRaises(bootstrap.StepFailed) as failed:
+                bootstrap.preflight()
+        self.assertIn("jq: sudo apt install jq", str(failed.exception))
+        self.assertFalse(failed.exception.started)
+
+
 class LaunchPartsTest(unittest.TestCase):
     CFG = config.load()
 

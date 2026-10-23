@@ -120,7 +120,7 @@ A minimal valid example, a stone **wall** tile with its lit top-left edge and sh
 
 ## UI
 
-Provisional, like the rest. The HUD (M1 parts 18 and 19) and the Style Guide page build on these.
+These counts stand until the wizard redraw task confirms them. The HUD (M1 parts 18 and 19) and the Style Guide page build on these.
 
 - **Font:** one pixel font, set in `hud/theme`, at whole-number sizes only. Body text is Bone light on Stone shadow; headings Bone base; warnings Fire light; gold and pickups Spark light. No other text colours.
 - **Panels:** a 1 px Outline border, Stone shadow fill, a Stone light top and left inner edge (3 shades at most). Corners are cut by one pixel, not rounded.

@@ -9,7 +9,6 @@
     "number": 202
   },
   "errors_in_a_row": 0,
-  "idle": null,
   "intake_tasks": {
     "208": {
       "author": "Brianmanden",
@@ -20,7 +19,7 @@
       "title": "Idea: summonable pet that draws enemy fire"
     }
   },
-  "last_own_merge": "2026-10-23T17:25:23Z",
+  "last_own_merge": "2026-10-23T17:48:16Z",
   "last_plan": "2026-10-23T16:25:27Z",
   "last_weekly": "2026-10-22T13:49:44Z",
   "panel_applied": {

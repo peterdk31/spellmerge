@@ -9,7 +9,6 @@
     "number": 202
   },
   "errors_in_a_row": 0,
-  "idle": "2026-10-23T13:12:39Z",
   "intake_tasks": {
     "208": {
       "author": "Brianmanden",
@@ -20,7 +19,7 @@
       "title": "Idea: summonable pet that draws enemy fire"
     }
   },
-  "last_own_merge": "2026-10-23T12:18:13Z",
+  "last_own_merge": "2026-10-23T14:36:29Z",
   "last_plan": "2026-10-23T13:12:39Z",
   "last_weekly": "2026-10-22T13:49:44Z",
   "panel_applied": {
@@ -32,15 +31,7 @@
   },
   "panel_problems": [],
   "paused_by_command": false,
-  "pending_instructions": [
-    {
-      "at": "2026-10-23T14:17:32Z",
-      "kind": "claude",
-      "number": 4,
-      "text": "the beam spell should be a continuous beam that fires as long as the user holds fire, and it should use mana continuously. It can only damage the same enemy x number of times per second - find a good x",
-      "url": "https://github.com/peterdk31/spellmerge/issues/4#issuecomment-6367011007"
-    }
-  ],
+  "pending_instructions": [],
   "processed_comments": [
     6241847784,
     6251160604,

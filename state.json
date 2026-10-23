@@ -9,7 +9,6 @@
     "number": 202
   },
   "errors_in_a_row": 0,
-  "idle": null,
   "intake_tasks": {
     "208": {
       "author": "Brianmanden",
@@ -20,7 +19,7 @@
       "title": "Idea: summonable pet that draws enemy fire"
     }
   },
-  "last_own_merge": "2026-10-23T19:36:25Z",
+  "last_own_merge": "2026-10-23T20:10:09Z",
   "last_plan": "2026-10-23T19:36:25Z",
   "last_weekly": "2026-10-22T13:49:44Z",
   "panel_applied": {
@@ -32,15 +31,7 @@
   },
   "panel_problems": [],
   "paused_by_command": false,
-  "pending_instructions": [
-    {
-      "at": "2026-10-23T19:38:04Z",
-      "kind": "claude",
-      "number": 4,
-      "text": "whenever the game shows the player how to interact through the joypad, keyboard og mouse+keyboard, it should do so by showing a glyph of a button that should be pressed. This will also save space, by not having to type out which action button should be pressed, but it can be shown with a single glyph.\nWe might need a controller class / strategy, and it should automatically swap controller type, when it detects a player has switched from eg. An Xbox controller to a keyboard. The glyphs should then update live",
-      "url": "https://github.com/peterdk31/spellmerge/issues/4#issuecomment-6373214037"
-    }
-  ],
+  "pending_instructions": [],
   "processed_comments": [
     6241847784,
     6251160604,

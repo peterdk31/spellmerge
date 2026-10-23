@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-23: HUD and Builder made easier to use (owner `/claude` on #4, point 2)
+
+Walked the builder through with one keyboard player and four gamepad players and listed nine things that are hard (in `docs/DECISIONS.md`). Fixed the worst three: slots are named in words ("Form", "Elem", "Mod 1", "Trig"), a hint line says what `cast` and `dodge` do for the control in focus, and the focused control has its own bright look (`BuilderButtonFocus`). Test: player 3 of 4 puts a component into a slot with gamepad button events. The rest is in `docs/BACKLOG.md`.
+
 ## 2026-10-23: "Drop component" is now "Bag" (owner `/claude` on #4)
 
 The overlay and quick-view action is named "Bag"; its open list is titled "Drop". It already opened in combat for every player (the overlay is not wave-gated), so step 2 needed no code, only tests (1 and 4 players in a wave). The full Builder stays locked in a wave; the reason is in `docs/DECISIONS.md`. I could not read the test and screenshot output in this session (see the PR).

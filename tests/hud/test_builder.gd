@@ -68,9 +68,14 @@ func before_each() -> void:
 
 
 ## `count` players with a device and a wizard (spell A bolt + fire, B bolt), joined, in a room.
-func _start(count: int) -> void:
+## With `gamepads` the devices are real gamepads (ids 0 to 3, joining in order), whose buttons
+## are sent as joypad button events; else virtual devices.
+func _start(count: int, gamepads: bool = false) -> void:
 	for index in count:
-		_input.add_virtual_device(index)
+		if gamepads:
+			_input.join(index)
+		else:
+			_input.add_virtual_device(index)
 		var player := own(PlayerScript.new()) as PlayerScript
 		player.index = index
 		player.input = _input
@@ -403,13 +408,14 @@ func test_the_longest_slot_text_fits_when_selected_and_focused() -> void:
 	var font: Font = button.get_theme_font(&"font")
 	var size: int = button.get_theme_font_size(&"font_size")
 	var room: float = BuilderScript.LEFT_WIDTH - button.get_theme_stylebox(&"normal").get_minimum_size().x
-	var longest: String = ""
-	for id in _registry.get_ids(&"spells"):
-		var component := _registry.get_resource(&"spells", id) as SpellComponent
-		if component != null and component.display_name.length() > longest.length():
-			longest = component.display_name
-	for slot_name in BuilderScript.SLOT_NAMES:
-		var text: String = "%s[%s: %s]" % [BuilderScript.FOCUS_MARK, slot_name, longest]
+	# Per slot: the longest name of the kind that slot takes (a trigger never sits in a modifier slot).
+	for slot in BuilderScript.SLOT_COUNT:
+		var longest: String = ""
+		for id in _registry.get_ids(&"spells"):
+			var component := _registry.get_resource(&"spells", id) as SpellComponent
+			if component != null and component.kind() == BuilderScript.SLOT_KINDS[slot] and component.display_name.length() > longest.length():
+				longest = component.display_name
+		var text: String = "%s[%s: %s]" % [BuilderScript.FOCUS_MARK, BuilderScript.SLOT_NAMES[slot], longest]
 		var wide: float = font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
 		check(wide <= room, "'%s' is %.0f px wide, the column has %.0f" % [text, wide, room])
 
@@ -848,3 +854,96 @@ func test_the_refusal_texts_say_what_to_do() -> void:
 	_choose(0, BuilderScript.SLOT_FORM, "Nova")
 	check(builder.note_text().contains("Too complex"), "got '%s'" % builder.note_text())
 	check(builder.note_lines_for(builder.note_text()) <= BuilderScript.NOTE_LINES, "the complexity refusal fits the note too")
+
+
+# --- Easier to use (owner's /claude on #4, point 2) -------------------------
+
+const PAD_CAST: JoyButton = JOY_BUTTON_X
+const PAD_DODGE: JoyButton = JOY_BUTTON_B
+const PAD_OVERLAY: JoyButton = JOY_BUTTON_Y
+const PAD_DOWN: JoyButton = JOY_BUTTON_DPAD_DOWN
+
+
+## Press and release a gamepad button on gamepad `pad` (its id is the player index here).
+func _pad(pad: int, button: JoyButton) -> void:
+	for pressed in [true, false]:
+		var event := InputEventJoypadButton.new()
+		event.device = pad
+		event.button_index = button
+		event.pressed = pressed
+		_input.handle_event(event)
+	_frame()
+
+
+func _focus_on_pad(pad: int, control: Control) -> bool:
+	for _attempt in 40:
+		if _focus.focused(pad) == control:
+			return true
+		_pad(pad, PAD_DOWN)
+	return _focus.focused(pad) == control
+
+
+func test_player_three_of_four_puts_a_component_in_a_slot_with_a_gamepad() -> void:
+	_start(4, true)
+	check_equal(_input.device_of(2), 2, "player 3 plays on gamepad 2")
+	_pad(2, PAD_OVERLAY)
+	_pad(2, PAD_DOWN)
+	_pad(2, PAD_CAST)
+	var builder: BuilderScript = _builder(2)
+	check(builder.is_open(), "Y, down, X opens player 3's builder from the overlay")
+	for other in [0, 1, 3]:
+		check(not _builder(other).is_open(), "player %d's builder stays closed" % (other + 1))
+	check_equal(_focus.focused(2), builder.slot_button(BuilderScript.SLOT_FORM), "it opens on the form slot")
+	_pad(2, PAD_DOWN)
+	_pad(2, PAD_DOWN)
+	check_equal(_focus.focused(2), builder.slot_button(BuilderScript.SLOT_FIRST_MODIFIER), "two presses down reach the first free modifier slot")
+	_pad(2, PAD_CAST)
+	var row: Button = _row_named(builder, "Split")
+	check(row != null and _focus.focused(2) == builder.shown_rows()[0], "X opens its bag, focus on the first row")
+	check(_focus_on_pad(2, row), "down reaches Split")
+	_pad(2, PAD_CAST)
+	check_equal(_requests.size(), 1, "one request went out")
+	if _requests.size() == 1:
+		check_equal(_requests[0], [2, PackedInt32Array([0]), BuilderScript.SLOT_FIRST_MODIFIER, &"split"], "for player 3, spell A, the first modifier slot, Split")
+	check_equal(builder.recipe_of(0).get("modifiers"), [&"split"], "player 3's spell A now holds Split")
+	check(_players[0] != null and _builder(0).recipe_of(0).get("modifiers", []).is_empty(), "player 1's spell is unchanged")
+	_pad(2, PAD_DODGE)
+	check(builder.is_open() and _focus.focused(2) is Button, "B goes back a step and keeps the builder open")
+
+
+func test_slots_are_labelled_in_words() -> void:
+	_start(1)
+	_open(0)
+	var builder: BuilderScript = _builder(0)
+	check(builder.slot_button(BuilderScript.SLOT_FORM).text.contains("Form: Bolt"), "got '%s'" % builder.slot_button(BuilderScript.SLOT_FORM).text)
+	check(builder.slot_button(BuilderScript.SLOT_FIRST_MODIFIER).text.contains("Mod 1: -"), "got '%s'" % builder.slot_button(BuilderScript.SLOT_FIRST_MODIFIER).text)
+	check(builder.slot_button(BuilderScript.SLOT_TRIGGER).text.contains("Trig: -"), "got '%s'" % builder.slot_button(BuilderScript.SLOT_TRIGGER).text)
+
+
+func test_the_focused_control_has_its_own_look_and_the_hint_says_what_cast_does() -> void:
+	_start(1)
+	_open(0)
+	var builder: BuilderScript = _builder(0)
+	var focused: Button = _focus.focused(0) as Button
+	check_equal(focused.theme_type_variation, BuilderScript.FOCUS_VARIATION, "the focused control has the focus look")
+	check_equal(builder.hint_text(), BuilderScript.HINT_SLOT, "on a slot, Cast picks a part")
+	var marked: int = 0
+	for control in builder.controls():
+		if (control as Button).theme_type_variation == BuilderScript.FOCUS_VARIATION:
+			marked += 1
+	check_equal(marked, 1, "exactly one control has it")
+	_press(0, builder.slot_button(BuilderScript.SLOT_ELEMENT))
+	check_equal(builder.hint_text(), BuilderScript.HINT_ROW, "on a bag row, Cast uses it and Dodge goes back")
+	check_equal(builder.slot_button(BuilderScript.SLOT_FORM).theme_type_variation, BuilderScript.BUTTON_VARIATION, "the control left behind is plain again")
+
+
+func test_every_hint_fits_the_info_panel() -> void:
+	_start(1)
+	_open(0)
+	var label: Label = _builder(0).info_panel().find_child("Hint", true, false) as Label
+	var font: Font = label.get_theme_font(&"font")
+	var size: int = label.get_theme_font_size(&"font_size")
+	var room: float = BuilderScript.INFO_WIDTH - 12.0
+	for hint in [BuilderScript.HINT_SLOT, BuilderScript.HINT_ROW, BuilderScript.HINT_TAB, BuilderScript.HINT_CLOSE, BuilderScript.HINT_UP, BuilderScript.HINT_HELD, BuilderScript.HINT_DROP]:
+		var wide: float = font.get_string_size(hint, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+		check(wide <= room, "'%s' is %.0f px wide, the panel has %.0f" % [hint, wide, room])

@@ -2,6 +2,23 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-23: HUD and Builder walkthrough: what is hard, and the three fixes (owner `/claude` on #4, point 2)
+
+- **Walked through** with real input: one player on keyboard, four players on gamepads (player 3 in detail), in the break (full builder) and in a wave (overlay, quick view, Bag), at 1x and 4x screenshots.
+- **What is hard** (worst first):
+  1. **Slot names are code letters.** "F: Bolt", "E: Fire", "M1: -", "T: -": a new player does not know F, E, M or T. Same in the refusal text ("Pick a form (F) first", from `player`).
+  2. **Nothing says what a button does.** The builder never says that `cast` picks and `dodge` goes back, nor what the focused control will do (a slot opens a list, a row applies, a tab switches spell).
+  3. **The focus is faint.** The focused control differs from the others only by a "> " and a slightly lighter fill; with four builders open it is easy to lose.
+  4. The description line cuts off at three lines ("Reliable, which the...").
+  5. A greyed slot ("Mod 2", "Held >") gives no reason (already in the backlog).
+  6. The bag rows mark the current component with " *", which says nothing by itself.
+  7. The hint names the actions ("Cast", "Dodge"), not the physical buttons, which differ for keyboard and gamepad.
+  8. In a wave, the quick view does not say that the full builder comes back after the wave (the title just changes).
+  9. The corner panel never says which button opens the overlay.
+- **Fixed (three, in `hud/`):** (1) words for slots: "Form", "Elem", "Mod 1-3", "Trig" ("Element" and "Trigger" do not fit next to the longest component name in the 100 px column, checked by the existing width test); (2) a hint line (8 px, theme variation `BuilderHint`) under the info panel's note that changes with the focus; the panel is full, so the complexity words now sit on the bar (one row, 12 px) and the preview is 14 px high, which pays for it ("Cast: pick a part" on a slot, "Cast: use  Dodge: back" on a bag row, and so on); (3) a visible focus: the focused control takes the theme variation `BuilderButtonFocus` (brighter fill, 2 px light border, white text) besides the "> " mark.
+- **The common case** (a component into a slot) was already short: the builder opens on the form slot, and a form or element into an empty slot moves on to the next bag. With a gamepad as player 3 of 4 it is: Y, down, X (open), down ×2 (to Mod 1), X, down to the row, X. A test (`test_player_three_of_four_puts_a_component_in_a_slot_with_a_gamepad`) runs that with real joypad button events on gamepad 2 of 4 and checks that only player 3's builder and recipe change.
+- **To the backlog:** items 4 to 9 (item 5 was there already), and the "(F)" in the refusal text, which is in `gameplay/player/` and so outside this task.
+
 ## 2026-10-23: The wave line shows only while a wave is on (owner `/claude` on #4)
 
 - **Why:** the line was hidden only by `run_started` and `run_ended`; no code sends them yet, and a cleared wave sent only `room_cleared`, so "Wave N" stayed mid-screen for good.

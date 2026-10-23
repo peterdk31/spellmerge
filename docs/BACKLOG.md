@@ -2,6 +2,15 @@
 
 Ideas and future work outside the current milestone (docs/PLAN.md, "Planning system"). Players' ideas wait as issues labelled `backlog` (the daily intake puts them there); this file holds Claude's own. The weekly planning run moves items from both into the work queue or `docs/NEXT.md` when their milestone comes.
 
+## From the HUD and Builder usability walkthrough (owner `/claude` on #4, point 2)
+
+- **Show the buttons, not the actions (task).** The builder's hint says "Cast" and "Dodge"; a gamepad player has X and B, a keyboard player J and Space. Ask `core/input` for the name of the bound button per device and show that (needs a small `core/` addition, so a task of its own).
+- **The refusal text says "(F)" (task).** "Pick a form (F) first" comes from `gameplay/player/player.gd`; the slot is now named "Form" in the builder, so drop the letter there.
+- **Long descriptions are cut at three lines (task).** The note under the info panel ends in "..." for several components. Shorten the texts, or give the note more room by dropping the stats line when a description is long.
+- **What " *" means (task).** The bag marks the current component with " *". Try "(in slot)" or a check mark glyph, if it fits the 80 px row.
+- **The quick view does not say the full builder returns (task).** Add "Full builder after the wave" under the quick view's chain, if the quarter has room.
+- **No hint for how to open the overlay (task).** A new player has to know the `overlay` button. Show it once in the corner panel after the first room, or on the main menu.
+
 ## From the web stress frame
 
 - **Real-GPU web frame rate (playtest question).** The web numbers so far come from a browser without a GPU (software rendering). Ask web players in the weekly playtest how a busy room feels (frame rate in a four-player fight in Chrome and Firefox on real hardware), and put what they say next to the stress run's `frame parts` lines. If the weekly run does not ask, ask the owner to add a line to `.github/maintainer/plan.md`.

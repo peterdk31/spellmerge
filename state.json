@@ -9,7 +9,6 @@
     "number": 202
   },
   "errors_in_a_row": 0,
-  "idle": null,
   "intake_tasks": {
     "208": {
       "author": "Brianmanden",
@@ -20,7 +19,7 @@
       "title": "Idea: summonable pet that draws enemy fire"
     }
   },
-  "last_own_merge": "2026-10-23T14:36:29Z",
+  "last_own_merge": "2026-10-23T17:25:23Z",
   "last_plan": "2026-10-23T16:25:27Z",
   "last_weekly": "2026-10-22T13:49:44Z",
   "panel_applied": {
@@ -32,15 +31,7 @@
   },
   "panel_problems": [],
   "paused_by_command": false,
-  "pending_instructions": [
-    {
-      "at": "2026-10-23T17:16:31Z",
-      "kind": "claude",
-      "number": 4,
-      "text": "1. the \"Drop component\" hud entry is misleading. I'm still not sure why it is called that. Also the Builder/Bag should always be accessible - even during a room. 2. The HUD and Builder needs some love. It is difficult to use. Try to rework it to be more user friendly. 3. The \"wave x\" text is currently always present in the middle of the screen. That is probably a mistake.\nMake tasks for each of these points",
-      "url": "https://github.com/peterdk31/spellmerge/issues/4#issuecomment-6370577323"
-    }
-  ],
+  "pending_instructions": [],
   "processed_comments": [
     6241847784,
     6251160604,

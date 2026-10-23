@@ -99,4 +99,4 @@ Weak spots found in the architecture review of 2026-10-20 (docs/ARCHITECTURE.md)
 
 ## Ideas from the community
 
-(none yet)
+- **Summonable pet that draws enemy fire (#208, p3, idea).** Weighed on 2026-10-23, kept on the backlog; not for M2 and not scheduled. A separate pet system would add a second body per player (four pets in co-op), enemy targeting code and a health bar, none of which builds spells (DESIGN's focus). Prefer the spell route: a **form or modifier** ("familiar": a still or orbiting shot with its own health that enemies prefer as target), which uses the shot budget and the tag system already built, so four players cannot exceed the limits. Decide in M3 when relics and run rewards are designed (a pet as a relic or reward) and in M5 for a kill-count unlock (an unlock of a component, not a new system). Needs then: an enemy targeting rule in `gameplay/ai` that can prefer a decoy, and health for a shot-like target in `gameplay/combat`.

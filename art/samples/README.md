@@ -60,3 +60,23 @@ Notes for whoever picks:
 - The two pale eyes sit in the dark under the brim (as in F) and are hard to see at 1×; at that size the hat, the beard and the staff are what is read.
 - The hat covers the face, so the body layer has no face to share between players; if a face or the beard is ever player-specific it needs its own layer.
 - D, E and C are not redrawn in this round; the owner moved on from them.
+
+## Round four: J, K and L (after the owner's answer on #206)
+
+The owner liked F's hat but said the body was too wide and the wizard should be cuter, and asked for more examples. Sheet: `tests/screenshots/shot_art_direction_4.gd` (`art_direction_sheet_4.png`, in `build/screenshots/` after `ci/build/build.sh --quick --screenshots`): H again for reference, then J, K and L, each with the same four views as round three. The hat is F's hat in each player's colour, unchanged; only the body is new, still without a player colour. As before, "Reads at 1×" and "Mood" are the author's opinion, not a verdict.
+
+What makes them cuter: a big round face under the brim with the eyes in plain view (two 2×2 eyes with a pale highlight, blushing cheeks in Fire light, a small smile) instead of two pale dots in shadow, and a small body, so the head and hat carry the figure. The body is 8 to 10 px wide (H's robe flares to about 14), with tiny boots.
+
+| | H: Cream (round 3, `h_cream/`) | J: Tiny cream (`j_tiny/`) | K: Bean brown (`k_bean/`) | L: Gold, big head (`l_gold/`) |
+| --- | --- | --- | --- | --- |
+| Face | Two pale eyes in shadow, a golden beard | Big face, 10 px wide, big eyes, cheeks, smile | J's face | The biggest face, 12 px wide |
+| Robe | Cream, wide shoulders, flared hem, about 14 px | Cream, 8 px at the chest, a small flare to 10 px, Wood belt and hem | Wood brown, a round bean 10 px wide, Bone collar, Spark belt | Spark gold, 8 px wide, Bone collar, Wood belt and hem |
+| Reads at 1× | Brightest body, widest | The light robe pops against the floor | The darkest body: the brown robe is close to the floor, so the hat and face carry it | The warm robe stands out most; the big head makes the figure top-heavy |
+| Mood | Classic white wizard | Sweet, an apprentice | Cosy, a little bear-like | Sunny, a storybook child |
+
+Notes:
+
+- The beard is gone in all three: the face is the cute part. A beard can come back as its own layer if the owner wants one.
+- Cheeks use Fire light (`#ffa23c`), which no player colour is close to. All three use only the standard palette.
+- L's gold robe is close to the Spark pickups and gold UI text; if L is picked that needs a look.
+- Picking one of these still leaves the hat file and sheet questions in `docs/NEXT.md` ("Record the chosen art direction").

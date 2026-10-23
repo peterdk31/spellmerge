@@ -2,6 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-23: A fourth art direction round (J, K, L), the pick asked again
+
+- **Why:** the owner answered #206 (key `art-direction-pick-3`) with "the body is too wide, I like the hat, the wizard needs to be more cute, give me some more examples". That is not a pick, so the record task cannot be done and nothing in `golden.json` or `STYLE.md` changes.
+- **Done:** F's hat stays; three new bodies, each under the four hats: J (tiny cream), K (bean brown), L (gold, bigger head). All are 8 to 10 px wide with a big round face, two big eyes with a highlight, Fire-light cheeks and a small smile, and no beard. Standard palette only. Sheet `art_direction_sheet_4.png`; comparison in `art/samples/README.md`.
+- **Same key:** the pick is asked again as `art-direction-pick-3` (one decision keeps one issue), and the task stays under "Blocked".
+- **Hand-written SVGs:** the session could not run a generator script, so the three files were written as rects by hand; the sheet was looked at, and `test_svg_art` checks palette, overlaps, bounds and that no body carries a player colour.
+
 ## 2026-10-23: planning with an empty queue; the pet idea (#208)
 
 - **Why:** the work queue ran empty: the only doable Queue task, "Read the web stress parts", needs a daily run newer than #202, and none exists yet. A session would only answer `nothing_to_do`, so planning ran.

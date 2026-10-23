@@ -14,10 +14,12 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
   - **Waits on:** the next daily run (a "Daily run" post newer than #202 with the `BENCH: frame parts` lines). The planning run moves it back to the top of the Queue once that post exists.
 
 - [ ] **Record the chosen art direction (M2 part 27 follow-up).** Replace the golden example candidates in `art/kit/golden.json` and `docs/STYLE.md` with the chosen style's files, and say in `docs/STYLE.md` that the style is no longer provisional. Redrawing the placeholders in that style is spread over later milestones (M2 design, "Art and the art direction"), one area at a time.
-  - **Also decide with the pick (G, H or I):** whether the player-coloured hat is a second sprite per wizard frame or a baked sheet per player, and how the four `hat_p1` to `hat_p4` files are loaded by player index (through `core/registry`, never a computed path). Both choices change the animation and player work.
-  - **Waits on:** the owner question with key `art-direction-pick-3` (the owner picks from A to I and locks it in `docs/DESIGN.md`; rounds one and two, #190 and #192, were answered with "more options").
+  - **Also decide with the pick (G to L):** whether the player-coloured hat is a second sprite per wizard frame or a baked sheet per player, and how the four `hat_p1` to `hat_p4` files are loaded by player index (through `core/registry`, never a computed path). Both choices change the animation and player work.
+  - **Waits on:** the owner question with key `art-direction-pick-3` (the owner picks from A to L and locks it in `docs/DESIGN.md`; rounds one, two and three, #190, #192 and #206, were answered with "more options" or changes: round four, J to L, is the narrower, cuter body under F's hat).
 
 ## Done recently
+
+- [x] **Fourth art direction round (M2 part 27, owner `/claude` on #206).** The owner liked F's hat but found the body too wide and not cute enough. In `art/samples/`: J (tiny cream), K (bean brown) and L (gold, bigger head), each a `body.svg` 8 to 10 px wide with a big round face, big eyes and cheeks, no beard, under the existing four hats. `tests/screenshots/shot_art_direction_4.gd` makes `art_direction_sheet_4.png`; `art/samples/README.md` compares them. The pick is asked again with the same key, `art-direction-pick-3`.
 
 - [x] **Collect the C2 evidence (M2 part 28, first half).** (`docs/LOG.md`) The section "C2 evidence" at the top of `docs/LOG.md` has the fuzz coverage and frame times, the headless stress numbers, the bots' recipes, the 21 combos, the carried-over M1 items with their state, and what M2 cut or left open. Web numbers are marked pending. No bug found; M2 stays open.
 

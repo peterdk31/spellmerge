@@ -604,6 +604,33 @@
       "prompt": "Style sample F (big hat): a 16x16 fire spell icon, a tall teardrop flame with a Spark core, Fire shades and a 1 px outline. Only non-overlapping rect elements, palette colours from docs/STYLE.md."
     },
     {
+      "path": "art/samples/j_tiny/body.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "Style sample J (tiny cream), the body without the hat: a narrow 32x32 wizard body under F's big hat, a big round face with two big eyes with highlights, blushing cheeks and a small smile, a small Bone robe 8 px wide with a Wood belt, a Wood hem, tiny boots, hands and a staff with a Spark gem. No player colour: the hat is drawn on top in the player's colour. 1 px outline, light from the top-left, only non-overlapping rect elements, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/samples/k_bean/body.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "Style sample K (bean brown), the body without the hat: a narrow 32x32 wizard body under F's big hat, the same big round face as J, a round bean-shaped Wood robe 10 px wide with a Bone collar and a Spark belt, tiny dark boots, hands and a staff with a Spark gem. No player colour: the hat is drawn on top in the player's colour. 1 px outline, light from the top-left, only non-overlapping rect elements, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/samples/l_gold/body.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "Style sample L (gold, big head), the body without the hat: a narrow 32x32 wizard body under F's big hat, an even bigger round face 12 px wide with big eyes with highlights, blushing cheeks and a small smile, a Spark robe 8 px wide with a Bone collar and a Wood belt and hem, tiny boots, hands and a staff with a Spark gem. No player colour: the hat is drawn on top in the player's colour. 1 px outline, light from the top-left, only non-overlapping rect elements, palette colours from docs/STYLE.md."
+    },
+    {
       "path": "art/samples/g_brown/body.svg",
       "origin": "ai",
       "author": "Claude",

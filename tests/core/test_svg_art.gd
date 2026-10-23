@@ -15,6 +15,9 @@ const KNOWN: Array[String] = [
 	"res://art/samples/hats_vivid/hat_p4.svg",
 	"res://art/samples/g_brown/body.svg",
 	"res://art/samples/h_cream/body.svg",
+	"res://art/samples/j_tiny/body.svg",
+	"res://art/samples/k_bean/body.svg",
+	"res://art/samples/l_gold/body.svg",
 	"res://art/samples/i_warm/floor.svg",
 ]
 const PALETTE: Array[String] = [
@@ -146,7 +149,7 @@ func test_the_soft_sample_has_no_black_and_the_big_hat_keeps_it() -> void:
 ## In G, H and I only the hat takes the player's colour: the body sprites use no player colour,
 ## and each hat uses exactly one player's ramp (standard or vivid).
 func test_only_the_hat_has_the_player_colour() -> void:
-	for body: String in ["g_brown", "h_cream"]:
+	for body: String in ["g_brown", "h_cream", "j_tiny", "k_bean", "l_gold"]:
 		var text: String = FileAccess.get_file_as_string("res://art/samples/%s/body.svg" % body)
 		for colour: String in PLAYER_COLOURS + SAMPLE_PALETTE_COLOURS:
 			check(not text.contains(colour), "%s/body.svg uses the player colour %s" % [body, colour])

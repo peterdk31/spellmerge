@@ -9,6 +9,7 @@
     "number": 202
   },
   "errors_in_a_row": 0,
+  "idle": null,
   "intake_tasks": {
     "208": {
       "author": "Brianmanden",
@@ -31,7 +32,15 @@
   },
   "panel_problems": [],
   "paused_by_command": false,
-  "pending_instructions": [],
+  "pending_instructions": [
+    {
+      "at": "2026-10-23T19:38:04Z",
+      "kind": "claude",
+      "number": 4,
+      "text": "whenever the game shows the player how to interact through the joypad, keyboard og mouse+keyboard, it should do so by showing a glyph of a button that should be pressed. This will also save space, by not having to type out which action button should be pressed, but it can be shown with a single glyph.\nWe might need a controller class / strategy, and it should automatically swap controller type, when it detects a player has switched from eg. An Xbox controller to a keyboard. The glyphs should then update live",
+      "url": "https://github.com/peterdk31/spellmerge/issues/4#issuecomment-6373214037"
+    }
+  ],
   "processed_comments": [
     6241847784,
     6251160604,
@@ -61,7 +70,8 @@
     6364455955,
     6367011007,
     6368586228,
-    6370577323
+    6370577323,
+    6373214037
   ],
   "task_failures": {
     "**Read the first WASM numbers (M2 part 25 follow-up).** (`tests/benchmark/`, `docs/`) Once a daily build has run the web projectile timing and stress steps, read their `BENCH:` lines (or why they failed or timed out; see `docs/DECISIONS.md`, 2026-10-22). Sessions can't read CI logs: the \"Daily run\" post in that day's Daily log quotes them under \"Stress and timing results\" (`gh issue list --label daily-log --state all`, then `gh issue view N --comments`). Then either confirm the limits or lower them. Also read what the per-frame `multimesh.buffer` upload costs there (bolt, rune and orbit batches each hand over the whole cap x 16 floats, up to 192 KB per batch at 3,000); if it is tight, upload only the used slice or size the rune and orbit batches smaller. \"WASM pending\" stays open until then.": {

@@ -47,7 +47,8 @@ const AiScript := preload("res://gameplay/ai/ai.gd")
 
 const PLAYERS: int = 4
 ## The scenarios: label, enemies, shots, and (variants only) whether the scene is drawn and
-## whether hit particles start.
+## whether hit particles start. The web scenarios follow the web cap on purpose (the web
+## budget is that cap); the PLAN's 1,000 is the older figure to compare against.
 const SCENARIOS: Array[Dictionary] = [
 	{"label": "web", "enemies": 100, "shots": ProjectileManagerScript.DEFAULT_CAP_WEB},
 	{"label": "desktop", "enemies": 200, "shots": 3000},

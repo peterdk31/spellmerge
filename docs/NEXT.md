@@ -10,7 +10,7 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
 
 ## Blocked
 
-- [ ] **Check the web stress run after the cap of 500 (M2 part 25 follow-up).** (`core/spells/limits.gd`, `docs/DECISIONS.md`) When a "Daily run" post newer than the 11:23 UTC one of 2026-10-23 in #202 has the web `BENCH: frame parts` lines, read them: the web physics step should be clearly under 16.7 ms (about 12 ms or less) with steps per frame near 1. If not, lower `MAX_SHOTS` and `MAX_FIRES_PER_STEP`, then make the per-enemy step cheaper. Write the result in DECISIONS. **The stabilisation task must not close M2 or write the C2 checkpoint before this is done.**
+- [ ] **Check the web stress run after the cap of 500 (M2 part 25 follow-up).** (`core/spells/limits.gd`, `docs/DECISIONS.md`) When a "Daily run" post newer than the 11:23 UTC one of 2026-10-23 in #202 has the web `BENCH: frame parts` lines, read them: the web physics step should be clearly under 16.7 ms (the threshold is 12 ms or less; the expected value is about 11 ms) with steps per frame near 1. Between 12 and 16.7 ms, or over, lower `MAX_SHOTS` and `MAX_FIRES_PER_STEP`, then make the per-enemy step cheaper. Write the result in DECISIONS. **The stabilisation task must not close M2 or write the C2 checkpoint before this is done.**
   - **Waits on:** the next daily run after the change (a "Daily run" post newer than 11:23 UTC on 2026-10-23 with the `BENCH: frame parts` lines).
 ## Done recently
 

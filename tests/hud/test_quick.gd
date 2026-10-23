@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## Tests for the quick view and the quick actions (M2 part 18): the active spell on the corner
 ## panel, a `swap` press turned into `spell_swap_requested`, the builder folding into the quick
-## view when a wave starts (and back when it is cleared), and "Drop component" in the quick view
+## view when a wave starts (and back when it is cleared), and "Bag" in the quick view
 ## and the overlay. The wizards are real (real registry and spell runtime), so a request is
 ## checked and answered as in the game. Several players at once is the point of some tests.
 ##
@@ -253,7 +253,7 @@ func test_a_wave_folds_an_open_builder_into_the_quick_view() -> void:
 	check(not builder.tab_button(0).is_visible_in_tree() and not builder.tab_button(1).is_visible_in_tree(), "the tabs are gone")
 	check(not builder.up_button().is_visible_in_tree() and not builder.held_button().is_visible_in_tree(), "so are the held levels")
 	check(not builder.info_panel().is_visible_in_tree(), "and the info panel")
-	check(builder.drop_button().is_visible_in_tree(), "\"Drop component\" is there")
+	check(builder.drop_button().is_visible_in_tree(), "\"Bag\" is there")
 	check(builder.close_button().is_visible_in_tree(), "and Close")
 	check(builder.slot_button(BuilderScript.SLOT_FORM).text.contains("Bolt"), "the chain is still shown")
 	check(builder.slot_button(BuilderScript.SLOT_ELEMENT).disabled, "but read only")
@@ -262,14 +262,14 @@ func test_a_wave_folds_an_open_builder_into_the_quick_view() -> void:
 		if control.is_visible_in_tree():
 			reachable.append(control)
 	check_equal(reachable, [builder.drop_button(), builder.close_button()] as Array[Control], "the controls that can be reached are Drop and Close")
-	check(_focus.focused(0) == builder.drop_button(), "focus is on \"Drop component\"")
+	check(_focus.focused(0) == builder.drop_button(), "focus is on \"Bag\"")
 	check(builder.drop_button().text.begins_with(BuilderScript.FOCUS_MARK), "marked by text")
 	check(_focus.is_open(0) and _input.is_captured(0), "the owner still holds focus and stands still")
 	check(not paused, "the wave is never paused")
 
 
 ## The focus mark ("> ") is on one control only: folding must not leave it on a slot that the
-## quick view shows read only (it showed "> [F: Bolt]" beside "> Drop component").
+## quick view shows read only (it showed "> [F: Bolt]" beside "> Bag").
 func _marked(builder: BuilderScript) -> Array[Button]:
 	var marked: Array[Button] = []
 	for slot in BuilderScript.SLOT_COUNT:
@@ -287,7 +287,7 @@ func test_folding_leaves_one_focus_mark_and_unfolding_too() -> void:
 	var builder: BuilderScript = _builder(0)
 	check_equal(_marked(builder), [builder.slot_button(BuilderScript.SLOT_FORM)] as Array[Button], "the full builder opens marked on the form slot")
 	_wave_start()
-	check_equal(_marked(builder), [builder.drop_button()] as Array[Button], "folded: only \"Drop component\" is marked")
+	check_equal(_marked(builder), [builder.drop_button()] as Array[Button], "folded: only \"Bag\" is marked")
 	_wave_end()
 	check_equal(_marked(builder), [builder.slot_button(BuilderScript.SLOT_FORM)] as Array[Button], "unfolded: back on the form slot, no mark left on Drop")
 	check(_focus.focused(0) == builder.slot_button(BuilderScript.SLOT_FORM), "and focus is there")
@@ -303,7 +303,7 @@ func test_folding_with_nothing_to_drop_puts_focus_on_close() -> void:
 		_press(0, _row_named(builder.shown_rows(), name_to_drop))
 	_wave_end()
 	_wave_start(2)
-	check(builder.is_quick() and builder.drop_button().disabled, "a full spell folds with \"Drop component\" greyed")
+	check(builder.is_quick() and builder.drop_button().disabled, "a full spell folds with \"Bag\" greyed")
 	check(_focus.focused(0) == builder.close_button(), "focus is on Close, not on a greyed button")
 	check_equal(_marked(builder), [] as Array[Button], "no read-only slot is marked")
 
@@ -321,7 +321,7 @@ func test_the_quick_view_unfolds_when_the_wave_is_cleared_and_keeps_the_choices(
 	check(builder.tab_button(0).is_visible_in_tree() and builder.info_panel().is_visible_in_tree(), "the full view is back")
 	check(builder.slot_button(BuilderScript.SLOT_FIRST_MODIFIER).text.contains("Split"), "with the choice kept")
 	check(not builder.slot_button(BuilderScript.SLOT_ELEMENT).disabled, "and the slots work again")
-	check(not builder.drop_button().visible, "\"Drop component\" is only the quick view's")
+	check(not builder.drop_button().visible, "\"Bag\" is only the quick view's")
 	check(builder.controls().has(builder.tab_button(0)), "the tabs are controls again")
 	check(builder.controls().size() > 4, "UIFocus has the full list")
 
@@ -360,7 +360,7 @@ func test_the_builder_state_resets_with_the_run() -> void:
 	check(not _hud.is_wave_active() and not _builder(0).is_quick(), "the run's end clears it")
 
 
-# --- Drop component in the quick view -----------------------------------------
+# --- Bag in the quick view -----------------------------------------
 
 func test_drop_component_lists_what_fits_a_free_slot() -> void:
 	_start(1)
@@ -405,7 +405,7 @@ func test_the_next_drop_goes_to_the_next_free_slot_until_all_are_full() -> void:
 	_press(0, _row_named(builder.shown_rows(), "Bigger"))
 	check_equal(_players[0].recipe_of(0).get("modifiers"), [&"split", &"pierce", &"bigger"], "three modifiers in order")
 	check(not builder.is_dropping(), "with every slot full the list is over")
-	check(builder.drop_button().disabled, "\"Drop component\" is greyed")
+	check(builder.drop_button().disabled, "\"Bag\" is greyed")
 	check(_focus.focused(0) == builder.close_button(), "and focus is on Close")
 	check_equal(_requests.size(), 3, "three requests, no more")
 
@@ -437,7 +437,7 @@ func test_cancel_goes_back_from_the_list_then_closes() -> void:
 	_tap(0, &"dodge")
 	_frame()
 	check(builder.is_open() and not builder.is_dropping(), "cancel on a component leaves the list, the builder stays")
-	check(_focus.focused(0) == builder.drop_button(), "focus is on \"Drop component\" again")
+	check(_focus.focused(0) == builder.drop_button(), "focus is on \"Bag\" again")
 	_tap(0, &"dodge")
 	_frame()
 	check(not builder.is_open(), "cancel there closes it")
@@ -555,7 +555,7 @@ func test_the_quick_view_is_narrower_than_the_full_builder() -> void:
 	check_equal(_builder(0).size.x, full, "and the full width is back")
 
 
-# --- Drop component in the overlay --------------------------------------------
+# --- Bag in the overlay --------------------------------------------
 
 func test_the_overlay_drops_a_component_during_a_wave() -> void:
 	_start(1)
@@ -565,7 +565,7 @@ func test_the_overlay_drops_a_component_during_a_wave() -> void:
 	var overlay: OverlayScript = _overlay(0)
 	check(overlay.is_open(), "the overlay opens in a wave")
 	_press(0, overlay.drop_button())
-	check(overlay.is_dropping() and not overlay.shown_rows().is_empty(), "\"Drop component\" lists the components")
+	check(overlay.is_dropping() and not overlay.shown_rows().is_empty(), "\"Bag\" lists the components")
 	check(not overlay.row_ids().has(&"fire"), "no element for A, which has one")
 	_press(0, _row_named(overlay.shown_rows(), "Homing"))
 	check_equal(_requests.size(), 1, "one request")
@@ -631,6 +631,67 @@ func test_four_overlays_drop_at_once() -> void:
 	check_equal(senders, [0, 1, 2, 3] as Array[int], "one request from each player")
 	for request in _requests:
 		check_equal(request[1], PackedInt32Array([0]), "all for spell A")
+
+
+func test_the_action_is_called_bag_and_its_list_says_drop() -> void:
+	_start(1)
+	_wave_start()
+	_tap(0, &"overlay")
+	_frame()
+	var overlay: OverlayScript = _overlay(0)
+	check(overlay.drop_button().text.ends_with("Bag"), "the overlay action is \"Bag\"")
+	check_equal(overlay.get_node("%Title").text, "P1 MENU", "the menu is titled MENU")
+	_press(0, overlay.drop_button())
+	check_equal(overlay.get_node("%Title").text, "P1 Drop", "the open list is titled Drop")
+	_tap(0, &"dodge")
+	_frame()
+	check_equal(overlay.get_node("%Title").text, "P1 MENU", "back from the list it is MENU again")
+	_tap(0, &"dodge")
+	_frame()
+	_open_builder(0)
+	var builder: BuilderScript = _builder(0)
+	check(builder.is_quick() and builder.drop_button().text.ends_with("Bag"), "the quick view action is \"Bag\"")
+	_press(0, builder.drop_button())
+	check_equal((builder.find_child("Title", true, false) as Label).text, "P1 Drop", "the quick view's open list is titled Drop")
+
+
+func test_bag_opens_in_combat_for_one_player() -> void:
+	_bag_opens(1, true)
+
+
+func test_bag_opens_in_combat_for_four_players() -> void:
+	_bag_opens(4, true)
+
+
+func test_bag_opens_in_a_room_for_one_player() -> void:
+	_bag_opens(1, false)
+
+
+func test_bag_opens_in_a_room_for_four_players() -> void:
+	_bag_opens(4, false)
+
+
+func _bag_opens(players: int, in_wave: bool) -> void:
+	_start(players)
+	if in_wave:
+		_wave_start()
+	for player in players:
+		_tap(player, &"overlay")
+	_frame()
+	for player in players:
+		var overlay: OverlayScript = _overlay(player)
+		check(overlay.is_open(), "%d players: overlay %d opens (wave: %s)" % [players, player, in_wave])
+		_press(player, overlay.drop_button())
+		check(overlay.is_dropping() and not overlay.shown_rows().is_empty(), "%d players: the Bag list of player %d opens (wave: %s)" % [players, player, in_wave])
+		_press(player, overlay.shown_rows()[0])
+	var senders: Array[int] = []
+	for request in _requests:
+		senders.append(request[0] as int)
+	senders.sort()
+	var expected: Array[int] = []
+	for player in players:
+		expected.append(player)
+	check_equal(senders, expected, "%d players: one drop request from each" % players)
 
 
 func test_build_from_the_overlay_in_a_wave_opens_the_quick_view() -> void:

@@ -4,6 +4,8 @@ shader_type canvas_item;
 
 varying vec3 tint;
 
+// In vertex(), COLOR is the item's vertex colour with its modulate already applied.
+
 void vertex() {
 	tint = COLOR.rgb;
 }

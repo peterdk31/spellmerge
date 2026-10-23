@@ -4,7 +4,7 @@ Ideas and future work outside the current milestone (docs/PLAN.md, "Planning sys
 
 ## From the reactions walkthrough
 
-- **One shape for all six flashes (task).** Reactions differ by colour and name only. Give each its own shape (a ring for Shatter, drops for Thaw, ...) so colour-blind players also read them at a glance; same flash slots.
+- **One shape for all six flashes (task).** Reactions differ by colour and name only. Give each its own shape (a ring for Shatter, drops for Thaw, ...) so colour-blind players also read them at a glance; same flash slots. Colour alone is weak for the hue-confusable pairs: Kindle (red) and Thaw (green), Thaw (green) and Flare (yellow); Rift and Stillness are also close (RGB distance about 0.48).
 - **Dark names on the dark floor (task).** The Kindle (red) and Stillness (blue) names at 8 px are dim; try a lighter outline or a pale halo.
 - **Four reaction flashes at once (task).** `REACTION_SLOTS` is 4, so a fifth reaction inside a quarter second takes over the oldest flash and name. Check in a four-player fight whether 6 reads better.
 

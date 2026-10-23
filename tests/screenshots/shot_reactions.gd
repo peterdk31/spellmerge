@@ -2,9 +2,9 @@ extends SceneTree
 ## Screenshots of element reactions, for people and for Claude to look at: one reaction
 ## (`reaction_one`), four at once, one per player (`reaction_four_players`), and all six made
 ## by real hits in the combo arena, three at a time: `reactions_first_three_1x` and
-## `reactions_last_three_1x` (plain 1x crops, as a player sees them), and the same at 4x. Needs a display, so it runs only through
-## `ci/build/build.sh --quick --screenshots`; each shot is saved as
-## user://screenshots/<name>.png and copied to build/screenshots/.
+## `reactions_last_three_1x` (plain 1x crops, as a player sees them), and the same at 4x.
+## Needs a display, so it runs only through `ci/build/build.sh --quick --screenshots`; each
+## shot is saved as user://screenshots/<name>.png and copied to build/screenshots/.
 
 const SHOTS_DIR := "user://screenshots"
 const SETTLE_FRAMES := 20

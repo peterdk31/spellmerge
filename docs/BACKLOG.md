@@ -99,4 +99,4 @@ Weak spots found in the architecture review of 2026-10-20 (docs/ARCHITECTURE.md)
 
 ## Ideas from the community
 
-(none yet)
+- **Summonable pet that draws enemy fire (#208, p3, idea).** Kept on the backlog on 2026-10-23, not scheduled (reasoning in `docs/DECISIONS.md`). Prefer a spell route (a "familiar" form or modifier) over a pet system; decide in M3 (relics, run rewards) and M5 (unlock). Needs: an enemy targeting rule in `gameplay/ai` that can prefer a decoy, and health for a shot-like target in `gameplay/combat`.

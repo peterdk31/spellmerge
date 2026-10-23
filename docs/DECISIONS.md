@@ -2,6 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-23: planning with an empty queue; the pet idea (#208)
+
+- **Why:** the work queue ran empty: the only doable Queue task, "Read the web stress parts", needs a daily run newer than #202, and none exists yet. A session would only answer `nothing_to_do`, so planning ran.
+- **Now:** that task waits in Blocked for the next daily run. A new first task, "Collect the C2 evidence", needs no web numbers and the checkpoint needs it anyway. M2 is not done (stabilisation and the web numbers are open), so no checkpoint yet.
+- **Idea #208 (summonable pet):** kept on the backlog, not scheduled (not for M2). A pet as its own system conflicts with "the game is about building spells" and multiplies bodies by four players. What fits DESIGN is a spell form or modifier (a "familiar" shot with its own health that enemies prefer) or a relic or reward in M3; a kill-count unlock is an M5 progression item that unlocks a component. Written in BACKLOG, "Ideas from the community".
+- **Re-examined feature:** the quick view and reactions walkthroughs already had polish passes this week and the web stress frame is the live item, so no new polish task.
+
 ## 2026-10-23: Reaction flashes are flat colour, and the six colours are far apart
 
 - **Weak (six reactions made by real hits, looked at at 1x).** The flash was the gold spark art with the reaction's colour multiplied in, so it came out wrong (Stillness olive, Rift brown) and not the colour of the name above it. The palette was also close: Shatter, Thaw and Stillness were three pale blue-greys, Kindle and Flare two oranges.

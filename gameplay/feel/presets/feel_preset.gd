@@ -98,6 +98,6 @@ extends Resource
 @export var nova_texture: Texture2D = preload("res://art/vfx/nova_ring.svg")
 ## How long a beam stays on screen, and how long a nova ring takes to grow to
 ## `nova_ring_size` pixels across.
-@export_range(0.0, 0.5, 0.01) var beam_seconds: float = 0.14
+@export_range(0.0, 0.5, 0.01) var beam_seconds: float = 0.26
 @export_range(0.0, 1.0, 0.01) var nova_seconds: float = 0.25
 @export_range(8.0, 400.0, 1.0) var nova_ring_size: float = 120.0

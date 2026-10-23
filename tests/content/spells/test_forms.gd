@@ -170,6 +170,24 @@ func test_the_beam_hits_along_a_line_up_to_its_reach_at_once() -> void:
 	check_equal(_mgr.get_count(), 0, "a beam holds no shot")
 
 
+func test_a_held_beam_hits_one_enemy_four_times_a_second_and_drains_mana_steadily() -> void:
+	_target(Vector2(60.0, 0.0))
+	var spell: CompiledSpell = _spells.compile({"form": &"beam"})
+	_spells.install(0, 0, spell)
+	var mana: float = 100.0
+	var casts: int = 0
+	# Fire is held for 2 seconds: the player casts whenever the cooldown allows.
+	for i in 120:
+		var taken: float = _spells.cast(0, 0, Vector2.ZERO, Vector2.RIGHT, mana)
+		if taken != SpellsScript.REFUSED:
+			mana -= taken
+			casts += 1
+		_tick(1)
+	check_equal(_hits.size(), 8, "one enemy is hit 4 times a second (8 in 2 s)")
+	check_equal(casts, 8, "each tick is one cast")
+	check(absf((100.0 - mana) / 2.0 - 16.0) < 0.01, "the beam takes 16 mana a second while held (%f)" % mana)
+
+
 func test_the_beam_does_not_reach_past_its_length() -> void:
 	_target(Vector2(_form(&"beam").ray_length + 40.0, 0.0))
 	_cast(&"beam", 0, Vector2.ZERO)

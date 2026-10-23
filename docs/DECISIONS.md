@@ -2,6 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-23: The beam is a held tick, 4 hits a second on one enemy (owner `/claude` on #4)
+
+- **Why:** the owner wants a continuous beam that fires while fire is held, uses mana continuously, and hits the same enemy only x times a second.
+- **x = 4.** While `cast` is held the player already casts whenever the cooldown allows, so the beam's cooldown is its tick: 0.25 s. Two a second reads as a pulse; eight or more makes hit flashes and particles strobe and buys nothing. The drawn beam stays 0.26 s, so each tick joins the next into one line.
+- **Numbers:** 3 damage a tick (12 a second per enemy, a little under the bolt's 14; pierce 1 hits two in line), 4 mana a tick = 16 mana a second against 10 regenerated, so a full pool lasts about 17 s of holding. `faster` still shortens the tick, so it raises the hit rate.
+- **No new mechanism:** a per-enemy hit limiter would duplicate the cooldown; one enemy is hit once per cast.
+
 ## 2026-10-23: Style N chosen; the wizard has a shared body and a separate hat, and idles with a blink
 
 - **Why:** the owner answered round five (#206, key `art-direction-pick-3`) with "lets go with N" and asked for character animations, such as an eye blink in idle and something that makes it feel alive. The earlier open question, a second sprite per wizard or a baked sheet per player, is decided here.

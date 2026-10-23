@@ -349,7 +349,7 @@ Performance is designed in from M1, with hard budgets checked every day, because
 | Budget | Web demo | Full desktop build |
 | --- | --- | --- |
 | Frame rate | 60 FPS on a mid-range laptop in Chrome or Firefox | 60 FPS on a mid-range PC with a \~5-year-old GPU |
-| Stress scenario | 4 players, 100 enemies, 1,000 projectiles, full effects | 4 players, 200 enemies, 3,000 projectiles, full effects |
+| Stress scenario | 4 players, 100 enemies, 500 projectiles (1,000 until the first web run, DECISIONS 2026-10-23), full effects | 4 players, 200 enemies, 3,000 projectiles, full effects |
 | Load time | Under 10 s on normal broadband | Under 5 s from SSD |
 | Download | Under 40 MB compressed | Under 300 MB |
 | Memory | Under 512 MB | Under 1.5 GB |

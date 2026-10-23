@@ -1,5 +1,5 @@
 extends Node
-## Times the projectile manager at its caps (1,000 web, 3,000 desktop) with four
+## Times the projectile manager at its caps (500 web, 3,000 desktop) with four
 ## players, and prints `BENCH:` lines. It gates nothing on time (runners differ);
 ## it checks only that the work was really done: the cap is full, nothing is lost,
 ## the batch holds every projectile.

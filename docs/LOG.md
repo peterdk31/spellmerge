@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-23: Web stress parts read, web projectile cap 500 (owner `/claude` on #4)
+
+Read the first web `frame parts` lines in #202: the web physics step is 14 to 20 ms, so the engine runs up to 8 catch-up steps per frame (the 130 ms frame). Enemy, combat and Feel passes are small. Lowered `DEFAULT_CAP_WEB` from 1,000 to 500; the web stress scenarios follow the constant; docs updated. A new Blocked task checks the next daily web run. Not verified in a browser (a session can't run one).
+
 ## 2026-10-23: Style N recorded and the wizard made alive (M2 part 27, owner `/claude` on #206)
 
 The owner chose N and asked for character animations, "an eye blink in idle and something that makes it feel alive". Redrew the in-game wizard in N: one shared body strip each for idle (open, closed, glance left, glance right), walk and dash, and four hats on a `Hat` node under `Sprite`; the twelve per-player strips are removed. `player.gd` orders the idle poses (a blink every few seconds, a glance now and then, a double blink), breathes with a 1 px bob and bobs on the walk and dash; the hat follows. Recorded the style in `docs/STYLE.md` and `art/kit/golden.json`. The SVG strips are hand-written rects (a generator script could not be run in this session). `build.sh --quick --tests` passes; the `art_sheet` and `arena_four_wizards` shots were looked at. `tools/check.sh` reports only the untracked `.idea`, `.vscode` and `scripts` folders of the runner.

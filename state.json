@@ -9,7 +9,6 @@
     "number": 202
   },
   "errors_in_a_row": 0,
-  "idle": "2026-10-23T11:51:01Z",
   "intake_tasks": {
     "208": {
       "author": "Brianmanden",
@@ -20,7 +19,7 @@
       "title": "Idea: summonable pet that draws enemy fire"
     }
   },
-  "last_own_merge": "2026-10-23T11:46:13Z",
+  "last_own_merge": "2026-10-23T12:18:13Z",
   "last_plan": "2026-10-23T11:51:01Z",
   "last_weekly": "2026-10-22T13:49:44Z",
   "panel_applied": {
@@ -32,15 +31,7 @@
   },
   "panel_problems": [],
   "paused_by_command": false,
-  "pending_instructions": [
-    {
-      "at": "2026-10-23T12:04:47Z",
-      "kind": "claude",
-      "number": 4,
-      "text": "The Daily run post at 11:23 UTC in #202 has the web \"BENCH: frame parts\" and \"stress parts\" lines. Move \"Read the web stress parts\" back to the top of the Queue and do it now.",
-      "url": "https://github.com/peterdk31/spellmerge/issues/4#issuecomment-6364455955"
-    }
-  ],
+  "pending_instructions": [],
   "processed_comments": [
     6241847784,
     6251160604,

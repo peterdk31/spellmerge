@@ -29,7 +29,7 @@ func _initialize() -> void:
 	_input.call("add_virtual_device", 0)
 	flow.call("start_run", 0)
 	await _settle()
-	# Wave 1 is on: the overlay's Drop component, in combat.
+	# Wave 1 is on: the overlay's Bag, in combat.
 	_tap(0, &"swap")
 	await _settle()
 	_tap(0, &"overlay")

@@ -8,6 +8,31 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - **Still over:** the web run with the render loop on has p95 56.5 ms, the particles-off run 51.8 ms (2.5 steps per frame), and the desktop-size scenario in the web export 119 ms. They run in the CI browser, which has no GPU (software rendering), so the time is most likely in the renderer and on a shared runner, not in game code. That is unconfirmed: the particles-off run is not faster than the one with particles (51.8 ms against 56.5 ms, still 2.5 steps per frame), and the 119 ms desktop-size run is not explained. The BACKLOG item "Real-GPU web frame rate" settles it. The warning is not a failure (docs/PLAN.md, "Gates are sparse").
 - **Decision:** `DEFAULT_CAP_WEB`, `MAX_SHOTS` and `MAX_FIRES_PER_STEP` stay. The game logic is inside the web budget. Frame rate on real hardware in Chrome and Firefox is for the owner and web players (BACKLOG, "Real-GPU web frame rate"). M2's done-when item 3 is met for game logic; the remaining warning will be named in the C2 checkpoint, which the next planning session opens.
 
+## 2026-10-23: HUD and Builder walkthrough: what is hard, and the three fixes (owner `/claude` on #4, point 2)
+
+- **Walked through** with real input: one player on keyboard, four players on gamepads (player 3 in detail), in the break (full builder) and in a wave (overlay, quick view, Bag), at 1x and 4x screenshots.
+- **What is hard** (worst first):
+  1. **Slot names are code letters.** "F: Bolt", "E: Fire", "M1: -", "T: -": a new player does not know F, E, M or T. Same in the refusal text ("Pick a form (F) first", from `player`).
+  2. **Nothing says what a button does.** The builder never says that `cast` picks and `dodge` goes back, nor what the focused control will do (a slot opens a list, a row applies, a tab switches spell).
+  3. **The focus is faint.** The focused control differs from the others only by a "> " and a slightly lighter fill; with four builders open it is easy to lose.
+  4. The description line cuts off at three lines ("Reliable, which the...").
+  5. A greyed slot ("Mod 2", "Held >") gives no reason (already in the backlog).
+  6. The bag rows mark the current component with " *", which says nothing by itself.
+  7. The hint names the actions ("Cast", "Dodge"), not the physical buttons, which differ for keyboard and gamepad.
+  8. In a wave, the quick view does not say that the full builder comes back after the wave (the title just changes).
+  9. The corner panel never says which button opens the overlay.
+- **Fixed (three, in `hud/`):** (1) words for slots: "Form", "Elem", "Mod 1-3", "Trig" ("Element" and "Trigger" do not fit next to the longest component name in the 100 px column, checked by the existing width test); (2) a hint line (8 px, theme variation `BuilderHint`) under the info panel's note that changes with the focus; the panel is full, so the complexity words now sit on the bar (one row, 12 px) and the preview is 14 px high, which pays for it ("Pick a part (Cast)" on a slot, "Use (Cast), back (Dodge)" on a bag row, and so on). The hint also shows in the quick view, where the info panel is hidden: a second label (`QuickHint`) under the chain, with the left column's spacing 0 so the longest quick view still fits its quarter (a test checks it). The words name the action in brackets because the physical button is not known yet, so this part is only partly solved (item 7 stays in the backlog); (3) a visible focus: the focused control takes the theme variation `BuilderButtonFocus` (brighter fill, 2 px light border, white text, 4 px side margins) besides the "> " mark. Its top and bottom margins stay 1 px: 2 px makes a focused quick row (14 px) taller than the others and the longest quick view no longer fits; in the screenshots the text does not touch the border.
+- **Still faint:** the overlay menu and the quick-view Bag list (`widgets/drop_choices.gd`) keep the old focus look and have no hint (BACKLOG).
+- **Looked at** (1x screenshots `builder_one_player`, `builder_four_players`, `quick_view_four_players`, `quick_view_drop_list`): the 8 px hint reads at 1x though small; "Complexity 2/12" on the 12 px bar stays readable (the outline helps over the fill); the focus border is clear of the text.
+- **The common case** (a component into a slot) was already short: the builder opens on the form slot, and a form or element into an empty slot moves on to the next bag. With a gamepad as player 3 of 4 it is: Y, down, X (open), down ×2 (to Mod 1), X, down to the row, X. A test (`test_player_three_of_four_puts_a_component_in_a_slot_with_a_gamepad`) runs that with real joypad button events on gamepad 2 of 4 and checks that only player 3's builder and recipe change.
+- **To the backlog:** items 4 to 9 (item 5 was there already), and the "(F)" in the refusal text, which is in `gameplay/player/` and so outside this task.
+
+## 2026-10-23: The wave line shows only while a wave is on (owner `/claude` on #4)
+
+- **Why:** the line was hidden only by `run_started` and `run_ended`; no code sends them yet, and a cleared wave sent only `room_cleared`, so "Wave N" stayed mid-screen for good.
+- **Decision:** keep the small 12 px line in the middle strip (the gap that stays clear of four open builders), but show it only from `wave_started` to `room_cleared`; the build line takes its place during the break. No fading banner: the number is useful all through a wave.
+- **A wave that is never cleared:** the line stays up while it runs, which is right. `Flow.stop_run` sends no event, so a run stopped mid-wave would leave the line; `room_entered` (sent right before `wave_started` at every run start) now hides it too. Until the next run starts, a stopped run still shows the old line.
+
 ## 2026-10-23: The beam is a held tick, 4 hits a second on one enemy (owner `/claude` on #4)
 
 - **Why:** the owner wants a continuous beam that fires while fire is held, uses mana continuously, and hits the same enemy only x times a second.
@@ -1221,3 +1246,9 @@ An independent review of the branch found these, all fixed with a regression tes
 - **Why:** the quick view had only tests and one staged shot. Walking a wave by real input (1 and 4 players, 1x and 4x) showed a stale focus mark after folding (the read-only form slot kept "> ") and focus on a greyed "Drop component" when a full spell folded.
 - **Now:** both fixed (`set_quick` clears the mark and focuses Close when nothing can be dropped). Text size (10 px) and the corner's "Spell A/B" read fine at 1x with four players; left as is.
 - **Not done:** (1) the disabled-slot hint: `UIFocus` skips disabled controls by design, so a hint needs a new way to read them, a core change bigger than a polish pass; the BACKLOG entry stays. (2) `swap` is ignored inside a menu (the wizard stands still there), so a player closes the quick view to swap. (3) the drop list names no slot. (4) read-only slots look greyed like disabled ones. (2) to (4) are in BACKLOG.
+
+## "Bag" replaces "Drop component"; no full editing in a wave
+
+- **Why:** the name said nothing about why the action exists. The owner (`/claude` on #4) asked for a name that says what it does, with "Drop" clear inside it, reachable by every player in a room and in a wave.
+- **Now:** the action is "Bag" in the overlay and the quick view; the list it opens is titled "P1 Drop" (the overlay title otherwise reads "MENU"). It opens in a wave for every player because the overlay is not gated by waves.
+- **Full editing mid-wave: no.** The M2 design locks the Builder in a wave (the quick view is the in-combat form, "choices so far kept"), and a player in a menu stands still and can be hit; a full six-slot editor in combat would break that trade-off. The quick Bag view (list, drop) is the answer; a wider in-wave Bag is for the HUD/Builder usability task.

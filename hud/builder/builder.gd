@@ -25,7 +25,7 @@ extends PanelContainer
 ## The quick view (M2 part 18): when a wave starts (`set_quick(true)`, called by `panels.gd`) an
 ## open builder folds into the quick view, and one opened during a wave starts as it. It keeps the
 ## slot chain of the active spell on show (read only), hides the tabs, the held levels, the bag
-## and the info panel, and offers "Drop component" and "Close". "Drop component" lists the bag
+## and the info panel, and offers "Bag" and "Close". "Bag" opens a list titled "Drop" of the bag
 ## components that fit a free slot (the empty element slot, the first free modifier slot; see
 ## `hud/widgets/drop_choices.gd`) and activating one asks for it with `build_change_requested`
 ## like the full builder. When the wave is cleared (`set_quick(false)`) it unfolds again. The
@@ -55,20 +55,25 @@ const SLOT_COUNT: int = 6
 const SLOT_KINDS: Array[StringName] = [&"form", &"element", &"modifier", &"modifier", &"modifier", &"trigger"]
 ## Short on purpose: the slot column is narrow and the component name must stay readable
 ## with the focus mark and brackets added.
-const SLOT_NAMES: Array[String] = ["F", "E", "M1", "M2", "M3", "T"]
+const SLOT_NAMES: Array[String] = ["Form", "Elem", "Mod 1", "Mod 2", "Mod 3", "Trig"]
 ## A trigger may hold a spell that holds another: two levels below the cast.
 const MAX_LEVEL: int = 2
 const SPELL_COUNT: int = 2
 const SPELL_NAMES: Array[String] = ["A", "B"]
 const NO_COMPONENT: StringName = &""
 
-const DROP_TEXT: String = "Drop component"
+const DROP_TEXT: String = "Bag"
+## The title while the quick view's list of components to drop is shown.
+const DROP_TITLE: String = "Drop"
 const NONE_TEXT: String = "None"
 const EMPTY_SLOT_TEXT: String = "-"
 const FOCUS_MARK: String = "> "
 const CURRENT_MARK: String = " *"
 ## The look of every control: the BuilderButton theme variation.
 const BUTTON_VARIATION: StringName = &"BuilderButton"
+## The look of the control in focus: brighter, with a bright border (the "> " mark stays, so it
+## is never colour alone).
+const FOCUS_VARIATION: StringName = &"BuilderButtonFocus"
 const ROW_HEIGHT: float = 18.0
 const QUICK_ROW_HEIGHT: float = 14.0
 const LEFT_WIDTH: float = 100.0
@@ -84,13 +89,24 @@ const INFO_HEIGHT: float = 112.0
 const INFO_EDGE: float = 4.0
 ## Height of the corner panel plus its gap: where the strip starts.
 const INFO_CORNER: float = 59.0
-const PREVIEW_HEIGHT: float = 16.0
+const PREVIEW_HEIGHT: float = 14.0
 const NOTE_HEIGHT: float = 36.0
+const COMPLEXITY_HEIGHT: float = 12.0
+const HINT_VARIATION: StringName = &"BuilderHint"
 ## Lines the note shows before it trims with an ellipsis (112 px wide, about 20 characters a line); a description must fit them
 ## (`test_builder.gd` checks every real one, and `StoryValidator.MAX_LORE_CHARS` caps the length).
 const NOTE_LINES: int = 3
 const LABEL_VARIATION: StringName = &"BuilderLabel"
 const BAR_VARIATION: StringName = &"ComplexityBar"
+## What the focused control does, one short line under the note (the actions are `cast` and `dodge`).
+const HINT_SLOT: String = "Pick a part (Cast)"
+const HINT_ROW: String = "Use (Cast), back (Dodge)"
+const HINT_TAB: String = "Show spell (Cast)"
+const HINT_CLOSE: String = "Close (Cast)"
+const HINT_UP: String = "Back up (Cast)"
+const HINT_HELD: String = "Held spell (Cast)"
+const HINT_DROP: String = "List parts (Cast)"
+const HINT_HEIGHT: float = 10.0
 const REFUSED_PREFIX: String = "Refused: "
 const NO_STATS_TEXT: String = "-"
 
@@ -111,7 +127,7 @@ var _bag: Array[StringName] = []
 var _reason: String = ""
 
 var _open: bool = false
-## The quick view is on (a wave is in progress), and its "Drop component" list is shown.
+## The quick view is on (a wave is in progress), and its "Bag" list is shown.
 var _quick: bool = false
 var _dropping: bool = false
 ## Whether the bag has a component that fits a free slot of the spell shown (quick view only).
@@ -133,12 +149,17 @@ var _held: Button = null
 var _drop: Button = null
 var _levels_row: Control = null
 var _bag_column: Control = null
+## The left column; tighter in the quick view to make room for its hint line.
+var _chain_column: Control = null
 var _info: PanelContainer = null
 var _complexity_label: Label = null
 var _complexity_bar: ProgressBar = null
 var _stats: Label = null
 var _preview: SpellPreviewScript = null
 var _note: Label = null
+var _hint: Label = null
+## The same hint in the quick view, where the info panel is hidden.
+var _quick_hint: Label = null
 var _rows: Array[Button] = []
 ## The component id each shown bag row asks for, in row order (`NO_COMPONENT` is "None").
 var _row_ids: Array[StringName] = []
@@ -165,6 +186,7 @@ func _ready() -> void:
 	var right := VBoxContainer.new()
 	right.name = "Bag"
 	_bag_column = right
+	_chain_column = left
 	right.custom_minimum_size = Vector2(RIGHT_WIDTH, 0.0)
 	right.add_theme_constant_override("separation", 2)
 	columns.add_child(right)
@@ -198,6 +220,11 @@ func _ready() -> void:
 	_held.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_drop = _make_button(left, "Drop")
 	_drop.visible = false
+	_quick_hint = Label.new()
+	_quick_hint.name = "QuickHint"
+	_quick_hint.theme_type_variation = HINT_VARIATION
+	_quick_hint.visible = false
+	left.add_child(_quick_hint)
 	_make_info(player)
 	visible = false
 	_render()
@@ -288,7 +315,7 @@ func is_quick() -> bool:
 	return _quick
 
 
-## Whether the quick view's "Drop component" list is shown.
+## Whether the quick view's "Bag" list is shown.
 func is_dropping() -> bool:
 	return _dropping
 
@@ -392,6 +419,11 @@ func note_text() -> String:
 	return _note.text
 
 
+## The hint line under the note: what `cast` does on the focused control.
+func hint_text() -> String:
+	return _hint.text
+
+
 ## How many lines `text` takes in the note at its real width and font (the note shows at most
 ## `NOTE_LINES`; more is trimmed).
 func note_lines_for(text: String) -> int:
@@ -424,9 +456,9 @@ func _make_info(player: int) -> void:
 	add_child(_info)
 	var column := VBoxContainer.new()
 	column.name = "Column"
-	column.add_theme_constant_override("separation", 1)
+	column.add_theme_constant_override("separation", 0)
 	_info.add_child(column)
-	_complexity_label = _make_info_label(column, "Complexity")
+	# The words sit on the bar (one row), which leaves room for the hint line below the note.
 	_complexity_bar = ProgressBar.new()
 	_complexity_bar.name = "ComplexityBar"
 	_complexity_bar.theme_type_variation = BAR_VARIATION
@@ -434,9 +466,12 @@ func _make_info(player: int) -> void:
 	_complexity_bar.min_value = 0.0
 	_complexity_bar.max_value = float(SpellLimits.MAX_COMPLEXITY)
 	_complexity_bar.step = 1.0
-	_complexity_bar.custom_minimum_size = Vector2(0.0, 5.0)
+	_complexity_bar.custom_minimum_size = Vector2(0.0, COMPLEXITY_HEIGHT)
 	_complexity_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	column.add_child(_complexity_bar)
+	_complexity_label = _make_info_label(_complexity_bar, "Complexity")
+	_complexity_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_complexity_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_stats = _make_info_label(column, "Stats")
 	_stats.custom_minimum_size = Vector2(0.0, 24.0)
 	_preview = SpellPreviewScript.new()
@@ -449,6 +484,9 @@ func _make_info(player: int) -> void:
 	_note.max_lines_visible = NOTE_LINES
 	_note.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	_note.custom_minimum_size = Vector2(0.0, NOTE_HEIGHT)
+	_hint = _make_info_label(column, "Hint")
+	_hint.theme_type_variation = HINT_VARIATION
+	_hint.custom_minimum_size = Vector2(0.0, HINT_HEIGHT)
 
 
 func _make_info_label(parent: Node, node_name: String) -> Label:
@@ -495,6 +533,31 @@ func _render_note() -> void:
 		_note.text = REFUSED_PREFIX + _reason
 	else:
 		_note.text = _description_in_focus()
+	_hint.text = _hint_in_focus()
+	_quick_hint.text = _hint.text
+	_quick_hint.visible = _quick
+
+
+## What `cast` does on the focused control (and `dodge`, on a bag row).
+func _hint_in_focus() -> String:
+	var button := _focused as Button
+	if button == null:
+		return ""
+	if _rows.has(button):
+		return HINT_ROW
+	if _slots.has(button):
+		return HINT_SLOT
+	if _tabs.has(button):
+		return HINT_TAB
+	if button == _close:
+		return HINT_CLOSE
+	if button == _up:
+		return HINT_UP
+	if button == _held:
+		return HINT_HELD
+	if button == _drop:
+		return HINT_DROP
+	return ""
 
 
 ## The one-line description of the component the player points at: the bag row in focus, else
@@ -608,6 +671,8 @@ func _render() -> void:
 	var title: String = "P%d Spell %s" % [index + 1, SPELL_NAMES[_viewed]]
 	if _level > 0:
 		title += " held %d" % _level
+	if _quick and _dropping:
+		title = "P%d %s" % [index + 1, DROP_TITLE]
 	_title.text = title
 	for spell in SPELL_COUNT:
 		_set_text(_tabs[spell], SPELL_NAMES[spell] if spell != _viewed else "[%s]" % SPELL_NAMES[spell])
@@ -629,6 +694,7 @@ func _render() -> void:
 	_render_rows(node)
 	_bag_column.visible = not _quick or _dropping
 	_bag_column.add_theme_constant_override("separation", 0 if _quick else 2)
+	_chain_column.add_theme_constant_override("separation", 0 if _quick else 2)
 	_drop.disabled = _quick and not _can_drop
 	_rebuild_controls()
 	_apply_marks()
@@ -717,6 +783,9 @@ func _apply_marks() -> void:
 		var button := control as Button
 		var base: String = str(button.get_meta(BASE_TEXT_META, ""))
 		button.text = (FOCUS_MARK if button == _focused else "") + base
+		button.theme_type_variation = FOCUS_VARIATION if button == _focused else BUTTON_VARIATION
+	# The note and the hint follow the focus, however it moved (opening and folding included).
+	_render_note()
 
 
 func _ask(slot: int, id: StringName) -> void:
@@ -782,7 +851,6 @@ func _on_focus_changed(player: int, control: Control) -> void:
 	if player == index and _open:
 		_focused = control
 		_apply_marks()
-		_render_note()
 
 
 func _on_cancelled(player: int) -> void:
@@ -797,7 +865,7 @@ func _on_cancelled(player: int) -> void:
 		close_builder()
 
 
-## Leave the quick view's drop list and put focus back on "Drop component".
+## Leave the quick view's drop list and put focus back on "Bag".
 func _stop_dropping() -> void:
 	_dropping = false
 	_render()
@@ -898,7 +966,7 @@ func _first_row() -> Control:
 	return _slots[_slot]
 
 
-## In the quick view: "Drop component", or "Close" when nothing is left to drop.
+## In the quick view: "Bag", or "Close" when nothing is left to drop.
 func _quick_focus_target() -> Control:
 	return _drop if not _drop.disabled else _close
 

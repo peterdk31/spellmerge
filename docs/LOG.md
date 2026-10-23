@@ -6,6 +6,22 @@ What each run did, newest first. Claude appends a short entry after each develop
 
 The queue was empty. The 13:29 UTC daily run shows the web physics step at 7.58 ms (max 11.10) with one step per frame at the cap of 500, so the Blocked web stress task is answered (docs/DECISIONS.md) and nothing was changed in the limits. M2 is marked done in the roadmap; the C2 checkpoint issue follows from this PR. The web run with rendering still warns (p95 56 ms) in the GPU-less CI browser.
 
+## 2026-10-23: HUD and Builder made easier to use (owner `/claude` on #4, point 2)
+
+Walked the builder through with one keyboard player and four gamepad players and listed nine things that are hard (in `docs/DECISIONS.md`). Fixed the worst three: slots are named in words ("Form", "Elem", "Mod 1", "Trig"), a hint line says what `cast` and `dodge` do for the control in focus, and the focused control has its own bright look (`BuilderButtonFocus`). Test: player 3 of 4 puts a component into a slot with gamepad button events. The rest is in `docs/BACKLOG.md`.
+
+## 2026-10-23: "Drop component" is now "Bag" (owner `/claude` on #4)
+
+The overlay and quick-view action is named "Bag"; its open list is titled "Drop". It already opened in combat for every player (the overlay is not wave-gated), so step 2 needed no code, only tests (1 and 4 players in a wave). The full Builder stays locked in a wave; the reason is in `docs/DECISIONS.md`. I could not read the test and screenshot output in this session (see the PR).
+
+## 2026-10-23: The wave line shows only during a wave (owner `/claude` on #4)
+
+"Wave N" stayed on screen after a wave was cleared, because only `run_started`/`run_ended` hid it and nothing sends them. It now hides at `room_cleared`; regression test in `test_panels.gd`.
+
+## 2026-10-23: Three tasks from the owner's HUD feedback (owner `/claude` on #4)
+
+Wrote three tasks in `docs/NEXT.md`, ahead of stabilisation: the always-visible "Wave N" text, Builder/Bag reachable in a room plus a better name than "Drop component", and a HUD/Builder usability rework. No code changed.
+
 ## 2026-10-23: The beam is held (owner `/claude` on #4)
 
 The beam now ticks while fire is held: cooldown 0.25 s (4 hits a second on one enemy), 3 damage and 4 mana a tick (16 mana a second, against 10 regenerated); the drawn beam lasts 0.25 s (one tick, so beams do not stack). New test in `test_forms.gd`. `build.sh --quick --tests` passes.

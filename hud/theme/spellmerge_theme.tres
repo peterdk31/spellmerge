@@ -1,4 +1,4 @@
-[gd_resource type="Theme" load_steps=16 format=3]
+[gd_resource type="Theme" load_steps=17 format=3]
 
 [sub_resource type="StyleBoxFlat" id="panel_p1"]
 content_margin_left = 4.0
@@ -128,6 +128,18 @@ border_width_right = 1
 border_width_bottom = 1
 border_color = Color(0.0784314, 0.0705882, 0.121569, 1)
 
+[sub_resource type="StyleBoxFlat" id="button_small_focus"]
+content_margin_left = 4.0
+content_margin_top = 1.0
+content_margin_right = 4.0
+content_margin_bottom = 1.0
+bg_color = Color(0.45098, 0.419608, 0.627451, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.94902, 0.901961, 0.54902, 1)
+
 [sub_resource type="StyleBoxFlat" id="panel_plain"]
 content_margin_left = 6.0
 content_margin_top = 4.0
@@ -156,6 +168,14 @@ BuilderButton/styles/disabled = SubResource("button_small_dark")
 BuilderButton/styles/hover = SubResource("button_small")
 BuilderButton/styles/normal = SubResource("button_small")
 BuilderButton/styles/pressed = SubResource("button_small_dark")
+BuilderButtonFocus/base_type = &"BuilderButton"
+BuilderButtonFocus/colors/font_color = Color(1, 1, 1, 1)
+BuilderButtonFocus/font_sizes/font_size = 10
+BuilderButtonFocus/styles/hover = SubResource("button_small_focus")
+BuilderButtonFocus/styles/normal = SubResource("button_small_focus")
+BuilderButtonFocus/styles/pressed = SubResource("button_small_focus")
+BuilderHint/base_type = &"Label"
+BuilderHint/font_sizes/font_size = 8
 BuilderLabel/base_type = &"Label"
 BuilderLabel/font_sizes/font_size = 10
 ComplexityBar/base_type = &"ProgressBar"

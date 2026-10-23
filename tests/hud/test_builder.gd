@@ -906,7 +906,8 @@ func test_player_three_of_four_puts_a_component_in_a_slot_with_a_gamepad() -> vo
 	if _requests.size() == 1:
 		check_equal(_requests[0], [2, PackedInt32Array([0]), BuilderScript.SLOT_FIRST_MODIFIER, &"split"], "for player 3, spell A, the first modifier slot, Split")
 	check_equal(builder.recipe_of(0).get("modifiers"), [&"split"], "player 3's spell A now holds Split")
-	check(_players[0] != null and _builder(0).recipe_of(0).get("modifiers", []).is_empty(), "player 1's spell is unchanged")
+	for other in [0, 1, 3]:
+		check(_builder(other).recipe_of(0).get("modifiers", []).is_empty(), "player %d's spell is unchanged" % (other + 1))
 	_pad(2, PAD_DODGE)
 	check(builder.is_open() and _focus.focused(2) is Button, "B goes back a step and keeps the builder open")
 
@@ -947,3 +948,4 @@ func test_every_hint_fits_the_info_panel() -> void:
 	for hint in [BuilderScript.HINT_SLOT, BuilderScript.HINT_ROW, BuilderScript.HINT_TAB, BuilderScript.HINT_CLOSE, BuilderScript.HINT_UP, BuilderScript.HINT_HELD, BuilderScript.HINT_DROP]:
 		var wide: float = font.get_string_size(hint, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
 		check(wide <= room, "'%s' is %.0f px wide, the panel has %.0f" % [hint, wide, room])
+		check(wide <= BuilderScript.LEFT_WIDTH, "'%s' is %.0f px wide, the quick view's column has %.0f" % [hint, wide, BuilderScript.LEFT_WIDTH])

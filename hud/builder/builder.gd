@@ -99,13 +99,13 @@ const NOTE_LINES: int = 3
 const LABEL_VARIATION: StringName = &"BuilderLabel"
 const BAR_VARIATION: StringName = &"ComplexityBar"
 ## What the focused control does, one short line under the note (the actions are `cast` and `dodge`).
-const HINT_SLOT: String = "Cast: pick a part"
-const HINT_ROW: String = "Cast: use  Dodge: back"
-const HINT_TAB: String = "Cast: show spell"
-const HINT_CLOSE: String = "Cast: close"
-const HINT_UP: String = "Cast: back up"
-const HINT_HELD: String = "Cast: held spell"
-const HINT_DROP: String = "Cast: list parts"
+const HINT_SLOT: String = "Pick a part (Cast)"
+const HINT_ROW: String = "Use (Cast), back (Dodge)"
+const HINT_TAB: String = "Show spell (Cast)"
+const HINT_CLOSE: String = "Close (Cast)"
+const HINT_UP: String = "Back up (Cast)"
+const HINT_HELD: String = "Held spell (Cast)"
+const HINT_DROP: String = "List parts (Cast)"
 const HINT_HEIGHT: float = 10.0
 const REFUSED_PREFIX: String = "Refused: "
 const NO_STATS_TEXT: String = "-"
@@ -149,6 +149,8 @@ var _held: Button = null
 var _drop: Button = null
 var _levels_row: Control = null
 var _bag_column: Control = null
+## The left column; tighter in the quick view to make room for its hint line.
+var _chain_column: Control = null
 var _info: PanelContainer = null
 var _complexity_label: Label = null
 var _complexity_bar: ProgressBar = null
@@ -156,6 +158,8 @@ var _stats: Label = null
 var _preview: SpellPreviewScript = null
 var _note: Label = null
 var _hint: Label = null
+## The same hint in the quick view, where the info panel is hidden.
+var _quick_hint: Label = null
 var _rows: Array[Button] = []
 ## The component id each shown bag row asks for, in row order (`NO_COMPONENT` is "None").
 var _row_ids: Array[StringName] = []
@@ -182,6 +186,7 @@ func _ready() -> void:
 	var right := VBoxContainer.new()
 	right.name = "Bag"
 	_bag_column = right
+	_chain_column = left
 	right.custom_minimum_size = Vector2(RIGHT_WIDTH, 0.0)
 	right.add_theme_constant_override("separation", 2)
 	columns.add_child(right)
@@ -215,6 +220,11 @@ func _ready() -> void:
 	_held.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_drop = _make_button(left, "Drop")
 	_drop.visible = false
+	_quick_hint = Label.new()
+	_quick_hint.name = "QuickHint"
+	_quick_hint.theme_type_variation = HINT_VARIATION
+	_quick_hint.visible = false
+	left.add_child(_quick_hint)
 	_make_info(player)
 	visible = false
 	_render()
@@ -524,6 +534,8 @@ func _render_note() -> void:
 	else:
 		_note.text = _description_in_focus()
 	_hint.text = _hint_in_focus()
+	_quick_hint.text = _hint.text
+	_quick_hint.visible = _quick
 
 
 ## What `cast` does on the focused control (and `dodge`, on a bag row).
@@ -682,6 +694,7 @@ func _render() -> void:
 	_render_rows(node)
 	_bag_column.visible = not _quick or _dropping
 	_bag_column.add_theme_constant_override("separation", 0 if _quick else 2)
+	_chain_column.add_theme_constant_override("separation", 0 if _quick else 2)
 	_drop.disabled = _quick and not _can_drop
 	_rebuild_controls()
 	_apply_marks()
@@ -771,6 +784,8 @@ func _apply_marks() -> void:
 		var base: String = str(button.get_meta(BASE_TEXT_META, ""))
 		button.text = (FOCUS_MARK if button == _focused else "") + base
 		button.theme_type_variation = FOCUS_VARIATION if button == _focused else BUTTON_VARIATION
+	# The note and the hint follow the focus, however it moved (opening and folding included).
+	_render_note()
 
 
 func _ask(slot: int, id: StringName) -> void:
@@ -836,7 +851,6 @@ func _on_focus_changed(player: int, control: Control) -> void:
 	if player == index and _open:
 		_focused = control
 		_apply_marks()
-		_render_note()
 
 
 func _on_cancelled(player: int) -> void:

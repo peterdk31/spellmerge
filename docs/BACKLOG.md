@@ -4,7 +4,8 @@ Ideas and future work outside the current milestone (docs/PLAN.md, "Planning sys
 
 ## From the HUD and Builder usability walkthrough (owner `/claude` on #4, point 2)
 
-- **Show the buttons, not the actions (task).** The builder's hint says "Cast" and "Dodge"; a gamepad player has X and B, a keyboard player J and Space. Ask `core/input` for the name of the bound button per device and show that (needs a small `core/` addition, so a task of its own).
+- **Show the buttons, not the actions (task).** The builder's hint says "Cast" and "Dodge"; a gamepad player has X and B, a keyboard player J and Space. The hints now read "Pick a part (Cast)", which is only a half fix. Ask `core/input` for the name of the bound button per device and show that (needs a small `core/` addition, so a task of its own).
+- **The overlay menu and the Bag list still have the faint focus and no hint (task).** Give `widgets/drop_choices.gd` and the overlay the `BuilderButtonFocus` look and a hint line.
 - **The refusal text says "(F)" (task).** "Pick a form (F) first" comes from `gameplay/player/player.gd`; the slot is now named "Form" in the builder, so drop the letter there.
 - **Long descriptions are cut at three lines (task).** The note under the info panel ends in "..." for several components. Shorten the texts, or give the note more room by dropping the stats line when a description is long.
 - **What " *" means (task).** The bag marks the current component with " *". Try "(in slot)" or a check mark glyph, if it fits the 80 px row.

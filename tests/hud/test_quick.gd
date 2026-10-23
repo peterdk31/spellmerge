@@ -268,6 +268,26 @@ func test_a_wave_folds_an_open_builder_into_the_quick_view() -> void:
 	check(not paused, "the wave is never paused")
 
 
+func test_the_quick_view_shows_a_hint_for_the_focused_control() -> void:
+	_start(1)
+	_open_builder(0)
+	var builder: BuilderScript = _builder(0)
+	var label: Label = builder.find_child("QuickHint", true, false) as Label
+	check(label != null and not label.is_visible_in_tree(), "the full builder has the hint in its info panel instead")
+	_wave_start()
+	check(label.is_visible_in_tree(), "the quick view shows a hint line")
+	check_equal(label.text, BuilderScript.HINT_DROP, "on Bag it says what Cast does")
+	_focus_on(0, builder.close_button())
+	check_equal(label.text, BuilderScript.HINT_CLOSE, "on Close it follows the focus")
+	_wave_end()
+	check(not label.is_visible_in_tree(), "the hint line goes with the quick view")
+	_wave_start(2)
+	_tap(0, &"dodge")
+	_frame()
+	_open_builder(0)
+	check_equal(label.text, BuilderScript.HINT_DROP, "a builder opened in a wave has the hint at once")
+
+
 ## The focus mark ("> ") is on one control only: folding must not leave it on a slot that the
 ## quick view shows read only (it showed "> [F: Bolt]" beside "> Bag").
 func _marked(builder: BuilderScript) -> Array[Button]:

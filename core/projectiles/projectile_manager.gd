@@ -148,7 +148,7 @@ const HIT_MEMORY: int = 3
 ## The most hit-test work one step does, in units: each target examined costs 1,
 ## each hit costs HIT_WORK. Once it is spent, the remaining projectiles are not
 ## tested this step (see the class doc). Normal play uses a tiny part of it.
-const WORK_PER_STEP: int = 8000
+const WORK_PER_STEP: int = 6000
 
 ## The most wall cells one shot walks in one step (see `_wall_hit`).
 const MAX_WALL_VISITS: int = 64

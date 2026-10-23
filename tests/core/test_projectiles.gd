@@ -774,7 +774,7 @@ func _test_spent_budget_resumes_at_the_first_untested_shot() -> void:
 	_check(_mgr._resume == tested.size(), "the next step resumes at the first untested slot (%d, tested %d)" % [_mgr._resume, tested.size()])
 	var seen: Dictionary = tested.duplicate()
 	var steps: int = 0
-	while seen.size() < count and steps < 8:
+	while seen.size() < count and steps < 16:
 		var before: int = _hits.size()
 		_mgr.step(DT)
 		for h in range(before, _hits.size()):

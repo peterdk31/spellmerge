@@ -53,4 +53,4 @@ Professional-looking, very few bugs, genuinely good art, music and gameplay. Qua
 
 ## Art direction (locked)
 
-Not chosen yet. In M2 an art direction call invites style samples, the community votes and the owner picks; the chosen style and its golden examples are recorded here so it can't drift.
+Chosen on 2026-10-23: style N, a narrow dusk (Stone) robe with a Spark placket, belt and hem, two big tall eyes and no mouth, under a big pointed hat in the player's colour (the only player colour on the wizard). The rules and golden examples are in docs/STYLE.md and art/kit/golden.json.

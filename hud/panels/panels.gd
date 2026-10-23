@@ -316,6 +316,7 @@ func _on_player_left(player: int) -> void:
 
 func _on_room_entered(_room_id: StringName) -> void:
 	_in_room = true
+	_wave_label.visible = false  # stop_run sends no event; Flow sends wave_started right after
 	for player in PLAYER_COUNT:
 		_refresh(player)
 

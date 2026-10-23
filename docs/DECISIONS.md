@@ -6,6 +6,7 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 
 - **Why:** the line was hidden only by `run_started` and `run_ended`; no code sends them yet, and a cleared wave sent only `room_cleared`, so "Wave N" stayed mid-screen for good.
 - **Decision:** keep the small 12 px line in the middle strip (the gap that stays clear of four open builders), but show it only from `wave_started` to `room_cleared`; the build line takes its place during the break. No fading banner: the number is useful all through a wave.
+- **A wave that is never cleared:** the line stays up while it runs, which is right. `Flow.stop_run` sends no event, so a run stopped mid-wave would leave the line; `room_entered` (sent right before `wave_started` at every run start) now hides it too. Until the next run starts, a stopped run still shows the old line.
 
 ## 2026-10-23: The beam is a held tick, 4 hits a second on one enemy (owner `/claude` on #4)
 

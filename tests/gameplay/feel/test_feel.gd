@@ -32,6 +32,7 @@ func _initialize() -> void:
 	_test_shake_off_does_nothing()
 	_test_particle_limit_holds_with_four_players()
 	_test_particles_come_back()
+	_test_particles_can_be_turned_off()
 	_test_missing_sound_is_silent()
 	_test_known_sound_plays()
 	_test_downed_has_no_particles()
@@ -221,6 +222,19 @@ func _test_particles_come_back() -> void:
 	_check(_feel.live_particles() == 0, "finished bursts return to the pool")
 	_hit(0)
 	_check(_feel.live_particles() == FeelScript.BURST_PARTICLES, "a returned burst can be used again")
+
+
+func _test_particles_can_be_turned_off() -> void:
+	_setup()
+	_feel.particles_enabled = false
+	for i in 20:
+		_hit(i % 4)
+	_bus.enemy_died.emit(0, null, Vector2(5.0, 0.0))
+	_feel.step(STEP)
+	_check(_feel.live_particles() == 0, "no hit particles start with particles off")
+	_feel.particles_enabled = true
+	_hit(0)
+	_check(_feel.live_particles() == FeelScript.BURST_PARTICLES, "particles start again when turned back on")
 
 
 func _test_missing_sound_is_silent() -> void:

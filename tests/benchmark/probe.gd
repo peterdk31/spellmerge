@@ -37,12 +37,31 @@ var _peak_memory: float = 0.0
 var _peak_particles: int = 0
 var _projectiles: Node = null
 var _feel: Node = null
+## The frame's parts, from the engine's own monitors (the web stress frame, docs/DECISIONS.md
+## 2026-10-23): physics steps run per drawn frame, milliseconds in physics and in process,
+## the renderer's CPU time and draw calls. Sums run over the frames after the first.
+var _last_physics_frame: int = -1
+var _steps_sum: int = 0
+var _steps_max: int = 0
+var _physics_sum_ms: float = 0.0
+var _physics_max_ms: float = 0.0
+var _process_sum_ms: float = 0.0
+var _process_max_ms: float = 0.0
+var _render_sum_ms: float = 0.0
+var _render_max_ms: float = 0.0
+var _peak_draw_calls: int = 0
+var _parts_frames: int = 0
 
 
 func _ready() -> void:
 	_samples.resize(max_samples)
 	_projectiles = get_node_or_null("/root/Projectiles")
 	_feel = get_node_or_null("/root/Feel")
+	RenderingServer.viewport_set_measure_render_time(get_viewport().get_viewport_rid(), true)
+
+
+func _exit_tree() -> void:
+	RenderingServer.viewport_set_measure_render_time(get_viewport().get_viewport_rid(), false)
 
 
 func _process(_delta: float) -> void:
@@ -50,12 +69,45 @@ func _process(_delta: float) -> void:
 	if _last_usec >= 0:
 		record(float(now - _last_usec) / 1000.0)
 	_last_usec = now
+	_sample_parts()
 	_peak_nodes = maxi(_peak_nodes, int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT)))
 	_peak_memory = maxf(_peak_memory, Performance.get_monitor(Performance.MEMORY_STATIC))
 	if _projectiles != null:
 		_peak_projectiles = maxi(_peak_projectiles, int(_projectiles.call("get_count")))
 	if _feel != null:
 		_peak_particles = maxi(_peak_particles, int(_feel.call("live_particles")))
+
+
+## Read the engine's monitors for the frame that just ended (nothing before the second frame).
+func _sample_parts() -> void:
+	var physics_frame: int = Engine.get_physics_frames()
+	if _last_physics_frame >= 0:
+		var steps: int = physics_frame - _last_physics_frame
+		_steps_sum += steps
+		_steps_max = maxi(_steps_max, steps)
+		var physics_ms: float = Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0
+		var process_ms: float = Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0
+		var render_ms: float = RenderingServer.viewport_get_measured_render_time_cpu(get_viewport().get_viewport_rid())
+		_physics_sum_ms += physics_ms
+		_physics_max_ms = maxf(_physics_max_ms, physics_ms)
+		_process_sum_ms += process_ms
+		_process_max_ms = maxf(_process_max_ms, process_ms)
+		_render_sum_ms += render_ms
+		_render_max_ms = maxf(_render_max_ms, render_ms)
+		_parts_frames += 1
+	_last_physics_frame = physics_frame
+	_peak_draw_calls = maxi(_peak_draw_calls, int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)))
+
+
+## Physics steps run per drawn frame, on average (0 with no frames). The engine runs several
+## in one frame when it is late, so a slow step makes the next frame slower still.
+func steps_per_frame_average() -> float:
+	return float(_steps_sum) / float(_parts_frames) if _parts_frames > 0 else 0.0
+
+
+## The most physics steps run in one drawn frame.
+func steps_per_frame_max() -> int:
+	return _steps_max
 
 
 ## Count one frame of `ms` milliseconds. Past `max_samples` frames it still counts
@@ -106,4 +158,7 @@ func report() -> void:
 		cap = int(_projectiles.call("get_cap"))
 		dropped = int(_projectiles.get("dropped"))
 	print("BENCH: peak nodes %d, peak projectiles %d (cap %d, dropped %d), peak static memory %.1f MiB (budgets %d web, %d desktop)" % [_peak_nodes, _peak_projectiles, cap, dropped, _peak_memory / 1048576.0, MEMORY_BUDGET_WEB_MIB, MEMORY_BUDGET_DESKTOP_MIB])
+	if _parts_frames > 0:
+		var n: float = float(_parts_frames)
+		print("BENCH: frame parts: physics steps per frame avg %.1f max %d; physics process avg %.2f ms max %.2f ms; process avg %.2f ms max %.2f ms; renderer CPU avg %.2f ms max %.2f ms; peak draw calls %d" % [steps_per_frame_average(), _steps_max, _physics_sum_ms / n, _physics_max_ms, _process_sum_ms / n, _process_max_ms, _render_sum_ms / n, _render_max_ms, _peak_draw_calls])
 	print("BENCH: peak live hit particles %d (limit %d, Feel.PARTICLE_LIMIT)" % [_peak_particles, FeelScript.PARTICLE_LIMIT])

@@ -2,6 +2,10 @@
 
 Ideas and future work outside the current milestone (docs/PLAN.md, "Planning system"). Players' ideas wait as issues labelled `backlog` (the daily intake puts them there); this file holds Claude's own. The weekly planning run moves items from both into the work queue or `docs/NEXT.md` when their milestone comes.
 
+## From the web stress frame
+
+- **Real-GPU web frame rate (playtest question).** The web numbers so far come from a browser without a GPU (software rendering). Ask web players in the weekly playtest how a busy room feels (frame rate in a four-player fight in Chrome and Firefox on real hardware), and put what they say next to the stress run's `frame parts` lines. If the weekly run does not ask, ask the owner to add a line to `.github/maintainer/plan.md`.
+
 ## From the reactions walkthrough
 
 - **One shape for all six flashes (task).** Reactions differ by colour and name only. Give each its own shape (a ring for Shatter, drops for Thaw, ...) so colour-blind players also read them at a glance; same flash slots. Colour alone is weak for the hue-confusable pairs: Kindle (red) and Thaw (green), Thaw (green) and Flare (yellow); Rift and Stillness are also close (RGB distance about 0.48).

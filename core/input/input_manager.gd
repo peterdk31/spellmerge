@@ -31,11 +31,17 @@ extends Node
 ## click, cleared by a press of the keyboard cast key). The mouse is only a flag
 ## here: turning the pointer into a direction needs the world, so the wizard does it.
 ##
+## Glyphs: glyph_kind(player) says what that player holds (keyboard, keyboard with the mouse
+## aiming, or a gamepad of one family) so the HUD can draw the button to press instead of
+## naming an action. `glyph_kind_changed(player)` fires when it changes: a device joins or
+## leaves, or the keyboard player turns the mouse aim on or off (core/input/input_glyphs.gd).
+##
 ## Several inputs can feed one action (W and Up, the d-pad and the stick). Each
 ## input is tracked as its own source and the action takes the strongest one, so
 ## letting go of one input never cancels another that is still held.
 
 const EventsScript := preload("res://core/events/events.gd")
+const GlyphsScript := preload("res://core/input/input_glyphs.gd")
 
 ## The keyboard and mouse as one device.
 const KEYBOARD: int = -1
@@ -78,11 +84,19 @@ const CAPTURED_ACTIONS: Array[StringName] = [
 const JOIN: StringName = &"join"
 const LEAVE: StringName = &"leave"
 
+## The kind of device of `player` changed: the glyphs for that player must be drawn again.
+signal glyph_kind_changed(player: int)
+
 ## The Events bus. Only tests set this, before adding the node, to use their own
 ## bus; otherwise the "Events" autoload is used.
 var events: EventsScript = null
 
+## Gives the name of a gamepad by device id; tests replace it.
+var joy_name_provider: Callable = Input.get_joy_name
+
 var _devices: Array[int] = []
+## Per player: the glyph family of the gamepad in the slot (GlyphsScript.Kind).
+var _pad_kind: Array[int] = []
 ## Per player: action -> strength 0..1 (the strongest of its held sources).
 var _strength: Array[Dictionary] = []
 ## Per player: action -> {source id -> strength} for the sources held right now.
@@ -104,6 +118,7 @@ var _mouse_travel: float = 0.0
 func _init() -> void:
 	for player in MAX_PLAYERS:
 		_devices.append(NO_DEVICE)
+		_pad_kind.append(GlyphsScript.Kind.GAMEPAD)
 		var strength: Dictionary = {}
 		var sources: Dictionary = {}
 		var process: Dictionary = {}
@@ -210,6 +225,7 @@ func leave(player: int) -> bool:
 		_sources[player][action].clear()
 	if events != null:
 		events.device_left.emit(player, device)
+	glyph_kind_changed.emit(player)
 	return true
 
 
@@ -244,12 +260,12 @@ func handle_event(event: InputEvent) -> void:
 		# A brush of the mouse is not a decision to aim with it.
 		_mouse_travel += (event as InputEventMouseMotion).relative.length()
 		if _mouse_travel >= MOUSE_AIM_TRAVEL:
-			_mouse_aiming = true
+			_set_mouse_aiming(player, true)
 		return
 	if event is InputEventMouseButton:
-		_mouse_aiming = true
+		_set_mouse_aiming(player, true)
 	elif event is InputEventKey and event.is_action_pressed(&"cast"):
-		_mouse_aiming = false
+		_set_mouse_aiming(player, false)
 		_mouse_travel = 0.0
 	if event is InputEventJoypadMotion:
 		_handle_motion(player, event)
@@ -349,8 +365,33 @@ func _valid(player: int) -> bool:
 
 func _assign(player: int, device: int) -> void:
 	_devices[player] = device
+	if device == KEYBOARD or is_virtual(device):
+		_pad_kind[player] = GlyphsScript.Kind.GAMEPAD
+	else:
+		_pad_kind[player] = GlyphsScript.kind_of_pad(String(joy_name_provider.call(device)))
 	if events != null:
 		events.device_joined.emit(player, device)
+	glyph_kind_changed.emit(player)
+
+
+## What `player` holds, for drawing glyphs (a GlyphsScript.Kind). A player with no device
+## counts as on the keyboard; a bot's virtual device draws as a plain gamepad.
+func glyph_kind(player: int) -> int:
+	if not _valid(player):
+		return GlyphsScript.Kind.KEYBOARD
+	var device: int = _devices[player]
+	if device == NO_DEVICE:
+		return GlyphsScript.Kind.KEYBOARD
+	if device == KEYBOARD:
+		return GlyphsScript.Kind.KEYBOARD_MOUSE if _mouse_aiming else GlyphsScript.Kind.KEYBOARD
+	return _pad_kind[player]
+
+
+func _set_mouse_aiming(player: int, aiming: bool) -> void:
+	if _mouse_aiming == aiming:
+		return
+	_mouse_aiming = aiming
+	glyph_kind_changed.emit(player)
 
 
 ## Which device an event came from. Keys and mouse are one device; a virtual

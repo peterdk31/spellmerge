@@ -2,6 +2,14 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-23: Glyphs for buttons, resolved in `core/input` and drawn in code (owner `/claude` on #4)
+
+- **Owner's instruction:** wherever the game shows how to interact, show a glyph of the button, not words; a controller strategy that swaps type by itself when a player changes from, say, an Xbox pad to the keyboard, with glyphs updating live.
+- **Strategy:** `InputGlyphs` (`core/input/input_glyphs.gd`) is the lookup (kind and action to shape, label, colour); `PlayerInput.glyph_kind(player)` holds the per-player kind and fires `glyph_kind_changed`. Pad family comes from `Input.get_joy_name` when the device joins (name fragments for Xbox, PlayStation, Switch; anything else is a plain pad with Xbox letters). The kind is per player, so four players can hold four different pads. The keyboard player is `KEYBOARD` or `KEYBOARD_MOUSE` (cast is a click while the mouse aims). The signal lives on `PlayerInput`, not on the Events bus: only the widgets use it.
+- **"Swap when it detects a switch":** in this game a player's device only changes by leave and join (the keyboard joins only as P1, a pad takes the lowest free slot), so the live swap happens there, and for keys against mouse. A device taking over a live player's slot is a new rule and is in BACKLOG for a decision.
+- **Drawn in code**, like the hammer icon, so no art files or manifest lines; 10 px high, 8 px text. Real glyph sprites are in BACKLOG.
+- **Scope:** only the builder's hint line shows a prompt today (the Cast/Dodge words were the only ones; the "(F)" in a refusal text is a form letter and stays). The overlay and Bag list have no hint yet.
+
 ## 2026-10-23: The web stress run after the cap of 500 is read; the limits stay (planning)
 
 - **Read:** the Daily run post of 13:29 UTC in #202 (release v0.20261023.3, after the web cap went from 1,000 to 500). Web, render loop off (game logic only), 100 enemies and 500 shots: physics steps per frame avg 1.0 (max 1), physics step avg 7.58 ms (max 11.10), process 2.43 ms. That meets the rule (a step of 12 ms or less, steps per frame near 1); the catch-up of about 8 steps per frame is gone. Enemy step 0.57 ms, combat lookups 0.24 ms, Feel 0.05 ms per pass.

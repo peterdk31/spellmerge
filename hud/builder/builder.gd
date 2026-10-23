@@ -44,6 +44,8 @@ const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const SpellPreviewScript := preload("res://hud/builder/spell_preview.gd")
 const DropChoicesScript := preload("res://hud/widgets/drop_choices.gd")
+const HintLineScript := preload("res://hud/widgets/hint_line.gd")
+const InputManagerScript := preload("res://core/input/input_manager.gd")
 
 const PLAYER_COUNT: int = 4
 ## The slot numbers of `build_change_requested` (the contract of `gameplay/player`).
@@ -92,20 +94,23 @@ const INFO_CORNER: float = 59.0
 const PREVIEW_HEIGHT: float = 14.0
 const NOTE_HEIGHT: float = 36.0
 const COMPLEXITY_HEIGHT: float = 12.0
-const HINT_VARIATION: StringName = &"BuilderHint"
 ## Lines the note shows before it trims with an ellipsis (112 px wide, about 20 characters a line); a description must fit them
 ## (`test_builder.gd` checks every real one, and `StoryValidator.MAX_LORE_CHARS` caps the length).
 const NOTE_LINES: int = 3
 const LABEL_VARIATION: StringName = &"BuilderLabel"
 const BAR_VARIATION: StringName = &"ComplexityBar"
-## What the focused control does, one short line under the note (the actions are `cast` and `dodge`).
-const HINT_SLOT: String = "Pick a part (Cast)"
-const HINT_ROW: String = "Use (Cast), back (Dodge)"
-const HINT_TAB: String = "Show spell (Cast)"
-const HINT_CLOSE: String = "Close (Cast)"
-const HINT_UP: String = "Back up (Cast)"
-const HINT_HELD: String = "Held spell (Cast)"
-const HINT_DROP: String = "List parts (Cast)"
+## What the focused control does, one short line under the note: the glyph of `cast` (the
+## button that activates) and this verb. A bag row also says what `dodge` does, with `HINT_BACK`.
+const HINT_SLOT: String = "Pick a part"
+const HINT_ROW: String = "Use"
+const HINT_BACK: String = "back"
+const HINT_TAB: String = "Show spell"
+const HINT_CLOSE: String = "Close"
+const HINT_UP: String = "Back up"
+const HINT_HELD: String = "Held spell"
+const HINT_DROP: String = "List parts"
+const HINT_ACTION: StringName = &"cast"
+const HINT_BACK_ACTION: StringName = &"dodge"
 const HINT_HEIGHT: float = 10.0
 const REFUSED_PREFIX: String = "Refused: "
 const NO_STATS_TEXT: String = "-"
@@ -157,9 +162,9 @@ var _complexity_bar: ProgressBar = null
 var _stats: Label = null
 var _preview: SpellPreviewScript = null
 var _note: Label = null
-var _hint: Label = null
+var _hint: HintLineScript = null
 ## The same hint in the quick view, where the info panel is hidden.
-var _quick_hint: Label = null
+var _quick_hint: HintLineScript = null
 var _rows: Array[Button] = []
 ## The component id each shown bag row asks for, in row order (`NO_COMPONENT` is "None").
 var _row_ids: Array[StringName] = []
@@ -220,9 +225,8 @@ func _ready() -> void:
 	_held.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_drop = _make_button(left, "Drop")
 	_drop.visible = false
-	_quick_hint = Label.new()
+	_quick_hint = HintLineScript.new()
 	_quick_hint.name = "QuickHint"
-	_quick_hint.theme_type_variation = HINT_VARIATION
 	_quick_hint.visible = false
 	left.add_child(_quick_hint)
 	_make_info(player)
@@ -232,7 +236,9 @@ func _ready() -> void:
 
 ## Connect to the event bus, the focus service and the spell runtime, which gives names, icons
 ## and kinds (called once by `panels.gd`).
-func bind(events: EventsScript, ui_focus: UIFocusScript, spells: SpellsScript) -> void:
+func bind(events: EventsScript, ui_focus: UIFocusScript, spells: SpellsScript, input: InputManagerScript = null) -> void:
+	_hint.bind(input)
+	_quick_hint.bind(input)
 	_events = events
 	_ui_focus = ui_focus
 	_spells = spells
@@ -421,7 +427,7 @@ func note_text() -> String:
 
 ## The hint line under the note: what `cast` does on the focused control.
 func hint_text() -> String:
-	return _hint.text
+	return _hint.text()
 
 
 ## How many lines `text` takes in the note at its real width and font (the note shows at most
@@ -484,9 +490,10 @@ func _make_info(player: int) -> void:
 	_note.max_lines_visible = NOTE_LINES
 	_note.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	_note.custom_minimum_size = Vector2(0.0, NOTE_HEIGHT)
-	_hint = _make_info_label(column, "Hint")
-	_hint.theme_type_variation = HINT_VARIATION
+	_hint = HintLineScript.new()
+	_hint.name = "Hint"
 	_hint.custom_minimum_size = Vector2(0.0, HINT_HEIGHT)
+	column.add_child(_hint)
 
 
 func _make_info_label(parent: Node, node_name: String) -> Label:
@@ -533,8 +540,10 @@ func _render_note() -> void:
 		_note.text = REFUSED_PREFIX + _reason
 	else:
 		_note.text = _description_in_focus()
-	_hint.text = _hint_in_focus()
-	_quick_hint.text = _hint.text
+	var verb: String = _hint_in_focus()
+	var back: String = HINT_BACK if verb == HINT_ROW else ""
+	_hint.show_hint(index, HINT_ACTION, verb, HINT_BACK_ACTION, back)
+	_quick_hint.show_hint(index, HINT_ACTION, verb, HINT_BACK_ACTION, back)
 	_quick_hint.visible = _quick
 
 

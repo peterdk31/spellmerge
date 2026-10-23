@@ -4,13 +4,16 @@ Ideas and future work outside the current milestone (docs/PLAN.md, "Planning sys
 
 ## From the HUD and Builder usability walkthrough (owner `/claude` on #4, point 2)
 
-- **Show the buttons, not the actions (task).** The builder's hint says "Cast" and "Dodge"; a gamepad player has X and B, a keyboard player J and Space. The hints now read "Pick a part (Cast)", which is only a half fix. Ask `core/input` for the name of the bound button per device and show that (needs a small `core/` addition, so a task of its own).
+- **Glyphs where the game still tells the player what to press (task, owner `/claude` on #4).** The builder's hint line now shows glyphs (`hud/widgets/hint_line.gd`). Still to do: when the overlay and the Bag list get a hint line they use the same widget; the "how to open the overlay" item below becomes a glyph of `overlay`; the main menu and any "press to join" text use the `join` glyph. Mouse clicks on the builder show nothing yet.
+- **A player cannot hand their slot to another device (task, owner `/claude` on #4).** The glyphs follow a player's device live, but a device only changes through leave and join (the keyboard joins only as P1). "Pick up the keyboard while holding an Xbox pad" does nothing today. A handover rule needs a design: for a single joined player, `join` from the other family could move the slot, and a second player's pad would still join as P2. Decide with the owner before building it.
+- **Glyph art is drawn in code (task).** `action_glyph.gd` draws key caps, round buttons and PlayStation symbols with 8 px text, so it is not pixel art in style N. Replace it with 10 px SVG sprites per family when the art direction has a glyph set (add them to `art/manifest.json`).
+- **Stick, d-pad and trigger glyphs are missing (task).** Only the face buttons, left shoulder, Join and Leave have glyphs; move hints would need a stick and a WASD group.
 - **The overlay menu and the Bag list still have the faint focus and no hint (task).** Give `widgets/drop_choices.gd` and the overlay the `BuilderButtonFocus` look and a hint line.
 - **The refusal text says "(F)" (task).** "Pick a form (F) first" comes from `gameplay/player/player.gd`; the slot is now named "Form" in the builder, so drop the letter there.
 - **Long descriptions are cut at three lines (task).** The note under the info panel ends in "..." for several components. Shorten the texts, or give the note more room by dropping the stats line when a description is long.
 - **What " *" means (task).** The bag marks the current component with " *". Try "(in slot)" or a check mark glyph, if it fits the 80 px row.
 - **The quick view does not say the full builder returns (task).** Add "Full builder after the wave" under the quick view's chain, if the quarter has room.
-- **No hint for how to open the overlay (task).** A new player has to know the `overlay` button. Show it once in the corner panel after the first room, or on the main menu.
+- **No hint for how to open the overlay (task).** A new player has to know the `overlay` button. Show it once in the corner panel after the first room, or on the main menu (now a one-glyph job with `ActionGlyph`).
 
 ## From the web stress frame
 

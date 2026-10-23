@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-23: Button glyphs instead of action names (owner `/claude` on #4)
+
+The builder hints now show the glyph of the button to press ("[X] Use  [B] back") instead of "(Cast)" and "(Dodge)". New: `core/input/input_glyphs.gd` (the table per controller family), `PlayerInput.glyph_kind(player)` and `glyph_kind_changed`, and the widgets `hud/widgets/action_glyph.gd` and `hint_line.gd`, which redraw live. Tests: `test_input_glyphs.gd`, `test_action_glyph.gd`, and the builder and quick-view tests follow the new hint line; shot `shot_glyphs.gd`. Not done: overlay and Bag hints, a device handover for one player (both in `docs/BACKLOG.md`).
+
 ## 2026-10-23: M2 closed for the C2 checkpoint (planning)
 
 The queue was empty. The 13:29 UTC daily run shows the web physics step at 7.58 ms (max 11.10) with one step per frame at the cap of 500, so the Blocked web stress task is answered (docs/DECISIONS.md) and nothing was changed in the limits. M2 stays in progress in the roadmap until the C2 checkpoint issue is opened (a read-only session cannot open it). Done-when item 3 is still open. The web run with rendering still warns (p95 56 ms) in the GPU-less CI browser.

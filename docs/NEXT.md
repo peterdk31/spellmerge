@@ -14,6 +14,8 @@ M2's parts are all built and no known crash or blocker is left. The C2 checkpoin
 
 ## Done recently
 
+- [x] **Show button glyphs instead of action names (owner `/claude` on #4).** (`core/input/`, `hud/widgets/`, `hud/builder/`) `PlayerInput.glyph_kind(player)` (keyboard, keyboard with mouse, Xbox, PlayStation, Switch, plain pad) and `glyph_kind_changed`; `ActionGlyph` and `HintLine` draw the button and update live. The builder's hint now reads "[X] Use  [B] back". Tests: `test_input_glyphs.gd`, `test_action_glyph.gd`; shot `glyphs_sheet`. Open (BACKLOG): glyphs in the overlay and Bag list, a device handover for one player, real glyph sprites.
+
 - [x] **Stabilisation and C2 (M2 part 28), second half.** The web stress run after the cap of 500 was read (13:29 UTC daily run): physics step 7.58 ms avg, one step per frame, so the limits stay (DECISIONS, 2026-10-23). No known crash or blocker is left; The C2 checkpoint issue is still to be opened (next planning session).
 
 - [x] **Check the web stress run after the cap of 500 (M2 part 25 follow-up).** Read in the planning session: see the DECISIONS entry "The web stress run after the cap of 500 is read".

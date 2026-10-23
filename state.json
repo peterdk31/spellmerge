@@ -9,7 +9,7 @@
     "number": 202
   },
   "errors_in_a_row": 0,
-  "idle": null,
+  "idle": "2026-10-23T13:12:39Z",
   "intake_tasks": {
     "208": {
       "author": "Brianmanden",
@@ -21,7 +21,7 @@
     }
   },
   "last_own_merge": "2026-10-23T12:18:13Z",
-  "last_plan": "2026-10-23T08:00:00Z",
+  "last_plan": "2026-10-23T13:12:39Z",
   "last_weekly": "2026-10-22T13:49:44Z",
   "panel_applied": {
     "automation_enabled": true,

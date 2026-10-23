@@ -9,7 +9,6 @@
     "number": 202
   },
   "errors_in_a_row": 0,
-  "idle": null,
   "intake_tasks": {
     "208": {
       "author": "Brianmanden",
@@ -72,6 +71,11 @@
       "count": 0,
       "parked_reason": "I made no changes. This task needs the `BENCH:` lines from a daily build's web projectile timing step, or its failure or timeout. This session can't read them: `gh run list` was refused for needing approval, so I couldn't fetch CI logs. The repo has no recorded web numbers either. `docs/LOG.md` and `docs/DECISIONS.md` hold only the headless results (p95 13.9 ms and 15.4 ms), which are not WASM. Confirming or lowering the limits, or changing the `multimesh.buffer` upload, would be guesswork, so \"",
       "parked_until": "2026-10-23T17:31:36Z"
+    },
+    "**Read the web stress parts (M2 part 25 follow-up).** (`tests/benchmark/`, `docs/DECISIONS.md`) The stress run now times the web frame in parts (done 2026-10-23, see Done recently); no web run has used it yet. When a \"Daily run\" post newer than #202 has `BENCH: frame parts` and `BENCH: stress parts` lines for the four web scenarios, read them: the physics steps per frame and the physics step time (last step of the frame; the hypothesis in DECISIONS: a physics step over 16.7 ms makes the engine run up to 8 steps in a frame, so the frame is about 8 steps long), the web run against \"render loop off\" and \"hit particles off\", and the enemy and combat lookup passes. Then fix what is cheap (Combat's linear lookups; lowering `physics/common/max_physics_steps_per_frame` only if a physics step is clearly under 16.7 ms: with longer steps it makes the game run in slow motion, so then make the step cheaper) and otherwise lower `DEFAULT_CAP_WEB`, `MAX_SHOTS` and `MAX_FIRES_PER_STEP`. Also read whether the lowered `WORK_PER_STEP` brought the web homing step under 8 ms. Write the result in DECISIONS. If no such post exists yet, report `nothing_to_do`. **The stabilisation task must not close M2 or write the C2 checkpoint before this is done** (the checkpoint needs honest web numbers). A real-GPU frame rate needs a human: it is in `docs/BACKLOG.md` for the weekly playtest questions.": {
+      "count": 0,
+      "parked_reason": "No web run with the stress parts exists yet. The newest \"Daily run\" post is in daily log #202 (06:14). It has no `BENCH: frame parts` or `BENCH: stress parts` lines. That run is the one that produced the 151 ms web frame. A session can't run a browser, so there is nothing to read or fix. I changed no files. The task stays queued, and the stabilisation task must not close M2 until it is done.",
+      "parked_until": "2026-10-24T05:29:12Z"
     },
     "**Record the chosen art direction (M2 part 27 follow-up).** Replace the golden example candidates in `art/kit/golden.json` and `docs/STYLE.md` with the chosen style's files, and say in `docs/STYLE.md` that the style is no longer provisional. Redrawing the placeholders in that style is spread over later milestones (M2 design, \"Art and the art direction\"), one area at a time.": {
       "count": 0

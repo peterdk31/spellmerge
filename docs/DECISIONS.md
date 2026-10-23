@@ -24,6 +24,11 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - **What.** A question can name up to three shot scripts (`screenshots` in `owner_questions`), staged to show exactly what is being decided. They run in the screenshots job with the PR's, on the same commit (on `main` when there is no PR), and appear under "What it looks like", right after the question. A question that names none shows the PR's screenshots instead.
 - **Order.** Questions are asked by a new `ask` job after the screenshots are posted, not when the PR opens, so the issue is created with its pictures. The revision is told the first session's questions, since they aren't issues yet, so it doesn't ask them twice; `finish` waits for `ask`, so the next session sees them.
 
+## Planning 2026-10-23: queue nearly empty, M2 still not done
+
+- **Why:** only stabilisation was queued. No "Daily run" post with "Stress and timing results" exists yet (#202 is the newest daily log), so the WASM task stays blocked. The art recording task still waits on `art-direction-pick-3`; no issue for that key is open (#190 and #192 are closed), so it is asked again. No issues were in the queue or backlog.
+- **Now:** a reactions walkthrough is added as the polish re-examination (reactions are what make combos surprising, and they only have unit tests). Stabilisation follows it. M2 is not done (done-when items 3, 5 and 6 are open), so no checkpoint.
+
 ## Planning 2026-10-22: queue empty, M2 not done
 
 - **Why:** the queue held only the WASM numbers task (parked: no web `BENCH:` post exists yet), the art recording task (waits on `art-direction-pick-3`) and stabilisation. M2 is not done: done-when items 3 (WASM numbers), 5 (owner items) and 6 (stabilisation) are open, so no checkpoint yet.

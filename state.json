@@ -9,6 +9,7 @@
     "number": 202
   },
   "errors_in_a_row": 0,
+  "idle": null,
   "intake_tasks": {
     "208": {
       "author": "Brianmanden",
@@ -31,7 +32,15 @@
   },
   "panel_problems": [],
   "paused_by_command": false,
-  "pending_instructions": [],
+  "pending_instructions": [
+    {
+      "at": "2026-10-23T09:57:49Z",
+      "kind": "claude",
+      "number": 206,
+      "text": "4: keep the hat style, but maybe add a robe as the clothes and the face just need two big eyes, no mouth. Give me some examples",
+      "url": "https://github.com/peterdk31/spellmerge/issues/206#issuecomment-6362314527"
+    }
+  ],
   "processed_comments": [
     6241847784,
     6251160604,
@@ -55,7 +64,8 @@
     6349722832,
     6351024487,
     6351463461,
-    6361916837
+    6361916837,
+    6362314527
   ],
   "task_failures": {
     "**Read the first WASM numbers (M2 part 25 follow-up).** (`tests/benchmark/`, `docs/`) Once a daily build has run the web projectile timing and stress steps, read their `BENCH:` lines (or why they failed or timed out; see `docs/DECISIONS.md`, 2026-10-22). Sessions can't read CI logs: the \"Daily run\" post in that day's Daily log quotes them under \"Stress and timing results\" (`gh issue list --label daily-log --state all`, then `gh issue view N --comments`). Then either confirm the limits or lower them. Also read what the per-frame `multimesh.buffer` upload costs there (bolt, rune and orbit batches each hand over the whole cap x 16 floats, up to 192 KB per batch at 3,000); if it is tight, upload only the used slice or size the rune and orbit batches smaller. \"WASM pending\" stays open until then.": {

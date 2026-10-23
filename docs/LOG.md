@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-23: Three tasks from the owner's HUD feedback (owner `/claude` on #4)
+
+Wrote three tasks in `docs/NEXT.md`, ahead of stabilisation: the always-visible "Wave N" text, Builder/Bag reachable in a room plus a better name than "Drop component", and a HUD/Builder usability rework. No code changed.
+
 ## 2026-10-23: The beam is held (owner `/claude` on #4)
 
 The beam now ticks while fire is held: cooldown 0.25 s (4 hits a second on one enemy), 3 damage and 4 mana a tick (16 mana a second, against 10 regenerated); the drawn beam lasts 0.25 s (one tick, so beams do not stack). New test in `test_forms.gd`. `build.sh --quick --tests` passes.

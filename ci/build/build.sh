@@ -16,7 +16,7 @@
 # A full build runs the unit tests and takes the screenshots too.
 #
 # Downloads the pinned Godot editor and export templates into $GODOT_CACHE
-# (default ~/.cache/spellmerge-godot) and refuses them if a hash differs. Only
+# (default ~/.cache/pinned-godot) and refuses them if a hash differs. Only
 # the checked downloads are cached; Godot is unpacked fresh into build/ on every
 # run, so a tampered cache can never supply an unchecked binary.
 # Output: dist/ with one zip per platform and SHA256SUMS.
@@ -25,6 +25,9 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 # shellcheck source=SCRIPTDIR/godot.env
 source ci/build/godot.env
+# The game's name (project.godot, the export paths) and slug (the zips), from ci/config.json.
+GAME_NAME=$(PYTHONPATH=ci python3 -m smbot.config get game.name)
+SLUG=$(PYTHONPATH=ci python3 -m smbot.config get game.slug)
 
 VERSION="dev"
 CHANNEL="dev"
@@ -44,7 +47,7 @@ while (($#)); do
   esac
 done
 
-CACHE="${GODOT_CACHE:-$HOME/.cache/spellmerge-godot}"
+CACHE="${GODOT_CACHE:-$HOME/.cache/pinned-godot}"
 TOOLS="$PWD/build/godot"
 # Keep Godot's settings, data and export templates inside build/, not in $HOME.
 export XDG_DATA_HOME="$TOOLS/xdg/data" XDG_CONFIG_HOME="$TOOLS/xdg/config" XDG_CACHE_HOME="$TOOLS/xdg/cache"
@@ -146,7 +149,7 @@ screenshots() {
     echo "warning: xvfb-run is not installed, so no screenshots were taken"
     return 0
   fi
-  local saved="$XDG_DATA_HOME/godot/app_userdata/Spellmerge/screenshots" script name png failed=()
+  local saved="$XDG_DATA_HOME/godot/app_userdata/$GAME_NAME/screenshots" script name png failed=()
   rm -rf build/screenshots && mkdir -p build/screenshots
   : > build/screenshots/shots.txt
   while IFS= read -r script; do
@@ -181,26 +184,26 @@ export_all() {
   done
 
   step "Boot smoke test (exported Linux build)"
-  godot_checked smoke-linux build/linux/Spellmerge.x86_64 --headless --quit-after 300
+  godot_checked smoke-linux build/linux/"$GAME_NAME".x86_64 --headless --quit-after 300
 
   # The shipped presets leave tests/ out; "Linux Test" is the Linux preset with tests, never
   # packaged. An exported build can't run a --script, so the main menu starts the 4-bot runner
   # on the --four-bot user argument (tests/smoke/four_bot_runner.gd).
   step "4-bot test (exported Linux build with tests)"
   rm -rf build/linux-test && mkdir -p build/linux-test
-  godot_checked export-linux-test "$GODOT" --headless --path . --export-release "Linux Test" build/linux-test/Spellmerge.x86_64
-  [[ -s build/linux-test/Spellmerge.x86_64 ]] || { echo "::error::Linux Test export produced no binary"; exit 1; }
-  godot_checked four-bot-linux timeout 300 build/linux-test/Spellmerge.x86_64 --headless -- --four-bot
+  godot_checked export-linux-test "$GODOT" --headless --path . --export-release "Linux Test" build/linux-test/"$GAME_NAME".x86_64
+  [[ -s build/linux-test/"$GAME_NAME".x86_64 ]] || { echo "::error::Linux Test export produced no binary"; exit 1; }
+  godot_checked four-bot-linux timeout 300 build/linux-test/"$GAME_NAME".x86_64 --headless -- --four-bot
   grep -q '^SMOKE OK' build/logs/four-bot-linux.log \
     || { echo "::error::the 4-bot test did not print SMOKE OK in the Linux Test export"; exit 1; }
 
   # The stress run and the projectile timings (tests/benchmark/, #166), started by the main menu
   # on --stress and --projectile-timing. They print BENCH lines and only warn on frame time.
   step "Stress run and projectile timing (exported Linux build with tests)"
-  godot_checked stress-linux timeout 300 build/linux-test/Spellmerge.x86_64 --headless -- --stress
+  godot_checked stress-linux timeout 300 build/linux-test/"$GAME_NAME".x86_64 --headless -- --stress
   grep -q '^STRESS OK' build/logs/stress-linux.log \
     || { echo "::error::the stress run did not print STRESS OK in the Linux Test export"; exit 1; }
-  godot_checked timing-linux timeout 300 build/linux-test/Spellmerge.x86_64 --headless -- --projectile-timing
+  godot_checked timing-linux timeout 300 build/linux-test/"$GAME_NAME".x86_64 --headless -- --projectile-timing
   grep -q '^test_projectile_timing: OK' build/logs/timing-linux.log \
     || { echo "::error::the projectile timing did not print test_projectile_timing: OK in the Linux Test export"; exit 1; }
 
@@ -257,7 +260,7 @@ package() {
   rm -rf dist && mkdir -p dist
   local name
   for platform in web windows linux; do
-    name="spellmerge-$platform-$VERSION.zip"
+    name="$SLUG-$platform-$VERSION.zip"
     zip_dir "build/$platform" "dist/$name"
   done
   (cd dist && sha256sum ./*.zip | sed 's| \./| |' > SHA256SUMS)
@@ -266,11 +269,11 @@ package() {
   # Budgets warn, with likely fixes; they never fail the build (docs/PLAN.md, "Gates are sparse").
   step "Size budgets"
   local size
-  size=$(stat -c %s "dist/spellmerge-web-$VERSION.zip")
+  size=$(stat -c %s "dist/$SLUG-web-$VERSION.zip")
   echo "web: $((size / 1000)) kB of $((WEB_BUDGET / 1000)) kB"
   ((size <= WEB_BUDGET)) || echo "::warning::web download is over its 40 MB budget. Not a failure. Likely fixes: big textures or sounds added recently (art/manifest.json, audio/manifest.json), more content the Web preset could exclude (export_presets.cfg, the demo flag), uncompressed imports"
   for platform in windows linux; do
-    size=$(stat -c %s "dist/spellmerge-$platform-$VERSION.zip")
+    size=$(stat -c %s "dist/$SLUG-$platform-$VERSION.zip")
     echo "$platform: $((size / 1000)) kB of $((DESKTOP_BUDGET / 1000)) kB"
     ((size <= DESKTOP_BUDGET)) || echo "::warning::$platform download is over its 300 MB budget. Not a failure. Likely fixes: big textures or sounds added recently, uncompressed imports, test or source files the export should exclude"
   done

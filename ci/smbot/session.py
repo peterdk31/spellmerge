@@ -141,8 +141,8 @@ def structured_result(messages: list[dict[str, Any]]) -> str:
 # --- Prompts -------------------------------------------------------------------
 
 
-def render(template: str, values: dict[str, str]) -> str:
-    return re.sub(r"\{\{(\w+)\}\}", lambda m: values.get(m.group(1), m.group(0)), template)
+def render(cfg: config_mod.Config, template: str, values: dict[str, str]) -> str:
+    return config_mod.render(template, {**config_mod.prompt_values(cfg), **values})
 
 
 def slug(text: str) -> str:
@@ -359,13 +359,12 @@ def prepare(cfg: config_mod.Config, st: dict[str, Any], focus: str, today: dt.da
                     f"{how} Read its review comments with `gh pr view {existing['number']} --comments`, and "
                     "improve it rather than starting over. " + (previous or ""))
     template = (MAINTAINER / "develop.md").read_text()
-    prompt = render(template, {
+    prompt = render(cfg, template, {
         "TASK": task or "(the queue is empty: only handle the owner instructions below)",
         "FOCUS": focus or "(none)",
         "INSTRUCTIONS": instructions_text(st.get("pending_instructions", [])),
         "PREVIOUS": previous or "(first attempt)",
         "BRANCH": branch,
-        "REPO": cfg.repo,
     })
     return {"prompt": prompt, "branch": branch, "task": task or "", "kind": kind}
 
@@ -377,7 +376,7 @@ def prepare_plan(cfg: config_mod.Config, st: dict[str, Any], focus: str, today: 
     # carries the time. A planning PR that didn't merge is continued instead of opening another.
     existing = open_pr_for(cfg, "planning")
     branch = existing["head"]["ref"] if existing else f"claude/{dt.datetime.now(dt.timezone.utc):%Y%m%d-%H%M}-planning"
-    prompt = render((MAINTAINER / "plan.md").read_text(), {
+    prompt = render(cfg, (MAINTAINER / "plan.md").read_text(), {
         "BACKLOG": backlog.replace(FENCE, "` ` `"),  # keep it inside its code block
         "CHECKPOINT": checkpoint.prompt_text(st, open_checkpoint(cfg)),
         "RUN": ("This is the weekly run on Sunday: do every step." if weekly_run else
@@ -386,7 +385,6 @@ def prepare_plan(cfg: config_mod.Config, st: dict[str, Any], focus: str, today: 
         "FOCUS": focus or "(none)",
         "INSTRUCTIONS": instructions_text(st.get("pending_instructions", [])),
         "BRANCH": branch,
-        "REPO": cfg.repo,
     })
     if existing:
         prompt += (f"\n\nPR #{existing['number']} from an earlier planning session didn't merge. Continue it on "
@@ -396,8 +394,8 @@ def prepare_plan(cfg: config_mod.Config, st: dict[str, Any], focus: str, today: 
 
 
 def review_prompt(cfg: config_mod.Config, pr: int, sha: str, round_: str) -> str:
-    return render((MAINTAINER / "review.md").read_text(), {
-        "PR": str(pr), "SHA": sha, "REPO": cfg.repo,
+    return render(cfg, (MAINTAINER / "review.md").read_text(), {
+        "PR": str(pr), "SHA": sha,
         "ROUND": ("This is the critique round: be demanding, the author will revise."
                   if round_ == "critique" else
                   "This is the final review: approve only if the PR can merge now as it is."),
@@ -415,8 +413,8 @@ def revise_prompt(cfg: config_mod.Config, pr: int, review: dict[str, Any], branc
     problems = "\n".join(
         f"- [{p.get('severity')}] {p.get('file', '')}{':' + str(p['line']) if p.get('line') else ''}: "
         f"{p.get('problem')} Fix: {p.get('fix')}" for p in review.get("problems", [])) or "(no specific problems)"
-    return render((MAINTAINER / "revise.md").read_text(), {
-        "PR": str(pr), "REPO": cfg.repo, "SUMMARY": review.get("summary", ""), "PROBLEMS": problems,
+    return render(cfg, (MAINTAINER / "revise.md").read_text(), {
+        "PR": str(pr), "SUMMARY": review.get("summary", ""), "PROBLEMS": problems,
         "RAISED": raised(first or {}), "BRANCH": branch or "the PR's head branch",
         "SYNC": synced or (f"Switch to it with `git fetch origin {branch} && git switch {branch}`. If GitHub reports "
                            "the PR as conflicting, or `main` has moved on, run `git fetch origin main && git merge "

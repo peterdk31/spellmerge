@@ -90,7 +90,9 @@ class PromptTest(unittest.TestCase):
     """Uses a fixed task, so the tests don't depend on what docs/NEXT.md says today."""
 
     def test_render_and_slug(self) -> None:
-        self.assertEqual(session.render("a {{X}} {{Y}}", {"X": "1"}), "a 1 {{Y}}")
+        self.assertEqual(session.render(CFG, "a {{X}} {{Y}}", {"X": "1"}), "a 1 {{Y}}")
+        self.assertEqual(session.render(CFG, "{{GAME}} ({{REPO}}), {{BOT}}", {}),
+                         f"{CFG.game.name} ({CFG.repo}), {CFG.bot.login}")
         self.assertEqual(session.slug("**Area READMEs for the content areas.** Write..."),
                          "area-readmes-for-the-content-areas")
 

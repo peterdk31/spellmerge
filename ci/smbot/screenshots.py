@@ -221,7 +221,7 @@ def gallery(folder: Path, out: Path, version: str) -> bool:
                        f"<figcaption>{name}</figcaption></figure>")
     (out / "index.html").write_text(f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Spellmerge screenshots</title>
+<title>{html.escape(config_mod.load().game.name)} screenshots</title>
 <style>
 body {{ background: #1b1a2e; color: #e8e6f0; font: 16px/1.5 system-ui, sans-serif; margin: 0 auto; max-width: 1340px; padding: 16px; }}
 a {{ color: #f4c542; }}
@@ -229,7 +229,7 @@ a {{ color: #f4c542; }}
 figure {{ margin: 0; }}
 img {{ width: 100%; height: auto; image-rendering: pixelated; border: 1px solid #3a3858; }}
 </style></head><body>
-<h1>Spellmerge screenshots</h1>
+<h1>{html.escape(config_mod.load().game.name)} screenshots</h1>
 <p>Build {html.escape(version)}, taken by the daily build on a virtual display. <a href="../play/">Play the demo</a>.</p>
 <div class="shots">
 {chr(10).join(figures)}

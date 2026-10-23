@@ -66,7 +66,7 @@ jobs:
       - id: read-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          client-id: Iv23lirdyRvc0KC6625s # the bot app's Client ID (public)
+          client-id: ${{ vars.BOT_CLIENT_ID }} # the bot app's Client ID (public; setup.sh sets it from ci/config.json)
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           permission-contents: read
           permission-issues: read
@@ -80,12 +80,15 @@ jobs:
           cp -r .github/actions/claude .ci-claude-action
           echo .ci-claude-action >> .git/info/exclude
       - name: Git identity of the bot
+        env:
+          BOT_LOGIN: ${{ vars.BOT_LOGIN }}
+          BOT_ID: ${{ vars.BOT_ID }}
         run: |
-          git config --global user.name "spellmerge-bot[bot]"
-          git config --global user.email "343592621+spellmerge-bot[bot]@users.noreply.github.com"
+          git config --global user.name "$BOT_LOGIN"
+          git config --global user.email "$BOT_ID+$BOT_LOGIN@users.noreply.github.com"
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: ~/.cache/spellmerge-godot
+          path: ~/.cache/pinned-godot
           key: godot-${{ hashFiles('ci/build/godot.env') }}
       - name: Prepare Godot for checks (and a virtual display for screenshots)
         run: |
@@ -103,6 +106,8 @@ jobs:
         timeout-minutes: 200
         uses: ./.ci-claude-action
         with:
+          bot-id: ${{ vars.BOT_ID }}
+          bot-login: ${{ vars.BOT_LOGIN }}
           claude-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github-token: ${{ steps.read-token.outputs.token }}
           prompt: ${{ steps.prepare.outputs.prompt }}
@@ -150,7 +155,7 @@ jobs:
       - id: app-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          client-id: Iv23lirdyRvc0KC6625s # the bot app's Client ID (public)
+          client-id: ${{ vars.BOT_CLIENT_ID }} # the bot app's Client ID (public; setup.sh sets it from ci/config.json)
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-issues: write
@@ -238,7 +243,7 @@ jobs:
       - id: read-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          client-id: Iv23lirdyRvc0KC6625s # the bot app's Client ID (public)
+          client-id: ${{ vars.BOT_CLIENT_ID }} # the bot app's Client ID (public; setup.sh sets it from ci/config.json)
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           permission-contents: read
           permission-issues: read
@@ -252,12 +257,15 @@ jobs:
           cp -r .github/actions/claude .ci-claude-action
           echo .ci-claude-action >> .git/info/exclude
       - name: Git identity of the bot
+        env:
+          BOT_LOGIN: ${{ vars.BOT_LOGIN }}
+          BOT_ID: ${{ vars.BOT_ID }}
         run: |
-          git config --global user.name "spellmerge-bot[bot]"
-          git config --global user.email "343592621+spellmerge-bot[bot]@users.noreply.github.com"
+          git config --global user.name "$BOT_LOGIN"
+          git config --global user.email "$BOT_ID+$BOT_LOGIN@users.noreply.github.com"
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: ~/.cache/spellmerge-godot
+          path: ~/.cache/pinned-godot
           key: godot-${{ hashFiles('ci/build/godot.env') }}
       - name: Prepare Godot for checks (and a virtual display for screenshots)
         run: |
@@ -277,6 +285,8 @@ jobs:
         timeout-minutes: 150
         uses: ./.ci-claude-action
         with:
+          bot-id: ${{ vars.BOT_ID }}
+          bot-login: ${{ vars.BOT_LOGIN }}
           claude-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github-token: ${{ steps.read-token.outputs.token }}
           prompt: ${{ steps.prepare.outputs.prompt }}
@@ -321,7 +331,7 @@ jobs:
       - id: app-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          client-id: Iv23lirdyRvc0KC6625s # the bot app's Client ID (public)
+          client-id: ${{ vars.BOT_CLIENT_ID }} # the bot app's Client ID (public; setup.sh sets it from ci/config.json)
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-issues: write
@@ -442,7 +452,7 @@ jobs:
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         if: steps.pick.outputs.scripts != ''
         with:
-          path: ~/.cache/spellmerge-godot
+          path: ~/.cache/pinned-godot
           key: godot-${{ hashFiles('after/ci/build/godot.env') }}
       - name: Virtual display
         if: steps.pick.outputs.scripts != ''
@@ -489,7 +499,7 @@ jobs:
       - id: app-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          client-id: Iv23lirdyRvc0KC6625s # the bot app's Client ID (public)
+          client-id: ${{ vars.BOT_CLIENT_ID }} # the bot app's Client ID (public; setup.sh sets it from ci/config.json)
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-pull-requests: write
@@ -523,7 +533,7 @@ jobs:
       - id: app-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          client-id: Iv23lirdyRvc0KC6625s # the bot app's Client ID (public)
+          client-id: ${{ vars.BOT_CLIENT_ID }} # the bot app's Client ID (public; setup.sh sets it from ci/config.json)
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           permission-contents: write # the questions' shots go on the screenshots branch
           permission-issues: write
@@ -586,7 +596,7 @@ jobs:
       - id: app-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          client-id: Iv23lirdyRvc0KC6625s # the bot app's Client ID (public)
+          client-id: ${{ vars.BOT_CLIENT_ID }} # the bot app's Client ID (public; setup.sh sets it from ci/config.json)
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-pull-requests: write
@@ -625,7 +635,7 @@ jobs:
       - id: app-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          client-id: Iv23lirdyRvc0KC6625s # the bot app's Client ID (public)
+          client-id: ${{ vars.BOT_CLIENT_ID }} # the bot app's Client ID (public; setup.sh sets it from ci/config.json)
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-issues: write

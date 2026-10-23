@@ -57,7 +57,7 @@ jobs:
       - id: app-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          client-id: Iv23lirdyRvc0KC6625s # the bot app's Client ID (public)
+          client-id: ${{ vars.BOT_CLIENT_ID }} # the bot app's Client ID (public; setup.sh sets it from ci/config.json)
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           permission-contents: write # the automation-state branch
           permission-issues: write # the Daily log
@@ -125,14 +125,14 @@ jobs:
       - id: read-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          client-id: Iv23lirdyRvc0KC6625s # the bot app's Client ID (public)
+          client-id: ${{ vars.BOT_CLIENT_ID }} # the bot app's Client ID (public; setup.sh sets it from ci/config.json)
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           permission-contents: read
       - id: prepare
         run: |
           {
             echo "prompt<<__END__"
-            sed "s|{{REPO}}|${GITHUB_REPOSITORY}|g" .github/maintainer/intake.md
+            python3 -m smbot.config render .github/maintainer/intake.md
             echo "__END__"
             echo "schema=$(jq -c . .github/maintainer/schemas/intake.json)"
           } >> "$GITHUB_OUTPUT"
@@ -141,6 +141,8 @@ jobs:
         timeout-minutes: 25
         uses: ./.github/actions/claude
         with:
+          bot-id: ${{ vars.BOT_ID }}
+          bot-login: ${{ vars.BOT_LOGIN }}
           claude-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github-token: ${{ steps.read-token.outputs.token }}
           prompt: ${{ steps.prepare.outputs.prompt }}
@@ -152,7 +154,7 @@ jobs:
         if: always()
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          client-id: Iv23lirdyRvc0KC6625s # the bot app's Client ID (public)
+          client-id: ${{ vars.BOT_CLIENT_ID }} # the bot app's Client ID (public; setup.sh sets it from ci/config.json)
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-issues: write
@@ -216,7 +218,7 @@ jobs:
       - id: app-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          client-id: Iv23lirdyRvc0KC6625s # the bot app's Client ID (public)
+          client-id: ${{ vars.BOT_CLIENT_ID }} # the bot app's Client ID (public; setup.sh sets it from ci/config.json)
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           permission-contents: write # the automation-state branch, submissions/ branches
           permission-issues: write
@@ -252,7 +254,7 @@ jobs:
       - name: Cache Godot (hash-checked again after restore)
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: ~/.cache/spellmerge-godot
+          path: ~/.cache/pinned-godot
           key: godot-${{ hashFiles('ci/build/godot.env') }}
       - name: Virtual display for the screenshots
         run: sudo apt-get update -qq && sudo apt-get install -y -qq xvfb
@@ -298,7 +300,7 @@ jobs:
           persist-credentials: false
       - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: ~/.cache/spellmerge-godot
+          path: ~/.cache/pinned-godot
           key: godot-${{ hashFiles('ci/build/godot.env') }}
       - id: bisect
         run: python3 -m smbot.revert bisect
@@ -322,7 +324,7 @@ jobs:
       - id: app-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          client-id: Iv23lirdyRvc0KC6625s # the bot app's Client ID (public)
+          client-id: ${{ vars.BOT_CLIENT_ID }} # the bot app's Client ID (public; setup.sh sets it from ci/config.json)
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-issues: write
@@ -453,7 +455,7 @@ jobs:
       - id: app-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          client-id: Iv23lirdyRvc0KC6625s # the bot app's Client ID (public)
+          client-id: ${{ vars.BOT_CLIENT_ID }} # the bot app's Client ID (public; setup.sh sets it from ci/config.json)
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-issues: write
@@ -476,7 +478,7 @@ jobs:
       - id: app-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          client-id: Iv23lirdyRvc0KC6625s # the bot app's Client ID (public)
+          client-id: ${{ vars.BOT_CLIENT_ID }} # the bot app's Client ID (public; setup.sh sets it from ci/config.json)
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           permission-contents: read
           permission-issues: write

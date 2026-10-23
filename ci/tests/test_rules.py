@@ -9,12 +9,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from smbot import rules
+from smbot import config, rules
 
 ROOT = Path(__file__).resolve().parents[2]
 PNG = b"\x89PNG\r\n\x1a\n" + b"\0" * 32
 OGG = b"OggS" + b"\0" * 32
-CONTRIBUTOR, BOT, OWNER = "someone", "spellmerge-bot[bot]", "peterdk31"
+CFG = config.load()
+CONTRIBUTOR, BOT, OWNER = "someone", CFG.bot.login, CFG.owner.login
 
 
 def banned(text: str, path: str = "content/spells/x.gd") -> list[str]:

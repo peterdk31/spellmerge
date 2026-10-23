@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://3d7l7nmiumrp"
-path="res://.godot/imported/wizard_p1_walk.svg-9b31dd21a110da86a243c0393bd15967.ctex"
+uid="uid://d1sedauj4phri"
+path="res://.godot/imported/wizard_hat_p4.svg-584cf51fdb077b302c7c6ebf8d2ee7b1.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://content/wizard/base/wizard_p1_walk.svg"
-dest_files=["res://.godot/imported/wizard_p1_walk.svg-9b31dd21a110da86a243c0393bd15967.ctex"]
+source_file="res://content/wizard/base/wizard_hat_p4.svg"
+dest_files=["res://.godot/imported/wizard_hat_p4.svg-584cf51fdb077b302c7c6ebf8d2ee7b1.ctex"]
 
 [params]
 

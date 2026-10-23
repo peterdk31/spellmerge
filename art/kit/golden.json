@@ -1,11 +1,11 @@
 {
-  "status": "candidates",
-  "note": "Golden example candidates for the Style Guide (docs/STYLE.md, 'Golden examples'). They are the best placeholder art so far; the M2 art direction call confirms or replaces them. The starter kit zip includes these files next to the palette and templates.",
+  "status": "chosen",
+  "note": "Golden examples for the Style Guide (docs/STYLE.md, 'Golden examples'). The player character is in the style the owner chose on 2026-10-23 (style N, docs/DESIGN.md). The others are the best placeholder art so far and are redrawn in that style over later milestones. The starter kit zip includes these files next to the palette and templates.",
   "examples": [
     {
-      "path": "content/wizard/base/wizard_p1_idle.svg",
-      "shows": "A player character: Player 1 ramp on robe and hat, Skin face, Wood staff, feet about 2-3 px above the bottom edge",
-      "rules": ["outline", "three shades", "light from the top-left", "player colour"]
+      "path": "art/kit/golden_wizard.svg",
+      "shows": "A player character, style N: a narrow Stone robe with a Spark placket, belt and hem, two big tall eyes and no mouth, Skin hands, under a hat in the Player 1 ramp (the only player colour). The game draws the body strip and the hat as two pictures (content/wizard/base/); this is the two together",
+      "rules": ["outline", "three shades", "light from the top-left", "player colour only on the hat"]
     },
     {
       "path": "content/enemies/ember_imp/idle.svg",

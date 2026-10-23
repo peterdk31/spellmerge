@@ -2,6 +2,14 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-23: Style N chosen; the wizard has a shared body and a separate hat, and idles with a blink
+
+- **Why:** the owner answered round five (#206, key `art-direction-pick-3`) with "lets go with N" and asked for character animations, such as an eye blink in idle and something that makes it feel alive. The earlier open question, a second sprite per wizard or a baked sheet per player, is decided here.
+- **A hat sprite, not four baked sheets.** The hat is the only player colour (DESIGN.md), so the body strips (`wizard_idle.svg`, `wizard_walk.svg`, `wizard_dash.svg`) are one set for all players and the hat is a `Hat` node under `Sprite` with `hat_textures` per player index, listed in the scene by literal `preload` paths (no computed path, nothing for `core/registry` to do). One body to draw and fix instead of four, and a new hat is one 32×32 file. `textures`, `walk_textures` and `dash_textures` stay lists of four, so the scene can still give a player another body.
+- **The art is poses; the code is time.** The idle strip has four poses (eyes open, closed, glance left, glance right) and `IDLE_SEQUENCE` (48 steps at 6 fps, 8 s) orders them: a blink, a glance left, a double blink, a glance right. Breathing is a 1 px bob of body and hat in the code (`BREATH_STEPS`), as are the walk's dip (`WALK_BOB`) and the dash's crouch and lift (`DASH_BOB`; the shadow stays on the ground), so no frame has to be redrawn to change a rhythm. STYLE.md's idle row says so.
+- **Cost:** the body shifts as a whole, so the feet leave the ground by 1 px while breathing; the hat moves with the body, never alone. The dash lost its banded lean frames (the code already stretches and leans the sprite) and has 2 frames.
+- **Golden example:** `art/kit/golden_wizard.svg` is the body with player 1's hat as one picture, since the Style Guide page shows one image per example.
+
 ## 2026-10-23: A fifth art direction round (M, N, O), the pick asked again
 
 - **Why:** the owner answered round four (#206, key `art-direction-pick-3`) with "4: keep the hat style, but maybe add a robe as the clothes and the face just needs two big eyes, no mouth. Give me some examples". Option 4 is "another round", not a pick, so the record task cannot be done yet.

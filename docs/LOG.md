@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-23: Style N recorded and the wizard made alive (M2 part 27, owner `/claude` on #206)
+
+The owner chose N and asked for character animations, "an eye blink in idle and something that makes it feel alive". Redrew the in-game wizard in N: one shared body strip each for idle (open, closed, glance left, glance right), walk and dash, and four hats on a `Hat` node under `Sprite`; the twelve per-player strips are removed. `player.gd` orders the idle poses (a blink every few seconds, a glance now and then, a double blink), breathes with a 1 px bob and bobs on the walk and dash; the hat follows. Recorded the style in `docs/STYLE.md` and `art/kit/golden.json`. The SVG strips are hand-written rects (a generator script could not be run in this session). `build.sh --quick --tests` passes; the `art_sheet` and `arena_four_wizards` shots were looked at. `tools/check.sh` reports only the untracked `.idea`, `.vscode` and `scripts` folders of the runner.
+
 ## 2026-10-23: Fifth art direction round (M2 part 27, owner `/claude` on #206)
 
 The owner answered round four with "4: keep the hat style, add a robe as the clothes, the face just two big eyes, no mouth; give me some examples". Added M (cream robe), N (dusk robe) and O (teal robe) in `art/samples/` (`m_cream/`, `n_dusk/`, `o_teal/`, each a `body.svg` under the existing hats), `tests/screenshots/shot_art_direction_5.gd` and a README section. `test_svg_art.gd` checks them, plus that the face has no cheeks or mouth. `build.sh --quick --tests` passes; the sheet was looked at. The pick is asked again (`art-direction-pick-3`); the record task stays blocked.

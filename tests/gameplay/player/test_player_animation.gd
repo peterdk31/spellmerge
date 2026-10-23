@@ -24,6 +24,10 @@ func _initialize() -> void:
 	await process_frame
 	_test_scene_lists_the_strips()
 	_test_idle_at_rest()
+	_test_idle_blinks_glances_and_breathes()
+	_test_players_do_not_idle_in_step()
+	_test_glances_follow_the_facing()
+	_test_walk_and_dash_move_the_body()
 	_test_walking_plays_the_walk_strip()
 	_test_dash_plays_once_then_idle()
 	_test_invulnerable_look_follows_the_window()
@@ -184,3 +188,79 @@ func _test_every_player_shows_its_own_strips() -> void:
 		_input.send_virtual(index, &"move_left", 1.0)
 		_run(1)
 		_check(_sprite().texture == _wizard.walk_textures[index], "player %d walks with its own strip" % index)
+		var hat: Sprite2D = _sprite().get_node("Hat") as Sprite2D
+		_check(hat.texture == _wizard.hat_textures[index], "player %d wears its own hat" % index)
+
+
+## The idle blinks, glances both ways and breathes within one loop of its sequence, and the
+## hat always sits where the body does.
+func _test_idle_blinks_glances_and_breathes() -> void:
+	_setup()
+	var sprite: Sprite2D = _sprite()
+	var hat: Sprite2D = sprite.get_node("Hat") as Sprite2D
+	var poses: Dictionary = {}
+	var bobs: Dictionary = {}
+	var loop_steps: int = int(float(PlayerScript.IDLE_SEQUENCE.size()) / PlayerScript.IDLE_FPS / STEP) + 1
+	for i in loop_steps:
+		_run(1)
+		poses[sprite.frame] = true
+		bobs[int(sprite.offset.y)] = true
+		_check(is_equal_approx(hat.position.y, sprite.offset.y), "the hat sits where the body does")
+	_check(poses.size() == sprite.hframes, "the idle loop shows every pose, saw %s" % [poses.keys()])
+	_check(bobs.size() == 2, "the body breathes between two heights, saw %s" % [bobs.keys()])
+	# Most of the time the eyes are open: a blink is a moment, not a state.
+	var open: int = PlayerScript.IDLE_SEQUENCE.count(0)
+	_check(open * 4 >= PlayerScript.IDLE_SEQUENCE.size() * 3, "the eyes are open most of the time")
+
+
+## Two wizards standing side by side are not on the same beat of the idle.
+func _test_players_do_not_idle_in_step() -> void:
+	var first: Array[int] = []
+	var second: Array[int] = []
+	for index in 2:
+		_setup(index)
+		for i in 160:
+			_run(1)
+			var shown: int = _sprite().frame * 10 + int(_sprite().offset.y)
+			if index == 0:
+				first.append(shown)
+			else:
+				second.append(shown)
+	_check(first != second, "two players show different idle poses at the same moment")
+
+
+## "Glance left" is on screen: the sprite is mirrored when facing left, so the poses swap.
+func _test_glances_follow_the_facing() -> void:
+	_setup()
+	var glance_step: int = PlayerScript.IDLE_SEQUENCE.find(2)
+	_check(glance_step >= 0, "the sequence has a glance left")
+	_wizard._faces_left = true
+	_wizard._anim_time = (float(glance_step) + 0.5) / PlayerScript.IDLE_FPS
+	_wizard._update_animation(0.0)
+	_check(_sprite().frame == 3, "a left glance uses the right-glancing pose when the sprite is mirrored")
+	_wizard._faces_left = false
+	_wizard._update_animation(0.0)
+	_check(_sprite().frame == 2, "a left glance uses the left pose when facing right")
+
+
+## The walk dips the body on its stride frames and the dash crouches, then lifts it; the
+## bob is gone again once the wizard stands still.
+func _test_walk_and_dash_move_the_body() -> void:
+	_setup()
+	_input.send_virtual(0, &"move_right", 1.0)
+	var sprite: Sprite2D = _sprite()
+	var bobs: Dictionary = {}
+	for i in 40:
+		_run(1)
+		bobs[int(sprite.offset.y)] = true
+	_check(bobs.size() == 2, "the walk dips the body on alternate frames, saw %s" % [bobs.keys()])
+	_input.send_virtual(0, &"dodge", 1.0)
+	_run(1)
+	_input.send_virtual(0, &"dodge", 0.0)
+	_check(_wizard.is_dodging(), "the wizard is dashing")
+	_check(sprite.offset.y > 0.0, "the dash starts in a crouch")
+	_run(1)
+	_check(_wizard.is_dodging() and sprite.offset.y < 0.0, "the dash then lifts the body off the ground")
+	_input.send_virtual(0, &"move_right", 0.0)
+	_run(int(PlayerScript.DODGE_TIME / STEP) + 4)
+	_check(not _wizard.is_dodging() and sprite.frame == 0, "standing still again")

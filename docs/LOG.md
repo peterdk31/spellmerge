@@ -4,7 +4,7 @@ What each run did, newest first. Claude appends a short entry after each develop
 
 ## 2026-10-23: The beam is held (owner `/claude` on #4)
 
-The beam now ticks while fire is held: cooldown 0.25 s (4 hits a second on one enemy), 3 damage and 4 mana a tick (16 mana a second, against 10 regenerated); the drawn beam stays 0.26 s so ticks join up. New test in `test_forms.gd`. `build.sh --quick --tests` passes.
+The beam now ticks while fire is held: cooldown 0.25 s (4 hits a second on one enemy), 3 damage and 4 mana a tick (16 mana a second, against 10 regenerated); the drawn beam lasts 0.25 s (one tick, so beams do not stack). New test in `test_forms.gd`. `build.sh --quick --tests` passes.
 
 ## 2026-10-23: Web stress parts read, web projectile cap 500 (owner `/claude` on #4)
 

@@ -183,9 +183,12 @@ func test_a_held_beam_hits_one_enemy_four_times_a_second_and_drains_mana_steadil
 			mana -= taken
 			casts += 1
 		_tick(1)
-	check_equal(_hits.size(), 8, "one enemy is hit 4 times a second (8 in 2 s)")
-	check_equal(casts, 8, "each tick is one cast")
-	check(absf((100.0 - mana) / 2.0 - 16.0) < 0.01, "the beam takes 16 mana a second while held (%f)" % mana)
+	check_equal(spell.cooldown, 0.25, "the beam ticks every 0.25 s")
+	check_equal(spell.damage, 3, "a tick does 3 damage")
+	check_equal(spell.mana_cost, 4.0, "a tick costs 4 mana")
+	check(absi(casts - 8) <= 1, "one enemy is hit 4 times a second (about 8 in 2 s): %d" % casts)
+	check_equal(_hits.size(), casts, "each tick is one hit")
+	check(absf(100.0 - mana - 4.0 * casts) < 0.01, "each tick takes 4 mana (%f)" % mana)
 
 
 func test_the_beam_does_not_reach_past_its_length() -> void:

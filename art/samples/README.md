@@ -78,5 +78,6 @@ Notes:
 
 - The beard is gone in all three: the face is the cute part. A beard can come back as its own layer if the owner wants one.
 - Cheeks use Fire light (`#ffa23c`), which no player colour is close to. All three use only the standard palette.
-- L's gold robe is close to the Spark pickups and gold UI text; if L is picked that needs a look.
+- L's gold robe is the Spark gold (`#f2c230`), the same as the Spark pickups and the gold UI text. In the game the robe is a large 8 px patch with a Bone collar and a Wood belt, so it would not be mistaken for a 2–4 px pickup, but a figure that is mostly the pickup colour could make pickups harder to spot near it. This is a judgement from the colours, not from playing it; it is a point against L, not a blocker.
+- Where to see the sheet: `art_direction_sheet_4.png` is in `build/screenshots/` after `ci/build/build.sh --quick --screenshots`, and the PR shows it as a screenshot, so nobody has to run the build to judge the look.
 - Picking one of these still leaves the hat file and sheet questions in `docs/NEXT.md` ("Record the chosen art direction").

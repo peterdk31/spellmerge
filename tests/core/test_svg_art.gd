@@ -178,6 +178,27 @@ func test_only_the_hat_has_the_player_colour() -> void:
 						check(not text.contains(colour), "%s uses another player's colour %s" % [path, colour])
 
 
+## J, K and L are narrow and keep the face under the hat's brim: nothing of the body (left of the
+## staff, x < 24) sits above y=15, and the chest row (y=21, outline included) is at most 10 px wide.
+func test_the_round_four_bodies_are_narrow_and_below_the_brim() -> void:
+	var rect_pattern: RegEx = RegEx.create_from_string('<rect x="(\\d+)" y="(\\d+)" width="(\\d+)" height="(\\d+)"')
+	for body: String in ["j_tiny", "k_bean", "l_gold"]:
+		var text: String = FileAccess.get_file_as_string("res://art/samples/%s/body.svg" % body)
+		var chest_left: int = 99
+		for rect in rect_pattern.search_all(text):
+			var x0: int = rect.get_string(1).to_int()
+			var y0: int = rect.get_string(2).to_int()
+			var rect_width: int = rect.get_string(3).to_int()
+			var rect_height: int = rect.get_string(4).to_int()
+			if x0 >= 24:
+				continue
+			check(y0 >= 15, "%s/body.svg has a rect at y=%d, under the hat" % [body, y0])
+			if y0 <= 21 and y0 + rect_height > 21 and x0 < 20:
+				chest_left = mini(chest_left, x0)
+		# The chest ends at x=19 (outline), so starting at x=10 or later is 10 px or less.
+		check(chest_left >= 10, "%s/body.svg is wider than 10 px at the chest (starts at x=%d)" % [body, chest_left])
+
+
 func test_every_svg_is_in_the_manifest() -> void:
 	var manifest: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://art/manifest.json"))
 	check(manifest is Dictionary, "art/manifest.json is a JSON object")

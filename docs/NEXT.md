@@ -10,13 +10,13 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
 
 ## Blocked
 
-- [ ] **Read the first WASM numbers (M2 part 25 follow-up).** (`tests/benchmark/`, `docs/`) Parked by the dev sessions until a daily build has run the web projectile timing and stress steps (no "Daily run" post with "Stress and timing results" exists yet as of 2026-10-22; #167 to #175 checked). Then read their `BENCH:` lines (or why they failed or timed out; see `docs/DECISIONS.md`, 2026-10-22). Sessions can't read CI logs: that post in the Daily log quotes them (`gh issue list --label daily-log --state all`, then `gh issue view N --comments`). Confirm the limits or lower them. "WASM pending" stays open until then. Move back to the Queue when such a post exists; **it must be done before the stabilisation task closes M2** (done-when item 3).
-
 - [ ] **Record the chosen art direction (M2 part 27 follow-up).** Replace the golden example candidates in `art/kit/golden.json` and `docs/STYLE.md` with the chosen style's files, and say in `docs/STYLE.md` that the style is no longer provisional. Redrawing the placeholders in that style is spread over later milestones (M2 design, "Art and the art direction"), one area at a time.
   - **Also decide with the pick (G, H or I):** whether the player-coloured hat is a second sprite per wizard frame or a baked sheet per player, and how the four `hat_p1` to `hat_p4` files are loaded by player index (through `core/registry`, never a computed path). Both choices change the animation and player work.
   - **Waits on:** the owner question with key `art-direction-pick-3` (the owner picks from A to I and locks it in `docs/DESIGN.md`; rounds one and two, #190 and #192, were answered with "more options").
 
 ## Done recently
+
+- [x] **Read the first WASM numbers (M2 part 25 follow-up).** (`tests/benchmark/`, `docs/`) The daily log of 2026-10-23 (#202) has the first web `BENCH:` lines. Web projectile timing (cap 1,000): `step` with hits 5.4 ms, `update_draw` 4.0 ms, homing 8.6 ms; about 2x the native numbers. Web stress in the CI browser: p95 151 ms (about 8 FPS) at 100 enemies and 1,000 shots, against 14.6 ms in the Linux export. No limit lowered; why, and what stays open, is in `docs/DECISIONS.md` (2026-10-23, the first WASM numbers) and BACKLOG.
 
 - [x] **Quick view walkthrough (re-examination of M2 part 18, polish).** (`hud/`, `tests/screenshots/`) `shot_quick.gd` walks a wave with one and four players by real input (break with full builders, `wave_started` folds, close/swap/reopen, Drop component, `room_cleared` unfolds; shots `walk_*`, each at 1x and a 4x crop of P1's quarter). One fix pass: folding left the "> " mark on the form slot beside "> Drop component", and with nothing to drop focus went to a greyed button (now Close). Tests in `test_quick.gd`. The rest, and why the disabled-slot hint waits, is in BACKLOG and DECISIONS.
 

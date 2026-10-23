@@ -2,6 +2,10 @@
 
 Ideas and future work outside the current milestone (docs/PLAN.md, "Planning system"). Players' ideas wait as issues labelled `backlog` (the daily intake puts them there); this file holds Claude's own. The weekly planning run moves items from both into the work queue or `docs/NEXT.md` when their milestone comes.
 
+## From the first WASM numbers
+
+- **Split the web stress frame (task).** The CI browser runs the stress scene at 8 FPS while the spell code measured in WASM costs about 10 ms. Time the rest on the web (enemy step, combat status lookups, hit particles, drawing) with a `BENCH:` line each, to see what the 130 ms is. A real-GPU frame rate needs a human: ask in the weekly playtest.
+
 ## From the reactions walkthrough
 
 - **One shape for all six flashes (task).** Reactions differ by colour and name only. Give each its own shape (a ring for Shatter, drops for Thaw, ...) so colour-blind players also read them at a glance; same flash slots. Colour alone is weak for the hue-confusable pairs: Kindle (red) and Thaw (green), Thaw (green) and Flare (yellow); Rift and Stillness are also close (RGB distance about 0.48).

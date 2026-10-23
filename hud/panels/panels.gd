@@ -102,6 +102,9 @@ func _ready() -> void:
 	_wave_label.add_theme_font_size_override("font_size", WAVE_LABEL_FONT_SIZE)
 	_wave_label.add_theme_color_override("font_outline_color", Color.BLACK)
 	_wave_label.add_theme_constant_override("outline_size", WAVE_LABEL_OUTLINE)
+	var wave_backing := StyleBoxFlat.new()
+	wave_backing.bg_color = Color(0.0, 0.0, 0.0, 0.7)
+	_wave_label.add_theme_stylebox_override("normal", wave_backing)
 	_wave_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_wave_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_wave_label.custom_minimum_size = Vector2(WAVE_LABEL_WIDTH, 0.0)

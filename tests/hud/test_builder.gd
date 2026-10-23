@@ -525,7 +525,25 @@ func test_the_wave_and_break_lines_stay_clear_of_four_open_builders() -> void:
 		for player in 4:
 			check(not rect.intersects(_builder(player).get_global_rect()), "the %s does not overlap builder %d, got %s and %s" % [line_name, player + 1, rect, _builder(player).get_global_rect()])
 			check(not rect.intersects(_hud.get_panel(player).get_global_rect()), "the %s does not overlap panel %d" % [line_name, player + 1])
+			check(not rect.intersects(_builder(player).info_panel().get_global_rect()), "the %s does not overlap info panel %d" % [line_name, player + 1])
 	check(not _hud.get_wave_label().get_global_rect().intersects(_hud.get_break_row().get_global_rect()), "the two lines do not overlap each other")
+
+
+func test_the_wave_line_alone_stays_clear_of_open_builders() -> void:
+	_start(4)
+	root.size = Vector2i(640, 360)
+	_bus.wave_started.emit(2)
+	for player in 4:
+		_open(player)
+	await process_frame
+	await process_frame
+	var rect: Rect2 = _hud.get_wave_label().get_global_rect()
+	check(_hud.get_wave_label().visible and not _hud.get_break_row().visible, "only the wave line shows")
+	check(Rect2(0, 0, 640, 360).encloses(rect), "the wave line is inside the view, got %s" % rect)
+	for player in 4:
+		check(not rect.intersects(_builder(player).get_global_rect()), "the wave line does not overlap builder %d" % [player + 1])
+		check(not rect.intersects(_hud.get_panel(player).get_global_rect()), "the wave line does not overlap panel %d" % [player + 1])
+		check(not rect.intersects(_builder(player).info_panel().get_global_rect()), "the wave line does not overlap info panel %d" % [player + 1])
 
 
 func test_a_builder_stays_on_its_owners_side_of_the_screen() -> void:

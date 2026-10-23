@@ -14,6 +14,7 @@ TARGET=$1 VERSION=$2 CHANNEL=$3 DIST=$4
 cd "$(dirname "$0")/../.."
 # shellcheck source=SCRIPTDIR/godot.env
 source ci/build/godot.env
+SLUG=$(PYTHONPATH=ci python3 -m smbot.config get game.slug)
 
 [[ -n "${BUTLER_API_KEY:-}" ]] || { echo "::warning::BUTLER_API_KEY is not set; skipping itch.io"; exit 0; }
 
@@ -29,5 +30,5 @@ suffix=""
 [[ "$CHANNEL" == stable ]] || suffix="-nightly"
 for platform in web windows linux; do
   "$work/butler/butler" push --userversion "$VERSION" \
-    "$DIST/spellmerge-$platform-$VERSION.zip" "$TARGET:$platform$suffix"
+    "$DIST/$SLUG-$platform-$VERSION.zip" "$TARGET:$platform$suffix"
 done

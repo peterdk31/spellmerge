@@ -77,7 +77,7 @@ def release_notes(repo: str, version: str, channel: str) -> str:
 
 def publish(repo: str, version: str, channel: str, commit: str, dist: Path) -> None:
     assets = sorted(str(p) for p in dist.glob("*.zip")) + [str(dist / "SHA256SUMS")]
-    title = f"Spellmerge {version} ({channel})"
+    title = f"{config.load().game.name} {version} ({channel})"
     notes = release_notes(repo, version, channel)
     # Draft first, so every asset is attached before the release becomes immutable.
     gh.run("release", "create", version, *assets, "--repo", repo, "--draft", "--target", commit,

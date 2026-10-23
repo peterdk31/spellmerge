@@ -27,7 +27,9 @@ STYLE = ROOT / "docs" / "STYLE.md"
 KIT = ROOT / "art" / "kit"
 SECTIONS = ("The short version", "The 32×32 grid", "Palette", "Light and shading", "Outline", "Readability",
             "Animation frame counts", "Checklist")
-ZIP_NAME = "spellmerge-art-kit.zip"
+GAME = config.load().game
+ZIP_NAME = f"{GAME.slug}-art-kit.zip"
+PALETTE = f"{GAME.slug}.gpl"  # art/kit/<slug>.gpl.txt, served without the .txt
 REPO_BLOB = f"https://github.com/{config.load().repo}/blob/main/"
 
 
@@ -94,14 +96,14 @@ def flat_name(path: str) -> str:
 
 
 def build_zip(out: Path) -> None:
-    entries = {"spellmerge.gpl": KIT / "spellmerge.gpl.txt", "palette.hex.txt": KIT / "palette.hex.txt",
+    entries = {PALETTE: KIT / f"{PALETTE}.txt", "palette.hex.txt": KIT / "palette.hex.txt",
                "grid_32.svg": KIT / "grid_32.svg", "sheet_template.svg": KIT / "sheet_template.svg",
                "checklist.md": KIT / "checklist.md", "golden.json": KIT / "golden.json"}
     for example in golden():
         entries[f"golden/{flat_name(example['path'])}"] = ROOT / example["path"]
-    notice = (f"Spellmerge art starter kit, from {REPO_BLOB.removesuffix('blob/main/')} (art/kit/).\n"
+    notice = (f"{GAME.name} art starter kit, from {REPO_BLOB.removesuffix('blob/main/')} (art/kit/).\n"
               "The art and templates are licensed CC-BY-SA-4.0 (https://creativecommons.org/licenses/by-sa/4.0/):\n"
-              "credit 'Spellmerge contributors' and share changes under the same licence.\n"
+              f"credit '{GAME.name} contributors' and share changes under the same licence.\n"
               "The rules are in docs/STYLE.md and on the Style Guide page.\n")
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:
         for name, source in sorted(entries.items()):
@@ -127,7 +129,7 @@ def page(screenshot: str = "") -> str:
         body = render(style[name])
         if name == "Palette":
             body = (f'<div class="swatches">{swatches}</div>' + body
-                    + '<p>Download: <a href="kit/spellmerge.gpl">spellmerge.gpl</a> (GIMP, Krita, Aseprite, '
+                    + f'<p>Download: <a href="kit/{PALETTE}">{PALETTE}</a> (GIMP, Krita, Aseprite, '
                     'LibreSprite, Inkscape) &middot; <a href="kit/palette.hex.txt">palette.hex.txt</a></p>')
         if name == "Animation frame counts":
             body += ('<p>The strip template (download <a href="kit/sheet_template.svg">sheet_template.svg</a>, '
@@ -143,7 +145,7 @@ def page(screenshot: str = "") -> str:
                             'alt="The arena with four wizards">' if screenshot else "") + "</section>")
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Spellmerge Style Guide</title>
+<title>{html.escape(GAME.name)} Style Guide</title>
 <style>
 body {{ background: #1b1a2e; color: #e8e6f0; font: 16px/1.55 system-ui, sans-serif; margin: 0 auto; max-width: 960px; padding: 16px; }}
 a {{ color: #f4c542; }}
@@ -161,21 +163,21 @@ img.wide {{ max-width: 100%; height: auto; }}
 ul.checks {{ list-style: none; padding-left: 0; }}
 .kit {{ background: #2b2840; padding: 12px 16px; border-radius: 6px; }}
 </style></head><body>
-<h1>Spellmerge Style Guide</h1>
+<h1>{html.escape(GAME.name)} Style Guide</h1>
 <p>The art rules, from <a href="{REPO_BLOB}docs/STYLE.md">docs/STYLE.md</a>. The art direction (style N) was chosen in M2.</p>
 <p class="kit"><strong>Starter kit:</strong> <a href="{ZIP_NAME}">{ZIP_NAME}</a>: the palette, the 32×32 grid, the strip template, the checklist and the golden examples. CC-BY-SA-4.0.</p>
 {chr(10).join(parts)}
-<p><a href="../">Back to Spellmerge</a></p>
+<p><a href="../">Back to {html.escape(GAME.name)}</a></p>
 </body></html>
 """
 
 
 def build(out: Path, screenshot_source: Path | None = None) -> None:
-    """Writes out/index.html, out/kit/*, out/golden/* and out/spellmerge-art-kit.zip."""
+    """Writes out/index.html, out/kit/*, out/golden/* and out/<slug>-art-kit.zip."""
     out.mkdir(parents=True, exist_ok=True)
     (out / "kit").mkdir(exist_ok=True)
     (out / "golden").mkdir(exist_ok=True)
-    shutil.copyfile(KIT / "spellmerge.gpl.txt", out / "kit" / "spellmerge.gpl")
+    shutil.copyfile(KIT / f"{PALETTE}.txt", out / "kit" / PALETTE)
     for name in ("palette.hex.txt", "grid_32.svg", "sheet_template.svg", "checklist.md"):
         shutil.copyfile(KIT / name, out / "kit" / name)
     for example in golden():

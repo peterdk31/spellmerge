@@ -54,7 +54,7 @@ jobs:
       - id: read-token
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          client-id: Iv23lirdyRvc0KC6625s # the bot app's Client ID (public)
+          client-id: ${{ vars.BOT_CLIENT_ID }} # the bot app's Client ID (public; setup.sh sets it from ci/config.json)
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           permission-contents: read
           permission-pull-requests: read
@@ -90,6 +90,8 @@ jobs:
         continue-on-error: true # the outcome output says how it went; a timeout must not skip the steps after
         uses: ./.github/actions/claude
         with:
+          bot-id: ${{ vars.BOT_ID }}
+          bot-login: ${{ vars.BOT_LOGIN }}
           claude-token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github-token: ${{ steps.read-token.outputs.token }}
           prompt: ${{ steps.prepare.outputs.prompt }}
@@ -101,7 +103,7 @@ jobs:
         if: always()
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          client-id: Iv23lirdyRvc0KC6625s # the bot app's Client ID (public)
+          client-id: ${{ vars.BOT_CLIENT_ID }} # the bot app's Client ID (public; setup.sh sets it from ci/config.json)
           private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
           permission-contents: write
           permission-issues: write

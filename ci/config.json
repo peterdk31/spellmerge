@@ -1,12 +1,21 @@
 {
   "repo": "peterdk31/spellmerge",
+  "game": {
+    "name": "Spellmerge",
+    "slug": "spellmerge",
+    "pitch": "a 2D top-down roguelite about building deep, combinable spells, for 1–4 local co-op players",
+    "tagline": "Merge spells. Cause chaos. Together. · Every spell is a merge request.",
+    "description": "Merge spells. Cause chaos. Together. A 1-4 player co-op roguelite built by Claude and the community.",
+    "itch": "https://peterdk31.itch.io/spellmerge"
+  },
   "owner": {
     "login": "peterdk31",
     "id": 13425287
   },
   "bot": {
     "login": "spellmerge-bot[bot]",
-    "id": 343592621
+    "id": 343592621,
+    "client_id": "Iv23lirdyRvc0KC6625s"
   },
   "dependency_bots": [
     "dependabot[bot]"

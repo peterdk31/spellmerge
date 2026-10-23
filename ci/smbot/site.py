@@ -23,6 +23,8 @@ from pathlib import Path
 
 from . import config, contribute, gh, screenshots, styleguide
 
+WEB_ZIPS = f"{config.load().game.slug}-web-*.zip"
+
 
 def unpack(zip_path: Path, dest: Path) -> None:
     dest.mkdir(parents=True, exist_ok=True)
@@ -41,8 +43,8 @@ def latest_stable_web_zip(repo: str, workdir: Path) -> tuple[str, Path] | None:
         tag = gh.run("release", "view", "--repo", repo, "--json", "tagName", "--jq", ".tagName").strip()
     except gh.GhError:
         return None
-    gh.run("release", "download", tag, "--repo", repo, "--pattern", "spellmerge-web-*.zip", "--dir", str(workdir))
-    zips = sorted(workdir.glob("spellmerge-web-*.zip"))
+    gh.run("release", "download", tag, "--repo", repo, "--pattern", WEB_ZIPS, "--dir", str(workdir))
+    zips = sorted(workdir.glob(WEB_ZIPS))
     return (tag, zips[0]) if zips else None
 
 
@@ -56,15 +58,15 @@ def newest_release_web_zip(repo: str, workdir: Path) -> tuple[str, str, Path] | 
     if not rows:
         return None
     tag, channel = rows[0]["tagName"], "nightly" if rows[0]["isPrerelease"] else "stable"
-    gh.run("release", "download", tag, "--repo", repo, "--pattern", "spellmerge-web-*.zip", "--dir", str(workdir))
-    zips = sorted(workdir.glob("spellmerge-web-*.zip"))
+    gh.run("release", "download", tag, "--repo", repo, "--pattern", WEB_ZIPS, "--dir", str(workdir))
+    zips = sorted(workdir.glob(WEB_ZIPS))
     return (tag, channel, zips[0]) if zips else None
 
 
 def build(repo: str, dist: Path, version: str, channel: str, out: Path, shots: Path | None = None) -> None:
     """The daily site: today's release is /nightly/ and /preview/, and /play/ if it is stable."""
     _reset(out)
-    today_zip = dist / f"spellmerge-web-{version}.zip"
+    today_zip = dist / WEB_ZIPS.replace("*", version)
     unpack(today_zip, out / "nightly")
     unpack(today_zip, out / "preview")
 
@@ -86,7 +88,7 @@ def build(repo: str, dist: Path, version: str, channel: str, out: Path, shots: P
 def build_preview(repo: str, dist: Path, version: str, out: Path, shots: Path | None = None) -> None:
     """The site between daily runs: this build is /preview/; /nightly/ and /play/ come from the releases."""
     _reset(out)
-    preview_zip = dist / f"spellmerge-web-{version}.zip"
+    preview_zip = dist / WEB_ZIPS.replace("*", version)
     unpack(preview_zip, out / "preview")
     with tempfile.TemporaryDirectory() as tmp:
         (Path(tmp) / "newest").mkdir()

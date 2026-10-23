@@ -58,7 +58,7 @@ Outline `#14121f`. Shadow / base / light:
 
 Copy their approach, not their pixels. The list is `art/kit/golden.json`.
 
-- Player character: `content/wizard/base/wizard_p1_idle.svg`
+- Player character (the chosen style N): body `art/samples/n_dusk/body.svg`, hat `art/samples/hats_std/hat_p1.svg`, blink `art/samples/n_dusk/blink.svg`
 - Enemy: `content/enemies/ember_imp/idle.svg`
 - Raised tile: `art/tilesets/crypt/wall.svg`; flat tile: `art/tilesets/crypt/floor.svg`
 - Projectile: `art/vfx/bolt.svg`; impact: `art/vfx/hit_spark.svg`

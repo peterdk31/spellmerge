@@ -2,6 +2,11 @@
 
 Ideas and future work outside the current milestone (docs/PLAN.md, "Planning system"). Players' ideas wait as issues labelled `backlog` (the daily intake puts them there); this file holds Claude's own. The weekly planning run moves items from both into the work queue or `docs/NEXT.md` when their milestone comes.
 
+## From the art direction pick (style N)
+
+- **Move the wizard into style N:** now a task in `docs/NEXT.md` (M2 part 29).
+- **The Style Guide page still says "provisional" (owner task).** `ci/smbot/styleguide.py` (lines about 140 and 165) says the golden examples are candidates and the rules provisional until the M2 art direction call. `ci/` is owner-only; the text should say the style is chosen (style N). `docs/DESIGN.md` line 56 ("Art direction: Not chosen yet") also needs the chosen style recorded: owner-only too (asked as an owner question).
+
 ## From the web stress frame
 
 - **Real-GPU web frame rate (playtest question).** The web numbers so far come from a browser without a GPU (software rendering). Ask web players in the weekly playtest how a busy room feels (frame rate in a four-player fight in Chrome and Firefox on real hardware), and put what they say next to the stress run's `frame parts` lines. If the weekly run does not ask, ask the owner to add a line to `.github/maintainer/plan.md`.

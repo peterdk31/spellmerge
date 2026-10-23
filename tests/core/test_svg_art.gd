@@ -219,6 +219,61 @@ func test_the_round_five_faces_are_just_two_big_eyes() -> void:
 		check(text.contains('<rect x="16" y="17" width="2" height="2" fill="#14121f"/>'), "%s/body.svg lost its right eye" % body)
 
 
+## The chosen style's blink layer (N) covers exactly the two eyes (x 12-13 and 16-17, rows 16 to 18)
+## and uses only Skin and the outline colour, so drawing it over the body closes the eyes and
+## touches nothing else; it carries no player colour.
+func test_the_blink_layer_covers_exactly_the_eyes() -> void:
+	var text: String = FileAccess.get_file_as_string("res://art/samples/n_dusk/blink.svg")
+	var rect_pattern: RegEx = RegEx.create_from_string('<rect x="(\\d+)" y="(\\d+)" width="(\\d+)" height="(\\d+)" fill="(#[0-9a-f]+)"')
+	var covered: Dictionary = {}
+	for rect in rect_pattern.search_all(text):
+		var fill: String = rect.get_string(5)
+		check(fill == "#f5cfa8" or fill == OUTLINE, "blink.svg uses %s, only Skin light and the outline are allowed" % fill)
+		for dx in rect.get_string(3).to_int():
+			for dy in rect.get_string(4).to_int():
+				covered[Vector2i(rect.get_string(1).to_int() + dx, rect.get_string(2).to_int() + dy)] = true
+	var expected: Dictionary = {}
+	for eye_x: int in [12, 16]:
+		for dx in 2:
+			for dy in 3:
+				expected[Vector2i(eye_x + dx, 16 + dy)] = true
+	check_equal(covered.keys().size(), expected.size(), "blink.svg covers 12 pixels, the two eyes")
+	for cell: Vector2i in expected:
+		check(covered.has(cell), "blink.svg leaves the eye pixel %s open" % cell)
+	for colour: String in PLAYER_COLOURS:
+		check(not text.contains(colour), "blink.svg uses the player colour %s" % colour)
+	# The blink must sit on the body's eyes: every non-Skin cell of the body's face band (highlight,
+	# pupil, eye block, x 11 to 18, rows 16 to 18) is a blink cell, and the other way round.
+	var body_text: String = FileAccess.get_file_as_string("res://art/samples/n_dusk/body.svg")
+	var body_eyes: Dictionary = {}
+	for rect in rect_pattern.search_all(body_text):
+		var body_x: int = rect.get_string(1).to_int()
+		var body_y: int = rect.get_string(2).to_int()
+		if rect.get_string(5) == "#f5cfa8" or body_x < 11 or body_x > 18 or body_y < 16 or body_y > 18:
+			continue
+		for dx in rect.get_string(3).to_int():
+			for dy in rect.get_string(4).to_int():
+				body_eyes[Vector2i(body_x + dx, body_y + dy)] = true
+	check_equal(body_eyes.keys().size(), covered.keys().size(), "the body's eyes and the blink cover the same number of pixels")
+	for cell: Vector2i in body_eyes:
+		check(covered.has(cell), "the body's eye pixel %s is not under the blink" % cell)
+
+
+## Every path in art/kit/golden.json exists, so the Style Guide never points at a missing file.
+func test_every_golden_example_exists() -> void:
+	var golden: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://art/kit/golden.json"))
+	check(golden is Dictionary, "art/kit/golden.json is a JSON object")
+	if not golden is Dictionary:
+		return
+	var examples: Variant = (golden as Dictionary).get("examples", [])
+	check(examples is Array and not (examples as Array).is_empty(), "golden.json lists examples")
+	if not examples is Array:
+		return
+	for entry: Variant in examples:
+		var path: String = String((entry as Dictionary).get("path", "")) if entry is Dictionary else ""
+		check(FileAccess.file_exists("res://" + path), "golden.json lists %s, which does not exist" % path)
+
+
 func test_every_svg_is_in_the_manifest() -> void:
 	var manifest: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://art/manifest.json"))
 	check(manifest is Dictionary, "art/manifest.json is a JSON object")

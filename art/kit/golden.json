@@ -1,11 +1,21 @@
 {
-  "status": "candidates",
-  "note": "Golden example candidates for the Style Guide (docs/STYLE.md, 'Golden examples'). They are the best placeholder art so far; the M2 art direction call confirms or replaces them. The starter kit zip includes these files next to the palette and templates.",
+  "status": "chosen",
+  "note": "Golden examples for the Style Guide (docs/STYLE.md, 'Golden examples'). The owner chose style N (dusk robe) on 2026-10-23, so the wizard files are N's. The enemy, tiles and effects are still the earlier placeholders: they are redrawn in the chosen style one area at a time (M2 design, 'Art and the art direction'), and each is replaced here when it is. The starter kit zip includes these files next to the palette and templates.",
   "examples": [
     {
-      "path": "content/wizard/base/wizard_p1_idle.svg",
-      "shows": "A player character: Player 1 ramp on robe and hat, Skin face, Wood staff, feet about 2-3 px above the bottom edge",
+      "path": "art/samples/n_dusk/body.svg",
+      "shows": "The player character body: a narrow dusk (Stone) robe with a Spark placket, belt and hem, two big tall eyes and no mouth, Wood staff, no player colour, feet about 2-3 px above the bottom edge",
+      "rules": ["outline", "three shades", "light from the top-left", "narrow silhouette", "no player colour"]
+    },
+    {
+      "path": "art/samples/hats_std/hat_p1.svg",
+      "shows": "The player's hat, its own layer drawn over the body: the big pointed hat with a Spark band in the player's ramp (Player 1 here), the only part with a player colour",
       "rules": ["outline", "three shades", "light from the top-left", "player colour"]
+    },
+    {
+      "path": "art/samples/n_dusk/blink.svg",
+      "shows": "The blink layer: closed eyes in Skin with a black line, drawn over the body's eyes for a moment every few seconds",
+      "rules": ["outline", "layer over the body", "no player colour"]
     },
     {
       "path": "content/enemies/ember_imp/idle.svg",

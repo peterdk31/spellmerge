@@ -9,7 +9,6 @@
     "number": 202
   },
   "errors_in_a_row": 0,
-  "idle": null,
   "intake_tasks": {
     "208": {
       "author": "Brianmanden",
@@ -90,9 +89,11 @@
       "parked_until": "2026-10-24T05:29:12Z"
     },
     "**Record the chosen art direction (M2 part 27 follow-up).** Replace the golden example candidates in `art/kit/golden.json` and `docs/STYLE.md` with the chosen style's files, and say in `docs/STYLE.md` that the style is no longer provisional. Redrawing the placeholders in that style is spread over later milestones (M2 design, \"Art and the art direction\"), one area at a time.": {
-      "count": 1,
+      "count": 2,
+      "parked_reason": "the final review didn't approve it 2 times in a row",
+      "parked_until": "2026-10-24T11:16:25Z",
       "pr": "219",
-      "problems": "- The description says \"Refs #206\" and that the PR \"does not close it\", because the blink and the bob are not in the game yet. Its last line is \"Closes #206\". On merge GitHub would close the issue and the owner would be told it is done, though their request for a blinking, lively wizard is still open. Fix: Remove the trailing \"Closes #206\" line and keep only \"Refs #206\".\n- The frame-count section still opens with \"Provisional, like the rest.\" The status line at the top of the file now says the style is chosen and not provisional, so the two disagree. Fix: Reword it, for example \"These counts stand until the wizard redraw task confirms them.\" or drop the sentence."
+      "problems": "- The body says \"Refs #206. This PR does not close it, because the blink and the bob are not in the game yet.\" The last line is `Closes #206`. Merging would auto-close the issue and tell the owner it is done, while the blink and bob are only queued as NEXT part 29. Fix: Delete the trailing `Closes #206` line so the PR only refs the issue. If the owner's pick on #206 should be closed out on merge, say so in the body instead."
     },
     "**Stabilisation and C2 (M2 part 28).** (The evidence task is done; its section \"C2 evidence\" is in `docs/LOG.md`. The web stress task in Blocked must be done before M2 closes: no bug is known, and the daily run found nothing to fix on 2026-10-23.) Only bug fixing, polish and performance until no known crash or blocker remains; then the planning session ends M2 with the C2 checkpoint issue (build link, bot data such as fuzz and stress numbers and which recipes bots build, Claude's honest assessment and the C2 question), and development waits for the owner's /go, /iterate or /pivot. **Before closing M2, check the Blocked WASM task:** if a \"Daily run\" post with \"Stress and timing results\" exists, move that task back to the Queue and finish it first. **If that task is still waiting** (no post newer than #202 with the `BENCH: frame parts` lines), there is nothing to do yet: answer `nothing_to_do`, do not close M2 and do not write the C2 checkpoint.": {
       "count": 0,

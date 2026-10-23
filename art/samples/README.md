@@ -4,7 +4,7 @@ Three looks for the game, each a wizard, a crypt floor tile and a fire spell ico
 
 | | A: Chunky (`a_chunky/`) | B: Current | C: Grim (`c_grim/`) |
 | --- | --- | --- | --- |
-| Wizard | Big head and face, short bell robe, 16×22 px | The game's placeholder: `content/wizard/base/wizard_p1_idle.svg` | Tall hooded cloak, no face, two glowing eyes, 16×20 px |
+| Wizard | Big head and face, short bell robe, 16×22 px | The game's placeholder at the time (since redrawn in style N: `content/wizard/base/wizard_idle.svg`, which `shot_art_direction.gd` now shows here) | Tall hooded cloak, no face, two glowing eyes, 16×20 px |
 | Floor | Bold offset bricks, clear joints | `art/tilesets/crypt/floor.svg`: flagstones with fine cracks | Large slabs, thin joints, two cracks |
 | Icon | One big round flame | `content/spells/elements/fire/icon.svg` | Narrow flame with a skull-like face |
 | Reads at 1× (the author's look at the sheet's 1× row, four wizards overlapping; judge it yourself) | The face and the hat stay apart when four overlap | The four hats stay apart; the fine floor cracks are busy | The dark cloak is close to the dark floor; four overlapping are a dark clump |

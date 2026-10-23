@@ -20,7 +20,7 @@ const FLOORS: Array[Texture2D] = [
 ]
 const WIZARDS: Array[Texture2D] = [
 	preload("res://art/samples/a_chunky/wizard.svg"),
-	preload("res://content/wizard/base/wizard_p1_idle.svg"),
+	preload("res://content/wizard/base/wizard_idle.svg"),
 	preload("res://art/samples/c_grim/wizard.svg"),
 ]
 const ICONS: Array[Texture2D] = [
@@ -29,7 +29,8 @@ const ICONS: Array[Texture2D] = [
 	preload("res://art/samples/c_grim/spell_icon.svg"),
 ]
 ## The current wizard file is a strip of frames; the first 32x32 is the idle pose.
-const STRIP_FRAME := Rect2(0, 0, 32, 32)
+const STRIP_FRAME := Rect2i(0, 0, 32, 32)
+const HAT: Texture2D = preload("res://content/wizard/base/wizard_hat_p1.svg")
 
 
 func _initialize() -> void:
@@ -79,10 +80,11 @@ func _column(index: int) -> void:
 func _frame(texture: Texture2D, from_strip: bool) -> Texture2D:
 	if not from_strip:
 		return texture
-	var atlas := AtlasTexture.new()
-	atlas.atlas = texture
-	atlas.region = STRIP_FRAME
-	return atlas
+	# The game's wizard is now a body strip under a separate hat: the first frame and player 1's hat.
+	var image: Image = texture.get_image().get_region(STRIP_FRAME)
+	var hat: Image = HAT.get_image()
+	image.blend_rect(hat, Rect2i(Vector2i.ZERO, hat.get_size()), Vector2i.ZERO)
+	return ImageTexture.create_from_image(image)
 
 
 func _label(text: String, x: float, y: float) -> void:

@@ -172,40 +172,49 @@
       "prompt": "A 32x32 enemy shot: a round ember orb with four short spikes along the axes, drawn as concentric rings from a dark Outline edge through Fire shadow, base and light to a Spark core and a Spark light centre, so it is the brightest thing in the room. A different silhouette from the player's comet-shaped fire bolt. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no player colours."
     },
     {
-      "path": "content/wizard/base/wizard_p1_idle.svg",
+      "path": "content/wizard/base/wizard_idle.svg",
       "origin": "ai",
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
       "tier": "placeholder",
       "tool": "Claude (hand-written SVG rects)",
-      "prompt": "A 2-frame idle strip (64x32, the second frame breathes by one pixel) of a wizard seen from the front with a pointed hat with a gold band, white beard and a belt, no staff (the game draws it, see staff.svg), robe and hat in the Player 1 (blue) ramp, skin and wood from the shared materials, 1px dark outline, light from the top-left. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+      "prompt": "A 4-frame idle strip (128x32) of style N from art/samples/n_dusk/body.svg: a narrow dusk robe with a Spark placket, belt and hem, two big tall eyes and no mouth, the body only (no hat, no staff, no player colour). Frame 1 eyes open, frame 2 eyes closed (a blink), frames 3 and 4 the eyes glance one pixel left and right. The game adds the breathing as a 1 px bob. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
     },
     {
-      "path": "content/wizard/base/wizard_p2_idle.svg",
+      "path": "content/wizard/base/wizard_hat_p1.svg",
       "origin": "ai",
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
       "tier": "placeholder",
       "tool": "Claude (hand-written SVG rects)",
-      "prompt": "The same wizard sprite as wizard_p1_idle.svg with the robe and hat recoloured to the Player 2 (rose) ramp. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+      "prompt": "The big pointed hat with a Spark band and a wide brim from style sample F, alone on a 32x32 canvas, in the Player 1 ramp. The game draws it over the body strips and moves it with the body's bob. A copy of art/samples/hats_std/hat_p1.svg. 1 px outline, light from the top-left, only non-overlapping rect elements, palette colours from docs/STYLE.md."
     },
     {
-      "path": "content/wizard/base/wizard_p3_idle.svg",
+      "path": "content/wizard/base/wizard_hat_p2.svg",
       "origin": "ai",
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
       "tier": "placeholder",
       "tool": "Claude (hand-written SVG rects)",
-      "prompt": "The same wizard sprite as wizard_p1_idle.svg with the robe and hat recoloured to the Player 3 (green) ramp. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+      "prompt": "The same hat as wizard_hat_p1.svg in the Player 2 (rose) ramp; a copy of art/samples/hats_std/hat_p2.svg. Only rect elements, palette colours from docs/STYLE.md."
     },
     {
-      "path": "content/wizard/base/wizard_p4_idle.svg",
+      "path": "content/wizard/base/wizard_hat_p3.svg",
       "origin": "ai",
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
       "tier": "placeholder",
       "tool": "Claude (hand-written SVG rects)",
-      "prompt": "The same wizard sprite as wizard_p1_idle.svg with the robe and hat recoloured to the Player 4 (purple) ramp. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+      "prompt": "The same hat as wizard_hat_p1.svg in the Player 3 (green) ramp; a copy of art/samples/hats_std/hat_p3.svg. Only rect elements, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "content/wizard/base/wizard_hat_p4.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "The same hat as wizard_hat_p1.svg in the Player 4 (purple) ramp; a copy of art/samples/hats_std/hat_p4.svg. Only rect elements, palette colours from docs/STYLE.md."
     },
     {
       "path": "content/wizard/base/staff.svg",
@@ -217,76 +226,31 @@
       "prompt": "A 32x32 wizard staff lying horizontally, pointing right: a Wood pole with a Skin fist on it (the hand, at pixel 14,16) and a gold Spark gem at the tip, 1px dark outline, light from the top. The game turns it along the aim and draws a player-colour gem over the tip. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
     },
     {
-      "path": "content/wizard/base/wizard_p1_walk.svg",
+      "path": "art/kit/golden_wizard.svg",
       "origin": "ai",
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
       "tier": "placeholder",
       "tool": "Claude (hand-written SVG rects)",
-      "prompt": "A 4-frame walk strip (128x32) of the same wizard as wizard_p1_idle.svg: the upper body dips one pixel on the two stride frames, and the boots alternate between a wide and a narrow stance. Only rect elements, whole-number translate offsets, palette colours from docs/STYLE.md."
+      "prompt": "The golden example of a player character, style N: frame 1 of content/wizard/base/wizard_idle.svg (eyes open) with content/wizard/base/wizard_hat_p1.svg over it, as one 32x32 picture for the Style Guide page and the starter kit. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
     },
     {
-      "path": "content/wizard/base/wizard_p2_walk.svg",
+      "path": "content/wizard/base/wizard_walk.svg",
       "origin": "ai",
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
       "tier": "placeholder",
       "tool": "Claude (hand-written SVG rects)",
-      "prompt": "The same walk strip as wizard_p1_walk.svg with the robe and hat recoloured to the Player 2 (rose) ramp. Only rect elements, palette colours from docs/STYLE.md."
+      "prompt": "A 4-frame walk strip (128x32) of the same body as wizard_idle.svg (eyes open): the boots waddle between a wide stance, together, left boot out and right boot out. The game dips the body and hat one pixel on frames 1 and 3. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
     },
     {
-      "path": "content/wizard/base/wizard_p3_walk.svg",
+      "path": "content/wizard/base/wizard_dash.svg",
       "origin": "ai",
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
       "tier": "placeholder",
       "tool": "Claude (hand-written SVG rects)",
-      "prompt": "The same walk strip as wizard_p1_walk.svg with the robe and hat recoloured to the Player 3 (green) ramp. Only rect elements, palette colours from docs/STYLE.md."
-    },
-    {
-      "path": "content/wizard/base/wizard_p4_walk.svg",
-      "origin": "ai",
-      "author": "Claude",
-      "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (hand-written SVG rects)",
-      "prompt": "The same walk strip as wizard_p1_walk.svg with the robe and hat recoloured to the Player 4 (purple) ramp. Only rect elements, palette colours from docs/STYLE.md."
-    },
-    {
-      "path": "content/wizard/base/wizard_p1_dash.svg",
-      "origin": "ai",
-      "author": "Claude",
-      "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (hand-written SVG rects)",
-      "prompt": "A 3-frame dash strip (96x32) of the same wizard as wizard_p1_idle.svg: a crouch with a small lean, then two frames leaning far forward with the boots off the ground and the robe trailing behind. The upper body is shifted in bands to lean. Only rect elements, whole-number translate offsets, palette colours from docs/STYLE.md."
-    },
-    {
-      "path": "content/wizard/base/wizard_p2_dash.svg",
-      "origin": "ai",
-      "author": "Claude",
-      "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (hand-written SVG rects)",
-      "prompt": "The same dash strip as wizard_p1_dash.svg with the robe and hat recoloured to the Player 2 (rose) ramp. Only rect elements, palette colours from docs/STYLE.md."
-    },
-    {
-      "path": "content/wizard/base/wizard_p3_dash.svg",
-      "origin": "ai",
-      "author": "Claude",
-      "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (hand-written SVG rects)",
-      "prompt": "The same dash strip as wizard_p1_dash.svg with the robe and hat recoloured to the Player 3 (green) ramp. Only rect elements, palette colours from docs/STYLE.md."
-    },
-    {
-      "path": "content/wizard/base/wizard_p4_dash.svg",
-      "origin": "ai",
-      "author": "Claude",
-      "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (hand-written SVG rects)",
-      "prompt": "The same dash strip as wizard_p1_dash.svg with the robe and hat recoloured to the Player 4 (purple) ramp. Only rect elements, palette colours from docs/STYLE.md."
+      "prompt": "A 2-frame dash strip (64x32) of the same body as wizard_idle.svg: frame 1 eyes open (the crouch), frame 2 eyes shut tight (the leap). The game crouches, lifts, stretches and leans it. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
     },
     {
       "path": "content/spells/elements/fire/icon.svg",

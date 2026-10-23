@@ -4,6 +4,7 @@ extends "res://tests/support/suite.gd"
 ## is free to change; these checks only hold the contract the player script relies on.
 
 const WizardScene := preload("res://content/wizard/base/wizard.tscn")
+const PlayerScript := preload("res://gameplay/player/player.gd")
 const FRAME: int = 32
 const PLAYERS: int = 4
 
@@ -43,11 +44,36 @@ func test_dash_strips_are_whole_frames_for_every_player() -> void:
 	_check_whole_frames("dash_textures")
 
 
-func test_every_player_gets_a_different_idle_look() -> void:
-	var strips: Array[Texture2D] = _strips("textures")
-	for i in strips.size():
-		for j in range(i + 1, strips.size()):
-			check(strips[i] != strips[j], "players %d and %d must be told apart" % [i, j])
+func test_every_player_gets_a_different_hat() -> void:
+	var hats: Array[Texture2D] = _strips("hat_textures")
+	check_equal(hats.size(), PLAYERS, "hat_textures has one hat per player")
+	for i in hats.size():
+		check(hats[i] != null, "hat_textures[%d] is set" % i)
+		if hats[i] != null:
+			check_equal(hats[i].get_width(), FRAME, "hat %d is one frame wide" % i)
+			check_equal(hats[i].get_height(), FRAME, "hat %d is one frame high" % i)
+		for j in range(i + 1, hats.size()):
+			check(hats[i] != hats[j], "players %d and %d must be told apart" % [i, j])
+
+
+func test_bob_tables_match_the_strip_lengths() -> void:
+	var walk: Array[Texture2D] = _strips("walk_textures")
+	var dash: Array[Texture2D] = _strips("dash_textures")
+	for i in walk.size():
+		check_equal(walk[i].get_width() / FRAME, PlayerScript.WALK_BOB.size(), "walk strip %d has one bob per frame" % i)
+	for i in dash.size():
+		check_equal(dash[i].get_width() / FRAME, PlayerScript.DASH_BOB.size(), "dash strip %d has one bob per frame" % i)
+
+
+func test_the_scene_has_a_hat_node_under_the_sprite() -> void:
+	check(wizard.get_node_or_null("Sprite/Hat") is Sprite2D, "the hat is a Sprite2D under Sprite")
+
+
+func test_the_idle_has_four_poses_for_the_blink_and_the_glances() -> void:
+	var idle: Texture2D = _strips("textures")[0]
+	check_equal(idle.get_width() / FRAME, 4, "open, closed, glance left, glance right")
+	for pose: int in PlayerScript.IDLE_SEQUENCE:
+		check(pose >= 0 and pose < 4, "IDLE_SEQUENCE only names poses of the strip")
 
 
 func test_the_staff_is_set() -> void:

@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://iaoumuvp3rx3"
-path="res://.godot/imported/wizard_p3_dash.svg-507b892d432274a6589d5552ece9d4d6.ctex"
+uid="uid://bmefw8n622eox"
+path="res://.godot/imported/wizard_hat_p2.svg-8897377dc9e218599c7d600f58f454d1.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://content/wizard/base/wizard_p3_dash.svg"
-dest_files=["res://.godot/imported/wizard_p3_dash.svg-507b892d432274a6589d5552ece9d4d6.ctex"]
+source_file="res://content/wizard/base/wizard_hat_p2.svg"
+dest_files=["res://.godot/imported/wizard_hat_p2.svg-8897377dc9e218599c7d600f58f454d1.ctex"]
 
 [params]
 

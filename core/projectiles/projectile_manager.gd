@@ -2,7 +2,7 @@ extends Node2D
 ## The projectile manager: one autoload ("Projectiles") that simulates every
 ## spell projectile in bulk and draws them all in one batch. Projectiles are
 ## rows in packed arrays, never nodes, so thousands cost little (PLAN budgets:
-## 1,000 on the web, 3,000 on desktop).
+## 500 on the web, 3,000 on desktop).
 ##
 ##     Projectiles.add_target(enemy, 10.0, Projectiles.LAYER_ENEMY)
 ##     Projectiles.spawn(player, origin, direction * 300.0, 1.5, 4.0)
@@ -139,8 +139,10 @@ const MOTION_STRAIGHT: int = 0
 const MOTION_STILL: int = 1
 ## Only `spawn_orbit` makes this one.
 const MOTION_ORBIT: int = 2
-## Default global caps on live projectiles: the PLAN budgets for each platform.
-const DEFAULT_CAP_WEB: int = 1000
+## Default global caps on live projectiles for each platform. The web cap was 1,000 (the PLAN
+## budget) until the first web stress run: a physics step of 14 to 20 ms made the engine
+## catch up with up to 8 steps per frame (docs/DECISIONS.md, 2026-10-23), so it is 500.
+const DEFAULT_CAP_WEB: int = 500
 const DEFAULT_CAP_DESKTOP: int = 3000
 ## How many recently hit targets a piercing projectile remembers; also the most
 ## hits one projectile can register in a single step.

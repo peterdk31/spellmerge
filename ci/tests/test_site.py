@@ -30,6 +30,24 @@ class ContributePageTest(unittest.TestCase):
         self.assertEqual(current.parts_total, 7)
         self.assertGreater(current.checks_total, 10)
 
+    def test_parts_done_come_from_next_and_log(self) -> None:
+        """M1 and M2's parts tables have no status column: the bar stayed at 0 for two milestones."""
+        design = ("| # | Part | Delivers |\n| --- | --- | --- |\n"
+                  "| 1 | a | x |\n| 2 | b | x |\n| 3 | c | x |\n| 4 | d | x |\n")
+        next_md = ("- [ ] **Stabilisation (M2 part 4).** open\n"
+                   "- [x] **Follow-up (M2 part 3 follow-up).** not the part itself\n"
+                   "- [x] **Base classes (M2 part 1).** done\n"
+                   "- [x] **Old milestone (M1 part 2).** another milestone\n")
+        log_md = "## 2026-10-22: Events (M2 part 2)\n\nSee (M2 part 3) in passing.\n"
+        m = contribute.parse_progress(contribute.Milestone(code="M2"), design, next_md, log_md)
+        self.assertEqual((m.parts_done, m.parts_total), (2, 4))
+
+    def test_no_checks_bar_without_a_checklist(self) -> None:
+        data = contribute.PageData(current=contribute.Milestone("M2", "Spells", parts_done=3, parts_total=4))
+        page = contribute.render(config.load(), data, "v0.1", "nightly", "v0.0")
+        self.assertIn("3 of 4 (75%)", page)
+        self.assertNotIn("Checks passed", page)
+
     def test_render_escapes_and_handles_missing_data(self) -> None:
         data = contribute.PageData(merged=[{"title": "<script>x</script>", "url": "https://x", "author": "a"}])
         page = contribute.render(config.load(), data, "v0.1", "nightly", "v0.0")

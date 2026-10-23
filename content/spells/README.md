@@ -62,7 +62,7 @@ Element interactions go in `reactions.tres` (a `ReactionTable` of `ReactionRow`s
 
 Each is a `.tres` plus an `icon.svg`, no script.
 
-- **Form: `forms/bolt/`.** `FormBase` with damage 5, mana 5, cooldown 0.35 s, speed 220, one STRAIGHT shot, complexity 1. A beam sets `motion` to RAY and `ray_length`; a nova raises `shots` and `spread`.
+- **Form: `forms/bolt/`.** `FormBase` with damage 5, mana 5, cooldown 0.35 s, speed 220, one STRAIGHT shot, complexity 1. A beam sets `motion` to RAY and `ray_length`, and is a held tick (cooldown 0.25 s, so 4 hits a second on one enemy, 4 mana a tick); a nova raises `shots` and `spread`.
 - **Element: `elements/frost/`.** `ElementBase` with `status_id = &"chill"`, 3 s, strength 40, `damage_scale` 1.0 and a palette `tint`, complexity 1. The reactions with other elements are rows in `reactions.tres`, not fields here.
 - **Modifier: `modifiers/split/`.** `ModifierBase` with `shot_mult = 3`, `damage_mult = 0.5`, `mana_mult = 1.5`, complexity 2. A modifier names only the fields it changes and leaves the rest at 1; its cost in damage or mana pays for its power. Homing and chain use `behaviour` and `behaviour_strength`.
 - **Trigger: `triggers/on_hit/`.** `TriggerBase` with `event = 0` (HIT), `max_fires = 1`, complexity 1. The timer sets `event = 2`, `interval = 0.5` and `max_fires = 4`.

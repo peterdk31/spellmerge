@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-23: The beam is held (owner `/claude` on #4)
+
+The beam now ticks while fire is held: cooldown 0.25 s (4 hits a second on one enemy), 3 damage and 4 mana a tick (16 mana a second, against 10 regenerated); the drawn beam lasts 0.25 s (one tick, so beams do not stack). New test in `test_forms.gd`. `build.sh --quick --tests` passes.
+
 ## 2026-10-23: Web stress parts read, web projectile cap 500 (owner `/claude` on #4)
 
 Read the first web `frame parts` lines in #202: the web physics step is 14 to 20 ms, so the engine runs up to 8 catch-up steps per frame (the 130 ms frame). Enemy, combat and Feel passes are small. Lowered `DEFAULT_CAP_WEB` from 1,000 to 500; the web stress scenarios follow the constant; docs updated. A new Blocked task checks the next daily web run. Not verified in a browser (a session can't run one).

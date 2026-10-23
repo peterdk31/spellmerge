@@ -6,7 +6,7 @@ The ordered task queue for the current milestone, M2 (its design, [M2-spell-syst
 
 M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97). Each task's details are the matching row and sections of the M2 design. Nothing from M3+ is built (rewards, relics, staffs, rooms, the door rule).
 
-M2 is done. The C2 checkpoint issue is not opened yet (the next planning session does it); then development waits for the owner's verdict (`/go`, `/iterate <what>` or `/pivot <how>`). Until then the queue is empty on purpose, and an automated development session answers `nothing_to_do` (it does not pick from the Backlog): the next milestone's design and tasks are written only after `go`; an `iterate` adds rework tasks here.
+M2's parts are all built and no known crash or blocker is left. The C2 checkpoint issue is not opened yet (the next planning session does it, and sets M2 to done in the roadmap when it exists); done-when item 3 is still open on the real-GPU frame rate. Then development waits for the owner's verdict (`/go`, `/iterate <what>` or `/pivot <how>`). Until then the queue is empty on purpose, and an automated development session answers `nothing_to_do` (it does not pick from the Backlog): the next milestone's design and tasks are written only after `go`; an `iterate` adds rework tasks here.
 
 ## Blocked
 
@@ -14,7 +14,7 @@ M2 is done. The C2 checkpoint issue is not opened yet (the next planning session
 
 ## Done recently
 
-- [x] **Stabilisation and C2 (M2 part 28), second half.** The web stress run after the cap of 500 was read (13:29 UTC daily run): physics step 7.58 ms avg, one step per frame, so the limits stay (DECISIONS, 2026-10-23). No known crash or blocker is left; the planning session marked M2 done. The C2 checkpoint issue is still to be opened (next planning session).
+- [x] **Stabilisation and C2 (M2 part 28), second half.** The web stress run after the cap of 500 was read (13:29 UTC daily run): physics step 7.58 ms avg, one step per frame, so the limits stay (DECISIONS, 2026-10-23). No known crash or blocker is left; The C2 checkpoint issue is still to be opened (next planning session).
 
 - [x] **Check the web stress run after the cap of 500 (M2 part 25 follow-up).** Read in the planning session: see the DECISIONS entry "The web stress run after the cap of 500 is read".
 

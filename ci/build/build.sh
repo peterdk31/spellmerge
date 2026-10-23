@@ -59,11 +59,11 @@ TEMPLATES_TPZ="Godot_v${GODOT_RELEASE}_export_templates.tpz"
 GODOT="$TOOLS/Godot_v${GODOT_RELEASE}_linux.x86_64"
 
 # Budgets from docs/PLAN.md, "Performance": compressed download sizes.
-WEB_BUDGET=$((40 * 1000 * 1000))
-DESKTOP_BUDGET=$((300 * 1000 * 1000))
+WEB_BUDGET=$(($(PYTHONPATH=ci python3 -m smbot.config budget web_mb) * 1000 * 1000))
+DESKTOP_BUDGET=$(($(PYTHONPATH=ci python3 -m smbot.config budget desktop_mb) * 1000 * 1000))
 # docs/PLAN.md target: the web build loads in under 10 s (here from a local server, so no
 # download). Over it the web smoke test warns with likely fixes; it never fails the build.
-WEB_LOAD_WARN=10
+WEB_LOAD_WARN=$(PYTHONPATH=ci python3 -m smbot.config budget web_load_s)
 
 step() { printf '\n==> %s\n' "$*"; }
 
@@ -189,7 +189,7 @@ export_all() {
 
   # The shipped presets leave tests/ out; "Linux Test" is the Linux preset with tests, never
   # packaged. An exported build can't run a --script, so the game starts each test runner on its
-  # user argument. The runs are the game's own (tests/exported_runs.json, which the bot maintains:
+  # user argument. The runs are the game's own (tests/build.json, which the bot maintains:
   # for Spellmerge the 4-bot test, the stress run and the projectile timing); none skips this.
   local runs name arg label linux_ok web_ok web_timeout
   runs=$(PYTHONPATH=ci python3 -m smbot.config runs)
@@ -263,11 +263,11 @@ package() {
   local size
   size=$(stat -c %s "dist/$SLUG-web-$VERSION.zip")
   echo "web: $((size / 1000)) kB of $((WEB_BUDGET / 1000)) kB"
-  ((size <= WEB_BUDGET)) || echo "::warning::web download is over its 40 MB budget. Not a failure. Likely fixes: big textures or sounds added recently (art/manifest.json, audio/manifest.json), more content the Web preset could exclude (export_presets.cfg, the demo flag), uncompressed imports"
+  ((size <= WEB_BUDGET)) || echo "::warning::web download is over its $((WEB_BUDGET / 1000000)) MB budget (tests/build.json). Not a failure. Likely fixes: big textures or sounds added recently (art/manifest.json, audio/manifest.json), more content the Web preset could exclude (export_presets.cfg, the demo flag), uncompressed imports"
   for platform in windows linux; do
     size=$(stat -c %s "dist/$SLUG-$platform-$VERSION.zip")
     echo "$platform: $((size / 1000)) kB of $((DESKTOP_BUDGET / 1000)) kB"
-    ((size <= DESKTOP_BUDGET)) || echo "::warning::$platform download is over its 300 MB budget. Not a failure. Likely fixes: big textures or sounds added recently, uncompressed imports, test or source files the export should exclude"
+    ((size <= DESKTOP_BUDGET)) || echo "::warning::$platform download is over its $((DESKTOP_BUDGET / 1000000)) MB budget (tests/build.json). Not a failure. Likely fixes: big textures or sounds added recently, uncompressed imports, test or source files the export should exclude"
   done
 }
 

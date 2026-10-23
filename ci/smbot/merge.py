@@ -12,10 +12,6 @@ merges only when every hard rule also passes, pinned to the exact reviewed commi
 4. GitHub merges with --match-head-commit, so a push between the checks and the
    merge makes GitHub refuse it.
 
-A bot PR that changes an owner-only path (only docs/DESIGN.md while it is a draft, see
-rules.DESIGN_DRAFT_MARKER) is never merged here: it asks for the owner's review, and the owner
-approves and merges it, or asks for changes.
-
 GH_TOKEN (the bot app's token) merges; READ_TOKEN (the workflow token with
 checks: read) reads check results, which the app has no permission for.
 """
@@ -36,23 +32,6 @@ from . import gh, rules
 REQUIRED_CHECKS = ("rules", "ci-tests")
 CHECK_TIMEOUT = 15 * 60
 CONFLICT = "the PR conflicts with main"  # finish() looks for this to send the PR back for a merge of main
-OWNER_REVIEW = "it waits for the owner's review"  # finish() sets the task aside and tells the owner
-
-
-def owner_reviewed(cfg: config_mod.Config, number: int, policy: Path) -> list[str]:
-    """The PR's files that CODEOWNERS (main's copy) gives to the owner."""
-    owner_only = rules.owner_only_patterns((policy / ".github" / "CODEOWNERS").read_text(), cfg.owner.login)
-    files = gh.api_paginated(f"repos/{cfg.repo}/pulls/{number}/files")
-    return [f["filename"] for f in files if any(rules.matches(f["filename"], p) for p in owner_only)]
-
-
-def ask_the_owner(cfg: config_mod.Config, number: int, paths: list[str]) -> str:
-    try:
-        gh.run("pr", "edit", str(number), "--repo", cfg.repo, "--add-reviewer", cfg.owner.login)
-    except gh.GhError:
-        pass  # the message below still says it
-    return (f"{OWNER_REVIEW}: it changes {', '.join(paths)}. @{cfg.owner.login} approves and merges it, or asks "
-            "for changes in a review and comments `/retry` on it")
 
 
 class NotMerged(Exception):
@@ -117,8 +96,6 @@ def merge(cfg: config_mod.Config, number: int, sha: str, read_token: str | None)
     errors = [f for f in rerun_rules(cfg, number, sha, pr["user"]["login"]) if f.severity == "error"]
     if errors:
         raise NotMerged("hard rules fail: " + "; ".join(f"{f.rule} {f.path}: {f.message}" for f in errors[:5]))
-    if paths := owner_reviewed(cfg, number, Path.cwd()):
-        raise NotMerged(ask_the_owner(cfg, number, paths))
     try:
         gh.run("pr", "merge", str(number), "--repo", cfg.repo, "--squash", "--match-head-commit", sha)
     except gh.GhError as e:

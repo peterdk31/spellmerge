@@ -188,23 +188,28 @@ class RepoTest(unittest.TestCase):
         self.assertEqual([f for f in found if f[2] != "ci/evil.py"], [])
         self.assertIn(("protected-path", "error", "ci/evil.py"), found)
 
-    def test_bot_may_draft_the_design_only_while_mains_copy_is_a_draft(self) -> None:
-        idea = f"# Design\n\n{rules.DESIGN_DRAFT_MARKER}\nA game about bees.\n"
-        self.git("switch", "-q", "main")
-        self.write(rules.DESIGN, idea)
-        self.commit("idea")
-        self.git("switch", "-q", "pr")
-        self.git("merge", "-q", "main")
-        self.write(rules.DESIGN, "# Design\n\nBees, in depth.\n")
+    def test_the_last_matching_codeowners_line_wins(self) -> None:
+        entries = rules.owner_only_patterns(f"/.github/  @{OWNER}\n/.github/ISSUE_TEMPLATE/\n", OWNER)
+        self.assertTrue(rules.is_owner_only(".github/workflows/x.yml", entries))
+        self.assertFalse(rules.is_owner_only(".github/ISSUE_TEMPLATE/bug.yml", entries))
+        self.assertFalse(rules.is_owner_only("docs/NEXT.md", entries))
+
+    def test_the_bot_keeps_the_design_the_forms_and_contributing(self) -> None:
+        self.write("docs/DESIGN.md", "# Design\n")
+        self.write("CONTRIBUTING.md", "# Contributing\n")
+        self.write(".github/ISSUE_TEMPLATE/idea.yml", 'name: Idea\nlabels: ["idea"]\nbody: []\n')
         self.commit()
-        locked = ("protected-path", "error", rules.DESIGN)
-        self.assertNotIn(locked, self.check(BOT))  # main's copy is a draft; the PR's isn't
-        self.assertIn(locked, self.check(CONTRIBUTOR))  # only the bot drafts it
-        self.git("switch", "-q", "main")
-        self.write(rules.DESIGN, "# Design\n\nLocked.\n")
-        self.commit("accepted")
-        self.git("switch", "-q", "pr")
-        self.assertIn(locked, self.check(BOT))  # once main's copy is accepted, it's owner-only
+        self.assertEqual(self.check(BOT), [])
+        found = self.check(CONTRIBUTOR)
+        for path in ("docs/DESIGN.md", "CONTRIBUTING.md", ".github/ISSUE_TEMPLATE/idea.yml"):
+            self.assertIn(("bot-path", "error", path), found)
+
+    def test_issue_forms_may_only_add_the_plain_labels(self) -> None:
+        form = rules.ISSUE_FORMS + "x.yml"
+        self.assertEqual(rules.check_issue_form(form, 'name: X\nlabels: ["bug", "idea"]\nbody:\n  - type: textarea\n'), [])
+        for bad in ('labels: ["bug", "scheduled"]', 'labels: [p0]', "assignees: [someone]", "labels:\n  - scheduled"):
+            with self.subTest(bad=bad):
+                self.assertTrue(rules.check_issue_form(form, f"name: X\n{bad}\nbody: []\n"))
 
     def test_deleting_protected_files_is_a_change_too(self) -> None:
         self.git("rm", "-q", ".github/CODEOWNERS")

@@ -9,7 +9,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from smbot import bootstrap, config, panel, rules
+from smbot import bootstrap, config, panel
 
 ROOT = Path(__file__).resolve().parents[2]
 GAME = bootstrap.Game(name="Bee Keeper", repo="someone/bee-keeper", idea="A cozy co-op game about bees.\nMore.",
@@ -36,11 +36,10 @@ class ScaffoldTest(unittest.TestCase):
         cfg = config.load(self.dest / "ci" / "config.json")
         self.assertEqual((cfg.repo, cfg.game.name, cfg.game.slug, cfg.owner.id), (GAME.repo, "Bee Keeper", "bee-keeper", 4242424))
         self.assertEqual((cfg.bot.login, cfg.bot_client_id, cfg.control_panel_issue), ("", "", 0))
-        self.assertEqual(config.load_runs(self.dest), ("main menu ready", ()))
+        self.assertEqual(config.load_build(self.dest), config.DEFAULT_BUILD)
 
-    def test_the_design_is_the_idea_and_a_draft(self) -> None:
+    def test_the_design_is_the_idea(self) -> None:
         design = (self.dest / "docs" / "DESIGN.md").read_text()
-        self.assertIn(rules.DESIGN_DRAFT_MARKER, design)
         self.assertIn("A cozy co-op game about bees.\nMore.", design)
         self.assertIn("**Draft the design (M0 part 1).**", (self.dest / "docs" / "NEXT.md").read_text())
 
@@ -56,7 +55,7 @@ class ScaffoldTest(unittest.TestCase):
         self.assertFalse((self.dest / "content").exists())
         self.assertFalse((self.dest / "ci" / "bootstrap").exists())
         self.assertFalse((self.dest / ".github" / "ISSUE_TEMPLATE" / "spell_idea.yml").exists())
-        self.assertIn("/docs/DESIGN.md              @someone", (self.dest / ".github" / "CODEOWNERS").read_text())
+        self.assertIn("/ci/                         @someone", (self.dest / ".github" / "CODEOWNERS").read_text())
         self.assertIn('export_path="build/windows/Bee Keeper.exe"', (self.dest / "export_presets.cfg").read_text())
         self.assertIn('config/name="Bee Keeper"', (self.dest / "project.godot").read_text())
         self.assertEqual(json.loads((self.dest / "docs" / "cla-signatures.json").read_text())["signatures"], [])

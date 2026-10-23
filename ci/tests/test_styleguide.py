@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 import re
 import tempfile
 import unittest
@@ -42,8 +43,10 @@ class StyleGuideTest(unittest.TestCase):
             out = Path(tmp, "style-guide")
             styleguide.build(out)
             page = (out / "index.html").read_text()
-            for name in styleguide.SECTIONS:
-                self.assertIn(f"<h2>{name}</h2>", page)
+            for name in styleguide.sections(styleguide.STYLE.read_text()):  # the page follows STYLE.md
+                self.assertIn(f"<h2>{html.escape(name)}</h2>", page)
+            for name in styleguide.kit_files():
+                self.assertTrue((out / "kit" / name).is_file(), name)
             self.assertEqual(page.count('class="swatch"'), len(styleguide.palette()))
             self.assertNotIn("in_game.png", page)
             for example in styleguide.golden():
@@ -52,6 +55,16 @@ class StyleGuideTest(unittest.TestCase):
             self.assertIn(styleguide.PALETTE, names)
             self.assertIn("NOTICE.txt", names)
             self.assertEqual(len([n for n in names if n.startswith("golden/")]), len(styleguide.golden()))
+
+    def test_the_screenshot_comes_from_golden_json(self) -> None:
+        wanted = styleguide.golden_file().get("screenshot")
+        if not wanted:
+            self.skipTest("golden.json names no screenshot")
+        with tempfile.TemporaryDirectory() as tmp:
+            Path(tmp, "shots").mkdir()
+            Path(tmp, "shots", wanted).write_bytes(b"\x89PNG\r\n\x1a\n")
+            styleguide.build(Path(tmp, "out"), Path(tmp, "shots"))
+            self.assertIn('src="in_game.png"', Path(tmp, "out", "index.html").read_text())
 
 
 if __name__ == "__main__":

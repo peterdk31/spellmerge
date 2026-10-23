@@ -38,6 +38,10 @@ from . import config as config_mod
 # Paths only Claude's own PRs may change (docs/PLAN.md, "Path tiers"), plus the
 # Godot project files, which can register autoload scripts and export settings.
 BOT_PATHS = (
+    "docs/DESIGN.md",  # the bot keeps the vision in line with the owner's direction (develop.md, "Paths")
+    "CONTRIBUTING.md",
+    "tools/",  # the check scripts contributors run; CI runs main's rules, never these
+    ".github/ISSUE_TEMPLATE/",  # the issue forms; their labels are limited (check_issue_form)
     "docs/ROADMAP.md",
     "docs/NEXT.md",
     "docs/BACKLOG.md",
@@ -53,7 +57,7 @@ BOT_PATHS = (
     "core/",
     "project.godot",
     "export_presets.cfg",
-    "tests/exported_runs.json",  # which exported-build tests build.sh runs (smbot.config)
+    "tests/build.json",  # the build settings and exported-build tests (smbot.config)
 )
 
 # File types outside contributors may add: images, .ogg, Godot text files,
@@ -66,6 +70,10 @@ CONTRIBUTOR_NAMES = frozenset({".gitkeep"})
 BOT_TYPES = CONTRIBUTOR_TYPES | {".md", ".txt", ".cfg", ".godot", ".html", ".css"}
 BOT_NAMES = CONTRIBUTOR_NAMES | {".gitignore", ".gitattributes", ".gdignore"}
 BOT_TOOL_TYPES = frozenset({".sh", ".py"})
+ISSUE_FORMS = ".github/ISSUE_TEMPLATE/"
+# The labels an issue form may put on a new issue. The intake gives the others (scheduled, the
+# priorities, backlog), and the work queue trusts them, so a form must never set them.
+ISSUE_FORM_LABELS = frozenset({"bug", "idea", "copyright"})
 
 # Dependabot only updates GitHub Actions; those files still need owner review.
 DEPENDENCY_BOT_PATHS = (".github/workflows/*.yml", ".github/workflows/*.yaml", ".github/dependabot.yml")
@@ -260,32 +268,22 @@ def read_file(repo: Path, change: Change, worktree: bool) -> bytes:
 # --- Path tiers -------------------------------------------------------------------
 
 
-# A new game starts with only its idea in docs/DESIGN.md and this marker (ci/bootstrap). While the
-# base's copy has it, the bot may write the file: its first session drafts the design there. CODEOWNERS
-# still makes GitHub wait for the owner's approving review, so the owner accepts the design by
-# approving and merging that PR, which removes the marker.
-DESIGN = "docs/DESIGN.md"
-DESIGN_DRAFT_MARKER = "<!-- smbot:design-draft -->"
-
-
-def design_is_draft(repo: Path, base: str) -> bool:
-    """Whether the base (main) still has the marker; the PR's own copy removes it."""
-    try:
-        return DESIGN_DRAFT_MARKER.encode() in _git(repo, "show", f"{base}:{DESIGN}")
-    except subprocess.CalledProcessError:
-        return False
-
-
-def owner_only_patterns(codeowners: str, owner: str) -> list[str]:
+def owner_only_patterns(codeowners: str, owner: str) -> list[tuple[str, bool]]:
+    """CODEOWNERS lines in order: (pattern, whether the owner owns it). A line with no owners exempts a
+    path from a broader one above it, as on GitHub, where the last matching line wins."""
     patterns = []
     for line in codeowners.splitlines():
         line = line.split("#", 1)[0].strip()
         if not line:
             continue
         pattern, *owners = line.split()
-        if f"@{owner}" in owners:
-            patterns.append(pattern)
+        patterns.append((pattern, f"@{owner}" in owners))
     return patterns
+
+
+def is_owner_only(path: str, owner_only: list[tuple[str, bool]]) -> bool:
+    owned = [mine for pattern, mine in owner_only if matches(path, pattern)]
+    return bool(owned) and owned[-1]
 
 
 def matches(path: str, pattern: str) -> bool:
@@ -312,7 +310,7 @@ def _suffix(path: str) -> str:
     return PurePosixPath(path).suffix.lower()
 
 
-def check_paths(change: Change, role: str, owner_only: list[str]) -> list[Finding]:
+def check_paths(change: Change, role: str, owner_only: list[tuple[str, bool]]) -> list[Finding]:
     path = change.path
     if role == OWNER:
         return []
@@ -321,7 +319,7 @@ def check_paths(change: Change, role: str, owner_only: list[str]) -> list[Findin
             return []  # still needs the owner's review through CODEOWNERS
         return [Finding("dependency-bot", "error", path, 0, "Dependency updates may only change GitHub Actions files.",
                         "Close this PR; the owner updates other dependencies by hand.")]
-    if any(matches(path, p) for p in owner_only):
+    if is_owner_only(path, owner_only):
         return [Finding("protected-path", "error", path, 0, "This path is owner-only.",
                         "Remove this change from the PR. If it is needed, open an issue instead.")]
     if is_bot_path(path) and role != BOT:
@@ -337,7 +335,8 @@ def check_file_type(change: Change, role: str) -> list[Finding]:
         return []
     name, suffix = PurePosixPath(path).name, _suffix(path)
     if role == BOT:
-        allowed = name in BOT_NAMES or suffix in BOT_TYPES or (path.startswith("tools/") and suffix in BOT_TOOL_TYPES)
+        allowed = (name in BOT_NAMES or suffix in BOT_TYPES or (path.startswith("tools/") and suffix in BOT_TOOL_TYPES)
+                   or (path.startswith(ISSUE_FORMS) and suffix in (".yml", ".yaml")))
     else:
         allowed = name in CONTRIBUTOR_NAMES or suffix in CONTRIBUTOR_TYPES
     if allowed:
@@ -381,12 +380,14 @@ def check_content(change: Change, data: bytes, role: str) -> list[Finding]:
         return findings
 
     text = data.decode("utf-8", "replace")
-    if path == config_mod.RUNS_FILE:
+    if path.startswith(ISSUE_FORMS):
+        findings += check_issue_form(path, text)
+    if path == config_mod.BUILD_FILE:
         try:
-            config_mod.parse_runs(json.loads(text))
+            config_mod.parse_build(json.loads(text))
         except (ValueError, AttributeError) as e:  # JSONDecodeError is a ValueError
-            findings.append(Finding("runs-file", "error", path, 0, f"The exported-build test runs can't be read: {e}",
-                                    "Fix the file; smbot.config.parse_runs says what each field may hold."))
+            findings.append(Finding("build-file", "error", path, 0, f"The build settings can't be read: {e}",
+                                    "Fix the file; smbot.config.parse_build says what each field may hold."))
     if suffix == ".svg":
         findings += _check_svg(path, text)
     if suffix == ".gdextension" or "type=\"GDExtension\"" in text:
@@ -442,6 +443,24 @@ def check_links_file(path: str, text: str) -> list[Finding]:
             findings.append(Finding("banned-api", "error", path, _line_of(text, m.start()),
                                     f"`{m.group(1)}` is not one of the project's own addresses.",
                                     "Only " + ", ".join(LINK_PREFIXES) + " may be linked."))
+    return findings
+
+
+def check_issue_form(path: str, text: str) -> list[Finding]:
+    """An issue form may only apply the labels in ISSUE_FORM_LABELS, and assign nobody."""
+    findings = []
+    for m in re.finditer(r"^(labels|assignees|projects|type)\s*:(.*)$", text, re.MULTILINE):  # top-level keys
+        key, value = m.group(1), m.group(2)
+        names = set(re.findall(r"[\w.-]+", value))
+        if key != "labels" or not names <= ISSUE_FORM_LABELS:
+            findings.append(Finding("issue-form", "error", path, _line_of(text, m.start()),
+                                    f"An issue form may only add the labels {', '.join(sorted(ISSUE_FORM_LABELS))} "
+                                    f"(here: `{m.group(0).strip()}`).",
+                                    "The daily intake labels and schedules issues; keep the form to those labels, "
+                                    "on one line, e.g. labels: [\"idea\"]."))
+    if re.search(r"^labels\s*:\s*$", text, re.MULTILINE):
+        findings.append(Finding("issue-form", "error", path, 0, "Write the form's labels on one line.",
+                                'For example: labels: ["bug"]'))
     return findings
 
 
@@ -531,12 +550,10 @@ def run(repo: Path, policy: Path, base: str, author: str | None, worktree: bool)
     role = role_for(author, cfg)
     codeowners = (policy / ".github" / "CODEOWNERS").read_text()
     owner_only = owner_only_patterns(codeowners, cfg.owner.login)
-    draft = role == BOT and design_is_draft(repo, base)
 
     findings: list[Finding] = []
     for change in changes_between(repo, base, worktree):
-        if not (draft and change.path == DESIGN and change.status == "M"):
-            findings += check_paths(change, role, owner_only)
+        findings += check_paths(change, role, owner_only)
         findings += check_file_type(change, role)
         findings += check_mode(change, role)
         if change.status != "D" and change.mode not in ("120000", "160000") and role != DEPENDENCY_BOT:

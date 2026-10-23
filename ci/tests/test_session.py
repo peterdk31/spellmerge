@@ -292,13 +292,6 @@ class FinishTest(unittest.TestCase):
         self.assertIn("refused", st["task_failures"]["A"]["parked_reason"])
         self.assertEqual(out["again"], "true")
 
-    def test_a_merge_that_waits_for_the_owners_review_is_set_aside_for_longer(self) -> None:
-        start = dt.datetime.now(dt.timezone.utc)
-        _, st = self.run_finish(copy.deepcopy(state.DEFAULT), ["A", "B"], PR="5", FINAL_REVIEW=self.APPROVE,
-                                MERGED="false", MERGE_RESULT=f"Not merged: {merge.OWNER_REVIEW}: it changes docs/DESIGN.md")
-        until = dt.datetime.fromisoformat(st["task_failures"]["A"]["parked_until"].replace("Z", "+00:00"))
-        self.assertGreaterEqual(until - start, session.PARK_BLOCKED - dt.timedelta(minutes=1))
-
     def test_a_blocked_session_hands_the_owners_instruction_on_once(self) -> None:
         """Run #505 reported blocked on the owner's "more options" answer on #192, which was then lost."""
         st = copy.deepcopy(state.DEFAULT)

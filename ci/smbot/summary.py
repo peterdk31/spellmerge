@@ -54,7 +54,7 @@ def lines_for(env: dict[str, str], repo: str) -> list[str]:
 
 
 def bench_logs(runs: tuple[config_mod.Run, ...]) -> dict[str, str]:
-    """build/logs name -> what ran, for the game's runs that print BENCH lines (tests/exported_runs.json)."""
+    """build/logs name -> what ran, for the game's runs that print BENCH lines (tests/build.json)."""
     runs = tuple(r for r in runs if r.bench)
     return {**{f"{r.name}-linux": f"Linux Test, {r.label}" for r in runs},
             **{f"{r.name}-web": f"Web Test (WASM), {r.label}" for r in runs}}
@@ -106,7 +106,7 @@ def main() -> int:
     lines += parked_lines(st, now)
     if env.get("BUILD_LOGS"):
         try:
-            runs = config_mod.load_runs()[1]
+            runs = config_mod.load_build().runs
         except (OSError, ValueError) as e:  # the build has failed on it already; say so, post the rest
             runs = ()
             lines.append(f"⚠️ {e}")

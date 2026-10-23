@@ -161,7 +161,7 @@ def scaffold(game: Game, dest: Path, source: Path = SOURCE, today: dt.date | Non
             shutil.copy2(source / path, target)
     pages = f"https://{game.owner_login.lower()}.github.io/{game.repo.split('/')[1]}"
     values = {"GAME": game.name, "REPO": game.repo, "IDEA": game.idea.strip(), "DATE": today.isoformat(),
-              "MARKER": rules.DESIGN_DRAFT_MARKER, "DESCRIPTION": game.description, "PAGES": pages}
+              "DESCRIPTION": game.description, "PAGES": pages}
     skeleton = source / "ci" / "bootstrap" / "skeleton"
     for path in sorted(p for p in skeleton.rglob("*") if p.is_file()):
         target = dest / path.relative_to(skeleton)
@@ -431,9 +431,9 @@ def launch(dest: Path, first_step: int = 1, total: int = len(STEPS)) -> None:
     say(f"{GREEN}{cfg.game.name} is running.{OFF}")
     print(f"""
   What happens now:
-  - In about half an hour the bot opens a pull request that drafts docs/DESIGN.md from your idea.
-    GitHub asks for your review: approve and merge it, or ask for changes in a review and comment /retry.
-  - Then it plans the game and starts building. A new build is published every day:
+  - In about half an hour the bot drafts docs/DESIGN.md from your idea (read it on GitHub; to change
+    anything, comment /claude <what> on the Control panel). Then it plans the game and starts building.
+  - A new build is published every day:
     https://github.com/{cfg.repo}/releases
   - Steer it from the Control panel: https://github.com/{cfg.repo}/issues/{cfg.control_panel_issue}
 

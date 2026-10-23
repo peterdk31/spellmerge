@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-23: "Drop component" is now "Bag" (owner `/claude` on #4)
+
+The overlay and quick-view action is named "Bag"; its open list is titled "Drop". It already opened in combat for every player (the overlay is not wave-gated), so step 2 needed no code, only tests (1 and 4 players in a wave). The full Builder stays locked in a wave; the reason is in `docs/DECISIONS.md`. I could not read the test and screenshot output in this session (see the PR).
+
 ## 2026-10-23: The wave line shows only during a wave (owner `/claude` on #4)
 
 "Wave N" stayed on screen after a wave was cleared, because only `run_started`/`run_ended` hid it and nothing sends them. It now hides at `room_cleared`; regression test in `test_panels.gd`.

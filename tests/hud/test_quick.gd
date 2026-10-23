@@ -633,6 +633,58 @@ func test_four_overlays_drop_at_once() -> void:
 		check_equal(request[1], PackedInt32Array([0]), "all for spell A")
 
 
+func test_the_action_is_called_bag_and_its_list_says_drop() -> void:
+	_start(1)
+	_wave_start()
+	_tap(0, &"overlay")
+	_frame()
+	var overlay: OverlayScript = _overlay(0)
+	check(overlay.drop_button().text.ends_with("Bag"), "the overlay action is \"Bag\"")
+	check_equal(overlay.get_node("%Title").text, "P1 MENU", "the menu is titled MENU")
+	_press(0, overlay.drop_button())
+	check_equal(overlay.get_node("%Title").text, "P1 Drop", "the open list is titled Drop")
+	_tap(0, &"dodge")
+	_frame()
+	check_equal(overlay.get_node("%Title").text, "P1 MENU", "back from the list it is MENU again")
+	_tap(0, &"dodge")
+	_frame()
+	_open_builder(0)
+	var builder: BuilderScript = _builder(0)
+	check(builder.is_quick() and builder.drop_button().text.ends_with("Bag"), "the quick view action is \"Bag\"")
+	_press(0, builder.drop_button())
+	check_equal((builder.find_child("Title", true, false) as Label).text, "P1 Drop", "the quick view's open list is titled Drop")
+
+
+func test_bag_opens_in_combat_for_one_player() -> void:
+	_bag_in_combat(1)
+
+
+func test_bag_opens_in_combat_for_four_players() -> void:
+	_bag_in_combat(4)
+
+
+func _bag_in_combat(players: int) -> void:
+	_start(players)
+	_wave_start()
+	for player in players:
+		_tap(player, &"overlay")
+	_frame()
+	for player in players:
+		var overlay: OverlayScript = _overlay(player)
+		check(overlay.is_open(), "%d players: overlay %d opens in a wave" % [players, player])
+		_press(player, overlay.drop_button())
+		check(overlay.is_dropping() and not overlay.shown_rows().is_empty(), "%d players: the Bag list of player %d opens in a wave" % [players, player])
+		_press(player, overlay.shown_rows()[0])
+	var senders: Array[int] = []
+	for request in _requests:
+		senders.append(request[0] as int)
+	senders.sort()
+	var expected: Array[int] = []
+	for player in players:
+		expected.append(player)
+	check_equal(senders, expected, "%d players: one drop request from each" % players)
+
+
 func test_build_from_the_overlay_in_a_wave_opens_the_quick_view() -> void:
 	_start(1)
 	_wave_start()

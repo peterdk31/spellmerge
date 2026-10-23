@@ -15,13 +15,13 @@ extends PanelContainer
 ## `build_pressed(player)`, and `hud/panels/panels.gd` opens the builder (which takes the
 ## player's focus over from this overlay). The overlay sends no event for it.
 ##
-## "Drop component" (M2 part 18) is the quick action that works in combat too: it lists the
+## "Bag" (M2 part 18; it was "Drop component") is the quick action that works in combat too: it lists the
 ## bag components that fit a free slot of the active spell (the empty element slot, the first
 ## free modifier slot; `hud/widgets/drop_choices.gd`) and activating one sends
 ## `build_change_requested(player, [active spell], slot, id)`. What it offers follows
 ## `recipe_changed`, `bag_changed` and `active_spell_changed`, so a refused or answered change
 ## shows up as the list changing; the overlay never changes a recipe itself. `dodge` on a
-## component goes back to "Drop component", anywhere else it closes the overlay.
+## component goes back to "Bag", anywhere else it closes the overlay.
 
 const EventsScript := preload("res://core/events/events.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
@@ -32,7 +32,9 @@ const PLAYER_COUNT: int = 4
 const SPELL_COUNT: int = 2
 const RESUME_TEXT: String = "Resume"
 const BUILD_TEXT: String = "Build"
-const DROP_TEXT: String = "Drop component"
+const DROP_TEXT: String = "Bag"
+## The title word while the list of components to drop is shown.
+const DROP_TITLE: String = "Drop"
 const FOCUS_MARK: String = "> "
 ## The look of the drop list: the BuilderButton theme variation (10 px).
 const ROW_VARIATION: StringName = &"BuilderButton"
@@ -151,7 +153,7 @@ func toggle() -> void:
 		open_overlay()
 
 
-## The "Drop component" button (for tests and screenshots).
+## The "Bag" button (for tests and screenshots).
 func drop_button() -> Button:
 	return _drop
 
@@ -225,6 +227,7 @@ func _refresh() -> void:
 	_build.visible = not _dropping
 	_drop.visible = not _dropping
 	_grid.visible = _dropping
+	_title.text = "P%d %s" % [clampi(index, 0, PLAYER_COUNT - 1) + 1, DROP_TITLE if _dropping else "MENU"]
 	_controls.clear()
 	_controls.append(_resume)
 	_controls.append(_build)

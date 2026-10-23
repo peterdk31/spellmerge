@@ -25,7 +25,7 @@ extends PanelContainer
 ## The quick view (M2 part 18): when a wave starts (`set_quick(true)`, called by `panels.gd`) an
 ## open builder folds into the quick view, and one opened during a wave starts as it. It keeps the
 ## slot chain of the active spell on show (read only), hides the tabs, the held levels, the bag
-## and the info panel, and offers "Drop component" and "Close". "Drop component" lists the bag
+## and the info panel, and offers "Bag" and "Close". "Bag" opens a list titled "Drop" of the bag
 ## components that fit a free slot (the empty element slot, the first free modifier slot; see
 ## `hud/widgets/drop_choices.gd`) and activating one asks for it with `build_change_requested`
 ## like the full builder. When the wave is cleared (`set_quick(false)`) it unfolds again. The
@@ -62,7 +62,9 @@ const SPELL_COUNT: int = 2
 const SPELL_NAMES: Array[String] = ["A", "B"]
 const NO_COMPONENT: StringName = &""
 
-const DROP_TEXT: String = "Drop component"
+const DROP_TEXT: String = "Bag"
+## The title while the quick view's list of components to drop is shown.
+const DROP_TITLE: String = "Drop"
 const NONE_TEXT: String = "None"
 const EMPTY_SLOT_TEXT: String = "-"
 const FOCUS_MARK: String = "> "
@@ -111,7 +113,7 @@ var _bag: Array[StringName] = []
 var _reason: String = ""
 
 var _open: bool = false
-## The quick view is on (a wave is in progress), and its "Drop component" list is shown.
+## The quick view is on (a wave is in progress), and its "Bag" list is shown.
 var _quick: bool = false
 var _dropping: bool = false
 ## Whether the bag has a component that fits a free slot of the spell shown (quick view only).
@@ -288,7 +290,7 @@ func is_quick() -> bool:
 	return _quick
 
 
-## Whether the quick view's "Drop component" list is shown.
+## Whether the quick view's "Bag" list is shown.
 func is_dropping() -> bool:
 	return _dropping
 
@@ -608,6 +610,8 @@ func _render() -> void:
 	var title: String = "P%d Spell %s" % [index + 1, SPELL_NAMES[_viewed]]
 	if _level > 0:
 		title += " held %d" % _level
+	if _quick and _dropping:
+		title = "P%d %s" % [index + 1, DROP_TITLE]
 	_title.text = title
 	for spell in SPELL_COUNT:
 		_set_text(_tabs[spell], SPELL_NAMES[spell] if spell != _viewed else "[%s]" % SPELL_NAMES[spell])
@@ -797,7 +801,7 @@ func _on_cancelled(player: int) -> void:
 		close_builder()
 
 
-## Leave the quick view's drop list and put focus back on "Drop component".
+## Leave the quick view's drop list and put focus back on "Bag".
 func _stop_dropping() -> void:
 	_dropping = false
 	_render()
@@ -898,7 +902,7 @@ func _first_row() -> Control:
 	return _slots[_slot]
 
 
-## In the quick view: "Drop component", or "Close" when nothing is left to drop.
+## In the quick view: "Bag", or "Close" when nothing is left to drop.
 func _quick_focus_target() -> Control:
 	return _drop if not _drop.disabled else _close
 

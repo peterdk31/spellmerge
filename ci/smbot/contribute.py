@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import datetime as dt
 import html
+import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -93,9 +94,13 @@ def gather(cfg: config_mod.Config, root: Path = Path("."), now: dt.datetime | No
         pass
     since = (now - dt.timedelta(days=RECENT_DAYS)).date().isoformat()
     try:
-        found = gh.api(f"search/issues?q=repo:{cfg.repo}+is:pr+is:merged+merged:>={since}&sort=updated&per_page=10")
-        data.merged = [{"title": i["title"], "url": i["html_url"]} for i in found.get("items", [])[:10]]
-    except gh.GhError:
+        # Newest merge first. Search can only sort by update time, which a comment after the
+        # merge changes, so take the last 30 and sort by mergedAt here.
+        found = json.loads(gh.run("pr", "list", "--repo", cfg.repo, "--state", "merged", "--limit", "30",
+                                  "--search", f"merged:>={since}", "--json", "title,url,mergedAt"))
+        found.sort(key=lambda p: p["mergedAt"], reverse=True)
+        data.merged = [{"title": p["title"], "url": p["url"]} for p in found[:10]]
+    except (gh.GhError, ValueError, KeyError):
         pass
     try:
         found = gh.api(f"search/issues?q=repo:{cfg.repo}+is:issue+is:closed+reason:completed+label:triaged"

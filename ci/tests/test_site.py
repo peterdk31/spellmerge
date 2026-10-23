@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 import zipfile
@@ -41,6 +42,17 @@ class ContributePageTest(unittest.TestCase):
         log_md = "## 2026-10-22: Events (M2 part 2)\n\nSee (M2 part 3) in passing.\n"
         m = contribute.parse_progress(contribute.Milestone(code="M2"), design, next_md, log_md)
         self.assertEqual((m.parts_done, m.parts_total), (2, 4))
+
+    def test_recently_merged_is_newest_merge_first(self) -> None:
+        """Search sorted by update time: a comment after the merge moved an old PR to the top."""
+        prs = [{"title": "old, commented today", "url": "u1", "mergedAt": "2026-10-20T10:00:00Z"},
+               {"title": "newest", "url": "u2", "mergedAt": "2026-10-23T09:00:00Z"},
+               {"title": "middle", "url": "u3", "mergedAt": "2026-10-22T09:00:00Z"}]
+        with mock.patch.object(contribute.gh, "run", return_value=json.dumps(prs)), \
+                mock.patch.object(contribute.gh, "api", side_effect=contribute.gh.GhError("x")), \
+                mock.patch.object(contribute.gh, "api_paginated", side_effect=contribute.gh.GhError("x")):
+            data = contribute.gather(config.load(), ROOT)
+        self.assertEqual([p["title"] for p in data.merged or []], ["newest", "middle", "old, commented today"])
 
     def test_no_checks_bar_without_a_checklist(self) -> None:
         data = contribute.PageData(current=contribute.Milestone("M2", "Spells", parts_done=3, parts_total=4))

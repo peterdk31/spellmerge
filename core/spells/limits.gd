@@ -5,9 +5,8 @@ extends RefCounted
 ## stress benchmark (tests/benchmark/stress_runner.gd) confirms or lowers, so they live here
 ## and nowhere else. M2 part 25 checked them on the headless numbers (4 bots with heavy
 ## builds, 100 enemies and 1,000 shots, then 200 and 3,000: p95 13.9 and 15.4 ms, inside
-## 16.7); nothing was lowered. Confirmed headless; WASM pending: those numbers come from the
-## Web Test export once the daily build runs `--stress` (an owner issue, #166) and
-## `--projectile-timing`; lower a limit if they are over.
+## 16.7); nothing was lowered. The first web numbers led to a lower `WORK_PER_STEP`; the web
+## stress frame is still unexplained (docs/DECISIONS.md).
 
 ## Complexity a whole spell may cost, counting the spell its trigger holds.
 const MAX_COMPLEXITY: int = 12

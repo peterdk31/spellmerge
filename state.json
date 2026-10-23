@@ -9,7 +9,6 @@
     "number": 202
   },
   "errors_in_a_row": 0,
-  "idle": null,
   "intake_tasks": {
     "208": {
       "author": "Brianmanden",
@@ -20,7 +19,7 @@
       "title": "Idea: summonable pet that draws enemy fire"
     }
   },
-  "last_own_merge": "2026-10-23T07:46:18Z",
+  "last_own_merge": "2026-10-23T09:54:58Z",
   "last_plan": "2026-10-23T07:30:19Z",
   "last_weekly": "2026-10-22T13:49:44Z",
   "panel_applied": {
@@ -32,15 +31,7 @@
   },
   "panel_problems": [],
   "paused_by_command": false,
-  "pending_instructions": [
-    {
-      "at": "2026-10-23T09:34:40Z",
-      "kind": "claude",
-      "number": 206,
-      "text": "the body it too wide. I like the hat! The wizard need to be more cute. Give me some more examples",
-      "url": "https://github.com/peterdk31/spellmerge/issues/206#issuecomment-6361916837"
-    }
-  ],
+  "pending_instructions": [],
   "processed_comments": [
     6241847784,
     6251160604,
@@ -86,9 +77,6 @@
       "count": 0,
       "parked_reason": "No web run with the stress parts exists yet. The newest \"Daily run\" post is in daily log #202 (06:14). It has no `BENCH: frame parts` or `BENCH: stress parts` lines. That run is the one that produced the 151 ms web frame. A session can't run a browser, so there is nothing to read or fix. I changed no files. The task stays queued, and the stabilisation task must not close M2 until it is done.",
       "parked_until": "2026-10-24T05:29:12Z"
-    },
-    "**Record the chosen art direction (M2 part 27 follow-up).** Replace the golden example candidates in `art/kit/golden.json` and `docs/STYLE.md` with the chosen style's files, and say in `docs/STYLE.md` that the style is no longer provisional. Redrawing the placeholders in that style is spread over later milestones (M2 design, \"Art and the art direction\"), one area at a time.": {
-      "count": 0
     },
     "**Stabilisation and C2 (M2 part 28).** (The evidence task is done; its section \"C2 evidence\" is in `docs/LOG.md`. The web stress task in Blocked must be done before M2 closes: no bug is known, and the daily run found nothing to fix on 2026-10-23.) Only bug fixing, polish and performance until no known crash or blocker remains; then the planning session ends M2 with the C2 checkpoint issue (build link, bot data such as fuzz and stress numbers and which recipes bots build, Claude's honest assessment and the C2 question), and development waits for the owner's /go, /iterate or /pivot. **Before closing M2, check the Blocked WASM task:** if a \"Daily run\" post with \"Stress and timing results\" exists, move that task back to the Queue and finish it first. **If that task is still waiting** (no post newer than #202 with the `BENCH: frame parts` lines), there is nothing to do yet: answer `nothing_to_do`, do not close M2 and do not write the C2 checkpoint.": {
       "count": 0,

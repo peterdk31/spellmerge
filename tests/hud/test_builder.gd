@@ -515,7 +515,9 @@ func test_the_wave_and_break_lines_stay_clear_of_four_open_builders() -> void:
 	await process_frame
 	await process_frame
 	var screen := Rect2(0, 0, 640, 360)
-	var lines: Dictionary = {"wave line": _hud.get_wave_label(), "break line": _hud.get_break_row()}
+	# The wave line is gone once the wave is cleared; it is checked alone in the next test.
+	check(not _hud.get_wave_label().visible, "the wave line is hidden during the break")
+	var lines: Dictionary = {"break line": _hud.get_break_row()}
 	for line_name: String in lines:
 		var line: Control = lines[line_name]
 		check(line.visible, "the %s shows during the break" % line_name)
@@ -526,7 +528,6 @@ func test_the_wave_and_break_lines_stay_clear_of_four_open_builders() -> void:
 			check(not rect.intersects(_builder(player).get_global_rect()), "the %s does not overlap builder %d, got %s and %s" % [line_name, player + 1, rect, _builder(player).get_global_rect()])
 			check(not rect.intersects(_hud.get_panel(player).get_global_rect()), "the %s does not overlap panel %d" % [line_name, player + 1])
 			check(not rect.intersects(_builder(player).info_panel().get_global_rect()), "the %s does not overlap info panel %d" % [line_name, player + 1])
-	check(not _hud.get_wave_label().get_global_rect().intersects(_hud.get_break_row().get_global_rect()), "the two lines do not overlap each other")
 
 
 func test_the_wave_line_alone_stays_clear_of_open_builders() -> void:

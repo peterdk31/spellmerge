@@ -1,0 +1,17 @@
+name: Idea
+description: Suggest something for the game.
+labels: ["idea"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What is it, and what does it do?
+      description: Use generic names, not ones from another game or story.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why would it make the game better?
+    validations:
+      required: true

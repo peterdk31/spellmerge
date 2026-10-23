@@ -120,7 +120,8 @@ def _finish(out: Path, version: str, channel: str, stable_name: str, preview: st
     if shots:
         screenshots.gallery(shots, out / "screenshots", preview)
     try:
-        styleguide.build(out / "style-guide", shots / "arena_four_wizards.png" if shots else None)
+        if styleguide.STYLE.exists():  # a new game has no style yet
+            styleguide.build(out / "style-guide", shots)
     except (OSError, ValueError, KeyError) as exc:  # never keep today's build off the site
         print(f"::warning::the Style Guide page was not built: {exc}")
     cfg = config.load()

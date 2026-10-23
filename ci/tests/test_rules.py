@@ -188,6 +188,29 @@ class RepoTest(unittest.TestCase):
         self.assertEqual([f for f in found if f[2] != "ci/evil.py"], [])
         self.assertIn(("protected-path", "error", "ci/evil.py"), found)
 
+    def test_the_last_matching_codeowners_line_wins(self) -> None:
+        entries = rules.owner_only_patterns(f"/.github/  @{OWNER}\n/.github/ISSUE_TEMPLATE/\n", OWNER)
+        self.assertTrue(rules.is_owner_only(".github/workflows/x.yml", entries))
+        self.assertFalse(rules.is_owner_only(".github/ISSUE_TEMPLATE/bug.yml", entries))
+        self.assertFalse(rules.is_owner_only("docs/NEXT.md", entries))
+
+    def test_the_bot_keeps_the_design_the_forms_and_contributing(self) -> None:
+        self.write("docs/DESIGN.md", "# Design\n")
+        self.write("CONTRIBUTING.md", "# Contributing\n")
+        self.write(".github/ISSUE_TEMPLATE/idea.yml", 'name: Idea\nlabels: ["idea"]\nbody: []\n')
+        self.commit()
+        self.assertEqual(self.check(BOT), [])
+        found = self.check(CONTRIBUTOR)
+        for path in ("docs/DESIGN.md", "CONTRIBUTING.md", ".github/ISSUE_TEMPLATE/idea.yml"):
+            self.assertIn(("bot-path", "error", path), found)
+
+    def test_issue_forms_may_only_add_the_plain_labels(self) -> None:
+        form = rules.ISSUE_FORMS + "x.yml"
+        self.assertEqual(rules.check_issue_form(form, 'name: X\nlabels: ["bug", "idea"]\nbody:\n  - type: textarea\n'), [])
+        for bad in ('labels: ["bug", "scheduled"]', 'labels: [p0]', "assignees: [someone]", "labels:\n  - scheduled"):
+            with self.subTest(bad=bad):
+                self.assertTrue(rules.check_issue_form(form, f"name: X\n{bad}\nbody: []\n"))
+
     def test_deleting_protected_files_is_a_change_too(self) -> None:
         self.git("rm", "-q", ".github/CODEOWNERS")
         self.commit()
@@ -250,15 +273,14 @@ class RepoTest(unittest.TestCase):
         self.assertEqual(self.check(worktree=True), [("unreadable", "warning", "content/relics/a/locked.json")])
 
     def test_links_file_may_open_only_its_own_table(self) -> None:
-        good = ('extends Node\n\nconst URLS := {\n\t"feedback": "https://github.com/peterdk31/spellmerge/discussions",\n'
-                '\t"contribute": "https://peterdk31.github.io/spellmerge/contribute/",\n}\n\n'
+        good = (f'extends Node\n\nconst URLS := {{\n\t"feedback": "https://github.com/{CFG.repo}/discussions",\n'
+                f'\t"contribute": "{CFG.pages}/contribute/",\n}}\n\n'
                 'func open(key: String) -> void:\n\tif URLS.has(key):\n\t\tOS.shell_open(URLS[key])\n')
         self.assertEqual(banned(good, rules.LINKS_FILE), [])
         self.assertTrue(banned(good, "core/menu/menu.gd"))  # anywhere else it stays banned
         self.assertTrue(banned(good.replace("OS.shell_open(URLS[key])", "OS.shell_open(key)"), rules.LINKS_FILE))
-        self.assertTrue(banned(good.replace("https://peterdk31.github.io/spellmerge/contribute/",
-                                            "https://evil.example/x"), rules.LINKS_FILE))
-        self.assertTrue(banned(good + '\nfunc x() -> void:\n\tURLS["a"] = "https://github.com/peterdk31/spellmerge"\n',
+        self.assertTrue(banned(good.replace(f"{CFG.pages}/contribute/", "https://evil.example/x"), rules.LINKS_FILE))
+        self.assertTrue(banned(good + f'\nfunc x() -> void:\n\tURLS["a"] = "https://github.com/{CFG.repo}"\n',
                                rules.LINKS_FILE))
         self.assertTrue(banned(good.replace("const URLS", "var URLS"), rules.LINKS_FILE))
         self.assertTrue(banned(good + '\nfunc y() -> void:\n\tOS.execute("sh", [])\n', rules.LINKS_FILE))

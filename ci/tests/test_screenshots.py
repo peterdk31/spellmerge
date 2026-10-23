@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import json
 import tempfile
 import unittest
@@ -122,8 +123,9 @@ class ScreenshotsTest(unittest.TestCase):
             origin = Path(tmp, "origin.git")
             subprocess.run(["git", "init", "-q", "--bare", str(origin)], check=True)
             Path(tmp, "main_menu.png").write_bytes(PNG)
-            first = screenshots.push(CFG, "t", [Path(tmp, "main_menu.png")], "pr-7/abc1234", str(origin))
-            second = screenshots.push(CFG, "t", [Path(tmp, "main_menu.png")], "pr-8/def5678", str(origin))
+            cfg = dataclasses.replace(CFG, bot=config.Identity("test-bot[bot]", 1))  # a new game has none yet
+            first = screenshots.push(cfg, "t", [Path(tmp, "main_menu.png")], "pr-7/abc1234", str(origin))
+            second = screenshots.push(cfg, "t", [Path(tmp, "main_menu.png")], "pr-8/def5678", str(origin))
             files = subprocess.run(["git", "-C", str(origin), "ls-tree", "-r", "--name-only", second],
                                    check=True, capture_output=True, text=True).stdout.split()
             self.assertEqual(files, ["pr-7/abc1234/main_menu.png", "pr-8/def5678/main_menu.png"])

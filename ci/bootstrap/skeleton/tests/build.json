@@ -1,0 +1,10 @@
+{
+  "about": "The game's build settings (ci/build/build.sh), kept by the bot and checked by smbot.config: ready is the line the first screen prints; runs are the tests the exported \"Linux Test\" and \"Web Test\" builds run (the game starts each runner on its argument, and the build fails unless the log has the line; bench: true puts the result lines in the Daily log); budgets only warn.",
+  "ready": "main menu ready",
+  "budgets": {
+    "web_mb": 40,
+    "desktop_mb": 300,
+    "web_load_s": 10
+  },
+  "runs": []
+}

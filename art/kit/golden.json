@@ -1,36 +1,62 @@
 {
   "status": "chosen",
   "note": "Golden examples for the Style Guide (docs/STYLE.md, 'Golden examples'). The player character is in the style the owner chose on 2026-10-23 (style N, docs/DESIGN.md). The others are the best placeholder art so far and are redrawn in that style over later milestones. The starter kit zip includes these files next to the palette and templates.",
+  "intro": "The look: the wizard is style N; the rest is redrawn in it over time. Copy their approach, not their pixels.",
+  "screenshot": "arena_four_wizards.png",
+  "screenshot_alt": "The arena with four wizards",
   "examples": [
     {
       "path": "art/kit/golden_wizard.svg",
       "shows": "A player character, style N: a narrow Stone robe with a Spark placket, belt and hem, two big tall eyes and no mouth, Skin hands, under a hat in the Player 1 ramp (the only player colour). The game draws the body strip and the hat as two pictures (content/wizard/base/); this is the two together",
-      "rules": ["outline", "three shades", "light from the top-left", "player colour only on the hat"]
+      "rules": [
+        "outline",
+        "three shades",
+        "light from the top-left",
+        "player colour only on the hat"
+      ]
     },
     {
       "path": "content/enemies/ember_imp/idle.svg",
       "shows": "An enemy: Fire body, Bone horns and Spark eyes, no player colour, a bold silhouette",
-      "rules": ["outline", "silhouette", "no player colour"]
+      "rules": [
+        "outline",
+        "silhouette",
+        "no player colour"
+      ]
     },
     {
       "path": "art/tilesets/crypt/wall.svg",
       "shows": "A raised tile: lit top and left edge, shaded bottom and right edge",
-      "rules": ["light from the top-left", "three shades", "tile fills the cell"]
+      "rules": [
+        "light from the top-left",
+        "three shades",
+        "tile fills the cell"
+      ]
     },
     {
       "path": "art/tilesets/crypt/floor.svg",
       "shows": "A flat tile: Stone base, a few inner details, nothing on the outer edge so it repeats",
-      "rules": ["seamless tile", "flat floor"]
+      "rules": [
+        "seamless tile",
+        "flat floor"
+      ]
     },
     {
       "path": "art/vfx/bolt.svg",
       "shows": "A projectile: a streak in Bone materials with a Spark core, outlined in its own shadow shade",
-      "rules": ["effects outline", "no glow halo", "readable at speed"]
+      "rules": [
+        "effects outline",
+        "no glow halo",
+        "readable at speed"
+      ]
     },
     {
       "path": "art/vfx/hit_spark.svg",
       "shows": "An impact: a flat burst in Spark materials, over in 0.2 s",
-      "rules": ["effects outline", "no partial transparency"]
+      "rules": [
+        "effects outline",
+        "no partial transparency"
+      ]
     }
   ]
 }

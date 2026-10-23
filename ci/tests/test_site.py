@@ -27,9 +27,10 @@ class ContributePageTest(unittest.TestCase):
         current, upcoming = contribute.parse_roadmap((ROOT / "docs/ROADMAP.md").read_text())
         self.assertRegex(current.code, r"^M\d$")
         self.assertTrue(all(int(u[0][1]) > int(current.code[1]) for u in upcoming))
-        contribute.parse_progress(current, (ROOT / "docs/milestones/M0-foundation.md").read_text())
-        self.assertEqual(current.parts_total, 7)
-        self.assertGreater(current.checks_total, 10)
+        m0 = ROOT / "docs/milestones/M0-foundation.md"
+        if m0.exists():  # a new game's first task writes it
+            contribute.parse_progress(current, m0.read_text())
+            self.assertGreater(current.parts_total, 0)
 
     def test_parts_done_come_from_next_and_log(self) -> None:
         """M1 and M2's parts tables have no status column: the bar stayed at 0 for two milestones."""

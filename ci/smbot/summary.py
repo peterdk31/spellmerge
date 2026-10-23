@@ -53,20 +53,21 @@ def lines_for(env: dict[str, str], repo: str) -> list[str]:
     return out
 
 
-BENCH_LOGS = {  # build/logs name -> what ran
-    "stress-linux": "Linux Test, stress",
-    "timing-linux": "Linux Test, projectile timing",
-    "timing-web": "Web Test (WASM), projectile timing",
-    "stress-web": "Web Test (WASM), stress",
-}
+def bench_logs(runs: tuple[config_mod.Run, ...]) -> dict[str, str]:
+    """build/logs name -> what ran, for the game's runs that print BENCH lines (tests/build.json)."""
+    runs = tuple(r for r in runs if r.bench)
+    return {**{f"{r.name}-linux": f"Linux Test, {r.label}" for r in runs},
+            **{f"{r.name}-web": f"Web Test (WASM), {r.label}" for r in runs}}
+
+
 BENCH_LINE = re.compile(r"BENCH|(STRESS|TIMING|WEB SMOKE) (OK|FAILED)|FAILED|::error::")
 MAX_BENCH_LINES = 40  # per log; 4 logs of at most 40 lines of 300 characters fit in a comment
 
 
-def bench_line(logs: Path) -> str:
+def bench_line(runs: tuple[config_mod.Run, ...], logs: Path) -> str:
     """The stress and timing results from the build's logs, as one collapsed Daily log line; "" if none ran."""
     out: list[str] = []
-    for name, label in BENCH_LOGS.items():
+    for name, label in bench_logs(runs).items():
         try:
             text = (logs / f"{name}.log").read_text(errors="replace")
         except OSError:
@@ -104,7 +105,12 @@ def main() -> int:
     lines.append(pacing.usage_line(st, now))
     lines += parked_lines(st, now)
     if env.get("BUILD_LOGS"):
-        lines.append(bench_line(Path(env["BUILD_LOGS"])))
+        try:
+            runs = config_mod.load_build().runs
+        except (OSError, ValueError) as e:  # the build has failed on it already; say so, post the rest
+            runs = ()
+            lines.append(f"⚠️ {e}")
+        lines.append(bench_line(runs, Path(env["BUILD_LOGS"])))
     try:
         waiting = inbox.reminder(cfg)
     except gh.GhError:

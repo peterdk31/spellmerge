@@ -75,9 +75,10 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Keep main's Claude action (the session may switch to an older branch before it runs)
+      - name: Keep main's Claude action and scripts (the session may switch to an older branch, or change files)
         run: |
           cp -r .github/actions/claude .ci-claude-action
+          cp -r ci "$RUNNER_TEMP/ci-main" # outside the working tree, which is all the sandbox lets Claude write
           echo .ci-claude-action >> .git/info/exclude
       - name: Git identity of the bot
         env:
@@ -114,16 +115,18 @@ jobs:
           schema: ${{ steps.prepare.outputs.schema }}
           max-turns: 400
           allowed-tools: "Read,Write,Edit,MultiEdit,Glob,Grep,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git switch:*),Bash(git checkout:*),Bash(git add:*),Bash(git rm:*),Bash(git mv:*),Bash(git commit:*),Bash(git restore:*),Bash(git branch:*),Bash(git fetch:*),Bash(git merge:*),Bash(git rev-parse:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr list:*),Bash(gh pr checkout:*),Bash(gh issue view:*),Bash(gh issue list:*),Bash(tools/check.sh:*),Bash(ci/build/build.sh --quick),Bash(ci/build/build.sh --quick --tests),Bash(ci/build/build.sh --quick --screenshots),Bash(ls:*),Bash(mkdir:*),Bash(mv:*),Bash(cp:*),Bash(rm:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(diff:*),Bash(sort:*)"
-          disallowed-tools: "WebFetch,WebSearch,Edit(/.git/**),Write(/.git/**),MultiEdit(/.git/**),Edit(/ci/**),Write(/ci/**),MultiEdit(/ci/**),Edit(/.github/**),Write(/.github/**),MultiEdit(/.github/**),Edit(/tools/**),Write(/tools/**),MultiEdit(/tools/**)"
+          disallowed-tools: "WebFetch,WebSearch,Edit(/.git/**),Write(/.git/**),MultiEdit(/.git/**),Edit(/ci/**),Write(/ci/**),MultiEdit(/ci/**),Edit(/.ci-claude-action/**),Write(/.ci-claude-action/**),MultiEdit(/.ci-claude-action/**),Edit(/.github/workflows/**),Write(/.github/workflows/**),MultiEdit(/.github/workflows/**),Edit(/.github/actions/**),Write(/.github/actions/**),MultiEdit(/.github/actions/**),Edit(/.github/maintainer/**),Write(/.github/maintainer/**),MultiEdit(/.github/maintainer/**),Edit(/.github/CODEOWNERS),Write(/.github/CODEOWNERS),MultiEdit(/.github/CODEOWNERS),Edit(/.github/dependabot.yml),Write(/.github/dependabot.yml),MultiEdit(/.github/dependabot.yml)"
       - id: usage
         if: always()
         env:
+          PYTHONPATH: ${{ runner.temp }}/ci-main # main's scripts: Claude's cp and mv could have changed ci/
           EXEC_FILE: ${{ steps.claude.outputs.execution_file }}
           FAILED: ${{ steps.claude.outputs.outcome != 'success' }}
         run: python3 -m smbot.session usage --file "${EXEC_FILE:-/nonexistent}" $([ "$FAILED" = true ] && echo --step-failed)
       - id: package
         if: always()
         env:
+          PYTHONPATH: ${{ runner.temp }}/ci-main # main's scripts: Claude's cp and mv could have changed ci/
           BRANCH: ${{ steps.prepare.outputs.branch }}
         run: python3 -m smbot.session package --out work --branch "$BRANCH"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -252,9 +255,10 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Keep main's Claude action (the session may switch to an older branch before it runs)
+      - name: Keep main's Claude action and scripts (the session may switch to an older branch, or change files)
         run: |
           cp -r .github/actions/claude .ci-claude-action
+          cp -r ci "$RUNNER_TEMP/ci-main" # outside the working tree, which is all the sandbox lets Claude write
           echo .ci-claude-action >> .git/info/exclude
       - name: Git identity of the bot
         env:
@@ -293,16 +297,18 @@ jobs:
           schema: ${{ steps.prepare.outputs.schema }}
           max-turns: 250
           allowed-tools: "Read,Write,Edit,MultiEdit,Glob,Grep,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git switch:*),Bash(git checkout:*),Bash(git add:*),Bash(git rm:*),Bash(git mv:*),Bash(git commit:*),Bash(git restore:*),Bash(git branch:*),Bash(git fetch:*),Bash(git merge:*),Bash(git rev-parse:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr checkout:*),Bash(gh issue view:*),Bash(gh issue list:*),Bash(tools/check.sh:*),Bash(ci/build/build.sh --quick),Bash(ci/build/build.sh --quick --tests),Bash(ci/build/build.sh --quick --screenshots),Bash(ls:*),Bash(mkdir:*),Bash(mv:*),Bash(cp:*),Bash(rm:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(diff:*),Bash(sort:*)"
-          disallowed-tools: "WebFetch,WebSearch,Edit(/.git/**),Write(/.git/**),MultiEdit(/.git/**),Edit(/ci/**),Write(/ci/**),MultiEdit(/ci/**),Edit(/.github/**),Write(/.github/**),MultiEdit(/.github/**),Edit(/tools/**),Write(/tools/**),MultiEdit(/tools/**)"
+          disallowed-tools: "WebFetch,WebSearch,Edit(/.git/**),Write(/.git/**),MultiEdit(/.git/**),Edit(/ci/**),Write(/ci/**),MultiEdit(/ci/**),Edit(/.ci-claude-action/**),Write(/.ci-claude-action/**),MultiEdit(/.ci-claude-action/**),Edit(/.github/workflows/**),Write(/.github/workflows/**),MultiEdit(/.github/workflows/**),Edit(/.github/actions/**),Write(/.github/actions/**),MultiEdit(/.github/actions/**),Edit(/.github/maintainer/**),Write(/.github/maintainer/**),MultiEdit(/.github/maintainer/**),Edit(/.github/CODEOWNERS),Write(/.github/CODEOWNERS),MultiEdit(/.github/CODEOWNERS),Edit(/.github/dependabot.yml),Write(/.github/dependabot.yml),MultiEdit(/.github/dependabot.yml)"
       - id: usage
         if: always()
         env:
+          PYTHONPATH: ${{ runner.temp }}/ci-main # main's scripts: Claude's cp and mv could have changed ci/
           EXEC_FILE: ${{ steps.claude.outputs.execution_file }}
           FAILED: ${{ steps.claude.outputs.outcome != 'success' }}
         run: python3 -m smbot.session usage --file "${EXEC_FILE:-/nonexistent}" $([ "$FAILED" = true ] && echo --step-failed)
       - id: package
         if: always()
         env:
+          PYTHONPATH: ${{ runner.temp }}/ci-main # main's scripts: Claude's cp and mv could have changed ci/
           BRANCH: ${{ needs.publish.outputs.branch }}
         run: python3 -m smbot.session package --out work --branch "$BRANCH"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

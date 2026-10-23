@@ -2,11 +2,13 @@
 
   python3 -m smbot.styleguide --out site/style-guide     (normally called by smbot.site)
 
-The page is generated from docs/STYLE.md (its sections on the grid, palette, light,
-outline, readability, frame counts and the checklist), with swatches from
-art/kit/palette.hex.txt, the golden examples listed in art/kit/golden.json and the
-animation strip template. The zip holds the files an artist starts from. Neither is
-part of the game build or the web export: they exist only on the site.
+The page is docs/STYLE.md: its intro and every `## ` section in order, so the bot shapes the page by
+editing that file. Some sections get extras when the files exist: "Palette" the swatches from
+art/kit/palette.hex.txt and the palette downloads, "Golden examples" the examples listed in
+art/kit/golden.json (with its "intro" and an in-game "screenshot"), "Animation frame counts" the
+strip template, "The starter kit" and "Checklist" their downloads. The zip holds every file in
+art/kit/ (a *.gpl.txt palette as *.gpl) and the golden examples. Neither is part of the game build or
+the web export: they exist only on the site.
 """
 
 from __future__ import annotations
@@ -25,12 +27,17 @@ from . import config
 ROOT = Path(__file__).resolve().parent.parent.parent
 STYLE = ROOT / "docs" / "STYLE.md"
 KIT = ROOT / "art" / "kit"
-SECTIONS = ("The short version", "The 32×32 grid", "Palette", "Light and shading", "Outline", "Readability",
-            "Animation frame counts", "Checklist")
 GAME = config.load().game
 ZIP_NAME = f"{GAME.slug}-art-kit.zip"
 PALETTE = f"{GAME.slug}.gpl"  # art/kit/<slug>.gpl.txt, served without the .txt
+NOT_IN_KIT = {"README.md", ".gdignore"}
 REPO_BLOB = f"https://github.com/{config.load().repo}/blob/main/"
+
+
+def intro(markdown: str) -> str:
+    """The text between the title and the first `## ` section."""
+    head = re.split(r"^## ", markdown, maxsplit=1, flags=re.M)[0]
+    return re.sub(r"^# .*\n", "", head).strip()
 
 
 def sections(markdown: str) -> dict[str, str]:
@@ -85,8 +92,21 @@ def palette() -> list[str]:
     return [line.strip().lower() for line in (KIT / "palette.hex.txt").read_text().splitlines() if line.strip()]
 
 
+def golden_file() -> dict:
+    path = KIT / "golden.json"
+    return json.loads(path.read_text()) if path.exists() else {}
+
+
 def golden() -> list[dict[str, str]]:
-    return json.loads((KIT / "golden.json").read_text())["examples"]
+    return golden_file().get("examples", [])
+
+
+def kit_files() -> dict[str, Path]:
+    """Published name -> file, for every file in art/kit/ (a .gpl.txt palette loses its .txt)."""
+    if not KIT.is_dir():
+        return {}
+    return {p.name.removesuffix(".txt") if p.name.endswith(".gpl.txt") else p.name: p
+            for p in sorted(KIT.iterdir()) if p.is_file() and p.name not in NOT_IN_KIT}
 
 
 def flat_name(path: str) -> str:
@@ -96,9 +116,7 @@ def flat_name(path: str) -> str:
 
 
 def build_zip(out: Path) -> None:
-    entries = {PALETTE: KIT / f"{PALETTE}.txt", "palette.hex.txt": KIT / "palette.hex.txt",
-               "grid_32.svg": KIT / "grid_32.svg", "sheet_template.svg": KIT / "sheet_template.svg",
-               "checklist.md": KIT / "checklist.md", "golden.json": KIT / "golden.json"}
+    entries = kit_files()
     for example in golden():
         entries[f"golden/{flat_name(example['path'])}"] = ROOT / example["path"]
     notice = (f"{GAME.name} art starter kit, from {REPO_BLOB.removesuffix('blob/main/')} (art/kit/).\n"
@@ -114,35 +132,40 @@ def build_zip(out: Path) -> None:
 
 
 def page(screenshot: str = "") -> str:
-    style = sections(STYLE.read_text())
-    missing = [s for s in SECTIONS if s not in style]
-    if missing:
-        raise ValueError(f"docs/STYLE.md has no section {', '.join(missing)}")
-    swatches = "".join(f'<figure class="swatch"><span style="background:#{c}"></span><figcaption>#{c}</figcaption>'
-                       "</figure>" for c in palette())
+    text = STYLE.read_text()
+    style = sections(text)
+    kit = kit_files()
+
+    def link(name: str, label: str = "") -> str:
+        return f'<a href="kit/{html.escape(name)}">{html.escape(label or name)}</a>' if name in kit else ""
+
     examples = "".join(
         f'<figure class="golden"><img src="golden/{html.escape(flat_name(e["path"]))}" alt="" width="128" height="128">'
         f"<figcaption>{inline(e['shows'])}<br><code>{html.escape(e['path'])}</code></figcaption></figure>"
         for e in golden())
-    parts = []
-    for name in SECTIONS:
-        body = render(style[name])
-        if name == "Palette":
-            body = (f'<div class="swatches">{swatches}</div>' + body
-                    + f'<p>Download: <a href="kit/{PALETTE}">{PALETTE}</a> (GIMP, Krita, Aseprite, '
-                    'LibreSprite, Inkscape) &middot; <a href="kit/palette.hex.txt">palette.hex.txt</a></p>')
-        if name == "Animation frame counts":
-            body += ('<p>The strip template (download <a href="kit/sheet_template.svg">sheet_template.svg</a>, '
-                     'and the <a href="kit/grid_32.svg">32×32 grid</a>):</p>'
-                     '<img class="wide" src="kit/sheet_template.svg" alt="Animation strip template">')
-        if name == "Checklist":
-            body += '<p>As one page: <a href="kit/checklist.md">checklist.md</a></p>'
-        parts.append(f'<section><h2>{html.escape(name)}</h2>{body}</section>')
-        if name == "The short version":
-            parts.append(f'<section><h2>Golden examples</h2><p>The look: the wizard is style N; the rest is redrawn '
-                         f'in it over time. Copy their approach, not their pixels.</p><div class="goldens">{examples}</div>'
-                         + (f'<p>In the game:</p><img class="wide" src="{html.escape(screenshot)}" '
-                            'alt="The arena with four wizards">' if screenshot else "") + "</section>")
+    meta = golden_file()
+    downloads = " &middot; ".join(x for x in (link(PALETTE) and f"{link(PALETTE)} (GIMP, Krita, Aseprite, LibreSprite, "
+                                                               "Inkscape)", link("palette.hex.txt")) if x)
+    swatches = "".join(f'<figure class="swatch"><span style="background:#{c}"></span><figcaption>#{c}</figcaption>'
+                       "</figure>" for c in palette() if re.fullmatch(r"[0-9a-f]{6}", c)) if "palette.hex.txt" in kit else ""
+    shot = (f'<p>In the game:</p><img class="wide" src="{html.escape(screenshot)}" '
+            f'alt="{html.escape(meta.get("screenshot_alt", "The game"))}">' if screenshot else "")
+    before = {"Palette": f'<div class="swatches">{swatches}</div>' if swatches else ""}
+    after = {  # what each section gets below its own text, when the files exist
+        "Palette": f"<p>Download: {downloads}</p>" if downloads else "",
+        "Golden examples": ((f"<p>{inline(meta['intro'])}</p>" if meta.get("intro") else "")
+                            + (f'<div class="goldens">{examples}</div>' if examples else "") + shot),
+        "Animation frame counts": (f"<p>The strip template ({link('sheet_template.svg')}, and "
+                                   f"{link('grid_32.svg', 'the 32×32 grid')}):</p>"
+                                   '<img class="wide" src="kit/sheet_template.svg" alt="Animation strip template">'
+                                   if "sheet_template.svg" in kit else ""),
+        "The starter kit": f'<p>Download: <a href="{ZIP_NAME}">{ZIP_NAME}</a></p>' if kit else "",
+        "Checklist": f"<p>As one page: {link('checklist.md')}</p>" if "checklist.md" in kit else "",
+    }
+    parts = [f'<section><h2>{html.escape(name)}</h2>{before.get(name, "")}{render(markdown)}{after.get(name, "")}'
+             "</section>" for name, markdown in style.items()]
+    kit_line = (f'<p class="kit"><strong>Starter kit:</strong> <a href="{ZIP_NAME}">{ZIP_NAME}</a>: the palette, '
+                "the templates, the checklist and the golden examples. CC-BY-SA-4.0.</p>" if kit else "")
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{html.escape(GAME.name)} Style Guide</title>
@@ -164,25 +187,28 @@ ul.checks {{ list-style: none; padding-left: 0; }}
 .kit {{ background: #2b2840; padding: 12px 16px; border-radius: 6px; }}
 </style></head><body>
 <h1>{html.escape(GAME.name)} Style Guide</h1>
-<p>The art rules, from <a href="{REPO_BLOB}docs/STYLE.md">docs/STYLE.md</a>. The art direction (style N) was chosen in M2.</p>
-<p class="kit"><strong>Starter kit:</strong> <a href="{ZIP_NAME}">{ZIP_NAME}</a>: the palette, the 32×32 grid, the strip template, the checklist and the golden examples. CC-BY-SA-4.0.</p>
+<p>The art rules, from <a href="{REPO_BLOB}docs/STYLE.md">docs/STYLE.md</a>.</p>
+{render(intro(text))}
+{kit_line}
 {chr(10).join(parts)}
 <p><a href="../">Back to {html.escape(GAME.name)}</a></p>
 </body></html>
 """
 
 
-def build(out: Path, screenshot_source: Path | None = None) -> None:
-    """Writes out/index.html, out/kit/*, out/golden/* and out/<slug>-art-kit.zip."""
+def build(out: Path, screenshots: Path | None = None) -> None:
+    """Writes out/index.html, out/kit/*, out/golden/* and out/<slug>-art-kit.zip. `screenshots` is
+    today's folder; golden.json's "screenshot" names the one to show."""
     out.mkdir(parents=True, exist_ok=True)
     (out / "kit").mkdir(exist_ok=True)
     (out / "golden").mkdir(exist_ok=True)
-    shutil.copyfile(KIT / f"{PALETTE}.txt", out / "kit" / PALETTE)
-    for name in ("palette.hex.txt", "grid_32.svg", "sheet_template.svg", "checklist.md"):
-        shutil.copyfile(KIT / name, out / "kit" / name)
+    for name, source in kit_files().items():
+        shutil.copyfile(source, out / "kit" / name)
     for example in golden():
         shutil.copyfile(ROOT / example["path"], out / "golden" / flat_name(example["path"]))
     shot = ""
+    wanted = golden_file().get("screenshot", "")
+    screenshot_source = screenshots / Path(wanted).name if screenshots and wanted else None
     if screenshot_source and screenshot_source.is_file():
         shutil.copyfile(screenshot_source, out / "in_game.png")
         shot = "in_game.png"
@@ -193,9 +219,9 @@ def build(out: Path, screenshot_source: Path | None = None) -> None:
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--out", type=Path, required=True)
-    ap.add_argument("--screenshot", type=Path, help="an in-game PNG to show (optional)")
+    ap.add_argument("--screenshots", type=Path, help="today's screenshots folder (optional)")
     args = ap.parse_args(argv)
-    build(args.out, args.screenshot)
+    build(args.out, args.screenshots)
     return 0
 
 

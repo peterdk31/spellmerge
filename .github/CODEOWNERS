@@ -5,12 +5,14 @@
 # merge its own PRs there. The rules script limits them to the bot's PRs.
 
 /.github/                    @peterdk31
+# The issue forms describe the game; the bot keeps them (their labels are checked by smbot.rules).
+/.github/ISSUE_TEMPLATE/
 /ci/                         @peterdk31
 /.claude/                    @peterdk31
-/docs/DESIGN.md              @peterdk31
 /LICENSE                     @peterdk31
 /CLA.md                      @peterdk31
 /setup.sh                    @peterdk31
+/new-game.sh                 @peterdk31
 /REUSE.toml                  @peterdk31
 /docs/SECURITY-CHECKLIST.md  @peterdk31
 /docs/SETUP-APP.md           @peterdk31

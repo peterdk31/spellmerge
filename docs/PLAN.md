@@ -14,7 +14,7 @@ Spellmerge is a 2D top-down roguelite about building deep, combinable spells, fo
 - **Platforms:** Daily web build (a free demo and showcase) plus daily full desktop builds for Windows and Linux; Steam later.
 - **License:** GPL-3.0-or-later code, CC-BY-SA assets. Players send ideas, not files, so no contributor licenses are needed (see Protection).
 - **Budget:** Claude Pro (about $20/month). Everything else is free.
-- **Autonomy:** Claude plans, builds and merges on its own. The owner only controls the vision in `DESIGN.md`, the protected infrastructure and the milestone checkpoints.
+- **Autonomy:** Claude plans, builds and merges on its own. The owner sets the vision (Claude keeps `DESIGN.md` in line with the owner's direction), and controls the protected infrastructure and the milestone checkpoints.
 
 ## Quality bar
 
@@ -101,8 +101,8 @@ Security comes first: all outside input (PR code, PR text, issues, discussions) 
 
 | Tier | Paths | Who may change |
 | --- | --- | --- |
-| Owner only | `.github/` (incl. `.github/maintainer/` prompts), `ci/`, `.claude/`, `docs/DESIGN.md`, `LICENSE`, `CLA.md`, `setup.sh`, `REUSE.toml`, `docs/SECURITY-CHECKLIST.md`, `docs/SETUP-APP.md`, `addons/` | Owner review required |
-| Bot maintained | `docs/ROADMAP.md`, `docs/NEXT.md`, `docs/BACKLOG.md`, `docs/DECISIONS.md`, `docs/LOG.md`, `docs/milestones/`, `docs/STYLE.md`, `docs/STORY.md`, area `README.md` files, `AGENTS.md`, `CLAUDE.md`, `llms.txt`, `docs/cla-signatures.json`, `core/`, `project.godot`, `export_presets.cfg` | Claude's own PRs only (a contributor's PR touching them is finished by the bot, whose PR may) |
+| Owner only | `.github/` (incl. `.github/maintainer/` prompts; not the issue forms), `ci/`, `.claude/`, `LICENSE`, `CLA.md`, `setup.sh`, `REUSE.toml`, `docs/SECURITY-CHECKLIST.md`, `docs/SETUP-APP.md`, `addons/` | Owner review required |
+| Bot maintained | `docs/DESIGN.md` (only with the owner's direction), `CONTRIBUTING.md`, `.github/ISSUE_TEMPLATE/` (labels limited to `bug`, `idea`, `copyright`), `tests/build.json`, `tools/`, `docs/ROADMAP.md`, `docs/NEXT.md`, `docs/BACKLOG.md`, `docs/DECISIONS.md`, `docs/LOG.md`, `docs/milestones/`, `docs/STYLE.md`, `docs/STORY.md`, area `README.md` files, `AGENTS.md`, `CLAUDE.md`, `llms.txt`, `docs/cla-signatures.json`, `core/`, `project.godot`, `export_presets.cfg` | Claude's own PRs only (a contributor's PR touching them is finished by the bot, whose PR may) |
 
 **Kill switch:** set the repo variable `AUTOMATION_ENABLED=false`, or disable the workflow in the Actions tab. The Control panel issue also has a kill-switch checkbox usable from the GitHub mobile app. Every bot action is posted to that day's "Daily log YYYY-MM-DD" issue (label `daily-log`; the next day's log closes it), and every merge can be reverted.
 
@@ -389,7 +389,7 @@ Claude has no memory between runs, so the repo is its memory: a fixed set of pla
 
 | File | Holds | Changed by |
 | --- | --- | --- |
-| `docs/DESIGN.md` | Vision and pillars | Owner only |
+| `docs/DESIGN.md` | Vision and pillars | Claude, with the owner's direction |
 | `docs/ROADMAP.md` | Linear milestones with done-when criteria | Claude |
 | `docs/milestones/Mx-*.md` | Detailed design of the current milestone, written before any code | Claude (self-critiqued) |
 | `docs/NEXT.md` | Ordered task queue; the top item is next | Claude |
@@ -431,7 +431,7 @@ Claude's own development is the only engine and players steer it with bug report
 - **Same-day merge of Claude's own PRs:** rules, tests, smoke test and benchmark, plus an independent review by a separate Claude session with fresh context. If all pass, it merges immediately and the next session builds on it.
 - **Tasks sized to one session;** the weekly planning run splits larger ones.
 - **Never stuck:** a task that fails twice or is reported blocked is set aside for a week with the reason logged, and work moves on to the next task; blocked tasks are revisited weekly. A task blocked on an owner question names the question's key under `## Blocked` in `docs/NEXT.md`, and goes before the queue by itself once that question is closed or answered with `/claude` (`smbot.nexttask.unblocked`). A task whose approved PR waits on GitHub or the owner is set aside for a day the same way.
-- **Never waiting for humans:** unclear points are decided by Claude and recorded in `DECISIONS.md`; only `DESIGN.md` needs the owner.
+- **Never waiting for humans:** unclear points are decided by Claude and recorded in `DECISIONS.md`; only the vision needs the owner.
 - **Milestones never depend on players:** all content targets are planned as Claude's work; a player's idea that fits shapes or replaces a task.
 
 ### Measurement and alarms

@@ -1,5 +1,5 @@
 extends RefCounted
-## What "Drop component" (M2 part 18) can offer: the components of the bag that fit a free
+## What "Bag" (M2 part 18) can offer: the components of the bag that fit a free
 ## slot of a recipe without the full builder. A free slot is the empty element slot or the
 ## first free modifier slot (the form and the trigger are built in the full builder). Shared
 ## by the overlay and the quick view, so both offer the same and ask for the same slot.

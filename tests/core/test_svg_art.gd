@@ -15,6 +15,9 @@ const KNOWN: Array[String] = [
 	"res://art/samples/hats_vivid/hat_p4.svg",
 	"res://art/samples/g_brown/body.svg",
 	"res://art/samples/h_cream/body.svg",
+	"res://art/samples/j_tiny/body.svg",
+	"res://art/samples/k_bean/body.svg",
+	"res://art/samples/l_gold/body.svg",
 	"res://art/samples/i_warm/floor.svg",
 ]
 const PALETTE: Array[String] = [
@@ -146,7 +149,7 @@ func test_the_soft_sample_has_no_black_and_the_big_hat_keeps_it() -> void:
 ## In G, H and I only the hat takes the player's colour: the body sprites use no player colour,
 ## and each hat uses exactly one player's ramp (standard or vivid).
 func test_only_the_hat_has_the_player_colour() -> void:
-	for body: String in ["g_brown", "h_cream"]:
+	for body: String in ["g_brown", "h_cream", "j_tiny", "k_bean", "l_gold"]:
 		var text: String = FileAccess.get_file_as_string("res://art/samples/%s/body.svg" % body)
 		for colour: String in PLAYER_COLOURS + SAMPLE_PALETTE_COLOURS:
 			check(not text.contains(colour), "%s/body.svg uses the player colour %s" % [body, colour])
@@ -173,6 +176,27 @@ func test_only_the_hat_has_the_player_colour() -> void:
 						continue
 					for colour: String in (ramps[other_folder] as Array)[other]:
 						check(not text.contains(colour), "%s uses another player's colour %s" % [path, colour])
+
+
+## J, K and L are narrow and keep the face under the hat's brim: nothing of the body (left of the
+## staff, x < 24) sits above y=15, and the chest row (y=21, outline included) is at most 10 px wide.
+func test_the_round_four_bodies_are_narrow_and_below_the_brim() -> void:
+	var rect_pattern: RegEx = RegEx.create_from_string('<rect x="(\\d+)" y="(\\d+)" width="(\\d+)" height="(\\d+)"')
+	for body: String in ["j_tiny", "k_bean", "l_gold"]:
+		var text: String = FileAccess.get_file_as_string("res://art/samples/%s/body.svg" % body)
+		var chest_left: int = 99
+		for rect in rect_pattern.search_all(text):
+			var x0: int = rect.get_string(1).to_int()
+			var y0: int = rect.get_string(2).to_int()
+			var rect_width: int = rect.get_string(3).to_int()
+			var rect_height: int = rect.get_string(4).to_int()
+			if x0 >= 24:
+				continue
+			check(y0 >= 15, "%s/body.svg has a rect at y=%d, under the hat" % [body, y0])
+			if y0 <= 21 and y0 + rect_height > 21 and x0 < 20:
+				chest_left = mini(chest_left, x0)
+		# The chest ends at x=19 (outline), so starting at x=10 or later is 10 px or less.
+		check(chest_left >= 10, "%s/body.svg is wider than 10 px at the chest (starts at x=%d)" % [body, chest_left])
 
 
 func test_every_svg_is_in_the_manifest() -> void:

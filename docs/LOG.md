@@ -1,9 +1,50 @@
 # Log
 
-What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue.
+What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
+
+## C2 evidence
+
+Gathered on 2026-10-23 from `ci/build/build.sh --quick --tests` (headless on the session runner: game logic only, no renderer) and the newest daily post (log #202, the 06:14 run). For the C2 checkpoint issue. M2 is not closed.
+
+**Tests.** The whole build passes: smoke, every unit test, the validators (`test_validators`, 21 tests), `test_combos` (11), `test_spell_fuzz` (5), the 4-bot smoke and the stress run. No error lines logged.
+
+**Fuzz (`test_spell_fuzz.gd`).** 300 seeded random recipes, 244 compile (the rest are refused by the real limits, as intended), all cast in the combo arena. Coverage is checked: among compiled recipes at least 5 have a held spell, 5 have three modifiers, 5 have a trigger and 20 have an element (`MIN_COVERAGE`). Over two runs: slowest mean step 0.45 to 0.50 ms, slowest single step 1.4 to 1.6 ms, most live shots 456. No broken limit, no runaway shot count.
+
+**Headless stress (4 players with built spells, game logic only).** `STRESS OK`: 4 scenarios, no errors.
+
+| Scenario | Enemies / shots | Frame avg | p95 | Max | Physics step (avg) |
+|---|---|---|---|---|---|
+| web | 100 / 1,000 | 6.90 ms | 11.56 ms | 13.58 ms | 5.26 ms |
+| web, render loop off | 100 / 1,000 | 6.89 ms | 11.85 ms | 12.59 ms | 6.32 ms |
+| web, hit particles off | 100 / 1,000 | 6.89 ms | 11.18 ms | 11.95 ms | 4.66 ms |
+| desktop | 200 / 3,000 | 6.91 ms | 13.47 ms | 17.89 ms | 9.61 ms |
+
+Budget 16.7 ms: web is inside it; desktop p95 is inside and its single worst frame is 1.2 ms over (a warning only). Per pass: enemy step 0.42 ms (100 enemies) and 1.21 ms (200); combat status lookups 0.26 and 0.91 ms (the O(n²) `find` worry in the backlog stays small at these sizes); Feel step 0.015 to 0.020 ms. Peak nodes 1,255 and 1,955; static memory 41 to 45 MiB (budgets 512 web, 1,536 desktop); hit particles at their limit of 48. Projectile timing at cap 1,000 and 3,000 (native): `update_draw` 0.77 and 2.3 ms, homing step 2.8 and 3.5 ms, orbit step 2.0 and 3.1 ms, a spawn 1.4 us.
+
+**Web numbers: pending.** The last web run (log #202, before the parts timing existed) had projectile timing about 2x native (step with hits 5.4 ms, `update_draw` 4.0 ms, homing 8.6 ms at 1,000 shots; `WORK_PER_STEP` was lowered from 8,000 to 6,000 since, unconfirmed) and the stress scene in the CI browser at p95 151 ms (Linux export 14.6 ms), unexplained and over budget. Pending: web `BENCH: frame parts` and `BENCH: stress parts` for the four scenarios (a daily run newer than #202; task "Read the web stress parts" in Blocked), the homing time after the work cut, and the real-GPU frame rate (BACKLOG, playtest question). M2 done-when item 3 stays open until these are read.
+
+**What the bots build.** In the 4-bot smoke test, bots 1 to 3 build from seeds 2026 to 2028 through `build_change_requested` and bot 4 stays in its builder. The room was cleared in 9.0 game seconds with 28 casts; the builds were an orbit with frost; an orbit with fire and homing, trigger on expire, holding a frost rune (two levels); a fire bolt with split and faster. The fuzz test covers the wider range (above). Wave balance with fighter bots on the default spell: 1 player cleared in 34.9 s (10 health lost), 2 in 26.2 s, 3 in 16.5 s, 4 in 12.9 s, nobody downed. That test follows real frame time, so the numbers move between runs (BACKLOG).
+
+**The 21 combos** (`content/spells/combos.json`; all pass in `test_combos`, and each of the 18 components is in at least two): Burning bolt, Shatter, Big fire ring, Storm lance, Frost pulse rune, Void ring, Homing fan, Storm chain, Blast at the end, Swift line, Wide frost lane, Fire fan orbit, Hexed fire burst, Storm mine, Frost then lightning ray, Frost carousel, Seeking void ray, Fire trap, Quick shock ring, Seeking frost burst, Storm on flame (two players; Flare).
+
+**Carried over from M1 (done-when item 5).**
+- Web 4-bot run (#93), web load time (#91), Style Guide page and kit zip (#95): the issues are closed and the owner's PR #98 merged on 2026-10-21. This run read no daily post showing the web 4-bot result, so "passes on web" (done-when item 4) is still to be confirmed from the next daily post.
+- WASM projectile timing runner: done (part 25); the first WASM numbers are in (above).
+- M0's dry runs and 3 daily releases in a row: owner-run; nothing in this log records them, so treat them as open.
+
+**What M2 cut or left open (BACKLOG).**
+- Spell runtime: a held fast or slow shot born on a hit crosses its target and can hit it again (the combo "Hexed fire burst" works around it); a beam has no timer trigger; `test_wave_balance` depends on real time and the 1 and 2 player bots often lose.
+- Builder and quick view: no mouse (M4 polish); modifiers are picked one slot at a time; no hint on a disabled slot or button; held-spell levels are two small buttons and refusals name no held slot; a swap needs the quick view closed; the drop list names no slot; read-only slots look disabled; the builder panel is translucent.
+- Reactions: the six flashes differ by colour and name only (a problem for colour-blind players); dark names on the dark floor; four flash slots may be too few.
+- Art: the art direction is not chosen (owner question `art-direction-pick-3`, A to I); placeholders are redrawn later. Nothing shows a status on an enemy.
+- Foundation: the wave is still a constant in `flow`; `player.gd` is large; `ai.gd` has one attack; four sounds (`cast`, `hit`, `enemy_death`, `player_downed`) do not exist; no wave announcement.
+- Playtest: no building questions in the weekly playtest; the real-GPU web frame rate is unasked.
+
+**Open M2 tasks:** read the web stress parts (waits on a daily run), record the art direction (waits on the owner), stabilisation and C2.
 
 ## 2026-10-23
 
+- C2 evidence (M2 part 28, first half): collected in the section "C2 evidence" at the top of this file, above the daily entries. No bug found, no code changed; `build.sh --quick --tests` passes.
 - Web stress frame, first half (M2 part 25 follow-up). No web run could be read (the newest daily log is still #202), so the stress run now measures the frame in parts for the next one: the probe prints physics steps per frame, physics and process time, renderer time and draw calls; the runner times the enemy step, the combat lookups and Feel's step per pass, and runs the web scenario again with the render loop off and with hit particles off. Headless, the web scenario's physics step is 5 to 6 ms, so at the WASM factor of 2 or more it nears or passes 16.7 ms and the engine would run up to 8 steps per frame: a possible reason for 130 ms frames. Nothing was lowered; the Queue task "Read the web stress parts" reads the numbers and decides. Tests: `Feel.particles_enabled`, the probe's step counters.
 - Read the first WASM numbers (M2 part 25 follow-up). The daily log #202 had them: projectile timing in WASM is about 2x native (step 5.4 ms, update_draw 4.0 ms, homing step 8.6 ms at 1,000 shots), and the stress scene in the CI browser ran at p95 151 ms (Linux export: 14.6 ms). Homing is over the 8 ms target, so by the M1 part 22 rule `WORK_PER_STEP` went from 8,000 to 6,000 (an estimate; the next web run confirms it). The 130 ms stress frame is unexplained and over budget; a new Queue task times the rest of the frame on the web (`docs/DECISIONS.md`).
 - Quick view walkthrough (M2 part 18, polish). `shot_quick.gd` now plays a wave by real input for one and four players (break, fold on `wave_started`, close + swap + reopen, Drop component, unfold on `room_cleared`; `walk_*` shots at 1x and 4x). Looked at all: text reads at 1x. Fixed: folding left a stale "> " on the form slot (two marks on screen), and a full spell folded with focus on a greyed "Drop component" (now Close). Two tests in `test_quick.gd`. The disabled-slot hint stays in BACKLOG (needs focus on disabled controls); other findings in BACKLOG.

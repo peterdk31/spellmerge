@@ -344,9 +344,11 @@ func get_break_label() -> Label:
 	return _break_label
 
 
-## The wave is cleared: the builders unfold into the full view for the break.
+## The wave is cleared: the builders unfold into the full view for the break, and the wave line
+## goes (it shows only while a wave is on; nothing sends `run_ended` yet).
 func _on_room_cleared(_room_id: StringName) -> void:
 	_set_quick(false)
+	_wave_label.visible = false
 
 
 ## Whether a wave is in progress, so the builders show their quick view (for tests).

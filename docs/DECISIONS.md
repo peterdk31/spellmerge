@@ -2,6 +2,11 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-23: The wave line shows only while a wave is on (owner `/claude` on #4)
+
+- **Why:** the line was hidden only by `run_started` and `run_ended`; no code sends them yet, and a cleared wave sent only `room_cleared`, so "Wave N" stayed mid-screen for good.
+- **Decision:** keep the small 12 px line in the middle strip (the gap that stays clear of four open builders), but show it only from `wave_started` to `room_cleared`; the build line takes its place during the break. No fading banner: the number is useful all through a wave.
+
 ## 2026-10-23: The beam is a held tick, 4 hits a second on one enemy (owner `/claude` on #4)
 
 - **Why:** the owner wants a continuous beam that fires while fire is held, uses mana continuously, and hits the same enemy only x times a second.

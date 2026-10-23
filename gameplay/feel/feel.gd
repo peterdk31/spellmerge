@@ -104,6 +104,9 @@ var registry: RegistryScript = null
 var projectiles: Node = null
 ## Tests turn this off: no Engine.time_scale changes.
 var drive_engine: bool = true
+## The stress benchmark turns this off to time a scene without hit particles (the bursts are
+## skipped as when the pool is empty; flashes, numbers and sound stay).
+var particles_enabled: bool = true
 
 var preset: FeelPresetScript = null
 var shake_enabled: bool = true:
@@ -819,6 +822,8 @@ func _juice(position: Vector2, stop: float, strong: bool, shake: float, sound: S
 ## spray along it, `spread` degrees to each side and faster; without, a round puff.
 ## Returns it, or null when the pool is empty.
 func _burst(position: Vector2, size: float, aim: Vector2 = Vector2.ZERO, tint: Color = Color.WHITE, spread: float = 180.0) -> CPUParticles2D:
+	if not particles_enabled:
+		return null
 	var burst := _bursts.acquire() as CPUParticles2D
 	if burst == null:
 		return null

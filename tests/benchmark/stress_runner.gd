@@ -6,7 +6,11 @@ extends Node
 ##  - web: 100 enemies, 1,000 shots,
 ##  - desktop: 200 enemies, 3,000 shots,
 ## both with four players and full effects (every hit sends its particles, reactions
-## and numbers). The two scenarios run one after the other.
+## and numbers). Between them run two diagnostic variants of the web scenario, to explain the
+## web frame time (docs/DECISIONS.md, 2026-10-23): one with the render loop off (nothing is
+## drawn, so the frame is game logic only) and one with the hit particles off. The four
+## scenarios (web, web with the render loop off, web with hit particles off, desktop) run one
+## after the other.
 ##
 ## How the numbers are held. The bots cast their built spells through the real input
 ## path (`cast`, and `swap` every SWAP_EVERY seconds so both spells are used). Their
@@ -22,7 +26,10 @@ extends Node
 ## fillers) hit something, frames were measured, no build was refused and the log has no
 ## error. The fillers are load only; the hit and reaction paths are exercised by the
 ## bots' real spells. Frame time never fails the run: past 16.7 ms it prints a `BENCH WARNING:`
-## with likely fixes (docs/PLAN.md, "Gates are sparse"). `BENCH:` lines carry the numbers.
+## with likely fixes (docs/PLAN.md, "Gates are sparse"). `BENCH:` lines carry the numbers: the
+## frame (probe.gd, with its parts: physics steps per frame, physics and process time, renderer
+## time) and, timed here in the measured window, one pass over the crowd of the enemy step, of
+## the combat lookups it makes and of Feel's step.
 ##
 ## Started by `stress.gd` (a SceneTree script run from the command line) or, shortened, by
 ## `test_stress.gd` (`build.sh --quick --tests`). Part 25 adds the exports. The node prints
@@ -39,10 +46,13 @@ const PlayerScript := preload("res://gameplay/player/player.gd")
 const AiScript := preload("res://gameplay/ai/ai.gd")
 
 const PLAYERS: int = 4
-## The scenarios: label, enemies, shots.
+## The scenarios: label, enemies, shots, and (variants only) whether the scene is drawn and
+## whether hit particles start.
 const SCENARIOS: Array[Dictionary] = [
 	{"label": "web", "enemies": 100, "shots": 1000},
 	{"label": "desktop", "enemies": 200, "shots": 3000},
+	{"label": "web, render loop off", "enemies": 100, "shots": 1000, "render": false},
+	{"label": "web, hit particles off", "enemies": 100, "shots": 1000, "particles": false},
 ]
 ## Game seconds a scenario takes to build up before frames are measured, and to measure.
 const WARM_UP: float = 3.0
@@ -56,6 +66,8 @@ const TOP_UP_PER_STEP: int = 120
 const ENEMY_AREA: Rect2 = Rect2(48.0, 48.0, 544.0, 264.0)
 ## Seconds between the bots' `swap` presses.
 const SWAP_EVERY: float = 4.0
+## The timing pass over the crowd (`_time_parts`) runs on every PARTS_EVERY-th drawn frame.
+const PARTS_EVERY: int = 30
 ## Filler shots: speed range (px/s), life (s), radius and pierce.
 const FILLER_SPEED_MIN: float = 80.0
 const FILLER_SPEED_MAX: float = 260.0
@@ -93,13 +105,14 @@ const RECIPES: Array[Array] = [
 var warm_up: float = WARM_UP
 var measure: float = MEASURE
 ## The scenarios to run, in order (indexes into SCENARIOS).
-var scenarios: Array[int] = [0, 1]
+var scenarios: Array[int] = [0, 2, 3, 1]
 
 var _log: Logger = ErrorLogScript.new()
 var _logging: bool = false
 var _failures: Array[String] = []
 var _events: Node
 var _flow: Node
+var _feel: Node
 var _input: Node
 var _projectiles: Node
 var _bots: Array[BotScript] = []
@@ -125,6 +138,14 @@ var _shot_samples: int = 0
 var _hits: int = 0
 var _reactions: int = 0
 var _refused: int = 0
+## Microseconds spent in each timed part over the measured frames (see `_time_parts`).
+var _enemy_step_usec: int = 0
+var _lookup_usec: int = 0
+var _feel_step_usec: int = 0
+var _enemy_step_max_usec: int = 0
+var _lookup_max_usec: int = 0
+var _parts_frames: int = 0
+var _process_frames: int = 0
 
 
 func _ready() -> void:
@@ -135,6 +156,7 @@ func _ready() -> void:
 	_flow = root.get_node_or_null("Flow")
 	_input = root.get_node_or_null("PlayerInput")
 	_projectiles = root.get_node_or_null("Projectiles")
+	_feel = root.get_node_or_null("Feel")
 	if _events == null or _flow == null or _input == null or _projectiles == null:
 		_finish(["the Events, PlayerInput, Flow and Projectiles autoloads must exist"])
 		return
@@ -178,7 +200,16 @@ func _next_scenario() -> void:
 	_elapsed = 0.0
 	_swap_left = SWAP_EVERY
 	_measuring = false
+	_enemy_step_usec = 0
+	_lookup_usec = 0
+	_feel_step_usec = 0
+	_enemy_step_max_usec = 0
+	_lookup_max_usec = 0
+	_parts_frames = 0
 	_enemies.clear()
+	RenderingServer.render_loop_enabled = scenario.get("render", true)
+	if _feel != null:
+		_feel.set("particles_enabled", scenario.get("particles", true))
 	_projectiles.call("set_cap", _target_shots)
 	for index in PLAYERS:
 		var bot := BotScript.new()
@@ -235,6 +266,9 @@ func _process(delta: float) -> void:
 			_input.call("send_virtual", bot.player, &"swap", 1.0)
 			_input.call("send_virtual", bot.player, &"swap", 0.0)
 	_top_up_enemies()
+	_process_frames += 1
+	if _measuring and _process_frames % PARTS_EVERY == 0:
+		_time_parts()
 	if not _measuring and _elapsed >= warm_up:
 		_measuring = true
 		_casts = [0, 0, 0, 0]
@@ -242,6 +276,40 @@ func _process(delta: float) -> void:
 		add_child(_probe)
 	if _elapsed >= warm_up + measure:
 		_end_scenario()
+
+
+## Time one pass over the crowd of each part the web frame might be spent on, apart from the
+## engine's own work, which probe.gd reads from the monitors. It is an extra pass on top of
+## the real steps (about 1.5 ms or more in WASM), so it adds to the frame it runs in; it runs
+## on only every PARTS_EVERY-th frame to keep that out of the averages (a maximum or p95 can
+## still contain it). A step with delta 0 is nearly a no-op, but not exactly: an enemy may
+## retarget or start a windup, and the knockback and Feel's step move their own state. Per pass, not per physics step: the engine runs
+## several steps in a late frame.
+func _time_parts() -> void:
+	var start: int = Time.get_ticks_usec()
+	for enemy in _enemies:
+		if is_instance_valid(enemy):
+			enemy.call("step", 0.0)
+	var stepped: int = Time.get_ticks_usec()
+	# The two linear lookups an enemy's step makes in Combat (`Array.find` over the crowd).
+	for enemy in _enemies:
+		if is_instance_valid(enemy):
+			var combat: Object = enemy.get("combat")
+			if combat != null:
+				combat.call("speed_factor", enemy)
+				combat.call("consume_knockback_step", enemy, 0.0)
+	var looked: int = Time.get_ticks_usec()
+	if _feel != null:
+		_feel.call("step", 0.0)
+	var done: int = Time.get_ticks_usec()
+	var enemy_usec: int = stepped - start
+	var lookup_usec: int = looked - stepped
+	_enemy_step_usec += enemy_usec
+	_lookup_usec += lookup_usec
+	_feel_step_usec += done - looked
+	_enemy_step_max_usec = maxi(_enemy_step_max_usec, enemy_usec)
+	_lookup_max_usec = maxi(_lookup_max_usec, lookup_usec)
+	_parts_frames += 1
 
 
 func _physics_process(_delta: float) -> void:
@@ -336,6 +404,7 @@ func _end_scenario() -> void:
 		print("BENCH: stress %s results" % label)
 		_probe.call("report")
 		_warn_when_slow(label)
+		_report_parts()
 	var mean_enemies: float = float(_enemy_sum) / maxf(1.0, float(_enemy_samples))
 	var mean_shots: float = float(_shot_sum) / maxf(1.0, float(_shot_samples))
 	print("BENCH: stress %s: enemies mean %.0f peak %d of %d, shots mean %.0f peak %d of %d, spell hits %d, reactions %d, casts per player (measured window) %s" % [label, mean_enemies, _peak_enemies, _target_enemies, mean_shots, _peak_shots, _target_shots, _hits, _reactions, str(_casts)])
@@ -354,6 +423,15 @@ func _end_scenario() -> void:
 	_next_scenario()
 
 
+## One `BENCH:` line each for the timed parts: milliseconds for one pass over the crowd.
+func _report_parts() -> void:
+	var frames: float = maxf(1.0, float(_parts_frames))
+	var crowd: float = maxf(1.0, float(_enemies.size()))
+	print("BENCH: stress parts, enemy step: avg %.3f ms max %.3f ms for one pass over %d enemies (%.1f us each; includes the combat lookups)" % [float(_enemy_step_usec) / frames / 1000.0, float(_enemy_step_max_usec) / 1000.0, _enemies.size(), float(_enemy_step_usec) / frames / crowd])
+	print("BENCH: stress parts, combat status lookups (speed factor and knockback): avg %.3f ms max %.3f ms per pass" % [float(_lookup_usec) / frames / 1000.0, float(_lookup_max_usec) / 1000.0])
+	print("BENCH: stress parts, Feel step (hit particles, flashes, labels; the particles' own work is in the renderer and the particles-off run): avg %.3f ms per pass" % (float(_feel_step_usec) / frames / 1000.0))
+
+
 ## A warning, never a failure, when the 95th percentile frame is over the 60 FPS budget.
 func _warn_when_slow(label: String) -> void:
 	var p95: float = _probe.call("percentile_95")
@@ -368,9 +446,17 @@ func _teardown_scenario() -> void:
 	if _flow != null:
 		_flow.call("stop_run")
 	_enemies.clear()
+	_restore_diagnostics()
 	if _probe != null:
 		_probe.free()
 		_probe = null
+
+
+## Back to drawing with particles, after a variant (and when the run ends).
+func _restore_diagnostics() -> void:
+	RenderingServer.render_loop_enabled = true
+	if _feel != null:
+		_feel.set("particles_enabled", true)
 
 
 func _check_log() -> Array[String]:
@@ -386,6 +472,7 @@ func _check_log() -> Array[String]:
 func _finish(failed: Array[String]) -> void:
 	_active = false
 	_stop_logging()
+	_restore_diagnostics()
 	if _projectiles != null and _default_cap > 0:
 		_projectiles.call("set_cap", _default_cap)
 	if failed.is_empty():

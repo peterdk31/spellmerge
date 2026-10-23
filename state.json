@@ -9,7 +9,6 @@
     "number": 202
   },
   "errors_in_a_row": 0,
-  "idle": null,
   "intake_tasks": {
     "208": {
       "author": "Brianmanden",
@@ -80,6 +79,11 @@
     },
     "**Record the chosen art direction (M2 part 27 follow-up).** Replace the golden example candidates in `art/kit/golden.json` and `docs/STYLE.md` with the chosen style's files, and say in `docs/STYLE.md` that the style is no longer provisional. Redrawing the placeholders in that style is spread over later milestones (M2 design, \"Art and the art direction\"), one area at a time.": {
       "count": 0
+    },
+    "**Stabilisation and C2 (M2 part 28).** (The two polish tasks and the web stress task above come first: no bug is known, and the daily run found nothing to fix on 2026-10-23.) Only bug fixing, polish and performance until no known crash or blocker remains; then the planning session ends M2 with the C2 checkpoint issue (build link, bot data such as fuzz and stress numbers and which recipes bots build, Claude's honest assessment and the C2 question), and development waits for the owner's /go, /iterate or /pivot. **Before closing M2, check the Blocked WASM task:** if a \"Daily run\" post with \"Stress and timing results\" exists, move that task back to the Queue and finish it first.": {
+      "count": 0,
+      "parked_reason": "No change made. The two polish tasks are already done and merged (quick view walkthrough, wave and break lines). The web stress read task (\"Read the web stress parts\") is still open and has no data: the newest \"Daily run\" post is still #202 (2026-10-23), and it has no `BENCH: frame parts` or `BENCH: stress parts` lines, only the older stress and timing numbers that task 25 already read. The Queue's own rule is that M2 may not close and the C2 checkpoint may not be written until that read is done",
+      "parked_until": "2026-10-24T05:32:16Z"
     },
     "**Stabilisation and C2 (M2 part 28).** Only bug fixing, polish and performance until no known crash or blocker remains; then the planning session ends M2 with the C2 checkpoint issue (build link, bot data such as fuzz and stress numbers and which recipes bots build, Claude's honest assessment and the C2 question), and development waits for the owner's /go, /iterate or /pivot.": {
       "count": 0,

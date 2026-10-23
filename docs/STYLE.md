@@ -134,10 +134,10 @@ Style N, chosen by the owner. The wizard is three layers, so a player colour is 
 
 - **Body** (`art/samples/n_dusk/body.svg`): narrow (10 px at the chest, 12 px at the hem), a Stone robe with a Spark front placket, belt with a buckle and hem band, long sleeves, a Wood staff. **Two big tall eyes (2×3 px, black, with a highlight) and nothing else on the face**: no mouth, no cheeks. The body uses no player colour.
 - **Hat** (`art/samples/hats_std/hat_p1.svg` to `hat_p4.svg`): the big pointed hat with a Spark band and a wide brim, in the player's ramp, drawn over the body.
-- **Blink** (`art/samples/n_dusk/blink.svg`): the closed eyes (Skin with a black line), drawn over the body's eyes. The wizard blinks every 2 to 5 seconds (random) for about 0.15 s, so an idle wizard feels alive.
-- **Idle:** the layers move together by 1 px down and up (a four-step bob at the idle speed in the table below), so no per-frame, per-player strip is needed: the game moves the layers, the art stays still. The blink and the bob are timed in the scene, never in the art.
+- **Blink** (`art/samples/n_dusk/blink.svg`): the closed eyes (Skin with a black line), drawn over the body's eyes. Draw order: body, then blink, then hat (the brim sits above the eyes, so the hat covers the top of the blink). Plan for the redraw task, not yet in the game: the wizard blinks every 2 to 5 seconds (random) for about 0.15 s, so an idle wizard feels alive.
+- **Idle (planned, not yet in the game):** the layers move together by 1 px down and up (a four-step bob at the idle speed in the table below), so no per-frame, per-player strip is needed: the game moves the layers, the art stays still. The blink and the bob are timed in the scene, never in the art.
 
-These files are still samples under `art/samples/`; the wizard in `content/wizard/` and the game still use the earlier placeholder. Moving N into `content/wizard/` (the layers, the four hat files loaded by player index through `core/registry`) is the wizard's redraw task.
+The blink and the bob are neither implemented nor tested yet; the "Move the wizard into style N" task in `docs/NEXT.md` does both. These files are still samples under `art/samples/`; the wizard in `content/wizard/` and the game still use the earlier placeholder. Moving N into `content/wizard/` (the layers, the four hat files loaded by player index through `core/registry`) is the wizard's redraw task.
 
 ## Golden examples
 

@@ -7,7 +7,7 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - **Why:** the owner answered #206 (key `art-direction-pick-3`) with "lets go with N" and asked for animations: an eye blink in idle and something that makes the wizard feel alive.
 - **Done:** N is recorded in `golden.json` and `docs/STYLE.md` (no longer provisional). The enemy, tiles and effects stay as golden examples until redrawn in this style, one area at a time.
 - **Hat: a layer, not a baked sheet.** The hat is its own sprite over the body (four hat files, one per player), the blink a third layer. Reasons: a player colour stays on the hat only; no strip per player per animation (4 players x frames); the blink is one 4-rect file. The cost is three sprites per wizard.
-- **Animation is timed in the scene.** The 1 px bob moves all layers together in four steps at the idle speed; the blink layer shows for about 0.15 s at a random 2 to 5 s per player. This keeps the art to one still per layer. The hand-drawn walk, dodge, cast, hurt and downed sets in N come with the wizard's redraw (BACKLOG).
+- **Animation is timed in the scene.** The 1 px bob moves all layers together in four steps at the idle speed; the blink layer shows for about 0.15 s at a random 2 to 5 s per player. This keeps the art to one still per layer. The hand-drawn walk, dodge, cast, hurt and downed sets in N come with the wizard's redraw (NEXT, "Move the wizard into style N").
 - **Owner-only text:** `docs/DESIGN.md` ("Art direction: not chosen yet") and the "provisional" lines in `ci/smbot/styleguide.py` can't be changed by the bot; asked as an owner question.
 
 ## 2026-10-23: A fifth art direction round (M, N, O), the pick asked again

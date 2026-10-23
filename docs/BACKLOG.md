@@ -4,7 +4,7 @@ Ideas and future work outside the current milestone (docs/PLAN.md, "Planning sys
 
 ## From the art direction pick (style N)
 
-- **Move the wizard into style N (task, later milestone).** Put the body, the four hats and the blink layer under `content/wizard/` and draw them as stacked sprites in `wizard.tscn` (body, hat, blink). Load the four hat files by player index through `core/registry` (never a computed path). The bob moves the layers together by 1 px (four steps at the idle speed); the blink shows `blink.svg` for about 0.15 s every 2 to 5 s at random per player (so four wizards do not blink together). The walk, dodge, cast, hurt and downed sets still need drawing in N (the narrow body has no walk frames yet). Needs `player.gd`'s texture lists changed, so it touches `gameplay/player/`.
+- **Move the wizard into style N:** now a task in `docs/NEXT.md` (M2 part 29).
 - **The Style Guide page still says "provisional" (owner task).** `ci/smbot/styleguide.py` (lines about 140 and 165) says the golden examples are candidates and the rules provisional until the M2 art direction call. `ci/` is owner-only; the text should say the style is chosen (style N). `docs/DESIGN.md` line 56 ("Art direction: Not chosen yet") also needs the chosen style recorded: owner-only too (asked as an owner question).
 
 ## From the web stress frame

@@ -32,7 +32,15 @@
   },
   "panel_problems": [],
   "paused_by_command": false,
-  "pending_instructions": [],
+  "pending_instructions": [
+    {
+      "at": "2026-10-23T14:17:32Z",
+      "kind": "claude",
+      "number": 4,
+      "text": "the beam spell should be a continuous beam that fires as long as the user holds fire, and it should use mana continuously. It can only damage the same enemy x number of times per second - find a good x",
+      "url": "https://github.com/peterdk31/spellmerge/issues/4#issuecomment-6367011007"
+    }
+  ],
   "processed_comments": [
     6241847784,
     6251160604,
@@ -59,7 +67,8 @@
     6361916837,
     6362314527,
     6363198538,
-    6364455955
+    6364455955,
+    6367011007
   ],
   "task_failures": {
     "**Read the first WASM numbers (M2 part 25 follow-up).** (`tests/benchmark/`, `docs/`) Once a daily build has run the web projectile timing and stress steps, read their `BENCH:` lines (or why they failed or timed out; see `docs/DECISIONS.md`, 2026-10-22). Sessions can't read CI logs: the \"Daily run\" post in that day's Daily log quotes them under \"Stress and timing results\" (`gh issue list --label daily-log --state all`, then `gh issue view N --comments`). Then either confirm the limits or lower them. Also read what the per-frame `multimesh.buffer` upload costs there (bolt, rune and orbit batches each hand over the whole cap x 16 floats, up to 192 KB per batch at 3,000); if it is tight, upload only the used slice or size the rune and orbit batches smaller. \"WASM pending\" stays open until then.": {

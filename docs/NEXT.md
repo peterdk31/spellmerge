@@ -6,8 +6,6 @@ The ordered task queue for the current milestone, M2 (its design, [M2-spell-syst
 
 M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97). Each task's details are the matching row and sections of the M2 design. Nothing from M3+ is built (rewards, relics, staffs, rooms, the door rule).
 
-- [ ] **Collect the C2 evidence (M2 part 28, first half).** (`docs/LOG.md`, `docs/DECISIONS.md`) No bug is known and the web stress numbers are not in yet, so gather what the C2 checkpoint issue will need, from `ci/build/build.sh --quick --tests` and the newest daily post: fuzz coverage and frame times (`test_spell_fuzz.gd`), the headless stress numbers, which recipes the bots build, the 21 combos, and what M2 cut or left open (BACKLOG, and the "Carried over from M1" items with their state). Write it as one section "C2 evidence" in `docs/LOG.md`, with the web numbers marked "pending". Fix any bug found on the way. Do not close M2.
-
 - [ ] **Stabilisation and C2 (M2 part 28).** (The evidence task above comes first, and the web stress task in Blocked must be done before M2 closes: no bug is known, and the daily run found nothing to fix on 2026-10-23.) Only bug fixing, polish and performance until no known crash or blocker remains; then the planning session ends M2 with the C2 checkpoint issue (build link, bot data such as fuzz and stress numbers and which recipes bots build, Claude's honest assessment and the C2 question), and development waits for the owner's /go, /iterate or /pivot. **Before closing M2, check the Blocked WASM task:** if a "Daily run" post with "Stress and timing results" exists, move that task back to the Queue and finish it first. **If that task is still waiting** (no post newer than #202 with the `BENCH: frame parts` lines) and the evidence task is done, there is nothing to do yet: answer `nothing_to_do`, do not close M2 and do not write the C2 checkpoint.
 
 ## Blocked
@@ -20,6 +18,8 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
   - **Waits on:** the owner question with key `art-direction-pick-3` (the owner picks from A to I and locks it in `docs/DESIGN.md`; rounds one and two, #190 and #192, were answered with "more options").
 
 ## Done recently
+
+- [x] **Collect the C2 evidence (M2 part 28, first half).** (`docs/LOG.md`) The section "C2 evidence" at the top of `docs/LOG.md` has the fuzz coverage and frame times, the headless stress numbers, the bots' recipes, the 21 combos, the carried-over M1 items with their state, and what M2 cut or left open. Web numbers are marked pending. No bug found; M2 stays open.
 
 - [x] **Time the web stress frame in parts (M2 part 25 follow-up, first half).** (`tests/benchmark/`, `gameplay/feel/`) The stress run prints, per scenario, `BENCH: frame parts` (physics steps per drawn frame, physics and process time, renderer CPU time, draw calls; from the probe) and three `BENCH: stress parts` lines (enemy step, combat status lookups, Feel step; one pass over the crowd). Two web variants run after the web scenario: render loop off and hit particles off (`Feel.particles_enabled`). Headless numbers and the hypothesis are in `docs/DECISIONS.md`; the web numbers come with the next daily run, read by the Queue task above.
 

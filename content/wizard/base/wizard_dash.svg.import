@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://hbfkupil0cts"
-path="res://.godot/imported/wizard_p1_dash.svg-281c5912de4215673382323a9192bf32.ctex"
+uid="uid://cmuly11im31jy"
+path="res://.godot/imported/wizard_dash.svg-8f97db259361d6bd45a52edb694db515.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://content/wizard/base/wizard_p1_dash.svg"
-dest_files=["res://.godot/imported/wizard_p1_dash.svg-281c5912de4215673382323a9192bf32.ctex"]
+source_file="res://content/wizard/base/wizard_dash.svg"
+dest_files=["res://.godot/imported/wizard_dash.svg-8f97db259361d6bd45a52edb694db515.ctex"]
 
 [params]
 

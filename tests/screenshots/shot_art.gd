@@ -12,12 +12,15 @@ const FRAME := 32.0
 
 const FLOOR := preload("res://art/tilesets/crypt/floor.svg")
 const WALL := preload("res://art/tilesets/crypt/wall.svg")
-const IDLE_1 := preload("res://content/wizard/base/wizard_p1_idle.svg")
-const IDLE_2 := preload("res://content/wizard/base/wizard_p2_idle.svg")
-const IDLE_3 := preload("res://content/wizard/base/wizard_p3_idle.svg")
-const IDLE_4 := preload("res://content/wizard/base/wizard_p4_idle.svg")
-const WALK_1 := preload("res://content/wizard/base/wizard_p1_walk.svg")
-const DASH_1 := preload("res://content/wizard/base/wizard_p1_dash.svg")
+const IDLE := preload("res://content/wizard/base/wizard_idle.svg")
+const WALK := preload("res://content/wizard/base/wizard_walk.svg")
+const DASH_STRIP := preload("res://content/wizard/base/wizard_dash.svg")
+const HATS: Array[Texture2D] = [
+	preload("res://content/wizard/base/wizard_hat_p1.svg"),
+	preload("res://content/wizard/base/wizard_hat_p2.svg"),
+	preload("res://content/wizard/base/wizard_hat_p3.svg"),
+	preload("res://content/wizard/base/wizard_hat_p4.svg"),
+]
 const STAFF := preload("res://content/wizard/base/staff.svg")
 const IMP := preload("res://content/enemies/ember_imp/idle.svg")
 const IMP_WINDUP := preload("res://content/enemies/ember_imp/windup.svg")
@@ -45,15 +48,17 @@ func _initialize() -> void:
 	floor_sprite.region_enabled = true
 	floor_sprite.region_rect = Rect2(0, 0, 640, 360)
 	root.add_child(floor_sprite)
-	# Row 1: the wizard's idle (2), walk (4) and dash (3) frames.
+	# Row 1: the wizard's idle (4: open, closed, glance left, glance right), walk (4) and
+	# dash (2) frames, each under player 1's hat.
 	var x: float = 4.0
-	x = _strip(IDLE_1, x, 40.0)
-	x = _strip(WALK_1, x, 40.0)
-	x = _strip(DASH_1, x, 40.0)
+	x = _strip(IDLE, x, 40.0, HATS[0])
+	x = _strip(WALK, x, 40.0, HATS[0])
+	x = _strip(DASH_STRIP, x, 40.0, HATS[0])
 	# Row 2: the four players, the imp, the staff, the bolt and the spark.
 	x = 32.0
-	for texture: Texture2D in [IDLE_1, IDLE_2, IDLE_3, IDLE_4]:
-		_frame(texture, 0, x, 120.0)
+	for hat: Texture2D in HATS:
+		_frame(IDLE, 0, x, 120.0)
+		_frame(hat, 0, x, 120.0)
 		x += FRAME * SCALE
 	x = _strip(IMP, x, 120.0)
 	for texture: Texture2D in [STAFF, BOLT, SPARK]:
@@ -81,10 +86,12 @@ func _initialize() -> void:
 
 
 ## Every frame of a strip, left to right from `x`. Returns the x after the strip.
-func _strip(texture: Texture2D, x: float, y: float) -> float:
+func _strip(texture: Texture2D, x: float, y: float, hat: Texture2D = null) -> float:
 	var frames: int = int(texture.get_width() / FRAME)
 	for i in frames:
 		_frame(texture, i, x, y)
+		if hat != null:
+			_frame(hat, 0, x, y)
 		x += FRAME * SCALE
 	return x + FRAME * 0.5
 

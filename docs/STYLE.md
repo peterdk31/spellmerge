@@ -2,7 +2,7 @@
 
 The art rules for Spellmerge, written so a person, an agent or a script can check an asset against them. The vision is in [DESIGN.md](DESIGN.md) (pillar 4, "Readable chaos"); the plan is in [PLAN.md](PLAN.md) ("Art and music").
 
-**Status: provisional.** Claude drafted this style in M1 so whoever makes art (the bot, or an artist the owner commissions) has something to follow. In M2 the owner picks the final style from Claude's samples; its golden examples are then recorded in `docs/DESIGN.md` and this file is updated to match. Until then these rules are the ones art is reviewed against.
+**Status: chosen, not provisional.** Claude drafted this style in M1; on 2026-10-23 the owner picked the look from Claude's samples: style N, recorded in [DESIGN.md](DESIGN.md) ("Art direction (locked)"). The wizard is drawn in it (`content/wizard/base/`: a narrow dusk robe with a Spark placket, belt and hem, two big tall eyes and no mouth, under a big pointed hat in the player's colour). Everything else is redrawn in the same spirit, one area at a time, over later milestones. These rules are the ones art is reviewed against.
 
 ## The short version
 
@@ -62,7 +62,7 @@ The player colours belong to the players: enemies, props and tiles don't use the
 - A silhouette must read at 1× in solid black. Check it before adding detail.
 - Enemy telegraphs use Fire colours and are larger and brighter than anything else on screen.
 - Colour is never the only signal for who a player is; the HUD adds a number or a shape next to the colour.
-- Player sprites differ only in the player colour ramp. The ramp covers the robe and hat (and the panel and markers); the face and hands use Skin, the staff uses Wood. The same shapes in four colours are fine.
+- Player sprites differ only in the player colour ramp. The ramp covers the hat (and the panel and markers) and nothing else on the wizard: the robe is Stone and Spark for every player, the face and hands use Skin, the staff uses Wood. The hat is its own picture (`wizard_hat_pN.svg`), drawn over one shared body strip.
 - The four player base colours (`#3b73c9`, `#d9477a`, `#3f8f4f`, `#8a4fc4`) are the comparison set: any two must differ clearly in hue, and nothing else on screen may use a colour close to one of them.
 - Floors use only Stone base and light, with Stone shadow only for small inner details. Players and enemies don't use Stone shadow for their own surfaces, so a silhouette doesn't melt into the floor.
 
@@ -72,7 +72,7 @@ One animation is one horizontal strip: frame 1 at the left, each frame 32 px wid
 
 | Animation | Frames | Loops | Speed | Notes |
 | --- | --- | --- | --- | --- |
-| Idle | 4 | yes | 6 fps | Breathing or a small bob; 1 px of movement is enough |
+| Idle | 4 | yes | 6 fps | Poses, not motion: eyes open, eyes closed (the blink), glance left, glance right. The game orders them (a blink every few seconds, a glance now and then) and adds the 1 px breathing bob itself |
 | Walk / move | 6 | yes | 12 fps | Same silhouette height in every frame |
 | Dodge | 4 | no | 16 fps | Reads as a quick roll or dash; the last frame returns to idle |
 | Cast | 4 | no | 16 fps | Frame 3 is the release; the game sends the spell then |
@@ -120,7 +120,7 @@ A minimal valid example, a stone **wall** tile with its lit top-left edge and sh
 
 ## UI
 
-Provisional, like the rest. The HUD (M1 parts 18 and 19) and the Style Guide page build on these.
+The HUD (M1 parts 18 and 19) and the Style Guide page build on these.
 
 - **Font:** one pixel font, set in `hud/theme`, at whole-number sizes only. Body text is Bone light on Stone shadow; headings Bone base; warnings Fire light; gold and pickups Spark light. No other text colours.
 - **Panels:** a 1 px Outline border, Stone shadow fill, a Stone light top and left inner edge (3 shades at most). Corners are cut by one pixel, not rounded.
@@ -130,11 +130,11 @@ Provisional, like the rest. The HUD (M1 parts 18 and 19) and the Style Guide pag
 
 ## Golden examples
 
-Candidates for the pieces the Style Guide page shows as "this is the look". They are the best placeholder art so far, listed with what each one shows in [art/kit/golden.json](../art/kit/golden.json). In M2 the owner's art direction choice confirms or replaces them. Copy their approach, not their pixels.
+The pieces the Style Guide page shows as "this is the look", listed with what each one shows in [art/kit/golden.json](../art/kit/golden.json). The player character is in the chosen style N; the others are the best placeholder art so far and are redrawn in that style over later milestones, when they move here. Copy their approach, not their pixels.
 
 | Kind | File | What to learn from it |
 | --- | --- | --- |
-| Player character | `content/wizard/base/wizard_p1_idle.svg` | Player ramp on robe and hat, Skin face, Wood staff, feet about 2-3 px above the bottom edge |
+| Player character | `art/kit/golden_wizard.svg` (the game's `content/wizard/base/wizard_idle.svg` under `wizard_hat_p1.svg`) | Style N: a narrow Stone robe with a Spark placket, belt and hem, two big tall eyes (2×3 px with a highlight), no mouth, Skin hands, under a hat in the player ramp; feet about 1 px above the bottom edge |
 | Enemy | `content/enemies/ember_imp/idle.svg` | Fire body, Bone horns and Spark eyes, no player colour, a bold silhouette |
 | Raised tile | `art/tilesets/crypt/wall.svg` | Lit top and left edge, shaded bottom and right edge |
 | Flat tile | `art/tilesets/crypt/floor.svg` | Stone base, a few inner details, nothing on the outer edge |

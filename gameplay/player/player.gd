@@ -42,7 +42,9 @@ extends CharacterBody2D
 ##
 ## Animation: the sprite plays an idle, a walk or a dash strip (frames of 32 px
 ## side by side, see docs/STYLE.md); _update_animation() picks it from the speed
-## and the dodge. The staff is drawn above the sprite along the aim.
+## and the dodge. The body has no player colour; the hat is a second sprite in it
+## (`Hat`), moved with the body's bob. The idle blinks, glances and breathes
+## (IDLE_SEQUENCE, BREATH_STEPS). The staff is drawn above the sprite along the aim.
 ##
 ## Dash look: during a dodge the sprite stretches and leans along the dash and
 ## fading ghosts of it trail behind (drawn in _draw; no nodes or arrays made).
@@ -121,9 +123,23 @@ const GHOST_ALPHAS: Array[float] = [0.45, 0.28, 0.14]
 ## width divided by it. Idle and walk loop; the dash plays once and holds its
 ## last frame. The art shows the poses only; the speeds are set here.
 const FRAME_SIZE: int = 32
-const IDLE_FPS: float = 2.0
+const IDLE_FPS: float = 6.0
 const WALK_FPS: float = 8.0
 const DASH_FPS: float = 16.0
+## The idle strip has four poses: 0 eyes open, 1 eyes closed, 2 glance left, 3 glance
+## right. IDLE_SEQUENCE says which one shows at each idle step (8 s, then it loops):
+## a blink, a glance left, a double blink and a glance right, so the wizard looks alive.
+const IDLE_SEQUENCE: Array[int] = [
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0,
+	0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 3, 3, 3, 3,
+]
+## Breathing: for the second half of every BREATH_STEPS idle steps the body sits 1 px lower.
+const BREATH_STEPS: int = 12
+## How many pixels the body (and the hat) sit lower on each frame of the walk, and
+## on each frame of the dash (a crouch, then lifted off the ground; the shadow stays).
+const WALK_BOB: Array[int] = [1, 0, 1, 0]
+const DASH_BOB: Array[int] = [1, -2]
 ## Pixels per second above which the wizard counts as walking.
 const WALK_THRESHOLD: float = 10.0
 ## Where the hand is on staff.svg (its pivot), in pixels from the corner.
@@ -162,14 +178,19 @@ const LAYER_PLAYERS: int = 2
 ## The player index 0-3.
 @export var index: int = 0
 
-## One idle texture per player index (the player colour). The scene lists the four
-## textures; _ready() shows the one for `index` on the `Sprite` node.
+## One idle strip per player index. The scene lists the four strips (the body has no
+## player colour, so they can be the same file); _ready() shows the one for `index` on
+## the `Sprite` node.
 @export var textures: Array[Texture2D] = []
 
 ## The walk and dash strips, one per player index like `textures`. An empty
 ## list (or a missing index) keeps the idle strip.
 @export var walk_textures: Array[Texture2D] = []
 @export var dash_textures: Array[Texture2D] = []
+
+## The hat, one 32x32 picture per player index: the only part in the player colour.
+## It is drawn by the `Hat` node under `Sprite`, which follows the body's bob.
+@export var hat_textures: Array[Texture2D] = []
 
 ## The staff, drawn from the hand along the aim; pointing right, hand at STAFF_PIVOT.
 ## Without it a plain line is drawn.
@@ -218,6 +239,8 @@ var _aim_hold_left: float = 0.0
 var _drawn_aim: Vector2 = Vector2.ZERO
 ## The `Sprite` node (null in bare-script tests) and which way it is turned.
 var _sprite: Sprite2D = null
+## The `Hat` node under `Sprite` (null without one).
+var _hat: Sprite2D = null
 var _faces_left: bool = false
 ## True while the dash look is applied (to redraw and to reset it once).
 var _dash_look: bool = false
@@ -272,6 +295,10 @@ func apply_texture() -> void:
 	_anim = Anim.IDLE
 	_anim_time = 0.0
 	_show_strip(textures[index])
+	_hat = _sprite.get_node_or_null("Hat") as Sprite2D
+	if _hat != null and index < hat_textures.size():
+		_hat.texture = hat_textures[index]
+	_set_bob(0)
 
 
 ## Show a strip on the sprite from its first frame.
@@ -320,8 +347,20 @@ func _update_animation(delta: float) -> void:
 	var step_index: int = int(_anim_time * fps)
 	if _anim == Anim.DASH:
 		_sprite.frame = mini(step_index, _sprite.hframes - 1)
-	else:
+		_set_bob(DASH_BOB[mini(_sprite.frame, DASH_BOB.size() - 1)])
+	elif _anim == Anim.WALK:
 		_sprite.frame = step_index % _sprite.hframes
+		_set_bob(WALK_BOB[_sprite.frame % WALK_BOB.size()])
+	else:
+		_sprite.frame = mini(IDLE_SEQUENCE[step_index % IDLE_SEQUENCE.size()], _sprite.hframes - 1)
+		_set_bob(1 if step_index % BREATH_STEPS >= BREATH_STEPS / 2 else 0)
+
+
+## Sit the body `pixels` lower than its place (the hat goes with it), or higher if negative.
+func _set_bob(pixels: int) -> void:
+	_sprite.offset = Vector2(0.0, float(pixels))
+	if _hat != null:
+		_hat.position = Vector2(0.0, float(pixels))
 
 
 func _ready() -> void:
@@ -538,6 +577,8 @@ func _refresh_look() -> void:
 		_faces_left = false
 	if _sprite != null:
 		_sprite.flip_h = _faces_left
+		if _hat != null:
+			_hat.flip_h = _faces_left
 	var dashing: bool = is_dodging() and not _downed
 	if dashing or _dash_look:
 		_apply_dash_look(dashing)
@@ -667,7 +708,10 @@ func _draw_ghosts() -> void:
 	for i in GHOST_ALPHAS.size():
 		var at: Vector2 = _sprite.position + _trail[i] - global_position
 		draw_set_transform(at, lean, Vector2(flip * stretch.x, stretch.y))
-		draw_texture_rect_region(texture, Rect2(-size * 0.5, size), source, Color(tint, GHOST_ALPHAS[i]))
+		var shade: Color = Color(tint, GHOST_ALPHAS[i])
+		draw_texture_rect_region(texture, Rect2(-size * 0.5 + _sprite.offset, size), source, shade)
+		if _hat != null and _hat.texture != null:
+			draw_texture_rect_region(_hat.texture, Rect2(-size * 0.5 + _hat.position, size), Rect2(Vector2.ZERO, size), shade)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 

@@ -9,6 +9,7 @@
     "number": 202
   },
   "errors_in_a_row": 0,
+  "idle": null,
   "intake_tasks": {
     "208": {
       "author": "Brianmanden",
@@ -59,7 +60,8 @@
     6362314527,
     6363198538,
     6364455955,
-    6367011007
+    6367011007,
+    6368586228
   ],
   "task_failures": {
     "**Read the first WASM numbers (M2 part 25 follow-up).** (`tests/benchmark/`, `docs/`) Once a daily build has run the web projectile timing and stress steps, read their `BENCH:` lines (or why they failed or timed out; see `docs/DECISIONS.md`, 2026-10-22). Sessions can't read CI logs: the \"Daily run\" post in that day's Daily log quotes them under \"Stress and timing results\" (`gh issue list --label daily-log --state all`, then `gh issue view N --comments`). Then either confirm the limits or lower them. Also read what the per-frame `multimesh.buffer` upload costs there (bolt, rune and orbit batches each hand over the whole cap x 16 floats, up to 192 KB per batch at 3,000); if it is tight, upload only the used slice or size the rune and orbit batches smaller. \"WASM pending\" stays open until then.": {
@@ -83,9 +85,7 @@
       "parked_until": "2026-10-24T05:29:12Z"
     },
     "**Record the chosen art direction (M2 part 27 follow-up).** Replace the golden example candidates in `art/kit/golden.json` and `docs/STYLE.md` with the chosen style's files, and say in `docs/STYLE.md` that the style is no longer provisional. Redrawing the placeholders in that style is spread over later milestones (M2 design, \"Art and the art direction\"), one area at a time.": {
-      "count": 2,
-      "parked_reason": "the final review didn't approve it 2 times in a row",
-      "parked_until": "2026-10-24T11:16:25Z",
+      "count": 0,
       "pr": "219",
       "problems": "- The body says \"Refs #206. This PR does not close it, because the blink and the bob are not in the game yet.\" The last line is `Closes #206`. Merging would auto-close the issue and tell the owner it is done, while the blink and bob are only queued as NEXT part 29. Fix: Delete the trailing `Closes #206` line so the PR only refs the issue. If the owner's pick on #206 should be closed out on merge, say so in the body instead."
     },

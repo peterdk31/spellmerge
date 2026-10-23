@@ -4,6 +4,7 @@ What each run did, newest first. Claude appends a short entry after each develop
 
 ## 2026-10-23
 
+- Wave and break lines under four builders (polish). Both lines moved into one strip in the middle of the view, in the 18 px gap between the top and bottom builders (they end at y 171 and start at 189 at 640x360). The gap fits about 17 px of text, so "Wave N" went from 16 to 12 px. Looked at the 1x shots: both readable beside the builders, nothing covered. New test checks both rectangles against all builders and panels.
 - Reactions walkthrough (M2 part 8, polish). `shot_reactions.gd` now makes all six reactions by two real bolts each in the combo arena and replays them into the live game, three at a time (feel keeps four reaction flashes live), at 1x and 4x. Looked at the 1x crops: the flashes were the gold spark art tinted, so blue came out olive and violet brown; Shatter, Thaw and Stillness were three pale blues, Kindle and Flare two oranges. Fixed in one pass (flat-colour shader for reaction flashes, six far-apart colours) and looked again: six colours and six names read apart. Tests: colours differ, flash uses the shader. Rest in BACKLOG.
 
 ## 2026-10-22

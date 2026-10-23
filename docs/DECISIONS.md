@@ -1146,3 +1146,8 @@ An independent review of the branch found these, all fixed with a regression tes
 
 **Context:** Only the stabilisation task was left, and the daily run found no bug (`build.sh --quick --tests` passes, 4-bot p95 7.7 ms). M2's done-when item 3 (stress within budget on web) still has no WASM numbers: no "Daily run" post with "Stress and timing results" exists as of the 2026-10-23 daily log (#202). The art direction pick (#206) is open; nothing waits on it.
 **Decision:** M2 stays in progress and no C2 issue is opened: closing it with the web numbers unread would put an unchecked done-when item in front of the owner. Two polish tasks go first (the wave and break lines hidden under four builders, a quick view walkthrough as the re-examination of part 18), so sessions have useful work while the next daily build runs. If the numbers still do not appear after a few more daily builds, the next planning run should ask the owner whether the web stress step runs.
+
+## 2026-10-23: the wave and break lines go in the gap between the builders
+
+- **Why:** four open builders leave 20 px at the top middle, so "Wave N" was hidden and "Build N" covered a builder's top row (this reverses the earlier "break line is drawn over the builders" choice).
+- **Now:** one strip at the screen centre holds both lines side by side, in the 18 px gap between the top builders (end y 171) and the bottom ones (start y 189). Narrowing the builders by 10 px was not chosen: it costs builder width, and the gap is free. The gap fits about 17 px of text, so the wave line is 12 px (was 16) with a 3 px outline. Cost: during a wave the line sits in the middle of the arena, small and outlined. If it hides play, the "Wave announcement" backlog item can move or fade it.

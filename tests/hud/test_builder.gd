@@ -501,6 +501,33 @@ func test_four_open_builders_fit_the_screen_without_covering_anything() -> void:
 			check(not rects[i].intersects(rects[j]), "%s and %s do not overlap, got %s and %s" % [names[i], names[j], rects[i], rects[j]])
 
 
+func test_the_wave_and_break_lines_stay_clear_of_four_open_builders() -> void:
+	_start(4)
+	root.size = Vector2i(640, 360)
+	_bus.wave_started.emit(2)
+	_bus.room_cleared.emit(&"test_room")
+	_bus.build_break_started.emit(20.0)
+	for player in 4:
+		_open(player)
+	for player in 4:
+		_choose(player, BuilderScript.SLOT_FIRST_MODIFIER, "Split")
+		_press(player, _builder(player).slot_button(BuilderScript.SLOT_FIRST_MODIFIER))
+	await process_frame
+	await process_frame
+	var screen := Rect2(0, 0, 640, 360)
+	var lines: Dictionary = {"wave line": _hud.get_wave_label(), "break line": _hud.get_break_row()}
+	for line_name: String in lines:
+		var line: Control = lines[line_name]
+		check(line.visible, "the %s shows during the break" % line_name)
+		var rect: Rect2 = line.get_global_rect()
+		check(rect.size.x > 0.0 and rect.size.y > 0.0, "the %s has a size after layout" % line_name)
+		check(screen.encloses(rect), "the %s is inside the 640x360 view, got %s" % [line_name, rect])
+		for player in 4:
+			check(not rect.intersects(_builder(player).get_global_rect()), "the %s does not overlap builder %d, got %s and %s" % [line_name, player + 1, rect, _builder(player).get_global_rect()])
+			check(not rect.intersects(_hud.get_panel(player).get_global_rect()), "the %s does not overlap panel %d" % [line_name, player + 1])
+	check(not _hud.get_wave_label().get_global_rect().intersects(_hud.get_break_row().get_global_rect()), "the two lines do not overlap each other")
+
+
 func test_a_builder_stays_on_its_owners_side_of_the_screen() -> void:
 	_start(4)
 	root.size = Vector2i(640, 360)

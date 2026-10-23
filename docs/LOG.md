@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-23: M2 closed for the C2 checkpoint (planning)
+
+The queue was empty. The 13:29 UTC daily run shows the web physics step at 7.58 ms (max 11.10) with one step per frame at the cap of 500, so the Blocked web stress task is answered (docs/DECISIONS.md) and nothing was changed in the limits. M2 is marked done in the roadmap; the C2 checkpoint issue follows from this PR. The web run with rendering still warns (p95 56 ms) in the GPU-less CI browser.
+
 ## 2026-10-23: The beam is held (owner `/claude` on #4)
 
 The beam now ticks while fire is held: cooldown 0.25 s (4 hits a second on one enemy), 3 damage and 4 mana a tick (16 mana a second, against 10 regenerated); the drawn beam lasts 0.25 s (one tick, so beams do not stack). New test in `test_forms.gd`. `build.sh --quick --tests` passes.

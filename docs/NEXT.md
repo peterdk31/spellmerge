@@ -6,13 +6,17 @@ The ordered task queue for the current milestone, M2 (its design, [M2-spell-syst
 
 M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97). Each task's details are the matching row and sections of the M2 design. Nothing from M3+ is built (rewards, relics, staffs, rooms, the door rule).
 
-- [ ] **Stabilisation and C2 (M2 part 28).** (The evidence task is done; its section "C2 evidence" is in `docs/LOG.md`. The web stress check in Blocked must be done before M2 closes: the web cap went to 500 on 2026-10-23 and the next daily run has to show the step under budget.) Only bug fixing, polish and performance until no known crash or blocker remains; then the planning session ends M2 with the C2 checkpoint issue (build link, bot data such as fuzz and stress numbers and which recipes bots build, Claude's honest assessment and the C2 question), and development waits for the owner's /go, /iterate or /pivot. **Before closing M2, check the Blocked WASM task:** if a "Daily run" post newer than 11:23 UTC on 2026-10-23 with "Stress and timing results" exists, move that task back to the Queue and finish it first. **If that task is still waiting** (no such post with the `BENCH: frame parts` lines), there is nothing to do yet: answer `nothing_to_do`, do not close M2 and do not write the C2 checkpoint.
+M2 is done and waits for the owner's verdict at C2 (`/go`, `/iterate <what>` or `/pivot <how>`). Until then the queue is empty on purpose: the next milestone's design and tasks are written only after `go`; an `iterate` adds rework tasks here.
 
 ## Blocked
 
-- [ ] **Check the web stress run after the cap of 500 (M2 part 25 follow-up).** (`core/spells/limits.gd`, `docs/DECISIONS.md`) When a "Daily run" post newer than the 11:23 UTC one of 2026-10-23 in #202 has the web `BENCH: frame parts` lines, read them: the web physics step should be clearly under 16.7 ms (the threshold is 12 ms or less; the expected value is about 11 ms) with steps per frame near 1. Between 12 and 16.7 ms, or over, lower `MAX_SHOTS` and `MAX_FIRES_PER_STEP`, then make the per-enemy step cheaper. Write the result in DECISIONS. **The stabilisation task must not close M2 or write the C2 checkpoint before this is done.**
-  - **Waits on:** the next daily run after the change (a "Daily run" post newer than 11:23 UTC on 2026-10-23 with the `BENCH: frame parts` lines).
+(none)
+
 ## Done recently
+
+- [x] **Stabilisation and C2 (M2 part 28), second half.** The web stress run after the cap of 500 was read (13:29 UTC daily run): physics step 7.58 ms avg, one step per frame, so the limits stay (DECISIONS, 2026-10-23). No known crash or blocker is left; the planning session marked M2 done and opened the C2 checkpoint.
+
+- [x] **Check the web stress run after the cap of 500 (M2 part 25 follow-up).** Read in the planning session: see the DECISIONS entry "The web stress run after the cap of 500 is read".
 
 - [x] **Read the web stress parts (M2 part 25 follow-up; owner `/claude` on #4 moved it to the top of the Queue).** (`core/projectiles/`, `tests/benchmark/`, `docs/DECISIONS.md`) The Daily run post in #202 (11:23 UTC) has the web `BENCH: frame parts` and `stress parts` lines. The hypothesis holds: the web physics step is 14.3 ms on average (21.4 max) with the render loop off, so the engine catches up with extra steps; the enemy and combat passes are under 1 ms and Feel's step 0.05 ms. `DEFAULT_CAP_WEB` went from 1,000 to 500, and the web stress scenarios follow it. The next daily web run shows whether the step is clearly under 16.7 ms; if not, `MAX_SHOTS` and `MAX_FIRES_PER_STEP` are next. Details in DECISIONS.
 

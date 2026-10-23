@@ -6,8 +6,6 @@ The ordered task queue for the current milestone, M2 (its design, [M2-spell-syst
 
 M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97). Each task's details are the matching row and sections of the M2 design. Nothing from M3+ is built (rewards, relics, staffs, rooms, the door rule).
 
-- [ ] **Quick view walkthrough (re-examination of M2 part 18, polish).** (`hud/`, `tests/screenshots/`) Play the real input flow of a wave with one and four players: the builder folding into the quick view on `wave_started`, "Drop component", swap, and unfolding on `room_cleared`. Staged shots at 1x and 4x, one fix pass for what reads badly (text size, what the active-spell corner shows, focus after the fold), the rest to BACKLOG with reasons in DECISIONS. Include the disabled-slot hint from BACKLOG ("No hint on a disabled slot or button") if it fits the session; if done, remove that BACKLOG entry.
-
 - [ ] **Stabilisation and C2 (M2 part 28).** (The two polish tasks above come first: no bug is known, and the daily run found nothing to fix on 2026-10-23.) Only bug fixing, polish and performance until no known crash or blocker remains; then the planning session ends M2 with the C2 checkpoint issue (build link, bot data such as fuzz and stress numbers and which recipes bots build, Claude's honest assessment and the C2 question), and development waits for the owner's /go, /iterate or /pivot. **Before closing M2, check the Blocked WASM task:** if a "Daily run" post with "Stress and timing results" exists, move that task back to the Queue and finish it first.
 
 ## Blocked
@@ -19,6 +17,8 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
   - **Waits on:** the owner question with key `art-direction-pick-3` (the owner picks from A to I and locks it in `docs/DESIGN.md`; rounds one and two, #190 and #192, were answered with "more options").
 
 ## Done recently
+
+- [x] **Quick view walkthrough (re-examination of M2 part 18, polish).** (`hud/`, `tests/screenshots/`) `shot_quick.gd` walks a wave with one and four players by real input (break with full builders, `wave_started` folds, close/swap/reopen, Drop component, `room_cleared` unfolds; shots `walk_*`, each at 1x and a 4x crop of P1's quarter). One fix pass: folding left the "> " mark on the form slot beside "> Drop component", and with nothing to drop focus went to a greyed button (now Close). Tests in `test_quick.gd`. The rest, and why the disabled-slot hint waits, is in BACKLOG and DECISIONS.
 
 - [x] **Wave and break lines under four open builders (polish, from the builder walkthrough).** (`hud/panels/`, `tests/hud/`) Both lines now share one strip (`Root/Strip`) in the 18 px gap between the top and the bottom builders, "Wave N" left and the hammer and "Build N" right; neither covers a builder. Test: `test_the_wave_and_break_lines_stay_clear_of_four_open_builders`; the shots `builder_four_players_wave` and `builder_four_players_break_again` show them.
 

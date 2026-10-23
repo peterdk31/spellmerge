@@ -366,7 +366,8 @@ def prepare(cfg: config_mod.Config, st: dict[str, Any], focus: str, today: dt.da
         "PREVIOUS": previous or "(first attempt)",
         "BRANCH": branch,
     })
-    return {"prompt": prompt, "branch": branch, "task": task or "", "kind": kind}
+    return {"prompt": prompt, "branch": branch, "task": task or "", "kind": kind,
+            "picked": picked(task or "", kind, st.get("pending_instructions", []))}
 
 
 def prepare_plan(cfg: config_mod.Config, st: dict[str, Any], focus: str, today: dt.date,
@@ -390,7 +391,8 @@ def prepare_plan(cfg: config_mod.Config, st: dict[str, Any], focus: str, today: 
         prompt += (f"\n\nPR #{existing['number']} from an earlier planning session didn't merge. Continue it on "
                    f"`{branch}`: `git fetch origin {branch} && git switch {branch}`, merge `origin/main`, read its "
                    f"review with `gh pr view {existing['number']} --comments`, and fix what it says.")
-    return {"prompt": prompt, "branch": branch, "task": "Planning", "kind": "plan"}
+    return {"prompt": prompt, "branch": branch, "task": "Planning", "kind": "plan",
+            "picked": picked("Planning", "plan", [], weekly_run)}
 
 
 def review_prompt(cfg: config_mod.Config, pr: int, sha: str, round_: str) -> str:
@@ -514,6 +516,16 @@ UNFINISHED = ("**Unfinished:** the session stopped before it was done ({reason})
 def task_title(task: str) -> str:
     m = re.match(r"\*\*(.+?)\*\*", task.strip())
     return (m.group(1) if m else task.strip()).rstrip(".")[:150] or "Claude's work"
+
+
+def picked(task: str, kind: str, pending: list[dict[str, Any]], weekly: bool = False) -> str:
+    """What a session works on, in one line: first in its run's log and in its Daily log post."""
+    if kind == "plan":
+        return "Picked: weekly planning" if weekly else "Picked: planning"
+    asks = ", ".join(f"`/{p['kind']}` on #{p['number']}" for p in pending)
+    if task:
+        return f"Picked: {task_title(task)}" + (f", with the owner's {asks}" if asks else "")
+    return f"Picked: the owner's {asks} (no task in the queue)" if asks else "Picked: nothing, the queue is empty"
 
 
 def workflow_changes(tip: str, bases: list[str]) -> list[str]:
@@ -729,8 +741,10 @@ def finish(cfg: config_mod.Config, env: dict[str, str]) -> dict[str, str]:
     handed_back: list[str] = []
     was_idle: list[bool] = []
     kept: list[int] = []  # issues whose `/claude` instruction a blocked session handed on
+    pending: list[dict[str, Any]] = []  # the owner instructions this session had, before they're cleared
 
     def apply(s: dict[str, Any]) -> None:
+        pending[:] = list(s.get("pending_instructions", []))
         failures = s.setdefault("task_failures", {})
         if planning:
             s["last_plan"] = pacing.iso(now)
@@ -801,10 +815,11 @@ def finish(cfg: config_mod.Config, env: dict[str, str]) -> dict[str, str]:
 
     what = (pr_title(cfg, pr) or task_title(task)) if (pr or task) else "owner instructions"
     said = dailylog.shorten(env.get("IMPLEMENT_SUMMARY", ""), 300)
+    lines.append(picked(task, env.get("TASK_KIND", ""), pending, env.get("WEEKLY") == "true"))
     if merged:
         lines.append(f"Merged #{pr}: {what}")
     elif env.get("TASK_KIND") == "plan" and status == "nothing_to_do":
-        lines.append("Planning: no plan changes needed")
+        lines.append(f"Planning: no plan changes needed. {said}".strip())
     elif status == "blocked":
         if kept:
             lines.append(f"Blocked: {what}. {said} The owner's `/claude` instruction on "
@@ -923,6 +938,11 @@ def main(argv: list[str] | None = None) -> int:
                prepare(cfg, st, os.environ.get("FOCUS", ""), today, sync=sync_with_main))
         schema = MAINTAINER / "schemas" / ("plan.json" if args.mode == "plan" else "session.json")
         out["schema"] = json.dumps(json.loads(schema.read_text()), separators=(",", ":"))
+        what = out.pop("picked")
+        print(what)  # first, so the run's log says what this session works on
+        if summary := os.environ.get("GITHUB_STEP_SUMMARY"):
+            with open(summary, "a") as fh:
+                fh.write(f"{what}\n\n")
         write_outputs(out)
     elif args.cmd == "account":
         write_outputs({"status": account(cfg, args.file, args.kind, args.step_failed)})

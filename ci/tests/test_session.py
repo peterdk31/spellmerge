@@ -110,6 +110,7 @@ class PromptTest(unittest.TestCase):
         st["pending_instructions"] = [{"kind": "ask", "text": "how is it going?", "number": 9, "url": "u"}]
         with mock.patch.object(session.gh, "api", return_value=[]):
             out = session.prepare(CFG, st, "bugs first", dt.date(2026, 10, 17))
+        self.assertEqual(out["picked"], "Picked: Area READMEs for the content areas, with the owner's `/ask` on #9")
         self.assertIn("Area READMEs for the content areas", out["prompt"])
         self.assertIn("`/ask` on #9", out["prompt"])
         self.assertIn("bugs first", out["prompt"])
@@ -136,6 +137,12 @@ class PromptTest(unittest.TestCase):
                 mock.patch.object(session.inbox, "answered_keys", lambda cfg, st: set()), \
                 mock.patch.object(session.nexttask, "blocked", lambda text: {FIXTURE_TASK: {"some-key"}}):
             self.assertNotIn("owner question(s)", session.prepare(CFG, st, "", dt.date(2026, 10, 22))["prompt"])
+
+    def test_picked_names_the_task_the_instructions_or_planning(self) -> None:
+        claude = [{"kind": "claude", "number": 4}]
+        self.assertEqual(session.picked("", "next", claude), "Picked: the owner's `/claude` on #4 (no task in the queue)")
+        self.assertEqual(session.picked("", "next", []), "Picked: nothing, the queue is empty")
+        self.assertEqual(session.picked("Planning", "plan", claude, weekly=True), "Picked: weekly planning")
 
     def test_prepare_plan_builds_the_planning_prompt(self) -> None:
         """A parameter named `weekly` once hid the weekly module, so every planning session crashed."""
@@ -243,10 +250,25 @@ class FinishTest(unittest.TestCase):
         self.run_finish(copy.deepcopy(state.DEFAULT), ["B"], posts, PR="5", FINAL_REVIEW=self.APPROVE, MERGED="true")
         self.run_finish(copy.deepcopy(state.DEFAULT), ["A", "B"], posts, IMPLEMENT_STATUS="blocked",
                         TASK="**Do the thing.** With a long description", IMPLEMENT_SUMMARY="It waits. " * 100)
-        self.assertEqual(posts[0][0], "Merged #5: Title of #5")
-        self.assertTrue(posts[1][0].startswith("Blocked, set aside for a week: Do the thing. It waits."))
-        self.assertLess(len(posts[1][0]), 400)
-        self.assertTrue(posts[1][0].endswith("It waits."))
+        self.assertEqual(posts[0][1], "Merged #5: Title of #5")
+        self.assertTrue(posts[1][1].startswith("Blocked, set aside for a week: Do the thing. It waits."))
+        self.assertLess(len(posts[1][1]), 400)
+        self.assertTrue(posts[1][1].endswith("It waits."))
+
+    def test_each_post_starts_with_what_the_session_picked(self) -> None:
+        posts: list = []
+        st = copy.deepcopy(state.DEFAULT)
+        st["pending_instructions"] = [{"kind": "claude", "text": "make the beam continuous", "number": 4, "url": "u"}]
+        self.run_finish(st, ["B"], posts, TASK="", PR="5", FINAL_REVIEW=self.APPROVE, MERGED="true")
+        self.run_finish(copy.deepcopy(state.DEFAULT), ["A", "B"], posts, TASK="**Do the thing.** More text",
+                        PR="6", FINAL_REVIEW=self.APPROVE, MERGED="true")
+        self.run_finish(copy.deepcopy(state.DEFAULT), ["B"], posts, TASK="Planning", TASK_KIND="plan",
+                        IMPLEMENT_STATUS="nothing_to_do", IMPLEMENT_SUMMARY="It waits on the web bench numbers.")
+        self.assertEqual(posts[0][:2], ["Picked: the owner's `/claude` on #4 (no task in the queue)",
+                                        "Merged #5: Title of #5"])
+        self.assertEqual(posts[1][0], "Picked: Do the thing")
+        self.assertEqual(posts[2][:2], ["Picked: planning",
+                                        "Planning: no plan changes needed. It waits on the web bench numbers."])
 
     def test_the_log_shows_the_prs_screenshots(self) -> None:
         extras: list = []

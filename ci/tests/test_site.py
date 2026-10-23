@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 import zipfile
@@ -29,6 +30,35 @@ class ContributePageTest(unittest.TestCase):
         contribute.parse_progress(current, (ROOT / "docs/milestones/M0-foundation.md").read_text())
         self.assertEqual(current.parts_total, 7)
         self.assertGreater(current.checks_total, 10)
+
+    def test_parts_done_come_from_next_and_log(self) -> None:
+        """M1 and M2's parts tables have no status column: the bar stayed at 0 for two milestones."""
+        design = ("| # | Part | Delivers |\n| --- | --- | --- |\n"
+                  "| 1 | a | x |\n| 2 | b | x |\n| 3 | c | x |\n| 4 | d | x |\n")
+        next_md = ("- [ ] **Stabilisation (M2 part 4).** open\n"
+                   "- [x] **Follow-up (M2 part 3 follow-up).** not the part itself\n"
+                   "- [x] **Base classes (M2 part 1).** done\n"
+                   "- [x] **Old milestone (M1 part 2).** another milestone\n")
+        log_md = "## 2026-10-22: Events (M2 part 2)\n\nSee (M2 part 3) in passing.\n"
+        m = contribute.parse_progress(contribute.Milestone(code="M2"), design, next_md, log_md)
+        self.assertEqual((m.parts_done, m.parts_total), (2, 4))
+
+    def test_recently_merged_is_newest_merge_first(self) -> None:
+        """Search sorted by update time: a comment after the merge moved an old PR to the top."""
+        prs = [{"title": "old, commented today", "url": "u1", "mergedAt": "2026-10-20T10:00:00Z"},
+               {"title": "newest", "url": "u2", "mergedAt": "2026-10-23T09:00:00Z"},
+               {"title": "middle", "url": "u3", "mergedAt": "2026-10-22T09:00:00Z"}]
+        with mock.patch.object(contribute.gh, "run", return_value=json.dumps(prs)), \
+                mock.patch.object(contribute.gh, "api", side_effect=contribute.gh.GhError("x")), \
+                mock.patch.object(contribute.gh, "api_paginated", side_effect=contribute.gh.GhError("x")):
+            data = contribute.gather(config.load(), ROOT)
+        self.assertEqual([p["title"] for p in data.merged or []], ["newest", "middle", "old, commented today"])
+
+    def test_no_checks_bar_without_a_checklist(self) -> None:
+        data = contribute.PageData(current=contribute.Milestone("M2", "Spells", parts_done=3, parts_total=4))
+        page = contribute.render(config.load(), data, "v0.1", "nightly", "v0.0")
+        self.assertIn("3 of 4 (75%)", page)
+        self.assertNotIn("Checks passed", page)
 
     def test_render_escapes_and_handles_missing_data(self) -> None:
         data = contribute.PageData(merged=[{"title": "<script>x</script>", "url": "https://x", "author": "a"}])

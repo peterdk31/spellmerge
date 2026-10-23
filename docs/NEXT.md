@@ -6,8 +6,6 @@ The ordered task queue for the current milestone, M2 (its design, [M2-spell-syst
 
 M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97). Each task's details are the matching row and sections of the M2 design. Nothing from M3+ is built (rewards, relics, staffs, rooms, the door rule).
 
-- [ ] **Reactions walkthrough (re-examination of M2 part 8, polish).** (`gameplay/feel/`, `tests/screenshots/`) Already looked at (LOG, M2 part 8): `tests/screenshots/shot_reactions.gd` sends `reaction_triggered` by hand for four reactions (shatter, thaw, flare, rift); the name and flash read clearly at 1 and 4 players. Not yet looked at: kindle and stillness at all, and any of the six produced by real hits (frost then fire, and so on) in the combo arena. C2 asks whether combos are surprising, so extend `shot_reactions.gd` (do not add a second script) to stage each of the six by real hits and look at the 1x crops. Done when each reaction's flash colour and name can be told apart from the other five at 1x (pillar 4), and the 1x crops were looked at again after the changes. At most two fix passes; anything left goes to `docs/BACKLOG.md`. Record what was weak and what changed in `docs/DECISIONS.md`. Test the changes.
-
 - [ ] **Stabilisation and C2 (M2 part 28).** Only bug fixing, polish and performance until no known crash or blocker remains; then the planning session ends M2 with the C2 checkpoint issue (build link, bot data such as fuzz and stress numbers and which recipes bots build, Claude's honest assessment and the C2 question), and development waits for the owner's /go, /iterate or /pivot. **Before closing M2, check the Blocked WASM task:** if a "Daily run" post with "Stress and timing results" exists, move that task back to the Queue and finish it first.
 
 ## Blocked
@@ -19,6 +17,8 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
   - **Waits on:** the owner question with key `art-direction-pick-3` (the owner picks from A to I and locks it in `docs/DESIGN.md`; rounds one and two, #190 and #192, were answered with "more options").
 
 ## Done recently
+
+- [x] **Reactions walkthrough (re-examination of M2 part 8, polish).** (`gameplay/feel/`, `tests/screenshots/`) `shot_reactions.gd` stages all six reactions by two real bolts each in the combo arena and replays them into the live game (shots `reactions_first_three_*` and `reactions_last_three_*`, 1x and 4x). Weak: the flash was the gold spark art tinted (wrong colours) and three reactions were pale blues, two were oranges. One fix pass: a flat-colour flash shader and six far-apart colours; 1x crops looked at again. Left over is in BACKLOG; reasons in DECISIONS.
 
 - [x] **Builder walkthrough with four players (re-examination of M2 parts 16-18, polish).** (`hud/builder/`, `tests/screenshots/`) Walked the real input flow for one and four players (`shot_builder.gd`, three new shots). The builder opens on the form slot, "Close" follows the tabs, tabs and held levels land on the form slot, a form or element in an empty slot moves on to the next bag (form + element: four presses, was nine), and the refusal texts say what to do ("Pick a form (F) first.", "Too complex: 13 of 12. Remove one."). Still awkward (mouse, wave line under four builders, modifiers, disabled-slot hints) is in `docs/BACKLOG.md`, "From M2 part 29"; see `docs/DECISIONS.md`.
 

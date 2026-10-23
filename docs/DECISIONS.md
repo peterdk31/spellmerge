@@ -2,6 +2,12 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-23: Reaction flashes are flat colour, and the six colours are far apart
+
+- **Weak (six reactions made by real hits, looked at at 1x).** The flash was the gold spark art with the reaction's colour multiplied in, so it came out wrong (Stillness olive, Rift brown) and not the colour of the name above it. The palette was also close: Shatter, Thaw and Stillness were three pale blue-greys, Kindle and Flare two oranges.
+- **Now.** Reaction flashes use `reaction_flash.gdshader` (the art's shape in the plain tint). `reaction_colors` are ice white (Shatter), green (Thaw), yellow (Flare), red (Kindle), blue (Stillness) and violet (Rift); a test keeps every pair at least 0.45 apart in RGB. One fix pass was enough; the 1x crops were looked at again afterwards.
+- **Left (BACKLOG).** All six flashes share one shape, so apart from the name only colour tells them apart; red and blue names are dim on the dark floor; feel keeps four reaction flashes at once.
+
 ## 2026-10-22: Multimesh batches are sized by use, not cut mid-buffer
 
 - **Why.** `MultiMesh.buffer` must hold exactly instance_count x 16 floats, so a partial upload is not possible; the only way to send less is a smaller MultiMesh.

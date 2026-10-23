@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue.
 
+## 2026-10-23
+
+- Reactions walkthrough (M2 part 8, polish). `shot_reactions.gd` now makes all six reactions by two real bolts each in the combo arena and replays them into the live game, three at a time (feel keeps four reaction flashes live), at 1x and 4x. Looked at the 1x crops: the flashes were the gold spark art tinted, so blue came out olive and violet brown; Shatter, Thaw and Stillness were three pale blues, Kindle and Flare two oranges. Fixed in one pass (flat-colour shader for reaction flashes, six far-apart colours) and looked again: six colours and six names read apart. Tests: colours differ, flash uses the shader. Rest in BACKLOG.
+
 ## 2026-10-22
 
 - Builder walkthrough with four players (M2 part 29, polish). `shot_builder.gd` now walks the real input flow (new shots `builder_opened`, `builder_four_players_wave`, `builder_four_players_break_again`; looked at all). Fixed: opens on the form slot, "Close" follows the tabs in the focus order, tabs and held levels put focus on the form slot, a form or element in an empty slot moves on to the next bag (form + element is four presses, was nine), refusal texts say what to do. New tests in `test_builder.gd`; the awkward rest (mouse, wave line under four builders, modifiers) is in `docs/BACKLOG.md`. `build.sh --quick --tests` passes.

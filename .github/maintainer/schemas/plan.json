@@ -146,6 +146,28 @@
           "change": {
             "type": "string",
             "description": "For owner_change: the exact change (a diff or the new lines)"
+          },
+          "screenshots": {
+            "type": "array",
+            "description": "Up to three shot scripts whose shots show exactly what the owner decides on (taken on this branch and shown in the question). Leave it out when nothing visible is involved.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "script": {
+                  "type": "string",
+                  "description": "A tests/screenshots script name without .gd, e.g. shot_builder"
+                },
+                "caption": {
+                  "type": "string",
+                  "description": "One sentence: what to look at in these shots"
+                }
+              },
+              "required": [
+                "script",
+                "caption"
+              ],
+              "additionalProperties": false
+            }
           }
         },
         "required": [

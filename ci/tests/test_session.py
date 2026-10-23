@@ -185,6 +185,12 @@ class SchemaTest(unittest.TestCase):
             json.loads(text)
             self.assertNotIn("'", text, f"{path.name} contains a single quote")
 
+    def test_planning_asks_questions_like_development(self) -> None:
+        """Planning's questions once had no `screenshots`, so #206 asked about an art sheet nobody could see."""
+        def questions(name: str) -> dict:
+            return json.loads(session.MAINTAINER.joinpath("schemas", name).read_text())["properties"]["owner_questions"]
+        self.assertEqual(questions("plan.json"), questions("session.json"))
+
 
 class FinishTest(unittest.TestCase):
     """finish() decides whether the next session starts right away."""

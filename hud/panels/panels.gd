@@ -49,13 +49,15 @@ const EDGE_MARGIN: float = 4.0
 const OVERLAY_GAP: float = 2.0
 ## Space between a corner panel and its builder, which sits beside it.
 const BUILDER_GAP: float = 2.0
-## The "Wave N" line at the top middle of the view (between the P1 and P2 panels).
-const WAVE_LABEL_WIDTH: float = 96.0
-const WAVE_LABEL_FONT_SIZE: int = 16
-const WAVE_LABEL_OUTLINE: int = 4
-## The build break line (hammer and "Build 12") under the wave line.
+## The "Wave N" line and the build break line (hammer and "Build 12") sit side by side in one
+## strip in the middle of the view: the free gap between the top builders and the bottom ones.
+## The builders fill the width between the info panels, so the top middle is taken once four
+## are open.
+const WAVE_LABEL_WIDTH: float = 80.0
+const WAVE_LABEL_FONT_SIZE: int = 12
+const WAVE_LABEL_OUTLINE: int = 3
 const BREAK_FONT_SIZE: int = 12
-const BREAK_GAP: float = 2.0
+const STRIP_SEPARATION: int = 6
 
 ## The event bus, the UI focus service, the input manager and the spell runtime (the
 ## builders ask it for names and icons). Only tests set these, before adding the
@@ -77,6 +79,8 @@ var _wave_active: bool = false
 var _joined: Array[bool] = [false, false, false, false]
 var _in_room: bool = false
 var _vignette: VignetteScript = null
+## The strip in the middle of the view that holds the wave line and the break line.
+var _strip: HBoxContainer = null
 var _wave_label: Label = null
 ## The build break line: a row (hidden outside a break) with the hammer and the countdown.
 var _break_row: PanelContainer = null
@@ -98,27 +102,34 @@ func _ready() -> void:
 	_wave_label.add_theme_font_size_override("font_size", WAVE_LABEL_FONT_SIZE)
 	_wave_label.add_theme_color_override("font_outline_color", Color.BLACK)
 	_wave_label.add_theme_constant_override("outline_size", WAVE_LABEL_OUTLINE)
+	var wave_backing := StyleBoxFlat.new()
+	wave_backing.bg_color = Color(0.0, 0.0, 0.0, 0.7)
+	_wave_label.add_theme_stylebox_override("normal", wave_backing)
 	_wave_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_wave_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_wave_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP, Control.PRESET_MODE_MINSIZE)
 	_wave_label.custom_minimum_size = Vector2(WAVE_LABEL_WIDTH, 0.0)
-	_wave_label.offset_left = -WAVE_LABEL_WIDTH * 0.5
-	_wave_label.offset_right = WAVE_LABEL_WIDTH * 0.5
-	_wave_label.offset_top = EDGE_MARGIN
-	root_control.add_child(_wave_label)
-	# Above the vignette, below the panels and the builders, which may cover it.
-	root_control.move_child(_wave_label, 1)
+	_wave_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_strip = HBoxContainer.new()
+	_strip.name = "Strip"
+	_strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_strip.alignment = BoxContainer.ALIGNMENT_CENTER
+	_strip.add_theme_constant_override("separation", STRIP_SEPARATION)
+	_strip.set_anchors_and_offsets_preset(Control.PRESET_CENTER, Control.PRESET_MODE_MINSIZE)
+	_strip.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	_strip.grow_vertical = Control.GROW_DIRECTION_BOTH
+	_strip.add_child(_wave_label)
+	# Above the vignette, below the panels and the builders (it sits in the gap between them).
+	root_control.add_child(_strip)
+	root_control.move_child(_strip, 1)
 	_break_row = PanelContainer.new()
 	_break_row.name = "BreakRow"
 	_break_row.visible = false
 	_break_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var backing := StyleBoxFlat.new()
 	backing.bg_color = Color(0.0, 0.0, 0.0, 0.7)
-	backing.set_content_margin_all(2.0)
+	backing.content_margin_left = 2.0
+	backing.content_margin_right = 2.0
 	_break_row.add_theme_stylebox_override("panel", backing)
-	_break_row.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP, Control.PRESET_MODE_MINSIZE)
-	_break_row.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	_break_row.offset_top = EDGE_MARGIN + float(WAVE_LABEL_FONT_SIZE) + float(WAVE_LABEL_OUTLINE) + BREAK_GAP
 	var box := HBoxContainer.new()
 	box.name = "Box"
 	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -132,8 +143,8 @@ func _ready() -> void:
 	_break_label.add_theme_font_size_override("font_size", BREAK_FONT_SIZE)
 	_break_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	box.add_child(_break_label)
-	# Last child, over the builders: four open ones leave no gap at the top middle.
-	root_control.add_child(_break_row)
+	_break_row.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_strip.add_child(_break_row)
 	for player in PLAYER_COUNT:
 		var panel := get_node("Root/Panel%d" % (player + 1)) as PlayerPanelScript
 		panel.visible = false

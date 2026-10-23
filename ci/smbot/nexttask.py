@@ -1,4 +1,4 @@
-"""The ordered task queue (docs/PLAN.md, "Planning system").
+r"""The ordered task queue (docs/PLAN.md, "Planning system").
 
 Scheduled issues from the community intake go first (smbot.intake.queue_tasks, priority
 order), then docs/NEXT.md: under its "## Queue" heading, one task per line as "- [ ] ...".

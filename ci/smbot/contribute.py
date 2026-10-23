@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import datetime as dt
 import html
+import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -58,9 +59,17 @@ def parse_roadmap(text: str) -> tuple[Milestone, list[tuple[str, str, str]]]:
     return current, upcoming
 
 
-def parse_progress(m: Milestone, text: str) -> Milestone:
-    m.parts_total = len(re.findall(r"^\| \d+ \|", text, re.MULTILINE))
-    m.parts_done = len(re.findall(r"^\| \d+ \|.*\| Built", text, re.MULTILINE))
+def parse_progress(m: Milestone, text: str, next_md: str = "", log_md: str = "") -> Milestone:
+    """Parts built: a "Built" status in the design's parts table (M0's form), or the part's task
+    done in docs/NEXT.md ("- [x] **...** (M2 part 5)") or in a docs/LOG.md heading. Follow-ups,
+    halves and polish ("(M2 part 25 follow-up)") don't count; only the bare "(M2 part N)"."""
+    parts = {int(n) for n in re.findall(r"^\| (\d+) \|", text, re.MULTILINE)}
+    done = {int(n) for n in re.findall(r"^\| (\d+) \|.*\| Built", text, re.MULTILINE)}
+    marker = rf"\({re.escape(m.code)} part (\d+)\)"
+    done |= {int(n) for n in re.findall(rf"^- \[[xX]\].*?{marker}", next_md, re.MULTILINE)}
+    done |= {int(n) for n in re.findall(rf"^## .*?{marker}", log_md, re.MULTILINE)}
+    m.parts_total = len(parts)
+    m.parts_done = len(parts & done)
     m.checks_total = len(re.findall(r"^- \[[ xX]\]", text, re.MULTILINE))
     m.checks_done = len(re.findall(r"^- \[[xX]\]", text, re.MULTILINE))
     return m
@@ -74,7 +83,9 @@ def gather(cfg: config_mod.Config, root: Path = Path("."), now: dt.datetime | No
         data.current, data.upcoming = parse_roadmap(roadmap.read_text())
         design = root / "docs" / data.current.design
         if data.current.design and design.exists():
-            parse_progress(data.current, design.read_text())
+            plan = {name: (root / "docs" / name).read_text() if (root / "docs" / name).exists() else ""
+                    for name in ("NEXT.md", "LOG.md")}
+            parse_progress(data.current, design.read_text(), plan["NEXT.md"], plan["LOG.md"])
     try:
         data.queue = {label: len([i for i in gh.api_paginated(
             f"repos/{cfg.repo}/issues?state=open&labels={label}&per_page=100") if "pull_request" not in i])
@@ -83,9 +94,13 @@ def gather(cfg: config_mod.Config, root: Path = Path("."), now: dt.datetime | No
         pass
     since = (now - dt.timedelta(days=RECENT_DAYS)).date().isoformat()
     try:
-        found = gh.api(f"search/issues?q=repo:{cfg.repo}+is:pr+is:merged+merged:>={since}&sort=updated&per_page=10")
-        data.merged = [{"title": i["title"], "url": i["html_url"]} for i in found.get("items", [])[:10]]
-    except gh.GhError:
+        # Newest merge first. Search can only sort by update time, which a comment after the
+        # merge changes, so take the last 30 and sort by mergedAt here.
+        found = json.loads(gh.run("pr", "list", "--repo", cfg.repo, "--state", "merged", "--limit", "30",
+                                  "--search", f"merged:>={since}", "--json", "title,url,mergedAt"))
+        found.sort(key=lambda p: p["mergedAt"], reverse=True)
+        data.merged = [{"title": p["title"], "url": p["url"]} for p in found[:10]]
+    except (gh.GhError, ValueError, KeyError):
         pass
     try:
         found = gh.api(f"search/issues?q=repo:{cfg.repo}+is:issue+is:closed+reason:completed+label:triaged"
@@ -125,6 +140,8 @@ def render(cfg: config_mod.Config, data: PageData, version: str, channel: str, s
     upcoming = "".join(f"<li><strong>{e(code)}: {e(name)}</strong>. Done when: {e(done)}.</li>"
                        for code, name, done in data.upcoming[:3])
     design_link = f"{repo_url}/blob/main/docs/{e(m.design)}" if m.design else f"{repo_url}/blob/main/docs/ROADMAP.md"
+    # Only designs with a checklist (M0's dry runs) have checks; "0 of 0" says nothing.
+    checks = f"<p>Checks passed</p>{_bar(m.checks_done, m.checks_total)}" if m.checks_total else ""
 
     return f"""<!doctype html>
 <html lang="en">
@@ -175,7 +192,7 @@ def render(cfg: config_mod.Config, data: PageData, version: str, channel: str, s
       <h2>Now: {e(m.code)} {e(m.name)}</h2>
       <p class="small">Done when: {e(m.done_when)}</p>
       <p>Parts built</p>{_bar(m.parts_done, m.parts_total)}
-      <p>Checks passed</p>{_bar(m.checks_done, m.checks_total)}
+      {checks}
       <p class="small"><a href="{design_link}">Milestone design</a> &middot;
          <a href="{repo_url}/blob/main/docs/NEXT.md">What Claude does next</a></p>
     </section>

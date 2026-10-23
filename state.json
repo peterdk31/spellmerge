@@ -32,7 +32,15 @@
   },
   "panel_problems": [],
   "paused_by_command": false,
-  "pending_instructions": [],
+  "pending_instructions": [
+    {
+      "at": "2026-10-23T12:04:47Z",
+      "kind": "claude",
+      "number": 4,
+      "text": "The Daily run post at 11:23 UTC in #202 has the web \"BENCH: frame parts\" and \"stress parts\" lines. Move \"Read the web stress parts\" back to the top of the Queue and do it now.",
+      "url": "https://github.com/peterdk31/spellmerge/issues/4#issuecomment-6364455955"
+    }
+  ],
   "processed_comments": [
     6241847784,
     6251160604,
@@ -58,7 +66,8 @@
     6351463461,
     6361916837,
     6362314527,
-    6363198538
+    6363198538,
+    6364455955
   ],
   "task_failures": {
     "**Read the first WASM numbers (M2 part 25 follow-up).** (`tests/benchmark/`, `docs/`) Once a daily build has run the web projectile timing and stress steps, read their `BENCH:` lines (or why they failed or timed out; see `docs/DECISIONS.md`, 2026-10-22). Sessions can't read CI logs: the \"Daily run\" post in that day's Daily log quotes them under \"Stress and timing results\" (`gh issue list --label daily-log --state all`, then `gh issue view N --comments`). Then either confirm the limits or lower them. Also read what the per-frame `multimesh.buffer` upload costs there (bolt, rune and orbit batches each hand over the whole cap x 16 floats, up to 192 KB per batch at 3,000); if it is tight, upload only the used slice or size the rune and orbit batches smaller. \"WASM pending\" stays open until then.": {

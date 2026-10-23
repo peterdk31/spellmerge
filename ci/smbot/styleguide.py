@@ -137,8 +137,8 @@ def page(screenshot: str = "") -> str:
             body += '<p>As one page: <a href="kit/checklist.md">checklist.md</a></p>'
         parts.append(f'<section><h2>{html.escape(name)}</h2>{body}</section>')
         if name == "The short version":
-            parts.append(f'<section><h2>Golden examples</h2><p>The look so far (candidates until the M2 art direction '
-                         f'call). Copy their approach, not their pixels.</p><div class="goldens">{examples}</div>'
+            parts.append(f'<section><h2>Golden examples</h2><p>The look: the wizard is style N; the rest is redrawn '
+                         f'in it over time. Copy their approach, not their pixels.</p><div class="goldens">{examples}</div>'
                          + (f'<p>In the game:</p><img class="wide" src="{html.escape(screenshot)}" '
                             'alt="The arena with four wizards">' if screenshot else "") + "</section>")
     return f"""<!doctype html>
@@ -162,7 +162,7 @@ ul.checks {{ list-style: none; padding-left: 0; }}
 .kit {{ background: #2b2840; padding: 12px 16px; border-radius: 6px; }}
 </style></head><body>
 <h1>Spellmerge Style Guide</h1>
-<p>The art rules, from <a href="{REPO_BLOB}docs/STYLE.md">docs/STYLE.md</a>. They are provisional until the M2 art direction call.</p>
+<p>The art rules, from <a href="{REPO_BLOB}docs/STYLE.md">docs/STYLE.md</a>. The art direction (style N) was chosen in M2.</p>
 <p class="kit"><strong>Starter kit:</strong> <a href="{ZIP_NAME}">{ZIP_NAME}</a>: the palette, the 32×32 grid, the strip template, the checklist and the golden examples. CC-BY-SA-4.0.</p>
 {chr(10).join(parts)}
 <p><a href="../">Back to Spellmerge</a></p>

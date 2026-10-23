@@ -3,6 +3,7 @@
   python3 -m smbot.config get game.slug              -> one value, for shell scripts
   python3 -m smbot.config render PROMPT.md           -> the prompt with {{REPO}}, {{GAME}}, {{PITCH}}, {{BOT}}
   python3 -m smbot.config runs                       -> the exported-build test runs, one per line (build.sh)
+  python3 -m smbot.config ready                      -> the line the game's first screen prints
 """
 
 from __future__ import annotations
@@ -10,11 +11,18 @@ from __future__ import annotations
 import argparse
 import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from pathlib import Path
 from typing import Any
 
 CI_DIR = Path(__file__).resolve().parent.parent
+# The game's exported-build test runs. Bot-maintained (rules.BOT_PATHS), unlike this folder: the bot
+# writes the runners they start, and build.sh only passes these values as quoted arguments.
+RUNS_FILE = "tests/exported_runs.json"
+MAX_RUNS = 10
+_NAME = re.compile(r"[a-z0-9][a-z0-9-]{0,39}")
+_ARG = re.compile(r"--[a-z0-9][a-z0-9-]{0,39}")
+_LINE = re.compile(r"[^\t\r\n]{1,200}")  # build.sh reads the runs as tab-separated lines
 
 
 @dataclass(frozen=True)
@@ -35,7 +43,8 @@ class Game:
 
 @dataclass(frozen=True)
 class Run:
-    """A test the exported "Linux Test" and "Web Test" builds run, started by a user argument (build.sh)."""
+    """A test the exported "Linux Test" and "Web Test" builds run, started by a user argument (build.sh).
+    From tests/exported_runs.json, which the bot maintains."""
     name: str  # build/logs/<name>-linux.log and <name>-web.log
     arg: str  # e.g. --stress; the game starts the runner on it
     label: str
@@ -56,8 +65,6 @@ class Config:
     control_panel_issue: int
     timezone: str
     state_branch: str
-    ready_line: str  # the line the game prints once its first screen is up (the web smoke test waits for it)
-    runs: tuple[Run, ...]
 
     @property
     def pages(self) -> str:
@@ -67,6 +74,44 @@ class Config:
 
 def raw(path: Path | None = None) -> dict[str, Any]:
     return json.loads((path or CI_DIR / "config.json").read_text())
+
+
+def parse_runs(data: dict[str, Any]) -> tuple[str, tuple[Run, ...]]:
+    """The ready line and the runs, strictly checked; ValueError says what is wrong."""
+    def line(value: Any, what: str) -> str:
+        if not isinstance(value, str) or not _LINE.fullmatch(value):
+            raise ValueError(f"{RUNS_FILE}: {what} must be one line of 1-200 characters without tabs")
+        return value
+    ready = line(data.get("ready"), "ready")
+    rows = data.get("runs")
+    if not isinstance(rows, list) or len(rows) > MAX_RUNS:
+        raise ValueError(f"{RUNS_FILE}: runs must be a list of at most {MAX_RUNS}")
+    runs: list[Run] = []
+    for i, row in enumerate(rows):
+        if not isinstance(row, dict) or set(row) != {f.name for f in fields(Run)}:
+            raise ValueError(f"{RUNS_FILE}: run {i + 1} must have exactly {', '.join(f.name for f in fields(Run))}")
+        if not isinstance(row["name"], str) or not _NAME.fullmatch(row["name"]):
+            raise ValueError(f"{RUNS_FILE}: run {i + 1}: name must be lowercase letters, digits and dashes")
+        if not isinstance(row["arg"], str) or not _ARG.fullmatch(row["arg"]):
+            raise ValueError(f"{RUNS_FILE}: run {i + 1}: arg must look like --name")
+        timeout = row["web_timeout"]
+        if not isinstance(timeout, int) or isinstance(timeout, bool) or not 10 <= timeout <= 1800:
+            raise ValueError(f"{RUNS_FILE}: run {i + 1}: web_timeout must be 10-1800 seconds")
+        if not isinstance(row["bench"], bool):
+            raise ValueError(f"{RUNS_FILE}: run {i + 1}: bench must be true or false")
+        for key in ("label", "linux_ok", "web_ok"):
+            line(row[key], f"run {i + 1}: {key}")
+        runs.append(Run(**row))
+    if len({r.name for r in runs}) != len(runs):
+        raise ValueError(f"{RUNS_FILE}: two runs have the same name")
+    return ready, tuple(runs)
+
+
+def load_runs(root: Path = CI_DIR.parent) -> tuple[str, tuple[Run, ...]]:
+    """The line the game's first screen prints (the web smoke test waits for it) and the runs.
+    Kept out of Config, so a bad file only stops the build, never the gate or the intake."""
+    path = root / RUNS_FILE
+    return parse_runs(json.loads(path.read_text())) if path.exists() else ("main menu ready", ())
 
 
 def load(path: Path | None = None) -> Config:
@@ -81,8 +126,6 @@ def load(path: Path | None = None) -> Config:
         control_panel_issue=data["issues"]["control_panel"],
         timezone=data["timezone"],
         state_branch=data["state_branch"],
-        ready_line=data["build"]["ready"],
-        runs=tuple(Run(**r) for r in data["build"]["runs"]),
     )
 
 
@@ -110,11 +153,14 @@ def main() -> None:
     sub.add_parser("get").add_argument("key")
     sub.add_parser("render").add_argument("template", type=Path)
     sub.add_parser("runs")
+    sub.add_parser("ready")
     args = parser.parse_args()
     if args.cmd == "get":
         print(get(raw(), args.key))
+    elif args.cmd == "ready":
+        print(load_runs()[0])
     elif args.cmd == "runs":
-        for run in load().runs:
+        for run in load_runs()[1]:
             print("\t".join((run.name, run.arg, run.label, run.linux_ok, run.web_ok, str(run.web_timeout))))
     else:
         print(render(args.template.read_text(), prompt_values(load())), end="")

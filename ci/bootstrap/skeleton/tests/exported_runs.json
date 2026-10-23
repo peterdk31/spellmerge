@@ -1,0 +1,5 @@
+{
+  "about": "The tests the exported \"Linux Test\" and \"Web Test\" builds run (ci/build/build.sh). The game starts each runner on its argument; the build fails unless the log has the line. Runs with bench: true go into the Daily log. ready is the line the first screen prints. Checked by smbot.config.",
+  "ready": "main menu ready",
+  "runs": []
+}

@@ -17,7 +17,8 @@ GAME = bootstrap.Game(name="Bee Keeper", repo="someone/bee-keeper", idea="A cozy
                       owner_login="someone", owner_id=4242424, timezone="Europe/Copenhagen")
 
 
-@unittest.skipUnless((ROOT / ".git").exists(), "needs this repository's git checkout")
+@unittest.skipUnless((ROOT / ".git").exists() and (ROOT / "ci" / "bootstrap" / "harness.json").exists(),
+                     "needs a git checkout with the template (a new game's copy has none)")
 class ScaffoldTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -34,7 +35,8 @@ class ScaffoldTest(unittest.TestCase):
     def test_the_config_is_the_new_games_and_waits_for_the_bot(self) -> None:
         cfg = config.load(self.dest / "ci" / "config.json")
         self.assertEqual((cfg.repo, cfg.game.name, cfg.game.slug, cfg.owner.id), (GAME.repo, "Bee Keeper", "bee-keeper", 4242424))
-        self.assertEqual((cfg.bot.login, cfg.bot_client_id, cfg.control_panel_issue, cfg.runs), ("", "", 0, ()))
+        self.assertEqual((cfg.bot.login, cfg.bot_client_id, cfg.control_panel_issue), ("", "", 0))
+        self.assertEqual(config.load_runs(self.dest), ("main menu ready", ()))
 
     def test_the_design_is_the_idea_and_a_draft(self) -> None:
         design = (self.dest / "docs" / "DESIGN.md").read_text()

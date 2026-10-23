@@ -134,7 +134,6 @@ def new_config(game: Game, state_branch: str) -> dict[str, Any]:
         "issues": {"control_panel": 0},  # launch opens the panel
         "timezone": game.timezone,
         "state_branch": state_branch,
-        "build": {"ready": "main menu ready", "runs": []},
     }
 
 

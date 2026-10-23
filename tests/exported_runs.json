@@ -1,0 +1,33 @@
+{
+  "about": "The tests the exported \"Linux Test\" and \"Web Test\" builds run (ci/build/build.sh). The game starts each runner on its argument; the build fails unless the log has the line. Runs with bench: true go into the Daily log. ready is the line the first screen prints. Checked by smbot.config.",
+  "ready": "main menu ready",
+  "runs": [
+    {
+      "name": "four-bot",
+      "arg": "--four-bot",
+      "label": "4-bot test",
+      "linux_ok": "^SMOKE OK",
+      "web_ok": "SMOKE OK",
+      "web_timeout": 240,
+      "bench": false
+    },
+    {
+      "name": "stress",
+      "arg": "--stress",
+      "label": "stress",
+      "linux_ok": "^STRESS OK",
+      "web_ok": "STRESS OK",
+      "web_timeout": 600,
+      "bench": true
+    },
+    {
+      "name": "timing",
+      "arg": "--projectile-timing",
+      "label": "projectile timing",
+      "linux_ok": "^test_projectile_timing: OK",
+      "web_ok": "TIMING OK",
+      "web_timeout": 240,
+      "bench": true
+    }
+  ]
+}

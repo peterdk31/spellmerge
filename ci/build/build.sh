@@ -28,7 +28,7 @@ source ci/build/godot.env
 # The game's name (project.godot, the export paths) and slug (the zips), from ci/config.json.
 GAME_NAME=$(PYTHONPATH=ci python3 -m smbot.config get game.name)
 SLUG=$(PYTHONPATH=ci python3 -m smbot.config get game.slug)
-READY_LINE=$(PYTHONPATH=ci python3 -m smbot.config get build.ready)
+READY_LINE=$(PYTHONPATH=ci python3 -m smbot.config ready)
 
 VERSION="dev"
 CHANNEL="dev"
@@ -189,8 +189,8 @@ export_all() {
 
   # The shipped presets leave tests/ out; "Linux Test" is the Linux preset with tests, never
   # packaged. An exported build can't run a --script, so the game starts each test runner on its
-  # user argument. The runs are the game's own (.build.runs in ci/config.json: for Spellmerge the
-  # 4-bot test, the stress run and the projectile timing); a game with none skips this.
+  # user argument. The runs are the game's own (tests/exported_runs.json, which the bot maintains:
+  # for Spellmerge the 4-bot test, the stress run and the projectile timing); none skips this.
   local runs name arg label linux_ok web_ok web_timeout
   runs=$(PYTHONPATH=ci python3 -m smbot.config runs)
   if [[ -n "$runs" ]]; then

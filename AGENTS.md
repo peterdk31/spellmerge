@@ -16,7 +16,7 @@ A contributor's PR is only taken in once these pass and the author has signed th
 
 These cover only security and copyright. Everything else is guidance.
 
-1. **Don't touch protected paths.** Owner-only: `.github/`, `ci/`, `.claude/`, `addons/`, `docs/DESIGN.md`, `LICENSE`, `CLA.md`, `setup.sh`, `REUSE.toml`, `docs/SECURITY-CHECKLIST.md`, `docs/SETUP-APP.md`. Maintained by Claude: `core/`, `project.godot`, `export_presets.cfg`, `docs/` plan files, `AGENTS.md`, `CLAUDE.md`, `llms.txt`, every `README.md`.
+1. **Don't touch protected paths.** Owner-only: `.github/`, `ci/`, `.claude/`, `addons/`, `docs/DESIGN.md`, `LICENSE`, `CLA.md`, `setup.sh`, `REUSE.toml`, `docs/SECURITY-CHECKLIST.md`, `docs/SETUP-APP.md`. Maintained by Claude: `core/`, `project.godot`, `export_presets.cfg`, `tests/exported_runs.json`, `docs/` plan files, `AGENTS.md`, `CLAUDE.md`, `llms.txt`, every `README.md`.
 2. **Allowed file types only:** `.png` and `.svg` images, `.ogg` audio, `.gd`, `.tscn`, `.tres`, `.json` and other Godot text files (`.import`, `.uid`, `.gdshader`), plus REUSE `.license` files. No binaries, archives, executables, symlinks or submodules.
 3. **Size limits:** 1 MB per image, 5 MB per `.ogg`, 1 MB for anything else.
 4. **No banned APIs** in `.gd`, `.tscn` or `.tres`:

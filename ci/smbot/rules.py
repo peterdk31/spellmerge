@@ -53,6 +53,7 @@ BOT_PATHS = (
     "core/",
     "project.godot",
     "export_presets.cfg",
+    "tests/exported_runs.json",  # which exported-build tests build.sh runs (smbot.config)
 )
 
 # File types outside contributors may add: images, .ogg, Godot text files,
@@ -380,6 +381,12 @@ def check_content(change: Change, data: bytes, role: str) -> list[Finding]:
         return findings
 
     text = data.decode("utf-8", "replace")
+    if path == config_mod.RUNS_FILE:
+        try:
+            config_mod.parse_runs(json.loads(text))
+        except (ValueError, AttributeError) as e:  # JSONDecodeError is a ValueError
+            findings.append(Finding("runs-file", "error", path, 0, f"The exported-build test runs can't be read: {e}",
+                                    "Fix the file; smbot.config.parse_runs says what each field may hold."))
     if suffix == ".svg":
         findings += _check_svg(path, text)
     if suffix == ".gdextension" or "type=\"GDExtension\"" in text:

@@ -57,6 +57,7 @@ func _initialize() -> void:
 	await _shot("quick_view_drop_list")
 	_tap(0, &"overlay")
 	await _settle()
+	await _walk_a_wave(1, "one")
 	flow.call("stop_run")
 	await _settle()
 	for index in range(1, 4):
@@ -74,6 +75,7 @@ func _initialize() -> void:
 	for index in [0, 3]:
 		await _press(index, _hud.call("get_builder", index).call("drop_button"))
 	await _shot("quick_view_four_players")
+	await _walk_a_wave(4, "four")
 	# The break: the wave is cleared, the builders unfold and the hammer counts down (staged with
 	# the events Flow sends, so the room's imps stay out of the picture).
 	var events: Node = root.get_node("Events")
@@ -83,6 +85,70 @@ func _initialize() -> void:
 	flow.call("stop_run")
 	await create_timer(0.3).timeout
 	quit(0)
+
+
+## A wave as people play it, with every player's builder open: the break (full builders), the
+## wave starts and they fold, a swap, a dropped component, the wave is cleared and they unfold.
+## Staged with the events Flow sends, so the room's imps stay out of the picture. Each step is
+## shot at 1x, and the first player's quarter again at 4x.
+func _walk_a_wave(count: int, label: String) -> void:
+	var events: Node = root.get_node("Events")
+	events.emit_signal("room_cleared", &"arena_01")
+	await _settle()
+	for index in count:
+		if not bool(_hud.call("get_builder", index).call("is_open")):
+			await _open_builder(index)
+		elif bool(_hud.call("get_builder", index).call("is_quick")):
+			_fail("a builder stayed folded after room_cleared")
+			return
+	await _walk_shot("walk_%s_break_full" % label)
+	events.emit_signal("wave_started", 2)
+	await _settle()
+	for index in count:
+		var builder: Node = _hud.call("get_builder", index)
+		if not bool(builder.call("is_quick")) or not bool(builder.call("is_open")):
+			_fail("the open builder did not fold on wave_started")
+			return
+	await _walk_shot("walk_%s_folded" % label)
+	# A swap press is dropped inside a menu, so a player closes the quick view, swaps and looks again.
+	for index in count:
+		_tap(index, &"overlay")
+	await _settle()
+	for index in count:
+		_tap(index, &"swap")
+	await _settle()
+	for index in count:
+		await _open_builder(index)
+	await _walk_shot("walk_%s_swapped" % label)
+	for index in count:
+		await _press(index, _hud.call("get_builder", index).call("drop_button"))
+		_tap(index, &"cast")
+		await _settle()
+	await _walk_shot("walk_%s_dropped" % label)
+	events.emit_signal("room_cleared", &"arena_01")
+	await _settle()
+	for index in count:
+		if bool(_hud.call("get_builder", index).call("is_quick")):
+			_fail("the builder did not unfold on room_cleared")
+			return
+	await _walk_shot("walk_%s_unfolded" % label)
+	for index in count:
+		_tap(index, &"overlay")
+	await _settle()
+
+
+## The whole view at 1x, and the first player's quarter at 4x.
+func _walk_shot(shot_name: String) -> void:
+	await _shot(shot_name)
+	await _quarter(shot_name + "_4x")
+
+
+func _quarter(shot_name: String) -> void:
+	var image: Image = root.get_texture().get_image()
+	var crop: Image = image.get_region(Rect2i(0, 0, 240, 180))
+	crop.resize(960, 720, Image.INTERPOLATE_NEAREST)
+	if crop.save_png("%s/%s.png" % [SHOTS_DIR, shot_name]) == OK:
+		print("SHOT: %s (960x720)" % shot_name)
 
 
 func _tap(player: int, action: StringName) -> void:

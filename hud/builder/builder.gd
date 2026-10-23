@@ -274,10 +274,13 @@ func set_quick(quick: bool) -> void:
 	_slot = SLOT_FORM
 	if quick:
 		_viewed = _active
+	# The mark must not stay on a slot the quick view stops listing: it is cleared by the render
+	# and set again on the control that takes the focus.
+	_focused = null
 	_render()
 	if _open:
 		_resync_focus(true)
-		_focus_control(_drop if quick else _slots[_slot])
+		_focus_control(_slots[_slot] if not quick else (_drop if not _drop.disabled else _close))
 		_apply_marks()
 
 
@@ -762,7 +765,8 @@ func _resync_focus(force: bool = false) -> void:
 		return
 	_synced_controls = _controls.size()
 	_focused = _ui_focus.focused(index)
-	_focus_control(keep)
+	if keep != null:
+		_focus_control(keep)
 	_apply_marks()
 
 

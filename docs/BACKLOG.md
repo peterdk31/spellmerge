@@ -12,7 +12,7 @@ Ideas and future work outside the current milestone (docs/PLAN.md, "Planning sys
 
 - **The mouse (task).** The builder, the overlay and the quick view ignore the mouse. Add a mouse for P1's panel only: hover mark (a "> " or an outline, not colour alone), click to activate, a click outside the builder closes nothing. Needs the hover to go through `UIFocus` so the owner's device still wins. M4 polish.
 - **Picking modifiers is still one slot at a time (task).** A form and an element are four presses; each modifier is about three (dodge, move to its slot, cast, move to the row, cast). Try advancing through the modifier slots too, or a "next free slot" shortcut, once a real playtest says what players do.
-- **No hint on a disabled slot or button (task).** A greyed modifier slot or "Held >" says nothing about why (needs the slot before it filled, needs a trigger). Show it in the note when focus rests on it (it skips disabled controls today, so this needs a way to read them).
+- **No hint on a disabled slot or button (task).** A greyed modifier slot or "Held >" says nothing about why (needs the slot before it filled, needs a trigger). Show it in the note when focus rests on it (it skips disabled controls today, so this needs a way to read them: a `UIFocus` change, too big for the quick view walkthrough).
 - **The held-spell levels are two small buttons (task).** "Held >" and "< Up" at 10 px are easy to miss; the title says "held 1" but not which trigger holds it. Show the holding trigger's name in the title.
 - **Refusals name no slot for a held spell (task).** "Pick a form (F) first." is shown for the held spell too, where the title says "held 1"; the note could start with "Held spell:" when `level() > 0`.
 
@@ -86,6 +86,12 @@ Weak spots found in the architecture review of 2026-10-20 (docs/ARCHITECTURE.md)
 - **Move the big test files to `tests/support/suite.gd`.** Old scripts (`test_projectiles.gd` 760 lines, `test_feel.gd`, `test_coop.gd`, `test_input.gd`, `test_ui_focus.gd`, `test_overlay.gd`, `test_panels.gd`, `test_player_*`, `test_flow.gd`, `test_combat.gd`, `test_fire_bolt_m1.gd`, which part 11 deletes with `legacy/`) run every check in one `_initialize` and share one `_failures` list, so a failure in a setup step hides the rest. When a task touches one, split it into `test_*` methods on the suite with a small fixture (see `tests/gameplay/ai/ai_fixture.gd`), one behaviour each, and drop checks of tuning numbers and looks. Do not rewrite them in one go.
 - **Pillar tops are 60% opaque.** `PillarTops` is drawn translucent so a wizard standing behind a pillar still shows through, but a head under a half-transparent capital can look like a rendering fault and weakens the 2.5D look. After a human playtest, revisit: for example fade the top only while a character overlaps it, and draw it fully opaque otherwise.
 - **Telegraph dash on the lane.** The dash texture is a plain 8×8 tile; if the owner wants a different look (a pulsing ring at the end, an animated dash), it needs art with more frames, not code.
+
+## From M2 part 18 (quick view walkthrough)
+
+- **A swap needs the menu closed (task).** `swap` is ignored inside the quick view (a menu holds input), so a player closes it, swaps and opens it again (four presses). Consider a swap that works there, or a "Swap" button, once a playtest says whether players build mid-wave.
+- **The drop list names no slot (task).** It lists components only; a short heading ("Element" / "Modifier M1") would help, but the longest list of ten fills the quarter already.
+- **Read-only slots look like disabled ones (task).** The quick view greys the chain because it is read only; next to the one live button it reads as broken. Needs a non-grey read-only look (a theme variation).
 
 ## Ideas from the community
 

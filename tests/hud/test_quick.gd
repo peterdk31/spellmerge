@@ -268,6 +268,46 @@ func test_a_wave_folds_an_open_builder_into_the_quick_view() -> void:
 	check(not paused, "the wave is never paused")
 
 
+## The focus mark ("> ") is on one control only: folding must not leave it on a slot that the
+## quick view shows read only (it showed "> [F: Bolt]" beside "> Drop component").
+func _marked(builder: BuilderScript) -> Array[Button]:
+	var marked: Array[Button] = []
+	for slot in BuilderScript.SLOT_COUNT:
+		var button: Button = builder.slot_button(slot)
+		if button.text.begins_with(BuilderScript.FOCUS_MARK):
+			marked.append(button)
+	if builder.drop_button().text.begins_with(BuilderScript.FOCUS_MARK):
+		marked.append(builder.drop_button())
+	return marked
+
+
+func test_folding_leaves_one_focus_mark_and_unfolding_too() -> void:
+	_start(1)
+	_open_builder(0)
+	var builder: BuilderScript = _builder(0)
+	check_equal(_marked(builder), [builder.slot_button(BuilderScript.SLOT_FORM)] as Array[Button], "the full builder opens marked on the form slot")
+	_wave_start()
+	check_equal(_marked(builder), [builder.drop_button()] as Array[Button], "folded: only \"Drop component\" is marked")
+	_wave_end()
+	check_equal(_marked(builder), [builder.slot_button(BuilderScript.SLOT_FORM)] as Array[Button], "unfolded: back on the form slot, no mark left on Drop")
+	check(_focus.focused(0) == builder.slot_button(BuilderScript.SLOT_FORM), "and focus is there")
+
+
+func test_folding_with_nothing_to_drop_puts_focus_on_close() -> void:
+	_start(1)
+	_wave_start()
+	_open_builder(0)
+	var builder: BuilderScript = _builder(0)
+	_press(0, builder.drop_button())
+	for name_to_drop in ["Split", "Pierce", "Bigger"]:
+		_press(0, _row_named(builder.shown_rows(), name_to_drop))
+	_wave_end()
+	_wave_start(2)
+	check(builder.is_quick() and builder.drop_button().disabled, "a full spell folds with \"Drop component\" greyed")
+	check(_focus.focused(0) == builder.close_button(), "focus is on Close, not on a greyed button")
+	check_equal(_marked(builder), [] as Array[Button], "no read-only slot is marked")
+
+
 func test_the_quick_view_unfolds_when_the_wave_is_cleared_and_keeps_the_choices() -> void:
 	_start(1)
 	_open_builder(0)

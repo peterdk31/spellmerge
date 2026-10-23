@@ -280,7 +280,7 @@ func set_quick(quick: bool) -> void:
 	_render()
 	if _open:
 		_resync_focus(true)
-		_focus_control(_slots[_slot] if not quick else (_drop if not _drop.disabled else _close))
+		_focus_control(_quick_focus_target() if quick else _slots[_slot])
 		_apply_marks()
 
 
@@ -801,7 +801,7 @@ func _on_cancelled(player: int) -> void:
 func _stop_dropping() -> void:
 	_dropping = false
 	_render()
-	_focus_control(_drop if not _drop.disabled else _close)
+	_focus_control(_quick_focus_target())
 
 
 func _on_active_spell_changed(player: int, slot: int) -> void:
@@ -813,7 +813,7 @@ func _on_active_spell_changed(player: int, slot: int) -> void:
 		_dropping = false
 		_render()
 		if _open:
-			_focus_control(_drop if not _drop.disabled else _close)
+			_focus_control(_quick_focus_target())
 
 
 func _on_activated(player: int, control: Control) -> void:
@@ -894,8 +894,13 @@ func _first_row() -> Control:
 	if not _row_ids.is_empty():
 		return _rows[0]
 	if _quick:
-		return _drop if not _drop.disabled else _close
+		return _quick_focus_target()
 	return _slots[_slot]
+
+
+## In the quick view: "Drop component", or "Close" when nothing is left to drop.
+func _quick_focus_target() -> Control:
+	return _drop if not _drop.disabled else _close
 
 
 ## Move this player's focus to `target` by single steps (the focus service has no jump).

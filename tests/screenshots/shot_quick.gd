@@ -111,7 +111,9 @@ func _walk_a_wave(count: int, label: String) -> void:
 			return
 	await _walk_shot("walk_%s_folded" % label)
 	# A swap press is dropped inside a menu, so a player closes the quick view, swaps and looks again.
+	var before: Array[int] = []
 	for index in count:
+		before.append(int(_hud.call("get_builder", index).call("viewed_spell")))
 		_tap(index, &"overlay")
 	await _settle()
 	for index in count:
@@ -119,6 +121,9 @@ func _walk_a_wave(count: int, label: String) -> void:
 	await _settle()
 	for index in count:
 		await _open_builder(index)
+		if int(_hud.call("get_builder", index).call("viewed_spell")) == before[index]:
+			_fail("the swap did not change player %d's spell" % index)
+			return
 	await _walk_shot("walk_%s_swapped" % label)
 	for index in count:
 		await _press(index, _hud.call("get_builder", index).call("drop_button"))

@@ -604,33 +604,6 @@
       "prompt": "Style sample F (big hat): a 16x16 fire spell icon, a tall teardrop flame with a Spark core, Fire shades and a 1 px outline. Only non-overlapping rect elements, palette colours from docs/STYLE.md."
     },
     {
-      "path": "art/samples/m_cream/body.svg",
-      "origin": "ai",
-      "author": "Claude",
-      "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (hand-written SVG rects)",
-      "prompt": "Style sample M (cream robe), the body without the hat: J's narrow 32x32 wizard body under F's big hat, but the face is only two big tall eyes with a highlight, no mouth and no cheeks, and the clothes are a clear robe: Bone robe 8 px wide with a Spark front placket, a Wood belt with a Spark buckle, long sleeves, a Spark hem, tiny boots and a staff with a Spark gem. No player colour: the hat is drawn on top in the player's colour. 1 px outline, light from the top-left, only non-overlapping rect elements, palette colours from docs/STYLE.md."
-    },
-    {
-      "path": "art/samples/n_dusk/body.svg",
-      "origin": "ai",
-      "author": "Claude",
-      "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (hand-written SVG rects)",
-      "prompt": "Style sample N (dusk robe), the body without the hat: M's shape with a Stone robe (violet-grey) with a Spark placket, belt buckle and hem, two big tall eyes with a highlight, no mouth. No player colour: the hat is drawn on top in the player's colour. 1 px outline, light from the top-left, only non-overlapping rect elements, palette colours from docs/STYLE.md."
-    },
-    {
-      "path": "art/samples/o_teal/body.svg",
-      "origin": "ai",
-      "author": "Claude",
-      "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (hand-written SVG rects)",
-      "prompt": "Style sample O (teal robe), the body without the hat: M's shape with an Ice robe (teal) with a Bone placket and hem, a Wood belt with a Spark buckle, two big tall eyes with a highlight, no mouth. No player colour: the hat is drawn on top in the player's colour. 1 px outline, light from the top-left, only non-overlapping rect elements, palette colours from docs/STYLE.md."
-    },
-    {
       "path": "art/samples/j_tiny/body.svg",
       "origin": "ai",
       "author": "Claude",
@@ -656,6 +629,33 @@
       "tier": "placeholder",
       "tool": "Claude (hand-written SVG rects)",
       "prompt": "Style sample L (gold, big head), the body without the hat: a narrow 32x32 wizard body under F's big hat, an even bigger round face 12 px wide with big eyes with highlights, blushing cheeks and a small smile, a Spark robe 8 px wide with a Bone collar and a Wood belt and hem, tiny boots, hands and a staff with a Spark gem. No player colour: the hat is drawn on top in the player's colour. 1 px outline, light from the top-left, only non-overlapping rect elements, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/samples/m_cream/body.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "Style sample M (cream robe), the body without the hat: J's narrow 32x32 wizard body under F's big hat, but the face is only two big tall eyes with a highlight, no mouth and no cheeks, and the clothes are a clear robe: Bone robe 8 px wide with a Spark front placket, a Wood belt with a Spark buckle, long sleeves, a Spark hem, tiny boots and a staff with a Spark gem. No player colour: the hat is drawn on top in the player's colour. 1 px outline, light from the top-left, only non-overlapping rect elements, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/samples/n_dusk/body.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "Style sample N (dusk robe), the body without the hat: M's shape with a Stone robe (violet-grey) with a Spark placket, belt buckle and hem, two big tall eyes with a highlight, no mouth. No player colour: the hat is drawn on top in the player's colour. 1 px outline, light from the top-left, only non-overlapping rect elements, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/samples/o_teal/body.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "Style sample O (teal robe), the body without the hat: M's shape with an Ice robe (teal) with a Bone placket and hem, a Wood belt with a Spark buckle, two big tall eyes with a highlight, no mouth. No player colour: the hat is drawn on top in the player's colour. 1 px outline, light from the top-left, only non-overlapping rect elements, palette colours from docs/STYLE.md."
     },
     {
       "path": "art/samples/g_brown/body.svg",

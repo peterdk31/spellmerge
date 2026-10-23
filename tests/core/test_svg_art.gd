@@ -203,12 +203,18 @@ func test_the_round_four_bodies_are_narrow_and_below_the_brim() -> void:
 
 
 ## M, N and O have two big eyes and nothing else on the face: no cheeks (Fire light) and no mouth
-## (the Wood mouth colour of J and K), and the eyes are two 2x2 black blocks at rows 17 and 18.
+## (the Wood mouth colour of J and K), and each eye is a 2x3 black block with a highlight on its
+## top row (rows 16 to 18). The face area (x 10 to 19, y 16 to 19) holds only skin, eye and outline colours.
 func test_the_round_five_faces_are_just_two_big_eyes() -> void:
+	var rect_pattern: RegEx = RegEx.create_from_string('<rect x="(\\d+)" y="(\\d+)" width="(\\d+)" height="(\\d+)" fill="(#[0-9a-f]+)"')
 	for body: String in ["m_cream", "n_dusk", "o_teal"]:
 		var text: String = FileAccess.get_file_as_string("res://art/samples/%s/body.svg" % body)
 		check(not text.contains("#ffa23c"), "%s/body.svg has cheeks" % body)
-		check(not text.contains('y="18" width="2" height="1" fill="#8a5a44"'), "%s/body.svg has a mouth" % body)
+		for rect in rect_pattern.search_all(text):
+			var rect_x: int = rect.get_string(1).to_int()
+			var rect_y: int = rect.get_string(2).to_int()
+			var in_face: bool = rect_x >= 10 and rect_x <= 19 and rect_y >= 16 and rect_y <= 19
+			check(not (in_face and rect.get_string(5) == "#8a5a44"), "%s/body.svg has a mouth at %d,%d" % [body, rect_x, rect_y])
 		check(text.contains('<rect x="12" y="17" width="2" height="2" fill="#14121f"/>'), "%s/body.svg lost its left eye" % body)
 		check(text.contains('<rect x="16" y="17" width="2" height="2" fill="#14121f"/>'), "%s/body.svg lost its right eye" % body)
 

@@ -91,7 +91,7 @@ What changed from J, K and L: the face is two big tall eyes (2×3 px, black, wit
 | | M: Cream robe (`m_cream/`) | N: Dusk robe (`n_dusk/`) | O: Teal robe (`o_teal/`) |
 | --- | --- | --- | --- |
 | Robe | Bone, Spark placket and hem, Wood belt | Stone violet-grey, Spark placket and hem, dark belt | Ice teal, Bone placket and hem, Wood belt |
-| Reads at 1× | Brightest body: pops most against the floor; the gold placket is a clear mark | Darkest body, close to the floor's value; the gold trim and the hat carry it | Bright and cool, but the same teal as the Ice element and the frost tint |
+| Reads at 1× | Brightest body: pops most against the floor; the gold placket is a clear mark | Darkest body, close to the floor's value by eye (not measured); the gold trim and the hat carry it | Bright and cool, but the same teal as the Ice element and the frost tint |
 | Mood | Apprentice, classic | Night wizard, mysterious | Fresh, a water mage |
 
 Notes:

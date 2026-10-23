@@ -56,6 +56,15 @@ func test_every_player_gets_a_different_hat() -> void:
 			check(hats[i] != hats[j], "players %d and %d must be told apart" % [i, j])
 
 
+func test_bob_tables_match_the_strip_lengths() -> void:
+	var walk: Array[Texture2D] = _strips("walk_textures")
+	var dash: Array[Texture2D] = _strips("dash_textures")
+	for i in walk.size():
+		check_equal(walk[i].get_width() / FRAME, PlayerScript.WALK_BOB.size(), "walk strip %d has one bob per frame" % i)
+	for i in dash.size():
+		check_equal(dash[i].get_width() / FRAME, PlayerScript.DASH_BOB.size(), "dash strip %d has one bob per frame" % i)
+
+
 func test_the_scene_has_a_hat_node_under_the_sprite() -> void:
 	check(wizard.get_node_or_null("Sprite/Hat") is Sprite2D, "the hat is a Sprite2D under Sprite")
 

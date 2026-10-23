@@ -72,9 +72,9 @@ One animation is one horizontal strip: frame 1 at the left, each frame 32 px wid
 
 | Animation | Frames | Loops | Speed | Notes |
 | --- | --- | --- | --- | --- |
-| Idle | 4 | yes | 6 fps | Poses, not motion: eyes open, eyes closed (the blink), glance left, glance right. The game orders them (a blink every few seconds, a glance now and then) and adds the 1 px breathing bob itself |
-| Walk / move | 6 | yes | 12 fps | Same silhouette height in every frame |
-| Dodge | 4 | no | 16 fps | Reads as a quick roll or dash; the last frame returns to idle |
+| Idle | 4 | yes | 6 fps | Poses, not motion: eyes open, eyes closed (the blink), glance left, glance right. The game orders them (a blink every few seconds, a glance now and then) and adds the breathing bob itself: body and hat sit 1 px lower for part of each breath (`IDLE_SEQUENCE`, `BREATH_STEPS`) |
+| Walk / move | 4 | yes | 8 fps | Same silhouette height in every frame; the game dips the body on alternate frames (`WALK_BOB`) |
+| Dodge | 2 | no | 16 fps | A crouch, then lifted off the ground (`DASH_BOB`); the last frame holds, then idle returns |
 | Cast | 4 | no | 16 fps | Frame 3 is the release; the game sends the spell then |
 | Hurt | 2 | no | 12 fps | One frame of recoil, one of recovery |
 | Downed | 2 | yes | 4 fps | The player lies down in their colour; the revive ring is drawn by the game |
@@ -83,6 +83,8 @@ One animation is one horizontal strip: frame 1 at the left, each frame 32 px wid
 | Projectile | 2–4 | yes | 12 fps | Loops while it flies |
 | Impact / spark | 4 | no | 20 fps | Over in 0.2 s |
 | Animated tile | 4 | yes | 4 fps | Optional (torches, water); still tiles are 1 frame |
+
+The table is a guide; the wizard's real values are the constants in `gameplay/player/player.gd`.
 
 A single still image has 1 frame and is a plain 32×32 file.
 

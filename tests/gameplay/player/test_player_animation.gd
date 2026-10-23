@@ -25,6 +25,8 @@ func _initialize() -> void:
 	_test_scene_lists_the_strips()
 	_test_idle_at_rest()
 	_test_idle_blinks_glances_and_breathes()
+	_test_players_do_not_idle_in_step()
+	_test_glances_follow_the_facing()
 	_test_walk_and_dash_move_the_body()
 	_test_walking_plays_the_walk_strip()
 	_test_dash_plays_once_then_idle()
@@ -209,6 +211,36 @@ func _test_idle_blinks_glances_and_breathes() -> void:
 	# Most of the time the eyes are open: a blink is a moment, not a state.
 	var open: int = PlayerScript.IDLE_SEQUENCE.count(0)
 	_check(open * 4 >= PlayerScript.IDLE_SEQUENCE.size() * 3, "the eyes are open most of the time")
+
+
+## Two wizards standing side by side are not on the same beat of the idle.
+func _test_players_do_not_idle_in_step() -> void:
+	var first: Array[int] = []
+	var second: Array[int] = []
+	for index in 2:
+		_setup(index)
+		for i in 160:
+			_run(1)
+			var shown: int = _sprite().frame * 10 + int(_sprite().offset.y)
+			if index == 0:
+				first.append(shown)
+			else:
+				second.append(shown)
+	_check(first != second, "two players show different idle poses at the same moment")
+
+
+## "Glance left" is on screen: the sprite is mirrored when facing left, so the poses swap.
+func _test_glances_follow_the_facing() -> void:
+	_setup()
+	var glance_step: int = PlayerScript.IDLE_SEQUENCE.find(2)
+	_check(glance_step >= 0, "the sequence has a glance left")
+	_wizard._faces_left = true
+	_wizard._anim_time = (float(glance_step) + 0.5) / PlayerScript.IDLE_FPS
+	_wizard._update_animation(0.0)
+	_check(_sprite().frame == 3, "a left glance uses the right-glancing pose when the sprite is mirrored")
+	_wizard._faces_left = false
+	_wizard._update_animation(0.0)
+	_check(_sprite().frame == 2, "a left glance uses the left pose when facing right")
 
 
 ## The walk dips the body on its stride frames and the dash crouches, then lifts it; the

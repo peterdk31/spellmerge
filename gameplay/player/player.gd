@@ -127,14 +127,19 @@ const IDLE_FPS: float = 6.0
 const WALK_FPS: float = 8.0
 const DASH_FPS: float = 16.0
 ## The idle strip has four poses: 0 eyes open, 1 eyes closed, 2 glance left, 3 glance
-## right. IDLE_SEQUENCE says which one shows at each idle step (8 s, then it loops):
-## a blink, a glance left, a double blink and a glance right, so the wizard looks alive.
+## right (on screen: the sprite is mirrored when the wizard faces left, so the two
+## glances swap then). IDLE_SEQUENCE says which one shows at each idle step (8 s, then
+## it loops): a blink, a glance left, a double blink and a glance right, so the wizard
+## looks alive. Each player starts IDLE_STEP_OFFSET steps further in, so a group of
+## wizards does not blink and glance on the same beat.
 const IDLE_SEQUENCE: Array[int] = [
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0,
 	0, 0, 0, 0, 0, 0, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 3, 3, 3, 3,
 ]
-## Breathing: for the second half of every BREATH_STEPS idle steps the body sits 1 px lower.
+const IDLE_STEP_OFFSET: int = 13
+## Breathing: for the second half of every BREATH_STEPS idle steps the body sits 1 px
+## lower (the feet dip 1 px below the standing line; the shadow stays).
 const BREATH_STEPS: int = 12
 ## How many pixels the body (and the hat) sit lower on each frame of the walk, and
 ## on each frame of the dash (a crouch, then lifted off the ground; the shadow stays).
@@ -352,7 +357,11 @@ func _update_animation(delta: float) -> void:
 		_sprite.frame = step_index % _sprite.hframes
 		_set_bob(WALK_BOB[_sprite.frame % WALK_BOB.size()])
 	else:
-		_sprite.frame = mini(IDLE_SEQUENCE[step_index % IDLE_SEQUENCE.size()], _sprite.hframes - 1)
+		step_index += index * IDLE_STEP_OFFSET
+		var pose: int = IDLE_SEQUENCE[step_index % IDLE_SEQUENCE.size()]
+		if _faces_left and pose >= 2:
+			pose = 5 - pose
+		_sprite.frame = mini(pose, _sprite.hframes - 1)
 		_set_bob(1 if step_index % BREATH_STEPS >= BREATH_STEPS / 2 else 0)
 
 

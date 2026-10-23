@@ -43,6 +43,7 @@ const PoolScript := preload("res://core/pools/pool.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const FeelPresetScript := preload("res://gameplay/feel/presets/feel_preset.gd")
 const FLASH_SHADER: Shader = preload("res://gameplay/feel/hit_flash.gdshader")
+const REACTION_SHADER: Shader = preload("res://gameplay/feel/reaction_flash.gdshader")
 ## Draws the beam and the nova ring like a shot: bone body tinted by the player, core by the element.
 const CORE_SHADER: Shader = preload("res://core/projectiles/shot_core.gdshader")
 ## Beams and nova rings on screen per player: one cast makes at most 24 shots (the spell limit),
@@ -147,6 +148,7 @@ var _react_left: PackedFloat32Array = PackedFloat32Array()
 var _react_total: PackedFloat32Array = PackedFloat32Array()
 var _react_amount: PackedFloat32Array = PackedFloat32Array()
 var _flash_material: ShaderMaterial = null
+var _reaction_material: ShaderMaterial = null
 ## Muzzle flashes and death puffs: sprites made once, with seconds left, seconds
 ## they started with and their size (parallel arrays of ALL_FLASH_SLOTS).
 var _flashes: Array[Sprite2D] = []
@@ -217,6 +219,8 @@ func _ready() -> void:
 	_bursts = PoolScript.new(_make_burst, BURST_SLOTS, Callable(), _hide_burst)
 	_flash_material = ShaderMaterial.new()
 	_flash_material.shader = FLASH_SHADER
+	_reaction_material = ShaderMaterial.new()
+	_reaction_material.shader = REACTION_SHADER
 	for i in ALL_FLASH_SLOTS:
 		var flash := Sprite2D.new()
 		flash.texture = _texture
@@ -224,6 +228,9 @@ func _ready() -> void:
 		flash.visible = false
 		flash.z_index = 20
 		flash.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		if i >= FLASH_SLOTS + SPARK_SLOTS:
+			# A reaction is told apart by its colour, and the gold spark art would bend any tint.
+			flash.material = _reaction_material
 		add_child(flash)
 		_flashes.append(flash)
 	for i in FORM_SLOTS:

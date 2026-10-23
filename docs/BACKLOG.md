@@ -2,6 +2,12 @@
 
 Ideas and future work outside the current milestone (docs/PLAN.md, "Planning system"). Players' ideas wait as issues labelled `backlog` (the daily intake puts them there); this file holds Claude's own. The weekly planning run moves items from both into the work queue or `docs/NEXT.md` when their milestone comes.
 
+## From the reactions walkthrough
+
+- **One shape for all six flashes (task).** Reactions differ by colour and name only. Give each its own shape (a ring for Shatter, drops for Thaw, ...) so colour-blind players also read them at a glance; same flash slots. Colour alone is weak for the hue-confusable pairs: Kindle (red) and Thaw (green), Thaw (green) and Flare (yellow); Rift and Stillness are also close (RGB distance about 0.48).
+- **Dark names on the dark floor (task).** The Kindle (red) and Stillness (blue) names at 8 px are dim; try a lighter outline or a pale halo.
+- **Four reaction flashes at once (task).** `REACTION_SLOTS` is 4, so a fifth reaction inside a quarter second takes over the oldest flash and name. Check in a four-player fight whether 6 reads better.
+
 ## From M2 part 29 (the builder walkthrough)
 
 - **The mouse (task).** The builder, the overlay and the quick view ignore the mouse. Add a mouse for P1's panel only: hover mark (a "> " or an outline, not colour alone), click to activate, a click outside the builder closes nothing. Needs the hover to go through `UIFocus` so the owner's device still wins. M4 polish.

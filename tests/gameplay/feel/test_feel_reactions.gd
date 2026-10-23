@@ -103,3 +103,30 @@ func test_the_same_reaction_on_the_same_spot_shows_one_name_and_one_sound() -> v
 		_feel.step(STEP)
 	_bus.reaction_triggered.emit(0, &"flare", Vector2(10.0, 10.0))
 	check_equal(_registry.asked.count(&"reaction_flare"), 2, "and the sound comes back later")
+
+
+func test_the_six_reactions_have_colours_that_differ_at_a_glance() -> void:
+	var preset: FeelPresetScript = FeelPresetScript.new()
+	var ids: Array = preset.reaction_colors.keys()
+	check_equal(ids.size(), 6, "one colour for each of the six reactions")
+	for a in ids.size():
+		for b in range(a + 1, ids.size()):
+			var one: Color = preset.reaction_colors[ids[a]] as Color
+			var other: Color = preset.reaction_colors[ids[b]] as Color
+			var apart: float = Vector3(one.r - other.r, one.g - other.g, one.b - other.b).length()
+			check(apart >= 0.45, "%s and %s are far apart in colour (%.2f)" % [ids[a], ids[b], apart])
+
+
+func test_a_reaction_flash_keeps_its_own_colour_not_the_arts() -> void:
+	_bus.reaction_triggered.emit(0, &"rift", Vector2(5.0, 5.0))
+	var found: bool = false
+	for child in _feel.get_children():
+		var flash := child as Sprite2D
+		if flash == null or not flash.visible or flash.material == null:
+			continue
+		var material := flash.material as ShaderMaterial
+		if material != null and material.shader.resource_path.ends_with("reaction_flash.gdshader"):
+			found = true
+			var want: Color = _feel.preset.reaction_colors[&"rift"] as Color
+			check_equal(flash.modulate.r, want.r, "the flash is tinted with the reaction's colour")
+	check_equal(found, true, "a visible flash draws with the reaction shader")

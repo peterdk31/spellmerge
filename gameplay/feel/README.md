@@ -31,7 +31,7 @@ The first preset is `presets/punchy.tres`. Follow the steps and test layout in [
 
 ## Example to copy
 
-`gameplay/feel/presets/punchy.tres`, a `FeelPreset` (`presets/feel_preset.gd`): hit-stop length, shake strength and decay, particle speed and life, and the sound ids. Copy it, change the numbers and load it as `Feel.preset` before Feel's `_ready` (the art is read once, then). On `reaction_triggered` feel shows a flash and a burst in the reaction's colour (`reaction_colors` by id), its name rising from the spot, a little shake, and plays the sound `reaction_<id>` (silent until Audio adds it). A preset only tunes reactions; it has no field that touches damage. It also names the art feel draws (`spark_texture`, `bolt_texture`, `hostile_texture`), so a re-skin is a preset, never an edit to `feel.gd`. Tests: `tests/gameplay/feel/test_feel.gd`.
+`gameplay/feel/presets/punchy.tres`, a `FeelPreset` (`presets/feel_preset.gd`): hit-stop length, shake strength and decay, particle speed and life, and the sound ids. Copy it, change the numbers and load it as `Feel.preset` before Feel's `_ready` (the art is read once, then). On `reaction_triggered` feel shows a flash (drawn flat in the colour, by `reaction_flash.gdshader`, so the art never bends it; keep the six colours far apart) and a burst in the reaction's colour (`reaction_colors` by id), its name rising from the spot, a little shake, and plays the sound `reaction_<id>` (silent until Audio adds it). A preset only tunes reactions; it has no field that touches damage. It also names the art feel draws (`spark_texture`, `bolt_texture`, `hostile_texture`), so a re-skin is a preset, never an edit to `feel.gd`. Tests: `tests/gameplay/feel/test_feel.gd`.
 
 ## Validate
 

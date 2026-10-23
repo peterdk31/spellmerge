@@ -69,12 +69,12 @@ extends Resource
 @export_range(0.1, 6.0, 0.1) var reaction_flash_size: float = 1.4
 @export_range(0.0, 1.0, 0.01) var reaction_shake: float = 0.2
 @export var reaction_colors: Dictionary = {
-	&"shatter": Color("bfe6ff"),
-	&"thaw": Color("e8e0d0"),
-	&"flare": Color("f2a030"),
-	&"kindle": Color("e0592f"),
-	&"stillness": Color("7fc0f0"),
-	&"rift": Color("c99af0"),
+	&"shatter": Color("e8fbff"),
+	&"thaw": Color("7be05a"),
+	&"flare": Color("ffd23a"),
+	&"kindle": Color("ff3b30"),
+	&"stillness": Color("4a78ff"),
+	&"rift": Color("c05cff"),
 }
 @export var reaction_sound_prefix: String = "reaction_"
 ## Sound ids asked from `core/registry`. A missing sound is silent.

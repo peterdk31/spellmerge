@@ -86,6 +86,8 @@ One animation is one horizontal strip: frame 1 at the left, each frame 32 px wid
 
 A single still image has 1 frame and is a plain 32×32 file.
 
+These counts stand until the wizard redraw task confirms them.
+
 The art only shows timing; it doesn't set it. The telegraph's length and the moment damage lands are set by the AI and the scene (the telegraph frames can be held longer there; 0.25 s is only the shortest), never by the animation.
 
 ## File formats
@@ -120,7 +122,7 @@ A minimal valid example, a stone **wall** tile with its lit top-left edge and sh
 
 ## UI
 
-These counts stand until the wizard redraw task confirms them. The HUD (M1 parts 18 and 19) and the Style Guide page build on these.
+These rules are final, like the rest of the chosen style. The HUD (M1 parts 18 and 19) and the Style Guide page build on these.
 
 - **Font:** one pixel font, set in `hud/theme`, at whole-number sizes only. Body text is Bone light on Stone shadow; headings Bone base; warnings Fire light; gold and pickups Spark light. No other text colours.
 - **Panels:** a 1 px Outline border, Stone shadow fill, a Stone light top and left inner edge (3 shades at most). Corners are cut by one pixel, not rounded.
@@ -134,7 +136,7 @@ Style N, chosen by the owner. The wizard is three layers, so a player colour is 
 
 - **Body** (`art/samples/n_dusk/body.svg`): narrow (10 px at the chest, 12 px at the hem), a Stone robe with a Spark front placket, belt with a buckle and hem band, long sleeves, a Wood staff. **Two big tall eyes (2×3 px, black, with a highlight) and nothing else on the face**: no mouth, no cheeks. The body uses no player colour.
 - **Hat** (`art/samples/hats_std/hat_p1.svg` to `hat_p4.svg`): the big pointed hat with a Spark band and a wide brim, in the player's ramp, drawn over the body.
-- **Blink** (`art/samples/n_dusk/blink.svg`): the closed eyes (Skin with a black line), drawn over the body's eyes. Draw order: body, then blink, then hat (the brim sits above the eyes, so the hat covers the top of the blink). Plan for the redraw task, not yet in the game: the wizard blinks every 2 to 5 seconds (random) for about 0.15 s, so an idle wizard feels alive.
+- **Blink** (`art/samples/n_dusk/blink.svg`): the closed eyes (Skin with a black line), drawn over the body's eyes. Draw order: body, then blink, then hat (the hat does not overlap the eyes, its lowest row is y=14; the order only keeps the player's colour on top). Plan for the redraw task, not yet in the game: the wizard blinks every 2 to 5 seconds (random) for about 0.15 s, so an idle wizard feels alive.
 - **Idle (planned, not yet in the game):** the layers move together by 1 px down and up (a four-step bob at the idle speed in the table below), so no per-frame, per-player strip is needed: the game moves the layers, the art stays still. The blink and the bob are timed in the scene, never in the art.
 
 The blink and the bob are neither implemented nor tested yet; the "Move the wizard into style N" task in `docs/NEXT.md` does both. These files are still samples under `art/samples/`; the wizard in `content/wizard/` and the game still use the earlier placeholder. Moving N into `content/wizard/` (the layers, the four hat files loaded by player index through `core/registry`) is the wizard's redraw task.

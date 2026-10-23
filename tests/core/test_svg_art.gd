@@ -242,6 +242,36 @@ func test_the_blink_layer_covers_exactly_the_eyes() -> void:
 		check(covered.has(cell), "blink.svg leaves the eye pixel %s open" % cell)
 	for colour: String in PLAYER_COLOURS:
 		check(not text.contains(colour), "blink.svg uses the player colour %s" % colour)
+	# The blink must sit on the body's eyes: every non-Skin cell of the body's face band (highlight,
+	# pupil, eye block, x 11 to 18, rows 16 to 18) is a blink cell, and the other way round.
+	var body_text: String = FileAccess.get_file_as_string("res://art/samples/n_dusk/body.svg")
+	var body_eyes: Dictionary = {}
+	for rect in rect_pattern.search_all(body_text):
+		var body_x: int = rect.get_string(1).to_int()
+		var body_y: int = rect.get_string(2).to_int()
+		if rect.get_string(5) == "#f5cfa8" or body_x < 11 or body_x > 18 or body_y < 16 or body_y > 18:
+			continue
+		for dx in rect.get_string(3).to_int():
+			for dy in rect.get_string(4).to_int():
+				body_eyes[Vector2i(body_x + dx, body_y + dy)] = true
+	check_equal(body_eyes.keys().size(), covered.keys().size(), "the body's eyes and the blink cover the same number of pixels")
+	for cell: Vector2i in body_eyes:
+		check(covered.has(cell), "the body's eye pixel %s is not under the blink" % cell)
+
+
+## Every path in art/kit/golden.json exists, so the Style Guide never points at a missing file.
+func test_every_golden_example_exists() -> void:
+	var golden: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://art/kit/golden.json"))
+	check(golden is Dictionary, "art/kit/golden.json is a JSON object")
+	if not golden is Dictionary:
+		return
+	var examples: Variant = (golden as Dictionary).get("examples", [])
+	check(examples is Array and not (examples as Array).is_empty(), "golden.json lists examples")
+	if not examples is Array:
+		return
+	for entry: Variant in examples:
+		var path: String = String((entry as Dictionary).get("path", "")) if entry is Dictionary else ""
+		check(FileAccess.file_exists("res://" + path), "golden.json lists %s, which does not exist" % path)
 
 
 func test_every_svg_is_in_the_manifest() -> void:

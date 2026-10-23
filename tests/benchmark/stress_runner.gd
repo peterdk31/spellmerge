@@ -3,7 +3,7 @@ extends Node
 ## (Flow, Combat, the projectile manager, the spell runtime, Feel and the HUD), with
 ## enemies and shots kept at the numbers of the PLAN's stress scenario (docs/PLAN.md,
 ## "Performance budgets"):
-##  - web: 100 enemies, 1,000 shots,
+##  - web: 100 enemies, shots at the web cap (500 since the first web run; the PLAN said 1,000),
 ##  - desktop: 200 enemies, 3,000 shots,
 ## both with four players and full effects (every hit sends its particles, reactions
 ## and numbers). Between them run two diagnostic variants of the web scenario, to explain the
@@ -16,7 +16,7 @@ extends Node
 ## path (`cast`, and `swap` every SWAP_EVERY seconds so both spells are used). Their
 ## mana and health are kept full (so they keep casting), and enemies are added whenever
 ## fewer than the target stand, with more health than the game's imp, so fights go on.
-## The shots the spells make are never enough for 1,000 or 3,000, so each physics step
+## The shots the spells make are never enough for 500 or 3,000, so each physics step
 ## the runner tops the projectile manager up to the target with plain shots owned by the
 ## players in turn (at most TOP_UP_PER_STEP a step); the manager's cap is set to the
 ## target, so the oldest shot of the richest owner is dropped past it, as in play.
@@ -47,12 +47,13 @@ const AiScript := preload("res://gameplay/ai/ai.gd")
 
 const PLAYERS: int = 4
 ## The scenarios: label, enemies, shots, and (variants only) whether the scene is drawn and
-## whether hit particles start.
+## whether hit particles start. The web scenarios follow the web cap on purpose (the web
+## budget is that cap); the PLAN's 1,000 is the older figure to compare against.
 const SCENARIOS: Array[Dictionary] = [
-	{"label": "web", "enemies": 100, "shots": 1000},
+	{"label": "web", "enemies": 100, "shots": ProjectileManagerScript.DEFAULT_CAP_WEB},
 	{"label": "desktop", "enemies": 200, "shots": 3000},
-	{"label": "web, render loop off", "enemies": 100, "shots": 1000, "render": false},
-	{"label": "web, hit particles off", "enemies": 100, "shots": 1000, "particles": false},
+	{"label": "web, render loop off", "enemies": 100, "shots": ProjectileManagerScript.DEFAULT_CAP_WEB, "render": false},
+	{"label": "web, hit particles off", "enemies": 100, "shots": ProjectileManagerScript.DEFAULT_CAP_WEB, "particles": false},
 ]
 ## Game seconds a scenario takes to build up before frames are measured, and to measure.
 const WARM_UP: float = 3.0

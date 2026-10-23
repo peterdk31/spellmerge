@@ -8,7 +8,7 @@
 
 1. **Validators pass:** every component `.tres` and the reaction table pass the content validator (`core/spells/validator.gd`), run by `tests/content/spells/test_validators.gd` in `ci/build/build.sh --quick --tests`. A broken fixture of each kind fails it with a message that names the file, the field and the fix.
 2. **20+ combos work:** `tests/content/spells/test_combos.gd` builds at least 20 named spells from the combo catalogue (below), casts each in a headless test arena, and checks the behaviour each one promises. Every one of the 18 components appears in at least two passing combos that are not refusal checks.
-3. The **stress benchmark** runs in the daily build and is within budget: 4 players, 100 enemies and 1,000 projectiles on web, 200 and 3,000 on desktop, full effects, game-logic frame time under 16.7 ms on the runner. Over budget it prints a warning with the numbers and likely fixes, never a failure (docs/PLAN.md, "Gates are sparse"); this done-when item is met when the warning is gone, which is a task, not a gate.
+3. The **stress benchmark** runs in the daily build and is within budget: 4 players, 100 enemies and 500 projectiles on web (1,000 until the first web run, docs/DECISIONS.md, 2026-10-23), 200 and 3,000 on desktop, full effects, game-logic frame time under 16.7 ms on the runner. Over budget it prints a warning with the numbers and likely fixes, never a failure (docs/PLAN.md, "Gates are sparse"); this done-when item is met when the warning is gone, which is a task, not a gate.
 4. The **4-bot smoke test** passes natively and on web with built spells: bots 1–3 each fight with a random valid spell, and bot 4 stays in its builder (full view in the breaks, the quick view during waves) while the others progress.
 5. M1's carried-over items are done (below).
 6. The **stabilisation phase** is over: no known crash or blocker in M2's scope.
@@ -131,7 +131,7 @@ Every combo in the catalogue below fits under 12 with these numbers. Its largest
 - **Shots per cast:** at most **24** from one cast, after split, nova and `shot_mult` multiply. The compiler clamps the count and says so in the description.
 - **Trigger depth:** a trigger may hold a spell whose own trigger holds another, at most **2** levels below the cast (depth 3 in all). The builder offers no deeper slot.
 - **Trigger fires per player per step:** at most **32**. Extra fires in that step are dropped, not queued, so an on-hit cascade can never snowball across frames. Each trigger also has `max_fires` per shot; a timer fires at most 4 times.
-- **The global projectile cap** stays 1,000 on web and 3,000 on desktop, and drops the oldest shot of whoever owns the most. At the cap, effects degrade (fewer particles per hit) instead of lagging. `feel` keeps its `PARTICLE_LIMIT`; components declare no particles in M2, so the validator has no particle count to check yet.
+- **The global projectile cap** is 500 on web (1,000 until the first web run, docs/DECISIONS.md, 2026-10-23) and stays 3,000 on desktop, and drops the oldest shot of whoever owns the most. At the cap, effects degrade (fewer particles per hit) instead of lagging. `feel` keeps its `PARTICLE_LIMIT`; components declare no particles in M2, so the validator has no particle count to check yet.
 - These numbers are first guesses for the stress benchmark (part 25) to confirm or lower. They are constants in `core/spells/limits.gd`. Tests check that a spell at every limit still compiles and that one over a limit is refused or clamped.
 
 ### Building spells, without anyone waiting
@@ -232,7 +232,7 @@ Each part ends with tests and a green `tools/check.sh` and `ci/build/build.sh --
 | 21 | **Combos to 20+:** `combos.json` | At least 20 combos passing, each component in two non-refusal combos; done-when item 2 |
 | 22 | **Story canon:** `docs/STORY.md` | Canon and tone, short; listed in `llms.txt` |
 | 23 | **The first lore:** `content/story/lore/components/` | One description per component, its validator, the Story README's example and schema; the builder shows them |
-| 24 | **Stress scene:** `tests/benchmark` | The stress scene (4 bots with built spells, 100 or 200 enemies, 1,000 or 3,000 shots, full effects) in the editor run, `BENCH:` lines, `STRESS OK` |
+| 24 | **Stress scene:** `tests/benchmark` | The stress scene (4 bots with built spells, 100 or 200 enemies, 500 or 3,000 shots, full effects) in the editor run, `BENCH:` lines, `STRESS OK` |
 | 25 | **Stress in the exports and the limits:** `tests/benchmark`, `core/spells/limits.gd` | The stress run and M1's WASM projectile timing runner in the Linux Test and Web Test exports (a node the main menu adds on `--stress` or `--projectile-timing`, like the 4-bot runner); the limits confirmed or lowered from the numbers; the `ci/` step (a warning over budget, not a gate) asked as an owner issue |
 | 26 | **Component icons and art pass:** `art/`, `content/spells/` | Icons for all 18, element shot tints and the vfx checked together in one screenshot sheet against docs/STYLE.md; whatever falls short becomes Claude's own replacement task in `docs/NEXT.md` |
 | 27 | **Art direction choice** | Claude drafts the style samples itself and asks the owner in one `owner` issue to pick one (optionally after asking players for feedback in Discussions) and to lock it in DESIGN.md; nothing in the game waits on it |

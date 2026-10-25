@@ -5,8 +5,7 @@ revision in its edit history is by the owner too. Commands from anyone else are
 ignored and never treated as instructions.
 
 Carried out here, by script: /pause, /resume, /close, /merge, /revert and /retry (puts a parked
-task back in the queue: on its PR, or on the issue it comes from; a bot PR whose task is no longer
-queued, done or dropped meanwhile, is closed instead).
+task back in the queue: on its PR, or on the issue it comes from).
 Queued for the next Claude session: /priority, /claude <text> and /ask <question>.
 Checkpoint answers, only in an open `checkpoint` issue: /go, /iterate <what> and /pivot <how>
 (smbot.checkpoint); the gate starts a planning session that carries them out.
@@ -219,7 +218,7 @@ def retry_status(st: dict[str, Any], number: int, open_tasks: Collection[str]) -
 
 def do_retry(cfg: config_mod.Config, effects: Effects, cmd: Command, st: dict[str, Any],
              open_tasks: Collection[str]) -> str:
-    """Puts the task back in the queue; closes the bot's own PR if its task is no longer queued."""
+    """Puts the task back in the queue, or says why there is nothing to put back."""
     effects.retries.append(cmd.number)
     try:
         gh.api(f"repos/{cfg.repo}/issues/{cmd.number}/labels/parked", "-X", "DELETE")
@@ -231,13 +230,8 @@ def do_retry(cfg: config_mod.Config, effects: Effects, cmd: Command, st: dict[st
     if status == "queued":
         return ("Back in the queue: the next session takes this task up again, with two fresh attempts and the "
                 "last review's points as its brief.")
-    gone = ("this task is no longer in the queue (`docs/NEXT.md` or the scheduled issues), so no session takes "
-            "it up again. It was done or dropped, maybe by another pull request.")
-    pr = gh.api(f"repos/{cfg.repo}/pulls/{cmd.number}") if cmd.is_pr else None
-    if pr is None or pr["state"] != "open" or (pr.get("user") or {}).get("login") != cfg.bot.login:
-        return f"Nothing to retry: {gone}"
-    gh.api(f"repos/{cfg.repo}/pulls/{cmd.number}", "-X", "PATCH", input={"state": "closed"})
-    return f"Closed this pull request: {gone}"
+    return ("Nothing to retry: this task is no longer in the queue (`docs/NEXT.md` or the scheduled issues); "
+            "it was done or dropped meanwhile. If this is the bot's pull request, this check closes it.")
 
 
 def queue_instruction(effects: Effects, cmd: Command) -> str:

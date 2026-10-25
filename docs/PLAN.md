@@ -430,7 +430,7 @@ Claude's own development is the only engine and players steer it with bug report
 
 - **Same-day merge of Claude's own PRs:** rules, tests, smoke test and benchmark, plus an independent review by a separate Claude session with fresh context. If all pass, it merges immediately and the next session builds on it.
 - **Tasks sized to one session;** the weekly planning run splits larger ones.
-- **Never stuck:** a task that fails twice or is reported blocked is set aside for a week with the reason logged, and work moves on to the next task; blocked tasks are revisited weekly. A task blocked on an owner question names the question's key under `## Blocked` in `docs/NEXT.md`, and goes before the queue by itself once that question is closed or answered with `/claude` (`smbot.nexttask.unblocked`). A task whose approved PR waits on GitHub or the owner is set aside for a day the same way.
+- **Never stuck:** a task that fails twice or is reported blocked is set aside for a week with the reason logged, and work moves on to the next task; blocked tasks are revisited weekly. A task blocked on an owner question names the question's key under `## Blocked` in `docs/NEXT.md`, and goes before the queue by itself once that question is closed or answered with `/claude` (`smbot.nexttask.unblocked`). A task whose approved PR waits on GitHub or the owner is set aside for a day the same way. A waiting PR whose task leaves the queue meanwhile (another PR did it, or planning reworded or dropped it) is closed by the hourly check, with the reason on the PR and in the Daily log (`smbot.stale`); nothing else would take it up again.
 - **Never waiting for humans:** unclear points are decided by Claude and recorded in `DECISIONS.md`; only the vision needs the owner.
 - **Milestones never depend on players:** all content targets are planned as Claude's work; a player's idea that fits shapes or replaces a task.
 
@@ -488,7 +488,7 @@ Comments by the owner's user ID on any issue or PR are carried out by the next r
 | `/ask <question>` | Claude replies in the thread |
 | `/pause`, `/resume` | Same as the panel checkboxes |
 | `/go`, `/iterate <what>`, `/pivot <how>` | Answer a milestone checkpoint (only in its checkpoint issue); planning starts at once |
-| `/retry` | On a parked task's PR or issue: back in the queue now, with two fresh attempts. If the task is no longer queued (done or dropped meanwhile), the bot's own PR is closed instead; the reply and the Daily log say so |
+| `/retry` | On a parked task's PR or issue: back in the queue now, with two fresh attempts (the reply says when there is nothing to put back) |
 
 `/claude` instructions follow the same rules as all of Claude's work: they cannot change protected paths or override security, copyright or quality rules.
 

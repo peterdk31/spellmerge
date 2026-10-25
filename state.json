@@ -9,6 +9,7 @@
     "number": 238
   },
   "errors_in_a_row": 0,
+  "idle": null,
   "intake_tasks": {
     "208": {
       "author": "Brianmanden",
@@ -68,51 +69,6 @@
   ],
   "task_failures": {},
   "usage": [
-    {
-      "at": "2026-10-17T19:41:25Z",
-      "kind": "dev",
-      "tokens": 15766
-    },
-    {
-      "at": "2026-10-17T20:37:49Z",
-      "kind": "dev",
-      "tokens": 97103
-    },
-    {
-      "at": "2026-10-17T20:38:50Z",
-      "kind": "review",
-      "tokens": 46642
-    },
-    {
-      "at": "2026-10-17T20:42:35Z",
-      "kind": "dev",
-      "tokens": 105224
-    },
-    {
-      "at": "2026-10-17T20:43:32Z",
-      "kind": "review",
-      "tokens": 34060
-    },
-    {
-      "at": "2026-10-17T20:49:18Z",
-      "kind": "dev",
-      "tokens": 253308
-    },
-    {
-      "at": "2026-10-17T20:50:49Z",
-      "kind": "review",
-      "tokens": 81230
-    },
-    {
-      "at": "2026-10-17T20:55:54Z",
-      "kind": "dev",
-      "tokens": 198858
-    },
-    {
-      "at": "2026-10-17T20:57:08Z",
-      "kind": "review",
-      "tokens": 69013
-    },
     {
       "at": "2026-10-17T21:05:25Z",
       "kind": "dev",
@@ -2077,6 +2033,11 @@
       "at": "2026-10-25T19:31:09Z",
       "kind": "review",
       "tokens": 27440
+    },
+    {
+      "at": "2026-10-25T20:58:11Z",
+      "kind": "dev",
+      "tokens": 1714706
     }
   ],
   "version": 1

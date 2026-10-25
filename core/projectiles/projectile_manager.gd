@@ -182,6 +182,23 @@ const BATCH_BOLT: int = 0
 const BATCH_RUNE: int = 1
 const BATCH_ORBIT: int = 2
 const BATCH_HOSTILE: int = 3
+## The trail marks behind shaped bolts (see `set_shape`); counted apart from the shots.
+const BATCH_TRAIL: int = 4
+## The element shapes (`set_shape`): 0 is the plain sprite. They match `ElementBase.shape`.
+const SHAPE_FLAME: int = 1
+const SHAPE_STAR: int = 2
+const SHAPE_ZIGZAG: int = 3
+const SHAPE_RING: int = 4
+const SHAPE_COUNT: int = 5
+## Trail marks per shaped bolt and the most marks drawn in all. Past the limit the later
+## shots draw no trail; it is a draw batch, not particles, so Feel's PARTICLE_LIMIT is
+## untouched, and the cost is bounded whatever the cap is.
+const TRAIL_MARKS: int = 2
+const TRAIL_MAX: int = 256
+## Pixels between a bolt and its first trail mark, and between marks, per shape.
+const TRAIL_STEP: PackedFloat32Array = [0.0, 7.0, 9.0, 6.0, 8.0]
+## Sideways pixels the marks drift off the line of flight, per shape (alternating sides).
+const TRAIL_DRIFT: PackedFloat32Array = [0.0, 3.0, 0.0, 5.0, 4.0]
 ## Draws the neutral sprites: the bone body takes the owner's tint, the Spark-coloured
 ## core takes the element's colour (`set_core`).
 const CORE_SHADER: Shader = preload("res://core/projectiles/shot_core.gdshader")
@@ -246,6 +263,9 @@ var friendly_fire: bool = false
 
 var _cap: int = 0
 var _count: int = 0
+## Seconds of simulation stepped so far; shaped shots animate from it (not from the
+## engine's clock), so a hand-stepped run draws the same frames every time.
+var sim_time: float = 0.0
 ## One past the highest slot in use.
 var _high: int = 0
 var _next_seq: int = 0
@@ -315,6 +335,8 @@ var _has_walls: bool = false
 
 ## The colour of each shot's core (white for a plain shot), see `set_core`.
 var _core: PackedColorArray = PackedColorArray()
+## The element shape of each shot (0 plain), see `set_shape`.
+var _shape: PackedByteArray = PackedByteArray()
 var _draw_node: MultiMeshInstance2D = null
 ## Shots each batch's MultiMesh and buffer have room for now (see `_batch_room`).
 var _draw_room: int = 0
@@ -322,7 +344,12 @@ var _rune_room: int = 0
 var _orbit_room: int = 0
 var _hostile_room: int = 0
 ## Live shots per batch this frame (BATCH_*), refilled by _count_batches; a member so no array is made per frame.
-var _batch_counts: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
+var _batch_counts: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0])
+var _trail_room: int = 0
+var _trail_node: MultiMeshInstance2D = null
+var _trail_buffer: PackedFloat32Array = PackedFloat32Array()
+## Trail marks drawn by the last `update_draw`.
+var drawn_trails: int = 0
 var _draw_buffer: PackedFloat32Array = PackedFloat32Array()
 ## The batches of runes and orbit shots, beside the bolts' `_draw_node`.
 var _rune_node: MultiMeshInstance2D = null
@@ -371,6 +398,7 @@ func _ready() -> void:
 	_rune_node = _make_batch(DRAW_Z, true)
 	_orbit_node = _make_batch(DRAW_Z, true)
 	_hostile_node = _make_batch(DRAW_Z + 1, false)
+	_trail_node = _make_batch(DRAW_Z - 1, true)
 	_apply_textures()
 	_fit_draw_bounds()
 
@@ -404,6 +432,8 @@ func _apply_textures() -> void:
 		_orbit_node.texture = orbit_texture if orbit_texture != null else texture
 	if _hostile_node != null:
 		_hostile_node.texture = hostile_texture if hostile_texture != null else texture
+	if _trail_node != null:
+		_trail_node.texture = texture
 
 
 func _physics_process(delta: float) -> void:
@@ -439,6 +469,9 @@ func set_cap(value: int) -> void:
 	_own_prev.resize(_cap)
 	_own_next.resize(_cap)
 	_core.resize(_cap)
+	_shape.resize(_cap)
+	_trail_buffer.resize(0)
+	_trail_room = 0
 	_draw_buffer.resize(0)
 	_rune_buffer.resize(0)
 	_orbit_buffer.resize(0)
@@ -455,6 +488,7 @@ func set_cap(value: int) -> void:
 		_rune_node.multimesh.instance_count = 0
 		_orbit_node.multimesh.instance_count = 0
 		_hostile_node.multimesh.instance_count = 0
+		_trail_node.multimesh.instance_count = 0
 
 
 func get_cap() -> int:
@@ -597,6 +631,7 @@ func _fit_draw_bounds() -> void:
 	_rune_node.multimesh.custom_aabb = aabb
 	_orbit_node.multimesh.custom_aabb = aabb
 	_hostile_node.multimesh.custom_aabb = aabb
+	_trail_node.multimesh.custom_aabb = aabb
 
 
 ## Remove every projectile (targets stay registered).
@@ -748,6 +783,24 @@ func set_core(slot: int, color: Color) -> bool:
 	return true
 
 
+## Give the shot in `slot` the shape of its element (SHAPE_*; 0 is the plain sprite): its
+## own silhouette, animation frames and, for a bolt, a trail of marks. The shape is drawn
+## for bolts and orbit shots; a rune keeps its glyph. Returns false for an empty slot or a
+## shape out of range.
+func set_shape(slot: int, shape: int) -> bool:
+	if slot < 0 or slot >= _cap or _alive[slot] == 0 or shape < 0 or shape >= SHAPE_COUNT:
+		return false
+	_shape[slot] = shape
+	return true
+
+
+## The shape of the shot in `slot`, 0 for an empty slot or a plain shot.
+func get_shape_of(slot: int) -> int:
+	if slot < 0 or slot >= _cap or _alive[slot] == 0:
+		return 0
+	return _shape[slot]
+
+
 ## The core colour of the shot in `slot`, white for an empty slot or a plain shot.
 func get_core_of(slot: int) -> Color:
 	if slot < 0 or slot >= _cap or _alive[slot] == 0:
@@ -780,6 +833,7 @@ func _spawn_row(player: int, origin: Vector2, velocity: Vector2, lifetime: float
 	_pierce[slot] = maxi(pierce, 0)
 	_tag[slot] = tag
 	_core[slot] = Color.WHITE
+	_shape[slot] = 0
 	_seq[slot] = _next_seq
 	_next_seq += 1
 	_skip_left[slot] = 0.0
@@ -803,6 +857,7 @@ func _spawn_row(player: int, origin: Vector2, velocity: Vector2, lifetime: float
 
 ## Move every projectile by `delta` seconds, find hits and send the events.
 func step(delta: float) -> void:
+	sim_time += delta
 	_refresh_targets()
 	var top: int = _high
 	var first_new: int = _next_seq
@@ -1062,19 +1117,26 @@ func update_draw(fraction: float = -1.0) -> void:
 		return
 	var multimesh: MultiMesh = _draw_node.multimesh
 	var hostile_multimesh: MultiMesh = _hostile_node.multimesh
+	var trail_multimesh: MultiMesh = _trail_node.multimesh
 	if fraction < 0.0:
 		fraction = Engine.get_physics_interpolation_fraction()
 	fraction = clampf(fraction, 0.0, 1.0)
+	_set_sim_time(_draw_node)
+	_set_sim_time(_rune_node)
+	_set_sim_time(_orbit_node)
+	_set_sim_time(_trail_node)
 	_count_batches()
 	var counts: PackedInt32Array = _batch_counts
 	_draw_room = _fit_batch(multimesh, _draw_buffer, _draw_room, counts[BATCH_BOLT])
 	_rune_room = _fit_batch(_rune_node.multimesh, _rune_buffer, _rune_room, counts[BATCH_RUNE])
 	_orbit_room = _fit_batch(_orbit_node.multimesh, _orbit_buffer, _orbit_room, counts[BATCH_ORBIT])
 	_hostile_room = _fit_batch(hostile_multimesh, _hostile_buffer, _hostile_room, counts[BATCH_HOSTILE])
+	_trail_room = _fit_batch(trail_multimesh, _trail_buffer, _trail_room, counts[BATCH_TRAIL], TRAIL_MAX)
 	var out: int = 0
 	var rune_out: int = 0
 	var orbit_out: int = 0
 	var hostile_out: int = 0
+	var trail_out: int = 0
 	for slot in _high:
 		if _alive[slot] == 0:
 			continue
@@ -1085,17 +1147,19 @@ func update_draw(fraction: float = -1.0) -> void:
 		var at: Vector2 = _prev[slot].lerp(_pos[slot], fraction)
 		var batch: int = _batch_of(slot)
 		if batch == BATCH_HOSTILE:
-			_write_quad(_hostile_buffer, hostile_out * DRAW_STRIDE, dir, diameter, at, Color.WHITE, Color.WHITE)
+			_write_quad(_hostile_buffer, hostile_out * DRAW_STRIDE, dir, diameter, at, Color.WHITE, Color.WHITE, 0)
 			hostile_out += 1
 		elif batch == BATCH_RUNE:
-			_write_quad(_rune_buffer, rune_out * DRAW_STRIDE, dir, diameter, at, _color_of(_player[slot]), _core[slot])
+			_write_quad(_rune_buffer, rune_out * DRAW_STRIDE, dir, diameter, at, _color_of(_player[slot]), _core[slot], 0)
 			rune_out += 1
 		elif batch == BATCH_ORBIT:
-			_write_quad(_orbit_buffer, orbit_out * DRAW_STRIDE, dir, diameter, at, _color_of(_player[slot]), _core[slot])
+			_write_quad(_orbit_buffer, orbit_out * DRAW_STRIDE, dir, diameter, at, _color_of(_player[slot]), _core[slot], _shape[slot])
 			orbit_out += 1
 		else:
-			_write_quad(_draw_buffer, out * DRAW_STRIDE, dir, diameter, at, _color_of(_player[slot]), _core[slot])
+			_write_quad(_draw_buffer, out * DRAW_STRIDE, dir, diameter, at, _color_of(_player[slot]), _core[slot], _shape[slot])
 			out += 1
+			if _shape[slot] != 0 and _motion[slot] == MOTION_STRAIGHT:
+				trail_out = _write_trail(slot, dir, diameter, at, trail_out)
 	if out > 0:
 		multimesh.buffer = _draw_buffer
 	multimesh.visible_instance_count = out
@@ -1108,8 +1172,17 @@ func update_draw(fraction: float = -1.0) -> void:
 	if hostile_out > 0:
 		hostile_multimesh.buffer = _hostile_buffer
 	hostile_multimesh.visible_instance_count = hostile_out
+	if trail_out > 0:
+		trail_multimesh.buffer = _trail_buffer
+	trail_multimesh.visible_instance_count = trail_out
+	drawn_trails = trail_out
 	drawn_hostile = hostile_out
 	drawn = out + rune_out + orbit_out + hostile_out
+
+
+## Hand the shader the simulation clock (`shot_core.gdshader` animates from it).
+func _set_sim_time(node: MultiMeshInstance2D) -> void:
+	(node.material as ShaderMaterial).set_shader_parameter(&"sim_time", sim_time)
 
 
 ## Which draw batch a live slot belongs to (BATCH_*). The one rule both the counting and
@@ -1131,6 +1204,9 @@ func _count_batches() -> void:
 	for slot in _high:
 		if _alive[slot] != 0:
 			_batch_counts[_batch_of(slot)] += 1
+			if _shape[slot] != 0 and _motion[slot] == MOTION_STRAIGHT and _player[slot] >= 0:
+				_batch_counts[BATCH_TRAIL] += TRAIL_MARKS
+	_batch_counts[BATCH_TRAIL] = mini(_batch_counts[BATCH_TRAIL], TRAIL_MAX)
 
 
 ## Size a batch's MultiMesh and buffer to draw `used` shots; returns the new room.
@@ -1140,13 +1216,13 @@ func _count_batches() -> void:
 ## flickers between empty and busy. The MultiMesh buffer must be exactly instance_count
 ## x DRAW_STRIDE floats, so a smaller upload means a smaller MultiMesh. The buffer is
 ## shared, not copied, so resizing it here resizes the caller's.
-func _fit_batch(multimesh: MultiMesh, buffer: PackedFloat32Array, room: int, used: int) -> int:
+func _fit_batch(multimesh: MultiMesh, buffer: PackedFloat32Array, room: int, used: int, limit: int = -1) -> int:
 	if used == 0 or (used <= room and used * 4 > room):
 		return room
 	var wanted: int = MIN_BATCH
 	while wanted < used:
 		wanted *= 2
-	wanted = mini(wanted, _cap)
+	wanted = mini(wanted, _cap if limit < 0 else limit)
 	if wanted != room:
 		multimesh.instance_count = wanted
 		buffer.resize(wanted * DRAW_STRIDE)
@@ -1156,7 +1232,9 @@ func _fit_batch(multimesh: MultiMesh, buffer: PackedFloat32Array, room: int, use
 ## Write one quad at float index `i` of `buffer` (packed arrays are shared, not copied):
 ## Transform2D(dir * d, dir.orthogonal() * d, at), row by row, then the colour and the
 ## colour of the core (custom data).
-func _write_quad(buffer: PackedFloat32Array, i: int, dir: Vector2, diameter: float, at: Vector2, color: Color, core: Color) -> void:
+## `kind` (0 the sprite, 1-4 an element shape's body, 5-8 its trail mark) goes in the
+## alpha of the custom data as 1 - 0.1 * kind, which `shot_core.gdshader` reads back.
+func _write_quad(buffer: PackedFloat32Array, i: int, dir: Vector2, diameter: float, at: Vector2, color: Color, core: Color, kind: int) -> void:
 	buffer[i] = dir.x * diameter
 	buffer[i + 1] = dir.y * diameter
 	buffer[i + 2] = 0.0
@@ -1172,7 +1250,24 @@ func _write_quad(buffer: PackedFloat32Array, i: int, dir: Vector2, diameter: flo
 	buffer[i + 12] = core.r
 	buffer[i + 13] = core.g
 	buffer[i + 14] = core.b
-	buffer[i + 15] = 1.0
+	buffer[i + 15] = 1.0 - 0.1 * kind
+
+
+## Write the trail marks of the shaped bolt in `slot` (TRAIL_MARKS of them, behind it,
+## smaller and drifting off the line) from `out` on; returns the next free mark. Stops at
+## the limit TRAIL_MAX.
+func _write_trail(slot: int, dir: Vector2, diameter: float, at: Vector2, out: int) -> int:
+	var shape: int = _shape[slot]
+	var side: Vector2 = dir.orthogonal()
+	for n in TRAIL_MARKS:
+		if out >= TRAIL_MAX:
+			break
+		var back: float = TRAIL_STEP[shape] * (n + 1)
+		var drift: float = TRAIL_DRIFT[shape] * (n + 1) * (1.0 if (n + slot) % 2 == 0 else -1.0)
+		var size: float = diameter * (0.45 - 0.1 * n)
+		_write_quad(_trail_buffer, out * DRAW_STRIDE, dir, size, at - dir * back + side * drift, _color_of(_player[slot]), _core[slot], shape + 4)
+		out += 1
+	return out
 
 
 ## Position of a live projectile, or Vector2.INF if the slot is empty.

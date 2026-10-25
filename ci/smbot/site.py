@@ -9,19 +9,22 @@
   /preview/  the newest web build of main: rebuilt after merges (preview.yml), today's build after the daily run
   /screenshots/  today's screenshots (smbot.screenshots), when the build took any
   /style-guide/  the Style Guide page and the art starter kit zip (smbot.styleguide)
+  /atlas/    the Spell atlas: every spell's clip (smbot.clips), as the daily run last published it
+             on the screenshots branch (--atlas), so a preview deploy keeps it too
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import re
 import shutil
 import sys
 import tempfile
 import zipfile
 from pathlib import Path
 
-from . import config, contribute, gh, screenshots, styleguide
+from . import clips, config, contribute, gh, screenshots, styleguide
 
 WEB_ZIPS = f"{config.load().game.slug}-web-*.zip"
 
@@ -63,7 +66,8 @@ def newest_release_web_zip(repo: str, workdir: Path) -> tuple[str, str, Path] | 
     return (tag, channel, zips[0]) if zips else None
 
 
-def build(repo: str, dist: Path, version: str, channel: str, out: Path, shots: Path | None = None) -> None:
+def build(repo: str, dist: Path, version: str, channel: str, out: Path, shots: Path | None = None,
+          atlas: Path | None = None) -> None:
     """The daily site: today's release is /nightly/ and /preview/, and /play/ if it is stable."""
     _reset(out)
     today_zip = dist / WEB_ZIPS.replace("*", version)
@@ -82,10 +86,11 @@ def build(repo: str, dist: Path, version: str, channel: str, out: Path, shots: P
             else:  # no stable release yet
                 stable_name = f"{version} (nightly)"
                 unpack(today_zip, out / "play")
-    _finish(out, version, channel, stable_name, version, shots)
+    _finish(out, version, channel, stable_name, version, shots, atlas)
 
 
-def build_preview(repo: str, dist: Path, version: str, out: Path, shots: Path | None = None) -> None:
+def build_preview(repo: str, dist: Path, version: str, out: Path, shots: Path | None = None,
+                  atlas: Path | None = None) -> None:
     """The site between daily runs: this build is /preview/; /nightly/ and /play/ come from the releases."""
     _reset(out)
     preview_zip = dist / WEB_ZIPS.replace("*", version)
@@ -106,7 +111,7 @@ def build_preview(repo: str, dist: Path, version: str, out: Path, shots: Path | 
         else:
             stable_name = f"{day_version} ({day_channel})"
             unpack(day_zip, out / "play")
-    _finish(out, day_version, day_channel, stable_name, version, shots)
+    _finish(out, day_version, day_channel, stable_name, version, shots, atlas)
 
 
 def _reset(out: Path) -> None:
@@ -115,10 +120,30 @@ def _reset(out: Path) -> None:
     out.mkdir(parents=True)
 
 
-def _finish(out: Path, version: str, channel: str, stable_name: str, preview: str, shots: Path | None) -> None:
-    """Screenshots, Style Guide and the Contribute page, shared by the daily and the preview site."""
+ATLAS_FILE = re.compile(r"^(index\.html|hashes\.json|[a-z0-9_]{1,60}\.png)$")
+
+
+def copy_atlas(atlas: Path, out: Path) -> int:
+    """Copies the published Spell atlas (smbot.clips) into out/; returns how many files it copied."""
+    if not (atlas / "index.html").is_file():
+        return 0
+    out.mkdir(parents=True, exist_ok=True)
+    count = 0
+    for path in sorted(atlas.iterdir()):
+        if ATLAS_FILE.match(path.name) and path.is_file() and not path.is_symlink() \
+                and path.stat().st_size <= clips.MAX_CLIP_BYTES:
+            shutil.copyfile(path, out / path.name)
+            count += 1
+    return count
+
+
+def _finish(out: Path, version: str, channel: str, stable_name: str, preview: str, shots: Path | None,
+            atlas: Path | None = None) -> None:
+    """Screenshots, the Spell atlas, Style Guide and the Contribute page, shared by the daily and the preview site."""
     if shots:
         screenshots.gallery(shots, out / "screenshots", preview)
+    if atlas:
+        copy_atlas(atlas, out / clips.ATLAS)
     try:
         if styleguide.STYLE.exists():  # a new game has no style yet
             styleguide.build(out / "style-guide", shots)
@@ -138,14 +163,15 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--preview", action="store_true", help="a preview build of main, not a release")
     ap.add_argument("--out", type=Path, default=Path("site"))
     ap.add_argument("--screenshots", type=Path, help="folder of today's screenshots (optional)")
+    ap.add_argument("--atlas", type=Path, help="the published Spell atlas folder (optional)")
     args = ap.parse_args(argv)
     if args.preview == bool(args.channel):
         ap.error("give either --channel (daily) or --preview")
     repo = config.load().repo
     if args.preview:
-        build_preview(repo, args.dist, args.version, args.out, args.screenshots)
+        build_preview(repo, args.dist, args.version, args.out, args.screenshots, args.atlas)
     else:
-        build(repo, args.dist, args.version, args.channel, args.out, args.screenshots)
+        build(repo, args.dist, args.version, args.channel, args.out, args.screenshots, args.atlas)
     return 0
 
 

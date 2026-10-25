@@ -2,6 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-25: The clip pipeline: animated PNG, recorded apart from the build (owner session, #246)
+
+- **Format: animated PNG (APNG), not GIF or WebP.** It is built from the recorder's own PNG frames without decoding them (`ci/smbot/clips.py`), so it needs no image library or tool in CI, keeps style N's palette exactly (a GIF would need a 256-colour quantiser; WebP needs a converter), and is still a `.png`. Chrome, Firefox, Safari and GitHub play it inline; viewers that don't (some apps) show the first frame. Identical frames in a row are merged into one longer frame, so a still moment costs nothing.
+- **Recorded in its own job,** `record-clips` in daily.yml, after the build and on the build's commit, with no secrets and a read-only token. A recorder that fails or runs long never holds back the release; the job that has a token (`publish-clips`) only reads the frames as data and refuses any that break the format.
+- **The atlas lives on the `screenshots` branch** (`atlas/`, replaced each day) and Pages copies it from there on every deploy, so a preview deploy between daily runs keeps it. `atlas/hashes.json` says what each clip looked like, so the Daily log shows only the clips that are new or changed, at most 8, with a link to the atlas for the rest.
+- **On a PR,** a session names at most 4 clips in `clips` (like `screenshots`); they're recorded on the PR and on main and shown in the same comment, so the Daily log's repeat of that comment carries them too.
+
 ## 2026-10-23: Glyphs for buttons, resolved in `core/input` and drawn in code (owner `/claude` on #4)
 
 - **Owner's instruction:** wherever the game shows how to interact, show a glyph of the button, not words; a controller strategy that swaps type by itself when a player changes from, say, an Xbox pad to the keyboard, with glyphs updating live.

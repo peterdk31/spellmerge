@@ -99,11 +99,21 @@ jobs:
         with:
           name: screenshots
           path: screenshots
+      - name: The Spell atlas (smbot.clips; the daily run publishes it on the screenshots branch)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        continue-on-error: true # no atlas yet: the site goes out without it
+        with:
+          ref: screenshots
+          path: published
+          sparse-checkout: atlas
+          persist-credentials: false
       - name: Assemble the site
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.build.outputs.version }}
-        run: python3 -m smbot.site --version "$VERSION" --preview --out site --screenshots screenshots
+        run: >-
+          python3 -m smbot.site --version "$VERSION" --preview --out site --screenshots screenshots
+          --atlas published/atlas
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:

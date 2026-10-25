@@ -3,7 +3,9 @@
   python3 -m smbot.screenshots post --pr N --sha SHA --dir shots
       pushes the PNGs to the `screenshots` branch and comments on PR #N with them
 
-A PR's screenshots show what it changes. The session names the shot scripts that show its
+A PR's screenshots show what it changes, and its clips show it in motion (smbot.clips: the
+session names clip ids in `clips`, saved as clips.json; the recorder runs them on both sides
+and the same comment shows them before and after). The session names the shot scripts that show its
 change, each with a caption (`screenshots` in its result, saved as list.json). Only those
 scripts run, on the PR's commit (after/) and on main (before/), with
 `ci/build/build.sh --quick --screenshots` in a job with no secrets; shots.txt in each folder
@@ -63,8 +65,11 @@ def title(path: Path) -> str:
 
 
 def push(cfg: config_mod.Config, token: str, shots: list[Path], prefix: str, remote: str = "",
-         names: list[str] | None = None) -> str:
-    """Adds the shots under `prefix` on the screenshots branch (as `names`, if given); returns the new commit."""
+         names: list[str] | None = None, clear: bool = False) -> str:
+    """Adds the shots under `prefix` on the screenshots branch (as `names`, if given); returns the new commit.
+
+    With `clear`, whatever was under `prefix` before is removed first (the Spell atlas replaces itself).
+    """
     remote = remote or f"https://x-access-token:{token}@github.com/{cfg.repo}.git"
     with tempfile.TemporaryDirectory() as tmp:
         def git(*args: str) -> str:
@@ -78,6 +83,8 @@ def push(cfg: config_mod.Config, token: str, shots: list[Path], prefix: str, rem
                           capture_output=True).returncode == 0:
             git("reset", "-q", "--hard", "FETCH_HEAD")
         dest = Path(tmp, prefix)
+        if clear and dest.is_dir():
+            shutil.rmtree(dest)
         for shot, name in zip(shots, names or [s.name for s in shots]):
             (dest / name).parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(shot, dest / name)
@@ -170,17 +177,25 @@ def for_log(cfg: config_mod.Config, pr: int | str) -> str:
 
 
 def post(cfg: config_mod.Config, token: str, pr: int, sha: str, folder: Path) -> None:
-    shown = pairs(folder)
-    if not shown:
-        print("nothing visible changed in the chosen shots (or none were chosen): no screenshots posted")
-        return
-    prefix = f"pr-{pr}/{sha[:7]}"
-    files = [(after, f"after/{name}") for _, name, after, _ in shown]
-    files += [(old, f"before/{name}") for _, name, _, old in shown if old is not None]
-    commit = push(cfg, token, [f for f, _ in files], prefix, names=[n for _, n in files])
-    body = comment(cfg, commit, prefix, shown, sha)
+    from . import clips  # clips uses this module's push
+
+    with tempfile.TemporaryDirectory() as work:
+        shown, moving = pairs(folder), clips.pairs(folder, Path(work))
+        if not shown and not moving:
+            print("nothing visible changed in the chosen shots and clips (or none were chosen): nothing posted")
+            return
+        prefix = f"pr-{pr}/{sha[:7]}"
+        files = [(after, f"after/{name}") for _, name, after, _ in shown]
+        files += [(old, f"before/{name}") for _, name, _, old in shown if old is not None]
+        files += [(after, f"clips/after/{clip.id}.png") for _, clip, after, _ in moving]
+        files += [(old, f"clips/before/{clip.id}.png") for _, clip, _, old in moving if old is not None]
+        commit = push(cfg, token, [f for f, _ in files], prefix, names=[n for _, n in files])
+    body = comment(cfg, commit, prefix, shown, sha) if shown else f"{HEADING} ({sha[:7]} against `main`)"
+    if moving:
+        base = f"https://raw.githubusercontent.com/{cfg.repo}/{commit}/{prefix}/clips"
+        body = body.rstrip() + "\n\n" + clips.section(base, moving)
     gh.api(f"repos/{cfg.repo}/issues/{pr}/comments", "-X", "POST", input={"body": body})
-    print(f"posted {len(shown)} screenshot(s) on #{pr}")
+    print(f"posted {len(shown)} screenshot(s) and {len(moving)} clip(s) on #{pr}")
 
 
 def for_question(cfg: config_mod.Config, token: str, question: dict, folder: Path, sha: str,

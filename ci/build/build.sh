@@ -12,6 +12,13 @@
 #                                     on a virtual display (xvfb-run); PNGs in build/screenshots/,
 #                                     and shots.txt there saying which script made each one.
 #                                     SHOTS_ONLY="shot_a shot_b" runs only those scripts.
+#   ci/build/build.sh --quick --clips   the same, then the clip recorder (tests/clips/record.gd)
+#                                     on a virtual display; one folder of frames per clip in
+#                                     build/clips/ (format: ci/smbot/clips.py), and atlas.json
+#                                     from tools/atlas.py. CLIPS_ONLY="id_a id_b" records only
+#                                     those clips. A failed recording warns; it never fails.
+#
+# --screenshots and --clips can be given together.
 #
 # A full build runs the unit tests and takes the screenshots too.
 #
@@ -36,11 +43,13 @@ COMMIT="$(git rev-parse HEAD 2>/dev/null || echo "")"
 QUICK=0
 TESTS=0
 SHOTS=0
+CLIPS=0
 while (($#)); do
   case "$1" in
     --quick)   QUICK=1; shift ;;
     --tests)   TESTS=1; shift ;;
     --screenshots) SHOTS=1; shift ;;
+    --clips)   CLIPS=1; shift ;;
     --version) VERSION=$2; shift 2 ;;
     --channel) CHANNEL=$2; shift 2 ;;
     --commit)  COMMIT=$2; shift 2 ;;
@@ -173,6 +182,44 @@ screenshots() {
   fi
 }
 
+# The recorder saves one folder per clip to user://clips/ (the format is in ci/smbot/clips.py);
+# the ids to record are its user arguments, none meaning every clip. The clips are build output
+# for the atlas and the PR comments, so a recorder that fails or is missing only warns.
+clips() {
+  step "Clips (virtual display)"
+  rm -rf build/clips && mkdir -p build/clips
+  if [[ ! -f tests/clips/record.gd ]]; then
+    echo "warning: there is no tests/clips/record.gd yet, so no clips were recorded"
+    return 0
+  fi
+  if ! command -v xvfb-run >/dev/null; then
+    echo "::warning::xvfb-run is not installed (sudo apt-get install xvfb), so no clips were recorded"
+    return 0
+  fi
+  local saved="$XDG_DATA_HOME/godot/app_userdata/$GAME_NAME/clips" id words=() ids=()
+  read -ra words <<<"${CLIPS_ONLY:-}"
+  for id in "${words[@]}"; do
+    if [[ "$id" =~ ^[a-z0-9_]{1,60}$ ]]; then ids+=("$id"); else echo "skipping clip id '$id'"; fi
+  done
+  if [[ -n "${CLIPS_ONLY:-}" && ${#ids[@]} -eq 0 ]]; then
+    echo "no valid clip ids in CLIPS_ONLY, so no clips were recorded"
+    return 0
+  fi
+  rm -rf "$saved"
+  godot_checked clips timeout 1500 xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24" \
+    "$GODOT" --path . --rendering-driver opengl3 --audio-driver Dummy --script res://tests/clips/record.gd \
+    -- "${ids[@]}" \
+    || echo "::warning::the clip recorder failed (build/logs/clips.log); the clips it saved are kept"
+  if [[ -d "$saved" ]]; then
+    cp -r "$saved"/. build/clips/
+  fi
+  if [[ -f tools/atlas.py ]]; then
+    python3 tools/atlas.py build/clips/atlas.json \
+      || echo "::warning::tools/atlas.py failed, so the atlas lists the clips without their descriptions"
+  fi
+  echo "$(find build/clips -name meta.json | wc -l) clip(s) in build/clips"
+}
+
 export_all() {
   for preset in Web Windows Linux; do
     step "Exporting $preset"
@@ -279,6 +326,7 @@ if ((QUICK)); then
   import_and_smoke
   ((TESTS)) && unit_tests
   ((SHOTS)) && screenshots
+  ((CLIPS)) && clips
   step "Quick check passed"
   exit 0
 fi

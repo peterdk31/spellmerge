@@ -6,7 +6,7 @@ The ordered task queue for the current milestone, M2 (its design, [M2-spell-syst
 
 M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97). Each task's details are the matching row and sections of the M2 design. Nothing from M3+ is built (rewards, relics, staffs, rooms, the door rule).
 
-M2's parts are all built and no known crash or blocker is left. The C2 checkpoint issue is not opened yet (the next planning session does it, and sets M2 to done in the roadmap when it exists); done-when item 3 is still open on the real-GPU frame rate. Then development waits for the owner's verdict (`/go`, `/iterate <what>` or `/pivot <how>`). Until then the queue is empty on purpose, and an automated development session answers `nothing_to_do` (it does not pick from the Backlog): the next milestone's design and tasks are written only after `go`; an `iterate` adds rework tasks here.
+M2's parts are all built and no known crash or blocker is left. The C2 checkpoint issue is open (#235) and M2 is marked done in the roadmap; done-when item 3 is still open on the real-GPU frame rate. Then development waits for the owner's verdict (`/go`, `/iterate <what>` or `/pivot <how>`). Until then the queue is empty on purpose, and an automated development session answers `nothing_to_do` (it does not pick from the Backlog): the next milestone's design and tasks are written only after `go`; an `iterate` adds rework tasks here.
 
 ## Blocked
 

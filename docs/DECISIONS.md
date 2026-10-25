@@ -70,6 +70,13 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - **Same key:** the pick is asked again as `art-direction-pick-3` (one decision keeps one issue), and the task stays under "Blocked".
 - **Hand-written SVGs:** the session could not run a generator script, so the three files were written as rects by hand; the sheet was looked at, and `test_svg_art` checks palette, overlaps, bounds and that no body carries a player colour.
 
+## 2026-10-25: weekly planning while C2 (#235) waits
+
+- **M2:** marked "Done, waiting for the checkpoint" in the roadmap; the checkpoint issue #235 is open with no answer yet. Nothing from M3 is written or queued. The queue stays empty on purpose.
+- **Idea #208 (pet):** unchanged. It stays on the backlog: it can only be weighed against M3's relics and rewards and M5's unlocks, and M2 is closed. The preferred shape is still a spell form or modifier ("familiar"), not a pet system.
+- **Re-examined feature:** the button glyphs (merged this week) are code-drawn and cover the builder hint only; the gaps are already BACKLOG tasks (overlay and Bag hints, sprites, stick glyphs), so no new polish task. They wait for the owner's verdict.
+- **Queue moves:** none (no scheduled issues).
+
 ## 2026-10-23: planning with an empty queue; the pet idea (#208)
 
 - **Why:** the work queue ran empty: the only doable Queue task, "Read the web stress parts", needs a daily run newer than #202, and none exists yet. A session would only answer `nothing_to_do`, so planning ran.

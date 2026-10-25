@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-25: Weekly planning (C2 waiting)
+
+M2 is marked done in the roadmap, waiting for the owner's verdict on #235. Pet idea #208 stays on the backlog. No tasks added.
+
 ## 2026-10-23: Button glyphs instead of action names (owner `/claude` on #4)
 
 The builder hints now show the glyph of the button to press ("[X] Use  [B] back") instead of "(Cast)" and "(Dodge)". New: `core/input/input_glyphs.gd` (the table per controller family), `PlayerInput.glyph_kind(player)` and `glyph_kind_changed`, and the widgets `hud/widgets/action_glyph.gd` and `hint_line.gd`, which redraw live. Tests: `test_input_glyphs.gd`, `test_action_glyph.gd`, and the builder and quick-view tests follow the new hint line; shot `shot_glyphs.gd`. Not done: overlay and Bag hints, a device handover for one player (both in `docs/BACKLOG.md`).

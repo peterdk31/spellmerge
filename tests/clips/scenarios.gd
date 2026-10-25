@@ -61,11 +61,15 @@ static func read_combos() -> Array:
 	return []
 
 
+static var _id_regex: RegEx = null
+
+
 ## True when `id` is a folder name the pipeline accepts.
 static func valid_id(id: String) -> bool:
-	var pattern := RegEx.new()
-	pattern.compile(ID_PATTERN)
-	return pattern.search(id) != null
+	if _id_regex == null:
+		_id_regex = RegEx.new()
+		_id_regex.compile(ID_PATTERN)
+	return _id_regex.search(id) != null
 
 
 static func _combo(combo: Dictionary) -> Dictionary:

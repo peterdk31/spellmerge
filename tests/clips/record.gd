@@ -65,7 +65,7 @@ func _initialize() -> void:
 			printerr("CLIP SKIPPED: %s is not a valid clip id" % scenario["id"])
 			failed.append(scenario["id"])
 			continue
-		var frames: Array[Image] = await _play(stage, scenario)
+		var frames: Array[PackedByteArray] = await _play(stage, scenario)
 		if frames.is_empty():
 			failed.append(scenario["id"])
 			continue
@@ -100,8 +100,8 @@ func _has(all: Array[Dictionary], id: String) -> bool:
 
 
 ## Plays `scenario` and returns its frames (empty when it can't be played).
-func _play(stage: RefCounted, scenario: Dictionary) -> Array[Image]:
-	var frames: Array[Image] = []
+func _play(stage: RefCounted, scenario: Dictionary) -> Array[PackedByteArray]:
+	var frames: Array[PackedByteArray] = []
 	if not stage.call("start", scenario):
 		return frames
 	for i in SETTLE_FRAMES:
@@ -119,13 +119,15 @@ func _play(stage: RefCounted, scenario: Dictionary) -> Array[Image]:
 			printerr("CLIP FAILED: %s: the viewport gave no image" % scenario["id"])
 			frames.clear()
 			break
-		bytes += image.save_png_to_buffer().size()
+		var png: PackedByteArray = image.save_png_to_buffer()
+		bytes += png.size()
 		if bytes > MAX_CLIP_BYTES:
 			print("CLIP CUT: %s stops at frame %d (size limit)" % [scenario["id"], frame])
 			break
-		frames.append(image)
+		frames.append(png)
 	if scenario["kind"] == "reaction" and not (stage.call("reaction_ids") as Array).has(StringName(String(scenario["id"]).trim_prefix("reaction_").trim_suffix("_coop"))):
-		printerr("CLIP WARNING: %s did not set off its reaction" % scenario["id"])
+		printerr("CLIP FAILED: %s did not set off its reaction" % scenario["id"])
+		frames.clear()
 	stage.call("free_all")
 	return frames
 
@@ -146,7 +148,7 @@ func _crop() -> Image:
 
 
 ## Writes the frames and meta.json of one clip, replacing a folder of the same id.
-func _save(scenario: Dictionary, frames: Array[Image]) -> bool:
+func _save(scenario: Dictionary, frames: Array[PackedByteArray]) -> bool:
 	var folder: String = "%s/%s" % [CLIPS_DIR, scenario["id"]]
 	DirAccess.make_dir_recursive_absolute(folder)
 	var directory := DirAccess.open(folder)
@@ -156,9 +158,12 @@ func _save(scenario: Dictionary, frames: Array[Image]) -> bool:
 	for file in directory.get_files():
 		directory.remove(file)
 	for i in frames.size():
-		if frames[i].save_png("%s/frame_%04d.png" % [folder, i]) != OK:
+		var file := FileAccess.open("%s/frame_%04d.png" % [folder, i], FileAccess.WRITE)
+		if file == null:
 			printerr("CLIP FAILED: could not save frame %d of %s" % [i, scenario["id"]])
 			return false
+		file.store_buffer(frames[i])
+		file.close()
 	var meta := FileAccess.open(folder + "/meta.json", FileAccess.WRITE)
 	if meta == null:
 		printerr("CLIP FAILED: could not write the meta.json of " + scenario["id"])

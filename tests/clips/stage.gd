@@ -87,7 +87,7 @@ func start(scenario: Dictionary) -> bool:
 	combat.events = bus
 	combat.projectiles = projectiles
 	combat.spells = spells
-	combat._ready()
+	combat.setup()
 	bus.reaction_triggered.connect(func(player: int, id: StringName, at: Vector2) -> void: reactions.append([player, id, at]))
 	feel = _own(FeelScript.new()) as FeelScript
 	feel.events = bus
@@ -160,8 +160,7 @@ func tick() -> void:
 func update_draw() -> void:
 	# The manager draws a shot between its last two steps by the engine's real time since the
 	# last physics tick, which no clip can repeat: draw every shot where its last step put it.
-	projectiles._prev = projectiles._pos.duplicate()
-	projectiles.update_draw()
+	projectiles.update_draw(1.0)
 
 
 ## The ids of the reactions seen, in order.

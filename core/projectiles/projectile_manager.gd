@@ -1051,8 +1051,10 @@ func _ray_keep(base: int, found: int, wanted: int, t: int, along: float, closest
 ## Copy the live projectiles into the one batched draw (a single buffer write).
 ## Called every frame. Positions are interpolated between physics steps, so
 ## shots stay smooth on screens faster than the physics rate. Does nothing
-## while there are no projectiles.
-func update_draw() -> void:
+## while there are no projectiles. `fraction` (0 to 1) fixes how far between the last two
+## steps shots are drawn, instead of the engine's real time since the last physics tick;
+## 1.0 draws every shot where its last step put it (the clip recorder needs that).
+func update_draw(fraction: float = -1.0) -> void:
 	if _draw_node == null:
 		drawn = 0
 		return
@@ -1060,7 +1062,9 @@ func update_draw() -> void:
 		return
 	var multimesh: MultiMesh = _draw_node.multimesh
 	var hostile_multimesh: MultiMesh = _hostile_node.multimesh
-	var fraction: float = clampf(Engine.get_physics_interpolation_fraction(), 0.0, 1.0)
+	if fraction < 0.0:
+		fraction = Engine.get_physics_interpolation_fraction()
+	fraction = clampf(fraction, 0.0, 1.0)
 	_count_batches()
 	var counts: PackedInt32Array = _batch_counts
 	_draw_room = _fit_batch(multimesh, _draw_buffer, _draw_room, counts[BATCH_BOLT])

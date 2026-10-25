@@ -9,7 +9,6 @@
     "number": 238
   },
   "errors_in_a_row": 0,
-  "idle": null,
   "intake_tasks": {
     "208": {
       "author": "Brianmanden",
@@ -20,7 +19,7 @@
       "title": "Idea: summonable pet that draws enemy fire"
     }
   },
-  "last_own_merge": "2026-10-25T22:55:16Z",
+  "last_own_merge": "2026-10-25T23:16:17Z",
   "last_plan": "2026-10-25T19:31:34Z",
   "last_weekly": "2026-10-25T10:11:43Z",
   "panel_applied": {
@@ -32,15 +31,7 @@
   },
   "panel_problems": [],
   "paused_by_command": false,
-  "pending_instructions": [
-    {
-      "at": "2026-10-25T22:32:14Z",
-      "kind": "claude",
-      "number": 244,
-      "text": "the new visuals for spells are way too big. I actually liked having bolts in different colors as before, but then we could add some particle effects indicating what type it is. But we do need way more animations for advanced combination of spells",
-      "url": "https://github.com/peterdk31/spellmerge/issues/244#issuecomment-6404318237"
-    }
-  ],
+  "pending_instructions": [],
   "processed_comments": [
     6241847784,
     6251160604,

@@ -84,9 +84,32 @@ func test_runes_enemy_shots_and_orbit_shots_get_no_trail() -> void:
 	mgr.set_shape(orb, ManagerScript.SHAPE_RING)
 	mgr.update_draw(1.0)
 	check_equal(mgr.drawn_trails, 0, "none of them trails")
-	check_equal(kind_at(mgr._rune_node, 0), 0, "a rune keeps its glyph")
 	check_equal(kind_at(mgr._hostile_node, 0), 0, "an enemy shot stays the enemy sprite, whatever its shape")
-	check_equal(kind_at(mgr._orbit_node, 0), ManagerScript.SHAPE_RING, "an orbit shot takes the shape")
+
+
+func test_runes_and_orbit_shots_are_drawn_as_their_form_whatever_the_element() -> void:
+	var rune: int = mgr.spawn(0, Vector2(50.0, 50.0), Vector2.ZERO, 1.0, 8.0, ManagerScript.LAYER_ENEMY, 0, 0, ManagerScript.MOTION_STILL)
+	mgr.set_anchor(2, Vector2(200.0, 200.0))
+	mgr.spawn_orbit(2, 20.0, 0.0, 1.0, 1.0)
+	mgr.update_draw(1.0)
+	check_equal(kind_at(mgr._rune_node, 0), ManagerScript.KIND_RUNE, "a plain rune is drawn as a rune")
+	check_equal(kind_at(mgr._orbit_node, 0), ManagerScript.KIND_ORBIT, "a plain orbit shot is drawn as a pair of beads")
+	mgr.set_shape(rune, ManagerScript.SHAPE_STAR)
+	mgr.update_draw(1.0)
+	check_equal(kind_at(mgr._rune_node, 0), ManagerScript.KIND_RUNE, "an element's shape does not change a rune's body")
+	check(ManagerScript.KIND_RUNE != ManagerScript.KIND_ORBIT, "so rune and orbit differ in flight")
+
+
+func test_shaped_bodies_are_drawn_smaller_than_the_sprite() -> void:
+	var plain: int = mgr.spawn(0, Vector2(100.0, 100.0), Vector2(100.0, 0.0), 1.0)
+	var shaped: int = mgr.spawn(0, Vector2(100.0, 200.0), Vector2(100.0, 0.0), 1.0)
+	mgr.set_shape(shaped, ManagerScript.SHAPE_FLAME)
+	mgr.update_draw(1.0)
+	var buffer: PackedFloat32Array = mgr._draw_node.multimesh.buffer
+	var sizes: Array[float] = [buffer[0], buffer[ManagerScript.DRAW_STRIDE]]
+	sizes.sort()
+	check(absf(sizes[0] / sizes[1] - ManagerScript.SHAPE_SCALE) < 0.01, "a shaped body is drawn at SHAPE_SCALE of the sprite")
+	check(plain != shaped, "two shots")
 
 
 func test_trail_marks_are_bounded() -> void:

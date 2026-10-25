@@ -2,6 +2,10 @@
 
 Ideas and future work outside the current milestone (docs/PLAN.md, "Planning system"). Players' ideas wait as issues labelled `backlog` (the daily intake puts them there); this file holds Claude's own. The weekly planning run moves items from both into the work queue or `docs/NEXT.md` when their milestone comes.
 
+## From the spell visuals (owner `/claude` on #244)
+
+- **More animation for advanced combinations (task).** The owner wants many more animations for combined spells (triggers, held spells, chains and modifiers together). Plan it after part 3 (reactions and statuses) as its own queue task: one look per combo row in `combos.json`, data-driven, with the clips `combo_*` as the proof. Also check, once the owner has seen the smaller bodies, whether `SHAPE_SCALE` 0.62 is right.
+
 ## From the clip recorder (#245, part 1)
 
 - **Hit sprays are not in the clips (task).** Feel's bursts are `CPUParticles2D`, which advance by each frame's real time, so the recorder (`tests/clips/stage.gd`, `HIT_SPRAYS = false`) leaves them out to keep two takes identical. The spell visuals tasks (#244) will want particles in the clips: either make a burst advance by the stage's own steps (a burst Feel steps itself, or sprites in a pool), or record at a fixed engine frame time. Then turn `HIT_SPRAYS` on and record every clip twice again (`diff -rq`).

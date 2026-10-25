@@ -190,6 +190,13 @@ const SHAPE_STAR: int = 2
 const SHAPE_ZIGZAG: int = 3
 const SHAPE_RING: int = 4
 const SHAPE_COUNT: int = 5
+## The form bodies (the kind written for a player's rune and orbit shots, whatever their
+## element): a diamond that pulses, two beads that spin. Kinds 5-8 are the trail marks.
+const KIND_RUNE: int = 9
+const KIND_ORBIT: int = 10
+## A shaped body is drawn this fraction of the sprite's size: the shapes carry their own
+## outline, and at the sprite's size they crowded the view (the owner's note on #244).
+const SHAPE_SCALE: float = 0.62
 ## Trail marks per shaped bolt and the most marks drawn in all. Past the limit the later
 ## shots draw no trail; it is a draw batch, not particles, so Feel's PARTICLE_LIMIT is
 ## untouched, and the cost is bounded whatever the cap is.
@@ -1157,16 +1164,17 @@ func update_draw(fraction: float = -1.0) -> void:
 			_write_quad(_hostile_buffer, hostile_out * DRAW_STRIDE, dir, diameter, at, Color.WHITE, Color.WHITE, 0)
 			hostile_out += 1
 		elif batch == BATCH_RUNE:
-			_write_quad(_rune_buffer, rune_out * DRAW_STRIDE, dir, diameter, at, _color_of(_player[slot]), _core[slot], 0)
+			_write_quad(_rune_buffer, rune_out * DRAW_STRIDE, dir, diameter * SHAPE_SCALE, at, _color_of(_player[slot]), _core[slot], KIND_RUNE)
 			rune_out += 1
 		elif batch == BATCH_ORBIT:
-			_write_quad(_orbit_buffer, orbit_out * DRAW_STRIDE, dir, diameter, at, _color_of(_player[slot]), _core[slot], _shape[slot])
+			_write_quad(_orbit_buffer, orbit_out * DRAW_STRIDE, dir, diameter * SHAPE_SCALE, at, _color_of(_player[slot]), _core[slot], KIND_ORBIT)
 			orbit_out += 1
 		else:
-			_write_quad(_draw_buffer, out * DRAW_STRIDE, dir, diameter, at, _color_of(_player[slot]), _core[slot], _shape[slot])
+			var shaped: bool = _shape[slot] != 0
+			_write_quad(_draw_buffer, out * DRAW_STRIDE, dir, diameter * (SHAPE_SCALE if shaped else 1.0), at, _color_of(_player[slot]), _core[slot], _shape[slot])
 			out += 1
-			if _shape[slot] != 0 and _motion[slot] == MOTION_STRAIGHT:
-				trail_out = _write_trail(slot, dir, diameter, at, trail_out)
+			if shaped and _motion[slot] == MOTION_STRAIGHT:
+				trail_out = _write_trail(slot, dir, diameter * SHAPE_SCALE, at, trail_out)
 	if out > 0:
 		multimesh.buffer = _draw_buffer
 	multimesh.visible_instance_count = out
@@ -1239,7 +1247,7 @@ func _fit_batch(multimesh: MultiMesh, buffer: PackedFloat32Array, room: int, use
 ## Write one quad at float index `i` of `buffer` (packed arrays are shared, not copied):
 ## Transform2D(dir * d, dir.orthogonal() * d, at), row by row, then the colour and the
 ## colour of the core (custom data).
-## `kind` (0 the sprite, 1-4 an element shape's body, 5-8 its trail mark) goes in the
+## `kind` (0 the sprite, 1-4 an element shape's body, 5-8 its trail mark, 9 a rune, 10 an orbit shot) goes in the
 ## alpha of the custom data as 1 - 0.1 * kind, which `shot_core.gdshader` reads back.
 func _write_quad(buffer: PackedFloat32Array, i: int, dir: Vector2, diameter: float, at: Vector2, color: Color, core: Color, kind: int) -> void:
 	buffer[i] = dir.x * diameter

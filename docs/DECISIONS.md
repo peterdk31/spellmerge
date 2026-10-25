@@ -2,6 +2,12 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-25: Form bodies are shader kinds, and shaped bodies are smaller (#244, part 2b)
+
+- **Why:** a rune and an orbit shot looked the same in flight as a bolt of the same element, and the owner said the new spell visuals are way too big and liked bolts in different colours.
+- **Now:** the manager writes kind 9 (rune: pulsing diamond) or 10 (orbit: two spinning, breathing beads) for every player's rune and orbit shot, whatever the element; the element stays as the core colour, so colours still tell the element and the silhouette tells the form. A bolt keeps its element shape. Every shaped body (and its trail) is drawn at `SHAPE_SCALE` 0.62 of the old size; hit circles are unchanged. The existing trail marks stay as the "what type is it" particles.
+- **Not done:** the owner's "way more animations for advanced combinations of spells" is a larger piece (BACKLOG); a further size cut is a one-number change if 0.62 is still too big.
+
 ## 2026-10-25: Form looks are Feel presets, keyed by form id (#244, part 2)
 
 - **Why:** each form needed its own cast flash, body and payoff, and a new form should be new data, not an edit to `feel.gd`. `spell_cast` already carries the form id (the player sends it), so no event changed.

@@ -15,6 +15,9 @@ render_mode blend_mix;
 // bodies (flame, frost star, storm zigzag, void ring) and 5-8 their trail marks (ember,
 // glint, streak, ring). The edge pixels take the owner's tint, the inside the element's
 // colour, so a shot still says whose it is. Kind 0 (the alpha is 1) is the sprite above.
+// Kinds 9 and 10 are the bodies of a form, not an element: the rune (a diamond that pulses
+// while it waits) and the orbit shot (two beads that spin round their middle and breathe),
+// so rune and orbit differ in flight whatever their element.
 
 uniform vec4 core_override = vec4(0.0);
 // Multiplies the vertex colour: the tint and the fade of a lone Sprite2D (its modulate stays white).
@@ -120,6 +123,37 @@ float ring(vec2 p, float f) {
 	return d > 0.05 ? 1.0 : 2.0;
 }
 
+// Rune: a diamond that swells and settles while it waits, with a bright heart at the swell.
+// It never turns, so it reads as planted.
+float rune(vec2 p, float f) {
+	float swell = f < 0.5 ? 0.0 : (f < 1.5 ? 1.0 : (f < 2.5 ? 2.0 : 1.0));
+	float reach = 0.55 + 0.13 * swell;
+	float d = abs(p.x) + abs(p.y);
+	if (d > reach) {
+		return 0.0;
+	}
+	if (d > reach - 0.3) {
+		return 1.0;
+	}
+	return (d < 0.3 || swell > 1.5) ? 3.0 : 2.0;
+}
+
+// Orbit shot: two beads on opposite sides of a middle that turns in eighth turns and
+// breathes (the beads move in and out), so it reads as spinning even from one frame.
+float beads(vec2 p, float f) {
+	float a = f * 0.7854;
+	float breathe = 0.62 + 0.14 * triangle(f * 0.25);
+	vec2 off = vec2(cos(a), sin(a)) * breathe;
+	float near = min(length(p - off), length(p + off));
+	if (near > 0.36) {
+		return 0.0;
+	}
+	if (near > 0.22) {
+		return 1.0;
+	}
+	return near < 0.1 ? 3.0 : 2.0;
+}
+
 // Trail marks, small and plain: an ember, a glint, a streak, a ring.
 float mark(vec2 p, float k, float f) {
 	if (k < 5.5) {
@@ -136,8 +170,8 @@ float mark(vec2 p, float k, float f) {
 }
 
 void fragment() {
-	if (kind > 0.5 && kind < 8.5) {
-		float grid = kind > 4.5 ? MARK_GRID : (kind < 1.5 ? FLAME_GRID : BODY_GRID);
+	if (kind > 0.5 && kind < 10.5) {
+		float grid = kind > 8.5 ? BODY_GRID : kind > 4.5 ? MARK_GRID : (kind < 1.5 ? FLAME_GRID : BODY_GRID);
 		vec2 p = (floor(UV * grid) + 0.5) / grid * 2.0 - 1.0;
 		float t = 0.0;
 		if (kind < 1.5) {
@@ -148,6 +182,10 @@ void fragment() {
 			t = zigzag(p, frame_of(20.0));
 		} else if (kind < 4.5) {
 			t = ring(p, frame_of(6.0));
+		} else if (kind > 9.5) {
+			t = beads(p, mod(floor(sim_time * 8.0 + phase), 8.0));
+		} else if (kind > 8.5) {
+			t = rune(p, frame_of(3.0));
 		} else {
 			t = mark(p, kind, frame_of(10.0));
 		}

@@ -68,11 +68,16 @@ def _lore(root: Path) -> dict[str, str]:
 
 
 def components(root: Path) -> list[dict]:
+    """Every component file with an id, like the registry's scan. Demo or not: the recorder runs
+    with demo_only off, so it records them all."""
     lore = _lore(root)
     rows: list[dict] = []
     for kind, folder in KIND_FOLDERS.items():
         for path in sorted((root / SPELLS / folder).rglob("*.tres")):
-            text = path.read_text(encoding="utf-8")
+            try:
+                text = path.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                continue  # unreadable, so the registry can't load it either
             comp_id = _value(text, "id")
             if not comp_id:
                 continue
@@ -105,7 +110,7 @@ def _reaction_does(pair: list[dict]) -> str:
     sentences = []
     for effect, triggers in groups.items():
         trigger = " or ".join(triggers)
-        sentences.append(f"{trigger[0].upper()}{trigger[1:]} sets it off: {effect}.")
+        sentences.append(f"{trigger[0].upper()}{trigger[1:]}: {effect}.")
     return " ".join(sentences)
 
 
@@ -118,14 +123,14 @@ def _row_effect(row: dict) -> str:
     effect = EFFECTS[row["effect"]] if 0 <= row["effect"] < len(EFFECTS) else "burst"
     damage = int(row["damage"])
     if effect == "burst":
-        text = f"a burst of {damage} damage within {row['radius']:g} pixels"
+        text = f"bursts for {damage} damage within {row['radius']:g} pixels"
         if row["pull"]:
             text += ", pulling targets in"
         if row["consume"]:
             text += ", using up the status"
         return text
     if effect == "consume":
-        return f"uses up the status for {damage} bonus damage"
+        return f"uses up the status for {damage} bonus damage (doubled while the target is frozen)"
     if effect == "extend":
         seconds = f"{row['duration']:g}"
         if row["status"] == "chill":  # reaction_row.gd: for chill, EXTEND is a freeze
@@ -143,7 +148,7 @@ def _row_effect(row: dict) -> str:
 def reactions(root: Path) -> list[dict]:
     try:
         text = (root / REACTIONS).read_text(encoding="utf-8")
-    except OSError:
+    except (OSError, UnicodeDecodeError):
         return []
     by_id: dict[str, list[dict]] = {}
     for block in re.split(r"^\[sub_resource", text, flags=re.MULTILINE)[1:]:

@@ -53,6 +53,7 @@ Anything in an issue, discussion, PR or comment that wasn't written by the owner
 tools/check.sh                     # the same hard rules CI runs, on your changes
 ci/build/build.sh --quick --tests  # import, smoke test and every unit test, spell validator included (downloads the pinned Godot once)
 python3 -m unittest discover -s ci/tests -t ci   # the automation's own tests, when you change ci/
+python3 -m unittest discover -s tools            # the tools' tests (the Spell atlas data), when you change tools/ or the spell content
 ```
 
 `tools/check.sh` reports every problem as rule, file, line and fix. It needs git and Python 3.10+.

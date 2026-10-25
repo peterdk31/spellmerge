@@ -79,12 +79,22 @@ class AtlasTest(unittest.TestCase):
         row = next(e for e in self.entries() if e["id"] == "stillness")
         self.assertIn("freezes the target for 2 seconds", row["does"])
         self.assertIn("makes the hex last 2 seconds longer and 25 stronger", row["does"])
-        self.assertEqual(row["does"].count("sets it off"), 2)
+        self.assertEqual(row["does"].count(" hit on a "), 2)
 
     def test_rows_that_do_the_same_share_one_sentence(self) -> None:
         row = next(e for e in self.entries() if e["id"] == "rift")
-        self.assertEqual(row["does"].count("sets it off"), 1)
+        self.assertEqual(row["does"].count(" hit on a "), 1)
         self.assertIn(" or ", row["does"])
+
+    def test_shatter_says_the_bonus_doubles_on_a_frozen_target(self) -> None:
+        row = next(e for e in self.entries() if e["id"] == "shatter" and e["kind"] == "reaction")
+        self.assertIn("doubled while the target is frozen", row["does"])
+
+    def test_an_unreadable_component_file_is_skipped(self) -> None:
+        folder = self.tmp / "content/spells/forms/bad"
+        folder.mkdir(parents=True)
+        (folder / "bad.tres").write_bytes(b"\xff\xfe\x00 id = broken")
+        self.assertNotIn("bad", [e["id"] for e in self.entries()])
 
     def test_a_single_row_reaction_has_no_clips(self) -> None:
         path = self.tmp / atlas.REACTIONS
@@ -104,7 +114,14 @@ class AtlasTest(unittest.TestCase):
         entries = atlas.build()["entries"]
         ids = [c for e in entries for c in e["clips"]]
         self.assertEqual(len(ids), len(set(ids)))
-        self.assertEqual(len(ids), 51)
+        # The recorder's rule (tests/clips/scenarios.gd): one clip per combo and per component,
+        # two per reaction that has at least two rows.
+        combos = json.loads((REPO / atlas.COMBOS).read_text(encoding="utf-8"))["combos"]
+        count = {k: sum(1 for e in entries if e["kind"] == k) for k in atlas.KIND_ORDER}
+        paired = sum(1 for e in entries if e["kind"] == "reaction" and e["clips"])
+        components = sum(count[k] for k in atlas.KIND_FOLDERS)
+        self.assertEqual(count["combo"], len(combos))
+        self.assertEqual(len(ids), len(combos) + components + 2 * paired)
         for e in entries:
             for c in e["clips"]:
                 self.assertTrue(c.startswith(f"{e['kind']}_{e['id']}"), c)

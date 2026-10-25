@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-25: Visual polish with the clips (#244 rework)
+
+Looked at the 51 clips and the sheets at 1x. Worst finding: the flame body (most visible when Bigger scales it) had a pale, washed-out middle; its light tier is now a small hot head in `shot_core.gdshader`. Four smaller findings (thin storm bolt, two-player coop clips, speckled orbit beads, no volley in the four-wizard sheet) went to `docs/BACKLOG.md`. The particle limit is unchanged and tested in `tests/gameplay/feel/`. After the shader change the sheets were rebuilt and the flame in `shot_form_bodies` and `element_shots` looked at again at the default 0.62 scale: the body is the element colour with a small light head.
+
 ## 2026-10-25: Spell visuals, reactions and statuses (#244, part 3)
 
 A reaction is now a burst bigger than a plain hit: a ring that opens next to the flash, a particle burst 2.2 times the size, a hit-stop of 0.09 s (a death's is 0.07) and more shake, scaled per reaction by `reaction_power` (Shatter 1.3 the most, Stillness 0.9 the least), with the sound `reaction_<id>` as before. An enemy with burn, chill, freeze, shock or hex wears a tinted copy of its `Sprite` (orange pulse, steady pale blue, solid white-blue, a yellow blink with a one-pixel jitter, a slow purple pulse), read from `Combat.status_left` every 0.1 s and gone when the status ends; the hit flash covers it for its moment. Data is in the preset (`status_looks`, `status_order`). Sheet: `shot_statuses`; clips `reaction_*`. Tests: `test_feel_reaction_bursts.gd`. The reaction sounds themselves are still not in `audio/` (silent by design).

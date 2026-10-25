@@ -8,14 +8,15 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
 
 M2's parts were all built and the owner answered the C2 checkpoint (#235) with **iterate** on 2026-10-25: rework in this order, #245 (clip recorder and Spell atlas), #244 (spell visuals), #243 (Lightning). The tasks below follow that order; the next end of M2 is a new C2 checkpoint. Done-when item 3 is still open on the real-GPU frame rate. Nothing from M3+ is started. `ci/` is owner-only: the owner built the pipeline side (#246); the Godot side of the recorder and the atlas data are built here, in the format `ci/smbot/clips.py` reads.
 
-- [ ] **Re-examine the visuals with the clips (polish).** Look at every clip and the four-player sheets at 1x for readability and the particle limit; fix the worst and put the rest in `docs/BACKLOG.md`.
 - [ ] **Lightning, status and element (#243, part 1).** (`content/spells/elements/lightning/`, `gameplay/combat/`, `core/spells/`) A fifth element priced at complexity 1, with a new status (static: a charged enemy hit again by any player's spell discharges to every other charged enemy nearby, not a second jump), built to the #244 visual bar and apart from Storm's Spark yellow and the four player colours. Tests including that the discharge cannot loop forever and that every hit carries a player index. Keep a list of every file changed outside the element folder and why, for the report.
 - [ ] **Lightning, reactions, combos and the extensibility report (#243, part 2).** Reaction rows with at least two existing elements (both directions) with colour and sound in Feel; at least two combo rows in `combos.json`, one with two players; `lightning` in `test_combos.gd`'s `COMPONENTS`; icon, manifest lines and the builder line; a short clip. The PR description has the extensibility report asked for in #243 (files outside the folder, which README steps held, what would make the next element new files only); fix `content/spells/README.md`. Open a follow-up issue for any proposal; do not build it.
-- [ ] **Close M2 again.** When the eight tasks above are done and no crash is known: mark M2 done in the roadmap and fill the C2 checkpoint again (what was reworked, assessment, recommendation).
+- [ ] **Close M2 again.** When the tasks above are done and no crash is known: mark M2 done in the roadmap and fill the C2 checkpoint again (what was reworked, assessment, recommendation).
 
 ## Blocked
 
 ## Done recently
+
+- [x] **Re-examine the visuals with the clips (polish).** Looked at the 51 clips and the sheets at 1x. The big flame body had a pale, washed-out middle (its light tier covered almost half the body); it is now a small hot head, so the element colour carries it (`shot_core.gdshader`). Four more findings are in `docs/BACKLOG.md`. The particle limit holds (tested in `tests/gameplay/feel/`).
 
 - [x] **Spell visuals, reactions and statuses (#244, part 3).** (`gameplay/feel/`) Each reaction has a ring, a bigger burst, a longer hit-stop and more shake with its sound, scaled by `reaction_power`; burning, chilled, frozen, shocked and hexed enemies wear a tinted overlay of their sprite in a look of its own (`status_looks`). All in Feel and its preset; no change in `gameplay/enemies/` (it does not exist; the overlay is read from the enemy's `Sprite` like the hit flash). Sheet: `shot_statuses`; clips `reaction_*`. Test: `test_feel_reaction_bursts.gd`.
 

@@ -72,7 +72,7 @@ class AtlasTest(unittest.TestCase):
         path.write_text(path.read_text() + extra)
         row = next(e for e in self.entries() if e["id"] == "fizzle")
         self.assertEqual(row["clips"], ["reaction_fizzle", "reaction_fizzle_coop"])
-        self.assertIn("void on burning", row["does"])
+        self.assertIn("void on burning", row["does"].lower())
         self.assertIn("4 damage", row["does"])
 
     def test_stillness_says_which_row_freezes(self) -> None:

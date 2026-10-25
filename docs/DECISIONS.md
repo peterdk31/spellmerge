@@ -2,6 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-25: Element shapes are drawn by the shot shader, trails are a draw batch (#244, part 1)
+
+- **Why:** four elements had to read without colour with four players firing. New art per element would have needed a texture per batch and four more sprites; a shape in the shader costs no files, no per-shot memory beyond one byte and one draw call for the trails.
+- **Now:** `ElementBase.shape` (0 plain, 1 flame, 2 star, 3 zigzag, 4 ring) goes through `CompiledSpell.shape` to `Projectiles.set_shape`. It travels in the alpha of the MultiMesh custom data (`1 - 0.1 * kind`; kinds 5-8 are the trail marks). A new element with `shape = 0` keeps the plain sprite; a fifth shape means a new function in the shader and a constant, which the Lightning task (#243) will show.
+- **Trails are not particles:** `Feel.PARTICLE_LIMIT` is for hit bursts; the trail marks are at most `TRAIL_MAX` (256) quads of one batch, only behind straight player bolts. Runes keep their glyph, enemy shots keep the enemy sprite (they stay unmistakable), orbit shots take the body shape without a trail.
+- **Frame rates** (fire 12, storm 20, frost 4, void 6 a second) use the engine's `TIME` with a per-shot phase, so a volley does not blink together. They are not deterministic between runs; the clips already leave such cosmetics free.
+
 ## 2026-10-25: How the clip recorder works and what is deterministic (#245, part 1)
 
 - **A fresh stage per clip, stepped by hand.** The recorder builds its own event bus, projectile manager, spell runtime, combat and Feel for each clip (not the autoloads, which keep cooldowns, statuses and Feel's random numbers from one clip to the next), puts the drawing nodes in the tree, and turns their own processing off. It moves 1/60 s at a time in the order of project.godot and draws a frame every third step (20 frames a second), so the frames do not depend on the machine's speed.

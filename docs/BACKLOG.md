@@ -115,6 +115,8 @@ Weak spots found in the architecture review of 2026-10-20 (docs/ARCHITECTURE.md)
 - **The drop list names no slot (task).** It lists components only; a short heading ("Element" / "Modifier M1") would help, but the longest list of ten fills the quarter already.
 - **Read-only slots look like disabled ones (task).** The quick view greys the chain because it is read only; next to the one live button it reads as broken. Needs a non-grey read-only look (a theme variation).
 
+- **Flame shot is small and blobby at a bolt's radius (#244).** Fire's teardrop on a 12-pixel grid reads as a smudge at 1x next to the star, zigzag and ring (the greyscale strip in `shot_element_shots` shows it). Try a taller tail or a 16-pixel grid for fire; for the polish task.
+
 ## Ideas from the community
 
 - **Summonable pet that draws enemy fire (#208, p3, idea).** Kept on the backlog on 2026-10-23, not scheduled (reasoning in `docs/DECISIONS.md`). Prefer a spell route (a "familiar" form or modifier) over a pet system; decide in M3 (relics, run rewards) and M5 (unlock). Needs: an enemy targeting rule in `gameplay/ai` that can prefer a decoy, and health for a shot-like target in `gameplay/combat`.

@@ -70,7 +70,15 @@ const SPARK_SLOTS: int = 4
 ## Reaction flashes (and a name label each) come last, so reactions never take a muzzle
 ## flash, puff or spark.
 const REACTION_SLOTS: int = 4
-const ALL_FLASH_SLOTS: int = FLASH_SLOTS + SPARK_SLOTS + REACTION_SLOTS
+## A reaction's ring comes after its flashes, one per reaction slot.
+const ALL_FLASH_SLOTS: int = FLASH_SLOTS + SPARK_SLOTS + REACTION_SLOTS * 2
+## Enemies that show a status at once (a tinted copy of the enemy's `Sprite` over it), how
+## often the statuses are read in seconds, and how far above the enemy's sprite it is drawn.
+const STATUS_SLOTS: int = 16
+const STATUS_POLL: float = 0.1
+const STATUS_Z: int = 3
+## How much bigger the ring of a reaction grows while it fades.
+const REACTION_RING_GROW: float = 1.2
 ## How far a reaction's name rises while it shows, in pixels.
 const REACTION_RISE: float = 10.0
 ## The same reaction makes its sound and shake at most this often, and its name is not shown
@@ -102,6 +110,8 @@ const MAX_KICK_PIXELS: float = 4.0
 var events: EventsScript = null
 var registry: RegistryScript = null
 var projectiles: Node = null
+## The combat autoload, asked only `status_left(enemy, id)` to know when a status ends.
+var combat: Node = null
 ## Tests turn this off: no Engine.time_scale changes.
 var drive_engine: bool = true
 ## The stress benchmark turns this off to time a scene without hit particles (the bursts are
@@ -178,6 +188,15 @@ var _labels: Array[Label] = []
 var _label_left: PackedFloat32Array = PackedFloat32Array()
 var _label_start: PackedVector2Array = PackedVector2Array()
 var _next_reaction: int = 0
+## Status overlays, per enemy shown (parallel arrays): its instance id, the overlay sprite,
+## real seconds shown, the status it shows and when to read the statuses next; and the overlays
+## not in use. Sprites are made when first needed and kept.
+var _status_enemies: PackedInt64Array = PackedInt64Array()
+var _status_overlays: Array[Sprite2D] = []
+var _status_age: PackedFloat32Array = PackedFloat32Array()
+var _status_shown: Array[StringName] = []
+var _status_next_poll: PackedFloat32Array = PackedFloat32Array()
+var _status_free: Array[Sprite2D] = []
 ## Sound ids by reaction id, built the first time a reaction is heard (so it allocates once).
 var _reaction_sounds: Dictionary = {}
 ## Display names by reaction id, built the same way.
@@ -305,6 +324,9 @@ func _ready() -> void:
 	events.projectile_impact.connect(_on_projectile_impact)
 	events.form_shown.connect(_on_form_shown)
 	events.reaction_triggered.connect(_on_reaction_triggered)
+	events.status_applied.connect(_on_status_applied)
+	if combat == null:
+		combat = get_node_or_null("/root/Combat")
 	if projectiles == null:
 		projectiles = get_node_or_null("/root/Projectiles")
 	if projectiles != null and "texture" in projectiles and projectiles.texture == null:
@@ -359,6 +381,7 @@ func step(real_delta: float) -> void:
 	_step_flashes(real_delta)
 	_step_forms(real_delta)
 	_step_labels(real_delta)
+	_step_statuses(real_delta)
 	_step_ghosts(real_delta)
 	var at: int = _active.size() - 1
 	while at >= 0:
@@ -604,11 +627,13 @@ func _on_damage_dealt(player: int, target: Node, amount: int, position: Vector2)
 ## player; it changes nothing in the fight.
 func _on_reaction_triggered(_player: int, reaction_id: StringName, position: Vector2) -> void:
 	var tint: Color = preset.reaction_colors.get(reaction_id, Color.WHITE) as Color
+	var power: float = preset.reaction_power.get(reaction_id, 1.0) as float
 	var slot: int = _next_reaction
 	_next_reaction = (_next_reaction + 1) % REACTION_SLOTS
-	_show_flash(FLASH_SLOTS + SPARK_SLOTS + slot, position, preset.reaction_seconds, preset.reaction_flash_size, tint)
+	_show_flash(FLASH_SLOTS + SPARK_SLOTS + slot, position, preset.reaction_seconds, preset.reaction_flash_size * power, tint)
+	_show_flash(FLASH_SLOTS + SPARK_SLOTS + REACTION_SLOTS + slot, position, preset.reaction_seconds * 1.6, preset.reaction_ring_size * power, tint, 0.0, Vector2.ONE, REACTION_RING_GROW, true)
 	if _active.size() < BURST_SLOTS - WALL_RESERVE:
-		_burst(position, 1.2, Vector2.ZERO, tint)
+		_burst(position, preset.reaction_burst_size * power, Vector2.ZERO, tint)
 	if not _reaction_names.has(reaction_id):
 		_reaction_names[reaction_id] = String(reaction_id).capitalize()
 		_reaction_sounds[reaction_id] = StringName(preset.reaction_sound_prefix + String(reaction_id))
@@ -626,10 +651,145 @@ func _on_reaction_triggered(_player: int, reaction_id: StringName, position: Vec
 	if _clock - (_reaction_heard.get(reaction_id, -REACTION_REPEAT) as float) < REACTION_REPEAT:
 		return
 	_reaction_heard[reaction_id] = _clock
+	# The hit-stop is longer than a death's and, like a death's, ignores the rest after a stop.
+	var stop: float = preset.reaction_stop_seconds * power
+	if stop > stop_left:
+		stop_left = stop
+		_set_time_scale(preset.hit_stop_scale)
 	if shake_enabled:
 		_refresh_camera()
-		_trauma = minf(_trauma + preset.reaction_shake, 1.0)
+		_trauma = minf(_trauma + preset.reaction_shake * power, 1.0)
 	_play(_reaction_sounds[reaction_id] as StringName)
+
+
+## An enemy got a status: show it on the enemy until combat says it has ended.
+func _on_status_applied(_player: int, target: Node, _status_id: StringName) -> void:
+	if target == null or not is_instance_valid(target) or combat == null:
+		return
+	var id: int = target.get_instance_id()
+	var known: int = _status_enemies.find(id)
+	if known >= 0:
+		# A new status on a shown enemy (a chill that froze it) changes the look at once.
+		_status_shown[known] = _status_of(target)
+		return
+	var sprite := target.get_node_or_null("Sprite") as Sprite2D
+	if sprite == null or _status_enemies.size() >= STATUS_SLOTS:
+		return
+	var overlay: Sprite2D = _make_overlay() if _status_free.is_empty() else _status_free.pop_back() as Sprite2D
+	_status_enemies.append(id)
+	_status_overlays.append(overlay)
+	_status_age.append(0.0)
+	_status_shown.append(_status_of(target))
+	_status_next_poll.append(STATUS_POLL)
+	_pose_status(_status_enemies.size() - 1)
+
+
+func _make_overlay() -> Sprite2D:
+	var overlay := Sprite2D.new()
+	overlay.top_level = true
+	overlay.visible = false
+	overlay.material = _reaction_material
+	overlay.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	add_child(overlay)
+	return overlay
+
+
+## Read the statuses now and then, and pose every overlay each step.
+func _step_statuses(real_delta: float) -> void:
+	var at: int = _status_enemies.size() - 1
+	while at >= 0:
+		_status_age[at] += real_delta
+		var enemy := instance_from_id(_status_enemies[at]) as Node
+		var keep: bool = enemy != null and combat != null
+		if keep:
+			if _status_age[at] >= _status_next_poll[at]:
+				_status_next_poll[at] = _status_age[at] + STATUS_POLL
+				_status_shown[at] = _status_of(enemy)
+			keep = _status_shown[at] != &""
+		if keep:
+			_pose_status(at)
+		else:
+			var overlay: Sprite2D = _status_overlays[at]
+			overlay.visible = false
+			_status_free.append(overlay)
+			var last: int = _status_enemies.size() - 1
+			_status_enemies[at] = _status_enemies[last]
+			_status_overlays[at] = _status_overlays[last]
+			_status_age[at] = _status_age[last]
+			_status_shown[at] = _status_shown[last]
+			_status_next_poll[at] = _status_next_poll[last]
+			_status_enemies.resize(last)
+			_status_overlays.resize(last)
+			_status_age.resize(last)
+			_status_shown.resize(last)
+			_status_next_poll.resize(last)
+		at -= 1
+
+
+## The status to show on `enemy` (the first of `status_order` it has), or empty for none.
+func _status_of(enemy: Node) -> StringName:
+	if not is_instance_valid(enemy):
+		return &""
+	for id in preset.status_order:
+		if (combat.call("status_left", enemy, id) as float) > 0.0:
+			return id
+	return &""
+
+
+## Lay overlay `at` over its enemy's sprite in the look of its status. Hidden while the hit
+## flash is on (the white flash is the hit's, not the status's), or when the sprite is.
+func _pose_status(at: int) -> void:
+	var overlay: Sprite2D = _status_overlays[at]
+	var enemy := instance_from_id(_status_enemies[at]) as Node
+	var sprite: Sprite2D = null
+	if enemy != null:
+		sprite = enemy.get_node_or_null("Sprite") as Sprite2D
+	var look: Dictionary = preset.status_looks.get(_status_shown[at], {}) as Dictionary
+	if sprite == null or look.is_empty() or sprite.material == _flash_material or not sprite.is_visible_in_tree():
+		overlay.visible = false
+		return
+	var rate: float = look.get("rate", 0.0) as float
+	var phase: float = _status_age[at] * rate
+	var strength: float = look.get("alpha", 0.5) as float
+	if rate > 0.0:
+		strength *= 0.45 + 0.55 * (0.5 + 0.5 * sin(phase * TAU))
+	if look.get("blink", false) as bool and fposmod(phase, 1.0) > 0.6:
+		strength = 0.0
+	if overlay.texture != sprite.texture:
+		overlay.texture = sprite.texture
+	overlay.hframes = sprite.hframes
+	overlay.vframes = sprite.vframes
+	overlay.frame = sprite.frame
+	overlay.region_enabled = sprite.region_enabled
+	overlay.region_rect = sprite.region_rect
+	overlay.centered = sprite.centered
+	overlay.offset = sprite.offset
+	overlay.flip_h = sprite.flip_h
+	overlay.flip_v = sprite.flip_v
+	overlay.global_transform = sprite.global_transform
+	var jitter: float = look.get("jitter", 0.0) as float
+	if jitter > 0.0:
+		overlay.global_position += Vector2(floorf(sin(phase * 5.1 * TAU) * 1.99), floorf(cos(phase * 3.7 * TAU) * 1.99)) * jitter
+	overlay.z_index = sprite.z_index + STATUS_Z
+	overlay.modulate = Color(look.get("color", Color.WHITE) as Color, strength)
+	overlay.visible = strength > 0.0
+
+
+## The status shown on `enemy` (empty for none), for tests.
+func status_shown(enemy: Node) -> StringName:
+	var at: int = _status_enemies.find(enemy.get_instance_id())
+	if at < 0 or not _status_overlays[at].visible:
+		return &""
+	return _status_shown[at]
+
+
+## Status overlays showing right now (for tests).
+func live_statuses() -> int:
+	var count: int = 0
+	for overlay in _status_overlays:
+		if overlay.visible:
+			count += 1
+	return count
 
 
 ## Is the name of `reaction_id` already rising near `position`?

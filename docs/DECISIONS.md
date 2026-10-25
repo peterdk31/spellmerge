@@ -1300,6 +1300,12 @@ An independent review of the branch found these, all fixed with a regression tes
 - **Now:** both fixed (`set_quick` clears the mark and focuses Close when nothing can be dropped). Text size (10 px) and the corner's "Spell A/B" read fine at 1x with four players; left as is.
 - **Not done:** (1) the disabled-slot hint: `UIFocus` skips disabled controls by design, so a hint needs a new way to read them, a core change bigger than a polish pass; the BACKLOG entry stays. (2) `swap` is ignored inside a menu (the wizard stands still there), so a player closes the quick view to swap. (3) the drop list names no slot. (4) read-only slots look greyed like disabled ones. (2) to (4) are in BACKLOG.
 
+## Statuses are shown by Feel as an overlay read from Combat (#244, part 3)
+
+- **Why:** the enemy's own `Sprite` already carries the telegraph (`modulate`) and the hit flash (`material`), so a status painted on it would fight both. The task named `gameplay/enemies/`, which does not exist; enemies are content plus `gameplay/ai`.
+- **Now:** Feel keeps up to 16 tinted copies of enemy sprites (`STATUS_SLOTS`), made once and reused. `status_applied` starts one; every 0.1 s Feel asks the `Combat` autoload `status_left(enemy, id)` (a duck-typed read, like the projectile manager) to pick the first of `status_order` the enemy has, and the overlay ends when none is left. The hit flash hides it while it shows. Only one status shows at a time: freeze, shock, burn, hex, chill in that order.
+- **Reactions** add a ring, a bigger burst (inside the particle limit), a hit-stop longer than a death's and shake, scaled by `reaction_power`.
+
 ## "Bag" replaces "Drop component"; no full editing in a wave
 
 - **Why:** the name said nothing about why the action exists. The owner (`/claude` on #4) asked for a name that says what it does, with "Drop" clear inside it, reachable by every player in a room and in a wave.

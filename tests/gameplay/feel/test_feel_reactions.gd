@@ -41,7 +41,7 @@ func before_each() -> void:
 
 func test_a_reaction_shows_a_flash_and_a_name() -> void:
 	_bus.reaction_triggered.emit(0, &"shatter", Vector2(10.0, 20.0))
-	check_equal(_feel.live_flashes(), 1, "one flash")
+	check_equal(_feel.live_flashes(), 2, "a flash and a ring")
 	check_equal(_feel.live_labels(), 1, "one name")
 	check_equal(_feel.get_child_count() > 0, true, "feel owns them")
 
@@ -71,7 +71,7 @@ func test_a_crowd_of_reactions_stays_inside_the_pools() -> void:
 	for i in 60:
 		_bus.reaction_triggered.emit(i % 4, &"kindle", Vector2(float(i), 0.0))
 	check(_feel.live_labels() <= FeelScript.REACTION_SLOTS, "labels are capped")
-	check(_feel.live_flashes() <= FeelScript.REACTION_SLOTS, "flashes are capped")
+	check(_feel.live_flashes() <= FeelScript.REACTION_SLOTS * 2, "flashes are capped")
 	var particles: int = 0
 	for child in _feel.get_children():
 		var burst := child as CPUParticles2D
@@ -82,7 +82,7 @@ func test_a_crowd_of_reactions_stays_inside_the_pools() -> void:
 
 func test_an_unknown_reaction_still_shows_and_a_missing_sound_is_silent() -> void:
 	_bus.reaction_triggered.emit(0, &"brand_new", Vector2.ZERO)
-	check_equal(_feel.live_flashes(), 1, "a flash in the default colour")
+	check_equal(_feel.live_flashes(), 2, "a flash and a ring in the default colour")
 	check_equal(_feel.live_labels(), 1, "and its name")
 
 

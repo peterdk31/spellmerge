@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-25: Spell visuals, reactions and statuses (#244, part 3)
+
+A reaction is now a burst bigger than a plain hit: a ring that opens next to the flash, a particle burst 2.2 times the size, a hit-stop of 0.09 s (a death's is 0.07) and more shake, scaled per reaction by `reaction_power` (Shatter 1.3 the most, Stillness 0.9 the least), with the sound `reaction_<id>` as before. An enemy with burn, chill, freeze, shock or hex wears a tinted copy of its `Sprite` (orange pulse, steady pale blue, solid white-blue, a yellow blink with a one-pixel jitter, a slow purple pulse), read from `Combat.status_left` every 0.1 s and gone when the status ends; the hit flash covers it for its moment. Data is in the preset (`status_looks`, `status_order`). Sheet: `shot_statuses`; clips `reaction_*`. Tests: `test_feel_reaction_bursts.gd`. The reaction sounds themselves are still not in `audio/` (silent by design).
+
 ## 2026-10-25: Spell visuals, forms: bodies in flight (#244, part 2b)
 
 A rune is a diamond that swells and settles while it waits, an orbit shot two beads that turn and breathe (`shot_core.gdshader` kinds 9 and 10, animated from `sim_time`; the manager writes them for every player rune and orbit shot, whatever the element). Shaped bodies are drawn smaller (`SHAPE_SCALE` 0.62) after the owner's note that the new visuals were too big. Elements still show their colour (core) and their shape; the trail marks are the type particles. Tests: `tests/core/test_projectile_shapes.gd`. Sheet: `shot_form_bodies`; clips `form_rune`, `form_orbit`, `form_bolt`. More animation for combined spells is in the backlog.

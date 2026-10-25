@@ -266,6 +266,21 @@ class CommandsTest(unittest.TestCase):
         self.assertIn("parked_until", f["**Other.**"])
         self.assertEqual(commands.parse("/retry"), ("retry", ""))
 
+    # #219 was parked, then #224 did its task; /retry on #219 still said "Back in the queue" (2026-10-23).
+    def test_retry_says_when_the_task_is_no_longer_queued(self) -> None:
+        st = copy.deepcopy(state.DEFAULT)
+        st["task_failures"] = {"**Record style N.**": {"count": 0, "pr": "219"},
+                               "**Fix doors.** x (issue #40, p2; ...)": {"count": 2, "parked_until": "2099-01-01T00:00:00Z"}}
+        self.assertIn("no longer in the queue", commands.retry_reply(st, 219, {"**Make the wizard alive.**"}))
+        self.assertIn("Back in the queue", commands.retry_reply(st, 219, {"**Record style N.**"}))
+        # A scheduled issue's task line may have been rewritten since it failed; its number still matches.
+        self.assertIn("Back in the queue", commands.retry_reply(st, 40, {"**Fix doors.** y (issue #40, p1; ...)"}))
+        self.assertIn("no parked task", commands.retry_reply(st, 77, {"**Record style N.**"}))
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp, "NEXT.md")
+            path.write_text("## Queue\n\n- [ ] Q\n\n## Blocked\n\n- [ ] B\n\n## Done recently\n\n- [x] D\n")
+            self.assertEqual(nexttask.open_tasks(path, first=["S"]), {"S", "Q", "B"})
+
     def test_effects_are_idempotent(self) -> None:
         st = copy.deepcopy(state.DEFAULT)
         eff = commands.Effects([1, 2], True, [{"url": "u1", "kind": "ask"}])

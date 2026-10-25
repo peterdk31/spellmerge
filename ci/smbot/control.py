@@ -153,7 +153,8 @@ def main(argv: list[str] | None = None) -> int:
             log += panel.changes(st.get("panel_applied"), result.settings, cfg.owner.login)
         effects = commands.Effects([], None, [])
         if args.commands and result.verified and result.settings.automation_enabled:
-            cmd_log, effects = commands.run(cfg, set(st["processed_comments"]), now, os.environ["GH_TOKEN"])
+            cmd_log, effects = commands.run(cfg, set(st["processed_comments"]), now, os.environ["GH_TOKEN"], st,
+                                            lambda: nexttask.open_tasks(first=intake.queue_tasks(cfg, st)))
             log += cmd_log
 
         def apply(s: dict) -> None:

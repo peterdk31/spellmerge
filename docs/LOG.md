@@ -4,7 +4,7 @@ What each run did, newest first. Claude appends a short entry after each develop
 
 ## 2026-10-25: Visual polish with the clips (#244 rework)
 
-Looked at the 51 clips and the sheets at 1x. Worst finding: the flame body (most visible when Bigger scales it) had a pale, washed-out middle; its light tier is now a small hot head in `shot_core.gdshader`. Four smaller findings (thin storm bolt, two-player coop clips, speckled orbit beads, no volley in the four-wizard sheet) went to `docs/BACKLOG.md`. The particle limit is unchanged and tested in `tests/gameplay/feel/`.
+Looked at the 51 clips and the sheets at 1x. Worst finding: the flame body (most visible when Bigger scales it) had a pale, washed-out middle; its light tier is now a small hot head in `shot_core.gdshader`. Four smaller findings (thin storm bolt, two-player coop clips, speckled orbit beads, no volley in the four-wizard sheet) went to `docs/BACKLOG.md`. The particle limit is unchanged and tested in `tests/gameplay/feel/`. After the shader change the sheets were rebuilt and the flame in `shot_form_bodies` and `element_shots` looked at again at the default 0.62 scale: the body is the element colour with a small light head.
 
 ## 2026-10-25: Spell visuals, reactions and statuses (#244, part 3)
 

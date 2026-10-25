@@ -64,6 +64,7 @@ vec4 tier(float t, vec3 edge, vec3 mid, vec3 light, float alpha) {
 }
 
 // Flame: a fat teardrop with a long wavering tail, head forward (on a finer grid).
+// The light tier (3) is only the front head, so the element colour carries the body.
 float flame(vec2 p, float f) {
 	float wave = 0.22 * sin(p.x * 5.0 + f * 1.5708) * clamp(0.4 - p.x, 0.0, 1.0);
 	float dy = abs(p.y - wave);

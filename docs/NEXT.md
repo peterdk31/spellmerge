@@ -10,7 +10,7 @@ M2's parts were all built and the owner answered the C2 checkpoint (#235) with *
 
 - [ ] **Lightning, status and element (#243, part 1).** (`content/spells/elements/lightning/`, `gameplay/combat/`, `core/spells/`) A fifth element priced at complexity 1, with a new status (static: a charged enemy hit again by any player's spell discharges to every other charged enemy nearby, not a second jump), built to the #244 visual bar and apart from Storm's Spark yellow and the four player colours. Tests including that the discharge cannot loop forever and that every hit carries a player index. Keep a list of every file changed outside the element folder and why, for the report.
 - [ ] **Lightning, reactions, combos and the extensibility report (#243, part 2).** Reaction rows with at least two existing elements (both directions) with colour and sound in Feel; at least two combo rows in `combos.json`, one with two players; `lightning` in `test_combos.gd`'s `COMPONENTS`; icon, manifest lines and the builder line; a short clip. The PR description has the extensibility report asked for in #243 (files outside the folder, which README steps held, what would make the next element new files only); fix `content/spells/README.md`. Open a follow-up issue for any proposal; do not build it.
-- [ ] **Close M2 again.** When the eight tasks above are done and no crash is known: mark M2 done in the roadmap and fill the C2 checkpoint again (what was reworked, assessment, recommendation).
+- [ ] **Close M2 again.** When the tasks above are done and no crash is known: mark M2 done in the roadmap and fill the C2 checkpoint again (what was reworked, assessment, recommendation).
 
 ## Blocked
 

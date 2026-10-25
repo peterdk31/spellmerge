@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-25: Spell visuals, forms: bodies in flight (#244, part 2b)
+
+A rune is a diamond that swells and settles while it waits, an orbit shot two beads that turn and breathe (`shot_core.gdshader` kinds 9 and 10, animated from `sim_time`; the manager writes them for every player rune and orbit shot, whatever the element). Shaped bodies are drawn smaller (`SHAPE_SCALE` 0.62) after the owner's note that the new visuals were too big. Elements still show their colour (core) and their shape; the trail marks are the type particles. Tests: `tests/core/test_projectile_shapes.gd`. Sheet: `shot_form_bodies`; clips `form_rune`, `form_orbit`, `form_bolt`. More animation for combined spells is in the backlog.
+
 ## 2026-10-25: Spell visuals, forms (#244, part 2)
 
 Bolt, beam, nova, rune and orbit each have a cast flash on the wizard (streak, long flare, ring burst, rune and orbit gathering in), a flare where they end or hit (beam stretched along the beam, nova and rune rings, orbit tick) and a beam that opens wide and thins. Data is `cast_looks` and `impact_looks` in the preset; an enemy's shot always ends in an ember mark on its corner. The flare comes from the shot's own form (`Projectiles.impact_form`), not the last cast. The bodies in flight are a separate Queue task. Tests: `tests/gameplay/feel/test_feel_form_looks.gd`, `tests/core/test_projectile_impacts.gd`. Sheet: `shot_form_looks`; clips `form_bolt`, `form_beam`, `form_nova`, `form_rune`, `form_orbit`.

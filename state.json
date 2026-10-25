@@ -9,7 +9,6 @@
     "number": 238
   },
   "errors_in_a_row": 0,
-  "idle": null,
   "intake_tasks": {
     "208": {
       "author": "Brianmanden",
@@ -67,7 +66,13 @@
     6401761222,
     6402088067
   ],
-  "task_failures": {},
+  "task_failures": {
+    "**Spell atlas data (#245, part 2).** (`tools/`, `tests/`) A generator, `tools/atlas.py` run as `python3 tools/atlas.py <out>` (standard library only; `build.sh --clips` calls it with `build/clips/atlas.json`), that writes `atlas.json` from the content in the format in `ci/smbot/clips.py`: one entry per component, combo and reaction, grouped by kind, with name, builder description (`content/story/lore/components/*.json`), the `does` line, the clip id and the file that last changed it. No hand-written list; a test adds a fake combo row and sees it appear. The Pages page, the Daily log clips and the PR comment clips are already in `ci/` (#246); sessions name the clips that show a change in `clips` in their result, like `screenshots`.": {
+      "count": 1,
+      "pr": "250",
+      "problems": "- `_reaction_does` builds the effect text from `pair[0]` only. In `content/spells/reactions.tres` Stillness has a chill EXTEND row (2 s, which `reaction_row.gd` says is a freeze) and a hex EXTEND row (2 s plus 25 strength). The atlas would say \"makes the status last 2 seconds longer\" for both, which is wrong for the chill row. The PR description says the chill EXTEND row is a freeze and that differing rows get one sentence each, but the code does neither. Fix: Build the text per row. For a chill EXTEND row write \"freezes the target for N seconds (or keeps it frozen that much longer)\". For a hex EXTEND row write \"makes the hex last N seconds longer\". Join rows that give the same sentence and give each differing row its own sentence.\n- The description says the tests cover the Stillness wording, a single-row reaction having no clips, and a clip count and id shape check against the recorder. None of these exist. The reaction test uses a fake burst pair, so the wrong Stillness text would pass. The suite also never checks the single-row branch or the 51-clip total. Fix: Add a test that Stillness's `does` mentions freezing. Add a test that a single-row reaction has `clips == []`. Add a test that the total clip count equals the recorder's 51, or that the ids match the `scenarios.gd` scheme.\n- Neither the tests, the generator, `tools/check.sh` nor the build was run, by the PR's own admission. AGENTS.md requires checks before committing. The regexes (`^id = `, the `[sub_resource` split, the `effect` int) have never been exercised on the real content, and `test_the_real_content_has_every_field` has never passed. Fix: Run `python3 -m unittest discover -s tools`, `python3 tools/atlas.py build/clips/atlas.json` and `tools/check.sh`. Confirm 51 clips. Fix whatever fails, then re-request review.\n- The PR text says components are found \"at any depth\" and that the kind comes from the base script. The code globs only `*/*.tres` under the four fixed kind folders, so a deeper component is missed and the base script is ignored. The PR text and `docs/NEXT.md` disagree with the code. Fix: Either use `rglob` and the base script as described, or correct the PR text and docs to say one folder level. The recorder (`scenarios.gd`) should find the same set of components."
+    }
+  },
   "usage": [
     {
       "at": "2026-10-17T21:17:46Z",

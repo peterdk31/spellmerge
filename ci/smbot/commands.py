@@ -18,7 +18,7 @@ import re
 import subprocess
 import tempfile
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Callable, Collection
 
 from . import checkpoint
 from . import config as config_mod
@@ -191,10 +191,47 @@ class Effects:
             checkpoint.record(state, a["issue"], a["verdict"], a["text"], a["url"], a["at"])
         for number in self.retries:
             for task, entry in state.get("task_failures", {}).items():
-                if str(entry.get("pr")) == str(number) or f"#{number}," in task or f"#{number} " in task[:60]:
+                if belongs_to(task, entry, number):
                     entry.pop("parked_until", None)
                     entry.pop("parked_reason", None)
                     entry["count"] = 0  # two fresh attempts; the last review's problems stay as the brief
+
+
+def belongs_to(task: str, entry: dict[str, Any], number: int) -> bool:
+    """True if a task_failures entry is the task of PR or issue `number`."""
+    return str(entry.get("pr")) == str(number) or f"#{number}," in task or f"#{number} " in task[:60]
+
+
+def retry_status(st: dict[str, Any], number: int, open_tasks: Collection[str]) -> str:
+    """What /retry finds: "none" (no task of this PR or issue failed or was parked), "gone" or "queued".
+
+    `open_tasks` are the tasks still to do: docs/NEXT.md's queue and blocked tasks and the scheduled issues.
+    A task that failed review but is no longer among them ("gone") was done or dropped, for example by another PR.
+    """
+    tasks = [t for t, e in st.get("task_failures", {}).items() if belongs_to(t, e, number)]
+    if not tasks:
+        return "none"
+    if any(t in open_tasks for t in tasks) or any(belongs_to(t, {}, number) for t in open_tasks):
+        return "queued"
+    return "gone"
+
+
+def do_retry(cfg: config_mod.Config, effects: Effects, cmd: Command, st: dict[str, Any],
+             open_tasks: Collection[str]) -> str:
+    """Puts the task back in the queue, or says why there is nothing to put back."""
+    effects.retries.append(cmd.number)
+    try:
+        gh.api(f"repos/{cfg.repo}/issues/{cmd.number}/labels/parked", "-X", "DELETE")
+    except gh.GhError:
+        pass  # it wasn't labelled
+    status = retry_status(st, cmd.number, open_tasks)
+    if status == "none":
+        return "Nothing to retry: no parked task belongs to this pull request or issue."
+    if status == "queued":
+        return ("Back in the queue: the next session takes this task up again, with two fresh attempts and the "
+                "last review's points as its brief.")
+    return ("Nothing to retry: this task is no longer in the queue (`docs/NEXT.md` or the scheduled issues); "
+            "it was done or dropped meanwhile. If this is the bot's pull request, this check closes it.")
 
 
 def queue_instruction(effects: Effects, cmd: Command) -> str:
@@ -222,8 +259,12 @@ def answer_checkpoint(cfg: config_mod.Config, effects: Effects, cmd: Command) ->
             "pivot": "Got it: pivot. A planning session works out the new direction now."}[cmd.name]
 
 
-def run(cfg: config_mod.Config, processed: set[int], now: dt.datetime, token: str) -> tuple[list[str], Effects]:
-    """Carries out new owner commands; returns lines for the Daily log and the state effects."""
+def run(cfg: config_mod.Config, processed: set[int], now: dt.datetime, token: str, st: dict[str, Any],
+        open_tasks: Callable[[], Collection[str]]) -> tuple[list[str], Effects]:
+    """Carries out new owner commands; returns lines for the Daily log and the state effects.
+
+    `st` is the state the effects will be applied to; `open_tasks` gives the tasks still to do (for /retry).
+    """
     log: list[str] = []
     effects = Effects([], None, [])
     for cmd in find(cfg, processed, now):
@@ -244,13 +285,7 @@ def run(cfg: config_mod.Config, processed: set[int], now: dt.datetime, token: st
             elif cmd.name in checkpoint.VERDICTS:
                 result = answer_checkpoint(cfg, effects, cmd)
             elif cmd.name == "retry":
-                effects.retries.append(cmd.number)
-                try:
-                    gh.api(f"repos/{cfg.repo}/issues/{cmd.number}/labels/parked", "-X", "DELETE")
-                except gh.GhError:
-                    pass  # it wasn't labelled
-                result = ("Back in the queue: if this task was parked, the next session takes it up again, with "
-                          "two fresh attempts and the last review's points as its brief.")
+                result = do_retry(cfg, effects, cmd, st, open_tasks())
             else:
                 result = queue_instruction(effects, cmd)
         except (gh.GhError, subprocess.CalledProcessError) as e:

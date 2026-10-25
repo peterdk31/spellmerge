@@ -74,6 +74,12 @@ def parked(state: dict[str, Any], now: dt.datetime) -> set[str]:
             if f.get("parked_until") and now < pacing.parse_time(f["parked_until"])}
 
 
+def open_tasks(path: Path = Path("docs/NEXT.md"), first: Sequence[str] = ()) -> set[str]:
+    """Every task still to do: `first` (the scheduled issues) and docs/NEXT.md's queue and blocked tasks."""
+    text = path.read_text() if path.exists() else ""
+    return {*first, *blocked(text), *queue(text)}
+
+
 def next_task(path: Path = Path("docs/NEXT.md"), skip: Collection[str] = (),
               first: Sequence[str] = (), milestone: bool = True, answered: Collection[str] = ()) -> str | None:
     """The first task of `first` (the scheduled issues), then of docs/NEXT.md, that isn't in `skip`.

@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-25: Spell atlas data (#245, part 2)
+
+`tools/atlas.py <out>` writes the Spell atlas data (`atlas.json`) from the content, with no hand-written list: components, combos and reactions with name, builder line, `does`, clip ids and source file. Tests: `tools/test_atlas.py` (`python3 -m unittest discover -s tools`); `.py` files are only allowed under `tools/`, so the test lives there. No session could run Python (the sandbox refuses it), so the first CI run is the first run of both files; the revision made the reaction wording skip a zero damage or radius and the tests use temp rows. Next: spell visuals (#244).
+
 ## 2026-10-25: Spell visuals, elements (#244, part 1)
 
 Fire, frost, storm and void shots have a silhouette, animation and trail of their own (flame, star, zigzag, ring), built in `shot_core.gdshader` from `ElementBase.shape`; the trail is a draw batch of at most 256 marks, not particles, so `Feel.PARTICLE_LIMIT` is untouched. Greyscale strip in `shot_element_shots` shows they read without colour. Four-bot smoke bench unchanged (peak 48 particles of 48).

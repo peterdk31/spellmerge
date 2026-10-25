@@ -9,7 +9,6 @@
     "number": 202
   },
   "errors_in_a_row": 0,
-  "idle": null,
   "intake_tasks": {
     "208": {
       "author": "Brianmanden",
@@ -21,8 +20,8 @@
     }
   },
   "last_own_merge": "2026-10-23T20:10:09Z",
-  "last_plan": "2026-10-23T19:36:25Z",
-  "last_weekly": "2026-10-22T13:49:44Z",
+  "last_plan": "2026-10-25T10:11:43Z",
+  "last_weekly": "2026-10-25T10:11:43Z",
   "panel_applied": {
     "automation_enabled": true,
     "focus": "",
@@ -115,6 +114,12 @@
       "count": 0,
       "parked_reason": "I found no known crash or blocker to fix, so I made no changes and left no commits. `ci/build/build.sh --quick --tests` passes in full: import, every unit test, and the 4-bot smoke test (frame time p95 7.7 ms, no errors logged). The only warning in the output is the expected \"--four-bot needs a build that includes tests/\" from the main-menu test. `docs/BACKLOG.md` has no crash or blocker entries, and no open issue carries the bug label. The Blocked WASM task still can't move: none of the daily-l",
       "parked_until": "2026-10-23T23:01:41Z"
+    },
+    "Planning": {
+      "count": 0,
+      "parked_reason": "Not merged: required checks failed: ci-tests ",
+      "parked_until": "2026-10-26T10:11:43Z",
+      "pr": "239"
     }
   },
   "usage": [

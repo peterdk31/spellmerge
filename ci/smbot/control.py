@@ -25,12 +25,14 @@ import datetime as dt
 import os
 import sys
 from dataclasses import dataclass, field
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from . import checkpoint, commands, dailylog, gh, inbox, intake, nexttask, pacing, panel, state
+from . import checkpoint, commands, dailylog, gh, inbox, intake, nexttask, pacing, panel, stale, state
 from . import config as config_mod
 
 
+NEXT = Path("docs/NEXT.md")
 PLAN_COOLDOWN = dt.timedelta(hours=3)  # an empty queue runs planning at most this often
 WEEKLY_AT = (6, 6)  # the weekly planning is due from Sunday (weekday 6) 06:00 UTC
 
@@ -129,6 +131,13 @@ def write_outputs(values: dict[str, str]) -> None:
                 fh.write(f"{key}<<__END__\n{value}\n__END__\n")
 
 
+def open_tasks(cfg: config_mod.Config, st: dict) -> set[str]:
+    """The tasks still to do. Raises when GitHub or docs/NEXT.md can't be read, so nothing is judged gone by mistake."""
+    if not NEXT.exists():
+        raise FileNotFoundError(NEXT)
+    return nexttask.open_tasks(NEXT, first=intake.queue_tasks(cfg, st, strict=True))
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--commands", action="store_true", help="carry out owner commands (needs the app token)")
@@ -152,17 +161,27 @@ def main(argv: list[str] | None = None) -> int:
         if result.verified:
             log += panel.changes(st.get("panel_applied"), result.settings, cfg.owner.login)
         effects = commands.Effects([], None, [])
+        forget: list[str] = []
         if args.commands and result.verified and result.settings.automation_enabled:
-            cmd_log, effects = commands.run(cfg, set(st["processed_comments"]), now, os.environ["GH_TOKEN"])
+            cmd_log, effects = commands.run(cfg, set(st["processed_comments"]), now, os.environ["GH_TOKEN"], st,
+                                            lambda: open_tasks(cfg, st))
             log += cmd_log
+            if not st.get("paused_by_command") and not effects.paused:
+                try:
+                    stale_log, forget = stale.sweep(cfg, st, open_tasks(cfg, st))
+                    log += stale_log
+                except (gh.GhError, FileNotFoundError):
+                    pass  # an unreadable queue is no reason to close anything; the next check tries again
 
         def apply(s: dict) -> None:
             s["panel_problems"] = result.problems
             if result.verified:
                 s["panel_applied"] = panel.to_json(result.settings)
             effects.apply(s)
-        changed = (st.get("panel_problems") != result.problems or effects.processed or not st.get("last_weekly")
-                   or (result.verified and st.get("panel_applied") != panel.to_json(result.settings)))
+            for task in forget:
+                s.get("task_failures", {}).pop(task, None)
+        changed = (st.get("panel_problems") != result.problems or effects.processed or forget
+                   or not st.get("last_weekly") or (result.verified and st.get("panel_applied") != panel.to_json(result.settings)))
 
         def apply_all(s: dict) -> None:
             apply(s)

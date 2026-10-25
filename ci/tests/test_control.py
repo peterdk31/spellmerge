@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from smbot import checkpoint, commands, config, control, nexttask, pacing, panel, state
+from smbot import checkpoint, commands, config, control, nexttask, pacing, panel, stale, state
 
 OWNER = 13425287
 CFG = config.load()
@@ -266,6 +266,24 @@ class CommandsTest(unittest.TestCase):
         self.assertIn("parked_until", f["**Other.**"])
         self.assertEqual(commands.parse("/retry"), ("retry", ""))
 
+    def test_retry_says_when_there_is_nothing_to_retry(self) -> None:
+        st = copy.deepcopy(state.DEFAULT)
+        st["task_failures"] = {"**Record style N.**": {"count": 0, "pr": "219"},
+                               "**Fix doors.** x (issue #40, p2; ...)": {"count": 2, "parked_until": "2099-01-01T00:00:00Z"}}
+        self.assertEqual(commands.retry_status(st, 219, {"**Make the wizard alive.**"}), "gone")
+        self.assertEqual(commands.retry_status(st, 219, {"**Record style N.**"}), "queued")
+        # A scheduled issue's task line may have been rewritten since it failed; its number still matches.
+        self.assertEqual(commands.retry_status(st, 40, {"**Fix doors.** y (issue #40, p1; ...)"}), "queued")
+        self.assertEqual(commands.retry_status(st, 77, {"**Record style N.**"}), "none")
+        cmd = commands.Command("retry", "", 1, "n", 219, True, "u", "2026-10-23T15:34:58Z")
+        with mock.patch.object(commands.gh, "api", lambda *a, **k: {}):
+            reply = commands.do_retry(CFG, commands.Effects([], None, []), cmd, st, {"**Other.**"})
+        self.assertIn("Nothing to retry", reply)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp, "NEXT.md")
+            path.write_text("## Queue\n\n- [ ] Q\n\n## Blocked\n\n- [ ] B\n\n## Done recently\n\n- [x] D\n")
+            self.assertEqual(nexttask.open_tasks(path, first=["S"]), {"S", "Q", "B"})
+
     def test_effects_are_idempotent(self) -> None:
         st = copy.deepcopy(state.DEFAULT)
         eff = commands.Effects([1, 2], True, [{"url": "u1", "kind": "ask"}])
@@ -328,3 +346,47 @@ class NextTaskTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class StaleTest(unittest.TestCase):
+    # #219 waited parked while #224 did its task and took it off docs/NEXT.md (2026-10-23); it stayed open,
+    # with nothing left to take it up, until the owner asked.
+    def test_a_bot_pr_whose_task_is_gone_is_closed_and_forgotten(self) -> None:
+        st = copy.deepcopy(state.DEFAULT)
+        st["task_failures"] = {
+            "**Record style N.**": {"count": 0, "pr": "219"},  # done by another PR: closed
+            "**Outside.**": {"count": 2, "pr": "220"},  # gone too, but not the bot's PR: left open
+            "**Queued.**": {"count": 1, "pr": "221"},  # still queued: kept
+            "**Fix doors.** x (issue #40, p2; ...)": {"count": 2, "pr": "222"},  # issue still scheduled, reworded
+            "**Reworded.**": {"count": 0, "parked_until": "2099-01-01T00:00:00Z"},  # gone, no PR: forgotten
+            "Planning": {"count": 0, "pr": "239", "parked_until": "2099-01-01T00:00:00Z"},  # not from the queue
+        }
+        open_tasks = {"**Queued.**", "**Fix doors.** y (issue #40, p1; ...)"}
+        prs = {219: {"state": "open", "title": "Record style N", "user": {"login": CFG.bot.login}},
+               220: {"state": "open", "title": "Outside", "user": {"login": "someone"}}}
+        calls: list[tuple[str, tuple]] = []
+
+        def api(path: str, *args: str, **kwargs: object) -> dict:
+            calls.append((path, args))
+            return prs.get(int(path.split("/pulls/")[1]), {}) if "/pulls/" in path else {}
+
+        with mock.patch.object(stale.gh, "api", api):
+            lines, forget = stale.sweep(CFG, st, open_tasks)
+        self.assertEqual(sorted(forget), ["**Outside.**", "**Record style N.**", "**Reworded.**"])
+        self.assertEqual(len(lines), 1)
+        self.assertIn("Closed #219 Record style N", lines[0])
+        closed = [p for p, a in calls if a[:2] == ("-X", "PATCH")]
+        self.assertEqual(closed, [f"repos/{CFG.repo}/pulls/219"])
+        self.assertIn((f"repos/{CFG.repo}/issues/219/comments", ("-X", "POST")), calls)
+
+    def test_a_pr_github_wont_close_is_tried_again(self) -> None:
+        st = copy.deepcopy(state.DEFAULT)
+        st["task_failures"] = {"**Gone.**": {"count": 0, "pr": "219"}}
+
+        def api(path: str, *args: str, **kwargs: object) -> dict:
+            raise stale.gh.GhError("HTTP 502")
+
+        with mock.patch.object(stale.gh, "api", api):
+            lines, forget = stale.sweep(CFG, st, set())
+        self.assertEqual(forget, [])
+        self.assertIn("Couldn't close #219", lines[0])

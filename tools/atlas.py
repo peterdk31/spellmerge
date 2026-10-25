@@ -136,9 +136,10 @@ def _row_effect(row: dict) -> str:
         if row["status"] == "chill":  # reaction_row.gd: for chill, EXTEND is a freeze
             text = f"freezes the target for {seconds} seconds (or keeps it frozen that much longer)"
         else:
-            text = f"makes the {row['status']} last {seconds} seconds longer"
+            word = STATUS_WORDS.get(row["status"], row["status"])
+            text = f"extends the {word} status by {seconds} seconds"
             if row["strength"]:
-                text += f" and {row['strength']:g} stronger"
+                text += f" and its strength by {row['strength']:g}"
         if damage:
             text += f", dealing {damage} damage"
         return text

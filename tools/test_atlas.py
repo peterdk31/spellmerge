@@ -78,12 +78,13 @@ class AtlasTest(unittest.TestCase):
     def test_stillness_says_which_row_freezes(self) -> None:
         row = next(e for e in self.entries() if e["id"] == "stillness")
         self.assertIn("freezes the target for 2 seconds", row["does"])
-        self.assertIn("makes the hex last 2 seconds longer and 25 stronger", row["does"])
+        self.assertIn("extends the hexed status by 2 seconds and its strength by 25", row["does"])
         self.assertEqual(row["does"].count(" hit on a "), 2)
 
     def test_rows_that_do_the_same_share_one_sentence(self) -> None:
         row = next(e for e in self.entries() if e["id"] == "rift")
-        self.assertEqual(row["does"].count(" hit on a "), 1)
+        self.assertEqual(row["does"].count(": "), 1)
+        self.assertEqual(row["does"].count("bursts for"), 1)
         self.assertIn(" or ", row["does"])
 
     def test_shatter_says_the_bonus_doubles_on_a_frozen_target(self) -> None:

@@ -469,6 +469,8 @@ func _test_one_thousand_run_and_draw() -> void:
 	_check(alive > 900, "most of the 1,000 are still flying (%d)" % alive)
 	_mgr.update_draw()
 	_check(_mgr.drawn == alive, "one batch holds every live projectile (%d of %d)" % [_mgr.drawn, alive])
+	_mgr.update_draw(1.0)
+	_check(_mgr.drawn == alive, "a fixed draw fraction (the clip recorder's) draws every live projectile too")
 	_mgr.clear()
 	_mgr.update_draw()
 	_check(_mgr.drawn == 0 and _mgr.get_count() == 0, "clear empties the batch")

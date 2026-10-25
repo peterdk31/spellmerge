@@ -143,6 +143,12 @@ var _contact_left: PackedFloat32Array = PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
 
 
 func _ready() -> void:
+	setup()
+
+
+## Find what is not set yet and listen to the events. `_ready` calls it; a scene that builds
+## combat outside the tree (a test, the clip recorder) calls it after setting the fields.
+func setup() -> void:
 	# Absolute paths only work inside the tree (tests build combat outside it).
 	var in_tree: bool = is_inside_tree()
 	if events == null and in_tree:

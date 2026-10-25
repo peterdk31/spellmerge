@@ -2,6 +2,11 @@
 
 Ideas and future work outside the current milestone (docs/PLAN.md, "Planning system"). Players' ideas wait as issues labelled `backlog` (the daily intake puts them there); this file holds Claude's own. The weekly planning run moves items from both into the work queue or `docs/NEXT.md` when their milestone comes.
 
+## From the clip recorder (#245, part 1)
+
+- **Hit sprays are not in the clips (task).** Feel's bursts are `CPUParticles2D`, which advance by each frame's real time, so the recorder (`tests/clips/stage.gd`, `HIT_SPRAYS = false`) leaves them out to keep two takes identical. The spell visuals tasks (#244) will want particles in the clips: either make a burst advance by the stage's own steps (a burst Feel steps itself, or sprites in a pool), or record at a fixed engine frame time. Then turn `HIT_SPRAYS` on and record every clip twice again (`diff -rq`).
+- **Hit-stop is not played in clips.** The stage runs Feel without `Engine.time_scale`, so a clip shows a hit without its freeze. A clip could repeat frames for the stop's length.
+
 ## From the HUD and Builder usability walkthrough (owner `/claude` on #4, point 2)
 
 - **Glyphs where the game still tells the player what to press (task, owner `/claude` on #4).** The builder's hint line now shows glyphs (`hud/widgets/hint_line.gd`). Still to do: when the overlay and the Bag list get a hint line they use the same widget; the "how to open the overlay" item below becomes a glyph of `overlay`; the main menu and any "press to join" text use the `join` glyph. Mouse clicks on the builder show nothing yet.

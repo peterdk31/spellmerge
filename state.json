@@ -9,7 +9,6 @@
     "number": 238
   },
   "errors_in_a_row": 0,
-  "idle": null,
   "intake_tasks": {
     "208": {
       "author": "Brianmanden",
@@ -20,7 +19,7 @@
       "title": "Idea: summonable pet that draws enemy fire"
     }
   },
-  "last_own_merge": "2026-10-25T21:56:11Z",
+  "last_own_merge": "2026-10-25T22:12:31Z",
   "last_plan": "2026-10-25T19:31:34Z",
   "last_weekly": "2026-10-25T10:11:43Z",
   "panel_applied": {
@@ -68,13 +67,7 @@
     6402088067,
     6403591111
   ],
-  "task_failures": {
-    "**Spell atlas data (#245, part 2).** (`tools/`, `tests/`) A generator, `tools/atlas.py` run as `python3 tools/atlas.py <out>` (standard library only; `build.sh --clips` calls it with `build/clips/atlas.json`), that writes `atlas.json` from the content in the format in `ci/smbot/clips.py`: one entry per component, combo and reaction, grouped by kind, with name, builder description (`content/story/lore/components/*.json`), the `does` line, the clip id and the file that last changed it. No hand-written list; a test adds a fake combo row and sees it appear. The Pages page, the Daily log clips and the PR comment clips are already in `ci/` (#246); sessions name the clips that show a change in `clips` in their result, like `screenshots`.": {
-      "count": 1,
-      "pr": "250",
-      "problems": "- `test_a_new_reaction_pair_appears_with_a_coop_clip` asserts `assertIn(\"void on burning\", row[\"does\"])`. `_reaction_does` capitalises the first letter of the sentence (`trigger[0].upper()`), and the fake pair's two rows have identical effects, so they merge into one sentence. The `does` text is therefore \"Void on burning or fire on hexed: bursts for 4 damage within 30 pixels.\" The lowercase match fails, so the test fails. Fix: Assert `\"Void on burning\"` (with the capital V), or `assertIn(\"void on burning\", row[\"does\"].lower())`. Then run `python3 -m unittest discover -s tools` and report the real result in the PR.\n- The generator and its tests have never been run (the PR text says so). Other tests may fail too. I traced the Stillness, Rift and Shatter assertions by hand and they look correct. Fix: Run the tests locally and fix any failures before merging."
-    }
-  },
+  "task_failures": {},
   "usage": [
     {
       "at": "2026-10-17T22:45:38Z",

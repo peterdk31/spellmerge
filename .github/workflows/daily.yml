@@ -241,11 +241,14 @@ jobs:
     outputs:
       version: ${{ steps.plan.outputs.version }}
       channel: ${{ steps.plan.outputs.channel }}
+      commit: ${{ steps.commit.outputs.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: main # include today's merges
           persist-credentials: false
+      - id: commit
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - name: Plan the release (version and quality gate)
         id: plan
         env:
@@ -372,9 +375,77 @@ jobs:
           CHANNEL: ${{ needs.build.outputs.channel }}
         run: python3 -m smbot.release publish --version "$VERSION" --channel "$CHANNEL" --commit "$(git rev-parse HEAD)"
 
+  # The Spell atlas (smbot.clips): the recorder runs the build's commit with no secrets and no
+  # token that can write; the clips are only data to the job that publishes them.
+  record-clips:
+    name: record the clips (no secrets)
+    needs: build
+    if: always() && needs.build.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.build.outputs.commit }}
+          persist-credentials: false
+      - name: Cache Godot (hash-checked again after restore)
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/pinned-godot
+          key: godot-${{ hashFiles('ci/build/godot.env') }}
+      - name: Virtual display
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq xvfb
+      - name: Record every clip
+        run: ci/build/build.sh --quick --clips
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: clips
+          path: build/clips
+          retention-days: 1
+          if-no-files-found: ignore
+
+  publish-clips:
+    name: publish the Spell atlas and post the changed clips
+    needs: [build, record-clips]
+    if: always() && needs.record-clips.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: automation
+    steps:
+      - name: Clean checkout of main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        continue-on-error: true # nothing recorded: publish says so and stops
+        with:
+          name: clips
+          path: clips
+      - name: The atlas published last time (to see what changed)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        continue-on-error: true # the first atlas has nothing to compare with
+        with:
+          ref: screenshots
+          path: published
+          sparse-checkout: atlas
+          persist-credentials: false
+      - id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.BOT_CLIENT_ID }} # the bot app's Client ID (public; setup.sh sets it from ci/config.json)
+          private-key: ${{ secrets.BOT_APP_PRIVATE_KEY }}
+          permission-contents: write # the screenshots branch
+          permission-issues: write # the Daily log
+      - env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          VERSION: ${{ needs.build.outputs.version }}
+        run: python3 -m smbot.clips publish --dir clips --previous published/atlas --version "$VERSION"
+
   pages:
     name: deploy web build to Pages
-    needs: [build, release]
+    needs: [build, release, publish-clips]
     if: always() && needs.release.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -404,12 +475,22 @@ jobs:
         with:
           name: screenshots
           path: screenshots
+      - name: The Spell atlas (smbot.clips; published on the screenshots branch)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        continue-on-error: true # no atlas yet: the site goes out without it
+        with:
+          ref: screenshots
+          path: published
+          sparse-checkout: atlas
+          persist-credentials: false
       - name: Assemble the site
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.build.outputs.version }}
           CHANNEL: ${{ needs.build.outputs.channel }}
-        run: python3 -m smbot.site --version "$VERSION" --channel "$CHANNEL" --out site --screenshots screenshots
+        run: >-
+          python3 -m smbot.site --version "$VERSION" --channel "$CHANNEL" --out site --screenshots screenshots
+          --atlas published/atlas
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:

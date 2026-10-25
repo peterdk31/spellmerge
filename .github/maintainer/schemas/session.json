@@ -40,6 +40,28 @@
         "additionalProperties": false
       }
     },
+    "clips": {
+      "type": "array",
+      "description": "The clips that show what this change does in motion, for the before/after clips on the PR (at most 4). Empty when no spell, combo or reaction looks different.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "A clip id from the recorder (tests/clips/), e.g. combo_shatter"
+          },
+          "caption": {
+            "type": "string",
+            "description": "One sentence: what to look at in this clip"
+          }
+        },
+        "required": [
+          "id",
+          "caption"
+        ],
+        "additionalProperties": false
+      }
+    },
     "blocked_reason": {
       "type": "string"
     },

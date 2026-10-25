@@ -114,7 +114,7 @@ jobs:
           prompt: ${{ steps.prepare.outputs.prompt }}
           schema: ${{ steps.prepare.outputs.schema }}
           max-turns: 400
-          allowed-tools: "Read,Write,Edit,MultiEdit,Glob,Grep,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git switch:*),Bash(git checkout:*),Bash(git add:*),Bash(git rm:*),Bash(git mv:*),Bash(git commit:*),Bash(git restore:*),Bash(git branch:*),Bash(git fetch:*),Bash(git merge:*),Bash(git rev-parse:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr list:*),Bash(gh pr checkout:*),Bash(gh issue view:*),Bash(gh issue list:*),Bash(tools/check.sh:*),Bash(ci/build/build.sh --quick),Bash(ci/build/build.sh --quick --tests),Bash(ci/build/build.sh --quick --screenshots),Bash(ls:*),Bash(mkdir:*),Bash(mv:*),Bash(cp:*),Bash(rm:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(diff:*),Bash(sort:*)"
+          allowed-tools: "Read,Write,Edit,MultiEdit,Glob,Grep,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git switch:*),Bash(git checkout:*),Bash(git add:*),Bash(git rm:*),Bash(git mv:*),Bash(git commit:*),Bash(git restore:*),Bash(git branch:*),Bash(git fetch:*),Bash(git merge:*),Bash(git rev-parse:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr list:*),Bash(gh pr checkout:*),Bash(gh issue view:*),Bash(gh issue list:*),Bash(tools/check.sh:*),Bash(ci/build/build.sh --quick),Bash(ci/build/build.sh --quick --tests),Bash(ci/build/build.sh --quick --screenshots),Bash(ci/build/build.sh --quick --clips),Bash(ls:*),Bash(mkdir:*),Bash(mv:*),Bash(cp:*),Bash(rm:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(diff:*),Bash(sort:*)"
           disallowed-tools: "WebFetch,WebSearch,Edit(/.git/**),Write(/.git/**),MultiEdit(/.git/**),Edit(/ci/**),Write(/ci/**),MultiEdit(/ci/**),Edit(/.ci-claude-action/**),Write(/.ci-claude-action/**),MultiEdit(/.ci-claude-action/**),Edit(/.github/workflows/**),Write(/.github/workflows/**),MultiEdit(/.github/workflows/**),Edit(/.github/actions/**),Write(/.github/actions/**),MultiEdit(/.github/actions/**),Edit(/.github/maintainer/**),Write(/.github/maintainer/**),MultiEdit(/.github/maintainer/**),Edit(/.github/CODEOWNERS),Write(/.github/CODEOWNERS),MultiEdit(/.github/CODEOWNERS),Edit(/.github/dependabot.yml),Write(/.github/dependabot.yml),MultiEdit(/.github/dependabot.yml)"
       - id: usage
         if: always()
@@ -296,7 +296,7 @@ jobs:
           prompt: ${{ steps.prepare.outputs.prompt }}
           schema: ${{ steps.prepare.outputs.schema }}
           max-turns: 250
-          allowed-tools: "Read,Write,Edit,MultiEdit,Glob,Grep,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git switch:*),Bash(git checkout:*),Bash(git add:*),Bash(git rm:*),Bash(git mv:*),Bash(git commit:*),Bash(git restore:*),Bash(git branch:*),Bash(git fetch:*),Bash(git merge:*),Bash(git rev-parse:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr checkout:*),Bash(gh issue view:*),Bash(gh issue list:*),Bash(tools/check.sh:*),Bash(ci/build/build.sh --quick),Bash(ci/build/build.sh --quick --tests),Bash(ci/build/build.sh --quick --screenshots),Bash(ls:*),Bash(mkdir:*),Bash(mv:*),Bash(cp:*),Bash(rm:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(diff:*),Bash(sort:*)"
+          allowed-tools: "Read,Write,Edit,MultiEdit,Glob,Grep,Bash(git status:*),Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(git switch:*),Bash(git checkout:*),Bash(git add:*),Bash(git rm:*),Bash(git mv:*),Bash(git commit:*),Bash(git restore:*),Bash(git branch:*),Bash(git fetch:*),Bash(git merge:*),Bash(git rev-parse:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr checkout:*),Bash(gh issue view:*),Bash(gh issue list:*),Bash(tools/check.sh:*),Bash(ci/build/build.sh --quick),Bash(ci/build/build.sh --quick --tests),Bash(ci/build/build.sh --quick --screenshots),Bash(ci/build/build.sh --quick --clips),Bash(ls:*),Bash(mkdir:*),Bash(mv:*),Bash(cp:*),Bash(rm:*),Bash(cat:*),Bash(head:*),Bash(tail:*),Bash(wc:*),Bash(diff:*),Bash(sort:*)"
           disallowed-tools: "WebFetch,WebSearch,Edit(/.git/**),Write(/.git/**),MultiEdit(/.git/**),Edit(/ci/**),Write(/ci/**),MultiEdit(/ci/**),Edit(/.ci-claude-action/**),Write(/.ci-claude-action/**),MultiEdit(/.ci-claude-action/**),Edit(/.github/workflows/**),Write(/.github/workflows/**),MultiEdit(/.github/workflows/**),Edit(/.github/actions/**),Write(/.github/actions/**),MultiEdit(/.github/actions/**),Edit(/.github/maintainer/**),Write(/.github/maintainer/**),MultiEdit(/.github/maintainer/**),Edit(/.github/CODEOWNERS),Write(/.github/CODEOWNERS),MultiEdit(/.github/CODEOWNERS),Edit(/.github/dependabot.yml),Write(/.github/dependabot.yml),MultiEdit(/.github/dependabot.yml)"
       - id: usage
         if: always()
@@ -386,7 +386,8 @@ jobs:
         run: python3 -m smbot.session answers
 
   # Before/after screenshots of what the PR changes: only the shot scripts the session named
-  # (`screenshots` in its result) run, on the PR's commit and on main. The scripts its owner
+  # (`screenshots` in its result) run, on the PR's commit and on main, and the same for the
+  # clips it named (`clips`, recorded by tests/clips/record.gd; see ci/smbot/clips.py). The scripts its owner
   # questions name run too, on the same commit (on main when there is no PR), for the questions
   # to show. The game code runs here with no secrets, no environment and a read-only token;
   # posting is separate.
@@ -402,6 +403,7 @@ jobs:
       sha: ${{ steps.sha.outputs.sha }}
       scripts: ${{ steps.pick.outputs.scripts }}
       pr_scripts: ${{ steps.pick.outputs.pr_scripts }}
+      clips: ${{ steps.pick.outputs.clips }}
     steps:
       - id: pick
         env:
@@ -418,8 +420,8 @@ jobs:
               except ValueError:
                   return {}
               return value if isinstance(value, dict) else {}
-          def shots(res):
-              value = res.get("screenshots")
+          def shots(res, key="screenshots"):
+              value = res.get(key)
               return value if isinstance(value, list) else None
           def names(chosen, limit):
               return sorted({c.get("script") for c in chosen if isinstance(c, dict)
@@ -432,52 +434,75 @@ jobs:
                    for s in (q.get("screenshots") if isinstance(q.get("screenshots"), list) else [])[:3]]
           pr_names = names(chosen, 6)
           all_names = sorted(set(pr_names) | set(names(asked, 9)))
+          clips = shots(revised, "clips")
+          clips = clips if clips is not None else (shots(first, "clips") or [])
+          clips = clips if os.environ["PR"] else []
+          clip_ids = sorted({c.get("id") for c in clips if isinstance(c, dict)
+                             and re.fullmatch(r"[a-z0-9_]{1,60}", str(c.get("id")))})[:4]
           os.makedirs("shots", exist_ok=True)
           with open("shots/list.json", "w") as fh:
               json.dump(chosen, fh)
+          with open("shots/clips.json", "w") as fh:
+              json.dump(clips, fh)
           with open(os.environ["GITHUB_OUTPUT"], "a") as fh:
-              fh.write(f"pr_scripts={' '.join(pr_names)}\nscripts={' '.join(all_names)}\n")
+              fh.write(f"pr_scripts={' '.join(pr_names)}\nscripts={' '.join(all_names)}\n"
+                       f"clips={' '.join(clip_ids)}\n")
+          print("Clips chosen for the PR:", " ".join(clip_ids) or "none")
           print("Shot scripts chosen for the PR:", " ".join(pr_names) or "none")
           print("All shot scripts, the owner questions' included:", " ".join(all_names) or "none")
           PY
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        if: steps.pick.outputs.scripts != ''
+        if: steps.pick.outputs.scripts != '' || steps.pick.outputs.clips != ''
         with:
           ref: ${{ needs.publish-revision.outputs.sha || needs.publish.outputs.sha || 'main' }}
           path: after
           persist-credentials: false
       - id: sha
-        if: steps.pick.outputs.scripts != ''
+        if: steps.pick.outputs.scripts != '' || steps.pick.outputs.clips != ''
         run: echo "sha=$(git -C after rev-parse HEAD)" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        if: steps.pick.outputs.pr_scripts != ''
+        if: steps.pick.outputs.pr_scripts != '' || steps.pick.outputs.clips != ''
         with:
           ref: main
           path: before
           persist-credentials: false
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        if: steps.pick.outputs.scripts != ''
+        if: steps.pick.outputs.scripts != '' || steps.pick.outputs.clips != ''
         with:
           path: ~/.cache/pinned-godot
           key: godot-${{ hashFiles('after/ci/build/godot.env') }}
       - name: Virtual display
-        if: steps.pick.outputs.scripts != ''
+        if: steps.pick.outputs.scripts != '' || steps.pick.outputs.clips != ''
         run: sudo apt-get update -qq && sudo apt-get install -y -qq xvfb
       - name: After (this PR)
-        if: steps.pick.outputs.scripts != ''
+        if: steps.pick.outputs.scripts != '' || steps.pick.outputs.clips != ''
         working-directory: after
         env:
           SHOTS_ONLY: ${{ steps.pick.outputs.scripts }}
-        run: ci/build/build.sh --quick --screenshots && mv build/screenshots ../shots/after
-      - name: Before (main; a script the PR adds has no before)
-        if: steps.pick.outputs.pr_scripts != ''
+          CLIPS_ONLY: ${{ steps.pick.outputs.clips }}
+        # An empty SHOTS_ONLY would run every script, so each part runs only when something was chosen.
+        run: |
+          ci/build/build.sh --quick ${SHOTS_ONLY:+--screenshots} ${CLIPS_ONLY:+--clips}
+          mkdir -p ../shots/after
+          if [ -n "$SHOTS_ONLY" ]; then cp -r build/screenshots/. ../shots/after/; fi
+          if [ -n "$CLIPS_ONLY" ]; then cp -r build/clips ../shots/after/clips; fi
+      - name: Before (main; a script or clip the PR adds has no before)
+        if: steps.pick.outputs.pr_scripts != '' || steps.pick.outputs.clips != ''
         continue-on-error: true
         working-directory: before
         env:
           SHOTS_ONLY: ${{ steps.pick.outputs.pr_scripts }}
-        run: ci/build/build.sh --quick --screenshots; mv build/screenshots ../shots/before
+          CLIPS_ONLY: ${{ steps.pick.outputs.clips }}
+        # What main could take is kept even when a script fails there (one the PR fixes, say).
+        run: |
+          status=0
+          ci/build/build.sh --quick ${SHOTS_ONLY:+--screenshots} ${CLIPS_ONLY:+--clips} || status=$?
+          mkdir -p ../shots/before
+          if [ -n "$SHOTS_ONLY" ] && [ -d build/screenshots ]; then cp -r build/screenshots/. ../shots/before/; fi
+          if [ -n "$CLIPS_ONLY" ] && [ -d build/clips ]; then cp -r build/clips ../shots/before/clips; fi
+          exit "$status"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: steps.pick.outputs.scripts != ''
+        if: steps.pick.outputs.scripts != '' || steps.pick.outputs.clips != ''
         with:
           name: screenshots
           path: shots
@@ -488,7 +513,8 @@ jobs:
     name: post the screenshots on the PR
     needs: [publish, screenshots]
     if: >-
-      always() && needs.screenshots.result == 'success' && needs.screenshots.outputs.pr_scripts != ''
+      always() && needs.screenshots.result == 'success'
+      && (needs.screenshots.outputs.pr_scripts != '' || needs.screenshots.outputs.clips != '')
       && needs.publish.outputs.pr != ''
     runs-on: ubuntu-latest
     timeout-minutes: 10

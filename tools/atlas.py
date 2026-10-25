@@ -71,7 +71,7 @@ def components(root: Path) -> list[dict]:
     lore = _lore(root)
     rows: list[dict] = []
     for kind, folder in KIND_FOLDERS.items():
-        for path in sorted((root / SPELLS / folder).glob("*/*.tres")):
+        for path in sorted((root / SPELLS / folder).rglob("*.tres")):
             text = path.read_text(encoding="utf-8")
             comp_id = _value(text, "id")
             if not comp_id:
@@ -97,26 +97,47 @@ def combos(root: Path) -> list[dict]:
 
 
 def _reaction_does(pair: list[dict]) -> str:
-    """A plain sentence for a reaction, from its rows (a pair reacts both ways)."""
-    first = pair[0]
-    trigger = " or ".join(f"a {r['element']} hit on a {STATUS_WORDS.get(r['status'], r['status'])} target" for r in pair)
-    effect = EFFECTS[first["effect"]] if 0 <= first["effect"] < len(EFFECTS) else "burst"
-    damage = int(first["damage"])
+    """A plain sentence for a reaction, from its rows (a pair reacts both ways). Rows that do the
+    same thing share a sentence; a row that differs gets its own."""
+    groups: dict[str, list[str]] = {}
+    for row in pair:
+        groups.setdefault(_row_effect(row), []).append(_row_trigger(row))
+    sentences = []
+    for effect, triggers in groups.items():
+        trigger = " or ".join(triggers)
+        sentences.append(f"{trigger[0].upper()}{trigger[1:]} sets it off: {effect}.")
+    return " ".join(sentences)
+
+
+def _row_trigger(row: dict) -> str:
+    return f"a {row['element']} hit on a {STATUS_WORDS.get(row['status'], row['status'])} target"
+
+
+def _row_effect(row: dict) -> str:
+    """What one row does, as a phrase."""
+    effect = EFFECTS[row["effect"]] if 0 <= row["effect"] < len(EFFECTS) else "burst"
+    damage = int(row["damage"])
     if effect == "burst":
-        text = f"a burst of {damage} damage within {first['radius']:g} pixels"
-        if first["pull"]:
+        text = f"a burst of {damage} damage within {row['radius']:g} pixels"
+        if row["pull"]:
             text += ", pulling targets in"
-        if first["consume"]:
+        if row["consume"]:
             text += ", using up the status"
-    elif effect == "consume":
-        text = f"uses up the status for {damage} bonus damage"
-    elif effect == "extend":
-        text = f"makes the status last {first['duration']:g} seconds longer"
-        if first["damage"]:
-            text += f" and deals {damage} damage"
-    else:
-        text = f"spreads the status to other targets within {first['radius']:g} pixels"
-    return f"{trigger[0].upper()}{trigger[1:]} sets it off: {text}."
+        return text
+    if effect == "consume":
+        return f"uses up the status for {damage} bonus damage"
+    if effect == "extend":
+        seconds = f"{row['duration']:g}"
+        if row["status"] == "chill":  # reaction_row.gd: for chill, EXTEND is a freeze
+            text = f"freezes the target for {seconds} seconds (or keeps it frozen that much longer)"
+        else:
+            text = f"makes the {row['status']} last {seconds} seconds longer"
+            if row["strength"]:
+                text += f" and {row['strength']:g} stronger"
+        if damage:
+            text += f", dealing {damage} damage"
+        return text
+    return f"spreads the status to other targets within {row['radius']:g} pixels"
 
 
 def reactions(root: Path) -> list[dict]:
@@ -133,7 +154,7 @@ def reactions(root: Path) -> list[dict]:
             "name": _value(block, "display_name", reaction.capitalize()), "status": _value(block, "status_id"),
             "element": _value(block, "element_id"), "effect": int(_number(block, "effect")),
             "damage": _number(block, "damage"), "radius": _number(block, "radius"),
-            "duration": _number(block, "duration"), "pull": _number(block, "pull"),
+            "duration": _number(block, "duration"), "strength": _number(block, "strength"), "pull": _number(block, "pull"),
             "consume": _value(block, "consume_status") == "true"})
     rows = []
     for reaction, pair in by_id.items():

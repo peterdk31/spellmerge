@@ -75,6 +75,40 @@ class AtlasTest(unittest.TestCase):
         self.assertIn("void hit on a burning target", row["does"])
         self.assertIn("4 damage", row["does"])
 
+    def test_stillness_says_which_row_freezes(self) -> None:
+        row = next(e for e in self.entries() if e["id"] == "stillness")
+        self.assertIn("freezes the target for 2 seconds", row["does"])
+        self.assertIn("makes the hex last 2 seconds longer and 25 stronger", row["does"])
+        self.assertEqual(row["does"].count("sets it off"), 2)
+
+    def test_rows_that_do_the_same_share_one_sentence(self) -> None:
+        row = next(e for e in self.entries() if e["id"] == "rift")
+        self.assertEqual(row["does"].count("sets it off"), 1)
+        self.assertIn(" or ", row["does"])
+
+    def test_a_single_row_reaction_has_no_clips(self) -> None:
+        path = self.tmp / atlas.REACTIONS
+        path.write_text(path.read_text() + '\n[sub_resource type="Resource" id="Resource_solo"]\n'
+                        'reaction_id = &"solo"\ndisplay_name = "Solo"\nstatus_id = &"burn"\n'
+                        'element_id = &"fire"\ndamage = 1\n')
+        self.assertEqual(next(e for e in self.entries() if e["id"] == "solo")["clips"], [])
+
+    def test_a_deeper_component_is_found(self) -> None:
+        folder = self.tmp / "content/spells/forms/deep/inner"
+        folder.mkdir(parents=True)
+        (folder / "deep.tres").write_text('[resource]\nid = &"deep"\ndisplay_name = "Deep"\n')
+        row = next(e for e in self.entries() if e["id"] == "deep")
+        self.assertEqual((row["kind"], row["clips"]), ("form", ["form_deep"]))
+
+    def test_clip_ids_match_the_recorder(self) -> None:
+        entries = atlas.build()["entries"]
+        ids = [c for e in entries for c in e["clips"]]
+        self.assertEqual(len(ids), len(set(ids)))
+        self.assertEqual(len(ids), 51)
+        for e in entries:
+            for c in e["clips"]:
+                self.assertTrue(c.startswith(f"{e['kind']}_{e['id']}"), c)
+
     def test_the_output_file_is_written(self) -> None:
         out = self.tmp / "deep/atlas.json"
         self.assertEqual(atlas.main(["atlas.py", str(out)]), 0)

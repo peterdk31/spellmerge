@@ -70,16 +70,6 @@
   "task_failures": {},
   "usage": [
     {
-      "at": "2026-10-17T21:14:17Z",
-      "kind": "dev",
-      "tokens": 75383
-    },
-    {
-      "at": "2026-10-17T21:15:14Z",
-      "kind": "review",
-      "tokens": 31254
-    },
-    {
       "at": "2026-10-17T21:17:46Z",
       "kind": "dev",
       "tokens": 87155
@@ -2043,6 +2033,11 @@
       "at": "2026-10-25T21:13:08Z",
       "kind": "review",
       "tokens": 81267
+    },
+    {
+      "at": "2026-10-25T21:15:55Z",
+      "kind": "dev",
+      "tokens": 98462
     }
   ],
   "version": 1

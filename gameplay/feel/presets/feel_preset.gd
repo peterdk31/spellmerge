@@ -101,3 +101,29 @@ extends Resource
 @export_range(0.0, 0.5, 0.01) var beam_seconds: float = 0.25
 @export_range(0.0, 1.0, 0.01) var nova_seconds: float = 0.25
 @export_range(8.0, 400.0, 1.0) var nova_ring_size: float = 120.0
+## How much wider a beam is in its first moments (1.0 is twice as wide).
+@export_range(0.0, 3.0, 0.1) var beam_flare: float = 1.0
+## The cast flash on the wizard of each form (by form id; a form not listed gets the muzzle
+## flash above). Keys: `seconds`, `size`, `stretch` (length along the aim), `tall`, `aim` (turned
+## along the aim, else upright) and `grow` (0.5 bursts outwards; negative gathers inwards, the
+## build-up of a rune or an orbit) and `ring` (the nova ring art instead of the spark).
+@export var cast_looks: Dictionary = {
+	&"bolt": {},
+	&"beam": {"seconds": 0.16, "size": 0.7, "stretch": 3.4, "tall": 0.5, "grow": 0.2},
+	&"nova": {"seconds": 0.18, "size": 0.9, "stretch": 1.0, "tall": 1.0, "aim": false, "grow": 1.2, "ring": true},
+	&"rune": {"seconds": 0.22, "size": 1.1, "stretch": 1.5, "tall": 0.6, "aim": false, "grow": -0.5, "ring": true},
+	&"orbit": {"seconds": 0.2, "size": 0.7, "stretch": 1.0, "tall": 1.0, "aim": false, "grow": -0.6, "ring": true},
+}
+## The flare where a player's shot ends or hits (by the form that player cast last), same keys.
+## A form not listed gets the wall spark above.
+@export var impact_looks: Dictionary = {
+	&"bolt": {"seconds": 0.1, "size": 0.45},
+	&"beam": {"seconds": 0.16, "size": 0.7, "stretch": 1.8, "aim": true, "grow": 0.2},
+	&"nova": {"seconds": 0.14, "size": 0.5, "grow": 1.0, "ring": true},
+	&"rune": {"seconds": 0.22, "size": 0.7, "grow": 1.2, "ring": true},
+	&"orbit": {"seconds": 0.07, "size": 0.35, "grow": 0.0},
+}
+## An enemy's shot ending or hitting always shows this mark turned on its corner, in
+## `enemy_hit_color`, whatever any player cast.
+@export_range(0.0, 0.3, 0.01) var enemy_impact_seconds: float = 0.12
+@export_range(0.1, 3.0, 0.1) var enemy_impact_size: float = 0.7

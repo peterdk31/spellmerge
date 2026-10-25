@@ -267,15 +267,37 @@ class CommandsTest(unittest.TestCase):
         self.assertEqual(commands.parse("/retry"), ("retry", ""))
 
     # #219 was parked, then #224 did its task; /retry on #219 still said "Back in the queue" (2026-10-23).
-    def test_retry_says_when_the_task_is_no_longer_queued(self) -> None:
+    def test_retry_closes_a_bot_pr_whose_task_is_no_longer_queued(self) -> None:
         st = copy.deepcopy(state.DEFAULT)
         st["task_failures"] = {"**Record style N.**": {"count": 0, "pr": "219"},
+                               "**Outside.**": {"count": 2, "pr": "220"},
                                "**Fix doors.** x (issue #40, p2; ...)": {"count": 2, "parked_until": "2099-01-01T00:00:00Z"}}
-        self.assertIn("no longer in the queue", commands.retry_reply(st, 219, {"**Make the wizard alive.**"}))
-        self.assertIn("Back in the queue", commands.retry_reply(st, 219, {"**Record style N.**"}))
+        self.assertEqual(commands.retry_status(st, 219, {"**Make the wizard alive.**"}), "gone")
+        self.assertEqual(commands.retry_status(st, 219, {"**Record style N.**"}), "queued")
         # A scheduled issue's task line may have been rewritten since it failed; its number still matches.
-        self.assertIn("Back in the queue", commands.retry_reply(st, 40, {"**Fix doors.** y (issue #40, p1; ...)"}))
-        self.assertIn("no parked task", commands.retry_reply(st, 77, {"**Record style N.**"}))
+        self.assertEqual(commands.retry_status(st, 40, {"**Fix doors.** y (issue #40, p1; ...)"}), "queued")
+        self.assertEqual(commands.retry_status(st, 77, {"**Record style N.**"}), "none")
+
+        prs = {219: {"state": "open", "user": {"login": CFG.bot.login}},
+               220: {"state": "open", "user": {"login": "someone"}}}
+        calls: list[tuple[str, tuple]] = []
+
+        def api(path: str, *args: str, **kwargs: object) -> dict:
+            calls.append((path, args))
+            return prs.get(int(path.rsplit("/", 1)[1]), {}) if "/pulls/" in path else {}
+
+        def retry(number: int, open_tasks: set[str]) -> str:
+            cmd = commands.Command("retry", "", 1, "n", number, True, "u", "2026-10-23T15:34:58Z")
+            return commands.do_retry(CFG, commands.Effects([], None, []), cmd, st, open_tasks)
+
+        with mock.patch.object(commands.gh, "api", api):
+            self.assertIn("Closed this pull request", retry(219, {"**Other.**"}))
+            self.assertIn(("repos/" + CFG.repo + "/pulls/219", ("-X", "PATCH")), calls)
+            calls.clear()
+            self.assertIn("Nothing to retry", retry(220, {"**Other.**"}))  # not the bot's PR: left open
+            self.assertIn("Back in the queue", retry(219, {"**Record style N.**"}))
+            self.assertIn("no parked task", retry(77, set()))
+        self.assertFalse([c for c in calls if "PATCH" in c[1]])
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp, "NEXT.md")
             path.write_text("## Queue\n\n- [ ] Q\n\n## Blocked\n\n- [ ] B\n\n## Done recently\n\n- [x] D\n")

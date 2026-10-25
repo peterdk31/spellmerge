@@ -69,7 +69,8 @@ def _lore(root: Path) -> dict[str, str]:
 
 def components(root: Path) -> list[dict]:
     """Every component file with an id, like the registry's scan. Demo or not: the recorder runs
-    with demo_only off, so it records them all."""
+    with demo_only off, so it records them all. The name must agree with `Spells.component_name`
+    (display_name, else the id as it is), because the recorder titles its clips with it."""
     lore = _lore(root)
     rows: list[dict] = []
     for kind, folder in KIND_FOLDERS.items():
@@ -81,7 +82,7 @@ def components(root: Path) -> list[dict]:
             comp_id = _value(text, "id")
             if not comp_id:
                 continue
-            rows.append({"id": comp_id, "kind": kind, "name": _value(text, "display_name", comp_id.capitalize()),
+            rows.append({"id": comp_id, "kind": kind, "name": _value(text, "display_name", comp_id),
                          "description": lore.get(comp_id, ""), "does": "", "clips": [f"{kind}_{comp_id}"],
                          "source": path.relative_to(root).as_posix()})
     return rows
@@ -115,7 +116,7 @@ def _reaction_does(pair: list[dict]) -> str:
 
 
 def _row_trigger(row: dict) -> str:
-    return f"a {row['element']} hit on a {STATUS_WORDS.get(row['status'], row['status'])} target"
+    return f"{row['element']} on {STATUS_WORDS.get(row['status'], row['status'])}"
 
 
 def _row_effect(row: dict) -> str:

@@ -39,7 +39,7 @@ class AtlasTest(unittest.TestCase):
             if e["kind"] == "reaction":
                 self.assertEqual(len(e["clips"]), 2, e)
             elif e["kind"] != "combo":
-                self.assertTrue(e["description"], f"no builder description: {e}")
+                self.assertTrue(e["description"], f"no builder description: add content/story/lore/components/{e['id']}.json: {e}")
 
     def test_a_fake_combo_row_appears(self) -> None:
         path = self.tmp / atlas.COMBOS
@@ -72,14 +72,14 @@ class AtlasTest(unittest.TestCase):
         path.write_text(path.read_text() + extra)
         row = next(e for e in self.entries() if e["id"] == "fizzle")
         self.assertEqual(row["clips"], ["reaction_fizzle", "reaction_fizzle_coop"])
-        self.assertIn("void hit on a burning target", row["does"])
+        self.assertIn("void on burning", row["does"])
         self.assertIn("4 damage", row["does"])
 
     def test_stillness_says_which_row_freezes(self) -> None:
         row = next(e for e in self.entries() if e["id"] == "stillness")
         self.assertIn("freezes the target for 2 seconds", row["does"])
         self.assertIn("extends the hexed status by 2 seconds and its strength by 25", row["does"])
-        self.assertEqual(row["does"].count(" hit on a "), 2)
+        self.assertEqual(row["does"].count(": "), 2)
 
     def test_rows_that_do_the_same_share_one_sentence(self) -> None:
         row = next(e for e in self.entries() if e["id"] == "rift")

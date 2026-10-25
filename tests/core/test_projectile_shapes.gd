@@ -27,7 +27,7 @@ func before_each() -> void:
 ## The kind written in the custom data of instance `i` of a node's buffer.
 func kind_at(node: MultiMeshInstance2D, i: int) -> int:
 	var buffer: PackedFloat32Array = node.multimesh.buffer
-	return roundi((1.0 - buffer[i * ManagerScript.DRAW_STRIDE + 15]) * 10.0)
+	return roundi((1.0 - buffer[i * ManagerScript.DRAW_STRIDE + 15]) * ManagerScript.KIND_STEPS)
 
 
 func test_set_shape_takes_a_live_shot_in_range_only() -> void:
@@ -97,7 +97,6 @@ func test_runes_and_orbit_shots_are_drawn_as_their_form_whatever_the_element() -
 	mgr.set_shape(rune, ManagerScript.SHAPE_STAR)
 	mgr.update_draw(1.0)
 	check_equal(kind_at(mgr._rune_node, 0), ManagerScript.KIND_RUNE, "an element's shape does not change a rune's body")
-	check(ManagerScript.KIND_RUNE != ManagerScript.KIND_ORBIT, "so rune and orbit differ in flight")
 
 
 func test_shaped_bodies_are_drawn_smaller_than_the_sprite() -> void:
@@ -106,10 +105,30 @@ func test_shaped_bodies_are_drawn_smaller_than_the_sprite() -> void:
 	mgr.set_shape(shaped, ManagerScript.SHAPE_FLAME)
 	mgr.update_draw(1.0)
 	var buffer: PackedFloat32Array = mgr._draw_node.multimesh.buffer
-	var sizes: Array[float] = [buffer[0], buffer[ManagerScript.DRAW_STRIDE]]
-	sizes.sort()
-	check(absf(sizes[0] / sizes[1] - ManagerScript.SHAPE_SCALE) < 0.01, "a shaped body is drawn at SHAPE_SCALE of the sprite")
-	check(plain != shaped, "two shots")
+	var plain_size: float = 0.0
+	var shaped_size: float = 0.0
+	for i in 2:
+		var size: float = buffer[i * ManagerScript.DRAW_STRIDE]
+		if kind_at(mgr._draw_node, i) == 0:
+			plain_size = size
+		else:
+			shaped_size = size
+	check(plain_size > 0.0 and shaped_size > 0.0, "one sprite and one shaped body were written")
+	check(absf(shaped_size / plain_size - ManagerScript.SHAPE_SCALE) < 0.01, "a shaped body is drawn at SHAPE_SCALE of the sprite")
+	check(plain >= 0 and shaped >= 0, "both shots spawned")
+
+
+func test_kinds_fit_the_alpha_encoding_and_round_trip() -> void:
+	check(ManagerScript.KIND_RUNE > ManagerScript.SHAPE_COUNT + 3, "the form kinds sit above the trail-mark kinds 5-8")
+	check(ManagerScript.KIND_ORBIT > ManagerScript.KIND_RUNE, "orbit is its own kind")
+	check(ManagerScript.KIND_ORBIT <= ManagerScript.KIND_MAX, "the kinds fit the encoding")
+	var buffer: PackedFloat32Array = PackedFloat32Array()
+	buffer.resize(ManagerScript.DRAW_STRIDE)
+	for kind in ManagerScript.KIND_MAX + 1:
+		mgr._write_quad(buffer, 0, Vector2.RIGHT, 1.0, Vector2.ZERO, Color.WHITE, Color.WHITE, kind)
+		var alpha: float = buffer[15]
+		check(alpha > 0.0 and alpha <= 1.0, "kind %d keeps the alpha inside 0..1" % kind)
+		check_equal(floori((1.0 - alpha) * ManagerScript.KIND_STEPS + 0.5), kind, "kind %d decodes back as the shader does" % kind)
 
 
 func test_trail_marks_are_bounded() -> void:

@@ -38,25 +38,27 @@ func _initialize() -> void:
 	root.add_child(floor_sprite)
 	shots.call("set_bounds", Rect2(0, 0, 640, 360))
 	shots.call("set_cap", 200)
-	# Four columns, one per element.
-	for _copy in 1:
-		var top: float = 40.0
-		for e in 4:
-			var tint: Color = ELEMENTS[e].get("tint") as Color
-			for p in 4:
-				var x: float = 50.0 + e * 150.0 + p * 34.0
-				var bolt: int = shots.call("spawn", p, Vector2(x, top), Vector2(0.01, 0.0), 60.0, 6.0) as int
-				shots.call("set_core", bolt, tint)
-				shots.call("set_shape", bolt, e + 1)
-				var rune: int = shots.call("spawn", p, Vector2(x, top + 40.0), Vector2.ZERO, 60.0, 8.0, 1, 0, 0, 1) as int
-				shots.call("set_core", rune, tint)
-				shots.call("set_shape", rune, e + 1)
-			# An anchor is per player, so the orbit row has one player (and element) a column.
-			var anchor := Vector2(95.0 + e * 150.0, top + 100.0)
-			shots.call("set_anchor", e, anchor)
-			for n in 2:
-				var orb: int = shots.call("spawn_orbit", e, 16.0, n * PI, 0.0001, 60.0, 6.0) as int
-				shots.call("set_core", orb, tint)
+	# Four columns, one per element: a row of bolts and a row of runes (four players each, so
+	# every tint), then a row of orbit shots. An anchor is per player, so each orbit shot
+	# column has one player, paired with that column's element.
+	var top: float = 40.0
+	for e in 4:
+		var tint: Color = ELEMENTS[e].get("tint") as Color
+		for p in 4:
+			var x: float = 50.0 + e * 150.0 + p * 34.0
+			var bolt: int = shots.call("spawn", p, Vector2(x, top), Vector2(0.01, 0.0), 60.0, 6.0) as int
+			shots.call("set_core", bolt, tint)
+			shots.call("set_shape", bolt, e + 1)
+			var rune: int = shots.call("spawn", p, Vector2(x, top + 40.0), Vector2.ZERO, 60.0, 8.0, 1, 0, 0, 1) as int
+			shots.call("set_core", rune, tint)
+			shots.call("set_shape", rune, e + 1)
+		var anchor := Vector2(95.0 + e * 150.0, top + 100.0)
+		shots.call("set_anchor", e, anchor)
+		for n in 2:
+			var orb: int = shots.call("spawn_orbit", e, 16.0, n * PI, 0.0001, 60.0, 6.0) as int
+			shots.call("set_core", orb, tint)
+	# The right half is the same scene through a grey filter (a screen-reading shader), to
+	# check the forms read by silhouette and not only by colour.
 	var grey := ColorRect.new()
 	grey.position = Vector2(320.0, 0.0)
 	grey.size = Vector2(320.0, 360.0)

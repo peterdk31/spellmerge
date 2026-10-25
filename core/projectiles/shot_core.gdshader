@@ -9,7 +9,7 @@ render_mode blend_mix;
 // every bone shade is near neutral, so no new palette colour is needed. The core keeps the
 // three Spark shades as light and dark.
 //
-// A shot with an element shape (the alpha of the custom data, 1 - 0.1 * kind) is not drawn
+// A shot with an element shape (the alpha of the custom data, 1 - kind / 16) is not drawn
 // from the sprite: its own silhouette is built here on a pixel grid, with its own
 // animation frames, so the four elements read without colour. Kinds 1-4 are the shot
 // bodies (flame, frost star, storm zigzag, void ring) and 5-8 their trail marks (ember,
@@ -40,7 +40,7 @@ varying flat float phase;
 void vertex() {
 	body = COLOR * body_tint;
 	core = core_override.a > 0.0 ? core_override.rgb : INSTANCE_CUSTOM.rgb;
-	kind = core_override.a > 0.0 ? 0.0 : floor((1.0 - INSTANCE_CUSTOM.a) * 10.0 + 0.5);
+	kind = core_override.a > 0.0 ? 0.0 : floor((1.0 - INSTANCE_CUSTOM.a) * 16.0 + 0.5);
 	phase = float(INSTANCE_ID % 4);
 }
 
@@ -142,16 +142,17 @@ float rune(vec2 p, float f) {
 // breathes (the beads move in and out), so it reads as spinning even from one frame.
 float beads(vec2 p, float f) {
 	float a = f * 0.7854;
-	float breathe = 0.62 + 0.14 * triangle(f * 0.25);
+	// Centre at most 0.6 from the middle plus radius 0.32 stays inside the quad (1.0).
+	float breathe = 0.5 + 0.1 * triangle(f * 0.25);
 	vec2 off = vec2(cos(a), sin(a)) * breathe;
 	float near = min(length(p - off), length(p + off));
-	if (near > 0.36) {
+	if (near > 0.32) {
 		return 0.0;
 	}
-	if (near > 0.22) {
+	if (near > 0.2) {
 		return 1.0;
 	}
-	return near < 0.1 ? 3.0 : 2.0;
+	return near < 0.09 ? 3.0 : 2.0;
 }
 
 // Trail marks, small and plain: an ember, a glint, a streak, a ring.

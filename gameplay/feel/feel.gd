@@ -153,12 +153,15 @@ var _react_amount: PackedFloat32Array = PackedFloat32Array()
 var _flash_material: ShaderMaterial = null
 var _reaction_material: ShaderMaterial = null
 ## Muzzle flashes and death puffs: sprites made once, with seconds left, seconds
-## they started with and their size (parallel arrays of ALL_FLASH_SLOTS).
+## they started with and their size (parallel arrays of ALL_FLASH_SLOTS). A flash takes the
+## spark or the ring art each time it is shown, so a slot's texture is only right while it shows.
 var _flashes: Array[Sprite2D] = []
 var _flash_left: PackedFloat32Array = PackedFloat32Array()
 var _flash_total: PackedFloat32Array = PackedFloat32Array()
 var _flash_size: PackedFloat32Array = PackedFloat32Array()
 var _flash_aspect: PackedVector2Array = PackedVector2Array()
+## How much each flash grows while it fades (0.5: half its size bigger; negative: it gathers).
+var _flash_grow: PackedFloat32Array = PackedFloat32Array()
 ## Beams and nova rings (sprites made once): seconds left and in all, whether it is a ring,
 ## the owner's body tint and the beam's length in pixels.
 var _forms: Array[Sprite2D] = []
@@ -273,6 +276,8 @@ func _ready() -> void:
 	_flash_size.resize(ALL_FLASH_SLOTS)
 	_flash_aspect.resize(ALL_FLASH_SLOTS)
 	_flash_aspect.fill(Vector2.ONE)
+	_flash_grow.resize(ALL_FLASH_SLOTS)
+	_flash_grow.fill(0.5)
 	for i in GHOST_SLOTS:
 		var ghost := Sprite2D.new()
 		ghost.top_level = true
@@ -415,7 +420,7 @@ func _step_flashes(real_delta: float) -> void:
 			continue
 		var t: float = _flash_left[i] / _flash_total[i]
 		flash.modulate.a = t
-		flash.scale = _flash_aspect[i] * (_flash_size[i] * (1.0 + 0.5 * (1.0 - t)))
+		flash.scale = _flash_aspect[i] * (_flash_size[i] * (1.0 + _flash_grow[i] * (1.0 - t)))
 
 
 ## Fade, widen and collapse the death animations.
@@ -472,15 +477,19 @@ func _start_ghost(dead: Node) -> void:
 
 ## Show flash `slot` at `position` for `seconds`, `size` times the art's size, turned
 ## to `angle` and stretched to `aspect` (x along the angle), tinted `tint`.
-func _show_flash(slot: int, position: Vector2, seconds: float, size: float, tint: Color = Color.WHITE, angle: float = 0.0, aspect: Vector2 = Vector2.ONE) -> void:
+func _show_flash(slot: int, position: Vector2, seconds: float, size: float, tint: Color = Color.WHITE, angle: float = 0.0, aspect: Vector2 = Vector2.ONE, grow: float = 0.5, ring: bool = false) -> void:
 	if seconds <= 0.0:
 		return
 	var flash: Sprite2D = _flashes[slot]
+	var art: Texture2D = preset.nova_texture if ring else _texture
+	if flash.texture != art:
+		flash.texture = art
 	flash.global_position = position
 	flash.modulate = tint
 	flash.rotation = angle
 	flash.scale = aspect * size
 	_flash_aspect[slot] = aspect
+	_flash_grow[slot] = grow
 	flash.visible = true
 	_flash_left[slot] = seconds
 	_flash_total[slot] = seconds
@@ -665,6 +674,7 @@ func _on_projectile_impact(player: int, target: Node, position: Vector2, directi
 		_impact_frame = Engine.get_physics_frames()
 		_impact_at = position
 		_impact_aim = direction
+		_show_impact(player, position, direction)
 		return
 	# Stone chips fly back off the surface; they only use the bursts the hits on characters leave free.
 	if _active.size() < BURST_SLOTS - WALL_RESERVE:
@@ -672,9 +682,31 @@ func _on_projectile_impact(player: int, target: Node, position: Vector2, directi
 		if chips != null:
 			chips.scale_amount_min = 0.2 * preset.wall_chip_size
 			chips.scale_amount_max = 0.7 * preset.wall_chip_size
+	_show_impact(player, position, direction)
+
+
+## The payoff of a shot: a flare in the shot's colour, shaped by the form of the shot itself
+## (the projectile manager's `impact_form` while the impact is sent; a beam's end stretches along the beam, a nova's is wide and soft, a rune's pops, an orbit's
+## ticks). An enemy's shot (a negative index) always shows the same hard ember mark, turned
+## on its corner, which no player's flare resembles.
+func _show_impact(player: int, position: Vector2, direction: Vector2) -> void:
 	var slot: int = _next_spark
 	_next_spark = FLASH_SLOTS + (_next_spark - FLASH_SLOTS + 1) % SPARK_SLOTS
-	_show_flash(slot, position, preset.wall_spark_seconds, preset.wall_spark_size, _shot_color(player))
+	if player < 0 or player >= PLAYER_COLORS.size():
+		_show_flash(slot, position, preset.enemy_impact_seconds, preset.enemy_impact_size, preset.enemy_hit_color, PI / 4.0, Vector2.ONE, 0.2)
+		return
+	var form: StringName = &""
+	if projectiles != null and "impact_form" in projectiles:
+		form = projectiles.impact_form as StringName
+	var look: Dictionary = preset.impact_looks.get(form, {}) as Dictionary
+	var seconds: float = look.get("seconds", preset.wall_spark_seconds) as float
+	var size: float = look.get("size", preset.wall_spark_size) as float
+	var stretch: float = look.get("stretch", 1.0) as float
+	var grow: float = look.get("grow", 0.5) as float
+	var angle: float = 0.0
+	if look.get("aim", false) as bool and direction != Vector2.ZERO:
+		angle = direction.angle()
+	_show_flash(slot, position, seconds, size, PLAYER_COLORS[player], angle, Vector2(stretch, 1.0), grow, look.get("ring", false) as bool)
 
 
 ## The colour of what was hit: a wizard's own colour, else the enemy ember.
@@ -700,10 +732,22 @@ func _on_enemy_died(_player: int, enemy: Node, position: Vector2) -> void:
 	_juice(position, preset.death_stop_seconds, true, preset.death_shake, preset.death_sound)
 
 
-func _on_spell_cast(player: int, _spell_id: StringName, origin: Vector2, direction: Vector2) -> void:
-	var slot: int = clampi(player, 0, MUZZLE_SLOTS - 1)
-	var angle: float = direction.angle() if direction != Vector2.ZERO else 0.0
-	_show_flash(slot, origin, preset.muzzle_flash_seconds, preset.muzzle_flash_size, PLAYER_COLORS[slot], angle, Vector2(MUZZLE_STRETCH, 1.0))
+func _on_spell_cast(player: int, spell_id: StringName, origin: Vector2, direction: Vector2) -> void:
+	if player < 0 or player >= MUZZLE_SLOTS:
+		return
+	var slot: int = player
+	# Each form has its own flash on the wizard: a bolt a short streak along the aim, a beam a
+	# long thin flare, a nova a wide burst, a rune and an orbit gather in (the build-up).
+	var look: Dictionary = preset.cast_looks.get(spell_id, {}) as Dictionary
+	var seconds: float = look.get("seconds", preset.muzzle_flash_seconds) as float
+	var size: float = look.get("size", preset.muzzle_flash_size) as float
+	var stretch: float = look.get("stretch", MUZZLE_STRETCH) as float
+	var tall: float = look.get("tall", 1.0) as float
+	var grow: float = look.get("grow", 0.5) as float
+	var angle: float = 0.0
+	if look.get("aim", true) as bool and direction != Vector2.ZERO:
+		angle = direction.angle()
+	_show_flash(slot, origin, seconds, size, PLAYER_COLORS[slot], angle, Vector2(stretch, tall), grow, look.get("ring", false) as bool)
 	if shake_enabled and direction != Vector2.ZERO:
 		_refresh_camera()
 		_kick = (_kick - direction.normalized() * preset.cast_kick_pixels).limit_length(MAX_KICK_PIXELS)
@@ -765,16 +809,21 @@ func _step_forms(real_delta: float) -> void:
 		_pose_form(i, _form_left[i] / _form_total[i])
 
 
-## Show form `slot` at `t` (1 just shown, 0 gone): faded, and a ring wider, a beam thinner.
+## Show form `slot` at `t` (1 just shown, 0 gone), faded. A ring widens; a beam opens extra
+## wide for its first moments (the payoff), then thins and flickers.
 func _pose_form(slot: int, t: float) -> void:
 	var sprite: Sprite2D = _forms[slot]
 	var body: Color = _form_body[slot]
+	var age: float = 1.0 - t
 	(sprite.material as ShaderMaterial).set_shader_parameter(&"body_tint", Color(body.r, body.g, body.b, t))
 	if _form_is_ring[slot] != 0:
-		var across: float = preset.nova_ring_size * (0.25 + 0.75 * (1.0 - t))
+		var across: float = preset.nova_ring_size * (0.25 + 0.75 * age)
 		sprite.scale = Vector2.ONE * (across / 32.0)
 	else:
-		sprite.scale = Vector2(1.0, t)
+		var flare: float = 1.0 + preset.beam_flare * maxf(1.0 - age / preset.beam_flare_share, 0.0)
+		var step: int = int(age * _form_total[slot] * preset.beam_flicker_rate)
+		var flicker: float = 1.0 - preset.beam_flicker_depth * float(step % 2)
+		sprite.scale = Vector2(1.0, t * flare * flicker)
 
 
 func _on_wizard_cast(_player: int, wizard: Node) -> void:

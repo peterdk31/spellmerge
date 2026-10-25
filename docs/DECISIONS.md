@@ -2,6 +2,15 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-25: Form looks are Feel presets, keyed by form id (#244, part 2)
+
+- **Why:** each form needed its own cast flash, body and payoff, and a new form should be new data, not an edit to `feel.gd`. `spell_cast` already carries the form id (the player sends it), so no event changed.
+- **Now:** `FeelPreset.cast_looks` (the flash on the wizard) and `impact_looks` (where a shot ends or hits) are dictionaries by form id with keys `seconds`, `size`, `stretch`, `tall`, `aim`, `grow` and `ring`. A bolt streaks along the aim; a beam is a long thin flare and opens extra wide (`beam_flare`) then thins and flickers; a nova bursts as a ring; a rune and an orbit gather in (negative `grow`, the build-up) and pop at the end (payoff). A form not listed gets the old muzzle flash and wall spark.
+- **Impacts take the form from the shot itself.** The event signature stays (a fifth argument would break every listener and test), so the manager has `impact_form` (`bolt`, `rune`, `orbit`, `beam`, `""` for an enemy's shot), set only while it sends `projectile_impact`, from the shot's draw batch or from `ray`. Feel reads it. A bolt fired after a rune, or a rune that pops seconds later, gets its own flare; nothing is remembered per player, so nothing goes stale between runs. `nova` has an impact look in the preset but the manager never sends one (a nova is an area, not a shot).
+- **Beam flicker is data:** `beam_flare_share`, `beam_flicker_rate` (steps a second, in real time) and `beam_flicker_depth` (10%, every other step) are preset knobs. The first version stepped by the beam's life fraction, about 80 Hz, which could alias into a strobe.
+- **Enemy shots:** they show one ember mark turned on its corner (`enemy_impact_*`), whatever any player cast, beside their own sprite and batch (part 1). No player flare is turned on its corner.
+- **Not done:** the in-flight bodies of the bolt, rune and orbit keep their art and the element shapes of part 1; no new art files. A rune pulse and an orbit spin are their own Queue task (`shot_core.gdshader`, `sim_time`).
+
 ## 2026-10-25: Element shapes are drawn by the shot shader, trails are a draw batch (#244, part 1)
 
 - **Why:** four elements had to read without colour with four players firing. New art per element would have needed a texture per batch and four more sprites; a shape in the shader costs no files, no per-shot memory beyond one byte and one draw call for the trails.

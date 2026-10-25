@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-25: Spell visuals, forms (#244, part 2)
+
+Bolt, beam, nova, rune and orbit each have a cast flash on the wizard (streak, long flare, ring burst, rune and orbit gathering in), a flare where they end or hit (beam stretched along the beam, nova and rune rings, orbit tick) and a beam that opens wide and thins. Data is `cast_looks` and `impact_looks` in the preset; an enemy's shot always ends in an ember mark on its corner. The flare comes from the shot's own form (`Projectiles.impact_form`), not the last cast. The bodies in flight are a separate Queue task. Tests: `tests/gameplay/feel/test_feel_form_looks.gd`, `tests/core/test_projectile_impacts.gd`. Sheet: `shot_form_looks`; clips `form_bolt`, `form_beam`, `form_nova`, `form_rune`, `form_orbit`.
+
 ## 2026-10-25: Spell atlas data (#245, part 2)
 
 `tools/atlas.py <out>` writes the Spell atlas data (`atlas.json`) from the content, with no hand-written list: components, combos and reactions with name, builder line, `does`, clip ids and source file. Tests: `tools/test_atlas.py` (`python3 -m unittest discover -s tools`); `.py` files are only allowed under `tools/`, so the test lives there. No session could run Python (the sandbox refuses it), so the first CI run is the first run of both files; the revision made the reaction wording skip a zero damage or radius and the tests use temp rows. Next: spell visuals (#244).

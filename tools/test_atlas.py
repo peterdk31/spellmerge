@@ -75,21 +75,47 @@ class AtlasTest(unittest.TestCase):
         self.assertIn("void on burning", row["does"].lower())
         self.assertIn("4 damage", row["does"])
 
-    def test_stillness_says_which_row_freezes(self) -> None:
-        row = next(e for e in self.entries() if e["id"] == "stillness")
-        self.assertIn("freezes the target for 2 seconds", row["does"])
-        self.assertIn("extends the hexed status by 2 seconds and its strength by 25", row["does"])
+    def add_reaction(self, reaction: str, *rows: tuple[str, str, str]) -> dict:
+        """Appends rows (status, element, other lines) to the temp reactions.tres; returns the entry."""
+        path = self.tmp / atlas.REACTIONS
+        extra = ""
+        for i, (status, element, lines) in enumerate(rows):
+            extra += (f'\n[sub_resource type="Resource" id="Resource_{reaction}_{i}"]\nreaction_id = &"{reaction}"\n'
+                      f'display_name = "{reaction.capitalize()}"\nstatus_id = &"{status}"\nelement_id = &"{element}"\n{lines}\n')
+        path.write_text(path.read_text() + extra)
+        return next(e for e in self.entries() if e["id"] == reaction)
+
+    def test_extend_says_which_row_freezes(self) -> None:
+        row = self.add_reaction("t_ext", ("chill", "fire", "effect = 2\nduration = 3.0\n"),
+                                ("hex", "void", "effect = 2\nduration = 4.0\nstrength = 20.0\n"))
+        self.assertIn("Fire on chilled: freezes the target for 3 seconds", row["does"])
+        self.assertIn("Void on hexed: extends the hexed status by 4 seconds and its strength by 20", row["does"])
         self.assertEqual(row["does"].count(": "), 2)
 
     def test_rows_that_do_the_same_share_one_sentence(self) -> None:
-        row = next(e for e in self.entries() if e["id"] == "rift")
-        self.assertEqual(row["does"].count(": "), 1)
-        self.assertEqual(row["does"].count("bursts for"), 1)
-        self.assertIn(" or ", row["does"])
+        row = self.add_reaction("t_same", ("burn", "void", "damage = 5\nradius = 40.0\n"),
+                                ("hex", "fire", "damage = 5\nradius = 40.0\n"))
+        self.assertEqual(row["does"], "Void on burning or Fire on hexed: bursts for 5 damage within 40 pixels.")
 
-    def test_shatter_says_the_bonus_doubles_on_a_frozen_target(self) -> None:
-        row = next(e for e in self.entries() if e["id"] == "shatter" and e["kind"] == "reaction")
-        self.assertIn("doubled while the target is frozen", row["does"])
+    def test_a_burst_leaves_out_a_zero_damage_or_radius(self) -> None:
+        row = self.add_reaction("t_zero", ("burn", "void", "pull = 1.0\n"), ("hex", "fire", "pull = 1.0\n"))
+        self.assertEqual(row["does"], "Void on burning or Fire on hexed: bursts, pulling targets in.")
+
+    def test_consume_says_the_bonus_doubles_on_a_frozen_target(self) -> None:
+        row = self.add_reaction("t_con", ("chill", "fire", "effect = 1\ndamage = 9\n"),
+                                ("burn", "void", "effect = 1\ndamage = 9\n"))
+        self.assertIn("uses up the status for 9 bonus damage (doubled while the target is frozen)", row["does"])
+
+    def test_spread_names_its_radius(self) -> None:
+        row = self.add_reaction("t_spr", ("burn", "fire", "effect = 3\nradius = 60.0\n"),
+                                ("hex", "void", "effect = 3\nradius = 60.0\n"))
+        self.assertIn("spreads the status to other targets within 60 pixels", row["does"])
+
+    def test_the_real_reactions_get_one_sentence_per_distinct_effect(self) -> None:
+        for e in atlas.build()["entries"]:
+            if e["kind"] == "reaction":
+                self.assertTrue(e["does"].endswith("."), e)
+                self.assertGreaterEqual(e["does"].count(": "), 1, e)
 
     def test_an_unreadable_component_file_is_skipped(self) -> None:
         folder = self.tmp / "content/spells/forms/bad"

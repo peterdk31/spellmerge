@@ -4,7 +4,7 @@ What each run did, newest first. Claude appends a short entry after each develop
 
 ## 2026-10-25: Spell atlas data (#245, part 2)
 
-`tools/atlas.py <out>` writes the Spell atlas data (`atlas.json`) from the content, with no hand-written list: components, combos and reactions with name, builder line, `does`, clip ids and source file. Tests: `tools/test_atlas.py` (`python3 -m unittest discover -s tools`); `.py` files are only allowed under `tools/`, so the test lives there. The session could not run Python it wrote, so neither file was executed before the PR. Next: spell visuals (#244).
+`tools/atlas.py <out>` writes the Spell atlas data (`atlas.json`) from the content, with no hand-written list: components, combos and reactions with name, builder line, `does`, clip ids and source file. Tests: `tools/test_atlas.py` (`python3 -m unittest discover -s tools`); `.py` files are only allowed under `tools/`, so the test lives there. No session could run Python (the sandbox refuses it), so the first CI run is the first run of both files; the revision made the reaction wording skip a zero damage or radius and the tests use temp rows. Next: spell visuals (#244).
 
 ## 2026-10-25: Spell visuals, elements (#244, part 1)
 

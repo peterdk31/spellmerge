@@ -9,7 +9,7 @@ The format is {"entries": [...]} as read by ci/smbot/clips.py: {"id", "kind", "n
 "does", "clips": [clip ids], "source": "repo/path"}. Nothing is listed by hand: a new component
 folder, combo row or reaction row is a new entry. The clip ids are the ones tests/clips/scenarios.gd
 gives (`combo_<id>`, `<kind>_<id>`, `reaction_<id>` and `reaction_<id>_coop`). `source` is the file
-that defines the entry, which the page links to its history.
+that defines the entry (not the last one that changed it); the page links it to its history.
 
 Standard library only; reads the repository, writes only <out>.
 """
@@ -111,20 +111,26 @@ def _reaction_does(pair: list[dict]) -> str:
     sentences = []
     for effect, triggers in groups.items():
         trigger = " or ".join(triggers)
-        sentences.append(f"{trigger[0].upper()}{trigger[1:]}: {effect}.")
+        sentences.append(f"{trigger}: {effect}.")
     return " ".join(sentences)
 
 
 def _row_trigger(row: dict) -> str:
-    return f"{row['element']} on {STATUS_WORDS.get(row['status'], row['status'])}"
+    return f"{str(row['element']).capitalize()} on {STATUS_WORDS.get(row['status'], row['status'])}"
 
 
 def _row_effect(row: dict) -> str:
-    """What one row does, as a phrase."""
+    """What one row does, as a phrase. The wording of each effect copies what the game does with
+    it; core/base/reaction_row.gd and the combat code are the source of truth, so change this
+    with them (test_atlas.py has one test per effect)."""
     effect = EFFECTS[row["effect"]] if 0 <= row["effect"] < len(EFFECTS) else "burst"
     damage = int(row["damage"])
     if effect == "burst":
-        text = f"bursts for {damage} damage within {row['radius']:g} pixels"
+        text = "bursts"
+        if damage:
+            text += f" for {damage} damage"
+        if row["radius"]:
+            text += f" within {row['radius']:g} pixels"
         if row["pull"]:
             text += ", pulling targets in"
         if row["consume"]:

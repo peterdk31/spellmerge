@@ -16,6 +16,10 @@ extends SpellComponent
 @export var damage_scale: float = 1.0
 ## Shot tint, a colour from the palette in docs/STYLE.md.
 @export var tint: Color = Color.WHITE
+## The silhouette, animation and trail of the element's shots, so they read without
+## colour: 0 the plain sprite, 1 flame, 2 star, 3 zigzag, 4 ring (the SHAPE_* constants of
+## `core/projectiles`). Fire is 1, frost 2, storm 3, void 4.
+@export var shape: int = 0
 
 
 func kind() -> StringName:
@@ -28,5 +32,6 @@ func ranges() -> Dictionary:
 		"status_duration": Vector2(0.0, 30.0),
 		"status_strength": Vector2(0.0, 100.0),
 		"damage_scale": Vector2(0.1, 4.0),
+		"shape": Vector2(0.0, 4.0),
 	})
 	return limits

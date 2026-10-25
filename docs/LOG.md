@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-25: Spell visuals, elements (#244, part 1)
+
+Fire, frost, storm and void shots have a silhouette, animation and trail of their own (flame, star, zigzag, ring), built in `shot_core.gdshader` from `ElementBase.shape`; the trail is a draw batch of at most 256 marks, not particles, so `Feel.PARTICLE_LIMIT` is untouched. Greyscale strip in `shot_element_shots` shows they read without colour. Four-bot smoke bench unchanged (peak 48 particles of 48).
+
 ## 2026-10-25: Clip recorder, Godot side (#245, part 1)
 
 `tests/clips/record.gd` records one clip per scenario to `user://clips/<id>/` (`meta.json` and `frame_0000.png` and up, in the format of `ci/smbot/clips.py`); `build.sh --quick --clips` copies them to `build/clips/`. `scenarios.gd` reads the scenarios from the content: every combo row, every component alone, every reaction and a two-player version of each (51 clips today). `stage.gd` is the live stage (real runtime and Feel, stepped by hand). Test: `test_clip_scenarios.gd`. Ids and format are in `tests/README.md`; what is and isn't deterministic is in `docs/DECISIONS.md`. Next: the atlas data (`tools/atlas.py`).

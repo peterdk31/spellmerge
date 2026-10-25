@@ -49,6 +49,8 @@ var status_id: StringName = &""
 var status_duration: float = 0.0
 var status_strength: float = 0.0
 var tint: Color = Color.WHITE
+## The element's shot shape (0 plain), see `ElementBase.shape`.
+var shape: int = 0
 
 ## What a hit does, for `Spells.hit_profile`; set by the compiler.
 var hit: HitProfile = null

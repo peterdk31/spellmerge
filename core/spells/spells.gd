@@ -476,6 +476,7 @@ func _fan_angle(n: int, count: int, spell: CompiledSpell) -> float:
 ## Gives the manager's shot in `slot` its record and counts it.
 func _register(slot: int, tag: int, spell: CompiledSpell, fires: int, chain: int, prev: int) -> void:
 	projectiles.set_core(slot, spell.tint)
+	projectiles.set_shape(slot, spell.shape)
 	if _rec_seq.size() < projectiles.get_cap():
 		var size: int = projectiles.get_cap()
 		var old_size: int = _rec_seq.size()
@@ -888,6 +889,7 @@ func _apply(spell: CompiledSpell, form: FormBase, element: ElementBase, modifier
 		spell.status_duration = element.status_duration
 		spell.status_strength = element.status_strength
 		spell.tint = element.tint
+		spell.shape = element.shape
 		damage *= element.damage_scale
 	for modifier in modifiers:
 		spell.modifier_ids.append(modifier.id)

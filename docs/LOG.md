@@ -2,9 +2,9 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
-## 2026-10-25: Weekly planning (C2 waiting)
+## 2026-10-25: Planning after the C2 verdict
 
-M2 is marked done in the roadmap, waiting for the owner's verdict on #235. Pet idea #208 stays on the backlog. No tasks added.
+The owner answered C2 (#235) with iterate: recorder and Spell atlas (#245), spell visuals (#244), Lightning (#243). M2 is in progress again; nine tasks are in `docs/NEXT.md`, and the `ci/` part of the recorder is an owner question. Pet idea #208 stays on the backlog.
 
 ## 2026-10-23: Button glyphs instead of action names (owner `/claude` on #4)
 

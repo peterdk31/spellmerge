@@ -7,12 +7,15 @@ const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
 
 const DT: float = 1.0 / 60.0
+const NO_PLAYER_SHOT: int = -1
 
 var bus: EventsScript
 var mgr: ManagerScript
 ## Every impact as [player, target, position, direction], and every hit as the same order of events.
 var impacts: Array = []
 var order: Array[String] = []
+## The manager's `impact_form` as each impact was sent.
+var forms: Array[StringName] = []
 
 
 func before_each() -> void:
@@ -22,7 +25,9 @@ func before_each() -> void:
 	mgr.set_bounds(Rect2(0.0, 0.0, 640.0, 360.0))
 	impacts.clear()
 	order.clear()
+	forms.clear()
 	bus.projectile_impact.connect(func(player: int, target: Node, position: Vector2, direction: Vector2) -> void:
+		forms.append(mgr.impact_form)
 		impacts.append([player, target, position, direction])
 		order.append("impact"))
 	bus.projectile_hit.connect(func(_player: int, _target: Node, _position: Vector2, _tag: int) -> void: order.append("hit"))
@@ -95,6 +100,26 @@ func test_a_hit_on_a_target_says_which_way_the_shot_flew_before_the_hit() -> voi
 	check_equal(impacts[0][0], 1, "the shooter")
 	check((impacts[0][3] as Vector2).is_equal_approx(Vector2.RIGHT), "flying right")
 	check_equal(order, ["impact", "hit"] as Array[String], "the impact comes first, so the damage that follows `projectile_hit` can use it")
+
+
+func test_each_impact_names_the_form_of_its_own_shot() -> void:
+	mgr.set_walls([Rect2(96.0, 0.0, 32.0, 200.0)] as Array[Rect2])
+	var target := own(Node2D.new()) as Node2D
+	root.add_child(target)
+	target.global_position = Vector2(30.0, 300.0)
+	mgr.add_target(target, 10.0, ManagerScript.LAYER_ENEMY)
+	mgr.spawn(0, Vector2(50.0, 100.0), Vector2(120.0, 0.0), 5.0)
+	mgr.spawn(NO_PLAYER_SHOT, Vector2(50.0, 120.0), Vector2(120.0, 0.0), 5.0)
+	mgr.spawn(1, Vector2(30.0, 300.0), Vector2.ZERO, 5.0, 4.0, ManagerScript.LAYER_ENEMY, 0, 0, ManagerScript.MOTION_STILL)
+	mgr.ray(2, Vector2(50.0, 140.0), Vector2.RIGHT, 300.0)
+	for _i in 60:
+		mgr.step(DT)
+	var names: Array[String] = []
+	for form in forms:
+		names.append(String(form))
+	names.sort()
+	check_equal(names, ["", "beam", "bolt", "rune"] as Array[String], "an enemy shot, a beam, a bolt and a rune, each its own")
+	check_equal(mgr.impact_form, &"", "no form once the impacts are sent")
 
 
 func test_a_miss_reports_nothing() -> void:

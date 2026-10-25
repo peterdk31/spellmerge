@@ -153,7 +153,8 @@ var _react_amount: PackedFloat32Array = PackedFloat32Array()
 var _flash_material: ShaderMaterial = null
 var _reaction_material: ShaderMaterial = null
 ## Muzzle flashes and death puffs: sprites made once, with seconds left, seconds
-## they started with and their size (parallel arrays of ALL_FLASH_SLOTS).
+## they started with and their size (parallel arrays of ALL_FLASH_SLOTS). A flash takes the
+## spark or the ring art each time it is shown, so a slot's texture is only right while it shows.
 var _flashes: Array[Sprite2D] = []
 var _flash_left: PackedFloat32Array = PackedFloat32Array()
 var _flash_total: PackedFloat32Array = PackedFloat32Array()
@@ -161,9 +162,6 @@ var _flash_size: PackedFloat32Array = PackedFloat32Array()
 var _flash_aspect: PackedVector2Array = PackedVector2Array()
 ## How much each flash grows while it fades (0.5: half its size bigger; negative: it gathers).
 var _flash_grow: PackedFloat32Array = PackedFloat32Array()
-## The form each player cast last (a shot's form is not in its impact event, so an impact is
-## shown for this one).
-var _last_form: Array[StringName] = [&"", &"", &"", &""]
 ## Beams and nova rings (sprites made once): seconds left and in all, whether it is a ring,
 ## the owner's body tint and the beam's length in pixels.
 var _forms: Array[Sprite2D] = []
@@ -483,7 +481,9 @@ func _show_flash(slot: int, position: Vector2, seconds: float, size: float, tint
 	if seconds <= 0.0:
 		return
 	var flash: Sprite2D = _flashes[slot]
-	flash.texture = preset.nova_texture if ring else _texture
+	var art: Texture2D = preset.nova_texture if ring else _texture
+	if flash.texture != art:
+		flash.texture = art
 	flash.global_position = position
 	flash.modulate = tint
 	flash.rotation = angle
@@ -685,8 +685,8 @@ func _on_projectile_impact(player: int, target: Node, position: Vector2, directi
 	_show_impact(player, position, direction)
 
 
-## The payoff of a shot: a flare in the shot's colour, shaped by the form its player cast last
-## (a beam's end stretches along the beam, a nova's is wide and soft, a rune's pops, an orbit's
+## The payoff of a shot: a flare in the shot's colour, shaped by the form of the shot itself
+## (the projectile manager's `impact_form` while the impact is sent; a beam's end stretches along the beam, a nova's is wide and soft, a rune's pops, an orbit's
 ## ticks). An enemy's shot (a negative index) always shows the same hard ember mark, turned
 ## on its corner, which no player's flare resembles.
 func _show_impact(player: int, position: Vector2, direction: Vector2) -> void:
@@ -695,7 +695,10 @@ func _show_impact(player: int, position: Vector2, direction: Vector2) -> void:
 	if player < 0 or player >= PLAYER_COLORS.size():
 		_show_flash(slot, position, preset.enemy_impact_seconds, preset.enemy_impact_size, preset.enemy_hit_color, PI / 4.0, Vector2.ONE, 0.2)
 		return
-	var look: Dictionary = preset.impact_looks.get(_last_form[player], {}) as Dictionary
+	var form: StringName = &""
+	if projectiles != null and "impact_form" in projectiles:
+		form = projectiles.impact_form as StringName
+	var look: Dictionary = preset.impact_looks.get(form, {}) as Dictionary
 	var seconds: float = look.get("seconds", preset.wall_spark_seconds) as float
 	var size: float = look.get("size", preset.wall_spark_size) as float
 	var stretch: float = look.get("stretch", 1.0) as float
@@ -730,8 +733,9 @@ func _on_enemy_died(_player: int, enemy: Node, position: Vector2) -> void:
 
 
 func _on_spell_cast(player: int, spell_id: StringName, origin: Vector2, direction: Vector2) -> void:
-	var slot: int = clampi(player, 0, MUZZLE_SLOTS - 1)
-	_last_form[slot] = spell_id
+	if player < 0 or player >= MUZZLE_SLOTS:
+		return
+	var slot: int = player
 	# Each form has its own flash on the wizard: a bolt a short streak along the aim, a beam a
 	# long thin flare, a nova a wide burst, a rune and an orbit gather in (the build-up).
 	var look: Dictionary = preset.cast_looks.get(spell_id, {}) as Dictionary
@@ -816,8 +820,9 @@ func _pose_form(slot: int, t: float) -> void:
 		var across: float = preset.nova_ring_size * (0.25 + 0.75 * age)
 		sprite.scale = Vector2.ONE * (across / 32.0)
 	else:
-		var flare: float = 1.0 + preset.beam_flare * maxf(1.0 - age * 5.0, 0.0)
-		var flicker: float = 1.0 - 0.15 * float(int(age * 40.0) % 2)
+		var flare: float = 1.0 + preset.beam_flare * maxf(1.0 - age / preset.beam_flare_share, 0.0)
+		var step: int = int(age * _form_total[slot] * preset.beam_flicker_rate)
+		var flicker: float = 1.0 - preset.beam_flicker_depth * float(step % 2)
 		sprite.scale = Vector2(1.0, t * flare * flicker)
 
 

@@ -254,6 +254,9 @@ var events: EventsScript = null
 var dropped: int = 0
 ## The slot of the shot whose hit or expiry event is being sent, else -1. See "Ends".
 var event_slot: int = -1
+## The form of the shot whose `projectile_impact` is being sent: `&"bolt"`, `&"rune"`, `&"orbit"`
+## or `&"beam"` (an enemy's shot, and any time outside an impact: `&""`). For looks only.
+var impact_form: StringName = &""
 ## How many projectiles ended on a wall, since start.
 var wall_hits: int = 0
 ## Projectiles written into the batch by the last update_draw().
@@ -905,7 +908,7 @@ func step(delta: float) -> void:
 			if _work_left <= 0:
 				if walled:
 					wall_hits += 1
-					_emit_wall_impact(_player[slot], _pos[slot], _vel[slot])
+					_emit_wall_impact(slot, _vel[slot])
 					_expire(slot)
 				elif starved_at < 0:
 					starved_at = slot
@@ -918,7 +921,7 @@ func step(delta: float) -> void:
 					break
 		if walled and _alive[slot] != 0:
 			wall_hits += 1
-			_emit_wall_impact(_player[slot], _pos[slot], _vel[slot])
+			_emit_wall_impact(slot, _vel[slot])
 			_expire(slot)
 	_resume = maxi(starved_at, 0)
 	_step_index += 1
@@ -1076,13 +1079,17 @@ func ray(player: int, origin: Vector2, direction: Vector2, length: float, pierce
 	for i in found:
 		var node: Variant = _ray_nodes[base + i]
 		if events != null and is_instance_valid(node):
+			impact_form = &"beam"
 			events.projectile_impact.emit(player, node, _ray_points[base + i], heading)
+			impact_form = &""
 			events.projectile_hit.emit(player, node, _ray_points[base + i], tag)
 		_ray_nodes[base + i] = null
 	_ray_depth -= 1
 	event_slot = outer_slot
 	if walled and events != null:
+		impact_form = &"beam"
 		events.projectile_impact.emit(player, null, origin + heading * got, heading)
+		impact_form = &""
 	return got
 
 
@@ -1566,10 +1573,24 @@ func _remembers(slot: int, id: int) -> bool:
 	return false
 
 
-## Tell listeners a shot ended on a wall at `at`, flying along `velocity`.
-func _emit_wall_impact(player: int, at: Vector2, velocity: Vector2) -> void:
+## Tell listeners the shot in `slot` ended on a wall where it stands, flying along `velocity`.
+func _emit_wall_impact(slot: int, velocity: Vector2) -> void:
 	if events != null and not velocity.is_zero_approx():
-		events.projectile_impact.emit(player, null, at, velocity.normalized())
+		impact_form = _form_of(slot)
+		events.projectile_impact.emit(_player[slot], null, _pos[slot], velocity.normalized())
+		impact_form = &""
+
+
+## The form of the shot in `slot`, by its draw batch (`&""` for an enemy's shot).
+func _form_of(slot: int) -> StringName:
+	var batch: int = _batch_of(slot)
+	if batch == BATCH_RUNE:
+		return &"rune"
+	if batch == BATCH_ORBIT:
+		return &"orbit"
+	if batch == BATCH_BOLT:
+		return &"bolt"
+	return &""
 
 
 func _register_hit(slot: int, target: int, at: Vector2) -> void:
@@ -1593,7 +1614,9 @@ func _register_hit(slot: int, target: int, at: Vector2) -> void:
 		spent = true
 		_kill(slot, false)
 	if events != null and is_instance_valid(node):
+		impact_form = _form_of(slot)
 		events.projectile_impact.emit(player, node, at, heading)
+		impact_form = &""
 		event_slot = slot
 		events.projectile_hit.emit(player, node, at, tag)
 		event_slot = -1

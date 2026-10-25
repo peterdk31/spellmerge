@@ -25,6 +25,7 @@ func _initialize() -> void:
 	DirAccess.make_dir_recursive_absolute(SHOTS_DIR)
 	var feel: Node = root.get_node_or_null("Feel")
 	var events: Node = root.get_node_or_null("Events")
+	var projectiles: Node = root.get_node_or_null("Projectiles")
 	if feel == null or events == null:
 		printerr("SHOT FAILED: the Feel and Events autoloads must exist")
 		quit(1)
@@ -47,7 +48,12 @@ func _initialize() -> void:
 			events.call("emit_signal", "form_shown", 0, &"beam", Vector2(x - 20.0, ROWS_Y[0]), Vector2.RIGHT, 56.0, Color("e0592f"))
 		elif form == &"nova":
 			events.call("emit_signal", "form_shown", 0, &"nova", Vector2(x, ROWS_Y[0]), Vector2.RIGHT, 0.0, Color("e0592f"))
+		# The manager names the form of the shot while it sends the impact.
+		if projectiles != null:
+			projectiles.set("impact_form", form)
 		events.call("emit_signal", "projectile_impact", 0, null, Vector2(x, ROWS_Y[1]), Vector2.RIGHT)
+		if projectiles != null:
+			projectiles.set("impact_form", &"")
 		events.call("emit_signal", "projectile_impact", -1, null, Vector2(x, ROWS_Y[2]), Vector2.RIGHT)
 		await process_frame
 		await RenderingServer.frame_post_draw

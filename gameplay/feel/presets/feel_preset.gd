@@ -103,6 +103,12 @@ extends Resource
 @export_range(8.0, 400.0, 1.0) var nova_ring_size: float = 120.0
 ## How much wider a beam is in its first moments (1.0 is twice as wide).
 @export_range(0.0, 3.0, 0.1) var beam_flare: float = 1.0
+## The share of a beam's life the extra width lasts (0.2 is the first fifth).
+@export_range(0.01, 1.0, 0.01) var beam_flare_share: float = 0.2
+## The beam thins by this much on every other flicker step (0 is steady; keep it small, a big
+## swing at a fast rate reads as a strobe), and the steps come this many times a second.
+@export_range(0.0, 0.3, 0.01) var beam_flicker_depth: float = 0.1
+@export_range(1.0, 30.0, 1.0) var beam_flicker_rate: float = 16.0
 ## The cast flash on the wizard of each form (by form id; a form not listed gets the muzzle
 ## flash above). Keys: `seconds`, `size`, `stretch` (length along the aim), `tall`, `aim` (turned
 ## along the aim, else upright) and `grow` (0.5 bursts outwards; negative gathers inwards, the

@@ -4,7 +4,7 @@ What each run did, newest first. Claude appends a short entry after each develop
 
 ## 2026-10-25: Spell visuals, forms (#244, part 2)
 
-Bolt, beam, nova, rune and orbit each have a cast flash on the wizard (streak, long flare, ring burst, rune and orbit gathering in), a flare where they end or hit (beam stretched along the beam, nova and rune rings, orbit tick) and a beam that opens wide and thins. Data is `cast_looks` and `impact_looks` in the preset; an enemy's shot always ends in an ember mark on its corner. Tests: `tests/gameplay/feel/test_feel_form_looks.gd`. Sheet: `shot_form_looks`; clips `form_bolt`, `form_beam`, `form_nova`, `form_rune`, `form_orbit`.
+Bolt, beam, nova, rune and orbit each have a cast flash on the wizard (streak, long flare, ring burst, rune and orbit gathering in), a flare where they end or hit (beam stretched along the beam, nova and rune rings, orbit tick) and a beam that opens wide and thins. Data is `cast_looks` and `impact_looks` in the preset; an enemy's shot always ends in an ember mark on its corner. The flare comes from the shot's own form (`Projectiles.impact_form`), not the last cast. The bodies in flight are a separate Queue task. Tests: `tests/gameplay/feel/test_feel_form_looks.gd`, `tests/core/test_projectile_impacts.gd`. Sheet: `shot_form_looks`; clips `form_bolt`, `form_beam`, `form_nova`, `form_rune`, `form_orbit`.
 
 ## 2026-10-25: Spell atlas data (#245, part 2)
 

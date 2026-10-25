@@ -77,6 +77,33 @@ extends Resource
 	&"rift": Color("c05cff"),
 }
 @export var reaction_sound_prefix: String = "reaction_"
+## The burst a reaction adds to its flash, bigger than any plain hit: its hit-stop in seconds
+## (longer than a death's), the size of its particle burst, and the size of the ring that
+## opens (1.0 is the nova ring art's size; it grows as it fades). `reaction_power` scales
+## these and the flash and shake by reaction id (a reaction not listed is 1.0).
+@export_range(0.0, 0.3, 0.005) var reaction_stop_seconds: float = 0.09
+@export_range(1.0, 4.0, 0.1) var reaction_burst_size: float = 2.2
+@export_range(0.1, 4.0, 0.1) var reaction_ring_size: float = 0.9
+@export var reaction_power: Dictionary = {
+	&"shatter": 1.3,
+	&"rift": 1.2,
+	&"flare": 1.1,
+	&"kindle": 1.0,
+	&"thaw": 1.0,
+	&"stillness": 0.9,
+}
+## What an enemy with a status looks like, by status id (`burn`, `chill`, `freeze`, `shock`,
+## `hex`): a colour laid over its sprite, the most it shows (alpha), how fast it pulses per
+## second (0: steady), how far it jitters in pixels, and whether it blinks off between pulses.
+## When an enemy has several, the first in `status_order` is the one shown.
+@export var status_order: Array[StringName] = [&"freeze", &"shock", &"burn", &"hex", &"chill"]
+@export var status_looks: Dictionary = {
+	&"burn": {"color": Color("ff6a1a"), "alpha": 0.55, "rate": 7.0, "jitter": 0.0, "blink": false},
+	&"chill": {"color": Color("8fd8ff"), "alpha": 0.5, "rate": 0.0, "jitter": 0.0, "blink": false},
+	&"freeze": {"color": Color("e8fbff"), "alpha": 0.8, "rate": 0.0, "jitter": 0.0, "blink": false},
+	&"shock": {"color": Color("fff04a"), "alpha": 0.75, "rate": 14.0, "jitter": 1.0, "blink": true},
+	&"hex": {"color": Color("a63cff"), "alpha": 0.5, "rate": 1.8, "jitter": 0.0, "blink": false},
+}
 ## Sound ids asked from `core/registry`. A missing sound is silent.
 @export var hit_sound: StringName = &"hit"
 @export var death_sound: StringName = &"enemy_death"

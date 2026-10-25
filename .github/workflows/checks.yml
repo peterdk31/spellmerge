@@ -58,4 +58,10 @@ jobs:
           persist-credentials: false
       - name: Unit tests for the automation scripts
         run: python3 -m unittest discover -s ci/tests -t ci
+      - name: Unit tests for the tools
+        run: |
+          # unittest exits 5 when it finds no tests, so skip until tools/ has some.
+          if ls tools/test_*.py >/dev/null 2>&1; then
+            python3 -m unittest discover -s tools
+          fi
 

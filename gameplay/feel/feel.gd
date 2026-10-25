@@ -745,7 +745,7 @@ func _pose_status(at: int) -> void:
 	if enemy != null:
 		sprite = enemy.get_node_or_null("Sprite") as Sprite2D
 	var look: Dictionary = preset.status_looks.get(_status_shown[at], {}) as Dictionary
-	if sprite == null or look.is_empty() or sprite.material != null or not sprite.is_visible_in_tree():
+	if sprite == null or look.is_empty() or sprite.material == _flash_material or not sprite.is_visible_in_tree():
 		overlay.visible = false
 		return
 	var rate: float = look.get("rate", 0.0) as float

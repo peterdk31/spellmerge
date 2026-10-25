@@ -143,6 +143,13 @@ func test_the_hit_flash_hides_the_overlay() -> void:
 	check_equal(_feel.live_statuses(), 1, "and back after")
 
 
+func test_a_sprite_with_its_own_material_still_shows_a_status() -> void:
+	var enemy: Enemy = _enemy()
+	(enemy.get_node("Sprite") as Sprite2D).material = ShaderMaterial.new()
+	_status_on(enemy, &"burn")
+	check_equal(_feel.live_statuses(), 1, "an own material is not the hit flash")
+
+
 func test_a_freed_enemy_loses_its_overlay() -> void:
 	var enemy: Enemy = _enemy()
 	_status_on(enemy, &"shock")

@@ -102,6 +102,35 @@ func test_trail_marks_are_bounded() -> void:
 	check_equal(mgr.drawn_trails, 0, "the marks go with the shots")
 
 
+func test_the_shape_range_matches_the_shape_count() -> void:
+	var element: ElementBase = load(ELEMENTS[0]) as ElementBase
+	check_equal(int((element.ranges()["shape"] as Vector2).y), ManagerScript.SHAPE_COUNT - 1, "ElementBase's top shape is the manager's last")
+
+
+func test_trail_marks_stay_consistent_under_a_small_cap() -> void:
+	mgr.set_cap(40)
+	for i in 30:
+		var slot: int = mgr.spawn(i % 4, Vector2(20.0 + i, 20.0 + (i % 10) * 10.0), Vector2(100.0, 0.0), 1.0)
+		mgr.set_shape(slot, 1 + i % 4)
+	mgr.update_draw(1.0)
+	check_equal(mgr.drawn, 30, "all the bolts are drawn")
+	check_equal(mgr.drawn_trails, 30 * ManagerScript.TRAIL_MARKS, "every bolt gets its marks")
+	check(mgr._trail_node.multimesh.instance_count >= mgr.drawn_trails, "the batch has room for every mark")
+	check_equal(mgr._trail_buffer.size(), mgr._trail_node.multimesh.instance_count * ManagerScript.DRAW_STRIDE, "and the buffer is exactly the batch")
+
+
+func test_shapes_animate_from_the_simulation_clock() -> void:
+	var slot: int = mgr.spawn(0, Vector2(50.0, 50.0), Vector2(10.0, 0.0), 1.0)
+	mgr.set_shape(slot, ManagerScript.SHAPE_FLAME)
+	for i in 30:
+		mgr.step(1.0 / 60.0)
+	mgr.update_draw(1.0)
+	var drawn_time: float = float((mgr._draw_node.material as ShaderMaterial).get_shader_parameter(&"sim_time"))
+	check_equal(drawn_time, mgr.sim_time, "the batch is drawn at the simulation time")
+	check(absf(mgr.sim_time - 0.5) < 0.001, "which counts the stepped seconds, not the engine's clock")
+	check_equal(float((mgr._trail_node.material as ShaderMaterial).get_shader_parameter(&"sim_time")), mgr.sim_time, "so is the trail")
+
+
 func test_a_reused_slot_starts_plain() -> void:
 	var slot: int = mgr.spawn(0, Vector2(50.0, 50.0), Vector2(100.0, 0.0), 1.0)
 	mgr.set_shape(slot, ManagerScript.SHAPE_ZIGZAG)

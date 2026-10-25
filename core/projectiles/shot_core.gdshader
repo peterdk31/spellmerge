@@ -19,10 +19,15 @@ render_mode blend_mix;
 uniform vec4 core_override = vec4(0.0);
 // Multiplies the vertex colour: the tint and the fade of a lone Sprite2D (its modulate stays white).
 uniform vec4 body_tint = vec4(1.0);
+// Seconds of simulation, set by the projectile manager; the shapes animate from it, not TIME,
+// so a run stepped by hand (the clip recorder) draws the same frames every time.
+uniform float sim_time = 0.0;
 
 // Pixels across a shot body and across a trail mark.
 const float BODY_GRID = 12.0;
 const float MARK_GRID = 6.0;
+// The flame has more pixels so its tail reads.
+const float FLAME_GRID = 16.0;
 
 varying flat vec4 body;
 varying flat vec3 core;
@@ -43,7 +48,7 @@ float triangle(float x) {
 // The animation frame (0-3) at `rate` frames a second: fire flickers fast, storm jitters,
 // frost ticks slowly. Each shot starts on its own frame, so a volley does not blink together.
 float frame_of(float rate) {
-	return mod(floor(TIME * rate + phase), 4.0);
+	return mod(floor(sim_time * rate + phase + 0.001), 4.0);
 }
 
 // The pixel colour tiers: 0 = none, 1 = the owner's edge, 2 = the element, 3 = its light.
@@ -55,19 +60,19 @@ vec4 tier(float t, vec3 edge, vec3 mid, vec3 light, float alpha) {
 	return vec4(rgb, alpha);
 }
 
-// Flame: a teardrop with a wavering tail, head forward.
+// Flame: a fat teardrop with a long wavering tail, head forward (on a finer grid).
 float flame(vec2 p, float f) {
-	float wave = 0.2 * sin(p.x * 5.0 + f * 1.5708) * clamp(0.3 - p.x, 0.0, 1.0);
+	float wave = 0.22 * sin(p.x * 5.0 + f * 1.5708) * clamp(0.4 - p.x, 0.0, 1.0);
 	float dy = abs(p.y - wave);
-	float x = p.x - 0.25;
-	float half_w = x >= 0.0 ? sqrt(max(0.0, 0.25 - x * x)) : 0.5 * clamp((p.x + 1.0) / 1.25, 0.0, 1.0);
+	float x = p.x - 0.2;
+	float half_w = x >= 0.0 ? sqrt(max(0.0, 0.66 * 0.66 - x * x)) : 0.66 * pow(clamp((p.x + 1.0) / 1.2, 0.0, 1.0), 0.8);
 	if (dy > half_w || half_w <= 0.0) {
 		return 0.0;
 	}
-	if (dy > half_w - 0.2) {
+	if (dy > half_w - 0.17) {
 		return 1.0;
 	}
-	return (dy < half_w * 0.4 && p.x > -0.3) ? 3.0 : 2.0;
+	return (dy < half_w * 0.45 && p.x > -0.2) ? 3.0 : 2.0;
 }
 
 // Frost: a four-point star that ticks between upright and turned, with a glint on the tips.
@@ -132,7 +137,7 @@ float mark(vec2 p, float k, float f) {
 
 void fragment() {
 	if (kind > 0.5 && kind < 8.5) {
-		float grid = kind > 4.5 ? MARK_GRID : BODY_GRID;
+		float grid = kind > 4.5 ? MARK_GRID : (kind < 1.5 ? FLAME_GRID : BODY_GRID);
 		vec2 p = (floor(UV * grid) + 0.5) / grid * 2.0 - 1.0;
 		float t = 0.0;
 		if (kind < 1.5) {

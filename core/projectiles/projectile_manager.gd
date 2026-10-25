@@ -263,6 +263,9 @@ var friendly_fire: bool = false
 
 var _cap: int = 0
 var _count: int = 0
+## Seconds of simulation stepped so far; shaped shots animate from it (not from the
+## engine's clock), so a hand-stepped run draws the same frames every time.
+var sim_time: float = 0.0
 ## One past the highest slot in use.
 var _high: int = 0
 var _next_seq: int = 0
@@ -854,6 +857,7 @@ func _spawn_row(player: int, origin: Vector2, velocity: Vector2, lifetime: float
 
 ## Move every projectile by `delta` seconds, find hits and send the events.
 func step(delta: float) -> void:
+	sim_time += delta
 	_refresh_targets()
 	var top: int = _high
 	var first_new: int = _next_seq
@@ -1117,6 +1121,10 @@ func update_draw(fraction: float = -1.0) -> void:
 	if fraction < 0.0:
 		fraction = Engine.get_physics_interpolation_fraction()
 	fraction = clampf(fraction, 0.0, 1.0)
+	_set_sim_time(_draw_node)
+	_set_sim_time(_rune_node)
+	_set_sim_time(_orbit_node)
+	_set_sim_time(_trail_node)
 	_count_batches()
 	var counts: PackedInt32Array = _batch_counts
 	_draw_room = _fit_batch(multimesh, _draw_buffer, _draw_room, counts[BATCH_BOLT])
@@ -1170,6 +1178,11 @@ func update_draw(fraction: float = -1.0) -> void:
 	drawn_trails = trail_out
 	drawn_hostile = hostile_out
 	drawn = out + rune_out + orbit_out + hostile_out
+
+
+## Hand the shader the simulation clock (`shot_core.gdshader` animates from it).
+func _set_sim_time(node: MultiMeshInstance2D) -> void:
+	(node.material as ShaderMaterial).set_shader_parameter(&"sim_time", sim_time)
 
 
 ## Which draw batch a live slot belongs to (BATCH_*). The one rule both the counting and

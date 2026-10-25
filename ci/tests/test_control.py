@@ -298,6 +298,13 @@ class NextTaskTest(unittest.TestCase):
         text = "# Next\n\n## Queue\n\n- [x] done\n- [ ] **First** thing\n- [ ] Second\n\n## Blocked\n\n- [ ] not this\n"
         self.assertEqual(nexttask.queue(text), ["**First** thing", "Second"])
 
+    def test_a_numbered_queue_is_read_too(self) -> None:
+        """Planning wrote the C2 iterate as "1. [ ] ...": the queue read as empty and nothing started."""
+        text = ("## Queue\n\n1. [ ] **Recorder** first\n2. [x] done\n10. [ ] Tenth\n- [ ] Plain\n"
+                "1.[ ] no space\n\n## Blocked\n\n1. [ ] Waits, key `some-key`\n")
+        self.assertEqual(nexttask.queue(text), ["**Recorder** first", "Tenth", "Plain"])
+        self.assertEqual(nexttask.blocked(text), {"Waits, key `some-key`": {"some-key"}})
+
     def test_parked_tasks_are_skipped_until_their_time(self) -> None:
         now = dt.datetime(2026, 10, 17, 12, tzinfo=dt.timezone.utc)
         st = {"task_failures": {"First": {"count": 2, "parked_until": "2026-10-18T00:00:00Z"},

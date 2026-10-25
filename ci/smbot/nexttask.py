@@ -1,7 +1,9 @@
 r"""The ordered task queue (docs/PLAN.md, "Planning system").
 
 Scheduled issues from the community intake go first (smbot.intake.queue_tasks, priority
-order), then docs/NEXT.md: under its "## Queue" heading, one task per line as "- [ ] ...".
+order), then docs/NEXT.md: under its "## Queue" heading, one task per line as "- [ ] ..." (a
+numbered "1. [ ] ..." counts too: a planning session once wrote the queue that way, the parser
+saw none, and development waited hours for the next planning run).
 The first task that isn't parked is the next one.
 
 A task that waits on the owner sits under "## Blocked" with the key of its owner question
@@ -23,7 +25,7 @@ from typing import Any, Collection, Sequence
 
 from . import pacing
 
-_TASK = re.compile(r"^- \[ \] (.+)$")
+_TASK = re.compile(r"^(?:- |\d{1,3}\. )\[ \] (.+)$")
 _QUESTION_KEY = re.compile(r"\bkey `([a-z0-9-]+)`")
 
 

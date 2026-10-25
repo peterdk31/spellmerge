@@ -70,6 +70,14 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - **Same key:** the pick is asked again as `art-direction-pick-3` (one decision keeps one issue), and the task stays under "Blocked".
 - **Hand-written SVGs:** the session could not run a generator script, so the three files were written as rects by hand; the sheet was looked at, and `test_svg_art` checks palette, overlaps, bounds and that no body carries a player colour.
 
+## 2026-10-25: C2 answered with iterate; M2 reworked
+
+- **Verdict:** the owner answered #235 with iterate: the clip recorder and Spell atlas (#245), spell visuals (#244), Lightning (#243), in that order. M2 is in progress again; its next end is a new C2 checkpoint. Nothing from M3 is written.
+- **Order and split:** recorder first, because the owner judges the visuals with its clips. Visuals are split into elements, forms, and reactions with statuses (the split #244 suggests), then a polish pass with the clips; Lightning is last and is built to the visual bar. Each is one session.
+- **`ci/` is owner-only:** the Godot recorder (`tests/clips/`) and the atlas data (`tools/`) are built here; GIF encoding and publishing, the Pages page, Daily log and PR clips are `ci/` work, asked as owner question `clip-pipeline-ci` and Blocked in NEXT.
+- **Idea #208 (pet):** unchanged, stays on the backlog; M3 and M5 are not started. The preferred shape is still a spell form or modifier ("familiar"), not a pet system.
+- **Queue moves:** none; #243 to #245 are the owner's own issues and are covered by NEXT tasks.
+
 ## 2026-10-23: planning with an empty queue; the pet idea (#208)
 
 - **Why:** the work queue ran empty: the only doable Queue task, "Read the web stress parts", needs a daily run newer than #202, and none exists yet. A session would only answer `nothing_to_do`, so planning ran.

@@ -4,7 +4,9 @@
 
 **Status (2026-10-21):** started by the owner ("Start milestone 2"), which is the **go** verdict at C1 (#97) after two iterate rounds. M1's done-when items that are still open carry into M2 (see "Carried over from M1"), the way M0's dry runs carried into M1.
 
-**Status (2026-10-23):** all parts are built and no known crash or blocker is left; the milestone stays in progress until the C2 checkpoint issue is opened, then the owner's verdict. Done-when item 3 is **not yet met**: the web physics step with rendering off is 7.6 ms with the cap of 500 (docs/DECISIONS.md, 2026-10-23), but the web run with rendering still warns (p95 56.5 ms, in the CI browser without a GPU). That is carried to the owner's C2 verdict together with the real-GPU frame rate.
+**Status (2026-10-23):** all parts are built and no known crash or blocker is left. Done-when item 3 is **not yet met**: the web physics step with rendering off is 7.6 ms with the cap of 500 (docs/DECISIONS.md, 2026-10-23), but the web run with rendering still warns (p95 56.5 ms, in the CI browser without a GPU). That is carried to the owner's C2 verdict together with the real-GPU frame rate.
+
+**Status (2026-10-25):** the owner answered the C2 checkpoint (#235) with **iterate**, so the milestone is in progress again with rework tasks (docs/NEXT.md): the clip recorder and Spell atlas (#245), spell visuals (#244), Lightning as a fifth element (#243), in that order. Its next end is a new C2 checkpoint.
 
 **Done when:**
 

@@ -6,7 +6,7 @@ Eight strictly sequential milestones (docs/PLAN.md, "Roadmap"). One milestone at
 | --- | --- | --- | --- |
 | M0 | [Foundation](milestones/M0-foundation.md) | **Closed early** on 2026-10-16 by the owner; its dry runs and release streak carry into M1 | 3 daily releases in a row work and every pipeline part passes its dry run |
 | M1 | [Core loop prototype](milestones/M1-core-loop.md) | **Closed** on 2026-10-21 by the owner (C1: go, after two iterate rounds); its open owner items carry into M2 | 4-bot smoke test passes on web, plus M0's carried-over dry runs and 3 daily releases in a row |
-| M2 | [Spell system](milestones/M2-spell-system.md) | **In progress** since 2026-10-21; all parts built, waiting for the C2 checkpoint issue (done-when item 3 is open on the real-GPU frame rate) | Validators pass, 20+ combos work, plus M1's carried-over items |
+| M2 | [Spell system](milestones/M2-spell-system.md) | **In progress again** since 2026-10-25: the owner answered C2 (#235) with iterate: the clip recorder and Spell atlas (#245), spell visuals (#244), Lightning (#243), in that order; its next end is a new C2 checkpoint; done-when item 3 is open on the real-GPU frame rate (for the owner to judge) | Validators pass, 20+ combos work, plus M1's carried-over items |
 | M3 | Run structure | Not started | A full run can be completed |
 | M4 | Polish and variety | Not started | Polished enough to show off |
 | M5 | Meta-progression | Not started | Runs give lasting progression |

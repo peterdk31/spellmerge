@@ -75,7 +75,7 @@ float flame(vec2 p, float f) {
 	if (dy > half_w - 0.17) {
 		return 1.0;
 	}
-	return (dy < half_w * 0.45 && p.x > -0.2) ? 3.0 : 2.0;
+	return (dy < half_w * 0.3 && p.x > 0.0) ? 3.0 : 2.0;
 }
 
 // Frost: a four-point star that ticks between upright and turned, with a glint on the tips.

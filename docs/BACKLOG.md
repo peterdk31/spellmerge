@@ -6,6 +6,15 @@ Ideas and future work outside the current milestone (docs/PLAN.md, "Planning sys
 
 - **More animation for advanced combinations (task).** The owner wants many more animations for combined spells (triggers, held spells, chains and modifiers together). Plan it after part 3 (reactions and statuses) as its own queue task: one look per combo row in `combos.json`, data-driven, with the clips `combo_*` as the proof. Also check, once the owner has seen the smaller bodies, whether `SHAPE_SCALE` 0.62 is right.
 
+## From the clip polish (#244 rework, last task)
+
+Found by looking at all 51 clips and the four-player sheets at 1x (a clip frame is 320x180).
+
+- **Storm bolt is thin in grey (task).** The zigzag core is one pixel wide at 12 px, so it nearly vanishes in the greyscale strip and on a busy floor. Try a two-pixel core or a brighter edge.
+- **The coop clips show two players, not four (task).** `reaction_*_coop` cannot show the four-player load; add a four-player clip of the busiest combo (fan, chain, orbit) to judge readability and `Feel.PARTICLE_LIMIT` together.
+- **Orbit bodies speckle at 1x (task).** The beads of `combo_fire_fan_orbit` look noisy beside the flame body, because each is a few pixels in the owner's edge and the element colour. Try a solid bead with a one-pixel light centre.
+- **Shots are hard to find in the four-wizard arena sheet (task).** `arena_four_wizards` has no shots in flight; stage a four-player volley sheet for the next look.
+
 ## From the clip recorder (#245, part 1)
 
 - **Hit sprays are not in the clips (task).** Feel's bursts are `CPUParticles2D`, which advance by each frame's real time, so the recorder (`tests/clips/stage.gd`, `HIT_SPRAYS = false`) leaves them out to keep two takes identical. The spell visuals tasks (#244) will want particles in the clips: either make a burst advance by the stage's own steps (a burst Feel steps itself, or sprites in a pool), or record at a fixed engine frame time. Then turn `HIT_SPRAYS` on and record every clip twice again (`diff -rq`).

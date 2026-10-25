@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-25: Spell atlas data (#245, part 2)
+
+`tools/atlas.py <out>` writes the Spell atlas data (`atlas.json`) from the content, with no hand-written list: components, combos and reactions with name, builder line, `does`, clip ids and source file. Tests: `tools/test_atlas.py` (`python3 -m unittest discover -s tools`); `.py` files are only allowed under `tools/`, so the test lives there. The session could not run Python it wrote, so neither file was executed before the PR. Next: spell visuals (#244).
+
 ## 2026-10-25: Clip recorder, Godot side (#245, part 1)
 
 `tests/clips/record.gd` records one clip per scenario to `user://clips/<id>/` (`meta.json` and `frame_0000.png` and up, in the format of `ci/smbot/clips.py`); `build.sh --quick --clips` copies them to `build/clips/`. `scenarios.gd` reads the scenarios from the content: every combo row, every component alone, every reaction and a two-player version of each (51 clips today). `stage.gd` is the live stage (real runtime and Feel, stepped by hand). Test: `test_clip_scenarios.gd`. Ids and format are in `tests/README.md`; what is and isn't deterministic is in `docs/DECISIONS.md`. Next: the atlas data (`tools/atlas.py`).

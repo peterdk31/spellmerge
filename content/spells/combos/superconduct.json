@@ -3,8 +3,8 @@
 	"name": "Superconduct",
 	"does": "One wizard's frost bolt chills the imp; the other's lightning bolt then freezes it solid.",
 	"casts": [
-		{"slot": 0, "player": 0, "recipe": {"form": "bolt", "element": "frost"}},
-		{"slot": 0, "player": 1, "recipe": {"form": "bolt", "element": "lightning"}, "at": 0.3}
+		{"staff": 0, "cards": ["frost", "bolt"], "player": 0},
+		{"staff": 0, "cards": ["lightning", "bolt"], "at": 0.3, "player": 1}
 	],
 	"imps": [[100, 0]],
 	"seconds": 2.0,

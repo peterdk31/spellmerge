@@ -72,7 +72,7 @@ func _init(root: Node, registry: Node) -> void:
 
 
 ## Builds the stage for `scenario` (see scenarios.gd). False, with the reason printed, when a
-## recipe does not compile.
+## staff casts nothing.
 func start(scenario: Dictionary) -> bool:
 	free_all()
 	bus = _own(EventsScript.new()) as EventsScript
@@ -109,12 +109,18 @@ func start(scenario: Dictionary) -> bool:
 	projectiles.set_process(false)
 	feel.set_process(false)
 	for entry: Dictionary in scenario["casts"]:
-		var recipe: Dictionary = entry["recipe"] as Dictionary
-		var built: CompiledSpell = spells.compile(recipe)
-		if not built.valid:
-			printerr("CLIP SKIPPED: %s: the recipe does not build: %s" % [scenario["id"], built.reason])
+		var ids: Array[StringName] = []
+		for id: Variant in entry["cards"]:
+			ids.append(StringName(str(id)))
+		var plain := StaffBase.new()
+		plain.slots = maxi(ids.size(), 1)
+		plain.cast_delay = 0.0
+		plain.recharge = 0.0
+		var built: CompiledStaff = spells.compile_staff(ids, plain)
+		if built.is_empty():
+			printerr("CLIP SKIPPED: %s: the staff casts nothing" % scenario["id"])
 			return false
-		spells.install(int(entry["player"]), int(entry["slot"]), built)
+		spells.install_staff(int(entry["player"]), int(entry["staff"]), built)
 		_anchors[int(entry["player"])] = entry["origin"]
 	for at: Vector2 in scenario["imps"]:
 		_add_imp(at)
@@ -145,7 +151,7 @@ func tick() -> void:
 		var entry: Dictionary = _pending.pop_front()
 		var origin: Vector2 = entry["origin"] as Vector2
 		projectiles.set_anchor(int(entry["player"]), origin)
-		spells.cast(int(entry["player"]), int(entry["slot"]), origin, entry["aim"] as Vector2, MANA)
+		spells.cast_staff(int(entry["player"]), int(entry["staff"]), origin, entry["aim"] as Vector2, MANA)
 	# Orbits circle their caster's anchor, which has to be current every step, as in the game.
 	for player: int in _anchors:
 		projectiles.set_anchor(player, _anchors[player] as Vector2)

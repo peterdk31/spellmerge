@@ -3,8 +3,8 @@
 	"name": "Quick shock ring",
 	"does": "A quick ring of shock that flies farther and is ready again before a plain ring is (the second cast, at 0.8 s, is refused without Faster).",
 	"casts": [
-		{"slot": 0, "recipe": {"form": "nova", "element": "storm", "modifiers": ["faster"]}},
-		{"slot": 0, "at": 0.8, "recipe": {"form": "nova", "element": "storm", "modifiers": ["faster"]}}
+		{"staff": 0, "cards": ["storm", "faster", "nova"]},
+		{"staff": 0, "cards": ["storm", "faster", "nova"], "at": 0.8}
 	],
 	"imps": [[40, 0], [0, 40], [-40, 0], [60, 60]],
 	"seconds": 1.5,

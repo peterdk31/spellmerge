@@ -5,8 +5,8 @@ extends "res://tests/support/suite.gd"
 ## and must do what it promises. One data-driven test per check kind runs over every combo, so
 ## a new combo file is covered without a new test.
 ##
-## A combo file: `id` (also the file name), `name`, `does` (plain words), `casts` (slot,
-## recipe, optional `at` seconds, `player`), `imps` ([x, y] from the caster at (0, 0), aiming
+## A combo file: `id` (also the file name), `name`, `does` (plain words), `casts` (`staff`,
+## `cards`: one card id per slot, read as a staff reads them; optional `at` seconds, `player`), `imps` ([x, y] from the caster at (0, 0), aiming
 ## along +x), `seconds` and `checks`. Check kinds: `damaged` (imps), `status` (imps, status),
 ## `status_count` (status, min), `keeps_burning` (imp), `reaction` (reaction), `max_shots` (max),
 ## `caster_moved` (mode: a card moved its caster, for example a dash).
@@ -29,26 +29,26 @@ func before_each() -> void:
 
 
 ## Builds the arena for `combo`, casts it as the row says and runs it. The caller frees it.
-## With `quiet`, a recipe that does not build or a cast that is refused is not a failure (the
-## control runs below drop a component on purpose).
+## With `quiet`, a staff that casts nothing or a cast that is refused is not a failure (the
+## control runs below drop a card on purpose).
 func _play(combo: Dictionary, quiet: bool = false) -> ArenaScript:
 	var arena := ArenaScript.new(root)
 	for at: Array in combo.get("imps", []):
 		arena.add_imp(Vector2(float(at[0]), float(at[1])))
 	var casts: Array = (combo.get("casts", []) as Array).duplicate()
 	for entry: Dictionary in casts:
-		var built: CompiledSpell = arena.install(int(entry.get("player", 0)), int(entry["slot"]), entry["recipe"] as Dictionary)
+		var built: CompiledStaff = arena.install_cards(int(entry.get("player", 0)), int(entry["staff"]), entry["cards"] as Array)
 		if not quiet:
-			check(built.valid, "%s: the recipe builds: %s" % [combo["id"], built.reason])
+			check(not built.is_empty(), "%s: the staff casts something" % combo["id"])
 	casts.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a.get("at", 0.0)) < float(b.get("at", 0.0)))
 	var seconds: float = float(combo.get("seconds", 1.0))
 	for entry: Dictionary in casts:
 		var at: float = float(entry.get("at", 0.0))
 		if at > arena.time:
 			arena.run(at - arena.time)
-		var made: bool = arena.cast(int(entry.get("player", 0)), int(entry["slot"]))
+		var made: bool = arena.cast(int(entry.get("player", 0)), int(entry["staff"]))
 		if not quiet:
-			check(made, "%s: the cast in slot %d is made" % [combo["id"], int(entry["slot"])])
+			check(made, "%s: the cast of staff %d is made" % [combo["id"], int(entry["staff"])])
 	arena.run(maxf(seconds - arena.time, 0.0))
 	return arena
 
@@ -107,7 +107,7 @@ func test_every_component_is_in_two_combos() -> void:
 	for combo: Dictionary in _combos:
 		var in_combo: Dictionary = {}
 		for entry: Dictionary in combo["casts"]:
-			for id: StringName in _recipe_ids(entry["recipe"] as Dictionary):
+			for id: StringName in _card_ids(entry):
 				in_combo[id] = true
 		for id: StringName in in_combo:
 			uses[id] = int(uses.get(id, 0)) + 1
@@ -145,36 +145,31 @@ func test_every_row_has_its_fields_and_an_unseen_id() -> void:
 			check(CHECK_KINDS.has(str(row.get("kind", ""))), "%s: check kind %s is known" % [id, row.get("kind")])
 
 
-func test_every_recipe_compiles_within_the_budget() -> void:
+func test_every_staff_casts_something() -> void:
 	var arena := ArenaScript.new(root)
 	for combo: Dictionary in _combos:
 		for entry: Dictionary in combo["casts"]:
-			var spell: CompiledSpell = arena.spells.compile(entry["recipe"] as Dictionary)
-			check(spell.valid, "%s: %s" % [combo["id"], spell.reason])
-			check(spell.complexity <= SpellLimits.MAX_COMPLEXITY, "%s: complexity %d is over the budget" % [combo["id"], spell.complexity])
+			var ids: Array[StringName] = _card_ids(entry)
+			var compiled: CompiledStaff = arena.spells.compile_staff(ids, ArenaScript.plain_staff(ids.size()))
+			check(not compiled.is_empty(), "%s: the staff casts something" % combo["id"])
 	arena.free_all()
 
 
-func test_the_recipe_ids_are_real_components() -> void:
+func test_the_card_ids_are_real_cards() -> void:
 	var arena := ArenaScript.new(root)
-	var ids: Array[StringName] = []
 	for combo: Dictionary in _combos:
 		for entry: Dictionary in combo["casts"]:
-			ids.append_array(_recipe_ids(entry["recipe"] as Dictionary))
-	for id in ids:
-		check(arena.registry.call("get_resource", &"spells", id) != null, "the registry knows %s" % id)
+			for id in _card_ids(entry):
+				check(arena.registry.call("get_resource", &"spells", id) != null, "%s: the registry knows %s" % [combo["id"], id])
 	arena.free_all()
 
 
-func _recipe_ids(recipe: Dictionary) -> Array[StringName]:
+## The card ids of one cast entry, empty slots left out.
+func _card_ids(entry: Dictionary) -> Array[StringName]:
 	var ids: Array[StringName] = []
-	for key in ["form", "element", "trigger"]:
-		if recipe.has(key):
-			ids.append(StringName(recipe[key]))
-	for id: String in recipe.get("modifiers", []):
-		ids.append(StringName(id))
-	if recipe.has("held"):
-		ids.append_array(_recipe_ids(recipe["held"] as Dictionary))
+	for id: Variant in entry.get("cards", []):
+		if str(id) != "":
+			ids.append(StringName(str(id)))
 	return ids
 
 
@@ -189,7 +184,7 @@ func test_every_combo_does_what_it_promises() -> void:
 		arena.free_all()
 
 
-## Rows whose point is one component: with it dropped, some check of the row must fail.
+## Rows whose point is one card: with it dropped, some check of the row must fail.
 const CONTROLS: Dictionary = {
 	"storm_mine": "chain",
 	"frost_carousel": "pierce",
@@ -198,15 +193,12 @@ const CONTROLS: Dictionary = {
 }
 
 
-func _without(recipe: Dictionary, component: String) -> Dictionary:
-	var out: Dictionary = recipe.duplicate(true)
-	if out.get("trigger", "") == component:
-		out.erase("trigger")
-		out.erase("held")
-	if out.has("modifiers"):
-		(out["modifiers"] as Array).erase(component)
-	if out.has("held"):
-		out["held"] = _without(out["held"] as Dictionary, component)
+## The cards with every copy of `card` taken out (its slots dropped, so the rest reads as before).
+func _without(cards: Array, card: String) -> Array:
+	var out: Array = []
+	for id: Variant in cards:
+		if str(id) != card:
+			out.append(id)
 	return out
 
 
@@ -216,7 +208,7 @@ func test_a_combo_row_fails_without_the_component_it_is_for() -> void:
 			continue
 		var plain: Dictionary = combo.duplicate(true)
 		for entry: Dictionary in plain["casts"]:
-			entry["recipe"] = _without(entry["recipe"] as Dictionary, CONTROLS[combo["id"]])
+			entry["cards"] = _without(entry["cards"] as Array, CONTROLS[combo["id"]])
 		var arena: ArenaScript = _play(plain, true)
 		var failed: bool = false
 		for row: Dictionary in combo["checks"]:
@@ -234,7 +226,7 @@ func test_a_combo_check_that_fails_is_reported() -> void:
 	# The checks themselves can fail: an imp no shot reaches is not hurt.
 	var arena := ArenaScript.new(root)
 	arena.add_imp(Vector2(100.0, 400.0))
-	arena.install(0, 0, {"form": "bolt"})
+	arena.install_cards(0, 0, ["bolt"])
 	arena.cast(0, 0)
 	arena.run(1.5)
 	check(_problem_with(arena, {"kind": "damaged", "imps": [0]}) != "", "a missed imp fails the damaged check")

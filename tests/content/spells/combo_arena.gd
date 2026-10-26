@@ -94,6 +94,28 @@ func install(player: int, slot: int, recipe: Dictionary) -> CompiledSpell:
 	return spell
 
 
+## Builds `cards` (card ids, one per slot) into `player`'s staff `staff` on a plain staff with
+## no delay or recharge of its own (staffs A6b), and returns the compiled staff, so a test can
+## look at its casts and wasted cards. An empty staff is installed as no build.
+func install_cards(player: int, staff: int, cards: Array) -> CompiledStaff:
+	var ids: Array[StringName] = []
+	for id: Variant in cards:
+		ids.append(StringName(str(id)))
+	var compiled: CompiledStaff = spells.compile_staff(ids, plain_staff(ids.size()))
+	spells.install_staff(player, staff, compiled)
+	return compiled
+
+
+## A staff of `slots` slots with no delay or recharge of its own, for tests.
+static func plain_staff(slots: int) -> StaffBase:
+	var staff := StaffBase.new()
+	staff.id = &"arena"
+	staff.slots = clampi(slots, 1, 64)
+	staff.cast_delay = 0.0
+	staff.recharge = 0.0
+	return staff
+
+
 ## Casts `player`'s `slot` toward `direction` (+x by default). True when it was cast.
 func cast(player: int, slot: int, direction: Vector2 = Vector2.RIGHT) -> bool:
 	# An orbit has to find its anchor already set, as it is every physics step in the game.

@@ -2,7 +2,7 @@
 	"id": "fire_trap",
 	"name": "Fire trap",
 	"does": "A fire rune waits on the floor and, when it ends, bursts into a ring of fire that burns the imps standing near it.",
-	"casts": [{"slot": 0, "recipe": {"form": "rune", "element": "fire", "trigger": "on_expire", "held": {"form": "nova", "element": "fire"}}}],
+	"casts": [{"staff": 0, "cards": ["fire", "on_expire", "rune", "fire", "nova"]}],
 	"imps": [[40, 0], [0, 40], [-40, 0]],
 	"seconds": 9.0,
 	"checks": [{"kind": "status", "imps": [0, 1, 2], "status": "burn"}]

@@ -53,7 +53,7 @@ func test_every_combo_row_is_a_clip() -> void:
 func test_a_new_combo_row_is_a_clip_with_no_code_change() -> void:
 	var row: Dictionary = {
 		"id": "fake_row", "name": "Fake row", "does": "Test only.", "seconds": 1.5,
-		"casts": [{"slot": 0, "recipe": {"form": "bolt", "element": "fire"}}, {"slot": 1, "recipe": {"form": "nova"}, "at": 0.5, "player": 1}],
+		"casts": [{"staff": 0, "cards": ["fire", "bolt"]}, {"staff": 1, "cards": ["nova"], "at": 0.5, "player": 1}],
 		"imps": [[80, 10]], "checks": [{"kind": "damaged", "imps": [0]}],
 	}
 	var more: Array = _combos.duplicate()
@@ -80,8 +80,11 @@ func test_every_component_is_a_clip_of_its_kind_that_builds() -> void:
 		check_equal(scenario["kind"], str(kind), "%s is a %s clip" % [id, kind])
 		check_equal(scenario["title"], arena.spells.component_name(id), "%s is titled by its name" % id)
 		for entry: Dictionary in scenario["casts"]:
-			var built: CompiledSpell = arena.spells.compile(entry["recipe"] as Dictionary)
-			check(built.valid, "%s alone builds: %s" % [id, built.reason])
+			var ids: Array[StringName] = []
+			for card: Variant in entry["cards"]:
+				ids.append(StringName(str(card)))
+			var built: CompiledStaff = arena.spells.compile_staff(ids, ArenaScript.plain_staff(ids.size()))
+			check(not built.is_empty() and not built.wasted.has(0), "%s on a bolt casts and does something: %s" % [id, built.wasted])
 	check(count >= 18, "the shipped components were found (%d)" % count)
 	arena.free_all()
 
@@ -158,9 +161,9 @@ func test_the_same_scenario_twice_gives_the_same_simulation() -> void:
 		check(runs[0][0] != runs[0][runs[0].size() - 1], "%s: something happens in the clip" % id)
 
 
-func test_a_scenario_with_a_recipe_that_does_not_build_is_refused() -> void:
+func test_a_scenario_with_a_staff_that_casts_nothing_is_refused() -> void:
 	var scenario: Dictionary = (_find(_all(), "combo_shatter")).duplicate(true)
-	scenario["casts"] = [{"player": 0, "slot": 0, "recipe": {"form": "no_such_form"}, "at": 0.0, "origin": Vector2.ZERO, "aim": Vector2.RIGHT}]
+	scenario["casts"] = [{"player": 0, "staff": 0, "cards": ["no_such_card"], "at": 0.0, "origin": Vector2.ZERO, "aim": Vector2.RIGHT}]
 	var stage := StageScript.new(root, _registry)
 	check(not stage.start(scenario), "start says no")
 	stage.free_all()

@@ -2,7 +2,7 @@
 	"id": "static_ring",
 	"name": "Static ring",
 	"does": "A big lightning ring charges every imp round the caster.",
-	"casts": [{"slot": 0, "recipe": {"form": "nova", "element": "lightning", "modifiers": ["bigger"]}}],
+	"casts": [{"staff": 0, "cards": ["lightning", "bigger", "nova"]}],
 	"imps": [[36, 0], [0, 36], [-36, 0]],
 	"seconds": 1.0,
 	"checks": [{"kind": "status", "imps": [0, 1, 2], "status": "static"}]

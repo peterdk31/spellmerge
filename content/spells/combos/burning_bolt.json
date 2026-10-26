@@ -2,7 +2,7 @@
 	"id": "burning_bolt",
 	"name": "Burning bolt",
 	"does": "A fire bolt; the imp keeps losing health after the hit.",
-	"casts": [{"slot": 0, "recipe": {"form": "bolt", "element": "fire"}}],
+	"casts": [{"staff": 0, "cards": ["fire", "bolt"]}],
 	"imps": [[100, 0]],
 	"seconds": 2.5,
 	"checks": [{"kind": "keeps_burning", "imp": 0}]

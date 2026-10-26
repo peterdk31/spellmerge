@@ -3,8 +3,8 @@
 	"name": "Storm on flame",
 	"does": "Two players: one sets an imp burning, the other's pulsing storm bolt sets off Flare on it.",
 	"casts": [
-		{"slot": 0, "player": 0, "recipe": {"form": "bolt", "element": "fire"}},
-		{"slot": 0, "player": 1, "recipe": {"form": "bolt", "element": "storm", "trigger": "timer", "held": {"form": "nova", "element": "storm"}}, "at": 0.4}
+		{"staff": 0, "cards": ["fire", "bolt"], "player": 0},
+		{"staff": 0, "cards": ["storm", "timer", "bolt", "storm", "nova"], "at": 0.4, "player": 1}
 	],
 	"imps": [[100, 0]],
 	"seconds": 3.0,

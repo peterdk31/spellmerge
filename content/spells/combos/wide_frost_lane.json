@@ -2,7 +2,7 @@
 	"id": "wide_frost_lane",
 	"name": "Wide frost lane",
 	"does": "A wide ray that chills the imp in its lane.",
-	"casts": [{"slot": 0, "recipe": {"form": "beam", "element": "frost", "modifiers": ["bigger"]}}],
+	"casts": [{"staff": 0, "cards": ["frost", "bigger", "beam"]}],
 	"imps": [[100, 0]],
 	"seconds": 1.0,
 	"checks": [{"kind": "status", "imps": [0], "status": "chill"}]

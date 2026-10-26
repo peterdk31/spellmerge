@@ -496,6 +496,22 @@ func test_a_heavy_hit_that_knocks_an_enemy_into_a_wall_hurts_once() -> void:
 	check_equal(_combat.get_health(enemy), 90, "only once")
 
 
+func test_an_enemy_killed_by_the_slam_is_not_the_spells_kill() -> void:
+	_projectiles.set_bounds(Rect2(-200.0, -200.0, 400.0, 400.0))
+	_projectiles.set_walls([Rect2(20.0, -20.0, 20.0, 40.0)] as Array[Rect2])
+	var enemy := _enemy(Vector2(10.0, 0.0), 8)
+	var deaths: Array = []
+	_bus.enemy_died.connect(func(p: int, e: Node, _at: Vector2) -> void: deaths.append([p, e]))
+	var profile := _profile(3)
+	profile.knockback = 300.0
+	profile.slam = 7
+	_bus.projectile_hit.emit(0, enemy, Vector2(0.0, 0.0), _tag(profile))
+	check(deaths.is_empty(), "the hit itself leaves it alive")
+	_run(STEP)
+	check_equal(deaths.size(), 1, "the slam killed it")
+	check(_kills.is_empty(), "a slam is not the spell's own hit, so no kill_landed")
+
+
 func test_a_heavy_hit_in_the_open_slams_nothing() -> void:
 	_projectiles.set_bounds(Rect2(-200.0, -200.0, 400.0, 400.0))
 	var enemy := _enemy(Vector2(10.0, 0.0))

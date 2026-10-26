@@ -211,15 +211,13 @@ var _w_last_name: PackedStringArray = PackedStringArray(["", "", "", ""])
 ## The tag of the spell hit being dealt now (0 for none): `kill_landed`, `reaction_landed` and
 ## `wizard_hurt` carry it. Set around a spell's hit, restored after, so hits inside hits are right.
 var _tag: int = 0
-# Heavy hits armed on enemies: the slam damage waiting for a wall, who dealt it and its tag.
+# Heavy hits armed on enemies: the slam damage waiting for a wall, and who dealt it.
 var _slam: PackedInt32Array = PackedInt32Array()
 var _slam_player: PackedInt32Array = PackedInt32Array()
-var _slam_tag: PackedInt32Array = PackedInt32Array()
 # Slams due this step (after the loop, as hits can remove rows).
 var _slam_due_enemy: Array[Node2D] = []
 var _slam_due_player: PackedInt32Array = PackedInt32Array()
 var _slam_due_amount: PackedInt32Array = PackedInt32Array()
-var _slam_due_tag: PackedInt32Array = PackedInt32Array()
 # Scratch copies of the targets of area hits, one per nesting depth, and the depth now.
 var _area_pool: Array = []
 var _area_depth: int = 0
@@ -322,7 +320,6 @@ func register_enemy(enemy: Node2D, health: int, hurt_radius: float, contact_dama
 	_react_wait.append(0.0)
 	_slam.append(0)
 	_slam_player.append(EventsScript.NO_PLAYER)
-	_slam_tag.append(0)
 	if projectiles != null:
 		projectiles.add_target(enemy, hurt_radius, ProjectileManagerScript.LAYER_ENEMY, -1, hurt_offset)
 
@@ -838,7 +835,6 @@ func _apply_to_enemy(player: int, enemy: Node2D, position: Vector2, profile: Hit
 		if armed >= 0:
 			_slam[armed] = profile.slam
 			_slam_player[armed] = player
-			_slam_tag[armed] = _tag
 	var spent: int = _enemies.find(enemy)
 	if spent >= 0:
 		_shock_left[spent] = 0.0
@@ -1126,7 +1122,6 @@ func _remove_enemy_at(at: int) -> void:
 	_react_wait.remove_at(at)
 	_slam.remove_at(at)
 	_slam_player.remove_at(at)
-	_slam_tag.remove_at(at)
 
 
 ## Area hits (`area_hit_requested`, from blast and a payload's fallback): the spell's hit lands
@@ -1234,23 +1229,22 @@ func _check_slam(row: int) -> void:
 		_slam_due_enemy.append(_enemies[row])
 		_slam_due_player.append(_slam_player[row])
 		_slam_due_amount.append(_slam[row])
-		_slam_due_tag.append(_slam_tag[row])
 		_slam[row] = 0
 
 
+## A slam is not the spell's own hit: no tag, so it sends no `kill_landed`.
 func _send_slams() -> void:
 	var saved_tag: int = _tag
+	_tag = 0
 	var sent: int = 0
 	while sent < _slam_due_enemy.size():
 		if is_instance_valid(_slam_due_enemy[sent]):
-			_tag = _slam_due_tag[sent]
 			_hit(_slam_due_player[sent], _slam_due_enemy[sent], maxi(_slam_due_amount[sent], 1), Vector2.ZERO, 0.0, false, KIND_REACTION)
 		sent += 1
 	_tag = saved_tag
 	_slam_due_enemy.clear()
 	_slam_due_player.clear()
 	_slam_due_amount.clear()
-	_slam_due_tag.clear()
 
 
 ## Put `status_id` on the wizard `index` like `apply_status` does on an enemy (same numbers, same

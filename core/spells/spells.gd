@@ -52,6 +52,14 @@ extends Node
 ## own later firings start from where the caster has moved to. `mirror` also fires the carrier
 ## backwards; an echo hits at half damage.
 ##
+## Payload and line carriers (B2c): `rain` drops its payload on the aim point after its
+## `lifetime` (a `form_shown` cue `&"rain"` says where and when; an `on expire` trigger on it
+## fires as it lands); `familiar` and `decoy` ask `ai` for an entity (`entity_spawn_requested`),
+## count it as a live shot of their tag until `entity_ended`, fire a familiar's payload on every
+## `familiar_cast_requested`, and fire an entity's `on expire` payload and `blast` at its end
+## point; `hold` keeps an entity until its staff is cast again (`entity_end_requested`). `wall`
+## is a line of still shots across the aim; `fissure` is a beam that pierces everything on its line.
+##
 ## Tags (`SpellTag`): player, staff, generation and node. `begin_generation(player, staff,
 ## compiled)` registers every compiled spell of a staff under a new generation and returns the
 ## tag of its first one; a payload's spells have their own nodes. Shots keep the tag they were
@@ -84,6 +92,8 @@ class PendingLaunch:
 	var anchor: Vector2 = Vector2.INF
 	## The scatter stream's seed for this firing, so it points the same way however late it runs.
 	var seed: int = 0
+	## The rain whose payload this is, so its own trigger (`on expire`) fires as it lands.
+	var landing: CompiledSpell = null
 
 
 ## What `cast` returns when the spell did not fire (cooling down, too little mana, no spell).
@@ -114,6 +124,8 @@ var _current: PackedInt32Array = PackedInt32Array()
 var _installed: Array[CompiledStaff] = []
 ## player * STAFFS + staff -> which cast of its cycle comes next
 var _cursor: PackedInt32Array = PackedInt32Array()
+## tag -> entities (decoys, familiars) alive that came from it; each counts as a live shot
+var _entities: Dictionary = {}
 ## player * STAFFS + staff -> the tags of its sustained (`hold`) carriers that are on
 var _hold_tags: Array[PackedInt64Array] = []
 ## player * STAFFS + staff -> the carrier (form id) of its last cast, for the cast's look
@@ -246,6 +258,8 @@ func bind(manager: ProjectilesScript, bus: EventsScript) -> void:
 		events.wizard_hurt.disconnect(_on_hurt)
 		events.reaction_landed.disconnect(_on_reaction)
 		events.ally_passed.disconnect(_on_ally)
+		events.entity_ended.disconnect(_on_entity_ended)
+		events.familiar_cast_requested.disconnect(_on_familiar_cast)
 	projectiles = manager
 	events = bus
 	if projectiles != null:
@@ -259,6 +273,8 @@ func bind(manager: ProjectilesScript, bus: EventsScript) -> void:
 		events.wizard_hurt.connect(_on_hurt)
 		events.reaction_landed.connect(_on_reaction)
 		events.ally_passed.connect(_on_ally)
+		events.entity_ended.connect(_on_entity_ended)
+		events.familiar_cast_requested.connect(_on_familiar_cast)
 
 
 ## Compiles a staff's cards (ids by slot, `&""` for an empty slot) into its cycle, the casts it
@@ -453,6 +469,8 @@ func install_staff(player: int, staff: int, compiled: CompiledStaff) -> int:
 	if projectiles != null:
 		for revoked in revoked_tags:
 			projectiles.remove_by_tag(revoked)
+	for revoked in revoked_tags:
+		_end_entities(revoked)
 	return tag
 
 
@@ -596,6 +614,12 @@ func _launch(spell: CompiledSpell, tag: int, player: int, origin: Vector2, direc
 		if events != null:
 			events.caster_move_requested.emit(player, &"dash", origin + direction * spell.speed * spell.lifetime, spell.lifetime, tag)
 		return 1
+	if spell.motion == FormBase.Motion.DECOY or spell.motion == FormBase.Motion.FAMILIAR:
+		return _spawn_entities(spell, tag, player, origin, count, lifetime)
+	if spell.motion == FormBase.Motion.RAIN:
+		return _telegraph_rain(spell, tag, player, origin, direction)
+	if spell.motion == FormBase.Motion.WALL:
+		return _launch_wall(spell, tag, player, origin, direction, source, lifetime, carried, prev)
 	var base: float = direction.angle()
 	if spell.motion == FormBase.Motion.RAY and spell.homing_turn > 0.0:
 		direction = projectiles.homing_aim(player, origin, direction, deg_to_rad(30.0), ProjectilesScript.LAYER_ENEMY)
@@ -605,6 +629,10 @@ func _launch(spell: CompiledSpell, tag: int, player: int, origin: Vector2, direc
 		var heading: Vector2 = Vector2.from_angle(angle)
 		if spell.motion == FormBase.Motion.RAY:
 			_shoot_ray(spell, tag, player, origin, heading, carried, prev, source)
+			made += 1
+			continue
+		if spell.motion == FormBase.Motion.FISSURE:
+			_shoot_ray(spell, tag, player, origin, heading, carried, prev, source, -1.0, maxi(spell.pierce, SpellLimits.FISSURE_PIERCE - 1))
 			made += 1
 			continue
 		var slot: int = -1
@@ -633,6 +661,114 @@ func _launch(spell: CompiledSpell, tag: int, player: int, origin: Vector2, direc
 	if events != null and made > 0 and count > 1 and spell.spread >= 360.0 and spell.motion == FormBase.Motion.STRAIGHT:
 		events.form_shown.emit(player, &"nova", origin, direction, 0.0, spell.tint)
 	return made
+
+
+## Rain: for each of its shots, a cue at the aim point and a launch of its payload there after
+## its `lifetime`. The aim point is `ray_length` (or `SpellLimits.RAIN_REACH`) along the shot's
+## heading, stopped at a wall. Returns how many were set (0 when the queue is full).
+## `hold` does nothing for a rain: it always falls after its `lifetime` and is no sustained carrier.
+func _telegraph_rain(spell: CompiledSpell, tag: int, player: int, origin: Vector2, heading: Vector2) -> int:
+	var reach: float = spell.ray_length if spell.ray_length > 0.0 else SpellLimits.RAIN_REACH
+	var placed: int = 0
+	for n in spell.shots:
+		var along: Vector2 = heading.rotated(_fan_angle(n, spell.shots, spell))
+		var point: Vector2 = projectiles.clip_to_walls(origin, origin + along * reach)
+		var group: CompiledGroup = spell.own_payload if spell.own_payload != null else CompiledGroup.new()
+		var launch: PendingLaunch = _delay(spell.lifetime, group, null, player, SpellTag.staff_of(tag), SpellTag.generation_of(tag), point, along, null, false)
+		if launch == null:
+			continue
+		launch.landing = spell
+		placed += 1
+		if events != null:
+			events.form_shown.emit(player, &"rain", point, along, spell.lifetime, spell.tint)
+	return placed
+
+
+## A rain lands: its payload falls (a group, so a burst repeats it), then its own `on expire`
+## trigger fires, both from the aim point.
+func _land_rain(spell: CompiledSpell, group: CompiledGroup, player: int, staff: int, generation: int, point: Vector2, heading: Vector2) -> void:
+	if group != null and not group.is_empty() and _take_fire(player):
+		_launch_group(group, player, staff, generation, point, heading, null)
+	if spell.payload != null and spell.trigger_event == TriggerBase.Event.EXPIRE and _take_fire(player):
+		_launch_group(spell.payload, player, staff, generation, point, heading, null)
+
+
+## Wall: `shots` still shots in a line across `direction`, `spread` pixels apart (the shot's
+## diameter when the form has none), centred `SpellLimits.WALL_REACH` ahead of `origin`. A shot
+## born in a wall is skipped. Shield charges apply, so `shield . wall` stops enemy shots.
+func _launch_wall(spell: CompiledSpell, tag: int, player: int, origin: Vector2, direction: Vector2, source: Node, lifetime: float, carried: int, prev: int) -> int:
+	var centre: Vector2 = projectiles.clip_to_walls(origin, origin + direction * SpellLimits.WALL_REACH)
+	var across: Vector2 = direction.orthogonal()
+	var gap: float = spell.spread if spell.spread > 0.0 else spell.radius * 2.0
+	var shield: int = roundi(spell.behaviour(ModifierBase.Behaviour.SHIELD))
+	var made: int = 0
+	for n in spell.shots:
+		var at: Vector2 = centre + across * (n - (spell.shots - 1) * 0.5) * gap
+		var slot: int = projectiles.spawn(player, at, Vector2.ZERO, lifetime, spell.radius, ProjectilesScript.LAYER_ENEMY, spell.pierce, tag, ProjectilesScript.MOTION_STILL)
+		if slot < 0:
+			continue
+		made += 1
+		_register(slot, tag, spell, spell.trigger_max_fires, carried, prev)
+		if shield > 0:
+			projectiles.set_shield(slot, shield)
+		if source != null:
+			projectiles.exclude(slot, source, SpellLimits.SOURCE_EXCLUSION)
+	return made
+
+
+## Decoys and familiars: `ai` makes the entity (`entity_spawn_requested`, `lifetime` seconds, or
+## until ended for a `hold`). Each counts as a live shot of `tag` until `entity_ended`, so its
+## build stays known while it lives. Returns how many were asked for.
+func _spawn_entities(spell: CompiledSpell, tag: int, player: int, origin: Vector2, count: int, lifetime: float) -> int:
+	if events == null or not _profiles.has(tag):
+		return 0
+	var kind: StringName = &"decoy" if spell.motion == FormBase.Motion.DECOY else &"familiar"
+	var seconds: float = INF if lifetime >= SpellLimits.HOLD_LIFETIME else lifetime
+	for n in count:
+		_entities[tag] = _entities.get(tag, 0) + 1
+		shot_started(tag)
+		events.entity_spawn_requested.emit(player, kind, origin, seconds, tag)
+	return count
+
+
+## An entity of this player ended where it stood: its `blast` and its `on expire` payload happen
+## there (the end point), then it stops counting as a live shot.
+func _on_entity_ended(player: int, _kind: StringName, position: Vector2, tag: int) -> void:
+	if player != SpellTag.player_of(tag):
+		return
+	var count: int = _entities.get(tag, 0)
+	if count <= 0:
+		return
+	if count == 1:
+		_entities.erase(tag)
+	else:
+		_entities[tag] = count - 1
+	var spell: CompiledSpell = _profiles.get(tag)
+	if spell != null and position.is_finite():
+		var blast: float = spell.behaviour(ModifierBase.Behaviour.BLAST)
+		if blast > 0.0 and events != null:
+			events.area_hit_requested.emit(player, position, blast, tag)
+		if spell.payload != null and spell.trigger_event == TriggerBase.Event.EXPIRE and _take_fire(player):
+			_launch_group(spell.payload, player, SpellTag.staff_of(tag), SpellTag.generation_of(tag), position, Vector2.RIGHT, null)
+	shot_ended(tag)
+
+
+## The familiar with `tag` casts: its payload (what came after it on the staff) leaves `position`
+## along `direction`, in the staff and generation of the familiar's own cards.
+func _on_familiar_cast(player: int, position: Vector2, direction: Vector2, tag: int) -> void:
+	if player != SpellTag.player_of(tag) or not _entities.has(tag) or not position.is_finite() or player < 0 or player >= SpellLimits.PLAYERS:
+		return
+	var spell: CompiledSpell = _profiles.get(tag)
+	if spell == null or spell.own_payload == null or spell.own_payload.is_empty() or not _take_fire(player):
+		return
+	var aim: Vector2 = direction.normalized() if direction.is_finite() and not direction.is_zero_approx() else Vector2.RIGHT
+	_launch_group(spell.own_payload, player, SpellTag.staff_of(tag), SpellTag.generation_of(tag), position, aim, null)
+
+
+## A revoked build's entities are told to end, and forgotten (their `entity_ended` is then ignored).
+func _end_entities(tag: int) -> void:
+	if _entities.erase(tag) and events != null:
+		events.entity_end_requested.emit(SpellTag.player_of(tag), tag)
 
 
 ## Hand a flying shot the behaviours of its cards that the projectile manager runs (staffs B1).
@@ -713,7 +849,7 @@ func _fire_spell(spell: CompiledSpell, player: int, staff: int, generation: int,
 		return _fallback_hit(spell, tag, player, origin)
 	_echo_spell = spell if echoed else null
 	var launched: int = _launch(spell, tag, player, origin, heading, source)
-	if launched > 0 and spell.behaviour(ModifierBase.Behaviour.MIRROR) > 0.0 and (spell.motion == FormBase.Motion.STRAIGHT or spell.motion == FormBase.Motion.RETURN or spell.motion == FormBase.Motion.RAY):
+	if launched > 0 and spell.behaviour(ModifierBase.Behaviour.MIRROR) > 0.0 and (spell.motion == FormBase.Motion.STRAIGHT or spell.motion == FormBase.Motion.RETURN or spell.motion == FormBase.Motion.RAY or spell.motion == FormBase.Motion.FISSURE):
 		launched += _launch(spell, tag, player, origin, -heading, source)
 	_echo_spell = null
 	# `on cast`: the payload leaves at once, from where the carrier did.
@@ -727,11 +863,12 @@ func _fire_spell(spell: CompiledSpell, player: int, staff: int, generation: int,
 
 ## Queues a launch `wait` seconds from now: `group` (a burst's later firing) or, with no group,
 ## `spell` (an echo). Dropped when too many wait already.
-func _delay(wait: float, group: CompiledGroup, spell: CompiledSpell, player: int, staff: int, generation: int, origin: Vector2, heading: Vector2, source: Node, from_caster: bool) -> void:
+func _delay(wait: float, group: CompiledGroup, spell: CompiledSpell, player: int, staff: int, generation: int, origin: Vector2, heading: Vector2, source: Node, from_caster: bool) -> PendingLaunch:
 	if _pending_free.is_empty():
 		delayed_dropped += 1
-		return
+		return null
 	var launch: PendingLaunch = _pending_free.pop_back()
+	launch.landing = null
 	launch.seed = hash(Vector3i(_scatter.seed, roundi(wait * 1000.0), 0 if group != null else 1))
 	launch.due = _clock + maxf(wait, 0.0)
 	launch.player = player
@@ -746,6 +883,7 @@ func _delay(wait: float, group: CompiledGroup, spell: CompiledSpell, player: int
 	if from_caster and projectiles != null:
 		launch.anchor = projectiles.get_anchor(player)
 	_pending.append(launch)
+	return launch
 
 
 ## Fires the queued launches that are due. One whose staff was rebuilt or switched off since is
@@ -774,9 +912,12 @@ func _run_pending() -> void:
 		var staff: int = launch.staff
 		var generation: int = launch.generation
 		var heading: Vector2 = launch.heading
+		var landing: CompiledSpell = launch.landing
 		_scatter.seed = launch.seed
 		_release_launch(launch)
-		if group != null:
+		if landing != null:
+			_land_rain(landing, group, player, staff, generation, origin, heading)
+		elif group != null:
 			_fire_group(group, player, staff, generation, origin, heading, source, from_caster)
 		else:
 			_fire_spell(spell, player, staff, generation, origin, heading, source, from_caster, true)
@@ -786,6 +927,7 @@ func _run_pending() -> void:
 func _release_launch(launch: PendingLaunch) -> void:
 	launch.group = null
 	launch.spell = null
+	launch.landing = null
 	launch.source = null
 	_pending_free.append(launch)
 
@@ -1213,6 +1355,7 @@ func clear() -> void:
 	for i in _installed.size():
 		_installed[i] = null
 		_hold_tags[i].clear()
+	_entities.clear()
 	_node_counts.clear()
 	_profiles.clear()
 	_live.clear()
@@ -1266,6 +1409,10 @@ func _release_hold(index: int) -> void:
 	var tags: PackedInt64Array = _hold_tags[index].duplicate()
 	_hold_tags[index].clear()
 	_hold_mana[index] = 0.0
+	if events != null:
+		for tag in tags:
+			if _entities.has(tag):
+				events.entity_end_requested.emit(SpellTag.player_of(tag), tag)
 	if projectiles != null:
 		for tag in tags:
 			# remove_by_tag sends no shot_ended, so the counts are ended here.

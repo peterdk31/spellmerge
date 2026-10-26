@@ -14,6 +14,7 @@ For later milestones; see `docs/milestones/M2-staffs.md`, "Later".
 - **Elements on the room (M3 rooms).** Fire lights grass, frost freezes water into floor, lightning electrifies water, void breaks weak walls.
 - **Codex of discoveries (M5).** The first time a reaction, a combo or an unknown chain happens, the game notes it (with a short clip if the recorder can do it cheaply).
 - **Superseded by the pivot:** "Spell visuals round 2, part 2" (a burst per combo row) and the combo marks per combo class are replaced by the layered shot look (staffs B6); keep what still reads well.
+- **Fissure and `bounce` (from B2c).** The design says `bounce · fissure` turns at walls; the projectile manager gives a beam no wall normal, so the fissure stops at the wall. Needs a wall-normal query on the manager. Also: Feel draws only `beam` and `nova` cues; the `rain` cue (`form_shown`, `length` = seconds until it falls) needs a look (B6b).
 
 ## From the spell visuals (owner `/claude` on #244)
 

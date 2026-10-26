@@ -2,6 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-26: Trigger kit, part 3 (staffs B2c)
+
+- **Rain's aim point** is `ray_length` (else `SpellLimits.RAIN_REACH`, 120 px) along the aim, stopped at a wall; the delay is the form's `lifetime`. A rain's own `on expire` trigger fires as it lands, after its payload; other events never fire on a rain (it has no shot). Why: the design says the carrier's own payload is read first, then the trigger's; landing is its only end point.
+- **Entities count as live shots** of their carrier's tag from `entity_spawn_requested` to `entity_ended`. Why: a familiar casts long after the cast, so its build (and payload) must stay known; it also makes `hold` work for them with the existing machinery, and a revoked or rebuilt-over `hold` build sends `entity_end_requested`. `entity_ended` for a tag with no live entity is ignored.
+- **A decoy's or familiar's end point** fires its `on expire` payload (heading right) and its `blast` as `area_hit_requested`. Why: the design names `blast · decoy` and `on expire · decoy · nova`.
+- **Wall** is placed `WALL_REACH` (28 px) ahead of the caster, `spread` pixels apart (a shot's diameter if 0). **Fissure** is a beam piercing up to `FISSURE_PIERCE` (16) targets, drawn as a beam cue. Fissure does not yet turn at walls for `bounce` (backlog).
+
 ## 2026-10-26: Trigger kit, part 2 (staffs B2b)
 
 - **Scatter is the full circle:** each carrier of a scatter group leaves at a random angle from 0 to 360 degrees off the aim, as the design says "random directions"; the owner's fairness question at D3 covers it. The generator is seeded from player, staff and the staff's cast count, so a replay is the same; a burst's later firings and an echo each carry a seed derived from the cast's, so they point the same way whatever else is cast in between. A payload fired from a hit draws from whatever stream is current, so its directions depend on when the hit lands; only the cast's own firings are reproducible.

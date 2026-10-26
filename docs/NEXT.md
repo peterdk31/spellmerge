@@ -65,7 +65,7 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 - [ ] **Entity kit (staffs B5).** (`gameplay/ai/`) After A6c.
 - [ ] **Shot look, part 1: small layered shots (staffs B6a).** (`core/projectiles/` drawing, the card classes, `content/spells/`) After B1. Small shots (a 3-5 px core from the carrier), the trail in the player colour, up to four look layers per shot from the cards (`look_layer`, two infusions and two modifiers) drawn by one shader; a sheet of every carrier with every infusion and of four players firing the same card. Split from B6 by the owner on 2026-10-26, because the bot's B3 (#279) is changing `gameplay/feel/` at the same time.
 - [ ] **Shot look, part 2: Feel's looks on cards, the spark pool (staffs B6b).** (`gameplay/feel/`, `core/projectiles/`) After B6a and B3. Feel's per-form looks (`cast_looks`, `impact_looks` in the preset) move to card data; sparks and embers from one shared pool with a global count, trails thinning first at the cap; the clip sheets and a four-player clip. Before B7.
-- [ ] **Sandbox (staffs B7).** (`gameplay/flow/`, `content/rooms/`, `hud/menus/sandbox/`) After B6.
+- [ ] **Sandbox (staffs B7).** (`gameplay/flow/`, `content/rooms/`, `hud/menus/sandbox/`) After B6b.
 - [ ] **Builder (staffs B8).** (`hud/builder/`) After A6c.
 - [ ] **Card: teleport (staffs C).** After B2 and B4. Data only (M2-staffs.md, "Working in parallel").
 - [ ] **Card: hook (staffs C).** After B2 and B4. Data only (M2-staffs.md, "Working in parallel").

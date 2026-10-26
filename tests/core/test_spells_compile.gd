@@ -301,7 +301,9 @@ func test_all_tags_are_different() -> void:
 			for depth in SpellLimits.MAX_DEPTH + 1:
 				for generation in SpellLimits.GENERATIONS:
 					seen[SpellTag.make(player, slot, depth, generation)] = true
-	check_equal(seen.size(), 4 * 2 * 3 * 8, "every combination has its own tag")
+	check_equal(seen.size(), SpellLimits.PLAYERS * SpellLimits.STAFFS * (SpellLimits.MAX_DEPTH + 1) * SpellLimits.GENERATIONS, "every combination has its own tag")
+	check(SpellTag.make(3, 3, SpellTag.NODE_MASK, 7) < SpellTag.FLAG << 1, "the largest tag is still a spell tag")
+	check(not SpellTag.is_spell_tag(101000), "the highest enemy attack tag (gameplay/ai) is not a spell tag")
 
 
 func test_a_built_spell_registers_every_depth() -> void:
@@ -319,7 +321,7 @@ func test_invalid_builds_and_bad_arguments_give_tag_zero() -> void:
 	check_equal(_spells.call("begin_generation", 0, 0, bad), 0, "an invalid spell is not registered")
 	var good: CompiledSpell = _compile({"form": &"bolt"})
 	check_equal(_spells.call("begin_generation", 4, 0, good), 0, "player 4 does not exist")
-	check_equal(_spells.call("begin_generation", 0, 2, good), 0, "slot 2 does not exist")
+	check_equal(_spells.call("begin_generation", 0, SpellLimits.STAFFS, good), 0, "a fifth staff does not exist")
 	check_equal(_spells.call("begin_generation", -1, 0, good), 0, "player -1 does not exist")
 	check_equal(_spells.call("begin_generation", 0, 0, null), 0, "null is not a spell")
 
@@ -334,11 +336,12 @@ func test_four_players_build_at_once_without_mixing() -> void:
 			tags.append(_spells.call("begin_generation", player, slot, spell))
 	for i in tags.size():
 		check(_spells.call("profile", tags[i]) == spells[i], "tag %d finds its own spell" % i)
-	# Rebuilding one slot leaves the other seven alone.
+	# Rebuilding one staff leaves the others alone.
 	var rebuilt: int = _spells.call("begin_generation", 1, 0, _compile({"form": &"nova"}))
-	check(rebuilt != tags[2], "the new build has a new tag")
+	var at: int = SpellLimits.STAFFS
+	check(rebuilt != tags[at], "the new build has a new tag")
 	for i in tags.size():
-		if i != 2:
+		if i != at:
 			check(_spells.call("profile", tags[i]) == spells[i], "slot %d is untouched" % i)
 
 

@@ -34,7 +34,7 @@
   "panel_applied": {
     "automation_enabled": true,
     "focus": "",
-    "pause_development": true,
+    "pause_development": false,
     "pause_merging": false,
     "quiet_hours": null
   },

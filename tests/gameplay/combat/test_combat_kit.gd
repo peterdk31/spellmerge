@@ -314,7 +314,8 @@ func test_burn_on_a_wizard_hurts_over_time_as_kind_status() -> void:
 	check(_combat.apply_wizard_status(0, 0, &"burn", 1.0, 4.0), "the burn took")
 	_run(1.0)
 	check(wizard.health <= PlayerScript.MAX_HEALTH - 3, "burn took health")
-	check_equal(_hurt[0][3], &"status", "ticks are kind status")
+	check(_hurt.is_empty(), "a burn tick is not a hit: no wizard_hurt for cards")
+	check(_landed.size() > 0 and _landed[0][3] == &"status", "ticks are kind status")
 	check_equal(_applied[0], [0, wizard, &"burn"], "status_applied names the wizard")
 	_run(1.0)
 	check_equal(_combat.wizard_status_left(0, &"burn"), 0.0, "and it ends")
@@ -510,6 +511,21 @@ func test_an_enemy_killed_by_the_slam_is_not_the_spells_kill() -> void:
 	_run(STEP)
 	check_equal(deaths.size(), 1, "the slam killed it")
 	check(_kills.is_empty(), "a slam is not the spell's own hit, so no kill_landed")
+
+
+func test_a_later_plain_hit_disarms_the_slam() -> void:
+	_projectiles.set_bounds(Rect2(-200.0, -200.0, 400.0, 400.0))
+	_projectiles.set_walls([Rect2(20.0, -20.0, 20.0, 40.0)] as Array[Rect2])
+	var enemy := _enemy(Vector2(10.0, 0.0))
+	var heavy := _profile(3)
+	heavy.knockback = 300.0
+	heavy.slam = 7
+	var plain := _profile(3)
+	plain.knockback = 300.0
+	_bus.projectile_hit.emit(0, enemy, Vector2(0.0, 0.0), _tag(heavy))
+	_bus.projectile_hit.emit(1, enemy, Vector2(0.0, 0.0), _tag(plain))
+	_run(0.5)
+	check_equal(_combat.get_health(enemy), 94, "two hits of 3 and no slam damage")
 
 
 func test_a_heavy_hit_in_the_open_slams_nothing() -> void:

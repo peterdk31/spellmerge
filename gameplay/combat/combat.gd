@@ -672,7 +672,9 @@ func _hit_player(player: int, target: Node, amount: int, direction: Vector2, str
 	if events != null:
 		events.hit_landed.emit(player, target, amount, where, kind)
 		events.damage_dealt.emit(player, target, amount, where)
-		events.wizard_hurt.emit(index, amount, where, _tag, kind)
+		# A burn tick is not a hit: cards that fire on hurt are not set off by it.
+		if kind != KIND_STATUS:
+			events.wizard_hurt.emit(index, amount, where, _tag, kind)
 	if discharge_share > 0.0:
 		# A charged wizard is a lightning rod: the charge leaves in one step to the enemies near.
 		_wizard_discharge(index, where, maxi(roundi(float(amount) * discharge_share / 100.0), 1))
@@ -830,10 +832,11 @@ func _apply_to_enemy(player: int, enemy: Node2D, position: Vector2, profile: Hit
 		reaction = _reaction_for(at, profile.element_id)
 	if not hit(player, enemy, damage, direction, strength, kind):
 		return
-	if profile != null and profile.slam > 0 and strength > 0.0:
+	if strength > 0.0:
+		# A push replaces the knockback, so it replaces the slam too: only a heavy hit arms it.
 		var armed: int = _enemies.find(enemy)
 		if armed >= 0:
-			_slam[armed] = profile.slam
+			_slam[armed] = profile.slam if profile != null and profile.slam > 0 else 0
 			_slam_player[armed] = player
 	var spent: int = _enemies.find(enemy)
 	if spent >= 0:

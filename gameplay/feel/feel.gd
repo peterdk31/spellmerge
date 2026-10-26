@@ -41,7 +41,9 @@ extends Node
 const EventsScript := preload("res://core/events/events.gd")
 const PoolScript := preload("res://core/pools/pool.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
-const FeelPresetScript := preload("res://gameplay/feel/presets/feel_preset.gd")
+## The look of a hit kind with no entry at all: nothing changes. Shared, never written.
+const NO_LOOK: Dictionary = {}
+const FeelPresetScript :=preload("res://gameplay/feel/presets/feel_preset.gd")
 const FLASH_SHADER: Shader = preload("res://gameplay/feel/hit_flash.gdshader")
 const REACTION_SHADER: Shader = preload("res://gameplay/feel/reaction_flash.gdshader")
 ## Draws the beam and the nova ring like a shot: bone body tinted by the player, core by the element.
@@ -692,7 +694,8 @@ func _on_damage_dealt(player: int, target: Node, amount: int, position: Vector2)
 	var sound: StringName = preset.hit_sound
 	var own: bool = false
 	if target != null and target.get_instance_id() == _kind_target and Engine.get_physics_frames() == _kind_frame:
-		var look: Dictionary = preset.kind_looks.get(_kind, preset.kind_looks.get(&"shot", {})) as Dictionary
+		var look_kind: StringName = _kind if preset.kind_looks.has(_kind) else &"shot"
+		var look: Dictionary = preset.kind_looks[look_kind] as Dictionary if preset.kind_looks.has(look_kind) else NO_LOOK
 		stop *= look.get("stop", 1.0) as float
 		shake *= look.get("shake", 1.0) as float
 		sound = look.get("sound", preset.hit_sound) as StringName
@@ -712,7 +715,7 @@ func _on_hit_landed(player: int, target: Node, _amount: int, _position: Vector2,
 	_kind_target = target.get_instance_id()
 	_kind = kind
 	_kind_frame = Engine.get_physics_frames()
-	_kind_own = kind != &"heal" and target.is_in_group(&"players") and target.get("index") == player
+	_kind_own = kind != &"heal" and kind != &"status" and target.is_in_group(&"players") and target.get("index") == player
 
 
 ## A heal: a soft ring in green on the wizard, with no stop and no shake.

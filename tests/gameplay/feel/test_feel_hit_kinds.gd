@@ -113,6 +113,13 @@ func test_a_wizard_hit_by_another_player_or_an_enemy_gets_no_self_ring() -> void
 	check_equal(feel.live_flashes(), before, "only a self-hit has the ring")
 
 
+func test_a_self_inflicted_burn_tick_gets_no_ring() -> void:
+	var wizard: Node2D = _wizard(1)
+	var before: int = feel.live_flashes()
+	_hit(1, wizard, &"status")
+	check_equal(feel.live_flashes(), before, "a burn tick is not a hit: no self-hit ring")
+
+
 func test_a_heal_shows_a_ring_without_stop_or_shake() -> void:
 	var wizard: Node2D = _wizard(0)
 	var before: int = feel.live_flashes()

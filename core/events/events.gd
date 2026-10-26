@@ -93,7 +93,7 @@ signal enemy_died(player: int, enemy: Node, position: Vector2)
 signal shield_blocked(player: int, position: Vector2, tag: int)
 ## Sender: combat. A hit of `player` with `tag` killed `target` at `position`. Heard by core/spells (on kill).
 signal kill_landed(player: int, target: Node, position: Vector2, tag: int)
-## Sender: combat. The wizard `player` took `amount` damage at `position` from a hit with `tag` (0 for an enemy's hit) of kind `kind` (`&"shot"`, `&"ray"`, `&"burst"`, `&"reaction"`, `&"status"`). Heard by core/spells (on hurt), feel and hud.
+## Sender: combat. The wizard `player` took `amount` damage at `position` from a hit with `tag` (0 for an enemy's hit) of kind `kind` (`&"shot"`, `&"ray"`, `&"burst"`, `&"reaction"`, `&"status"`; a burn tick is not a hit, so it is not sent here). Heard by core/spells (on hurt), feel and hud.
 signal wizard_hurt(player: int, amount: int, position: Vector2, tag: int, kind: StringName)
 ## Sender: combat. A hit of `player` with `tag` on `target` at `position` set off the reaction `reaction_id`. Heard by core/spells (on reaction); feel keeps `reaction_triggered`.
 signal reaction_landed(player: int, reaction_id: StringName, target: Node, position: Vector2, tag: int)
@@ -101,7 +101,7 @@ signal reaction_landed(player: int, reaction_id: StringName, target: Node, posit
 signal wizard_shield_requested(player: int, charges: int, seconds: float, tag: int)
 ## Sender: core/spells. A card of `player` (magnet) pulls every enemy within `radius` of `position` toward it at `strength` pixels per second; the card has `tag`. Heard by combat.
 signal pull_requested(player: int, position: Vector2, radius: float, strength: float, tag: int)
-## Sender: combat. Just before `damage_dealt`: the hit of `player` on `target` for `amount` is of `kind` (`&"shot"`, `&"ray"`, `&"burst"`, `&"reaction"`, `&"status"`). A wizard hit by their own spell has `player` equal to their index. Heard by feel.
+## Sender: combat. Just before `damage_dealt`: the hit of `player` on `target` for `amount` is of `kind` (`&"shot"`, `&"ray"`, `&"burst"`, `&"reaction"`, `&"status"`, and `&"heal"` for a heal). A wizard's contact hit counts as `&"shot"`. A wizard hit by their own spell has `player` equal to their index. Heard by feel.
 signal hit_landed(player: int, target: Node, amount: int, position: Vector2, kind: StringName)
 ## Sender: combat. A heal hit of `player` gave the wizard `target` `amount` health at `position`. Heard by player and feel.
 signal heal_dealt(player: int, target: Node, amount: int, position: Vector2)

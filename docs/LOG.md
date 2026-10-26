@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-26: Trigger kit, part 4 (staffs B2d)
+
+The spell runtime runs the moves, areas and refunds: teleport (a blink along the aim, cut at walls), hook (a hit pulls the caster to it), swap (a hit moves the target to the caster and the caster to the target), recoil (a push back from each firing of the cast, so mirror cancels it); the end of a dash, teleport or hook (`caster_move_finished`) is the carrier's end point, where its blast and `on expire` payload happen; `blast` asks combat for an area hit where a shot or beam ends; siphon refunds mana per hit. Tests: `tests/core/test_spells_moves.gd` (22 tests). **B2 is done.**
+
 ## 2026-10-26: Trigger kit, part 3 (staffs B2c)
 
 The spell runtime runs the payload and line carriers: rain (a `form_shown` cue, then its payload on the aim point after its lifetime), familiar and decoy (`entity_spawn_requested`, counted as live until `entity_ended`; a familiar casts its payload on `familiar_cast_requested`; a decoy's end point fires its `on expire` payload and `blast`), wall (a line of still shots across the aim, shields apply) and fissure (a beam through everything on its line). Tests: `tests/core/test_spells_payload_carriers.gd` (28 tests). B2d (moves, areas, refunds) is next.

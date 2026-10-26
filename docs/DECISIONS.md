@@ -2,6 +2,14 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-26: Trigger kit, part 4 (staffs B2d)
+
+- **Where each card asks for movement.** Teleport (and dash) ask at cast; hook and swap ask when their shot hits (a miss moves nobody); recoil asks for each firing of the cast's own group (not payloads), `strength` pixels against the firing's heading, so `mirror` pushes both ways and cancels. Durations are `SpellLimits.HOOK_SECONDS`, `SWAP_SECONDS`, `RECOIL_SECONDS`; a teleport is at once. Why: the design describes the cards this way; recoil per firing makes `mirror · recoil` cancel without special cases.
+- **Swap needs the caster's place**, read from the manager's anchor; without one nothing is traded. `target_move_requested` carries the player first (as in `events.gd`, which differs from the milestone table).
+- **End points from `caster_move_finished`** (dash, teleport, hook; other modes are ignored) fire the carrier's `blast` and its `on expire` payload at the arrival. The payload goes along the move's heading. A forgotten build (tag unknown) does nothing.
+- **Blast on shots** goes off where a spent shot hit, where a shot expired (also a sticky one, or a wall), and at the end of a beam or fissure. A piercing shot or beam does not blast per target. A hook's blast waits for the arrival, so a missing hook does not explode.
+- **Siphon** sends one refund of its strength per hit (a beam's every target too); the pool is `player`'s concern (B4).
+
 ## 2026-10-26: Trigger kit, part 3 (staffs B2c)
 
 - **Rain's aim point** is `ray_length` (else `SpellLimits.RAIN_REACH`, 120 px) along the aim, stopped at a wall; the delay is the form's `lifetime`. A rain's own `on expire` trigger fires as it lands, after its payload; other events never fire on a rain (it has no shot). Why: the design says the carrier's own payload is read first, then the trigger's; landing is its only end point.

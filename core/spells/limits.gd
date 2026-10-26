@@ -42,6 +42,11 @@ const WALL_REACH: float = 28.0
 const FISSURE_PIERCE: int = 16
 ## Seconds a shot made sustained by `hold` lives: until it is switched off, in practice.
 const HOLD_LIFETIME: float = 100000.0
+## Seconds the wizard takes to be pulled by a hook, to swap places, and to be pushed by a recoil
+## (the player's move may stop early at a wall). A teleport is at once.
+const HOOK_SECONDS: float = 0.15
+const SWAP_SECONDS: float = 0.1
+const RECOIL_SECONDS: float = 0.1
 ## Players, indexes 0 to 3.
 const PLAYERS: int = 4
 

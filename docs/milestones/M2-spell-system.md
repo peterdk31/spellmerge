@@ -8,6 +8,8 @@
 
 **Status (2026-10-25):** the owner answered the C2 checkpoint (#235) with **iterate**, so the milestone is in progress again with rework tasks (docs/NEXT.md): the clip recorder and Spell atlas (#245), spell visuals (#244), Lightning as a fifth element (#243), in that order. Its next end is a new C2 checkpoint.
 
+**Status (2026-10-26):** the iterate round is built: clip recorder and Spell atlas (#245), spell visuals (#244), Lightning with the static status, two reactions and three combos (#243), and scrolling drop lists. No known crash or blocker. Done, waiting for the second C2 checkpoint; done-when item 3 (real-GPU frame rate) is left to the owner's judgement.
+
 **Done when:**
 
 1. **Validators pass:** every component `.tres` and the reaction table pass the content validator (`core/spells/validator.gd`), run by `tests/content/spells/test_validators.gd` in `ci/build/build.sh --quick --tests`. A broken fixture of each kind fails it with a message that names the file, the field and the fix.

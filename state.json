@@ -9,7 +9,6 @@
     "number": 256
   },
   "errors_in_a_row": 0,
-  "idle": null,
   "intake_tasks": {
     "208": {
       "author": "Brianmanden",
@@ -80,6 +79,11 @@
     6415196364
   ],
   "task_failures": {
+    "**Combat kit (staffs B3).** (`gameplay/combat/`, `gameplay/feel/`) After A6c.": {
+      "count": 1,
+      "pr": "279",
+      "problems": "- `_send_slams` sets `_tag = _slam_due_tag[sent]` before calling `_hit`. `_hit` sends `kill_landed` whenever `_tag != 0`, so an enemy killed by the wall slam sends `kill_landed`, with the heavy spell's tag. The PR description, DECISIONS.md, the combat README and `kill_landed` for cards all say a slam kill does not count as the spell's own kill. An 'on kill' card would trigger from a slam (and could chain with area hits). `test_combat_kit.gd` has no test for a slam kill. Fix: Leave `_tag` at 0 during `_send_slams`, like the shock jump, the discharge and `_react_effect`. Then the `_slam_tag` array is no longer needed. Add a regression test: a heavy hit knocks an enemy with low health into a wall, the enemy dies of the slam, and no `kill_landed` is sent (while `enemy_died` still is)."
+    },
     "**Trigger kit (staffs B2).** (`core/spells/`) After A6c.": {
       "count": 0,
       "parked_reason": "The trigger kit (B2) is written but not committed, and the new test file has not run yet. The work is in the working tree on branch claude/20261026-trigger-kit-staffs-b2-core-spells. The first full `ci/build/build.sh --quick --tests` run passed with the runtime changes, but it started before I wrote `tests/core/test_trigger_kit.gd`, so it never ran that file. A second full run was still going when I was told to stop, so I can't say whether the new tests pass. Nothing was run for `tools/check.sh`",

@@ -96,7 +96,7 @@ The art only shows timing; it doesn't set it. The telegraph's length and the mom
 - Art is `.png` or `.svg` (`AGENTS.md`, hard rule 2), at most 1 MB.
 - PNGs are 8-bit with colours exactly as in the palette.
 - Godot imports every sprite with **filtering off** (nearest neighbour) so pixel edges stay crisp; set this in the file's `.import`.
-- Every asset has an entry in `art/manifest.json` with its origin and tier ([art/README.md](../art/README.md)).
+- Every asset has an entry in `art/manifest.json`, or in an `assets.json` in its content folder, with its origin and tier ([art/README.md](../art/README.md)).
 
 ## Placeholder SVGs
 

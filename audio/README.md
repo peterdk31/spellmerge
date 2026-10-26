@@ -8,7 +8,7 @@ Shared sound used by more than one thing: music (`music/`) and sound effects (`s
 
 - Audio depends on nothing. It holds files only, no logic.
 - **`.ogg` only.** No `.wav`, `.mp3` or other formats.
-- Every asset has an entry in `audio/manifest.json` (see below). Item-specific sounds are listed there too, wherever they live.
+- Every asset has an entry in `audio/manifest.json` (see below), or, for the sounds of one content folder, in an `assets.json` in that folder in the same shape.
 - Loop music must loop without a click. Keep sound effects short and balanced in volume with the others.
 - Names are original. No ripped game audio, no samples of other works.
 - Audio is CC-BY-SA-4.0 by default. A file may instead declare CC0-1.0 or CC-BY-4.0 with a `<file>.license` file (AGENTS.md, hard rules).

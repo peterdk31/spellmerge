@@ -1,0 +1,9 @@
+{
+	"id": "frost_pulse_rune",
+	"name": "Frost pulse rune",
+	"does": "A frost rune that pulses a frost nova every half second; imps standing round it freeze.",
+	"casts": [{"slot": 0, "recipe": {"form": "rune", "element": "frost", "trigger": "timer", "held": {"form": "nova", "element": "frost"}}}],
+	"imps": [[30, 0], [0, 30], [-30, 0]],
+	"seconds": 2.6,
+	"checks": [{"kind": "status", "imps": [0, 1, 2], "status": "freeze"}]
+}

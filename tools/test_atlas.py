@@ -41,15 +41,13 @@ class AtlasTest(unittest.TestCase):
             elif e["kind"] != "combo":
                 self.assertTrue(e["description"], f"no builder description: add content/story/lore/components/{e['id']}.json: {e}")
 
-    def test_a_fake_combo_row_appears(self) -> None:
-        path = self.tmp / atlas.COMBOS
-        data = json.loads(path.read_text())
-        data["combos"].append({"id": "fake_combo", "name": "Fake combo", "does": "Does a fake thing."})
-        path.write_text(json.dumps(data))
+    def test_a_fake_combo_file_appears(self) -> None:
+        path = self.tmp / atlas.COMBOS / "fake_combo.json"
+        path.write_text(json.dumps({"id": "fake_combo", "name": "Fake combo", "does": "Does a fake thing."}))
         row = next(e for e in self.entries() if e["id"] == "fake_combo")
         self.assertEqual((row["kind"], row["name"], row["does"]), ("combo", "Fake combo", "Does a fake thing."))
         self.assertEqual(row["clips"], ["combo_fake_combo"])
-        self.assertEqual(row["source"], atlas.COMBOS)
+        self.assertEqual(row["source"], f"{atlas.COMBOS}/fake_combo.json")
 
     def test_a_new_component_folder_appears_with_its_description(self) -> None:
         folder = self.tmp / "content/spells/elements/acid"
@@ -143,7 +141,7 @@ class AtlasTest(unittest.TestCase):
         self.assertEqual(len(ids), len(set(ids)))
         # The recorder's rule (tests/clips/scenarios.gd): one clip per combo and per component,
         # two per reaction that has at least two rows.
-        combos = json.loads((REPO / atlas.COMBOS).read_text(encoding="utf-8"))["combos"]
+        combos = list((REPO / atlas.COMBOS).glob("*.json"))
         count = {k: sum(1 for e in entries if e["kind"] == k) for k in atlas.KIND_ORDER}
         paired = sum(1 for e in entries if e["kind"] == "reaction" and e["clips"])
         components = sum(count[k] for k in atlas.KIND_FOLDERS)

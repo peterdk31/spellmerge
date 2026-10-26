@@ -1,0 +1,9 @@
+{
+	"id": "seeking_void_ray",
+	"name": "Seeking void ray",
+	"does": "A ray that turns toward an imp a little off the aim and hexes it.",
+	"casts": [{"slot": 0, "recipe": {"form": "beam", "element": "void", "modifiers": ["homing"]}}],
+	"imps": [[150, 40]],
+	"seconds": 1.0,
+	"checks": [{"kind": "status", "imps": [0], "status": "hex"}]
+}

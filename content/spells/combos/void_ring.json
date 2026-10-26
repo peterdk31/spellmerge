@@ -1,0 +1,9 @@
+{
+	"id": "void_ring",
+	"name": "Void ring",
+	"does": "Circling shots hex every imp that crosses the orbit.",
+	"casts": [{"slot": 0, "recipe": {"form": "orbit", "element": "void"}}],
+	"imps": [[36, 0], [0, -36], [-36, 0]],
+	"seconds": 3.0,
+	"checks": [{"kind": "status", "imps": [0, 1, 2], "status": "hex"}]
+}

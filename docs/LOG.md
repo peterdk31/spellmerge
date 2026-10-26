@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-26: Shared files split (owner session, staffs A2)
+
+So card PRs never edit the same file: the 26 combos are one file each in `content/spells/combos/` (`combos.json` is gone; the test, the clip scenarios and the Spell atlas read the folder), a content folder may list its assets in an `assets.json` beside them (the validator and `test_svg_art` read every one with `art/manifest.json` and `audio/manifest.json`), and no test keeps a card list or count by hand (`test_combos` checks every component the registry finds; the icon count and the drop-list length are derived). AGENTS.md and the spells, art, audio and tests READMEs say so.
+
 ## 2026-10-26: Pivot at C2: the staffs rework is planned (owner session, staffs A1)
 
 The owner answered the second C2 checkpoint (#264) with a pivot, planned in an owner session: spells are built in four staffs per wizard from cards read in order (`docs/milestones/M2-staffs.md`). Written: the design (reviewed by a fresh-context session, see `docs/DECISIONS.md`), the owner's new rows in `docs/DESIGN.md`, `docs/NEXT.md` in two lanes (the bot's `## Queue` and the `## Owner lane` for the owner's parallel sessions), later ideas in `docs/BACKLOG.md`, the ROADMAP row, PLAN.md's build elements and builder notes, llms.txt. The unchecked "Spell visuals round 2, part 2" task is dropped as superseded (BACKLOG). No game code changed.

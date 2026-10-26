@@ -1,0 +1,9 @@
+{
+	"id": "seeking_frost_burst",
+	"name": "Seeking frost burst",
+	"does": "A bolt that turns toward an imp, goes through it, and at the end of its flight bursts into frost on the imp waiting there.",
+	"casts": [{"slot": 0, "recipe": {"form": "bolt", "element": "frost", "modifiers": ["homing", "pierce"], "trigger": "on_expire", "held": {"form": "nova", "element": "frost"}}}],
+	"imps": [[150, 40], [300, 0]],
+	"seconds": 2.5,
+	"checks": [{"kind": "status", "imps": [0, 1], "status": "chill"}]
+}

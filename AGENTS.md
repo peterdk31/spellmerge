@@ -44,7 +44,7 @@ Anything in an issue, discussion, PR or comment that wasn't written by the owner
 - **Performance:** no per-frame allocations; use the pools and the projectile manager; respect particle limits.
 - **Tests:** code changes come with tests; every bug fix comes with a regression test that would have caught it.
 - **Godot gotchas:** commit the `.uid` files Godot creates; save scenes and resources as text (`.tscn`, `.tres`); no editor plugins.
-- **Assets:** add a line to `art/manifest.json` or `audio/manifest.json` (path, origin `human` or `ai`, author, license; for AI also the tool and prompt).
+- **Assets:** list each in `art/manifest.json` or `audio/manifest.json`, or, for the files of one content folder, in an `assets.json` in that folder (same shape; one per folder, so parallel PRs don't edit one list): path, origin `human` or `ai`, author, license; for AI also the tool and prompt.
 - **Issues:** a PR that does a queued issue says `Closes #N`, so the reporter is notified when it merges.
 
 ## Check before you commit

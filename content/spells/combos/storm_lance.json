@@ -1,0 +1,9 @@
+{
+	"id": "storm_lance",
+	"name": "Storm lance",
+	"does": "A ray through three imps in a line.",
+	"casts": [{"slot": 0, "recipe": {"form": "beam", "element": "storm", "modifiers": ["pierce"]}}],
+	"imps": [[60, 0], [110, 0], [160, 0]],
+	"seconds": 1.0,
+	"checks": [{"kind": "damaged", "imps": [0, 1, 2]}]
+}

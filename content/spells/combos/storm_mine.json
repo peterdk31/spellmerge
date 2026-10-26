@@ -1,0 +1,9 @@
+{
+	"id": "storm_mine",
+	"name": "Storm mine",
+	"does": "A storm rune on the floor; an imp that steps on it is hit, and the hit jumps on to the imps standing farther off.",
+	"casts": [{"slot": 0, "recipe": {"form": "rune", "element": "storm", "modifiers": ["chain"]}}],
+	"imps": [[20, 0], [0, 80], [-60, 60]],
+	"seconds": 1.5,
+	"checks": [{"kind": "damaged", "imps": [0, 1, 2]}]
+}

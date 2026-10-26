@@ -1,0 +1,9 @@
+{
+	"id": "blast_at_the_end",
+	"name": "Blast at the end",
+	"does": "A fire blast where the bolt ends, with nothing in its way.",
+	"casts": [{"slot": 0, "recipe": {"form": "bolt", "trigger": "on_expire", "held": {"form": "nova", "element": "fire"}}}],
+	"imps": [[264, 25], [264, -25]],
+	"seconds": 2.0,
+	"checks": [{"kind": "status", "imps": [0, 1], "status": "burn"}]
+}

@@ -22,8 +22,14 @@ extends RefCounted
 ## reaction table: each row names a known status, an existing element and a real effect,
 ## has the numbers its effect uses, and no pair of status and element is listed twice.
 
-## The art manifest, whose `assets[].path` lists every icon.
+## The art manifest, whose `assets[].path` lists shared art and the older icons.
 const MANIFEST_PATH: String = "res://art/manifest.json"
+## A card's own assets are listed in a file of this name beside them, in the same shape as
+## the manifest (`{"assets": [{"path": "content/...", ...}]}`), so card PRs never edit one
+## shared list (staffs A2, docs/milestones/M2-staffs.md, "Working in parallel").
+const FRAGMENT_NAME: String = "assets.json"
+## Where `load_manifest` looks for those files, and for the audio manifest.
+const FRAGMENT_ROOTS: Array[String] = ["res://content", "res://art", "res://audio"]
 
 ## The statuses an element may put on a target. `freeze` is not here: three stacks of chill
 ## make it, no element sets it. `tests/content/spells/test_validators.gd` checks this list
@@ -42,22 +48,37 @@ const REACTION_RANGES: Dictionary = {
 }
 
 
-## The `path` of every asset in the manifest, as {path: true}. Empty when the file is missing
-## or is not a manifest, so every icon then reports as unlisted.
-static func load_manifest(path: String = MANIFEST_PATH) -> Dictionary:
+## The `path` of every asset in the manifest at `path` and in every `assets.json` (and
+## `manifest.json`) under `fragment_roots`, as {path: true}. Files that are missing or are not
+## a manifest add nothing, so an icon listed nowhere reports as unlisted.
+static func load_manifest(path: String = MANIFEST_PATH, fragment_roots: Array[String] = FRAGMENT_ROOTS) -> Dictionary:
 	var listed: Dictionary = {}
-	if not FileAccess.file_exists(path):
-		return listed
-	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+	_add_listed(path, listed)
+	for root in fragment_roots:
+		var folders: Array[String] = [root]
+		while not folders.is_empty():
+			var folder: String = folders.pop_back()
+			for sub: String in DirAccess.get_directories_at(folder):
+				folders.append(folder.path_join(sub))
+			for file_name: String in DirAccess.get_files_at(folder):
+				if file_name == FRAGMENT_NAME or file_name == "manifest.json":
+					_add_listed(folder.path_join(file_name), listed)
+	return listed
+
+
+## Adds the `path` of every asset listed in the manifest file `file` to `listed`.
+static func _add_listed(file: String, listed: Dictionary) -> void:
+	if not FileAccess.file_exists(file):
+		return
+	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(file))
 	if not (parsed is Dictionary):
-		return listed
+		return
 	var assets: Variant = (parsed as Dictionary).get("assets")
 	if not (assets is Array):
-		return listed
+		return
 	for asset: Variant in assets:
 		if asset is Dictionary and (asset as Dictionary).get("path") is String:
 			listed[(asset as Dictionary)["path"]] = true
-	return listed
 
 
 ## Every problem in `resources` (resources that are not spell components are skipped), in `reactions` (null skips the table), and in the duplicate
@@ -113,7 +134,7 @@ static func check_component(component: SpellComponent, manifest: Dictionary) -> 
 	else:
 		var icon_path: String = component.icon.resource_path
 		if icon_path == "" or not manifest.has(icon_path.trim_prefix("res://")):
-			problems.append(_problem("icon-manifest", file, "icon", "Add a line for '%s' to art/manifest.json (path, origin, author, license)." % icon_path.trim_prefix("res://")))
+			problems.append(_problem("icon-manifest", file, "icon", "Add a line for '%s' to the assets.json beside it (path, origin, author, license; the same shape as art/manifest.json)." % icon_path.trim_prefix("res://")))
 	for line in component.range_problems():
 		var field: String = line.get_slice(":", 0)
 		problems.append(_problem("range", file, field, "%s. Change it to a value inside the range (documented next to the field)." % line))

@@ -7,7 +7,7 @@
 
 The format is {"entries": [...]} as read by ci/smbot/clips.py: {"id", "kind", "name", "description",
 "does", "clips": [clip ids], "source": "repo/path"}. Nothing is listed by hand: a new component
-folder, combo row or reaction row is a new entry. The clip ids are the ones tests/clips/scenarios.gd
+folder, combo file or reaction row is a new entry. The clip ids are the ones tests/clips/scenarios.gd
 gives (`combo_<id>`, `<kind>_<id>`, `reaction_<id>` and `reaction_<id>_coop`). `source` is the file
 that defines the entry (not the last one that changed it); the page links it to its history.
 
@@ -23,7 +23,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SPELLS = "content/spells"
-COMBOS = f"{SPELLS}/combos.json"
+COMBOS = f"{SPELLS}/combos"  # one JSON file per combo, named like its id
 REACTIONS = f"{SPELLS}/reactions.tres"
 LORE = "content/story/lore/components"
 # The folder of each component kind under content/spells/.
@@ -89,16 +89,16 @@ def components(root: Path) -> list[dict]:
 
 
 def combos(root: Path) -> list[dict]:
-    try:
-        data = json.loads((root / COMBOS).read_text(encoding="utf-8"))
-    except (OSError, ValueError):
-        return []
     rows = []
-    for combo in data.get("combos", []) if isinstance(data, dict) else []:
+    for path in sorted((root / COMBOS).glob("*.json")):
+        try:
+            combo = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
         if isinstance(combo, dict) and isinstance(combo.get("id"), str):
             rows.append({"id": combo["id"], "kind": "combo", "name": str(combo.get("name", combo["id"])),
                          "description": "", "does": str(combo.get("does", "")),
-                         "clips": [f"combo_{combo['id']}"], "source": COMBOS})
+                         "clips": [f"combo_{combo['id']}"], "source": path.relative_to(root).as_posix()})
     return rows
 
 

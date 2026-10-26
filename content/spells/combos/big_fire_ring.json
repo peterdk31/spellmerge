@@ -1,0 +1,9 @@
+{
+	"id": "big_fire_ring",
+	"name": "Big fire ring",
+	"does": "One ring hits every imp within reach around the caster.",
+	"casts": [{"slot": 0, "recipe": {"form": "nova", "element": "fire", "modifiers": ["bigger"]}}],
+	"imps": [[36, 0], [0, 36], [-36, 0], [0, -36]],
+	"seconds": 1.0,
+	"checks": [{"kind": "damaged", "imps": [0, 1, 2, 3]}, {"kind": "status", "imps": [0, 1, 2, 3], "status": "burn"}]
+}

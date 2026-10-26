@@ -1,6 +1,6 @@
 extends RefCounted
 ## The clip scenarios (#245), read from the content so a new row or component is a new clip
-## with no code change: one per row of `content/spells/combos.json`, one per component (a form,
+## with no code change: one per combo file in `content/spells/combos/`, one per component (a form,
 ## an element, a modifier or a trigger alone), one per element reaction in `reactions.tres`,
 ## and a co-op version of each reaction with two players.
 ##
@@ -11,7 +11,7 @@ extends RefCounted
 ## `reaction_<id>_coop`. The kind prefix keeps the combo "shatter" and the reaction "shatter"
 ## apart.
 
-const COMBOS: String = "res://content/spells/combos.json"
+const ComboFiles := preload("res://tests/support/combo_files.gd")
 const REACTIONS: String = "res://content/spells/reactions.tres"
 const ID_PATTERN: String = "^[a-z0-9_]{1,60}$"
 ## The longest a clip runs, in seconds (the recorder's frame cap follows from it).
@@ -29,7 +29,7 @@ const COOP_ORIGINS: Array[Vector2] = [Vector2(0.0, -28.0), Vector2(0.0, 28.0)]
 
 ## Every scenario for `registry` (a scanned Registry), `spells` (a Spells node that knows it:
 ## component names and kinds are asked of it, never read from the components), `combos` (the
-## rows of combos.json) and `table` (the ReactionTable), in a stable order.
+## combo rows, `read_combos()`) and `table` (the ReactionTable), in a stable order.
 static func build(registry: Node, spells: Node, combos: Array, table: ReactionTable) -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	for combo: Dictionary in combos:
@@ -53,12 +53,9 @@ static func build(registry: Node, spells: Node, combos: Array, table: ReactionTa
 	return out
 
 
-## The combo rows of the catalogue file (empty when it can't be read).
+## The combo rows of the catalogue, one file each (empty when none can be read).
 static func read_combos() -> Array:
-	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(COMBOS))
-	if parsed is Dictionary and (parsed as Dictionary).get("combos") is Array:
-		return (parsed as Dictionary)["combos"] as Array
-	return []
+	return ComboFiles.read_all()
 
 
 static var _id_regex: RegEx = null

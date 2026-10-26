@@ -9,7 +9,7 @@ Palette files, grid templates and the one-page checklist are in [kit/](kit/READM
 ## Contract
 
 - Art depends on nothing. It holds files only, no logic.
-- Every asset has an entry in `art/manifest.json` (see below). Item-specific art is listed there too, wherever it lives.
+- Every asset has an entry in `art/manifest.json` (see below), or, for the files of one content folder, in an `assets.json` in that folder in the same shape (one list per folder, so two PRs never edit the same list; the validator and `tests/core/test_svg_art.gd` read them all).
 - Sprites and tiles are 32×32 pixels (or a whole multiple for bigger objects).
 - Names are original. No ripped game assets, no fan art of other IP, no names from other works.
 - Art is CC-BY-SA-4.0 by default. An asset may instead declare CC0-1.0 or CC-BY-4.0 with a `<file>.license` file (AGENTS.md, hard rules).

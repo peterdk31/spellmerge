@@ -1,38 +1,30 @@
 extends "res://tests/support/suite.gd"
-## The combo catalogue in content/spells/combos.json (M2 part 14): every named combo is built
-## from the real components, cast in the test arena (`combo_arena.gd`: real registry, spell
-## runtime, projectile manager and combat, with imps) and must do what it promises. One
-## data-driven test per check kind runs over every combo, so a new row in the JSON is covered
-## without a new test.
+## The combo catalogue in content/spells/combos/ (M2 part 14; one file per combo since staffs
+## A2): every named combo is built from the real components, cast in the test arena
+## (`combo_arena.gd`: real registry, spell runtime, projectile manager and combat, with imps)
+## and must do what it promises. One data-driven test per check kind runs over every combo, so
+## a new combo file is covered without a new test.
 ##
-## A combo row: `id`, `name`, `does` (plain words), `casts` (slot, recipe, optional `at`
-## seconds, `player`), `imps` ([x, y] from the caster at (0, 0), aiming along +x), `seconds`
-## and `checks`. Check kinds: `damaged` (imps), `status` (imps, status), `status_count`
-## (status, min), `keeps_burning` (imp), `reaction` (reaction), `max_shots` (max).
+## A combo file: `id` (also the file name), `name`, `does` (plain words), `casts` (slot,
+## recipe, optional `at` seconds, `player`), `imps` ([x, y] from the caster at (0, 0), aiming
+## along +x), `seconds` and `checks`. Check kinds: `damaged` (imps), `status` (imps, status),
+## `status_count` (status, min), `keeps_burning` (imp), `reaction` (reaction), `max_shots` (max).
 ##
 ## godot --headless --path . --script res://tests/content/spells/test_combos.gd
 
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
-const CATALOGUE: String = "res://content/spells/combos.json"
+const ComboFiles := preload("res://tests/support/combo_files.gd")
 const MIN_COMBOS: int = 20
-## Every shipped component; each must be in at least two combos. A new component is added here
-## together with its rows (the spells README, "The combo row rule").
-const COMPONENTS: Array[String] = [
-	"bolt", "beam", "nova", "rune", "orbit",
-	"fire", "frost", "storm", "void", "lightning",
-	"split", "pierce", "homing", "chain", "bigger", "faster",
-	"on_hit", "on_expire", "timer",
-]
 const CHECK_KINDS: Array[String] = ["damaged", "status", "status_count", "keeps_burning", "reaction", "max_shots"]
 
 var _combos: Array = []
+## Files of the catalogue that are not a JSON object.
+var _unreadable: PackedStringArray = PackedStringArray()
 
 
 func before_each() -> void:
-	var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(CATALOGUE))
-	_combos = []
-	if parsed is Dictionary and (parsed as Dictionary).get("combos") is Array:
-		_combos = (parsed as Dictionary)["combos"] as Array
+	_unreadable = PackedStringArray()
+	_combos = ComboFiles.read_all(ComboFiles.FOLDER, _unreadable)
 
 
 ## Builds the arena for `combo`, casts it as the row says and runs it. The caller frees it.
@@ -112,21 +104,23 @@ func test_every_component_is_in_two_combos() -> void:
 				in_combo[id] = true
 		for id: StringName in in_combo:
 			uses[id] = int(uses.get(id, 0)) + 1
-	for component: String in COMPONENTS:
-		var count: int = int(uses.get(StringName(component), 0))
-		check(count >= 2, "%s is in at least two combos (got %d)" % [component, count])
-
-
-func test_the_component_list_is_every_spell_component() -> void:
+	# Every component the registry finds, so a new card folder is checked with no list to edit.
 	var arena := ArenaScript.new(root)
-	var known: Array[String] = []
-	for id: StringName in arena.registry.call("get_ids", &"spells"):
-		known.append(String(id))
-	for id: String in known:
-		check(COMPONENTS.has(id), "%s is a component: add it to COMPONENTS with its two combos" % id)
-	for id: String in COMPONENTS:
-		check(known.has(id), "%s in COMPONENTS is in the registry" % id)
+	var known: Array[StringName] = arena.registry.call("get_ids", &"spells")
 	arena.free_all()
+	check(known.size() > 0, "the registry finds the spell components")
+	for component: StringName in known:
+		var count: int = int(uses.get(component, 0))
+		check(count >= 2, "%s is in at least two combos (got %d): add combo files for it in content/spells/combos/" % [component, count])
+
+
+func test_every_combo_file_is_an_object_named_like_its_id() -> void:
+	check(_unreadable.is_empty(), "every combo file is a JSON object (not: %s)" % ", ".join(_unreadable))
+	var ids: PackedStringArray = ComboFiles.file_ids()
+	check_equal(ids.size(), _combos.size() + _unreadable.size(), "one combo per file")
+	for combo: Dictionary in _combos:
+		var id: String = str(combo.get("id", ""))
+		check(ids.has(id), "the combo %s is in content/spells/combos/%s.json" % [id, id])
 
 
 func test_every_row_has_its_fields_and_an_unseen_id() -> void:

@@ -42,7 +42,7 @@ Element interactions go in `reactions.tres` (a `ReactionTable` of `ReactionRow`s
 
 ### The combo row rule
 
-**Every new component comes with at least one combo row** in `combos.json`; by the end of M2 each component is in at least two combos that work. A row has an `id`, `name`, `does` (plain words), `casts` (slot, `recipe`, optional `at` seconds and `player`), `imps` (`[x, y]` pixels from the caster, who stands at (0, 0) and aims along +x), `seconds` and `checks`. A recipe is `{"form": id, "element": id, "modifiers": [ids, at most 3], "trigger": id, "held": {another recipe}}`; every key is optional except `form`, and `held` is the spell the trigger fires. Example: `{"form": "rune", "element": "frost", "trigger": "timer", "held": {"form": "nova", "element": "frost"}}`. Check kinds: `damaged`, `status`, `status_count`, `keeps_burning`, `reaction`, `max_shots`. Copy a row from `combos.json`. `tests/content/spells/test_combos.gd` casts every row in the test arena with the real runtime, so a new row needs no new test code; its recipe must fit the complexity budget.
+**Every new component comes with at least two combos that work**, each a file of its own in `combos/`, named like the combo's `id` (`combos/<id>.json`, one combo per file, so card PRs never edit the same list). A combo has an `id`, `name`, `does` (plain words), `casts` (slot, `recipe`, optional `at` seconds and `player`), `imps` (`[x, y]` pixels from the caster, who stands at (0, 0) and aims along +x), `seconds` and `checks`. A recipe is `{"form": id, "element": id, "modifiers": [ids, at most 3], "trigger": id, "held": {another recipe}}`; every key is optional except `form`, and `held` is the spell the trigger fires. Example: `{"form": "rune", "element": "frost", "trigger": "timer", "held": {"form": "nova", "element": "frost"}}`. Check kinds: `damaged`, `status`, `status_count`, `keeps_burning`, `reaction`, `max_shots`. Copy a file from `combos/`. `tests/content/spells/test_combos.gd` casts every combo in the test arena with the real runtime and checks that every component the registry finds is in two of them, so a new combo needs no new test code and a new component no list to edit; its recipe must fit the complexity budget.
 
 ### What a new element still needs outside its folder
 
@@ -52,7 +52,6 @@ These steps are not new files only (the report of #243, the fifth element):
 - **A shape of its own** (`shape` above 5): the silhouette is drawn by `core/projectiles/shot_core.gdshader` and numbered in `core/projectiles/projectile_manager.gd`, so a new shape edits both.
 - **A colour ramp** if the palette has no free hue: `docs/STYLE.md` and `art/kit/`.
 - **A look for its status** on the enemy: `status_looks` in the Feel preset.
-- **Room in the builder's drop lists.** They hold 11 rows (`test_quick.gd` fails on a twelfth); a scrolling list must come first (`docs/NEXT.md`).
 
 ## Allowed files
 
@@ -62,9 +61,9 @@ These steps are not new files only (the report of #243, the fifth element):
 
 1. Copy the example folder of the same kind into `forms/`, `elements/`, `modifiers/` or `triggers/` and rename the folder.
 2. Edit the `.tres`: `id` (equal to the folder), `display_name`, `complexity` and the numbers. Write a `.gd` only if the behaviour is new.
-3. Replace the icon (16×16, palette from docs/STYLE.md) and the optional SFX. Add a line for each to `art/manifest.json` or `audio/manifest.json` (path, origin `human` or `ai`, author, license; for AI also tool and prompt). Commit the `.uid` and `.import` files Godot creates.
+3. Replace the icon (16×16, palette from docs/STYLE.md) and the optional SFX. List each in an `assets.json` in the component's folder, in the same shape as `art/manifest.json` (`{"assets": [{"path": "content/spells/...", "origin": ..., "author": ..., "license": ...}]}`; for AI also tool and prompt). The validator and the art test read `art/manifest.json`, `audio/manifest.json` and every `assets.json`. Commit the `.uid` and `.import` files Godot creates.
 4. If it interacts with other elements, add the rows to `reactions.tres`, then the colour of each new reaction id (and optionally its `reaction_power`) to the Feel preset (see Reactions above).
-5. Add the combo row(s) to `combos.json`, and the new id to `COMPONENTS` in `tests/content/spells/test_combos.gd` (the test fails until it is in two combos).
+5. Add its two combo files to `combos/` (the combo test fails until the component is in two).
 6. Add the builder description: copy `content/story/lore/components/bolt.json` to `content/story/lore/components/<id>.json` and write one honest line (at most 60 characters; say only what the component really does). Without it the builder shows no description and a debug build warns, but nothing fails.
 7. Run the checks below, then open a PR using the template.
 

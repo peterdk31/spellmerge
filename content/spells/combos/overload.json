@@ -1,0 +1,12 @@
+{
+	"id": "overload",
+	"name": "Overload",
+	"does": "A fire bolt sets an imp burning; a lightning bolt on it sets off Overload, which also hurts the imp standing next to it.",
+	"casts": [
+		{"slot": 0, "recipe": {"form": "bolt", "element": "fire"}},
+		{"slot": 1, "recipe": {"form": "bolt", "element": "lightning"}, "at": 0.3}
+	],
+	"imps": [[100, 0], [100, 34]],
+	"seconds": 2.0,
+	"checks": [{"kind": "reaction", "reaction": "overload"}, {"kind": "damaged", "imps": [0, 1]}]
+}

@@ -519,7 +519,7 @@ func test_four_quick_views_with_their_longest_lists_fit_the_screen() -> void:
 	for player in 4:
 		_open_builder(player)
 		_press(player, _builder(player).drop_button())
-	check_equal(_builder(0).row_ids().size(), 11, "the longest list has eleven components")
+	check_equal(_builder(0).row_ids().size(), _elements_and_modifiers(), "the longest list has every element and modifier")
 	await process_frame
 	await process_frame
 	var screen := Rect2(0, 0, 640, 360)
@@ -545,7 +545,7 @@ func test_four_overlays_with_their_longest_lists_fit_the_screen() -> void:
 	_frame()
 	for player in 4:
 		_press(player, _overlay(player).drop_button())
-	check_equal(_overlay(0).row_ids().size(), 11, "the longest list has eleven components")
+	check_equal(_overlay(0).row_ids().size(), _elements_and_modifiers(), "the longest list has every element and modifier")
 	await process_frame
 	await process_frame
 	var screen := Rect2(0, 0, 640, 360)
@@ -838,3 +838,14 @@ func test_the_row_window_moves_only_as_far_as_it_must() -> void:
 	check_equal(RowWindow.first_line_for(2, 5, 11, 16), 2, "a line above the window scrolls up to it")
 	check_equal(RowWindow.first_line_for(0, 5, 11, 11), 0, "a list that fits never scrolls")
 	check_equal(RowWindow.first_line_for(3, 9, 11, 16), 3, "a stale start is clamped, then follows")
+
+
+## How many elements and modifiers the registry holds (the longest drop list), counted so a new
+## card needs no change here.
+func _elements_and_modifiers() -> int:
+	var count: int = 0
+	for id: StringName in _registry.get_ids(&"spells"):
+		var kind: StringName = _spells.component_kind(id)
+		if kind == &"element" or kind == &"modifier":
+			count += 1
+	return count

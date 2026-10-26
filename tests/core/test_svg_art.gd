@@ -126,7 +126,7 @@ func test_every_icon_has_a_closed_outline() -> void:
 			icons += 1
 			for problem in _outline_problems(FileAccess.get_file_as_string(path)):
 				check(false, "%s: %s" % [path, problem])
-	check_equal(icons, 19, "the scan found 19 spell component icons")
+	check_equal(icons, _component_files(), "the scan found one icon per spell component")
 
 
 ## The art direction samples (art/samples/) hold four icons; they follow the same closed-outline
@@ -221,16 +221,26 @@ func test_the_round_five_faces_are_just_two_big_eyes() -> void:
 
 
 func test_every_svg_is_in_the_manifest() -> void:
-	var manifest: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://art/manifest.json"))
-	check(manifest is Dictionary, "art/manifest.json is a JSON object")
-	if not manifest is Dictionary:
-		return
-	var listed: Dictionary = {}
-	for entry: Variant in (manifest as Dictionary).get("assets", []):
-		if entry is Dictionary:
-			listed["res://" + String((entry as Dictionary).get("path", ""))] = true
+	# art/manifest.json, audio/manifest.json and every assets.json beside the files (staffs A2).
+	var listed: Dictionary = SpellValidator.load_manifest()
+	check(not listed.is_empty(), "the manifests list something")
 	for path in _files:
-		check(listed.has(path), "%s has no entry in art/manifest.json" % path)
+		check(listed.has(path.trim_prefix("res://")), "%s has no entry in art/manifest.json or an assets.json beside it" % path)
+
+
+## How many spell component files (`.tres` other than the reaction table) are under ICON_ROOT,
+## so the icon count needs no change when a card is added.
+func _component_files() -> int:
+	var count: int = 0
+	var folders: Array[String] = [ICON_ROOT]
+	while not folders.is_empty():
+		var folder: String = folders.pop_back()
+		for sub: String in DirAccess.get_directories_at(folder):
+			folders.append(folder.path_join(sub))
+		for file_name: String in DirAccess.get_files_at(folder):
+			if file_name.get_extension() == "tres" and file_name != "reactions.tres":
+				count += 1
+	return count
 
 
 ## Every problem in one SVG text; empty when it is valid.

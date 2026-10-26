@@ -1,0 +1,9 @@
+{
+	"id": "storm_chain",
+	"name": "Storm chain",
+	"does": "A hit jumps to the next imp, and that imp's shock makes the next hit jump once more.",
+	"casts": [{"slot": 0, "recipe": {"form": "bolt", "element": "storm", "modifiers": ["chain"]}}],
+	"imps": [[100, 0], [150, 40], [200, 80]],
+	"seconds": 1.5,
+	"checks": [{"kind": "damaged", "imps": [0, 1, 2]}]
+}

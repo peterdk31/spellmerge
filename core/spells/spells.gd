@@ -632,7 +632,7 @@ func _launch(spell: CompiledSpell, tag: int, player: int, origin: Vector2, direc
 			made += 1
 			continue
 		if spell.motion == FormBase.Motion.FISSURE:
-			_shoot_ray(spell, tag, player, origin, heading, carried, prev, source, -1.0, maxi(spell.pierce, SpellLimits.FISSURE_PIERCE))
+			_shoot_ray(spell, tag, player, origin, heading, carried, prev, source, -1.0, maxi(spell.pierce, SpellLimits.FISSURE_PIERCE - 1))
 			made += 1
 			continue
 		var slot: int = -1
@@ -666,6 +666,7 @@ func _launch(spell: CompiledSpell, tag: int, player: int, origin: Vector2, direc
 ## Rain: for each of its shots, a cue at the aim point and a launch of its payload there after
 ## its `lifetime`. The aim point is `ray_length` (or `SpellLimits.RAIN_REACH`) along the shot's
 ## heading, stopped at a wall. Returns how many were set (0 when the queue is full).
+## `hold` does nothing for a rain: it always falls after its `lifetime` and is no sustained carrier.
 func _telegraph_rain(spell: CompiledSpell, tag: int, player: int, origin: Vector2, heading: Vector2) -> int:
 	var reach: float = spell.ray_length if spell.ray_length > 0.0 else SpellLimits.RAIN_REACH
 	var placed: int = 0
@@ -733,6 +734,8 @@ func _spawn_entities(spell: CompiledSpell, tag: int, player: int, origin: Vector
 ## An entity of this player ended where it stood: its `blast` and its `on expire` payload happen
 ## there (the end point), then it stops counting as a live shot.
 func _on_entity_ended(player: int, _kind: StringName, position: Vector2, tag: int) -> void:
+	if player != SpellTag.player_of(tag):
+		return
 	var count: int = _entities.get(tag, 0)
 	if count <= 0:
 		return
@@ -753,7 +756,7 @@ func _on_entity_ended(player: int, _kind: StringName, position: Vector2, tag: in
 ## The familiar with `tag` casts: its payload (what came after it on the staff) leaves `position`
 ## along `direction`, in the staff and generation of the familiar's own cards.
 func _on_familiar_cast(player: int, position: Vector2, direction: Vector2, tag: int) -> void:
-	if not _entities.has(tag) or not position.is_finite() or player < 0 or player >= SpellLimits.PLAYERS:
+	if player != SpellTag.player_of(tag) or not _entities.has(tag) or not position.is_finite() or player < 0 or player >= SpellLimits.PLAYERS:
 		return
 	var spell: CompiledSpell = _profiles.get(tag)
 	if spell == null or spell.own_payload == null or spell.own_payload.is_empty() or not _take_fire(player):

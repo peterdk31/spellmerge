@@ -213,6 +213,14 @@ func test_rain_payload_counts_as_live_until_it_ends() -> void:
 	check_equal(_spells.live_shots(tag + (1 << SpellTag.NODE_SHIFT)), 1, "the payload's shot is counted under its own node")
 
 
+func test_a_rain_with_hold_still_falls_on_time_and_is_not_held() -> void:
+	_build(0, [&"hold", &"rain", &"bolt"])
+	_cast()
+	check(not _spells.is_holding(0, 0), "a rain is no sustained carrier")
+	_tick(32)
+	check_equal(_mgr.get_count(), 1, "it fell after its own delay, not after the hold lifetime")
+
+
 func test_familiar_asks_for_an_entity() -> void:
 	var tag: int = _build(0, [&"familiar", &"bolt"])
 	_cast()
@@ -241,6 +249,15 @@ func test_a_familiar_cast_for_an_unknown_tag_is_ignored() -> void:
 	_cast()
 	_bus.familiar_cast_requested.emit(0, Vector2.ZERO, Vector2.RIGHT, tag + (1 << SpellTag.NODE_SHIFT))
 	check_equal(_mgr.get_count(), 0, "a tag that is not a familiar's is ignored")
+
+
+func test_entity_events_for_another_player_are_ignored() -> void:
+	var tag: int = _build(0, [&"familiar", &"bolt"])
+	_cast()
+	_bus.familiar_cast_requested.emit(1, Vector2.ZERO, Vector2.RIGHT, tag)
+	check_equal(_mgr.get_count(), 0, "player 1 cannot make player 0's familiar cast")
+	_bus.entity_ended.emit(1, &"familiar", Vector2.ZERO, tag)
+	check_equal(_spells.live_shots(tag), 1, "nor end it")
 
 
 func test_a_familiar_stops_casting_when_it_ends() -> void:
@@ -374,6 +391,14 @@ func test_fissure_hits_everything_on_its_line() -> void:
 		_target(Vector2(40.0 + n * 40.0, 0.0))
 	_cast()
 	check_equal(_hits.size(), 5, "all five on the line")
+
+
+func test_fissure_hits_at_most_its_pierce_cap() -> void:
+	_build(0, [&"fissure"])
+	for n in SpellLimits.FISSURE_PIERCE + 4:
+		_target(Vector2(20.0 + n * 12.0, 0.0))
+	_cast()
+	check_equal(_hits.size(), SpellLimits.FISSURE_PIERCE, "exactly the cap, not one more")
 
 
 func test_a_beam_with_no_pierce_hits_only_the_first() -> void:

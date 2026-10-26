@@ -233,6 +233,7 @@ Added in part A3, so later parts in different areas don't all edit `core/events/
 | `target_move_requested(target: Node, to: Vector2)` (swap) | spells | ai |
 | `area_hit_requested(player, position: Vector2, radius: float, tag: int)` | spells | combat |
 | `entity_spawn_requested(player, kind: StringName, position: Vector2, seconds: float, tag: int)` (decoy, familiar) | spells | ai |
+| `entity_end_requested(player, tag: int)` (a `hold` switched off; added in B5) | spells | ai |
 | `entity_ended(player, kind: StringName, position: Vector2, tag: int)` | ai | spells (a decoy's end point) |
 | `familiar_cast_requested(player, position: Vector2, direction: Vector2, tag: int)` | ai | spells |
 | `mana_refund_requested(player, amount: float)` | spells | player |

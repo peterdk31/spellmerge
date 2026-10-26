@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-26: M2 closed again for C2
+
+Ran the whole build (`--quick --tests`): all tests pass, 26 combos, fuzz 244 of 300 compiled, stress OK, 4-bot smoke OK. No crash is known. The roadmap says M2 is done and waits for the C2 verdict; the checkpoint is filled again in `docs/milestones/M2-spell-system.md` (reworked, numbers, assessment, recommendation: go). The real-GPU web frame rate (done-when item 3) stays open for the owner.
+
 ## 2026-10-26: Scrolling drop lists
 
 The quick view's drop list (11 rows) and the overlay's (6 lines of two) are now windows: a longer list scrolls to follow the focused row (`hud/widgets/row_window.gd`), so a twelfth element or modifier no longer pushes the panel off its quarter of the screen. UIFocus is unchanged. The title shows "n/total" when the list scrolls. Tests: `test_quick.gd` (a 16-row list in the quick view and the overlay, the focused row always in view, the window maths). Screenshots of the 11-row lists look as before. Decisions in `docs/DECISIONS.md`.

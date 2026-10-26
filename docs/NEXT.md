@@ -8,11 +8,13 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
 
 M2's parts were all built and the owner answered the C2 checkpoint (#235) with **iterate** on 2026-10-25: rework in this order, #245 (clip recorder and Spell atlas), #244 (spell visuals), #243 (Lightning). The tasks below follow that order; the next end of M2 is a new C2 checkpoint. Done-when item 3 is still open on the real-GPU frame rate. Nothing from M3+ is started. `ci/` is owner-only: the owner built the pipeline side (#246); the Godot side of the recorder and the atlas data are built here, in the format `ci/smbot/clips.py` reads.
 
-- [ ] **Close M2 again.** When the tasks above are done and no crash is known: mark M2 done in the roadmap and fill the C2 checkpoint again (what was reworked, assessment, recommendation).
+No tasks are left; the owner's second C2 verdict decides what follows.
 
 ## Blocked
 
 ## Done recently
+
+- [x] **Close M2 again.** M2 is marked done in the roadmap (waiting for the owner's verdict) and the C2 checkpoint is filled again in the M2 design ("Checkpoint C2, second round": what was reworked, numbers, assessment, recommendation go). Nothing from M3 is started.
 
 - [x] **Scrolling drop list (before any twelfth element or modifier).** (`hud/`) The quick view's list (11 rows) and the overlay's (6 lines of two) are clipping windows that slide to follow the focused row; UIFocus is unchanged and the title shows "n/total" while it scrolls. `hud/widgets/row_window.gd`; tests in `test_quick.gd` with a 16-row list. The existing count-of-11 checks stay, since the real content still has 11: when a twelfth is added, update that number (the lists now scroll).
 

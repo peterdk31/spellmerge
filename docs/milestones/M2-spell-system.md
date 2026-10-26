@@ -8,6 +8,8 @@
 
 **Status (2026-10-25):** the owner answered the C2 checkpoint (#235) with **iterate**, so the milestone is in progress again with rework tasks (docs/NEXT.md): the clip recorder and Spell atlas (#245), spell visuals (#244), Lightning as a fifth element (#243), in that order. Its next end is a new C2 checkpoint.
 
+**Status (2026-10-26):** the iterate round is built (see "Checkpoint C2, second round") and no known crash or blocker is left. M2 is done and waits for the owner's second C2 verdict; done-when item 3 is still open on the real-GPU frame rate.
+
 **Done when:**
 
 1. **Validators pass:** every component `.tres` and the reaction table pass the content validator (`core/spells/validator.gd`), run by `tests/content/spells/test_validators.gd` in `ci/build/build.sh --quick --tests`. A broken fixture of each kind fails it with a message that names the file, the field and the fix.
@@ -282,6 +284,20 @@ The question is: **is building spells fun and deep, with surprising combos?**
 - The owner decides, with Claude's assessment from bot data (which recipes bots and players build, the fuzz and stress numbers), the weekly playtest answers and player feedback.
 - Verdicts: **go** (M3 starts), **iterate** (rework the weak parts, at most 2 rounds) or **pivot**.
 - The owner has 7 days to answer. Without an answer, Claude defaults to iterate (docs/PLAN.md, "Go/no-go checkpoints").
+
+### Checkpoint C2, second round (2026-10-26)
+
+**What was reworked** (the owner's iterate, #235, in the order they asked):
+- **#245, the clip recorder and the Spell atlas.** `tests/clips/record.gd` records clips of spells, combos and reactions as frames (the format `ci/smbot/clips.py` reads); the Spell atlas data is in `tools/`. The owner can judge visuals from animations. GIF encoding and publishing are `ci/` work, built by the owner (#246).
+- **#244, spell visuals,** in parts: element looks, form bodies in flight (rune diamond, orbit beads, shaped bodies drawn at 0.62), reactions as bursts bigger than a hit (ring, particles, hit-stop, shake, power per reaction), tinted enemy looks for burn, chill, freeze, shock and hex, then a polish pass over 51 clips (the flame body fixed).
+- **#243, Lightning,** the fifth element: the `static` status and the discharge to nearby charged enemies, two new reactions (Overload, Superconduct), three new combos and a drawn discharge arc. The extensibility report is in its PR.
+- Also: the quick view's and overlay's drop lists scroll, so a twelfth component no longer breaks the layout.
+
+**Numbers** (`ci/build/build.sh --quick --tests`, headless, game logic only; everything passes): 26 combos in `combos.json`, all passing `test_combos`; `test_validators` passes; the fuzz test compiled 244 of 300 random recipes (slowest mean step 0.66 ms, slowest step 2.5 ms, most live shots 456); the stress run is OK; the 4-bot smoke test cleared the room in 9.3 game seconds. Renderer numbers are not measured by a session; the web frame rate on a real GPU is still unread (BACKLOG).
+
+**Assessment.** Building is deeper than at the first C2: five elements, 26 combos, and every cast now reads on screen, so a surprise is visible and not only in a log. Known weak spots: reactions differ mostly by colour (a colour-blind item is in the backlog), some clips are still plain (thin storm bolt, two-player clips, speckled orbit beads), there are four reaction flash slots, the reaction sounds do not exist yet (silent by design), and components are still given, not found (M3). Whether it is fun needs people: the weekly playtest has no building questions yet, and the clips are the first thing the owner can judge without playing.
+
+**Recommendation: go.** The spell system does what the milestone promised and the rework closed the visible gap the owner named. Open for the owner: the real-GPU web frame rate (item 3) and the reaction sounds. If another round is wanted, the first candidates are the backlog's visual items and a building question in the weekly playtest.
 
 ## Out of scope
 

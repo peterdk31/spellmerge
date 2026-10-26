@@ -133,6 +133,11 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - **Same key:** the pick is asked again as `art-direction-pick-3` (one decision keeps one issue), and the task stays under "Blocked".
 - **Hand-written SVGs:** the session could not run a generator script, so the three files were written as rects by hand; the sheet was looked at, and `test_svg_art` checks palette, overlaps, bounds and that no body carries a player colour.
 
+## 2026-10-26: M2 closed again for the second C2
+
+- **Decision:** M2 is marked done and waits for the owner's verdict; the recommendation is go. Done-when item 3 (real-GPU web frame rate) is unchanged and stays open for the owner, as in the first C2.
+- **Why:** all iterate tasks (#245, #244, #243) are done, the build passes and no crash is known. Nothing from M3 is started until the owner says go.
+
 ## 2026-10-25: C2 answered with iterate; M2 reworked
 
 - **Verdict:** the owner answered #235 with iterate: the clip recorder and Spell atlas (#245), spell visuals (#244), Lightning (#243), in that order. M2 is in progress again; its next end is a new C2 checkpoint. Nothing from M3 is written.

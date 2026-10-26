@@ -9,6 +9,7 @@
     "number": 256
   },
   "errors_in_a_row": 0,
+  "idle": null,
   "intake_tasks": {
     "208": {
       "author": "Brianmanden",
@@ -31,7 +32,15 @@
   },
   "panel_problems": [],
   "paused_by_command": false,
-  "pending_instructions": [],
+  "pending_instructions": [
+    {
+      "at": "2026-10-25T23:56:40Z",
+      "kind": "claude",
+      "number": 244,
+      "text": "the spells, effects, bursts combinations needs to be way more polished. Maybe it is because of the poor resolution we are rendering the game at - should we increase it? But everything looks kinda plain. I love that we have animations now, but the visuals for each visual element, needs to be easier to distinguish and have wow factors",
+      "url": "https://github.com/peterdk31/spellmerge/issues/244#issuecomment-6405166432"
+    }
+  ],
   "processed_comments": [
     6241847784,
     6251160604,
@@ -66,7 +75,8 @@
     6401761222,
     6402088067,
     6403591111,
-    6404318237
+    6404318237,
+    6405166432
   ],
   "task_failures": {},
   "usage": [

@@ -4,7 +4,7 @@ extends RefCounted
 ## there is no art file to ship. Feel tints the mark with the spell's element colour, so a mark
 ## is one palette colour with no partial transparency. Each picture is a different shape, so
 ## the classes read apart at 1x even in one colour: boosted is a ring of ticks (a sun), on_hit
-## two chevrons that point along the aim, on_expire a diamond with a dot, timer a dashed ring
+## two chevrons that point toward the nearest of four directions to the aim, on_expire a diamond with a dot, timer a dashed ring
 ## with a hand, stacked a full ring over a diamond and ticks.
 
 ## Side of a picture in pixels and the radius its marks are drawn on.

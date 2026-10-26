@@ -1028,7 +1028,7 @@ func _on_combo_cast(player: int, combo_class: StringName, origin: Vector2, direc
 		return
 	var mark: Sprite2D = _combo_marks[player]
 	mark.texture = texture
-	mark.global_position = origin
+	mark.global_position = origin.round()
 	# Plain arcane is white; the mark takes the palette's pale Bone instead of pure white.
 	mark.modulate = COMBO_ARCANE if tint.is_equal_approx(Color.WHITE) else tint
 	_combo_class[player] = combo_class

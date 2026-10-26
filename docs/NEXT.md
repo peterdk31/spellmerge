@@ -10,11 +10,14 @@ M2's parts were all built and the owner answered the C2 checkpoint (#235) with *
 
 M2's rework is done: every iterate task is built (see Done recently). The ROADMAP row reads "In progress, all tasks done, waiting for the checkpoint" (the site parser needs "In progress"). Development waits for the owner's verdict. Do not write M3 tasks before a `go`.
 
-- [ ] **Open the C2 checkpoint issue (second round).** Text: `docs/milestones/M2-spell-system.md`, "Checkpoint C2, second round" (recommendation: go, conditional on item 3). Remove this task once the issue exists, then wait 7 days; without an answer, default to iterate.
+- [ ] **Spell visuals round 2, part 2: a burst for each multi-component combo (#244, p2).** (`gameplay/feel/`, `content/spells/combos.json`) Part 1 marks the class of a cast; this gives the rows that combine several components (held-spell payoffs, trigger chains, reaction combos) a release burst of their own where the held spell fires, data-driven in the Feel preset by combo id or class, within `PARTICLE_LIMIT` and the pools. Proof: clips `combo_*` and a sheet, at 1x, with four players in frame. Also per-element hit sparks (the owner's "particles carry the identity") and the combo class shown in the Spell atlas data (`tools/atlas.py`).
+- [ ] **Open the C2 checkpoint issue (second round).** Text: `docs/milestones/M2-spell-system.md`, "Checkpoint C2, second round" (recommendation: go, conditional on item 3; it now also holds the render-resolution question). Remove this task once the issue exists, then wait 7 days; without an answer, default to iterate.
 
 ## Blocked
 
 ## Done recently
+
+- [x] **Spell visuals round 2, part 1: bolt size, trails, combo marks (#244, p2).** Shaped bodies are drawn at `SHAPE_SCALE` 0.8 (closer to the old bolt) with three trail marks each (384 at most); a new event `combo_cast` and `Spells.combo_class` give each combo class (boosted, on_hit, on_expire, timer, stacked) its own flat mark on the caster (`gameplay/feel/combo_marks.gd`, made in code, no asset files). The render-resolution assessment is in `docs/DECISIONS.md` and is a question for the next C2 checkpoint. Sheet: `shot_combo_marks`; clips `combo_*`. Tests: `test_feel_combo_marks.gd`, `test_spells_cast.gd`, `test_projectile_shapes.gd`. The rest is the Queue task "part 2".
 
 - [x] **Scrolling drop list (before any twelfth element or modifier).** (`hud/`) The quick view's list (11 rows) and the overlay's (6 lines of two) are clipping windows that slide to follow the focused row; UIFocus is unchanged and the title shows "n/total" while it scrolls. `hud/widgets/row_window.gd`; tests in `test_quick.gd` with a 16-row list. The existing count-of-11 checks stay, since the real content still has 11: when a twelfth is added, update that number (the lists now scroll).
 

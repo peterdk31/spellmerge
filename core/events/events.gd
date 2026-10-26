@@ -46,6 +46,8 @@ signal projectile_impact(player: int, target: Node, position: Vector2, direction
 signal projectile_expired(player: int, position: Vector2, tag: int)
 ## Sender: core/spells. A beam or a nova of `player` just fired, for looks only (they have no shot to draw). `form` is `&"beam"` (`length` is how far it got, along `direction`) or `&"nova"` (a ring of shots leaves `origin`; `length` is 0). `tint` is the colour of the spell's element (white for plain arcane).
 signal form_shown(player: int, form: StringName, origin: Vector2, direction: Vector2, length: float, tint: Color)
+## Sender: core/spells. `player` just cast a spell that is more than a plain shot, for looks only. `combo_class` is `&"boosted"` (modifiers only), `&"on_hit"`, `&"on_expire"` or `&"timer"` (a trigger holds a second spell), or `&"stacked"` (a trigger with two or more modifiers, or a chain of three spells); a plain cast sends nothing. `tint` is the element's colour (white for plain arcane). Sent after the cast made a shot. Heard by feel.
+signal combo_cast(player: int, combo_class: StringName, origin: Vector2, direction: Vector2, tint: Color)
 ## Sender: player. The spell of `player` at `spell` (a path as in `build_change_requested`) was built or changed; `description` says in plain words what it does now.
 signal spell_changed(player: int, spell: PackedInt32Array, description: String)
 ## Sender: player. A build change asked for by `player` was refused; `reason` says why in plain words.

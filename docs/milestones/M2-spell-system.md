@@ -293,6 +293,8 @@ For the issue. **Build:** the newest daily release. **Built since the first C2 (
 
 **Question:** is building spells fun and deep, with surprising combos, now? **Recommendation:** go, conditional on the owner confirming item 3 (frame rate on a real GPU, which no bot can measure). The three iterate points are built, but the post-Lightning stress numbers are stale and there are no playtest answers, so this is not a bot assessment that performance holds. If item 3 is not confirmed or the new visuals disappoint, iterate.
 
+**Second question (resolution):** should the render resolution (640x360 now) be raised? The assessment is in `docs/DECISIONS.md` ("Should the render resolution be raised?"): a bigger render shows more room or needs redrawn art, costs up to 4x the pixels on web (unmeasured), and would not make combos clearer. **Recommendation:** keep 640x360; if the owner wants it explored, measure a 2x test build on a real GPU first.
+
 ## Out of scope
 
 - **M3:** collecting components through rewards; relics (including ones that change components or the budget); staffs and their basic attacks; several rooms; the door rule; the run lifecycle; the pause menu; enemy scaling by player count; balance reports.

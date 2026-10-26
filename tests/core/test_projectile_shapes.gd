@@ -41,7 +41,7 @@ func test_set_shape_takes_a_live_shot_in_range_only() -> void:
 	check_equal(mgr.get_shape_of(slot), ManagerScript.SHAPE_RING, "a refused shape changes nothing")
 
 
-func test_a_shaped_bolt_is_drawn_with_its_kind_and_two_trail_marks() -> void:
+func test_a_shaped_bolt_is_drawn_with_its_kind_and_three_trail_marks() -> void:
 	var plain: int = mgr.spawn(0, Vector2(50.0, 50.0), Vector2(100.0, 0.0), 1.0)
 	var kinds: Array[int] = []
 	for shape in range(1, ManagerScript.SHAPE_COUNT):
@@ -51,17 +51,17 @@ func test_a_shaped_bolt_is_drawn_with_its_kind_and_two_trail_marks() -> void:
 	mgr.update_draw(1.0)
 	check(plain >= 0, "the plain bolt exists")
 	check_equal(mgr.drawn, 6, "six bolts drawn")
-	check_equal(mgr.drawn_trails, 10, "two marks behind each of the five shaped bolts, none behind the plain one")
+	check_equal(mgr.drawn_trails, 15, "three marks behind each of the five shaped bolts, none behind the plain one")
 	var seen: Array[int] = []
 	for i in 6:
 		seen.append(kind_at(mgr._draw_node, i))
 	seen.sort()
 	check_equal(seen, [0, 1, 2, 3, 4, 5] as Array[int], "each shape writes its own kind, the plain bolt 0")
 	var marks: Array[int] = []
-	for i in 10:
+	for i in 15:
 		marks.append(kind_at(mgr._trail_node, i))
 	marks.sort()
-	check_equal(marks, [6, 6, 7, 7, 8, 8, 9, 9, 10, 10] as Array[int], "each mark is its shape's kind plus five")
+	check_equal(marks, [6, 6, 6, 7, 7, 7, 8, 8, 8, 9, 9, 9, 10, 10, 10] as Array[int], "each mark is its shape's kind plus five")
 
 
 func test_the_trail_lies_behind_the_bolt() -> void:

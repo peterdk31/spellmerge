@@ -388,7 +388,29 @@ func cast(player: int, slot: int, origin: Vector2, direction: Vector2, mana: flo
 	if _launch(spell, tag, player, origin, direction.normalized(), null) == 0:
 		return REFUSED
 	_cooldown[index] = spell.cooldown
+	var combo: StringName = combo_class(spell)
+	if events != null and combo != &"":
+		events.combo_cast.emit(player, combo, origin, direction.normalized(), spell.tint)
 	return spell.mana_cost
+
+
+## Which kind of combination a compiled spell is, for the look of its cast (`combo_cast`):
+## `&"stacked"` for a trigger with two or more modifiers or a chain of three spells,
+## otherwise the event of its trigger (`&"on_hit"`, `&"on_expire"`, `&"timer"`), otherwise
+## `&"boosted"` for modifiers alone, and `&""` for a plain shot.
+func combo_class(spell: CompiledSpell) -> StringName:
+	if spell == null or not spell.valid:
+		return &""
+	if spell.held != null:
+		if spell.modifier_ids.size() >= 2 or spell.chain_length() >= 3:
+			return &"stacked"
+		match spell.trigger_event:
+			TriggerBase.Event.EXPIRE:
+				return &"on_expire"
+			TriggerBase.Event.TIMER:
+				return &"timer"
+		return &"on_hit"
+	return &"boosted" if not spell.modifier_ids.is_empty() else &""
 
 
 ## Runs the cooldowns and the timer triggers by `delta` seconds, and opens a new step for

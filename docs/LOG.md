@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-26: Spell visuals round 2, part 1 (#244, p2)
+
+The owner found the shaped shots too big and the combos plain. Bodies are now 0.8 of the old bolt (was 0.62) with three trail marks each (384 at most, still one draw batch). New event `combo_cast`, sent by `Spells.cast` with `Spells.combo_class`: a flat mark on the caster per class, a ring of ticks (boosted), chevrons along the aim (on_hit), a diamond (on_expire), a dashed ring with a ticking hand (timer), ring over diamond (stacked); made in code in `gameplay/feel/combo_marks.gd`, so no assets. Looked at the sheet `combo_marks` and the clips (`combo_fire_fan_orbit` shows the timer ring); a first version that turned the rings by 22.5 degrees came out ragged, so quarter turns only. The resolution question is assessed in `docs/DECISIONS.md` and added to the C2 second-round text. Part 2 (a release burst per multi-component combo) is in NEXT.md. Tests: `test_feel_combo_marks.gd`, `test_spells_cast.gd`, `test_events.gd`, `test_projectile_shapes.gd`; all unit tests pass.
+
 ## 2026-10-26: Scrolling drop lists
 
 The quick view's drop list (11 rows) and the overlay's (6 lines of two) are now windows: a longer list scrolls to follow the focused row (`hud/widgets/row_window.gd`), so a twelfth element or modifier no longer pushes the panel off its quarter of the screen. UIFocus is unchanged. The title shows "n/total" when the list scrolls. Tests: `test_quick.gd` (a 16-row list in the quick view and the overlay, the focused row always in view, the window maths). Screenshots of the 11-row lists look as before. Decisions in `docs/DECISIONS.md`.

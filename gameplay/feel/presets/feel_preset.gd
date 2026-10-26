@@ -55,6 +55,8 @@ extends Resource
 @export_range(0.0, 0.6, 0.01) var death_anim_seconds: float = 0.25
 ## The muzzle flash at the staff tip: seconds it shows and its size (1 is the art's size).
 @export_range(0.0, 0.3, 0.01) var muzzle_flash_seconds: float = 0.1
+## How long the mark of a combo cast (`combo_cast`) stays on the wizard; 0 turns it off.
+@export_range(0.0, 1.0, 0.01) var combo_mark_seconds: float = 0.36
 @export_range(0.1, 3.0, 0.1) var muzzle_flash_size: float = 0.5
 ## The white puff where an enemy dies: seconds and biggest size.
 @export_range(0.0, 0.5, 0.01) var death_puff_seconds: float = 0.14

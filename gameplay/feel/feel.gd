@@ -50,6 +50,15 @@ const CORE_SHADER: Shader = preload("res://core/projectiles/shot_core.gdshader")
 ## so a split fan is drawn whole; past that the player's oldest slot is taken over.
 const FORMS_PER_PLAYER: int = 24
 const FORM_SLOTS: int = FORMS_PER_PLAYER * 4
+const ComboMarks := preload("res://gameplay/feel/combo_marks.gd")
+## The mark of a combo cast (`combo_cast`): one per player, which a new cast of that player
+## replaces, so four players never show more than four marks.
+const COMBO_SLOTS: int = 4
+## The mark is drawn at its own size for this share of its time, then at twice that (whole
+## multiples only, so the pixels stay square), and a timer's hand ticks round in quarter turns.
+const COMBO_SWELL_AT: float = 0.45
+## Bone light, the mark's colour for plain arcane (white is not in the palette).
+const COMBO_ARCANE: Color = Color("#f4f1ea")
 ## Beams and rings draw above the room, under the shots (50) and the flashes (20).
 const FORM_Z: int = 18
 
@@ -187,6 +196,13 @@ var _form_length: PackedFloat32Array = PackedFloat32Array()
 var _next_form: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 var _next_puff: int = MUZZLE_SLOTS
 var _next_spark: int = FLASH_SLOTS
+## Combo marks (sprites made once, one per player): seconds left, the class shown and the
+## angle it started at. The pictures are built in code (`combo_marks.gd`), one per class.
+var _combo_marks: Array[Sprite2D] = []
+var _combo_left: PackedFloat32Array = PackedFloat32Array()
+var _combo_class: Array[StringName] = []
+var _combo_angle: PackedFloat32Array = PackedFloat32Array()
+var _combo_textures: Dictionary = {}
 ## Reaction names: one label per reaction flash slot, with where it starts and seconds left.
 var _labels: Array[Label] = []
 var _label_left: PackedFloat32Array = PackedFloat32Array()
@@ -267,6 +283,19 @@ func _ready() -> void:
 			flash.material = _reaction_material
 		add_child(flash)
 		_flashes.append(flash)
+	for combo_class in ComboMarks.CLASSES:
+		_combo_textures[combo_class] = ComboMarks.make_texture(combo_class)
+	for i in COMBO_SLOTS:
+		var mark := Sprite2D.new()
+		mark.top_level = true
+		mark.visible = false
+		mark.z_index = 20
+		mark.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		add_child(mark)
+		_combo_marks.append(mark)
+		_combo_class.append(&"")
+	_combo_left.resize(COMBO_SLOTS)
+	_combo_angle.resize(COMBO_SLOTS)
 	for i in FORM_SLOTS:
 		var form := Sprite2D.new()
 		var material := ShaderMaterial.new()
@@ -346,6 +375,7 @@ func _ready() -> void:
 	events.wizard_cast.connect(_on_wizard_cast)
 	events.projectile_impact.connect(_on_projectile_impact)
 	events.form_shown.connect(_on_form_shown)
+	events.combo_cast.connect(_on_combo_cast)
 	events.reaction_triggered.connect(_on_reaction_triggered)
 	events.discharge_arc.connect(_on_discharge_arc)
 	events.status_applied.connect(_on_status_applied)
@@ -403,6 +433,7 @@ func step(real_delta: float) -> void:
 		_apply_camera()
 	_step_reactions(real_delta)
 	_step_flashes(real_delta)
+	_step_combo_marks(real_delta)
 	_step_forms(real_delta)
 	_step_labels(real_delta)
 	_step_arcs(real_delta)
@@ -985,6 +1016,56 @@ func _on_spell_cast(player: int, spell_id: StringName, origin: Vector2, directio
 	if shake_enabled and direction != Vector2.ZERO:
 		_refresh_camera()
 		_kick = (_kick - direction.normalized() * preset.cast_kick_pixels).limit_length(MAX_KICK_PIXELS)
+
+
+## A cast that is more than a plain shot gets a mark on the wizard, in the element's colour,
+## whose shape tells the class (`combo_marks.gd`). Flat colour and whole-pixel steps, no fade.
+func _on_combo_cast(player: int, combo_class: StringName, origin: Vector2, direction: Vector2, tint: Color) -> void:
+	if player < 0 or player >= COMBO_SLOTS or preset.combo_mark_seconds <= 0.0:
+		return
+	var texture: Texture2D = _combo_textures.get(combo_class) as Texture2D
+	if texture == null or not origin.is_finite():
+		return
+	var mark: Sprite2D = _combo_marks[player]
+	mark.texture = texture
+	mark.global_position = origin.round()
+	# Plain arcane is white; the mark takes the palette's pale Bone instead of pure white.
+	mark.modulate = COMBO_ARCANE if tint.is_equal_approx(Color.WHITE) else tint
+	_combo_class[player] = combo_class
+	_combo_angle[player] = 0.0
+	if combo_class == ComboMarks.ON_HIT and direction != Vector2.ZERO:
+		_combo_angle[player] = roundf(direction.angle() / (PI / 2.0)) * (PI / 2.0)
+	_combo_left[player] = preset.combo_mark_seconds
+	_pose_combo_mark(player, 0.0)
+	mark.visible = true
+
+
+## Show, swell and turn the combo marks; a mark ends in one step, never fading.
+func _step_combo_marks(real_delta: float) -> void:
+	for i in COMBO_SLOTS:
+		if _combo_left[i] <= 0.0:
+			continue
+		_combo_left[i] -= real_delta
+		if _combo_left[i] <= 0.0:
+			_combo_marks[i].visible = false
+			continue
+		_pose_combo_mark(i, 1.0 - _combo_left[i] / preset.combo_mark_seconds)
+
+
+## Size and angle of mark `i` at `age` (0 to 1 of its time).
+func _pose_combo_mark(i: int, age: float) -> void:
+	var mark: Sprite2D = _combo_marks[i]
+	mark.scale = Vector2.ONE * (2.0 if age >= COMBO_SWELL_AT else 1.0)
+	# Quarter turns only, so the pixels stay square: a timer's hand ticks round like a clock.
+	if _combo_class[i] == ComboMarks.TIMER:
+		mark.rotation = floorf(age * 4.0) * PI / 2.0
+	else:
+		mark.rotation = _combo_angle[i]
+
+
+## The combo mark of `player` (for tests).
+func combo_mark(player: int) -> Sprite2D:
+	return _combo_marks[clampi(player, 0, COMBO_SLOTS - 1)]
 
 
 ## A beam or a nova ring, drawn in the owner's tint with the element's colour in its core.

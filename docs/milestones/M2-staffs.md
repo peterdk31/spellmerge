@@ -16,7 +16,7 @@
 
 ## Summary of the rules
 
-- Each wizard has **four staffs, one per button**: A, X, Y and B on a gamepad; Space (or Shift), left mouse, right mouse and Q for P1 on keyboard and mouse. There is no separate dodge or cast: the A staff starts with a `dash` card, the X staff with `fire · bolt`.
+- Each wizard has **four staffs, one per shoulder button** (owner, 2026-10-26): RB, RT, LB and LT on a gamepad (staffs 1 to 4); Space (or Shift), left mouse, right mouse and Q for P1 on keyboard and mouse. There is no separate dodge or cast: staff 1 (RB) starts with a `dash` card, staff 2 (RT) with `fire · bolt`. The face buttons work the menus: A accepts, B goes back (in play it opens the builder), X is a menu's second action; Y is free for now. Start opens the pause menu.
 - A staff is a row of **slots**. The player puts **cards** in any order. A cast reads the cards left to right with the rules in "Reading a staff".
 - **No build limits.** The complexity budget, the shot, modifier and depth limits and the number clamps go. The builder refuses nothing except a full staff. What stays are the engine's own safeguards, which never shape a build (see "Engine safeguards"). If the stress benchmark later shows a staff that freezes the game, a limit, a mana cost or a cheaper effect is decided then (owner, 2026-10-26: "They can be added later if we want to / need to").
 - **Self-harm is always on.** A wizard's own spells hurt them (damage, knockback, statuses). Hurting other players stays the friendly-fire option, off by default.
@@ -214,7 +214,7 @@ The aim is a builder each player can use quickly and without help, in their own 
 - One room of **two shooting lanes split by a wall** (owner, 2026-10-26: "two dummies separated by a wall (so like two shooting range lanes). One dummy for hitting and the other one fires back"); four 20-slot `dev` staffs per player; the full bag; the full builder at any time.
 - **Training dummy** (end of one lane): never dies or moves; shows damage numbers, damage per second over the last 5 s, its statuses and reactions.
 - **Shooting dummy** (end of the other lane): fires slow, telegraphed shots at the nearest wizard, for shields, blocks and self-harm.
-- **The sandbox page**, a "Sandbox" entry in each player's Start-button overlay beside "Build" (owner, 2026-10-26: "The dev menu should probably just be an entry in the start button menu - where the builder also is"): spawn an imp wave, reset the dummies, and (part B7b) friendly fire on or off and slow motion (0.25x). There is no pause menu for these. The actions change the room, never another player's choices or menus.
+- **The sandbox page** in the pause menu (owner, 2026-10-26: first "an entry in the start button menu - where the builder also is", then Start became the pause menu and B the builder): spawn an imp wave, reset the dummies. Friendly fire is in the pause menu's Settings, Gameplay, for every run; slow motion is not needed (owner). The actions change the room, never another player's choices or menus.
 - **Staff codes** (part D2): copy a staff as a short text code and paste one, so builds can be shared in Discussions. A code is only card ids, checked against the registry; nothing in it runs.
 
 ## Events
@@ -290,10 +290,10 @@ Each part is one session and one PR, with tests, a green `tools/check.sh` and `c
 | B4 | **Caster kit** | `gameplay/player` | B3 | Teleport, hook, swap and recoil moves, wall-safe, answering `caster_move_finished`; wizard statuses that slow or freeze movement; the mana pool with reservations and refunds |
 | B5 | **Entity kit** | `gameplay/ai` | A6c | Decoy and familiar as pooled entities (`entity_spawn_requested`, `entity_ended`, `familiar_cast_requested`); the AI targets decoys; `target_move_requested` for swap |
 | B6 | **Shot look** | `core/projectiles` (drawing), `art/vfx` | B1 | Small shots; the layer shader and its effect kinds; per-card look data (and Feel's per-form looks moved to card data); the shared spark pool; the player colour on the trail; the clip sheets. Before B7 |
-| B7 | **Sandbox** | `gameplay/flow`, `content/rooms`, `content/enemies`, `hud/menus/sandbox/` | B6 | B7a: the two-lane sandbox room, both dummies, the sandbox page (imp wave, reset dummies) from the overlay; `dev` and `preview` start in it (a focused Sandbox button above Play). B7b: friendly fire and slow motion on the same page (`gameplay/coop`, `gameplay/feel`'s hit-stop under a base time scale) |
+| B7 | **Sandbox** | `gameplay/flow`, `content/rooms`, `content/enemies`, `hud/menus/` | B6 | B7a: the two-lane sandbox room, both dummies, the sandbox page (imp wave, reset dummies); `dev` and `preview` start in it (a focused Sandbox button above Play). Then the controls rework (owner): staffs on RB, RT, LB, LT, the builder on B, the pause menu on Start with the sandbox page and Settings, Gameplay, Friendly fire |
 | B8 | **Builder** | `hud/builder` | A6c | Pick and place (pick a card up, put it down, swapping; `card_move_requested`), links in the cast plan, live numbers, mouse drag for P1, and quicker moves than one control at a time (A6a's builder walks tabs, slots and bag in one line, so from the bag back to the tabs is many presses: left and right between tabs, slots and bag, or a jump); screenshots at 1 and 4 players; every slot reachable with the d-pad alone |
 
-B1 and B6 both change `core/projectiles/projectile_manager.gd`, so B6 waits for B1. B3 and B4 both reach the wizard's movement and health, so B4 waits for B3. B7 adds its own folder in `hud/menus/` and one line in the overlay; B8 owns `hud/builder/`.
+B1 and B6 both change `core/projectiles/projectile_manager.gd`, so B6 waits for B1. B3 and B4 both reach the wizard's movement and health, so B4 waits for B3. B7 adds its own folders in `hud/menus/`; B8 owns `hud/builder/`.
 
 ### Phase C: cards, one PR each, in parallel
 

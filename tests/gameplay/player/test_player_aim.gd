@@ -259,7 +259,7 @@ func _test_muzzle_is_the_staff_tip() -> void:
 	_setup(1)
 	_players[0].global_position = Vector2(100, 100)
 	_input.send_virtual_aim(0, Vector2.RIGHT)
-	_input.send_virtual(0, &"cast_a", 1.0)
+	_input.send_virtual(0, &"staff_1", 1.0)
 	_run(1)
 	var expected := Vector2(100.0 + PlayerScript.STAFF_REACH, 100.0 - PlayerScript.HAND_HEIGHT)
 	_check(_fake.origins.size() > 0 and _near(_fake.origins[0], expected), "the shot starts at the staff tip, got %s" % [_fake.origins])

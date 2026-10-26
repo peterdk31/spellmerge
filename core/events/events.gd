@@ -23,9 +23,11 @@ signal reward_pick_requested(player: int, choice: int)
 signal door_vote_requested(player: int, door: int)
 ## A player asked to pause. Heard by run.
 signal pause_requested(player: int)
+## `player` switched friendly fire on or off in the pause menu (Settings, Gameplay). Heard by coop, which answers with `friendly_fire_changed`.
+signal friendly_fire_requested(player: int, on: bool)
 ## The Sandbox button was pressed (only shown in `dev` and `preview` builds). Heard by flow, which starts the sandbox (staffs B7).
 signal sandbox_requested(player: int)
-## `player` picked a sandbox action on their sandbox page: `imp_wave` or `reset_dummies`. Heard by flow (staffs B7).
+## `player` picked a sandbox action on the pause menu's sandbox page: `imp_wave` or `reset_dummies`. Heard by flow (staffs B7).
 signal sandbox_action_requested(player: int, action: StringName)
 
 # --- Devices (sender: core/input) -------------------------------------------
@@ -126,6 +128,8 @@ signal player_stats_changed(player: int, health: int, max_health: int, mana: flo
 signal player_joined(player: int)
 ## Sender: coop. `player` left the game.
 signal player_left(player: int)
+## Sender: coop. Friendly fire is now on or off (the answer to `friendly_fire_requested`, also sent by `Coop.set_friendly_fire`). Heard by hud.
+signal friendly_fire_changed(on: bool)
 
 # --- Run and rooms ----------------------------------------------------------
 
@@ -137,7 +141,7 @@ signal run_ended(victory: bool)
 signal room_entered(room_id: StringName)
 ## Sender: flow. The room `room_id` was cleared.
 signal room_cleared(room_id: StringName)
-## Sender: flow. A run started in the sandbox (`on` true) or out of it (false), or the sandbox run ended (false). Heard by hud, which shows the sandbox page's entry only while it is on.
+## Sender: flow. A run started in the sandbox (`on` true) or out of it (false), or the sandbox run ended (false). Heard by hud, whose pause menu shows its Sandbox entry only while it is on.
 signal sandbox_changed(on: bool)
 ## Sender: flow. Wave number `wave` (1 for the first of a run) of the room began.
 signal wave_started(wave: int)

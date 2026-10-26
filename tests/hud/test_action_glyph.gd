@@ -33,17 +33,17 @@ func _label(glyph: ActionGlyphScript) -> String:
 func test_it_shows_the_button_of_the_pad_in_the_players_hands() -> void:
 	_input.join(0)
 	_input.join(1)
-	check_equal(_label(_glyph(0, &"cast_x")), "X", "player 1 on an Xbox pad")
-	check_equal(_label(_glyph(1, &"cast_x")), "square", "player 2 on a PlayStation pad")
+	check_equal(_label(_glyph(0, &"alternate")), "X", "player 1 on an Xbox pad")
+	check_equal(_label(_glyph(1, &"alternate")), "square", "player 2 on a PlayStation pad")
 
 
 func test_it_changes_when_the_player_changes_controller() -> void:
 	_input.join(0)
-	var glyph: ActionGlyphScript = _glyph(0, &"cast_a")
+	var glyph: ActionGlyphScript = _glyph(0, &"accept")
 	check_equal(_label(glyph), "A", "the Xbox pad")
 	_input.leave(0)
 	_input.join(InputManagerScript.KEYBOARD)
-	check_equal(_label(glyph), "Space", "the keyboard, without anyone asking the widget to look again")
+	check_equal(_label(glyph), "Enter", "the keyboard, without anyone asking the widget to look again")
 	_input.leave(0)
 	_input.join(1)
 	check_equal(_label(glyph), "cross", "the PlayStation pad")
@@ -51,7 +51,7 @@ func test_it_changes_when_the_player_changes_controller() -> void:
 
 func test_cast_turns_into_the_mouse_and_back() -> void:
 	_input.join(InputManagerScript.KEYBOARD)
-	var glyph: ActionGlyphScript = _glyph(0, &"cast_x")
+	var glyph: ActionGlyphScript = _glyph(0, &"staff_2")
 	check_equal(_label(glyph), "J", "keys first")
 	var click := InputEventMouseButton.new()
 	click.button_index = MOUSE_BUTTON_LEFT
@@ -68,18 +68,18 @@ func test_cast_turns_into_the_mouse_and_back() -> void:
 func test_a_change_for_one_player_leaves_the_other_glyphs_alone() -> void:
 	_input.join(0)
 	_input.join(1)
-	var first: ActionGlyphScript = _glyph(0, &"cast_x")
-	var second: ActionGlyphScript = _glyph(1, &"cast_x")
+	var first: ActionGlyphScript = _glyph(0, &"staff_2")
+	var second: ActionGlyphScript = _glyph(1, &"staff_2")
 	_input.leave(0)
 	_input.join(InputManagerScript.KEYBOARD)
 	check_equal(_label(first), "J", "player 1's slot now holds the keyboard")
-	check_equal(_label(second), "square", "player 2 is still on the PlayStation pad")
+	check_equal(_label(second), "R2", "player 2 is still on the PlayStation pad")
 
 
 func test_a_glyph_is_wide_enough_for_its_key() -> void:
 	_input.join(InputManagerScript.KEYBOARD)
-	var space: ActionGlyphScript = _glyph(0, &"cast_a")
-	var letter: ActionGlyphScript = _glyph(0, &"cast_x")
+	var space: ActionGlyphScript = _glyph(0, &"staff_1")
+	var letter: ActionGlyphScript = _glyph(0, &"staff_2")
 	check(space.custom_minimum_size.x > letter.custom_minimum_size.x, "the Space key is wider than J")
 
 
@@ -88,11 +88,11 @@ func test_a_hint_line_says_the_verb_beside_the_glyph() -> void:
 	var line: HintLineScript = own(HintLineScript.new()) as HintLineScript
 	line.bind(_input)
 	root.add_child(line)
-	line.show_hint(0, &"cast_x", "Use", &"cast_a", "back")
+	line.show_hint(0, &"alternate", "Use", &"accept", "back")
 	check_equal(line.text(), "Use, back", "both verbs")
-	check_equal(line.action_of(0), &"cast_x", "the first glyph is for cast")
-	check_equal(line.action_of(1), &"cast_a", "the second is for dodge")
-	line.show_hint(0, &"cast_x", "Close")
+	check_equal(line.action_of(0), &"alternate", "the first glyph is for alternate")
+	check_equal(line.action_of(1), &"accept", "the second is for accept")
+	line.show_hint(0, &"alternate", "Close")
 	check_equal(line.text(), "Close", "one pair")
 	check_equal(line.action_of(1), &"", "the second glyph is hidden")
 	line.show_hint(0, &"", "")
@@ -105,7 +105,7 @@ func test_a_hint_line_follows_the_controller_too() -> void:
 	var line: HintLineScript = own(HintLineScript.new()) as HintLineScript
 	line.bind(_input)
 	root.add_child(line)
-	line.show_hint(0, &"cast_x", "Close")
+	line.show_hint(0, &"alternate", "Close")
 	var glyph: ActionGlyphScript = line.glyph_node(0) as ActionGlyphScript
 	check_equal(_label(glyph), "X", "Xbox")
 	_input.leave(0)

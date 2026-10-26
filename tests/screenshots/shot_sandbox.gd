@@ -5,7 +5,7 @@ extends SceneTree
 ## and copied to build/screenshots/.
 ##
 ## Shots: one player firing fire bolts up the left lane at the training dummy (damage numbers,
-## DPS, burn); the same player's sandbox page open; four players, two per lane, with an imp
+## DPS, burn); the pause menu's sandbox page open; four players, two per lane, with an imp
 ## wave in and the shooting dummy's telegraph up.
 
 const SHOTS_DIR := "user://screenshots"
@@ -41,19 +41,20 @@ func _initialize() -> void:
 	var dummy: Node2D = (_flow.call("dummies") as Array)[0]
 	var wizard: Node2D = _flow.call("get_wizard", 0)
 	_input.call("send_virtual_aim", 0, (dummy.position + Vector2(0.0, -14.0) - wizard.position).normalized())
-	_input.call("send_virtual", 0, &"cast_x", 1.0)
+	_input.call("send_virtual", 0, &"staff_2", 1.0)
 	await create_timer(2.0).timeout
-	_input.call("send_virtual", 0, &"cast_x", 0.0)
+	_input.call("send_virtual", 0, &"staff_2", 0.0)
 	if int(dummy.get("total_damage")) <= 0:
 		_fail("the training dummy took no damage")
 		return
 	await _shot("sandbox_training_lane")
 	await _open_page(0)
-	if not _hud.call("get_sandbox_page", 0).call("is_open"):
-		_fail("the sandbox page of player 1 is not open")
+	var pause_menu: Node = _hud.call("get_pause_menu")
+	if not pause_menu.call("is_open") or int(pause_menu.get("page")) != 1:
+		_fail("the pause menu's sandbox page is not open for player 1")
 		return
 	await _shot("sandbox_page")
-	_tap(0, &"overlay")
+	_tap(0, &"pause")
 	await _settle()
 	_flow.call("stop_run")
 	await _settle()
@@ -82,15 +83,14 @@ func _tap(player: int, action: StringName) -> void:
 	_input.call("send_virtual", player, action, 0.0)
 
 
-## The overlay, then "Sandbox" (the third control), as a person does.
+## Start, then "Sandbox" (the second button in the sandbox), as a person does.
 func _open_page(player: int) -> void:
-	_tap(player, &"overlay")
+	_tap(player, &"pause")
 	await _settle()
-	for step in 2:
-		_tap(player, &"move_down")
-		await process_frame
-		await process_frame
-	_tap(player, &"cast_a")
+	_tap(player, &"move_down")
+	await process_frame
+	await process_frame
+	_tap(player, &"accept")
 	await _settle()
 
 

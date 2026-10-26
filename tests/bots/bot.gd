@@ -1,27 +1,28 @@
 extends RefCounted
 ## A bot: plays one player slot through a virtual device and the real input path
 ## (`PlayerInput.send_virtual`), the same path a gamepad uses. It holds `move_*` and the staff
-## buttons `cast_x` and `cast_y`, and taps `cast_a` (the dash staff) and `overlay`; it never
+## buttons `staff_2` and `staff_3` (RT, LB), and taps `staff_1` (RB, the dash staff) and `back`
+## (B, which opens the builder in play); it never
 ## touches a spell field or the projectile manager, so it plays the way a person does. The
 ## wizard casts a staff when its button is held, so a bot calls nothing on a spell itself.
 ##
 ## Fighter: walks toward the nearest enemy of the current world (a wizard faces
 ## where it walks, so the shots fly at the enemy) and holds `cast` within
-## FIRE_RANGE and sees it (shots stop at walls): `cast_x` (the fire bolt it starts with) and
-## `cast_y` (the staff it built, if any). With a wall in between it walks
+## FIRE_RANGE and sees it (shots stop at walls): `staff_2` (the fire bolt it starts with) and
+## `staff_3` (the staff it built, if any). With a wall in between it walks
 ## round it: it probes the eight directions PROBE_DISTANCE ahead, takes a free one
 ## from which the enemy is in view (else the free one nearest the enemy) and keeps
 ## it for DETOUR_STEPS steps. When it hardly moved for STUCK_STEPS steps (a pillar)
 ## it side-steps for SIDESTEP_STEPS steps. Dodge: like a person reading the
 ## telegraph, when an enemy within DODGE_RANGE is aimed at the wizard and its windup
-## is past DODGE_FROM, the bot steps off the line of the shot and taps `cast_a`, the dash
-## staff (once per windup). Idler: stands still; it only opens its overlay.
+## is past DODGE_FROM, the bot steps off the line of the shot and taps `staff_1`, the dash
+## staff (once per windup). Idler: stands still; it only opens its builder.
 ##
-## Builder: `build_random(seed)` builds a random staff into staff Y (BUILD_STAFF, empty at the
+## Builder: `build_random(seed)` builds a random staff into staff 3 (BUILD_STAFF, LB, empty at the
 ## start) with the same `staff_change_requested` events a person sends (slot by slot, from the
 ## bag of the wizard). The cards come from `staff_fuzzer.gd`, seeded, so a failing run can be
-## replayed. `open_builder()` is how bot 4 of the 4-bot test works: the overlay, then "Build"
-## with `move_down` and `cast_a`, and it stays there (the full builder, waves included).
+## replayed. `open_builder()` is how bot 4 of the 4-bot test works: one press of `back` (B),
+## and it stays there (the full builder, waves included).
 ##
 ## Everything is driven by step(delta), so a run with the same frames repeats. A
 ## bot sends an input only when it changes.
@@ -30,7 +31,8 @@ enum Mode { FIGHTER, IDLER }
 
 const FuzzerScript := preload("res://tests/bots/staff_fuzzer.gd")
 
-## The staff a bot builds into: Y (empty at the start; A dashes and X fires the start bolt).
+## The staff a bot builds into: staff 3, LB (empty at the start; RB dashes and RT fires the
+## start bolt).
 const BUILD_STAFF: int = 2
 ## A random staff has at most this many cards, so a built staff stays quick to cast.
 const BUILD_CARDS: int = 6
@@ -67,9 +69,6 @@ var _sidestep_sign: float = 1.0
 var _detour: Vector2 = Vector2.ZERO
 var _detour_left: int = 0
 var _dodged_enemy: int = 0
-## Steps before the next press of the way into the builder; -1 when not on the way.
-var _open_wait: int = -1
-var _open_stage: int = 0
 
 ## The cards of the last `build_random`, one per slot of the staff (empty before the first).
 var built_cards: Array[StringName] = []
@@ -88,13 +87,13 @@ func join(index: int, bot_mode: Mode, input: Node, flow: Node) -> bool:
 	return int(_input.call("add_virtual_device", player)) != int(_input.get("NO_DEVICE"))
 
 
-## Press and release `overlay` once.
-func tap_overlay() -> void:
-	_input.call("send_virtual", player, &"overlay", 1.0)
-	_input.call("send_virtual", player, &"overlay", 0.0)
+## Press and release `back` (B) once: in play it opens the builder.
+func tap_back() -> void:
+	_input.call("send_virtual", player, &"back", 1.0)
+	_input.call("send_virtual", player, &"back", 0.0)
 
 
-## Build a random staff into staff Y, slot by slot. The cards are chosen from the wizard's bag
+## Build a random staff into staff 3, slot by slot. The cards are chosen from the wizard's bag
 ## with `build_seed`. Returns false when the bot has no wizard or the bag has no carrier. True
 ## means the requests were sent; check the wizard's `cards_of(BUILD_STAFF)`.
 func build_random(build_seed: int) -> bool:
@@ -121,12 +120,9 @@ func build_random(build_seed: int) -> bool:
 	return true
 
 
-## Start the way into the builder: tap the overlay; `step` then presses `move_down` and
-## `cast_a` on the following steps, as a person does.
+## Open the builder as a person does: one press of `back` (B).
 func open_builder() -> void:
-	tap_overlay()
-	_open_stage = 0
-	_open_wait = 1
+	tap_back()
 
 
 ## Let go of everything the bot holds and free the slot.
@@ -137,7 +133,6 @@ func leave() -> void:
 
 ## One decision. An idler does nothing.
 func step(_delta: float) -> void:
-	_walk_into_builder()
 	if mode == Mode.IDLER:
 		return
 	var wizard := _flow.call("get_wizard", player) as Node2D
@@ -178,23 +173,11 @@ func step(_delta: float) -> void:
 	_hold_move(direction)
 	if threat != null and threat.get_instance_id() != _dodged_enemy and bool(wizard.call("has_staff", 0)):
 		_dodged_enemy = threat.get_instance_id()
-		_input.call("send_virtual", player, &"cast_a", 1.0)
-		_input.call("send_virtual", player, &"cast_a", 0.0)
+		_input.call("send_virtual", player, &"staff_1", 1.0)
+		_input.call("send_virtual", player, &"staff_1", 0.0)
 	_hold_cast(in_range and sees)
 
 
-## The presses after `open_builder`, one per step, with a step between so the focus moves.
-func _walk_into_builder() -> void:
-	if _open_wait < 0:
-		return
-	if _open_wait > 0:
-		_open_wait -= 1
-		return
-	var action: StringName = &"move_down" if _open_stage == 0 else &"cast_a"
-	_input.call("send_virtual", player, action, 1.0)
-	_input.call("send_virtual", player, action, 0.0)
-	_open_stage += 1
-	_open_wait = 1 if _open_stage < 2 else -1
 
 
 ## False when a wall (physics layer 1) is between the wizard and the enemy: shots
@@ -296,8 +279,8 @@ func _hold_move(direction: Vector2) -> void:
 func _hold_cast(on: bool) -> void:
 	if on == _casting:
 		return
-	_input.call("send_virtual", player, &"cast_x", 1.0 if on else 0.0)
-	_input.call("send_virtual", player, &"cast_y", 1.0 if on else 0.0)
+	_input.call("send_virtual", player, &"staff_2", 1.0 if on else 0.0)
+	_input.call("send_virtual", player, &"staff_3", 1.0 if on else 0.0)
 	_casting = on
 
 

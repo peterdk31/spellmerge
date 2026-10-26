@@ -1,19 +1,19 @@
 extends Node
 ## The 4-bot smoke test as a node: four bots join on virtual devices and play the
-## first room through the real input path. Bots 1-3 fight; bot 4 opens its overlay
-## with the `overlay` action when the room starts, walks into its builder ("Build") and
-## idles in it the whole run (full view in breaks, quick view in waves). Bots 1-3 also
-## build: when the room starts each builds a seeded random staff into staff Y
-## with `staff_change_requested` and casts it with staff X, so the run is played with built staffs.
+## first room through the real input path. Bots 1-3 fight; bot 4 opens its builder with B
+## (`back`) when the room starts and idles in it the whole run (the full builder, waves
+## included). Bots 1-3 also build: when the room starts each builds a seeded random staff into
+## staff 3 with `staff_change_requested` and casts it with staff 2, so the run is played with
+## built staffs.
 ##
 ## It passes only if
 ##  - `room_cleared` is received,
 ##  - players 1-3 (indices 0-2) are alive or revived at the end,
 ##  - at least one `spell_cast` happened (the bots really fired),
-##  - bot 4's overlay opened, its builder opened, and neither was seen closed
-##    afterwards (polled every frame; the overlay hands over to the builder). Bot 4 stands still and can be downed; it is not checked for that, and
+##  - bot 4's builder opened and was not seen closed afterwards (polled every frame). Bot 4
+##    stands still and can be downed; it is not checked for that, and
 ##    a close while it was downed is printed as a note, not a failure, and
-##  - every fighter's build went through (staff Y holds the cards the bot chose) and no
+##  - every fighter's build went through (staff 3 holds the cards the bot chose) and no
 ##    `build_refused` arrived, and
 ##  - the log has no `push_error` call, no line starting `ERROR:` and no "the
 ##    restart failed" warning (tests/smoke/error_log.gd, which has a unit test; it
@@ -44,7 +44,7 @@ const ErrorLogScript := preload("res://tests/smoke/error_log.gd")
 const ProbeScript := preload("res://tests/benchmark/probe.gd")
 
 const PLAYERS: int = 4
-## The index of the bot that idles in its overlay (bot 4).
+## The index of the bot that idles in its builder (bot 4).
 const IDLER: int = 3
 ## Bot `i` builds with the seed BUILD_SEED + i, so a failing run can be replayed.
 const BUILD_SEED: int = 2026
@@ -71,11 +71,11 @@ var _elapsed: float = 0.0
 var _settle: int = -1
 var _started: bool = false
 var _logging: bool = false
-var _overlay_seen_open: bool = false
+var _builder_was_open: bool = false
 var _builder_seen_open: bool = false
 var _refusals: Array[String] = []
 var _builds_failed: Array[String] = []
-var _overlay_closed_at: float = -1.0
+var _builder_closed_at: float = -1.0
 var _idler_downed_at_close: bool = false
 
 
@@ -126,7 +126,7 @@ func _process(delta: float) -> void:
 	if not _started:
 		return
 	_elapsed += delta
-	_watch_overlay()
+	_watch_builder()
 	for bot in _bots:
 		bot.step(delta)
 	if _settle >= 0:
@@ -138,18 +138,15 @@ func _process(delta: float) -> void:
 		_finish(_check())
 
 
-## Record that the idler's overlay opened and when it was first closed again.
-func _watch_overlay() -> void:
-	var overlay := _hud.call("get_overlay", IDLER) as Node
+## Record that the idler's builder opened and when it was first closed again.
+func _watch_builder() -> void:
 	var builder := _hud.call("get_builder", IDLER) as Node
-	var builder_open: bool = builder != null and bool(builder.call("is_open"))
-	var open: bool = (overlay != null and bool(overlay.call("is_open"))) or builder_open
-	if builder_open:
-		_builder_seen_open = true
+	var open: bool = builder != null and bool(builder.call("is_open"))
 	if open:
-		_overlay_seen_open = true
-	elif _overlay_seen_open and _overlay_closed_at < 0.0:
-		_overlay_closed_at = _elapsed
+		_builder_seen_open = true
+		_builder_was_open = true
+	elif _builder_was_open and _builder_closed_at < 0.0:
+		_builder_closed_at = _elapsed
 		_idler_downed_at_close = _downed[IDLER]
 
 
@@ -206,13 +203,11 @@ func _check() -> Array[String]:
 		var wizard := _flow.call("get_wizard", index) as Node
 		var bot: BotScript = _bots[index]
 		if wizard != null and not bot.built_cards.is_empty() and wizard.call("cards_of", BotScript.BUILD_STAFF) != bot.built_cards:
-			failed.append("bot %d: staff Y is not the staff it built" % (index + 1))
-	if not _overlay_seen_open:
-		failed.append("the overlay of bot %d never opened" % (IDLER + 1))
-	elif not _builder_seen_open:
+			failed.append("bot %d: staff 3 is not the staff it built" % (index + 1))
+	if not _builder_seen_open:
 		failed.append("the builder of bot %d never opened" % (IDLER + 1))
-	elif _overlay_closed_at >= 0.0:
-		var message: String = "the overlay of bot %d closed at %.1f game seconds, after it had opened" % [IDLER + 1, _overlay_closed_at]
+	elif _builder_closed_at >= 0.0:
+		var message: String = "the builder of bot %d closed at %.1f game seconds, after it had opened" % [IDLER + 1, _builder_closed_at]
 		if _idler_downed_at_close:
 			print("SMOKE NOTE: " + message + " (bot %d was downed; not a failure)" % (IDLER + 1))
 		else:

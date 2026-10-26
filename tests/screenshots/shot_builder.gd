@@ -46,7 +46,7 @@ func _initialize() -> void:
 		_fail("the nova is not held in builder_holding")
 		return
 	await _shot("builder_holding")
-	_tap(0, &"cast_b")
+	_tap(0, &"back")
 	await _settle()
 	# Homing alone in staff Y: it lands on the caster and does nothing, so the note says why.
 	await _press(0, builder.call("tab_button", 2))
@@ -55,14 +55,14 @@ func _initialize() -> void:
 	_focus.call("focus", 0, builder.call("slot_button", 0))
 	await _shot("builder_wasted")
 	# A stopped run leaves the HUD as it is, so close the builder as its owner would.
-	_tap(0, &"overlay")
+	_tap(0, &"pause")
 	await _settle()
 	flow.call("stop_run")
 	await _settle()
 	for index in range(1, 4):
 		_input.call("add_virtual_device", index)
 	flow.call("start_run", 0)
-	# The room is entered a little after the run starts; the overlay opens only inside it.
+	# The room is entered a little after the run starts; the builder opens only inside it.
 	for i in 4:
 		await _settle()
 	# The wave is live while the builders are staged; a downed wizard's builder closes, so keep
@@ -83,7 +83,7 @@ func _initialize() -> void:
 			return
 	await _shot("builder_four_players")
 	for index in 4:
-		_tap(index, &"overlay")
+		_tap(index, &"pause")
 	await _settle()
 	flow.call("stop_run")
 	await create_timer(0.3).timeout
@@ -103,22 +103,17 @@ func _tap(player: int, action: StringName) -> void:
 	_input.call("send_virtual", player, action, 0.0)
 
 
-## The overlay, then "Build" (the second control), as a person does.
+## B (`back`) in play, as a person does.
 func _open_builder(player: int) -> void:
-	_tap(player, &"overlay")
-	await _settle()
-	_tap(player, &"move_down")
-	await process_frame
-	await process_frame
-	_tap(player, &"cast_a")
+	_tap(player, &"back")
 	await _settle()
 
 
-## Put the player's focus on `control` and press `cast_a` (activate) on it.
+## Put the player's focus on `control` and press `accept` (activate) on it.
 func _press(player: int, control: Control) -> void:
 	_focus.call("focus", player, control)
 	await process_frame
-	_tap(player, &"cast_a")
+	_tap(player, &"accept")
 	await _settle()
 
 

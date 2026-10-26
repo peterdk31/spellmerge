@@ -58,8 +58,8 @@ extends CharacterBody2D
 ## Dash look: during a dodge the sprite stretches and leans along the dash and
 ## fading ghosts of it trail behind (drawn in _draw; no nodes or arrays made).
 ##
-## Staffs (staffs A6a, docs/milestones/M2-staffs.md): four staffs, one per button: `cast_a`,
-## `cast_x`, `cast_y` and `cast_b` cast staff 0 to 3 (A, X, Y, B). Each staff is a row of card
+## Staffs (staffs A6a, docs/milestones/M2-staffs.md): four staffs, one per button: `staff_1` to
+## `staff_4` cast staff 0 to 3 (RB, RT, LB, LT on a pad; owner, 2026-10-26). Each staff is a row of card
 ## ids, `staff.slots` long (`staff` is the StaffBase flow hands over: `starter` or `dev`),
 ## compiled and installed by `Spells`; the wizard reads no spell field. Holding a button casts
 ## that staff whenever it is ready; a press while it is not ready is remembered for
@@ -92,9 +92,9 @@ const CombatScript := preload("res://gameplay/combat/combat.gd")
 const MOVE_SPEED: float = 90.0
 ## A staff cast pressed this long (seconds) before the staff is ready still happens.
 const INPUT_BUFFER: float = 0.15
-## The four staffs and their buttons (0 A, 1 X, 2 Y, 3 B).
+## The four staffs and their buttons (0 RB, 1 RT, 2 LB, 3 LT).
 const STAFF_COUNT: int = 4
-const CAST_ACTIONS: Array[StringName] = [&"cast_a", &"cast_x", &"cast_y", &"cast_b"]
+const CAST_ACTIONS: Array[StringName] = [&"staff_1", &"staff_2", &"staff_3", &"staff_4"]
 ## The ring of `protect` closes over this many seconds at most (it shows how much is left).
 const INVULNERABLE_TIME: float = 2.0
 ## Sprite opacity and ring size while the wizard cannot be hurt.

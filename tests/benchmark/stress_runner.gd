@@ -13,7 +13,7 @@ extends Node
 ## after the other.
 ##
 ## How the numbers are held. The bots cast their built spells through the real input
-## path (`cast_x` and `cast_y` held together, so both built staffs are used). Their
+## path (`staff_2` and `staff_3` held together, so both built staffs are used). Their
 ## mana and health are kept full (so they keep casting), and enemies are added whenever
 ## fewer than the target stand, with more health than the game's imp, so fights go on.
 ## The shots the spells make are never enough for 500 or 3,000, so each physics step

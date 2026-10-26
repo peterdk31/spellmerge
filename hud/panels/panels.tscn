@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" path="res://hud/panels/panels.gd" id="1_panels"]
 [ext_resource type="PackedScene" path="res://hud/panels/player_panel/player_panel.tscn" id="2_panel"]
-[ext_resource type="PackedScene" path="res://hud/panels/overlay/overlay.tscn" id="3_overlay"]
+[ext_resource type="PackedScene" path="res://hud/menus/pause/pause_menu.tscn" id="3_pause"]
 [ext_resource type="PackedScene" path="res://hud/builder/builder.tscn" id="4_builder"]
 
 [node name="Hud" type="CanvasLayer"]
@@ -64,52 +64,6 @@ grow_horizontal = 0
 grow_vertical = 0
 index = 3
 
-[node name="Overlay1" parent="Root" instance=ExtResource("3_overlay")]
-layout_mode = 0
-offset_left = 4.0
-offset_top = 63.0
-offset_right = 4.0
-offset_bottom = 63.0
-
-[node name="Overlay2" parent="Root" instance=ExtResource("3_overlay")]
-layout_mode = 1
-anchors_preset = 1
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -4.0
-offset_top = 63.0
-offset_right = -4.0
-offset_bottom = 63.0
-grow_horizontal = 0
-index = 1
-
-[node name="Overlay3" parent="Root" instance=ExtResource("3_overlay")]
-layout_mode = 1
-anchors_preset = 2
-anchor_top = 1.0
-anchor_bottom = 1.0
-offset_left = 4.0
-offset_top = -63.0
-offset_right = 4.0
-offset_bottom = -63.0
-grow_vertical = 0
-index = 2
-
-[node name="Overlay4" parent="Root" instance=ExtResource("3_overlay")]
-layout_mode = 1
-anchors_preset = 3
-anchor_left = 1.0
-anchor_top = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = -4.0
-offset_top = -63.0
-offset_right = -4.0
-offset_bottom = -63.0
-grow_horizontal = 0
-grow_vertical = 0
-index = 3
-
 [node name="Builder1" parent="Root" instance=ExtResource("4_builder")]
 layout_mode = 0
 offset_left = 118.0
@@ -155,3 +109,6 @@ offset_bottom = -4.0
 grow_horizontal = 0
 grow_vertical = 0
 index = 3
+
+[node name="PauseMenu" parent="Root" instance=ExtResource("3_pause")]
+layout_mode = 1

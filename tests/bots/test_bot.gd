@@ -1,7 +1,7 @@
 extends SceneTree
 ## Tests for the bot (tests/bots/bot.gd): it takes a virtual device, an idler sends
 ## nothing, a fighter walks toward the enemies and lets go of every input when the
-## run is over, the overlay tap goes through the input path to its own player only,
+## run is over, the B tap goes through the input path to its own player only,
 ## and leaving frees the slot. Bots for different indices never disturb each other.
 ##
 ## godot --headless --path . --script res://tests/bots/test_bot.gd
@@ -62,36 +62,31 @@ func _test_join_and_leave() -> void:
 	_check(not clash.join(0, BotScript.Mode.FIGHTER, _input, _flow), "a taken slot is refused")
 	_check(_input.call("is_joined", 0) and _input.call("is_joined", 3), "both slots are joined")
 	_check(not _input.call("is_joined", 1), "slot 1 stays free")
-	second.tap_overlay()
-	_check(int(_input.call("get_press_count", 3, &"overlay")) == 1, "the overlay tap counts as one press for player 4")
-	_check(int(_input.call("get_press_count", 0, &"overlay")) == 0, "the overlay tap does not reach player 1")
+	second.tap_back()
+	_check(int(_input.call("get_press_count", 3, &"back")) == 1, "the B tap counts as one press for player 4")
+	_check(int(_input.call("get_press_count", 0, &"back")) == 0, "the B tap does not reach player 1")
 	first.leave()
 	second.leave()
 	_check(not _input.call("is_joined", 0) and not _input.call("is_joined", 3), "leaving frees the slots")
 
 
-## The way into the builder is the overlay tap, then one `move_down` and one `cast_a` press on
-## later steps; without a wizard a bot cannot build and sends nothing.
+## The way into the builder is one press of B (`back`) and nothing else; without a wizard a bot
+## cannot build and sends nothing.
 func _test_builder_walk() -> void:
 	var bot := BotScript.new()
 	bot.join(1, BotScript.Mode.IDLER, _input, _flow)
 	_check(not bot.build_random(1), "a bot without a wizard cannot build")
 	_check(bot.requests_sent == 0, "a refused build sends no request")
 	bot.open_builder()
-	_check(int(_input.call("get_press_count", 1, &"overlay")) == 1, "the way into the builder starts with the overlay")
-	var cast_before_down: bool = false
 	for i in 6:
 		bot.step(0.016)
-		if int(_input.call("get_press_count", 1, &"cast_a")) > 0 and int(_input.call("get_press_count", 1, &"move_down")) == 0:
-			cast_before_down = true
-	_check(not cast_before_down, "move_down is pressed before cast on the way to Build")
-	_check(int(_input.call("get_press_count", 1, &"move_down")) == 1, "one move_down press on the way")
-	_check(int(_input.call("get_press_count", 1, &"cast_a")) == 1, "one cast_a press on the way, on Build")
+	_check(int(_input.call("get_press_count", 1, &"back")) == 1, "one B press opens the builder")
+	_check(int(_input.call("get_press_count", 1, &"accept")) == 0 and int(_input.call("get_press_count", 1, &"move_down")) == 0, "and no other press")
 	bot.leave()
 
 
-## With a wizard, `build_random` sends one `staff_change_requested` per slot of staff Y, all for
-## its own player, and the wizard's staff Y then holds the cards the bot chose.
+## With a wizard, `build_random` sends one `staff_change_requested` per slot of staff 3, all for
+## its own player, and the wizard's staff 3 then holds the cards the bot chose.
 func _test_build_random(events: Node, bot: BotScript, wizard: Node) -> void:
 	var builds: Array = []
 	var on_build := func(player: int, staff: int, slot: int, id: StringName) -> void: builds.append([player, staff, slot, id])
@@ -104,8 +99,8 @@ func _test_build_random(events: Node, bot: BotScript, wizard: Node) -> void:
 	var own: bool = true
 	for entry: Array in builds:
 		own = own and entry[0] == 0 and entry[1] == BotScript.BUILD_STAFF
-	_check(own, "all build calls are for the bot's own player and staff Y")
-	_check(wizard.call("cards_of", BotScript.BUILD_STAFF) == bot.built_cards, "staff Y holds what the bot built")
+	_check(own, "all build calls are for the bot's own player and staff 3")
+	_check(wizard.call("cards_of", BotScript.BUILD_STAFF) == bot.built_cards, "staff 3 holds what the bot built")
 	_check(bool(wizard.call("has_staff", BotScript.BUILD_STAFF)), "and it can cast")
 
 
@@ -115,7 +110,7 @@ func _test_idler_sends_nothing() -> void:
 	for i in 10:
 		idler.step(0.016)
 	_check(_input.call("get_move", 2) == Vector2.ZERO, "an idler does not move")
-	_check(not _input.call("is_action_pressed", 2, &"cast_x"), "an idler does not cast")
+	_check(not _input.call("is_action_pressed", 2, &"staff_2"), "an idler does not cast")
 	idler.leave()
 
 
@@ -142,6 +137,6 @@ func _test_fighter(events: Node) -> void:
 	_flow.call("stop_run")
 	for bot in bots:
 		bot.step(0.016)
-	_check(_input.call("get_move", 0) == Vector2.ZERO and not _input.call("is_action_pressed", 0, &"cast_x"), "with no world a fighter lets go of every input")
+	_check(_input.call("get_move", 0) == Vector2.ZERO and not _input.call("is_action_pressed", 0, &"staff_2"), "with no world a fighter lets go of every input")
 	for bot in bots:
 		bot.leave()

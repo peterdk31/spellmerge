@@ -1,7 +1,7 @@
 extends SceneTree
 ## The button glyphs, one row per kind of controller (keyboard, keyboard with the mouse, Xbox,
-## PlayStation, Switch and a plain gamepad) and one column per action (cast, dodge, overlay,
-## swap, join, leave), at 3x, with the builder's hint line under them at 1x for each kind.
+## PlayStation, Switch and a plain gamepad) and one column per action (the four staffs, accept,
+## back, alternate, pause), at 2x, with the builder's hint line under them at 1x for each kind.
 ## Needs a display, so it runs only through `ci/build/build.sh --quick --screenshots`; the shot
 ## is saved as user://screenshots/glyphs_sheet.png and copied to build/screenshots/.
 
@@ -11,7 +11,7 @@ const HintLineScript := preload("res://hud/widgets/hint_line.gd")
 
 const SHOTS_DIR := "user://screenshots"
 const SETTLE_FRAMES := 10
-const ACTIONS: Array[StringName] = [&"cast_a", &"cast_x", &"cast_y", &"cast_b", &"overlay", &"join", &"leave"]
+const ACTIONS: Array[StringName] = [&"staff_1", &"staff_2", &"staff_3", &"staff_4", &"accept", &"back", &"alternate", &"pause"]
 const PAD_NAMES: Dictionary = {0: "Xbox One Controller", 1: "PS5 Controller", 2: "Nintendo Switch Pro Controller", 3: "Generic Pad"}
 const ROW_HEIGHT: float = 44.0
 
@@ -41,7 +41,7 @@ func _initialize() -> void:
 		var player: int = rows[row][1]
 		var line := Control.new()
 		line.position = Vector2(12.0, 8.0 + ROW_HEIGHT * row)
-		line.scale = Vector2(3.0, 3.0)
+		line.scale = Vector2(2.0, 2.0)
 		root.add_child(line)
 		var x: float = 0.0
 		for action in ACTIONS:
@@ -50,12 +50,12 @@ func _initialize() -> void:
 			line.add_child(glyph)
 			glyph.show_action(player, action)
 			glyph.position = Vector2(x, 0.0)
-			x += glyph.custom_minimum_size.x + 8.0
+			x += glyph.custom_minimum_size.x + 6.0
 		var hint: HintLineScript = HintLineScript.new()
 		hint.bind(manager)
-		hint.position = Vector2(540.0, 8.0 + ROW_HEIGHT * row)
+		hint.position = Vector2(520.0, 8.0 + ROW_HEIGHT * row)
 		root.add_child(hint)
-		hint.show_hint(player, &"cast_a", "Use", &"cast_b", "back")
+		hint.show_hint(player, &"accept", "Use", &"back", "back")
 	await _settle()
 	await RenderingServer.frame_post_draw
 	var image: Image = root.get_texture().get_image()

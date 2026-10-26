@@ -1,0 +1,416 @@
+extends "res://tests/support/suite.gd"
+## Tests for the moves, areas and refunds of the staffs (B2d): teleport, hook, swap and recoil ask
+## the player and ai to move through the events; the end of a dash, teleport or hook is the
+## carrier's end point (blast, on expire); blast asks combat for an area hit where a shot or beam
+## ends; siphon refunds mana per hit. It runs a real projectile manager and event bus, stepped by
+## hand, with cards built in code.
+##
+## godot --headless --path . --script res://tests/core/test_spells_moves.gd
+
+const StaffKit := preload("res://tests/support/staff_kit.gd")
+const SpellsScript := preload("res://core/spells/spells.gd")
+const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
+const EventsScript := preload("res://core/events/events.gd")
+
+const DT: float = 1.0 / 60.0
+
+
+class FakeRegistry:
+	extends Node
+	var items: Dictionary = {}
+
+	func get_resource(_folder: StringName, id: StringName) -> Resource:
+		return items.get(id)
+
+
+var _fake: FakeRegistry
+var _spells: SpellsScript
+var _mgr: ManagerScript
+var _bus: EventsScript
+## Every caster_move_requested as [player, mode, to, seconds, tag].
+var _moves: Array = []
+## Every target_move_requested as [player, target, to].
+var _target_moves: Array = []
+## Every area_hit_requested as [player, position, radius, tag].
+var _areas: Array = []
+## Every mana_refund_requested as [player, amount].
+var _refunds: Array = []
+
+
+func before_each() -> void:
+	_fake = own(FakeRegistry.new()) as FakeRegistry
+	_bus = own(EventsScript.new()) as EventsScript
+	_mgr = own(ManagerScript.new()) as ManagerScript
+	_mgr.events = _bus
+	_mgr.set_cap(512)
+	_spells = own(SpellsScript.new()) as SpellsScript
+	_spells.registry = _fake
+	_spells.bind(_mgr, _bus)
+	_mgr.set_anchor(0, Vector2.ZERO)
+	_moves.clear()
+	_target_moves.clear()
+	_areas.clear()
+	_refunds.clear()
+	_bus.caster_move_requested.connect(func(player: int, mode: StringName, to: Vector2, seconds: float, tag: int) -> void:
+		_moves.append([player, mode, to, seconds, tag]))
+	_bus.target_move_requested.connect(func(player: int, target: Node, to: Vector2) -> void:
+		_target_moves.append([player, target, to]))
+	_bus.area_hit_requested.connect(func(player: int, at: Vector2, radius: float, tag: int) -> void:
+		_areas.append([player, at, radius, tag]))
+	_bus.mana_refund_requested.connect(func(player: int, amount: float) -> void:
+		_refunds.append([player, amount]))
+	var bolt: FormBase = _form(&"bolt", 300.0, 1.0)
+	bolt.base_damage = 10
+	var teleport: FormBase = _form(&"teleport", 400.0, 0.25)
+	teleport.motion = FormBase.Motion.TELEPORT
+	var dash: FormBase = _form(&"dash", 400.0, 0.2)
+	dash.motion = FormBase.Motion.DASH
+	var hook: FormBase = _form(&"hook", 300.0, 1.0)
+	hook.motion = FormBase.Motion.HOOK
+	var swap: FormBase = _form(&"swap", 300.0, 1.0)
+	swap.motion = FormBase.Motion.SWAP
+	var beam: FormBase = _form(&"beam", 0.0, 0.2)
+	beam.motion = FormBase.Motion.RAY
+	beam.ray_length = 200.0
+	beam.radius = 6.0
+	_modifier(&"blast", ModifierBase.Behaviour.BLAST, 30.0)
+	_modifier(&"recoil", ModifierBase.Behaviour.RECOIL, 20.0)
+	_modifier(&"siphon", ModifierBase.Behaviour.SIPHON, 2.0)
+	_modifier(&"mirror", ModifierBase.Behaviour.MIRROR, 1.0)
+	_modifier(&"chain", ModifierBase.Behaviour.CHAIN, 1.0)
+	var piercing := ModifierBase.new()
+	piercing.extra_pierce = 2
+	_put(piercing, &"pierce")
+	var wall: FormBase = _form(&"wall", 0.0, 0.5)
+	wall.motion = FormBase.Motion.WALL
+	wall.shots = 3
+	wall.spread = 10.0
+	wall.radius = 4.0
+	_trigger(&"on_expire", TriggerBase.Event.EXPIRE)
+	var spark: FormBase = _form(&"spark", 100.0, 1.0)
+	spark.base_damage = 3
+
+
+func _put(component: SpellComponent, id: StringName) -> void:
+	component.id = id
+	component.display_name = String(id).capitalize()
+	component.complexity = 1
+	_fake.items[id] = component
+
+
+func _form(id: StringName, speed: float, lifetime: float) -> FormBase:
+	var form := FormBase.new()
+	form.base_damage = 5
+	form.speed = speed
+	form.lifetime = lifetime
+	form.mana_cost = 2.0
+	_put(form, id)
+	return form
+
+
+func _modifier(id: StringName, behaviour: ModifierBase.Behaviour, strength: float) -> void:
+	var modifier := ModifierBase.new()
+	modifier.behaviour = behaviour
+	modifier.behaviour_strength = strength
+	_put(modifier, id)
+
+
+func _trigger(id: StringName, event: TriggerBase.Event) -> TriggerBase:
+	var trigger := TriggerBase.new()
+	trigger.event = event
+	trigger.max_fires = 1
+	_put(trigger, id)
+	return trigger
+
+
+func _build(player: int, cards: Array[StringName]) -> int:
+	StaffKit.build(_spells, player, 0, cards)
+	return _spells.current_tag(player, 0, 0)
+
+
+func _target(position: Vector2) -> Node2D:
+	var node := Node2D.new()
+	root.add_child(node)
+	node.global_position = position
+	own(node)
+	_mgr.add_target(node, 10.0, ManagerScript.LAYER_ENEMY, EventsScript.NO_PLAYER)
+	return node
+
+
+func _tick(steps: int) -> void:
+	for i in steps:
+		_mgr.step(DT)
+		_spells.step(DT)
+
+
+func _cast(player: int = 0) -> float:
+	return _spells.cast_staff(player, 0, Vector2.ZERO, Vector2.RIGHT, 100.0)
+
+
+func test_teleport_asks_for_a_blink_along_the_aim() -> void:
+	var tag: int = _build(0, [&"teleport"])
+	check(_cast() >= 0.0, "the cast went through")
+	check_equal(_moves.size(), 1, "one move asked for")
+	check(_moves.size() == 1 and _moves[0][1] == &"teleport" and _moves[0][2].is_equal_approx(Vector2(100, 0)) and _moves[0][4] == tag, "a blink of speed x lifetime: %s" % [_moves])
+	check_equal(_mgr.get_count(), 0, "no shot leaves the caster")
+
+
+func test_teleport_is_cut_short_at_a_wall() -> void:
+	_mgr.set_walls([Rect2(60.0, -50.0, 20.0, 100.0)])
+	_build(0, [&"teleport"])
+	_cast()
+	check(_moves.size() == 1 and _moves[0][2].x <= 60.5, "it ends at the wall: %s" % [_moves])
+
+
+func test_a_blast_teleport_explodes_on_arrival() -> void:
+	var tag: int = _build(0, [&"blast", &"teleport"])
+	_cast()
+	check_equal(_areas.size(), 0, "nothing before the player has arrived")
+	_bus.caster_move_finished.emit(0, &"teleport", Vector2(90, 5), tag)
+	check_equal(_areas.size(), 1, "one explosion")
+	check(_areas.size() == 1 and _areas[0][1].is_equal_approx(Vector2(90, 5)) and is_equal_approx(_areas[0][2], 30.0) and _areas[0][3] == tag, "where the wizard arrived, as wide as the blast: %s" % [_areas])
+
+
+func test_an_on_expire_teleport_fires_its_payload_on_arrival() -> void:
+	var tag: int = _build(0, [&"on_expire", &"teleport", &"spark"])
+	_cast()
+	check_equal(_mgr.get_count(), 0, "nothing yet")
+	_bus.caster_move_finished.emit(0, &"teleport", Vector2(90, 5), tag)
+	check_equal(_mgr.get_count(), 1, "the payload left the arrival point")
+	for slot in _mgr.get_cap():
+		if _mgr.is_alive(slot):
+			check(_mgr.get_position_of(slot).is_equal_approx(Vector2(90, 5)), "from the arrival")
+			check(_mgr.get_velocity_of(slot).normalized().is_equal_approx(Vector2.RIGHT), "along the blink")
+
+
+func test_a_dash_ends_with_its_blast_too() -> void:
+	var tag: int = _build(0, [&"blast", &"dash"])
+	_cast()
+	_bus.caster_move_finished.emit(0, &"dash", Vector2(70, 0), tag)
+	check_equal(_areas.size(), 1, "the dash explodes where it stops")
+
+
+func test_a_move_that_ended_for_another_player_or_mode_is_ignored() -> void:
+	var tag: int = _build(0, [&"blast", &"teleport"])
+	_cast()
+	_bus.caster_move_finished.emit(1, &"teleport", Vector2(90, 0), tag)
+	_bus.caster_move_finished.emit(0, &"recoil", Vector2(90, 0), tag)
+	_bus.caster_move_finished.emit(0, &"teleport", Vector2.INF, tag)
+	_bus.caster_move_finished.emit(0, &"teleport", Vector2(90, 0), 0)
+	check_equal(_areas.size(), 0, "none of them is the end of this teleport")
+
+
+func test_a_move_of_a_forgotten_build_does_nothing() -> void:
+	var tag: int = _build(0, [&"blast", &"teleport"])
+	_cast()
+	_build(0, [&"bolt"])
+	for i in SpellLimits.GENERATIONS:
+		_build(0, [&"bolt"])
+	_bus.caster_move_finished.emit(0, &"teleport", Vector2(90, 0), tag)
+	check_equal(_areas.size(), 0, "its tag means nothing any more")
+
+
+func test_hook_pulls_the_caster_to_where_it_hits() -> void:
+	var tag: int = _build(0, [&"hook"])
+	_target(Vector2(60, 0))
+	_cast()
+	_tick(30)
+	check_equal(_moves.size(), 1, "one pull")
+	check(_moves.size() == 1 and _moves[0][1] == &"hook" and absf(_moves[0][2].x - 50.0) < 12.0 and _moves[0][4] == tag, "to the hit point: %s" % [_moves])
+	check(_moves.size() == 1 and is_equal_approx(_moves[0][3], SpellLimits.HOOK_SECONDS), "over the hook's time")
+
+
+func test_a_hook_that_misses_pulls_nothing() -> void:
+	_build(0, [&"blast", &"hook"])
+	_cast()
+	_tick(90)
+	check_equal(_moves.size(), 0, "no pull")
+	check_equal(_areas.size(), 0, "and no blast: it waits for an arrival that never comes")
+
+
+func test_a_blast_hook_explodes_on_arrival_not_at_the_hit() -> void:
+	var tag: int = _build(0, [&"blast", &"hook"])
+	_target(Vector2(60, 0))
+	_cast()
+	_tick(30)
+	check_equal(_areas.size(), 0, "not where the hook struck")
+	_bus.caster_move_finished.emit(0, &"hook", Vector2(45, 0), tag)
+	check(_areas.size() == 1 and _areas[0][1].is_equal_approx(Vector2(45, 0)), "where the wizard arrived: %s" % [_areas])
+
+
+func test_swap_trades_places_with_the_target() -> void:
+	_mgr.set_anchor(0, Vector2(-10, 4))
+	var tag: int = _build(0, [&"swap"])
+	var enemy: Node2D = _target(Vector2(60, 0))
+	_spells.cast_staff(0, 0, Vector2(-10, 4), Vector2.RIGHT, 100.0)
+	_tick(30)
+	check_equal(_target_moves.size(), 1, "the target is moved")
+	check(_target_moves.size() == 1 and _target_moves[0][1] == enemy and _target_moves[0][2].is_equal_approx(Vector2(-10, 4)), "to where the caster stood: %s" % [_target_moves])
+	check(_moves.size() == 1 and _moves[0][1] == &"swap" and _moves[0][2].is_equal_approx(Vector2(60, 0)) and _moves[0][4] == tag, "and the caster to the target: %s" % [_moves])
+
+
+func test_a_swap_with_no_caster_place_moves_nobody() -> void:
+	_mgr.clear_anchor(0)
+	_build(0, [&"swap"])
+	_target(Vector2(60, 0))
+	_cast()
+	_tick(30)
+	check_equal(_target_moves.size() + _moves.size(), 0, "without knowing where the caster is, nothing is traded")
+
+
+func test_recoil_pushes_the_caster_back() -> void:
+	var tag: int = _build(0, [&"recoil", &"bolt"])
+	_cast()
+	check_equal(_moves.size(), 1, "one push")
+	check(_moves.size() == 1 and _moves[0][1] == &"recoil" and _moves[0][2].is_equal_approx(Vector2(-20, 0)) and _moves[0][4] == tag, "against the aim by its strength: %s" % [_moves])
+	check_equal(_mgr.get_count(), 1, "the bolt still flew")
+
+
+func test_mirror_cancels_the_recoil() -> void:
+	_build(0, [&"mirror", &"recoil", &"bolt"])
+	_cast()
+	check_equal(_moves.size(), 2, "a push each way")
+	var sum: Vector2 = Vector2.ZERO
+	for move in _moves:
+		sum += move[2]
+	check(sum.is_zero_approx(), "they cancel: %s" % [_moves])
+
+
+func test_a_payload_does_not_recoil_the_caster() -> void:
+	_build(0, [&"recoil", &"on_expire", &"bolt", &"spark"])
+	_cast()
+	_tick(90)
+	var pushes: int = 0
+	for move in _moves:
+		if move[1] == &"recoil":
+			pushes += 1
+	check_equal(pushes, 1, "only the cast's own firing pushes")
+
+
+func test_a_blast_shot_explodes_where_it_hits() -> void:
+	var tag: int = _build(0, [&"blast", &"bolt"])
+	_target(Vector2(60, 0))
+	_cast()
+	_tick(30)
+	check_equal(_areas.size(), 1, "one explosion")
+	check(_areas.size() == 1 and absf(_areas[0][1].x - 50.0) < 12.0 and is_equal_approx(_areas[0][2], 30.0) and _areas[0][3] == tag, "at the hit: %s" % [_areas])
+
+
+func test_a_blast_shot_explodes_where_it_expires() -> void:
+	_build(0, [&"blast", &"bolt"])
+	_cast()
+	_tick(90)
+	check_equal(_areas.size(), 1, "one explosion at its end")
+	check(_areas.size() == 1 and _areas[0][1].x > 200.0, "far out: %s" % [_areas])
+
+
+func test_a_blast_beam_explodes_at_its_end() -> void:
+	_build(0, [&"blast", &"beam"])
+	_cast()
+	check_equal(_areas.size(), 1, "one explosion")
+	check(_areas.size() == 1 and absf(_areas[0][1].x - 200.0) < 1.0, "at the end of the beam: %s" % [_areas])
+
+
+func test_a_shot_without_blast_asks_for_no_area_hit() -> void:
+	_build(0, [&"bolt"])
+	_target(Vector2(60, 0))
+	_cast()
+	_tick(30)
+	check_equal(_areas.size(), 0, "a plain hit is no area")
+
+
+func test_siphon_refunds_mana_for_each_hit() -> void:
+	_build(0, [&"siphon", &"beam"])
+	_target(Vector2(60, 0))
+	_cast()
+	check_equal(_refunds, [[0, 2.0]], "the beam's hit paid back its strength")
+
+
+func test_siphon_refunds_mana_for_a_shot_hit() -> void:
+	_build(0, [&"siphon", &"bolt"])
+	_target(Vector2(60, 0))
+	_cast()
+	_tick(30)
+	check_equal(_refunds, [[0, 2.0]], "the bolt's hit paid back its strength")
+
+
+func test_a_miss_refunds_nothing() -> void:
+	_build(0, [&"siphon", &"bolt"])
+	_cast()
+	_tick(90)
+	check_equal(_refunds.size(), 0, "no hit, no mana")
+
+
+func test_a_piercing_shot_does_not_blast_at_a_hit_it_survives() -> void:
+	_build(0, [&"blast", &"pierce", &"bolt"])
+	_target(Vector2(60, 0))
+	_cast()
+	_tick(30)
+	check_equal(_areas.size(), 0, "still flying: no explosion at the hit")
+	_tick(60)
+	check_equal(_areas.size(), 1, "one explosion where it finally expires")
+
+
+func test_a_chain_shot_blasts_where_each_jump_ends() -> void:
+	_build(0, [&"blast", &"chain", &"bolt"])
+	_target(Vector2(60, 0))
+	_target(Vector2(60, 40))
+	_cast()
+	_tick(60)
+	check_equal(_areas.size(), 2, "the first shot is spent on its hit and so is the jump shot: %s" % [_areas])
+
+
+func test_every_shot_of_a_wall_blasts_when_it_expires() -> void:
+	_build(0, [&"blast", &"wall"])
+	_cast()
+	_tick(60)
+	check_equal(_areas.size(), 3, "one explosion for each of the three shots")
+
+
+func test_the_move_heading_is_the_last_asked_move() -> void:
+	var tag: int = _build(0, [&"on_expire", &"teleport", &"spark"])
+	_cast()
+	_tick(120)
+	check(_spells.cast_staff(0, 0, Vector2.ZERO, Vector2.UP, 100.0) >= 0.0, "the second cast went off")
+	_bus.caster_move_finished.emit(0, &"teleport", Vector2(90, 5), tag)
+	var seen: int = 0
+	for slot in _mgr.get_cap():
+		if _mgr.is_alive(slot):
+			seen += 1
+			check(_mgr.get_velocity_of(slot).normalized().is_equal_approx(Vector2.UP), "the later move's heading wins")
+	check(seen > 0, "the payload left")
+
+
+func test_a_hook_works_for_player_two() -> void:
+	_mgr.set_anchor(2, Vector2(0, 100))
+	var tag: int = _build(2, [&"on_expire", &"hook", &"spark"])
+	_target(Vector2(60, 100))
+	_spells.cast_staff(2, 0, Vector2(0, 100), Vector2.RIGHT, 100.0)
+	_tick(30)
+	check(_moves.size() == 1 and _moves[0][0] == 2 and _moves[0][1] == &"hook" and _moves[0][4] == tag, "the pull is player 2's: %s" % [_moves])
+	_bus.caster_move_finished.emit(2, &"hook", Vector2(45, 100), tag)
+	var found: bool = false
+	for slot in _mgr.get_cap():
+		if _mgr.is_alive(slot) and SpellTag.player_of(_mgr.get_tag_of(slot)) == 2 and _mgr.get_position_of(slot).is_equal_approx(Vector2(45, 100)):
+			found = true
+	check(found, "its payload is player 2's and leaves the arrival point")
+
+
+func test_a_swap_reads_the_casters_own_anchor() -> void:
+	_mgr.set_anchor(0, Vector2(-500, 0))
+	_mgr.set_anchor(3, Vector2(-10, 4))
+	_build(3, [&"swap"])
+	var enemy: Node2D = _target(Vector2(60, 0))
+	_spells.cast_staff(3, 0, Vector2(-10, 4), Vector2.RIGHT, 100.0)
+	_tick(30)
+	check(_target_moves.size() == 1 and _target_moves[0][0] == 3 and _target_moves[0][1] == enemy and _target_moves[0][2].is_equal_approx(Vector2(-10, 4)), "player 3's place, not player 0's: %s" % [_target_moves])
+
+
+func test_a_teleport_of_player_three_ignores_other_players_arrivals() -> void:
+	var tag: int = _build(3, [&"on_expire", &"teleport", &"spark"])
+	_spells.cast_staff(3, 0, Vector2.ZERO, Vector2.RIGHT, 100.0)
+	check(_moves.size() == 1 and _moves[0][0] == 3 and _moves[0][1] == &"teleport", "asked for player 3: %s" % [_moves])
+	_bus.caster_move_finished.emit(0, &"teleport", Vector2(90, 0), tag)
+	check_equal(_mgr.get_count(), 0, "another player's arrival fires nothing")
+	_bus.caster_move_finished.emit(3, &"teleport", Vector2(90, 0), tag)
+	check_equal(_mgr.get_count(), 1, "its own does")

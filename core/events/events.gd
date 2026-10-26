@@ -44,7 +44,7 @@ signal projectile_hit(player: int, target: Node, position: Vector2, tag: int)
 signal projectile_impact(player: int, target: Node, position: Vector2, direction: Vector2)
 ## Sender: core/projectiles. A projectile fired by `player` ended without a hit: its life ran out or it struck a wall. `tag` is the value given to `Projectiles.spawn()`.
 signal projectile_expired(player: int, position: Vector2, tag: int)
-## Sender: core/spells. A beam or a nova of `player` just fired, for looks only (they have no shot to draw). `form` is `&"beam"` (`length` is how far it got, along `direction`) or `&"nova"` (a ring of shots leaves `origin`; `length` is 0). `tint` is the colour of the spell's element (white for plain arcane).
+## Sender: core/spells. A beam, a nova or a rain of `player` just fired, for looks only (they have no shot to draw). `form` is `&"rain"` (a telegraph: its payload falls on `origin` after `length` seconds) or `&"beam"` (`length` is how far it got, along `direction`) or `&"nova"` (a ring of shots leaves `origin`; `length` is 0). `tint` is the colour of the spell's element (white for plain arcane).
 signal form_shown(player: int, form: StringName, origin: Vector2, direction: Vector2, length: float, tint: Color)
 ## Sender: core/spells. `player` just cast a spell that is more than a plain shot, for looks only. `combo_class` is `&"boosted"` (modifiers only), `&"on_hit"`, `&"on_expire"` or `&"timer"` (a trigger holds a second spell), or `&"stacked"` (a trigger with two or more modifiers, or a chain of three spells); a plain cast sends nothing. `tint` is the element's colour (white for plain arcane). Sent after the cast made a shot. Heard by feel.
 signal combo_cast(player: int, combo_class: StringName, origin: Vector2, direction: Vector2, tint: Color)
@@ -56,7 +56,7 @@ signal bag_changed(player: int, bag: Array[StringName])
 signal staff_changed(player: int, staff: int, plan: Dictionary)
 ## Sender: player. `player` cast their staff `staff` from `origin` along `direction`. Heard by feel.
 signal staff_cast(player: int, staff: int, origin: Vector2, direction: Vector2)
-## Sender: core/spells. A card of `player` moves the wizard: `mode` is `&"dash"`, `&"teleport"`, `&"hook"`, `&"swap"` or `&"recoil"`; `to` is where it wants to go (the wizard stops at walls), over `seconds` (0 is at once); `tag` is the card's tag. Heard by player, which answers with `caster_move_finished`.
+## Sender: core/spells. A card of `player` moves the wizard: `mode` is `&"dash"`, `&"teleport"`, `&"hook"`, `&"swap"` or `&"recoil"`; `to` is where it wants to go (the wizard stops at walls), over `seconds` (0 is at once); `tag` is the card's tag. Heard by player, which answers with `caster_move_finished`. Several requests can come in one step (a scatter, a burst, `mirror`): the player adds up the `recoil` requests of a step (so `mirror · recoil` cancels) and lets a later dash, teleport, hook or swap replace an earlier one.
 signal caster_move_requested(player: int, mode: StringName, to: Vector2, seconds: float, tag: int)
 ## Sender: player. The move asked for by `caster_move_requested` ended at `position`: the end point of a dash, teleport or hook. Heard by core/spells.
 signal caster_move_finished(player: int, mode: StringName, position: Vector2, tag: int)
@@ -64,8 +64,10 @@ signal caster_move_finished(player: int, mode: StringName, position: Vector2, ta
 signal target_move_requested(player: int, target: Node, to: Vector2)
 ## Sender: core/spells. A card of `player` (blast, a payload's fallback) hits everything in the circle at `position` of `radius`, the caster included, with the hit profile of `tag`. Heard by combat.
 signal area_hit_requested(player: int, position: Vector2, radius: float, tag: int)
-## Sender: core/spells. A card of `player` makes an entity of `kind` (`&"decoy"`, `&"familiar"`) at `position` that lasts `seconds`; `tag` is the card's tag. Heard by ai.
+## Sender: core/spells. A card of `player` makes an entity of `kind` (`&"decoy"`, `&"familiar"`) at `position` that lasts `seconds` (INF, or 0 or less: until `entity_end_requested`, the room or the run ends); `tag` is the card's tag. Heard by ai.
 signal entity_spawn_requested(player: int, kind: StringName, position: Vector2, seconds: float, tag: int)
+## Sender: core/spells. The entities of `player` made by the card with `tag` end now (a `hold` switched off, or its staff rebuilt). Heard by ai, which answers with `entity_ended` for each.
+signal entity_end_requested(player: int, tag: int)
 ## Sender: ai. The entity of `player` of `kind` with `tag` ended at `position` (a decoy died, a familiar left). Heard by core/spells (its end point).
 signal entity_ended(player: int, kind: StringName, position: Vector2, tag: int)
 ## Sender: ai. The familiar of `player` with `tag` casts its payload from `position` along `direction`. Heard by core/spells.

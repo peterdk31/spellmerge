@@ -6,6 +6,22 @@ What each run did, newest first. Claude appends a short entry after each develop
 
 `gameplay/combat` now does what the staff cards need from a fight: every hit has a kind (`hit_landed` before `damage_dealt`), a wizard is hurt by their own spell like any other target (damage, push, status), wizards have burn, chill/freeze, shock, hex and static of their own, barriers (`wizard_shield_requested`, `shield_blocked`), area hits (`area_hit_requested`), several elements on one hit (each reacts with what the one before left), heal hits (`heal_dealt`, which `gameplay/player` now applies), pulls (`pull_requested`) and the heavy wall slam. It sends `kill_landed`, `reaction_landed` and `wizard_hurt` for cards, and `downed_note` for "downed by your own Blast". `gameplay/feel` gives each kind a default stop, shake and sound, the self-hit its own ring, the heal a soft ring, and shows the note. Not switched on yet: `Spells` does not send the shield and pull events or set self-hit on shots (B2 and the cards). Tests: `test_combat_kit.gd` (35), `test_feel_hit_kinds.gd` (11) and four compiler rows.
 
+## 2026-10-26: Trigger kit, part 4 (staffs B2d)
+
+The spell runtime runs the moves, areas and refunds: teleport (a blink along the aim, cut at walls), hook (a hit pulls the caster to it), swap (a hit moves the target to the caster and the caster to the target), recoil (a push back from each firing of the cast, so mirror cancels it); the end of a dash, teleport or hook (`caster_move_finished`) is the carrier's end point, where its blast and `on expire` payload happen; `blast` asks combat for an area hit where a shot or beam ends; siphon refunds mana per hit. Tests: `tests/core/test_spells_moves.gd` (22 tests). **B2 is done.**
+
+## 2026-10-26: Trigger kit, part 3 (staffs B2c)
+
+The spell runtime runs the payload and line carriers: rain (a `form_shown` cue, then its payload on the aim point after its lifetime), familiar and decoy (`entity_spawn_requested`, counted as live until `entity_ended`; a familiar casts its payload on `familiar_cast_requested`; a decoy's end point fires its `on expire` payload and `blast`), wall (a line of still shots across the aim, shields apply) and fissure (a beam through everything on its line). Tests: `tests/core/test_spells_payload_carriers.gd` (28 tests). B2d (moves, areas, refunds) is next.
+
+## 2026-10-26: Trigger kit, part 2 (staffs B2b)
+
+The spell runtime runs the multicast spread: scatter (random directions, seeded per cast), burst (later firings of the group, queued), echo (the carrier again after its strength in seconds, at half damage) and mirror (also fires backwards). Tests: `tests/core/test_spells_multicast.gd` (27 tests). B2c and B2d are next.
+
+## 2026-10-26: Trigger kit, part 1 (staffs B2a)
+
+The spell runtime fires the payloads of the seven new trigger events (on block, on kill, on cast, on wall, on hurt, on reaction, on ally) and runs `relay`. Tests: `tests/core/test_spells_triggers.gd` (10 tests). B2b to B2d (multicast spread, payload carriers, moves and refunds) are next.
+
 ## 2026-10-26: Projectile kit (staffs B1)
 
 `core/projectiles` runs the movement and collision behaviours of the staff cards: bounce, ghost, spiral, return, linger, growth, sticky, shield (`shot_blocked`), shots that may hit their caster after leaving the caster's hitbox, shots that pass teammates (`ally_passed`) or hit them (mend), and `expired_on_wall` for `on wall`. The spell runtime hands a shot these from the card strengths, so the cards after B1 (bounce, double and the like) are data. Self-hit and ally-hit are available but not switched on by `Spells` yet: combat has no self-harm until B3. Tests: `tests/core/test_projectiles_kit.gd` (17 tests, including 1,500 shots with behaviours).

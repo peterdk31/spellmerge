@@ -27,13 +27,14 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `projectile_expired` | `core/projectiles` | none yet (`core/spells` from M2 part 6) |
 | `build_refused` | `player` | `hud` (the builders) |
 | `bag_changed` | `player` | `hud` (the builders) |
-| `card_move_requested` | `hud` (staffs B8) | `player` |
+| `card_move_requested` | `hud` (the builders) | `player` |
 | `staff_changed` | `player` | `hud` (the builders) |
 | `staff_cast` | `player` | `hud` (the corner panel) |
 | `caster_move_requested`, `mana_reserved` | `core/spells` | `player` |
-| `target_move_requested`, `entity_spawn_requested`, `mana_refund_requested` | `core/spells` | none yet (staffs kits B2-B5) |
+| `area_hit_requested`, `mana_refund_requested` | `core/spells` | `combat` (area hits); refunds: none yet |
+| `target_move_requested`, `entity_spawn_requested`, `entity_end_requested` | `core/spells` (staffs B2) | `ai` |
 | `caster_move_finished` | `player` | none yet (`core/spells`, staffs B2) |
-| `entity_ended`, `familiar_cast_requested` | `ai` | none yet (`core/spells`, staffs B5) |
+| `entity_ended`, `familiar_cast_requested` | `ai` | none yet (`core/spells`, staffs B2) |
 | `shot_blocked`, `ally_passed` | `core/projectiles` | none yet (`core/spells`, staffs B1) |
 | `shield_blocked`, `kill_landed`, `wizard_hurt`, `reaction_landed` | `combat` | none yet (`core/spells`, staffs B2) |
 | `hit_landed` | `combat` | `feel` |

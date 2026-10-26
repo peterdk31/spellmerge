@@ -43,6 +43,7 @@ const EVENTS: Dictionary = {
 	&"target_move_requested": [["player", TYPE_INT], ["target", TYPE_OBJECT], ["to", TYPE_VECTOR2]],
 	&"area_hit_requested": [["player", TYPE_INT], ["position", TYPE_VECTOR2], ["radius", TYPE_FLOAT], ["tag", TYPE_INT]],
 	&"entity_spawn_requested": [["player", TYPE_INT], ["kind", TYPE_STRING_NAME], ["position", TYPE_VECTOR2], ["seconds", TYPE_FLOAT], ["tag", TYPE_INT]],
+	&"entity_end_requested": [["player", TYPE_INT], ["tag", TYPE_INT]],
 	&"entity_ended": [["player", TYPE_INT], ["kind", TYPE_STRING_NAME], ["position", TYPE_VECTOR2], ["tag", TYPE_INT]],
 	&"familiar_cast_requested": [["player", TYPE_INT], ["position", TYPE_VECTOR2], ["direction", TYPE_VECTOR2], ["tag", TYPE_INT]],
 	&"mana_refund_requested": [["player", TYPE_INT], ["amount", TYPE_FLOAT]],

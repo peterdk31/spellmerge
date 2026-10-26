@@ -1,8 +1,9 @@
 extends "res://tests/support/suite.gd"
-## Tests for the staff builder in hud/builder (staffs A6a): opened from the overlay at any
+## Tests for the staff builder in hud/builder (staffs A6a, B8): opened from the overlay at any
 ## time, driven only by its owner's device through core/ui_focus, showing the four staffs, their
-## slots, the bag and the cast plan from events, and asking for changes with
-## `staff_change_requested`. The wizards are real (on the real registry and spell runtime, with
+## slots, the bag, the links and the cast plan with its numbers from events, and asking for
+## changes with `staff_change_requested` and `card_move_requested` (pick and place, X to the
+## bag, LB and RB for the staffs, the d-pad in two dimensions, player 1's mouse). The wizards are real (on the real registry and spell runtime, with
 ## the 20-slot dev staff), so a request is answered as in the game. Four builders open at once is
 ## the point of several tests.
 ##
@@ -41,6 +42,8 @@ var _players: Array[PlayerScript] = []
 var _requests: Array = []
 ## Every build_refused as [player, reason].
 var _refused: Array = []
+## Every card_move_requested as [player, from staff, from slot, to staff, to slot].
+var _moves: Array = []
 
 
 func before_each() -> void:
@@ -61,6 +64,8 @@ func before_each() -> void:
 	_players.clear()
 	_requests.clear()
 	_refused.clear()
+	_moves.clear()
+	_bus.card_move_requested.connect(func(player: int, fs: int, fl: int, ts: int, tl: int) -> void: _moves.append([player, fs, fl, ts, tl]))
 	_bus.staff_change_requested.connect(func(player: int, staff: int, slot: int, id: StringName) -> void: _requests.append([player, staff, slot, id]))
 	_bus.build_refused.connect(func(player: int, reason: String) -> void: _refused.append([player, reason]))
 	# The HUD first, as in the game (the autoload exists before any wizard appears).
@@ -122,13 +127,11 @@ func _open(player: int) -> void:
 	_frame()
 
 
-## Press move_down for `player` until `control` is focused. False if it never was.
+## Put `player`'s focus on `control` (a jump; `test_every_control_is_reached_with_the_dpad`
+## checks that a person gets there with the d-pad). False if it is not one of the panel's.
 func _focus_on(player: int, control: Control) -> bool:
-	for _attempt in 120:
-		if _focus.focused(player) == control:
-			return true
-		_tap(player, &"move_down")
-		_frame()
+	_focus.focus(player, control)
+	_frame()
 	return _focus.focused(player) == control
 
 
@@ -175,10 +178,12 @@ func test_empty_clears_a_slot() -> void:
 	_start(1)
 	_open(0)
 	var builder: BuilderScript = _builder(0)
-	_press(0, builder.slot_button(0))
+	_press(0, builder.slot_button(3))
+	_press(0, _row_named(builder, "Nova"))
+	_press(0, builder.slot_button(5))
 	_press(0, _row_named(builder, BuilderScript.EMPTY_TEXT))
-	check_equal(builder.cards_of(X)[0], &"", "the fire card is gone")
-	check_equal(builder.selected_slot(), 0, "emptying does not move on")
+	check_equal(builder.cards_of(X)[5], &"", "an empty slot stays empty")
+	check_equal(builder.selected_slot(), 5, "emptying does not move on")
 
 
 func test_a_tab_shows_another_staff() -> void:
@@ -271,3 +276,147 @@ func test_the_builder_opens_during_a_wave() -> void:
 	_open(0)
 	check(_builder(0).is_open(), "the full builder opens in a wave")
 	check_equal(_builder(0).tab_button(A).visible, true, "with its tabs")
+
+
+func test_pick_and_place_swaps_two_slots() -> void:
+	_start(1)
+	_open(0)
+	var builder: BuilderScript = _builder(0)
+	_press(0, builder.slot_button(0))
+	check_equal(builder.held(), [X, 0] as Array[int], "A on the fire card picks it up")
+	check(builder.slot_button(0).text.contains(BuilderScript.HELD_MARK), "it is marked as held: %s" % builder.slot_button(0).text)
+	check(builder.hint_text().contains(BuilderScript.HINT_PLACE), "the hint offers to place it: %s" % builder.hint_text())
+	_press(0, builder.slot_button(1))
+	check_equal(_moves, [[0, X, 0, X, 1]], "A on another slot moves it there")
+	check_equal(builder.cards_of(X).slice(0, 2), [&"bolt", &"fire"] as Array[StringName], "swapping with the bolt")
+	check_equal(builder.held(), [BuilderScript.NOTHING, -1] as Array[int], "and nothing is held any more")
+
+
+func test_a_held_card_moves_to_another_staff() -> void:
+	_start(1)
+	_open(0)
+	var builder: BuilderScript = _builder(0)
+	_press(0, builder.slot_button(1))
+	_tap(0, &"page_prev")
+	_frame()
+	check_equal(builder.viewed_staff(), A, "LB shows the previous staff, still holding")
+	_press(0, builder.slot_button(2))
+	check_equal(builder.cards_of(A)[2], &"bolt", "the bolt went into staff A")
+	check_equal(builder.cards_of(X)[1], &"", "and left staff X")
+
+
+func test_back_drops_a_held_card_and_x_sends_one_to_the_bag() -> void:
+	_start(1)
+	_open(0)
+	var builder: BuilderScript = _builder(0)
+	_press(0, builder.slot_button(0))
+	_tap(0, &"cast_b")
+	_frame()
+	check(builder.is_open(), "B while holding does not close")
+	check_equal(builder.held(), [BuilderScript.NOTHING, -1] as Array[int], "it drops the card where it was")
+	check(_moves.is_empty(), "without moving anything")
+	check(_focus_on(0, builder.slot_button(1)), "focus on the bolt")
+	_tap(0, &"cast_x")
+	_frame()
+	check_equal(_moves, [[0, X, 1, BuilderScript.BAG, 0]], "X sends the card back to the bag")
+	check_equal(builder.cards_of(X)[1], &"", "the slot is empty")
+	_press(0, builder.slot_button(0))
+	_press(0, _row_named(builder, "Nova"))
+	check_equal(_moves.back(), [0, X, 0, BuilderScript.BAG, 0], "A on the bag while holding sends the held card back")
+
+
+func test_lb_and_rb_page_through_the_staffs() -> void:
+	_start(1)
+	_open(0)
+	var builder: BuilderScript = _builder(0)
+	_tap(0, &"page_next")
+	_frame()
+	check_equal(builder.viewed_staff(), Y, "RB: X to Y")
+	_tap(0, &"page_next")
+	_tap(0, &"page_next")
+	_frame()
+	check_equal(builder.viewed_staff(), A, "and on round to A")
+	_tap(0, &"page_prev")
+	_frame()
+	check_equal(builder.viewed_staff(), B, "LB goes back")
+
+
+func test_the_dpad_moves_in_two_dimensions() -> void:
+	_start(1)
+	_open(0)
+	var builder: BuilderScript = _builder(0)
+	check_equal(_focus.focused(0), builder.slot_button(0), "start on the first slot")
+	_tap(0, &"move_up")
+	_frame()
+	check_equal(_focus.focused(0), builder.tab_button(X), "up from the first slot is the shown staff's tab")
+	_tap(0, &"move_right")
+	_frame()
+	check_equal(_focus.focused(0), builder.tab_button(Y), "right along the tabs")
+	_tap(0, &"move_down")
+	_frame()
+	check_equal(_focus.focused(0), builder.slot_button(0), "down to the slots")
+	_tap(0, &"move_down")
+	_frame()
+	check_equal(_focus.focused(0), builder.slot_button(1), "down the slots")
+	_tap(0, &"move_right")
+	_frame()
+	check_equal(_focus.focused(0), _row_named(builder, "Bolt"), "right to the bag, on the card in the slot")
+	_tap(0, &"move_left")
+	_frame()
+	check(builder.slot_button(0) == _focus.focused(0) or builder.slot_button(1) == _focus.focused(0), "left back to the slots")
+
+
+func test_every_control_is_reached_with_the_dpad() -> void:
+	_start(1)
+	_open(0)
+	var builder: BuilderScript = _builder(0)
+	var directions: Array[StringName] = [&"move_up", &"move_down", &"move_left", &"move_right"]
+	var seen: Array[Control] = [_focus.focused(0)]
+	var todo: Array[Control] = [_focus.focused(0)]
+	while not todo.is_empty():
+		var from: Control = todo.pop_back()
+		for direction in directions:
+			_focus.focus(0, from)
+			_tap(0, direction)
+			_frame()
+			var to: Control = _focus.focused(0)
+			if to != null and not seen.has(to):
+				seen.append(to)
+				todo.append(to)
+	for control in builder.controls():
+		check(seen.has(control), "%s is reached with the d-pad" % control.name)
+
+
+func test_links_and_numbers_show() -> void:
+	_start(1)
+	_open(0)
+	var builder: BuilderScript = _builder(0)
+	check(builder.slot_button(0).text.contains(">2"), "fire goes into the bolt in slot 2: %s" % builder.slot_button(0).text)
+	check(builder.slot_button(1).text.contains("#1"), "the bolt is cast 1: %s" % builder.slot_button(1).text)
+	check(builder.slot_button(1).text.contains(BuilderScript.LINK_MARK.strip_edges()), "focused on fire, the bolt it goes into is marked")
+	check(builder.note_text().begins_with("Goes into Bolt (slot 2)."), "the note says where fire goes: %s" % builder.note_text())
+	check(builder.plan_text().contains("dmg") and builder.plan_text().contains("mana"), "the plan has live numbers: %s" % builder.plan_text())
+
+
+func test_player_one_drags_with_the_mouse() -> void:
+	_start(1)
+	root.size = Vector2i(640, 360)
+	_open(0)
+	await process_frame
+	var builder: BuilderScript = _builder(0)
+	var from: Button = builder.slot_button(0)
+	var to: Button = builder.slot_button(3)
+	check_equal(from.mouse_filter, Control.MOUSE_FILTER_STOP, "player 1's slots take the mouse")
+	check_equal(_builder(1).slot_button(0).mouse_filter if _builder(1).slot_count() > 0 else Control.MOUSE_FILTER_IGNORE, Control.MOUSE_FILTER_IGNORE, "other players' do not")
+	var press := InputEventMouseButton.new()
+	press.button_index = MOUSE_BUTTON_LEFT
+	press.pressed = true
+	press.global_position = from.get_global_rect().get_center()
+	builder._on_mouse(press, from)
+	var release := InputEventMouseButton.new()
+	release.button_index = MOUSE_BUTTON_LEFT
+	release.pressed = false
+	release.global_position = to.get_global_rect().get_center()
+	builder._on_mouse(release, from)
+	check_equal(_moves, [[0, X, 0, X, 3]], "dragging fire onto slot 4 moves it there")
+

@@ -12,6 +12,7 @@ extends RefCounted
 ## refused: a card that does nothing is listed as wasted, with the reason.
 
 ## `CompiledCast.targets` value for a card that landed on the caster, and on a payload's origin.
+const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 const TARGET_CASTER: int = -1
 const TARGET_POINT: int = -2
 
@@ -245,7 +246,6 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 			spell.status_duration = element.status_duration
 			spell.status_strength = element.status_strength
 			spell.tint = element.tint
-			spell.shape = element.shape
 		else:
 			later_ids.append(element.status_id)
 			later_durations.append(element.status_duration)
@@ -268,6 +268,7 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 				spell.homing_turn = maxf(spell.homing_turn, modifier.behaviour_strength)
 			ModifierBase.Behaviour.CHAIN:
 				spell.chain_jumps += int(modifier.behaviour_strength)
+	spell.look = _look_of(elements, modifiers)
 	spell.damage = maxi(roundi(damage), 1)
 	spell.mana_cost = mana
 	spell.cooldown = maxf(cooldown, 0.0)
@@ -298,6 +299,15 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 	if heavy > 0.0:
 		spell.hit.knockback *= heavy
 		spell.hit.slam = roundi(float(spell.damage) * SpellLimits.SLAM_SHARE)
+	if spell.behaviour(ModifierBase.Behaviour.ECHO) > 0.0:
+		spell.echo_hit = HitProfile.new()
+		spell.echo_hit.damage = maxi(roundi(spell.damage * SpellLimits.ECHO_DAMAGE), 1)
+		spell.echo_hit.knockback = spell.hit.knockback
+		spell.echo_hit.element_id = spell.element_id
+		spell.echo_hit.element_ids = spell.element_ids
+		spell.echo_hit.status_id = spell.status_id
+		spell.echo_hit.status_duration = spell.status_duration
+		spell.echo_hit.status_strength = spell.status_strength
 	if trigger != null:
 		spell.trigger_id = trigger.id
 		spell.trigger_event = trigger.event
@@ -306,6 +316,16 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 	_cast.mana += spell.mana_cost
 	_cast.delay += spell.cooldown
 	return spell
+
+
+## The look of a carrier's shots (docs/milestones/M2-staffs.md, "The look of a shot"): the
+## looks of every infusion and modifier on it, combined.
+static func _look_of(elements: Array, modifiers: Array) -> int:
+	var kinds := PackedInt32Array()
+	for cards: Array in [elements, modifiers]:
+		for card: SpellComponent in cards:
+			kinds.append(int(card.get(&"look_layer")))
+	return ProjectilesScript.pack_look(kinds)
 
 
 ## The next card slot to read, or -1 when the group must end: no card is left, or the next

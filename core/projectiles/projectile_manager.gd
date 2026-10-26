@@ -38,7 +38,10 @@ extends Node2D
 ## The budget is per `step` call, not per frame: if the engine runs several
 ## physics steps in one frame to catch up, each has its own budget.
 ##
-## Drawing: two batches. Shots of players are tinted with their colour; enemy shots
+## Drawing: a player's shot is built by `shot_core.gdshader` on a pixel grid (staffs B6a): a
+## small core in its first infusion's colour (`set_core`) outlined in its player's shadow
+## shade, a short trail in its player's colour behind a bolt, and particles given off from
+## its tail in the styles of all its cards (`set_look`), mixed at random. It is drawn about its hit size (`look_size`). Enemy shots
 ## (owner NO_PLAYER) have their own texture (`hostile_texture`), are not tinted and are
 ## drawn one layer above, so a dangerous shot never hides under a friendly one.
 ##
@@ -215,41 +218,47 @@ const BATCH_BOLT: int = 0
 const BATCH_RUNE: int = 1
 const BATCH_ORBIT: int = 2
 const BATCH_HOSTILE: int = 3
-## The trail marks behind shaped bolts (see `set_shape`); counted apart from the shots.
-const BATCH_TRAIL: int = 4
-## The element shapes (`set_shape`): 0 is the plain sprite. They match `ElementBase.shape`.
-const SHAPE_FLAME: int = 1
-const SHAPE_STAR: int = 2
-const SHAPE_ZIGZAG: int = 3
-const SHAPE_RING: int = 4
-const SHAPE_ARC: int = 5
-const SHAPE_COUNT: int = 6
-## The form bodies (the kind written for a player's rune and orbit shots, whatever their
-## element): a diamond that pulses, two beads that spin. Kinds 6-10 are the trail marks
-## (a shape's number plus TRAIL_KIND_OFFSET).
-const KIND_RUNE: int = 11
-const KIND_ORBIT: int = 12
-const TRAIL_KIND_OFFSET: int = 5
+## The bodies a player's shot is drawn as (`shot_core.gdshader` builds them on a pixel grid;
+## staffs B6a): a bolt with a trail in its player's colour, a rune (a diamond that pulses), an
+## orbit shot (two beads that spin). Kind 0 is the texture, which only Feel's lone sprites use.
+const KIND_BOLT: int = 1
+const KIND_RUNE: int = 2
+const KIND_ORBIT: int = 3
 ## The kind travels in the alpha of the custom data as 1 - kind / KIND_STEPS, so it is exact
 ## in a float and has room for kinds 0 to KIND_MAX.
 const KIND_STEPS: float = 16.0
 const KIND_MAX: int = 15
-## A shaped body is drawn this fraction of the sprite's size: the shapes carry their own
-## outline, and at the sprite's size they crowded the view (the owner's note on #244). The
-## drawn body is smaller than the hit circle by design: the circle is the fair reach of a
-## shot or a planted rune, the picture is only what the eye follows.
-const SHAPE_SCALE: float = 0.8
-## Trail marks per shaped bolt and the most marks drawn in all. Past the limit the later
-## shots draw no trail; it is a draw batch, not particles, so Feel's PARTICLE_LIMIT is
-## untouched, and the cost is bounded whatever the cap is.
-const TRAIL_MARKS: int = 3
-const TRAIL_MAX: int = 384
-## Pixels between a bolt and its first trail mark, and between marks, per shape.
-const TRAIL_STEP: PackedFloat32Array = [0.0, 7.0, 9.0, 6.0, 8.0, 7.0]
-## Sideways pixels the marks drift off the line of flight, per shape (alternating sides).
-const TRAIL_DRIFT: PackedFloat32Array = [0.0, 3.0, 0.0, 5.0, 4.0, 3.0]
-## Draws the neutral sprites: the bone body takes the owner's tint, the Spark-coloured
-## core takes the element's colour (`set_core`).
+## The look kinds a card can give a shot (`look_layer` on infusions and modifiers; see
+## `set_look`). The body stays plain; each kind is a style of particle the shot gives off from
+## its tail (`shot_core.gdshader`), and a shot shows every kind its cards bring, mixed at
+## random: the look is a set, one bit per kind. WEAVE and STREAKS also change the body (a
+## weave, a longer core). A new kind of effect is a new number here (up to LOOK_MAX_KINDS) and
+## a branch in the shader's `particle`; a new card with an old kind needs neither.
+const LOOK_NONE: int = 0
+const LOOK_EMBERS: int = 1
+const LOOK_FLECKS: int = 2
+const LOOK_GUSTS: int = 3
+const LOOK_PULL: int = 4
+const LOOK_SPARKS: int = 5
+const LOOK_MOTES: int = 6
+const LOOK_GLINTS: int = 7
+const LOOK_STREAKS: int = 8
+const LOOK_BURST: int = 9
+const LOOK_ORBITERS: int = 10
+const LOOK_WEAVE: int = 11
+const LOOK_GLITTER: int = 12
+const LOOK_COUNT: int = 13
+## The most kinds the instance data has room for: three bytes of bits (`_look_color`).
+const LOOK_MAX_KINDS: int = 24
+## A player's shot is drawn in a square of LOOK_GRID x zoom screen pixels round its centre
+## (room for the tail and the particles it gives off); its core is about 5 x zoom pixels across, and every
+## line stays one pixel. The zoom is this many per pixel of hit radius, rounded and at least
+## one (at most LOOK_ZOOM_MAX), so a bolt (radius 5) has zoom 1, a bigger one 2 and a rune 4:
+## a shot is drawn about its hit size and hits a little wider than it looks.
+const LOOK_GRID: int = 24
+const LOOK_CELL_PER_RADIUS: float = 0.25
+const LOOK_ZOOM_MAX: int = 15
+## Builds the players' shots from their look (see "Drawing" above).
 const CORE_SHADER: Shader = preload("res://core/projectiles/shot_core.gdshader")
 ## Draw order of the shots: above the room and the wizards. The autoload is drawn
 ## before the current scene, so at z_index 0 the room's floor hid every shot.
@@ -276,14 +285,13 @@ const PLAYER_COLORS: Array[Color] = [
 ]
 const ENEMY_COLOR: Color = Color("#e0592f")
 
-## Drawn tinted with the colour of the owner. Set a texture for the real art. Neutral
-## (bone) art with a Spark-coloured core shows the element in the core (see `set_core`).
+## The art of the player batches. Since staffs B6a the shader builds every player's shot and
+## never reads these three; Feel still hands them over, and B6b removes them with Feel's
+## per-form looks.
 var texture: Texture2D = null:
 	set(value):
 		texture = value
 		_apply_textures()
-## The art of runes (MOTION_STILL) and of orbit shots, drawn like `texture`. Left empty,
-## they use `texture`.
 var rune_texture: Texture2D = null:
 	set(value):
 		rune_texture = value
@@ -315,7 +323,7 @@ var friendly_fire: bool = false
 
 var _cap: int = 0
 var _count: int = 0
-## Seconds of simulation stepped so far; shaped shots animate from it (not from the
+## Seconds of simulation stepped so far; shots animate from it (not from the
 ## engine's clock), so a hand-stepped run draws the same frames every time.
 var sim_time: float = 0.0
 ## One past the highest slot in use.
@@ -412,8 +420,8 @@ var _has_walls: bool = false
 
 ## The colour of each shot's core (white for a plain shot), see `set_core`.
 var _core: PackedColorArray = PackedColorArray()
-## The element shape of each shot (0 plain), see `set_shape`.
-var _shape: PackedByteArray = PackedByteArray()
+## The packed look layers of each shot (0 none), see `set_look`.
+var _look: PackedInt32Array = PackedInt32Array()
 var _draw_node: MultiMeshInstance2D = null
 ## Shots each batch's MultiMesh and buffer have room for now (see `_batch_room`).
 var _draw_room: int = 0
@@ -421,12 +429,7 @@ var _rune_room: int = 0
 var _orbit_room: int = 0
 var _hostile_room: int = 0
 ## Live shots per batch this frame (BATCH_*), refilled by _count_batches; a member so no array is made per frame.
-var _batch_counts: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0])
-var _trail_room: int = 0
-var _trail_node: MultiMeshInstance2D = null
-var _trail_buffer: PackedFloat32Array = PackedFloat32Array()
-## Trail marks drawn by the last `update_draw`.
-var drawn_trails: int = 0
+var _batch_counts: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 var _draw_buffer: PackedFloat32Array = PackedFloat32Array()
 ## The batches of runes and orbit shots, beside the bolts' `_draw_node`.
 var _rune_node: MultiMeshInstance2D = null
@@ -475,7 +478,6 @@ func _ready() -> void:
 	_rune_node = _make_batch(DRAW_Z, true)
 	_orbit_node = _make_batch(DRAW_Z, true)
 	_hostile_node = _make_batch(DRAW_Z + 1, false)
-	_trail_node = _make_batch(DRAW_Z - 1, true)
 	_apply_textures()
 	_fit_draw_bounds()
 
@@ -509,8 +511,6 @@ func _apply_textures() -> void:
 		_orbit_node.texture = orbit_texture if orbit_texture != null else texture
 	if _hostile_node != null:
 		_hostile_node.texture = hostile_texture if hostile_texture != null else texture
-	if _trail_node != null:
-		_trail_node.texture = texture
 
 
 func _physics_process(delta: float) -> void:
@@ -562,9 +562,7 @@ func set_cap(value: int) -> void:
 	_own_prev.resize(_cap)
 	_own_next.resize(_cap)
 	_core.resize(_cap)
-	_shape.resize(_cap)
-	_trail_buffer.resize(0)
-	_trail_room = 0
+	_look.resize(_cap)
 	_draw_buffer.resize(0)
 	_rune_buffer.resize(0)
 	_orbit_buffer.resize(0)
@@ -581,7 +579,6 @@ func set_cap(value: int) -> void:
 		_rune_node.multimesh.instance_count = 0
 		_orbit_node.multimesh.instance_count = 0
 		_hostile_node.multimesh.instance_count = 0
-		_trail_node.multimesh.instance_count = 0
 
 
 func get_cap() -> int:
@@ -724,7 +721,6 @@ func _fit_draw_bounds() -> void:
 	_rune_node.multimesh.custom_aabb = aabb
 	_orbit_node.multimesh.custom_aabb = aabb
 	_hostile_node.multimesh.custom_aabb = aabb
-	_trail_node.multimesh.custom_aabb = aabb
 
 
 ## Remove every projectile (targets stay registered).
@@ -876,22 +872,37 @@ func set_core(slot: int, color: Color) -> bool:
 	return true
 
 
-## Give the shot in `slot` the shape of its element (SHAPE_*; 0 is the plain sprite): its
-## own silhouette, animation frames and, for a bolt, a trail of marks. The shape is drawn
-## for bolts and orbit shots; a rune keeps its glyph. Returns false for an empty slot or a
-## shape out of range.
-func set_shape(slot: int, shape: int) -> bool:
-	if slot < 0 or slot >= _cap or _alive[slot] == 0 or shape < 0 or shape >= SHAPE_COUNT:
+## Give the shot in `slot` its look, packed by `pack_look` (0 for none): every effect
+## `shot_core.gdshader` draws round its core. Returns false for an empty slot or a look with a
+## bit for a kind that does not exist.
+func set_look(slot: int, look: int) -> bool:
+	if slot < 0 or slot >= _cap or _alive[slot] == 0 or look < 0 or look >= 1 << (LOOK_COUNT - 1):
 		return false
-	_shape[slot] = shape
+	_look[slot] = look
 	return true
 
 
-## The shape of the shot in `slot`, 0 for an empty slot or a plain shot.
-func get_shape_of(slot: int) -> int:
+## The packed look of the shot in `slot`, 0 for an empty slot or a plain shot.
+func get_look_of(slot: int) -> int:
 	if slot < 0 or slot >= _cap or _alive[slot] == 0:
 		return 0
-	return _shape[slot]
+	return _look[slot]
+
+
+## Pack layer kinds (LOOK_*) into one int for `set_look`: bit `kind - 1` for each kind, so
+## any number of cards combine and a kind brought twice shows once. LOOK_NONE and unknown
+## kinds are skipped.
+static func pack_look(kinds: PackedInt32Array) -> int:
+	var look: int = 0
+	for kind in kinds:
+		if kind > LOOK_NONE and kind < LOOK_COUNT:
+			look |= 1 << (kind - 1)
+	return look
+
+
+## True when the packed `look` has `kind`.
+static func look_has(look: int, kind: int) -> bool:
+	return kind > LOOK_NONE and kind < LOOK_COUNT and (look >> (kind - 1)) & 1 == 1
 
 
 ## The core colour of the shot in `slot`, white for an empty slot or a plain shot.
@@ -1043,7 +1054,7 @@ func _spawn_row(player: int, origin: Vector2, velocity: Vector2, lifetime: float
 	_pierce[slot] = maxi(pierce, 0)
 	_tag[slot] = tag
 	_core[slot] = Color.WHITE
-	_shape[slot] = 0
+	_look[slot] = 0
 	_seq[slot] = _next_seq
 	_next_seq += 1
 	_skip_left[slot] = 0.0
@@ -1284,7 +1295,9 @@ func _shield_block(slot: int) -> void:
 		var at: Vector2 = _pos[other]
 		_kill(other)
 		if events != null:
+			event_slot = slot
 			events.shot_blocked.emit(_player[slot], at, _tag[slot])
+			event_slot = -1
 
 
 ## Advance an orbit shot: turn its angle and place it round the anchor.
@@ -1483,50 +1496,46 @@ func update_draw(fraction: float = -1.0) -> void:
 		return
 	var multimesh: MultiMesh = _draw_node.multimesh
 	var hostile_multimesh: MultiMesh = _hostile_node.multimesh
-	var trail_multimesh: MultiMesh = _trail_node.multimesh
 	if fraction < 0.0:
 		fraction = Engine.get_physics_interpolation_fraction()
 	fraction = clampf(fraction, 0.0, 1.0)
 	_set_sim_time(_draw_node)
 	_set_sim_time(_rune_node)
 	_set_sim_time(_orbit_node)
-	_set_sim_time(_trail_node)
 	_count_batches()
 	var counts: PackedInt32Array = _batch_counts
 	_draw_room = _fit_batch(multimesh, _draw_buffer, _draw_room, counts[BATCH_BOLT])
 	_rune_room = _fit_batch(_rune_node.multimesh, _rune_buffer, _rune_room, counts[BATCH_RUNE])
 	_orbit_room = _fit_batch(_orbit_node.multimesh, _orbit_buffer, _orbit_room, counts[BATCH_ORBIT])
 	_hostile_room = _fit_batch(hostile_multimesh, _hostile_buffer, _hostile_room, counts[BATCH_HOSTILE])
-	_trail_room = _fit_batch(trail_multimesh, _trail_buffer, _trail_room, counts[BATCH_TRAIL], TRAIL_MAX)
 	var out: int = 0
 	var rune_out: int = 0
 	var orbit_out: int = 0
 	var hostile_out: int = 0
-	var trail_out: int = 0
 	for slot in _high:
 		if _alive[slot] == 0:
 			continue
-		var diameter: float = maxf(_radius[slot] * 2.0, 1.0) * DRAW_SCALE
 		var dir: Vector2 = Vector2.RIGHT
 		if _vel[slot].length_squared() > 0.0:
 			dir = _vel[slot].normalized()
 		var at: Vector2 = _prev[slot].lerp(_pos[slot], fraction)
 		var batch: int = _batch_of(slot)
 		if batch == BATCH_HOSTILE:
+			var diameter: float = maxf(_radius[slot] * 2.0, 1.0) * DRAW_SCALE
 			_write_quad(_hostile_buffer, hostile_out * DRAW_STRIDE, dir, diameter, at, Color.WHITE, Color.WHITE, 0)
 			hostile_out += 1
-		elif batch == BATCH_RUNE:
-			_write_quad(_rune_buffer, rune_out * DRAW_STRIDE, dir, _shaped_size(diameter, true), at, _color_of(_player[slot]), _core[slot], KIND_RUNE)
+			continue
+		var size: float = look_size(_radius[slot])
+		var player_look: Color = _look_color(slot)
+		if batch == BATCH_RUNE:
+			_write_quad(_rune_buffer, rune_out * DRAW_STRIDE, dir, size, at, player_look, _core[slot], KIND_RUNE)
 			rune_out += 1
 		elif batch == BATCH_ORBIT:
-			_write_quad(_orbit_buffer, orbit_out * DRAW_STRIDE, dir, _shaped_size(diameter, true), at, _color_of(_player[slot]), _core[slot], KIND_ORBIT)
+			_write_quad(_orbit_buffer, orbit_out * DRAW_STRIDE, dir, size, at, player_look, _core[slot], KIND_ORBIT)
 			orbit_out += 1
 		else:
-			var shaped: bool = _shape[slot] != 0
-			_write_quad(_draw_buffer, out * DRAW_STRIDE, dir, _shaped_size(diameter, shaped), at, _color_of(_player[slot]), _core[slot], _shape[slot])
+			_write_quad(_draw_buffer, out * DRAW_STRIDE, dir, size, at, player_look, _core[slot], KIND_BOLT)
 			out += 1
-			if shaped and _motion[slot] == MOTION_STRAIGHT:
-				trail_out = _write_trail(slot, dir, _shaped_size(diameter, true), at, trail_out)
 	if out > 0:
 		multimesh.buffer = _draw_buffer
 	multimesh.visible_instance_count = out
@@ -1539,10 +1548,6 @@ func update_draw(fraction: float = -1.0) -> void:
 	if hostile_out > 0:
 		hostile_multimesh.buffer = _hostile_buffer
 	hostile_multimesh.visible_instance_count = hostile_out
-	if trail_out > 0:
-		trail_multimesh.buffer = _trail_buffer
-	trail_multimesh.visible_instance_count = trail_out
-	drawn_trails = trail_out
 	drawn_hostile = hostile_out
 	drawn = out + rune_out + orbit_out + hostile_out
 
@@ -1571,9 +1576,6 @@ func _count_batches() -> void:
 	for slot in _high:
 		if _alive[slot] != 0:
 			_batch_counts[_batch_of(slot)] += 1
-			if _shape[slot] != 0 and _motion[slot] == MOTION_STRAIGHT and _player[slot] >= 0:
-				_batch_counts[BATCH_TRAIL] += TRAIL_MARKS
-	_batch_counts[BATCH_TRAIL] = mini(_batch_counts[BATCH_TRAIL], TRAIL_MAX)
 
 
 ## Size a batch's MultiMesh and buffer to draw `used` shots; returns the new room.
@@ -1596,16 +1598,29 @@ func _fit_batch(multimesh: MultiMesh, buffer: PackedFloat32Array, room: int, use
 	return wanted
 
 
-## The drawn size of a body: shaped bodies (and their trails) take SHAPE_SCALE of the sprite.
-func _shaped_size(diameter: float, shaped: bool) -> float:
-	return diameter * SHAPE_SCALE if shaped else diameter
+## The zoom of a player's shot of hit radius `radius` (see LOOK_CELL_PER_RADIUS).
+static func look_zoom(radius: float) -> int:
+	return clampi(roundi(radius * LOOK_CELL_PER_RADIUS), 1, LOOK_ZOOM_MAX)
+
+
+## The drawn size in pixels of a player's shot of hit radius `radius`.
+static func look_size(radius: float) -> float:
+	return float(LOOK_GRID * look_zoom(radius))
+
+
+## The instance colour of a player's shot, which `shot_core.gdshader` reads as data, a byte
+## per channel: the player index and the zoom in red (player + zoom x 4), the look's bits in
+## green (kinds 1-8), blue (9-16) and alpha (17-24).
+func _look_color(slot: int) -> Color:
+	var look: int = _look[slot]
+	var red: int = _player[slot] + look_zoom(_radius[slot]) * 4
+	return Color(float(red) / 255.0, float(look & 255) / 255.0, float((look >> 8) & 255) / 255.0, float((look >> 16) & 255) / 255.0)
 
 
 ## Write one quad at float index `i` of `buffer` (packed arrays are shared, not copied):
 ## Transform2D(dir * d, dir.orthogonal() * d, at), row by row, then the colour and the
 ## colour of the core (custom data).
-## `kind` (0 the sprite, 1-5 an element shape's body, 6-10 its trail mark, 11 a rune, 12 an
-## orbit shot; at most KIND_MAX) goes in the alpha of the custom data as 1 - kind / 16,
+## `kind` (0 the texture, KIND_BOLT, KIND_RUNE or KIND_ORBIT; at most KIND_MAX) goes in the alpha of the custom data as 1 - kind / 16,
 ## which `shot_core.gdshader` reads back.
 func _write_quad(buffer: PackedFloat32Array, i: int, dir: Vector2, diameter: float, at: Vector2, color: Color, core: Color, kind: int) -> void:
 	assert(kind >= 0 and kind <= KIND_MAX, "the kind must fit the alpha encoding")
@@ -1625,23 +1640,6 @@ func _write_quad(buffer: PackedFloat32Array, i: int, dir: Vector2, diameter: flo
 	buffer[i + 13] = core.g
 	buffer[i + 14] = core.b
 	buffer[i + 15] = 1.0 - kind / KIND_STEPS
-
-
-## Write the trail marks of the shaped bolt in `slot` (TRAIL_MARKS of them, behind it,
-## smaller and drifting off the line) from `out` on; returns the next free mark. Stops at
-## the limit TRAIL_MAX.
-func _write_trail(slot: int, dir: Vector2, diameter: float, at: Vector2, out: int) -> int:
-	var shape: int = _shape[slot]
-	var side: Vector2 = dir.orthogonal()
-	for n in TRAIL_MARKS:
-		if out >= TRAIL_MAX:
-			break
-		var back: float = TRAIL_STEP[shape] * (n + 1)
-		var drift: float = TRAIL_DRIFT[shape] * (n + 1) * (1.0 if (n + slot) % 2 == 0 else -1.0)
-		var size: float = diameter * (0.45 - 0.1 * n)
-		_write_quad(_trail_buffer, out * DRAW_STRIDE, dir, size, at - dir * back + side * drift, _color_of(_player[slot]), _core[slot], shape + TRAIL_KIND_OFFSET)
-		out += 1
-	return out
 
 
 ## Position of a live projectile, or Vector2.INF if the slot is empty.
@@ -1742,6 +1740,15 @@ func get_velocity_of(slot: int) -> Vector2:
 ## Where `player`'s anchor is (see `set_anchor`), or `Vector2.INF` when it has none.
 func get_anchor(player: int) -> Vector2:
 	return _anchors[player] if player >= 0 and player < MAX_PLAYERS else Vector2.INF
+
+
+## The player (0-3) a registered target belongs to (`add_target`'s `owner`), or
+## `Events.NO_PLAYER` for an enemy, an unknown node or null.
+func target_owner_of(node: Node) -> int:
+	if node == null or not is_instance_valid(node):
+		return EventsScript.NO_PLAYER
+	var at: int = _target_id.find(node.get_instance_id())
+	return EventsScript.NO_PLAYER if at < 0 else _target_owner[at]
 
 
 ## Where the target `nearest_target` last returned is (its hit circle's centre).

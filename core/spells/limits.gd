@@ -18,6 +18,11 @@ const FALLBACK_RADIUS: float = 8.0
 const MAX_FIRES_PER_STEP: int = 32
 ## Engine safeguard: chain jumps one player may make in one physics step; the rest are dropped.
 const MAX_CHAINS_PER_STEP: int = 16
+## Engine safeguard: launches (a burst's later firings, echoes) that may wait at once; the rest
+## are dropped.
+const MAX_PENDING: int = 128
+## Damage of an echo's second firing, as a share of the carrier's.
+const ECHO_DAMAGE: float = 0.5
 ## Reach in pixels of a chain's jump to the next target.
 const CHAIN_RANGE: float = 96.0
 ## Degrees a split fan covers when the form has no spread of its own.
@@ -29,8 +34,19 @@ const STAFFS: int = 4
 ## Degrees between the carriers of one multicast group, so two bolts cast together do not fly
 ## as one (tuning, not a limit).
 const MULTICAST_SPREAD: float = 12.0
+## Pixels ahead of the caster that a rain falls when the form gives no `ray_length`, and that
+## the middle of a wall is placed.
+const RAIN_REACH: float = 120.0
+const WALL_REACH: float = 28.0
+## Targets a fissure's line can hit (the line pierces them all up to this many; tuning).
+const FISSURE_PIERCE: int = 16
 ## Seconds a shot made sustained by `hold` lives: until it is switched off, in practice.
 const HOLD_LIFETIME: float = 100000.0
+## Seconds the wizard takes to be pulled by a hook, to swap places, and to be pushed by a recoil
+## (the player's move may stop early at a wall). A teleport is at once.
+const HOOK_SECONDS: float = 0.15
+const SWAP_SECONDS: float = 0.1
+const RECOIL_SECONDS: float = 0.1
 ## Players, indexes 0 to 3.
 const PLAYERS: int = 4
 

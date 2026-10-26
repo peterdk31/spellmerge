@@ -343,3 +343,12 @@ func test_a_beam_is_a_ray_hit_and_a_bolt_a_shot() -> void:
 	_form(&"beam", 3, 1).ray_length = 200.0
 	check_equal((_compile("beam").casts[0].group.spells[0] as CompiledSpell).hit.kind, &"ray", "a beam")
 	check_equal((_compile("bolt").casts[0].group.spells[0] as CompiledSpell).hit.kind, &"shot", "a bolt")
+
+
+func test_the_builder_view_counts_a_casts_damage() -> void:
+	# A bolt hits for 5 once, a nova for 4 with 8 shots: 5 + 32, the on-hit payload left out.
+	var ids: Array[StringName] = [&"double", &"bolt", &"nova"]
+	var view: Dictionary = _spells.call("staff_view", ids, _staff)
+	check_equal(int((view["casts"] as Array)[0]["damage"]), 37, "a bolt and a nova together")
+	var payload: Dictionary = _spells.call("staff_view", [&"on_hit", &"bolt", &"nova"] as Array[StringName], _staff)
+	check_equal(int((payload["casts"] as Array)[0]["damage"]), 5, "a payload is not counted: it depends on what is hit")

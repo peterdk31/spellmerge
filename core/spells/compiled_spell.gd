@@ -37,11 +37,14 @@ var status_id: StringName = &""
 var status_duration: float = 0.0
 var status_strength: float = 0.0
 var tint: Color = Color.WHITE
-## The element's shot shape (0 plain), see `ElementBase.shape`.
-var shape: int = 0
+## The shot's look, packed by `core/projectiles`' `pack_look`: the `look_layer` of every
+## infusion and modifier on it, combined (0 none).
+var look: int = 0
 
 ## What a hit does, for `Spells.hit_profile`; set by the compiler.
 var hit: HitProfile = null
+## What an echo's second firing does: the hit at half damage. Null without an `echo` modifier.
+var echo_hit: HitProfile = null
 
 ## Radians per second a shot turns toward a target; 0 means no homing.
 var homing_turn: float = 0.0

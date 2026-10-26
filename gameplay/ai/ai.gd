@@ -34,6 +34,11 @@ extends CharacterBody2D
 ## is lost, and once at the first step; with no explicit `targets` it reads the
 ## `players` group then. With nobody to chase it looks only every RETARGET_TIME.
 ##
+## Decoys and swaps (staffs B5): a decoy (`entities.gd`) within its lure range is chased
+## before any wizard, and a decoy that breaks is dropped at once (it reads as downed). A swap
+## card moves an enemy with `target_move_requested`; the enemy it names goes there at once and
+## keeps its state.
+##
 ## Statuses: a chilled enemy walks and winds up slower, a frozen one stands still and its
 ## attack waits (`Combat.speed_factor`); knockback still moves it.
 ##
@@ -43,6 +48,7 @@ extends CharacterBody2D
 const EventsScript := preload("res://core/events/events.gd")
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
+const EntitiesScript := preload("res://gameplay/ai/entities.gd")
 
 enum State { CHASE, WINDUP, RECOVER }
 enum Pose { IDLE, WINDUP, HURT }
@@ -106,11 +112,12 @@ var targets: Array = []
 @export var windup_texture: Texture2D = null
 @export var hurt_texture: Texture2D = null
 
-## The event bus, Combat and the projectile manager. Only tests set these, before
-## _ready(); otherwise the "Events", "Combat" and "Projectiles" autoloads are used.
+## The event bus, Combat, the projectile manager and the decoys. Only tests set these, before
+## _ready(); otherwise the "Events", "Combat", "Projectiles" and "Entities" autoloads are used.
 var events: EventsScript = null
 var combat: CombatScript = null
 var projectiles: ProjectileManagerScript = null
+var entities: EntitiesScript = null
 
 var state: State = State.CHASE
 ## The player being chased, or null.
@@ -169,6 +176,11 @@ func _ready() -> void:
 		combat = get_node_or_null("/root/Combat") as CombatScript
 	if projectiles == null:
 		projectiles = get_node_or_null("/root/Projectiles") as ProjectileManagerScript
+	# Tests build enemies outside the tree, where absolute paths do not work.
+	if entities == null and is_inside_tree():
+		entities = get_node_or_null("/root/Entities") as EntitiesScript
+	if events != null and not events.target_move_requested.is_connected(_on_target_move_requested):
+		events.target_move_requested.connect(_on_target_move_requested)
 	if events != null and not events.player_downed.is_connected(_on_player_downed):
 		events.player_downed.connect(_on_player_downed)
 	if events != null and not events.damage_dealt.is_connected(_on_damage_dealt):
@@ -187,6 +199,8 @@ func _ready() -> void:
 
 
 func _exit_tree() -> void:
+	if events != null and events.target_move_requested.is_connected(_on_target_move_requested):
+		events.target_move_requested.disconnect(_on_target_move_requested)
 	if events != null and events.player_downed.is_connected(_on_player_downed):
 		events.player_downed.disconnect(_on_player_downed)
 	if events != null and events.damage_dealt.is_connected(_on_damage_dealt):
@@ -365,6 +379,9 @@ func _on_damage_dealt(_player: int, target: Node, _amount: int, _position: Vecto
 func _find_target() -> Node2D:
 	lookup_count += 1
 	var here: Vector2 = _position_of(self)
+	var decoy: Node2D = entities.lure(here) if entities != null else null
+	if decoy != null:
+		return decoy
 	var best: Node2D = null
 	var best_distance: float = INF
 	var candidates: Array = targets
@@ -386,6 +403,16 @@ func _is_valid_target(node: Variant) -> bool:
 	if not is_instance_valid(node):
 		return false
 	return not (node.has_method("is_downed") and node.is_downed())
+
+
+## A swap card moved this enemy: it is there at once, its state and aim kept.
+func _on_target_move_requested(_player: int, moved: Node, to: Vector2) -> void:
+	if moved != self or not to.is_finite():
+		return
+	if is_inside_tree():
+		global_position = to
+	else:
+		position = to
 
 
 func _on_player_downed(player: int) -> void:

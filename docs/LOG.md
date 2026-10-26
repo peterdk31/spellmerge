@@ -4,7 +4,7 @@ What each run did, newest first. Claude appends a short entry after each develop
 
 ## 2026-10-26: M2 closed again for C2
 
-Ran the whole build (`--quick --tests`): all tests pass, 26 combos, fuzz 244 of 300 compiled, stress OK, 4-bot smoke OK. No crash is known. The roadmap says M2 is done and waits for the C2 verdict; the checkpoint is filled again in `docs/milestones/M2-spell-system.md` (reworked, numbers, assessment, recommendation: go). The real-GPU web frame rate (done-when item 3) stays open for the owner.
+Ran `ci/build/build.sh --quick --tests` on this commit: all unit tests pass, 26 combos, fuzz 244 of 300 compiled (fixed seed, same counts as the first C2), stress OK, 4-bot smoke OK (9.3 game seconds). No crash is known. The roadmap says M2 is done and waits for the C2 verdict; the checkpoint is filled again in `docs/milestones/M2-spell-system.md` (reworked, numbers, assessment, recommendation: go). The real-GPU web frame rate (done-when item 3) stays open for the owner.
 
 ## 2026-10-26: Scrolling drop lists
 

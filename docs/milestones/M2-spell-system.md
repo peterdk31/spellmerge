@@ -283,7 +283,7 @@ The question is: **is building spells fun and deep, with surprising combos?**
 
 - The owner decides, with Claude's assessment from bot data (which recipes bots and players build, the fuzz and stress numbers), the weekly playtest answers and player feedback.
 - Verdicts: **go** (M3 starts), **iterate** (rework the weak parts, at most 2 rounds) or **pivot**.
-- The owner has 7 days to answer. Without an answer, Claude defaults to iterate (docs/PLAN.md, "Go/no-go checkpoints").
+- There is no timeout: the issue stays in the "waiting for you" line until the owner answers (docs/PLAN.md, "Go/no-go checkpoints").
 
 ### Checkpoint C2, second round (2026-10-26)
 
@@ -293,11 +293,11 @@ The question is: **is building spells fun and deep, with surprising combos?**
 - **#243, Lightning,** the fifth element: the `static` status and the discharge to nearby charged enemies, two new reactions (Overload, Superconduct), three new combos and a drawn discharge arc. The extensibility report is in its PR.
 - Also: the quick view's and overlay's drop lists scroll, so a twelfth component no longer breaks the layout.
 
-**Numbers** (`ci/build/build.sh --quick --tests`, headless, game logic only; everything passes): 26 combos in `combos.json`, all passing `test_combos`; `test_validators` passes; the fuzz test compiled 244 of 300 random recipes (slowest mean step 0.66 ms, slowest step 2.5 ms, most live shots 456); the stress run is OK; the 4-bot smoke test cleared the room in 9.3 game seconds. Renderer numbers are not measured by a session; the web frame rate on a real GPU is still unread (BACKLOG).
+**Numbers** (measured by the session that revised this checkpoint, on this commit, with `ci/build/build.sh --quick --tests`, headless, game logic only; all unit tests passed): 26 combos in `combos.json`, all passing `test_combos`; `test_validators` passes. The fuzz test (fixed seed) compiled 244 of 300 random recipes with most live shots 456; both counts are the same as in the first C2 evidence. Timing differs from that evidence: slowest mean step 0.84 ms and slowest step 2.9 ms (first evidence 0.45-0.50 and 1.4-1.6 ms), on a shared CI machine and not a controlled benchmark. The stress runs completed (web case: 100 enemies, 500 shots at the cap, none dropped) and the 4-bot smoke test cleared the room in 9.3 game seconds (28 casts), no errors logged. Renderer numbers are not measured by a session; the web frame rate on a real GPU is still unread (BACKLOG).
 
 **Assessment.** Building is deeper than at the first C2: five elements, 26 combos, and every cast now reads on screen, so a surprise is visible and not only in a log. Known weak spots: reactions differ mostly by colour (a colour-blind item is in the backlog), some clips are still plain (thin storm bolt, two-player clips, speckled orbit beads), there are four reaction flash slots, the reaction sounds do not exist yet (silent by design), and components are still given, not found (M3). Whether it is fun needs people: the weekly playtest has no building questions yet, and the clips are the first thing the owner can judge without playing.
 
-**Recommendation: go.** The spell system does what the milestone promised and the rework closed the visible gap the owner named. Open for the owner: the real-GPU web frame rate (item 3) and the reaction sounds. One iterate round is done (#235); the owner may still answer iterate once more, and that would be the last round (docs/PLAN.md, Go/no-go checkpoints). After that the answer must be go or pivot. If the owner is still unhappy, they can ask for one more round, pivot, or go with the backlog's visual items carried into M3.
+**Recommendation: go.** The spell system does what the milestone promised and the rework closed the visible gap the owner named. Only done-when item 3 (the real-GPU web frame rate, which only the owner can read) is still open. If the owner says go, the weak spots above (reactions that differ mostly by colour, plain clips, silent reaction sounds) are carried into M3 as backlog. If the owner says iterate, it is the last round (docs/PLAN.md, Go/no-go checkpoints); after it the answer must be go or pivot. The planning session opens the second checkpoint issue, and the roadmap row links to it once it exists.
 
 ## Out of scope
 

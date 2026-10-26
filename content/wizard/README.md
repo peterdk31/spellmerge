@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Everything that customises the single base wizard. **Cosmetics** (`cosmetics/`) change looks only: hat, robe, colours, staff look. **Staffs** (`staffs/`) are chosen before a run and set the basic attack and a small bonus.
+Everything that customises the single base wizard. **Cosmetics** (`cosmetics/`) change looks only: hat, robe, colours, staff look. **Staffs** (`staffs/`) hold the wizard's cards: every wizard has four, one per button, and a staff sets how many slots it has and how fast it casts and recharges (docs/milestones/M2-staffs.md, "Staffs").
 
 **Built in M4** (Polish and variety; see docs/ROADMAP.md). **The example to copy arrives with Claude's first wizard content in M4**; this README is updated then with its path.
 
@@ -10,7 +10,7 @@ Everything that customises the single base wizard. **Cosmetics** (`cosmetics/`) 
 
 - There is one base wizard. No new characters or classes.
 - Cosmetics are visual only and must never change gameplay or hitboxes.
-- A staff is a `.tres` on the staff base class (arrives in M4) plus an optional `.gd` for a new basic attack. It reacts through `core/` events and the projectile manager, and takes a player index 0–3.
+- A staff is a `.tres` on `StaffBase` (`core/base/staff_base.gd`): `id` (the folder name), `display_name`, `slots` (1–64), `draw` (1–4), `cast_delay` (0–2 s), `recharge` (0–5 s) and `spread` (0–45°). The validator checks it (`SpellValidator.check_staff`). Two ship: `staffs/starter/` (4 slots, the normal game) and `staffs/dev/` (20 slots, the sandbox in `dev` and `preview` builds). The cards in the slots belong to the player, not the staff. Staff types found in runs are M3.
 - Each of the four players must stay recognisable: respect the player colours and keep the silhouette readable at 1× with 4 wizards on screen.
 - Sprites follow `docs/STYLE.md` (32×32, palette, frame counts). Content is discovered by folder through `core/registry`.
 

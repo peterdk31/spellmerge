@@ -17,6 +17,10 @@ signal play_requested(player: int)
 signal build_change_requested(player: int, spell: PackedInt32Array, slot: int, component_id: StringName)
 ## A player asked to switch between the two prepared spells. Heard by player.
 signal spell_swap_requested(player: int)
+## Sender: hud. `player` asked to put the card `card_id` into slot `slot` of their staff `staff` (0-3: A, X, Y, B); `&""` empties the slot. Heard by player, which applies it (staffs, docs/milestones/M2-staffs.md).
+signal staff_change_requested(player: int, staff: int, slot: int, card_id: StringName)
+## `player` asked to move the card in `from_slot` of staff `from_staff` to `to_slot` of staff `to_staff`, swapping with what is there; a staff of -1 means the bag. Heard by player.
+signal card_move_requested(player: int, from_staff: int, from_slot: int, to_staff: int, to_slot: int)
 ## A player picked reward choice number `choice`. Heard by rewards.
 signal reward_pick_requested(player: int, choice: int)
 ## A player voted for door number `door`. Heard by flow.
@@ -58,6 +62,30 @@ signal recipe_changed(player: int, slot: int, recipe: Dictionary)
 signal active_spell_changed(player: int, slot: int)
 ## Sender: player. The component ids `player` may build with, in registry order. Sent when the wizard appears and whenever the bag changes.
 signal bag_changed(player: int, bag: Array[StringName])
+## Sender: player. The staff `staff` (0-3) of `player` was built or changed. `plan` holds plain values for the builder (the cards, the casts of its cycle, wasted cards with their reasons, the numbers), as `Spells.staff_view` gives them. Heard by hud.
+signal staff_changed(player: int, staff: int, plan: Dictionary)
+## Sender: player. `player` cast their staff `staff` from `origin` along `direction`. Heard by feel.
+signal staff_cast(player: int, staff: int, origin: Vector2, direction: Vector2)
+## Sender: core/spells. A card of `player` moves the wizard: `mode` is `&"dash"`, `&"teleport"`, `&"hook"`, `&"swap"` or `&"recoil"`; `to` is where it wants to go (the wizard stops at walls), over `seconds` (0 is at once); `tag` is the card's tag. Heard by player, which answers with `caster_move_finished`.
+signal caster_move_requested(player: int, mode: StringName, to: Vector2, seconds: float, tag: int)
+## Sender: player. The move asked for by `caster_move_requested` ended at `position`: the end point of a dash, teleport or hook. Heard by core/spells.
+signal caster_move_finished(player: int, mode: StringName, position: Vector2, tag: int)
+## Sender: core/spells. A card of `player` (swap) moves `target` to `to`. Heard by ai.
+signal target_move_requested(player: int, target: Node, to: Vector2)
+## Sender: core/spells. A card of `player` (blast, a payload's fallback) hits everything in the circle at `position` of `radius`, the caster included, with the hit profile of `tag`. Heard by combat.
+signal area_hit_requested(player: int, position: Vector2, radius: float, tag: int)
+## Sender: core/spells. A card of `player` makes an entity of `kind` (`&"decoy"`, `&"familiar"`) at `position` that lasts `seconds`; `tag` is the card's tag. Heard by ai.
+signal entity_spawn_requested(player: int, kind: StringName, position: Vector2, seconds: float, tag: int)
+## Sender: ai. The entity of `player` of `kind` with `tag` ended at `position` (a decoy died, a familiar left). Heard by core/spells (its end point).
+signal entity_ended(player: int, kind: StringName, position: Vector2, tag: int)
+## Sender: ai. The familiar of `player` with `tag` casts its payload from `position` along `direction`. Heard by core/spells.
+signal familiar_cast_requested(player: int, position: Vector2, direction: Vector2, tag: int)
+## Sender: core/spells. Mana of `player` comes back (siphon). Heard by player.
+signal mana_refund_requested(player: int, amount: float)
+## Sender: core/spells. `amount` of the mana of `player` is now held by sustained cards (`hold`); 0 when none is on. Heard by player and hud.
+signal mana_reserved(player: int, amount: float)
+## Sender: core/projectiles. A shot of `player` with `tag` stopped an enemy shot at `position` with one of its shield charges. Heard by core/spells and feel.
+signal shot_blocked(player: int, position: Vector2, tag: int)
 ## Sender: combat. The reaction `reaction_id` (for example &"shatter") fired for `player` (or NO_PLAYER) at `position`.
 signal reaction_triggered(player: int, reaction_id: StringName, position: Vector2)
 ## Sender: combat. A discharge of `player` jumped from `from` (the enemy struck) to `to` (an enemy zapped), both in world pixels; one is sent for each enemy zapped, next to its `reaction_triggered` `discharge`. Heard by feel, which draws the arc.
@@ -68,6 +96,17 @@ signal damage_dealt(player: int, target: Node, amount: int, position: Vector2)
 signal status_applied(player: int, target: Node, status_id: StringName)
 ## Sender: combat. `enemy` died; `player` landed the last hit (or NO_PLAYER).
 signal enemy_died(player: int, enemy: Node, position: Vector2)
+
+## Sender: combat. A barrier on the wizard `player` (shield charges from the card with `tag`) stopped a hit at `position`. Heard by core/spells and feel.
+signal shield_blocked(player: int, position: Vector2, tag: int)
+## Sender: combat. A hit of `player` with `tag` killed `target` at `position`. Heard by core/spells (on kill).
+signal kill_landed(player: int, target: Node, position: Vector2, tag: int)
+## Sender: combat. The wizard `player` took `amount` damage at `position` from a hit with `tag` (0 for an enemy's hit) of kind `kind` (`&"shot"`, `&"ray"`, `&"burst"`, `&"reaction"`, `&"status"`). Heard by core/spells (on hurt), feel and hud.
+signal wizard_hurt(player: int, amount: int, position: Vector2, tag: int, kind: StringName)
+## Sender: combat. A hit of `player` with `tag` on `target` at `position` set off the reaction `reaction_id`. Heard by core/spells (on reaction); feel keeps `reaction_triggered`.
+signal reaction_landed(player: int, reaction_id: StringName, target: Node, position: Vector2, tag: int)
+## Sender: core/projectiles. A shot of `player` with `tag` passed through the teammate `ally` at `position`. Heard by core/spells (relay, on ally).
+signal ally_passed(player: int, ally: Node, position: Vector2, tag: int)
 
 # --- Players ----------------------------------------------------------------
 

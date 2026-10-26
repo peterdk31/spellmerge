@@ -28,6 +28,13 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `spell_changed`, `build_refused` | `player` | none yet (`hud` shows them from M2 part 17) |
 | `recipe_changed`, `bag_changed` | `player` | `hud` (the builders, the overlay) |
 | `active_spell_changed` | `player` | `hud` (the corner panel, the quick view, the overlay) |
+| `staff_change_requested`, `card_move_requested` | `hud` | none yet (`player` from staffs A6a) |
+| `staff_changed`, `staff_cast` | `player` | none yet (staffs A6a) |
+| `caster_move_requested`, `target_move_requested`, `area_hit_requested`, `entity_spawn_requested`, `mana_refund_requested`, `mana_reserved` | `core/spells` | none yet (staffs kits B2-B5) |
+| `caster_move_finished` | `player` | none yet (`core/spells`, staffs A6a) |
+| `entity_ended`, `familiar_cast_requested` | `ai` | none yet (`core/spells`, staffs B5) |
+| `shot_blocked`, `ally_passed` | `core/projectiles` | none yet (`core/spells`, staffs B1) |
+| `shield_blocked`, `kill_landed`, `wizard_hurt`, `reaction_landed` | `combat` | none yet (`core/spells`, staffs B3) |
 | `reaction_triggered` | `combat` | `feel` |
 | `discharge_arc` | `combat` | `feel` |
 | `damage_dealt` | `combat` | `feel`, `player` |

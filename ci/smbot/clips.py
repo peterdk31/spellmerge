@@ -48,7 +48,7 @@ from pathlib import Path
 from . import config as config_mod
 from . import dailylog, gh, screenshots
 
-KINDS = ("form", "element", "modifier", "trigger", "combo", "reaction")
+KINDS = ("form", "element", "modifier", "trigger", "multicast", "combo", "reaction")
 KIND_TITLES = {"form": "Forms", "element": "Elements", "modifier": "Modifiers", "trigger": "Triggers",
                "combo": "Combos", "reaction": "Reactions"}
 ID = re.compile(r"^[a-z0-9_]{1,60}$")

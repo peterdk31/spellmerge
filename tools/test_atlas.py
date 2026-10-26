@@ -27,7 +27,10 @@ class AtlasTest(unittest.TestCase):
 
     def test_every_kind_is_listed_and_grouped(self) -> None:
         kinds = [e["kind"] for e in self.entries()]
-        self.assertEqual(set(kinds), set(atlas.KIND_ORDER))
+        # A card kind is listed once its folder has content (multicast cards come with staffs C).
+        present = {k for k, folder in atlas.KIND_FOLDERS.items() if any((self.tmp / atlas.SPELLS / folder).glob("*/*.tres"))}
+        self.assertEqual(set(kinds), present | {"combo", "reaction"})
+        self.assertTrue(set(kinds) <= set(atlas.KIND_ORDER))
         self.assertEqual(kinds, sorted(kinds, key=atlas.KIND_ORDER.index))
 
     def test_the_real_content_has_every_field(self) -> None:

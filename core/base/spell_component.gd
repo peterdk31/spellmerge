@@ -1,9 +1,9 @@
 class_name SpellComponent
 extends Resource
-## One spell component (M2): a form, an element, a modifier or a trigger. A spell is
-## built from them as form -> element -> modifiers -> trigger, and the trigger holds
-## one more spell (docs/milestones/M2-spell-system.md). A component is a `.tres` on
-## one of the four subclasses, in its own folder under `content/spells/<kind>s/`.
+## One spell card (M2): a form (carrier), an element (infusion), a modifier, a trigger or a
+## multicast. Since the staffs rework (docs/milestones/M2-staffs.md) cards are placed in a
+## staff in any order and read left to right. A card is a `.tres` on one of the five
+## subclasses, in its own folder under `content/spells/<kind>s/`.
 ##
 ## Components are shared, read-only data: the spell runtime (`core/spells`, M2 part 5)
 ## compiles them into per-player spells. Only `content/spells/`, `core/base/` and
@@ -30,8 +30,8 @@ const COMPLEXITY_MIN: int = 1
 const COMPLEXITY_MAX: int = 4
 
 
-## The kind of component: &"form", &"element", &"modifier" or &"trigger". The builder
-## uses it to filter the bag by slot.
+## The kind of card: &"form", &"element", &"modifier", &"trigger" or &"multicast". The
+## builder uses it to filter the bag by slot.
 func kind() -> StringName:
 	return &""
 

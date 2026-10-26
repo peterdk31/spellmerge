@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The spell components that players assemble into spells: **forms** (bolt, beam, nova, rune, orbit), **elements** (fire, frost, storm, void, lightning), **modifiers** (split, pierce, homing, chain, bigger, faster) and **triggers** (on hit, on expire, timer). A spell is built as form → element → up to three modifiers → trigger, and a trigger holds another spell, built from the same slots. Few components, many combinations: this is the game's first pillar (docs/DESIGN.md).
+Since the staffs rework (docs/milestones/M2-staffs.md) these are **cards** that players place in their staffs in any order; a fifth kind, **multicast** (`MulticastBase`, `multicasts/`), pulls more carriers into one cast. The rest of this README still describes the first design until staffs part A6c rewrites it. The spell components that players assemble into spells: **forms** (bolt, beam, nova, rune, orbit), **elements** (fire, frost, storm, void, lightning), **modifiers** (split, pierce, homing, chain, bigger, faster) and **triggers** (on hit, on expire, timer). A spell is built as form → element → up to three modifiers → trigger, and a trigger holds another spell, built from the same slots. Few components, many combinations: this is the game's first pillar (docs/DESIGN.md).
 
 **Built in M2** (Spell system, see docs/milestones/M2-spell-system.md). All four kinds, the validator and the combo test exist since part 15. The component icons are placeholders until the art pass (part 26).
 

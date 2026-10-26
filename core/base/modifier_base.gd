@@ -14,6 +14,40 @@ enum Behaviour {
 	## A hit sends one new shot on to the nearest other target, `behaviour_strength`
 	## times in all (`core/spells`).
 	CHAIN,
+	# Staffs (A3, docs/milestones/M2-staffs.md). `behaviour_strength` is what the comment says;
+	# where it means nothing, set it to 1. Each is run by the kit named.
+	## Blocks `behaviour_strength` hits (stacks); on the caster or a self carrier, a barrier (B1, B3).
+	SHIELD,
+	## Explodes at the carrier's end point, radius `behaviour_strength` pixels (B2, B3).
+	BLAST,
+	## Sustained: stays until switched off and reserves its mana (A5, B4).
+	HOLD,
+	## Pushes the caster back `behaviour_strength` pixels when cast (B2, B4).
+	RECOIL,
+	## Bounces off walls, `behaviour_strength` times (B1).
+	BOUNCE,
+	## Fires the carrier again `behaviour_strength` seconds later at half damage (B2).
+	ECHO,
+	## Stops mid-air for `behaviour_strength` seconds, then goes on (B1).
+	LINGER,
+	## Knockback times `behaviour_strength`; a knock into a wall hurts (B3).
+	HEAVY,
+	## Hits refund `behaviour_strength` mana each (B2, B4).
+	SIPHON,
+	## Sticks to the target it hits for `behaviour_strength` seconds, then expires there (B1).
+	STICKY,
+	## Pulls enemies within `behaviour_strength` pixels toward its path (B1, B3).
+	MAGNET,
+	## Passes through walls (B1).
+	GHOST,
+	## Flies in a sine wave `behaviour_strength` pixels wide (B1).
+	SPIRAL,
+	## Also fires the carrier backwards (B2).
+	MIRROR,
+	## Grows `behaviour_strength` times bigger and stronger per second of flight (B1).
+	GROWTH,
+	## Takes on a teammate's infusions when it passes through them (B1, B2).
+	RELAY,
 }
 
 @export var damage_mult: float = 1.0
@@ -46,6 +80,6 @@ func ranges() -> Dictionary:
 		"shot_mult": Vector2(1, 8),
 		"extra_pierce": Vector2(0, 8),
 		"behaviour": Vector2(0, Behaviour.size() - 1),
-		"behaviour_strength": Vector2(0.0, 32.0),
+		"behaviour_strength": Vector2(0.0, 256.0),
 	})
 	return limits

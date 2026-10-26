@@ -56,7 +56,7 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
 For the owner's sessions (see the top of this file). Phase A runs one PR at a time; the owner session that wrote the design does A2–A4 before the bot starts. Owner sessions run `tools/check.sh --author peterdk31` (without `--author` it checks as an outside contributor).
 
 - [x] **Shared files split (staffs A2).** One combo per file in `content/spells/combos/` (read by `tests/support/combo_files.gd`, the clip scenarios and `tools/atlas.py`); `assets.json` beside a content folder's files, read with the manifests by `SpellValidator.load_manifest`; `test_combos` checks every registry component, and the icon and drop-list counts are derived. Owner session, 2026-10-26.
-- [ ] **Card and staff classes, events (staffs A3).** (`core/base/`, `core/events/`, `content/wizard/staffs/`) Owner session, 2026-10-26.
+- [x] **Card and staff classes, events (staffs A3).** `MulticastBase` (fifth card kind, `content/spells/multicasts/`); the new carrier motions, modifier behaviours and trigger events, each commented with its kit; `StaffBase` with `content/wizard/staffs/starter` (4 slots) and `dev` (20), checked by `SpellValidator.check_staff` and the registry; the 19 staffs events in `core/events`; `multicast` as a kind in `tools/atlas.py` and `ci/smbot/clips.py`. Owner session, 2026-10-26.
 - [ ] **The staff compiler (staffs A4).** (`core/spells/`) Owner session, 2026-10-26.
 - [ ] **Caster kit (staffs B4).** (`gameplay/player/`) After B3.
 - [ ] **Entity kit (staffs B5).** (`gameplay/ai/`) After A6c.

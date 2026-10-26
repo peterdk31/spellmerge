@@ -353,6 +353,11 @@ func direction_to(id: StringName) -> Vector2:
 	return Vector2.ZERO
 
 
+## The ring's middle in view pixels (for screenshots).
+func ring_center() -> Vector2:
+	return _center
+
+
 ## The lines the hub shows now.
 func hub_lines() -> PackedStringArray:
 	if _pointed != NONE:

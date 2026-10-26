@@ -156,6 +156,29 @@ func test_the_ring_holds_every_card_once_grouped_by_kind() -> void:
 		check_equal(radial.direction_to(entry["id"]).is_zero_approx(), false, "%s can be pointed at" % entry["id"])
 
 
+## Every real card in the registry, found by the registry's own scan (so a new card folder is
+## checked with no list to edit): on the ring, picked exactly by the stick, with its name, kind
+## and at least one line of numbers in the hub.
+func test_every_real_card_can_be_picked_and_shows_its_numbers() -> void:
+	_start(1)
+	var radial: RadialScript = _open(0)
+	var cards: Array[StringName] = []
+	for id: StringName in _registry.get_ids(&"spells"):
+		if _registry.get_resource(&"spells", id) is SpellComponent:
+			cards.append(id)
+	check(cards.size() >= 20, "the registry found the cards (%d)" % cards.size())
+	check_equal(radial.ring_entries().size(), cards.size(), "each real card has one place on the ring")
+	for id in cards:
+		_input.send_virtual_aim(0, radial.direction_to(id))
+		_frame()
+		check_equal(radial.pointed_id(), id, "the stick picks %s" % id)
+		var lines: PackedStringArray = radial.hub_lines()
+		check_equal(lines[0], _spells.component_name(id), "%s: its name in the hub" % id)
+		check_equal(lines[1], String(RadialScript.KIND_WORDS.get(_spells.component_kind(id), "")), "%s: its kind" % id)
+		check(lines.size() > 2, "%s: at least one line of its numbers" % id)
+	check_equal(_rumbles.size(), cards.size(), "one rumble per card landed on")
+
+
 func test_the_right_stick_picks_a_card_with_a_rumble_and_keeps_it() -> void:
 	_start(1)
 	var radial: RadialScript = _open(0)

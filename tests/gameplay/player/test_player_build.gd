@@ -161,23 +161,23 @@ func test_the_start_cards_are_built_and_announced() -> void:
 
 func test_each_button_casts_its_own_staff() -> void:
 	var player := _wizard(0, [[&"bolt"], [&"fire", &"bolt"], [], []])
-	_input.send_virtual(0, &"cast_x", 1.0)
+	_input.send_virtual(0, &"staff_2", 1.0)
 	_run(1)
-	check_equal(_staff_casts, [[0, 1]], "cast_x casts staff X")
+	check_equal(_staff_casts, [[0, 1]], "staff_2 casts staff 2")
 	check_equal(_cast_forms, [&"bolt"] as Array[StringName], "spell_cast names the carrier")
-	_input.send_virtual(0, &"cast_a", 1.0)
+	_input.send_virtual(0, &"staff_1", 1.0)
 	_run(1)
-	check(_staff_casts.has([0, 0]), "cast_a casts staff A, with X still held")
+	check(_staff_casts.has([0, 0]), "staff_1 casts staff 1, with staff 2 still held")
 	check(player.mana < PlayerScript.MAX_MANA, "the casts took mana")
 
 
 func test_a_tap_just_before_the_staff_is_ready_still_casts() -> void:
 	_wizard(0, [[], [&"bolt"], [], []])
-	_tap(0, &"cast_x")
+	_tap(0, &"staff_2")
 	_run(1)
 	check_equal(_staff_casts.size(), 1, "the first tap casts")
 	_run(2)
-	_tap(0, &"cast_x")
+	_tap(0, &"staff_2")
 	_run(3)
 	check_equal(_staff_casts.size(), 2, "a tap within INPUT_BUFFER of the end of the delay casts once ready")
 
@@ -186,7 +186,7 @@ func test_a_dash_card_dashes_the_wizard() -> void:
 	var player := _wizard(0)
 	_input.send_virtual(0, &"move_right", 1.0)
 	_run(1)
-	_tap(0, &"cast_a")
+	_tap(0, &"staff_1")
 	_run(2)
 	check(player.is_dashing(), "the A staff's dash card dashes")
 	check(not player.is_invulnerable(), "without invulnerability")
@@ -195,14 +195,14 @@ func test_a_dash_card_dashes_the_wizard() -> void:
 
 func test_a_held_button_does_not_switch_a_hold_off_but_a_new_press_does() -> void:
 	var player := _wizard(0, [[], [], [&"hold", &"orbit"], []])
-	_input.send_virtual(0, &"cast_y", 1.0)
+	_input.send_virtual(0, &"staff_3", 1.0)
 	_run(1)
 	check(_spells.is_holding(0, 2), "the press switches the orbit on")
 	check_equal(player.free_mana(), player.mana - 5.0, "its mana is held")
 	_run(20)
 	check(_spells.is_holding(0, 2), "holding the button does not switch it off")
-	_input.send_virtual(0, &"cast_y", 0.0)
-	_tap(0, &"cast_y")
+	_input.send_virtual(0, &"staff_3", 0.0)
+	_tap(0, &"staff_3")
 	_run(1)
 	check(not _spells.is_holding(0, 2), "a new press switches it off")
 	check_equal(player.free_mana(), player.mana, "and frees its mana")
@@ -267,7 +267,7 @@ func test_four_players_build_different_staffs_at_once() -> void:
 func test_the_orbit_anchor_follows_the_wizard_and_goes_when_it_falls() -> void:
 	var player := _wizard(0, [[], [&"orbit"], [], []])
 	player.global_position = Vector2(100, 50)
-	_input.send_virtual(0, &"cast_x", 1.0)
+	_input.send_virtual(0, &"staff_2", 1.0)
 	_run(1)
 	check(_mgr.get_count() > 0, "the orbit shot flies")
 	check(_mgr.get_anchor(0).is_finite(), "the anchor is set")

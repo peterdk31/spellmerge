@@ -17,8 +17,9 @@ extends RefCounted
 enum Kind { KEYBOARD, KEYBOARD_MOUSE, XBOX, PLAYSTATION, SWITCH, GAMEPAD }
 ## How a glyph is drawn: a key cap with its label, a round face button with a letter, a
 ## round PlayStation button with a symbol (label is `cross`, `circle`, `square` or
-## `triangle`), a shoulder button, or the mouse with its left button lit.
-enum Shape { KEY, FACE, SYMBOL, SHOULDER, MOUSE }
+## `triangle`), a shoulder button (a bumper, or Start and Back), a trigger, or the mouse with
+## its left button lit.
+enum Shape { KEY, FACE, SYMBOL, SHOULDER, MOUSE, TRIGGER }
 
 const FACE_GREEN: Color = Color(0.36, 0.72, 0.4)
 const FACE_RED: Color = Color(0.86, 0.3, 0.3)
@@ -33,7 +34,8 @@ const PS_TRIANGLE: Color = Color(0.4, 0.8, 0.65)
 const NO_GLYPH: Dictionary = {"shape": Shape.KEY, "label": "?", "color": PLAIN}
 
 const _KEYS: Dictionary = {
-	&"cast_a": "Space", &"cast_x": "J", &"cast_y": "K", &"cast_b": "Q", &"overlay": "E", &"join": "Enter",
+	&"staff_1": "Space", &"staff_2": "J", &"staff_3": "K", &"staff_4": "Q", &"accept": "Enter", &"back": "Tab",
+	&"alternate": "X", &"pause": "Esc", &"join": "Enter",
 	&"leave": "Bksp", &"move_up": "W", &"move_down": "S", &"move_left": "A", &"move_right": "D", &"page_prev": "Z", &"page_next": "C",
 }
 
@@ -66,36 +68,52 @@ static func is_pad(kind: int) -> bool:
 
 ## How to draw `action` for `kind`; NO_GLYPH for an action with no button.
 static func glyph(kind: int, action: StringName) -> Dictionary:
-	if kind == Kind.KEYBOARD_MOUSE and action == &"cast_x":
+	if kind == Kind.KEYBOARD_MOUSE and action == &"staff_2":
 		return {"shape": Shape.MOUSE, "label": "LMB", "color": PLAIN}
-	if kind == Kind.KEYBOARD_MOUSE and action == &"cast_y":
+	if kind == Kind.KEYBOARD_MOUSE and action == &"staff_3":
 		return {"shape": Shape.MOUSE, "label": "RMB", "color": PLAIN}
 	if not is_pad(kind):
 		if _KEYS.has(action):
 			return {"shape": Shape.KEY, "label": _KEYS[action], "color": PLAIN}
 		return NO_GLYPH
 	match action:
-		&"cast_a", &"join":
+		&"accept", &"join":
 			return _face(kind, 0)
-		&"cast_b":
+		&"back":
 			return _face(kind, 1)
-		&"cast_x":
+		&"alternate":
 			return _face(kind, 2)
-		&"cast_y":
-			return _face(kind, 3)
-		&"overlay":
+		&"pause":
 			var start: String = "Options" if kind == Kind.PLAYSTATION else ("+" if kind == Kind.SWITCH else "Menu")
 			return {"shape": Shape.SHOULDER, "label": start, "color": PLAIN}
-		&"page_prev":
-			var left: String = "L1" if kind == Kind.PLAYSTATION else ("L" if kind == Kind.SWITCH else "LB")
-			return {"shape": Shape.SHOULDER, "label": left, "color": PLAIN}
-		&"page_next":
-			var right: String = "R1" if kind == Kind.PLAYSTATION else ("R" if kind == Kind.SWITCH else "RB")
-			return {"shape": Shape.SHOULDER, "label": right, "color": PLAIN}
+		&"page_prev", &"staff_3":
+			return _bumper(kind, false)
+		&"page_next", &"staff_1":
+			return _bumper(kind, true)
+		&"staff_2":
+			return _trigger(kind, true)
+		&"staff_4":
+			return _trigger(kind, false)
 		&"leave":
 			var back: String = "Share" if kind == Kind.PLAYSTATION else ("-" if kind == Kind.SWITCH else "Back")
 			return {"shape": Shape.SHOULDER, "label": back, "color": PLAIN}
 	return NO_GLYPH
+
+
+## A bumper: LB / RB, L1 / R1, L / R.
+static func _bumper(kind: int, right: bool) -> Dictionary:
+	var label: String = "R1" if kind == Kind.PLAYSTATION else ("R" if kind == Kind.SWITCH else "RB")
+	if not right:
+		label = "L1" if kind == Kind.PLAYSTATION else ("L" if kind == Kind.SWITCH else "LB")
+	return {"shape": Shape.SHOULDER, "label": label, "color": PLAIN}
+
+
+## A trigger: LT / RT, L2 / R2, ZL / ZR.
+static func _trigger(kind: int, right: bool) -> Dictionary:
+	var label: String = "R2" if kind == Kind.PLAYSTATION else ("ZR" if kind == Kind.SWITCH else "RT")
+	if not right:
+		label = "L2" if kind == Kind.PLAYSTATION else ("ZL" if kind == Kind.SWITCH else "LT")
+	return {"shape": Shape.TRIGGER, "label": label, "color": PLAIN}
 
 
 ## A face button by place: 0 bottom, 1 right, 2 left, 3 top (Godot's JoyButton 0 to 3).

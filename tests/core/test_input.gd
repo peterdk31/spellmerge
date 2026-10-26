@@ -120,7 +120,7 @@ func _press_join(device: int) -> void:
 # --- Tests ------------------------------------------------------------------
 
 func _test_actions_defined() -> void:
-	for action: StringName in [&"move_left", &"move_right", &"move_up", &"move_down", &"cast_a", &"cast_x", &"cast_y", &"cast_b", &"overlay", &"join", &"leave"]:
+	for action: StringName in [&"move_left", &"move_right", &"move_up", &"move_down", &"staff_1", &"staff_2", &"staff_3", &"staff_4", &"accept", &"back", &"alternate", &"pause", &"join", &"leave"]:
 		_check(InputMap.has_action(action), "project.godot defines the action %s" % action)
 	for action in InputManagerScript.ACTIONS:
 		_check(InputMap.has_action(action), "the manager's action %s is defined in project.godot" % action)
@@ -247,8 +247,8 @@ func _test_virtual_device_every_index() -> void:
 			_check(_manager.get_move(other) == expected, "after virtual move from %d, player %d moves %s, got %s" % [player, other, expected, _manager.get_move(other)])
 	for player in 4:
 		_manager.send_virtual(player, &"move_right", 0.0)
-		_manager.send_virtual(player, &"cast_x")
-		_check(_manager.is_action_pressed(player, &"cast_x"), "virtual cast reaches player %d" % player)
+		_manager.send_virtual(player, &"staff_2")
+		_check(_manager.is_action_pressed(player, &"staff_2"), "virtual cast reaches player %d" % player)
 		_check(_manager.get_move(player) == Vector2.ZERO, "virtual release stops player %d" % player)
 	_check(_manager.leave(2), "a virtual device can leave")
 	_check(not _manager.is_joined(2), "its slot is free")
@@ -277,11 +277,11 @@ func _test_virtual_device_is_not_joinable_by_button() -> void:
 
 func _test_virtual_send_needs_a_device() -> void:
 	_setup()
-	_manager.send_virtual(0, &"cast_x")
-	_check(not _manager.is_action_pressed(0, &"cast_x"), "a virtual send without a virtual device does nothing")
+	_manager.send_virtual(0, &"staff_2")
+	_check(not _manager.is_action_pressed(0, &"staff_2"), "a virtual send without a virtual device does nothing")
 	_press_join(0)
-	_manager.send_virtual(0, &"cast_x")
-	_check(not _manager.is_action_pressed(0, &"cast_x"), "a virtual send cannot drive a real player's slot")
+	_manager.send_virtual(0, &"staff_2")
+	_check(not _manager.is_action_pressed(0, &"staff_2"), "a virtual send cannot drive a real player's slot")
 
 
 func _test_move_from_keyboard() -> void:
@@ -302,7 +302,7 @@ func _test_move_from_keyboard() -> void:
 	click.button_index = MOUSE_BUTTON_LEFT
 	click.pressed = true
 	_manager.handle_event(click)
-	_check(_manager.is_action_pressed(0, &"cast_x"), "the left mouse button casts")
+	_check(_manager.is_action_pressed(0, &"staff_2"), "the left mouse button casts")
 
 
 func _test_move_from_gamepad_stick() -> void:
@@ -318,9 +318,9 @@ func _test_move_from_gamepad_stick() -> void:
 	_manager.handle_event(_axis(1, JOY_AXIS_LEFT_Y, -0.1))
 	_check(_manager.get_move(1) == Vector2.ZERO, "values inside the deadzone are zero")
 	_manager.handle_event(_axis(0, JOY_AXIS_TRIGGER_RIGHT, 1.0))
-	_check(_manager.is_action_pressed(0, &"cast_x"), "the right trigger casts")
+	_check(_manager.is_action_pressed(0, &"staff_2"), "the right trigger casts")
 	_manager.handle_event(_axis(0, JOY_AXIS_TRIGGER_RIGHT, 0.0))
-	_check(not _manager.is_action_pressed(0, &"cast_x"), "releasing the trigger stops the cast")
+	_check(not _manager.is_action_pressed(0, &"staff_2"), "releasing the trigger stops the cast")
 
 
 func _test_aim_from_right_stick() -> void:
@@ -387,8 +387,8 @@ func _test_players_do_not_share_state() -> void:
 	_setup()
 	for pad in 4:
 		_press_join(pad)
-	var actions: Array[JoyButton] = [JOY_BUTTON_B, JOY_BUTTON_X, JOY_BUTTON_Y, JOY_BUTTON_X]
-	var names: Array[StringName] = [&"cast_b", &"cast_x", &"cast_y", &"cast_x"]
+	var actions: Array[JoyButton] = [JOY_BUTTON_B, JOY_BUTTON_X, JOY_BUTTON_A, JOY_BUTTON_X]
+	var names: Array[StringName] = [&"back", &"alternate", &"accept", &"alternate"]
 	for player in 4:
 		_manager.handle_event(_button(player, actions[player]))
 	for player in 4:
@@ -403,11 +403,11 @@ func _test_just_pressed() -> void:
 	for pad in 4:
 		_press_join(pad)
 	for player in 4:
-		_check(not _manager.is_action_just_pressed(player, &"cast_b"), "player %d has no staff B press before pressing" % player)
+		_check(not _manager.is_action_just_pressed(player, &"back"), "player %d has no B press before pressing" % player)
 	_manager.handle_event(_button(2, JOY_BUTTON_B))
-	_check(_manager.is_action_just_pressed(2, &"cast_b"), "player 2 just pressed cast_b this frame")
-	_check(not _manager.is_action_just_pressed(1, &"cast_b"), "player 1 did not")
-	_check(not _manager.is_action_just_pressed(2, &"cast_x"), "player 2 did not press cast")
+	_check(_manager.is_action_just_pressed(2, &"back"), "player 2 just pressed back this frame")
+	_check(not _manager.is_action_just_pressed(1, &"back"), "player 1 did not")
+	_check(not _manager.is_action_just_pressed(2, &"staff_2"), "player 2 did not press cast")
 
 
 func _test_two_inputs_one_action() -> void:
@@ -435,12 +435,15 @@ func _test_two_inputs_one_action() -> void:
 	_manager.handle_event(_axis(2, JOY_AXIS_LEFT_X, 0.0))
 	_check(_manager.get_move(2) == Vector2.ZERO, "everything released stops")
 
+	_manager.handle_event(_axis(2, JOY_AXIS_TRIGGER_LEFT, 1.0))
+	_manager.handle_event(_key(KEY_Q))
+	_check(_manager.is_action_pressed(2, &"staff_4"), "the left trigger casts staff 4")
 	_manager.handle_event(_axis(2, JOY_AXIS_TRIGGER_RIGHT, 1.0))
-	_manager.handle_event(_button(2, JOY_BUTTON_X))
-	_manager.handle_event(_button(2, JOY_BUTTON_X, false))
-	_check(_manager.is_action_pressed(2, &"cast_x"), "the trigger still casts after X is released")
+	_manager.handle_event(_button(2, JOY_BUTTON_RIGHT_SHOULDER))
+	_manager.handle_event(_button(2, JOY_BUTTON_RIGHT_SHOULDER, false))
+	_check(_manager.is_action_pressed(2, &"staff_2"), "the right trigger still casts after RB is released")
 	_manager.handle_event(_axis(2, JOY_AXIS_TRIGGER_RIGHT, 0.0))
-	_check(not _manager.is_action_pressed(2, &"cast_x"), "the cast stops when the last input is released")
+	_check(not _manager.is_action_pressed(2, &"staff_2"), "the cast stops when the last input is released")
 
 
 func _test_bindings_route_as_documented() -> void:
@@ -456,8 +459,8 @@ func _test_bindings_route_as_documented() -> void:
 		_check(_manager.get_move(0) == dpad[button], "d-pad button %d moves %s" % [button, dpad[button]])
 		_manager.handle_event(_button(0, button, false))
 	var buttons: Dictionary = {
-		JOY_BUTTON_A: &"cast_a", JOY_BUTTON_B: &"cast_b", JOY_BUTTON_X: &"cast_x", JOY_BUTTON_RIGHT_SHOULDER: &"cast_x",
-		JOY_BUTTON_Y: &"cast_y", JOY_BUTTON_START: &"overlay",
+		JOY_BUTTON_RIGHT_SHOULDER: &"staff_1", JOY_BUTTON_LEFT_SHOULDER: &"staff_3", JOY_BUTTON_A: &"accept",
+		JOY_BUTTON_B: &"back", JOY_BUTTON_X: &"alternate", JOY_BUTTON_START: &"pause",
 	}
 	for button: JoyButton in buttons:
 		_manager.handle_event(_button(0, button))
@@ -470,8 +473,9 @@ func _test_bindings_route_as_documented() -> void:
 	_manager.handle_event(_key(KEY_ENTER))
 	var keys: Dictionary = {
 		KEY_LEFT: &"move_left", KEY_RIGHT: &"move_right", KEY_UP: &"move_up", KEY_DOWN: &"move_down",
-		KEY_SHIFT: &"cast_a", KEY_SPACE: &"cast_a", KEY_TAB: &"overlay", KEY_E: &"overlay", KEY_J: &"cast_x",
-		KEY_K: &"cast_y", KEY_Q: &"cast_b", KEY_L: &"cast_b",
+		KEY_SHIFT: &"staff_1", KEY_SPACE: &"staff_1", KEY_TAB: &"back", KEY_E: &"back", KEY_J: &"staff_2",
+		KEY_K: &"staff_3", KEY_Q: &"staff_4", KEY_L: &"staff_4", KEY_ENTER: &"accept", KEY_X: &"alternate",
+		KEY_ESCAPE: &"pause",
 	}
 	for key: Key in keys:
 		_manager.handle_event(_key(key))
@@ -486,8 +490,9 @@ func _test_input_map_has_documented_bindings() -> void:
 	var keys: Dictionary = {
 		&"move_left": [KEY_A, KEY_LEFT], &"move_right": [KEY_D, KEY_RIGHT],
 		&"move_up": [KEY_W, KEY_UP], &"move_down": [KEY_S, KEY_DOWN],
-		&"cast_a": [KEY_SPACE, KEY_SHIFT], &"cast_x": [KEY_J], &"cast_y": [KEY_K], &"cast_b": [KEY_Q, KEY_L],
-		&"overlay": [KEY_TAB, KEY_E],
+		&"staff_1": [KEY_SPACE, KEY_SHIFT], &"staff_2": [KEY_J], &"staff_3": [KEY_K], &"staff_4": [KEY_Q, KEY_L],
+		&"accept": [KEY_ENTER, KEY_SPACE], &"back": [KEY_TAB, KEY_E], &"alternate": [KEY_X, KEY_DELETE],
+		&"pause": [KEY_ESCAPE],
 		&"join": [KEY_ENTER, KEY_SPACE], &"leave": [KEY_BACKSPACE],
 	}
 	for action: StringName in keys:
@@ -496,32 +501,33 @@ func _test_input_map_has_documented_bindings() -> void:
 	var pad: Dictionary = {
 		&"move_left": JOY_BUTTON_DPAD_LEFT, &"move_right": JOY_BUTTON_DPAD_RIGHT,
 		&"move_up": JOY_BUTTON_DPAD_UP, &"move_down": JOY_BUTTON_DPAD_DOWN,
-		&"cast_a": JOY_BUTTON_A, &"cast_b": JOY_BUTTON_B, &"cast_x": JOY_BUTTON_X, &"cast_y": JOY_BUTTON_Y,
-		&"overlay": JOY_BUTTON_START,
+		&"staff_1": JOY_BUTTON_RIGHT_SHOULDER, &"staff_3": JOY_BUTTON_LEFT_SHOULDER,
+		&"accept": JOY_BUTTON_A, &"back": JOY_BUTTON_B, &"alternate": JOY_BUTTON_X, &"pause": JOY_BUTTON_START,
 		&"join": JOY_BUTTON_A, &"leave": JOY_BUTTON_BACK,
 	}
 	for action: StringName in pad:
 		_check(InputMap.action_has_event(action, _button(0, pad[action])), "%s is bound to gamepad button %d" % [action, pad[action]])
 	_check(InputMap.action_has_event(&"join", _button(0, JOY_BUTTON_START)), "join is bound to Start")
-	_check(InputMap.action_has_event(&"cast_x", _button(0, JOY_BUTTON_RIGHT_SHOULDER)), "cast_x is bound to the right shoulder")
+	# The triggers are axes; the manager routes them itself (RT staff 2, LT staff 4).
+	_check(not InputMap.action_has_event(&"staff_1", _button(0, JOY_BUTTON_A)), "A no longer casts a staff")
 
 
 func _test_press_frames_recorded() -> void:
 	_setup()
 	_manager.add_virtual_device(0)
-	_manager.send_virtual(0, &"cast_a")
-	_check(_manager._pressed_physics[0][&"cast_a"] == Engine.get_physics_frames(), "a press is stamped with the physics frame")
-	_check(_manager._pressed_process[0][&"cast_a"] == Engine.get_process_frames(), "a press is stamped with the process frame")
-	_check(_manager.is_action_just_pressed(0, &"cast_a"), "the press counts as just pressed outside a physics step")
+	_manager.send_virtual(0, &"staff_1")
+	_check(_manager._pressed_physics[0][&"staff_1"] == Engine.get_physics_frames(), "a press is stamped with the physics frame")
+	_check(_manager._pressed_process[0][&"staff_1"] == Engine.get_process_frames(), "a press is stamped with the process frame")
+	_check(_manager.is_action_just_pressed(0, &"staff_1"), "the press counts as just pressed outside a physics step")
 
 
 func _test_leave_clears_held_actions() -> void:
 	_setup()
 	_manager.add_virtual_device(1)
 	_manager.send_virtual(1, &"move_down")
-	_manager.send_virtual(1, &"cast_x")
+	_manager.send_virtual(1, &"staff_2")
 	_manager.leave(1)
-	_check(_manager.get_move(1) == Vector2.ZERO and not _manager.is_action_pressed(1, &"cast_x"),
+	_check(_manager.get_move(1) == Vector2.ZERO and not _manager.is_action_pressed(1, &"staff_2"),
 		"a player who leaves holding a button does not keep moving or casting")
 
 
@@ -529,10 +535,10 @@ func _test_join_press_is_not_a_cast() -> void:
 	_setup()
 	_manager.handle_event(_key(KEY_SPACE))
 	_check(_manager.is_joined(0), "Space joins the keyboard")
-	_check(not _manager.is_action_pressed(0, &"cast_a"), "the press that joined does not also cast staff A")
+	_check(not _manager.is_action_pressed(0, &"staff_1"), "the press that joined does not also cast staff 1")
 	_manager.handle_event(_key(KEY_SPACE, false))
 	_manager.handle_event(_key(KEY_SPACE))
-	_check(_manager.is_action_pressed(0, &"cast_a"), "Space casts staff A once joined")
+	_check(_manager.is_action_pressed(0, &"staff_1"), "Space casts staff 1 once joined")
 
 
 func _test_invalid_player_index() -> void:
@@ -541,7 +547,7 @@ func _test_invalid_player_index() -> void:
 		_check(_manager.device_of(player) == NO_DEVICE, "device_of(%d) is NO_DEVICE" % player)
 		_check(not _manager.is_joined(player), "player %d is not joined" % player)
 		_check(_manager.get_move(player) == Vector2.ZERO, "player %d has no move" % player)
-		_check(not _manager.is_action_pressed(player, &"cast_x"), "player %d has no cast" % player)
-		_check(not _manager.is_action_just_pressed(player, &"cast_x"), "player %d has no just-pressed cast" % player)
+		_check(not _manager.is_action_pressed(player, &"staff_2"), "player %d has no cast" % player)
+		_check(not _manager.is_action_just_pressed(player, &"staff_2"), "player %d has no just-pressed cast" % player)
 		_check(not _manager.leave(player), "player %d cannot leave" % player)
 	_teardown()

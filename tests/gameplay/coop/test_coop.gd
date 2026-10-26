@@ -596,4 +596,15 @@ func _test_friendly_fire() -> void:
 	_coop.set_friendly_fire(true)
 	_coop.set_friendly_fire(false)
 	_check(not _projectiles.friendly_fire and not _coop.friendly_fire, "friendly fire switches back off")
+	# The pause menu's setting: a request from any player switches it, and every change is announced.
+	var announced: Array[bool] = []
+	var listen := func(on: bool) -> void: announced.append(on)
+	_events.connect("friendly_fire_changed", listen)
+	_events.emit_signal("friendly_fire_requested", 2, true)
+	_check(_coop.friendly_fire and _projectiles.friendly_fire, "friendly_fire_requested switches it on")
+	_events.emit_signal("friendly_fire_requested", 7, false)
+	_check(_coop.friendly_fire, "a request with a bad player index is ignored")
+	_coop.set_friendly_fire(false)
+	_check(announced == ([true, false] as Array[bool]), "friendly_fire_changed follows each change, got %s" % [announced])
+	_events.disconnect("friendly_fire_changed", listen)
 	_stop()

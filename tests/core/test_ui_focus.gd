@@ -199,8 +199,8 @@ func _test_activate_and_cancel() -> void:
 	_setup()
 	_focus.open(1, _panel(1))
 	_tap(1, &"move_down")
-	_tap(1, &"cast_a")
-	_tap(1, &"cast_b")
+	_tap(1, &"accept")
+	_tap(1, &"back")
 	_check(_count("activated", 1) == 1, "cast activates once")
 	_check(_log.has(["activated", 1, 1]), "it activates the focused control")
 	_check(_count("cancelled", 1) == 1, "dodge cancels once")
@@ -209,7 +209,7 @@ func _test_activate_and_cancel() -> void:
 
 func _test_closed_panel_ignores_its_owner() -> void:
 	_setup()
-	for action: StringName in [&"move_down", &"cast_a", &"cast_b"]:
+	for action: StringName in [&"move_down", &"accept", &"back"]:
 		_tap(0, action)
 	_check(_log.is_empty(), "no panel open, nothing happens, got %s" % str(_log))
 
@@ -219,7 +219,7 @@ func _test_only_the_owner_moves_the_panel() -> void:
 	_focus.open(1, _panel(1))
 	_log.clear()
 	for player in [0, 2, 3]:
-		for action: StringName in [&"move_down", &"move_up", &"move_left", &"move_right", &"cast_a", &"cast_b"]:
+		for action: StringName in [&"move_down", &"move_up", &"move_left", &"move_right", &"accept", &"back"]:
 			_tap(player, action)
 	_check(_log.is_empty(), "players 1, 3 and 4 cannot touch player 2's panel, got %s" % str(_log))
 	_check(_focus.focus_index(1) == 0, "player 2's focus did not move")
@@ -235,8 +235,8 @@ func _test_four_owners_at_once() -> void:
 	# All four hold a different direction in the same frame.
 	_input.send_virtual(0, &"move_down")
 	_input.send_virtual(1, &"move_up")
-	_input.send_virtual(2, &"cast_a")
-	_input.send_virtual(3, &"cast_b")
+	_input.send_virtual(2, &"accept")
+	_input.send_virtual(3, &"back")
 	_focus.poll()
 	_check(_focus.focus_index(0) == 1, "player 1 went to the next control")
 	_check(_focus.focus_index(1) == 2, "player 2 wrapped to the last control")
@@ -250,8 +250,8 @@ func _test_four_owners_at_once() -> void:
 	_focus.poll()
 	_input.send_virtual(0, &"move_down", 0.0)
 	_input.send_virtual(1, &"move_up", 0.0)
-	_input.send_virtual(2, &"cast_a", 0.0)
-	_input.send_virtual(3, &"cast_b", 0.0)
+	_input.send_virtual(2, &"accept", 0.0)
+	_input.send_virtual(3, &"back", 0.0)
 	_focus.poll()
 	_check(_focus.focus_index(0) == 1 and _focus.focus_index(1) == 2, "holding moved focus only once")
 	# Closing one panel leaves the other three working.
@@ -270,11 +270,11 @@ func _test_one_open_others_closed() -> void:
 	_focus.open(0, _panel(0))
 	# Player 2 plays on: moving and casting must not reach player 1's panel.
 	_input.send_virtual(1, &"move_down")
-	_input.send_virtual(1, &"cast_a")
+	_input.send_virtual(1, &"staff_2")
 	_focus.poll()
 	_check(_log.size() == 2, "only player 1's own opening was logged, got %s" % str(_log))
 	_check(_input.get_move(1) == Vector2(0.0, 1.0), "player 2's gameplay input is untouched by the panel")
-	_check(_input.is_action_pressed(1, &"cast_a"), "player 2 is still casting")
+	_check(_input.is_action_pressed(1, &"staff_2"), "player 2 is still casting")
 	_check(_input.get_move(0) == Vector2.ZERO, "the open panel does not eat or invent input for player 1")
 	# Player 1 opens, then player 2's own panel opens later without disturbing it.
 	_tap(0, &"move_down")
@@ -285,17 +285,17 @@ func _test_one_open_others_closed() -> void:
 
 func _test_held_button_when_opening_does_nothing() -> void:
 	_setup()
-	# The overlay button opens the panel; casting is held too.
-	_input.send_virtual(0, &"cast_a")
+	# The button that opened the panel is still held, and a direction too.
+	_input.send_virtual(0, &"accept")
 	_input.send_virtual(0, &"move_down")
 	_focus.open(0, _panel(0))
 	_focus.poll()
 	_check(_count("activated", 0) == 0, "a held cast does not activate on open")
 	_check(_focus.focus_index(0) == 0, "a held direction does not move on open")
-	_input.send_virtual(0, &"cast_a", 0.0)
+	_input.send_virtual(0, &"accept", 0.0)
 	_input.send_virtual(0, &"move_down", 0.0)
 	_focus.poll()
-	_tap(0, &"cast_a")
+	_tap(0, &"accept")
 	_check(_count("activated", 0) == 1, "after release a new press works")
 
 
@@ -334,10 +334,10 @@ func _test_quick_taps_are_not_lost() -> void:
 	_tap(0, &"move_down")
 	_tap(0, &"move_down")
 	_check(_focus.focus_index(0) == 0, "two taps in two frames move twice")
-	_input.send_virtual(0, &"cast_a")
-	_input.send_virtual(0, &"cast_a", 0.0)
-	_input.send_virtual(0, &"cast_a")
-	_input.send_virtual(0, &"cast_a", 0.0)
+	_input.send_virtual(0, &"accept")
+	_input.send_virtual(0, &"accept", 0.0)
+	_input.send_virtual(0, &"accept")
+	_input.send_virtual(0, &"accept", 0.0)
 	_focus.poll()
 	_check(_count("activated", 0) == 2, "two taps within one frame activate twice")
 
@@ -347,22 +347,24 @@ func _test_open_panel_captures_its_owners_input() -> void:
 	_focus.open(0, _panel(0))
 	_check(_input.is_captured(0), "an open panel captures its owner")
 	_input.send_virtual(0, &"move_right")
-	_input.send_virtual(0, &"cast_a")
-	_input.send_virtual(0, &"cast_b")
-	_input.send_virtual(0, &"overlay")
+	_input.send_virtual(0, &"accept")
+	_input.send_virtual(0, &"back")
+	_input.send_virtual(0, &"staff_1")
+	_input.send_virtual(0, &"staff_2")
+	_input.send_virtual(0, &"pause")
 	_check(_input.get_move(0) == Vector2.ZERO, "the owner's wizard does not walk")
-	_check(not _input.is_action_pressed(0, &"cast_a") and not _input.is_action_pressed(0, &"cast_b"),
-		"the owner's wizard does not cast or dodge")
-	_check(not _input.is_action_just_pressed(0, &"cast_a"), "no just-pressed for gameplay")
+	_check(not _input.is_action_pressed(0, &"staff_1") and not _input.is_action_pressed(0, &"staff_2"),
+		"the owner's wizard does not cast or dash")
+	_check(not _input.is_action_just_pressed(0, &"staff_2"), "no just-pressed for gameplay")
 	_check(_input.get_strength(0, &"move_right") == 0.0, "no strength for gameplay")
-	_check(_input.is_action_pressed(0, &"overlay"), "the overlay button stays readable")
+	_check(_input.is_action_pressed(0, &"pause") and _input.is_action_pressed(0, &"accept"), "the menu buttons stay readable")
 	_focus.poll()
 	_check(_count("activated", 0) == 1 and _count("cancelled", 0) == 1, "the panel still sees the presses")
 	# Other players, with and without a panel, play on.
 	_input.send_virtual(1, &"move_down")
-	_input.send_virtual(1, &"cast_a")
+	_input.send_virtual(1, &"staff_2")
 	_check(not _input.is_captured(1), "other players are not captured")
-	_check(_input.get_move(1) == Vector2(0.0, 1.0) and _input.is_action_pressed(1, &"cast_a"),
+	_check(_input.get_move(1) == Vector2(0.0, 1.0) and _input.is_action_pressed(1, &"staff_2"),
 		"other players move and cast while player 1's panel is open")
 	_focus.open(2, _panel(2))
 	_check(_input.get_move(1) == Vector2(0.0, 1.0), "a second open panel leaves player 2 alone")
@@ -387,15 +389,15 @@ func _test_focused_control_disabled_before_activate() -> void:
 	_setup()
 	_focus.open(0, _panel(0))
 	(_buttons[0][0] as Button).disabled = true
-	_tap(0, &"cast_a")
+	_tap(0, &"accept")
 	_check(_count("activated", 0) == 0, "a control disabled after getting focus is not activated")
 	_check(_focus.focus_index(0) == 1, "focus moved to the next usable control")
 	_check(_log.has(["focus", 0, 1]), "focus_changed was sent for the move")
-	_tap(0, &"cast_a")
+	_tap(0, &"accept")
 	_check(_log.has(["activated", 0, 1]), "the new focus can be activated")
 	for button: Button in _buttons[0]:
 		button.disabled = true
-	_tap(0, &"cast_a")
+	_tap(0, &"accept")
 	_check(_focus.focused(0) == null and _count("activated", 0) == 1, "nothing usable, nothing activated")
 	(_buttons[0][2] as Button).disabled = false
 	_tap(0, &"move_down")
@@ -427,7 +429,7 @@ func _test_focused_control_freed() -> void:
 	(_buttons[1][2] as Button).free()
 	_buttons[1][1] = null
 	_buttons[1][2] = null
-	_tap(1, &"cast_a")
+	_tap(1, &"accept")
 	_check(_focus.focused(1) == null and _count("activated", 1) == 0, "a panel of freed controls does nothing")
 
 
@@ -449,7 +451,7 @@ func _test_hidden_parent_in_the_tree() -> void:
 	_tap(0, &"move_down")
 	_check(_focus.focus_index(0) == 0, "they can once the parent is shown")
 	parent.visible = false
-	_tap(0, &"cast_a")
+	_tap(0, &"accept")
 	_check(_count("activated", 0) == 0, "hiding the whole panel stops activation")
 	holder.free()
 
@@ -479,7 +481,7 @@ func _test_close_then_reopen() -> void:
 	_check(_focus.close(0), "close returns true for an open panel")
 	_check(not _focus.close(0), "close returns false for a closed panel")
 	_check(_focus.focused(0) == null, "no focus after close")
-	_tap(0, &"cast_a")
+	_tap(0, &"accept")
 	_check(_count("activated", 0) == 0, "a closed panel does not activate")
 	_focus.open(0, _panel(0))
 	_check(_focus.focus_index(0) == 0, "reopening starts at the first control")
@@ -516,13 +518,13 @@ func _test_alternate_and_paging() -> void:
 	_focus.paged.connect(func(p: int, step: int) -> void: pages.append([p, step]))
 	_focus.open(1, _panel(1))
 	_tap(1, &"move_down")
-	_tap(1, &"cast_x")
-	_check(alternates == [[1, 1]], "cast_x sends alternate for the focused control, got %s" % str(alternates))
+	_tap(1, &"alternate")
+	_check(alternates == [[1, 1]], "alternate sends alternate for the focused control, got %s" % str(alternates))
 	_tap(1, &"page_next")
 	_tap(1, &"page_prev")
 	_check(pages == [[1, 1], [1, -1]], "page_next and page_prev send paged +1 and -1, got %s" % str(pages))
 	_check(_focus.focus_index(1) == 1, "neither moves the focus")
-	_tap(2, &"cast_x")
+	_tap(2, &"alternate")
 	_tap(2, &"page_next")
 	_check(alternates.size() == 1 and pages.size() == 2, "a closed panel sends neither")
 

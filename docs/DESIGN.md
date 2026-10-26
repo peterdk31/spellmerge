@@ -20,7 +20,7 @@ Spellmerge is a 2D top-down action roguelite for 1–4 local co-op players, wher
 | Element | Role |
 | --- | --- |
 | Wizard | One base character; cosmetics only (hat, robe, colours, staff look). |
-| Staffs | Four per wizard, one per button (A, X, Y, B). A staff is a row of slots; there is no separate attack or dodge, only what the player puts in their staffs. Staffs found later differ in slots, speed and recharge. |
+| Staffs | Four per wizard, one per shoulder button (RB, RT, LB, LT; the face buttons work the menus). A staff is a row of slots; there is no separate attack or dodge, only what the player puts in their staffs. Staffs found later differ in slots, speed and recharge. |
 | Spells | Cards placed in a staff in any order and read left to right: carriers (what leaves the caster), modifiers and infusions (change the next carrier, or the caster when none follows), multicast (more carriers per cast) and triggers (the next cast becomes the payload). Reading wraps around the staff. Every arrangement is legal and does something; there is no complexity budget. |
 | Relics | Passives found in runs, some altering how cards behave. |
 
@@ -37,7 +37,7 @@ Spell rules (chosen on 2026-10-26, the pivot at C2):
 ## No-waiting co-op rules
 
 1. No player controls another player's choices; there is no leader and no shared menu.
-2. Menus are per-player overlays and never pause the game for others.
+2. Menus are per-player (the builder) and never pause the game for others; only the pause menu does (rule 6).
 3. Rewards are rolled per player.
 4. Unpicked rewards carry over as an unspent icon.
 5. Shared decisions are made by walking (the door rule).

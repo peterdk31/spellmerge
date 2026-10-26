@@ -2,6 +2,17 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-26: Controls: staffs on the shoulders, a pause menu, the builder on B
+
+The owner's direction after B7a: "The 4 staffs should be mapped to lb/rb lt/rt instead of the face buttons", "The spellbuilder should open by pressing B", "The settings menu should be in a pause menu, opened by pressing start", "Friendly fire should be located in a settings menu under gameplay", "Slow-motion is not needed".
+
+- **Staffs:** RB staff 1 (starts with `dash`), RT staff 2 (`fire · bolt`), LB staff 3, LT staff 4 (the owner's order). The actions are `staff_1` to `staff_4`; the keyboard and mouse keep Space, left mouse, right mouse and Q. The triggers are axes, routed in `core/input` (LT was unused before). Text names a staff by number ("Staff 2", tabs "1 2 3 4"); the glyphs show RB/RT/LB/LT, R1/R2/L1/L2 or R/ZR/L/ZL, and the triggers have their own glyph shape.
+- **The face buttons are the menus':** new actions `accept` (A; Enter, Space), `back` (B; Tab, E) and `alternate` (X; X, Delete), so a menu no longer reads a staff button. Y is free: the owner will find a use for A, X and Y later (a map view is one idea, in BACKLOG).
+- **B opens the builder in play.** It is the same action as a menu's back, so `panels.gd` opens the builder only when the player had no menu open at this poll and the one before; the B that closes a menu never reopens the builder.
+- **Start opens a pause menu** (`hud/menus/pause/`) that stops the game for everyone (co-op rule 6) and is worked by the player who opened it: Resume, Sandbox (in the sandbox), Settings > Gameplay > Friendly fire. Start (or Escape) also closes the builder. The per-player overlay is gone; its only jobs were opening the builder and the sandbox page. `PlayerInput`, `UIFocus` and the HUD run while the tree is paused.
+- **Friendly fire for every run, through events:** `friendly_fire_requested(player, on)` (hud to coop) and `friendly_fire_changed(on)` (coop to hud); the menu shows coop's answer. In memory until `core/save`.
+- **Slow motion is dropped** (owner), so Feel's hit-stop keeps `Engine.time_scale` to itself.
+
 ## 2026-10-26: Caster kit details (staffs B4)
 
 - **Only recoil is held to the next step.** The events ask for "the recoils of a step added up, a later dash, teleport, hook or swap replaces an earlier one". A move that is not a recoil is acted on the moment it arrives (so "later replaces earlier" is the order of arrival), and the replaced one is answered with `caster_move_finished` where the wizard stands, so its blast and `on expire` payload are not lost. Recoil requests are summed and applied by the next `step`; the distance of each is measured from the staff tip.
@@ -125,7 +136,7 @@ An independent fresh-context session reviewed `docs/milestones/M2-staffs.md` aga
 - **The input buffer applies to every staff button,** not to the dash alone (owner).
 - **Smaller shots with layered looks** (owner: "they are way too big"; "apply eg. electricity to one, which makes it emit sparks").
 - **`dev` and `preview` builds are a sandbox** with 20-slot staffs (one field, easy to change), the full bag and a training dummy; building is possible at any time there (owner).
-- **The sandbox's controls live in the Start-button overlay,** as a "Sandbox" entry beside "Build", not in a pause menu (owner, 2026-10-26, part B7). There is still no pause menu; global switches such as friendly fire and slow motion sit on the same page.
+- **The sandbox's controls live in the Start-button overlay,** as a "Sandbox" entry beside "Build", not in a pause menu (owner, 2026-10-26, part B7). Replaced the same evening: Start now opens the pause menu, which holds the sandbox page (see "Controls: staffs on the shoulders").
 - **The sandbox room is two shooting lanes split by a wall:** the training dummy at the end of one, the shooting dummy at the end of the other (owner, 2026-10-26). The wall stops short of the bottom, so wizards cross between the lanes.
 - **`dev` and `preview` builds start in the sandbox through a focused "Sandbox" button above Play** (one press), not by skipping the menu, so the menu's test runners and Play still work as before (part B7 session's choice).
 - **The builder may scroll** where that makes it easier to use; it is not a requirement (owner).

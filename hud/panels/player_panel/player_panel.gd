@@ -15,7 +15,7 @@ const PLAYER_COUNT: int = 4
 const DOWN_TEXT: String = "DOWN"
 const MENU_TEXT: String = "MENU"
 ## The four staffs by index, named by their buttons (staffs A6a).
-const STAFF_NAMES: Array[String] = ["A", "X", "Y", "B"]
+const STAFF_NAMES: Array[String] = ["1", "2", "3", "4"]
 ## No staff cast yet.
 const NO_STAFF: int = -1
 
@@ -72,7 +72,7 @@ func set_menu_open(open: bool) -> void:
 		_refresh_status()
 
 
-## Show which staff the player cast last, by its button: 1 is "Staff X".
+## Show which staff the player cast last, by its number: 1 is "Staff 2".
 func set_active_staff(staff: int) -> void:
 	if staff != _active_staff and staff >= 0 and staff < STAFF_NAMES.size():
 		_active_staff = staff
@@ -84,7 +84,7 @@ func active_staff() -> int:
 	return _active_staff
 
 
-## The staff word in the header, for example "Staff X" (empty before the first cast).
+## The staff word in the header, for example "Staff 2" (empty before the first cast).
 func spell_text() -> String:
 	return _spell.text
 

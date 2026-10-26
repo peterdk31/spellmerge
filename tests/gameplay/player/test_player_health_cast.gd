@@ -1,7 +1,7 @@
 extends SceneTree
 ## Tests for gameplay/player (health, mana, downed, revive and cast), with two
 ## players (and four) at once: a hit, downing and reviving one never touches the
-## other; the cast goes through `Spells.cast_staff(player, staff, ...)` (staff A, button `cast_a`,
+## other; the cast goes through `Spells.cast_staff(player, staff, ...)` (staff A, button `staff_1`,
 ## here) and sends spell_cast;
 ## a missing cast sound is silent. The spell runtime is a stand-in (fixtures/fake_spells.gd),
 ## so only the wizard is under test. Input goes through virtual devices; time moves
@@ -174,7 +174,7 @@ func _test_downed_cannot_move_or_cast() -> void:
 	_arm(_players[0], 1.0, 0.0)
 	_hit(_players[0], 1000)
 	_input.send_virtual(0, &"move_right", 1.0)
-	_input.send_virtual(0, &"cast_a", 1.0)
+	_input.send_virtual(0, &"staff_1", 1.0)
 	_input.send_virtual(1, &"move_right", 1.0)
 	_run(4)
 	_check(_players[0].velocity == Vector2.ZERO, "a downed wizard does not move")
@@ -187,9 +187,9 @@ func _test_revive() -> void:
 	_setup(2)
 	_arm(_players[0], 1.0, 0.0)
 	_hit(_players[0], 1000)
-	_input.send_virtual(0, &"cast_a", 1.0)  # pressed while downed
+	_input.send_virtual(0, &"staff_1", 1.0)  # pressed while downed
 	_run(2)
-	_input.send_virtual(0, &"cast_a", 0.0)
+	_input.send_virtual(0, &"staff_1", 0.0)
 	_check(_players[0].revive(1), "revive returns true for a downed wizard")
 	_check(_revived == [Vector2i(0, 1)], "player_revived carries the player and the reviver")
 	_check(_players[0].health == PlayerScript.REVIVE_HEALTH, "a revive gives REVIVE_HEALTH")
@@ -223,7 +223,7 @@ func _test_mana_regenerates_up_to_max() -> void:
 func _test_cast_spends_mana_and_sends_event() -> void:
 	_setup(2)
 	_arm(_players[1], 10.0, 0.0)
-	_input.send_virtual(1, &"cast_a", 1.0)
+	_input.send_virtual(1, &"staff_1", 1.0)
 	_players[1].step(STEP)
 	_check(_fake.fired_players == [1], "holding cast calls the runtime for this player")
 	_check(_fake.fired_slots == [0], "and for the active slot")
@@ -261,7 +261,7 @@ func _test_cast_origin_stops_at_a_wall() -> void:
 func _test_cast_cooldown() -> void:
 	_setup(1)
 	_arm(_players[0], 1.0, 0.25)
-	_input.send_virtual(0, &"cast_a", 1.0)
+	_input.send_virtual(0, &"staff_1", 1.0)
 	_run(8)  # 0.5 s held: fires at 0 s and again once the 0.25 s cooldown is over
 	_check(_fake.fired_players.size() == 2, "a held cast fires once per cooldown (got %d)" % _fake.fired_players.size())
 	_check(_casts.size() == 2, "one spell_cast per cast")
@@ -274,8 +274,8 @@ func _test_cast_tap_just_before_ready_is_buffered() -> void:
 	_arm(_players[0], 1.0, 0.25)
 	_check(_players[0].cast_staff(0), "the first cast fires")
 	_run(2)  # 0.125 s of the cooldown left
-	_input.send_virtual(0, &"cast_a", 1.0)
-	_input.send_virtual(0, &"cast_a", 0.0)
+	_input.send_virtual(0, &"staff_1", 1.0)
+	_input.send_virtual(0, &"staff_1", 0.0)
 	_run(1)
 	_check(_fake.fired_players.size() == 1, "the tap is not used while the spell cools down")
 	_run(1)
@@ -286,8 +286,8 @@ func _test_cast_tap_just_before_ready_is_buffered() -> void:
 	_arm(_players[0], 1.0, 0.5)
 	_check(_players[0].cast_staff(0), "the first cast fires")
 	_run(2)  # 0.375 s left
-	_input.send_virtual(0, &"cast_a", 1.0)
-	_input.send_virtual(0, &"cast_a", 0.0)
+	_input.send_virtual(0, &"staff_1", 1.0)
+	_input.send_virtual(0, &"staff_1", 0.0)
 	_run(8)
 	_check(_fake.fired_players.size() == 1, "a tap longer ago than INPUT_BUFFER is dropped")
 	_setup(1)
@@ -295,8 +295,8 @@ func _test_cast_tap_just_before_ready_is_buffered() -> void:
 	_check(_players[0].cast_staff(0), "the first cast fires")
 	_run(2)
 	_input.set_captured(0, true)
-	_input.send_virtual(0, &"cast_a", 1.0)
-	_input.send_virtual(0, &"cast_a", 0.0)
+	_input.send_virtual(0, &"staff_1", 1.0)
+	_input.send_virtual(0, &"staff_1", 0.0)
 	_run(1)
 	_input.set_captured(0, false)
 	_run(3)
@@ -305,9 +305,9 @@ func _test_cast_tap_just_before_ready_is_buffered() -> void:
 	_arm(_players[0], 1.0, 0.25)
 	_check(_players[0].cast_staff(0), "the first cast fires")
 	_run(2)
-	_input.send_virtual(0, &"cast_a", 1.0)  # held until the spell is ready
+	_input.send_virtual(0, &"staff_1", 1.0)  # held until the spell is ready
 	_run(2)
-	_input.send_virtual(0, &"cast_a", 0.0)
+	_input.send_virtual(0, &"staff_1", 0.0)
 	var fired: int = _fake.fired_players.size()
 	_run(1)
 	_check(_fake.fired_players.size() == fired, "a tap that fired while held leaves no buffered cast")
@@ -324,7 +324,7 @@ func _test_cast_needs_mana() -> void:
 
 func _test_no_spell_no_cast() -> void:
 	_setup(1)
-	_input.send_virtual(0, &"cast_a", 1.0)
+	_input.send_virtual(0, &"staff_1", 1.0)
 	_run(2)
 	_check(_casts.is_empty() and not _players[0].cast_staff(0), "without a spell nothing is cast")
 	_check(not _players[0].has_staff(0), "a wizard with empty staffs has no build")
@@ -373,8 +373,8 @@ func _test_two_players_cast_and_down_independently() -> void:
 	_setup(2)
 	_arm(_players[1], 10.0, 0.5)
 	_arm(_players[0], 10.0, 0.5)
-	_input.send_virtual(0, &"cast_a", 1.0)
-	_input.send_virtual(1, &"cast_a", 1.0)
+	_input.send_virtual(0, &"staff_1", 1.0)
+	_input.send_virtual(1, &"staff_1", 1.0)
 	_hit(_players[0], 1000)
 	_run(1)
 	_check(_fake.fired_players == [1], "downed player 0 does not cast; player 1 casts at the same time")
@@ -388,7 +388,7 @@ func _test_four_players() -> void:
 	_setup(4)
 	for player in _players:
 		_arm(player, 10.0, 1.0)  # one runtime for all: cooldowns are per player
-		_input.send_virtual(player.index, &"cast_a", 1.0)
+		_input.send_virtual(player.index, &"staff_1", 1.0)
 	_run(1)
 	_check(_fake.fired_players == [0, 1, 2, 3], "four wizards each cast once")
 	_hit(_players[3], 1000)
@@ -402,8 +402,8 @@ func _test_captured_player_does_not_cast() -> void:
 	_setup(2)
 	_arm(_players[0], 1.0, 0.0)
 	_arm(_players[1], 1.0, 0.0)
-	_input.send_virtual(0, &"cast_a", 1.0)
-	_input.send_virtual(1, &"cast_a", 1.0)
+	_input.send_virtual(0, &"staff_1", 1.0)
+	_input.send_virtual(1, &"staff_1", 1.0)
 	_input.set_captured(0, true)
 	_run(1)
 	_check(_fake.fired_players == [1], "a player with an overlay open does not cast; the other does")

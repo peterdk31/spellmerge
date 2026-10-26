@@ -1,5 +1,5 @@
 extends "res://tests/support/suite.gd"
-## Tests for the staff builder in hud/builder (staffs A6a, B8): opened from the overlay at any
+## Tests for the staff builder in hud/builder (staffs A6a, B8): opened with B (`back`) at any
 ## time, driven only by its owner's device through core/ui_focus, showing the four staffs, their
 ## slots, the bag, the links and the cast plan with its numbers from events, and asking for
 ## changes with `staff_change_requested` and `card_move_requested` (pick and place, X to the
@@ -117,13 +117,9 @@ func _builder(player: int) -> BuilderScript:
 	return _hud.get_builder(player)
 
 
-## Open player's builder the way a person does: the overlay, then "Build".
+## Open player's builder the way a person does: B (`back`) in play.
 func _open(player: int) -> void:
-	_tap(player, &"overlay")
-	_frame()
-	_tap(player, &"move_down")
-	_frame()
-	_tap(player, &"cast_a")
+	_tap(player, &"back")
 	_frame()
 
 
@@ -135,10 +131,10 @@ func _focus_on(player: int, control: Control) -> bool:
 	return _focus.focused(player) == control
 
 
-## Focus `control` and press `cast_a` (activate) on it.
+## Focus `control` and press `accept` (activate) on it.
 func _press(player: int, control: Control) -> void:
 	check(_focus_on(player, control), "player %d can reach %s" % [player + 1, control.name])
-	_tap(player, &"cast_a")
+	_tap(player, &"accept")
 	_frame()
 
 
@@ -149,12 +145,12 @@ func _row_named(builder: BuilderScript, display_name: String) -> Button:
 	return null
 
 
-func test_the_overlay_opens_the_builder_on_the_first_slot_of_staff_x() -> void:
+func test_b_opens_the_builder_on_the_first_slot_of_staff_2() -> void:
 	_start(1)
 	_open(0)
 	var builder: BuilderScript = _builder(0)
-	check(builder.is_open(), "Build opens the builder")
-	check_equal(builder.viewed_staff(), X, "it shows staff X (the fire bolt)")
+	check(builder.is_open(), "B opens the builder")
+	check_equal(builder.viewed_staff(), X, "it shows staff 2 (the fire bolt)")
 	check_equal(_focus.focused(0), builder.slot_button(0), "focus starts on the first slot")
 	check_equal(builder.slot_count(), 20, "the dev staff's 20 slots")
 	check_equal(builder.cards_of(X).slice(0, 2), [&"fire", &"bolt"] as Array[StringName], "the cards the player announced")
@@ -205,10 +201,10 @@ func test_back_on_a_card_returns_to_the_slot_and_elsewhere_closes() -> void:
 	var builder: BuilderScript = _builder(0)
 	_press(0, builder.slot_button(4))
 	check(builder.shown_rows().has(_focus.focused(0) as Button), "focus is in the bag")
-	_tap(0, &"cast_b")
+	_tap(0, &"back")
 	_frame()
 	check_equal(_focus.focused(0), builder.slot_button(4), "back returns to the slot")
-	_tap(0, &"cast_b")
+	_tap(0, &"back")
 	_frame()
 	check(not builder.is_open(), "back on a slot closes the builder")
 
@@ -310,13 +306,13 @@ func test_back_drops_a_held_card_and_x_sends_one_to_the_bag() -> void:
 	_open(0)
 	var builder: BuilderScript = _builder(0)
 	_press(0, builder.slot_button(0))
-	_tap(0, &"cast_b")
+	_tap(0, &"back")
 	_frame()
 	check(builder.is_open(), "B while holding does not close")
 	check_equal(builder.held(), [BuilderScript.NOTHING, -1] as Array[int], "it drops the card where it was")
 	check(_moves.is_empty(), "without moving anything")
 	check(_focus_on(0, builder.slot_button(1)), "focus on the bolt")
-	_tap(0, &"cast_x")
+	_tap(0, &"alternate")
 	_frame()
 	check_equal(_moves, [[0, X, 1, BuilderScript.BAG, 0]], "X sends the card back to the bag")
 	check_equal(builder.cards_of(X)[1], &"", "the slot is empty")

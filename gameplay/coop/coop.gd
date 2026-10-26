@@ -9,11 +9,12 @@ extends Node
 ## removes the wizard, `difficulty` counts the players. Coop knows nothing about
 ## wizards beyond the `players` group, so the run simply goes on.
 ##
-## Friendly fire is off by default. `set_friendly_fire(true)` makes shots fired by
+## Friendly fire is off by default. `friendly_fire_requested(player, on)` (the pause menu's
+## Settings, Gameplay) or `set_friendly_fire(true)` makes shots fired by
 ## a player also hit the other players (never the shooter): the switch is
 ## `Projectiles.friendly_fire` in `core/projectiles`, and `combat` turns the hits
-## into damage as for any wizard. The option lives in memory; saving it waits for
-## `core/save`.
+## into damage as for any wizard. Every change is announced with `friendly_fire_changed(on)`.
+## The option lives in memory; saving it waits for `core/save`.
 ##
 ## The shared camera: after `room_entered` Coop takes the current `Camera2D` and,
 ## every frame, moves it to the middle of all wizards (downed ones too, so a
@@ -101,6 +102,7 @@ func _ready() -> void:
 	events.device_joined.connect(_on_device_joined)
 	events.device_left.connect(_on_device_left)
 	events.room_entered.connect(_on_room_entered)
+	events.friendly_fire_requested.connect(_on_friendly_fire_requested)
 	if projectiles != null:
 		projectiles.friendly_fire = friendly_fire
 
@@ -124,6 +126,13 @@ func set_friendly_fire(enabled: bool) -> void:
 	friendly_fire = enabled
 	if projectiles != null:
 		projectiles.friendly_fire = enabled
+	if events != null:
+		events.friendly_fire_changed.emit(enabled)
+
+
+func _on_friendly_fire_requested(player: int, on: bool) -> void:
+	if player >= 0 and player < PLAYER_SLOTS:
+		set_friendly_fire(on)
 
 
 ## Use `node` as the shared camera (normally found by itself after `room_entered`).

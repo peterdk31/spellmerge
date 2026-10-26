@@ -6,52 +6,46 @@ extends CanvasLayer
 ## when the player leaves. A run starting or ending hides all panels and clears
 ## their numbers, so none stays over the menu. Numbers come only from `player_stats_changed`; the
 ## "MENU" word follows `UIFocus.opened` and `closed` for that player. Nothing is
-## polled and nothing here takes input, so a player in their overlay never makes
+## polled and nothing here takes input, so a player in their builder never makes
 ## another panel wait.
 ##
-## An overlay opens only while a room is active and its owner is not down, and
-## it closes when the run starts or ends or when its owner goes down, so none is
-## ever left open over the menu. Each overlay sits just under (P1, P2) or over
-## (P3, P4) its own corner panel, placed from that panel's height.
+## Menus open only while a room is active, and close when the run starts or ends, so none is
+## ever left open over the main menu.
 ##
 ## A red vignette (`vignette/`, node Root/Vignette, behind the panels) glows when a
 ## wizard's health falls, strongest toward that wizard's corner and fading in under
 ## half a second. It is read from `player_stats_changed` alone (a drop in health),
 ## never from a node, and it takes no input.
 ##
-## The overlays (`overlay/`, nodes Root/Overlay1 to Root/Overlay4) open and close
-## with the owner's `overlay` action. The toggle is read here, from the press
-## counter of `core/input` (a tap released within a frame is not lost); each
-## overlay then takes its input through `core/ui_focus`. Nothing is paused. The
-## overlay's "Build" opens that player's spell builder (`hud/builder/`, nodes
-## Root/Builder1 to Root/Builder4), which sits beside the corner panel toward the
-## middle of the screen and takes the player's focus over from the overlay; the
-## `overlay` action closes an open builder. The builder is the full one at any time, waves
-## included (staffs A6a: there is no quick view). The only event the HUD sends from here is
-## `staff_change_requested`, by a builder.
-##
-## In the sandbox (staffs B7) the overlay's "Sandbox" opens that player's sandbox page
-## (`hud/menus/sandbox/`, nodes Root/Sandbox1 to Root/Sandbox4, made here and anchored like the
-## overlay), which takes the focus over; its "Back" opens the overlay again, and the `overlay`
-## action closes it. The page sends `sandbox_action_requested`.
+## The buttons that open menus are read here, from the press counters of `core/input` (a tap
+## released within a frame is not lost); each menu then takes its input through
+## `core/ui_focus` (owner, 2026-10-26):
+## - `back` (B; Tab or E on the keyboard) opens that player's spell builder (`hud/builder/`,
+##   nodes Root/Builder1 to Root/Builder4) when they have no menu open, are not down and the
+##   game is not paused. It sits beside the corner panel toward the middle of the screen and
+##   never pauses the game; it is the full builder at any time, waves included (staffs A6a).
+##   Inside a menu `back` is that menu's own (UIFocus `cancelled`), so a press only opens the
+##   builder when the player had no menu open at the poll before it too.
+## - `pause` (Start; Escape) closes the menu its player has open (the builder, or the pause menu
+##   they opened); with none open it opens the pause menu (`hud/menus/pause/`, node
+##   Root/PauseMenu), which stops the game for everyone and is worked by the player who opened
+##   it. Another player's `pause` does nothing while it is open.
 
 const EventsScript := preload("res://core/events/events.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
-const OverlayScript := preload("res://hud/panels/overlay/overlay.gd")
+const PauseMenuScript := preload("res://hud/menus/pause/pause_menu.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const BuilderScript := preload("res://hud/builder/builder.gd")
 const PlayerPanelScript := preload("res://hud/panels/player_panel/player_panel.gd")
 const VignetteScript := preload("res://hud/panels/vignette/vignette.gd")
 const HammerIconScript := preload("res://hud/widgets/hammer_icon.gd")
-const SandboxPageScene: PackedScene = preload("res://hud/menus/sandbox/sandbox_page.tscn")
-const SandboxPageScript := preload("res://hud/menus/sandbox/sandbox_page.gd")
 
 const PLAYER_COUNT: int = 4
-const OVERLAY_ACTION: StringName = &"overlay"
-## Space between the screen edge and a panel, and between a panel and its overlay.
+const PAUSE_ACTION: StringName = &"pause"
+const BUILDER_ACTION: StringName = &"back"
+## Space between the screen edge and a panel.
 const EDGE_MARGIN: float = 4.0
-const OVERLAY_GAP: float = 2.0
 ## Space between a corner panel and its builder, which sits beside it.
 const BUILDER_GAP: float = 2.0
 ## The "Wave N" line and the build break line (hammer and "Build 12") sit side by side in one
@@ -73,11 +67,13 @@ var input: InputManagerScript = null
 var spells: SpellsScript = null
 
 var _panels: Array[PlayerPanelScript] = []
-var _overlays: Array[OverlayScript] = []
 var _builders: Array[BuilderScript] = []
-var _pages: Array[SandboxPageScript] = []
-## Per player: the `overlay` press count at the last poll.
-var _seen_overlay: Array[int] = [0, 0, 0, 0]
+var _pause_menu: PauseMenuScript = null
+## Per player: the `pause` and `back` press counts at the last poll, and whether a menu of
+## theirs was open then.
+var _seen_pause: Array[int] = [0, 0, 0, 0]
+var _seen_back: Array[int] = [0, 0, 0, 0]
+var _had_menu: Array[bool] = [false, false, false, false]
 ## A wave is in progress (the wave line shows).
 var _wave_active: bool = false
 var _joined: Array[bool] = [false, false, false, false]
@@ -94,6 +90,8 @@ var _break_left: float = 0.0
 
 
 func _ready() -> void:
+	# The pause menu is worked while the game is paused, so the HUD runs then too.
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	# Behind the panels: the first child of Root.
 	_vignette = VignetteScript.new()
 	_vignette.name = "Vignette"
@@ -153,9 +151,8 @@ func _ready() -> void:
 		var panel := get_node("Root/Panel%d" % (player + 1)) as PlayerPanelScript
 		panel.visible = false
 		_panels.append(panel)
-		_overlays.append(get_node("Root/Overlay%d" % (player + 1)) as OverlayScript)
 		_builders.append(get_node("Root/Builder%d" % (player + 1)) as BuilderScript)
-		_pages.append(_make_page(player))
+	_pause_menu = get_node("Root/PauseMenu") as PauseMenuScript
 	if events == null:
 		events = get_node_or_null("/root/Events") as EventsScript
 	if ui_focus == null:
@@ -165,20 +162,13 @@ func _ready() -> void:
 	if spells == null:
 		spells = get_node_or_null("/root/Spells") as SpellsScript
 	for player in PLAYER_COUNT:
-		_panels[player].minimum_size_changed.connect(_place_overlay.bind(player))
 		_panels[player].minimum_size_changed.connect(_place_builder.bind(player))
-		_place_overlay(player)
 		_place_builder(player)
 	if input != null:
 		for player in PLAYER_COUNT:
-			_seen_overlay[player] = input.get_press_count(player, OVERLAY_ACTION)
-	for overlay in _overlays:
-		overlay.bind(events, ui_focus, spells)
-		overlay.build_pressed.connect(_on_build_pressed)
-		overlay.sandbox_pressed.connect(_on_sandbox_pressed)
-	for page in _pages:
-		page.bind(events, ui_focus)
-		page.back_pressed.connect(_on_page_back)
+			_seen_pause[player] = input.get_press_count(player, PAUSE_ACTION)
+			_seen_back[player] = input.get_press_count(player, BUILDER_ACTION)
+	_pause_menu.bind(events, ui_focus)
 	for builder in _builders:
 		builder.bind(events, ui_focus, spells, input)
 	if events != null:
@@ -192,10 +182,9 @@ func _ready() -> void:
 		events.staff_cast.connect(_on_staff_cast)
 		events.run_started.connect(_on_run_started)
 		events.run_ended.connect(_on_run_ended)
-		events.sandbox_changed.connect(_on_sandbox_changed)
 	if ui_focus != null:
-		ui_focus.opened.connect(_on_overlay_opened)
-		ui_focus.closed.connect(_on_overlay_closed)
+		ui_focus.opened.connect(_on_menu_opened)
+		ui_focus.closed.connect(_on_menu_closed)
 
 
 func _process(delta: float) -> void:
@@ -217,34 +206,49 @@ func _show_break_seconds() -> void:
 	_break_label.text = "Build %d" % ceili(_break_left)
 
 
-## Toggle the overlay of every joined player who pressed `overlay` since the
-## last poll (several presses in one frame toggle once). Presses outside a room
-## are dropped, and a downed player's overlay is not opened. Called every frame by
-## _process; tests call it directly. One player's press never touches another.
+## Read every joined player's `pause` and `back` presses since the last poll (several presses in
+## one frame count once) and open or close menus as the top of this file says. Presses outside a
+## room are dropped. Called every frame by _process; tests call it directly. One player's press
+## never touches another player's menus.
 func poll() -> void:
 	if input == null:
 		return
 	for player in PLAYER_COUNT:
-		var count: int = input.get_press_count(player, OVERLAY_ACTION)
-		var presses: int = count - _seen_overlay[player]
-		_seen_overlay[player] = count
-		if presses <= 0 or not input.is_joined(player):
-			continue
-		if _builders[player].is_open():
-			_builders[player].close_builder()
-		elif _pages[player].is_open():
-			_pages[player].close_page()
-		elif _overlays[player].is_open():
-			_overlays[player].close_overlay()
-		elif _in_room and not _panels[player].is_downed():
-			_overlays[player].open_overlay()
+		var pause_count: int = input.get_press_count(player, PAUSE_ACTION)
+		var paused_now: bool = pause_count > _seen_pause[player]
+		_seen_pause[player] = pause_count
+		var back_count: int = input.get_press_count(player, BUILDER_ACTION)
+		var back_now: bool = back_count > _seen_back[player]
+		_seen_back[player] = back_count
+		var had_menu: bool = _had_menu[player]
+		if input.is_joined(player):
+			if paused_now:
+				_on_pause_pressed(player)
+			elif back_now and not had_menu and not _has_menu(player) and _in_room \
+					and not _pause_menu.is_open() and not _panels[player].is_downed():
+				_builders[player].open_builder()
+		_had_menu[player] = _has_menu(player)
 
 
-## The overlay of `player`, or null for a bad index.
-func get_overlay(player: int) -> OverlayScript:
-	if player < 0 or player >= PLAYER_COUNT:
-		return null
-	return _overlays[player]
+## Whether `player` has a menu open: their builder, or the pause menu they work.
+func _has_menu(player: int) -> bool:
+	return _builders[player].is_open() or _pause_menu.owner_player == player
+
+
+## `pause`: close the player's open menu, or open the pause menu for them.
+func _on_pause_pressed(player: int) -> void:
+	if _builders[player].is_open():
+		_builders[player].close_builder()
+	elif _pause_menu.is_open():
+		if _pause_menu.owner_player == player:
+			_pause_menu.close_menu()
+	elif _in_room:
+		_pause_menu.open_menu(player)
+
+
+## The pause menu (for tests and screenshots).
+func get_pause_menu() -> PauseMenuScript:
+	return _pause_menu
 
 
 ## The spell builder of `player`, or null for a bad index.
@@ -252,13 +256,6 @@ func get_builder(player: int) -> BuilderScript:
 	if player < 0 or player >= PLAYER_COUNT:
 		return null
 	return _builders[player]
-
-
-## The sandbox page of `player`, or null for a bad index.
-func get_sandbox_page(player: int) -> SandboxPageScript:
-	if player < 0 or player >= PLAYER_COUNT:
-		return null
-	return _pages[player]
 
 
 ## The red vignette (for tests).
@@ -273,18 +270,6 @@ func get_panel(player: int) -> PlayerPanelScript:
 	return _panels[player]
 
 
-## Put the overlay of `player` clear of that player's panel: under it in the top
-## corners, over it in the bottom ones, from the panel's height, not a fixed number.
-func _place_overlay(player: int) -> void:
-	var offset: float = EDGE_MARGIN + _panels[player].get_combined_minimum_size().y + OVERLAY_GAP
-	var y: float = offset if player < 2 else -offset
-	_overlays[player].offset_top = y
-	_overlays[player].offset_bottom = y
-	if player < _pages.size():
-		_pages[player].offset_top = y
-		_pages[player].offset_bottom = y
-
-
 ## Put the builder of `player` beside that player's panel, toward the middle of the
 ## screen (right of the left panels, left of the right ones), from the panel's width.
 func _place_builder(player: int) -> void:
@@ -292,53 +277,6 @@ func _place_builder(player: int) -> void:
 	var x: float = offset if player % 2 == 0 else -offset
 	_builders[player].offset_left = x
 	_builders[player].offset_right = x
-
-
-## The overlay's "Build" was activated: the builder takes the owner's focus over.
-func _on_build_pressed(player: int) -> void:
-	if player >= 0 and player < PLAYER_COUNT:
-		_builders[player].open_builder()
-
-
-## The sandbox page of `player`, hidden, in the place of that player's overlay (the same
-## anchors, offsets and growth, so `_place_overlay` places both).
-func _make_page(player: int) -> SandboxPageScript:
-	var overlay: Control = _overlays[player]
-	var page := SandboxPageScene.instantiate() as SandboxPageScript
-	page.name = "Sandbox%d" % (player + 1)
-	page.index = player
-	page.anchor_left = overlay.anchor_left
-	page.anchor_right = overlay.anchor_right
-	page.anchor_top = overlay.anchor_top
-	page.anchor_bottom = overlay.anchor_bottom
-	page.grow_horizontal = overlay.grow_horizontal
-	page.grow_vertical = overlay.grow_vertical
-	page.offset_left = overlay.offset_left
-	page.offset_right = overlay.offset_right
-	var root_control: Control = get_node("Root") as Control
-	root_control.add_child(page)
-	root_control.move_child(page, overlay.get_index() + 1)
-	return page
-
-
-## The overlay's "Sandbox" was activated: the sandbox page takes the owner's focus over.
-func _on_sandbox_pressed(player: int) -> void:
-	if player >= 0 and player < PLAYER_COUNT:
-		_pages[player].open_page()
-
-
-## The sandbox page's "Back": the overlay opens again.
-func _on_page_back(player: int) -> void:
-	if player >= 0 and player < PLAYER_COUNT and _in_room and not _panels[player].is_downed():
-		_overlays[player].open_overlay()
-
-
-## Out of the sandbox, no sandbox page stays open.
-func _on_sandbox_changed(on: bool) -> void:
-	if on:
-		return
-	for page in _pages:
-		page.close_page()
 
 
 func _refresh(player: int) -> void:
@@ -429,10 +367,9 @@ func _reset_all() -> void:
 	_wave_label.visible = false
 	_break_row.visible = false
 	_vignette.clear()
+	_pause_menu.close_menu()
 	for player in PLAYER_COUNT:
-		_overlays[player].close_overlay()
 		_builders[player].close_builder()
-		_pages[player].close_page()
 		_panels[player].reset()
 		_refresh(player)
 
@@ -444,16 +381,14 @@ func _on_stats_changed(player: int, health: int, max_health: int, mana: float, m
 		if _in_room and before >= 0 and health < before:
 			_vignette.flash_hit(player, float(before - health) / float(maxi(max_health, 1)), _joined.count(true))
 		if health <= 0:
-			_overlays[player].close_overlay()
 			_builders[player].close_builder()
-			_pages[player].close_page()
 
 
-func _on_overlay_opened(player: int) -> void:
+func _on_menu_opened(player: int) -> void:
 	if player >= 0 and player < PLAYER_COUNT:
 		_panels[player].set_menu_open(true)
 
 
-func _on_overlay_closed(player: int) -> void:
+func _on_menu_closed(player: int) -> void:
 	if player >= 0 and player < PLAYER_COUNT:
 		_panels[player].set_menu_open(false)

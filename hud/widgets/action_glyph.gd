@@ -91,7 +91,7 @@ func _glyph_width() -> float:
 	match int(_glyph["shape"]):
 		GlyphsScript.Shape.KEY:
 			return maxf(KEY_MIN_WIDTH, _text_width(label) + KEY_MARGIN)
-		GlyphsScript.Shape.SHOULDER:
+		GlyphsScript.Shape.SHOULDER, GlyphsScript.Shape.TRIGGER:
 			return maxf(SHOULDER_MIN_WIDTH, _text_width(label) + KEY_MARGIN)
 		GlyphsScript.Shape.MOUSE:
 			return MOUSE_WIDTH
@@ -114,6 +114,8 @@ func _draw() -> void:
 			_draw_cap(area, KEY_FACE, TEXT_ON_PLAIN)
 		GlyphsScript.Shape.SHOULDER:
 			_draw_cap(area, color.darkened(0.55), TEXT_ON_PLAIN)
+		GlyphsScript.Shape.TRIGGER:
+			_draw_trigger(area, color.darkened(0.55))
 		GlyphsScript.Shape.FACE:
 			_draw_disc(area, color)
 			_draw_label(area, _glyph["label"], TEXT_ON_COLOR)
@@ -163,9 +165,20 @@ func _draw_symbol(area: Rect2, symbol: String, color: Color) -> void:
 			draw_polyline(points, color, 1.0)
 
 
-## The mouse: a body with the left button lit, the way a player reads "click".
+## A trigger: a shoulder cap with its top corners cut, so LT and RT read apart from LB and RB
+## by shape too, not only by their label.
+func _draw_trigger(area: Rect2, face: Color) -> void:
+	_draw_cap(area, face, TEXT_ON_PLAIN)
+	draw_rect(Rect2(area.position, Vector2(2.0, 2.0)), OUTLINE)
+	draw_rect(Rect2(Vector2(area.end.x - 2.0, area.position.y), Vector2(2.0, 2.0)), OUTLINE)
+	draw_line(Vector2(area.position.x + 2.0, area.position.y + 2.5), Vector2(area.end.x - 2.0, area.position.y + 2.5), TEXT_ON_PLAIN.darkened(0.3), 1.0)
+
+
+## The mouse: a body with the button of its label lit (LMB the left, RMB the right), the way a
+## player reads "click".
 func _draw_mouse(area: Rect2) -> void:
 	draw_rect(area, OUTLINE)
 	draw_rect(area.grow(-1.0), KEY_FACE)
-	draw_rect(Rect2(area.position + Vector2(1.0, 1.0), Vector2(area.size.x * 0.5 - 1.0, 4.0)), GlyphsScript.FACE_YELLOW)
+	var left: float = 1.0 if String(_glyph["label"]) != "RMB" else area.size.x * 0.5
+	draw_rect(Rect2(area.position + Vector2(left, 1.0), Vector2(area.size.x * 0.5 - 1.0, 4.0)), GlyphsScript.FACE_YELLOW)
 	draw_line(Vector2(area.size.x * 0.5, 1.0), Vector2(area.size.x * 0.5, 5.0), OUTLINE, 1.0)

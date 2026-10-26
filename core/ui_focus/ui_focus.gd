@@ -16,8 +16,8 @@ extends Node
 ## never pauses the game, and no player ever waits for another.
 ##
 ## Controls: move_up and move_left go to the previous control, move_down and
-## move_right to the next (wrapping round); `cast_a` activates the focused
-## control, `cast_b` cancels, `cast_x` sends `alternate` for the focused control
+## move_right to the next (wrapping round); `accept` (A) activates the focused
+## control, `back` (B) cancels, `alternate` (X) sends `alternate` for the focused control
 ## and `page_prev` / `page_next` (LB, RB) send `paged`. A panel laid out in two
 ## dimensions gives a navigator (`set_navigator`): each move asks it for the control
 ## in that direction first, and only when it has none does the move go to the
@@ -48,9 +48,9 @@ const NO_FOCUS: int = -1
 const PREVIOUS_ACTIONS: Array[StringName] = [&"move_up", &"move_left"]
 ## A (Space) activates and B (Q) goes back, as on most gamepads (staffs A6a); X (J) is the
 ## panel's second action on the focused control, LB and RB (Z, C) page (staffs B8).
-const ACTIVATE: StringName = &"cast_a"
-const CANCEL: StringName = &"cast_b"
-const ALTERNATE: StringName = &"cast_x"
+const ACTIVATE: StringName = &"accept"
+const CANCEL: StringName = &"back"
+const ALTERNATE: StringName = &"alternate"
 const PAGE_PREV: StringName = &"page_prev"
 const PAGE_NEXT: StringName = &"page_next"
 ## The direction of each move action, for a navigator.
@@ -59,7 +59,7 @@ const DIRECTIONS: Dictionary = {
 }
 ## Every action read while a panel is open.
 const WATCHED: Array[StringName] = [
-	&"move_up", &"move_left", &"move_down", &"move_right", &"cast_a", &"cast_b", &"cast_x", &"page_prev", &"page_next",
+	&"move_up", &"move_left", &"move_down", &"move_right", &"accept", &"back", &"alternate", &"page_prev", &"page_next",
 ]
 
 ## A panel opened for `player`.
@@ -72,7 +72,7 @@ signal focus_changed(player: int, control: Control)
 signal activated(player: int, control: Control)
 ## `player` asked to go back. The panel decides what that means (usually close()).
 signal cancelled(player: int)
-## `player` pressed the second action (`cast_x`) on `control`. The panel decides what it does.
+## `player` pressed the second action (`alternate`, X) on `control`. The panel decides what it does.
 signal alternate(player: int, control: Control)
 ## `player` paged: -1 for `page_prev`, +1 for `page_next`. The panel decides what it does.
 signal paged(player: int, step: int)
@@ -93,6 +93,8 @@ var _navigators: Array[Callable] = []
 
 
 func _init() -> void:
+	# The pause menu is worked while the game is paused.
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	for player in MAX_PLAYERS:
 		var controls: Array = []
 		_controls.append(controls)

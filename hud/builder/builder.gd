@@ -1,9 +1,9 @@
 extends PanelContainer
 ## One player's staff builder (staffs A6a, docs/milestones/M2-staffs.md, "The builder"): the
 ## corner panel expanded toward the middle of the screen, with the four staffs as tabs, the
-## shown staff's slots on the left and the bag on the right. Opened from the player's overlay
-## ("Build") at any time, waves included (there is no quick view), closed by its owner, never
-## pausing the game.
+## shown staff's slots on the left and the bag on the right. Opened by its owner's `back` button
+## (B; Tab or E on the keyboard) in play, at any time, waves included (there is no quick view;
+## `hud/panels/panels.gd` opens it), closed by its owner, never pausing the game.
 ##
 ## What it shows comes only from events: `staff_changed` (each staff's cards and its cast plan,
 ## the plain view of `Spells.staff_view`), `bag_changed` (the ids the player may build with) and
@@ -13,21 +13,21 @@ extends PanelContainer
 ## another player's builder.
 ##
 ## Controls (through `core/ui_focus`, so only the owner's device works them), laid out in two
-## dimensions (staffs B8): the staff tabs (A, X, Y, B) and "Close" in a row on top, the slots of
+## dimensions (staffs B8): the staff tabs (1 to 4: RB, RT, LB, LT on a pad) and "Close" in a row on top, the slots of
 ## the shown staff on the left, the bag on the right. Left and right move along the tabs and
 ## between the slots and the bag, up and down within a list and from its top to the tabs, so
 ## every slot is reached with the d-pad alone; LB and RB (`page_prev`, `page_next`) show the
 ## previous or next staff from anywhere.
 ##
-## Pick and place: `cast_a` on a slot with a card picks it up (marked "^"); `cast_a` on another
+## Pick and place: `accept` on a slot with a card picks it up (marked "^"); `accept` on another
 ## slot, of this staff or another, places it there, swapping with what is there
-## (`card_move_requested`); `cast_a` on a bag row while holding sends it back to the bag; `cast_b`
-## drops it where it was. `cast_x` on a slot sends its card back to the bag. With nothing held,
-## `cast_a` on an empty slot selects it and moves to the bag, and `cast_a` on a bag card puts it
+## (`card_move_requested`); `accept` on a bag row while holding sends it back to the bag; `back`
+## drops it where it was. `alternate` on a slot sends its card back to the bag. With nothing held,
+## `accept` on an empty slot selects it and moves to the bag, and `accept` on a bag card puts it
 ## in the selected slot and selects the next slot, so a staff is still built left to right by
-## picking cards one after another ("Empty" clears the slot). `cast_b` on a bag row goes back to
+## picking cards one after another ("Empty" clears the slot). `back` on a bag row goes back to
 ## the slot; anywhere else it closes the builder. Player 1 can also use the mouse: a click works
-## as `cast_a`, and dragging a card onto a slot (or onto the bag) moves it there.
+## as `accept`, and dragging a card onto a slot (or onto the bag) moves it there.
 ##
 ## The focused control is marked with "> ", the selected slot is shown in brackets and a held
 ## card with "^", so nothing is shown by colour alone; a card that does nothing where it is (a
@@ -39,7 +39,7 @@ extends PanelContainer
 ## line per cast of the staff's cycle with its live numbers (its mana and delay in its words,
 ## then its damage if every shot lands once), and a note: the refusal reason, else why the focused slot's card is wasted,
 ## else where it goes and the description of the card in focus; and a hint line with what
-## `cast_a` (and `cast_b` or `cast_x`) do on the focused control.
+## `accept` (and `back` or `alternate`) do on the focused control.
 ##
 ## Every UIFocus signal carries a player index and this node ignores all but its own, so it
 ## is the same for any index 0-3. Buttons are made once and only grow; the slot and bag lists sit
@@ -54,8 +54,9 @@ const InputManagerScript := preload("res://core/input/input_manager.gd")
 
 const PLAYER_COUNT: int = 4
 const STAFF_COUNT: int = 4
-## The staffs by index, named by their buttons.
-const STAFF_NAMES: Array[String] = ["A", "X", "Y", "B"]
+## The staffs by index, named by number (their buttons differ per device: RB, RT, LB, LT on a
+## pad, Space, the mouse buttons and Q on the keyboard).
+const STAFF_NAMES: Array[String] = ["1", "2", "3", "4"]
 const NO_CARD: StringName = &""
 
 const EMPTY_TEXT: String = "Empty"
@@ -102,9 +103,9 @@ const HINT_ROW: String = "Put in"
 const HINT_BACK: String = "back"
 const HINT_TAB: String = "Show staff"
 const HINT_CLOSE: String = "Close"
-const HINT_ACTION: StringName = &"cast_a"
-const HINT_BACK_ACTION: StringName = &"cast_b"
-const HINT_BAG_ACTION: StringName = &"cast_x"
+const HINT_ACTION: StringName = &"accept"
+const HINT_BACK_ACTION: StringName = &"back"
+const HINT_BAG_ACTION: StringName = &"alternate"
 const REFUSED_PREFIX: String = "Refused: "
 const WASTED_PREFIX: String = "Does nothing: "
 
@@ -228,7 +229,7 @@ func is_open() -> bool:
 	return _open
 
 
-## Open the builder for its owner (replacing their overlay if it is open). False if the owner
+## Open the builder for its owner (replacing any other panel of theirs that is open). False if the owner
 ## has no device. Starts on the staff last shown, on its first slot.
 func open_builder() -> bool:
 	if _open or _ui_focus == null:
@@ -239,7 +240,7 @@ func open_builder() -> bool:
 	_held_staff = NOTHING
 	_place_info()
 	_render()
-	# Close the overlay's panel first: its `closed` would hide this node if it came during open.
+	# Close any other panel of the owner's first: its `closed` would hide this node if it came during open.
 	_ui_focus.close(index)
 	# Visible before opening: UIFocus only focuses controls that are shown.
 	visible = true
@@ -330,7 +331,7 @@ func note_text() -> String:
 	return _note.text
 
 
-## The hint line under the note: what `cast_a` does on the focused control.
+## The hint line under the note: what `accept` does on the focused control.
 func hint_text() -> String:
 	return _hint.text()
 
@@ -709,7 +710,7 @@ func _on_activated(player: int, control: Control) -> void:
 			_focus_control(control)
 
 
-## `cast_x`: the card in the focused slot goes back to the bag.
+## `alternate`: the card in the focused slot goes back to the bag.
 func _on_alternate(player: int, control: Control) -> void:
 	if player != index or not _open or not _slots.has(control as Button):
 		return
@@ -881,7 +882,7 @@ func _numbers(cast: Dictionary) -> String:
 
 
 ## Player 1's mouse on `button`: a press focuses it; a release on the same control works as
-## `cast_a`, on another slot (or the bag) moves the card there.
+## `accept`, on another slot (or the bag) moves the card there.
 func _on_mouse(event: InputEvent, button: Button) -> void:
 	var click := event as InputEventMouseButton
 	if click == null or click.button_index != MOUSE_BUTTON_LEFT or not _open:

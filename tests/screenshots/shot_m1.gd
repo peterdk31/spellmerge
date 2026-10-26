@@ -5,7 +5,7 @@ extends SceneTree
 ## saved as user://screenshots/<name>.png and the script copies them to build/screenshots/.
 ##
 ## Shots: the main menu, the arena with four wizards just after Play, the same
-## with all four overlays open, with player 4 down, and with the Coop camera at
+## with the pause menu open (P2 opened it), with player 4 down, and with the Coop camera at
 ## zoom 0.5 (wizards in the corners of an area twice the screen). Look at them for legible 12/14 px text
 ## over the translucent panels.
 
@@ -34,9 +34,9 @@ func _initialize() -> void:
 	await _shot("arena_four_wizards")
 	# Shots above the floor, fired from the staff tips, and a wizard mid-dash.
 	for index in 3:
-		input.call("send_virtual", index, &"cast_x", 1.0)
+		input.call("send_virtual", index, &"staff_2", 1.0)
 	input.call("send_virtual", 3, &"move_right", 1.0)
-	_tap(input, 3, &"cast_a")
+	_tap(input, 3, &"staff_1")
 	for i in 12:
 		await physics_frame
 	await RenderingServer.frame_post_draw
@@ -49,20 +49,20 @@ func _initialize() -> void:
 		action_image.save_png("%s/shots_and_dash.png" % SHOTS_DIR)
 		print("SHOT: shots_and_dash (%dx%d)" % [action_image.get_width(), action_image.get_height()])
 	for index in 3:
-		input.call("send_virtual", index, &"cast_x", 0.0)
+		input.call("send_virtual", index, &"staff_2", 0.0)
 	input.call("send_virtual", 3, &"move_right", 0.0)
-	for index in 4:
-		_tap(input, index, &"overlay")
+	_tap(input, 1, &"pause")
 	await _settle()
-	var focus: Node = root.get_node_or_null("UIFocus")
-	for index in 4:
-		if focus == null or not focus.call("is_open", index):
-			_fail("the overlay of player %d is not open in hud_four_overlays" % (index + 1))
-			return
-	await _shot("hud_four_overlays")
-	for index in 4:
-		_tap(input, index, &"overlay")
-	await process_frame
+	var pause_menu: Node = root.get_node("Hud").call("get_pause_menu")
+	if not pause_menu.call("is_open") or not paused:
+		_fail("the pause menu is not open, or the game is not paused, in hud_pause_menu")
+		return
+	await _shot("hud_pause_menu")
+	_tap(input, 1, &"pause")
+	await _settle()
+	if paused:
+		_fail("Start again did not close the pause menu")
+		return
 	var wizard4: Node = flow.call("get_wizard", 3)
 	if wizard4 == null:
 		_fail("player 4 has no wizard")
@@ -74,11 +74,11 @@ func _initialize() -> void:
 	# The HUD stops fading the vignette for this shot: frames are slow on a software
 	# renderer and the glow would be gone before it is drawn.
 	root.get_node("Hud").set_process(false)
-	input.call("send_virtual", 0, &"cast_x", 1.0)
+	input.call("send_virtual", 0, &"staff_2", 1.0)
 	wizard4.call("take_damage", 30)
 	await physics_frame
 	await physics_frame
-	input.call("send_virtual", 0, &"cast_x", 0.0)
+	input.call("send_virtual", 0, &"staff_2", 0.0)
 	await RenderingServer.frame_post_draw
 	var juice_image: Image = root.get_texture().get_image()
 	var hud: Node = root.get_node_or_null("Hud")

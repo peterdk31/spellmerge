@@ -12,6 +12,7 @@ For later milestones; see `docs/milestones/M2-staffs.md`, "Later".
 - **Relics on cards (M3).** Explosion immunity (hit kind `burst`), self-damage refunded as mana, immunity to one element, triggers that fire twice.
 - **Enemies with staffs (M3–M4).** Elites and bosses built on the same compiler; their cards can drop as rewards.
 - **Elements on the room (M3 rooms).** Fire lights grass, frost freezes water into floor, lightning electrifies water, void breaks weak walls.
+- **A map view, and other uses for A, X and Y (task, owner 2026-10-26).** The staffs moved to the shoulders, so A, X and Y do nothing in play (B opens the builder). The owner's first idea is a map view (the room sequence and where the players are, once M3 has rooms and doors); A, X and Y get their jobs then.
 - **Codex of discoveries (M5).** The first time a reaction, a combo or an unknown chain happens, the game notes it (with a short clip if the recorder can do it cheaply).
 - **Superseded by the pivot:** "Spell visuals round 2, part 2" (a burst per combo row) and the combo marks per combo class are replaced by the layered shot look (staffs B6); keep what still reads well.
 - **Fissure and `bounce` (from B2c).** The design says `bounce · fissure` turns at walls; the projectile manager gives a beam no wall normal, so the fissure stops at the wall. Needs a wall-normal query on the manager. Also: Feel draws only `beam` and `nova` cues; the `rain` cue (`form_shown`, `length` = seconds until it falls) needs a look (B6b).
@@ -39,13 +40,13 @@ Found by looking at all 51 clips and the four-player sheets at 1x (a clip frame 
 - **Glyphs where the game still tells the player what to press (task, owner `/claude` on #4).** The builder's hint line now shows glyphs (`hud/widgets/hint_line.gd`). Still to do: when the overlay and the Bag list get a hint line they use the same widget; the "how to open the overlay" item below becomes a glyph of `overlay`; the main menu and any "press to join" text use the `join` glyph. Mouse clicks on the builder show nothing yet.
 - **A player cannot hand their slot to another device (task, owner `/claude` on #4).** The glyphs follow a player's device live, but a device only changes through leave and join (the keyboard joins only as P1). "Pick up the keyboard while holding an Xbox pad" does nothing today. A handover rule needs a design: for a single joined player, `join` from the other family could move the slot, and a second player's pad would still join as P2. Decide with the owner before building it.
 - **Glyph art is drawn in code (task).** `action_glyph.gd` draws key caps, round buttons and PlayStation symbols with 8 px text, so it is not pixel art in style N. Replace it with 10 px SVG sprites per family when the art direction has a glyph set (add them to `art/manifest.json`).
-- **Stick, d-pad and trigger glyphs are missing (task).** Only the face buttons, left shoulder, Join and Leave have glyphs; move hints would need a stick and a WASD group.
-- **The overlay menu and the Bag list still have the faint focus and no hint (task).** Give `widgets/drop_choices.gd` and the overlay the `BuilderButtonFocus` look and a hint line.
+- **Stick and d-pad glyphs are missing (task).** The face buttons, the shoulders and triggers, Start, Join and Leave have glyphs; move hints would need a stick and a WASD group.
+- **The pause menu has the plain focus look and no hint line (task).** Give it the `BuilderButtonFocus` look and a hint line (A to pick, B back).
 - **The refusal text says "(F)" (task).** "Pick a form (F) first" comes from `gameplay/player/player.gd`; the slot is now named "Form" in the builder, so drop the letter there.
 - **Long descriptions are cut at three lines (task).** The note under the info panel ends in "..." for several components. Shorten the texts, or give the note more room by dropping the stats line when a description is long.
 - **What " *" means (task).** The bag marks the current component with " *". Try "(in slot)" or a check mark glyph, if it fits the 80 px row.
 - **The quick view does not say the full builder returns (task).** Add "Full builder after the wave" under the quick view's chain, if the quarter has room.
-- **No hint for how to open the overlay (task).** A new player has to know the `overlay` button. Show it once in the corner panel after the first room, or on the main menu (now a one-glyph job with `ActionGlyph`).
+- **No hint for how to open the builder or the pause menu (task).** A new player has to know B and Start. Show the glyphs once in the corner panel after the first room, or on the main menu (a one-glyph job with `ActionGlyph`).
 
 ## From the web stress frame
 

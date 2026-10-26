@@ -297,7 +297,7 @@ The question is: **is building spells fun and deep, with surprising combos?**
 
 **Assessment.** Building is deeper than at the first C2: five elements, 26 combos, and every cast now reads on screen, so a surprise is visible and not only in a log. Known weak spots: reactions differ mostly by colour (a colour-blind item is in the backlog), some clips are still plain (thin storm bolt, two-player clips, speckled orbit beads), there are four reaction flash slots, the reaction sounds do not exist yet (silent by design), and components are still given, not found (M3). Whether it is fun needs people: the weekly playtest has no building questions yet, and the clips are the first thing the owner can judge without playing.
 
-**Recommendation: go.** The spell system does what the milestone promised and the rework closed the visible gap the owner named. Open for the owner: the real-GPU web frame rate (item 3) and the reaction sounds. This is the second and last iterate round (docs/PLAN.md, Go/no-go checkpoints), so the owner's options are go or pivot. If the owner is still unhappy, the choice is pivot, or go with the backlog's visual items carried into M3.
+**Recommendation: go.** The spell system does what the milestone promised and the rework closed the visible gap the owner named. Open for the owner: the real-GPU web frame rate (item 3) and the reaction sounds. One iterate round is done (#235); the owner may still answer iterate once more, and that would be the last round (docs/PLAN.md, Go/no-go checkpoints). After that the answer must be go or pivot. If the owner is still unhappy, they can ask for one more round, pivot, or go with the backlog's visual items carried into M3.
 
 ## Out of scope
 

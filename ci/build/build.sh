@@ -9,9 +9,11 @@
 #   ci/build/build.sh --quick     import and editor smoke test only (for development)
 #   ci/build/build.sh --quick --tests   the same, then every tests/**/test_*.gd unit test
 #   ci/build/build.sh --quick --screenshots   the same, then every tests/screenshots/shot_*.gd
-#                                     on a virtual display (xvfb-run); PNGs in build/screenshots/,
-#                                     and shots.txt there saying which script made each one.
-#                                     SHOTS_ONLY="shot_a shot_b" runs only those scripts.
+#                                     on a virtual display (xvfb-run, or $DISPLAY without it), up to
+#                                     8 at once; PNGs in build/screenshots/, and shots.txt there
+#                                     saying which script made each one.
+#                                     SHOTS_ONLY="shot_a shot_b" runs only those scripts;
+#                                     SHOT_JOBS=1 runs them one at a time.
 #   ci/build/build.sh --quick --clips   the same, then the clip recorder (tests/clips/record.gd)
 #                                     on a virtual display; one folder of frames per clip in
 #                                     build/clips/ (format: ci/smbot/clips.py), and atlas.json
@@ -148,33 +150,52 @@ unit_tests() {
 }
 
 # Each shot script saves PNGs to user://screenshots/ (scripts may only write to user://),
-# which is Godot's data folder for the project under $XDG_DATA_HOME.
+# which is Godot's data folder for the project under $XDG_DATA_HOME; every script gets a data
+# folder of its own, so up to SHOT_JOBS of them (default: the cores, at most 8) run at once,
+# each on its own virtual display (`--auto-servernum` started several at once can pick the same
+# number, so each job is given one). --fixed-fps makes each frame 1/60 s of game time however
+# slow it is to draw, so a script sees the same game whether it runs alone or beside seven others.
 screenshots() {
   step "Screenshots (virtual display)"
+  local virtual=1
   if ! command -v xvfb-run >/dev/null; then
     if [[ -n "${CI:-}" ]]; then
       echo "::error::xvfb-run is not installed (sudo apt-get install xvfb)"
       return 1
+    elif [[ -z "${DISPLAY:-}" ]]; then
+      echo "warning: xvfb-run is not installed and there is no display, so no screenshots were taken"
+      return 0
     fi
-    echo "warning: xvfb-run is not installed, so no screenshots were taken"
-    return 0
+    echo "xvfb-run is not installed, so the screenshots are drawn on the display $DISPLAY"
+    virtual=0
   fi
-  local saved="$XDG_DATA_HOME/godot/app_userdata/$GAME_NAME/screenshots" script name png failed=()
-  rm -rf build/screenshots && mkdir -p build/screenshots
+  local runs="$PWD/build/screenshot-runs" script name png display=() scripts=() failed=()
+  local cores; cores=$(nproc)
+  local parallel="${SHOT_JOBS:-$((cores < 8 ? cores : 8))}"
+  rm -rf build/screenshots "$runs" && mkdir -p build/screenshots "$runs"
   : > build/screenshots/shots.txt
   while IFS= read -r script; do
     name=$(basename "$script" .gd)
     if [[ -n "${SHOTS_ONLY:-}" && " $SHOTS_ONLY " != *" $name "* ]]; then continue; fi
-    rm -rf "$saved"
-    godot_checked "shot-$name" xvfb-run --auto-servernum --server-args="-screen 0 1280x720x24" \
-      "$GODOT" --path . --rendering-driver opengl3 --audio-driver Dummy --script "res://$script" \
-      || failed+=("$script")
-    for png in "$saved"/*.png; do
+    scripts+=("$script")
+    while (($(jobs -rp | wc -l) >= parallel)); do wait -n || true; done
+    if ((virtual)); then
+      display=(xvfb-run --server-num=$((100 + ${#scripts[@]})) --server-args="-screen 0 1280x720x24")
+    fi
+    (XDG_DATA_HOME="$runs/$name" godot_checked "shot-$name" "${display[@]}" "$GODOT" --path . \
+      --rendering-driver opengl3 --audio-driver Dummy --fixed-fps 60 --script "res://$script" \
+      || touch "$runs/$name.failed") &
+  done < <(find tests/screenshots -name 'shot_*.gd' 2>/dev/null | sort)
+  wait
+  for script in "${scripts[@]}"; do
+    name=$(basename "$script" .gd)
+    [[ -f "$runs/$name.failed" ]] && failed+=("$script")
+    for png in "$runs/$name/godot/app_userdata/$GAME_NAME/screenshots"/*.png; do
       [[ -f "$png" ]] || continue
       cp "$png" build/screenshots/
       echo "$name $(basename "$png")" >> build/screenshots/shots.txt
     done
-  done < <(find tests/screenshots -name 'shot_*.gd' 2>/dev/null | sort)
+  done
   ls -l build/screenshots
   if ((${#failed[@]})); then
     echo "::error::${#failed[@]} screenshot script(s) failed: ${failed[*]}"

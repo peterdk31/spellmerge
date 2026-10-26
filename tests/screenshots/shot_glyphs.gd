@@ -1,27 +1,22 @@
-extends SceneTree
-## The button glyphs, one row per kind of controller (keyboard, keyboard with the mouse, Xbox,
+extends "res://tests/support/screenshot.gd"
+## The button glyphs (`glyphs_sheet`), one row per kind of controller (keyboard, keyboard with the mouse, Xbox,
 ## PlayStation, Switch and a plain gamepad) and one column per action (the four staffs, accept,
-## back, alternate, pause), at 2x, with the builder's hint line under them at 1x for each kind.
-## Needs a display, so it runs only through `ci/build/build.sh --quick --screenshots`; the shot
-## is saved as user://screenshots/glyphs_sheet.png and copied to build/screenshots/.
+## back, alternate, pause), at 2x, with the builder's hint line beside them at 1x for each kind.
 
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 const ActionGlyphScript := preload("res://hud/widgets/action_glyph.gd")
 const HintLineScript := preload("res://hud/widgets/hint_line.gd")
 
-const SHOTS_DIR := "user://screenshots"
-const SETTLE_FRAMES := 10
 const ACTIONS: Array[StringName] = [&"staff_1", &"staff_2", &"staff_3", &"staff_4", &"accept", &"back", &"alternate", &"pause"]
 const PAD_NAMES: Dictionary = {0: "Xbox One Controller", 1: "PS5 Controller", 2: "Nintendo Switch Pro Controller", 3: "Generic Pad"}
 const ROW_HEIGHT: float = 44.0
 
 
-func _initialize() -> void:
-	await process_frame
-	DirAccess.make_dir_recursive_absolute(SHOTS_DIR)
+func take() -> void:
+	settle_frames = 10
 	var background := ColorRect.new()
 	background.color = Color(0.1, 0.11, 0.16)
-	background.size = Vector2(640, 360)
+	background.size = SCREEN
 	root.add_child(background)
 	var pads := InputManagerScript.new()
 	pads.joy_name_provider = func(device: int) -> String: return String(PAD_NAMES.get(device, ""))
@@ -56,20 +51,8 @@ func _initialize() -> void:
 		hint.position = Vector2(520.0, 8.0 + ROW_HEIGHT * row)
 		root.add_child(hint)
 		hint.show_hint(player, &"accept", "Use", &"back", "back")
-	await _settle()
-	await RenderingServer.frame_post_draw
-	var image: Image = root.get_texture().get_image()
+	await settle()
+	var image: Image = await grab()
 	for manager: Node in [pads, keys, mouse]:
 		manager.free()
-	var path: String = "%s/glyphs_sheet.png" % SHOTS_DIR
-	if image == null or image.save_png(path) != OK:
-		printerr("SHOT FAILED: could not save " + path)
-		quit(1)
-		return
-	print("SHOT: glyphs_sheet (%dx%d)" % [image.get_width(), image.get_height()])
-	quit(0)
-
-
-func _settle() -> void:
-	for i in SETTLE_FRAMES:
-		await process_frame
+	save(image, "glyphs_sheet")

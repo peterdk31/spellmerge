@@ -1,9 +1,6 @@
-extends SceneTree
-## A sheet of the look of shots (staffs B6a), for people and for Claude to look at (it only
-## checks that the shots were drawn). The looks come from the real cards (`tint` and
-## `look_layer`), packed as the compiler packs them. Needs a display, so it runs only through
-## `ci/build/build.sh --quick --screenshots`; saved as user://screenshots/<name>.png and copied
-## to build/screenshots/.
+extends "res://tests/support/screenshot.gd"
+## A sheet of the look of shots (staffs B6a). The looks come from the real cards (`tint` and
+## `look_layer`), packed as the compiler packs them; it fails when fewer than 40 shots are drawn.
 ##
 ## `looks_sheet` (1x, as a player sees it):
 ##   top left    every carrier with every infusion: a row of bolts, a row of runes (plain,
@@ -16,9 +13,6 @@ extends SceneTree
 ##               the right half through a grey filter, to check the looks read without colour
 ## `looks_sheet_4x`: the top rows at 4x. `looks_combined_4x`: the combined shots at 4x.
 
-const SHOTS_DIR := "user://screenshots"
-const SETTLE_FRAMES := 12
-const FLOOR := preload("res://art/tilesets/crypt/floor.svg")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const ELEMENTS: Array[Resource] = [
 	preload("res://content/spells/elements/fire/fire.tres"),
@@ -36,23 +30,12 @@ const BOLT_RADIUS: float = 5.0
 var _shots: Node = null
 
 
-func _initialize() -> void:
-	await process_frame
-	DirAccess.make_dir_recursive_absolute(SHOTS_DIR)
-	_shots = root.get_node_or_null("Projectiles")
-	if _shots == null:
-		printerr("SHOT FAILED: the Projectiles autoload must exist")
-		quit(1)
+func take() -> void:
+	if not need(["Projectiles"]):
 		return
-	var floor_sprite := Sprite2D.new()
-	floor_sprite.texture = FLOOR
-	floor_sprite.centered = false
-	floor_sprite.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
-	floor_sprite.region_enabled = true
-	floor_sprite.region_rect = Rect2(0, 0, 640, 360)
-	floor_sprite.z_index = -10
-	root.add_child(floor_sprite)
-	_shots.call("set_bounds", Rect2(0, 0, 640, 360))
+	_shots = root.get_node("Projectiles")
+	lay_floor()
+	_shots.call("set_bounds", Rect2(Vector2.ZERO, SCREEN))
 	_shots.call("set_cap", 200)
 	# Carriers by infusion: column 0 is plain.
 	for e in 6:
@@ -104,23 +87,14 @@ func _initialize() -> void:
 	grey.material = material
 	grey.z_index = 100
 	root.add_child(grey)
-	for i in SETTLE_FRAMES:
-		await process_frame
-	await RenderingServer.frame_post_draw
+	await settle(12)
+	var image: Image = await grab()
 	if int(_shots.get("drawn")) < 40:
-		printerr("SHOT FAILED: only %d shots were drawn" % int(_shots.get("drawn")))
-		quit(1)
+		fail("only %d shots were drawn" % int(_shots.get("drawn")))
 		return
-	var image: Image = root.get_texture().get_image()
-	_save(image, "looks_sheet")
-	var scale_to_image: Vector2 = Vector2(image.get_size()) / Vector2(root.get_visible_rect().size)
-	var crop: Image = image.get_region(Rect2i(Vector2i(Vector2(0.0, 0.0) * scale_to_image), Vector2i(Vector2(320.0, 170.0) * scale_to_image)))
-	crop.resize(crop.get_width() * 4, crop.get_height() * 4, Image.INTERPOLATE_NEAREST)
-	_save(crop, "looks_sheet_4x")
-	var combined: Image = image.get_region(Rect2i(Vector2i(Vector2(310.0, 100.0) * scale_to_image), Vector2i(Vector2(300.0, 80.0) * scale_to_image)))
-	combined.resize(combined.get_width() * 4, combined.get_height() * 4, Image.INTERPOLATE_NEAREST)
-	_save(combined, "looks_combined_4x")
-	quit(0)
+	save(image, "looks_sheet")
+	save_crop(image, Vector2(160.0, 85.0), "looks_sheet_4x", Vector2i(160, 85))
+	save_crop(image, Vector2(460.0, 140.0), "looks_combined_4x", Vector2i(150, 40))
 
 
 ## A bolt of `player` that barely moves (the sheet is a still), with a core and layers.
@@ -132,11 +106,3 @@ func _bolt(player: int, at: Vector2, radius: float, tint: Color, look: PackedInt
 func _dress(slot: int, tint: Color, look: PackedInt32Array) -> void:
 	_shots.call("set_core", slot, tint)
 	_shots.call("set_look", slot, ManagerScript.pack_look(look))
-
-
-func _save(image: Image, shot_name: String) -> void:
-	var path: String = "%s/%s.png" % [SHOTS_DIR, shot_name]
-	if image == null or image.save_png(path) != OK:
-		printerr("SHOT FAILED: could not save " + path)
-		return
-	print("SHOT: %s (%dx%d)" % [shot_name, image.get_width(), image.get_height()])

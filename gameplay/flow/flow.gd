@@ -27,10 +27,12 @@ extends Node
 ## Restart: when every wizard is down, a timer of RESTART_DELAY seconds runs, then
 ## a fresh world replaces the old one: new wizards at full health, wave 1, no
 ## projectiles left, and `Spells` cleared (every cooldown and build is forgotten; each
-## new wizard builds its two start spells again).
+## new wizard builds its start staffs again).
 ##
-## Spells: every wizard gets `start_recipe_a` and `start_recipe_b` (component ids, see
-## `core/spells`) and builds them itself; flow never touches a spell.
+## Staffs (staffs A6a, docs/milestones/M2-staffs.md): every wizard gets the staff of the build
+## channel (`staff_for_channel`: `dev` in `dev` and `preview` builds, `starter` otherwise, from
+## `content/wizard/staffs/`) and `start_cards`, four lists of card ids (A `dash`, X `fire bolt`,
+## Y and B empty), and builds them itself; flow never touches a spell.
 ##
 ## All timing runs in step(delta), so tests drive it with fixed deltas.
 
@@ -52,8 +54,13 @@ const DEFAULT_ROOM_ID: StringName = &"arena_01"
 const ENEMY_FOLDER: StringName = &"enemies"
 const DEFAULT_ENEMY_ID: StringName = &"ember_imp"
 ## The two spells every wizard starts with: A is a fire bolt (M1's bolt plus burn), B a plain bolt.
-const DEFAULT_START_RECIPE_A: Dictionary = {"form": &"bolt", "element": &"fire"}
-const DEFAULT_START_RECIPE_B: Dictionary = {"form": &"bolt"}
+## The cards each staff starts with: A, X, Y, B (the owner's choice, 2026-10-26).
+const DEFAULT_START_CARDS: Array = [[&"dash"], [&"fire", &"bolt"], [], []]
+## The staff of test builds (the sandbox) and of the normal game, by id under `wizard`.
+const DEV_STAFF: StringName = &"dev"
+const STARTER_STAFF: StringName = &"starter"
+## The build channels that get the dev staff (`BuildInfo.channel()`).
+const DEV_CHANNELS: Array[String] = ["dev", "preview"]
 ## The wave, sized for four players: one enemy per entry, placed at the room's
 ## enemy spawn with that index (wrapped if the room has fewer). An index used
 ## again puts the enemy a step further along the diagonal.
@@ -98,8 +105,9 @@ var world_parent: Node = null
 ## the scene). The start recipes are component ids (a recipe as in `core/spells`).
 var room_id_to_play: StringName = DEFAULT_ROOM_ID
 var enemy_id_to_play: StringName = DEFAULT_ENEMY_ID
-var start_recipe_a: Dictionary = DEFAULT_START_RECIPE_A.duplicate(true)
-var start_recipe_b: Dictionary = DEFAULT_START_RECIPE_B.duplicate(true)
+var start_cards: Array = DEFAULT_START_CARDS.duplicate(true)
+## The build channel, which picks the staff; `BuildInfo.channel()` unless a test sets it.
+var channel: String = BuildInfo.channel()
 var wizard_scene: PackedScene = DefaultWizardScene
 
 var state: State = State.IDLE
@@ -216,11 +224,9 @@ func start_run(requester: int) -> bool:
 	if spells == null:
 		push_warning("Flow: the Spells autoload is missing, so no run starts.")
 		return false
-	for recipe: Dictionary in [start_recipe_a, start_recipe_b]:
-		var compiled: CompiledSpell = spells.compile(recipe)
-		if not compiled.valid:
-			push_warning("Flow: a start spell does not compile (%s), so no run starts." % compiled.reason)
-			return false
+	if staff_for_channel() == null:
+		push_warning("Flow: the staff for the %s channel is missing from the registry, so no run starts." % channel)
+		return false
 	if not _is_wizard_scene(wizard_scene):
 		push_warning("Flow: the wizard scene is missing or has no player script, so no run starts.")
 		return false
@@ -465,11 +471,19 @@ func _is_wizard_scene(scene: PackedScene) -> bool:
 	return ok
 
 
+## The staff every wizard's four staffs are: the 20-slot `dev` staff in `dev` and `preview`
+## builds (the sandbox for testing builds), the 4-slot `starter` otherwise. Null when missing.
+func staff_for_channel() -> StaffBase:
+	if registry == null:
+		return null
+	return registry.get_resource(&"wizard", DEV_STAFF if DEV_CHANNELS.has(channel) else STARTER_STAFF) as StaffBase
+
+
 func _add_wizard(parent: Node2D, room: RoomBase, index: int, at: Vector2 = Vector2.INF) -> void:
 	var wizard := _wizard_scene.instantiate() as PlayerScript
 	wizard.index = index
-	wizard.start_recipe_a = start_recipe_a.duplicate(true)
-	wizard.start_recipe_b = start_recipe_b.duplicate(true)
+	wizard.staff = staff_for_channel()
+	wizard.start_cards = start_cards.duplicate(true)
 	if at != Vector2.INF:
 		wizard.position = at
 	elif index < room.player_spawns.size():

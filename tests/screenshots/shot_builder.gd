@@ -1,11 +1,11 @@
 extends SceneTree
-## Screenshots of the spell builder (M2 part 16), for people and for Claude to look at (not a
+## Screenshots of the staff builder (staffs A6a), for people and for Claude to look at (not a
 ## test: it only checks that each staged state happened). Needs a display, so it runs only through
 ## `ci/build/build.sh --quick --screenshots`; each shot is saved as user://screenshots/<name>.png
 ## and copied to build/screenshots/.
 ##
-## Shots: one player with the builder open on the bag of the element slot, then all four players
-## with their builders open, each on something different (an element, a modifier, a held spell).
+## Shots: one player with the builder open, then picking cards into staff X, a wasted card, then
+## all four players with their builders open on different staffs, in a wave.
 
 const SHOTS_DIR := "user://screenshots"
 const SETTLE_FRAMES := 20
@@ -28,26 +28,23 @@ func _initialize() -> void:
 	_input.call("add_virtual_device", 0)
 	flow.call("start_run", 0)
 	await _settle()
-	_end_wave()
-	await _settle()
 	await _open_builder(0)
 	var builder: Node = _hud.call("get_builder", 0)
 	await _shot("builder_opened")
-	await _press(0, builder.call("slot_button", 1))
-	if not _hud.call("get_builder", 0).call("is_open"):
+	# Two cards after the fire bolt: a split and a nova; the plan shows both casts.
+	await _press(0, builder.call("slot_button", 2))
+	await _press(0, _row(builder, "Split"))
+	await _press(0, _row(builder, "Nova"))
+	if not builder.call("is_open"):
 		_fail("the builder of player 1 is not open")
 		return
 	await _shot("builder_one_player")
-	# A trigger, its held spell, then an element for it: refused (no form), so the reason shows.
-	await _press(0, builder.call("slot_button", 5))
-	await _press(0, builder.call("shown_rows")[0])
-	await _press(0, builder.call("held_button"))
-	await _press(0, builder.call("slot_button", 1))
-	await _press(0, builder.call("shown_rows")[0])
-	if str(builder.call("note_text")) == "":
-		_fail("the refused pick showed no reason")
-		return
-	await _shot("builder_refused")
+	# Homing alone in staff Y: it lands on the caster and does nothing, so the note says why.
+	await _press(0, builder.call("tab_button", 2))
+	await _press(0, builder.call("slot_button", 0))
+	await _press(0, _row(builder, "Homing"))
+	await _press(0, builder.call("slot_button", 0))
+	await _shot("builder_wasted")
 	# A stopped run leaves the HUD as it is, so close the builder as its owner would.
 	_tap(0, &"overlay")
 	await _settle()
@@ -59,31 +56,19 @@ func _initialize() -> void:
 	# The room is entered a little after the run starts; the overlay opens only inside it.
 	for i in 4:
 		await _settle()
-	_end_wave()
-	await _settle()
 	for index in 4:
 		await _open_builder(index)
-	# P1: the element bag. P2: a modifier. P3: a trigger and its held spell. P4: spell B.
-	await _press(0, _hud.call("get_builder", 0).call("slot_button", 1))
-	await _press(1, _hud.call("get_builder", 1).call("slot_button", 2))
-	await _press(2, _hud.call("get_builder", 2).call("slot_button", 5))
-	await _press(2, _hud.call("get_builder", 2).call("shown_rows")[0])
-	await _press(3, _hud.call("get_builder", 3).call("tab_button", 1))
+	# P1: staff X. P2: staff A. P3: staff Y with a pick. P4: staff B.
+	await _press(1, _hud.call("get_builder", 1).call("tab_button", 0))
+	await _press(2, _hud.call("get_builder", 2).call("tab_button", 2))
+	await _press(2, _hud.call("get_builder", 2).call("slot_button", 0))
+	await _press(2, _row(_hud.call("get_builder", 2), "Orbit"))
+	await _press(3, _hud.call("get_builder", 3).call("tab_button", 3))
 	for index in 4:
 		if not _hud.call("get_builder", index).call("is_open"):
 			_fail("the builder of player %d is not open in builder_four_players (focus panel open: %s)" % [index + 1, _focus.call("is_open", index)])
 			return
 	await _shot("builder_four_players")
-	# The wave starts with the builders open: they fold into the quick view; then the break
-	# comes back and they unfold with the same choices.
-	var events: Node = root.get_node("Events")
-	events.emit_signal("wave_started", 2)
-	await _settle()
-	await _shot("builder_four_players_wave")
-	events.emit_signal("room_cleared", &"shot")
-	events.emit_signal("build_break_started", 20.0)
-	await _settle()
-	await _shot("builder_four_players_break_again")
 	for index in 4:
 		_tap(index, &"overlay")
 	await _settle()
@@ -92,10 +77,12 @@ func _initialize() -> void:
 	quit(0)
 
 
-## A wave is on from the start of a run and the builder is then the quick view; the full builder is
-## for the break, so end the wave the way the flow does.
-func _end_wave() -> void:
-	root.get_node("Events").emit_signal("room_cleared", &"shot")
+## The bag row of the card named `display_name` in `builder`, or null.
+func _row(builder: Node, display_name: String) -> Control:
+	for row: Button in builder.call("shown_rows"):
+		if row.text.trim_prefix("> ").begins_with(display_name):
+			return row
+	return null
 
 
 func _tap(player: int, action: StringName) -> void:
@@ -110,19 +97,19 @@ func _open_builder(player: int) -> void:
 	_tap(player, &"move_down")
 	await process_frame
 	await process_frame
-	_tap(player, &"cast")
+	_tap(player, &"cast_a")
 	await _settle()
 
 
-## Move the player's focus down to `control` and press cast on it.
+## Move the player's focus down to `control` and press `cast_a` (activate) on it.
 func _press(player: int, control: Control) -> void:
-	for attempt in 40:
+	for attempt in 120:
 		if _focus.call("focused", player) == control:
 			break
 		_tap(player, &"move_down")
 		await process_frame
 		await process_frame
-	_tap(player, &"cast")
+	_tap(player, &"cast_a")
 	await _settle()
 
 

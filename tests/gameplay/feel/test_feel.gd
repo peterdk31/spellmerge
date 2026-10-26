@@ -588,7 +588,7 @@ func _test_death_animation_starts_at_rest_scale() -> void:
 class DashingWizard:
 	extends Node2D
 
-	func is_dodging() -> bool:
+	func is_dashing() -> bool:
 		return true
 
 

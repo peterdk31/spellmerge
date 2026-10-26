@@ -6,14 +6,13 @@ extends CharacterBody2D
 ## The scene is content/wizard/base/wizard.tscn, with this script on its root.
 ## Set `index` before adding the node to the tree.
 ##
-## Dodge: a press of the `dodge` action starts a short dash. The wizard cannot
-## be hurt for the first part of it (is_invulnerable()), then there is a cooldown
-## before the next dodge. Combat (part 11) asks is_invulnerable() before damage.
-## A press made while the dodge is not ready is remembered for INPUT_BUFFER
-## seconds: if the dodge becomes ready in that time it starts then, so a press just
-## before the end of the cooldown still counts. An earlier press is dropped.
-## While the wizard cannot be hurt it is drawn translucent with a closing ring in
-## its colour, so everyone sees the window (also after joining or a revive).
+## Dash (staffs A6a): there is no dodge button any more. A `dash` card in a staff makes the
+## spell runtime send `caster_move_requested(player, &"dash", to, seconds, tag)`; the wizard
+## then dashes the way it walks (the way it faces when standing) as far and as long as asked,
+## and sends `caster_move_finished` where it stops. A dash gives no invulnerability: shields
+## do that (staffs B1, B3). `protect(seconds)` still makes the wizard unhurtable for a while (a
+## wizard who joins mid-run), drawn translucent with a closing ring in its colour. Combat asks
+## is_invulnerable() before damage.
 ##
 ## Health and mana: MAX_HEALTH, and MAX_MANA that regenerates. A hit (the
 ## `damage_dealt` event with this wizard as target, or take_damage()) does nothing
@@ -49,23 +48,25 @@ extends CharacterBody2D
 ## Dash look: during a dodge the sprite stretches and leans along the dash and
 ## fading ghosts of it trail behind (drawn in _draw; no nodes or arrays made).
 ##
-## Cast: a press of `cast` is buffered like the dodge (INPUT_BUFFER seconds), so a tap
-## just before the spell's cooldown ends still fires.
+## Staffs (staffs A6a, docs/milestones/M2-staffs.md): four staffs, one per button: `cast_a`,
+## `cast_x`, `cast_y` and `cast_b` cast staff 0 to 3 (A, X, Y, B). Each staff is a row of card
+## ids, `staff.slots` long (`staff` is the StaffBase flow hands over: `starter` or `dev`),
+## compiled and installed by `Spells`; the wizard reads no spell field. Holding a button casts
+## that staff whenever it is ready; a press while it is not ready is remembered for
+## INPUT_BUFFER seconds, so a tap just before its delay ends still fires. While a staff has a
+## sustained (`hold`) card on, only a new press casts it (which switches it off), so a held
+## button does not switch it on and off. Mana: what the wizard has minus what its sustained
+## cards reserve (`mana_reserved`). A cast takes the mana returned, sends `spell_cast` (the
+## carrier) and `staff_cast`, and plays the sound `cast` from `core/registry` (nothing on null).
 ##
-## While `cast` is held the wizard calls `Spells.cast(index, slot, origin, aim, mana)` for
-## its active slot and reads no spell field. If the spell fired it takes the mana returned,
-## sends `spell_cast` and plays the sound `cast` from `core/registry` (nothing on null).
-##
-## Spells (M2 part 11): two prepared spells, slot 0 (A) and 1 (B), each a recipe of component
-## ids (see `core/spells`) compiled and installed by `Spells`. `start_recipe_a`/`_b` are built
-## when the wizard enters the tree (flow sets them). `swap()` (or `spell_swap_requested`)
-## switches the active slot, and `active_spell_changed` says which one (also when the wizard
-## appears). `build_change_requested` for this player is checked with
-## `Spells.compile` on a copy of the recipe: if it compiles the copy replaces the spell and
-## `spell_changed` is sent, else `build_refused` says why and nothing changes. The `bag` holds
-## the ids the player may build with (every component in the registry until M3's rewards
-## fill it). Orbit shots circle the body: the anchor is pushed to the projectile manager each
-## step and cleared when the wizard is downed or leaves.
+## Building: `start_cards` (four lists of card ids, flow sets them) are built when the wizard
+## enters the tree. `staff_change_requested` puts one card in one slot, `card_move_requested`
+## moves or swaps cards between slots and staffs (a staff of -1 is the bag). A change is only
+## refused when the slot does not exist or the card is not in the `bag`; then `build_refused`
+## says why. Every built staff is announced with `staff_changed(player, staff, plan)`, the plain
+## view of `Spells.staff_view`. The `bag` holds the ids the player may build with (every card
+## in the registry until M3's rewards fill it). Orbit shots circle the body: the anchor is
+## pushed to the projectile manager each step and cleared when the wizard is downed or leaves.
 ##
 ## All timing runs in step(delta), so tests drive it with fixed deltas and no
 ## real-time waits. Nothing here allocates per frame.
@@ -78,15 +79,13 @@ const SpellsScript := preload("res://core/spells/spells.gd")
 
 ## Walking speed in pixels per second (the view is 640x360).
 const MOVE_SPEED: float = 90.0
-## Dash speed, and how long the dash lasts.
-const DODGE_SPEED: float = 220.0
-const DODGE_TIME: float = 0.25
-## The wizard cannot be hurt this long from the start of a dodge (at most DODGE_TIME).
-const INVULNERABLE_TIME: float = 0.125
-## Seconds from the start of a dodge until the next one may start.
-const DODGE_COOLDOWN: float = 0.625
-## A dodge or cast pressed this long (seconds) before it is possible still happens.
+## A staff cast pressed this long (seconds) before the staff is ready still happens.
 const INPUT_BUFFER: float = 0.15
+## The four staffs and their buttons (0 A, 1 X, 2 Y, 3 B).
+const STAFF_COUNT: int = 4
+const CAST_ACTIONS: Array[StringName] = [&"cast_a", &"cast_x", &"cast_y", &"cast_b"]
+## The ring of `protect` closes over this many seconds at most (it shows how much is left).
+const INVULNERABLE_TIME: float = 2.0
 ## Sprite opacity and ring size while the wizard cannot be hurt.
 const INVULNERABLE_ALPHA: float = 0.55
 const INVULNERABLE_RING_RADIUS: float = 15.0
@@ -165,13 +164,8 @@ const REVIVE_RING_HEIGHT: float = 34.0
 const REVIVE_RING_BACK: Color = Color("5a5a6e")
 ## Id of the cast sound (looked up in core/registry; a missing sound is silent).
 const CAST_SOUND_ID: StringName = &"cast"
-## The slots of a spell in `build_change_requested`: 0 form, 1 element, 2-4 modifiers, 5 trigger.
-const SLOT_FORM: int = 0
-const SLOT_ELEMENT: int = 1
-const SLOT_FIRST_MODIFIER: int = 2
-const SLOT_TRIGGER: int = SLOT_FIRST_MODIFIER + SpellLimits.MAX_MODIFIERS
-## The kind of component each slot takes (`SpellComponent.kind()`).
-const SLOT_KINDS: Array[StringName] = [&"form", &"element", &"modifier", &"modifier", &"modifier", &"trigger"]
+## `card_move_requested`'s staff for the bag.
+const BAG: int = -1
 ## Where orbit shots circle, above the feet (the same body offset as the hit circle).
 const ORBIT_ANCHOR_OFFSET: Vector2 = Vector2(0.0, -12.0)
 ## Physics layers (the plan: 1 walls, 2 players, 3 enemies, 4 projectiles and
@@ -216,15 +210,14 @@ var projectiles: ProjectileManagerScript = null
 ## autoload is used.
 var spells: SpellsScript = null
 
-## The recipes built when the wizard enters the tree (`{}` for none). Flow sets them.
-var start_recipe_a: Dictionary = {}
-var start_recipe_b: Dictionary = {}
+## The staff every one of the four staffs is (its slots, delay and recharge). Flow sets it by
+## build channel; without one a staff has 4 slots and casts with no delay of its own.
+var staff: StaffBase = null
+## The card ids built into staff 0 to 3 when the wizard enters the tree. Flow sets them.
+var start_cards: Array = [[], [], [], []]
 
-## The component ids this player may build with. Filled from the registry in `_ready`.
+## The card ids this player may build with. Filled from the registry in `_ready`.
 var bag: Array[StringName] = []
-
-## The prepared spell that `cast` fires: 0 (A) or 1 (B).
-var active_slot: int = 0
 
 var health: int = MAX_HEALTH
 var mana: float = MAX_MANA
@@ -259,25 +252,28 @@ var _trail_timer: float = 0.0
 ## Child drawn above the sprite: the staff and the reticle (null in bare scripts).
 var _overlay: Node2D = null
 
-var _dodge_left: float = 0.0
+## The dash in progress: seconds left, the way, the speed, and the tag of its card.
+var _dash_left: float = 0.0
+var _dash_direction: Vector2 = Vector2.ZERO
+var _dash_speed: float = 0.0
+var _dash_tag: int = 0
 var _invulnerable_left: float = 0.0
-var _cooldown_left: float = 0.0
-var _dodge_direction: Vector2 = Vector2.ZERO
-var _seen_dodge_presses: int = 0
-var _seen_cast_presses: int = 0
-## Seconds left in which a remembered press still counts (0 = none remembered).
-var _dodge_buffer_left: float = 0.0
-var _cast_buffer_left: float = 0.0
+## Per staff: the button's press count last seen, and the seconds left in which a remembered
+## press still counts (0 = none remembered).
+var _seen_presses: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
+var _buffer_left: PackedFloat32Array = PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
+## Mana the sustained cards of this wizard's staffs hold (from `mana_reserved`).
+var _reserved: float = 0.0
 ## True while the invulnerable look (translucent sprite and ring) is shown.
 var _invulnerable_look: bool = false
 var _downed: bool = false
 ## How far a teammate's revive has got (0 to 1), from `revive_progress`; drawn as a ring.
 var _revive_progress: float = 0.0
 var _sound_player: AudioStreamPlayer = null
+## The card ids of each staff, `slots` long (`&""` is an empty slot), and whether it built.
+var _cards: Array = [[], [], [], []]
+var _has_build: Array[bool] = [false, false, false, false]
 ## What the last `player_stats_changed` said, to send it only on a change.
-## The recipe and the compiled spell of slots A and B (null when the slot has no spell).
-var _recipes: Array[Dictionary] = [{}, {}]
-var _built: Array[CompiledSpell] = [null, null]
 var _sent_health: int = -1
 var _sent_mana: int = -1
 
@@ -332,7 +328,7 @@ func _update_animation(delta: float) -> void:
 	if _sprite == null:
 		return
 	var wanted: Anim = Anim.IDLE
-	if is_dodging():
+	if is_dashing():
 		wanted = Anim.DASH
 	elif velocity.length() > WALK_THRESHOLD:
 		wanted = Anim.WALK
@@ -397,15 +393,12 @@ func _ready() -> void:
 		spells = get_node_or_null("/root/Spells") as SpellsScript
 	_connect_build_events()
 	_fill_bag()
-	if not start_recipe_a.is_empty():
-		set_recipe(0, start_recipe_a)
-	if not start_recipe_b.is_empty():
-		set_recipe(1, start_recipe_b)
-	# Start on the slot that has a spell, so a wizard with only B can cast at once.
-	if _built[active_slot] == null and _built[1 - active_slot] != null:
-		active_slot = 1 - active_slot
-	if events != null:
-		events.active_spell_changed.emit(index, active_slot)
+	for at in STAFF_COUNT:
+		var cards: Array[StringName] = []
+		if at < start_cards.size() and start_cards[at] is Array:
+			for id: Variant in start_cards[at]:
+				cards.append(StringName(str(id)))
+		set_staff(at, cards)
 	if _overlay == null:
 		_overlay = Node2D.new()
 		_overlay.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -414,9 +407,7 @@ func _ready() -> void:
 	if is_inside_tree() and _sound_player == null:
 		_sound_player = AudioStreamPlayer.new()
 		add_child(_sound_player)
-	if input != null:
-		_seen_dodge_presses = input.get_press_count(index, &"dodge")
-		_seen_cast_presses = input.get_press_count(index, &"cast")
+	_forget_presses()
 	_announce_stats()
 
 
@@ -428,20 +419,28 @@ func _enter_tree() -> void:
 func _connect_build_events() -> void:
 	if events == null:
 		return
-	if not events.build_change_requested.is_connected(_on_build_change_requested):
-		events.build_change_requested.connect(_on_build_change_requested)
-	if not events.spell_swap_requested.is_connected(_on_spell_swap_requested):
-		events.spell_swap_requested.connect(_on_spell_swap_requested)
+	if not events.staff_change_requested.is_connected(_on_staff_change_requested):
+		events.staff_change_requested.connect(_on_staff_change_requested)
+	if not events.card_move_requested.is_connected(_on_card_move_requested):
+		events.card_move_requested.connect(_on_card_move_requested)
+	if not events.caster_move_requested.is_connected(_on_caster_move_requested):
+		events.caster_move_requested.connect(_on_caster_move_requested)
+	if not events.mana_reserved.is_connected(_on_mana_reserved):
+		events.mana_reserved.connect(_on_mana_reserved)
 
 
 ## Stop listening to build requests (a wizard that left is freed a frame later) and stop
 ## the orbit shots that circled it.
 func _exit_tree() -> void:
 	if events != null:
-		if events.build_change_requested.is_connected(_on_build_change_requested):
-			events.build_change_requested.disconnect(_on_build_change_requested)
-		if events.spell_swap_requested.is_connected(_on_spell_swap_requested):
-			events.spell_swap_requested.disconnect(_on_spell_swap_requested)
+		if events.staff_change_requested.is_connected(_on_staff_change_requested):
+			events.staff_change_requested.disconnect(_on_staff_change_requested)
+		if events.card_move_requested.is_connected(_on_card_move_requested):
+			events.card_move_requested.disconnect(_on_card_move_requested)
+		if events.caster_move_requested.is_connected(_on_caster_move_requested):
+			events.caster_move_requested.disconnect(_on_caster_move_requested)
+		if events.mana_reserved.is_connected(_on_mana_reserved):
+			events.mana_reserved.disconnect(_on_mana_reserved)
 	if projectiles != null:
 		projectiles.clear_anchor(index)
 
@@ -451,7 +450,7 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 
 
-## Advance the wizard by `delta` seconds: read input, start a dodge, set
+## Advance the wizard by `delta` seconds: read input, cast staffs, run a dash, set
 ## `velocity`. The caller moves the body (_physics_process does).
 func step(delta: float) -> void:
 	if projectiles != null:
@@ -461,70 +460,67 @@ func step(delta: float) -> void:
 			projectiles.set_anchor(index, global_position + ORBIT_ANCHOR_OFFSET)
 	if _downed:
 		velocity = Vector2.ZERO
-		if input != null:
-			# Presses made while downed are not held against the wizard after a revive.
-			_seen_dodge_presses = input.get_press_count(index, &"dodge")
-			_seen_cast_presses = input.get_press_count(index, &"cast")
-		_dodge_buffer_left = 0.0
-		_cast_buffer_left = 0.0
+		# Presses made while downed are not held against the wizard after a revive.
+		_forget_presses()
 		_update_invulnerable_look()
 		return
 	mana = minf(mana + MANA_REGEN * delta, MAX_MANA)
 	_announce_stats()
-	_dodge_left = maxf(_dodge_left - delta, 0.0)
 	_invulnerable_left = maxf(_invulnerable_left - delta, 0.0)
-	_cooldown_left = maxf(_cooldown_left - delta, 0.0)
-	_dodge_buffer_left = maxf(_dodge_buffer_left - delta, 0.0)
-	_cast_buffer_left = maxf(_cast_buffer_left - delta, 0.0)
+	for at in STAFF_COUNT:
+		_buffer_left[at] = maxf(_buffer_left[at] - delta, 0.0)
+	if _dash_left > 0.0:
+		_dash_left = maxf(_dash_left - delta, 0.0)
+		if _dash_left <= 0.0:
+			_finish_dash()
 	if input == null:
 		velocity = Vector2.ZERO
 		_update_invulnerable_look()
 		return
 	var move: Vector2 = input.get_move(index)
-	if input.is_captured(index):
-		# An overlay opened: freeze, and end a dash in progress (the cooldown stays).
-		_dodge_left = 0.0
-		_invulnerable_left = 0.0
-		_dodge_buffer_left = 0.0
-		_cast_buffer_left = 0.0
+	var captured: bool = input.is_captured(index)
+	if captured and is_dashing():
+		# An overlay opened: freeze, and end a dash in progress.
+		_dash_left = 0.0
+		_finish_dash()
 	if move != Vector2.ZERO:
 		facing = move.normalized()
 	_update_aim(move, delta)
 	if _dash_look:
 		_tick_trail(delta)
-	# Count presses rather than asking "just pressed": a tap released again
-	# before this frame is not lost. A captured player (overlay open) is skipped,
-	# and a press made meanwhile is not held against them later.
-	var presses: int = input.get_press_count(index, &"dodge")
-	var pressed: bool = presses != _seen_dodge_presses
-	_seen_dodge_presses = presses
-	var captured: bool = input.is_captured(index)
-	if pressed and not captured:
-		_dodge_buffer_left = INPUT_BUFFER
-	if _dodge_buffer_left > 0.0 and not captured and can_dodge():
-		_dodge_buffer_left = 0.0
-		_start_dodge(move)
-	if is_dodging():
-		velocity = _dodge_direction * DODGE_SPEED
+	if is_dashing():
+		velocity = _dash_direction * _dash_speed
 	else:
 		velocity = move * MOVE_SPEED
 	_update_animation(delta)
 	_update_invulnerable_look()
-	# Held: the spell's own cooldown sets the rate. A press is also remembered, so a
-	# tap just before the cooldown ends fires. `cast` is hidden while an overlay is
-	# open (captured), so a menu tap never fires.
-	var cast_presses: int = input.get_press_count(index, &"cast")
-	if cast_presses != _seen_cast_presses:
-		_seen_cast_presses = cast_presses
-		if not captured:
-			_cast_buffer_left = INPUT_BUFFER
-	if not has_spell():
-		return
-	if input.is_action_pressed(index, &"cast"):
-		if cast():
-			_cast_buffer_left = 0.0
-	elif _cast_buffer_left > 0.0 and not captured and cast():
-		_cast_buffer_left = 0.0
+	# Count presses rather than asking "just pressed": a tap released again before this
+	# frame is not lost. The staff buttons are hidden while an overlay is open (captured), so
+	# a menu tap never casts, and a press made meanwhile is not held against the player later.
+	for at in STAFF_COUNT:
+		var presses: int = input.get_press_count(index, CAST_ACTIONS[at])
+		var fresh: bool = presses != _seen_presses[at]
+		_seen_presses[at] = presses
+		if captured:
+			_buffer_left[at] = 0.0
+			continue
+		if fresh:
+			_buffer_left[at] = INPUT_BUFFER
+		if not _has_build[at] or spells == null:
+			continue
+		# A held button casts whenever the staff is ready, except while it holds a sustained
+		# card: then only a new press casts, which switches it off.
+		var held: bool = input.is_action_pressed(index, CAST_ACTIONS[at]) and not spells.is_holding(index, at)
+		if (held or _buffer_left[at] > 0.0) and cast_staff(at):
+			_buffer_left[at] = 0.0
+
+
+## Take the press counts as they are now, so no press made before counts later.
+func _forget_presses() -> void:
+	for at in STAFF_COUNT:
+		_buffer_left[at] = 0.0
+		if input != null:
+			_seen_presses[at] = input.get_press_count(index, CAST_ACTIONS[at])
 
 
 ## Choose `aim` for this step: the right stick, else the mouse (keyboard player),
@@ -588,7 +584,7 @@ func _refresh_look() -> void:
 		_sprite.flip_h = _faces_left
 		if _hat != null:
 			_hat.flip_h = _faces_left
-	var dashing: bool = is_dodging() and not _downed
+	var dashing: bool = is_dashing() and not _downed
 	if dashing or _dash_look:
 		_apply_dash_look(dashing)
 	if not aim.is_equal_approx(_drawn_aim):
@@ -617,7 +613,7 @@ func _redraw() -> void:
 
 ## The sprite scale of a dash: stretched along the dominant axis of the dash.
 func _dash_scale() -> Vector2:
-	if absf(_dodge_direction.x) >= absf(_dodge_direction.y):
+	if absf(_dash_direction.x) >= absf(_dash_direction.y):
 		return DASH_STRETCH
 	return Vector2(DASH_STRETCH.y, DASH_STRETCH.x)
 
@@ -625,7 +621,7 @@ func _dash_scale() -> Vector2:
 ## Lean in radians, into the dash. A node's rotation is not mirrored by flip_h,
 ## so the sign needs no care for a sprite that faces left.
 func _dash_lean() -> float:
-	return clampf(_dodge_direction.x, -1.0, 1.0) * DASH_LEAN
+	return clampf(_dash_direction.x, -1.0, 1.0) * DASH_LEAN
 
 
 ## Stretch and lean the sprite along the dash, or put it back when it ends.
@@ -749,45 +745,50 @@ func _reticle_visible() -> bool:
 	return not _downed and aim != Vector2.ZERO
 
 
-## True when the active slot holds a built spell.
-func has_spell() -> bool:
-	return spells != null and _built[active_slot] != null
+## True when staff `at` (0-3) has a build that can cast.
+func has_staff(at: int) -> bool:
+	return spells != null and at >= 0 and at < STAFF_COUNT and _has_build[at]
 
 
-## The recipe (component ids) of slot 0 or 1 as a copy, `{}` when it has none.
-func recipe_of(slot: int) -> Dictionary:
-	return _recipes[slot].duplicate(true) if slot >= 0 and slot < _recipes.size() else {}
+## The card ids of staff `at` as a copy, one per slot (`&""` for an empty slot).
+func cards_of(at: int) -> Array[StringName]:
+	var out: Array[StringName] = []
+	if at >= 0 and at < STAFF_COUNT:
+		out.assign(_cards[at])
+	return out
 
 
-## Switch between the two prepared spells. Does nothing when downed or when the other slot
-## has no spell. Returns true when the active slot changed.
-func swap() -> bool:
-	var other: int = 1 - active_slot
-	if _downed or _built[other] == null:
-		return false
-	active_slot = other
+## How many slots every staff has.
+func slot_count() -> int:
+	return staff.slots if staff != null else SpellLimits.STAFFS
+
+
+## Build `cards` (card ids by slot) into staff `at` (0-3): cut or padded to the staff's slots,
+## compiled and installed by `Spells`, and announced with `staff_changed`. Nothing is refused
+## for what the cards do; an empty staff simply casts nothing. Returns false only for a staff
+## that does not exist or without the spell runtime.
+func set_staff(at: int, cards: Array[StringName]) -> bool:
+	if spells == null or at < 0 or at >= STAFF_COUNT:
+		return _refuse("There is no such staff.")
+	var row: Array[StringName] = []
+	for slot in slot_count():
+		row.append(cards[slot] if slot < cards.size() else &"")
+	_cards[at] = row
+	_has_build[at] = spells.install_staff(index, at, spells.compile_staff(row, _staff_or_default())) != 0
 	if events != null:
-		events.active_spell_changed.emit(index, active_slot)
+		events.staff_changed.emit(index, at, spells.staff_view(row, _staff_or_default()))
 	return true
 
 
-## Build `recipe` into slot 0 or 1 (a full recipe, see `core/spells`). If `Spells.compile`
-## refuses it, sends `build_refused` with the reason and changes nothing. Otherwise the slot
-## now holds it and `spell_changed` says in words what it does. Returns true when built.
-func set_recipe(slot: int, recipe: Dictionary) -> bool:
-	if spells == null or slot < 0 or slot >= _recipes.size():
-		return _refuse("No spell slot here.")
-	var compiled: CompiledSpell = spells.compile(recipe)
-	if not compiled.valid:
-		return _refuse(compiled.reason)
-	if spells.install(index, slot, compiled) == 0:
-		return _refuse("The spell could not be built.")
-	_recipes[slot] = recipe.duplicate(true)
-	_built[slot] = compiled
-	if events != null:
-		events.spell_changed.emit(index, PackedInt32Array([slot]), compiled.description)
-		events.recipe_changed.emit(index, slot, _recipes[slot].duplicate(true))
-	return true
+## The staff the cards sit in: `staff`, or a plain one of 4 slots when flow set none.
+func _staff_or_default() -> StaffBase:
+	if staff != null:
+		return staff
+	var plain := StaffBase.new()
+	plain.slots = SpellLimits.STAFFS
+	plain.cast_delay = 0.0
+	plain.recharge = 0.0
+	return plain
 
 
 func _refuse(reason: String) -> bool:
@@ -807,102 +808,114 @@ func _fill_bag() -> void:
 		events.bag_changed.emit(index, bag.duplicate())
 
 
-func _on_spell_swap_requested(player: int) -> void:
-	if player == index:
-		swap()
-
-
-## A build change for this player: put `component_id` in `slot` of the spell at path `spell`
-## (`&""` empties the slot). The change is made on a copy and only kept if it compiles.
-## `spell_changed` names the prepared spell the path starts at, since a change in a held spell
-## rebuilds the whole chain.
-func _on_build_change_requested(player: int, spell: PackedInt32Array, slot: int, component_id: StringName) -> void:
+## A builder asked to put `card_id` into `slot` of staff `at` (`&""` empties it).
+func _on_staff_change_requested(player: int, at: int, slot: int, card_id: StringName) -> void:
 	if player != index:
 		return
-	if spell.is_empty() or spell[0] < 0 or spell[0] >= _recipes.size():
-		_refuse("There is no such spell.")
+	if at < 0 or at >= STAFF_COUNT or slot < 0 or slot >= slot_count():
+		_refuse("There is no such slot.")
 		return
-	var top: int = spell[0]
-	var recipe: Dictionary = _recipes[top].duplicate(true)
-	var node: Dictionary = recipe
-	for depth in range(1, spell.size()):
-		if spell[depth] != 0:
-			_refuse("There is no such spell.")
-			return
-		var held: Variant = node.get("held")
-		if not held is Dictionary:
-			held = {}
-			node["held"] = held
-		node = held as Dictionary
-	var problem: String = _put(node, slot, component_id)
-	if problem != "":
-		_refuse(problem)
+	if card_id != &"" and not bag.has(card_id):
+		_refuse("You do not have that card.")
 		return
-	set_recipe(top, recipe)
+	var row: Array[StringName] = cards_of(at)
+	row[slot] = card_id
+	set_staff(at, row)
 
 
-## Put `id` into `slot` of the recipe `node`. Returns why it cannot, or `""`.
-func _put(node: Dictionary, slot: int, id: StringName) -> String:
-	if slot < 0 or slot >= SLOT_KINDS.size():
-		return "There is no such slot."
-	if id != &"":
-		if not bag.has(id):
-			return "You do not have that component."
-		var component: SpellComponent = registry.get_resource(&"spells", id) as SpellComponent if registry != null else null
-		if component == null or component.kind() != SLOT_KINDS[slot]:
-			return "That component does not fit this slot."
-	if slot == SLOT_FORM:
-		_set_or_erase(node, "form", id)
-	elif slot == SLOT_ELEMENT:
-		_set_or_erase(node, "element", id)
-	elif slot == SLOT_TRIGGER:
-		_set_or_erase(node, "trigger", id)
-		if id == &"":
-			node.erase("held")
-	else:
-		var modifiers: Array = node.get("modifiers", []) as Array
-		var at: int = slot - SLOT_FIRST_MODIFIER
-		if id == &"":
-			if at < modifiers.size():
-				modifiers.remove_at(at)
-		elif at < modifiers.size():
-			modifiers[at] = id
-		else:
-			modifiers.append(id)
-		if modifiers.is_empty():
-			node.erase("modifiers")
-		else:
-			node["modifiers"] = modifiers
-	return ""
+## A builder asked to move a card: from a slot of one staff to a slot of another (or the same),
+## swapping with what is there; from the bag (`from_staff` BAG, `from_slot` the bag index) it is
+## put in, and to the bag (`to_staff` BAG) the slot is emptied.
+func _on_card_move_requested(player: int, from_staff: int, from_slot: int, to_staff: int, to_slot: int) -> void:
+	if player != index:
+		return
+	var slots: int = slot_count()
+	var from_ok: bool = (from_staff == BAG and from_slot >= 0 and from_slot < bag.size()) or (from_staff >= 0 and from_staff < STAFF_COUNT and from_slot >= 0 and from_slot < slots)
+	var to_ok: bool = to_staff == BAG or (to_staff >= 0 and to_staff < STAFF_COUNT and to_slot >= 0 and to_slot < slots)
+	if not from_ok or not to_ok:
+		_refuse("There is no such slot.")
+		return
+	if from_staff == BAG:
+		if to_staff != BAG:
+			_on_staff_change_requested(index, to_staff, to_slot, bag[from_slot])
+		return
+	if to_staff == BAG:
+		_on_staff_change_requested(index, from_staff, from_slot, &"")
+		return
+	var moving: StringName = _cards[from_staff][from_slot]
+	var there: StringName = _cards[to_staff][to_slot]
+	var source: Array[StringName] = cards_of(from_staff)
+	source[from_slot] = there
+	if from_staff == to_staff:
+		source[to_slot] = moving
+		set_staff(from_staff, source)
+		return
+	var target: Array[StringName] = cards_of(to_staff)
+	target[to_slot] = moving
+	set_staff(from_staff, source)
+	set_staff(to_staff, target)
 
 
-func _set_or_erase(node: Dictionary, key: String, id: StringName) -> void:
-	if id == &"":
-		node.erase(key)
-	else:
-		node[key] = id
+func _on_mana_reserved(player: int, amount: float) -> void:
+	if player == index:
+		_reserved = maxf(amount, 0.0)
 
 
-## Fire the active spell now. Returns true if it fired. Does nothing when
-## downed or without a spell.
-func cast() -> bool:
-	if _downed or not has_spell():
+## Mana a cast may use now: what the wizard has, minus what sustained cards hold.
+func free_mana() -> float:
+	return maxf(mana - _reserved, 0.0)
+
+
+## Cast staff `at` (0-3) now. Returns true if it cast (or switched its sustained cards off).
+## Does nothing when downed or when the staff has no build.
+func cast_staff(at: int) -> bool:
+	if _downed or not has_staff(at):
 		return false
 	var origin: Vector2 = muzzle_position()
 	if projectiles != null:
 		# A staff tip behind a wall: the shot starts at the wall and ends on it
 		# (the manager takes no pool slot for a shot that starts inside a wall).
 		origin = projectiles.clip_to_walls(global_position, origin)
-	var spent: float = spells.cast(index, active_slot, origin, aim, mana)
+	var spent: float = spells.cast_staff(index, at, origin, aim, free_mana())
 	if spent == SpellsScript.REFUSED:
 		return false
 	mana -= spent
 	_announce_stats()
 	if events != null:
-		events.spell_cast.emit(index, _recipes[active_slot].get("form", &"") as StringName, origin, aim)
+		var form: StringName = spells.last_form(index, at)
+		if form != &"":
+			events.spell_cast.emit(index, form, origin, aim)
+		events.staff_cast.emit(index, at, origin, aim)
 		events.wizard_cast.emit(index, self)
 	_play_cast_sound()
 	return true
+
+
+## A dash card of this wizard asked for a dash: the way it walks (or faces), as far and as long
+## as the card says. Other moves (teleport, hook, swap, recoil) come with staffs B4.
+func _on_caster_move_requested(player: int, mode: StringName, to: Vector2, seconds: float, tag: int) -> void:
+	if player != index or _downed or mode != &"dash":
+		return
+	if is_dashing():
+		_finish_dash()
+	var distance: float = (to - muzzle_position()).length()
+	var time: float = maxf(seconds, 0.01)
+	_dash_direction = facing
+	if input != null and input.get_move(index) != Vector2.ZERO:
+		_dash_direction = input.get_move(index).normalized()
+	_dash_speed = distance / time
+	_dash_left = time
+	_dash_tag = tag
+	# The ghosts start on the wizard and grow out behind as the dash goes on.
+	_trail.fill(global_position)
+	_trail_timer = GHOST_INTERVAL
+
+
+## The dash ended: say where, so its card can go off there (blast, a trigger; staffs B2).
+func _finish_dash() -> void:
+	_dash_left = 0.0
+	if events != null:
+		events.caster_move_finished.emit(index, &"dash", global_position, _dash_tag)
 
 
 func _play_cast_sound() -> void:
@@ -957,7 +970,7 @@ func take_damage(amount: int) -> bool:
 	if health == 0:
 		_downed = true
 		_apply_dash_look(false)
-		_dodge_left = 0.0
+		_dash_left = 0.0
 		_invulnerable_left = 0.0
 		velocity = Vector2.ZERO
 		_revive_progress = 0.0
@@ -983,11 +996,11 @@ func revive(reviver: int) -> bool:
 	return true
 
 
-func is_dodging() -> bool:
-	return _dodge_left > 0.0
+func is_dashing() -> bool:
+	return _dash_left > 0.0
 
 
-## True while a hit must do nothing (the first INVULNERABLE_TIME of a dodge).
+## True while a hit must do nothing (`protect`, for a wizard who just joined).
 func is_invulnerable() -> bool:
 	return _invulnerable_left > 0.0
 
@@ -997,18 +1010,3 @@ func is_invulnerable() -> bool:
 func protect(seconds: float) -> void:
 	if not _downed:
 		_invulnerable_left = maxf(_invulnerable_left, seconds)
-
-
-## True if a dodge pressed now would start.
-func can_dodge() -> bool:
-	return _dodge_left <= 0.0 and _cooldown_left <= 0.0
-
-
-func _start_dodge(move: Vector2) -> void:
-	_dodge_direction = move.normalized() if move != Vector2.ZERO else facing
-	_dodge_left = DODGE_TIME
-	_invulnerable_left = INVULNERABLE_TIME
-	_cooldown_left = DODGE_COOLDOWN
-	# The ghosts start on the wizard and grow out behind as the dash goes on.
-	_trail.fill(global_position)
-	_trail_timer = GHOST_INTERVAL

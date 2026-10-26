@@ -34,9 +34,9 @@ func _initialize() -> void:
 	await _shot("arena_four_wizards")
 	# Shots above the floor, fired from the staff tips, and a wizard mid-dash.
 	for index in 3:
-		input.call("send_virtual", index, &"cast", 1.0)
+		input.call("send_virtual", index, &"cast_x", 1.0)
 	input.call("send_virtual", 3, &"move_right", 1.0)
-	_tap(input, 3, &"dodge")
+	_tap(input, 3, &"cast_a")
 	for i in 12:
 		await physics_frame
 	await RenderingServer.frame_post_draw
@@ -49,7 +49,7 @@ func _initialize() -> void:
 		action_image.save_png("%s/shots_and_dash.png" % SHOTS_DIR)
 		print("SHOT: shots_and_dash (%dx%d)" % [action_image.get_width(), action_image.get_height()])
 	for index in 3:
-		input.call("send_virtual", index, &"cast", 0.0)
+		input.call("send_virtual", index, &"cast_x", 0.0)
 	input.call("send_virtual", 3, &"move_right", 0.0)
 	for index in 4:
 		_tap(input, index, &"overlay")
@@ -74,11 +74,11 @@ func _initialize() -> void:
 	# The HUD stops fading the vignette for this shot: frames are slow on a software
 	# renderer and the glow would be gone before it is drawn.
 	root.get_node("Hud").set_process(false)
-	input.call("send_virtual", 0, &"cast", 1.0)
+	input.call("send_virtual", 0, &"cast_x", 1.0)
 	wizard4.call("take_damage", 30)
 	await physics_frame
 	await physics_frame
-	input.call("send_virtual", 0, &"cast", 0.0)
+	input.call("send_virtual", 0, &"cast_x", 0.0)
 	await RenderingServer.frame_post_draw
 	var juice_image: Image = root.get_texture().get_image()
 	var hud: Node = root.get_node_or_null("Hud")
@@ -132,7 +132,7 @@ func _initialize() -> void:
 	# Wizard 1 dodges: translucent with a closing ring while it cannot be hurt.
 	wizard1.global_position = Vector2(320.0, 200.0)
 	await _settle()
-	_tap(input, 0, &"dodge")
+	_tap(input, 0, &"cast_a")
 	await create_timer(0.05).timeout
 	await RenderingServer.frame_post_draw
 	if not wizard1.call("is_invulnerable"):

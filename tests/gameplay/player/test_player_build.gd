@@ -1,9 +1,10 @@
 extends "res://tests/support/suite.gd"
-## Tests for the wizard on the spell runtime (M2 part 11): the two prepared spells and `swap`,
-## the bag, `build_change_requested` checked with `Spells.compile` and applied or refused
-## (`spell_changed`, `build_refused`), casting through `Spells.cast`, the orbit anchor, and four
-## players building at once. It runs the real `Spells`, projectile manager and event bus, with
-## components built in code behind a stand-in registry.
+## Tests for the wizard on staffs (staffs A6a): four staffs on four buttons, the start cards and
+## the bag, `staff_change_requested` and `card_move_requested` applied and announced
+## (`staff_changed`) or refused (`build_refused`), casting through `Spells.cast_staff`, a
+## sustained (`hold`) card switched off only by a new press, mana held by sustained cards, the
+## orbit anchor, and four players building at once. It runs the real `Spells`, projectile manager
+## and event bus, with cards built in code behind a stand-in registry.
 ##
 ## godot --headless --path . --script res://tests/gameplay/player/test_player_build.gd
 
@@ -15,10 +16,10 @@ const SpellsScript := preload("res://core/spells/spells.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 
 const STEP: float = 0.0625
-const BOLT: Dictionary = {"form": &"bolt"}
+const START: Array = [[&"dash"], [&"fire", &"bolt"], [], []]
 
 
-## A registry that knows only the components a test puts in it.
+## A registry that knows only the cards a test puts in it.
 class FakeRegistry:
 	extends RegistryScript
 	var items: Dictionary = {}
@@ -39,11 +40,14 @@ var _bus: EventsScript
 var _input: InputManagerScript
 var _mgr: ManagerScript
 var _spells: SpellsScript
+var _staff: StaffBase
 var _players: Array[PlayerScript] = []
-## Every spell_changed as [player, path, description].
+## Every staff_changed as [player, staff, plan].
 var _changed: Array = []
 ## Every build_refused as [player, reason].
 var _refused: Array = []
+## Every staff_cast as [player, staff], and every spell_cast's form.
+var _staff_casts: Array = []
 var _cast_forms: Array[StringName] = []
 
 
@@ -58,45 +62,52 @@ func before_each() -> void:
 	_spells = own(SpellsScript.new()) as SpellsScript
 	_spells.registry = _registry
 	_spells.bind(_mgr, _bus)
+	_staff = StaffBase.new()
+	_staff.id = &"test"
+	_staff.slots = 6
+	_staff.cast_delay = 0.0
+	_staff.recharge = 0.0
 	_players.clear()
 	_changed.clear()
 	_refused.clear()
+	_staff_casts.clear()
 	_cast_forms.clear()
-	_bus.spell_changed.connect(func(player: int, path: PackedInt32Array, text: String) -> void: _changed.append([player, path, text]))
+	_bus.staff_changed.connect(func(player: int, staff: int, plan: Dictionary) -> void: _changed.append([player, staff, plan]))
 	_bus.build_refused.connect(func(player: int, reason: String) -> void: _refused.append([player, reason]))
+	_bus.staff_cast.connect(func(player: int, staff: int, _o: Vector2, _d: Vector2) -> void: _staff_casts.append([player, staff]))
 	_bus.spell_cast.connect(func(_p: int, form: StringName, _o: Vector2, _d: Vector2) -> void: _cast_forms.append(form))
-	_component(FormBase.new(), &"bolt")
-	var nova := _component(FormBase.new(), &"nova") as FormBase
-	nova.shots = 8
-	nova.spread = 360.0
-	var orbit := _component(FormBase.new(), &"orbit") as FormBase
+	var bolt := _card(FormBase.new(), &"bolt") as FormBase
+	bolt.cooldown = 0.25
+	var orbit := _card(FormBase.new(), &"orbit") as FormBase
 	orbit.motion = FormBase.Motion.ORBIT
 	orbit.orbit_radius = 30.0
 	orbit.lifetime = 5.0
-	var fire := _component(ElementBase.new(), &"fire") as ElementBase
+	orbit.pierce = 16
+	var dash := _card(FormBase.new(), &"dash") as FormBase
+	dash.motion = FormBase.Motion.DASH
+	dash.speed = 220.0
+	dash.lifetime = 0.25
+	dash.mana_cost = 0.0
+	var fire := _card(ElementBase.new(), &"fire") as ElementBase
 	fire.status_id = &"burn"
 	fire.status_duration = 3.0
-	_component(ElementBase.new(), &"frost")
-	var split := _component(ModifierBase.new(), &"split") as ModifierBase
-	split.shot_mult = 2
-	_component(ModifierBase.new(), &"bigger")
-	var heavy := _component(ModifierBase.new(), &"heavy") as ModifierBase
-	heavy.complexity = 5
-	_component(TriggerBase.new(), &"on_hit")
+	var hold := _card(ModifierBase.new(), &"hold") as ModifierBase
+	hold.behaviour = ModifierBase.Behaviour.HOLD
+	hold.behaviour_strength = 1.0
 
 
-func _component(component: SpellComponent, id: StringName) -> SpellComponent:
-	component.id = id
-	component.display_name = String(id).capitalize()
-	if component is FormBase:
-		(component as FormBase).mana_cost = 5.0
-		(component as FormBase).speed = 200.0
-	_registry.items[id] = component
-	return component
+func _card(card: SpellComponent, id: StringName) -> SpellComponent:
+	card.id = id
+	card.display_name = String(id).capitalize()
+	if card is FormBase:
+		(card as FormBase).mana_cost = 5.0
+		(card as FormBase).speed = 200.0
+	_registry.items[id] = card
+	return card
 
 
-## A wizard outside the tree for player `index`, with the start recipes and a real device.
-func _wizard(index: int, a: Dictionary = BOLT, b: Dictionary = {}) -> PlayerScript:
+## A wizard outside the tree for player `index`, with the start cards and a real device.
+func _wizard(index: int, start: Array = START) -> PlayerScript:
 	_input.add_virtual_device(index)
 	var player := own(PlayerScript.new()) as PlayerScript
 	player.index = index
@@ -105,251 +116,164 @@ func _wizard(index: int, a: Dictionary = BOLT, b: Dictionary = {}) -> PlayerScri
 	player.registry = _registry
 	player.projectiles = _mgr
 	player.spells = _spells
-	player.start_recipe_a = a
-	player.start_recipe_b = b
+	player.staff = _staff
+	player.start_cards = start
 	player._ready()
 	_players.append(player)
 	return player
 
 
-func _build(player: int, path: Array[int], slot: int, id: StringName) -> void:
-	_bus.build_change_requested.emit(player, PackedInt32Array(path), slot, id)
+func _ids(words: String) -> Array[StringName]:
+	var out: Array[StringName] = []
+	for word in words.split(" ", false):
+		out.append(&"" if word == "-" else StringName(word))
+	return out
 
 
-func test_the_bag_holds_every_component_in_the_registry() -> void:
+func _run(count: int) -> void:
+	for i in count:
+		_mgr.step(STEP)
+		_spells.step(STEP)
+		for player in _players:
+			player.step(STEP)
+
+
+func _tap(player: int, action: StringName) -> void:
+	_input.send_virtual(player, action, 1.0)
+	_input.send_virtual(player, action, 0.0)
+
+
+func test_the_bag_holds_every_card_in_the_registry() -> void:
 	var player := _wizard(0)
-	check_equal(player.bag.size(), _registry.items.size(), "the bag has every component")
-	check(player.bag.has(&"bolt") and player.bag.has(&"on_hit"), "forms and triggers are in the bag")
+	check_equal(player.bag.size(), _registry.items.size(), "the bag has every card")
 
 
-func test_start_recipes_are_built_and_announced() -> void:
-	var player := _wizard(0, {"form": &"bolt", "element": &"fire"}, BOLT)
-	check(player.has_spell(), "spell A is built")
-	check_equal(player.recipe_of(0), {"form": &"bolt", "element": &"fire"}, "recipe A")
-	check_equal(player.recipe_of(1), BOLT, "recipe B")
-	check_equal(_changed.size(), 2, "one spell_changed per start spell")
-	check_equal(_changed[0][1], PackedInt32Array([0]), "the first is spell A")
-	check_equal(_changed[1][1], PackedInt32Array([1]), "the second is spell B")
-	check(String(_changed[0][2]) != "", "the description is not empty")
-	check(_refused.is_empty(), "nothing was refused")
+func test_the_start_cards_are_built_and_announced() -> void:
+	var player := _wizard(1)
+	check(player.has_staff(0) and player.has_staff(1), "the dash and the fire bolt staffs are built")
+	check(not player.has_staff(2) and not player.has_staff(3), "the empty staffs have no build")
+	check_equal(player.cards_of(1), _ids("fire bolt - - - -"), "staff X holds the fire bolt, as many slots as the staff")
+	check_equal(_changed.size(), 4, "every staff is announced once")
+	var plan: Dictionary = _changed[1][2]
+	check_equal(plan.get("cards"), _ids("fire bolt - - - -"), "the plan carries the cards")
+	check(not (plan.get("casts", []) as Array).is_empty(), "and the casts")
 
 
-func test_a_wizard_without_recipes_has_no_spell() -> void:
-	var player := _wizard(0, {}, {})
-	check(not player.has_spell(), "no spell")
-	check(not player.cast(), "and no cast")
-	check(_changed.is_empty(), "nothing is announced")
+func test_each_button_casts_its_own_staff() -> void:
+	var player := _wizard(0, [[&"bolt"], [&"fire", &"bolt"], [], []])
+	_input.send_virtual(0, &"cast_x", 1.0)
+	_run(1)
+	check_equal(_staff_casts, [[0, 1]], "cast_x casts staff X")
+	check_equal(_cast_forms, [&"bolt"] as Array[StringName], "spell_cast names the carrier")
+	_input.send_virtual(0, &"cast_a", 1.0)
+	_run(1)
+	check(_staff_casts.has([0, 0]), "cast_a casts staff A, with X still held")
+	check(player.mana < PlayerScript.MAX_MANA, "the casts took mana")
 
 
-func test_a_cast_spawns_shots_and_sends_the_form_id() -> void:
-	var player := _wizard(0, {"form": &"nova"})
-	check(player.cast(), "the cast fires")
-	check_equal(_mgr.get_count(), 8, "the nova made its ring through the runtime")
-	check_equal(_cast_forms, [&"nova"] as Array[StringName], "spell_cast names the form")
-	check(player.mana < PlayerScript.MAX_MANA, "the cast took mana")
+func test_a_tap_just_before_the_staff_is_ready_still_casts() -> void:
+	_wizard(0, [[], [&"bolt"], [], []])
+	_tap(0, &"cast_x")
+	_run(1)
+	check_equal(_staff_casts.size(), 1, "the first tap casts")
+	_run(2)
+	_tap(0, &"cast_x")
+	_run(3)
+	check_equal(_staff_casts.size(), 2, "a tap within INPUT_BUFFER of the end of the delay casts once ready")
 
 
-func test_swap_switches_the_active_spell_and_each_has_its_own_cooldown() -> void:
-	var player := _wizard(0, {"form": &"nova"}, BOLT)
-	check(player.cast(), "spell A casts")
-	check(not player.cast(), "spell A is cooling down")
-	_bus.spell_swap_requested.emit(0)
-	check_equal(player.active_slot, 1, "the swap made B active")
-	check(player.cast(), "spell B casts at once: its cooldown is its own")
-	check_equal(_cast_forms, [&"nova", &"bolt"] as Array[StringName], "B is a bolt")
-	_bus.spell_swap_requested.emit(0)
-	check_equal(player.active_slot, 0, "swapping again goes back to A")
-
-
-func test_swap_for_another_player_changes_nothing() -> void:
-	var one := _wizard(0, BOLT, BOLT)
-	var two := _wizard(1, BOLT, BOLT)
-	_bus.spell_swap_requested.emit(1)
-	check_equal(one.active_slot, 0, "player 0 stays on A")
-	check_equal(two.active_slot, 1, "player 1 swapped")
-
-
-func test_swap_needs_a_second_spell_and_a_standing_wizard() -> void:
-	var player := _wizard(0, BOLT, {})
-	check(not player.swap(), "no swap to an empty slot")
-	check_equal(player.active_slot, 0, "still A")
-	var other := _wizard(1, BOLT, BOLT)
-	_bus.damage_dealt.emit(-1, other, 1000, Vector2.ZERO)
-	check(not other.swap(), "a downed wizard does not swap")
-
-
-func test_a_build_request_changes_the_spell_and_is_announced() -> void:
+func test_a_dash_card_dashes_the_wizard() -> void:
 	var player := _wizard(0)
+	_input.send_virtual(0, &"move_right", 1.0)
+	_run(1)
+	_tap(0, &"cast_a")
+	_run(2)
+	check(player.is_dashing(), "the A staff's dash card dashes")
+	check(not player.is_invulnerable(), "without invulnerability")
+	check(player.velocity.x > PlayerScript.MOVE_SPEED, "faster than walking, the way the wizard walks")
+
+
+func test_a_held_button_does_not_switch_a_hold_off_but_a_new_press_does() -> void:
+	var player := _wizard(0, [[], [], [&"hold", &"orbit"], []])
+	_input.send_virtual(0, &"cast_y", 1.0)
+	_run(1)
+	check(_spells.is_holding(0, 2), "the press switches the orbit on")
+	check_equal(player.free_mana(), player.mana - 5.0, "its mana is held")
+	_run(20)
+	check(_spells.is_holding(0, 2), "holding the button does not switch it off")
+	_input.send_virtual(0, &"cast_y", 0.0)
+	_tap(0, &"cast_y")
+	_run(1)
+	check(not _spells.is_holding(0, 2), "a new press switches it off")
+	check_equal(player.free_mana(), player.mana, "and frees its mana")
+
+
+func test_a_change_request_builds_the_staff_and_is_announced() -> void:
+	var player := _wizard(2)
 	_changed.clear()
-	_build(0, [0], PlayerScript.SLOT_ELEMENT, &"fire")
-	check_equal(player.recipe_of(0), {"form": &"bolt", "element": &"fire"}, "the element is in")
-	check_equal(_changed.size(), 1, "one spell_changed")
-	check_equal(_changed[0][0], 0, "for player 0")
-	check_equal(_changed[0][1], PackedInt32Array([0]), "for spell A")
-	check(String(_changed[0][2]).to_lower().contains("fire") or String(_changed[0][2]).to_lower().contains("burn"), "the description tells about the fire: " + String(_changed[0][2]))
-	check(_refused.is_empty(), "nothing refused")
+	_bus.staff_change_requested.emit(2, 3, 0, &"bolt")
+	check_equal(player.cards_of(3)[0], &"bolt", "the card is in the slot")
+	check(player.has_staff(3), "the staff can cast now")
+	check_equal(_changed.size(), 1, "the change is announced")
+	check_equal([_changed[0][0], _changed[0][1]], [2, 3], "for this player and staff")
+	_bus.staff_change_requested.emit(2, 3, 0, &"")
+	check(not player.has_staff(3), "emptying the slot leaves nothing to cast")
 
 
-func test_modifiers_fill_in_order_and_clear() -> void:
+func test_a_wrong_request_is_refused_and_changes_nothing() -> void:
 	var player := _wizard(0)
-	_build(0, [0], PlayerScript.SLOT_FIRST_MODIFIER, &"split")
-	_build(0, [0], PlayerScript.SLOT_FIRST_MODIFIER + 1, &"bigger")
-	check_equal(player.recipe_of(0).get("modifiers"), [&"split", &"bigger"], "two modifiers")
-	_build(0, [0], PlayerScript.SLOT_FIRST_MODIFIER + 2, &"bigger")
-	_build(0, [0], PlayerScript.SLOT_FIRST_MODIFIER + 1, &"")
-	check_equal(player.recipe_of(0).get("modifiers"), [&"split", &"bigger"], "clearing the middle one closes the gap")
-	_build(0, [0], PlayerScript.SLOT_FIRST_MODIFIER, &"")
-	_build(0, [0], PlayerScript.SLOT_FIRST_MODIFIER, &"")
-	check(not player.recipe_of(0).has("modifiers"), "no modifiers left")
-	check(_refused.is_empty(), "nothing refused: " + str(_refused))
-
-
-func test_a_trigger_holds_a_spell_through_a_path() -> void:
-	var player := _wizard(0)
-	_build(0, [0], PlayerScript.SLOT_TRIGGER, &"on_hit")
-	_build(0, [0, 0], PlayerScript.SLOT_FORM, &"nova")
-	_build(0, [0, 0], PlayerScript.SLOT_ELEMENT, &"frost")
-	check_equal(player.recipe_of(0), {"form": &"bolt", "trigger": &"on_hit", "held": {"form": &"nova", "element": &"frost"}}, "the held spell is built")
-	check(_refused.is_empty(), "nothing refused: " + str(_refused))
-	check_equal(_changed[_changed.size() - 1][1], PackedInt32Array([0]), "a change below announces the prepared spell it belongs to")
-	_build(0, [0], PlayerScript.SLOT_TRIGGER, &"")
-	check_equal(player.recipe_of(0), BOLT, "clearing the trigger drops the held spell")
-
-
-func test_a_refusal_says_why_and_changes_nothing() -> void:
-	var player := _wizard(0)
-	_changed.clear()
-	_build(0, [0], PlayerScript.SLOT_FORM, &"")
-	check_equal(_refused.size(), 1, "taking the form out is refused")
-	check(String(_refused[0][1]).to_lower().contains("form"), "the reason names the form: " + str(_refused))
-	check_equal(_refused[0][0], 0, "for player 0")
-	check_equal(player.recipe_of(0), BOLT, "the spell is as it was")
-	check(_changed.is_empty(), "and nothing was announced")
-	check(player.has_spell(), "it can still cast")
-
-
-func test_a_spell_over_the_budget_is_refused() -> void:
-	var player := _wizard(0)
-	_build(0, [0], PlayerScript.SLOT_FIRST_MODIFIER, &"heavy")
-	_build(0, [0], PlayerScript.SLOT_FIRST_MODIFIER + 1, &"heavy")
-	check(_refused.is_empty(), "two heavy modifiers fit: " + str(_refused))
-	_build(0, [0], PlayerScript.SLOT_FIRST_MODIFIER + 2, &"heavy")
-	check_equal(_refused.size(), 1, "the third goes over the complexity budget")
-	check(String(_refused[0][1]).to_lower().contains("complex"), "the reason says too complex: " + str(_refused))
-	check_equal(player.recipe_of(0).get("modifiers"), [&"heavy", &"heavy"], "the spell keeps its two")
-
-
-func test_a_wrong_request_is_refused() -> void:
-	var player := _wizard(0)
-	_build(0, [0], PlayerScript.SLOT_ELEMENT, &"split")
-	_build(0, [0], PlayerScript.SLOT_ELEMENT, &"no_such_component")
-	_build(0, [0], 9, &"fire")
-	_build(0, [0], -1, &"fire")
-	_build(0, [2], PlayerScript.SLOT_ELEMENT, &"fire")
-	_build(0, [], PlayerScript.SLOT_ELEMENT, &"fire")
-	_build(0, [0, 1], PlayerScript.SLOT_FORM, &"nova")
-	check_equal(_refused.size(), 7, "every one of the seven is refused: " + str(_refused))
-	check_equal(player.recipe_of(0), BOLT, "the spell did not change")
-
-
-func test_a_held_spell_without_a_trigger_is_refused() -> void:
-	var player := _wizard(0)
-	_build(0, [0, 0], PlayerScript.SLOT_FORM, &"nova")
-	check_equal(_refused.size(), 1, "a held spell needs a trigger")
-	check_equal(player.recipe_of(0), BOLT, "unchanged")
-
-
-func test_a_component_outside_the_bag_is_refused() -> void:
-	var player := _wizard(0)
-	player.bag.erase(&"fire")
-	_build(0, [0], PlayerScript.SLOT_ELEMENT, &"fire")
-	check_equal(_refused.size(), 1, "the bag decides what a player may build with")
-	check_equal(player.recipe_of(0), BOLT, "unchanged")
+	var before: Array[StringName] = player.cards_of(1)
+	_bus.staff_change_requested.emit(0, 1, 9, &"bolt")
+	_bus.staff_change_requested.emit(0, 4, 0, &"bolt")
+	_bus.staff_change_requested.emit(0, 1, 0, &"no_such_card")
+	check_equal(_refused.size(), 3, "three refusals")
+	check_equal(player.cards_of(1), before, "the staff is as it was")
 
 
 func test_a_request_for_another_player_is_ignored() -> void:
-	var one := _wizard(0)
-	var two := _wizard(1)
-	_changed.clear()
-	_build(1, [0], PlayerScript.SLOT_ELEMENT, &"frost")
-	check_equal(one.recipe_of(0), BOLT, "player 0 is untouched")
-	check_equal(two.recipe_of(0), {"form": &"bolt", "element": &"frost"}, "player 1 built")
-	check_equal(_changed.size(), 1, "only player 1 announced")
-	check_equal(_changed[0][0], 1, "as player 1")
-	check(_refused.is_empty(), "and nobody refused")
+	var first := _wizard(0)
+	var second := _wizard(1)
+	_bus.staff_change_requested.emit(1, 2, 0, &"bolt")
+	check(not first.has_staff(2), "player 1's staff Y is untouched")
+	check(second.has_staff(2), "player 2's is built")
 
 
-func test_a_refusal_goes_only_to_the_asker() -> void:
-	_wizard(0)
-	_wizard(1)
-	_build(2, [0], PlayerScript.SLOT_ELEMENT, &"fire")
-	check(_refused.is_empty(), "a request for a player with no wizard is not answered by the others")
-	_build(1, [0], PlayerScript.SLOT_FORM, &"")
-	check_equal(_refused.size(), 1, "one refusal")
-	check_equal(_refused[0][0], 1, "for player 1")
+func test_cards_move_and_swap_between_slots_staffs_and_the_bag() -> void:
+	var player := _wizard(0)
+	_bus.card_move_requested.emit(0, 1, 0, 1, 1)
+	check_equal(player.cards_of(1).slice(0, 2), _ids("bolt fire"), "two slots of one staff swap")
+	_bus.card_move_requested.emit(0, 1, 0, 2, 3)
+	check_equal(player.cards_of(2)[3], &"bolt", "a card moves to another staff")
+	check_equal(player.cards_of(1)[0], &"", "and leaves its slot")
+	_bus.card_move_requested.emit(0, PlayerScript.BAG, player.bag.find(&"orbit"), 3, 0)
+	check_equal(player.cards_of(3)[0], &"orbit", "a card comes from the bag")
+	_bus.card_move_requested.emit(0, 3, 0, PlayerScript.BAG, 0)
+	check_equal(player.cards_of(3)[0], &"", "and goes back")
 
 
-func test_four_players_build_different_spells_at_once() -> void:
-	var elements: Array[StringName] = [&"fire", &"frost", &"", &"fire"]
-	var forms: Array[StringName] = [&"bolt", &"bolt", &"nova", &"orbit"]
+func test_four_players_build_different_staffs_at_once() -> void:
 	for index in 4:
-		_wizard(index, {"form": forms[index]})
+		_wizard(index, [[], [], [], []])
+	var cards: Array[StringName] = [&"bolt", &"orbit", &"dash", &"fire"]
 	for index in 4:
-		_build(index, [0], PlayerScript.SLOT_ELEMENT, elements[index])
-		_build(index, [1], PlayerScript.SLOT_FORM, &"nova")
-	check(_refused.is_empty(), "nothing refused: " + str(_refused))
+		_bus.staff_change_requested.emit(index, index, 0, cards[index])
 	for index in 4:
-		var recipe: Dictionary = _players[index].recipe_of(0)
-		check_equal(recipe.get("form"), forms[index], "player %d keeps their form" % index)
-		check_equal(recipe.get("element", &""), elements[index], "player %d has their element" % index)
-		check_equal(_players[index].recipe_of(1), {"form": &"nova"}, "player %d built spell B" % index)
-	for index in 4:
-		check(_players[index].swap(), "player %d swaps" % index)
-	check(_players[0].cast() and _players[1].cast() and _players[2].cast() and _players[3].cast(), "all four cast their B spell")
-	check_equal(_mgr.get_count(), 32, "four rings of eight")
-
-
-func test_a_rebuild_leaves_the_shots_in_the_air() -> void:
-	var player := _wizard(0, {"form": &"nova"})
-	check(player.cast(), "the cast fires")
-	var before: int = _mgr.get_count()
-	_build(0, [0], PlayerScript.SLOT_ELEMENT, &"fire")
-	check_equal(_mgr.get_count(), before, "the shots already flying are not taken back")
-	for i in 10:  # past the 0.5 s cooldown, which a rebuild does not reset
-		_mgr.step(STEP)
-		_spells.step(STEP)
-	check(player.cast(), "the new build casts")
+		check_equal(_players[index].cards_of(index)[0], cards[index], "player %d built its own staff" % index)
+		for other in 4:
+			if other != index:
+				check_equal(_players[index].cards_of(other)[0], &"", "player %d's other staffs are empty" % index)
 
 
 func test_the_orbit_anchor_follows_the_wizard_and_goes_when_it_falls() -> void:
-	var player := _wizard(0, {"form": &"orbit"})
-	player.global_position = Vector2(100.0, 80.0)
-	player.step(STEP)
-	check_equal(_mgr.get_anchor(0), Vector2(100.0, 80.0) + PlayerScript.ORBIT_ANCHOR_OFFSET, "the anchor sits on the body")
-	check(player.cast(), "the orbit casts")
-	check(_mgr.get_count() > 0, "the orbit made a shot")
-	_bus.damage_dealt.emit(-1, player, 1000, Vector2.ZERO)
-	player.step(STEP)
-	check(not _mgr.get_anchor(0).is_finite(), "a downed wizard has no anchor")
-	check_equal(_mgr.get_anchor(1), Vector2.INF, "and the others never had one")
-
-
-func test_leaving_the_tree_clears_the_anchor_and_stops_listening() -> void:
-	var player := _wizard(0)
-	root.add_child(player)
-	player.step(STEP)
+	var player := _wizard(0, [[], [&"orbit"], [], []])
+	player.global_position = Vector2(100, 50)
+	_input.send_virtual(0, &"cast_x", 1.0)
+	_run(1)
+	check(_mgr.get_count() > 0, "the orbit shot flies")
 	check(_mgr.get_anchor(0).is_finite(), "the anchor is set")
-	root.remove_child(player)
-	check(not _mgr.get_anchor(0).is_finite(), "leaving the tree clears the anchor")
-	_changed.clear()
-	_build(0, [0], PlayerScript.SLOT_ELEMENT, &"fire")
-	check(_changed.is_empty() and _refused.is_empty(), "a wizard that left no longer answers build requests")
-
-
-func test_a_wizard_with_only_spell_b_starts_on_it() -> void:
-	var player := _wizard(0, {}, BOLT)
-	check_equal(player.active_slot, 1, "the active slot is the one with a spell")
-	check(player.has_spell(), "so the wizard can cast at once")
+	player.take_damage(1000)
+	_run(1)
+	check(not _mgr.get_anchor(0).is_finite(), "a downed wizard clears its anchor")
 
 
 func test_a_wizard_put_back_in_the_tree_hears_requests_again() -> void:
@@ -357,6 +281,6 @@ func test_a_wizard_put_back_in_the_tree_hears_requests_again() -> void:
 	root.add_child(player)
 	root.remove_child(player)
 	root.add_child(player)
-	_changed.clear()
-	_build(0, [0], PlayerScript.SLOT_ELEMENT, &"fire")
-	check_equal(_changed.size(), 1, "the build request is answered after re-entering the tree")
+	_bus.staff_change_requested.emit(0, 2, 0, &"bolt")
+	check(player.has_staff(2), "it still listens")
+	root.remove_child(player)

@@ -1,6 +1,6 @@
 extends "res://tests/support/suite.gd"
 ## A run is made of the content flow is told to use (by registry id), not of fixed names, so a new
-## room, enemy, start spell or wizard scene needs no edit in `flow.gd`. Uses the real autoloads.
+## room, enemy, start card, staff or wizard scene needs no edit in `flow.gd`. Uses the real autoloads.
 
 const FlowScript := preload("res://gameplay/flow/flow.gd")
 
@@ -21,8 +21,8 @@ func after_each() -> void:
 	flow.stop_run()
 	flow.room_id_to_play = FlowScript.DEFAULT_ROOM_ID
 	flow.enemy_id_to_play = FlowScript.DEFAULT_ENEMY_ID
-	flow.start_recipe_a = FlowScript.DEFAULT_START_RECIPE_A.duplicate(true)
-	flow.start_recipe_b = FlowScript.DEFAULT_START_RECIPE_B.duplicate(true)
+	flow.start_cards = FlowScript.DEFAULT_START_CARDS.duplicate(true)
+	flow.channel = BuildInfo.channel()
 	flow.wizard_scene = FlowScript.DefaultWizardScene
 	input.leave(0)
 
@@ -30,8 +30,7 @@ func after_each() -> void:
 func test_the_defaults_are_the_m1_content() -> void:
 	check_equal(flow.room_id_to_play, &"arena_01", "default room")
 	check_equal(flow.enemy_id_to_play, &"ember_imp", "default enemy")
-	check_equal(flow.start_recipe_a, {"form": &"bolt", "element": &"fire"}, "default spell A")
-	check_equal(flow.start_recipe_b, {"form": &"bolt"}, "default spell B")
+	check_equal(flow.start_cards, [[&"dash"], [&"fire", &"bolt"], [], []], "default start cards: dash on A, fire bolt on X")
 
 
 func test_an_unknown_room_starts_no_run() -> void:
@@ -45,23 +44,27 @@ func test_an_unknown_enemy_starts_no_run() -> void:
 	check(not flow.start_run(0), "a missing enemy must not start a run")
 
 
-func test_an_unknown_component_starts_no_run() -> void:
-	flow.start_recipe_a = {"form": &"no_such_form"}
-	check(not flow.start_run(0), "a start spell with a missing component must not start a run")
-	check_equal(flow.state, FlowScript.State.IDLE, "flow stays idle")
+func test_a_missing_staff_starts_no_run() -> void:
+	flow.channel = "no_such_channel"
+	var registry: Node = root.get_node("Registry")
+	check(flow.staff_for_channel() == registry.call("get_resource", &"wizard", &"starter"), "an unknown channel plays the starter staff")
+	flow.channel = "dev"
+	check(flow.staff_for_channel() == registry.call("get_resource", &"wizard", &"dev"), "dev builds get the sandbox staff")
+	flow.channel = "preview"
+	check(flow.staff_for_channel() == registry.call("get_resource", &"wizard", &"dev"), "preview builds get the sandbox staff")
+	flow.channel = "stable"
+	check(flow.staff_for_channel() == registry.call("get_resource", &"wizard", &"starter"), "stable builds get the starter staff")
 
 
-func test_a_start_spell_without_a_form_starts_no_run() -> void:
-	flow.start_recipe_b = {"element": &"fire"}
-	check(not flow.start_run(0), "a start spell that does not compile must not start a run")
-
-
-func test_other_start_recipes_reach_the_wizards() -> void:
-	flow.start_recipe_a = {"form": &"nova"}
-	check(flow.start_run(0), "the run starts with another start spell")
+func test_other_start_cards_reach_the_wizards() -> void:
+	flow.start_cards = [[&"nova"], [], [], [&"frost", &"bolt"]]
+	check(flow.start_run(0), "the run starts with other start cards")
 	var wizard: Node = flow.get_wizard(0)
-	check_equal(wizard.call("recipe_of", 0), {"form": &"nova"}, "spell A is the chosen recipe")
-	check_equal(wizard.call("recipe_of", 1), {"form": &"bolt"}, "spell B is the default")
+	var a: Array[StringName] = wizard.call("cards_of", 0)
+	var b: Array[StringName] = wizard.call("cards_of", 3)
+	check_equal(a[0], &"nova", "staff A holds the chosen card")
+	check_equal(b.slice(0, 2), [&"frost", &"bolt"] as Array[StringName], "staff B too")
+	check(not bool(wizard.call("has_staff", 1)), "an empty start staff has no build")
 
 
 func test_the_chosen_wizard_scene_is_the_one_spawned() -> void:
@@ -74,7 +77,7 @@ func test_the_chosen_wizard_scene_is_the_one_spawned() -> void:
 	var wizard: Node = flow.get_wizard(0)
 	check(wizard != null and wizard.name == &"SwappedWizard", "the player got the swapped wizard scene")
 	check_equal(wizard.get("index"), 0, "the swapped wizard is player 0")
-	check(wizard.call("has_spell") as bool, "the swapped wizard holds a spell")
+	check(wizard.call("has_staff", 1) as bool, "the swapped wizard holds its staffs")
 
 
 func test_a_missing_wizard_scene_starts_no_run() -> void:

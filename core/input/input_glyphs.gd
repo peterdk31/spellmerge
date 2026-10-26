@@ -33,7 +33,7 @@ const PS_TRIANGLE: Color = Color(0.4, 0.8, 0.65)
 const NO_GLYPH: Dictionary = {"shape": Shape.KEY, "label": "?", "color": PLAIN}
 
 const _KEYS: Dictionary = {
-	&"cast": "J", &"dodge": "Space", &"overlay": "E", &"swap": "Q", &"join": "Enter",
+	&"cast_a": "Space", &"cast_x": "J", &"cast_y": "K", &"cast_b": "Q", &"overlay": "E", &"join": "Enter",
 	&"leave": "Bksp", &"move_up": "W", &"move_down": "S", &"move_left": "A", &"move_right": "D",
 }
 
@@ -66,24 +66,26 @@ static func is_pad(kind: int) -> bool:
 
 ## How to draw `action` for `kind`; NO_GLYPH for an action with no button.
 static func glyph(kind: int, action: StringName) -> Dictionary:
-	if kind == Kind.KEYBOARD_MOUSE and action == &"cast":
+	if kind == Kind.KEYBOARD_MOUSE and action == &"cast_x":
 		return {"shape": Shape.MOUSE, "label": "LMB", "color": PLAIN}
+	if kind == Kind.KEYBOARD_MOUSE and action == &"cast_y":
+		return {"shape": Shape.MOUSE, "label": "RMB", "color": PLAIN}
 	if not is_pad(kind):
 		if _KEYS.has(action):
 			return {"shape": Shape.KEY, "label": _KEYS[action], "color": PLAIN}
 		return NO_GLYPH
 	match action:
-		&"cast":
-			return _face(kind, 2)
-		&"dodge":
-			return _face(kind, 1)
-		&"overlay":
-			return _face(kind, 3)
-		&"join":
+		&"cast_a", &"join":
 			return _face(kind, 0)
-		&"swap":
-			var shoulder: String = "L1" if kind == Kind.PLAYSTATION else ("L" if kind == Kind.SWITCH else "LB")
-			return {"shape": Shape.SHOULDER, "label": shoulder, "color": PLAIN}
+		&"cast_b":
+			return _face(kind, 1)
+		&"cast_x":
+			return _face(kind, 2)
+		&"cast_y":
+			return _face(kind, 3)
+		&"overlay":
+			var start: String = "Options" if kind == Kind.PLAYSTATION else ("+" if kind == Kind.SWITCH else "Menu")
+			return {"shape": Shape.SHOULDER, "label": start, "color": PLAIN}
 		&"leave":
 			var back: String = "Share" if kind == Kind.PLAYSTATION else ("-" if kind == Kind.SWITCH else "Back")
 			return {"shape": Shape.SHOULDER, "label": back, "color": PLAIN}

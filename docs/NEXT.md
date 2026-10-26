@@ -9,7 +9,7 @@ The ordered task queue for the current milestone, M2, now in its **staffs rework
 M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97). The second C2 checkpoint (#264) was answered with **pivot** on 2026-10-26: spells are built in staffs (M2-staffs.md). Nothing from M3+ is built (rewards, relics, staff types, rooms, the door rule).
 
 - [x] **The staff runtime (staffs A5).** Done in an owner session (development paused meanwhile): `SpellTag` is player, staff, generation, node above `1 << 20`; `install_staff`, `cast_staff`, `cast_index`, `is_holding`, `reserved_mana`; four staffs per player with their own cursor and delay; multicast groups fan out; payloads fire as groups under their own node's tag; fallbacks send `area_hit_requested`; `hold` keeps its shots until switched off (`mana_reserved`); a recipe runs as a staff of one cast, so there is one runtime. Tests: `tests/core/test_staff_runtime.gd`.
-- [ ] **Player and builder on staffs (staffs A6a).** (`gameplay/player/`, `gameplay/flow/`, `hud/builder/`, `project.godot` input map, `tests/bots/`) After A5.
+- [x] **Player and builder on staffs (staffs A6a).** Done in an owner session (development paused meanwhile): four cast actions (`cast_a`, `cast_x`, `cast_y`, `cast_b`; menus activate with A and go back with B; the overlay on Start; `dodge`, `cast`, `swap` gone); the player's four staffs with the buffer on every button, `free_mana`, a held button never switching a `hold` off; the `dash` card (no invulnerability, `caster_move_requested`/`_finished`); flow's staff by channel (`dev` in dev and preview, `starter` otherwise) and start cards; a first staff builder (four tabs, scrolling slots and bag, the plan as text, open at any time; the quick view and the overlay's Bag are gone, owner); bots, the 4-bot and stress runners and the screenshots on staffs. Combos stay recipes until A6b.
 - [ ] **Combos and tests on staffs (staffs A6b).** (`content/spells/combos/`, `tests/content/spells/`, `tests/clips/`, `tests/bots/test_spell_fuzz.gd`, `tools/atlas.py`) After A6a.
 - [ ] **The old recipe path removed (staffs A6c).** (`core/spells/`, `core/events/`, `docs/ARCHITECTURE.md`, `content/spells/README.md`) After A6b.
 - [ ] **Projectile kit (staffs B1).** (`core/projectiles/`) After A6c.
@@ -47,6 +47,7 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
 - [ ] **Card: on reaction (staffs C).** After B1, B2 and B3. Data only (M2-staffs.md, "Working in parallel").
 - [ ] **Card: siphon (staffs C).** After B2 and B4. Data only (M2-staffs.md, "Working in parallel").
 - [ ] **Card: hold (staffs C).** After B2 and B4. Data only (M2-staffs.md, "Working in parallel").
+- [ ] **Spell names (staffs E1).** (`core/spells/`, `hud/builder/`) After A6c. A name for every cast, generated from its cards (owner's idea): see M2-staffs.md, "The builder" and part E1.
 - [ ] **The existing cards' looks and numbers (staffs C0).** (`content/spells/`) After B6.
 - [ ] **Bots and the emergent combo report (staffs D1).** (`tests/bots/`, `docs/LOG.md`) After A6c; the report gets richer as cards land.
 - [ ] **Stress and C2 (staffs D3).** Last: when every other task in both lanes has merged. Then the C2 checkpoint, with the owner's sandbox playtest on `/preview/`.

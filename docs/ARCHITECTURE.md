@@ -23,8 +23,8 @@ hud/       panels and menus (send requests as events, show state from events)
 | --- | --- | --- |
 | add a room, enemy or spell | copy the example folder in `content/` (see its README) | `flow.gd`, `registry.gd` |
 | use another room or enemy in a run | set `Flow.room_id_to_play`, `enemy_id_to_play` (a room picker does this) | the wave or spawn code |
-| start a run with other spells | set `Flow.start_recipe_a` and `start_recipe_b` (component ids, a recipe as in `core/spells`); every wizard builds them itself | `flow.gd`'s spawn code, `player.gd` |
-| change what a player may build with | the wizard's `bag` (filled from the registry until M3's rewards fill it); builds arrive as `build_change_requested` | the builder, `core/spells` |
+| start a run with other staffs | set `Flow.start_cards` (four lists of card ids) and the staffs in `content/wizard/staffs/` (`starter`, `dev`, by build channel); every wizard builds them itself | `flow.gd`'s spawn code, `player.gd` |
+| change what a player may build with | the wizard's `bag` (filled from the registry until M3's rewards fill it); builds arrive as `staff_change_requested` and `card_move_requested` | the builder, `core/spells` |
 | swap a sprite, tile or animation strip | replace the file, keep the contract below | scripts, node names in scenes, tests |
 | re-skin the shot, spark or hostile shot | another `FeelPreset` (or its texture fields), set before `Feel._ready` | `feel.gd` |
 | change a wizard's look | the textures in `content/wizard/base/wizard.tscn`, or give `Flow.wizard_scene` another scene | `player.gd` |

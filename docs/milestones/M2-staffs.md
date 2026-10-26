@@ -193,7 +193,8 @@ The aim is a builder each player can use quickly and without help, in their own 
 - **Pick and place:** A picks a card up and places it (swapping if the slot is taken); X sends a card back to the bag; B cancels. P1 can also drag with the mouse.
 - **The cast plan strip** under the slots: brackets each cast of the cycle, draws a link from each modifier or infusion to the carrier it affects (or to the fallback), greys out wasted cards with the reason, and reads in plain words: *Cast 1: fire bolt and bolt; on hit: frost nova · Cast 2: beam · recharge 0.6 s*.
 - **Live numbers** per cast (damage, mana, delay) and the card's lore line.
-- **Quick view** during waves (the normal game): place one card from the bag into an empty slot. In the sandbox the full builder is open at any time.
+- **A name for every spell** (owner, 2026-10-26: "generate a name for the spell dynamically ... a long funny convoluted name, which is funny to try and read out loud"): `Spells` builds a name for each cast from its cards, deterministic (the same cards always give the same name), original words only (no names from other works), growing with the build: a plain bolt is "Bolt", `double · fire · frost · bolt · on hit · nova` is something like "Twice-Thawing Firefrost Bolt of Sudden Novas". The builder shows the names (part E1); a spell's name is also what a staff code (D2) and the emergent combo report (D1) call it.
+- **The full builder at any time,** in waves too (owner, 2026-10-26: "The quick action is not needed. A full builder is always preferred"). There is no quick view and no "Bag" drop in the overlay; a player who builds during a wave stands still and can be hit, as in any menu.
 - The HUD only shows what events say: `Spells.staff_view(...)` returns plain values (as `builder_view` does today), and the HUD sends intent events.
 
 ## The look of a shot
@@ -275,7 +276,7 @@ Each part is one session and one PR, with tests, a green `tools/check.sh` and `c
 | A3 | **Card and staff classes, events** | `MulticastBase`; the enum values of the card classes (motions, behaviours, trigger events) and the fields A4 needs; `StaffBase` with the `starter` and `dev` staffs; every event above; the validator knows them; tests |
 | A4 | **The staff compiler** | `Spells.compile_staff(cards, staff) -> CompiledStaff`: the reading rules, fallbacks, multicast, payloads, wrap-around, use-once, wasted cards with reasons, several infusions, the numbers of a cast, a plain description per cast; `Spells.staff_view` for the builder; every example above as a table test (slots in, casts out). Additive: the recipe compiler stays until A6c |
 | A5 | **The staff runtime** | The new tag layout (`SpellTag`), with the recipe runtime moved onto it (a recipe becomes its cards, slot A and B become staffs 0 and 1), so there is one runtime; `Spells.install_staff(player, staff, compiled)` and `Spells.cast_staff(player, staff, origin, direction, mana)`; four staffs per player with their own cursor, delay and recharge; multicast groups; payload groups; fallback casts; `hold` on and off with `mana_reserved`, switched off on edit; tests with 4 players × 4 staffs and a rebuild mid-flight. The staff compiler never had the build limits; they leave with the recipe compiler in A6c |
-| A6a | **Player and builder on staffs** | `gameplay/player`: four staffs, four cast actions (`cast_a`, `cast_x`, `cast_y`, `cast_b`) with the buffer each, the dash card (today's dodge without the invulnerable window: spells sends `caster_move_requested`, player moves and answers `caster_move_finished`); `dodge`, `cast` and `swap` actions gone, the overlay on View/Back; `gameplay/flow`: start staffs by channel; the existing builder edits a staff's slots (`staff_change_requested`; the rewrite is B8); bots send the new events; the 4-bot test green |
+| A6a | **Player and builder on staffs** | `gameplay/player`: four staffs, four cast actions (`cast_a`, `cast_x`, `cast_y`, `cast_b`) with the buffer each, the dash card (today's dodge without the invulnerable window: spells sends `caster_move_requested`, player moves and answers `caster_move_finished`); `dodge`, `cast` and `swap` actions gone, the overlay on Start (Back is `leave`); `gameplay/flow`: start staffs by channel; a first staff builder (four staff tabs, the slots, the bag, the cast plan as text; open at any time, waves included; the quick view and the overlay's "Bag" drop are removed) sending `staff_change_requested`, with B8 adding pick and place, links in the cast plan and mouse drag; bots send the new events; the 4-bot test green |
 | A6b | **Combos and tests on staffs** | Every combo file as a slot list; the combo arena, clip scenarios, fuzz test and `tools/atlas.py` on staffs |
 | A6c | **The old path removed** | The recipe compiler and API, the old events, the old `SpellLimits` constants; `docs/ARCHITECTURE.md`, the spells README and its examples rewritten for cards and staffs |
 
@@ -290,7 +291,7 @@ Each part is one session and one PR, with tests, a green `tools/check.sh` and `c
 | B5 | **Entity kit** | `gameplay/ai` | A6c | Decoy and familiar as pooled entities (`entity_spawn_requested`, `entity_ended`, `familiar_cast_requested`); the AI targets decoys; `target_move_requested` for swap |
 | B6 | **Shot look** | `core/projectiles` (drawing), `art/vfx` | B1 | Small shots; the layer shader and its effect kinds; per-card look data (and Feel's per-form looks moved to card data); the shared spark pool; the player colour on the trail; the clip sheets. Before B7 |
 | B7 | **Sandbox** | `gameplay/flow`, `content/rooms`, `hud/menus/sandbox/` | B6 | The sandbox room, both dummies, the sandbox actions in a new overlay page and the pause-menu toggles; `dev` and `preview` start in it |
-| B8 | **Builder** | `hud/builder` | A6c | Four tabs, slot rows, the bag, pick and place, mouse drag for P1, the cast plan strip, live numbers, the quick view; screenshots at 1 and 4 players; every slot reachable with the d-pad alone |
+| B8 | **Builder** | `hud/builder` | A6c | Pick and place (pick a card up, put it down, swapping; `card_move_requested`), links in the cast plan, live numbers, mouse drag for P1, and quicker moves than one control at a time (A6a's builder walks tabs, slots and bag in one line, so from the bag back to the tabs is many presses: left and right between tabs, slots and bag, or a jump); screenshots at 1 and 4 players; every slot reachable with the d-pad alone |
 
 B1 and B6 both change `core/projectiles/projectile_manager.gd`, so B6 waits for B1. B3 and B4 both reach the wizard's movement and health, so B4 waits for B3. B7 adds its own folder in `hud/menus/` and one line in the overlay; B8 owns `hud/builder/`.
 
@@ -311,6 +312,12 @@ A card task touches only its own folder (`.tres`, icon, look, `assets.json`), `c
 | B2 + B5 | decoy, familiar |
 
 C0 (after B6): the 19 existing cards get their look data and a second look at their numbers without the budget.
+
+### Phase E: extras the owner asked for along the way
+
+| # | Part | Area | After | Delivers |
+| --- | --- | --- | --- | --- |
+| E1 | **Spell names** | `core/spells` (a namer beside the compiler), `hud/builder` | A6c | A name for every cast from its cards (see "The builder"): word lists per card in the card's own `.tres` (`name_words`, so a new card brings its words and edits no shared list), rules for multicast, triggers and payloads, `Spells.staff_view` gives each cast's `name`; the builder shows the names above the plan; tests that names are deterministic and grow with the build |
 
 ### Phase D: proof
 

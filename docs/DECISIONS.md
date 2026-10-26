@@ -2,6 +2,16 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-26: Player, input and builder on staffs (staffs A6a)
+
+- **Buttons:** A, X, Y, B cast staffs 0 to 3 (`cast_a` Space or Shift, `cast_x` left mouse, J, right trigger or RB, `cast_y` right mouse or K, `cast_b` Q or L). **Menus activate with A and go back with B**, the gamepad standard, now that the old activate (`cast`) and back (`dodge`) buttons are gone. **The overlay is on Start** (and Tab, E): the design said View/Back, but Back is `leave`; Start only joins a device that has not joined yet.
+- **The full builder at any time, waves included** (owner: "The quick action is not needed. A full builder is always preferred"). The quick view, the overlay's Bag drop list and `drop_choices.gd` are gone; a player building in a wave stands still and can be hit, as in any menu.
+- **The first staff builder is a list builder** (tabs, slots, bag, one line per control) so A6a could land on main green; B8 makes it quicker to use (pick and place, links, mouse, moving between tabs, slots and bag without walking every control).
+- **The dash comes from its card** and goes the way the wizard walks (the way it faces when standing), as far and as long as the card's `speed` x `lifetime`, with no invulnerability. `protect()` (join and revive) is the only invulnerability left.
+- **A held button never switches a `hold` off;** only a new press does, so holding a button does not flicker a sustained card.
+- **Staff numbers retuned:** starter delay 0 and recharge 0.05 s, dev delay 0 and recharge 0, because a two-card staff such as `fire · bolt` recharges after every cast; with the first numbers (0.1 and 0.5 s) a bolt would have taken 0.95 s instead of 0.35 s. The dash card's cooldown (0.575 s) keeps the old dodge's rhythm.
+- **The corner panel shows the staff cast last** ("Staff X"), from `staff_cast`; there is no swap.
+
 ## 2026-10-26: Staff runtime details (staffs A5)
 
 - **Recipes run as staffs of one cast.** `install` and `cast` wrap a recipe's spell (its held spells as payloads, its depth as its node), so there is one runtime and every M2 cast and trigger test keeps checking it until A6c removes recipes.

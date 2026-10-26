@@ -501,6 +501,23 @@ func test_overload_the_other_way_fire_on_a_charged_enemy() -> void:
 	check(not _combat.has_status(enemy, &"burn"), "and fire's burn did not go on")
 
 
+func test_fire_on_a_charged_enemy_discharges_and_then_bursts() -> void:
+	var enemy := _enemy()
+	var near := _enemy(Vector2(30.0, 0.0))
+	_combat.apply_status(1, enemy, &"static", 5.0, 60.0)
+	_combat.apply_status(1, near, &"static", 5.0, 60.0)
+	var arcs: Array = []
+	_bus.discharge_arc.connect(func(player: int, from: Vector2, to: Vector2) -> void: arcs.append([player, from, to]))
+	_hit(1, enemy, &"fire")
+	var ids: Array = _ids()
+	check_equal(ids.size(), 2, "two reactions, no more: the discharge does not start another")
+	check(ids.has(CombatScript.DISCHARGE) and ids.has(&"overload"), "the discharge and the overload both fired")
+	check_equal(arcs.size(), 1, "one arc, to the one charged neighbour")
+	# The discharge is 60% of the 4 damage (2); the burst is 4.
+	check_equal(_combat.get_health(near), 100 - 2 - 4, "the neighbour takes the discharge and the burst")
+	check_equal(_combat.get_health(enemy), 100 - BOLT - 4, "the struck enemy takes its hit and the burst, not the discharge")
+
+
 func test_superconduct_freezes_a_chilled_enemy_hit_by_lightning() -> void:
 	var enemy := _enemy()
 	_combat.apply_status(0, enemy, &"chill", 3.0, 40.0)

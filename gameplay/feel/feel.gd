@@ -87,7 +87,7 @@ const REACTION_REPEAT: float = 0.3
 const REACTION_LABEL_NEAR: float = 40.0
 ## Discharge arcs (a jagged line each) that show at once, and the points of one: its two ends
 ## and the corners between them.
-const ARC_SLOTS: int = 8
+const ARC_SLOTS: int = 16
 const ARC_POINTS: int = 6
 ## Hit bursts always left free: wall dust never takes the last slots from a hit on a character.
 const WALL_RESERVE: int = 2
@@ -699,13 +699,14 @@ func _on_discharge_arc(_player: int, from: Vector2, to: Vector2) -> void:
 	var arc: Line2D = _arcs[slot]
 	var side: Vector2 = (to - from).normalized().orthogonal()
 	var flip: float = 1.0 if _rng.randf() < 0.5 else -1.0
-	arc.set_point_position(0, from)
+	# Corners sit on whole pixels and the width is whole, so the line stays crisp.
+	arc.set_point_position(0, from.round())
 	for i in range(1, ARC_POINTS - 1):
 		var along: Vector2 = from.lerp(to, float(i) / float(ARC_POINTS - 1))
-		arc.set_point_position(i, along + side * flip * _rng.randf_range(0.4, 1.0) * preset.arc_jag)
+		arc.set_point_position(i, (along + side * flip * _rng.randf_range(0.4, 1.0) * preset.arc_jag).round())
 		flip = -flip
-	arc.set_point_position(ARC_POINTS - 1, to)
-	arc.width = preset.arc_width
+	arc.set_point_position(ARC_POINTS - 1, to.round())
+	arc.width = roundf(preset.arc_width)
 	arc.default_color = preset.reaction_colors.get(&"discharge", Color.WHITE) as Color
 	arc.modulate.a = 1.0
 	arc.visible = true

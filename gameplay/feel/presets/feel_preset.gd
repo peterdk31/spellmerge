@@ -76,7 +76,7 @@ extends Resource
 	&"stillness": Color("4a78ff"),
 	&"rift": Color("c05cff"),
 	&"discharge": Color("00f0ff"),
-	&"overload": Color("7a3f18"),
+	&"overload": Color("ff6ba0"),
 	&"superconduct": Color("14a38b"),
 }
 @export var reaction_sound_prefix: String = "reaction_"

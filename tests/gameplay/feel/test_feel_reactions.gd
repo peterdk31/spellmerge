@@ -108,7 +108,18 @@ func test_the_same_reaction_on_the_same_spot_shows_one_name_and_one_sound() -> v
 func test_the_reactions_have_colours_that_differ_at_a_glance() -> void:
 	var preset: FeelPresetScript = FeelPresetScript.new()
 	var ids: Array = preset.reaction_colors.keys()
-	check_equal(ids.size(), 9, "one colour for each of the six reactions, the discharge, overload and superconduct")
+	var table: ReactionTable = load("res://content/spells/reactions.tres") as ReactionTable
+	var wanted: Array[StringName] = [&"discharge"]
+	for row: ReactionRow in table.rows:
+		if not wanted.has(row.reaction_id):
+			wanted.append(row.reaction_id)
+	for id: StringName in wanted:
+		check(ids.has(id), "%s has a colour" % id)
+	for id: StringName in ids:
+		check(wanted.has(id), "%s is a reaction that exists" % id)
+	for id: StringName in ids:
+		var colour: Color = preset.reaction_colors[id] as Color
+		check(maxf(colour.r, maxf(colour.g, colour.b)) >= 0.6, "%s is bright enough for the dark floor" % id)
 	for a in ids.size():
 		for b in range(a + 1, ids.size()):
 			var one: Color = preset.reaction_colors[ids[a]] as Color

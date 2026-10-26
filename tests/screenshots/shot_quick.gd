@@ -55,6 +55,16 @@ func _initialize() -> void:
 		_fail("the quick view's drop list is not shown")
 		return
 	await _shot("quick_view_drop_list")
+	# A longer bag than any real one: the list scrolls, with the last row focused.
+	var ids: Array = builder.call("row_ids")
+	var long_bag: Array[StringName] = []
+	for at in ids.size() + 5:
+		long_bag.append(ids[at % ids.size()])
+	root.get_node("Events").emit_signal("bag_changed", 0, long_bag)
+	await _settle()
+	var rows: Array = builder.call("shown_rows")
+	await _press_focus_only(0, rows[rows.size() - 1])
+	await _shot("quick_view_drop_list_scrolled")
 	_tap(0, &"overlay")
 	await _settle()
 	await _walk_a_wave(1, "one")
@@ -181,6 +191,17 @@ func _press(player: int, control: Control) -> void:
 		await process_frame
 		await process_frame
 	_tap(player, &"cast")
+	await _settle()
+
+
+## Move the player's focus down to `control`, without pressing it.
+func _press_focus_only(player: int, control: Control) -> void:
+	for attempt in 40:
+		if _focus.call("focused", player) == control:
+			break
+		_tap(player, &"move_down")
+		await process_frame
+		await process_frame
 	await _settle()
 
 

@@ -45,6 +45,7 @@ const SpellsScript := preload("res://core/spells/spells.gd")
 const SpellPreviewScript := preload("res://hud/builder/spell_preview.gd")
 const DropChoicesScript := preload("res://hud/widgets/drop_choices.gd")
 const HintLineScript := preload("res://hud/widgets/hint_line.gd")
+const RowWindowScript := preload("res://hud/widgets/row_window.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 
 const PLAYER_COUNT: int = 4
@@ -158,6 +159,12 @@ var _held: Button = null
 var _drop: Button = null
 var _levels_row: Control = null
 var _bag_column: Control = null
+## The bag rows sit in a list inside a clipping window, which scrolls in the quick view.
+var _rows_window: Control = null
+var _rows_holder: VBoxContainer = null
+## The first drop row in view, and the title before the row count is added.
+var _rows_first: int = 0
+var _base_title: String = ""
 ## The left column; tighter in the quick view to make room for its hint line.
 var _chain_column: Control = null
 var _info: PanelContainer = null
@@ -199,6 +206,11 @@ func _ready() -> void:
 	right.custom_minimum_size = Vector2(RIGHT_WIDTH, 0.0)
 	right.add_theme_constant_override("separation", 2)
 	columns.add_child(right)
+	_rows_holder = VBoxContainer.new()
+	_rows_holder.name = "Rows"
+	_rows_holder.custom_minimum_size = Vector2(RIGHT_WIDTH, 0.0)
+	_rows_window = RowWindowScript.make_window("RowsWindow", _rows_holder, RIGHT_WIDTH)
+	right.add_child(_rows_window)
 
 	_title = Label.new()
 	_title.name = "Title"
@@ -610,9 +622,8 @@ func _most_rows() -> int:
 
 
 func _grow_rows(count: int) -> void:
-	var holder: Node = get_node("Columns/Bag")
 	while _rows.size() < count:
-		var row: Button = _make_button(holder, "Row%d" % _rows.size())
+		var row: Button = _make_button(_rows_holder, "Row%d" % _rows.size())
 		row.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		row.custom_minimum_size = Vector2(0.0, ROW_HEIGHT)
 		row.visible = false
@@ -686,6 +697,7 @@ func _render() -> void:
 		title += " held %d" % _level
 	if _quick and _dropping:
 		title = "P%d %s" % [index + 1, DROP_TITLE]
+	_base_title = title
 	_title.text = title
 	for spell in SPELL_COUNT:
 		_set_text(_tabs[spell], SPELL_NAMES[spell] if spell != _viewed else "[%s]" % SPELL_NAMES[spell])
@@ -707,10 +719,12 @@ func _render() -> void:
 	_render_rows(node)
 	_bag_column.visible = not _quick or _dropping
 	_bag_column.add_theme_constant_override("separation", 0 if _quick else 2)
+	_rows_holder.add_theme_constant_override("separation", 0 if _quick else 2)
 	_chain_column.add_theme_constant_override("separation", 0 if _quick else 2)
 	_drop.disabled = _quick and not _can_drop
 	_rebuild_controls()
 	_apply_marks()
+	_scroll_rows()
 	_render_info()
 	_fit_size()
 
@@ -760,6 +774,28 @@ func _render_rows(node: Dictionary) -> void:
 		else:
 			button.icon = _spells.component_icon(id) if _spells != null and not _quick else null
 			_set_text(button, _name_of(id) + (CURRENT_MARK if id == current else ""))
+
+
+## Keep the focused drop row in view. The quick view's list shows at most
+## `RowWindowScript.QUICK_MAX_LINES` rows and slides to follow the focus (UIFocus walks all of
+## them); the title then shows the focused row ("Drop 3/14") and arrows show hidden rows. The
+## full builder's bag list is as high as it is.
+func _scroll_rows() -> void:
+	if not _quick:
+		_rows_first = 0
+		_rows_window.custom_minimum_size.y = _rows_holder.get_combined_minimum_size().y
+		_rows_holder.position = Vector2.ZERO
+		return
+	var total: int = _row_ids.size()
+	var most: int = RowWindowScript.QUICK_MAX_LINES
+	var focus_at: int = _rows.find(_focused as Button)
+	_rows_first = RowWindowScript.first_line_for(focus_at if focus_at >= 0 else _rows_first, _rows_first, most, total)
+	# A row can be taller than `QUICK_ROW_HEIGHT` (the theme's margins), so the step is its own.
+	var step: float = maxf(QUICK_ROW_HEIGHT, _rows[0].get_combined_minimum_size().y) if not _rows.is_empty() else QUICK_ROW_HEIGHT
+	RowWindowScript.apply(_rows_window, _rows_holder, step, total, most, _rows_first)
+	_title.text = _base_title
+	if _dropping and total > most and focus_at >= 0 and focus_at < total:
+		_title.text = "%s %d/%d" % [_base_title, focus_at + 1, total]
 
 
 ## The quick view is narrower until its drop list is shown. The offsets of the builder make its
@@ -868,6 +904,7 @@ func _on_focus_changed(player: int, control: Control) -> void:
 	if player == index and _open:
 		_focused = control
 		_apply_marks()
+		_scroll_rows()
 
 
 func _on_cancelled(player: int) -> void:

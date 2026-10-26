@@ -8,7 +8,9 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
 
 M2's parts were all built and the owner answered the C2 checkpoint (#235) with **iterate** on 2026-10-25: rework in this order, #245 (clip recorder and Spell atlas), #244 (spell visuals), #243 (Lightning). The tasks below follow that order; the next end of M2 is a new C2 checkpoint. Done-when item 3 is still open on the real-GPU frame rate. Nothing from M3+ is started. `ci/` is owner-only: the owner built the pipeline side (#246); the Godot side of the recorder and the atlas data are built here, in the format `ci/smbot/clips.py` reads.
 
-- [ ] **Close M2 again.** When the tasks above are done and no crash is known: mark M2 done in the roadmap and fill the C2 checkpoint again (what was reworked, assessment, recommendation).
+M2's rework is done: every iterate task is built (see Done recently). The ROADMAP row reads "In progress, all tasks done, waiting for the checkpoint" (the site parser needs "In progress"). Development waits for the owner's verdict. Do not write M3 tasks before a `go`.
+
+- [ ] **Open the C2 checkpoint issue (second round).** Text: `docs/milestones/M2-spell-system.md`, "Checkpoint C2, second round" (recommendation: go, conditional on item 3). Remove this task once the issue exists, then wait 7 days; without an answer, default to iterate.
 
 ## Blocked
 

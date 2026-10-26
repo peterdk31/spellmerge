@@ -8,6 +8,8 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - **Swap needs the caster's place**, read from the manager's anchor; without one nothing is traded. `target_move_requested` carries the player first (as in `events.gd`, which differs from the milestone table).
 - **End points from `caster_move_finished`** (dash, teleport, hook; other modes are ignored) fire the carrier's `blast` and its `on expire` payload at the arrival. The payload goes along the move's heading. A forgotten build (tag unknown) does nothing.
 - **Blast on shots** goes off where a spent shot hit, where a shot expired (also a sticky one, or a wall), and at the end of a beam or fissure. A piercing shot or beam does not blast per target. A hook's blast waits for the arrival, so a missing hook does not explode.
+- **Simultaneous moves.** The player (B4) sums the `recoil` requests of one step and lets a later non-recoil move replace an earlier one (written in `events.gd` and the B4 task). `Spells` keeps one move heading per player, so the last asked move wins: of two moves in flight, the first one's `on expire` payload leaves along the later heading. A hook with pierce left can fire its `on expire` payload at the arrival and again when the shot expires; both are accepted for now.
+- **Every spent shot blasts.** The blast rule is per shot: each chain jump shot, each echo and each shot of a wall or orbit blasts where it is spent, so a wall of N shots expiring together sends N area hits in one step. A piercing shot does not blast at a hit it survives. Pinned by tests.
 - **Siphon** sends one refund of its strength per hit (a beam's every target too); the pool is `player`'s concern (B4).
 
 ## 2026-10-26: Trigger kit, part 3 (staffs B2c)

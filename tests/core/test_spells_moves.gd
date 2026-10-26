@@ -77,6 +77,15 @@ func before_each() -> void:
 	_modifier(&"recoil", ModifierBase.Behaviour.RECOIL, 20.0)
 	_modifier(&"siphon", ModifierBase.Behaviour.SIPHON, 2.0)
 	_modifier(&"mirror", ModifierBase.Behaviour.MIRROR, 1.0)
+	_modifier(&"chain", ModifierBase.Behaviour.CHAIN, 1.0)
+	var piercing := ModifierBase.new()
+	piercing.extra_pierce = 2
+	_put(piercing, &"pierce")
+	var wall: FormBase = _form(&"wall", 0.0, 0.5)
+	wall.motion = FormBase.Motion.WALL
+	wall.shots = 3
+	wall.spread = 10.0
+	wall.radius = 4.0
 	_trigger(&"on_expire", TriggerBase.Event.EXPIRE)
 	var spark: FormBase = _form(&"spark", 100.0, 1.0)
 	spark.base_damage = 3
@@ -330,3 +339,78 @@ func test_a_miss_refunds_nothing() -> void:
 	_cast()
 	_tick(90)
 	check_equal(_refunds.size(), 0, "no hit, no mana")
+
+
+func test_a_piercing_shot_does_not_blast_at_a_hit_it_survives() -> void:
+	_build(0, [&"blast", &"pierce", &"bolt"])
+	_target(Vector2(60, 0))
+	_cast()
+	_tick(30)
+	check_equal(_areas.size(), 0, "still flying: no explosion at the hit")
+	_tick(60)
+	check_equal(_areas.size(), 1, "one explosion where it finally expires")
+
+
+func test_a_chain_shot_blasts_where_each_jump_ends() -> void:
+	_build(0, [&"blast", &"chain", &"bolt"])
+	_target(Vector2(60, 0))
+	_target(Vector2(60, 40))
+	_cast()
+	_tick(60)
+	check_equal(_areas.size(), 2, "the first shot is spent on its hit and so is the jump shot: %s" % [_areas])
+
+
+func test_every_shot_of_a_wall_blasts_when_it_expires() -> void:
+	_build(0, [&"blast", &"wall"])
+	_cast()
+	_tick(60)
+	check_equal(_areas.size(), 3, "one explosion for each of the three shots")
+
+
+func test_the_move_heading_is_the_last_asked_move() -> void:
+	var tag: int = _build(0, [&"on_expire", &"teleport", &"spark"])
+	_cast()
+	_tick(120)
+	check(_spells.cast_staff(0, 0, Vector2.ZERO, Vector2.UP, 100.0) >= 0.0, "the second cast went off")
+	_bus.caster_move_finished.emit(0, &"teleport", Vector2(90, 5), tag)
+	var seen: int = 0
+	for slot in _mgr.get_cap():
+		if _mgr.is_alive(slot):
+			seen += 1
+			check(_mgr.get_velocity_of(slot).normalized().is_equal_approx(Vector2.UP), "the later move's heading wins")
+	check(seen > 0, "the payload left")
+
+
+func test_a_hook_works_for_player_two() -> void:
+	_mgr.set_anchor(2, Vector2(0, 100))
+	var tag: int = _build(2, [&"on_expire", &"hook", &"spark"])
+	_target(Vector2(60, 100))
+	_spells.cast_staff(2, 0, Vector2(0, 100), Vector2.RIGHT, 100.0)
+	_tick(30)
+	check(_moves.size() == 1 and _moves[0][0] == 2 and _moves[0][1] == &"hook" and _moves[0][4] == tag, "the pull is player 2's: %s" % [_moves])
+	_bus.caster_move_finished.emit(2, &"hook", Vector2(45, 100), tag)
+	var found: bool = false
+	for slot in _mgr.get_cap():
+		if _mgr.is_alive(slot) and SpellTag.player_of(_mgr.get_tag_of(slot)) == 2 and _mgr.get_position_of(slot).is_equal_approx(Vector2(45, 100)):
+			found = true
+	check(found, "its payload is player 2's and leaves the arrival point")
+
+
+func test_a_swap_reads_the_casters_own_anchor() -> void:
+	_mgr.set_anchor(0, Vector2(-500, 0))
+	_mgr.set_anchor(3, Vector2(-10, 4))
+	_build(3, [&"swap"])
+	var enemy: Node2D = _target(Vector2(60, 0))
+	_spells.cast_staff(3, 0, Vector2(-10, 4), Vector2.RIGHT, 100.0)
+	_tick(30)
+	check(_target_moves.size() == 1 and _target_moves[0][0] == 3 and _target_moves[0][1] == enemy and _target_moves[0][2].is_equal_approx(Vector2(-10, 4)), "player 3's place, not player 0's: %s" % [_target_moves])
+
+
+func test_a_teleport_of_player_three_ignores_other_players_arrivals() -> void:
+	var tag: int = _build(3, [&"on_expire", &"teleport", &"spark"])
+	_spells.cast_staff(3, 0, Vector2.ZERO, Vector2.RIGHT, 100.0)
+	check(_moves.size() == 1 and _moves[0][0] == 3 and _moves[0][1] == &"teleport", "asked for player 3: %s" % [_moves])
+	_bus.caster_move_finished.emit(0, &"teleport", Vector2(90, 0), tag)
+	check_equal(_mgr.get_count(), 0, "another player's arrival fires nothing")
+	_bus.caster_move_finished.emit(3, &"teleport", Vector2(90, 0), tag)
+	check_equal(_mgr.get_count(), 1, "its own does")

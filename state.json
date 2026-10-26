@@ -9,7 +9,6 @@
     "number": 256
   },
   "errors_in_a_row": 0,
-  "idle": null,
   "intake_tasks": {
     "208": {
       "author": "Brianmanden",
@@ -70,7 +69,13 @@
     6404318237,
     6405166432
   ],
-  "task_failures": {},
+  "task_failures": {
+    "**Close M2 again.** When the tasks above are done and no crash is known: mark M2 done in the roadmap and fill the C2 checkpoint again (what was reworked, assessment, recommendation).": {
+      "count": 1,
+      "pr": "262",
+      "problems": "- The recommendation says this is \"the second and last iterate round\" and that the owner's options are therefore \"go or pivot\". docs/PLAN.md (Go/no-go checkpoints) allows at most 2 iterate rounds and says a pivot follows only after 2 failed rounds. M2 has had one iterate answer (#235, 2026-10-25), and this is the second checkpoint. So `/iterate` is still a valid answer here, and a second round would be the last. Telling the owner otherwise misstates the plan at the moment they decide. Fix: Reword to say that one iterate round is done and the owner may still answer iterate once more, which would be the last round; after that the answer must be go or pivot. Drop \"the owner's options are go or pivot\". Say the same in the PR description."
+    }
+  },
   "usage": [
     {
       "at": "2026-10-18T06:33:23Z",

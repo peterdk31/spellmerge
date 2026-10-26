@@ -105,16 +105,55 @@ func test_the_same_reaction_on_the_same_spot_shows_one_name_and_one_sound() -> v
 	check_equal(_registry.asked.count(&"reaction_flare"), 2, "and the sound comes back later")
 
 
-func test_the_six_reactions_have_colours_that_differ_at_a_glance() -> void:
+func test_the_reactions_have_colours_that_differ_at_a_glance() -> void:
 	var preset: FeelPresetScript = FeelPresetScript.new()
 	var ids: Array = preset.reaction_colors.keys()
-	check_equal(ids.size(), 6, "one colour for each of the six reactions")
+	check_equal(ids.size(), 9, "one colour for each of the six reactions, the discharge, overload and superconduct")
 	for a in ids.size():
 		for b in range(a + 1, ids.size()):
 			var one: Color = preset.reaction_colors[ids[a]] as Color
 			var other: Color = preset.reaction_colors[ids[b]] as Color
 			var apart: float = Vector3(one.r - other.r, one.g - other.g, one.b - other.b).length()
 			check(apart >= 0.45, "%s and %s are far apart in colour (%.2f)" % [ids[a], ids[b], apart])
+
+
+func test_a_discharge_asks_for_its_sound_and_the_new_reactions_for_theirs() -> void:
+	for id: StringName in [&"discharge", &"overload", &"superconduct"]:
+		_bus.reaction_triggered.emit(0, id, Vector2.ZERO)
+		check_equal(_registry.asked.has(StringName("reaction_" + String(id))), true, "reaction_%s was asked for" % id)
+		check(_feel.preset.reaction_colors.has(id), "%s has a colour of its own" % id)
+
+
+func test_a_discharge_arc_shows_a_jagged_line_between_both_ends_and_fades() -> void:
+	var from := Vector2(10.0, 10.0)
+	var to := Vector2(90.0, 10.0)
+	_bus.discharge_arc.emit(0, from, to)
+	check_equal(_feel.live_arcs(), 1, "one arc")
+	var line: Line2D = null
+	for child in _feel.get_children():
+		var found := child as Line2D
+		if found != null and found.visible:
+			line = found
+	check(line != null, "a line is drawn")
+	check_equal(line.get_point_position(0), from, "it starts at the struck enemy")
+	check_equal(line.get_point_position(line.get_point_count() - 1), to, "and ends at the zapped one")
+	var strays: bool = false
+	for i in range(1, line.get_point_count() - 1):
+		if absf(line.get_point_position(i).y - 10.0) > 0.1:
+			strays = true
+	check(strays, "the corners between leave the straight line")
+	check_equal(line.default_color, _feel.preset.reaction_colors[&"discharge"], "in the discharge's colour")
+	for i in 20:
+		_feel.step(STEP)
+	check_equal(_feel.live_arcs(), 0, "the arc ends by itself")
+
+
+func test_a_crowd_of_arcs_stays_inside_the_pool() -> void:
+	for i in 40:
+		_bus.discharge_arc.emit(i % 4, Vector2.ZERO, Vector2(20.0 + float(i), 5.0))
+	check_equal(_feel.live_arcs(), FeelScript.ARC_SLOTS, "arcs are capped")
+	_bus.discharge_arc.emit(0, Vector2(3.0, 3.0), Vector2(3.0, 3.0))
+	check_equal(_feel.live_arcs(), FeelScript.ARC_SLOTS, "an arc of no length shows nothing")
 
 
 func test_a_reaction_flash_keeps_its_own_colour_not_the_arts() -> void:

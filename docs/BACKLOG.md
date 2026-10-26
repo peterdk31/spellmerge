@@ -85,6 +85,8 @@ Sounds the game asks for by id and does not have yet. A missing sound is silent 
 - **`enemy_death`** (M1 part 16). An enemy dying: a small burst or fizz, under 0.6 s, clearly different from `hit`.
 - **`player_downed`** (M1 part 16). A wizard going down: a low, soft thud or sigh, under 0.8 s, calm rather than alarming.
 
+- **`reaction_discharge`, `reaction_overload`, `reaction_superconduct`** (#243 part 2). Feel asks for each by id when the reaction fires and nothing plays until the `.ogg` is in `audio/sfx/`. Same family as the six older `reaction_<id>` sounds (none exists yet): short (under 0.4 s), a crackle for the discharge, a dull thump for overload, a glassy ping for superconduct. Heard in every fight with lightning, so they must not tire.
+
 ## Foundation
 
 Weak spots found in the architecture review of 2026-10-20 (docs/ARCHITECTURE.md). Each is fixed by the feature that needs it, not ahead of it.
@@ -131,8 +133,15 @@ Weak spots found in the architecture review of 2026-10-20 (docs/ARCHITECTURE.md)
 ## From #243 part 1 (Lightning)
 
 - **The quick drop list and the overlay's list cap at 11 rows (task).** Each new element or modifier adds a row to the longest list; at 12 px rows and 8 px text 11 rows fit a player's quarter at 640×360, a 12th does not. Needs a list that scrolls or pages (UIFocus must follow it), or two columns in the quick view. Do it before the next element or modifier is added.
-- **The discharge has no sound, colour or line (task).** It is a white burst on each zapped enemy (`reaction_triggered` `discharge`). A short jagged line from the struck enemy to each zapped one would read better; it needs a `core/events` signal that carries both ends.
 - **Shader kinds are a number scheme (task).** Shapes, trail marks and form bodies share one 0–15 kind in the shot's custom data, and adding a shape moves the others. A table in the manager (kind per shape and form) would make the next shape one line.
+
+## From #243 part 2 (extensibility proposals, not built)
+
+- **Statuses as data (proposal).** A new status needs code in `gameplay/combat/combat.gd` (two or more parallel arrays, an apply, a tick, a remove and a `match` line in five places), `core/spells/spells.gd` and `core/spells/validator.gd`. A status table (a resource per status: duration, strength, whether it ticks, what it changes) would make a status with no special behaviour new files only. Static's discharge would stay a script.
+- **Reaction look in the row (proposal).** A reaction's colour and power live in the Feel preset by id, so a new reaction edits `gameplay/feel/presets/feel_preset.gd` and the colour test's count. `ReactionRow` could carry `color` and `power` and Feel read them from the table.
+- **Element shape and status look as fields (proposal).** `shape` numbers are drawn in the shader and the manager; the status look is a preset dictionary. An element that names a palette ramp and an overlay colour would not need the Feel preset or the STYLE palette edited for a look that reuses existing ones.
+- **A colour-distance check on the table, not a hand count (task).** `test_feel_reactions.gd` asserts the number of colours (nine); it should read the reaction ids from `reactions.tres` plus `discharge` so a new reaction fails only if its colour is missing or too close.
+- **The discharge arc is a straight-segment zigzag (polish).** At the clip's 2x scale it reads as bracket-like corners; a thinner line with more corners, or a short flicker (two frames of a different jag), would look more like lightning.
 
 ## Ideas from the community
 

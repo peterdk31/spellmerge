@@ -845,8 +845,10 @@ func _discharge(player: int, from_enemy: Node2D, from: Vector2, amount: int) -> 
 		var row: int = _enemies.find(near)
 		if row >= 0 and _static_left[row] > 0.0:
 			if events != null:
-				# Feel shows it as a white burst on each enemy zapped (no colour is listed for this id).
-				events.reaction_triggered.emit(player, DISCHARGE, _position_of(near) + _hurt_offset[row])
+				# Feel shows a burst on each enemy zapped and a jagged arc from the struck one.
+				var zapped: Vector2 = _position_of(near) + _hurt_offset[row]
+				events.reaction_triggered.emit(player, DISCHARGE, zapped)
+				events.discharge_arc.emit(player, from, zapped)
 			hit_any = hit(player, near, maxi(amount, 1)) or hit_any
 	_discharging = false
 	return hit_any

@@ -85,6 +85,10 @@ const REACTION_RISE: float = 10.0
 ## again while the first still rises within `REACTION_LABEL_NEAR` pixels.
 const REACTION_REPEAT: float = 0.3
 const REACTION_LABEL_NEAR: float = 40.0
+## Discharge arcs (a jagged line each) that show at once, and the points of one: its two ends
+## and the corners between them.
+const ARC_SLOTS: int = 8
+const ARC_POINTS: int = 6
 ## Hit bursts always left free: wall dust never takes the last slots from a hit on a character.
 const WALL_RESERVE: int = 2
 ## Bursts draw above the room and the pillar tops (z 5), below the flashes (20).
@@ -188,6 +192,11 @@ var _labels: Array[Label] = []
 var _label_left: PackedFloat32Array = PackedFloat32Array()
 var _label_start: PackedVector2Array = PackedVector2Array()
 var _next_reaction: int = 0
+## Discharge arcs: a line each, made once, with seconds left and in all.
+var _arcs: Array[Line2D] = []
+var _arc_left: PackedFloat32Array = PackedFloat32Array()
+var _arc_total: PackedFloat32Array = PackedFloat32Array()
+var _next_arc: int = 0
 ## Status overlays, per enemy shown (parallel arrays): its instance id, the overlay sprite,
 ## real seconds shown, the status it shows and when to read the statuses next; and the overlays
 ## not in use. Sprites are made when first needed and kept.
@@ -290,6 +299,20 @@ func _ready() -> void:
 		_label_id.append(&"")
 	_label_left.resize(REACTION_SLOTS)
 	_label_start.resize(REACTION_SLOTS)
+	for i in ARC_SLOTS:
+		var arc := Line2D.new()
+		arc.top_level = true
+		arc.visible = false
+		arc.z_index = 21
+		arc.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		arc.begin_cap_mode = Line2D.LINE_CAP_ROUND
+		arc.end_cap_mode = Line2D.LINE_CAP_ROUND
+		for point in ARC_POINTS:
+			arc.add_point(Vector2.ZERO)
+		add_child(arc)
+		_arcs.append(arc)
+	_arc_left.resize(ARC_SLOTS)
+	_arc_total.resize(ARC_SLOTS)
 	_flash_left.resize(ALL_FLASH_SLOTS)
 	_flash_total.resize(ALL_FLASH_SLOTS)
 	_flash_size.resize(ALL_FLASH_SLOTS)
@@ -324,6 +347,7 @@ func _ready() -> void:
 	events.projectile_impact.connect(_on_projectile_impact)
 	events.form_shown.connect(_on_form_shown)
 	events.reaction_triggered.connect(_on_reaction_triggered)
+	events.discharge_arc.connect(_on_discharge_arc)
 	events.status_applied.connect(_on_status_applied)
 	if combat == null:
 		combat = get_node_or_null("/root/Combat")
@@ -381,6 +405,7 @@ func step(real_delta: float) -> void:
 	_step_flashes(real_delta)
 	_step_forms(real_delta)
 	_step_labels(real_delta)
+	_step_arcs(real_delta)
 	_step_statuses(real_delta)
 	_step_ghosts(real_delta)
 	var at: int = _active.size() - 1
@@ -660,6 +685,54 @@ func _on_reaction_triggered(_player: int, reaction_id: StringName, position: Vec
 		_refresh_camera()
 		_trauma = minf(_trauma + preset.reaction_shake * power, 1.0)
 	_play(_reaction_sounds[reaction_id] as StringName)
+
+
+## A discharge jumped from `from` to `to`: a jagged line between them that fades fast, in
+## the colour of the reaction `discharge`. The corners stray by turns to either side of the
+## straight line, by a random amount up to `preset.arc_jag`. An arc past ARC_SLOTS takes over
+## the oldest. It only draws; the damage is combat's.
+func _on_discharge_arc(_player: int, from: Vector2, to: Vector2) -> void:
+	if preset.arc_seconds <= 0.0 or from.is_equal_approx(to):
+		return
+	var slot: int = _next_arc
+	_next_arc = (_next_arc + 1) % ARC_SLOTS
+	var arc: Line2D = _arcs[slot]
+	var side: Vector2 = (to - from).normalized().orthogonal()
+	var flip: float = 1.0 if _rng.randf() < 0.5 else -1.0
+	arc.set_point_position(0, from)
+	for i in range(1, ARC_POINTS - 1):
+		var along: Vector2 = from.lerp(to, float(i) / float(ARC_POINTS - 1))
+		arc.set_point_position(i, along + side * flip * _rng.randf_range(0.4, 1.0) * preset.arc_jag)
+		flip = -flip
+	arc.set_point_position(ARC_POINTS - 1, to)
+	arc.width = preset.arc_width
+	arc.default_color = preset.reaction_colors.get(&"discharge", Color.WHITE) as Color
+	arc.modulate.a = 1.0
+	arc.visible = true
+	_arc_left[slot] = preset.arc_seconds
+	_arc_total[slot] = preset.arc_seconds
+
+
+## Fade the arcs and hide those done.
+func _step_arcs(real_delta: float) -> void:
+	for i in ARC_SLOTS:
+		if _arc_left[i] <= 0.0:
+			continue
+		_arc_left[i] -= real_delta
+		if _arc_left[i] <= 0.0:
+			_arcs[i].visible = false
+		else:
+			# Full for the first half, then it fades.
+			_arcs[i].modulate.a = minf(2.0 * _arc_left[i] / maxf(_arc_total[i], 0.001), 1.0)
+
+
+## Discharge arcs showing right now (for tests).
+func live_arcs() -> int:
+	var count: int = 0
+	for i in ARC_SLOTS:
+		if _arc_left[i] > 0.0:
+			count += 1
+	return count
 
 
 ## An enemy got a status: show it on the enemy until combat says it has ended.

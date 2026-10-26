@@ -58,6 +58,8 @@ signal active_spell_changed(player: int, slot: int)
 signal bag_changed(player: int, bag: Array[StringName])
 ## Sender: combat. The reaction `reaction_id` (for example &"shatter") fired for `player` (or NO_PLAYER) at `position`.
 signal reaction_triggered(player: int, reaction_id: StringName, position: Vector2)
+## Sender: combat. A discharge of `player` jumped from `from` (the enemy struck) to `to` (an enemy zapped), both in world pixels; one is sent for each enemy zapped, next to its `reaction_triggered` `discharge`. Heard by feel, which draws the arc.
+signal discharge_arc(player: int, from: Vector2, to: Vector2)
 ## Sender: combat. `player` (or NO_PLAYER) dealt `amount` damage to `target`.
 signal damage_dealt(player: int, target: Node, amount: int, position: Vector2)
 ## Sender: combat. A status effect from `player` (or NO_PLAYER) was put on `target`.

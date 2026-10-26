@@ -360,6 +360,33 @@ func test_a_discharge_is_announced_at_each_enemy_it_zaps() -> void:
 	check(places.has(left.position) and places.has(right.position), "at the zapped enemies' places")
 
 
+func test_a_discharge_sends_an_arc_from_the_struck_enemy_to_each_one_zapped() -> void:
+	var struck := _enemy(Vector2(0.0, 0.0))
+	var left := _enemy(Vector2(-50.0, 0.0))
+	var right := _enemy(Vector2(60.0, 0.0))
+	for charged: Node2D in [struck, left, right]:
+		_combat.apply_status(0, charged, &"static", 5.0, 60.0)
+	var arcs: Array = []
+	_bus.discharge_arc.connect(func(player: int, from: Vector2, to: Vector2) -> void: arcs.append([player, from, to]))
+	_hit(2, struck, _tag(2, &""))
+	check_equal(arcs.size(), 2, "one arc for each enemy zapped")
+	var ends: Array = []
+	for arc: Array in arcs:
+		check_equal(arc[0], 2, "it names the player who hit")
+		check_equal(arc[1], struck.position, "it starts at the struck enemy")
+		ends.append(arc[2])
+	check(ends.has(left.position) and ends.has(right.position), "and ends at the zapped ones")
+
+
+func test_no_arc_when_nobody_is_zapped() -> void:
+	var struck := _enemy(Vector2(0.0, 0.0))
+	_combat.apply_status(0, struck, &"static", 5.0, 60.0)
+	var arcs: Array = []
+	_bus.discharge_arc.connect(func(player: int, from: Vector2, to: Vector2) -> void: arcs.append([player, from, to]))
+	_hit(0, struck, _tag(0, &""))
+	check(arcs.is_empty(), "a charged enemy alone has nothing to arc to")
+
+
 func test_a_discharge_is_one_step_not_a_second_jump() -> void:
 	var struck := _enemy(Vector2(0.0, 0.0))
 	var near := _enemy(Vector2(60.0, 0.0))

@@ -75,6 +75,9 @@ extends Resource
 	&"kindle": Color("ff3b30"),
 	&"stillness": Color("4a78ff"),
 	&"rift": Color("c05cff"),
+	&"discharge": Color("00f0ff"),
+	&"overload": Color("7a3f18"),
+	&"superconduct": Color("14a38b"),
 }
 @export var reaction_sound_prefix: String = "reaction_"
 ## The burst a reaction adds to its flash, bigger than any plain hit: its hit-stop in seconds
@@ -92,7 +95,15 @@ extends Resource
 	&"thaw": 1.0,
 	&"stillness": 0.9,
 	&"discharge": 0.7,
+	&"overload": 1.1,
+	&"superconduct": 1.0,
 }
+## The jagged arc a discharge draws from the enemy struck to each enemy zapped (`discharge_arc`),
+## in the colour of the reaction `discharge`: seconds it shows, its width in pixels and how far
+## its corners stray from the straight line, in pixels.
+@export_range(0.0, 0.5, 0.01) var arc_seconds: float = 0.25
+@export_range(0.5, 6.0, 0.5) var arc_width: float = 2.0
+@export_range(0.0, 16.0, 0.5) var arc_jag: float = 5.0
 ## What an enemy with a status looks like, by status id (`burn`, `chill`, `freeze`, `shock`,
 ## `hex`, `static`): a colour laid over its sprite, the most it shows (alpha), how fast it pulses per
 ## second (0: steady), how far it jitters in pixels, and whether it blinks off between pulses.

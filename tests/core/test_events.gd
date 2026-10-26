@@ -33,6 +33,7 @@ const EVENTS: Dictionary = {
 	&"active_spell_changed": [["player", TYPE_INT], ["slot", TYPE_INT]],
 	&"bag_changed": [["player", TYPE_INT], ["bag", TYPE_ARRAY]],
 	&"reaction_triggered": [["player", TYPE_INT], ["reaction_id", TYPE_STRING_NAME], ["position", TYPE_VECTOR2]],
+	&"discharge_arc": [["player", TYPE_INT], ["from", TYPE_VECTOR2], ["to", TYPE_VECTOR2]],
 	&"damage_dealt": [["player", TYPE_INT], ["target", TYPE_OBJECT], ["amount", TYPE_INT], ["position", TYPE_VECTOR2]],
 	&"status_applied": [["player", TYPE_INT], ["target", TYPE_OBJECT], ["status_id", TYPE_STRING_NAME]],
 	&"enemy_died": [["player", TYPE_INT], ["enemy", TYPE_OBJECT], ["position", TYPE_VECTOR2]],

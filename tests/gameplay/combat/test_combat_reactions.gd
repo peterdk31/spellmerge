@@ -59,7 +59,7 @@ func before_each() -> void:
 	bolt.speed = 200.0
 	bolt.lifetime = 1.0
 	_fake.items[&"bolt"] = bolt
-	for element in ELEMENTS:
+	for element in ELEMENTS + [&"lightning"]:
 		_fake.items[element] = load("res://content/spells/elements/%s/%s.tres" % [element, element])
 
 
@@ -97,7 +97,7 @@ func _ids() -> Array:
 # --- the table ---
 
 
-func test_every_pair_of_elements_reacts_both_ways_under_one_of_six_names() -> void:
+func test_every_pair_of_the_four_first_elements_reacts_both_ways_under_one_of_six_names() -> void:
 	var table: ReactionTable = load("res://content/spells/reactions.tres") as ReactionTable
 	var names: Dictionary = {}
 	for a in ELEMENTS:
@@ -106,7 +106,7 @@ func test_every_pair_of_elements_reacts_both_ways_under_one_of_six_names() -> vo
 				continue
 			var found: bool = false
 			for row in table.rows:
-				var status_element: StringName = {&"burn": &"fire", &"chill": &"frost", &"shock": &"storm", &"hex": &"void"}[row.status_id]
+				var status_element: StringName = {&"burn": &"fire", &"chill": &"frost", &"shock": &"storm", &"hex": &"void"}.get(row.status_id, &"")
 				if status_element == a and row.element_id == b:
 					found = true
 					names[row.reaction_id] = true
@@ -462,3 +462,60 @@ func test_a_spread_row_can_use_up_the_status() -> void:
 	_hit(0, enemy, &"storm")
 	check(not _combat.has_status(enemy, &"burn"), "the struck enemy lost its burn")
 	check(_combat.has_status(near, &"burn"), "the neighbour caught it")
+
+
+# --- Lightning (#243): Overload with fire, Superconduct with frost ---
+
+
+func test_lightning_reacts_with_fire_and_frost_both_ways() -> void:
+	var table: ReactionTable = load("res://content/spells/reactions.tres") as ReactionTable
+	var wanted: Array = [
+		[&"burn", &"lightning", &"overload"], [&"static", &"fire", &"overload"],
+		[&"chill", &"lightning", &"superconduct"], [&"static", &"frost", &"superconduct"],
+	]
+	for want: Array in wanted:
+		var row: ReactionRow = table.find(want[0], want[1])
+		check(row != null and row.reaction_id == want[2], "%s on %s is %s" % [want[1], want[0], want[2]])
+
+
+func test_overload_bursts_round_a_burning_enemy_hit_by_lightning() -> void:
+	var enemy := _enemy()
+	var near := _enemy(Vector2(30.0, 0.0))
+	var outside := _enemy(Vector2(100.0, 0.0))
+	_combat.apply_status(0, enemy, &"burn", 3.0, 1.0)
+	_hit(0, enemy, &"lightning")
+	check_equal(_ids(), [&"overload"], "overload fired")
+	check_equal(_combat.get_health(near), 100 - 4, "the neighbour takes the burst")
+	check_equal(_combat.get_health(outside), 100, "out of reach is untouched")
+	check(not _combat.has_status(enemy, &"static"), "the reaction ran instead of the charge")
+
+
+func test_overload_the_other_way_fire_on_a_charged_enemy() -> void:
+	var enemy := _enemy()
+	var near := _enemy(Vector2(30.0, 0.0))
+	_combat.apply_status(1, enemy, &"static", 5.0, 60.0)
+	_hit(1, enemy, &"fire")
+	check_equal(_ids(), [&"overload"], "fire on static")
+	check_equal(_reacted[0][0], 1, "it names the player who hit")
+	check_equal(_combat.get_health(near), 100 - 4, "the neighbour takes the burst")
+	check(not _combat.has_status(enemy, &"burn"), "and fire's burn did not go on")
+
+
+func test_superconduct_freezes_a_chilled_enemy_hit_by_lightning() -> void:
+	var enemy := _enemy()
+	_combat.apply_status(0, enemy, &"chill", 3.0, 40.0)
+	_hit(0, enemy, &"lightning")
+	check_equal(_ids(), [&"superconduct"], "superconduct fired")
+	check(_combat.has_status(enemy, &"freeze"), "frozen")
+	check_equal(_combat.status_left(enemy, &"freeze"), 1.5, "for 1.5 seconds")
+	check(not _combat.has_status(enemy, &"static"), "no charge went on")
+
+
+func test_superconduct_the_other_way_frost_drains_a_charge_for_damage() -> void:
+	var enemy := _enemy()
+	_combat.apply_status(0, enemy, &"static", 5.0, 60.0)
+	_hit(0, enemy, &"frost")
+	check_equal(_ids(), [&"superconduct"], "frost on static")
+	check_equal(_combat.get_health(enemy), 100 - BOLT - 4, "the hit plus the bonus")
+	check(not _combat.has_status(enemy, &"static"), "the charge is used up")
+	check(not _combat.has_status(enemy, &"chill"), "frost's chill did not go on")

@@ -13,10 +13,6 @@ const NO_PLAYER: int = -1
 
 ## The Play button was pressed. Heard by flow.
 signal play_requested(player: int)
-## A player asked to put the component `component_id` into slot `slot` of the spell at `spell`, a path of slot indices: `[0]` is spell A, `[1]` is spell B, `[0, 0]` the spell held by A's trigger. Heard by player.
-signal build_change_requested(player: int, spell: PackedInt32Array, slot: int, component_id: StringName)
-## A player asked to switch between the two prepared spells. Heard by player.
-signal spell_swap_requested(player: int)
 ## Sender: hud. `player` asked to put the card `card_id` into slot `slot` of their staff `staff` (0-3: A, X, Y, B); `&""` empties the slot. Heard by player, which applies it (staffs, docs/milestones/M2-staffs.md).
 signal staff_change_requested(player: int, staff: int, slot: int, card_id: StringName)
 ## `player` asked to move the card in `from_slot` of staff `from_staff` to `to_slot` of staff `to_staff`, swapping with what is there; a staff of -1 means the bag. Heard by player.
@@ -52,14 +48,8 @@ signal projectile_expired(player: int, position: Vector2, tag: int)
 signal form_shown(player: int, form: StringName, origin: Vector2, direction: Vector2, length: float, tint: Color)
 ## Sender: core/spells. `player` just cast a spell that is more than a plain shot, for looks only. `combo_class` is `&"boosted"` (modifiers only), `&"on_hit"`, `&"on_expire"` or `&"timer"` (a trigger holds a second spell), or `&"stacked"` (a trigger with two or more modifiers, or a chain of three spells); a plain cast sends nothing. `tint` is the element's colour (white for plain arcane). Sent after the cast made a shot. Heard by feel.
 signal combo_cast(player: int, combo_class: StringName, origin: Vector2, direction: Vector2, tint: Color)
-## Sender: player. The spell of `player` at `spell` (a path as in `build_change_requested`) was built or changed; `description` says in plain words what it does now.
-signal spell_changed(player: int, spell: PackedInt32Array, description: String)
 ## Sender: player. A build change asked for by `player` was refused; `reason` says why in plain words.
 signal build_refused(player: int, reason: String)
-## Sender: player. The prepared spell `slot` (0 is A, 1 is B) of `player` now has this `recipe` (component ids by key, as `Spells.compile` reads them: `form`, `element`, `modifiers`, `trigger`, and `held` for the spell the trigger holds). Sent with `spell_changed`, so the builder can show the chain without reading the player.
-signal recipe_changed(player: int, slot: int, recipe: Dictionary)
-## Sender: player. The active prepared spell of `player` is now `slot` (0 is A, 1 is B). Sent when the wizard appears and after every swap, so the HUD shows which spell `cast` fires.
-signal active_spell_changed(player: int, slot: int)
 ## Sender: player. The component ids `player` may build with, in registry order. Sent when the wizard appears and whenever the bag changes.
 signal bag_changed(player: int, bag: Array[StringName])
 ## Sender: player. The staff `staff` (0-3) of `player` was built or changed. `plan` holds plain values for the builder (the cards, the casts of its cycle, wasted cards with their reasons, the numbers), as `Spells.staff_view` gives them. Heard by hud.

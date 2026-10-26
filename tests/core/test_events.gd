@@ -12,8 +12,6 @@ const EventsScript := preload("res://core/events/events.gd")
 const EVENTS: Dictionary = {
 	# Player intent from the HUD.
 	&"play_requested": [["player", TYPE_INT]],
-	&"build_change_requested": [["player", TYPE_INT], ["spell", TYPE_PACKED_INT32_ARRAY], ["slot", TYPE_INT], ["component_id", TYPE_STRING_NAME]],
-	&"spell_swap_requested": [["player", TYPE_INT]],
 	&"staff_change_requested": [["player", TYPE_INT], ["staff", TYPE_INT], ["slot", TYPE_INT], ["card_id", TYPE_STRING_NAME]],
 	&"card_move_requested": [["player", TYPE_INT], ["from_staff", TYPE_INT], ["from_slot", TYPE_INT], ["to_staff", TYPE_INT], ["to_slot", TYPE_INT]],
 	&"reward_pick_requested": [["player", TYPE_INT], ["choice", TYPE_INT]],
@@ -30,10 +28,7 @@ const EVENTS: Dictionary = {
 	&"projectile_expired": [["player", TYPE_INT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT]],
 	&"form_shown": [["player", TYPE_INT], ["form", TYPE_STRING_NAME], ["origin", TYPE_VECTOR2], ["direction", TYPE_VECTOR2], ["length", TYPE_FLOAT], ["tint", TYPE_COLOR]],
 	&"combo_cast": [["player", TYPE_INT], ["combo_class", TYPE_STRING_NAME], ["origin", TYPE_VECTOR2], ["direction", TYPE_VECTOR2], ["tint", TYPE_COLOR]],
-	&"spell_changed": [["player", TYPE_INT], ["spell", TYPE_PACKED_INT32_ARRAY], ["description", TYPE_STRING]],
 	&"build_refused": [["player", TYPE_INT], ["reason", TYPE_STRING]],
-	&"recipe_changed": [["player", TYPE_INT], ["slot", TYPE_INT], ["recipe", TYPE_DICTIONARY]],
-	&"active_spell_changed": [["player", TYPE_INT], ["slot", TYPE_INT]],
 	&"bag_changed": [["player", TYPE_INT], ["bag", TYPE_ARRAY]],
 	&"reaction_triggered": [["player", TYPE_INT], ["reaction_id", TYPE_STRING_NAME], ["position", TYPE_VECTOR2]],
 	&"discharge_arc": [["player", TYPE_INT], ["from", TYPE_VECTOR2], ["to", TYPE_VECTOR2]],

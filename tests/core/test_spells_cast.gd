@@ -7,6 +7,7 @@ extends "res://tests/support/suite.gd"
 ##
 ## godot --headless --path . --script res://tests/core/test_spells_cast.gd
 
+const StaffKit := preload("res://tests/support/staff_kit.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
@@ -119,15 +120,17 @@ func _trigger(id: StringName, event: TriggerBase.Event, max_fires: int) -> Trigg
 	return trigger
 
 
+## The first carrier of the staff for `recipe` (the old recipe shape, see staff_kit.gd).
 func _compile(recipe: Dictionary) -> CompiledSpell:
-	var spell: CompiledSpell = _spells.compile(recipe)
-	check(spell.valid, "the recipe compiles: " + spell.reason)
+	var spell: CompiledSpell = StaffKit.first(_spells, StaffKit.cards(recipe))
+	check(spell != null, "the staff for %s casts" % [recipe])
 	return spell
 
 
-## Builds `recipe` into a slot and returns the tag of its cast.
-func _build(player: int, slot: int, recipe: Dictionary) -> int:
-	return _spells.install(player, slot, _compile(recipe))
+## Builds `recipe` into a staff and returns the tag of its first spell. A payload's spells have
+## the next nodes, so `current_tag(player, staff, 1)` is the first one.
+func _build(player: int, staff: int, recipe: Dictionary) -> int:
+	return StaffKit.build(_spells, player, staff, StaffKit.cards(recipe))
 
 
 func _held(form: StringName, trigger: StringName, held: StringName) -> Dictionary:
@@ -164,7 +167,7 @@ func _slots(tag: int = 0) -> Array[int]:
 
 
 func _cast(player: int, slot: int = 0, mana: float = 10.0, origin: Vector2 = Vector2.ZERO, direction: Vector2 = Vector2.RIGHT) -> float:
-	return _spells.cast(player, slot, origin, direction, mana)
+	return _spells.cast_staff(player, slot, origin, direction, mana)
 
 
 func test_a_cast_spends_mana_then_cools_down() -> void:
@@ -312,7 +315,7 @@ func test_a_combination_announces_its_class_for_looks() -> void:
 	check_equal(_spells.combo_class(null), &"", "no spell, no class")
 	seen.clear()
 	_build(1, 0, {"form": &"bolt", "modifiers": [&"pierce"]})
-	_spells.cast(1, 0, Vector2.ZERO, Vector2.ZERO, 10.0)
+	_spells.cast_staff(1, 0, Vector2.ZERO, Vector2.ZERO, 10.0)
 	check_equal(seen.size(), 0, "a refused cast announces nothing")
 
 
@@ -333,7 +336,7 @@ func test_on_hit_fires_the_held_spell_from_the_hit_point_along_the_shot() -> voi
 	check_equal(_hits.size(), 1, "the first shot hit once")
 	check_equal(_mgr.get_count(), 1, "and was replaced by the held shot")
 	var held: int = _slots()[0]
-	check_equal(SpellTag.depth_of(_mgr.get_tag_of(held)), 1, "the held shot carries a depth 1 tag")
+	check_equal(SpellTag.node_of(_mgr.get_tag_of(held)), 1, "the payload shot carries node 1's tag")
 	check(_mgr.get_velocity_of(held).normalized().is_equal_approx(Vector2.RIGHT), "it flies the way the first one did")
 	var hit_at: Vector2 = _hits[0][2]
 	check(_mgr.get_position_of(held).x >= hit_at.x, "it started at the hit point")
@@ -364,7 +367,7 @@ func test_on_expire_fires_where_the_shot_ended() -> void:
 	_tick(6)
 	var shots: Array[int] = _slots()
 	check_equal(shots.size(), 1, "the first shot is gone, its held spell flies")
-	check_equal(SpellTag.depth_of(_mgr.get_tag_of(shots[0])), 1, "at depth 1")
+	check_equal(SpellTag.node_of(_mgr.get_tag_of(shots[0])), 1, "at node 1")
 	check(_mgr.get_position_of(shots[0]).x > 25.0, "from where the first one ended")
 
 
@@ -478,10 +481,10 @@ func test_a_beam_makes_all_six_jumps() -> void:
 		line.append(_target(Vector2(60 + 40 * i, 0)))
 	var recipe: Dictionary = {"form": &"beam", "modifiers": [&"chain", &"chain", &"chain"]}
 	var spell: CompiledSpell = _compile(recipe)
-	check_equal(spell.chain_jumps, SpellLimits.MAX_CHAIN_JUMPS, "three chain runes give the most jumps")
+	check_equal(spell.chain_jumps, 6, "three chain runes give the most jumps")
 	_build(0, 0, recipe)
 	_cast(0)
-	check_equal(_hits.size(), SpellLimits.MAX_CHAIN_JUMPS + 1, "the beam and all six jumps hit, deeper than the ray nesting limit")
+	check_equal(_hits.size(), 6 + 1, "the beam and all six jumps hit, deeper than the ray nesting limit")
 	for i in 7:
 		check_equal(_hits[i][1], line[i], "target %d was hit in order" % i)
 	check_equal(_spells.live_shots(_spells.current_tag(0, 0, 0)), 0, "every beam was counted as ended")

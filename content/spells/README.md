@@ -2,16 +2,16 @@
 
 ## Purpose
 
-Since the staffs rework (docs/milestones/M2-staffs.md) these are **cards** that players place in their staffs in any order; a fifth kind, **multicast** (`MulticastBase`, `multicasts/`), pulls more carriers into one cast. The rest of this README still describes the first design until staffs part A6c rewrites it. The spell components that players assemble into spells: **forms** (bolt, beam, nova, rune, orbit), **elements** (fire, frost, storm, void, lightning), **modifiers** (split, pierce, homing, chain, bigger, faster) and **triggers** (on hit, on expire, timer). A spell is built as form → element → up to three modifiers → trigger, and a trigger holds another spell, built from the same slots. Few components, many combinations: this is the game's first pillar (docs/DESIGN.md).
+The **cards** players put in their staffs, in any order, and that a staff reads left to right (docs/milestones/M2-staffs.md, "Reading a staff"): **carriers** (`forms/`: bolt, beam, nova, rune, orbit, dash), what leaves the caster and ends a group; **modifiers** (`modifiers/`: split, pierce, homing, chain, bigger, faster) and **infusions** (`elements/`: fire, frost, storm, void, lightning), which change the next carrier (or land on the caster when none follows); **triggers** (`triggers/`: on hit, on expire, timer), which make the group read after the next carrier its payload; and **multicast** (`multicasts/`), which pulls more carriers into one group. Every arrangement is legal; there is no budget. Few cards, many combinations: this is the game's first pillar (docs/DESIGN.md). The class names (`FormBase`, `ElementBase`) and kinds (`form`, `element`) stay from the first design.
 
-**Built in M2** (Spell system, see docs/milestones/M2-spell-system.md). All four kinds, the validator and the combo test exist since part 15. The component icons are placeholders until the art pass (part 26).
+**Built in M2**, reworked by the staffs pivot (docs/milestones/M2-staffs.md). The new cards come one PR each (staffs phase C). The card icons are placeholders until the art pass.
 
 ## Contract
 
-- A component is one folder, named like its `id`, holding a `.tres` on one of the four classes in `core/base/` (`FormBase`, `ElementBase`, `ModifierBase`, `TriggerBase`, all on `SpellComponent`), a 16×16 icon, and optionally a `.gd` or an SFX. **Most components need no script:** the fields below can express them. Write a `.gd` only for behaviour no field can say.
+- A card is one folder, named like its `id`, holding a `.tres` on one of the five classes in `core/base/` (`FormBase`, `ElementBase`, `ModifierBase`, `TriggerBase`, `MulticastBase`, all on `SpellComponent`), a 16×16 icon, and optionally a `.gd` or an SFX. **Most components need no script:** the fields below can express them. Write a `.gd` only for behaviour no field can say.
 - Content is discovered by folder through `core/registry`. Do not edit any central list.
 - Components depend only on `core/`. They never call other areas; they talk through `core/` events. Every effect takes a player index 0–3; nothing assumes a single player.
-- Players, bots and the HUD never read a component's fields. They call `Spells` (compile, cast) and answer to its events; `tests/core/test_spell_field_reads.gd` fails if a script outside `content/spells/`, `core/base/` and `core/spells/` reads one.
+- Players, bots and the HUD never read a component's fields. They call `Spells` (`compile_staff`, `install_staff`, `cast_staff`, `staff_view`) and answer to its events; `tests/core/test_spell_field_reads.gd` fails if a script outside `content/spells/`, `core/base/` and `core/spells/` reads one.
 - Spawn shots only through the projectile manager (`core/projectiles`); no per-frame allocations.
 - Names are original. No names from other works (write Fireball, not Hadouken).
 
@@ -25,16 +25,17 @@ The script of each class documents every field, and its `ranges()` holds the all
 
 | Kind | Fields (range) |
 | --- | --- |
-| Form (`FormBase`) | `base_damage` 1–200, `mana_cost` 0–100, `cooldown` 0.05–10 s, `speed` 0–2000 px/s, `lifetime` 0.05–20 s, `radius` 1–64 px, `shots` 1–24, `spread` 0–360°, `motion` (STRAIGHT, STILL, ORBIT, RAY), `pierce` 0–16, `orbit_radius` 0–256 px (ORBIT), `ray_length` 0–1024 px (RAY) |
+| Form (`FormBase`, a carrier) | `base_damage` 1–200, `mana_cost` 0–100, `cooldown` 0.05–10 s (what the carrier adds to its staff's delay), `speed` 0–2000 px/s, `lifetime` 0.05–20 s, `radius` 1–64 px, `shots` 1–24, `spread` 0–360°, `motion` (STRAIGHT, STILL, ORBIT, RAY, DASH, and the staffs carriers TELEPORT to FAMILIAR, each run by its kit), `pierce` 0–16, `orbit_radius` 0–256 px (ORBIT), `ray_length` 0–1024 px (RAY) |
 | Element (`ElementBase`) | `status_id` (a status combat knows: burn, chill, shock, hex, static), `status_duration` 0–30 s, `status_strength` 0–100, `damage_scale` 0.1–4, `tint` (a palette colour from docs/STYLE.md; the validator does not check it, reviewers do), `shape` 0–5 (0 the plain sprite, 1 flame, 2 star, 3 zigzag, 4 ring, 5 forked arc: the silhouette, animation and trail of its shots, drawn by `core/projectiles/shot_core.gdshader`; each element needs a shape of its own so it reads without colour) |
-| Modifier (`ModifierBase`) | `damage_mult` 0.1–4, `speed_mult` 0.1–4, `radius_mult` 0.25–4, `cooldown_mult` 0.1–4, `mana_mult` 0.1–4, `shot_mult` 1–8, `extra_pierce` 0–8, `behaviour` (NONE, HOMING, CHAIN), `behaviour_strength` 0–32 (turn rate for homing, jumps for chain) |
-| Trigger (`TriggerBase`) | `event` (HIT, EXPIRE, TIMER), `interval` 0–10 s (TIMER), `max_fires` 1–4 |
+| Modifier (`ModifierBase`) | `damage_mult` 0.1–4, `speed_mult` 0.1–4, `radius_mult` 0.25–4, `cooldown_mult` 0.1–4, `mana_mult` 0.1–4, `shot_mult` 1–8, `extra_pierce` 0–8, `behaviour` (NONE, HOMING, CHAIN, and the staffs behaviours SHIELD to RELAY, each documented in `modifier_base.gd` with what its strength means), `behaviour_strength` 0–256 |
+| Trigger (`TriggerBase`) | `event` (HIT, EXPIRE, TIMER, and BLOCK to ALLY), `interval` 0–10 s (TIMER), `max_fires` 1–4 |
+| Multicast (`MulticastBase`) | `extra_draws` 0–4, `mode` (TOGETHER, SCATTER, BURST), `repeats` 1–8, `repeat_interval` 0–1 s, `mana_cost` 0–100, `cooldown` 0–2 s |
 
-Multipliers multiply the form's numbers and adds are added, in slot order. There is no cast time: the cooldown is the cast time.
+Multipliers multiply the carrier's numbers and adds are added, in slot order. There is no cast time: a cast's delay is its staff's delay plus every carrier's cooldown.
 
-### Complexity
+### No budget, engine safeguards only
 
-Every component costs `complexity` (1–4) from a budget of **12 per spell, counting the spell its trigger holds**. The compiler refuses a spell over the budget, with a reason. Shots, speed, radius, pierce and cooldown are also clamped to the limits in `core/spells/limits.gd` (at most 24 shots, 3 modifiers, trigger depth 2). These are performance limits, so a component cannot lift them. Price a component by its power: the shipped ones cost forms 1–2 (bolt 1, the rest 2), elements 1, modifiers 1–2 (split, homing and chain 2) and triggers 1–2 (timer 2). A component stronger than its neighbours costs more; one that makes another obsolete needs a rebalance, not an addition.
+There is no complexity budget and no build limit: a staff may hold any cards in any order, as many modifiers and as deep payloads as its slots allow, and the compiled numbers are not clamped. `complexity` (1–4) stays on every card as a rough measure of its power (the validator keeps it in range). What stays are the engine safeguards in `core/spells/limits.gd` and the projectile pool, which never change a build. Price a card by its mana and cooldown: a card stronger than its neighbours costs more; one that makes another obsolete needs a rebalance, not an addition.
 
 ### Reactions
 
@@ -60,7 +61,7 @@ These steps are not new files only (the report of #243, the fifth element):
 ## Steps
 
 1. Copy the example folder of the same kind into `forms/`, `elements/`, `modifiers/` or `triggers/` and rename the folder.
-2. Edit the `.tres`: `id` (equal to the folder), `display_name`, `complexity` and the numbers. Write a `.gd` only if the behaviour is new.
+2. Edit the `.tres`: `id` (equal to the folder), `display_name`, `complexity` (a rough measure, 1–4) and the numbers. Write a `.gd` only if the behaviour is new.
 3. Replace the icon (16×16, palette from docs/STYLE.md) and the optional SFX. List each in an `assets.json` in the component's folder, in the same shape as `art/manifest.json` (`{"assets": [{"path": "content/spells/...", "origin": ..., "author": ..., "license": ...}]}`; for AI also tool and prompt). The validator and the art test read `art/manifest.json`, `audio/manifest.json` and every `assets.json`. Commit the `.uid` and `.import` files Godot creates.
 4. If it interacts with other elements, add the rows to `reactions.tres`, then the colour of each new reaction id (and optionally its `reaction_power`) to the Feel preset (see Reactions above).
 5. Add its two combo files to `combos/` (the combo test fails until the component is in two).
@@ -90,6 +91,6 @@ The registry's check in debug builds and `tests/content/spells/test_validators.g
 Besides the general review (bugs, edge cases, 1–4 players, performance, clarity, fun):
 
 - Does it create creative, surprising interactions with existing components?
-- Is its power in line with its complexity cost (power budget)?
+- Is its power in line with its mana and cooldown?
 - Does it avoid making another component obsolete?
 - Does it come with a combo row that works?

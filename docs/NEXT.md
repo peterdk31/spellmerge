@@ -1,17 +1,73 @@
 # Next
 
-The ordered task queue for the current milestone, M2 (its design, [M2-spell-system.md](milestones/M2-spell-system.md), is the plan for every task below: the component fields, the runtime in `core/spells/`, tags, limits, the builder rules and the combo catalogue). M1's open items carry over (its "Carried over from M1" section). The first unchecked task under "Queue" is next. Bug reports go above features. Each task is one session and one PR; a session that runs short stops at a task boundary and writes what is left as a new task here. Claude keeps this file up to date; only tasks in paths Claude may change belong here (docs/PLAN.md, "Path tiers").
+The ordered task queue for the current milestone, M2, now in its **staffs rework** (the owner's pivot at C2, #264). Its design, [M2-staffs.md](milestones/M2-staffs.md), is the plan for every task below: the cards, the reading rules, the staffs, self-harm, the look, the sandbox, the events, the tags and the parts. Each task names its part (A1–D3); the part's row in the design says what it delivers. Bug reports go above features. Each task is one session and one PR; a session that runs short stops at a task boundary and writes what is left as a new task here. Claude keeps this file up to date; only tasks in paths Claude may change belong here (docs/PLAN.md, "Path tiers").
+
+**Two lanes** (M2-staffs.md, "Working in parallel"). `## Queue` is the bot's: the first unchecked task there is next. `## Owner lane` is for the owner's own sessions, which run at the same time; the bot never takes a task from it. An owner session takes the first owner-lane task that no open PR names, opens a draft PR at once on a branch `owner/<task-slug>` with `Task: <task name>` in its body, and does not edit this file; the bot's planning session ticks the task off once that PR has merged. The owner moves tasks between the lanes. A task whose parts it needs have not merged yet answers `nothing_to_do` and waits.
 
 ## Queue
 
-M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97). Each task's details are the matching row and sections of the M2 design. Nothing from M3+ is built (rewards, relics, staffs, rooms, the door rule).
+M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97). The second C2 checkpoint (#264) was answered with **pivot** on 2026-10-26: spells are built in staffs (M2-staffs.md). Nothing from M3+ is built (rewards, relics, staff types, rooms, the door rule).
 
-M2's parts were all built and the owner answered the C2 checkpoint (#235) with **iterate** on 2026-10-25: rework in this order, #245 (clip recorder and Spell atlas), #244 (spell visuals), #243 (Lightning). The tasks below follow that order; the next end of M2 is a new C2 checkpoint. Done-when item 3 is still open on the real-GPU frame rate. Nothing from M3+ is started. `ci/` is owner-only: the owner built the pipeline side (#246); the Godot side of the recorder and the atlas data are built here, in the format `ci/smbot/clips.py` reads.
+- [ ] **The staff runtime (staffs A5).** (`core/spells/`) After A4. Additive: the recipe runtime stays until A6.
+- [ ] **The switch to staffs (staffs A6).** (`gameplay/player/`, `gameplay/flow/`, `hud/builder/`, `core/spells/`, `core/events/`, `tests/`, `content/spells/combos/`) After A5. Main must stay green: the old recipe path and the old events go in this same PR.
+- [ ] **Projectile kit (staffs B1).** (`core/projectiles/`) After A6.
+- [ ] **Trigger kit (staffs B2).** (`core/spells/`) After A6.
+- [ ] **Combat kit (staffs B3).** (`gameplay/combat/`, `gameplay/feel/` for the self-hit flash) After A6.
+- [ ] **Card: double (staffs C).** After A6.
+- [ ] **Card: triple (staffs C).** After A6.
+- [ ] **Card: overcharge (staffs C).** After A6.
+- [ ] **Card: mirror (staffs C).** After A6.
+- [ ] **Card: bounce (staffs C).** After B1.
+- [ ] **Card: ghost (staffs C).** After B1.
+- [ ] **Card: spiral (staffs C).** After B1.
+- [ ] **Card: boomerang (staffs C).** After B1.
+- [ ] **Card: linger (staffs C).** After B1.
+- [ ] **Card: growth (staffs C).** After B1.
+- [ ] **Card: magnet (staffs C).** After B1.
+- [ ] **Card: wall (staffs C).** After B1.
+- [ ] **Card: on cast (staffs C).** After B2.
+- [ ] **Card: on wall (staffs C).** After B2.
+- [ ] **Card: echo (staffs C).** After B2.
+- [ ] **Card: burst (staffs C).** After B2.
+- [ ] **Card: scatter (staffs C).** After B2.
+- [ ] **Card: rain (staffs C).** After B2.
+- [ ] **Card: fissure (staffs C).** After B2.
+- [ ] **Card: sticky (staffs C).** After B1 and B2.
+- [ ] **Card: relay (staffs C).** After B1 and B2.
+- [ ] **Card: on ally (staffs C).** After B1 and B2.
+- [ ] **Card: shield (staffs C).** After B1 and B3.
+- [ ] **Card: heavy (staffs C).** After B1 and B3.
+- [ ] **Card: blast (staffs C).** After B3.
+- [ ] **Card: mend (staffs C).** After B3.
+- [ ] **Card: on block (staffs C).** After B2 and B3.
+- [ ] **Card: on kill (staffs C).** After B2 and B3.
+- [ ] **Card: on hurt (staffs C).** After B2 and B3.
+- [ ] **Card: on reaction (staffs C).** After B2 and B3.
+- [ ] **Card: hold (staffs C).** After B2 and B3 (also needs B4's mana reservations).
+- [ ] **Card: siphon (staffs C).** After B2 and B3.
+- [ ] **The existing cards' looks and numbers (staffs C0).** (`content/spells/`) After B6.
+- [ ] **Bots and the emergent combo report (staffs D1).** (`tests/bots/`, `docs/LOG.md`) After A6; the report gets richer as cards land.
+- [ ] **Stress and C2 (staffs D3).** Last: when every other task in both lanes has merged. Then the C2 checkpoint, with the owner's sandbox playtest on `/preview/`.
 
-M2's rework is done: every iterate task is built (see Done recently). The ROADMAP row reads "In progress, all tasks done, waiting for the checkpoint" (the site parser needs "In progress"). Development waits for the owner's verdict. Do not write M3 tasks before a `go`.
+## Owner lane
 
-- [ ] **Spell visuals round 2, part 2: a burst for each multi-component combo (#244, p2).** (`gameplay/feel/`, `content/spells/combos.json`) Part 1 marks the class of a cast; this gives the rows that combine several components (held-spell payoffs, trigger chains, reaction combos) a release burst of their own where the held spell fires, data-driven in the Feel preset by combo id or class, within `PARTICLE_LIMIT` and the pools. Proof: clips `combo_*` and a sheet, at 1x, with four players in frame. Also per-element hit sparks (the owner's "particles carry the identity") and the combo class shown in the Spell atlas data (`tools/atlas.py`).
-- [ ] **Open the C2 checkpoint issue (second round).** Text: `docs/milestones/M2-spell-system.md`, "Checkpoint C2, second round" (recommendation: go, conditional on item 3; it now also holds the render-resolution question). Remove this task once the issue exists, then wait 7 days; without an answer, default to iterate.
+For the owner's sessions (see the top of this file). Phase A runs one PR at a time; the owner session that wrote the design does A2–A4 before the bot starts.
+
+- [ ] **Shared files split (staffs A2).** (`content/spells/combos/`, `core/spells/validator.gd`, `tests/`, `tools/atlas.py`, READMEs) Owner session, 2026-10-26.
+- [ ] **Card and staff classes, events (staffs A3).** (`core/base/`, `core/events/`, `content/wizard/staffs/`) Owner session, 2026-10-26.
+- [ ] **The staff compiler (staffs A4).** (`core/spells/`) Owner session, 2026-10-26.
+- [ ] **Caster kit (staffs B4).** (`gameplay/player/`) After A6.
+- [ ] **Entity kit (staffs B5).** (`gameplay/ai/`) After A6.
+- [ ] **Shot look (staffs B6).** (`core/projectiles/` drawing, `art/vfx/`) After A6; before B7.
+- [ ] **Sandbox (staffs B7).** (`gameplay/flow/`, `content/rooms/`, `hud/menus/`) After B6.
+- [ ] **Builder (staffs B8).** (`hud/builder/`) After A6.
+- [ ] **Card: teleport (staffs C).** After B4.
+- [ ] **Card: hook (staffs C).** After B4.
+- [ ] **Card: swap (staffs C).** After B4.
+- [ ] **Card: recoil (staffs C).** After B4.
+- [ ] **Card: decoy (staffs C).** After B5.
+- [ ] **Card: familiar (staffs C).** After B5.
+- [ ] **Staff codes (staffs D2).** (`hud/`, `core/spells/`) After B7 and B8.
 
 ## Blocked
 

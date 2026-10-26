@@ -2,6 +2,23 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-26: Pivot at C2: spells are built in staffs
+
+**Decided by:** the owner, in an owner session over six rounds of planning (answer to #264: pivot). The design is `docs/milestones/M2-staffs.md`; the owner's DESIGN.md rows changed with it.
+
+- **Why:** the builder was hard to use, the form → element → modifiers → trigger template locked builds out, and the only way to deepen builds was more components. The owner wants players to find interactions nobody designed.
+- **Staffs, cards read in order** (Magicraft and Noita as references): four staffs per wizard, one per button (A, X, Y, B), so there is no built-in dodge or attack; the A staff starts with `dash`. Cards attach to the next carrier, or to the caster when none follows (owner: "if build without a projectile, it will explode on the caster"). Wrap-around is on; each card is read once per cast, which is what keeps every staff's cycle finite.
+- **No build limits** (owner: "Lets disable the hard limits for now. They can be added later if we want to / need to"). The projectile pool stays: it is the pre-allocated buffer every shot lives in, not a build rule, and it drops the oldest shot when full. The stress benchmark and the emergent combo report say when a limit is needed.
+- **The dash has no invulnerable window;** protection is built (`shield · dash`), and shield charges stack (owner).
+- **Self-harm always on;** hit kinds exist so relics (M3) can grant immunities, for example to explosions (owner).
+- **One mana pool per wizard;** sustained cards reserve mana (owner).
+- **The input buffer applies to every staff button,** not to the dash alone (owner).
+- **Smaller shots with layered looks** (owner: "they are way too big"; "apply eg. electricity to one, which makes it emit sparks").
+- **`dev` and `preview` builds are a sandbox** with 20-slot staffs (one field, easy to change), the full bag and a training dummy; building is possible at any time there (owner).
+- **The builder may scroll** where that makes it easier to use; it is not a requirement (owner).
+- **All 39 new cards are in scope**, including the second batch of ideas (owner: "All of them"), and the card batches do not wait for an owner playtest between them (owner: "no need to wait for my input").
+- **Two lanes in `docs/NEXT.md`:** the owner runs external sessions in parallel with the bot. The bot reads only `## Queue` (`ci/smbot/nexttask.py`), so an `## Owner lane` section needs no change in `ci/`. Shared lists (combos, the asset manifests) are split per file first, and kits come before cards, so card PRs touch only their own files.
+
 ## 2026-10-26: Spell visuals round 2, part 1: bolt size, trails, combo marks (#244, p2)
 
 - **Why:** the owner found the shaped bodies too big (the earlier coloured bolts were better, with particles for the element or type) and asked for many more, clearer animations for combined spells.

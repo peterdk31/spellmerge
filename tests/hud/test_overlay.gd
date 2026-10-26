@@ -74,7 +74,7 @@ func _setup(count: int) -> void:
 	_focus.input = _input
 	_focus.events = _bus
 	_focus._ready()
-	_bus.build_change_requested.connect(_on_build_change_requested)
+	_bus.staff_change_requested.connect(_on_staff_change_requested)
 	for index in count:
 		_input.add_virtual_device(index)
 		var player := PlayerScript.new()
@@ -108,8 +108,8 @@ func _teardown() -> void:
 	_bus = null
 
 
-func _on_build_change_requested(player: int, spell: PackedInt32Array, slot: int, component_id: StringName) -> void:
-	_requests.append([player, slot, component_id, spell])
+func _on_staff_change_requested(player: int, staff: int, slot: int, card_id: StringName) -> void:
+	_requests.append([player, slot, card_id, staff])
 
 
 func _tap(player: int, action: StringName) -> void:

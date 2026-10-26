@@ -1372,7 +1372,7 @@ func remove_by_tag(tag: int) -> int:
 	return removed
 
 
-## Keep the shot in `slot` from hitting `node` for `seconds` (a held spell must not hit the
+## Keep the shot in `slot` from hitting `node` for `seconds` (a payload must not hit the
 ## target that fired it). One target per shot; a later call replaces it.
 func exclude(slot: int, node: Node, seconds: float) -> void:
 	if slot >= 0 and slot < _cap and _alive[slot] != 0 and node != null:

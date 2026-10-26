@@ -6,6 +6,7 @@ extends "res://tests/support/suite.gd"
 ##
 ## godot --headless --path . --script res://tests/gameplay/combat/test_combat_statuses.gd
 
+const StaffKit := preload("res://tests/support/staff_kit.gd")
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
@@ -75,7 +76,7 @@ func _tag(player: int, element: StringName) -> int:
 	var recipe: Dictionary = {"form": &"bolt"}
 	if element != &"":
 		recipe["element"] = element
-	return _spells.install(player, 0, _spells.compile(recipe))
+	return StaffKit.build(_spells, player, 0, StaffKit.cards(recipe))
 
 
 ## A shot of `tag` from `player` hits `enemy` from the left.

@@ -7,6 +7,7 @@ extends "res://tests/support/suite.gd"
 ##
 ## godot --headless --path . --script res://tests/content/spells/test_forms.gd
 
+const StaffKit := preload("res://tests/support/staff_kit.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
@@ -59,14 +60,13 @@ func _tick(steps: int, anchors: Dictionary = {}) -> void:
 		_spells.step(DT)
 
 
-## Builds a bare `form` into slot A of `player` and casts it from `origin` toward `direction`.
+## Builds a bare `form` into staff A of `player` and casts it from `origin` toward `direction`.
 func _cast(form: StringName, player: int, origin: Vector2, direction: Vector2 = Vector2.RIGHT) -> int:
-	var spell: CompiledSpell = _spells.compile({"form": form})
-	check(spell.valid, "%s compiles: %s" % [form, spell.reason])
-	var tag: int = _spells.install(player, 0, spell)
+	var tag: int = StaffKit.build(_spells, player, 0, [form] as Array[StringName])
+	check(tag != 0, "%s builds" % form)
 	# An orbit needs its caster's anchor; the player pushes it every step.
 	_mgr.set_anchor(player, origin)
-	check(_spells.cast(player, 0, origin, direction, 100.0) != SpellsScript.REFUSED, "%s is cast" % form)
+	check(_spells.cast_staff(player, 0, origin, direction, 100.0) != SpellsScript.REFUSED, "%s is cast" % form)
 	return tag
 
 
@@ -172,13 +172,13 @@ func test_the_beam_hits_along_a_line_up_to_its_reach_at_once() -> void:
 
 func test_a_held_beam_hits_one_enemy_four_times_a_second_and_drains_mana_steadily() -> void:
 	_target(Vector2(60.0, 0.0))
-	var spell: CompiledSpell = _spells.compile({"form": &"beam"})
-	_spells.install(0, 0, spell)
+	StaffKit.build(_spells, 0, 0, [&"beam"] as Array[StringName])
+	var spell: CompiledSpell = StaffKit.first(_spells, [&"beam"] as Array[StringName])
 	var mana: float = 100.0
 	var casts: int = 0
 	# Fire is held for 2 seconds: the player casts whenever the cooldown allows.
 	for i in 120:
-		var taken: float = _spells.cast(0, 0, Vector2.ZERO, Vector2.RIGHT, mana)
+		var taken: float = _spells.cast_staff(0, 0, Vector2.ZERO, Vector2.RIGHT, mana)
 		if taken != SpellsScript.REFUSED:
 			mana -= taken
 			casts += 1

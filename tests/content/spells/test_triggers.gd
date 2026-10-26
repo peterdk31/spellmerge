@@ -8,6 +8,7 @@ extends "res://tests/support/suite.gd"
 ##
 ## godot --headless --path . --script res://tests/content/spells/test_triggers.gd
 
+const StaffKit := preload("res://tests/support/staff_kit.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
@@ -64,16 +65,18 @@ func _tick(steps: int) -> void:
 		_spells.step(DT)
 
 
+## The first carrier of the staff for `recipe` (the old recipe shape, see staff_kit.gd).
 func _compile(recipe: Dictionary) -> CompiledSpell:
-	var spell: CompiledSpell = _spells.compile(recipe)
-	check(spell.valid, "the recipe compiles: " + spell.reason)
+	var spell: CompiledSpell = StaffKit.first(_spells, StaffKit.cards(recipe))
+	check(spell != null, "the staff for %s casts" % [recipe])
 	return spell
 
 
-## Builds `recipe` into a slot and casts it from `origin` toward +x. Returns the cast's tag.
-func _build_and_cast(player: int, slot: int, recipe: Dictionary, origin: Vector2 = Vector2.ZERO) -> int:
-	var tag: int = _spells.install(player, slot, _compile(recipe))
-	check(_spells.cast(player, slot, origin, Vector2.RIGHT, 100.0) != SpellsScript.REFUSED, "%s is cast" % [recipe])
+## Builds `recipe` into a staff and casts it from `origin` toward +x. Returns the cast's tag. A
+## payload's spells have the next nodes, so `current_tag(player, staff, 1)` is the first one.
+func _build_and_cast(player: int, staff: int, recipe: Dictionary, origin: Vector2 = Vector2.ZERO) -> int:
+	var tag: int = StaffKit.build(_spells, player, staff, StaffKit.cards(recipe))
+	check(_spells.cast_staff(player, staff, origin, Vector2.RIGHT, 100.0) != SpellsScript.REFUSED, "%s is cast" % [recipe])
 	return tag
 
 
@@ -111,7 +114,7 @@ func test_every_trigger_loads_and_matches_its_folder() -> void:
 func test_the_timer_waits_half_a_second_and_fires_at_most_four_times() -> void:
 	var timer: TriggerBase = _trigger(&"timer")
 	check_equal(timer.interval, 0.5, "the timer fires every half second")
-	check_equal(timer.max_fires, SpellLimits.MAX_TIMER_FIRES, "and at most the timer limit")
+	check_equal(timer.max_fires, 4, "and at most four times (its own number; there is no build limit)")
 	check_equal(_trigger(&"on_hit").max_fires, 1, "on hit fires once per shot")
 	check_equal(_trigger(&"on_expire").max_fires, 1, "on expire fires once per shot")
 
@@ -142,14 +145,13 @@ func test_a_trigger_compiles_into_the_spell_numbers() -> void:
 		check_equal(spell.trigger_event, trigger.event, "%s: the event is compiled" % id)
 		check_equal(spell.trigger_interval, trigger.interval, "%s: the interval is compiled" % id)
 		check_equal(spell.trigger_max_fires, trigger.max_fires, "%s: max_fires is compiled" % id)
-		check(spell.held != null, "%s: the held spell is kept" % id)
-		# bolt 1 + trigger + nova 2
-		check_equal(spell.complexity, 3 + COMPLEXITY[id], "%s: the complexity counts the trigger and the held spell" % id)
+		check(spell.payload != null and spell.payload.spells[0].form_id == &"nova", "%s: the payload is the nova" % id)
 
 
-func test_a_trigger_needs_a_held_spell_and_the_other_way_round() -> void:
-	check(not _spells.compile({"form": &"bolt", "held": {"form": &"nova"}}).valid, "a held spell without a trigger is refused")
-	check(_spells.compile({"form": &"bolt", "trigger": &"on_hit"}).valid, "a trigger with nothing held is fine (the builder fills it later)")
+func test_a_trigger_with_nothing_after_its_carrier_is_wasted() -> void:
+	var staff: CompiledStaff = StaffKit.compile(_spells, [&"on_hit", &"bolt"] as Array[StringName])
+	check(staff.casts[0].group.spells[0].payload == null, "nothing to fire")
+	check(staff.wasted.has(0), "the trigger is wasted, not refused")
 
 
 # --- On hit -----------------------------------------------------------------
@@ -161,11 +163,11 @@ func test_on_hit_fires_the_held_spell_from_the_hit_point() -> void:
 	var held_tag: int = _spells.current_tag(0, 0, 1)
 	var bolt_hits: int = 0
 	for hit: Array in _hits:
-		if SpellTag.depth_of(hit[3] as int) == 0:
+		if SpellTag.node_of(hit[3] as int) == 0:
 			bolt_hits += 1
 	check_equal(bolt_hits, 1, "the bolt hit once")
 	check_equal(_born(held_tag), 8, "and its nova of eight was born")
-	check_equal(SpellTag.depth_of(held_tag), 1, "at depth 1")
+	check_equal(SpellTag.node_of(held_tag), 1, "at node 1")
 	var hit_at: Vector2 = _hits[0][2]
 	check(hit_at.x > 50.0 and hit_at.x < 90.0, "the hit was on the target")
 
@@ -184,7 +186,7 @@ func test_on_hit_fires_once_per_shot_even_through_a_pierce() -> void:
 	_tick(60)
 	var from_pierce: int = 0
 	for hit: Array in _hits:
-		if SpellTag.depth_of(hit[3] as int) == 0:
+		if SpellTag.node_of(hit[3] as int) == 0:
 			from_pierce += 1
 	check(from_pierce >= 2, "the pierce bolt hit more than one target")
 	check_equal(_born(_spells.current_tag(0, 0, 1)), 1, "but fired its held spell once (max_fires 1)")
@@ -273,7 +275,7 @@ func test_a_spell_three_levels_deep_fires_all_the_way_down() -> void:
 		"held": {"form": &"nova", "trigger": &"on_hit", "held": {"form": &"bolt"}},
 	}
 	var spell: CompiledSpell = _compile(recipe)
-	check_equal(spell.complexity, 1 + 1 + 2 + 1 + 1, "bolt, on hit, nova, on hit, bolt")
+	check_equal(spell.chain_length(), 3, "bolt, on hit, nova, on hit, bolt: three spells deep")
 	_build_and_cast(0, 0, recipe)
 	_tick(90)
 	var depth_1: int = _born(_spells.current_tag(0, 0, 1))
@@ -281,21 +283,16 @@ func test_a_spell_three_levels_deep_fires_all_the_way_down() -> void:
 	check_equal(depth_1, 8, "the nova of depth 1 was born")
 	check(depth_2 >= 1, "and at least one bolt of depth 2 after it: %d" % depth_2)
 	check(depth_2 <= 8, "no more than one per nova shot (max_fires 1): %d" % depth_2)
-	check_equal(SpellTag.depth_of(_spells.current_tag(0, 0, 2)), 2, "the last level is depth 2")
+	check_equal(SpellTag.node_of(_spells.current_tag(0, 0, 2)), 2, "the last level is depth 2")
 
 
-func test_one_level_deeper_is_refused() -> void:
-	var too_deep: Dictionary = {
+func test_payloads_nest_as_deep_as_the_cards_go() -> void:
+	var deep: Dictionary = {
 		"form": &"bolt", "trigger": &"on_hit",
 		"held": {"form": &"bolt", "trigger": &"on_expire", "held": {"form": &"bolt", "trigger": &"timer", "held": {"form": &"bolt"}}},
 	}
-	var spell: CompiledSpell = _spells.compile(too_deep)
-	check(not spell.valid, "a fourth level is refused")
-	check(spell.reason != "", "with a reason: " + spell.reason)
-	var deepest: Dictionary = (too_deep["held"] as Dictionary)["held"] as Dictionary
-	deepest.erase("trigger")
-	deepest.erase("held")
-	check(_spells.compile(too_deep).valid, "three levels are fine")
+	var spell: CompiledSpell = _compile(deep)
+	check(spell != null and spell.chain_length() == 4, "four levels compile: there is no depth limit any more")
 
 
 func test_the_three_triggers_mix_at_three_levels() -> void:
@@ -319,7 +316,7 @@ func test_the_three_triggers_mix_at_three_levels() -> void:
 func test_the_fire_cap_holds_with_the_real_triggers() -> void:
 	for n in 24:
 		_target(Vector2.from_angle(TAU * n / 24.0) * 40.0, 3.0)
-	var hold: Dictionary = {"form": &"nova", "modifiers": [&"split", &"split"], "trigger": &"on_hit", "held": {"form": &"bolt"}}
+	var hold: Dictionary = {"form": &"nova", "modifiers": [&"split"], "trigger": &"on_hit", "held": {"form": &"bolt"}}
 	check_equal(_compile(hold).shots, 24, "the nova is 24 shots")
 	_build_and_cast(0, 0, hold)
 	_build_and_cast(0, 1, hold)

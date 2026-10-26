@@ -8,6 +8,7 @@ extends "res://tests/support/suite.gd"
 ##
 ## godot --headless --path . --script res://tests/content/spells/test_modifiers.gd
 
+const StaffKit := preload("res://tests/support/staff_kit.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
@@ -58,16 +59,23 @@ func _tick(steps: int) -> void:
 		_spells.step(DT)
 
 
+## The modifiers before the form: one carrier with all of them (staffs A6c).
+func _row(form: StringName, modifiers: Array[StringName]) -> Array[StringName]:
+	var row: Array[StringName] = modifiers.duplicate()
+	row.append(form)
+	return row
+
+
 func _compile(form: StringName, modifiers: Array[StringName]) -> CompiledSpell:
-	var spell: CompiledSpell = _spells.compile({"form": form, "modifiers": modifiers})
-	check(spell.valid, "%s + %s compiles: %s" % [form, modifiers, spell.reason])
+	var spell: CompiledSpell = StaffKit.first(_spells, _row(form, modifiers))
+	check(spell != null, "%s + %s compiles" % [form, modifiers])
 	return spell
 
 
-## Builds `form` with `modifiers` into slot A of `player` and casts it from `origin`.
+## Builds `form` with `modifiers` into staff A of `player` and casts it from `origin`.
 func _cast(form: StringName, modifiers: Array[StringName], player: int, origin: Vector2, direction: Vector2 = Vector2.RIGHT) -> int:
-	var tag: int = _spells.install(player, 0, _compile(form, modifiers))
-	check(_spells.cast(player, 0, origin, direction, 100.0) != SpellsScript.REFUSED, "%s + %s is cast" % [form, modifiers])
+	var tag: int = StaffKit.build(_spells, player, 0, _row(form, modifiers))
+	check(_spells.cast_staff(player, 0, origin, direction, 100.0) != SpellsScript.REFUSED, "%s + %s is cast" % [form, modifiers])
 	return tag
 
 
@@ -165,10 +173,9 @@ func test_a_modifier_may_appear_twice_and_stacks() -> void:
 	check_equal(faster.speed, 220.0 * 1.5 * 1.5, "two faster modifiers multiply the speed")
 
 
-func test_three_complex_modifiers_still_fit_the_complexity_budget() -> void:
-	var spell: CompiledSpell = _spells.compile({"form": &"bolt", "modifiers": [&"split", &"homing", &"chain"]})
-	check(spell.valid, "bolt + split + homing + chain (complexity %d) fits: %s" % [spell.complexity, spell.reason])
-	check(spell.complexity <= SpellLimits.MAX_COMPLEXITY, "inside the budget")
+func test_many_modifiers_all_attach_to_one_carrier() -> void:
+	var spell: CompiledSpell = _compile(&"bolt", [&"split", &"homing", &"chain", &"pierce", &"bigger"])
+	check_equal(spell.modifier_ids.size(), 5, "no cap on modifiers: all five are on the bolt")
 
 
 # --- Split ------------------------------------------------------------------
@@ -196,10 +203,9 @@ func test_split_throws_a_fan_and_hits_three_targets_side_by_side() -> void:
 	check_equal(hit.size(), 3, "once each")
 
 
-func test_split_on_a_nova_stops_at_the_shot_limit() -> void:
+func test_split_on_a_nova_has_no_shot_limit() -> void:
 	var spell: CompiledSpell = _compile(&"nova", [&"split", &"split"])
-	check_equal(spell.shots, SpellLimits.MAX_SHOTS, "the shots are clamped")
-	check(spell.shots_clamped, "and the spell says so")
+	check_equal(spell.shots, _compile(&"nova", []).shots * 9, "every split multiplies: no build limit")
 
 
 # --- Pierce -----------------------------------------------------------------
@@ -292,9 +298,9 @@ func test_a_bare_bolt_does_not_chain() -> void:
 	check_equal(_hits.size(), 1, "one hit")
 
 
-func test_chain_compiles_to_two_jumps_and_stacks_to_the_limit() -> void:
+func test_chain_compiles_to_two_jumps_and_stacks() -> void:
 	check_equal(_compile(&"bolt", [&"chain"]).chain_jumps, 2, "two jumps")
-	check_equal(_compile(&"bolt", [&"chain", &"chain", &"chain"]).chain_jumps, SpellLimits.MAX_CHAIN_JUMPS, "three chains reach the limit")
+	check_equal(_compile(&"bolt", [&"chain", &"chain", &"chain", &"chain"]).chain_jumps, 8, "four chains jump eight times: no cap")
 
 
 # --- Bigger -----------------------------------------------------------------

@@ -20,7 +20,8 @@ extends Resource
 @export var demo: bool = false
 ## Name shown in the builder, for example "Frost". Original names only.
 @export var display_name: String = ""
-## What the component costs from the spell's complexity budget (1-4).
+## A rough measure of the card's power (1-4). There is no complexity budget since the staffs
+## rework; the validator still keeps it in range, and it may come back as a price.
 @export var complexity: int = 1
 ## The 16x16 icon shown in the builder.
 @export var icon: Texture2D

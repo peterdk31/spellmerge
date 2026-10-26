@@ -2,8 +2,8 @@ class_name SpellTag
 extends RefCounted
 ## The int `tag` every shot carries, which is how a hit finds its spell (staffs A5,
 ## docs/milestones/M2-staffs.md, "Tags"). It packs the player (0-3), the staff (0-3: the A, X,
-## Y and B buttons; a recipe's slot A and B are staffs 0 and 1), the node (0-511: the compiled
-## spell's index in its staff's cycle, `CompiledSpell.node`; a recipe's depth is its node) and a
+## Y and B buttons), the node (0-511: the compiled spell's index in its staff's cycle,
+## `CompiledSpell.node`) and a
 ## generation (0-7, a ring that advances on each build change of that staff). `FLAG` sits above
 ## every enemy attack tag of gameplay/ai (1,000 to 101,000), so the two never meet, and keeps
 ## every tag above 0, which means "no tag" to `gameplay/combat`.
@@ -53,12 +53,3 @@ static func generation_of(tag: int) -> int:
 ## The tag with its node cleared: one key for every spell of one generation of one staff.
 static func generation_key(tag: int) -> int:
 	return tag & ~(NODE_MASK << NODE_SHIFT)
-
-
-## The recipe runtime's names for `staff_of` and `node_of`; they go with it in staffs A6c.
-static func slot_of(tag: int) -> int:
-	return staff_of(tag)
-
-
-static func depth_of(tag: int) -> int:
-	return node_of(tag)

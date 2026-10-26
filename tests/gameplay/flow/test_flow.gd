@@ -167,12 +167,12 @@ func _test_cooldowns_reset_on_a_new_run() -> void:
 	_play()
 	var wizard := _flow.get_wizard(1) as PlayerScript
 	var at := Vector2(100.0, 100.0)
-	_check(_spells.cast(1, 0, at, Vector2.RIGHT, 100.0) != SpellsScript.REFUSED, "spell A fires for player 2")
-	_check(_spells.cast(1, 0, at, Vector2.RIGHT, 100.0) == SpellsScript.REFUSED, "spell A cools down for player 2")
-	_check(_spells.cast(1, 1, at, Vector2.RIGHT, 100.0) != SpellsScript.REFUSED, "spell B has its own cooldown")
+	_check(_spells.cast_staff(1, 1, at, Vector2.RIGHT, 100.0) != SpellsScript.REFUSED, "staff X fires for player 2")
+	_check(_spells.cast_staff(1, 1, at, Vector2.RIGHT, 100.0) == SpellsScript.REFUSED, "staff X waits out its delay for player 2")
+	_check(_spells.cast_staff(1, 0, at, Vector2.RIGHT, 100.0) != SpellsScript.REFUSED, "staff A has its own delay")
 	_flow.stop_run()
 	_play()
-	_check(_spells.cast(1, 0, at, Vector2.RIGHT, 100.0) != SpellsScript.REFUSED, "a new run forgot the cooldowns")
+	_check(_spells.cast_staff(1, 1, at, Vector2.RIGHT, 100.0) != SpellsScript.REFUSED, "a new run forgot the delays")
 	_check(wizard != null, "the wizard of player 2 existed")
 	_stop()
 
@@ -424,7 +424,7 @@ func _test_build_break_ignores_builders() -> void:
 		root.add_child(builder)
 		# The last player sits in a menu for the whole break.
 		_check(focus.call("open", count - 1, [builder] as Array[Control]) == true, "%d players: the last player opened a menu" % count)
-		_events.emit_signal("build_change_requested", count - 1, [0], 1, &"fire")
+		_events.emit_signal("staff_change_requested", count - 1, 2, 0, &"fire")
 		_flow.step(FlowScript.BUILD_BREAK - 0.1)
 		_check(focus.call("is_open", count - 1) == true, "%d players: the menu is still open late in the break" % count)
 		_check(_flow.wave == 1 and _flow.state == FlowScript.State.CLEARED, "%d players: the wave is not early while someone builds" % count)

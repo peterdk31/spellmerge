@@ -6,6 +6,7 @@ extends "res://tests/support/suite.gd"
 ##
 ## godot --headless --path . --script res://tests/gameplay/combat/test_combat_reactions.gd
 
+const StaffKit := preload("res://tests/support/staff_kit.gd")
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
@@ -72,7 +73,7 @@ func _enemy(at: Vector2 = Vector2.ZERO, health: int = 100) -> Node2D:
 
 
 func _tag(player: int, element: StringName) -> int:
-	return _spells.install(player, 0, _spells.compile({"form": &"bolt", "element": element}))
+	return StaffKit.build(_spells, player, 0, [element, &"bolt"] as Array[StringName])
 
 
 ## A shot of `element` from `player` hits `enemy` from the left.
@@ -325,7 +326,7 @@ func test_the_same_element_does_not_react() -> void:
 func test_a_hit_with_no_element_does_not_react() -> void:
 	var enemy := _enemy()
 	_combat.apply_status(0, enemy, &"chill", 3.0, 40.0)
-	_bus.projectile_hit.emit(0, enemy, enemy.position + Vector2(-8.0, 0.0), _spells.install(0, 0, _spells.compile({"form": &"bolt"})))
+	_bus.projectile_hit.emit(0, enemy, enemy.position + Vector2(-8.0, 0.0), StaffKit.build(_spells, 0, 0, [&"bolt"] as Array[StringName]))
 	check(_reacted.is_empty(), "plain damage reacts with nothing")
 	check(_combat.has_status(enemy, &"chill"), "and leaves the chill")
 

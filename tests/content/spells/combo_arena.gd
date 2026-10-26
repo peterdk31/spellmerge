@@ -2,13 +2,13 @@ extends RefCounted
 ## The test arena for the combo catalogue (M2 part 14): the real registry, projectile manager,
 ## spell runtime and combat, wired together outside the scene tree's autoloads, with imps (plain
 ## `Node2D`s that Combat knows as enemies) standing where a combo wants them. It builds a
-## recipe, casts it and moves time on in the same order as project.godot (projectiles, spells,
-## combat). Whoever uses it calls `free_all()` afterwards.
+## staff from card ids, casts it and moves time on in the same order as project.godot
+## (projectiles, spells, combat). Whoever uses it calls `free_all()` afterwards.
 ##
 ## Example (see test_combos.gd):
 ##   var arena := ArenaScript.new(root)
 ##   var imp: Node2D = arena.add_imp(Vector2(100.0, 0.0))
-##   arena.install(0, 0, {"form": &"bolt", "element": &"fire"})
+##   arena.install_cards(0, 0, [&"fire", &"bolt"])
 ##   arena.cast(0, 0)
 ##   arena.run(1.0)
 
@@ -85,15 +85,6 @@ func place_caster(player: int, at: Vector2) -> void:
 	_casters[player] = at
 
 
-## Compiles `recipe` and builds it into `player`'s `slot`. Returns the compile result, so a
-## test can look at `valid` and `reason`.
-func install(player: int, slot: int, recipe: Dictionary) -> CompiledSpell:
-	var spell: CompiledSpell = spells.compile(recipe)
-	if spell.valid:
-		spells.install(player, slot, spell)
-	return spell
-
-
 ## Builds `cards` (card ids, one per slot) into `player`'s staff `staff` on a plain staff with
 ## no delay or recharge of its own (staffs A6b), and returns the compiled staff, so a test can
 ## look at its casts and wasted cards. An empty staff is installed as no build.
@@ -116,11 +107,12 @@ static func plain_staff(slots: int) -> StaffBase:
 	return staff
 
 
-## Casts `player`'s `slot` toward `direction` (+x by default). True when it was cast.
-func cast(player: int, slot: int, direction: Vector2 = Vector2.RIGHT) -> bool:
+## Casts `player`'s staff `staff` (its next cast) toward `direction` (+x by default). True when
+## it was cast.
+func cast(player: int, staff: int, direction: Vector2 = Vector2.RIGHT) -> bool:
 	# An orbit has to find its anchor already set, as it is every physics step in the game.
 	projectiles.set_anchor(player, _casters[player])
-	return spells.cast(player, slot, _casters[player], direction, MANA) != SpellsScript.REFUSED
+	return spells.cast_staff(player, staff, _casters[player], direction, MANA) != SpellsScript.REFUSED
 
 
 ## Moves time on by `seconds` in fixed steps.

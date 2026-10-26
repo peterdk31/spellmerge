@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-26: The old recipe path removed (owner session, staffs A6c)
+
+Staffs are the one way to build and cast. Removed: the recipe compiler (`Spells.compile`, `builder_view`, the clamps, the budget), the recipe wrappers, the fields only recipes used (`valid`, `reason`, `description`, `complexity`, `depth`, `held` on `CompiledSpell`), the build limits in `SpellLimits` (only the per-step fire and chain caps stay, as engine safeguards) and five events (`build_change_requested`, `spell_swap_requested`, `spell_changed`, `recipe_changed`, `active_spell_changed`). Tests that wrote spells as recipes build staffs through `tests/support/staff_kit.gd`; the limit tests became no-limit tests (a nova with two splits makes 72 shots; four chains jump eight times; payloads nest four deep). Phase A is done, so development is unpaused: the bot starts phase B, and the owner lane opens.
+
 ## 2026-10-26: Combos and tests on staffs (owner session, staffs A6b)
 
 The 28 combo files are card rows now (`{"staff": 0, "cards": ["fire", "timer", "orbit", "fire", "split", "bolt"]}`), converted mechanically (infusions and modifiers, the trigger, the carrier, then the payload); all 28 still pass. The clip scenarios cast card rows (a lone card on a bolt; a trigger fires a nova; a multicast pulls three bolts). The fuzz test builds 300 random staffs from every card: no errors, every cycle finite, and the costliest staffs printed (the first run: at most 32 live shots, nothing dropped at the pool, the slowest step 0.3 ms headless).

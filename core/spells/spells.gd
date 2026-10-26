@@ -1,23 +1,32 @@
 extends Node
-## The spell runtime (autoload `Spells`): the compiler, the limits and the tags (part 5),
-## casting and triggers (part 6).
+## The spell runtime (autoload `Spells`): staffs compiled from cards and cast (docs/milestones/
+## M2-staffs.md). The reading rules live in `StaffCompiler` (`compile_staff`); this script casts.
 ##
-## Casting: `install(player, slot, spell)` makes a compiled spell the build of a slot
-## (and removes the shots a full generation ring revoked); `cast(player, slot, origin,
-## direction, mana)` fires it and returns the mana spent or `REFUSED`. Cooldowns are per player and slot and tick in `step` (physics). The
-## form decides the shots (a fan for straight, a ring for orbit, still ones, or rays), split
-## and nova have already multiplied them in `compile`, homing is set on each shot.
+## Building: `compile_staff(cards, staff)` reads a staff's cards into its cycle (`CompiledStaff`;
+## it refuses nothing), `staff_view` gives the builder plain values, and
+## `install_staff(player, staff, compiled)` makes it the build of one of a player's four staffs:
+## a new generation, the shots a full generation ring revoked removed, and the staff's sustained
+## (`hold`) carriers switched off.
 ##
-## Triggers: a held spell is fired by its shot's `projectile_hit` (on hit), `projectile_expired`
-## (on expire) or every `trigger_interval` seconds (timer, in `step`). It starts at the hit
-## point (the shot's place at expiry, a little back from a wall; the shot's place for a timer),
-## flies along the shot's velocity (outward from the caster through the shot for an orbit or
-## still shot, along the beam for a ray) and cannot hit the target that fired it for
-## `SpellLimits.SOURCE_EXCLUSION` seconds (a beam never hits it). Each shot fires at most
-## `trigger_max_fires` times. One player's triggers fire at most
-## `SpellLimits.MAX_FIRES_PER_STEP` held spells per `step`; the rest are dropped, never
-## queued (`fires_dropped` counts them). A beam fires an on-expire spell
-## at its end and has no timer. Held spells send no `spell_cast`: the player's staff does.
+## Casting: `cast_staff(player, staff, origin, direction, mana)` fires the next cast of the
+## staff's cycle and returns the mana spent or `REFUSED`; delays (the staff's own, every
+## carrier's cooldown, the recharge after the last cast) are per player and staff and tick in
+## `step` (physics). A cast is a group: its carriers fan out a little; each carrier's shots are a
+## fan (straight), a ring (orbit), still shots or rays; split and nova multiplied them in the
+## compiler; homing is set on each shot. Cards that landed on the caster (or a payload's origin)
+## ask combat for an area hit there (`area_hit_requested`); a dash card asks the player to move
+## (`caster_move_requested`). A `hold` carrier lives until its staff is cast again or edited.
+##
+## Payloads: a trigger's payload (a group) is fired by its shot's `projectile_hit` (on hit),
+## `projectile_expired` (on expire) or every `trigger_interval` seconds (timer, in `step`). It
+## starts at the hit point (the shot's place at expiry, a little back from a wall; the shot's
+## place for a timer), flies along the shot's velocity (outward from the caster through the shot
+## for an orbit or still shot, along the beam for a ray) and cannot hit the target that fired it
+## for `SpellLimits.SOURCE_EXCLUSION` seconds (a beam never hits it). Each shot fires at most
+## `trigger_max_fires` times. One player's triggers fire at most `SpellLimits.MAX_FIRES_PER_STEP`
+## payloads per `step` (an engine safeguard, not a build limit); the rest are dropped, never
+## queued (`fires_dropped` counts them). A beam fires an on-expire payload at its end and has no
+## timer. Payloads send no `spell_cast`: the player's staff does.
 ##
 ## Chain: a shot of a spell with `chain_jumps` that hits a target spawns a shot of the same
 ## tag from the hit point to the nearest other target within `SpellLimits.CHAIN_RANGE`
@@ -35,25 +44,16 @@ extends Node
 ##
 ## `hit_profile(tag)` is what `gameplay/combat` asks on `projectile_hit`.
 ##
-## A recipe is a Dictionary of component ids (a held spell is a recipe too):
+## Tags (`SpellTag`): player, staff, generation and node. `begin_generation(player, staff,
+## compiled)` registers every compiled spell of a staff under a new generation and returns the
+## tag of its first one; a payload's spells have their own nodes. Shots keep the tag they were
+## born with, so a shot still in the air after a rebuild hits with its old numbers
+## (`profile(tag)`). A generation is forgotten as a whole (every node together) when its last
+## shot has ended (`shot_ended`) and it is no longer current.
 ##
-##     {"form": &"bolt", "element": &"fire", "modifiers": [&"split", &"homing"],
-##      "trigger": &"on_hit", "held": {"form": &"nova"}}
-##
-## Only `form` is required; `element`, `modifiers`, `trigger` and `held` may be left out.
-## `compile` never errors: a recipe that breaks a rule gives a spell with `valid == false`
-## and a plain `reason`, and numbers over a limit are clamped and said so in `description`.
-##
-## Tags: `begin_generation(player, slot, spell)` registers a built spell under a new
-## generation of that slot and returns the tag of its cast (depth 0); its held spells get
-## the same tag with depth 1 and 2. Shots keep the tag they were born with, so a shot still
-## in the air after a rebuild hits with its old numbers (`profile(tag)`). A generation is
-## forgotten as a whole (all its depths together) when its last shot, of any depth, has
-## ended (`shot_ended`) and it is no longer current.
-##
-## Order matters: a shot that spawns children (a held spell on hit) must call
-## `shot_started` for each child before it calls `shot_ended` for itself, or an old build
-## could be freed between the two.
+## Order matters: a shot that spawns children (a payload on hit) must call `shot_started` for
+## each child before it calls `shot_ended` for itself, or an old build could be freed between
+## the two.
 
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
@@ -61,7 +61,7 @@ const EventsScript := preload("res://core/events/events.gd")
 ## What `cast` returns when the spell did not fire (cooling down, too little mana, no spell).
 const REFUSED: float = -1.0
 
-## Held spells dropped by the per-step fire cap since the last `clear`.
+## Payloads dropped by the per-step fire cap since the last `clear`.
 var fires_dropped: int = 0
 ## Chain jumps dropped by the per-step jump cap since the last `clear`.
 var chains_dropped: int = 0
@@ -77,22 +77,12 @@ var events: EventsScript = null
 ## or `shot_ended` again for them. Part 6 does exactly that.
 var revoked_tags: PackedInt64Array = PackedInt64Array()
 
-## How the description says a status (the ids belong to gameplay/combat).
-const STATUS_VERBS: Dictionary = {
-	&"burn": "Burns",
-	&"chill": "Chills",
-	&"freeze": "Freezes",
-	&"shock": "Shocks",
-	&"hex": "Hexes",
-	&"static": "Charges",
-}
-
 ## Registry stand-in for tests: anything with `get_resource(folder, id)`. Null uses `Registry`.
 var registry: Node = null
 
 ## player * STAFFS + staff -> the current generation (0-7), -1 for no build
 var _current: PackedInt32Array = PackedInt32Array()
-## player * STAFFS + staff -> the current build (a recipe is a staff of one cast), or null
+## player * STAFFS + staff -> the current build, or null
 var _installed: Array[CompiledStaff] = []
 ## player * STAFFS + staff -> which cast of its cycle comes next
 var _cursor: PackedInt32Array = PackedInt32Array()
@@ -113,7 +103,7 @@ var _generation_live: Dictionary = {}
 
 ## player * STAFFS + staff -> seconds before that staff may cast again
 var _cooldown: PackedFloat32Array = PackedFloat32Array()
-## Held spells each player has fired in this step.
+## Payloads each player has fired in this step.
 var _fires_used: PackedInt32Array = PackedInt32Array()
 ## Chain jumps each player has made in this step.
 var _chains_used: PackedInt32Array = PackedInt32Array()
@@ -204,17 +194,6 @@ func bind(manager: ProjectilesScript, bus: EventsScript) -> void:
 		events.projectile_expired.connect(_on_expired)
 
 
-## Turns a recipe into a CompiledSpell. See the class doc for the recipe shape.
-func compile(recipe: Dictionary) -> CompiledSpell:
-	var spell: CompiledSpell = _compile(recipe, 0)
-	if not spell.valid:
-		return spell
-	if spell.complexity > SpellLimits.MAX_COMPLEXITY:
-		return _refused("Too complex: %d of %d. Remove one." % [spell.complexity, SpellLimits.MAX_COMPLEXITY])
-	_describe(spell)
-	return spell
-
-
 ## Compiles a staff's cards (ids by slot, `&""` for an empty slot) into its cycle, the casts it
 ## makes until it recharges (staffs A4; the rules are docs/milestones/M2-staffs.md, "Reading a
 ## staff", and `StaffCompiler`). It never errors and refuses nothing: an unknown or useless
@@ -256,39 +235,6 @@ func component_icon(id: StringName) -> Texture2D:
 	return component.icon if component != null else null
 
 
-## What the builder shows of `recipe` at held level `level` (0 is the cast), as plain values so
-## that nothing outside `core/spells` reads a `CompiledSpell`. Always has `valid` and
-## `complexity` (of the whole spell, held spells included; 0 when invalid). When the recipe is
-## valid and has a spell at `level` it also has `shown` true and `damage`, `shots`, `ray` (a beam:
-## no shot count), `cooldown`, `mana`, `pattern` (`&"fan"`, `&"ring"`, `&"orbit"`, `&"rune"` or
-## `&"ray"`), `spread` (degrees), `pierce` and `tint`; otherwise `shown` is false.
-func builder_view(recipe: Dictionary, level: int) -> Dictionary:
-	var whole: CompiledSpell = compile(recipe)
-	var view: Dictionary = {"valid": whole.valid, "complexity": whole.complexity if whole.valid else 0, "shown": false}
-	var spell: CompiledSpell = whole.at_depth(level) if whole.valid else null
-	if spell == null:
-		return view
-	view["shown"] = true
-	view["damage"] = spell.damage
-	view["shots"] = spell.shots
-	view["ray"] = spell.motion == FormBase.Motion.RAY
-	view["cooldown"] = spell.cooldown
-	view["mana"] = spell.mana_cost
-	view["spread"] = spell.spread
-	view["pierce"] = spell.pierce
-	view["tint"] = spell.tint
-	match spell.motion:
-		FormBase.Motion.RAY:
-			view["pattern"] = &"ray"
-		FormBase.Motion.ORBIT:
-			view["pattern"] = &"orbit"
-		FormBase.Motion.STILL:
-			view["pattern"] = &"rune"
-		_:
-			view["pattern"] = &"ring" if spell.spread >= 360.0 else &"fan"
-	return view
-
-
 ## The one-line description of the component `id` for the builder, from its lore file in
 ## `content/story/lore/components/`. Empty for an unknown id or a missing file; the builder
 ## shows nothing for an empty one.
@@ -309,22 +255,11 @@ func profile(tag: int) -> CompiledSpell:
 	return _profiles.get(tag)
 
 
-## Registers `spell` (which must be valid) as the new build of this player's slot and
-## returns the tag of its cast, or 0 for an invalid spell or a bad player or slot. A recipe's
-## spell becomes a staff of one cast (its held spells are its payloads, its depth their node), so
-## recipes and staffs share one runtime (staffs A5). The slot's generation advances; if its shots
-## from 8 builds ago are still in the air the oldest generation is revoked (see `revoked_tags`).
-func begin_generation(player: int, slot: int, spell: CompiledSpell) -> int:
-	revoked_tags.clear()
-	if spell == null or not spell.valid:
-		return 0
-	return _begin(player, slot, _wrap(spell))
-
-
 ## Registers every spell of `compiled` under a new generation of this player's staff and
 ## returns the tag of its first spell, or 0 for an empty staff (the staff then has no build)
-## or a bad player or staff. See `begin_generation` for the ring and `revoked_tags`.
-func _begin(player: int, staff: int, compiled: CompiledStaff) -> int:
+## or a bad player or staff. The staff's generation advances; if its shots from 8 builds ago are
+## still in the air the oldest generation is revoked (see `revoked_tags`).
+func begin_generation(player: int, staff: int, compiled: CompiledStaff) -> int:
 	revoked_tags.clear()
 	if compiled == null or not _in_range(player, staff) or compiled.nodes.size() > SpellTag.NODE_MASK + 1:
 		return 0
@@ -358,31 +293,7 @@ func _begin(player: int, staff: int, compiled: CompiledStaff) -> int:
 	return SpellTag.make(player, staff, 0, generation)
 
 
-## A recipe's spell as a staff of one cast: the spell and the spells its triggers hold become
-## the nodes, depth by depth, and each held spell is the payload of the one above it. Mana and
-## cooldown are the recipe's own, as before staffs.
-func _wrap(spell: CompiledSpell) -> CompiledStaff:
-	var out := CompiledStaff.new()
-	var level: CompiledSpell = spell
-	while level != null:
-		level.node = out.nodes.size()
-		out.nodes.append(level)
-		if level.held != null and level.payload == null:
-			level.payload = CompiledGroup.new()
-			level.payload.spells.append(level.held)
-		level = level.held
-	var cast := CompiledCast.new()
-	cast.group = CompiledGroup.new()
-	cast.group.spells.append(spell)
-	cast.mana = spell.mana_cost
-	cast.delay = spell.cooldown
-	cast.recharges = true
-	out.casts.append(cast)
-	return out
-
-
-## The tag of the current build of this staff (or a recipe's slot) at `node` (a recipe's
-## depth), or 0 when it has no build.
+## The tag of the current build of this staff at `node`, or 0 when it has no build.
 func current_tag(player: int, slot: int, node: int = 0) -> int:
 	if not _in_range(player, slot):
 		return 0
@@ -444,29 +355,19 @@ func hit_profile(tag: int) -> HitProfile:
 	return null if spell == null else spell.hit
 
 
-## Makes `spell` the build of this player's slot, as `begin_generation` does, and removes
-## from the projectile manager the shots it revoked (see `revoked_tags`). Returns the tag of
-## its cast, or 0 for an invalid spell or a bad player or slot.
-func install(player: int, slot: int, spell: CompiledSpell) -> int:
-	if spell == null or not spell.valid:
-		revoked_tags.clear()
-		return 0
-	return install_staff(player, slot, _wrap(spell))
-
-
 ## Makes `compiled` (from `compile_staff`) the build of this player's staff (0-3), starting its
 ## cycle at the first cast, and removes the shots the new generation revoked. Editing a staff
 ## switches its sustained (`hold`) carriers off. Returns the tag of its first spell, or 0 for an
 ## empty staff (which leaves the staff with no build) or a bad player or staff.
 func install_staff(player: int, staff: int, compiled: CompiledStaff) -> int:
-	var tag: int = _begin(player, staff, compiled)
+	var tag: int = begin_generation(player, staff, compiled)
 	if projectiles != null:
 		for revoked in revoked_tags:
 			projectiles.remove_by_tag(revoked)
 	return tag
 
 
-## Seconds before this player's staff (or a recipe's slot) may cast again.
+## Seconds before this player's staff may cast again.
 func cooldown_left(player: int, slot: int) -> float:
 	return _cooldown[player * SpellLimits.STAFFS + slot] if _in_range(player, slot) else 0.0
 
@@ -485,11 +386,6 @@ func last_form(player: int, staff: int) -> StringName:
 ## True while this player's staff has sustained (`hold`) carriers switched on.
 func is_holding(player: int, staff: int) -> bool:
 	return _in_range(player, staff) and not _hold_tags[player * SpellLimits.STAFFS + staff].is_empty()
-
-
-## The recipe runtime's name for `cast_staff` (slot A and B are staffs 0 and 1).
-func cast(player: int, slot: int, origin: Vector2, direction: Vector2, mana: float) -> float:
-	return cast_staff(player, slot, origin, direction, mana)
 
 
 ## Fires the next cast of this player's staff from `origin` along `direction`. `mana` is what
@@ -545,9 +441,9 @@ func _after_cast(index: int, compiled: CompiledStaff, cast: CompiledCast) -> voi
 ## otherwise the event of its trigger (`&"on_hit"`, `&"on_expire"`, `&"timer"`), otherwise
 ## `&"boosted"` for modifiers alone, and `&""` for a plain shot.
 func combo_class(spell: CompiledSpell) -> StringName:
-	if spell == null or not spell.valid:
+	if spell == null:
 		return &""
-	if spell.payload != null or spell.held != null:
+	if spell.payload != null:
 		if spell.modifier_ids.size() >= 2 or spell.chain_length() >= 3:
 			return &"stacked"
 		match spell.trigger_event:
@@ -731,7 +627,7 @@ func _shoot_ray(spell: CompiledSpell, tag: int, player: int, origin: Vector2, he
 	var got: float = projectiles.ray(player, origin, heading, reach, spell.pierce if pierce < 0 else pierce, ProjectilesScript.LAYER_ENEMY, tag, spell.radius * 0.5, source)
 	if got > 0.0 and events != null:
 		events.form_shown.emit(player, &"beam", origin, heading, got, spell.tint)
-	# A `ray()` that did nothing (too deep, or a bad aim) has no end to fire the held spell from.
+	# A `ray()` that did nothing (too deep, or a bad aim) has no end to fire the payload from.
 	if got > 0.0 and spell.payload != null and spell.trigger_event == TriggerBase.Event.EXPIRE and _ray_fires > 0 and _take_fire(player):
 		_ray_fires -= 1
 		_fire_payload(spell, tag, player, origin + heading * got, heading, null)
@@ -764,7 +660,7 @@ func _cast_jumps() -> void:
 	_jq_busy = false
 
 
-## True when the shot in `slot` fires its held spell on a timer.
+## True when the shot in `slot` fires its payload on a timer.
 func _is_timer(slot: int) -> bool:
 	var spell: CompiledSpell = _profiles.get(projectiles.get_tag_of(slot))
 	return spell != null and spell.payload != null and spell.trigger_event == TriggerBase.Event.TIMER
@@ -776,7 +672,7 @@ func _fire_payload(spell: CompiledSpell, tag: int, player: int, at: Vector2, hea
 	return _launch_group(spell.payload, player, SpellTag.staff_of(tag), SpellTag.generation_of(tag), at, heading, source)
 
 
-## True when this player may fire one more held spell in this step.
+## True when this player may fire one more payload in this step.
 func _take_fire(player: int) -> bool:
 	if _fires_used[player] >= SpellLimits.MAX_FIRES_PER_STEP:
 		fires_dropped += 1
@@ -796,7 +692,7 @@ func _knows(slot: int) -> bool:
 	return _same(slot) and projectiles.is_alive(slot)
 
 
-## The way a held spell fired by a shot goes: its velocity, or outward from the caster
+## The way a payload fired by a shot goes: its velocity, or outward from the caster
 ## through the shot for an orbit or still one (or one with no velocity).
 func _heading(spell: CompiledSpell, slot: int, at: Vector2, player: int) -> Vector2:
 	var velocity: Vector2 = projectiles.get_velocity_of(slot)
@@ -1035,229 +931,5 @@ func _component(id: StringName) -> SpellComponent:
 	return source.call("get_resource", &"spells", id) as SpellComponent
 
 
-func _refused(reason: String) -> CompiledSpell:
-	var spell := CompiledSpell.new()
-	spell.valid = false
-	spell.reason = reason
-	return spell
-
-
-## One component of `kind` by id, or null with the reason in `problem[0]`.
-func _pick(id: StringName, kind: StringName, problem: PackedStringArray) -> SpellComponent:
-	var component: SpellComponent = _component(id)
-	if component == null:
-		problem.append("Unknown component '%s'." % id)
-		return null
-	if component.kind() != kind:
-		problem.append("'%s' is %s %s, not %s %s." % [id, _article(component.kind()), component.kind(), _article(kind), kind])
-		return null
-	return component
-
-
-## A component id field: missing or null is &"", a String or StringName is its id,
-## anything else adds a reason to `problem`.
-func _id_field(recipe: Dictionary, key: String, problem: PackedStringArray) -> StringName:
-	var value: Variant = recipe.get(key)
-	if value == null:
-		return &""
-	if value is String or value is StringName:
-		return StringName(value)
-	problem.append("'%s' must be a component id, not %s." % [key, type_string(typeof(value))])
-	return &""
-
-
-## A list of component ids (Array or PackedStringArray); missing or null is empty.
-func _id_list_field(recipe: Dictionary, key: String, problem: PackedStringArray) -> Array:
-	var value: Variant = recipe.get(key)
-	var ids: Array = []
-	if value == null:
-		return ids
-	if not (value is Array or value is PackedStringArray):
-		problem.append("'%s' must be a list of component ids, not %s." % [key, type_string(typeof(value))])
-		return ids
-	for item in value:
-		if item is String or item is StringName:
-			ids.append(StringName(item))
-		else:
-			problem.append("'%s' holds %s, not a component id." % [key, type_string(typeof(item))])
-			return []
-	return ids
-
-
-func _article(word: StringName) -> String:
-	return "an" if String(word).left(1) in ["a", "e", "i", "o", "u"] else "a"
-
-
 func _name_of(component: SpellComponent) -> String:
 	return component.display_name if not component.display_name.is_empty() else String(component.id)
-
-
-func _compile(recipe: Dictionary, depth: int) -> CompiledSpell:
-	var problem: PackedStringArray = PackedStringArray()
-	var form: FormBase = null
-	var element: ElementBase = null
-	var trigger: TriggerBase = null
-	var modifiers: Array[ModifierBase] = []
-
-	var form_id: StringName = _id_field(recipe, "form", problem)
-	var element_id: StringName = _id_field(recipe, "element", problem)
-	var trigger_id: StringName = _id_field(recipe, "trigger", problem)
-	var modifier_ids: Array = _id_list_field(recipe, "modifiers", problem)
-	if not problem.is_empty():
-		return _refused(problem[0])
-	if form_id == &"":
-		return _refused("Pick a form (F) first.")
-	if modifier_ids.size() > SpellLimits.MAX_MODIFIERS:
-		return _refused("A spell holds at most %d modifiers." % SpellLimits.MAX_MODIFIERS)
-	form = _pick(form_id, &"form", problem) as FormBase
-	if element_id != &"" and form != null:
-		element = _pick(element_id, &"element", problem) as ElementBase
-	for id in modifier_ids:
-		if problem.is_empty():
-			modifiers.append(_pick(id as StringName, &"modifier", problem) as ModifierBase)
-	if trigger_id != &"" and problem.is_empty():
-		trigger = _pick(trigger_id, &"trigger", problem) as TriggerBase
-	if not problem.is_empty():
-		return _refused(problem[0])
-
-	var held_recipe: Variant = recipe.get("held")
-	var held: CompiledSpell = null
-	if held_recipe != null and not held_recipe is Dictionary:
-		return _refused("The held spell must be a recipe (a Dictionary).")
-	if held_recipe is Dictionary and not (held_recipe as Dictionary).is_empty():
-		if trigger == null:
-			return _refused("A held spell needs a trigger to fire it.")
-		if depth + 1 > SpellLimits.MAX_DEPTH:
-			return _refused("Triggers can hold spells at most %d levels deep." % SpellLimits.MAX_DEPTH)
-		held = _compile(held_recipe as Dictionary, depth + 1)
-		if not held.valid:
-			return held
-
-	var spell := CompiledSpell.new()
-	spell.depth = depth
-	_apply(spell, form, element, modifiers, trigger)
-	spell.held = held
-	spell.complexity += 0 if held == null else held.complexity
-	return spell
-
-
-## Fills the numbers: the form's base, then the element, then the modifiers in slot order.
-func _apply(spell: CompiledSpell, form: FormBase, element: ElementBase, modifiers: Array[ModifierBase], trigger: TriggerBase) -> void:
-	spell.form_id = form.id
-	spell.form_name = _name_of(form)
-	spell.complexity = form.complexity
-	var damage: float = form.base_damage
-	var mana: float = form.mana_cost
-	var cooldown: float = form.cooldown
-	var speed: float = form.speed
-	var radius: float = form.radius
-	var shots: int = form.shots
-	var pierce: int = form.pierce
-	if element != null:
-		spell.element_id = element.id
-		spell.element_name = _name_of(element)
-		spell.complexity += element.complexity
-		spell.status_id = element.status_id
-		spell.status_duration = element.status_duration
-		spell.status_strength = element.status_strength
-		spell.tint = element.tint
-		spell.shape = element.shape
-		damage *= element.damage_scale
-	for modifier in modifiers:
-		spell.modifier_ids.append(modifier.id)
-		spell.complexity += modifier.complexity
-		damage *= modifier.damage_mult
-		mana *= modifier.mana_mult
-		cooldown *= modifier.cooldown_mult
-		speed *= modifier.speed_mult
-		radius *= modifier.radius_mult
-		shots *= modifier.shot_mult
-		pierce += modifier.extra_pierce
-		match modifier.behaviour:
-			ModifierBase.Behaviour.HOMING:
-				spell.homing_turn = maxf(spell.homing_turn, modifier.behaviour_strength)
-			ModifierBase.Behaviour.CHAIN:
-				spell.chain_jumps += int(modifier.behaviour_strength)
-	spell.chain_jumps = clampi(spell.chain_jumps, 0, SpellLimits.MAX_CHAIN_JUMPS)
-	spell.damage = clampi(roundi(damage), 1, SpellLimits.MAX_DAMAGE)
-	spell.mana_cost = mana
-	spell.cooldown = maxf(cooldown, SpellLimits.MIN_COOLDOWN)
-	spell.speed = minf(speed, SpellLimits.MAX_SPEED)
-	spell.lifetime = clampf(form.lifetime, SpellLimits.MIN_LIFETIME, SpellLimits.MAX_LIFETIME)
-	spell.radius = minf(radius, SpellLimits.MAX_RADIUS)
-	spell.pierce = mini(pierce, SpellLimits.MAX_PIERCE)
-	spell.motion = form.motion
-	spell.orbit_radius = form.orbit_radius
-	spell.ray_length = form.ray_length
-	spell.spread = form.spread
-	spell.hit = HitProfile.new()
-	spell.hit.damage = spell.damage
-	spell.hit.knockback = SpellLimits.KNOCKBACK
-	spell.hit.element_id = spell.element_id
-	spell.hit.status_id = spell.status_id
-	spell.hit.status_duration = spell.status_duration
-	spell.hit.status_strength = spell.status_strength
-	spell.shots_requested = shots
-	if shots > SpellLimits.MAX_SHOTS:
-		spell.shots_clamped = true
-		spell.shots = SpellLimits.MAX_SHOTS
-	else:
-		spell.shots = shots
-	if spell.shots > 1 and spell.spread <= 0.0 and spell.motion != FormBase.Motion.ORBIT:
-		spell.spread = SpellLimits.SPLIT_SPREAD
-	if trigger != null:
-		spell.trigger_id = trigger.id
-		spell.complexity += trigger.complexity
-		spell.trigger_event = trigger.event
-		spell.trigger_interval = trigger.interval
-		spell.trigger_max_fires = trigger.max_fires
-		if trigger.event == TriggerBase.Event.TIMER:
-			spell.trigger_max_fires = mini(trigger.max_fires, SpellLimits.MAX_TIMER_FIRES)
-			spell.trigger_interval = clampf(trigger.interval, SpellLimits.MIN_TIMER_INTERVAL, SpellLimits.MAX_TIMER_INTERVAL)
-
-
-## Writes the description of this spell and, first, of the spells it holds.
-func _describe(spell: CompiledSpell) -> void:
-	if spell.held != null:
-		_describe(spell.held)
-	var parts: PackedStringArray = PackedStringArray()
-	var title: String = spell.form_name
-	if spell.element_id != &"":
-		title = "%s %s" % [spell.element_name, title]
-	parts.append("%s: %d damage" % [title, spell.damage])
-	if spell.motion == FormBase.Motion.RAY:
-		parts.append("a ray")
-	elif spell.shots > 1:
-		parts.append("%d shots" % spell.shots)
-	else:
-		parts.append("1 shot")
-	parts.append("cooldown %s s" % _number(spell.cooldown))
-	if spell.mana_cost > 0.0:
-		parts.append("%s mana" % _number(spell.mana_cost))
-	var text: String = ", ".join(parts) + "."
-	if spell.shots_clamped:
-		text += " Cut from %d to %d shots, the limit." % [spell.shots_requested, SpellLimits.MAX_SHOTS]
-	if spell.pierce > 0:
-		text += " Pierces %d." % spell.pierce
-	if spell.status_id != &"" and spell.status_duration > 0.0:
-		text += " %s for %s s." % [_status_verb(spell.status_id), _number(spell.status_duration)]
-	if spell.homing_turn > 0.0:
-		text += " Homing."
-	if spell.chain_jumps > 0:
-		text += " Chains %d times." % spell.chain_jumps
-	if spell.held != null:
-		var when: String = "on hit"
-		if spell.trigger_event == TriggerBase.Event.EXPIRE:
-			when = "when it ends"
-		elif spell.trigger_event == TriggerBase.Event.TIMER:
-			when = "every %s s" % _number(spell.trigger_interval)
-		text += " Then, %s: %s" % [when, spell.held.description]
-	spell.description = text
-
-
-func _status_verb(status: StringName) -> String:
-	return STATUS_VERBS.get(status, "Applies %s" % status)
-
-
-func _number(value: float) -> String:
-	return String.num(value, 2)

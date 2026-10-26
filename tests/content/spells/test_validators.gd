@@ -180,7 +180,7 @@ func test_an_icon_missing_from_the_manifest_is_reported() -> void:
 
 func test_complexity_above_the_whole_spell_budget_is_reported_once_as_a_range() -> void:
 	var element := _fine(ElementBase.new())
-	element.complexity = SpellLimits.MAX_COMPLEXITY + 1
+	element.complexity = SpellComponent.COMPLEXITY_MAX + 1
 	var problems := SpellValidator.check_component(element, _listed())
 	check_equal(_fields(problems, "range"), ["complexity"] as Array[String], "one range problem")
 	check_equal(problems.size(), 1, "and no second one")

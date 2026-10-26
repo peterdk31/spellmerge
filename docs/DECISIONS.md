@@ -2,6 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-26: Planning after the pivot verdict (#264)
+
+- **Verdict adopted as given:** the owner's pivot at C2 (#264) is carried out by the merged staffs design (`M2-staffs.md`, DESIGN.md rows, parts A1–A4 in #266–#269). ROADMAP, NEXT and the entry below already say so; per the owner, the design and both lanes of `docs/NEXT.md` stay as they are and no task is rewritten or reordered. #264 is closed by this PR. The bot starts at the top of `## Queue` (A5); owner sessions take `## Owner lane`.
+- **Milestone state:** M2 is in progress, not done; no new checkpoint until D3.
+- **Idea #208 (pet):** stays on the backlog, not scheduled. The staffs plan now covers its shape as cards, `familiar` and `decoy` (owner lane, after B2 and B5), so a separate pet system is not needed; a kill-count unlock is an M5 item.
+- **Queue moves:** none. No re-examination task: the only recently finished work is the owner's A2–A4, still unused by the game.
+
 ## 2026-10-26: Staffs design review
 
 An independent fresh-context session reviewed `docs/milestones/M2-staffs.md` against `docs/DESIGN.md`, the code and the bot's task picker. Fourteen findings; thirteen changed the design, one was wrong.

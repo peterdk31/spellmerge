@@ -313,3 +313,98 @@ func test_echo_and_mirror_together_fire_four_shots() -> void:
 	_cast()
 	_tick(20)
 	check_equal(_mgr.get_count(), 4, "two and their echoes")
+
+
+func _chain_setup() -> void:
+	_modifier(&"chain", ModifierBase.Behaviour.CHAIN, 1.0)
+
+
+func test_an_echoed_chain_keeps_half_damage_on_its_jump() -> void:
+	_chain_setup()
+	_target(Vector2(60, 0))
+	_target(Vector2(110, 0))
+	_build(0, [&"echo", &"chain", &"bolt"])
+	_cast()
+	_tick(120)
+	var damage: Array = []
+	for hit in _hits:
+		damage.append(hit[4])
+	check_equal(damage, [10, 10, 5, 5], "the cast hits twice at full damage, its echo twice at half")
+
+
+func test_a_mirrored_beam_hits_both_ways() -> void:
+	_target(Vector2(100, 0))
+	_target(Vector2(-100, 0))
+	_build(0, [&"mirror", &"beam"])
+	_cast()
+	check_equal(_hits.size(), 2, "one beam each way")
+
+
+func test_a_mirrored_returning_shot_goes_both_ways() -> void:
+	var boomerang: FormBase = _form(&"boomerang", 300.0, 1.0)
+	boomerang.motion = FormBase.Motion.RETURN
+	_build(0, [&"mirror", &"boomerang"])
+	_cast()
+	var headings: Array[Vector2] = _headings()
+	check_equal(headings.size(), 2, "two returning shots")
+	check(headings.size() == 2 and headings[0].is_equal_approx(-headings[1]), "opposite ways")
+
+
+func test_releasing_a_hold_drops_the_waiting_firings() -> void:
+	_build(0, [&"burst", &"bolt"])
+	_cast()
+	_spells._release_hold(0)
+	_tick(30)
+	check_equal(_mgr.get_count(), 1, "the later firings never came")
+
+
+func _trigger_card(id: StringName, event: TriggerBase.Event) -> void:
+	var trigger := TriggerBase.new()
+	trigger.event = event
+	trigger.max_fires = 1
+	_put(trigger, id)
+
+
+func test_an_echoed_carrier_fires_its_on_cast_payload_again() -> void:
+	_trigger_card(&"on_cast", TriggerBase.Event.CAST)
+	_build(0, [&"echo", &"on_cast", &"bolt", &"bolt"])
+	_cast()
+	check_equal(_mgr.get_count(), 2, "the carrier and its payload at the cast")
+	_tick(20)
+	check_equal(_mgr.get_count(), 4, "and both again in the echo")
+
+
+func test_waiting_launches_stay_with_their_own_player() -> void:
+	StaffKit.build(_spells, 0, 0, [&"burst", &"bolt"])
+	StaffKit.build(_spells, 1, 0, [&"burst", &"bolt"])
+	_spells.cast_staff(0, 0, Vector2.ZERO, Vector2.RIGHT, 100.0)
+	_spells.cast_staff(1, 0, Vector2.ZERO, Vector2.LEFT, 100.0)
+	StaffKit.build(_spells, 1, 0, [&"bolt"])
+	_mgr.clear()
+	_tick(30)
+	check_equal(_mgr.get_count(), 2, "player 0's two later firings came, player 1's did not")
+
+
+func test_scatter_works_for_a_later_player() -> void:
+	StaffKit.build(_spells, 2, 0, [&"scatter", &"bolt", &"bolt", &"bolt"])
+	_spells.cast_staff(2, 0, Vector2.ZERO, Vector2.RIGHT, 100.0)
+	check_equal(_mgr.get_count(), 3, "three carriers for player 2")
+
+
+func test_a_later_firing_scatters_the_same_whatever_else_was_cast() -> void:
+	_build(0, [&"burst", &"scatter", &"bolt", &"bolt", &"bolt"])
+	_cast()
+	_tick(7)
+	var alone: Array[Vector2] = _headings().slice(3)
+	_mgr.clear()
+	_spells.clear()
+	_build(0, [&"burst", &"scatter", &"bolt", &"bolt", &"bolt"])
+	_cast()
+	StaffKit.build(_spells, 1, 0, [&"scatter", &"bolt", &"bolt", &"bolt"])
+	_spells.cast_staff(1, 0, Vector2.ZERO, Vector2.RIGHT, 100.0)
+	_tick(7)
+	var busy: Array[Vector2] = _headings().slice(6)
+	var same: bool = alone.size() == 3 and busy.size() == 3
+	for i in mini(alone.size(), busy.size()):
+		same = same and alone[i].is_equal_approx(busy[i])
+	check(same, "the burst's second firing points the same way: %s vs %s" % [alone, busy])

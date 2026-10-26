@@ -4,7 +4,7 @@ What each run did, newest first. Claude appends a short entry after each develop
 
 ## 2026-10-26: Trigger kit, part 2 (staffs B2b)
 
-The spell runtime runs the multicast spread: scatter (random directions, seeded per cast), burst (later firings of the group, queued), echo (the carrier again after its strength in seconds, at half damage) and mirror (also fires backwards). Tests: `tests/core/test_spells_multicast.gd` (19 tests). B2c and B2d are next.
+The spell runtime runs the multicast spread: scatter (random directions, seeded per cast), burst (later firings of the group, queued), echo (the carrier again after its strength in seconds, at half damage) and mirror (also fires backwards). Tests: `tests/core/test_spells_multicast.gd` (27 tests). B2c and B2d are next.
 
 ## 2026-10-26: Trigger kit, part 1 (staffs B2a)
 

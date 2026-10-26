@@ -82,6 +82,8 @@ class PendingLaunch:
 	var source: Node = null
 	## The caster's anchor when it was scheduled (`Vector2.INF` if the launch is not the cast's).
 	var anchor: Vector2 = Vector2.INF
+	## The scatter stream's seed for this firing, so it points the same way however late it runs.
+	var seed: int = 0
 
 
 ## What `cast` returns when the spell did not fire (cooling down, too little mana, no spell).
@@ -156,6 +158,8 @@ var _last_infused: Array[CompiledSpell] = []
 
 ## Launches that wait for their time (a burst's later firings, an echo), oldest first.
 var _pending: Array[PendingLaunch] = []
+## `SpellLimits.MAX_PENDING` records made once; `_delay` takes one and `_release_launch` gives it back.
+var _pending_free: Array[PendingLaunch] = []
 var _clock: float = 0.0
 ## Launches dropped because `SpellLimits.MAX_PENDING` were already waiting.
 var delayed_dropped: int = 0
@@ -205,6 +209,8 @@ func _init() -> void:
 	_cooldown.resize(SpellLimits.PLAYERS * SpellLimits.STAFFS)
 	_fires_used.resize(SpellLimits.PLAYERS)
 	_chains_used.resize(SpellLimits.PLAYERS)
+	for i in SpellLimits.MAX_PENDING:
+		_pending_free.append(PendingLaunch.new())
 	_jq_spell.resize(JUMP_QUEUE)
 	_jq_target.resize(JUMP_QUEUE)
 	_jq_tag.resize(JUMP_QUEUE)
@@ -722,10 +728,11 @@ func _fire_spell(spell: CompiledSpell, player: int, staff: int, generation: int,
 ## Queues a launch `wait` seconds from now: `group` (a burst's later firing) or, with no group,
 ## `spell` (an echo). Dropped when too many wait already.
 func _delay(wait: float, group: CompiledGroup, spell: CompiledSpell, player: int, staff: int, generation: int, origin: Vector2, heading: Vector2, source: Node, from_caster: bool) -> void:
-	if _pending.size() >= SpellLimits.MAX_PENDING:
+	if _pending_free.is_empty():
 		delayed_dropped += 1
 		return
-	var launch := PendingLaunch.new()
+	var launch: PendingLaunch = _pending_free.pop_back()
+	launch.seed = hash(Vector3i(_scatter.seed, roundi(wait * 1000.0), 0 if group != null else 1))
 	launch.due = _clock + maxf(wait, 0.0)
 	launch.player = player
 	launch.staff = staff
@@ -735,6 +742,7 @@ func _delay(wait: float, group: CompiledGroup, spell: CompiledSpell, player: int
 	launch.origin = origin
 	launch.heading = heading
 	launch.source = source
+	launch.anchor = Vector2.INF
 	if from_caster and projectiles != null:
 		launch.anchor = projectiles.get_anchor(player)
 	_pending.append(launch)
@@ -751,6 +759,7 @@ func _run_pending() -> void:
 			continue
 		_pending.remove_at(i)
 		if _current[launch.player * SpellLimits.STAFFS + launch.staff] != launch.generation:
+			_release_launch(launch)
 			continue
 		var origin: Vector2 = launch.origin
 		var from_caster: bool = launch.anchor.is_finite()
@@ -759,10 +768,26 @@ func _run_pending() -> void:
 			if now.is_finite():
 				origin += now - launch.anchor
 		var source: Node = launch.source if is_instance_valid(launch.source) else null
-		if launch.group != null:
-			_fire_group(launch.group, launch.player, launch.staff, launch.generation, origin, launch.heading, source, from_caster)
+		var group: CompiledGroup = launch.group
+		var spell: CompiledSpell = launch.spell
+		var player: int = launch.player
+		var staff: int = launch.staff
+		var generation: int = launch.generation
+		var heading: Vector2 = launch.heading
+		_scatter.seed = launch.seed
+		_release_launch(launch)
+		if group != null:
+			_fire_group(group, player, staff, generation, origin, heading, source, from_caster)
 		else:
-			_fire_spell(launch.spell, launch.player, launch.staff, launch.generation, origin, launch.heading, source, from_caster, true)
+			_fire_spell(spell, player, staff, generation, origin, heading, source, from_caster, true)
+
+
+## Gives a finished record back to the pool.
+func _release_launch(launch: PendingLaunch) -> void:
+	launch.group = null
+	launch.spell = null
+	launch.source = null
+	_pending_free.append(launch)
 
 
 ## Forgets the launches still waiting for this staff.
@@ -770,6 +795,7 @@ func _drop_pending(player: int, staff: int) -> void:
 	var i: int = _pending.size() - 1
 	while i >= 0:
 		if _pending[i].player == player and _pending[i].staff == staff:
+			_release_launch(_pending[i])
 			_pending.remove_at(i)
 		i -= 1
 
@@ -964,6 +990,8 @@ func _on_hit(player: int, target: Node, position: Vector2, tag: int) -> void:
 			chain = _rec_chain[slot]
 			prev = _rec_prev[slot]
 		heading = _heading(spell, slot, position, player)
+	# A chain from an echoed shot goes on at the echo's damage.
+	var echoed: bool = not by_ray and _same(slot) and spell.echo_hit != null and _rec_relay[slot] == spell.echo_hit
 	var held: bool = spell.payload != null and spell.trigger_event == TriggerBase.Event.HIT and fires > 0 and _take_fire(player)
 	if held:
 		fires -= 1
@@ -976,11 +1004,11 @@ func _on_hit(player: int, target: Node, position: Vector2, tag: int) -> void:
 	if held:
 		_fire_payload(spell, tag, player, position, heading, target)
 	if chain > 0:
-		_jump(spell, tag, player, position, target as Node2D, struck, prev, fires, chain - 1, by_ray)
+		_jump(spell, tag, player, position, target as Node2D, struck, prev, fires, chain - 1, by_ray, echoed)
 
 
 ## Sends a chain on from `position` to the nearest other target, if there is one in range.
-func _jump(spell: CompiledSpell, tag: int, player: int, position: Vector2, target: Node2D, struck: int, prev: int, fires: int, chain: int, by_ray: bool) -> void:
+func _jump(spell: CompiledSpell, tag: int, player: int, position: Vector2, target: Node2D, struck: int, prev: int, fires: int, chain: int, by_ray: bool, echoed: bool = false) -> void:
 	if _chains_used[player] >= SpellLimits.MAX_CHAINS_PER_STEP:
 		chains_dropped += 1
 		return
@@ -1018,6 +1046,8 @@ func _jump(spell: CompiledSpell, tag: int, player: int, position: Vector2, targe
 	if slot < 0:
 		return
 	_register(slot, tag, spell, fires, chain, struck)
+	if echoed:
+		_rec_relay[slot] = spell.echo_hit
 	projectiles.exclude(slot, target, SpellLimits.SOURCE_EXCLUSION)
 
 
@@ -1163,6 +1193,8 @@ func clear() -> void:
 	_chains_used.fill(0)
 	_jq_head = 0
 	_jq_count = 0
+	for launch in _pending:
+		_release_launch(launch)
 	_pending.clear()
 	_cast_count.fill(0)
 	delayed_dropped = 0

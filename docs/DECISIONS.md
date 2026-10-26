@@ -2,6 +2,14 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-26: Trigger kit, part 2 (staffs B2b)
+
+- **Scatter is the full circle:** each carrier of a scatter group leaves at a random angle from 0 to 360 degrees off the aim, as the design says "random directions"; the owner's fairness question at D3 covers it. The generator is seeded from player, staff and the staff's cast count, so a replay is the same; payloads and later firings go on drawing from the same stream.
+- **Later firings are queued, not timed on shots:** a burst's later firings and an echo wait in `Spells` (capped at `SpellLimits.MAX_PENDING`, overflow counted in `delayed_dropped`), start from the original point moved by however far the caster's anchor has moved (the cast's own group only; a payload's stay where they were), and are dropped when the staff is rebuilt or switched off. They cost no mana; the cast paid once.
+- **Echo** hits through a second shared `HitProfile` (`echo_hit`, half damage rounded, at least 1), built by the compiler, so no hit allocates. It fires after the strength in seconds, does not echo again, and a `hold` carrier does not echo (a sustained shot has nothing to repeat). An echo of a carrier with a trigger registers its own trigger, which is why `echo` doubles triggers. `on cast` fires on the carrier's first launch and again on its echo.
+- **Mirror** fires the second shot straight behind the first and only for straight, returning and beam carriers (an orbit, a rune and a dash have no back). Like every modifier it is on one carrier only. `on cast` fires once, not for the back shot.
+- **Burst of a payload:** a burst inside a payload fires the payload group again from the same point. Burst repeats of a `scatter` group draw new directions.
+
 ## 2026-10-26: Trigger kit, part 1 (staffs B2a)
 
 - **One path for the events that name a shot's tag** (`_fire_event`): it looks the tag up, checks the trigger matches, and uses the shot's record for `max_fires` when the event is being sent for that very shot (`event_slot` with the same tag). `shot_blocked` now sets `event_slot`. A beam has no slot, so while its `ray()` runs an event naming its tag (a kill or reaction its hit caused) counts against `_ray_fires`, the same count `_on_hit` uses. An event with no live shot behind it (a wizard's barrier, `shield_blocked`, a kill from a status tick after the shot is gone) has no count to keep and is limited only by the per-step fire cap; we chose that over keeping a per-tag, per-step table, because it is rare and the cap already bounds it.

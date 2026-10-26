@@ -44,6 +44,14 @@ extends Node
 ##
 ## `hit_profile(tag)` is what `gameplay/combat` asks on `projectile_hit`.
 ##
+## Multicast spread (B2b): a scatter group sends each carrier in a random direction, drawn from
+## a generator seeded by the player, staff and how many casts the staff has made (a replay is
+## the same). A burst group fires `repeats` times; the later firings, and an `echo` carrier's
+## second firing, wait in a small queue (`SpellLimits.MAX_PENDING`, `delayed_dropped` counts
+## the overflow) and are dropped if the staff was rebuilt or switched off meanwhile. A cast's
+## own later firings start from where the caster has moved to. `mirror` also fires the carrier
+## backwards; an echo hits at half damage.
+##
 ## Tags (`SpellTag`): player, staff, generation and node. `begin_generation(player, staff,
 ## compiled)` registers every compiled spell of a staff under a new generation and returns the
 ## tag of its first one; a payload's spells have their own nodes. Shots keep the tag they were
@@ -57,6 +65,24 @@ extends Node
 
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
+
+
+## A launch that waits for its time: a group's later firing (burst) or one carrier's echo.
+class PendingLaunch:
+	extends RefCounted
+	var due: float = 0.0
+	var player: int = 0
+	var staff: int = 0
+	var generation: int = 0
+	## The group to fire, or null for the single `spell` of an echo.
+	var group: CompiledGroup = null
+	var spell: CompiledSpell = null
+	var origin: Vector2 = Vector2.ZERO
+	var heading: Vector2 = Vector2.RIGHT
+	var source: Node = null
+	## The caster's anchor when it was scheduled (`Vector2.INF` if the launch is not the cast's).
+	var anchor: Vector2 = Vector2.INF
+
 
 ## What `cast` returns when the spell did not fire (cooling down, too little mana, no spell).
 const REFUSED: float = -1.0
@@ -128,6 +154,17 @@ var _rec_relay: Array[HitProfile] = []
 ## The carrier of each player's last cast that had an infusion (for `relay`), or null.
 var _last_infused: Array[CompiledSpell] = []
 
+## Launches that wait for their time (a burst's later firings, an echo), oldest first.
+var _pending: Array[PendingLaunch] = []
+var _clock: float = 0.0
+## Launches dropped because `SpellLimits.MAX_PENDING` were already waiting.
+var delayed_dropped: int = 0
+## player * STAFFS + staff -> casts made, which seeds the next cast's scatter.
+var _cast_count: PackedInt32Array = PackedInt32Array()
+var _scatter: RandomNumberGenerator = RandomNumberGenerator.new()
+## The carrier whose echo is being launched: its shots hit at the echo's half damage.
+var _echo_spell: CompiledSpell = null
+
 ## The beam being cast: its tag, direction and how many fires it has left.
 var _ray_tag: int = 0
 var _ray_dir: Vector2 = Vector2.ZERO
@@ -159,6 +196,7 @@ func _init() -> void:
 	_installed.resize(SpellLimits.PLAYERS * SpellLimits.STAFFS)
 	_cursor.resize(SpellLimits.PLAYERS * SpellLimits.STAFFS)
 	_hold_mana.resize(SpellLimits.PLAYERS * SpellLimits.STAFFS)
+	_cast_count.resize(SpellLimits.PLAYERS * SpellLimits.STAFFS)
 	for i in SpellLimits.PLAYERS * SpellLimits.STAFFS:
 		_hold_tags.append(PackedInt64Array())
 		_last_form.append(&"")
@@ -381,6 +419,9 @@ func hit_profile(tag: int) -> HitProfile:
 	var slot: int = projectiles.event_slot if projectiles != null else -1
 	if slot >= 0 and slot < _rec_relay.size() and _rec_relay[slot] != null and _same(slot) and projectiles.get_tag_of(slot) == tag:
 		return _rec_relay[slot]
+	# A beam's echo has no slot: it hits at half damage while it is being cast.
+	if _echo_spell != null and tag == _ray_tag and _profiles.get(tag) == _echo_spell:
+		return _echo_spell.echo_hit
 	return spell.hit
 
 
@@ -447,8 +488,10 @@ func cast_staff(player: int, staff: int, origin: Vector2, direction: Vector2, ma
 	if cast.group.is_empty():
 		_after_cast(index, compiled, cast)
 		return REFUSED
-	if _launch_group(cast.group, player, staff, _current[index], origin, aim, null) == 0:
+	_scatter.seed = hash(Vector3i(player, staff, _cast_count[index]))
+	if _launch_group(cast.group, player, staff, _current[index], origin, aim, null, true) == 0:
 		return REFUSED
+	_cast_count[index] += 1
 	_after_cast(index, compiled, cast)
 	_start_hold(index, player, staff, cast)
 	_last_infused[player] = null
@@ -500,6 +543,7 @@ func step(delta: float) -> void:
 		_cooldown[c] = maxf(_cooldown[c] - delta, 0.0)
 	_fires_used.fill(0)
 	_chains_used.fill(0)
+	_clock += delta
 	var i: int = 0
 	while i < _timer_count:
 		var slot: int = _timers[i]
@@ -517,6 +561,7 @@ func step(delta: float) -> void:
 			_timers[i] = _timers[_timer_count]
 			continue
 		i += 1
+	_run_pending()
 
 
 ## The shots made by one launch of `spell`, returned as how many were made (a beam counts
@@ -603,10 +648,25 @@ func _apply_travel(slot: int, spell: CompiledSpell) -> void:
 ## The shots of every spell of `group`, fired together from `origin` along `direction` by this
 ## player's staff in its `generation` (each spell's tag names its node); returns how many were
 ## made (a fallback counts as one). Two or more carriers of one group fan out a little
-## (`SpellLimits.MULTICAST_SPREAD` degrees apart). A fallback asks for an area hit on the spot:
-## the caster's for a cast, the payload's origin for a payload. `source` is the target that
-## fired the payload, or null.
-func _launch_group(group: CompiledGroup, player: int, staff: int, generation: int, origin: Vector2, direction: Vector2, source: Node) -> int:
+## (`SpellLimits.MULTICAST_SPREAD` degrees apart); a scatter group sends each in a random
+## direction instead. A burst group fires again `repeats - 1` times, `repeat_interval` seconds
+## apart (at once when that is 0), reading nothing again. A fallback asks for an area hit on the
+## spot: the caster's for a cast, the payload's origin for a payload. `source` is the target that
+## fired the payload, or null. `from_caster` is true for the cast's own group, whose later
+## firings (burst, echo) start from where the caster has moved to.
+func _launch_group(group: CompiledGroup, player: int, staff: int, generation: int, origin: Vector2, direction: Vector2, source: Node, from_caster: bool = false) -> int:
+	var made: int = _fire_group(group, player, staff, generation, origin, direction, source, from_caster)
+	if made > 0:
+		for n in range(1, group.repeats):
+			if group.repeat_interval <= 0.0:
+				_fire_group(group, player, staff, generation, origin, direction, source, from_caster)
+			else:
+				_delay(n * group.repeat_interval, group, null, player, staff, generation, origin, direction, source, from_caster)
+	return made
+
+
+## One firing of `group` (see `_launch_group`).
+func _fire_group(group: CompiledGroup, player: int, staff: int, generation: int, origin: Vector2, direction: Vector2, source: Node, from_caster: bool) -> int:
 	var made: int = 0
 	var carriers: int = 0
 	for spell in group.spells:
@@ -614,20 +674,91 @@ func _launch_group(group: CompiledGroup, player: int, staff: int, generation: in
 			carriers += 1
 	var k: int = 0
 	for spell in group.spells:
-		var tag: int = SpellTag.make(player, staff, spell.node, generation)
-		if spell.fallback != CompiledSpell.FALLBACK_NONE:
-			made += _fallback_hit(spell, tag, player, origin)
-			continue
 		var heading: Vector2 = direction
-		if carriers > 1:
-			heading = direction.rotated(deg_to_rad(SpellLimits.MULTICAST_SPREAD) * (float(k) / (carriers - 1) - 0.5) * (carriers - 1))
-		k += 1
-		var launched: int = _launch(spell, tag, player, origin, heading, source)
-		made += launched
-		# `on cast`: the payload leaves at once, from where the carrier did.
-		if launched > 0 and spell.payload != null and spell.trigger_event == TriggerBase.Event.CAST and _take_fire(player):
-			_launch_group(spell.payload, player, staff, generation, origin, heading, source)
+		if spell.fallback == CompiledSpell.FALLBACK_NONE:
+			if group.scatter:
+				heading = direction.rotated(_scatter.randf() * TAU)
+			elif carriers > 1:
+				heading = direction.rotated(deg_to_rad(SpellLimits.MULTICAST_SPREAD) * (float(k) / (carriers - 1) - 0.5) * (carriers - 1))
+			k += 1
+		made += _fire_spell(spell, player, staff, generation, origin, heading, source, from_caster, false)
 	return made
+
+
+## One carrier of a group, launched; returns the shots made. `mirror` also sends it backwards
+## (straight, returning and beam carriers), and `echo` schedules it once more. `echoed` is true
+## for that second firing, which hits at half damage and does not echo again.
+func _fire_spell(spell: CompiledSpell, player: int, staff: int, generation: int, origin: Vector2, heading: Vector2, source: Node, from_caster: bool, echoed: bool) -> int:
+	var tag: int = SpellTag.make(player, staff, spell.node, generation)
+	if spell.fallback != CompiledSpell.FALLBACK_NONE:
+		return _fallback_hit(spell, tag, player, origin)
+	_echo_spell = spell if echoed else null
+	var launched: int = _launch(spell, tag, player, origin, heading, source)
+	if launched > 0 and spell.behaviour(ModifierBase.Behaviour.MIRROR) > 0.0 and (spell.motion == FormBase.Motion.STRAIGHT or spell.motion == FormBase.Motion.RETURN or spell.motion == FormBase.Motion.RAY):
+		launched += _launch(spell, tag, player, origin, -heading, source)
+	_echo_spell = null
+	# `on cast`: the payload leaves at once, from where the carrier did.
+	if launched > 0 and spell.payload != null and spell.trigger_event == TriggerBase.Event.CAST and _take_fire(player):
+		_launch_group(spell.payload, player, staff, generation, origin, heading, source)
+	var echo: float = spell.behaviour(ModifierBase.Behaviour.ECHO)
+	if launched > 0 and not echoed and echo > 0.0 and spell.behaviour(ModifierBase.Behaviour.HOLD) <= 0.0:
+		_delay(echo, null, spell, player, staff, generation, origin, heading, source, from_caster)
+	return launched
+
+
+## Queues a launch `wait` seconds from now: `group` (a burst's later firing) or, with no group,
+## `spell` (an echo). Dropped when too many wait already.
+func _delay(wait: float, group: CompiledGroup, spell: CompiledSpell, player: int, staff: int, generation: int, origin: Vector2, heading: Vector2, source: Node, from_caster: bool) -> void:
+	if _pending.size() >= SpellLimits.MAX_PENDING:
+		delayed_dropped += 1
+		return
+	var launch := PendingLaunch.new()
+	launch.due = _clock + maxf(wait, 0.0)
+	launch.player = player
+	launch.staff = staff
+	launch.generation = generation
+	launch.group = group
+	launch.spell = spell
+	launch.origin = origin
+	launch.heading = heading
+	launch.source = source
+	if from_caster and projectiles != null:
+		launch.anchor = projectiles.get_anchor(player)
+	_pending.append(launch)
+
+
+## Fires the queued launches that are due. One whose staff was rebuilt or switched off since is
+## dropped. A cast's own launch starts as far from where it was cast as the caster has moved.
+func _run_pending() -> void:
+	var i: int = 0
+	while i < _pending.size():
+		var launch: PendingLaunch = _pending[i]
+		if launch.due > _clock:
+			i += 1
+			continue
+		_pending.remove_at(i)
+		if _current[launch.player * SpellLimits.STAFFS + launch.staff] != launch.generation:
+			continue
+		var origin: Vector2 = launch.origin
+		var from_caster: bool = launch.anchor.is_finite()
+		if from_caster and projectiles != null:
+			var now: Vector2 = projectiles.get_anchor(launch.player)
+			if now.is_finite():
+				origin += now - launch.anchor
+		var source: Node = launch.source if is_instance_valid(launch.source) else null
+		if launch.group != null:
+			_fire_group(launch.group, launch.player, launch.staff, launch.generation, origin, launch.heading, source, from_caster)
+		else:
+			_fire_spell(launch.spell, launch.player, launch.staff, launch.generation, origin, launch.heading, source, from_caster, true)
+
+
+## Forgets the launches still waiting for this staff.
+func _drop_pending(player: int, staff: int) -> void:
+	var i: int = _pending.size() - 1
+	while i >= 0:
+		if _pending[i].player == player and _pending[i].staff == staff:
+			_pending.remove_at(i)
+		i -= 1
 
 
 ## The cards that landed on the caster or on a payload's origin: an area hit there with the
@@ -666,7 +797,7 @@ func _register(slot: int, tag: int, spell: CompiledSpell, fires: int, chain: int
 		_rec_hurt.resize(size)
 		_rec_relay.resize(size)
 		_hurt_slots.resize(size)
-	_rec_relay[slot] = null
+	_rec_relay[slot] = spell.echo_hit if spell == _echo_spell else null
 	_rec_seq[slot] = projectiles.get_seq_of(slot)
 	_rec_fires[slot] = fires
 	_rec_chain[slot] = chain
@@ -1019,6 +1150,9 @@ func clear() -> void:
 	_chains_used.fill(0)
 	_jq_head = 0
 	_jq_count = 0
+	_pending.clear()
+	_cast_count.fill(0)
+	delayed_dropped = 0
 	_timer_count = 0
 	_rec_seq.fill(-1)
 	_rec_timed.fill(0)
@@ -1081,6 +1215,7 @@ func _start_hold(index: int, player: int, staff: int, cast: CompiledCast) -> voi
 
 ## Switches off the sustained carriers of this staff: their shots go, their mana is free.
 func _release_hold(index: int) -> void:
+	_drop_pending(floori(float(index) / SpellLimits.STAFFS), index % SpellLimits.STAFFS)
 	if _hold_tags[index].is_empty():
 		return
 	var tags: PackedInt64Array = _hold_tags[index].duplicate()

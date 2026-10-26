@@ -9,7 +9,6 @@
     "number": 256
   },
   "errors_in_a_row": 0,
-  "idle": null,
   "intake_tasks": {
     "208": {
       "author": "Brianmanden",
@@ -79,7 +78,13 @@
     6405166432,
     6415196364
   ],
-  "task_failures": {},
+  "task_failures": {
+    "**Trigger kit (staffs B2).** (`core/spells/`) After A6c.": {
+      "count": 0,
+      "parked_reason": "The trigger kit (B2) is written but not committed, and the new test file has not run yet. The work is in the working tree on branch claude/20261026-trigger-kit-staffs-b2-core-spells. The first full `ci/build/build.sh --quick --tests` run passed with the runtime changes, but it started before I wrote `tests/core/test_trigger_kit.gd`, so it never ran that file. A second full run was still going when I was told to stop, so I can't say whether the new tests pass. Nothing was run for `tools/check.sh`",
+      "parked_until": "2026-11-02T13:54:54Z"
+    }
+  },
   "usage": [
     {
       "at": "2026-10-18T14:55:14Z",

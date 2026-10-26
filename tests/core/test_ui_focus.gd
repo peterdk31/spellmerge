@@ -46,6 +46,10 @@ func _initialize() -> void:
 	_test_close_then_reopen()
 	_test_never_takes_global_focus()
 	_test_invalid_player_index()
+	_test_alternate_and_paging()
+	_test_navigator_steers_moves()
+	_test_navigator_is_kept_on_reopen_and_cleared_on_close()
+	_test_focus_jumps_to_a_control()
 	_teardown()
 	if _failures.is_empty():
 		print("TEST OK: core/ui_focus")
@@ -502,3 +506,76 @@ func _test_invalid_player_index() -> void:
 	_focus.cancel(9)
 	_check(not _focus.close(9), "closing an out of range player is false")
 	_check(_log.is_empty(), "out of range calls do nothing")
+
+
+func _test_alternate_and_paging() -> void:
+	_setup()
+	var alternates: Array = []
+	var pages: Array = []
+	_focus.alternate.connect(func(p: int, c: Control) -> void: alternates.append([p, _buttons[p].find(c)]))
+	_focus.paged.connect(func(p: int, step: int) -> void: pages.append([p, step]))
+	_focus.open(1, _panel(1))
+	_tap(1, &"move_down")
+	_tap(1, &"cast_x")
+	_check(alternates == [[1, 1]], "cast_x sends alternate for the focused control, got %s" % str(alternates))
+	_tap(1, &"page_next")
+	_tap(1, &"page_prev")
+	_check(pages == [[1, 1], [1, -1]], "page_next and page_prev send paged +1 and -1, got %s" % str(pages))
+	_check(_focus.focus_index(1) == 1, "neither moves the focus")
+	_tap(2, &"cast_x")
+	_tap(2, &"page_next")
+	_check(alternates.size() == 1 and pages.size() == 2, "a closed panel sends neither")
+
+
+## A navigator for a panel of three in a row: right and left step along it, up and down have
+## nothing, so they fall back to next and previous.
+func _test_navigator_steers_moves() -> void:
+	_setup()
+	_focus.open(0, _panel(0))
+	var asked: Array = []
+	_focus.set_navigator(0, func(c: Control, d: Vector2i) -> Control:
+		asked.append([_buttons[0].find(c), d])
+		if d == Vector2i.RIGHT:
+			return _buttons[0][2]
+		return null)
+	_tap(0, &"move_right")
+	_check(_focus.focus_index(0) == 2, "the navigator sends right to the third control")
+	_check(asked.back() == [0, Vector2i.RIGHT], "asked with the focused control and the direction, got %s" % str(asked))
+	_tap(0, &"move_down")
+	_check(_focus.focus_index(0) == 0, "with no answer, down goes to the next control (wrapping)")
+	_tap(0, &"move_left")
+	_check(_focus.focus_index(0) == 2, "with no answer, left goes to the previous control")
+	var stranger := Button.new()
+	_focus.set_navigator(0, func(_c: Control, _d: Vector2i) -> Control: return stranger)
+	_tap(0, &"move_down")
+	_check(_focus.focus_index(0) == 0, "a control outside the panel counts as no answer")
+	stranger.free()
+
+
+func _test_navigator_is_kept_on_reopen_and_cleared_on_close() -> void:
+	_setup()
+	_focus.open(0, _panel(0))
+	_focus.set_navigator(0, func(_c: Control, _d: Vector2i) -> Control: return _buttons[0][2])
+	_focus.open(0, _panel(0))
+	_tap(0, &"move_down")
+	_check(_focus.focus_index(0) == 2, "opening again with new controls keeps the navigator")
+	_focus.close(0)
+	_focus.open(0, _panel(0))
+	_tap(0, &"move_down")
+	_check(_focus.focus_index(0) == 1, "a closed panel's navigator is gone")
+	_focus.close(0)
+	_focus.set_navigator(0, func(_c: Control, _d: Vector2i) -> Control: return _buttons[0][2])
+	_focus.open(0, _panel(0))
+	_tap(0, &"move_down")
+	_check(_focus.focus_index(0) == 1, "a navigator set while closed is ignored")
+
+
+func _test_focus_jumps_to_a_control() -> void:
+	_setup()
+	_check(not _focus.focus(0, _buttons[0][2]), "a closed panel takes no jump")
+	_focus.open(0, _panel(0))
+	_check(_focus.focus(0, _buttons[0][2]) and _focus.focus_index(0) == 2, "a jump focuses the control")
+	_check(not _focus.focus(0, _buttons[1][0]), "another panel's control is refused")
+	(_buttons[0][1] as Button).disabled = true
+	_check(not _focus.focus(0, _buttons[0][1]) and _focus.focus_index(0) == 2, "a disabled control is refused")
+

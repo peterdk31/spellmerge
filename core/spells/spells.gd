@@ -227,7 +227,7 @@ func compile_staff(cards: Array[StringName], staff: StaffBase) -> CompiledStaff:
 
 ## What the builder shows of a staff, as plain values so that nothing outside `core/spells`
 ## reads a compiled staff: `empty`; `cards` (the card ids by slot, `&""` for an empty slot); `casts`, one Dictionary per cast of the cycle with `slots`
-## (read order), `text`, `mana`, `delay`, `recharges`, `wrapped`, `targets` (card slot -> the
+## (read order), `text`, `mana`, `delay`, `damage` (each carrier's hit times its shots and the group's repeats, payloads left out), `recharges`, `wrapped`, `targets` (card slot -> the
 ## carrier's slot, or `StaffCompiler.TARGET_CASTER` / `TARGET_POINT`) and `wasted` (slot ->
 ## reason); and `wasted` for the staff (cards that did nothing in any cast that read them).
 func staff_view(cards: Array[StringName], staff: StaffBase) -> Dictionary:
@@ -236,12 +236,25 @@ func staff_view(cards: Array[StringName], staff: StaffBase) -> Dictionary:
 	for cast in compiled.casts:
 		casts.append({
 			"slots": cast.slots, "text": cast.description, "mana": cast.mana, "delay": cast.delay,
+			"damage": _cast_damage(cast),
 			"recharges": cast.recharges, "wrapped": cast.wrapped,
 			"targets": cast.targets.duplicate(), "wasted": cast.wasted.duplicate(),
 		})
 	var row: Array[StringName] = []
 	row.assign(compiled.cards)
 	return {"empty": compiled.is_empty(), "cards": row, "casts": casts, "wasted": compiled.wasted.duplicate()}
+
+
+## The damage one cast deals if every shot of it lands once: each carrier's hit times its
+## shots, times the group's repeats. Payloads are left out (they depend on what is hit), so it is
+## the builder's "at least" number.
+static func _cast_damage(cast: CompiledCast) -> int:
+	if cast.group == null:
+		return 0
+	var total: int = 0
+	for spell in cast.group.spells:
+		total += spell.damage * maxi(spell.shots, 1)
+	return total * maxi(cast.group.repeats, 1)
 
 
 ## What the builder shows of the component `id`: its name (the id when it has none, "" for

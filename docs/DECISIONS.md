@@ -2,6 +2,14 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-26: Staff runtime details (staffs A5)
+
+- **Recipes run as staffs of one cast.** `install` and `cast` wrap a recipe's spell (its held spells as payloads, its depth as its node), so there is one runtime and every M2 cast and trigger test keeps checking it until A6c removes recipes.
+- **Switching a `hold` off is a cast of the staff that spends nothing** (`cast_staff` returns 0.0). Which presses may do it is the player's call (A6a): a button held down must not switch on and off again and again.
+- **A cast with nothing in it** (every card wasted) still moves the staff on and starts its delay, so a staff can never stick on it; it returns `REFUSED`.
+- **Carriers of one group fan out 12° apart** (`MULTICAST_SPREAD`), so `double · bolt · bolt` reads as two bolts. Tuning, not a limit.
+- **Fallbacks are area hits on the spot,** as wide as the larger of the spell's radius and its blast strength; combat makes them hurt in B3.
+
 ## 2026-10-26: Planning after the pivot verdict (#264)
 
 - **Verdict adopted as given:** the owner's pivot at C2 (#264) is carried out by the merged staffs design (`M2-staffs.md`, DESIGN.md rows, parts A1–A4 in #266–#269). ROADMAP, NEXT and the entry below already say so; per the owner, the design and both lanes of `docs/NEXT.md` stay as they are and no task is rewritten or reordered. #264 is closed by this PR. The bot starts at the top of `## Queue` (A5); owner sessions take `## Owner lane`.

@@ -33,10 +33,18 @@ const MAX_TIMER_FIRES: int = 4
 const CHAIN_RANGE: float = 96.0
 ## Degrees a split fan covers when the form has no spread of its own.
 const SPLIT_SPREAD: float = 30.0
-## Builds of one slot (the generations) whose shots can be in the air at once.
+## Builds of one staff (the generations) whose shots can be in the air at once.
 const GENERATIONS: int = 8
-## Spell slots per player (A and B).
-const SLOTS: int = 2
+## Staffs per player, one per button (staffs A5): A, X, Y and B.
+const STAFFS: int = 4
+## The recipe runtime's name for `STAFFS` (a recipe's slot A and B are staffs 0 and 1); it goes
+## with the recipe path in staffs A6c.
+const SLOTS: int = STAFFS
+## Degrees between the carriers of one multicast group, so two bolts cast together do not fly
+## as one (tuning, not a limit).
+const MULTICAST_SPREAD: float = 12.0
+## Seconds a shot made sustained by `hold` lives: until it is switched off, in practice.
+const HOLD_LIFETIME: float = 100000.0
 ## Players, indexes 0 to 3.
 const PLAYERS: int = 4
 

@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-26: The staff runtime (owner session, staffs A5)
+
+The owner paused development (control panel) so the bot would not idle through tasks that wait on A5, and an owner session built it. Staffs cast: four per player, each with its cycle, cursor, delay and recharge; multicast carriers fan out; payloads fire as groups; fallbacks ask combat for an area hit (`area_hit_requested`, which nothing hears until B3); `hold` keeps its shots and reserves mana until the staff is cast again or edited. The tag is now player, staff, generation and node above `1 << 20` (enemy attack tags reach 101,000). Recipes run as staffs of one cast, so the old cast, trigger and combo tests pass unchanged on the new runtime; the three tag tests that assumed two slots now use four staffs. New: `tests/core/test_staff_runtime.gd` (10 tests).
+
 ## 2026-10-26: The staff compiler (owner session, staffs A4)
 
 `Spells.compile_staff(cards, staff)` reads a staff into its cycle with the rules of the design (`core/spells/staff_compiler.gd`), and `Spells.staff_view` gives the builder plain values. Every example in the design is a test in `tests/core/test_staff_compiler.gd` (20 tests). Two things the tests taught: wrap-around lets a trailing card reach the first carrier in a later cast (so `fire · bolt · homing` puts homing on a bolt in cast 2, and `double · on hit · bolt · nova · bolt · blast` makes two casts of three spells each), and a 64-slot staff can make more than 128 compiled spells in one cycle, so the tag's node field is 9 bits. Nothing casts a compiled staff yet; that is A5.

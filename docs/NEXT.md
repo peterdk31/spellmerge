@@ -8,7 +8,7 @@ The ordered task queue for the current milestone, M2, now in its **staffs rework
 
 M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97). The second C2 checkpoint (#264) was answered with **pivot** on 2026-10-26: spells are built in staffs (M2-staffs.md). Nothing from M3+ is built (rewards, relics, staff types, rooms, the door rule).
 
-- [ ] **The staff runtime (staffs A5).** (`core/spells/`) After A4. The recipe runtime moves onto the new tags in the same PR.
+- [x] **The staff runtime (staffs A5).** Done in an owner session (development paused meanwhile): `SpellTag` is player, staff, generation, node above `1 << 20`; `install_staff`, `cast_staff`, `cast_index`, `is_holding`, `reserved_mana`; four staffs per player with their own cursor and delay; multicast groups fan out; payloads fire as groups under their own node's tag; fallbacks send `area_hit_requested`; `hold` keeps its shots until switched off (`mana_reserved`); a recipe runs as a staff of one cast, so there is one runtime. Tests: `tests/core/test_staff_runtime.gd`.
 - [ ] **Player and builder on staffs (staffs A6a).** (`gameplay/player/`, `gameplay/flow/`, `hud/builder/`, `project.godot` input map, `tests/bots/`) After A5.
 - [ ] **Combos and tests on staffs (staffs A6b).** (`content/spells/combos/`, `tests/content/spells/`, `tests/clips/`, `tests/bots/test_spell_fuzz.gd`, `tools/atlas.py`) After A6a.
 - [ ] **The old recipe path removed (staffs A6c).** (`core/spells/`, `core/events/`, `docs/ARCHITECTURE.md`, `content/spells/README.md`) After A6b.

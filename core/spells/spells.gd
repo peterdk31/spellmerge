@@ -90,8 +90,18 @@ const STATUS_VERBS: Dictionary = {
 ## Registry stand-in for tests: anything with `get_resource(folder, id)`. Null uses `Registry`.
 var registry: Node = null
 
-## player * SLOTS + slot -> the current generation (0-7)
+## player * STAFFS + staff -> the current generation (0-7), -1 for no build
 var _current: PackedInt32Array = PackedInt32Array()
+## player * STAFFS + staff -> the current build (a recipe is a staff of one cast), or null
+var _installed: Array[CompiledStaff] = []
+## player * STAFFS + staff -> which cast of its cycle comes next
+var _cursor: PackedInt32Array = PackedInt32Array()
+## player * STAFFS + staff -> the tags of its sustained (`hold`) carriers that are on
+var _hold_tags: Array[PackedInt64Array] = []
+## player * STAFFS + staff -> the mana its sustained carriers reserve
+var _hold_mana: PackedFloat32Array = PackedFloat32Array()
+## generation key (`SpellTag.generation_key`) -> how many nodes that generation registered
+var _node_counts: Dictionary = {}
 ## tag -> CompiledSpell
 var _profiles: Dictionary = {}
 ## tag -> live shots
@@ -99,7 +109,7 @@ var _live: Dictionary = {}
 ## generation key (the depth-0 tag) -> live shots of all depths of that generation
 var _generation_live: Dictionary = {}
 
-## player * SLOTS + slot -> seconds before that slot may cast again
+## player * STAFFS + staff -> seconds before that staff may cast again
 var _cooldown: PackedFloat32Array = PackedFloat32Array()
 ## Held spells each player has fired in this step.
 var _fires_used: PackedInt32Array = PackedInt32Array()
@@ -143,9 +153,14 @@ var _jq_busy: bool = false
 
 
 func _init() -> void:
-	_current.resize(SpellLimits.PLAYERS * SpellLimits.SLOTS)
+	_current.resize(SpellLimits.PLAYERS * SpellLimits.STAFFS)
 	_current.fill(-1)
-	_cooldown.resize(SpellLimits.PLAYERS * SpellLimits.SLOTS)
+	_installed.resize(SpellLimits.PLAYERS * SpellLimits.STAFFS)
+	_cursor.resize(SpellLimits.PLAYERS * SpellLimits.STAFFS)
+	_hold_mana.resize(SpellLimits.PLAYERS * SpellLimits.STAFFS)
+	for i in SpellLimits.PLAYERS * SpellLimits.STAFFS:
+		_hold_tags.append(PackedInt64Array())
+	_cooldown.resize(SpellLimits.PLAYERS * SpellLimits.STAFFS)
 	_fires_used.resize(SpellLimits.PLAYERS)
 	_chains_used.resize(SpellLimits.PLAYERS)
 	_jq_spell.resize(JUMP_QUEUE)
@@ -290,62 +305,107 @@ func profile(tag: int) -> CompiledSpell:
 
 
 ## Registers `spell` (which must be valid) as the new build of this player's slot and
-## returns the tag of its cast, or 0 for an invalid spell or a bad player or slot.
-## The slot's generation advances; if its shots from 8 builds ago are still in the air the
-## oldest generation is revoked (see `revoked_tags`).
+## returns the tag of its cast, or 0 for an invalid spell or a bad player or slot. A recipe's
+## spell becomes a staff of one cast (its held spells are its payloads, its depth their node), so
+## recipes and staffs share one runtime (staffs A5). The slot's generation advances; if its shots
+## from 8 builds ago are still in the air the oldest generation is revoked (see `revoked_tags`).
 func begin_generation(player: int, slot: int, spell: CompiledSpell) -> int:
 	revoked_tags.clear()
-	if spell == null or not spell.valid or not _in_range(player, slot):
+	if spell == null or not spell.valid:
 		return 0
-	var index: int = player * SpellLimits.SLOTS + slot
+	return _begin(player, slot, _wrap(spell))
+
+
+## Registers every spell of `compiled` under a new generation of this player's staff and
+## returns the tag of its first spell, or 0 for an empty staff (the staff then has no build)
+## or a bad player or staff. See `begin_generation` for the ring and `revoked_tags`.
+func _begin(player: int, staff: int, compiled: CompiledStaff) -> int:
+	revoked_tags.clear()
+	if compiled == null or not _in_range(player, staff) or compiled.nodes.size() > SpellTag.NODE_MASK + 1:
+		return 0
+	var index: int = player * SpellLimits.STAFFS + staff
+	_release_hold(index)
 	var old: int = _current[index]
+	if compiled.is_empty():
+		_installed[index] = null
+		_cursor[index] = 0
+		_current[index] = -1
+		if old >= 0:
+			_release_generation(player, staff, old)
+		return 0
 	var generation: int = (old + 1) % SpellLimits.GENERATIONS
 	_current[index] = generation
-	for depth in SpellLimits.MAX_DEPTH + 1:
-		var tag: int = SpellTag.make(player, slot, depth, generation)
-		if _live.get(tag, 0) > 0:
-			revoked_tags.append(tag)
-		_profiles.erase(tag)
-		_live.erase(tag)
-	_generation_live.erase(SpellTag.make(player, slot, 0, generation))
-	var level: CompiledSpell = spell
-	for depth in SpellLimits.MAX_DEPTH + 1:
-		if level == null:
-			break
-		_profiles[SpellTag.make(player, slot, depth, generation)] = level
-		level = level.held
+	var key: int = SpellTag.generation_key(SpellTag.make(player, staff, 0, generation))
+	for node in _node_counts.get(key, 0):
+		var stale: int = SpellTag.make(player, staff, node, generation)
+		if _live.get(stale, 0) > 0:
+			revoked_tags.append(stale)
+		_profiles.erase(stale)
+		_live.erase(stale)
+	_generation_live.erase(key)
+	for spell in compiled.nodes:
+		_profiles[SpellTag.make(player, staff, spell.node, generation)] = spell
+	_node_counts[key] = compiled.nodes.size()
+	_installed[index] = compiled
+	_cursor[index] = 0
 	if old >= 0:
-		_release_generation(player, slot, old)
-	return SpellTag.make(player, slot, 0, generation)
+		_release_generation(player, staff, old)
+	return SpellTag.make(player, staff, 0, generation)
 
 
-## The tag of the current build of this slot at `depth`, or 0 when it was never built.
-func current_tag(player: int, slot: int, depth: int = 0) -> int:
+## A recipe's spell as a staff of one cast: the spell and the spells its triggers hold become
+## the nodes, depth by depth, and each held spell is the payload of the one above it. Mana and
+## cooldown are the recipe's own, as before staffs.
+func _wrap(spell: CompiledSpell) -> CompiledStaff:
+	var out := CompiledStaff.new()
+	var level: CompiledSpell = spell
+	while level != null:
+		level.node = out.nodes.size()
+		out.nodes.append(level)
+		if level.held != null and level.payload == null:
+			level.payload = CompiledGroup.new()
+			level.payload.spells.append(level.held)
+		level = level.held
+	var cast := CompiledCast.new()
+	cast.group = CompiledGroup.new()
+	cast.group.spells.append(spell)
+	cast.mana = spell.mana_cost
+	cast.delay = spell.cooldown
+	cast.recharges = true
+	out.casts.append(cast)
+	return out
+
+
+## The tag of the current build of this staff (or a recipe's slot) at `node` (a recipe's
+## depth), or 0 when it has no build.
+func current_tag(player: int, slot: int, node: int = 0) -> int:
 	if not _in_range(player, slot):
 		return 0
-	var generation: int = _current[player * SpellLimits.SLOTS + slot]
-	return 0 if generation < 0 else SpellTag.make(player, slot, depth, generation)
+	var generation: int = _current[player * SpellLimits.STAFFS + slot]
+	return 0 if generation < 0 else SpellTag.make(player, slot, node, generation)
 
 
 ## A shot with `tag` was spawned. Ignored for a tag that has no spell.
 func shot_started(tag: int) -> void:
 	if _profiles.has(tag):
 		_live[tag] = _live.get(tag, 0) + 1
-		var key: int = _generation_key(tag)
+		var key: int = SpellTag.generation_key(tag)
 		_generation_live[key] = _generation_live.get(key, 0) + 1
 
 
 ## A shot with `tag` ended (hit, expired or was removed). The generation's spells (every
-## depth) are freed once its last shot of any depth is gone and a newer build has replaced it.
+## node) are freed once its last shot of any node is gone and a newer build has replaced it. A
+## sustained (`hold`) carrier whose last shot ends frees its mana reservation.
 func shot_ended(tag: int) -> void:
 	var live: int = _live.get(tag, 0)
 	if live <= 0:
 		return
 	if live == 1:
 		_live.erase(tag)
+		_end_hold_of(tag)
 	else:
 		_live[tag] = live - 1
-	var key: int = _generation_key(tag)
+	var key: int = SpellTag.generation_key(tag)
 	var in_air: int = _generation_live.get(key, 0) - 1
 	if in_air > 0:
 		_generation_live[key] = in_air
@@ -360,14 +420,14 @@ func live_shots(tag: int) -> int:
 	return _live.get(tag, 0)
 
 
-## Generations of this slot that still have a spell registered (the current one and any
+## Generations of this staff that still have spells registered (the current one and any
 ## older ones with shots in the air).
 func generations_held(player: int, slot: int) -> int:
 	var count: int = 0
 	if not _in_range(player, slot):
 		return 0
 	for generation in SpellLimits.GENERATIONS:
-		if _profiles.has(SpellTag.make(player, slot, 0, generation)):
+		if _node_counts.has(SpellTag.generation_key(SpellTag.make(player, slot, 0, generation))):
 			count += 1
 	return count
 
@@ -383,40 +443,89 @@ func hit_profile(tag: int) -> HitProfile:
 ## from the projectile manager the shots it revoked (see `revoked_tags`). Returns the tag of
 ## its cast, or 0 for an invalid spell or a bad player or slot.
 func install(player: int, slot: int, spell: CompiledSpell) -> int:
-	var tag: int = begin_generation(player, slot, spell)
-	if tag != 0 and projectiles != null:
+	if spell == null or not spell.valid:
+		revoked_tags.clear()
+		return 0
+	return install_staff(player, slot, _wrap(spell))
+
+
+## Makes `compiled` (from `compile_staff`) the build of this player's staff (0-3), starting its
+## cycle at the first cast, and removes the shots the new generation revoked. Editing a staff
+## switches its sustained (`hold`) carriers off. Returns the tag of its first spell, or 0 for an
+## empty staff (which leaves the staff with no build) or a bad player or staff.
+func install_staff(player: int, staff: int, compiled: CompiledStaff) -> int:
+	var tag: int = _begin(player, staff, compiled)
+	if projectiles != null:
 		for revoked in revoked_tags:
 			projectiles.remove_by_tag(revoked)
 	return tag
 
 
-## Seconds before this player's slot may cast again.
+## Seconds before this player's staff (or a recipe's slot) may cast again.
 func cooldown_left(player: int, slot: int) -> float:
-	return _cooldown[player * SpellLimits.SLOTS + slot] if _in_range(player, slot) else 0.0
+	return _cooldown[player * SpellLimits.STAFFS + slot] if _in_range(player, slot) else 0.0
 
 
-## Fires the spell built in this player's slot from `origin` along `direction`. `mana` is
-## what the caster has. Returns the mana spent (0.0 or more) when the spell fired, or
-## `REFUSED` when it did not (nothing built, cooling down, too little mana, no direction,
-## or every shot starting inside a wall); the caller then takes that much mana and reads
-## no field. A refused cast changes nothing.
+## Which cast of its cycle this player's staff makes next (0 after a recharge).
+func cast_index(player: int, staff: int) -> int:
+	return _cursor[player * SpellLimits.STAFFS + staff] if _in_range(player, staff) else 0
+
+
+## True while this player's staff has sustained (`hold`) carriers switched on.
+func is_holding(player: int, staff: int) -> bool:
+	return _in_range(player, staff) and not _hold_tags[player * SpellLimits.STAFFS + staff].is_empty()
+
+
+## The recipe runtime's name for `cast_staff` (slot A and B are staffs 0 and 1).
 func cast(player: int, slot: int, origin: Vector2, direction: Vector2, mana: float) -> float:
-	if projectiles == null or not _in_range(player, slot) or not origin.is_finite():
+	return cast_staff(player, slot, origin, direction, mana)
+
+
+## Fires the next cast of this player's staff from `origin` along `direction`. `mana` is what
+## the caster has. Returns the mana spent (0.0 or more) when it fired, or `REFUSED` when it did
+## not (nothing built, still in its delay, too little mana, no direction, or every shot starting
+## inside a wall); the caller then takes that much mana and reads no field. A refused cast
+## changes nothing, except that a cast with nothing in it (every card wasted) still moves the
+## staff on, so it never sticks there.
+##
+## While the staff has sustained (`hold`) carriers on, a cast switches them all off instead,
+## frees their reservation and returns 0.0. The caller decides which presses may do that (a
+## held button should not switch on and off again and again).
+func cast_staff(player: int, staff: int, origin: Vector2, direction: Vector2, mana: float) -> float:
+	if projectiles == null or not _in_range(player, staff) or not origin.is_finite():
 		return REFUSED
 	if not direction.is_finite() or direction.is_zero_approx():
 		return REFUSED
-	var tag: int = current_tag(player, slot)
-	var spell: CompiledSpell = _profiles.get(tag)
-	var index: int = player * SpellLimits.SLOTS + slot
-	if spell == null or _cooldown[index] > 0.0 or mana < spell.mana_cost:
+	var index: int = player * SpellLimits.STAFFS + staff
+	var compiled: CompiledStaff = _installed[index]
+	if compiled == null or compiled.is_empty() or _cooldown[index] > 0.0:
 		return REFUSED
-	if _launch(spell, tag, player, origin, direction.normalized(), null) == 0:
+	if not _hold_tags[index].is_empty():
+		_release_hold(index)
+		_cooldown[index] = compiled.staff.cast_delay if compiled.staff != null else 0.0
+		return 0.0
+	var cast: CompiledCast = compiled.casts[mini(_cursor[index], compiled.casts.size() - 1)]
+	if mana < cast.mana:
 		return REFUSED
-	_cooldown[index] = spell.cooldown
-	var combo: StringName = combo_class(spell)
-	if events != null and combo != &"":
-		events.combo_cast.emit(player, combo, origin, direction.normalized(), spell.tint)
-	return spell.mana_cost
+	var aim: Vector2 = direction.normalized()
+	if cast.group.is_empty():
+		_after_cast(index, compiled, cast)
+		return REFUSED
+	if _launch_group(cast.group, player, staff, _current[index], origin, aim, null) == 0:
+		return REFUSED
+	_after_cast(index, compiled, cast)
+	_start_hold(index, player, staff, cast)
+	var first: CompiledSpell = cast.group.spells[0]
+	var combo: StringName = combo_class(first)
+	if events != null and combo != &"" and first.fallback == CompiledSpell.FALLBACK_NONE:
+		events.combo_cast.emit(player, combo, origin, aim, first.tint)
+	return cast.mana
+
+
+## The delay and the next cast of the cycle, after `cast` fired (or had nothing in it).
+func _after_cast(index: int, compiled: CompiledStaff, cast: CompiledCast) -> void:
+	_cooldown[index] = cast.delay
+	_cursor[index] = 0 if cast.recharges else (_cursor[index] + 1) % compiled.casts.size()
 
 
 ## Which kind of combination a compiled spell is, for the look of its cast (`combo_cast`):
@@ -426,7 +535,7 @@ func cast(player: int, slot: int, origin: Vector2, direction: Vector2, mana: flo
 func combo_class(spell: CompiledSpell) -> StringName:
 	if spell == null or not spell.valid:
 		return &""
-	if spell.held != null:
+	if spell.payload != null or spell.held != null:
 		if spell.modifier_ids.size() >= 2 or spell.chain_length() >= 3:
 			return &"stacked"
 		match spell.trigger_event:
@@ -474,6 +583,7 @@ func _launch(spell: CompiledSpell, tag: int, player: int, origin: Vector2, direc
 	var count: int = spell.shots
 	var made: int = 0
 	var carried: int = spell.chain_jumps if chain < 0 else chain
+	var lifetime: float = SpellLimits.HOLD_LIFETIME if spell.behaviour(ModifierBase.Behaviour.HOLD) > 0.0 else spell.lifetime
 	var base: float = direction.angle()
 	if spell.motion == FormBase.Motion.RAY and spell.homing_turn > 0.0:
 		direction = projectiles.homing_aim(player, origin, direction, deg_to_rad(30.0), ProjectilesScript.LAYER_ENEMY)
@@ -491,12 +601,12 @@ func _launch(spell: CompiledSpell, tag: int, player: int, origin: Vector2, direc
 				var turn: float = SpellLimits.ORBIT_TURN
 				if spell.speed > 0.0 and spell.orbit_radius > 0.0:
 					turn = spell.speed / spell.orbit_radius
-				slot = projectiles.spawn_orbit(player, spell.orbit_radius, base + TAU * n / count, turn, spell.lifetime, spell.radius, ProjectilesScript.LAYER_ENEMY, spell.pierce, tag)
+				slot = projectiles.spawn_orbit(player, spell.orbit_radius, base + TAU * n / count, turn, lifetime, spell.radius, ProjectilesScript.LAYER_ENEMY, spell.pierce, tag)
 			FormBase.Motion.STILL:
 				var at: Vector2 = origin if count == 1 else origin + heading * spell.radius * 2.0
-				slot = projectiles.spawn(player, at, Vector2.ZERO, spell.lifetime, spell.radius, ProjectilesScript.LAYER_ENEMY, spell.pierce, tag, ProjectilesScript.MOTION_STILL)
+				slot = projectiles.spawn(player, at, Vector2.ZERO, lifetime, spell.radius, ProjectilesScript.LAYER_ENEMY, spell.pierce, tag, ProjectilesScript.MOTION_STILL)
 			_:
-				slot = projectiles.spawn(player, origin, heading * spell.speed, spell.lifetime, spell.radius, ProjectilesScript.LAYER_ENEMY, spell.pierce, tag)
+				slot = projectiles.spawn(player, origin, heading * spell.speed, lifetime, spell.radius, ProjectilesScript.LAYER_ENEMY, spell.pierce, tag)
 				if slot >= 0 and spell.homing_turn > 0.0:
 					projectiles.set_homing(slot, spell.homing_turn)
 		if slot < 0:
@@ -509,6 +619,40 @@ func _launch(spell: CompiledSpell, tag: int, player: int, origin: Vector2, direc
 	if events != null and made > 0 and count > 1 and spell.spread >= 360.0 and spell.motion == FormBase.Motion.STRAIGHT:
 		events.form_shown.emit(player, &"nova", origin, direction, 0.0, spell.tint)
 	return made
+
+
+## The shots of every spell of `group`, fired together from `origin` along `direction` by this
+## player's staff in its `generation` (each spell's tag names its node); returns how many were
+## made (a fallback counts as one). Two or more carriers of one group fan out a little
+## (`SpellLimits.MULTICAST_SPREAD` degrees apart). A fallback asks for an area hit on the spot:
+## the caster's for a cast, the payload's origin for a payload. `source` is the target that
+## fired the payload, or null.
+func _launch_group(group: CompiledGroup, player: int, staff: int, generation: int, origin: Vector2, direction: Vector2, source: Node) -> int:
+	var made: int = 0
+	var carriers: int = 0
+	for spell in group.spells:
+		if spell.fallback == CompiledSpell.FALLBACK_NONE:
+			carriers += 1
+	var k: int = 0
+	for spell in group.spells:
+		var tag: int = SpellTag.make(player, staff, spell.node, generation)
+		if spell.fallback != CompiledSpell.FALLBACK_NONE:
+			made += _fallback_hit(spell, tag, player, origin)
+			continue
+		var heading: Vector2 = direction
+		if carriers > 1:
+			heading = direction.rotated(deg_to_rad(SpellLimits.MULTICAST_SPREAD) * (float(k) / (carriers - 1) - 0.5) * (carriers - 1))
+		k += 1
+		made += _launch(spell, tag, player, origin, heading, source)
+	return made
+
+
+## The cards that landed on the caster or on a payload's origin: an area hit there with the
+## spell's profile (a blast is as wide as its strength). Combat decides what it does (staffs B3).
+func _fallback_hit(spell: CompiledSpell, tag: int, player: int, at: Vector2) -> int:
+	if events != null:
+		events.area_hit_requested.emit(player, at, maxf(spell.radius, spell.behaviour(ModifierBase.Behaviour.BLAST)), tag)
+	return 1
 
 
 ## Degrees (as radians) off the aim of shot `n` of `count`: none for one shot, an even ring
@@ -542,7 +686,7 @@ func _register(slot: int, tag: int, spell: CompiledSpell, fires: int, chain: int
 	_rec_prev[slot] = prev
 	_rec_clock[slot] = spell.trigger_interval
 	shot_started(tag)
-	if spell.held != null and spell.trigger_event == TriggerBase.Event.TIMER:
+	if spell.payload != null and spell.trigger_event == TriggerBase.Event.TIMER:
 		# A shot that ended and was replaced in this slot before `step` is still listed once.
 		if _rec_timed[slot] == 0:
 			if _timer_count == _timers.size():
@@ -570,9 +714,9 @@ func _shoot_ray(spell: CompiledSpell, tag: int, player: int, origin: Vector2, he
 	if got > 0.0 and events != null:
 		events.form_shown.emit(player, &"beam", origin, heading, got, spell.tint)
 	# A `ray()` that did nothing (too deep, or a bad aim) has no end to fire the held spell from.
-	if got > 0.0 and spell.held != null and spell.trigger_event == TriggerBase.Event.EXPIRE and _ray_fires > 0 and _take_fire(player):
+	if got > 0.0 and spell.payload != null and spell.trigger_event == TriggerBase.Event.EXPIRE and _ray_fires > 0 and _take_fire(player):
 		_ray_fires -= 1
-		_launch(spell.held, _held_tag(tag), player, origin + heading * got, heading, null)
+		_fire_payload(spell, tag, player, origin + heading * got, heading, null)
 	_ray_tag = saved_tag
 	_ray_dir = saved_dir
 	_ray_fires = saved_fires
@@ -605,11 +749,13 @@ func _cast_jumps() -> void:
 ## True when the shot in `slot` fires its held spell on a timer.
 func _is_timer(slot: int) -> bool:
 	var spell: CompiledSpell = _profiles.get(projectiles.get_tag_of(slot))
-	return spell != null and spell.held != null and spell.trigger_event == TriggerBase.Event.TIMER
+	return spell != null and spell.payload != null and spell.trigger_event == TriggerBase.Event.TIMER
 
 
-func _held_tag(tag: int) -> int:
-	return SpellTag.make(SpellTag.player_of(tag), SpellTag.slot_of(tag), SpellTag.depth_of(tag) + 1, SpellTag.generation_of(tag))
+## Fires the payload of `spell` (whose shot has `tag`) from `at` along `heading`, in the same
+## player's staff and generation as the shot.
+func _fire_payload(spell: CompiledSpell, tag: int, player: int, at: Vector2, heading: Vector2, source: Node) -> int:
+	return _launch_group(spell.payload, player, SpellTag.staff_of(tag), SpellTag.generation_of(tag), at, heading, source)
 
 
 ## True when this player may fire one more held spell in this step.
@@ -646,7 +792,7 @@ func _heading(spell: CompiledSpell, slot: int, at: Vector2, player: int) -> Vect
 func _fire_timer(slot: int) -> void:
 	var tag: int = projectiles.get_tag_of(slot)
 	var spell: CompiledSpell = _profiles.get(tag)
-	if spell == null or spell.held == null:
+	if spell == null or spell.payload == null:
 		_rec_fires[slot] = 0
 		return
 	var player: int = SpellTag.player_of(tag)
@@ -655,7 +801,7 @@ func _fire_timer(slot: int) -> void:
 		return
 	_rec_fires[slot] -= 1
 	var at: Vector2 = projectiles.get_position_of(slot)
-	_launch(spell.held, _held_tag(tag), player, at, _heading(spell, slot, at, player), null)
+	_fire_payload(spell, tag, player, at, _heading(spell, slot, at, player), null)
 
 
 func _on_hit(player: int, target: Node, position: Vector2, tag: int) -> void:
@@ -683,7 +829,7 @@ func _on_hit(player: int, target: Node, position: Vector2, tag: int) -> void:
 			chain = _rec_chain[slot]
 			prev = _rec_prev[slot]
 		heading = _heading(spell, slot, position, player)
-	var held: bool = spell.held != null and spell.trigger_event == TriggerBase.Event.HIT and fires > 0 and _take_fire(player)
+	var held: bool = spell.payload != null and spell.trigger_event == TriggerBase.Event.HIT and fires > 0 and _take_fire(player)
 	if held:
 		fires -= 1
 	# Write the record back before spawning: a shot that has ended may lose its slot to a child.
@@ -693,7 +839,7 @@ func _on_hit(player: int, target: Node, position: Vector2, tag: int) -> void:
 		_rec_fires[slot] = fires
 	var struck: int = target.get_instance_id()
 	if held:
-		_launch(spell.held, _held_tag(tag), player, position, heading, target)
+		_fire_payload(spell, tag, player, position, heading, target)
 	if chain > 0:
 		_jump(spell, tag, player, position, target as Node2D, struck, prev, fires, chain - 1, by_ray)
 
@@ -744,7 +890,7 @@ func _on_expired(player: int, position: Vector2, tag: int) -> void:
 	if not SpellTag.is_spell_tag(tag):
 		return
 	var spell: CompiledSpell = _profiles.get(tag)
-	if spell == null or spell.held == null or spell.trigger_event != TriggerBase.Event.EXPIRE:
+	if spell == null or spell.payload == null or spell.trigger_event != TriggerBase.Event.EXPIRE:
 		return
 	if player < 0 or player >= SpellLimits.PLAYERS:
 		return
@@ -755,7 +901,7 @@ func _on_expired(player: int, position: Vector2, tag: int) -> void:
 	if fires <= 0 or not _take_fire(player):
 		return
 	var heading: Vector2 = _heading(spell, slot, position, player)
-	_launch(spell.held, _held_tag(tag), player, position - heading * SpellLimits.EXPIRE_BACKOFF, heading, null)
+	_fire_payload(spell, tag, player, position - heading * SpellLimits.EXPIRE_BACKOFF, heading, null)
 
 
 ## Forgets every registered spell and shot count (a new run, and tests).
@@ -771,37 +917,97 @@ func clear() -> void:
 	fires_dropped = 0
 	chains_dropped = 0
 	_current.fill(-1)
+	_cursor.fill(0)
+	_hold_mana.fill(0.0)
+	for i in _installed.size():
+		_installed[i] = null
+		_hold_tags[i].clear()
+	_node_counts.clear()
 	_profiles.clear()
 	_live.clear()
 	_generation_live.clear()
 	revoked_tags.clear()
 
 
-func _in_range(player: int, slot: int) -> bool:
-	return player >= 0 and player < SpellLimits.PLAYERS and slot >= 0 and slot < SpellLimits.SLOTS
+func _in_range(player: int, staff: int) -> bool:
+	return player >= 0 and player < SpellLimits.PLAYERS and staff >= 0 and staff < SpellLimits.STAFFS
 
 
 func _is_current(tag: int) -> bool:
-	var index: int = SpellTag.player_of(tag) * SpellLimits.SLOTS + SpellTag.slot_of(tag)
+	var index: int = SpellTag.player_of(tag) * SpellLimits.STAFFS + SpellTag.staff_of(tag)
 	return _current[index] == SpellTag.generation_of(tag)
 
 
-## The depth-0 tag of the tag's generation: one key for all three depths.
-func _generation_key(tag: int) -> int:
-	return SpellTag.make(SpellTag.player_of(tag), SpellTag.slot_of(tag), 0, SpellTag.generation_of(tag))
-
-
-## Erases the profiles of every depth of the tag's generation.
+## Erases the profiles of every node of the tag's generation.
 func _erase_generation(tag: int) -> void:
-	for depth in SpellLimits.MAX_DEPTH + 1:
-		_profiles.erase(SpellTag.make(SpellTag.player_of(tag), SpellTag.slot_of(tag), depth, SpellTag.generation_of(tag)))
+	var key: int = SpellTag.generation_key(tag)
+	for node in _node_counts.get(key, 0):
+		_profiles.erase(SpellTag.make(SpellTag.player_of(tag), SpellTag.staff_of(tag), node, SpellTag.generation_of(tag)))
+	_node_counts.erase(key)
 
 
 ## The old generation is no longer current: free it now if none of its shots is in the air.
-func _release_generation(player: int, slot: int, generation: int) -> void:
-	var key: int = SpellTag.make(player, slot, 0, generation)
+func _release_generation(player: int, staff: int, generation: int) -> void:
+	var key: int = SpellTag.generation_key(SpellTag.make(player, staff, 0, generation))
 	if _generation_live.get(key, 0) == 0:
 		_erase_generation(key)
+
+
+## After a cast: its sustained (`hold`) carriers that made shots stay on and reserve the cast's
+## mana until they are switched off (`cast_staff` again, an edit) or their last shot ends.
+func _start_hold(index: int, player: int, staff: int, cast: CompiledCast) -> void:
+	var tags: PackedInt64Array = _hold_tags[index]
+	for spell in cast.group.spells:
+		if spell.fallback == CompiledSpell.FALLBACK_NONE and spell.behaviour(ModifierBase.Behaviour.HOLD) > 0.0:
+			var tag: int = SpellTag.make(player, staff, spell.node, _current[index])
+			if _live.get(tag, 0) > 0:
+				tags.append(tag)
+	if not tags.is_empty():
+		_hold_mana[index] = cast.mana
+		_send_reserved(player)
+
+
+## Switches off the sustained carriers of this staff: their shots go, their mana is free.
+func _release_hold(index: int) -> void:
+	if _hold_tags[index].is_empty():
+		return
+	var tags: PackedInt64Array = _hold_tags[index].duplicate()
+	_hold_tags[index].clear()
+	_hold_mana[index] = 0.0
+	if projectiles != null:
+		for tag in tags:
+			# remove_by_tag sends no shot_ended, so the counts are ended here.
+			for _n in projectiles.remove_by_tag(tag):
+				shot_ended(tag)
+	_send_reserved(floori(float(index) / SpellLimits.STAFFS))
+
+
+## The last shot of `tag` ended: if it was a sustained carrier, it is off now.
+func _end_hold_of(tag: int) -> void:
+	if not SpellTag.is_spell_tag(tag):
+		return
+	var index: int = SpellTag.player_of(tag) * SpellLimits.STAFFS + SpellTag.staff_of(tag)
+	var at: int = _hold_tags[index].find(tag)
+	if at < 0:
+		return
+	_hold_tags[index].remove_at(at)
+	if _hold_tags[index].is_empty():
+		_hold_mana[index] = 0.0
+		_send_reserved(SpellTag.player_of(tag))
+
+
+## Mana this player's sustained carriers hold, over all their staffs.
+func reserved_mana(player: int) -> float:
+	var total: float = 0.0
+	if player >= 0 and player < SpellLimits.PLAYERS:
+		for staff in SpellLimits.STAFFS:
+			total += _hold_mana[player * SpellLimits.STAFFS + staff]
+	return total
+
+
+func _send_reserved(player: int) -> void:
+	if events != null:
+		events.mana_reserved.emit(player, reserved_mana(player))
 
 
 func _component(id: StringName) -> SpellComponent:

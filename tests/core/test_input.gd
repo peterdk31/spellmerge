@@ -36,6 +36,8 @@ func _initialize() -> void:
 	_test_move_from_keyboard()
 	_test_move_from_gamepad_stick()
 	_test_aim_from_right_stick()
+	_test_menu_sticks_answer_while_captured()
+	_test_rumble_reaches_the_players_pad_only()
 	_test_mouse_aiming_flag()
 	_test_players_do_not_share_state()
 	_test_just_pressed()
@@ -351,6 +353,44 @@ func _test_aim_from_right_stick() -> void:
 	_teardown()
 
 
+func _test_menu_sticks_answer_while_captured() -> void:
+	_setup()
+	_press_join(0)
+	_manager.set_captured(0, true)
+	_manager.handle_event(_axis(0, JOY_AXIS_LEFT_X, 1.0))
+	_check(_manager.get_move(0) == Vector2.ZERO, "a captured player does not walk")
+	_check(_manager.menu_move(0).is_equal_approx(Vector2.RIGHT), "but their menu reads the left stick, got %s" % _manager.menu_move(0))
+	_manager.handle_event(_axis(0, JOY_AXIS_LEFT_X, 0.0))
+	_manager.handle_event(_button(0, JOY_BUTTON_DPAD_LEFT))
+	_check(_manager.menu_move(0) == Vector2.ZERO, "on a pad the d-pad is not the menu's stick")
+	_check(_manager.is_action_pressed(0, &"kind_prev"), "the d-pad's left is kind_prev")
+	_manager.handle_event(_button(0, JOY_BUTTON_DPAD_LEFT, false))
+	_manager.handle_event(_axis(0, JOY_AXIS_RIGHT_Y, -1.0))
+	_check(_manager.get_aim(0) == Vector2.ZERO, "a captured player does not aim")
+	_check(_manager.menu_aim(0).is_equal_approx(Vector2.UP), "but their menu reads the right stick")
+	_manager.handle_event(_axis(0, JOY_AXIS_RIGHT_Y, -0.1))
+	_check(_manager.menu_aim(0) == Vector2.ZERO, "inside the dead zone it is zero")
+	_manager.add_virtual_device(1)
+	_manager.set_captured(1, true)
+	_manager.send_virtual(1, &"move_down", 1.0)
+	_check(_manager.menu_move(1).is_equal_approx(Vector2.DOWN), "a virtual device's menu reads its move actions")
+	_check(_manager.menu_move(2) == Vector2.ZERO and _manager.menu_aim(2) == Vector2.ZERO, "a free slot reads nothing")
+	_teardown()
+
+
+func _test_rumble_reaches_the_players_pad_only() -> void:
+	_setup()
+	var shaken: Array = []
+	_manager.set("vibrator", func(device: int, weak: float, strong: float, seconds: float) -> void: shaken.append([device, weak, strong, seconds]))
+	_manager.handle_event(_key(KEY_ENTER))
+	_press_join(3)
+	_check(not _manager.rumble(0, 1.0, 1.0, 0.1), "the keyboard does not rumble")
+	_check(_manager.rumble(1, 0.25, 2.0, 0.05), "player 2's pad rumbles")
+	_check(shaken == [[3, 0.25, 1.0, 0.05]], "on its own device, motors clamped to 1, got %s" % [shaken])
+	_check(not _manager.rumble(2, 1.0, 1.0, 0.1), "a free slot does not rumble")
+	_teardown()
+
+
 func _test_mouse_aiming_flag() -> void:
 	_setup()
 	_check(not _manager.is_mouse_aiming(0), "no mouse aim before anyone joined")
@@ -460,7 +500,8 @@ func _test_bindings_route_as_documented() -> void:
 		_manager.handle_event(_button(0, button, false))
 	var buttons: Dictionary = {
 		JOY_BUTTON_RIGHT_SHOULDER: &"staff_1", JOY_BUTTON_LEFT_SHOULDER: &"staff_3", JOY_BUTTON_A: &"accept",
-		JOY_BUTTON_B: &"back", JOY_BUTTON_X: &"alternate", JOY_BUTTON_START: &"pause",
+		JOY_BUTTON_B: &"back", JOY_BUTTON_X: &"alternate", JOY_BUTTON_Y: &"extra", JOY_BUTTON_START: &"pause",
+		JOY_BUTTON_DPAD_LEFT: &"kind_prev", JOY_BUTTON_DPAD_RIGHT: &"kind_next",
 	}
 	for button: JoyButton in buttons:
 		_manager.handle_event(_button(0, button))
@@ -475,7 +516,7 @@ func _test_bindings_route_as_documented() -> void:
 		KEY_LEFT: &"move_left", KEY_RIGHT: &"move_right", KEY_UP: &"move_up", KEY_DOWN: &"move_down",
 		KEY_SHIFT: &"staff_1", KEY_SPACE: &"staff_1", KEY_TAB: &"back", KEY_E: &"back", KEY_J: &"staff_2",
 		KEY_K: &"staff_3", KEY_Q: &"staff_4", KEY_L: &"staff_4", KEY_ENTER: &"accept", KEY_X: &"alternate",
-		KEY_ESCAPE: &"pause",
+		KEY_ESCAPE: &"pause", KEY_R: &"extra", KEY_PAGEUP: &"kind_prev", KEY_PAGEDOWN: &"kind_next",
 	}
 	for key: Key in keys:
 		_manager.handle_event(_key(key))

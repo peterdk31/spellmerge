@@ -251,6 +251,32 @@ func test_cards_move_and_swap_between_slots_staffs_and_the_bag() -> void:
 	check_equal(player.cards_of(3)[0], &"", "and goes back")
 
 
+func test_a_whole_staff_request_sets_every_slot_in_one_change() -> void:
+	var player := _wizard(1)
+	_changed.clear()
+	_bus.staff_cards_requested.emit(1, 2, _ids("fire bolt orbit"))
+	check_equal(player.cards_of(2).slice(0, 4), _ids("fire bolt orbit -"), "the cards fill the first slots, the rest is empty")
+	check_equal(player.cards_of(2).size(), player.slot_count(), "the row keeps the staff's slots")
+	check_equal(_changed.size(), 1, "one change, announced once")
+	_bus.staff_cards_requested.emit(1, 2, [] as Array[StringName])
+	check(not player.has_staff(2), "an empty list clears the staff")
+
+
+func test_a_wrong_whole_staff_request_is_refused_and_changes_nothing() -> void:
+	var player := _wizard(0)
+	var before: Array[StringName] = player.cards_of(1)
+	var too_many: Array[StringName] = []
+	for _slot in player.slot_count() + 1:
+		too_many.append(&"bolt")
+	_bus.staff_cards_requested.emit(0, 1, too_many)
+	_bus.staff_cards_requested.emit(0, 4, _ids("bolt"))
+	_bus.staff_cards_requested.emit(0, 1, _ids("bolt no_such_card"))
+	check_equal(_refused.size(), 3, "three refusals")
+	check_equal(player.cards_of(1), before, "the staff is as it was")
+	_bus.staff_cards_requested.emit(1, 1, _ids("orbit"))
+	check_equal(player.cards_of(1), before, "another player's request is not this wizard's")
+
+
 func test_four_players_build_different_staffs_at_once() -> void:
 	for index in 4:
 		_wizard(index, [[], [], [], []])

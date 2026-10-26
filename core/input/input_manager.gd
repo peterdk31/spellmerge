@@ -31,6 +31,14 @@ extends Node
 ## click, cleared by a press of the keyboard `staff_2` key, J). The mouse is only a flag
 ## here: turning the pointer into a direction needs the world, so the wizard does it.
 ##
+## Menus that steer with the sticks (the radial builder) read menu_move() and menu_aim(), which
+## answer while the player is captured: their own panel is open, so the sticks are theirs.
+## menu_move() is the left stick alone on a gamepad (so the d-pad stays free for the menu's own
+## buttons), and the move keys or a virtual device's move actions otherwise.
+##
+## Rumble: rumble(player, weak, strong, seconds) shakes that player's gamepad (nothing for the
+## keyboard); `vibrator` does the shaking, so tests can listen in.
+##
 ## Glyphs: glyph_kind(player) says what that player holds (keyboard, keyboard with the mouse
 ## aiming, or a gamepad of one family) so the HUD can draw the button to press instead of
 ## naming an action. `glyph_kind_changed(player)` fires when it changes: a device joins or
@@ -72,10 +80,12 @@ const MOUSE_AIM_TRAVEL: float = 8.0
 ## mouse buttons and Q on the keyboard. The face buttons are the menus' (core/ui_focus):
 ## `accept` (A), `back` (B; in play it opens the builder, `hud/panels`) and `alternate` (X);
 ## `pause` (Start, Escape) opens the pause menu; `page_prev` and `page_next` (LB, RB; Z, C)
-## page menus such as the builder's staff tabs. Y is free.
+## page menus such as the builder's staff tabs. `extra` (Y; R) is a menu's third action (the
+## radial builder's clear, held), and `kind_prev` / `kind_next` (d-pad left and right only, not
+## the stick; Page Up, Page Down) flip the radial builder's kind of card.
 const ACTIONS: Array[StringName] = [
 	&"move_left", &"move_right", &"move_up", &"move_down", &"staff_1", &"staff_2", &"staff_3", &"staff_4",
-	&"accept", &"back", &"alternate", &"pause", &"page_prev", &"page_next",
+	&"accept", &"back", &"alternate", &"pause", &"page_prev", &"page_next", &"extra", &"kind_prev", &"kind_next",
 ]
 ## The staff cast actions, by staff index (0 to 3: RB, RT, LB, LT).
 const CAST_ACTIONS: Array[StringName] = [&"staff_1", &"staff_2", &"staff_3", &"staff_4"]
@@ -101,6 +111,8 @@ var events: EventsScript = null
 
 ## Gives the name of a gamepad by device id; tests replace it.
 var joy_name_provider: Callable = Input.get_joy_name
+## Shakes a gamepad: (device, weak 0..1, strong 0..1, seconds). Tests replace it.
+var vibrator: Callable = Input.start_joy_vibration
 
 var _devices: Array[int] = []
 ## Per player: the glyph family of the gamepad in the slot (GlyphsScript.Kind).
@@ -118,6 +130,8 @@ var _press_count: Array[Dictionary] = []
 var _captured: Array[bool] = []
 ## Per player: the raw right stick (x and y axis values, -1 to 1).
 var _aim_stick: Array[Vector2] = []
+## Per player: the raw left stick, for menu_move().
+var _move_stick: Array[Vector2] = []
 var _mouse_aiming: bool = false
 ## How far the mouse moved (pixels) since the cast key last turned mouse aim off.
 var _mouse_travel: float = 0.0
@@ -147,6 +161,7 @@ func _init() -> void:
 		_press_count.append(counts)
 		_captured.append(false)
 		_aim_stick.append(Vector2.ZERO)
+		_move_stick.append(Vector2.ZERO)
 
 
 func _ready() -> void:
@@ -227,6 +242,7 @@ func leave(player: int) -> bool:
 	_devices[player] = NO_DEVICE
 	_captured[player] = false
 	_aim_stick[player] = Vector2.ZERO
+	_move_stick[player] = Vector2.ZERO
 	if device == KEYBOARD:
 		_mouse_aiming = false
 		_mouse_travel = 0.0
@@ -305,6 +321,45 @@ func get_aim(player: int) -> Vector2:
 	if stick.length() <= DEADZONE:
 		return Vector2.ZERO
 	return stick.normalized()
+
+
+## The left stick of `player` for their own open menu, length 0 to 1, captured or not: the
+## stick alone on a gamepad (zero in its dead zone; the d-pad is left out), the move keys or
+## the virtual move actions otherwise.
+func menu_move(player: int) -> Vector2:
+	if not is_joined(player):
+		return Vector2.ZERO
+	var device: int = _devices[player]
+	if device != KEYBOARD and not is_virtual(device):
+		var stick: Vector2 = _move_stick[player]
+		var length: float = stick.length()
+		if length <= DEADZONE:
+			return Vector2.ZERO
+		return stick / length * minf((length - DEADZONE) / (1.0 - DEADZONE), 1.0)
+	var strength: Dictionary = _strength[player]
+	var move := Vector2(
+		float(strength[&"move_right"]) - float(strength[&"move_left"]),
+		float(strength[&"move_down"]) - float(strength[&"move_up"]))
+	return move.limit_length(1.0)
+
+
+## The right stick of `player` as a unit vector (zero in its dead zone), for their own open
+## menu: like get_aim(), but captured or not.
+func menu_aim(player: int) -> Vector2:
+	if not is_joined(player):
+		return Vector2.ZERO
+	var stick: Vector2 = _aim_stick[player]
+	return stick.normalized() if stick.length() > DEADZONE else Vector2.ZERO
+
+
+## Shake the gamepad of `player`: `weak` and `strong` (0 to 1) are the two motors, for
+## `seconds`. False, and nothing happens, for the keyboard or a free slot. A virtual device
+## shakes nothing real, but `vibrator` hears it, so tests see the rumble.
+func rumble(player: int, weak: float, strong: float, seconds: float) -> bool:
+	if not is_joined(player) or _devices[player] == KEYBOARD:
+		return false
+	vibrator.call(_devices[player], clampf(weak, 0.0, 1.0), clampf(strong, 0.0, 1.0), maxf(seconds, 0.0))
+	return true
 
 
 ## Aim the virtual right stick of `player` (a unit vector, or zero to let go),
@@ -422,9 +477,11 @@ func _handle_motion(player: int, event: InputEventJoypadMotion) -> void:
 	var source: int = _source_of(event)
 	match event.axis:
 		AXIS_LEFT_X:
+			_move_stick[player].x = value
 			_set_source(player, &"move_left", source, scaled if value < 0.0 else 0.0)
 			_set_source(player, &"move_right", source, scaled if value > 0.0 else 0.0)
 		AXIS_LEFT_Y:
+			_move_stick[player].y = value
 			_set_source(player, &"move_up", source, scaled if value < 0.0 else 0.0)
 			_set_source(player, &"move_down", source, scaled if value > 0.0 else 0.0)
 		AXIS_RIGHT_X:

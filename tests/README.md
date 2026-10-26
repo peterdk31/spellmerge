@@ -36,7 +36,7 @@ New tests extend `tests/support/suite.gd` (`extends "res://tests/support/suite.g
   - `reaction_<id>`: one per reaction in `reactions.tres`: a bolt of the element that gives the status, then 0.3 s later a bolt of the row's element. `reaction_<id>_coop`: the same with two players standing apart, one bolt each.
 
   `test_clip_scenarios.gd` (headless) checks the scenarios, that every reaction clip sets its reaction off and that a stage played twice gives the same simulation; the frames themselves need a display. Two takes of a clip are identical frame for frame, because Feel's hit sprays (CPU particles, which follow real frame time) are left out; to check, run the recorder twice and `diff -rq` the two `build/clips` folders (docs/DECISIONS.md, 2026-10-25).
-- `support/`: the suite base class (`suite.gd`). Fixtures shared by several tests live here; a fixture for one area lives next to its tests (`tests/gameplay/ai/ai_fixture.gd`, `tests/content/rooms/room_scan.gd`). Nothing here is named `test_*`, so the build does not run it as a test.
+- `support/`: the suite base class (`suite.gd`). Fixtures shared by several tests live here (`staff_kit.gd` for old recipe shapes as card rows; `fake_cards.gd`, any number of made-up cards behind a stand-in registry, for the radial builder's tests and screenshots); a fixture for one area lives next to its tests (`tests/gameplay/ai/ai_fixture.gd`, `tests/content/rooms/room_scan.gd`). Nothing here is named `test_*`, so the build does not run it as a test.
 - Everything else mirrors the tree (`tests/core/...`, `tests/gameplay/...`).
 
 ## Allowed files

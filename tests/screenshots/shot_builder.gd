@@ -27,6 +27,8 @@ func _initialize() -> void:
 		_fail("the PlayerInput, UIFocus, Hud and Flow autoloads must exist")
 		return
 	_input.call("add_virtual_device", 0)
+	# These shots are the list builder's (the radial one is the default).
+	_hud.call("_on_builder_options_changed", false, false, true)
 	flow.call("start_run", 0)
 	await _settle()
 	await _open_builder(0)

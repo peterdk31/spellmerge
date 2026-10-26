@@ -124,6 +124,8 @@ func _draw() -> void:
 			_draw_symbol(area, String(_glyph["label"]), color)
 		GlyphsScript.Shape.MOUSE:
 			_draw_mouse(area)
+		GlyphsScript.Shape.DPAD:
+			_draw_dpad(area)
 
 
 func _draw_cap(area: Rect2, face: Color, text_color: Color) -> void:
@@ -172,6 +174,17 @@ func _draw_trigger(area: Rect2, face: Color) -> void:
 	draw_rect(Rect2(area.position, Vector2(2.0, 2.0)), OUTLINE)
 	draw_rect(Rect2(Vector2(area.end.x - 2.0, area.position.y), Vector2(2.0, 2.0)), OUTLINE)
 	draw_line(Vector2(area.position.x + 2.0, area.position.y + 2.5), Vector2(area.end.x - 2.0, area.position.y + 2.5), TEXT_ON_PLAIN.darkened(0.3), 1.0)
+
+
+## The d-pad: a cross with the arm of its label (`left` or `right`) lit.
+func _draw_dpad(area: Rect2) -> void:
+	var c: Vector2 = area.get_center().floor()
+	draw_rect(Rect2(c.x - 5.0, c.y - 2.0, 10.0, 4.0), OUTLINE)
+	draw_rect(Rect2(c.x - 2.0, c.y - 5.0, 4.0, 10.0), OUTLINE)
+	draw_rect(Rect2(c.x - 4.0, c.y - 1.0, 8.0, 2.0), KEY_FACE)
+	draw_rect(Rect2(c.x - 1.0, c.y - 4.0, 2.0, 8.0), KEY_FACE)
+	var lit: float = -4.0 if String(_glyph["label"]) == "left" else 2.0
+	draw_rect(Rect2(c.x + lit, c.y - 1.0, 2.0, 2.0), TEXT_ON_PLAIN)
 
 
 ## The mouse: a body with the button of its label lit (LMB the left, RMB the right), the way a

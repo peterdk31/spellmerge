@@ -17,6 +17,8 @@ signal play_requested(player: int)
 signal staff_change_requested(player: int, staff: int, slot: int, card_id: StringName)
 ## `player` asked to move the card in `from_slot` of staff `from_staff` to `to_slot` of staff `to_staff`, swapping with what is there; a staff of -1 means the bag. Heard by player.
 signal card_move_requested(player: int, from_staff: int, from_slot: int, to_staff: int, to_slot: int)
+## Sender: hud. `player` asked to set every slot of their staff `staff` at once: `cards` holds the card ids by slot (`&""` for an empty slot), as many as the staff has slots or fewer (the rest are emptied). The radial builder sends it for a push-right insert, a take-out that closes the gap, an undo and a clear, so each is one change. Heard by player.
+signal staff_cards_requested(player: int, staff: int, cards: Array[StringName])
 ## A player picked reward choice number `choice`. Heard by rewards.
 signal reward_pick_requested(player: int, choice: int)
 ## A player voted for door number `door`. Heard by flow.

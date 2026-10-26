@@ -10,6 +10,7 @@ const GlyphsScript := preload("res://core/input/input_glyphs.gd")
 
 const ACTIONS_SHOWN: Array[StringName] = [
 	&"staff_1", &"staff_2", &"staff_3", &"staff_4", &"accept", &"back", &"alternate", &"pause", &"join", &"leave",
+	&"page_prev", &"page_next", &"extra", &"kind_prev", &"kind_next",
 ]
 const FAMILIES: Array[int] = [GlyphsScript.Kind.KEYBOARD, GlyphsScript.Kind.KEYBOARD_MOUSE, GlyphsScript.Kind.XBOX, GlyphsScript.Kind.PLAYSTATION, GlyphsScript.Kind.SWITCH, GlyphsScript.Kind.GAMEPAD]
 
@@ -57,6 +58,14 @@ func test_every_family_has_a_glyph_for_every_action_the_hints_use() -> void:
 			var glyph: Dictionary = GlyphsScript.glyph(kind, action)
 			check(glyph != GlyphsScript.NO_GLYPH, "kind %d has a glyph for %s" % [kind, action])
 			check(String(glyph["label"]) != "", "kind %d, %s has a label" % [kind, action])
+
+
+func test_the_radial_builders_buttons_are_y_and_the_dpad() -> void:
+	check_equal(GlyphsScript.glyph(GlyphsScript.Kind.XBOX, &"extra")["label"], "Y", "extra is Y on an Xbox pad")
+	check_equal(GlyphsScript.glyph(GlyphsScript.Kind.PLAYSTATION, &"extra")["label"], "triangle", "and the triangle")
+	check_equal(int(GlyphsScript.glyph(GlyphsScript.Kind.XBOX, &"kind_prev")["shape"]), GlyphsScript.Shape.DPAD, "kind_prev is the d-pad")
+	check_equal(GlyphsScript.glyph(GlyphsScript.Kind.SWITCH, &"kind_next")["label"], "right", "its right arm")
+	check_equal(GlyphsScript.glyph(GlyphsScript.Kind.KEYBOARD, &"extra")["label"], "R", "R on the keyboard")
 
 
 func test_the_families_label_the_same_button_differently() -> void:

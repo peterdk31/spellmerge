@@ -8,6 +8,11 @@ extends RefCounted
 ## 16.7); nothing was lowered. The first web numbers led to a lower `WORK_PER_STEP`; the web
 ## stress frame in parts then led to a web projectile cap of 500 (docs/DECISIONS.md).
 
+## Staffs (A4): the numbers of a fallback, the hit made when cards land on the caster or on a
+## payload's origin with no carrier (docs/milestones/M2-staffs.md, "Reading a staff").
+const FALLBACK_DAMAGE: float = 4.0
+const FALLBACK_RADIUS: float = 8.0
+
 ## Complexity a whole spell may cost, counting the spell its trigger holds.
 const MAX_COMPLEXITY: int = 12
 ## Shots one cast may make, after split, nova and `shot_mult` multiply. The compiler clamps.

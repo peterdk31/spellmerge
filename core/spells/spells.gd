@@ -197,6 +197,31 @@ func compile(recipe: Dictionary) -> CompiledSpell:
 	return spell
 
 
+## Compiles a staff's cards (ids by slot, `&""` for an empty slot) into its cycle, the casts it
+## makes until it recharges (staffs A4; the rules are docs/milestones/M2-staffs.md, "Reading a
+## staff", and `StaffCompiler`). It never errors and refuses nothing: an unknown or useless
+## card is listed in `wasted` with the reason.
+func compile_staff(cards: Array[StringName], staff: StaffBase) -> CompiledStaff:
+	return StaffCompiler.new(_component).compile(cards, staff)
+
+
+## What the builder shows of a staff, as plain values so that nothing outside `core/spells`
+## reads a compiled staff: `empty`; `casts`, one Dictionary per cast of the cycle with `slots`
+## (read order), `text`, `mana`, `delay`, `recharges`, `wrapped`, `targets` (card slot -> the
+## carrier's slot, or `StaffCompiler.TARGET_CASTER` / `TARGET_POINT`) and `wasted` (slot ->
+## reason); and `wasted` for the staff (cards that did nothing in any cast that read them).
+func staff_view(cards: Array[StringName], staff: StaffBase) -> Dictionary:
+	var compiled: CompiledStaff = compile_staff(cards, staff)
+	var casts: Array[Dictionary] = []
+	for cast in compiled.casts:
+		casts.append({
+			"slots": cast.slots, "text": cast.description, "mana": cast.mana, "delay": cast.delay,
+			"recharges": cast.recharges, "wrapped": cast.wrapped,
+			"targets": cast.targets.duplicate(), "wasted": cast.wasted.duplicate(),
+		})
+	return {"empty": compiled.is_empty(), "casts": casts, "wasted": compiled.wasted.duplicate()}
+
+
 ## What the builder shows of the component `id`: its name (the id when it has none, "" for
 ## an unknown id), its 16x16 icon (null when unknown) and its kind (`&"form"`, `&"element"`,
 ## `&"modifier"` or `&"trigger"`, `&""` when unknown). Scripts outside `core/` and

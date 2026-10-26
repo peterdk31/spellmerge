@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-26: The staff compiler (owner session, staffs A4)
+
+`Spells.compile_staff(cards, staff)` reads a staff into its cycle with the rules of the design (`core/spells/staff_compiler.gd`), and `Spells.staff_view` gives the builder plain values. Every example in the design is a test in `tests/core/test_staff_compiler.gd` (20 tests). Two things the tests taught: wrap-around lets a trailing card reach the first carrier in a later cast (so `fire · bolt · homing` puts homing on a bolt in cast 2, and `double · on hit · bolt · nova · bolt · blast` makes two casts of three spells each), and a 64-slot staff can make more than 128 compiled spells in one cycle, so the tag's node field is 9 bits. Nothing casts a compiled staff yet; that is A5.
+
 ## 2026-10-26: Card and staff classes, events (owner session, staffs A3)
 
 The foundation the kits build on, so they never edit the same base file: `MulticastBase` (double, triple, scatter, burst); `FormBase.Motion` DASH to FAMILIAR (`carries_payload()` for rain and familiar), `ModifierBase.Behaviour` SHIELD to RELAY (`behaviour_strength` now up to 256, and every behaviour needs one above 0), `TriggerBase.Event` BLOCK to ALLY, each commented with the kit that runs it; `StaffBase` and the `starter` (4 slots) and `dev` (20 slots) staffs; the staffs events (`staff_change_requested` to `ally_passed`) with their senders; `multicast` as a kind in the Spell atlas and the clip pipeline (`ci/smbot/clips.py`, an owner-path change made in the owner session). Nothing runs the new values yet.

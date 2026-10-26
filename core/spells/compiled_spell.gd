@@ -67,6 +67,35 @@ var trigger_max_fires: int = 1
 ## The spell the trigger fires, or null.
 var held: CompiledSpell = null
 
+# --- Staffs (A4, docs/milestones/M2-staffs.md) --------------------------------
+# A staff's cards compile into these same spells (`StaffCompiler`); the recipe compiler above
+# leaves them at their defaults until A6c removes it.
+
+## `fallback` values: a carrier's spell, the cards that landed on the caster, or on a
+## payload's origin.
+const FALLBACK_NONE: int = 0
+const FALLBACK_CASTER: int = 1
+const FALLBACK_POINT: int = 2
+var fallback: int = FALLBACK_NONE
+## Every infusion on the shot, in slot order; `element_id` is the first.
+var element_ids: Array[StringName] = []
+## The summed `behaviour_strength` of the modifiers, indexed by `ModifierBase.Behaviour`
+## (three shields give 3 at SHIELD). Empty for a recipe spell.
+var behaviours: PackedFloat32Array = PackedFloat32Array()
+## The group the trigger fires (staffs), or null.
+var payload: CompiledGroup = null
+## The group a payload carrier (rain, familiar) carries, or null.
+var own_payload: CompiledGroup = null
+## Index in `CompiledStaff.nodes`, -1 for a recipe spell.
+var node: int = -1
+## The carrier's slot in the staff, -1 for a fallback or a recipe spell.
+var slot: int = -1
+
+
+## The summed strength of `behaviour` (a `ModifierBase.Behaviour`) on this spell, 0 for none.
+func behaviour(kind: int) -> float:
+	return behaviours[kind] if kind >= 0 and kind < behaviours.size() else 0.0
+
 
 ## How many spells there are in this chain, this one included.
 func chain_length() -> int:

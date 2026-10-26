@@ -247,7 +247,7 @@ Added in part A3, so later parts in different areas don't all edit `core/events/
 
 ## Tags
 
-A shot's int tag becomes **player (2 bits), staff (2), generation (3), node (7)**, with `SpellTag.FLAG` at `1 << 20`, so spell tags (1,048,576 and up) never meet the enemy attack tags of `gameplay/ai` (1,000 to 101,000). The node is the index of a compiled node in the staff's cycle: every carrier of every cast, payloads included, **and every fallback** (the caster or a payload origin); at most 128 per staff. The generation ring (8 per staff) and the rule that a shot in the air keeps its old numbers after a rebuild stay as they are (part A5).
+A shot's int tag becomes **player (2 bits), staff (2), generation (3), node (9)**, with `SpellTag.FLAG` at `1 << 20`, so spell tags (1,048,576 and up) never meet the enemy attack tags of `gameplay/ai` (1,000 to 101,000). The node is the index of a compiled node in the staff's cycle: every carrier of every cast, payloads included, **and every fallback** (the caster or a payload origin); at most 512 per staff. Only the last cast of a cycle can wrap, so a cycle reads each card at most twice, and each group adds at most one fallback: a 64-slot staff stays under 512 (A4 found that 128 was not enough). The generation ring (8 per staff) and the rule that a shot in the air keeps its old numbers after a rebuild stay as they are (part A5).
 
 ## Working in parallel
 

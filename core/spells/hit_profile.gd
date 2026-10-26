@@ -10,6 +10,9 @@ var damage: int = 1
 var knockback: float = 0.0
 ## The element's id, or `&""` for plain arcane damage.
 var element_id: StringName = &""
+## Every element of the hit in order (staffs: several infusions on one shot); `element_id` is
+## the first. Empty for plain arcane damage.
+var element_ids: Array[StringName] = []
 ## The status a hit applies (`&""` for none), for how long, and how strongly.
 var status_id: StringName = &""
 var status_duration: float = 0.0

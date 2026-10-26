@@ -34,6 +34,12 @@ const STAFFS: int = 4
 ## Degrees between the carriers of one multicast group, so two bolts cast together do not fly
 ## as one (tuning, not a limit).
 const MULTICAST_SPREAD: float = 12.0
+## Pixels ahead of the caster that a rain falls when the form gives no `ray_length`, and that
+## the middle of a wall is placed.
+const RAIN_REACH: float = 120.0
+const WALL_REACH: float = 28.0
+## Targets a fissure's line can hit (the line pierces them all up to this many; tuning).
+const FISSURE_PIERCE: int = 16
 ## Seconds a shot made sustained by `hold` lives: until it is switched off, in practice.
 const HOLD_LIFETIME: float = 100000.0
 ## Players, indexes 0 to 3.

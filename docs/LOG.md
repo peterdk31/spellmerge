@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-26: Trigger kit, part 3 (staffs B2c)
+
+The spell runtime runs the payload and line carriers: rain (a `form_shown` cue, then its payload on the aim point after its lifetime), familiar and decoy (`entity_spawn_requested`, counted as live until `entity_ended`; a familiar casts its payload on `familiar_cast_requested`; a decoy's end point fires its `on expire` payload and `blast`), wall (a line of still shots across the aim, shields apply) and fissure (a beam through everything on its line). Tests: `tests/core/test_spells_payload_carriers.gd` (28 tests). B2d (moves, areas, refunds) is next.
+
 ## 2026-10-26: Trigger kit, part 2 (staffs B2b)
 
 The spell runtime runs the multicast spread: scatter (random directions, seeded per cast), burst (later firings of the group, queued), echo (the carrier again after its strength in seconds, at half damage) and mirror (also fires backwards). Tests: `tests/core/test_spells_multicast.gd` (27 tests). B2c and B2d are next.

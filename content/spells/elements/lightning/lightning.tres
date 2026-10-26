@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="ElementBase" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/base/element_base.gd" id="1_base"]
+[ext_resource type="Texture2D" path="res://content/spells/elements/lightning/icon.svg" id="2_icon"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"lightning"
+display_name = "Lightning"
+complexity = 1
+icon = ExtResource("2_icon")
+status_id = &"static"
+status_duration = 5.0
+status_strength = 60.0
+damage_scale = 1.0
+tint = Color(0.7059, 0.9098, 0.1647, 1)
+shape = 5

@@ -19,7 +19,7 @@ const MIN_COMBOS: int = 20
 ## together with its rows (the spells README, "The combo row rule").
 const COMPONENTS: Array[String] = [
 	"bolt", "beam", "nova", "rune", "orbit",
-	"fire", "frost", "storm", "void",
+	"fire", "frost", "storm", "void", "lightning",
 	"split", "pierce", "homing", "chain", "bigger", "faster",
 	"on_hit", "on_expire", "timer",
 ]

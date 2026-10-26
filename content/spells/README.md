@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The spell components that players assemble into spells: **forms** (bolt, beam, nova, rune, orbit), **elements** (fire, frost, storm, void), **modifiers** (split, pierce, homing, chain, bigger, faster) and **triggers** (on hit, on expire, timer). A spell is built as form → element → up to three modifiers → trigger, and a trigger holds another spell, built from the same slots. Few components, many combinations: this is the game's first pillar (docs/DESIGN.md).
+The spell components that players assemble into spells: **forms** (bolt, beam, nova, rune, orbit), **elements** (fire, frost, storm, void, lightning), **modifiers** (split, pierce, homing, chain, bigger, faster) and **triggers** (on hit, on expire, timer). A spell is built as form → element → up to three modifiers → trigger, and a trigger holds another spell, built from the same slots. Few components, many combinations: this is the game's first pillar (docs/DESIGN.md).
 
 **Built in M2** (Spell system, see docs/milestones/M2-spell-system.md). All four kinds, the validator and the combo test exist since part 15. The component icons are placeholders until the art pass (part 26).
 
@@ -26,7 +26,7 @@ The script of each class documents every field, and its `ranges()` holds the all
 | Kind | Fields (range) |
 | --- | --- |
 | Form (`FormBase`) | `base_damage` 1–200, `mana_cost` 0–100, `cooldown` 0.05–10 s, `speed` 0–2000 px/s, `lifetime` 0.05–20 s, `radius` 1–64 px, `shots` 1–24, `spread` 0–360°, `motion` (STRAIGHT, STILL, ORBIT, RAY), `pierce` 0–16, `orbit_radius` 0–256 px (ORBIT), `ray_length` 0–1024 px (RAY) |
-| Element (`ElementBase`) | `status_id` (a status combat knows: burn, chill, shock, hex), `status_duration` 0–30 s, `status_strength` 0–100, `damage_scale` 0.1–4, `tint` (a palette colour from docs/STYLE.md; the validator does not check it, reviewers do), `shape` 0–4 (0 the plain sprite, 1 flame, 2 star, 3 zigzag, 4 ring: the silhouette, animation and trail of its shots, drawn by `core/projectiles/shot_core.gdshader`; each element needs a shape of its own so it reads without colour) |
+| Element (`ElementBase`) | `status_id` (a status combat knows: burn, chill, shock, hex, static), `status_duration` 0–30 s, `status_strength` 0–100, `damage_scale` 0.1–4, `tint` (a palette colour from docs/STYLE.md; the validator does not check it, reviewers do), `shape` 0–5 (0 the plain sprite, 1 flame, 2 star, 3 zigzag, 4 ring, 5 forked arc: the silhouette, animation and trail of its shots, drawn by `core/projectiles/shot_core.gdshader`; each element needs a shape of its own so it reads without colour) |
 | Modifier (`ModifierBase`) | `damage_mult` 0.1–4, `speed_mult` 0.1–4, `radius_mult` 0.25–4, `cooldown_mult` 0.1–4, `mana_mult` 0.1–4, `shot_mult` 1–8, `extra_pierce` 0–8, `behaviour` (NONE, HOMING, CHAIN), `behaviour_strength` 0–32 (turn rate for homing, jumps for chain) |
 | Trigger (`TriggerBase`) | `event` (HIT, EXPIRE, TIMER), `interval` 0–10 s (TIMER), `max_fires` 1–4 |
 

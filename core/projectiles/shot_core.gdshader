@@ -12,10 +12,11 @@ render_mode blend_mix;
 // A shot with an element shape (the alpha of the custom data, 1 - kind / 16) is not drawn
 // from the sprite: its own silhouette is built here on a pixel grid, with its own
 // animation frames, so the four elements read without colour. Kinds 1-4 are the shot
-// bodies (flame, frost star, storm zigzag, void ring) and 5-8 their trail marks (ember,
-// glint, streak, ring). The edge pixels take the owner's tint, the inside the element's
-// colour, so a shot still says whose it is. Kind 0 (the alpha is 1) is the sprite above.
-// Kinds 9 and 10 are the bodies of a form, not an element: the rune (a diamond that pulses
+// bodies (flame, frost star, storm zigzag, void ring, lightning's forked arc) and 6-10 their
+// trail marks (ember, glint, streak, ring, spark). The edge pixels take the owner's tint, the
+// inside the element's colour, so a shot still says whose it is. Kind 0 (the alpha is 1) is
+// the sprite above.
+// Kinds 11 and 12 are the bodies of a form, not an element: the rune (a diamond that pulses
 // while it waits) and the orbit shot (two beads that spin round their middle and breathe),
 // so rune and orbit differ in flight whatever their element.
 
@@ -124,6 +125,40 @@ float ring(vec2 p, float f) {
 	return d > 0.05 ? 1.0 : 2.0;
 }
 
+// A whole number from -2 to 2 that changes with the cell and the frame, so the arc re-forms
+// every frame instead of wobbling along a fixed path.
+float jag(float cell, float f) {
+	return floor(fract(sin(cell * 12.9898 + f * 78.233) * 43758.5453) * 5.0) - 2.0;
+}
+
+// Lightning: a jagged spine that is redrawn every frame (the steps join up with each other)
+// and a fork that leaves it near the head, up on some frames and down on others. Sharper and
+// busier than the storm's zigzag, and it has a fork, which no other shape does.
+float arc(vec2 p, float f) {
+	// Work in whole pixels: the column (0 tail, 11 head) and the row (-6 to 5).
+	float col = floor(p.x * 6.0 + 6.0);
+	float row = floor(p.y * 6.0);
+	float here = col > 10.5 ? 0.0 : jag(col, f);
+	float before = col < 0.5 ? 0.0 : jag(col - 1.0, f);
+	// A column spans the rows between its own step and the last one, so the spine is joined.
+	float gap = row < min(here, before) ? min(here, before) - row : (row > max(here, before) ? row - max(here, before) : 0.0);
+	// The fork leaves the spine at column 6, one row further per column, up or down.
+	if (col > 6.5 && col < 9.5) {
+		float fork_row = jag(6.0, f) + (col - 6.0) * (mod(f, 2.0) < 0.5 ? 1.0 : -1.0);
+		if (row == fork_row) {
+			return col > 8.5 ? 3.0 : 2.0;
+		}
+	}
+	if (gap < 0.5) {
+		return 3.0;
+	}
+	// A crackle of the element colour and the owner's edge beside the spine, changing per frame.
+	if (gap < 1.5) {
+		return mod(col + f, 2.0) < 0.5 ? 2.0 : 1.0;
+	}
+	return 0.0;
+}
+
 // Rune: a diamond that swells and settles while it waits, with a bright heart at the swell.
 // It never turns, so it reads as planted.
 float rune(vec2 p, float f) {
@@ -156,24 +191,29 @@ float beads(vec2 p, float f) {
 	return near < 0.09 ? 3.0 : 2.0;
 }
 
-// Trail marks, small and plain: an ember, a glint, a streak, a ring.
+// Trail marks, small and plain: an ember, a glint, a streak, a ring, a spark.
 float mark(vec2 p, float k, float f) {
-	if (k < 5.5) {
+	if (k < 6.5) {
 		return max(abs(p.x), abs(p.y)) < 0.55 ? (f < 2.0 ? 3.0 : 2.0) : 0.0;
 	}
-	if (k < 6.5) {
+	if (k < 7.5) {
 		return ((abs(p.x) < 0.2 || abs(p.y) < 0.2) && length(p) < 0.85) ? 3.0 : 0.0;
 	}
-	if (k < 7.5) {
+	if (k < 8.5) {
 		return (abs(p.y) < 0.25 && abs(p.x) < 0.9) ? 3.0 : 0.0;
+	}
+	if (k > 9.5) {
+		// A short diagonal dash that flips every other frame.
+		float lean = mod(f, 2.0) < 0.5 ? p.x - p.y : p.x + p.y;
+		return (abs(lean) < 0.3 && length(p) < 0.85) ? 3.0 : 0.0;
 	}
 	float r = length(p);
 	return (r > 0.4 && r < 0.9) ? 2.0 : 0.0;
 }
 
 void fragment() {
-	if (kind > 0.5 && kind < 10.5) {
-		float grid = kind > 8.5 ? BODY_GRID : kind > 4.5 ? MARK_GRID : (kind < 1.5 ? FLAME_GRID : BODY_GRID);
+	if (kind > 0.5 && kind < 12.5) {
+		float grid = kind > 10.5 ? BODY_GRID : kind > 5.5 ? MARK_GRID : (kind < 1.5 ? FLAME_GRID : BODY_GRID);
 		vec2 p = (floor(UV * grid) + 0.5) / grid * 2.0 - 1.0;
 		float t = 0.0;
 		if (kind < 1.5) {
@@ -184,9 +224,11 @@ void fragment() {
 			t = zigzag(p, frame_of(20.0));
 		} else if (kind < 4.5) {
 			t = ring(p, frame_of(6.0));
-		} else if (kind > 9.5) {
+		} else if (kind < 5.5) {
+			t = arc(p, frame_of(16.0));
+		} else if (kind > 11.5) {
 			t = beads(p, mod(floor(sim_time * 8.0 + phase), 8.0));
-		} else if (kind > 8.5) {
+		} else if (kind > 10.5) {
 			t = rune(p, frame_of(3.0));
 		} else {
 			t = mark(p, kind, frame_of(10.0));

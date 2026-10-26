@@ -519,7 +519,7 @@ func test_four_quick_views_with_their_longest_lists_fit_the_screen() -> void:
 	for player in 4:
 		_open_builder(player)
 		_press(player, _builder(player).drop_button())
-	check_equal(_builder(0).row_ids().size(), 10, "the longest list has ten components")
+	check_equal(_builder(0).row_ids().size(), 11, "the longest list has eleven components")
 	await process_frame
 	await process_frame
 	var screen := Rect2(0, 0, 640, 360)
@@ -545,7 +545,7 @@ func test_four_overlays_with_their_longest_lists_fit_the_screen() -> void:
 	_frame()
 	for player in 4:
 		_press(player, _overlay(player).drop_button())
-	check_equal(_overlay(0).row_ids().size(), 10, "the longest list has ten components")
+	check_equal(_overlay(0).row_ids().size(), 11, "the longest list has eleven components")
 	await process_frame
 	await process_frame
 	var screen := Rect2(0, 0, 640, 360)

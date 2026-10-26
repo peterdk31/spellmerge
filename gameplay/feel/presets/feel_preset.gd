@@ -91,18 +91,20 @@ extends Resource
 	&"kindle": 1.0,
 	&"thaw": 1.0,
 	&"stillness": 0.9,
+	&"discharge": 0.7,
 }
 ## What an enemy with a status looks like, by status id (`burn`, `chill`, `freeze`, `shock`,
-## `hex`): a colour laid over its sprite, the most it shows (alpha), how fast it pulses per
+## `hex`, `static`): a colour laid over its sprite, the most it shows (alpha), how fast it pulses per
 ## second (0: steady), how far it jitters in pixels, and whether it blinks off between pulses.
 ## When an enemy has several, the first in `status_order` is the one shown.
-@export var status_order: Array[StringName] = [&"freeze", &"shock", &"burn", &"hex", &"chill"]
+@export var status_order: Array[StringName] = [&"freeze", &"static", &"shock", &"burn", &"hex", &"chill"]
 @export var status_looks: Dictionary = {
 	&"burn": {"color": Color("ff6a1a"), "alpha": 0.55, "rate": 7.0, "jitter": 0.0, "blink": false},
 	&"chill": {"color": Color("8fd8ff"), "alpha": 0.5, "rate": 0.0, "jitter": 0.0, "blink": false},
 	&"freeze": {"color": Color("e8fbff"), "alpha": 0.8, "rate": 0.0, "jitter": 0.0, "blink": false},
 	&"shock": {"color": Color("fff04a"), "alpha": 0.75, "rate": 14.0, "jitter": 1.0, "blink": true},
 	&"hex": {"color": Color("a63cff"), "alpha": 0.5, "rate": 1.8, "jitter": 0.0, "blink": false},
+	&"static": {"color": Color("b4e82a"), "alpha": 0.7, "rate": 5.0, "jitter": 0.5, "blink": true},
 }
 ## Sound ids asked from `core/registry`. A missing sound is silent.
 @export var hit_sound: StringName = &"hit"

@@ -280,6 +280,15 @@
       "prompt": "A 16x16 icon of a zigzag lightning bolt for the Storm element: Spark base with Spark light on its left edge, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
     },
     {
+      "path": "content/spells/elements/lightning/icon.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "placeholder",
+      "tool": "Claude (hand-written SVG rects)",
+      "prompt": "A 16x16 icon of a forked lightning arc for the Lightning element: a jagged spine with a short branch to the upper right, Arc base with Arc light on its left edge and Arc shadow on its right, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
       "path": "content/spells/elements/void/icon.svg",
       "origin": "ai",
       "author": "Claude",

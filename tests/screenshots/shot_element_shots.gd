@@ -18,6 +18,7 @@ const ELEMENTS: Array[Resource] = [
 	preload("res://content/spells/elements/frost/frost.tres"),
 	preload("res://content/spells/elements/storm/storm.tres"),
 	preload("res://content/spells/elements/void/void.tres"),
+	preload("res://content/spells/elements/lightning/lightning.tres"),
 ]
 
 
@@ -50,7 +51,7 @@ func _initialize() -> void:
 		for e in tints.size():
 			var slot: int = shots.call("spawn", p, Vector2(40.0 + e * 44.0, 36.0 + p * 30.0), Vector2(0.01, 0.0), 60.0, 6.0) as int
 			shots.call("set_core", slot, tints[e])
-			shots.call("set_shape", slot, e + 1 if e < 4 else 0)
+			shots.call("set_shape", slot, e + 1 if e < 5 else 0)
 		var anchor := Vector2(40.0 + p * 76.0, 250.0)
 		var rune: int = shots.call("spawn", p, anchor, Vector2.ZERO, 60.0, 8.0, 1, 0, 0, 1) as int
 		shots.call("set_core", rune, tints[p])
@@ -60,7 +61,7 @@ func _initialize() -> void:
 	# A strip in greyscale, to see that the four read without colour: one bolt per element.
 	var grey := ColorRect.new()
 	grey.position = Vector2(0.0, 168.0)
-	grey.size = Vector2(250.0, 40.0)
+	grey.size = Vector2(300.0, 40.0)
 	var material := ShaderMaterial.new()
 	var shader := Shader.new()
 	shader.code = "shader_type canvas_item;\nuniform sampler2D screen : hint_screen_texture, filter_nearest;\nvoid fragment() { float g = dot(texture(screen, SCREEN_UV).rgb, vec3(0.3, 0.59, 0.11)); COLOR = vec4(vec3(g), 1.0); }\n"
@@ -68,8 +69,8 @@ func _initialize() -> void:
 	grey.material = material
 	grey.z_index = 100
 	root.add_child(grey)
-	for e in 4:
-		var slot: int = shots.call("spawn", 0, Vector2(60.0 + e * 52.0, 188.0), Vector2(0.01, 0.0), 60.0, 6.0) as int
+	for e in 5:
+		var slot: int = shots.call("spawn", 0, Vector2(50.0 + e * 52.0, 188.0), Vector2(0.01, 0.0), 60.0, 6.0) as int
 		shots.call("set_core", slot, tints[e])
 		shots.call("set_shape", slot, e + 1)
 	var preset: Resource = feel.get("preset") as Resource

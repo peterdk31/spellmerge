@@ -41,7 +41,10 @@ const FOCUS_MARK: String = "> "
 ## The look of the drop list: the BuilderButton theme variation (10 px).
 const ROW_VARIATION: StringName = &"BuilderButton"
 const ROW_WIDTH: float = 54.0
-const ROW_HEIGHT: float = 14.0
+## Rows are 8 px text in 12 px rows (the font's height plus the button's 2 px of margin), so
+## the eleven components of five elements and six modifiers stay inside the player's quarter.
+const ROW_HEIGHT: float = 12.0
+const ROW_FONT: int = 8
 ## The meta key that keeps a button's text without the focus mark.
 const BASE_TEXT_META: StringName = &"base_text"
 
@@ -96,7 +99,7 @@ func _ready() -> void:
 	_grid.name = "DropList"
 	_grid.columns = 2
 	_grid.add_theme_constant_override("h_separation", 2)
-	_grid.add_theme_constant_override("v_separation", 2)
+	_grid.add_theme_constant_override("v_separation", 1)
 	_grid.visible = false
 	get_node("Rows").add_child(_grid)
 	visible = false
@@ -219,6 +222,7 @@ func _refresh() -> void:
 		row.clip_text = true
 		row.visible = false
 		row.custom_minimum_size = Vector2(ROW_WIDTH, ROW_HEIGHT)
+		row.add_theme_font_size_override("font_size", ROW_FONT)
 		_grid.add_child(row)
 		_rows.append(row)
 	for at in _rows.size():

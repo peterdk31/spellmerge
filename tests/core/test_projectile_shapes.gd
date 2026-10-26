@@ -11,6 +11,7 @@ const ELEMENTS: Array[String] = [
 	"res://content/spells/elements/frost/frost.tres",
 	"res://content/spells/elements/storm/storm.tres",
 	"res://content/spells/elements/void/void.tres",
+	"res://content/spells/elements/lightning/lightning.tres",
 ]
 
 var mgr: ManagerScript
@@ -49,18 +50,18 @@ func test_a_shaped_bolt_is_drawn_with_its_kind_and_two_trail_marks() -> void:
 		kinds.append(shape)
 	mgr.update_draw(1.0)
 	check(plain >= 0, "the plain bolt exists")
-	check_equal(mgr.drawn, 5, "five bolts drawn")
-	check_equal(mgr.drawn_trails, 8, "two marks behind each of the four shaped bolts, none behind the plain one")
+	check_equal(mgr.drawn, 6, "six bolts drawn")
+	check_equal(mgr.drawn_trails, 10, "two marks behind each of the five shaped bolts, none behind the plain one")
 	var seen: Array[int] = []
-	for i in 5:
+	for i in 6:
 		seen.append(kind_at(mgr._draw_node, i))
 	seen.sort()
-	check_equal(seen, [0, 1, 2, 3, 4] as Array[int], "each shape writes its own kind, the plain bolt 0")
+	check_equal(seen, [0, 1, 2, 3, 4, 5] as Array[int], "each shape writes its own kind, the plain bolt 0")
 	var marks: Array[int] = []
-	for i in 8:
+	for i in 10:
 		marks.append(kind_at(mgr._trail_node, i))
 	marks.sort()
-	check_equal(marks, [5, 5, 6, 6, 7, 7, 8, 8] as Array[int], "each mark is its shape's kind plus four")
+	check_equal(marks, [6, 6, 7, 7, 8, 8, 9, 9, 10, 10] as Array[int], "each mark is its shape's kind plus five")
 
 
 func test_the_trail_lies_behind_the_bolt() -> void:
@@ -119,7 +120,7 @@ func test_shaped_bodies_are_drawn_smaller_than_the_sprite() -> void:
 
 
 func test_kinds_fit_the_alpha_encoding_and_round_trip() -> void:
-	check(ManagerScript.KIND_RUNE > ManagerScript.SHAPE_COUNT + 3, "the form kinds sit above the trail-mark kinds 5-8")
+	check(ManagerScript.KIND_RUNE > ManagerScript.SHAPE_COUNT - 1 + ManagerScript.TRAIL_KIND_OFFSET, "the form kinds sit above the trail-mark kinds 6-10")
 	check(ManagerScript.KIND_ORBIT > ManagerScript.KIND_RUNE, "orbit is its own kind")
 	check(ManagerScript.KIND_ORBIT <= ManagerScript.KIND_MAX, "the kinds fit the encoding")
 	var buffer: PackedFloat32Array = PackedFloat32Array()
@@ -181,7 +182,7 @@ func test_a_reused_slot_starts_plain() -> void:
 	check_equal(mgr.get_shape_of(again), 0, "a new shot is plain, not the last one's shape")
 
 
-func test_the_four_elements_have_four_different_shapes() -> void:
+func test_the_five_elements_have_five_different_shapes() -> void:
 	var seen: Array[int] = []
 	for path in ELEMENTS:
 		var element: ElementBase = load(path) as ElementBase

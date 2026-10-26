@@ -2,6 +2,21 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-26: Lightning, status and element (#243, part 1)
+
+Added the fifth element, Lightning (complexity 1), and the `static` status. A static enemy hit again by any player's spell discharges to every other static enemy within 96 px for 60% of the hit (at least 1), as plain hits for the same player, announced as `reaction_triggered` `discharge` at each. One step only: no chain, and a reentrancy guard refuses a discharge started inside another. Looks: a new palette ramp "Arc" (acid lime), a forked-arc shot body with a spark trail, an enemy overlay (lime blink, apart from Storm's yellow), and an icon. Sheets `element_shots`, `statuses_4x`; clips `element_lightning`, `combo_static_bolt`, `combo_static_ring`.
+
+Files changed outside `content/spells/elements/lightning/`, and why:
+- `gameplay/combat/combat.gd` (+README): the status and the discharge (two packed arrays, a line in each `match`).
+- `core/spells/validator.gd`, `core/spells/spells.gd`: `static` as a known status, and its description verb "Charges".
+- `core/base/element_base.gd`: `shape` range 0–5.
+- `core/projectiles/projectile_manager.gd`, `shot_core.gdshader`: shape 5 (the arc) and its trail mark; the kind numbers moved (marks 6–10, rune 11, orbit 12) because trail marks were "shape + 4".
+- `gameplay/feel/presets/feel_preset.gd` (+README): the status look, `status_order`, the discharge's power.
+- `hud/builder/builder.gd`, `hud/panels/overlay/overlay.gd`: the drop lists hold every element and modifier, 11 now, which no longer fit a player's quarter at 14 px rows; rows are 12 px in 8 px text.
+- `docs/STYLE.md`, `art/kit/*` (palette, GIMP palette, README, checklist), `tests/core/test_svg_art.gd`: the Arc ramp (40 colours).
+- `art/manifest.json`, `content/story/lore/components/lightning.json`, `content/spells/combos.json` (two rows: the combo test needs two per component), `content/spells/README.md`.
+- Tests and shots: `test_combos.gd`'s COMPONENTS, `test_validators.gd`, `test_svg_art.gd` (counts), `test_projectile_shapes.gd`, `test_combat_statuses.gd`, `test_quick.gd` (11 rows), `shot_element_shots.gd`, `shot_statuses.gd`.
+
 ## 2026-10-25: Visual polish with the clips (#244 rework)
 
 Looked at the 51 clips and the sheets at 1x. Worst finding: the flame body (most visible when Bigger scales it) had a pale, washed-out middle; its light tier is now a small hot head in `shot_core.gdshader`. Four smaller findings (thin storm bolt, two-player coop clips, speckled orbit beads, no volley in the four-wizard sheet) went to `docs/BACKLOG.md`. The particle limit is unchanged and tested in `tests/gameplay/feel/`. After the shader change the sheets were rebuilt and the flame in `shot_form_bodies` and `element_shots` looked at again at the default 0.62 scale: the body is the element colour with a small light head.

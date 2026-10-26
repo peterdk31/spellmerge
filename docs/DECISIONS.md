@@ -2,6 +2,15 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-26: Trigger kit, part 1 (staffs B2a)
+
+- **One path for the events that name a shot's tag** (`_fire_event`): it looks the tag up, checks the trigger matches, and uses the shot's record for `max_fires` when the event is being sent for that very shot (`event_slot` with the same tag). `shot_blocked` now sets `event_slot`. An event with no shot behind it (a wizard's barrier, `shield_blocked`) is limited only by the per-step fire cap, since such a barrier is a fallback and carries no trigger anyway.
+- **`on wall` fires on walls only; `on expire` still fires on a wall too** (as before B2a), so existing builds do not change.
+- **`on cast`** fires from `_launch_group` right after its carrier launched, from the carrier's origin and heading; payloads nest finitely, and the per-step fire cap bounds it.
+- **`on hurt`** keeps a list of live shots with that trigger (cleaned lazily, like timers); it fires for the hurt player's carriers only, from the wizard's position, `max_fires` times each.
+- **`relay`** reads the ally's player from the manager (`target_owner_of`), and takes the elements and status of that player's last cast that had an infusion (the first such carrier). The result is a per-slot `HitProfile` that `Spells.hit_profile(tag)` returns while that shot's hit is being sent; it costs one small allocation per pass, not per frame. Several elements per hit are used by combat once B3 lands; until then combat reads the first element and the status. Chain children and payloads do not inherit it.
+- **Bounces do not send `on wall`:** a bounced shot does not end, so `projectile_expired` is not sent; the card example "a nova at every bounce" needs a manager event for it, noted in BACKLOG.
+
 ## 2026-10-26: Projectile kit (staffs B1)
 
 - **Behaviours are per-shot setters,** called by the spell runtime right after `spawn` (a small `_apply_travel` in `core/spells`, so the cards after B1 are data only). Plain shots keep the old path: flags 0, no extra work.

@@ -1284,7 +1284,9 @@ func _shield_block(slot: int) -> void:
 		var at: Vector2 = _pos[other]
 		_kill(other)
 		if events != null:
+			event_slot = slot
 			events.shot_blocked.emit(_player[slot], at, _tag[slot])
+			event_slot = -1
 
 
 ## Advance an orbit shot: turn its angle and place it round the anchor.
@@ -1742,6 +1744,15 @@ func get_velocity_of(slot: int) -> Vector2:
 ## Where `player`'s anchor is (see `set_anchor`), or `Vector2.INF` when it has none.
 func get_anchor(player: int) -> Vector2:
 	return _anchors[player] if player >= 0 and player < MAX_PLAYERS else Vector2.INF
+
+
+## The player (0-3) a registered target belongs to (`add_target`'s `owner`), or
+## `Events.NO_PLAYER` for an enemy, an unknown node or null.
+func target_owner_of(node: Node) -> int:
+	if node == null or not is_instance_valid(node):
+		return EventsScript.NO_PLAYER
+	var at: int = _target_id.find(node.get_instance_id())
+	return EventsScript.NO_PLAYER if at < 0 else _target_owner[at]
 
 
 ## Where the target `nearest_target` last returned is (its hit circle's centre).

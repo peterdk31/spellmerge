@@ -56,6 +56,10 @@ func _initialize() -> void:
 	# The room is entered a little after the run starts; the overlay opens only inside it.
 	for i in 4:
 		await _settle()
+	# The wave is live while the builders are staged; a downed wizard's builder closes, so keep
+	# all four from being hurt meanwhile.
+	for index in 4:
+		flow.call("get_wizard", index).call("protect", 60.0)
 	for index in 4:
 		await _open_builder(index)
 	# P1: staff X. P2: staff A. P3: staff Y with a pick. P4: staff B.

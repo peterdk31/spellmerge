@@ -62,8 +62,8 @@ func _six(events: Node, centre: Vector2) -> void:
 	for row: Dictionary in SIX:
 		var arena: RefCounted = ArenaScript.new(root)
 		arena.call("add_imp", Vector2(100.0, 0.0))
-		arena.call("install", 0, 0, {"form": &"bolt", "element": row["first"]})
-		arena.call("install", 0, 1, {"form": &"bolt", "element": row["second"]})
+		arena.call("install_cards", 0, 0, [row["first"], &"bolt"])
+		arena.call("install_cards", 0, 1, [row["second"], &"bolt"])
 		arena.call("cast", 0, 0)
 		arena.call("run", 0.3)
 		arena.call("cast", 0, 1)

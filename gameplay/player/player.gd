@@ -71,7 +71,8 @@ extends CharacterBody2D
 ##
 ## Building: `start_cards` (four lists of card ids, flow sets them) are built when the wizard
 ## enters the tree. `staff_change_requested` puts one card in one slot, `card_move_requested`
-## moves or swaps cards between slots and staffs (a staff of -1 is the bag). A change is only
+## moves or swaps cards between slots and staffs (a staff of -1 is the bag) and
+## `staff_cards_requested` sets a whole staff (the radial builder). A change is only
 ## refused when the slot does not exist or the card is not in the `bag`; then `build_refused`
 ## says why. Every built staff is announced with `staff_changed(player, staff, plan)`, the plain
 ## view of `Spells.staff_view`. The `bag` holds the ids the player may build with (every card
@@ -460,6 +461,8 @@ func _connect_build_events() -> void:
 		events.staff_change_requested.connect(_on_staff_change_requested)
 	if not events.card_move_requested.is_connected(_on_card_move_requested):
 		events.card_move_requested.connect(_on_card_move_requested)
+	if not events.staff_cards_requested.is_connected(_on_staff_cards_requested):
+		events.staff_cards_requested.connect(_on_staff_cards_requested)
 	if not events.caster_move_requested.is_connected(_on_caster_move_requested):
 		events.caster_move_requested.connect(_on_caster_move_requested)
 	if not events.mana_reserved.is_connected(_on_mana_reserved):
@@ -476,6 +479,8 @@ func _exit_tree() -> void:
 			events.staff_change_requested.disconnect(_on_staff_change_requested)
 		if events.card_move_requested.is_connected(_on_card_move_requested):
 			events.card_move_requested.disconnect(_on_card_move_requested)
+		if events.staff_cards_requested.is_connected(_on_staff_cards_requested):
+			events.staff_cards_requested.disconnect(_on_staff_cards_requested)
 		if events.caster_move_requested.is_connected(_on_caster_move_requested):
 			events.caster_move_requested.disconnect(_on_caster_move_requested)
 		if events.mana_reserved.is_connected(_on_mana_reserved):
@@ -874,6 +879,22 @@ func _on_staff_change_requested(player: int, at: int, slot: int, card_id: String
 	var row: Array[StringName] = cards_of(at)
 	row[slot] = card_id
 	set_staff(at, row)
+
+
+## A builder asked to set every slot of staff `at` at once (`cards` by slot; fewer than the
+## staff's slots empties the rest). Refused, and nothing changes, for a staff that does not
+## exist, more cards than slots, or a card not in the `bag`.
+func _on_staff_cards_requested(player: int, at: int, cards: Array[StringName]) -> void:
+	if player != index:
+		return
+	if at < 0 or at >= STAFF_COUNT or cards.size() > slot_count():
+		_refuse("There is no such slot.")
+		return
+	for card_id in cards:
+		if card_id != &"" and not bag.has(card_id):
+			_refuse("You do not have that card.")
+			return
+	set_staff(at, cards)
 
 
 ## A builder asked to move a card: from a slot of one staff to a slot of another (or the same),

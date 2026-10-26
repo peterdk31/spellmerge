@@ -16,6 +16,7 @@ const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
 const HUD_SCENE_PATH: String = "res://hud/panels/panels.tscn"
 const HudScript := preload("res://hud/panels/panels.gd")
 const PauseMenuScript := preload("res://hud/menus/pause/pause_menu.gd")
+const RadialScript := preload("res://hud/builder/radial_builder.gd")
 
 var _failures: Array[String] = []
 var _bus: EventsScript
@@ -33,6 +34,7 @@ func _initialize() -> void:
 	_test_resume_back_and_start_close_it()
 	_test_sandbox_entry_and_actions()
 	_test_friendly_fire_setting()
+	_test_the_sandbox_switches_the_builder()
 	_test_b_opens_the_builder_in_play_only()
 	_test_start_closes_the_builder()
 	_test_the_run_ending_closes_it()
@@ -162,7 +164,7 @@ func _test_sandbox_entry_and_actions() -> void:
 	_frame()
 	_check(_names() == ["Resume", "Sandbox", "Settings"], "in the sandbox the main page has Sandbox, got %s" % [_names()])
 	_press(1, "Sandbox")
-	_check(_names() == ["ImpWave", "ResetDummies", "SandboxBack"], "the sandbox page, got %s" % [_names()])
+	_check(_names() == ["ImpWave", "ResetDummies", "BuilderStyle", "RingStyle", "PutStyle", "SandboxBack"], "the sandbox page, got %s" % [_names()])
 	_press(1, "ImpWave")
 	_press(1, "ImpWave")
 	_press(1, "ResetDummies")
@@ -173,6 +175,42 @@ func _test_sandbox_entry_and_actions() -> void:
 	_check(_menu().page == PauseMenuScript.Page.MAIN and _menu().is_open(), "B goes back to the main page")
 	_bus.sandbox_changed.emit(false)
 	_check(_names() == ["Resume", "Settings"], "out of the sandbox the entry goes")
+
+
+func _test_the_sandbox_switches_the_builder() -> void:
+	_setup(1, true)
+	var options: Array = []
+	_menu().builder_options_changed.connect(func(radial: bool, by_kind: bool, push: bool) -> void: options.append([radial, by_kind, push]))
+	_tap(0, &"pause")
+	_frame()
+	_press(0, "Sandbox")
+	_check(_menu().button("BuilderStyle").text.ends_with("Builder: List"), "the list builder by default")
+	_check(_menu().button("PutStyle").text.ends_with("Full slot: Push right"), "a full slot pushes right by default")
+	_press(0, "BuilderStyle")
+	_check(_menu().button("BuilderStyle").text.ends_with("Builder: Radial"), "it flips to the radial builder")
+	_check(_hud.uses_radial(), "and the panels use it")
+	_press(0, "RingStyle")
+	_press(0, "PutStyle")
+	_check(options == [[true, false, true], [true, true, true], [true, true, false]], "each flip goes out, got %s" % [options])
+	_check(_hud.get_radial(0).layout == RadialScript.Layout.KIND, "the ring shows one kind at a time")
+	_check(_hud.get_radial(0).put == RadialScript.Put.REPLACE, "a full slot is replaced")
+	_check(_menu().page == PauseMenuScript.Page.SANDBOX, "the page stays")
+	_tap(0, &"pause")
+	_frame()
+	_tap(0, &"back")
+	_frame()
+	_check(_hud.get_radial(0).is_open(), "B opens the radial builder now")
+	_check(not _hud.get_builder(0).is_open(), "not the list one")
+	_tap(0, &"back")
+	_frame()
+	_check(not _hud.get_radial(0).is_open(), "B closes it again")
+	_frame()
+	_check(not _hud.get_radial(0).is_open(), "and it stays closed")
+	_tap(0, &"back")
+	_frame()
+	_tap(0, &"pause")
+	_frame()
+	_check(not _hud.get_radial(0).is_open() and not _menu().is_open(), "Start closes it rather than pausing")
 
 
 func _test_friendly_fire_setting() -> void:

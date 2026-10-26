@@ -26,6 +26,9 @@ extends CanvasLayer
 ##   never pauses the game; it is the full builder at any time, waves included (staffs A6a).
 ##   Inside a menu `back` is that menu's own (UIFocus `cancelled`), so a press only opens the
 ##   builder when the player had no menu open at the poll before it too.
+##   The pause menu's Sandbox page can swap it for the radial builder (`builder/radial_builder.gd`,
+##   nodes Root/Radial1 to Root/Radial4, made here; owner, 2026-10-26): `back` then opens that one,
+##   with the ring layout and full-slot choice from the same page (`builder_options_changed`).
 ## - `pause` (Start; Escape) closes the menu its player has open (the builder, or the pause menu
 ##   they opened); with none open it opens the pause menu (`hud/menus/pause/`, node
 ##   Root/PauseMenu), which stops the game for everyone and is worked by the player who opened
@@ -37,6 +40,7 @@ const InputManagerScript := preload("res://core/input/input_manager.gd")
 const PauseMenuScript := preload("res://hud/menus/pause/pause_menu.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const BuilderScript := preload("res://hud/builder/builder.gd")
+const RadialScript := preload("res://hud/builder/radial_builder.gd")
 const PlayerPanelScript := preload("res://hud/panels/player_panel/player_panel.gd")
 const VignetteScript := preload("res://hud/panels/vignette/vignette.gd")
 const HammerIconScript := preload("res://hud/widgets/hammer_icon.gd")
@@ -68,6 +72,9 @@ var spells: SpellsScript = null
 
 var _panels: Array[PlayerPanelScript] = []
 var _builders: Array[BuilderScript] = []
+var _radials: Array[RadialScript] = []
+## `back` opens the radial builders instead of the list ones (the pause menu's Sandbox page).
+var _use_radial: bool = false
 var _pause_menu: PauseMenuScript = null
 ## Per player: the `pause` and `back` press counts at the last poll, and whether a menu of
 ## theirs was open then.
@@ -153,6 +160,14 @@ func _ready() -> void:
 		_panels.append(panel)
 		_builders.append(get_node("Root/Builder%d" % (player + 1)) as BuilderScript)
 	_pause_menu = get_node("Root/PauseMenu") as PauseMenuScript
+	for player in PLAYER_COUNT:
+		var radial := RadialScript.new()
+		radial.name = "Radial%d" % (player + 1)
+		radial.index = player
+		root_control.add_child(radial)
+		# Under the corner panels (its shade leaves their band free but never dims them).
+		root_control.move_child(radial, _panels[0].get_index())
+		_radials.append(radial)
 	if events == null:
 		events = get_node_or_null("/root/Events") as EventsScript
 	if ui_focus == null:
@@ -171,6 +186,9 @@ func _ready() -> void:
 	_pause_menu.bind(events, ui_focus)
 	for builder in _builders:
 		builder.bind(events, ui_focus, spells, input)
+	for radial in _radials:
+		radial.bind(events, ui_focus, spells, input)
+	_pause_menu.builder_options_changed.connect(_on_builder_options_changed)
 	if events != null:
 		events.player_joined.connect(_on_player_joined)
 		events.player_left.connect(_on_player_left)
@@ -226,19 +244,24 @@ func poll() -> void:
 				_on_pause_pressed(player)
 			elif back_now and not had_menu and not _has_menu(player) and _in_room \
 					and not _pause_menu.is_open() and not _panels[player].is_downed():
-				_builders[player].open_builder()
+				if _use_radial:
+					_radials[player].open_builder()
+				else:
+					_builders[player].open_builder()
 		_had_menu[player] = _has_menu(player)
 
 
 ## Whether `player` has a menu open: their builder, or the pause menu they work.
 func _has_menu(player: int) -> bool:
-	return _builders[player].is_open() or _pause_menu.owner_player == player
+	return _builders[player].is_open() or _radials[player].is_open() or _pause_menu.owner_player == player
 
 
 ## `pause`: close the player's open menu, or open the pause menu for them.
 func _on_pause_pressed(player: int) -> void:
 	if _builders[player].is_open():
 		_builders[player].close_builder()
+	elif _radials[player].is_open():
+		_radials[player].close_builder()
 	elif _pause_menu.is_open():
 		if _pause_menu.owner_player == player:
 			_pause_menu.close_menu()
@@ -256,6 +279,26 @@ func get_builder(player: int) -> BuilderScript:
 	if player < 0 or player >= PLAYER_COUNT:
 		return null
 	return _builders[player]
+
+
+## The radial builder of `player`, or null for a bad index.
+func get_radial(player: int) -> RadialScript:
+	if player < 0 or player >= PLAYER_COUNT:
+		return null
+	return _radials[player]
+
+
+## Whether `back` opens the radial builders.
+func uses_radial() -> bool:
+	return _use_radial
+
+
+## The pause menu's builder switches: which builder `back` opens, and the radial's options.
+func _on_builder_options_changed(radial: bool, ring_by_kind: bool, push: bool) -> void:
+	_use_radial = radial
+	for builder in _radials:
+		builder.layout = RadialScript.Layout.KIND if ring_by_kind else RadialScript.Layout.ALL
+		builder.put = RadialScript.Put.PUSH if push else RadialScript.Put.REPLACE
 
 
 ## The red vignette (for tests).
@@ -370,6 +413,7 @@ func _reset_all() -> void:
 	_pause_menu.close_menu()
 	for player in PLAYER_COUNT:
 		_builders[player].close_builder()
+		_radials[player].close_builder()
 		_panels[player].reset()
 		_refresh(player)
 
@@ -382,6 +426,7 @@ func _on_stats_changed(player: int, health: int, max_health: int, mana: float, m
 			_vignette.flash_hit(player, float(before - health) / float(maxi(max_health, 1)), _joined.count(true))
 		if health <= 0:
 			_builders[player].close_builder()
+			_radials[player].close_builder()
 
 
 func _on_menu_opened(player: int) -> void:

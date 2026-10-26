@@ -28,6 +28,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `build_refused` | `player` | `hud` (the builders) |
 | `bag_changed` | `player` | `hud` (the builders) |
 | `card_move_requested` | `hud` (the builders) | `player` |
+| `staff_cards_requested` | `hud` (the radial builder) | `player` |
 | `staff_changed` | `player` | `hud` (the builders) |
 | `staff_cast` | `player` | `hud` (the corner panel) |
 | `caster_move_requested`, `mana_reserved`, `mana_refund_requested` | `core/spells` | `player` |

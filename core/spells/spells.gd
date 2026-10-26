@@ -302,7 +302,9 @@ func compile_staff(cards: Array[StringName], staff: StaffBase) -> CompiledStaff:
 ## reads a compiled staff: `empty`; `cards` (the card ids by slot, `&""` for an empty slot); `casts`, one Dictionary per cast of the cycle with `slots`
 ## (read order), `text`, `mana`, `delay`, `damage` (each carrier's hit times its shots and the group's repeats, payloads left out), `recharges`, `wrapped`, `targets` (card slot -> the
 ## carrier's slot, or `StaffCompiler.TARGET_CASTER` / `TARGET_POINT`) and `wasted` (slot ->
-## reason); and `wasted` for the staff (cards that did nothing in any cast that read them).
+## reason); `wasted` for the staff (cards that did nothing in any cast that read them); and
+## `staff`, the StaffBase given, only to hand back to `staff_view` for a preview of other cards
+## (the radial builder shows what a card would change before it is put in).
 func staff_view(cards: Array[StringName], staff: StaffBase) -> Dictionary:
 	var compiled: CompiledStaff = compile_staff(cards, staff)
 	var casts: Array[Dictionary] = []
@@ -315,7 +317,7 @@ func staff_view(cards: Array[StringName], staff: StaffBase) -> Dictionary:
 		})
 	var row: Array[StringName] = []
 	row.assign(compiled.cards)
-	return {"empty": compiled.is_empty(), "cards": row, "casts": casts, "wasted": compiled.wasted.duplicate()}
+	return {"empty": compiled.is_empty(), "cards": row, "casts": casts, "wasted": compiled.wasted.duplicate(), "staff": staff}
 
 
 ## The damage one cast deals if every shot of it lands once: each carrier's hit times its
@@ -342,6 +344,72 @@ func component_name(id: StringName) -> String:
 func component_icon(id: StringName) -> Texture2D:
 	var component: SpellComponent = _component(id)
 	return component.icon if component != null else null
+
+
+## The card's own numbers for the builder, as short lines of at most three (none for an unknown
+## id): a carrier's damage (times its shots), mana and delay ("Dmg 3x8", "Mana 10", "Delay 1s");
+## a modifier's changes ("Dmg x0.5", "Shots x3", "Homes in"); an element's status and how long it
+## lasts ("Burn 3s"); when a trigger fires its payload ("On hit"); a multicast's draws.
+func component_stats(id: StringName) -> PackedStringArray:
+	var out := PackedStringArray()
+	var component: SpellComponent = _component(id)
+	if component is FormBase:
+		var form: FormBase = component
+		out.append("Dmg %d" % form.base_damage if form.shots <= 1 else "Dmg %dx%d" % [form.base_damage, form.shots])
+		out.append("Mana " + _short(form.mana_cost))
+		out.append("Delay %ss" % _short(form.cooldown))
+	elif component is ModifierBase:
+		var modifier: ModifierBase = component
+		var words: Dictionary = {
+			ModifierBase.Behaviour.HOMING: "Homes in", ModifierBase.Behaviour.CHAIN: "Chains %s",
+			ModifierBase.Behaviour.SHIELD: "Blocks %s", ModifierBase.Behaviour.BOUNCE: "Bounces %s",
+		}
+		if words.has(modifier.behaviour):
+			var word: String = words[modifier.behaviour]
+			out.append(word % _short(modifier.behaviour_strength) if word.contains("%s") else word)
+		elif modifier.behaviour != ModifierBase.Behaviour.NONE:
+			out.append(String(ModifierBase.Behaviour.keys()[modifier.behaviour]).capitalize())
+		if modifier.extra_pierce != 0:
+			out.append("Pierce +%d" % modifier.extra_pierce)
+		var mults: Array = [
+			["Dmg", modifier.damage_mult], ["Mana", modifier.mana_mult], ["Shots", float(modifier.shot_mult)],
+			["Delay", modifier.cooldown_mult], ["Speed", modifier.speed_mult], ["Size", modifier.radius_mult],
+		]
+		for pair: Array in mults:
+			if not is_equal_approx(float(pair[1]), 1.0):
+				out.append("%s x%s" % [pair[0], _short(float(pair[1]))])
+	elif component is ElementBase:
+		var element: ElementBase = component
+		if element.status_id != &"":
+			out.append("%s %ss" % [String(element.status_id).capitalize(), _short(element.status_duration)])
+		if not is_equal_approx(element.damage_scale, 1.0):
+			out.append("Dmg x" + _short(element.damage_scale))
+	elif component is TriggerBase:
+		var trigger: TriggerBase = component
+		if trigger.event == TriggerBase.Event.TIMER:
+			out.append("Every %ss" % _short(trigger.interval))
+			out.append("%d times" % trigger.max_fires)
+		else:
+			out.append("On " + String(TriggerBase.Event.keys()[trigger.event]).to_lower())
+	elif component is MulticastBase:
+		var multicast: MulticastBase = component
+		if multicast.extra_draws > 0:
+			out.append("+%d carriers" % multicast.extra_draws)
+		if multicast.repeats > 1:
+			out.append("%d times" % multicast.repeats)
+		if multicast.mana_cost > 0.0:
+			out.append("Mana " + _short(multicast.mana_cost))
+	if out.size() > 3:
+		out.resize(3)
+	return out
+
+
+## A number as the builder writes it: at most two decimals, no trailing zeros, no leading zero
+## (0.35 is ".35").
+static func _short(value: float) -> String:
+	var text: String = "%.2f" % value
+	text = text.rstrip("0").rstrip(".")
+	return text.substr(1) if text.begins_with("0.") else text
 
 
 ## The one-line description of the component `id` for the builder, from its lore file in

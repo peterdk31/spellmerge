@@ -18,8 +18,8 @@ enum Kind { KEYBOARD, KEYBOARD_MOUSE, XBOX, PLAYSTATION, SWITCH, GAMEPAD }
 ## How a glyph is drawn: a key cap with its label, a round face button with a letter, a
 ## round PlayStation button with a symbol (label is `cross`, `circle`, `square` or
 ## `triangle`), a shoulder button (a bumper, or Start and Back), a trigger, or the mouse with
-## its left button lit.
-enum Shape { KEY, FACE, SYMBOL, SHOULDER, MOUSE, TRIGGER }
+## its left button lit, or the d-pad with one arm lit (label `left` or `right`).
+enum Shape { KEY, FACE, SYMBOL, SHOULDER, MOUSE, TRIGGER, DPAD }
 
 const FACE_GREEN: Color = Color(0.36, 0.72, 0.4)
 const FACE_RED: Color = Color(0.86, 0.3, 0.3)
@@ -37,6 +37,7 @@ const _KEYS: Dictionary = {
 	&"staff_1": "Space", &"staff_2": "J", &"staff_3": "K", &"staff_4": "Q", &"accept": "Enter", &"back": "Tab",
 	&"alternate": "X", &"pause": "Esc", &"join": "Enter",
 	&"leave": "Bksp", &"move_up": "W", &"move_down": "S", &"move_left": "A", &"move_right": "D", &"page_prev": "Z", &"page_next": "C",
+	&"extra": "R", &"kind_prev": "PgUp", &"kind_next": "PgDn",
 }
 
 ## Name fragments (lower case) of a gamepad's name, per family.
@@ -83,6 +84,12 @@ static func glyph(kind: int, action: StringName) -> Dictionary:
 			return _face(kind, 1)
 		&"alternate":
 			return _face(kind, 2)
+		&"extra":
+			return _face(kind, 3)
+		&"kind_prev":
+			return {"shape": Shape.DPAD, "label": "left", "color": PLAIN}
+		&"kind_next":
+			return {"shape": Shape.DPAD, "label": "right", "color": PLAIN}
 		&"pause":
 			var start: String = "Options" if kind == Kind.PLAYSTATION else ("+" if kind == Kind.SWITCH else "Menu")
 			return {"shape": Shape.SHOULDER, "label": start, "color": PLAIN}

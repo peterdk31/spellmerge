@@ -7,7 +7,11 @@ extends PanelContainer
 ## Pages, one list of buttons each:
 ## - **Main:** Resume, Sandbox (only while the run is a sandbox, `sandbox_changed`), Settings.
 ## - **Sandbox** (staffs B7): Imp wave and Reset dummies (each sends
-##   `sandbox_action_requested(player, imp_wave | reset_dummies)` and stays on the page), Back.
+##   `sandbox_action_requested(player, imp_wave | reset_dummies)` and stays on the page); the
+##   builder switches (owner, 2026-10-26), each flipping on `accept` and staying on the page:
+##   "Builder: List" or "Radial", "Ring: Every card" or "One kind" and "Full slot: Push right"
+##   or "Replace" (the radial builder's options); each flip sends `builder_options_changed`,
+##   which `hud/panels` applies to every player's builder. Back.
 ## - **Settings:** Gameplay, Back.
 ## - **Gameplay:** "Friendly fire: Off" (or On), which sends `friendly_fire_requested(player, on)`;
 ##   the word follows `friendly_fire_changed` from coop, never the press itself. Back.
@@ -37,6 +41,13 @@ const BASE_TEXT_META: StringName = &"base_text"
 
 ## The menu closed (resumed). Carries the player who had it.
 signal closed_menu(player: int)
+## A builder switch on the Sandbox page flipped: the radial builder or the list one, the ring by
+## kind or every card, a full slot pushed right or replaced.
+signal builder_options_changed(radial: bool, ring_by_kind: bool, push: bool)
+
+const BUILDER_TEXT: String = "Builder: %s"
+const RING_TEXT: String = "Ring: %s"
+const PUT_TEXT: String = "Full slot: %s"
 
 ## The player working the menu (0-3), or -1 while it is closed.
 var owner_player: int = -1
@@ -51,6 +62,10 @@ var _focused: Control = null
 var _controls: Array[Control] = []
 ## Page -> its buttons, in order.
 var _pages: Dictionary = {}
+## The builder switches (see the top); the list builder by default.
+var builder_radial: bool = false
+var ring_by_kind: bool = false
+var put_push: bool = true
 
 @onready var _title: Label = %Title
 @onready var _rows: VBoxContainer = %Rows
@@ -59,6 +74,9 @@ var _pages: Dictionary = {}
 @onready var _settings: Button = _add(Page.MAIN, "Settings", "Settings")
 @onready var _imp_wave: Button = _add(Page.SANDBOX, "ImpWave", "Imp wave")
 @onready var _reset: Button = _add(Page.SANDBOX, "ResetDummies", "Reset dummies")
+@onready var _builder_style: Button = _add(Page.SANDBOX, "BuilderStyle", BUILDER_TEXT % "List")
+@onready var _ring_style: Button = _add(Page.SANDBOX, "RingStyle", RING_TEXT % "Every card")
+@onready var _put_style: Button = _add(Page.SANDBOX, "PutStyle", PUT_TEXT % "Push right")
 @onready var _sandbox_back: Button = _add(Page.SANDBOX, "SandboxBack", "Back")
 @onready var _gameplay: Button = _add(Page.SETTINGS, "Gameplay", "Gameplay")
 @onready var _settings_back: Button = _add(Page.SETTINGS, "SettingsBack", "Back")
@@ -228,6 +246,15 @@ func _on_activated(player: int, control: Control) -> void:
 		_send(ACTION_IMP_WAVE)
 	elif control == _reset:
 		_send(ACTION_RESET_DUMMIES)
+	elif control == _builder_style:
+		builder_radial = not builder_radial
+		_show_builder_options()
+	elif control == _ring_style:
+		ring_by_kind = not ring_by_kind
+		_show_builder_options()
+	elif control == _put_style:
+		put_push = not put_push
+		_show_builder_options()
 	elif control == _gameplay:
 		_go(Page.GAMEPLAY)
 	elif control == _friendly:
@@ -250,6 +277,15 @@ func _on_cancelled(player: int) -> void:
 			_go(Page.SETTINGS)
 		_:
 			_go(Page.MAIN)
+
+
+## Write the switches' words and tell `hud/panels`.
+func _show_builder_options() -> void:
+	_builder_style.set_meta(BASE_TEXT_META, BUILDER_TEXT % ("Radial" if builder_radial else "List"))
+	_ring_style.set_meta(BASE_TEXT_META, RING_TEXT % ("One kind" if ring_by_kind else "Every card"))
+	_put_style.set_meta(BASE_TEXT_META, PUT_TEXT % ("Push right" if put_push else "Replace"))
+	_mark_focus()
+	builder_options_changed.emit(builder_radial, ring_by_kind, put_push)
 
 
 func _send(action: StringName) -> void:

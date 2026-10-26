@@ -15,4 +15,4 @@ status_duration = 4.0
 status_strength = 25.0
 damage_scale = 1.0
 tint = Color(0.8784, 0.5412, 0.8471, 1)
-shape = 4
+look_layer = 4

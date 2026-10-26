@@ -64,6 +64,15 @@ enum Behaviour {
 ## Turn rate for HOMING, number of jumps for CHAIN; unused for NONE.
 @export var behaviour_strength: float = 0.0
 
+# --- Look (staffs B6a) ----------------------------------------------------------------
+
+## The effect this card draws round its shots: a LOOK_* kind of `core/projectiles` (0 none,
+## 1 flicker and embers, 2 frost flecks, 3 gusts, 4 pulled-in pixels, 5 sparks and arcs,
+## 6 rising motes, 7 a halo, 8 a bright point in front and a longer core, 9 a pulsing rim,
+## 10 a dotted ring, 11 a weave, 12 a glow). A shot draws its first two infusions' and first
+## two modifiers' looks.
+@export var look_layer: int = 0
+
 
 func kind() -> StringName:
 	return &"modifier"
@@ -78,6 +87,7 @@ func ranges() -> Dictionary:
 		"cooldown_mult": Vector2(0.1, 4.0),
 		"mana_mult": Vector2(0.1, 4.0),
 		"shot_mult": Vector2(1, 8),
+		"look_layer": Vector2(0.0, 12.0),
 		"extra_pierce": Vector2(0, 8),
 		"behaviour": Vector2(0, Behaviour.size() - 1),
 		"behaviour_strength": Vector2(0.0, 256.0),

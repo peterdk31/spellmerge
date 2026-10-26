@@ -506,8 +506,10 @@ func _test_shot_core_colour_and_batches() -> void:
 		var buffer: PackedFloat32Array = node.multimesh.buffer
 		_check(is_equal_approx(buffer[12], frost.r) and is_equal_approx(buffer[13], frost.g) and is_equal_approx(buffer[14], frost.b), "the core colour is in the custom data")
 	var body: PackedFloat32Array = _mgr._draw_node.multimesh.buffer
+	# The instance colour carries the owner as data (staffs B6a); the shader colours the outline
+	# and the trail by it (test_projectile_looks.gd).
+	_check(roundi(body[8] * 255.0) == 1, "the body names its owner, player 2")
 	var owner_tint: Color = _mgr.tint_of(1)
-	_check(is_equal_approx(body[8], owner_tint.r) and is_equal_approx(body[10], owner_tint.b), "the body keeps the owner's tint")
 	_check(owner_tint != frost, "the owner's tint and the element's colour are separate")
 	var seen: Array[Color] = []
 	for player in 4:

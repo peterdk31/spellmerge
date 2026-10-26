@@ -26,12 +26,16 @@ The script of each class documents every field, and its `ranges()` holds the all
 | Kind | Fields (range) |
 | --- | --- |
 | Form (`FormBase`, a carrier) | `base_damage` 1–200, `mana_cost` 0–100, `cooldown` 0.05–10 s (what the carrier adds to its staff's delay), `speed` 0–2000 px/s, `lifetime` 0.05–20 s, `radius` 1–64 px, `shots` 1–24, `spread` 0–360°, `motion` (STRAIGHT, STILL, ORBIT, RAY, DASH, and the staffs carriers TELEPORT to FAMILIAR, each run by its kit), `pierce` 0–16, `orbit_radius` 0–256 px (ORBIT), `ray_length` 0–1024 px (RAY) |
-| Element (`ElementBase`) | `status_id` (a status combat knows: burn, chill, shock, hex, static), `status_duration` 0–30 s, `status_strength` 0–100, `damage_scale` 0.1–4, `tint` (a palette colour from docs/STYLE.md; the validator does not check it, reviewers do), `shape` 0–5 (0 the plain sprite, 1 flame, 2 star, 3 zigzag, 4 ring, 5 forked arc: the silhouette, animation and trail of its shots, drawn by `core/projectiles/shot_core.gdshader`; each element needs a shape of its own so it reads without colour) |
-| Modifier (`ModifierBase`) | `damage_mult` 0.1–4, `speed_mult` 0.1–4, `radius_mult` 0.25–4, `cooldown_mult` 0.1–4, `mana_mult` 0.1–4, `shot_mult` 1–8, `extra_pierce` 0–8, `behaviour` (NONE, HOMING, CHAIN, and the staffs behaviours SHIELD to RELAY, each documented in `modifier_base.gd` with what its strength means), `behaviour_strength` 0–256 |
+| Element (`ElementBase`) | `status_id` (a status combat knows: burn, chill, shock, hex, static), `status_duration` 0–30 s, `status_strength` 0–100, `damage_scale` 0.1–4, `tint` (a palette colour from docs/STYLE.md; the validator does not check it, reviewers do), `look_layer` 0–12 (see "The look of a shot" below) |
+| Modifier (`ModifierBase`) | `damage_mult` 0.1–4, `speed_mult` 0.1–4, `radius_mult` 0.25–4, `cooldown_mult` 0.1–4, `mana_mult` 0.1–4, `shot_mult` 1–8, `extra_pierce` 0–8, `behaviour` (NONE, HOMING, CHAIN, and the staffs behaviours SHIELD to RELAY, each documented in `modifier_base.gd` with what its strength means), `behaviour_strength` 0–256, `look_layer` 0–12 |
 | Trigger (`TriggerBase`) | `event` (HIT, EXPIRE, TIMER, and BLOCK to ALLY), `interval` 0–10 s (TIMER), `max_fires` 1–4 |
 | Multicast (`MulticastBase`) | `extra_draws` 0–4, `mode` (TOGETHER, SCATTER, BURST), `repeats` 1–8, `repeat_interval` 0–1 s, `mana_cost` 0–100, `cooldown` 0–2 s |
 
 Multipliers multiply the carrier's numbers and adds are added, in slot order. There is no cast time: a cast's delay is its staff's delay plus every carrier's cooldown.
+
+### The look of a shot
+
+A shot is drawn by `core/projectiles/shot_core.gdshader` from its cards (staffs B6a; docs/milestones/M2-staffs.md, "The look of a shot"): a small core shaped by its carrier (a bolt, a rune's diamond, an orbit shot's beads) in its first infusion's `tint`, outlined in the player's shadow shade, a short trail in the player's colour, and up to four layers: the `look_layer` of the first two infusions, then of the first two modifiers that have one. A layer is an effect kind the shader knows (the `LOOK_*` constants in `core/projectiles/projectile_manager.gd`): 1 flicker and embers (fire), 2 frost flecks, 3 gusts (storm), 4 pulled-in pixels (void), 5 sparks and arcs (lightning), 6 rising motes, 7 a halo (bigger), 8 a point in front and a longer core (pierce), 9 a pulsing rim, 10 a dotted ring, 11 a weave (homing), 12 a glow. A new card picks one, or 0 for none; an infusion should pick one no other infusion uses, so elements read without colour. Sheet: `tests/screenshots/shot_looks.gd`.
 
 ### No budget, engine safeguards only
 
@@ -50,7 +54,7 @@ Element interactions go in `reactions.tres` (a `ReactionTable` of `ReactionRow`s
 These steps are not new files only (the report of #243, the fifth element):
 
 - **A status of its own** (`status_id` that combat does not know): code in `gameplay/combat/combat.gd` (arrays, apply, tick, remove, `REACTING_STATUSES`), a word in `core/spells/spells.gd` and a name in `core/spells/validator.gd`. An element that reuses `burn`, `chill`, `shock`, `hex` or `static` needs none.
-- **A shape of its own** (`shape` above 5): the silhouette is drawn by `core/projectiles/shot_core.gdshader` and numbered in `core/projectiles/projectile_manager.gd`, so a new shape edits both.
+- **A look of its own** when no free `look_layer` kind fits: a new `LOOK_*` number in `core/projectiles/projectile_manager.gd` and its branch in `core/projectiles/shot_core.gdshader`.
 - **A colour ramp** if the palette has no free hue: `docs/STYLE.md` and `art/kit/`.
 - **A look for its status** on the enemy: `status_looks` in the Feel preset.
 

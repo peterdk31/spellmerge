@@ -16,10 +16,15 @@ extends SpellComponent
 @export var damage_scale: float = 1.0
 ## Shot tint, a colour from the palette in docs/STYLE.md.
 @export var tint: Color = Color.WHITE
-## The silhouette, animation and trail of the element's shots, so they read without
-## colour: 0 the plain sprite, 1 flame, 2 star, 3 zigzag, 4 ring, 5 forked arc (the SHAPE_* constants
-## of `core/projectiles`). Fire is 1, frost 2, storm 3, void 4, lightning 5.
-@export var shape: int = 0
+
+# --- Look (staffs B6a) ----------------------------------------------------------------
+
+## The effect this card draws round its shots: a LOOK_* kind of `core/projectiles` (0 none,
+## 1 flicker and embers, 2 frost flecks, 3 gusts, 4 pulled-in pixels, 5 sparks and arcs,
+## 6 rising motes, 7 a halo, 8 a bright point in front and a longer core, 9 a pulsing rim,
+## 10 a dotted ring, 11 a weave, 12 a glow). A shot draws its first two infusions' and first
+## two modifiers' looks.
+@export var look_layer: int = 0
 
 
 func kind() -> StringName:
@@ -32,6 +37,6 @@ func ranges() -> Dictionary:
 		"status_duration": Vector2(0.0, 30.0),
 		"status_strength": Vector2(0.0, 100.0),
 		"damage_scale": Vector2(0.1, 4.0),
-		"shape": Vector2(0.0, 5.0),
+		"look_layer": Vector2(0.0, 12.0),
 	})
 	return limits

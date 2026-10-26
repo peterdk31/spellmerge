@@ -12,6 +12,7 @@ extends RefCounted
 ## refused: a card that does nothing is listed as wasted, with the reason.
 
 ## `CompiledCast.targets` value for a card that landed on the caster, and on a payload's origin.
+const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 const TARGET_CASTER: int = -1
 const TARGET_POINT: int = -2
 
@@ -241,7 +242,6 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 			spell.status_duration = element.status_duration
 			spell.status_strength = element.status_strength
 			spell.tint = element.tint
-			spell.shape = element.shape
 		spell.element_ids.append(element.id)
 		damage *= element.damage_scale
 	for modifier in modifiers:
@@ -259,6 +259,7 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 				spell.homing_turn = maxf(spell.homing_turn, modifier.behaviour_strength)
 			ModifierBase.Behaviour.CHAIN:
 				spell.chain_jumps += int(modifier.behaviour_strength)
+	spell.look = _look_of(elements, modifiers)
 	spell.damage = maxi(roundi(damage), 1)
 	spell.mana_cost = mana
 	spell.cooldown = maxf(cooldown, 0.0)
@@ -285,6 +286,20 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 	_cast.mana += spell.mana_cost
 	_cast.delay += spell.cooldown
 	return spell
+
+
+## The look of a carrier's shots (docs/milestones/M2-staffs.md, "The look of a shot"): the
+## looks of the first two infusions that have one, then of the first two such modifiers.
+static func _look_of(elements: Array, modifiers: Array) -> int:
+	var kinds := PackedInt32Array()
+	for cards: Array in [elements, modifiers]:
+		var taken: int = 0
+		for card: SpellComponent in cards:
+			var look: int = int(card.get(&"look_layer"))
+			if look > 0 and taken < 2:
+				kinds.append(look)
+				taken += 1
+	return ProjectilesScript.pack_look(kinds)
 
 
 ## The next card slot to read, or -1 when the group must end: no card is left, or the next

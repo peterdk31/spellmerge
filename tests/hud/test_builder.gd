@@ -75,6 +75,8 @@ func before_each() -> void:
 	_hud.input = _input
 	_hud.spells = _spells
 	root.add_child(_hud)
+	# These tests are the list builder's: the pause menu's Sandbox page picked it.
+	_hud.call("_on_builder_options_changed", false, false, true)
 
 
 ## `count` players with a device and a wizard (the start cards on the dev staff), joined, in a room.

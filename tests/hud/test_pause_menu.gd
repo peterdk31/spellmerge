@@ -142,7 +142,7 @@ func _test_only_the_opener_works_it() -> void:
 	_check(_menu().is_open() and _menu().owner_player == 0, "another player's buttons do nothing to it")
 	_tap(1, &"back")
 	_frame()
-	_check(not _hud.get_builder(1).is_open(), "nobody opens a builder while the game is paused")
+	_check(not _hud.get_radial(1).is_open(), "nobody opens a builder while the game is paused")
 
 
 func _test_resume_back_and_start_close_it() -> void:
@@ -155,7 +155,7 @@ func _test_resume_back_and_start_close_it() -> void:
 		_frame()
 		_check(not _menu().is_open() and not _menu().visible, "%s closes the menu" % way)
 		_check(not paused, "%s: the game goes on" % way)
-		_check(not _hud.get_builder(0).is_open(), "%s: closing with B does not open the builder" % way)
+		_check(not _hud.get_radial(0).is_open(), "%s: closing with B does not open the builder" % way)
 
 
 func _test_sandbox_entry_and_actions() -> void:
@@ -184,14 +184,16 @@ func _test_the_sandbox_switches_the_builder() -> void:
 	_tap(0, &"pause")
 	_frame()
 	_press(0, "Sandbox")
-	_check(_menu().button("BuilderStyle").text.ends_with("Builder: List"), "the list builder by default")
+	_check(_menu().button("BuilderStyle").text.ends_with("Builder: Radial"), "the radial builder by default")
+	_check(_hud.uses_radial(), "and the panels use it")
 	_check(_menu().button("PutStyle").text.ends_with("Full slot: Push right"), "a full slot pushes right by default")
 	_press(0, "BuilderStyle")
-	_check(_menu().button("BuilderStyle").text.ends_with("Builder: Radial"), "it flips to the radial builder")
-	_check(_hud.uses_radial(), "and the panels use it")
+	_check(_menu().button("BuilderStyle").text.ends_with("Builder: List"), "it flips to the list builder")
+	_check(not _hud.uses_radial(), "and the panels use that")
+	_press(0, "BuilderStyle")
 	_press(0, "RingStyle")
 	_press(0, "PutStyle")
-	_check(options == [[true, false, true], [true, true, true], [true, true, false]], "each flip goes out, got %s" % [options])
+	_check(options == [[false, false, true], [true, false, true], [true, true, true], [true, true, false]], "each flip goes out, got %s" % [options])
 	_check(_hud.get_radial(0).layout == RadialScript.Layout.KIND, "the ring shows one kind at a time")
 	_check(_hud.get_radial(0).put == RadialScript.Put.REPLACE, "a full slot is replaced")
 	_check(_menu().page == PauseMenuScript.Page.SANDBOX, "the page stays")
@@ -240,19 +242,19 @@ func _test_b_opens_the_builder_in_play_only() -> void:
 	_setup(2)
 	_tap(1, &"back")
 	_frame()
-	_check(_hud.get_builder(1).is_open(), "B opens the builder in play")
-	_check(not _hud.get_builder(0).is_open(), "only the presser's")
+	_check(_hud.get_radial(1).is_open(), "B opens the builder in play")
+	_check(not _hud.get_radial(0).is_open(), "only the presser's")
 	_check(not paused, "the builder never pauses")
 	_tap(1, &"back")
 	_frame()
-	_check(not _hud.get_builder(1).is_open(), "B on a slot closes it again")
+	_check(not _hud.get_radial(1).is_open(), "B closes it again")
 	_frame()
-	_check(not _hud.get_builder(1).is_open(), "and it stays closed")
+	_check(not _hud.get_radial(1).is_open(), "and it stays closed")
 	_bus.room_cleared.emit(&"test_room")
 	_bus.run_ended.emit(false)
 	_tap(0, &"back")
 	_frame()
-	_check(not _hud.get_builder(0).is_open(), "no builder outside a room")
+	_check(not _hud.get_radial(0).is_open(), "no builder outside a room")
 
 
 func _test_start_closes_the_builder() -> void:
@@ -261,7 +263,7 @@ func _test_start_closes_the_builder() -> void:
 	_frame()
 	_tap(0, &"pause")
 	_frame()
-	_check(not _hud.get_builder(0).is_open(), "Start closes an open builder")
+	_check(not _hud.get_radial(0).is_open(), "Start closes an open builder")
 	_check(not _menu().is_open(), "rather than pausing on top of it")
 
 

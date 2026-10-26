@@ -20,6 +20,8 @@ const COMMON_FIELDS: String = "(id|demo|damage|speed|complexity|shots|radius|pie
 const SPELL_CLASSES: String = "(SpellComponent|FormBase|ElementBase|ModifierBase|TriggerBase|CompiledSpell)"
 ## Folders that are not game scripts, and the three that may read spell fields.
 const SKIPPED_DIRS: PackedStringArray = [".git", ".github", ".godot", "addons", "build", "ci", "docs", "content/spells", "core/base", "core/spells"]
+## Fixtures that build cards, so they set card fields as the test_*.gd files may.
+const SKIPPED_FILES: PackedStringArray = ["tests/support/fake_cards.gd"]
 
 
 func test_the_scanner_catches_field_reads() -> void:
@@ -118,6 +120,8 @@ func _scan_dir(path: String, offenders: PackedStringArray) -> int:
 		if file_name.get_extension() != "gd" or file_name.begins_with("test_"):
 			continue
 		var file_path: String = path.path_join(file_name)
+		if SKIPPED_FILES.has(file_path.trim_prefix("res://")):
+			continue
 		count += 1
 		var number: int = 0
 		var text: String = FileAccess.get_file_as_string(file_path)

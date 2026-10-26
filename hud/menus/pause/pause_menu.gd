@@ -9,7 +9,7 @@ extends PanelContainer
 ## - **Sandbox** (staffs B7): Imp wave and Reset dummies (each sends
 ##   `sandbox_action_requested(player, imp_wave | reset_dummies)` and stays on the page); the
 ##   builder switches (owner, 2026-10-26), each flipping on `accept` and staying on the page:
-##   "Builder: List" or "Radial", "Ring: Every card" or "One kind" and "Full slot: Push right"
+##   "Builder: Radial" (the default) or "List", "Ring: Every card" or "One kind" and "Full slot: Push right"
 ##   or "Replace" (the radial builder's options); each flip sends `builder_options_changed`,
 ##   which `hud/panels` applies to every player's builder. Back.
 ## - **Settings:** Gameplay, Back.
@@ -62,8 +62,8 @@ var _focused: Control = null
 var _controls: Array[Control] = []
 ## Page -> its buttons, in order.
 var _pages: Dictionary = {}
-## The builder switches (see the top); the list builder by default.
-var builder_radial: bool = false
+## The builder switches (see the top); the radial builder by default (owner, 2026-10-26).
+var builder_radial: bool = true
 var ring_by_kind: bool = false
 var put_push: bool = true
 
@@ -74,7 +74,7 @@ var put_push: bool = true
 @onready var _settings: Button = _add(Page.MAIN, "Settings", "Settings")
 @onready var _imp_wave: Button = _add(Page.SANDBOX, "ImpWave", "Imp wave")
 @onready var _reset: Button = _add(Page.SANDBOX, "ResetDummies", "Reset dummies")
-@onready var _builder_style: Button = _add(Page.SANDBOX, "BuilderStyle", BUILDER_TEXT % "List")
+@onready var _builder_style: Button = _add(Page.SANDBOX, "BuilderStyle", BUILDER_TEXT % "Radial")
 @onready var _ring_style: Button = _add(Page.SANDBOX, "RingStyle", RING_TEXT % "Every card")
 @onready var _put_style: Button = _add(Page.SANDBOX, "PutStyle", PUT_TEXT % "Push right")
 @onready var _sandbox_back: Button = _add(Page.SANDBOX, "SandboxBack", "Back")

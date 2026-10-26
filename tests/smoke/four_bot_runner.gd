@@ -140,7 +140,7 @@ func _process(delta: float) -> void:
 
 ## Record that the idler's builder opened and when it was first closed again.
 func _watch_builder() -> void:
-	var builder := _hud.call("get_builder", IDLER) as Node
+	var builder := _hud.call("get_radial" if bool(_hud.call("uses_radial")) else "get_builder", IDLER) as Node
 	var open: bool = builder != null and bool(builder.call("is_open"))
 	if open:
 		_builder_seen_open = true

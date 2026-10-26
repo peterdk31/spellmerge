@@ -26,9 +26,10 @@ extends CanvasLayer
 ##   never pauses the game; it is the full builder at any time, waves included (staffs A6a).
 ##   Inside a menu `back` is that menu's own (UIFocus `cancelled`), so a press only opens the
 ##   builder when the player had no menu open at the poll before it too.
-##   The pause menu's Sandbox page can swap it for the radial builder (`builder/radial_builder.gd`,
-##   nodes Root/Radial1 to Root/Radial4, made here; owner, 2026-10-26): `back` then opens that one,
-##   with the ring layout and full-slot choice from the same page (`builder_options_changed`).
+##   By default `back` opens the radial builder instead (`builder/radial_builder.gd`, nodes
+##   Root/Radial1 to Root/Radial4, made here; owner, 2026-10-26); the pause menu's Sandbox page
+##   switches back to the list one and sets the radial's ring layout and full-slot choice
+##   (`builder_options_changed`).
 ## - `pause` (Start; Escape) closes the menu its player has open (the builder, or the pause menu
 ##   they opened); with none open it opens the pause menu (`hud/menus/pause/`, node
 ##   Root/PauseMenu), which stops the game for everyone and is worked by the player who opened
@@ -73,8 +74,9 @@ var spells: SpellsScript = null
 var _panels: Array[PlayerPanelScript] = []
 var _builders: Array[BuilderScript] = []
 var _radials: Array[RadialScript] = []
-## `back` opens the radial builders instead of the list ones (the pause menu's Sandbox page).
-var _use_radial: bool = false
+## `back` opens the radial builders (the default, owner 2026-10-26), or the list ones when the
+## pause menu's Sandbox page says so.
+var _use_radial: bool = true
 var _pause_menu: PauseMenuScript = null
 ## Per player: the `pause` and `back` press counts at the last poll, and whether a menu of
 ## theirs was open then.

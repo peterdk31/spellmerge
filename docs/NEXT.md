@@ -8,65 +8,67 @@ The ordered task queue for the current milestone, M2, now in its **staffs rework
 
 M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97). The second C2 checkpoint (#264) was answered with **pivot** on 2026-10-26: spells are built in staffs (M2-staffs.md). Nothing from M3+ is built (rewards, relics, staff types, rooms, the door rule).
 
-- [ ] **The staff runtime (staffs A5).** (`core/spells/`) After A4. Additive: the recipe runtime stays until A6.
-- [ ] **The switch to staffs (staffs A6).** (`gameplay/player/`, `gameplay/flow/`, `hud/builder/`, `core/spells/`, `core/events/`, `tests/`, `content/spells/combos/`) After A5. Main must stay green: the old recipe path and the old events go in this same PR.
-- [ ] **Projectile kit (staffs B1).** (`core/projectiles/`) After A6.
-- [ ] **Trigger kit (staffs B2).** (`core/spells/`) After A6.
-- [ ] **Combat kit (staffs B3).** (`gameplay/combat/`, `gameplay/feel/` for the self-hit flash) After A6.
-- [ ] **Card: double (staffs C).** After A6.
-- [ ] **Card: triple (staffs C).** After A6.
-- [ ] **Card: overcharge (staffs C).** After A6.
-- [ ] **Card: mirror (staffs C).** After A6.
-- [ ] **Card: bounce (staffs C).** After B1.
-- [ ] **Card: ghost (staffs C).** After B1.
-- [ ] **Card: spiral (staffs C).** After B1.
-- [ ] **Card: boomerang (staffs C).** After B1.
-- [ ] **Card: linger (staffs C).** After B1.
-- [ ] **Card: growth (staffs C).** After B1.
-- [ ] **Card: magnet (staffs C).** After B1.
-- [ ] **Card: wall (staffs C).** After B1.
-- [ ] **Card: on cast (staffs C).** After B2.
-- [ ] **Card: on wall (staffs C).** After B2.
-- [ ] **Card: echo (staffs C).** After B2.
-- [ ] **Card: burst (staffs C).** After B2.
-- [ ] **Card: scatter (staffs C).** After B2.
-- [ ] **Card: rain (staffs C).** After B2.
-- [ ] **Card: fissure (staffs C).** After B2.
-- [ ] **Card: sticky (staffs C).** After B1 and B2.
-- [ ] **Card: relay (staffs C).** After B1 and B2.
-- [ ] **Card: on ally (staffs C).** After B1 and B2.
-- [ ] **Card: shield (staffs C).** After B1 and B3.
-- [ ] **Card: heavy (staffs C).** After B1 and B3.
-- [ ] **Card: blast (staffs C).** After B3.
-- [ ] **Card: mend (staffs C).** After B3.
-- [ ] **Card: on block (staffs C).** After B2 and B3.
-- [ ] **Card: on kill (staffs C).** After B2 and B3.
-- [ ] **Card: on hurt (staffs C).** After B2 and B3.
-- [ ] **Card: on reaction (staffs C).** After B2 and B3.
-- [ ] **Card: hold (staffs C).** After B2 and B3 (also needs B4's mana reservations).
-- [ ] **Card: siphon (staffs C).** After B2 and B3.
+- [ ] **The staff runtime (staffs A5).** (`core/spells/`) After A4. The recipe runtime moves onto the new tags in the same PR.
+- [ ] **Player and builder on staffs (staffs A6a).** (`gameplay/player/`, `gameplay/flow/`, `hud/builder/`, `project.godot` input map, `tests/bots/`) After A5.
+- [ ] **Combos and tests on staffs (staffs A6b).** (`content/spells/combos/`, `tests/content/spells/`, `tests/clips/`, `tests/bots/test_spell_fuzz.gd`, `tools/atlas.py`) After A6a.
+- [ ] **The old recipe path removed (staffs A6c).** (`core/spells/`, `core/events/`, `docs/ARCHITECTURE.md`, `content/spells/README.md`) After A6b.
+- [ ] **Projectile kit (staffs B1).** (`core/projectiles/`) After A6c.
+- [ ] **Trigger kit (staffs B2).** (`core/spells/`) After A6c.
+- [ ] **Combat kit (staffs B3).** (`gameplay/combat/`, `gameplay/feel/`) After A6c.
+- [ ] **Card: double (staffs C).** After A6c. Data only (M2-staffs.md, "Working in parallel").
+- [ ] **Card: triple (staffs C).** After A6c. Data only (M2-staffs.md, "Working in parallel").
+- [ ] **Card: overcharge (staffs C).** After A6c. Data only (M2-staffs.md, "Working in parallel").
+- [ ] **Card: bounce (staffs C).** After B1. Data only (M2-staffs.md, "Working in parallel").
+- [ ] **Card: ghost (staffs C).** After B1. Data only (M2-staffs.md, "Working in parallel").
+- [ ] **Card: spiral (staffs C).** After B1. Data only (M2-staffs.md, "Working in parallel").
+- [ ] **Card: boomerang (staffs C).** After B1. Data only (M2-staffs.md, "Working in parallel").
+- [ ] **Card: linger (staffs C).** After B1. Data only (M2-staffs.md, "Working in parallel").
+- [ ] **Card: growth (staffs C).** After B1. Data only (M2-staffs.md, "Working in parallel").
+- [ ] **Card: on cast (staffs C).** After B2. Data only (M2-staffs.md, "Working in parallel").
+- [ ] **Card: echo (staffs C).** After B2. Data only (M2-staffs.md, "Working in parallel").
+- [ ] **Card: burst (staffs C).** After B2. Data only (M2-staffs.md, "Working in parallel").
+- [ ] **Card: scatter (staffs C).** After B2. Data only (M2-staffs.md, "Working in parallel").
+- [ ] **Card: mirror (staffs C).** After B2. Data only (M2-staffs.md, "Working in parallel").
+- [ ] **Card: rain (staffs C).** After B2. Data only (M2-staffs.md, "Working in parallel").
+- [ ] **Card: fissure (staffs C).** After B2. Data only (M2-staffs.md, "Working in parallel").
+- [ ] **Card: wall (staffs C).** After B2. Data only (M2-staffs.md, "Working in parallel").
+- [ ] **Card: sticky (staffs C).** After B1 and B2. Data only (M2-staffs.md, "Working in parallel").
+- [ ] **Card: relay (staffs C).** After B1 and B2. Data only (M2-staffs.md, "Working in parallel").
+- [ ] **Card: on ally (staffs C).** After B1 and B2. Data only (M2-staffs.md, "Working in parallel").
+- [ ] **Card: on wall (staffs C).** After B1 and B2. Data only (M2-staffs.md, "Working in parallel").
+- [ ] **Card: heavy (staffs C).** After B1 and B3. Data only (M2-staffs.md, "Working in parallel").
+- [ ] **Card: magnet (staffs C).** After B1 and B3. Data only (M2-staffs.md, "Working in parallel").
+- [ ] **Card: shield (staffs C).** After B1, B2 and B3. Data only (M2-staffs.md, "Working in parallel").
+- [ ] **Card: blast (staffs C).** After B1, B2 and B3. Data only (M2-staffs.md, "Working in parallel").
+- [ ] **Card: mend (staffs C).** After B1, B2 and B3. Data only (M2-staffs.md, "Working in parallel").
+- [ ] **Card: on block (staffs C).** After B1, B2 and B3. Data only (M2-staffs.md, "Working in parallel").
+- [ ] **Card: on kill (staffs C).** After B1, B2 and B3. Data only (M2-staffs.md, "Working in parallel").
+- [ ] **Card: on hurt (staffs C).** After B1, B2 and B3. Data only (M2-staffs.md, "Working in parallel").
+- [ ] **Card: on reaction (staffs C).** After B1, B2 and B3. Data only (M2-staffs.md, "Working in parallel").
+- [ ] **Card: siphon (staffs C).** After B2 and B4. Data only (M2-staffs.md, "Working in parallel").
+- [ ] **Card: hold (staffs C).** After B2 and B4. Data only (M2-staffs.md, "Working in parallel").
 - [ ] **The existing cards' looks and numbers (staffs C0).** (`content/spells/`) After B6.
-- [ ] **Bots and the emergent combo report (staffs D1).** (`tests/bots/`, `docs/LOG.md`) After A6; the report gets richer as cards land.
+- [ ] **Bots and the emergent combo report (staffs D1).** (`tests/bots/`, `docs/LOG.md`) After A6c; the report gets richer as cards land.
 - [ ] **Stress and C2 (staffs D3).** Last: when every other task in both lanes has merged. Then the C2 checkpoint, with the owner's sandbox playtest on `/preview/`.
 
 ## Owner lane
 
-For the owner's sessions (see the top of this file). Phase A runs one PR at a time; the owner session that wrote the design does A2–A4 before the bot starts.
+For the owner's sessions (see the top of this file). Phase A runs one PR at a time; the owner session that wrote the design does A2–A4 before the bot starts. Owner sessions run `tools/check.sh --author peterdk31` (without `--author` it checks as an outside contributor).
 
 - [ ] **Shared files split (staffs A2).** (`content/spells/combos/`, `core/spells/validator.gd`, `tests/`, `tools/atlas.py`, READMEs) Owner session, 2026-10-26.
 - [ ] **Card and staff classes, events (staffs A3).** (`core/base/`, `core/events/`, `content/wizard/staffs/`) Owner session, 2026-10-26.
 - [ ] **The staff compiler (staffs A4).** (`core/spells/`) Owner session, 2026-10-26.
-- [ ] **Caster kit (staffs B4).** (`gameplay/player/`) After A6.
-- [ ] **Entity kit (staffs B5).** (`gameplay/ai/`) After A6.
-- [ ] **Shot look (staffs B6).** (`core/projectiles/` drawing, `art/vfx/`) After A6; before B7.
-- [ ] **Sandbox (staffs B7).** (`gameplay/flow/`, `content/rooms/`, `hud/menus/`) After B6.
-- [ ] **Builder (staffs B8).** (`hud/builder/`) After A6.
-- [ ] **Card: teleport (staffs C).** After B4.
-- [ ] **Card: hook (staffs C).** After B4.
-- [ ] **Card: swap (staffs C).** After B4.
-- [ ] **Card: recoil (staffs C).** After B4.
-- [ ] **Card: decoy (staffs C).** After B5.
-- [ ] **Card: familiar (staffs C).** After B5.
+- [ ] **Caster kit (staffs B4).** (`gameplay/player/`) After B3.
+- [ ] **Entity kit (staffs B5).** (`gameplay/ai/`) After A6c.
+- [ ] **Shot look (staffs B6).** (`core/projectiles/` drawing, `art/vfx/`, `gameplay/feel/`) After B1; before B7.
+- [ ] **Sandbox (staffs B7).** (`gameplay/flow/`, `content/rooms/`, `hud/menus/sandbox/`) After B6.
+- [ ] **Builder (staffs B8).** (`hud/builder/`) After A6c.
+- [ ] **Card: teleport (staffs C).** After B2 and B4. Data only (M2-staffs.md, "Working in parallel").
+- [ ] **Card: hook (staffs C).** After B2 and B4. Data only (M2-staffs.md, "Working in parallel").
+- [ ] **Card: recoil (staffs C).** After B2 and B4. Data only (M2-staffs.md, "Working in parallel").
+- [ ] **Card: swap (staffs C).** After B2, B4 and B5. Data only (M2-staffs.md, "Working in parallel").
+- [ ] **Card: decoy (staffs C).** After B2 and B5. Data only (M2-staffs.md, "Working in parallel").
+- [ ] **Card: familiar (staffs C).** After B2 and B5. Data only (M2-staffs.md, "Working in parallel").
 - [ ] **Staff codes (staffs D2).** (`hud/`, `core/spells/`) After B7 and B8.
 
 ## Blocked

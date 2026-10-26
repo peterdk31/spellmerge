@@ -2,6 +2,25 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-26: Staffs design review
+
+An independent fresh-context session reviewed `docs/milestones/M2-staffs.md` against `docs/DESIGN.md`, the code and the bot's task picker. Fourteen findings; thirteen changed the design, one was wrong.
+
+- **Examples broke the reading rules** (modifiers and triggers come before their carrier, payloads after it). Every example is now in slot order, and the reading examples are A4's table tests.
+- **Rule holes:** leftover cards in a payload now land on the payload's origin, not the caster; a group resumes after its payload; multicast counts per group; burst repeats the same compiled group; a wrap anywhere in the cast means a recharge; the cursor moves past payload cards. `rain` and `familiar` carry a payload of their own; every card has an end point.
+- **Tag collision:** enemy attack tags reach 101,000, inside the planned spell range; `SpellTag.FLAG` moves to `1 << 20`. Fallback casts get node numbers too.
+- **Self-harm needs projectile code** (a wizard is never hit by their own shot today): moved into B1, with the per-shot "left the caster" flag.
+- **Missing events:** where a dash or teleport ends, decoy ends, familiar casts, enemy moves for swap, area hits, and a projectiles-sent `shot_blocked` beside combat's `shield_blocked`.
+- **The card dependency table** was rebuilt from what each card touches (hold and siphon need B4; on wall needs B1; blast and mend need B1, B2 and B3; wall's line is B2's).
+- **Parallel conflicts:** B6 waits for B1 (both in the projectile manager), B4 waits for B3 (both reach the wizard); cards are data only, and kits may add their own fields.
+- **No build limits vs the runtime:** the per-step work caps and the pool stay as engine safeguards that never shape a build; the pool already drops the oldest shot of whoever owns the most, so one player's huge cast eats its own shots first. The build limits go.
+- **Co-op rules:** slow motion and friendly fire, which change the game for everyone, are in the pause menu, not a player's overlay.
+- **Pillar 4 and game feel:** the clip sheet checks that four players' shots can be told apart; every card has a sound id and every hit kind default feel.
+- **Hold vs the generation ring:** editing a staff switches its held carriers off, so no stale reservation or orphaned sustained shot survives a rebuild.
+- **Phase A sizing:** A6 is split into A6a (player and builder), A6b (combos and tests) and A6c (the old path removed), each keeping main green; A5 moves the recipe runtime onto the new tags.
+- **Shot look data:** the batch's custom data has little room left, so at most four layers per shot are drawn.
+- **Not changed:** the review said the lore files live in `content/story/lore/`; they are in `content/story/lore/components/`, as written.
+
 ## 2026-10-26: Pivot at C2: spells are built in staffs
 
 **Decided by:** the owner, in an owner session over six rounds of planning (answer to #264: pivot). The design is `docs/milestones/M2-staffs.md`; the owner's DESIGN.md rows changed with it.

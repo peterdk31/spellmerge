@@ -216,6 +216,10 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 	var radius: float = SpellLimits.FALLBACK_RADIUS
 	var shots: int = 1
 	var pierce: int = 0
+	var heals: bool = false
+	var later_ids: Array[StringName] = []
+	var later_durations: PackedFloat32Array = PackedFloat32Array()
+	var later_strengths: PackedFloat32Array = PackedFloat32Array()
 	spell.motion = FormBase.Motion.STILL
 	spell.lifetime = SpellLimits.MIN_LIFETIME
 	if form != null:
@@ -242,8 +246,13 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 			spell.status_strength = element.status_strength
 			spell.tint = element.tint
 			spell.shape = element.shape
+		else:
+			later_ids.append(element.status_id)
+			later_durations.append(element.status_duration)
+			later_strengths.append(element.status_strength)
 		spell.element_ids.append(element.id)
 		damage *= element.damage_scale
+		heals = heals or element.heals
 	for modifier in modifiers:
 		spell.modifier_ids.append(modifier.id)
 		damage *= modifier.damage_mult
@@ -277,6 +286,18 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 	spell.hit.status_id = spell.status_id
 	spell.hit.status_duration = spell.status_duration
 	spell.hit.status_strength = spell.status_strength
+	spell.hit.later_status_ids = later_ids
+	spell.hit.later_status_durations = later_durations
+	spell.hit.later_status_strengths = later_strengths
+	if spell.ray_length > 0.0:
+		spell.hit.kind = &"ray"
+	if heals:
+		spell.hit.heal = spell.damage
+		spell.hit.damage = maxi(roundi(float(spell.damage) * SpellLimits.HEAL_ENEMY_SHARE), 1)
+	var heavy: float = spell.behaviour(ModifierBase.Behaviour.HEAVY)
+	if heavy > 0.0:
+		spell.hit.knockback *= heavy
+		spell.hit.slam = roundi(float(spell.damage) * SpellLimits.SLAM_SHARE)
 	if trigger != null:
 		spell.trigger_id = trigger.id
 		spell.trigger_event = trigger.event

@@ -95,6 +95,14 @@ signal kill_landed(player: int, target: Node, position: Vector2, tag: int)
 signal wizard_hurt(player: int, amount: int, position: Vector2, tag: int, kind: StringName)
 ## Sender: combat. A hit of `player` with `tag` on `target` at `position` set off the reaction `reaction_id`. Heard by core/spells (on reaction); feel keeps `reaction_triggered`.
 signal reaction_landed(player: int, reaction_id: StringName, target: Node, position: Vector2, tag: int)
+## Sender: core/spells. The wizard `player` gets a barrier of `charges` blocked hits for `seconds` (shield on a dash, a teleport or the caster); the card has `tag`. Heard by combat.
+signal wizard_shield_requested(player: int, charges: int, seconds: float, tag: int)
+## Sender: core/spells. A card of `player` (magnet) pulls every enemy within `radius` of `position` toward it at `strength` pixels per second; the card has `tag`. Heard by combat.
+signal pull_requested(player: int, position: Vector2, radius: float, strength: float, tag: int)
+## Sender: combat. Just before `damage_dealt`: the hit of `player` on `target` for `amount` is of `kind` (`&"shot"`, `&"ray"`, `&"burst"`, `&"reaction"`, `&"status"`). A wizard hit by their own spell has `player` equal to their index. Heard by feel.
+signal hit_landed(player: int, target: Node, amount: int, position: Vector2, kind: StringName)
+## Sender: combat. A heal hit of `player` gave the wizard `target` `amount` health at `position`. Heard by player and feel.
+signal heal_dealt(player: int, target: Node, amount: int, position: Vector2)
 ## Sender: core/projectiles. A shot of `player` with `tag` passed through the teammate `ally` at `position`. Heard by core/spells (relay, on ally).
 signal ally_passed(player: int, ally: Node, position: Vector2, tag: int)
 

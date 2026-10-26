@@ -307,3 +307,39 @@ func test_the_builder_view_is_plain_values() -> void:
 	check(String(cast["text"]).contains("on you: Fire"), "it reads as fire on the caster: %s" % cast["text"])
 	check_equal((cast["targets"] as Dictionary)[1], StaffCompiler.TARGET_CASTER, "fire links to the caster")
 	check((view["wasted"] as Dictionary).has(0), "homing on the caster is wasted")
+
+
+# --- The hit profile combat reads (staffs B3) ----------------------------------
+
+func test_every_element_of_a_hit_keeps_its_status_in_order() -> void:
+	var staff: CompiledStaff = _compile("fire frost bolt")
+	var hit: HitProfile = staff.casts[0].group.spells[0].hit
+	check_equal(hit.element_ids, [&"fire", &"frost"] as Array[StringName], "both elements")
+	check_equal(hit.status_id, &"burn", "the first element's status")
+	check_equal(hit.later_status_ids, [&"chill"] as Array[StringName], "the second one's follows")
+	check_equal(hit.later_status_durations.size(), 1, "with its time")
+
+
+func test_a_heavy_hit_pushes_harder_and_slams() -> void:
+	var heavy: ModifierBase = _modifier(&"heavy")
+	heavy.behaviour = ModifierBase.Behaviour.HEAVY
+	heavy.behaviour_strength = 3.0
+	var plain: HitProfile = _compile("bolt").casts[0].group.spells[0].hit
+	var hit: HitProfile = _compile("heavy bolt").casts[0].group.spells[0].hit
+	check_equal(plain.slam, 0, "an ordinary hit has no slam")
+	check_equal(hit.knockback, plain.knockback * 3.0, "three times the push")
+	check(hit.slam >= 1, "a knock into a wall hurts")
+
+
+func test_a_mend_hit_heals_and_barely_hurts_enemies() -> void:
+	(_fake.items[&"frost"] as ElementBase).heals = true
+	var hit: HitProfile = _compile("frost bolt").casts[0].group.spells[0].hit
+	check(hit.heal > 0, "it heals wizards")
+	check(hit.damage < hit.heal, "and an enemy takes a tenth of it")
+	check(hit.damage >= 1, "at least a point")
+
+
+func test_a_beam_is_a_ray_hit_and_a_bolt_a_shot() -> void:
+	_form(&"beam", 3, 1).ray_length = 200.0
+	check_equal((_compile("beam").casts[0].group.spells[0] as CompiledSpell).hit.kind, &"ray", "a beam")
+	check_equal((_compile("bolt").casts[0].group.spells[0] as CompiledSpell).hit.kind, &"shot", "a bolt")

@@ -119,6 +119,30 @@ extends Resource
 	&"hex": {"color": Color("a63cff"), "alpha": 0.5, "rate": 1.8, "jitter": 0.0, "blink": false},
 	&"static": {"color": Color("b4e82a"), "alpha": 0.7, "rate": 5.0, "jitter": 0.5, "blink": true},
 }
+## The default feel of each hit kind (`hit_landed`: `shot`, `ray`, `burst`, `reaction`, `status`),
+## so a new card feels like something before it has its own sound: `stop` and `shake` scale
+## `hit_stop_seconds` and `hit_shake` (0 turns it off), `sound` is the id asked from the registry
+## (silent until an `.ogg` exists). A kind not listed uses the shot's look.
+@export var kind_looks: Dictionary = {
+	&"shot": {"stop": 1.0, "shake": 1.0, "sound": &"hit"},
+	&"ray": {"stop": 0.5, "shake": 0.5, "sound": &"hit_ray"},
+	&"burst": {"stop": 1.5, "shake": 2.0, "sound": &"hit_burst"},
+	&"reaction": {"stop": 1.0, "shake": 1.0, "sound": &"hit_reaction"},
+	&"status": {"stop": 0.0, "shake": 0.0, "sound": &""},
+}
+## A wizard hit by their own spell: a ring in this colour on the frame of the hit, so a self-hit
+## is never mistaken for an enemy's (seconds, size as `reaction_ring_size`, and the sound id).
+@export var self_hit_color: Color = Color("ff5fa8")
+@export_range(0.05, 1.0, 0.01) var self_hit_seconds: float = 0.35
+@export_range(0.2, 4.0, 0.1) var self_hit_size: float = 1.3
+@export var self_hit_sound: StringName = &"self_hit"
+## A heal hit: a soft ring in this colour, no stop, no shake (seconds, size, sound id).
+@export var heal_color: Color = Color("6be36b")
+@export_range(0.05, 1.0, 0.01) var heal_seconds: float = 0.4
+@export_range(0.2, 4.0, 0.1) var heal_size: float = 1.0
+@export var heal_sound: StringName = &"heal"
+## How long the "downed by your own ..." note rises over a downed wizard, in seconds.
+@export_range(0.5, 6.0, 0.1) var downed_note_seconds: float = 2.5
 ## Sound ids asked from `core/registry`. A missing sound is silent.
 @export var hit_sound: StringName = &"hit"
 @export var death_sound: StringName = &"enemy_death"

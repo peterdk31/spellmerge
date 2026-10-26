@@ -52,6 +52,10 @@ const EVENTS: Dictionary = {
 	&"kill_landed": [["player", TYPE_INT], ["target", TYPE_OBJECT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT]],
 	&"wizard_hurt": [["player", TYPE_INT], ["amount", TYPE_INT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT], ["kind", TYPE_STRING_NAME]],
 	&"reaction_landed": [["player", TYPE_INT], ["reaction_id", TYPE_STRING_NAME], ["target", TYPE_OBJECT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT]],
+	&"wizard_shield_requested": [["player", TYPE_INT], ["charges", TYPE_INT], ["seconds", TYPE_FLOAT], ["tag", TYPE_INT]],
+	&"pull_requested": [["player", TYPE_INT], ["position", TYPE_VECTOR2], ["radius", TYPE_FLOAT], ["strength", TYPE_FLOAT], ["tag", TYPE_INT]],
+	&"hit_landed": [["player", TYPE_INT], ["target", TYPE_OBJECT], ["amount", TYPE_INT], ["position", TYPE_VECTOR2], ["kind", TYPE_STRING_NAME]],
+	&"heal_dealt": [["player", TYPE_INT], ["target", TYPE_OBJECT], ["amount", TYPE_INT], ["position", TYPE_VECTOR2]],
 	&"ally_passed": [["player", TYPE_INT], ["ally", TYPE_OBJECT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT]],
 	# Players.
 	&"player_downed": [["player", TYPE_INT]],

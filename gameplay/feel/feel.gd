@@ -206,6 +206,8 @@ var _combo_textures: Dictionary = {}
 ## Reaction names: one label per reaction flash slot, with where it starts and seconds left.
 var _labels: Array[Label] = []
 var _label_left: PackedFloat32Array = PackedFloat32Array()
+## The seconds a label was given (0: a reaction name's own three times `reaction_seconds`).
+var _label_total: PackedFloat32Array = PackedFloat32Array()
 var _label_start: PackedVector2Array = PackedVector2Array()
 var _next_reaction: int = 0
 ## Discharge arcs: a line each, made once, with seconds left and in all.
@@ -238,6 +240,12 @@ var _impact_target: int = 0
 var _impact_player: int = 0
 ## The physics frame it was sent in: the damage follows at once, or the record is stale.
 var _impact_frame: int = -1
+## The latest hit kind (`hit_landed`): the target it was for, the kind, the frame, and whether a
+## wizard hit themselves. `damage_dealt` follows at once, or the record is stale.
+var _kind_target: int = 0
+var _kind: StringName = &"shot"
+var _kind_frame: int = -1
+var _kind_own: bool = false
 var _impact_at: Vector2 = Vector2.ZERO
 var _impact_aim: Vector2 = Vector2.ZERO
 ## The tint of the latest plain hit burst, kept for a kill that makes it bigger.
@@ -327,6 +335,7 @@ func _ready() -> void:
 		_labels.append(label)
 		_label_id.append(&"")
 	_label_left.resize(REACTION_SLOTS)
+	_label_total.resize(REACTION_SLOTS)
 	_label_start.resize(REACTION_SLOTS)
 	for i in ARC_SLOTS:
 		var arc := Line2D.new()
@@ -369,6 +378,8 @@ func _ready() -> void:
 		push_warning("Feel: the Events autoload is missing, so there is no juice.")
 		return
 	events.damage_dealt.connect(_on_damage_dealt)
+	events.hit_landed.connect(_on_hit_landed)
+	events.heal_dealt.connect(_on_heal_dealt)
 	events.enemy_died.connect(_on_enemy_died)
 	events.player_downed.connect(_on_player_downed)
 	events.spell_cast.connect(_on_spell_cast)
@@ -675,7 +686,61 @@ func _on_damage_dealt(player: int, target: Node, amount: int, position: Vector2)
 			at = _impact_at
 			size = clampf(1.0 + float(amount - SPRAY_REF_DAMAGE) * preset.hit_spray_per_damage, SPRAY_MIN_SIZE, SPRAY_MAX_SIZE)
 	_impact_target = 0
-	_juice(position, preset.hit_stop_seconds, false, preset.hit_shake, preset.hit_sound, aim, tint, size, at)
+	# The kind of the hit came just before (`hit_landed`): its default stop, shake and sound.
+	var stop: float = preset.hit_stop_seconds
+	var shake: float = preset.hit_shake
+	var sound: StringName = preset.hit_sound
+	var own: bool = false
+	if target != null and target.get_instance_id() == _kind_target and Engine.get_physics_frames() == _kind_frame:
+		var look: Dictionary = preset.kind_looks.get(_kind, preset.kind_looks.get(&"shot", {})) as Dictionary
+		stop *= look.get("stop", 1.0) as float
+		shake *= look.get("shake", 1.0) as float
+		sound = look.get("sound", preset.hit_sound) as StringName
+		own = _kind_own
+	_kind_target = 0
+	_juice(position, stop, false, shake, sound, aim, tint, size, at)
+	if own:
+		# Their own spell: a ring in its own colour on this frame, so it is never taken for an enemy's hit.
+		_show_ring(position, preset.self_hit_color, preset.self_hit_seconds, preset.self_hit_size)
+		_play(preset.self_hit_sound)
+
+
+## The kind of the hit that `damage_dealt` announces next, and whether a wizard hit themselves.
+func _on_hit_landed(player: int, target: Node, _amount: int, _position: Vector2, kind: StringName) -> void:
+	if target == null:
+		return
+	_kind_target = target.get_instance_id()
+	_kind = kind
+	_kind_frame = Engine.get_physics_frames()
+	_kind_own = kind != &"heal" and target.is_in_group(&"players") and target.get("index") == player
+
+
+## A heal: a soft ring in green on the wizard, with no stop and no shake.
+func _on_heal_dealt(_player: int, _target: Node, _amount: int, position: Vector2) -> void:
+	_show_ring(position, preset.heal_color, preset.heal_seconds, preset.heal_size)
+	_play(preset.heal_sound)
+
+
+## A ring that grows and fades at `position`, in a spark slot (the oldest is taken over).
+func _show_ring(position: Vector2, tint: Color, seconds: float, size: float) -> void:
+	var slot: int = _next_spark
+	_next_spark = FLASH_SLOTS + (_next_spark - FLASH_SLOTS + 1) % SPARK_SLOTS
+	_show_flash(slot, position, seconds, size, tint, 0.0, Vector2.ONE, REACTION_RING_GROW, true)
+
+
+## A line of text rising from `position` for `seconds`, in a label slot of the reactions.
+func _show_note(text: String, position: Vector2, tint: Color, seconds: float) -> void:
+	var slot: int = _next_reaction
+	_next_reaction = (_next_reaction + 1) % REACTION_SLOTS
+	var label: Label = _labels[slot]
+	label.text = text
+	label.modulate = tint
+	_label_start[slot] = position + Vector2(-label.get_minimum_size().x * 0.5, -22.0)
+	label.global_position = _label_start[slot]
+	label.visible = true
+	_label_left[slot] = seconds
+	_label_total[slot] = seconds
+	_label_id[slot] = &"note"
 
 
 ## An element reaction fired at `position`: a flash and a burst in the reaction's colour, its
@@ -703,6 +768,7 @@ func _on_reaction_triggered(_player: int, reaction_id: StringName, position: Vec
 		label.global_position = _label_start[slot]
 		label.visible = true
 		_label_left[slot] = preset.reaction_seconds * 3.0
+		_label_total[slot] = 0.0
 		_label_id[slot] = reaction_id
 	if _clock - (_reaction_heard.get(reaction_id, -REACTION_REPEAT) as float) < REACTION_REPEAT:
 		return
@@ -916,7 +982,8 @@ func _step_labels(real_delta: float) -> void:
 		if _label_left[i] <= 0.0:
 			label.visible = false
 			continue
-		var t: float = _label_left[i] / (preset.reaction_seconds * 3.0)
+		var total: float = _label_total[i] if _label_total[i] > 0.0 else preset.reaction_seconds * 3.0
+		var t: float = _label_left[i] / total
 		label.global_position = _label_start[i] + Vector2(0.0, -REACTION_RISE * (1.0 - t))
 		label.modulate.a = minf(t * 2.0, 1.0)
 
@@ -1148,9 +1215,17 @@ func _on_wizard_cast(_player: int, wizard: Node) -> void:
 	_start_reaction(wizard, preset.cast_squash_seconds, -preset.cast_squash, false)
 
 
-func _on_player_downed(_player: int) -> void:
-	# The event names no position, so a downed wizard gets stop, shake and sound only.
+func _on_player_downed(player: int) -> void:
+	# The event names no position, so a downed wizard gets stop, shake and sound only...
 	_juice(Vector2.INF, preset.death_stop_seconds, true, preset.downed_shake, preset.downed_sound)
+	# ...and, when their own (or a teammate's) spell did it, a note over them saying so.
+	if combat == null or not combat.has_method("downed_note"):
+		return
+	var note: String = combat.downed_note(player) as String
+	var wizard: Node2D = combat.wizard_of(player) as Node2D
+	if note.is_empty() or wizard == null:
+		return
+	_show_note(note, wizard.global_position if wizard.is_inside_tree() else wizard.position, _shot_color(player), preset.downed_note_seconds)
 
 
 ## `strong` is a death or a downed wizard: it ignores the rest after a hit-stop and

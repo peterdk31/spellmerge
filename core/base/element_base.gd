@@ -20,6 +20,9 @@ extends SpellComponent
 ## colour: 0 the plain sprite, 1 flame, 2 star, 3 zigzag, 4 ring, 5 forked arc (the SHAPE_* constants
 ## of `core/projectiles`). Fire is 1, frost 2, storm 3, void 4, lightning 5.
 @export var shape: int = 0
+## A hit of this element heals wizards instead of hurting them (mend); enemies take a tenth of
+## the damage, at least 1.
+@export var heals: bool = false
 
 
 func kind() -> StringName:

@@ -13,7 +13,6 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
 - [x] **Combos and tests on staffs (staffs A6b).** Done in an owner session: every combo file is card rows (`staff`, `cards`); the combo test (with a card-row `install_cards` in the arena and the control rows dropping a card), the clip scenarios and stage, and a new staff fuzz test (300 random staffs; fails on errors, runaway cycles and staffs that never cast; reports the costliest) work on staffs; `recipe_fuzzer.gd` is gone. The per-card tests (`test_forms` and the like) still build recipes; A6c moves them.
 - [x] **The old recipe path removed (staffs A6c).** Done in an owner session: `Spells.compile(recipe)`, `builder_view`, the recipe wrappers (`install`, `cast`, a spell's `begin_generation`) and the recipe compiler are gone, `begin_generation` takes a compiled staff; `CompiledSpell` lost `valid`, `reason`, `description`, `complexity`, `depth` and `held`; `SpellLimits` keeps only engine safeguards and tuning; the events `build_change_requested`, `spell_swap_requested`, `spell_changed`, `recipe_changed` and `active_spell_changed` are removed; tests build staffs (`tests/support/staff_kit.gd` turns the old recipe shorthand into card rows; `test_spell_tags.gd` replaces `test_spells_compile.gd`); the spells, core and gameplay READMEs say so. **Phase B and the cards can start; development is unpaused.**
 - [ ] **Trigger kit (staffs B2).** (`core/spells/`) After A6c.
-- [ ] **Combat kit (staffs B3).** (`gameplay/combat/`, `gameplay/feel/`) After A6c.
 - [ ] **Card: double (staffs C).** After A6c. Data only (M2-staffs.md, "Working in parallel").
 - [ ] **Card: triple (staffs C).** After A6c. Data only (M2-staffs.md, "Working in parallel").
 - [ ] **Card: overcharge (staffs C).** After A6c. Data only (M2-staffs.md, "Working in parallel").
@@ -74,6 +73,8 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 ## Blocked
 
 ## Done recently
+
+- [x] **Combat kit (staffs B3).** `gameplay/combat` has hit kinds (`hit_landed`), self-harm and statuses on wizards, barriers on wizards (`wizard_shield_requested`, `shield_blocked`), area hits (`area_hit_requested`, kind `burst`), several elements per hit, heal hits (`heal_dealt`), pulls (`pull_requested`), the heavy wall slam, `kill_landed`, `wizard_hurt`, `reaction_landed` and `downed_note`; `gameplay/feel` has a default look per hit kind, the self-hit ring, the heal ring and the "downed by your own ..." note. `Spells` does not send `wizard_shield_requested`, `pull_requested` or switch on self-hit yet: that is B2's and the cards'. Tests: `test_combat_kit.gd`, `test_feel_hit_kinds.gd`.
 
 - [x] **Projectile kit (staffs B1).** `core/projectiles` bounces, ghosts, spirals, returns, lingers, grows, sticks and shields (`shot_blocked`); shots may hit their caster after leaving the caster's hitbox and pass teammates (`ally_passed`) or hit them; `expired_on_wall`. `Spells` hands the card strengths to the manager. Self-hit and ally-hit are not switched on yet (B3). Tests: `test_projectiles_kit.gd`.
 

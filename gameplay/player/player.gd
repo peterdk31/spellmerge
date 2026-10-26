@@ -383,6 +383,8 @@ func _ready() -> void:
 			push_warning("Wizard %d: the Events autoload is missing, so this wizard sends no events." % index)
 	if events != null and not events.damage_dealt.is_connected(_on_damage_dealt):
 		events.damage_dealt.connect(_on_damage_dealt)
+	if events != null and not events.heal_dealt.is_connected(_on_heal_dealt):
+		events.heal_dealt.connect(_on_heal_dealt)
 	if events != null and not events.revive_progress.is_connected(_on_revive_progress):
 		events.revive_progress.connect(_on_revive_progress)
 	if registry == null and in_tree:
@@ -958,6 +960,21 @@ func _on_revive_progress(player: int, progress: float) -> void:
 func _on_damage_dealt(_player: int, target: Node, amount: int, _position: Vector2) -> void:
 	if target == self:
 		take_damage(amount)
+
+
+func _on_heal_dealt(_player: int, target: Node, amount: int, _position: Vector2) -> void:
+	if target == self:
+		heal(amount)
+
+
+## Gain `amount` health, up to MAX_HEALTH. Ignored while downed (a revive is the way back).
+## Returns true if any health was added.
+func heal(amount: int) -> bool:
+	if _downed or amount <= 0 or health >= MAX_HEALTH:
+		return false
+	health = mini(health + amount, MAX_HEALTH)
+	_announce_stats()
+	return true
 
 
 ## Lose `amount` health. Ignored while invulnerable or downed. Returns true if it

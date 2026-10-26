@@ -2,6 +2,16 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-26: Combat kit details (staffs B3)
+
+- **New events** (`core/events`): `wizard_shield_requested` and `pull_requested` (from `core/spells`, so spells never call combat), `hit_landed` (kind, just before `damage_dealt`; Feel reads it, so `damage_dealt` keeps its shape) and `heal_dealt` (`gameplay/player` applies it, so combat never writes a wizard's health).
+- **Statuses on wizards** needed a meaning for each: burn is damage over time that a barrier does not stop (a tick is not a hit); chill and freeze slow (`wizard_speed_factor`, used by B4); hex adds damage taken; shock adds its share to the next hit and is spent; static makes the wizard a lightning rod that discharges that share of the next hit to enemies near. Reactions do not run on wizards (no rows for them); revisit if C2 asks.
+- **Barriers** stop a hit whole (no damage, status or push); a wizard's `is_invulnerable` is checked first, so the dash (no invulnerability since A6a) is the barrier's use case.
+- **Mend** is a field on the element (`ElementBase.heals`); enemies take a tenth of the damage (`SpellLimits.HEAL_ENEMY_SHARE`, at least 1). **Heavy** multiplies the knockback and arms a slam of `SLAM_SHARE` times the damage; combat finds the wall itself (`clip_to_walls`), so the enemy mover needs no change.
+- **`kill_landed` only for a spell's hit,** not for a burn tick or a slam without a tag: "on kill" needs a carrier whose hit killed.
+- **"Downed by your own ..."** is text from combat (`downed_note`) shown by Feel, with `HitProfile.source_name` filled by the namer (E1); until then the kind's word is used.
+- **An old test changed:** "wizards get no status from player spells" was the pre-staffs rule and now says the opposite (the design: statuses on wizards).
+
 ## 2026-10-26: Projectile kit (staffs B1)
 
 - **Behaviours are per-shot setters,** called by the spell runtime right after `spawn` (a small `_apply_travel` in `core/spells`, so the cards after B1 are data only). Plain shots keep the old path: flags 0, no extra work.

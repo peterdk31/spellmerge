@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-26: Combat kit (staffs B3)
+
+`gameplay/combat` now does what the staff cards need from a fight: every hit has a kind (`hit_landed` before `damage_dealt`), a wizard is hurt by their own spell like any other target (damage, push, status), wizards have burn, chill/freeze, shock, hex and static of their own, barriers (`wizard_shield_requested`, `shield_blocked`), area hits (`area_hit_requested`), several elements on one hit (each reacts with what the one before left), heal hits (`heal_dealt`, which `gameplay/player` now applies), pulls (`pull_requested`) and the heavy wall slam. It sends `kill_landed`, `reaction_landed` and `wizard_hurt` for cards, and `downed_note` for "downed by your own Blast". `gameplay/feel` gives each kind a default stop, shake and sound, the self-hit its own ring, the heal a soft ring, and shows the note. Not switched on yet: `Spells` does not send the shield and pull events or set self-hit on shots (B2 and the cards). Tests: `test_combat_kit.gd` (35), `test_feel_hit_kinds.gd` (11) and four compiler rows.
+
 ## 2026-10-26: Projectile kit (staffs B1)
 
 `core/projectiles` runs the movement and collision behaviours of the staff cards: bounce, ghost, spiral, return, linger, growth, sticky, shield (`shot_blocked`), shots that may hit their caster after leaving the caster's hitbox, shots that pass teammates (`ally_passed`) or hit them (mend), and `expired_on_wall` for `on wall`. The spell runtime hands a shot these from the card strengths, so the cards after B1 (bounce, double and the like) are data. Self-hit and ally-hit are available but not switched on by `Spells` yet: combat has no self-harm until B3. Tests: `tests/core/test_projectiles_kit.gd` (17 tests, including 1,500 shots with behaviours).

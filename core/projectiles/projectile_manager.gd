@@ -269,6 +269,8 @@ const PARTICLE_CAP: int = 1024
 const TRAIL_COST: int = 4
 ## Particles a shot keeps in the air at most (the same number as the shader's).
 const PARTICLES_PER_SHOT_MAX: int = 12
+## The look bits of the kinds that give off particles: all of them but the weave.
+const EMITTING_MASK: int = ((1 << (LOOK_COUNT - 1)) - 1) & ~(1 << (LOOK_WEAVE - 1))
 ## Builds the players' shots from their look (see "Drawing" above).
 const CORE_SHADER: Shader = preload("res://core/projectiles/shot_core.gdshader")
 ## Draw order of the shots: above the room and the wizards. The autoload is drawn
@@ -1598,14 +1600,15 @@ func _set_shares(node: MultiMeshInstance2D) -> void:
 
 ## How many particles the pool is asked for by a shot with the packed `look`: 4 + 2 per
 ## emitting kind (every kind but the weave, which changes the body), at most 12; none for a
-## plain shot.
+## plain shot. `shot_core.gdshader` (`emit_count`) holds the same rule; keep the two equal.
 static func particles_of(look: int) -> int:
 	if look == 0:
 		return 0
+	var bits: int = look & EMITTING_MASK
 	var kinds: int = 0
-	for kind in range(1, LOOK_COUNT):
-		if kind != LOOK_WEAVE and (look >> (kind - 1)) & 1 == 1:
-			kinds += 1
+	while bits != 0:
+		bits &= bits - 1
+		kinds += 1
 	if kinds == 0:
 		return 0
 	return mini(4 + 2 * kinds, PARTICLES_PER_SHOT_MAX)

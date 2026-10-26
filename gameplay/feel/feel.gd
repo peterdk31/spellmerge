@@ -1074,10 +1074,12 @@ func _form_look(form: StringName, cast: bool) -> Dictionary:
 	if cached != null:
 		return cached as Dictionary
 	var look: Dictionary = {}
-	if registry != null:
-		var card: Resource = registry.get_resource(&"spells", form)
-		if card is FormBase:
-			look = ((card as FormBase).cast_look if cast else (card as FormBase).impact_look).duplicate()
+	# No registry yet, or no form id yet: answer plain but keep nothing, so a later card still counts.
+	if registry == null or form == &"":
+		return look
+	var card: Resource = registry.get_resource(&"spells", form)
+	if card is FormBase:
+		look = ((card as FormBase).cast_look if cast else (card as FormBase).impact_look).duplicate()
 	cache[form] = look
 	return look
 

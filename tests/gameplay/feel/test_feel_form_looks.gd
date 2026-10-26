@@ -96,6 +96,17 @@ func test_a_new_carrier_card_brings_its_own_look() -> void:
 	check_equal(flare.scale, Vector2.ONE * 1.5, "its flare is the card's")
 
 
+func test_a_look_missed_for_want_of_a_registry_is_not_kept() -> void:
+	feel.registry = null
+	var plain: Sprite2D = _cast(0, &"nova")
+	var plain_scale: Vector2 = plain.scale
+	check(feel._form_look(&"", false).is_empty(), "no form id, no look")
+	feel.registry = registry
+	var flash: Sprite2D = _cast(0, &"nova")
+	check(flash.scale != plain_scale, "once the registry is there the nova has its own flash")
+	check(not feel._form_look(&"nova", false).is_empty(), "and its flare")
+
+
 func test_each_form_flashes_differently_on_the_wizard() -> void:
 	var looks: Dictionary = {}
 	for form in FORMS:

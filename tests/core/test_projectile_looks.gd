@@ -210,6 +210,13 @@ func test_a_shot_asks_the_pool_for_four_plus_two_per_emitting_kind() -> void:
 	check_equal(ManagerScript.particles_of(ManagerScript.pack_look(all_kinds())), ManagerScript.PARTICLES_PER_SHOT_MAX, "never more than twelve")
 
 
+func test_the_shader_holds_the_same_particle_rule_as_the_manager() -> void:
+	var shader: Shader = load("res://core/projectiles/shot_core.gdshader")
+	check(shader.code.contains("min(4.0 + 2.0 * emit_count, float(MAX_PARTICLES))"), "the shader asks 4 + 2 per kind")
+	check(shader.code.contains("const int MAX_PARTICLES = %d;" % ManagerScript.PARTICLES_PER_SHOT_MAX), "with the same cap")
+	check_equal(ManagerScript.EMITTING_MASK & (1 << (ManagerScript.LOOK_WEAVE - 1)), 0, "the weave does not emit")
+
+
 func test_under_the_cap_nothing_thins() -> void:
 	mgr.particle_cap = 1000
 	_volley(20, 0, PackedInt32Array([ManagerScript.LOOK_EMBERS]))

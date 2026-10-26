@@ -302,6 +302,7 @@ vec4 procedural(vec2 uv) {
 	}
 	// What the cards give off: particles born at random points of the tail (or the outline).
 	if (emit_count > 0.5) {
+		// The same rule as `particles_of` in projectile_manager.gd; keep the two equal.
 		float asked = min(4.0 + 2.0 * emit_count, float(MAX_PARTICLES));
 		// Each shot rounds its share by its own seed, so the pool's total stays near the share.
 		int count = int(floor(asked * particle_share + fract(seed)));

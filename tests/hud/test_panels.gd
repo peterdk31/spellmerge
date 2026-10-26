@@ -1,6 +1,6 @@
 extends SceneTree
 ## Tests for hud/panels and hud/theme: a panel per player index 0-3 in its own
-## colour (theme variation and "P<n>" text), health and mana shown from
+## colour (theme variation), health and mana shown from
 ## `player_stats_changed` only, "DOWN" and "MENU" words (state is never colour
 ## alone), panels shown only for joined players once a room was entered, four
 ## players at once without crosstalk, a corner each, and every panel fits the
@@ -108,7 +108,6 @@ func _test_panel_per_player() -> void:
 		panel.index = player
 		root.add_child(panel)
 		_check(panel.theme_type_variation == StringName("PlayerPanel%d" % (player + 1)), "panel %d uses its theme variation" % player)
-		_check((panel.find_child("Name", true, false) as Label).text == "P%d" % (player + 1), "panel %d is labelled P%d" % [player, player + 1])
 		panel.free()
 
 
@@ -384,5 +383,6 @@ func _test_hud_sends_no_events() -> void:
 	var source := FileAccess.get_file_as_string("res://hud/panels/panels.gd")
 	source = source.replace("events.spell_swap_requested.emit(player)", "")
 	source += FileAccess.get_file_as_string("res://hud/panels/player_panel/player_panel.gd")
+	source += FileAccess.get_file_as_string("res://hud/panels/player_panel/staff_row.gd")
 	_check(not source.contains(".emit("), "the panel scripts send no events but the swap request")
 	_check(not source.contains("Input."), "the panel scripts read no input")

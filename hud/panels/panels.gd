@@ -12,6 +12,11 @@ extends CanvasLayer
 ## Menus open only while a room is active, and close when the run starts or ends, so none is
 ## ever left open over the main menu.
 ##
+## Under each panel's mana bar, one row per staff with cards (owner, 2026-10-27): its cast
+## sequence comes from `staff_changed` (the plain `Spells.staff_view`, icons asked of `Spells`
+## once per plan), and its next cast and delay are read each frame from `Spells.cast_index` and
+## `Spells.cooldown_left`, plain numbers that allocate nothing (`step_staffs`).
+##
 ## A red vignette (`vignette/`, node Root/Vignette, behind the panels) glows when a
 ## wizard's health falls, strongest toward that wizard's corner and fading in under
 ## half a second. It is read from `player_stats_changed` alone (a drop in health),
@@ -199,7 +204,7 @@ func _ready() -> void:
 		events.wave_started.connect(_on_wave_started)
 		events.room_cleared.connect(_on_room_cleared)
 		events.build_break_started.connect(_on_build_break_started)
-		events.staff_cast.connect(_on_staff_cast)
+		events.staff_changed.connect(_on_staff_changed)
 		events.run_started.connect(_on_run_started)
 		events.run_ended.connect(_on_run_ended)
 	if ui_focus != null:
@@ -211,6 +216,7 @@ func _process(delta: float) -> void:
 	poll()
 	_vignette.step(delta)
 	step_break(delta)
+	step_staffs()
 
 
 ## Count the break line down by `delta` seconds. It only draws; Flow decides when the wave
@@ -340,6 +346,7 @@ func _on_player_left(player: int) -> void:
 		return
 	_joined[player] = false
 	_panels[player].reset()
+	_panels[player].clear_staffs()
 	_refresh(player)
 
 
@@ -386,9 +393,29 @@ func is_wave_active() -> bool:
 	return _wave_active
 
 
-func _on_staff_cast(player: int, staff: int, _origin: Vector2, _direction: Vector2) -> void:
-	if player >= 0 and player < PLAYER_COUNT:
-		_panels[player].set_active_staff(staff)
+## A staff was built or changed: its row shows the plan's cast sequence, with each card's icon
+## asked of `Spells` once here (never per frame).
+func _on_staff_changed(player: int, staff: int, plan: Dictionary) -> void:
+	if player < 0 or player >= PLAYER_COUNT:
+		return
+	var icons: Array[Texture2D] = []
+	for id: Variant in plan.get("cards", []):
+		var card: StringName = StringName(id)
+		icons.append(spells.component_icon(card) if spells != null and card != &"" else null)
+	_panels[player].set_staff_plan(staff, plan, icons)
+
+
+## Each shown panel's staff rows get their staff's next cast and delay left from `Spells`
+## (plain numbers; nothing allocated). Called every frame by _process; tests call it directly.
+func step_staffs() -> void:
+	if spells == null:
+		return
+	for player in PLAYER_COUNT:
+		var panel: PlayerPanelScript = _panels[player]
+		if not panel.visible:
+			continue
+		for staff in PlayerPanelScript.STAFF_COUNT:
+			panel.set_staff_timing(staff, spells.cast_index(player, staff), spells.cooldown_left(player, staff))
 
 
 ## The "Wave N" line, or null before the script's `_ready`.
@@ -401,9 +428,12 @@ func _on_run_started(_player_count: int) -> void:
 	_reset_all()
 
 
-## A run is over: no panels over the menu, and the next run starts clean.
+## A run is over: no panels over the menu, and the next run starts clean (its wizards announce
+## their staffs again when they appear).
 func _on_run_ended(_victory: bool) -> void:
 	_reset_all()
+	for panel in _panels:
+		panel.clear_staffs()
 
 
 func _reset_all() -> void:

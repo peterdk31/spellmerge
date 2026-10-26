@@ -119,7 +119,6 @@ var _rec_timed: PackedByteArray = PackedByteArray()
 ## Slots of shots with a timer trigger.
 var _timers: PackedInt32Array = PackedInt32Array()
 var _timer_count: int = 0
-## The beam being cast: its tag, direction and how many fires it has left.
 ## Slots of live shots with an `on hurt` trigger, `_hurt_count` of them, flagged in `_rec_hurt`.
 var _hurt_slots: PackedInt32Array = PackedInt32Array()
 var _hurt_count: int = 0
@@ -129,6 +128,7 @@ var _rec_relay: Array[HitProfile] = []
 ## The carrier of each player's last cast that had an infusion (for `relay`), or null.
 var _last_infused: Array[CompiledSpell] = []
 
+## The beam being cast: its tag, direction and how many fires it has left.
 var _ray_tag: int = 0
 var _ray_dir: Vector2 = Vector2.ZERO
 var _ray_fires: int = 0
@@ -904,7 +904,7 @@ func _on_reaction(player: int, _reaction_id: StringName, target: Node, position:
 func _on_ally(player: int, ally: Node, position: Vector2, tag: int) -> void:
 	if not is_instance_valid(ally):
 		return
-	_relay(player, projectiles.target_owner_of(ally), tag)
+	_relay(player, ally, tag)
 	_fire_event(TriggerBase.Event.ALLY, player, position, tag, ally)
 
 
@@ -922,14 +922,22 @@ func _fire_event(event: int, player: int, at: Vector2, tag: int, source: Node, b
 	var slot: int = projectiles.event_slot
 	if slot >= 0 and (not _same(slot) or projectiles.get_tag_of(slot) != tag):
 		slot = -1
+	# A beam has no slot: while its `ray()` runs, its count is `_ray_fires`. An event with no live
+	# shot behind it (a status tick's kill, a tag whose shot is gone) has no count to keep, so it
+	# fires every time, bounded only by the per-step fire cap.
+	var by_ray: bool = slot < 0 and tag == _ray_tag
 	var fires: int = spell.trigger_max_fires
 	if slot >= 0:
 		fires = _rec_fires[slot]
+	elif by_ray:
+		fires = _ray_fires
 	if fires <= 0 or not _take_fire(player):
 		return
 	if slot >= 0:
 		_rec_fires[slot] = fires - 1
-	var heading: Vector2 = _heading(spell, slot, at, player)
+	elif by_ray:
+		_ray_fires = fires - 1
+	var heading: Vector2 = _ray_dir if by_ray else _heading(spell, slot, at, player)
 	if back_off:
 		at -= heading * SpellLimits.EXPIRE_BACKOFF
 	_fire_payload(spell, tag, player, at, heading, source)
@@ -957,9 +965,9 @@ func _on_hurt(player: int, _amount: int, position: Vector2, _tag: int, _kind: St
 	for n in count:
 		var slot: int = _hurt_slots[n]
 		var tag: int = projectiles.get_tag_of(slot)
-		if SpellTag.player_of(tag) != player or _rec_fires[slot] <= 0 or not _take_fire(player):
+		var spell: CompiledSpell = _profiles.get(tag)
+		if spell == null or not _knows(slot) or SpellTag.player_of(tag) != player or _rec_fires[slot] <= 0 or not _take_fire(player):
 			continue
-		var spell: CompiledSpell = _profiles[tag]
 		_rec_fires[slot] -= 1
 		_fire_payload(spell, tag, player, position, _heading(spell, slot, projectiles.get_position_of(slot), player), null)
 
@@ -967,10 +975,11 @@ func _on_hurt(player: int, _amount: int, position: Vector2, _tag: int, _kind: St
 ## `relay`: a shot with it that passes the teammate `ally_player` takes on the infusions of
 ## that player's last cast: their elements join the hit, and the status is theirs if the shot
 ## had none. Allocates one profile per pass, never per frame.
-func _relay(player: int, ally_player: int, tag: int) -> void:
+func _relay(player: int, ally: Node, tag: int) -> void:
 	var spell: CompiledSpell = _profiles.get(tag)
 	if spell == null or spell.behaviour(ModifierBase.Behaviour.RELAY) <= 0.0:
 		return
+	var ally_player: int = projectiles.target_owner_of(ally)
 	if ally_player < 0 or ally_player >= SpellLimits.PLAYERS or ally_player == player:
 		return
 	var slot: int = projectiles.event_slot

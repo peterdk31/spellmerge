@@ -170,6 +170,36 @@ func test_on_block_fires_where_the_shield_stopped_the_shot() -> void:
 	check_equal(_slots(held).size(), 1, "one block, one payload (a shield of one charge)")
 
 
+func test_on_block_respects_max_fires_with_a_bigger_shield() -> void:
+	_modifier(&"shield2", ModifierBase.Behaviour.SHIELD, 2.0)
+	var held: int = _build(0, [&"shield2", &"on_block", &"bolt", &"rune"])
+	_cast(0, Vector2.RIGHT)
+	_mgr.spawn(EventsScript.NO_PLAYER, Vector2(160, 0), Vector2(-100, 0), 3.0, 3.0, ManagerScript.LAYER_PLAYER, 0, 0)
+	_mgr.spawn(EventsScript.NO_PLAYER, Vector2(200, 0), Vector2(-100, 0), 3.0, 3.0, ManagerScript.LAYER_PLAYER, 0, 0)
+	_tick(60)
+	check_equal(_slots(held).size(), 1, "two blocks of a two-charge shield, but max_fires 1: one payload")
+
+
+func test_a_beam_on_kill_respects_max_fires() -> void:
+	var beam: FormBase = _form(&"beam", 0.0, 0.1)
+	beam.motion = FormBase.Motion.RAY
+	beam.ray_length = 300.0
+	beam.pierce = 3
+	_bus.projectile_hit.connect(func(player: int, target: Node, at: Vector2, tag: int) -> void:
+		_bus.kill_landed.emit(player, target, at, tag))
+	_target(Vector2(100, 0))
+	_target(Vector2(150, 0))
+	var killed: int = _build(0, [&"on_kill", &"beam", &"rune"])
+	_cast(0)
+	_tick(30)
+	var from_kill: int = 0
+	for hit: Array in _hits:
+		if hit[3] == killed:
+			from_kill += 1
+	check(_hits.size() >= 2, "the beam hit both targets")
+	check_equal(from_kill, 1, "a beam that kills two targets fires an on kill of max_fires 1 once")
+
+
 func test_on_kill_and_on_reaction_fire_from_the_hit() -> void:
 	# What combat does: tell about the kill and the reaction while the hit is being sent.
 	_bus.projectile_hit.connect(func(player: int, target: Node, at: Vector2, tag: int) -> void:
@@ -264,6 +294,37 @@ func test_relay_takes_on_the_infusion_of_a_teammates_last_cast() -> void:
 		check(profile != null and profile.element_ids.has(&"frost"), "with the teammate's frost")
 		check_equal(profile.status_id if profile != null else &"", &"chill", "and its status")
 	check_equal(_spells.hit_profile(_spells.current_tag(0, 0, 0)).element_ids.size(), 0, "the build itself stays plain")
+
+
+func test_relay_from_a_donor_without_infusion_changes_nothing() -> void:
+	_target(Vector2(60, 0), ManagerScript.LAYER_PLAYER, 1)
+	_target(Vector2(200, 0))
+	_build(1, [&"bolt"])
+	_build(0, [&"relay", &"bolt"])
+	_spells.cast_staff(1, 0, Vector2(0, 100), Vector2.RIGHT, 10.0)
+	_cast(0)
+	_tick(40)
+	var plain: bool = false
+	for hit: Array in _hits:
+		if hit[0] == 0:
+			plain = (hit[4] as HitProfile).element_ids.is_empty()
+	check(plain, "a teammate whose cast had no infusion gives nothing")
+
+
+func test_relay_passing_the_same_teammate_twice_adds_the_element_once() -> void:
+	_target(Vector2(50, 0), ManagerScript.LAYER_PLAYER, 1)
+	_target(Vector2(80, 0), ManagerScript.LAYER_PLAYER, 1)
+	_target(Vector2(200, 0))
+	_build(1, [&"frost", &"bolt"])
+	_build(0, [&"relay", &"bolt"])
+	_spells.cast_staff(1, 0, Vector2(0, 100), Vector2.RIGHT, 10.0)
+	_cast(0)
+	_tick(40)
+	var frosts: int = -1
+	for hit: Array in _hits:
+		if hit[0] == 0:
+			frosts = (hit[4] as HitProfile).element_ids.count(&"frost")
+	check_equal(frosts, 1, "frost joined the hit once")
 
 
 func test_a_plain_shot_takes_nothing_from_a_teammate() -> void:

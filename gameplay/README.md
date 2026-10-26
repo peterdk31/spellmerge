@@ -31,9 +31,10 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `staff_changed` | `player` | `hud` (the builders) |
 | `staff_cast` | `player` | `hud` (the corner panel) |
 | `caster_move_requested`, `mana_reserved` | `core/spells` | `player` |
-| `target_move_requested`, `area_hit_requested`, `entity_spawn_requested`, `mana_refund_requested` | `core/spells` | none yet (staffs kits B2-B5) |
+| `area_hit_requested`, `mana_refund_requested` | `core/spells` | none yet (staffs kits B3, B4) |
+| `target_move_requested`, `entity_spawn_requested`, `entity_end_requested` | `core/spells` (staffs B2) | `ai` |
 | `caster_move_finished` | `player` | none yet (`core/spells`, staffs B2) |
-| `entity_ended`, `familiar_cast_requested` | `ai` | none yet (`core/spells`, staffs B5) |
+| `entity_ended`, `familiar_cast_requested` | `ai` | none yet (`core/spells`, staffs B2) |
 | `shot_blocked`, `ally_passed` | `core/projectiles` | none yet (`core/spells`, staffs B1) |
 | `shield_blocked`, `kill_landed`, `wizard_hurt`, `reaction_landed` | `combat` | none yet (`core/spells`, staffs B3) |
 | `reaction_triggered` | `combat` | `feel` |

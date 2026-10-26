@@ -16,14 +16,18 @@ extends Node
 ## never pauses the game, and no player ever waits for another.
 ##
 ## Controls: move_up and move_left go to the previous control, move_down and
-## move_right to the next (wrapping round); `cast` activates the focused
-## control and `dodge` cancels. Presses come from PlayerInput's press counter,
+## move_right to the next (wrapping round); `cast_a` activates the focused
+## control, `cast_b` cancels, `cast_x` sends `alternate` for the focused control
+## and `page_prev` / `page_next` (LB, RB) send `paged`. A panel laid out in two
+## dimensions gives a navigator (`set_navigator`): each move asks it for the control
+## in that direction first, and only when it has none does the move go to the
+## previous or next control. `focus(player, control)` jumps straight to a control. Presses come from PlayerInput's press counter,
 ## so even a tap released within one frame is not lost, and a button already
 ## held when the panel opens (the one that opened it) does nothing until it is
 ## let go and pressed again.
 ##
 ## While a panel is open its owner's gameplay input is captured
-## (PlayerInput.set_captured): the wizard does not walk, cast or dodge, and
+## (PlayerInput.set_captured): the wizard does not walk or cast a staff, and
 ## gameplay needs no check of its own. The other players are not affected.
 ##
 ## A control can take focus when it is valid, visible in the tree (a hidden
@@ -42,12 +46,20 @@ const MAX_PLAYERS: int = InputManagerScript.MAX_PLAYERS
 const NO_FOCUS: int = -1
 
 const PREVIOUS_ACTIONS: Array[StringName] = [&"move_up", &"move_left"]
-## A (Space) activates and B (Q) goes back, as on most gamepads (staffs A6a).
+## A (Space) activates and B (Q) goes back, as on most gamepads (staffs A6a); X (J) is the
+## panel's second action on the focused control, LB and RB (Z, C) page (staffs B8).
 const ACTIVATE: StringName = &"cast_a"
 const CANCEL: StringName = &"cast_b"
+const ALTERNATE: StringName = &"cast_x"
+const PAGE_PREV: StringName = &"page_prev"
+const PAGE_NEXT: StringName = &"page_next"
+## The direction of each move action, for a navigator.
+const DIRECTIONS: Dictionary = {
+	&"move_up": Vector2i.UP, &"move_down": Vector2i.DOWN, &"move_left": Vector2i.LEFT, &"move_right": Vector2i.RIGHT,
+}
 ## Every action read while a panel is open.
 const WATCHED: Array[StringName] = [
-	&"move_up", &"move_left", &"move_down", &"move_right", &"cast_a", &"cast_b",
+	&"move_up", &"move_left", &"move_down", &"move_right", &"cast_a", &"cast_b", &"cast_x", &"page_prev", &"page_next",
 ]
 
 ## A panel opened for `player`.
@@ -60,6 +72,10 @@ signal focus_changed(player: int, control: Control)
 signal activated(player: int, control: Control)
 ## `player` asked to go back. The panel decides what that means (usually close()).
 signal cancelled(player: int)
+## `player` pressed the second action (`cast_x`) on `control`. The panel decides what it does.
+signal alternate(player: int, control: Control)
+## `player` paged: -1 for `page_prev`, +1 for `page_next`. The panel decides what it does.
+signal paged(player: int, step: int)
 
 ## The input manager and the event bus. Only tests set these, before adding the
 ## node, to use their own; otherwise the "PlayerInput" and "Events" autoloads.
@@ -72,6 +88,8 @@ var _open: Array[bool] = []
 var _focus: Array[int] = []
 ## Per player: action -> PlayerInput's press count at the last poll.
 var _seen: Array[Dictionary] = []
+## Per player: the open panel's navigator (see `set_navigator`), or an empty Callable.
+var _navigators: Array[Callable] = []
 
 
 func _init() -> void:
@@ -84,6 +102,7 @@ func _init() -> void:
 		for action in WATCHED:
 			seen[action] = 0
 		_seen.append(seen)
+		_navigators.append(Callable())
 
 
 func _ready() -> void:
@@ -120,7 +139,11 @@ func open(player: int, controls: Array[Control]) -> bool:
 	if input == null or not input.is_joined(player):
 		return false
 	if _open[player]:
+		# Replacing the panel keeps its navigator: a panel that opens again with new controls
+		# (a list that grew) is still the same panel.
+		var navigator: Callable = _navigators[player]
 		close(player)
+		_navigators[player] = navigator
 	_controls[player].clear()
 	_controls[player].append_array(controls)
 	_open[player] = true
@@ -139,6 +162,7 @@ func close(player: int) -> bool:
 	_open[player] = false
 	_focus[player] = NO_FOCUS
 	_controls[player].clear()
+	_navigators[player] = Callable()
 	if input != null:
 		input.set_captured(player, false)
 	closed.emit(player)
@@ -175,6 +199,28 @@ func move_focus(player: int, step: int) -> void:
 		if _can_focus(_controls[player][index]):
 			_set_focus(player, index)
 			return
+
+
+## Give `player`'s open panel a navigator: `navigator.call(control, direction)` (the focused
+## control, or null, and a Vector2i step) returns the control to move to, or null to let the
+## move go to the previous or next control as usual. A control it returns that is not in the
+## panel or cannot take focus counts as null. Cleared when the panel closes; kept when it is
+## opened again with new controls. An empty Callable removes it.
+func set_navigator(player: int, navigator: Callable) -> void:
+	if is_open(player):
+		_navigators[player] = navigator
+
+
+## Move `player`'s focus straight to `control`. False when the panel is closed or `control`
+## is not one of its controls or cannot take focus.
+func focus(player: int, control: Control) -> bool:
+	if not is_open(player) or control == null:
+		return false
+	var at: int = _controls[player].find(control)
+	if at < 0 or not _can_focus(control):
+		return false
+	_set_focus(player, at)
+	return true
 
 
 ## Activate the focused control of `player`, as if the activate button was
@@ -216,13 +262,33 @@ func _poll_player(player: int) -> void:
 				activate(player)
 			elif action == CANCEL:
 				cancel(player)
-			elif PREVIOUS_ACTIONS.has(action):
-				move_focus(player, -1)
-			else:
-				move_focus(player, 1)
+			elif action == ALTERNATE:
+				_alternate(player)
+			elif action == PAGE_PREV or action == PAGE_NEXT:
+				paged.emit(player, -1 if action == PAGE_PREV else 1)
+			elif not _navigate(player, DIRECTIONS[action]):
+				move_focus(player, -1 if PREVIOUS_ACTIONS.has(action) else 1)
 	# After the presses, so a press never lands on a control the player has not
 	# seen focused.
 	_revalidate(player)
+
+
+## The second action on the focused control, checked like `activate`.
+func _alternate(player: int) -> void:
+	var control: Control = focused(player)
+	if control == null or not _can_focus(control):
+		_revalidate(player)
+		return
+	alternate.emit(player, control)
+
+
+## Ask the panel's navigator where `direction` goes; true when it moved the focus.
+func _navigate(player: int, direction: Vector2i) -> bool:
+	var navigator: Callable = _navigators[player]
+	if not navigator.is_valid():
+		return false
+	var target: Variant = navigator.call(focused(player), direction)
+	return target is Control and focus(player, target as Control)
 
 
 ## Remember the press counts now, so presses from before the panel opened (and a

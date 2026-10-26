@@ -307,3 +307,12 @@ func test_the_builder_view_is_plain_values() -> void:
 	check(String(cast["text"]).contains("on you: Fire"), "it reads as fire on the caster: %s" % cast["text"])
 	check_equal((cast["targets"] as Dictionary)[1], StaffCompiler.TARGET_CASTER, "fire links to the caster")
 	check((view["wasted"] as Dictionary).has(0), "homing on the caster is wasted")
+
+
+func test_the_builder_view_counts_a_casts_damage() -> void:
+	# A bolt hits for 5 once, a nova for 4 with 8 shots: 5 + 32, the on-hit payload left out.
+	var ids: Array[StringName] = [&"double", &"bolt", &"nova"]
+	var view: Dictionary = _spells.call("staff_view", ids, _staff)
+	check_equal(int((view["casts"] as Array)[0]["damage"]), 37, "a bolt and a nova together")
+	var payload: Dictionary = _spells.call("staff_view", [&"on_hit", &"bolt", &"nova"] as Array[StringName], _staff)
+	check_equal(int((payload["casts"] as Array)[0]["damage"]), 5, "a payload is not counted: it depends on what is hit")

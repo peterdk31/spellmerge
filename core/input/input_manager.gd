@@ -68,9 +68,11 @@ const MOUSE_AIM_TRAVEL: float = 8.0
 ## The per-player actions, defined in project.godot. `join` and `leave` are
 ## handled here and are not per-player state. `cast_a` to `cast_b` cast the four staffs, one
 ## per button (staffs, docs/milestones/M2-staffs.md); menus activate with `cast_a` and go back
-## with `cast_b` (core/ui_focus).
+## with `cast_b` (core/ui_focus); `page_prev` and `page_next` (LB, RB; Z, C) page menus such as
+## the builder's staff tabs and do nothing in play.
 const ACTIONS: Array[StringName] = [
 	&"move_left", &"move_right", &"move_up", &"move_down", &"cast_a", &"cast_x", &"cast_y", &"cast_b", &"overlay",
+	&"page_prev", &"page_next",
 ]
 ## The staff cast actions, by staff index (0 A, 1 X, 2 Y, 3 B).
 const CAST_ACTIONS: Array[StringName] = [&"cast_a", &"cast_x", &"cast_y", &"cast_b"]

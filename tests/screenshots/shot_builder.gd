@@ -1,11 +1,12 @@
 extends SceneTree
-## Screenshots of the staff builder (staffs A6a), for people and for Claude to look at (not a
-## test: it only checks that each staged state happened). Needs a display, so it runs only through
+## Screenshots of the staff builder (staffs A6a, B8), for people and for Claude to look at (not
+## a test: it only checks that each staged state happened). Needs a display, so it runs only through
 ## `ci/build/build.sh --quick --screenshots`; each shot is saved as user://screenshots/<name>.png
 ## and copied to build/screenshots/.
 ##
-## Shots: one player with the builder open, then picking cards into staff X, a wasted card, then
-## all four players with their builders open on different staffs, in a wave.
+## Shots: one player with the builder open (links: fire "> 2" into the bolt, "#1" on the bolt),
+## then picking cards into staff X, a card picked up to move ("^", `builder_holding`), a wasted
+## card, then all four players with their builders open on different staffs, in a wave.
 
 const SHOTS_DIR := "user://screenshots"
 const SETTLE_FRAMES := 20
@@ -39,11 +40,19 @@ func _initialize() -> void:
 		_fail("the builder of player 1 is not open")
 		return
 	await _shot("builder_one_player")
+	# Pick the nova up to move it: it is marked held and the hint says "Place".
+	await _press(0, builder.call("slot_button", 3))
+	if (builder.call("held") as Array)[0] != 1:
+		_fail("the nova is not held in builder_holding")
+		return
+	await _shot("builder_holding")
+	_tap(0, &"cast_b")
+	await _settle()
 	# Homing alone in staff Y: it lands on the caster and does nothing, so the note says why.
 	await _press(0, builder.call("tab_button", 2))
 	await _press(0, builder.call("slot_button", 0))
 	await _press(0, _row(builder, "Homing"))
-	await _press(0, builder.call("slot_button", 0))
+	_focus.call("focus", 0, builder.call("slot_button", 0))
 	await _shot("builder_wasted")
 	# A stopped run leaves the HUD as it is, so close the builder as its owner would.
 	_tap(0, &"overlay")
@@ -105,14 +114,10 @@ func _open_builder(player: int) -> void:
 	await _settle()
 
 
-## Move the player's focus down to `control` and press `cast_a` (activate) on it.
+## Put the player's focus on `control` and press `cast_a` (activate) on it.
 func _press(player: int, control: Control) -> void:
-	for attempt in 120:
-		if _focus.call("focused", player) == control:
-			break
-		_tap(player, &"move_down")
-		await process_frame
-		await process_frame
+	_focus.call("focus", player, control)
+	await process_frame
 	_tap(player, &"cast_a")
 	await _settle()
 

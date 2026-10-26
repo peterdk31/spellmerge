@@ -12,20 +12,34 @@ extends PanelContainer
 ## `staff_changed`, so this node never changes a staff itself. Nothing here reads the player or
 ## another player's builder.
 ##
-## Controls (through `core/ui_focus`, so only the owner's device works them): up/left and
-## down/right move through the controls in order, `cast_a` activates and `cast_b` goes back.
-## Order: the staff tabs (A, X, Y, B), "Close", the slots of the shown staff, then the bag rows.
-## Activating a slot selects it and moves focus to the bag; activating a bag card puts it in the
-## selected slot and selects the next slot, so a staff is built left to right by picking cards
-## one after another ("Empty" clears the slot). `cast_b` on a bag row goes back to the slot;
-## anywhere else it closes the builder. The focused control is marked with "> " and the selected
-## slot is shown in brackets, so nothing is shown by colour alone; a card that does nothing
-## where it is (a wasted card) has a "!" and the note says why.
+## Controls (through `core/ui_focus`, so only the owner's device works them), laid out in two
+## dimensions (staffs B8): the staff tabs (A, X, Y, B) and "Close" in a row on top, the slots of
+## the shown staff on the left, the bag on the right. Left and right move along the tabs and
+## between the slots and the bag, up and down within a list and from its top to the tabs, so
+## every slot is reached with the d-pad alone; LB and RB (`page_prev`, `page_next`) show the
+## previous or next staff from anywhere.
+##
+## Pick and place: `cast_a` on a slot with a card picks it up (marked "^"); `cast_a` on another
+## slot, of this staff or another, places it there, swapping with what is there
+## (`card_move_requested`); `cast_a` on a bag row while holding sends it back to the bag; `cast_b`
+## drops it where it was. `cast_x` on a slot sends its card back to the bag. With nothing held,
+## `cast_a` on an empty slot selects it and moves to the bag, and `cast_a` on a bag card puts it
+## in the selected slot and selects the next slot, so a staff is still built left to right by
+## picking cards one after another ("Empty" clears the slot). `cast_b` on a bag row goes back to
+## the slot; anywhere else it closes the builder. Player 1 can also use the mouse: a click works
+## as `cast_a`, and dragging a card onto a slot (or onto the bag) moves it there.
+##
+## The focused control is marked with "> ", the selected slot is shown in brackets and a held
+## card with "^", so nothing is shown by colour alone; a card that does nothing where it is (a
+## wasted card) has a "!" and the note says why. Links: each modifier, infusion and trigger shows
+## where it goes ("> 4" for the carrier in slot 4, "> you" for the caster, "> aim" for the aim
+## point) and each carrier its cast ("#1"); the cards linked to the focused one are marked "<".
 ##
 ## The info panel (`Info`, in the free strip of the player's quarter) shows the cast plan, one
-## line per cast of the staff's cycle, and a note: the refusal reason, else why the focused
-## slot's card is wasted, else the description of the card in focus; and a hint line with what
-## `cast_a` (and `cast_b`) do on the focused control.
+## line per cast of the staff's cycle with its live numbers (its mana and delay in its words,
+## then its damage if every shot lands once), and a note: the refusal reason, else why the focused slot's card is wasted,
+## else where it goes and the description of the card in focus; and a hint line with what
+## `cast_a` (and `cast_b` or `cast_x`) do on the focused control.
 ##
 ## Every UIFocus signal carries a player index and this node ignores all but its own, so it
 ## is the same for any index 0-3. Buttons are made once and only grow; the slot and bag lists sit
@@ -49,6 +63,11 @@ const EMPTY_SLOT_TEXT: String = "-"
 const FOCUS_MARK: String = "> "
 const CURRENT_MARK: String = " *"
 const WASTED_MARK: String = " !"
+const HELD_MARK: String = "^"
+const LINK_MARK: String = " <"
+## `card_move_requested`'s staff for the bag, and "nothing held".
+const BAG: int = -1
+const NOTHING: int = -2
 ## The look of every control, and of the control in focus (brighter, with a bright border; the
 ## "> " mark stays, so it is never colour alone).
 const BUTTON_VARIATION: StringName = &"BuilderButton"
@@ -75,12 +94,17 @@ const PLAN_LINES: int = 5
 const NOTE_LINES: int = 3
 const HINT_HEIGHT: float = 10.0
 const HINT_SLOT: String = "Pick a card"
+const HINT_PICK: String = "Pick up"
+const HINT_PLACE: String = "Place"
+const HINT_TO_BAG: String = "To bag"
+const HINT_DROP: String = "Drop"
 const HINT_ROW: String = "Put in"
 const HINT_BACK: String = "back"
 const HINT_TAB: String = "Show staff"
 const HINT_CLOSE: String = "Close"
 const HINT_ACTION: StringName = &"cast_a"
 const HINT_BACK_ACTION: StringName = &"cast_b"
+const HINT_BAG_ACTION: StringName = &"cast_x"
 const REFUSED_PREFIX: String = "Refused: "
 const WASTED_PREFIX: String = "Does nothing: "
 
@@ -105,6 +129,15 @@ var _open: bool = false
 var _viewed: int = 1
 var _slot: int = 0
 var _focused: Control = null
+## The card picked up: its staff (BAG never; NOTHING when none) and slot.
+var _held_staff: int = NOTHING
+var _held_slot: int = -1
+## The shown staff's links: slot -> the carrier's slot (or a StaffCompiler TARGET_*), and
+## carrier slot -> its cast number (1 up).
+var _links: Dictionary = {}
+var _cast_of: Dictionary = {}
+## Player 1's mouse: the control a press started on, or null.
+var _pressed: Control = null
 
 var _title: Label = null
 var _tabs: Array[Button] = []
@@ -187,6 +220,8 @@ func bind(events: EventsScript, ui_focus: UIFocusScript, spells: SpellsScript, i
 		_ui_focus.activated.connect(_on_activated)
 		_ui_focus.cancelled.connect(_on_cancelled)
 		_ui_focus.focus_changed.connect(_on_focus_changed)
+		_ui_focus.alternate.connect(_on_alternate)
+		_ui_focus.paged.connect(_on_paged)
 
 
 func is_open() -> bool:
@@ -201,6 +236,7 @@ func open_builder() -> bool:
 	_slot = 0
 	_focused = null
 	_reason = ""
+	_held_staff = NOTHING
 	_place_info()
 	_render()
 	# Close the overlay's panel first: its `closed` would hide this node if it came during open.
@@ -212,6 +248,7 @@ func open_builder() -> bool:
 		return false
 	_open = true
 	_synced_controls = _controls.size()
+	_ui_focus.set_navigator(index, _navigate)
 	_focused = _ui_focus.focused(index)
 	if not _slots.is_empty():
 		_focus_control(_slots[0])
@@ -234,6 +271,11 @@ func viewed_staff() -> int:
 ## The selected slot of the shown staff.
 func selected_slot() -> int:
 	return _slot
+
+
+## The staff and slot of the card picked up, or [NOTHING, -1].
+func held() -> Array[int]:
+	return [_held_staff, _held_slot] as Array[int] if _held_staff != NOTHING else [NOTHING, -1] as Array[int]
 
 
 ## The card ids of a staff as the player announced them, by slot (a copy).
@@ -353,6 +395,10 @@ func _make_button(parent: Node, node_name: String) -> Button:
 	button.focus_mode = Control.FOCUS_NONE
 	button.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	button.clip_text = true
+	if index == 0:
+		# Player 1 may use the mouse (the keyboard player; see the top).
+		button.mouse_filter = Control.MOUSE_FILTER_STOP
+		button.gui_input.connect(_on_mouse.bind(button))
 	parent.add_child(button)
 	return button
 
@@ -387,6 +433,8 @@ func _render() -> void:
 	while _slots.size() < cards.size():
 		_slots.append(_make_row(_slots_holder, "Slot%d" % _slots.size()))
 	var wasted: Dictionary = _wasted()
+	_read_links()
+	var linked: Array[int] = _linked_to(_slots.find(_focused as Button))
 	for slot in _slots.size():
 		var button: Button = _slots[slot]
 		button.visible = slot < cards.size()
@@ -394,8 +442,16 @@ func _render() -> void:
 			continue
 		var id: StringName = cards[slot]
 		var text: String = "%d %s" % [slot + 1, _name_of(id) if id != NO_CARD else EMPTY_SLOT_TEXT]
+		if _held_staff == _viewed and _held_slot == slot:
+			text = HELD_MARK + text
 		if wasted.has(slot):
 			text += WASTED_MARK
+		elif _links.has(slot):
+			text += " >" + _target_word(int(_links[slot]))
+		elif _cast_of.has(slot):
+			text += " #%d" % int(_cast_of[slot])
+		if linked.has(slot):
+			text += LINK_MARK
 		_set_text(button, "[%s]" % text if slot == _slot else text)
 	_render_rows(cards[_slot] if _slot < cards.size() else NO_CARD)
 	_rebuild_controls()
@@ -424,7 +480,7 @@ func _render_rows(current: StringName) -> void:
 			_set_text(button, _name_of(id) + (CURRENT_MARK if id == current else ""))
 
 
-## The plan of the shown staff: one line per cast of its cycle.
+## The plan of the shown staff: one line per cast of its cycle, with its live numbers.
 func _render_plan() -> void:
 	var lines: PackedStringArray = PackedStringArray()
 	var casts: Variant = _plans[_viewed].get("casts", [])
@@ -432,7 +488,8 @@ func _render_plan() -> void:
 		var number: int = 1
 		for cast: Variant in casts:
 			if cast is Dictionary:
-				lines.append("%d: %s" % [number, str((cast as Dictionary).get("text", ""))])
+				var row: Dictionary = cast
+				lines.append("%d: %s (%s)" % [number, str(row.get("text", "")).trim_suffix("."), _numbers(row)])
 				number += 1
 	_plan.text = "\n".join(lines) if not lines.is_empty() else "Empty: put cards in the slots."
 	_render_note()
@@ -448,9 +505,16 @@ func _render_note() -> void:
 	elif at_slot >= 0 and wasted.has(at_slot):
 		_note.text = WASTED_PREFIX + str(wasted[at_slot])
 	else:
-		_note.text = _description_in_focus()
+		var link: String = _link_sentence(at_slot)
+		var description: String = _description_in_focus()
+		_note.text = link + (" " if link != "" and description != "" else "") + description
 	var verb: String = _hint_in_focus()
-	_hint.show_hint(index, HINT_ACTION, verb, HINT_BACK_ACTION, HINT_BACK if verb == HINT_ROW else "")
+	if _held_staff != NOTHING:
+		_hint.show_hint(index, HINT_ACTION, verb, HINT_BACK_ACTION, HINT_DROP)
+	elif verb == HINT_PICK:
+		_hint.show_hint(index, HINT_ACTION, verb, HINT_BAG_ACTION, HINT_TO_BAG)
+	else:
+		_hint.show_hint(index, HINT_ACTION, verb, HINT_BACK_ACTION, HINT_BACK if verb == HINT_ROW else "")
 
 
 func _hint_in_focus() -> String:
@@ -458,9 +522,13 @@ func _hint_in_focus() -> String:
 	if button == null:
 		return ""
 	if _rows.has(button):
-		return HINT_ROW
+		return HINT_TO_BAG if _held_staff != NOTHING else HINT_ROW
 	if _slots.has(button):
-		return HINT_SLOT
+		if _held_staff != NOTHING:
+			return HINT_PLACE
+		var slot: int = _slots.find(button)
+		var cards: Array[StringName] = cards_of(_viewed)
+		return HINT_PICK if slot < cards.size() and cards[slot] != NO_CARD else HINT_SLOT
 	if _tabs.has(button):
 		return HINT_TAB
 	if button == _close:
@@ -588,14 +656,16 @@ func _on_closed(player: int) -> void:
 func _on_focus_changed(player: int, control: Control) -> void:
 	if player == index and _open:
 		_focused = control
-		_apply_marks()
-		_scroll_lists()
+		# The slot rows show what is linked to the focused card, so they are drawn again.
+		_render()
 
 
 func _on_cancelled(player: int) -> void:
 	if player != index or not _open:
 		return
-	if _rows.has(_focused as Button) and _slot < _slots.size():
+	if _held_staff != NOTHING:
+		_drop()
+	elif _rows.has(_focused as Button) and _slot < _slots.size():
 		_focus_control(_slots[_slot])
 	else:
 		close_builder()
@@ -607,19 +677,30 @@ func _on_activated(player: int, control: Control) -> void:
 	if control == _close:
 		close_builder()
 	elif _tabs.has(control as Button):
-		_viewed = _tabs.find(control as Button)
-		_slot = 0
-		_render()
-		_resync_focus()
+		_show_staff(_tabs.find(control as Button))
 		if not _slots.is_empty():
 			_focus_control(_slots[0])
 	elif _slots.has(control as Button):
-		_slot = _slots.find(control as Button)
-		_render()
-		_focus_control(_rows[0] if not _rows.is_empty() else control)
+		var slot: int = _slots.find(control as Button)
+		var cards: Array[StringName] = cards_of(_viewed)
+		if _held_staff != NOTHING:
+			_move(_held_staff, _held_slot, _viewed, slot)
+			_drop()
+		elif slot < cards.size() and cards[slot] != NO_CARD:
+			_held_staff = _viewed
+			_held_slot = slot
+			_slot = slot
+			_render()
+		else:
+			_slot = slot
+			_render()
+			_focus_control(_rows[0] if not _rows.is_empty() else control)
 	elif _rows.has(control as Button):
 		var row: int = _rows.find(control as Button)
-		if row < _row_ids.size():
+		if _held_staff != NOTHING:
+			_move(_held_staff, _held_slot, BAG, 0)
+			_drop()
+		elif row < _row_ids.size():
 			_ask(_slot, _row_ids[row])
 			# Build left to right: the next pick goes to the next slot.
 			if _row_ids[row] != NO_CARD and _slot + 1 < cards_of(_viewed).size():
@@ -628,17 +709,226 @@ func _on_activated(player: int, control: Control) -> void:
 			_focus_control(control)
 
 
+## `cast_x`: the card in the focused slot goes back to the bag.
+func _on_alternate(player: int, control: Control) -> void:
+	if player != index or not _open or not _slots.has(control as Button):
+		return
+	var slot: int = _slots.find(control as Button)
+	var cards: Array[StringName] = cards_of(_viewed)
+	if slot < cards.size() and cards[slot] != NO_CARD:
+		if _held_staff == _viewed and _held_slot == slot:
+			_held_staff = NOTHING
+		_move(_viewed, slot, BAG, 0)
+
+
+## LB and RB: the previous or next staff, focus kept on the same kind of control.
+func _on_paged(player: int, step: int) -> void:
+	if player != index or not _open:
+		return
+	var at_slot: int = _slots.find(_focused as Button)
+	_show_staff(posmod(_viewed + step, STAFF_COUNT))
+	if at_slot >= 0:
+		var cards: int = cards_of(_viewed).size()
+		if cards > 0:
+			_focus_control(_slots[mini(at_slot, cards - 1)])
+
+
+## Where a d-pad press goes from `from` (see the top): always an answer, so the focus service
+## never falls back to walking the controls in a line.
+func _navigate(from: Control, direction: Vector2i) -> Control:
+	var button := from as Button
+	var cards: int = cards_of(_viewed).size()
+	var tab_row: Array[Button] = _tabs.duplicate()
+	tab_row.append(_close)
+	if button == null:
+		return _slots[_slot] if _slot < cards else _tabs[_viewed]
+	var at_tab: int = tab_row.find(button)
+	if at_tab >= 0:
+		if direction == Vector2i.LEFT:
+			return tab_row[maxi(at_tab - 1, 0)]
+		if direction == Vector2i.RIGHT:
+			return tab_row[mini(at_tab + 1, tab_row.size() - 1)]
+		if direction == Vector2i.DOWN and cards > 0:
+			return _slots[clampi(_slot, 0, cards - 1)]
+		return button
+	var at_slot: int = _slots.find(button)
+	if at_slot >= 0:
+		if direction == Vector2i.UP:
+			return _slots[at_slot - 1] if at_slot > 0 else _tabs[_viewed]
+		if direction == Vector2i.DOWN:
+			return _slots[mini(at_slot + 1, cards - 1)]
+		if direction == Vector2i.RIGHT and not _row_ids.is_empty():
+			return _rows[_row_for(at_slot)]
+		return button
+	var at_row: int = _rows.find(button)
+	if at_row >= 0:
+		if direction == Vector2i.UP:
+			return _rows[at_row - 1] if at_row > 0 else _tabs[_viewed]
+		if direction == Vector2i.DOWN:
+			return _rows[mini(at_row + 1, _row_ids.size() - 1)]
+		if direction == Vector2i.LEFT and cards > 0:
+			return _slots[clampi(_slot, 0, cards - 1)]
+		return button
+	return button
+
+
+## The bag row to move right to from `slot`: the row of the card in it, else the first row.
+func _row_for(slot: int) -> int:
+	var cards: Array[StringName] = cards_of(_viewed)
+	if slot >= 0 and slot < cards.size():
+		var at: int = _row_ids.find(cards[slot])
+		if at >= 0:
+			return at
+	return 0
+
+
+func _show_staff(staff: int) -> void:
+	_viewed = staff
+	_slot = 0
+	_render()
+	_resync_focus()
+
+
+func _drop() -> void:
+	_held_staff = NOTHING
+	_held_slot = -1
+	_render()
+
+
+## Ask the player to move a card (BAG as `to_staff` sends it back to the bag; as `from_staff`,
+## `from_slot` is the bag index).
+func _move(from_staff: int, from_slot: int, to_staff: int, to_slot: int) -> void:
+	_reason = ""
+	if _events != null:
+		_events.card_move_requested.emit(index, from_staff, from_slot, to_staff, to_slot)
+
+
 func _ask(slot: int, id: StringName) -> void:
 	_reason = ""
 	if _events != null:
 		_events.staff_change_requested.emit(index, _viewed, slot, id)
 
 
-## Move this player's focus to `target` by single steps (the focus service has no jump).
-func _focus_control(target: Control) -> void:
-	if _ui_focus == null:
+## Read the shown staff's links from its plan (see `_links` and `_cast_of`).
+func _read_links() -> void:
+	_links.clear()
+	_cast_of.clear()
+	var casts: Variant = _plans[_viewed].get("casts", [])
+	if not casts is Array:
 		return
-	for _step in _controls.size():
-		if _ui_focus.focused(index) == target:
-			return
-		_ui_focus.move_focus(index, 1)
+	var number: int = 1
+	for cast: Variant in casts:
+		if not cast is Dictionary:
+			continue
+		var targets: Dictionary = (cast as Dictionary).get("targets", {}) as Dictionary
+		for slot: Variant in targets:
+			if not _links.has(int(slot)):
+				_links[int(slot)] = int(targets[slot])
+			var target: int = int(targets[slot])
+			if target >= 0 and not _cast_of.has(target):
+				_cast_of[target] = number
+		var read: Variant = (cast as Dictionary).get("slots", PackedInt32Array())
+		var wasted: Dictionary = (cast as Dictionary).get("wasted", {}) as Dictionary
+		for slot: Variant in read:
+			if not targets.has(slot) and not wasted.has(slot) and not _cast_of.has(int(slot)):
+				_cast_of[int(slot)] = number
+		number += 1
+
+
+## The slots linked to `slot`: its carrier, or the cards that go into it.
+func _linked_to(slot: int) -> Array[int]:
+	var out: Array[int] = []
+	if slot < 0:
+		return out
+	if _links.has(slot) and int(_links[slot]) >= 0:
+		out.append(int(_links[slot]))
+	for other: Variant in _links:
+		if int(_links[other]) == slot:
+			out.append(int(other))
+	return out
+
+
+func _target_word(target: int) -> String:
+	if target == StaffCompiler.TARGET_CASTER:
+		return "you"
+	if target == StaffCompiler.TARGET_POINT:
+		return "aim"
+	return str(target + 1)
+
+
+## Where the card in `slot` goes, in words, or "".
+func _link_sentence(slot: int) -> String:
+	if slot < 0:
+		return ""
+	if _links.has(slot):
+		var target: int = int(_links[slot])
+		if target == StaffCompiler.TARGET_CASTER:
+			return "Goes on you."
+		if target == StaffCompiler.TARGET_POINT:
+			return "Goes where you aim."
+		var cards: Array[StringName] = cards_of(_viewed)
+		var carrier: String = _name_of(cards[target]) if target < cards.size() else ""
+		return "Goes into %s (slot %d)." % [carrier, target + 1]
+	if _cast_of.has(slot):
+		return "Cast %d." % int(_cast_of[slot])
+	return ""
+
+
+## The live number the cast's own words leave out: its damage if every shot lands once (the
+## words already give its mana and delay).
+func _numbers(cast: Dictionary) -> String:
+	return "%d dmg" % int(cast.get("damage", 0))
+
+
+## Player 1's mouse on `button`: a press focuses it; a release on the same control works as
+## `cast_a`, on another slot (or the bag) moves the card there.
+func _on_mouse(event: InputEvent, button: Button) -> void:
+	var click := event as InputEventMouseButton
+	if click == null or click.button_index != MOUSE_BUTTON_LEFT or not _open:
+		return
+	if click.pressed:
+		_pressed = button
+		if _ui_focus != null:
+			_ui_focus.focus(index, button)
+		return
+	var from: Control = _pressed
+	_pressed = null
+	if from == null:
+		return
+	var to: Control = _control_at(click.global_position)
+	if to == null:
+		return
+	if to == from:
+		_on_activated(index, from)
+		return
+	var from_slot: int = _slots.find(from as Button)
+	var to_slot: int = _slots.find(to as Button)
+	var from_row: int = _rows.find(from as Button)
+	if from_slot >= 0 and to_slot >= 0:
+		_move(_viewed, from_slot, _viewed, to_slot)
+	elif from_slot >= 0 and _rows.has(to as Button):
+		_move(_viewed, from_slot, BAG, 0)
+	elif from_row >= 0 and to_slot >= 0 and from_row < _row_ids.size():
+		if _row_ids[from_row] == NO_CARD:
+			_slot = to_slot
+			_ask(to_slot, NO_CARD)
+		else:
+			_move(BAG, _bag.find(_row_ids[from_row]), _viewed, to_slot)
+	if _held_staff != NOTHING:
+		_drop()
+	if _ui_focus != null:
+		_ui_focus.focus(index, to)
+
+
+## The shown tab, slot or bag row under the screen point `at`, or null.
+func _control_at(at: Vector2) -> Control:
+	for control in _controls:
+		if control.is_visible_in_tree() and control.get_global_rect().has_point(at):
+			return control
+	return null
+
+
+## Move this player's focus to `target`.
+func _focus_control(target: Control) -> void:
+	if _ui_focus != null:
+		_ui_focus.focus(index, target)

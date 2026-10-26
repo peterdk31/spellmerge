@@ -198,12 +198,15 @@
 		},
 		{
 			"id": "static_bolt",
-			"name": "Static bolt",
-			"does": "A lightning bolt leaves the imp charged, ready to discharge on the next hit.",
-			"casts": [{"slot": 0, "recipe": {"form": "bolt", "element": "lightning"}}],
-			"imps": [[100, 0]],
-			"seconds": 1.5,
-			"checks": [{"kind": "damaged", "imps": [0]}, {"kind": "status", "imps": [0], "status": "static"}]
+			"name": "Static discharge",
+			"does": "A lightning ring charges three imps standing close together; a lightning bolt then hits one of them and the charge jumps to the other two.",
+			"casts": [
+				{"slot": 0, "recipe": {"form": "nova", "element": "lightning", "modifiers": ["bigger"]}},
+				{"slot": 1, "at": 0.6, "recipe": {"form": "bolt", "element": "lightning"}}
+			],
+			"imps": [[36, 0], [0, 36], [-36, 0]],
+			"seconds": 2.0,
+			"checks": [{"kind": "status", "imps": [0, 1, 2], "status": "static"}, {"kind": "reaction", "reaction": "discharge"}]
 		},
 		{
 			"id": "static_ring",

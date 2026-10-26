@@ -2,6 +2,15 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-26: Projectile kit (staffs B1)
+
+- **Behaviours are per-shot setters,** called by the spell runtime right after `spawn` (a small `_apply_travel` in `core/spells`, so the cards after B1 are data only). Plain shots keep the old path: flags 0, no extra work.
+- **Self-hit and ally-hit exist but are off.** The design says shots may hit their caster; `combat` cannot yet hurt a wizard with a shot (that is B3), so `Spells` does not switch the flag on. B3 turns it on with the self-harm flash. Until then a wizard is never hit by their own shot, as before.
+- **Meanings of the numbers:** bounce = times; spiral = full width in px (a wave takes 0.5 s); linger = seconds, stopping at half the shot's life, and the stop is added to its life; growth = factor per second, capped at 4x the first radius (`get_growth_of` is the strength multiplier for B3 to use); sticky = seconds on the target, then an expiry there; shield = charges (summed over cards); return = out for half the life, then back to the caster's anchor at the same speed, hits remembered again on the turn.
+- **A returning shot ends with `projectile_expired` at its caster,** so an `on expire` payload fires there. A shield only stops shots of enemies (owner none), costs one charge per shot, and runs after every shot has moved in the step, testing the shield's path against the enemy shot's path (in the enemy shot's frame), so a fast shot cannot tunnel through whatever the slot order.
+- **Passing a teammate** is reported once per teammate and shares the hit memory (the last three targets) of the shot. A piercing shot that passes three wizards in a 4-player game can therefore forget an enemy it hit and hit it again; accepted, since it is rare and costs one more hit. A bounce or the return turn clears the memory, so a wizard is passed again after it.
+- **A sticky shot keeps its velocity** while stuck (`_advance` never moves it by that), so its payloads fly the way it was flying; a shot that sticks on a step where it also reached a wall stays stuck.
+
 ## 2026-10-26: Player, input and builder on staffs (staffs A6a)
 
 - **Buttons:** A, X, Y, B cast staffs 0 to 3 (`cast_a` Space or Shift, `cast_x` left mouse, J, right trigger or RB, `cast_y` right mouse or K, `cast_b` Q or L). **Menus activate with A and go back with B**, the gamepad standard, now that the old activate (`cast`) and back (`dodge`) buttons are gone. **The overlay is on Start** (and Tab, E): the design said View/Back, but Back is `leave`; Start only joins a device that has not joined yet.

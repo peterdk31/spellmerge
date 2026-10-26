@@ -37,8 +37,8 @@ var status_id: StringName = &""
 var status_duration: float = 0.0
 var status_strength: float = 0.0
 var tint: Color = Color.WHITE
-## The shot's look layers, packed by `core/projectiles`' `pack_look`: the `look_layer` of the
-## first two infusions, then of the first two modifiers that have one (0 none).
+## The shot's look, packed by `core/projectiles`' `pack_look`: the `look_layer` of every
+## infusion and modifier on it, combined (0 none).
 var look: int = 0
 
 ## What a hit does, for `Spells.hit_profile`; set by the compiler.

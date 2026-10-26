@@ -10,10 +10,11 @@ extends SceneTree
 ##               fire, frost, storm, void, lightning) and a row of orbit shots (one per player,
 ##               fire, frost, storm, void)
 ##   top right   the modifier looks on a fire bolt (bigger, pierce, homing) and the kinds no
-##               card has yet (motes, rim, ring, glow), then two infusions and two modifiers
+##               card has yet (motes, burst, orbiters, glitter); then combined: all five infusions on
+##               one bolt, and every kind at once on a bolt, a bigger bolt and a rune
 ##   bottom      four players firing the same card (a fire bolt), to tell them apart at 1x;
 ##               the right half through a grey filter, to check the looks read without colour
-## `looks_sheet_4x`: the top rows at 4x.
+## `looks_sheet_4x`: the top rows at 4x. `looks_combined_4x`: the combined shots at 4x.
 
 const SHOTS_DIR := "user://screenshots"
 const SETTLE_FRAMES := 12
@@ -72,16 +73,22 @@ func _initialize() -> void:
 	var fire_tint: Color = fire.get("tint") as Color
 	var fire_look: int = int(fire.get("look_layer"))
 	var extra: Array[int] = [int(BIGGER.get("look_layer")), int(PIERCE.get("look_layer")), int(HOMING.get("look_layer")),
-			ManagerScript.LOOK_MOTES, ManagerScript.LOOK_RIM, ManagerScript.LOOK_RING, ManagerScript.LOOK_GLOW]
+			ManagerScript.LOOK_MOTES, ManagerScript.LOOK_BURST, ManagerScript.LOOK_ORBITERS, ManagerScript.LOOK_GLITTER]
 	for n in extra.size():
 		var radius: float = BOLT_RADIUS * (float(BIGGER.get("radius_mult")) if n == 0 else 1.0)
 		_bolt(0, Vector2(330.0 + (n % 4) * 70.0, 30.0 + (n / 4) * 50.0), radius, fire_tint, PackedInt32Array([fire_look, extra[n]]))
-	# Two infusions and two modifiers: frost and lightning, pierce and homing.
-	_bolt(1, Vector2(330.0, 130.0), BOLT_RADIUS, ELEMENTS[1].get("tint") as Color,
-			PackedInt32Array([int(ELEMENTS[1].get("look_layer")), int(ELEMENTS[4].get("look_layer")), int(PIERCE.get("look_layer")), int(HOMING.get("look_layer"))]))
-	# Void and storm on a bigger bolt with a shield ring.
-	_bolt(2, Vector2(420.0, 130.0), BOLT_RADIUS * float(BIGGER.get("radius_mult")), ELEMENTS[3].get("tint") as Color,
-			PackedInt32Array([int(ELEMENTS[3].get("look_layer")), int(ELEMENTS[2].get("look_layer")), ManagerScript.LOOK_RING]))
+	# Combined: all five infusions on one bolt, then every kind at once.
+	var infusions := PackedInt32Array()
+	for element: Resource in ELEMENTS:
+		infusions.append(int(element.get("look_layer")))
+	_bolt(1, Vector2(330.0, 140.0), BOLT_RADIUS, ELEMENTS[1].get("tint") as Color, infusions)
+	var everything := PackedInt32Array()
+	for kind in range(1, ManagerScript.LOOK_COUNT):
+		everything.append(kind)
+	_bolt(2, Vector2(400.0, 140.0), BOLT_RADIUS, ELEMENTS[3].get("tint") as Color, everything)
+	_bolt(3, Vector2(470.0, 140.0), BOLT_RADIUS * float(BIGGER.get("radius_mult")), ELEMENTS[0].get("tint") as Color, everything)
+	var rune: int = _shots.call("spawn", 0, Vector2(565.0, 140.0), Vector2.ZERO, 600.0, 14.0, 1, 0, 0, ManagerScript.MOTION_STILL) as int
+	_dress(rune, ELEMENTS[4].get("tint") as Color, everything)
 	# Four players, the same fire bolt, twice: in colour on the left, grey on the right.
 	for half in 2:
 		for p in 4:
@@ -110,6 +117,9 @@ func _initialize() -> void:
 	var crop: Image = image.get_region(Rect2i(Vector2i(Vector2(0.0, 0.0) * scale_to_image), Vector2i(Vector2(320.0, 170.0) * scale_to_image)))
 	crop.resize(crop.get_width() * 4, crop.get_height() * 4, Image.INTERPOLATE_NEAREST)
 	_save(crop, "looks_sheet_4x")
+	var combined: Image = image.get_region(Rect2i(Vector2i(Vector2(310.0, 100.0) * scale_to_image), Vector2i(Vector2(300.0, 80.0) * scale_to_image)))
+	combined.resize(combined.get_width() * 4, combined.get_height() * 4, Image.INTERPOLATE_NEAREST)
+	_save(combined, "looks_combined_4x")
 	quit(0)
 
 

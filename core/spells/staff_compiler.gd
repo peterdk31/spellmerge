@@ -289,16 +289,12 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 
 
 ## The look of a carrier's shots (docs/milestones/M2-staffs.md, "The look of a shot"): the
-## looks of the first two infusions that have one, then of the first two such modifiers.
+## looks of every infusion and modifier on it, combined.
 static func _look_of(elements: Array, modifiers: Array) -> int:
 	var kinds := PackedInt32Array()
 	for cards: Array in [elements, modifiers]:
-		var taken: int = 0
 		for card: SpellComponent in cards:
-			var look: int = int(card.get(&"look_layer"))
-			if look > 0 and taken < 2:
-				kinds.append(look)
-				taken += 1
+			kinds.append(int(card.get(&"look_layer")))
 	return ProjectilesScript.pack_look(kinds)
 
 

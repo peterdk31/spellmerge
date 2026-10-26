@@ -40,8 +40,8 @@ extends Node2D
 ##
 ## Drawing: a player's shot is built by `shot_core.gdshader` on a pixel grid (staffs B6a): a
 ## small core in its first infusion's colour (`set_core`) outlined in its player's shadow
-## shade, a short trail in its player's colour behind a bolt, and up to LOOK_LAYERS effects
-## from its cards (`set_look`). It is drawn about its hit size (`look_size`). Enemy shots
+## shade, a short trail in its player's colour behind a bolt, and particles given off from
+## its tail in the styles of all its cards (`set_look`), mixed at random. It is drawn about its hit size (`look_size`). Enemy shots
 ## (owner NO_PLAYER) have their own texture (`hostile_texture`), are not tinted and are
 ## drawn one layer above, so a dangerous shot never hides under a friendly one.
 ##
@@ -228,32 +228,34 @@ const KIND_ORBIT: int = 3
 ## in a float and has room for kinds 0 to KIND_MAX.
 const KIND_STEPS: float = 16.0
 const KIND_MAX: int = 15
-## The look layers a card can give a shot (`look_layer` on infusions and modifiers; see
-## `set_look`), each an effect `shot_core.gdshader` draws round the core. A new kind of effect
-## is a new number here and a branch in the shader; a new card with an old kind needs neither.
+## The look kinds a card can give a shot (`look_layer` on infusions and modifiers; see
+## `set_look`). The body stays plain; each kind is a style of particle the shot gives off from
+## its tail (`shot_core.gdshader`), and a shot shows every kind its cards bring, mixed at
+## random: the look is a set, one bit per kind. WEAVE and STREAKS also change the body (a
+## weave, a longer core). A new kind of effect is a new number here (up to LOOK_MAX_KINDS) and
+## a branch in the shader's `particle`; a new card with an old kind needs neither.
 const LOOK_NONE: int = 0
-const LOOK_FLICKER: int = 1
+const LOOK_EMBERS: int = 1
 const LOOK_FLECKS: int = 2
 const LOOK_GUSTS: int = 3
 const LOOK_PULL: int = 4
 const LOOK_SPARKS: int = 5
 const LOOK_MOTES: int = 6
-const LOOK_HALO: int = 7
-const LOOK_STRETCH: int = 8
-const LOOK_RIM: int = 9
-const LOOK_RING: int = 10
-const LOOK_WOBBLE: int = 11
-const LOOK_GLOW: int = 12
+const LOOK_GLINTS: int = 7
+const LOOK_STREAKS: int = 8
+const LOOK_BURST: int = 9
+const LOOK_ORBITERS: int = 10
+const LOOK_WEAVE: int = 11
+const LOOK_GLITTER: int = 12
 const LOOK_COUNT: int = 13
-## Layers per shot, four bits each in the packed look: the first two infusions, then the
-## first two modifiers that have a look (`pack_look`).
-const LOOK_LAYERS: int = 4
+## The most kinds the instance data has room for: three bytes of bits (`_look_color`).
+const LOOK_MAX_KINDS: int = 24
 ## A player's shot is drawn in a square of LOOK_GRID x zoom screen pixels round its centre
-## (room for the trail and the layers); its core is about 5 x zoom pixels across, and every
+## (room for the tail and the particles it gives off); its core is about 5 x zoom pixels across, and every
 ## line stays one pixel. The zoom is this many per pixel of hit radius, rounded and at least
 ## one (at most LOOK_ZOOM_MAX), so a bolt (radius 5) has zoom 1, a bigger one 2 and a rune 4:
 ## a shot is drawn about its hit size and hits a little wider than it looks.
-const LOOK_GRID: int = 16
+const LOOK_GRID: int = 24
 const LOOK_CELL_PER_RADIUS: float = 0.25
 const LOOK_ZOOM_MAX: int = 15
 ## Builds the players' shots from their look (see "Drawing" above).
@@ -870,15 +872,12 @@ func set_core(slot: int, color: Color) -> bool:
 	return true
 
 
-## Give the shot in `slot` its look layers, packed by `pack_look` (0 for none): the effects
-## `shot_core.gdshader` draws round its core. Returns false for an empty slot or a look that
-## does not unpack to LOOK_LAYERS known kinds.
+## Give the shot in `slot` its look, packed by `pack_look` (0 for none): every effect
+## `shot_core.gdshader` draws round its core. Returns false for an empty slot or a look with a
+## bit for a kind that does not exist.
 func set_look(slot: int, look: int) -> bool:
-	if slot < 0 or slot >= _cap or _alive[slot] == 0 or look < 0 or look >= 1 << (4 * LOOK_LAYERS):
+	if slot < 0 or slot >= _cap or _alive[slot] == 0 or look < 0 or look >= 1 << (LOOK_COUNT - 1):
 		return false
-	for n in LOOK_LAYERS:
-		if (look >> (4 * n)) & 15 >= LOOK_COUNT:
-			return false
 	_look[slot] = look
 	return true
 
@@ -890,18 +889,20 @@ func get_look_of(slot: int) -> int:
 	return _look[slot]
 
 
-## Pack up to LOOK_LAYERS layer kinds (LOOK_*, in drawing order: later ones over earlier ones)
-## into one int for `set_look`; LOOK_NONE and unknown kinds are skipped, and kinds past the
-## fourth are dropped.
+## Pack layer kinds (LOOK_*) into one int for `set_look`: bit `kind - 1` for each kind, so
+## any number of cards combine and a kind brought twice shows once. LOOK_NONE and unknown
+## kinds are skipped.
 static func pack_look(kinds: PackedInt32Array) -> int:
 	var look: int = 0
-	var n: int = 0
 	for kind in kinds:
-		if kind <= LOOK_NONE or kind >= LOOK_COUNT or n >= LOOK_LAYERS:
-			continue
-		look |= kind << (4 * (LOOK_LAYERS - 1 - n))
-		n += 1
+		if kind > LOOK_NONE and kind < LOOK_COUNT:
+			look |= 1 << (kind - 1)
 	return look
+
+
+## True when the packed `look` has `kind`.
+static func look_has(look: int, kind: int) -> bool:
+	return kind > LOOK_NONE and kind < LOOK_COUNT and (look >> (kind - 1)) & 1 == 1
 
 
 ## The core colour of the shot in `slot`, white for an empty slot or a plain shot.
@@ -1605,12 +1606,13 @@ static func look_size(radius: float) -> float:
 	return float(LOOK_GRID * look_zoom(radius))
 
 
-## The instance colour of a player's shot, which `shot_core.gdshader` reads as data: the
-## player index in red, the four look layers two to a channel in green and blue, the zoom in
-## alpha.
+## The instance colour of a player's shot, which `shot_core.gdshader` reads as data, a byte
+## per channel: the player index and the zoom in red (player + zoom x 4), the look's bits in
+## green (kinds 1-8), blue (9-16) and alpha (17-24).
 func _look_color(slot: int) -> Color:
 	var look: int = _look[slot]
-	return Color(float(_player[slot]) / 255.0, float(look >> 8) / 255.0, float(look & 255) / 255.0, float(look_zoom(_radius[slot])) / 255.0)
+	var red: int = _player[slot] + look_zoom(_radius[slot]) * 4
+	return Color(float(red) / 255.0, float(look & 255) / 255.0, float((look >> 8) & 255) / 255.0, float((look >> 16) & 255) / 255.0)
 
 
 ## Write one quad at float index `i` of `buffer` (packed arrays are shared, not copied):

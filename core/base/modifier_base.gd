@@ -66,11 +66,11 @@ enum Behaviour {
 
 # --- Look (staffs B6a) ----------------------------------------------------------------
 
-## The effect this card draws round its shots: a LOOK_* kind of `core/projectiles` (0 none,
-## 1 flicker and embers, 2 frost flecks, 3 gusts, 4 pulled-in pixels, 5 sparks and arcs,
-## 6 rising motes, 7 a halo, 8 a bright point in front and a longer core, 9 a pulsing rim,
-## 10 a dotted ring, 11 a weave, 12 a glow). A shot draws its first two infusions' and first
-## two modifiers' looks.
+## The particles this card makes its shots give off: a LOOK_* kind of `core/projectiles` (0
+## none, 1 embers, 2 frost flecks, 3 gusts, 4 pulled-in pixels, 5 sparks, 6 rising motes,
+## 7 glints, 8 streaks and a longer core, 9 a burst, 10 orbiting sparks, 11 a weave of the
+## body, 12 glitter). A shot gives off the kinds of all its infusions and modifiers, mixed at
+## random from its tail; two cards with the same kind add nothing more.
 @export var look_layer: int = 0
 
 

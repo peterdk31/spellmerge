@@ -508,7 +508,7 @@ func _test_shot_core_colour_and_batches() -> void:
 	var body: PackedFloat32Array = _mgr._draw_node.multimesh.buffer
 	# The instance colour carries the owner as data (staffs B6a); the shader colours the outline
 	# and the trail by it (test_projectile_looks.gd).
-	_check(roundi(body[8] * 255.0) == 1, "the body names its owner, player 2")
+	_check(roundi(body[8] * 255.0) % 4 == 1, "the body names its owner, player 2 (red is player + zoom x 4)")
 	var owner_tint: Color = _mgr.tint_of(1)
 	_check(owner_tint != frost, "the owner's tint and the element's colour are separate")
 	var seen: Array[Color] = []

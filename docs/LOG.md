@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-26: Trigger kit, part 1 (staffs B2a)
+
+The spell runtime fires the payloads of the seven new trigger events (on block, on kill, on cast, on wall, on hurt, on reaction, on ally) and runs `relay`. Tests: `tests/core/test_spells_triggers.gd` (10 tests). B2b to B2d (multicast spread, payload carriers, moves and refunds) are next.
+
 ## 2026-10-26: Projectile kit (staffs B1)
 
 `core/projectiles` runs the movement and collision behaviours of the staff cards: bounce, ghost, spiral, return, linger, growth, sticky, shield (`shot_blocked`), shots that may hit their caster after leaving the caster's hitbox, shots that pass teammates (`ally_passed`) or hit them (mend), and `expired_on_wall` for `on wall`. The spell runtime hands a shot these from the card strengths, so the cards after B1 (bounce, double and the like) are data. Self-hit and ally-hit are available but not switched on by `Spells` yet: combat has no self-harm until B3. Tests: `tests/core/test_projectiles_kit.gd` (17 tests, including 1,500 shots with behaviours).

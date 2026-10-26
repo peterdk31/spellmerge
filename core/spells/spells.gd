@@ -119,6 +119,15 @@ var _rec_timed: PackedByteArray = PackedByteArray()
 ## Slots of shots with a timer trigger.
 var _timers: PackedInt32Array = PackedInt32Array()
 var _timer_count: int = 0
+## Slots of live shots with an `on hurt` trigger, `_hurt_count` of them, flagged in `_rec_hurt`.
+var _hurt_slots: PackedInt32Array = PackedInt32Array()
+var _hurt_count: int = 0
+var _rec_hurt: PackedByteArray = PackedByteArray()
+## What a relay shot's hit became after it passed a teammate, by slot (null for none).
+var _rec_relay: Array[HitProfile] = []
+## The carrier of each player's last cast that had an infusion (for `relay`), or null.
+var _last_infused: Array[CompiledSpell] = []
+
 ## The beam being cast: its tag, direction and how many fires it has left.
 var _ray_tag: int = 0
 var _ray_dir: Vector2 = Vector2.ZERO
@@ -153,6 +162,8 @@ func _init() -> void:
 	for i in SpellLimits.PLAYERS * SpellLimits.STAFFS:
 		_hold_tags.append(PackedInt64Array())
 		_last_form.append(&"")
+	for i in SpellLimits.PLAYERS:
+		_last_infused.append(null)
 	_cooldown.resize(SpellLimits.PLAYERS * SpellLimits.STAFFS)
 	_fires_used.resize(SpellLimits.PLAYERS)
 	_chains_used.resize(SpellLimits.PLAYERS)
@@ -185,6 +196,12 @@ func bind(manager: ProjectilesScript, bus: EventsScript) -> void:
 	if events != null and is_instance_valid(events):
 		events.projectile_hit.disconnect(_on_hit)
 		events.projectile_expired.disconnect(_on_expired)
+		events.shot_blocked.disconnect(_on_shot_blocked)
+		events.shield_blocked.disconnect(_on_shield_blocked)
+		events.kill_landed.disconnect(_on_kill)
+		events.wizard_hurt.disconnect(_on_hurt)
+		events.reaction_landed.disconnect(_on_reaction)
+		events.ally_passed.disconnect(_on_ally)
 	projectiles = manager
 	events = bus
 	if projectiles != null:
@@ -192,6 +209,12 @@ func bind(manager: ProjectilesScript, bus: EventsScript) -> void:
 	if events != null:
 		events.projectile_hit.connect(_on_hit)
 		events.projectile_expired.connect(_on_expired)
+		events.shot_blocked.connect(_on_shot_blocked)
+		events.shield_blocked.connect(_on_shield_blocked)
+		events.kill_landed.connect(_on_kill)
+		events.wizard_hurt.connect(_on_hurt)
+		events.reaction_landed.connect(_on_reaction)
+		events.ally_passed.connect(_on_ally)
 
 
 ## Compiles a staff's cards (ids by slot, `&""` for an empty slot) into its cycle, the casts it
@@ -365,7 +388,13 @@ func generations_held(player: int, slot: int) -> int:
 ## shot) or its generation is gone. Shared and read-only; allocates nothing.
 func hit_profile(tag: int) -> HitProfile:
 	var spell: CompiledSpell = _profiles.get(tag)
-	return null if spell == null else spell.hit
+	if spell == null:
+		return null
+	# A relay shot that passed a teammate hits with what it took on (the hit being sent names its slot).
+	var slot: int = projectiles.event_slot if projectiles != null else -1
+	if slot >= 0 and slot < _rec_relay.size() and _rec_relay[slot] != null and _same(slot) and projectiles.get_tag_of(slot) == tag:
+		return _rec_relay[slot]
+	return spell.hit
 
 
 ## Makes `compiled` (from `compile_staff`) the build of this player's staff (0-3), starting its
@@ -435,6 +464,11 @@ func cast_staff(player: int, staff: int, origin: Vector2, direction: Vector2, ma
 		return REFUSED
 	_after_cast(index, compiled, cast)
 	_start_hold(index, player, staff, cast)
+	_last_infused[player] = null
+	for carrier in cast.group.spells:
+		if not carrier.element_ids.is_empty():
+			_last_infused[player] = carrier
+			break
 	var first: CompiledSpell = cast.group.spells[0]
 	_last_form[index] = first.form_id
 	var combo: StringName = combo_class(first)
@@ -601,7 +635,11 @@ func _launch_group(group: CompiledGroup, player: int, staff: int, generation: in
 		if carriers > 1:
 			heading = direction.rotated(deg_to_rad(SpellLimits.MULTICAST_SPREAD) * (float(k) / (carriers - 1) - 0.5) * (carriers - 1))
 		k += 1
-		made += _launch(spell, tag, player, origin, heading, source)
+		var launched: int = _launch(spell, tag, player, origin, heading, source)
+		made += launched
+		# `on cast`: the payload leaves at once, from where the carrier did.
+		if launched > 0 and spell.payload != null and spell.trigger_event == TriggerBase.Event.CAST and _take_fire(player):
+			_launch_group(spell.payload, player, staff, generation, origin, heading, source)
 	return made
 
 
@@ -638,6 +676,10 @@ func _register(slot: int, tag: int, spell: CompiledSpell, fires: int, chain: int
 		_rec_clock.resize(size)
 		_rec_prev.resize(size)
 		_rec_timed.resize(size)
+		_rec_hurt.resize(size)
+		_rec_relay.resize(size)
+		_hurt_slots.resize(size)
+	_rec_relay[slot] = null
 	_rec_seq[slot] = projectiles.get_seq_of(slot)
 	_rec_fires[slot] = fires
 	_rec_chain[slot] = chain
@@ -652,6 +694,10 @@ func _register(slot: int, tag: int, spell: CompiledSpell, fires: int, chain: int
 			_timers[_timer_count] = slot
 			_timer_count += 1
 			_rec_timed[slot] = 1
+	if spell.payload != null and spell.trigger_event == TriggerBase.Event.HURT and _rec_hurt[slot] == 0:
+		_hurt_slots[_hurt_count] = slot
+		_hurt_count += 1
+		_rec_hurt[slot] = 1
 
 
 ## One beam: counted while it is cast, with its context set for the hit handler.
@@ -845,21 +891,138 @@ func _jump(spell: CompiledSpell, tag: int, player: int, position: Vector2, targe
 
 
 func _on_expired(player: int, position: Vector2, tag: int) -> void:
+	var event: int = TriggerBase.Event.EXPIRE
+	var spell: CompiledSpell = _profiles.get(tag)
+	if spell != null and spell.trigger_event == TriggerBase.Event.WALL and projectiles.expired_on_wall:
+		event = TriggerBase.Event.WALL
+	_fire_event(event, player, position, tag, null, true)
+
+
+func _on_shot_blocked(player: int, position: Vector2, tag: int) -> void:
+	_fire_event(TriggerBase.Event.BLOCK, player, position, tag, null)
+
+
+func _on_shield_blocked(player: int, position: Vector2, tag: int) -> void:
+	_fire_event(TriggerBase.Event.BLOCK, player, position, tag, null)
+
+
+func _on_kill(player: int, target: Node, position: Vector2, tag: int) -> void:
+	_fire_event(TriggerBase.Event.KILL, player, position, tag, target if is_instance_valid(target) else null)
+
+
+func _on_reaction(player: int, _reaction_id: StringName, target: Node, position: Vector2, tag: int) -> void:
+	_fire_event(TriggerBase.Event.REACTION, player, position, tag, target if is_instance_valid(target) else null)
+
+
+func _on_ally(player: int, ally: Node, position: Vector2, tag: int) -> void:
+	if not is_instance_valid(ally):
+		return
+	_relay(player, ally, tag)
+	_fire_event(TriggerBase.Event.ALLY, player, position, tag, ally)
+
+
+## Fires the payload of the shot with `tag` from `at`, when that shot's trigger is `event` (the
+## shared way of the events that name a shot's tag). When the event is being sent for that
+## very shot, its record limits how often it fires. `back_off` pulls the point out of a wall.
+func _fire_event(event: int, player: int, at: Vector2, tag: int, source: Node, back_off: bool = false) -> void:
 	if not SpellTag.is_spell_tag(tag):
 		return
 	var spell: CompiledSpell = _profiles.get(tag)
-	if spell == null or spell.payload == null or spell.trigger_event != TriggerBase.Event.EXPIRE:
+	if spell == null or spell.payload == null or spell.trigger_event != event:
 		return
 	if player < 0 or player >= SpellLimits.PLAYERS:
 		return
 	var slot: int = projectiles.event_slot
+	if slot >= 0 and (not _same(slot) or projectiles.get_tag_of(slot) != tag):
+		slot = -1
+	# A beam has no slot: while its `ray()` runs, its count is `_ray_fires`. An event with no live
+	# shot behind it (a status tick's kill, a tag whose shot is gone) has no count to keep, so it
+	# fires every time, bounded only by the per-step fire cap.
+	var by_ray: bool = slot < 0 and tag == _ray_tag
 	var fires: int = spell.trigger_max_fires
-	if _same(slot):
+	if slot >= 0:
 		fires = _rec_fires[slot]
+	elif by_ray:
+		fires = _ray_fires
 	if fires <= 0 or not _take_fire(player):
 		return
-	var heading: Vector2 = _heading(spell, slot, position, player)
-	_fire_payload(spell, tag, player, position - heading * SpellLimits.EXPIRE_BACKOFF, heading, null)
+	if slot >= 0:
+		_rec_fires[slot] = fires - 1
+	elif by_ray:
+		_ray_fires = fires - 1
+	var heading: Vector2 = _ray_dir if by_ray else _heading(spell, slot, at, player)
+	if back_off:
+		at -= heading * SpellLimits.EXPIRE_BACKOFF
+	_fire_payload(spell, tag, player, at, heading, source)
+
+
+## `on hurt`: every live carrier of `player` with that trigger fires its payload from where
+## the wizard was hurt.
+func _on_hurt(player: int, _amount: int, position: Vector2, _tag: int, _kind: StringName) -> void:
+	if player < 0 or player >= SpellLimits.PLAYERS or _hurt_count == 0:
+		return
+	var i: int = 0
+	while i < _hurt_count:
+		var slot: int = _hurt_slots[i]
+		var spell: CompiledSpell = null
+		if _knows(slot):
+			spell = _profiles.get(projectiles.get_tag_of(slot))
+		if spell == null or spell.payload == null or spell.trigger_event != TriggerBase.Event.HURT or _rec_fires[slot] <= 0:
+			_rec_hurt[slot] = 0
+			_hurt_count -= 1
+			_hurt_slots[i] = _hurt_slots[_hurt_count]
+			continue
+		i += 1
+	# Payloads may start more such shots; they sit past `count` and wait for the next hurt.
+	var count: int = _hurt_count
+	for n in count:
+		var slot: int = _hurt_slots[n]
+		var tag: int = projectiles.get_tag_of(slot)
+		var spell: CompiledSpell = _profiles.get(tag)
+		if spell == null or not _knows(slot) or SpellTag.player_of(tag) != player or _rec_fires[slot] <= 0 or not _take_fire(player):
+			continue
+		_rec_fires[slot] -= 1
+		_fire_payload(spell, tag, player, position, _heading(spell, slot, projectiles.get_position_of(slot), player), null)
+
+
+## `relay`: a shot with it that passes the teammate `ally_player` takes on the infusions of
+## that player's last cast: their elements join the hit, and the status is theirs if the shot
+## had none. Allocates one profile per pass, never per frame.
+func _relay(player: int, ally: Node, tag: int) -> void:
+	var spell: CompiledSpell = _profiles.get(tag)
+	if spell == null or spell.behaviour(ModifierBase.Behaviour.RELAY) <= 0.0:
+		return
+	var ally_player: int = projectiles.target_owner_of(ally)
+	if ally_player < 0 or ally_player >= SpellLimits.PLAYERS or ally_player == player:
+		return
+	var slot: int = projectiles.event_slot
+	var donor: CompiledSpell = _last_infused[ally_player]
+	if donor == null or slot < 0 or not _same(slot) or projectiles.get_tag_of(slot) != tag:
+		return
+	var base: HitProfile = _rec_relay[slot] if _rec_relay[slot] != null else spell.hit
+	var merged: HitProfile = HitProfile.new()
+	merged.damage = base.damage
+	merged.knockback = base.knockback
+	merged.element_id = base.element_id
+	merged.element_ids = base.element_ids.duplicate()
+	merged.status_id = base.status_id
+	merged.status_duration = base.status_duration
+	merged.status_strength = base.status_strength
+	var added: bool = false
+	for id in donor.element_ids:
+		if not merged.element_ids.has(id):
+			merged.element_ids.append(id)
+			added = true
+	if not added:
+		return
+	if merged.element_id == &"":
+		merged.element_id = donor.element_id
+		projectiles.set_core(slot, donor.tint)
+	if merged.status_id == &"":
+		merged.status_id = donor.status_id
+		merged.status_duration = donor.status_duration
+		merged.status_strength = donor.status_strength
+	_rec_relay[slot] = merged
 
 
 ## Forgets every registered spell and shot count (a new run, and tests).
@@ -872,6 +1035,10 @@ func clear() -> void:
 	_timer_count = 0
 	_rec_seq.fill(-1)
 	_rec_timed.fill(0)
+	_rec_hurt.fill(0)
+	_hurt_count = 0
+	_rec_relay.fill(null)
+	_last_infused.fill(null)
 	fires_dropped = 0
 	chains_dropped = 0
 	_current.fill(-1)

@@ -2,6 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-26: Caster kit details (staffs B4)
+
+- **Only recoil is held to the next step.** The events ask for "the recoils of a step added up, a later dash, teleport, hook or swap replaces an earlier one". A move that is not a recoil is acted on the moment it arrives (so "later replaces earlier" is the order of arrival), and the replaced one is answered with `caster_move_finished` where the wizard stands, so its blast and `on expire` payload are not lost. Recoil requests are summed and applied by the next `step`; the distance of each is measured from the staff tip.
+- **A move walks its whole time.** The dash used to end at the start of the step in which its time ran out, so it walked one step too few (a quarter of a short swap). The time now runs after the step's velocity is set and the move is answered by the next step, when the body has got there.
+- **Statuses and pushes.** Chill and freeze slow walking and dashing; a hook, swap, recoil and combat's push are not slowed (they are done to the wizard, not by it). A swap sends no `caster_move_finished` (core/spells ignores it; its blast goes off at the target).
+- **Wall safety.** A teleport is clipped by the projectile manager's wall grid and backs off `TELEPORT_CLEARANCE` (8 px); hook, swap and recoil are moved by `move_and_slide` and so stop at walls.
+
 ## 2026-10-26: The spark pool and the form looks on cards (staffs B6b)
 
 - **The pool is a budget, not nodes.** The shader draws a shot's particles, so "one shared pool with a global count" is an accounting the manager does each `update_draw`: every drawn player shot asks for `particles_of(look)` (4 + 2 per emitting kind, at most 12) and a bolt's trail for `TRAIL_COST` (4); the cap is `particle_cap` (1,024, a var so the effect quality setting can set it later). Particles are served first, the trails get the rest (`trail_share`, 0 to 1, shortens the trail), and past the cap the particles thin by the same share for every shot (a shot rounds its own count by its seed, so the total stays near the share). Enemy shots and plain shots ask for nothing. Two uniforms carry it, so no per-shot data changes.

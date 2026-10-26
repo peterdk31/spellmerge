@@ -97,7 +97,7 @@ func _enemy_target(at: Vector2) -> Node2D:
 
 
 func _spawn(player: int, kind: StringName, at: Vector2, seconds: float = 5.0, tag: int = TAG) -> void:
-	_world.bus.entity_spawn_requested.emit(player, kind, at, seconds, tag)
+	_world.bus.entity_spawn_requested.emit(player, kind, at, seconds, tag, -1)
 
 
 ## `count` physics frames of the whole world: every imp, Combat, the projectiles, the entities.

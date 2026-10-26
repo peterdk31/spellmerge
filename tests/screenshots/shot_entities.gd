@@ -29,9 +29,9 @@ func take() -> void:
 	for index in 4:
 		var wizard: Node2D = flow.call("get_wizard", index) as Node2D
 		var at: Vector2 = wizard.global_position
-		events.call("emit_signal", "entity_spawn_requested", index, &"decoy", at + Vector2(0.0, 40.0), 30.0, TAG + index)
-		events.call("emit_signal", "entity_spawn_requested", index, &"familiar", at + Vector2(20.0, -14.0), 30.0, TAG + index)
-		events.call("emit_signal", "entity_spawn_requested", index, &"familiar", at + Vector2(-20.0, -14.0), 30.0, TAG + index)
+		events.call("emit_signal", "entity_spawn_requested", index, &"decoy", at + Vector2(0.0, 40.0), 30.0, TAG + index, -1)
+		events.call("emit_signal", "entity_spawn_requested", index, &"familiar", at + Vector2(20.0, -14.0), 30.0, TAG + index, -1)
+		events.call("emit_signal", "entity_spawn_requested", index, &"familiar", at + Vector2(-20.0, -14.0), 30.0, TAG + index, -1)
 	await settle()
 	if int(entities.call("count")) != 12:
 		fail("there are %d entities, not 12, in entities_four_players" % int(entities.call("count")))

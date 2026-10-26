@@ -72,8 +72,8 @@ signal caster_move_finished(player: int, mode: StringName, position: Vector2, ta
 signal target_move_requested(player: int, target: Node, to: Vector2)
 ## Sender: core/spells. A card of `player` (blast, a payload's fallback) hits everything in the circle at `position` of `radius`, the caster included, with the hit profile of `tag`. Heard by combat.
 signal area_hit_requested(player: int, position: Vector2, radius: float, tag: int)
-## Sender: core/spells. A card of `player` makes an entity of `kind` (`&"decoy"`, `&"familiar"`) at `position` that lasts `seconds` (INF, or 0 or less: until `entity_end_requested`, the room or the run ends); `tag` is the card's tag. Heard by ai.
-signal entity_spawn_requested(player: int, kind: StringName, position: Vector2, seconds: float, tag: int)
+## Sender: core/spells. A card of `player` makes an entity of `kind` (`&"decoy"`, `&"familiar"`) at `position` that lasts `seconds` (INF, or 0 or less: until `entity_end_requested`, the room or the run ends); `tag` is the card's tag. `caster` is who cast it, what a familiar circles: -1 the wizard, a `core/projectiles` slot for the shot whose trigger made it, or -2 the point `position` (that shot is gone). Heard by ai.
+signal entity_spawn_requested(player: int, kind: StringName, position: Vector2, seconds: float, tag: int, caster: int)
 ## Sender: core/spells. The entities of `player` made by the card with `tag` end now (a `hold` switched off, or its staff rebuilt). Heard by ai, which answers with `entity_ended` for each.
 signal entity_end_requested(player: int, tag: int)
 ## Sender: ai. The entity of `player` of `kind` with `tag` ended at `position` (a decoy died, a familiar left). Heard by core/spells (its end point).

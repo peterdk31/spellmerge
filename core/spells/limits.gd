@@ -49,6 +49,14 @@ const SWAP_SECONDS: float = 0.1
 const RECOIL_SECONDS: float = 0.1
 ## Players, indexes 0 to 3.
 const PLAYERS: int = 4
+## Live beams at once over every player (one more ends the oldest), and the seconds between a
+## live beam's hits. A beam lives its carrier's `lifetime`, so a held staff keeps one on.
+const BEAMS: int = 64
+const BEAM_TICK: float = 0.15
+## Degrees off its aim a homing beam still bends to a target.
+const BEAM_HOMING_ANGLE: float = 45.0
+## Moves of shots at once whose end point is still to come (a dash whose caster is a shot).
+const SHOT_MOVES: int = 64
 
 ## Seconds a payload's shots cannot hit the target that fired the trigger.
 const SOURCE_EXCLUSION: float = 0.1

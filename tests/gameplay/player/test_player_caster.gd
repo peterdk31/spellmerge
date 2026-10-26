@@ -140,6 +140,90 @@ func test_recoils_of_one_step_add_up_and_cancel() -> void:
 	check(mirrored.global_position.distance_to(START) < 0.01, "a recoil and its mirror cancel, got %s" % mirrored.global_position)
 
 
+func test_recoils_of_different_times_move_the_sum_of_their_distances() -> void:
+	# Regression: a running short recoil kept its full speed for a later, longer one.
+	var player: PlayerScript = _wizard(0)
+	_ask(player, &"recoil", Vector2(-20.0, 0.0), 0.125)
+	_run(player, 1)
+	_ask(player, &"recoil", Vector2(-20.0, 0.0), 0.5)
+	_run(player, 12)
+	check(player.global_position.distance_to(START + Vector2(-40.0, 0.0)) < 0.01, "two recoils move 20 + 20 px, got %s" % player.global_position)
+
+
+func test_recoil_works_without_input() -> void:
+	var player: PlayerScript = _wizard(0)
+	player.input = null
+	_ask(player, &"recoil", Vector2(-30.0, 0.0), 0.125)
+	_run(player, 4)
+	check(player.global_position.distance_to(START + Vector2(-30.0, 0.0)) < 0.01, "pushed without an input manager, got %s" % player.global_position)
+
+
+func test_a_dash_walks_its_whole_distance_and_is_answered_one_step_later() -> void:
+	# Regression: the move's last step was cut off and answered a step early.
+	var player: PlayerScript = _wizard(0)
+	player.facing = Vector2.RIGHT
+	_ask(player, &"dash", Vector2(55.0, 0.0), 0.25)
+	for n in 4:
+		_run(player, 1)
+		check(_finished.is_empty(), "no answer while it walks (step %d)" % n)
+	check(player.global_position.distance_to(START + Vector2(55.0, 0.0)) < 0.01, "walked 55 px, got %s" % player.global_position)
+	_run(player, 1)
+	check_equal(_finished.size(), 1, "answered one step later")
+	check_equal(_finished[0][1], &"dash", "as a dash")
+
+
+func test_teleport_along_a_wall_keeps_the_body_out_of_it() -> void:
+	var player: PlayerScript = _wizard(0)
+	_mgr.set_walls([Rect2(60.0, 112.0, 200.0, 20.0)])
+	_ask(player, &"teleport", Vector2(100.0, 0.0), 0.0)
+	check(not _mgr.circle_blocked(player.global_position, PlayerScript.BODY_RADIUS), "no part of the body is in the wall, got %s" % player.global_position)
+	check(player.global_position.x > START.x + 50.0, "and it still jumped along the wall, got %s" % player.global_position)
+
+
+func test_teleport_into_a_corner_keeps_the_body_out_of_the_walls() -> void:
+	var player: PlayerScript = _wizard(0)
+	_mgr.set_walls([Rect2(140.0, 60.0, 40.0, 40.0), Rect2(140.0, 100.0, 8.0, 80.0)])
+	_ask(player, &"teleport", Vector2(45.0, 0.0), 0.0)
+	check(not _mgr.circle_blocked(player.global_position, PlayerScript.BODY_RADIUS), "clear of the corner, got %s" % player.global_position)
+
+
+func test_teleport_does_not_leave_the_room() -> void:
+	var player: PlayerScript = _wizard(0)
+	_ask(player, &"teleport", Vector2(900.0, 0.0), 0.0)
+	check(not _mgr.circle_blocked(player.global_position, PlayerScript.BODY_RADIUS), "the body stays in the room, got %s" % player.global_position)
+	check(player.global_position.x > START.x, "but it still moves, got %s" % player.global_position)
+
+
+func test_an_overlay_ends_a_hook_and_answers_it() -> void:
+	var player: PlayerScript = _wizard(0)
+	_bus.caster_move_requested.emit(0, &"hook", START + Vector2(0.0, 80.0), 0.5, 6)
+	_input.set_captured(0, true)
+	_run(player, 1)
+	check(not player.is_dashing(), "the move ended")
+	check_equal(_finished.size(), 1, "and was answered")
+	check_equal(_finished[0][1], &"hook", "as a hook")
+
+
+func test_downing_clears_moves_and_recoil() -> void:
+	var player: PlayerScript = _wizard(0)
+	_bus.caster_move_requested.emit(0, &"hook", START + Vector2(0.0, 80.0), 0.5, 6)
+	_ask(player, &"recoil", Vector2(-40.0, 0.0), 0.5)
+	player.take_damage(PlayerScript.MAX_HEALTH)
+	_run(player, 2)
+	check(not player.is_dashing(), "no pull while downed")
+	player.revive(1)
+	_run(player, 8)
+	check_equal(player.global_position, START, "nothing carries over a revive")
+
+
+func test_a_replaced_swap_is_not_answered() -> void:
+	var player: PlayerScript = _wizard(0)
+	_bus.caster_move_requested.emit(0, &"swap", START + Vector2(-40.0, 0.0), 0.5, 3)
+	_ask(player, &"teleport", Vector2(30.0, 0.0), 0.0, 4)
+	check_equal(_finished.size(), 1, "only the teleport answers")
+	check_equal(_finished[0][1], &"teleport", "as a teleport")
+
+
 func test_a_later_move_replaces_an_earlier_one() -> void:
 	var player: PlayerScript = _wizard(0)
 	_bus.caster_move_requested.emit(0, &"hook", START + Vector2(0.0, 80.0), 0.5, 1)
@@ -155,12 +239,17 @@ func test_a_later_move_replaces_an_earlier_one() -> void:
 
 
 func test_other_players_moves_are_ignored() -> void:
-	var one: PlayerScript = _wizard(0)
-	var two: PlayerScript = _wizard(1)
-	var tip: Vector2 = two.muzzle_position()
-	_bus.caster_move_requested.emit(1, &"teleport", tip + Vector2(40.0, 0.0), 0.0, 5)
-	check_equal(one.global_position, START, "player 1 stays")
-	check_equal(two.global_position, START + Vector2(40.0, 0.0), "player 2 moves")
+	var wizards: Array[PlayerScript] = []
+	for at in 4:
+		wizards.append(_wizard(at))
+	for mover in 4:
+		for other in 4:
+			wizards[other].global_position = START
+		var tip: Vector2 = wizards[mover].muzzle_position()
+		_bus.caster_move_requested.emit(mover, &"teleport", tip + Vector2(40.0, 0.0), 0.0, 5)
+		for other in 4:
+			var want: Vector2 = START + Vector2(40.0, 0.0) if other == mover else START
+			check_equal(wizards[other].global_position, want, "player %d moves, player %d stays: %d" % [mover, mover, other])
 
 
 func test_a_downed_wizard_does_not_move() -> void:

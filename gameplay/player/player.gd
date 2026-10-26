@@ -121,11 +121,16 @@ const FLIP_BAND: float = 0.3
 ## is STAFF_REACH from the hand along the aim.
 const HAND_HEIGHT: float = 10.0
 const STAFF_REACH: float = 14.0
+## A teleport that meets a wall ends this many pixels short of it, and is then backed off in
+## steps of TELEPORT_BACKOFF until the body (radius BODY_RADIUS, as in wizard.tscn) is clear.
+const TELEPORT_CLEARANCE: float = 8.0
+const TELEPORT_BACKOFF: float = 4.0
+const BODY_RADIUS: float = 6.0
+## Most recoils that run at once (a push past this is dropped).
+const MAX_RECOILS: int = 8
 ## Dash look: sprite stretch along the dash, lean in radians, the ghosts' spacing
 ## in pixels and their opacities (one per ghost).
 ## The stretch is for a horizontal dash; a mostly vertical one swaps the axes.
-## A teleport that meets a wall ends this many pixels short of it (the body is not in the wall).
-const TELEPORT_CLEARANCE: float = 8.0
 const DASH_STRETCH: Vector2 = Vector2(1.2, 0.85)
 const DASH_LEAN: float = 0.1
 ## A ghost is left behind every GHOST_INTERVAL seconds of the dash (3 of them).
@@ -276,12 +281,13 @@ var _dash_tag: int = 0
 var _dash_mode: StringName = &"dash"
 ## True when the move's time ran out in the last step: the next step answers it.
 var _dash_done: bool = false
-## Recoil asked for since the last step (pixels to move, the longest time asked), and the push
-## being applied: its velocity and the seconds left.
+## Recoil asked for since the last step (pixels to move, the longest time asked), and the pushes
+## being applied, each with its own velocity and seconds left (the first `_recoil_count` count).
 var _recoil_pending: Vector2 = Vector2.ZERO
 var _recoil_pending_seconds: float = 0.0
-var _recoil_velocity: Vector2 = Vector2.ZERO
-var _recoil_left: float = 0.0
+var _recoil_velocities: Array[Vector2] = []
+var _recoil_lefts: PackedFloat32Array = PackedFloat32Array()
+var _recoil_count: int = 0
 var _invulnerable_left: float = 0.0
 ## Per staff: the button's press count last seen, and the seconds left in which a remembered
 ## press still counts (0 = none remembered).
@@ -304,6 +310,8 @@ var _sent_mana: int = -1
 
 
 func _init() -> void:
+	_recoil_velocities.resize(MAX_RECOILS)
+	_recoil_lefts.resize(MAX_RECOILS)
 	collision_layer = LAYER_PLAYERS
 	collision_mask = LAYER_WALLS
 	motion_mode = CharacterBody2D.MOTION_MODE_FLOATING
@@ -507,7 +515,8 @@ func step(delta: float) -> void:
 		# The last step of the move has been walked (the body moved after the last step call).
 		_finish_dash()
 	if input == null:
-		velocity = Vector2.ZERO
+		# No input (only in tests): stand still, but a push still applies.
+		velocity = _recoil_step(delta)
 		_update_invulnerable_look()
 		return
 	var move: Vector2 = input.get_move(index)
@@ -979,7 +988,8 @@ func _on_caster_move_requested(player: int, mode: StringName, to: Vector2, secon
 
 
 ## Jump to where a teleport card aimed (`to` is measured from the staff tip), stopping short of
-## the first wall, and say where the wizard landed.
+## the first wall, then backing off along the path until the whole body is clear of walls and
+## inside the room (or staying put), and say where the wizard landed.
 func _teleport(to: Vector2, tag: int) -> void:
 	var start: Vector2 = global_position
 	var goal: Vector2 = start + (to - muzzle_position())
@@ -988,6 +998,8 @@ func _teleport(to: Vector2, tag: int) -> void:
 		if reached != goal:
 			reached = reached.move_toward(start, TELEPORT_CLEARANCE)
 		goal = reached
+		while goal != start and projectiles.circle_blocked(goal, BODY_RADIUS):
+			goal = goal.move_toward(start, TELEPORT_BACKOFF)
 	global_position = goal
 	if events != null:
 		events.caster_move_finished.emit(index, &"teleport", goal, tag)
@@ -1002,29 +1014,37 @@ func _finish_dash() -> void:
 		events.caster_move_finished.emit(index, _dash_mode, global_position, _dash_tag)
 
 
-## The recoil asked for since the last step becomes a push of that distance over the time asked;
-## returns the push to add to the velocity now.
+## The recoil asked for since the last step becomes a push of that distance over the time asked,
+## which ends on its own time; returns the velocity of all pushes to add now (a push's last step
+## is shortened, so each moves exactly its distance).
 func _recoil_step(delta: float) -> Vector2:
-	if _recoil_pending != Vector2.ZERO:
-		_recoil_velocity += _recoil_pending / _recoil_pending_seconds
-		_recoil_left = maxf(_recoil_left, _recoil_pending_seconds)
-		_recoil_pending = Vector2.ZERO
-		_recoil_pending_seconds = 0.0
-	if _recoil_left <= 0.0:
-		return Vector2.ZERO
-	_recoil_left -= delta
-	if _recoil_left <= 0.0:
-		var last: Vector2 = _recoil_velocity
-		_recoil_velocity = Vector2.ZERO
-		return last
-	return _recoil_velocity
+	if _recoil_pending != Vector2.ZERO and _recoil_count < MAX_RECOILS:
+		_recoil_velocities[_recoil_count] = _recoil_pending / _recoil_pending_seconds
+		_recoil_lefts[_recoil_count] = _recoil_pending_seconds
+		_recoil_count += 1
+	_recoil_pending = Vector2.ZERO
+	_recoil_pending_seconds = 0.0
+	var total: Vector2 = Vector2.ZERO
+	var at: int = 0
+	while at < _recoil_count:
+		var left: float = _recoil_lefts[at]
+		total += _recoil_velocities[at] * minf(left, delta) / maxf(delta, 0.0001)
+		left -= delta
+		if left <= 0.0:
+			# Done: the last push takes its place.
+			_recoil_count -= 1
+			_recoil_velocities[at] = _recoil_velocities[_recoil_count]
+			_recoil_lefts[at] = _recoil_lefts[_recoil_count]
+			continue
+		_recoil_lefts[at] = left
+		at += 1
+	return total
 
 
 func _clear_recoil() -> void:
 	_recoil_pending = Vector2.ZERO
 	_recoil_pending_seconds = 0.0
-	_recoil_velocity = Vector2.ZERO
-	_recoil_left = 0.0
+	_recoil_count = 0
 
 
 func _play_cast_sound() -> void:

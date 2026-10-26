@@ -34,6 +34,15 @@ extends Node
 ## `content/wizard/staffs/`) and `start_cards`, four lists of card ids (A `dash`, X `fire bolt`,
 ## Y and B empty), and builds them itself; flow never touches a spell.
 ##
+## Sandbox (staffs B7, docs/milestones/M2-staffs.md, "The sandbox"): `sandbox_requested` (the
+## main menu's Sandbox button, in `dev` and `preview` builds) starts a run in the sandbox room
+## (`sandbox`): no waves, the training dummy and the shooting dummy at the room's
+## `dummy_spawns`, and `sandbox_changed(true)` so the HUD shows the sandbox page. The page sends
+## `sandbox_action_requested`: `imp_wave` adds a wave of imps (wave 1's size, while fewer than
+## WAVE_MAX are up), `reset_dummies` puts fresh dummies back. Clearing the imps starts no build
+## break. When every wizard is down, after RESTART_DELAY they all stand up where they are and
+## keep their staffs, instead of a restart.
+##
 ## All timing runs in step(delta), so tests drive it with fixed deltas.
 
 const EventsScript := preload("res://core/events/events.gd")
@@ -56,6 +65,12 @@ const DEFAULT_ENEMY_ID: StringName = &"ember_imp"
 ## The two spells every wizard starts with: A is a fire bolt (M1's bolt plus burn), B a plain bolt.
 ## The cards each staff starts with: A, X, Y, B (the owner's choice, 2026-10-26).
 const DEFAULT_START_CARDS: Array = [[&"dash"], [&"fire", &"bolt"], [], []]
+## The sandbox room, and the dummies it stands at its `dummy_spawns` (in this order).
+const SANDBOX_ROOM_ID: StringName = &"sandbox"
+const DUMMY_IDS: Array[StringName] = [&"training_dummy", &"shooting_dummy"]
+## The actions of `sandbox_action_requested`.
+const ACTION_IMP_WAVE: StringName = &"imp_wave"
+const ACTION_RESET_DUMMIES: StringName = &"reset_dummies"
 ## The staff of test builds (the sandbox) and of the normal game, by id under `wizard`.
 const DEV_STAFF: StringName = &"dev"
 const STARTER_STAFF: StringName = &"starter"
@@ -115,14 +130,18 @@ var state: State = State.IDLE
 var world: Node2D = null
 ## The id of the room of the run in progress.
 var room_id: StringName = &""
-## The wave in progress (1 for the first of a run; 0 before a run).
+## The wave in progress (1 for the first of a run; 0 before a run and in the sandbox).
 var wave: int = 0
+## True while the run is in the sandbox (and for its restarts).
+var sandbox: bool = false
 
 var _starter: int = 0
 var _room: RoomBase = null
 ## The wizard scene the run in progress started with (joiners get the same one).
 var _wizard_scene: PackedScene = null
 var _enemies: Array[Node] = []
+## The sandbox's dummies still standing.
+var _dummies: Array[Node] = []
 var _wizards: Array[Node2D] = []
 var _downed: Array[bool] = [false, false, false, false]
 var _restart_left: float = -1.0
@@ -147,6 +166,8 @@ func _ready() -> void:
 		push_warning("Flow: the Events autoload is missing, so the game cannot be started.")
 		return
 	events.play_requested.connect(_on_play_requested)
+	events.sandbox_requested.connect(_on_sandbox_requested)
+	events.sandbox_action_requested.connect(_on_sandbox_action_requested)
 	events.enemy_died.connect(_on_enemy_died)
 	events.player_downed.connect(_on_player_downed)
 	events.player_revived.connect(_on_player_revived)
@@ -170,7 +191,9 @@ func step(delta: float) -> void:
 	_restart_left -= delta
 	if _restart_left <= 0.0:
 		_restart_left = -1.0
-		if not start_run(_starter):
+		if sandbox:
+			_stand_everyone_up()
+		elif not start_run(_starter):
 			# A warning, not an error: the run ends cleanly and a test provokes this on purpose.
 			push_warning("Flow: the restart failed, so the run is over; Play starts a new one.")
 			stop_run()
@@ -200,9 +223,14 @@ static func wave_size(number: int) -> int:
 	return mini(WAVE.size() + WAVE_GROWTH * maxi(number - 1, 0), WAVE_MAX)
 
 
-## Enemies of the wave still alive.
+## Enemies of the wave still alive (the sandbox's imps; never its dummies).
 func enemies_left() -> int:
 	return _enemies.size()
+
+
+## The sandbox's dummies still standing.
+func dummies() -> Array[Node]:
+	return _dummies.duplicate()
 
 
 ## The wizard of player `index` in the current world, or null.
@@ -216,7 +244,7 @@ func get_wizard(index: int) -> Node2D:
 ## Build the world and start the run now, replacing any run in progress. Returns
 ## false (and starts nothing) when content is missing or no player has a device.
 func start_run(requester: int) -> bool:
-	var room: RoomBase = registry.get_resource(ROOM_FOLDER, room_id_to_play) as RoomBase if registry != null else null
+	var room: RoomBase = registry.get_resource(ROOM_FOLDER, SANDBOX_ROOM_ID if sandbox else room_id_to_play) as RoomBase if registry != null else null
 	var enemy_data: EnemyBase = registry.get_resource(ENEMY_FOLDER, enemy_id_to_play) as EnemyBase if registry != null else null
 	if room == null or room.scene == null or enemy_data == null or enemy_data.scene == null:
 		push_warning("Flow: the room or the enemy is missing from the registry, so no run starts.")
@@ -253,8 +281,12 @@ func start_run(requester: int) -> bool:
 	new_world.add_child(room.scene.instantiate())
 	_add_camera(new_world, room)
 	_spawn_players(new_world, room, players)
-	wave = 1
-	_spawn_wave(new_world, room, enemy_data, wave)
+	if sandbox:
+		wave = 0
+		_spawn_dummies(new_world, room)
+	else:
+		wave = 1
+		_spawn_wave(new_world, room, enemy_data, wave)
 	world = new_world
 	room_id = room.id
 	state = State.RUNNING
@@ -262,7 +294,9 @@ func start_run(requester: int) -> bool:
 	_set_walls(new_world)
 	if events != null:
 		events.room_entered.emit(room.id)
-		events.wave_started.emit(wave)
+		events.sandbox_changed.emit(sandbox)
+		if not sandbox:
+			events.wave_started.emit(wave)
 	return true
 
 
@@ -274,12 +308,44 @@ func stop_run() -> void:
 	wave = 0
 	_clear_run()
 	state = State.IDLE
+	if sandbox:
+		sandbox = false
+		if events != null:
+			events.sandbox_changed.emit(false)
 
 
 func _on_play_requested(player: int) -> void:
 	if state != State.IDLE:
 		return
+	sandbox = false
 	start_run(player)
+
+
+func _on_sandbox_requested(player: int) -> void:
+	if state != State.IDLE:
+		return
+	sandbox = true
+	if not start_run(player):
+		sandbox = false
+
+
+## A sandbox page's action. Ignored out of the sandbox, and an imp wave while WAVE_MAX imps
+## are up. It changes the room only, never a player's staffs or menus.
+func _on_sandbox_action_requested(player: int, action: StringName) -> void:
+	if not sandbox or state == State.IDLE or world == null or _room == null or player < 0 or player >= PLAYER_SLOTS:
+		return
+	match action:
+		ACTION_IMP_WAVE:
+			if _enemy_data != null and _enemies.size() < WAVE_MAX:
+				_spawn_enemies(world, _room, _enemy_data, mini(WAVE.size(), WAVE_MAX - _enemies.size()))
+		ACTION_RESET_DUMMIES:
+			for dummy: Node in _dummies:
+				if is_instance_valid(dummy):
+					_detach(dummy)
+			_dummies.clear()
+			_spawn_dummies(world, _room)
+		_:
+			push_warning("Flow: unknown sandbox action '%s'." % action)
 
 
 ## Add the wizard of a player who joined mid-run. Ignored while no run is up, and
@@ -319,11 +385,12 @@ func _on_player_left(player: int) -> void:
 
 
 func _on_enemy_died(_player: int, enemy: Node, _position: Vector2) -> void:
+	_dummies.erase(enemy)
 	var at: int = _enemies.find(enemy)
 	if at < 0:
 		return
 	_enemies.remove_at(at)
-	if _enemies.is_empty() and state == State.RUNNING:
+	if _enemies.is_empty() and state == State.RUNNING and not sandbox:
 		state = State.CLEARED
 		_next_wave_left = BUILD_BREAK
 		if events != null:
@@ -351,6 +418,20 @@ func _start_next_wave() -> void:
 	state = State.RUNNING
 	if events != null:
 		events.wave_started.emit(wave)
+
+
+## The sandbox's answer to everyone down: they all stand up where they are, protected for a
+## moment, with their staffs as they were; stray shots go.
+func _stand_everyone_up() -> void:
+	if projectiles != null:
+		projectiles.clear()
+	for wizard: Node2D in _wizards:
+		var hero := wizard as PlayerScript
+		if not is_instance_valid(hero):
+			continue
+		if hero.revive(hero.index):
+			_downed[hero.index] = false
+		hero.protect(PlayerScript.JOIN_PROTECTION)
 
 
 func _on_player_downed(player: int) -> void:
@@ -496,11 +577,16 @@ func _add_wizard(parent: Node2D, room: RoomBase, index: int, at: Vector2 = Vecto
 
 func _spawn_wave(parent: Node2D, room: RoomBase, data: EnemyBase, number: int) -> void:
 	_enemies.clear()
+	_spawn_enemies(parent, room, data, wave_size(number))
+
+
+## Add `count` enemies to `_enemies`, placed as a wave of that size is.
+func _spawn_enemies(parent: Node2D, room: RoomBase, data: EnemyBase, count: int) -> void:
 	if room.enemy_spawns.is_empty():
 		push_warning("Flow: the room has no enemy spawns, so the wave is empty.")
 		return
 	var uses: Dictionary = {}
-	for at: int in wave_size(number):
+	for at: int in count:
 		# Wave 1 is WAVE as written; a bigger wave carries on round the spawns.
 		var entry: int = WAVE[at] if at < WAVE.size() else at
 		var spawn: int = entry % room.enemy_spawns.size()
@@ -516,6 +602,26 @@ func _spawn_wave(parent: Node2D, room: RoomBase, data: EnemyBase, number: int) -
 		_enemies.append(enemy)
 
 
+## Stand the sandbox's dummies at the room's `dummy_spawns`: DUMMY_IDS in order, from the
+## registry. A missing one is skipped with a warning; the sandbox runs without it.
+func _spawn_dummies(parent: Node2D, room: RoomBase) -> void:
+	for i in mini(DUMMY_IDS.size(), room.dummy_spawns.size()):
+		var data: EnemyBase = registry.get_resource(ENEMY_FOLDER, DUMMY_IDS[i]) as EnemyBase if registry != null else null
+		if data == null or data.scene == null:
+			push_warning("Flow: the dummy '%s' is missing from the registry, so the sandbox runs without it." % DUMMY_IDS[i])
+			continue
+		var dummy := data.scene.instantiate() as Node2D
+		if dummy == null or not "data" in dummy:
+			push_warning("Flow: the dummy '%s' has no enemy script on its root, so it is skipped." % DUMMY_IDS[i])
+			if dummy != null:
+				dummy.free()
+			continue
+		dummy.set("data", data)
+		dummy.position = room.dummy_spawns[i]
+		parent.add_child(dummy)
+		_dummies.append(dummy)
+
+
 ## Forget the old run: wizards leave `Combat` (the enemies do it themselves when
 ## they leave the tree) and the old world is freed.
 func _clear_run() -> void:
@@ -524,6 +630,7 @@ func _clear_run() -> void:
 			combat.unregister_player(index)
 	_wizards.clear()
 	_enemies.clear()
+	_dummies.clear()
 	if world != null and is_instance_valid(world):
 		_detach(world)
 	world = null

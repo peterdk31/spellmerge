@@ -29,6 +29,11 @@ extends CanvasLayer
 ## `overlay` action closes an open builder. The builder is the full one at any time, waves
 ## included (staffs A6a: there is no quick view). The only event the HUD sends from here is
 ## `staff_change_requested`, by a builder.
+##
+## In the sandbox (staffs B7) the overlay's "Sandbox" opens that player's sandbox page
+## (`hud/menus/sandbox/`, nodes Root/Sandbox1 to Root/Sandbox4, made here and anchored like the
+## overlay), which takes the focus over; its "Back" opens the overlay again, and the `overlay`
+## action closes it. The page sends `sandbox_action_requested`.
 
 const EventsScript := preload("res://core/events/events.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
@@ -39,6 +44,8 @@ const BuilderScript := preload("res://hud/builder/builder.gd")
 const PlayerPanelScript := preload("res://hud/panels/player_panel/player_panel.gd")
 const VignetteScript := preload("res://hud/panels/vignette/vignette.gd")
 const HammerIconScript := preload("res://hud/widgets/hammer_icon.gd")
+const SandboxPageScene: PackedScene = preload("res://hud/menus/sandbox/sandbox_page.tscn")
+const SandboxPageScript := preload("res://hud/menus/sandbox/sandbox_page.gd")
 
 const PLAYER_COUNT: int = 4
 const OVERLAY_ACTION: StringName = &"overlay"
@@ -68,6 +75,7 @@ var spells: SpellsScript = null
 var _panels: Array[PlayerPanelScript] = []
 var _overlays: Array[OverlayScript] = []
 var _builders: Array[BuilderScript] = []
+var _pages: Array[SandboxPageScript] = []
 ## Per player: the `overlay` press count at the last poll.
 var _seen_overlay: Array[int] = [0, 0, 0, 0]
 ## A wave is in progress (the wave line shows).
@@ -147,6 +155,7 @@ func _ready() -> void:
 		_panels.append(panel)
 		_overlays.append(get_node("Root/Overlay%d" % (player + 1)) as OverlayScript)
 		_builders.append(get_node("Root/Builder%d" % (player + 1)) as BuilderScript)
+		_pages.append(_make_page(player))
 	if events == null:
 		events = get_node_or_null("/root/Events") as EventsScript
 	if ui_focus == null:
@@ -166,6 +175,10 @@ func _ready() -> void:
 	for overlay in _overlays:
 		overlay.bind(events, ui_focus, spells)
 		overlay.build_pressed.connect(_on_build_pressed)
+		overlay.sandbox_pressed.connect(_on_sandbox_pressed)
+	for page in _pages:
+		page.bind(events, ui_focus)
+		page.back_pressed.connect(_on_page_back)
 	for builder in _builders:
 		builder.bind(events, ui_focus, spells, input)
 	if events != null:
@@ -179,6 +192,7 @@ func _ready() -> void:
 		events.staff_cast.connect(_on_staff_cast)
 		events.run_started.connect(_on_run_started)
 		events.run_ended.connect(_on_run_ended)
+		events.sandbox_changed.connect(_on_sandbox_changed)
 	if ui_focus != null:
 		ui_focus.opened.connect(_on_overlay_opened)
 		ui_focus.closed.connect(_on_overlay_closed)
@@ -218,6 +232,8 @@ func poll() -> void:
 			continue
 		if _builders[player].is_open():
 			_builders[player].close_builder()
+		elif _pages[player].is_open():
+			_pages[player].close_page()
 		elif _overlays[player].is_open():
 			_overlays[player].close_overlay()
 		elif _in_room and not _panels[player].is_downed():
@@ -236,6 +252,13 @@ func get_builder(player: int) -> BuilderScript:
 	if player < 0 or player >= PLAYER_COUNT:
 		return null
 	return _builders[player]
+
+
+## The sandbox page of `player`, or null for a bad index.
+func get_sandbox_page(player: int) -> SandboxPageScript:
+	if player < 0 or player >= PLAYER_COUNT:
+		return null
+	return _pages[player]
 
 
 ## The red vignette (for tests).
@@ -257,6 +280,9 @@ func _place_overlay(player: int) -> void:
 	var y: float = offset if player < 2 else -offset
 	_overlays[player].offset_top = y
 	_overlays[player].offset_bottom = y
+	if player < _pages.size():
+		_pages[player].offset_top = y
+		_pages[player].offset_bottom = y
 
 
 ## Put the builder of `player` beside that player's panel, toward the middle of the
@@ -272,6 +298,47 @@ func _place_builder(player: int) -> void:
 func _on_build_pressed(player: int) -> void:
 	if player >= 0 and player < PLAYER_COUNT:
 		_builders[player].open_builder()
+
+
+## The sandbox page of `player`, hidden, in the place of that player's overlay (the same
+## anchors, offsets and growth, so `_place_overlay` places both).
+func _make_page(player: int) -> SandboxPageScript:
+	var overlay: Control = _overlays[player]
+	var page := SandboxPageScene.instantiate() as SandboxPageScript
+	page.name = "Sandbox%d" % (player + 1)
+	page.index = player
+	page.anchor_left = overlay.anchor_left
+	page.anchor_right = overlay.anchor_right
+	page.anchor_top = overlay.anchor_top
+	page.anchor_bottom = overlay.anchor_bottom
+	page.grow_horizontal = overlay.grow_horizontal
+	page.grow_vertical = overlay.grow_vertical
+	page.offset_left = overlay.offset_left
+	page.offset_right = overlay.offset_right
+	var root_control: Control = get_node("Root") as Control
+	root_control.add_child(page)
+	root_control.move_child(page, overlay.get_index() + 1)
+	return page
+
+
+## The overlay's "Sandbox" was activated: the sandbox page takes the owner's focus over.
+func _on_sandbox_pressed(player: int) -> void:
+	if player >= 0 and player < PLAYER_COUNT:
+		_pages[player].open_page()
+
+
+## The sandbox page's "Back": the overlay opens again.
+func _on_page_back(player: int) -> void:
+	if player >= 0 and player < PLAYER_COUNT and _in_room and not _panels[player].is_downed():
+		_overlays[player].open_overlay()
+
+
+## Out of the sandbox, no sandbox page stays open.
+func _on_sandbox_changed(on: bool) -> void:
+	if on:
+		return
+	for page in _pages:
+		page.close_page()
 
 
 func _refresh(player: int) -> void:
@@ -365,6 +432,7 @@ func _reset_all() -> void:
 	for player in PLAYER_COUNT:
 		_overlays[player].close_overlay()
 		_builders[player].close_builder()
+		_pages[player].close_page()
 		_panels[player].reset()
 		_refresh(player)
 
@@ -378,6 +446,7 @@ func _on_stats_changed(player: int, health: int, max_health: int, mana: float, m
 		if health <= 0:
 			_overlays[player].close_overlay()
 			_builders[player].close_builder()
+			_pages[player].close_page()
 
 
 func _on_overlay_opened(player: int) -> void:

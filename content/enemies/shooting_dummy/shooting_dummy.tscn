@@ -1,0 +1,45 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://gameplay/ai/ai.gd" id="1_ai"]
+[ext_resource type="Texture2D" path="res://content/enemies/shooting_dummy/idle.svg" id="2_idle"]
+[ext_resource type="Texture2D" path="res://art/vfx/telegraph_dash.svg" id="3_dash"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_body"]
+radius = 6.0
+
+[node name="ShootingDummy" type="CharacterBody2D"]
+script = ExtResource("1_ai")
+attack_range = 280.0
+windup_time = 1.5
+recover_time = 1.25
+attack_damage = 6
+attack_speed = 70.0
+attack_lifetime = 4.0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("CircleShape2D_body")
+
+[node name="Telegraph" type="Line2D" parent="."]
+visible = false
+texture_filter = 1
+texture_repeat = 1
+points = PackedVector2Array(10, 0, 280, 0)
+width = 6.0
+default_color = Color(1, 1, 1, 1)
+texture = ExtResource("3_dash")
+texture_mode = 1
+
+[node name="Lane" type="Polygon2D" parent="Telegraph"]
+show_behind_parent = true
+color = Color(0.627, 0.188, 0.604, 0.28)
+polygon = PackedVector2Array(10, -8, 280, -8, 280, 8, 10, 8)
+
+[node name="Tip" type="Polygon2D" parent="Telegraph"]
+position = Vector2(280, 0)
+color = Color(0.878, 0.541, 0.847, 1)
+polygon = PackedVector2Array(-7, -8, 7, 0, -7, 8)
+
+[node name="Sprite" type="Sprite2D" parent="."]
+texture_filter = 1
+position = Vector2(0, -14)
+texture = ExtResource("2_idle")

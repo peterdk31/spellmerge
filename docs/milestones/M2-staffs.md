@@ -211,11 +211,10 @@ The aim is a builder each player can use quickly and without help, in their own 
 ## The sandbox
 
 - `dev` and `preview` builds start in the sandbox; "Play" in the menu still starts the normal game.
-- One room; four 20-slot `dev` staffs per player; the full bag; the full builder at any time.
-- **Training dummy:** never dies or moves; shows damage numbers, damage per second over the last 5 s, its statuses and reactions.
-- **Shooting dummy:** fires slow, telegraphed shots at the nearest wizard, for shields, blocks and self-harm.
-- **Sandbox actions** in each player's overlay: spawn an imp wave, reset the dummies. They change the room, never another player's choices or menus.
-- **In the pause menu** (it stops the game for everyone anyway, and any player can open it, co-op rule 6): friendly fire on or off, slow motion (0.25x).
+- One room of **two shooting lanes split by a wall** (owner, 2026-10-26: "two dummies separated by a wall (so like two shooting range lanes). One dummy for hitting and the other one fires back"); four 20-slot `dev` staffs per player; the full bag; the full builder at any time.
+- **Training dummy** (end of one lane): never dies or moves; shows damage numbers, damage per second over the last 5 s, its statuses and reactions.
+- **Shooting dummy** (end of the other lane): fires slow, telegraphed shots at the nearest wizard, for shields, blocks and self-harm.
+- **The sandbox page**, a "Sandbox" entry in each player's Start-button overlay beside "Build" (owner, 2026-10-26: "The dev menu should probably just be an entry in the start button menu - where the builder also is"): spawn an imp wave, reset the dummies, and (part B7b) friendly fire on or off and slow motion (0.25x). There is no pause menu for these. The actions change the room, never another player's choices or menus.
 - **Staff codes** (part D2): copy a staff as a short text code and paste one, so builds can be shared in Discussions. A code is only card ids, checked against the registry; nothing in it runs.
 
 ## Events
@@ -291,7 +290,7 @@ Each part is one session and one PR, with tests, a green `tools/check.sh` and `c
 | B4 | **Caster kit** | `gameplay/player` | B3 | Teleport, hook, swap and recoil moves, wall-safe, answering `caster_move_finished`; wizard statuses that slow or freeze movement; the mana pool with reservations and refunds |
 | B5 | **Entity kit** | `gameplay/ai` | A6c | Decoy and familiar as pooled entities (`entity_spawn_requested`, `entity_ended`, `familiar_cast_requested`); the AI targets decoys; `target_move_requested` for swap |
 | B6 | **Shot look** | `core/projectiles` (drawing), `art/vfx` | B1 | Small shots; the layer shader and its effect kinds; per-card look data (and Feel's per-form looks moved to card data); the shared spark pool; the player colour on the trail; the clip sheets. Before B7 |
-| B7 | **Sandbox** | `gameplay/flow`, `content/rooms`, `hud/menus/sandbox/` | B6 | The sandbox room, both dummies, the sandbox actions in a new overlay page and the pause-menu toggles; `dev` and `preview` start in it |
+| B7 | **Sandbox** | `gameplay/flow`, `content/rooms`, `content/enemies`, `hud/menus/sandbox/` | B6 | B7a: the two-lane sandbox room, both dummies, the sandbox page (imp wave, reset dummies) from the overlay; `dev` and `preview` start in it (a focused Sandbox button above Play). B7b: friendly fire and slow motion on the same page (`gameplay/coop`, `gameplay/feel`'s hit-stop under a base time scale) |
 | B8 | **Builder** | `hud/builder` | A6c | Pick and place (pick a card up, put it down, swapping; `card_move_requested`), links in the cast plan, live numbers, mouse drag for P1, and quicker moves than one control at a time (A6a's builder walks tabs, slots and bag in one line, so from the bag back to the tabs is many presses: left and right between tabs, slots and bag, or a jump); screenshots at 1 and 4 players; every slot reachable with the d-pad alone |
 
 B1 and B6 both change `core/projectiles/projectile_manager.gd`, so B6 waits for B1. B3 and B4 both reach the wizard's movement and health, so B4 waits for B3. B7 adds its own folder in `hud/menus/` and one line in the overlay; B8 owns `hud/builder/`.

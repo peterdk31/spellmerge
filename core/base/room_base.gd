@@ -15,3 +15,6 @@ extends Resource
 @export var enemy_spawns: PackedVector2Array = PackedVector2Array()
 ## Door positions, in room pixels.
 @export var doors: PackedVector2Array = PackedVector2Array()
+## Where a sandbox room puts its dummies, in room pixels (staffs B7): the training dummy first,
+## then the shooting dummy. Empty in every other room.
+@export var dummy_spawns: PackedVector2Array = PackedVector2Array()

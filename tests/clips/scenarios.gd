@@ -26,6 +26,13 @@ const REACTION_SECONDS: float = 1.6
 const REACTION_GAP: float = 0.3
 ## Where the two players of a co-op clip stand; both aim at the first imp.
 const COOP_ORIGINS: Array[Vector2] = [Vector2(0.0, -28.0), Vector2(0.0, 28.0)]
+## The four-player clips: where the wizards stand, the cards they all cast, how often and how long.
+const FOUR_ORIGINS: Array[Vector2] = [Vector2(0.0, -42.0), Vector2(0.0, -14.0), Vector2(0.0, 14.0), Vector2(0.0, 42.0)]
+const FOUR_PLAYER_CARDS: Array = [&"fire", &"frost", &"bigger", &"bolt"]
+const CROWD_CARDS: Array = [&"fire", &"frost", &"lightning", &"split", &"nova"]
+const FOUR_PLAYER_ROUNDS: int = 3
+const FOUR_PLAYER_GAP: float = 0.6
+const FOUR_PLAYER_SECONDS: float = 3.0
 
 
 ## Every scenario for `registry` (a scanned Registry), `spells` (a Spells node that knows it:
@@ -37,6 +44,8 @@ static func build(registry: Node, spells: Node, combos: Array, table: ReactionTa
 		out.append(_combo(combo))
 	for id: StringName in registry.call("get_ids", &"spells"):
 		out.append(_component(id, spells.call("component_kind", id) as StringName, spells.call("component_name", id) as String))
+	out.append(_four_players(FOUR_PLAYER_CARDS, "combo_four_players", "Four players, one card"))
+	out.append(_four_players(CROWD_CARDS, "combo_spark_crowd", "Four players, a crowd of sparks"))
 	var rows: Dictionary = {}
 	for row in table.rows:
 		if row != null:
@@ -52,6 +61,20 @@ static func build(registry: Node, spells: Node, combos: Array, table: ReactionTa
 		out.append(_reaction(pair[0] as ReactionRow, first, false))
 		out.append(_reaction(pair[0] as ReactionRow, first, true))
 	return out
+
+
+## Four wizards in a column, all aiming at the first imp, each casting the same cards twice
+## (staffs B6b): a shot's look is told apart by its player at 1x (pillar 4), and a crowd of
+## looked shots is where the spark pool thins the trails first.
+static func _four_players(cards: Array, id: String, title: String) -> Dictionary:
+	var casts: Array[Dictionary] = []
+	for round_index in FOUR_PLAYER_ROUNDS:
+		for player in 4:
+			var entry: Dictionary = _cast(player, 0, cards, float(round_index) * FOUR_PLAYER_GAP)
+			entry["origin"] = FOUR_ORIGINS[player]
+			entry["aim"] = (SPREAD_IMPS[0] - FOUR_ORIGINS[player]).normalized()
+			casts.append(entry)
+	return _scenario(id, "combo", title, SPREAD_IMPS, casts, FOUR_PLAYER_SECONDS)
 
 
 ## The combo rows of the catalogue, one file each (empty when none can be read).

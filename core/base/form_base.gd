@@ -62,6 +62,14 @@ enum Motion {
 @export var orbit_radius: float = 0.0
 ## RAY only: how far the ray reaches in pixels.
 @export var ray_length: float = 0.0
+## How the wizard's cast flash looks for this carrier (staffs B6b; `gameplay/feel` reads it, and
+## an empty one gets the plain muzzle flash). Keys, all optional: `seconds`, `size`, `stretch`
+## (length along the aim), `tall`, `aim` (turned along the aim, else upright), `grow` (0.5 bursts
+## outwards; negative gathers inwards) and `ring` (the nova ring art instead of the spark).
+@export var cast_look: Dictionary = {}
+## The same keys for the flare where this carrier's shot ends or hits (an empty one gets the wall
+## spark). A new carrier brings its looks in its own `.tres`; Feel's preset has none of them.
+@export var impact_look: Dictionary = {}
 
 
 func kind() -> StringName:

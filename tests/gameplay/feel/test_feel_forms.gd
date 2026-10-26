@@ -125,5 +125,3 @@ func test_a_form_with_no_player_is_ignored() -> void:
 func test_the_shipped_preset_has_the_form_art() -> void:
 	var shipped := load("res://gameplay/feel/presets/punchy.tres") as FeelPresetScript
 	check(shipped.beam_texture != null and shipped.nova_texture != null, "beam and ring art")
-	check(shipped.rune_texture != null and shipped.orbit_texture != null, "rune and orbit art")
-	check(projectiles.rune_texture == preset.rune_texture and projectiles.orbit_texture == preset.orbit_texture, "the manager draws runes and orbs with the preset's art")

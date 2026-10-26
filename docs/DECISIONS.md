@@ -2,6 +2,12 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-26: The spark pool and the form looks on cards (staffs B6b)
+
+- **The pool is a budget, not nodes.** The shader draws a shot's particles, so "one shared pool with a global count" is an accounting the manager does each `update_draw`: every drawn player shot asks for `particles_of(look)` (4 + 2 per emitting kind, at most 12) and a bolt's trail for `TRAIL_COST` (4); the cap is `particle_cap` (1,024, a var so the effect quality setting can set it later). Particles are served first, the trails get the rest (`trail_share`, 0 to 1, shortens the trail), and past the cap the particles thin by the same share for every shot (a shot rounds its own count by its seed, so the total stays near the share). Enemy shots and plain shots ask for nothing. Two uniforms carry it, so no per-shot data changes.
+- **Form looks are `FormBase` dictionaries** (`cast_look`, `impact_look`), not new typed fields: the keys are the ones the preset used, all optional, and Feel reads them once per card id (a cache, no allocation per cast). Feel looks the card up in the registry folder `spells` (forms live there with every other card); a card with no look, or no registry, gets the muzzle flash and the wall spark. The preset lost `cast_looks`, `impact_looks`, `rune_texture` and `orbit_texture` (the shader has drawn runes and orbit shots since B6a); the SVG files stay, other sheets use them.
+- **Clips:** the two four-player clips have kind `combo` (the clip pipeline's kinds are owner-path), ids `combo_four_players` and `combo_spark_crowd`.
+
 ## 2026-10-26: Combat kit details (staffs B3)
 
 - **New events** (`core/events`): `wizard_shield_requested` and `pull_requested` (from `core/spells`, so spells never call combat), `hit_landed` (kind, just before `damage_dealt`; Feel reads it, so `damage_dealt` keeps its shape) and `heal_dealt` (`gameplay/player` applies it, so combat never writes a wizard's health).

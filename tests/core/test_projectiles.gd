@@ -523,11 +523,8 @@ func _test_shot_core_colour_and_batches() -> void:
 	var plain: PackedFloat32Array = _mgr._draw_node.multimesh.buffer
 	_check(again >= 0 and is_equal_approx(plain[12], 1.0) and is_equal_approx(plain[13], 1.0) and is_equal_approx(plain[14], 1.0), "a new shot has a white core, not the last one's")
 	var art := PlaceholderTexture2D.new()
-	var rune_art := PlaceholderTexture2D.new()
 	_mgr.texture = art
-	_check(_mgr._rune_node.texture == art and _mgr._orbit_node.texture == art, "rune and orbit shots use the shared art without their own")
-	_mgr.rune_texture = rune_art
-	_check(_mgr._rune_node.texture == rune_art and _mgr._orbit_node.texture == art, "a rune gets its own art")
+	_check(_mgr._rune_node.texture == art and _mgr._orbit_node.texture == art, "rune and orbit shots use the shared art")
 	root.remove_child(_mgr)
 
 

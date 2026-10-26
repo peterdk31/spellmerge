@@ -258,6 +258,17 @@ const LOOK_MAX_KINDS: int = 24
 const LOOK_GRID: int = 24
 const LOOK_CELL_PER_RADIUS: float = 0.25
 const LOOK_ZOOM_MAX: int = 15
+## The spark pool (staffs B6b): the sparks, embers and the rest that all the shots give off come
+## from one pool with a global count, `particle_cap` (a visual budget, under the effect quality
+## setting once there is one; never a build rule). A shot with `n` emitting kinds asks for
+## `particles_of(look)` of them (4 + 2n, at most 12) and a bolt's trail for TRAIL_COST more.
+## Under the cap everything is drawn. Over it the trails thin first (shorter, then gone), and only
+## when the particles alone are over the cap do the particles thin too, every shot alike.
+const PARTICLE_CAP: int = 1024
+## What a bolt's trail counts in the pool.
+const TRAIL_COST: int = 4
+## Particles a shot keeps in the air at most (the same number as the shader's).
+const PARTICLES_PER_SHOT_MAX: int = 12
 ## Builds the players' shots from their look (see "Drawing" above).
 const CORE_SHADER: Shader = preload("res://core/projectiles/shot_core.gdshader")
 ## Draw order of the shots: above the room and the wizards. The autoload is drawn
@@ -285,20 +296,11 @@ const PLAYER_COLORS: Array[Color] = [
 ]
 const ENEMY_COLOR: Color = Color("#e0592f")
 
-## The art of the player batches. Since staffs B6a the shader builds every player's shot and
-## never reads these three; Feel still hands them over, and B6b removes them with Feel's
-## per-form looks.
+## The art of the player batches. Since staffs B6a the shader builds every player's shot (runes
+## and orbit shots too) and never reads it; only the sprite path of Feel's lone flashes does.
 var texture: Texture2D = null:
 	set(value):
 		texture = value
-		_apply_textures()
-var rune_texture: Texture2D = null:
-	set(value):
-		rune_texture = value
-		_apply_textures()
-var orbit_texture: Texture2D = null:
-	set(value):
-		orbit_texture = value
 		_apply_textures()
 ## The art of enemy shots (owner NO_PLAYER), drawn apart from the players' shots: other
 ## shape, no tint, on top. Left empty, they use `texture`.
@@ -318,6 +320,17 @@ var impact_form: StringName = &""
 var wall_hits: int = 0
 ## Projectiles written into the batch by the last update_draw().
 var drawn: int = 0
+## The global count of the spark pool (see PARTICLE_CAP). Tests and a future effect quality
+## setting change it; it never changes what a shot does.
+var particle_cap: int = PARTICLE_CAP
+## What the drawn shots asked of the pool in the last update_draw(): particles, and bolt trails
+## (in pool units, TRAIL_COST each).
+var particle_demand: int = 0
+var trail_demand: int = 0
+## The share of the particles and of the trails the pool drew in the last update_draw() (1.0 is
+## all of them; trails go down first).
+var particle_share: float = 1.0
+var trail_share: float = 1.0
 ## Whether shots fired by players also hit other players' targets (see the class doc).
 var friendly_fire: bool = false
 
@@ -507,8 +520,8 @@ func _make_batch(z: int, cored: bool) -> MultiMeshInstance2D:
 func _apply_textures() -> void:
 	if _draw_node != null:
 		_draw_node.texture = texture
-		_rune_node.texture = rune_texture if rune_texture != null else texture
-		_orbit_node.texture = orbit_texture if orbit_texture != null else texture
+		_rune_node.texture = texture
+		_orbit_node.texture = texture
 	if _hostile_node != null:
 		_hostile_node.texture = hostile_texture if hostile_texture != null else texture
 
@@ -1512,6 +1525,8 @@ func update_draw(fraction: float = -1.0) -> void:
 	var rune_out: int = 0
 	var orbit_out: int = 0
 	var hostile_out: int = 0
+	var asked: int = 0
+	var trails: int = 0
 	for slot in _high:
 		if _alive[slot] == 0:
 			continue
@@ -1527,6 +1542,9 @@ func update_draw(fraction: float = -1.0) -> void:
 			continue
 		var size: float = look_size(_radius[slot])
 		var player_look: Color = _look_color(slot)
+		asked += particles_of(_look[slot])
+		if batch == BATCH_BOLT:
+			trails += TRAIL_COST
 		if batch == BATCH_RUNE:
 			_write_quad(_rune_buffer, rune_out * DRAW_STRIDE, dir, size, at, player_look, _core[slot], KIND_RUNE)
 			rune_out += 1
@@ -1550,11 +1568,47 @@ func update_draw(fraction: float = -1.0) -> void:
 	hostile_multimesh.visible_instance_count = hostile_out
 	drawn_hostile = hostile_out
 	drawn = out + rune_out + orbit_out + hostile_out
+	_share_pool(asked, trails)
 
 
 ## Hand the shader the simulation clock (`shot_core.gdshader` animates from it).
 func _set_sim_time(node: MultiMeshInstance2D) -> void:
 	(node.material as ShaderMaterial).set_shader_parameter(&"sim_time", sim_time)
+
+
+## Share the spark pool out for a frame that asked for `asked` particles and `trails` of trail:
+## the particles come first, the trails get what is left of the cap (see PARTICLE_CAP), and the
+## shader draws that share of each.
+func _share_pool(asked: int, trails: int) -> void:
+	particle_demand = asked
+	trail_demand = trails
+	var cap: float = float(maxi(particle_cap, 0))
+	particle_share = 1.0 if asked <= 0 else minf(1.0, cap / float(asked))
+	trail_share = 1.0 if trails <= 0 else clampf((cap - float(asked)) / float(trails), 0.0, 1.0)
+	_set_shares(_draw_node)
+	_set_shares(_rune_node)
+	_set_shares(_orbit_node)
+
+
+func _set_shares(node: MultiMeshInstance2D) -> void:
+	var material: ShaderMaterial = node.material as ShaderMaterial
+	material.set_shader_parameter(&"particle_share", particle_share)
+	material.set_shader_parameter(&"trail_share", trail_share)
+
+
+## How many particles the pool is asked for by a shot with the packed `look`: 4 + 2 per
+## emitting kind (every kind but the weave, which changes the body), at most 12; none for a
+## plain shot.
+static func particles_of(look: int) -> int:
+	if look == 0:
+		return 0
+	var kinds: int = 0
+	for kind in range(1, LOOK_COUNT):
+		if kind != LOOK_WEAVE and (look >> (kind - 1)) & 1 == 1:
+			kinds += 1
+	if kinds == 0:
+		return 0
+	return mini(4 + 2 * kinds, PARTICLES_PER_SHOT_MAX)
 
 
 ## Which draw batch a live slot belongs to (BATCH_*). The one rule both the counting and

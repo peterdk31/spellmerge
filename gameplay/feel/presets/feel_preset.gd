@@ -153,10 +153,9 @@ extends Resource
 @export var spark_texture: Texture2D = preload("res://art/vfx/hit_spark.svg")
 ## A player's spell shot, and an enemy's shot (drawn apart, so it never reads as a spell).
 ## The bolt is neutral bone with a Spark core: the owner tints the bone, the element
-## colours the core (see `core/projectiles`). The rune and the orbit orb are drawn the same way.
+## colours the core (see `core/projectiles`). Since staffs B6a the shader builds a player's shot
+## (a rune and an orbit orb included), so only Feel's lone sprites use this art.
 @export var bolt_texture: Texture2D = preload("res://art/vfx/bolt.svg")
-@export var rune_texture: Texture2D = preload("res://art/vfx/rune.svg")
-@export var orbit_texture: Texture2D = preload("res://art/vfx/orbit_orb.svg")
 @export var hostile_texture: Texture2D = preload("res://art/vfx/imp_fireball.svg")
 ## The beam (a 32 px segment that repeats along its length) and the nova ring, drawn from
 ## `form_shown`, tinted like the bolt.
@@ -175,26 +174,9 @@ extends Resource
 ## swing at a fast rate reads as a strobe), and the steps come this many times a second.
 @export_range(0.0, 0.3, 0.01) var beam_flicker_depth: float = 0.1
 @export_range(1.0, 30.0, 1.0) var beam_flicker_rate: float = 16.0
-## The cast flash on the wizard of each form (by form id; a form not listed gets the muzzle
-## flash above). Keys: `seconds`, `size`, `stretch` (length along the aim), `tall`, `aim` (turned
-## along the aim, else upright) and `grow` (0.5 bursts outwards; negative gathers inwards, the
-## build-up of a rune or an orbit) and `ring` (the nova ring art instead of the spark).
-@export var cast_looks: Dictionary = {
-	&"bolt": {},
-	&"beam": {"seconds": 0.16, "size": 0.7, "stretch": 3.4, "tall": 0.5, "grow": 0.2},
-	&"nova": {"seconds": 0.18, "size": 0.9, "stretch": 1.0, "tall": 1.0, "aim": false, "grow": 1.2, "ring": true},
-	&"rune": {"seconds": 0.22, "size": 1.1, "stretch": 1.5, "tall": 0.6, "aim": false, "grow": -0.5, "ring": true},
-	&"orbit": {"seconds": 0.2, "size": 0.7, "stretch": 1.0, "tall": 1.0, "aim": false, "grow": -0.6, "ring": true},
-}
-## The flare where a player's shot ends or hits (by the form that player cast last), same keys.
-## A form not listed gets the wall spark above.
-@export var impact_looks: Dictionary = {
-	&"bolt": {"seconds": 0.1, "size": 0.45},
-	&"beam": {"seconds": 0.16, "size": 0.7, "stretch": 1.8, "aim": true, "grow": 0.2},
-	&"nova": {"seconds": 0.14, "size": 0.5, "grow": 1.0, "ring": true},
-	&"rune": {"seconds": 0.22, "size": 0.7, "grow": 1.2, "ring": true},
-	&"orbit": {"seconds": 0.07, "size": 0.35, "grow": 0.0},
-}
+## The cast flash on the wizard and the flare where a shot ends are data on the carrier cards
+## (`FormBase.cast_look` and `impact_look`, staffs B6b), not in this preset. A card without a
+## look gets the muzzle flash above and the wall spark.
 ## An enemy's shot ending or hitting always shows this mark turned on its corner, in
 ## `enemy_hit_color`, whatever any player cast.
 @export_range(0.0, 0.3, 0.01) var enemy_impact_seconds: float = 0.12

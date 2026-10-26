@@ -35,6 +35,10 @@ uniform vec4 body_tint = vec4(1.0);
 // Seconds of simulation, set by the projectile manager; everything animates from it, not TIME,
 // so a run stepped by hand (the clip recorder) draws the same frames every time.
 uniform float sim_time = 0.0;
+// The spark pool's share (set by the projectile manager, 1.0 is everything): the fraction of
+// every shot's particles and of every bolt's trail that is drawn this frame. Trails go first.
+uniform float particle_share = 1.0;
+uniform float trail_share = 1.0;
 
 // The quad is GRID x zoom pixels: the core in the middle, the tail and its particles behind.
 const float GRID = 24.0;
@@ -288,7 +292,7 @@ vec4 procedural(vec2 uv) {
 	if (bolt) {
 		float t = (c.x - 2.0 * zoom - q.x) / zoom;
 		float dy = q.y - c.y;
-		if (t > 0.0 && t < 7.0) {
+		if (t > 0.0 && t < 7.0 * trail_share) {
 			bool near = t < 3.5 && abs(dy) < zoom;
 			bool far = t >= 3.5 && dy > 0.0 && dy < max(zoom * 0.5, 1.0) && (t < 6.0 || mod(floor(sim_time * 10.0 + seed), 2.0) < 0.5);
 			if (near || far) {
@@ -298,7 +302,9 @@ vec4 procedural(vec2 uv) {
 	}
 	// What the cards give off: particles born at random points of the tail (or the outline).
 	if (emit_count > 0.5) {
-		int count = int(min(4.0 + 2.0 * emit_count, float(MAX_PARTICLES)));
+		float asked = min(4.0 + 2.0 * emit_count, float(MAX_PARTICLES));
+		// Each shot rounds its share by its own seed, so the pool's total stays near the share.
+		int count = int(floor(asked * particle_share + fract(seed)));
 		for (int n = 0; n < MAX_PARTICLES; n++) {
 			if (n >= count) {
 				break;

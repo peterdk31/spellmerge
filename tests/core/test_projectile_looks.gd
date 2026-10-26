@@ -188,3 +188,78 @@ func test_the_compiler_combines_every_card_with_a_look() -> void:
 	var only_modifiers: int = StaffCompiler._look_of([] as Array[ElementBase], [HOMING] as Array[ModifierBase])
 	check_equal(only_modifiers, ManagerScript.pack_look(PackedInt32Array([HOMING.look_layer])), "a plain shot shows its modifier's look")
 	check_equal(StaffCompiler._look_of([] as Array[ElementBase], [SPLIT] as Array[ModifierBase]), 0, "no card with a look, no layers")
+
+
+## Spawn `count` bolts for `player`, each with the look of `kinds`.
+func _volley(count: int, player: int, kinds: PackedInt32Array) -> void:
+	var look: int = ManagerScript.pack_look(kinds)
+	for i in count:
+		var slot: int = mgr.spawn(player, Vector2(20.0 + i % 50 * 10.0, 40.0 + i / 50 * 6.0), Vector2(1.0, 0.0), 1.0)
+		mgr.set_look(slot, look)
+
+
+func _shader_share(node: MultiMeshInstance2D, name: StringName) -> float:
+	return (node.material as ShaderMaterial).get_shader_parameter(name) as float
+
+
+func test_a_shot_asks_the_pool_for_four_plus_two_per_emitting_kind() -> void:
+	check_equal(ManagerScript.particles_of(0), 0, "a plain shot asks for none")
+	check_equal(ManagerScript.particles_of(ManagerScript.pack_look(PackedInt32Array([ManagerScript.LOOK_WEAVE]))), 0, "a weave only changes the body")
+	check_equal(ManagerScript.particles_of(ManagerScript.pack_look(PackedInt32Array([ManagerScript.LOOK_EMBERS]))), 6, "one kind: six")
+	check_equal(ManagerScript.particles_of(ManagerScript.pack_look(PackedInt32Array([1, 2, 3]))), 10, "three kinds: ten")
+	check_equal(ManagerScript.particles_of(ManagerScript.pack_look(all_kinds())), ManagerScript.PARTICLES_PER_SHOT_MAX, "never more than twelve")
+
+
+func test_under_the_cap_nothing_thins() -> void:
+	mgr.particle_cap = 1000
+	_volley(20, 0, PackedInt32Array([ManagerScript.LOOK_EMBERS]))
+	mgr.update_draw(1.0)
+	check_equal(mgr.particle_demand, 20 * 6, "twenty shots ask for 120")
+	check_equal(mgr.trail_demand, 20 * ManagerScript.TRAIL_COST, "and twenty trails")
+	check_equal(mgr.particle_share, 1.0, "all particles")
+	check_equal(mgr.trail_share, 1.0, "all trails")
+	check_equal(_shader_share(mgr._draw_node, &"trail_share"), 1.0, "the shader is told")
+
+
+func test_at_the_cap_the_trails_thin_first() -> void:
+	mgr.particle_cap = 150
+	_volley(20, 0, PackedInt32Array([ManagerScript.LOOK_EMBERS]))
+	mgr.update_draw(1.0)
+	check_equal(mgr.particle_share, 1.0, "the particles (120) fit, so they all show")
+	check(is_equal_approx(mgr.trail_share, 30.0 / 80.0), "the trails get what is left: 30 of 80")
+	check(is_equal_approx(_shader_share(mgr._draw_node, &"trail_share"), mgr.trail_share), "the shader draws that much trail")
+	mgr.particle_cap = 100
+	mgr.update_draw(1.0)
+	check_equal(mgr.trail_share, 0.0, "when the particles fill the pool there is no trail")
+	check(is_equal_approx(mgr.particle_share, 100.0 / 120.0), "and then the particles thin, every shot alike")
+	check(is_equal_approx(_shader_share(mgr._rune_node, &"particle_share"), mgr.particle_share), "for every batch")
+
+
+func test_four_players_share_one_pool() -> void:
+	mgr.particle_cap = 240
+	for player in 4:
+		_volley(10, player, PackedInt32Array([ManagerScript.LOOK_EMBERS, ManagerScript.LOOK_SPARKS]))
+	mgr.update_draw(1.0)
+	check_equal(mgr.particle_demand, 40 * 8, "all four players' shots ask the same pool")
+	check(is_equal_approx(mgr.particle_share, 240.0 / 320.0), "so everyone thins by the same share")
+
+
+func test_the_pool_asks_nothing_for_enemy_shots_or_plain_ones() -> void:
+	mgr.particle_cap = 10
+	mgr.spawn(-1, Vector2(50.0, 50.0), Vector2(1.0, 0.0), 1.0)
+	mgr.spawn(0, Vector2(80.0, 50.0), Vector2(1.0, 0.0), 1.0)
+	mgr.update_draw(1.0)
+	check_equal(mgr.particle_demand, 0, "no particles asked")
+	check_equal(mgr.trail_demand, ManagerScript.TRAIL_COST, "only the player's bolt has a trail")
+	check_equal(mgr.trail_share, 1.0, "which fits")
+
+
+func test_a_crowd_of_looked_shots_stays_inside_the_cap() -> void:
+	# 500 shots with five kinds each ask for 6,000 particles.
+	_volley(500, 1, PackedInt32Array([1, 2, 3, 5, 7]))
+	mgr.update_draw(1.0)
+	check_equal(mgr.drawn, 500, "every shot is still drawn")
+	check_equal(mgr.particle_demand, 500 * 12, "they ask for 6,000")
+	var shown: float = float(mgr.particle_demand) * mgr.particle_share + float(mgr.trail_demand) * mgr.trail_share
+	check(shown <= float(mgr.particle_cap) + 0.5, "what is drawn is no more than the cap")
+	check_equal(mgr.trail_share, 0.0, "and the trails went first")

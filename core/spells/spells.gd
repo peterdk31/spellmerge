@@ -523,6 +523,8 @@ func _launch(spell: CompiledSpell, tag: int, player: int, origin: Vector2, direc
 				slot = projectiles.spawn(player, origin, heading * spell.speed, lifetime, spell.radius, ProjectilesScript.LAYER_ENEMY, spell.pierce, tag)
 				if slot >= 0 and spell.homing_turn > 0.0:
 					projectiles.set_homing(slot, spell.homing_turn)
+				if slot >= 0:
+					_apply_travel(slot, spell)
 		if slot < 0:
 			continue
 		made += 1
@@ -533,6 +535,35 @@ func _launch(spell: CompiledSpell, tag: int, player: int, origin: Vector2, direc
 	if events != null and made > 0 and count > 1 and spell.spread >= 360.0 and spell.motion == FormBase.Motion.STRAIGHT:
 		events.form_shown.emit(player, &"nova", origin, direction, 0.0, spell.tint)
 	return made
+
+
+## Hand a flying shot the behaviours of its cards that the projectile manager runs (staffs B1).
+## A plain shot costs one comparison per behaviour and no call.
+func _apply_travel(slot: int, spell: CompiledSpell) -> void:
+	if spell.motion == FormBase.Motion.RETURN:
+		projectiles.set_return(slot)
+	if spell.behaviours.is_empty():
+		return
+	var bounce: float = spell.behaviour(ModifierBase.Behaviour.BOUNCE)
+	if bounce > 0.0:
+		projectiles.set_bounce(slot, roundi(bounce))
+	if spell.behaviour(ModifierBase.Behaviour.GHOST) > 0.0:
+		projectiles.set_ghost(slot)
+	var spiral: float = spell.behaviour(ModifierBase.Behaviour.SPIRAL)
+	if spiral > 0.0:
+		projectiles.set_spiral(slot, spiral)
+	var linger: float = spell.behaviour(ModifierBase.Behaviour.LINGER)
+	if linger > 0.0:
+		projectiles.set_linger(slot, linger)
+	var growth: float = spell.behaviour(ModifierBase.Behaviour.GROWTH)
+	if growth > 1.0:
+		projectiles.set_growth(slot, growth)
+	var sticky: float = spell.behaviour(ModifierBase.Behaviour.STICKY)
+	if sticky > 0.0:
+		projectiles.set_sticky(slot, sticky)
+	var shield: float = spell.behaviour(ModifierBase.Behaviour.SHIELD)
+	if shield > 0.0:
+		projectiles.set_shield(slot, roundi(shield))
 
 
 ## The shots of every spell of `group`, fired together from `origin` along `direction` by this

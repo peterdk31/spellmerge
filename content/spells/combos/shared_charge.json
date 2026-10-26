@@ -3,8 +3,8 @@
 	"name": "Shared charge",
 	"does": "One wizard's lightning ring charges three imps; the other's lightning bolt hits one and the charge jumps to the other two.",
 	"casts": [
-		{"slot": 0, "player": 0, "recipe": {"form": "nova", "element": "lightning", "modifiers": ["bigger"]}},
-		{"slot": 0, "player": 1, "at": 0.6, "recipe": {"form": "bolt", "element": "lightning"}}
+		{"staff": 0, "cards": ["lightning", "bigger", "nova"], "player": 0},
+		{"staff": 0, "cards": ["lightning", "bolt"], "at": 0.6, "player": 1}
 	],
 	"imps": [[36, 0], [0, 36], [-36, 0]],
 	"seconds": 2.0,

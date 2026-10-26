@@ -2,7 +2,7 @@
 	"id": "homing_fan",
 	"name": "Homing fan",
 	"does": "Three homing bolts bend toward imps well off the aim, beyond what a plain fan of three reaches.",
-	"casts": [{"slot": 0, "recipe": {"form": "bolt", "modifiers": ["split", "homing"]}}],
+	"casts": [{"staff": 0, "cards": ["split", "homing", "bolt"]}],
 	"imps": [[110, -60], [110, 60]],
 	"seconds": 1.5,
 	"checks": [{"kind": "damaged", "imps": [0, 1]}]

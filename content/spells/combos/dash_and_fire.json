@@ -3,8 +3,8 @@
 	"name": "Dash and fire",
 	"does": "Dash with one staff, then a fire bolt from another: the imp burns.",
 	"casts": [
-		{"slot": 0, "recipe": {"form": "dash"}},
-		{"slot": 1, "recipe": {"form": "bolt", "element": "fire"}, "at": 0.1}
+		{"staff": 0, "cards": ["dash"]},
+		{"staff": 1, "cards": ["fire", "bolt"], "at": 0.1}
 	],
 	"imps": [[100, 0]],
 	"seconds": 1.5,

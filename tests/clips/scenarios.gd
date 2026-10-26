@@ -6,7 +6,8 @@ extends RefCounted
 ##
 ## A scenario is a Dictionary: `id` (the clip's folder name, `^[a-z0-9_]{1,60}$`), `kind` (one
 ## of the kinds in ci/smbot/clips.py), `title`, `imps` (Vector2s, from the caster at (0, 0)),
-## `casts` (each `player`, `slot`, `recipe`, `at` seconds, `origin` and `aim`) and `seconds`.
+## `casts` (each `player`, `staff`, `cards`: card ids by slot, `at` seconds, `origin` and `aim`)
+## and `seconds`.
 ## Ids: `combo_<id>`, `<kind>_<id>` for a component (`element_fire`), `reaction_<id>` and
 ## `reaction_<id>_coop`. The kind prefix keeps the combo "shatter" and the reaction "shatter"
 ## apart.
@@ -75,33 +76,32 @@ static func _combo(combo: Dictionary) -> Dictionary:
 		imps.append(Vector2(float(at[0]), float(at[1])))
 	var casts: Array[Dictionary] = []
 	for entry: Dictionary in combo.get("casts", []):
-		casts.append(_cast(int(entry.get("player", 0)), int(entry["slot"]), entry["recipe"] as Dictionary, float(entry.get("at", 0.0))))
+		casts.append(_cast(int(entry.get("player", 0)), int(entry["staff"]), entry["cards"] as Array, float(entry.get("at", 0.0))))
 	return _scenario("combo_" + str(combo["id"]), "combo", str(combo.get("name", combo["id"])), imps, casts, float(combo.get("seconds", 1.0)))
 
 
 static func _component(id: StringName, kind: StringName, title: String) -> Dictionary:
-	var recipe: Dictionary = {"form": &"bolt"}
+	# The card on a bolt: alone for a carrier, before the bolt for the others; a trigger fires a
+	# nova, a multicast pulls three bolts.
+	var cards: Array = [id, &"bolt"]
 	match kind:
 		&"form":
-			recipe = {"form": id}
-		&"element":
-			recipe["element"] = id
-		&"modifier":
-			recipe["modifiers"] = [id]
+			cards = [id]
 		&"trigger":
-			recipe["trigger"] = id
-			recipe["held"] = {"form": &"nova"}
-	var casts: Array[Dictionary] = [_cast(0, 0, recipe, 0.0)]
+			cards = [id, &"bolt", &"nova"]
+		&"multicast":
+			cards = [id, &"bolt", &"bolt", &"bolt"]
+	var casts: Array[Dictionary] = [_cast(0, 0, cards, 0.0)]
 	return _scenario("%s_%s" % [kind, id], str(kind), title if title != "" else String(id), SPREAD_IMPS, casts, COMPONENT_SECONDS)
 
 
 ## A reaction made by two real bolts: the first (of element `first`) puts the status on, the
 ## second (of the row's element) sets it off. In co-op the two bolts come from two players.
 static func _reaction(row: ReactionRow, first: StringName, coop: bool) -> Dictionary:
-	var recipes: Array[Dictionary] = [{"form": &"bolt", "element": first}, {"form": &"bolt", "element": row.element_id}]
+	var rows: Array = [[first, &"bolt"], [row.element_id, &"bolt"]]
 	var casts: Array[Dictionary] = []
 	for i in 2:
-		var entry: Dictionary = _cast(i if coop else 0, i, recipes[i], float(i) * REACTION_GAP)
+		var entry: Dictionary = _cast(i if coop else 0, i, rows[i] as Array, float(i) * REACTION_GAP)
 		if coop:
 			entry["origin"] = COOP_ORIGINS[i]
 			entry["aim"] = (SPREAD_IMPS[0] - COOP_ORIGINS[i]).normalized()
@@ -111,8 +111,8 @@ static func _reaction(row: ReactionRow, first: StringName, coop: bool) -> Dictio
 	return _scenario(id, "reaction", name + (" (co-op)" if coop else ""), SPREAD_IMPS, casts, REACTION_SECONDS)
 
 
-static func _cast(player: int, slot: int, recipe: Dictionary, at: float) -> Dictionary:
-	return {"player": player, "slot": slot, "recipe": recipe, "at": at, "origin": Vector2.ZERO, "aim": Vector2.RIGHT}
+static func _cast(player: int, staff: int, cards: Array, at: float) -> Dictionary:
+	return {"player": player, "staff": staff, "cards": cards, "at": at, "origin": Vector2.ZERO, "aim": Vector2.RIGHT}
 
 
 static func _scenario(id: String, kind: String, title: String, imps: Array[Vector2], casts: Array[Dictionary], seconds: float) -> Dictionary:

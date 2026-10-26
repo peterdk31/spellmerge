@@ -3,8 +3,8 @@
 	"name": "Shatter",
 	"does": "A frost bolt chills the imp, then a storm bolt on it sets off Shatter.",
 	"casts": [
-		{"slot": 0, "recipe": {"form": "bolt", "element": "frost"}},
-		{"slot": 1, "recipe": {"form": "bolt", "element": "storm"}, "at": 0.3}
+		{"staff": 0, "cards": ["frost", "bolt"]},
+		{"staff": 1, "cards": ["storm", "bolt"], "at": 0.3}
 	],
 	"imps": [[100, 0]],
 	"seconds": 2.0,

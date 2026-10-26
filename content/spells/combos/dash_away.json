@@ -2,7 +2,7 @@
 	"id": "dash_away",
 	"name": "Dash away",
 	"does": "The dash card moves its caster; nothing else happens.",
-	"casts": [{"slot": 0, "recipe": {"form": "dash"}}],
+	"casts": [{"staff": 0, "cards": ["dash"]}],
 	"imps": [[100, 0]],
 	"seconds": 0.5,
 	"checks": [{"kind": "caster_moved", "mode": "dash"}, {"kind": "max_shots", "max": 0}]

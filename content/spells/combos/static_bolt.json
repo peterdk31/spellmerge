@@ -3,8 +3,8 @@
 	"name": "Static discharge",
 	"does": "A lightning ring charges three imps standing close together; a lightning bolt then hits one of them and the charge jumps to the other two.",
 	"casts": [
-		{"slot": 0, "recipe": {"form": "nova", "element": "lightning", "modifiers": ["bigger"]}},
-		{"slot": 1, "at": 0.6, "recipe": {"form": "bolt", "element": "lightning"}}
+		{"staff": 0, "cards": ["lightning", "bigger", "nova"]},
+		{"staff": 1, "cards": ["lightning", "bolt"], "at": 0.6}
 	],
 	"imps": [[36, 0], [0, 36], [-36, 0]],
 	"seconds": 2.0,

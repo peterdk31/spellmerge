@@ -2,7 +2,7 @@
 	"id": "frost_carousel",
 	"name": "Frost carousel",
 	"does": "A frost ring that goes through a packed crowd and chills nearly every imp it passes.",
-	"casts": [{"slot": 0, "recipe": {"form": "orbit", "element": "frost", "modifiers": ["pierce"]}}],
+	"casts": [{"staff": 0, "cards": ["frost", "pierce", "orbit"]}],
 	"imps": [[36, 0], [34, 12], [28, 23], [18, 31], [6, 35], [-6, 35], [-18, 31], [-28, 23], [-34, 12], [-36, 0], [-34, -12], [-28, -23], [-18, -31], [-6, -35], [6, -35], [18, -31], [28, -23], [34, -12]],
 	"seconds": 3.0,
 	"checks": [{"kind": "status_count", "status": "chill", "min": 16}]

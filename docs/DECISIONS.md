@@ -1341,5 +1341,5 @@ An independent review of the branch found these, all fixed with a regression tes
 ## 2026-10-26: M2 closed again for C2
 
 - **M2 done:** all iterate tasks (#245, #244, #243) are built, so M2 is marked done in the roadmap. Nothing from M3 is planned until the owner answers.
-- **The checkpoint text is written, not yet posted.** This session cannot open issues (read-only token). The assessment and recommendation are in `docs/milestones/M2-spell-system.md`, "Checkpoint C2, second round", and the evidence in `docs/LOG.md`, "C2 evidence", "After the iterate round". NEXT.md keeps a task that opens the checkpoint issue from that text.
+- **The checkpoint text is written, not yet posted.** This session cannot open issues (read-only token). The assessment and recommendation are in `docs/milestones/M2-spell-system.md`, "Checkpoint C2, second round", and the evidence in `docs/LOG.md`, "C2 evidence", "After the iterate round". The planning output carries the same text as `checkpoint`, and the bot opens the issue when the PR merges. The ROADMAP row keeps "In progress" because the site's roadmap parser (`ci/smbot/contribute.py`, owner-only) finds the current milestone by that phrase; a "Done" row made `test_the_real_plan_files_parse` fail on PR #263.
 - **Idea #208 (pet):** deferred until M3's design is written (one-line note in `docs/BACKLOG.md`).

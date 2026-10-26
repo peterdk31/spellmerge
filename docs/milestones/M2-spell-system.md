@@ -8,7 +8,7 @@
 
 **Status (2026-10-25):** the owner answered the C2 checkpoint (#235) with **iterate**, so the milestone is in progress again with rework tasks (docs/NEXT.md): the clip recorder and Spell atlas (#245), spell visuals (#244), Lightning as a fifth element (#243), in that order. Its next end is a new C2 checkpoint.
 
-**Status (2026-10-26):** the iterate round is built: clip recorder and Spell atlas (#245), spell visuals (#244), Lightning with the static status, two reactions and three combos (#243), and scrolling drop lists. Done-when items 1, 2, 4, 5 and 6 are met as far as the bots can show: `ci/build/build.sh --quick --tests` passed with each code change of the round (the last being the Lightning part 2 merge, #260, and the scrolling drop lists with their own tests); this docs-only session ran no build. Item 3 (real-GPU frame rate) and item 7 (the verdict at the second C2 checkpoint) are left to the owner. The checkpoint text is below; the issue is still to be opened.
+**Status (2026-10-26):** the iterate round is built: clip recorder and Spell atlas (#245), spell visuals (#244), Lightning with the static status, two reactions and three combos (#243), and scrolling drop lists. Done-when items 1, 2, 4, 5 and 6 are met as far as the bots can show: `ci/build/build.sh --quick --tests` passed with each code change of the round (the last being the Lightning part 2 merge, #260, and the scrolling drop lists with their own tests); this docs-only session ran no build. Item 3 (real-GPU frame rate) and item 7 (the verdict at the second C2 checkpoint) are left to the owner. The checkpoint text is below; the issue is opened when the planning PR merges.
 
 **Done when:**
 
@@ -287,7 +287,7 @@ The question is: **is building spells fun and deep, with surprising combos?**
 
 ### Checkpoint C2, second round
 
-For the issue (not yet opened). **Build:** the newest daily release. **Built since the first C2 (#235):** the clip recorder and the Spell atlas (#245); spell visuals reworked with the clips (#244); Lightning as a fifth element with the `static` status, the Overload and Superconduct reactions, the discharge arc and three combos (#243); scrolling drop lists in the quick view and the overlay. **Cut:** nothing from M2's scope; the discharge reaction has no sound file yet (silent, listed under Audio needs).
+For the issue. **Build:** the newest daily release. **Built since the first C2 (#235):** the clip recorder and the Spell atlas (#245); spell visuals reworked with the clips (#244); Lightning as a fifth element with the `static` status, the Overload and Superconduct reactions, the discharge arc and three combos (#243); scrolling drop lists in the quick view and the overlay. **Cut:** nothing from M2's scope; the discharge reaction has no sound file yet (silent, listed under Audio needs).
 
 **Assessment (bot data only, no playtest answers yet):** 24 combos pass `test_combos` (21 before, 3 new); the fuzz and stress numbers in `docs/LOG.md` ("C2 evidence") were measured before Lightning and not repeated. The real-GPU frame rate (item 3) is still unmeasured: the CI browser has no GPU. No player has reported on the new visuals or on Lightning.
 

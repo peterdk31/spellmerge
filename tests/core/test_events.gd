@@ -17,6 +17,8 @@ const EVENTS: Dictionary = {
 	&"reward_pick_requested": [["player", TYPE_INT], ["choice", TYPE_INT]],
 	&"door_vote_requested": [["player", TYPE_INT], ["door", TYPE_INT]],
 	&"pause_requested": [["player", TYPE_INT]],
+	&"sandbox_requested": [["player", TYPE_INT]],
+	&"sandbox_action_requested": [["player", TYPE_INT], ["action", TYPE_STRING_NAME]],
 	# Devices.
 	&"device_joined": [["player", TYPE_INT], ["device", TYPE_INT]],
 	&"device_left": [["player", TYPE_INT], ["device", TYPE_INT]],
@@ -71,6 +73,7 @@ const EVENTS: Dictionary = {
 	&"room_entered": [["room_id", TYPE_STRING_NAME]],
 	&"room_cleared": [["room_id", TYPE_STRING_NAME]],
 	&"wave_started": [["wave", TYPE_INT]],
+	&"sandbox_changed": [["on", TYPE_BOOL]],
 	&"build_break_started": [["seconds", TYPE_FLOAT]],
 	&"door_voted": [["player", TYPE_INT], ["door", TYPE_INT]],
 	&"difficulty_changed": [["level", TYPE_FLOAT]],
@@ -84,7 +87,7 @@ const EVENTS: Dictionary = {
 ## Events about the run, a room or the account, with no player index.
 const NOT_PER_PLAYER: Array[StringName] = [
 	&"run_started", &"run_ended", &"room_entered", &"room_cleared", &"wave_started",
-	&"build_break_started", &"difficulty_changed", &"reward_rolled", &"unlock_gained", &"currency_changed",
+	&"sandbox_changed", &"build_break_started", &"difficulty_changed", &"reward_rolled", &"unlock_gained", &"currency_changed",
 ]
 
 var _failures: Array[String] = []

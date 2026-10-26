@@ -2,12 +2,16 @@ extends Control
 ## The main menu: the name, the tagline, the build version and the Play button.
 ## Play only sends the intent event `play_requested`; the flow area hears it and
 ## starts the arena. The menu never calls flow and never changes the scene itself.
+## In `dev` and `preview` builds a Sandbox button stands above Play and has the focus, so
+## those builds start in the sandbox with one press (staffs B7); it sends `sandbox_requested`.
 
 const EventsScript := preload("res://core/events/events.gd")
 
 ## The player index sent with `play_requested`: the menu is used by P1 (the mouse
 ## and keyboard, or the gamepad that joined first).
 const MENU_PLAYER: int = 0
+## The build channels that show the Sandbox button (`BuildInfo.channel()`).
+const SANDBOX_CHANNELS: Array[String] = ["dev", "preview"]
 
 ## The user argument (`-- --four-bot`) that starts the 4-bot test, and its script.
 const FOUR_BOT_ARGUMENT: String = "--four-bot"
@@ -28,9 +32,12 @@ var events: EventsScript = null
 
 ## Only tests set this: makes the node to add instead of loading the runner script.
 var runner_factory: Callable = Callable()
+## The build channel; `BuildInfo.channel()` unless a test sets it before adding the node.
+var channel: String = BuildInfo.channel()
 
 @onready var _version: Label = %Version
 @onready var _play: Button = %Play
+@onready var _sandbox: Button = %Sandbox
 
 
 func _ready() -> void:
@@ -38,7 +45,12 @@ func _ready() -> void:
 	if events == null:
 		events = get_node_or_null("/root/Events") as EventsScript
 	_play.pressed.connect(_on_play_pressed)
-	_play.grab_focus()
+	_sandbox.pressed.connect(_on_sandbox_pressed)
+	_sandbox.visible = SANDBOX_CHANNELS.has(channel)
+	if _sandbox.visible:
+		_sandbox.grab_focus()
+	else:
+		_play.grab_focus()
 	print("Spellmerge %s: main menu ready" % BuildInfo.describe())
 	var args: PackedStringArray = _cmdline_arguments()
 	_start_four_bot_test(args)
@@ -123,3 +135,10 @@ func _on_play_pressed() -> void:
 		push_warning("Main menu: the Events autoload is missing, so Play does nothing.")
 		return
 	events.play_requested.emit(MENU_PLAYER)
+
+
+func _on_sandbox_pressed() -> void:
+	if events == null:
+		push_warning("Main menu: the Events autoload is missing, so Sandbox does nothing.")
+		return
+	events.sandbox_requested.emit(MENU_PLAYER)

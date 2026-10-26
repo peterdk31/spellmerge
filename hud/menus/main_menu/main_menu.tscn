@@ -44,6 +44,12 @@ layout_mode = 2
 text = "Merge spells. Cause chaos. Together."
 horizontal_alignment = 1
 
+[node name="Sandbox" type="Button" parent="Center/Lines"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+text = "Sandbox"
+
 [node name="Play" type="Button" parent="Center/Lines"]
 unique_name_in_owner = true
 layout_mode = 2

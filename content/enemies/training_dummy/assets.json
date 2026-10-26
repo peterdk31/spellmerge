@@ -1,0 +1,13 @@
+{
+	"assets": [
+		{
+			"path": "content/enemies/training_dummy/idle.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "placeholder",
+			"tool": "Claude (SVG rects written by a small generator from a pixel map)",
+			"prompt": "A 32x32 sandbox training dummy seen from the front: a Spark-gold straw sack on a Wood post, a round straw head with a highlight, a crossbar of Wood arms, a Bone target with a Fire bullseye on its chest, standing on a Stone base. 1px dark outline, light from the top-left. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no player colours."
+		}
+	]
+}

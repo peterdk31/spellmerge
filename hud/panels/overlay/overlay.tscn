@@ -29,3 +29,11 @@ layout_mode = 2
 focus_mode = 0
 mouse_filter = 2
 text = "Build"
+
+[node name="Sandbox" type="Button" parent="Rows"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+focus_mode = 0
+mouse_filter = 2
+text = "Sandbox"

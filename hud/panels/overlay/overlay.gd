@@ -16,6 +16,10 @@ extends PanelContainer
 ## player's focus over from this overlay). The overlay sends no event for it. There is no
 ## quick "Bag" drop any more: the full builder is open at any time, waves included (owner,
 ## staffs A6a).
+##
+## "Sandbox" (staffs B7) shows under "Build" only while the run is a sandbox (`sandbox_changed`)
+## and sends the local signal `sandbox_pressed(player)`; `hud/panels/panels.gd` opens that
+## player's sandbox page (`hud/menus/sandbox/`) in the overlay's place.
 
 const EventsScript := preload("res://core/events/events.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
@@ -24,6 +28,7 @@ const SpellsScript := preload("res://core/spells/spells.gd")
 const PLAYER_COUNT: int = 4
 const RESUME_TEXT: String = "Resume"
 const BUILD_TEXT: String = "Build"
+const SANDBOX_TEXT: String = "Sandbox"
 ## The title word.
 const MENU_TITLE: String = "MENU"
 const FOCUS_MARK: String = "> "
@@ -32,6 +37,8 @@ const BASE_TEXT_META: StringName = &"base_text"
 
 ## The owner activated "Build". Carries the index of this overlay.
 signal build_pressed(player: int)
+## The owner activated "Sandbox". Carries the index of this overlay.
+signal sandbox_pressed(player: int)
 
 ## The player index 0-3. Set before adding the node to the tree.
 @export var index: int = 0
@@ -44,6 +51,7 @@ var _controls: Array[Control] = []
 @onready var _title: Label = %Title
 @onready var _resume: Button = %Resume
 @onready var _build: Button = %Build
+@onready var _sandbox: Button = %Sandbox
 
 
 func _ready() -> void:
@@ -53,13 +61,17 @@ func _ready() -> void:
 	_title.text = "P%d %s" % [player + 1, MENU_TITLE]
 	_set_text(_resume, RESUME_TEXT)
 	_set_text(_build, BUILD_TEXT)
-	_controls = [_resume, _build]
+	_set_text(_sandbox, SANDBOX_TEXT)
+	_sandbox.visible = false
+	_controls = [_resume, _build, _sandbox]
 	visible = false
 
 
-## Connect to the focus service (called once by `panels.gd`). `events` and `spells` are taken
-## for the same call as the builder's and not used.
-func bind(_events: EventsScript, ui_focus: UIFocusScript, _spells: SpellsScript = null) -> void:
+## Connect to the event bus (for `sandbox_changed`) and the focus service (called once by
+## `panels.gd`). `spells` is taken for the same call as the builder's and not used.
+func bind(events: EventsScript, ui_focus: UIFocusScript, _spells: SpellsScript = null) -> void:
+	if events != null:
+		events.sandbox_changed.connect(_on_sandbox_changed)
 	_ui_focus = ui_focus
 	if _ui_focus != null:
 		_ui_focus.closed.connect(_on_closed)
@@ -109,6 +121,15 @@ func build_button() -> Button:
 	return _build
 
 
+## The "Sandbox" button, shown only in the sandbox (for tests and screenshots).
+func sandbox_button() -> Button:
+	return _sandbox
+
+
+func _on_sandbox_changed(on: bool) -> void:
+	_sandbox.visible = on
+
+
 func _set_text(button: Button, text: String) -> void:
 	button.set_meta(BASE_TEXT_META, text)
 	button.text = (FOCUS_MARK if button == _focused else "") + text
@@ -141,6 +162,8 @@ func _on_activated(player: int, control: Control) -> void:
 		close_overlay()
 	elif control == _build:
 		build_pressed.emit(index)
+	elif control == _sandbox:
+		sandbox_pressed.emit(index)
 
 
 func _on_cancelled(player: int) -> void:

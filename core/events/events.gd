@@ -23,6 +23,10 @@ signal reward_pick_requested(player: int, choice: int)
 signal door_vote_requested(player: int, door: int)
 ## A player asked to pause. Heard by run.
 signal pause_requested(player: int)
+## The Sandbox button was pressed (only shown in `dev` and `preview` builds). Heard by flow, which starts the sandbox (staffs B7).
+signal sandbox_requested(player: int)
+## `player` picked a sandbox action on their sandbox page: `imp_wave` or `reset_dummies`. Heard by flow (staffs B7).
+signal sandbox_action_requested(player: int, action: StringName)
 
 # --- Devices (sender: core/input) -------------------------------------------
 
@@ -133,6 +137,8 @@ signal run_ended(victory: bool)
 signal room_entered(room_id: StringName)
 ## Sender: flow. The room `room_id` was cleared.
 signal room_cleared(room_id: StringName)
+## Sender: flow. A run started in the sandbox (`on` true) or out of it (false), or the sandbox run ended (false). Heard by hud, which shows the sandbox page's entry only while it is on.
+signal sandbox_changed(on: bool)
 ## Sender: flow. Wave number `wave` (1 for the first of a run) of the room began.
 signal wave_started(wave: int)
 ## Sender: flow. The build break between waves began and lasts `seconds`; the next wave starts when it ends, whoever is building. Follows `room_cleared`; `wave_started` ends it.

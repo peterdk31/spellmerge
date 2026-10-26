@@ -1,95 +1,89 @@
-extends SceneTree
-## Screenshots of the staff builder (staffs A6a, B8), for people and for Claude to look at (not
-## a test: it only checks that each staged state happened). Needs a display, so it runs only through
-## `ci/build/build.sh --quick --screenshots`; each shot is saved as user://screenshots/<name>.png
-## and copied to build/screenshots/.
+extends "res://tests/support/screenshot.gd"
+## Screenshots of the list builder (staffs A6a, B8), which the Sandbox page switches to; the
+## default, radial builder is in `shot_radial_builder.gd`.
 ##
 ## Shots: one player with the builder open (links: fire "> 2" into the bolt, "#1" on the bolt),
 ## then picking cards into staff X, a card picked up to move ("^", `builder_holding`), a wasted
 ## card, then all four players with their builders open on different staffs, in a wave.
 
-const SHOTS_DIR := "user://screenshots"
-const SETTLE_FRAMES := 20
+## Frames after a press for the builder to redraw; the full settle is kept for the shots.
+const STEP_FRAMES := 3
 
 var _input: Node = null
 var _focus: Node = null
 var _hud: Node = null
 
 
-func _initialize() -> void:
-	await process_frame
-	DirAccess.make_dir_recursive_absolute(SHOTS_DIR)
-	_input = root.get_node_or_null("PlayerInput")
-	_focus = root.get_node_or_null("UIFocus")
-	_hud = root.get_node_or_null("Hud")
-	var flow: Node = root.get_node_or_null("Flow")
-	if _input == null or _focus == null or _hud == null or flow == null:
-		_fail("the PlayerInput, UIFocus, Hud and Flow autoloads must exist")
+func take() -> void:
+	if not need(["PlayerInput", "UIFocus", "Hud", "Flow"]):
 		return
+	_input = root.get_node("PlayerInput")
+	_focus = root.get_node("UIFocus")
+	_hud = root.get_node("Hud")
+	var flow: Node = root.get_node("Flow")
 	_input.call("add_virtual_device", 0)
 	# These shots are the list builder's (the radial one is the default).
 	_hud.call("_on_builder_options_changed", false, false, true)
 	flow.call("start_run", 0)
-	await _settle()
-	await _open_builder(0)
+	await settle(STEP_FRAMES)
+	await _open_builders([0])
 	var builder: Node = _hud.call("get_builder", 0)
-	await _shot("builder_opened")
+	await shot("builder_opened")
 	# Two cards after the fire bolt: a split and a nova; the plan shows both casts.
 	await _press(0, builder.call("slot_button", 2))
 	await _press(0, _row(builder, "Split"))
 	await _press(0, _row(builder, "Nova"))
 	if not builder.call("is_open"):
-		_fail("the builder of player 1 is not open")
+		fail("the builder of player 1 is not open")
 		return
-	await _shot("builder_one_player")
+	await shot("builder_one_player")
 	# Pick the nova up to move it: it is marked held and the hint says "Place".
 	await _press(0, builder.call("slot_button", 3))
 	if (builder.call("held") as Array)[0] != 1:
-		_fail("the nova is not held in builder_holding")
+		fail("the nova is not held in builder_holding")
 		return
-	await _shot("builder_holding")
-	_tap(0, &"back")
-	await _settle()
+	await shot("builder_holding")
+	tap(0, &"back")
+	await settle(STEP_FRAMES)
 	# Homing alone in staff Y: it lands on the caster and does nothing, so the note says why.
 	await _press(0, builder.call("tab_button", 2))
 	await _press(0, builder.call("slot_button", 0))
 	await _press(0, _row(builder, "Homing"))
 	_focus.call("focus", 0, builder.call("slot_button", 0))
-	await _shot("builder_wasted")
+	await shot("builder_wasted")
 	# A stopped run leaves the HUD as it is, so close the builder as its owner would.
-	_tap(0, &"pause")
-	await _settle()
+	tap(0, &"pause")
+	await settle(STEP_FRAMES)
 	flow.call("stop_run")
-	await _settle()
+	await settle(STEP_FRAMES)
 	for index in range(1, 4):
 		_input.call("add_virtual_device", index)
 	flow.call("start_run", 0)
-	# The room is entered a little after the run starts; the builder opens only inside it.
-	for i in 4:
-		await _settle()
 	# The wave is live while the builders are staged; a downed wizard's builder closes, so keep
 	# all four from being hurt meanwhile.
+	if not await wait_for(func() -> bool: return flow.call("get_wizard", 3) != null):
+		fail("player 4 has no wizard in builder_four_players")
+		return
 	for index in 4:
 		flow.call("get_wizard", index).call("protect", 60.0)
-	for index in 4:
-		await _open_builder(index)
-	# P1: staff X. P2: staff A. P3: staff Y with a pick. P4: staff B.
-	await _press(1, _hud.call("get_builder", 1).call("tab_button", 0))
-	await _press(2, _hud.call("get_builder", 2).call("tab_button", 2))
+	await _open_builders([0, 1, 2, 3])
+	# P1: staff X. P2: staff A. P3: staff Y with a pick. P4: staff B. Players press side by side.
+	_focus_press(1, _hud.call("get_builder", 1).call("tab_button", 0))
+	_focus_press(2, _hud.call("get_builder", 2).call("tab_button", 2))
+	_focus_press(3, _hud.call("get_builder", 3).call("tab_button", 3))
+	await settle(STEP_FRAMES)
 	await _press(2, _hud.call("get_builder", 2).call("slot_button", 0))
 	await _press(2, _row(_hud.call("get_builder", 2), "Orbit"))
-	await _press(3, _hud.call("get_builder", 3).call("tab_button", 3))
 	for index in 4:
 		if not _hud.call("get_builder", index).call("is_open"):
-			_fail("the builder of player %d is not open in builder_four_players (focus panel open: %s)" % [index + 1, _focus.call("is_open", index)])
+			fail("the builder of player %d is not open in builder_four_players (focus panel open: %s)" % [index + 1, _focus.call("is_open", index)])
 			return
-	await _shot("builder_four_players")
+	await shot("builder_four_players")
 	for index in 4:
-		_tap(index, &"pause")
-	await _settle()
+		tap(index, &"pause")
+	await settle()
 	flow.call("stop_run")
 	await create_timer(0.3).timeout
-	quit(0)
 
 
 ## The bag row of the card named `display_name` in `builder`, or null.
@@ -100,41 +94,20 @@ func _row(builder: Node, display_name: String) -> Control:
 	return null
 
 
-func _tap(player: int, action: StringName) -> void:
-	_input.call("send_virtual", player, action, 1.0)
-	_input.call("send_virtual", player, action, 0.0)
-
-
-## B (`back`) in play, as a person does.
-func _open_builder(player: int) -> void:
-	_tap(player, &"back")
-	await _settle()
+## B (`back`) in play for each of `players`, as a person does; waits until every builder is open.
+func _open_builders(players: Array[int]) -> void:
+	for player in players:
+		tap(player, &"back")
+	await wait_for(func() -> bool: return players.all(func(player: int) -> bool: return _hud.call("get_builder", player).call("is_open")))
+	await settle(STEP_FRAMES)
 
 
 ## Put the player's focus on `control` and press `accept` (activate) on it.
 func _press(player: int, control: Control) -> void:
+	_focus_press(player, control)
+	await settle(STEP_FRAMES)
+
+
+func _focus_press(player: int, control: Control) -> void:
 	_focus.call("focus", player, control)
-	await process_frame
-	_tap(player, &"accept")
-	await _settle()
-
-
-func _fail(message: String) -> void:
-	printerr("SHOT FAILED: " + message)
-	quit(1)
-
-
-func _settle() -> void:
-	for i in SETTLE_FRAMES:
-		await process_frame
-
-
-func _shot(shot_name: String) -> void:
-	await _settle()
-	await RenderingServer.frame_post_draw
-	var image: Image = root.get_texture().get_image()
-	var path: String = "%s/%s.png" % [SHOTS_DIR, shot_name]
-	if image == null or image.save_png(path) != OK:
-		printerr("SHOT FAILED: could not save " + path)
-		return
-	print("SHOT: %s (%dx%d)" % [shot_name, image.get_width(), image.get_height()])
+	tap(player, &"accept")

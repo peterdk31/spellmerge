@@ -1,16 +1,13 @@
-extends SceneTree
-## A sheet of the placeholder art at 2x on the crypt floor, to look at: the
-## wizard's idle, walk and dash frames, the four player colours, the ember imp,
-## the staff, the fire bolt, the hit spark and the two tiles. Needs a display,
-## so it runs only through `ci/build/build.sh --quick --screenshots`; the shot is
-## saved as user://screenshots/art_sheet.png and copied to build/screenshots/.
+extends "res://tests/support/screenshot.gd"
+## The art of the wizard, the ember imp and the crypt at 2x on the crypt floor (`art_sheet`):
+## the wizard's idle, walk and dash frames under player 1's hat, the four players, the imp's
+## idle, windup and hurt poses, the staff, the bolt, the hit spark, the dash telegraph, the
+## crypt's wall, pillar, door and floor dressing, and the torch flame's frames. The spell
+## cards' art is in `shot_cards.gd`.
 
-const SHOTS_DIR := "user://screenshots"
-const SETTLE_FRAMES := 10
 const SCALE := 2.0
 const FRAME := 32.0
 
-const FLOOR := preload("res://art/tilesets/crypt/floor.svg")
 const WALL := preload("res://art/tilesets/crypt/wall.svg")
 const IDLE := preload("res://content/wizard/base/wizard_idle.svg")
 const WALK := preload("res://content/wizard/base/wizard_walk.svg")
@@ -38,16 +35,9 @@ const BOLT := preload("res://art/vfx/bolt.svg")
 const SPARK := preload("res://art/vfx/hit_spark.svg")
 
 
-func _initialize() -> void:
-	await process_frame
-	DirAccess.make_dir_recursive_absolute(SHOTS_DIR)
-	var floor_sprite := Sprite2D.new()
-	floor_sprite.texture = FLOOR
-	floor_sprite.centered = false
-	floor_sprite.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
-	floor_sprite.region_enabled = true
-	floor_sprite.region_rect = Rect2(0, 0, 640, 360)
-	root.add_child(floor_sprite)
+func take() -> void:
+	settle_frames = 10
+	lay_floor()
 	# Row 1: the wizard's idle (4: open, closed, glance left, glance right), walk (4) and
 	# dash (2) frames, each under player 1's hat.
 	var x: float = 4.0
@@ -73,16 +63,7 @@ func _initialize() -> void:
 	x = _strip(IMP_WINDUP, 32.0, 266.0)
 	_frame(IMP_HURT, 0, x, 266.0)
 	_strip(TORCH_FLAME, x + FRAME * SCALE, 266.0)
-	await _settle()
-	await RenderingServer.frame_post_draw
-	var image: Image = root.get_texture().get_image()
-	var path: String = "%s/art_sheet.png" % SHOTS_DIR
-	if image == null or image.save_png(path) != OK:
-		printerr("SHOT FAILED: could not save " + path)
-		quit(1)
-		return
-	print("SHOT: art_sheet (%dx%d)" % [image.get_width(), image.get_height()])
-	quit(0)
+	await shot("art_sheet")
 
 
 ## Every frame of a strip, left to right from `x`. Returns the x after the strip.
@@ -97,17 +78,6 @@ func _strip(texture: Texture2D, x: float, y: float, hat: Texture2D = null) -> fl
 
 
 func _frame(texture: Texture2D, frame: int, x: float, y: float) -> void:
-	var sprite := Sprite2D.new()
-	sprite.texture = texture
+	var sprite: Sprite2D = place(texture, SCALE, Vector2(x, y))
 	sprite.hframes = maxi(int(texture.get_width() / FRAME), 1)
 	sprite.frame = frame
-	sprite.centered = false
-	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	sprite.scale = Vector2(SCALE, SCALE)
-	sprite.position = Vector2(x, y)
-	root.add_child(sprite)
-
-
-func _settle() -> void:
-	for i in SETTLE_FRAMES:
-		await process_frame

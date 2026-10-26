@@ -1,5 +1,7 @@
 # Art direction samples
 
+The owner picked N (round five), and the game's wizard was redrawn in it. The sheet scripts named below (`shot_art_direction*.gd`) were removed on 2026-10-26; they are in the git history if a round needs to be seen again. The samples stay as the record of the choice.
+
 Three looks for the game, each a wizard, a crypt floor tile and a fire spell icon, all on the 32×32 grid and in the shared palette ([docs/STYLE.md](../../docs/STYLE.md)). They exist so the owner can pick one (M2 part 27); nothing in the game uses them. Sheet: `tests/screenshots/shot_art_direction.gd` (`art_direction_sheet.png`, in `build/screenshots/` after `ci/build/build.sh --quick --screenshots`; the owner question is #190). The "Reads at 1×" and "Mood" rows are the author's opinion, not a verdict.
 
 | | A: Chunky (`a_chunky/`) | B: Current | C: Grim (`c_grim/`) |

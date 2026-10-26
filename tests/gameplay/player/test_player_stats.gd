@@ -117,10 +117,10 @@ func _test_mana_spent_and_regenerated() -> void:
 	var spells: FakeSpells = FakeSpells.new()
 	spells.cost = 25.0
 	_players[0].spells = spells
-	_players[0].set_recipe(0, {"form": &"bolt"})
+	_players[0].set_staff(0, [&"bolt"] as Array[StringName])
 	_fakes.append(spells)
 	_stats.clear()
-	_check(_players[0].cast(), "the cast fires")
+	_check(_players[0].cast_staff(0), "the cast fires")
 	_check(_stats.size() == 1 and _stats[0][3] == 75.0, "spending 25 mana sends mana 75, got %s" % [_stats])
 	_stats.clear()
 	# 0.0625 s * 10 mana/s = 0.625: two steps cross one whole number, not two events per step.

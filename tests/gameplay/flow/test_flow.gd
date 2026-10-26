@@ -127,8 +127,8 @@ func _test_play_starts_the_room(count: int) -> void:
 	_check(_wizards().size() == count, "%d players: %d wizards spawned" % [count, _wizards().size()])
 	for index in count:
 		var wizard := _flow.get_wizard(index) as PlayerScript
-		_check(wizard != null and wizard.index == index and wizard.has_spell(), "%d players: wizard %d has its index and a spell" % [count, index])
-		_check(wizard != null and wizard.recipe_of(0) == FlowScript.DEFAULT_START_RECIPE_A and wizard.recipe_of(1) == FlowScript.DEFAULT_START_RECIPE_B, "%d players: wizard %d has both start spells" % [count, index])
+		_check(wizard != null and wizard.index == index and wizard.has_staff(0) and wizard.has_staff(1), "%d players: wizard %d has its index and its dash and bolt staffs" % [count, index])
+		_check(wizard != null and wizard.cards_of(0)[0] == &"dash" and wizard.cards_of(1).slice(0, 2) == ([&"fire", &"bolt"] as Array[StringName]), "%d players: wizard %d has the start cards" % [count, index])
 		_check(wizard != null and wizard.position == Vector2(224.0 + 64.0 * index, 320.0), "%d players: wizard %d stands on its spawn" % [count, index])
 	_check(_flow.enemies_left() == FlowScript.WAVE.size(), "%d players: the wave has %d enemies, got %d" % [count, FlowScript.WAVE.size(), _flow.enemies_left()])
 	_check(_combat.call("get_enemy_count") == FlowScript.WAVE.size(), "%d players: every enemy is registered with combat" % count)

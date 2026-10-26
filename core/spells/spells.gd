@@ -98,6 +98,8 @@ var _installed: Array[CompiledStaff] = []
 var _cursor: PackedInt32Array = PackedInt32Array()
 ## player * STAFFS + staff -> the tags of its sustained (`hold`) carriers that are on
 var _hold_tags: Array[PackedInt64Array] = []
+## player * STAFFS + staff -> the carrier (form id) of its last cast, for the cast's look
+var _last_form: Array[StringName] = []
 ## player * STAFFS + staff -> the mana its sustained carriers reserve
 var _hold_mana: PackedFloat32Array = PackedFloat32Array()
 ## generation key (`SpellTag.generation_key`) -> how many nodes that generation registered
@@ -160,6 +162,7 @@ func _init() -> void:
 	_hold_mana.resize(SpellLimits.PLAYERS * SpellLimits.STAFFS)
 	for i in SpellLimits.PLAYERS * SpellLimits.STAFFS:
 		_hold_tags.append(PackedInt64Array())
+		_last_form.append(&"")
 	_cooldown.resize(SpellLimits.PLAYERS * SpellLimits.STAFFS)
 	_fires_used.resize(SpellLimits.PLAYERS)
 	_chains_used.resize(SpellLimits.PLAYERS)
@@ -221,7 +224,7 @@ func compile_staff(cards: Array[StringName], staff: StaffBase) -> CompiledStaff:
 
 
 ## What the builder shows of a staff, as plain values so that nothing outside `core/spells`
-## reads a compiled staff: `empty`; `casts`, one Dictionary per cast of the cycle with `slots`
+## reads a compiled staff: `empty`; `cards` (the card ids by slot, `&""` for an empty slot); `casts`, one Dictionary per cast of the cycle with `slots`
 ## (read order), `text`, `mana`, `delay`, `recharges`, `wrapped`, `targets` (card slot -> the
 ## carrier's slot, or `StaffCompiler.TARGET_CASTER` / `TARGET_POINT`) and `wasted` (slot ->
 ## reason); and `wasted` for the staff (cards that did nothing in any cast that read them).
@@ -234,7 +237,9 @@ func staff_view(cards: Array[StringName], staff: StaffBase) -> Dictionary:
 			"recharges": cast.recharges, "wrapped": cast.wrapped,
 			"targets": cast.targets.duplicate(), "wasted": cast.wasted.duplicate(),
 		})
-	return {"empty": compiled.is_empty(), "casts": casts, "wasted": compiled.wasted.duplicate()}
+	var row: Array[StringName] = []
+	row.assign(compiled.cards)
+	return {"empty": compiled.is_empty(), "cards": row, "casts": casts, "wasted": compiled.wasted.duplicate()}
 
 
 ## What the builder shows of the component `id`: its name (the id when it has none, "" for
@@ -471,6 +476,12 @@ func cast_index(player: int, staff: int) -> int:
 	return _cursor[player * SpellLimits.STAFFS + staff] if _in_range(player, staff) else 0
 
 
+## The carrier (form id) of the last cast this player's staff made, `&""` before any or for a
+## cast with no carrier (cards that landed on the caster). The player sends it with `spell_cast`.
+func last_form(player: int, staff: int) -> StringName:
+	return _last_form[player * SpellLimits.STAFFS + staff] if _in_range(player, staff) else &""
+
+
 ## True while this player's staff has sustained (`hold`) carriers switched on.
 func is_holding(player: int, staff: int) -> bool:
 	return _in_range(player, staff) and not _hold_tags[player * SpellLimits.STAFFS + staff].is_empty()
@@ -516,6 +527,7 @@ func cast_staff(player: int, staff: int, origin: Vector2, direction: Vector2, ma
 	_after_cast(index, compiled, cast)
 	_start_hold(index, player, staff, cast)
 	var first: CompiledSpell = cast.group.spells[0]
+	_last_form[index] = first.form_id
 	var combo: StringName = combo_class(first)
 	if events != null and combo != &"" and first.fallback == CompiledSpell.FALLBACK_NONE:
 		events.combo_cast.emit(player, combo, origin, aim, first.tint)
@@ -584,6 +596,12 @@ func _launch(spell: CompiledSpell, tag: int, player: int, origin: Vector2, direc
 	var made: int = 0
 	var carried: int = spell.chain_jumps if chain < 0 else chain
 	var lifetime: float = SpellLimits.HOLD_LIFETIME if spell.behaviour(ModifierBase.Behaviour.HOLD) > 0.0 else spell.lifetime
+	if spell.motion == FormBase.Motion.DASH:
+		# The wizard moves, not a shot: the player picks the way (the way it walks) and answers
+		# with `caster_move_finished` where it stops (staffs A6a).
+		if events != null:
+			events.caster_move_requested.emit(player, &"dash", origin + direction * spell.speed * spell.lifetime, spell.lifetime, tag)
+		return 1
 	var base: float = direction.angle()
 	if spell.motion == FormBase.Motion.RAY and spell.homing_turn > 0.0:
 		direction = projectiles.homing_aim(player, origin, direction, deg_to_rad(30.0), ProjectilesScript.LAYER_ENEMY)

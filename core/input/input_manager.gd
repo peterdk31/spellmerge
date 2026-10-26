@@ -13,7 +13,7 @@ extends Node
 ## `Input` directly; it asks this manager by player index:
 ##
 ##     var move: Vector2 = PlayerInput.get_move(player)
-##     if PlayerInput.is_action_just_pressed(player, &"dodge"):
+##     if PlayerInput.is_action_just_pressed(player, &"cast_a"):
 ##
 ## Joins and leaves are announced as `device_joined` and `device_left` on the
 ## Events bus. Nothing here allocates per frame; events allocate only when a
@@ -22,13 +22,13 @@ extends Node
 ## A player's input can be captured (set_captured) while one of their UI panels
 ## is open: the gameplay questions below (get_move, get_strength,
 ## is_action_pressed, is_action_just_pressed) then answer "nothing" for the
-## actions in CAPTURED_ACTIONS, so a wizard does not walk, cast, dodge or swap spells while
+## actions in CAPTURED_ACTIONS, so a wizard does not walk or cast a staff while
 ## their player works a menu. Gameplay needs no extra check. core/ui_focus reads
 ## get_press_count instead, which is never captured.
 ##
 ## Aim: get_aim() is the right stick (zero in its dead zone) and is_mouse_aiming()
 ## says whether the keyboard player aims with the mouse (set by a mouse move or
-## click, cleared by a press of the keyboard cast key). The mouse is only a flag
+## click, cleared by a press of the keyboard `cast_x` key, J). The mouse is only a flag
 ## here: turning the pointer into a direction needs the world, so the wizard does it.
 ##
 ## Glyphs: glyph_kind(player) says what that player holds (keyboard, keyboard with the mouse
@@ -66,20 +66,24 @@ const TRIGGER_PRESSED: float = 0.5
 const MOUSE_AIM_TRAVEL: float = 8.0
 
 ## The per-player actions, defined in project.godot. `join` and `leave` are
-## handled here and are not per-player state.
+## handled here and are not per-player state. `cast_a` to `cast_b` cast the four staffs, one
+## per button (staffs, docs/milestones/M2-staffs.md); menus activate with `cast_a` and go back
+## with `cast_b` (core/ui_focus).
 const ACTIONS: Array[StringName] = [
-	&"move_left", &"move_right", &"move_up", &"move_down", &"dodge", &"cast", &"overlay", &"swap",
+	&"move_left", &"move_right", &"move_up", &"move_down", &"cast_a", &"cast_x", &"cast_y", &"cast_b", &"overlay",
 ]
+## The staff cast actions, by staff index (0 A, 1 X, 2 Y, 3 B).
+const CAST_ACTIONS: Array[StringName] = [&"cast_a", &"cast_x", &"cast_y", &"cast_b"]
 ## Source ids: keys use their keycode; the other kinds sit in separate ranges.
 const SOURCE_MOUSE: int = 1 << 40
 const SOURCE_BUTTON: int = 2 << 40
 const SOURCE_AXIS: int = 3 << 40
 const SOURCE_VIRTUAL: int = 4 << 40
-## The actions hidden from gameplay while a player is captured (walking, cast,
-## dodge and swap). `overlay` stays
+## The actions hidden from gameplay while a player is captured (walking and the four
+## staffs). `overlay` stays
 ## readable so the overlay can close itself with its own button.
 const CAPTURED_ACTIONS: Array[StringName] = [
-	&"move_left", &"move_right", &"move_up", &"move_down", &"dodge", &"cast", &"swap",
+	&"move_left", &"move_right", &"move_up", &"move_down", &"cast_a", &"cast_x", &"cast_y", &"cast_b",
 ]
 const JOIN: StringName = &"join"
 const LEAVE: StringName = &"leave"
@@ -264,7 +268,7 @@ func handle_event(event: InputEvent) -> void:
 		return
 	if event is InputEventMouseButton:
 		_set_mouse_aiming(player, true)
-	elif event is InputEventKey and event.is_action_pressed(&"cast"):
+	elif event is InputEventKey and event.is_action_pressed(&"cast_x"):
 		_set_mouse_aiming(player, false)
 		_mouse_travel = 0.0
 	if event is InputEventJoypadMotion:
@@ -422,7 +426,7 @@ func _handle_motion(player: int, event: InputEventJoypadMotion) -> void:
 		AXIS_RIGHT_Y:
 			_aim_stick[player].y = value
 		AXIS_TRIGGER_RIGHT:
-			_set_source(player, &"cast", source, 1.0 if value > TRIGGER_PRESSED else 0.0)
+			_set_source(player, &"cast_x", source, 1.0 if value > TRIGGER_PRESSED else 0.0)
 
 
 ## An id for the physical input behind an event (one key, one mouse button, one

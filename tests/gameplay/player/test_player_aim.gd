@@ -74,7 +74,7 @@ func _setup(count: int, keyboard: bool = false) -> void:
 		player.events = _bus
 		player.spells = _fake
 		player._ready()
-		player.set_recipe(0, {"form": &"bolt"})
+		player.set_staff(0, [&"bolt"] as Array[StringName])
 		_players.append(player)
 
 
@@ -171,7 +171,7 @@ func _test_cast_goes_along_the_aim() -> void:
 	_input.send_virtual(0, &"move_left", 1.0)
 	_input.send_virtual_aim(0, Vector2.UP)
 	_run(1)
-	_check(_players[0].cast(), "the wizard casts")
+	_check(_players[0].cast_staff(0), "the wizard casts")
 	_check(_fake.directions.size() == 1 and _near(_fake.directions[0], Vector2.UP), "the spell got the aim, not the walk direction")
 
 
@@ -259,15 +259,15 @@ func _test_muzzle_is_the_staff_tip() -> void:
 	_setup(1)
 	_players[0].global_position = Vector2(100, 100)
 	_input.send_virtual_aim(0, Vector2.RIGHT)
-	_input.send_virtual(0, &"cast", 1.0)
+	_input.send_virtual(0, &"cast_a", 1.0)
 	_run(1)
 	var expected := Vector2(100.0 + PlayerScript.STAFF_REACH, 100.0 - PlayerScript.HAND_HEIGHT)
 	_check(_fake.origins.size() > 0 and _near(_fake.origins[0], expected), "the shot starts at the staff tip, got %s" % [_fake.origins])
 	_check(_near(_players[0].muzzle_position(), expected), "muzzle_position is hand height plus the reach along the aim")
 
 
-## A fresh wizard (no tree) that has started a dash with `action` held, and has
-## had two steps since.
+## A fresh wizard (no tree) that has started a dash (as a dash card asks) with `action` held,
+## and has had a step since.
 func _dashing_wizard(action: StringName) -> PlayerScript:
 	_teardown()
 	_bus = EventsScript.new()
@@ -280,9 +280,9 @@ func _dashing_wizard(action: StringName) -> PlayerScript:
 	wizard._ready()
 	_players.append(wizard)
 	_input.send_virtual(0, action, 1.0)
-	_input.send_virtual(0, &"dodge", 1.0)
-	_input.send_virtual(0, &"dodge", 0.0)
 	wizard.step(STEP)
+	# What a dash card sends (staffs A6a): 55 px over a quarter of a second.
+	_bus.caster_move_requested.emit(0, &"dash", wizard.muzzle_position() + Vector2(55.0, 0.0), 0.25, 1)
 	wizard.step(STEP)
 	return wizard
 
@@ -300,7 +300,7 @@ func _test_shot_and_reticle_line_up_with_the_mouse() -> void:
 		_run(1)
 		_fake.origins.clear()
 		_fake.directions.clear()
-		_check(wizard.cast(), "the wizard casts at %s" % mouse)
+		_check(wizard.cast_staff(0), "the wizard casts at %s" % mouse)
 		if _fake.origins.is_empty():
 			continue
 		var origin: Vector2 = _fake.origins[0]
@@ -330,14 +330,14 @@ func _test_aim_at_a_point() -> void:
 func _test_dash_look_applies_and_resets() -> void:
 	var wizard := _dashing_wizard(&"move_right")
 	var sprite := wizard.get_node("Sprite") as Sprite2D
-	_check(wizard.is_dodging(), "the wizard is dashing")
+	_check(wizard.is_dashing(), "the wizard is dashing")
 	_check(sprite.scale == PlayerScript.DASH_STRETCH, "the sprite stretches during the dash")
 	_check(sprite.rotation > 0.0, "the sprite leans into a dash to the right")
 	var steps: int = 0
-	while wizard.is_dodging() and steps < 60:
+	while wizard.is_dashing() and steps < 60:
 		wizard.step(STEP)
 		steps += 1
-	_check(not wizard.is_dodging(), "the dash is over")
+	_check(not wizard.is_dashing(), "the dash is over")
 	_check(sprite.scale == Vector2.ONE and sprite.rotation == 0.0, "the sprite is back to normal after the dash")
 
 

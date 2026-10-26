@@ -135,44 +135,45 @@ func _test_walking_plays_the_walk_strip() -> void:
 	_check(sprite.texture == _wizard.textures[0], "back to the idle strip when the wizard stops")
 
 
+## What a dash card sends (staffs A6a): a dash of DASH_TIME seconds.
+const DASH_TIME: float = 0.25
+
+
+func _dash() -> void:
+	_bus.caster_move_requested.emit(0, &"dash", _wizard.muzzle_position() + Vector2(55.0, 0.0), DASH_TIME, 1)
+
+
 func _test_dash_plays_once_then_idle() -> void:
 	_setup()
 	_input.send_virtual(0, &"move_right", 1.0)
-	_input.send_virtual(0, &"dodge", 1.0)
-	_input.send_virtual(0, &"dodge", 0.0)
+	_run(1)
+	_dash()
 	_run(1)
 	var sprite := _sprite()
-	_check(_wizard.is_dodging(), "the wizard is dashing")
+	_check(_wizard.is_dashing(), "the wizard is dashing")
 	_check(sprite.texture == _wizard.dash_textures[0], "a dashing wizard shows the dash strip")
 	var last: int = sprite.hframes - 1
 	var steps: int = 0
-	while _wizard.is_dodging() and steps < 60:
+	while _wizard.is_dashing() and steps < 60:
 		_run(1)
 		steps += 1
-		if _wizard.is_dodging():
+		if _wizard.is_dashing():
 			_check(sprite.frame <= last, "the dash frame stays inside the strip")
 	# The dash is longer than its strip, so the last frame is held (not looped).
-	_check(PlayerScript.DODGE_TIME * PlayerScript.DASH_FPS >= float(sprite.hframes), "the dash lasts as long as its strip")
+	_check(DASH_TIME * PlayerScript.DASH_FPS >= float(sprite.hframes), "the dash lasts as long as its strip")
 	_input.send_virtual(0, &"move_right", 0.0)
 	_run(2)
 	_check(sprite.texture == _wizard.textures[0], "idle again after the dash")
 
 
-## During the invulnerable part of a dodge the sprite is translucent and the ring
-## shows; both are gone as soon as the window ends, and a downed wizard has neither.
+## While the wizard is protected (join or revive) the sprite is translucent and the ring shows;
+## both are gone as soon as the protection ends. A dash gives none (staffs A6a).
 func _test_invulnerable_look_follows_the_window() -> void:
 	_setup()
 	_check(_sprite().modulate.a == 1.0 and not _wizard._invulnerable_look, "a wizard at rest is opaque with no ring")
-	_input.send_virtual(0, &"dodge", 1.0)
+	_dash()
 	_run(1)
-	_check(_wizard.is_invulnerable(), "the dodge made the wizard invulnerable")
-	_check(is_equal_approx(_sprite().modulate.a, PlayerScript.INVULNERABLE_ALPHA), "the sprite is translucent while invulnerable")
-	_check(_wizard._invulnerable_look, "the ring shows while invulnerable")
-	_input.send_virtual(0, &"dodge", 0.0)
-	_run(int(PlayerScript.INVULNERABLE_TIME / STEP))
-	_check(not _wizard.is_invulnerable(), "the window ended")
-	_check(_sprite().modulate.a == 1.0 and not _wizard._invulnerable_look, "the sprite is opaque again and the ring is gone")
-	_check(_wizard.is_dodging(), "the look ends with the window, not with the dash")
+	_check(not _wizard.is_invulnerable() and not _wizard._invulnerable_look, "a dash does not protect")
 	_setup()
 	_wizard.protect(1.0)
 	_run(1)
@@ -254,13 +255,12 @@ func _test_walk_and_dash_move_the_body() -> void:
 		_run(1)
 		bobs[int(sprite.offset.y)] = true
 	_check(bobs.size() == 2, "the walk dips the body on alternate frames, saw %s" % [bobs.keys()])
-	_input.send_virtual(0, &"dodge", 1.0)
+	_dash()
 	_run(1)
-	_input.send_virtual(0, &"dodge", 0.0)
-	_check(_wizard.is_dodging(), "the wizard is dashing")
+	_check(_wizard.is_dashing(), "the wizard is dashing")
 	_check(sprite.offset.y > 0.0, "the dash starts in a crouch")
 	_run(1)
-	_check(_wizard.is_dodging() and sprite.offset.y < 0.0, "the dash then lifts the body off the ground")
+	_check(_wizard.is_dashing() and sprite.offset.y < 0.0, "the dash then lifts the body off the ground")
 	_input.send_virtual(0, &"move_right", 0.0)
-	_run(int(PlayerScript.DODGE_TIME / STEP) + 4)
-	_check(not _wizard.is_dodging() and sprite.frame == 0, "standing still again")
+	_run(int(DASH_TIME / STEP) + 4)
+	_check(not _wizard.is_dashing() and sprite.frame == 0, "standing still again")

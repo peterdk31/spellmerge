@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="FormBase" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/base/form_base.gd" id="1_base"]
+[ext_resource type="Texture2D" path="res://content/spells/forms/dash/icon.svg" id="2_icon"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"dash"
+demo = true
+display_name = "Dash"
+complexity = 1
+icon = ExtResource("2_icon")
+base_damage = 1
+mana_cost = 0.0
+cooldown = 0.575
+speed = 220.0
+lifetime = 0.25
+radius = 1.0
+shots = 1
+spread = 0.0
+motion = 4
+pierce = 0

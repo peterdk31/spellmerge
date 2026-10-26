@@ -42,11 +42,12 @@ const MAX_PLAYERS: int = InputManagerScript.MAX_PLAYERS
 const NO_FOCUS: int = -1
 
 const PREVIOUS_ACTIONS: Array[StringName] = [&"move_up", &"move_left"]
-const ACTIVATE: StringName = &"cast"
-const CANCEL: StringName = &"dodge"
+## A (Space) activates and B (Q) goes back, as on most gamepads (staffs A6a).
+const ACTIVATE: StringName = &"cast_a"
+const CANCEL: StringName = &"cast_b"
 ## Every action read while a panel is open.
 const WATCHED: Array[StringName] = [
-	&"move_up", &"move_left", &"move_down", &"move_right", &"cast", &"dodge",
+	&"move_up", &"move_left", &"move_down", &"move_right", &"cast_a", &"cast_b",
 ]
 
 ## A panel opened for `player`.

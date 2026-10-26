@@ -3,8 +3,8 @@ extends Node
 ## first room through the real input path. Bots 1-3 fight; bot 4 opens its overlay
 ## with the `overlay` action when the room starts, walks into its builder ("Build") and
 ## idles in it the whole run (full view in breaks, quick view in waves). Bots 1-3 also
-## build: when the room starts each builds a seeded random spell that compiles into spell B
-## with `build_change_requested` and swaps to it, so the run is played with built spells.
+## build: when the room starts each builds a seeded random staff into staff Y
+## with `staff_change_requested` and casts it with staff X, so the run is played with built staffs.
 ##
 ## It passes only if
 ##  - `room_cleared` is received,
@@ -13,7 +13,7 @@ extends Node
 ##  - bot 4's overlay opened, its builder opened, and neither was seen closed
 ##    afterwards (polled every frame; the overlay hands over to the builder). Bot 4 stands still and can be downed; it is not checked for that, and
 ##    a close while it was downed is printed as a note, not a failure, and
-##  - every fighter's build went through (spell B holds the recipe the bot chose) and no
+##  - every fighter's build went through (staff Y holds the cards the bot chose) and no
 ##    `build_refused` arrived, and
 ##  - the log has no `push_error` call, no line starting `ERROR:` and no "the
 ##    restart failed" warning (tests/smoke/error_log.gd, which has a unit test; it
@@ -205,10 +205,8 @@ func _check() -> Array[String]:
 	for index in IDLER:
 		var wizard := _flow.call("get_wizard", index) as Node
 		var bot: BotScript = _bots[index]
-		if wizard != null and not bot.built_recipe.is_empty() and _plain(wizard.call("recipe_of", BotScript.BUILD_SPELL)) != _plain(bot.built_recipe):
-			failed.append("bot %d: spell B is not the recipe it built" % (index + 1))
-		if wizard != null and not bot.built_recipe.is_empty() and int(wizard.get("active_slot")) != BotScript.BUILD_SPELL:
-			failed.append("bot %d: still not on spell B, the swap did not happen" % (index + 1))
+		if wizard != null and not bot.built_cards.is_empty() and wizard.call("cards_of", BotScript.BUILD_STAFF) != bot.built_cards:
+			failed.append("bot %d: staff Y is not the staff it built" % (index + 1))
 	if not _overlay_seen_open:
 		failed.append("the overlay of bot %d never opened" % (IDLER + 1))
 	elif not _builder_seen_open:
@@ -260,11 +258,11 @@ func _finish(failed: Array[String]) -> void:
 		get_tree().quit(1)
 
 
-## The recipes the fighters built, for the OK line.
+## The staffs the fighters built, for the OK line.
 func _built_text() -> String:
 	var parts: Array[String] = []
 	for index in IDLER:
-		parts.append(str((_bots[index] as BotScript).built_recipe))
+		parts.append(str((_bots[index] as BotScript).built_cards))
 	return "; ".join(parts)
 
 

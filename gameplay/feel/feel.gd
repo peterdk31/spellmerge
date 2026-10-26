@@ -1143,7 +1143,7 @@ func _pose_form(slot: int, t: float) -> void:
 
 func _on_wizard_cast(_player: int, wizard: Node) -> void:
 	# The dash look owns the sprite scale while dodging; a squash would fight it.
-	if wizard != null and wizard.has_method("is_dodging") and wizard.call("is_dodging"):
+	if wizard != null and wizard.has_method("is_dashing") and wizard.call("is_dashing"):
 		return
 	_start_reaction(wizard, preset.cast_squash_seconds, -preset.cast_squash, false)
 

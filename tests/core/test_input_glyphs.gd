@@ -8,7 +8,7 @@ extends "res://tests/support/suite.gd"
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 const GlyphsScript := preload("res://core/input/input_glyphs.gd")
 
-const ACTIONS_SHOWN: Array[StringName] = [&"cast", &"dodge", &"overlay", &"swap", &"join", &"leave"]
+const ACTIONS_SHOWN: Array[StringName] = [&"cast_a", &"cast_x", &"cast_y", &"cast_b", &"overlay", &"join", &"leave"]
 const FAMILIES: Array[int] = [GlyphsScript.Kind.KEYBOARD, GlyphsScript.Kind.KEYBOARD_MOUSE, GlyphsScript.Kind.XBOX, GlyphsScript.Kind.PLAYSTATION, GlyphsScript.Kind.SWITCH, GlyphsScript.Kind.GAMEPAD]
 
 var _pad_names: Dictionary = {}
@@ -58,27 +58,27 @@ func test_every_family_has_a_glyph_for_every_action_the_hints_use() -> void:
 
 
 func test_the_families_label_the_same_button_differently() -> void:
-	var xbox: String = GlyphsScript.glyph(GlyphsScript.Kind.XBOX, &"cast")["label"]
-	var playstation: String = GlyphsScript.glyph(GlyphsScript.Kind.PLAYSTATION, &"cast")["label"]
-	var switch_label: String = GlyphsScript.glyph(GlyphsScript.Kind.SWITCH, &"cast")["label"]
-	var keyboard: String = GlyphsScript.glyph(GlyphsScript.Kind.KEYBOARD, &"cast")["label"]
+	var xbox: String = GlyphsScript.glyph(GlyphsScript.Kind.XBOX, &"cast_x")["label"]
+	var playstation: String = GlyphsScript.glyph(GlyphsScript.Kind.PLAYSTATION, &"cast_x")["label"]
+	var switch_label: String = GlyphsScript.glyph(GlyphsScript.Kind.SWITCH, &"cast_x")["label"]
+	var keyboard: String = GlyphsScript.glyph(GlyphsScript.Kind.KEYBOARD, &"cast_x")["label"]
 	check(xbox != playstation and xbox != switch_label and playstation != switch_label and xbox != keyboard, "cast reads %s, %s, %s, %s" % [xbox, playstation, switch_label, keyboard])
 
 
 func test_the_mouse_shows_cast_as_a_click_and_nothing_else_changes() -> void:
-	check_equal(GlyphsScript.glyph(GlyphsScript.Kind.KEYBOARD_MOUSE, &"cast")["shape"], GlyphsScript.Shape.MOUSE, "cast is the mouse")
-	check_equal(GlyphsScript.glyph(GlyphsScript.Kind.KEYBOARD_MOUSE, &"dodge"), GlyphsScript.glyph(GlyphsScript.Kind.KEYBOARD, &"dodge"), "dodge stays a key")
+	check_equal(GlyphsScript.glyph(GlyphsScript.Kind.KEYBOARD_MOUSE, &"cast_x")["shape"], GlyphsScript.Shape.MOUSE, "cast_x is the left mouse button")
+	check_equal(GlyphsScript.glyph(GlyphsScript.Kind.KEYBOARD_MOUSE, &"cast_a"), GlyphsScript.glyph(GlyphsScript.Kind.KEYBOARD, &"cast_a"), "cast_a stays a key")
 
 
 func test_the_glyphs_follow_the_bindings_in_the_input_map() -> void:
-	var place_of: Dictionary = {&"join": JOY_BUTTON_A, &"dodge": JOY_BUTTON_B, &"cast": JOY_BUTTON_X, &"overlay": JOY_BUTTON_Y, &"swap": JOY_BUTTON_LEFT_SHOULDER}
+	var place_of: Dictionary = {&"join": JOY_BUTTON_A, &"cast_a": JOY_BUTTON_A, &"cast_b": JOY_BUTTON_B, &"cast_x": JOY_BUTTON_X, &"cast_y": JOY_BUTTON_Y}
 	for action: StringName in place_of:
 		var bound: bool = false
 		for event in InputMap.action_get_events(action):
 			if event is InputEventJoypadButton and (event as InputEventJoypadButton).button_index == place_of[action]:
 				bound = true
 		check(bound, "%s is bound to joypad button %d, which the pad glyphs show" % [action, place_of[action]])
-	var keys: Dictionary = {&"cast": KEY_J, &"dodge": KEY_SPACE, &"overlay": KEY_E, &"swap": KEY_Q}
+	var keys: Dictionary = {&"cast_x": KEY_J, &"cast_y": KEY_K, &"cast_a": KEY_SPACE, &"cast_b": KEY_Q, &"overlay": KEY_E}
 	for action: StringName in keys:
 		var key_bound: bool = false
 		for event in InputMap.action_get_events(action):

@@ -11,7 +11,7 @@ const HintLineScript := preload("res://hud/widgets/hint_line.gd")
 
 const SHOTS_DIR := "user://screenshots"
 const SETTLE_FRAMES := 10
-const ACTIONS: Array[StringName] = [&"cast", &"dodge", &"overlay", &"swap", &"join", &"leave"]
+const ACTIONS: Array[StringName] = [&"cast_a", &"cast_x", &"cast_y", &"cast_b", &"overlay", &"join", &"leave"]
 const PAD_NAMES: Dictionary = {0: "Xbox One Controller", 1: "PS5 Controller", 2: "Nintendo Switch Pro Controller", 3: "Generic Pad"}
 const ROW_HEIGHT: float = 44.0
 
@@ -55,7 +55,7 @@ func _initialize() -> void:
 		hint.bind(manager)
 		hint.position = Vector2(540.0, 8.0 + ROW_HEIGHT * row)
 		root.add_child(hint)
-		hint.show_hint(player, &"cast", "Use", &"dodge", "back")
+		hint.show_hint(player, &"cast_a", "Use", &"cast_b", "back")
 	await _settle()
 	await RenderingServer.frame_post_draw
 	var image: Image = root.get_texture().get_image()

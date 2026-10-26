@@ -13,7 +13,7 @@ extends Node
 ## after the other.
 ##
 ## How the numbers are held. The bots cast their built spells through the real input
-## path (`cast`, and `swap` every SWAP_EVERY seconds so both spells are used). Their
+## path (`cast_x` and `cast_y` held together, so both built staffs are used). Their
 ## mana and health are kept full (so they keep casting), and enemies are added whenever
 ## fewer than the target stand, with more health than the game's imp, so fights go on.
 ## The shots the spells make are never enough for 500 or 3,000, so each physics step
@@ -65,8 +65,6 @@ const SPAWN_PER_FRAME: int = 10
 const TOP_UP_PER_STEP: int = 120
 ## Where enemies appear (inside the walls of the 640x360 room).
 const ENEMY_AREA: Rect2 = Rect2(48.0, 48.0, 544.0, 264.0)
-## Seconds between the bots' `swap` presses.
-const SWAP_EVERY: float = 4.0
 ## The timing pass over the crowd (`_time_parts`) runs on every PARTS_EVERY-th drawn frame.
 const PARTS_EVERY: int = 30
 ## Filler shots: speed range (px/s), life (s), radius and pierce.
@@ -80,24 +78,24 @@ const SEED: int = 24
 const REACH: float = 0.9
 const FRAME_BUDGET_MS: float = 1000.0 / 60.0
 
-## The build of each player: slot A and slot B. Heavy on purpose: splits, rings, orbits,
-## triggers with held spells, all four elements.
-const RECIPES: Array[Array] = [
+## The build of each player: the cards of staff X and staff Y (the A staff keeps its dash).
+## Heavy on purpose: splits, rings, orbits, triggers with payloads, all four elements.
+const STAFFS: Array[Array] = [
 	[
-		{"form": &"nova", "element": &"fire", "modifiers": [&"split", &"bigger"], "trigger": &"on_hit", "held": {"form": &"bolt", "element": &"storm"}},
-		{"form": &"orbit", "element": &"frost", "trigger": &"timer", "held": {"form": &"bolt", "element": &"fire", "modifiers": [&"split"]}},
+		[&"fire", &"split", &"bigger", &"on_hit", &"nova", &"storm", &"bolt"],
+		[&"frost", &"timer", &"orbit", &"fire", &"split", &"bolt"],
 	],
 	[
-		{"form": &"beam", "element": &"storm", "modifiers": [&"chain", &"pierce"]},
-		{"form": &"bolt", "element": &"void", "modifiers": [&"homing", &"split"], "trigger": &"on_expire", "held": {"form": &"nova", "element": &"fire"}},
+		[&"storm", &"chain", &"pierce", &"beam"],
+		[&"void", &"homing", &"split", &"on_expire", &"bolt", &"fire", &"nova"],
 	],
 	[
-		{"form": &"rune", "element": &"frost", "trigger": &"timer", "held": {"form": &"nova", "element": &"frost"}},
-		{"form": &"nova", "element": &"storm", "modifiers": [&"split", &"pierce"]},
+		[&"frost", &"timer", &"rune", &"frost", &"nova"],
+		[&"storm", &"split", &"pierce", &"nova"],
 	],
 	[
-		{"form": &"bolt", "element": &"fire", "modifiers": [&"split", &"homing", &"faster"], "trigger": &"on_hit", "held": {"form": &"bolt", "element": &"frost", "modifiers": [&"split"]}},
-		{"form": &"nova", "element": &"void", "trigger": &"on_hit", "held": {"form": &"nova", "element": &"fire"}},
+		[&"fire", &"split", &"homing", &"faster", &"on_hit", &"bolt", &"frost", &"split", &"bolt"],
+		[&"void", &"on_hit", &"nova", &"fire", &"nova"],
 	],
 ]
 
@@ -126,7 +124,6 @@ var _current: int = -1
 var _target_enemies: int = 0
 var _target_shots: int = 0
 var _elapsed: float = 0.0
-var _swap_left: float = 0.0
 var _measuring: bool = false
 var _active: bool = false
 var _default_cap: int = 0
@@ -199,7 +196,6 @@ func _next_scenario() -> void:
 	_hits = 0
 	_reactions = 0
 	_elapsed = 0.0
-	_swap_left = SWAP_EVERY
 	_measuring = false
 	_enemy_step_usec = 0
 	_lookup_usec = 0
@@ -231,9 +227,11 @@ func _next_scenario() -> void:
 		if wizard == null:
 			_finish(["the wizard of player %d is missing" % (index + 1)])
 			return
-		for slot in 2:
-			if not wizard.set_recipe(slot, RECIPES[index][slot]):
-				_finish(["the stress recipe %d of player %d was refused" % [slot, index + 1]])
+		for at in 2:
+			var cards: Array[StringName] = []
+			cards.assign(STAFFS[index][at])
+			if not wizard.set_staff(at + 1, cards):
+				_finish(["the stress staff %d of player %d was refused" % [at + 1, index + 1]])
 				return
 	print("BENCH: stress scenario %s: %d players, %d enemies, %d shots (cap %d), warm-up %.0f s, measured %.0f s" % [scenario["label"], PLAYERS, _target_enemies, _target_shots, int(_projectiles.call("get_cap")), warm_up, measure])
 	_active = true
@@ -257,15 +255,8 @@ func _process(delta: float) -> void:
 		return
 	_elapsed += delta
 	_keep_wizards_up()
-	_swap_left -= delta
-	var swap: bool = _swap_left <= 0.0
-	if swap:
-		_swap_left = SWAP_EVERY
 	for bot in _bots:
 		bot.step(delta)
-		if swap:
-			_input.call("send_virtual", bot.player, &"swap", 1.0)
-			_input.call("send_virtual", bot.player, &"swap", 0.0)
 	_top_up_enemies()
 	_process_frames += 1
 	if _measuring and _process_frames % PARTS_EVERY == 0:

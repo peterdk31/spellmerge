@@ -32,6 +32,8 @@ var spells: SpellsScript
 var combat: CombatScript
 ## Every imp added, in order.
 var imps: Array[Node2D] = []
+## Every caster_move_requested as [player, mode] (a dash card moves its caster, staffs A6a).
+var caster_moves: Array = []
 ## Every reaction_triggered as [player, id, position].
 var reactions: Array = []
 ## Every status_applied as [player, imp, status id, health the imp had lost by then].
@@ -64,6 +66,7 @@ func _init(root: Node) -> void:
 	combat.spells = spells
 	combat._ready()
 	bus.reaction_triggered.connect(func(player: int, id: StringName, at: Vector2) -> void: reactions.append([player, id, at]))
+	bus.caster_move_requested.connect(func(player: int, mode: StringName, _to: Vector2, _seconds: float, _tag: int) -> void: caster_moves.append([player, mode]))
 	bus.status_applied.connect(func(player: int, target: Node, id: StringName) -> void: statuses.append([player, target, id, lost(target as Node2D)]))
 
 

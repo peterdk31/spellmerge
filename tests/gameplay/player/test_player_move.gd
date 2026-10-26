@@ -1,7 +1,7 @@
 extends SceneTree
-## Tests for gameplay/player (move and dodge): the speeds, the dodge with its
-## brief invulnerability and cooldown, a captured player, and two players (and
-## all four) at once without touching each other. Input goes through the real
+## Tests for gameplay/player (move and dash): the speeds, the dash a dash card asks for (staffs
+## A6a: `caster_move_requested`, no invulnerability, `caster_move_finished` where it ends), a
+## captured player, and two players (and all four) at once without touching each other. Input goes through the real
 ## input manager's virtual devices; time moves by fixed deltas. The step and the
 ## timings are binary fractions, so the timers add up exactly.
 ##
@@ -13,6 +13,10 @@ const EventsScript := preload("res://core/events/events.gd")
 const WizardScene := preload("res://content/wizard/base/wizard.tscn")
 
 const STEP: float = 0.0625
+## A dash as the dash card asks for it: 55 px over a quarter of a second (220 px/s).
+const DASH_DISTANCE: float = 55.0
+const DASH_TIME: float = 0.25
+const DASH_SPEED: float = 220.0
 
 var _failures: Array[String] = []
 var _bus: Node
@@ -27,22 +31,19 @@ func _initialize() -> void:
 	_test_stands_still()
 	_test_walks_at_move_speed()
 	_test_diagonal_is_not_faster()
-	_test_dodge_dashes_and_invulnerability_ends_first()
-	_test_dodge_without_direction_uses_facing()
-	_test_dodge_direction_is_locked()
-	_test_cooldown()
-	_test_press_too_early_is_dropped()
-	_test_press_just_before_ready_is_buffered()
-	_test_tap_released_before_step_counts()
-	_test_captured_player_cannot_move_or_dodge()
-	_test_press_while_captured_is_not_saved()
+	_test_dash_runs_at_the_card_speed_without_invulnerability()
+	_test_dash_without_direction_uses_facing()
+	_test_dash_direction_is_locked()
+	_test_dash_end_is_reported_where_it_stopped()
+	_test_dash_for_another_player_is_ignored()
+	_test_captured_player_cannot_move()
 	_test_capture_during_dash_ends_it()
 	_test_two_players_at_once()
 	_test_four_players_at_once()
 	_test_no_input_manager()
 	_teardown()
 	if _failures.is_empty():
-		print("TEST OK: gameplay/player (move and dodge)")
+		print("TEST OK: gameplay/player (move and dash)")
 		quit(0)
 	else:
 		for failure in _failures:
@@ -65,6 +66,7 @@ func _setup(count: int) -> void:
 		var player := PlayerScript.new()
 		player.index = index
 		player.input = _input
+		player.events = _bus
 		player._ready()
 		_players.append(player)
 
@@ -86,6 +88,11 @@ func _hold(player: int, action: StringName) -> void:
 
 func _release(player: int, action: StringName) -> void:
 	_input.send_virtual(player, action, 0.0)
+
+
+## A dash card's request for `player`: `distance` pixels over `seconds`.
+func _dash(player: int, distance: float = DASH_DISTANCE, seconds: float = DASH_TIME) -> void:
+	_bus.caster_move_requested.emit(player, &"dash", _players[player].muzzle_position() + Vector2(distance, 0.0), seconds, 77)
 
 
 ## Step every player `count` times.
@@ -153,7 +160,7 @@ func _test_stands_still() -> void:
 	_setup(1)
 	_run(2)
 	_check(_players[0].velocity == Vector2.ZERO, "no input, no movement")
-	_check(not _players[0].is_dodging() and not _players[0].is_invulnerable(), "not dodging at rest")
+	_check(not _players[0].is_dashing() and not _players[0].is_invulnerable(), "not dashing at rest")
 
 
 func _test_walks_at_move_speed() -> void:
@@ -175,202 +182,112 @@ func _test_diagonal_is_not_faster() -> void:
 	_check(is_equal_approx(_players[0].velocity.length(), PlayerScript.MOVE_SPEED), "a diagonal is not faster, got %f" % _players[0].velocity.length())
 
 
-func _test_dodge_dashes_and_invulnerability_ends_first() -> void:
+func _test_dash_runs_at_the_card_speed_without_invulnerability() -> void:
 	_setup(1)
 	var player: PlayerScript = _players[0]
 	_hold(0, &"move_left")
-	_hold(0, &"dodge")
 	_run(1)
-	_check(player.is_dodging(), "a dodge press starts a dodge")
-	_check(player.is_invulnerable(), "the dodge makes the wizard invulnerable")
-	_check(_near(player.velocity, Vector2(-PlayerScript.DODGE_SPEED, 0.0)), "the dash is at DODGE_SPEED, got %s" % player.velocity)
-	_release(0, &"dodge")
+	_dash(0)
 	_run(1)
-	_check(player.is_invulnerable(), "still invulnerable halfway through INVULNERABLE_TIME")
-	_run(1)
-	_check(not player.is_invulnerable(), "invulnerability ends after INVULNERABLE_TIME")
-	_check(player.is_dodging(), "the dash outlasts the invulnerability")
-	_run(2)
-	_check(not player.is_dodging(), "the dash ends after DODGE_TIME")
-	_check(_near(player.velocity, Vector2(-PlayerScript.MOVE_SPEED, 0.0)), "back to walking after the dash")
+	_check(player.is_dashing(), "the request starts a dash")
+	_check(not player.is_invulnerable(), "a dash gives no invulnerability")
+	_check(_near(player.velocity, Vector2(-DASH_SPEED, 0.0)), "the dash goes the way the wizard walks, as fast as asked, got %s" % player.velocity)
+	_run(int(DASH_TIME / STEP))
+	_check(not player.is_dashing(), "the dash ends after the time asked")
+	_check(_near(player.velocity, Vector2(-PlayerScript.MOVE_SPEED, 0.0)), "then the wizard walks again")
 
 
-func _test_dodge_without_direction_uses_facing() -> void:
+func _test_dash_without_direction_uses_facing() -> void:
 	_setup(1)
 	var player: PlayerScript = _players[0]
-	_hold(0, &"move_down")
+	_dash(0)
 	_run(1)
-	_release(0, &"move_down")
-	_hold(0, &"dodge")
-	_run(1)
-	_check(_near(player.velocity, Vector2(0.0, PlayerScript.DODGE_SPEED)), "a standing dodge goes the way the wizard faces, got %s" % player.velocity)
+	_check(_near(player.velocity, Vector2(0.0, DASH_SPEED)), "a standing dash goes the way the wizard faces, got %s" % player.velocity)
 
 
-func _test_dodge_direction_is_locked() -> void:
+func _test_dash_direction_is_locked() -> void:
 	_setup(1)
 	var player: PlayerScript = _players[0]
 	_hold(0, &"move_right")
-	_hold(0, &"dodge")
+	_run(1)
+	_dash(0)
 	_run(1)
 	_release(0, &"move_right")
 	_hold(0, &"move_up")
 	_run(1)
-	_check(_near(player.velocity, Vector2(PlayerScript.DODGE_SPEED, 0.0)), "steering does not bend a dodge, got %s" % player.velocity)
+	_check(_near(player.velocity, Vector2(DASH_SPEED, 0.0)), "steering does not bend a dash, got %s" % player.velocity)
 
 
-func _test_cooldown() -> void:
+func _test_dash_end_is_reported_where_it_stopped() -> void:
 	_setup(1)
 	var player: PlayerScript = _players[0]
-	_hold(0, &"dodge")
-	_run(1)
-	_release(0, &"dodge")
-	_run(int(PlayerScript.DODGE_TIME / STEP))
-	_check(not player.is_dodging() and not player.can_dodge(), "after the dash the cooldown still runs")
-	_hold(0, &"dodge")
-	_release(0, &"dodge")
-	_run(1)
-	_check(not player.is_dodging(), "a dodge pressed during the cooldown does nothing")
-	_run(int(PlayerScript.DODGE_COOLDOWN / STEP))
-	_check(player.can_dodge(), "the dodge is ready after DODGE_COOLDOWN")
-	_hold(0, &"dodge")
-	_run(1)
-	_check(player.is_dodging(), "a second dodge starts once the cooldown is over")
+	var ends: Array = []
+	_bus.caster_move_finished.connect(func(p: int, mode: StringName, at: Vector2, tag: int) -> void: ends.append([p, mode, at, tag]))
+	_dash(0)
+	_run(int(DASH_TIME / STEP) + 1)
+	_check(ends.size() == 1, "the end is reported once, got %s" % [ends])
+	if ends.size() == 1:
+		_check(ends[0][0] == 0 and ends[0][1] == &"dash" and ends[0][3] == 77, "for this player, the dash and its card's tag")
+		_check(_near(ends[0][2], player.global_position), "where the wizard stopped")
 
 
-func _test_press_too_early_is_dropped() -> void:
-	_setup(1)
-	var player: PlayerScript = _players[0]
-	_hold(0, &"dodge")
+func _test_dash_for_another_player_is_ignored() -> void:
+	_setup(2)
+	_dash(1)
 	_run(1)
-	_release(0, &"dodge")
-	_hold(0, &"dodge")
-	_release(0, &"dodge")
-	_run(int((PlayerScript.DODGE_COOLDOWN + 0.25) / STEP))
-	_check(not player.is_dodging(), "a press made too early is not queued for later")
+	_check(not _players[0].is_dashing(), "player 1 does not dash for player 2's card")
+	_check(_players[1].is_dashing(), "player 2 does")
 
 
-## A press within INPUT_BUFFER of the end of the cooldown starts the dodge when it
-## ends; one made earlier is dropped; a buffered press is used once.
-func _test_press_just_before_ready_is_buffered() -> void:
-	_setup(1)
-	var player: PlayerScript = _players[0]
-	_hold(0, &"dodge")
-	_run(1)
-	_release(0, &"dodge")
-	_run(8)  # 0.125 s of the cooldown left
-	_check(not player.can_dodge(), "the cooldown is almost over")
-	_hold(0, &"dodge")
-	_release(0, &"dodge")
-	_run(1)
-	_check(not player.is_dodging(), "the press is not used while the cooldown runs")
-	_run(1)
-	_check(player.is_dodging(), "the press just before the end starts the dodge when it is ready")
-	_run(int((PlayerScript.DODGE_TIME + PlayerScript.DODGE_COOLDOWN) / STEP))
-	_check(not player.is_dodging(), "a buffered press is used once")
-	# A press 0.25 s before the end is longer ago than the buffer.
-	_setup(1)
-	player = _players[0]
-	_hold(0, &"dodge")
-	_run(1)
-	_release(0, &"dodge")
-	_run(6)  # 0.25 s left
-	_hold(0, &"dodge")
-	_release(0, &"dodge")
-	_run(int(PlayerScript.DODGE_COOLDOWN / STEP))
-	_check(not player.is_dodging(), "a press longer ago than INPUT_BUFFER is dropped")
-	# A press made in an overlay is not buffered either.
-	_setup(1)
-	player = _players[0]
-	_hold(0, &"dodge")
-	_run(1)
-	_release(0, &"dodge")
-	_run(8)
-	_input.set_captured(0, true)
-	_hold(0, &"dodge")
-	_release(0, &"dodge")
-	_run(1)
-	_input.set_captured(0, false)
-	_run(3)
-	_check(not player.is_dodging(), "a press made while captured is not buffered")
-
-
-func _test_tap_released_before_step_counts() -> void:
-	_setup(1)
-	_hold(0, &"dodge")
-	_release(0, &"dodge")
-	_run(1)
-	_check(_players[0].is_dodging(), "a tap released before the next step still dodges")
-
-
-func _test_captured_player_cannot_move_or_dodge() -> void:
+func _test_captured_player_cannot_move() -> void:
 	_setup(1)
 	var player: PlayerScript = _players[0]
 	_input.set_captured(0, true)
 	_hold(0, &"move_right")
-	_hold(0, &"dodge")
 	_run(1)
 	_check(player.velocity == Vector2.ZERO, "a player in their overlay does not walk")
-	_check(not player.is_dodging(), "a player in their overlay does not dodge")
-
-
-func _test_press_while_captured_is_not_saved() -> void:
-	_setup(1)
-	var player: PlayerScript = _players[0]
-	_input.set_captured(0, true)
-	_hold(0, &"dodge")
-	_run(1)
-	_release(0, &"dodge")
-	_input.set_captured(0, false)
-	_run(1)
-	_check(not player.is_dodging(), "a dodge pressed in the overlay does not fire when it closes")
 
 
 func _test_capture_during_dash_ends_it() -> void:
 	_setup(1)
 	var player: PlayerScript = _players[0]
 	_hold(0, &"move_right")
-	_hold(0, &"dodge")
 	_run(1)
-	_release(0, &"dodge")
-	_check(player.is_dodging(), "the dodge started")
+	_dash(0)
+	_run(1)
+	_check(player.is_dashing(), "the dash started")
 	_input.set_captured(0, true)
 	_run(1)
-	_check(not player.is_dodging(), "an overlay opening ends the dash")
-	_check(not player.is_invulnerable(), "an overlay opening ends the invulnerability")
+	_check(not player.is_dashing(), "an overlay opening ends the dash")
 	_check(player.velocity == Vector2.ZERO, "the captured wizard stands still")
-	_input.set_captured(0, false)
-	_hold(0, &"dodge")
-	_run(1)
-	_check(not player.is_dodging(), "the cooldown still holds after a cancelled dash")
 
 
 func _test_two_players_at_once() -> void:
 	_setup(2)
 	_hold(0, &"move_right")
 	_hold(1, &"move_left")
-	_hold(1, &"dodge")
+	_run(1)
+	_dash(1)
 	_run(1)
 	_check(_near(_players[0].velocity, Vector2(PlayerScript.MOVE_SPEED, 0.0)), "player 0 walks right")
-	_check(not _players[0].is_dodging() and not _players[0].is_invulnerable(), "player 1's dodge does not touch player 0")
-	_check(_players[1].is_dodging() and _players[1].is_invulnerable(), "player 1 dodges")
-	_check(_near(_players[1].velocity, Vector2(-PlayerScript.DODGE_SPEED, 0.0)), "player 1 dashes left")
-	_release(1, &"dodge")
-	_hold(0, &"dodge")
+	_check(not _players[0].is_dashing(), "player 1's dash does not touch player 0")
+	_check(_near(_players[1].velocity, Vector2(-DASH_SPEED, 0.0)), "player 1 dashes left")
+	_dash(0)
 	_run(1)
-	_check(_players[0].is_dodging(), "player 0 dodges while player 1 is on cooldown")
-	_check(not _players[1].can_dodge(), "player 1 is still on cooldown")
+	_check(_players[0].is_dashing() and _players[1].is_dashing(), "both dash at once")
 
 
 func _test_four_players_at_once() -> void:
 	_setup(4)
 	for index in 4:
 		_hold(index, &"move_down")
-	_hold(2, &"dodge")
+	_run(1)
+	_dash(2)
 	_run(1)
 	for index in 4:
-		var dodging: bool = index == 2
-		_check(_players[index].is_dodging() == dodging, "only player 2 dodges (player %d)" % index)
-		var speed: float = PlayerScript.DODGE_SPEED if dodging else PlayerScript.MOVE_SPEED
+		var dashing: bool = index == 2
+		_check(_players[index].is_dashing() == dashing, "only player 2 dashes (player %d)" % index)
+		var speed: float = DASH_SPEED if dashing else PlayerScript.MOVE_SPEED
 		_check(_near(_players[index].velocity, Vector2(0.0, speed)), "player %d moves down at the right speed" % index)
 
 

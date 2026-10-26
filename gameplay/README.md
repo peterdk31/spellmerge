@@ -27,7 +27,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `projectile_expired` | `core/projectiles` | none yet (`core/spells` from M2 part 6) |
 | `build_refused` | `player` | `hud` (the builders) |
 | `bag_changed` | `player` | `hud` (the builders) |
-| `card_move_requested` | `hud` (staffs B8) | `player` |
+| `card_move_requested` | `hud` (the builders) | `player` |
 | `staff_changed` | `player` | `hud` (the builders) |
 | `staff_cast` | `player` | `hud` (the corner panel) |
 | `caster_move_requested`, `mana_reserved` | `core/spells` | `player` |

@@ -34,7 +34,7 @@ const NO_GLYPH: Dictionary = {"shape": Shape.KEY, "label": "?", "color": PLAIN}
 
 const _KEYS: Dictionary = {
 	&"cast_a": "Space", &"cast_x": "J", &"cast_y": "K", &"cast_b": "Q", &"overlay": "E", &"join": "Enter",
-	&"leave": "Bksp", &"move_up": "W", &"move_down": "S", &"move_left": "A", &"move_right": "D",
+	&"leave": "Bksp", &"move_up": "W", &"move_down": "S", &"move_left": "A", &"move_right": "D", &"page_prev": "Z", &"page_next": "C",
 }
 
 ## Name fragments (lower case) of a gamepad's name, per family.
@@ -86,6 +86,12 @@ static func glyph(kind: int, action: StringName) -> Dictionary:
 		&"overlay":
 			var start: String = "Options" if kind == Kind.PLAYSTATION else ("+" if kind == Kind.SWITCH else "Menu")
 			return {"shape": Shape.SHOULDER, "label": start, "color": PLAIN}
+		&"page_prev":
+			var left: String = "L1" if kind == Kind.PLAYSTATION else ("L" if kind == Kind.SWITCH else "LB")
+			return {"shape": Shape.SHOULDER, "label": left, "color": PLAIN}
+		&"page_next":
+			var right: String = "R1" if kind == Kind.PLAYSTATION else ("R" if kind == Kind.SWITCH else "RB")
+			return {"shape": Shape.SHOULDER, "label": right, "color": PLAIN}
 		&"leave":
 			var back: String = "Share" if kind == Kind.PLAYSTATION else ("-" if kind == Kind.SWITCH else "Back")
 			return {"shape": Shape.SHOULDER, "label": back, "color": PLAIN}

@@ -673,6 +673,24 @@ func clip_to_walls(from: Vector2, to: Vector2) -> Vector2:
 	return from.lerp(to, t)
 
 
+## True when a circle of `radius` at `center` is out of the bounds or touches a wall cell
+## (checked at the centre and eight points on its rim, each in its 8-pixel cell).
+func circle_blocked(center: Vector2, radius: float) -> bool:
+	for n in 9:
+		var point: Vector2 = center
+		if n > 0:
+			point += Vector2.RIGHT.rotated(float(n - 1) * TAU / 8.0) * radius
+		if not _bounds.has_point(point):
+			return true
+		if not _has_walls:
+			continue
+		var cx: int = floori((point.x - _bounds.position.x) / WALL_CELL)
+		var cy: int = floori((point.y - _bounds.position.y) / WALL_CELL)
+		if cx >= 0 and cx < _wall_w and cy >= 0 and cy < _wall_h and _wall_cells[cy * _wall_w + cx] != 0:
+			return true
+	return false
+
+
 ## How far along `from`->`to` (0 to 1) the path first enters a solid cell, or -1.0
 ## when it does not. Walks the cells the path crosses (Amanatides and Woo), at
 ## most |dx| + |dy| + 1 of them, in cells.

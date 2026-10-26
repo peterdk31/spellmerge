@@ -14,6 +14,16 @@ extends CharacterBody2D
 ## wizard who joins mid-run), drawn translucent with a closing ring in its colour. Combat asks
 ## is_invulnerable() before damage.
 ##
+## Moves (staffs B4): `teleport` jumps along the aim and stops at the first wall (`TELEPORT_CLEARANCE`
+## short of it); `hook` and `swap` pull the wizard to a point over the time asked (like a dash that
+## ignores the walk; it stops at walls); `recoil` pushes it back. A request is acted on when it
+## comes, so a later dash, teleport, hook or swap replaces an earlier one (the replaced one is
+## answered where the wizard is); the `recoil` requests of one step are added up first (so
+## `mirror` and `recoil` cancel) and applied by the next `step`. A dash, teleport or hook answers
+## `caster_move_finished`. Wizard statuses (`Combat.wizard_speed_factor`) slow or stop walking
+## and dashing, and a hit's push (`Combat.consume_wizard_knockback`) is added to the movement.
+## `mana_refund_requested` (siphon) gives mana back, up to MAX_MANA.
+##
 ## Health and mana: MAX_HEALTH, and MAX_MANA that regenerates. A hit (the
 ## `damage_dealt` event with this wizard as target, or take_damage()) does nothing
 ## while invulnerable or downed. At 0 health the wizard is downed: it cannot move,
@@ -76,6 +86,7 @@ const EventsScript := preload("res://core/events/events.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
+const CombatScript := preload("res://gameplay/combat/combat.gd")
 
 ## Walking speed in pixels per second (the view is 640x360).
 const MOVE_SPEED: float = 90.0
@@ -110,6 +121,13 @@ const FLIP_BAND: float = 0.3
 ## is STAFF_REACH from the hand along the aim.
 const HAND_HEIGHT: float = 10.0
 const STAFF_REACH: float = 14.0
+## A teleport that meets a wall ends this many pixels short of it, and is then backed off in
+## steps of TELEPORT_BACKOFF until the body (radius BODY_RADIUS, as in wizard.tscn) is clear.
+const TELEPORT_CLEARANCE: float = 8.0
+const TELEPORT_BACKOFF: float = 4.0
+const BODY_RADIUS: float = 6.0
+## Most recoils that run at once (a push past this is dropped).
+const MAX_RECOILS: int = 8
 ## Dash look: sprite stretch along the dash, lean in radians, the ghosts' spacing
 ## in pixels and their opacities (one per ghost).
 ## The stretch is for a horizontal dash; a mostly vertical one swaps the axes.
@@ -209,6 +227,8 @@ var projectiles: ProjectileManagerScript = null
 ## The spell runtime. Only tests set this, before adding the node; otherwise the "Spells"
 ## autoload is used.
 var spells: SpellsScript = null
+## Combat, for the statuses and pushes on this wizard (the "Combat" autoload; tests set it).
+var combat: CombatScript = null
 
 ## The staff every one of the four staffs is (its slots, delay and recharge). Flow sets it by
 ## build channel; without one a staff has 4 slots and casts with no delay of its own.
@@ -257,6 +277,17 @@ var _dash_left: float = 0.0
 var _dash_direction: Vector2 = Vector2.ZERO
 var _dash_speed: float = 0.0
 var _dash_tag: int = 0
+## What the dash state is doing: &"dash", or &"hook"/&"swap" (a pull to a point, not walking).
+var _dash_mode: StringName = &"dash"
+## True when the move's time ran out in the last step: the next step answers it.
+var _dash_done: bool = false
+## Recoil asked for since the last step (pixels to move, the longest time asked), and the pushes
+## being applied, each with its own velocity and seconds left (the first `_recoil_count` count).
+var _recoil_pending: Vector2 = Vector2.ZERO
+var _recoil_pending_seconds: float = 0.0
+var _recoil_velocities: Array[Vector2] = []
+var _recoil_lefts: PackedFloat32Array = PackedFloat32Array()
+var _recoil_count: int = 0
 var _invulnerable_left: float = 0.0
 ## Per staff: the button's press count last seen, and the seconds left in which a remembered
 ## press still counts (0 = none remembered).
@@ -279,6 +310,8 @@ var _sent_mana: int = -1
 
 
 func _init() -> void:
+	_recoil_velocities.resize(MAX_RECOILS)
+	_recoil_lefts.resize(MAX_RECOILS)
 	collision_layer = LAYER_PLAYERS
 	collision_mask = LAYER_WALLS
 	motion_mode = CharacterBody2D.MOTION_MODE_FLOATING
@@ -393,6 +426,8 @@ func _ready() -> void:
 		projectiles = get_node_or_null("/root/Projectiles") as ProjectileManagerScript
 	if spells == null and in_tree:
 		spells = get_node_or_null("/root/Spells") as SpellsScript
+	if combat == null and in_tree:
+		combat = get_node_or_null("/root/Combat") as CombatScript
 	_connect_build_events()
 	_fill_bag()
 	for at in STAFF_COUNT:
@@ -429,6 +464,8 @@ func _connect_build_events() -> void:
 		events.caster_move_requested.connect(_on_caster_move_requested)
 	if not events.mana_reserved.is_connected(_on_mana_reserved):
 		events.mana_reserved.connect(_on_mana_reserved)
+	if not events.mana_refund_requested.is_connected(_on_mana_refund):
+		events.mana_refund_requested.connect(_on_mana_refund)
 
 
 ## Stop listening to build requests (a wizard that left is freed a frame later) and stop
@@ -443,6 +480,8 @@ func _exit_tree() -> void:
 			events.caster_move_requested.disconnect(_on_caster_move_requested)
 		if events.mana_reserved.is_connected(_on_mana_reserved):
 			events.mana_reserved.disconnect(_on_mana_reserved)
+		if events.mana_refund_requested.is_connected(_on_mana_refund):
+			events.mana_refund_requested.disconnect(_on_mana_refund)
 	if projectiles != null:
 		projectiles.clear_anchor(index)
 
@@ -462,6 +501,7 @@ func step(delta: float) -> void:
 			projectiles.set_anchor(index, global_position + ORBIT_ANCHOR_OFFSET)
 	if _downed:
 		velocity = Vector2.ZERO
+		_clear_recoil()
 		# Presses made while downed are not held against the wizard after a revive.
 		_forget_presses()
 		_update_invulnerable_look()
@@ -471,12 +511,12 @@ func step(delta: float) -> void:
 	_invulnerable_left = maxf(_invulnerable_left - delta, 0.0)
 	for at in STAFF_COUNT:
 		_buffer_left[at] = maxf(_buffer_left[at] - delta, 0.0)
-	if _dash_left > 0.0:
-		_dash_left = maxf(_dash_left - delta, 0.0)
-		if _dash_left <= 0.0:
-			_finish_dash()
+	if _dash_done:
+		# The last step of the move has been walked (the body moved after the last step call).
+		_finish_dash()
 	if input == null:
-		velocity = Vector2.ZERO
+		# No input (only in tests): stand still, but a push still applies.
+		velocity = _recoil_step(delta)
 		_update_invulnerable_look()
 		return
 	var move: Vector2 = input.get_move(index)
@@ -490,10 +530,21 @@ func step(delta: float) -> void:
 	_update_aim(move, delta)
 	if _dash_look:
 		_tick_trail(delta)
+	var pace: float = combat.wizard_speed_factor(index) if combat != null else 1.0
 	if is_dashing():
 		velocity = _dash_direction * _dash_speed
+		if _dash_mode == &"dash":
+			velocity *= pace
+		# The move lasts its whole time: it is answered by the next step, once walked.
+		_dash_left = maxf(_dash_left - delta, 0.0)
+		_dash_done = _dash_left <= 0.0
+		if _dash_done:
+			_apply_dash_look(false)
 	else:
-		velocity = move * MOVE_SPEED
+		velocity = move * MOVE_SPEED * pace
+	velocity += _recoil_step(delta)
+	if combat != null:
+		velocity += combat.consume_wizard_knockback(index, delta)
 	_update_animation(delta)
 	_update_invulnerable_look()
 	# Count presses rather than asking "just pressed": a tap released again before this
@@ -863,6 +914,14 @@ func _on_mana_reserved(player: int, amount: float) -> void:
 		_reserved = maxf(amount, 0.0)
 
 
+## Siphon gives mana back (never above MAX_MANA).
+func _on_mana_refund(player: int, amount: float) -> void:
+	if player != index or _downed or not is_finite(amount) or amount <= 0.0:
+		return
+	mana = minf(mana + amount, MAX_MANA)
+	_announce_stats()
+
+
 ## Mana a cast may use now: what the wizard has, minus what sustained cards hold.
 func free_mana() -> float:
 	return maxf(mana - _reserved, 0.0)
@@ -893,19 +952,34 @@ func cast_staff(at: int) -> bool:
 	return true
 
 
-## A dash card of this wizard asked for a dash: the way it walks (or faces), as far and as long
-## as the card says. Other moves (teleport, hook, swap, recoil) come with staffs B4.
+## A card of this wizard asked to move it (staffs A6a, B4). A dash goes the way the wizard walks
+## (or faces), a teleport jumps, a hook or swap pulls it to a point, a recoil pushes it back.
+## Anything but a recoil replaces the move in progress, which is answered where the wizard is.
 func _on_caster_move_requested(player: int, mode: StringName, to: Vector2, seconds: float, tag: int) -> void:
-	if player != index or _downed or mode != &"dash":
+	if player != index or _downed or not to.is_finite():
 		return
-	if is_dashing():
+	if mode == &"recoil":
+		_recoil_pending += to - muzzle_position()
+		_recoil_pending_seconds = maxf(_recoil_pending_seconds, maxf(seconds, 0.01))
+		return
+	if mode != &"dash" and mode != &"teleport" and mode != &"hook" and mode != &"swap":
+		return
+	if is_dashing() or _dash_done:
 		_finish_dash()
-	var distance: float = (to - muzzle_position()).length()
+	if mode == &"teleport":
+		_teleport(to, tag)
+		return
 	var time: float = maxf(seconds, 0.01)
-	_dash_direction = facing
-	if input != null and input.get_move(index) != Vector2.ZERO:
-		_dash_direction = input.get_move(index).normalized()
-	_dash_speed = distance / time
+	_dash_mode = mode
+	if mode == &"dash":
+		_dash_direction = facing
+		if input != null and input.get_move(index) != Vector2.ZERO:
+			_dash_direction = input.get_move(index).normalized()
+		_dash_speed = (to - muzzle_position()).length() / time
+	else:
+		var pull: Vector2 = to - global_position
+		_dash_direction = pull.normalized()
+		_dash_speed = pull.length() / time
 	_dash_left = time
 	_dash_tag = tag
 	# The ghosts start on the wizard and grow out behind as the dash goes on.
@@ -913,11 +987,64 @@ func _on_caster_move_requested(player: int, mode: StringName, to: Vector2, secon
 	_trail_timer = GHOST_INTERVAL
 
 
-## The dash ended: say where, so its card can go off there (blast, a trigger; staffs B2).
+## Jump to where a teleport card aimed (`to` is measured from the staff tip), stopping short of
+## the first wall, then backing off along the path until the whole body is clear of walls and
+## inside the room (or staying put), and say where the wizard landed.
+func _teleport(to: Vector2, tag: int) -> void:
+	var start: Vector2 = global_position
+	var goal: Vector2 = start + (to - muzzle_position())
+	if projectiles != null:
+		var reached: Vector2 = projectiles.clip_to_walls(start, goal)
+		if reached != goal:
+			reached = reached.move_toward(start, TELEPORT_CLEARANCE)
+		goal = reached
+		while goal != start and projectiles.circle_blocked(goal, BODY_RADIUS):
+			goal = goal.move_toward(start, TELEPORT_BACKOFF)
+	global_position = goal
+	if events != null:
+		events.caster_move_finished.emit(index, &"teleport", goal, tag)
+
+
+## The move ended: say where, so its card can go off there (blast, a trigger; staffs B2). A swap
+## sends nothing (its blast goes off at the target).
 func _finish_dash() -> void:
 	_dash_left = 0.0
-	if events != null:
-		events.caster_move_finished.emit(index, &"dash", global_position, _dash_tag)
+	_dash_done = false
+	if events != null and _dash_mode != &"swap":
+		events.caster_move_finished.emit(index, _dash_mode, global_position, _dash_tag)
+
+
+## The recoil asked for since the last step becomes a push of that distance over the time asked,
+## which ends on its own time; returns the velocity of all pushes to add now (a push's last step
+## is shortened, so each moves exactly its distance).
+func _recoil_step(delta: float) -> Vector2:
+	if _recoil_pending != Vector2.ZERO and _recoil_count < MAX_RECOILS:
+		_recoil_velocities[_recoil_count] = _recoil_pending / _recoil_pending_seconds
+		_recoil_lefts[_recoil_count] = _recoil_pending_seconds
+		_recoil_count += 1
+	_recoil_pending = Vector2.ZERO
+	_recoil_pending_seconds = 0.0
+	var total: Vector2 = Vector2.ZERO
+	var at: int = 0
+	while at < _recoil_count:
+		var left: float = _recoil_lefts[at]
+		total += _recoil_velocities[at] * minf(left, delta) / maxf(delta, 0.0001)
+		left -= delta
+		if left <= 0.0:
+			# Done: the last push takes its place.
+			_recoil_count -= 1
+			_recoil_velocities[at] = _recoil_velocities[_recoil_count]
+			_recoil_lefts[at] = _recoil_lefts[_recoil_count]
+			continue
+		_recoil_lefts[at] = left
+		at += 1
+	return total
+
+
+func _clear_recoil() -> void:
+	_recoil_pending = Vector2.ZERO
+	_recoil_pending_seconds = 0.0
+	_recoil_count = 0
 
 
 func _play_cast_sound() -> void:
@@ -988,6 +1115,8 @@ func take_damage(amount: int) -> bool:
 		_downed = true
 		_apply_dash_look(false)
 		_dash_left = 0.0
+		_dash_done = false
+		_clear_recoil()
 		_invulnerable_left = 0.0
 		velocity = Vector2.ZERO
 		_revive_progress = 0.0

@@ -928,6 +928,9 @@ func _test_clip_to_walls() -> void:
 	_check(inside == Vector2(110.0, 100.0), "from inside a wall the segment is empty")
 	var clear: Vector2 = _mgr.clip_to_walls(Vector2(60.0, 250.0), Vector2(160.0, 250.0))
 	_check(clear == Vector2(160.0, 250.0), "a clear segment is unchanged")
+	_check(not _mgr.circle_blocked(Vector2(60.0, 250.0), 6.0), "a circle in the open is not blocked")
+	_check(_mgr.circle_blocked(Vector2(90.0, 100.0), 6.0), "a circle whose rim meets a wall is blocked")
+	_check(_mgr.circle_blocked(Vector2(3.0, 250.0), 6.0), "a circle past the bounds is blocked")
 
 
 func _test_wall_body_rectangles_become_walls() -> void:

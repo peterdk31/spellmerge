@@ -9,6 +9,7 @@
     "number": 256
   },
   "errors_in_a_row": 0,
+  "idle": null,
   "intake_tasks": {
     "208": {
       "author": "Brianmanden",
@@ -33,7 +34,7 @@
   "panel_applied": {
     "automation_enabled": true,
     "focus": "",
-    "pause_development": false,
+    "pause_development": true,
     "pause_merging": false,
     "quiet_hours": null
   },

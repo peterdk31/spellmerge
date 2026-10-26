@@ -189,11 +189,14 @@ const SHAPE_FLAME: int = 1
 const SHAPE_STAR: int = 2
 const SHAPE_ZIGZAG: int = 3
 const SHAPE_RING: int = 4
-const SHAPE_COUNT: int = 5
+const SHAPE_ARC: int = 5
+const SHAPE_COUNT: int = 6
 ## The form bodies (the kind written for a player's rune and orbit shots, whatever their
-## element): a diamond that pulses, two beads that spin. Kinds 5-8 are the trail marks.
-const KIND_RUNE: int = 9
-const KIND_ORBIT: int = 10
+## element): a diamond that pulses, two beads that spin. Kinds 6-10 are the trail marks
+## (a shape's number plus TRAIL_KIND_OFFSET).
+const KIND_RUNE: int = 11
+const KIND_ORBIT: int = 12
+const TRAIL_KIND_OFFSET: int = 5
 ## The kind travels in the alpha of the custom data as 1 - kind / KIND_STEPS, so it is exact
 ## in a float and has room for kinds 0 to KIND_MAX.
 const KIND_STEPS: float = 16.0
@@ -209,9 +212,9 @@ const SHAPE_SCALE: float = 0.62
 const TRAIL_MARKS: int = 2
 const TRAIL_MAX: int = 256
 ## Pixels between a bolt and its first trail mark, and between marks, per shape.
-const TRAIL_STEP: PackedFloat32Array = [0.0, 7.0, 9.0, 6.0, 8.0]
+const TRAIL_STEP: PackedFloat32Array = [0.0, 7.0, 9.0, 6.0, 8.0, 7.0]
 ## Sideways pixels the marks drift off the line of flight, per shape (alternating sides).
-const TRAIL_DRIFT: PackedFloat32Array = [0.0, 3.0, 0.0, 5.0, 4.0]
+const TRAIL_DRIFT: PackedFloat32Array = [0.0, 3.0, 0.0, 5.0, 4.0, 3.0]
 ## Draws the neutral sprites: the bone body takes the owner's tint, the Spark-coloured
 ## core takes the element's colour (`set_core`).
 const CORE_SHADER: Shader = preload("res://core/projectiles/shot_core.gdshader")
@@ -1258,7 +1261,7 @@ func _shaped_size(diameter: float, shaped: bool) -> float:
 ## Write one quad at float index `i` of `buffer` (packed arrays are shared, not copied):
 ## Transform2D(dir * d, dir.orthogonal() * d, at), row by row, then the colour and the
 ## colour of the core (custom data).
-## `kind` (0 the sprite, 1-4 an element shape's body, 5-8 its trail mark, 9 a rune, 10 an
+## `kind` (0 the sprite, 1-5 an element shape's body, 6-10 its trail mark, 11 a rune, 12 an
 ## orbit shot; at most KIND_MAX) goes in the alpha of the custom data as 1 - kind / 16,
 ## which `shot_core.gdshader` reads back.
 func _write_quad(buffer: PackedFloat32Array, i: int, dir: Vector2, diameter: float, at: Vector2, color: Color, core: Color, kind: int) -> void:
@@ -1293,7 +1296,7 @@ func _write_trail(slot: int, dir: Vector2, diameter: float, at: Vector2, out: in
 		var back: float = TRAIL_STEP[shape] * (n + 1)
 		var drift: float = TRAIL_DRIFT[shape] * (n + 1) * (1.0 if (n + slot) % 2 == 0 else -1.0)
 		var size: float = diameter * (0.45 - 0.1 * n)
-		_write_quad(_trail_buffer, out * DRAW_STRIDE, dir, size, at - dir * back + side * drift, _color_of(_player[slot]), _core[slot], shape + 4)
+		_write_quad(_trail_buffer, out * DRAW_STRIDE, dir, size, at - dir * back + side * drift, _color_of(_player[slot]), _core[slot], shape + TRAIL_KIND_OFFSET)
 		out += 1
 	return out
 

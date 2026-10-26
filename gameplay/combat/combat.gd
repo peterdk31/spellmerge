@@ -28,7 +28,9 @@ extends Node
 ## arrays beside the health ones, counted down in step(). Burn deals whole points of damage
 ## as it goes, chill and freeze are read by the enemy's mover through `speed_factor`, a
 ## hexed enemy takes extra damage and is pulled toward hits, and a shocked enemy's next hit
-## jumps to a neighbour found with the projectile manager's target grid. A spell's hit comes
+## jumps to a neighbour found with the projectile manager's target grid. A static (charged)
+## enemy hit again by a player's spell discharges to every other charged enemy near it, one
+## step only (`_discharge`). A spell's hit comes
 ## with `Spells.hit_profile(tag)`; combat reads no spell field.
 ##
 ## Nothing here allocates per hit or per frame: enemies are rows in packed arrays.
@@ -51,6 +53,9 @@ const CHILL: StringName = &"chill"
 const FREEZE: StringName = &"freeze"
 const SHOCK: StringName = &"shock"
 const HEX: StringName = &"hex"
+const STATIC: StringName = &"static"
+## The id a discharge is announced with on `reaction_triggered`, at each enemy it hits.
+const DISCHARGE: StringName = &"discharge"
 
 const PLAYER_SLOTS: int = 4
 ## Seconds a wizard is safe from contact damage after one contact hit.
@@ -67,8 +72,11 @@ const SHOCK_JUMP_RANGE: float = 64.0
 ## A hit on a hexed enemy pulls it toward the hit point with this share of the push it
 ## would have had away from it.
 const HEX_PULL_SHARE: float = 0.5
+## A charged (static) enemy that is hit again discharges to every other charged enemy within
+## this many pixels of it, once: the discharge is plain damage, so it sets off nothing else.
+const STATIC_RANGE: float = 96.0
 ## The statuses a reaction can start from, in the order they are looked at.
-const REACTING_STATUSES: Array[StringName] = [BURN, CHILL, SHOCK, HEX]
+const REACTING_STATUSES: Array[StringName] = [BURN, CHILL, SHOCK, HEX, STATIC]
 ## A consume reaction does this many times its damage to a frozen enemy.
 const FROZEN_BONUS: int = 2
 ## An enemy reacts at most once per this many seconds; a hit inside the wait does its own
@@ -93,6 +101,8 @@ var reactions: ReactionTable = null
 
 # Scratch list for the targets of a burst or a spread (reused, so a reaction allocates nothing).
 var _near: Array[Node2D] = []
+# The targets of a discharge, copied out of `_near` (a hit can reuse that one).
+var _discharge_targets: Array[Node2D] = []
 
 # Hit profiles: tag -> damage and knockback strength.
 var _profile_damage: Dictionary = {}
@@ -123,6 +133,11 @@ var _shock_share: PackedFloat32Array = PackedFloat32Array()
 # Hex: seconds left and the percent of extra damage taken.
 var _hex_left: PackedFloat32Array = PackedFloat32Array()
 var _hex_extra: PackedFloat32Array = PackedFloat32Array()
+# Static: seconds left and the percent of the hit's damage that discharges.
+var _static_left: PackedFloat32Array = PackedFloat32Array()
+var _static_share: PackedFloat32Array = PackedFloat32Array()
+## True while a discharge is being dealt, so nothing it causes can start another.
+var _discharging: bool = false
 ## Seconds until this enemy may react again.
 var _react_wait: PackedFloat32Array = PackedFloat32Array()
 
@@ -227,6 +242,8 @@ func register_enemy(enemy: Node2D, health: int, hurt_radius: float, contact_dama
 	_shock_share.append(0.0)
 	_hex_left.append(0.0)
 	_hex_extra.append(0.0)
+	_static_left.append(0.0)
+	_static_share.append(0.0)
 	_react_wait.append(0.0)
 	if projectiles != null:
 		projectiles.add_target(enemy, hurt_radius, ProjectileManagerScript.LAYER_ENEMY, -1, hurt_offset)
@@ -336,6 +353,9 @@ func apply_status(player: int, enemy: Node2D, status_id: StringName, duration: f
 		HEX:
 			_hex_left[at] = maxf(_hex_left[at], duration)
 			_hex_extra[at] = maxf(_hex_extra[at], strength)
+		STATIC:
+			_static_left[at] = maxf(_static_left[at], duration)
+			_static_share[at] = maxf(_static_share[at], strength)
 		_:
 			push_warning("Combat: unknown status '%s'." % status_id)
 			return false
@@ -363,6 +383,8 @@ func status_left(enemy: Node2D, status_id: StringName) -> float:
 			return _shock_left[at]
 		HEX:
 			return _hex_left[at]
+		STATIC:
+			return _static_left[at]
 	return 0.0
 
 
@@ -477,6 +499,7 @@ func _tick_statuses(row: int, delta: float) -> void:
 	_freeze_left[row] = maxf(_freeze_left[row] - delta, 0.0)
 	_shock_left[row] = maxf(_shock_left[row] - delta, 0.0)
 	_hex_left[row] = maxf(_hex_left[row] - delta, 0.0)
+	_static_left[row] = maxf(_static_left[row] - delta, 0.0)
 	_react_wait[row] = maxf(_react_wait[row] - delta, 0.0)
 
 
@@ -504,6 +527,8 @@ func _clear_statuses(row: int) -> void:
 	_shock_share[row] = 0.0
 	_hex_left[row] = 0.0
 	_hex_extra[row] = 0.0
+	_static_left[row] = 0.0
+	_static_share[row] = 0.0
 
 
 func _touch_players(row: int) -> void:
@@ -587,6 +612,8 @@ func _on_projectile_hit(player: int, target: Node, position: Vector2, tag: int) 
 	var at: int = _enemies.find(enemy)
 	var jump_share: float = 0.0
 	var jump_from: Vector2 = Vector2.ZERO
+	var discharge_share: float = 0.0
+	var discharge_from: Vector2 = Vector2.ZERO
 	if at >= 0:
 		if _hex_left[at] > 0.0:
 			direction = -direction
@@ -594,6 +621,10 @@ func _on_projectile_hit(player: int, target: Node, position: Vector2, tag: int) 
 		if _shock_left[at] > 0.0:
 			jump_share = _shock_share[at]
 			jump_from = _position_of(enemy) + _hurt_offset[at]
+		# Only a player's spell discharges: the hit must carry a player index.
+		if _static_left[at] > 0.0 and profile != null and player >= 0 and player < PLAYER_SLOTS:
+			discharge_share = _static_share[at]
+			discharge_from = _position_of(enemy) + _hurt_offset[at]
 	# The reaction is chosen from the statuses the target had when the shot arrived.
 	var reaction: ReactionRow = null
 	if at >= 0 and profile != null and profile.element_id != &"" and _react_wait[at] <= 0.0:
@@ -606,10 +637,19 @@ func _on_projectile_hit(player: int, target: Node, position: Vector2, tag: int) 
 		_shock_share[spent] = 0.0
 	if jump_share > 0.0:
 		_shock_jump(player, enemy, jump_from, roundi(float(damage) * jump_share / 100.0))
+	var discharged: bool = false
+	if discharge_share > 0.0:
+		discharged = _discharge(player, enemy, discharge_from, roundi(float(damage) * discharge_share / 100.0))
+		if discharged:
+			# The struck enemy is spent; the ones it hit stay charged.
+			var spent_at: int = _enemies.find(enemy)
+			if spent_at >= 0:
+				_remove_status(spent_at, STATIC)
 	if reaction != null:
 		# The reaction runs instead of the hit's own status, and only on a target that lived.
 		_react(player, enemy, reaction)
-	elif profile != null and profile.status_id != &"" and is_instance_valid(enemy):
+	elif not discharged and profile != null and profile.status_id != &"" and is_instance_valid(enemy):
+		# (A discharge replaces the hit's own status, so a lightning hit does not charge again at once.)
 		apply_status(player, enemy, profile.status_id, profile.status_duration, profile.status_strength)
 
 
@@ -636,6 +676,8 @@ func _status_on(at: int, status_id: StringName) -> bool:
 			return _shock_left[at] > 0.0
 		HEX:
 			return _hex_left[at] > 0.0
+		STATIC:
+			return _static_left[at] > 0.0
 	return false
 
 
@@ -708,6 +750,9 @@ func _extend(player: int, at: int, row: ReactionRow) -> void:
 		HEX:
 			_hex_left[at] = minf(_hex_left[at] + row.duration, MAX_EXTENDED_TIME)
 			_hex_extra[at] = minf(_hex_extra[at] + row.strength, MAX_EXTENDED_PERCENT)
+		STATIC:
+			_static_left[at] = minf(_static_left[at] + row.duration, MAX_EXTENDED_TIME)
+			_static_share[at] = minf(_static_share[at] + row.strength, MAX_EXTENDED_PERCENT)
 
 
 ## SPREAD: the status, as it is now, goes on every other enemy in the circle.
@@ -740,6 +785,8 @@ func _strength_of(at: int, status_id: StringName) -> float:
 			return _shock_share[at]
 		HEX:
 			return _hex_extra[at]
+		STATIC:
+			return _static_share[at]
 	return 0.0
 
 
@@ -761,6 +808,9 @@ func _remove_status(at: int, status_id: StringName) -> void:
 		HEX:
 			_hex_left[at] = 0.0
 			_hex_extra[at] = 0.0
+		STATIC:
+			_static_left[at] = 0.0
+			_static_share[at] = 0.0
 
 
 ## The hit on `from_enemy` jumps from `from` to the nearest other enemy in reach, for `amount`
@@ -771,6 +821,35 @@ func _shock_jump(player: int, from_enemy: Node2D, from: Vector2, amount: int) ->
 	var next: Node2D = projectiles.nearest_target(from, SHOCK_JUMP_RANGE, ProjectileManagerScript.LAYER_ENEMY, from_enemy)
 	if next != null:
 		hit(player, next, maxi(amount, 1))
+
+
+## The hit on `from_enemy` discharges: every other charged enemy within STATIC_RANGE of `from`
+## takes `amount` (at least 1) as `player`'s damage. One step only: the damage is plain `hit`s
+## that react to nothing and charge nothing, and `_discharging` refuses a discharge started
+## from inside another one (a listener of `damage_dealt` casting, say). Returns true if
+## anyone was hit.
+func _discharge(player: int, from_enemy: Node2D, from: Vector2, amount: int) -> bool:
+	if projectiles == null or _discharging:
+		return false
+	_discharging = true
+	var hit_any: bool = false
+	var count: int = projectiles.targets_in(from, STATIC_RANGE, ProjectileManagerScript.LAYER_ENEMY, _near)
+	# Hits can remove rows and listeners can reuse `_near`: copy the targets before dealing damage.
+	_discharge_targets.clear()
+	for i in count:
+		_discharge_targets.append(_near[i])
+	_near.clear()
+	for near in _discharge_targets:
+		if near == from_enemy or not is_instance_valid(near):
+			continue
+		var row: int = _enemies.find(near)
+		if row >= 0 and _static_left[row] > 0.0:
+			if events != null:
+				# Feel shows it as a white burst on each enemy zapped (no colour is listed for this id).
+				events.reaction_triggered.emit(player, DISCHARGE, _position_of(near) + _hurt_offset[row])
+			hit_any = hit(player, near, maxi(amount, 1)) or hit_any
+	_discharging = false
+	return hit_any
 
 
 func _remove_enemy_at(at: int) -> void:
@@ -794,6 +873,8 @@ func _remove_enemy_at(at: int) -> void:
 	_shock_share.remove_at(at)
 	_hex_left.remove_at(at)
 	_hex_extra.remove_at(at)
+	_static_left.remove_at(at)
+	_static_share.remove_at(at)
 	_react_wait.remove_at(at)
 
 

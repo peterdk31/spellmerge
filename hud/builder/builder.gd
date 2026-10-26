@@ -77,7 +77,11 @@ const BUTTON_VARIATION: StringName = &"BuilderButton"
 ## is never colour alone).
 const FOCUS_VARIATION: StringName = &"BuilderButtonFocus"
 const ROW_HEIGHT: float = 18.0
-const QUICK_ROW_HEIGHT: float = 14.0
+## The quick view's drop list lists every element and modifier at once (11 with five
+## elements), so its rows are lower and in a smaller font (8 px, as the hint line) to stay
+## inside the builder's quarter of the screen. A row is the font's height plus 2 px of margin.
+const QUICK_ROW_HEIGHT: float = 12.0
+const QUICK_ROW_FONT: int = 8
 const LEFT_WIDTH: float = 100.0
 const RIGHT_WIDTH: float = 80.0
 ## The meta key that keeps a button's text without the focus mark.
@@ -746,6 +750,10 @@ func _render_rows(node: Dictionary) -> void:
 		# The quick view's list can hold every element and modifier at once, so its rows have no
 		# icon and are lower, to stay inside the builder's quarter of the screen.
 		button.custom_minimum_size = Vector2(0.0, QUICK_ROW_HEIGHT if _quick else ROW_HEIGHT)
+		if _quick:
+			button.add_theme_font_size_override("font_size", QUICK_ROW_FONT)
+		else:
+			button.remove_theme_font_size_override("font_size")
 		if id == NO_COMPONENT:
 			button.icon = null
 			_set_text(button, NONE_TEXT)

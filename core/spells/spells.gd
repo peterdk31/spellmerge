@@ -84,6 +84,7 @@ const STATUS_VERBS: Dictionary = {
 	&"freeze": "Freezes",
 	&"shock": "Shocks",
 	&"hex": "Hexes",
+	&"static": "Charges",
 }
 
 ## Registry stand-in for tests: anything with `get_resource(folder, id)`. Null uses `Registry`.

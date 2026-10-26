@@ -12,7 +12,7 @@ const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 
 const STEP: float = 0.0625
-const ELEMENTS: Array[StringName] = [&"fire", &"frost", &"storm", &"void"]
+const ELEMENTS: Array[StringName] = [&"fire", &"frost", &"storm", &"void", &"lightning"]
 
 
 class FakeRegistry:
@@ -107,12 +107,13 @@ func test_a_spell_hit_deals_the_profile_damage_and_its_status() -> void:
 
 
 func test_each_element_puts_its_own_status_on() -> void:
-	var wanted: Array[StringName] = [&"burn", &"chill", &"shock", &"hex"]
+	var wanted: Array[StringName] = [&"burn", &"chill", &"shock", &"hex", &"static"]
 	for i in ELEMENTS.size():
+		var player: int = i % 4
 		var enemy := _enemy()
-		_hit(i, enemy, _tag(i, ELEMENTS[i]))
+		_hit(player, enemy, _tag(player, ELEMENTS[i]))
 		check(_combat.has_status(enemy, wanted[i]), "%s puts on %s" % [ELEMENTS[i], wanted[i]])
-		check_equal(_applied[_applied.size() - 1], [i, enemy, wanted[i]], "player %d is named" % i)
+		check_equal(_applied[_applied.size() - 1], [player, enemy, wanted[i]], "player %d is named" % player)
 
 
 func test_a_hit_without_an_element_puts_nothing_on() -> void:
@@ -325,3 +326,139 @@ func test_wizards_get_no_status_from_player_spells() -> void:
 	_hit(0, wizard, _tag(0, &"fire"))
 	check(_applied.is_empty(), "friendly fire is damage only")
 	check_equal(_damage.size(), 1, "the damage was sent")
+
+
+func test_a_charged_enemy_hit_again_discharges_to_every_other_charged_enemy_nearby() -> void:
+	var struck := _enemy(Vector2(0.0, 0.0))
+	var left := _enemy(Vector2(-50.0, 0.0))
+	var right := _enemy(Vector2(60.0, 30.0))
+	var uncharged := _enemy(Vector2(0.0, 40.0))
+	for charged: Node2D in [struck, left, right]:
+		_combat.apply_status(0, charged, &"static", 5.0, 60.0)
+	_hit(1, struck, _tag(1, &""))
+	check_equal(_combat.get_health(struck), 96, "the hit itself did its damage")
+	check_equal(_combat.get_health(left), 98, "one charged neighbour took 60% of the hit")
+	check_equal(_combat.get_health(right), 98, "so did the other, whichever side it is on")
+	check_equal(_combat.get_health(uncharged), 100, "an enemy that is not charged is left alone")
+	check(not _combat.has_status(struck, &"static"), "the struck enemy spent its charge")
+	check(_combat.has_status(left, &"static") and _combat.has_status(right, &"static"), "the ones it zapped stay charged")
+
+
+func test_a_discharge_is_announced_at_each_enemy_it_zaps() -> void:
+	var struck := _enemy(Vector2(0.0, 0.0))
+	var left := _enemy(Vector2(-50.0, 0.0))
+	var right := _enemy(Vector2(60.0, 0.0))
+	for charged: Node2D in [struck, left, right]:
+		_combat.apply_status(0, charged, &"static", 5.0, 60.0)
+	var seen: Array = []
+	_bus.reaction_triggered.connect(func(player: int, id: StringName, at: Vector2) -> void: seen.append([player, id, at]))
+	_hit(3, struck, _tag(3, &""))
+	check_equal(seen.size(), 2, "one announcement for each enemy zapped, none for the struck one")
+	for row: Array in seen:
+		check(row[0] == 3 and row[1] == _combat.DISCHARGE, "it names the discharge and the player who hit")
+	var places: Array = [seen[0][2], seen[1][2]]
+	check(places.has(left.position) and places.has(right.position), "at the zapped enemies' places")
+
+
+func test_a_discharge_is_one_step_not_a_second_jump() -> void:
+	var struck := _enemy(Vector2(0.0, 0.0))
+	var near := _enemy(Vector2(60.0, 0.0))
+	var beyond := _enemy(Vector2(150.0, 0.0))
+	for charged: Node2D in [struck, near, beyond]:
+		_combat.apply_status(0, charged, &"static", 5.0, 60.0)
+	_hit(0, struck, _tag(0, &""))
+	check_equal(_combat.get_health(near), 98, "the near one was zapped")
+	check_equal(_combat.get_health(beyond), 100, "one in reach of the near one only is not: the discharge does not go on")
+
+
+func test_a_discharge_cannot_loop_forever() -> void:
+	# A tight ring of charged enemies, every one in reach of every other.
+	var ring: Array[Node2D] = []
+	for i in 8:
+		ring.append(_enemy(Vector2.from_angle(i * TAU / 8.0) * 20.0))
+		_combat.apply_status(0, ring[i], &"static", 5.0, 100.0)
+	# A listener that hits another charged enemy from inside the discharge: it takes its own
+	# damage, but must not start a discharge of its own.
+	var tag: int = _tag(0, &"")
+	var reentered: Array[bool] = [false]
+	_bus.damage_dealt.connect(func(_player: int, target: Node, _amount: int, _at: Vector2) -> void:
+		if not reentered[0] and target == ring[1]:
+			reentered[0] = true
+			_bus.projectile_hit.emit(0, ring[2], ring[2].position, tag)
+	)
+	_hit(0, ring[0], tag)
+	check(reentered[0], "the listener did hit from inside the discharge")
+	check(not _combat._discharging, "the discharge finished")
+	check(_damage.size() <= 8 + 1, "one hit, its discharge and the nested hit: at most one event per enemy plus one (%d)" % _damage.size())
+	var third: int = 0
+	for row: Array in _damage:
+		if row[1] == ring[3]:
+			third += 1
+	check_equal(third, 1, "an enemy not hit directly was zapped once, so the nested hit started no second discharge")
+
+
+func test_discharge_damage_always_names_the_player_who_hit() -> void:
+	for player in 4:
+		var struck := _enemy(Vector2(0.0, player * 200.0))
+		var other := _enemy(Vector2(40.0, player * 200.0))
+		_combat.apply_status(player, struck, &"static", 5.0, 60.0)
+		_combat.apply_status(player, other, &"static", 5.0, 60.0)
+		_damage.clear()
+		_hit(player, struck, _tag(player, &""))
+		check_equal(_damage.size(), 2, "player %d: the hit and the discharge" % player)
+		for row: Array in _damage:
+			check_equal(row[0], player, "player %d: every damage_dealt carries the hitter's index" % player)
+
+
+func test_a_hit_with_no_player_does_not_discharge() -> void:
+	var struck := _enemy(Vector2(0.0, 0.0))
+	var other := _enemy(Vector2(40.0, 0.0))
+	_combat.apply_status(0, struck, &"static", 5.0, 60.0)
+	_combat.apply_status(0, other, &"static", 5.0, 60.0)
+	_hit(EventsScript.NO_PLAYER, struck, _tag(0, &""))
+	check_equal(_combat.get_health(other), 100, "a hit that names no player discharges nothing")
+	check(_combat.has_status(struck, &"static"), "and keeps its charge")
+	_combat.set_hit_profile(4321, 5, 0.0)
+	_hit(0, struck, 4321)
+	check_equal(_combat.get_health(other), 100, "a shot that is not a spell does not discharge either")
+
+
+func test_a_lone_charged_enemy_keeps_its_charge_and_lightning_charges_again() -> void:
+	var enemy := _enemy()
+	_hit(2, enemy, _tag(2, &"lightning"))
+	check(_combat.has_status(enemy, &"static"), "lightning charges")
+	check_equal(_applied[_applied.size() - 1], [2, enemy, &"static"], "status_applied names static and the player")
+	_run(2.0)
+	var left: float = _combat.status_left(enemy, &"static")
+	_hit(2, enemy, _tag(2, &"lightning"))
+	check(_combat.status_left(enemy, &"static") > left, "with nobody to zap the charge is kept and refreshed")
+
+
+func test_a_lightning_hit_that_discharges_does_not_charge_the_struck_enemy_again() -> void:
+	var struck := _enemy(Vector2(0.0, 0.0))
+	var other := _enemy(Vector2(40.0, 0.0))
+	_combat.apply_status(0, struck, &"static", 5.0, 60.0)
+	_combat.apply_status(0, other, &"static", 5.0, 60.0)
+	_hit(0, struck, _tag(0, &"lightning"))
+	check_equal(_combat.get_health(other), 98, "it discharged")
+	check(not _combat.has_status(struck, &"static"), "the discharge replaced the charge")
+
+
+func test_a_killing_hit_still_discharges() -> void:
+	var struck := _enemy(Vector2(0.0, 0.0), 3)
+	var other := _enemy(Vector2(40.0, 0.0))
+	_combat.apply_status(0, struck, &"static", 5.0, 100.0)
+	_combat.apply_status(0, other, &"static", 5.0, 100.0)
+	_hit(0, struck, _tag(0, &""))
+	check_equal(_combat.get_enemy_count(), 1, "the struck enemy died")
+	check_equal(_combat.get_health(other), 96, "and its charge went to the other")
+
+
+func test_static_runs_out_and_registering_again_clears_it() -> void:
+	var enemy := _enemy()
+	_combat.apply_status(0, enemy, &"static", 1.0, 60.0)
+	_run(1.5)
+	check(not _combat.has_status(enemy, &"static"), "the charge ran out")
+	_combat.apply_status(0, enemy, &"static", 5.0, 60.0)
+	_combat.register_enemy(enemy, 50, 10.0)
+	check(not _combat.has_status(enemy, &"static"), "registering again cleared it")

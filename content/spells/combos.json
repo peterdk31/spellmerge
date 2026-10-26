@@ -195,6 +195,24 @@
 			"imps": [[100, 0]],
 			"seconds": 3.0,
 			"checks": [{"kind": "reaction", "reaction": "flare"}]
+		},
+		{
+			"id": "static_bolt",
+			"name": "Static bolt",
+			"does": "A lightning bolt leaves the imp charged, ready to discharge on the next hit.",
+			"casts": [{"slot": 0, "recipe": {"form": "bolt", "element": "lightning"}}],
+			"imps": [[100, 0]],
+			"seconds": 1.5,
+			"checks": [{"kind": "damaged", "imps": [0]}, {"kind": "status", "imps": [0], "status": "static"}]
+		},
+		{
+			"id": "static_ring",
+			"name": "Static ring",
+			"does": "A big lightning ring charges every imp round the caster.",
+			"casts": [{"slot": 0, "recipe": {"form": "nova", "element": "lightning", "modifiers": ["bigger"]}}],
+			"imps": [[36, 0], [0, 36], [-36, 0]],
+			"seconds": 1.0,
+			"checks": [{"kind": "status", "imps": [0, 1, 2], "status": "static"}]
 		}
 	]
 }

@@ -128,6 +128,12 @@ Weak spots found in the architecture review of 2026-10-20 (docs/ARCHITECTURE.md)
 - **The drop list names no slot (task).** It lists components only; a short heading ("Element" / "Modifier M1") would help, but the longest list of ten fills the quarter already.
 - **Read-only slots look like disabled ones (task).** The quick view greys the chain because it is read only; next to the one live button it reads as broken. Needs a non-grey read-only look (a theme variation).
 
+## From #243 part 1 (Lightning)
+
+- **The quick drop list and the overlay's list cap at 11 rows (task).** Each new element or modifier adds a row to the longest list; at 12 px rows and 8 px text 11 rows fit a player's quarter at 640×360, a 12th does not. Needs a list that scrolls or pages (UIFocus must follow it), or two columns in the quick view. Do it before the next element or modifier is added.
+- **The discharge has no sound, colour or line (task).** It is a white burst on each zapped enemy (`reaction_triggered` `discharge`). A short jagged line from the struck enemy to each zapped one would read better; it needs a `core/events` signal that carries both ends.
+- **Shader kinds are a number scheme (task).** Shapes, trail marks and form bodies share one 0–15 kind in the shot's custom data, and adding a shape moves the others. A table in the manager (kind per shape and form) would make the next shape one line.
+
 ## Ideas from the community
 
 - **Summonable pet that draws enemy fire (#208, p3, idea).** Kept on the backlog on 2026-10-23, not scheduled (reasoning in `docs/DECISIONS.md`). Prefer a spell route (a "familiar" form or modifier) over a pet system; decide in M3 (relics, run rewards) and M5 (unlock). Needs: an enemy targeting rule in `gameplay/ai` that can prefer a decoy, and health for a shot-like target in `gameplay/combat`.

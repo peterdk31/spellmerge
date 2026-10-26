@@ -1,6 +1,6 @@
 extends SceneTree
 ## Screenshots of enemy statuses (#244, part 3), for people and for Claude to look at: one ember
-## imp each with burning, chill, freeze, shock and hex, in a row in the live game
+## imp each with burning, chill, freeze, shock, hex and static, in a row in the live game
 ## (`statuses_1x`, as a player sees them, and `statuses_4x`), then a reaction bursting over
 ## the row (`status_reaction_1x`). Needs a display, so it runs only through
 ## `ci/build/build.sh --quick --screenshots`; each shot is saved as
@@ -9,7 +9,7 @@ extends SceneTree
 const SHOTS_DIR := "user://screenshots"
 const SETTLE_FRAMES := 20
 const IMP_SCENE := preload("res://content/enemies/ember_imp/ember_imp.tscn")
-const IDS: Array[StringName] = [&"burn", &"chill", &"freeze", &"shock", &"hex"]
+const IDS: Array[StringName] = [&"burn", &"chill", &"freeze", &"shock", &"hex", &"static"]
 ## Pixels between neighbours in the row.
 const GAP: float = 40.0
 ## Status seconds, long enough to outlast the shots.
@@ -43,7 +43,7 @@ func _initialize() -> void:
 		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		imp.add_child(sprite)
 		root.add_child(imp)
-		imp.global_position = centre + Vector2((float(i) - 2.0) * GAP, 0.0)
+		imp.global_position = centre + Vector2((float(i) - 2.5) * GAP, 0.0)
 		combat.call("register_enemy", imp, 400, 10.0)
 		imps.append(imp)
 	for i in IDS.size():
@@ -70,7 +70,7 @@ func _snap(at: Vector2, name: String, zoom: int) -> void:
 	var image: Image = root.get_texture().get_image()
 	var scale_to_image: Vector2 = Vector2(image.get_size()) / Vector2(root.get_visible_rect().size)
 	var centre: Vector2i = Vector2i((root.get_canvas_transform() * at) * scale_to_image)
-	var half: Vector2i = Vector2i(96, 40) if zoom == 4 else Vector2i(120, 40)
+	var half: Vector2i = Vector2i(128, 40) if zoom == 4 else Vector2i(120, 40)
 	var corner: Vector2i = (centre - half).clamp(Vector2i.ZERO, image.get_size() - half * 2)
 	var crop: Image = image.get_region(Rect2i(corner, half * 2))
 	if zoom != 1:

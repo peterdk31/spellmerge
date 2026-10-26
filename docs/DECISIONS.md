@@ -2,6 +2,15 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-26: Lightning and the static status (#243, part 1)
+
+- **Why:** the owner asked for a fifth element that tests how extensible the spell system is, with a status of its own (a charged enemy discharges to the others, not a second jump).
+- **Status rules:** lightning puts `static` (5 s, strength 60 = percent of the hit that discharges). A player's spell hit on a static enemy deals 60% (at least 1) to every other static enemy within 96 px, as plain hits for the same player. The discharge sets off no reaction, no status and no discharge; a guard also refuses one started from a listener inside it. The struck enemy is spent only if it discharged to someone (a lone charged enemy keeps its charge), and a discharging lightning hit does not charge it again; the zapped ones stay charged, so a charged pack keeps passing damage as long as the players keep hitting. A hit with no player index, or a shot that is not a spell, never discharges.
+- **Announced as a reaction:** the discharge sends `reaction_triggered` with id `discharge` at each zapped enemy instead of a new event, so Feel shows a burst with no new signal in `core/events`. It is white and silent for now: lime was too near Thaw and Flare in the colour-distance test; part 2 picks a colour and a sound.
+- **Colour:** a new palette material, Arc (`#3f6b10` `#b4e82a` `#eeffa6`), an acid lime apart from Spark's gold, the players' greens and Ice's cyan; the palette is 40 colours (the bot may add colours, see the Ice and Void decision). Silhouette: a forked arc (shape 5) that is redrawn every frame; Storm's zigzag has no fork.
+- **Shader kinds moved:** trail marks were "shape + 4", which collided with the rune at 9 for a fifth shape; marks are now 6–10 (`TRAIL_KIND_OFFSET`), rune 11, orbit 12. The encoding has room up to 15, so two more shapes fit before it must be widened.
+- **HUD:** the quick drop list and the overlay's list show every element and modifier at once, now 11, which no longer fit a player's quarter at 14 px rows. They are 12 px rows with 8 px text. This is the limit for the next element too (12 rows overflow again): see the BACKLOG item.
+
 ## 2026-10-25: Form bodies are shader kinds, and shaped bodies are smaller (#244, part 2b)
 
 - **Why:** a rune and an orbit shot looked the same in flight as a bolt of the same element, and the owner said the new spell visuals are way too big and liked bolts in different colours.

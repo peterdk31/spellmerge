@@ -2,6 +2,15 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-26: Lightning's reactions and the discharge arc (#243, part 2)
+
+- **Overload and Superconduct, only with fire and frost.** The task asked for at least two existing elements; storm and void are left out so lightning is not a copy of storm (an electric element that reacts with everything) and each new reaction needs a colour 0.45 apart from all the others, which gets hard with more. Lightning on storm or void just charges, as before.
+- **A pair's two rows may differ.** Frost on a charged enemy is CONSUME, not EXTEND: after a discharge the struck enemy has lost its charge, and EXTEND would have charged it again. Lightning on a chilled enemy is a short freeze (1.5 s, less than Stillness's 2 s).
+- **Fire on a charged enemy does both.** The hit discharges (if others are charged near) and Overload bursts: one hit, two effects, on purpose. The discharge is plain damage that starts nothing, so it does not loop.
+- **A new event for the arc.** `discharge_arc(player, from, to)`, sender combat, listener feel; the arc is a `Line2D` pool in Feel (16 arcs of 6 points, corners and width on whole pixels, and an arc past 16 in one frame takes over the oldest, written with `set_point_position`, no allocation per arc), not a particle, so `PARTICLE_LIMIT` is untouched. Corners stray with Feel's own seeded `_rng`, so combat stays deterministic.
+- **Colours.** `discharge` cyan `#00f0ff` (electric and far from the others), `overload` hot pink `#ff6ba0` (the first pick, brown `#7a3f18`, was too dark on the dark floor; orange was too near Flare's gold and Kindle's red), `superconduct` teal `#14a38b`. The colour test now also wants every reaction colour to have a bright channel (at least 0.6) and a colour for every row in `reactions.tres`.
+- **The discharge's sound** is the id `reaction_discharge`. Sessions can't make `.ogg` files, so it is silent until one is made (BACKLOG, Audio needs), as for every reaction.
+
 ## 2026-10-26: Lightning and the static status (#243, part 1)
 
 - **Why:** the owner asked for a fifth element that tests how extensible the spell system is, with a status of its own (a charged enemy discharges to the others, not a second jump).

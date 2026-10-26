@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="ReactionTable" load_steps=15 format=3]
+[gd_resource type="Resource" script_class="ReactionTable" load_steps=19 format=3]
 
 [ext_resource type="Script" path="res://core/base/reaction_table.gd" id="1_table"]
 [ext_resource type="Script" path="res://core/base/reaction_row.gd" id="2_row"]
@@ -116,6 +116,42 @@ damage = 2
 radius = 48.0
 pull = 120.0
 
+[sub_resource type="Resource" id="Resource_overload_burn"]
+script = ExtResource("2_row")
+reaction_id = &"overload"
+display_name = "Overload"
+status_id = &"burn"
+element_id = &"lightning"
+damage = 4
+radius = 52.0
+
+[sub_resource type="Resource" id="Resource_overload_static"]
+script = ExtResource("2_row")
+reaction_id = &"overload"
+display_name = "Overload"
+status_id = &"static"
+element_id = &"fire"
+damage = 4
+radius = 52.0
+
+[sub_resource type="Resource" id="Resource_superconduct_chill"]
+script = ExtResource("2_row")
+reaction_id = &"superconduct"
+display_name = "Superconduct"
+status_id = &"chill"
+element_id = &"lightning"
+effect = 2
+duration = 1.5
+
+[sub_resource type="Resource" id="Resource_superconduct_static"]
+script = ExtResource("2_row")
+reaction_id = &"superconduct"
+display_name = "Superconduct"
+status_id = &"static"
+element_id = &"frost"
+effect = 1
+damage = 4
+
 [resource]
 script = ExtResource("1_table")
-rows = Array[ExtResource("2_row")]([SubResource("Resource_shatter_chill"), SubResource("Resource_shatter_shock"), SubResource("Resource_thaw_burn"), SubResource("Resource_thaw_chill"), SubResource("Resource_flare_burn"), SubResource("Resource_flare_shock"), SubResource("Resource_kindle_burn"), SubResource("Resource_kindle_hex"), SubResource("Resource_stillness_chill"), SubResource("Resource_stillness_hex"), SubResource("Resource_rift_shock"), SubResource("Resource_rift_hex")])
+rows = Array[ExtResource("2_row")]([SubResource("Resource_shatter_chill"), SubResource("Resource_shatter_shock"), SubResource("Resource_thaw_burn"), SubResource("Resource_thaw_chill"), SubResource("Resource_flare_burn"), SubResource("Resource_flare_shock"), SubResource("Resource_kindle_burn"), SubResource("Resource_kindle_hex"), SubResource("Resource_stillness_chill"), SubResource("Resource_stillness_hex"), SubResource("Resource_rift_shock"), SubResource("Resource_rift_hex"), SubResource("Resource_overload_burn"), SubResource("Resource_overload_static"), SubResource("Resource_superconduct_chill"), SubResource("Resource_superconduct_static")])

@@ -29,6 +29,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `recipe_changed`, `bag_changed` | `player` | `hud` (the builders, the overlay) |
 | `active_spell_changed` | `player` | `hud` (the corner panel, the quick view, the overlay) |
 | `reaction_triggered` | `combat` | `feel` |
+| `discharge_arc` | `combat` | `feel` |
 | `damage_dealt` | `combat` | `feel`, `player` |
 | `status_applied` | `combat` | none yet |
 | `enemy_died` | `combat` | `feel`, `flow` |

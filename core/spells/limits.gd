@@ -18,6 +18,11 @@ const FALLBACK_RADIUS: float = 8.0
 const MAX_FIRES_PER_STEP: int = 32
 ## Engine safeguard: chain jumps one player may make in one physics step; the rest are dropped.
 const MAX_CHAINS_PER_STEP: int = 16
+## Engine safeguard: launches (a burst's later firings, echoes) that may wait at once; the rest
+## are dropped.
+const MAX_PENDING: int = 128
+## Damage of an echo's second firing, as a share of the carrier's.
+const ECHO_DAMAGE: float = 0.5
 ## Reach in pixels of a chain's jump to the next target.
 const CHAIN_RANGE: float = 96.0
 ## Degrees a split fan covers when the form has no spread of its own.

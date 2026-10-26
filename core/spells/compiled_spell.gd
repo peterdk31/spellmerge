@@ -43,6 +43,8 @@ var look: int = 0
 
 ## What a hit does, for `Spells.hit_profile`; set by the compiler.
 var hit: HitProfile = null
+## What an echo's second firing does: the hit at half damage. Null without an `echo` modifier.
+var echo_hit: HitProfile = null
 
 ## Radians per second a shot turns toward a target; 0 means no homing.
 var homing_turn: float = 0.0

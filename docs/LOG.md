@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-26: Trigger kit, part 2 (staffs B2b)
+
+The spell runtime runs the multicast spread: scatter (random directions, seeded per cast), burst (later firings of the group, queued), echo (the carrier again after its strength in seconds, at half damage) and mirror (also fires backwards). Tests: `tests/core/test_spells_multicast.gd` (27 tests). B2c and B2d are next.
+
 ## 2026-10-26: Trigger kit, part 1 (staffs B2a)
 
 The spell runtime fires the payloads of the seven new trigger events (on block, on kill, on cast, on wall, on hurt, on reaction, on ally) and runs `relay`. Tests: `tests/core/test_spells_triggers.gd` (10 tests). B2b to B2d (multicast spread, payload carriers, moves and refunds) are next.

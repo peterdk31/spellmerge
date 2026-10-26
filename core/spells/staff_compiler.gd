@@ -278,6 +278,15 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 	spell.hit.status_id = spell.status_id
 	spell.hit.status_duration = spell.status_duration
 	spell.hit.status_strength = spell.status_strength
+	if spell.behaviour(ModifierBase.Behaviour.ECHO) > 0.0:
+		spell.echo_hit = HitProfile.new()
+		spell.echo_hit.damage = maxi(roundi(spell.damage * SpellLimits.ECHO_DAMAGE), 1)
+		spell.echo_hit.knockback = spell.hit.knockback
+		spell.echo_hit.element_id = spell.element_id
+		spell.echo_hit.element_ids = spell.element_ids
+		spell.echo_hit.status_id = spell.status_id
+		spell.echo_hit.status_duration = spell.status_duration
+		spell.echo_hit.status_strength = spell.status_strength
 	if trigger != null:
 		spell.trigger_id = trigger.id
 		spell.trigger_event = trigger.event

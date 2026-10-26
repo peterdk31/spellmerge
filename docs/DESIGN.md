@@ -20,11 +20,19 @@ Spellmerge is a 2D top-down action roguelite for 1–4 local co-op players, wher
 | Element | Role |
 | --- | --- |
 | Wizard | One base character; cosmetics only (hat, robe, colours, staff look). |
-| Staff | Chosen before a run; sets the basic attack and a small bonus. |
-| Spells | Built from form → element → modifiers → trigger; a trigger holds another spell. Limited by a complexity budget. |
-| Relics | Passives found in runs, some altering how components behave. |
+| Staffs | Four per wizard, one per button (A, X, Y, B). A staff is a row of slots; there is no separate attack or dodge, only what the player puts in their staffs. Staffs found later differ in slots, speed and recharge. |
+| Spells | Cards placed in a staff in any order and read left to right: carriers (what leaves the caster), modifiers and infusions (change the next carrier, or the caster when none follows), multicast (more carriers per cast) and triggers (the next cast becomes the payload). Reading wraps around the staff. Every arrangement is legal and does something; there is no complexity budget. |
+| Relics | Passives found in runs, some altering how cards behave. |
 
-Starting components: forms (bolt, beam, nova, rune, orbit), elements (fire, frost, storm, void), modifiers (split, pierce, homing, chain, bigger, faster), triggers (on hit, on expire, timer).
+Starting cards: carriers (bolt, beam, nova, rune, orbit, dash, teleport, hook, swap, boomerang, wall, rain, fissure, decoy, familiar), modifiers (split, pierce, homing, chain, bigger, faster, shield, blast, hold, recoil, bounce, echo, linger, heavy, siphon, overcharge, sticky, magnet, ghost, spiral, mirror, growth, relay), infusions (fire, frost, storm, void, lightning, mend), triggers (on hit, on expire, timer, on block, on kill, on cast, on wall, on hurt, on reaction, on ally), multicast (double, triple, scatter, burst).
+
+Spell rules (chosen on 2026-10-26, the pivot at C2):
+
+- **Self-harm:** a wizard's own spells hurt them. Hurting other players stays an option.
+- **One mana pool per wizard**, shared by its staffs; sustained spells reserve part of it.
+- **No build limits** beyond what the engine needs to run; limits are added only when measurements ask for them.
+- **Small shots:** a shot is a small core; its cards add its look in layers.
+- **Test builds are a sandbox:** preview builds start in a room with large staffs, every card and a training dummy.
 
 ## No-waiting co-op rules
 

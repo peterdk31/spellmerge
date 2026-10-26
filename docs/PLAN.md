@@ -192,11 +192,11 @@ Spellmerge is a 2D top-down action roguelite where the build comes from spells y
 | Element | Role |
 | --- | --- |
 | Wizard | One base character; cosmetics only (hat, robe, colours, staff look). |
-| Staff | Chosen before a run; sets the basic attack and a small bonus. |
-| Spells | Built from form → element → modifiers → trigger; a trigger holds another spell. Limited by a complexity budget. |
-| Relics | Passives found in runs, some altering how components behave. |
+| Staffs | Four per wizard, one per button (A, X, Y, B); a row of slots holding cards. No separate attack or dodge. |
+| Spells | Cards read left to right in a staff: carriers, modifiers and infusions, multicast, triggers. Wraps around; every arrangement is legal; no complexity budget. |
+| Relics | Passives found in runs, some altering how cards behave. |
 
-Starting components: forms (bolt, beam, nova, rune, orbit), elements (fire, frost, storm, void), modifiers (split, pierce, homing, chain, bigger, faster), triggers (on hit, on expire, timer).
+The full rules and the starting cards are in docs/DESIGN.md and docs/milestones/M2-staffs.md (the pivot at C2, 2026-10-26).
 
 ### No-waiting co-op rules
 
@@ -210,9 +210,9 @@ Starting components: forms (bolt, beam, nova, rune, orbit), elements (fire, fros
 ### Spell builder and UI
 
 - Each player has a corner panel in their colour. It expands toward the centre for the builder or rewards, never covers another panel, and fills the screen in single player.
-- The builder is a slot chain navigated with d-pad or stick, with a bag of collected components, live stats (damage, mana, cast time, complexity bar) and a live mini-preview.
+- The builder shows a player's four staffs as rows of slots and a bag of collected cards: pick a card up and place it, with a cast plan that says what each cast does, live numbers and the card's description.
 - **Full builder:** cleared rooms and the hub, no time limit.
-- **During combat:** quick actions only (swap prepared spells, drop a component into a free slot).
+- **During combat:** quick actions only (place a card from the bag into an empty slot). Test builds (`dev`, `preview`) are a sandbox where the full builder is always open.
 - Gamepad first; P1 can also use keyboard and mouse, and the mouse only acts on P1's panel.
 
 ### Door rule

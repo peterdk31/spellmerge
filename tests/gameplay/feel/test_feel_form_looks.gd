@@ -8,6 +8,19 @@ const EventsScript := preload("res://core/events/events.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
 const FeelPresetScript := preload("res://gameplay/feel/presets/feel_preset.gd")
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
+const RegistryScript := preload("res://core/registry/registry.gd")
+
+
+## A registry that knows one more carrier card, made in the test.
+class CardsRegistry:
+	extends RegistryScript
+	var extra: Resource = null
+
+	func get_resource(folder: StringName, id: StringName) -> Resource:
+		if extra != null and folder == &"spells" and id == extra.get("id"):
+			return extra
+		return super(folder, id)
+
 
 const FORMS: Array[StringName] = [&"bolt", &"beam", &"nova", &"rune", &"orbit"]
 
@@ -15,6 +28,7 @@ var bus: EventsScript
 var feel: FeelScript
 var preset: FeelPresetScript
 var projectiles: Node
+var registry: CardsRegistry
 
 
 func before_each() -> void:
@@ -26,8 +40,17 @@ func before_each() -> void:
 	feel.events = bus
 	feel.projectiles = projectiles
 	feel.drive_engine = false
+	registry = own(CardsRegistry.new()) as CardsRegistry
+	registry.scan()
+	feel.registry = registry
 	feel.preset = preset
 	root.add_child(feel)
+
+
+## The look the carrier card `form` brings (`FormBase.cast_look` or `impact_look`).
+func _card_look(form: StringName, cast: bool) -> Dictionary:
+	var card: FormBase = registry.get_resource(&"spells", form) as FormBase
+	return card.cast_look if cast else card.impact_look
 
 
 func _cast(player: int, form: StringName) -> Sprite2D:
@@ -50,10 +73,38 @@ func _wall_flare(player: int, form: StringName = &"") -> Sprite2D:
 	return null
 
 
-func test_every_form_has_a_cast_look_and_an_impact_look() -> void:
+func test_the_looks_are_data_on_the_cards_not_in_the_preset() -> void:
+	check(not ("cast_looks" in preset) and not ("impact_looks" in preset), "the preset has no per-form looks")
 	for form in FORMS:
-		check(preset.cast_looks.has(form), "%s has a cast flash" % form)
-		check(preset.impact_looks.has(form), "%s has an impact flare" % form)
+		check(registry.get_resource(&"spells", form) is FormBase, "%s is a carrier card" % form)
+		check(not _card_look(form, false).is_empty(), "%s has an impact flare" % form)
+	check(not _card_look(&"nova", true).is_empty(), "a nova has a cast flash of its own")
+	check(_card_look(&"bolt", true).is_empty(), "a bolt takes the plain muzzle flash")
+
+
+func test_a_new_carrier_card_brings_its_own_look() -> void:
+	var card := FormBase.new()
+	card.id = &"test_wave"
+	card.cast_look = {"seconds": 0.5, "size": 2.0, "aim": false, "tall": 3.0, "stretch": 1.0}
+	card.impact_look = {"seconds": 0.3, "size": 1.5}
+	registry.extra = card
+	var flash: Sprite2D = _cast(0, &"test_wave")
+	check(flash.visible, "its cast flash shows")
+	check_equal(flash.rotation, 0.0, "upright, as the card says")
+	check(flash.scale.y > flash.scale.x, "and tall, as the card says")
+	var flare: Sprite2D = _wall_flare(0, &"test_wave")
+	check_equal(flare.scale, Vector2.ONE * 1.5, "its flare is the card's")
+
+
+func test_a_look_missed_for_want_of_a_registry_is_not_kept() -> void:
+	feel.registry = null
+	var plain: Sprite2D = _cast(0, &"nova")
+	var plain_scale: Vector2 = plain.scale
+	check(feel._form_look(&"", false).is_empty(), "no form id, no look")
+	feel.registry = registry
+	var flash: Sprite2D = _cast(0, &"nova")
+	check(flash.scale != plain_scale, "once the registry is there the nova has its own flash")
+	check(not feel._form_look(&"nova", false).is_empty(), "and its flare")
 
 
 func test_each_form_flashes_differently_on_the_wizard() -> void:
@@ -92,7 +143,7 @@ func test_a_nova_flash_is_upright_wide_and_round() -> void:
 
 func test_a_rune_and_an_orbit_gather_in_while_a_bolt_bursts_out() -> void:
 	for form in [&"bolt", &"rune", &"orbit"]:
-		var look: Dictionary = preset.cast_looks[form] as Dictionary
+		var look: Dictionary = _card_look(form, true)
 		var flash: Sprite2D = _cast(0, form)
 		var start: float = flash.scale.x
 		var seconds: float = look.get("seconds", preset.muzzle_flash_seconds) as float
@@ -101,9 +152,9 @@ func test_a_rune_and_an_orbit_gather_in_while_a_bolt_bursts_out() -> void:
 		var grow: float = look.get("grow", 0.5) as float
 		check(is_equal_approx(flash.scale.x / start, 1.0 + grow * 0.5), "%s: its size follows its grow of %s" % [form, grow])
 		feel.step(seconds)
-	check((preset.cast_looks[&"bolt"] as Dictionary).get("grow", 0.5) as float > 0.0, "a bolt's flash grows")
-	check((preset.cast_looks[&"rune"] as Dictionary)["grow"] as float < 0.0, "a rune's flash gathers")
-	check((preset.cast_looks[&"orbit"] as Dictionary)["grow"] as float < 0.0, "an orbit's flash gathers")
+	check(_card_look(&"bolt", true).get("grow", 0.5) as float > 0.0, "a bolt's flash grows")
+	check(_card_look(&"rune", true)["grow"] as float < 0.0, "a rune's flash gathers")
+	check(_card_look(&"orbit", true)["grow"] as float < 0.0, "an orbit's flash gathers")
 
 
 func test_rings_use_the_ring_art_and_the_others_the_spark() -> void:
@@ -121,7 +172,7 @@ func test_an_unknown_form_gets_the_plain_muzzle_flash() -> void:
 
 func test_a_flash_gone_is_hidden_after_its_seconds() -> void:
 	var flash: Sprite2D = _cast(0, &"rune")
-	feel.step(preset.cast_looks[&"rune"]["seconds"] + 0.01)
+	feel.step((_card_look(&"rune", true)["seconds"] as float) + 0.01)
 	check(not flash.visible, "gone")
 
 
@@ -174,7 +225,7 @@ func test_a_cast_by_an_enemy_or_a_bad_index_changes_nothing() -> void:
 		bus.spell_cast.emit(bad, &"beam", Vector2(10, 10), Vector2.DOWN)
 	check_equal(feel.live_flashes(), live, "no flash for a bad index")
 	check_equal(_cast(0, &"bolt").scale, plain, "player 0's flash is the same")
-	check_equal(_wall_flare(0, &"bolt").scale, Vector2.ONE * (preset.impact_looks[&"bolt"]["size"] as float), "and so is the end of the shot")
+	check_equal(_wall_flare(0, &"bolt").scale, Vector2.ONE * (_card_look(&"bolt", false)["size"] as float), "and so is the end of the shot")
 
 
 func test_a_spark_shown_after_a_ring_in_the_same_slot_has_the_spark_art_again() -> void:

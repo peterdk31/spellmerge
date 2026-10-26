@@ -264,6 +264,9 @@ var _next_ghost: int = 0
 ## Camera kick of casts (pixels), added to the shake.
 var _kick: Vector2 = Vector2.ZERO
 var _last_usec: int = 0
+## The looks read from the carrier cards, by card id (see `_form_look`).
+var _cast_look_cache: Dictionary = {}
+var _impact_look_cache: Dictionary = {}
 
 
 func _ready() -> void:
@@ -398,10 +401,6 @@ func _ready() -> void:
 		projectiles = get_node_or_null("/root/Projectiles")
 	if projectiles != null and "texture" in projectiles and projectiles.texture == null:
 		projectiles.texture = preset.bolt_texture
-	if projectiles != null and "rune_texture" in projectiles and projectiles.rune_texture == null:
-		projectiles.rune_texture = preset.rune_texture
-	if projectiles != null and "orbit_texture" in projectiles and projectiles.orbit_texture == null:
-		projectiles.orbit_texture = preset.orbit_texture
 	# Enemy shots look different (a spiky orb, not a comet), so they are never taken for a spell.
 	if projectiles != null and "hostile_texture" in projectiles and projectiles.hostile_texture == null:
 		projectiles.hostile_texture = preset.hostile_texture
@@ -1033,7 +1032,7 @@ func _show_impact(player: int, position: Vector2, direction: Vector2) -> void:
 	var form: StringName = &""
 	if projectiles != null and "impact_form" in projectiles:
 		form = projectiles.impact_form as StringName
-	var look: Dictionary = preset.impact_looks.get(form, {}) as Dictionary
+	var look: Dictionary = _form_look(form, false)
 	var seconds: float = look.get("seconds", preset.wall_spark_seconds) as float
 	var size: float = look.get("size", preset.wall_spark_size) as float
 	var stretch: float = look.get("stretch", 1.0) as float
@@ -1067,13 +1066,31 @@ func _on_enemy_died(_player: int, enemy: Node, position: Vector2) -> void:
 	_juice(position, preset.death_stop_seconds, true, preset.death_shake, preset.death_sound)
 
 
+## The look a carrier's card brings (`FormBase.cast_look` or `impact_look`), empty when the card
+## has none or there is no registry. Read once per card id, then kept: a cast allocates nothing.
+func _form_look(form: StringName, cast: bool) -> Dictionary:
+	var cache: Dictionary = _cast_look_cache if cast else _impact_look_cache
+	var cached: Variant = cache.get(form)
+	if cached != null:
+		return cached as Dictionary
+	var look: Dictionary = {}
+	# No registry yet, or no form id yet: answer plain but keep nothing, so a later card still counts.
+	if registry == null or form == &"":
+		return look
+	var card: Resource = registry.get_resource(&"spells", form)
+	if card is FormBase:
+		look = ((card as FormBase).cast_look if cast else (card as FormBase).impact_look).duplicate()
+	cache[form] = look
+	return look
+
+
 func _on_spell_cast(player: int, spell_id: StringName, origin: Vector2, direction: Vector2) -> void:
 	if player < 0 or player >= MUZZLE_SLOTS:
 		return
 	var slot: int = player
 	# Each form has its own flash on the wizard: a bolt a short streak along the aim, a beam a
 	# long thin flare, a nova a wide burst, a rune and an orbit gather in (the build-up).
-	var look: Dictionary = preset.cast_looks.get(spell_id, {}) as Dictionary
+	var look: Dictionary = _form_look(spell_id, true)
 	var seconds: float = look.get("seconds", preset.muzzle_flash_seconds) as float
 	var size: float = look.get("size", preset.muzzle_flash_size) as float
 	var stretch: float = look.get("stretch", MUZZLE_STRETCH) as float

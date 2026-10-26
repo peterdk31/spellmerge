@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-26: Shot look, part 2 (staffs B6b)
+
+Feel's per-form looks are data on the carrier cards now (`FormBase.cast_look`, `impact_look`; the five `.tres` carry the old preset values, the preset has none, the old rune and orbit textures are gone). The shots' particles and bolt trails come from one pool with a global count (`particle_cap`, 1,024): the manager adds up what the drawn shots ask for, particles get their share first, the trails get what is left and thin down to nothing, and only then do the particles thin, every shot alike (the shader reads `particle_share` and `trail_share`). New clips: four players firing the same cards, and a crowd of sparks. Tests: 6 pool tests, the form-look tests read the cards, a clip-scenario test.
+
 ## 2026-10-26: Combat kit (staffs B3)
 
 `gameplay/combat` now does what the staff cards need from a fight: every hit has a kind (`hit_landed` before `damage_dealt`), a wizard is hurt by their own spell like any other target (damage, push, status), wizards have burn, chill/freeze, shock, hex and static of their own, barriers (`wizard_shield_requested`, `shield_blocked`), area hits (`area_hit_requested`), several elements on one hit (each reacts with what the one before left), heal hits (`heal_dealt`, which `gameplay/player` now applies), pulls (`pull_requested`) and the heavy wall slam. It sends `kill_landed`, `reaction_landed` and `wizard_hurt` for cards, and `downed_note` for "downed by your own Blast". `gameplay/feel` gives each kind a default stop, shake and sound, the self-hit its own ring, the heal a soft ring, and shows the note. Not switched on yet: `Spells` does not send the shield and pull events or set self-hit on shots (B2 and the cards). Tests: `test_combat_kit.gd` (35), `test_feel_hit_kinds.gd` (11) and four compiler rows.

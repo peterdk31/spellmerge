@@ -121,6 +121,23 @@ func test_the_co_op_clip_shoots_from_two_places_with_two_player_indexes() -> voi
 	check(casts[0]["origin"] != casts[1]["origin"], "from two places")
 
 
+func test_two_clips_have_four_players_firing_the_same_cards() -> void:
+	for id in ["combo_four_players", "combo_spark_crowd"]:
+		var scenario: Dictionary = _find(_all(), id)
+		check(not scenario.is_empty(), "%s is a clip" % id)
+		if scenario.is_empty():
+			continue
+		var players: Dictionary = {}
+		var origins: Dictionary = {}
+		var cards: Array = (scenario["casts"] as Array)[0]["cards"]
+		for entry: Dictionary in scenario["casts"]:
+			players[entry["player"]] = true
+			origins[entry["origin"]] = true
+			check_equal(entry["cards"], cards, "%s: everyone casts the same cards" % id)
+		check_equal(players.size(), 4, "%s: four players" % id)
+		check_equal(origins.size(), 4, "%s: from four places" % id)
+
+
 func test_every_id_is_a_clip_id_the_pipeline_takes_and_used_once() -> void:
 	var seen: Dictionary = {}
 	for scenario in _all():

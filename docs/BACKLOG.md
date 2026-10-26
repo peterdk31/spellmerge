@@ -6,6 +6,8 @@ Ideas and future work outside the current milestone (docs/PLAN.md, "Planning sys
 
 For later milestones; see `docs/milestones/M2-staffs.md`, "Later".
 
+- **`on wall` at every bounce.** A bouncing shot does not end, so `projectile_expired` is not sent and `on wall` fires only at the last wall. The card text (`bounce · on wall · bolt · nova`, a nova at every bounce) needs a manager event for a bounce (for example `shot_bounced`) that B2's trigger relay can read; decide before the `on wall` card.
+
 - **Staff types (M3).** An always-cast slot, a shuffle staff (random order), built-in recoil, cheaper `hold`; staffs found in runs with other slot counts, delays and recharges.
 - **Relics on cards (M3).** Explosion immunity (hit kind `burst`), self-damage refunded as mana, immunity to one element, triggers that fire twice.
 - **Enemies with staffs (M3–M4).** Elites and bosses built on the same compiler; their cards can drop as rewards.

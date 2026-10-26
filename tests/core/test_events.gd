@@ -27,6 +27,7 @@ const EVENTS: Dictionary = {
 	&"projectile_impact": [["player", TYPE_INT], ["target", TYPE_OBJECT], ["position", TYPE_VECTOR2], ["direction", TYPE_VECTOR2]],
 	&"projectile_expired": [["player", TYPE_INT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT]],
 	&"form_shown": [["player", TYPE_INT], ["form", TYPE_STRING_NAME], ["origin", TYPE_VECTOR2], ["direction", TYPE_VECTOR2], ["length", TYPE_FLOAT], ["tint", TYPE_COLOR]],
+	&"combo_cast": [["player", TYPE_INT], ["combo_class", TYPE_STRING_NAME], ["origin", TYPE_VECTOR2], ["direction", TYPE_VECTOR2], ["tint", TYPE_COLOR]],
 	&"spell_changed": [["player", TYPE_INT], ["spell", TYPE_PACKED_INT32_ARRAY], ["description", TYPE_STRING]],
 	&"build_refused": [["player", TYPE_INT], ["reason", TYPE_STRING]],
 	&"recipe_changed": [["player", TYPE_INT], ["slot", TYPE_INT], ["recipe", TYPE_DICTIONARY]],

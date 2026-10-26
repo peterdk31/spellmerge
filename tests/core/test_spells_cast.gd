@@ -281,6 +281,41 @@ func test_a_beam_and_a_nova_announce_themselves_for_looks() -> void:
 	check_equal(seen.size(), 0, "a bolt has no announcement, it is drawn as a shot")
 
 
+func test_a_combination_announces_its_class_for_looks() -> void:
+	var seen: Array = []
+	_bus.combo_cast.connect(func(player: int, combo_class: StringName, origin: Vector2, direction: Vector2, tint: Color) -> void: seen.append([player, combo_class, origin, direction, tint]))
+	var cases: Dictionary = {
+		&"boosted": {"form": &"bolt", "modifiers": [&"pierce"]},
+		&"on_hit": _held(&"bolt", &"on_hit", &"nova"),
+		&"on_expire": _held(&"bolt", &"on_expire", &"nova"),
+		&"timer": _held(&"rune", &"timer", &"bolt"),
+		&"stacked": {"form": &"bolt", "element": &"fire", "modifiers": [&"split", &"homing"], "trigger": &"on_hit", "held": {"form": &"nova"}},
+	}
+	var player: int = 0
+	for combo_class in cases:
+		seen.clear()
+		_build(player, 0, cases[combo_class] as Dictionary)
+		check_equal(_spells.combo_class(_compile(cases[combo_class] as Dictionary)), combo_class, "%s is classed" % combo_class)
+		_cast(player, 0, 10.0, Vector2(5, 6), Vector2.DOWN)
+		check_equal(seen.size(), 1, "%s: one announcement per cast" % combo_class)
+		if seen.size() == 1:
+			check_equal(seen[0][0], player, "%s: from the caster" % combo_class)
+			check_equal(seen[0][1], combo_class, "%s: with its class" % combo_class)
+			check_equal(seen[0][2], Vector2(5, 6), "%s: at the staff" % combo_class)
+		player = (player + 1) % 4
+		_tick(120)
+	check_equal(_spells.combo_class(_compile({"form": &"bolt", "trigger": &"on_hit", "held": {"form": &"bolt", "trigger": &"on_hit", "held": {"form": &"nova"}}})), &"stacked", "a chain of three spells is stacked")
+	seen.clear()
+	_build(0, 0, {"form": &"bolt", "element": &"fire"})
+	_cast(0)
+	check_equal(seen.size(), 0, "a plain shot announces nothing")
+	check_equal(_spells.combo_class(null), &"", "no spell, no class")
+	seen.clear()
+	_build(1, 0, {"form": &"bolt", "modifiers": [&"pierce"]})
+	_spells.cast(1, 0, Vector2.ZERO, Vector2.ZERO, 10.0)
+	check_equal(seen.size(), 0, "a refused cast announces nothing")
+
+
 func test_a_beam_hits_instantly_and_counts_as_a_shot() -> void:
 	_target(Vector2(100, 0))
 	var tag: int = _build(0, 0, {"form": &"beam"})

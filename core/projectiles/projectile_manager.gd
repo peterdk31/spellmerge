@@ -205,12 +205,12 @@ const KIND_MAX: int = 15
 ## outline, and at the sprite's size they crowded the view (the owner's note on #244). The
 ## drawn body is smaller than the hit circle by design: the circle is the fair reach of a
 ## shot or a planted rune, the picture is only what the eye follows.
-const SHAPE_SCALE: float = 0.62
+const SHAPE_SCALE: float = 0.8
 ## Trail marks per shaped bolt and the most marks drawn in all. Past the limit the later
 ## shots draw no trail; it is a draw batch, not particles, so Feel's PARTICLE_LIMIT is
 ## untouched, and the cost is bounded whatever the cap is.
-const TRAIL_MARKS: int = 2
-const TRAIL_MAX: int = 256
+const TRAIL_MARKS: int = 3
+const TRAIL_MAX: int = 384
 ## Pixels between a bolt and its first trail mark, and between marks, per shape.
 const TRAIL_STEP: PackedFloat32Array = [0.0, 7.0, 9.0, 6.0, 8.0, 7.0]
 ## Sideways pixels the marks drift off the line of flight, per shape (alternating sides).

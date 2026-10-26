@@ -1338,7 +1338,8 @@ An independent review of the branch found these, all fixed with a regression tes
 - **Now:** the action is "Bag" in the overlay and the quick view; the list it opens is titled "P1 Drop" (the overlay title otherwise reads "MENU"). It opens in a wave for every player because the overlay is not gated by waves.
 - **Full editing mid-wave: no.** The M2 design locks the Builder in a wave (the quick view is the in-combat form, "choices so far kept"), and a player in a menu stands still and can be hit; a full six-slot editor in combat would break that trade-off. The quick Bag view (list, drop) is the answer; a wider in-wave Bag is for the HUD/Builder usability task.
 
-## 2026-10-26: M2 closed again for C2; the pet idea (#208)
+## 2026-10-26: M2 closed again for C2
 
-- **M2 done:** all iterate tasks (#245, #244, #243) are built and no crash is known, so M2 is marked done and the C2 checkpoint is filled again. Nothing from M3 is planned until the owner answers.
-- **Idea #208 (pet):** unchanged, stays on the backlog; the M3 and M5 designs do not exist yet, so it cannot be weighed against them. It is decided when M3's design is written: preferred shape is a spell form or modifier ("familiar"), not a pet system.
+- **M2 done:** all iterate tasks (#245, #244, #243) are built, so M2 is marked done in the roadmap. Nothing from M3 is planned until the owner answers.
+- **The checkpoint text is written, not yet posted.** This session cannot open issues (read-only token). The assessment and recommendation are in `docs/milestones/M2-spell-system.md`, "Checkpoint C2, second round", and the evidence in `docs/LOG.md`, "C2 evidence", "After the iterate round". NEXT.md keeps a task that opens the checkpoint issue from that text.
+- **Idea #208 (pet):** deferred until M3's design is written (one-line note in `docs/BACKLOG.md`).

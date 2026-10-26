@@ -126,6 +126,8 @@ Budget 16.7 ms: web is inside it; desktop p95 is inside and its single worst fra
 
 **The 21 combos** (`content/spells/combos.json`; all pass in `test_combos`, and each of the 18 components is in at least two): Burning bolt, Shatter, Big fire ring, Storm lance, Frost pulse rune, Void ring, Homing fan, Storm chain, Blast at the end, Swift line, Wide frost lane, Fire fan orbit, Hexed fire burst, Storm mine, Frost then lightning ray, Frost carousel, Seeking void ray, Fire trap, Quick shock ring, Seeking frost burst, Storm on flame (two players; Flare).
 
+**After the iterate round (2026-10-26).** Facts, not a new run: 24 combos (the 21 above plus Overload, Superconduct and Shared charge); Lightning is the fifth element, with two new reactions; the clip recorder (#245) with clips for the elements and the new combos; the drop lists scroll. The stress and fuzz numbers above were not measured again after Lightning, and the real-GPU frame rate (item 3) is still open.
+
 **Carried over from M1 (done-when item 5).**
 - Web 4-bot run (#93), web load time (#91), Style Guide page and kit zip (#95): the issues are closed and the owner's PR #98 merged on 2026-10-21. This run read no daily post showing the web 4-bot result, so "passes on web" (done-when item 4) is still to be confirmed from the next daily post.
 - WASM projectile timing runner: done (part 25); the first WASM numbers are in (above).

@@ -27,6 +27,7 @@ const EventsScript := preload("res://core/events/events.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const DropChoicesScript := preload("res://hud/widgets/drop_choices.gd")
+const RowWindowScript := preload("res://hud/widgets/row_window.gd")
 
 const PLAYER_COUNT: int = 4
 const SPELL_COUNT: int = 2
@@ -45,6 +46,10 @@ const ROW_WIDTH: float = 54.0
 ## the eleven components of five elements and six modifiers stay inside the player's quarter.
 const ROW_HEIGHT: float = 12.0
 const ROW_FONT: int = 8
+## The list has two columns, `LIST_GAP` apart, and rows 1 px apart.
+const LIST_GAP: float = 2.0
+const LINE_GAP: float = 1.0
+const COLUMNS: int = 2
 ## The meta key that keeps a button's text without the focus mark.
 const BASE_TEXT_META: StringName = &"base_text"
 
@@ -74,6 +79,9 @@ var _synced_controls: int = 0
 var _reopening: bool = false
 var _controls: Array[Control] = []
 var _grid: GridContainer = null
+## The clipping window the grid sits in, and the first line of the grid in view.
+var _window: Control = null
+var _first_line: int = 0
 
 @onready var _title: Label = %Title
 @onready var _resume: Button = %Resume
@@ -97,11 +105,14 @@ func _ready() -> void:
 	# components stays inside this player's quarter of the screen.
 	_grid = GridContainer.new()
 	_grid.name = "DropList"
-	_grid.columns = 2
-	_grid.add_theme_constant_override("h_separation", 2)
-	_grid.add_theme_constant_override("v_separation", 1)
+	_grid.columns = COLUMNS
+	_grid.add_theme_constant_override("h_separation", int(LIST_GAP))
+	_grid.add_theme_constant_override("v_separation", int(LINE_GAP))
 	_grid.visible = false
-	get_node("Rows").add_child(_grid)
+	# A list longer than `RowWindowScript.OVERLAY_MAX_LINES` lines scrolls inside a window.
+	_window = RowWindowScript.make_window("DropWindow", _grid, ROW_WIDTH * 2.0 + LIST_GAP)
+	_window.visible = false
+	get_node("Rows").add_child(_window)
 	visible = false
 	_refresh()
 
@@ -237,7 +248,9 @@ func _refresh() -> void:
 	_build.visible = not _dropping
 	_drop.visible = not _dropping
 	_grid.visible = _dropping
+	_window.visible = _dropping
 	_set_title(DROP_TITLE if _dropping else MENU_TITLE)
+	_scroll_list()
 	_controls.clear()
 	_controls.append(_resume)
 	_controls.append(_build)
@@ -245,6 +258,24 @@ func _refresh() -> void:
 	for row in _rows:
 		_controls.append(row)
 	_mark_focus()
+
+
+## Keep the focused drop row in view: the list shows `OVERLAY_MAX_LINES` lines of two rows at
+## most and slides to follow the focus (UIFocus walks all rows). The title shows the focused
+## row ("Drop 3/14") once the list is longer than the window.
+func _scroll_list() -> void:
+	var total: int = _row_ids.size()
+	var lines: int = ceili(float(total) / COLUMNS)
+	var most: int = RowWindowScript.OVERLAY_MAX_LINES
+	var focus_at: int = _rows.find(_focused as Button)
+	var focus_line: int = floori(float(focus_at) / COLUMNS) if focus_at >= 0 else _first_line
+	_first_line = RowWindowScript.first_line_for(focus_line, _first_line, most, lines)
+	# A row can be taller than `ROW_HEIGHT` (the theme's margins), so the step is its own.
+	var step: float = maxf(ROW_HEIGHT, _rows[0].get_combined_minimum_size().y) if not _rows.is_empty() else ROW_HEIGHT
+	RowWindowScript.apply(_window, _grid, step + LINE_GAP, lines, most, _first_line)
+	_set_title(DROP_TITLE if _dropping else MENU_TITLE)
+	if _dropping and lines > most and focus_at >= 0 and focus_at < total:
+		_title.text += " %d/%d" % [focus_at + 1, total]
 
 
 ## UIFocus keeps its own copy of the controls: after more rows were made, hand it the new list.
@@ -314,6 +345,7 @@ func _on_focus_changed(player: int, control: Control) -> void:
 	if player == index and _open:
 		_focused = control
 		_mark_focus()
+		_scroll_list()
 
 
 func _on_activated(player: int, control: Control) -> void:

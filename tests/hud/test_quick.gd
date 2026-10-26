@@ -747,3 +747,77 @@ func test_the_quick_actions_send_only_build_change_requested() -> void:
 		for other in ["spell_swap_requested.emit", "recipe_changed.emit", "bag_changed.emit", "spell_changed.emit"]:
 			check(not source.contains(other), "%s never sends %s" % [path, other])
 		check(not source.contains("res://gameplay"), "%s never loads anything from gameplay" % path)
+
+
+## A bag with `extra` more rows than the real one has (the first ids again), so the list is
+## longer than any real content makes it: the drop lists must scroll, not grow.
+func _long_bag(player: int, ids: Array[StringName], extra: int) -> void:
+	var bag: Array[StringName] = ids.duplicate()
+	for at in extra:
+		bag.append(ids[at % ids.size()])
+	_bus.bag_changed.emit(player, bag)
+
+
+func _inside(inner: Rect2, outer: Rect2) -> bool:
+	return outer.grow(0.5).encloses(inner)
+
+
+func test_a_longer_quick_list_scrolls_and_follows_the_focus() -> void:
+	_start(1)
+	root.size = Vector2i(640, 360)
+	_tap(0, &"swap")
+	_frame()
+	_wave_start()
+	_open_builder(0)
+	var builder: BuilderScript = _builder(0)
+	_press(0, builder.drop_button())
+	_long_bag(0, builder.row_ids(), 5)
+	await process_frame
+	await process_frame
+	var rows: Array[Button] = builder.shown_rows()
+	check_equal(rows.size(), 16, "sixteen rows are offered")
+	var window := builder.get_node("Columns/Bag/RowsWindow") as Control
+	check(window.size.y <= 11.0 * rows[0].size.y + 0.5,"the window shows eleven rows at most, got %s" % window.size.y)
+	check(_inside(rows[0].get_global_rect(), window.get_global_rect()), "the first row is in view")
+	check(not _inside(rows[15].get_global_rect(), window.get_global_rect()), "the last row is out of view at first")
+	check(_focus_on(0, rows[15]), "UIFocus reaches the last row")
+	await process_frame
+	check(_inside(rows[15].get_global_rect(), window.get_global_rect()), "the last row is in view once focused, got %s in %s" % [rows[15].get_global_rect(), window.get_global_rect()])
+	check(_focus_on(0, rows[0]), "UIFocus wraps to the first row")
+	await process_frame
+	check(_inside(rows[0].get_global_rect(), window.get_global_rect()), "the first row is back in view")
+	check(_inside(builder.get_global_rect(), Rect2(0, 0, 640, 360)), "the builder stays on the screen")
+
+
+func test_a_longer_overlay_list_scrolls_and_follows_the_focus() -> void:
+	_start(1)
+	root.size = Vector2i(640, 360)
+	_tap(0, &"swap")
+	_tap(0, &"overlay")
+	_frame()
+	var overlay: OverlayScript = _overlay(0)
+	_press(0, overlay.drop_button())
+	_long_bag(0, overlay.row_ids(), 5)
+	await process_frame
+	await process_frame
+	var rows: Array[Button] = overlay.shown_rows()
+	check_equal(rows.size(), 16, "sixteen rows are offered")
+	var window := overlay.get_node("Rows/DropWindow") as Control
+	check(window.size.y <= 6.0 * (rows[0].size.y + OverlayScript.LINE_GAP) + 0.5,"the window shows six lines at most, got %s" % window.size.y)
+	check(_inside(rows[0].get_global_rect(), window.get_global_rect()), "the first row is in view")
+	check(not _inside(rows[15].get_global_rect(), window.get_global_rect()), "the last row is out of view at first")
+	check(_focus_on(0, rows[15]), "UIFocus reaches the last row")
+	await process_frame
+	check(_inside(rows[15].get_global_rect(), window.get_global_rect()), "the last row is in view once focused")
+	check(_inside(overlay.get_global_rect(), Rect2(0, 0, 640, 360)), "the overlay stays on the screen")
+
+
+func test_the_row_window_moves_only_as_far_as_it_must() -> void:
+	const RowWindow := preload("res://hud/widgets/row_window.gd")
+	check_equal(RowWindow.first_line_for(0, 0, 11, 16), 0, "at the top it stays")
+	check_equal(RowWindow.first_line_for(10, 0, 11, 16), 0, "the last visible line does not scroll")
+	check_equal(RowWindow.first_line_for(11, 0, 11, 16), 1, "one past the end scrolls by one")
+	check_equal(RowWindow.first_line_for(15, 0, 11, 16), 5, "the last line shows the end of the list")
+	check_equal(RowWindow.first_line_for(2, 5, 11, 16), 2, "a line above the window scrolls up to it")
+	check_equal(RowWindow.first_line_for(0, 5, 11, 11), 0, "a list that fits never scrolls")
+	check_equal(RowWindow.first_line_for(3, 9, 11, 16), 3, "a stale start is clamped, then follows")

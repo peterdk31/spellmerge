@@ -2,6 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-26: The drop lists scroll, they do not page
+
+- **A scrolling window, not pages.** The quick view's drop list shows 11 rows at most and the overlay's 6 lines of two (`hud/widgets/row_window.gd`); a longer list sits in a clipping `Control` and slides to keep the focused row in view. Paging would need extra "next page" controls or a change of what UIFocus walks; with a window every row stays a visible control, so UIFocus (`core/ui_focus`) is unchanged and wraps around the whole list as before.
+- **The step is the row's real height.** A quick row is 14 px tall in the theme (not the 12 of `QUICK_ROW_HEIGHT`, which is only its minimum), so the window uses the row's own minimum height; otherwise the list would slide by the wrong amount.
+- **The title shows where you are** ("P1 Drop 12/16") only when the list is longer than the window. The full builder's bag list is unchanged (it is as high as its rows).
+- **The test uses a longer bag than any content has** (the real ids repeated, via `bag_changed`), so the 12th element or modifier can be added without a new test.
+
 ## 2026-10-26: Lightning's reactions and the discharge arc (#243, part 2)
 
 - **Overload and Superconduct, only with fire and frost.** The task asked for at least two existing elements; storm and void are left out so lightning is not a copy of storm (an electric element that reacts with everything) and each new reaction needs a colour 0.45 apart from all the others, which gets hard with more. Lightning on storm or void just charges, as before.

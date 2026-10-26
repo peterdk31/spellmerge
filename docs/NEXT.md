@@ -8,12 +8,13 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
 
 M2's parts were all built and the owner answered the C2 checkpoint (#235) with **iterate** on 2026-10-25: rework in this order, #245 (clip recorder and Spell atlas), #244 (spell visuals), #243 (Lightning). The tasks below follow that order; the next end of M2 is a new C2 checkpoint. Done-when item 3 is still open on the real-GPU frame rate. Nothing from M3+ is started. `ci/` is owner-only: the owner built the pipeline side (#246); the Godot side of the recorder and the atlas data are built here, in the format `ci/smbot/clips.py` reads.
 
-- [ ] **Scrolling or paging drop list (before any twelfth element or modifier).** The quick view's and the overlay's drop lists are full at 11 rows of 12 px (`QUICK_ROW_HEIGHT`); a scrolling or paging list that UIFocus follows must exist before another element or modifier is added. `test_quick.gd` already fails on a twelfth row (it checks the count of 11 and that the lists stay inside the screen).
 - [ ] **Close M2 again.** When the tasks above are done and no crash is known: mark M2 done in the roadmap and fill the C2 checkpoint again (what was reworked, assessment, recommendation).
 
 ## Blocked
 
 ## Done recently
+
+- [x] **Scrolling drop list (before any twelfth element or modifier).** (`hud/`) The quick view's list (11 rows) and the overlay's (6 lines of two) are clipping windows that slide to follow the focused row; UIFocus is unchanged and the title shows "n/total" while it scrolls. `hud/widgets/row_window.gd`; tests in `test_quick.gd` with a 16-row list. The existing count-of-11 checks stay, since the real content still has 11: when a twelfth is added, update that number (the lists now scroll).
 
 - [x] **Lightning, reactions, combos and the extensibility report (#243, part 2).** Overload (fire, `burn`/`static`) and Superconduct (frost, `chill`/`static`) as four rows in `reactions.tres`, with colours and power in the Feel preset; the discharge has a colour (cyan), a sound id (`reaction_discharge`, silent until the `.ogg` exists) and a jagged arc from the struck enemy to each one zapped (new event `discharge_arc`, drawn by Feel from a pool of eight `Line2D`s). Combos `overload`, `superconduct` (two players) and `shared_charge` (two players, shows the discharge). `content/spells/README.md` fixed (reactions, steps, what a new element needs outside its folder). The extensibility report is in the PR description.
 - [x] **Lightning, status and element (#243, part 1).** The fifth element `lightning` (complexity 1, Arc palette ramp, forked-arc shot shape 5) and the `static` status: a charged enemy hit again by a player's spell discharges to every other charged enemy within 96 px, one step only. Files outside the element folder and why are in `docs/LOG.md`. Tests in `test_combat_statuses.gd` (loop guard, player index) and `test_projectile_shapes.gd`.

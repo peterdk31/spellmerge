@@ -52,9 +52,9 @@ extends Node2D
 ## pixel cells, so a wall check is a walk over the cells the step's path crosses
 ## (a few for a normal shot; at most MAX_WALL_VISITS for a huge step, and a path
 ## not fully walked then counts as a wall hit) and needs no physics query. A
-## projectile whose path enters a solid cell ends there, even a piercing one:
-## it bounces only if `set_bounce` gave it bounces. It is checked as a point, not a circle. The step is cut
-## at the wall first, so a target in front of the wall is still hit by a fast
+## projectile whose path enters a solid cell ends there, even a piercing one,
+## unless `set_bounce` gave it bounces (then it turns back). It is checked as a
+## point, not a circle. The step is cut at the wall first, so a target in front of the wall is still hit by a fast
 ## shot, and one behind it is not. The wall walk is not charged to the work
 ## budget above (its length is capped instead). `wall_hits` counts these ends.
 ## `clip_to_walls(from, to)` shortens a segment to the first wall. `spawn` refuses
@@ -157,9 +157,6 @@ const MOTION_STRAIGHT: int = 0
 const MOTION_STILL: int = 1
 ## Only `spawn_orbit` makes this one.
 const MOTION_ORBIT: int = 2
-## Default global caps on live projectiles for each platform. The web cap was 1,000 (the PLAN
-## budget) until the first web stress run: a physics step of 14 to 20 ms made the engine
-## catch up with up to 8 steps per frame (docs/DECISIONS.md, 2026-10-23), so it is 500.
 ## Per-shot flags (`_flags`), set by the `set_*` calls below.
 const F_SELF: int = 1
 const F_SELF_LIVE: int = 2
@@ -175,6 +172,9 @@ const SPIRAL_PERIOD: float = 0.5
 ## A growing shot never gets bigger than this many times its first radius.
 const GROWTH_MAX: float = 4.0
 
+## Default global caps on live projectiles for each platform. The web cap was 1,000 (the PLAN
+## budget) until the first web stress run: a physics step of 14 to 20 ms made the engine
+## catch up with up to 8 steps per frame (docs/DECISIONS.md, 2026-10-23), so it is 500.
 const DEFAULT_CAP_WEB: int = 500
 const DEFAULT_CAP_DESKTOP: int = 3000
 ## How many recently hit targets a piercing projectile remembers; also the most
@@ -1127,8 +1127,6 @@ func step(delta: float) -> void:
 		if not limit.has_point(_pos[slot]):
 			_kill(slot)
 			continue
-		if _shield[slot] > 0:
-			_shield_block(slot)
 		# A shot that meets a wall is cut short there: it can still hit what is
 		# in front of the wall, then it ends (or bounces). An orbit or ghost shot ignores walls.
 		var walled: bool = false
@@ -1150,8 +1148,13 @@ func step(delta: float) -> void:
 			for _hit in HIT_MEMORY:
 				if not _hit_test(slot) or _alive[slot] == 0 or _seq[slot] != seq or (_flags[slot] & F_STUCK) != 0:
 					break
-		if walled and _alive[slot] != 0:
+		# A shot that stuck to a target this step stays stuck, even at a wall.
+		if walled and _alive[slot] != 0 and (_flags[slot] & F_STUCK) == 0:
 			_wall_end(slot)
+	# Shields run once every shot has moved, so each enemy shot's path is this step's.
+	for slot in top:
+		if _alive[slot] != 0 and _shield[slot] > 0 and _seq[slot] < first_new:
+			_shield_block(slot)
 	_resume = maxi(starved_at, 0)
 	_step_index += 1
 	_stepping = false
@@ -1194,9 +1197,10 @@ func _solid_at(point: Vector2) -> bool:
 	return x >= 0 and x < _wall_w and y >= 0 and y < _wall_h and _wall_cells[y * _wall_w + x] != 0
 
 
+## `_advance` results: moved on, the shot ended where it stands (with `projectile_expired`),
+## vanished (its stuck-to target is gone or its anchor cleared), or is stuck (no hit test
+## this step).
 const ADVANCE_OK: int = 0
-## `_advance` results: the shot ended where it stands (with `projectile_expired`), vanished
-## (its stuck-to target is gone or its anchor cleared), or is stuck (no hit test this step).
 const ADVANCE_END: int = 1
 const ADVANCE_GONE: int = 2
 const ADVANCE_STUCK: int = 3
@@ -1267,11 +1271,14 @@ func _shield_block(slot: int) -> void:
 		if _alive[other] == 0 or _player[other] >= 0:
 			continue
 		var reach: float = _radius[slot] + _radius[other]
-		var path: Vector2 = _pos[other] - _prev[other]
+		# Both shots move during the step: in the enemy shot's frame the shield goes along
+		# the relative path, so the test is the distance from that segment to the origin.
+		var start: Vector2 = _prev[slot] - _prev[other]
+		var path: Vector2 = (_pos[slot] - _pos[other]) - start
 		var along: float = 0.0
 		if not path.is_zero_approx():
-			along = clampf((_pos[slot] - _prev[other]).dot(path) / path.length_squared(), 0.0, 1.0)
-		if (_prev[other] + path * along).distance_squared_to(_pos[slot]) > reach * reach:
+			along = clampf(-start.dot(path) / path.length_squared(), 0.0, 1.0)
+		if (start + path * along).length_squared() > reach * reach:
 			continue
 		_shield[slot] -= 1
 		var at: Vector2 = _pos[other]
@@ -2031,7 +2038,8 @@ func _register_hit(slot: int, target: int, at: Vector2) -> void:
 		_stuck_off[slot] = at - (node as Node2D).global_position
 		_life[slot] = _stick[slot]
 		_stick[slot] = 0.0
-		_vel[slot] = Vector2.ZERO
+		# `_vel` stays: `_advance` never moves a stuck shot, and a payload it fires (on hit
+		# or on a timer) still goes the way the shot was flying.
 	elif _pierce[slot] > 0:
 		_pierce[slot] -= 1
 		var memory: int = slot * HIT_MEMORY

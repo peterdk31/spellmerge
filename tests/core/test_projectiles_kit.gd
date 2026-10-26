@@ -6,7 +6,8 @@ extends SceneTree
 ## godot --headless --path . --script res://tests/core/test_projectiles_kit.gd
 
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
-const EventsScript := preload("res://core/events/events.gd")
+const SpellsScript := preload("res://core/spells/spells.gd")
+const EventsScript :=preload("res://core/events/events.gd")
 
 const DT: float = 1.0 / 60.0
 
@@ -42,6 +43,9 @@ func _initialize() -> void:
 	_test_shield_only_for_players_shots()
 	_test_self_hit_waits_until_the_shot_leaves_the_caster()
 	_test_ally_is_passed_once_or_hit()
+	_test_sticky_shot_keeps_its_direction_and_stays_stuck_at_a_wall()
+	_test_shield_catches_fast_shots_in_any_slot_order()
+	_test_apply_travel_maps_cards_to_the_shot()
 	_test_setters_refuse_bad_slots()
 	_test_many_shots_with_behaviours_stay_cheap()
 	_teardown()
@@ -381,6 +385,86 @@ func _test_ally_is_passed_once_or_hit() -> void:
 	_fire(Vector2(200.0, 0.0))
 	_run(30)
 	_check(_hits.size() == 1 and _passed.is_empty(), "with friendly fire a teammate is hit, not passed")
+
+
+func _test_sticky_shot_keeps_its_direction_and_stays_stuck_at_a_wall() -> void:
+	_setup()
+	_target(Vector2(100.0, 100.0), 8.0)
+	var slot: int = _fire(Vector2(200.0, 0.0), Vector2(50.0, 100.0), 3.0, 9)
+	_mgr.set_sticky(slot, 1.0)
+	_run(20)
+	_check(_mgr.get_velocity_of(slot).x > 100.0, "a stuck shot still reports the way it was flying")
+	# It sticks on the step it also reaches a wall: it stays, it does not bounce or end.
+	_setup()
+	_mgr.set_walls([Rect2(104.0, 0.0, 32.0, 200.0)] as Array[Rect2])
+	_target(Vector2(100.0, 100.0), 8.0)
+	var wall_slot: int = _fire(Vector2(300.0, 0.0), Vector2(50.0, 100.0), 3.0, 8)
+	_mgr.set_bounce(wall_slot, 2)
+	_mgr.set_sticky(wall_slot, 1.0)
+	_run(12)
+	_check(_mgr.is_alive(wall_slot) and _hits.size() == 1 and _mgr.get_velocity_of(wall_slot).x > 100.0, "a shot that sticks at a wall stays stuck")
+
+
+func _test_shield_catches_fast_shots_in_any_slot_order() -> void:
+	# The enemy shot has a higher slot than the shield, and the shield moves toward it.
+	_setup()
+	var shield: int = _fire(Vector2(600.0, 0.0), Vector2(100.0, 100.0), 3.0, 5)
+	_mgr.set_shield(shield, 1)
+	var enemy: int = _mgr.spawn(EventsScript.NO_PLAYER, Vector2(300.0, 100.0), Vector2(-1500.0, 0.0), 3.0, 3.0, ManagerScript.LAYER_PLAYER, 0, 0)
+	_run(8)
+	_check(enemy > shield and not _mgr.is_alive(enemy) and _blocked.size() == 1, "a moving shield blocks a fast shot in a higher slot")
+	# And with the enemy shot in the lower slot.
+	_setup()
+	var first: int = _mgr.spawn(EventsScript.NO_PLAYER, Vector2(300.0, 100.0), Vector2(-1500.0, 0.0), 3.0, 3.0, ManagerScript.LAYER_PLAYER, 0, 0)
+	var second: int = _fire(Vector2(600.0, 0.0), Vector2(100.0, 100.0), 3.0, 5)
+	_mgr.set_shield(second, 1)
+	_run(8)
+	_check(first < second and not _mgr.is_alive(first) and _blocked.size() == 1, "and a fast shot in a lower slot")
+
+
+func _test_apply_travel_maps_cards_to_the_shot() -> void:
+	_setup()
+	var spells: SpellsScript = SpellsScript.new()
+	spells.bind(_mgr, _bus)
+	# A plain spell calls no setter.
+	var plain_slot: int = _fire(Vector2(100.0, 0.0))
+	spells._apply_travel(plain_slot, CompiledSpell.new())
+	_check(_mgr.get_shield_of(plain_slot) == 0 and _mgr.get_growth_of(plain_slot) == 1.0, "a plain spell sets nothing")
+	# A spell with every behaviour; the wall is passed because the shot is a ghost.
+	var spell := CompiledSpell.new()
+	spell.behaviours.resize(ModifierBase.Behaviour.size())
+	spell.behaviours[ModifierBase.Behaviour.BOUNCE] = 1.4
+	spell.behaviours[ModifierBase.Behaviour.GHOST] = 1.0
+	spell.behaviours[ModifierBase.Behaviour.SPIRAL] = 20.0
+	spell.behaviours[ModifierBase.Behaviour.LINGER] = 0.3
+	spell.behaviours[ModifierBase.Behaviour.GROWTH] = 2.0
+	spell.behaviours[ModifierBase.Behaviour.STICKY] = 0.5
+	spell.behaviours[ModifierBase.Behaviour.SHIELD] = 2.6
+	spell.motion = FormBase.Motion.RETURN
+	_mgr.set_walls([Rect2(100.0, 0.0, 32.0, 200.0)] as Array[Rect2])
+	_mgr.set_anchor(0, Vector2(50.0, 100.0))
+	var slot: int = _fire(Vector2(200.0, 0.0), Vector2(50.0, 100.0), 1.2)
+	spells._apply_travel(slot, spell)
+	_check(_mgr.get_shield_of(slot) == 3, "shield strength is rounded (%d)" % _mgr.get_shield_of(slot))
+	_run(28)
+	_check(_mgr.get_growth_of(slot) > 1.0, "the shot grows")
+	_check(_mgr.is_alive(slot) and _mgr.get_position_of(slot).x > 132.0 and _mgr.get_velocity_of(slot).x > 0.0, "a ghost passes the wall without bouncing")
+	_run(150)
+	_check(not _mgr.is_alive(slot) and not _expired.is_empty() and _expired.back()[1].distance_to(Vector2(50.0, 100.0)) < 1.0, "a return carrier flies back to the caster")
+	spells.free()
+	# A bounce card: 1.4 rounds to one bounce.
+	_setup()
+	spells = SpellsScript.new()
+	spells.bind(_mgr, _bus)
+	var bouncer := CompiledSpell.new()
+	bouncer.behaviours.resize(ModifierBase.Behaviour.size())
+	bouncer.behaviours[ModifierBase.Behaviour.BOUNCE] = 1.4
+	_mgr.set_walls([Rect2(160.0, 0.0, 32.0, 200.0)] as Array[Rect2])
+	var bounced: int = _fire(Vector2(200.0, 0.0), Vector2(50.0, 100.0), 3.0)
+	spells._apply_travel(bounced, bouncer)
+	_run(60)
+	_check(_mgr.is_alive(bounced) and _mgr.get_velocity_of(bounced).x < 0.0, "a bounce card turns the shot at a wall")
+	spells.free()
 
 
 func _test_setters_refuse_bad_slots() -> void:

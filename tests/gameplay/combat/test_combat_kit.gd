@@ -244,7 +244,69 @@ func test_a_later_element_without_a_reaction_puts_its_own_status_on() -> void:
 	check(_combat.get_health(enemy) <= 100 - 4 - 8, "the second fire's stronger burn won (9 per second)")
 
 
+func test_the_elements_of_one_hit_chain_their_reactions() -> void:
+	var enemy := _enemy(Vector2.ZERO)
+	_combat.apply_status(0, enemy, &"burn", 5.0, 0.0001)
+	_combat.apply_status(0, enemy, &"hex", 5.0, 10.0)
+	var profile := _profile(4)
+	profile.element_id = &"frost"
+	profile.element_ids = [&"frost", &"fire"]
+	var ids: Array[StringName] = []
+	_bus.reaction_triggered.connect(func(_p: int, id: StringName, _at: Vector2) -> void: ids.append(id))
+	_bus.projectile_hit.emit(0, enemy, Vector2(-5.0, 0.0), _tag(profile))
+	check_equal(ids, [&"thaw", &"kindle"], "the second element reacts with what the first reaction left")
+
+
 # --- Statuses on wizards ---
+
+
+func test_every_element_of_a_hit_puts_its_status_on_the_wizard_it_hurt() -> void:
+	_wizard(0, Vector2.ZERO)
+	var profile := _profile(2)
+	profile.element_id = &"fire"
+	profile.element_ids = [&"fire", &"frost"]
+	profile.status_id = &"burn"
+	profile.status_duration = 2.0
+	profile.status_strength = 1.0
+	profile.later_status_ids = [&"chill"]
+	profile.later_status_durations = PackedFloat32Array([3.0])
+	profile.later_status_strengths = PackedFloat32Array([40.0])
+	_bus.projectile_hit.emit(0, _wizards[0], Vector2(-5.0, 0.0), _tag(profile))
+	check(_combat.wizard_status_left(0, &"burn") > 0.0, "burning")
+	check(_combat.wizard_status_left(0, &"chill") > 0.0, "and chilled by the second element")
+
+
+func test_a_burn_tick_spends_no_shock_and_no_static_and_adds_no_hex() -> void:
+	var wizard := _wizard(0, Vector2.ZERO)
+	var near := _enemy(Vector2(30.0, 0.0))
+	_projectiles.step(STEP)
+	_combat.apply_wizard_status(0, 0, &"shock", 5.0, 100.0)
+	_combat.apply_wizard_status(0, 0, &"static", 5.0, 50.0)
+	_combat.apply_wizard_status(0, 0, &"burn", 1.0, 4.0)
+	_run(1.0)
+	check(_combat.wizard_status_left(0, &"shock") > 0.0, "the shock is still on after the ticks")
+	check(_combat.wizard_status_left(0, &"static") > 0.0, "so is the static")
+	check_equal(_combat.get_health(near), 100, "no discharge from the wizard's own burn")
+	check_equal(wizard.health, PlayerScript.MAX_HEALTH - 4, "the ticks took plain damage, no shock bonus")
+
+
+func test_a_burn_tick_sends_a_status_hit_kind_that_feel_gives_no_stop() -> void:
+	_wizard(0, Vector2.ZERO)
+	_combat.apply_wizard_status(0, 0, &"burn", 1.0, 4.0)
+	_run(1.0)
+	check(not _landed.is_empty(), "ticks are told")
+	for row: Array in _landed:
+		check_equal(row[3], &"status", "every tick is kind status")
+
+
+func test_a_shock_jump_kill_is_no_kill_for_a_card() -> void:
+	var struck := _enemy(Vector2.ZERO)
+	var weak := _enemy(Vector2(30.0, 0.0), 1)
+	_projectiles.step(STEP)
+	_combat.apply_status(0, struck, &"shock", 5.0, 100.0)
+	_bus.projectile_hit.emit(0, struck, Vector2(-5.0, 0.0), _tag(_profile(5)))
+	check_equal(_combat.get_health(weak), -1, "the jump killed it")
+	check(_kills.is_empty(), "a jump is not the spell's own hit")
 
 
 func test_burn_on_a_wizard_hurts_over_time_as_kind_status() -> void:
@@ -429,6 +491,7 @@ func test_a_heavy_hit_that_knocks_an_enemy_into_a_wall_hurts_once() -> void:
 	check_equal(_combat.get_health(enemy), 97, "the hit itself")
 	_run(STEP)
 	check_equal(_combat.get_health(enemy), 90, "the slam into the wall")
+	check_equal(_landed[_landed.size() - 1][3], &"reaction", "a slam is told as kind reaction, not a shot")
 	_run(STEP * 2.0)
 	check_equal(_combat.get_health(enemy), 90, "only once")
 

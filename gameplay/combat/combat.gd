@@ -654,17 +654,19 @@ func _hit_player(player: int, target: Node, amount: int, direction: Vector2, str
 		if events != null:
 			events.shield_blocked.emit(index, where, _w_shield_tag[index])
 		return false
-	if _w_hex_left[index] > 0.0:
-		amount += roundi(float(amount) * _w_hex_extra[index] / 100.0)
 	var discharge_share: float = 0.0
-	if _w_shock_left[index] > 0.0:
-		amount += roundi(float(amount) * _w_shock_share[index] / 100.0)
-		_w_shock_left[index] = 0.0
-		_w_shock_share[index] = 0.0
-	if _w_static_left[index] > 0.0:
-		discharge_share = _w_static_share[index]
-		_w_static_left[index] = 0.0
-		_w_static_share[index] = 0.0
+	# A status tick (a burn) is not a hit: no hex bonus, and it spends no shock or static.
+	if kind != KIND_STATUS:
+		if _w_hex_left[index] > 0.0:
+			amount += roundi(float(amount) * _w_hex_extra[index] / 100.0)
+		if _w_shock_left[index] > 0.0:
+			amount += roundi(float(amount) * _w_shock_share[index] / 100.0)
+			_w_shock_left[index] = 0.0
+			_w_shock_share[index] = 0.0
+		if _w_static_left[index] > 0.0:
+			discharge_share = _w_static_share[index]
+			_w_static_left[index] = 0.0
+			_w_static_share[index] = 0.0
 	if strength > 0.0:
 		_w_knock[index] = direction * strength
 	_w_last_player[index] = player
@@ -686,6 +688,8 @@ func _wizard_discharge(index: int, from: Vector2, amount: int) -> void:
 	if projectiles == null or _discharging:
 		return
 	_discharging = true
+	var spell_tag: int = _tag
+	_tag = 0
 	var count: int = projectiles.targets_in(from, STATIC_RANGE, ProjectileManagerScript.LAYER_ENEMY, _near)
 	_discharge_targets.clear()
 	for i in count:
@@ -699,6 +703,7 @@ func _wizard_discharge(index: int, from: Vector2, amount: int) -> void:
 				events.reaction_triggered.emit(index, DISCHARGE, zapped)
 				events.discharge_arc.emit(index, from, zapped)
 			hit(index, near, amount, Vector2.ZERO, 0.0, KIND_REACTION)
+	_tag = spell_tag
 	_discharging = false
 
 
@@ -788,9 +793,18 @@ func _apply_to_wizard(player: int, index: int, position: Vector2, profile: HitPr
 		return
 	var wizard: Node2D = _players[index]
 	var direction: Vector2 = (_position_of(wizard) - position).normalized()
-	if _hit_player(player, wizard, damage, direction, strength, kind, profile) \
-			and profile != null and profile.status_id != &"" and index < PLAYER_SLOTS:
+	if not _hit_player(player, wizard, damage, direction, strength, kind, profile) or profile == null \
+			or index >= PLAYER_SLOTS:
+		return
+	# Every element's status goes on in order; a wizard has no reactions, so none of them react.
+	if profile.status_id != &"":
 		apply_wizard_status(player, index, profile.status_id, profile.status_duration, profile.status_strength)
+	for i in profile.later_status_ids.size():
+		if profile.later_status_ids[i] == &"":
+			continue
+		var duration: float = profile.later_status_durations[i] if i < profile.later_status_durations.size() else 0.0
+		var power: float = profile.later_status_strengths[i] if i < profile.later_status_strengths.size() else 0.0
+		apply_wizard_status(player, index, profile.later_status_ids[i], duration, power)
 
 
 ## A spell's hit on an enemy: damage and push (pulled toward the hit when hexed), the shock jump,
@@ -829,11 +843,17 @@ func _apply_to_enemy(player: int, enemy: Node2D, position: Vector2, profile: Hit
 	if spent >= 0:
 		_shock_left[spent] = 0.0
 		_shock_share[spent] = 0.0
+	# What the jump, the discharge and the reactions kill is not the spell's own kill: no `kill_landed`.
+	var spell_tag: int = _tag
 	if jump_share > 0.0:
+		_tag = 0
 		_shock_jump(player, enemy, jump_from, roundi(float(damage) * jump_share / 100.0))
+		_tag = spell_tag
 	var discharged: bool = false
 	if discharge_share > 0.0:
+		_tag = 0
 		discharged = _discharge(player, enemy, discharge_from, roundi(float(damage) * discharge_share / 100.0))
+		_tag = spell_tag
 		if discharged:
 			# The struck enemy is spent; the ones it hit stay charged.
 			var spent_at: int = _enemies.find(enemy)
@@ -843,6 +863,8 @@ func _apply_to_enemy(player: int, enemy: Node2D, position: Vector2, profile: Hit
 		return
 	# Every element of the hit in order: each reacts with what the ones before it left, or puts its
 	# own status on (`fire · frost · bolt` thaws on its own hit). The first reaction was chosen above.
+	# (One reaction per hit on a target, but within a hit the chain goes on: `reacted` lets the next element read what is left.)
+	var reacted: bool = false
 	var elements: int = maxi(profile.element_ids.size(), 1)
 	for i in elements:
 		var row: int = _enemies.find(enemy)
@@ -854,13 +876,14 @@ func _apply_to_enemy(player: int, enemy: Node2D, position: Vector2, profile: Hit
 		var power: float = profile.status_strength
 		if i > 0:
 			var element: StringName = profile.element_ids[i] if i < profile.element_ids.size() else &""
-			step_reaction = _reaction_for(row, element) if element != &"" and _react_wait[row] <= 0.0 else null
+			step_reaction = _reaction_for(row, element) if element != &"" and (reacted or _react_wait[row] <= 0.0) else null
 			status_id = profile.later_status_ids[i - 1] if i - 1 < profile.later_status_ids.size() else &""
 			duration = profile.later_status_durations[i - 1] if i - 1 < profile.later_status_durations.size() else 0.0
 			power = profile.later_status_strengths[i - 1] if i - 1 < profile.later_status_strengths.size() else 0.0
 		if step_reaction != null:
 			# The reaction runs instead of the status, and only on a target that lived.
 			_react(player, enemy, step_reaction)
+			reacted = true
 		elif status_id != &"" and not (i == 0 and discharged):
 			# (A discharge replaces the first status, so a lightning hit does not charge again at once.)
 			apply_status(player, enemy, status_id, duration, power)
@@ -909,6 +932,14 @@ func _react(player: int, enemy: Node2D, row: ReactionRow) -> void:
 		at = _enemies.find(enemy)
 		if at < 0:
 			return
+	# A kill by the reaction's own damage is not the spell's kill: no `kill_landed`.
+	var spell_tag: int = _tag
+	_tag = 0
+	_react_effect(player, enemy, at, centre, row)
+	_tag = spell_tag
+
+
+func _react_effect(player: int, enemy: Node2D, at: int, centre: Vector2, row: ReactionRow) -> void:
 	match row.effect:
 		ReactionRow.Effect.CONSUME:
 			var amount: int = row.damage
@@ -1213,7 +1244,7 @@ func _send_slams() -> void:
 	while sent < _slam_due_enemy.size():
 		if is_instance_valid(_slam_due_enemy[sent]):
 			_tag = _slam_due_tag[sent]
-			_hit(_slam_due_player[sent], _slam_due_enemy[sent], maxi(_slam_due_amount[sent], 1), Vector2.ZERO, 0.0, false, KIND_SHOT)
+			_hit(_slam_due_player[sent], _slam_due_enemy[sent], maxi(_slam_due_amount[sent], 1), Vector2.ZERO, 0.0, false, KIND_REACTION)
 		sent += 1
 	_tag = saved_tag
 	_slam_due_enemy.clear()

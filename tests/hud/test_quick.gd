@@ -777,11 +777,20 @@ func test_a_longer_quick_list_scrolls_and_follows_the_focus() -> void:
 	var rows: Array[Button] = builder.shown_rows()
 	check_equal(rows.size(), 16, "sixteen rows are offered")
 	var window := builder.get_node("Columns/Bag/RowsWindow") as Control
-	check(window.size.y <= 11.0 * rows[0].size.y + 0.5,"the window shows eleven rows at most, got %s" % window.size.y)
+	var step: float = maxf(BuilderScript.QUICK_ROW_HEIGHT, rows[0].get_combined_minimum_size().y)
+	check(absf(window.size.y - 11.0 * step) < 0.5, "the window is exactly eleven rows high, got %s" % window.size.y)
+	var title := builder.get_node("Columns/Chain/Title") as Label
+	check_equal(title.text, "P1 Drop 1/16", "the title shows the first row of sixteen")
+	check(not window.get_node("MoreAbove").visible, "no arrow up at the top")
+	check(window.get_node("MoreBelow").visible, "an arrow down shows rows below")
 	check(_inside(rows[0].get_global_rect(), window.get_global_rect()), "the first row is in view")
 	check(not _inside(rows[15].get_global_rect(), window.get_global_rect()), "the last row is out of view at first")
 	check(_focus_on(0, rows[15]), "UIFocus reaches the last row")
 	await process_frame
+	check_equal(title.text, "P1 Drop 16/16", "the title follows the focus to the last row")
+	check(window.get_node("MoreAbove").visible, "an arrow up shows rows above")
+	check(not window.get_node("MoreBelow").visible, "no arrow down at the end")
+	check(title.size.x <= title.get_parent().size.x + 0.5, "the title fits its column")
 	check(_inside(rows[15].get_global_rect(), window.get_global_rect()), "the last row is in view once focused, got %s in %s" % [rows[15].get_global_rect(), window.get_global_rect()])
 	check(_focus_on(0, rows[0]), "UIFocus wraps to the first row")
 	await process_frame
@@ -803,11 +812,19 @@ func test_a_longer_overlay_list_scrolls_and_follows_the_focus() -> void:
 	var rows: Array[Button] = overlay.shown_rows()
 	check_equal(rows.size(), 16, "sixteen rows are offered")
 	var window := overlay.get_node("Rows/DropWindow") as Control
-	check(window.size.y <= 6.0 * (rows[0].size.y + OverlayScript.LINE_GAP) + 0.5,"the window shows six lines at most, got %s" % window.size.y)
+	var line: float = maxf(OverlayScript.ROW_HEIGHT, rows[0].get_combined_minimum_size().y) + OverlayScript.LINE_GAP
+	check(absf(window.size.y - 6.0 * line) < 0.5, "the window is exactly six lines high, got %s" % window.size.y)
+	var title := overlay.get_node("%Title") as Label
+	check_equal(title.text, "P1 Drop 1/16", "the title shows the first row of sixteen")
+	check(window.get_node("MoreBelow").visible, "an arrow down shows rows below")
 	check(_inside(rows[0].get_global_rect(), window.get_global_rect()), "the first row is in view")
 	check(not _inside(rows[15].get_global_rect(), window.get_global_rect()), "the last row is out of view at first")
 	check(_focus_on(0, rows[15]), "UIFocus reaches the last row")
 	await process_frame
+	check_equal(title.text, "P1 Drop 16/16", "the title follows the focus to the last row")
+	check(window.get_node("MoreAbove").visible, "an arrow up shows rows above")
+	check(not window.get_node("MoreBelow").visible, "no arrow down at the end")
+	check(title.size.x <= overlay.get_global_rect().size.x, "the title fits the overlay")
 	check(_inside(rows[15].get_global_rect(), window.get_global_rect()), "the last row is in view once focused")
 	check(_inside(overlay.get_global_rect(), Rect2(0, 0, 640, 360)), "the overlay stays on the screen")
 

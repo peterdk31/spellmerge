@@ -83,8 +83,6 @@ const ROW_HEIGHT: float = 18.0
 ## inside the builder's quarter of the screen. A row is the font's height plus 2 px of margin.
 const QUICK_ROW_HEIGHT: float = 12.0
 const QUICK_ROW_FONT: int = 8
-## A drop list longer than `RowWindowScript.QUICK_MAX_LINES` rows scrolls inside a window that
-## many rows high and follows the focus; the title then shows the focused row ("Drop 3/14").
 const LEFT_WIDTH: float = 100.0
 const RIGHT_WIDTH: float = 80.0
 ## The meta key that keeps a button's text without the focus mark.
@@ -780,7 +778,8 @@ func _render_rows(node: Dictionary) -> void:
 
 ## Keep the focused drop row in view. The quick view's list shows at most
 ## `RowWindowScript.QUICK_MAX_LINES` rows and slides to follow the focus (UIFocus walks all of
-## them); the full builder's bag list is as high as it is.
+## them); the title then shows the focused row ("Drop 3/14") and arrows show hidden rows. The
+## full builder's bag list is as high as it is.
 func _scroll_rows() -> void:
 	if not _quick:
 		_rows_first = 0

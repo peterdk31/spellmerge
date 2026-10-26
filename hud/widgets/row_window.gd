@@ -12,6 +12,11 @@ extends RefCounted
 ## quarter of the screen); the overlay has two rows per line (6 lines).
 const QUICK_MAX_LINES: int = 11
 const OVERLAY_MAX_LINES: int = 6
+## The small triangles at the window's right edge that show rows are hidden above or below.
+const MORE_ABOVE: String = "MoreAbove"
+const MORE_BELOW: String = "MoreBelow"
+const MARKER_SIZE: float = 4.0
+const MARKER_COLOR: Color = Color(1.0, 0.9, 0.4)
 
 
 ## A clipping window of `width` that holds `content`. The content is placed by `apply`, so it
@@ -23,6 +28,12 @@ static func make_window(window_name: String, content: Control, width: float) -> 
 	window.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	window.custom_minimum_size = Vector2(width, 0.0)
 	window.add_child(content)
+	for marker_name in [MORE_ABOVE, MORE_BELOW]:
+		var marker := Polygon2D.new()
+		marker.name = marker_name
+		marker.color = MARKER_COLOR
+		marker.visible = false
+		window.add_child(marker)
 	return window
 
 
@@ -43,3 +54,11 @@ static func first_line_for(focused_line: int, first_line: int, visible_lines: in
 static func apply(window: Control, content: Control, step: float, lines: int, max_lines: int, first_line: int) -> void:
 	window.custom_minimum_size.y = float(mini(lines, max_lines)) * step
 	content.position = Vector2(0.0, -float(first_line) * step)
+	var height: float = window.custom_minimum_size.y
+	var left: float = window.custom_minimum_size.x - MARKER_SIZE * 2.0 - 1.0
+	var above := window.get_node(MORE_ABOVE) as Polygon2D
+	var below := window.get_node(MORE_BELOW) as Polygon2D
+	above.polygon = PackedVector2Array([Vector2(left, MARKER_SIZE + 1.0), Vector2(left + MARKER_SIZE, 1.0), Vector2(left + MARKER_SIZE * 2.0, MARKER_SIZE + 1.0)])
+	below.polygon = PackedVector2Array([Vector2(left, height - MARKER_SIZE - 1.0), Vector2(left + MARKER_SIZE, height - 1.0), Vector2(left + MARKER_SIZE * 2.0, height - MARKER_SIZE - 1.0)])
+	above.visible = first_line > 0
+	below.visible = first_line + max_lines < lines

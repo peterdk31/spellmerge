@@ -54,6 +54,10 @@ const PLAYERS: int = 4
 const SOURCE_EXCLUSION: float = 0.1
 ## Knockback of one hit in pixels per second (M1's fire bolt had 120).
 const KNOCKBACK: float = 120.0
+## A heavy hit's knock into a wall hurts for this share of the hit's damage (at least 1).
+const SLAM_SHARE: float = 1.0
+## Share of a mend hit's strength that an enemy takes as damage.
+const HEAL_ENEMY_SHARE: float = 0.1
 ## Speed of a chain jump when the spell's own speed is lower (a rune or a beam has none).
 const CHAIN_MIN_SPEED: float = 300.0
 ## Radians per second an orbit form turns when it gives no speed.

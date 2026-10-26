@@ -17,3 +17,20 @@ var element_ids: Array[StringName] = []
 var status_id: StringName = &""
 var status_duration: float = 0.0
 var status_strength: float = 0.0
+## The statuses of the elements after the first, in order (`element_ids[1]` first): the hit
+## puts each on after the one before has reacted. Parallel arrays; shorter than `element_ids`
+## means the missing ones carry no status.
+var later_status_ids: Array[StringName] = []
+var later_status_durations: PackedFloat32Array = PackedFloat32Array()
+var later_status_strengths: PackedFloat32Array = PackedFloat32Array()
+
+# Staffs (B3, docs/milestones/M2-staffs.md, "Self-harm and hits").
+## The hit kind: `&"shot"`, `&"ray"` or `&"burst"` (an area hit is always `burst`). Combat sets
+## `reaction` and `status` for the hits it makes itself.
+var kind: StringName = &"shot"
+## Health a hit gives a wizard instead of damage (mend); 0 for none. An enemy still takes `damage`.
+var heal: int = 0
+## Damage an enemy takes when this hit knocks it into a wall (heavy); 0 for none.
+var slam: int = 0
+## The spell's own name, for "downed by your own <name>"; empty when not known.
+var source_name: String = ""

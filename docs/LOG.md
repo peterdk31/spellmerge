@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-26: Combat kit (staffs B3)
+
+`gameplay/combat` now does what the staff cards need from a fight: every hit has a kind (`hit_landed` before `damage_dealt`), a wizard is hurt by their own spell like any other target (damage, push, status), wizards have burn, chill/freeze, shock, hex and static of their own, barriers (`wizard_shield_requested`, `shield_blocked`), area hits (`area_hit_requested`), several elements on one hit (each reacts with what the one before left), heal hits (`heal_dealt`, which `gameplay/player` now applies), pulls (`pull_requested`) and the heavy wall slam. It sends `kill_landed`, `reaction_landed` and `wizard_hurt` for cards, and `downed_note` for "downed by your own Blast". `gameplay/feel` gives each kind a default stop, shake and sound, the self-hit its own ring, the heal a soft ring, and shows the note. Not switched on yet: `Spells` does not send the shield and pull events or set self-hit on shots (B2 and the cards). Tests: `test_combat_kit.gd` (35), `test_feel_hit_kinds.gd` (11) and four compiler rows.
+
 ## 2026-10-26: Trigger kit, part 4 (staffs B2d)
 
 The spell runtime runs the moves, areas and refunds: teleport (a blink along the aim, cut at walls), hook (a hit pulls the caster to it), swap (a hit moves the target to the caster and the caster to the target), recoil (a push back from each firing of the cast, so mirror cancels it); the end of a dash, teleport or hook (`caster_move_finished`) is the carrier's end point, where its blast and `on expire` payload happen; `blast` asks combat for an area hit where a shot or beam ends; siphon refunds mana per hit. Tests: `tests/core/test_spells_moves.gd` (22 tests). **B2 is done.**

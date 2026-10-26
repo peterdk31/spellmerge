@@ -321,11 +321,14 @@ func test_bad_applications_are_refused() -> void:
 	check_equal(_combat.speed_factor(stranger), 1.0, "an unknown enemy is not slowed")
 
 
-func test_wizards_get_no_status_from_player_spells() -> void:
+func test_a_wizard_a_spell_hits_gets_its_status_too() -> void:
+	# Staffs (B3): statuses on wizards exist; what reaches a wizard at all is the projectile
+	# manager's rule (the caster once out of their hitbox, a teammate with friendly fire).
 	var wizard := own(Node2D.new()) as Node2D
 	_combat.register_player(1, wizard, 8.0)
 	_hit(0, wizard, _tag(0, &"fire"))
-	check(_applied.is_empty(), "friendly fire is damage only")
+	check_equal(_applied, [[0, wizard, &"burn"]], "the fire hit set the wizard burning")
+	check(_combat.wizard_status_left(1, &"burn") > 0.0, "and combat keeps it for the wizard's index")
 	check_equal(_damage.size(), 1, "the damage was sent")
 
 

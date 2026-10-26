@@ -16,6 +16,9 @@ extends SpellComponent
 @export var damage_scale: float = 1.0
 ## Shot tint, a colour from the palette in docs/STYLE.md.
 @export var tint: Color = Color.WHITE
+## A hit of this element heals wizards instead of hurting them (mend); enemies take a tenth of
+## the damage, at least 1.
+@export var heals: bool = false
 
 # --- Look (staffs B6a) ----------------------------------------------------------------
 

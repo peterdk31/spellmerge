@@ -76,6 +76,8 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 
 ## Done recently
 
+- [x] **Combat kit (staffs B3).** `gameplay/combat` has hit kinds (`hit_landed`), self-harm and statuses on wizards, barriers on wizards (`wizard_shield_requested`, `shield_blocked`), area hits (`area_hit_requested`, kind `burst`), several elements per hit, heal hits (`heal_dealt`), pulls (`pull_requested`), the heavy wall slam, `kill_landed`, `wizard_hurt`, `reaction_landed` and `downed_note`; `gameplay/feel` has a default look per hit kind, the self-hit ring, the heal ring and the "downed by your own ..." note. `Spells` does not send `wizard_shield_requested`, `pull_requested` or switch on self-hit yet: that is B2's and the cards'. Tests: `test_combat_kit.gd`, `test_feel_hit_kinds.gd`.
+
 - [x] **Trigger kit, part 4: moves, areas and refunds (staffs B2d).** `Spells` runs teleport, hook, swap and recoil (`caster_move_requested`, `target_move_requested`; end points of dash, teleport and hook from `caster_move_finished`), blast as `area_hit_requested` where a shot or beam ends, and siphon's `mana_refund_requested`. Tests: `test_spells_moves.gd`.
 
 - [x] **Trigger kit, part 3: payload and line carriers (staffs B2c).** `Spells` runs rain (cue, then its payload on the aim point), familiar and decoy (entity spawns, familiar casts, decoy end point), wall (a line of still shots) and fissure (a beam through its line). Tests: `test_spells_payload_carriers.gd`.

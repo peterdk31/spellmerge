@@ -651,7 +651,7 @@ func _fan_angle(n: int, count: int, spell: CompiledSpell) -> float:
 ## Gives the manager's shot in `slot` its record and counts it.
 func _register(slot: int, tag: int, spell: CompiledSpell, fires: int, chain: int, prev: int) -> void:
 	projectiles.set_core(slot, spell.tint)
-	projectiles.set_shape(slot, spell.shape)
+	projectiles.set_look(slot, spell.look)
 	if _rec_seq.size() < projectiles.get_cap():
 		var size: int = projectiles.get_cap()
 		var old_size: int = _rec_seq.size()

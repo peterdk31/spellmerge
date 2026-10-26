@@ -12,6 +12,21 @@ enum Event {
 	EXPIRE,
 	## Every `interval` seconds while the shot lives.
 	TIMER,
+	# Staffs (A3, docs/milestones/M2-staffs.md). Each is run by the kit named.
+	## A shield on the carrier absorbs a hit; the payload fires from there (B1, B2, B3).
+	BLOCK,
+	## The carrier's hit kills; the payload fires from the target (B2, B3).
+	KILL,
+	## At once, from the caster, when the carrier is cast (B2).
+	CAST,
+	## The shot hits a wall; the payload fires from there (B1, B2).
+	WALL,
+	## The caster takes damage while the carrier lives; the payload fires from the caster (B2, B3).
+	HURT,
+	## The carrier's hit sets off a reaction; the payload fires from the target (B2, B3).
+	REACTION,
+	## The shot passes through a teammate; the payload fires from them (B1, B2).
+	ALLY,
 }
 
 @export var event: Event = Event.HIT

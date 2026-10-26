@@ -7,5 +7,5 @@ script = ExtResource("1_modifier")
 id = &"broken_modifier"
 display_name = "Broken"
 damage_mult = 0.0
-behaviour = 5
+behaviour = 99
 behaviour_strength = 0.0

@@ -27,8 +27,9 @@ COMBOS = f"{SPELLS}/combos"  # one JSON file per combo, named like its id
 REACTIONS = f"{SPELLS}/reactions.tres"
 LORE = "content/story/lore/components"
 # The folder of each component kind under content/spells/.
-KIND_FOLDERS = {"form": "forms", "element": "elements", "modifier": "modifiers", "trigger": "triggers"}
-KIND_ORDER = ("form", "element", "modifier", "trigger", "combo", "reaction")
+KIND_FOLDERS = {"form": "forms", "element": "elements", "modifier": "modifiers", "trigger": "triggers",
+                "multicast": "multicasts"}
+KIND_ORDER = ("form", "element", "modifier", "trigger", "multicast", "combo", "reaction")
 # ReactionRow.Effect, in the order of the enum in core/base/reaction_row.gd.
 EFFECTS = ("burst", "consume", "extend", "spread")
 STATUS_WORDS = {"burn": "burning", "chill": "chilled", "shock": "shocked", "hex": "hexed"}

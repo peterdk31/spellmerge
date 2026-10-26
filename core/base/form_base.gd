@@ -1,7 +1,9 @@
 class_name FormBase
 extends SpellComponent
-## A form (bolt, beam, nova, rune, orbit): how the shots leave the caster. Every spell
-## has exactly one, and it sets the base numbers the element and modifiers then change.
+## A carrier (bolt, beam, nova, rune, orbit, dash, teleport, ...): what leaves the caster
+## and ends a group when a staff is read (docs/milestones/M2-staffs.md). It sets the base
+## numbers the infusions and modifiers before it then change. The class keeps its old name,
+## `FormBase`, and its kind `&"form"`.
 
 ## How the shots move once spawned.
 enum Motion {
@@ -13,6 +15,27 @@ enum Motion {
 	ORBIT,
 	## No shot: one ray of `ray_length` hits along a line at once (beam).
 	RAY,
+	# Staffs (A3). Each is run by the kit named, until then the carrier does nothing.
+	## The wizard dashes along the move direction for `lifetime` seconds at `speed` (A6a).
+	DASH,
+	## The wizard blinks `speed` x `lifetime` pixels along the aim, stopping before walls (B2, B4).
+	TELEPORT,
+	## A straight shot that pulls the caster to where it hits (B2, B4).
+	HOOK,
+	## A straight shot that trades places with the target it hits (B2, B4, B5).
+	SWAP,
+	## Flies out for half its life, then back to the caster (B1).
+	RETURN,
+	## `shots` still shots in a line across the aim, `spread` pixels apart (B2).
+	WALL,
+	## Reads a payload and drops it on the aim point after `lifetime` seconds (B2).
+	RAIN,
+	## A crack along the ground that hits every target on its line, `ray_length` long (B2).
+	FISSURE,
+	## A still copy of the wizard that enemies target, for `lifetime` seconds (B2, B5).
+	DECOY,
+	## A helper that orbits the caster and casts its payload every `cooldown` seconds (B2, B5).
+	FAMILIAR,
 }
 
 ## Damage of one hit before the element and modifiers.
@@ -43,6 +66,11 @@ enum Motion {
 
 func kind() -> StringName:
 	return &"form"
+
+
+## True for the carriers that read a payload of their own, as a trigger does (rain, familiar).
+func carries_payload() -> bool:
+	return motion == Motion.RAIN or motion == Motion.FAMILIAR
 
 
 func ranges() -> Dictionary:

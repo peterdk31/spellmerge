@@ -149,6 +149,23 @@ static func check_component(component: SpellComponent, manifest: Dictionary) -> 
 	return problems
 
 
+## The problems of one staff (`StaffBase`, staffs A3): an `id` equal to its folder, a name,
+## and every number inside its `ranges()`.
+static func check_staff(staff: StaffBase) -> Array[Dictionary]:
+	var problems: Array[Dictionary] = []
+	var file: String = staff.resource_path
+	var folder: String = file.get_base_dir().get_file()
+	if staff.id == &"":
+		problems.append(_problem("required-field", file, "id", "Set `id` to the folder name ('%s')." % folder))
+	elif file != "" and String(staff.id) != folder:
+		problems.append(_problem("id-folder", file, "id", "`id` is '%s' but the folder is '%s'. Rename one so they match." % [staff.id, folder]))
+	if staff.display_name.strip_edges() == "":
+		problems.append(_problem("required-field", file, "display_name", "Give it a name for the builder, for example \"Starter staff\"."))
+	for line in staff.range_problems():
+		problems.append(_problem("range", file, line.get_slice(":", 0), "%s. Change it to a value inside the range (documented next to the field)." % line))
+	return problems
+
+
 ## The problems of the reaction table's rows. `element_ids` are the ids of the elements
 ## that exist.
 static func check_reactions(table: ReactionTable, element_ids: Array[StringName]) -> Array[Dictionary]:
@@ -221,7 +238,7 @@ static func _check_element(element: ElementBase) -> Array[Dictionary]:
 static func _check_modifier(modifier: ModifierBase) -> Array[Dictionary]:
 	var problems: Array[Dictionary] = []
 	if modifier.behaviour != ModifierBase.Behaviour.NONE and modifier.behaviour_strength <= 0.0:
-		problems.append(_problem("required-field", modifier.resource_path, "behaviour_strength", "HOMING (turn rate) and CHAIN (jumps) need a `behaviour_strength` above 0."))
+		problems.append(_problem("required-field", modifier.resource_path, "behaviour_strength", "A behaviour needs a `behaviour_strength` above 0 (what it means is next to the behaviour in core/base/modifier_base.gd; 1 where it means nothing)."))
 	return problems
 
 

@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-26: Card and staff classes, events (owner session, staffs A3)
+
+The foundation the kits build on, so they never edit the same base file: `MulticastBase` (double, triple, scatter, burst); `FormBase.Motion` DASH to FAMILIAR (`carries_payload()` for rain and familiar), `ModifierBase.Behaviour` SHIELD to RELAY (`behaviour_strength` now up to 256, and every behaviour needs one above 0), `TriggerBase.Event` BLOCK to ALLY, each commented with the kit that runs it; `StaffBase` and the `starter` (4 slots) and `dev` (20 slots) staffs; the staffs events (`staff_change_requested` to `ally_passed`) with their senders; `multicast` as a kind in the Spell atlas and the clip pipeline (`ci/smbot/clips.py`, an owner-path change made in the owner session). Nothing runs the new values yet.
+
 ## 2026-10-26: Shared files split (owner session, staffs A2)
 
 So card PRs never edit the same file: the 26 combos are one file each in `content/spells/combos/` (`combos.json` is gone; the test, the clip scenarios and the Spell atlas read the folder), a content folder may list its assets in an `assets.json` beside them (the validator and `test_svg_art` read every one with `art/manifest.json` and `audio/manifest.json`), and no test keeps a card list or count by hand (`test_combos` checks every component the registry finds; the icon count and the drop-list length are derived). AGENTS.md and the spells, art, audio and tests READMEs say so.

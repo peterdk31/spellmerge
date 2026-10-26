@@ -52,7 +52,7 @@ func test_an_out_of_range_field_is_named() -> void:
 
 func test_enum_fields_are_range_checked() -> void:
 	var trigger := TriggerBase.new()
-	trigger.set("event", 7)
+	trigger.set("event", TriggerBase.Event.size())
 	check(" ".join(trigger.range_problems()).contains("event:"), "an unknown trigger event is reported")
 
 

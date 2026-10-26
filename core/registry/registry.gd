@@ -118,9 +118,9 @@ func warn_story_problems() -> int:
 	return problems.size()
 
 
-## Runs the spell validator on everything found under `spells` (demo or not) and on the
+## Runs the spell validator on everything found under `spells` (demo or not), on the
 ## reaction table `<content root>/spells/reactions.tres`, which is skipped when there is
-## none. Returns the problems as `SpellValidator` describes them; empty when all is well.
+## none, and on every staff found under `wizard` (`SpellValidator.check_staff`). Returns the problems as `SpellValidator` describes them; empty when all is well.
 func validate_spells() -> Array[Dictionary]:
 	var spells: Array[Resource] = []
 	var found: Dictionary = _resources.get(&"spells", {})
@@ -130,7 +130,12 @@ func validate_spells() -> Array[Dictionary]:
 	var table_path: String = _content_root.path_join("spells/reactions.tres")
 	if ResourceLoader.exists(table_path):
 		reactions = ResourceLoader.load(table_path) as ReactionTable
-	return SpellValidator.check_all(spells, reactions, SpellValidator.load_manifest(), _duplicates)
+	var problems: Array[Dictionary] = SpellValidator.check_all(spells, reactions, SpellValidator.load_manifest(), _duplicates)
+	# The staffs (staffs A3) live under `wizard` with the other wizard content.
+	for res: Resource in _resources.get(&"wizard", {}).values():
+		if res is StaffBase:
+			problems.append_array(SpellValidator.check_staff(res as StaffBase))
+	return problems
 
 
 ## Reads every lore `.json` below `root` (`content/story/lore`). A file that fails the story

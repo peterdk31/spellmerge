@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="StaffBase" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/staff_base.gd" id="1_base"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"dev"
+display_name = "Sandbox staff"
+slots = 20
+draw = 1
+cast_delay = 0.05
+recharge = 0.2
+spread = 0.0

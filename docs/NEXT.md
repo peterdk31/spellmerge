@@ -18,6 +18,8 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
 - [ ] **Trigger kit, part 4: moves, areas and refunds (staffs B2d).** (`core/spells/`) After B2a. The spells side of hook, swap (`target_move_requested`), teleport and recoil (`caster_move_requested`, end points from `caster_move_finished`); `area_hit_requested` for blast and payload fallbacks; siphon's refund (`mana_refund_requested`).
 - [ ] **Combat kit (staffs B3).** (`gameplay/combat/`, `gameplay/feel/`) After A6c.
 - [ ] **Shot look, part 2: Feel's looks on cards, the spark pool (staffs B6b).** (`gameplay/feel/`, `core/projectiles/`) After B6a and B3. Feel's per-form looks (`cast_looks`, `impact_looks` in the preset) move to card data; sparks and embers from one shared pool with a global count, trails thinning first at the cap; the clip sheets and a four-player clip. Before B7. Moved to the bot's queue by the owner on 2026-10-26.
+- [ ] **Caster kit (staffs B4).** (`gameplay/player/`) After B3. Moved to the bot's queue by the owner on 2026-10-26.
+- [ ] **Sandbox (staffs B7).** (`gameplay/flow/`, `content/rooms/`, `hud/menus/sandbox/`) After B6b. Moved to the bot's queue by the owner on 2026-10-26.
 - [ ] **Card: double (staffs C).** After A6c. Data only (M2-staffs.md, "Working in parallel").
 - [ ] **Card: triple (staffs C).** After A6c. Data only (M2-staffs.md, "Working in parallel").
 - [ ] **Card: overcharge (staffs C).** After A6c. Data only (M2-staffs.md, "Working in parallel").
@@ -50,9 +52,16 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
 - [ ] **Card: on reaction (staffs C).** After B1, B2 and B3. Data only (M2-staffs.md, "Working in parallel").
 - [ ] **Card: siphon (staffs C).** After B2 and B4. Data only (M2-staffs.md, "Working in parallel").
 - [ ] **Card: hold (staffs C).** After B2 and B4. Data only (M2-staffs.md, "Working in parallel").
-- [ ] **Spell names (staffs E1).** (`core/spells/`, `hud/builder/`) After A6c. A name for every cast, generated from its cards (owner's idea): see M2-staffs.md, "The builder" and part E1.
+- [ ] **Card: teleport (staffs C).** After B2 and B4. Data only (M2-staffs.md, "Working in parallel"). Moved to the bot's queue by the owner on 2026-10-26.
+- [ ] **Card: hook (staffs C).** After B2 and B4. Data only (M2-staffs.md, "Working in parallel"). Moved to the bot's queue by the owner on 2026-10-26.
+- [ ] **Card: recoil (staffs C).** After B2 and B4. Data only (M2-staffs.md, "Working in parallel"). Moved to the bot's queue by the owner on 2026-10-26.
+- [ ] **Card: swap (staffs C).** After B2, B4 and B5. Data only (M2-staffs.md, "Working in parallel"). Moved to the bot's queue by the owner on 2026-10-26.
+- [ ] **Card: decoy (staffs C).** After B2 and B5. Data only (M2-staffs.md, "Working in parallel"). Moved to the bot's queue by the owner on 2026-10-26.
+- [ ] **Card: familiar (staffs C).** After B2 and B5. Data only (M2-staffs.md, "Working in parallel"). Moved to the bot's queue by the owner on 2026-10-26.
+- [ ] **Spell names (staffs E1).** (`core/spells/`, `hud/builder/`) After A6c and B8 (B8 rewrites `hud/builder/` in an owner session; owner, 2026-10-26). A name for every cast, generated from its cards (owner's idea): see M2-staffs.md, "The builder" and part E1.
 - [ ] **The existing cards' looks and numbers (staffs C0).** (`content/spells/`) After B6a and B6b.
 - [ ] **Bots and the emergent combo report (staffs D1).** (`tests/bots/`, `docs/LOG.md`) After A6c; the report gets richer as cards land.
+- [ ] **Staff codes (staffs D2).** (`hud/`, `core/spells/`) After B7 and B8. Moved to the bot's queue by the owner on 2026-10-26.
 - [ ] **Stress and C2 (staffs D3).** Last: when every other task in both lanes has merged. Then the C2 checkpoint, with the owner's sandbox playtest on `/preview/`.
 
 ## Owner lane
@@ -62,18 +71,9 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 - [x] **Shared files split (staffs A2).** One combo per file in `content/spells/combos/` (read by `tests/support/combo_files.gd`, the clip scenarios and `tools/atlas.py`); `assets.json` beside a content folder's files, read with the manifests by `SpellValidator.load_manifest`; `test_combos` checks every registry component, and the icon and drop-list counts are derived. Owner session, 2026-10-26.
 - [x] **Card and staff classes, events (staffs A3).** `MulticastBase` (fifth card kind, `content/spells/multicasts/`); the new carrier motions, modifier behaviours and trigger events, each commented with its kit; `StaffBase` with `content/wizard/staffs/starter` (4 slots) and `dev` (20), checked by `SpellValidator.check_staff` and the registry; the 19 staffs events in `core/events`; `multicast` as a kind in `tools/atlas.py` and `ci/smbot/clips.py`. Owner session, 2026-10-26.
 - [x] **The staff compiler (staffs A4).** `Spells.compile_staff` and `StaffCompiler` read a staff's cards into its cycle (`CompiledStaff`, `CompiledCast`, `CompiledGroup`; payloads, fallbacks, multicast, wrap-around, use-once, wasted cards with reasons, the numbers of a cast, plain descriptions); `Spells.staff_view` for the builder; `tests/core/test_staff_compiler.gd` holds every example of the design. Additive: the recipe compiler is untouched. The tag's node field is 9 bits (design updated). Owner session, 2026-10-26.
-- [ ] **Caster kit (staffs B4).** (`gameplay/player/`) After B3.
 - [ ] **Entity kit (staffs B5).** (`gameplay/ai/`) After A6c.
 - [ ] **Shot look, part 1: small layered shots (staffs B6a).** (`core/projectiles/` drawing, the card classes, `content/spells/`) After B1. Small shots (a 3-5 px core from the carrier), the trail in the player colour, up to four look layers per shot from the cards (`look_layer`, two infusions and two modifiers) drawn by one shader; a sheet of every carrier with every infusion and of four players firing the same card. Split from B6 by the owner on 2026-10-26, because the bot's B3 (#279) is changing `gameplay/feel/` at the same time.
-- [ ] **Sandbox (staffs B7).** (`gameplay/flow/`, `content/rooms/`, `hud/menus/sandbox/`) After B6b.
 - [ ] **Builder (staffs B8).** (`hud/builder/`) After A6c.
-- [ ] **Card: teleport (staffs C).** After B2 and B4. Data only (M2-staffs.md, "Working in parallel").
-- [ ] **Card: hook (staffs C).** After B2 and B4. Data only (M2-staffs.md, "Working in parallel").
-- [ ] **Card: recoil (staffs C).** After B2 and B4. Data only (M2-staffs.md, "Working in parallel").
-- [ ] **Card: swap (staffs C).** After B2, B4 and B5. Data only (M2-staffs.md, "Working in parallel").
-- [ ] **Card: decoy (staffs C).** After B2 and B5. Data only (M2-staffs.md, "Working in parallel").
-- [ ] **Card: familiar (staffs C).** After B2 and B5. Data only (M2-staffs.md, "Working in parallel").
-- [ ] **Staff codes (staffs D2).** (`hud/`, `core/spells/`) After B7 and B8.
 
 ## Blocked
 

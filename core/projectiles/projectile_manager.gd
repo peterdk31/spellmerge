@@ -42,14 +42,25 @@ extends Node2D
 ## glow look, 2026-10-27): a small white-hot core in the ramp of its first infusion's colour
 ## (`set_core`; its player's for a plain shot), a long tail that cools and frays and bends with
 ## its path (`bend_of`), a soft glow round both, and particles given off from its tail in the
-## styles of all its cards (`set_look`), mixed at random. It is drawn about its hit size (`look_size`). Enemy shots
-## (owner NO_PLAYER) have their own texture (`hostile_texture`), are not tinted and are
-## drawn one layer above, so a dangerous shot never hides under a friendly one.
+## styles of all its cards (`set_look`), mixed at random. It is drawn about its hit size (`look_size`). Shots
+## of owner NO_PLAYER (the AI's old attack, until staffs F9) have their own texture
+## (`hostile_texture`) and are not tinted; an enemy caster's spells are drawn by the same
+## shader in the enemy ramp (`ramp_look`). Both are drawn one layer above, so a dangerous shot
+## never hides under a friendly one.
+##
+## Casters (staffs F4, "Enemy staffs"): a shot's owner is a caster, a player 0-3, an enemy
+## caster row FIRST_ENEMY_CASTER to CASTERS - 1 (one per enemy that casts a staff; the spell
+## runtime hands them out), or NO_PLAYER. An enemy caster is the enemies' side, like NO_PLAYER:
+## events name it NO_PLAYER (`event_player`), so no listener takes it for a player, and its
+## shots share NO_PLAYER's drop bucket at the cap. Unlike NO_PLAYER it has an anchor (its orbit
+## shots), its own body (`set_target_owner`: its shots never hit it, unless self-hitting),
+## shields, homing (on wizards and decoys) and allies (the other enemies, for a mend shot).
 ##
 ## Friendly fire: while `friendly_fire` is on, a shot fired by a player (0-3) also
 ## hits targets on LAYER_PLAYER, except targets registered with that same player
 ## as their `owner` (a wizard is never hit by its own shot). It is off by default
-## and read when a shot is spawned. `gameplay/coop` owns the option.
+## and read when a shot is spawned. `gameplay/coop` owns the option. `enemy_fire` is the
+## same for enemy casters' shots and LAYER_ENEMY (an enemy is never hit by its own).
 ##
 ## Walls: `set_walls(rects)` (or `add_wall_body(body)` for a room's static body) gives
 ## the solid parts of the room. They are rasterised into a grid of WALL_CELL
@@ -165,6 +176,11 @@ const EventsScript := preload("res://core/events/events.gd")
 signal shot_ended(tag: int)
 
 const MAX_PLAYERS: int = 4
+## Enemy casters (see Casters): the first caster number after the players, how many there are
+## (SpellTag.ROW_MASK + 1 enemy rows), and every caster number there is.
+const FIRST_ENEMY_CASTER: int = MAX_PLAYERS
+const ENEMY_CASTERS: int = 256
+const CASTERS: int = FIRST_ENEMY_CASTER + ENEMY_CASTERS
 ## Motion modes of a shot (see the class doc).
 const MOTION_STRAIGHT: int = 0
 const MOTION_STILL: int = 1
@@ -229,11 +245,13 @@ const DRAW_STRIDE: int = 16
 ## as the busiest recent frame needed, rounded up to a power of two (never above the
 ## cap), so a quiet batch uploads a few KB a frame rather than cap x 16 floats.
 const MIN_BATCH: int = 64
-## The draw batches: player bolts, runes (still), orbit shots, enemy shots.
+## The draw batches: player bolts, runes (still), orbit shots, NO_PLAYER's shots (the
+## texture), enemy casters' shots (every body kind, drawn by the shader above the players').
 const BATCH_BOLT: int = 0
 const BATCH_RUNE: int = 1
 const BATCH_ORBIT: int = 2
 const BATCH_HOSTILE: int = 3
+const BATCH_ENEMY: int = 4
 ## The bodies a player's shot is drawn as (`shot_core.gdshader` builds them on a pixel grid;
 ## staffs B6a): a bolt with its tail, a rune (a diamond that pulses), an orbit shot (a bolt whose
 ## tail bends round its circle). Kind 0 is the texture, which only Feel's lone sprites use.
@@ -354,11 +372,12 @@ var dropped: int = 0
 ## The slot of the shot whose hit or expiry event is being sent, else -1. See "Ends".
 var event_slot: int = -1
 ## The form of the shot whose `projectile_impact` is being sent: `&"bolt"`, `&"rune"`, `&"orbit"`
-## or `&"beam"` (an enemy's shot, and any time outside an impact: `&""`). For looks only.
+## or `&"beam"`, an enemy caster's too (a NO_PLAYER shot, and any time outside an impact:
+## `&""`). For looks only.
 var impact_form: StringName = &""
 ## The core colour and the look (`set_core`, `set_look`) of the shot whose `projectile_impact`
 ## is being sent, so its flare can take the shot's colours and card effects (white and 0 for a
-## beam, an enemy's shot, and outside an impact). For looks only.
+## beam, a NO_PLAYER shot, and outside an impact). For looks only.
 var impact_core: Color = Color.WHITE
 var impact_look: int = 0
 ## How many projectiles ended on a wall, since start.
@@ -378,6 +397,11 @@ var particle_share: float = 1.0
 var trail_share: float = 1.0
 ## Whether shots fired by players also hit other players' targets (see the class doc).
 var friendly_fire: bool = false
+## Whether enemy casters' shots also hit other enemies (off by default; staffs F10 makes it a
+## setting). Read when a shot is spawned, as `friendly_fire` is.
+var enemy_fire: bool = false
+## Enemy casters' shots written into their batch by the last update_draw().
+var drawn_enemy: int = 0
 
 var _cap: int = 0
 var _count: int = 0
@@ -464,7 +488,8 @@ var _alive: PackedByteArray = PackedByteArray()
 ## Stack of free slots.
 var _free_slots: PackedInt32Array = PackedInt32Array()
 var _free_count: int = 0
-## Live projectiles per owner; index 0 is NO_PLAYER, 1..4 are players 0..3.
+## Live projectiles per owner; index 0 is the enemies' (NO_PLAYER and every enemy caster), 1..4
+## are players 0..3 (`_owner_index`).
 var _owned: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0])
 
 # Targets, one row each.
@@ -505,7 +530,7 @@ var _rune_room: int = 0
 var _orbit_room: int = 0
 var _hostile_room: int = 0
 ## Live shots per batch this frame (BATCH_*), refilled by _count_batches; a member so no array is made per frame.
-var _batch_counts: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
+var _batch_counts: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0])
 var _draw_buffer: PackedFloat32Array = PackedFloat32Array()
 ## The batches of runes and orbit shots, beside the bolts' `_draw_node`.
 var _rune_node: MultiMeshInstance2D = null
@@ -514,6 +539,15 @@ var _orbit_node: MultiMeshInstance2D = null
 var _orbit_buffer: PackedFloat32Array = PackedFloat32Array()
 ## The second batch, for enemy shots (see `hostile_texture`).
 var _hostile_node: MultiMeshInstance2D = null
+## The enemy casters' shots, drawn by the shader one layer above the players'.
+var _enemy_node: MultiMeshInstance2D = null
+var _enemy_buffer: PackedFloat32Array = PackedFloat32Array()
+var _enemy_room: int = 0
+## The players' shots a shield of an enemy caster's shot checks, made once a step like
+## `_hostile_slots` (see `_shield_block`).
+var _friendly_slots: PackedInt32Array = PackedInt32Array()
+var _friendly_count: int = 0
+var _friendly_step: int = -1
 var _hostile_buffer: PackedFloat32Array = PackedFloat32Array()
 ## Enemy shots written by the last update_draw() (part of `drawn`).
 var drawn_hostile: int = 0
@@ -526,11 +560,11 @@ var _work_left: int = 0
 var _resume: int = 0
 ## Steps taken so far (staggers the homing searches).
 var _step_index: int = 0
-## Where each player's orbit shots circle (INF for no anchor), see `set_anchor`.
+## Where each caster's orbit shots circle (INF for no anchor), see `set_anchor`; CASTERS of them.
 ## Per slot: the target a shot must not hit, and the seconds left of that.
 var _skip_id: PackedInt64Array = PackedInt64Array()
 var _skip_left: PackedFloat32Array = PackedFloat32Array()
-var _anchors: PackedVector2Array = PackedVector2Array([Vector2.INF, Vector2.INF, Vector2.INF, Vector2.INF])
+var _anchors: PackedVector2Array = PackedVector2Array()
 ## Scratch for `ray`, RAY_MAX_HITS rows per nesting level: the best hits so far, nearest
 ## first (reused, never grows). `_ray_depth` is how many rays are in progress.
 var _ray_nodes: Array = []
@@ -553,6 +587,8 @@ func _init() -> void:
 	_ray_points.resize(RAY_MAX_HITS * RAY_MAX_DEPTH)
 	_ray_heads.resize(RAY_MAX_HITS * RAY_MAX_DEPTH)
 	_path.resize(RAY_PATH_POINTS)
+	_anchors.resize(CASTERS)
+	_anchors.fill(Vector2.INF)
 	set_cap(DEFAULT_CAP_WEB if OS.has_feature("web") else DEFAULT_CAP_DESKTOP)
 	set_bounds(_bounds)
 
@@ -564,6 +600,7 @@ func _ready() -> void:
 	_rune_node = _make_batch(DRAW_Z, true)
 	_orbit_node = _make_batch(DRAW_Z, true)
 	_hostile_node = _make_batch(DRAW_Z + 1, false)
+	_enemy_node = _make_batch(DRAW_Z + 1, true)
 	_apply_textures()
 	_fit_draw_bounds()
 
@@ -652,6 +689,7 @@ func set_cap(value: int) -> void:
 	_move_turn.resize(_cap)
 	_move_range.resize(_cap)
 	_hostile_slots.resize(_cap)
+	_friendly_slots.resize(_cap)
 	_skip_id.resize(_cap)
 	_skip_left.resize(_cap)
 	_last_hit.resize(_cap * HIT_MEMORY)
@@ -664,10 +702,12 @@ func set_cap(value: int) -> void:
 	_rune_buffer.resize(0)
 	_orbit_buffer.resize(0)
 	_hostile_buffer.resize(0)
+	_enemy_buffer.resize(0)
 	_draw_room = 0
 	_rune_room = 0
 	_orbit_room = 0
 	_hostile_room = 0
+	_enemy_room = 0
 	_alive.resize(_cap)
 	_free_slots.resize(_cap)
 	clear()
@@ -676,6 +716,7 @@ func set_cap(value: int) -> void:
 		_rune_node.multimesh.instance_count = 0
 		_orbit_node.multimesh.instance_count = 0
 		_hostile_node.multimesh.instance_count = 0
+		_enemy_node.multimesh.instance_count = 0
 
 
 func get_cap() -> int:
@@ -836,6 +877,7 @@ func _fit_draw_bounds() -> void:
 	_rune_node.multimesh.custom_aabb = aabb
 	_orbit_node.multimesh.custom_aabb = aabb
 	_hostile_node.multimesh.custom_aabb = aabb
+	_enemy_node.multimesh.custom_aabb = aabb
 
 
 ## Remove every projectile (targets stay registered).
@@ -860,17 +902,43 @@ func get_count() -> int:
 	return _count
 
 
-## Live projectiles owned by `player` (Events.NO_PLAYER for enemy shots).
+## Live projectiles owned by `player` (Events.NO_PLAYER or an enemy caster: every enemy shot,
+## which share one count).
 func get_count_for(player: int) -> int:
-	if player < EventsScript.NO_PLAYER or player >= MAX_PLAYERS:
+	if not is_caster(player):
 		return 0
-	return _owned[player + 1]
+	return _owned[_owner_index(player)]
+
+
+## True for a caster number a shot may have: a player, an enemy caster or NO_PLAYER.
+static func is_caster(caster: int) -> bool:
+	return caster >= EventsScript.NO_PLAYER and caster < CASTERS
+
+
+## True for a player's caster number (0-3).
+static func is_player_caster(caster: int) -> bool:
+	return caster >= 0 and caster < MAX_PLAYERS
+
+
+## The player events name for a caster: the player, or NO_PLAYER for the enemies' side.
+static func event_player(caster: int) -> int:
+	return caster if is_player_caster(caster) else EventsScript.NO_PLAYER
+
+
+## The layer of a caster's own side: LAYER_PLAYER for a player, LAYER_ENEMY for an enemy.
+static func side_layer(caster: int) -> int:
+	return LAYER_PLAYER if is_player_caster(caster) else LAYER_ENEMY
+
+
+## The drop bucket (`_owned`) of a caster: 0 for the enemies, 1-4 for players 0-3.
+static func _owner_index(caster: int) -> int:
+	return caster + 1 if is_player_caster(caster) else 0
 
 
 ## Register a Node2D as something projectiles can hit (`layer` is a non-zero
 ## bit mask). Registering twice only updates the radius, layer and owner. A freed target is dropped by itself.
-## `owner` is the player (0-3) the target belongs to, or Events.NO_PLAYER: shots of that
-## player never hit it (matters with friendly fire). `offset` moves the hit circle from the
+## `owner` is the caster (a player 0-3, or an enemy caster) the target belongs to, or
+## Events.NO_PLAYER: shots of that caster never hit it (matters with friendly fire). `offset` moves the hit circle from the
 ## node's origin (usually the feet) to the drawn body, so a shot that looks like it touches
 ## the sprite does hit.
 func add_target(node: Node2D, radius: float, layer: int = LAYER_ENEMY, owner: int = EventsScript.NO_PLAYER, offset: Vector2 = Vector2.ZERO) -> void:
@@ -897,6 +965,18 @@ func add_target(node: Node2D, radius: float, layer: int = LAYER_ENEMY, owner: in
 	_max_target_radius = maxf(_max_target_radius, radius)
 
 
+## Give a registered target a new `owner` (see `add_target`): an enemy that casts a staff
+## names its caster row, so its own shots skip it. Returns false for a node not registered.
+func set_target_owner(node: Node2D, owner: int) -> bool:
+	if node == null or not is_caster(owner):
+		return false
+	var at: int = _target_id.find(node.get_instance_id())
+	if at < 0:
+		return false
+	_target_owner[at] = owner
+	return true
+
+
 func remove_target(node: Node2D) -> void:
 	if node == null:
 		return
@@ -914,7 +994,7 @@ func get_target_count() -> int:
 	return _targets.size()
 
 
-## Start a projectile for `player` (0-3, or Events.NO_PLAYER for an enemy) at
+## Start a projectile for `player` (a caster: 0-3, an enemy caster, or Events.NO_PLAYER) at
 ## `origin`, moving `velocity` pixels per second for `lifetime` seconds.
 ## `pierce` is how many targets it passes through before it ends. Returns its
 ## slot, or -1 for bad arguments or an origin inside a wall.
@@ -923,7 +1003,7 @@ func get_target_count() -> int:
 func spawn(player: int, origin: Vector2, velocity: Vector2, lifetime: float, radius: float = 4.0, hit_layers: int = LAYER_ENEMY, pierce: int = 0, tag: int = 0, motion: int = MOTION_STRAIGHT) -> int:
 	if motion != MOTION_STRAIGHT and motion != MOTION_STILL:
 		return -1
-	if player < EventsScript.NO_PLAYER or player >= MAX_PLAYERS:
+	if not is_caster(player):
 		return -1
 	if not (lifetime > 0.0) or not origin.is_finite() or not velocity.is_finite():
 		return -1
@@ -933,12 +1013,12 @@ func spawn(player: int, origin: Vector2, velocity: Vector2, lifetime: float, rad
 ## Start a shot that circles `player`'s anchor (see `set_anchor`) at `orbit_radius`
 ## pixels, starting at `angle` (radians, 0 = east of the owner) and turning
 ## `angular_speed` radians a second (negative turns the other way). The other arguments
-## are those of `spawn`. Returns its slot, or -1 for bad arguments, a player outside 0-3
-## or a player with no anchor. With a finite `centre` it circles that point instead (a
+## are those of `spawn`. Returns its slot, or -1 for bad arguments, NO_PLAYER or a caster
+## outside 0 to CASTERS - 1, or a caster with no anchor. With a finite `centre` it circles that point instead (a
 ## payload's orbit, whose caster is a shot or the point where one ended; `set_caster_shot`
 ## then makes it follow the shot), and needs no anchor.
 func spawn_orbit(player: int, orbit_radius: float, angle: float, angular_speed: float, lifetime: float, radius: float = 4.0, hit_layers: int = LAYER_ENEMY, pierce: int = 0, tag: int = 0, centre: Vector2 = Vector2.INF) -> int:
-	if player < 0 or player >= MAX_PLAYERS or not (centre.is_finite() or _anchors[player].is_finite()):
+	if player < 0 or player >= CASTERS or not (centre.is_finite() or _anchors[player].is_finite()):
 		return -1
 	if not (lifetime > 0.0) or not is_finite(orbit_radius) or not is_finite(angle) or not is_finite(angular_speed):
 		return -1
@@ -955,16 +1035,16 @@ func spawn_orbit(player: int, orbit_radius: float, angle: float, angular_speed: 
 	return slot
 
 
-## Tell the manager where `player`'s wizard is, for its orbit shots. Call it every physics
-## step before the manager's (the owner of the wizard does).
+## Tell the manager where `player`'s wizard (or an enemy caster's enemy) is, for its orbit
+## shots. Call it every physics step before the manager's (the owner of the body does).
 func set_anchor(player: int, position: Vector2) -> void:
-	if player >= 0 and player < MAX_PLAYERS and position.is_finite():
+	if player >= 0 and player < CASTERS and position.is_finite():
 		_anchors[player] = position
 
 
-## The wizard is gone: its orbit shots end at the next step, quietly.
+## The wizard (or enemy) is gone: its orbit shots end at the next step, quietly.
 func clear_anchor(player: int) -> void:
-	if player >= 0 and player < MAX_PLAYERS:
+	if player >= 0 and player < CASTERS:
 		_anchors[player] = Vector2.INF
 
 
@@ -1238,7 +1318,7 @@ func set_ally_hit(slot: int) -> bool:
 	if slot < 0 or slot >= _cap or _alive[slot] == 0 or _player[slot] < 0:
 		return false
 	_flags[slot] |= F_ALLY
-	_layers[slot] |= LAYER_PLAYER
+	_layers[slot] |= side_layer(_player[slot])
 	return true
 
 
@@ -1266,7 +1346,11 @@ func _spawn_row(player: int, origin: Vector2, velocity: Vector2, lifetime: float
 	_life[slot] = lifetime
 	_radius[slot] = maxf(radius, 0.0)
 	_player[slot] = player
-	_layers[slot] = (hit_layers | LAYER_PLAYER) if friendly_fire and player >= 0 else hit_layers
+	_layers[slot] = hit_layers
+	if friendly_fire and is_player_caster(player):
+		_layers[slot] |= LAYER_PLAYER
+	elif enemy_fire and player >= FIRST_ENEMY_CASTER:
+		_layers[slot] |= LAYER_ENEMY
 	_pierce[slot] = maxi(pierce, 0)
 	_tag[slot] = tag
 	_core[slot] = Color.WHITE
@@ -1296,7 +1380,7 @@ func _spawn_row(player: int, origin: Vector2, velocity: Vector2, lifetime: float
 		_last_hit[slot * HIT_MEMORY + i] = 0
 	_alive[slot] = 1
 	_count += 1
-	var owner_index: int = player + 1
+	var owner_index: int = _owner_index(player)
 	_owned[owner_index] += 1
 	_own_prev[slot] = _own_tail[owner_index]
 	_own_next[slot] = -1
@@ -1494,23 +1578,33 @@ func _advance(slot: int, delta: float, flags: int) -> int:
 	return ADVANCE_OK
 
 
-## Check a shielded shot against enemy shots: every enemy shot it touches is stopped, one
-## shield charge each, and `shot_blocked` is sent. The list of enemy shots is made once per
-## step, the first time a shield needs it; the scan is charged to the hit-work budget.
+## Check a shielded shot against the other side's shots (a player's shield against enemy
+## shots, an enemy caster's against players' shots): every one it touches is stopped, one
+## shield charge each, and `shot_blocked` is sent. Each side's list is made once per step, the
+## first time a shield needs it; the scan is charged to the hit-work budget.
 func _shield_block(slot: int) -> void:
-	if _hostile_step != _step_index:
+	var mine: bool = is_player_caster(_player[slot])
+	if mine and _hostile_step != _step_index:
 		_hostile_step = _step_index
 		_hostile_count = 0
 		for other in _high:
-			if _alive[other] != 0 and _player[other] < 0:
+			if _alive[other] != 0 and not is_player_caster(_player[other]):
 				_hostile_slots[_hostile_count] = other
 				_hostile_count += 1
-	for n in _hostile_count:
+	elif not mine and _friendly_step != _step_index:
+		_friendly_step = _step_index
+		_friendly_count = 0
+		for other in _high:
+			if _alive[other] != 0 and is_player_caster(_player[other]):
+				_friendly_slots[_friendly_count] = other
+				_friendly_count += 1
+	var count: int = _hostile_count if mine else _friendly_count
+	for n in count:
 		if _shield[slot] <= 0 or _work_left <= 0:
 			return
 		_work_left -= 1
-		var other: int = _hostile_slots[n]
-		if _alive[other] == 0 or _player[other] >= 0:
+		var other: int = _hostile_slots[n] if mine else _friendly_slots[n]
+		if _alive[other] == 0 or is_player_caster(_player[other]) == mine:
 			continue
 		var reach: float = _radius[slot] + _radius[other]
 		# Both shots move during the step: in the enemy shot's frame the shield goes along
@@ -1527,7 +1621,7 @@ func _shield_block(slot: int) -> void:
 		_kill(other)
 		if events != null:
 			event_slot = slot
-			events.shot_blocked.emit(_player[slot], at, _tag[slot])
+			events.shot_blocked.emit(event_player(_player[slot]), at, _tag[slot])
 			event_slot = -1
 
 
@@ -1601,7 +1695,8 @@ func homing_aim(player: int, origin: Vector2, direction: Vector2, max_angle: flo
 ## The centre of the target a homing thing at `origin` going along `direction` steers to, or
 ## INF when there is none: one on `layers` no further than `within` pixels (cut to
 ## RAY_MAX_LENGTH) whose centre lies within `max_angle` radians of `direction` (PI for any
-## way). Targets owned by `player` and wizards (LAYER_PLAYER) are skipped. The target whose
+## way). Targets owned by `player` and its own side's (wizards for a player, enemies for an
+## enemy caster: `side_layer`) are skipped. The target whose
 ## instance id is `keep` stays the pick while it qualifies; otherwise one is picked at random
 ## among those that do, from `pick_seed` (the same seed and targets give the same pick), so a
 ## group of shots spreads over a group of enemies. The target whose id is `avoid` (the one it
@@ -1624,8 +1719,8 @@ func homing_point(player: int, origin: Vector2, direction: Vector2, max_angle: f
 ## The one homing search: the target (an index, or -1) `homing_point` describes. For a shot
 ## (`slot` 0 or more) it also skips the targets the shot just hit and charges the work budget.
 func _home_pick(player: int, origin: Vector2, direction: Vector2, max_angle: float, layers: int, within: float, keep: int, pick_seed: int, slot: int, avoid: int) -> int:
-	# Homing never picks a wizard, even with friendly fire on.
-	layers &= ~LAYER_PLAYER
+	# Homing never picks its own side (a wizard, for a player), even with friendly fire on.
+	layers &= ~side_layer(player)
 	var any_way: bool = max_angle >= PI
 	var pick: int = -1
 	var avoided: int = -1
@@ -1737,7 +1832,7 @@ func ray_curve(player: int, origin: Vector2, bend: Vector2, end: Vector2, pierce
 func _ray_path(player: int, segments: int, pierce: int, layers: int, tag: int, width: float, exclude: Node, hit: bool) -> float:
 	ray_end = Vector2.INF
 	ray_end_heading = Vector2.ZERO
-	if player < EventsScript.NO_PLAYER or player >= MAX_PLAYERS:
+	if not is_caster(player):
 		return 0.0
 	if hit and _ray_depth >= RAY_MAX_DEPTH:
 		return 0.0
@@ -1764,8 +1859,10 @@ func _ray_path(player: int, segments: int, pierce: int, layers: int, tag: int, w
 	var skip: int = exclude.get_instance_id() if exclude != null else 0
 	if not _targets.is_empty() and reach > 0.0:
 		_query_ready()
-		if friendly_fire and player >= 0:
+		if friendly_fire and is_player_caster(player):
 			layers |= LAYER_PLAYER
+		elif enemy_fire and player >= FIRST_ENEMY_CASTER:
+			layers |= LAYER_ENEMY
 		var wide: float = maxf(width, 0.0)
 		var pad: Vector2 = Vector2.ONE * (wide + _max_target_radius)
 		var start: float = 0.0
@@ -1816,11 +1913,11 @@ func _ray_path(player: int, segments: int, pierce: int, layers: int, tag: int, w
 			impact_form = &"beam"
 			impact_core = Color.WHITE
 			impact_look = 0
-			events.projectile_impact.emit(player, node, _ray_points[base + i], _ray_heads[base + i])
+			events.projectile_impact.emit(event_player(player), node, _ray_points[base + i], _ray_heads[base + i])
 			impact_form = &""
 			impact_core = Color.WHITE
 			impact_look = 0
-			events.projectile_hit.emit(player, node, _ray_points[base + i], tag)
+			events.projectile_hit.emit(event_player(player), node, _ray_points[base + i], tag)
 		_ray_nodes[base + i] = null
 	_ray_depth -= 1
 	event_slot = outer_slot
@@ -1828,7 +1925,7 @@ func _ray_path(player: int, segments: int, pierce: int, layers: int, tag: int, w
 		impact_form = &"beam"
 		impact_core = Color.WHITE
 		impact_look = 0
-		events.projectile_impact.emit(player, null, end, end_heading)
+		events.projectile_impact.emit(event_player(player), null, end, end_heading)
 		impact_form = &""
 		impact_core = Color.WHITE
 		impact_look = 0
@@ -1907,16 +2004,19 @@ func update_draw(fraction: float = -1.0) -> void:
 	_set_sim_time(_draw_node)
 	_set_sim_time(_rune_node)
 	_set_sim_time(_orbit_node)
+	_set_sim_time(_enemy_node)
 	_count_batches()
 	var counts: PackedInt32Array = _batch_counts
 	_draw_room = _fit_batch(multimesh, _draw_buffer, _draw_room, counts[BATCH_BOLT])
 	_rune_room = _fit_batch(_rune_node.multimesh, _rune_buffer, _rune_room, counts[BATCH_RUNE])
 	_orbit_room = _fit_batch(_orbit_node.multimesh, _orbit_buffer, _orbit_room, counts[BATCH_ORBIT])
 	_hostile_room = _fit_batch(hostile_multimesh, _hostile_buffer, _hostile_room, counts[BATCH_HOSTILE])
+	_enemy_room = _fit_batch(_enemy_node.multimesh, _enemy_buffer, _enemy_room, counts[BATCH_ENEMY])
 	var out: int = 0
 	var rune_out: int = 0
 	var orbit_out: int = 0
 	var hostile_out: int = 0
+	var enemy_out: int = 0
 	var asked: int = 0
 	var trails: int = 0
 	for slot in _high:
@@ -1935,9 +2035,16 @@ func update_draw(fraction: float = -1.0) -> void:
 		var size: float = look_size(_radius[slot])
 		var player_look: Color = _look_color(slot)
 		asked += particles_of(_look[slot])
-		if batch == BATCH_BOLT:
+		if batch == BATCH_BOLT or (batch == BATCH_ENEMY and _motion[slot] == MOTION_STRAIGHT):
 			trails += TRAIL_COST
-		if batch == BATCH_RUNE:
+		if batch == BATCH_ENEMY:
+			var kind: int = _kind_of(slot)
+			if kind == KIND_RUNE:
+				_write_quad(_enemy_buffer, enemy_out * DRAW_STRIDE, dir, size, at, player_look, _core[slot], KIND_RUNE, 0.0, trace_code(sim_time - _born[slot]))
+			else:
+				_write_quad(_enemy_buffer, enemy_out * DRAW_STRIDE, dir, size, at, player_look, _core[slot], kind, look_length(_radius[slot]), bend_code(bend_of(slot)))
+			enemy_out += 1
+		elif batch == BATCH_RUNE:
 			_write_quad(_rune_buffer, rune_out * DRAW_STRIDE, dir, size, at, player_look, _core[slot], KIND_RUNE, 0.0, trace_code(sim_time - _born[slot]))
 			rune_out += 1
 		elif batch == BATCH_ORBIT:
@@ -1959,7 +2066,11 @@ func update_draw(fraction: float = -1.0) -> void:
 		hostile_multimesh.buffer = _hostile_buffer
 	hostile_multimesh.visible_instance_count = hostile_out
 	drawn_hostile = hostile_out
-	drawn = out + rune_out + orbit_out + hostile_out
+	if enemy_out > 0:
+		_enemy_node.multimesh.buffer = _enemy_buffer
+	_enemy_node.multimesh.visible_instance_count = enemy_out
+	drawn_enemy = enemy_out
+	drawn = out + rune_out + orbit_out + hostile_out + enemy_out
 	_share_pool(asked, trails)
 
 
@@ -1980,6 +2091,7 @@ func _share_pool(asked: int, trails: int) -> void:
 	_set_shares(_draw_node)
 	_set_shares(_rune_node)
 	_set_shares(_orbit_node)
+	_set_shares(_enemy_node)
 
 
 func _set_shares(node: MultiMeshInstance2D) -> void:
@@ -2009,11 +2121,22 @@ static func particles_of(look: int) -> int:
 func _batch_of(slot: int) -> int:
 	if _player[slot] < 0:
 		return BATCH_HOSTILE
+	if _player[slot] >= FIRST_ENEMY_CASTER:
+		return BATCH_ENEMY
 	if _motion[slot] == MOTION_STILL:
 		return BATCH_RUNE
 	if _motion[slot] == MOTION_ORBIT:
 		return BATCH_ORBIT
 	return BATCH_BOLT
+
+
+## The body a shader-drawn shot has (KIND_BOLT, KIND_RUNE or KIND_ORBIT), by its motion.
+func _kind_of(slot: int) -> int:
+	if _motion[slot] == MOTION_STILL:
+		return KIND_RUNE
+	if _motion[slot] == MOTION_ORBIT:
+		return KIND_ORBIT
+	return KIND_BOLT
 
 
 ## Count the live shots each batch will draw into _batch_counts, indexed by BATCH_*.
@@ -2116,12 +2239,13 @@ static func look_color(player: int, zoom: int, look: int) -> Color:
 ## The red byte of the instance colour: the player (0-3; 0 for an enemy, whose ramp is a look
 ## flag) plus the zoom x 4.
 static func look_red(player: int, zoom: int) -> int:
-	return clampi(player, 0, MAX_PLAYERS - 1) + clampi(zoom, 0, 63) * 4
+	return (player if is_player_caster(player) else 0) + clampi(zoom, 0, 63) * 4
 
 
-## `look` with the enemy ramp's flag for a caster below 0 (an enemy), as it is for a player.
+## `look` with the enemy ramp's flag for a caster that is not a player (NO_PLAYER or an enemy
+## caster), as it is for a player.
 static func ramp_look(player: int, look: int) -> int:
-	return look | LOOK_ENEMY_RAMP if player < 0 else look & ~LOOK_ENEMY_RAMP
+	return look & ~LOOK_ENEMY_RAMP if is_player_caster(player) else look | LOOK_ENEMY_RAMP
 
 
 ## Write one quad at float index `i` of `buffer` (packed arrays are shared, not copied):
@@ -2168,14 +2292,14 @@ func is_alive(slot: int) -> bool:
 	return slot >= 0 and slot < _cap and _alive[slot] != 0
 
 
-## The tint of the bone body of `player`'s shots (the enemy's colour for NO_PLAYER), also
-## used for the beams and rings `feel` draws.
+## The tint of the bone body of `player`'s shots (the enemy's colour for NO_PLAYER or an enemy
+## caster), also used for the beams and rings `feel` draws.
 func tint_of(player: int) -> Color:
-	return _color_of(clampi(player, EventsScript.NO_PLAYER, MAX_PLAYERS - 1))
+	return _color_of(player)
 
 
 func _color_of(player: int) -> Color:
-	if player < 0:
+	if not is_player_caster(player):
 		return Color.WHITE.lerp(ENEMY_COLOR, TINT_STRENGTH)
 	return Color.WHITE.lerp(PLAYER_COLORS[player], TINT_STRENGTH)
 
@@ -2187,7 +2311,7 @@ func _kill(slot: int, announce: bool = true) -> void:
 	_free_slots[_free_count] = slot
 	_free_count += 1
 	_count -= 1
-	var owner_index: int = _player[slot] + 1
+	var owner_index: int = _owner_index(_player[slot])
 	_owned[owner_index] -= 1
 	var before: int = _own_prev[slot]
 	var after: int = _own_next[slot]
@@ -2211,7 +2335,7 @@ func _expire(slot: int) -> void:
 	_kill(slot, false)
 	if events != null:
 		event_slot = slot
-		events.projectile_expired.emit(player, at, tag)
+		events.projectile_expired.emit(event_player(player), at, tag)
 		event_slot = -1
 	if tag != 0:
 		shot_ended.emit(tag)
@@ -2254,7 +2378,7 @@ func get_velocity_of(slot: int) -> Vector2:
 
 ## Where `player`'s anchor is (see `set_anchor`), or `Vector2.INF` when it has none.
 func get_anchor(player: int) -> Vector2:
-	return _anchors[player] if player >= 0 and player < MAX_PLAYERS else Vector2.INF
+	return _anchors[player] if player >= 0 and player < CASTERS else Vector2.INF
 
 
 ## The player (0-3) a registered target belongs to (`add_target`'s `owner`), or
@@ -2457,7 +2581,7 @@ func _hit_test(slot: int) -> bool:
 						continue
 				elif (_target_layer[t] & layers) == 0:
 					# A teammate's wizard is passed through, once, and told.
-					if shooter >= 0 and owner_of >= 0 and (_target_layer[t] & LAYER_PLAYER) != 0 and passed < MAX_PLAYERS and not _remembers(slot, _target_id[t]):
+					if is_player_caster(shooter) and is_player_caster(owner_of) and (_target_layer[t] & LAYER_PLAYER) != 0 and passed < MAX_PLAYERS and not _remembers(slot, _target_id[t]):
 						var pass_at: float = 0.0
 						if path_sq > 0.0:
 							pass_at = clampf((_target_pos[t] - from).dot(path) / path_sq, 0.0, 1.0)
@@ -2534,22 +2658,23 @@ func _emit_wall_impact(slot: int, velocity: Vector2) -> void:
 		impact_form = _form_of(slot)
 		impact_core = _core[slot]
 		impact_look = _look[slot]
-		events.projectile_impact.emit(_player[slot], null, _pos[slot], velocity.normalized())
+		events.projectile_impact.emit(event_player(_player[slot]), null, _pos[slot], velocity.normalized())
 		impact_form = &""
 		impact_core = Color.WHITE
 		impact_look = 0
 
 
-## The form of the shot in `slot`, by its draw batch (`&""` for an enemy's shot).
+## The form of the shot in `slot`, by its body (`&""` for a NO_PLAYER shot, the texture).
 func _form_of(slot: int) -> StringName:
 	var batch: int = _batch_of(slot)
-	if batch == BATCH_RUNE:
+	if batch == BATCH_HOSTILE:
+		return &""
+	var kind: int = _kind_of(slot)
+	if kind == KIND_RUNE:
 		return &"rune"
-	if batch == BATCH_ORBIT:
+	if kind == KIND_ORBIT:
 		return &"orbit"
-	if batch == BATCH_BOLT:
-		return &"bolt"
-	return &""
+	return &"bolt"
 
 
 func _register_hit(slot: int, target: int, at: Vector2) -> void:
@@ -2585,12 +2710,12 @@ func _register_hit(slot: int, target: int, at: Vector2) -> void:
 		impact_form = _form_of(slot)
 		impact_core = _core[slot]
 		impact_look = _look[slot]
-		events.projectile_impact.emit(player, node, at, heading)
+		events.projectile_impact.emit(event_player(player), node, at, heading)
 		impact_form = &""
 		impact_core = Color.WHITE
 		impact_look = 0
 		event_slot = slot
-		events.projectile_hit.emit(player, node, at, tag)
+		events.projectile_hit.emit(event_player(player), node, at, tag)
 		event_slot = -1
 	if spent and tag != 0:
 		shot_ended.emit(tag)

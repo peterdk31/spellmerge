@@ -345,13 +345,13 @@ func _test_default_cap_follows_the_platform() -> void:
 
 func _test_bad_arguments() -> void:
 	_setup()
-	_check(_mgr.spawn(4, Vector2.ZERO, Vector2.RIGHT, 1.0) == -1, "player 4 is refused")
+	_check(_mgr.spawn(ManagerScript.CASTERS, Vector2.ZERO, Vector2.RIGHT, 1.0) == -1, "a caster past the last enemy row is refused")
 	_check(_mgr.spawn(-2, Vector2.ZERO, Vector2.RIGHT, 1.0) == -1, "player -2 is refused")
 	_check(_mgr.spawn(0, Vector2.ZERO, Vector2.RIGHT, 0.0) == -1, "zero lifetime is refused")
 	_check(_mgr.spawn(0, Vector2(NAN, 0.0), Vector2.RIGHT, 1.0) == -1, "a NaN position is refused")
 	_check(_mgr.spawn(0, Vector2.ZERO, Vector2(INF, 0.0), 1.0) == -1, "an infinite velocity is refused")
 	_check(_mgr.get_count() == 0, "refused spawns leave nothing behind")
-	_check(_mgr.get_count_for(7) == 0, "counting an invalid player gives 0")
+	_check(_mgr.get_count_for(ManagerScript.CASTERS) == 0, "counting an invalid caster gives 0")
 
 
 func _test_cap_drops_the_oldest_of_the_richest() -> void:

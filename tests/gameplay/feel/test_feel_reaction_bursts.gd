@@ -5,6 +5,7 @@ extends "res://tests/support/suite.gd"
 
 const EventsScript := preload("res://core/events/events.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
+const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const FeelPresetScript := preload("res://gameplay/feel/presets/feel_preset.gd")
 
 const STEP: float = 0.0625
@@ -73,19 +74,22 @@ func test_every_reaction_has_a_power_and_a_colour() -> void:
 		check(preset.reaction_power.has(id), "%s has a power" % id)
 
 
-func test_the_burst_is_bigger_than_a_hit_and_the_ring_ends() -> void:
+func test_the_puff_is_bigger_than_a_hit_and_the_ring_ends() -> void:
+	_bus.damage_dealt.emit(0, null, 5, Vector2(50.0, 0.0))
+	var hit: int = _feel.effect_info(FeelScript.KIND_PUFF)["zoom"] as int
 	_bus.reaction_triggered.emit(0, &"shatter", Vector2.ZERO)
-	check(_feel.live_particles() > 0, "particles fly")
-	check(_feel.live_particles() <= FeelScript.PARTICLE_LIMIT, "inside the particle limit")
+	check((_feel.effect_info(FeelScript.KIND_PUFF)["zoom"] as int) > hit, "a reaction's puff is bigger than a hit's")
+	check_equal(_feel.effects_of(FeelScript.KIND_RING_OUT), 1, "with a ring")
 	for i in 40:
 		_feel.step(STEP)
-	check_equal(_feel.live_flashes(), 0, "ring and flash end")
+	check_equal(_feel.live_effects(), 0, "ring and puff end")
 
 
-func test_four_players_reacting_at_once_stay_inside_the_particle_limit() -> void:
+func test_four_players_reacting_at_once_stay_inside_the_effect_slots() -> void:
 	for player in 4:
 		_bus.reaction_triggered.emit(player, &"shatter", Vector2(float(player) * 20.0, 0.0))
-	check(_feel.live_particles() <= FeelScript.PARTICLE_LIMIT, "inside the particle limit")
+	check_equal(_feel.effects_of(FeelScript.KIND_PUFF), 4, "four puffs")
+	check(_feel.live_effects() <= _feel.effect_slots, "inside the effect slots")
 
 
 func test_each_status_shows_a_different_colour() -> void:
@@ -102,22 +106,20 @@ func test_each_status_shows_a_different_colour() -> void:
 		seen.append(color)
 
 
-func test_the_overlay_follows_the_enemy_and_ends_with_the_status() -> void:
+func test_the_status_follows_the_enemy_and_ends_with_the_status() -> void:
 	var enemy: Enemy = _enemy()
 	enemy.global_position = Vector2(40.0, 30.0)
 	_status_on(enemy, &"burn")
 	_feel.step(STEP)
-	check_equal(_feel.live_statuses(), 1, "one overlay")
+	check_equal(_feel.live_statuses(), 1, "one status effect")
+	var shown: Dictionary = _feel.effect_info(FeelScript.KIND_STATUS)
+	var preset: FeelPresetScript = _feel.preset
+	var look: Dictionary = preset.status_looks[&"burn"] as Dictionary
+	check_equal(shown["core"], look["color"], "in the status's colour")
+	check(ProjectileManagerScript.look_has(shown["look"] as int, look["look"] as int), "giving off the element's particles (fire's embers)")
 	enemy.global_position = Vector2(80.0, 30.0)
 	_feel.step(STEP)
-	var overlay: Sprite2D = null
-	for child in _feel.get_children():
-		var sprite := child as Sprite2D
-		if sprite != null and sprite.visible and sprite.z_index == enemy.sprite.z_index + FeelScript.STATUS_Z:
-			overlay = sprite
-	check(overlay != null, "the overlay is drawn above the enemy")
-	if overlay != null:
-		check_equal(overlay.global_position.x, 80.0, "it moved with the enemy")
+	check_equal((_feel.effect_info(FeelScript.KIND_STATUS)["at"] as Vector2).x, 80.0, "it moved with the enemy")
 	_combat.left.clear()
 	for i in 4:
 		_feel.step(STEP)
@@ -131,16 +133,24 @@ func test_a_frozen_enemy_wins_over_its_other_statuses() -> void:
 	check_equal(_feel.status_shown(enemy), &"freeze", "freeze first")
 
 
-func test_the_hit_flash_hides_the_overlay() -> void:
+func test_a_status_shows_through_a_hit() -> void:
 	var enemy: Enemy = _enemy()
 	_status_on(enemy, &"hex")
 	check_equal(_feel.live_statuses(), 1, "shown")
 	_bus.damage_dealt.emit(0, enemy, 3, Vector2.ZERO)
 	_feel.step(STEP * 0.1)
-	check_equal(_feel.live_statuses(), 0, "hidden while the sprite flashes white")
-	for i in 10:
-		_feel.step(STEP)
-	check_equal(_feel.live_statuses(), 1, "and back after")
+	check_equal(_feel.live_statuses(), 1, "its particles go on while the sprite flashes")
+
+
+func test_a_status_comes_back_when_a_crowd_of_effects_took_its_slot() -> void:
+	_feel.set_effect_slots(EffectSlots.MIN)
+	var enemy: Enemy = _enemy()
+	_status_on(enemy, &"static")
+	for i in _feel.effect_slots:
+		_bus.damage_dealt.emit(0, null, 5, Vector2(float(i), 0.0))
+	check_equal(_feel.live_statuses(), 0, "the crowd took the oldest slot, the status's")
+	_feel.step(STEP)
+	check_equal(_feel.live_statuses(), 1, "the next step shows it again")
 
 
 func test_a_sprite_with_its_own_material_still_shows_a_status() -> void:
@@ -161,7 +171,7 @@ func test_a_freed_enemy_loses_its_overlay() -> void:
 func test_a_crowd_of_statuses_stays_inside_the_slots() -> void:
 	for i in FeelScript.STATUS_SLOTS + 8:
 		_status_on(_enemy(), &"burn", i % 4)
-	check(_feel.live_statuses() <= FeelScript.STATUS_SLOTS, "no more overlays than slots")
+	check(_feel.live_statuses() <= FeelScript.STATUS_SLOTS, "no more statuses than slots")
 
 
 func test_without_combat_there_are_no_overlays() -> void:

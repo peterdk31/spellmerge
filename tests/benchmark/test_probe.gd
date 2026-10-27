@@ -24,7 +24,7 @@ func _initialize() -> void:
 	_check(float(probe.call("percentile_95")) >= 0.0, "a percentile exists after frames")
 	_check(float(probe.call("steps_per_frame_average")) > 0.0, "physics steps per frame are counted")
 	_check(int(probe.call("steps_per_frame_max")) >= 1, "at least one physics step ran in the busiest frame")
-	_check(FeelScript.PARTICLE_LIMIT > 0, "the particle limit constant is readable")
+	_check(EffectSlots.DEFAULT > 0, "the effect slots are readable")
 	probe.call("report")
 	probe.free()
 	_check_known_samples()

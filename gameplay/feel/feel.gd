@@ -12,29 +12,28 @@ extends Node
 ##   there is a short rest in which plain hits do not stop the game again (a
 ##   crowded fight must not feel like lag); deaths and downed wizards always stop.
 ## - screen shake: trauma on the current Camera2D, off when `shake_enabled` is false.
-## - particles: a burst of CPUParticles2D from a fixed pool. Live particles never
-##   exceed PARTICLE_LIMIT. With the pool empty a hit burst is skipped, but a death
-##   takes over the burst closest to ending. A kill upgrades the burst its killing
-##   blow just made into a bigger one, so it costs one slot, not two.
+## - an effect (see "Effects" below): sparks sprayed on along the hit, or a puff all
+##   round for a hit with no way. A kill turns its killing blow's spray into a bigger
+##   puff, so it costs one slot, not two.
 ## - a white hit flash and a squash on the hit enemy's or wizard's `Sprite` node
 ##   (a fixed set of reactions; a sprite that is gone is skipped).
-## - a white puff where an enemy dies, and a short death animation: a white copy of
-##   the dead enemy's `Sprite` widens, collapses and fades (the enemy itself is freed
-##   at once).
+## - a white-hot ring where an enemy dies, and a death animation: a copy of the dead
+##   enemy's `Sprite` turns white-hot and falls apart pixel by pixel (the enemy itself is
+##   freed at once).
 ## - a sound from `core/registry` by id; nothing plays on `null`.
 ##
 ## `projectile_impact` (from `core/projectiles`) says where a shot struck and which way it
-## flew. On a character the hit burst becomes a spray along that way, in ember for an
-## enemy and in the wizard's own colour for a wizard, a little bigger with more damage.
-## On a wall or pillar it throws stone chips back. Where a player's shot lands it shows an
-## effect in the shot's own ramp and cards (see "Effects" below); an enemy's shows an ember mark.
-## Wall chips leave WALL_RESERVE bursts free, so a hit on a character always has one.
+## flew. On a character the hit becomes a spray along that way, in ember for an enemy and
+## in the wizard's own colours for a wizard, a little bigger with more damage. On a wall or
+## pillar it knocks stone chips back. Where a shot lands it shows an effect in the shot's own
+## ramp and cards (see "Effects" below).
 ##
 ## On `spell_cast` it shows a cast flash at the staff tip in the player's colours (and a ring
 ## for a carrier whose cast look has one), and kicks the camera a little against the aim.
 ##
-## Effects (the glow look, 2026-10-27): the flares of player shots are drawn by the shots' own
-## shader (`shot_core.gdshader`, kinds KIND_BURST to KIND_CAST) in one MultiMesh of `effect_slots`
+## Effects (the glow look, 2026-10-27; the owner: "I only want the new style going forward"):
+## every flare, spray, puff, ring, chip, arc and status is drawn by the shots' own shader
+## (`shot_core.gdshader`, kinds KIND_BURST to KIND_STATUS) in one MultiMesh of `effect_slots`
 ## (a setting: Settings, "Effect slots", through `effect_slots_changed`),
 ## each with the core colour and look of the shot it comes from (`impact_core`, `impact_look` of
 ## the projectile manager), so a frost bolt lands in frost flecks and a lightning one in sparks,
@@ -42,20 +41,21 @@ extends Node
 ## `wizard_cast` (which carries the wizard node) the caster's `Sprite` gets thin and
 ## tall for a moment. None of this touches the cast itself.
 ##
-## Nothing is allocated while playing: emitters and sound players are made once.
-## The emitters live under this autoload (top level, so in world space), never
-## under the scene: Flow frees the world on every Play and restart.
+## Nothing is allocated while playing: the effect batch and sound players are made once.
+## They live under this autoload (top level, so in world space), never under the scene:
+## Flow frees the world on every Play and restart.
 
 const EventsScript := preload("res://core/events/events.gd")
-const PoolScript := preload("res://core/pools/pool.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 ## The look of a hit kind with no entry at all: nothing changes. Shared, never written.
 const NO_LOOK: Dictionary = {}
 const FeelPresetScript :=preload("res://gameplay/feel/presets/feel_preset.gd")
 const FLASH_SHADER: Shader = preload("res://gameplay/feel/hit_flash.gdshader")
-const REACTION_SHADER: Shader = preload("res://gameplay/feel/reaction_flash.gdshader")
 ## Draws the beam and the nova ring like a shot: bone body tinted by the player, core by the element.
 const CORE_SHADER: Shader = preload("res://core/projectiles/shot_core.gdshader")
+const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
+## Bone light: the white-hot of a plain thing (a death's ring).
+const BONE_LIGHT: Color = Color("#f4f1ea")
 ## Beams and nova rings on screen per player: one cast makes at most 24 shots (the spell limit),
 ## so a split fan is drawn whole; past that the player's oldest slot is taken over.
 const FORMS_PER_PLAYER: int = 24
@@ -78,52 +78,30 @@ const LIVE_BEAM_POINTS: int = 80
 ## The beam texture's height: a line this wide shows it at its own size.
 const BEAM_TEXTURE_HEIGHT: float = 32.0
 
-## Most hit particles alive at once, across all players (one limit for the "hit" effect).
-const PARTICLE_LIMIT: int = 48
-## Particles in one burst. The pool holds PARTICLE_LIMIT / BURST_PARTICLES bursts.
-const BURST_PARTICLES: int = 8
-const BURST_SLOTS: int = PARTICLE_LIMIT / BURST_PARTICLES
 ## Sounds that can play at once.
 const SOUND_VOICES: int = 8
 ## Sprites reacting to a hit at once; a hit past this only skips its flash.
 const REACT_SLOTS: int = 16
-## Flash sprites: one muzzle flash per player (slots 0-3), then the death puffs.
-const MUZZLE_SLOTS: int = 4
-const FLASH_SLOTS: int = 8
-## Wall-impact sparks come after them (slots FLASH_SLOTS up to ALL_FLASH_SLOTS).
-const SPARK_SLOTS: int = 4
-## Reaction flashes (and a name label each) come last, so reactions never take a muzzle
-## flash, puff or spark.
+## Reaction names (labels) rising at once.
 const REACTION_SLOTS: int = 4
-## A reaction's ring comes after its flashes, one per reaction slot.
-const ALL_FLASH_SLOTS: int = FLASH_SLOTS + SPARK_SLOTS + REACTION_SLOTS * 2
-## Enemies that show a status at once (a tinted copy of the enemy's `Sprite` over it), how
-## often the statuses are read in seconds, and how far above the enemy's sprite it is drawn.
+## Characters that show a status at once (an effect that follows each), and how often the
+## statuses are read in seconds.
 const STATUS_SLOTS: int = 16
 const STATUS_POLL: float = 0.1
-const STATUS_Z: int = 3
-## How much bigger the ring of a reaction grows while it fades.
-const REACTION_RING_GROW: float = 1.2
 ## How far a reaction's name rises while it shows, in pixels.
 const REACTION_RISE: float = 10.0
 ## The same reaction makes its sound and shake at most this often, and its name is not shown
 ## again while the first still rises within `REACTION_LABEL_NEAR` pixels.
 const REACTION_REPEAT: float = 0.3
 const REACTION_LABEL_NEAR: float = 40.0
-## Discharge arcs (a jagged line each) that show at once, and the points of one: its two ends
-## and the corners between them.
-const ARC_SLOTS: int = 16
-const ARC_POINTS: int = 6
-## Hit bursts always left free: wall dust never takes the last slots from a hit on a character.
-const WALL_RESERVE: int = 2
-## Bursts draw above the room and the pillar tops (z 5), below the flashes (20).
-const BURST_Z: int = 19
 ## The damage a hit spray is sized for (the fire bolt's); more is a bigger spray, less a smaller one.
 const SPRAY_REF_DAMAGE: int = 5
 const SPRAY_MIN_SIZE: float = 0.7
 const SPRAY_MAX_SIZE: float = 1.6
-## Death animations at once; past that the oldest slot is taken over.
+## Death animations at once; past that the oldest slot is taken over. They draw above the
+## room and the wizards, under the shots and effects.
 const GHOST_SLOTS: int = 8
+const GHOST_Z: int = 21
 ## The effects drawn with the shot shader (see "Effects" above): the kinds it knows (K_* in
 ## shot_core.gdshader), their seconds and their draw layer (with the shots, above the room and
 ## the wizards). How many can show at once is a setting (`EffectSlots` in core/settings).
@@ -133,6 +111,19 @@ const KIND_RING_IN: int = 6
 const KIND_RUNE_BURST: int = 7
 const KIND_CAST: int = 8
 const KIND_DASH: int = 9
+const KIND_SPRAY: int = 11
+const KIND_PUFF: int = 12
+const KIND_CHIPS: int = 13
+const KIND_ARC: int = 14
+const KIND_STATUS: int = 15
+## The look bit that makes an effect take its colour exactly (a reaction's own colour) instead
+## of the palette material it is nearest (kind 24 in the shader).
+const EXACT: int = 1 << 23
+const SPRAY_SECONDS: float = 0.3
+const PUFF_SECONDS: float = 0.4
+const CHIPS_SECONDS: float = 0.5
+## A status effect lasts until its status ends (Feel ends it).
+const FOREVER: float = 1.0e9
 const BURST_SECONDS: float = 0.3
 const RING_SECONDS: float = 0.22
 const RUNE_BURST_SECONDS: float = 0.45
@@ -143,6 +134,13 @@ const DASH_SECONDS: float = 0.6
 const DASH_LONGEST: float = 252.0
 const DASH_MARGIN: float = 12.0
 const DASH_ACROSS: float = 32.0
+## A discharge arc is drawn like a dash: its length in the zoom's place, ARC_MARGIN past each end,
+## ARC_ACROSS across (the shader's).
+const ARC_MARGIN: float = 4.0
+const ARC_ACROSS: float = 16.0
+## A status effect's zoom (round a character of about 16 px) and how far above its feet it sits.
+const STATUS_ZOOM: int = 2
+const STATUS_RISE: float = 8.0
 ## A beam is drawn this wide (its core, rim, flares and glow; `shot_core.gdshader`'s beam mode).
 const BEAM_WIDTH: float = 16.0
 const EFFECT_Z: int = 50
@@ -158,7 +156,6 @@ const PLAYER_COLORS: Array[Color] = [
 	Color("7fc0f0"), Color("f59ab8"), Color("8fd46a"), Color("c99af0"),
 ]
 ## How long a muzzle flash is compared with its width.
-const MUZZLE_STRETCH: float = 1.8
 ## The biggest camera kick in pixels, however fast the casting.
 const MAX_KICK_PIXELS: float = 4.0
 
@@ -196,18 +193,13 @@ var shake_offset: Vector2 = Vector2.ZERO
 var _trauma: float = 0.0
 var _camera: Camera2D = null
 var _rng: RandomNumberGenerator = RandomNumberGenerator.new()
-var _bursts: PoolScript = null
-## Bursts in use and their seconds left (parallel arrays, at most BURST_SLOTS long).
-var _active: Array[CPUParticles2D] = []
-var _active_left: PackedFloat32Array = PackedFloat32Array()
-## The burst, spot and sound voice of the latest plain hit since the last step, so a
+## The effect slot, spot and sound voice of the latest plain hit since the last step, so a
 ## kill at the same spot upgrades them instead of using a second slot and sound.
-var _hit_burst: CPUParticles2D = null
+var _hit_effect: int = -1
 var _hit_position: Vector2 = Vector2.INF
 var _hit_voice: int = -1
 var _voices: Array[AudioStreamPlayer] = []
 var _next_voice: int = 0
-var _texture: Texture2D = null
 ## Hit reactions: the sprite, the scale it had, and seconds left (parallel arrays).
 ## Instance ids, not references: a sprite may be freed while it waits, and an
 ## array cannot hold a freed object.
@@ -220,17 +212,6 @@ var _react_left: PackedFloat32Array = PackedFloat32Array()
 var _react_total: PackedFloat32Array = PackedFloat32Array()
 var _react_amount: PackedFloat32Array = PackedFloat32Array()
 var _flash_material: ShaderMaterial = null
-var _reaction_material: ShaderMaterial = null
-## Muzzle flashes and death puffs: sprites made once, with seconds left, seconds
-## they started with and their size (parallel arrays of ALL_FLASH_SLOTS). A flash takes the
-## spark or the ring art each time it is shown, so a slot's texture is only right while it shows.
-var _flashes: Array[Sprite2D] = []
-var _flash_left: PackedFloat32Array = PackedFloat32Array()
-var _flash_total: PackedFloat32Array = PackedFloat32Array()
-var _flash_size: PackedFloat32Array = PackedFloat32Array()
-var _flash_aspect: PackedVector2Array = PackedVector2Array()
-## How much each flash grows while it fades (0.5: half its size bigger; negative: it gathers).
-var _flash_grow: PackedFloat32Array = PackedFloat32Array()
 ## The live beams (`Spells.beam_*`), one line each, made once.
 var _live_beams: Array[Line2D] = []
 ## Scratch for the points of the live beam being drawn.
@@ -243,8 +224,6 @@ var _form_total: PackedFloat32Array = PackedFloat32Array()
 var _form_body: PackedColorArray = PackedColorArray()
 var _form_length: PackedFloat32Array = PackedFloat32Array()
 var _next_form: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
-var _next_puff: int = MUZZLE_SLOTS
-var _next_spark: int = FLASH_SLOTS
 ## Combo marks (sprites made once, one per player): seconds left, the class shown and the
 ## angle it started at. The pictures are built in code (`combo_marks.gd`), one per class.
 var _combo_marks: Array[Sprite2D] = []
@@ -259,20 +238,14 @@ var _label_left: PackedFloat32Array = PackedFloat32Array()
 var _label_total: PackedFloat32Array = PackedFloat32Array()
 var _label_start: PackedVector2Array = PackedVector2Array()
 var _next_reaction: int = 0
-## Discharge arcs: a line each, made once, with seconds left and in all.
-var _arcs: Array[Line2D] = []
-var _arc_left: PackedFloat32Array = PackedFloat32Array()
-var _arc_total: PackedFloat32Array = PackedFloat32Array()
-var _next_arc: int = 0
-## Status overlays, per enemy shown (parallel arrays): its instance id, the overlay sprite,
-## real seconds shown, the status it shows and when to read the statuses next; and the overlays
-## not in use. Sprites are made when first needed and kept.
+## Statuses shown, per character (parallel arrays): its instance id, the effect slot that
+## shows it (-1 for none), real seconds shown, the status it shows and when to read the
+## statuses next.
 var _status_enemies: PackedInt64Array = PackedInt64Array()
-var _status_overlays: Array[Sprite2D] = []
+var _status_effect: PackedInt32Array = PackedInt32Array()
 var _status_age: PackedFloat32Array = PackedFloat32Array()
 var _status_shown: Array[StringName] = []
 var _status_next_poll: PackedFloat32Array = PackedFloat32Array()
-var _status_free: Array[Sprite2D] = []
 ## Sound ids by reaction id, built the first time a reaction is heard (so it allocates once).
 var _reaction_sounds: Dictionary = {}
 ## Display names by reaction id, built the same way.
@@ -291,6 +264,9 @@ var _effect_look: PackedInt32Array = PackedInt32Array()
 var _effect_age: PackedFloat32Array = PackedFloat32Array()
 var _effect_seconds: PackedFloat32Array = PackedFloat32Array()
 var _effect_length: PackedFloat32Array = PackedFloat32Array()
+## The character an effect follows (a status), or null, and how far above it the effect sits.
+var _effect_follow: Array[Node2D] = []
+var _effect_rise: PackedFloat32Array = PackedFloat32Array()
 var _next_effect: int = 0
 ## How many effects can show at once (`EffectSlots.DEFAULT` until the setting changes it; see
 ## `set_effect_slots`). Read only.
@@ -313,16 +289,11 @@ var _kind_frame: int = -1
 var _kind_own: bool = false
 var _impact_at: Vector2 = Vector2.ZERO
 var _impact_aim: Vector2 = Vector2.ZERO
-## The tint of the latest plain hit burst, kept for a kill that makes it bigger.
-var _hit_tint: Color = Color.WHITE
-## Where the latest plain hit burst started, so a kill relaunches it from there.
-var _hit_at: Vector2 = Vector2.ZERO
-## Death animations: sprites made once, seconds left, seconds they started with and
-## the scale they started at (parallel arrays of GHOST_SLOTS).
+## Death animations: sprites made once (drawn by the shot shader's dissolve), seconds left
+## and seconds they started with (parallel arrays of GHOST_SLOTS).
 var _ghosts: Array[Sprite2D] = []
 var _ghost_left: PackedFloat32Array = PackedFloat32Array()
 var _ghost_total: PackedFloat32Array = PackedFloat32Array()
-var _ghost_scale: PackedVector2Array = PackedVector2Array()
 var _next_ghost: int = 0
 ## Camera kick of casts (pixels), added to the shake.
 var _kick: Vector2 = Vector2.ZERO
@@ -340,25 +311,9 @@ func _ready() -> void:
 		registry = get_node_or_null("/root/Registry") as RegistryScript
 	if preset == null:
 		preset = load("res://gameplay/feel/presets/punchy.tres") as FeelPresetScript
-	_texture = preset.spark_texture
 	_last_usec = Time.get_ticks_usec()
-	_bursts = PoolScript.new(_make_burst, BURST_SLOTS, Callable(), _hide_burst)
 	_flash_material = ShaderMaterial.new()
 	_flash_material.shader = FLASH_SHADER
-	_reaction_material = ShaderMaterial.new()
-	_reaction_material.shader = REACTION_SHADER
-	for i in ALL_FLASH_SLOTS:
-		var flash := Sprite2D.new()
-		flash.texture = _texture
-		flash.top_level = true
-		flash.visible = false
-		flash.z_index = 20
-		flash.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		if i >= FLASH_SLOTS + SPARK_SLOTS:
-			# A reaction is told apart by its colour, and the gold spark art would bend any tint.
-			flash.material = _reaction_material
-		add_child(flash)
-		_flashes.append(flash)
 	for combo_class in ComboMarks.CLASSES:
 		_combo_textures[combo_class] = ComboMarks.make_texture(combo_class)
 	for i in COMBO_SLOTS:
@@ -422,39 +377,21 @@ func _ready() -> void:
 	_label_left.resize(REACTION_SLOTS)
 	_label_total.resize(REACTION_SLOTS)
 	_label_start.resize(REACTION_SLOTS)
-	for i in ARC_SLOTS:
-		var arc := Line2D.new()
-		arc.top_level = true
-		arc.visible = false
-		arc.z_index = 21
-		arc.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		arc.begin_cap_mode = Line2D.LINE_CAP_ROUND
-		arc.end_cap_mode = Line2D.LINE_CAP_ROUND
-		for point in ARC_POINTS:
-			arc.add_point(Vector2.ZERO)
-		add_child(arc)
-		_arcs.append(arc)
-	_arc_left.resize(ARC_SLOTS)
-	_arc_total.resize(ARC_SLOTS)
-	_flash_left.resize(ALL_FLASH_SLOTS)
-	_flash_total.resize(ALL_FLASH_SLOTS)
-	_flash_size.resize(ALL_FLASH_SLOTS)
-	_flash_aspect.resize(ALL_FLASH_SLOTS)
-	_flash_aspect.fill(Vector2.ONE)
-	_flash_grow.resize(ALL_FLASH_SLOTS)
-	_flash_grow.fill(0.5)
 	for i in GHOST_SLOTS:
 		var ghost := Sprite2D.new()
 		ghost.top_level = true
 		ghost.visible = false
-		ghost.z_index = 21
-		ghost.material = _flash_material
+		ghost.z_index = GHOST_Z
+		var dissolve := ShaderMaterial.new()
+		dissolve.shader = CORE_SHADER
+		# The sprite path of the shot shader, as itself: a white core leaves its colours be.
+		dissolve.set_shader_parameter(&"core_override", Color.WHITE)
+		ghost.material = dissolve
 		ghost.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		add_child(ghost)
 		_ghosts.append(ghost)
 	_ghost_left.resize(GHOST_SLOTS)
 	_ghost_total.resize(GHOST_SLOTS)
-	_ghost_scale.resize(GHOST_SLOTS)
 	for i in SOUND_VOICES:
 		var voice := AudioStreamPlayer.new()
 		add_child(voice)
@@ -505,10 +442,8 @@ func _process(delta: float) -> void:
 
 
 ## Advance by `real_delta` seconds of real time (not slowed by hit-stop).
-## Particles simulate on scaled time, which is never ahead of real time, so a burst
-## is never released while it is still flying.
 func step(real_delta: float) -> void:
-	_hit_burst = null
+	_hit_effect = -1
 	_hit_voice = -1
 	_clock += real_delta
 	rest_left = maxf(rest_left - real_delta, 0.0)
@@ -527,27 +462,13 @@ func step(real_delta: float) -> void:
 		shake_offset += _kick
 		_apply_camera()
 	_step_reactions(real_delta)
-	_step_flashes(real_delta)
 	_step_combo_marks(real_delta)
 	_step_forms(real_delta)
 	_step_effects(real_delta)
 	_draw_live_beams()
 	_step_labels(real_delta)
-	_step_arcs(real_delta)
 	_step_statuses(real_delta)
 	_step_ghosts(real_delta)
-	var at: int = _active.size() - 1
-	while at >= 0:
-		_active_left[at] -= real_delta
-		if _active_left[at] <= 0.0:
-			if is_instance_valid(_active[at]):
-				_bursts.release(_active[at])
-			var last: int = _active.size() - 1
-			_active[at] = _active[last]
-			_active_left[at] = _active_left[last]
-			_active.resize(last)
-			_active_left.resize(last)
-		at -= 1
 
 
 ## Flash and squash the hit sprites for `real_delta` seconds, and put back those done.
@@ -584,22 +505,7 @@ func _step_reactions(real_delta: float) -> void:
 		at -= 1
 
 
-## Fade and grow the muzzle flashes and death puffs.
-func _step_flashes(real_delta: float) -> void:
-	for i in ALL_FLASH_SLOTS:
-		if _flash_left[i] <= 0.0:
-			continue
-		_flash_left[i] -= real_delta
-		var flash: Sprite2D = _flashes[i]
-		if _flash_left[i] <= 0.0:
-			flash.visible = false
-			continue
-		var t: float = _flash_left[i] / _flash_total[i]
-		flash.modulate.a = t
-		flash.scale = _flash_aspect[i] * (_flash_size[i] * (1.0 + _flash_grow[i] * (1.0 - t)))
-
-
-## Fade, widen and collapse the death animations.
+## Dissolve the death animations: white-hot, then pixel by pixel gone.
 func _step_ghosts(real_delta: float) -> void:
 	for i in GHOST_SLOTS:
 		if _ghost_left[i] <= 0.0:
@@ -609,10 +515,8 @@ func _step_ghosts(real_delta: float) -> void:
 		if _ghost_left[i] <= 0.0:
 			ghost.visible = false
 			continue
-		var t: float = _ghost_left[i] / _ghost_total[i]
-		var progress: float = 1.0 - t
-		ghost.scale = _ghost_scale[i] * Vector2(1.0 + 0.3 * progress, maxf(1.0 - progress, 0.05))
-		ghost.modulate.a = clampf(t * 2.0, 0.0, 1.0)
+		var progress: float = 1.0 - _ghost_left[i] / _ghost_total[i]
+		(ghost.material as ShaderMaterial).set_shader_parameter(&"dissolve", maxf(progress, 0.01))
 
 
 ## Start a death animation from a copy of the dead node's `Sprite` child, where that
@@ -639,37 +543,16 @@ func _start_ghost(dead: Node) -> void:
 	ghost.global_position = source.global_position
 	ghost.global_rotation = source.global_rotation
 	ghost.modulate = Color.WHITE
-	# Start from the rest scale: a sprite killed mid-squash would otherwise pop.
+	# At the rest scale: a sprite killed mid-squash would otherwise pop.
 	var rest: Vector2 = source.global_scale
 	var at: int = _react_sprites.find(source.get_instance_id())
 	if at >= 0 and source.scale.x != 0.0 and source.scale.y != 0.0:
 		rest = rest / source.scale * _react_scale[at]
 	ghost.scale = rest
+	(ghost.material as ShaderMaterial).set_shader_parameter(&"dissolve", 0.01)
 	ghost.visible = true
 	_ghost_left[slot] = preset.death_anim_seconds
 	_ghost_total[slot] = preset.death_anim_seconds
-	_ghost_scale[slot] = rest
-
-
-## Show flash `slot` at `position` for `seconds`, `size` times the art's size, turned
-## to `angle` and stretched to `aspect` (x along the angle), tinted `tint`.
-func _show_flash(slot: int, position: Vector2, seconds: float, size: float, tint: Color = Color.WHITE, angle: float = 0.0, aspect: Vector2 = Vector2.ONE, grow: float = 0.5, ring: bool = false) -> void:
-	if seconds <= 0.0:
-		return
-	var flash: Sprite2D = _flashes[slot]
-	var art: Texture2D = preset.nova_texture if ring else _texture
-	if flash.texture != art:
-		flash.texture = art
-	flash.global_position = position
-	flash.modulate = tint
-	flash.rotation = angle
-	flash.scale = aspect * size
-	_flash_aspect[slot] = aspect
-	_flash_grow[slot] = grow
-	flash.visible = true
-	_flash_left[slot] = seconds
-	_flash_total[slot] = seconds
-	_flash_size[slot] = size
 
 
 ## Start the flash and squash of the hit node's `Sprite` child, if it has one.
@@ -710,15 +593,6 @@ func reacting_sprites() -> int:
 	return _react_sprites.size()
 
 
-## Muzzle flashes and death puffs showing right now (for tests).
-func live_flashes() -> int:
-	var count: int = 0
-	for i in ALL_FLASH_SLOTS:
-		if _flash_left[i] > 0.0:
-			count += 1
-	return count
-
-
 ## Death animations showing right now (for tests).
 func live_ghosts() -> int:
 	var count: int = 0
@@ -733,24 +607,9 @@ func ghost(slot: int) -> Sprite2D:
 	return _ghosts[slot]
 
 
-## The wall-impact spark sprite in `slot` (for tests).
-func wall_spark(slot: int) -> Sprite2D:
-	return _flashes[FLASH_SLOTS + clampi(slot, 0, SPARK_SLOTS - 1)]
-
-
-## The muzzle flash sprite of `player` (for tests).
-func muzzle_flash(player: int) -> Sprite2D:
-	return _flashes[clampi(player, 0, MUZZLE_SLOTS - 1)]
-
-
 ## Current camera kick in pixels (for tests).
 func kick() -> Vector2:
 	return _kick
-
-
-## Live hit particles right now: never more than PARTICLE_LIMIT.
-func live_particles() -> int:
-	return _active.size() * BURST_PARTICLES
 
 
 ## Current shake strength, 0 to 1.
@@ -764,8 +623,13 @@ func _on_damage_dealt(player: int, target: Node, amount: int, position: Vector2)
 	var at: Vector2 = position
 	var tint: Color = Color.WHITE
 	var size: float = 1.0
+	var colours: int = 0
 	if target != null and is_instance_valid(target):
 		tint = _target_tint(target)
+		# A wizard's hit is in their own colours: white, their player's ramp.
+		if target.is_in_group(&"players") and target.get("index") is int:
+			colours = clampi(target.get("index") as int, 0, PLAYER_COLORS.size() - 1)
+			tint = Color.WHITE
 		# The shot that did this hit told us where it struck and which way it flew.
 		if target.get_instance_id() == _impact_target and player == _impact_player and Engine.get_physics_frames() == _impact_frame:
 			aim = _impact_aim
@@ -785,7 +649,7 @@ func _on_damage_dealt(player: int, target: Node, amount: int, position: Vector2)
 		sound = look.get("sound", preset.hit_sound) as StringName
 		own = _kind_own
 	_kind_target = 0
-	_juice(position, stop, false, shake, sound, aim, tint, size, at)
+	_juice(position, stop, false, shake, sound, aim, tint, size, at, colours)
 	if own:
 		# Their own spell: a ring in its own colour on this frame, so it is never taken for an enemy's hit.
 		_show_ring(position, preset.self_hit_color, preset.self_hit_seconds, preset.self_hit_size)
@@ -808,11 +672,10 @@ func _on_heal_dealt(_player: int, _target: Node, _amount: int, position: Vector2
 	_play(preset.heal_sound)
 
 
-## A ring that grows and fades at `position`, in a spark slot (the oldest is taken over).
+## A ring that flashes out from `position` in exactly `tint`, `size` as wide as the old ring
+## art (32 px), for `seconds`.
 func _show_ring(position: Vector2, tint: Color, seconds: float, size: float) -> void:
-	var slot: int = _next_spark
-	_next_spark = FLASH_SLOTS + (_next_spark - FLASH_SLOTS + 1) % SPARK_SLOTS
-	_show_flash(slot, position, seconds, size, tint, 0.0, Vector2.ONE, REACTION_RING_GROW, true)
+	show_effect(KIND_RING_OUT, position, Vector2.RIGHT, tint, 0, EXACT, clampi(roundi(size * 1.6), 1, 15), seconds)
 
 
 ## A line of text rising from `position` for `seconds`, in a label slot of the reactions.
@@ -830,7 +693,7 @@ func _show_note(text: String, position: Vector2, tint: Color, seconds: float) ->
 	_label_id[slot] = &"note"
 
 
-## An element reaction fired at `position`: a flash and a burst in the reaction's colour, its
+## An element reaction fired at `position`: a puff and a ring in the reaction's colour, its
 ## name rising from the spot, a little shake and the sound `reaction_<id>`. The same for every
 ## player; it changes nothing in the fight.
 func _on_reaction_triggered(_player: int, reaction_id: StringName, position: Vector2) -> void:
@@ -838,10 +701,9 @@ func _on_reaction_triggered(_player: int, reaction_id: StringName, position: Vec
 	var power: float = preset.reaction_power.get(reaction_id, 1.0) as float
 	var slot: int = _next_reaction
 	_next_reaction = (_next_reaction + 1) % REACTION_SLOTS
-	_show_flash(FLASH_SLOTS + SPARK_SLOTS + slot, position, preset.reaction_seconds, preset.reaction_flash_size * power, tint)
-	_show_flash(FLASH_SLOTS + SPARK_SLOTS + REACTION_SLOTS + slot, position, preset.reaction_seconds * 1.6, preset.reaction_ring_size * power, tint, 0.0, Vector2.ONE, REACTION_RING_GROW, true)
-	if _active.size() < BURST_SLOTS - WALL_RESERVE:
-		_burst(position, preset.reaction_burst_size * power, Vector2.ZERO, tint)
+	# A puff and a ring in the reaction's own colour, bigger for a stronger reaction.
+	show_effect(KIND_PUFF, position, Vector2.RIGHT, tint, 0, EXACT, clampi(roundi(preset.reaction_burst_size * power), 1, 15), preset.reaction_seconds * 2.0)
+	_show_ring(position, tint, preset.reaction_seconds * 1.6, preset.reaction_ring_size * power * 2.0)
 	if not _reaction_names.has(reaction_id):
 		_reaction_names[reaction_id] = String(reaction_id).capitalize()
 		_reaction_sounds[reaction_id] = StringName(preset.reaction_sound_prefix + String(reaction_id))
@@ -871,88 +733,42 @@ func _on_reaction_triggered(_player: int, reaction_id: StringName, position: Vec
 	_play(_reaction_sounds[reaction_id] as StringName)
 
 
-## A discharge jumped from `from` to `to`: a jagged line between them that fades fast, in
-## the colour of the reaction `discharge`. The corners stray by turns to either side of the
-## straight line, by a random amount up to `preset.arc_jag`. An arc past ARC_SLOTS takes over
-## the oldest. It only draws; the damage is combat's.
+## A discharge jumped from `from` to `to`: a jagged line of lightning between them, re-rolled
+## as it flickers, that burns out (an effect, KIND_ARC), in the discharge's colour.
 func _on_discharge_arc(_player: int, from: Vector2, to: Vector2) -> void:
 	if preset.arc_seconds <= 0.0 or from.is_equal_approx(to):
 		return
-	var slot: int = _next_arc
-	_next_arc = (_next_arc + 1) % ARC_SLOTS
-	var arc: Line2D = _arcs[slot]
-	var side: Vector2 = (to - from).normalized().orthogonal()
-	var flip: float = 1.0 if _rng.randf() < 0.5 else -1.0
-	# Corners sit on whole pixels and the width is whole, so the line stays crisp.
-	arc.set_point_position(0, from.round())
-	for i in range(1, ARC_POINTS - 1):
-		var along: Vector2 = from.lerp(to, float(i) / float(ARC_POINTS - 1))
-		arc.set_point_position(i, (along + side * flip * _rng.randf_range(0.4, 1.0) * preset.arc_jag).round())
-		flip = -flip
-	arc.set_point_position(ARC_POINTS - 1, to.round())
-	arc.width = roundf(preset.arc_width)
-	arc.default_color = preset.reaction_colors.get(&"discharge", Color.WHITE) as Color
-	arc.modulate.a = 1.0
-	arc.visible = true
-	_arc_left[slot] = preset.arc_seconds
-	_arc_total[slot] = preset.arc_seconds
-
-
-## Fade the arcs and hide those done.
-func _step_arcs(real_delta: float) -> void:
-	for i in ARC_SLOTS:
-		if _arc_left[i] <= 0.0:
-			continue
-		_arc_left[i] -= real_delta
-		if _arc_left[i] <= 0.0:
-			_arcs[i].visible = false
-		else:
-			# Full for the first half, then it fades.
-			_arcs[i].modulate.a = minf(2.0 * _arc_left[i] / maxf(_arc_total[i], 0.001), 1.0)
+	var tint: Color = preset.reaction_colors.get(&"discharge", Color.WHITE) as Color
+	show_effect(KIND_ARC, from, from.direction_to(to), tint, 0, EXACT, 1, preset.arc_seconds, from.distance_to(to))
 
 
 ## Discharge arcs showing right now (for tests).
 func live_arcs() -> int:
-	var count: int = 0
-	for i in ARC_SLOTS:
-		if _arc_left[i] > 0.0:
-			count += 1
-	return count
+	return effects_of(KIND_ARC)
 
 
-## An enemy got a status: show it on the enemy until combat says it has ended.
+## A character got a status: show it until combat says it has ended.
 func _on_status_applied(_player: int, target: Node, _status_id: StringName) -> void:
 	if target == null or not is_instance_valid(target) or combat == null:
 		return
 	var id: int = target.get_instance_id()
 	var known: int = _status_enemies.find(id)
 	if known >= 0:
-		# A new status on a shown enemy (a chill that froze it) changes the look at once.
+		# A new status on a shown character (a chill that froze it) changes the look at once.
 		_status_shown[known] = _status_of(target)
+		_pose_status(known)
 		return
-	var sprite := target.get_node_or_null("Sprite") as Sprite2D
-	if sprite == null or _status_enemies.size() >= STATUS_SLOTS:
+	if not target is Node2D or _status_enemies.size() >= STATUS_SLOTS:
 		return
-	var overlay: Sprite2D = _make_overlay() if _status_free.is_empty() else _status_free.pop_back() as Sprite2D
 	_status_enemies.append(id)
-	_status_overlays.append(overlay)
+	_status_effect.append(-1)
 	_status_age.append(0.0)
 	_status_shown.append(_status_of(target))
 	_status_next_poll.append(STATUS_POLL)
 	_pose_status(_status_enemies.size() - 1)
 
 
-func _make_overlay() -> Sprite2D:
-	var overlay := Sprite2D.new()
-	overlay.top_level = true
-	overlay.visible = false
-	overlay.material = _reaction_material
-	overlay.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	add_child(overlay)
-	return overlay
-
-
-## Read the statuses now and then, and pose every overlay each step.
+## Read the statuses now and then; end the effect of a status that ended.
 func _step_statuses(real_delta: float) -> void:
 	var at: int = _status_enemies.size() - 1
 	while at >= 0:
@@ -962,22 +778,23 @@ func _step_statuses(real_delta: float) -> void:
 		if keep:
 			if _status_age[at] >= _status_next_poll[at]:
 				_status_next_poll[at] = _status_age[at] + STATUS_POLL
-				_status_shown[at] = _status_of(enemy)
+				var shown: StringName = _status_of(enemy)
+				if shown != _status_shown[at]:
+					_status_shown[at] = shown
+					_end_status_effect(at)
 			keep = _status_shown[at] != &""
 		if keep:
 			_pose_status(at)
 		else:
-			var overlay: Sprite2D = _status_overlays[at]
-			overlay.visible = false
-			_status_free.append(overlay)
+			_end_status_effect(at)
 			var last: int = _status_enemies.size() - 1
 			_status_enemies[at] = _status_enemies[last]
-			_status_overlays[at] = _status_overlays[last]
+			_status_effect[at] = _status_effect[last]
 			_status_age[at] = _status_age[last]
 			_status_shown[at] = _status_shown[last]
 			_status_next_poll[at] = _status_next_poll[last]
 			_status_enemies.resize(last)
-			_status_overlays.resize(last)
+			_status_effect.resize(last)
 			_status_age.resize(last)
 			_status_shown.resize(last)
 			_status_next_poll.resize(last)
@@ -994,60 +811,48 @@ func _status_of(enemy: Node) -> StringName:
 	return &""
 
 
-## Lay overlay `at` over its enemy's sprite in the look of its status. Hidden while the hit
-## flash is on (the white flash is the hit's, not the status's), or when the sprite is.
+## Keep status `at` shown: an effect that follows its character, its look's particles round it
+## and a glow in its colour (`status_looks`: `color`, `look`), started again if a crowd of other
+## effects took its slot. Hidden while the character's sprite is.
 func _pose_status(at: int) -> void:
-	var overlay: Sprite2D = _status_overlays[at]
-	var enemy := instance_from_id(_status_enemies[at]) as Node
-	var sprite: Sprite2D = null
-	if enemy != null:
-		sprite = enemy.get_node_or_null("Sprite") as Sprite2D
+	var enemy := instance_from_id(_status_enemies[at]) as Node2D
 	var look: Dictionary = preset.status_looks.get(_status_shown[at], {}) as Dictionary
-	if sprite == null or look.is_empty() or sprite.material == _flash_material or not sprite.is_visible_in_tree():
-		overlay.visible = false
+	var sprite: CanvasItem = null
+	if enemy != null:
+		sprite = enemy.get_node_or_null("Sprite") as CanvasItem
+	if enemy == null or look.is_empty() or (sprite != null and not sprite.is_visible_in_tree()):
+		_end_status_effect(at)
 		return
-	var rate: float = look.get("rate", 0.0) as float
-	var phase: float = _status_age[at] * rate
-	var strength: float = look.get("alpha", 0.5) as float
-	if rate > 0.0:
-		strength *= 0.45 + 0.55 * (0.5 + 0.5 * sin(phase * TAU))
-	if look.get("blink", false) as bool and fposmod(phase, 1.0) > 0.6:
-		strength = 0.0
-	if overlay.texture != sprite.texture:
-		overlay.texture = sprite.texture
-	overlay.hframes = sprite.hframes
-	overlay.vframes = sprite.vframes
-	overlay.frame = sprite.frame
-	overlay.region_enabled = sprite.region_enabled
-	overlay.region_rect = sprite.region_rect
-	overlay.centered = sprite.centered
-	overlay.offset = sprite.offset
-	overlay.flip_h = sprite.flip_h
-	overlay.flip_v = sprite.flip_v
-	overlay.global_transform = sprite.global_transform
-	var jitter: float = look.get("jitter", 0.0) as float
-	if jitter > 0.0:
-		overlay.global_position += Vector2(floorf(sin(phase * 5.1 * TAU) * 1.99), floorf(cos(phase * 3.7 * TAU) * 1.99)) * jitter
-	overlay.z_index = sprite.z_index + STATUS_Z
-	overlay.modulate = Color(look.get("color", Color.WHITE) as Color, strength)
-	overlay.visible = strength > 0.0
+	var slot: int = _status_effect[at]
+	if slot >= 0 and slot < effect_slots and _effect_seconds[slot] > 0.0 and _effect_follow[slot] == enemy:
+		return
+	var kinds: int = look.get("look", 0) as int
+	var bits: int = ProjectileManagerScript.pack_look(PackedInt32Array([kinds])) if kinds > 0 else 0
+	var tint: Color = look.get("color", Color.WHITE) as Color
+	_status_effect[at] = show_effect(KIND_STATUS, enemy.global_position, Vector2.RIGHT, tint, 0, bits | EXACT, STATUS_ZOOM, FOREVER, 0.0, enemy)
+
+
+## End the effect that shows status `at`, if it still shows it.
+func _end_status_effect(at: int) -> void:
+	var slot: int = _status_effect[at]
+	var enemy := instance_from_id(_status_enemies[at]) as Node2D
+	if slot >= 0 and slot < effect_slots and _effect_kind[slot] == KIND_STATUS and _effect_follow[slot] == enemy:
+		_effect_seconds[slot] = 0.0
+		_effect_follow[slot] = null
+	_status_effect[at] = -1
 
 
 ## The status shown on `enemy` (empty for none), for tests.
 func status_shown(enemy: Node) -> StringName:
 	var at: int = _status_enemies.find(enemy.get_instance_id())
-	if at < 0 or not _status_overlays[at].visible:
+	if at < 0 or _status_effect[at] < 0:
 		return &""
 	return _status_shown[at]
 
 
-## Status overlays showing right now (for tests).
+## Statuses showing right now (for tests).
 func live_statuses() -> int:
-	var count: int = 0
-	for overlay in _status_overlays:
-		if overlay.visible:
-			count += 1
-	return count
+	return effects_of(KIND_STATUS)
 
 
 ## Is the name of `reaction_id` already rising near `position`?
@@ -1095,24 +900,18 @@ func _on_projectile_impact(player: int, target: Node, position: Vector2, directi
 		_impact_aim = direction
 		_show_impact(player, position, direction)
 		return
-	# Stone chips fly back off the surface; they only use the bursts the hits on characters leave free.
-	if _active.size() < BURST_SLOTS - WALL_RESERVE:
-		var chips: CPUParticles2D = _burst(position, preset.wall_chip_size, -direction, preset.wall_chip_color, preset.wall_chip_spread)
-		if chips != null:
-			chips.scale_amount_min = 0.2 * preset.wall_chip_size
-			chips.scale_amount_max = 0.7 * preset.wall_chip_size
+	# Stone chips knocked back off the surface.
+	if particles_enabled:
+		show_effect(KIND_CHIPS, position, -direction, Color.WHITE, 0, 0, clampi(roundi(preset.wall_chip_size), 1, 3), CHIPS_SECONDS)
 	_show_impact(player, position, direction)
 
 
 ## The payoff of a shot: a flare in the shot's colour, shaped by the form of the shot itself
-## (the projectile manager's `impact_form` while the impact is sent; a beam's end stretches along the beam, a nova's is wide and soft, a rune's pops, an orbit's
-## ticks). An enemy's shot (a negative index) always shows the same hard ember mark, turned
-## on its corner, which no player's flare resembles.
+## (the projectile manager's `impact_form` while the impact is sent; a rune goes off, a nova's
+## adds a ring). An enemy's shot (a negative index) lands in a burst in the enemy colour.
 func _show_impact(player: int, position: Vector2, direction: Vector2) -> void:
-	var slot: int = _next_spark
-	_next_spark = FLASH_SLOTS + (_next_spark - FLASH_SLOTS + 1) % SPARK_SLOTS
 	if player < 0 or player >= PLAYER_COLORS.size():
-		_show_flash(slot, position, preset.enemy_impact_seconds, preset.enemy_impact_size, preset.enemy_hit_color, PI / 4.0, Vector2.ONE, 0.2)
+		show_effect(KIND_BURST, position, direction, preset.enemy_hit_color, 0, 0, 1, BURST_SECONDS)
 		return
 	var form: StringName = &""
 	if projectiles != null and "impact_form" in projectiles:
@@ -1175,7 +974,12 @@ func _size_effects(slots: int) -> void:
 	_effect_seconds.resize(slots)
 	_effect_seconds.fill(0.0)
 	_effect_length.resize(slots)
+	_effect_follow.resize(slots)
+	_effect_follow.fill(null)
+	_effect_rise.resize(slots)
 	_next_effect = 0
+	# The statuses shown lost their effects; the next step shows them again.
+	_status_effect.fill(-1)
 
 
 ## The setting: how many effects can show at once, snapped by `EffectSlots.snap`. Returns the
@@ -1195,11 +999,13 @@ func _on_effect_slots_changed(slots: int) -> void:
 
 ## Show an effect of `kind` (KIND_BURST to KIND_CAST) at `at`, aimed along `dir`, in the ramp of
 ## `core` (white: `player`'s colours) with the particles of the packed `look`, at `zoom`, for
-## `seconds`. A dash runs `length` pixels from `at` along `dir` (its zoom is then the length).
-## It takes the next slot, the oldest effect when they are all busy.
-func show_effect(kind: int, at: Vector2, dir: Vector2, core: Color, player: int, look: int, zoom: int, seconds: float, length: float = 0.0) -> void:
+## `seconds`. A dash or an arc runs `length` pixels from `at` along `dir` (its zoom is then the
+## length). An effect given a `follow` node moves with it (a status), and ends when it is gone.
+## It takes the next slot, the oldest effect when they are all busy, and returns it (-1 for
+## none).
+func show_effect(kind: int, at: Vector2, dir: Vector2, core: Color, player: int, look: int, zoom: int, seconds: float, length: float = 0.0, follow: Node2D = null) -> int:
 	if _effect_node == null or not at.is_finite() or player < 0 or player >= PLAYER_COLORS.size():
-		return
+		return -1
 	var slot: int = _next_effect
 	_next_effect = (_next_effect + 1) % effect_slots
 	_effect_kind[slot] = kind
@@ -1212,10 +1018,13 @@ func show_effect(kind: int, at: Vector2, dir: Vector2, core: Color, player: int,
 	_effect_age[slot] = 0.0
 	_effect_seconds[slot] = maxf(seconds, 0.01)
 	_effect_length[slot] = 0.0
-	if kind == KIND_DASH:
+	_effect_follow[slot] = follow
+	_effect_rise[slot] = STATUS_RISE if follow != null else 0.0
+	if kind == KIND_DASH or kind == KIND_ARC:
 		var steps: int = clampi(roundi(length / 4.0), 1, roundi(DASH_LONGEST / 4.0))
 		_effect_zoom[slot] = steps
 		_effect_length[slot] = steps * 4.0
+	return slot
 
 
 ## Age the effects by `real_delta` and write the live ones into the batch, oldest first.
@@ -1230,18 +1039,25 @@ func _step_effects(real_delta: float) -> void:
 			continue
 		_effect_age[slot] += real_delta
 		var through: float = _effect_age[slot] / _effect_seconds[slot]
+		var follow: Node2D = _effect_follow[slot]
+		if follow != null and not is_instance_valid(follow):
+			through = 1.0
 		if through >= 1.0:
 			_effect_seconds[slot] = 0.0
+			_effect_follow[slot] = null
 			continue
+		if follow != null:
+			_effect_at[slot] = (follow.global_position + Vector2(0.0, -_effect_rise[slot])).round()
 		var i: int = out * EFFECT_STRIDE
 		var d: float = EFFECT_GRID * _effect_zoom[slot]
 		var along: float = d
 		var dir: Vector2 = _effect_dir[slot]
 		var at: Vector2 = _effect_at[slot]
 		if _effect_length[slot] > 0.0:
-			# A dash: from where it left along its way, a margin past each end.
-			d = DASH_ACROSS
-			along = _effect_length[slot] + 2.0 * DASH_MARGIN
+			# A dash or an arc: from where it starts along its way, a margin past each end.
+			var arc: bool = _effect_kind[slot] == KIND_ARC
+			d = ARC_ACROSS if arc else DASH_ACROSS
+			along = _effect_length[slot] + 2.0 * (ARC_MARGIN if arc else DASH_MARGIN)
 			at += dir * _effect_length[slot] * 0.5
 		_effect_buffer[i] = dir.x * along
 		_effect_buffer[i + 1] = dir.y * d
@@ -1294,6 +1110,17 @@ func effect_dress(kind: int) -> Array:
 	return []
 
 
+## The newest live effect of `kind` (for tests): its place, way, core colour, player, zoom and
+## look, or an empty dictionary when none shows.
+func effect_info(kind: int) -> Dictionary:
+	for n in effect_slots:
+		var slot: int = (_next_effect - 1 - n + effect_slots) % effect_slots
+		if _effect_seconds[slot] > 0.0 and _effect_kind[slot] == kind:
+			return {"at": _effect_at[slot], "dir": _effect_dir[slot], "core": _effect_core[slot], "player": _effect_player[slot],
+					"zoom": _effect_zoom[slot], "look": _effect_look[slot], "seconds": _effect_seconds[slot]}
+	return {}
+
+
 ## The colour of what was hit: a wizard's own colour, else the enemy ember.
 func _target_tint(target: Node) -> Color:
 	if target.is_in_group(&"players"):
@@ -1312,8 +1139,8 @@ func _shot_color(player: int) -> Color:
 
 func _on_enemy_died(_player: int, enemy: Node, position: Vector2) -> void:
 	_start_ghost(enemy)
-	_show_flash(_next_puff, position, preset.death_puff_seconds, preset.death_puff_size)
-	_next_puff = MUZZLE_SLOTS + (_next_puff - MUZZLE_SLOTS + 1) % (FLASH_SLOTS - MUZZLE_SLOTS)
+	if preset.death_puff_seconds > 0.0:
+		_show_ring(position, BONE_LIGHT, preset.death_puff_seconds, preset.death_puff_size)
 	_juice(position, preset.death_stop_seconds, true, preset.death_shake, preset.death_sound)
 
 
@@ -1336,7 +1163,7 @@ func _form_look(form: StringName, cast: bool) -> Dictionary:
 
 
 func _on_spell_cast(player: int, spell_id: StringName, origin: Vector2, direction: Vector2) -> void:
-	if player < 0 or player >= MUZZLE_SLOTS:
+	if player < 0 or player >= PLAYER_COLORS.size():
 		return
 	var slot: int = player
 	# Each form has its own flash on the wizard: a bolt a short streak along the aim, a beam a
@@ -1572,10 +1399,11 @@ func _on_player_downed(player: int) -> void:
 
 
 ## `strong` is a death or a downed wizard: it ignores the rest after a hit-stop and
-## gets the bigger burst.
+## gets the bigger puff.
 ## A plain hit with an `aim` (the way the shot flew) sprays along it, `size` times as big,
-## from `at`, in `tint`; without one it is the old round puff at `position`.
-func _juice(position: Vector2, stop: float, strong: bool, shake: float, sound: StringName, aim: Vector2 = Vector2.ZERO, tint: Color = Color.WHITE, size: float = 1.0, at: Vector2 = Vector2.INF) -> void:
+## from `at`, in the ramp of `tint` (white: `player`'s colours); without one it is a puff at
+## `position`.
+func _juice(position: Vector2, stop: float, strong: bool, shake: float, sound: StringName, aim: Vector2 = Vector2.ZERO, tint: Color = Color.WHITE, size: float = 1.0, at: Vector2 = Vector2.INF, player: int = 0) -> void:
 	# A plain hit only starts a stop when none runs and the rest is over (or a stream
 	# of hits would extend it for ever); a strong one may lengthen a shorter stop.
 	if stop > stop_left and (strong or (stop_left <= 0.0 and rest_left <= 0.0)):
@@ -1585,14 +1413,17 @@ func _juice(position: Vector2, stop: float, strong: bool, shake: float, sound: S
 		_refresh_camera()
 		_trauma = minf(_trauma + shake, 1.0)
 	var upgraded: bool = false
-	if position != Vector2.INF:
+	if position != Vector2.INF and particles_enabled:
 		if strong:
 			upgraded = _burst_death(position)
 		else:
-			_hit_at = position if at == Vector2.INF else at
-			_hit_burst = _burst(_hit_at, size, aim, tint, preset.hit_spray_spread)
+			var from: Vector2 = position if at == Vector2.INF else at
+			var zoom: int = clampi(roundi(size), 1, 3)
+			if aim != Vector2.ZERO:
+				_hit_effect = show_effect(KIND_SPRAY, from, aim, tint, player, 0, zoom, SPRAY_SECONDS)
+			else:
+				_hit_effect = show_effect(KIND_PUFF, from, Vector2.RIGHT, tint, player, 0, zoom, PUFF_SECONDS)
 			_hit_position = position
-			_hit_tint = tint
 	if upgraded and _hit_voice >= 0:
 		_voices[_hit_voice].stop()
 	var voice: int = _play(sound)
@@ -1600,61 +1431,19 @@ func _juice(position: Vector2, stop: float, strong: bool, shake: float, sound: S
 		_hit_voice = voice
 
 
-## Start a burst; `size` scales its speed, life and particle size. With an `aim` it is a
-## spray along it, `spread` degrees to each side and faster; without, a round puff.
-## Returns it, or null when the pool is empty.
-func _burst(position: Vector2, size: float, aim: Vector2 = Vector2.ZERO, tint: Color = Color.WHITE, spread: float = 180.0) -> CPUParticles2D:
-	if not particles_enabled:
-		return null
-	var burst := _bursts.acquire() as CPUParticles2D
-	if burst == null:
-		return null
-	_launch(burst, position, size, aim, tint, spread)
-	_active.append(burst)
-	_active_left.append(preset.particle_lifetime * size)
-	return burst
-
-
-func _launch(burst: CPUParticles2D, position: Vector2, size: float, aim: Vector2 = Vector2.ZERO, tint: Color = Color.WHITE, spread: float = 180.0) -> void:
-	var speed: float = preset.particle_speed * size
-	if aim != Vector2.ZERO:
-		burst.direction = aim
-		burst.spread = spread
-		speed *= preset.spray_speed
-	else:
-		burst.spread = 180.0
-	burst.color = tint
-	burst.global_position = position
-	burst.lifetime = preset.particle_lifetime * size
-	burst.initial_velocity_min = speed * 0.5
-	burst.initial_velocity_max = speed
-	burst.scale_amount_min = 0.3 * size
-	burst.scale_amount_max = 0.5 * size
-	burst.visible = true
-	burst.restart()
-	burst.emitting = true
-
-
-## A death burst: the killing blow's own burst made bigger when it is at this spot,
-## else a new one, else the burst closest to ending taken over. Returns true when
-## it upgraded the hit burst (which then needs no second sound).
+## A death puff: the killing blow's own spray turned into a bigger puff when it is at this
+## spot (one slot, one sound), else a new puff in the enemy colour. Returns true when it
+## upgraded the hit's effect (which then needs no second sound).
 func _burst_death(position: Vector2) -> bool:
-	var size: float = preset.death_particle_size
-	if _hit_burst != null and _hit_position == position:
-		var at: int = _active.find(_hit_burst)
-		if at >= 0:
-			_launch(_hit_burst, _hit_at, size, Vector2.ZERO, _hit_tint)
-			_active_left[at] = preset.particle_lifetime * size
-			return true
-	if _burst(position, size) != null:
-		return false
-	var oldest: int = -1
-	for i in _active.size():
-		if oldest < 0 or _active_left[i] < _active_left[oldest]:
-			oldest = i
-	if oldest >= 0:
-		_launch(_active[oldest], position, size)
-		_active_left[oldest] = preset.particle_lifetime * size
+	var zoom: int = clampi(roundi(preset.death_particle_size), 1, 3)
+	var slot: int = _hit_effect
+	if slot >= 0 and _hit_position == position and _effect_seconds[slot] > 0.0:
+		_effect_kind[slot] = KIND_PUFF
+		_effect_zoom[slot] = zoom
+		_effect_age[slot] = 0.0
+		_effect_seconds[slot] = PUFF_SECONDS
+		return true
+	show_effect(KIND_PUFF, position, Vector2.RIGHT, preset.enemy_hit_color, 0, 0, zoom, PUFF_SECONDS)
 	return false
 
 
@@ -1671,32 +1460,6 @@ func _play(id: StringName) -> int:
 	voice.stream = sound
 	voice.play()
 	return used
-
-
-func _make_burst() -> Object:
-	var burst := CPUParticles2D.new()
-	burst.amount = BURST_PARTICLES
-	burst.one_shot = true
-	burst.explosiveness = 1.0
-	burst.emitting = false
-	burst.visible = false
-	burst.texture = _texture
-	burst.spread = 180.0
-	burst.gravity = Vector2.ZERO
-	burst.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	# Top level: the burst sits in world space and lives under this autoload, so a
-	# scene change cannot free it.
-	burst.top_level = true
-	# Feel draws before the room: at z 0 the floor and the pillar tops would hide the burst.
-	burst.z_index = BURST_Z
-	add_child(burst)
-	return burst
-
-
-func _hide_burst(item: Object) -> void:
-	var burst := item as CPUParticles2D
-	burst.emitting = false
-	burst.visible = false
 
 
 func _set_time_scale(value: float) -> void:

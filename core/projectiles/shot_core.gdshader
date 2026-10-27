@@ -49,6 +49,9 @@ uniform float particle_share = 1.0;
 uniform float trail_share = 1.0;
 // How bright the glow is (1.0 the look; 0.0 none).
 uniform float glow_strength = 1.0;
+// The sprite path's dissolve (Feel's death: a copy of the dead sprite): 0 whole, 1 gone. Its
+// pixels turn white-hot and fall out one by one, and it glows as they go.
+uniform float dissolve = 0.0;
 // Beam mode (Feel's beams; the instance data above is not used): 1 a Line2D stretched along its
 // path (UV.x 0-1 along `beam_length` pixels, UV.y across `beam_width`), 2 a Sprite2D whose region
 // is the beam (UV in texture pixels, 32 across). Its core colour is `core_override`, its player
@@ -101,6 +104,17 @@ const float TRACE_SPAN = 0.42;
 //                 to end); its quad is that long plus DASH_MARGIN each end, DASH_ACROSS across
 //   K_BEAM        a beam (beam mode above): a white-hot one-pixel core, a rim that breathes
 //                 along it, motes running down it, flares at both ends and its card particles
+//   K_SPRAY       a hit on a character: sparks thrown on along the hit's way, cooling
+//   K_PUFF        sparks all round and a dotted white-hot puff (a kill, a reaction, a hit
+//                 with no way)
+//   K_CHIPS       stone chips knocked back off a wall, falling; stone does not glow
+//   K_ARC         lightning jumping from the effect's place along its aim for zoom x 4 pixels
+//                 (a discharge): a jagged line re-rolled 30 times a second; its quad is that long
+//                 plus ARC_MARGIN each end, ARC_ACROSS across
+//   K_STATUS      a status on a character, kept while it lasts and moved with it: its look's
+//                 particles round it and a pulsing glow
+// An effect whose look has the EXACT bit (kind 24) takes its colour as it is, the ramp made from
+// it (a reaction's own colour), instead of the palette material the colour is nearest.
 const float K_BURST = 4.0;
 const float K_RING_OUT = 5.0;
 const float K_RING_IN = 6.0;
@@ -108,6 +122,17 @@ const float K_RUNE_BURST = 7.0;
 const float K_CAST = 8.0;
 const float K_DASH = 9.0;
 const float K_BEAM = 10.0;
+const float K_SPRAY = 11.0;
+const float K_PUFF = 12.0;
+const float K_CHIPS = 13.0;
+const float K_ARC = 14.0;
+const float K_STATUS = 15.0;
+const float EXACT = 24.0;
+const float ARC_MARGIN = 4.0;
+const float ARC_ACROSS = 16.0;
+const vec3 STONE_SHADOW = vec3(0.169, 0.157, 0.251);
+const vec3 STONE_BASE = vec3(0.290, 0.275, 0.388);
+const vec3 STONE_LIGHT = vec3(0.478, 0.463, 0.580);
 const float DASH_MARGIN = 12.0;
 const float DASH_ACROSS = 32.0;
 // A rune's reach at its rest (the 14 px of rune.tres, as `rune()` draws it at zoom 4).
@@ -217,7 +242,13 @@ void vertex() {
 	}
 	int pi = int(player);
 	plain = all(greaterThan(core, vec3(0.99))) ? 1.0 : 0.0;
-	if (plain > 0.5) {
+	if (bit_set(bits, EXACT)) {
+		plain = 0.0;
+		mid = core;
+		hi = mix(core, vec3(1.0), 0.35);
+		hot = mix(core, vec3(1.0), 0.7);
+		lo = core * 0.55;
+	} else if (plain > 0.5) {
 		hot = BONE_LIGHT;
 		hi = P_LIGHT[pi];
 		mid = P_BASE[pi];
@@ -733,9 +764,67 @@ vec4 beam(float along, float across) {
 	return vec4(glow * lit * glow_strength, 0.0);
 }
 
+// A discharge (K_ARC): `uv` over a quad ARC_MARGIN longer than the arc at each end.
+vec4 arc(vec2 uv) {
+	float len = zoom * 4.0;
+	vec2 size = vec2(len + 2.0 * ARC_MARGIN, ARC_ACROSS);
+	vec2 d = floor(uv * size) - vec2(ARC_MARGIN, size.y * 0.5);
+	float a = age;
+	float seg = 5.0;
+	float k = floor(d.x / seg);
+	float jf = floor(sim_time * 30.0);
+	float o0 = k < 0.5 ? 0.0 : (hash(k, jf, 61.0) - 0.5) * 6.0;
+	float o1 = (k + 1.0) * seg >= len ? 0.0 : (hash(k + 1.0, jf, 61.0) - 0.5) * 6.0;
+	float off = round(mix(o0, o1, fract(d.x / seg)));
+	bool along = d.x >= 0.0 && d.x <= len;
+	// It burns out from the ends inwards as it fades.
+	bool kept = hash(d.x, 0.0, 62.0) > a * 1.2 - 0.2;
+	if (along && kept && d.y == off) {
+		return vec4(a < 0.4 ? hot : hi, 1.0);
+	}
+	if (along && kept && abs(d.y - off) == 1.0 && hash(d.x, jf, 63.0) < 0.25) {
+		return vec4(mid, 1.0);
+	}
+	float lit = along ? (1.0 - a) * 0.6 * falloff(abs(d.y - off), 5.0) : 0.0;
+	lit *= 0.6 + 0.8 * hash(jf, 0.0, 64.0);
+	return vec4(glow * lit * glow_strength, 0.0);
+}
+
+// A status (K_STATUS): its look's particles round the character, endless, and a pulsing glow.
+vec4 status(vec2 uv) {
+	vec2 size = vec2(GRID) * zoom;
+	vec2 d = floor(uv * size) - size * 0.5;
+	float reach = 4.0 * zoom;
+	for (int n = 0; n < 8; n++) {
+		float i = float(n);
+		float t = sim_time * (1.2 + 0.8 * hash(i, 0.0, 71.0)) + hash(i, 0.0, 72.0);
+		float cyc = floor(t);
+		float ang = hash(i, cyc, 73.0) * 6.2832;
+		vec2 from = vec2(cos(ang), sin(ang) * 0.8) * reach * (0.5 + 0.5 * hash(i, cyc, 74.0));
+		vec4 p = vec4(0.0);
+		if (emit_count > 0.5) {
+			float look = emitter(int(min(floor(hash(i, cyc, 75.0) * emit_count), emit_count - 1.0)));
+			p = particle(look, from, fract(t), i, cyc, d, 1.0);
+		} else if (fract(t) < 0.8 && on(d, from + vec2(0.0, -6.0 * fract(t)))) {
+			p = vec4(fract(t) < 0.4 ? hi : mid, 1.0);
+		}
+		if (p.a > 0.0) {
+			return p;
+		}
+	}
+	float pulse = 0.6 + 0.4 * sin(sim_time * 6.0 + seed);
+	return vec4(glow * 0.3 * pulse * falloff(length(d), reach * 1.6) * glow_strength, 0.0);
+}
+
 vec4 effect(vec2 uv) {
 	if (kind == K_DASH) {
 		return dash(uv);
+	}
+	if (kind == K_ARC) {
+		return arc(uv);
+	}
+	if (kind == K_STATUS) {
+		return status(uv);
 	}
 	vec2 size = vec2(GRID) * zoom;
 	vec2 d = floor(uv * size) + 0.5 - size * 0.5 - vec2(0.5);
@@ -801,6 +890,48 @@ vec4 effect(vec2 uv) {
 			}
 		}
 		lit = (1.0 - a) * (0.5 * falloff(abs(m - wide), 6.0) + (a < 0.25 ? 0.8 : 0.0) * falloff(m, RUNE_REACH));
+	} else if (kind == K_SPRAY || kind == K_PUFF) {
+		bool round_about = kind == K_PUFF;
+		// A small white-hot cross where it struck, or a dotted puff.
+		if (round_about) {
+			if (a < 0.18 && r <= 2.0 * zoom && mod(d.x + d.y, 2.0) == 0.0) {
+				colour = vec4(a < 0.09 ? hot : hi, 1.0);
+			}
+		} else if (a < 0.2 && ((d.x == 0.0 && abs(d.y) <= 1.0) || (d.y == 0.0 && abs(d.x) <= 1.0))) {
+			colour = vec4(hot, 1.0);
+		}
+		int sparks = round_about ? 14 : 10;
+		for (int n = 0; n < 14; n++) {
+			if (n >= sparks || colour.a > 0.0) {
+				break;
+			}
+			float i = float(n);
+			float life = 0.5 + 0.5 * hash(i, 11.0, 31.0);
+			if (a > life) {
+				continue;
+			}
+			float ang = round_about ? i / 14.0 * 6.2832 + (hash(i, 12.0, 31.0) - 0.5) * 0.4 : (hash(i, 12.0, 31.0) - 0.5) * 1.6;
+			float reach = (2.0 + (round_about ? 10.0 : 13.0) * (0.5 + 0.5 * hash(i, 13.0, 31.0)) * ease) * zoom;
+			if (on(d + 0.5, vec2(cos(ang), sin(ang)) * reach + 0.5)) {
+				colour = vec4(ramp(a / life), 1.0);
+			}
+		}
+		lit = (1.0 - a) * (1.0 - a) * (0.7 * falloff(r, 3.0 * zoom) + 0.3 * falloff(r, 9.0 * zoom));
+	} else if (kind == K_CHIPS) {
+		// Stone chips knocked back off the wall, falling as they fly; no glow.
+		for (int n = 0; n < 7; n++) {
+			float i = float(n);
+			float ang = (hash(i, 14.0, 31.0) - 0.5) * 2.2;
+			float reach = (2.0 + 9.0 * (0.5 + 0.5 * hash(i, 15.0, 31.0)) * ease) * zoom;
+			vec2 at = vec2(cos(ang), sin(ang)) * reach + vec2(0.0, 0.0);
+			// Down the screen as it falls, whatever the wall's side.
+			vec2 fall = vec2(0.0, 7.0 * a * a * zoom);
+			vec2 local = at;
+			if (a < 0.9 && (on(d + 0.5, local + 0.5 + fall) || (hash(i, 16.0, 31.0) < 0.4 && on(d + 0.5, local + vec2(1.5, 0.5) + fall)))) {
+				return vec4(a < 0.3 ? STONE_LIGHT : (a < 0.65 ? STONE_BASE : STONE_SHADOW), 1.0);
+			}
+		}
+		return vec4(0.0);
 	}
 	// The shot's cards: its particles, set off from round the middle at the start.
 	if (colour.a == 0.0 && emit_count > 0.5 && kind != K_CAST) {
@@ -849,7 +980,17 @@ void fragment() {
 		float shade = clamp((lum - 0.5) / 0.45, 0.0, 1.0);
 		vec3 lit = mix(core * 0.55, mix(core, vec3(1.0), 0.55), shade);
 		float alpha = t.a * body.a;
+		vec3 shown = mix(rgb, lit, warm);
+		if (dissolve > 0.0) {
+			vec2 px = floor(UV / TEXTURE_PIXEL_SIZE);
+			if (t.a > 0.5 && hash(px.x, px.y, 81.0) < dissolve * 1.2 - 0.1) {
+				alpha = 0.0;
+			} else if (t.a > 0.5) {
+				shown = mix(shown, BONE_LIGHT, min(dissolve * 3.0, 1.0));
+				alpha = 1.0;
+			}
+		}
 		// Premultiplied, as the blend mode wants.
-		COLOR = vec4(mix(rgb, lit, warm) * alpha, alpha);
+		COLOR = vec4(shown * alpha, alpha);
 	}
 }

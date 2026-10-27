@@ -120,7 +120,7 @@ func test_a_bad_cast_shows_nothing_and_a_plain_one_stays_silent() -> void:
 func test_marks_use_no_particles() -> void:
 	for player in 4:
 		_show(player, ComboMarks.STACKED)
-	check_equal(feel.live_particles(), 0, "the marks are sprites, outside PARTICLE_LIMIT")
+	check_equal(feel.live_effects(), 0, "the marks are sprites, outside the effect slots")
 
 
 func test_a_preset_can_turn_the_marks_off() -> void:

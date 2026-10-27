@@ -23,26 +23,17 @@ extends Resource
 @export_range(0.0, 32.0, 0.5) var max_shake_pixels: float = 6.0
 ## Trauma lost per second.
 @export_range(0.1, 10.0, 0.1) var shake_decay: float = 2.5
-## How far hit particles fly (pixels per second) and how long they live.
-@export_range(0.0, 400.0, 1.0) var particle_speed: float = 90.0
-@export_range(0.05, 2.0, 0.05) var particle_lifetime: float = 0.3
-## How much bigger (speed, life, particle size) a death burst is than a hit burst.
+## How much bigger (rounded to a whole zoom) a death's puff is than a hit's.
 @export_range(1.0, 3.0, 0.1) var death_particle_size: float = 1.6
-## The spray of a hit on a character: along the way the shot flew, `hit_spray_spread`
-## degrees to each side, `spray_speed` times as fast as a round puff, bigger or smaller
-## by `hit_spray_per_damage` (0.06 is 6%) for each damage point above or below 5.
-## An enemy is hit in `enemy_hit_color` (ember); a wizard in its own colour.
-@export_range(0.0, 90.0, 1.0) var hit_spray_spread: float = 35.0
-@export_range(0.5, 3.0, 0.1) var spray_speed: float = 1.4
+## The spray of a hit on a character (an effect along the way the shot flew), bigger or smaller
+## by `hit_spray_per_damage` (0.06 is 6%) for each damage point above or below 5, rounded to a
+## whole zoom. An enemy is hit in the ramp of `enemy_hit_color` (ember); a wizard in its own.
 @export_range(0.0, 0.2, 0.01) var hit_spray_per_damage: float = 0.06
 @export var enemy_hit_color: Color = Color("e0592f")
-## A shot that ends on a wall or pillar: stone chips and dust fly back off the surface
-## (`wall_chip_size`, `wall_chip_spread` degrees to each side, `wall_chip_color`) and a
-## short spark in the shot's colour shows for `wall_spark_seconds`.
+## A shot that ends on a wall or pillar knocks Stone chips back off the surface, `wall_chip_size`
+## times as far (rounded to a whole zoom); `wall_spark_size` is the size of a shot's flare when
+## its carrier card names none.
 @export_range(0.3, 2.0, 0.1) var wall_chip_size: float = 0.9
-@export_range(0.0, 90.0, 1.0) var wall_chip_spread: float = 60.0
-@export var wall_chip_color: Color = Color("a39fb8")
-@export_range(0.0, 0.3, 0.01) var wall_spark_seconds: float = 0.1
 @export_range(0.1, 3.0, 0.1) var wall_spark_size: float = 0.45
 ## Seconds a hit enemy or wizard shows as plain white, and how much its sprite
 ## squashes then (0.25 is 25% wider and 25% lower), settling back in the same time.
@@ -51,24 +42,20 @@ extends Resource
 ## The caster's squash on a cast: seconds, and how much thinner and taller (0.15 is 15%).
 @export_range(0.0, 0.3, 0.01) var cast_squash_seconds: float = 0.12
 @export_range(0.0, 0.6, 0.01) var cast_squash: float = 0.2
-## Seconds a dead enemy's white copy takes to collapse and fade.
+## Seconds a dead enemy's copy takes to turn white-hot and fall apart.
 @export_range(0.0, 0.6, 0.01) var death_anim_seconds: float = 0.25
-## The muzzle flash at the staff tip: seconds it shows and its size (1 is the art's size).
-@export_range(0.0, 0.3, 0.01) var muzzle_flash_seconds: float = 0.1
 ## How long the mark of a combo cast (`combo_cast`) stays on the wizard; 0 turns it off.
 @export_range(0.0, 1.0, 0.01) var combo_mark_seconds: float = 0.36
-@export_range(0.1, 3.0, 0.1) var muzzle_flash_size: float = 0.5
-## The white puff where an enemy dies: seconds and biggest size.
+## The white-hot ring where an enemy dies: seconds and biggest size.
 @export_range(0.0, 0.5, 0.01) var death_puff_seconds: float = 0.14
 @export_range(0.1, 6.0, 0.1) var death_puff_size: float = 1.6
 ## Camera kick of a cast: pixels pushed against the aim, and pixels given back per second.
 @export_range(0.0, 8.0, 0.1) var cast_kick_pixels: float = 1.5
 @export_range(1.0, 200.0, 1.0) var cast_kick_decay: float = 40.0
-## An element reaction (`reaction_triggered`): the flash and the name's size and seconds, the
+## An element reaction (`reaction_triggered`): the seconds of its puff, ring and name, the
 ## shake it adds, and the colour of each reaction by its id (a reaction not listed is white).
 ## The sound is `reaction_sound_prefix` + the reaction id, for example `reaction_shatter`.
 @export_range(0.0, 0.5, 0.01) var reaction_seconds: float = 0.25
-@export_range(0.1, 6.0, 0.1) var reaction_flash_size: float = 1.4
 @export_range(0.0, 1.0, 0.01) var reaction_shake: float = 0.2
 @export var reaction_colors: Dictionary = {
 	&"shatter": Color("e8fbff"),
@@ -100,24 +87,23 @@ extends Resource
 	&"overload": 1.1,
 	&"superconduct": 1.0,
 }
-## The jagged arc a discharge draws from the enemy struck to each enemy zapped (`discharge_arc`),
-## in the colour of the reaction `discharge`: seconds it shows, its width in pixels and how far
-## its corners stray from the straight line, in pixels.
+## The jagged arc of lightning a discharge draws from the enemy struck to each enemy zapped
+## (`discharge_arc`), in the colour of the reaction `discharge`: seconds it shows.
 @export_range(0.0, 0.5, 0.01) var arc_seconds: float = 0.25
-@export_range(0.5, 6.0, 0.5) var arc_width: float = 2.0
-@export_range(0.0, 16.0, 0.5) var arc_jag: float = 5.0
-## What an enemy with a status looks like, by status id (`burn`, `chill`, `freeze`, `shock`,
-## `hex`, `static`): a colour laid over its sprite, the most it shows (alpha), how fast it pulses per
-## second (0: steady), how far it jitters in pixels, and whether it blinks off between pulses.
-## When an enemy has several, the first in `status_order` is the one shown.
+## What a character with a status looks like, by status id (`burn`, `chill`, `freeze`, `shock`,
+## `hex`, `static`; the glow look, 2026-10-27): an effect that follows it, giving off the
+## particles of a look kind (`look`: a `LOOK_*` of core/projectiles, the element's own: burn
+## fire's embers, chill and freeze frost's flecks, shock storm's gusts, hex void's pull, static
+## lightning's sparks) round it, with a glow in `color` that pulses.
+## When a character has several, the first in `status_order` is the one shown.
 @export var status_order: Array[StringName] = [&"freeze", &"static", &"shock", &"burn", &"hex", &"chill"]
 @export var status_looks: Dictionary = {
-	&"burn": {"color": Color("ff6a1a"), "alpha": 0.55, "rate": 7.0, "jitter": 0.0, "blink": false},
-	&"chill": {"color": Color("8fd8ff"), "alpha": 0.5, "rate": 0.0, "jitter": 0.0, "blink": false},
-	&"freeze": {"color": Color("e8fbff"), "alpha": 0.8, "rate": 0.0, "jitter": 0.0, "blink": false},
-	&"shock": {"color": Color("fff04a"), "alpha": 0.75, "rate": 14.0, "jitter": 1.0, "blink": true},
-	&"hex": {"color": Color("a63cff"), "alpha": 0.5, "rate": 1.8, "jitter": 0.0, "blink": false},
-	&"static": {"color": Color("b4e82a"), "alpha": 0.7, "rate": 5.0, "jitter": 0.5, "blink": true},
+	&"burn": {"color": Color("ff6a1a"), "look": 1},
+	&"chill": {"color": Color("8fd8ff"), "look": 2},
+	&"freeze": {"color": Color("e8fbff"), "look": 2},
+	&"shock": {"color": Color("fff04a"), "look": 3},
+	&"hex": {"color": Color("a63cff"), "look": 4},
+	&"static": {"color": Color("b4e82a"), "look": 5},
 }
 ## The default feel of each hit kind (`hit_landed`: `shot`, `ray`, `burst`, `reaction`, `status`),
 ## so a new card feels like something before it has its own sound: `stop` and `shake` scale
@@ -179,8 +165,4 @@ extends Resource
 @export_range(0.2, 1.0, 0.05) var beam_alpha: float = 0.7
 ## The cast flash on the wizard and the flare where a shot ends are data on the carrier cards
 ## (`FormBase.cast_look` and `impact_look`, staffs B6b), not in this preset. A card without a
-## look gets the muzzle flash above and the wall spark.
-## An enemy's shot ending or hitting always shows this mark turned on its corner, in
-## `enemy_hit_color`, whatever any player cast.
-@export_range(0.0, 0.3, 0.01) var enemy_impact_seconds: float = 0.12
-@export_range(0.1, 3.0, 0.1) var enemy_impact_size: float = 0.7
+## look gets the plain cast flash and a burst `wall_spark_size` big.

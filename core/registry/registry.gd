@@ -17,9 +17,11 @@ extends Node
 ## is skipped. The first file found wins a duplicate id (files are read in
 ## sorted path order) and a warning names both.
 ##
-## The `demo` flag: when `demo_only` is true (the web demo build, the feature
-## tag `demo`), resources whose `demo` is false are hidden from every question.
-## Resources with no `demo` property are always visible.
+## The `demo` flag: when `demo_only` is true (a web build, the feature tag `demo`, on a
+## release channel), resources whose `demo` is false are hidden from every question.
+## Resources with no `demo` property are always visible. Development and preview builds
+## (`EVERY_CARD_CHANNELS`) show everything even on the web (the owner, 2026-10-27: the new cards
+## were missing from the web preview), so only the public web demo is limited.
 ##
 ## In a debug build the registry runs the spell validator at start (`validate_spells()`) and
 ## pushes one warning per problem, so broken spell content shows up on the first run.
@@ -30,6 +32,9 @@ extends Node
 const DEFAULT_CONTENT_ROOT: String = "res://content"
 const DEFAULT_AUDIO_ROOT: String = "res://audio"
 const FEATURE_DEMO: String = "demo"
+## The build channels (`BuildInfo.channel()`) that show every resource even with the `demo`
+## feature: the ones that also start in the sandbox with the dev staff.
+const EVERY_CARD_CHANNELS: Array[String] = ["dev", "preview"]
 
 ## Only demo content is visible when true. Starts true in a build with the
 ## `demo` feature tag. Changing it takes effect at once, no rescan needed.
@@ -54,7 +59,7 @@ var _lore: Dictionary = {}
 
 
 func _ready() -> void:
-	demo_only = OS.has_feature(FEATURE_DEMO)
+	demo_only = demo_only_for(OS.has_feature(FEATURE_DEMO), BuildInfo.channel())
 	scan()
 	if OS.is_debug_build():
 		warn_spell_problems()
@@ -231,6 +236,12 @@ func get_sound(id: StringName) -> AudioStream:
 	var stream: AudioStream = ResourceLoader.load(path) as AudioStream
 	_sounds[id] = stream  # a failed load is remembered too, so it is tried once
 	return stream
+
+
+## Whether a build hides non-demo resources: one with the `demo` feature, on a channel that is
+## not one of EVERY_CARD_CHANNELS.
+static func demo_only_for(demo_feature: bool, channel: String) -> bool:
+	return demo_feature and not EVERY_CARD_CHANNELS.has(channel)
 
 
 func _visible(res: Resource) -> bool:

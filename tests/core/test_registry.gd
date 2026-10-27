@@ -85,6 +85,11 @@ func _test_demo_flag() -> void:
 	_check(registry.get_resource(&"rooms", &"hall") != null,"demo content stays visible")
 	registry.demo_only = false
 	_check(registry.get_resource(&"spells", &"hidden") != null,"turning demo_only off shows everything again")
+	# Only a release of the web demo is limited; development and preview builds show every card.
+	_check(RegistryScript.demo_only_for(true, "stable") and RegistryScript.demo_only_for(true, "nightly"), "the web demo's releases show only demo content")
+	_check(not RegistryScript.demo_only_for(true, "preview"), "a web preview build shows everything")
+	_check(not RegistryScript.demo_only_for(true, "dev"), "a web development build shows everything")
+	_check(not RegistryScript.demo_only_for(false, "stable"), "a full build shows everything")
 	registry.free()
 
 

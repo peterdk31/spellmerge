@@ -1,0 +1,10 @@
+{
+	"id": "bounce_frost_fan",
+	"name": "Bounce frost fan",
+	"does": "A fan of three frost bolts bounces off the wall ahead and chills the imps fanned out behind the caster.",
+	"casts": [{"staff": 0, "cards": ["bounce", "split", "frost", "bolt"]}],
+	"imps": [[-40, -54], [-40, 0], [-40, 54]],
+	"walls": [[80, -200, 16, 400]],
+	"seconds": 1.5,
+	"checks": [{"kind": "status_count", "status": "chill", "min": 2}]
+}

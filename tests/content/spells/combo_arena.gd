@@ -43,6 +43,7 @@ var peak_shots: int = 0
 ## Seconds of arena time that have passed.
 var time: float = 0.0
 
+var _walls: Array[Rect2] = []
 var _root: Node
 var _owned: Array[Object] = []
 ## Where each player stands (the origin of casts and the orbit anchor).
@@ -78,6 +79,13 @@ func add_imp(at: Vector2, health: int = IMP_HEALTH) -> Node2D:
 	combat.register_enemy(imp, health, IMP_RADIUS)
 	imps.append(imp)
 	return imp
+
+
+## Puts a wall over `rect` (pixels, the caster at (0, 0)): shots end, bounce or pass on it as
+## their cards say.
+func add_wall(rect: Rect2) -> void:
+	_walls.append(rect)
+	projectiles.set_walls(_walls)
 
 
 ## Where `player` stands. Casts start here and the player's orbit circles it.

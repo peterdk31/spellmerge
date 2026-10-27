@@ -7,7 +7,7 @@ extends "res://tests/support/suite.gd"
 ##
 ## A combo file: `id` (also the file name), `name`, `does` (plain words), `casts` (`staff`,
 ## `cards`: one card id per slot, read as a staff reads them; optional `at` seconds, `player`), `imps` ([x, y] from the caster at (0, 0), aiming
-## along +x), `seconds` and `checks`. Check kinds: `damaged` (imps), `status` (imps, status),
+## along +x), optional `walls` ([x, y, width, height] rects), `seconds` and `checks`. Check kinds: `damaged` (imps), `status` (imps, status),
 ## `status_count` (status, min), `keeps_burning` (imp), `reaction` (reaction), `max_shots` (max),
 ## `caster_moved` (mode: a card moved its caster, for example a dash).
 ##
@@ -35,6 +35,8 @@ func _play(combo: Dictionary, quiet: bool = false) -> ArenaScript:
 	var arena := ArenaScript.new(root)
 	for at: Array in combo.get("imps", []):
 		arena.add_imp(Vector2(float(at[0]), float(at[1])))
+	for rect: Array in combo.get("walls", []):
+		arena.add_wall(Rect2(float(rect[0]), float(rect[1]), float(rect[2]), float(rect[3])))
 	var casts: Array = (combo.get("casts", []) as Array).duplicate()
 	for entry: Dictionary in casts:
 		var built: CompiledStaff = arena.install_cards(int(entry.get("player", 0)), int(entry["staff"]), entry["cards"] as Array)

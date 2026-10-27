@@ -34,6 +34,7 @@ const PALETTE: Array[String] = [
 	"#1f7080", "#4fd6dc", "#c4f6f2",
 	"#4a1450", "#a0309a", "#e08ad8",
 	"#3f6b10", "#b4e82a", "#eeffa6",
+	"#4d3f12", "#a68a2a", "#e3cf6b",
 	"#1d3a6b", "#3b73c9", "#7fc0f0",
 	"#7a2347", "#d9477a", "#f59ab8",
 	"#1f4a3a", "#3f8f4f", "#8fd46a",

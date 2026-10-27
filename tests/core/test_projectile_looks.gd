@@ -132,6 +132,33 @@ func test_enemy_shots_keep_their_sprite() -> void:
 	check(is_equal_approx(buffer[0], 8.0 * ManagerScript.DRAW_SCALE), "at DRAW_SCALE of its hit circle")
 
 
+func test_the_instance_colour_keeps_every_players_bytes() -> void:
+	for player in 4:
+		for zoom in [1, 4, 15, 63]:
+			var look: int = ManagerScript.pack_look(PackedInt32Array([1, 5, 12])) | (1 << 23)
+			var data: Color = ManagerScript.look_color(player, zoom, look)
+			check_equal(roundi(data.r * 255.0), player + zoom * 4, "player %d at zoom %d: red is player + zoom x 4" % [player, zoom])
+			check_equal(roundi(data.g * 255.0) | (roundi(data.b * 255.0) << 8) | (roundi(data.a * 255.0) << 16), look, "and the look's bytes, Feel's EXACT included, are as they were")
+
+
+func test_an_enemy_is_drawn_in_the_enemy_ramp() -> void:
+	var look: int = ManagerScript.pack_look(PackedInt32Array([1, 9]))
+	var data: Color = ManagerScript.look_color(EventsScript.NO_PLAYER, 2, look)
+	check_equal(roundi(data.r * 255.0), 2 * 4, "an enemy takes player 0's place in red")
+	var bits: int = roundi(data.g * 255.0) | (roundi(data.b * 255.0) << 8) | (roundi(data.a * 255.0) << 16)
+	check_equal(bits, look | ManagerScript.LOOK_ENEMY_RAMP, "with the enemy ramp's flag beside its kinds")
+	check_equal(ManagerScript.ramp_look(1, look | ManagerScript.LOOK_ENEMY_RAMP), look, "a player's shot never carries the flag")
+	check(1 << (ManagerScript.LOOK_COUNT - 2) < ManagerScript.LOOK_ENEMY_RAMP, "no particle kind reaches the flag")
+	check_equal(ManagerScript.LOOK_ENEMY_RAMP, 1 << 22, "the flag is kind 23, below Feel's EXACT (kind 24)")
+	var shader: Shader = load("res://core/projectiles/shot_core.gdshader")
+	check(shader.code.contains("const float ENEMY_RAMP = 23.0;"), "the shader reads the same flag")
+	check(shader.code.contains("const float ENEMY_PLAYER = 4.0;"), "as a fifth ramp after the players'")
+	check(shader.code.contains("vec3(0.651, 0.541, 0.165))"), "whose base is Blight ochre (#a68a2a), last in P_BASE")
+	check(shader.code.contains("beam_player < 0 ? ENEMY_PLAYER"), "and an enemy's beam uses it too")
+	check(ManagerScript.ENEMY_COLOR.is_equal_approx(Color("#a68a2a")), "the enemy colour is Blight ochre")
+	check(mgr.tint_of(EventsScript.NO_PLAYER).is_equal_approx(Color.WHITE.lerp(Color("#a68a2a"), ManagerScript.TINT_STRENGTH)), "and so is an enemy's tint")
+
+
 func test_shots_are_drawn_about_their_hit_size_in_whole_pixels() -> void:
 	check_equal(ManagerScript.look_size(5.0), 24.0, "a bolt (radius 5) has zoom 1: a 3 px core in a 10 px circle, in a quad 24 px across")
 	check_equal(ManagerScript.look_size(1.0), 24.0, "never below zoom 1")

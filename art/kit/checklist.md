@@ -8,7 +8,7 @@ One page. Full rules: docs/STYLE.md (the Style Guide page on the website shows t
 2. **Light from the top-left.** Highlights on the top and left, shadows on the bottom and right.
 3. **1 px dark outline** (`#14121f`) around every object, closed, no gaps.
 4. **At most 3 shades per material:** shadow, base, light.
-5. **Only the 40 palette colours.** No gradients, blur, antialiasing or partial transparency.
+5. **Only the 43 palette colours.** No gradients, blur, antialiasing or partial transparency.
 6. **Four players stay readable:** bold silhouettes; the player colours belong to the players only.
 
 ## Before you open the PR

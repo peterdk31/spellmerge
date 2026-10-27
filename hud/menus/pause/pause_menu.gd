@@ -11,7 +11,9 @@ extends PanelContainer
 ##   builder switches (owner, 2026-10-26), each flipping on `accept` and staying on the page:
 ##   "Builder: Radial" (the default) or "List", "Ring: Every card" or "One kind" and "Full slot: Push right"
 ##   or "Replace" (the radial builder's options); each flip sends `builder_options_changed`,
-##   which `hud/panels` applies to every player's builder. Back.
+##   which `hud/panels` applies to every player's builder. "Reload: Button" (the default) or
+##   "Next cast" (owner, 2026-10-27): where the corner panels' staff rows show a staff's delay;
+##   each flip sends `reload_style_changed`, which `hud/panels` applies to every panel. Back.
 ## - **Settings:** Gameplay, Back.
 ## - **Gameplay:** "Friendly fire: Off" (or On), which sends `friendly_fire_requested(player, on)`;
 ##   the word follows `friendly_fire_changed` from coop, never the press itself. Back.
@@ -44,10 +46,14 @@ signal closed_menu(player: int)
 ## A builder switch on the Sandbox page flipped: the radial builder or the list one, the ring by
 ## kind or every card, a full slot pushed right or replaced.
 signal builder_options_changed(radial: bool, ring_by_kind: bool, push: bool)
+## The reload switch on the Sandbox page flipped: the staff rows show the delay on the button
+## glyph, or on the next cast.
+signal reload_style_changed(on_button: bool)
 
 const BUILDER_TEXT: String = "Builder: %s"
 const RING_TEXT: String = "Ring: %s"
 const PUT_TEXT: String = "Full slot: %s"
+const RELOAD_TEXT: String = "Reload: %s"
 
 ## The player working the menu (0-3), or -1 while it is closed.
 var owner_player: int = -1
@@ -66,6 +72,8 @@ var _pages: Dictionary = {}
 var builder_radial: bool = true
 var ring_by_kind: bool = false
 var put_push: bool = true
+## The reload switch (see the top); the button glyph by default (owner, 2026-10-27).
+var reload_on_button: bool = true
 
 @onready var _title: Label = %Title
 @onready var _rows: VBoxContainer = %Rows
@@ -77,6 +85,7 @@ var put_push: bool = true
 @onready var _builder_style: Button = _add(Page.SANDBOX, "BuilderStyle", BUILDER_TEXT % "Radial")
 @onready var _ring_style: Button = _add(Page.SANDBOX, "RingStyle", RING_TEXT % "Every card")
 @onready var _put_style: Button = _add(Page.SANDBOX, "PutStyle", PUT_TEXT % "Push right")
+@onready var _reload_style: Button = _add(Page.SANDBOX, "ReloadStyle", RELOAD_TEXT % "Button")
 @onready var _sandbox_back: Button = _add(Page.SANDBOX, "SandboxBack", "Back")
 @onready var _gameplay: Button = _add(Page.SETTINGS, "Gameplay", "Gameplay")
 @onready var _settings_back: Button = _add(Page.SETTINGS, "SettingsBack", "Back")
@@ -255,6 +264,11 @@ func _on_activated(player: int, control: Control) -> void:
 	elif control == _put_style:
 		put_push = not put_push
 		_show_builder_options()
+	elif control == _reload_style:
+		reload_on_button = not reload_on_button
+		_reload_style.set_meta(BASE_TEXT_META, RELOAD_TEXT % ("Button" if reload_on_button else "Next cast"))
+		_mark_focus()
+		reload_style_changed.emit(reload_on_button)
 	elif control == _gameplay:
 		_go(Page.GAMEPLAY)
 	elif control == _friendly:

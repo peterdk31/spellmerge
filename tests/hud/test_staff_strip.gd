@@ -1,9 +1,12 @@
 extends "res://tests/support/suite.gd"
 ## Tests for the staff rows under each corner panel's mana bar (owner, 2026-10-27): a row only
 ## for a staff with cards (0, 1 and 4 rows), the cast sequence in read order with one group per
-## cast and wasted cards greyed, the next-cast mark moving after a cast, the delay bar emptying
-## and the recharge read apart from a plain delay, a long staff capped with "+N", four rows still
-## a small corner panel, and the rows hiding while their player has a menu open.
+## cast and wasted cards greyed, the next-cast mark moving after a cast, the delay emptying and
+## the recharge read apart from a plain delay, a long staff capped with "+N", four rows still a
+## small corner panel, and the rows hiding while their player has a menu open. The two ways to
+## show the delay (owner, 2026-10-27): a shade on the button glyph (the default, its next cast
+## dashed during a recharge) and a shade on the next cast (the whole cycle during a recharge),
+## and the white rim when a staff is ready again.
 ##
 ## The HUD runs on its own bus with the real `Spells` (a projectile manager and made-up carriers
 ## from `tests/support/fake_cards.gd`), stepped by hand.
@@ -148,11 +151,11 @@ func test_the_next_cast_mark_moves_after_a_cast() -> void:
 	check_equal(row.next_cast(), 0, "after the last the cycle starts over")
 
 
-func test_the_delay_bar_empties() -> void:
+func test_the_delay_empties() -> void:
 	_build(0, 0, 2)
 	var row: RowScript = _hud.get_panel(0).staff_row(0)
 	_hud.step_staffs()
-	check_equal(row.cooldown_fill(), 0.0, "a ready staff has an empty bar")
+	check_equal(row.cooldown_fill(), 0.0, "a ready staff has nothing to wait")
 	_cast(0, 0)
 	check(is_equal_approx(row.cooldown_fill(), 1.0), "full right after a cast, got %s" % row.cooldown_fill())
 	check(not row.is_recharging(), "a cast before the last is a plain delay")
@@ -171,7 +174,7 @@ func test_the_recharge_reads_apart() -> void:
 	_wait_ready(1, 3)
 	_cast(1, 3)
 	check(row.is_recharging(), "the delay after the last cast is the recharge")
-	check(is_equal_approx(row.cooldown_fill(), 1.0), "and its bar starts full")
+	check(is_equal_approx(row.cooldown_fill(), 1.0), "and it starts full")
 	_wait_ready(1, 3)
 	_hud.step_staffs()
 	check(not row.is_recharging(), "the recharge ends when the staff is ready")
@@ -235,3 +238,85 @@ func test_the_outline_comes_back_when_a_recharge_ends_on_a_sliver() -> void:
 	await process_frame
 	await process_frame
 	check_equal(row.drawn_outline(), 0, "the outline is drawn again once the staff is ready")
+
+
+## A three-cast staff's row of player 0, driven by hand (the HUD would push the real staff's
+## timing every frame), drawn twice so `_draw` and the cover's draw ran.
+func _hand_row() -> RowScript:
+	_build(0, 0, 3)
+	_hud.set_process(false)
+	return _hud.get_panel(0).staff_row(0)
+
+
+func _show(row: RowScript, cursor: int, left: float) -> void:
+	row.set_timing(cursor, left)
+	await process_frame
+	await process_frame
+
+
+func test_the_button_style_is_the_default() -> void:
+	for player in 4:
+		for staff in 4:
+			check(_hud.get_panel(player).staff_row(staff).style == RowScript.Style.BUTTON, "P%d staff %d shows the reload on its button" % [player + 1, staff + 1])
+
+
+func test_the_button_shade_pulls_back_as_the_delay_runs() -> void:
+	var row: RowScript = _hand_row()
+	await _show(row, 1, 1.0)
+	var full: Rect2 = row.drawn_shade()
+	check(full.size.y >= 7.0, "just after a cast the glyph is shaded, got %s" % full)
+	check(full.end.x <= row.cards_start(), "the shade stays on the glyph, off the cards: %s" % full)
+	await _show(row, 1, 0.5)
+	var half: Rect2 = row.drawn_shade()
+	check(half.size.y > 2.0 and half.size.y < full.size.y, "half way it covers about half, got %s" % half)
+	check_equal(half.position.y, full.position.y, "it pulls back toward the top")
+	check_equal(row.drawn_outline(), 1, "the next cast keeps its gold frame during a delay")
+	await _show(row, 1, 0.0)
+	check_equal(row.drawn_shade(), Rect2(), "no shade on a ready staff")
+
+
+func test_a_recharge_dashes_the_next_cast_on_the_button_style() -> void:
+	var row: RowScript = _hand_row()
+	await _show(row, 0, 2.0)
+	check_equal(row.drawn_dashed(), 0, "the first cast, next after the recharge, has the dashed frame")
+	check_equal(row.drawn_outline(), -1, "and no solid one")
+	check(row.drawn_shade().size.y > 0.0, "the glyph is shaded too")
+	await _show(row, 0, 0.0)
+	check_equal(row.drawn_dashed(), -1, "the dashes go when it is ready")
+	check_equal(row.drawn_outline(), 0, "and the solid frame is back")
+
+
+func test_the_next_cast_style_shades_the_next_cast() -> void:
+	var row: RowScript = _hand_row()
+	_hud.get_pause_menu().reload_style_changed.emit(false)
+	check(row.style == RowScript.Style.NEXT_CAST, "the pause menu's switch reaches the row")
+	await _show(row, 1, 1.0)
+	var start: float = row.cards_start()
+	# One card per cast: cast 1's frame starts one frame and one gap after the first.
+	var second: float = start + RowScript.ICON_STEP + 1.0 + RowScript.CAST_GAP
+	var shade: Rect2 = row.drawn_shade()
+	check(shade.position.x > second and shade.end.x < second + RowScript.ICON_STEP + 1.0, "the shade is inside the next cast's frame, got %s from %s" % [shade, second])
+	check(shade.size.x >= RowScript.ICON - 1.0, "and covers it just after a cast")
+	check((row.get_node("Glyph") as CanvasItem).modulate != Color.WHITE, "the glyph greys while the staff waits")
+	await _show(row, 1, 0.5)
+	check(row.drawn_shade().size.x < shade.size.x and is_equal_approx(row.drawn_shade().end.x, shade.end.x), "it pulls back from the left, got %s" % row.drawn_shade())
+	await _show(row, 0, 2.0)
+	var cycle: Rect2 = row.drawn_shade()
+	check(cycle.position.x < second and cycle.end.x > second + RowScript.ICON_STEP, "a recharge shades the whole cycle, got %s" % cycle)
+	check(row.drawn_outline() == -1 and row.drawn_dashed() == -1, "with no gold frame")
+	await _show(row, 0, 0.0)
+	check_equal(row.drawn_shade(), Rect2(), "no shade on a ready staff")
+	check_equal((row.get_node("Glyph") as CanvasItem).modulate, Color.WHITE, "and the glyph is lit again")
+	_hud.get_pause_menu().reload_style_changed.emit(true)
+	check(row.style == RowScript.Style.BUTTON, "and the switch goes back")
+
+
+func test_a_rim_marks_the_staff_ready_for_a_few_frames() -> void:
+	var row: RowScript = _hand_row()
+	row.set_timing(1, 0.3)
+	check(not row.is_rimmed(), "no rim while waiting")
+	row.set_timing(1, 0.0)
+	check(row.is_rimmed(), "the rim shows when the staff is ready")
+	for i in RowScript.RIM_FRAMES:
+		row.set_timing(1, 0.0)
+	check(not row.is_rimmed(), "and goes after a few frames")

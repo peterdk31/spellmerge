@@ -58,6 +58,9 @@ const BEAM_TICK: float = 0.15
 ## radians a second bend it 43 degrees), and at most INSTANT_HOMING_MAX degrees.
 const INSTANT_HOMING_SECONDS: float = 0.25
 const INSTANT_HOMING_MAX: float = 90.0
+## A homing teleport whose target is within its distance lands this far outside the target's
+## hit circle (a wizard's body radius), not on it.
+const LAND_CLEARANCE: float = 6.0
 ## The most targets a homing beam bends on to, one after another: with pierce it hits one, then
 ## bends on toward another from there (as a homing shot picks a new target after a hit).
 const BEAM_LEGS: int = 8

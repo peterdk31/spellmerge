@@ -149,6 +149,9 @@ var _move_heading: PackedVector2Array = PackedVector2Array([Vector2.RIGHT, Vecto
 var _dash_homing: Array[Homing] = []
 ## The homing of the teleport being cast (it is over at once), and one that never homes.
 var _teleport_homing: Homing = Homing.new()
+## Per player, the target their last homing teleport landed at (0 for none): the next one picks
+## another while it can, as a homing shot does after a hit, so hops go from enemy to enemy.
+var _landed_at: PackedInt64Array = PackedInt64Array([0, 0, 0, 0])
 var _no_homing: Homing = Homing.new()
 ## tag -> entities (decoys, familiars) alive that came from it; each counts as a live shot
 var _entities: Dictionary = {}
@@ -871,15 +874,26 @@ func _launch(spell: CompiledSpell, tag: int, player: int, origin: Vector2, direc
 ## answers with `caster_move_finished` where it stops, staffs A6a; a teleport blinks along the
 ## aim, cut short at the first wall). A shot that cast it dashes or blinks along `direction`
 ## itself, and its end point comes when the move is over. Homing turns a dash as it goes (the
-## wizard's through `move_homing`, a shot's in `move_shot`) and bends a teleport's way at once.
+## wizard's through `move_homing`, a shot's in `move_shot`) and bends a teleport's way at once,
+## landing it at its target's edge when that is nearer than its distance. A teleport's payload
+## is cast by the wizard where it lands, so teleports in payloads hop on from there.
 ## With nothing to move (a payload whose shot is gone) it does nothing and returns 0.
 func _move_caster(spell: CompiledSpell, tag: int, player: int, origin: Vector2, direction: Vector2) -> int:
 	var dash: bool = spell.motion == FormBase.Motion.DASH
+	var distance: float = move_distance(spell.ray_length, spell.speed, spell.lifetime)
 	if not dash:
-		# A teleport is over at once: like a beam, it bends its way toward a target.
+		# A teleport is over at once: like a beam, it bends its way toward a target, and like a
+		# beam it ends there when the target is within its distance: at the target's edge.
 		_teleport_homing.start(spell, hash(Vector3i(player, tag, roundi(_clock * 1000.0))))
-		direction = _teleport_homing.aim(projectiles, player, origin, direction)
-	var offset: Vector2 = direction * move_distance(spell.ray_length, spell.speed, spell.lifetime)
+		_teleport_homing.avoid = _landed_at[player] if player >= 0 and player < _landed_at.size() else 0
+		var goal: Vector2 = _teleport_homing.point(projectiles, player, origin, direction)
+		if goal.is_finite() and not goal.is_equal_approx(origin):
+			direction = origin.direction_to(goal)
+			var gap: float = origin.distance_to(goal) - _teleport_homing.target_radius - SpellLimits.LAND_CLEARANCE
+			if gap <= distance and player >= 0 and player < _landed_at.size():
+				_landed_at[player] = _teleport_homing.keep
+			distance = minf(distance, maxf(gap, 0.0))
+	var offset: Vector2 = direction * distance
 	var seconds: float = move_seconds(spell.ray_length, spell.speed, spell.lifetime) if dash else 0.0
 	if _caster == CASTER_WIZARD:
 		if events != null:

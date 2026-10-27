@@ -1541,6 +1541,7 @@ static func turned_toward(velocity: Vector2, want: Vector2, most: float) -> Vect
 ## says which, to hand back as `keep` next step. Allocation-free.
 func home_velocity(player: int, from: Vector2, velocity: Vector2, turn_rate: float, within: float, delta: float, keep: int, pick_seed: int, layers: int = LAYER_ENEMY) -> Vector2:
 	homing_target = 0
+	homing_target_radius = 0.0
 	if not (turn_rate > 0.0) or not velocity.is_finite() or velocity.is_zero_approx():
 		return velocity
 	var goal: Vector2 = homing_point(player, from, velocity, PI, layers, within, keep, pick_seed)
@@ -1552,7 +1553,7 @@ func home_velocity(player: int, from: Vector2, velocity: Vector2, turn_rate: flo
 ## Where a homing shot steers: the target it kept, while it may still home on it, or else a
 ## new one picked at random (`_home_pick`), or INF. Charges the work budget.
 func _homing_point(slot: int) -> Vector2:
-	var t: int = _home_pick(_player[slot], _pos[slot], Vector2.RIGHT, PI, _layers[slot], _home_range[slot], _home_target[slot], int(_seq[slot]), slot)
+	var t: int = _home_pick(_player[slot], _pos[slot], Vector2.RIGHT, PI, _layers[slot], _home_range[slot], _home_target[slot], int(_seq[slot]), slot, 0)
 	_home_target[slot] = _target_id[t] if t >= 0 else 0
 	return _target_pos[t] if t >= 0 else Vector2.INF
 
@@ -1570,27 +1571,31 @@ func homing_aim(player: int, origin: Vector2, direction: Vector2, max_angle: flo
 ## way). Targets owned by `player` and wizards (LAYER_PLAYER) are skipped. The target whose
 ## instance id is `keep` stays the pick while it qualifies; otherwise one is picked at random
 ## among those that do, from `pick_seed` (the same seed and targets give the same pick), so a
-## group of shots spreads over a group of enemies. `homing_target` is left at the pick's id (0 for
-## none), for the caller to keep. Allocation-free.
-func homing_point(player: int, origin: Vector2, direction: Vector2, max_angle: float, layers: int, within: float, keep: int, pick_seed: int) -> Vector2:
+## group of shots spreads over a group of enemies. The target whose id is `avoid` (the one it
+## just reached) is picked only when no other qualifies. `homing_target` is left at the pick's
+## id (0 for none), for the caller to keep. Allocation-free.
+func homing_point(player: int, origin: Vector2, direction: Vector2, max_angle: float, layers: int, within: float, keep: int, pick_seed: int, avoid: int = 0) -> Vector2:
 	homing_target = 0
+	homing_target_radius = 0.0
 	if not origin.is_finite() or not direction.is_finite() or direction.is_zero_approx() or not is_finite(max_angle) or not is_finite(within) or within <= 0.0:
 		return Vector2.INF
 	_query_ready()
-	var t: int = _home_pick(player, origin, direction, max_angle, layers, minf(within, RAY_MAX_LENGTH), keep, pick_seed, -1)
+	var t: int = _home_pick(player, origin, direction, max_angle, layers, minf(within, RAY_MAX_LENGTH), keep, pick_seed, -1, avoid)
 	if t < 0:
 		return Vector2.INF
 	homing_target = _target_id[t]
+	homing_target_radius = _target_radius[t]
 	return _target_pos[t]
 
 
 ## The one homing search: the target (an index, or -1) `homing_point` describes. For a shot
 ## (`slot` 0 or more) it also skips the targets the shot just hit and charges the work budget.
-func _home_pick(player: int, origin: Vector2, direction: Vector2, max_angle: float, layers: int, within: float, keep: int, pick_seed: int, slot: int) -> int:
+func _home_pick(player: int, origin: Vector2, direction: Vector2, max_angle: float, layers: int, within: float, keep: int, pick_seed: int, slot: int, avoid: int) -> int:
 	# Homing never picks a wizard, even with friendly fire on.
 	layers &= ~LAYER_PLAYER
 	var any_way: bool = max_angle >= PI
 	var pick: int = -1
+	var avoided: int = -1
 	var seen: int = 0
 	var cells: Vector4i = _query_cells(origin, within)
 	for y in range(cells.y, cells.w + 1):
@@ -1605,12 +1610,16 @@ func _home_pick(player: int, origin: Vector2, direction: Vector2, max_angle: flo
 					if to_target.length_squared() <= reach * reach and (any_way or (not to_target.is_zero_approx() and absf(direction.angle_to(to_target)) <= max_angle)):
 						if keep != 0 and _target_id[t] == keep:
 							return t
+						if avoid != 0 and _target_id[t] == avoid:
+							avoided = t
+							t = _target_next[t]
+							continue
 						# Reservoir pick: the n-th target seen replaces the pick one time in n.
 						seen += 1
 						if posmod(hash(Vector2i(pick_seed, seen)), seen) == 0:
 							pick = t
 				t = _target_next[t]
-	return pick
+	return pick if pick >= 0 else avoided
 
 
 ## An instant beam from `origin` along `direction` for up to `length` pixels, fired by
@@ -2149,8 +2158,10 @@ func target_owner_of(node: Node) -> int:
 
 
 ## The instance id of the target the last `homing_point`, `homing_aim` or `home_velocity`
-## picked, 0 for none: hand it back as `keep` so a homing thing stays on one target.
+## picked, 0 for none: hand it back as `keep` so a homing thing stays on one target. And that
+## target's hit radius (0 for none), for something that stops at its edge (a teleport).
 var homing_target: int = 0
+var homing_target_radius: float = 0.0
 
 ## Where the target `nearest_target` last returned is (its hit circle's centre).
 var nearest_point: Vector2 = Vector2.INF

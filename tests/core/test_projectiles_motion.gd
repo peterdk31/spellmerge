@@ -377,6 +377,9 @@ func _test_homing_picks_at_random_and_keeps_its_pick() -> void:
 		_check(_mgr.homing_target == kept, "a kept target stays the pick while it is in reach")
 	_mgr.homing_point(0, centre, Vector2.RIGHT, PI, ManagerScript.LAYER_ENEMY, HOMING_REACH, far.get_instance_id(), 3)
 	_check(ids.has(_mgr.homing_target), "a kept target out of reach gives way to a new pick")
+	for pick_seed in 32:
+		_mgr.homing_point(0, centre, Vector2.RIGHT, PI, ManagerScript.LAYER_ENEMY, HOMING_REACH, 0, pick_seed, ids[0])
+		_check(_mgr.homing_target != ids[0] and ids.has(_mgr.homing_target), "an avoided target is not picked while others are in reach")
 	# A fan of homing shots from one point spreads over the group instead of all taking one.
 	var slots: Array[int] = []
 	for i in 8:

@@ -180,7 +180,7 @@ func test_wall_sparks_are_limited_and_end() -> void:
 		bus.projectile_impact.emit(i % 4, null, Vector2(float(i), 0.0), Vector2.UP)
 		bus.projectile_impact.emit(-1, null, Vector2(float(i), 0.0), Vector2.UP)
 	check(feel.live_flashes() <= FeelScript.SPARK_SLOTS, "no more sparks than slots")
-	check(feel.live_effects() <= FeelScript.EFFECT_SLOTS, "no more effects than slots")
+	check(feel.live_effects() <= feel.effect_slots, "no more effects than slots")
 	for i in 4:
 		feel.step(STEP)
 	check_equal(feel.live_flashes(), 0, "the sparks end")

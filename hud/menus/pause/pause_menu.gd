@@ -14,9 +14,13 @@ extends PanelContainer
 ##   which `hud/panels` applies to every player's builder. "Reload: Button" (the default) or
 ##   "Next cast" (owner, 2026-10-27): where the corner panels' staff rows show a staff's delay;
 ##   each flip sends `reload_style_changed`, which `hud/panels` applies to every panel. Back.
-## - **Settings:** Gameplay, "Fullscreen: Off" (or On), Back. The switch asks `Display` (core) to
-##   fill the screen or not and stays on the page; its word follows the window itself, read each
-##   time the page is shown, so leaving fullscreen with the browser's Escape shows Off again.
+## - **Settings:** Gameplay, "Fullscreen: Off" (or On), "Effect slots: 256", Back. The switch asks
+##   `Display` (core) to fill the screen or not and stays on the page; its word follows the window
+##   itself, read each time the page is shown, so leaving fullscreen with the browser's Escape shows
+##   Off again. "Effect slots" is a slider (the owner, 2026-10-27): left and right move it a step
+##   (`EffectSlots` in core/settings: its STEP, from MIN to MAX), `accept` a step up (from the
+##   top back to the bottom), up and down leave it; each move sends `effect_slots_changed`, which
+##   feel applies. It is kept in memory until core/save exists, as friendly fire is.
 ## - **Gameplay:** "Friendly fire: Off" (or On), which sends `friendly_fire_requested(player, on)`;
 ##   the word follows `friendly_fire_changed` from coop, never the press itself. Back.
 ##
@@ -57,6 +61,9 @@ const RING_TEXT: String = "Ring: %s"
 const PUT_TEXT: String = "Full slot: %s"
 const RELOAD_TEXT: String = "Reload: %s"
 const FULLSCREEN_TEXT: String = "Fullscreen: %s"
+const EFFECT_SLOTS_TEXT: String = "Effect slots: %d"
+## The slider bar beside the words: this wide, at the right of the row.
+const SLIDER_WIDTH: float = 64.0
 
 ## The player working the menu (0-3), or -1 while it is closed.
 var owner_player: int = -1
@@ -77,6 +84,8 @@ var ring_by_kind: bool = false
 var put_push: bool = true
 ## The reload switch (see the top); the button glyph by default (owner, 2026-10-27).
 var reload_on_button: bool = true
+## The "Effect slots" setting (see the top).
+var effect_slots: int = EffectSlots.DEFAULT
 ## The window service (`core/display`, the `Display` autoload); tests may set their own first.
 var display: Node = null
 
@@ -94,6 +103,8 @@ var display: Node = null
 @onready var _sandbox_back: Button = _add(Page.SANDBOX, "SandboxBack", "Back")
 @onready var _gameplay: Button = _add(Page.SETTINGS, "Gameplay", "Gameplay")
 @onready var _fullscreen: Button = _add(Page.SETTINGS, "Fullscreen", FULLSCREEN_TEXT % "Off")
+@onready var _effects: Button = _add(Page.SETTINGS, "EffectSlots", EFFECT_SLOTS_TEXT % EffectSlots.DEFAULT)
+@onready var _effects_bar: HSlider = _add_slider(_effects)
 @onready var _settings_back: Button = _add(Page.SETTINGS, "SettingsBack", "Back")
 @onready var _friendly: Button = _add(Page.GAMEPLAY, "FriendlyFire", FRIENDLY_FIRE_TEXT % "Off")
 @onready var _gameplay_back: Button = _add(Page.GAMEPLAY, "GameplayBack", "Back")
@@ -142,6 +153,8 @@ func open_menu(player: int) -> bool:
 		owner_player = -1
 		visible = false
 		return false
+	# Left and right work the slider; everywhere else they move as usual.
+	_ui_focus.set_navigator(player, _navigate)
 	_set_paused(true)
 	_focus_first()
 	return true
@@ -181,6 +194,51 @@ func _add(on_page: Page, node_name: String, text: String) -> Button:
 		_pages[on_page] = []
 	(_pages[on_page] as Array).append(made)
 	return made
+
+
+## A slider bar drawn in `row` (at its right), for show only: the row works it (see the top).
+func _add_slider(row: Button) -> HSlider:
+	var bar := HSlider.new()
+	bar.name = "Bar"
+	bar.min_value = EffectSlots.MIN
+	bar.max_value = EffectSlots.MAX
+	bar.step = EffectSlots.STEP
+	bar.value = effect_slots
+	bar.editable = false
+	bar.focus_mode = Control.FOCUS_NONE
+	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bar.set_anchors_and_offsets_preset(Control.PRESET_RIGHT_WIDE)
+	bar.offset_left = -SLIDER_WIDTH - 4.0
+	bar.offset_right = -4.0
+	row.add_child(bar)
+	row.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	# Wide enough for the longest words (focused, at the top) and the bar beside them.
+	var font: Font = row.get_theme_font(&"font")
+	var longest: float = font.get_string_size(FOCUS_MARK + EFFECT_SLOTS_TEXT % EffectSlots.MAX, HORIZONTAL_ALIGNMENT_LEFT, -1, row.get_theme_font_size(&"font_size")).x
+	row.custom_minimum_size.x = longest + SLIDER_WIDTH + 24.0
+	return bar
+
+
+## The menu's navigator for UIFocus: left and right on the slider move it and keep the focus
+## there; any other move goes on as usual (null).
+func _navigate(control: Control, direction: Vector2i) -> Control:
+	if control == _effects and direction.x != 0:
+		_set_effect_slots(effect_slots + direction.x * EffectSlots.STEP)
+		return _effects
+	return null
+
+
+## Move the slider to `slots` (inside its range), show it and tell feel.
+func _set_effect_slots(slots: int) -> void:
+	var next: int = clampi(slots, EffectSlots.MIN, EffectSlots.MAX)
+	if next == effect_slots:
+		return
+	effect_slots = next
+	_effects.set_meta(BASE_TEXT_META, EFFECT_SLOTS_TEXT % effect_slots)
+	_effects_bar.value = effect_slots
+	_mark_focus()
+	if _events != null:
+		_events.effect_slots_changed.emit(effect_slots)
 
 
 func _show_page(next: Page) -> void:
@@ -285,6 +343,8 @@ func _on_activated(player: int, control: Control) -> void:
 		if display != null:
 			display.call("toggle_fullscreen")
 		_show_fullscreen()
+	elif control == _effects:
+		_set_effect_slots(EffectSlots.MIN if effect_slots >= EffectSlots.MAX else effect_slots + EffectSlots.STEP)
 	elif control == _friendly:
 		if _events != null:
 			_events.friendly_fire_requested.emit(player, not _friendly_fire)

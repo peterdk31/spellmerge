@@ -34,7 +34,8 @@ extends Node
 ## for a carrier whose cast look has one), and kicks the camera a little against the aim.
 ##
 ## Effects (the glow look, 2026-10-27): the flares of player shots are drawn by the shots' own
-## shader (`shot_core.gdshader`, kinds KIND_BURST to KIND_CAST) in one MultiMesh of EFFECT_SLOTS,
+## shader (`shot_core.gdshader`, kinds KIND_BURST to KIND_CAST) in one MultiMesh of `effect_slots`
+## (a setting: Settings, "Effect slots", through `effect_slots_changed`),
 ## each with the core colour and look of the shot it comes from (`impact_core`, `impact_look` of
 ## the projectile manager), so a frost bolt lands in frost flecks and a lightning one in sparks,
 ## all glowing. A new effect takes the oldest slot when they are all busy. On
@@ -124,17 +125,14 @@ const SPRAY_MAX_SIZE: float = 1.6
 ## Death animations at once; past that the oldest slot is taken over.
 const GHOST_SLOTS: int = 8
 ## The effects drawn with the shot shader (see "Effects" above): the kinds it knows (K_* in
-## shot_core.gdshader), how many can show at once, their seconds and their draw layer (with the
-## shots, above the room and the wizards). 256 effects of 24 x 24 px are under 1% of what the
-## shots themselves draw at their cap, and hold about 850 bursts a second (four players with
-## split and multicast builds) before the oldest is taken.
+## shot_core.gdshader), their seconds and their draw layer (with the shots, above the room and
+## the wizards). How many can show at once is a setting (`EffectSlots` in core/settings).
 const KIND_BURST: int = 4
 const KIND_RING_OUT: int = 5
 const KIND_RING_IN: int = 6
 const KIND_RUNE_BURST: int = 7
 const KIND_CAST: int = 8
 const KIND_DASH: int = 9
-const EFFECT_SLOTS: int = 256
 const BURST_SECONDS: float = 0.3
 const RING_SECONDS: float = 0.22
 const RUNE_BURST_SECONDS: float = 0.45
@@ -294,6 +292,9 @@ var _effect_age: PackedFloat32Array = PackedFloat32Array()
 var _effect_seconds: PackedFloat32Array = PackedFloat32Array()
 var _effect_length: PackedFloat32Array = PackedFloat32Array()
 var _next_effect: int = 0
+## How many effects can show at once (`EffectSlots.DEFAULT` until the setting changes it; see
+## `set_effect_slots`). Read only.
+var effect_slots: int = EffectSlots.DEFAULT
 var _reaction_heard: Dictionary = {}
 ## The reaction id each name label shows.
 var _label_id: Array[StringName] = []
@@ -474,6 +475,7 @@ func _ready() -> void:
 	events.reaction_triggered.connect(_on_reaction_triggered)
 	events.discharge_arc.connect(_on_discharge_arc)
 	events.status_applied.connect(_on_status_applied)
+	events.effect_slots_changed.connect(_on_effect_slots_changed)
 	if combat == null:
 		combat = get_node_or_null("/root/Combat")
 	if projectiles == null:
@@ -1131,7 +1133,7 @@ func _show_impact(player: int, position: Vector2, direction: Vector2) -> void:
 		show_effect(KIND_RING_OUT, position, direction, core, player, 0, 1, RING_SECONDS)
 
 
-## Make the effect batch (see "Effects" above): one MultiMesh of EFFECT_SLOTS quads in world
+## Make the effect batch (see "Effects" above): one MultiMesh of `effect_slots` quads in world
 ## space, drawn by the shot shader, and the arrays behind it.
 func _make_effects() -> void:
 	_effect_node = MultiMeshInstance2D.new()
@@ -1142,7 +1144,6 @@ func _make_effects() -> void:
 	multimesh.use_colors = true
 	multimesh.use_custom_data = true
 	multimesh.mesh = quad
-	multimesh.instance_count = EFFECT_SLOTS
 	multimesh.visible_instance_count = 0
 	# Effects show anywhere in the world; there is no room to fit a box to.
 	multimesh.custom_aabb = AABB(Vector3(-100000.0, -100000.0, -1.0), Vector3(200000.0, 200000.0, 2.0))
@@ -1153,17 +1154,43 @@ func _make_effects() -> void:
 	_effect_node.top_level = true
 	_effect_node.z_index = EFFECT_Z
 	add_child(_effect_node)
-	_effect_buffer.resize(EFFECT_SLOTS * EFFECT_STRIDE)
-	_effect_kind.resize(EFFECT_SLOTS)
-	_effect_at.resize(EFFECT_SLOTS)
-	_effect_dir.resize(EFFECT_SLOTS)
-	_effect_core.resize(EFFECT_SLOTS)
-	_effect_player.resize(EFFECT_SLOTS)
-	_effect_zoom.resize(EFFECT_SLOTS)
-	_effect_look.resize(EFFECT_SLOTS)
-	_effect_age.resize(EFFECT_SLOTS)
-	_effect_seconds.resize(EFFECT_SLOTS)
-	_effect_length.resize(EFFECT_SLOTS)
+	_size_effects(effect_slots)
+
+
+## Make room for `slots` effects: the MultiMesh, its buffer and the arrays behind it. The
+## effects showing end (a setting changed in a menu: nobody misses a tenth of a second of sparks).
+func _size_effects(slots: int) -> void:
+	effect_slots = slots
+	_effect_node.multimesh.visible_instance_count = 0
+	_effect_node.multimesh.instance_count = slots
+	_effect_buffer.resize(slots * EFFECT_STRIDE)
+	_effect_kind.resize(slots)
+	_effect_at.resize(slots)
+	_effect_dir.resize(slots)
+	_effect_core.resize(slots)
+	_effect_player.resize(slots)
+	_effect_zoom.resize(slots)
+	_effect_look.resize(slots)
+	_effect_age.resize(slots)
+	_effect_seconds.resize(slots)
+	_effect_seconds.fill(0.0)
+	_effect_length.resize(slots)
+	_next_effect = 0
+
+
+## The setting: how many effects can show at once, snapped by `EffectSlots.snap`. Returns the
+## number taken.
+func set_effect_slots(slots: int) -> int:
+	var snapped: int = EffectSlots.snap(slots)
+	if _effect_node == null:
+		effect_slots = snapped
+	elif snapped != effect_slots:
+		_size_effects(snapped)
+	return effect_slots
+
+
+func _on_effect_slots_changed(slots: int) -> void:
+	set_effect_slots(slots)
 
 
 ## Show an effect of `kind` (KIND_BURST to KIND_CAST) at `at`, aimed along `dir`, in the ramp of
@@ -1174,7 +1201,7 @@ func show_effect(kind: int, at: Vector2, dir: Vector2, core: Color, player: int,
 	if _effect_node == null or not at.is_finite() or player < 0 or player >= PLAYER_COLORS.size():
 		return
 	var slot: int = _next_effect
-	_next_effect = (_next_effect + 1) % EFFECT_SLOTS
+	_next_effect = (_next_effect + 1) % effect_slots
 	_effect_kind[slot] = kind
 	_effect_at[slot] = at.round()
 	_effect_dir[slot] = dir.normalized() if dir != Vector2.ZERO else Vector2.RIGHT
@@ -1197,8 +1224,8 @@ func _step_effects(real_delta: float) -> void:
 		return
 	(_effect_node.material as ShaderMaterial).set_shader_parameter(&"sim_time", _clock)
 	var out: int = 0
-	for n in EFFECT_SLOTS:
-		var slot: int = (_next_effect + n) % EFFECT_SLOTS
+	for n in effect_slots:
+		var slot: int = (_next_effect + n) % effect_slots
 		if _effect_seconds[slot] <= 0.0:
 			continue
 		_effect_age[slot] += real_delta
@@ -1243,7 +1270,7 @@ func _step_effects(real_delta: float) -> void:
 ## How many effects are showing (for tests and the sheets).
 func live_effects() -> int:
 	var live: int = 0
-	for slot in EFFECT_SLOTS:
+	for slot in effect_slots:
 		if _effect_seconds[slot] > 0.0:
 			live += 1
 	return live
@@ -1252,7 +1279,7 @@ func live_effects() -> int:
 ## How many live effects are of `kind`, and (with `player` 0-3) of that player.
 func effects_of(kind: int, player: int = -1) -> int:
 	var found: int = 0
-	for slot in EFFECT_SLOTS:
+	for slot in effect_slots:
 		if _effect_seconds[slot] > 0.0 and _effect_kind[slot] == kind and (player < 0 or _effect_player[slot] == player):
 			found += 1
 	return found
@@ -1260,8 +1287,8 @@ func effects_of(kind: int, player: int = -1) -> int:
 
 ## The core colour and look of the newest live effect of `kind` (for tests): [core, look].
 func effect_dress(kind: int) -> Array:
-	for n in EFFECT_SLOTS:
-		var slot: int = (_next_effect - 1 - n + EFFECT_SLOTS) % EFFECT_SLOTS
+	for n in effect_slots:
+		var slot: int = (_next_effect - 1 - n + effect_slots) % effect_slots
 		if _effect_seconds[slot] > 0.0 and _effect_kind[slot] == kind:
 			return [_effect_core[slot], _effect_look[slot]]
 	return []

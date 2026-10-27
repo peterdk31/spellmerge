@@ -20,6 +20,7 @@ const EVENTS: Dictionary = {
 	&"pause_requested": [["player", TYPE_INT]],
 	&"sandbox_requested": [["player", TYPE_INT]],
 	&"friendly_fire_requested": [["player", TYPE_INT], ["on", TYPE_BOOL]],
+	&"effect_slots_changed": [["slots", TYPE_INT]],
 	&"sandbox_action_requested": [["player", TYPE_INT], ["action", TYPE_STRING_NAME]],
 	# Devices.
 	&"device_joined": [["player", TYPE_INT], ["device", TYPE_INT]],
@@ -90,7 +91,7 @@ const EVENTS: Dictionary = {
 ## Events about the run, a room or the account, with no player index.
 const NOT_PER_PLAYER: Array[StringName] = [
 	&"run_started", &"run_ended", &"room_entered", &"room_cleared", &"wave_started",
-	&"sandbox_changed", &"friendly_fire_changed", &"build_break_started", &"difficulty_changed", &"reward_rolled", &"unlock_gained", &"currency_changed",
+	&"sandbox_changed", &"friendly_fire_changed", &"effect_slots_changed", &"build_break_started", &"difficulty_changed", &"reward_rolled", &"unlock_gained", &"currency_changed",
 ]
 
 var _failures: Array[String] = []

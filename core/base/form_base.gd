@@ -47,7 +47,7 @@ enum Motion {
 @export var cooldown: float = 0.5
 ## Pixels per second. Ignored by STILL and RAY.
 @export var speed: float = 0.0
-## Seconds a shot lives. For RAY, how long the drawn beam stays on screen.
+## Seconds a shot lives. For RAY, how long the beam stays on (it hits every `SpellLimits.BEAM_TICK`).
 @export var lifetime: float = 1.0
 ## Hit circle of one shot in pixels. For RAY, the half-width of the beam.
 @export var radius: float = 4.0
@@ -60,7 +60,8 @@ enum Motion {
 @export var pierce: int = 0
 ## ORBIT only: distance from the caster in pixels.
 @export var orbit_radius: float = 0.0
-## RAY only: how far the ray reaches in pixels.
+## RAY, FISSURE and RAIN: how far it reaches in pixels. DASH and TELEPORT: how far the caster
+## moves (fixed: speed only changes how long a dash takes).
 @export var ray_length: float = 0.0
 ## How the wizard's cast flash looks for this carrier (staffs B6b; `gameplay/feel` reads it, and
 ## an empty one gets the plain muzzle flash). Keys, all optional: `seconds`, `size`, `stretch`

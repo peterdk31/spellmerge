@@ -1,0 +1,12 @@
+{
+	"id": "short_delay_bolts",
+	"name": "Short delay bolts",
+	"does": "Two bolts close together: with Short Delay the second cast, at 0.25 s, is ready in time.",
+	"casts": [
+		{"staff": 0, "cards": ["short_delay", "bolt"]},
+		{"staff": 0, "cards": ["short_delay", "bolt"], "at": 0.25}
+	],
+	"imps": [[80, 0]],
+	"seconds": 1.5,
+	"checks": [{"kind": "damaged", "imps": [0]}]
+}

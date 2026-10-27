@@ -43,6 +43,10 @@ A card is a `.tres` on one of five classes in `core/base/`, in its own folder un
 
 **Every card has an end point:** where its effects happen once it is done. A shot's end point is where it hits or expires; a dash's, teleport's and hook's is where the wizard arrives; a decoy's where it dies; the caster's is the caster. `blast`, `on expire` and the look of an ending all use it.
 
+**Who casts a card** (owner, 2026-10-27: "this should not be a special case, but follow the core spell logic"): a staff's own cast is cast by the wizard; a payload is cast by the shot whose trigger fired it, while that shot still flies, and otherwise by the point it fired from (a shot spent on its hit, an expiry, a beam, a rain, an entity); an `on cast` payload by its carrier's caster. Every card that names the caster follows this one rule: dash, teleport, hook, swap and recoil move it (a payload dash makes its shot lunge forward; with only a point there is nothing to move), and orbit, familiar and a returning shot circle it or come back to it (`timer · bolt · orbit` is a ring round the flying bolt, `on expire · bolt · orbit` one round where it ended).
+
+**Live beams** (owner, 2026-10-27): a beam is a carrier that lives its `lifetime` like a shot (0.3 s, one cast cycle of the starter staff, so held fire keeps a beam on with no gap; `hold · beam` stays on until switched off). It follows its caster while it lives (the wizard's aim, or the shot that fired it), hits what is on it at once and then every `SpellLimits.BEAM_TICK` (0.15 s), and a homing beam bends along a curve onto the nearest target within 45 degrees of its aim. Its `blast` and `on expire` happen where it got when its life is over.
+
 **Two carriers carry a payload of their own:** `rain` and `familiar` read the group after them as their payload, the way a trigger does (rain drops it on the aim point; familiar casts it). If one of them also has a trigger, the carrier's own payload is read first, then the trigger's.
 
 ### What each new card does
@@ -53,8 +57,8 @@ Numbers are first guesses for the card's own task to set. Examples are written i
 
 | Card | Does | Two interactions |
 | --- | --- | --- |
-| dash | The wizard dashes along the move direction (today's dodge, **without** the invulnerable window). End point: where the dash ends | `shield · dash` blocks one hit during the dash; `blast · dash` explodes at the end |
-| teleport | Blink along the aim, stopping before walls. End point: the arrival | `blast · teleport` arrives with an explosion; `on expire · teleport · nova` rings out on arrival |
+| dash (Short Dash), medium dash, long dash | The wizard dashes along the move direction (today's dodge, **without** the invulnerable window) a fixed 48, 80 or 128 px (`ray_length`); its speed only sets how long that takes, so `faster` arrives sooner, never farther (owner, 2026-10-27). 2 s delay each. End point: where the dash ends | `shield · dash` blocks one hit during the dash; `blast · dash` explodes at the end |
+| teleport | Blink a fixed `ray_length` along the aim, stopping before walls. End point: the arrival | `blast · teleport` arrives with an explosion; `on expire · teleport · nova` rings out on arrival |
 | hook | A shot that pulls the caster to where it hits | `shield · hook` is a safe gap-closer; `blast · hook` charges in with a bang |
 | swap | A shot that trades places with the target it hits | an escape through an enemy; `frost · swap` leaves a chilled target where you stood |
 | boomerang | Flies out and comes back to the caster | `blast · boomerang` explodes on you unless you move; `pierce · boomerang` hits twice |
@@ -85,6 +89,7 @@ Numbers are first guesses for the card's own task to set. Examples are written i
 | mirror | Also fires the carrier backwards | guards your back; `mirror · recoil · bolt` cancels the push |
 | growth | Grows and gets stronger the further it flies | rewards range; `growth · linger · bolt` is a huge slow orb |
 | relay | When the shot passes through a teammate it takes on the infusions of that player's last cast | your bolt plus their frost, with nobody waiting (docs/PLAN.md, cross-player linking) |
+| short delay | Halves the carrier's delay for 25 % more mana (owner, 2026-10-27; named after the builder's "Delay", so it is not mistaken for `faster`) | `short delay · dash` dashes again sooner; `short delay · beam` keeps a beam on with a slower staff |
 
 **Infusion:** mend: hits heal wizards (whatever the friendly-fire setting) and do almost nothing to enemies. `mend · blast` is a self-heal burst; `mend · chain · bolt` jumps a heal through the party.
 
@@ -233,7 +238,7 @@ Added in part A3, so later parts in different areas don't all edit `core/events/
 | `caster_move_finished(player, mode: StringName, position: Vector2, tag: int)` | player | spells (the end point of dash, teleport, hook) |
 | `target_move_requested(target: Node, to: Vector2)` (swap) | spells | ai |
 | `area_hit_requested(player, position: Vector2, radius: float, tag: int)` | spells | combat |
-| `entity_spawn_requested(player, kind: StringName, position: Vector2, seconds: float, tag: int)` (decoy, familiar) | spells | ai |
+| `entity_spawn_requested(player, kind: StringName, position: Vector2, seconds: float, tag: int, caster: int)` (decoy, familiar; `caster` -1 the wizard, a projectile slot, or -2 the point) | spells | ai |
 | `entity_end_requested(player, tag: int)` (a `hold` switched off; added in B5) | spells | ai |
 | `entity_ended(player, kind: StringName, position: Vector2, tag: int)` | ai | spells (a decoy's end point) |
 | `familiar_cast_requested(player, position: Vector2, direction: Vector2, tag: int)` | ai | spells |

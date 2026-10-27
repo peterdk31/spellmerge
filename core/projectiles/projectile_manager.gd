@@ -91,7 +91,7 @@ extends Node2D
 ## step (a query after `add_target` and before the next step refreshes the grid
 ## first), so inside a hit handler they are exact for that step.
 ##
-## Orbit: `spawn_orbit` starts a shot that circles its owner. The owner's position comes
+## Orbit: `spawn_orbit` starts a shot that circles its owner (or its caster, see Casters). The owner's position comes
 ## from a per-player anchor that `set_anchor(player, position)` is given every physics step
 ## (by `player`), so the manager never looks up a node. The shot's place is the anchor plus
 ## a turning offset, so it follows a walking wizard; its velocity is the tangent, for the
@@ -131,7 +131,13 @@ extends Node2D
 ##                          `ally_passed` once per teammate
 ## Self-hit and ally-hit are off until `gameplay/combat` is ready for them (B3).
 ##
-## Rays: `ray(...)` is an instant beam. It holds no row; see its comment.
+## Rays: `ray(...)` is an instant beam, `ray_curve(...)` a bent one (a homing beam). They hold
+## no row; see their comments. The spell runtime keeps a live beam on by casting one every step.
+##
+## Casters: every shot has a caster, its player's anchor unless `set_caster_shot` (a payload's
+## shot, cast by the shot whose trigger fired it) or `set_caster_point` says otherwise. An orbit
+## circles its caster and a returning shot flies back to it; a caster shot that ends leaves the
+## point where it was last. `move_shot` moves a shot by a card (a payload's dash, hook, recoil).
 ##
 ## Ends: `shot_ended(tag)`, a signal of the manager itself (not on the event bus), is sent
 ## once for every shot with a non-zero tag when it ends for any reason: a hit that spends it,

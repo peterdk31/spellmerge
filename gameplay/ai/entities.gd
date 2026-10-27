@@ -287,6 +287,8 @@ func _on_spawn_requested(player: int, kind: StringName, at: Vector2, seconds: fl
 			var from: Vector2 = at - _centre_of(wizard)
 			_angle[row] = from.angle() if from != Vector2.ZERO else 0.0
 			_position[row] = _orbit_point(row)
+		elif _centre_at[row].is_finite():
+			_position[row] = _orbit_point(row)
 	queue_redraw()
 
 

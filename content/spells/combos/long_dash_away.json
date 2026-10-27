@@ -1,0 +1,9 @@
+{
+	"id": "long_dash_away",
+	"name": "Long dash away",
+	"does": "The long dash moves its caster a fixed 128 px; nothing else happens.",
+	"casts": [{"staff": 0, "cards": ["long_dash"]}],
+	"imps": [[100, 0]],
+	"seconds": 0.6,
+	"checks": [{"kind": "caster_moved", "mode": "dash"}, {"kind": "max_shots", "max": 0}]
+}

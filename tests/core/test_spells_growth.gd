@@ -1,8 +1,7 @@
 extends "res://tests/support/suite.gd"
-## Growth hits harder (owner design, M2-staffs.md: "Grows and gets stronger the further it
-## flies"): `Spells.hit_profile` scales a grown shot's damage by how much it grew
-## (`Projectiles.get_growth_of`), with no allocation per hit. Real manager and event bus, cards
-## built in code.
+## Growth is size only (owner, 2026-10-27): a grown shot hits wider, as its radius is its hit
+## circle, and for its card's damage, however much it grew; damage boosts are overcharge's. Real
+## manager and event bus, cards built in code.
 ##
 ## godot --headless --path . --script res://tests/core/test_spells_growth.gd
 
@@ -61,12 +60,13 @@ func _put(component: SpellComponent, id: StringName) -> void:
 	_fake.items[id] = component
 
 
-## The damage of the first hit of `cards` on a target `distance` px ahead.
-func _first_hit(cards: Array[StringName], distance: float) -> int:
+## The damage of the first hit of `cards` on a target `distance` px ahead and `off` px off the
+## line, or -1 for none.
+func _first_hit(cards: Array[StringName], distance: float, off: float = 0.0) -> int:
 	var target := Node2D.new()
 	root.add_child(target)
 	own(target)
-	target.global_position = Vector2(distance, 0.0)
+	target.global_position = Vector2(distance, off)
 	_mgr.add_target(target, 6.0, ManagerScript.LAYER_ENEMY, EventsScript.NO_PLAYER)
 	StaffKit.build(_spells, 0, 0, cards)
 	_spells.cast_staff(0, 0, Vector2.ZERO, Vector2.RIGHT, 100.0)
@@ -78,21 +78,14 @@ func _first_hit(cards: Array[StringName], distance: float) -> int:
 	return _damage[0] if not _damage.is_empty() else -1
 
 
-func test_a_plain_shot_hits_for_its_damage() -> void:
-	check_equal(_first_hit([&"bolt"], 100.0), 10, "no growth, no change")
-
-
-func test_a_grown_shot_hits_harder_the_further_it_flew() -> void:
-	# x2 a second: after about a second of flight it is about twice as big and hits for about 20.
-	var near: int = _first_hit([&"growth", &"bolt"], 30.0)
+func test_a_grown_shot_hits_for_its_damage() -> void:
+	check_equal(_first_hit([&"bolt"], 100.0), 10, "a plain bolt")
 	before_each()
-	var far: int = _first_hit([&"growth", &"bolt"], 110.0)
-	check(near > 10 and near < 15, "close, it has grown a little (%d)" % near)
-	check(far >= 18 and far <= 24, "after about a second, about twice (%d)" % far)
+	check_equal(_first_hit([&"growth", &"bolt"], 200.0), 10, "a bolt that has grown for two seconds: the same damage")
 
 
-func test_growth_is_capped() -> void:
-	# GROWTH_MAX (4) times at most, however far it flies.
-	var far: int = _first_hit([&"growth", &"bolt"], 290.0)
-	check(far <= roundi(10 * ManagerScript.GROWTH_MAX), "at most %s times (%d)" % [ManagerScript.GROWTH_MAX, far])
-	check(far >= 30, "and it got there (%d)" % far)
+func test_a_grown_shot_hits_wider() -> void:
+	# 20 px off the line, out of a plain bolt's reach (4 + 6 px), inside a bolt grown x4 (16 + 6).
+	check_equal(_first_hit([&"bolt"], 250.0, 20.0), -1, "a plain bolt flies past")
+	before_each()
+	check_equal(_first_hit([&"growth", &"bolt"], 250.0, 20.0), 10, "a grown one catches it, for its damage")

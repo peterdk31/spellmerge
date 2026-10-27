@@ -199,10 +199,6 @@ var _rec_arc_clock: PackedFloat32Array = PackedFloat32Array()
 ## profile is the shot's `arc_hit` (see `hit_profile`).
 var _arcs_used: int = 0
 var _arc_spell: CompiledSpell = null
-## The records `_grown_hit` writes a grown shot's hit into, in turn.
-const GROWN_HITS: int = 8
-var _grown: Array[HitProfile] = []
-var _grown_next: int = 0
 ## Slots of live shots with an `on hurt` trigger, `_hurt_count` of them, flagged in `_rec_hurt`.
 var _hurt_slots: PackedInt32Array = PackedInt32Array()
 var _hurt_count: int = 0
@@ -338,8 +334,6 @@ func _init() -> void:
 	_jq_chain.resize(JUMP_QUEUE)
 	_jq_prev.resize(JUMP_QUEUE)
 	_timers.resize(64)
-	for n in GROWN_HITS:
-		_grown.append(HitProfile.new())
 	_arcs.resize(64)
 	_bm_on.resize(SpellLimits.BEAMS)
 	_bm_born.resize(SpellLimits.BEAMS)
@@ -675,43 +669,16 @@ func hit_profile(tag: int) -> HitProfile:
 		return null
 	# A relay shot that passed a teammate hits with what it took on (the hit being sent names its slot).
 	var slot: int = projectiles.event_slot if projectiles != null else -1
-	var own_shot: bool = slot >= 0 and _same(slot) and projectiles.get_tag_of(slot) == tag
-	# A shot that has grown (growth) hits harder by as much as it grew.
-	var grown: float = projectiles.get_growth_of(slot) if own_shot else 1.0
-	if own_shot and slot < _rec_relay.size() and _rec_relay[slot] != null:
-		return _grown_hit(_rec_relay[slot], grown)
+	if slot >= 0 and slot < _rec_relay.size() and _rec_relay[slot] != null and _same(slot) and projectiles.get_tag_of(slot) == tag:
+		return _rec_relay[slot]
 	# An arc zap has no slot either: it hits with its shot's `arc_hit`.
 	if _arc_spell != null and tag == _ray_tag and spell == _arc_spell:
 		return _arc_spell.arc_hit
 	# A beam's echo has no slot: it hits at half damage while it is being cast.
 	if _echo_spell != null and tag == _ray_tag and _profiles.get(tag) == _echo_spell:
 		return _echo_spell.echo_hit
-	return _grown_hit(spell.hit, grown)
+	return spell.hit
 
-
-## `hit` as it lands from a shot grown `grown` times (growth): damage and heal times `grown`, the
-## rest as it is. Written into one of GROWN_HITS records made once, so a hit allocates nothing and
-## a hit set off while another is still being applied (a kill's payload) does not overwrite it.
-func _grown_hit(hit: HitProfile, grown: float) -> HitProfile:
-	if grown <= 1.0 or hit == null:
-		return hit
-	var out: HitProfile = _grown[_grown_next]
-	_grown_next = (_grown_next + 1) % GROWN_HITS
-	out.damage = maxi(roundi(hit.damage * grown), 1)
-	out.heal = roundi(hit.heal * grown)
-	out.knockback = hit.knockback
-	out.element_id = hit.element_id
-	out.element_ids = hit.element_ids
-	out.status_id = hit.status_id
-	out.status_duration = hit.status_duration
-	out.status_strength = hit.status_strength
-	out.later_status_ids = hit.later_status_ids
-	out.later_status_durations = hit.later_status_durations
-	out.later_status_strengths = hit.later_status_strengths
-	out.kind = hit.kind
-	out.slam = roundi(hit.slam * grown)
-	out.source_name = hit.source_name
-	return out
 
 
 ## Makes `compiled` (from `compile_staff`) the build of this player's staff (0-3), starting its

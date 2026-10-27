@@ -406,3 +406,14 @@ func test_four_radials_open_at_once_each_for_its_own_player() -> void:
 	_tap(1, &"back")
 	_frame()
 	check(not _radial(1).is_open() and _radial(0).is_open() and _radial(3).is_open(), "B closes only its owner's")
+
+
+func test_the_slots_frame_each_cast_of_the_cycle() -> void:
+	_start(1)
+	var radial: RadialScript = _open(0)
+	# The dev staff draws one carrier a cast: fire bolt, then frost nova.
+	_bus.staff_cards_requested.emit(0, 1, _ids("fire bolt frost nova"))
+	var groups: PackedInt32Array = radial.slot_groups()
+	check_equal(Array(groups.slice(0, 5)), [0, 0, 1, 1, -1], "two casts of two cards, and an empty slot in none")
+	_bus.staff_cards_requested.emit(0, 1, _ids("fire bolt"))
+	check_equal(Array(radial.slot_groups().slice(0, 3)), [0, 0, -1], "one cast after an edit")

@@ -17,6 +17,8 @@ extends Control
 ## - **The slots:** the shown staff's slots in five columns beside the ring, with a gold marker
 ##   that the left stick moves (with key-repeat; P1's move keys, or a click on a slot). The
 ##   pointed card shows faded in the marked slot, so RT's result is seen before it is pressed.
+##   The casts of the cycle are framed: the cards one cast reads share a frame, every other cast
+##   in the other Bone shade, so what fires together is seen while building (`slot_groups`).
 ## - **RT** (`staff_2`; P1's left click) puts the pointed card in the marked slot and moves the
 ##   marker on one. With `put` PUSH (the default), a card already there and the ones after it
 ##   move one slot right (refused when the last slot is taken); with REPLACE it is replaced.
@@ -75,6 +77,8 @@ const MUTED: Color = Color("#a39fb8")
 const DIM: Color = Color("#7a7694")
 const GOLD: Color = Color("#f2c230")
 const WARN: Color = Color("#e0592f")
+## The frames round the casts of the cycle in the slots, every other cast in the other shade.
+const GROUP_COLORS: Array[Color] = [Color("#f4f1ea"), Color("#a39fb8")]
 
 ## The layout, in the view's pixels, for P1's quarter (top left); the others mirror it so the
 ## column always sits under or over the corner panel, at the screen's edge.
@@ -1059,6 +1063,7 @@ func _draw_slots() -> void:
 				_text("!", rect.position + Vector2(rect.size.x - 4.0, -1.0), WARN)
 		if fade > 0.0 and slot < _fading.size() and _fading[slot] != NO_CARD:
 			_draw_card(_fading[slot], rect, fade)
+	_draw_groups(cards.size())
 	# The marked slot: the pointed card faded in it (or a caret where a push inserts), then the
 	# gold marker with corner ticks, so it reads without its colour.
 	if _slot < cards.size() and _slot_shown(_slot):
@@ -1083,6 +1088,47 @@ func _draw_slots() -> void:
 		var box := Rect2(_slots_at - Vector2(3.0, 3.0), Vector2(SLOT_STEP * SLOT_COLUMNS + 4.0, SLOT_STEP * ceili(float(shown) / float(SLOT_COLUMNS)) + 4.0))
 		_frame(box, Color(WARN, 0.3 + 0.6 * share))
 		draw_rect(Rect2(box.position.x, box.end.y, box.size.x * share, 2.0), WARN)
+
+
+## The casts of the cycle (owner, 2026-10-27: "show these groups when building the staff"): the
+## slots each cast reads share one frame per row, every other cast in the other Bone shade, so
+## the cards that fire together read as a group and a break between frames ends a cast. A slot
+## read again by a wrapped last cast keeps the frame of its first cast.
+func _draw_groups(count: int) -> void:
+	var groups: PackedInt32Array = slot_groups()
+	for slot in mini(count, groups.size()):
+		var group: int = groups[slot]
+		if group < 0 or not _slot_shown(slot):
+			continue
+		var color: Color = GROUP_COLORS[group % GROUP_COLORS.size()]
+		var box: Rect2 = _slot_rect(slot).grow(1.0)
+		var joined_left: bool = slot % SLOT_COLUMNS > 0 and groups[slot - 1] == group
+		var joined_right: bool = slot % SLOT_COLUMNS < SLOT_COLUMNS - 1 and slot + 1 < groups.size() and groups[slot + 1] == group
+		draw_rect(Rect2(box.position.x, box.position.y, box.size.x, 1.0), color)
+		draw_rect(Rect2(box.position.x, box.end.y - 1.0, box.size.x, 1.0), color)
+		if not joined_left:
+			draw_rect(Rect2(box.position.x, box.position.y, 1.0, box.size.y), color)
+		if not joined_right:
+			draw_rect(Rect2(box.end.x - 1.0, box.position.y, 1.0, box.size.y), color)
+
+
+## Per slot of the shown staff, the cast of its cycle that first reads it (0 first), or -1 for a
+## slot no cast reads. Allocates; called when the radial redraws and by tests.
+func slot_groups() -> PackedInt32Array:
+	var groups := PackedInt32Array()
+	groups.resize(cards_of(_viewed).size())
+	groups.fill(-1)
+	var casts: Variant = _plans[_viewed].get("casts", [])
+	if not casts is Array:
+		return groups
+	for c in (casts as Array).size():
+		var cast: Variant = (casts as Array)[c]
+		if not cast is Dictionary:
+			continue
+		for slot: int in (cast as Dictionary).get("slots", PackedInt32Array()):
+			if slot >= 0 and slot < groups.size() and groups[slot] < 0:
+				groups[slot] = c
+	return groups
 
 
 func _draw_card(id: StringName, rect: Rect2, alpha: float) -> void:

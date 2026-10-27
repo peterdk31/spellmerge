@@ -210,3 +210,28 @@ func test_every_rows_cards_start_at_the_same_place_whatever_the_button() -> void
 	check(start >= 42.0, "the cards start past the widest button: %s" % start)
 	for staff in 4:
 		check_equal(panel.staff_row(staff).cards_start(), start, "row %d's cards line up" % staff)
+
+
+## Regression (owner, 2026-10-27): after a dash's recharge the outline did not come back. Its
+## delay counted down in float steps ended on a sliver (1e-7 s) for one frame, and going from that
+## sliver to 0 counted as "no change", so the row was never drawn again.
+func test_the_outline_comes_back_when_a_recharge_ends_on_a_sliver() -> void:
+	_build(0, 0, 1)
+	var row: RowScript = _hud.get_panel(0).staff_row(0)
+	# The row alone is driven here: the HUD would push the real staff's timing every frame.
+	_hud.set_process(false)
+	row.set_timing(0, 0.0)
+	await process_frame
+	await process_frame
+	check_equal(row.drawn_outline(), 0, "the outline is drawn on a ready staff")
+	row.set_timing(0, 2.0)
+	await process_frame
+	await process_frame
+	check_equal(row.drawn_outline(), -1, "no outline during the recharge")
+	row.set_timing(0, 0.0000001)
+	await process_frame
+	await process_frame
+	row.set_timing(0, 0.0)
+	await process_frame
+	await process_frame
+	check_equal(row.drawn_outline(), 0, "the outline is drawn again once the staff is ready")

@@ -74,6 +74,8 @@ var _recharging: bool = false
 var _plus_text: String = ""
 var _shown: int = 0
 var _glyph: GlyphScript = null
+## The cast drawn with the gold outline at the last draw, -1 for none (for tests).
+var _drawn_outline: int = -1
 
 
 func _init() -> void:
@@ -126,18 +128,22 @@ func set_plan(plan: Dictionary, icons: Array[Texture2D]) -> void:
 
 ## The staff's next cast and its delay left, from `Spells.cast_index` and `cooldown_left`. A
 ## rise in the delay is a cast: the bar starts full from there, and it is a recharge when the
-## cycle started over (the cursor is back at 0).
+## cycle started over (the cursor is back at 0). It redraws whenever anything it shows changed,
+## compared exactly: a delay counted down in float steps can end on a sliver (1e-7 s) for one
+## frame, and the step from that sliver to 0 is the one that ends the recharge look.
 func set_timing(cursor: int, left: float) -> void:
+	left = maxf(left, 0.0)
+	var was_recharging: bool = is_recharging()
 	if left > _left + 0.0001:
 		_total = left
 		_recharging = cursor == 0
 	if left <= 0.0:
 		_recharging = false
-	if cursor == _cursor and is_equal_approx(left, _left):
-		return
+	var changed: bool = cursor != _cursor or left != _left
 	_cursor = cursor
-	_left = maxf(left, 0.0)
-	queue_redraw()
+	_left = left
+	if changed or is_recharging() != was_recharging:
+		queue_redraw()
 
 
 ## The cards shown in read order (for tests): how many, and how many are greyed.
@@ -165,6 +171,12 @@ func cooldown_fill() -> float:
 
 func is_recharging() -> bool:
 	return _recharging and _left > 0.0
+
+
+## The cast that had the gold outline when the row was last drawn, -1 for none (for tests: it is
+## what the player saw, not what the row knows).
+func drawn_outline() -> int:
+	return _drawn_outline
 
 
 ## Where this row's first card starts (for tests): the same in every row of a panel.
@@ -218,6 +230,7 @@ func _set_shown(shown: int, total: int) -> void:
 func _draw() -> void:
 	var next: int = next_cast()
 	var recharging: bool = is_recharging()
+	_drawn_outline = next if not recharging and next < _cast_size.size() else -1
 	var x: float = _cards_left()
 	var start: float = x
 	var next_hidden: bool = next < _cast_first.size() and _cast_first[next] >= _shown

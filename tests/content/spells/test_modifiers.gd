@@ -168,7 +168,7 @@ func test_every_modifier_works_for_all_four_players_at_once() -> void:
 
 func test_a_modifier_may_appear_twice_and_stacks() -> void:
 	var twice: CompiledSpell = _compile(&"bolt", [&"pierce", &"pierce"])
-	check_equal(twice.pierce, 4, "two pierce modifiers pierce four")
+	check_equal(twice.pierce, 2, "two pierce modifiers pierce two: one each")
 	var faster: CompiledSpell = _compile(&"bolt", [&"faster", &"faster"])
 	check_equal(faster.speed, 220.0 * 1.5 * 1.5, "two faster modifiers multiply the speed")
 
@@ -226,9 +226,9 @@ func test_pierce_passes_through_the_targets_in_line() -> void:
 	_cast(&"bolt", [&"pierce"], 0, Vector2.ZERO)
 	_tick(60)
 	var hit: Array = _hit_targets()
-	check_equal(hit.size(), 3, "pierce 2 hits three targets")
-	check(hit.has(first) and hit.has(second) and hit.has(third), "the first three in line")
-	check(not hit.has(fourth), "not the fourth")
+	check_equal(hit.size(), 2, "one pierce card: one pierce, two targets")
+	check(hit.has(first) and hit.has(second), "the first two in line")
+	check(not hit.has(third) and not hit.has(fourth), "not the third or fourth")
 
 
 func test_pierce_makes_a_beam_reach_further_down_the_line() -> void:
@@ -238,7 +238,7 @@ func test_pierce_makes_a_beam_reach_further_down_the_line() -> void:
 	var bare: int = _hits.size()
 	_hits.clear()
 	_cast(&"beam", [&"pierce"], 1, Vector2.ZERO)
-	check_equal(_hits.size(), bare + 2, "two more targets are hit")
+	check_equal(_hits.size(), bare + 1, "one more target is hit")
 
 
 # --- Homing -----------------------------------------------------------------
@@ -273,6 +273,15 @@ func test_a_homing_beam_aims_at_a_target_near_its_line() -> void:
 	check_equal(_hits.size(), 0, "a bare beam misses it")
 	_cast(&"beam", [&"homing"], 1, Vector2.ZERO)
 	check_equal(_hit_targets(), [imp] as Array, "a homing beam turns toward it")
+
+
+func test_a_homing_beam_finds_a_target_as_far_as_it_reaches() -> void:
+	# Past the Homing card's reach (160 px) but within the beam's length, off its line.
+	var imp := _target(Vector2(210.0, 60.0))
+	_cast(&"beam", [], 0, Vector2.ZERO)
+	check_equal(_hits.size(), 0, "a bare beam misses it")
+	_cast(&"beam", [&"homing"], 1, Vector2.ZERO)
+	check_equal(_hit_targets(), [imp] as Array, "a homing beam turns toward it all the same")
 
 
 # --- Chain ------------------------------------------------------------------

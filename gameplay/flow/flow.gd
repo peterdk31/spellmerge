@@ -37,7 +37,8 @@ extends Node
 ## Sandbox (staffs B7, docs/milestones/M2-staffs.md, "The sandbox"): `sandbox_requested` (the
 ## main menu's Sandbox button, in `dev` and `preview` builds) starts a run in the sandbox room
 ## (`sandbox`): no waves, the training dummy and the shooting dummy at the room's
-## `dummy_spawns`, and `sandbox_changed(true)` so the HUD shows the sandbox page. The page sends
+## `dummy_spawns` (more spawns stand more training dummies, a group to try homing, pierce and
+## spreads on), and `sandbox_changed(true)` so the HUD shows the sandbox page. The page sends
 ## `sandbox_action_requested`: `imp_wave` adds a wave of imps (wave 1's size, while fewer than
 ## WAVE_MAX are up), `reset_dummies` puts fresh dummies back. Clearing the imps starts no build
 ## break. When every wizard is down, after RESTART_DELAY they all stand up where they are and
@@ -65,7 +66,8 @@ const DEFAULT_ENEMY_ID: StringName = &"ember_imp"
 ## The two spells every wizard starts with: A is a fire bolt (M1's bolt plus burn), B a plain bolt.
 ## The cards each staff starts with: A, X, Y, B (the owner's choice, 2026-10-26).
 const DEFAULT_START_CARDS: Array = [[&"dash"], [&"fire", &"bolt"], [], []]
-## The sandbox room, and the dummies it stands at its `dummy_spawns` (in this order).
+## The sandbox room, and the dummies it stands at its `dummy_spawns` (in this order; every
+## spawn after these stands another of the first, `dummy_id`).
 const SANDBOX_ROOM_ID: StringName = &"sandbox"
 const DUMMY_IDS: Array[StringName] = [&"training_dummy", &"shooting_dummy"]
 ## The actions of `sandbox_action_requested`.
@@ -602,17 +604,24 @@ func _spawn_enemies(parent: Node2D, room: RoomBase, data: EnemyBase, count: int)
 		_enemies.append(enemy)
 
 
-## Stand the sandbox's dummies at the room's `dummy_spawns`: DUMMY_IDS in order, from the
-## registry. A missing one is skipped with a warning; the sandbox runs without it.
+## The dummy the sandbox stands at its `spawn`-th dummy spawn: DUMMY_IDS in order, then more
+## training dummies.
+static func dummy_id(spawn: int) -> StringName:
+	return DUMMY_IDS[spawn] if spawn < DUMMY_IDS.size() else DUMMY_IDS[0]
+
+
+## Stand the sandbox's dummies at the room's `dummy_spawns` (`dummy_id`), from the registry. A
+## missing one is skipped with a warning; the sandbox runs without it.
 func _spawn_dummies(parent: Node2D, room: RoomBase) -> void:
-	for i in mini(DUMMY_IDS.size(), room.dummy_spawns.size()):
-		var data: EnemyBase = registry.get_resource(ENEMY_FOLDER, DUMMY_IDS[i]) as EnemyBase if registry != null else null
+	for i in room.dummy_spawns.size():
+		var id: StringName = dummy_id(i)
+		var data: EnemyBase = registry.get_resource(ENEMY_FOLDER, id) as EnemyBase if registry != null else null
 		if data == null or data.scene == null:
-			push_warning("Flow: the dummy '%s' is missing from the registry, so the sandbox runs without it." % DUMMY_IDS[i])
+			push_warning("Flow: the dummy '%s' is missing from the registry, so the sandbox runs without it." % id)
 			continue
 		var dummy := data.scene.instantiate() as Node2D
 		if dummy == null or not "data" in dummy:
-			push_warning("Flow: the dummy '%s' has no enemy script on its root, so it is skipped." % DUMMY_IDS[i])
+			push_warning("Flow: the dummy '%s' has no enemy script on its root, so it is skipped." % id)
 			if dummy != null:
 				dummy.free()
 			continue

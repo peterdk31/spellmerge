@@ -437,6 +437,11 @@ func _distance_cards() -> void:
 	var faster := ModifierBase.new()
 	faster.speed_mult = 1.5
 	_put(faster, &"faster")
+	var homing := ModifierBase.new()
+	homing.behaviour = ModifierBase.Behaviour.HOMING
+	homing.behaviour_strength = 3.0
+	homing.behaviour_reach = 160.0
+	_put(homing, &"homing")
 
 
 ## The live shots that are not `slot`.
@@ -480,6 +485,45 @@ func test_a_dash_in_a_payload_moves_the_shot_that_fired_it_not_the_wizard() -> v
 	check(_mgr.is_alive(bolt), "the bolt still flies")
 	# One second at 300 px/s, plus the dash's 48 px.
 	check(absf(_mgr.get_position_of(bolt).x - (300.0 + 48.0)) < 6.0, "the bolt dashed 48 px: %s" % _mgr.get_position_of(bolt))
+
+
+func test_a_homing_dash_tells_the_wizard_how_to_turn_and_a_plain_one_does_not() -> void:
+	_distance_cards()
+	_build(0, [&"homing", &"short"])
+	_cast(0)
+	var homing: Homing = _spells.move_homing(0)
+	check(is_equal_approx(homing.turn, 3.0) and is_equal_approx(homing.reach, 160.0), "the card's turn rate and reach: %s, %s" % [homing.turn, homing.reach])
+	_mgr.set_anchor(1, Vector2.ZERO)
+	_build(1, [&"short"])
+	_cast(1)
+	check(not _spells.move_homing(1).homes(), "a plain dash does not home")
+	_build(0, [&"short"])
+	_tick(30)
+	_cast(0)
+	check(not _spells.move_homing(0).homes(), "nor does the next plain dash of the same wizard")
+
+
+func test_a_homing_teleport_bends_its_way_toward_a_target_and_blinks_its_distance() -> void:
+	_distance_cards()
+	var target := _target(Vector2(60.0, 30.0))
+	_build(0, [&"homing", &"blink"])
+	_cast(0)
+	check_equal(_moves.size(), 1, "one move")
+	var to: Vector2 = _moves[0][2]
+	check(to.y > 1.0, "bent toward the target, off the aim: %s" % to)
+	check(is_equal_approx(to.length(), 64.0), "still its card's distance: %s" % to.length())
+	check(absf(to.angle_to(target.global_position)) < 0.01, "straight at it: %s" % to)
+
+
+func test_a_homing_dash_in_a_payload_turns_the_shot_toward_a_target() -> void:
+	_distance_cards()
+	_target(Vector2(160.0, 50.0))
+	_build(0, [&"timer", &"bolt", &"homing", &"short"])
+	_cast(0)
+	var bolt: int = _others(-1)[0]
+	_tick(20)
+	check(_mgr.is_alive(bolt), "the bolt still flies")
+	check(_mgr.get_position_of(bolt).y > 1.0, "its dash turned it toward the target: %s" % _mgr.get_position_of(bolt))
 
 
 func test_a_payload_whose_shot_is_gone_has_nothing_to_dash() -> void:

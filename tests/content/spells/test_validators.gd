@@ -141,6 +141,15 @@ func test_a_homing_or_chain_modifier_needs_strength() -> void:
 	check_equal(SpellValidator.check_component(modifier, _listed()).size(), 0, "chain with jumps is fine")
 
 
+func test_a_homing_modifier_needs_a_reach() -> void:
+	var modifier := _fine(ModifierBase.new()) as ModifierBase
+	modifier.behaviour = ModifierBase.Behaviour.HOMING
+	modifier.behaviour_strength = 3.0
+	check_equal(_fields(SpellValidator.check_component(modifier, _listed()), "required-field"), ["behaviour_reach"] as Array[String], "homing that looks nowhere")
+	modifier.behaviour_reach = 160.0
+	check_equal(SpellValidator.check_component(modifier, _listed()).size(), 0, "homing with a reach is fine")
+
+
 func test_the_broken_reaction_table_fails() -> void:
 	var table := load(FIXTURES + "/reactions/broken_reactions.tres") as ReactionTable
 	var elements: Array[StringName] = [&"fire", &"frost"]

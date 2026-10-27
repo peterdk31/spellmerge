@@ -1,7 +1,8 @@
 extends "res://tests/support/suite.gd"
 ## The sandbox room (content/rooms/crypt/sandbox, staffs B7): two shooting lanes split by a
 ## wall (owner, 2026-10-26), the training dummy at the far end of the left lane and the
-## shooting dummy at the far end of the right one, the divider stopping short of the bottom so
+## shooting dummy at the far end of the right one, a group of four more training dummies round
+## the first in the left lane (owner, 2026-10-27: to try homing and pierce on), the divider stopping short of the bottom so
 ## wizards walk between the lanes. The data matches the scene's markers; no scripts.
 
 const RoomData := preload("res://content/rooms/crypt/sandbox.tres")
@@ -17,13 +18,13 @@ func before_each() -> void:
 	room_root = own((RoomData as RoomBase).scene.instantiate()) as Node
 
 
-func test_resource_has_an_id_a_scene_and_two_dummy_spawns() -> void:
+func test_resource_has_an_id_a_scene_and_six_dummy_spawns() -> void:
 	var room: RoomBase = RoomData
 	check_equal(room.id, &"sandbox", "the id")
 	check(room.scene != null, "the room has a scene")
 	check_equal(room.player_spawns.size(), 4, "player spawns")
 	check(room.enemy_spawns.size() >= 4, "at least four enemy spawns, for the imp wave")
-	check_equal(room.dummy_spawns.size(), 2, "dummy spawns: the training dummy and the shooting dummy")
+	check_equal(room.dummy_spawns.size(), 6, "dummy spawns: the training dummy, the shooting dummy and a group of four")
 
 
 func test_in_web_builds() -> void:
@@ -58,6 +59,8 @@ func test_a_wall_splits_the_dummies_into_two_lanes() -> void:
 	check(spawns[0].x < divider.position.x, "the training dummy is in the left lane")
 	check(spawns[1].x > divider.end.x, "the shooting dummy is in the right lane")
 	check(spawns[0].y < divider.end.y and spawns[1].y < divider.end.y, "both dummies stand beside the divider")
+	for i in range(2, spawns.size()):
+		check(spawns[i].x < divider.position.x and spawns[i].y < divider.end.y, "the group's dummy %s is in the left lane, beside the divider" % spawns[i])
 	check(divider.end.y < 320.0, "the divider stops short of the bottom, so wizards cross between the lanes")
 
 
@@ -70,6 +73,13 @@ func test_two_players_start_in_each_lane() -> void:
 	check_equal(left, 2, "players starting in the left lane")
 
 
+func test_dummies_stand_apart() -> void:
+	var spawns: PackedVector2Array = (RoomData as RoomBase).dummy_spawns
+	for i in spawns.size():
+		for j in range(i + 1, spawns.size()):
+			check(spawns[i].distance_to(spawns[j]) >= DUMMY_RADIUS * 4.0, "dummies %s and %s do not touch" % [spawns[i], spawns[j]])
+
+
 func test_dummy_spawns_are_clear_of_walls() -> void:
 	var walls: Array[Rect2] = RoomScan.wall_rects(room_root)
 	check(walls.size() >= 4, "the walls are found")
@@ -77,8 +87,3 @@ func test_dummy_spawns_are_clear_of_walls() -> void:
 		var body := Rect2(point - Vector2.ONE * DUMMY_RADIUS, Vector2.ONE * DUMMY_RADIUS * 2.0)
 		for wall: Rect2 in walls:
 			check(not wall.intersects(body), "dummy spawn %s is clear of the wall %s" % [point, wall])
-
-
-func test_dummies_stand_apart() -> void:
-	var spawns: PackedVector2Array = (RoomData as RoomBase).dummy_spawns
-	check(spawns[0].distance_to(spawns[1]) > DUMMY_RADIUS * 4.0, "the two dummies do not stand on each other")

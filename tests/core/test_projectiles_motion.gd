@@ -9,6 +9,8 @@ const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
 
 const DT: float = 1.0 / 60.0
+## How far round a shot homing looks here (the Homing card's reach).
+const HOMING_REACH: float = 160.0
 
 var _failures: Array[String] = []
 var _bus: Node
@@ -37,6 +39,8 @@ func _initialize() -> void:
 	_test_homing_checks_every_fourth_step()
 	_test_homing_search_is_charged_to_the_budget()
 	_test_homing_aim_for_a_beam()
+	_test_home_velocity_turns_anything_that_moves()
+	_test_homing_picks_at_random_and_keeps_its_pick()
 	_test_ray_hits_in_order_and_reports_its_reach()
 	_test_ray_width_layers_and_owner()
 	_test_ray_stops_at_walls()
@@ -199,7 +203,7 @@ func _test_homing_turns_toward_a_target() -> void:
 	_setup()
 	var enemy: Node2D = _target(Vector2(300.0, 150.0), 8.0)
 	var slot: int = _mgr.spawn(0, Vector2(100.0, 100.0), Vector2(200.0, 0.0), 3.0, 4.0)
-	_check(_mgr.set_homing(slot, 6.0), "a straight shot can home")
+	_check(_mgr.set_homing(slot, 6.0, HOMING_REACH), "a straight shot can home")
 	for _i in 120:
 		_mgr.step(DT)
 		if not _mgr.is_alive(slot):
@@ -216,7 +220,7 @@ func _test_homing_rules() -> void:
 	_setup()
 	_target(Vector2(100.0, 220.0), 8.0)
 	var slot: int = _mgr.spawn(0, Vector2(0.0, 100.0), Vector2(100.0, 0.0), 5.0, 4.0)
-	_mgr.set_homing(slot, 0.5)
+	_mgr.set_homing(slot, 0.5, HOMING_REACH)
 	for _i in 20:
 		_mgr.step(DT)
 	var velocity: Vector2 = _mgr._vel[slot]
@@ -225,13 +229,14 @@ func _test_homing_rules() -> void:
 	var rune: int = _mgr.spawn(0, Vector2(50.0, 50.0), Vector2.ZERO, 1.0, 4.0, ManagerScript.LAYER_ENEMY, 0, 0, ManagerScript.MOTION_STILL)
 	_mgr.set_anchor(0, Vector2(200.0, 200.0))
 	var orbit: int = _mgr.spawn_orbit(0, 10.0, 0.0, 1.0, 1.0)
-	_check(not _mgr.set_homing(rune, 3.0) and not _mgr.set_homing(orbit, 3.0), "still and orbit shots cannot home")
-	_check(not _mgr.set_homing(-1, 3.0) and not _mgr.set_homing(slot, -1.0) and not _mgr.set_homing(slot, NAN), "bad slots and rates are refused")
-	_check(_mgr.set_homing(slot, 0.0) and _mgr._turn[slot] == 0.0, "a rate of 0 turns homing off and is accepted")
+	_check(not _mgr.set_homing(rune, 3.0, HOMING_REACH) and not _mgr.set_homing(orbit, 3.0, HOMING_REACH), "still and orbit shots cannot home")
+	_check(not _mgr.set_homing(-1, 3.0, HOMING_REACH) and not _mgr.set_homing(slot, -1.0, HOMING_REACH) and not _mgr.set_homing(slot, NAN, HOMING_REACH), "bad slots and rates are refused")
+	_check(not _mgr.set_homing(slot, 3.0, 0.0) and not _mgr.set_homing(slot, 3.0, INF), "a range not above 0 and finite is refused")
+	_check(_mgr.set_homing(slot, 0.0, HOMING_REACH) and _mgr._turn[slot] == 0.0, "a rate of 0 turns homing off and is accepted")
 	# A reused slot does not inherit homing.
 	_mgr.clear()
 	var gone: int = _mgr.spawn(0, Vector2.ZERO, Vector2(1.0, 0.0), 1.0)
-	_mgr.set_homing(gone, 4.0)
+	_mgr.set_homing(gone, 4.0, HOMING_REACH)
 	_mgr.clear()
 	var again: int = _mgr.spawn(0, Vector2.ZERO, Vector2(1.0, 0.0), 1.0)
 	_check(again == gone and _mgr._turn[again] == 0.0, "a reused slot starts without homing")
@@ -242,17 +247,18 @@ func _test_homing_skips_its_own_wizard_and_the_target_just_hit() -> void:
 	_mgr.friendly_fire = true
 	_target(Vector2(100.0, 130.0), 8.0, ManagerScript.LAYER_PLAYER, 0)
 	var slot: int = _mgr.spawn(0, Vector2(100.0, 100.0), Vector2(100.0, 0.0), 5.0, 4.0)
-	_mgr.set_homing(slot, 8.0)
+	_mgr.set_homing(slot, 8.0, HOMING_REACH)
 	for _i in 30:
 		_mgr.step(DT)
 	_check(_mgr._vel[slot].normalized().is_equal_approx(Vector2.RIGHT), "a homing shot does not turn toward its own wizard")
 	_mgr.clear()
 	_hits.clear()
+	# The pick is random among the targets in reach, so the second starts just out of reach.
 	var near: Node2D = _target(Vector2(180.0, 100.0), 8.0)
-	var far: Node2D = _target(Vector2(220.0, 160.0), 8.0)
+	var far: Node2D = _target(Vector2(320.0, 130.0), 8.0)
 	var pierce: int = _mgr.spawn(1, Vector2(150.0, 100.0), Vector2(100.0, 0.0), 5.0, 4.0, ManagerScript.LAYER_ENEMY, 3)
-	_mgr.set_homing(pierce, 8.0)
-	for _i in 90:
+	_mgr.set_homing(pierce, 8.0, HOMING_REACH)
+	for _i in 150:
 		_mgr.step(DT)
 	var hit_near: bool = false
 	var hit_far: bool = false
@@ -268,7 +274,7 @@ func _test_homing_checks_every_fourth_step() -> void:
 	var slots: Array[int] = []
 	for i in 8:
 		slots.append(_mgr.spawn(0, Vector2(100.0, 100.0), Vector2(0.0, 0.0001), 5.0, 4.0))
-		_mgr.set_homing(slots[i], 1.0)
+		_mgr.set_homing(slots[i], 1.0, HOMING_REACH)
 	_target(Vector2(150.0, 100.0), 8.0)
 	var searched: Array[int] = []
 	for _n in 4:
@@ -288,7 +294,7 @@ func _test_homing_search_is_charged_to_the_budget() -> void:
 	for i in 20:
 		_target(Vector2(300.0 + float(i), 100.0), 6.0)
 	var slot: int = _mgr.spawn(0, Vector2(200.0, 100.0), Vector2(10.0, 0.0), 5.0, 4.0)
-	_mgr.set_homing(slot, 1.0)
+	_mgr.set_homing(slot, 1.0, HOMING_REACH)
 	_mgr._refresh_targets()
 	_mgr._step_index = (4 - slot % 4) % 4
 	_mgr._work_left = 0
@@ -303,22 +309,87 @@ func _test_homing_aim_for_a_beam() -> void:
 	_setup()
 	var inside: Node2D = _target(Vector2(200.0, 130.0), 8.0)
 	_target(Vector2(120.0, 0.0), 8.0)
-	var aim: Vector2 = _mgr.homing_aim(0, Vector2(100.0, 100.0), Vector2.RIGHT, deg_to_rad(30.0), ManagerScript.LAYER_ENEMY)
+	var aim: Vector2 = _mgr.homing_aim(0, Vector2(100.0, 100.0), Vector2.RIGHT, deg_to_rad(30.0), ManagerScript.LAYER_ENEMY, HOMING_REACH, 0, 0)
 	_check(aim.is_equal_approx(Vector2(100.0, 100.0).direction_to(inside.global_position)), "a beam bends toward the nearest target inside the cone")
-	aim = _mgr.homing_aim(0, Vector2(100.0, 100.0), Vector2.RIGHT, deg_to_rad(10.0), ManagerScript.LAYER_ENEMY)
+	aim = _mgr.homing_aim(0, Vector2(100.0, 100.0), Vector2.RIGHT, deg_to_rad(10.0), ManagerScript.LAYER_ENEMY, HOMING_REACH, 0, 0)
 	_check(aim == Vector2.RIGHT, "and keeps its aim when none is that close to it")
-	aim = _mgr.homing_aim(0, Vector2(100.0, 100.0), Vector2.LEFT, deg_to_rad(30.0), ManagerScript.LAYER_ENEMY)
+	aim = _mgr.homing_aim(0, Vector2(100.0, 100.0), Vector2.LEFT, deg_to_rad(30.0), ManagerScript.LAYER_ENEMY, HOMING_REACH, 0, 0)
 	_check(aim == Vector2.LEFT, "a target behind the aim is not chosen")
-	aim = _mgr.homing_aim(0, Vector2(100.0, 100.0), Vector2.ZERO, deg_to_rad(30.0), ManagerScript.LAYER_ENEMY)
+	aim = _mgr.homing_aim(0, Vector2(100.0, 100.0), Vector2.ZERO, deg_to_rad(30.0), ManagerScript.LAYER_ENEMY, HOMING_REACH, 0, 0)
 	_check(aim == Vector2.ZERO, "a zero aim comes back unchanged")
 	_target(Vector2(500.0, 300.0), 8.0)
-	aim = _mgr.homing_aim(0, Vector2(500.0, 300.0), Vector2.RIGHT, deg_to_rad(30.0), ManagerScript.LAYER_ENEMY)
+	aim = _mgr.homing_aim(0, Vector2(500.0, 300.0), Vector2.RIGHT, deg_to_rad(30.0), ManagerScript.LAYER_ENEMY, HOMING_REACH, 0, 0)
 	_check(aim == Vector2.RIGHT, "a target exactly on the origin is skipped, never a zero aim")
 	_target(Vector2(140.0, 100.0), 8.0, ManagerScript.LAYER_PLAYER, 1)
-	aim = _mgr.homing_aim(0, Vector2(100.0, 100.0), Vector2.RIGHT, deg_to_rad(30.0), ManagerScript.LAYER_ENEMY | ManagerScript.LAYER_PLAYER)
+	aim = _mgr.homing_aim(0, Vector2(100.0, 100.0), Vector2.RIGHT, deg_to_rad(30.0), ManagerScript.LAYER_ENEMY | ManagerScript.LAYER_PLAYER, HOMING_REACH, 0, 0)
 	_check(aim.is_equal_approx(Vector2(100.0, 100.0).direction_to(inside.global_position)), "a beam never bends toward a wizard")
+	var far: Node2D = _target(Vector2(100.0, 900.0), 8.0)
+	aim = _mgr.homing_aim(0, Vector2(100.0, 650.0), Vector2.DOWN, deg_to_rad(30.0), ManagerScript.LAYER_ENEMY, HOMING_REACH, 0, 0)
+	_check(aim == Vector2.DOWN, "past a homing shot's range a target is not found")
+	aim = _mgr.homing_aim(0, Vector2(100.0, 650.0), Vector2.DOWN, deg_to_rad(30.0), ManagerScript.LAYER_ENEMY, 260.0, 0, 0)
+	_check(aim.is_equal_approx(Vector2(100.0, 650.0).direction_to(far.global_position)), "with a longer range (a beam's length) it is")
+	aim = _mgr.homing_aim(0, Vector2(100.0, 650.0), Vector2.DOWN, deg_to_rad(30.0), ManagerScript.LAYER_ENEMY, 0.0, 0, 0)
+	_check(aim == Vector2.DOWN, "a zero reach finds nothing")
 	var ray_len: float = _mgr.ray(0, Vector2(10.0, 600.0), Vector2.RIGHT, 100000.0)
 	_check(ray_len <= ManagerScript.RAY_MAX_LENGTH, "a very long beam is cut to RAY_MAX_LENGTH (%f)" % ray_len)
+
+
+func _test_home_velocity_turns_anything_that_moves() -> void:
+	_setup()
+	var target: Node2D = _target(Vector2(100.0, 200.0), 8.0)
+	var from: Vector2 = Vector2(100.0, 100.0)
+	var velocity: Vector2 = Vector2(200.0, 0.0)
+	var turned: Vector2 = _mgr.home_velocity(0, from, velocity, 3.0, HOMING_REACH, 0.1, 0, 0)
+	_check(is_equal_approx(turned.length(), 200.0), "it keeps its speed")
+	_check(is_equal_approx(velocity.angle_to(turned), 0.3), "turning at most the rate for the time, toward the target (%f)" % velocity.angle_to(turned))
+	_check(_mgr.home_velocity(0, from, velocity, 3.0, 50.0, 0.1, 0, 0) == velocity, "a target past its reach is not homed on")
+	_check(_mgr.home_velocity(0, from, velocity, 0.0, HOMING_REACH, 0.1, 0, 0) == velocity, "a rate of 0 does not turn")
+	target.global_position = Vector2(500.0, 500.0)
+	_mgr.step(0.0)
+	_target(Vector2(100.0, 150.0), 8.0, ManagerScript.LAYER_PLAYER, 1)
+	_check(_mgr.home_velocity(0, from, velocity, 3.0, HOMING_REACH, 0.1, 0, 0) == velocity, "a wizard is never homed on")
+	var slot: int = _mgr.spawn(0, Vector2(300.0, 300.0), Vector2.ZERO, 2.0, 2.0)
+	_target(Vector2(420.0, 360.0), 8.0)
+	_check(_mgr.move_shot(slot, Vector2(60.0, 0.0), 0.5, 3.0, HOMING_REACH), "a homing move is taken")
+	for i in 30:
+		_mgr.step(DT)
+	_check(_mgr.get_position_of(slot).y > 300.5, "a shot's homing move turns toward the target: %s" % _mgr.get_position_of(slot))
+
+
+func _test_homing_picks_at_random_and_keeps_its_pick() -> void:
+	_setup()
+	var centre: Vector2 = Vector2(300.0, 300.0)
+	var ids: Array[int] = []
+	for offset: Vector2 in [Vector2(60.0, 0.0), Vector2(-60.0, 0.0), Vector2(0.0, 60.0), Vector2(0.0, -60.0)]:
+		ids.append(_target(centre + offset, 8.0).get_instance_id())
+	var far: Node2D = _target(centre + Vector2(400.0, 0.0), 8.0)
+	var picked: Dictionary = {}
+	for pick_seed in 32:
+		_mgr.homing_point(0, centre, Vector2.RIGHT, PI, ManagerScript.LAYER_ENEMY, HOMING_REACH, 0, pick_seed)
+		_check(ids.has(_mgr.homing_target), "a pick is one of the targets in reach, never the far one")
+		picked[_mgr.homing_target] = true
+	_check(picked.size() >= 3, "different seeds pick different targets (%d of 4)" % picked.size())
+	var first: Vector2 = _mgr.homing_point(0, centre, Vector2.RIGHT, PI, ManagerScript.LAYER_ENEMY, HOMING_REACH, 0, 7)
+	var kept: int = _mgr.homing_target
+	_check(_mgr.homing_point(0, centre, Vector2.RIGHT, PI, ManagerScript.LAYER_ENEMY, HOMING_REACH, 0, 7) == first, "the same seed picks the same target")
+	for pick_seed in 16:
+		_mgr.homing_point(0, centre, Vector2.RIGHT, PI, ManagerScript.LAYER_ENEMY, HOMING_REACH, kept, pick_seed)
+		_check(_mgr.homing_target == kept, "a kept target stays the pick while it is in reach")
+	_mgr.homing_point(0, centre, Vector2.RIGHT, PI, ManagerScript.LAYER_ENEMY, HOMING_REACH, far.get_instance_id(), 3)
+	_check(ids.has(_mgr.homing_target), "a kept target out of reach gives way to a new pick")
+	# A fan of homing shots from one point spreads over the group instead of all taking one.
+	var slots: Array[int] = []
+	for i in 8:
+		var slot: int = _mgr.spawn(0, centre + Vector2(0.0, 120.0), Vector2(0.0, -60.0), 3.0, 2.0)
+		_mgr.set_homing(slot, 0.5, HOMING_REACH)
+		slots.append(slot)
+	for i in ManagerScript.HOMING_PERIOD:
+		_mgr.step(DT)
+	var chosen: Dictionary = {}
+	for slot in slots:
+		if _mgr._home_target[slot] != 0:
+			chosen[_mgr._home_target[slot]] = true
+	_check(chosen.size() >= 2, "eight shots home on more than one target (%d)" % chosen.size())
 
 
 func _test_homing_skips_wizards_and_freed_targets() -> void:
@@ -327,7 +398,7 @@ func _test_homing_skips_wizards_and_freed_targets() -> void:
 	_target(Vector2(300.0, 160.0), 8.0, ManagerScript.LAYER_PLAYER, 1)
 	var gone: Node2D = _target(Vector2(300.0, 40.0), 8.0)
 	var slot: int = _mgr.spawn(0, Vector2(100.0, 100.0), Vector2(100.0, 0.0), 5.0, 4.0)
-	_mgr.set_homing(slot, 3.0)
+	_mgr.set_homing(slot, 3.0, HOMING_REACH)
 	_mgr._refresh_targets()
 	gone.free()
 	_check(not _mgr._homing_point(slot).is_finite(), "homing neither picks another wizard (friendly fire on) nor a freed target")

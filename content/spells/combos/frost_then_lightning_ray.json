@@ -2,7 +2,7 @@
 	"id": "frost_then_lightning_ray",
 	"name": "Frost then lightning ray",
 	"does": "A frost bolt's hit fires a storm ray onward from the target, through the imps behind it.",
-	"casts": [{"staff": 0, "cards": ["frost", "on_hit", "bolt", "storm", "beam"]}],
+	"casts": [{"staff": 0, "cards": ["frost", "on_hit", "bolt", "storm", "pierce", "beam"]}],
 	"imps": [[100, 0], [160, 0], [220, 0]],
 	"seconds": 2.0,
 	"checks": [{"kind": "damaged", "imps": [0, 1, 2]}]

@@ -174,6 +174,9 @@ extends Resource
 ## swing at a fast rate reads as a strobe), and the steps come this many times a second.
 @export_range(0.0, 0.3, 0.01) var beam_flicker_depth: float = 0.1
 @export_range(1.0, 30.0, 1.0) var beam_flicker_rate: float = 16.0
+## How opaque a beam is (1.0 solid): a little see-through, so beams that cross (a split, a
+## multicast) all still show instead of only the one drawn last.
+@export_range(0.2, 1.0, 0.05) var beam_alpha: float = 0.7
 ## The cast flash on the wizard and the flare where a shot ends are data on the carrier cards
 ## (`FormBase.cast_look` and `impact_look`, staffs B6b), not in this preset. A card without a
 ## look gets the muzzle flash above and the wall spark.

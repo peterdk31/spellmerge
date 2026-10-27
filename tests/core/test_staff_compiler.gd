@@ -43,6 +43,7 @@ func before_each() -> void:
 	var homing: ModifierBase = _modifier(&"homing")
 	homing.behaviour = ModifierBase.Behaviour.HOMING
 	homing.behaviour_strength = 4.0
+	homing.behaviour_reach = 160.0
 	var bigger: ModifierBase = _modifier(&"bigger")
 	bigger.radius_mult = 2.0
 	bigger.damage_mult = 2.0
@@ -226,6 +227,28 @@ func test_a_steering_modifier_on_the_caster_is_wasted() -> void:
 	check_equal(spell.fallback, CompiledSpell.FALLBACK_CASTER, "fire lands on the caster")
 	check(not spell.modifier_ids.has(&"homing"), "homing does not")
 	check(staff.wasted.has(0), "homing is wasted with a reason")
+
+
+func test_how_far_homing_looks_comes_from_the_card_and_a_beam_s_length() -> void:
+	var far: ModifierBase = _modifier(&"far_homing")
+	far.behaviour = ModifierBase.Behaviour.HOMING
+	far.behaviour_strength = 2.0
+	far.behaviour_reach = 240.0
+	var beam: FormBase = _form(&"beam", 3, 1)
+	beam.motion = FormBase.Motion.RAY
+	beam.ray_length = 300.0
+	var rune: FormBase = _form(&"rune", 3, 1)
+	rune.motion = FormBase.Motion.STILL
+	check_equal((_compile("homing bolt").casts[0].group.spells[0] as CompiledSpell).homing_range, 160.0, "a bolt looks as far as its card reaches")
+	check_equal((_compile("far_homing bolt").casts[0].group.spells[0] as CompiledSpell).homing_range, 240.0, "a card that reaches further looks further, with no change to core")
+	check_equal((_compile("homing far_homing bolt").casts[0].group.spells[0] as CompiledSpell).homing_range, 240.0, "two cards look as far as the further one")
+	check_equal((_compile("homing beam").casts[0].group.spells[0] as CompiledSpell).homing_range, 300.0, "a beam looks at least as far as it is long")
+	beam.ray_length = 200.0
+	check_equal((_compile("far_homing beam").casts[0].group.spells[0] as CompiledSpell).homing_range, 240.0, "and as far as its card reaches, past its end")
+	check_equal((_compile("bolt").casts[0].group.spells[0] as CompiledSpell).homing_range, 0.0, "no homing card, no homing")
+	var staff: CompiledStaff = _compile("homing rune")
+	check_equal((staff.casts[0].group.spells[0] as CompiledSpell).homing_range, 0.0, "a rune cannot be steered")
+	check(staff.wasted.has(0) and not (staff.casts[0].group.spells[0] as CompiledSpell).modifier_ids.has(&"homing"), "so homing on it is wasted and left off it")
 
 
 func test_a_shield_means_nothing_at_a_payload_origin() -> void:

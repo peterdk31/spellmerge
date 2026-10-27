@@ -53,10 +53,15 @@ const PLAYERS: int = 4
 ## live beam's hits. A beam lives its carrier's `lifetime`, so a held staff keeps one on.
 const BEAMS: int = 64
 const BEAM_TICK: float = 0.15
-## Degrees off its aim a homing beam still bends to a target, with one homing card, and at most.
-const BEAM_HOMING_ANGLE: float = 45.0
-const BEAM_HOMING_MAX: float = 90.0
-## Each homing card after the first multiplies the turn rate (and a beam's bend) by this.
+## A homing carrier that is over at once (a beam, a teleport) has no time to turn, so it bends
+## toward a target as far as its turn rate turns in this many seconds (the Homing card's 3
+## radians a second bend it 43 degrees), and at most INSTANT_HOMING_MAX degrees.
+const INSTANT_HOMING_SECONDS: float = 0.25
+const INSTANT_HOMING_MAX: float = 90.0
+## The most targets a homing beam bends on to, one after another: with pierce it hits one, then
+## bends on toward another from there (as a homing shot picks a new target after a hit).
+const BEAM_LEGS: int = 8
+## Each homing card after the first multiplies the turn rate (and an instant carrier's bend) by this.
 const HOMING_STACK: float = 1.5
 ## Moves of shots at once whose end point is still to come (a dash whose caster is a shot).
 const SHOT_MOVES: int = 64

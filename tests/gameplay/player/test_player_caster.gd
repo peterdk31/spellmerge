@@ -12,6 +12,7 @@ const InputManagerScript := preload("res://core/input/input_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const CombatScript := preload("res://gameplay/combat/combat.gd")
+const SpellsScript := preload("res://core/spells/spells.gd")
 
 const STEP: float = 0.0625
 const START: Vector2 = Vector2(100.0, 100.0)
@@ -28,6 +29,15 @@ class FakeCombat:
 
 	func consume_wizard_knockback(_index: int, _delta: float) -> Vector2:
 		return push
+
+
+## The spell runtime, asked only how the last dash homes.
+class FakeSpells:
+	extends SpellsScript
+	var homing: Homing = Homing.new()
+
+	func move_homing(_player: int) -> Homing:
+		return homing
 
 
 var _bus: EventsScript
@@ -170,6 +180,30 @@ func test_a_dash_walks_its_whole_distance_and_is_answered_one_step_later() -> vo
 	_run(player, 1)
 	check_equal(_finished.size(), 1, "answered one step later")
 	check_equal(_finished[0][1], &"dash", "as a dash")
+
+
+func test_a_homing_dash_turns_toward_an_enemy_and_goes_its_whole_distance() -> void:
+	var enemy := own(Node2D.new()) as Node2D
+	root.add_child(enemy)
+	enemy.global_position = START + Vector2(60.0, 40.0)
+	_mgr.add_target(enemy, 8.0, ManagerScript.LAYER_ENEMY)
+	var plain: PlayerScript = _wizard(0)
+	plain.facing = Vector2.RIGHT
+	_ask(plain, &"dash", Vector2(55.0, 0.0), 0.25)
+	_run(plain, 5)
+	check(is_equal_approx(plain.global_position.y, START.y), "a plain dash goes straight: %s" % plain.global_position)
+	var spells := own(FakeSpells.new()) as FakeSpells
+	spells.homing.turn = 3.0
+	spells.homing.reach = 160.0
+	var homing: PlayerScript = _wizard(1)
+	homing.spells = spells
+	homing.facing = Vector2.RIGHT
+	_ask(homing, &"dash", Vector2(55.0, 0.0), 0.25)
+	_run(homing, 5)
+	var moved: Vector2 = homing.global_position - START
+	check(moved.y > 3.0, "a homing dash turns toward the enemy: %s" % moved)
+	check(homing.global_position.distance_to(enemy.global_position) < plain.global_position.distance_to(enemy.global_position), "and ends nearer it")
+	check(absf(moved.length() - 55.0) < 1.0 or moved.length() < 55.0, "no farther than its distance: %s" % moved.length())
 
 
 func test_teleport_along_a_wall_keeps_the_body_out_of_it() -> void:

@@ -48,8 +48,12 @@ var echo_hit: HitProfile = null
 
 ## Radians per second a shot turns toward a target; 0 means no homing.
 var homing_turn: float = 0.0
-## Degrees off its aim a homing beam still bends to a target (0 without homing).
+## Degrees off its aim a homing beam or teleport still bends to a target: what `homing_turn`
+## turns in SpellLimits.INSTANT_HOMING_SECONDS, at most INSTANT_HOMING_MAX (0 without homing).
 var homing_angle: float = 0.0
+## Pixels away a homing spell looks for its target (`StaffCompiler.homing_range`); 0 when it does
+## not home, or its form cannot be steered (its homing cards are then listed as wasted).
+var homing_range: float = 0.0
 ## Times a hit jumps on to another target; 0 means no chain.
 var chain_jumps: int = 0
 

@@ -145,6 +145,11 @@ var _installed: Array[CompiledStaff] = []
 var _cursor: PackedInt32Array = PackedInt32Array()
 ## player -> the way the wizard's last asked move goes, for the payload fired where it ends
 var _move_heading: PackedVector2Array = PackedVector2Array([Vector2.RIGHT, Vector2.RIGHT, Vector2.RIGHT, Vector2.RIGHT])
+## Per player, the homing of the wizard's last dash; the player steers with it (`move_homing`).
+var _dash_homing: Array[Homing] = []
+## The homing of the teleport being cast (it is over at once), and one that never homes.
+var _teleport_homing: Homing = Homing.new()
+var _no_homing: Homing = Homing.new()
 ## tag -> entities (decoys, familiars) alive that came from it; each counts as a live shot
 var _entities: Dictionary = {}
 ## player * STAFFS + staff -> the tags of its sustained (`hold`) carriers that are on
@@ -209,6 +214,9 @@ var _echo_spell: CompiledSpell = null
 ## recoil move it; orbit, familiar and a returning shot circle it or come back to it.
 const CASTER_WIZARD: int = ProjectilesScript.CASTER_WIZARD
 const CASTER_POINT: int = ProjectilesScript.CASTER_POINT
+## Points of one live beam's path: its start, RAY_SEGMENTS a leg for each target it bends to,
+## and a straight end (within `Projectiles.RAY_PATH_POINTS`).
+const BEAM_POINTS: int = SpellLimits.BEAM_LEGS * ProjectilesScript.RAY_SEGMENTS + 2
 var _caster: int = CASTER_WIZARD
 var _caster_seq: int = 0
 ## Moves of shots whose end point is still to come (a dash whose caster is a shot): the shot,
@@ -260,6 +268,11 @@ var _bm_caster_seq: PackedInt64Array = PackedInt64Array()
 var _bm_life: PackedFloat32Array = PackedFloat32Array()
 var _bm_span: PackedFloat32Array = PackedFloat32Array()
 var _bm_tick: PackedFloat32Array = PackedFloat32Array()
+## The homing of each leg of each live beam (BEAM_LEGS a beam): the target it keeps.
+var _bm_homing: Array[Homing] = []
+## Each live beam's path, BEAM_POINTS a beam (see `_beam_path`), and how many it uses.
+var _bm_points: PackedVector2Array = PackedVector2Array()
+var _bm_count: PackedInt32Array = PackedInt32Array()
 var _bm_turn: PackedFloat32Array = PackedFloat32Array()
 var _bm_fires: PackedInt32Array = PackedInt32Array()
 var _bm_chain: PackedInt32Array = PackedInt32Array()
@@ -319,6 +332,12 @@ func _init() -> void:
 	_bm_span.resize(SpellLimits.BEAMS)
 	_bm_tick.resize(SpellLimits.BEAMS)
 	_bm_turn.resize(SpellLimits.BEAMS)
+	for i in SpellLimits.BEAMS * SpellLimits.BEAM_LEGS:
+		_bm_homing.append(Homing.new())
+	for i in SpellLimits.PLAYERS:
+		_dash_homing.append(Homing.new())
+	_bm_points.resize(SpellLimits.BEAMS * BEAM_POINTS)
+	_bm_count.resize(SpellLimits.BEAMS)
 	_bm_fires.resize(SpellLimits.BEAMS)
 	_bm_chain.resize(SpellLimits.BEAMS)
 	_bm_prev.resize(SpellLimits.BEAMS)
@@ -830,8 +849,8 @@ func _launch(spell: CompiledSpell, tag: int, player: int, origin: Vector2, direc
 				slot = projectiles.spawn(player, at, Vector2.ZERO, lifetime, spell.radius, ProjectilesScript.LAYER_ENEMY, spell.pierce, tag, ProjectilesScript.MOTION_STILL)
 			_:
 				slot = projectiles.spawn(player, origin, heading * spell.speed, lifetime, spell.radius, ProjectilesScript.LAYER_ENEMY, spell.pierce, tag)
-				if slot >= 0 and spell.homing_turn > 0.0:
-					projectiles.set_homing(slot, spell.homing_turn)
+				if slot >= 0 and spell.homing_range > 0.0:
+					projectiles.set_homing(slot, spell.homing_turn, spell.homing_range)
 				if slot >= 0:
 					_apply_travel(slot, spell)
 		if slot < 0:
@@ -851,25 +870,38 @@ func _launch(spell: CompiledSpell, tag: int, player: int, origin: Vector2, direc
 ## farther. The wizard is asked through the player (who picks a dash's way, the way it walks, and
 ## answers with `caster_move_finished` where it stops, staffs A6a; a teleport blinks along the
 ## aim, cut short at the first wall). A shot that cast it dashes or blinks along `direction`
-## itself, and its end point comes when the move is over. With nothing to move (a payload whose
-## shot is gone) it does nothing and returns 0.
+## itself, and its end point comes when the move is over. Homing turns a dash as it goes (the
+## wizard's through `move_homing`, a shot's in `move_shot`) and bends a teleport's way at once.
+## With nothing to move (a payload whose shot is gone) it does nothing and returns 0.
 func _move_caster(spell: CompiledSpell, tag: int, player: int, origin: Vector2, direction: Vector2) -> int:
 	var dash: bool = spell.motion == FormBase.Motion.DASH
+	if not dash:
+		# A teleport is over at once: like a beam, it bends its way toward a target.
+		_teleport_homing.start(spell, hash(Vector3i(player, tag, roundi(_clock * 1000.0))))
+		direction = _teleport_homing.aim(projectiles, player, origin, direction)
 	var offset: Vector2 = direction * move_distance(spell.ray_length, spell.speed, spell.lifetime)
 	var seconds: float = move_seconds(spell.ray_length, spell.speed, spell.lifetime) if dash else 0.0
 	if _caster == CASTER_WIZARD:
 		if events != null:
 			_move_heading[player] = direction
 			if dash:
+				_dash_homing[player].start(spell, hash(Vector2i(player, tag)))
 				events.caster_move_requested.emit(player, &"dash", origin + offset, seconds, tag)
 			else:
 				events.caster_move_requested.emit(player, &"teleport", projectiles.clip_to_walls(origin, origin + offset), 0.0, tag)
 		return 1
 	var shot: int = _caster_shot()
-	if shot < 0 or not projectiles.move_shot(shot, offset, seconds):
+	var turn: float = spell.homing_turn if spell.homing_range > 0.0 else 0.0
+	if shot < 0 or not projectiles.move_shot(shot, offset, seconds, turn, spell.homing_range):
 		return 0
 	_track_move(shot, tag, seconds, direction)
 	return 1
+
+
+## The homing of `player`'s last dash, for the wizard to turn it as it goes (`Homing.steer`); one
+## that does not home when the dash does not, or `player` is out of range.
+func move_homing(player: int) -> Homing:
+	return _dash_homing[player] if player >= 0 and player < _dash_homing.size() else _no_homing
 
 
 ## How far a dash or teleport card moves its caster: its `ray_length` (a card made before moves
@@ -1444,6 +1476,9 @@ func _start_beam(spell: CompiledSpell, tag: int, player: int, origin: Vector2, h
 	_bm_caster[at] = _caster
 	_bm_caster_seq[at] = _caster_seq
 	_bm_turn[at] = 0.0
+	for leg in SpellLimits.BEAM_LEGS:
+		_bm_homing[at * SpellLimits.BEAM_LEGS + leg].start(spell, hash(Vector2i(_bm_born[at], leg)))
+	_bm_count[at] = 0
 	if _caster == CASTER_WIZARD:
 		if _aim_dir[player].is_finite():
 			_bm_turn[at] = _aim_dir[player].angle_to(heading)
@@ -1497,22 +1532,60 @@ func _beam_follow(at: int) -> void:
 			_bm_caster[at] = CASTER_POINT
 
 
-## The curve live beam `at` follows: straight along its way for its `ray_length`, or, when it
-## homes and a target is in front of it, bent from its way onto that target.
+## The path live beam `at` follows (`_bm_points`): straight along its way for its `ray_length`,
+## or, when it homes, bent onto a target in front of it (picked by `Projectiles.homing_point` and
+## kept while it can), then for each pierce it has bent on from there toward another, as a homing
+## shot picks a new target after a hit; past the last it goes straight on. Its hits cut it at
+## its `ray_length` (`ray_points`). `beam_bend` and `beam_end` keep its first curve.
 func _beam_path(at: int) -> void:
 	var spell: CompiledSpell = _bm_spell[at]
 	var origin: Vector2 = _bm_origin[at]
 	var way: Vector2 = _bm_dir[at]
 	var length: float = spell.ray_length
-	var end: Vector2 = origin + way * length
-	var bend: Vector2 = origin + way * (length * 0.5)
-	if spell.homing_turn > 0.0:
-		var goal: Vector2 = projectiles.homing_point(_bm_player[at], origin, way, deg_to_rad(spell.homing_angle), ProjectilesScript.LAYER_ENEMY)
-		if goal.is_finite():
-			end = goal
-			bend = origin + way * (origin.distance_to(goal) * 0.6)
-	_bm_bend[at] = bend
-	_bm_end[at] = end
+	var base: int = at * BEAM_POINTS
+	_bm_points[base] = origin
+	var count: int = 1
+	_bm_bend[at] = origin + way * (length * 0.5)
+	_bm_end[at] = origin + way * length
+	var from: Vector2 = origin
+	var walked: float = 0.0
+	if spell.homing_range > 0.0:
+		var legs: int = mini(spell.pierce + 1, SpellLimits.BEAM_LEGS)
+		for leg in legs:
+			var homing: Homing = _bm_homing[at * SpellLimits.BEAM_LEGS + leg]
+			var goal: Vector2 = homing.point(projectiles, _bm_player[at], from, way)
+			if not goal.is_finite() or walked >= length or _picked_before(at, leg):
+				homing.keep = 0
+				break
+			var bend: Vector2 = from + way * (from.distance_to(goal) * 0.6)
+			if leg == 0:
+				_bm_bend[at] = bend
+				_bm_end[at] = goal
+			for n in range(1, ProjectilesScript.RAY_SEGMENTS + 1):
+				var t: float = float(n) / ProjectilesScript.RAY_SEGMENTS
+				var u: float = 1.0 - t
+				var point: Vector2 = from * (u * u) + bend * (2.0 * u * t) + goal * (t * t)
+				walked += _bm_points[base + count - 1].distance_to(point)
+				_bm_points[base + count] = point
+				count += 1
+			# It leaves the target the way the curve came in.
+			if not goal.is_equal_approx(bend):
+				way = bend.direction_to(goal)
+			from = goal
+	if walked < length:
+		_bm_points[base + count] = from + way * (length - walked)
+		count += 1
+	_bm_count[at] = count
+
+
+## True when leg `leg` of live beam `at` picked a target an earlier leg already bent to: the
+## beam then goes straight on instead of doubling back.
+func _picked_before(at: int, leg: int) -> bool:
+	var id: int = _bm_homing[at * SpellLimits.BEAM_LEGS + leg].keep
+	for before in leg:
+		if _bm_homing[at * SpellLimits.BEAM_LEGS + before].keep == id:
+			return true
+	return false
 
 
 ## Live beam `at` along its curve: with `hit`, its hits, payloads and chain jumps (in the beam
@@ -1523,7 +1596,7 @@ func _beam_cast(at: int, hit: bool) -> void:
 	var player: int = _bm_player[at]
 	var source: Node = _bm_source[at] if is_instance_valid(_bm_source[at]) else null
 	if not hit:
-		_bm_reach[at] = projectiles.ray_curve(player, _bm_origin[at], _bm_bend[at], _bm_end[at], spell.pierce, ProjectilesScript.LAYER_ENEMY, tag, spell.radius * 0.5, source, false)
+		_bm_reach[at] = projectiles.ray_points(player, _bm_points, at * BEAM_POINTS, _bm_count[at], spell.ray_length, spell.pierce, ProjectilesScript.LAYER_ENEMY, tag, spell.radius * 0.5, source, false)
 		_bm_tip[at] = projectiles.ray_end
 		_bm_tip_dir[at] = projectiles.ray_end_heading
 		return
@@ -1539,7 +1612,7 @@ func _beam_cast(at: int, hit: bool) -> void:
 	_ray_chain = _bm_chain[at]
 	_ray_prev = _bm_prev[at]
 	_echo_spell = spell if _bm_echo[at] != 0 else null
-	var got: float = projectiles.ray_curve(player, _bm_origin[at], _bm_bend[at], _bm_end[at], spell.pierce, ProjectilesScript.LAYER_ENEMY, tag, spell.radius * 0.5, source, true)
+	var got: float = projectiles.ray_points(player, _bm_points, at * BEAM_POINTS, _bm_count[at], spell.ray_length, spell.pierce, ProjectilesScript.LAYER_ENEMY, tag, spell.radius * 0.5, source, true)
 	var tip: Vector2 = projectiles.ray_end
 	var tip_dir: Vector2 = projectiles.ray_end_heading
 	_bm_fires[at] = _ray_fires
@@ -1611,8 +1684,9 @@ func clear_aim(player: int) -> void:
 
 
 ## The live beams, for their look (`gameplay/feel` draws them every frame): `beam_slots()` rows,
-## each on or off. A beam on runs from `beam_origin` along the curve pulled toward `beam_bend` to
-## `beam_end`, cut to its first `beam_reach` pixels (a wall, or the target that spends it).
+## each on or off. A beam on runs along its path (`beam_point_count`, `beam_point`; a homing one
+## bends onto a target, `beam_end`, through `beam_bend`, and with pierce on to more), cut to its
+## first `beam_reach` pixels (its length, a wall, or the target that spends it).
 ## `beam_since_hit` is seconds since its last hit; `beam_left` is its life left, 0 to 1.
 func beam_slots() -> int:
 	return SpellLimits.BEAMS
@@ -1628,6 +1702,16 @@ func beam_player(at: int) -> int:
 
 func beam_origin(at: int) -> Vector2:
 	return _bm_origin[at]
+
+
+## The points of live beam `at`'s path, from its start; it is drawn along them for its first
+## `beam_reach` pixels.
+func beam_point_count(at: int) -> int:
+	return _bm_count[at]
+
+
+func beam_point(at: int, n: int) -> Vector2:
+	return _bm_points[at * BEAM_POINTS + n]
 
 
 func beam_bend(at: int) -> Vector2:

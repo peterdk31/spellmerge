@@ -63,12 +63,10 @@ const COMBO_SWELL_AT: float = 0.45
 const COMBO_ARCANE: Color = Color("#f4f1ea")
 ## Beams and rings draw above the room, under the shots (50) and the flashes (20).
 const FORM_Z: int = 18
-## Live beams drawn at once (core/spells keeps at most as many), and the points of each one's
-## line: a homing beam bends, so it is drawn as a curve of LIVE_BEAM_POINTS - 1 pieces.
+## Live beams drawn at once (core/spells keeps at most as many), and the most points of each
+## one's line: a homing beam bends from target to target, so it is drawn along its path's points.
 const LIVE_BEAMS: int = 64
-const LIVE_BEAM_POINTS: int = 9
-## Samples of the curve walked to find where a beam cut short (a wall, a target) ends.
-const LIVE_BEAM_SAMPLES: int = 16
+const LIVE_BEAM_POINTS: int = 80
 ## The beam texture's height: a line this wide shows it at its own size.
 const BEAM_TEXTURE_HEIGHT: float = 32.0
 
@@ -199,6 +197,8 @@ var _flash_aspect: PackedVector2Array = PackedVector2Array()
 var _flash_grow: PackedFloat32Array = PackedFloat32Array()
 ## The live beams (`Spells.beam_*`), one line each, made once.
 var _live_beams: Array[Line2D] = []
+## Scratch for the points of the live beam being drawn.
+var _beam_line: PackedVector2Array = PackedVector2Array()
 ## Beams and nova rings (sprites made once): seconds left and in all, whether it is a ring,
 ## the owner's body tint and the beam's length in pixels.
 var _forms: Array[Sprite2D] = []
@@ -334,6 +334,7 @@ func _ready() -> void:
 		form.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
 		add_child(form)
 		_forms.append(form)
+	_beam_line.resize(LIVE_BEAM_POINTS)
 	for i in LIVE_BEAMS:
 		var line := Line2D.new()
 		var material := ShaderMaterial.new()
@@ -346,8 +347,8 @@ func _ready() -> void:
 		line.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		line.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
 		line.joint_mode = Line2D.LINE_JOINT_ROUND
-		for n in LIVE_BEAM_POINTS:
-			line.add_point(Vector2.ZERO)
+		line.add_point(Vector2.ZERO)
+		line.add_point(Vector2.ZERO)
 		add_child(line)
 		_live_beams.append(line)
 	_form_left.resize(FORM_SLOTS)
@@ -1255,28 +1256,35 @@ func _draw_live_beams() -> void:
 			if line.visible:
 				line.visible = false
 			continue
-		var origin: Vector2 = spells.call("beam_origin", i)
-		var bend: Vector2 = spells.call("beam_bend", i)
-		var end: Vector2 = spells.call("beam_end", i)
+		var points: int = mini(int(spells.call("beam_point_count", i)), LIVE_BEAM_POINTS)
 		var reach: float = spells.call("beam_reach", i)
-		if reach <= 0.0 or not origin.is_finite():
+		var origin: Vector2 = spells.call("beam_point", i, 0) if points > 0 else Vector2.INF
+		if reach <= 0.0 or points < 2 or not origin.is_finite():
 			line.visible = false
 			continue
-		# How far along the curve (0 to 1) the beam got, then the points spread up to there.
-		var cut: float = 1.0
+		# Its path up to where it got: whole pieces, then the last one cut short.
 		var walked: float = 0.0
 		var prev: Vector2 = origin
-		for n in range(1, LIVE_BEAM_SAMPLES + 1):
-			var t: float = float(n) / LIVE_BEAM_SAMPLES
-			var point: Vector2 = _bezier(origin, bend, end, t)
+		var used: int = 1
+		_beam_line[0] = origin
+		for n in range(1, points):
+			var point: Vector2 = spells.call("beam_point", i, n)
 			var piece: float = prev.distance_to(point)
 			if walked + piece >= reach:
-				cut = (float(n - 1) + (reach - walked) / maxf(piece, 0.001)) / LIVE_BEAM_SAMPLES
+				_beam_line[used] = prev.move_toward(point, reach - walked)
+				used += 1
 				break
 			walked += piece
+			_beam_line[used] = point
+			used += 1
 			prev = point
-		for n in LIVE_BEAM_POINTS:
-			line.set_point_position(n, _bezier(origin, bend, end, cut * float(n) / (LIVE_BEAM_POINTS - 1)))
+		# The line only changes its number of points when the path does.
+		while line.get_point_count() < used:
+			line.add_point(Vector2.ZERO)
+		while line.get_point_count() > used:
+			line.remove_point(line.get_point_count() - 1)
+		for n in used:
+			line.set_point_position(n, _beam_line[n])
 		var since: float = spells.call("beam_since_hit", i)
 		var left: float = spells.call("beam_left", i)
 		var fade: float = clampf(left * 4.0, 0.0, 1.0)
@@ -1291,13 +1299,8 @@ func _draw_live_beams() -> void:
 		var tint: Color = spells.call("beam_tint", i)
 		var material: ShaderMaterial = line.material as ShaderMaterial
 		material.set_shader_parameter(&"core_override", Color(tint.r, tint.g, tint.b, 1.0))
-		material.set_shader_parameter(&"body_tint", Color(body.r, body.g, body.b, fade))
+		material.set_shader_parameter(&"body_tint", Color(body.r, body.g, body.b, fade * preset.beam_alpha))
 		line.visible = true
-
-
-static func _bezier(origin: Vector2, bend: Vector2, end: Vector2, t: float) -> Vector2:
-	var u: float = 1.0 - t
-	return origin * (u * u) + bend * (2.0 * u * t) + end * (t * t)
 
 
 ## Show form `slot` at `t` (1 just shown, 0 gone), faded. A ring widens; a beam opens extra
@@ -1306,7 +1309,8 @@ func _pose_form(slot: int, t: float) -> void:
 	var sprite: Sprite2D = _forms[slot]
 	var body: Color = _form_body[slot]
 	var age: float = 1.0 - t
-	(sprite.material as ShaderMaterial).set_shader_parameter(&"body_tint", Color(body.r, body.g, body.b, t))
+	var alpha: float = t if _form_is_ring[slot] != 0 else t * preset.beam_alpha
+	(sprite.material as ShaderMaterial).set_shader_parameter(&"body_tint", Color(body.r, body.g, body.b, alpha))
 	if _form_is_ring[slot] != 0:
 		var across: float = preset.nova_ring_size * (0.25 + 0.75 * age)
 		sprite.scale = Vector2.ONE * (across / 32.0)

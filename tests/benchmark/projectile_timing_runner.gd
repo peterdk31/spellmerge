@@ -35,6 +35,8 @@ const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
 
 const DT: float = 1.0 / 60.0
+## How far round a shot homing looks (the Homing card's reach).
+const HOMING_REACH: float = 160.0
 const ROOM: Vector2 = Vector2(640.0, 360.0)
 const ENEMIES: int = 100
 ## Where the crowd stands, and where the hostile shots start.
@@ -213,7 +215,7 @@ func _run_motion_timings(cap: int) -> void:
 		for n in cap:
 			var at := CROWD_CENTER + Vector2(float(n * 37 % 240) - 120.0, 90.0 + float(n * 53 % 60))
 			var slot: int = _mgr.spawn(n % PLAYERS, at, Vector2(0.0, -60.0), 1.0e6, 4.0, ManagerScript.LAYER_ENEMY, 1000000)
-			_mgr.set_homing(slot, 3.0)
+			_mgr.set_homing(slot, 3.0, HOMING_REACH)
 		var start: int = Time.get_ticks_usec()
 		_mgr.step(DT)
 		homing_us += float(Time.get_ticks_usec() - start)

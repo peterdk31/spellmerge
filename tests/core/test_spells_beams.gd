@@ -56,6 +56,12 @@ func before_each() -> void:
 	var bolt: FormBase = _form(&"bolt", 300.0, 1.0)
 	bolt.radius = 2.0
 	_modifier(&"homing", ModifierBase.Behaviour.HOMING, 3.0)
+	(_fake.items[&"homing"] as ModifierBase).behaviour_reach = 160.0
+	_modifier(&"far_homing", ModifierBase.Behaviour.HOMING, 3.0)
+	(_fake.items[&"far_homing"] as ModifierBase).behaviour_reach = 340.0
+	var piercing := ModifierBase.new()
+	piercing.extra_pierce = 1
+	_put(piercing, &"pierce")
 	_modifier(&"hold", ModifierBase.Behaviour.HOLD, 1.0)
 	_modifier(&"blast", ModifierBase.Behaviour.BLAST, 30.0)
 	var timer := TriggerBase.new()
@@ -168,6 +174,37 @@ func test_a_homing_beam_bends_onto_a_target_off_its_line() -> void:
 	check(_hits.size() == 1 and _hits[0][1] == off, "and hits it")
 
 
+func test_a_homing_beam_never_reaches_past_its_length() -> void:
+	# The card looks 340 px; the beam is 200 px long: it bends toward the target but stops short.
+	var far: Node2D = _target(Vector2(280, 40))
+	_build([&"far_homing", &"beam"])
+	_cast()
+	var at: int = _beam()
+	check(_spells.beam_end(at).is_equal_approx(far.global_position), "it bends toward a target past its end")
+	check(_hits.is_empty(), "but does not hit it")
+	check(_spells.beam_reach(at) <= 200.0 + 0.01, "it is cut at its 200 px: %s" % _spells.beam_reach(at))
+
+
+func test_a_homing_beam_with_pierce_bends_on_to_another_target_after_a_hit() -> void:
+	# The second stands outside the 45 degree bend from the staff, but inside it from the first.
+	var first: Node2D = _target(Vector2(60, 20))
+	var second: Node2D = _target(Vector2(80, 90))
+	_build([&"homing", &"beam"])
+	_cast()
+	check(_hits.size() == 1 and _hits[0][1] == first, "without pierce it ends on the first: %s" % [_hits])
+	_tick(30)
+	_hits.clear()
+	_build([&"homing", &"pierce", &"beam"])
+	_cast()
+	var hit: Array = []
+	for h: Array in _hits:
+		hit.append(h[1])
+	check(hit.has(first) and hit.has(second), "with pierce it hits one, then bends on to the other: %s" % [hit])
+	var at: int = _beam()
+	check(_spells.beam_point_count(at) > ManagerScript.RAY_SEGMENTS + 1, "its path has a second bend (%d points)" % _spells.beam_point_count(at))
+	check(SpellsScript.BEAM_POINTS <= ManagerScript.RAY_PATH_POINTS, "a beam's whole path fits a ray's")
+
+
 func test_a_held_beam_stays_on_until_its_staff_is_cast_again() -> void:
 	var tag: int = _build([&"hold", &"beam"])
 	_cast()
@@ -220,15 +257,15 @@ func test_homing_cards_stack_by_multiplying() -> void:
 	var one: CompiledSpell = StaffKit.first(_spells, [&"homing", &"bolt"] as Array[StringName])
 	var two: CompiledSpell = StaffKit.first(_spells, [&"homing", &"homing", &"bolt"] as Array[StringName])
 	var three: CompiledSpell = StaffKit.first(_spells, [&"homing", &"homing", &"homing", &"bolt"] as Array[StringName])
-	check(is_equal_approx(one.homing_turn, 3.0) and is_equal_approx(one.homing_angle, SpellLimits.BEAM_HOMING_ANGLE), "one card: its own turn rate and the base bend")
+	check(is_equal_approx(one.homing_turn, 3.0) and is_equal_approx(one.homing_angle, rad_to_deg(3.0 * SpellLimits.INSTANT_HOMING_SECONDS)), "one card: its own turn rate, and the bend that turns in INSTANT_HOMING_SECONDS")
 	check(is_equal_approx(two.homing_turn, 3.0 * SpellLimits.HOMING_STACK), "two turn %s times faster: %s" % [SpellLimits.HOMING_STACK, two.homing_turn])
 	check(is_equal_approx(three.homing_turn, 3.0 * SpellLimits.HOMING_STACK * SpellLimits.HOMING_STACK), "three faster again: %s" % three.homing_turn)
-	check(is_equal_approx(two.homing_angle, SpellLimits.BEAM_HOMING_ANGLE * SpellLimits.HOMING_STACK), "a beam bends wider with two: %s" % two.homing_angle)
-	check(is_equal_approx(three.homing_angle, SpellLimits.BEAM_HOMING_MAX), "up to the most: %s" % three.homing_angle)
+	check(is_equal_approx(two.homing_angle, rad_to_deg(two.homing_turn * SpellLimits.INSTANT_HOMING_SECONDS)), "a beam bends wider with two, as it turns faster: %s" % two.homing_angle)
+	check(is_equal_approx(three.homing_angle, SpellLimits.INSTANT_HOMING_MAX), "up to the most: %s" % three.homing_angle)
 
 
 func test_two_homing_cards_bend_a_beam_onto_a_target_one_cannot_reach() -> void:
-	# 60 degrees off the aim: past one card's 45, inside two cards' 67.5.
+	# 60 degrees off the aim: past one card's 43, inside two cards' 64.
 	var off: Node2D = _target(Vector2.from_angle(deg_to_rad(60.0)) * 100.0)
 	_build([&"homing", &"beam"])
 	_cast()

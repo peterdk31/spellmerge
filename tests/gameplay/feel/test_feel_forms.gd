@@ -127,11 +127,25 @@ func test_the_shipped_preset_has_the_form_art() -> void:
 	check(shipped.beam_texture != null and shipped.nova_texture != null, "beam and ring art")
 
 
-## Stands in for core/spells' live beams: one beam of player 1 bending from (0, 0) to (100, 40).
+## Stands in for core/spells' live beams: one beam of player 1 bending from (0, 0) to (100, 40),
+## and with `on_again` bending on from there to (160, 0).
 class FakeBeams:
 	extends Node
 	var on: bool = true
 	var reach: float = 500.0
+	var on_again: bool = false
+
+	func beam_point_count(_at: int) -> int:
+		return 17 if on_again else 9
+
+	func beam_point(_at: int, n: int) -> Vector2:
+		if n <= 8:
+			return _curve(Vector2.ZERO, Vector2(60, 0), Vector2(100, 40), float(n) / 8.0)
+		return _curve(Vector2(100, 40), Vector2(124, 64), Vector2(160, 0), float(n - 8) / 8.0)
+
+	static func _curve(from: Vector2, bend: Vector2, end: Vector2, t: float) -> Vector2:
+		var u: float = 1.0 - t
+		return from * (u * u) + bend * (2.0 * u * t) + end * (t * t)
 
 	func beam_slots() -> int:
 		return 2
@@ -184,10 +198,16 @@ func test_a_live_beam_is_drawn_along_its_curve_every_frame() -> void:
 	var middle: Vector2 = line.get_point_position(line.get_point_count() / 2)
 	check(middle.y > 0.0 and middle.y < 20.0, "bent, not straight: %s" % middle)
 	check((line.material as ShaderMaterial).get_shader_parameter(&"core_override").is_equal_approx(Color(FROST.r, FROST.g, FROST.b, 1.0)), "the core is the element's")
+	var tint: Color = (line.material as ShaderMaterial).get_shader_parameter(&"body_tint")
+	check(is_equal_approx(tint.a, feel.preset.beam_alpha) and tint.a < 1.0, "a little see-through, so crossing beams all show: %f" % tint.a)
 	beams.reach = 50.0
 	feel.step(0.016)
 	var tip: Vector2 = line.get_point_position(line.get_point_count() - 1)
 	check(absf(tip.length() - 50.0) < 3.0, "cut where it stopped: %s" % tip)
+	beams.reach = 500.0
+	beams.on_again = true
+	feel.step(0.016)
+	check(line.get_point_position(line.get_point_count() - 1).is_equal_approx(Vector2(160, 0)), "a beam bending on to a second target is drawn to it: %s" % line.get_point_position(line.get_point_count() - 1))
 	beams.on = false
 	feel.step(0.016)
 	check(_live_lines().is_empty(), "gone when it ends")

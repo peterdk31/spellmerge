@@ -25,6 +25,12 @@ const MAX_PENDING: int = 128
 const ECHO_DAMAGE: float = 0.5
 ## Reach in pixels of a chain's jump to the next target.
 const CHAIN_RANGE: float = 96.0
+## Share of its shot's damage an `arc` zap hits for (the shot's infusions come along).
+const ARC_DAMAGE: float = 0.5
+## Fewest seconds between two zaps of one shot, whatever its card says.
+const ARC_MIN_INTERVAL: float = 0.1
+## Zaps all shots together may make in one physics step; more wait for the next.
+const MAX_ARCS_PER_STEP: int = 32
 ## Degrees a split fan covers when the form has no spread of its own.
 const SPLIT_SPREAD: float = 30.0
 ## Builds of one staff (the generations) whose shots can be in the air at once.

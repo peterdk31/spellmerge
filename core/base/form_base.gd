@@ -24,8 +24,6 @@ enum Motion {
 	HOOK,
 	## A straight shot that trades places with the target it hits (B2, B4, B5).
 	SWAP,
-	## Flies out for half its life, then back to the caster (B1).
-	RETURN,
 	## `shots` still shots in a line across the aim, `spread` pixels apart (B2).
 	WALL,
 	## Reads a payload and drops it on the aim point after `lifetime` seconds (B2).

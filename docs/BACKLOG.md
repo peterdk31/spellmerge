@@ -9,6 +9,7 @@ For later milestones; see `docs/milestones/M2-staffs.md`, "Later".
 - **`on wall` at every bounce.** A bouncing shot does not end, so `projectile_expired` is not sent and `on wall` fires only at the last wall. The card text (`bounce · on wall · bolt · nova`, a nova at every bounce) needs a manager event for a bounce (for example `shot_bounced`) that B2's trigger relay can read; decide before the `on wall` card.
 
 - **Staff types (M3).** An always-cast slot, a shuffle staff (random order), built-in recoil, cheaper `hold`; staffs found in runs with other slot counts, delays and recharges.
+- **Arc zaps and `on hit` (M3 staffs or relics, owner 2026-10-27).** For now an `arc` zap is a hit like any other, so it sets off `on hit` payloads and chains. Later that should not be the card's default but something a build earns: either an implicit mod on a staff type ("zaps count as hits") or a relic. Then the plain arc zap stops setting off `on hit`.
 - **Staff spread (M3, owner 2026-10-27).** Found staffs have a `spread`: either rolled at random, or starting high and upgradable to lower values. The runtime and `spread_mult` (Sniper) are in since 2026-10-27; the dev and starter staffs aim true.
 - **Relics on cards (M3).** Explosion immunity (hit kind `burst`), self-damage refunded as mana, immunity to one element, triggers that fire twice.
 - **Enemies with staffs (M3–M4).** Elites and bosses built on the same compiler; their cards can drop as rewards.

@@ -19,7 +19,9 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
 - [ ] **Card: bounce (staffs C).** After B1. Data only (M2-staffs.md, "Working in parallel").
 - [ ] **Card: ghost (staffs C).** After B1. Data only (M2-staffs.md, "Working in parallel").
 - [ ] **Card: spiral (staffs C).** After B1. Data only (M2-staffs.md, "Working in parallel").
-- [ ] **Card: boomerang (staffs C).** After B1. Data only (M2-staffs.md, "Working in parallel").
+- [ ] **Card: return (staffs C).** After the slow, return and arc kit (owner, 2026-10-27; replaces the boomerang carrier). Data only.
+- [ ] **Card: slow (staffs C).** After the slow, return and arc kit (owner, 2026-10-27). Data only.
+- [ ] **Card: arc (staffs C).** After the slow, return and arc kit (owner, 2026-10-27). Data only.
 - [ ] **Card: linger (staffs C).** After B1. Data only (M2-staffs.md, "Working in parallel").
 - [ ] **Card: growth (staffs C).** After B1. Data only (M2-staffs.md, "Working in parallel").
 - [ ] **Card: on cast (staffs C).** After B2. Data only (M2-staffs.md, "Working in parallel").

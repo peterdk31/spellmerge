@@ -440,7 +440,7 @@ func _test_apply_travel_maps_cards_to_the_shot() -> void:
 	spell.behaviours[ModifierBase.Behaviour.GROWTH] = 2.0
 	spell.behaviours[ModifierBase.Behaviour.STICKY] = 0.5
 	spell.behaviours[ModifierBase.Behaviour.SHIELD] = 2.6
-	spell.motion = FormBase.Motion.RETURN
+	spell.behaviours[ModifierBase.Behaviour.RETURN] = 1.0
 	_mgr.set_walls([Rect2(100.0, 0.0, 32.0, 200.0)] as Array[Rect2])
 	_mgr.set_anchor(0, Vector2(50.0, 100.0))
 	var slot: int = _fire(Vector2(200.0, 0.0), Vector2(50.0, 100.0), 1.2)
@@ -450,7 +450,7 @@ func _test_apply_travel_maps_cards_to_the_shot() -> void:
 	_check(_mgr.get_growth_of(slot) > 1.0, "the shot grows")
 	_check(_mgr.is_alive(slot) and _mgr.get_position_of(slot).x > 132.0 and _mgr.get_velocity_of(slot).x > 0.0, "a ghost passes the wall without bouncing")
 	_run(150)
-	_check(not _mgr.is_alive(slot) and not _expired.is_empty() and _expired.back()[1].distance_to(Vector2(50.0, 100.0)) < 1.0, "a return carrier flies back to the caster")
+	_check(not _mgr.is_alive(slot) and not _expired.is_empty() and _expired.back()[1].distance_to(Vector2(50.0, 100.0)) < 1.0, "a returning shot flies back to the caster")
 	spells.free()
 	# A bounce card: 1.4 rounds to one bounce.
 	_setup()

@@ -1617,3 +1617,10 @@ How it is built (parts F2–F10):
 - **The enemies share one player's worth of beam sprites** (24), so a crowd of casters never takes a player's.
 - **A rain shows a marker,** for wizards and enemies alike: a ring closing on its point for the seconds until it falls. Feel drew nothing for `rain` before, which an enemy's rain would have made unfair.
 - **The hostile texture hand-off stays until F9,** with the hostile batch it serves (the AI's old shot still uses it).
+
+## 2026-10-28: Enemies cast their staffs (staffs F8a)
+
+- **The staff is data on the enemy type** (`EnemyBase.staff`, `cards`, `max_mana`, `mana_regen`), so a new enemy is a sprite and a `.tres`, as the owner asked. It is compiled once per type and installed into each enemy's own caster row, so 200 imps share one compiled staff but each has its own delay, cycle and generations.
+- **The telegraph is a promise:** the windup starts only when the next cast can leave as it ends (its delay no longer than the windup, its mana there), and the enemy holds in reach until then. A refused cast after a telegraph would teach players to ignore telegraphs.
+- **The aim is locked through the windup and the recovery,** so a beam the enemy holds follows where it aimed, not the wizard; it follows the target again once the enemy chases.
+- **F8 is three parts:** the casting (F8a), the telegraph in the new style (F8b, Feel) and caster-side cards on enemies (F8c, with Entities), so no PR touches two areas' internals at once.

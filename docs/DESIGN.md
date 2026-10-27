@@ -61,4 +61,4 @@ Professional-looking, very few bugs, genuinely good art, music and gameplay. Qua
 
 ## Art direction (locked)
 
-Chosen on 2026-10-23: style N, a narrow dusk (Stone) robe with a Spark placket, belt and hem, two big tall eyes and no mouth, under a big pointed hat in the player's colour (the only player colour on the wizard). The rules and golden examples are in docs/STYLE.md and art/kit/golden.json.
+Chosen on 2026-10-23: style N, a narrow dusk (Stone) robe with a Spark placket, belt and hem, two big tall eyes and no mouth, under a big pointed hat in the player's colour (the only player colour on the wizard). The rules and golden examples are in docs/STYLE.md and art/kit/golden.json. Spell shots are the one thing that glows (the owner, 2026-10-27): small white-hot cores, long cooling tails and a soft glow in their colour, drawn by the shot shader (docs/milestones/M2-staffs.md, "The look of a shot").

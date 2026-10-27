@@ -39,7 +39,7 @@ func take() -> void:
 	_shots.call("set_cap", 200)
 	# Carriers by infusion: column 0 is plain.
 	for e in 6:
-		var x: float = 30.0 + e * 40.0
+		var x: float = 40.0 + e * 52.0
 		var tint: Color = Color.WHITE if e == 0 else ELEMENTS[e - 1].get("tint") as Color
 		var look: PackedInt32Array = PackedInt32Array() if e == 0 else PackedInt32Array([int(ELEMENTS[e - 1].get("look_layer"))])
 		_bolt(0, Vector2(x, 30.0), BOLT_RADIUS, tint, look)

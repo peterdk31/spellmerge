@@ -1,0 +1,9 @@
+{
+	"id": "growth_far_shot",
+	"name": "Growth far shot",
+	"does": "A fire bolt that has grown by the end of its flight and catches an imp a plain bolt would fly past.",
+	"casts": [{"staff": 0, "cards": ["growth", "fire", "bolt"]}],
+	"imps": [[230, 18]],
+	"seconds": 1.5,
+	"checks": [{"kind": "status", "imps": [0], "status": "burn"}]
+}

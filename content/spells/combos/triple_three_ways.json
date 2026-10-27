@@ -1,9 +1,9 @@
 {
 	"id": "triple_three_ways",
 	"name": "Triple three ways",
-	"does": "A fire bolt, a frost beam and a void orbit in one cast: each marks its own imp.",
-	"casts": [{"staff": 0, "cards": ["triple", "fire", "bolt", "frost", "beam", "void", "orbit"]}],
-	"imps": [[88, -19], [150, 0], [0, 36]],
+	"does": "A fire bolt, a nova and a void orbit in one cast: the imp far ahead burns, the ring hits the one behind and the orbit hexes the one beside.",
+	"casts": [{"staff": 0, "cards": ["triple", "fire", "bolt", "nova", "void", "orbit"]}],
+	"imps": [[150, 0], [-60, 0], [0, -36]],
 	"seconds": 1.5,
-	"checks": [{"kind": "status", "imps": [0], "status": "burn"}, {"kind": "status", "imps": [1], "status": "chill"}, {"kind": "status", "imps": [2], "status": "hex"}]
+	"checks": [{"kind": "status", "imps": [0], "status": "burn"}, {"kind": "damaged", "imps": [1]}, {"kind": "status", "imps": [2], "status": "hex"}]
 }

@@ -148,14 +148,13 @@ func test_a_cast_needs_its_mana() -> void:
 	check_equal(_spells.cast_index(2, 3), 0, "a refused cast changes nothing")
 
 
-func test_multicast_fires_two_carriers_apart() -> void:
+func test_multicast_fires_two_carriers_along_the_aim() -> void:
+	# The staff has no spread, so nothing sets them apart (tests/core/test_staff_spread.gd).
 	_install(0, 0, "double bolt bolt")
 	_spells.cast_staff(0, 0, Vector2.ZERO, AIM, 100.0)
 	check_equal(_mgr.get_count(), 2, "two bolts in one cast")
-	var headings: Array[Vector2] = []
 	for slot in 2:
-		headings.append(_mgr.get_velocity_of(slot).normalized())
-	check(not headings[0].is_equal_approx(headings[1]), "they fly apart, not as one")
+		check(_mgr.get_velocity_of(slot).normalized().is_equal_approx(AIM.normalized()), "bolt %d flies along the aim" % slot)
 
 
 func test_a_payload_fires_on_hit_under_its_own_node() -> void:

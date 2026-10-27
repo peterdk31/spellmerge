@@ -31,9 +31,6 @@ const SPLIT_SPREAD: float = 30.0
 const GENERATIONS: int = 8
 ## Staffs per player, one per button: A, X, Y and B.
 const STAFFS: int = 4
-## Degrees between the carriers of one multicast group, so two bolts cast together do not fly
-## as one (tuning, not a limit).
-const MULTICAST_SPREAD: float = 12.0
 ## Pixels ahead of the caster that a rain falls when the form gives no `ray_length`, and that
 ## the middle of a wall is placed.
 const RAIN_REACH: float = 120.0

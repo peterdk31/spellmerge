@@ -1,9 +1,0 @@
-{
-	"id": "triple_frost_fan",
-	"name": "Triple frost fan",
-	"does": "Three frost bolts leave in one cast, fanned out, and chill three imps in a row across the aim.",
-	"casts": [{"staff": 0, "cards": ["triple", "frost", "bolt", "frost", "bolt", "frost", "bolt"]}],
-	"imps": [[117, -25], [120, 0], [117, 25]],
-	"seconds": 1.5,
-	"checks": [{"kind": "status_count", "status": "chill", "min": 3}]
-}

@@ -10,7 +10,7 @@ Everything that customises the single base wizard. **Cosmetics** (`cosmetics/`) 
 
 - There is one base wizard. No new characters or classes.
 - Cosmetics are visual only and must never change gameplay or hitboxes.
-- A staff is a `.tres` on `StaffBase` (`core/base/staff_base.gd`): `id` (the folder name), `display_name`, `slots` (1–64), `draw` (1–4), `cast_delay` (0–2 s), `recharge` (0–5 s) and `spread` (0–45°). The validator checks it (`SpellValidator.check_staff`). Two ship: `staffs/starter/` (4 slots, the normal game) and `staffs/dev/` (20 slots, the sandbox in `dev` and `preview` builds). The cards in the slots belong to the player, not the staff. Staff types found in runs are M3.
+- A staff is a `.tres` on `StaffBase` (`core/base/staff_base.gd`): `id` (the folder name), `display_name`, `slots` (1–64), `draw` (1–4), `cast_delay` (0–2 s), `recharge` (0–5 s) and `spread` (0–45°: how far each shot may leave its line, either side, at random; both staffs that ship have 0). The validator checks it (`SpellValidator.check_staff`). Two ship: `staffs/starter/` (4 slots, the normal game) and `staffs/dev/` (20 slots, the sandbox in `dev` and `preview` builds). The cards in the slots belong to the player, not the staff. Staff types found in runs are M3.
 - Each of the four players must stay recognisable: respect the player colours and keep the silhouette readable at 1× with 4 wizards on screen.
 - Sprites follow `docs/STYLE.md` (32×32, palette, frame counts). Content is discovered by folder through `core/registry`.
 

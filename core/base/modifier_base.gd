@@ -77,6 +77,12 @@ enum Behaviour {
 ## random from its tail; two cards with the same kind add nothing more.
 @export var look_layer: int = 0
 
+# --- Aim (staff spread) ---------------------------------------------------------------
+
+## Factor on the staff's `spread` for the next carrier's shots: below 1 they leave truer
+## (sniper), above 1 wilder. Several multiply. A staff with no spread aims true whatever it is.
+@export var spread_mult: float = 1.0
+
 
 func kind() -> StringName:
 	return &"modifier"
@@ -96,5 +102,6 @@ func ranges() -> Dictionary:
 		"behaviour": Vector2(0, Behaviour.size() - 1),
 		"behaviour_strength": Vector2(0.0, 256.0),
 		"behaviour_reach": Vector2(0.0, 360.0),
+		"spread_mult": Vector2(0.0, 4.0),
 	})
 	return limits

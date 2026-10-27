@@ -26,8 +26,9 @@ extends Node2D
 ##
 ## Swap (`target_move_requested`) is heard by each enemy itself (`ai.gd`), not here.
 ##
-## Nothing here allocates per frame; drawing is one canvas item (this node) plus the pooled
-## decoy nodes. All timing runs in step(delta), so tests drive it with fixed deltas.
+## Nothing here allocates per frame; drawing is the pooled decoy nodes and one batch of the
+## familiars, drawn by the shots' shader as orbit shots (the glow look, 2026-10-27): a small
+## white-hot core in its player's colours and a tail that bends round its circle. All timing runs in step(delta), so tests drive it with fixed deltas.
 
 const EventsScript := preload("res://core/events/events.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
@@ -53,8 +54,11 @@ const DECOY_RADIUS: float = 8.0
 const DECOY_OFFSET: Vector2 = Vector2(0.0, -12.0)
 ## An enemy this close to a decoy chases the decoy rather than any wizard.
 const DECOY_LURE: float = 240.0
-## How see-through the copy is, so it never reads as a second wizard.
-const DECOY_ALPHA: float = 0.6
+## How far the copy has fallen apart (the shot shader's dissolve: its pixels in its player's
+## colour, part of them gone, with a glow), so it never reads as a second wizard; never
+## see-through (the glow look, 2026-10-27).
+const DECOY_DISSOLVE: float = 0.3
+const DECOY_GLOW: float = 0.6
 
 ## The familiar circles this far from the wizard's body, this fast (radians a second).
 const FAMILIAR_ORBIT: float = 20.0
@@ -66,9 +70,10 @@ const FAMILIAR_FIRST: float = 0.5
 ## Enemies further than this are not cast at.
 const FAMILIAR_RANGE: float = 200.0
 ## The orb: radius in pixels, outline and core.
+## A familiar is drawn as an orbit shot of this hit radius (its zoom, see `look_zoom`).
 const FAMILIAR_SIZE: float = 3.0
-const OUTLINE_COLOR: Color = Color("14121f")
-const CORE_COLOR: Color = Color("fff4d6")
+const CORE_SHADER: Shader = preload("res://core/projectiles/shot_core.gdshader")
+const STRIDE: int = 16
 
 ## Above the room and the wizards, below the shots (`ProjectileManagerScript.DRAW_Z`): the
 ## autoload is drawn before the current scene, as the shots are.
@@ -113,11 +118,26 @@ class Decoy extends Node2D:
 	func _init() -> void:
 		sprite = Sprite2D.new()
 		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		sprite.material = _material()
 		add_child(sprite)
 		hat = Sprite2D.new()
 		hat.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		hat.material = _material()
 		sprite.add_child(hat)
 		visible = false
+
+	func _material() -> ShaderMaterial:
+		var material := ShaderMaterial.new()
+		material.shader = CORE_SHADER
+		material.set_shader_parameter(&"core_override", Color.WHITE)
+		material.set_shader_parameter(&"dissolve", DECOY_DISSOLVE)
+		material.set_shader_parameter(&"sprite_glow", DECOY_GLOW)
+		return material
+
+	## Turn the copy to `colour` (its player's).
+	func tint(colour: Color) -> void:
+		(sprite.material as ShaderMaterial).set_shader_parameter(&"dissolve_color", colour)
+		(hat.material as ShaderMaterial).set_shader_parameter(&"dissolve_color", colour)
 
 	func is_downed() -> bool:
 		return not active
@@ -141,8 +161,32 @@ class Decoy extends Node2D:
 		to.centered = from.centered
 
 
+## The familiars' batch and its buffer, and the seconds its shader animates from.
+var _familiar_node: MultiMeshInstance2D = null
+var _familiar_buffer: PackedFloat32Array = PackedFloat32Array()
+var _clock: float = 0.0
+
+
 func _init() -> void:
 	z_index = DRAW_Z
+	_familiar_node = MultiMeshInstance2D.new()
+	var quad := QuadMesh.new()
+	quad.size = Vector2.ONE
+	var multimesh := MultiMesh.new()
+	multimesh.transform_format = MultiMesh.TRANSFORM_2D
+	multimesh.use_colors = true
+	multimesh.use_custom_data = true
+	multimesh.mesh = quad
+	multimesh.instance_count = POOL_SIZE
+	multimesh.visible_instance_count = 0
+	multimesh.custom_aabb = AABB(Vector3(-100000.0, -100000.0, -1.0), Vector3(200000.0, 200000.0, 2.0))
+	_familiar_node.multimesh = multimesh
+	var material := ShaderMaterial.new()
+	material.shader = CORE_SHADER
+	_familiar_node.material = material
+	_familiar_node.name = "Familiars"
+	add_child(_familiar_node)
+	_familiar_buffer.resize(POOL_SIZE * STRIDE)
 	for row in POOL_SIZE:
 		_kind.append(&"")
 		_caster.append(null)
@@ -151,7 +195,6 @@ func _init() -> void:
 		_centre_seq.append(0)
 		var decoy := Decoy.new()
 		decoy.name = "Decoy%d" % row
-		decoy.modulate.a = DECOY_ALPHA
 		_decoys.append(decoy)
 		add_child(decoy)
 	_player.resize(POOL_SIZE)
@@ -185,7 +228,9 @@ func _physics_process(delta: float) -> void:
 
 ## Move time on: lifetimes, familiar orbits and casts.
 func step(delta: float) -> void:
+	_clock += delta
 	if _live == 0:
+		_write_familiars()
 		return
 	for row in POOL_SIZE:
 		if _kind[row] == &"":
@@ -197,6 +242,7 @@ func step(delta: float) -> void:
 		if _kind[row] == FAMILIAR:
 			_step_familiar(row, delta)
 	queue_redraw()
+	_write_familiars()
 
 
 ## How many entities are live, of `kind` (all kinds when empty) and `player` (all when -1).
@@ -276,6 +322,7 @@ func _on_spawn_requested(player: int, kind: StringName, at: Vector2, seconds: fl
 		var decoy: Decoy = _decoys[row]
 		decoy.position = at
 		decoy.copy_look(wizard)
+		decoy.tint(ProjectileManagerScript.PLAYER_COLORS[clampi(player, 0, 3)].lerp(Color.WHITE, 0.4))
 		decoy.active = true
 		decoy.visible = true
 		if projectiles != null:
@@ -404,11 +451,45 @@ func _centre_of(wizard: Node2D) -> Vector2:
 	return (wizard.global_position if wizard.is_inside_tree() else wizard.position) + FAMILIAR_CENTRE
 
 
-func _draw() -> void:
+## Write the live familiars into their batch: orbit shots flying along their circle (the bend of
+## FAMILIAR_ORBIT), in their player's colours.
+func _write_familiars() -> void:
+	(_familiar_node.material as ShaderMaterial).set_shader_parameter(&"sim_time", _clock)
+	var out: int = 0
+	var size: float = ProjectileManagerScript.look_size(FAMILIAR_SIZE)
+	var length: float = ProjectileManagerScript.look_length(FAMILIAR_SIZE)
+	var code: float = ProjectileManagerScript.bend_code(1.0 / FAMILIAR_ORBIT)
+	var zoom: int = ProjectileManagerScript.look_zoom(FAMILIAR_SIZE)
 	for row in POOL_SIZE:
 		if _kind[row] != FAMILIAR:
 			continue
-		var at: Vector2 = _position[row].round()
-		draw_circle(at, FAMILIAR_SIZE + 1.0, OUTLINE_COLOR)
-		draw_circle(at, FAMILIAR_SIZE, ProjectileManagerScript.PLAYER_COLORS[_player[row]])
-		draw_rect(Rect2(at - Vector2.ONE * 0.5, Vector2.ONE), CORE_COLOR)
+		# The way it flies: along its circle as the angle grows.
+		var dir: Vector2 = Vector2(-sin(_angle[row]), cos(_angle[row]))
+		var centre: Vector2 = _position[row] - dir * (length - size) * 0.5
+		var i: int = out * STRIDE
+		_familiar_buffer[i] = dir.x * length
+		_familiar_buffer[i + 1] = dir.y * size
+		_familiar_buffer[i + 2] = 0.0
+		_familiar_buffer[i + 3] = centre.x
+		_familiar_buffer[i + 4] = dir.y * length
+		_familiar_buffer[i + 5] = -dir.x * size
+		_familiar_buffer[i + 6] = 0.0
+		_familiar_buffer[i + 7] = centre.y
+		_familiar_buffer[i + 8] = float(clampi(_player[row], 0, 3) + zoom * 4) / 255.0
+		_familiar_buffer[i + 9] = 0.0
+		_familiar_buffer[i + 10] = 0.0
+		_familiar_buffer[i + 11] = 0.0
+		_familiar_buffer[i + 12] = 1.0
+		_familiar_buffer[i + 13] = 1.0
+		_familiar_buffer[i + 14] = 1.0
+		_familiar_buffer[i + 15] = 1.0 - (float(ProjectileManagerScript.KIND_ORBIT) + code) / ProjectileManagerScript.KIND_STEPS
+		out += 1
+	if out > 0:
+		_familiar_node.multimesh.buffer = _familiar_buffer
+	_familiar_node.multimesh.visible_instance_count = out
+
+
+## Familiars drawn right now (for tests).
+func drawn_familiars() -> int:
+	return _familiar_node.multimesh.visible_instance_count
+

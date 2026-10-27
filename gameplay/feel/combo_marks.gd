@@ -10,6 +10,8 @@ extends RefCounted
 ## Side of a picture in pixels and the radius its marks are drawn on.
 const SIZE: int = 24
 const RADIUS: float = 11.0
+## Empty pixels round the texture's picture, room for the glow Feel draws round it.
+const PAD: int = 6
 
 const BOOSTED: StringName = &"boosted"
 const ON_HIT: StringName = &"on_hit"
@@ -31,8 +33,11 @@ static func make_image(combo_class: StringName) -> Image:
 	return image
 
 
+## The picture with PAD empty pixels round it, as a texture.
 static func make_texture(combo_class: StringName) -> ImageTexture:
-	return ImageTexture.create_from_image(make_image(combo_class))
+	var padded: Image = Image.create(SIZE + 2 * PAD, SIZE + 2 * PAD, false, Image.FORMAT_RGBA8)
+	padded.blit_rect(make_image(combo_class), Rect2i(0, 0, SIZE, SIZE), Vector2i(PAD, PAD))
+	return ImageTexture.create_from_image(padded)
 
 
 ## Is the pixel at offset (dx, dy) from the centre part of the picture?

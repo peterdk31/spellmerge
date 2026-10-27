@@ -372,3 +372,17 @@ func _test_dash_ghosts_trail_the_wizard() -> void:
 		wizard.step(STEP)
 	_check(wizard._trail[0].x > wizard._trail[1].x or wizard._trail[1].x > wizard._trail[2].x, "the ghosts fall behind as the wizard moves")
 	_check(wizard._trail[0].x <= wizard.global_position.x, "no ghost is ahead of the wizard")
+	# Solid copies drawn by the shot shader (the glow look): never see-through, falling apart
+	# pixel by pixel, the older the more, and gone when the dash ends.
+	wizard._apply_dash_look(true)
+	_check(wizard._ghosts.size() == 3, "three ghosts")
+	var dissolves: Array[float] = []
+	for ghost: Sprite2D in wizard._ghosts:
+		_check(ghost.visible and ghost.modulate.a == 1.0 and ghost.self_modulate.a == 1.0, "a ghost is solid while dashing")
+		var material := ghost.material as ShaderMaterial
+		dissolves.append(material.get_shader_parameter(&"dissolve") as float)
+		_check((material.get_shader_parameter(&"sprite_glow") as float) > 0.0, "and glows")
+		_check(ghost.get_index() < wizard.get_node("Sprite").get_index(), "under the wizard's own sprite")
+	_check(dissolves[0] < dissolves[1] and dissolves[1] < dissolves[2], "the older the more fallen apart")
+	wizard._apply_dash_look(false)
+	_check(not wizard._ghosts[0].visible, "hidden when the dash ends")

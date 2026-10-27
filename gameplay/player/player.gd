@@ -134,9 +134,14 @@ const MAX_RECOILS: int = 8
 ## The stretch is for a horizontal dash; a mostly vertical one swaps the axes.
 const DASH_STRETCH: Vector2 = Vector2(1.2, 0.85)
 const DASH_LEAN: float = 0.1
-## A ghost is left behind every GHOST_INTERVAL seconds of the dash (3 of them).
+## A ghost is left behind every GHOST_INTERVAL seconds of the dash (3 of them). Each is a solid
+## copy of the sprite drawn by the shot shader (the glow look, 2026-10-27): turned to the
+## player's colour and falling apart pixel by pixel, the older the more (GHOST_DISSOLVE), with a
+## glow round it; never see-through.
 const GHOST_INTERVAL: float = 0.04
-const GHOST_ALPHAS: Array[float] = [0.45, 0.28, 0.14]
+const GHOST_DISSOLVE: Array[float] = [0.2, 0.45, 0.7]
+const GHOST_GLOW: float = 0.7
+const CORE_SHADER: Shader = preload("res://core/projectiles/shot_core.gdshader")
 ## Sprite strips: every frame is FRAME_SIZE wide, the frame count is the strip's
 ## width divided by it. Idle and walk loop; the dash plays once and holds its
 ## last frame. The art shows the poses only; the speeds are set here.
@@ -270,6 +275,8 @@ var _anim_time: float = 0.0
 ## fixed array, only overwritten), and the time to the next tick.
 var _trail: Array[Vector2] = [Vector2.ZERO, Vector2.ZERO, Vector2.ZERO]
 var _trail_timer: float = 0.0
+## The dash ghosts (sprites made the first time they are needed, each with its hat), newest first.
+var _ghosts: Array[Sprite2D] = []
 ## Child drawn above the sprite: the staff and the reticle (null in bare scripts).
 var _overlay: Node2D = null
 
@@ -702,7 +709,67 @@ func _apply_dash_look(dashing: bool) -> void:
 	if _sprite != null:
 		_sprite.scale = _dash_scale() if dashing else Vector2.ONE
 		_sprite.rotation = _dash_lean() if dashing else 0.0
+	_pose_ghosts()
 	_redraw()
+
+
+## Put the dash ghosts where the wizard was (`_trail`), stretched and leaned like it, or hide them.
+func _pose_ghosts() -> void:
+	if _sprite == null or _sprite.texture == null:
+		return
+	if _ghosts.is_empty():
+		if not _dash_look:
+			return
+		_make_ghosts()
+	var light: Color = PLAYER_COLORS[clampi(index, 0, PLAYER_COLORS.size() - 1)].lerp(Color.WHITE, 0.4)
+	for i in _ghosts.size():
+		var ghost: Sprite2D = _ghosts[i]
+		ghost.visible = _dash_look
+		if not _dash_look:
+			continue
+		ghost.texture = _sprite.texture
+		ghost.hframes = _sprite.hframes
+		ghost.vframes = _sprite.vframes
+		ghost.frame = _sprite.frame
+		ghost.offset = _sprite.offset
+		ghost.centered = _sprite.centered
+		ghost.flip_h = _faces_left
+		ghost.position = _sprite.position + _trail[i] - global_position
+		ghost.scale = _sprite.scale
+		ghost.rotation = _sprite.rotation
+		(ghost.material as ShaderMaterial).set_shader_parameter(&"dissolve_color", light)
+		var hat := ghost.get_child(0) as Sprite2D
+		hat.visible = _hat != null and _hat.texture != null
+		if hat.visible:
+			hat.texture = _hat.texture
+			hat.position = _hat.position
+			hat.flip_h = _faces_left
+			(hat.material as ShaderMaterial).set_shader_parameter(&"dissolve_color", light)
+
+
+## The ghost sprites, each with a hat, drawn under the wizard's own sprite.
+func _make_ghosts() -> void:
+	for i in GHOST_DISSOLVE.size():
+		var ghost := Sprite2D.new()
+		ghost.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		ghost.material = _ghost_material(GHOST_DISSOLVE[i])
+		var hat := Sprite2D.new()
+		hat.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		hat.material = _ghost_material(GHOST_DISSOLVE[i])
+		ghost.add_child(hat)
+		add_child(ghost)
+		# Under the wizard: before its sprite among the children.
+		move_child(ghost, _sprite.get_index())
+		_ghosts.append(ghost)
+
+
+func _ghost_material(dissolve: float) -> ShaderMaterial:
+	var material := ShaderMaterial.new()
+	material.shader = CORE_SHADER
+	material.set_shader_parameter(&"core_override", Color.WHITE)
+	material.set_shader_parameter(&"dissolve", dissolve)
+	material.set_shader_parameter(&"sprite_glow", GHOST_GLOW)
+	return material
 
 
 ## Note where the wizard is every GHOST_INTERVAL of the dash (shifts 3 values).
@@ -716,13 +783,11 @@ func _tick_trail(delta: float) -> void:
 	_trail[0] = global_position
 
 
-## A soft shadow under the feet and the dash ghosts, both below the sprite.
+## A soft shadow under the feet, below the sprite (the dash ghosts are sprites of their own).
 func _draw() -> void:
 	draw_set_transform(Vector2(0, 2), 0.0, Vector2(1.0, 0.4))
 	draw_circle(Vector2.ZERO, 8.0, Color(0, 0, 0, 0.35))
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-	if _dash_look and _sprite != null and _sprite.texture != null:
-		_draw_ghosts()
 
 
 ## The staff and the aim reticle (a chevron in the player colour with an
@@ -771,25 +836,6 @@ func _draw_revive_ring() -> void:
 	_overlay.draw_line(centre + Vector2(0, -2), centre + Vector2(0, 2), OUTLINE_COLOR, 3.0)
 	_overlay.draw_line(centre + Vector2(-2, 0), centre + Vector2(2, 0), Color.WHITE, 1.0)
 	_overlay.draw_line(centre + Vector2(0, -2), centre + Vector2(0, 2), Color.WHITE, 1.0)
-
-
-## Fading copies of the sprite where the wizard was, stretched and leaned like it.
-func _draw_ghosts() -> void:
-	var texture: Texture2D = _sprite.texture
-	var size: Vector2 = Vector2(FRAME_SIZE, texture.get_height())
-	var source: Rect2 = Rect2(Vector2(_sprite.frame * FRAME_SIZE, 0.0), size)
-	var tint: Color = PLAYER_COLORS[clampi(index, 0, PLAYER_COLORS.size() - 1)]
-	var flip: float = -1.0 if _faces_left else 1.0
-	var stretch: Vector2 = _dash_scale()
-	var lean: float = _dash_lean()
-	for i in GHOST_ALPHAS.size():
-		var at: Vector2 = _sprite.position + _trail[i] - global_position
-		draw_set_transform(at, lean, Vector2(flip * stretch.x, stretch.y))
-		var shade: Color = Color(tint, GHOST_ALPHAS[i])
-		draw_texture_rect_region(texture, Rect2(-size * 0.5 + _sprite.offset, size), source, shade)
-		if _hat != null and _hat.texture != null:
-			draw_texture_rect_region(_hat.texture, Rect2(-size * 0.5 + _hat.position, size), Rect2(Vector2.ZERO, size), shade)
-	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 ## The staff: the staff art turned along the aim with the hand on the wizard

@@ -440,7 +440,7 @@ func _test_hit_flash_and_squash() -> void:
 func _test_cast_flash_and_kick() -> void:
 	_setup()
 	_bus.spell_cast.emit(2, &"fire_bolt", Vector2(10, 5), Vector2.RIGHT)
-	_check(_feel.live_flashes() == 1, "a cast shows a muzzle flash")
+	_check(_feel.effects_of(FeelScript.KIND_CAST, 2) == 1, "a cast shows a cast flash")
 	_check(_feel.kick().x < 0.0 and _feel.kick().y == 0.0, "the camera kicks against the aim")
 	_feel.step(0.015625)
 	_check(_camera.offset.x < 0.0, "the camera moves with the kick")
@@ -449,40 +449,33 @@ func _test_cast_flash_and_kick() -> void:
 	_check(_feel.kick().length() <= FeelScript.MAX_KICK_PIXELS + 0.001, "the kick is capped")
 	for i in 10:
 		_feel.step(STEP)
-	_check(_feel.live_flashes() == 0, "the muzzle flashes end")
+	_check(_feel.effects_of(FeelScript.KIND_CAST) == 0, "the cast flashes end")
 	_check(_camera.offset == Vector2.ZERO and _feel.kick() == Vector2.ZERO, "the camera settles after a cast")
 	_feel.shake_enabled = false
 	_bus.spell_cast.emit(0, &"fire_bolt", Vector2.ZERO, Vector2.RIGHT)
 	_check(_feel.kick() == Vector2.ZERO, "no kick with shake off")
 
 
+## The cast flash is a small effect at the staff tip: a cross of a few pixels and sparks that
+## reach no further than a shot's own quad (zoom 1).
 func _test_muzzle_flash_stays_small() -> void:
 	_setup()
-	_feel.preset = load("res://gameplay/feel/presets/punchy.tres") as FeelPresetScript
 	_bus.spell_cast.emit(0, &"fire_bolt", Vector2.ZERO, Vector2.RIGHT)
-	var flash: Sprite2D = _feel.muzzle_flash(0)
-	_check(flash.visible, "the muzzle flash shows after a cast")
-	var art: float = flash.texture.get_size().x
-	var longest: float = 0.0
-	for i in 12:
-		longest = maxf(longest, flash.scale.x * art)
-		_feel.step(0.015625)
-	_check(longest > 0.0, "the muzzle flash was measured")
-	_check(longest <= 48.0, "the punchy muzzle flash is at most 48 px long at its largest (%.1f)" % longest)
+	_feel.step(0.01)
+	var multimesh: MultiMesh = _feel._effect_node.multimesh
+	_check(multimesh.visible_instance_count == 1, "the cast flash is drawn")
+	_check(is_equal_approx(multimesh.buffer[0], FeelScript.EFFECT_GRID), "in a quad of 24 px at most")
 
 
 func _test_muzzle_flash_follows_aim_and_colour() -> void:
 	_setup()
 	_bus.spell_cast.emit(1, &"fire_bolt", Vector2(10, 5), Vector2.DOWN)
-	var flash: Sprite2D = _feel.muzzle_flash(1)
-	_check(flash.visible, "the muzzle flash shows")
-	_check(is_equal_approx(flash.rotation, PI / 2.0), "the muzzle flash turns along the aim")
-	_check(flash.scale.x > flash.scale.y, "the muzzle flash is stretched along the aim")
-	var colour: Color = FeelScript.PLAYER_COLORS[1]
-	_check(flash.modulate.r == colour.r and flash.modulate.b == colour.b, "the muzzle flash has the colour of player 2")
-	_feel.step(0.03125)
-	_check(flash.modulate.a < 1.0 and flash.modulate.r == colour.r, "the muzzle flash fades and keeps its colour")
-	_check(_feel.muzzle_flash(3).modulate != flash.modulate, "each player has a colour of their own")
+	_feel.step(0.01)
+	_check(_feel.effects_of(FeelScript.KIND_CAST, 1) == 1, "player 2's cast flash shows")
+	var buffer: PackedFloat32Array = _feel._effect_node.multimesh.buffer
+	_check(Vector2(buffer[0], buffer[4]).normalized().is_equal_approx(Vector2.DOWN), "the cast flash turns along the aim")
+	_check(roundi(buffer[8] * 255.0) % 4 == 1, "it is drawn in the colours of player 2")
+	_check(is_equal_approx(buffer[3], 10.0) and is_equal_approx(buffer[7], 5.0), "at the staff tip")
 
 
 func _test_cast_squash() -> void:

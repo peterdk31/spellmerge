@@ -224,6 +224,56 @@ func test_the_shader_holds_the_same_quad_and_bend_as_the_manager() -> void:
 	check(ManagerScript.BEND_ZERO + ManagerScript.BEND_SPAN < 0.5 and ManagerScript.BEND_ZERO - ManagerScript.BEND_SPAN > 0.0, "the bend code rounds away from the kind")
 
 
+## The code beside a rune's kind, as the shader reads it.
+func code_at(node: MultiMeshInstance2D, i: int) -> float:
+	var coded: float = (1.0 - node.multimesh.buffer[i * ManagerScript.DRAW_STRIDE + 15]) * ManagerScript.KIND_STEPS
+	return coded - floorf(coded + 0.5)
+
+
+func test_a_new_rune_traces_itself_onto_the_floor() -> void:
+	mgr.spawn(0, Vector2(50.0, 50.0), Vector2.ZERO, 5.0, 14.0, ManagerScript.LAYER_ENEMY, 0, 0, ManagerScript.MOTION_STILL)
+	mgr.update_draw(1.0)
+	check(absf(code_at(mgr._rune_node, 0) - ManagerScript.TRACE_FROM) < 0.001, "a rune just cast is not traced yet")
+	for i in 6:
+		mgr.step(1.0 / 60.0)
+	mgr.update_draw(1.0)
+	var half: float = ManagerScript.TRACE_FROM + ManagerScript.TRACE_SPAN * 0.1 / ManagerScript.RUNE_TRACE
+	check(absf(code_at(mgr._rune_node, 0) - half) < 0.001, "a tenth of a second later, part of it is")
+	check_equal(kind_at(mgr._rune_node, 0), ManagerScript.KIND_RUNE, "still a rune")
+	for i in 12:
+		mgr.step(1.0 / 60.0)
+	mgr.update_draw(1.0)
+	check_equal(code_at(mgr._rune_node, 0), 0.0, "past RUNE_TRACE it is whole")
+	check_equal(ManagerScript.trace_code(-1.0), 0.0, "a time out of order draws it whole")
+
+
+var _seen_impacts: Array = []
+
+
+func _on_impact(_player: int, _target: Node, _position: Vector2, _direction: Vector2) -> void:
+	_seen_impacts.append([mgr.impact_form, mgr.impact_core, mgr.impact_look])
+
+
+func test_an_impact_names_the_shots_colour_and_look() -> void:
+	_seen_impacts.clear()
+	mgr.events.projectile_impact.connect(_on_impact)
+	mgr.set_walls([Rect2(100.0, 0.0, 16.0, 200.0)] as Array[Rect2])
+	var frost := Color(0.31, 0.84, 0.86)
+	var look: int = ManagerScript.pack_look(PackedInt32Array([ManagerScript.LOOK_FLECKS]))
+	var slot: int = mgr.spawn(1, Vector2(80.0, 50.0), Vector2(600.0, 0.0), 1.0)
+	mgr.set_core(slot, frost)
+	mgr.set_look(slot, look)
+	for i in 6:
+		mgr.step(1.0 / 60.0)
+	check_equal(_seen_impacts.size(), 1, "the shot met the wall")
+	if _seen_impacts.size() == 1:
+		check_equal(_seen_impacts[0][0], &"bolt", "a bolt")
+		check((_seen_impacts[0][1] as Color).is_equal_approx(frost), "in its frost colour")
+		check_equal(_seen_impacts[0][2], look, "with its look")
+	check_equal(mgr.impact_core, Color.WHITE, "outside an impact the colour is white")
+	check_equal(mgr.impact_look, 0, "and the look none")
+
+
 func test_looks_animate_from_the_simulation_clock() -> void:
 	mgr.spawn(0, Vector2(50.0, 50.0), Vector2(10.0, 0.0), 1.0)
 	for i in 30:

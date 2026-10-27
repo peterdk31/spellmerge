@@ -254,6 +254,11 @@ const BEND_ZERO: float = 0.225
 const BEND_SPAN: float = 0.2
 const BEND_RADIUS: float = 16.0
 const BEND_CORNER: float = 0.5
+## A rune traces itself onto the floor over its first RUNE_TRACE seconds; while it does, the code
+## beside its kind is TRACE_FROM + TRACE_SPAN x how much is drawn (0 once it is whole).
+const RUNE_TRACE: float = 0.25
+const TRACE_FROM: float = 0.02
+const TRACE_SPAN: float = 0.42
 ## The look kinds a card can give a shot (`look_layer` on infusions and modifiers; see
 ## `set_look`). The body stays plain; each kind is a style of particle the shot gives off from
 ## its tail (`shot_core.gdshader`), and a shot shows every kind its cards bring, mixed at
@@ -347,6 +352,11 @@ var event_slot: int = -1
 ## The form of the shot whose `projectile_impact` is being sent: `&"bolt"`, `&"rune"`, `&"orbit"`
 ## or `&"beam"` (an enemy's shot, and any time outside an impact: `&""`). For looks only.
 var impact_form: StringName = &""
+## The core colour and the look (`set_core`, `set_look`) of the shot whose `projectile_impact`
+## is being sent, so its flare can take the shot's colours and card effects (white and 0 for a
+## beam, an enemy's shot, and outside an impact). For looks only.
+var impact_core: Color = Color.WHITE
+var impact_look: int = 0
 ## How many projectiles ended on a wall, since start.
 var wall_hits: int = 0
 ## Projectiles written into the batch by the last update_draw().
@@ -482,6 +492,8 @@ var _has_walls: bool = false
 var _core: PackedColorArray = PackedColorArray()
 ## The packed look layers of each shot (0 none), see `set_look`.
 var _look: PackedInt32Array = PackedInt32Array()
+## The simulation time each shot was born at (`sim_time`), for the rune's trace.
+var _born: PackedFloat32Array = PackedFloat32Array()
 var _draw_node: MultiMeshInstance2D = null
 ## Shots each batch's MultiMesh and buffer have room for now (see `_batch_room`).
 var _draw_room: int = 0
@@ -643,6 +655,7 @@ func set_cap(value: int) -> void:
 	_own_next.resize(_cap)
 	_core.resize(_cap)
 	_look.resize(_cap)
+	_born.resize(_cap)
 	_draw_buffer.resize(0)
 	_rune_buffer.resize(0)
 	_orbit_buffer.resize(0)
@@ -1254,6 +1267,7 @@ func _spawn_row(player: int, origin: Vector2, velocity: Vector2, lifetime: float
 	_tag[slot] = tag
 	_core[slot] = Color.WHITE
 	_look[slot] = 0
+	_born[slot] = sim_time
 	_seq[slot] = _next_seq
 	_next_seq += 1
 	_skip_left[slot] = 0.0
@@ -1796,16 +1810,24 @@ func _ray_path(player: int, segments: int, pierce: int, layers: int, tag: int, w
 		var node: Variant = _ray_nodes[base + i]
 		if events != null and is_instance_valid(node):
 			impact_form = &"beam"
+			impact_core = Color.WHITE
+			impact_look = 0
 			events.projectile_impact.emit(player, node, _ray_points[base + i], _ray_heads[base + i])
 			impact_form = &""
+			impact_core = Color.WHITE
+			impact_look = 0
 			events.projectile_hit.emit(player, node, _ray_points[base + i], tag)
 		_ray_nodes[base + i] = null
 	_ray_depth -= 1
 	event_slot = outer_slot
 	if walled and events != null:
 		impact_form = &"beam"
+		impact_core = Color.WHITE
+		impact_look = 0
 		events.projectile_impact.emit(player, null, end, end_heading)
 		impact_form = &""
+		impact_core = Color.WHITE
+		impact_look = 0
 	ray_end = end
 	ray_end_heading = end_heading
 	return got
@@ -1912,13 +1934,13 @@ func update_draw(fraction: float = -1.0) -> void:
 		if batch == BATCH_BOLT:
 			trails += TRAIL_COST
 		if batch == BATCH_RUNE:
-			_write_quad(_rune_buffer, rune_out * DRAW_STRIDE, dir, size, at, player_look, _core[slot], KIND_RUNE)
+			_write_quad(_rune_buffer, rune_out * DRAW_STRIDE, dir, size, at, player_look, _core[slot], KIND_RUNE, 0.0, trace_code(sim_time - _born[slot]))
 			rune_out += 1
 		elif batch == BATCH_ORBIT:
-			_write_quad(_orbit_buffer, orbit_out * DRAW_STRIDE, dir, size, at, player_look, _core[slot], KIND_ORBIT, look_length(_radius[slot]), bend_of(slot))
+			_write_quad(_orbit_buffer, orbit_out * DRAW_STRIDE, dir, size, at, player_look, _core[slot], KIND_ORBIT, look_length(_radius[slot]), bend_code(bend_of(slot)))
 			orbit_out += 1
 		else:
-			_write_quad(_draw_buffer, out * DRAW_STRIDE, dir, size, at, player_look, _core[slot], KIND_BOLT, look_length(_radius[slot]), bend_of(slot))
+			_write_quad(_draw_buffer, out * DRAW_STRIDE, dir, size, at, player_look, _core[slot], KIND_BOLT, look_length(_radius[slot]), bend_code(bend_of(slot)))
 			out += 1
 	if out > 0:
 		multimesh.buffer = _draw_buffer
@@ -2040,6 +2062,18 @@ static func look_back(radius: float) -> float:
 	return (look_length(radius) - look_size(radius)) * 0.5
 
 
+## The code a bend travels as beside the kind (see BEND_ZERO).
+static func bend_code(bend: float) -> float:
+	return BEND_ZERO + BEND_SPAN * clampf(bend * BEND_RADIUS, -1.0, 1.0)
+
+
+## The code of a rune `age` seconds old (see RUNE_TRACE): how much of it is traced, 0 when whole.
+static func trace_code(age: float) -> float:
+	if age >= RUNE_TRACE or age < 0.0:
+		return 0.0
+	return TRACE_FROM + TRACE_SPAN * age / RUNE_TRACE
+
+
 ## How the path of a live shot curves (see BEND_ZERO): 1 / the radius, signed. An orbit shot's
 ## comes from its circle; any other shot's from its last step, whose chord lags its heading by
 ## half the turn, so a homing, spiralling or returning shot bends its tail as it turns. 0 for a
@@ -2073,17 +2107,16 @@ func _look_color(slot: int) -> Color:
 ## Transform2D(dir * length, dir.orthogonal() * d, centre), row by row, then the colour and the
 ## colour of the core (custom data). A square quad (`length` 0) is centred on `at`; a long one
 ## reaches `diameter` / 2 ahead of `at` and the rest behind it (a bolt and its tail).
-## `kind` (0 the texture, KIND_BOLT, KIND_RUNE or KIND_ORBIT; at most KIND_MAX) and the code of
-## `bend` (see BEND_ZERO; only for a long quad) go in the alpha of the custom data as
-## 1 - (kind + code) / 16, which `shot_core.gdshader` reads back.
-func _write_quad(buffer: PackedFloat32Array, i: int, dir: Vector2, diameter: float, at: Vector2, color: Color, core: Color, kind: int, length: float = 0.0, bend: float = 0.0) -> void:
+## `kind` (0 the texture, KIND_BOLT, KIND_RUNE or KIND_ORBIT; at most KIND_MAX) and `code`
+## (0 to below 0.5: a bend, `bend_code`, or a rune's trace, `trace_code`) go in the alpha of the
+## custom data as 1 - (kind + code) / 16, which `shot_core.gdshader` reads back.
+func _write_quad(buffer: PackedFloat32Array, i: int, dir: Vector2, diameter: float, at: Vector2, color: Color, core: Color, kind: int, length: float = 0.0, code: float = 0.0) -> void:
 	assert(kind >= 0 and kind <= KIND_MAX, "the kind must fit the alpha encoding")
+	assert(code >= 0.0 and code < 0.5, "the code must round away from the kind")
 	var along: float = diameter
-	var code: float = 0.0
 	var centre: Vector2 = at
 	if length > 0.0:
 		along = length
-		code = BEND_ZERO + BEND_SPAN * clampf(bend * BEND_RADIUS, -1.0, 1.0)
 		centre = at - dir * (length - diameter) * 0.5
 	buffer[i] = dir.x * along
 	buffer[i + 1] = dir.y * diameter
@@ -2478,8 +2511,12 @@ func _remembers(slot: int, id: int) -> bool:
 func _emit_wall_impact(slot: int, velocity: Vector2) -> void:
 	if events != null and not velocity.is_zero_approx():
 		impact_form = _form_of(slot)
+		impact_core = _core[slot]
+		impact_look = _look[slot]
 		events.projectile_impact.emit(_player[slot], null, _pos[slot], velocity.normalized())
 		impact_form = &""
+		impact_core = Color.WHITE
+		impact_look = 0
 
 
 ## The form of the shot in `slot`, by its draw batch (`&""` for an enemy's shot).
@@ -2525,8 +2562,12 @@ func _register_hit(slot: int, target: int, at: Vector2) -> void:
 		_kill(slot, false)
 	if events != null and is_instance_valid(node):
 		impact_form = _form_of(slot)
+		impact_core = _core[slot]
+		impact_look = _look[slot]
 		events.projectile_impact.emit(player, node, at, heading)
 		impact_form = &""
+		impact_core = Color.WHITE
+		impact_look = 0
 		event_slot = slot
 		events.projectile_hit.emit(player, node, at, tag)
 		event_slot = -1

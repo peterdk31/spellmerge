@@ -87,7 +87,7 @@ func take() -> void:
 	grey.material = material
 	grey.z_index = 100
 	root.add_child(grey)
-	await settle(12)
+	await settle(20)
 	var image: Image = await grab()
 	if int(_shots.get("drawn")) < 40:
 		fail("only %d shots were drawn" % int(_shots.get("drawn")))

@@ -161,12 +161,13 @@ func test_a_wall_hit_throws_chips_back_off_the_wall() -> void:
 	check(bursts[0].global_position.is_equal_approx(Vector2(96.0, 100.0)), "at the wall")
 
 
-func test_a_wall_hit_shows_a_spark_in_the_shot_colour() -> void:
+func test_a_wall_hit_shows_an_effect_for_its_player() -> void:
 	for player in 4:
 		bus.projectile_impact.emit(player, null, Vector2(10.0 * float(player), 0.0), Vector2.UP)
-	check_equal(feel.live_flashes(), 4, "four sparks")
+	check_equal(feel.live_effects(), 4, "four effects")
 	for player in 4:
-		check_equal(feel.wall_spark(player).modulate, FeelScript.PLAYER_COLORS[player], "spark %d has its player's colour" % player)
+		check_equal(feel.effects_of(FeelScript.KIND_BURST, player), 1, "player %d's burst" % player)
+	check_equal(feel.live_flashes(), 0, "no sprite flare for a player's shot")
 
 
 func test_an_enemy_shot_on_a_wall_is_ember() -> void:
@@ -177,7 +178,9 @@ func test_an_enemy_shot_on_a_wall_is_ember() -> void:
 func test_wall_sparks_are_limited_and_end() -> void:
 	for i in 30:
 		bus.projectile_impact.emit(i % 4, null, Vector2(float(i), 0.0), Vector2.UP)
+		bus.projectile_impact.emit(-1, null, Vector2(float(i), 0.0), Vector2.UP)
 	check(feel.live_flashes() <= FeelScript.SPARK_SLOTS, "no more sparks than slots")
+	check(feel.live_effects() <= FeelScript.EFFECT_SLOTS, "no more effects than slots")
 	for i in 4:
 		feel.step(STEP)
 	check_equal(feel.live_flashes(), 0, "the sparks end")

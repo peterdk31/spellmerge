@@ -26,11 +26,18 @@ extends Node
 ## `projectile_impact` (from `core/projectiles`) says where a shot struck and which way it
 ## flew. On a character the hit burst becomes a spray along that way, in ember for an
 ## enemy and in the wizard's own colour for a wizard, a little bigger with more damage.
-## On a wall or pillar it throws stone chips back and shows a spark in the shot's colour.
+## On a wall or pillar it throws stone chips back. Where a player's shot lands it shows an
+## effect in the shot's own ramp and cards (see "Effects" below); an enemy's shows an ember mark.
 ## Wall chips leave WALL_RESERVE bursts free, so a hit on a character always has one.
 ##
-## On `spell_cast` it shows a muzzle flash at the staff tip, stretched along the aim
-## and in the player's colour, and kicks the camera a little against the aim. On
+## On `spell_cast` it shows a cast flash at the staff tip in the player's colours (and a ring
+## for a carrier whose cast look has one), and kicks the camera a little against the aim.
+##
+## Effects (the glow look, 2026-10-27): the flares of player shots are drawn by the shots' own
+## shader (`shot_core.gdshader`, kinds KIND_BURST to KIND_CAST) in one MultiMesh of EFFECT_SLOTS,
+## each with the core colour and look of the shot it comes from (`impact_core`, `impact_look` of
+## the projectile manager), so a frost bolt lands in frost flecks and a lightning one in sparks,
+## all glowing. A new effect takes the oldest slot when they are all busy. On
 ## `wizard_cast` (which carries the wizard node) the caster's `Sprite` gets thin and
 ## tall for a moment. None of this touches the cast itself.
 ##
@@ -116,6 +123,28 @@ const SPRAY_MIN_SIZE: float = 0.7
 const SPRAY_MAX_SIZE: float = 1.6
 ## Death animations at once; past that the oldest slot is taken over.
 const GHOST_SLOTS: int = 8
+## The effects drawn with the shot shader (see "Effects" above): the kinds it knows (K_* in
+## shot_core.gdshader), how many can show at once, their seconds and their draw layer (with the
+## shots, above the room and the wizards). 256 effects of 24 x 24 px are under 1% of what the
+## shots themselves draw at their cap, and hold about 850 bursts a second (four players with
+## split and multicast builds) before the oldest is taken.
+const KIND_BURST: int = 4
+const KIND_RING_OUT: int = 5
+const KIND_RING_IN: int = 6
+const KIND_RUNE_BURST: int = 7
+const KIND_CAST: int = 8
+const EFFECT_SLOTS: int = 256
+const BURST_SECONDS: float = 0.3
+const RING_SECONDS: float = 0.22
+const RUNE_BURST_SECONDS: float = 0.45
+const CAST_SECONDS: float = 0.14
+const EFFECT_Z: int = 50
+## The effect quad is the shot shader's grid times the zoom (LOOK_GRID in core/projectiles).
+const EFFECT_GRID: float = 24.0
+const EFFECT_STRIDE: int = 16
+## The age code beside an effect's kind: TRACE_FROM + TRACE_SPAN x how far through it is.
+const EFFECT_FROM: float = 0.02
+const EFFECT_SPAN: float = 0.42
 ## Muzzle flash colour of each player: the light colour of the player ramps in
 ## docs/STYLE.md (the same as the reticle in `gameplay/player`).
 const PLAYER_COLORS: Array[Color] = [
@@ -244,6 +273,18 @@ var _reaction_sounds: Dictionary = {}
 var _reaction_names: Dictionary = {}
 ## Real seconds since feel started, and when each reaction id last gave a sound and a shake.
 var _clock: float = 0.0
+var _effect_node: MultiMeshInstance2D = null
+var _effect_buffer: PackedFloat32Array = PackedFloat32Array()
+var _effect_kind: PackedInt32Array = PackedInt32Array()
+var _effect_at: PackedVector2Array = PackedVector2Array()
+var _effect_dir: PackedVector2Array = PackedVector2Array()
+var _effect_core: PackedColorArray = PackedColorArray()
+var _effect_player: PackedInt32Array = PackedInt32Array()
+var _effect_zoom: PackedInt32Array = PackedInt32Array()
+var _effect_look: PackedInt32Array = PackedInt32Array()
+var _effect_age: PackedFloat32Array = PackedFloat32Array()
+var _effect_seconds: PackedFloat32Array = PackedFloat32Array()
+var _next_effect: int = 0
 var _reaction_heard: Dictionary = {}
 ## The reaction id each name label shows.
 var _label_id: Array[StringName] = []
@@ -334,6 +375,7 @@ func _ready() -> void:
 		form.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
 		add_child(form)
 		_forms.append(form)
+	_make_effects()
 	_beam_line.resize(LIVE_BEAM_POINTS)
 	for i in LIVE_BEAMS:
 		var line := Line2D.new()
@@ -478,6 +520,7 @@ func step(real_delta: float) -> void:
 	_step_flashes(real_delta)
 	_step_combo_marks(real_delta)
 	_step_forms(real_delta)
+	_step_effects(real_delta)
 	_draw_live_beams()
 	_step_labels(real_delta)
 	_step_arcs(real_delta)
@@ -1065,14 +1108,142 @@ func _show_impact(player: int, position: Vector2, direction: Vector2) -> void:
 	if projectiles != null and "impact_form" in projectiles:
 		form = projectiles.impact_form as StringName
 	var look: Dictionary = _form_look(form, false)
-	var seconds: float = look.get("seconds", preset.wall_spark_seconds) as float
 	var size: float = look.get("size", preset.wall_spark_size) as float
-	var stretch: float = look.get("stretch", 1.0) as float
-	var grow: float = look.get("grow", 0.5) as float
-	var angle: float = 0.0
-	if look.get("aim", false) as bool and direction != Vector2.ZERO:
-		angle = direction.angle()
-	_show_flash(slot, position, seconds, size, PLAYER_COLORS[player], angle, Vector2(stretch, 1.0), grow, look.get("ring", false) as bool)
+	var core: Color = Color.WHITE
+	var bits: int = 0
+	if projectiles != null and "impact_core" in projectiles:
+		core = projectiles.impact_core as Color
+		bits = projectiles.impact_look as int
+	if form == &"rune":
+		show_effect(KIND_RUNE_BURST, position, Vector2.RIGHT, core, player, bits, 3, RUNE_BURST_SECONDS)
+		return
+	var zoom: int = clampi(roundi(size * 2.0), 1, 3)
+	show_effect(KIND_BURST, position, direction, core, player, bits, zoom, BURST_SECONDS)
+	if look.get("ring", false) as bool:
+		show_effect(KIND_RING_OUT, position, direction, core, player, 0, 1, RING_SECONDS)
+
+
+## Make the effect batch (see "Effects" above): one MultiMesh of EFFECT_SLOTS quads in world
+## space, drawn by the shot shader, and the arrays behind it.
+func _make_effects() -> void:
+	_effect_node = MultiMeshInstance2D.new()
+	var quad := QuadMesh.new()
+	quad.size = Vector2.ONE
+	var multimesh := MultiMesh.new()
+	multimesh.transform_format = MultiMesh.TRANSFORM_2D
+	multimesh.use_colors = true
+	multimesh.use_custom_data = true
+	multimesh.mesh = quad
+	multimesh.instance_count = EFFECT_SLOTS
+	multimesh.visible_instance_count = 0
+	# Effects show anywhere in the world; there is no room to fit a box to.
+	multimesh.custom_aabb = AABB(Vector3(-100000.0, -100000.0, -1.0), Vector3(200000.0, 200000.0, 2.0))
+	_effect_node.multimesh = multimesh
+	var material := ShaderMaterial.new()
+	material.shader = CORE_SHADER
+	_effect_node.material = material
+	_effect_node.top_level = true
+	_effect_node.z_index = EFFECT_Z
+	add_child(_effect_node)
+	_effect_buffer.resize(EFFECT_SLOTS * EFFECT_STRIDE)
+	_effect_kind.resize(EFFECT_SLOTS)
+	_effect_at.resize(EFFECT_SLOTS)
+	_effect_dir.resize(EFFECT_SLOTS)
+	_effect_core.resize(EFFECT_SLOTS)
+	_effect_player.resize(EFFECT_SLOTS)
+	_effect_zoom.resize(EFFECT_SLOTS)
+	_effect_look.resize(EFFECT_SLOTS)
+	_effect_age.resize(EFFECT_SLOTS)
+	_effect_seconds.resize(EFFECT_SLOTS)
+
+
+## Show an effect of `kind` (KIND_BURST to KIND_CAST) at `at`, aimed along `dir`, in the ramp of
+## `core` (white: `player`'s colours) with the particles of the packed `look`, at `zoom`, for
+## `seconds`. It takes the next slot, the oldest effect when they are all busy.
+func show_effect(kind: int, at: Vector2, dir: Vector2, core: Color, player: int, look: int, zoom: int, seconds: float) -> void:
+	if _effect_node == null or not at.is_finite() or player < 0 or player >= PLAYER_COLORS.size():
+		return
+	var slot: int = _next_effect
+	_next_effect = (_next_effect + 1) % EFFECT_SLOTS
+	_effect_kind[slot] = kind
+	_effect_at[slot] = at.round()
+	_effect_dir[slot] = dir.normalized() if dir != Vector2.ZERO else Vector2.RIGHT
+	_effect_core[slot] = core
+	_effect_player[slot] = player
+	_effect_zoom[slot] = clampi(zoom, 1, 15)
+	_effect_look[slot] = look
+	_effect_age[slot] = 0.0
+	_effect_seconds[slot] = maxf(seconds, 0.01)
+
+
+## Age the effects by `real_delta` and write the live ones into the batch, oldest first.
+func _step_effects(real_delta: float) -> void:
+	if _effect_node == null:
+		return
+	(_effect_node.material as ShaderMaterial).set_shader_parameter(&"sim_time", _clock)
+	var out: int = 0
+	for n in EFFECT_SLOTS:
+		var slot: int = (_next_effect + n) % EFFECT_SLOTS
+		if _effect_seconds[slot] <= 0.0:
+			continue
+		_effect_age[slot] += real_delta
+		var through: float = _effect_age[slot] / _effect_seconds[slot]
+		if through >= 1.0:
+			_effect_seconds[slot] = 0.0
+			continue
+		var i: int = out * EFFECT_STRIDE
+		var d: float = EFFECT_GRID * _effect_zoom[slot]
+		var dir: Vector2 = _effect_dir[slot]
+		var at: Vector2 = _effect_at[slot]
+		_effect_buffer[i] = dir.x * d
+		_effect_buffer[i + 1] = dir.y * d
+		_effect_buffer[i + 2] = 0.0
+		_effect_buffer[i + 3] = at.x
+		_effect_buffer[i + 4] = dir.y * d
+		_effect_buffer[i + 5] = -dir.x * d
+		_effect_buffer[i + 6] = 0.0
+		_effect_buffer[i + 7] = at.y
+		var look: int = _effect_look[slot]
+		_effect_buffer[i + 8] = float(_effect_player[slot] + _effect_zoom[slot] * 4) / 255.0
+		_effect_buffer[i + 9] = float(look & 255) / 255.0
+		_effect_buffer[i + 10] = float((look >> 8) & 255) / 255.0
+		_effect_buffer[i + 11] = float((look >> 16) & 255) / 255.0
+		var core: Color = _effect_core[slot]
+		_effect_buffer[i + 12] = core.r
+		_effect_buffer[i + 13] = core.g
+		_effect_buffer[i + 14] = core.b
+		_effect_buffer[i + 15] = 1.0 - (float(_effect_kind[slot]) + EFFECT_FROM + EFFECT_SPAN * through) / 16.0
+		out += 1
+	if out > 0:
+		_effect_node.multimesh.buffer = _effect_buffer
+	_effect_node.multimesh.visible_instance_count = out
+
+
+## How many effects are showing (for tests and the sheets).
+func live_effects() -> int:
+	var live: int = 0
+	for slot in EFFECT_SLOTS:
+		if _effect_seconds[slot] > 0.0:
+			live += 1
+	return live
+
+
+## How many live effects are of `kind`, and (with `player` 0-3) of that player.
+func effects_of(kind: int, player: int = -1) -> int:
+	var found: int = 0
+	for slot in EFFECT_SLOTS:
+		if _effect_seconds[slot] > 0.0 and _effect_kind[slot] == kind and (player < 0 or _effect_player[slot] == player):
+			found += 1
+	return found
+
+
+## The core colour and look of the newest live effect of `kind` (for tests): [core, look].
+func effect_dress(kind: int) -> Array:
+	for n in EFFECT_SLOTS:
+		var slot: int = (_next_effect - 1 - n + EFFECT_SLOTS) % EFFECT_SLOTS
+		if _effect_seconds[slot] > 0.0 and _effect_kind[slot] == kind:
+			return [_effect_core[slot], _effect_look[slot]]
+	return []
 
 
 ## The colour of what was hit: a wizard's own colour, else the enemy ember.
@@ -1123,15 +1294,11 @@ func _on_spell_cast(player: int, spell_id: StringName, origin: Vector2, directio
 	# Each form has its own flash on the wizard: a bolt a short streak along the aim, a beam a
 	# long thin flare, a nova a wide burst, a rune and an orbit gather in (the build-up).
 	var look: Dictionary = _form_look(spell_id, true)
-	var seconds: float = look.get("seconds", preset.muzzle_flash_seconds) as float
-	var size: float = look.get("size", preset.muzzle_flash_size) as float
-	var stretch: float = look.get("stretch", MUZZLE_STRETCH) as float
-	var tall: float = look.get("tall", 1.0) as float
-	var grow: float = look.get("grow", 0.5) as float
-	var angle: float = 0.0
-	if look.get("aim", true) as bool and direction != Vector2.ZERO:
-		angle = direction.angle()
-	_show_flash(slot, origin, seconds, size, PLAYER_COLORS[slot], angle, Vector2(stretch, tall), grow, look.get("ring", false) as bool)
+	var aim: Vector2 = direction if direction != Vector2.ZERO else Vector2.RIGHT
+	show_effect(KIND_CAST, origin, aim, Color.WHITE, slot, 0, 1, CAST_SECONDS)
+	if look.get("ring", false) as bool:
+		var gather: bool = (look.get("grow", 0.5) as float) < 0.0
+		show_effect(KIND_RING_IN if gather else KIND_RING_OUT, origin, aim, Color.WHITE, slot, 0, 1, RING_SECONDS)
 	if shake_enabled and direction != Vector2.ZERO:
 		_refresh_camera()
 		_kick = (_kick - direction.normalized() * preset.cast_kick_pixels).limit_length(MAX_KICK_PIXELS)

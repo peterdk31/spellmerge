@@ -1,0 +1,9 @@
+{
+	"id": "linger_frost_mines",
+	"name": "Linger frost mines",
+	"does": "A timed frost bolt hangs in mid-air and drops frost novas on one spot, chilling an imp off to its side.",
+	"casts": [{"staff": 0, "cards": ["timer", "linger", "frost", "bolt", "frost", "nova"]}],
+	"imps": [[132, -52]],
+	"seconds": 2.5,
+	"checks": [{"kind": "status", "imps": [0], "status": "chill"}]
+}

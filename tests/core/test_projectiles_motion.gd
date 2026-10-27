@@ -473,7 +473,7 @@ func _test_ray_bad_arguments() -> void:
 	_check(_mgr.ray(0, Vector2(0.0, 100.0), Vector2.RIGHT, 0.0) == 0.0, "no length")
 	_check(_mgr.ray(0, Vector2(0.0, 100.0), Vector2.RIGHT, NAN) == 0.0, "NaN length")
 	_check(_mgr.ray(0, Vector2.INF, Vector2.RIGHT, 100.0) == 0.0, "infinite origin")
-	_check(_mgr.ray(4, Vector2(0.0, 100.0), Vector2.RIGHT, 100.0) == 0.0, "bad player")
+	_check(_mgr.ray(ManagerScript.CASTERS, Vector2(0.0, 100.0), Vector2.RIGHT, 100.0) == 0.0, "bad caster")
 	_check(_hits.is_empty(), "none of them hit anything")
 	_check(absf(_mgr.ray(0, Vector2(0.0, 100.0), Vector2.RIGHT, 50.0, -3) - 50.0) < 0.001, "a negative pierce counts as 0")
 

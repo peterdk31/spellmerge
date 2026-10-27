@@ -9,7 +9,9 @@ extends "res://tests/support/screenshot.gd"
 ##   top right   the modifier looks on a fire bolt (bigger, pierce, homing) and the kinds no
 ##               card has yet (motes, burst, orbiters, glitter); then combined: all five infusions on
 ##               one bolt, and every kind at once on a bolt, a bigger bolt and a rune
-##   bottom      four players firing the same card (a fire bolt), to tell them apart at 1x;
+##   bottom      four players firing the same card (a fire bolt), to tell them apart at 1x, and
+##               an enemy caster (staffs F4) firing it in the enemy ramp, with its plain bolt
+##               between, to check Blight ochre reads apart from the players and from Spark;
 ##               the right half through a grey filter, to check the looks read without colour
 ## `looks_sheet_4x`: the top rows at 4x. `looks_combined_4x`: the combined shots at 4x.
 
@@ -74,9 +76,11 @@ func take() -> void:
 	_dress(rune, ELEMENTS[4].get("tint") as Color, everything)
 	# Four players, the same fire bolt, twice: in colour on the left, grey on the right.
 	for half in 2:
-		for p in 4:
-			_bolt(p, Vector2(40.0 + half * 320.0 + p * 60.0, 230.0), BOLT_RADIUS, fire_tint, PackedInt32Array([fire_look]))
-			_bolt(p, Vector2(40.0 + half * 320.0 + p * 60.0, 290.0), BOLT_RADIUS, ELEMENTS[4].get("tint") as Color, PackedInt32Array([int(ELEMENTS[4].get("look_layer"))]))
+		for p in 5:
+			var caster: int = p if p < 4 else ManagerScript.FIRST_ENEMY_CASTER
+			_bolt(caster, Vector2(40.0 + half * 320.0 + p * 60.0, 230.0), BOLT_RADIUS, fire_tint, PackedInt32Array([fire_look]))
+			_bolt(caster, Vector2(40.0 + half * 320.0 + p * 60.0, 290.0), BOLT_RADIUS, ELEMENTS[4].get("tint") as Color, PackedInt32Array([int(ELEMENTS[4].get("look_layer"))]))
+		_bolt(ManagerScript.FIRST_ENEMY_CASTER, Vector2(40.0 + half * 320.0 + 4 * 60.0, 260.0), BOLT_RADIUS, Color.WHITE, PackedInt32Array())
 	var grey := ColorRect.new()
 	grey.position = Vector2(320.0, 200.0)
 	grey.size = Vector2(320.0, 160.0)

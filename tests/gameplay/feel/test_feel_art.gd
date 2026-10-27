@@ -42,11 +42,7 @@ func test_the_shipped_preset_has_art_for_every_slot() -> void:
 	check(preset.hostile_texture != null, "hostile shot art")
 
 
-func test_the_preset_spark_texture_is_what_the_bursts_use() -> void:
-	var preset := FeelPresetScript.new()
-	preset.spark_texture = _texture()
-	var feel: Node = _start(preset, own(ProjectilesScript.new()) as Node)
-	check(feel._texture == preset.spark_texture, "bursts and flashes use the preset's spark")
+
 
 
 func test_a_manager_that_already_has_art_keeps_it() -> void:

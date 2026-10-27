@@ -163,8 +163,8 @@ func test_an_effect_ends_after_its_seconds() -> void:
 	feel.step(FeelScript.CAST_SECONDS + 0.01)
 	check_equal(feel.effects_of(FeelScript.KIND_CAST), 0, "the cast flash is gone")
 	check_equal(feel.effects_of(FeelScript.KIND_BURST), 1, "the burst lasts longer")
-	feel.step(FeelScript.BURST_SECONDS)
-	check_equal(feel.live_effects(), 0, "and then it is gone too")
+	feel.step(FeelScript.CHIPS_SECONDS)
+	check_equal(feel.live_effects(), 0, "and then it is gone too, and the wall's chips")
 	check_equal(feel._effect_node.multimesh.visible_instance_count, 0, "nothing is drawn")
 
 
@@ -173,8 +173,11 @@ func test_the_batch_draws_the_live_effects() -> void:
 	_impact(1, &"nova")
 	feel.step(0.01)
 	var multimesh: MultiMesh = feel._effect_node.multimesh
-	check_equal(multimesh.visible_instance_count, 3, "a burst, and a burst and a ring")
+	check_equal(multimesh.visible_instance_count, 5, "a burst, and a burst and a ring, and the wall's chips for each")
 	var buffer: PackedFloat32Array = multimesh.buffer
+	# The first drawn is the oldest: the first wall's chips, then its burst.
+	check_equal(floori((1.0 - buffer[15]) * 16.0 + 0.5), FeelScript.KIND_CHIPS, "chips first")
+	buffer = buffer.slice(FeelScript.EFFECT_STRIDE)
 	var coded: float = (1.0 - buffer[15]) * 16.0
 	check_equal(floori(coded + 0.5), FeelScript.KIND_BURST, "the kind travels as the shader reads it")
 	check(coded - FeelScript.KIND_BURST > FeelScript.EFFECT_FROM and coded - FeelScript.KIND_BURST < 0.5, "with its age beside it")
@@ -201,32 +204,16 @@ func test_effects_past_the_slots_take_the_oldest() -> void:
 	check_equal(feel.live_effects(), feel.effect_slots, "every slot busy, no more")
 
 
-func test_an_enemy_shot_always_ends_in_the_same_ember_mark() -> void:
-	var marks: Dictionary = {}
+func test_an_enemy_shot_always_lands_the_same_way() -> void:
 	for form in FORMS:
 		_cast(0, form)
 		bus.projectile_impact.emit(-1, null, Vector2(50, 50), Vector2.RIGHT)
-		var flare: Sprite2D = null
-		for slot in FeelScript.SPARK_SLOTS:
-			var spark: Sprite2D = feel.wall_spark(slot)
-			if spark.visible and spark.global_position == Vector2(50, 50) and spark.modulate.is_equal_approx(preset.enemy_hit_color):
-				flare = spark
-		check(flare != null, "%s: an enemy's shot is ember" % form)
-		if flare != null:
-			marks[[flare.scale, flare.rotation]] = true
+		var shown: Dictionary = feel.effect_info(FeelScript.KIND_BURST)
+		check(not shown.is_empty() and shown["core"] == preset.enemy_hit_color, "%s: an enemy's shot lands in an ember burst" % form)
 		feel.step(1.0)
-	check_equal(marks.size(), 1, "the same mark whatever any player cast")
 
 
-func test_an_enemy_mark_is_turned_on_its_corner_and_a_player_flare_is_not() -> void:
-	bus.projectile_impact.emit(-1, null, Vector2(50, 50), Vector2.RIGHT)
-	check(is_equal_approx(feel.wall_spark(0).rotation, PI / 4.0), "on its corner")
-	for form in FORMS:
-		_cast(0, form)
-		bus.projectile_impact.emit(0, null, Vector2(50, 50), Vector2.UP)
-	for slot in FeelScript.SPARK_SLOTS:
-		var spark: Sprite2D = feel.wall_spark(slot)
-		check_equal(is_equal_approx(spark.rotation, PI / 4.0), spark.modulate.is_equal_approx(preset.enemy_hit_color), "only ember marks sit on a corner")
+
 
 
 func test_four_players_casting_and_hitting_stay_in_the_pools() -> void:
@@ -236,7 +223,6 @@ func test_four_players_casting_and_hitting_stay_in_the_pools() -> void:
 			_cast(player, FORMS[(player + round) % FORMS.size()])
 			bus.projectile_impact.emit(player, null, Vector2(player * 10, 0), Vector2.RIGHT)
 			bus.projectile_impact.emit(-1, null, Vector2(player * 10, 5), Vector2.LEFT)
-	check(feel.live_flashes() <= FeelScript.ALL_FLASH_SLOTS, "inside the flash slots")
 	check(feel.live_effects() <= feel.effect_slots, "inside the effect slots")
 	check_equal(feel.get_child_count(), children, "no new nodes were needed")
 

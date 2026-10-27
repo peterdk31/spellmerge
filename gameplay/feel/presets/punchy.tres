@@ -11,5 +11,4 @@ death_shake = 0.38
 downed_shake = 0.6
 max_shake_pixels = 7.0
 shake_decay = 3.0
-particle_speed = 110.0
 death_particle_size = 1.8

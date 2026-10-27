@@ -191,8 +191,12 @@ func _test_shake_off_does_nothing() -> void:
 	_check(_feel.trauma() == 0.0 and _camera.offset == Vector2.ZERO, "turning shake off stops it at once")
 
 
+## Every hit, kill and puff is an effect (the glow look): a flood from four players fills the
+## effect slots and no more, and makes no nodes.
 func _test_particle_limit_holds_with_four_players() -> void:
 	_setup()
+	_feel.set_effect_slots(EffectSlots.MIN)
+	var children: int = _feel.get_child_count()
 	var most: int = 0
 	for frame in 30:
 		for player in 4:
@@ -200,28 +204,23 @@ func _test_particle_limit_holds_with_four_players() -> void:
 				_hit(player, Vector2(10.0 * shot, 10.0 * player))
 			_bus.enemy_died.emit(player, null, Vector2(5.0 * player, 0.0))
 		_feel.step(0.015625)
-		most = maxi(most, _feel.live_particles())
-		_check(_feel.live_particles() <= FeelScript.PARTICLE_LIMIT, "live particles stay within PARTICLE_LIMIT (frame %d)" % frame)
-	_check(most > 0, "hits make particles")
-	_check(most == FeelScript.PARTICLE_LIMIT, "a flood fills the limit and no more")
-	_check(FeelScript.BURST_PARTICLES * (FeelScript.PARTICLE_LIMIT / FeelScript.BURST_PARTICLES) == FeelScript.PARTICLE_LIMIT, "the limit is a whole number of bursts")
-	var emitters: int = 0
-	for child in _feel.get_children():
-		if child is CPUParticles2D:
-			emitters += 1
-	_check(emitters <= FeelScript.PARTICLE_LIMIT / FeelScript.BURST_PARTICLES, "no more emitters exist than the limit allows")
+		most = maxi(most, _feel.live_effects())
+		_check(_feel.live_effects() <= _feel.effect_slots, "live effects stay within the slots (frame %d)" % frame)
+	_check(most > 0, "hits make effects")
+	_check(most == _feel.effect_slots, "a flood fills the slots and no more")
+	_check(_feel.get_child_count() == children, "no node is made for a hit")
 
 
 func _test_particles_come_back() -> void:
 	_setup()
 	for i in 20:
 		_hit(i % 4)
-	_check(_feel.live_particles() == FeelScript.PARTICLE_LIMIT, "the pool is used up")
-	for i in 8:
+	_check(_feel.effects_of(FeelScript.KIND_PUFF) == 20, "twenty hits with no way, twenty puffs")
+	for i in 30:
 		_feel.step(STEP)
-	_check(_feel.live_particles() == 0, "finished bursts return to the pool")
+	_check(_feel.live_effects() == 0, "finished effects end")
 	_hit(0)
-	_check(_feel.live_particles() == FeelScript.BURST_PARTICLES, "a returned burst can be used again")
+	_check(_feel.live_effects() == 1, "and a new hit has one again")
 
 
 func _test_particles_can_be_turned_off() -> void:
@@ -231,10 +230,10 @@ func _test_particles_can_be_turned_off() -> void:
 		_hit(i % 4)
 	_bus.enemy_died.emit(0, null, Vector2(5.0, 0.0))
 	_feel.step(STEP)
-	_check(_feel.live_particles() == 0, "no hit particles start with particles off")
+	_check(_feel.effects_of(FeelScript.KIND_PUFF) == 0 and _feel.effects_of(FeelScript.KIND_SPRAY) == 0, "no hit effects start with particles off")
 	_feel.particles_enabled = true
 	_hit(0)
-	_check(_feel.live_particles() == FeelScript.BURST_PARTICLES, "particles start again when turned back on")
+	_check(_feel.effects_of(FeelScript.KIND_PUFF) == 1, "they start again when turned back on")
 
 
 func _test_missing_sound_is_silent() -> void:
@@ -260,7 +259,7 @@ func _test_known_sound_plays() -> void:
 func _test_downed_has_no_particles() -> void:
 	_setup()
 	_bus.player_downed.emit(3)
-	_check(_feel.live_particles() == 0, "a downed event names no position, so no burst")
+	_check(_feel.live_effects() == 0, "a downed event names no position, so no effect")
 	_check(_feel.stop_left > 0.0 and _feel.trauma() > 0.0, "a downed wizard still gets stop and shake")
 
 
@@ -301,14 +300,14 @@ func _test_bursts_survive_the_world_being_freed() -> void:
 		root.add_child(world)
 		current_scene = world
 		_hit(0, Vector2(4.0, 4.0))
-		_check(_feel.live_particles() == FeelScript.BURST_PARTICLES, "a burst starts with a world scene (round %d)" % round)
+		_check(_feel.live_effects() == 1, "an effect starts with a world scene (round %d)" % round)
 		world.free()
 		current_scene = null
-		for i in 9:
+		for i in 30:
 			_feel.step(STEP)
 	for shot in 12:
 		_hit(shot % 4, Vector2(shot, 0.0))
-	_check(_feel.live_particles() == FeelScript.PARTICLE_LIMIT, "after the world was freed three times, bursts still fill the limit")
+	_check(_feel.live_effects() == 12, "after the world was freed three times, effects still show")
 
 
 func _test_hit_stops_are_limited() -> void:
@@ -338,18 +337,16 @@ func _test_a_kill_uses_one_slot_and_beats_a_full_pool() -> void:
 	_setup()
 	_hit(0, Vector2(7.0, 7.0))
 	_bus.enemy_died.emit(0, null, Vector2(7.0, 7.0))
-	_check(_feel.live_particles() == FeelScript.BURST_PARTICLES, "a killing blow uses one burst, not two")
+	_check(_feel.effects_of(FeelScript.KIND_PUFF) == 1, "a killing blow's puff becomes the death puff: one slot, not two")
+	_check(_feel.effects_of(FeelScript.KIND_RING_OUT) == 1, "and a white-hot ring")
 	_feel.step(STEP)
-	for i in FeelScript.BURST_SLOTS:
+	_feel.set_effect_slots(EffectSlots.MIN)
+	for i in _feel.effect_slots:
 		_hit(i % 4, Vector2(100.0 + i, 0.0))
-	_check(_feel.live_particles() == FeelScript.PARTICLE_LIMIT, "the pool is full of hit bursts")
+	_check(_feel.live_effects() == _feel.effect_slots, "the slots are full of hit effects")
 	_bus.enemy_died.emit(1, null, Vector2(-50.0, 9.0))
-	var found: bool = false
-	for child in _feel.get_children():
-		if child is CPUParticles2D and (child as CPUParticles2D).global_position == Vector2(-50.0, 9.0):
-			found = true
-	_check(found, "a kill gets a burst even when the pool is full of hit bursts")
-	_check(_feel.live_particles() == FeelScript.PARTICLE_LIMIT, "taking a burst over keeps the limit")
+	_check(_feel.effects_of(FeelScript.KIND_PUFF) >= 1, "a kill gets its puff even when the slots are full (the oldest is taken)")
+	_check(_feel.live_effects() == _feel.effect_slots, "taking one over keeps the limit")
 
 
 func _test_engine_time_scale_comes_back() -> void:
@@ -522,8 +519,12 @@ func _test_death_animation() -> void:
 	_check(_feel.live_ghosts() == 1, "a death starts an animation although the enemy is freed")
 	var copy: Sprite2D = _feel.ghost(0)
 	_check(copy.global_position == Vector2(40, 30) and copy.texture == texture, "the copy sits where the enemy was")
+	var dissolve: ShaderMaterial = copy.material as ShaderMaterial
+	_check(dissolve != null and dissolve.shader == FeelScript.CORE_SHADER, "drawn by the shot shader")
+	var start: float = dissolve.get_shader_parameter(&"dissolve") as float
 	_feel.step(0.1875)
-	_check(copy.scale.y < 1.0 and copy.modulate.a < 1.0, "the copy collapses and fades")
+	_check((dissolve.get_shader_parameter(&"dissolve") as float) > start, "the copy falls apart pixel by pixel")
+	_check(copy.scale == Vector2.ONE and copy.modulate.a == 1.0, "never stretched nor faded: whole pixels go")
 	for i in 4:
 		_feel.step(STEP)
 	_check(_feel.live_ghosts() == 0 and not copy.visible, "the animation ends")
@@ -545,12 +546,13 @@ func _test_death_animation() -> void:
 
 func _test_death_puff_is_limited() -> void:
 	_setup()
-	for i in 20:
+	_feel.set_effect_slots(EffectSlots.MIN)
+	for i in 100:
 		_bus.enemy_died.emit(i % 4, null, Vector2(i, 0))
-	_check(_feel.live_flashes() == FeelScript.FLASH_SLOTS - FeelScript.MUZZLE_SLOTS, "death puffs use their own slots and no more")
-	for i in 10:
+	_check(_feel.live_effects() <= _feel.effect_slots, "death puffs stay within the effect slots")
+	for i in 30:
 		_feel.step(STEP)
-	_check(_feel.live_flashes() == 0, "the puffs end")
+	_check(_feel.live_effects() == 0, "the puffs end")
 
 
 func _test_muzzle_colours_match_the_reticles() -> void:

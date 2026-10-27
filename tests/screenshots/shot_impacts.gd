@@ -13,6 +13,10 @@ func take() -> void:
 	await settle()
 	if not need(["PlayerInput", "Flow", "Feel", "Combat", "Projectiles", "Events"]):
 		return
+	# Feel ages its effects on the real clock, which a slow virtual display stretches past
+	# their tenths of a second; on game time each frame is 1/60 s, as in play.
+	if root.has_node("Feel"):
+		root.get_node("Feel").set("drive_engine", false)
 	var input: Node = root.get_node("PlayerInput")
 	var flow: Node = root.get_node("Flow")
 	var combat: Node = root.get_node("Combat")

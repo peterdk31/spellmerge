@@ -100,31 +100,31 @@ func test_a_stale_kind_is_not_applied_to_a_later_hit() -> void:
 
 func test_a_wizard_hit_by_their_own_spell_gets_a_ring() -> void:
 	var wizard: Node2D = _wizard(1)
-	var before: int = feel.live_flashes()
+	var before: int = feel.effects_of(FeelScript.KIND_RING_OUT)
 	_hit(1, wizard, &"shot")
-	check(feel.live_flashes() > before, "a ring on the hit's frame")
+	check(feel.effects_of(FeelScript.KIND_RING_OUT) > before, "a ring on the hit's frame")
 
 
 func test_a_wizard_hit_by_another_player_or_an_enemy_gets_no_self_ring() -> void:
 	var wizard: Node2D = _wizard(1)
-	var before: int = feel.live_flashes()
+	var before: int = feel.effects_of(FeelScript.KIND_RING_OUT)
 	_hit(2, wizard, &"shot")
 	_hit(-1, wizard, &"shot")
-	check_equal(feel.live_flashes(), before, "only a self-hit has the ring")
+	check_equal(feel.effects_of(FeelScript.KIND_RING_OUT), before, "only a self-hit has the ring")
 
 
 func test_a_self_inflicted_burn_tick_gets_no_ring() -> void:
 	var wizard: Node2D = _wizard(1)
-	var before: int = feel.live_flashes()
+	var before: int = feel.effects_of(FeelScript.KIND_RING_OUT)
 	_hit(1, wizard, &"status")
-	check_equal(feel.live_flashes(), before, "a burn tick is not a hit: no self-hit ring")
+	check_equal(feel.effects_of(FeelScript.KIND_RING_OUT), before, "a burn tick is not a hit: no self-hit ring")
 
 
 func test_a_heal_shows_a_ring_without_stop_or_shake() -> void:
 	var wizard: Node2D = _wizard(0)
-	var before: int = feel.live_flashes()
+	var before: int = feel.effects_of(FeelScript.KIND_RING_OUT)
 	bus.heal_dealt.emit(1, wizard, 5, Vector2(10.0, 10.0))
-	check(feel.live_flashes() > before, "a ring")
+	check(feel.effects_of(FeelScript.KIND_RING_OUT) > before, "a ring")
 	check_equal(feel.stop_left, 0.0, "no stop")
 	check_equal(feel.trauma(), 0.0, "no shake")
 

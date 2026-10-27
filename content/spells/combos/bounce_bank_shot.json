@@ -1,0 +1,10 @@
+{
+	"id": "bounce_bank_shot",
+	"name": "Bounce bank shot",
+	"does": "A bolt banks off the wall ahead and hits the imp standing behind the caster.",
+	"casts": [{"staff": 0, "cards": ["bounce", "bolt"]}],
+	"imps": [[-60, 0]],
+	"walls": [[80, -200, 16, 400]],
+	"seconds": 1.5,
+	"checks": [{"kind": "damaged", "imps": [0]}]
+}

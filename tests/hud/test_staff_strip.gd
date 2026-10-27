@@ -201,7 +201,7 @@ func test_the_header_line_is_gone() -> void:
 func test_every_rows_cards_start_at_the_same_place_whatever_the_button() -> void:
 	for staff in 4:
 		_build(0, staff, 2)
-	var panel = _hud.get_panel(0)
+	var panel: PanelScript = _hud.get_panel(0)
 	# One row's button gets a much wider name (a long key name on the keyboard).
 	var wide: Control = panel.staff_row(2).get_node("Glyph") as Control
 	wide.custom_minimum_size = Vector2(40.0, wide.custom_minimum_size.y)

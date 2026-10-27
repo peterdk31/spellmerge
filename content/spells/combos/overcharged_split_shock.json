@@ -1,0 +1,9 @@
+{
+	"id": "overcharged_split_shock",
+	"name": "Overcharged split shock",
+	"does": "A fan of three overcharged lightning bolts: every bolt hits twice as hard and charges its imp with static.",
+	"casts": [{"staff": 0, "cards": ["overcharge", "lightning", "split", "bolt"]}],
+	"imps": [[100, -20], [100, 0], [100, 20]],
+	"seconds": 1.5,
+	"checks": [{"kind": "damaged", "imps": [0, 1, 2]}, {"kind": "status_count", "status": "static", "min": 3}]
+}

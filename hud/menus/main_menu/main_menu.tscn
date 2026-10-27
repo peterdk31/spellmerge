@@ -55,6 +55,11 @@ unique_name_in_owner = true
 layout_mode = 2
 text = "Play"
 
+[node name="Fullscreen" type="Button" parent="Center/Lines"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Fullscreen: Off"
+
 [node name="Status" type="Label" parent="Center/Lines"]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.6, 0.6, 0.72, 1)

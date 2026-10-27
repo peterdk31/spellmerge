@@ -35,6 +35,7 @@ func _initialize() -> void:
 	_test_resume_back_and_start_close_it()
 	_test_sandbox_entry_and_actions()
 	_test_friendly_fire_setting()
+	_test_the_fullscreen_switch()
 	_test_the_sandbox_switches_the_builder()
 	_test_the_sandbox_switches_the_reload()
 	_test_b_opens_the_builder_in_play_only()
@@ -242,7 +243,7 @@ func _test_friendly_fire_setting() -> void:
 	_tap(0, &"pause")
 	_frame()
 	_press(0, "Settings")
-	_check(_names() == ["Gameplay", "SettingsBack"], "Settings, got %s" % [_names()])
+	_check(_names() == ["Gameplay", "Fullscreen", "SettingsBack"], "Settings, got %s" % [_names()])
 	_press(0, "Gameplay")
 	_check(_menu().button("FriendlyFire").text.ends_with("Friendly fire: Off"), "off by default")
 	_press(0, "FriendlyFire")
@@ -258,6 +259,41 @@ func _test_friendly_fire_setting() -> void:
 	_tap(0, &"back")
 	_frame()
 	_check(_menu().page == PauseMenuScript.Page.MAIN, "and up to the main page")
+
+
+## A stand-in for `core/display` (headless has no window to fill).
+class FakeDisplay:
+	extends Node
+	var on: bool = false
+	var toggles: int = 0
+
+	func is_fullscreen() -> bool:
+		return on
+
+	func toggle_fullscreen() -> void:
+		on = not on
+		toggles += 1
+
+
+func _test_the_fullscreen_switch() -> void:
+	_setup(1)
+	var display := FakeDisplay.new()
+	_menu().display = display
+	_tap(0, &"pause")
+	_frame()
+	_press(0, "Settings")
+	_check(_menu().button("Fullscreen").text.ends_with("Fullscreen: Off"), "off in a window")
+	_press(0, "Fullscreen")
+	_check(display.toggles == 1 and display.on, "it asks Display to fill the screen")
+	_check(_menu().button("Fullscreen").text.ends_with("Fullscreen: On"), "and shows On")
+	_check(_menu().page == PauseMenuScript.Page.SETTINGS, "it stays on the page")
+	# The browser leaves fullscreen on its own (Escape): the word follows the window when shown again.
+	display.on = false
+	_tap(0, &"back")
+	_frame()
+	_press(0, "Settings")
+	_check(_menu().button("Fullscreen").text.ends_with("Fullscreen: Off"), "the window's own state shows")
+	display.free()
 
 
 func _test_b_opens_the_builder_in_play_only() -> void:

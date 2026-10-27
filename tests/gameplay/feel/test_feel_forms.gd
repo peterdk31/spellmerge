@@ -42,7 +42,7 @@ func _param(sprite: Sprite2D, name: StringName) -> Color:
 
 
 func test_a_beam_is_drawn_along_the_aim_as_long_as_it_got() -> void:
-	bus.form_shown.emit(1, &"beam", Vector2(10, 20), Vector2.DOWN, 150.0, FROST)
+	bus.form_shown.emit(1, &"beam", Vector2(10, 20), Vector2.DOWN, 150.0, FROST, 0)
 	var shown: Array[Sprite2D] = _shown()
 	check_equal(shown.size(), 1, "one beam on screen")
 	var beam: Sprite2D = shown[0]
@@ -53,7 +53,7 @@ func test_a_beam_is_drawn_along_the_aim_as_long_as_it_got() -> void:
 
 
 func test_the_core_has_the_element_colour_and_the_body_the_owners() -> void:
-	bus.form_shown.emit(2, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, FROST)
+	bus.form_shown.emit(2, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, FROST, 0)
 	var beam: Sprite2D = _shown()[0]
 	var core: Color = _param(beam, &"core_override")
 	check(core.is_equal_approx(Color(FROST.r, FROST.g, FROST.b, 1.0)), "the core is frost")
@@ -63,45 +63,62 @@ func test_the_core_has_the_element_colour_and_the_body_the_owners() -> void:
 	check(not core.is_equal_approx(body), "the two are not the same colour")
 
 
-func test_a_nova_is_a_ring_at_the_caster_that_grows() -> void:
-	bus.form_shown.emit(0, &"nova", Vector2(50, 60), Vector2.RIGHT, 0.0, FROST)
-	var ring: Sprite2D = _shown()[0]
-	check(ring.texture == preset.nova_texture, "with the ring art")
-	check_equal(ring.global_position, Vector2(50, 60), "at the caster")
-	check(ring.centered and not ring.region_enabled, "centred, not stretched")
-	var before: float = ring.scale.x
-	feel.step(preset.nova_seconds * 0.5)
-	check(ring.scale.x > before, "the ring grows")
-	check(_param(ring, &"body_tint").a < 1.0, "and fades")
+func test_a_nova_is_a_ring_at_the_caster_in_its_elements_colours() -> void:
+	bus.form_shown.emit(0, &"nova", Vector2(50, 60), Vector2.RIGHT, 0.0, FROST, 7)
+	check_equal(_shown().size(), 0, "no sprite: the ring is an effect")
+	check_equal(feel.effects_of(FeelScript.KIND_RING_OUT, 0), 1, "a ring flashes out")
+	check_equal(feel.effect_dress(FeelScript.KIND_RING_OUT), [FROST, 7], "in the element's colours, with the cast's cards")
+	feel.step(0.01)
+	var buffer: PackedFloat32Array = feel._effect_node.multimesh.buffer
+	check(is_equal_approx(buffer[3], 50.0) and is_equal_approx(buffer[7], 60.0), "at the caster")
+	var across: float = buffer[0]
+	check(across >= preset.nova_ring_size * 0.9, "as wide as the preset's ring (%f)" % across)
+	feel.step(preset.nova_seconds)
+	check_equal(feel.effects_of(FeelScript.KIND_RING_OUT), 0, "and gone after its seconds")
+
+
+func test_a_dash_leaves_its_trail_along_its_way() -> void:
+	bus.form_shown.emit(2, &"dash", Vector2(10, 20), Vector2.DOWN, 80.0, FROST, 5)
+	check_equal(feel.effects_of(FeelScript.KIND_DASH, 2), 1, "a dash effect for player 3")
+	check_equal(feel.effect_dress(FeelScript.KIND_DASH), [FROST, 5], "with the dash's colours and cards")
+	feel.step(0.01)
+	var buffer: PackedFloat32Array = feel._effect_node.multimesh.buffer
+	check(Vector2(buffer[0], buffer[4]).is_equal_approx(Vector2.DOWN * (80.0 + 2.0 * FeelScript.DASH_MARGIN)), "along its way, a margin past each end")
+	check(is_equal_approx(buffer[3], 10.0) and is_equal_approx(buffer[7], 60.0), "centred half way along")
+	check_equal(roundi(buffer[8] * 255.0) / 4, 20, "its length travels in the zoom's place (80 px is 20 steps of 4)")
+	bus.form_shown.emit(2, &"dash", Vector2(10, 20), Vector2.DOWN, 0.0, FROST, 5)
+	bus.form_shown.emit(-1, &"dash", Vector2(10, 20), Vector2.DOWN, 80.0, FROST, 5)
+	check_equal(feel.effects_of(FeelScript.KIND_DASH), 1, "a dash that went nowhere, or an enemy's, shows nothing")
 
 
 func test_forms_end() -> void:
-	bus.form_shown.emit(0, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, FROST)
-	bus.form_shown.emit(0, &"nova", Vector2.ZERO, Vector2.RIGHT, 0.0, FROST)
+	bus.form_shown.emit(0, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, FROST, 0)
+	bus.form_shown.emit(0, &"nova", Vector2.ZERO, Vector2.RIGHT, 0.0, FROST, 0)
 	feel.step(1.0)
-	check_equal(_shown().size(), 0, "after their seconds both are gone")
+	check_equal(_shown().size(), 0, "after its seconds the beam is gone")
+	check_equal(feel.live_effects(), 0, "and the ring")
 
 
 func test_other_forms_and_empty_beams_show_nothing() -> void:
-	bus.form_shown.emit(0, &"bolt", Vector2.ZERO, Vector2.RIGHT, 100.0, FROST)
-	bus.form_shown.emit(0, &"beam", Vector2.ZERO, Vector2.RIGHT, 0.0, FROST)
-	bus.form_shown.emit(0, &"beam", Vector2.ZERO, Vector2.ZERO, 100.0, FROST)
+	bus.form_shown.emit(0, &"bolt", Vector2.ZERO, Vector2.RIGHT, 100.0, FROST, 0)
+	bus.form_shown.emit(0, &"beam", Vector2.ZERO, Vector2.RIGHT, 0.0, FROST, 0)
+	bus.form_shown.emit(0, &"beam", Vector2.ZERO, Vector2.ZERO, 100.0, FROST, 0)
 	check_equal(_shown().size(), 0, "none of them is drawn")
 
 
 func test_four_players_firing_at_once_stay_inside_the_pool() -> void:
 	for round in 4:
 		for player in 4:
-			bus.form_shown.emit(player, &"beam", Vector2(player * 10, 0), Vector2.RIGHT, 100.0, FROST)
+			bus.form_shown.emit(player, &"beam", Vector2(player * 10, 0), Vector2.RIGHT, 100.0, FROST, 0)
 	check(_shown().size() <= FeelScript.FORM_SLOTS, "never more sprites than the pool holds")
 	check_equal(feel._forms.size(), FeelScript.FORM_SLOTS, "and no sprite is made on the way")
 
 
 func test_one_players_many_beams_never_push_out_another_players_beam() -> void:
 	for player in 4:
-		bus.form_shown.emit(player, &"beam", Vector2(player * 10, 0), Vector2.RIGHT, 100.0, FROST)
+		bus.form_shown.emit(player, &"beam", Vector2(player * 10, 0), Vector2.RIGHT, 100.0, FROST, 0)
 	for ray in 20:
-		bus.form_shown.emit(0, &"beam", Vector2(0, ray), Vector2.UP, 100.0, FROST)
+		bus.form_shown.emit(0, &"beam", Vector2(0, ray), Vector2.UP, 100.0, FROST, 0)
 	for player in 4:
 		var seen: int = 0
 		for slot in range(player * FeelScript.FORMS_PER_PLAYER, (player + 1) * FeelScript.FORMS_PER_PLAYER):
@@ -113,12 +130,12 @@ func test_one_players_many_beams_never_push_out_another_players_beam() -> void:
 
 func test_one_cast_with_many_rays_shows_every_ray() -> void:
 	for ray in 24:
-		bus.form_shown.emit(1, &"beam", Vector2.ZERO, Vector2.RIGHT.rotated(ray * 0.1), 100.0, FROST)
+		bus.form_shown.emit(1, &"beam", Vector2.ZERO, Vector2.RIGHT.rotated(ray * 0.1), 100.0, FROST, 0)
 	check_equal(_shown().size(), 24, "a fan of 24 rays is drawn whole")
 
 
 func test_a_form_with_no_player_is_ignored() -> void:
-	bus.form_shown.emit(-1, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, FROST)
+	bus.form_shown.emit(-1, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, FROST, 0)
 	check_equal(_shown().size(), 0, "an enemy's beam takes no player's slot")
 
 
@@ -155,6 +172,9 @@ class FakeBeams:
 
 	func beam_player(_at: int) -> int:
 		return 1
+
+	func beam_look(_at: int) -> int:
+		return 6
 
 	func beam_origin(_at: int) -> Vector2:
 		return Vector2.ZERO
@@ -211,3 +231,18 @@ func test_a_live_beam_is_drawn_along_its_curve_every_frame() -> void:
 	beams.on = false
 	feel.step(0.016)
 	check(_live_lines().is_empty(), "gone when it ends")
+
+
+func test_a_live_beam_is_drawn_by_the_beam_mode_as_long_as_it_got() -> void:
+	var beams := own(FakeBeams.new()) as FakeBeams
+	beams.reach = 50.0
+	feel.spells = beams
+	feel.step(0.016)
+	var line: Line2D = _live_lines()[0]
+	var material: ShaderMaterial = line.material as ShaderMaterial
+	check_equal(material.get_shader_parameter(&"beam_mode"), 1, "a line beam")
+	check(is_equal_approx(material.get_shader_parameter(&"beam_length") as float, 50.0), "as long as it got along its curve")
+	check_equal(material.get_shader_parameter(&"beam_player"), 1, "of its player")
+	check_equal(material.get_shader_parameter(&"beam_look"), 6, "with its cards")
+	check_equal(line.width, FeelScript.BEAM_WIDTH, "a fixed width: the shader swells its rim, never its pixels")
+	check_equal(line.texture_mode, Line2D.LINE_TEXTURE_STRETCH, "its UV runs once along it")

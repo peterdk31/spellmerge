@@ -241,19 +241,6 @@ func test_four_players_casting_and_hitting_stay_in_the_pools() -> void:
 	check_equal(feel.get_child_count(), children, "no new nodes were needed")
 
 
-func test_a_beam_opens_wide_then_thins() -> void:
-	bus.form_shown.emit(0, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, Color.RED)
-	var beam: Sprite2D = null
-	for sprite in feel._forms:
-		if sprite.visible:
-			beam = sprite
-	var first: float = beam.scale.y
-	check(first > 1.5, "wider than the art at first")
-	feel.step(preset.beam_seconds * 0.5)
-	check(beam.scale.y < first, "thinner after")
-	check(beam.scale.y < 1.0, "thinner than the art at last")
-
-
 func _the_shown_beam() -> Sprite2D:
 	var beam: Sprite2D = null
 	for sprite in feel._forms:
@@ -262,45 +249,56 @@ func _the_shown_beam() -> Sprite2D:
 	return beam
 
 
+func _swell() -> float:
+	return (_the_shown_beam().material as ShaderMaterial).get_shader_parameter(&"beam_swell") as float
+
+
+func test_a_beam_opens_wide_then_thins() -> void:
+	bus.form_shown.emit(0, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, Color.RED, 0)
+	var first: float = _swell()
+	check(first > 1.5, "its rim and glow swell at first")
+	feel.step(preset.beam_seconds * 0.5)
+	check(_swell() < first, "thinner after")
+	check(_swell() < 1.0, "thinner than at rest at last")
+	check(_the_shown_beam().scale == Vector2.ONE, "its pixels are never stretched")
+
+
 func test_a_beam_flickers_by_the_preset_depth_on_every_other_step() -> void:
 	preset.beam_flare = 0.0
 	preset.beam_flicker_rate = 10.0
 	preset.beam_flicker_depth = 0.1
-	bus.form_shown.emit(0, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, Color.RED)
-	var beam: Sprite2D = _the_shown_beam()
-	check_equal(beam.scale.y, 1.0, "step 0 is full width")
+	bus.form_shown.emit(0, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, Color.RED, 0)
+	check_equal(_swell(), 1.0, "step 0 is full width")
 	feel.step(0.11)
 	var t: float = (preset.beam_seconds - 0.11) / preset.beam_seconds
-	check(is_equal_approx(beam.scale.y, t * 0.9), "step 1 is 10% thinner")
+	check(is_equal_approx(_swell(), t * 0.9), "step 1 is 10% thinner")
 	feel.step(0.11)
 	t = (preset.beam_seconds - 0.22) / preset.beam_seconds
-	check(is_equal_approx(beam.scale.y, t), "step 2 is back to full")
+	check(is_equal_approx(_swell(), t), "step 2 is back to full")
 
 
 func test_a_beam_with_no_flicker_depth_is_steady() -> void:
 	preset.beam_flare = 0.0
 	preset.beam_flicker_depth = 0.0
-	bus.form_shown.emit(0, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, Color.RED)
-	var beam: Sprite2D = _the_shown_beam()
+	bus.form_shown.emit(0, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, Color.RED, 0)
 	feel.step(0.07)
 	var t: float = (preset.beam_seconds - 0.07) / preset.beam_seconds
-	check(is_equal_approx(beam.scale.y, t), "only the fade thins it")
+	check(is_equal_approx(_swell(), t), "only the fade thins it")
+	var fade: float = (_the_shown_beam().material as ShaderMaterial).get_shader_parameter(&"beam_fade") as float
+	check(is_equal_approx(fade, t), "and dissolves it by as much")
 
 
-func test_a_beam_is_see_through_by_the_preset_and_a_ring_is_not() -> void:
-	preset.beam_alpha = 0.6
-	bus.form_shown.emit(0, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, Color.RED)
-	var tint: Color = (_the_shown_beam().material as ShaderMaterial).get_shader_parameter(&"body_tint")
-	check(is_equal_approx(tint.a, 0.6), "a beam starts at the preset's alpha (%f)" % tint.a)
-	feel.step(1.0)
-	bus.form_shown.emit(0, &"nova", Vector2.ZERO, Vector2.RIGHT, 0.0, Color.RED)
-	tint = (_the_shown_beam().material as ShaderMaterial).get_shader_parameter(&"body_tint")
-	check(is_equal_approx(tint.a, 1.0), "a ring starts solid (%f)" % tint.a)
+func test_a_beam_is_drawn_by_the_beam_mode_with_its_cards() -> void:
+	bus.form_shown.emit(3, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, Color.RED, 9)
+	var material: ShaderMaterial = _the_shown_beam().material as ShaderMaterial
+	check_equal(material.get_shader_parameter(&"beam_mode"), 2, "a sprite beam")
+	check_equal(material.get_shader_parameter(&"beam_length"), 100.0, "as long as it got")
+	check_equal(material.get_shader_parameter(&"beam_player"), 3, "of its player")
+	check_equal(material.get_shader_parameter(&"beam_look"), 9, "with the cast's cards")
+	check(is_equal_approx(material.get_shader_parameter(&"beam_glow") as float, preset.beam_alpha), "glowing as the preset says")
 
 
 func test_a_flare_of_zero_leaves_the_beam_as_before() -> void:
 	preset.beam_flare = 0.0
-	bus.form_shown.emit(0, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, Color.RED)
-	for sprite in feel._forms:
-		if sprite.visible:
-			check_equal(sprite.scale.y, 1.0, "the full art width at the start")
+	bus.form_shown.emit(0, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, Color.RED, 0)
+	check_equal(_swell(), 1.0, "at rest at the start")

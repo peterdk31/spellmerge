@@ -264,7 +264,7 @@ func test_every_shot_takes_the_colour_of_its_element_in_its_core() -> void:
 
 func test_a_beam_and_a_nova_announce_themselves_for_looks() -> void:
 	var seen: Array = []
-	_bus.form_shown.connect(func(player: int, form: StringName, origin: Vector2, direction: Vector2, length: float, tint: Color) -> void: seen.append([player, form, origin, direction, length, tint]))
+	_bus.form_shown.connect(func(player: int, form: StringName, origin: Vector2, direction: Vector2, length: float, tint: Color, _look: int) -> void: seen.append([player, form, origin, direction, length, tint]))
 	_build(2, 0, {"form": &"beam", "element": &"fire"})
 	_cast(2, 0, 10.0, Vector2(5, 6), Vector2.DOWN)
 	# A beam lives on for its lifetime, so it is shown from the live beams, not announced.

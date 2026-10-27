@@ -60,7 +60,7 @@ func before_each() -> void:
 		_end_requests.append([player, tag]))
 	_bus.area_hit_requested.connect(func(player: int, at: Vector2, radius: float, tag: int) -> void:
 		_areas.append([player, at, radius, tag]))
-	_bus.form_shown.connect(func(player: int, form: StringName, at: Vector2, direction: Vector2, length: float, _tint: Color) -> void:
+	_bus.form_shown.connect(func(player: int, form: StringName, at: Vector2, direction: Vector2, length: float, _tint: Color, _look: int) -> void:
 		_shown.append([player, form, at, direction, length]))
 	var bolt: FormBase = _form(&"bolt", 300.0, 1.0)
 	bolt.base_damage = 10

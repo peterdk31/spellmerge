@@ -140,9 +140,10 @@ func test_a_wall_hit_shows_an_effect_for_its_player() -> void:
 	check_equal(feel.effects_of(FeelScript.KIND_CHIPS), 4, "and four sprays of chips")
 
 
-func test_an_enemy_shot_on_a_wall_lands_in_ember() -> void:
+func test_an_enemy_shot_on_a_wall_lands_in_the_enemy_ramp() -> void:
 	bus.projectile_impact.emit(EventsScript.NO_PLAYER, null, Vector2.ZERO, Vector2.UP)
-	check_equal(feel.effect_info(FeelScript.KIND_BURST)["core"], preset.enemy_hit_color, "an enemy shot's burst is ember")
+	var shown: Dictionary = feel.effect_info(FeelScript.KIND_BURST)
+	check(shown["player"] == EventsScript.NO_PLAYER and shown["core"] == Color.WHITE, "an enemy shot's burst is a spell's, in the enemy ramp (staffs F7)")
 
 
 func test_wall_effects_are_limited_and_end() -> void:

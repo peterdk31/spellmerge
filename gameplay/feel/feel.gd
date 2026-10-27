@@ -59,7 +59,10 @@ const BONE_LIGHT: Color = Color("#f4f1ea")
 ## Beams and nova rings on screen per player: one cast makes at most 24 shots (the spell limit),
 ## so a split fan is drawn whole; past that the player's oldest slot is taken over.
 const FORMS_PER_PLAYER: int = 24
-const FORM_SLOTS: int = FORMS_PER_PLAYER * 4
+## Four players' beam sprites and the enemies' (one share for every enemy caster, staffs F7).
+const FORM_SLOTS: int = FORMS_PER_PLAYER * 5
+## The share of the beam sprites every enemy's beam takes turns in.
+const ENEMY_FORMS: int = 4
 const ComboMarks := preload("res://gameplay/feel/combo_marks.gd")
 ## The mark of a combo cast (`combo_cast`): one per player, which a new cast of that player
 ## replaces, so four players never show more than four marks.
@@ -126,6 +129,8 @@ const CHIPS_SECONDS: float = 0.5
 const FOREVER: float = 1.0e9
 const BURST_SECONDS: float = 0.3
 const RING_SECONDS: float = 0.22
+## How big a rain's marker ring is (its zoom: GRID x zoom pixels across).
+const RAIN_MARK_ZOOM: int = 2
 const RUNE_BURST_SECONDS: float = 0.45
 const CAST_SECONDS: float = 0.14
 const DASH_SECONDS: float = 0.6
@@ -223,7 +228,7 @@ var _form_left: PackedFloat32Array = PackedFloat32Array()
 var _form_total: PackedFloat32Array = PackedFloat32Array()
 var _form_body: PackedColorArray = PackedColorArray()
 var _form_length: PackedFloat32Array = PackedFloat32Array()
-var _next_form: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
+var _next_form: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0])
 ## Combo marks (sprites made once, one per player): seconds left, the class shown and the
 ## angle it started at. The pictures are built in code (`combo_marks.gd`), one per class.
 var _combo_marks: Array[Sprite2D] = []
@@ -428,7 +433,8 @@ func _ready() -> void:
 		spells = get_node_or_null("/root/Spells")
 	if projectiles != null and "texture" in projectiles and projectiles.texture == null:
 		projectiles.texture = preset.bolt_texture
-	# Enemy shots look different (a spiky orb, not a comet), so they are never taken for a spell.
+	# The AI's old shot (NO_PLAYER, until staffs F9) keeps its sprite; an enemy's spell is drawn
+	# like any spell, in the enemy ramp.
 	if projectiles != null and "hostile_texture" in projectiles and projectiles.hostile_texture == null:
 		projectiles.hostile_texture = preset.hostile_texture
 
@@ -915,11 +921,9 @@ func _on_projectile_impact(player: int, target: Node, position: Vector2, directi
 
 ## The payoff of a shot: a flare in the shot's colour, shaped by the form of the shot itself
 ## (the projectile manager's `impact_form` while the impact is sent; a rune goes off, a nova's
-## adds a ring). An enemy's shot (a negative index) lands in a burst in the enemy colour.
+## adds a ring). An enemy's shot (NO_PLAYER) lands the same way, in the enemy ramp where a
+## player's colour would show (staffs F7: one look for every spell).
 func _show_impact(player: int, position: Vector2, direction: Vector2) -> void:
-	if player < 0 or player >= PLAYER_COLORS.size():
-		show_effect(KIND_BURST, position, direction, preset.enemy_hit_color, 0, 0, 1, BURST_SECONDS)
-		return
 	var form: StringName = &""
 	if projectiles != null and "impact_form" in projectiles:
 		form = projectiles.impact_form as StringName
@@ -1005,13 +1009,13 @@ func _on_effect_slots_changed(slots: int) -> void:
 
 
 ## Show an effect of `kind` (KIND_BURST to KIND_CAST) at `at`, aimed along `dir`, in the ramp of
-## `core` (white: `player`'s colours) with the particles of the packed `look`, at `zoom`, for
+## `core` (white: `player`'s colours, the enemy ramp for NO_PLAYER) with the particles of the packed `look`, at `zoom`, for
 ## `seconds`. A dash or an arc runs `length` pixels from `at` along `dir` (its zoom is then the
 ## length). An effect given a `follow` node moves with it (a status), and ends when it is gone.
 ## It takes the next slot, the oldest effect when they are all busy, and returns it (-1 for
 ## none).
 func show_effect(kind: int, at: Vector2, dir: Vector2, core: Color, player: int, look: int, zoom: int, seconds: float, length: float = 0.0, follow: Node2D = null) -> int:
-	if _effect_node == null or not at.is_finite() or player < 0 or player >= PLAYER_COLORS.size():
+	if _effect_node == null or not at.is_finite() or player < EventsScript.NO_PLAYER or player >= PLAYER_COLORS.size():
 		return -1
 	var slot: int = _next_effect
 	_next_effect = (_next_effect + 1) % effect_slots
@@ -1137,11 +1141,11 @@ func _target_tint(target: Node) -> Color:
 	return preset.enemy_hit_color
 
 
-## The colour of a shot: its player's colour, the enemy ember for an enemy's.
+## The colour of a shot: its player's colour, the enemy ramp's (Blight ochre) for an enemy's.
 func _shot_color(player: int) -> Color:
 	if player >= 0 and player < PLAYER_COLORS.size():
 		return PLAYER_COLORS[player]
-	return preset.enemy_hit_color
+	return ProjectileManagerScript.ENEMY_COLOR
 
 
 func _on_enemy_died(_player: int, enemy: Node, position: Vector2) -> void:
@@ -1236,11 +1240,16 @@ func combo_mark(player: int) -> Sprite2D:
 	return _combo_marks[clampi(player, 0, COMBO_SLOTS - 1)]
 
 
-## A beam (drawn by the shot shader's beam mode in the element's ramp), a nova's ring and a dash
-## (effects), each with the cast's cards.
+## A beam (drawn by the shot shader's beam mode in the element's ramp), a nova's ring, a dash and
+## a rain's marker (effects), each with the cast's cards. An enemy's (NO_PLAYER) look the same,
+## in the enemy ramp (staffs F7). A rain's marker is a ring closing on the point for as long as
+## the rain takes to fall (`length` seconds), so nobody is hit by a rain they could not see.
 func _on_form_shown(player: int, form: StringName, origin: Vector2, direction: Vector2, length: float, tint: Color, look: int) -> void:
-	# Only players cast these; an enemy (negative index) has no slots, so it is ignored.
-	if player < 0 or player >= PLAYER_COLORS.size() or not origin.is_finite():
+	if player < EventsScript.NO_PLAYER or player >= PLAYER_COLORS.size() or not origin.is_finite():
+		return
+	if form == &"rain":
+		if length > 0.0:
+			show_effect(KIND_RING_IN, origin, Vector2.RIGHT, tint, player, look, RAIN_MARK_ZOOM, length)
 		return
 	if form == &"nova":
 		if preset.nova_seconds > 0.0:
@@ -1256,8 +1265,9 @@ func _on_form_shown(player: int, form: StringName, origin: Vector2, direction: V
 	var seconds: float = preset.beam_seconds
 	if seconds <= 0.0:
 		return
-	# Each player reuses only their own oldest slots, so nobody's beams push out another's.
-	var who: int = mini(player, 3)
+	# Each player reuses only their own oldest slots, so nobody's beams push out another's; the
+	# enemies share one player's worth, so a crowd of them never takes a player's.
+	var who: int = player if player >= 0 else ENEMY_FORMS
 	var slot: int = who * FORMS_PER_PLAYER + _next_form[who]
 	_next_form[who] = (_next_form[who] + 1) % FORMS_PER_PLAYER
 	var sprite: Sprite2D = _forms[slot]

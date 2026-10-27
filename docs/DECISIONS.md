@@ -1610,3 +1610,10 @@ How it is built (parts F2–F10):
 - **`reaction_landed` on a wizard names the caster's tag,** so an enemy's `on reaction` cards fire from it.
 - **An enemy's area hit** hits every wizard in its circle, other enemies only with `enemy_fire`, never the enemy that cast it (its body is owned by its caster row, `set_target_owner`, from F8). A player's is unchanged.
 - **Not yet:** an enemy's mend heals nothing (combat has no enemy heal); area hits do not reach decoys (they are Entities' targets, hit only by shots).
+
+## 2026-10-28: Enemy spells look like spells (staffs F7)
+
+- **No enemy special case in Feel.** An enemy's impact, nova ring, dash and beam take the same path as a wizard's, with NO_PLAYER as the player: the effect batch and the beam shader turn that into the enemy ramp (F2's look flag; `beam_player` -1). The ember burst for enemy shots is gone, so the AI's old shot (until F9) lands in a plain burst in the enemy ramp too. A hit spray on an enemy's body and its death puff keep `enemy_hit_color`: those are the enemy's own colours, not its spell's.
+- **The enemies share one player's worth of beam sprites** (24), so a crowd of casters never takes a player's.
+- **A rain shows a marker,** for wizards and enemies alike: a ring closing on its point for the seconds until it falls. Feel drew nothing for `rain` before, which an enemy's rain would have made unfair.
+- **The hostile texture hand-off stays until F9,** with the hostile batch it serves (the AI's old shot still uses it).

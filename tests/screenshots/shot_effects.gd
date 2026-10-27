@@ -8,6 +8,8 @@ extends "res://tests/support/screenshot.gd"
 ##   8    a rune's or orbit's cast ring (KIND_RING_IN), 6 frames old
 ##   9    the cast flash at a staff tip (KIND_CAST), 2 frames old
 ## `effects_sheet` at 1x and `effects_sheet_4x` (the plain, fire and frost rows, columns 1-6).
+## `effects_enemy_sheet`: the same grid cast by an enemy (NO_PLAYER, staffs F7), in the enemy ramp
+## where a player's colour would show.
 
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
@@ -36,6 +38,23 @@ func take() -> void:
 	feel.set("drive_engine", false)
 	lay_floor()
 	await settle()
+	if not await _sheet(feel, false):
+		return
+	save(_image, "effects_sheet")
+	save_crop(_image, Vector2(40.0 + 2.5 * COLUMN, 35.0 + ROW), "effects_sheet_4x", Vector2i(int(3.0 * COLUMN), int(1.5 * ROW)))
+	# Let every effect end before the enemy's grid.
+	for i in 90:
+		feel.call("step", 1.0 / 60.0)
+	if not await _sheet(feel, true):
+		return
+	save(_image, "effects_enemy_sheet")
+
+
+var _image: Image = null
+
+
+## Show the grid (by players, or by an enemy) and grab it into `_image`; false when it failed.
+func _sheet(feel: Node, enemy: bool) -> bool:
 	var oldest: int = 0
 	for column: Array in COLUMNS:
 		oldest = maxi(oldest, column[2] as int)
@@ -50,14 +69,13 @@ func take() -> void:
 				var look: int = 0 if e == 0 else ManagerScript.pack_look(PackedInt32Array([int(ELEMENTS[e - 1].get("look_layer"))]))
 				var at := Vector2(40.0 + c * COLUMN, 35.0 + e * ROW)
 				var seconds: float = _seconds_of(column[0] as int)
-				feel.call("show_effect", column[0] as int, at, Vector2.RIGHT, tint, e % 4, look, column[1] as int, seconds)
+				feel.call("show_effect", column[0] as int, at, Vector2.RIGHT, tint, -1 if enemy else e % 4, look, column[1] as int, seconds)
 		await process_frame
-	var image: Image = await grab()
+	_image = await grab()
 	if int(feel.call("live_effects")) < 50:
 		fail("only %d effects are showing" % int(feel.call("live_effects")))
-		return
-	save(image, "effects_sheet")
-	save_crop(image, Vector2(40.0 + 2.5 * COLUMN, 35.0 + ROW), "effects_sheet_4x", Vector2i(int(3.0 * COLUMN), int(1.5 * ROW)))
+		return false
+	return true
 
 
 func _seconds_of(kind: int) -> float:

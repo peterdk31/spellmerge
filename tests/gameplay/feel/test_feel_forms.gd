@@ -87,8 +87,10 @@ func test_a_dash_leaves_its_trail_along_its_way() -> void:
 	check(is_equal_approx(buffer[3], 10.0) and is_equal_approx(buffer[7], 60.0), "centred half way along")
 	check_equal(roundi(buffer[8] * 255.0) / 4, 20, "its length travels in the zoom's place (80 px is 20 steps of 4)")
 	bus.form_shown.emit(2, &"dash", Vector2(10, 20), Vector2.DOWN, 0.0, FROST, 5)
+	check_equal(feel.effects_of(FeelScript.KIND_DASH), 1, "a dash that went nowhere shows nothing")
 	bus.form_shown.emit(-1, &"dash", Vector2(10, 20), Vector2.DOWN, 80.0, FROST, 5)
-	check_equal(feel.effects_of(FeelScript.KIND_DASH), 1, "a dash that went nowhere, or an enemy's, shows nothing")
+	check_equal(feel.effects_of(FeelScript.KIND_DASH), 2, "an enemy's dash shows like a wizard's (staffs F7)")
+	check_equal(feel.effect_info(FeelScript.KIND_DASH)["player"], -1, "in the enemy ramp")
 
 
 func test_forms_end() -> void:
@@ -134,9 +136,25 @@ func test_one_cast_with_many_rays_shows_every_ray() -> void:
 	check_equal(_shown().size(), 24, "a fan of 24 rays is drawn whole")
 
 
-func test_a_form_with_no_player_is_ignored() -> void:
-	bus.form_shown.emit(-1, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, FROST, 0)
-	check_equal(_shown().size(), 0, "an enemy's beam takes no player's slot")
+func test_an_enemys_beams_take_only_the_enemies_share() -> void:
+	for i in FeelScript.FORMS_PER_PLAYER + 6:
+		bus.form_shown.emit(-1, &"beam", Vector2(0.0, i), Vector2.RIGHT, 100.0, FROST, 0)
+	check_equal(_shown().size(), FeelScript.FORMS_PER_PLAYER, "enemies' beams show, in their one share")
+	bus.form_shown.emit(0, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, FROST, 0)
+	check_equal(_shown().size(), FeelScript.FORMS_PER_PLAYER + 1, "and never take a player's slot")
+	var enemy_sprite: Sprite2D = feel._forms[FeelScript.ENEMY_FORMS * FeelScript.FORMS_PER_PLAYER]
+	check_equal((enemy_sprite.material as ShaderMaterial).get_shader_parameter(&"beam_player"), -1, "drawn in the enemy ramp")
+
+
+func test_a_rain_shows_its_marker_until_it_falls() -> void:
+	bus.form_shown.emit(1, &"rain", Vector2(40, 40), Vector2.RIGHT, 0.6, FROST, 3)
+	bus.form_shown.emit(-1, &"rain", Vector2(80, 40), Vector2.RIGHT, 0.6, FROST, 3)
+	check_equal(feel.effects_of(FeelScript.KIND_RING_IN), 2, "a ring closes on each rain's point, a wizard's and an enemy's")
+	check(is_equal_approx(feel.effect_info(FeelScript.KIND_RING_IN)["seconds"], 0.6), "for as long as it takes to fall")
+	feel.step(0.5)
+	check_equal(feel.effects_of(FeelScript.KIND_RING_IN), 2, "still there just before")
+	feel.step(0.2)
+	check_equal(feel.effects_of(FeelScript.KIND_RING_IN), 0, "gone when it lands")
 
 
 func test_the_shipped_preset_has_the_form_art() -> void:

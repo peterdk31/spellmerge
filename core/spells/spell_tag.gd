@@ -47,6 +47,14 @@ static func make(player: int, staff: int, node: int, generation: int) -> int:
 		| ((node & NODE_MASK) << NODE_SHIFT)
 
 
+## The tag of a shot of `caster` (`caster_of`): a player's (`make`) or an enemy row's
+## (`make_enemy`).
+static func make_for(caster: int, staff: int, node: int, generation: int) -> int:
+	if caster < FIRST_ENEMY_CASTER:
+		return make(caster, staff, node, generation)
+	return make_enemy(caster - FIRST_ENEMY_CASTER, staff, node, generation)
+
+
 ## The tag of an enemy's shot, from its enemy row. Arguments are wrapped as in `make`.
 static func make_enemy(row: int, staff: int, node: int, generation: int) -> int:
 	return make(0, staff, node, generation) | ENEMY_BIT | ((row & ROW_MASK) << ROW_SHIFT)

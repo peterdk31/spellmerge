@@ -145,7 +145,7 @@ func test_every_id_is_a_clip_id_the_pipeline_takes_and_used_once() -> void:
 		check(ScenariosScript.valid_id(id), "%s is a valid clip id" % id)
 		check(not seen.has(id), "%s is used once" % id)
 		seen[id] = true
-		check(["form", "element", "modifier", "trigger", "combo", "reaction"].has(scenario["kind"]), "%s has a kind the pipeline knows" % id)
+		check(["form", "element", "modifier", "trigger", "multicast", "combo", "reaction"].has(scenario["kind"]), "%s has a kind the pipeline knows" % id)
 		check(str(scenario["title"]) != "", "%s has a title" % id)
 		var frames: int = int(float(scenario["seconds"]) * RecordScript.FPS)
 		check(frames >= 1 and frames <= RecordScript.MAX_FRAMES, "%s has %d frames, within the cap" % [id, frames])

@@ -1,0 +1,9 @@
+{
+	"id": "double_bolt_and_nova",
+	"name": "Double bolt and nova",
+	"does": "A fire bolt and a nova leave in one cast: the bolt burns the imp ahead, the ring hits the one behind.",
+	"casts": [{"staff": 0, "cards": ["double", "fire", "bolt", "nova"]}],
+	"imps": [[90, -9], [-50, 0]],
+	"seconds": 1.5,
+	"checks": [{"kind": "status", "imps": [0], "status": "burn"}, {"kind": "damaged", "imps": [1]}]
+}

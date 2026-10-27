@@ -7,7 +7,7 @@
 			"license": "CC-BY-SA-4.0",
 			"tier": "placeholder",
 			"tool": "Claude (SVG rects written by a small generator)",
-			"prompt": "A 16x16 icon for the Sniper card: a grey crosshair ring with a red centre, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+			"prompt": "A 16x16 icon for the Sniper card: a grey crosshair ring on a dark stone disc with a red centre, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
 		}
 	]
 }

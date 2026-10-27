@@ -1,0 +1,9 @@
+{
+	"id": "slow_fire_fan",
+	"name": "Slow fire fan",
+	"does": "A fan of three crawling fire bolts that burns three imps close in front.",
+	"casts": [{"staff": 0, "cards": ["slow", "fire", "split", "bolt"]}],
+	"imps": [[48, -13], [50, 0], [48, 13]],
+	"seconds": 2.0,
+	"checks": [{"kind": "status_count", "status": "burn", "min": 3}]
+}

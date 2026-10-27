@@ -1,0 +1,13 @@
+{
+	"assets": [
+		{
+			"path": "content/spells/modifiers/arc/icon.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "placeholder",
+			"tool": "Claude (SVG rects written by a small generator)",
+			"prompt": "A 16x16 icon for the Arc card: a lime zig-zag spark with a small second spark beside it, a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+		}
+	]
+}

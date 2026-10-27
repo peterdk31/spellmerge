@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ModifierBase" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/base/modifier_base.gd" id="1_base"]
+[ext_resource type="Texture2D" path="res://content/spells/modifiers/arc/icon.svg" id="2_icon"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"arc"
+display_name = "Arc"
+complexity = 3
+icon = ExtResource("2_icon")
+mana_mult = 1.5
+behaviour = 20
+behaviour_strength = 2.0
+behaviour_reach = 60.0
+look_layer = 10

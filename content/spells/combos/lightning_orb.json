@@ -1,0 +1,9 @@
+{
+	"id": "lightning_orb",
+	"name": "Lightning orb",
+	"does": "A slow orb that crawls past an imp without touching it and zaps it with static as it goes.",
+	"casts": [{"staff": 0, "cards": ["slow", "lightning", "arc", "bolt"]}],
+	"imps": [[60, 45]],
+	"seconds": 3.0,
+	"checks": [{"kind": "status", "imps": [0], "status": "static"}]
+}

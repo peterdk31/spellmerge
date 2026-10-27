@@ -4,7 +4,8 @@ extends RefCounted
 ## beam, a teleport, a wizard's dash (owner, 2026-10-27: one rule, easy to add a new form to).
 ## It holds what its spell's homing cards give (`start`), the target it keeps and the seed of
 ## its random pick; `steer` turns what moves over time, `point` and `aim` bend what is over at
-## once. A new kind of carrier that homes holds one of these and calls one of the three.
+## once (which ends at its target when that is within its distance: a beam ends on it, a
+## teleport lands at its edge). A new kind of carrier that homes holds one of these and calls one of the three.
 ## The manager's shots keep the same numbers in its packed arrays, for speed, and pick the same
 ## way (`Projectiles.homing_point`).
 
@@ -18,6 +19,10 @@ var bend: float = 0.0
 ## The instance id of the target it keeps (0 for none yet), and the seed of its random pick.
 var keep: int = 0
 var pick_seed: int = 0
+## The hit radius of the target `point` last found (0 for none).
+var target_radius: float = 0.0
+## The id of a target to pick only when no other qualifies (one just reached), 0 for none.
+var avoid: int = 0
 
 
 ## Takes `spell`'s homing, keeping no target yet; a spell that does not home stops it.
@@ -29,6 +34,7 @@ func start(spell: CompiledSpell, with_seed: int) -> void:
 	reach = spell.homing_range
 	bend = deg_to_rad(spell.homing_angle)
 	keep = 0
+	avoid = 0
 	pick_seed = with_seed
 
 
@@ -37,6 +43,7 @@ func stop() -> void:
 	reach = 0.0
 	bend = 0.0
 	keep = 0
+	avoid = 0
 
 
 func homes() -> bool:
@@ -56,10 +63,12 @@ func steer(projectiles: ProjectilesScript, player: int, from: Vector2, velocity:
 ## The centre of the target something at `from` going along `direction` bends to (a beam's
 ## leg), or INF when it does not home or has nothing in reach and in its bend.
 func point(projectiles: ProjectilesScript, player: int, from: Vector2, direction: Vector2) -> Vector2:
+	target_radius = 0.0
 	if not homes() or projectiles == null:
 		return Vector2.INF
-	var goal: Vector2 = projectiles.homing_point(player, from, direction, bend, ProjectilesScript.LAYER_ENEMY, reach, keep, pick_seed)
+	var goal: Vector2 = projectiles.homing_point(player, from, direction, bend, ProjectilesScript.LAYER_ENEMY, reach, keep, pick_seed, avoid)
 	keep = projectiles.homing_target
+	target_radius = projectiles.homing_target_radius
 	return goal
 
 

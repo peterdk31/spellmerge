@@ -4,6 +4,9 @@ extends Control
 ## starts the arena. The menu never calls flow and never changes the scene itself.
 ## In `dev` and `preview` builds a Sandbox button stands above Play and has the focus, so
 ## those builds start in the sandbox with one press (staffs B7); it sends `sandbox_requested`.
+## Below Play, "Fullscreen: Off" (or On) asks `Display` (core) to fill the screen: on the web a
+## click or key press is what lets the browser do it (owner, 2026-10-27). F11 or Alt+Enter do the
+## same anywhere.
 
 const EventsScript := preload("res://core/events/events.gd")
 
@@ -34,10 +37,13 @@ var events: EventsScript = null
 var runner_factory: Callable = Callable()
 ## The build channel; `BuildInfo.channel()` unless a test sets it before adding the node.
 var channel: String = BuildInfo.channel()
+## The window service (`core/display`, the `Display` autoload); tests may set their own first.
+var display: Node = null
 
 @onready var _version: Label = %Version
 @onready var _play: Button = %Play
 @onready var _sandbox: Button = %Sandbox
+@onready var _fullscreen: Button = %Fullscreen
 
 
 func _ready() -> void:
@@ -46,6 +52,13 @@ func _ready() -> void:
 		events = get_node_or_null("/root/Events") as EventsScript
 	_play.pressed.connect(_on_play_pressed)
 	_sandbox.pressed.connect(_on_sandbox_pressed)
+	if display == null:
+		display = get_node_or_null(^"/root/Display")
+	_fullscreen.pressed.connect(_on_fullscreen_pressed)
+	_fullscreen.visible = display != null
+	if display != null:
+		display.connect(&"fullscreen_changed", func(_on: bool) -> void: _show_fullscreen())
+		_show_fullscreen()
 	_sandbox.visible = SANDBOX_CHANNELS.has(channel)
 	if _sandbox.visible:
 		_sandbox.grab_focus()
@@ -142,3 +155,15 @@ func _on_sandbox_pressed() -> void:
 		push_warning("Main menu: the Events autoload is missing, so Sandbox does nothing.")
 		return
 	events.sandbox_requested.emit(MENU_PLAYER)
+
+
+func _on_fullscreen_pressed() -> void:
+	if display != null:
+		display.call("toggle_fullscreen")
+	_show_fullscreen()
+
+
+## Writes the switch's word from the window itself.
+func _show_fullscreen() -> void:
+	var on: bool = display != null and bool(display.call("is_fullscreen"))
+	_fullscreen.text = "Fullscreen: %s" % ("On" if on else "Off")

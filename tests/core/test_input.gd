@@ -24,6 +24,8 @@ func _initialize() -> void:
 	_test_gamepads_join_in_order()
 	_test_keyboard_is_player_one_only()
 	_test_keyboard_blocked_by_gamepad_in_slot_zero()
+	_test_a_gamepad_takes_p1_from_a_provisional_keyboard()
+	_test_a_used_keyboard_keeps_p1()
 	_test_one_device_per_player()
 	_test_full_game_rejects_a_fifth()
 	_test_leave_frees_the_slot()
@@ -157,6 +159,46 @@ func _test_keyboard_is_player_one_only() -> void:
 	# Another keyboard press does not join a second time.
 	_manager.handle_event(_key(KEY_SPACE))
 	_check(_manager.joined_count() == 4, "the keyboard cannot join twice")
+
+
+## One player with a controller on the web clicks Play with the mouse: the keyboard joins P1
+## provisionally, and the pad's first A takes P1 over (owner, 2026-10-27).
+func _test_a_gamepad_takes_p1_from_a_provisional_keyboard() -> void:
+	_setup()
+	var glyphs: Array[int] = []
+	_manager.glyph_kind_changed.connect(func(player: int) -> void: glyphs.append(player))
+	_check(_manager.join(InputManagerScript.KEYBOARD, true) == 0, "the click on Play joins the keyboard as P1")
+	_check(_manager.is_keyboard_provisional(), "provisionally")
+	_manager.handle_event(_axis(0, JOY_AXIS_LEFT_X, 0.0))
+	_press_join(0)
+	_check(_manager.device_of(0) == 0, "the gamepad is P1 now (device %d)" % _manager.device_of(0))
+	_check(_manager.player_of(InputManagerScript.KEYBOARD) == InputManagerScript.NO_PLAYER, "the keyboard is out")
+	_check(_manager.joined_count() == 1, "still one player")
+	_check(glyphs.back() == 0, "P1's glyphs change to the pad's")
+	_check(_log == [["joined", 0, InputManagerScript.KEYBOARD]], "no leave or join: the wizard stays, got %s" % [_log])
+	_manager.handle_event(_axis(0, JOY_AXIS_LEFT_X, 1.0))
+	_check(_manager.get_move(0).x > 0.5, "the pad moves P1")
+	_press_join(1)
+	_check(_manager.device_of(1) == 1, "a second pad is P2 as usual")
+	# The keyboard can still join later, as anyone else would: P1 is taken, so it cannot.
+	_manager.handle_event(_key(KEY_ENTER))
+	_check(_manager.player_of(InputManagerScript.KEYBOARD) == InputManagerScript.NO_PLAYER, "the keyboard only ever takes P1")
+
+
+func _test_a_used_keyboard_keeps_p1() -> void:
+	_setup()
+	_manager.join(InputManagerScript.KEYBOARD, true)
+	_manager.handle_event(_key(KEY_W))
+	_manager.handle_event(_key(KEY_W, false))
+	_check(not _manager.is_keyboard_provisional(), "a key press makes the keyboard P1 for real")
+	_press_join(0)
+	_check(_manager.device_of(0) == InputManagerScript.KEYBOARD and _manager.device_of(1) == 0, "the pad joins as P2")
+	# A keyboard joined with its own key press is never provisional.
+	_setup()
+	_manager.handle_event(_key(KEY_ENTER))
+	_check(not _manager.is_keyboard_provisional(), "a key join is for real")
+	_press_join(0)
+	_check(_manager.device_of(1) == 0, "the pad is P2")
 
 
 func _test_keyboard_blocked_by_gamepad_in_slot_zero() -> void:

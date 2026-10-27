@@ -462,12 +462,13 @@ func _all_down() -> bool:
 
 
 ## The Play button may be pressed with the mouse by nobody who has joined: the
-## keyboard then takes slot 0. Anyone already joined (a gamepad, in any slot)
-## plays as they are and the keyboard stays out.
+## keyboard then takes slot 0, provisionally (a gamepad that joins before the keyboard is used
+## takes P1 over; core/input). Anyone already joined (a gamepad, in any slot) plays as they are
+## and the keyboard stays out.
 func _ensure_joined(requester: int) -> void:
 	if input == null or requester != 0 or input.joined_count() > 0:
 		return
-	input.join(InputManagerScript.KEYBOARD)
+	input.join(InputManagerScript.KEYBOARD, true)
 
 
 func _joined_players() -> Array[int]:

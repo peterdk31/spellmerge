@@ -14,7 +14,9 @@ extends PanelContainer
 ##   which `hud/panels` applies to every player's builder. "Reload: Button" (the default) or
 ##   "Next cast" (owner, 2026-10-27): where the corner panels' staff rows show a staff's delay;
 ##   each flip sends `reload_style_changed`, which `hud/panels` applies to every panel. Back.
-## - **Settings:** Gameplay, Back.
+## - **Settings:** Gameplay, "Fullscreen: Off" (or On), Back. The switch asks `Display` (core) to
+##   fill the screen or not and stays on the page; its word follows the window itself, read each
+##   time the page is shown, so leaving fullscreen with the browser's Escape shows Off again.
 ## - **Gameplay:** "Friendly fire: Off" (or On), which sends `friendly_fire_requested(player, on)`;
 ##   the word follows `friendly_fire_changed` from coop, never the press itself. Back.
 ##
@@ -54,6 +56,7 @@ const BUILDER_TEXT: String = "Builder: %s"
 const RING_TEXT: String = "Ring: %s"
 const PUT_TEXT: String = "Full slot: %s"
 const RELOAD_TEXT: String = "Reload: %s"
+const FULLSCREEN_TEXT: String = "Fullscreen: %s"
 
 ## The player working the menu (0-3), or -1 while it is closed.
 var owner_player: int = -1
@@ -74,6 +77,8 @@ var ring_by_kind: bool = false
 var put_push: bool = true
 ## The reload switch (see the top); the button glyph by default (owner, 2026-10-27).
 var reload_on_button: bool = true
+## The window service (`core/display`, the `Display` autoload); tests may set their own first.
+var display: Node = null
 
 @onready var _title: Label = %Title
 @onready var _rows: VBoxContainer = %Rows
@@ -88,6 +93,7 @@ var reload_on_button: bool = true
 @onready var _reload_style: Button = _add(Page.SANDBOX, "ReloadStyle", RELOAD_TEXT % "Button")
 @onready var _sandbox_back: Button = _add(Page.SANDBOX, "SandboxBack", "Back")
 @onready var _gameplay: Button = _add(Page.SETTINGS, "Gameplay", "Gameplay")
+@onready var _fullscreen: Button = _add(Page.SETTINGS, "Fullscreen", FULLSCREEN_TEXT % "Off")
 @onready var _settings_back: Button = _add(Page.SETTINGS, "SettingsBack", "Back")
 @onready var _friendly: Button = _add(Page.GAMEPLAY, "FriendlyFire", FRIENDLY_FIRE_TEXT % "Off")
 @onready var _gameplay_back: Button = _add(Page.GAMEPLAY, "GameplayBack", "Back")
@@ -96,6 +102,8 @@ var reload_on_button: bool = true
 func _ready() -> void:
 	# Worked while the game is paused.
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	if display == null:
+		display = get_node_or_null(^"/root/Display")
 	visible = false
 	_show_page(Page.MAIN)
 
@@ -182,6 +190,8 @@ func _show_page(next: Page) -> void:
 		for control: Button in _pages[on_page]:
 			control.visible = on_page == next
 	_sandbox.visible = next == Page.MAIN and _sandbox_on
+	if next == Page.SETTINGS:
+		_show_fullscreen()
 	_mark_focus()
 
 
@@ -271,6 +281,10 @@ func _on_activated(player: int, control: Control) -> void:
 		reload_style_changed.emit(reload_on_button)
 	elif control == _gameplay:
 		_go(Page.GAMEPLAY)
+	elif control == _fullscreen:
+		if display != null:
+			display.call("toggle_fullscreen")
+		_show_fullscreen()
 	elif control == _friendly:
 		if _events != null:
 			_events.friendly_fire_requested.emit(player, not _friendly_fire)
@@ -291,6 +305,13 @@ func _on_cancelled(player: int) -> void:
 			_go(Page.SETTINGS)
 		_:
 			_go(Page.MAIN)
+
+
+## Write the fullscreen switch's word from the window itself.
+func _show_fullscreen() -> void:
+	var on: bool = display != null and bool(display.call("is_fullscreen"))
+	_fullscreen.set_meta(BASE_TEXT_META, FULLSCREEN_TEXT % ("On" if on else "Off"))
+	_mark_focus()
 
 
 ## Write the switches' words and tell `hud/panels`.

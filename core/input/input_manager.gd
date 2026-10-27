@@ -5,7 +5,14 @@ extends Node
 ## Devices join by a button press (the `join` action): a gamepad takes the
 ## lowest free player index, the keyboard and mouse only ever take player 0
 ## (P1), so P2-P4 are gamepads. The `leave` action, or unplugging a gamepad,
-## frees the slot. Bots use virtual devices, one per player index, that feed the
+## frees the slot.
+##
+## A keyboard that joined only because P1's Play was clicked with the mouse (flow calls
+## `join(KEYBOARD, true)`) holds P1 provisionally: the first gamepad to press `join` takes P1 over
+## as long as the keyboard has not been used since (a key press or a mouse click). So one player
+## with a controller on the web, who clicks Play with the mouse because the browser shows no
+## gamepad before its first press, plays as P1 (owner, 2026-10-27). The handover keeps P1's
+## wizard: no `device_left` or `device_joined`, only `glyph_kind_changed(0)`. Bots use virtual devices, one per player index, that feed the
 ## same handle_event() path real devices use.
 ##
 ## Device ids: KEYBOARD (keys and mouse), a gamepad's own id (0 and up), and
@@ -133,6 +140,8 @@ var _aim_stick: Array[Vector2] = []
 ## Per player: the raw left stick, for menu_move().
 var _move_stick: Array[Vector2] = []
 var _mouse_aiming: bool = false
+## True while the keyboard holds P1 provisionally (see the top).
+var _keyboard_provisional: bool = false
 ## How far the mouse moved (pixels) since the cast key last turned mouse aim off.
 var _mouse_travel: float = 0.0
 
@@ -209,8 +218,8 @@ func joined_count() -> int:
 
 ## Join a real device (the keyboard or a gamepad). Returns the player index, or
 ## NO_PLAYER if the device already joined, is not allowed that slot, or the game
-## is full.
-func join(device: int) -> int:
+## is full. With `provisional`, a keyboard holds P1 only until a gamepad wants it (see the top).
+func join(device: int, provisional: bool = false) -> int:
 	if device == NO_DEVICE or is_virtual(device) or player_of(device) != NO_PLAYER:
 		return NO_PLAYER
 	var player: int = NO_PLAYER
@@ -220,8 +229,25 @@ func join(device: int) -> int:
 	else:
 		player = _devices.find(NO_DEVICE)
 	if player != NO_PLAYER:
+		_keyboard_provisional = provisional and device == KEYBOARD
 		_assign(player, device)
 	return player
+
+
+## True while the keyboard holds P1 provisionally.
+func is_keyboard_provisional() -> bool:
+	return _keyboard_provisional and _devices[0] == KEYBOARD
+
+
+## A gamepad takes P1 over from a provisional keyboard: the wizard stays, its input is the pad's.
+func _hand_over(device: int) -> void:
+	_keyboard_provisional = false
+	_clear_state(0)
+	_mouse_aiming = false
+	_mouse_travel = 0.0
+	_devices[0] = device
+	_pad_kind[0] = GlyphsScript.kind_of_pad(String(joy_name_provider.call(device)))
+	glyph_kind_changed.emit(0)
 
 
 ## Add the virtual device for `player` (a bot). Returns its device id, or
@@ -241,18 +267,24 @@ func leave(player: int) -> bool:
 	var device: int = _devices[player]
 	_devices[player] = NO_DEVICE
 	_captured[player] = false
-	_aim_stick[player] = Vector2.ZERO
-	_move_stick[player] = Vector2.ZERO
+	_clear_state(player)
 	if device == KEYBOARD:
 		_mouse_aiming = false
 		_mouse_travel = 0.0
-	for action in ACTIONS:
-		_strength[player][action] = 0.0
-		_sources[player][action].clear()
+		_keyboard_provisional = false
 	if events != null:
 		events.device_left.emit(player, device)
 	glyph_kind_changed.emit(player)
 	return true
+
+
+## Lets go of everything `player` holds: actions and sticks.
+func _clear_state(player: int) -> void:
+	_aim_stick[player] = Vector2.ZERO
+	_move_stick[player] = Vector2.ZERO
+	for action in ACTIONS:
+		_strength[player][action] = 0.0
+		_sources[player][action].clear()
 
 
 ## Send an action from the virtual device of `player`, through the same path as
@@ -277,8 +309,14 @@ func handle_event(event: InputEvent) -> void:
 	var player: int = player_of(device)
 	if player == NO_PLAYER:
 		if event.is_action_pressed(JOIN):
-			join(device)
+			if device != KEYBOARD and is_keyboard_provisional():
+				_hand_over(device)
+			else:
+				join(device)
 		return
+	# The keyboard in use for real (a key or a click) keeps P1.
+	if device == KEYBOARD and _keyboard_provisional and event.is_pressed() and (event is InputEventKey or event is InputEventMouseButton):
+		_keyboard_provisional = false
 	if event.is_action_pressed(LEAVE):
 		leave(player)
 		return

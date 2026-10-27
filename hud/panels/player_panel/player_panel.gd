@@ -54,6 +54,7 @@ func _ready() -> void:
 		row.visible = false
 		_staffs.add_child(row)
 		_rows.append(row)
+	_align_rows()
 	_refresh_status()
 
 
@@ -104,6 +105,13 @@ func set_staff_plan(staff: int, plan: Dictionary, icons: Array[Texture2D]) -> vo
 func set_staff_timing(staff: int, cursor: int, left: float) -> void:
 	if staff >= 0 and staff < STAFF_COUNT and _rows[staff].visible:
 		_rows[staff].set_timing(cursor, left)
+	if staff == STAFF_COUNT - 1:
+		# Once a frame: a glyph that changed width (another device) lines the rows up again.
+		var widest: float = 0.0
+		for row in _rows:
+			widest = maxf(widest, row.glyph_room())
+		if not is_equal_approx(widest, _rows[0].cards_left):
+			_align_rows()
 
 
 ## The row of staff `staff`, or null for a bad index (for tests and screenshots).
@@ -158,6 +166,16 @@ func is_downed() -> bool:
 ## The word over the health bar; empty when nothing special.
 func status_text() -> String:
 	return _status.text
+
+
+## Start every row's cards at the same x: past the widest button glyph of the four (a key name
+## like "Space" is wider than a shoulder glyph), so the casts read as columns.
+func _align_rows() -> void:
+	var widest: float = 0.0
+	for row in _rows:
+		widest = maxf(widest, row.glyph_room())
+	for row in _rows:
+		row.cards_left = widest
 
 
 func _refresh_rows() -> void:

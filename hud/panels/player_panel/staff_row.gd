@@ -51,6 +51,13 @@ const PLACEHOLDER: Color = Color("#7a7694")
 ## The player index 0-3 and the staff 0-3, set before adding the node.
 var player: int = 0
 var staff: int = 0
+## Where the cards start, set by the panel to the widest glyph of its rows so every row's cards
+## line up whatever its button is called (owner, 2026-10-27). 0 leaves it to this row's glyph.
+var cards_left: float = 0.0:
+	set(value):
+		if not is_equal_approx(value, cards_left):
+			cards_left = value
+			_measure()
 
 ## Per card shown, in read order: its icon (null draws a plain square) and whether it is wasted.
 var _icons: Array[Texture2D] = []
@@ -160,6 +167,11 @@ func is_recharging() -> bool:
 	return _recharging and _left > 0.0
 
 
+## Where this row's first card starts (for tests): the same in every row of a panel.
+func cards_start() -> float:
+	return _cards_left()
+
+
 ## How many cards fit, and the "+N" text for the rest ("" when all fit).
 func shown_count() -> int:
 	return _shown
@@ -169,8 +181,13 @@ func plus_text() -> String:
 	return _plus_text
 
 
-func _cards_left() -> float:
+## The room this row's own glyph needs before the cards.
+func glyph_room() -> float:
 	return GLYPH_CELL if _glyph == null else maxf(GLYPH_CELL, _glyph.custom_minimum_size.x + 2.0)
+
+
+func _cards_left() -> float:
+	return maxf(glyph_room(), cards_left)
 
 
 ## How many cards fit in the row's width (frames and gaps counted), leaving room for "+N".

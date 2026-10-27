@@ -196,3 +196,17 @@ func test_a_player_leaving_clears_the_rows() -> void:
 func test_the_header_line_is_gone() -> void:
 	var panel: PanelScript = _hud.get_panel(0)
 	check(panel.find_child("Name", true, false) == null and panel.find_child("Spell", true, false) == null, "no P1 or Staff N line")
+
+
+func test_every_rows_cards_start_at_the_same_place_whatever_the_button() -> void:
+	for staff in 4:
+		_build(0, staff, 2)
+	var panel = _hud.get_panel(0)
+	# One row's button gets a much wider name (a long key name on the keyboard).
+	var wide: Control = panel.staff_row(2).get_node("Glyph") as Control
+	wide.custom_minimum_size = Vector2(40.0, wide.custom_minimum_size.y)
+	_hud.step_staffs()
+	var start: float = panel.staff_row(0).cards_start()
+	check(start >= 42.0, "the cards start past the widest button: %s" % start)
+	for staff in 4:
+		check_equal(panel.staff_row(staff).cards_start(), start, "row %d's cards line up" % staff)

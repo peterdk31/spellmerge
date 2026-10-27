@@ -882,7 +882,7 @@ func _launch(spell: CompiledSpell, tag: int, player: int, origin: Vector2, direc
 			projectiles.exclude(slot, source, SpellLimits.SOURCE_EXCLUSION)
 	# The ring is only a cue, drawn once, and only when a shot really flew.
 	if events != null and made > 0 and count > 1 and spell.spread >= 360.0 and spell.motion == FormBase.Motion.STRAIGHT:
-		events.form_shown.emit(player, &"nova", origin, direction, 0.0, spell.tint)
+		events.form_shown.emit(player, &"nova", origin, direction, 0.0, spell.tint, spell.look)
 	return made
 
 
@@ -919,6 +919,8 @@ func _move_caster(spell: CompiledSpell, tag: int, player: int, origin: Vector2, 
 			if dash:
 				_dash_homing[player].start(spell, hash(Vector2i(player, tag)))
 				events.caster_move_requested.emit(player, &"dash", origin + offset, seconds, tag)
+				var reach: float = origin.distance_to(projectiles.clip_to_walls(origin, origin + offset))
+				events.form_shown.emit(player, &"dash", origin, direction, reach, spell.tint, spell.look)
 			else:
 				events.caster_move_requested.emit(player, &"teleport", projectiles.clip_to_walls(origin, origin + offset), 0.0, tag)
 		return 1
@@ -1047,7 +1049,7 @@ func _telegraph_rain(spell: CompiledSpell, tag: int, player: int, origin: Vector
 		launch.landing = spell
 		placed += 1
 		if events != null:
-			events.form_shown.emit(player, &"rain", point, along, spell.lifetime, spell.tint)
+			events.form_shown.emit(player, &"rain", point, along, spell.lifetime, spell.tint, spell.look)
 	return placed
 
 
@@ -1471,7 +1473,7 @@ func _shoot_ray(spell: CompiledSpell, tag: int, player: int, origin: Vector2, he
 	var reach: float = spell.ray_length if length < 0.0 else length
 	var got: float = projectiles.ray(player, origin, heading, reach, spell.pierce if pierce < 0 else pierce, ProjectilesScript.LAYER_ENEMY, tag, spell.radius * 0.5, source)
 	if got > 0.0 and events != null:
-		events.form_shown.emit(player, &"beam", origin, heading, got, spell.tint)
+		events.form_shown.emit(player, &"beam", origin, heading, got, spell.tint, spell.look)
 	# A `ray()` that did nothing (too deep, or a bad aim) has no end to fire the payload from.
 	if got > 0.0:
 		_blast(spell, tag, player, origin + heading * got)
@@ -1781,6 +1783,11 @@ func beam_tint(at: int) -> Color:
 	return _bm_spell[at].tint if _bm_spell[at] != null else Color.WHITE
 
 
+## The packed look kinds of live beam `at` (`CompiledSpell.look`), so it shows its cards.
+func beam_look(at: int) -> int:
+	return _bm_spell[at].look if _bm_spell[at] != null else 0
+
+
 func beam_since_hit(at: int) -> float:
 	return _clock - _bm_hit_at[at]
 
@@ -1937,7 +1944,7 @@ func _zap(slot: int) -> void:
 	if _same(slot) and projectiles.get_tag_of(slot) == tag:
 		_rec_fires[slot] = fires
 	if got > 0.0 and events != null:
-		events.form_shown.emit(player, &"beam", at, way, got, spell.tint)
+		events.form_shown.emit(player, &"beam", at, way, got, spell.tint, spell.look)
 	_cast_jumps()
 
 

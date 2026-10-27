@@ -166,7 +166,7 @@ extends Resource
 @export_range(0.0, 0.5, 0.01) var beam_seconds: float = 0.25
 @export_range(0.0, 1.0, 0.01) var nova_seconds: float = 0.25
 @export_range(8.0, 400.0, 1.0) var nova_ring_size: float = 120.0
-## How much wider a beam is in its first moments (1.0 is twice as wide).
+## How much wider a beam's rim and glow are in its first moments (1.0 is twice as wide).
 @export_range(0.0, 3.0, 0.1) var beam_flare: float = 1.0
 ## The share of a beam's life the extra width lasts (0.2 is the first fifth).
 @export_range(0.01, 1.0, 0.01) var beam_flare_share: float = 0.2
@@ -174,8 +174,8 @@ extends Resource
 ## swing at a fast rate reads as a strobe), and the steps come this many times a second.
 @export_range(0.0, 0.3, 0.01) var beam_flicker_depth: float = 0.1
 @export_range(1.0, 30.0, 1.0) var beam_flicker_rate: float = 16.0
-## How opaque a beam is (1.0 solid): a little see-through, so beams that cross (a split, a
-## multicast) all still show instead of only the one drawn last.
+## How strongly a beam glows (1.0 full; the glow look, 2026-10-27). Its one-pixel core leaves
+## room round it, so beams that cross (a split, a multicast) all still show.
 @export_range(0.2, 1.0, 0.05) var beam_alpha: float = 0.7
 ## The cast flash on the wizard and the flare where a shot ends are data on the carrier cards
 ## (`FormBase.cast_look` and `impact_look`, staffs B6b), not in this preset. A card without a

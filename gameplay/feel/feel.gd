@@ -133,11 +133,20 @@ const KIND_RING_OUT: int = 5
 const KIND_RING_IN: int = 6
 const KIND_RUNE_BURST: int = 7
 const KIND_CAST: int = 8
+const KIND_DASH: int = 9
 const EFFECT_SLOTS: int = 256
 const BURST_SECONDS: float = 0.3
 const RING_SECONDS: float = 0.22
 const RUNE_BURST_SECONDS: float = 0.45
 const CAST_SECONDS: float = 0.14
+const DASH_SECONDS: float = 0.6
+## A dash effect is drawn along its length (at most DASH_LONGEST: the length travels in the zoom's
+## place, 4 px a step), DASH_MARGIN longer at each end and DASH_ACROSS across (the shader's).
+const DASH_LONGEST: float = 252.0
+const DASH_MARGIN: float = 12.0
+const DASH_ACROSS: float = 32.0
+## A beam is drawn this wide (its core, rim, flares and glow; `shot_core.gdshader`'s beam mode).
+const BEAM_WIDTH: float = 16.0
 const EFFECT_Z: int = 50
 ## The effect quad is the shot shader's grid times the zoom (LOOK_GRID in core/projectiles).
 const EFFECT_GRID: float = 24.0
@@ -228,12 +237,11 @@ var _flash_grow: PackedFloat32Array = PackedFloat32Array()
 var _live_beams: Array[Line2D] = []
 ## Scratch for the points of the live beam being drawn.
 var _beam_line: PackedVector2Array = PackedVector2Array()
-## Beams and nova rings (sprites made once): seconds left and in all, whether it is a ring,
-## the owner's body tint and the beam's length in pixels.
+## Beams (sprites made once): seconds left and in all, the owner's body tint and the beam's
+## length in pixels.
 var _forms: Array[Sprite2D] = []
 var _form_left: PackedFloat32Array = PackedFloat32Array()
 var _form_total: PackedFloat32Array = PackedFloat32Array()
-var _form_is_ring: PackedByteArray = PackedByteArray()
 var _form_body: PackedColorArray = PackedColorArray()
 var _form_length: PackedFloat32Array = PackedFloat32Array()
 var _next_form: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
@@ -284,6 +292,7 @@ var _effect_zoom: PackedInt32Array = PackedInt32Array()
 var _effect_look: PackedInt32Array = PackedInt32Array()
 var _effect_age: PackedFloat32Array = PackedFloat32Array()
 var _effect_seconds: PackedFloat32Array = PackedFloat32Array()
+var _effect_length: PackedFloat32Array = PackedFloat32Array()
 var _next_effect: int = 0
 var _reaction_heard: Dictionary = {}
 ## The reaction id each name label shows.
@@ -395,7 +404,6 @@ func _ready() -> void:
 		_live_beams.append(line)
 	_form_left.resize(FORM_SLOTS)
 	_form_total.resize(FORM_SLOTS)
-	_form_is_ring.resize(FORM_SLOTS)
 	_form_body.resize(FORM_SLOTS)
 	_form_length.resize(FORM_SLOTS)
 	for i in REACTION_SLOTS:
@@ -1155,12 +1163,14 @@ func _make_effects() -> void:
 	_effect_look.resize(EFFECT_SLOTS)
 	_effect_age.resize(EFFECT_SLOTS)
 	_effect_seconds.resize(EFFECT_SLOTS)
+	_effect_length.resize(EFFECT_SLOTS)
 
 
 ## Show an effect of `kind` (KIND_BURST to KIND_CAST) at `at`, aimed along `dir`, in the ramp of
 ## `core` (white: `player`'s colours) with the particles of the packed `look`, at `zoom`, for
-## `seconds`. It takes the next slot, the oldest effect when they are all busy.
-func show_effect(kind: int, at: Vector2, dir: Vector2, core: Color, player: int, look: int, zoom: int, seconds: float) -> void:
+## `seconds`. A dash runs `length` pixels from `at` along `dir` (its zoom is then the length).
+## It takes the next slot, the oldest effect when they are all busy.
+func show_effect(kind: int, at: Vector2, dir: Vector2, core: Color, player: int, look: int, zoom: int, seconds: float, length: float = 0.0) -> void:
 	if _effect_node == null or not at.is_finite() or player < 0 or player >= PLAYER_COLORS.size():
 		return
 	var slot: int = _next_effect
@@ -1174,6 +1184,11 @@ func show_effect(kind: int, at: Vector2, dir: Vector2, core: Color, player: int,
 	_effect_look[slot] = look
 	_effect_age[slot] = 0.0
 	_effect_seconds[slot] = maxf(seconds, 0.01)
+	_effect_length[slot] = 0.0
+	if kind == KIND_DASH:
+		var steps: int = clampi(roundi(length / 4.0), 1, roundi(DASH_LONGEST / 4.0))
+		_effect_zoom[slot] = steps
+		_effect_length[slot] = steps * 4.0
 
 
 ## Age the effects by `real_delta` and write the live ones into the batch, oldest first.
@@ -1193,13 +1208,19 @@ func _step_effects(real_delta: float) -> void:
 			continue
 		var i: int = out * EFFECT_STRIDE
 		var d: float = EFFECT_GRID * _effect_zoom[slot]
+		var along: float = d
 		var dir: Vector2 = _effect_dir[slot]
 		var at: Vector2 = _effect_at[slot]
-		_effect_buffer[i] = dir.x * d
+		if _effect_length[slot] > 0.0:
+			# A dash: from where it left along its way, a margin past each end.
+			d = DASH_ACROSS
+			along = _effect_length[slot] + 2.0 * DASH_MARGIN
+			at += dir * _effect_length[slot] * 0.5
+		_effect_buffer[i] = dir.x * along
 		_effect_buffer[i + 1] = dir.y * d
 		_effect_buffer[i + 2] = 0.0
 		_effect_buffer[i + 3] = at.x
-		_effect_buffer[i + 4] = dir.y * d
+		_effect_buffer[i + 4] = dir.y * along
 		_effect_buffer[i + 5] = -dir.x * d
 		_effect_buffer[i + 6] = 0.0
 		_effect_buffer[i + 7] = at.y
@@ -1354,16 +1375,25 @@ func combo_mark(player: int) -> Sprite2D:
 	return _combo_marks[clampi(player, 0, COMBO_SLOTS - 1)]
 
 
-## A beam or a nova ring, drawn in the owner's tint with the element's colour in its core.
-func _on_form_shown(player: int, form: StringName, origin: Vector2, direction: Vector2, length: float, tint: Color) -> void:
-	var ring: bool = form == &"nova"
-	if not ring and (form != &"beam" or length <= 0.0 or direction == Vector2.ZERO):
+## A beam (drawn by the shot shader's beam mode in the element's ramp), a nova's ring and a dash
+## (effects), each with the cast's cards.
+func _on_form_shown(player: int, form: StringName, origin: Vector2, direction: Vector2, length: float, tint: Color, look: int) -> void:
+	# Only players cast these; an enemy (negative index) has no slots, so it is ignored.
+	if player < 0 or player >= PLAYER_COLORS.size() or not origin.is_finite():
 		return
-	var seconds: float = preset.nova_seconds if ring else preset.beam_seconds
-	if seconds <= 0.0 or not origin.is_finite():
+	if form == &"nova":
+		if preset.nova_seconds > 0.0:
+			var zoom: int = clampi(roundi(preset.nova_ring_size / 20.0), 1, 15)
+			show_effect(KIND_RING_OUT, origin, Vector2.RIGHT, tint, player, look, zoom, preset.nova_seconds)
 		return
-	# Only players cast beams and rings; an enemy (negative index) has no slots, so it is ignored.
-	if player < 0:
+	if form == &"dash":
+		if length > 0.0 and direction != Vector2.ZERO:
+			show_effect(KIND_DASH, origin, direction, tint, player, look, 1, DASH_SECONDS, length)
+		return
+	if form != &"beam" or length <= 0.0 or direction == Vector2.ZERO:
+		return
+	var seconds: float = preset.beam_seconds
+	if seconds <= 0.0:
 		return
 	# Each player reuses only their own oldest slots, so nobody's beams push out another's.
 	var who: int = mini(player, 3)
@@ -1371,34 +1401,31 @@ func _on_form_shown(player: int, form: StringName, origin: Vector2, direction: V
 	_next_form[who] = (_next_form[who] + 1) % FORMS_PER_PLAYER
 	var sprite: Sprite2D = _forms[slot]
 	sprite.global_position = origin
-	if ring:
-		sprite.texture = preset.nova_texture
-		sprite.centered = true
-		sprite.region_enabled = false
-		sprite.offset = Vector2.ZERO
-		sprite.rotation = 0.0
-	else:
-		sprite.texture = preset.beam_texture
-		sprite.centered = false
-		sprite.offset = Vector2(0.0, -16.0)
-		sprite.region_enabled = true
-		sprite.region_rect = Rect2(0.0, 0.0, length, 32.0)
-		sprite.rotation = direction.angle()
-		sprite.scale = Vector2.ONE
+	sprite.texture = preset.beam_texture
+	sprite.centered = false
+	sprite.offset = Vector2(0.0, -16.0)
+	sprite.region_enabled = true
+	sprite.region_rect = Rect2(0.0, 0.0, length, 32.0)
+	sprite.rotation = direction.angle()
+	sprite.scale = Vector2.ONE
 	var material: ShaderMaterial = sprite.material as ShaderMaterial
 	material.set_shader_parameter(&"core_override", Color(tint.r, tint.g, tint.b, 1.0))
+	material.set_shader_parameter(&"beam_mode", 2)
+	material.set_shader_parameter(&"beam_length", length)
+	material.set_shader_parameter(&"beam_player", player)
+	material.set_shader_parameter(&"beam_look", look)
+	material.set_shader_parameter(&"beam_glow", preset.beam_alpha)
 	var body: Color = Color.WHITE
 	if projectiles != null and projectiles.has_method("tint_of"):
 		body = projectiles.call("tint_of", player) as Color
 	_form_body[slot] = body
-	_form_is_ring[slot] = 1 if ring else 0
 	_form_left[slot] = seconds
 	_form_total[slot] = seconds
 	sprite.visible = true
 	_pose_form(slot, 1.0)
 
 
-## Fade the beams and grow the rings.
+## Fade the beams.
 func _step_forms(real_delta: float) -> void:
 	for i in FORM_SLOTS:
 		if _form_left[i] <= 0.0:
@@ -1439,6 +1466,7 @@ func _draw_live_beams() -> void:
 			var piece: float = prev.distance_to(point)
 			if walked + piece >= reach:
 				_beam_line[used] = prev.move_toward(point, reach - walked)
+				walked = reach
 				used += 1
 				break
 			walked += piece
@@ -1457,8 +1485,11 @@ func _draw_live_beams() -> void:
 		var fade: float = clampf(left * 4.0, 0.0, 1.0)
 		var flare: float = 1.0 + preset.beam_flare * maxf(1.0 - since / maxf(preset.beam_seconds * preset.beam_flare_share, 0.001), 0.0)
 		var flicker: float = 1.0 - preset.beam_flicker_depth * float(int(since * preset.beam_flicker_rate) % 2)
-		line.width = BEAM_TEXTURE_HEIGHT * maxf(fade, 0.35) * flare * flicker
+		# Drawn by the shader's beam mode across a fixed width; flare, flicker and fade swell and
+		# dissolve its pixels instead of stretching them.
+		line.width = BEAM_WIDTH
 		line.texture = preset.beam_texture
+		line.texture_mode = Line2D.LINE_TEXTURE_STRETCH
 		var player: int = spells.call("beam_player", i)
 		var body: Color = Color.WHITE
 		if projectiles != null and projectiles.has_method("tint_of"):
@@ -1467,25 +1498,30 @@ func _draw_live_beams() -> void:
 		var material: ShaderMaterial = line.material as ShaderMaterial
 		material.set_shader_parameter(&"core_override", Color(tint.r, tint.g, tint.b, 1.0))
 		material.set_shader_parameter(&"body_tint", Color(body.r, body.g, body.b, fade * preset.beam_alpha))
+		material.set_shader_parameter(&"beam_mode", 1)
+		material.set_shader_parameter(&"beam_length", walked)
+		material.set_shader_parameter(&"beam_width", BEAM_WIDTH)
+		material.set_shader_parameter(&"beam_player", player)
+		material.set_shader_parameter(&"beam_look", int(spells.call("beam_look", i)) if spells.has_method("beam_look") else 0)
+		material.set_shader_parameter(&"beam_fade", fade)
+		material.set_shader_parameter(&"beam_swell", maxf(fade, 0.35) * flare * flicker)
+		material.set_shader_parameter(&"beam_glow", preset.beam_alpha)
 		line.visible = true
 
 
-## Show form `slot` at `t` (1 just shown, 0 gone), faded. A ring widens; a beam opens extra
-## wide for its first moments (the payoff), then thins and flickers.
+## Show beam `slot` at `t` (1 just shown, 0 gone): its rim and glow swell for its first moments
+## (the payoff), then thin and flicker, and it dissolves into pixels (`beam_swell`, `beam_fade`).
 func _pose_form(slot: int, t: float) -> void:
 	var sprite: Sprite2D = _forms[slot]
 	var body: Color = _form_body[slot]
 	var age: float = 1.0 - t
-	var alpha: float = t if _form_is_ring[slot] != 0 else t * preset.beam_alpha
-	(sprite.material as ShaderMaterial).set_shader_parameter(&"body_tint", Color(body.r, body.g, body.b, alpha))
-	if _form_is_ring[slot] != 0:
-		var across: float = preset.nova_ring_size * (0.25 + 0.75 * age)
-		sprite.scale = Vector2.ONE * (across / 32.0)
-	else:
-		var flare: float = 1.0 + preset.beam_flare * maxf(1.0 - age / preset.beam_flare_share, 0.0)
-		var step: int = int(age * _form_total[slot] * preset.beam_flicker_rate)
-		var flicker: float = 1.0 - preset.beam_flicker_depth * float(step % 2)
-		sprite.scale = Vector2(1.0, t * flare * flicker)
+	var material: ShaderMaterial = sprite.material as ShaderMaterial
+	material.set_shader_parameter(&"body_tint", Color(body.r, body.g, body.b, t * preset.beam_alpha))
+	var flare: float = 1.0 + preset.beam_flare * maxf(1.0 - age / preset.beam_flare_share, 0.0)
+	var step: int = int(age * _form_total[slot] * preset.beam_flicker_rate)
+	var flicker: float = 1.0 - preset.beam_flicker_depth * float(step % 2)
+	material.set_shader_parameter(&"beam_swell", t * flare * flicker)
+	material.set_shader_parameter(&"beam_fade", t)
 
 
 func _on_wizard_cast(_player: int, wizard: Node) -> void:

@@ -27,9 +27,9 @@ func take() -> void:
 		var x: float = COLUMN * i + COLUMN * 0.5
 		events.call("emit_signal", "spell_cast", 0, form, Vector2(x - 20.0, ROWS_Y[0]), Vector2.RIGHT)
 		if form == &"beam":
-			events.call("emit_signal", "form_shown", 0, &"beam", Vector2(x - 20.0, ROWS_Y[0]), Vector2.RIGHT, 56.0, Color("e0592f"))
+			events.call("emit_signal", "form_shown", 0, &"beam", Vector2(x - 20.0, ROWS_Y[0]), Vector2.RIGHT, 56.0, Color("e0592f"), 0)
 		elif form == &"nova":
-			events.call("emit_signal", "form_shown", 0, &"nova", Vector2(x, ROWS_Y[0]), Vector2.RIGHT, 0.0, Color("e0592f"))
+			events.call("emit_signal", "form_shown", 0, &"nova", Vector2(x, ROWS_Y[0]), Vector2.RIGHT, 0.0, Color("e0592f"), 0)
 		# The manager names the form of the shot while it sends the impact.
 		projectiles.set("impact_form", form)
 		events.call("emit_signal", "projectile_impact", 0, null, Vector2(x, ROWS_Y[1]), Vector2.RIGHT)

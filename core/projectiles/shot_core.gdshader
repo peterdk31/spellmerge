@@ -49,6 +49,20 @@ uniform float particle_share = 1.0;
 uniform float trail_share = 1.0;
 // How bright the glow is (1.0 the look; 0.0 none).
 uniform float glow_strength = 1.0;
+// Beam mode (Feel's beams; the instance data above is not used): 1 a Line2D stretched along its
+// path (UV.x 0-1 along `beam_length` pixels, UV.y across `beam_width`), 2 a Sprite2D whose region
+// is the beam (UV in texture pixels, 32 across). Its core colour is `core_override`, its player
+// and look these. `beam_fade` (1 to 0) dissolves it into pixels as it ends; `beam_swell` (1 at
+// rest) widens its rim and glow when it flares and narrows them as it thins; `beam_glow` is how
+// strongly it glows.
+uniform int beam_mode = 0;
+uniform float beam_length = 0.0;
+uniform float beam_width = 16.0;
+uniform int beam_player = 0;
+uniform int beam_look = 0;
+uniform float beam_fade = 1.0;
+uniform float beam_swell = 1.0;
+uniform float beam_glow = 1.0;
 
 // The quad: GRID pixels across (and along, for a rune); LENGTH along for a bolt or orbit shot,
 // the shot FRONT pixels from the front. LOOK_GRID, LOOK_LENGTH in projectile_manager.gd.
@@ -81,11 +95,21 @@ const float TRACE_SPAN = 0.42;
 //   K_RUNE_BURST  a rune going off: a dotted flash over the diamond, a diamond ring widening
 //                 to twice its size, sparks all round
 //   K_CAST        the staff tip on a cast: a small cross and a few sparks along the aim
+//   K_DASH        a wizard's dash, from where it started (the effect's place) along its aim for
+//                 zoom x 4 pixels: speed streaks behind the head, dust where it left, a ring where
+//                 it lands, the dash's card particles along the way (lightning: an arc from end
+//                 to end); its quad is that long plus DASH_MARGIN each end, DASH_ACROSS across
+//   K_BEAM        a beam (beam mode above): a white-hot one-pixel core, a rim that breathes
+//                 along it, motes running down it, flares at both ends and its card particles
 const float K_BURST = 4.0;
 const float K_RING_OUT = 5.0;
 const float K_RING_IN = 6.0;
 const float K_RUNE_BURST = 7.0;
 const float K_CAST = 8.0;
+const float K_DASH = 9.0;
+const float K_BEAM = 10.0;
+const float DASH_MARGIN = 12.0;
+const float DASH_ACROSS = 32.0;
 // A rune's reach at its rest (the 14 px of rune.tres, as `rune()` draws it at zoom 4).
 const float RUNE_REACH = 14.4;
 // Particles a shot keeps in the air at most, and how many a shot with `n` emitting kinds uses:
@@ -162,26 +186,35 @@ bool bit_set(vec3 b, float look) {
 }
 
 void vertex() {
-	core = core_override.a > 0.0 ? core_override.rgb : INSTANCE_CUSTOM.rgb;
-	float coded = core_override.a > 0.0 ? 0.0 : (1.0 - INSTANCE_CUSTOM.a) * 16.0;
-	kind = floor(coded + 0.5);
-	float b = coded - kind;
 	bend = 0.0;
 	age = 1.0;
-	if ((abs(kind - 2.0) < 0.5 || kind > 3.5) && b > 0.01) {
-		age = clamp((b - TRACE_FROM) / TRACE_SPAN, 0.0, 1.0);
-	} else if (kind < 3.5 && b > 0.01) {
-		bend = (b - BEND_ZERO) / BEND_SPAN / BEND_RADIUS * BEND_SIDE;
-		if (abs(bend) < BEND_MIN) {
-			bend = 0.0;
-		}
-	}
-	seed = float(INSTANCE_ID % 61) * 1.618;
 	body = COLOR * body_tint;
-	float red = floor(COLOR.r * 255.0 + 0.5);
-	player = mod(red, 4.0);
-	zoom = max(floor(red / 4.0), 1.0);
-	bits = floor(COLOR.gba * 255.0 + 0.5);
+	if (beam_mode > 0) {
+		core = core_override.rgb;
+		kind = K_BEAM;
+		seed = 0.0;
+		player = float(clamp(beam_player, 0, 3));
+		zoom = 1.0;
+		bits = vec3(float(beam_look & 255), float((beam_look >> 8) & 255), float((beam_look >> 16) & 255));
+	} else {
+		core = core_override.a > 0.0 ? core_override.rgb : INSTANCE_CUSTOM.rgb;
+		float coded = core_override.a > 0.0 ? 0.0 : (1.0 - INSTANCE_CUSTOM.a) * 16.0;
+		kind = floor(coded + 0.5);
+		float b = coded - kind;
+		if ((abs(kind - 2.0) < 0.5 || kind > 3.5) && b > 0.01) {
+			age = clamp((b - TRACE_FROM) / TRACE_SPAN, 0.0, 1.0);
+		} else if (kind < 3.5 && b > 0.01) {
+			bend = (b - BEND_ZERO) / BEND_SPAN / BEND_RADIUS * BEND_SIDE;
+			if (abs(bend) < BEND_MIN) {
+				bend = 0.0;
+			}
+		}
+		seed = float(INSTANCE_ID % 61) * 1.618;
+		float red = floor(COLOR.r * 255.0 + 0.5);
+		player = mod(red, 4.0);
+		zoom = max(floor(red / 4.0), 1.0);
+		bits = floor(COLOR.gba * 255.0 + 0.5);
+	}
 	int pi = int(player);
 	plain = all(greaterThan(core, vec3(0.99))) ? 1.0 : 0.0;
 	if (plain > 0.5) {
@@ -536,7 +569,174 @@ vec3 ramp(float u) {
 	return u < 0.15 ? hot : (u < 0.4 ? hi : (u < 0.7 ? mid : lo));
 }
 
+// A wizard's dash (K_DASH): `uv` over a quad DASH_MARGIN longer than the dash at each end.
+vec4 dash(vec2 uv) {
+	float len = zoom * 4.0;
+	vec2 size = vec2(len + 2.0 * DASH_MARGIN, DASH_ACROSS);
+	// Whole pixels from where it left, +x along it.
+	vec2 d = floor(uv * size) - vec2(DASH_MARGIN, size.y * 0.5);
+	float a = age;
+	int pi = int(player);
+	// The wizard covers the dash in its first DASH_TRAVEL of the effect, then it lingers.
+	float travel = min(a / 0.45, 1.0);
+	float head = len * (1.0 - (1.0 - travel) * (1.0 - travel));
+	vec4 colour = vec4(0.0);
+	// Speed streaks in the player's colours, behind the head.
+	for (int n = 0; n < 12; n++) {
+		float i = float(n);
+		float y = round((hash(i, 1.0, 51.0) - 0.5) * 16.0) - 2.0;
+		float x = head - 3.0 - (8.0 + 30.0 * hash(i, 2.0, 51.0)) * (0.3 + 0.7 * travel);
+		float span = 3.0 + 6.0 * hash(i, 3.0, 51.0) * (1.0 - a);
+		if (a < 0.7 && d.y == y && d.x >= x && d.x <= x + span && d.x <= head && d.x >= 0.0) {
+			colour = vec4(a < 0.35 ? P_LIGHT[pi] : P_BASE[pi], 1.0);
+		}
+	}
+	// Dust kicked up where it left.
+	for (int n = 0; n < 6; n++) {
+		float i = float(n);
+		vec2 at = vec2(-(1.0 + 9.0 * hash(i, 4.0, 51.0)) * travel, 8.0 - 3.0 * hash(i, 5.0, 51.0) * travel);
+		if (a < 0.5 && on(d + 0.5, at + 0.5)) {
+			colour = vec4(a < 0.25 ? vec3(0.478, 0.463, 0.580) : vec3(0.290, 0.275, 0.388), 1.0);
+		}
+	}
+	// A ring where it lands.
+	float ring = (a - 0.4) / 0.35;
+	float radius = 3.0 + 8.0 * (1.0 - (1.0 - ring) * (1.0 - ring));
+	float r = length(d - vec2(len, 0.0));
+	if (ring > 0.0 && ring < 1.0 && abs(r - radius) < 0.5) {
+		colour = vec4(ring < 0.4 ? P_LIGHT[pi] : P_BASE[pi], 1.0);
+	}
+	// Lightning: an arc from where it left to where it landed, re-rolled 30 times a second.
+	if (has_layer(L_SPARKS) && a > 0.45 && a < 0.62 && d.x >= 0.0 && d.x <= len) {
+		float seg = 6.0;
+		float k = floor(d.x / seg);
+		float jf = floor(sim_time * 30.0);
+		float o0 = k < 0.5 ? 0.0 : (hash(k, jf, 52.0) - 0.5) * 6.0;
+		float o1 = k + 1.0 >= len / seg ? 0.0 : (hash(k + 1.0, jf, 52.0) - 0.5) * 6.0;
+		if (round(mix(o0, o1, fract(d.x / seg))) == d.y) {
+			colour = vec4(ARC_LIGHT, 1.0);
+		}
+	}
+	// The dash's cards along the way.
+	if (colour.a == 0.0 && emit_count > 0.5) {
+		// A dash is long: it always gives off the most a shot may.
+		for (int n = 0; n < MAX_PARTICLES; n++) {
+			float i = float(n);
+			float look = emitter(int(min(floor(hash(i, 6.0, 53.0) * emit_count), emit_count - 1.0)));
+			float x = len * hash(i, 7.0, 53.0);
+			float born = 0.45 * x / max(len, 1.0);
+			vec2 from = vec2(x, (hash(i, 8.0, 53.0) - 0.5) * 12.0);
+			float pa = (a - born) / 0.5;
+			if (pa > 0.0 && pa < 1.0) {
+				vec4 p = particle(look, from, pa, i, 0.0, d, 1.0);
+				if (p.a > 0.0) {
+					colour = p;
+				}
+			}
+		}
+	}
+	if (colour.a > 0.0) {
+		return colour;
+	}
+	float lit = 0.0;
+	if (d.x >= 0.0 && d.x <= head) {
+		// Brightest just behind the head, faded in from where it left.
+		lit += 0.35 * (1.0 - a) * falloff(abs(d.y + 2.0), 9.0) * d.x / max(head, 1.0);
+	}
+	if (ring > 0.0 && ring < 1.0) {
+		lit += 0.4 * (1.0 - ring) * falloff(abs(r - radius), 4.0);
+	}
+	return vec4(P_BASE[pi] * lit * glow_strength, 0.0);
+}
+
+// A beam (beam mode): its pixel at `along` pixels from the staff and `across` from its middle.
+vec4 beam(float along, float across) {
+	float len = max(beam_length, 1.0);
+	float at = floor(along);
+	float jf = floor(sim_time * 30.0);
+	// Where its middle runs: jagged for lightning, swaying for storm, wavering for fire.
+	float off = 0.0;
+	if (has_layer(L_SPARKS)) {
+		float seg = 6.0;
+		float k = floor(along / seg);
+		float o0 = k < 0.5 ? 0.0 : (hash(k, jf, 41.0) - 0.5) * 6.0;
+		float o1 = (k + 1.0) * seg >= len ? 0.0 : (hash(k + 1.0, jf, 41.0) - 0.5) * 6.0;
+		off = mix(o0, o1, fract(along / seg));
+	} else if (has_layer(L_GUSTS)) {
+		off = sin(along * 0.11 - sim_time * 18.0) * 1.6;
+	} else if (has_layer(L_EMBERS)) {
+		off = sin(along * 0.55 - sim_time * 36.0) * 0.7;
+	}
+	float x = round(across - off);
+	vec4 colour = vec4(0.0);
+	// As it ends it falls apart into pixels.
+	bool kept = hash(at, floor(across) + 7.0, 42.0) < beam_fade * 1.4;
+	float rim = 1.0 + floor(0.5 * beam_swell + 0.25);
+	if (kept) {
+		if (x == 0.0) {
+			colour = vec4(has_layer(L_PULL) ? OUTLINE : hot, 1.0);
+		} else if (abs(x) <= rim && sin(along * 0.23 - sim_time * 27.0) > -0.25) {
+			colour = vec4(hi, 1.0);
+		} else if (abs(x) <= rim + 1.0 && hash(at, floor(sim_time * 15.0), 43.0) < 0.12) {
+			colour = vec4(mid, 1.0);
+		}
+		// Motes running down it.
+		for (int n = 0; n < 6; n++) {
+			float i = float(n);
+			float pos = fract(sim_time * 1.3 + i / 6.0 + hash(i, 0.0, 44.0)) * len;
+			if (abs(along - pos) < 0.5 && x == (hash(i, 1.0, 44.0) < 0.5 ? -1.0 : 1.0)) {
+				colour = vec4(hot, 1.0);
+			}
+		}
+	}
+	// Flares at the staff and where it lands, flickering a pixel.
+	float flick = mod(floor(sim_time * 20.0), 2.0);
+	vec2 start = vec2(at + 0.5, across);
+	vec2 end = vec2(along - len, across);
+	float sr = 1.0 + flick;
+	float er = 2.0 + flick;
+	if ((abs(start.x) < 0.5 && abs(start.y) <= sr) || (abs(start.y) < 0.5 && start.x >= 0.0 && start.x <= sr)) {
+		colour = vec4(has_layer(L_PULL) ? VOID_LIGHT : hot, 1.0);
+	}
+	if ((abs(end.x) < 0.5 && abs(end.y) <= er) || (abs(end.y) < 0.5 && abs(end.x) <= er)) {
+		colour = vec4(has_layer(L_PULL) ? VOID_LIGHT : hot, 1.0);
+	}
+	// Its cards, given off along it.
+	if (colour.a == 0.0 && emit_count > 0.5) {
+		float count = min(4.0 + 2.0 * emit_count, float(MAX_PARTICLES));
+		for (int n = 0; n < MAX_PARTICLES; n++) {
+			if (float(n) >= count) {
+				break;
+			}
+			float i = float(n);
+			float t = sim_time * (2.5 + 1.5 * hash(i, 0.0, 45.0)) + hash(i, 0.0, 46.0);
+			float cyc = floor(t);
+			float look = emitter(int(min(floor(hash(i, cyc, 47.0) * emit_count), emit_count - 1.0)));
+			vec2 from = vec2(len * hash(i, cyc, 48.0), off);
+			vec4 p = particle(look, from, fract(t), i, cyc, vec2(along, across), 1.0);
+			if (p.a > 0.0) {
+				colour = p;
+			}
+		}
+	}
+	if (colour.a > 0.0) {
+		return colour;
+	}
+	float lit = 0.45 * falloff(abs(across - off), 3.0 + 3.0 * beam_swell) + 0.6 * falloff(length(end), 7.0) + 0.4 * falloff(length(start), 5.0);
+	lit *= beam_fade * beam_glow;
+	if (has_layer(L_SPARKS)) {
+		lit *= 0.55 + 0.9 * hash(floor(sim_time * 20.0), 0.0, 21.0);
+	}
+	if (has_layer(L_PULL)) {
+		lit *= 0.6;
+	}
+	return vec4(glow * lit * glow_strength, 0.0);
+}
+
 vec4 effect(vec2 uv) {
+	if (kind == K_DASH) {
+		return dash(uv);
+	}
 	vec2 size = vec2(GRID) * zoom;
 	vec2 d = floor(uv * size) + 0.5 - size * 0.5 - vec2(0.5);
 	float a = age;
@@ -633,7 +833,11 @@ vec4 effect(vec2 uv) {
 }
 
 void fragment() {
-	if (kind > 3.5) {
+	if (beam_mode == 1) {
+		COLOR = beam(UV.x * beam_length, (UV.y - 0.5) * beam_width);
+	} else if (beam_mode == 2) {
+		COLOR = beam(UV.x / TEXTURE_PIXEL_SIZE.x, UV.y / TEXTURE_PIXEL_SIZE.y - 0.5 / TEXTURE_PIXEL_SIZE.y);
+	} else if (kind > 3.5) {
 		COLOR = effect(UV);
 	} else if (kind > 0.5) {
 		COLOR = procedural(UV);

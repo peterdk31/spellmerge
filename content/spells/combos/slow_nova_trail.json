@@ -1,0 +1,9 @@
+{
+	"id": "slow_nova_trail",
+	"name": "Slow nova trail",
+	"does": "A crawling bolt rings out a nova every half second along its short path: the first one hits the imp just beside it.",
+	"casts": [{"staff": 0, "cards": ["timer", "slow", "bolt", "nova"]}],
+	"imps": [[33, 45]],
+	"seconds": 2.5,
+	"checks": [{"kind": "damaged", "imps": [0]}]
+}

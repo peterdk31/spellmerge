@@ -1147,7 +1147,7 @@ func set_linger(slot: int, seconds: float) -> bool:
 
 
 ## The shot's radius grows by `factor` each second of flight, up to GROWTH_MAX times its
-## first size. `get_growth_of` tells the spell runtime how much stronger it is.
+## first size: a wider hit circle, the same damage. `get_growth_of` tells how much bigger it is.
 func set_growth(slot: int, factor: float) -> bool:
 	if not _is_flyer(slot) or not (factor > 1.0) or not is_finite(factor):
 		return false
@@ -1155,8 +1155,7 @@ func set_growth(slot: int, factor: float) -> bool:
 	return true
 
 
-## How many times bigger the shot in `slot` is than when it started (1.0 for a plain shot). The
-## spell runtime scales a grown shot's hit by it (`Spells.hit_profile`).
+## How many times bigger the shot in `slot` is than when it started (1.0 for a plain shot).
 func get_growth_of(slot: int) -> float:
 	# The shot whose hit is being sent counts even when that hit spent it (it is gone already).
 	if slot < 0 or slot >= _cap or (_alive[slot] == 0 and slot != event_slot) or _radius0[slot] <= 0.0:

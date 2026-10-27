@@ -86,7 +86,7 @@ Numbers are first guesses for the card's own task to set. Examples are written i
 | ghost | Passes through walls | `ghost · homing · bolt` hunts through rooms; never sets off `on wall` |
 | spiral | Flies in a sine wave | covers an area; `spiral · split · bolt` is a curtain |
 | mirror | Also fires the carrier backwards | guards your back; `mirror · recoil · bolt` cancels the push |
-| growth | Grows and gets stronger the further it flies | rewards range; `growth · linger · bolt` is a huge slow orb |
+| growth | Grows the further it flies (x2 a second, up to 4x): a wider hit circle, the same damage (owner, 2026-10-27; damage is overcharge's) | rewards range; `growth · linger · bolt` is a huge slow orb; `growth · pierce · bolt` sweeps a wide lane |
 | relay | When the shot passes through a teammate it takes on the infusions of that player's last cast | your bolt plus their frost, with nobody waiting (docs/PLAN.md, cross-player linking) |
 | short delay | Halves the carrier's delay for 25 % more mana (owner, 2026-10-27; named after the builder's "Delay", so it is not mistaken for `faster`) | `short delay · dash` dashes again sooner; `short delay · beam` keeps a beam on with a slower staff |
 | sniper | The carrier keeps a quarter of its staff's spread (`spread_mult` 0.25, a factor; owner, 2026-10-27). Free: the dev and starter staffs aim true, so it waits for staffs with spread (M3) | `sniper · pierce · bolt` lines up a crowd; `sniper · double · bolt · bolt`, one true bolt and one wild |

@@ -1,0 +1,9 @@
+{
+	"id": "spiral_piercing_sweep",
+	"name": "Spiral piercing sweep",
+	"does": "A weaving fire bolt that pierces sweeps both sides of its line and burns several imps a straight bolt would miss.",
+	"casts": [{"staff": 0, "cards": ["spiral", "pierce", "pierce", "fire", "bolt"]}],
+	"imps": [[20, 22], [20, -22], [35, 22], [35, -22], [50, 22], [50, -22], [65, 22], [65, -22], [80, 22], [80, -22], [95, 22], [95, -22], [110, 22], [110, -22], [125, 22], [125, -22], [140, 22], [140, -22]],
+	"seconds": 1.5,
+	"checks": [{"kind": "status_count", "status": "burn", "min": 2}]
+}

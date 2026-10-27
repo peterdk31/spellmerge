@@ -115,12 +115,16 @@ func _open(player: int) -> RadialScript:
 	return _radial(player)
 
 
-## Point `player`'s right stick at card `id` and let go again (the card stays picked).
+## Point `player`'s right stick at card `id` and keep holding it there (letting go lets the card go).
 func _point(player: int, id: StringName) -> void:
 	var direction: Vector2 = _radial(player).direction_to(id)
 	check(direction != Vector2.ZERO, "%s is on the ring" % id)
 	_input.send_virtual_aim(player, direction)
 	_frame()
+
+
+## Let go of `player`'s right stick.
+func _let_go(player: int) -> void:
 	_input.send_virtual_aim(player, Vector2.ZERO)
 	_frame()
 
@@ -179,7 +183,7 @@ func test_every_real_card_can_be_picked_and_shows_its_numbers() -> void:
 	check_equal(_rumbles.size(), cards.size(), "one rumble per card landed on")
 
 
-func test_the_right_stick_picks_a_card_with_a_rumble_and_keeps_it() -> void:
+func test_the_right_stick_picks_a_card_with_a_rumble() -> void:
 	_start(1)
 	var radial: RadialScript = _open(0)
 	_point(0, &"nova")
@@ -194,6 +198,20 @@ func test_the_right_stick_picks_a_card_with_a_rumble_and_keeps_it() -> void:
 	check_equal(_rumbles.size(), 1, "staying on the same card does not rumble again")
 
 
+func test_letting_go_of_the_stick_lets_the_card_go_and_shows_the_staff() -> void:
+	_start(1)
+	var radial: RadialScript = _open(0)
+	_point(0, &"nova")
+	check_equal(radial.pointed_id(), &"nova", "pointed while held")
+	_let_go(0)
+	check_equal(radial.pointed_id(), &"", "letting go picks nothing")
+	check_equal(radial.hub_lines()[0], "Staff 2", "the hub shows the staff's numbers again")
+	var asked: int = _single.size() + _whole.size()
+	_tap(0, &"staff_2")
+	_frame()
+	check_equal(_single.size() + _whole.size(), asked, "RT with nothing picked asks for nothing")
+
+
 func test_rt_puts_the_card_in_and_moves_the_marker_on() -> void:
 	_start(1)
 	var radial: RadialScript = _open(0)
@@ -206,7 +224,7 @@ func test_rt_puts_the_card_in_and_moves_the_marker_on() -> void:
 	check(_rumbles.size() >= 2, "putting a card in rumbles")
 	_tap(0, &"staff_2")
 	_frame()
-	check_equal(radial.cards_of(1).slice(0, 4), _ids("fire bolt nova nova"), "the picked card stays picked for the next slot")
+	check_equal(radial.cards_of(1).slice(0, 4), _ids("fire bolt nova nova"), "a held stick keeps the card picked for the next slot")
 
 
 func test_rt_on_a_card_pushes_the_rest_right_or_replaces_it() -> void:

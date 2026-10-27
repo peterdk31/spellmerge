@@ -1,0 +1,9 @@
+{
+	"id": "overcharged_fire_rune",
+	"name": "Overcharged fire rune",
+	"does": "A fire rune at the caster's feet, overcharged: twice the hit on the imp that steps on it, and it burns.",
+	"casts": [{"staff": 0, "cards": ["overcharge", "fire", "rune"]}],
+	"imps": [[12, 0]],
+	"seconds": 1.0,
+	"checks": [{"kind": "damaged", "imps": [0]}, {"kind": "status", "imps": [0], "status": "burn"}]
+}

@@ -14,6 +14,9 @@ func take() -> void:
 	if not need(["Feel", "Events", "Projectiles"]):
 		return
 	settle_frames = 12
+	# Feel ages its effects on the real clock, which a slow virtual display stretches past
+	# their tenth of a second; on game time each frame is 1/60 s, as in play.
+	root.get_node("Feel").set("drive_engine", false)
 	var events: Node = root.get_node("Events")
 	var projectiles: Node = root.get_node("Projectiles")
 	lay_floor()

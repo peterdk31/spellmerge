@@ -7,9 +7,11 @@ render_mode blend_premul_alpha;
 //
 // MultiMesh instances (the projectile manager) carry:
 //   custom data rgb  the core colour (the first infusion's tint; white for none)
-//   custom data a    the body kind and the bend as 1 - (kind + bend) / 16: kind 1 a bolt, 2 a
-//                    rune, 3 an orbit shot, 0 draws the texture (below); the bend (0-0.45) is
-//                    how the shot's path curves, so its tail follows it (BEND_* below)
+//   custom data a    the body kind and a code as 1 - (kind + code) / 16: kind 1 a bolt, 2 a
+//                    rune, 3 an orbit shot, 4-8 an effect Feel draws (K_* below), 0 the texture
+//                    (below); the code (0-0.45) is a bolt's or orbit shot's bend (how its path
+//                    curves, so its tail follows it; BEND_* below), how much of a new rune is
+//                    traced, or how far through its life an effect is (TRACE_* below)
 //   colour r         player + zoom x 4, as n / 255: the shapes grow with the zoom while every
 //                    line stays one pixel, so a bigger shot is bigger, never chunkier
 //   colour g, b, a   the look: one bit per layer kind (kind 1 is bit 0 of green, kind 9 bit 0
@@ -66,6 +68,26 @@ const float BEND_RADIUS = 16.0;
 const float BEND_MIN = 0.004;
 // Which side of the quad a positive bend turns to.
 const float BEND_SIDE = 1.0;
+// A rune's trace and an effect's age: TRACE_FROM + TRACE_SPAN x the fraction (RUNE_TRACE in
+// projectile_manager.gd); a rune's code 0 is a whole rune.
+const float TRACE_FROM = 0.02;
+const float TRACE_SPAN = 0.42;
+// The effects Feel draws with this shader (KIND_* in gameplay/feel/feel.gd), in a square quad
+// GRID x zoom across, +x along their aim; all in the ramp and look of the shot they come from.
+//   K_BURST       where a shot lands: a white-hot cross that shrinks, sparks thrown back
+//                 against the flight that cool as they fly, and the shot's card particles
+//   K_RING_OUT    a ring that flashes out (a nova's cast)
+//   K_RING_IN     a ring that gathers in (a rune's or orbit's cast)
+//   K_RUNE_BURST  a rune going off: a dotted flash over the diamond, a diamond ring widening
+//                 to twice its size, sparks all round
+//   K_CAST        the staff tip on a cast: a small cross and a few sparks along the aim
+const float K_BURST = 4.0;
+const float K_RING_OUT = 5.0;
+const float K_RING_IN = 6.0;
+const float K_RUNE_BURST = 7.0;
+const float K_CAST = 8.0;
+// A rune's reach at its rest (the 14 px of rune.tres, as `rune()` draws it at zoom 4).
+const float RUNE_REACH = 14.4;
 // Particles a shot keeps in the air at most, and how many a shot with `n` emitting kinds uses:
 // 4 + 2n, so one card is a trickle, many cards a richer mix, never a cloud.
 const int MAX_PARTICLES = 12;
@@ -114,6 +136,8 @@ varying flat vec4 body;
 varying flat vec3 core;
 varying flat float kind;
 varying flat float bend;
+// A rune's trace or an effect's age, 0 to 1 (1 for everything else).
+varying flat float age;
 varying flat float seed;
 varying flat float player;
 varying flat float zoom;
@@ -142,9 +166,15 @@ void vertex() {
 	float coded = core_override.a > 0.0 ? 0.0 : (1.0 - INSTANCE_CUSTOM.a) * 16.0;
 	kind = floor(coded + 0.5);
 	float b = coded - kind;
-	bend = b < 0.01 ? 0.0 : (b - BEND_ZERO) / BEND_SPAN / BEND_RADIUS * BEND_SIDE;
-	if (abs(bend) < BEND_MIN) {
-		bend = 0.0;
+	bend = 0.0;
+	age = 1.0;
+	if ((abs(kind - 2.0) < 0.5 || kind > 3.5) && b > 0.01) {
+		age = clamp((b - TRACE_FROM) / TRACE_SPAN, 0.0, 1.0);
+	} else if (kind < 3.5 && b > 0.01) {
+		bend = (b - BEND_ZERO) / BEND_SPAN / BEND_RADIUS * BEND_SIDE;
+		if (abs(bend) < BEND_MIN) {
+			bend = 0.0;
+		}
 	}
 	seed = float(INSTANCE_ID % 61) * 1.618;
 	body = COLOR * body_tint;
@@ -343,7 +373,14 @@ float rune(vec2 q, float reach, float swell) {
 		return 0.0;
 	}
 	if (d > reach - 1.0) {
+		// While it is new, the outline traces itself round from the top, clockwise.
+		if (fract(atan(q.y, q.x) / 6.2832 + 1.25) > age) {
+			return 0.0;
+		}
 		return abs(q.x) < 1.0 || abs(q.y) < 1.0 ? 3.0 : 2.0;
+	}
+	if (age < 1.0) {
+		return 0.0;
 	}
 	if (d > reach - 5.0 && d <= reach - 4.0) {
 		return mod(floor(q.x) + floor(q.y), 2.0) < 0.5 && mod(floor(sim_time * 4.0 + seed) + floor(q.x), 4.0) < 2.0 ? 1.0 : 0.0;
@@ -475,7 +512,7 @@ vec4 procedural(vec2 uv) {
 	// The glow: light added round the core and along the tail (round a rune's outline).
 	if (runic) {
 		float ring = abs(abs(q.x) + abs(q.y) - reach);
-		lit = 0.35 * (0.7 + 0.15 * swell) * falloff(ring, 6.0) + 0.5 * falloff(length(q), 8.0);
+		lit = (0.35 * (0.7 + 0.15 * swell) * falloff(ring, 6.0) + 0.5 * falloff(length(q), 8.0)) * age;
 	} else {
 		float r = length(d);
 		lit = 0.8 * falloff(r, 4.0 * zoom) + 0.35 * falloff(r, 10.0 * zoom);
@@ -494,8 +531,111 @@ vec4 procedural(vec2 uv) {
 	return vec4(glow * lit * glow_strength, 0.0);
 }
 
+// The ramp at `u` (0 white-hot, 1 shadow): what cools as it ages.
+vec3 ramp(float u) {
+	return u < 0.15 ? hot : (u < 0.4 ? hi : (u < 0.7 ? mid : lo));
+}
+
+vec4 effect(vec2 uv) {
+	vec2 size = vec2(GRID) * zoom;
+	vec2 d = floor(uv * size) + 0.5 - size * 0.5 - vec2(0.5);
+	float a = age;
+	float r = length(d);
+	float ease = 1.0 - (1.0 - a) * (1.0 - a);
+	vec4 colour = vec4(0.0);
+	float lit = 0.0;
+	if (kind == K_BURST || kind == K_CAST) {
+		bool cast = kind == K_CAST;
+		// The flash: a white-hot cross that shrinks.
+		float arm = round((cast ? 1.5 : 2.0) * zoom * (1.0 - a * 2.5));
+		if (arm >= 0.0 && ((d.x == 0.0 && abs(d.y) <= arm) || (d.y == 0.0 && abs(d.x) <= arm))) {
+			colour = vec4(r < 0.5 ? hot : hi, 1.0);
+		}
+		// Sparks thrown back against the flight (along the aim from a staff), cooling as they fly.
+		int sparks = cast ? 4 : 8;
+		for (int n = 0; n < 8; n++) {
+			if (n >= sparks || colour.a > 0.0) {
+				break;
+			}
+			float i = float(n);
+			float life = 0.5 + 0.5 * hash(i, 1.0, 31.0);
+			if (a > life) {
+				continue;
+			}
+			float ang = (cast ? 0.0 : 3.1416) + (hash(i, 2.0, 31.0) - 0.5) * (cast ? 1.0 : 2.8);
+			float reach = (1.5 + (cast ? 6.0 : 10.0) * (0.6 + 0.4 * hash(i, 3.0, 31.0)) * ease) * zoom;
+			if (on(d + 0.5, vec2(cos(ang), sin(ang)) * reach + 0.5)) {
+				colour = vec4(ramp(a / life), 1.0);
+			}
+		}
+		lit = (1.0 - a) * (1.0 - a) * (0.9 * falloff(r, 4.0 * zoom) + 0.4 * falloff(r, 10.0 * zoom));
+	} else if (kind == K_RING_OUT || kind == K_RING_IN) {
+		// A ring that flashes out or gathers in, fraying as it goes.
+		float big = 10.0 * zoom, small = 2.0 * zoom;
+		float radius = kind == K_RING_OUT ? mix(small, big, ease) : mix(big, small, ease);
+		float bucket = floor(atan(d.y, d.x) * radius / 2.0);
+		if (abs(r - radius) < 0.5 && hash(bucket, floor(a * 8.0), 32.0) > a * 0.7) {
+			colour = vec4(ramp(a), 1.0);
+		}
+		lit = 0.5 * (1.0 - a) * falloff(abs(r - radius), 3.0 * zoom);
+	} else if (kind == K_RUNE_BURST) {
+		float m = abs(d.x) + abs(d.y);
+		// A dotted white-hot flash over the diamond, then a diamond ring that widens and frays.
+		if (a < 0.2 && m <= RUNE_REACH && mod(d.x + d.y, 2.0) == 0.0) {
+			colour = vec4(a < 0.1 ? hot : hi, 1.0);
+		}
+		float wide = mix(RUNE_REACH, RUNE_REACH * 2.2, ease);
+		float bucket = floor(atan(d.y, d.x) * wide / 2.0);
+		if (abs(m - wide) < 0.5 && hash(bucket, floor(a * 8.0), 33.0) > a * 0.7) {
+			colour = vec4(ramp(a), 1.0);
+		}
+		for (int n = 0; n < 16; n++) {
+			if (colour.a > 0.0) {
+				break;
+			}
+			float i = float(n);
+			float ang = i * 0.3927 + (hash(i, 4.0, 31.0) - 0.5) * 0.4;
+			float reach = (4.0 + 26.0 * (0.6 + 0.4 * hash(i, 5.0, 31.0)) * ease);
+			if (a < 0.8 && on(d + 0.5, vec2(cos(ang), sin(ang)) * reach + 0.5)) {
+				colour = vec4(ramp(a), 1.0);
+			}
+		}
+		lit = (1.0 - a) * (0.5 * falloff(abs(m - wide), 6.0) + (a < 0.25 ? 0.8 : 0.0) * falloff(m, RUNE_REACH));
+	}
+	// The shot's cards: its particles, set off from round the middle at the start.
+	if (colour.a == 0.0 && emit_count > 0.5 && kind != K_CAST) {
+		float spread = kind == K_RUNE_BURST ? RUNE_REACH : 2.0 * zoom;
+		float count = min(4.0 + 2.0 * emit_count, float(MAX_PARTICLES));
+		for (int n = 0; n < MAX_PARTICLES; n++) {
+			if (float(n) >= count) {
+				break;
+			}
+			float i = float(n);
+			float look = emitter(int(min(floor(hash(i, 6.0, 31.0) * emit_count), emit_count - 1.0)));
+			float ang = hash(i, 7.0, 31.0) * 6.2832;
+			vec2 from = vec2(cos(ang), sin(ang)) * spread * hash(i, 8.0, 31.0);
+			float pa = (a - 0.3 * hash(i, 9.0, 31.0)) / 0.7;
+			if (pa > 0.0 && pa < 1.0) {
+				vec4 p = particle(look, from, pa, i, 0.0, d, zoom);
+				if (p.a > 0.0) {
+					colour = p;
+				}
+			}
+		}
+	}
+	if (colour.a > 0.0) {
+		return colour;
+	}
+	if (has_layer(L_PULL)) {
+		lit *= 0.6;
+	}
+	return vec4(glow * lit * glow_strength, 0.0);
+}
+
 void fragment() {
-	if (kind > 0.5) {
+	if (kind > 3.5) {
+		COLOR = effect(UV);
+	} else if (kind > 0.5) {
 		COLOR = procedural(UV);
 	} else {
 		vec4 t = texture(TEXTURE, UV);

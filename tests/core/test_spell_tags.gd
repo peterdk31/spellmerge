@@ -44,6 +44,7 @@ func before_each() -> void:
 	var homing: ModifierBase = _modifier(&"homing", 2)
 	homing.behaviour = ModifierBase.Behaviour.HOMING
 	homing.behaviour_strength = 4.0
+	homing.behaviour_reach = 160.0
 	var chain: ModifierBase = _modifier(&"chain", 2)
 	chain.behaviour = ModifierBase.Behaviour.CHAIN
 	chain.behaviour_strength = 2.0

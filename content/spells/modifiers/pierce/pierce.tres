@@ -11,5 +11,5 @@ display_name = "Pierce"
 complexity = 1
 icon = ExtResource("2_icon")
 damage_mult = 0.9
-extra_pierce = 2
+extra_pierce = 1
 look_layer = 8

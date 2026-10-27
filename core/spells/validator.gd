@@ -239,6 +239,8 @@ static func _check_modifier(modifier: ModifierBase) -> Array[Dictionary]:
 	var problems: Array[Dictionary] = []
 	if modifier.behaviour != ModifierBase.Behaviour.NONE and modifier.behaviour_strength <= 0.0:
 		problems.append(_problem("required-field", modifier.resource_path, "behaviour_strength", "A behaviour needs a `behaviour_strength` above 0 (what it means is next to the behaviour in core/base/modifier_base.gd; 1 where it means nothing)."))
+	if modifier.behaviour == ModifierBase.Behaviour.HOMING and modifier.behaviour_reach <= 0.0:
+		problems.append(_problem("required-field", modifier.resource_path, "behaviour_reach", "A HOMING modifier needs a `behaviour_reach` above 0: how many pixels round a shot it looks for a target."))
 	return problems
 
 

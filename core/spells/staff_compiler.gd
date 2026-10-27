@@ -135,11 +135,21 @@ func _read_group(want: int, payload: bool) -> CompiledGroup:
 				trigger_slot = slot
 		elif card is FormBase:
 			var form := card as FormBase
-			var spell: CompiledSpell = _build(form, elements, modifiers, trigger, CompiledSpell.FALLBACK_NONE)
+			# Homing on a form it cannot steer is wasted, and changes nothing else either.
+			var steers: bool = homing_steers(form.motion)
+			var kept_modifiers: Array[ModifierBase] = []
+			for modifier in modifiers:
+				if steers or modifier.behaviour != ModifierBase.Behaviour.HOMING:
+					kept_modifiers.append(modifier)
+			var spell: CompiledSpell = _build(form, elements, kept_modifiers, trigger, CompiledSpell.FALLBACK_NONE)
 			spell.slot = slot
 			_useful[slot] = true
 			for at: int in kept:
-				_attach(at, slot)
+				var modifier := _cards[at] as ModifierBase
+				if modifier != null and not kept_modifiers.has(modifier):
+					_waste(at, "%s does nothing on a %s: it cannot be steered." % [_name(modifier), _name(form)])
+				else:
+					_attach(at, slot)
 			if form.carries_payload():
 				spell.own_payload = _read_group(1, true)
 			if trigger != null:
@@ -217,6 +227,7 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 	var radius: float = SpellLimits.FALLBACK_RADIUS
 	var shots: int = 1
 	var pierce: int = 0
+	var homing_reach: float = 0.0
 	var heals: bool = false
 	var later_ids: Array[StringName] = []
 	var later_durations: PackedFloat32Array = PackedFloat32Array()
@@ -266,13 +277,12 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 		match modifier.behaviour:
 			ModifierBase.Behaviour.HOMING:
 				# Homing stacks by multiplying: the strongest card's turn rate, x HOMING_STACK for
-				# each more (owner, 2026-10-27); a beam's bend widens the same way.
+				# each more (owner, 2026-10-27); an instant carrier's bend follows from it.
+				homing_reach = maxf(homing_reach, modifier.behaviour_reach)
 				if spell.homing_turn <= 0.0:
 					spell.homing_turn = modifier.behaviour_strength
-					spell.homing_angle = SpellLimits.BEAM_HOMING_ANGLE
 				else:
 					spell.homing_turn = maxf(spell.homing_turn, modifier.behaviour_strength) * SpellLimits.HOMING_STACK
-					spell.homing_angle = minf(spell.homing_angle * SpellLimits.HOMING_STACK, SpellLimits.BEAM_HOMING_MAX)
 			ModifierBase.Behaviour.CHAIN:
 				spell.chain_jumps += int(modifier.behaviour_strength)
 	spell.look = _look_of(elements, modifiers)
@@ -299,6 +309,9 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 	spell.hit.later_status_strengths = later_strengths
 	if spell.ray_length > 0.0 and spell.motion != FormBase.Motion.DASH and spell.motion != FormBase.Motion.TELEPORT:
 		spell.hit.kind = &"ray"
+	if spell.homing_turn > 0.0:
+		spell.homing_range = homing_range(spell.motion, spell.ray_length, homing_reach)
+		spell.homing_angle = minf(rad_to_deg(spell.homing_turn * SpellLimits.INSTANT_HOMING_SECONDS), SpellLimits.INSTANT_HOMING_MAX)
 	if heals:
 		spell.hit.heal = spell.damage
 		spell.hit.damage = maxi(roundi(float(spell.damage) * SpellLimits.HEAL_ENEMY_SHARE), 1)
@@ -323,6 +336,30 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 	_cast.mana += spell.mana_cost
 	_cast.delay += spell.cooldown
 	return spell
+
+
+## Whether homing can steer a carrier of `motion`: what it moves turns toward a target as it
+## goes, at the turn rate (a shot in flight, a dash, whether it carries the wizard or a shot),
+## and what is over at once bends its way toward one, up to `homing_angle` (a beam, a
+## teleport). On any other form a homing card is wasted. A new motion that should home goes here, and the homing
+## test of every form card (tests/content/spells/test_homing_forms.gd) checks it reaches.
+static func homing_steers(motion: FormBase.Motion) -> bool:
+	match motion:
+		FormBase.Motion.STRAIGHT, FormBase.Motion.HOOK, FormBase.Motion.SWAP, FormBase.Motion.RETURN, FormBase.Motion.RAY, FormBase.Motion.DASH, FormBase.Motion.TELEPORT:
+			return true
+	return false
+
+
+## How far a homing carrier looks for its target, the one rule for every form: as far as its
+## homing cards reach (`ModifierBase.behaviour_reach`, the largest), and one that is over at
+## once (a beam, a teleport) at least as far as it goes, so its far end homes too (a card that
+## reaches further bends it toward targets past its end). 0 where homing cannot steer.
+static func homing_range(motion: FormBase.Motion, ray_length: float, reach: float) -> float:
+	if not homing_steers(motion):
+		return 0.0
+	if motion == FormBase.Motion.RAY or motion == FormBase.Motion.TELEPORT:
+		return maxf(reach, ray_length)
+	return reach
 
 
 ## The look of a carrier's shots (docs/milestones/M2-staffs.md, "The look of a shot"): the

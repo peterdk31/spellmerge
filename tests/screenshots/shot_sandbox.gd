@@ -1,8 +1,8 @@
 extends "res://tests/support/screenshot.gd"
 ## Screenshots of the sandbox (staffs B7a), the two-lane room of dev and preview builds.
 ##
-## Shots: one player firing fire bolts up the left lane at the training dummy (damage numbers,
-## DPS, burn); the pause menu's sandbox page open; four players, two per lane, with an imp
+## Shots: one player firing fire bolts up the left lane at the training dummy and the group round
+## it (damage numbers, DPS, burn); the pause menu's sandbox page open; four players, two per lane, with an imp
 ## wave in and the shooting dummy's telegraph up.
 
 ## Frames after a press for the menus to redraw; the full settle is kept for the shots.
@@ -37,8 +37,13 @@ func take() -> void:
 	_input.call("send_virtual", 0, &"staff_2", 1.0)
 	await create_timer(2.0).timeout
 	_input.call("send_virtual", 0, &"staff_2", 0.0)
-	if int(dummy.get("total_damage")) <= 0:
-		fail("the training dummy took no damage")
+	# The group stands round the training dummy, so the bolts may land on one of them first.
+	var damage: int = 0
+	for standing: Node in _flow.call("dummies") as Array:
+		if (standing.get("data") as EnemyBase).id == &"training_dummy":
+			damage += int(standing.get("total_damage"))
+	if damage <= 0:
+		fail("no training dummy took damage")
 		return
 	await shot("sandbox_training_lane")
 	await _open_page(0)

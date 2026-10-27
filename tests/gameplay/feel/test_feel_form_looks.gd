@@ -332,6 +332,17 @@ func test_a_beam_with_no_flicker_depth_is_steady() -> void:
 	check(is_equal_approx(beam.scale.y, t), "only the fade thins it")
 
 
+func test_a_beam_is_see_through_by_the_preset_and_a_ring_is_not() -> void:
+	preset.beam_alpha = 0.6
+	bus.form_shown.emit(0, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, Color.RED)
+	var tint: Color = (_the_shown_beam().material as ShaderMaterial).get_shader_parameter(&"body_tint")
+	check(is_equal_approx(tint.a, 0.6), "a beam starts at the preset's alpha (%f)" % tint.a)
+	feel.step(1.0)
+	bus.form_shown.emit(0, &"nova", Vector2.ZERO, Vector2.RIGHT, 0.0, Color.RED)
+	tint = (_the_shown_beam().material as ShaderMaterial).get_shader_parameter(&"body_tint")
+	check(is_equal_approx(tint.a, 1.0), "a ring starts solid (%f)" % tint.a)
+
+
 func test_a_flare_of_zero_leaves_the_beam_as_before() -> void:
 	preset.beam_flare = 0.0
 	bus.form_shown.emit(0, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, Color.RED)

@@ -63,6 +63,10 @@ enum Behaviour {
 @export var behaviour: Behaviour = Behaviour.NONE
 ## Turn rate for HOMING, number of jumps for CHAIN; unused for NONE.
 @export var behaviour_strength: float = 0.0
+## Pixels the behaviour reaches. For HOMING, how far a shot looks for a target (one in flight
+## looks again as it flies; a beam looks at least as far as it is long), on every form homing
+## steers (`StaffCompiler.homing_range`). Unused by the others.
+@export var behaviour_reach: float = 0.0
 
 # --- Look (staffs B6a) ----------------------------------------------------------------
 
@@ -91,5 +95,6 @@ func ranges() -> Dictionary:
 		"extra_pierce": Vector2(0, 8),
 		"behaviour": Vector2(0, Behaviour.size() - 1),
 		"behaviour_strength": Vector2(0.0, 256.0),
+		"behaviour_reach": Vector2(0.0, 360.0),
 	})
 	return limits

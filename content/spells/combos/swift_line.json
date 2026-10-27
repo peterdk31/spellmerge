@@ -2,7 +2,7 @@
 	"id": "swift_line",
 	"name": "Swift line",
 	"does": "A fast line through the room that hits every imp on it.",
-	"casts": [{"staff": 0, "cards": ["faster", "pierce", "bolt"]}],
+	"casts": [{"staff": 0, "cards": ["faster", "pierce", "pierce", "bolt"]}],
 	"imps": [[80, 0], [140, 0], [200, 0]],
 	"seconds": 1.5,
 	"checks": [{"kind": "damaged", "imps": [0, 1, 2]}]

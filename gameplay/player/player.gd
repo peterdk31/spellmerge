@@ -277,6 +277,8 @@ var _overlay: Node2D = null
 var _dash_left: float = 0.0
 var _dash_direction: Vector2 = Vector2.ZERO
 var _dash_speed: float = 0.0
+## The homing of the dash in progress (`Spells.move_homing`), or null.
+var _dash_homing: Homing = null
 var _dash_tag: int = 0
 ## What the dash state is doing: &"dash", or &"hook"/&"swap" (a pull to a point, not walking).
 var _dash_mode: StringName = &"dash"
@@ -546,6 +548,9 @@ func step(delta: float) -> void:
 		_tick_trail(delta)
 	var pace: float = combat.wizard_speed_factor(index) if combat != null else 1.0
 	if is_dashing():
+		if _dash_mode == &"dash" and _dash_homing != null:
+			# A homing dash turns toward an enemy as it goes, as a homing shot does.
+			_dash_direction = _dash_homing.steer(projectiles, index, global_position, _dash_direction, delta)
 		velocity = _dash_direction * _dash_speed
 		if _dash_mode == &"dash":
 			velocity *= pace
@@ -1006,6 +1011,7 @@ func _on_caster_move_requested(player: int, mode: StringName, to: Vector2, secon
 		if input != null and input.get_move(index) != Vector2.ZERO:
 			_dash_direction = input.get_move(index).normalized()
 		_dash_speed = (to - muzzle_position()).length() / time
+		_dash_homing = spells.move_homing(index) if spells != null else null
 	else:
 		var pull: Vector2 = to - global_position
 		_dash_direction = pull.normalized()

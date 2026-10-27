@@ -164,9 +164,9 @@ func test_the_beam_hits_along_a_line_up_to_its_reach_at_once() -> void:
 	var third := _target(Vector2(180.0, 0.0))
 	var beside := _target(Vector2(120.0, 50.0))
 	_cast(&"beam", 0, Vector2.ZERO)
-	check_equal(_hits.size(), _form(&"beam").pierce + 1, "the beam hits pierce + 1 targets")
-	check_equal(_hit_targets(), [near, second] as Array, "the nearest two on the line, in order")
-	check(not _hit_targets().has(third) and not _hit_targets().has(beside), "not the third in line nor the one beside it")
+	check_equal(_form(&"beam").pierce, 0, "a beam pierces only with pierce cards")
+	check_equal(_hit_targets(), [near] as Array, "a bare beam hits the nearest on the line and stops there")
+	check(not _hit_targets().has(second) and not _hit_targets().has(third) and not _hit_targets().has(beside), "not the ones behind it nor the one beside it")
 	check_equal(_mgr.get_count(), 0, "a beam holds no shot")
 
 

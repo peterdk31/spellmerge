@@ -272,6 +272,18 @@ position = Vector2(168, 96)
 [node name="Shooting" type="Marker2D" parent="DummySpawns"]
 position = Vector2(472, 96)
 
+[node name="Group1" type="Marker2D" parent="DummySpawns"]
+position = Vector2(88, 136)
+
+[node name="Group2" type="Marker2D" parent="DummySpawns"]
+position = Vector2(248, 136)
+
+[node name="Group3" type="Marker2D" parent="DummySpawns"]
+position = Vector2(128, 192)
+
+[node name="Group4" type="Marker2D" parent="DummySpawns"]
+position = Vector2(208, 192)
+
 [node name="Doors" type="Node2D" parent="."]
 
 [node name="Entry" type="Marker2D" parent="Doors"]

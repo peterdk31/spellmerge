@@ -66,6 +66,15 @@ func _wizards() -> Array[PlayerScript]:
 	return found
 
 
+## The dummies the sandbox room should stand: `Flow.dummy_id` for each of its spawns.
+func _wanted_ids() -> Array[StringName]:
+	var room: RoomBase = root.get_node("Registry").call("get_resource", &"rooms", FlowScript.SANDBOX_ROOM_ID) as RoomBase
+	var ids: Array[StringName] = []
+	for i in room.dummy_spawns.size():
+		ids.append(FlowScript.dummy_id(i))
+	return ids
+
+
 func _dummy_ids() -> Array[StringName]:
 	var ids: Array[StringName] = []
 	for dummy: Node in flow.dummies():
@@ -79,7 +88,7 @@ func test_sandbox_starts_the_sandbox_room_with_both_dummies() -> void:
 		check(flow.sandbox, "%d players: the run is a sandbox" % count)
 		check_equal(flow.room_id, FlowScript.SANDBOX_ROOM_ID, "%d players: the room" % count)
 		check_equal(_wizards().size(), count, "%d players: a wizard each" % count)
-		check_equal(_dummy_ids(), FlowScript.DUMMY_IDS, "%d players: the training and the shooting dummy stand" % count)
+		check_equal(_dummy_ids(), _wanted_ids(), "%d players: the training and the shooting dummy stand, and the group" % count)
 		check_equal(flow.enemies_left(), 0, "%d players: no wave" % count)
 		check_equal(waves, [] as Array[int], "%d players: no wave_started" % count)
 		check_equal(sandbox_flags, [true] as Array[bool], "%d players: sandbox_changed(true) once" % count)
@@ -87,6 +96,13 @@ func test_sandbox_starts_the_sandbox_room_with_both_dummies() -> void:
 		for index in 4:
 			input.leave(index)
 		sandbox_flags.clear()
+
+
+func test_spawns_past_the_named_dummies_stand_training_dummies() -> void:
+	check_equal(FlowScript.dummy_id(0), &"training_dummy", "the first")
+	check_equal(FlowScript.dummy_id(1), &"shooting_dummy", "the second")
+	check_equal(FlowScript.dummy_id(2), &"training_dummy", "every one after is a training dummy")
+	check_equal(FlowScript.dummy_id(5), &"training_dummy", "every one after is a training dummy")
 
 
 func test_the_dummies_stand_at_the_rooms_dummy_spawns() -> void:
@@ -123,7 +139,7 @@ func test_imp_wave_adds_imps_up_to_the_cap() -> void:
 	for press in 10:
 		events.emit_signal("sandbox_action_requested", 0, FlowScript.ACTION_IMP_WAVE)
 	check_equal(flow.enemies_left(), FlowScript.WAVE_MAX, "more presses stop at WAVE_MAX imps")
-	check_equal(flow.dummies().size(), 2, "the dummies are not imps")
+	check_equal(flow.dummies().size(), _wanted_ids().size(), "the dummies are not imps")
 
 
 func test_clearing_the_imps_starts_no_break() -> void:
@@ -142,10 +158,10 @@ func test_reset_dummies_puts_fresh_ones_back() -> void:
 	var old: Array[Node] = flow.dummies()
 	# The shooting dummy can be killed; reset brings it back.
 	events.emit_signal("enemy_died", 0, old[1], Vector2.ZERO)
-	check_equal(flow.dummies().size(), 1, "a killed dummy is gone")
+	check_equal(flow.dummies().size(), _wanted_ids().size() - 1, "a killed dummy is gone")
 	events.emit_signal("sandbox_action_requested", 0, FlowScript.ACTION_RESET_DUMMIES)
 	var fresh: Array[Node] = flow.dummies()
-	check_equal(_dummy_ids(), FlowScript.DUMMY_IDS, "both dummies stand again")
+	check_equal(_dummy_ids(), _wanted_ids(), "every dummy stands again")
 	check(not fresh.has(old[0]), "the training dummy is a new one")
 	check(not is_instance_valid(old[0]) or not old[0].is_inside_tree(), "the old training dummy left the room")
 

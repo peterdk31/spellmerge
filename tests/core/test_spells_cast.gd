@@ -87,6 +87,7 @@ func before_each() -> void:
 	var homing: ModifierBase = ModifierBase.new()
 	homing.behaviour = ModifierBase.Behaviour.HOMING
 	homing.behaviour_strength = 6.0
+	homing.behaviour_reach = 160.0
 	_put(homing, &"homing")
 	_trigger(&"on_hit", TriggerBase.Event.HIT, 1)
 	_trigger(&"on_hit_twice", TriggerBase.Event.HIT, 2)

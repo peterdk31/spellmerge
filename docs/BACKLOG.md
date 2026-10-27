@@ -12,7 +12,7 @@ For later milestones; see `docs/milestones/M2-staffs.md`, "Later".
 - **Arc zaps and `on hit` (M3 staffs or relics, owner 2026-10-27).** For now an `arc` zap is a hit like any other, so it sets off `on hit` payloads and chains. Later that should not be the card's default but something a build earns: either an implicit mod on a staff type ("zaps count as hits") or a relic. Then the plain arc zap stops setting off `on hit`.
 - **Staff spread (M3, owner 2026-10-27).** Found staffs have a `spread`: either rolled at random, or starting high and upgradable to lower values. The runtime and `spread_mult` (Sniper) are in since 2026-10-27; the dev and starter staffs aim true.
 - **Relics on cards (M3).** Explosion immunity (hit kind `burst`), self-damage refunded as mana, immunity to one element, triggers that fire twice.
-- **Enemies with staffs (M3–M4).** Elites and bosses built on the same compiler; their cards can drop as rewards.
+- **Enemy cards as rewards (M3–M4).** Elites and bosses with dearer staffs, whose cards can drop as rewards. Enemies casting from staffs moved into M2 (owner, 2026-10-27; M2-staffs.md phase F).
 - **Elements on the room (M3 rooms).** Fire lights grass, frost freezes water into floor, lightning electrifies water, void breaks weak walls.
 - **A map view, and other uses for A, X and Y (task, owner 2026-10-26).** The staffs moved to the shoulders, so A, X and Y do nothing in play (B opens the builder). The owner's first idea is a map view (the room sequence and where the players are, once M3 has rooms and doors); A, X and Y get their jobs then.
 - **Codex of discoveries (M5).** The first time a reaction, a combo or an unknown chain happens, the game notes it (with a short clip if the recorder can do it cheaply).

@@ -2,6 +2,8 @@
 
 Eight strictly sequential milestones (docs/PLAN.md, "Roadmap"). One milestone at a time; nothing from a later milestone is built early. A milestone ends when its done-when criteria and the quality bar are met, never because time ran out.
 
+One exception, by the owner on 2026-10-27: enemies casting spells from staffs moved from M3–M4 into M2 ([M2-staffs.md](milestones/M2-staffs.md), "Enemy staffs", phase F), so new enemy types are a sprite and a staff.
+
 | # | Milestone | Status | Done when |
 | --- | --- | --- | --- |
 | M0 | [Foundation](milestones/M0-foundation.md) | **Closed early** on 2026-10-16 by the owner; its dry runs and release streak carry into M1 | 3 daily releases in a row work and every pipeline part passes its dry run |

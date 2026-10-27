@@ -216,7 +216,7 @@ The aim is a builder each player can use quickly and without help, in their own 
 - **No per-shot nodes or particles:** one shader draws the layers; sparks and embers come from one shared pool with a global count, and at the cap trails thin first. This is a visual budget under the effect quality setting, never a build rule.
 - **Each card's look is data in its own `.tres`** (`look_layer`, an effect kind the shader knows), so a new card never edits the shader unless it needs a new effect kind. Feel's per-form looks (`cast_looks` in the Feel preset) move to card data the same way.
 - **Player colours** (pillar 4) are checked explicitly: the clip sheet includes four players firing the same card, and each player's shots must be told apart at 1x.
-- Player shots hit a little wider than they look; enemy shots a little narrower.
+- Player shots hit a little wider than they look; enemy shots (an enemy's spells, from phase F) a little narrower.
 - Checked with the clip recorder: a sheet of every carrier with every infusion against `docs/STYLE.md`, and a four-player sandbox clip.
 
 ## The sandbox
@@ -227,6 +227,20 @@ The aim is a builder each player can use quickly and without help, in their own 
 - **Shooting dummy** (end of the other lane): fires slow, telegraphed shots at the nearest wizard, for shields, blocks and self-harm.
 - **The sandbox page** in the pause menu (owner, 2026-10-26: first "an entry in the start button menu - where the builder also is", then Start became the pause menu and B the builder): spawn an imp wave, reset the dummies. Friendly fire is in the pause menu's Settings, Gameplay, for every run; slow motion is not needed (owner). The actions change the room, never another player's choices or menus.
 - **Staff codes** (part D2): copy a staff as a short text code and paste one, so builds can be shared in Discussions. A code is only card ids, checked against the registry; nothing in it runs.
+
+## Enemy staffs
+
+The owner, 2026-10-27: "I actually want the enemies to have their own staff and fire spells. That way we can easily make new enemy types, by adding a new sprite and giving them a staff with some combined spell on it." Moved into M2 from "Later" (it was M3–M4) the same day. Built in phase F.
+
+- **An enemy is a sprite and a staff.** `EnemyBase` gains a `staff` (a `StaffBase`), its `cards`, `max_mana` and `mana_regen`. The AI compiles the staff once per enemy type and casts it through `Spells.cast_staff` like a wizard; a new enemy type is a folder with a sprite, a scene and a `.tres`, and no code.
+- **Player cards only.** There are no enemy-only cards: the imp becomes something like `fire · bolt` and its shot plays like that bolt, not like the old imp shot. Every caster-side card works on an enemy too (dash, teleport, hook, swap, recoil, decoy, familiar, shield, hold...), and the AI aims and uses them: it dashes toward or away from its target, teleports near a wizard, keeps a decoy between them.
+- **Enemies pay mana like players:** a pool and a regen per enemy type, so a dear staff casts less often. The AI checks the next cast's cost (`Spells.next_cast_mana`) before it winds up.
+- **One look for every spell** (the owner, 2026-10-27: the new style only, no separate enemy shot look): an enemy's spell is drawn by the shot shader exactly as a wizard's, with the **enemy ramp** where a player's colour would show (a plain shot's ramp, a quarter of an infused shot's tail, beams, effects). The enemy ramp is a new palette material, **Blight ochre**: shadow `#4d3f12`, base `#a68a2a`, light `#e3cf6b`, far from the four player colours. The old enemy look goes: the hostile batch, `imp_fireball.svg`, Feel's ember burst for enemy impacts.
+- **The telegraph is the cast.** The windup starts only when the cast is ready (its delay nearly over and the mana there), so a telegraph is always a promise; it shows the next cast's reach and lane from its first carrier (a shot's speed × life, a beam's length), a pose and flash for carriers that are not aimed (nova, orbit), and rain's own marker. It is drawn by the shot shader in the enemy ramp, not a `Line2D`.
+- **Enemy spells on wizards** do everything a spell does: damage, knockback, statuses and **reactions** (the same reaction table as on enemies). Area hits (blast, fallbacks) take the caster's side: an enemy's blast hits wizards and decoys, a wizard's hits enemies.
+- **Enemy spells on other enemies: a setting, off by default** (pause menu, Settings, Gameplay, "Enemy fire", beside Friendly fire). Off, an enemy's spells pass other enemies.
+- **Fair at any player count:** enemy shots hit a little narrower than they look (as before); enemies get a capped share of the shared runtime limits (beams, delayed firings) so they never take a slot from a player's spell; an enemy that dies drops its pending firings and holds, and its shots in the air fly on.
+- **Under the hood** (parts F2–F5): a spell's caster is a player 0–3 or an enemy row 4 and up (`ENEMY_CASTERS`, 256 rows; an enemy opens one when it spawns and closes it when it dies). Events keep `NO_PLAYER` for an enemy's cast, so no area mistakes an enemy for a player; the tag names the row (see "Tags").
 
 ## Events
 
@@ -252,7 +266,7 @@ Added in part A3, so later parts in different areas don't all edit `core/events/
 | `shot_blocked(player, position: Vector2, tag: int)` (a shot's shield stopped an enemy shot) | projectiles | spells, feel |
 | `shield_blocked(player, position: Vector2, tag: int)` (a wizard's barrier stopped a hit) | combat | spells, feel |
 | `kill_landed(player, target, position, tag)` | combat | spells |
-| `wizard_hurt(player, amount, position, tag, kind: StringName)` (`tag` 0 for an enemy's hit) | combat | spells, feel, hud |
+| `wizard_hurt(player, amount, position, tag, kind: StringName)` (`tag` 0 for contact damage; an enemy's spell hit carries its spell tag from part F6, so `SpellTag.caster_of` names the enemy row) | combat | spells, feel, hud |
 | `reaction_landed(player, reaction_id, target, position, tag)` | combat | spells |
 | `ally_passed(player, ally, position, tag)` | projectiles | spells |
 
@@ -261,6 +275,8 @@ Added in part A3, so later parts in different areas don't all edit `core/events/
 ## Tags
 
 A shot's int tag becomes **player (2 bits), staff (2), generation (3), node (9)**, with `SpellTag.FLAG` at `1 << 20`, so spell tags (1,048,576 and up) never meet the enemy attack tags of `gameplay/ai` (1,000 to 101,000). The node is the index of a compiled node in the staff's cycle: every carrier of every cast, payloads included, **and every fallback** (the caster or a payload origin); at most 512 per staff. Only the last cast of a cycle can wrap, so a cycle reads each card at most twice, and each group adds at most one fallback: a 64-slot staff stays under 512 (A4 found that 128 was not enough). The generation ring (8 per staff) and the rule that a shot in the air keeps its old numbers after a rebuild stay as they are (part A5).
+
+**Enemy casters (part F3):** bit 16 marks an enemy's spell tag and bits 21–28 hold its enemy row (0–255), above the flag; the player field is then unused. `SpellTag.caster_of(tag)` gives the caster (0–3 a player, 4 and up an enemy row plus 4), `player_of` gives `NO_PLAYER` for an enemy's tag, and `is_spell_tag` accepts every tag below `1 << 29`. Tags stay below 2³¹, since combat keeps shield tags in a `PackedInt32Array`, and every spell tag stays above the AI's attack tags until those go (part F9).
 
 ## Working in parallel
 
@@ -332,6 +348,23 @@ C0 (after B6): the 19 existing cards get their look data and a second look at th
 | --- | --- | --- | --- | --- |
 | E1 | **Spell names** | `core/spells` (a namer beside the compiler), `hud/builder` | A6c | A name for every cast from its cards (see "The builder"): word lists per card in the card's own `.tres` (`name_words`, so a new card brings its words and edits no shared list), rules for multicast, triggers and payloads, `Spells.staff_view` gives each cast's `name`; the builder shows the names above the plan; tests that names are deterministic and grow with the build |
 
+### Phase F: enemy staffs (owner, 2026-10-27)
+
+Owner sessions, one PR each, in this order: F2, F3 and F4 may run in parallel; F5 after F3 and F4; F6, F7 and F8 after F5; then F9; then F10. Before D3, so the stress run and the playtest see enemies that cast.
+
+| # | Part | Area | Delivers |
+| --- | --- | --- | --- |
+| F1 | **The plan** | `docs/` | This section, "Enemy staffs", the tag layout, the READMEs' notes, `docs/DECISIONS.md` |
+| F2 | **Enemy palette** | `docs/STYLE.md`, `core/projectiles` (shader) | Blight ochre in the palette table; the shader's fifth ramp, chosen by bit 7 of the instance red (`look_red(ramp, zoom)` in the manager, shared by Feel and Entities); the beam's enemy ramp; `tint_of(NO_PLAYER)`. Tests: the decode, and the players' bytes unchanged |
+| F3 | **Enemy tags** | `core/spells/spell_tag.gd` | The layout above. Tests: round trips, no overlap with the AI's attack tags, below 2³¹ |
+| F4 | **Enemy casters in the projectile manager** | `core/projectiles` | `ENEMY_CASTERS`; anchors for enemy rows; events with `NO_PLAYER`; one drop bucket for every enemy; shields and homing on wizards for enemy shots; `set_target_owner` (an enemy's shots skip its own body); `enemy_fire`; enemy shots in the shot shader's batches (still drawn above players'). The timing test still within budget |
+| F5 | **Enemy casters in the spell runtime** | `core/spells` | `open_enemy_caster`, `close_enemy_caster`; state sized for players and enemy rows; hit layers by the caster's side; handlers that find the caster from the tag; the enemies' share of the shared limits; `next_cast_mana`; caster-side moves and entities routed to the enemy. Tests: cast, payloads, chains, the beam share, closing mid-flight, every row in use, a four-player staff unchanged |
+| F6 | **Combat** | `gameplay/combat` | Area hits by side; enemy spell hits on wizards with statuses and reactions; the `wizard_hurt` tag |
+| F7 | **Feel** | `gameplay/feel` | Enemy impacts, casts, beams and rain markers as normal effects in the enemy ramp; the ember burst and the hostile texture hand-off removed |
+| F8 | **Enemies cast staffs** | `core/base/enemy_base.gd`, `gameplay/ai` | `staff`, `cards`, `max_mana`, `mana_regen` on `EnemyBase`; the AI's mana, caster row, anchor and aim; the windup gated on the next cast; the telegraph from the cast, drawn by the shot shader; the AI for caster-side cards |
+| F9 | **The imp and the shooting dummy on staffs** | `content/enemies`, `gameplay/ai`, `core/projectiles` | Both on player-card staffs; `ATTACK_TAG`, its hit-profile table, `imp_fireball.svg` and the hostile batch removed. Tests: the dummies, the waves, the 4-bot test; a stress run at the web cap (numbers in DECISIONS) |
+| F10 | **Enemy fire setting** | `core/settings`, `hud/menus/pause`, `gameplay/ai` | `core/settings/enemy_fire.gd` (off by default), `enemy_fire_requested` and `enemy_fire_changed`, the pause menu row, applied to the projectile manager |
+
 ### Phase D: proof
 
 | # | Part | Delivers |
@@ -344,7 +377,7 @@ C0 (after B6): the 19 existing cards get their look data and a second look at th
 
 - **Staff types (M3):** an always-cast slot, a shuffle staff, built-in recoil, cheaper `hold`.
 - **Relics (M3):** explosion immunity (hit kind `burst`), self-damage refunded as mana, immunity to one element, triggers that fire twice.
-- **Enemies with staffs (M3–M4):** elites and bosses on the same compiler; their cards can drop as rewards.
+- **Enemy cards as rewards (M3–M4):** elites and bosses with dearer staffs, whose cards can drop as rewards. Enemies casting from staffs moved into M2 (phase F).
 - **Elements on the room (M3 rooms):** fire lights grass, frost freezes water into floor, lightning electrifies water, void breaks weak walls.
 - **Codex (M5):** the first time a reaction, a combo or an unknown chain happens, the game notes it.
 

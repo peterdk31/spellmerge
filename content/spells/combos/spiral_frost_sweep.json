@@ -1,0 +1,9 @@
+{
+	"id": "spiral_frost_sweep",
+	"name": "Spiral frost sweep",
+	"does": "A weaving frost bolt sweeps wide of its line and chills an imp a plain bolt flies past.",
+	"casts": [{"staff": 0, "cards": ["spiral", "frost", "bolt"]}],
+	"imps": [[20, 22], [20, -22], [35, 22], [35, -22], [50, 22], [50, -22], [65, 22], [65, -22], [80, 22], [80, -22], [95, 22], [95, -22], [110, 22], [110, -22], [125, 22], [125, -22], [140, 22], [140, -22]],
+	"seconds": 1.5,
+	"checks": [{"kind": "status_count", "status": "chill", "min": 1}]
+}

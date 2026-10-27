@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ModifierBase" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/base/modifier_base.gd" id="1_base"]
+[ext_resource type="Texture2D" path="res://content/spells/modifiers/return/icon.svg" id="2_icon"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"return"
+display_name = "Return"
+complexity = 2
+icon = ExtResource("2_icon")
+mana_mult = 1.25
+behaviour = 19
+behaviour_strength = 1.0

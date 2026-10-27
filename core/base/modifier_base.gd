@@ -48,6 +48,14 @@ enum Behaviour {
 	GROWTH,
 	## Takes on a teammate's infusions when it passes through them (B1, B2).
 	RELAY,
+	## Flies out for half its life, then back to its caster (owner, 2026-10-27: a modifier, not
+	## a boomerang carrier). Only on a carrier that flies (`StaffCompiler.behaviour_runs`).
+	RETURN,
+	## Zaps the nearest enemy within `behaviour_reach` pixels `behaviour_strength` times a second
+	## (arc cards add up) while the shot lives, at `SpellLimits.ARC_DAMAGE` of its damage with its infusions; a zap
+	## is a hit, so it sets off `on hit` and chains (owner, 2026-10-27). Only on a carrier that
+	## stays in the air as a shot.
+	ARC,
 }
 
 @export var damage_mult: float = 1.0
@@ -83,6 +91,12 @@ enum Behaviour {
 ## (sniper), above 1 wilder. Several multiply. A staff with no spread aims true whatever it is.
 @export var spread_mult: float = 1.0
 
+# --- Life (slow) ----------------------------------------------------------------------
+
+## Factor on the carrier's `lifetime`. With `speed_mult` it makes a slow shot that still goes as
+## far (slow: speed x0.3, lifetime x3). Several multiply.
+@export var lifetime_mult: float = 1.0
+
 
 func kind() -> StringName:
 	return &"modifier"
@@ -103,5 +117,6 @@ func ranges() -> Dictionary:
 		"behaviour_strength": Vector2(0.0, 256.0),
 		"behaviour_reach": Vector2(0.0, 360.0),
 		"spread_mult": Vector2(0.0, 4.0),
+		"lifetime_mult": Vector2(0.1, 4.0),
 	})
 	return limits

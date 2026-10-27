@@ -59,6 +59,10 @@ var chain_jumps: int = 0
 ## Factor on the staff's `spread` for this carrier's shots (its modifiers' `spread_mult`,
 ## multiplied); 1 means the staff's own spread.
 var spread_mult: float = 1.0
+## `arc`: seconds between two zaps (0 for none), how far a zap reaches, and what it hits with.
+var arc_interval: float = 0.0
+var arc_reach: float = 0.0
+var arc_hit: HitProfile = null
 
 ## A `TriggerBase.Event` value, meaningful only when `payload` is not null.
 var trigger_event: int = TriggerBase.Event.HIT

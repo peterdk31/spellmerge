@@ -1525,3 +1525,10 @@ An independent review of the branch found these, all fixed with a regression tes
 - **The carriers of a multicast leave along the same aim;** only the staff's spread sets them apart. `SpellLimits.MULTICAST_SPREAD` (12°) is gone. A `scatter` group still sends each carrier its own random way.
 - **The `dev` and `starter` staffs have 0 spread** (they aim true). Staffs with spread come with staff types (M3): random, or high and upgradable to lower (docs/BACKLOG.md).
 - **`ModifierBase.spread_mult`** (0–4, several multiply) scales the staff's spread for the next carrier: a factor, not a flat number of degrees, so a card is worth the same share on every staff and two of them stack without a floor. The first card to use it is Sniper.
+
+## 2026-10-27: Return, slow and arc (owner)
+
+- **The boomerang carrier is gone; `return` is a modifier behaviour** (`ModifierBase.Behaviour.RETURN`), so any shot that flies out can come back. `StaffCompiler.behaviour_runs(behaviour, motion)` is the one rule for which carriers run a behaviour (homing where it steers, return on a shot that flies out, arc on a shot in the air); a card that cannot run is wasted with its reason.
+- **`ModifierBase.lifetime_mult`** (0.1–4, multiplies) lets a card change how long its carrier lives; slow is speed x0.3 and life x3.
+- **`arc`** (`ModifierBase.Behaviour.ARC`): a shot zaps the nearest enemy within `behaviour_reach` `behaviour_strength` times a second (arc cards add up, at least `SpellLimits.ARC_MIN_INTERVAL` apart), at `SpellLimits.ARC_DAMAGE` (0.5) of its damage with its infusions, as a short ray (`CompiledSpell.arc_hit`, kind `ray`). No enemy in reach: it tries again next step. At most `SpellLimits.MAX_ARCS_PER_STEP` zaps a step. This is how slow orbs that emit lightning are built from cards: `slow · lightning · arc · bolt`.
+- **A zap sets off `on hit` and chains for now** (owner): it uses the shot's trigger fires. Later that should come from a staff mod or a relic instead (BACKLOG).

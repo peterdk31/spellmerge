@@ -31,8 +31,8 @@ A card is a `.tres` on one of five classes in `core/base/`, in its own folder un
 
 | Kind | Class | Role | Cards (new in bold) |
 | --- | --- | --- | --- |
-| Carrier (15) | `FormBase` | Ends a group: something leaves the caster | bolt, beam, nova, rune, orbit, **dash, teleport, hook, swap, boomerang, wall, rain, fissure, decoy, familiar** |
-| Modifier (24) | `ModifierBase` | Attaches to the next carrier | split, pierce, homing, chain, bigger, faster, **shield, blast, hold, recoil, bounce, echo, linger, heavy, siphon, overcharge, sticky, magnet, ghost, spiral, mirror, growth, relay, sniper** |
+| Carrier (14) | `FormBase` | Ends a group: something leaves the caster | bolt, beam, nova, rune, orbit, **dash, teleport, hook, swap, wall, rain, fissure, decoy, familiar** (the boomerang carrier became the `return` modifier, owner 2026-10-27) |
+| Modifier (27) | `ModifierBase` | Attaches to the next carrier | split, pierce, homing, chain, bigger, faster, **shield, blast, hold, recoil, bounce, echo, linger, heavy, siphon, overcharge, sticky, magnet, ghost, spiral, mirror, growth, relay, sniper, return, slow, arc** |
 | Infusion (6) | `ElementBase` | Attaches to the next carrier; several may | fire, frost, storm, void, lightning, **mend** |
 | Trigger (10) | `TriggerBase` | Attaches to the next carrier; the group read after that carrier is its payload | on hit, on expire, timer, **on block, on kill, on cast, on wall, on hurt, on reaction, on ally** |
 | Multicast (4) | `MulticastBase` | Pulls more carriers into the same group | **double, triple, scatter, burst** |
@@ -61,7 +61,6 @@ Numbers are first guesses for the card's own task to set. Examples are written i
 | teleport | Blink a fixed `ray_length` along the aim, stopping before walls. End point: the arrival | `blast · teleport` arrives with an explosion; `on expire · teleport · nova` rings out on arrival |
 | hook | A shot that pulls the caster to where it hits | `shield · hook` is a safe gap-closer; `blast · hook` charges in with a bang |
 | swap | A shot that trades places with the target it hits | an escape through an enemy; `frost · swap` leaves a chilled target where you stood |
-| boomerang | Flies out and comes back to the caster | `blast · boomerang` explodes on you unless you move; `pierce · boomerang` hits twice |
 | wall | A line of still shots across the aim | `shield · wall` stops enemy shots; `fire · wall` is a burning fence |
 | rain | Its payload falls on the aim point after a telegraphed delay | `rain · nova`; `rain · frost · nova` freezes an area from above |
 | fissure | A crack along the ground that hits everything on its line | `on hit · fissure · nova` sets off a nova on every enemy in the line; `bounce · fissure` turns at walls |
@@ -76,7 +75,7 @@ Numbers are first guesses for the card's own task to set. Examples are written i
 | blast | The carrier explodes at its end point (radius damage, hit kind `burst`). On the caster it explodes on the caster | `blast` alone is self-harm a relic can turn around; `blast · bolt` is a rocket |
 | hold | Makes the carrier sustained: it stays until switched off, and reserves its mana from the pool while on (see "Mana") | `hold · shield · orbit` is a barrier ring; `hold · fire · orbit` is a permanent fire ring |
 | recoil | Pushes the caster back when cast | `recoil · blast · bolt` is a rocket jump; movement on an attack staff |
-| bounce | Bounces off walls; `on expire` fires only after the last bounce | `bounce · split · bolt` fills a room; `bounce · boomerang` |
+| bounce | Bounces off walls; `on expire` fires only after the last bounce | `bounce · split · bolt` fills a room; `bounce · return · bolt` |
 | echo | The carrier fires again 0.3 s later at half damage | doubles triggers; `echo · teleport` is a double blink |
 | linger | The shot stops mid-air for 1 s, then goes on | traps; `linger · nova` is a delayed ring |
 | heavy | Slower, much more knockback; an enemy knocked into a wall takes damage | sets up hex; `heavy · dash` is a shoulder charge |
@@ -91,6 +90,9 @@ Numbers are first guesses for the card's own task to set. Examples are written i
 | relay | When the shot passes through a teammate it takes on the infusions of that player's last cast | your bolt plus their frost, with nobody waiting (docs/PLAN.md, cross-player linking) |
 | short delay | Halves the carrier's delay for 25 % more mana (owner, 2026-10-27; named after the builder's "Delay", so it is not mistaken for `faster`) | `short delay · dash` dashes again sooner; `short delay · beam` keeps a beam on with a slower staff |
 | sniper | The carrier keeps a quarter of its staff's spread (`spread_mult` 0.25, a factor; owner, 2026-10-27). Free: the dev and starter staffs aim true, so it waits for staffs with spread (M3) | `sniper · pierce · bolt` lines up a crowd; `sniper · double · bolt · bolt`, one true bolt and one wild |
+| return | Flies out for half its life, then back to its caster (owner, 2026-10-27: a modifier, not a weak boomerang carrier). Wasted on a carrier that does not fly out (beam, rune, orbit, dash) | `pierce · return · bolt` hits twice; `blast · return · bolt` explodes on you unless you move; `spiral · return · bolt` is a wavy loop |
+| slow | A third of the speed for three times the life, so it crawls about as far (`lifetime_mult`, owner 2026-10-27) | `slow · lightning · arc · bolt`, the lightning orb; `slow · growth · bolt` grows three times as long |
+| arc | While the shot lives it zaps the nearest enemy within 60 px twice a second, at half its damage, with its infusions. A zap is a hit: it sets off `on hit` and chains (owner, 2026-10-27; see BACKLOG for making that a staff mod or relic later). Wasted on a carrier that is not a shot in the air (beam, dash) | `slow · lightning · arc · bolt` is a lightning orb; `arc · orbit` a ring of zappers; `arc · on hit · rune · nova` a trap that rings out at whatever comes near |
 
 **Infusion:** mend: hits heal wizards (whatever the friendly-fire setting) and do almost nothing to enemies. `mend · blast` is a self-heal burst; `mend · chain · bolt` jumps a heal through the party.
 
@@ -312,7 +314,8 @@ A card task touches only its own folder (`.tres`, icon, look, `assets.json`), `c
 | Needs | Cards |
 | --- | --- |
 | A6c | double, triple, overcharge |
-| B1 | bounce, ghost, spiral, boomerang, linger, growth |
+| B1 | bounce, ghost, spiral, linger, growth |
+| Slow, return and arc kit (owner, 2026-10-27) | return, slow, arc |
 | B2 | on cast, echo, burst, scatter, mirror, rain, fissure, wall |
 | B1 + B2 | sticky, relay, on ally, on wall |
 | B1 + B3 | heavy, magnet |

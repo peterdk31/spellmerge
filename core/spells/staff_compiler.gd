@@ -21,7 +21,7 @@ const TRAVEL_ONLY: Array[int] = [
 	ModifierBase.Behaviour.HOMING, ModifierBase.Behaviour.CHAIN, ModifierBase.Behaviour.BOUNCE,
 	ModifierBase.Behaviour.LINGER, ModifierBase.Behaviour.STICKY, ModifierBase.Behaviour.GHOST,
 	ModifierBase.Behaviour.SPIRAL, ModifierBase.Behaviour.MIRROR, ModifierBase.Behaviour.GROWTH,
-	ModifierBase.Behaviour.RELAY,
+	ModifierBase.Behaviour.RELAY, ModifierBase.Behaviour.RETURN, ModifierBase.Behaviour.ARC,
 ]
 
 ## How the description says when a trigger fires, by `TriggerBase.Event`.
@@ -135,11 +135,11 @@ func _read_group(want: int, payload: bool) -> CompiledGroup:
 				trigger_slot = slot
 		elif card is FormBase:
 			var form := card as FormBase
-			# Homing on a form it cannot steer is wasted, and changes nothing else either.
-			var steers: bool = homing_steers(form.motion)
+			# A behaviour its form cannot run (homing on a rune, return on a beam) is wasted, and
+			# changes nothing else either.
 			var kept_modifiers: Array[ModifierBase] = []
 			for modifier in modifiers:
-				if steers or modifier.behaviour != ModifierBase.Behaviour.HOMING:
+				if behaviour_runs(modifier.behaviour, form.motion):
 					kept_modifiers.append(modifier)
 			var spell: CompiledSpell = _build(form, elements, kept_modifiers, trigger, CompiledSpell.FALLBACK_NONE)
 			spell.slot = slot
@@ -147,7 +147,7 @@ func _read_group(want: int, payload: bool) -> CompiledGroup:
 			for at: int in kept:
 				var modifier := _cards[at] as ModifierBase
 				if modifier != null and not kept_modifiers.has(modifier):
-					_waste(at, "%s does nothing on a %s: it cannot be steered." % [_name(modifier), _name(form)])
+					_waste(at, "%s does nothing on a %s: %s." % [_name(modifier), _name(form), _why_not(modifier.behaviour)])
 				else:
 					_attach(at, slot)
 			if form.carries_payload():
@@ -274,6 +274,9 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 		shots *= modifier.shot_mult
 		pierce += modifier.extra_pierce
 		spell.spread_mult *= modifier.spread_mult
+		spell.lifetime *= modifier.lifetime_mult
+		if modifier.behaviour == ModifierBase.Behaviour.ARC:
+			spell.arc_reach = maxf(spell.arc_reach, modifier.behaviour_reach)
 		spell.behaviours[modifier.behaviour] += modifier.behaviour_strength
 		match modifier.behaviour:
 			ModifierBase.Behaviour.HOMING:
@@ -329,6 +332,23 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 		spell.echo_hit.status_id = spell.status_id
 		spell.echo_hit.status_duration = spell.status_duration
 		spell.echo_hit.status_strength = spell.status_strength
+	var arc: float = spell.behaviour(ModifierBase.Behaviour.ARC)
+	if arc > 0.0:
+		# Zaps per second add up over arc cards; a zap hits like a ray, at ARC_DAMAGE of the shot.
+		spell.arc_interval = maxf(1.0 / arc, SpellLimits.ARC_MIN_INTERVAL)
+		spell.arc_hit = HitProfile.new()
+		spell.arc_hit.damage = maxi(roundi(spell.hit.damage * SpellLimits.ARC_DAMAGE), 1)
+		spell.arc_hit.heal = roundi(spell.hit.heal * SpellLimits.ARC_DAMAGE)
+		spell.arc_hit.knockback = spell.hit.knockback * SpellLimits.ARC_DAMAGE
+		spell.arc_hit.element_id = spell.element_id
+		spell.arc_hit.element_ids = spell.element_ids
+		spell.arc_hit.status_id = spell.status_id
+		spell.arc_hit.status_duration = spell.status_duration
+		spell.arc_hit.status_strength = spell.status_strength
+		spell.arc_hit.later_status_ids = later_ids
+		spell.arc_hit.later_status_durations = later_durations
+		spell.arc_hit.later_status_strengths = later_strengths
+		spell.arc_hit.kind = &"ray"
 	if trigger != null:
 		spell.trigger_id = trigger.id
 		spell.trigger_event = trigger.event
@@ -346,9 +366,38 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 ## test of every form card (tests/content/spells/test_homing_forms.gd) checks it reaches.
 static func homing_steers(motion: FormBase.Motion) -> bool:
 	match motion:
-		FormBase.Motion.STRAIGHT, FormBase.Motion.HOOK, FormBase.Motion.SWAP, FormBase.Motion.RETURN, FormBase.Motion.RAY, FormBase.Motion.DASH, FormBase.Motion.TELEPORT:
+		FormBase.Motion.STRAIGHT, FormBase.Motion.HOOK, FormBase.Motion.SWAP, FormBase.Motion.RAY, FormBase.Motion.DASH, FormBase.Motion.TELEPORT:
 			return true
 	return false
+
+
+## True when a carrier of `motion` can run `behaviour`: homing where `homing_steers` says,
+## return on a shot that flies out, arc on a shot that stays in the air (a bolt, a rune, an orbit,
+## a wall); every other behaviour anywhere. A card whose behaviour cannot run is wasted.
+static func behaviour_runs(behaviour: int, motion: FormBase.Motion) -> bool:
+	match behaviour:
+		ModifierBase.Behaviour.HOMING:
+			return homing_steers(motion)
+		ModifierBase.Behaviour.RETURN:
+			return motion == FormBase.Motion.STRAIGHT or motion == FormBase.Motion.HOOK or motion == FormBase.Motion.SWAP
+		ModifierBase.Behaviour.ARC:
+			match motion:
+				FormBase.Motion.STRAIGHT, FormBase.Motion.STILL, FormBase.Motion.ORBIT, FormBase.Motion.HOOK, FormBase.Motion.SWAP, FormBase.Motion.WALL:
+					return true
+			return false
+	return true
+
+
+## Why a carrier cannot run `behaviour`, for the wasted card's reason.
+static func _why_not(behaviour: int) -> String:
+	match behaviour:
+		ModifierBase.Behaviour.HOMING:
+			return "it cannot be steered"
+		ModifierBase.Behaviour.RETURN:
+			return "it does not fly out"
+		ModifierBase.Behaviour.ARC:
+			return "it is not a shot that stays in the air"
+	return "it cannot run it"
 
 
 ## How far a homing carrier looks for its target, the one rule for every form: as far as its

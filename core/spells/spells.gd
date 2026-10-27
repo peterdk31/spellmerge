@@ -189,6 +189,16 @@ var _rec_timed: PackedByteArray = PackedByteArray()
 ## Slots of shots with a timer trigger.
 var _timers: PackedInt32Array = PackedInt32Array()
 var _timer_count: int = 0
+## Slots of live shots with `arc`, `_arc_count` of them, flagged in `_rec_arc`; `_rec_arc_clock` is
+## the seconds to each one's next zap.
+var _arcs: PackedInt32Array = PackedInt32Array()
+var _arc_count: int = 0
+var _rec_arc: PackedByteArray = PackedByteArray()
+var _rec_arc_clock: PackedFloat32Array = PackedFloat32Array()
+## Zaps made in this step (`SpellLimits.MAX_ARCS_PER_STEP`), and the zap being sent: its hit
+## profile is the shot's `arc_hit` (see `hit_profile`).
+var _arcs_used: int = 0
+var _arc_spell: CompiledSpell = null
 ## Slots of live shots with an `on hurt` trigger, `_hurt_count` of them, flagged in `_rec_hurt`.
 var _hurt_slots: PackedInt32Array = PackedInt32Array()
 var _hurt_count: int = 0
@@ -324,6 +334,7 @@ func _init() -> void:
 	_jq_chain.resize(JUMP_QUEUE)
 	_jq_prev.resize(JUMP_QUEUE)
 	_timers.resize(64)
+	_arcs.resize(64)
 	_bm_on.resize(SpellLimits.BEAMS)
 	_bm_born.resize(SpellLimits.BEAMS)
 	_bm_spell.resize(SpellLimits.BEAMS)
@@ -660,6 +671,9 @@ func hit_profile(tag: int) -> HitProfile:
 	var slot: int = projectiles.event_slot if projectiles != null else -1
 	if slot >= 0 and slot < _rec_relay.size() and _rec_relay[slot] != null and _same(slot) and projectiles.get_tag_of(slot) == tag:
 		return _rec_relay[slot]
+	# An arc zap has no slot either: it hits with its shot's `arc_hit`.
+	if _arc_spell != null and tag == _ray_tag and spell == _arc_spell:
+		return _arc_spell.arc_hit
 	# A beam's echo has no slot: it hits at half damage while it is being cast.
 	if _echo_spell != null and tag == _ray_tag and _profiles.get(tag) == _echo_spell:
 		return _echo_spell.echo_hit
@@ -807,6 +821,7 @@ func step(delta: float) -> void:
 			_timers[i] = _timers[_timer_count]
 			continue
 		i += 1
+	_step_arcs(delta)
 	_run_pending()
 
 
@@ -1134,7 +1149,7 @@ func _end_entities(tag: int) -> void:
 ## Hand a flying shot the behaviours of its cards that the projectile manager runs (staffs B1).
 ## A plain shot costs one comparison per behaviour and no call.
 func _apply_travel(slot: int, spell: CompiledSpell) -> void:
-	if spell.motion == FormBase.Motion.RETURN:
+	if spell.behaviour(ModifierBase.Behaviour.RETURN) > 0.0:
 		projectiles.set_return(slot)
 	if spell.behaviours.is_empty():
 		return
@@ -1202,7 +1217,7 @@ func _fire_spell(spell: CompiledSpell, player: int, staff: int, generation: int,
 	var launched: int = _launch(spell, tag, player, origin, heading, source)
 	if launched > 0:
 		_recoil(spell, tag, player, origin, heading)
-	if launched > 0 and spell.behaviour(ModifierBase.Behaviour.MIRROR) > 0.0 and (spell.motion == FormBase.Motion.STRAIGHT or spell.motion == FormBase.Motion.RETURN or spell.motion == FormBase.Motion.RAY or spell.motion == FormBase.Motion.FISSURE):
+	if launched > 0 and spell.behaviour(ModifierBase.Behaviour.MIRROR) > 0.0 and (spell.motion == FormBase.Motion.STRAIGHT or spell.motion == FormBase.Motion.RAY or spell.motion == FormBase.Motion.FISSURE):
 		var backwards: int = _launch(spell, tag, player, origin, -heading, source)
 		launched += backwards
 		if backwards > 0:
@@ -1398,6 +1413,8 @@ func _register(slot: int, tag: int, spell: CompiledSpell, fires: int, chain: int
 		_rec_prev.resize(size)
 		_rec_timed.resize(size)
 		_rec_hurt.resize(size)
+		_rec_arc.resize(size)
+		_rec_arc_clock.resize(size)
 		_rec_relay.resize(size)
 		_hurt_slots.resize(size)
 	_rec_relay[slot] = spell.echo_hit if spell == _echo_spell else null
@@ -1423,6 +1440,14 @@ func _register(slot: int, tag: int, spell: CompiledSpell, fires: int, chain: int
 			_timers[_timer_count] = slot
 			_timer_count += 1
 			_rec_timed[slot] = 1
+	if spell.arc_interval > 0.0 and spell.arc_reach > 0.0:
+		_rec_arc_clock[slot] = spell.arc_interval
+		if _rec_arc[slot] == 0:
+			if _arc_count == _arcs.size():
+				_arcs.resize(_arcs.size() * 2)
+			_arcs[_arc_count] = slot
+			_arc_count += 1
+			_rec_arc[slot] = 1
 	if spell.payload != null and spell.trigger_event == TriggerBase.Event.HURT and _rec_hurt[slot] == 0:
 		_hurt_slots[_hurt_count] = slot
 		_hurt_count += 1
@@ -1848,6 +1873,73 @@ func _fire_timer(slot: int) -> void:
 	_fire_payload(spell, tag, player, at, _heading(spell, slot, at, player), null, slot)
 
 
+## Runs the `arc` shots on by `delta`: each whose clock runs out zaps (`_zap`), at most
+## `SpellLimits.MAX_ARCS_PER_STEP` in all; one over the cap zaps in a later step.
+func _step_arcs(delta: float) -> void:
+	_arcs_used = 0
+	var i: int = 0
+	while i < _arc_count:
+		var slot: int = _arcs[i]
+		if not _knows(slot):
+			_rec_arc[slot] = 0
+			_arc_count -= 1
+			_arcs[i] = _arcs[_arc_count]
+			continue
+		_rec_arc_clock[slot] -= delta
+		if _rec_arc_clock[slot] <= 0.0 and _arcs_used < SpellLimits.MAX_ARCS_PER_STEP:
+			_zap(slot)
+		i += 1
+
+
+## Shot `slot`'s zap: a short ray to the nearest enemy within its `arc_reach`, hitting with its
+## `arc_hit` (`hit_profile`). It is a hit of the shot like any other: it uses the shot's trigger
+## fires and chain jumps, so `on hit` payloads and chains go off from the zapped enemy. With no
+## enemy in reach the shot tries again next step.
+func _zap(slot: int) -> void:
+	var tag: int = projectiles.get_tag_of(slot)
+	var spell: CompiledSpell = _profiles.get(tag)
+	if spell == null or spell.arc_interval <= 0.0:
+		_rec_arc_clock[slot] = INF
+		return
+	var at: Vector2 = projectiles.get_position_of(slot)
+	var target: Node2D = projectiles.nearest_target(at, spell.arc_reach, ProjectilesScript.LAYER_ENEMY)
+	var aim: Vector2 = projectiles.nearest_point
+	if target == null or not aim.is_finite():
+		return
+	_rec_arc_clock[slot] += spell.arc_interval
+	if _rec_arc_clock[slot] <= 0.0:
+		_rec_arc_clock[slot] = spell.arc_interval
+	_arcs_used += 1
+	var player: int = SpellTag.player_of(tag)
+	var way: Vector2 = at.direction_to(aim) if not at.is_equal_approx(aim) else Vector2.RIGHT
+	var saved_tag: int = _ray_tag
+	var saved_dir: Vector2 = _ray_dir
+	var saved_fires: int = _ray_fires
+	var saved_chain: int = _ray_chain
+	var saved_prev: int = _ray_prev
+	var saved_arc: CompiledSpell = _arc_spell
+	_ray_tag = tag
+	_ray_dir = way
+	_ray_fires = _rec_fires[slot]
+	_ray_chain = _rec_chain[slot]
+	_ray_prev = _rec_prev[slot]
+	_arc_spell = spell
+	var got: float = projectiles.ray(player, at, way, at.distance_to(aim) + 2.0, 0, ProjectilesScript.LAYER_ENEMY, tag, 0.0, null)
+	var fires: int = _ray_fires
+	_ray_tag = saved_tag
+	_ray_dir = saved_dir
+	_ray_fires = saved_fires
+	_ray_chain = saved_chain
+	_ray_prev = saved_prev
+	_arc_spell = saved_arc
+	# A payload may have taken the slot over; only a shot still its own keeps the fires it spent.
+	if _same(slot) and projectiles.get_tag_of(slot) == tag:
+		_rec_fires[slot] = fires
+	if got > 0.0 and events != null:
+		events.form_shown.emit(player, &"beam", at, way, got, spell.tint)
+	_cast_jumps()
+
+
 func _on_hit(player: int, target: Node, position: Vector2, tag: int) -> void:
 	if not SpellTag.is_spell_tag(tag):
 		return
@@ -2132,8 +2224,10 @@ func clear() -> void:
 	_cast_count.fill(0)
 	delayed_dropped = 0
 	_timer_count = 0
+	_arc_count = 0
 	_rec_seq.fill(-1)
 	_rec_timed.fill(0)
+	_rec_arc.fill(0)
 	_rec_hurt.fill(0)
 	_hurt_count = 0
 	_rec_relay.fill(null)

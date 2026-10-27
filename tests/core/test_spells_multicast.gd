@@ -341,9 +341,8 @@ func test_a_mirrored_beam_hits_both_ways() -> void:
 
 
 func test_a_mirrored_returning_shot_goes_both_ways() -> void:
-	var boomerang: FormBase = _form(&"boomerang", 300.0, 1.0)
-	boomerang.motion = FormBase.Motion.RETURN
-	_build(0, [&"mirror", &"boomerang"])
+	_modifier(&"return", ModifierBase.Behaviour.RETURN, 1.0)
+	_build(0, [&"mirror", &"return", &"bolt"])
 	_cast()
 	var headings: Array[Vector2] = _headings()
 	check_equal(headings.size(), 2, "two returning shots")

@@ -1579,3 +1579,9 @@ How it is built (parts F2–F10):
 - **Shared limits** (beams, delayed firings) give enemies a capped share, so a crowd of casters never ends a player's beam or drops a player's firing.
 - **The telegraph is a promise:** the windup waits until the cast is ready and the mana is there, so it never shows a cast that does not come.
 - **Enemy shots keep hitting a little narrower than they look,** the fairness rule of "The look of a shot".
+
+## 2026-10-27: The enemy ramp is a look flag (staffs F2)
+
+- **Not bit 7 of red, as planned.** The red byte holds the player and the zoom, and a dash's or arc's length travels in the zoom's place in steps of 4 px up to 63 steps, so every bit of red is used. The enemy ramp is a flag in the look instead: kind 23 (`LOOK_ENEMY_RAMP`, `1 << 22`), beside Feel's `EXACT` (kind 24). The particle kinds stop at 12, so ten are still free between them.
+- **One encoder:** `ProjectileManager.look_color(player, zoom, look)` (with `look_red` and `ramp_look`) writes the instance colour for the manager's shots, Feel's effects and Entities' familiars, so a caster below 0 is drawn in the enemy ramp everywhere once its shots reach the shader (F4, F7). The players' bytes are unchanged.
+- **Blight ochre** is the shader's fifth ramp (`ENEMY_PLAYER`), `ENEMY_COLOR` and `tint_of(NO_PLAYER)`; an enemy's beam is `beam_player` -1. The 1x check that an enemy's plain bolt does not read as a hit spark waits for F4, when enemy shots are drawn by the shader.

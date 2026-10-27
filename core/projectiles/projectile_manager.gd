@@ -281,6 +281,10 @@ const LOOK_GLITTER: int = 12
 const LOOK_COUNT: int = 13
 ## The most kinds the instance data has room for: three bytes of bits (`_look_color`).
 const LOOK_MAX_KINDS: int = 24
+## A flag in the look, not a kind (kind 23 of the shader): an enemy's spell, drawn in the enemy
+## ramp (Blight ochre, docs/STYLE.md) wherever a player's colour would show (staffs F2). Set by
+## `ramp_look` for a caster below 0; kind 24 is Feel's EXACT.
+const LOOK_ENEMY_RAMP: int = 1 << 22
 ## A player's shot is drawn in a quad of LOOK_GRID x zoom screen pixels across: a rune's is
 ## square round its centre, a bolt's or orbit shot's LOOK_LENGTH x zoom long with the shot
 ## LOOK_GRID / 2 x zoom from its front, for its tail (48 px at zoom 1), the particles it gives off
@@ -326,11 +330,11 @@ const BOUNDS_MARGIN: float = 128.0
 ## Target layers (bit mask).
 const LAYER_ENEMY: int = 1
 const LAYER_PLAYER: int = 2
-## The base colour of each player's ramp (docs/STYLE.md); enemy shots are Fire.
+## The base colour of each player's ramp (docs/STYLE.md); enemies' spells are Blight ochre.
 const PLAYER_COLORS: Array[Color] = [
 	Color("#3b73c9"), Color("#d9477a"), Color("#3f8f4f"), Color("#8a4fc4"),
 ]
-const ENEMY_COLOR: Color = Color("#e0592f")
+const ENEMY_COLOR: Color = Color("#a68a2a")
 
 ## The art of the player batches. Since staffs B6a the shader builds every player's shot (runes
 ## and orbit shots too) and never reads it; only the sprite path of Feel's lone flashes does.
@@ -2095,12 +2099,29 @@ func bend_of(slot: int) -> float:
 
 
 ## The instance colour of a player's shot, which `shot_core.gdshader` reads as data, a byte
-## per channel: the player index and the zoom in red (player + zoom x 4), the look's bits in
-## green (kinds 1-8), blue (9-16) and alpha (17-24).
+## per channel: the player index and the zoom in red (`look_red`), the look's bits in green
+## (kinds 1-8), blue (9-16) and alpha (17-24; `ramp_look` adds the enemy ramp's flag).
 func _look_color(slot: int) -> Color:
-	var look: int = _look[slot]
-	var red: int = _player[slot] + look_zoom(_radius[slot]) * 4
-	return Color(float(red) / 255.0, float(look & 255) / 255.0, float((look >> 8) & 255) / 255.0, float((look >> 16) & 255) / 255.0)
+	return look_color(_player[slot], look_zoom(_radius[slot]), _look[slot])
+
+
+## The instance colour `shot_core.gdshader` reads for `player`'s shot or effect (NO_PLAYER: an
+## enemy's) at `zoom` (or a dash's length in steps, up to 63) with the packed `look`. Feel's
+## effects and Entities' familiars use it too, so the encoding lives in one place.
+static func look_color(player: int, zoom: int, look: int) -> Color:
+	var bits: int = ramp_look(player, look)
+	return Color(float(look_red(player, zoom)) / 255.0, float(bits & 255) / 255.0, float((bits >> 8) & 255) / 255.0, float((bits >> 16) & 255) / 255.0)
+
+
+## The red byte of the instance colour: the player (0-3; 0 for an enemy, whose ramp is a look
+## flag) plus the zoom x 4.
+static func look_red(player: int, zoom: int) -> int:
+	return clampi(player, 0, MAX_PLAYERS - 1) + clampi(zoom, 0, 63) * 4
+
+
+## `look` with the enemy ramp's flag for a caster below 0 (an enemy), as it is for a player.
+static func ramp_look(player: int, look: int) -> int:
+	return look | LOOK_ENEMY_RAMP if player < 0 else look & ~LOOK_ENEMY_RAMP
 
 
 ## Write one quad at float index `i` of `buffer` (packed arrays are shared, not copied):

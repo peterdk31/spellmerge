@@ -475,10 +475,11 @@ func _write_familiars() -> void:
 		_familiar_buffer[i + 5] = -dir.x * size
 		_familiar_buffer[i + 6] = 0.0
 		_familiar_buffer[i + 7] = centre.y
-		_familiar_buffer[i + 8] = float(clampi(_player[row], 0, 3) + zoom * 4) / 255.0
-		_familiar_buffer[i + 9] = 0.0
-		_familiar_buffer[i + 10] = 0.0
-		_familiar_buffer[i + 11] = 0.0
+		var data: Color = ProjectileManagerScript.look_color(_player[row], zoom, 0)
+		_familiar_buffer[i + 8] = data.r
+		_familiar_buffer[i + 9] = data.g
+		_familiar_buffer[i + 10] = data.b
+		_familiar_buffer[i + 11] = data.a
 		_familiar_buffer[i + 12] = 1.0
 		_familiar_buffer[i + 13] = 1.0
 		_familiar_buffer[i + 14] = 1.0

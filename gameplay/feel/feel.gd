@@ -1074,11 +1074,11 @@ func _step_effects(real_delta: float) -> void:
 		_effect_buffer[i + 5] = -dir.x * d
 		_effect_buffer[i + 6] = 0.0
 		_effect_buffer[i + 7] = at.y
-		var look: int = _effect_look[slot]
-		_effect_buffer[i + 8] = float(_effect_player[slot] + _effect_zoom[slot] * 4) / 255.0
-		_effect_buffer[i + 9] = float(look & 255) / 255.0
-		_effect_buffer[i + 10] = float((look >> 8) & 255) / 255.0
-		_effect_buffer[i + 11] = float((look >> 16) & 255) / 255.0
+		var data: Color = ProjectileManagerScript.look_color(_effect_player[slot], _effect_zoom[slot], _effect_look[slot])
+		_effect_buffer[i + 8] = data.r
+		_effect_buffer[i + 9] = data.g
+		_effect_buffer[i + 10] = data.b
+		_effect_buffer[i + 11] = data.a
 		var core: Color = _effect_core[slot]
 		_effect_buffer[i + 12] = core.r
 		_effect_buffer[i + 13] = core.g

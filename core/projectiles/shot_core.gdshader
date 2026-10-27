@@ -15,7 +15,9 @@ render_mode blend_premul_alpha;
 //   colour r         player + zoom x 4, as n / 255: the shapes grow with the zoom while every
 //                    line stays one pixel, so a bigger shot is bigger, never chunkier
 //   colour g, b, a   the look: one bit per layer kind (kind 1 is bit 0 of green, kind 9 bit 0
-//                    of blue, kind 17 bit 0 of alpha), every kind the shot's cards bring
+//                    of blue, kind 17 bit 0 of alpha), every kind the shot's cards bring;
+//                    kind 23 (ENEMY_RAMP) is a flag, not a particle: an enemy's spell, drawn
+//                    in the enemy ramp wherever a player's colour would show (staffs F2)
 // A bolt or orbit shot's quad is LENGTH x GRID pixels times the zoom, the shot FRONT pixels from
 // its front edge and its tail behind; a rune's is GRID x GRID round its centre.
 //
@@ -59,7 +61,7 @@ uniform float sprite_glow = 0.0;
 // Beam mode (Feel's beams; the instance data above is not used): 1 a Line2D stretched along its
 // path (UV.x 0-1 along `beam_length` pixels, UV.y across `beam_width`), 2 a Sprite2D whose region
 // is the beam (UV in texture pixels, 32 across). Its core colour is `core_override`, its player
-// and look these. `beam_fade` (1 to 0) dissolves it into pixels as it ends; `beam_swell` (1 at
+// and look these (`beam_player` -1, NO_PLAYER, is an enemy's beam). `beam_fade` (1 to 0) dissolves it into pixels as it ends; `beam_swell` (1 at
 // rest) widens its rim and glow when it flares and narrows them as it thins; `beam_glow` is how
 // strongly it glows.
 uniform int beam_mode = 0;
@@ -117,6 +119,8 @@ const float TRACE_SPAN = 0.42;
 //                 plus ARC_MARGIN each end, ARC_ACROSS across
 //   K_STATUS      a status on a character, kept while it lasts and moved with it: its look's
 //                 particles round it and a pulsing glow
+// An enemy's shot, beam or effect has the ENEMY_RAMP bit (kind 23): the enemy ramp (Blight ochre)
+// takes the player's place.
 // An effect whose look has the EXACT bit (kind 24) takes its colour as it is, the ramp made from
 // it (a reaction's own colour), instead of the palette material the colour is nearest.
 const float K_BURST = 4.0;
@@ -131,6 +135,7 @@ const float K_PUFF = 12.0;
 const float K_CHIPS = 13.0;
 const float K_ARC = 14.0;
 const float K_STATUS = 15.0;
+const float ENEMY_RAMP = 23.0;
 const float EXACT = 24.0;
 const float ARC_MARGIN = 4.0;
 const float ARC_ACROSS = 16.0;
@@ -145,10 +150,12 @@ const float RUNE_REACH = 14.4;
 // 4 + 2n, so one card is a trickle, many cards a richer mix, never a cloud.
 const int MAX_PARTICLES = 12;
 
-// docs/STYLE.md: the players' ramps (shadow, base, light) and the colours the layers use.
-const vec3 P_SHADOW[4] = vec3[](vec3(0.114, 0.227, 0.420), vec3(0.478, 0.137, 0.278), vec3(0.122, 0.290, 0.227), vec3(0.290, 0.165, 0.420));
-const vec3 P_BASE[4] = vec3[](vec3(0.231, 0.451, 0.788), vec3(0.851, 0.278, 0.478), vec3(0.247, 0.561, 0.310), vec3(0.541, 0.310, 0.769));
-const vec3 P_LIGHT[4] = vec3[](vec3(0.498, 0.753, 0.941), vec3(0.961, 0.604, 0.722), vec3(0.561, 0.831, 0.416), vec3(0.788, 0.604, 0.941));
+// docs/STYLE.md: the players' ramps (shadow, base, light), then the enemy ramp (Blight ochre,
+// ENEMY_PLAYER), and the colours the layers use.
+const vec3 P_SHADOW[5] = vec3[](vec3(0.114, 0.227, 0.420), vec3(0.478, 0.137, 0.278), vec3(0.122, 0.290, 0.227), vec3(0.290, 0.165, 0.420), vec3(0.302, 0.247, 0.071));
+const vec3 P_BASE[5] = vec3[](vec3(0.231, 0.451, 0.788), vec3(0.851, 0.278, 0.478), vec3(0.247, 0.561, 0.310), vec3(0.541, 0.310, 0.769), vec3(0.651, 0.541, 0.165));
+const vec3 P_LIGHT[5] = vec3[](vec3(0.498, 0.753, 0.941), vec3(0.961, 0.604, 0.722), vec3(0.561, 0.831, 0.416), vec3(0.788, 0.604, 0.941), vec3(0.890, 0.812, 0.420));
+const float ENEMY_PLAYER = 4.0;
 const vec3 OUTLINE = vec3(0.078, 0.071, 0.122);
 const vec3 FIRE_BASE = vec3(0.878, 0.349, 0.184);
 const vec3 FIRE_LIGHT = vec3(1.0, 0.635, 0.235);
@@ -222,7 +229,7 @@ void vertex() {
 		core = core_override.rgb;
 		kind = K_BEAM;
 		seed = 0.0;
-		player = float(clamp(beam_player, 0, 3));
+		player = beam_player < 0 ? ENEMY_PLAYER : float(min(beam_player, 3));
 		zoom = 1.0;
 		bits = vec3(float(beam_look & 255), float((beam_look >> 8) & 255), float((beam_look >> 16) & 255));
 	} else {
@@ -243,6 +250,9 @@ void vertex() {
 		player = mod(red, 4.0);
 		zoom = max(floor(red / 4.0), 1.0);
 		bits = floor(COLOR.gba * 255.0 + 0.5);
+		if (bit_set(bits, ENEMY_RAMP)) {
+			player = ENEMY_PLAYER;
+		}
 	}
 	int pi = int(player);
 	plain = all(greaterThan(core, vec3(0.99))) ? 1.0 : 0.0;

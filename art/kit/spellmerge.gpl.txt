@@ -1,7 +1,7 @@
 GIMP Palette
 Name: Spellmerge
 Columns: 3
-# The 40 colours of docs/STYLE.md. Opens in GIMP, Krita, Aseprite, LibreSprite and Inkscape.
+# The 43 colours of docs/STYLE.md. Opens in GIMP, Krita, Aseprite, LibreSprite and Inkscape.
  20  18  31 Outline
  43  40  64 Stone shadow
  74  70  99 Stone base
@@ -30,6 +30,9 @@ Columns: 3
  63 107  16 Arc shadow
 180 232  42 Arc base
 238 255 166 Arc light
+ 77  63  18 Blight shadow
+166 138  42 Blight base
+227 207 107 Blight light
  29  58 107 Player 1 shadow
  59 115 201 Player 1 base
 127 192 240 Player 1 light

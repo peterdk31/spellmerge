@@ -1,6 +1,6 @@
 extends "res://tests/support/suite.gd"
 ## Tests for the tags and generations of the spell runtime (staffs A5/A6c; M2 part 5 before):
-## the tag layout (player, staff, generation, node), every compiled spell of a staff registered
+## the tag layout (player, staff, generation, node; an enemy's row, staffs F3), every compiled spell of a staff registered
 ## under its node, four players building at once, a rebuild mid-flight, the generation ring
 ## wrapping and revoking. It uses cards built in code and a stand-in registry, so no content is
 ## needed. The compiler's own rules are in test_staff_compiler.gd.
@@ -10,6 +10,7 @@ extends "res://tests/support/suite.gd"
 const StaffKit := preload("res://tests/support/staff_kit.gd")
 
 const SpellsScript := preload("res://core/spells/spells.gd")
+const EventsScript := preload("res://core/events/events.gd")
 
 
 ## A registry stand-in with the same question as the real one.
@@ -131,6 +132,49 @@ func test_all_tags_are_different() -> void:
 	check_equal(seen.size(), SpellLimits.PLAYERS * SpellLimits.STAFFS * 3 * SpellLimits.GENERATIONS, "every combination has its own tag")
 	check(SpellTag.make(3, 3, SpellTag.NODE_MASK, 7) < SpellTag.FLAG << 1, "the largest tag is still a spell tag")
 	check(not SpellTag.is_spell_tag(101000), "the highest enemy attack tag (gameplay/ai) is not a spell tag")
+
+
+func test_enemy_tags_pack_and_unpack() -> void:
+	for row in [0, 1, 37, SpellTag.ROW_MASK]:
+		for staff in SpellLimits.STAFFS:
+			for node in [0, 5, SpellTag.NODE_MASK]:
+				for generation in SpellLimits.GENERATIONS:
+					var tag: int = SpellTag.make_enemy(row, staff, node, generation)
+					check(SpellTag.is_spell_tag(tag) and SpellTag.is_enemy_tag(tag), "enemy tag %d is a spell tag" % tag)
+					check(SpellTag.row_of(tag) == row and SpellTag.staff_of(tag) == staff and SpellTag.node_of(tag) == node and SpellTag.generation_of(tag) == generation, "enemy tag %d unpacks to what made it" % tag)
+					check_equal(SpellTag.player_of(tag), EventsScript.NO_PLAYER, "an enemy's spell has no player")
+					check_equal(SpellTag.caster_of(tag), SpellTag.FIRST_ENEMY_CASTER + row, "its caster is its row after the players")
+	for player in SpellLimits.PLAYERS:
+		var tag: int = SpellTag.make(player, 2, 9, 3)
+		check(not SpellTag.is_enemy_tag(tag), "a player's tag is not an enemy's")
+		check_equal(SpellTag.caster_of(tag), player, "a player's caster is the player")
+		check_equal(SpellTag.row_of(tag), -1, "a player's tag has no enemy row")
+
+
+func test_enemy_tags_are_all_different_from_each_other_and_players() -> void:
+	var seen: Dictionary = {}
+	for row in SpellTag.ROW_MASK + 1:
+		for staff in SpellLimits.STAFFS:
+			for generation in [0, 7]:
+				seen[SpellTag.make_enemy(row, staff, 1, generation)] = true
+	for player in SpellLimits.PLAYERS:
+		for staff in SpellLimits.STAFFS:
+			for generation in [0, 7]:
+				seen[SpellTag.make(player, staff, 1, generation)] = true
+	check_equal(seen.size(), (SpellTag.ROW_MASK + 1 + SpellLimits.PLAYERS) * SpellLimits.STAFFS * 2, "every caster has its own tags")
+
+
+func test_enemy_tags_fit_an_int32_and_miss_the_ai_tags() -> void:
+	var largest: int = SpellTag.make_enemy(SpellTag.ROW_MASK, 3, SpellTag.NODE_MASK, 7)
+	check(largest < SpellTag.LIMIT and SpellTag.is_spell_tag(largest), "the largest enemy tag is a spell tag")
+	check(SpellTag.LIMIT <= 1 << 31, "every spell tag fits an int32")
+	var shields := PackedInt32Array([largest])
+	check_equal(shields[0], largest, "an int32 array keeps the largest tag")
+	check(SpellTag.make_enemy(0, 0, 0, 0) > 101000, "the smallest enemy tag is above the AI's attack tags")
+	check(not SpellTag.is_spell_tag(SpellTag.LIMIT), "nothing at the limit is a spell tag")
+	check(not SpellTag.is_enemy_tag(SpellTag.ENEMY_BIT), "the enemy bit alone is no tag")
+	check_equal(SpellTag.generation_key(SpellTag.make_enemy(3, 0, 9, 2)), SpellTag.make_enemy(3, 0, 0, 2), "an enemy's generation key keeps its row")
+	check(SpellTag.generation_key(SpellTag.make_enemy(3, 0, 9, 2)) != SpellTag.generation_key(SpellTag.make_enemy(4, 0, 9, 2)), "two rows have their own keys")
 
 
 func test_a_built_staff_registers_every_node() -> void:

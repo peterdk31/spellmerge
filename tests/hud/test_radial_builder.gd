@@ -417,15 +417,3 @@ func test_the_slots_frame_each_cast_of_the_cycle() -> void:
 	check_equal(Array(groups.slice(0, 5)), [0, 0, 1, 1, -1], "two casts of two cards, and an empty slot in none")
 	_bus.staff_cards_requested.emit(0, 1, _ids("fire bolt"))
 	check_equal(Array(radial.slot_groups().slice(0, 3)), [0, 0, -1], "one cast after an edit")
-
-
-func test_pointing_at_a_card_shows_the_casts_as_rt_would_leave_them() -> void:
-	_start(1)
-	var radial: RadialScript = _open(0)
-	radial.mark_slot(1)
-	_point(0, &"nova")
-	# Pushed in after the fire: the fire now infuses the nova, and the bolt is a cast of its own.
-	check_equal(Array(radial.slot_groups().slice(0, 4)), [0, 0, 1, -1], "the preview's casts while pointing")
-	check_equal(radial.cards_of(1).slice(0, 3), _ids("fire bolt -"), "the staff itself is unchanged")
-	_let_go(0)
-	check_equal(Array(radial.slot_groups().slice(0, 3)), [0, 0, -1], "the staff's own casts again after letting go")

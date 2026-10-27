@@ -16,11 +16,9 @@ extends Control
 ##   nothing. Letting go of the stick lets the card go.
 ## - **The slots:** the shown staff's slots in five columns beside the ring, with a gold marker
 ##   that the left stick moves (with key-repeat; P1's move keys, or a click on a slot). The
-##   pointed card shows faded in the marked slot, so RT's result is seen before it is pressed:
-##   while pointing, the slots show the staff as RT would leave it (the rest pushed on, its casts
-##   and wasted cards). The casts of the cycle are framed: the cards one cast reads share a frame,
-##   every other cast in the other Bone shade, so what fires together is seen while building
-##   (`slot_groups`).
+##   pointed card shows faded in the marked slot, so RT's result is seen before it is pressed.
+##   The casts of the cycle are framed: the cards one cast reads share a frame, every other cast
+##   in the other Bone shade, so what fires together is seen while building (`slot_groups`).
 ## - **RT** (`staff_2`; P1's left click) puts the pointed card in the marked slot and moves the
 ##   marker on one. With `put` PUSH (the default), a card already there and the ones after it
 ##   move one slot right (refused when the last slot is taken); with REPLACE it is replaced.
@@ -192,11 +190,6 @@ var _first_row: int = 0
 var _pointed: int = NONE
 ## The staff as RT would leave it with the pointed card, and its numbers ({} when none).
 var _preview: Dictionary = {}
-## The staff as RT would leave it with the pointed card: its cards and its plain view (casts and
-## wasted), shown in the slots while pointing ([] and {} when nothing is pointed at or RT would
-## be refused).
-var _preview_cards: Array[StringName] = []
-var _preview_view: Dictionary = {}
 ## The press counts of the buttons read here, at the last poll.
 var _seen: Dictionary = {}
 var _move_dir: Vector2i = Vector2i.ZERO
@@ -724,8 +717,6 @@ func _scroll_to_marker() -> void:
 ## The staff as RT would leave it with the pointed card, compiled for its numbers.
 func _refresh_preview() -> void:
 	_preview = {}
-	_preview_cards = []
-	_preview_view = {}
 	if _pointed == NONE or _spells == null:
 		return
 	var plan: Dictionary = _plans[_viewed]
@@ -741,9 +732,7 @@ func _refresh_preview() -> void:
 		cards.resize(cards.size() - 1)
 	else:
 		cards[_slot] = id
-	_preview_view = _spells.staff_view(cards, staff)
-	_preview_cards = cards
-	_preview = _numbers(_preview_view)
+	_preview = _numbers(_spells.staff_view(cards, staff))
 
 
 ## A staff view's numbers: the dearest cast's mana, the cycle's damage and time.
@@ -1053,12 +1042,8 @@ func _draw_tabs() -> void:
 
 
 func _draw_slots() -> void:
-	# While a card is pointed at, the slots show the staff as RT would leave it: the card faded in
-	# at the marker, the rest pushed on, and that staff's casts and wasted cards (owner, 2026-10-27).
-	var previewing: bool = not _preview_cards.is_empty()
-	var cards: Array[StringName] = _preview_cards if previewing else cards_of(_viewed)
-	var plan: Dictionary = _preview_view if previewing else _plans[_viewed]
-	var wasted: Dictionary = plan.get("wasted", {}) as Dictionary
+	var cards: Array[StringName] = cards_of(_viewed)
+	var wasted: Dictionary = _plans[_viewed].get("wasted", {}) as Dictionary
 	var fade: float = 1.0 - clampf((_clock - _fade_start) / FADE_TIME, 0.0, 1.0) if not _fading.is_empty() else 0.0
 	var landing: Dictionary = {}
 	for flyer in _flyers:
@@ -1072,22 +1057,18 @@ func _draw_slots() -> void:
 		if id == NO_CARD or landing.has(slot):
 			draw_rect(rect, EMPTY)
 			_frame(rect, TILE)
-		elif previewing and slot == _slot:
-			draw_rect(rect, EMPTY)
-			_draw_icon(id, rect, 0.55)
 		else:
 			_draw_card(id, rect, 1.0)
-		if id != NO_CARD and not landing.has(slot) and wasted.has(slot):
-			_text("!", rect.position + Vector2(rect.size.x - 4.0, -1.0), WARN)
+			if wasted.has(slot):
+				_text("!", rect.position + Vector2(rect.size.x - 4.0, -1.0), WARN)
 		if fade > 0.0 and slot < _fading.size() and _fading[slot] != NO_CARD:
 			_draw_card(_fading[slot], rect, fade)
-	_draw_groups(_groups_of(plan, cards.size()))
-	# The marked slot: the pointed card faded in it (drawn above when previewing; a caret where a
-	# push is refused, the staff being full), then the gold marker with corner ticks, so it reads
-	# without its colour.
+	_draw_groups(cards.size())
+	# The marked slot: the pointed card faded in it (or a caret where a push inserts), then the
+	# gold marker with corner ticks, so it reads without its colour.
 	if _slot < cards.size() and _slot_shown(_slot):
 		var mark: Rect2 = _slot_rect(_slot)
-		if _pointed != NONE and not previewing:
+		if _pointed != NONE:
 			var ghost: StringName = _entries[_pointed]["id"]
 			if put == Put.PUSH and cards[_slot] != NO_CARD:
 				draw_rect(Rect2(mark.position.x - 2.0, mark.position.y - 1.0, 2.0, mark.size.y + 2.0), GOLD)
@@ -1113,8 +1094,9 @@ func _draw_slots() -> void:
 ## slots each cast reads share one frame per row, every other cast in the other Bone shade, so
 ## the cards that fire together read as a group and a break between frames ends a cast. A slot
 ## read again by a wrapped last cast keeps the frame of its first cast.
-func _draw_groups(groups: PackedInt32Array) -> void:
-	for slot in groups.size():
+func _draw_groups(count: int) -> void:
+	var groups: PackedInt32Array = slot_groups()
+	for slot in mini(count, groups.size()):
 		var group: int = groups[slot]
 		if group < 0 or not _slot_shown(slot):
 			continue
@@ -1131,19 +1113,12 @@ func _draw_groups(groups: PackedInt32Array) -> void:
 
 
 ## Per slot of the shown staff, the cast of its cycle that first reads it (0 first), or -1 for a
-## slot no cast reads; while a card is pointed at, of the staff as RT would leave it. Allocates;
-## called when the radial redraws and by tests.
+## slot no cast reads. Allocates; called when the radial redraws and by tests.
 func slot_groups() -> PackedInt32Array:
-	if not _preview_cards.is_empty():
-		return _groups_of(_preview_view, _preview_cards.size())
-	return _groups_of(_plans[_viewed], cards_of(_viewed).size())
-
-
-func _groups_of(plan: Dictionary, count: int) -> PackedInt32Array:
 	var groups := PackedInt32Array()
-	groups.resize(count)
+	groups.resize(cards_of(_viewed).size())
 	groups.fill(-1)
-	var casts: Variant = plan.get("casts", [])
+	var casts: Variant = _plans[_viewed].get("casts", [])
 	if not casts is Array:
 		return groups
 	for c in (casts as Array).size():

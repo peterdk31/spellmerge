@@ -261,19 +261,21 @@ func test_the_elements_of_one_hit_chain_their_reactions() -> void:
 
 
 func test_every_element_of_a_hit_puts_its_status_on_the_wizard_it_hurt() -> void:
+	# Lightning then storm: static and shock have no reaction, so both go on. (Fire then frost
+	# thaws on a wizard as on an enemy since staffs F6: see test_combat_enemy_spells.gd.)
 	_wizard(0, Vector2.ZERO)
 	var profile := _profile(2)
-	profile.element_id = &"fire"
-	profile.element_ids = [&"fire", &"frost"]
-	profile.status_id = &"burn"
+	profile.element_id = &"lightning"
+	profile.element_ids = [&"lightning", &"storm"]
+	profile.status_id = &"static"
 	profile.status_duration = 2.0
-	profile.status_strength = 1.0
-	profile.later_status_ids = [&"chill"]
+	profile.status_strength = 30.0
+	profile.later_status_ids = [&"shock"]
 	profile.later_status_durations = PackedFloat32Array([3.0])
 	profile.later_status_strengths = PackedFloat32Array([40.0])
 	_bus.projectile_hit.emit(0, _wizards[0], Vector2(-5.0, 0.0), _tag(profile))
-	check(_combat.wizard_status_left(0, &"burn") > 0.0, "burning")
-	check(_combat.wizard_status_left(0, &"chill") > 0.0, "and chilled by the second element")
+	check(_combat.wizard_status_left(0, &"static") > 0.0, "charged")
+	check(_combat.wizard_status_left(0, &"shock") > 0.0, "and shocked by the second element")
 
 
 func test_a_burn_tick_spends_no_shock_and_no_static_and_adds_no_hex() -> void:

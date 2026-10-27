@@ -199,6 +199,8 @@ var _w_hex_left: PackedFloat32Array = PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
 var _w_hex_extra: PackedFloat32Array = PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
 var _w_static_left: PackedFloat32Array = PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
 var _w_static_share: PackedFloat32Array = PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
+# Seconds before a wizard can react again (REACTION_WAIT, as on an enemy).
+var _w_react_wait: PackedFloat32Array = PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
 # The barrier on a wizard: blocked hits left, seconds left and the card's tag.
 var _w_shield: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 var _w_shield_left: PackedFloat32Array = PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
@@ -782,28 +784,192 @@ func _on_projectile_hit(player: int, target: Node, position: Vector2, tag: int) 
 	_tag = saved_tag
 
 
-## A spell's hit (or an enemy's shot, with `profile` null) on the wizard `index`: a heal for a mend
-## hit, else damage, a push away from `position` and the hit's status. The caster's own spell
-## hurts them like any other (self-harm is always on); `core/projectiles` decides which shots can
-## reach a wizard at all (the caster once out of their hitbox, a teammate with friendly fire).
+## A spell's hit (or the AI's old shot, with `profile` null) on the wizard `index`: a heal for a
+## mend hit, else damage, a push away from `position`, then each element's reaction or status, as
+## on an enemy (staffs F6: wizards react, from the same table, to every spell: an enemy's, a
+## teammate's with friendly fire, their own). The caster's own spell hurts them like any other
+## (self-harm is always on); `core/projectiles` decides which shots can reach a wizard at all
+## (an enemy's, the caster once out of their hitbox, a teammate with friendly fire).
 func _apply_to_wizard(player: int, index: int, position: Vector2, profile: HitProfile, damage: int, strength: float, kind: StringName) -> void:
 	if profile != null and profile.heal > 0:
 		_heal_player(player, index, profile.heal)
 		return
 	var wizard: Node2D = _players[index]
 	var direction: Vector2 = (_position_of(wizard) - position).normalized()
+	# The reaction is chosen from the statuses the wizard had when the hit arrived.
+	var reaction: ReactionRow = null
+	if profile != null and index < PLAYER_SLOTS and profile.element_id != &"" and _w_react_wait[index] <= 0.0:
+		reaction = _wizard_reaction_for(index, profile.element_id)
 	if not _hit_player(player, wizard, damage, direction, strength, kind, profile) or profile == null \
 			or index >= PLAYER_SLOTS:
 		return
-	# Every element's status goes on in order; a wizard has no reactions, so none of them react.
-	if profile.status_id != &"":
-		apply_wizard_status(player, index, profile.status_id, profile.status_duration, profile.status_strength)
-	for i in profile.later_status_ids.size():
-		if profile.later_status_ids[i] == &"":
-			continue
-		var duration: float = profile.later_status_durations[i] if i < profile.later_status_durations.size() else 0.0
-		var power: float = profile.later_status_strengths[i] if i < profile.later_status_strengths.size() else 0.0
-		apply_wizard_status(player, index, profile.later_status_ids[i], duration, power)
+	# Every element in order: each reacts with what the ones before it left, or puts its own status on.
+	var reacted: bool = false
+	var elements: int = maxi(profile.element_ids.size(), profile.later_status_ids.size() + 1)
+	for i in elements:
+		if not is_instance_valid(wizard) or _is_downed(wizard):
+			return
+		var step_reaction: ReactionRow = reaction
+		var status_id: StringName = profile.status_id
+		var duration: float = profile.status_duration
+		var power: float = profile.status_strength
+		if i > 0:
+			var element: StringName = profile.element_ids[i] if i < profile.element_ids.size() else &""
+			step_reaction = _wizard_reaction_for(index, element) if element != &"" and (reacted or _w_react_wait[index] <= 0.0) else null
+			status_id = profile.later_status_ids[i - 1] if i - 1 < profile.later_status_ids.size() else &""
+			duration = profile.later_status_durations[i - 1] if i - 1 < profile.later_status_durations.size() else 0.0
+			power = profile.later_status_strengths[i - 1] if i - 1 < profile.later_status_strengths.size() else 0.0
+		if step_reaction != null:
+			_react_wizard(player, index, step_reaction)
+			reacted = true
+		elif status_id != &"":
+			apply_wizard_status(player, index, status_id, duration, power)
+
+
+## The reaction a hit of `element_id` sets off on the wizard `index`, from the first of their
+## statuses that has a row for that element (a frozen wizard counts as chilled); null for none.
+func _wizard_reaction_for(index: int, element_id: StringName) -> ReactionRow:
+	var table: ReactionTable = reactions if reactions != null else REACTIONS
+	for status in REACTING_STATUSES:
+		if _w_status_on(index, status):
+			var row: ReactionRow = table.find(status, element_id)
+			if row != null:
+				return row
+	return null
+
+
+func _w_status_on(index: int, status_id: StringName) -> bool:
+	match status_id:
+		BURN:
+			return _w_burn_left[index] > 0.0
+		CHILL:
+			return _w_chill_left[index] > 0.0 or _w_freeze_left[index] > 0.0
+		SHOCK:
+			return _w_shock_left[index] > 0.0
+		HEX:
+			return _w_hex_left[index] > 0.0
+		STATIC:
+			return _w_static_left[index] > 0.0
+	return false
+
+
+## Run `row` on the wizard `index`, as `_react` does on an enemy: announced (`reaction_triggered`,
+## and `reaction_landed` for the caster's `on reaction`), then its effect on wizards: CONSUME hurts
+## this one, BURST every wizard in the circle, EXTEND lengthens (or freezes), SPREAD copies the
+## status to the wizards near. What it deals sets off no more reactions and is no spell's kill.
+func _react_wizard(player: int, index: int, row: ReactionRow) -> void:
+	var wizard: Node2D = _players[index]
+	if wizard == null or not is_instance_valid(wizard):
+		return
+	var centre: Vector2 = _position_of(wizard) + _player_offset[index]
+	_w_react_wait[index] = REACTION_WAIT
+	if events != null:
+		events.reaction_triggered.emit(player, row.reaction_id, centre)
+		if _tag != 0:
+			events.reaction_landed.emit(player, row.reaction_id, wizard, centre, _tag)
+	var spell_tag: int = _tag
+	_tag = 0
+	match row.effect:
+		ReactionRow.Effect.CONSUME:
+			var amount: int = row.damage
+			if _w_freeze_left[index] > 0.0:
+				amount *= FROZEN_BONUS
+				_w_remove_status(index, CHILL)
+			_w_remove_status(index, row.status_id)
+			_hit_player(player, wizard, amount, Vector2.ZERO, 0.0, KIND_REACTION, null)
+		ReactionRow.Effect.BURST:
+			if row.consume_status:
+				_w_remove_status(index, row.status_id)
+			for other in PLAYER_SLOTS:
+				var near: Node2D = _players[other]
+				if near == null or not is_instance_valid(near) or _is_downed(near):
+					continue
+				var reach: float = row.radius + _player_radius[other]
+				var at: Vector2 = _position_of(near) + _player_offset[other]
+				if at.distance_squared_to(centre) > reach * reach and other != index:
+					continue
+				var toward: Vector2 = (centre - at).normalized() if row.pull > 0.0 else Vector2.ZERO
+				_hit_player(player, near, row.damage, toward, row.pull, KIND_REACTION, null)
+		ReactionRow.Effect.EXTEND:
+			_w_extend(player, index, row)
+		ReactionRow.Effect.SPREAD:
+			var left: float = wizard_status_left(index, row.status_id)
+			var spread_strength: float = _w_strength_of(index, row.status_id)
+			if row.consume_status:
+				_w_remove_status(index, row.status_id)
+			if left > 0.0:
+				for other in PLAYER_SLOTS:
+					var near: Node2D = _players[other]
+					if other == index or near == null or not is_instance_valid(near):
+						continue
+					var reach: float = row.radius + _player_radius[other]
+					if (_position_of(near) + _player_offset[other]).distance_squared_to(centre) <= reach * reach:
+						apply_wizard_status(player, other, row.status_id, left, spread_strength)
+	_tag = spell_tag
+
+
+## EXTEND on the wizard `index`: as `_extend` on an enemy (a chilled wizard freezes).
+func _w_extend(player: int, index: int, row: ReactionRow) -> void:
+	match row.status_id:
+		BURN:
+			_w_burn_left[index] = minf(_w_burn_left[index] + row.duration, MAX_EXTENDED_TIME)
+			_w_burn_rate[index] = minf(_w_burn_rate[index] + row.strength, MAX_EXTENDED_BURN)
+		CHILL:
+			var newly: bool = _w_freeze_left[index] <= 0.0
+			_w_chill_left[index] = 0.0
+			_w_chill_slow[index] = 0.0
+			_w_chill_stacks[index] = 0
+			_w_freeze_left[index] = minf(_w_freeze_left[index] + row.duration, MAX_FREEZE)
+			if newly and events != null:
+				events.status_applied.emit(player, _players[index], FREEZE)
+		SHOCK:
+			_w_shock_left[index] = minf(_w_shock_left[index] + row.duration, MAX_EXTENDED_TIME)
+			_w_shock_share[index] = minf(_w_shock_share[index] + row.strength, MAX_EXTENDED_PERCENT)
+		HEX:
+			_w_hex_left[index] = minf(_w_hex_left[index] + row.duration, MAX_EXTENDED_TIME)
+			_w_hex_extra[index] = minf(_w_hex_extra[index] + row.strength, MAX_EXTENDED_PERCENT)
+		STATIC:
+			_w_static_left[index] = minf(_w_static_left[index] + row.duration, MAX_EXTENDED_TIME)
+			_w_static_share[index] = minf(_w_static_share[index] + row.strength, MAX_EXTENDED_PERCENT)
+
+
+## The strength `apply_wizard_status` takes for the wizard's status now (as `_strength_of`).
+func _w_strength_of(index: int, status_id: StringName) -> float:
+	match status_id:
+		BURN:
+			return _w_burn_rate[index]
+		CHILL:
+			return _w_chill_slow[index] * 100.0
+		SHOCK:
+			return _w_shock_share[index]
+		HEX:
+			return _w_hex_extra[index]
+		STATIC:
+			return _w_static_share[index]
+	return 0.0
+
+
+## Switch `status_id` off on the wizard `index` (the freeze goes with the chill).
+func _w_remove_status(index: int, status_id: StringName) -> void:
+	match status_id:
+		BURN:
+			_w_burn_left[index] = 0.0
+			_w_burn_rate[index] = 0.0
+			_w_burn_carry[index] = 0.0
+		CHILL:
+			_w_chill_left[index] = 0.0
+			_w_chill_slow[index] = 0.0
+			_w_chill_stacks[index] = 0
+			_w_freeze_left[index] = 0.0
+		SHOCK:
+			_w_shock_left[index] = 0.0
+			_w_shock_share[index] = 0.0
+		HEX:
+			_w_hex_left[index] = 0.0
+			_w_hex_extra[index] = 0.0
+		STATIC:
+			_w_static_left[index] = 0.0
+			_w_static_share[index] = 0.0
 
 
 ## A spell's hit on an enemy: damage and push (pulled toward the hit when hexed), the shock jump,
@@ -1131,6 +1297,9 @@ func _remove_enemy_at(at: int) -> void:
 ## on every enemy and every wizard in the circle, the caster included, with kind `burst`.
 ## A teammate is only hurt with friendly fire (`Projectiles.friendly_fire`); a mend hit heals
 ## whoever stands in it. Nested area hits (on kill, on hit chains) are cut at AREA_DEPTH.
+## An enemy's area hit (its tag is an enemy's, staffs F6) takes its side: it hurts every wizard
+## in the circle, other enemies only with `Projectiles.enemy_fire` and never the enemy that cast
+## it (the target its caster row owns); an enemy's mend heals no wizard.
 func _on_area_hit_requested(player: int, position: Vector2, radius: float, tag: int) -> void:
 	var profile: HitProfile = spells.hit_profile(tag) if spells != null else null
 	if profile == null or _area_depth >= AREA_DEPTH:
@@ -1144,13 +1313,15 @@ func _on_area_hit_requested(player: int, position: Vector2, radius: float, tag: 
 	targets.clear()
 	var saved_tag: int = _tag
 	_tag = tag
-	if projectiles != null:
+	var enemy_side: bool = SpellTag.is_enemy_tag(tag)
+	var caster: int = SpellTag.caster_of(tag)
+	if projectiles != null and (not enemy_side or projectiles.enemy_fire):
 		var count: int = projectiles.targets_in(position, radius, ProjectileManagerScript.LAYER_ENEMY, _near)
 		for i in count:
 			targets.append(_near[i])
 		_near.clear()
 	for enemy in targets:
-		if is_instance_valid(enemy) and _enemies.has(enemy):
+		if is_instance_valid(enemy) and _enemies.has(enemy) and not (enemy_side and projectiles.target_owner_of(enemy) == caster):
 			_apply_to_enemy(player, enemy, position, profile, profile.damage, profile.knockback, KIND_BURST)
 	targets.clear()
 	var friendly: bool = projectiles != null and projectiles.friendly_fire
@@ -1161,7 +1332,9 @@ func _on_area_hit_requested(player: int, position: Vector2, radius: float, tag: 
 		var reach: float = radius + _player_radius[index]
 		if (_position_of(wizard) + _player_offset[index]).distance_squared_to(position) > reach * reach:
 			continue
-		if index != player and not friendly and profile.heal <= 0:
+		if enemy_side and profile.heal > 0:
+			continue
+		if not enemy_side and index != player and not friendly and profile.heal <= 0:
 			continue
 		_apply_to_wizard(player, index, position, profile, profile.damage, profile.knockback, KIND_BURST)
 	_tag = saved_tag
@@ -1369,6 +1542,7 @@ func _tick_wizard(index: int, delta: float) -> void:
 	_w_shock_left[index] = maxf(_w_shock_left[index] - delta, 0.0)
 	_w_hex_left[index] = maxf(_w_hex_left[index] - delta, 0.0)
 	_w_static_left[index] = maxf(_w_static_left[index] - delta, 0.0)
+	_w_react_wait[index] = maxf(_w_react_wait[index] - delta, 0.0)
 
 
 func _clear_wizard(index: int) -> void:
@@ -1388,6 +1562,7 @@ func _clear_wizard(index: int) -> void:
 	_w_static_share[index] = 0.0
 	_w_shield[index] = 0
 	_w_shield_left[index] = 0.0
+	_w_react_wait[index] = 0.0
 
 
 ## Why the wizard `index` went down, in plain words, for the screen: "downed by your own Blast"

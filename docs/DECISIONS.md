@@ -1602,3 +1602,11 @@ How it is built (parts F2–F10):
 - **Shares:** all enemies share one per-step fire count and one chain count (one player's worth), hold at most 16 of the 64 live beams (an enemy's beam only ever ends another enemy's) and 32 of the 128 waiting launches. These are engine safeguards, as the players' are; the stress run (F9) checks them.
 - **What the AI reads instead of events:** siphon refunds wait in `take_refund`, reservations in `reserved_mana`, and the next cast's cost in `next_cast_mana`; `mana_reserved` and `mana_refund_requested` stay the players'.
 - **Not yet:** `on hurt` and `relay` stay the players' (they listen to wizards' events); an enemy's decoys and familiars are asked for with `NO_PLAYER`, which Entities ignores until F8; combat still treats a `NO_PLAYER` area hit as hitting enemies until F6.
+
+## 2026-10-28: Wizards react, and area hits take sides (staffs F6)
+
+- **Wizards react to every spell, not only to enemies'.** The owner asked for wizards to take reactions from enemy elements (decision 5 of "Enemies cast from staffs"). Combat makes that one rule for every target: a wizard's statuses react with a hit's elements from the same table as an enemy's, whoever cast it, so friendly fire and self-harm (`fire` on yourself, then your own `frost`) react too. An enemy-only branch would be a special case the owner does not want ("one general rule").
+- **Each effect on a wizard is the enemy's, on the wizards' side:** CONSUME hurts the wizard (double when frozen), BURST hurts every wizard in its circle (it never reaches enemies: it is the side the spell was against), EXTEND lengthens or freezes, SPREAD copies the status to the wizards near. A wizard waits `REACTION_WAIT` (0.5 s) before reacting again, as an enemy does. Reaction damage carries no spell tag (no `on hurt` credit, no kill), as on enemies.
+- **`reaction_landed` on a wizard names the caster's tag,** so an enemy's `on reaction` cards fire from it.
+- **An enemy's area hit** hits every wizard in its circle, other enemies only with `enemy_fire`, never the enemy that cast it (its body is owned by its caster row, `set_target_owner`, from F8). A player's is unchanged.
+- **Not yet:** an enemy's mend heals nothing (combat has no enemy heal); area hits do not reach decoys (they are Entities' targets, hit only by shots).

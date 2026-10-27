@@ -1,0 +1,40 @@
+extends "res://tests/support/screenshot.gd"
+## Live beams as the game draws them (owner, 2026-10-27): a plain beam, a fire beam, and a
+## homing frost beam bending along its curve onto a dummy off its line, each kept on with `hold`
+## so the shot catches it. `live_beams` is the whole screen and `live_beams_bend` a crop of the
+## bent one.
+
+const DUMMY := preload("res://content/enemies/training_dummy/idle.svg")
+const STARTER := preload("res://content/wizard/staffs/starter/starter.tres")
+## Each row: the cards, the beam's start and the dummy it may hit (the homing one is off its line).
+const ROWS: Array = [
+	[[&"hold", &"beam"], Vector2(60.0, 70.0), Vector2(240.0, 70.0)],
+	[[&"hold", &"fire", &"beam"], Vector2(60.0, 170.0), Vector2(240.0, 170.0)],
+	[[&"hold", &"homing", &"frost", &"beam"], Vector2(60.0, 270.0), Vector2(170.0, 315.0)],
+]
+
+
+func take() -> void:
+	if not need(["Spells", "Projectiles", "Feel"]):
+		return
+	settle_frames = 6
+	var spells: Node = root.get_node("Spells")
+	var projectiles: Node = root.get_node("Projectiles")
+	projectiles.call("set_bounds", Rect2(Vector2.ZERO, SCREEN))
+	lay_floor()
+	for row: Array in ROWS:
+		var dummy := Node2D.new()
+		dummy.position = row[2]
+		root.add_child(dummy)
+		place(DUMMY, 1.0, row[2])
+		projectiles.call("add_target", dummy, 10.0, 1)
+	for i in ROWS.size():
+		var row: Array = ROWS[i]
+		var cards: Array[StringName] = []
+		cards.assign(row[0])
+		spells.call("install_staff", 0, i, spells.call("compile_staff", cards, STARTER))
+		spells.call("cast_staff", 0, i, row[1], Vector2.RIGHT, 100.0)
+		label(" ".join(PackedStringArray(cards)), row[1] + Vector2(0.0, -24.0))
+	await settle()
+	await shot("live_beams")
+	await snap(Vector2(140.0, 290.0), "live_beams_bend", Vector2i(100, 50), 3)

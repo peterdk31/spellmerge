@@ -1155,9 +1155,11 @@ func set_growth(slot: int, factor: float) -> bool:
 	return true
 
 
-## How many times bigger the shot in `slot` is than when it started (1.0 for a plain shot).
+## How many times bigger the shot in `slot` is than when it started (1.0 for a plain shot). The
+## spell runtime scales a grown shot's hit by it (`Spells.hit_profile`).
 func get_growth_of(slot: int) -> float:
-	if slot < 0 or slot >= _cap or _alive[slot] == 0 or _radius0[slot] <= 0.0:
+	# The shot whose hit is being sent counts even when that hit spent it (it is gone already).
+	if slot < 0 or slot >= _cap or (_alive[slot] == 0 and slot != event_slot) or _radius0[slot] <= 0.0:
 		return 1.0
 	return _radius[slot] / _radius0[slot]
 

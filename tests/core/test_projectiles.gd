@@ -577,8 +577,9 @@ func _test_batches_upload_only_the_used_slice() -> void:
 		_check(room >= count and room <= 200 and buffer.size() == room * stride, "the upload holds %d shots in room for %d" % [room, count])
 		_check(count > 1 or room == ManagerScript.MIN_BATCH, "one shot uploads only the smallest batch (%d)" % room)
 		var seen: int = 0
+		var back: float = ManagerScript.look_back(5.0)
 		for i in count:
-			if is_equal_approx(buffer[i * stride + 3], float(i) + 1.0):
+			if is_equal_approx(buffer[i * stride + 3], float(i) + 1.0 - back):
 				seen += 1
 		_check(seen == count, "all %d shots are in the upload at their places (%d)" % [count, seen])
 	_mgr.clear()
@@ -646,13 +647,16 @@ func _test_every_batch_is_sized_to_its_own_shots() -> void:
 	var rune_buffer: PackedFloat32Array = _mgr._rune_node.multimesh.buffer
 	var hostile_buffer: PackedFloat32Array = _mgr._hostile_node.multimesh.buffer
 	var orbit_buffer: PackedFloat32Array = _mgr._orbit_node.multimesh.buffer
-	_check(is_equal_approx(bolt_buffer[(bolts - 1) * stride + 3], float(bolts)), "the last bolt is at its place")
+	# A bolt's or orbit shot's quad reaches ahead of it and holds its tail behind (look_back).
+	_check(is_equal_approx(bolt_buffer[(bolts - 1) * stride + 3], float(bolts) - ManagerScript.look_back(5.0)), "the last bolt is at its place")
 	_check(is_equal_approx(rune_buffer[(runes - 1) * stride + 3], float(runes)) and is_equal_approx(rune_buffer[7], 50.0), "the last rune is at its place")
 	_check(is_equal_approx(hostile_buffer[stride + 3], 2.0) and is_equal_approx(hostile_buffer[stride + 7], 90.0), "the last enemy shot is at its place")
 	var orbit_ok: bool = true
 	for i in orbits:
-		orbit_ok = orbit_ok and is_equal_approx(orbit_buffer[i * stride + 3], _mgr._pos[orbit_slots[i]].x)
-		orbit_ok = orbit_ok and is_equal_approx(orbit_buffer[i * stride + 7], _mgr._pos[orbit_slots[i]].y)
+		var slot: int = orbit_slots[i]
+		var centre: Vector2 = _mgr._pos[slot] - _mgr._vel[slot].normalized() * ManagerScript.look_back(_mgr._radius[slot])
+		orbit_ok = orbit_ok and is_equal_approx(orbit_buffer[i * stride + 3], centre.x)
+		orbit_ok = orbit_ok and is_equal_approx(orbit_buffer[i * stride + 7], centre.y)
 	_check(orbit_ok, "the orbit shots are at their places")
 	root.remove_child(_mgr)
 

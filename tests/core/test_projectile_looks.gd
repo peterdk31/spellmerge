@@ -120,7 +120,7 @@ func test_runes_and_orbit_shots_are_drawn_as_their_form() -> void:
 	mgr.update_draw(1.0)
 	check_equal(kind_at(mgr._rune_node, 0), ManagerScript.KIND_RUNE, "a rune is drawn as a rune")
 	check_equal(look_at(mgr._rune_node, 0), [1, 4, ManagerScript.pack_look(PackedInt32Array([2]))] as Array[int], "with its player, its zoom (radius 14) and its layers")
-	check_equal(kind_at(mgr._orbit_node, 0), ManagerScript.KIND_ORBIT, "an orbit shot is drawn as a pair of beads")
+	check_equal(kind_at(mgr._orbit_node, 0), ManagerScript.KIND_ORBIT, "an orbit shot is drawn as an orbit shot (a bolt whose tail bends)")
 	check_equal(look_at(mgr._orbit_node, 0)[0], 2, "of its player")
 
 
@@ -133,15 +133,95 @@ func test_enemy_shots_keep_their_sprite() -> void:
 
 
 func test_shots_are_drawn_about_their_hit_size_in_whole_pixels() -> void:
-	check_equal(ManagerScript.look_size(5.0), 24.0, "a bolt (radius 5) has zoom 1: a 5 px core in a 10 px circle, in 24 px with its tail")
+	check_equal(ManagerScript.look_size(5.0), 24.0, "a bolt (radius 5) has zoom 1: a 3 px core in a 10 px circle, in a quad 24 px across")
 	check_equal(ManagerScript.look_size(1.0), 24.0, "never below zoom 1")
 	check_equal(ManagerScript.look_size(8.0), 48.0, "a bigger bolt (radius 8) has zoom 2")
 	check_equal(ManagerScript.look_size(14.0), 96.0, "a rune (radius 14) has zoom 4")
+	check_equal(ManagerScript.look_length(5.0), 72.0, "and 72 px long, for its tail")
+	check_equal(ManagerScript.look_length(8.0), 144.0, "which grows with the zoom too")
 	var cell: float = ManagerScript.look_size(5.0) / ManagerScript.LOOK_GRID
-	check(5.0 * cell < 2.0 * 5.0, "the 5-cell core of a bolt is narrower than its hit circle: it hits a little wider than it looks")
+	check(3.0 * cell < 2.0 * 5.0, "the 3-cell core of a bolt is narrower than its hit circle: it hits wider than it looks")
 	var slot: int = mgr.spawn(0, Vector2(100.0, 100.0), Vector2(100.0, 0.0), 1.0, 5.0)
 	mgr.update_draw(1.0)
-	check(slot >= 0 and is_equal_approx(mgr._draw_node.multimesh.buffer[0], 24.0), "the drawn quad is look_size")
+	var buffer: PackedFloat32Array = mgr._draw_node.multimesh.buffer
+	check(slot >= 0 and is_equal_approx(buffer[0], 72.0), "the drawn quad is look_length along the flight")
+	check(is_equal_approx(buffer[5], -24.0) and is_equal_approx(buffer[1], 0.0) and is_equal_approx(buffer[4], 0.0), "and look_size across")
+	check(is_equal_approx(buffer[3], mgr.get_position_of(slot).x - 24.0) and is_equal_approx(buffer[7], 100.0), "reaching 12 px ahead of the shot, the rest behind it for the tail")
+
+
+## The bend a shot's instance carries, decoded as the shader does (1 / the radius, signed).
+func bend_at(node: MultiMeshInstance2D, i: int) -> float:
+	var coded: float = (1.0 - node.multimesh.buffer[i * ManagerScript.DRAW_STRIDE + 15]) * ManagerScript.KIND_STEPS
+	var code: float = coded - floorf(coded + 0.5)
+	return (code - ManagerScript.BEND_ZERO) / ManagerScript.BEND_SPAN / ManagerScript.BEND_RADIUS
+
+
+func test_a_long_quad_still_points_along_a_diagonal_flight() -> void:
+	var slot: int = mgr.spawn(0, Vector2(100.0, 100.0), Vector2(60.0, 80.0), 1.0, 5.0)
+	mgr.update_draw(1.0)
+	var buffer: PackedFloat32Array = mgr._draw_node.multimesh.buffer
+	var along := Vector2(buffer[0], buffer[4])
+	var across := Vector2(buffer[1], buffer[5])
+	check(along.is_equal_approx(Vector2(0.6, 0.8) * 72.0), "the quad's long axis is the heading (rows: x.x, y.x, _, o.x / x.y, y.y, _, o.y)")
+	check(across.is_equal_approx(Vector2(0.8, -0.6) * 24.0), "and its short axis crosses it")
+	check(is_equal_approx(along.dot(across), 0.0), "square to each other")
+	check(slot >= 0, "the shot was live")
+
+
+func test_a_straight_shot_does_not_bend() -> void:
+	var slot: int = mgr.spawn(0, Vector2(100.0, 100.0), Vector2(200.0, 0.0), 1.0)
+	for i in 3:
+		mgr.step(1.0 / 60.0)
+	check_equal(mgr.bend_of(slot), 0.0, "a straight path has no bend")
+	mgr.update_draw(1.0)
+	check(absf(bend_at(mgr._draw_node, 0)) < 0.0005, "and draws none")
+	check_equal(kind_at(mgr._draw_node, 0), ManagerScript.KIND_BOLT, "the bend leaves the kind as it was")
+
+
+func test_an_orbit_shot_bends_round_its_circle_either_way() -> void:
+	mgr.set_anchor(0, Vector2(200.0, 200.0))
+	var clockwise: int = mgr.spawn_orbit(0, 36.0, 0.0, 4.0, 5.0, 6.0)
+	var back: int = mgr.spawn_orbit(0, 36.0, PI, -4.0, 5.0, 6.0)
+	var tight: int = mgr.spawn_orbit(0, 4.0, 0.0, 4.0, 5.0, 6.0)
+	mgr.step(1.0 / 60.0)
+	check(is_equal_approx(mgr.bend_of(clockwise), 1.0 / 36.0), "1 / its radius")
+	check(is_equal_approx(mgr.bend_of(back), -1.0 / 36.0), "the other way round, the other side")
+	check(is_equal_approx(mgr.bend_of(tight), 1.0 / ManagerScript.BEND_RADIUS), "a tighter circle draws as the tightest bend")
+	mgr.update_draw(1.0)
+	for i in 3:
+		check_equal(kind_at(mgr._orbit_node, i), ManagerScript.KIND_ORBIT, "orbit shot %d keeps its kind" % i)
+	var drawn: Array[float] = []
+	for i in 3:
+		drawn.append(bend_at(mgr._orbit_node, i))
+	drawn.sort()
+	check(absf(drawn[0] + 1.0 / 36.0) < 0.0005 and absf(drawn[1] - 1.0 / 36.0) < 0.0005 and absf(drawn[2] - 1.0 / 16.0) < 0.0005, "the bends travel to the shader (%s)" % str(drawn))
+
+
+func test_a_turning_shot_bends_and_a_corner_does_not() -> void:
+	var slot: int = mgr.spawn(0, Vector2(100.0, 100.0), Vector2(100.0, 0.0), 1.0)
+	mgr._prev[slot] = Vector2(100.0, 100.0)
+	mgr._pos[slot] = Vector2(110.0, 100.0)
+	mgr._vel[slot] = Vector2(100.0, 0.0).rotated(0.1)
+	check(is_equal_approx(mgr.bend_of(slot), 2.0 * 0.1 / 10.0), "a heading 0.1 rad off a 10 px chord: a curve of radius 50")
+	mgr._vel[slot] = Vector2(100.0, 0.0).rotated(-0.1)
+	check(is_equal_approx(mgr.bend_of(slot), -0.02), "turning the other way bends the other way")
+	mgr._vel[slot] = Vector2(100.0, 0.0).rotated(2.5)
+	check_equal(mgr.bend_of(slot), 0.0, "a bounce is a corner, not a bend")
+	mgr._vel[slot] = Vector2(100.0, 0.0).rotated(0.45)
+	check(is_equal_approx(mgr.bend_of(slot), 1.0 / ManagerScript.BEND_RADIUS), "a sharp turn draws as the tightest bend")
+	mgr._pos[slot] = Vector2(100.1, 100.0)
+	check_equal(mgr.bend_of(slot), 0.0, "a shot that barely moved does not bend")
+
+
+func test_the_shader_holds_the_same_quad_and_bend_as_the_manager() -> void:
+	var shader: Shader = load("res://core/projectiles/shot_core.gdshader")
+	check(shader.code.contains("const float GRID = %d.0;" % ManagerScript.LOOK_GRID), "the same width")
+	check(shader.code.contains("const float LENGTH = %d.0;" % ManagerScript.LOOK_LENGTH), "the same length")
+	check(shader.code.contains("const float FRONT = %d.0;" % (ManagerScript.LOOK_GRID / 2)), "the shot as far from the front")
+	check(shader.code.contains("const float BEND_ZERO = %s;" % str(ManagerScript.BEND_ZERO)), "the same straight bend code")
+	check(shader.code.contains("const float BEND_SPAN = %s;" % str(ManagerScript.BEND_SPAN)), "the same span")
+	check(shader.code.contains("const float BEND_RADIUS = %d.0;" % int(ManagerScript.BEND_RADIUS)), "the same tightest bend")
+	check(ManagerScript.BEND_ZERO + ManagerScript.BEND_SPAN < 0.5 and ManagerScript.BEND_ZERO - ManagerScript.BEND_SPAN > 0.0, "the bend code rounds away from the kind")
 
 
 func test_looks_animate_from_the_simulation_clock() -> void:

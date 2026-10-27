@@ -49,6 +49,7 @@ The player colours belong to the players: enemies, props and tiles don't use the
 - Light comes from the **top-left**. On a rounded shape the highlight sits at the upper left, the shadow at the lower right.
 - Shade with the three shades of the material. The base shade covers most of the shape, the light shade the top-left edge and the shadow shade the bottom-right edge.
 - **No gradients, no dithering for smooth fades, no glow halos.** A glow is one or two flat rings in the light shade.
+- **The exception: spell shots glow** (the owner, 2026-10-27). The shot shader (`core/projectiles/shot_core.gdshader`) adds a soft light in the shot's colour round its core and tail, added to what is below. It is the shader's, never baked into an asset: sprites, tiles and icons keep the rules above.
 - **No baked drop shadow** under a sprite (it needs partial transparency). The game draws shadows.
 - Never mix shades of different materials on one surface to fake a fourth shade.
 

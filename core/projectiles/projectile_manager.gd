@@ -38,10 +38,11 @@ extends Node2D
 ## The budget is per `step` call, not per frame: if the engine runs several
 ## physics steps in one frame to catch up, each has its own budget.
 ##
-## Drawing: a player's shot is built by `shot_core.gdshader` on a pixel grid (staffs B6a): a
-## small core in its first infusion's colour (`set_core`) outlined in its player's shadow
-## shade, a short trail in its player's colour behind a bolt, and particles given off from
-## its tail in the styles of all its cards (`set_look`), mixed at random. It is drawn about its hit size (`look_size`). Enemy shots
+## Drawing: a player's shot is built by `shot_core.gdshader` on a pixel grid (staffs B6a; the
+## glow look, 2026-10-27): a small white-hot core in the ramp of its first infusion's colour
+## (`set_core`; its player's for a plain shot), a long tail that cools and frays and bends with
+## its path (`bend_of`), a soft glow round both, and particles given off from its tail in the
+## styles of all its cards (`set_look`), mixed at random. It is drawn about its hit size (`look_size`). Enemy shots
 ## (owner NO_PLAYER) have their own texture (`hostile_texture`), are not tinted and are
 ## drawn one layer above, so a dangerous shot never hides under a friendly one.
 ##
@@ -234,15 +235,25 @@ const BATCH_RUNE: int = 1
 const BATCH_ORBIT: int = 2
 const BATCH_HOSTILE: int = 3
 ## The bodies a player's shot is drawn as (`shot_core.gdshader` builds them on a pixel grid;
-## staffs B6a): a bolt with a trail in its player's colour, a rune (a diamond that pulses), an
-## orbit shot (two beads that spin). Kind 0 is the texture, which only Feel's lone sprites use.
+## staffs B6a): a bolt with its tail, a rune (a diamond that pulses), an orbit shot (a bolt whose
+## tail bends round its circle). Kind 0 is the texture, which only Feel's lone sprites use.
 const KIND_BOLT: int = 1
 const KIND_RUNE: int = 2
 const KIND_ORBIT: int = 3
-## The kind travels in the alpha of the custom data as 1 - kind / KIND_STEPS, so it is exact
-## in a float and has room for kinds 0 to KIND_MAX.
+## The kind travels in the alpha of the custom data as 1 - (kind + bend) / KIND_STEPS, so it
+## has room for kinds 0 to KIND_MAX, and the bend code (below 0.5) rounds away when it is read.
 const KIND_STEPS: float = 16.0
 const KIND_MAX: int = 15
+## The bend of a bolt or orbit shot: how its path curves (1 / the radius of the curve, signed:
+## positive turns the way the screen's +x turns to +y), so `shot_core.gdshader` bends its tail
+## along it. It travels as a code beside the kind: BEND_ZERO for a straight path, BEND_SPAN
+## either side for the tightest curve (radius BEND_RADIUS; tighter ones draw as that). The
+## shader holds the same numbers. A shot that turned more than BEND_CORNER radians in its last
+## step (a bounce) met a corner, not a curve, and draws straight.
+const BEND_ZERO: float = 0.225
+const BEND_SPAN: float = 0.2
+const BEND_RADIUS: float = 16.0
+const BEND_CORNER: float = 0.5
 ## The look kinds a card can give a shot (`look_layer` on infusions and modifiers; see
 ## `set_look`). The body stays plain; each kind is a style of particle the shot gives off from
 ## its tail (`shot_core.gdshader`), and a shot shows every kind its cards bring, mixed at
@@ -265,12 +276,15 @@ const LOOK_GLITTER: int = 12
 const LOOK_COUNT: int = 13
 ## The most kinds the instance data has room for: three bytes of bits (`_look_color`).
 const LOOK_MAX_KINDS: int = 24
-## A player's shot is drawn in a square of LOOK_GRID x zoom screen pixels round its centre
-## (room for the tail and the particles it gives off); its core is about 5 x zoom pixels across, and every
-## line stays one pixel. The zoom is this many per pixel of hit radius, rounded and at least
-## one (at most LOOK_ZOOM_MAX), so a bolt (radius 5) has zoom 1, a bigger one 2 and a rune 4:
-## a shot is drawn about its hit size and hits a little wider than it looks.
+## A player's shot is drawn in a quad of LOOK_GRID x zoom screen pixels across: a rune's is
+## square round its centre, a bolt's or orbit shot's LOOK_LENGTH x zoom long with the shot
+## LOOK_GRID / 2 x zoom from its front, for its tail (48 px at zoom 1), the particles it gives off
+## and its glow. Its core is about 3 x zoom pixels across, and every line stays one pixel. The
+## zoom is this many per pixel of hit radius, rounded and at least one (at most LOOK_ZOOM_MAX),
+## so a bolt (radius 5) has zoom 1, a bigger one 2 and a rune 4: a shot is drawn smaller than
+## its hit size and hits wider than it looks.
 const LOOK_GRID: int = 24
+const LOOK_LENGTH: int = 72
 const LOOK_CELL_PER_RADIUS: float = 0.25
 const LOOK_ZOOM_MAX: int = 15
 ## The spark pool (staffs B6b): the sparks, embers and the rest that all the shots give off come
@@ -1901,10 +1915,10 @@ func update_draw(fraction: float = -1.0) -> void:
 			_write_quad(_rune_buffer, rune_out * DRAW_STRIDE, dir, size, at, player_look, _core[slot], KIND_RUNE)
 			rune_out += 1
 		elif batch == BATCH_ORBIT:
-			_write_quad(_orbit_buffer, orbit_out * DRAW_STRIDE, dir, size, at, player_look, _core[slot], KIND_ORBIT)
+			_write_quad(_orbit_buffer, orbit_out * DRAW_STRIDE, dir, size, at, player_look, _core[slot], KIND_ORBIT, look_length(_radius[slot]), bend_of(slot))
 			orbit_out += 1
 		else:
-			_write_quad(_draw_buffer, out * DRAW_STRIDE, dir, size, at, player_look, _core[slot], KIND_BOLT)
+			_write_quad(_draw_buffer, out * DRAW_STRIDE, dir, size, at, player_look, _core[slot], KIND_BOLT, look_length(_radius[slot]), bend_of(slot))
 			out += 1
 	if out > 0:
 		multimesh.buffer = _draw_buffer
@@ -2015,6 +2029,37 @@ static func look_size(radius: float) -> float:
 	return float(LOOK_GRID * look_zoom(radius))
 
 
+## The drawn length in pixels of a bolt or orbit shot of hit radius `radius`: the shot and its tail.
+static func look_length(radius: float) -> float:
+	return float(LOOK_LENGTH * look_zoom(radius))
+
+
+## How far behind a bolt or orbit shot of hit radius `radius` the middle of its quad is (the
+## quad reaches look_size / 2 ahead of the shot and the rest behind it).
+static func look_back(radius: float) -> float:
+	return (look_length(radius) - look_size(radius)) * 0.5
+
+
+## How the path of a live shot curves (see BEND_ZERO): 1 / the radius, signed. An orbit shot's
+## comes from its circle; any other shot's from its last step, whose chord lags its heading by
+## half the turn, so a homing, spiralling or returning shot bends its tail as it turns. 0 for a
+## straight path, a corner, or a shot that did not move.
+func bend_of(slot: int) -> float:
+	if _motion[slot] == MOTION_ORBIT:
+		var radius: float = _orbit_radius[slot]
+		if radius <= 0.0 or _orbit_speed[slot] == 0.0:
+			return 0.0
+		return signf(_orbit_speed[slot]) / maxf(radius, BEND_RADIUS)
+	var chord: Vector2 = _pos[slot] - _prev[slot]
+	var moved: float = chord.length()
+	if moved < 0.5 or _vel[slot].length_squared() == 0.0:
+		return 0.0
+	var turn: float = chord.angle_to(_vel[slot])
+	if absf(turn) > BEND_CORNER:
+		return 0.0
+	return clampf(2.0 * turn / moved, -1.0 / BEND_RADIUS, 1.0 / BEND_RADIUS)
+
+
 ## The instance colour of a player's shot, which `shot_core.gdshader` reads as data, a byte
 ## per channel: the player index and the zoom in red (player + zoom x 4), the look's bits in
 ## green (kinds 1-8), blue (9-16) and alpha (17-24).
@@ -2025,20 +2070,29 @@ func _look_color(slot: int) -> Color:
 
 
 ## Write one quad at float index `i` of `buffer` (packed arrays are shared, not copied):
-## Transform2D(dir * d, dir.orthogonal() * d, at), row by row, then the colour and the
-## colour of the core (custom data).
-## `kind` (0 the texture, KIND_BOLT, KIND_RUNE or KIND_ORBIT; at most KIND_MAX) goes in the alpha of the custom data as 1 - kind / 16,
-## which `shot_core.gdshader` reads back.
-func _write_quad(buffer: PackedFloat32Array, i: int, dir: Vector2, diameter: float, at: Vector2, color: Color, core: Color, kind: int) -> void:
+## Transform2D(dir * length, dir.orthogonal() * d, centre), row by row, then the colour and the
+## colour of the core (custom data). A square quad (`length` 0) is centred on `at`; a long one
+## reaches `diameter` / 2 ahead of `at` and the rest behind it (a bolt and its tail).
+## `kind` (0 the texture, KIND_BOLT, KIND_RUNE or KIND_ORBIT; at most KIND_MAX) and the code of
+## `bend` (see BEND_ZERO; only for a long quad) go in the alpha of the custom data as
+## 1 - (kind + code) / 16, which `shot_core.gdshader` reads back.
+func _write_quad(buffer: PackedFloat32Array, i: int, dir: Vector2, diameter: float, at: Vector2, color: Color, core: Color, kind: int, length: float = 0.0, bend: float = 0.0) -> void:
 	assert(kind >= 0 and kind <= KIND_MAX, "the kind must fit the alpha encoding")
-	buffer[i] = dir.x * diameter
+	var along: float = diameter
+	var code: float = 0.0
+	var centre: Vector2 = at
+	if length > 0.0:
+		along = length
+		code = BEND_ZERO + BEND_SPAN * clampf(bend * BEND_RADIUS, -1.0, 1.0)
+		centre = at - dir * (length - diameter) * 0.5
+	buffer[i] = dir.x * along
 	buffer[i + 1] = dir.y * diameter
 	buffer[i + 2] = 0.0
-	buffer[i + 3] = at.x
-	buffer[i + 4] = dir.y * diameter
+	buffer[i + 3] = centre.x
+	buffer[i + 4] = dir.y * along
 	buffer[i + 5] = -dir.x * diameter
 	buffer[i + 6] = 0.0
-	buffer[i + 7] = at.y
+	buffer[i + 7] = centre.y
 	buffer[i + 8] = color.r
 	buffer[i + 9] = color.g
 	buffer[i + 10] = color.b
@@ -2046,7 +2100,7 @@ func _write_quad(buffer: PackedFloat32Array, i: int, dir: Vector2, diameter: flo
 	buffer[i + 12] = core.r
 	buffer[i + 13] = core.g
 	buffer[i + 14] = core.b
-	buffer[i + 15] = 1.0 - kind / KIND_STEPS
+	buffer[i + 15] = 1.0 - (kind + code) / KIND_STEPS
 
 
 ## Position of a live projectile, or Vector2.INF if the slot is empty.

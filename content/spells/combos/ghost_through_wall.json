@@ -1,0 +1,10 @@
+{
+	"id": "ghost_through_wall",
+	"name": "Ghost through the wall",
+	"does": "A bolt passes through the wall and hits the imp hiding behind it.",
+	"casts": [{"staff": 0, "cards": ["ghost", "bolt"]}],
+	"imps": [[120, 0]],
+	"walls": [[60, -100, 16, 200]],
+	"seconds": 1.5,
+	"checks": [{"kind": "damaged", "imps": [0]}]
+}

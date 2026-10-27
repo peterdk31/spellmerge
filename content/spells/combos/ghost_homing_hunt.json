@@ -1,0 +1,10 @@
+{
+	"id": "ghost_homing_hunt",
+	"name": "Ghost homing hunt",
+	"does": "A homing fire bolt goes through the wall to find the imp behind it, off the aim.",
+	"casts": [{"staff": 0, "cards": ["ghost", "homing", "fire", "bolt"]}],
+	"imps": [[110, 40]],
+	"walls": [[50, -100, 16, 200]],
+	"seconds": 1.5,
+	"checks": [{"kind": "status", "imps": [0], "status": "burn"}]
+}

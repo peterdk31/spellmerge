@@ -36,10 +36,10 @@ func take() -> void:
 		return
 	var radial: Node = _hud.call("get_radial", 0)
 	await _card_sheets(radial)
-	await _point(0, &"nova", false)
+	await _point(0, &"nova", true)
 	await shot("radial_pointing")
 	tap(0, &"staff_2")
-	await _point(0, &"split", false)
+	await _point(0, &"split", true)
 	tap(0, &"staff_2")
 	await _point(0, &"homing", true)
 	await shot("radial_built")
@@ -76,7 +76,7 @@ func _open(players: Array[int]) -> bool:
 	return opened
 
 
-## Point `player`'s right stick at `id`, held (the pointer line shows) or let go again.
+## Point `player`'s right stick at `id`, held (the card stays picked) or let go again (nothing picked).
 func _point(player: int, id: StringName, hold: bool) -> void:
 	var direction: Vector2 = _hud.call("get_radial", player).call("direction_to", id)
 	_input.call("send_virtual_aim", player, direction)

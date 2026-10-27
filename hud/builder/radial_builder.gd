@@ -13,7 +13,7 @@ extends Control
 ## - **Pointing:** the right stick (P1's mouse) points at a card: it pops out with a double gold
 ##   frame and the middle of the ring (the hub) shows its icon, name, kind and own numbers
 ##   (`Spells.component_stats`). Landing on a card rumbles the pad briefly; a gap rumbles
-##   nothing. Letting go of the stick keeps the card picked.
+##   nothing. Letting go of the stick lets the card go.
 ## - **The slots:** the shown staff's slots in five columns beside the ring, with a gold marker
 ##   that the left stick moves (with key-repeat; P1's move keys, or a click on a slot). The
 ##   pointed card shows faded in the marked slot, so RT's result is seen before it is pressed.
@@ -497,7 +497,8 @@ func _move_marker(dir: Vector2i) -> void:
 	mark_slot(clampi(next, 0, count - 1))
 
 
-## The right stick (P1's mouse) picks the card it points at; letting go keeps it.
+## The right stick (P1's mouse) picks the card it points at; letting go (the mouse leaving the
+## ring) lets the card go too, so the hub shows the staff's numbers again.
 func _poll_pointer() -> void:
 	var aim: Vector2 = _input.menu_aim(index) if _input != null else Vector2.ZERO
 	if aim.length() < POINT_THRESHOLD:
@@ -505,15 +506,16 @@ func _poll_pointer() -> void:
 	if aim.distance_squared_to(_drawn_aim) > 0.002:
 		_drawn_aim = aim
 		_dirty = true
-	if aim == Vector2.ZERO or _ring_entry.is_empty():
+	if _ring_entry.is_empty():
 		return
-	var angle: float = fposmod(atan2(aim.x, -aim.y), TAU)
 	var picked: int = NONE
-	for at in _ring_entry.size():
-		var off: float = absf(fposmod(angle - _ring_angle[at] + PI, TAU) - PI)
-		if off <= _ring_width[at] * 0.5:
-			picked = _ring_entry[at]
-			break
+	if aim != Vector2.ZERO:
+		var angle: float = fposmod(atan2(aim.x, -aim.y), TAU)
+		for at in _ring_entry.size():
+			var off: float = absf(fposmod(angle - _ring_angle[at] + PI, TAU) - PI)
+			if off <= _ring_width[at] * 0.5:
+				picked = _ring_entry[at]
+				break
 	if picked == _pointed:
 		return
 	_pointed = picked

@@ -1,0 +1,9 @@
+{
+	"id": "growth_slow_orb",
+	"name": "Growth slow orb",
+	"does": "A slow lightning orb that keeps growing and catches an imp well off its line.",
+	"casts": [{"staff": 0, "cards": ["slow", "growth", "lightning", "bolt"]}],
+	"imps": [[150, 26]],
+	"seconds": 3.5,
+	"checks": [{"kind": "status", "imps": [0], "status": "static"}]
+}

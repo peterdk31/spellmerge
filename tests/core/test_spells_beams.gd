@@ -214,3 +214,26 @@ func test_a_curved_ray_hits_a_target_on_its_curve_once() -> void:
 	check(not hits.has(on_line), "one off the curve is not")
 	check_equal(hits.count(on_curve), 1, "a target touched by two pieces is hit once")
 	check(_mgr.ray_end.is_finite(), "where it ended is known")
+
+
+func test_homing_cards_stack_by_multiplying() -> void:
+	var one: CompiledSpell = StaffKit.first(_spells, [&"homing", &"bolt"] as Array[StringName])
+	var two: CompiledSpell = StaffKit.first(_spells, [&"homing", &"homing", &"bolt"] as Array[StringName])
+	var three: CompiledSpell = StaffKit.first(_spells, [&"homing", &"homing", &"homing", &"bolt"] as Array[StringName])
+	check(is_equal_approx(one.homing_turn, 3.0) and is_equal_approx(one.homing_angle, SpellLimits.BEAM_HOMING_ANGLE), "one card: its own turn rate and the base bend")
+	check(is_equal_approx(two.homing_turn, 3.0 * SpellLimits.HOMING_STACK), "two turn %s times faster: %s" % [SpellLimits.HOMING_STACK, two.homing_turn])
+	check(is_equal_approx(three.homing_turn, 3.0 * SpellLimits.HOMING_STACK * SpellLimits.HOMING_STACK), "three faster again: %s" % three.homing_turn)
+	check(is_equal_approx(two.homing_angle, SpellLimits.BEAM_HOMING_ANGLE * SpellLimits.HOMING_STACK), "a beam bends wider with two: %s" % two.homing_angle)
+	check(is_equal_approx(three.homing_angle, SpellLimits.BEAM_HOMING_MAX), "up to the most: %s" % three.homing_angle)
+
+
+func test_two_homing_cards_bend_a_beam_onto_a_target_one_cannot_reach() -> void:
+	# 60 degrees off the aim: past one card's 45, inside two cards' 67.5.
+	var off: Node2D = _target(Vector2.from_angle(deg_to_rad(60.0)) * 100.0)
+	_build([&"homing", &"beam"])
+	_cast()
+	check(not _spells.beam_end(_beam()).is_equal_approx(off.global_position), "one homing card does not reach it")
+	_tick(30)
+	_build([&"homing", &"homing", &"beam"])
+	_cast()
+	check(_spells.beam_end(_beam()).is_equal_approx(off.global_position), "two do: %s" % _spells.beam_end(_beam()))

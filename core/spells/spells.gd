@@ -1507,7 +1507,7 @@ func _beam_path(at: int) -> void:
 	var end: Vector2 = origin + way * length
 	var bend: Vector2 = origin + way * (length * 0.5)
 	if spell.homing_turn > 0.0:
-		var goal: Vector2 = projectiles.homing_point(_bm_player[at], origin, way, deg_to_rad(SpellLimits.BEAM_HOMING_ANGLE), ProjectilesScript.LAYER_ENEMY)
+		var goal: Vector2 = projectiles.homing_point(_bm_player[at], origin, way, deg_to_rad(spell.homing_angle), ProjectilesScript.LAYER_ENEMY)
 		if goal.is_finite():
 			end = goal
 			bend = origin + way * (origin.distance_to(goal) * 0.6)

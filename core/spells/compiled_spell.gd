@@ -48,6 +48,8 @@ var echo_hit: HitProfile = null
 
 ## Radians per second a shot turns toward a target; 0 means no homing.
 var homing_turn: float = 0.0
+## Degrees off its aim a homing beam still bends to a target (0 without homing).
+var homing_angle: float = 0.0
 ## Times a hit jumps on to another target; 0 means no chain.
 var chain_jumps: int = 0
 

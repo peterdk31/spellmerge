@@ -125,3 +125,69 @@ func test_a_form_with_no_player_is_ignored() -> void:
 func test_the_shipped_preset_has_the_form_art() -> void:
 	var shipped := load("res://gameplay/feel/presets/punchy.tres") as FeelPresetScript
 	check(shipped.beam_texture != null and shipped.nova_texture != null, "beam and ring art")
+
+
+## Stands in for core/spells' live beams: one beam of player 1 bending from (0, 0) to (100, 40).
+class FakeBeams:
+	extends Node
+	var on: bool = true
+	var reach: float = 500.0
+
+	func beam_slots() -> int:
+		return 2
+
+	func beam_on(at: int) -> bool:
+		return on and at == 1
+
+	func beam_player(_at: int) -> int:
+		return 1
+
+	func beam_origin(_at: int) -> Vector2:
+		return Vector2.ZERO
+
+	func beam_bend(_at: int) -> Vector2:
+		return Vector2(60, 0)
+
+	func beam_end(_at: int) -> Vector2:
+		return Vector2(100, 40)
+
+	func beam_reach(_at: int) -> float:
+		return reach
+
+	func beam_tint(_at: int) -> Color:
+		return FROST
+
+	func beam_since_hit(_at: int) -> float:
+		return 1.0
+
+	func beam_left(_at: int) -> float:
+		return 1.0
+
+
+func _live_lines() -> Array[Line2D]:
+	var found: Array[Line2D] = []
+	for line in feel._live_beams:
+		if line.visible:
+			found.append(line)
+	return found
+
+
+func test_a_live_beam_is_drawn_along_its_curve_every_frame() -> void:
+	var beams := own(FakeBeams.new()) as FakeBeams
+	feel.spells = beams
+	feel.step(0.016)
+	var lines: Array[Line2D] = _live_lines()
+	check_equal(lines.size(), 1, "one live beam on screen")
+	var line: Line2D = lines[0]
+	check_equal(line.get_point_position(0), Vector2.ZERO, "from the staff")
+	check(line.get_point_position(line.get_point_count() - 1).is_equal_approx(Vector2(100, 40)), "to its end, on the target")
+	var middle: Vector2 = line.get_point_position(line.get_point_count() / 2)
+	check(middle.y > 0.0 and middle.y < 20.0, "bent, not straight: %s" % middle)
+	check((line.material as ShaderMaterial).get_shader_parameter(&"core_override").is_equal_approx(Color(FROST.r, FROST.g, FROST.b, 1.0)), "the core is the element's")
+	beams.reach = 50.0
+	feel.step(0.016)
+	var tip: Vector2 = line.get_point_position(line.get_point_count() - 1)
+	check(absf(tip.length() - 50.0) < 3.0, "cut where it stopped: %s" % tip)
+	beams.on = false
+	feel.step(0.016)
+	check(_live_lines().is_empty(), "gone when it ends")

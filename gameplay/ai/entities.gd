@@ -11,10 +11,12 @@ extends Node2D
 ## `ai.gd`). It ends after DECOY_HITS enemy hits or when its time runs out; where it ended is its
 ## end point.
 ##
-## A **familiar** is a small orb circling its caster's wizard (FAMILIAR_ORBIT px). Every
-## FAMILIAR_INTERVAL seconds it looks for the nearest enemy within FAMILIAR_RANGE and, if there
-## is one, sends `familiar_cast_requested` toward it; core/spells casts the familiar's payload.
-## With its wizard gone it stays where it was.
+## A **familiar** is a small orb circling its caster (FAMILIAR_ORBIT px): the wizard, or for a
+## familiar a trigger made the shot that fired it (a `core/projectiles` slot, followed while it
+## flies) or the point it was made at. Every FAMILIAR_INTERVAL seconds it looks for the nearest
+## enemy within FAMILIAR_RANGE and, if there is one, sends `familiar_cast_requested` toward it;
+## core/spells casts the familiar's payload. With its wizard gone it stays where it was; with its
+## shot gone it circles where the shot was last.
 ##
 ## Each player has up to PER_PLAYER of each kind; one more ends their oldest of that kind. An
 ## entity whose `seconds` is INF, or 0 or less, lasts until `entity_end_requested` with its tag
@@ -33,6 +35,9 @@ const ProjectileManagerScript := preload("res://core/projectiles/projectile_mana
 const DECOY: StringName = &"decoy"
 const FAMILIAR: StringName = &"familiar"
 const PLAYER_SLOTS: int = 4
+## `entity_spawn_requested`'s caster when it is the wizard, and when it is the point it was made at.
+const CASTER_WIZARD: int = -1
+const CASTER_POINT: int = -2
 ## Live entities of one kind one player may have.
 const PER_PLAYER: int = 4
 ## Rows in the pool: every kind for every player.
@@ -87,6 +92,11 @@ var _position: PackedVector2Array = PackedVector2Array()
 var _born: PackedInt64Array = PackedInt64Array()
 ## The familiar's wizard, or null.
 var _caster: Array[Node2D] = []
+## Without a wizard: the point a familiar circles (INF for none), and the slot and sequence number
+## of the shot it follows (-1 for none).
+var _centre_at: PackedVector2Array = PackedVector2Array()
+var _centre_slot: PackedInt32Array = PackedInt32Array()
+var _centre_seq: PackedInt64Array = PackedInt64Array()
 ## One pooled node per row, used when the row is a decoy.
 var _decoys: Array[Decoy] = []
 var _spawned: int = 0
@@ -136,6 +146,9 @@ func _init() -> void:
 	for row in POOL_SIZE:
 		_kind.append(&"")
 		_caster.append(null)
+		_centre_at.append(Vector2.INF)
+		_centre_slot.append(-1)
+		_centre_seq.append(0)
 		var decoy := Decoy.new()
 		decoy.name = "Decoy%d" % row
 		decoy.modulate.a = DECOY_ALPHA
@@ -227,7 +240,7 @@ func clear() -> void:
 	queue_redraw()
 
 
-func _on_spawn_requested(player: int, kind: StringName, at: Vector2, seconds: float, tag: int) -> void:
+func _on_spawn_requested(player: int, kind: StringName, at: Vector2, seconds: float, tag: int, caster: int = CASTER_WIZARD) -> void:
 	if player < 0 or player >= PLAYER_SLOTS or not at.is_finite() or is_nan(seconds):
 		return
 	if kind != DECOY and kind != FAMILIAR:
@@ -249,7 +262,16 @@ func _on_spawn_requested(player: int, kind: StringName, at: Vector2, seconds: fl
 	_born[row] = _spawned
 	_spawned += 1
 	_live += 1
-	var wizard: Node2D = _wizard_of(player)
+	var wizard: Node2D = _wizard_of(player) if caster == CASTER_WIZARD or kind == DECOY else null
+	_centre_at[row] = Vector2.INF
+	_centre_slot[row] = -1
+	if kind == FAMILIAR and caster != CASTER_WIZARD:
+		# A trigger made it: it circles the shot that fired the trigger, or the point.
+		_centre_at[row] = at
+		if caster >= 0 and projectiles != null and projectiles.is_alive(caster):
+			_centre_slot[row] = caster
+			_centre_seq[row] = projectiles.get_seq_of(caster)
+			_centre_at[row] = projectiles.get_position_of(caster)
 	if kind == DECOY:
 		var decoy: Decoy = _decoys[row]
 		decoy.position = at
@@ -264,6 +286,8 @@ func _on_spawn_requested(player: int, kind: StringName, at: Vector2, seconds: fl
 			# Start on the side of the wizard where the card put it.
 			var from: Vector2 = at - _centre_of(wizard)
 			_angle[row] = from.angle() if from != Vector2.ZERO else 0.0
+			_position[row] = _orbit_point(row)
+		elif _centre_at[row].is_finite():
 			_position[row] = _orbit_point(row)
 	queue_redraw()
 
@@ -314,12 +338,21 @@ func _step_familiar(row: int, delta: float) -> void:
 	events.familiar_cast_requested.emit(_player[row], _position[row], direction, _tag[row])
 
 
-## Where familiar `row` is now: on its circle round the wizard, or where it was without one.
+## Where familiar `row` is now: on its circle round the wizard, the shot or the point it circles,
+## or where it was without any.
 func _orbit_point(row: int) -> Vector2:
 	var wizard: Node2D = _caster[row]
-	if wizard == null:
-		return _position[row]
-	return _centre_of(wizard) + Vector2.from_angle(_angle[row]) * FAMILIAR_ORBIT
+	if wizard != null:
+		return _centre_of(wizard) + Vector2.from_angle(_angle[row]) * FAMILIAR_ORBIT
+	var shot: int = _centre_slot[row]
+	if shot >= 0:
+		if projectiles != null and projectiles.is_alive(shot) and projectiles.get_seq_of(shot) == _centre_seq[row]:
+			_centre_at[row] = projectiles.get_position_of(shot)
+		else:
+			_centre_slot[row] = -1
+	if _centre_at[row].is_finite():
+		return _centre_at[row] + Vector2.from_angle(_angle[row]) * FAMILIAR_ORBIT
+	return _position[row]
 
 
 func _end(row: int, announce: bool) -> void:

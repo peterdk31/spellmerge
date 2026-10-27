@@ -1,0 +1,12 @@
+{
+	"id": "short_delay_shock_ring",
+	"name": "Short delay shock ring",
+	"does": "A ring of shock that is ready again in half the time, so the second ring at 0.5 s goes out too.",
+	"casts": [
+		{"staff": 0, "cards": ["storm", "short_delay", "nova"]},
+		{"staff": 0, "cards": ["storm", "short_delay", "nova"], "at": 0.5}
+	],
+	"imps": [[40, 0], [0, 40], [-40, 0]],
+	"seconds": 1.5,
+	"checks": [{"kind": "status", "imps": [0, 1, 2], "status": "shock"}]
+}

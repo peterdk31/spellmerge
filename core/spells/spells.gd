@@ -22,11 +22,18 @@ extends Node
 ## starts at the hit point (the shot's place at expiry, a little back from a wall; the shot's
 ## place for a timer), flies along the shot's velocity (outward from the caster through the shot
 ## for an orbit or still shot, along the beam for a ray) and cannot hit the target that fired it
-## for `SpellLimits.SOURCE_EXCLUSION` seconds (a beam never hits it). Each shot fires at most
+## for `SpellLimits.SOURCE_EXCLUSION` seconds (a beam never hits it). A payload is cast by the
+## shot that fired it while that shot flies, else by the point (`_caster`): dash, teleport, hook,
+## swap and recoil move that shot, orbit, familiar and return circle it. Each shot fires at most
 ## `trigger_max_fires` times. One player's triggers fire at most `SpellLimits.MAX_FIRES_PER_STEP`
 ## payloads per `step` (an engine safeguard, not a build limit); the rest are dropped, never
-## queued (`fires_dropped` counts them). A beam fires an on-expire payload at its end and has no
-## timer. Payloads send no `spell_cast`: the player's staff does.
+## queued (`fires_dropped` counts them). A beam fires an on-expire payload where it ends when its
+## life is over, and has no timer.
+##
+## Beams: a beam lives its `lifetime` (`_start_beam`), held by its caster (the wizard's aim from
+## `set_aim`, or its shot), hits at once and every `SpellLimits.BEAM_TICK`, and a homing one bends
+## onto a target. `beam_*` give its look to `gameplay/feel`. Dash and teleport move their caster a
+## fixed `ray_length`; speed only sets how long a dash takes. Payloads send no `spell_cast`: the player's staff does.
 ##
 ## Chain: a shot of a spell with `chain_jumps` that hits a target spawns a shot of the same
 ## tag from the hit point to the nearest other target within `SpellLimits.CHAIN_RANGE`
@@ -99,6 +106,9 @@ class PendingLaunch:
 	var source: Node = null
 	## The caster's anchor when it was scheduled (`Vector2.INF` if the launch is not the cast's).
 	var anchor: Vector2 = Vector2.INF
+	## Who casts it (`_caster` and `_caster_seq` when it was scheduled).
+	var caster: int = -1
+	var caster_seq: int = 0
 	## The scatter stream's seed for this firing, so it points the same way however late it runs.
 	var seed: int = 0
 	## The rain whose payload this is, so its own trigger (`on expire`) fires as it lands.
@@ -192,6 +202,25 @@ var _scatter: RandomNumberGenerator = RandomNumberGenerator.new()
 ## The carrier whose echo is being launched: its shots hit at the echo's half damage.
 var _echo_spell: CompiledSpell = null
 
+## Who casts the launch being fired: the player's wizard (CASTER_WIZARD, a staff's own cast), the
+## point it starts from (CASTER_POINT: a payload whose shot is gone, or one a beam, a rain or an
+## entity fired), or the slot of the shot that fired the payload, while it is the shot with
+## `_caster_seq`. One rule for every card that names the caster: dash, teleport, hook, swap and
+## recoil move it; orbit, familiar and a returning shot circle it or come back to it.
+const CASTER_WIZARD: int = ProjectilesScript.CASTER_WIZARD
+const CASTER_POINT: int = ProjectilesScript.CASTER_POINT
+var _caster: int = CASTER_WIZARD
+var _caster_seq: int = 0
+## Moves of shots whose end point is still to come (a dash whose caster is a shot): the shot,
+## its sequence number, the carrier's tag, seconds left, its heading and where it was last seen.
+var _mv_slot: PackedInt32Array = PackedInt32Array()
+var _mv_seq: PackedInt64Array = PackedInt64Array()
+var _mv_tag: PackedInt64Array = PackedInt64Array()
+var _mv_left: PackedFloat32Array = PackedFloat32Array()
+var _mv_heading: PackedVector2Array = PackedVector2Array()
+var _mv_at: PackedVector2Array = PackedVector2Array()
+var _mv_count: int = 0
+
 ## The beam being cast: its tag, direction and how many fires it has left.
 var _ray_tag: int = 0
 var _ray_dir: Vector2 = Vector2.ZERO
@@ -215,6 +244,40 @@ var _jq_prev: PackedInt64Array = PackedInt64Array()
 var _jq_head: int = 0
 var _jq_count: int = 0
 var _jq_busy: bool = false
+
+## The live beams (see `_start_beam`), `SpellLimits.BEAMS` rows made once; `_bm_on` says which
+## are in use. Each keeps what a shot's record keeps (fires, chain) plus where it is: its origin,
+## way, the curve's pull and end, how far it got and where (its tip), and its caster.
+var _bm_on: PackedByteArray = PackedByteArray()
+var _bm_born: PackedInt64Array = PackedInt64Array()
+var _bm_next_born: int = 0
+var _bm_spell: Array[CompiledSpell] = []
+var _bm_source: Array[Node] = []
+var _bm_tag: PackedInt64Array = PackedInt64Array()
+var _bm_player: PackedInt32Array = PackedInt32Array()
+var _bm_caster: PackedInt32Array = PackedInt32Array()
+var _bm_caster_seq: PackedInt64Array = PackedInt64Array()
+var _bm_life: PackedFloat32Array = PackedFloat32Array()
+var _bm_span: PackedFloat32Array = PackedFloat32Array()
+var _bm_tick: PackedFloat32Array = PackedFloat32Array()
+var _bm_turn: PackedFloat32Array = PackedFloat32Array()
+var _bm_fires: PackedInt32Array = PackedInt32Array()
+var _bm_chain: PackedInt32Array = PackedInt32Array()
+var _bm_prev: PackedInt64Array = PackedInt64Array()
+var _bm_echo: PackedByteArray = PackedByteArray()
+var _bm_origin: PackedVector2Array = PackedVector2Array()
+var _bm_dir: PackedVector2Array = PackedVector2Array()
+var _bm_bend: PackedVector2Array = PackedVector2Array()
+var _bm_end: PackedVector2Array = PackedVector2Array()
+var _bm_reach: PackedFloat32Array = PackedFloat32Array()
+var _bm_tip: PackedVector2Array = PackedVector2Array()
+var _bm_tip_dir: PackedVector2Array = PackedVector2Array()
+var _bm_hit_at: PackedFloat32Array = PackedFloat32Array()
+## player -> the wizard's staff tip and aim from `set_aim` (INF when it holds none), and 1 once
+## the player has sent one (a test that never does keeps its beams where they were cast).
+var _aim_origin: PackedVector2Array = PackedVector2Array([Vector2.INF, Vector2.INF, Vector2.INF, Vector2.INF])
+var _aim_dir: PackedVector2Array = PackedVector2Array([Vector2.INF, Vector2.INF, Vector2.INF, Vector2.INF])
+var _aim_seen: PackedByteArray = PackedByteArray([0, 0, 0, 0])
 
 
 func _init() -> void:
@@ -244,6 +307,36 @@ func _init() -> void:
 	_jq_chain.resize(JUMP_QUEUE)
 	_jq_prev.resize(JUMP_QUEUE)
 	_timers.resize(64)
+	_bm_on.resize(SpellLimits.BEAMS)
+	_bm_born.resize(SpellLimits.BEAMS)
+	_bm_spell.resize(SpellLimits.BEAMS)
+	_bm_source.resize(SpellLimits.BEAMS)
+	_bm_tag.resize(SpellLimits.BEAMS)
+	_bm_player.resize(SpellLimits.BEAMS)
+	_bm_caster.resize(SpellLimits.BEAMS)
+	_bm_caster_seq.resize(SpellLimits.BEAMS)
+	_bm_life.resize(SpellLimits.BEAMS)
+	_bm_span.resize(SpellLimits.BEAMS)
+	_bm_tick.resize(SpellLimits.BEAMS)
+	_bm_turn.resize(SpellLimits.BEAMS)
+	_bm_fires.resize(SpellLimits.BEAMS)
+	_bm_chain.resize(SpellLimits.BEAMS)
+	_bm_prev.resize(SpellLimits.BEAMS)
+	_bm_echo.resize(SpellLimits.BEAMS)
+	_bm_origin.resize(SpellLimits.BEAMS)
+	_bm_dir.resize(SpellLimits.BEAMS)
+	_bm_bend.resize(SpellLimits.BEAMS)
+	_bm_end.resize(SpellLimits.BEAMS)
+	_bm_reach.resize(SpellLimits.BEAMS)
+	_bm_tip.resize(SpellLimits.BEAMS)
+	_bm_tip_dir.resize(SpellLimits.BEAMS)
+	_bm_hit_at.resize(SpellLimits.BEAMS)
+	_mv_slot.resize(SpellLimits.SHOT_MOVES)
+	_mv_seq.resize(SpellLimits.SHOT_MOVES)
+	_mv_tag.resize(SpellLimits.SHOT_MOVES)
+	_mv_left.resize(SpellLimits.SHOT_MOVES)
+	_mv_heading.resize(SpellLimits.SHOT_MOVES)
+	_mv_at.resize(SpellLimits.SHOT_MOVES)
 
 
 func _ready() -> void:
@@ -320,16 +413,24 @@ func staff_view(cards: Array[StringName], staff: StaffBase) -> Dictionary:
 	return {"empty": compiled.is_empty(), "cards": row, "casts": casts, "wasted": compiled.wasted.duplicate(), "staff": staff}
 
 
-## The damage one cast deals if every shot of it lands once: each carrier's hit times its
-## shots, times the group's repeats. Payloads are left out (they depend on what is hit), so it is
-## the builder's "at least" number.
+## The damage one cast deals if every shot of it lands once (a beam: every hit of its life):
+## each carrier's hit times its shots, times the group's repeats. Payloads are left out (they
+## depend on what is hit), so it is the builder's "at least" number.
 static func _cast_damage(cast: CompiledCast) -> int:
 	if cast.group == null:
 		return 0
 	var total: int = 0
 	for spell in cast.group.spells:
-		total += spell.damage * maxi(spell.shots, 1)
+		total += spell.damage * maxi(spell.shots, 1) * beam_hits(spell.motion, spell.lifetime)
 	return total * maxi(cast.group.repeats, 1)
+
+
+## How many times a carrier with `motion` that lives `lifetime` seconds hits one target: a live
+## beam once at once and then every `SpellLimits.BEAM_TICK` seconds of its life; anything else once.
+static func beam_hits(motion: int, lifetime: float) -> int:
+	if motion != FormBase.Motion.RAY:
+		return 1
+	return maxi(ceili(lifetime / SpellLimits.BEAM_TICK - 0.001), 1)
 
 
 ## What the builder shows of the component `id`: its name (the id when it has none, "" for
@@ -355,7 +456,8 @@ func component_stats(id: StringName) -> PackedStringArray:
 	var component: SpellComponent = _component(id)
 	if component is FormBase:
 		var form: FormBase = component
-		out.append("Dmg %d" % form.base_damage if form.shots <= 1 else "Dmg %dx%d" % [form.base_damage, form.shots])
+		var hits: int = maxi(form.shots, 1) * beam_hits(form.motion, form.lifetime)
+		out.append("Dmg %d" % form.base_damage if hits <= 1 else "Dmg %dx%d" % [form.base_damage, hits])
 		out.append("Mana " + _short(form.mana_cost))
 		out.append("Delay %ss" % _short(form.cooldown))
 	elif component is ModifierBase:
@@ -404,12 +506,11 @@ func component_stats(id: StringName) -> PackedStringArray:
 	return out
 
 
-## A number as the builder writes it: at most two decimals, no trailing zeros, no leading zero
-## (0.35 is ".35").
+## A number as the builder writes it: at most two decimals and no trailing zeros, keeping the
+## leading zero (0.35 is "0.35": ".35" in the pixel font read as 35).
 static func _short(value: float) -> String:
 	var text: String = "%.2f" % value
-	text = text.rstrip("0").rstrip(".")
-	return text.substr(1) if text.begins_with("0.") else text
+	return text.rstrip("0").rstrip(".")
 
 
 ## The one-line description of the component `id` for the builder, from its lore file in
@@ -552,6 +653,7 @@ func install_staff(player: int, staff: int, compiled: CompiledStaff) -> int:
 			projectiles.remove_by_tag(revoked)
 	for revoked in revoked_tags:
 		_end_entities(revoked)
+		_end_beams_of(revoked)
 	return tag
 
 
@@ -662,6 +764,8 @@ func step(delta: float) -> void:
 	_fires_used.fill(0)
 	_chains_used.fill(0)
 	_clock += delta
+	_step_moves(delta)
+	_step_beams(delta)
 	var i: int = 0
 	while i < _timer_count:
 		var slot: int = _timers[i]
@@ -689,19 +793,8 @@ func _launch(spell: CompiledSpell, tag: int, player: int, origin: Vector2, direc
 	var made: int = 0
 	var carried: int = spell.chain_jumps if chain < 0 else chain
 	var lifetime: float = SpellLimits.HOLD_LIFETIME if spell.behaviour(ModifierBase.Behaviour.HOLD) > 0.0 else spell.lifetime
-	if spell.motion == FormBase.Motion.DASH:
-		# The wizard moves, not a shot: the player picks the way (the way it walks) and answers
-		# with `caster_move_finished` where it stops (staffs A6a).
-		if events != null:
-			_move_heading[player] = direction
-			events.caster_move_requested.emit(player, &"dash", origin + direction * spell.speed * spell.lifetime, spell.lifetime, tag)
-		return 1
-	if spell.motion == FormBase.Motion.TELEPORT:
-		# A blink along the aim, cut short at the first wall; the arrival comes back the same way.
-		if events != null:
-			_move_heading[player] = direction
-			events.caster_move_requested.emit(player, &"teleport", projectiles.clip_to_walls(origin, origin + direction * spell.speed * spell.lifetime), 0.0, tag)
-		return 1
+	if spell.motion == FormBase.Motion.DASH or spell.motion == FormBase.Motion.TELEPORT:
+		return _move_caster(spell, tag, player, origin, direction)
 	if spell.motion == FormBase.Motion.DECOY or spell.motion == FormBase.Motion.FAMILIAR:
 		return _spawn_entities(spell, tag, player, origin, count, lifetime)
 	if spell.motion == FormBase.Motion.RAIN:
@@ -709,15 +802,12 @@ func _launch(spell: CompiledSpell, tag: int, player: int, origin: Vector2, direc
 	if spell.motion == FormBase.Motion.WALL:
 		return _launch_wall(spell, tag, player, origin, direction, source, lifetime, carried, prev)
 	var base: float = direction.angle()
-	if spell.motion == FormBase.Motion.RAY and spell.homing_turn > 0.0:
-		direction = projectiles.homing_aim(player, origin, direction, deg_to_rad(30.0), ProjectilesScript.LAYER_ENEMY)
-		base = direction.angle()
 	for n in count:
 		var angle: float = base + _fan_angle(n, count, spell)
 		var heading: Vector2 = Vector2.from_angle(angle)
 		if spell.motion == FormBase.Motion.RAY:
-			_shoot_ray(spell, tag, player, origin, heading, carried, prev, source)
-			made += 1
+			if _start_beam(spell, tag, player, origin, heading, carried, prev, source, lifetime):
+				made += 1
 			continue
 		if spell.motion == FormBase.Motion.FISSURE:
 			_shoot_ray(spell, tag, player, origin, heading, carried, prev, source, -1.0, maxi(spell.pierce, SpellLimits.FISSURE_PIERCE - 1))
@@ -729,7 +819,12 @@ func _launch(spell: CompiledSpell, tag: int, player: int, origin: Vector2, direc
 				var turn: float = SpellLimits.ORBIT_TURN
 				if spell.speed > 0.0 and spell.orbit_radius > 0.0:
 					turn = spell.speed / spell.orbit_radius
-				slot = projectiles.spawn_orbit(player, spell.orbit_radius, base + TAU * n / count, turn, lifetime, spell.radius, ProjectilesScript.LAYER_ENEMY, spell.pierce, tag)
+				# An orbit circles its caster: the wizard, or for a payload the shot or the point.
+				var centre: Vector2 = Vector2.INF
+				if _caster != CASTER_WIZARD:
+					var shot: int = _caster_shot()
+					centre = projectiles.get_position_of(shot) if shot >= 0 else origin
+				slot = projectiles.spawn_orbit(player, spell.orbit_radius, base + TAU * n / count, turn, lifetime, spell.radius, ProjectilesScript.LAYER_ENEMY, spell.pierce, tag, centre)
 			FormBase.Motion.STILL:
 				var at: Vector2 = origin if count == 1 else origin + heading * spell.radius * 2.0
 				slot = projectiles.spawn(player, at, Vector2.ZERO, lifetime, spell.radius, ProjectilesScript.LAYER_ENEMY, spell.pierce, tag, ProjectilesScript.MOTION_STILL)
@@ -748,6 +843,126 @@ func _launch(spell: CompiledSpell, tag: int, player: int, origin: Vector2, direc
 	# The ring is only a cue, drawn once, and only when a shot really flew.
 	if events != null and made > 0 and count > 1 and spell.spread >= 360.0 and spell.motion == FormBase.Motion.STRAIGHT:
 		events.form_shown.emit(player, &"nova", origin, direction, 0.0, spell.tint)
+	return made
+
+
+## Dash and teleport move their caster `ray_length` pixels: a card's distance is fixed, and its
+## speed only says how long a dash takes (`move_seconds`), so `faster` arrives sooner, not
+## farther. The wizard is asked through the player (who picks a dash's way, the way it walks, and
+## answers with `caster_move_finished` where it stops, staffs A6a; a teleport blinks along the
+## aim, cut short at the first wall). A shot that cast it dashes or blinks along `direction`
+## itself, and its end point comes when the move is over. With nothing to move (a payload whose
+## shot is gone) it does nothing and returns 0.
+func _move_caster(spell: CompiledSpell, tag: int, player: int, origin: Vector2, direction: Vector2) -> int:
+	var dash: bool = spell.motion == FormBase.Motion.DASH
+	var offset: Vector2 = direction * move_distance(spell.ray_length, spell.speed, spell.lifetime)
+	var seconds: float = move_seconds(spell.ray_length, spell.speed, spell.lifetime) if dash else 0.0
+	if _caster == CASTER_WIZARD:
+		if events != null:
+			_move_heading[player] = direction
+			if dash:
+				events.caster_move_requested.emit(player, &"dash", origin + offset, seconds, tag)
+			else:
+				events.caster_move_requested.emit(player, &"teleport", projectiles.clip_to_walls(origin, origin + offset), 0.0, tag)
+		return 1
+	var shot: int = _caster_shot()
+	if shot < 0 or not projectiles.move_shot(shot, offset, seconds):
+		return 0
+	_track_move(shot, tag, seconds, direction)
+	return 1
+
+
+## How far a dash or teleport card moves its caster: its `ray_length` (a card made before moves
+## had a distance falls back to speed x lifetime).
+static func move_distance(length: float, speed: float, lifetime: float) -> float:
+	return length if length > 0.0 else speed * lifetime
+
+
+## How long a dash takes: its distance at its speed (its lifetime when it has no speed).
+static func move_seconds(length: float, speed: float, lifetime: float) -> float:
+	if length > 0.0 and speed > 0.0:
+		return length / speed
+	return lifetime
+
+
+## Waits for the end of the move of `shot` (`seconds` from now; at once for 0), which is the end
+## point of the carrier `tag`: its `blast` and its `on expire` payload happen there. The carrier
+## counts as a live shot until then.
+func _track_move(shot: int, tag: int, seconds: float, heading: Vector2) -> void:
+	shot_started(tag)
+	if seconds <= 0.0 or _mv_count >= SpellLimits.SHOT_MOVES:
+		_move_end(tag, projectiles.get_position_of(shot), heading, shot)
+		shot_ended(tag)
+		return
+	_mv_slot[_mv_count] = shot
+	_mv_seq[_mv_count] = projectiles.get_seq_of(shot)
+	_mv_tag[_mv_count] = tag
+	_mv_left[_mv_count] = seconds
+	_mv_heading[_mv_count] = heading
+	_mv_at[_mv_count] = projectiles.get_position_of(shot)
+	_mv_count += 1
+
+
+## Runs the shot moves on by `delta`; one that is over ends where its shot is (or was last seen).
+func _step_moves(delta: float) -> void:
+	var i: int = 0
+	while i < _mv_count:
+		var shot: int = _mv_slot[i]
+		var alive: bool = projectiles.is_alive(shot) and projectiles.get_seq_of(shot) == _mv_seq[i]
+		if alive:
+			_mv_at[i] = projectiles.get_position_of(shot)
+		_mv_left[i] -= delta
+		if _mv_left[i] > 0.0:
+			i += 1
+			continue
+		var tag: int = _mv_tag[i]
+		var at: Vector2 = _mv_at[i]
+		var heading: Vector2 = _mv_heading[i]
+		_mv_count -= 1
+		_mv_slot[i] = _mv_slot[_mv_count]
+		_mv_seq[i] = _mv_seq[_mv_count]
+		_mv_tag[i] = _mv_tag[_mv_count]
+		_mv_left[i] = _mv_left[_mv_count]
+		_mv_heading[i] = _mv_heading[_mv_count]
+		_mv_at[i] = _mv_at[_mv_count]
+		_move_end(tag, at, heading, shot if alive else CASTER_POINT)
+		shot_ended(tag)
+
+
+## A move by the carrier `tag` ended at `at`: its `blast` goes off there and its `on expire`
+## payload leaves from there, cast by `caster` (the wizard, the shot that moved, or the point).
+func _move_end(tag: int, at: Vector2, heading: Vector2, caster: int) -> void:
+	var spell: CompiledSpell = _profiles.get(tag)
+	var player: int = SpellTag.player_of(tag)
+	if spell == null or not at.is_finite():
+		return
+	_blast(spell, tag, player, at)
+	if spell.payload != null and spell.trigger_event == TriggerBase.Event.EXPIRE and _take_fire(player):
+		_launch_as(spell.payload, player, SpellTag.staff_of(tag), SpellTag.generation_of(tag), at, heading, null, caster)
+
+
+## The live shot casting the launch being fired, or -1 when the caster is the wizard, a point,
+## or a shot that has ended since.
+func _caster_shot() -> int:
+	if _caster >= 0 and projectiles.is_alive(_caster) and projectiles.get_seq_of(_caster) == _caster_seq:
+		return _caster
+	return -1
+
+
+## `_launch_group` cast by `caster`: CASTER_WIZARD, CASTER_POINT, or a shot's slot (a shot that
+## is not alive makes the point the caster). The caster from before is set again afterwards.
+func _launch_as(group: CompiledGroup, player: int, staff: int, generation: int, origin: Vector2, heading: Vector2, source: Node, caster: int) -> int:
+	var saved: int = _caster
+	var saved_seq: int = _caster_seq
+	_caster = CASTER_POINT
+	if caster == CASTER_WIZARD:
+		_caster = CASTER_WIZARD
+	elif caster >= 0 and projectiles.is_alive(caster):
+		_caster = caster
+		_caster_seq = projectiles.get_seq_of(caster)
+	var made: int = _launch_group(group, player, staff, generation, origin, heading, source, _caster == CASTER_WIZARD)
+	_caster = saved
+	_caster_seq = saved_seq
 	return made
 
 
@@ -776,9 +991,9 @@ func _telegraph_rain(spell: CompiledSpell, tag: int, player: int, origin: Vector
 ## trigger fires, both from the aim point.
 func _land_rain(spell: CompiledSpell, group: CompiledGroup, player: int, staff: int, generation: int, point: Vector2, heading: Vector2) -> void:
 	if group != null and not group.is_empty() and _take_fire(player):
-		_launch_group(group, player, staff, generation, point, heading, null)
+		_launch_as(group, player, staff, generation, point, heading, null, CASTER_POINT)
 	if spell.payload != null and spell.trigger_event == TriggerBase.Event.EXPIRE and _take_fire(player):
-		_launch_group(spell.payload, player, staff, generation, point, heading, null)
+		_launch_as(spell.payload, player, staff, generation, point, heading, null, CASTER_POINT)
 
 
 ## Wall: `shots` still shots in a line across `direction`, `spread` pixels apart (the shot's
@@ -815,8 +1030,17 @@ func _spawn_entities(spell: CompiledSpell, tag: int, player: int, origin: Vector
 	for n in count:
 		_entities[tag] = _entities.get(tag, 0) + 1
 		shot_started(tag)
-		events.entity_spawn_requested.emit(player, kind, origin, seconds, tag)
+		events.entity_spawn_requested.emit(player, kind, origin, seconds, tag, _entity_caster())
 	return count
+
+
+## What an entity circles or copies, for `entity_spawn_requested`: the wizard (-1), the shot that
+## cast it, or nothing (-2: it stays where it was made).
+func _entity_caster() -> int:
+	if _caster == CASTER_WIZARD:
+		return -1
+	var shot: int = _caster_shot()
+	return shot if shot >= 0 else -2
 
 
 ## An entity of this player ended where it stood: its `blast` and its `on expire` payload happen
@@ -837,7 +1061,7 @@ func _on_entity_ended(player: int, _kind: StringName, position: Vector2, tag: in
 		if blast > 0.0 and events != null:
 			events.area_hit_requested.emit(player, position, blast, tag)
 		if spell.payload != null and spell.trigger_event == TriggerBase.Event.EXPIRE and _take_fire(player):
-			_launch_group(spell.payload, player, SpellTag.staff_of(tag), SpellTag.generation_of(tag), position, Vector2.RIGHT, null)
+			_launch_as(spell.payload, player, SpellTag.staff_of(tag), SpellTag.generation_of(tag), position, Vector2.RIGHT, null, CASTER_POINT)
 	shot_ended(tag)
 
 
@@ -850,7 +1074,7 @@ func _on_familiar_cast(player: int, position: Vector2, direction: Vector2, tag: 
 	if spell == null or spell.own_payload == null or spell.own_payload.is_empty() or not _take_fire(player):
 		return
 	var aim: Vector2 = direction.normalized() if direction.is_finite() and not direction.is_zero_approx() else Vector2.RIGHT
-	_launch_group(spell.own_payload, player, SpellTag.staff_of(tag), SpellTag.generation_of(tag), position, aim, null)
+	_launch_as(spell.own_payload, player, SpellTag.staff_of(tag), SpellTag.generation_of(tag), position, aim, null, CASTER_POINT)
 
 
 ## A revoked build's entities are told to end, and forgotten (their `entity_ended` is then ignored).
@@ -937,17 +1161,17 @@ func _fire_spell(spell: CompiledSpell, player: int, staff: int, generation: int,
 		return _fallback_hit(spell, tag, player, origin)
 	_echo_spell = spell if echoed else null
 	var launched: int = _launch(spell, tag, player, origin, heading, source)
-	if launched > 0 and from_caster:
+	if launched > 0:
 		_recoil(spell, tag, player, origin, heading)
 	if launched > 0 and spell.behaviour(ModifierBase.Behaviour.MIRROR) > 0.0 and (spell.motion == FormBase.Motion.STRAIGHT or spell.motion == FormBase.Motion.RETURN or spell.motion == FormBase.Motion.RAY or spell.motion == FormBase.Motion.FISSURE):
 		var backwards: int = _launch(spell, tag, player, origin, -heading, source)
 		launched += backwards
-		if backwards > 0 and from_caster:
+		if backwards > 0:
 			_recoil(spell, tag, player, origin, -heading)
 	_echo_spell = null
-	# `on cast`: the payload leaves at once, from where the carrier did.
+	# `on cast`: the payload leaves at once, from where the carrier did, cast by the carrier's caster.
 	if launched > 0 and spell.payload != null and spell.trigger_event == TriggerBase.Event.CAST and _take_fire(player):
-		_launch_group(spell.payload, player, staff, generation, origin, heading, source)
+		_launch_group(spell.payload, player, staff, generation, origin, heading, source, from_caster)
 	var echo: float = spell.behaviour(ModifierBase.Behaviour.ECHO)
 	if launched > 0 and not echoed and echo > 0.0 and spell.behaviour(ModifierBase.Behaviour.HOLD) <= 0.0:
 		_delay(echo, null, spell, player, staff, generation, origin, heading, source, from_caster)
@@ -958,9 +1182,16 @@ func _fire_spell(spell: CompiledSpell, player: int, staff: int, generation: int,
 ## pushes the other way, so `mirror` cancels it). Dash and teleport move the caster themselves.
 func _recoil(spell: CompiledSpell, tag: int, player: int, origin: Vector2, heading: Vector2) -> void:
 	var push: float = spell.behaviour(ModifierBase.Behaviour.RECOIL)
-	if push <= 0.0 or events == null or spell.motion == FormBase.Motion.DASH or spell.motion == FormBase.Motion.TELEPORT:
+	if push <= 0.0 or spell.motion == FormBase.Motion.DASH or spell.motion == FormBase.Motion.TELEPORT:
 		return
-	events.caster_move_requested.emit(player, &"recoil", origin - heading * push, SpellLimits.RECOIL_SECONDS, tag)
+	if _caster != CASTER_WIZARD:
+		# A payload's recoil pushes the shot that cast it (a point has nothing to push).
+		var shot: int = _caster_shot()
+		if shot >= 0:
+			projectiles.move_shot(shot, -heading * push, SpellLimits.RECOIL_SECONDS)
+		return
+	if events != null:
+		events.caster_move_requested.emit(player, &"recoil", origin - heading * push, SpellLimits.RECOIL_SECONDS, tag)
 
 
 ## The area hit of a `blast` at the end point `at` of the carrier with `tag`, as wide as its
@@ -978,12 +1209,8 @@ func _on_move_finished(player: int, mode: StringName, position: Vector2, tag: in
 		return
 	if not SpellTag.is_spell_tag(tag) or player != SpellTag.player_of(tag) or player < 0 or player >= SpellLimits.PLAYERS or not position.is_finite():
 		return
-	var spell: CompiledSpell = _profiles.get(tag)
-	if spell == null:
-		return
-	_blast(spell, tag, player, position)
-	if spell.payload != null and spell.trigger_event == TriggerBase.Event.EXPIRE and _take_fire(player):
-		_launch_group(spell.payload, player, SpellTag.staff_of(tag), SpellTag.generation_of(tag), position, _move_heading[player], null)
+	# The wizard moved, so the wizard casts what its end point fires.
+	_move_end(tag, position, _move_heading[player], CASTER_WIZARD)
 
 
 ## Queues a launch `wait` seconds from now: `group` (a burst's later firing) or, with no group,
@@ -1005,6 +1232,8 @@ func _delay(wait: float, group: CompiledGroup, spell: CompiledSpell, player: int
 	launch.heading = heading
 	launch.source = source
 	launch.anchor = Vector2.INF
+	launch.caster = _caster
+	launch.caster_seq = _caster_seq
 	if from_caster and projectiles != null:
 		launch.anchor = projectiles.get_anchor(player)
 	_pending.append(launch)
@@ -1030,6 +1259,11 @@ func _run_pending() -> void:
 			var now: Vector2 = projectiles.get_anchor(launch.player)
 			if now.is_finite():
 				origin += now - launch.anchor
+		# A payload's later firing is cast by its shot if that still flies, else from the point.
+		var caster: int = launch.caster
+		if caster >= 0 and not (projectiles.is_alive(caster) and projectiles.get_seq_of(caster) == launch.caster_seq):
+			caster = CASTER_POINT
+		var caster_seq: int = launch.caster_seq
 		var source: Node = launch.source if is_instance_valid(launch.source) else null
 		var group: CompiledGroup = launch.group
 		var spell: CompiledSpell = launch.spell
@@ -1040,12 +1274,18 @@ func _run_pending() -> void:
 		var landing: CompiledSpell = launch.landing
 		_scatter.seed = launch.seed
 		_release_launch(launch)
+		var saved: int = _caster
+		var saved_seq: int = _caster_seq
+		_caster = caster
+		_caster_seq = caster_seq
 		if landing != null:
 			_land_rain(landing, group, player, staff, generation, origin, heading)
 		elif group != null:
 			_fire_group(group, player, staff, generation, origin, heading, source, from_caster)
 		else:
 			_fire_spell(spell, player, staff, generation, origin, heading, source, from_caster, true)
+		_caster = saved
+		_caster_seq = saved_seq
 
 
 ## Gives a finished record back to the pool.
@@ -1104,6 +1344,14 @@ func _register(slot: int, tag: int, spell: CompiledSpell, fires: int, chain: int
 		_rec_relay.resize(size)
 		_hurt_slots.resize(size)
 	_rec_relay[slot] = spell.echo_hit if spell == _echo_spell else null
+	if _caster != CASTER_WIZARD:
+		# A payload's shot: an orbit circles the shot that cast it and a returning one flies back
+		# to it, or to the point it was cast from.
+		var shot: int = _caster_shot()
+		if shot >= 0:
+			projectiles.set_caster_shot(slot, shot)
+		elif projectiles.is_cast_by_wizard(slot):
+			projectiles.set_caster_point(slot, projectiles.get_position_of(slot))
 	_rec_seq[slot] = projectiles.get_seq_of(slot)
 	_rec_fires[slot] = fires
 	_rec_chain[slot] = chain
@@ -1156,6 +1404,261 @@ func _shoot_ray(spell: CompiledSpell, tag: int, player: int, origin: Vector2, he
 	_cast_jumps()
 
 
+## A live beam (`beam` carrier): it lives its `lifetime` (a `hold` one until it is switched off),
+## held by its caster: from the wizard's staff tip along its aim (`set_aim`), from the shot whose
+## trigger cast it along that shot's way, or from a fixed point. A homing one bends along a curve
+## to the nearest target in front of it. It hits what is on it at once and then every
+## `SpellLimits.BEAM_TICK` seconds; between hits it only finds how far it gets, for its look.
+## Its `blast` and `on expire` payload happen where it ends when its life is over. Returns false
+## when it could not start (no direction).
+func _start_beam(spell: CompiledSpell, tag: int, player: int, origin: Vector2, heading: Vector2, chain: int, prev: int, source: Node, lifetime: float) -> bool:
+	if not heading.is_finite() or heading.is_zero_approx() or not origin.is_finite():
+		return false
+	var at: int = _bm_on.find(0)
+	if at < 0:
+		# Every beam is on: the oldest ends (quietly, as the projectile cap drops a shot).
+		at = 0
+		for i in SpellLimits.BEAMS:
+			if _bm_born[i] < _bm_born[at]:
+				at = i
+		_end_beam(at, false)
+	_bm_on[at] = 1
+	_bm_born[at] = _bm_next_born
+	_bm_next_born += 1
+	_bm_spell[at] = spell
+	_bm_source[at] = source
+	_bm_tag[at] = tag
+	_bm_player[at] = player
+	_bm_life[at] = lifetime
+	_bm_span[at] = lifetime
+	_bm_tick[at] = 0.0
+	_bm_fires[at] = spell.trigger_max_fires
+	_bm_chain[at] = chain
+	_bm_prev[at] = prev
+	_bm_echo[at] = 1 if _echo_spell == spell else 0
+	_bm_origin[at] = origin
+	_bm_dir[at] = heading.normalized()
+	_bm_reach[at] = 0.0
+	_bm_hit_at[at] = _clock
+	# How far off its caster's way the beam points (a fan, a multicast or a mirror keeps it).
+	_bm_caster[at] = _caster
+	_bm_caster_seq[at] = _caster_seq
+	_bm_turn[at] = 0.0
+	if _caster == CASTER_WIZARD:
+		if _aim_dir[player].is_finite():
+			_bm_turn[at] = _aim_dir[player].angle_to(heading)
+	else:
+		var shot: int = _caster_shot()
+		var way: Vector2 = projectiles.get_velocity_of(shot) if shot >= 0 else Vector2.ZERO
+		if way.is_zero_approx():
+			_bm_caster[at] = CASTER_POINT
+		else:
+			_bm_turn[at] = way.angle_to(heading)
+	shot_started(tag)
+	_beam_step(at, 0.0)
+	return true
+
+
+## Runs live beam `at` on by `delta`: its life, where its caster holds it, its path and its hit.
+func _beam_step(at: int, delta: float) -> void:
+	_bm_life[at] -= delta
+	if _bm_life[at] <= 0.0:
+		_end_beam(at, true)
+		return
+	_beam_follow(at)
+	if _bm_on[at] == 0:
+		return
+	_beam_path(at)
+	_bm_tick[at] -= delta
+	var hit: bool = _bm_tick[at] <= 0.0
+	if hit:
+		_bm_tick[at] = maxf(_bm_tick[at] + SpellLimits.BEAM_TICK, 0.001)
+	_beam_cast(at, hit)
+
+
+## Puts live beam `at` where its caster holds it now. A beam whose wizard has no aim any more
+## (down, gone) ends quietly; one whose shot is gone stays where the shot last was.
+func _beam_follow(at: int) -> void:
+	var caster: int = _bm_caster[at]
+	if caster == CASTER_WIZARD:
+		var player: int = _bm_player[at]
+		if _aim_origin[player].is_finite():
+			_bm_origin[at] = _aim_origin[player]
+			_bm_dir[at] = _aim_dir[player].rotated(_bm_turn[at])
+		elif _aim_seen[player] != 0:
+			_end_beam(at, false)
+	elif caster >= 0:
+		if projectiles.is_alive(caster) and projectiles.get_seq_of(caster) == _bm_caster_seq[at]:
+			_bm_origin[at] = projectiles.get_position_of(caster)
+			var way: Vector2 = projectiles.get_velocity_of(caster)
+			if not way.is_zero_approx():
+				_bm_dir[at] = way.normalized().rotated(_bm_turn[at])
+		else:
+			_bm_caster[at] = CASTER_POINT
+
+
+## The curve live beam `at` follows: straight along its way for its `ray_length`, or, when it
+## homes and a target is in front of it, bent from its way onto that target.
+func _beam_path(at: int) -> void:
+	var spell: CompiledSpell = _bm_spell[at]
+	var origin: Vector2 = _bm_origin[at]
+	var way: Vector2 = _bm_dir[at]
+	var length: float = spell.ray_length
+	var end: Vector2 = origin + way * length
+	var bend: Vector2 = origin + way * (length * 0.5)
+	if spell.homing_turn > 0.0:
+		var goal: Vector2 = projectiles.homing_point(_bm_player[at], origin, way, deg_to_rad(spell.homing_angle), ProjectilesScript.LAYER_ENEMY)
+		if goal.is_finite():
+			end = goal
+			bend = origin + way * (origin.distance_to(goal) * 0.6)
+	_bm_bend[at] = bend
+	_bm_end[at] = end
+
+
+## Live beam `at` along its curve: with `hit`, its hits, payloads and chain jumps (in the beam
+## context `_ray_*` that `_on_hit` reads); without, only how far it gets.
+func _beam_cast(at: int, hit: bool) -> void:
+	var spell: CompiledSpell = _bm_spell[at]
+	var tag: int = _bm_tag[at]
+	var player: int = _bm_player[at]
+	var source: Node = _bm_source[at] if is_instance_valid(_bm_source[at]) else null
+	if not hit:
+		_bm_reach[at] = projectiles.ray_curve(player, _bm_origin[at], _bm_bend[at], _bm_end[at], spell.pierce, ProjectilesScript.LAYER_ENEMY, tag, spell.radius * 0.5, source, false)
+		_bm_tip[at] = projectiles.ray_end
+		_bm_tip_dir[at] = projectiles.ray_end_heading
+		return
+	var saved_tag: int = _ray_tag
+	var saved_dir: Vector2 = _ray_dir
+	var saved_fires: int = _ray_fires
+	var saved_chain: int = _ray_chain
+	var saved_prev: int = _ray_prev
+	var saved_echo: CompiledSpell = _echo_spell
+	_ray_tag = tag
+	_ray_dir = _bm_dir[at]
+	_ray_fires = _bm_fires[at]
+	_ray_chain = _bm_chain[at]
+	_ray_prev = _bm_prev[at]
+	_echo_spell = spell if _bm_echo[at] != 0 else null
+	var got: float = projectiles.ray_curve(player, _bm_origin[at], _bm_bend[at], _bm_end[at], spell.pierce, ProjectilesScript.LAYER_ENEMY, tag, spell.radius * 0.5, source, true)
+	var tip: Vector2 = projectiles.ray_end
+	var tip_dir: Vector2 = projectiles.ray_end_heading
+	_bm_fires[at] = _ray_fires
+	_ray_tag = saved_tag
+	_ray_dir = saved_dir
+	_ray_fires = saved_fires
+	_ray_chain = saved_chain
+	_ray_prev = saved_prev
+	_echo_spell = saved_echo
+	# A hit handler may have ended this beam (a rebuild) or reused its row.
+	if _bm_on[at] != 0 and _bm_spell[at] == spell and _bm_tag[at] == tag:
+		_bm_reach[at] = got
+		_bm_tip[at] = tip
+		_bm_tip_dir[at] = tip_dir
+		_bm_hit_at[at] = _clock
+	_cast_jumps()
+
+
+## Live beam `at` is over. With `finished` (its life ran out), its `blast` and its `on expire`
+## payload happen where it ends; a beam switched off, rebuilt or dropped ends quietly.
+func _end_beam(at: int, finished: bool) -> void:
+	if _bm_on[at] == 0:
+		return
+	_bm_on[at] = 0
+	var spell: CompiledSpell = _bm_spell[at]
+	var tag: int = _bm_tag[at]
+	var player: int = _bm_player[at]
+	_bm_spell[at] = null
+	_bm_source[at] = null
+	var tip: Vector2 = _bm_tip[at]
+	if finished and spell != null and _bm_reach[at] > 0.0 and tip.is_finite():
+		_blast(spell, tag, player, tip)
+		if spell.payload != null and spell.trigger_event == TriggerBase.Event.EXPIRE and _bm_fires[at] > 0 and _take_fire(player):
+			_fire_payload(spell, tag, player, tip, _bm_tip_dir[at] if not _bm_tip_dir[at].is_zero_approx() else _bm_dir[at], null)
+	shot_ended(tag)
+
+
+## Ends the live beams of `tag` quietly (a `hold` switched off, a revoked build).
+func _end_beams_of(tag: int) -> void:
+	for at in SpellLimits.BEAMS:
+		if _bm_on[at] != 0 and _bm_tag[at] == tag:
+			_end_beam(at, false)
+
+
+## Runs every live beam on by `delta` (a beam started meanwhile, by a payload, waits for the next).
+func _step_beams(delta: float) -> void:
+	var first_new: int = _bm_next_born
+	for at in SpellLimits.BEAMS:
+		if _bm_on[at] != 0 and _bm_born[at] < first_new:
+			_beam_step(at, delta)
+
+
+## Where `player`'s wizard holds its staffs now: the staff tip (`origin`) and the aim. The player
+## calls it every physics step, so a beam the wizard casts follows the aim while it lives.
+func set_aim(player: int, origin: Vector2, direction: Vector2) -> void:
+	if player < 0 or player >= SpellLimits.PLAYERS or not origin.is_finite() or not direction.is_finite() or direction.is_zero_approx():
+		return
+	_aim_origin[player] = origin
+	_aim_dir[player] = direction.normalized()
+	_aim_seen[player] = 1
+
+
+## `player`'s wizard holds nothing any more (down, or gone): its beams end.
+func clear_aim(player: int) -> void:
+	if player < 0 or player >= SpellLimits.PLAYERS:
+		return
+	_aim_origin[player] = Vector2.INF
+	_aim_dir[player] = Vector2.INF
+
+
+## The live beams, for their look (`gameplay/feel` draws them every frame): `beam_slots()` rows,
+## each on or off. A beam on runs from `beam_origin` along the curve pulled toward `beam_bend` to
+## `beam_end`, cut to its first `beam_reach` pixels (a wall, or the target that spends it).
+## `beam_since_hit` is seconds since its last hit; `beam_left` is its life left, 0 to 1.
+func beam_slots() -> int:
+	return SpellLimits.BEAMS
+
+
+func beam_on(at: int) -> bool:
+	return at >= 0 and at < SpellLimits.BEAMS and _bm_on[at] != 0
+
+
+func beam_player(at: int) -> int:
+	return _bm_player[at]
+
+
+func beam_origin(at: int) -> Vector2:
+	return _bm_origin[at]
+
+
+func beam_bend(at: int) -> Vector2:
+	return _bm_bend[at]
+
+
+func beam_end(at: int) -> Vector2:
+	return _bm_end[at]
+
+
+func beam_reach(at: int) -> float:
+	return _bm_reach[at]
+
+
+func beam_tint(at: int) -> Color:
+	return _bm_spell[at].tint if _bm_spell[at] != null else Color.WHITE
+
+
+func beam_since_hit(at: int) -> float:
+	return _clock - _bm_hit_at[at]
+
+
+func beam_left(at: int) -> float:
+	return clampf(_bm_life[at] / _bm_span[at], 0.0, 1.0) if _bm_span[at] > 0.0 and _bm_span[at] < SpellLimits.HOLD_LIFETIME else 1.0
+
+
+## Live beams on now (tests).
+func beam_count() -> int:
+	return _bm_on.count(1)
+
+
 ## Casts the queued beam jumps, if this is the outermost beam. Each jump's own jumps join the
 ## end of the queue, so the chain runs as a loop, one `ray()` deep per jump.
 func _cast_jumps() -> void:
@@ -1184,8 +1687,10 @@ func _is_timer(slot: int) -> bool:
 
 ## Fires the payload of `spell` (whose shot has `tag`) from `at` along `heading`, in the same
 ## player's staff and generation as the shot.
-func _fire_payload(spell: CompiledSpell, tag: int, player: int, at: Vector2, heading: Vector2, source: Node) -> int:
-	return _launch_group(spell.payload, player, SpellTag.staff_of(tag), SpellTag.generation_of(tag), at, heading, source)
+## Fires the payload of `spell` from `at`. Its caster is the shot in `slot` that fired it while
+## that shot still flies, otherwise the point `at` (see `_caster`).
+func _fire_payload(spell: CompiledSpell, tag: int, player: int, at: Vector2, heading: Vector2, source: Node, slot: int = -1) -> int:
+	return _launch_as(spell.payload, player, SpellTag.staff_of(tag), SpellTag.generation_of(tag), at, heading, source, slot if slot >= 0 else CASTER_POINT)
 
 
 ## True when this player may fire one more payload in this step.
@@ -1208,12 +1713,12 @@ func _knows(slot: int) -> bool:
 	return _same(slot) and projectiles.is_alive(slot)
 
 
-## The way a payload fired by a shot goes: its velocity, or outward from the caster
+## The way a payload fired by a shot goes: its velocity, or outward from the shot's caster
 ## through the shot for an orbit or still one (or one with no velocity).
 func _heading(spell: CompiledSpell, slot: int, at: Vector2, player: int) -> Vector2:
 	var velocity: Vector2 = projectiles.get_velocity_of(slot)
 	if spell.motion == FormBase.Motion.ORBIT or spell.motion == FormBase.Motion.STILL or velocity.is_zero_approx():
-		var anchor: Vector2 = projectiles.get_anchor(player)
+		var anchor: Vector2 = projectiles.get_caster_of(slot) if slot >= 0 else projectiles.get_anchor(player)
 		if anchor.is_finite() and not (at - anchor).is_zero_approx():
 			return (at - anchor).normalized()
 	return Vector2.RIGHT if velocity.is_zero_approx() else velocity.normalized()
@@ -1231,7 +1736,7 @@ func _fire_timer(slot: int) -> void:
 		return
 	_rec_fires[slot] -= 1
 	var at: Vector2 = projectiles.get_position_of(slot)
-	_fire_payload(spell, tag, player, at, _heading(spell, slot, at, player), null)
+	_fire_payload(spell, tag, player, at, _heading(spell, slot, at, player), null, slot)
 
 
 func _on_hit(player: int, target: Node, position: Vector2, tag: int) -> void:
@@ -1272,7 +1777,7 @@ func _on_hit(player: int, target: Node, position: Vector2, tag: int) -> void:
 	var struck: int = target.get_instance_id()
 	_on_hit_effects(spell, tag, player, target, position, slot)
 	if held:
-		_fire_payload(spell, tag, player, position, heading, target)
+		_fire_payload(spell, tag, player, position, heading, target, slot)
 	if chain > 0:
 		_jump(spell, tag, player, position, target as Node2D, struck, prev, fires, chain - 1, by_ray, echoed)
 
@@ -1284,17 +1789,35 @@ func _on_hit_effects(spell: CompiledSpell, tag: int, player: int, target: Node, 
 	var refund: float = spell.behaviour(ModifierBase.Behaviour.SIPHON)
 	if refund > 0.0 and events != null:
 		events.mana_refund_requested.emit(player, refund)
-	if spell.motion == FormBase.Motion.HOOK and events != null:
-		var anchor: Vector2 = projectiles.get_anchor(player)
-		_move_heading[player] = anchor.direction_to(position) if anchor.is_finite() and not anchor.is_equal_approx(position) else Vector2.RIGHT
-		events.caster_move_requested.emit(player, &"hook", position, SpellLimits.HOOK_SECONDS, tag)
+	# A hook pulls its caster and a swap trades places with it: the wizard (through the player),
+	# or the shot that cast this one; one cast from a point has nothing to move.
+	var by_wizard: bool = slot < 0 or projectiles.is_cast_by_wizard(slot)
+	var caster: int = projectiles.caster_shot_of(slot) if not by_wizard else -1
+	var pulled: bool = false
+	if spell.motion == FormBase.Motion.HOOK:
+		if by_wizard and events != null:
+			var anchor: Vector2 = projectiles.get_anchor(player)
+			_move_heading[player] = anchor.direction_to(position) if anchor.is_finite() and not anchor.is_equal_approx(position) else Vector2.RIGHT
+			events.caster_move_requested.emit(player, &"hook", position, SpellLimits.HOOK_SECONDS, tag)
+			pulled = true
+		elif caster >= 0:
+			var from: Vector2 = projectiles.get_position_of(caster)
+			if projectiles.move_shot(caster, position - from, SpellLimits.HOOK_SECONDS):
+				_track_move(caster, tag, SpellLimits.HOOK_SECONDS, from.direction_to(position))
+				pulled = true
 	elif spell.motion == FormBase.Motion.SWAP and events != null:
-		var anchor: Vector2 = projectiles.get_anchor(player)
 		var node := target as Node2D
-		if node != null and anchor.is_finite():
-			events.target_move_requested.emit(player, target, anchor)
-			events.caster_move_requested.emit(player, &"swap", node.global_position, SpellLimits.SWAP_SECONDS, tag)
-	if slot >= 0 and not projectiles.is_alive(slot) and spell.motion != FormBase.Motion.HOOK:
+		if by_wizard:
+			var anchor: Vector2 = projectiles.get_anchor(player)
+			if node != null and anchor.is_finite():
+				events.target_move_requested.emit(player, target, anchor)
+				events.caster_move_requested.emit(player, &"swap", node.global_position, SpellLimits.SWAP_SECONDS, tag)
+		elif caster >= 0 and node != null:
+			var from: Vector2 = projectiles.get_position_of(caster)
+			events.target_move_requested.emit(player, target, from)
+			projectiles.move_shot(caster, node.global_position - from, 0.0)
+	# A spent shot's blast goes off where it hit; a hook's waits for the arrival of what it pulls.
+	if slot >= 0 and not projectiles.is_alive(slot) and not pulled:
 		_blast(spell, tag, player, position)
 
 
@@ -1407,7 +1930,7 @@ func _fire_event(event: int, player: int, at: Vector2, tag: int, source: Node, b
 	var heading: Vector2 = _ray_dir if by_ray else _heading(spell, slot, at, player)
 	if back_off:
 		at -= heading * SpellLimits.EXPIRE_BACKOFF
-	_fire_payload(spell, tag, player, at, heading, source)
+	_fire_payload(spell, tag, player, at, heading, source, slot)
 
 
 ## `on hurt`: every live carrier of `player` with that trigger fires its payload from where
@@ -1436,7 +1959,7 @@ func _on_hurt(player: int, _amount: int, position: Vector2, _tag: int, _kind: St
 		if spell == null or not _knows(slot) or SpellTag.player_of(tag) != player or _rec_fires[slot] <= 0 or not _take_fire(player):
 			continue
 		_rec_fires[slot] -= 1
-		_fire_payload(spell, tag, player, position, _heading(spell, slot, projectiles.get_position_of(slot), player), null)
+		_fire_payload(spell, tag, player, position, _heading(spell, slot, projectiles.get_position_of(slot), player), null, slot)
 
 
 ## `relay`: a shot with it that passes the teammate `ally_player` takes on the infusions of
@@ -1486,6 +2009,14 @@ func clear() -> void:
 	_chains_used.fill(0)
 	_jq_head = 0
 	_jq_count = 0
+	_mv_count = 0
+	_caster = CASTER_WIZARD
+	_bm_on.fill(0)
+	_bm_spell.fill(null)
+	_bm_source.fill(null)
+	_aim_origin.fill(Vector2.INF)
+	_aim_dir.fill(Vector2.INF)
+	_aim_seen.fill(0)
 	for launch in _pending:
 		_release_launch(launch)
 	_pending.clear()
@@ -1564,6 +2095,8 @@ func _release_hold(index: int) -> void:
 		for tag in tags:
 			if _entities.has(tag):
 				events.entity_end_requested.emit(SpellTag.player_of(tag), tag)
+	for tag in tags:
+		_end_beams_of(tag)
 	if projectiles != null:
 		for tag in tags:
 			# remove_by_tag sends no shot_ended, so the counts are ended here.

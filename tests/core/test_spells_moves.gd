@@ -307,7 +307,9 @@ func test_a_blast_shot_explodes_where_it_expires() -> void:
 func test_a_blast_beam_explodes_at_its_end() -> void:
 	_build(0, [&"blast", &"beam"])
 	_cast()
-	check_equal(_areas.size(), 1, "one explosion")
+	check_equal(_areas.size(), 0, "nothing while the beam is on")
+	_tick(30)
+	check_equal(_areas.size(), 1, "one explosion when its life is over")
 	check(_areas.size() == 1 and absf(_areas[0][1].x - 200.0) < 1.0, "at the end of the beam: %s" % [_areas])
 
 
@@ -414,3 +416,109 @@ func test_a_teleport_of_player_three_ignores_other_players_arrivals() -> void:
 	check_equal(_mgr.get_count(), 0, "another player's arrival fires nothing")
 	_bus.caster_move_finished.emit(3, &"teleport", Vector2(90, 0), tag)
 	check_equal(_mgr.get_count(), 1, "its own does")
+
+
+# --- Fixed move distances and the payload's caster (owner, 2026-10-27) ------------------------
+
+## A dash card that moves a fixed 48 px at 240 px/s, a teleport that blinks 64 px, a timer
+## trigger that fires once after 0.25 s, an orbit, and faster (speed x1.5).
+func _distance_cards() -> void:
+	var short: FormBase = _form(&"short", 240.0, 0.25)
+	short.motion = FormBase.Motion.DASH
+	short.ray_length = 48.0
+	var blink: FormBase = _form(&"blink", 400.0, 0.25)
+	blink.motion = FormBase.Motion.TELEPORT
+	blink.ray_length = 64.0
+	var timer: TriggerBase = _trigger(&"timer", TriggerBase.Event.TIMER)
+	timer.interval = 0.25
+	var orbit: FormBase = _form(&"ring", 3.0, 1.0)
+	orbit.motion = FormBase.Motion.ORBIT
+	orbit.orbit_radius = 20.0
+	var faster := ModifierBase.new()
+	faster.speed_mult = 1.5
+	_put(faster, &"faster")
+
+
+## The live shots that are not `slot`.
+func _others(slot: int) -> Array[int]:
+	var out: Array[int] = []
+	for at in _mgr.get_cap():
+		if at != slot and _mgr.is_alive(at):
+			out.append(at)
+	return out
+
+
+func test_a_dash_moves_its_card_distance_and_faster_only_makes_it_sooner() -> void:
+	_distance_cards()
+	_build(0, [&"short"])
+	_cast(0)
+	check_equal(_moves.size(), 1, "one move")
+	check(_moves[0][2].is_equal_approx(Vector2(48.0, 0.0)), "48 px, the card's distance: %s" % _moves[0][2])
+	check(is_equal_approx(_moves[0][3], 0.2), "at 240 px/s it takes 0.2 s: %s" % _moves[0][3])
+	_mgr.set_anchor(1, Vector2.ZERO)
+	_build(1, [&"faster", &"short"])
+	_cast(1)
+	check_equal(_moves.size(), 2, "a second move")
+	check(_moves[1][2].is_equal_approx(Vector2(48.0, 0.0)), "faster goes no farther: %s" % _moves[1][2])
+	check(is_equal_approx(_moves[1][3], 0.2 / 1.5), "it gets there sooner: %s" % _moves[1][3])
+
+
+func test_a_teleport_blinks_its_card_distance() -> void:
+	_distance_cards()
+	_build(0, [&"blink"])
+	_cast(0)
+	check(_moves.size() == 1 and _moves[0][1] == &"teleport" and _moves[0][2].is_equal_approx(Vector2(64.0, 0.0)), "64 px, the card's distance: %s" % [_moves])
+
+
+func test_a_dash_in_a_payload_moves_the_shot_that_fired_it_not_the_wizard() -> void:
+	_distance_cards()
+	_build(0, [&"timer", &"bolt", &"short"])
+	_cast(0)
+	var bolt: int = _others(-1)[0]
+	_tick(60)
+	check_equal(_moves.size(), 0, "the wizard is not asked to move")
+	check(_mgr.is_alive(bolt), "the bolt still flies")
+	# One second at 300 px/s, plus the dash's 48 px.
+	check(absf(_mgr.get_position_of(bolt).x - (300.0 + 48.0)) < 6.0, "the bolt dashed 48 px: %s" % _mgr.get_position_of(bolt))
+
+
+func test_a_payload_whose_shot_is_gone_has_nothing_to_dash() -> void:
+	_distance_cards()
+	_build(0, [&"on_expire", &"bolt", &"short"])
+	_cast(0)
+	_tick(90)
+	check_equal(_moves.size(), 0, "the wizard is not asked to move")
+
+
+func test_an_orbit_in_a_payload_circles_the_shot_that_fired_it() -> void:
+	_distance_cards()
+	_build(0, [&"timer", &"bolt", &"ring"])
+	_cast(0)
+	var bolt: int = _others(-1)[0]
+	_tick(30)
+	var ring: Array[int] = _others(bolt)
+	check_equal(ring.size(), 1, "the orbit is out")
+	_tick(10)
+	check(_mgr.is_alive(ring[0]) and absf(_mgr.get_position_of(ring[0]).distance_to(_mgr.get_position_of(bolt)) - 20.0) < 6.0, "it circles the bolt as it flies: %s from %s" % [_mgr.get_position_of(ring[0]), _mgr.get_position_of(bolt)])
+	check(_mgr.get_position_of(ring[0]).length() > 60.0, "not the wizard")
+
+
+func test_an_orbit_in_a_payload_whose_shot_is_gone_circles_where_it_ended() -> void:
+	_distance_cards()
+	_build(0, [&"on_expire", &"bolt", &"ring"])
+	_cast(0)
+	_tick(62)
+	var ring: Array[int] = _others(-1)
+	check_equal(ring.size(), 1, "the orbit is out where the bolt ended")
+	_tick(20)
+	check(_mgr.is_alive(ring[0]) and absf(_mgr.get_position_of(ring[0]).distance_to(Vector2(300.0, 0.0)) - 20.0) < 8.0, "it circles the end point: %s" % _mgr.get_position_of(ring[0]))
+
+
+func test_recoil_in_a_payload_pushes_the_shot_that_fired_it() -> void:
+	_distance_cards()
+	_build(0, [&"timer", &"bolt", &"recoil", &"spark"])
+	_cast(0)
+	var bolt: int = _others(-1)[0]
+	_tick(60)
+	check_equal(_moves.size(), 0, "the wizard is not pushed")
+	check(_mgr.is_alive(bolt) and _mgr.get_position_of(bolt).x < 300.0 - 10.0, "the bolt was pushed back: %s" % _mgr.get_position_of(bolt))

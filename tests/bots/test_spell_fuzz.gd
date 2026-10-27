@@ -24,7 +24,7 @@ const ErrorLogScript := preload("res://tests/smoke/error_log.gd")
 
 const SEED: int = 20261026
 ## Random staffs tried.
-const STAFFS: int = 300
+const STAFFS: int = 600
 ## Cards in a random staff at most.
 const SLOTS: int = 10
 ## Seconds each staff is cast and run for.

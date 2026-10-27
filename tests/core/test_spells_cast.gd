@@ -266,14 +266,18 @@ func test_a_beam_and_a_nova_announce_themselves_for_looks() -> void:
 	_bus.form_shown.connect(func(player: int, form: StringName, origin: Vector2, direction: Vector2, length: float, tint: Color) -> void: seen.append([player, form, origin, direction, length, tint]))
 	_build(2, 0, {"form": &"beam", "element": &"fire"})
 	_cast(2, 0, 10.0, Vector2(5, 6), Vector2.DOWN)
-	check_equal(seen.size(), 1, "one beam, one announcement")
-	check_equal(seen[0][0], 2, "from the caster")
-	check_equal(seen[0][1], &"beam", "as a beam")
-	check_equal(seen[0][2], Vector2(5, 6), "from the staff")
-	check((seen[0][3] as Vector2).is_equal_approx(Vector2.DOWN), "along the aim")
-	check(is_equal_approx(seen[0][4], 200.0), "as long as it got (%s)" % str(seen[0][4]))
-	check_equal(seen[0][5], Color(0.88, 0.35, 0.18), "in the element's colour")
-	seen.clear()
+	# A beam lives on for its lifetime, so it is shown from the live beams, not announced.
+	check_equal(seen.size(), 0, "a beam is no announcement")
+	check_equal(_spells.beam_count(), 1, "one live beam")
+	var at: int = -1
+	for i in _spells.beam_slots():
+		if _spells.beam_on(i):
+			at = i
+	check_equal(_spells.beam_player(at), 2, "from the caster")
+	check_equal(_spells.beam_origin(at), Vector2(5, 6), "from the staff")
+	check(_spells.beam_origin(at).direction_to(_spells.beam_end(at)).is_equal_approx(Vector2.DOWN), "along the aim")
+	check(is_equal_approx(_spells.beam_reach(at), 200.0), "as long as it got (%s)" % str(_spells.beam_reach(at)))
+	check_equal(_spells.beam_tint(at), Color(0.88, 0.35, 0.18), "in the element's colour")
 	_build(1, 0, {"form": &"nova"})
 	_cast(1)
 	check_equal(seen.size(), 1, "one nova, one announcement, not one per shot")
@@ -325,7 +329,9 @@ func test_a_beam_hits_instantly_and_counts_as_a_shot() -> void:
 	check_equal(_cast(0), 2.0, "the beam fired")
 	check_equal(_hits.size(), 1, "it hit at once")
 	check_equal(_hits[0][3], tag, "with the spell's tag")
-	check_equal(_spells.live_shots(tag), 0, "and is no longer counted when done")
+	check_equal(_spells.live_shots(tag), 1, "it counts as a shot while it is on")
+	_tick(30)
+	check_equal(_spells.live_shots(tag), 0, "and is no longer counted when its life is over")
 
 
 func test_on_hit_fires_the_held_spell_from_the_hit_point_along_the_shot() -> void:
@@ -487,6 +493,7 @@ func test_a_beam_makes_all_six_jumps() -> void:
 	check_equal(_hits.size(), 6 + 1, "the beam and all six jumps hit, deeper than the ray nesting limit")
 	for i in 7:
 		check_equal(_hits[i][1], line[i], "target %d was hit in order" % i)
+	_tick(30)
 	check_equal(_spells.live_shots(_spells.current_tag(0, 0, 0)), 0, "every beam was counted as ended")
 
 
@@ -500,6 +507,7 @@ func test_split_beams_chain_past_the_ray_depth() -> void:
 	check(_hits.size() > 0, "the beams hit")
 	var spell: CompiledSpell = _compile(recipe)
 	check(_hits.size() > spell.shots * (spell.pierce + 1), "the jumps added hits beyond the first beams: %d" % _hits.size())
+	_tick(30)
 	check_equal(_spells.live_shots(_spells.current_tag(0, 0, 0)), 0, "every beam was counted as ended")
 
 

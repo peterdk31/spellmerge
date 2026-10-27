@@ -63,6 +63,14 @@ const COMBO_SWELL_AT: float = 0.45
 const COMBO_ARCANE: Color = Color("#f4f1ea")
 ## Beams and rings draw above the room, under the shots (50) and the flashes (20).
 const FORM_Z: int = 18
+## Live beams drawn at once (core/spells keeps at most as many), and the points of each one's
+## line: a homing beam bends, so it is drawn as a curve of LIVE_BEAM_POINTS - 1 pieces.
+const LIVE_BEAMS: int = 64
+const LIVE_BEAM_POINTS: int = 9
+## Samples of the curve walked to find where a beam cut short (a wall, a target) ends.
+const LIVE_BEAM_SAMPLES: int = 16
+## The beam texture's height: a line this wide shows it at its own size.
+const BEAM_TEXTURE_HEIGHT: float = 32.0
 
 ## Most hit particles alive at once, across all players (one limit for the "hit" effect).
 const PARTICLE_LIMIT: int = 48
@@ -127,6 +135,8 @@ var registry: RegistryScript = null
 var projectiles: Node = null
 ## The combat autoload, asked only `status_left(enemy, id)` to know when a status ends.
 var combat: Node = null
+## The spell runtime, asked only for its live beams (`beam_*`) to draw them every frame.
+var spells: Node = null
 ## Tests turn this off: no Engine.time_scale changes.
 var drive_engine: bool = true
 ## The stress benchmark turns this off to time a scene without hit particles (the bursts are
@@ -187,6 +197,8 @@ var _flash_size: PackedFloat32Array = PackedFloat32Array()
 var _flash_aspect: PackedVector2Array = PackedVector2Array()
 ## How much each flash grows while it fades (0.5: half its size bigger; negative: it gathers).
 var _flash_grow: PackedFloat32Array = PackedFloat32Array()
+## The live beams (`Spells.beam_*`), one line each, made once.
+var _live_beams: Array[Line2D] = []
 ## Beams and nova rings (sprites made once): seconds left and in all, whether it is a ring,
 ## the owner's body tint and the beam's length in pixels.
 var _forms: Array[Sprite2D] = []
@@ -322,6 +334,22 @@ func _ready() -> void:
 		form.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
 		add_child(form)
 		_forms.append(form)
+	for i in LIVE_BEAMS:
+		var line := Line2D.new()
+		var material := ShaderMaterial.new()
+		material.shader = CORE_SHADER
+		line.material = material
+		line.top_level = true
+		line.visible = false
+		line.z_index = FORM_Z
+		line.texture_mode = Line2D.LINE_TEXTURE_TILE
+		line.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		line.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
+		line.joint_mode = Line2D.LINE_JOINT_ROUND
+		for n in LIVE_BEAM_POINTS:
+			line.add_point(Vector2.ZERO)
+		add_child(line)
+		_live_beams.append(line)
 	_form_left.resize(FORM_SLOTS)
 	_form_total.resize(FORM_SLOTS)
 	_form_is_ring.resize(FORM_SLOTS)
@@ -399,6 +427,8 @@ func _ready() -> void:
 		combat = get_node_or_null("/root/Combat")
 	if projectiles == null:
 		projectiles = get_node_or_null("/root/Projectiles")
+	if spells == null:
+		spells = get_node_or_null("/root/Spells")
 	if projectiles != null and "texture" in projectiles and projectiles.texture == null:
 		projectiles.texture = preset.bolt_texture
 	# Enemy shots look different (a spiky orb, not a comet), so they are never taken for a spell.
@@ -447,6 +477,7 @@ func step(real_delta: float) -> void:
 	_step_flashes(real_delta)
 	_step_combo_marks(real_delta)
 	_step_forms(real_delta)
+	_draw_live_beams()
 	_step_labels(real_delta)
 	_step_arcs(real_delta)
 	_step_statuses(real_delta)
@@ -1209,6 +1240,64 @@ func _step_forms(real_delta: float) -> void:
 			_forms[i].visible = false
 			continue
 		_pose_form(i, _form_left[i] / _form_total[i])
+
+
+## Draw every live beam where it is this frame: along its curve, as far as it got, in its owner's
+## tint with its element's colour in the core. It flares on each hit, flickers a little and fades
+## over the last quarter of its life. Nothing is allocated.
+func _draw_live_beams() -> void:
+	var count: int = 0
+	if spells != null and spells.has_method("beam_slots"):
+		count = mini(int(spells.call("beam_slots")), LIVE_BEAMS)
+	for i in LIVE_BEAMS:
+		var line: Line2D = _live_beams[i]
+		if i >= count or not bool(spells.call("beam_on", i)):
+			if line.visible:
+				line.visible = false
+			continue
+		var origin: Vector2 = spells.call("beam_origin", i)
+		var bend: Vector2 = spells.call("beam_bend", i)
+		var end: Vector2 = spells.call("beam_end", i)
+		var reach: float = spells.call("beam_reach", i)
+		if reach <= 0.0 or not origin.is_finite():
+			line.visible = false
+			continue
+		# How far along the curve (0 to 1) the beam got, then the points spread up to there.
+		var cut: float = 1.0
+		var walked: float = 0.0
+		var prev: Vector2 = origin
+		for n in range(1, LIVE_BEAM_SAMPLES + 1):
+			var t: float = float(n) / LIVE_BEAM_SAMPLES
+			var point: Vector2 = _bezier(origin, bend, end, t)
+			var piece: float = prev.distance_to(point)
+			if walked + piece >= reach:
+				cut = (float(n - 1) + (reach - walked) / maxf(piece, 0.001)) / LIVE_BEAM_SAMPLES
+				break
+			walked += piece
+			prev = point
+		for n in LIVE_BEAM_POINTS:
+			line.set_point_position(n, _bezier(origin, bend, end, cut * float(n) / (LIVE_BEAM_POINTS - 1)))
+		var since: float = spells.call("beam_since_hit", i)
+		var left: float = spells.call("beam_left", i)
+		var fade: float = clampf(left * 4.0, 0.0, 1.0)
+		var flare: float = 1.0 + preset.beam_flare * maxf(1.0 - since / maxf(preset.beam_seconds * preset.beam_flare_share, 0.001), 0.0)
+		var flicker: float = 1.0 - preset.beam_flicker_depth * float(int(since * preset.beam_flicker_rate) % 2)
+		line.width = BEAM_TEXTURE_HEIGHT * maxf(fade, 0.35) * flare * flicker
+		line.texture = preset.beam_texture
+		var player: int = spells.call("beam_player", i)
+		var body: Color = Color.WHITE
+		if projectiles != null and projectiles.has_method("tint_of"):
+			body = projectiles.call("tint_of", player) as Color
+		var tint: Color = spells.call("beam_tint", i)
+		var material: ShaderMaterial = line.material as ShaderMaterial
+		material.set_shader_parameter(&"core_override", Color(tint.r, tint.g, tint.b, 1.0))
+		material.set_shader_parameter(&"body_tint", Color(body.r, body.g, body.b, fade))
+		line.visible = true
+
+
+static func _bezier(origin: Vector2, bend: Vector2, end: Vector2, t: float) -> Vector2:
+	var u: float = 1.0 - t
+	return origin * (u * u) + bend * (2.0 * u * t) + end * (t * t)
 
 
 ## Show form `slot` at `t` (1 just shown, 0 gone), faded. A ring widens; a beam opens extra

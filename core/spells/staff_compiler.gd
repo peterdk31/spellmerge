@@ -265,7 +265,14 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 		spell.behaviours[modifier.behaviour] += modifier.behaviour_strength
 		match modifier.behaviour:
 			ModifierBase.Behaviour.HOMING:
-				spell.homing_turn = maxf(spell.homing_turn, modifier.behaviour_strength)
+				# Homing stacks by multiplying: the strongest card's turn rate, x HOMING_STACK for
+				# each more (owner, 2026-10-27); a beam's bend widens the same way.
+				if spell.homing_turn <= 0.0:
+					spell.homing_turn = modifier.behaviour_strength
+					spell.homing_angle = SpellLimits.BEAM_HOMING_ANGLE
+				else:
+					spell.homing_turn = maxf(spell.homing_turn, modifier.behaviour_strength) * SpellLimits.HOMING_STACK
+					spell.homing_angle = minf(spell.homing_angle * SpellLimits.HOMING_STACK, SpellLimits.BEAM_HOMING_MAX)
 			ModifierBase.Behaviour.CHAIN:
 				spell.chain_jumps += int(modifier.behaviour_strength)
 	spell.look = _look_of(elements, modifiers)
@@ -290,7 +297,7 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 	spell.hit.later_status_ids = later_ids
 	spell.hit.later_status_durations = later_durations
 	spell.hit.later_status_strengths = later_strengths
-	if spell.ray_length > 0.0:
+	if spell.ray_length > 0.0 and spell.motion != FormBase.Motion.DASH and spell.motion != FormBase.Motion.TELEPORT:
 		spell.hit.kind = &"ray"
 	if heals:
 		spell.hit.heal = spell.damage

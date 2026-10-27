@@ -313,16 +313,16 @@ func test_the_builder_view_is_plain_values() -> void:
 func test_each_kind_of_card_has_short_lines_of_its_numbers() -> void:
 	var bolt: FormBase = _fake.items[&"bolt"]
 	bolt.mana_cost = 5.0
-	check_equal(_spells.call("component_stats", &"bolt"), PackedStringArray(["Dmg 5", "Mana 5", "Delay .2s"]), "a carrier: damage, mana, delay")
+	check_equal(_spells.call("component_stats", &"bolt"), PackedStringArray(["Dmg 5", "Mana 5", "Delay 0.2s"]), "a carrier: damage, mana, delay")
 	check_equal((_spells.call("component_stats", &"nova") as PackedStringArray)[0], "Dmg 4x8", "shots multiply the damage")
 	(_fake.items[&"split"] as ModifierBase).damage_mult = 0.5
-	check_equal(_spells.call("component_stats", &"split"), PackedStringArray(["Dmg x.5", "Shots x3"]), "a modifier: what it changes")
+	check_equal(_spells.call("component_stats", &"split"), PackedStringArray(["Dmg x0.5", "Shots x3"]), "a modifier: what it changes")
 	check_equal(_spells.call("component_stats", &"homing"), PackedStringArray(["Homes in"]), "a behaviour in words")
 	check_equal((_spells.call("component_stats", &"fire") as PackedStringArray)[0], "Burn %ss" % SpellsScript._short((_fake.items[&"fire"] as ElementBase).status_duration), "an element: its status and time")
 	check_equal(_spells.call("component_stats", &"on_hit"), PackedStringArray(["On hit"]), "a trigger: when it fires")
 	check_equal(_spells.call("component_stats", &"double"), PackedStringArray(["+1 carriers"]), "a multicast: its draws")
 	check_equal(_spells.call("component_stats", &"no_such_card"), PackedStringArray(), "nothing for an unknown id")
-	check_equal(SpellsScript._short(0.35), ".35", "no leading zero")
+	check_equal(SpellsScript._short(0.35), "0.35", "the leading zero stays, so the dot cannot be missed")
 	check_equal(SpellsScript._short(1.5), "1.5", "no trailing zero")
 	check_equal(SpellsScript._short(10.0), "10", "a whole number")
 

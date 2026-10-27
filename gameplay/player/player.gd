@@ -489,6 +489,8 @@ func _exit_tree() -> void:
 			events.mana_refund_requested.disconnect(_on_mana_refund)
 	if projectiles != null:
 		projectiles.clear_anchor(index)
+	if spells != null:
+		spells.clear_aim(index)
 
 
 func _physics_process(delta: float) -> void:
@@ -505,6 +507,9 @@ func step(delta: float) -> void:
 		else:
 			projectiles.set_anchor(index, global_position + ORBIT_ANCHOR_OFFSET)
 	if _downed:
+		if spells != null:
+			# A downed wizard holds no beam.
+			spells.clear_aim(index)
 		velocity = Vector2.ZERO
 		_clear_recoil()
 		# Presses made while downed are not held against the wizard after a revive.
@@ -533,6 +538,10 @@ func step(delta: float) -> void:
 	if move != Vector2.ZERO:
 		facing = move.normalized()
 	_update_aim(move, delta)
+	if spells != null:
+		# A beam this wizard cast follows the staff tip and the aim while it lives.
+		var tip: Vector2 = muzzle_position()
+		spells.set_aim(index, projectiles.clip_to_walls(global_position, tip) if projectiles != null else tip, aim)
 	if _dash_look:
 		_tick_trail(delta)
 	var pace: float = combat.wizard_speed_factor(index) if combat != null else 1.0

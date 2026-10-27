@@ -170,25 +170,41 @@ func test_the_beam_hits_along_a_line_up_to_its_reach_at_once() -> void:
 	check_equal(_mgr.get_count(), 0, "a beam holds no shot")
 
 
-func test_a_held_beam_hits_one_enemy_four_times_a_second_and_drains_mana_steadily() -> void:
+func test_one_beam_hits_at_once_and_every_tick_of_its_life() -> void:
 	_target(Vector2(60.0, 0.0))
-	StaffKit.build(_spells, 0, 0, [&"beam"] as Array[StringName])
+	var spell: CompiledSpell = StaffKit.first(_spells, [&"beam"] as Array[StringName])
+	_cast(&"beam", 0, Vector2.ZERO)
+	check_equal(_hits.size(), 1, "a hit at once")
+	check_equal(_spells.beam_count(), 1, "and the beam stays on")
+	_tick(60)
+	var hits: int = SpellsScript.beam_hits(FormBase.Motion.RAY, spell.lifetime)
+	check_equal(_hits.size(), hits, "then one hit every %s s of its %s s life" % [SpellLimits.BEAM_TICK, spell.lifetime])
+	check_equal(_spells.beam_count(), 0, "then it is gone")
+	check_equal(spell.damage, 2, "a hit does 2 damage")
+
+
+func test_a_held_beam_stays_on_and_drains_mana_steadily() -> void:
+	_target(Vector2(60.0, 0.0))
+	# The starter staff: the beam's life covers a whole cast cycle, so held fire leaves no gap.
+	var staff: StaffBase = load("res://content/wizard/staffs/starter/starter.tres") as StaffBase
+	_spells.install_staff(0, 0, _spells.compile_staff([&"beam"] as Array[StringName], staff))
 	var spell: CompiledSpell = StaffKit.first(_spells, [&"beam"] as Array[StringName])
 	var mana: float = 100.0
 	var casts: int = 0
-	# Fire is held for 2 seconds: the player casts whenever the cooldown allows.
+	var dark: int = 0
+	# Fire is held for 2 seconds: the player casts whenever the staff allows.
 	for i in 120:
 		var taken: float = _spells.cast_staff(0, 0, Vector2.ZERO, Vector2.RIGHT, mana)
 		if taken != SpellsScript.REFUSED:
 			mana -= taken
 			casts += 1
+		if _spells.beam_count() == 0:
+			dark += 1
 		_tick(1)
-	check_equal(spell.cooldown, 0.25, "the beam ticks every 0.25 s")
-	check_equal(spell.damage, 3, "a tick does 3 damage")
-	check_equal(spell.mana_cost, 4.0, "a tick costs 4 mana")
-	check(absi(casts - 8) <= 1, "one enemy is hit 4 times a second (about 8 in 2 s): %d" % casts)
-	check_equal(_hits.size(), casts, "each tick is one hit")
-	check(absf(100.0 - mana - 4.0 * casts) < 0.01, "each tick takes 4 mana (%f)" % mana)
+	check_equal(dark, 0, "a beam is on in every step")
+	check_equal(spell.mana_cost, 4.0, "a cast costs 4 mana")
+	check(absf(100.0 - mana - 4.0 * casts) < 0.01, "each cast takes 4 mana (%f)" % mana)
+	check(absi(_hits.size() - roundi(2.0 / SpellLimits.BEAM_TICK)) <= 3, "the enemy is hit about every %s s: %d hits" % [SpellLimits.BEAM_TICK, _hits.size()])
 
 
 func test_the_beam_does_not_reach_past_its_length() -> void:

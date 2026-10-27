@@ -32,6 +32,7 @@ func _initialize() -> void:
 	_test_decoy_runs_out()
 	_test_decoy_copies_its_wizard()
 	_test_familiar_circles_its_wizard()
+	_test_a_familiar_from_a_trigger_circles_the_shot_then_where_it_ended()
 	_test_familiar_casts_at_the_nearest_enemy()
 	_test_familiar_waits_without_an_enemy()
 	_test_cap_ends_the_oldest()
@@ -97,7 +98,7 @@ func _enemy_target(at: Vector2) -> Node2D:
 
 
 func _spawn(player: int, kind: StringName, at: Vector2, seconds: float = 5.0, tag: int = TAG) -> void:
-	_world.bus.entity_spawn_requested.emit(player, kind, at, seconds, tag)
+	_world.bus.entity_spawn_requested.emit(player, kind, at, seconds, tag, -1)
 
 
 ## `count` physics frames of the whole world: every imp, Combat, the projectiles, the entities.
@@ -206,6 +207,25 @@ func _test_familiar_circles_its_wizard() -> void:
 	_run(1)
 	var moved: Vector2 = _entities.positions_of(0, TAG)[0]
 	_check(is_equal_approx(moved.distance_to(wizard.position + EntitiesScript.FAMILIAR_CENTRE), EntitiesScript.FAMILIAR_ORBIT), "it follows the wizard")
+
+
+## A familiar a trigger made (its caster a shot) circles that shot, not the wizard; once the shot
+## is gone it circles where the shot was last.
+func _test_a_familiar_from_a_trigger_circles_the_shot_then_where_it_ended() -> void:
+	_setup(1)
+	_world.players[0].position = Vector2(-300.0, 0.0)
+	var shot: int = _world.projectiles.spawn(0, Vector2(100.0, 0.0), Vector2(40.0, 0.0), 2.0, 2.0, 0)
+	_world.bus.entity_spawn_requested.emit(0, EntitiesScript.FAMILIAR, Vector2(100.0, 0.0), 5.0, TAG, shot)
+	_run(10)
+	var at: Vector2 = _entities.positions_of(0, TAG)[0]
+	var centre: Vector2 = _world.projectiles.get_position_of(shot)
+	_check(absf(at.distance_to(centre) - EntitiesScript.FAMILIAR_ORBIT) < 4.0, "it circles the shot as it flies: %s round %s" % [at, centre])
+	_run(40)
+	_check(not _world.projectiles.is_alive(shot), "the shot is gone")
+	var last: Vector2 = _entities.positions_of(0, TAG)[0]
+	_run(10)
+	var later: Vector2 = _entities.positions_of(0, TAG)[0]
+	_check(not later.is_equal_approx(last) and absf(later.distance_to(Vector2(180.0, 0.0)) - EntitiesScript.FAMILIAR_ORBIT) < 6.0, "it keeps circling where the shot ended: %s" % later)
 
 
 func _test_familiar_casts_at_the_nearest_enemy() -> void:

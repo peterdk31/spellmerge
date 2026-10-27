@@ -28,7 +28,7 @@ var _mgr: ManagerScript
 var _bus: EventsScript
 ## Every projectile_hit as [player, target, position, tag].
 var _hits: Array = []
-## Every entity_spawn_requested as [player, kind, position, seconds, tag].
+## Every entity_spawn_requested as [player, kind, position, seconds, tag, caster].
 var _spawns: Array = []
 ## Every entity_end_requested as [player, tag].
 var _end_requests: Array = []
@@ -54,8 +54,8 @@ func before_each() -> void:
 	_shown.clear()
 	_bus.projectile_hit.connect(func(player: int, target: Node, at: Vector2, tag: int) -> void:
 		_hits.append([player, target, at, tag]))
-	_bus.entity_spawn_requested.connect(func(player: int, kind: StringName, at: Vector2, seconds: float, tag: int) -> void:
-		_spawns.append([player, kind, at, seconds, tag]))
+	_bus.entity_spawn_requested.connect(func(player: int, kind: StringName, at: Vector2, seconds: float, tag: int, caster: int) -> void:
+		_spawns.append([player, kind, at, seconds, tag, caster]))
 	_bus.entity_end_requested.connect(func(player: int, tag: int) -> void:
 		_end_requests.append([player, tag]))
 	_bus.area_hit_requested.connect(func(player: int, at: Vector2, radius: float, tag: int) -> void:

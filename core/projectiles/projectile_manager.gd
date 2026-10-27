@@ -91,7 +91,7 @@ extends Node2D
 ## step (a query after `add_target` and before the next step refreshes the grid
 ## first), so inside a hit handler they are exact for that step.
 ##
-## Orbit: `spawn_orbit` starts a shot that circles its owner. The owner's position comes
+## Orbit: `spawn_orbit` starts a shot that circles its owner (or its caster, see Casters). The owner's position comes
 ## from a per-player anchor that `set_anchor(player, position)` is given every physics step
 ## (by `player`), so the manager never looks up a node. The shot's place is the anchor plus
 ## a turning offset, so it follows a walking wizard; its velocity is the tangent, for the
@@ -131,7 +131,13 @@ extends Node2D
 ##                          `ally_passed` once per teammate
 ## Self-hit and ally-hit are off until `gameplay/combat` is ready for them (B3).
 ##
-## Rays: `ray(...)` is an instant beam. It holds no row; see its comment.
+## Rays: `ray(...)` is an instant beam, `ray_curve(...)` a bent one (a homing beam). They hold
+## no row; see their comments. The spell runtime keeps a live beam on by casting one every step.
+##
+## Casters: every shot has a caster, its player's anchor unless `set_caster_shot` (a payload's
+## shot, cast by the shot whose trigger fired it) or `set_caster_point` says otherwise. An orbit
+## circles its caster and a returning shot flies back to it; a caster shot that ends leaves the
+## point where it was last. `move_shot` moves a shot by a card (a payload's dash, hook, recoil).
 ##
 ## Ends: `shot_ended(tag)`, a signal of the manager itself (not on the event bus), is sent
 ## once for every shot with a non-zero tag when it ends for any reason: a hit that spends it,
@@ -160,6 +166,9 @@ const MOTION_STRAIGHT: int = 0
 const MOTION_STILL: int = 1
 ## Only `spawn_orbit` makes this one.
 const MOTION_ORBIT: int = 2
+## `_caster_slot` values that are no slot: the player's anchor, or a fixed point.
+const CASTER_WIZARD: int = -1
+const CASTER_POINT: int = -2
 ## Per-shot flags (`_flags`), set by the `set_*` calls below.
 const F_SELF: int = 1
 const F_SELF_LIVE: int = 2
@@ -201,6 +210,8 @@ const RAY_MAX_HITS: int = 64
 ## How many rays can be in progress at once: a hit handler that fires another ray (an
 ## on-hit trigger) nests one level. A deeper one returns 0.0.
 const RAY_MAX_DEPTH: int = 4
+## The straight pieces a bent beam (`ray_curve`) is walked as.
+const RAY_SEGMENTS: int = 8
 ## The longest beam in pixels: what the wall walk (MAX_WALL_VISITS cells) covers even on
 ## a diagonal. A longer `length` is cut to this, so a beam never ends on a wall it did
 ## not look at. Rays are not charged to the hit-work budget; how many a spell fires (and
@@ -384,6 +395,16 @@ var _stick: PackedFloat32Array = PackedFloat32Array()
 var _stuck_to: Array = []
 var _stuck_off: PackedVector2Array = PackedVector2Array()
 var _speed: PackedFloat32Array = PackedFloat32Array()
+## The shot's caster, which an orbit circles and a returning shot flies back to: the player's
+## anchor (CASTER_WIZARD), a fixed point in `_caster_at` (CASTER_POINT), or the shot in that slot
+## while it is the one with `_caster_seq` (a payload's carrier); once that shot is gone, the
+## point where it was last seen.
+var _caster_slot: PackedInt32Array = PackedInt32Array()
+var _caster_seq: PackedInt64Array = PackedInt64Array()
+var _caster_at: PackedVector2Array = PackedVector2Array()
+## A move a card asked for (`move_shot`): seconds left and the velocity it adds meanwhile.
+var _move_left: PackedFloat32Array = PackedFloat32Array()
+var _move_vel: PackedVector2Array = PackedVector2Array()
 var _passed: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 var _passed_nodes: Array = [null, null, null, null]
 var _passed_at: PackedVector2Array = PackedVector2Array([Vector2.ZERO, Vector2.ZERO, Vector2.ZERO, Vector2.ZERO])
@@ -475,13 +496,23 @@ var _anchors: PackedVector2Array = PackedVector2Array([Vector2.INF, Vector2.INF,
 var _ray_nodes: Array = []
 var _ray_along: PackedFloat32Array = PackedFloat32Array()
 var _ray_points: PackedVector2Array = PackedVector2Array()
+var _ray_heads: PackedVector2Array = PackedVector2Array()
 var _ray_depth: int = 0
+## The path of the ray being found (`ray`, `ray_curve`): up to RAY_SEGMENTS pieces.
+var _path: PackedVector2Array = PackedVector2Array()
+var _path_heading: Vector2 = Vector2.ZERO
+## Where the last `ray` or `ray_curve` ended, and the beam's heading there (INF and zero when it
+## did nothing). Read right after the call: a nested ray in a hit handler changes them.
+var ray_end: Vector2 = Vector2.INF
+var ray_end_heading: Vector2 = Vector2.ZERO
 
 
 func _init() -> void:
 	_ray_nodes.resize(RAY_MAX_HITS * RAY_MAX_DEPTH)
 	_ray_along.resize(RAY_MAX_HITS * RAY_MAX_DEPTH)
 	_ray_points.resize(RAY_MAX_HITS * RAY_MAX_DEPTH)
+	_ray_heads.resize(RAY_MAX_HITS * RAY_MAX_DEPTH)
+	_path.resize(RAY_SEGMENTS + 1)
 	set_cap(DEFAULT_CAP_WEB if OS.has_feature("web") else DEFAULT_CAP_DESKTOP)
 	set_bounds(_bounds)
 
@@ -570,6 +601,11 @@ func set_cap(value: int) -> void:
 	_stuck_to.resize(_cap)
 	_stuck_off.resize(_cap)
 	_speed.resize(_cap)
+	_caster_slot.resize(_cap)
+	_caster_seq.resize(_cap)
+	_caster_at.resize(_cap)
+	_move_left.resize(_cap)
+	_move_vel.resize(_cap)
 	_hostile_slots.resize(_cap)
 	_skip_id.resize(_cap)
 	_skip_left.resize(_cap)
@@ -852,14 +888,20 @@ func spawn(player: int, origin: Vector2, velocity: Vector2, lifetime: float, rad
 ## pixels, starting at `angle` (radians, 0 = east of the owner) and turning
 ## `angular_speed` radians a second (negative turns the other way). The other arguments
 ## are those of `spawn`. Returns its slot, or -1 for bad arguments, a player outside 0-3
-## or a player with no anchor.
-func spawn_orbit(player: int, orbit_radius: float, angle: float, angular_speed: float, lifetime: float, radius: float = 4.0, hit_layers: int = LAYER_ENEMY, pierce: int = 0, tag: int = 0) -> int:
-	if player < 0 or player >= MAX_PLAYERS or not _anchors[player].is_finite():
+## or a player with no anchor. With a finite `centre` it circles that point instead (a
+## payload's orbit, whose caster is a shot or the point where one ended; `set_caster_shot`
+## then makes it follow the shot), and needs no anchor.
+func spawn_orbit(player: int, orbit_radius: float, angle: float, angular_speed: float, lifetime: float, radius: float = 4.0, hit_layers: int = LAYER_ENEMY, pierce: int = 0, tag: int = 0, centre: Vector2 = Vector2.INF) -> int:
+	if player < 0 or player >= MAX_PLAYERS or not (centre.is_finite() or _anchors[player].is_finite()):
 		return -1
 	if not (lifetime > 0.0) or not is_finite(orbit_radius) or not is_finite(angle) or not is_finite(angular_speed):
 		return -1
 	var offset: Vector2 = Vector2.from_angle(angle) * maxf(orbit_radius, 0.0)
-	var slot: int = _spawn_row(player, _anchors[player] + offset, Vector2.ZERO, lifetime, radius, hit_layers, pierce, tag, MOTION_ORBIT)
+	var around: Vector2 = centre if centre.is_finite() else _anchors[player]
+	var slot: int = _spawn_row(player, around + offset, Vector2.ZERO, lifetime, radius, hit_layers, pierce, tag, MOTION_ORBIT)
+	if centre.is_finite():
+		_caster_slot[slot] = CASTER_POINT
+		_caster_at[slot] = centre
 	_orbit_radius[slot] = maxf(orbit_radius, 0.0)
 	_orbit_angle[slot] = angle
 	_orbit_speed[slot] = angular_speed
@@ -878,6 +920,89 @@ func set_anchor(player: int, position: Vector2) -> void:
 func clear_anchor(player: int) -> void:
 	if player >= 0 and player < MAX_PLAYERS:
 		_anchors[player] = Vector2.INF
+
+
+## The shot in `slot` was cast by the shot in `caster` (a payload's carrier): an orbit circles
+## it and a returning shot flies back to it while it lives, then to where it was last seen.
+## Returns false for an empty slot or a caster that is not a live shot.
+func set_caster_shot(slot: int, caster: int) -> bool:
+	if slot < 0 or slot >= _cap or _alive[slot] == 0 or caster < 0 or caster >= _cap or _alive[caster] == 0 or caster == slot:
+		return false
+	_caster_slot[slot] = caster
+	_caster_seq[slot] = _seq[caster]
+	_caster_at[slot] = _pos[caster]
+	return true
+
+
+## The shot in `slot` was cast from a point that does not move (a payload whose carrier is
+## gone): an orbit circles it and a returning shot flies back to it.
+func set_caster_point(slot: int, point: Vector2) -> bool:
+	if slot < 0 or slot >= _cap or _alive[slot] == 0 or not point.is_finite():
+		return false
+	_caster_slot[slot] = CASTER_POINT
+	_caster_at[slot] = point
+	return true
+
+
+## Where the caster of the shot in `slot` is now: its player's anchor (INF without one), the
+## shot that cast it, or a point. INF for an empty slot.
+func get_caster_of(slot: int) -> Vector2:
+	if slot < 0 or slot >= _cap or _alive[slot] == 0:
+		return Vector2.INF
+	return _caster_position(slot)
+
+
+## The slot of the live shot that cast the shot in `slot`, or -1 when its caster is the wizard,
+## a point, or a shot that has ended. It still answers for a shot ended by the hit being sent
+## (a hook's), until its slot is used again.
+func caster_shot_of(slot: int) -> int:
+	if slot < 0 or slot >= _cap:
+		return -1
+	var caster: int = _caster_slot[slot]
+	if caster >= 0 and _alive[caster] != 0 and _seq[caster] == _caster_seq[slot]:
+		return caster
+	return -1
+
+
+## True when the shot in `slot` was cast by its player's wizard (not by another shot or from a
+## point). Like `caster_shot_of`, it still answers for a shot ended by the hit being sent.
+func is_cast_by_wizard(slot: int) -> bool:
+	return slot >= 0 and slot < _cap and _caster_slot[slot] == CASTER_WIZARD
+
+
+func _caster_position(slot: int) -> Vector2:
+	var caster: int = _caster_slot[slot]
+	if caster == CASTER_WIZARD:
+		return _anchors[_player[slot]] if _player[slot] >= 0 else Vector2.INF
+	if caster >= 0:
+		if _alive[caster] != 0 and _seq[caster] == _caster_seq[slot]:
+			_caster_at[slot] = _pos[caster]
+		else:
+			# The caster is gone: from now on the shot keeps to where it was last seen.
+			_caster_slot[slot] = CASTER_POINT
+	return _caster_at[slot]
+
+
+## Move the shot in `slot` by `offset` pixels over `seconds` on top of its own motion (a dash,
+## hook or recoil card whose caster is this shot), or at once for `seconds` 0 or less (a
+## teleport or swap, stopped short at the first wall). A moving shot still hits what it passes
+## and still ends on a wall. Returns false for an empty slot, an orbit shot (its caster holds
+## it), or an offset or time that is not finite.
+func move_shot(slot: int, offset: Vector2, seconds: float) -> bool:
+	if slot < 0 or slot >= _cap or _alive[slot] == 0 or _motion[slot] == MOTION_ORBIT:
+		return false
+	if not offset.is_finite() or not is_finite(seconds):
+		return false
+	if seconds <= 0.0:
+		var to: Vector2 = clip_to_walls(_pos[slot], _pos[slot] + offset) if (_flags[slot] & F_GHOST) == 0 else _pos[slot] + offset
+		_base[slot] += to - _pos[slot]
+		_pos[slot] = to
+		_prev[slot] = to
+		_move_left[slot] = 0.0
+		return true
+	_move_left[slot] = seconds
+	_move_vel[slot] = offset / seconds
+	return true
 
 
 ## Make the straight shot in `slot` home on targets, turning at most `turn_rate` radians
@@ -1104,6 +1229,9 @@ func _spawn_row(player: int, origin: Vector2, velocity: Vector2, lifetime: float
 	_stick[slot] = 0.0
 	_stuck_to[slot] = null
 	_base[slot] = origin
+	_caster_slot[slot] = CASTER_WIZARD
+	_caster_at[slot] = Vector2.INF
+	_move_left[slot] = 0.0
 	for i in HIT_MEMORY:
 		_last_hit[slot * HIT_MEMORY + i] = 0
 	_alive[slot] = 1
@@ -1150,10 +1278,11 @@ func step(delta: float) -> void:
 		var orbiting: bool = _motion[slot] == MOTION_ORBIT
 		var flags: int = _flags[slot]
 		if orbiting:
-			if not _anchors[_player[slot]].is_finite():
+			var centre: Vector2 = _caster_position(slot)
+			if not centre.is_finite():
 				_kill(slot)
 				continue
-			_orbit_move(slot, delta)
+			_orbit_move(slot, delta, centre)
 		elif flags != 0 or _growth[slot] != 1.0 or _linger[slot] > 0.0:
 			var advance: int = _advance(slot, delta, flags)
 			if advance == ADVANCE_END:
@@ -1168,6 +1297,12 @@ func step(delta: float) -> void:
 			if _turn[slot] > 0.0:
 				_steer(slot, delta)
 			_pos[slot] += _vel[slot] * delta
+		if _move_left[slot] > 0.0 and not orbiting:
+			# A card's move (a dash whose caster is this shot) carries it on top of its own motion.
+			var part: float = minf(delta, _move_left[slot])
+			_move_left[slot] -= delta
+			_pos[slot] += _move_vel[slot] * part
+			_base[slot] += _move_vel[slot] * part
 		if not limit.has_point(_pos[slot]):
 			_kill(slot)
 			continue
@@ -1275,7 +1410,7 @@ func _advance(slot: int, delta: float, flags: int) -> int:
 			_speed[slot] = _vel[slot].length()
 			for i in HIT_MEMORY:
 				_last_hit[slot * HIT_MEMORY + i] = 0
-		var anchor: Vector2 = _anchors[_player[slot]] if _player[slot] >= 0 else Vector2.INF
+		var anchor: Vector2 = _caster_position(slot)
 		if not anchor.is_finite():
 			return ADVANCE_GONE
 		var here: Vector2 = _base[slot] if (flags & F_WAVE) != 0 else _pos[slot]
@@ -1333,10 +1468,10 @@ func _shield_block(slot: int) -> void:
 			event_slot = -1
 
 
-## Advance an orbit shot: turn its angle and place it round the anchor.
-func _orbit_move(slot: int, delta: float) -> void:
+## Advance an orbit shot: turn its angle and place it round its caster at `centre`.
+func _orbit_move(slot: int, delta: float, centre: Vector2) -> void:
 	_orbit_angle[slot] = wrapf(_orbit_angle[slot] + _orbit_speed[slot] * delta, -PI, PI)
-	_pos[slot] = _anchors[_player[slot]] + Vector2.from_angle(_orbit_angle[slot]) * _orbit_radius[slot]
+	_pos[slot] = centre + Vector2.from_angle(_orbit_angle[slot]) * _orbit_radius[slot]
 	_vel[slot] = _orbit_tangent(slot)
 
 
@@ -1391,8 +1526,15 @@ func _homing_point(slot: int) -> Vector2:
 ## `max_angle` radians of it, or `direction` unchanged when there is none. Targets
 ## owned by `player` are skipped, and so are wizards (LAYER_PLAYER). Allocation-free.
 func homing_aim(player: int, origin: Vector2, direction: Vector2, max_angle: float, layers: int) -> Vector2:
+	var goal: Vector2 = homing_point(player, origin, direction, max_angle, layers)
+	return direction if not goal.is_finite() else origin.direction_to(goal)
+
+
+## The centre of the target `homing_aim` would bend toward, or INF when there is none (a
+## homing beam bends along a curve to it). Allocation-free.
+func homing_point(player: int, origin: Vector2, direction: Vector2, max_angle: float, layers: int) -> Vector2:
 	if not origin.is_finite() or not direction.is_finite() or direction.is_zero_approx() or not is_finite(max_angle):
-		return direction
+		return Vector2.INF
 	_query_ready()
 	layers &= ~LAYER_PLAYER
 	var best: int = -1
@@ -1410,9 +1552,7 @@ func homing_aim(player: int, origin: Vector2, direction: Vector2, max_angle: flo
 						best_sq = d
 						best = t
 				t = _target_next[t]
-	if best < 0:
-		return direction
-	return origin.direction_to(_target_pos[best])
+	return _target_pos[best] if best >= 0 else Vector2.INF
 
 
 ## An instant beam from `origin` along `direction` for up to `length` pixels, fired by
@@ -1428,56 +1568,116 @@ func homing_aim(player: int, origin: Vector2, direction: Vector2, max_angle: flo
 ## 0.0 for bad arguments or an origin inside a wall. The hits are found before any event
 ## is sent, so a handler may remove or free targets, or fire another ray (up to
 ## RAY_MAX_DEPTH deep, a deeper one returns 0.0). A `length` over RAY_MAX_LENGTH is cut
-## to it. Allocation-free.
+## to it. Where it ended and its heading there are left in `ray_end` and `ray_end_heading`.
+## Allocation-free.
 func ray(player: int, origin: Vector2, direction: Vector2, length: float, pierce: int = 0, layers: int = LAYER_ENEMY, tag: int = 0, width: float = 0.0, exclude: Node = null) -> float:
+	if not direction.is_finite() or direction.is_zero_approx() or not is_finite(length) or length <= 0.0 or not origin.is_finite():
+		return 0.0
+	_path[0] = origin
+	_path[1] = origin + direction.normalized() * minf(length, RAY_MAX_LENGTH)
+	return _ray_path(player, 1, pierce, layers, tag, width, exclude, true)
+
+
+## A beam like `ray`, bent: it follows the quadratic curve from `origin` to `end` pulled
+## toward `bend` (a homing beam: `bend` along the aim, `end` on the target), walked as
+## RAY_SEGMENTS straight pieces and cut to RAY_MAX_LENGTH. With `hit` false it only finds how
+## far the beam gets (walls, and the target that spends it) and sends nothing, for the look of a
+## beam between its hits. Returns how far it got along the curve; `ray_end` and
+## `ray_end_heading` say where. Allocation-free.
+func ray_curve(player: int, origin: Vector2, bend: Vector2, end: Vector2, pierce: int = 0, layers: int = LAYER_ENEMY, tag: int = 0, width: float = 0.0, exclude: Node = null, hit: bool = true) -> float:
+	if not origin.is_finite() or not bend.is_finite() or not end.is_finite() or origin.is_equal_approx(end):
+		return 0.0
+	_path[0] = origin
+	var total: float = 0.0
+	var count: int = 0
+	for i in range(1, RAY_SEGMENTS + 1):
+		var t: float = float(i) / RAY_SEGMENTS
+		var u: float = 1.0 - t
+		var point: Vector2 = origin * (u * u) + bend * (2.0 * u * t) + end * (t * t)
+		var piece: float = _path[i - 1].distance_to(point)
+		count = i
+		if total + piece >= RAY_MAX_LENGTH:
+			_path[i] = _path[i - 1].move_toward(point, RAY_MAX_LENGTH - total)
+			break
+		total += piece
+		_path[i] = point
+	return _ray_path(player, count, pierce, layers, tag, width, exclude, hit)
+
+
+## The beam along the first `segments` pieces of `_path` (see `ray` and `ray_curve`).
+func _ray_path(player: int, segments: int, pierce: int, layers: int, tag: int, width: float, exclude: Node, hit: bool) -> float:
+	ray_end = Vector2.INF
+	ray_end_heading = Vector2.ZERO
 	if player < EventsScript.NO_PLAYER or player >= MAX_PLAYERS:
 		return 0.0
-	if not origin.is_finite() or not direction.is_finite() or direction.is_zero_approx() or not is_finite(length) or length <= 0.0:
+	if hit and _ray_depth >= RAY_MAX_DEPTH:
 		return 0.0
-	if _ray_depth >= RAY_MAX_DEPTH:
-		return 0.0
-	length = minf(length, RAY_MAX_LENGTH)
-	var base: int = _ray_depth * RAY_MAX_HITS
-	var heading: Vector2 = direction.normalized()
-	var reach: float = length
+	# Cut the path at the first wall.
+	var reach: float = 0.0
 	var walled: bool = false
-	if _has_walls:
-		var cut: float = _wall_hit(origin, origin + heading * length)
-		if cut >= 0.0:
-			walled = true
-			reach = length * cut
-	var end: Vector2 = origin + heading * reach
+	var used: int = 0
+	for i in segments:
+		var a: Vector2 = _path[i]
+		var b: Vector2 = _path[i + 1]
+		var piece: float = a.distance_to(b)
+		used = i + 1
+		if _has_walls:
+			var cut: float = _wall_hit(a, b)
+			if cut >= 0.0:
+				walled = true
+				_path[i + 1] = a.lerp(b, cut)
+				reach += piece * cut
+				break
+		reach += piece
+	var base: int = mini(_ray_depth, RAY_MAX_DEPTH - 1) * RAY_MAX_HITS
 	var wanted: int = mini(maxi(pierce, 0) + 1, RAY_MAX_HITS)
 	var found: int = 0
 	var skip: int = exclude.get_instance_id() if exclude != null else 0
-	if not _targets.is_empty():
+	if not _targets.is_empty() and reach > 0.0:
 		_query_ready()
 		if friendly_fire and player >= 0:
 			layers |= LAYER_PLAYER
 		var wide: float = maxf(width, 0.0)
 		var pad: Vector2 = Vector2.ONE * (wide + _max_target_radius)
-		var low: Vector2 = origin.min(end) - pad
-		var high: Vector2 = origin.max(end) + pad
-		var x0: int = clampi(floori((low.x - _bounds.position.x) / GRID_CELL), 0, _grid_w - 1)
-		var x1: int = clampi(floori((high.x - _bounds.position.x) / GRID_CELL), 0, _grid_w - 1)
-		var y0: int = clampi(floori((low.y - _bounds.position.y) / GRID_CELL), 0, _grid_h - 1)
-		var y1: int = clampi(floori((high.y - _bounds.position.y) / GRID_CELL), 0, _grid_h - 1)
-		for y in range(y0, y1 + 1):
-			for x in range(x0, x1 + 1):
-				var t: int = _cell_head[y * _grid_w + x]
-				while t >= 0:
-					if (_target_layer[t] & layers) != 0 and (player < 0 or _target_owner[t] != player) and _target_id[t] != skip and is_instance_valid(_targets[t]):
-						var along: float = clampf((_target_pos[t] - origin).dot(heading), 0.0, reach)
-						var closest: Vector2 = origin + heading * along
-						var touch: float = wide + _target_radius[t]
-						if closest.distance_squared_to(_target_pos[t]) <= touch * touch:
-							found = _ray_keep(base, found, wanted, t, along, closest)
-					t = _target_next[t]
+		var start: float = 0.0
+		for i in used:
+			var a: Vector2 = _path[i]
+			var b: Vector2 = _path[i + 1]
+			var piece: float = a.distance_to(b)
+			if piece <= 0.0:
+				continue
+			var heading: Vector2 = (b - a) / piece
+			var low: Vector2 = a.min(b) - pad
+			var high: Vector2 = a.max(b) + pad
+			var x0: int = clampi(floori((low.x - _bounds.position.x) / GRID_CELL), 0, _grid_w - 1)
+			var x1: int = clampi(floori((high.x - _bounds.position.x) / GRID_CELL), 0, _grid_w - 1)
+			var y0: int = clampi(floori((low.y - _bounds.position.y) / GRID_CELL), 0, _grid_h - 1)
+			var y1: int = clampi(floori((high.y - _bounds.position.y) / GRID_CELL), 0, _grid_h - 1)
+			for y in range(y0, y1 + 1):
+				for x in range(x0, x1 + 1):
+					var t: int = _cell_head[y * _grid_w + x]
+					while t >= 0:
+						if (_target_layer[t] & layers) != 0 and (player < 0 or _target_owner[t] != player) and _target_id[t] != skip and is_instance_valid(_targets[t]):
+							var along: float = clampf((_target_pos[t] - a).dot(heading), 0.0, piece)
+							var closest: Vector2 = a + heading * along
+							var touch: float = wide + _target_radius[t]
+							if closest.distance_squared_to(_target_pos[t]) <= touch * touch:
+								found = _ray_keep(base, found, wanted, t, start + along, closest, heading)
+						t = _target_next[t]
+			start += piece
 	var got: float = reach
 	if found > 0 and found == maxi(pierce, 0) + 1:
 		# The beam is spent on its last target.
 		got = _ray_along[base + found - 1]
 		walled = false
+	var end: Vector2 = _path_point(used, got)
+	var end_heading: Vector2 = _path_heading
+	if not hit:
+		for i in found:
+			_ray_nodes[base + i] = null
+		ray_end = end
+		ray_end_heading = end_heading
+		return got
 	_ray_depth += 1
 	var outer_slot: int = event_slot
 	event_slot = -1
@@ -1485,7 +1685,7 @@ func ray(player: int, origin: Vector2, direction: Vector2, length: float, pierce
 		var node: Variant = _ray_nodes[base + i]
 		if events != null and is_instance_valid(node):
 			impact_form = &"beam"
-			events.projectile_impact.emit(player, node, _ray_points[base + i], heading)
+			events.projectile_impact.emit(player, node, _ray_points[base + i], _ray_heads[base + i])
 			impact_form = &""
 			events.projectile_hit.emit(player, node, _ray_points[base + i], tag)
 		_ray_nodes[base + i] = null
@@ -1493,14 +1693,47 @@ func ray(player: int, origin: Vector2, direction: Vector2, length: float, pierce
 	event_slot = outer_slot
 	if walled and events != null:
 		impact_form = &"beam"
-		events.projectile_impact.emit(player, null, origin + heading * got, heading)
+		events.projectile_impact.emit(player, null, end, end_heading)
 		impact_form = &""
+	ray_end = end
+	ray_end_heading = end_heading
 	return got
 
 
-## Put target `t` (at `along` pixels, nearest point `closest`) into the sorted scratch of
-## the best hits if it is among the `wanted` nearest; returns the new count.
-func _ray_keep(base: int, found: int, wanted: int, t: int, along: float, closest: Vector2) -> int:
+## The point `distance` pixels along the first `segments` pieces of `_path`; its heading there
+## is left in `_path_heading`.
+func _path_point(segments: int, distance: float) -> Vector2:
+	var left: float = maxf(distance, 0.0)
+	_path_heading = Vector2.ZERO
+	for i in segments:
+		var a: Vector2 = _path[i]
+		var b: Vector2 = _path[i + 1]
+		var piece: float = a.distance_to(b)
+		if piece > 0.0:
+			_path_heading = (b - a) / piece
+		if left <= piece or i == segments - 1:
+			return a + _path_heading * minf(left, piece)
+		left -= piece
+	return _path[0]
+
+
+## Put target `t` (at `along` pixels, nearest point `closest`, the beam heading `heading` there)
+## into the sorted scratch of the best hits if it is among the `wanted` nearest; returns the new
+## count. A target a bent beam touches on two pieces keeps its nearer place.
+func _ray_keep(base: int, found: int, wanted: int, t: int, along: float, closest: Vector2, heading: Vector2) -> int:
+	for i in found:
+		if _ray_nodes[base + i] == _targets[t]:
+			if along >= _ray_along[base + i]:
+				return found
+			# Nearer on this piece: take it out and insert it again below.
+			for j in range(i, found - 1):
+				_ray_along[base + j] = _ray_along[base + j + 1]
+				_ray_points[base + j] = _ray_points[base + j + 1]
+				_ray_nodes[base + j] = _ray_nodes[base + j + 1]
+				_ray_heads[base + j] = _ray_heads[base + j + 1]
+			found -= 1
+			_ray_nodes[base + found] = null
+			break
 	if found == wanted and along >= _ray_along[base + found - 1]:
 		return found
 	var at: int = mini(found, wanted - 1)
@@ -1508,10 +1741,12 @@ func _ray_keep(base: int, found: int, wanted: int, t: int, along: float, closest
 		_ray_along[base + at] = _ray_along[base + at - 1]
 		_ray_points[base + at] = _ray_points[base + at - 1]
 		_ray_nodes[base + at] = _ray_nodes[base + at - 1]
+		_ray_heads[base + at] = _ray_heads[base + at - 1]
 		at -= 1
 	_ray_along[base + at] = along
 	_ray_points[base + at] = closest
 	_ray_nodes[base + at] = _targets[t]
+	_ray_heads[base + at] = heading
 	return mini(found + 1, wanted)
 
 

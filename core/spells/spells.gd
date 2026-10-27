@@ -2397,6 +2397,30 @@ func next_cast_mana(player: int, staff: int) -> float:
 	return compiled.casts[mini(_cursor[index], compiled.casts.size() - 1)].mana
 
 
+## How far the next cast of this caster's staff reaches along its aim, for an enemy's telegraph:
+## its first carrier's flight (speed x life), a beam's or fissure's length, a rain's aim point;
+## 0 for one that is not aimed (a nova's ring, an orbit, a still shot, a decoy...) or no build.
+func next_cast_reach(player: int, staff: int) -> float:
+	if not _in_range(player, staff):
+		return 0.0
+	var index: int = player * SpellLimits.STAFFS + staff
+	var compiled: CompiledStaff = _installed[index]
+	if compiled == null or compiled.is_empty():
+		return 0.0
+	var cast: CompiledCast = compiled.casts[mini(_cursor[index], compiled.casts.size() - 1)]
+	if cast.group.is_empty():
+		return 0.0
+	var first: CompiledSpell = cast.group.spells[0]
+	match first.motion:
+		FormBase.Motion.STRAIGHT:
+			return first.speed * first.lifetime if first.spread < 360.0 else 0.0
+		FormBase.Motion.RAY, FormBase.Motion.FISSURE:
+			return first.ray_length
+		FormBase.Motion.RAIN:
+			return first.ray_length if first.ray_length > 0.0 else SpellLimits.RAIN_REACH
+	return 0.0
+
+
 ## The mana siphon gave this enemy caster back since the last call, which its AI adds to its
 ## pool. A player's comes as `mana_refund_requested` instead (this gives 0.0).
 func take_refund(player: int) -> float:

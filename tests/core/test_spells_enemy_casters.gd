@@ -324,3 +324,14 @@ func test_an_enemys_orbit_circles_its_own_anchor() -> void:
 	_mgr.set_anchor(imp, Vector2(200.0, 200.0))
 	check(_cast(imp, Vector2(200.0, 200.0)) >= 0.0, "with its anchor it casts")
 	check_equal(_mgr.get_count_for(EventsScript.NO_PLAYER), 1, "one enemy shot round it")
+
+
+func test_next_cast_reach_for_a_telegraph() -> void:
+	var imp: int = _spells.open_enemy_caster()
+	check_equal(_spells.next_cast_reach(imp, 0), 0.0, "no build, no reach")
+	_build(imp, [&"bolt"])
+	check(is_equal_approx(_spells.next_cast_reach(imp, 0), 300.0), "a bolt reaches its speed times its life")
+	_build(imp, [&"beam"])
+	check(is_equal_approx(_spells.next_cast_reach(imp, 0), 200.0), "a beam its length")
+	_build(imp, [&"orb"])
+	check_equal(_spells.next_cast_reach(imp, 0), 0.0, "an orbit is not aimed")

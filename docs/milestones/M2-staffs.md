@@ -350,7 +350,7 @@ C0 (after B6): the 19 existing cards get their look data and a second look at th
 
 ### Phase F: enemy staffs (owner, 2026-10-27)
 
-Owner sessions, one PR each, in this order: F2, F3 and F4 may run in parallel; F5 after F3 and F4; F6, F7 and F8 after F5; then F9; then F10. Before D3, so the stress run and the playtest see enemies that cast.
+Owner sessions, one PR each, in this order: F2, F3 and F4 may run in parallel; F5 after F3 and F4; F6, F7 and F8a after F5, then F8b and F8c (split from F8 while building it: one area each); then F9; then F10. Before D3, so the stress run and the playtest see enemies that cast.
 
 | # | Part | Area | Delivers |
 | --- | --- | --- | --- |
@@ -361,7 +361,9 @@ Owner sessions, one PR each, in this order: F2, F3 and F4 may run in parallel; F
 | F5 | **Enemy casters in the spell runtime** | `core/spells` | `open_enemy_caster`, `close_enemy_caster`; state sized for players and enemy rows; hit layers by the caster's side; handlers that find the caster from the tag; the enemies' share of the shared limits; `next_cast_mana`; caster-side moves and entities routed to the enemy. Tests: cast, payloads, chains, the beam share, closing mid-flight, every row in use, a four-player staff unchanged |
 | F6 | **Combat** | `gameplay/combat` | Area hits by side; enemy spell hits on wizards with statuses and reactions; the `wizard_hurt` tag |
 | F7 | **Feel** | `gameplay/feel` | Enemy impacts, casts, beams and rain markers as normal effects in the enemy ramp; the ember burst and the hostile texture hand-off removed |
-| F8 | **Enemies cast staffs** | `core/base/enemy_base.gd`, `gameplay/ai` | `staff`, `cards`, `max_mana`, `mana_regen` on `EnemyBase`; the AI's mana, caster row, anchor and aim; the windup gated on the next cast; the telegraph from the cast, drawn by the shot shader; the AI for caster-side cards |
+| F8a | **Enemies cast staffs** | `core/base/enemy_base.gd`, `gameplay/ai` | `staff`, `cards`, `max_mana`, `mana_regen` on `EnemyBase`; the AI's mana, caster row, anchor and aim; the windup gated on the next cast; the telegraph's reach from the cast; one compile per enemy type |
+| F8b | **The telegraph in the new style** | `gameplay/ai`, `gameplay/feel` | The windup's line drawn by the shot shader (an effect) instead of the `Line2D`, in the enemy ramp |
+| F8c | **Caster-side cards on enemies** | `gameplay/ai` | Dash, teleport, hook, swap and recoil moving the enemy (answering `caster_move_requested` by tag); decoys and familiars for enemies in Entities; the AI choosing when and where to use them |
 | F9 | **The imp and the shooting dummy on staffs** | `content/enemies`, `gameplay/ai`, `core/projectiles` | Both on player-card staffs; `ATTACK_TAG`, its hit-profile table, `imp_fireball.svg` and the hostile batch removed. Tests: the dummies, the waves, the 4-bot test; a stress run at the web cap (numbers in DECISIONS) |
 | F10 | **Enemy fire setting** | `core/settings`, `hud/menus/pause`, `gameplay/ai` | `core/settings/enemy_fire.gd` (off by default), `enemy_fire_requested` and `enemy_fire_changed`, the pause menu row, applied to the projectile manager |
 

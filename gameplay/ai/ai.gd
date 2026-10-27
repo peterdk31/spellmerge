@@ -39,6 +39,18 @@ extends CharacterBody2D
 ## card moves an enemy with `target_move_requested`; the enemy it names goes there at once and
 ## keeps its state.
 ##
+## Staffs (staffs F8a, "Enemy staffs"): an enemy whose `data` has a staff and cards attacks by
+## casting them like a wizard (`uses_staff`). It opens a caster row in `core/spells` when it is
+## ready (`caster`) and closes it when it leaves the tree; the staff is compiled once per enemy
+## type and installed as its staff 0; its body is its row's projectile target, so its own spells
+## skip it; it tells the manager and the runtime where it stands and aims every step (orbits and
+## beams follow it). It pays each cast from `mana` (`data.max_mana`, `data.mana_regen` a second,
+## plus what siphon gives back), so a dear staff casts less often. The windup starts only when the
+## next cast is ready (its delay nearly over and the mana there), so a telegraph is always followed
+## by its cast; until then it holds where it stands. The telegraph's reach is the next cast's
+## first carrier's (a shot's speed x life, a beam's length); a carrier that is not aimed (a nova,
+## an orbit) shows only the pose and the flash.
+##
 ## Statuses: a chilled enemy walks and winds up slower, a frozen one stands still and its
 ## attack waits (`Combat.speed_factor`); knockback still moves it.
 ##
@@ -49,6 +61,7 @@ const EventsScript := preload("res://core/events/events.gd")
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EntitiesScript := preload("res://gameplay/ai/entities.gd")
+const SpellsScript := preload("res://core/spells/spells.gd")
 
 enum State { CHASE, WINDUP, RECOVER }
 enum Pose { IDLE, WINDUP, HURT }
@@ -118,6 +131,7 @@ var events: EventsScript = null
 var combat: CombatScript = null
 var projectiles: ProjectileManagerScript = null
 var entities: EntitiesScript = null
+var spells: SpellsScript = null
 
 var state: State = State.CHASE
 ## The player being chased, or null.
@@ -128,6 +142,13 @@ var aim: Vector2 = Vector2.DOWN
 var attack_tag: int = ATTACK_TAG_BASE
 ## How often the players were looked up (tests count it).
 var lookup_count: int = 0
+## This enemy's caster row in `core/spells` while it casts a staff, else -1.
+var caster: int = -1
+## The mana it has to cast with (staffs F8a).
+var mana: float = 0.0
+
+## Each enemy type's staff, compiled once (EnemyBase -> CompiledStaff).
+static var _compiled: Dictionary = {}
 
 var _state_left: float = 0.0
 var _retarget_left: float = 0.0
@@ -179,6 +200,8 @@ func _ready() -> void:
 	# Tests build enemies outside the tree, where absolute paths do not work.
 	if entities == null and is_inside_tree():
 		entities = get_node_or_null("/root/Entities") as EntitiesScript
+	if spells == null and is_inside_tree():
+		spells = get_node_or_null("/root/Spells") as SpellsScript
 	if events != null and not events.target_move_requested.is_connected(_on_target_move_requested):
 		events.target_move_requested.connect(_on_target_move_requested)
 	if events != null and not events.player_downed.is_connected(_on_player_downed):
@@ -188,11 +211,12 @@ func _ready() -> void:
 	if data == null:
 		push_warning("Ai: no enemy data set, so this enemy stands still.")
 	if combat != null:
-		if data != null:
+		if data != null and not uses_staff():
 			attack_tag = ATTACK_TAG_BASE + absi(hash([data.id, attack_damage])) % ATTACK_TAG_SPREAD
-		combat.set_hit_profile(attack_tag, attack_damage, 0.0)
+			combat.set_hit_profile(attack_tag, attack_damage, 0.0)
 		if data != null:
 			combat.register_enemy(self, data.max_health, hurt_radius, data.contact_damage, hurt_offset)
+	_open_staff()
 	# Spread retargeting over the half second so 200 enemies do not all look at once.
 	_retarget_offset = RETARGET_TIME * float(get_instance_id() % 8) / 8.0
 	_retarget_left = _retarget_offset
@@ -208,6 +232,63 @@ func _exit_tree() -> void:
 	# Leaving the tree without being freed must not leave a target behind in Combat.
 	if combat != null and is_instance_valid(combat):
 		combat.unregister_enemy(self)
+	close_staff()
+
+
+## True when this enemy attacks by casting its staff (its data has a staff and cards).
+func uses_staff() -> bool:
+	return data != null and data.staff != null and not data.cards.is_empty()
+
+
+## Open a caster row and install the staff (once, in `_ready`). With every row taken the
+## enemy has no attack and only chases.
+func _open_staff() -> void:
+	if not uses_staff() or spells == null or caster >= 0:
+		return
+	caster = spells.open_enemy_caster()
+	if caster < 0:
+		push_warning("Ai: every enemy caster row is open, so %s casts nothing." % data.id)
+		return
+	var compiled: CompiledStaff = _compiled.get(data) as CompiledStaff
+	if compiled == null:
+		compiled = spells.compile_staff(data.cards, data.staff)
+		_compiled[data] = compiled
+	spells.install_staff(caster, 0, compiled)
+	mana = data.max_mana
+	if projectiles != null:
+		projectiles.set_target_owner(self, caster)
+		projectiles.set_anchor(caster, _position_of(self) + hurt_offset)
+
+
+## Give the caster row back (the enemy left the tree or died): its spells in the air fly on.
+func close_staff() -> void:
+	if caster < 0:
+		return
+	if spells != null and is_instance_valid(spells):
+		spells.close_enemy_caster(caster)
+	if projectiles != null and is_instance_valid(projectiles):
+		projectiles.clear_anchor(caster)
+	caster = -1
+
+
+## True when the next cast can leave the moment a windup started now would end: its delay is no
+## longer than the windup and the mana is there.
+func cast_ready() -> bool:
+	if caster < 0 or spells == null:
+		return false
+	var cost: float = spells.next_cast_mana(caster, 0)
+	if cost < 0.0:
+		return false
+	return spells.cooldown_left(caster, 0) <= windup_time and mana - spells.reserved_mana(caster) >= cost
+
+
+## How far the next cast reaches along the aim, for the telegraph: its first carrier's flight
+## (speed x life), a beam's or fissure's length, a rain's aim point; 0 for a carrier that is not
+## aimed (a nova, an orbit, a decoy...), which shows no line.
+func next_cast_reach() -> float:
+	if caster < 0 or spells == null:
+		return maxf(attack_speed * attack_lifetime, TELEGRAPH_START)
+	return spells.next_cast_reach(caster, 0)
 
 
 func _physics_process(delta: float) -> void:
@@ -230,6 +311,8 @@ func step(delta: float) -> void:
 		_target_id = target.get_instance_id() if target != null else 0
 	# Chill slows the walk and the attack timers, freeze stops them (Combat's `speed_factor`).
 	var pace: float = combat.speed_factor(self) if combat != null else 1.0
+	if caster >= 0:
+		_step_staff(delta)
 	match state:
 		State.CHASE:
 			_step_chase(pace)
@@ -263,6 +346,21 @@ func telegraph_progress() -> float:
 	return clampf(1.0 - _state_left / windup_time, 0.0, 1.0)
 
 
+## Mana back, and where the caster stands and aims (its orbits circle it, its beams follow it).
+## The aim follows the target while it chases; the windup locks it, and so does the recovery, so
+## a beam it holds does not track a wizard who stepped aside.
+func _step_staff(delta: float) -> void:
+	mana = minf(mana + data.mana_regen * delta + spells.take_refund(caster), data.max_mana)
+	var origin: Vector2 = _position_of(self) + hurt_offset
+	if state == State.CHASE and target != null:
+		var to_target: Vector2 = _position_of(target) - _position_of(self)
+		if to_target != Vector2.ZERO:
+			aim = to_target.normalized()
+	if projectiles != null:
+		projectiles.set_anchor(caster, origin)
+	spells.set_aim(caster, origin, aim)
+
+
 func _step_chase(pace: float) -> void:
 	_show_telegraph(false)
 	if target == null or data == null:
@@ -272,6 +370,10 @@ func _step_chase(pace: float) -> void:
 	if to_target.length_squared() <= attack_range * attack_range:
 		if to_target != Vector2.ZERO:
 			aim = to_target.normalized()
+		if uses_staff() and not cast_ready():
+			# In reach but the cast is not ready: hold, so the telegraph only ever shows a cast that comes.
+			velocity = Vector2.ZERO
+			return
 		state = State.WINDUP
 		_state_left = windup_time
 		velocity = Vector2.ZERO
@@ -281,7 +383,11 @@ func _step_chase(pace: float) -> void:
 
 
 func _attack() -> void:
-	if projectiles != null:
+	if caster >= 0:
+		var spent: float = spells.cast_staff(caster, 0, _position_of(self) + hurt_offset, aim, mana - spells.reserved_mana(caster))
+		if spent > 0.0:
+			mana -= spent
+	elif not uses_staff() and projectiles != null:
 		projectiles.spawn(EventsScript.NO_PLAYER, _position_of(self) + hurt_offset, aim * attack_speed,
 				attack_lifetime, attack_radius, ProjectileManagerScript.LAYER_PLAYER, 0, attack_tag)
 	state = State.RECOVER
@@ -305,7 +411,12 @@ func _fit_telegraph_parts(reach: float) -> void:
 
 func _show_telegraph(on: bool) -> void:
 	if _telegraph != null:
-		_telegraph.visible = on
+		var reach: float = next_cast_reach() if on and caster >= 0 else 0.0
+		if on and caster >= 0 and _telegraph_line != null and _telegraph_line.get_point_count() >= 2 and reach > TELEGRAPH_START:
+			_telegraph_line.set_point_position(1, Vector2(reach, 0.0))
+			_fit_telegraph_parts(reach)
+		# A cast that is not aimed (a nova, an orbit) shows no line: the pose and flash say it.
+		_telegraph.visible = on and (caster < 0 or reach > TELEGRAPH_START)
 		if on:
 			_telegraph.rotation = aim.angle()
 			_update_telegraph()

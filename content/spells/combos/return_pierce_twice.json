@@ -1,0 +1,9 @@
+{
+	"id": "return_pierce_twice",
+	"name": "Return pierce twice",
+	"does": "A piercing fire bolt that goes through the imp, turns and goes through it again on the way back.",
+	"casts": [{"staff": 0, "cards": ["return", "pierce", "fire", "bolt"]}],
+	"imps": [[60, 0]],
+	"seconds": 1.5,
+	"checks": [{"kind": "status", "imps": [0], "status": "burn"}]
+}

@@ -1,0 +1,9 @@
+{
+	"id": "return_home_nova",
+	"name": "Return home nova",
+	"does": "A bolt that flies out and back, and rings out a nova at the caster's feet when it gets home: it hits the imp behind.",
+	"casts": [{"staff": 0, "cards": ["on_expire", "return", "bolt", "nova"]}],
+	"imps": [[-45, 0]],
+	"seconds": 1.8,
+	"checks": [{"kind": "damaged", "imps": [0]}]
+}

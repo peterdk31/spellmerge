@@ -1,0 +1,9 @@
+{
+	"id": "sniper_frost_beam",
+	"name": "Sniper frost beam",
+	"does": "A true frost beam that chills an imp at the far end of its reach.",
+	"casts": [{"staff": 0, "cards": ["sniper", "frost", "beam"]}],
+	"imps": [[220, 0]],
+	"seconds": 1.0,
+	"checks": [{"kind": "status", "imps": [0], "status": "chill"}]
+}

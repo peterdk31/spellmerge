@@ -1,0 +1,9 @@
+{
+	"id": "sniper_lance",
+	"name": "Sniper lance",
+	"does": "A true, piercing bolt that runs through two imps in a line.",
+	"casts": [{"staff": 0, "cards": ["sniper", "pierce", "bolt"]}],
+	"imps": [[60, 0], [140, 0]],
+	"seconds": 1.5,
+	"checks": [{"kind": "damaged", "imps": [0, 1]}]
+}

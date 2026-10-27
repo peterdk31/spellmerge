@@ -84,6 +84,17 @@ extends Node
 ## (`profile(tag)`). A generation is forgotten as a whole (every node together) when its last
 ## shot has ended (`shot_ended`) and it is no longer current.
 ##
+## Enemy casters (staffs F5, "Enemy staffs"): every `player` in this script is a caster number:
+## a player 0-3, or an enemy row (`open_enemy_caster`, SpellLimits.FIRST_ENEMY_CASTER and up)
+## that installs, casts and aims its staffs as a player does. Its tags carry the row
+## (`SpellTag.make_for`, `caster_of`), so the handlers find it from the tag; every event names it
+## NO_PLAYER (`_ev`). Its spells hit what is foe to it (`_foes`: wizards and decoys), its moves,
+## areas and entities are asked for with NO_PLAYER and its tag, its siphon refunds wait in
+## `take_refund`, and its AI reads `next_cast_mana` and `reserved_mana`. All enemies share one
+## per-step fire and chain count (`_budget`) and hold at most SpellLimits.ENEMY_BEAMS beams and
+## ENEMY_PENDING waiting launches, so they never take a player's. `close_enemy_caster` ends what
+## it holds; its shots in the air fly on.
+##
 ## Order matters: a shot that spawns children (a payload on hit) must call `shot_started` for
 ## each child before it calls `shot_ended` for itself, or an old build could be freed between
 ## the two.
@@ -144,15 +155,15 @@ var _current: PackedInt32Array = PackedInt32Array()
 var _installed: Array[CompiledStaff] = []
 ## player * STAFFS + staff -> which cast of its cycle comes next
 var _cursor: PackedInt32Array = PackedInt32Array()
-## player -> the way the wizard's last asked move goes, for the payload fired where it ends
-var _move_heading: PackedVector2Array = PackedVector2Array([Vector2.RIGHT, Vector2.RIGHT, Vector2.RIGHT, Vector2.RIGHT])
+## caster -> the way the wizard's (or enemy's) last asked move goes, for the payload fired where it ends
+var _move_heading: PackedVector2Array = PackedVector2Array()
 ## Per player, the homing of the wizard's last dash; the player steers with it (`move_homing`).
 var _dash_homing: Array[Homing] = []
 ## The homing of the teleport being cast (it is over at once), and one that never homes.
 var _teleport_homing: Homing = Homing.new()
 ## Per player, the target their last homing teleport landed at (0 for none): the next one picks
 ## another while it can, as a homing shot does after a hit, so hops go from enemy to enemy.
-var _landed_at: PackedInt64Array = PackedInt64Array([0, 0, 0, 0])
+var _landed_at: PackedInt64Array = PackedInt64Array()
 var _no_homing: Homing = Homing.new()
 ## tag -> entities (decoys, familiars) alive that came from it; each counts as a live shot
 var _entities: Dictionary = {}
@@ -253,7 +264,7 @@ var _ray_prev: int = 0
 ## beam's `ray()`, so casting it there would nest one `ray()` deeper per jump and the
 ## manager stops at RAY_MAX_DEPTH. The outermost beam casts them, first in first out, once
 ## its own `ray()` has returned. Fixed size, so nothing is allocated per frame.
-const JUMP_QUEUE: int = SpellLimits.MAX_CHAINS_PER_STEP * SpellLimits.PLAYERS
+const JUMP_QUEUE: int = SpellLimits.MAX_CHAINS_PER_STEP * SpellLimits.BUDGETS
 var _jq_spell: Array[CompiledSpell] = []
 var _jq_target: Array[Node2D] = []
 var _jq_tag: PackedInt64Array = PackedInt64Array()
@@ -302,26 +313,50 @@ var _bm_tip_dir: PackedVector2Array = PackedVector2Array()
 var _bm_hit_at: PackedFloat32Array = PackedFloat32Array()
 ## player -> the wizard's staff tip and aim from `set_aim` (INF when it holds none), and 1 once
 ## the player has sent one (a test that never does keeps its beams where they were cast).
-var _aim_origin: PackedVector2Array = PackedVector2Array([Vector2.INF, Vector2.INF, Vector2.INF, Vector2.INF])
-var _aim_dir: PackedVector2Array = PackedVector2Array([Vector2.INF, Vector2.INF, Vector2.INF, Vector2.INF])
-var _aim_seen: PackedByteArray = PackedByteArray([0, 0, 0, 0])
+var _aim_origin: PackedVector2Array = PackedVector2Array()
+var _aim_dir: PackedVector2Array = PackedVector2Array()
+var _aim_seen: PackedByteArray = PackedByteArray()
+## caster -> the mana siphon gave an enemy caster back, until its AI takes it (`take_refund`);
+## a player's goes out at once as `mana_refund_requested`.
+var _refunds: PackedFloat32Array = PackedFloat32Array()
+## caster * STAFFS + staff -> the last generation that staff used, so a build after an empty
+## staff, or a reopened enemy row, goes on round the ring (old shots in the air keep theirs).
+var _ring: PackedInt32Array = PackedInt32Array()
+## Enemy caster rows free to open, oldest closed first, and which are open.
+var _enemy_free: PackedInt32Array = PackedInt32Array()
+var _enemy_open: PackedByteArray = PackedByteArray()
+## Launches waiting for enemy casters, and live beams of enemy casters (their shares).
+var _enemy_pending: int = 0
 
 
 func _init() -> void:
-	_current.resize(SpellLimits.PLAYERS * SpellLimits.STAFFS)
+	_current.resize(SpellLimits.CASTERS * SpellLimits.STAFFS)
 	_current.fill(-1)
-	_installed.resize(SpellLimits.PLAYERS * SpellLimits.STAFFS)
-	_cursor.resize(SpellLimits.PLAYERS * SpellLimits.STAFFS)
-	_hold_mana.resize(SpellLimits.PLAYERS * SpellLimits.STAFFS)
-	_cast_count.resize(SpellLimits.PLAYERS * SpellLimits.STAFFS)
-	for i in SpellLimits.PLAYERS * SpellLimits.STAFFS:
+	_installed.resize(SpellLimits.CASTERS * SpellLimits.STAFFS)
+	_cursor.resize(SpellLimits.CASTERS * SpellLimits.STAFFS)
+	_hold_mana.resize(SpellLimits.CASTERS * SpellLimits.STAFFS)
+	_cast_count.resize(SpellLimits.CASTERS * SpellLimits.STAFFS)
+	for i in SpellLimits.CASTERS * SpellLimits.STAFFS:
 		_hold_tags.append(PackedInt64Array())
 		_last_form.append(&"")
-	for i in SpellLimits.PLAYERS:
+	for i in SpellLimits.CASTERS:
 		_last_infused.append(null)
-	_cooldown.resize(SpellLimits.PLAYERS * SpellLimits.STAFFS)
-	_fires_used.resize(SpellLimits.PLAYERS)
-	_chains_used.resize(SpellLimits.PLAYERS)
+	_move_heading.resize(SpellLimits.CASTERS)
+	_move_heading.fill(Vector2.RIGHT)
+	_landed_at.resize(SpellLimits.CASTERS)
+	_aim_origin.resize(SpellLimits.CASTERS)
+	_aim_origin.fill(Vector2.INF)
+	_aim_dir.resize(SpellLimits.CASTERS)
+	_aim_dir.fill(Vector2.INF)
+	_aim_seen.resize(SpellLimits.CASTERS)
+	_refunds.resize(SpellLimits.CASTERS)
+	_ring.resize(SpellLimits.CASTERS * SpellLimits.STAFFS)
+	_ring.fill(-1)
+	_enemy_open.resize(SpellLimits.ENEMY_CASTERS)
+	_free_enemy_rows()
+	_cooldown.resize(SpellLimits.CASTERS * SpellLimits.STAFFS)
+	_fires_used.resize(SpellLimits.BUDGETS)
+	_chains_used.resize(SpellLimits.BUDGETS)
 	for i in SpellLimits.MAX_PENDING:
 		_pending_free.append(PendingLaunch.new())
 	_jq_spell.resize(JUMP_QUEUE)
@@ -349,7 +384,7 @@ func _init() -> void:
 	_bm_turn.resize(SpellLimits.BEAMS)
 	for i in SpellLimits.BEAMS * SpellLimits.BEAM_LEGS:
 		_bm_homing.append(Homing.new())
-	for i in SpellLimits.PLAYERS:
+	for i in SpellLimits.CASTERS:
 		_dash_homing.append(Homing.new())
 	_bm_points.resize(SpellLimits.BEAMS * BEAM_POINTS)
 	_bm_count.resize(SpellLimits.BEAMS)
@@ -586,24 +621,25 @@ func begin_generation(player: int, staff: int, compiled: CompiledStaff) -> int:
 		if old >= 0:
 			_release_generation(player, staff, old)
 		return 0
-	var generation: int = (old + 1) % SpellLimits.GENERATIONS
+	var generation: int = (_ring[index] + 1) % SpellLimits.GENERATIONS
+	_ring[index] = generation
 	_current[index] = generation
-	var key: int = SpellTag.generation_key(SpellTag.make(player, staff, 0, generation))
+	var key: int = SpellTag.generation_key(SpellTag.make_for(player, staff, 0, generation))
 	for node in _node_counts.get(key, 0):
-		var stale: int = SpellTag.make(player, staff, node, generation)
+		var stale: int = SpellTag.make_for(player, staff, node, generation)
 		if _live.get(stale, 0) > 0:
 			revoked_tags.append(stale)
 		_profiles.erase(stale)
 		_live.erase(stale)
 	_generation_live.erase(key)
 	for spell in compiled.nodes:
-		_profiles[SpellTag.make(player, staff, spell.node, generation)] = spell
+		_profiles[SpellTag.make_for(player, staff, spell.node, generation)] = spell
 	_node_counts[key] = compiled.nodes.size()
 	_installed[index] = compiled
 	_cursor[index] = 0
 	if old >= 0:
 		_release_generation(player, staff, old)
-	return SpellTag.make(player, staff, 0, generation)
+	return SpellTag.make_for(player, staff, 0, generation)
 
 
 ## The tag of the current build of this staff at `node`, or 0 when it has no build.
@@ -611,7 +647,7 @@ func current_tag(player: int, slot: int, node: int = 0) -> int:
 	if not _in_range(player, slot):
 		return 0
 	var generation: int = _current[player * SpellLimits.STAFFS + slot]
-	return 0 if generation < 0 else SpellTag.make(player, slot, node, generation)
+	return 0 if generation < 0 else SpellTag.make_for(player, slot, node, generation)
 
 
 ## A shot with `tag` was spawned. Ignored for a tag that has no spell.
@@ -656,7 +692,7 @@ func generations_held(player: int, slot: int) -> int:
 	if not _in_range(player, slot):
 		return 0
 	for generation in SpellLimits.GENERATIONS:
-		if _node_counts.has(SpellTag.generation_key(SpellTag.make(player, slot, 0, generation))):
+		if _node_counts.has(SpellTag.generation_key(SpellTag.make_for(player, slot, 0, generation))):
 			count += 1
 	return count
 
@@ -762,7 +798,7 @@ func cast_staff(player: int, staff: int, origin: Vector2, direction: Vector2, ma
 	_last_form[index] = first.form_id
 	var combo: StringName = combo_class(first)
 	if events != null and combo != &"" and first.fallback == CompiledSpell.FALLBACK_NONE:
-		events.combo_cast.emit(player, combo, origin, aim, first.tint)
+		events.combo_cast.emit(_ev(player), combo, origin, aim, first.tint)
 	return cast.mana
 
 
@@ -864,12 +900,12 @@ func _launch(spell: CompiledSpell, tag: int, player: int, origin: Vector2, direc
 				if _caster != CASTER_WIZARD:
 					var shot: int = _caster_shot()
 					centre = projectiles.get_position_of(shot) if shot >= 0 else origin
-				slot = projectiles.spawn_orbit(player, spell.orbit_radius, base + TAU * n / count, turn, lifetime, spell.radius, ProjectilesScript.LAYER_ENEMY, spell.pierce, tag, centre)
+				slot = projectiles.spawn_orbit(player, spell.orbit_radius, base + TAU * n / count, turn, lifetime, spell.radius, _foes(player), spell.pierce, tag, centre)
 			FormBase.Motion.STILL:
 				var at: Vector2 = origin if count == 1 else origin + heading * spell.radius * 2.0
-				slot = projectiles.spawn(player, at, Vector2.ZERO, lifetime, spell.radius, ProjectilesScript.LAYER_ENEMY, spell.pierce, tag, ProjectilesScript.MOTION_STILL)
+				slot = projectiles.spawn(player, at, Vector2.ZERO, lifetime, spell.radius, _foes(player), spell.pierce, tag, ProjectilesScript.MOTION_STILL)
 			_:
-				slot = projectiles.spawn(player, origin, heading * spell.speed, lifetime, spell.radius, ProjectilesScript.LAYER_ENEMY, spell.pierce, tag)
+				slot = projectiles.spawn(player, origin, heading * spell.speed, lifetime, spell.radius, _foes(player), spell.pierce, tag)
 				if slot >= 0 and spell.homing_range > 0.0:
 					projectiles.set_homing(slot, spell.homing_turn, spell.homing_range)
 				if slot >= 0:
@@ -882,7 +918,7 @@ func _launch(spell: CompiledSpell, tag: int, player: int, origin: Vector2, direc
 			projectiles.exclude(slot, source, SpellLimits.SOURCE_EXCLUSION)
 	# The ring is only a cue, drawn once, and only when a shot really flew.
 	if events != null and made > 0 and count > 1 and spell.spread >= 360.0 and spell.motion == FormBase.Motion.STRAIGHT:
-		events.form_shown.emit(player, &"nova", origin, direction, 0.0, spell.tint, spell.look)
+		events.form_shown.emit(_ev(player), &"nova", origin, direction, 0.0, spell.tint, spell.look)
 	return made
 
 
@@ -918,11 +954,11 @@ func _move_caster(spell: CompiledSpell, tag: int, player: int, origin: Vector2, 
 			_move_heading[player] = direction
 			if dash:
 				_dash_homing[player].start(spell, hash(Vector2i(player, tag)))
-				events.caster_move_requested.emit(player, &"dash", origin + offset, seconds, tag)
+				events.caster_move_requested.emit(_ev(player), &"dash", origin + offset, seconds, tag)
 				var reach: float = origin.distance_to(projectiles.clip_to_walls(origin, origin + offset))
-				events.form_shown.emit(player, &"dash", origin, direction, reach, spell.tint, spell.look)
+				events.form_shown.emit(_ev(player), &"dash", origin, direction, reach, spell.tint, spell.look)
 			else:
-				events.caster_move_requested.emit(player, &"teleport", projectiles.clip_to_walls(origin, origin + offset), 0.0, tag)
+				events.caster_move_requested.emit(_ev(player), &"teleport", projectiles.clip_to_walls(origin, origin + offset), 0.0, tag)
 		return 1
 	var shot: int = _caster_shot()
 	var turn: float = spell.homing_turn if spell.homing_range > 0.0 else 0.0
@@ -999,7 +1035,7 @@ func _step_moves(delta: float) -> void:
 ## payload leaves from there, cast by `caster` (the wizard, the shot that moved, or the point).
 func _move_end(tag: int, at: Vector2, heading: Vector2, caster: int) -> void:
 	var spell: CompiledSpell = _profiles.get(tag)
-	var player: int = SpellTag.player_of(tag)
+	var player: int = SpellTag.caster_of(tag)
 	if spell == null or not at.is_finite():
 		return
 	_blast(spell, tag, player, at)
@@ -1049,7 +1085,7 @@ func _telegraph_rain(spell: CompiledSpell, tag: int, player: int, origin: Vector
 		launch.landing = spell
 		placed += 1
 		if events != null:
-			events.form_shown.emit(player, &"rain", point, along, spell.lifetime, spell.tint, spell.look)
+			events.form_shown.emit(_ev(player), &"rain", point, along, spell.lifetime, spell.tint, spell.look)
 	return placed
 
 
@@ -1073,7 +1109,7 @@ func _launch_wall(spell: CompiledSpell, tag: int, player: int, origin: Vector2, 
 	var made: int = 0
 	for n in spell.shots:
 		var at: Vector2 = centre + across * (n - (spell.shots - 1) * 0.5) * gap
-		var slot: int = projectiles.spawn(player, at, Vector2.ZERO, lifetime, spell.radius, ProjectilesScript.LAYER_ENEMY, spell.pierce, tag, ProjectilesScript.MOTION_STILL)
+		var slot: int = projectiles.spawn(player, at, Vector2.ZERO, lifetime, spell.radius, _foes(player), spell.pierce, tag, ProjectilesScript.MOTION_STILL)
 		if slot < 0:
 			continue
 		made += 1
@@ -1096,7 +1132,7 @@ func _spawn_entities(spell: CompiledSpell, tag: int, player: int, origin: Vector
 	for n in count:
 		_entities[tag] = _entities.get(tag, 0) + 1
 		shot_started(tag)
-		events.entity_spawn_requested.emit(player, kind, origin, seconds, tag, _entity_caster())
+		events.entity_spawn_requested.emit(_ev(player), kind, origin, seconds, tag, _entity_caster())
 	return count
 
 
@@ -1112,8 +1148,9 @@ func _entity_caster() -> int:
 ## An entity of this player ended where it stood: its `blast` and its `on expire` payload happen
 ## there (the end point), then it stops counting as a live shot.
 func _on_entity_ended(player: int, _kind: StringName, position: Vector2, tag: int) -> void:
-	if player != SpellTag.player_of(tag):
+	if not SpellTag.is_spell_tag(tag) or player != SpellTag.player_of(tag):
 		return
+	player = SpellTag.caster_of(tag)
 	var count: int = _entities.get(tag, 0)
 	if count <= 0:
 		return
@@ -1125,7 +1162,7 @@ func _on_entity_ended(player: int, _kind: StringName, position: Vector2, tag: in
 	if spell != null and position.is_finite():
 		var blast: float = spell.behaviour(ModifierBase.Behaviour.BLAST)
 		if blast > 0.0 and events != null:
-			events.area_hit_requested.emit(player, position, blast, tag)
+			events.area_hit_requested.emit(_ev(player), position, blast, tag)
 		if spell.payload != null and spell.trigger_event == TriggerBase.Event.EXPIRE and _take_fire(player):
 			_launch_as(spell.payload, player, SpellTag.staff_of(tag), SpellTag.generation_of(tag), position, Vector2.RIGHT, null, CASTER_POINT)
 	shot_ended(tag)
@@ -1134,8 +1171,9 @@ func _on_entity_ended(player: int, _kind: StringName, position: Vector2, tag: in
 ## The familiar with `tag` casts: its payload (what came after it on the staff) leaves `position`
 ## along `direction`, in the staff and generation of the familiar's own cards.
 func _on_familiar_cast(player: int, position: Vector2, direction: Vector2, tag: int) -> void:
-	if player != SpellTag.player_of(tag) or not _entities.has(tag) or not position.is_finite() or player < 0 or player >= SpellLimits.PLAYERS:
+	if not SpellTag.is_spell_tag(tag) or player != SpellTag.player_of(tag) or not _entities.has(tag) or not position.is_finite():
 		return
+	player = SpellTag.caster_of(tag)
 	var spell: CompiledSpell = _profiles.get(tag)
 	if spell == null or spell.own_payload == null or spell.own_payload.is_empty() or not _take_fire(player):
 		return
@@ -1213,7 +1251,7 @@ func _fire_group(group: CompiledGroup, player: int, staff: int, generation: int,
 ## (straight, returning and beam carriers), and `echo` schedules it once more. `echoed` is true
 ## for that second firing, which hits at half damage and does not echo again.
 func _fire_spell(spell: CompiledSpell, player: int, staff: int, generation: int, origin: Vector2, heading: Vector2, source: Node, from_caster: bool, echoed: bool) -> int:
-	var tag: int = SpellTag.make(player, staff, spell.node, generation)
+	var tag: int = SpellTag.make_for(player, staff, spell.node, generation)
 	if spell.fallback != CompiledSpell.FALLBACK_NONE:
 		return _fallback_hit(spell, tag, player, origin)
 	_echo_spell = spell if echoed else null
@@ -1248,7 +1286,7 @@ func _recoil(spell: CompiledSpell, tag: int, player: int, origin: Vector2, headi
 			projectiles.move_shot(shot, -heading * push, SpellLimits.RECOIL_SECONDS)
 		return
 	if events != null:
-		events.caster_move_requested.emit(player, &"recoil", origin - heading * push, SpellLimits.RECOIL_SECONDS, tag)
+		events.caster_move_requested.emit(_ev(player), &"recoil", origin - heading * push, SpellLimits.RECOIL_SECONDS, tag)
 
 
 ## The area hit of a `blast` at the end point `at` of the carrier with `tag`, as wide as its
@@ -1256,7 +1294,7 @@ func _recoil(spell: CompiledSpell, tag: int, player: int, origin: Vector2, headi
 func _blast(spell: CompiledSpell, tag: int, player: int, at: Vector2) -> void:
 	var radius: float = spell.behaviour(ModifierBase.Behaviour.BLAST)
 	if radius > 0.0 and events != null and at.is_finite():
-		events.area_hit_requested.emit(player, at, radius, tag)
+		events.area_hit_requested.emit(_ev(player), at, radius, tag)
 
 
 ## Where a dash, teleport or hook ended: the carrier's end point. Its `blast` and its `on expire`
@@ -1264,18 +1302,21 @@ func _blast(spell: CompiledSpell, tag: int, player: int, at: Vector2) -> void:
 func _on_move_finished(player: int, mode: StringName, position: Vector2, tag: int) -> void:
 	if mode != &"dash" and mode != &"teleport" and mode != &"hook":
 		return
-	if not SpellTag.is_spell_tag(tag) or player != SpellTag.player_of(tag) or player < 0 or player >= SpellLimits.PLAYERS or not position.is_finite():
+	if not SpellTag.is_spell_tag(tag) or player != SpellTag.player_of(tag) or not position.is_finite():
 		return
-	# The wizard moved, so the wizard casts what its end point fires.
-	_move_end(tag, position, _move_heading[player], CASTER_WIZARD)
+	# The wizard (or the enemy) moved, so it casts what its end point fires.
+	_move_end(tag, position, _move_heading[SpellTag.caster_of(tag)], CASTER_WIZARD)
 
 
 ## Queues a launch `wait` seconds from now: `group` (a burst's later firing) or, with no group,
 ## `spell` (an echo). Dropped when too many wait already.
 func _delay(wait: float, group: CompiledGroup, spell: CompiledSpell, player: int, staff: int, generation: int, origin: Vector2, heading: Vector2, source: Node, from_caster: bool) -> PendingLaunch:
-	if _pending_free.is_empty():
+	var enemy: bool = player >= SpellLimits.PLAYERS
+	if _pending_free.is_empty() or (enemy and _enemy_pending >= SpellLimits.ENEMY_PENDING):
 		delayed_dropped += 1
 		return null
+	if enemy:
+		_enemy_pending += 1
 	var launch: PendingLaunch = _pending_free.pop_back()
 	launch.landing = null
 	launch.seed = hash(Vector3i(_scatter.seed, roundi(wait * 1000.0), 0 if group != null else 1))
@@ -1347,6 +1388,8 @@ func _run_pending() -> void:
 
 ## Gives a finished record back to the pool.
 func _release_launch(launch: PendingLaunch) -> void:
+	if launch.player >= SpellLimits.PLAYERS:
+		_enemy_pending -= 1
 	launch.group = null
 	launch.spell = null
 	launch.landing = null
@@ -1368,7 +1411,7 @@ func _drop_pending(player: int, staff: int) -> void:
 ## spell's profile (a blast is as wide as its strength). Combat decides what it does (staffs B3).
 func _fallback_hit(spell: CompiledSpell, tag: int, player: int, at: Vector2) -> int:
 	if events != null:
-		events.area_hit_requested.emit(player, at, maxf(spell.radius, spell.behaviour(ModifierBase.Behaviour.BLAST)), tag)
+		events.area_hit_requested.emit(_ev(player), at, maxf(spell.radius, spell.behaviour(ModifierBase.Behaviour.BLAST)), tag)
 	return 1
 
 
@@ -1387,7 +1430,7 @@ func _fan_angle(n: int, count: int, spell: CompiledSpell) -> float:
 ## cast (so the same cast spreads the same way). With no spread (the `dev` staff, or a factor of
 ## 0) it aims true and draws nothing from the generator.
 func _staff_spread(tag: int, spell: CompiledSpell) -> float:
-	var player: int = SpellTag.player_of(tag)
+	var player: int = SpellTag.caster_of(tag)
 	var staff: int = SpellTag.staff_of(tag)
 	if not _in_range(player, staff):
 		return 0.0
@@ -1471,9 +1514,9 @@ func _shoot_ray(spell: CompiledSpell, tag: int, player: int, origin: Vector2, he
 	_ray_chain = chain
 	_ray_prev = prev
 	var reach: float = spell.ray_length if length < 0.0 else length
-	var got: float = projectiles.ray(player, origin, heading, reach, spell.pierce if pierce < 0 else pierce, ProjectilesScript.LAYER_ENEMY, tag, spell.radius * 0.5, source)
+	var got: float = projectiles.ray(player, origin, heading, reach, spell.pierce if pierce < 0 else pierce, _foes(player), tag, spell.radius * 0.5, source)
 	if got > 0.0 and events != null:
-		events.form_shown.emit(player, &"beam", origin, heading, got, spell.tint, spell.look)
+		events.form_shown.emit(_ev(player), &"beam", origin, heading, got, spell.tint, spell.look)
 	# A `ray()` that did nothing (too deep, or a bad aim) has no end to fire the payload from.
 	if got > 0.0:
 		_blast(spell, tag, player, origin + heading * got)
@@ -1499,13 +1542,17 @@ func _shoot_ray(spell: CompiledSpell, tag: int, player: int, origin: Vector2, he
 func _start_beam(spell: CompiledSpell, tag: int, player: int, origin: Vector2, heading: Vector2, chain: int, prev: int, source: Node, lifetime: float) -> bool:
 	if not heading.is_finite() or heading.is_zero_approx() or not origin.is_finite():
 		return false
-	var at: int = _bm_on.find(0)
+	# Every beam is on, or an enemy has its share: the oldest ends (quietly, as the projectile
+	# cap drops a shot). An enemy's beam only ever ends an enemy's, so a player's is never lost to
+	# the enemies.
+	var enemy: bool = player >= SpellLimits.PLAYERS
+	var at: int = -1
+	if not enemy or _enemy_beams() < SpellLimits.ENEMY_BEAMS:
+		at = _bm_on.find(0)
 	if at < 0:
-		# Every beam is on: the oldest ends (quietly, as the projectile cap drops a shot).
-		at = 0
-		for i in SpellLimits.BEAMS:
-			if _bm_born[i] < _bm_born[at]:
-				at = i
+		at = _oldest_beam(enemy)
+		if at < 0:
+			return false
 		_end_beam(at, false)
 	_bm_on[at] = 1
 	_bm_born[at] = _bm_next_born
@@ -1649,7 +1696,7 @@ func _beam_cast(at: int, hit: bool) -> void:
 	var player: int = _bm_player[at]
 	var source: Node = _bm_source[at] if is_instance_valid(_bm_source[at]) else null
 	if not hit:
-		_bm_reach[at] = projectiles.ray_points(player, _bm_points, at * BEAM_POINTS, _bm_count[at], spell.ray_length, spell.pierce, ProjectilesScript.LAYER_ENEMY, tag, spell.radius * 0.5, source, false)
+		_bm_reach[at] = projectiles.ray_points(player, _bm_points, at * BEAM_POINTS, _bm_count[at], spell.ray_length, spell.pierce, _foes(player), tag, spell.radius * 0.5, source, false)
 		_bm_tip[at] = projectiles.ray_end
 		_bm_tip_dir[at] = projectiles.ray_end_heading
 		return
@@ -1665,7 +1712,7 @@ func _beam_cast(at: int, hit: bool) -> void:
 	_ray_chain = _bm_chain[at]
 	_ray_prev = _bm_prev[at]
 	_echo_spell = spell if _bm_echo[at] != 0 else null
-	var got: float = projectiles.ray_points(player, _bm_points, at * BEAM_POINTS, _bm_count[at], spell.ray_length, spell.pierce, ProjectilesScript.LAYER_ENEMY, tag, spell.radius * 0.5, source, true)
+	var got: float = projectiles.ray_points(player, _bm_points, at * BEAM_POINTS, _bm_count[at], spell.ray_length, spell.pierce, _foes(player), tag, spell.radius * 0.5, source, true)
 	var tip: Vector2 = projectiles.ray_end
 	var tip_dir: Vector2 = projectiles.ray_end_heading
 	_bm_fires[at] = _ray_fires
@@ -1703,6 +1750,24 @@ func _end_beam(at: int, finished: bool) -> void:
 	shot_ended(tag)
 
 
+## The live beam born first (of an enemy caster only, with `enemies`), or -1 for none.
+func _oldest_beam(enemies: bool) -> int:
+	var oldest: int = -1
+	for i in SpellLimits.BEAMS:
+		if _bm_on[i] != 0 and (not enemies or _bm_player[i] >= SpellLimits.PLAYERS) and (oldest < 0 or _bm_born[i] < _bm_born[oldest]):
+			oldest = i
+	return oldest
+
+
+## Live beams of enemy casters.
+func _enemy_beams() -> int:
+	var count: int = 0
+	for i in SpellLimits.BEAMS:
+		if _bm_on[i] != 0 and _bm_player[i] >= SpellLimits.PLAYERS:
+			count += 1
+	return count
+
+
 ## Ends the live beams of `tag` quietly (a `hold` switched off, a revoked build).
 func _end_beams_of(tag: int) -> void:
 	for at in SpellLimits.BEAMS:
@@ -1721,7 +1786,7 @@ func _step_beams(delta: float) -> void:
 ## Where `player`'s wizard holds its staffs now: the staff tip (`origin`) and the aim. The player
 ## calls it every physics step, so a beam the wizard casts follows the aim while it lives.
 func set_aim(player: int, origin: Vector2, direction: Vector2) -> void:
-	if player < 0 or player >= SpellLimits.PLAYERS or not origin.is_finite() or not direction.is_finite() or direction.is_zero_approx():
+	if player < 0 or player >= SpellLimits.CASTERS or not origin.is_finite() or not direction.is_finite() or direction.is_zero_approx():
 		return
 	_aim_origin[player] = origin
 	_aim_dir[player] = direction.normalized()
@@ -1730,7 +1795,7 @@ func set_aim(player: int, origin: Vector2, direction: Vector2) -> void:
 
 ## `player`'s wizard holds nothing any more (down, or gone): its beams end.
 func clear_aim(player: int) -> void:
-	if player < 0 or player >= SpellLimits.PLAYERS:
+	if player < 0 or player >= SpellLimits.CASTERS:
 		return
 	_aim_origin[player] = Vector2.INF
 	_aim_dir[player] = Vector2.INF
@@ -1749,8 +1814,9 @@ func beam_on(at: int) -> bool:
 	return at >= 0 and at < SpellLimits.BEAMS and _bm_on[at] != 0
 
 
+## The player of live beam `at`, or NO_PLAYER for an enemy's (drawn in the enemy ramp).
 func beam_player(at: int) -> int:
-	return _bm_player[at]
+	return _ev(_bm_player[at])
 
 
 func beam_origin(at: int) -> Vector2:
@@ -1835,12 +1901,13 @@ func _fire_payload(spell: CompiledSpell, tag: int, player: int, at: Vector2, hea
 	return _launch_as(spell.payload, player, SpellTag.staff_of(tag), SpellTag.generation_of(tag), at, heading, source, slot if slot >= 0 else CASTER_POINT)
 
 
-## True when this player may fire one more payload in this step.
+## True when this caster may fire one more payload in this step (every enemy shares one count).
 func _take_fire(player: int) -> bool:
-	if _fires_used[player] >= SpellLimits.MAX_FIRES_PER_STEP:
+	var budget: int = _budget(player)
+	if _fires_used[budget] >= SpellLimits.MAX_FIRES_PER_STEP:
 		fires_dropped += 1
 		return false
-	_fires_used[player] += 1
+	_fires_used[budget] += 1
 	return true
 
 
@@ -1872,7 +1939,7 @@ func _fire_timer(slot: int) -> void:
 	if spell == null or spell.payload == null:
 		_rec_fires[slot] = 0
 		return
-	var player: int = SpellTag.player_of(tag)
+	var player: int = SpellTag.caster_of(tag)
 	_rec_clock[slot] += spell.trigger_interval
 	if not _take_fire(player):
 		return
@@ -1910,7 +1977,8 @@ func _zap(slot: int) -> void:
 		_rec_arc_clock[slot] = INF
 		return
 	var at: Vector2 = projectiles.get_position_of(slot)
-	var target: Node2D = projectiles.nearest_target(at, spell.arc_reach, ProjectilesScript.LAYER_ENEMY)
+	var player: int = SpellTag.caster_of(tag)
+	var target: Node2D = projectiles.nearest_target(at, spell.arc_reach, _foes(player))
 	var aim: Vector2 = projectiles.nearest_point
 	if target == null or not aim.is_finite():
 		return
@@ -1918,7 +1986,6 @@ func _zap(slot: int) -> void:
 	if _rec_arc_clock[slot] <= 0.0:
 		_rec_arc_clock[slot] = spell.arc_interval
 	_arcs_used += 1
-	var player: int = SpellTag.player_of(tag)
 	var way: Vector2 = at.direction_to(aim) if not at.is_equal_approx(aim) else Vector2.RIGHT
 	var saved_tag: int = _ray_tag
 	var saved_dir: Vector2 = _ray_dir
@@ -1932,7 +1999,7 @@ func _zap(slot: int) -> void:
 	_ray_chain = _rec_chain[slot]
 	_ray_prev = _rec_prev[slot]
 	_arc_spell = spell
-	var got: float = projectiles.ray(player, at, way, at.distance_to(aim) + 2.0, 0, ProjectilesScript.LAYER_ENEMY, tag, 0.0, null)
+	var got: float = projectiles.ray(player, at, way, at.distance_to(aim) + 2.0, 0, _foes(player), tag, 0.0, null)
 	var fires: int = _ray_fires
 	_ray_tag = saved_tag
 	_ray_dir = saved_dir
@@ -1944,7 +2011,7 @@ func _zap(slot: int) -> void:
 	if _same(slot) and projectiles.get_tag_of(slot) == tag:
 		_rec_fires[slot] = fires
 	if got > 0.0 and events != null:
-		events.form_shown.emit(player, &"beam", at, way, got, spell.tint, spell.look)
+		events.form_shown.emit(_ev(player), &"beam", at, way, got, spell.tint, spell.look)
 	_cast_jumps()
 
 
@@ -1952,8 +2019,9 @@ func _on_hit(player: int, target: Node, position: Vector2, tag: int) -> void:
 	if not SpellTag.is_spell_tag(tag):
 		return
 	var spell: CompiledSpell = _profiles.get(tag)
-	if spell == null or player < 0 or player >= SpellLimits.PLAYERS:
+	if spell == null:
 		return
+	player = SpellTag.caster_of(tag)
 	var slot: int = projectiles.event_slot
 	var fires: int = spell.trigger_max_fires
 	var chain: int = spell.chain_jumps
@@ -1996,8 +2064,8 @@ func _on_hit(player: int, target: Node, position: Vector2, tag: int) -> void:
 ## (a beam's waits for its end, a hook's for the arrival).
 func _on_hit_effects(spell: CompiledSpell, tag: int, player: int, target: Node, position: Vector2, slot: int) -> void:
 	var refund: float = spell.behaviour(ModifierBase.Behaviour.SIPHON)
-	if refund > 0.0 and events != null:
-		events.mana_refund_requested.emit(player, refund)
+	if refund > 0.0:
+		_refund(player, refund)
 	# A hook pulls its caster and a swap trades places with it: the wizard (through the player),
 	# or the shot that cast this one; one cast from a point has nothing to move.
 	var by_wizard: bool = slot < 0 or projectiles.is_cast_by_wizard(slot)
@@ -2007,7 +2075,7 @@ func _on_hit_effects(spell: CompiledSpell, tag: int, player: int, target: Node, 
 		if by_wizard and events != null:
 			var anchor: Vector2 = projectiles.get_anchor(player)
 			_move_heading[player] = anchor.direction_to(position) if anchor.is_finite() and not anchor.is_equal_approx(position) else Vector2.RIGHT
-			events.caster_move_requested.emit(player, &"hook", position, SpellLimits.HOOK_SECONDS, tag)
+			events.caster_move_requested.emit(_ev(player), &"hook", position, SpellLimits.HOOK_SECONDS, tag)
 			pulled = true
 		elif caster >= 0:
 			var from: Vector2 = projectiles.get_position_of(caster)
@@ -2019,11 +2087,11 @@ func _on_hit_effects(spell: CompiledSpell, tag: int, player: int, target: Node, 
 		if by_wizard:
 			var anchor: Vector2 = projectiles.get_anchor(player)
 			if node != null and anchor.is_finite():
-				events.target_move_requested.emit(player, target, anchor)
-				events.caster_move_requested.emit(player, &"swap", node.global_position, SpellLimits.SWAP_SECONDS, tag)
+				events.target_move_requested.emit(_ev(player), target, anchor)
+				events.caster_move_requested.emit(_ev(player), &"swap", node.global_position, SpellLimits.SWAP_SECONDS, tag)
 		elif caster >= 0 and node != null:
 			var from: Vector2 = projectiles.get_position_of(caster)
-			events.target_move_requested.emit(player, target, from)
+			events.target_move_requested.emit(_ev(player), target, from)
 			projectiles.move_shot(caster, node.global_position - from, 0.0)
 	# A spent shot's blast goes off where it hit; a hook's waits for the arrival of what it pulls.
 	if slot >= 0 and not projectiles.is_alive(slot) and not pulled:
@@ -2032,19 +2100,19 @@ func _on_hit_effects(spell: CompiledSpell, tag: int, player: int, target: Node, 
 
 ## Sends a chain on from `position` to the nearest other target, if there is one in range.
 func _jump(spell: CompiledSpell, tag: int, player: int, position: Vector2, target: Node2D, struck: int, prev: int, fires: int, chain: int, by_ray: bool, echoed: bool = false) -> void:
-	if _chains_used[player] >= SpellLimits.MAX_CHAINS_PER_STEP:
+	if _chains_used[_budget(player)] >= SpellLimits.MAX_CHAINS_PER_STEP:
 		chains_dropped += 1
 		return
 	var before: Node2D = null
 	if prev != 0:
 		before = instance_from_id(prev) as Node2D
-	var best: Node2D = projectiles.nearest_target(position, SpellLimits.CHAIN_RANGE, ProjectilesScript.LAYER_ENEMY, target, before)
+	var best: Node2D = projectiles.nearest_target(position, SpellLimits.CHAIN_RANGE, _foes(player), target, before)
 	if best == null:
 		return
 	var aim: Vector2 = projectiles.nearest_point
 	if not aim.is_finite() or aim.is_equal_approx(position):
 		return
-	_chains_used[player] += 1
+	_chains_used[_budget(player)] += 1
 	var along: Vector2 = position.direction_to(aim)
 	var distance: float = position.distance_to(aim)
 	if by_ray:
@@ -2065,7 +2133,7 @@ func _jump(spell: CompiledSpell, tag: int, player: int, position: Vector2, targe
 		return
 	var speed: float = maxf(spell.speed, SpellLimits.CHAIN_MIN_SPEED)
 	var life: float = (distance + 16.0) / speed * 1.5 + 0.05
-	var slot: int = projectiles.spawn(player, position, along * speed, life, spell.radius, ProjectilesScript.LAYER_ENEMY, 0, tag)
+	var slot: int = projectiles.spawn(player, position, along * speed, life, spell.radius, _foes(player), 0, tag)
 	if slot < 0:
 		return
 	_register(slot, tag, spell, fires, chain, struck)
@@ -2075,6 +2143,8 @@ func _jump(spell: CompiledSpell, tag: int, player: int, position: Vector2, targe
 
 
 func _on_expired(player: int, position: Vector2, tag: int) -> void:
+	if SpellTag.is_spell_tag(tag):
+		player = SpellTag.caster_of(tag)
 	var event: int = TriggerBase.Event.EXPIRE
 	var spell: CompiledSpell = _profiles.get(tag)
 	if spell != null and spell.trigger_event == TriggerBase.Event.WALL and projectiles.expired_on_wall:
@@ -2116,8 +2186,7 @@ func _fire_event(event: int, player: int, at: Vector2, tag: int, source: Node, b
 	var spell: CompiledSpell = _profiles.get(tag)
 	if spell == null or spell.payload == null or spell.trigger_event != event:
 		return
-	if player < 0 or player >= SpellLimits.PLAYERS:
-		return
+	player = SpellTag.caster_of(tag)
 	var slot: int = projectiles.event_slot
 	if slot >= 0 and (not _same(slot) or projectiles.get_tag_of(slot) != tag):
 		slot = -1
@@ -2229,6 +2298,13 @@ func clear() -> void:
 	for launch in _pending:
 		_release_launch(launch)
 	_pending.clear()
+	_enemy_pending = 0
+	_refunds.fill(0.0)
+	_ring.fill(-1)
+	_landed_at.fill(0)
+	_move_heading.fill(Vector2.RIGHT)
+	_last_form.fill(&"")
+	_free_enemy_rows()
 	_cast_count.fill(0)
 	delayed_dropped = 0
 	_timer_count = 0
@@ -2256,12 +2332,140 @@ func clear() -> void:
 	revoked_tags.clear()
 
 
+## Opens a row for an enemy that casts a staff (staffs F5, "Enemy staffs") and returns its
+## caster number (SpellLimits.FIRST_ENEMY_CASTER and up), or -1 when every row is open. The
+## enemy then installs, casts and aims with it like a player (`install_staff`, `cast_staff`,
+## `set_aim`), each with its own staffs, delays and generations; its spells hit wizards and
+## decoys, and events name it NO_PLAYER (its tag names the row, `SpellTag.caster_of`). The row
+## closed longest ago is handed out first.
+func open_enemy_caster() -> int:
+	if _enemy_free.is_empty():
+		return -1
+	var row: int = _enemy_free[0]
+	_enemy_free.remove_at(0)
+	_enemy_open[row] = 1
+	var caster: int = SpellLimits.FIRST_ENEMY_CASTER + row
+	_reset_caster(caster)
+	return caster
+
+
+## The enemy is gone: its staffs are emptied, its waiting launches, holds and beams end, and
+## its row is free again. Its shots in the air fly on with their own numbers until they end.
+func close_enemy_caster(caster: int) -> void:
+	var row: int = caster - SpellLimits.FIRST_ENEMY_CASTER
+	if row < 0 or row >= SpellLimits.ENEMY_CASTERS or _enemy_open[row] == 0:
+		return
+	for staff in SpellLimits.STAFFS:
+		var index: int = caster * SpellLimits.STAFFS + staff
+		_release_hold(index)
+		var old: int = _current[index]
+		_installed[index] = null
+		_current[index] = -1
+		if old >= 0:
+			_release_generation(caster, staff, old)
+	for at in SpellLimits.BEAMS:
+		if _bm_on[at] != 0 and _bm_player[at] == caster:
+			_end_beam(at, false)
+	_reset_caster(caster)
+	_enemy_open[row] = 0
+	_enemy_free.append(row)
+
+
+## True while the enemy caster row `caster` is open.
+func is_enemy_caster_open(caster: int) -> bool:
+	var row: int = caster - SpellLimits.FIRST_ENEMY_CASTER
+	return row >= 0 and row < SpellLimits.ENEMY_CASTERS and _enemy_open[row] != 0
+
+
+## Enemy caster rows open now.
+func enemy_casters_open() -> int:
+	return _enemy_open.count(1)
+
+
+## The mana the next cast of this caster's staff costs (`cast_staff` refuses with less), 0.0
+## while its sustained carriers are on (that press switches them off), or REFUSED when it has no
+## build. An enemy's AI asks before it winds up, so a telegraph is always followed by its cast.
+func next_cast_mana(player: int, staff: int) -> float:
+	if not _in_range(player, staff):
+		return REFUSED
+	var index: int = player * SpellLimits.STAFFS + staff
+	var compiled: CompiledStaff = _installed[index]
+	if compiled == null or compiled.is_empty():
+		return REFUSED
+	if not _hold_tags[index].is_empty():
+		return 0.0
+	return compiled.casts[mini(_cursor[index], compiled.casts.size() - 1)].mana
+
+
+## The mana siphon gave this enemy caster back since the last call, which its AI adds to its
+## pool. A player's comes as `mana_refund_requested` instead (this gives 0.0).
+func take_refund(player: int) -> float:
+	if player < SpellLimits.PLAYERS or player >= SpellLimits.CASTERS:
+		return 0.0
+	var amount: float = _refunds[player]
+	_refunds[player] = 0.0
+	return amount
+
+
+func _refund(player: int, amount: float) -> void:
+	if player < SpellLimits.PLAYERS:
+		if events != null:
+			events.mana_refund_requested.emit(player, amount)
+	elif player < SpellLimits.CASTERS:
+		_refunds[player] += amount
+
+
+## Every enemy row free, none open (at start and on `clear`).
+func _free_enemy_rows() -> void:
+	_enemy_free.resize(SpellLimits.ENEMY_CASTERS)
+	for row in SpellLimits.ENEMY_CASTERS:
+		_enemy_free[row] = row
+	_enemy_open.fill(0)
+
+
+## A caster's own state back to new (its builds are handled by the caller).
+func _reset_caster(caster: int) -> void:
+	for staff in SpellLimits.STAFFS:
+		var index: int = caster * SpellLimits.STAFFS + staff
+		_cooldown[index] = 0.0
+		_cursor[index] = 0
+		_cast_count[index] = 0
+		_hold_mana[index] = 0.0
+		_last_form[index] = &""
+	_move_heading[caster] = Vector2.RIGHT
+	_landed_at[caster] = 0
+	_aim_origin[caster] = Vector2.INF
+	_aim_dir[caster] = Vector2.INF
+	_aim_seen[caster] = 0
+	_refunds[caster] = 0.0
+	_last_infused[caster] = null
+
+
+## The player events name for a caster: the player, or NO_PLAYER for an enemy caster.
+static func _ev(player: int) -> int:
+	return ProjectilesScript.event_player(player)
+
+
+## What a caster's spells hit: enemies for a player, wizards and decoys for an enemy (the
+## projectile manager adds the other enemies when `enemy_fire` is on).
+static func _foes(player: int) -> int:
+	return ProjectilesScript.LAYER_ENEMY if player < SpellLimits.PLAYERS else ProjectilesScript.LAYER_PLAYER
+
+
+## Which per-step fire and chain count a caster uses: its own for a player, the enemies' one.
+static func _budget(player: int) -> int:
+	return player if player < SpellLimits.PLAYERS else SpellLimits.PLAYERS
+
+
+## A player's staff, or an open enemy row's (a closed row builds and casts nothing).
 func _in_range(player: int, staff: int) -> bool:
-	return player >= 0 and player < SpellLimits.PLAYERS and staff >= 0 and staff < SpellLimits.STAFFS
+	if staff < 0 or staff >= SpellLimits.STAFFS or player < 0:
+		return false
+	return player < SpellLimits.PLAYERS or (player < SpellLimits.CASTERS and _enemy_open[player - SpellLimits.FIRST_ENEMY_CASTER] != 0)
 
 
 func _is_current(tag: int) -> bool:
-	var index: int = SpellTag.player_of(tag) * SpellLimits.STAFFS + SpellTag.staff_of(tag)
+	var index: int = SpellTag.caster_of(tag) * SpellLimits.STAFFS + SpellTag.staff_of(tag)
 	return _current[index] == SpellTag.generation_of(tag)
 
 
@@ -2269,13 +2473,13 @@ func _is_current(tag: int) -> bool:
 func _erase_generation(tag: int) -> void:
 	var key: int = SpellTag.generation_key(tag)
 	for node in _node_counts.get(key, 0):
-		_profiles.erase(SpellTag.make(SpellTag.player_of(tag), SpellTag.staff_of(tag), node, SpellTag.generation_of(tag)))
+		_profiles.erase(SpellTag.make_for(SpellTag.caster_of(tag), SpellTag.staff_of(tag), node, SpellTag.generation_of(tag)))
 	_node_counts.erase(key)
 
 
 ## The old generation is no longer current: free it now if none of its shots is in the air.
 func _release_generation(player: int, staff: int, generation: int) -> void:
-	var key: int = SpellTag.generation_key(SpellTag.make(player, staff, 0, generation))
+	var key: int = SpellTag.generation_key(SpellTag.make_for(player, staff, 0, generation))
 	if _generation_live.get(key, 0) == 0:
 		_erase_generation(key)
 
@@ -2286,7 +2490,7 @@ func _start_hold(index: int, player: int, staff: int, cast: CompiledCast) -> voi
 	var tags: PackedInt64Array = _hold_tags[index]
 	for spell in cast.group.spells:
 		if spell.fallback == CompiledSpell.FALLBACK_NONE and spell.behaviour(ModifierBase.Behaviour.HOLD) > 0.0:
-			var tag: int = SpellTag.make(player, staff, spell.node, _current[index])
+			var tag: int = SpellTag.make_for(player, staff, spell.node, _current[index])
 			if _live.get(tag, 0) > 0:
 				tags.append(tag)
 	if not tags.is_empty():
@@ -2320,27 +2524,28 @@ func _release_hold(index: int) -> void:
 func _end_hold_of(tag: int) -> void:
 	if not SpellTag.is_spell_tag(tag):
 		return
-	var index: int = SpellTag.player_of(tag) * SpellLimits.STAFFS + SpellTag.staff_of(tag)
+	var index: int = SpellTag.caster_of(tag) * SpellLimits.STAFFS + SpellTag.staff_of(tag)
 	var at: int = _hold_tags[index].find(tag)
 	if at < 0:
 		return
 	_hold_tags[index].remove_at(at)
 	if _hold_tags[index].is_empty():
 		_hold_mana[index] = 0.0
-		_send_reserved(SpellTag.player_of(tag))
+		_send_reserved(SpellTag.caster_of(tag))
 
 
 ## Mana this player's sustained carriers hold, over all their staffs.
 func reserved_mana(player: int) -> float:
 	var total: float = 0.0
-	if player >= 0 and player < SpellLimits.PLAYERS:
+	if player >= 0 and player < SpellLimits.CASTERS:
 		for staff in SpellLimits.STAFFS:
 			total += _hold_mana[player * SpellLimits.STAFFS + staff]
 	return total
 
 
 func _send_reserved(player: int) -> void:
-	if events != null:
+	# An enemy's AI reads `reserved_mana` itself; the event is for the players.
+	if events != null and player < SpellLimits.PLAYERS:
 		events.mana_reserved.emit(player, reserved_mana(player))
 
 

@@ -1593,3 +1593,12 @@ How it is built (parts F2–F10):
 - **One drop bucket for all enemies,** as before, so a crowd of casters never drops a player's shot at the cap.
 - **One more batch, not three:** the shader reads the body kind per instance, so every enemy caster's bolt, rune and orbit shot goes in one batch one layer above the players'. The timing run is within noise of main (cap 500 `update_draw` 1.6–1.8 ms, the fresh-hit step 2.9–3.2 ms).
 - **The 1x look:** the looks sheet has an enemy caster beside the four players. Its tail pixels are a dull ochre and brown, apart from the players' colours; a plain enemy bolt's head is a pale yellow near Spark's gold, its tail is what tells it apart. The owner judges it on the sheet.
+
+## 2026-10-28: Enemy casters in the spell runtime (staffs F5)
+
+- **`player` in `Spells` is a caster number.** Every array is sized for the 4 players and the 256 enemy rows (1,040 staffs), so an enemy goes through exactly the code a wizard does: the same compiler output, cast, payloads, chains, beams, holds and moves. No enemy-only branch decides what a card does; only where a caster's side matters (what it hits, `_foes`; what events call it, `_ev`; whose budget it spends, `_budget`).
+- **Rows are opened, not assigned.** An enemy asks for a row when it spawns and gives it back when it dies, so 256 rows serve any number of enemies over a run. The row closed longest ago is handed out first, and each staff keeps its place on the generation ring (`_ring`), so a reused row's new build never takes the tag of the dead enemy's shots still in the air (they would otherwise be revoked).
+- **A closed row is out of range,** so a stale caster number cannot build or cast; its shots keep their numbers until they end.
+- **Shares:** all enemies share one per-step fire count and one chain count (one player's worth), hold at most 16 of the 64 live beams (an enemy's beam only ever ends another enemy's) and 32 of the 128 waiting launches. These are engine safeguards, as the players' are; the stress run (F9) checks them.
+- **What the AI reads instead of events:** siphon refunds wait in `take_refund`, reservations in `reserved_mana`, and the next cast's cost in `next_cast_mana`; `mana_reserved` and `mana_refund_requested` stay the players'.
+- **Not yet:** `on hurt` and `relay` stay the players' (they listen to wizards' events); an enemy's decoys and familiars are asked for with `NO_PLAYER`, which Entities ignores until F8; combat still treats a `NO_PLAYER` area hit as hitting enemies until F6.

@@ -52,6 +52,19 @@ const SWAP_SECONDS: float = 0.1
 const RECOIL_SECONDS: float = 0.1
 ## Players, indexes 0 to 3.
 const PLAYERS: int = 4
+## Enemy casters (staffs F5, "Enemy staffs"): rows FIRST_ENEMY_CASTER to CASTERS - 1, one per
+## enemy that casts a staff (`Spells.open_enemy_caster`); the same numbers as the projectile
+## manager's and `SpellTag`'s enemy rows.
+const FIRST_ENEMY_CASTER: int = PLAYERS
+const ENEMY_CASTERS: int = 256
+const CASTERS: int = FIRST_ENEMY_CASTER + ENEMY_CASTERS
+## The per-step fire and chain caps count per player and once for all enemies together, so a
+## crowd of casters shares one budget the size of one player's.
+const BUDGETS: int = PLAYERS + 1
+## Of the shared live beams and waiting launches (BEAMS, MAX_PENDING), the most enemies hold at
+## once. Enemies never end a player's beam or take a player's launch slot.
+const ENEMY_BEAMS: int = 16
+const ENEMY_PENDING: int = 32
 ## Live beams at once over every player (one more ends the oldest), and the seconds between a
 ## live beam's hits. A beam lives its carrier's `lifetime`, so a held staff keeps one on.
 const BEAMS: int = 64

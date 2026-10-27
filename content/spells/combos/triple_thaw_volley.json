@@ -1,0 +1,9 @@
+{
+	"id": "triple_thaw_volley",
+	"name": "Triple thaw volley",
+	"does": "A bolt, a frost bolt and a fire bolt leave as one volley: the frost chills the imp and the fire thaws it at once.",
+	"casts": [{"staff": 0, "cards": ["triple", "bolt", "frost", "bolt", "fire", "bolt"]}],
+	"imps": [[100, 0]],
+	"seconds": 1.5,
+	"checks": [{"kind": "reaction", "reaction": "thaw"}]
+}

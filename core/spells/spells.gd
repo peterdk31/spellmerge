@@ -11,9 +11,10 @@ extends Node
 ## Casting: `cast_staff(player, staff, origin, direction, mana)` fires the next cast of the
 ## staff's cycle and returns the mana spent or `REFUSED`; delays (the staff's own, every
 ## carrier's cooldown, the recharge after the last cast) are per player and staff and tick in
-## `step` (physics). A cast is a group: its carriers fan out a little; each carrier's shots are a
-## fan (straight), a ring (orbit), still shots or rays; split and nova multiplied them in the
-## compiler; homing is set on each shot. Cards that landed on the caster (or a payload's origin)
+## `step` (physics). A cast is a group: its carriers leave along the aim; each carrier's shots are
+## a fan (straight), a ring (orbit), still shots or rays; split and nova multiplied them in the
+## compiler; homing is set on each shot. Every shot leaves up to its staff's `spread` degrees off
+## its line, at random (`_staff_spread`). Cards that landed on the caster (or a payload's origin)
 ## ask combat for an area hit there (`area_hit_requested`); a dash card asks the player to move
 ## (`caster_move_requested`). A `hold` carrier lives until its staff is cast again or edited.
 ##
@@ -204,7 +205,7 @@ var _pending_free: Array[PendingLaunch] = []
 var _clock: float = 0.0
 ## Launches dropped because `SpellLimits.MAX_PENDING` were already waiting.
 var delayed_dropped: int = 0
-## player * STAFFS + staff -> casts made, which seeds the next cast's scatter.
+## player * STAFFS + staff -> casts made, which seeds the next cast's scatter and staff spread.
 var _cast_count: PackedInt32Array = PackedInt32Array()
 var _scatter: RandomNumberGenerator = RandomNumberGenerator.new()
 ## The carrier whose echo is being launched: its shots hit at the echo's half damage.
@@ -498,6 +499,7 @@ func component_stats(id: StringName) -> PackedStringArray:
 		var mults: Array = [
 			["Dmg", modifier.damage_mult], ["Mana", modifier.mana_mult], ["Shots", float(modifier.shot_mult)],
 			["Delay", modifier.cooldown_mult], ["Speed", modifier.speed_mult], ["Size", modifier.radius_mult],
+			["Spread", modifier.spread_mult],
 		]
 		for pair: Array in mults:
 			if not is_equal_approx(float(pair[1]), 1.0):
@@ -825,7 +827,7 @@ func _launch(spell: CompiledSpell, tag: int, player: int, origin: Vector2, direc
 		return _launch_wall(spell, tag, player, origin, direction, source, lifetime, carried, prev)
 	var base: float = direction.angle()
 	for n in count:
-		var angle: float = base + _fan_angle(n, count, spell)
+		var angle: float = base + _fan_angle(n, count, spell) + _staff_spread(tag, spell)
 		var heading: Vector2 = Vector2.from_angle(angle)
 		if spell.motion == FormBase.Motion.RAY:
 			if _start_beam(spell, tag, player, origin, heading, carried, prev, source, lifetime):
@@ -1160,8 +1162,8 @@ func _apply_travel(slot: int, spell: CompiledSpell) -> void:
 
 ## The shots of every spell of `group`, fired together from `origin` along `direction` by this
 ## player's staff in its `generation` (each spell's tag names its node); returns how many were
-## made (a fallback counts as one). Two or more carriers of one group fan out a little
-## (`SpellLimits.MULTICAST_SPREAD` degrees apart); a scatter group sends each in a random
+## made (a fallback counts as one). The carriers of one group leave along the same aim (only the
+## staff's `spread` sets them apart, shot by shot); a scatter group sends each in a random
 ## direction instead. A burst group fires again `repeats - 1` times, `repeat_interval` seconds
 ## apart (at once when that is 0), reading nothing again. A fallback asks for an area hit on the
 ## spot: the caster's for a cast, the payload's origin for a payload. `source` is the target that
@@ -1181,19 +1183,10 @@ func _launch_group(group: CompiledGroup, player: int, staff: int, generation: in
 ## One firing of `group` (see `_launch_group`).
 func _fire_group(group: CompiledGroup, player: int, staff: int, generation: int, origin: Vector2, direction: Vector2, source: Node, from_caster: bool) -> int:
 	var made: int = 0
-	var carriers: int = 0
-	for spell in group.spells:
-		if spell.fallback == CompiledSpell.FALLBACK_NONE:
-			carriers += 1
-	var k: int = 0
 	for spell in group.spells:
 		var heading: Vector2 = direction
-		if spell.fallback == CompiledSpell.FALLBACK_NONE:
-			if group.scatter:
-				heading = direction.rotated(_scatter.randf() * TAU)
-			elif carriers > 1:
-				heading = direction.rotated(deg_to_rad(SpellLimits.MULTICAST_SPREAD) * (float(k) / (carriers - 1) - 0.5) * (carriers - 1))
-			k += 1
+		if spell.fallback == CompiledSpell.FALLBACK_NONE and group.scatter:
+			heading = direction.rotated(_scatter.randf() * TAU)
 		made += _fire_spell(spell, player, staff, generation, origin, heading, source, from_caster, false)
 	return made
 
@@ -1369,6 +1362,24 @@ func _fan_angle(n: int, count: int, spell: CompiledSpell) -> float:
 	if spell.spread >= 360.0:
 		return TAU * n / count
 	return deg_to_rad(spell.spread) * (float(n) / (count - 1) - 0.5)
+
+
+## Radians a shot of `spell` (cast as `tag`) leaves off its line: random, up to its staff's
+## `spread` degrees times the spell's `spread_mult` either side, from the generator seeded per
+## cast (so the same cast spreads the same way). With no spread (the `dev` staff, or a factor of
+## 0) it aims true and draws nothing from the generator.
+func _staff_spread(tag: int, spell: CompiledSpell) -> float:
+	var player: int = SpellTag.player_of(tag)
+	var staff: int = SpellTag.staff_of(tag)
+	if not _in_range(player, staff):
+		return 0.0
+	var compiled: CompiledStaff = _installed[player * SpellLimits.STAFFS + staff]
+	if compiled == null or compiled.staff == null:
+		return 0.0
+	var degrees: float = compiled.staff.spread * spell.spread_mult
+	if degrees <= 0.0:
+		return 0.0
+	return deg_to_rad(degrees) * (_scatter.randf() * 2.0 - 1.0)
 
 
 ## Gives the manager's shot in `slot` its record and counts it.

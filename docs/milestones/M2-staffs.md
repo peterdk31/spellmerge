@@ -163,9 +163,10 @@ These are not build rules: they keep a frame from running away, never refuse or 
 | `draw` | Carriers one cast wants | 1–4 |
 | `cast_delay` | Seconds added to every cast's delay | 0–2 |
 | `recharge` | Seconds added when the staff recharges | 0–5 |
-| `spread` | Degrees of random spread on every shot | 0–45 |
+| `spread` | Degrees a shot may leave off its line, either side, at random (seeded per cast); the carriers of a multicast leave along one aim and only this sets them apart (owner, 2026-10-27) | 0–45 |
 
 - **`starter`:** 4 slots. Used by `nightly` and `stable` builds.
+- **Spread:** both staffs aim true (0). Later staffs (M3) get spread, at random or high and upgradable to lower; a modifier's `spread_mult` scales it for the next carrier (Sniper).
 - **`dev`:** 20 slots, short delay and recharge. Used by `dev` and `preview` builds. The slot count is one field in `content/wizard/staffs/dev/dev.tres`.
 - **Start cards:** A `dash`; X `fire · bolt`; Y and B empty. The bag holds every card until M3's rewards fill it.
 - **The build channel** comes from `BuildInfo.channel()` (`core/base/build_info.gd`), which `ci/build/build.sh --channel` already writes (`preview.yml` passes `preview`). No owner change is needed.

@@ -273,6 +273,7 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 		radius *= modifier.radius_mult
 		shots *= modifier.shot_mult
 		pierce += modifier.extra_pierce
+		spell.spread_mult *= modifier.spread_mult
 		spell.behaviours[modifier.behaviour] += modifier.behaviour_strength
 		match modifier.behaviour:
 			ModifierBase.Behaviour.HOMING:

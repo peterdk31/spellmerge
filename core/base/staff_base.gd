@@ -18,7 +18,8 @@ extends Resource
 @export var cast_delay: float = 0.1
 ## Seconds added when the staff has read all its cards and starts over.
 @export var recharge: float = 0.5
-## Degrees of random spread on every shot (0 is a true aim).
+## Degrees a shot may leave off its line, either side, at random (seeded per cast); 0 aims true.
+## The carriers of a multicast leave along one aim, so only this sets them apart.
 @export var spread: float = 0.0
 
 

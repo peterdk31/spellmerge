@@ -1,14 +1,14 @@
 extends "res://tests/support/suite.gd"
 ## The Triple card (content/spells/multicasts/triple/, staffs phase C): a multicast that pulls two
-## more carriers into the group being read, so three carriers leave in one cast, fanned out. Each
-## of its combos does what it promises with the card and fails without it.
+## more carriers into the group being read, so three carriers leave in one cast. Each of its combos
+## does what it promises with the card and fails without it.
 ##
 ## godot --headless --path . --script res://tests/content/spells/test_triple.gd
 
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const ComboFiles := preload("res://tests/support/combo_files.gd")
 
-const COMBOS: Array[String] = ["triple_frost_fan", "triple_three_ways"]
+const COMBOS: Array[String] = ["triple_thaw_volley", "triple_three_ways"]
 
 
 func _card() -> MulticastBase:
@@ -42,6 +42,11 @@ func _holds(combo: Dictionary, drop: String = "") -> bool:
 			"status":
 				for index: int in row["imps"]:
 					held = held and arena.was_given(arena.imps[index], StringName(row["status"]))
+			"damaged":
+				for index: int in row["imps"]:
+					held = held and arena.lost(arena.imps[index]) > 0
+			"reaction":
+				held = held and arena.reaction_ids().has(StringName(row["reaction"]))
 			"status_count":
 				var count: int = 0
 				for imp in arena.imps:
@@ -97,12 +102,11 @@ func test_four_players_triple_at_once() -> void:
 	for player in 4:
 		var at := Vector2(0.0, 150.0 * player)
 		arena.place_caster(player, at)
-		for offset: Vector2 in [Vector2(117.0, -25.0), Vector2(120.0, 0.0), Vector2(117.0, 25.0)]:
-			imps.append(arena.add_imp(at + offset))
+		imps.append(arena.add_imp(at + Vector2(120.0, 0.0)))
 		arena.install_cards(player, 0, ["triple", "bolt", "bolt", "bolt"])
 	for player in 4:
 		check(arena.cast(player, 0), "player %d casts" % player)
 	arena.run(1.5)
 	for imp in imps:
-		check(arena.lost(imp) > 0, "every player's three bolts hit")
+		check(arena.lost(imp) >= 15, "every player's three bolts hit (%d)" % arena.lost(imp))
 	arena.free_all()

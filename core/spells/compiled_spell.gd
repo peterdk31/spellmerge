@@ -56,6 +56,9 @@ var homing_angle: float = 0.0
 var homing_range: float = 0.0
 ## Times a hit jumps on to another target; 0 means no chain.
 var chain_jumps: int = 0
+## Factor on the staff's `spread` for this carrier's shots (its modifiers' `spread_mult`,
+## multiplied); 1 means the staff's own spread.
+var spread_mult: float = 1.0
 
 ## A `TriggerBase.Event` value, meaningful only when `payload` is not null.
 var trigger_event: int = TriggerBase.Event.HIT

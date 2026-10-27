@@ -98,7 +98,7 @@ func test_four_players_double_at_once() -> void:
 	for player in 4:
 		var at := Vector2(0.0, 150.0 * player)
 		arena.place_caster(player, at)
-		imps.append(arena.add_imp(at + Vector2(90.0, -9.0)))
+		imps.append(arena.add_imp(at + Vector2(90.0, 0.0)))
 		imps.append(arena.add_imp(at + Vector2(-50.0, 0.0)))
 		arena.install_cards(player, 0, ["double", "bolt", "nova"])
 	for player in 4:

@@ -94,7 +94,7 @@ The owner's direction after B7a: "The 4 staffs should be mapped to lb/rb lt/rt i
 - **Recipes run as staffs of one cast.** `install` and `cast` wrap a recipe's spell (its held spells as payloads, its depth as its node), so there is one runtime and every M2 cast and trigger test keeps checking it until A6c removes recipes.
 - **Switching a `hold` off is a cast of the staff that spends nothing** (`cast_staff` returns 0.0). Which presses may do it is the player's call (A6a): a button held down must not switch on and off again and again.
 - **A cast with nothing in it** (every card wasted) still moves the staff on and starts its delay, so a staff can never stick on it; it returns `REFUSED`.
-- **Carriers of one group fan out 12° apart** (`MULTICAST_SPREAD`), so `double · bolt · bolt` reads as two bolts. Tuning, not a limit.
+- ~~**Carriers of one group fan out 12° apart** (`MULTICAST_SPREAD`).~~ Replaced on 2026-10-27 by the staff's `spread` (see "Spread belongs to the staff").
 - **Fallbacks are area hits on the spot,** as wide as the larger of the spell's radius and its blast strength; combat makes them hurt in B3.
 
 ## 2026-10-26: Planning after the pivot verdict (#264)
@@ -1518,3 +1518,10 @@ An independent review of the branch found these, all fixed with a regression tes
 - **Pierce:** one Pierce card is one pierce (was two), so n cards are n pierces. The beam has no pierce of its own any more (it had 1 from the first tuning): a bare beam stops at its first target. The orbit keeps its 4, so its ring survives several hits.
 - **Beams and pierce:** a homing beam bends onto its pick, and for each pierce it has bends on from there toward another (`SpellLimits.BEAM_LEGS` at most), as a homing shot picks a new target after a hit; past the last it goes straight on. A beam never reaches past its own `ray_length` (`ray_points` cuts it), even when its card looks further. The sandbox has four more training dummies round the first, to try these on.
 - **Not yet:** a shot in flight picks from all around it, so a random pick can be behind it and it turns back; a cone in front would stop that if it plays badly.
+
+## 2026-10-27: Spread belongs to the staff (owner)
+
+- **Every shot a staff fires leaves up to the staff's `spread` degrees off its line, either side, at random** (`StaffBase.spread`, 0–45). The generator is seeded per cast (player, staff, cast count), so the same cast spreads the same way. It turns each shot after its card shape (a split's fan, a nova's ring), so a fan stays a fan. Moves, rain, walls and entities are not turned.
+- **The carriers of a multicast leave along the same aim;** only the staff's spread sets them apart. `SpellLimits.MULTICAST_SPREAD` (12°) is gone. A `scatter` group still sends each carrier its own random way.
+- **The `dev` and `starter` staffs have 0 spread** (they aim true). Staffs with spread come with staff types (M3): random, or high and upgradable to lower (docs/BACKLOG.md).
+- **`ModifierBase.spread_mult`** (0–4, several multiply) scales the staff's spread for the next carrier: a factor, not a flat number of degrees, so a card is worth the same share on every staff and two of them stack without a floor. The first card to use it is Sniper.

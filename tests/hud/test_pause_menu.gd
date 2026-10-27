@@ -26,6 +26,7 @@ var _focus: UIFocusScript
 var _hud: HudScript
 var _actions: Array[Array] = []
 var _friendly: Array[Array] = []
+var _slots: Array[int] = []
 
 
 func _initialize() -> void:
@@ -36,6 +37,7 @@ func _initialize() -> void:
 	_test_sandbox_entry_and_actions()
 	_test_friendly_fire_setting()
 	_test_the_fullscreen_switch()
+	_test_the_effect_slots_slider()
 	_test_the_sandbox_switches_the_builder()
 	_test_the_sandbox_switches_the_reload()
 	_test_b_opens_the_builder_in_play_only()
@@ -67,6 +69,7 @@ func _setup(count: int, sandbox: bool = false) -> void:
 	_focus._ready()
 	_bus.sandbox_action_requested.connect(func(player: int, action: StringName) -> void: _actions.append([player, action]))
 	_bus.friendly_fire_requested.connect(func(player: int, on: bool) -> void: _friendly.append([player, on]))
+	_bus.effect_slots_changed.connect(func(slots: int) -> void: _slots.append(slots))
 	for index in count:
 		_input.add_virtual_device(index)
 	_hud = (load(HUD_SCENE_PATH) as PackedScene).instantiate() as HudScript
@@ -84,6 +87,7 @@ func _teardown() -> void:
 	paused = false
 	_actions.clear()
 	_friendly.clear()
+	_slots.clear()
 	for node: Node in [_hud, _focus, _input, _bus]:
 		if node != null:
 			node.free()
@@ -243,7 +247,7 @@ func _test_friendly_fire_setting() -> void:
 	_tap(0, &"pause")
 	_frame()
 	_press(0, "Settings")
-	_check(_names() == ["Gameplay", "Fullscreen", "SettingsBack"], "Settings, got %s" % [_names()])
+	_check(_names() == ["Gameplay", "Fullscreen", "EffectSlots", "SettingsBack"], "Settings, got %s" % [_names()])
 	_press(0, "Gameplay")
 	_check(_menu().button("FriendlyFire").text.ends_with("Friendly fire: Off"), "off by default")
 	_press(0, "FriendlyFire")
@@ -294,6 +298,47 @@ func _test_the_fullscreen_switch() -> void:
 	_press(0, "Settings")
 	_check(_menu().button("Fullscreen").text.ends_with("Fullscreen: Off"), "the window's own state shows")
 	display.free()
+
+
+## Settings > Effect slots is a slider: left and right move it a step and keep the focus on it,
+## accept steps up and wraps, up and down leave it; each move tells feel, the ends do not move.
+func _test_the_effect_slots_slider() -> void:
+	_setup(1)
+	_tap(0, &"pause")
+	_frame()
+	_press(0, "Settings")
+	var row: Button = _menu().button("EffectSlots")
+	var bar: HSlider = row.get_node("Bar") as HSlider
+	_check(row.text.ends_with("Effect slots: 256") and is_equal_approx(bar.value, 256.0), "256 at the start, shown in words and on the bar")
+	_focus.focus(0, row)
+	_tap(0, &"move_right")
+	_frame()
+	_check(_slots == [320], "right asks for a step more, got %s" % [_slots])
+	_check(row.text.ends_with("Effect slots: 320") and is_equal_approx(bar.value, 320.0), "and shows it")
+	_check(_focus.focused(0) == row, "the focus stays on the slider")
+	_tap(0, &"move_left")
+	_frame()
+	_tap(0, &"move_left")
+	_frame()
+	_check(_slots == [320, 256, 192], "left steps down, got %s" % [_slots])
+	for i in 10:
+		_tap(0, &"move_left")
+		_frame()
+	_check(_menu().effect_slots == EffectSlots.MIN and _slots.back() == EffectSlots.MIN, "it stops at the bottom")
+	var sent: int = _slots.size()
+	_tap(0, &"move_left")
+	_frame()
+	_check(_slots.size() == sent, "past the end nothing is sent")
+	_menu().effect_slots = EffectSlots.MAX
+	_press(0, "EffectSlots")
+	_check(_menu().effect_slots == EffectSlots.MIN, "accept at the top wraps to the bottom")
+	_press(0, "EffectSlots")
+	_check(_menu().effect_slots == EffectSlots.MIN + EffectSlots.STEP, "accept steps up")
+	_focus.focus(0, row)
+	_tap(0, &"move_down")
+	_frame()
+	_check(_focus.focused(0) == _menu().button("SettingsBack"), "down leaves the slider")
+	_check(_menu().page == PauseMenuScript.Page.SETTINGS, "all on the Settings page")
 
 
 func _test_b_opens_the_builder_in_play_only() -> void:

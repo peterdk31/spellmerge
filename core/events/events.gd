@@ -27,6 +27,9 @@ signal door_vote_requested(player: int, door: int)
 signal pause_requested(player: int)
 ## `player` switched friendly fire on or off in the pause menu (Settings, Gameplay). Heard by coop, which answers with `friendly_fire_changed`.
 signal friendly_fire_requested(player: int, on: bool)
+## Sender: hud. The "Effect slots" slider in the pause menu (Settings) moved: how many effects
+## (the glowing flares of casts, impacts, rings and dashes) may show at once. Heard by feel.
+signal effect_slots_changed(slots: int)
 ## The Sandbox button was pressed (only shown in `dev` and `preview` builds). Heard by flow, which starts the sandbox (staffs B7).
 signal sandbox_requested(player: int)
 ## `player` picked a sandbox action on the pause menu's sandbox page: `imp_wave` or `reset_dummies`. Heard by flow (staffs B7).

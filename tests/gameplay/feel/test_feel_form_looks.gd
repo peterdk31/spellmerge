@@ -196,9 +196,9 @@ func test_a_hit_on_a_character_shows_the_flare_too() -> void:
 
 
 func test_effects_past_the_slots_take_the_oldest() -> void:
-	for i in FeelScript.EFFECT_SLOTS + 20:
+	for i in feel.effect_slots + 20:
 		_impact(i % 4, &"bolt")
-	check_equal(feel.live_effects(), FeelScript.EFFECT_SLOTS, "every slot busy, no more")
+	check_equal(feel.live_effects(), feel.effect_slots, "every slot busy, no more")
 
 
 func test_an_enemy_shot_always_ends_in_the_same_ember_mark() -> void:
@@ -237,7 +237,7 @@ func test_four_players_casting_and_hitting_stay_in_the_pools() -> void:
 			bus.projectile_impact.emit(player, null, Vector2(player * 10, 0), Vector2.RIGHT)
 			bus.projectile_impact.emit(-1, null, Vector2(player * 10, 5), Vector2.LEFT)
 	check(feel.live_flashes() <= FeelScript.ALL_FLASH_SLOTS, "inside the flash slots")
-	check(feel.live_effects() <= FeelScript.EFFECT_SLOTS, "inside the effect slots")
+	check(feel.live_effects() <= feel.effect_slots, "inside the effect slots")
 	check_equal(feel.get_child_count(), children, "no new nodes were needed")
 
 
@@ -302,3 +302,20 @@ func test_a_flare_of_zero_leaves_the_beam_as_before() -> void:
 	preset.beam_flare = 0.0
 	bus.form_shown.emit(0, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, Color.RED, 0)
 	check_equal(_swell(), 1.0, "at rest at the start")
+
+
+func test_the_effect_slots_setting_sizes_the_batch() -> void:
+	check_equal(feel.effect_slots, EffectSlots.DEFAULT, "the default at the start")
+	_impact(0, &"bolt")
+	bus.effect_slots_changed.emit(128)
+	check_equal(feel.effect_slots, 128, "the setting takes")
+	check_equal(feel._effect_node.multimesh.instance_count, 128, "the batch has that room")
+	check_equal(feel.live_effects(), 0, "the effects showing end")
+	for i in 200:
+		_impact(i % 4, &"bolt")
+	check_equal(feel.live_effects(), 128, "no more than the setting")
+	feel.step(0.01)
+	check_equal(feel._effect_node.multimesh.visible_instance_count, 128, "and all of them drawn")
+	check_equal(feel.set_effect_slots(5000), EffectSlots.MAX, "a number past the top is the top")
+	check_equal(feel.set_effect_slots(1), EffectSlots.MIN, "below the bottom, the bottom")
+	check_equal(feel.set_effect_slots(300), 320, "between steps, the nearest step")

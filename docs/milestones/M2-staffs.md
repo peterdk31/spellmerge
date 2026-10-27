@@ -32,7 +32,7 @@ A card is a `.tres` on one of five classes in `core/base/`, in its own folder un
 | Kind | Class | Role | Cards (new in bold) |
 | --- | --- | --- | --- |
 | Carrier (15) | `FormBase` | Ends a group: something leaves the caster | bolt, beam, nova, rune, orbit, **dash, teleport, hook, swap, boomerang, wall, rain, fissure, decoy, familiar** |
-| Modifier (23) | `ModifierBase` | Attaches to the next carrier | split, pierce, homing, chain, bigger, faster, **shield, blast, hold, recoil, bounce, echo, linger, heavy, siphon, overcharge, sticky, magnet, ghost, spiral, mirror, growth, relay** |
+| Modifier (24) | `ModifierBase` | Attaches to the next carrier | split, pierce, homing, chain, bigger, faster, **shield, blast, hold, recoil, bounce, echo, linger, heavy, siphon, overcharge, sticky, magnet, ghost, spiral, mirror, growth, relay, sniper** |
 | Infusion (6) | `ElementBase` | Attaches to the next carrier; several may | fire, frost, storm, void, lightning, **mend** |
 | Trigger (10) | `TriggerBase` | Attaches to the next carrier; the group read after that carrier is its payload | on hit, on expire, timer, **on block, on kill, on cast, on wall, on hurt, on reaction, on ally** |
 | Multicast (4) | `MulticastBase` | Pulls more carriers into the same group | **double, triple, scatter, burst** |
@@ -90,6 +90,7 @@ Numbers are first guesses for the card's own task to set. Examples are written i
 | growth | Grows and gets stronger the further it flies | rewards range; `growth · linger · bolt` is a huge slow orb |
 | relay | When the shot passes through a teammate it takes on the infusions of that player's last cast | your bolt plus their frost, with nobody waiting (docs/PLAN.md, cross-player linking) |
 | short delay | Halves the carrier's delay for 25 % more mana (owner, 2026-10-27; named after the builder's "Delay", so it is not mistaken for `faster`) | `short delay · dash` dashes again sooner; `short delay · beam` keeps a beam on with a slower staff |
+| sniper | The carrier keeps a quarter of its staff's spread (`spread_mult` 0.25, a factor; owner, 2026-10-27). Free: the dev and starter staffs aim true, so it waits for staffs with spread (M3) | `sniper · pierce · bolt` lines up a crowd; `sniper · double · bolt · bolt`, one true bolt and one wild |
 
 **Infusion:** mend: hits heal wizards (whatever the friendly-fire setting) and do almost nothing to enemies. `mend · blast` is a self-heal burst; `mend · chain · bolt` jumps a heal through the party.
 

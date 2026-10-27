@@ -49,9 +49,13 @@ uniform float particle_share = 1.0;
 uniform float trail_share = 1.0;
 // How bright the glow is (1.0 the look; 0.0 none).
 uniform float glow_strength = 1.0;
-// The sprite path's dissolve (Feel's death: a copy of the dead sprite): 0 whole, 1 gone. Its
-// pixels turn white-hot and fall out one by one, and it glows as they go.
+// The sprite path's dissolve (Feel's death, a wizard's dash afterimages): 0 whole, 1 gone. Its
+// pixels turn `dissolve_color` (white-hot unless set) and fall out one by one.
 uniform float dissolve = 0.0;
+uniform vec4 dissolve_color = vec4(0.957, 0.945, 0.918, 1.0);
+// The sprite path's glow: light added round the sprite's own pixels (a combo mark, an
+// afterimage), as bright as this; the sprite needs a few empty pixels round it to hold it.
+uniform float sprite_glow = 0.0;
 // Beam mode (Feel's beams; the instance data above is not used): 1 a Line2D stretched along its
 // path (UV.x 0-1 along `beam_length` pixels, UV.y across `beam_width`), 2 a Sprite2D whose region
 // is the beam (UV in texture pixels, 32 across). Its core colour is `core_override`, its player
@@ -986,11 +990,22 @@ void fragment() {
 			if (t.a > 0.5 && hash(px.x, px.y, 81.0) < dissolve * 1.2 - 0.1) {
 				alpha = 0.0;
 			} else if (t.a > 0.5) {
-				shown = mix(shown, BONE_LIGHT, min(dissolve * 3.0, 1.0));
+				shown = mix(shown, dissolve_color.rgb, min(dissolve * 3.0, 1.0));
 				alpha = 1.0;
 			}
 		}
-		// Premultiplied, as the blend mode wants.
-		COLOR = vec4(shown * alpha, alpha);
+		if (alpha < 0.5 && sprite_glow > 0.0) {
+			// The glow: how much of the sprite is near, 2 and 4 pixels away in eight directions.
+			float near = 0.0;
+			for (int k = 0; k < 8; k++) {
+				vec2 dir = vec2(cos(float(k) * 0.7854), sin(float(k) * 0.7854)) * TEXTURE_PIXEL_SIZE;
+				near += texture(TEXTURE, UV + dir * 2.0).a * 0.09 + texture(TEXTURE, UV + dir * 4.0).a * 0.035;
+			}
+			vec3 hue = dissolve > 0.0 ? dissolve_color.rgb : body.rgb;
+			COLOR = vec4(hue * near * sprite_glow * (1.0 - dissolve) * glow_strength, 0.0);
+		} else {
+			// Premultiplied, as the blend mode wants.
+			COLOR = vec4(shown * alpha, alpha);
+		}
 	}
 }

@@ -126,3 +126,12 @@ func test_marks_use_no_particles() -> void:
 func test_a_preset_can_turn_the_marks_off() -> void:
 	preset.combo_mark_seconds = 0.0
 	check(not _show(0, ComboMarks.STACKED).visible, "off")
+
+
+func test_a_mark_glows_and_has_room_for_it() -> void:
+	bus.combo_cast.emit(0, &"boosted", Vector2(20.0, 20.0), Vector2.RIGHT, Color.WHITE)
+	var mark: Sprite2D = feel.combo_mark(0)
+	var material := mark.material as ShaderMaterial
+	check(material != null and material.shader == FeelScript.CORE_SHADER, "drawn by the shot shader")
+	check((material.get_shader_parameter(&"sprite_glow") as float) > 0.0, "with a glow round it")
+	check_equal(mark.texture.get_width(), ComboMarks.SIZE + 2 * ComboMarks.PAD, "its picture has empty pixels round it for the glow")

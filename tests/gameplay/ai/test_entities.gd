@@ -188,7 +188,10 @@ func _test_decoy_copies_its_wizard() -> void:
 	if decoy != null:
 		_check(decoy.sprite.texture == sprite.texture and decoy.sprite.flip_h, "it copies the wizard's sprite and facing")
 		_check(decoy.hat.texture == hat.texture, "and its hat (the player's colour)")
-		_check(decoy.modulate.a < 1.0, "it is a little see-through, so it never reads as a second wizard")
+		var material := decoy.sprite.material as ShaderMaterial
+		_check(decoy.modulate.a == 1.0 and material != null, "never see-through (the glow look): drawn by the shot shader")
+		_check((material.get_shader_parameter(&"dissolve") as float) > 0.0, "part fallen apart, so it never reads as a second wizard")
+		_check(material.get_shader_parameter(&"dissolve_color") != Color(0.957, 0.945, 0.918, 1.0), "in its player's colour")
 		_check(decoy.position.is_equal_approx(Vector2(10.0, 10.0)), "it stands where the card put it")
 
 
@@ -207,6 +210,18 @@ func _test_familiar_circles_its_wizard() -> void:
 	_run(1)
 	var moved: Vector2 = _entities.positions_of(0, TAG)[0]
 	_check(is_equal_approx(moved.distance_to(wizard.position + EntitiesScript.FAMILIAR_CENTRE), EntitiesScript.FAMILIAR_ORBIT), "it follows the wizard")
+	# Drawn as an orbit shot by the shots' shader (the glow look): its player, the orbit kind and
+	# the bend of its circle, flying along it.
+	_check(_entities.drawn_familiars() == 1, "one familiar drawn")
+	var buffer: PackedFloat32Array = _entities._familiar_node.multimesh.buffer
+	var coded: float = (1.0 - buffer[15]) * ProjectileManagerScript.KIND_STEPS
+	_check(floori(coded + 0.5) == ProjectileManagerScript.KIND_ORBIT, "as an orbit shot")
+	_check(is_equal_approx(coded - ProjectileManagerScript.KIND_ORBIT, ProjectileManagerScript.bend_code(1.0 / EntitiesScript.FAMILIAR_ORBIT)), "bending round its circle")
+	_check(roundi(buffer[8] * 255.0) % 4 == 0, "in player 1's colours")
+	var along := Vector2(buffer[0], buffer[4]).normalized()
+	var round_about: Vector2 = (moved - (wizard.position + EntitiesScript.FAMILIAR_CENTRE)).normalized()
+	_check(absf(along.dot(round_about)) < 0.2, "flying along its circle, not out of it")
+	_check(not _entities.has_method("_draw"), "no flat circles drawn any more")
 
 
 ## A familiar a trigger made (its caster a shot) circles that shot, not the wizard; once the shot

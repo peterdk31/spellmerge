@@ -322,6 +322,12 @@ func _ready() -> void:
 		mark.visible = false
 		mark.z_index = 20
 		mark.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		# Drawn by the shot shader's sprite path, flat in its colour, with a glow round it.
+		var glowing := ShaderMaterial.new()
+		glowing.shader = CORE_SHADER
+		glowing.set_shader_parameter(&"core_override", Color.WHITE)
+		glowing.set_shader_parameter(&"sprite_glow", 1.0)
+		mark.material = glowing
 		add_child(mark)
 		_combo_marks.append(mark)
 		_combo_class.append(&"")
@@ -386,6 +392,7 @@ func _ready() -> void:
 		dissolve.shader = CORE_SHADER
 		# The sprite path of the shot shader, as itself: a white core leaves its colours be.
 		dissolve.set_shader_parameter(&"core_override", Color.WHITE)
+		dissolve.set_shader_parameter(&"sprite_glow", 0.8)
 		ghost.material = dissolve
 		ghost.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		add_child(ghost)

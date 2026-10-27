@@ -3,7 +3,7 @@ extends SceneTree
 ## 2026-10-26): `pause` (Start) opens it for the player who pressed it and stops the game for
 ## everyone; only that player works it; Resume, `back` on the main page and `pause` again close
 ## it and the game goes on; Sandbox shows only in the sandbox and its page sends the sandbox
-## actions; Settings > Gameplay > Friendly fire asks coop and shows coop's answer; `back` (B)
+## actions and switches the builder and where the staff rows show the reload; Settings > Gameplay > Friendly fire asks coop and shows coop's answer; `back` (B)
 ## opens the builder in play, but not from inside a menu nor while paused; `pause` closes an
 ## open builder. Input goes through the real input manager's virtual devices.
 ##
@@ -17,6 +17,7 @@ const HUD_SCENE_PATH: String = "res://hud/panels/panels.tscn"
 const HudScript := preload("res://hud/panels/panels.gd")
 const PauseMenuScript := preload("res://hud/menus/pause/pause_menu.gd")
 const RadialScript := preload("res://hud/builder/radial_builder.gd")
+const StaffRowScript := preload("res://hud/panels/player_panel/staff_row.gd")
 
 var _failures: Array[String] = []
 var _bus: EventsScript
@@ -35,6 +36,7 @@ func _initialize() -> void:
 	_test_sandbox_entry_and_actions()
 	_test_friendly_fire_setting()
 	_test_the_sandbox_switches_the_builder()
+	_test_the_sandbox_switches_the_reload()
 	_test_b_opens_the_builder_in_play_only()
 	_test_start_closes_the_builder()
 	_test_the_run_ending_closes_it()
@@ -164,7 +166,7 @@ func _test_sandbox_entry_and_actions() -> void:
 	_frame()
 	_check(_names() == ["Resume", "Sandbox", "Settings"], "in the sandbox the main page has Sandbox, got %s" % [_names()])
 	_press(1, "Sandbox")
-	_check(_names() == ["ImpWave", "ResetDummies", "BuilderStyle", "RingStyle", "PutStyle", "SandboxBack"], "the sandbox page, got %s" % [_names()])
+	_check(_names() == ["ImpWave", "ResetDummies", "BuilderStyle", "RingStyle", "PutStyle", "ReloadStyle", "SandboxBack"], "the sandbox page, got %s" % [_names()])
 	_press(1, "ImpWave")
 	_press(1, "ImpWave")
 	_press(1, "ResetDummies")
@@ -175,6 +177,26 @@ func _test_sandbox_entry_and_actions() -> void:
 	_check(_menu().page == PauseMenuScript.Page.MAIN and _menu().is_open(), "B goes back to the main page")
 	_bus.sandbox_changed.emit(false)
 	_check(_names() == ["Resume", "Settings"], "out of the sandbox the entry goes")
+
+
+func _test_the_sandbox_switches_the_reload() -> void:
+	_setup(2, true)
+	var sent: Array[bool] = []
+	_menu().reload_style_changed.connect(func(on_button: bool) -> void: sent.append(on_button))
+	_tap(0, &"pause")
+	_frame()
+	_press(0, "Sandbox")
+	_check(_menu().button("ReloadStyle").text.ends_with("Reload: Button"), "the reload is on the button by default")
+	_check(_hud.get_panel(1).staff_row(0).style == StaffRowScript.Style.BUTTON, "and the rows draw it there")
+	_press(0, "ReloadStyle")
+	_check(_menu().button("ReloadStyle").text.ends_with("Reload: Next cast"), "it flips to the next cast")
+	for player in 4:
+		for staff in 4:
+			_check(_hud.get_panel(player).staff_row(staff).style == StaffRowScript.Style.NEXT_CAST, "every row of every panel follows (P%d staff %d)" % [player + 1, staff + 1])
+	_press(0, "ReloadStyle")
+	_check(sent == [false, true], "each flip goes out, got %s" % [sent])
+	_check(_hud.get_panel(0).staff_row(2).style == StaffRowScript.Style.BUTTON, "and back on the button")
+	_check(_menu().page == PauseMenuScript.Page.SANDBOX, "the page stays")
 
 
 func _test_the_sandbox_switches_the_builder() -> void:

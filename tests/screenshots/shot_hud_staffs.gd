@@ -1,12 +1,14 @@
 extends "res://tests/support/screenshot.gd"
 ## Screenshots of the staff rows under the corner panels' mana bars (owner, 2026-10-27): each
 ## staff's glyph, its cast sequence by cast, the next cast in gold, wasted cards struck through,
-## the delay bar and the dashed recharge bar, and "+N" for a long staff.
+## the delay as a shade on the button glyph (a dashed next cast during a recharge), and "+N"
+## for a long staff.
 ##
 ## The sandbox with the dev staffs and four built staffs per wizard: the dash, a three-cast
 ## staff, one with a wasted card and a long one. Shots: one player just after casting (with a 3x
 ## crop of the panel), then four players, each having cast something else (with a 3x crop of
-## each corner).
+## each corner), and the same four corners again with the pause menu's other reload switch, the
+## shade on the next cast (`hud_staffs_next_cast_p1-4`).
 
 ## The staffs every wizard starts with: a dash; three casts; a second trigger before the same
 ## carrier (wasted) and a payload; a long staff that does not fit the row.
@@ -61,6 +63,13 @@ func take() -> void:
 	save(image, "hud_staffs_four_players")
 	for index in 4:
 		save_crop(image, CORNERS[index], "hud_staffs_four_players_p%d" % (index + 1), HALF, 3)
+	root.get_node("Hud").call("_on_reload_style_changed", false)
+	await settle(1)
+	image = await grab()
+	save(image, "hud_staffs_next_cast")
+	for index in 4:
+		save_crop(image, CORNERS[index], "hud_staffs_next_cast_p%d" % (index + 1), HALF, 3)
+	root.get_node("Hud").call("_on_reload_style_changed", true)
 	_flow.call("stop_run")
 	await create_timer(0.3).timeout
 

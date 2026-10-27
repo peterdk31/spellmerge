@@ -34,7 +34,9 @@ extends CanvasLayer
 ##   By default `back` opens the radial builder instead (`builder/radial_builder.gd`, nodes
 ##   Root/Radial1 to Root/Radial4, made here; owner, 2026-10-26); the pause menu's Sandbox page
 ##   switches back to the list one and sets the radial's ring layout and full-slot choice
-##   (`builder_options_changed`).
+##   (`builder_options_changed`). The same page switches where every corner panel's staff rows
+##   show a staff's delay, on the button glyph (the default) or on the next cast
+##   (`reload_style_changed`; owner, 2026-10-27).
 ## - `pause` (Start; Escape) closes the menu its player has open (the builder, or the pause menu
 ##   they opened); with none open it opens the pause menu (`hud/menus/pause/`, node
 ##   Root/PauseMenu), which stops the game for everyone and is worked by the player who opened
@@ -48,6 +50,7 @@ const SpellsScript := preload("res://core/spells/spells.gd")
 const BuilderScript := preload("res://hud/builder/builder.gd")
 const RadialScript := preload("res://hud/builder/radial_builder.gd")
 const PlayerPanelScript := preload("res://hud/panels/player_panel/player_panel.gd")
+const StaffRowScript := preload("res://hud/panels/player_panel/staff_row.gd")
 const VignetteScript := preload("res://hud/panels/vignette/vignette.gd")
 const HammerIconScript := preload("res://hud/widgets/hammer_icon.gd")
 
@@ -196,6 +199,7 @@ func _ready() -> void:
 	for radial in _radials:
 		radial.bind(events, ui_focus, spells, input)
 	_pause_menu.builder_options_changed.connect(_on_builder_options_changed)
+	_pause_menu.reload_style_changed.connect(_on_reload_style_changed)
 	if events != null:
 		events.player_joined.connect(_on_player_joined)
 		events.player_left.connect(_on_player_left)
@@ -307,6 +311,14 @@ func _on_builder_options_changed(radial: bool, ring_by_kind: bool, push: bool) -
 	for builder in _radials:
 		builder.layout = RadialScript.Layout.KIND if ring_by_kind else RadialScript.Layout.ALL
 		builder.put = RadialScript.Put.PUSH if push else RadialScript.Put.REPLACE
+
+
+## The pause menu's reload switch: every panel's staff rows show the delay on the button glyph,
+## or on the next cast.
+func _on_reload_style_changed(on_button: bool) -> void:
+	var style: StaffRowScript.Style = StaffRowScript.Style.BUTTON if on_button else StaffRowScript.Style.NEXT_CAST
+	for panel in _panels:
+		panel.set_reload_style(style)
 
 
 ## The red vignette (for tests).

@@ -7,9 +7,9 @@ extends PanelContainer
 ## 2026-10-27): the corner and the border say whose panel it is, and the rows say more than the
 ## staff cast last did.
 ##
-## It only shows what it is told: `set_stats`, `set_menu_open`, `set_staff_plan` and
-## `set_staff_timing` are called by `hud/panels/panels.gd`, which hears the events and reads the
-## staffs' timing from `Spells`. The panel takes no input and listens to nothing itself, so it is
+## It only shows what it is told: `set_stats`, `set_menu_open`, `set_staff_plan`,
+## `set_staff_timing` and the dev switch `set_reload_style` are called by `hud/panels/panels.gd`,
+## which hears the events and reads the staffs' timing from `Spells`. The panel takes no input and listens to nothing itself, so it is
 ## the same for any player index 0-3. Colours come from the shared theme (type variations
 ## PlayerPanel1-4, HealthBar and ManaBar). Updating only changes text when a number changed, and
 ## a row only redraws when its timing changed, so a frame with no change allocates nothing.
@@ -112,6 +112,13 @@ func set_staff_timing(staff: int, cursor: int, left: float) -> void:
 			widest = maxf(widest, row.glyph_room())
 		if not is_equal_approx(widest, _rows[0].cards_left):
 			_align_rows()
+
+
+## How every row shows its staff's delay: on the button glyph (the default) or on the next cast
+## (`StaffRowScript.Style`; the pause menu's Sandbox page switches it, owner 2026-10-27).
+func set_reload_style(style: StaffRowScript.Style) -> void:
+	for row in _rows:
+		row.style = style
 
 
 ## The row of staff `staff`, or null for a bad index (for tests and screenshots).

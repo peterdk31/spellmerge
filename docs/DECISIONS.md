@@ -2,6 +2,10 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-28: Wall card numbers
+
+Wall is a complexity-2 carrier: five still stones 9 px apart (a 36 px row plus the stone radius) raised 28 px ahead (the engine's `WALL_REACH`), 3 damage each, 6 mana, a 1 s cooldown, and stones that last 5 s. A stone is spent by its first hit (no pierce), so the row is a barrier of several small hits rather than one big trap like the rune. Not in the free demo.
+
 ## 2026-10-28: Fissure card numbers
 
 Fissure is a complexity-2 carrier: 2 damage, 5 mana, a 0.8 s cooldown, a 200 px line 6 px wide (the engine pierces up to 16 targets). Its line is a little shorter than the beam's 240 px because it hits everything on it. Not in the free demo. Its `lifetime` is unused: a fissure hits once, as one instant ray. Its cast and impact looks are modelled on the beam's, to be tuned in the Feel work (B6b). `bounce · fissure` still stops at walls (backlog).

@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-28: Card wall (staffs C)
+
+Added the Wall carrier card (data only: `.tres`, icon, assets, lore), two combos (`wall_fire_barrier`, `wall_frost_row`) and `test_wall.gd`.
+
 ## 2026-10-28: Card fissure (staffs C)
 
 Added the Fissure carrier card (data only: `.tres`, icon, assets, lore), two combos (`fissure_fire_line`, `fissure_hit_nova`) and `test_fissure.gd`.

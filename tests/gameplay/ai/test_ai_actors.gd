@@ -132,3 +132,31 @@ func test_the_ai_starts_over_when_it_drives_again() -> void:
 	imp.release()
 	fx.run(imp, 1)
 	check(ai.is_telegraphing() and ai.telegraph_progress() < 0.2, "back home, it winds up from the start")
+
+
+## Regression (performance pass, 2026-10-28): an enemy hears its own hits on its actor, so a crowd
+## adds no listener to the bus's per-hit events (each was called for every hit on anyone).
+func test_a_crowd_of_enemies_adds_no_listener_to_the_hit_events() -> void:
+	var before: int = fx.bus.damage_dealt.get_connections().size()
+	var downed: int = fx.bus.player_downed.get_connections().size()
+	for i in 5:
+		fx.imp(Vector2(40.0 * float(i), 100.0))
+	check_equal(fx.bus.damage_dealt.get_connections().size(), before, "no damage_dealt listener per enemy")
+	check_equal(fx.bus.player_downed.get_connections().size(), downed, "no player_downed listener per enemy")
+	var imp: Actor = fx.imp(Vector2.ZERO)
+	fx.run(imp, 1)
+	fx.combat.hit(fx.players[0].id, imp, 1)
+	check(Fixture.look(imp).is_hurt(), "its look still shows a hit, heard on the actor")
+
+
+func test_an_enemy_retargets_at_once_when_its_wizard_goes_down() -> void:
+	fx.players[0].position = Vector2(300.0, 0.0)
+	var imp: Actor = fx.imp(Vector2.ZERO, _broke())
+	var ai: AIController = Fixture.ai(imp)
+	fx.run(imp, 1)
+	check(ai.target == fx.players[0], "it chases the wizard")
+	var looks: int = ai.lookup_count
+	fx.players[0].set_down(true)
+	fx.run(imp, 1)
+	check_equal(ai.lookup_count, looks + 1, "a downed target is dropped at the next step, without player_downed")
+	check(ai.target != fx.players[0], "and no longer chased")

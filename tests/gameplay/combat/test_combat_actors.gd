@@ -198,3 +198,30 @@ func test_a_step_and_a_hit_make_no_objects() -> void:
 		_world.combat.pace(imp)
 		_world.combat.consume_knockback(mage, Fixture.STEP)
 	check_equal(int(Performance.get_monitor(Performance.OBJECT_COUNT)), before, "no objects made")
+
+
+## Performance pass (2026-10-28): the actor's own listeners hear its hits on the actor, not on the
+## bus, where a listener per enemy was called for every hit on anyone.
+func test_a_hit_on_an_actor_is_also_sent_to_the_actor_itself() -> void:
+	var imp: Actor = _actor(Vector2.ZERO, ActorsScript.TEAM_ENEMIES)
+	var other: Actor = _actor(Vector2(200.0, 0.0), ActorsScript.TEAM_ENEMIES)
+	var heard: Array = []
+	imp.damaged.connect(func(by: int, amount: int) -> void: heard.append([by, amount]))
+	other.damaged.connect(func(by: int, amount: int) -> void: heard.append(["other", by, amount]))
+	_world.combat.hit(other.id, imp, 7)
+	check_equal(heard, [[other.id, 7]], "once, with the attacker's id and the damage, and only to the actor hit")
+
+
+func test_an_actor_asking_by_its_own_id_gets_what_it_gets_by_node() -> void:
+	var imp: Actor = _actor(Vector2.ZERO, ActorsScript.TEAM_ENEMIES)
+	var combat: CombatScript = _world.combat
+	check_equal(combat.own_pace(imp, imp.id), 1.0, "free: full pace")
+	combat.apply_status(-1, imp, CombatScript.CHILL, 2.0, 40.0)
+	check_equal(combat.own_pace(imp, imp.id), combat.pace(imp), "chilled: the same pace as by node")
+	check(combat.own_pace(imp, imp.id) < 1.0, "and slower")
+	combat.hit(-1, imp, 1, Vector2.RIGHT, 100.0)
+	var by_node: Vector2 = combat.knockback_of(imp)
+	check_equal(combat.own_knockback(imp, imp.id, 0.0), by_node, "the same push")
+	check_equal(combat.own_pace(imp, ActorsScript.NONE), combat.pace(imp), "a wrong id falls back to the node")
+	var stranger: Actor = _actor(Vector2(300.0, 0.0), ActorsScript.TEAM_ENEMIES)
+	check_equal(combat.own_knockback(stranger, imp.id, 0.0), Vector2.ZERO, "another actor's id never reads that actor's row")

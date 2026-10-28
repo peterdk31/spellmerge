@@ -2394,6 +2394,29 @@ func next_cast_mana(actor: int, staff: int) -> float:
 	return compiled.casts[mini(_cursor[index], compiled.casts.size() - 1)].mana
 
 
+## True when the next cast of this actor's staff can leave within `within` seconds with `mana`:
+## its delay is no longer than that, and `mana` less what its sustained carriers hold
+## (`reserved_mana`) pays `next_cast_mana`. False with no build. One call for what an enemy's AI
+## asks every step while its target is in reach (performance pass, 2026-10-28).
+func cast_ready(actor: int, staff: int, within: float, mana: float) -> bool:
+	if not _in_range(actor, staff):
+		return false
+	var index: int = actor * SpellLimits.STAFFS + staff
+	if _cooldown[index] > within:
+		return false
+	var compiled: CompiledStaff = _installed[index]
+	if compiled == null or compiled.is_empty():
+		return false
+	var cost: float = 0.0
+	if _hold_tags[index].is_empty():
+		cost = compiled.casts[mini(_cursor[index], compiled.casts.size() - 1)].mana
+	var first: int = actor * SpellLimits.STAFFS
+	var reserved: float = 0.0
+	for at in SpellLimits.STAFFS:
+		reserved += _hold_mana[first + at]
+	return maxf(mana - reserved, 0.0) >= cost
+
+
 ## How far the next cast of this caster's staff reaches along its aim, for an enemy's telegraph:
 ## its first carrier's flight (speed x life), a beam's or fissure's length, a rain's aim point;
 ## 0 for one that is not aimed (a nova's ring, an orbit, a still shot, a decoy...) or no build.

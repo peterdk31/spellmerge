@@ -62,7 +62,7 @@ func take() -> void:
 			save_crop(image, Vector2(220.0, 32.0 + ROW), "dash_looks_4x", Vector2i(110, int(ROW * 1.5)))
 		if n == STEPS - 1:
 			for e in 6:
-				events.emit_signal("caster_move_finished", e if e < 4 else -1, &"dash", _at(e, 1.0, length), 0)
+				events.emit_signal("caster_move_finished", casters[e], &"dash", _at(e, 1.0, length), 0)
 	if int(shots.get("drawn_trails")) < 6:
 		fail("only %d dash trails are showing" % int(shots.get("drawn_trails")))
 		return

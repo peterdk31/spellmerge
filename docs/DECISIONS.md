@@ -1837,6 +1837,16 @@ The owner approved `possess` as a card (M2-actors.md, "Possess (a card)"); built
 - **Left for later:** `Actor.is_downed`/`is_invulnerable` (the names the old wizard slots asked by; the AI and the bots still ask `is_downed`) and Combat's `actor_id`/`caster` lookups for plain test bodies.
 - **Found on the way:** a GDScript runtime error in a test (a call to a removed function, a wrong argument type) is printed but does not fail the test, so the suite passed with two such errors before they were fixed here. A test log is worth a grep for `SCRIPT ERROR`.
 
+## 2026-10-28: Possess: the HUD stays the player's (owner)
+
+The owner's decision after G9: a player must always see their own wizard, which stands vulnerable while they drive another actor.
+
+- **A seat's corner panel and builder are always its own wizard** (the home body), whether the seat drives another actor or an enemy's AI drives the wizard, and its numbers stay live in both cases. `PlayerController` binds the home body once (its Health, its Caster's `staff_built`, the builder's requests) and the driven actor only for its casts (`spell_cast`, `staff_cast`): the buttons still cast the driven actor's staffs. A home controller that is away watches its body each step (`ActorController.watch_home`, after the looks), so the wizard's mana regen reaches the panel with no seat driving it.
+- **The HUD finds the home body in the actor table:** `Actors.set_home(id, seat)` (the actor sets it from its home controller's seat when it opens its id) and `home_of_seat(seat)`; `Spells.home_of_seat` replaces `Spells.actor_of_seat` for the staff rows' timing. `mana_reserved` still follows the driving seat (no HUD reads it yet).
+- **Gone:** the panel's "POSSESSED n" word and `player_possessed` (no other listener); the empty staffs announced while driving an actor with fewer; the builder on a possessed actor's staffs and the possession putting them back (`Possession._keep_cards`, `_give_cards_back`), now dead; `Actor.is_invulnerable()` (no callers).
+- **Over the possessed actor** (`PossessedLook`), just above the 32 px character: the timer as a small ring like the wizard's revive ring (outline, Stone back ring, the time left as an arc in the driver's light shade). Over an actor a seat drives that is not its own wizard, its health (Fire) and mana (Spark) beside it as two 16x2 px bars in a 1 px outline on a Stone trough, the panel's bar colours. A wizard an enemy's AI drives shows only the timer. The ring round the body is gone (Feel's rings mark the start and the end).
+- **The sound `possess`** is listed in docs/BACKLOG.md, "Audio needs".
+
 ## 2026-10-28: The floating staff (living staffs H3)
 
 - **A staff per button** (the owner, 2026-10-28, asked in this part): a player's Caster holds one `StaffBase` per button (`Caster.staffs`; `staff` stays for a button without one and for enemies), so a head, its tip and its personality are the staff's, and a staff found in a run (M3) is a data swap of one button. The four starter heads are four staffs, `curl`, `star`, `moon` and `crystal` (RB, RT, LB, LT), each with the old starter's numbers; `starter` is gone (moved to `curl`). Dev and preview builds give each head the `dev` staff's numbers (copies made once by flow), so the sandbox keeps its 20 slots with the new heads.

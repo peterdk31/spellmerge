@@ -21,8 +21,9 @@ func take() -> void:
 	for index in 4:
 		input.call("add_virtual_device", index)
 	flow.call("start_run", 0)
-	# Each wizard aims its own way, to see the aim reticle and the turned sprites.
-	var aims: Array[Vector2] = [Vector2.UP, Vector2(1, -1).normalized(), Vector2.LEFT, Vector2.RIGHT]
+	# Each wizard aims its own way, to see the aim reticle and the turned sprites. Every shot hits
+	# every actor (no sides, actors G3c), so none of the three that fire below aims at a teammate.
+	var aims: Array[Vector2] = [Vector2.UP, Vector2(1, -1).normalized(), Vector2(-1, -1).normalized(), Vector2.RIGHT]
 	for index in 4:
 		input.call("send_virtual_aim", index, aims[index])
 	await shot("arena_four_wizards")

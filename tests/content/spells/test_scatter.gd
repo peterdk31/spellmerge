@@ -46,7 +46,7 @@ func test_the_nova_rings_three_times() -> void:
 	check(one * 3 < ArenaScript.IMP_HEALTH, "the imp survives three rings")
 	# Each ring is turned a random way, so how many of its eight shots reach the imp varies; but
 	# every ring reaches it, so three rings hurt at least twice as much as one.
-	check(_lost(["scatter", "nova", "nova", "nova"], Vector2(20.0, 0.0), 1.0) >= one * 2, "three rings hurt more than two")
+	check(_lost(["scatter", "nova", "nova", "nova"], Vector2(20.0, 0.0), 1.0) >= one * 2, "three rings hurt at least twice as much as one")
 
 
 func test_a_bolt_flies_off_aim_for_some_casts() -> void:
@@ -62,7 +62,7 @@ func test_a_bolt_flies_off_aim_for_some_casts() -> void:
 		arena.cast(0, 0)
 		arena.run(1.5)
 		total += arena.lost(imp)
-	check(total < aimed * 4, "scattered bolts miss more than aimed ones (%d of %d)" % [total, aimed * 4])
+	check(total * 4 < aimed * 4 * 3, "scattered bolts do under three quarters of the aimed damage (%d of %d)" % [total, aimed * 4])
 	arena.free_all()
 
 

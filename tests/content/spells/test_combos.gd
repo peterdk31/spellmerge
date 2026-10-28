@@ -199,6 +199,8 @@ const CONTROLS: Dictionary = {
 	"seeking_frost_burst": "on_expire",
 	"echo_double_tap": "echo",
 	"echo_timer_nova": "echo",
+	"burst_triple_bolt": "burst",
+	"burst_nova_pulse": "burst",
 }
 
 

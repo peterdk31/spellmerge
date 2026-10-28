@@ -1,0 +1,9 @@
+{
+	"id": "burst_triple_bolt",
+	"name": "Burst triple bolt",
+	"does": "A bolt leaves three times, 0.1 s apart, all along the aim: the imp ahead loses 15 health, where one bolt takes 5.",
+	"casts": [{"staff": 0, "cards": ["burst", "bolt"]}],
+	"imps": [[100, 0]],
+	"seconds": 1.5,
+	"checks": [{"kind": "lost_at_least", "imps": [0], "min": 15}]
+}

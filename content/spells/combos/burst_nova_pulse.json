@@ -1,0 +1,9 @@
+{
+	"id": "burst_nova_pulse",
+	"name": "Burst nova pulse",
+	"does": "A frost nova rings three times in a row, so an imp beside the caster is chilled and takes three rings of damage.",
+	"casts": [{"staff": 0, "cards": ["burst", "frost", "nova"]}],
+	"imps": [[40, 0]],
+	"seconds": 1.0,
+	"checks": [{"kind": "status", "imps": [0], "status": "chill"}, {"kind": "lost_at_least", "imps": [0], "min": 6}]
+}

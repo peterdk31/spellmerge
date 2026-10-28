@@ -250,6 +250,7 @@ func _finish(failed: Array[String]) -> void:
 	else:
 		for reason in failed:
 			printerr("SMOKE FAILED: " + reason)
+		print("SMOKE builds: " + _built_text())
 		get_tree().quit(1)
 
 

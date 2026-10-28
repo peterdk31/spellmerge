@@ -134,6 +134,8 @@ func _creature(at: Vector2) -> Actor:
 	var health := Health.new()
 	health.max_health = 40
 	body.add_child(health)
+	# A hurtbox, so Combat can hit it (actors G5: hits reach Health only through Combat).
+	body.add_child(Hurtbox.new())
 	body.add_child(Mover.new())
 	var caster := Caster.new()
 	caster.staff_count = 2

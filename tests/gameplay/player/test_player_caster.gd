@@ -1,6 +1,5 @@
 extends "res://tests/support/suite.gd"
-## Tests for the caster kit on the wizard (staffs B4; the wizard's Mover since actors G7, a
-## WizardMover on the kit's Mover): teleport (wall-safe), hook, swap and recoil moves asked by
+## Tests for the caster kit on the wizard (staffs B4; the kit's Mover since actors G7 and G5): teleport (wall-safe), hook, swap and recoil moves asked by
 ## `caster_move_requested` and answered by `caster_move_finished`; the recoil requests of one step
 ## added up (so `mirror · recoil` cancels) while a later dash, teleport, hook or swap replaces an
 ## earlier one; wizard statuses from Combat's seat slots (`apply_wizard_status`) that slow or

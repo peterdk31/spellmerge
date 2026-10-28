@@ -88,6 +88,10 @@ func _setup(player_count: int = 0, with_projectiles: bool = false) -> void:
 	_bus.enemy_died.connect(func(p: int, enemy: Node, _at: Vector2) -> void:
 		_deaths.append([p, enemy]))
 	_actors = ActorsScript.new()
+	# One actor table for the wizards, Combat and the projectile manager (teams aim contact).
+	_combat.actors = _actors
+	if _projectiles != null:
+		_projectiles.actors = _actors
 	for index in player_count:
 		# A wizard actor of the real scene (actors G7), in the tree: its hurtbox registers it in
 		# Combat's seat slot (8 px, at the body).
@@ -139,7 +143,7 @@ func _enemy(health: int, at: Vector2 = Vector2.ZERO, contact: int = 0) -> Node2D
 	var enemy := Node2D.new()
 	enemy.position = at
 	_enemies.append(enemy)
-	_combat.register_enemy(enemy, health, 10.0, contact)
+	_combat.register_actor(enemy, health, 10.0, contact)
 	return enemy
 
 
@@ -154,7 +158,7 @@ func _test_damage_reduces_health_and_sends_event() -> void:
 	_setup()
 	var enemy := _enemy(10)
 	_check(_combat.hit(2, enemy, 3), "a hit for 3 counts")
-	_check(_combat.get_health(enemy) == 7, "health 10 minus 3 is 7")
+	_check(_combat.health_of(enemy) == 7, "health 10 minus 3 is 7")
 	_check(_damage == [[2, enemy, 3]], "damage_dealt names player 2, the enemy and 3")
 	_check(_deaths.is_empty(), "no death yet")
 
@@ -165,7 +169,7 @@ func _test_bad_hits_do_nothing() -> void:
 	_check(not _combat.hit(0, enemy, 0), "0 damage does not count")
 	_check(not _combat.hit(0, enemy, -4), "negative damage does not count")
 	_check(not _combat.hit(0, null, 3), "a null target does not count")
-	_check(_combat.get_health(enemy) == 5 and _damage.is_empty(), "nothing changed, nothing sent")
+	_check(_combat.health_of(enemy) == 5 and _damage.is_empty(), "nothing changed, nothing sent")
 
 
 func _test_unknown_target_is_ignored() -> void:
@@ -173,7 +177,7 @@ func _test_unknown_target_is_ignored() -> void:
 	var stranger := Node2D.new()
 	_enemies.append(stranger)
 	_check(not _combat.hit(0, stranger, 3), "a node that is not registered cannot be hit")
-	_check(_damage.is_empty() and not _combat.is_enemy(stranger), "no event, still not an enemy")
+	_check(_damage.is_empty() and not _combat.is_registered(stranger), "no event, still not an enemy")
 
 
 func _test_death_sends_event_with_killer() -> void:
@@ -182,9 +186,9 @@ func _test_death_sends_event_with_killer() -> void:
 	_combat.hit(0, enemy, 2)
 	_combat.hit(3, enemy, 9)  # overkill: health stops at 0
 	_check(_deaths == [[3, enemy]], "enemy_died names the player with the last hit")
-	_check(_combat.get_health(enemy) == -1 and not _combat.is_enemy(enemy), "a dead enemy is no longer registered")
+	_check(_combat.health_of(enemy) == -1 and not _combat.is_registered(enemy), "a dead enemy is no longer registered")
 	_check(_damage.size() == 2 and _damage[1][2] == 9, "both hits sent damage_dealt")
-	_check(_combat.get_enemy_count() == 0, "no enemies left")
+	_check(_combat.actor_count() == 0, "no enemies left")
 
 
 func _test_dead_enemy_cannot_die_twice() -> void:
@@ -199,29 +203,29 @@ func _test_knockback_pushes_away_and_fades() -> void:
 	_setup()
 	var enemy := _enemy(100, Vector2(10.0, 0.0))
 	_combat.hit(0, enemy, 1, Vector2.RIGHT, 160.0)
-	_check(_combat.get_knockback(enemy) == Vector2(160.0, 0.0), "knockback velocity is direction times strength")
+	_check(_combat.knockback_of(enemy) == Vector2(160.0, 0.0), "knockback velocity is direction times strength")
 	_run(4)
 	_check(enemy.position == Vector2(10.0, 0.0), "Combat never moves the enemy itself")
-	_check(_combat.get_knockback(enemy) == Vector2(160.0, 0.0), "step() does not fade knockback")
-	var first: Vector2 = _combat.consume_knockback_step(enemy, STEP)
+	_check(_combat.knockback_of(enemy) == Vector2(160.0, 0.0), "step() does not fade knockback")
+	var first: Vector2 = _combat.consume_knockback(enemy, STEP)
 	_check(first == Vector2(160.0, 0.0), "the mover gets the full velocity on the first step")
-	_check(_combat.get_knockback(enemy).x < 160.0, "the stored knockback fades after a step")
+	_check(_combat.knockback_of(enemy).x < 160.0, "the stored knockback fades after a step")
 	var travelled: float = first.x * STEP
 	for i in 8:
-		travelled += _combat.consume_knockback_step(enemy, STEP).x * STEP
-	_check(_combat.get_knockback(enemy) == Vector2.ZERO, "knockback fades to zero")
-	_check(_combat.consume_knockback_step(enemy, STEP) == Vector2.ZERO, "nothing left to consume")
+		travelled += _combat.consume_knockback(enemy, STEP).x * STEP
+	_check(_combat.knockback_of(enemy) == Vector2.ZERO, "knockback fades to zero")
+	_check(_combat.consume_knockback(enemy, STEP) == Vector2.ZERO, "nothing left to consume")
 	_check(travelled > 0.0 and travelled < 160.0, "knockback travels a short distance only")
 	var stranger := Node2D.new()
 	_enemies.append(stranger)
-	_check(_combat.consume_knockback_step(stranger, STEP) == Vector2.ZERO, "an unregistered node has no knockback")
+	_check(_combat.consume_knockback(stranger, STEP) == Vector2.ZERO, "an unregistered node has no knockback")
 
 
 func _test_knockback_zero_strength_does_not_move() -> void:
 	_setup()
 	var enemy := _enemy(10, Vector2(3.0, 3.0))
 	_combat.hit(0, enemy, 1, Vector2.RIGHT, 0.0)
-	_check(_combat.consume_knockback_step(enemy, STEP) == Vector2.ZERO, "strength 0 pushes nothing")
+	_check(_combat.consume_knockback(enemy, STEP) == Vector2.ZERO, "strength 0 pushes nothing")
 
 
 func _test_projectile_hit_uses_profile() -> void:
@@ -230,8 +234,8 @@ func _test_projectile_hit_uses_profile() -> void:
 	_profile(7, 5, 100.0)
 	_bus.projectile_hit.emit(1, enemy, Vector2(0.0, 0.0), 7)
 	_check(_damage == [[1, enemy, 5]], "projectile_hit with tag 7 deals the profile's damage for the shooter")
-	_check(_combat.get_health(enemy) == 15, "health 20 minus 5")
-	_check(_combat.get_knockback(enemy).x > 0.0, "pushed away from the hit position")
+	_check(_combat.health_of(enemy) == 15, "health 20 minus 5")
+	_check(_combat.knockback_of(enemy).x > 0.0, "pushed away from the hit position")
 
 
 func _test_projectile_hit_without_profile_is_ignored() -> void:
@@ -239,7 +243,7 @@ func _test_projectile_hit_without_profile_is_ignored() -> void:
 	var enemy := _enemy(5)
 	_bus.projectile_hit.emit(0, enemy, Vector2.ZERO, 0)
 	_bus.projectile_hit.emit(0, enemy, Vector2.ZERO, 99)
-	_check(_damage.is_empty() and _combat.get_health(enemy) == 5, "tags without a profile do no damage")
+	_check(_damage.is_empty() and _combat.health_of(enemy) == 5, "tags without a profile do no damage")
 
 
 func _test_projectile_target_added_and_removed() -> void:
@@ -275,7 +279,7 @@ func _test_contact_damage_and_cooldown() -> void:
 	var enemy := _enemy(10, _players[0].position + Vector2(5.0, 0.0), 2)
 	_run(1)
 	_check(_players[0].health.health == _players[0].health.max_health - 2, "touching the enemy costs its contact damage")
-	_check(_damage.size() == 1 and _damage[0][0] == EventsScript.NO_PLAYER, "the source is NO_PLAYER")
+	_check(_damage.size() == 1 and _damage[0][0] == _combat.actor_of(enemy), "the source is the actor that touched (actors G5)")
 	_run(8)
 	_check(_players[0].health.health == _players[0].health.max_health - 2, "no second hit inside the cooldown")
 	_run(int(CombatScript.CONTACT_COOLDOWN / STEP))
@@ -314,7 +318,7 @@ func _test_freed_enemy_is_dropped() -> void:
 	var keep := _enemy(5)
 	enemy.free()
 	_run(1)
-	_check(_combat.get_enemy_count() == 1 and _combat.is_enemy(keep), "a freed enemy is dropped, the other stays")
+	_check(_combat.actor_count() == 1 and _combat.is_registered(keep), "a freed enemy is dropped, the other stays")
 	_check(_combat.hit(0, keep, 1), "the remaining enemy can still be hit")
 
 
@@ -340,8 +344,8 @@ func _test_reregister_resets_numbers_and_target() -> void:
 	_setup(0, true)
 	var enemy := _enemy(5)
 	_combat.hit(0, enemy, 2)
-	_combat.register_enemy(enemy, 9, 30.0, 2)
-	_check(_combat.get_health(enemy) == 9 and _combat.get_enemy_count() == 1, "registering twice resets health, one row")
+	_combat.register_actor(enemy, 9, 30.0, 2)
+	_check(_combat.health_of(enemy) == 9 and _combat.actor_count() == 1, "registering twice resets health, one row")
 	_check(_projectiles.get_target_count() == 1, "still one projectile target")
 	_check(is_equal_approx(_projectiles._target_radius[0], 30.0), "the projectile target radius follows the new hurt radius")
 
@@ -352,14 +356,14 @@ func _test_listener_may_change_registrations() -> void:
 	var second := _enemy(5, _players[0].position, 1)
 	_bus.damage_dealt.connect(func(_p: int, target: Node, _a: int, _at: Vector2) -> void:
 		if target == _players[0]:
-			_combat.unregister_enemy(first)
-			_combat.unregister_enemy(second))
+			_combat.unregister_actor(first)
+			_combat.unregister_actor(second))
 	_run(1)
-	_check(_combat.get_enemy_count() == 0, "a listener removed both enemies during step without errors")
+	_check(_combat.actor_count() == 1, "a listener removed both enemies during step without errors (the wizard is left)")
 	var third := _enemy(5)
 	_bus.damage_dealt.connect(func(_p: int, target: Node, _a: int, _at: Vector2) -> void:
 		if target == third:
-			_combat.unregister_enemy(third))
+			_combat.unregister_actor(third))
 	_check(_combat.hit(0, third, 1), "a hit still counts when a listener unregisters the enemy")
 	_check(_deaths.is_empty(), "no death is sent for an enemy a listener removed")
 
@@ -412,7 +416,7 @@ func _test_hit_circles_follow_the_body_offset() -> void:
 	root.add_child(enemy)
 	enemy.position = Vector2(100.0, 0.0)
 	_enemies.append(enemy)
-	_combat.register_enemy(enemy, 5, 11.0, 0, body)
+	_combat.register_actor(enemy, 5, 11.0, 0, body)
 	_damage.clear()
 	_projectiles.spawn(0, Vector2(0.0, -12.0), Vector2(600.0, 0.0), 1.0, 2.0, ProjectileManagerScript.LAYER_ENEMY, 0, 9)
 	_projectiles.step(0.2)
@@ -438,6 +442,6 @@ func _test_contact_uses_the_body_offset() -> void:
 	var enemy := Node2D.new()
 	enemy.position = _players[0].position + Vector2(0.0, -29.0)
 	_enemies.append(enemy)
-	_combat.register_enemy(enemy, 5, 10.0, 2)
+	_combat.register_actor(enemy, 5, 10.0, 2)
 	_run(1)
 	_check(_players[0].health.health == _players[0].health.max_health - 2, "contact when the wizard's body touches the enemy (17 px, though the origins are 29 apart)")

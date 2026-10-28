@@ -149,9 +149,9 @@ func run(count: int, move: bool = true) -> void:
 		combat.step(STEP)
 
 
-## A hit of `amount` on `body` as Combat sends it (`damage_dealt`, which its Health takes).
+## A hit of `amount` on `body` through Combat, which takes it from its Health (actors G5).
 func hurt(body: Actor, amount: int, by: int = 0) -> void:
-	bus.damage_dealt.emit(by, body, amount, body.global_position)
+	combat.hit(by, body, amount)
 
 
 func free_all() -> void:

@@ -4,7 +4,7 @@ What each run did, newest first. Claude appends a short entry after each develop
 
 ## 2026-10-28: Card triple (staffs C), already built
 
-The Triple card was already done: the multicast `.tres`, icon, assets, two combos, lore and `test_triple.gd` exist, and all 122 unit tests pass. Ticked it off.
+The Triple card was already done: the multicast `.tres`, icon, assets, two combos, lore and `test_triple.gd` exist, and all 122 unit tests pass. Ticked it off. `tools/check.sh` reports errors only for `.idea`, `.vscode` and `scripts`: unreadable folders of this environment that git doesn't track, so none come from the doc files changed here.
 
 ## 2026-10-28: Card double (staffs C), already built
 

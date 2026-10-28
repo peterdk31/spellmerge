@@ -37,7 +37,10 @@ func test_a_nova_far_ahead_only_lands_with_rain() -> void:
 
 
 func test_nothing_falls_before_the_delay() -> void:
-	check_equal(_lost(["rain", "nova"], Vector2(120.0, 0.0), 0.3), 0, "the marker comes first")
+	var card: FormBase = load("res://content/spells/forms/rain/rain.tres") as FormBase
+	var delay: float = card.lifetime
+	check_equal(_lost(["rain", "nova"], Vector2(120.0, 0.0), delay - 0.2), 0, "the marker comes first")
+	check(_lost(["rain", "nova"], Vector2(120.0, 0.0), delay + 0.6) > 0, "it lands soon after the card's delay")
 
 
 func test_a_rain_with_no_payload_hurts_nobody() -> void:

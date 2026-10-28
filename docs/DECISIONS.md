@@ -1804,3 +1804,18 @@ The owner compared the game with the carrier mockup (2026-10-27) and listed what
 - **The training dummy** is an actor with Health (its data's billion), a Hurtbox at (0, -14), no controller and no Mover (so nothing moves it), on the enemies' team by `idle_team`, and a `DummyLook` (`gameplay/ai/dummy_look.gd`) for its numbers, DPS, statuses and reactions; `training_dummy.gd` is gone.
 - **Nodes:** an imp goes from 5 nodes to 12, the shooting dummy from 4 to 11, the training dummy from 13 to 16: about 700 more nodes at 100 imps, none with a process callback (only the actor steps).
 - **The stress run** (before: web frame avg 10.6 ms, p95 22.3 ms, peak nodes 1,588; desktop 169 ms, peak nodes 2,093; headless, a noisy shared machine) is to be repeated after this part with the final phase-G check, at the owner's word, so the after numbers come there.
+
+## 2026-10-28: Possess (actors G9)
+
+The owner approved `possess` as a card (M2-actors.md, "Possess (a card)"); built as planned, with these choices:
+
+- **The card:** a modifier, `behaviour` POSSESS (21), `behaviour_strength` 3 s (two cards add up), `mana_mult` 2.5 (the dearest modifier; 4.0 made some fuzz staffs uncastable at 100 mana), `cooldown_mult` 2, complexity 4, look 10 (orbiting sparks). Wasted on a fallback (it needs a hit). Combos `possess_bolt` and `possess_chain_bolt`.
+- **One possession per cast:** Spells keeps a flag per actor and staff, cleared by each cast of that staff; the first hit on an actor some other actor owns sends `possess_requested(caster, target, seconds, tag)`. An unowned target or the caster's own body spends nothing.
+- **The rule is in the actor kit** (`gameplay/actor/possession.gd`), not in Spells or an autoload: each actor hears the request for its own id and steps the possession holding it, before its controller thinks.
+- **`Actor.drive` takes the controller off the body it drove** (`ActorController.driving`): the flaw found in G7 (one controller on two bodies, builder signals bound twice) is gone.
+- **Where the driver goes back to:** the body it came from, unless another controller possessed that body meanwhile; then it waits behind that possession and comes back when it ends. A downed body still takes its seat back.
+- **A seat set aside** (an enemy drives its wizard) sends `player_possessed(seat, seconds)`; the panel shows "POSSESSED n" (priority after DOWN). A seat driving an actor with fewer staffs announces the rest empty.
+- **The builder on a possessed actor** builds that actor's staffs; they are put back as they were when the possession ends. Compiled staffs stay shared (the cache is keyed by cards, so a change never touches another actor's).
+- **The camera** keeps both a wizard's standing body and the actor its seat drives in view.
+- **Sound id** `possess` for Feel; no sound or Feel cue yet (`possess_started`/`possess_ended` have no listener).
+

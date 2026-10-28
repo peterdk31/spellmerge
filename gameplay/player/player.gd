@@ -29,6 +29,13 @@ extends ActorController
 ##   is refused only when the slot does not exist or the card is not in the `bag` (every card in
 ##   the registry until M3's rewards fill it); `card_move_requested`'s staff BAG (-1) is the bag.
 ##
+## - **Possessed** (G9): when another actor's controller takes the actor it drives, it is set aside
+##   (`set_aside`) and sends `player_possessed(seat, seconds)`, so the panel marks the seat
+##   possessed with the time left; it drives nothing meanwhile. When it drives again `started`
+##   sends `player_possessed(seat, 0)`. When it drives an actor with fewer staffs than four (a
+##   possessed imp), the staffs it lacks are announced empty, so the panel and the builder show
+##   only what that actor has.
+##
 ## Its seat is in the actor table through the actor it drives (`Actor.seat`, `Actors.set_driver`),
 ## so Spells' `mana_reserved` and budgets reach this seat while it drives. It binds to the actor
 ## handed to `started` and lets go in `stopped`; it never keeps its home body, so it works the same
@@ -78,6 +85,8 @@ var _sound_player: AudioStreamPlayer = null
 ## What the last `player_stats_changed` said, to send it only on a change.
 var _sent_health: int = -1
 var _sent_mana: int = -1
+## True while a possession has set it aside (`set_aside`), until it drives again.
+var _aside: bool = false
 
 
 func _init() -> void:
@@ -149,11 +158,30 @@ func started(actor: Actor) -> void:
 		else:
 			bus.bag_changed.emit(seat, bag.duplicate())
 	# The panel shows what this seat drives now: the staffs it has (a staff not built yet is
-	# announced when the actor's Caster builds it) and its numbers.
+	# announced when the actor's Caster builds it), none where it has fewer, and its numbers.
+	var staffs: int = actor.caster.staff_count if actor.caster != null else 0
 	if actor.caster != null and actor.caster.number >= 0:
-		for at in actor.caster.staff_count:
+		for at in staffs:
 			_on_staff_built(at)
+	if bus != null:
+		for at in range(staffs, STAFF_COUNT):
+			bus.staff_changed.emit(seat, at, {})
+		if _aside:
+			bus.player_possessed.emit(seat, 0.0)
+	_aside = false
 	announce_stats()
+
+
+## A possession took the actor it drove for `seconds`: the seat's panel shows it possessed.
+func set_aside(actor: Actor, seconds: float) -> void:
+	_aside = true
+	if actor.events != null:
+		actor.events.player_possessed.emit(seat, seconds)
+
+
+## True while a possession has set this seat aside (it drives nothing).
+func is_set_aside() -> bool:
+	return _aside
 
 
 func stopped(actor: Actor) -> void:

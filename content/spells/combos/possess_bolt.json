@@ -1,0 +1,9 @@
+{
+	"id": "possess_bolt",
+	"name": "Possess bolt",
+	"does": "A costly bolt that hurts the imp it hits and hands the caster's controls to it for three seconds.",
+	"casts": [{"staff": 0, "cards": ["possess", "bolt"]}],
+	"imps": [[100, 0]],
+	"seconds": 1.5,
+	"checks": [{"kind": "damaged", "imps": [0]}]
+}

@@ -43,6 +43,9 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `hit_landed` | `combat` | `feel` |
 | `heal_dealt` | `combat` | `feel` |
 | `wizard_shield_requested`, `pull_requested`, `area_hit_requested` | `core/spells` (staffs B2) | `combat` |
+| `possess_requested` | `core/spells` (actors G9) | `actor` (each actor, for its own id: `Possession.begin`) |
+| `possess_started`, `possess_ended` | `actor` (the Possession) | none yet (Feel, later) |
+| `player_possessed` | `player` (the seat set aside, and back) | `hud` (the corner panel) |
 | `reaction_triggered` | `combat` | `feel` |
 | `discharge_arc` | `combat` | `feel` |
 | `damage_dealt` | `combat` | `feel`, `ai` |

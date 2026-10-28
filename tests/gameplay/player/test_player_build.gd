@@ -360,10 +360,11 @@ func test_a_seat_drives_another_actor_and_release_gives_it_back() -> void:
 	check_equal(table.seat_of(wizard.id), ActorsScript.NONE, "the wizard's body has no seat")
 	check_equal(creature.team(), ActorsScript.TEAM_WIZARDS, "the creature is on the seat's team")
 	check_equal(_stats, [[0, 40, 40, 50.0, 50.0]], "the seat's numbers are the creature's at once")
-	check_equal(_changed.size(), 2, "both of the creature's staffs are announced")
-	if _changed.size() == 2:
+	check_equal(_changed.size(), 4, "both of the creature's staffs are announced, and the two it lacks as empty")
+	if _changed.size() == 4:
 		check_equal([_changed[0][0], _changed[0][1], _changed[1][0], _changed[1][1]], [0, 0, 0, 1], "for seat 0, staffs 0 and 1")
 		check_equal(_changed[0][2].get("cards"), _ids("bolt - - - - -"), "with the creature's cards")
+		check_equal([_changed[2][1], _changed[2][2], _changed[3][1], _changed[3][2]], [2, {}, 3, {}], "staffs 2 and 3 are empty (G9)")
 	# The seat's input moves and casts the creature, not the wizard.
 	_world.hold(0, &"move_right")
 	_run(1)

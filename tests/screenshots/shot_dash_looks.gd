@@ -9,6 +9,8 @@ extends "res://tests/support/screenshot.gd"
 ## `dash_looks_4x` (the plain, fire and frost rows half way).
 
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
+const ActorsScript := preload("res://core/actors/actors.gd")
+const ActorSeats := preload("res://tests/support/actor_seats.gd")
 const ELEMENTS: Array[Resource] = [
 	preload("res://content/spells/elements/fire/fire.tres"),
 	preload("res://content/spells/elements/frost/frost.tres"),
@@ -23,7 +25,7 @@ const STEPS: int = 16
 
 
 func take() -> void:
-	if not need(["Feel", "Projectiles", "Events"]):
+	if not need(["Feel", "Projectiles", "Events", "Actors"]):
 		return
 	var feel: Node = root.get_node("Feel")
 	var shots: Node = root.get_node("Projectiles")
@@ -33,17 +35,14 @@ func take() -> void:
 	shots.call("set_bounds", Rect2(Vector2.ZERO, SCREEN))
 	await settle()
 	var length: float = float(MEDIUM_DASH.get("ray_length"))
-	var casters: Array[int] = []
+	var casters: Array[int] = _casters()
 	for e in 6:
 		var tint: Color = Color.WHITE if e == 0 else ELEMENTS[e - 1].get("tint") as Color
 		var look: int = 0 if e == 0 else ManagerScript.pack_look(PackedInt32Array([int(ELEMENTS[e - 1].get("look_layer"))]))
-		# Players 0-3, then two enemy casters (their streaks are the enemy ramp).
-		var caster: int = e if e < 4 else ManagerScript.FIRST_ENEMY_CASTER + e
-		var player: int = e if e < 4 else -1
-		casters.append(caster)
+		var caster: int = casters[e]
 		shots.call("set_anchor", caster, _at(e, 0.0, length))
 		shots.call("follow_caster", caster, tint, look, float(STEPS) / 60.0)
-		events.emit_signal("form_shown", player, &"dash", _at(e, 0.0, length), Vector2.UP, length, tint, look)
+		events.emit_signal("form_shown", caster, &"dash", _at(e, 0.0, length), Vector2.UP, length, tint, look)
 	for n in STEPS + 4:
 		await physics_frame
 		for e in 6:
@@ -55,11 +54,23 @@ func take() -> void:
 			save_crop(image, Vector2(220.0, 32.0 + ROW), "dash_looks_4x", Vector2i(110, int(ROW * 1.5)))
 		if n == STEPS - 1:
 			for e in 6:
-				events.emit_signal("caster_move_finished", e if e < 4 else -1, &"dash", _at(e, 1.0, length), 0)
+				events.emit_signal("caster_move_finished", casters[e], &"dash", _at(e, 1.0, length), 0)
 	if int(shots.get("drawn_trails")) < 6:
 		fail("only %d dash trails are showing" % int(shots.get("drawn_trails")))
 		return
 	save(await grab(), "dash_looks_landed")
+
+
+## The dashers' actor ids, opened in the `Actors` table: four seated wizards, then two enemies
+## (their streaks are the enemy ramp).
+func _casters() -> Array[int]:
+	var table: ActorsScript = ActorSeats.autoload()
+	var casters: Array[int] = []
+	for id in ActorSeats.seat_wizards(table):
+		casters.append(id)
+	casters.append(ActorSeats.enemy(table))
+	casters.append(ActorSeats.enemy(table))
+	return casters
 
 
 ## Where dasher `e` is `t` of the way through: right along its row, bending down at the end.

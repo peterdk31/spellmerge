@@ -4,7 +4,7 @@
 
 Words in the game: **lore** (`lore/`) for item and world descriptions, **dialogue** (`dialogue/`) for conversations, and **events** (`events/`) for short in-run story moments. Items without lore or a description become writing tasks.
 
-**Built in M2, from part 23** (see docs/milestones/M2-spell-system.md), now that `docs/STORY.md` and the first component descriptions exist. Only component lore exists so far; dialogue and events come with their own schema and validator when the first ones are written.
+**Built in M2, from part 23** (see docs/milestones/M2-spell-system.md), now that `docs/STORY.md` and the first component descriptions exist. Only component lore exists so far; dialogue and events come with their own schema and validator when the first ones are written. The intro's captions (living staffs H6) live in `gameplay/flow/intro.gd` until then; they follow `docs/STORY.md`'s canon.
 
 ## Contract
 

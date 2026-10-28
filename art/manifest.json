@@ -19,6 +19,24 @@
       "prompt": "A sheet of cartoon eye pairs for a 32x32 living-staff character, 16x8 frames: ten columns (the pupils looking in nine directions, then a blink as a dark line) and six rows of styles: round eyes with 2x2 pupils and a highlight; the same with a second highlight and a gold sparkle; heavy-lidded sleepy eyes with a Bone lid and low pupils; narrow stern eyes with slit pupils; flat white 4x3 eyes with slit pupils to be tinted in an element colour; and one such eye alone. Bone whites shaded from the top-left, 1px dark outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no player colours."
     },
     {
+      "path": "art/story/favourite.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "good",
+      "tool": "Claude (SVG rects written by a small generator from the pixel rules of the owner's living-staffs mockup, 2026-10-28)",
+      "prompt": "One 48x48 frame of the Favourite, the wizard's shiny new staff, pointing straight up: a Spark gold shaft with two Bone bands, a Bone blade-shaped head with an Ice gem and a Spark glint, the grip at (24, 27). Light from the top-left, 1px dark outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no player colours."
+    },
+    {
+      "path": "art/story/wizard_hat.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "good",
+      "tool": "Claude (content/wizard/base/wizard_hat_p1.svg with the Player 1 ramp swapped for the Blight ramp by a script)",
+      "prompt": "The style N wizard's pointed hat (content/wizard/base/wizard_hat_p1.svg) in the Blight ramp, the enemies' colour, for the wizard, the villain of the intro, who wears no player colour. Only rect elements, palette colours from docs/STYLE.md."
+    },
+    {
       "path": "art/tilesets/crypt/floor.svg",
       "origin": "ai",
       "author": "Claude",

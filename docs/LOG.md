@@ -2,9 +2,9 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
-## 2026-10-28: Sandbox (staffs B7) was already built
+## 2026-10-28: Sandbox (staffs B7), already built
 
-Checked the queue task against `main`: the sandbox room, both dummies, the flow run, the main menu button, the pause menu's Sandbox page and the controls rework all landed in owner sessions (#295, #296), with tests. No code changed; the task is ticked in `docs/NEXT.md`. The "Friendly fire" setting in the design row no longer applies since actors G3c.
+The task found B7 done: the sandbox room, both dummies, flow's sandbox events, the main menu button and the pause menu's Sandbox page exist with tests, which pass (`test_flow_sandbox.gd`, `test_sandbox_data.gd`, `test_main_menu_sandbox.gd`, `test_pause_menu.gd`). They landed in owner sessions (#295, #296). The session only ticked it in `docs/NEXT.md`; no code changed. The "Friendly fire" setting in the design row no longer applies since actors G3c; `docs/milestones/M2-staffs.md` now carries a note on those rows. `tools/check.sh` was rerun: none of its findings are in the doc files changed here.
 
 ## 2026-10-26: Caster kit (staffs B4)
 

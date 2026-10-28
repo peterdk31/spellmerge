@@ -45,7 +45,6 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `wizard_shield_requested`, `pull_requested`, `area_hit_requested` | `core/spells` (staffs B2) | `combat` |
 | `possess_requested` | `core/spells` (actors G9) | `actor` (each actor, for its own id: `Possession.begin`) |
 | `possess_started`, `possess_ended` | `actor` (the Possession) | `feel` (a ring in the driver's ramp) |
-| `player_possessed` | `player` (the seat set aside, and back) | `hud` (the corner panel) |
 | `reaction_triggered` | `combat` | `feel` |
 | `discharge_arc` | `combat` | `feel` |
 | `damage_dealt` | `combat` | `feel`, `ai` (grudges, the looks) |
@@ -54,7 +53,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `player_downed` | `player` (Downed) | `ai`, `combat`, `feel`, `flow`, `run` |
 | `player_revived` | `player` (Downed) | `combat`, `flow` |
 | `revive_progress` | `coop` | `player` (Downed) |
-| `player_stats_changed` | `player` | `hud` |
+| `player_stats_changed` | `player` (the seat's own wizard, also while it is away) | `hud` |
 | `player_joined`, `player_left` | `coop` | `difficulty`, `flow`, `hud` |
 | `run_started`, `run_ended` | `run` | `run_started`: `difficulty`, `flow`; `run_ended`: `progression` |
 | `room_entered` | `flow` | `ai`, `coop`, `difficulty`, `hud` |

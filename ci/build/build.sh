@@ -6,9 +6,11 @@
 # builds (docs/PLAN.md, "Daily run", step 6). Used by daily.yml and locally.
 #
 #   ci/build/build.sh [--version v0.20261017] [--channel nightly] [--commit SHA]
-#   ci/build/build.sh --web [--version V] [--channel preview] [--commit SHA]
-#                                 the web build only, zipped into dist/: no unit tests, screenshots
-#                                 or smoke tests (preview.yml; the daily run checks everything)
+#   ci/build/build.sh --web [--screenshots] [--version V] [--channel preview] [--commit SHA]
+#                                 the web build only, zipped into dist/: no unit tests or smoke
+#                                 tests (preview.yml; the daily run checks everything). With
+#                                 --screenshots it takes them too, for the gallery; a failed
+#                                 script only warns, so it never keeps the build back.
 #   ci/build/build.sh --quick     import and editor smoke test only (for development)
 #   ci/build/build.sh --quick --tests   the same, then every tests/**/test_*.gd unit test
 #   ci/build/build.sh --quick --screenshots   the same, then every tests/screenshots/shot_*.gd
@@ -407,6 +409,9 @@ if ((WEB)); then
   godot_checked import "$GODOT" --headless --path . --import
   export_preset Web
   package web
+  if ((SHOTS)) && ! screenshots; then
+    echo "::warning::some screenshots failed; the web build goes out without them (the daily run fails on them)"
+  fi
   step "Done: dist/ (web only, unchecked)"
   exit 0
 fi

@@ -22,15 +22,17 @@ static func table(count: int = 4, first: int = 0) -> ActorsScript:
 	return made
 
 
-## Opens in `actors` (cleared first) `first` unseated enemies, then `count` seated wizards, and
-## returns the wizards' ids by seat.
+## Opens in `actors` (cleared first) `first` unseated enemies, then `count` seated wizards (each
+## its seat's home body too, `Actors.home_of_seat`), and returns the wizards' ids by seat.
 static func seat_wizards(actors: ActorsScript, count: int = 4, first: int = 0) -> PackedInt32Array:
 	actors.clear()
 	for i in first:
 		actors.open(ActorsScript.TEAM_ENEMIES, ActorsScript.RAMP_ENEMY)
 	var ids := PackedInt32Array()
 	for seat in count:
-		ids.append(actors.open(ActorsScript.TEAM_WIZARDS, seat, seat))
+		var id: int = actors.open(ActorsScript.TEAM_WIZARDS, seat, seat)
+		actors.set_home(id, seat)
+		ids.append(id)
 	return ids
 
 

@@ -7,6 +7,9 @@ extends ActorController
 ## and never looks at another seat, so nobody waits for anybody.
 ##
 ## It IS the seat: the HUD, the builder and the rest of the game hear a seat only from here.
+## The seat's panel and builder are always its own wizard, its **home body** (the actor whose
+## home controller it is): its input drives whatever actor it drives now, but what the player
+## sees and builds is the wizard, which may stand vulnerable meanwhile (owner, 2026-10-28).
 ##
 ## - **Input to intent** (`think`): the walk; the aim (the right stick, which holds AIM_HOLD_TIME
 ##   after it is let go, so a quick flick still shoots where it pointed; the keyboard player aims
@@ -18,27 +21,29 @@ extends ActorController
 ##   Caster casts (a press, or a hold while no sustained card is on). While an overlay captures
 ##   the seat (`is_captured`) the move in progress stops (`Mover.stop`), the intent is empty and
 ##   presses made meanwhile are not held against the player later; while the actor is down, too.
-## - **The seat's events** (only from the actor it drives now, so an undriven body sends none):
-##   `player_stats_changed` (when it starts driving, on a health change and when mana crosses a
-##   whole number: the mana is looked at each step, so a regen shows a step later),
-##   `spell_cast` (the carrier, `Caster.last_form`) and `staff_cast` on every cast
-##   (with the cast sound `cast` from `core/registry`, nothing on null), `staff_changed` with the
-##   plain view of every built staff (`Caster.plan_of`), `bag_changed` and `build_refused`.
+## - **The panel's events** (always from the home body, also while the seat drives another actor
+##   or another controller drives the wizard): `player_stats_changed` (when it first drives the
+##   wizard and each time it comes home, on a health change and when mana crosses a whole number:
+##   the mana is looked at each step, in `think` or, while away, `watch_home`, so a regen shows a
+##   step later), `staff_changed` with the plain view of every built staff (`Caster.plan_of`),
+##   `bag_changed` and `build_refused`.
+## - **The cast events** (from the actor it drives now, whose staffs its buttons cast): `spell_cast`
+##   (the carrier, `Caster.last_form`) and `staff_cast` on every cast (with the cast sound `cast`
+##   from `core/registry`, nothing on null).
 ## - **The builder** (`staff_change_requested`, `card_move_requested`, `staff_cards_requested`,
-##   each for this seat only) builds the driven actor's staffs with `Caster.set_staff`. A change
-##   is refused only when the slot does not exist or the card is not in the `bag` (every card in
-##   the registry until M3's rewards fill it); `card_move_requested`'s staff BAG (-1) is the bag.
-##
+##   each for this seat only) builds the home body's staffs with `Caster.set_staff`, also during a
+##   possession. A change is refused only when the slot does not exist or the card is not in the
+##   `bag` (every card in the registry until M3's rewards fill it); `card_move_requested`'s staff
+##   BAG (-1) is the bag.
 ## - **Possessed** (G9): when another actor's controller takes the actor it drives, it is set aside
-##   (`set_aside`) and sends `player_possessed(seat, seconds)`, so the panel marks the seat
-##   possessed with the time left; it drives nothing meanwhile. When it drives again `started`
-##   sends `player_possessed(seat, 0)`. When it drives an actor with fewer staffs than four (a
-##   possessed imp), the staffs it lacks are announced empty, so the panel and the builder show
-##   only what that actor has.
+##   (`set_aside`, `is_set_aside`) and drives nothing until `started` hands it an actor again; the
+##   panel goes on showing the wizard, and the time is drawn over the wizard (`PossessedLook`).
 ##
 ## Its seat is in the actor table through the actor it drives (`Actor.seat`, `Actors.set_driver`),
-## so Spells' `mana_reserved` and budgets reach this seat while it drives. It binds to the actor
-## handed to `started` and lets go in `stopped`; it never keeps its home body, so it works the same
+## so Spells' budgets (and `mana_reserved`, which no HUD reads yet) reach this seat while it drives;
+## the HUD finds the home body by `Actors.home_of_seat`. It binds the home body's Health, Caster and
+## the builder's requests once, when it first drives it (it is a node of that body, so they go
+## together), and the driven actor's casts in `started`, letting go in `stopped`; it works the same
 ## on any actor with a Caster, Health and Mover (each optional). Nothing here allocates per step.
 ##
 ## Flow puts a wizard together with `seat_wizard` before adding it to the tree.
@@ -75,6 +80,8 @@ var mouse_world_override: Vector2 = Vector2.INF
 
 ## The actor driven now (set by `started`, cleared by `stopped`), or null.
 var _actor: Actor = null
+## Its home body (the actor whose home controller it is), bound the first time it drives it.
+var _home: Actor = null
 var _aim_hold_left: float = 0.0
 ## Per staff: the button's press count last seen, and the seconds left in which a remembered
 ## press still counts (0 = none remembered).
@@ -137,14 +144,37 @@ func driven() -> Actor:
 	return _actor
 
 
+## Its home body (the wizard its panel shows), or null before it first drove it.
+func home() -> Actor:
+	return _home
+
+
 func started(actor: Actor) -> void:
 	_actor = actor
 	_aim_hold_left = 0.0
-	_sent_health = -1
-	_sent_mana = -1
+	_aside = false
 	forget_presses()
 	if actor.caster != null:
 		actor.caster.cast_done.connect(_on_cast_done)
+	if _home == null and actor.home_controller == self:
+		_bind_home(actor)
+	elif actor != _home:
+		return
+	# Home again (or for the first time): the panel gets the wizard's staffs (a staff not built
+	# yet is announced when its Caster builds it) and numbers anew.
+	if actor.caster != null and actor.caster.number >= 0:
+		for at in actor.caster.staff_count:
+			_on_staff_built(at)
+	_sent_health = -1
+	_sent_mana = -1
+	announce_stats()
+
+
+## Bind the home body's numbers and staffs, and the builder's requests, for good (this node goes
+## with that body).
+func _bind_home(actor: Actor) -> void:
+	_home = actor
+	if actor.caster != null:
 		actor.caster.staff_built.connect(_on_staff_built)
 	if actor.health != null:
 		actor.health.changed.connect(_on_health_changed)
@@ -155,28 +185,16 @@ func started(actor: Actor) -> void:
 		bus.staff_cards_requested.connect(_on_staff_cards_requested)
 		if not _bag_filled:
 			_fill_bag()
-		else:
-			bus.bag_changed.emit(seat, bag.duplicate())
-	# The panel shows what this seat drives now: the staffs it has (a staff not built yet is
-	# announced when the actor's Caster builds it), none where it has fewer, and its numbers.
-	var staffs: int = actor.caster.staff_count if actor.caster != null else 0
-	if actor.caster != null and actor.caster.number >= 0:
-		for at in staffs:
-			_on_staff_built(at)
-	if bus != null:
-		for at in range(staffs, STAFF_COUNT):
-			bus.staff_changed.emit(seat, at, {})
-		if _aside:
-			bus.player_possessed.emit(seat, 0.0)
-	_aside = false
-	announce_stats()
 
 
-## A possession took the actor it drove for `seconds`: the seat's panel shows it possessed.
-func set_aside(actor: Actor, seconds: float) -> void:
+## A possession took the actor it drove for `seconds`: it drives nothing until `started`.
+func set_aside(_actor_taken: Actor, _seconds: float) -> void:
 	_aside = true
-	if actor.events != null:
-		actor.events.player_possessed.emit(seat, seconds)
+
+
+## While it is away from its wizard, the wizard's mana still reaches the panel.
+func watch_home(_body: Actor, _delta: float) -> void:
+	announce_stats()
 
 
 ## True while a possession has set this seat aside (it drives nothing).
@@ -185,21 +203,8 @@ func is_set_aside() -> bool:
 
 
 func stopped(actor: Actor) -> void:
-	if actor.caster != null:
-		if actor.caster.cast_done.is_connected(_on_cast_done):
-			actor.caster.cast_done.disconnect(_on_cast_done)
-		if actor.caster.staff_built.is_connected(_on_staff_built):
-			actor.caster.staff_built.disconnect(_on_staff_built)
-	if actor.health != null and actor.health.changed.is_connected(_on_health_changed):
-		actor.health.changed.disconnect(_on_health_changed)
-	var bus: EventsScript = actor.events
-	if bus != null and is_instance_valid(bus):
-		if bus.staff_change_requested.is_connected(_on_staff_change_requested):
-			bus.staff_change_requested.disconnect(_on_staff_change_requested)
-		if bus.card_move_requested.is_connected(_on_card_move_requested):
-			bus.card_move_requested.disconnect(_on_card_move_requested)
-		if bus.staff_cards_requested.is_connected(_on_staff_cards_requested):
-			bus.staff_cards_requested.disconnect(_on_staff_cards_requested)
+	if actor.caster != null and actor.caster.cast_done.is_connected(_on_cast_done):
+		actor.caster.cast_done.disconnect(_on_cast_done)
 	if _actor == actor:
 		_actor = null
 
@@ -281,28 +286,28 @@ func forget_presses() -> void:
 			_seen_presses[at] = input.get_press_count(seat, CAST_ACTIONS[at])
 
 
-## Send `player_stats_changed` for the driven actor if its health or whole mana differ from the
+## Send `player_stats_changed` for the home body if its health or whole mana differ from the
 ## last one sent.
 func announce_stats() -> void:
-	if _actor == null or _actor.events == null:
+	if _home == null or not is_instance_valid(_home) or _home.events == null:
 		return
-	var health: int = _actor.health.health if _actor.health != null else 0
-	var max_health: int = _actor.health.max_health if _actor.health != null else 0
-	var whole_mana: int = floori(_actor.caster.mana) if _actor.caster != null else 0
+	var health: int = _home.health.health if _home.health != null else 0
+	var max_health: int = _home.health.max_health if _home.health != null else 0
+	var whole_mana: int = floori(_home.caster.mana) if _home.caster != null else 0
 	if health == _sent_health and whole_mana == _sent_mana:
 		return
 	_sent_health = health
 	_sent_mana = whole_mana
-	var max_mana: float = _actor.caster.max_mana if _actor.caster != null else 0.0
-	_actor.events.player_stats_changed.emit(seat, health, max_health, float(whole_mana), max_mana)
+	var max_mana: float = _home.caster.max_mana if _home.caster != null else 0.0
+	_home.events.player_stats_changed.emit(seat, health, max_health, float(whole_mana), max_mana)
 
 
 func _on_health_changed(_health: int, _max_health: int) -> void:
 	announce_stats()
 
 
-## A staff of the driven actor was cast: the seat's cast events, the sound, the mana spent, and
-## the buffered press is used up.
+## A staff of the driven actor was cast: the seat's cast events, the sound, the mana spent (the
+## home body's, when it is the one cast), and the buffered press is used up.
 func _on_cast_done(at: int, origin: Vector2, direction: Vector2) -> void:
 	if at >= 0 and at < STAFF_COUNT:
 		_buffer_left[at] = 0.0
@@ -318,10 +323,10 @@ func _on_cast_done(at: int, origin: Vector2, direction: Vector2) -> void:
 	_play_cast_sound()
 
 
-## A staff of the driven actor was built: the builder sees its plain view.
+## A staff of the home body was built: the panel and the builder see its plain view.
 func _on_staff_built(at: int) -> void:
-	if _actor != null and _actor.events != null and _actor.caster != null:
-		_actor.events.staff_changed.emit(seat, at, _actor.caster.plan_of(at))
+	if _home != null and _home.events != null and _home.caster != null:
+		_home.events.staff_changed.emit(seat, at, _home.caster.plan_of(at))
 
 
 func _play_cast_sound() -> void:
@@ -341,18 +346,18 @@ func _fill_bag() -> void:
 		for id: StringName in registry.get_ids(&"spells"):
 			if registry.get_resource(&"spells", id) is SpellComponent:
 				bag.append(id)
-	if _actor != null and _actor.events != null:
-		_actor.events.bag_changed.emit(seat, bag.duplicate())
+	if _home != null and _home.events != null:
+		_home.events.bag_changed.emit(seat, bag.duplicate())
 
 
 func _refuse(reason: String) -> void:
-	if _actor != null and _actor.events != null:
-		_actor.events.build_refused.emit(seat, reason)
+	if _home != null and _home.events != null:
+		_home.events.build_refused.emit(seat, reason)
 
 
-## The driven actor's Caster, when it has staffs a builder may edit.
+## The home body's Caster: the builder edits the player's own wizard, also during a possession.
 func _builder_caster() -> Caster:
-	return _actor.caster if _actor != null else null
+	return _home.caster if _home != null else null
 
 
 ## A builder asked to put `card_id` into `slot` of staff `at` (`&""` empties it).

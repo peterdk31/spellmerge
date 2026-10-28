@@ -8,7 +8,7 @@ extends "res://tests/support/suite.gd"
 ## A combo file: `id` (also the file name), `name`, `does` (plain words), `casts` (`staff`,
 ## `cards`: one card id per slot, read as a staff reads them; optional `at` seconds, `player`), `imps` ([x, y] from the caster at (0, 0), aiming
 ## along +x), optional `walls` ([x, y, width, height] rects), `seconds` and `checks`. Check kinds: `damaged` (imps), `status` (imps, status),
-## `status_count` (status, min), `keeps_burning` (imp), `reaction` (reaction), `max_shots` (max),
+## `status_count` (status, min), `lost_at_least` (imps, min: health lost in all), `keeps_burning` (imp), `reaction` (reaction), `max_shots` (max),
 ## `caster_moved` (mode: a card moved its caster, for example a dash).
 ##
 ## godot --headless --path . --script res://tests/content/spells/test_combos.gd
@@ -16,7 +16,7 @@ extends "res://tests/support/suite.gd"
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const ComboFiles := preload("res://tests/support/combo_files.gd")
 const MIN_COMBOS: int = 20
-const CHECK_KINDS: Array[String] = ["damaged", "status", "status_count", "keeps_burning", "reaction", "max_shots", "caster_moved"]
+const CHECK_KINDS: Array[String] = ["damaged", "status", "status_count", "keeps_burning", "reaction", "max_shots", "caster_moved", "lost_at_least"]
 
 var _combos: Array = []
 ## Files of the catalogue that are not a JSON object.
@@ -74,6 +74,11 @@ func _problem_with(arena: ArenaScript, check_row: Dictionary) -> String:
 					count += 1
 			if count < int(check_row["min"]):
 				return "%d imps got %s, wanted %d" % [count, check_row["status"], int(check_row["min"])]
+		"lost_at_least":
+			for index: int in check_row["imps"]:
+				var lost: int = arena.lost(arena.imps[index])
+				if lost < int(check_row["min"]):
+					return "imp %d lost %d, wanted %d" % [index, lost, int(check_row["min"])]
 		"keeps_burning":
 			var imp: Node2D = arena.imps[int(check_row["imp"])]
 			var at_hit: int = arena.lost_when_given(imp, &"burn")
@@ -192,6 +197,8 @@ const CONTROLS: Dictionary = {
 	"frost_carousel": "pierce",
 	"quick_shock_ring": "faster",
 	"seeking_frost_burst": "on_expire",
+	"echo_double_tap": "echo",
+	"echo_timer_nova": "echo",
 }
 
 

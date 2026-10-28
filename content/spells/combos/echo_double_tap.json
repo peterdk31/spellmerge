@@ -1,0 +1,9 @@
+{
+	"id": "echo_double_tap",
+	"name": "Echo double tap",
+	"does": "A bolt hits an imp ahead, and a moment later its echo hits again at half damage: 8 health lost, where one bolt takes 5.",
+	"casts": [{"staff": 0, "cards": ["echo", "bolt"]}],
+	"imps": [[100, 0]],
+	"seconds": 1.5,
+	"checks": [{"kind": "lost_at_least", "imps": [0], "min": 8}]
+}

@@ -1,0 +1,5 @@
+{
+ "id": "echo",
+ "about": "component",
+ "text": "Fires the next shot again a moment later, at half damage."
+}

@@ -1,0 +1,13 @@
+{
+	"assets": [
+		{
+			"path": "content/spells/modifiers/echo/icon.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "placeholder",
+			"tool": "Claude (SVG rects written by a small generator)",
+			"prompt": "A 16x16 icon for the Echo card: a bright Bone orb on the left and a dimmer Bone copy of it on the right, each with a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+		}
+	]
+}

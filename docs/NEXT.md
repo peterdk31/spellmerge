@@ -14,7 +14,6 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
 - [x] **The old recipe path removed (staffs A6c).** Done in an owner session: `Spells.compile(recipe)`, `builder_view`, the recipe wrappers (`install`, `cast`, a spell's `begin_generation`) and the recipe compiler are gone, `begin_generation` takes a compiled staff; `CompiledSpell` lost `valid`, `reason`, `description`, `complexity`, `depth` and `held`; `SpellLimits` keeps only engine safeguards and tuning; the events `build_change_requested`, `spell_swap_requested`, `spell_changed`, `recipe_changed` and `active_spell_changed` are removed; tests build staffs (`tests/support/staff_kit.gd` turns the old recipe shorthand into card rows; `test_spell_tags.gd` replaces `test_spells_compile.gd`); the spells, core and gameplay READMEs say so. **Phase B and the cards can start; development is unpaused.**
 - [x] **Card: arc (staffs C).** After the slow, return and arc kit (owner, 2026-10-27). Data only.
 - [x] **Card: linger (staffs C).** After B1. Data only (M2-staffs.md, "Working in parallel").
-- [ ] **Card: echo (staffs C).** After B2. Data only (M2-staffs.md, "Working in parallel").
 - [ ] **Card: burst (staffs C).** After B2. Data only (M2-staffs.md, "Working in parallel").
 - [ ] **Card: scatter (staffs C).** After B2. Data only (M2-staffs.md, "Working in parallel").
 - [ ] **Card: mirror (staffs C).** After B2. Data only (M2-staffs.md, "Working in parallel").
@@ -83,6 +82,7 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 
 ## Done recently
 
+- [x] **Card: echo (staffs C).** `content/spells/modifiers/echo/` (`ModifierBase`, behaviour echo, 0.3 s, icon, `assets.json`), the lore entry, the combos `echo_double_tap` and `echo_timer_nova`, and `tests/content/spells/test_echo.gd`. The combo test got a check kind `lost_at_least` (health lost in all), since an echo shows as more damage, not a new status.
 - [x] **Card: on cast (staffs C).** `content/spells/triggers/on_cast/` (`TriggerBase`, event CAST, one fire, icon, `assets.json`), the lore entry, the combos `on_cast_rune_bolt` and `on_cast_bolt_nova`, and `tests/content/spells/test_on_cast.gd` (valid card; each combo holds with it and fails without it). The engine side was built in B2.
 - [x] **Card: growth (staffs C).** Found already built (commits fac4ce6 and 98ed9b8, checked 2026-10-28): `content/spells/modifiers/growth/` (`ModifierBase`, icon, `assets.json`), the combos `growth_far_shot` and `growth_slow_orb`, and `tests/content/spells/test_growth.gd`. All 126 unit tests pass in `ci/build/build.sh --quick --tests`. Only the checkbox was missing.
 - [x] **Card: slow (staffs C).** Found already built (commit 7ae7cac, checked 2026-10-28): `content/spells/modifiers/slow/` (`ModifierBase`, `speed_mult` 0.3, `lifetime_mult` 3.0, icon, `assets.json`), the combos `slow_nova_trail`, `slow_fire_fan` and `growth_slow_orb`, and `tests/content/spells/test_slow.gd`. All 126 unit tests pass in `ci/build/build.sh --quick --tests`. Only the checkbox was missing.

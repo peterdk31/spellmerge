@@ -1,0 +1,9 @@
+{
+	"id": "echo_timer_nova",
+	"name": "Echo timer nova",
+	"does": "A timed bolt drops a nova, and its echo flies the same line a moment later and drops a second one, so an imp near the line is rung twice.",
+	"casts": [{"staff": 0, "cards": ["timer", "echo", "bolt", "nova"]}],
+	"imps": [[132, 40]],
+	"seconds": 2.5,
+	"checks": [{"kind": "lost_at_least", "imps": [0], "min": 6}]
+}

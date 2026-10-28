@@ -1,9 +1,10 @@
 extends SceneTree
 ## Tests for hud/panels and hud/theme: a panel per player index 0-3 in its own
 ## colour (theme variation), health and mana shown from
-## `player_stats_changed` only, "DOWN", "POSSESSED n" and "MENU" words (state is never colour
-## alone; `player_possessed` counts down, actors G9), panels shown only for joined players once a room was entered, four
-## players at once without crosstalk, a corner each, and every panel fits the
+## `player_stats_changed` only, "DOWN" and "MENU" words (state is never colour alone; a
+## possession has no word: the panel stays the player's own wizard, owner 2026-10-28, tested in
+## tests/gameplay/actor/test_possess.gd), panels shown only for joined players once a room was
+## entered, four players at once without crosstalk, a corner each, and every panel fits the
 ## 640x360 view.
 ##
 ## godot --headless --path . --script res://tests/hud/test_panels.gd
@@ -40,7 +41,6 @@ func _initialize() -> void:
 	_test_wave_line()
 	_test_build_break_line()
 	_test_hud_routes_to_the_right_panel()
-	_test_possessed_word_counts_down()
 	_test_leave_and_rejoin_resets_the_panel()
 	_test_run_boundaries_hide_panels()
 	_test_hurt_vignette()
@@ -264,29 +264,6 @@ func _test_hud_routes_to_the_right_panel() -> void:
 	_check(value.call(0, "HealthValue") == "100" and value.call(3, "HealthValue") == "100", "the other panels are untouched")
 	bus.player_stats_changed.emit(3, 0, 100, 0.0, 100.0)
 	_check(hud.get_panel(3).is_downed() and not hud.get_panel(2).is_downed(), "only player 3 is shown down")
-	_free_hud(parts)
-
-
-func _test_possessed_word_counts_down() -> void:
-	var parts: Array = _make_hud()
-	var hud: HudScript = parts[0]
-	var bus: EventsScript = parts[1]
-	var panel: PlayerPanelScript = hud.get_panel(1)
-	bus.player_stats_changed.emit(1, 100, 100, 50.0, 100.0)
-	hud.get_panel(1).set_menu_open(true)
-	bus.player_possessed.emit(1, 3.0)
-	_check(panel.status_text() == "POSSESSED 3", "a possessed seat shows POSSESSED and its time, over MENU: %s" % panel.status_text())
-	_check(hud.get_panel(0).status_text() == "", "only that seat's panel")
-	hud.step_possessed(1.25)
-	_check(panel.status_text() == "POSSESSED 2", "the time counts down in whole seconds: %s" % panel.status_text())
-	bus.player_stats_changed.emit(1, 0, 100, 50.0, 100.0)
-	_check(panel.status_text() == "DOWN", "DOWN wins over POSSESSED")
-	bus.player_stats_changed.emit(1, 50, 100, 50.0, 100.0)
-	bus.player_possessed.emit(1, 0.0)
-	_check(panel.status_text() == "MENU" and panel.possessed_seconds() == 0, "driving again clears the word")
-	bus.player_possessed.emit(1, 0.5)
-	hud.step_possessed(1.0)
-	_check(panel.possessed_seconds() == 0, "the count stops at 0")
 	_free_hud(parts)
 
 

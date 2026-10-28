@@ -13,6 +13,9 @@ extends Node
 ##   home. A seat drives one actor at a time: giving a seat to an actor takes it from the actor
 ##   that held it, which is left with no seat (the newer driver wins). `actor_of_seat(seat)` is
 ##   the actor a seat drives now.
+## - `set_home(id, seat)` names the seat whose own body an actor is (a wizard, from its home
+##   controller), and `home_of_seat(seat)` finds it while the seat drives another actor or
+##   another controller drives it (possess, G9): the HUD shows the home body (owner, 2026-10-28).
 ## - `budget_of(id)` is whose share of the shared limits it spends: its seat's when a seat drives
 ##   it, else `SHARED`, the one budget every actor no seat drives shares.
 ## - `set_node(id, node)` and `node_of(id)` find the actor's node; only its instance id is kept,
@@ -45,6 +48,9 @@ var _seat: PackedInt32Array = PackedInt32Array()
 var _node: PackedInt64Array = PackedInt64Array()
 ## The actor each seat drives, or NONE.
 var _seat_actor: PackedInt32Array = PackedInt32Array()
+## Per actor: the seat whose own body it is, or NONE; per seat: its own body, or NONE.
+var _home_seat: PackedInt32Array = PackedInt32Array()
+var _seat_home: PackedInt32Array = PackedInt32Array()
 ## No id below this is free: where `open` starts looking.
 var _lowest_free: int = 0
 var _count: int = 0
@@ -57,6 +63,8 @@ func _init() -> void:
 	_seat.resize(ACTORS)
 	_node.resize(ACTORS)
 	_seat_actor.resize(SEATS)
+	_home_seat.resize(ACTORS)
+	_seat_home.resize(SEATS)
 	clear()
 
 
@@ -74,6 +82,7 @@ func open(team: int, ramp: int, seat: int = NONE) -> int:
 	_team[id] = team
 	_ramp[id] = ramp
 	_seat[id] = NONE
+	_home_seat[id] = NONE
 	_node[id] = 0
 	_lowest_free = id + 1
 	_count += 1
@@ -86,6 +95,7 @@ func close(id: int) -> void:
 	if not is_open(id):
 		return
 	_take_seat(id, NONE)
+	set_home(id, NONE)
 	_open[id] = 0
 	_team[id] = NONE
 	_ramp[id] = NONE
@@ -134,6 +144,32 @@ func actor_of_seat(seat: int) -> int:
 	return _seat_actor[seat] if seat >= 0 and seat < SEATS else NONE
 
 
+## `id` is seat `seat`'s own body (NONE, or anything outside 0-3: no seat's). A seat has one
+## home body: naming a new one takes it from the old.
+func set_home(id: int, seat: int) -> void:
+	if not is_open(id):
+		return
+	if seat < 0 or seat >= SEATS:
+		seat = NONE
+	var old: int = _home_seat[id]
+	if old == seat:
+		return
+	if old != NONE and _seat_home[old] == id:
+		_seat_home[old] = NONE
+	if seat != NONE:
+		var holder: int = _seat_home[seat]
+		if holder != NONE:
+			_home_seat[holder] = NONE
+		_seat_home[seat] = id
+	_home_seat[id] = seat
+
+
+## A seat's own body (its wizard, also while the seat drives another actor or another controller
+## drives it), or NONE.
+func home_of_seat(seat: int) -> int:
+	return _seat_home[seat] if seat >= 0 and seat < SEATS else NONE
+
+
 ## Whose share of the shared limits it spends: its seat (0-3) while a seat drives it, else SHARED.
 func budget_of(id: int) -> int:
 	var seat: int = seat_of(id)
@@ -161,6 +197,8 @@ func clear() -> void:
 	_seat.fill(NONE)
 	_node.fill(0)
 	_seat_actor.fill(NONE)
+	_home_seat.fill(NONE)
+	_seat_home.fill(NONE)
 	_lowest_free = 0
 	_count = 0
 

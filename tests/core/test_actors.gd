@@ -4,7 +4,7 @@ extends "res://tests/support/suite.gd"
 ## table, team, ramp and seat, a seat held by one actor at a time, the budget of seated and
 ## unseated actors, a node lookup that forgets freed nodes, safe answers for bad ids, and the
 ## spell runtime leaving the table to the bodies (actors G3b: Spells opens no actor; it asks the
-## table for a seat's actor). Each test makes its own table.
+## table for a seat's own body), and a seat's home body, kept while another actor holds the seat. Each test makes its own table.
 ##
 ## godot --headless --path . --script res://tests/core/test_actors.gd
 
@@ -166,6 +166,29 @@ func test_clear_closes_everything() -> void:
 	check_equal(_actors.open(ActorsScript.TEAM_ENEMIES, ActorsScript.RAMP_ENEMY), 0, "ids start again at 0")
 
 
+func test_a_seat_keeps_its_home_body_while_another_actor_holds_the_seat() -> void:
+	var wizard: int = _actors.open(ActorsScript.TEAM_WIZARDS, 1, 1)
+	var imp: int = _actors.open(ActorsScript.TEAM_ENEMIES, ActorsScript.RAMP_ENEMY)
+	_actors.set_home(wizard, 1)
+	check_equal(_actors.home_of_seat(1), wizard, "the wizard is seat 1's own body")
+	_actors.set_driver(wizard, ActorsScript.TEAM_WIZARDS, ActorsScript.NONE)
+	_actors.set_driver(imp, ActorsScript.TEAM_WIZARDS, 1)
+	check_equal(_actors.actor_of_seat(1), imp, "seat 1 drives the imp")
+	check_equal(_actors.home_of_seat(1), wizard, "and its home body is still the wizard")
+	var other: int = _actors.open(ActorsScript.TEAM_WIZARDS, 1)
+	_actors.set_home(other, 1)
+	check_equal(_actors.home_of_seat(1), other, "a new home body takes the seat's home")
+	_actors.set_home(wizard, 1)
+	_actors.close(wizard)
+	check_equal(_actors.home_of_seat(1), ActorsScript.NONE, "closing the home body frees it")
+	_actors.set_home(other, 7)
+	check_equal(_actors.home_of_seat(7), ActorsScript.NONE, "a bad seat is no home")
+	check_equal(_actors.home_of_seat(-1), ActorsScript.NONE, "nor seat -1")
+	_actors.set_home(other, 2)
+	_actors.clear()
+	check_equal(_actors.home_of_seat(2), ActorsScript.NONE, "clear forgets the homes")
+
+
 func test_spells_opens_no_actors_and_finds_seats_in_the_table() -> void:
 	var spells: SpellsScript = own(SpellsScript.new()) as SpellsScript
 	spells.actors = _actors
@@ -173,8 +196,9 @@ func test_spells_opens_no_actors_and_finds_seats_in_the_table() -> void:
 	var wizard: int = _actors.open(ActorsScript.TEAM_WIZARDS, 2, 2)
 	check(spells.open_caster(imp) and spells.open_caster(wizard), "the bodies' ids open as casters")
 	check_equal(_actors.open_count(), 2, "opening a caster opens no actor")
-	check_equal(spells.actor_of_seat(2), wizard, "Spells finds a seat's actor in the table")
-	check_equal(spells.actor_of_seat(0), ActorsScript.NONE, "and no actor for an empty seat")
+	_actors.set_home(wizard, 2)
+	check_equal(spells.home_of_seat(2), wizard, "Spells finds a seat's own body in the table")
+	check_equal(spells.home_of_seat(0), ActorsScript.NONE, "and none for an empty seat")
 	spells.close_caster(imp)
 	check(_actors.is_open(imp), "closing a caster leaves its actor to its body")
 	spells.clear()

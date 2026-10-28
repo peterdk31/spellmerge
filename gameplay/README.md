@@ -23,7 +23,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `wizard_cast` | `player` | `feel` |
 | `projectile_hit` | `core/projectiles` | `combat` |
 | `projectile_impact` | `core/projectiles` | `feel` |
-| `form_shown`, `combo_cast` | `core/spells` | `feel` |
+| `form_shown` | `core/spells` | `feel` |
 | `projectile_expired` | `core/projectiles` | none yet (`core/spells` from M2 part 6) |
 | `build_refused` | `player` | `hud` (the builders) |
 | `bag_changed` | `player` | `hud` (the builders) |

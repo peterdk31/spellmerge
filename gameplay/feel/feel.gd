@@ -63,15 +63,6 @@ const FORMS_PER_PLAYER: int = 24
 const FORM_SLOTS: int = FORMS_PER_PLAYER * 5
 ## The share of the beam sprites every enemy's beam takes turns in.
 const ENEMY_FORMS: int = 4
-const ComboMarks := preload("res://gameplay/feel/combo_marks.gd")
-## The mark of a combo cast (`combo_cast`): one per player, which a new cast of that player
-## replaces, so four players never show more than four marks.
-const COMBO_SLOTS: int = 4
-## The mark is drawn at its own size for this share of its time, then at twice that (whole
-## multiples only, so the pixels stay square), and a timer's hand ticks round in quarter turns.
-const COMBO_SWELL_AT: float = 0.45
-## Bone light, the mark's colour for plain arcane (white is not in the palette).
-const COMBO_ARCANE: Color = Color("#f4f1ea")
 ## Beams and rings draw above the room, under the shots (50) and the flashes (20).
 const FORM_Z: int = 18
 ## Live beams drawn at once (core/spells keeps at most as many), and the most points of each
@@ -133,7 +124,12 @@ const RING_SECONDS: float = 0.22
 const RAIN_MARK_ZOOM: int = 2
 const RUNE_BURST_SECONDS: float = 0.45
 const CAST_SECONDS: float = 0.14
+## A dash's dust where it left (its way is the caster's trail, drawn by the projectile manager
+## where the wizard really went; its landing is a ring, `_on_caster_move_finished`).
 const DASH_SECONDS: float = 0.6
+## A shot whose life runs out goes off in a small pop (the mockup's): a flare this big.
+const POP_ZOOM: int = 1
+const POP_SECONDS: float = 0.2
 ## A dash effect is drawn along its length (at most DASH_LONGEST: the length travels in the zoom's
 ## place, 4 px a step), DASH_MARGIN longer at each end and DASH_ACROSS across (the shader's).
 const DASH_LONGEST: float = 252.0
@@ -148,6 +144,8 @@ const STATUS_ZOOM: int = 2
 const STATUS_RISE: float = 8.0
 ## A beam is drawn this wide (its core, rim, flares and glow; `shot_core.gdshader`'s beam mode).
 const BEAM_WIDTH: float = 16.0
+## How far a beam's quad reaches past each end, so its flares are whole (the shader's beam_lead).
+const BEAM_LEAD: float = 8.0
 const EFFECT_Z: int = 50
 ## The effect quad is the shot shader's grid times the zoom (LOOK_GRID in core/projectiles).
 const EFFECT_GRID: float = 24.0
@@ -229,13 +227,11 @@ var _form_total: PackedFloat32Array = PackedFloat32Array()
 var _form_body: PackedColorArray = PackedColorArray()
 var _form_length: PackedFloat32Array = PackedFloat32Array()
 var _next_form: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0])
-## Combo marks (sprites made once, one per player): seconds left, the class shown and the
-## angle it started at. The pictures are built in code (`combo_marks.gd`), one per class.
-var _combo_marks: Array[Sprite2D] = []
-var _combo_left: PackedFloat32Array = PackedFloat32Array()
-var _combo_class: Array[StringName] = []
-var _combo_angle: PackedFloat32Array = PackedFloat32Array()
-var _combo_textures: Dictionary = {}
+## Each player's last dash (the enemies share the fifth): where it started, its element's colour
+## and its look, for the landing.
+var _dash_from: PackedVector2Array = PackedVector2Array([Vector2.INF, Vector2.INF, Vector2.INF, Vector2.INF, Vector2.INF])
+var _dash_core: PackedColorArray = PackedColorArray([Color.WHITE, Color.WHITE, Color.WHITE, Color.WHITE, Color.WHITE])
+var _dash_look: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0])
 ## Reaction names: one label per reaction flash slot, with where it starts and seconds left.
 var _labels: Array[Label] = []
 var _label_left: PackedFloat32Array = PackedFloat32Array()
@@ -319,25 +315,6 @@ func _ready() -> void:
 	_last_usec = Time.get_ticks_usec()
 	_flash_material = ShaderMaterial.new()
 	_flash_material.shader = FLASH_SHADER
-	for combo_class in ComboMarks.CLASSES:
-		_combo_textures[combo_class] = ComboMarks.make_texture(combo_class)
-	for i in COMBO_SLOTS:
-		var mark := Sprite2D.new()
-		mark.top_level = true
-		mark.visible = false
-		mark.z_index = 20
-		mark.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		# Drawn by the shot shader's sprite path, flat in its colour, with a glow round it.
-		var glowing := ShaderMaterial.new()
-		glowing.shader = CORE_SHADER
-		glowing.set_shader_parameter(&"core_override", Color.WHITE)
-		glowing.set_shader_parameter(&"sprite_glow", 1.0)
-		mark.material = glowing
-		add_child(mark)
-		_combo_marks.append(mark)
-		_combo_class.append(&"")
-	_combo_left.resize(COMBO_SLOTS)
-	_combo_angle.resize(COMBO_SLOTS)
 	for i in FORM_SLOTS:
 		var form := Sprite2D.new()
 		var material := ShaderMaterial.new()
@@ -420,11 +397,12 @@ func _ready() -> void:
 	events.wizard_cast.connect(_on_wizard_cast)
 	events.projectile_impact.connect(_on_projectile_impact)
 	events.form_shown.connect(_on_form_shown)
-	events.combo_cast.connect(_on_combo_cast)
 	events.reaction_triggered.connect(_on_reaction_triggered)
 	events.discharge_arc.connect(_on_discharge_arc)
 	events.status_applied.connect(_on_status_applied)
 	events.effect_slots_changed.connect(_on_effect_slots_changed)
+	events.caster_move_finished.connect(_on_caster_move_finished)
+	events.projectile_expired.connect(_on_projectile_expired)
 	if combat == null:
 		combat = get_node_or_null("/root/Combat")
 	if projectiles == null:
@@ -471,7 +449,6 @@ func step(real_delta: float) -> void:
 		shake_offset += _kick
 		_apply_camera()
 	_step_reactions(real_delta)
-	_step_combo_marks(real_delta)
 	_step_forms(real_delta)
 	_step_effects(real_delta)
 	_draw_live_beams()
@@ -915,6 +892,37 @@ func _on_projectile_impact(player: int, target: Node, position: Vector2, directi
 	_show_impact(player, position, direction)
 
 
+## A dash landed: a ring in the player's colours where the wizard stopped; lightning arcs from
+## where it left, and an infused dash lands in a small flare of its element (the mockup's).
+func _on_caster_move_finished(player: int, mode: StringName, position: Vector2, _tag: int) -> void:
+	if mode != &"dash" or player < EventsScript.NO_PLAYER or player >= PLAYER_COLORS.size() or not position.is_finite():
+		return
+	var who: int = player if player >= 0 else ENEMY_FORMS
+	var look: int = _dash_look[who]
+	show_effect(KIND_RING_OUT, position, Vector2.RIGHT, Color.WHITE, player, 0, 1, RING_SECONDS)
+	var from: Vector2 = _dash_from[who]
+	if from.is_finite() and (look & (1 << (ProjectileManagerScript.LOOK_SPARKS - 1))) != 0 and from.distance_to(position) > 4.0:
+		show_effect(KIND_ARC, from, from.direction_to(position), _dash_core[who], player, look, 1, RING_SECONDS, from.distance_to(position))
+	if look != 0:
+		show_effect(KIND_BURST, position, from.direction_to(position) if from.is_finite() else Vector2.RIGHT, _dash_core[who], player, look, POP_ZOOM, POP_SECONDS)
+	_dash_from[who] = Vector2.INF
+
+
+## A bolt or orbit shot whose life ran out goes off in a small pop of its own colours where it
+## was (the mockup's); one that ended on a wall already showed its impact, and a rune's going off
+## is its own burst.
+func _on_projectile_expired(player: int, position: Vector2, _tag: int) -> void:
+	if projectiles == null or not position.is_finite() or player < EventsScript.NO_PLAYER or player >= PLAYER_COLORS.size():
+		return
+	if bool(projectiles.get("expired_on_wall")) or not ("impact_form" in projectiles):
+		return
+	var form: StringName = projectiles.impact_form as StringName
+	if form != &"bolt" and form != &"orbit":
+		return
+	var heading: Vector2 = projectiles.get("impact_heading") as Vector2 if "impact_heading" in projectiles else Vector2.RIGHT
+	show_effect(KIND_BURST, position, heading, projectiles.impact_core as Color, player, projectiles.impact_look as int, POP_ZOOM, POP_SECONDS)
+
+
 ## The payoff of a shot: a flare in the shot's colour, shaped by the form of the shot itself
 ## (the projectile manager's `impact_form` while the impact is sent; a rune goes off, a nova's
 ## adds a ring). An enemy's shot (NO_PLAYER) lands the same way, in the enemy ramp where a
@@ -1186,56 +1194,6 @@ func _on_spell_cast(player: int, spell_id: StringName, origin: Vector2, directio
 		_kick = (_kick - direction.normalized() * preset.cast_kick_pixels).limit_length(MAX_KICK_PIXELS)
 
 
-## A cast that is more than a plain shot gets a mark on the wizard, in the element's colour,
-## whose shape tells the class (`combo_marks.gd`). Flat colour and whole-pixel steps, no fade.
-func _on_combo_cast(player: int, combo_class: StringName, origin: Vector2, direction: Vector2, tint: Color) -> void:
-	if player < 0 or player >= COMBO_SLOTS or preset.combo_mark_seconds <= 0.0:
-		return
-	var texture: Texture2D = _combo_textures.get(combo_class) as Texture2D
-	if texture == null or not origin.is_finite():
-		return
-	var mark: Sprite2D = _combo_marks[player]
-	mark.texture = texture
-	mark.global_position = origin.round()
-	# Plain arcane is white; the mark takes the palette's pale Bone instead of pure white.
-	mark.modulate = COMBO_ARCANE if tint.is_equal_approx(Color.WHITE) else tint
-	_combo_class[player] = combo_class
-	_combo_angle[player] = 0.0
-	if combo_class == ComboMarks.ON_HIT and direction != Vector2.ZERO:
-		_combo_angle[player] = roundf(direction.angle() / (PI / 2.0)) * (PI / 2.0)
-	_combo_left[player] = preset.combo_mark_seconds
-	_pose_combo_mark(player, 0.0)
-	mark.visible = true
-
-
-## Show, swell and turn the combo marks; a mark ends in one step, never fading.
-func _step_combo_marks(real_delta: float) -> void:
-	for i in COMBO_SLOTS:
-		if _combo_left[i] <= 0.0:
-			continue
-		_combo_left[i] -= real_delta
-		if _combo_left[i] <= 0.0:
-			_combo_marks[i].visible = false
-			continue
-		_pose_combo_mark(i, 1.0 - _combo_left[i] / preset.combo_mark_seconds)
-
-
-## Size and angle of mark `i` at `age` (0 to 1 of its time).
-func _pose_combo_mark(i: int, age: float) -> void:
-	var mark: Sprite2D = _combo_marks[i]
-	mark.scale = Vector2.ONE * (2.0 if age >= COMBO_SWELL_AT else 1.0)
-	# Quarter turns only, so the pixels stay square: a timer's hand ticks round like a clock.
-	if _combo_class[i] == ComboMarks.TIMER:
-		mark.rotation = floorf(age * 4.0) * PI / 2.0
-	else:
-		mark.rotation = _combo_angle[i]
-
-
-## The combo mark of `player` (for tests).
-func combo_mark(player: int) -> Sprite2D:
-	return _combo_marks[clampi(player, 0, COMBO_SLOTS - 1)]
-
-
 ## A beam (drawn by the shot shader's beam mode in the element's ramp), a nova's ring, a dash and
 ## a rain's marker (effects), each with the cast's cards. An enemy's (NO_PLAYER) look the same,
 ## in the enemy ramp (staffs F7). A rain's marker is a ring closing on the point for as long as
@@ -1253,8 +1211,14 @@ func _on_form_shown(player: int, form: StringName, origin: Vector2, direction: V
 			show_effect(KIND_RING_OUT, origin, Vector2.RIGHT, tint, player, look, zoom, preset.nova_seconds)
 		return
 	if form == &"dash":
+		# Only its dust here: the wizard picks its way (where it walks), so its streaks and cards
+		# are its trail, and the ring comes where it lands.
+		var who: int = player if player >= 0 else ENEMY_FORMS
+		_dash_from[who] = origin
+		_dash_core[who] = tint
+		_dash_look[who] = look
 		if length > 0.0 and direction != Vector2.ZERO:
-			show_effect(KIND_DASH, origin, direction, tint, player, look, 1, DASH_SECONDS, length)
+			show_effect(KIND_DASH, origin, Vector2.RIGHT, tint, player, look, 1, DASH_SECONDS, 4.0)
 		return
 	if form != &"beam" or length <= 0.0 or direction == Vector2.ZERO:
 		return
@@ -1270,15 +1234,20 @@ func _on_form_shown(player: int, form: StringName, origin: Vector2, direction: V
 	sprite.global_position = origin
 	sprite.texture = preset.beam_texture
 	sprite.centered = false
-	sprite.offset = Vector2(0.0, -16.0)
+	# BEAM_LEAD past each end, so the flares are whole.
+	sprite.offset = Vector2(-BEAM_LEAD, -16.0)
 	sprite.region_enabled = true
-	sprite.region_rect = Rect2(0.0, 0.0, length, 32.0)
+	sprite.region_rect = Rect2(0.0, 0.0, length + 2.0 * BEAM_LEAD, 32.0)
 	sprite.rotation = direction.angle()
 	sprite.scale = Vector2.ONE
 	var material: ShaderMaterial = sprite.material as ShaderMaterial
 	material.set_shader_parameter(&"core_override", Color(tint.r, tint.g, tint.b, 1.0))
 	material.set_shader_parameter(&"beam_mode", 2)
 	material.set_shader_parameter(&"beam_length", length)
+	material.set_shader_parameter(&"beam_lead", BEAM_LEAD)
+	material.set_shader_parameter(&"beam_start", origin)
+	material.set_shader_parameter(&"beam_end", origin + direction.normalized() * length)
+	material.set_shader_parameter(&"beam_end_dir", direction.normalized())
 	material.set_shader_parameter(&"beam_player", player)
 	material.set_shader_parameter(&"beam_look", look)
 	material.set_shader_parameter(&"beam_glow", preset.beam_alpha)
@@ -1340,13 +1309,22 @@ func _draw_live_beams() -> void:
 			_beam_line[used] = point
 			used += 1
 			prev = point
-		# The line only changes its number of points when the path does.
+		# The line only changes its number of points when the path does. It reaches BEAM_LEAD past
+		# each end, so the flares there are whole.
 		while line.get_point_count() < used:
 			line.add_point(Vector2.ZERO)
 		while line.get_point_count() > used:
 			line.remove_point(line.get_point_count() - 1)
+		var start_dir: Vector2 = _beam_line[0].direction_to(_beam_line[1])
+		var end_at: Vector2 = _beam_line[used - 1]
+		var end_dir: Vector2 = _beam_line[used - 2].direction_to(end_at)
 		for n in used:
-			line.set_point_position(n, _beam_line[n])
+			var point: Vector2 = _beam_line[n]
+			if n == 0:
+				point -= start_dir * BEAM_LEAD
+			elif n == used - 1:
+				point += end_dir * BEAM_LEAD
+			line.set_point_position(n, point)
 		var since: float = spells.call("beam_since_hit", i)
 		var left: float = spells.call("beam_left", i)
 		var fade: float = clampf(left * 4.0, 0.0, 1.0)
@@ -1367,6 +1345,11 @@ func _draw_live_beams() -> void:
 		material.set_shader_parameter(&"body_tint", Color(body.r, body.g, body.b, fade * preset.beam_alpha))
 		material.set_shader_parameter(&"beam_mode", 1)
 		material.set_shader_parameter(&"beam_length", walked)
+		material.set_shader_parameter(&"beam_lead", BEAM_LEAD)
+		material.set_shader_parameter(&"beam_start", origin)
+		material.set_shader_parameter(&"beam_end", end_at)
+		material.set_shader_parameter(&"beam_end_dir", end_dir)
+		material.set_shader_parameter(&"sim_time", _clock)
 		material.set_shader_parameter(&"beam_width", BEAM_WIDTH)
 		material.set_shader_parameter(&"beam_player", player)
 		material.set_shader_parameter(&"beam_look", int(spells.call("beam_look", i)) if spells.has_method("beam_look") else 0)
@@ -1383,6 +1366,7 @@ func _pose_form(slot: int, t: float) -> void:
 	var body: Color = _form_body[slot]
 	var age: float = 1.0 - t
 	var material: ShaderMaterial = sprite.material as ShaderMaterial
+	material.set_shader_parameter(&"sim_time", _clock)
 	material.set_shader_parameter(&"body_tint", Color(body.r, body.g, body.b, t * preset.beam_alpha))
 	var flare: float = 1.0 + preset.beam_flare * maxf(1.0 - age / preset.beam_flare_share, 0.0)
 	var step: int = int(age * _form_total[slot] * preset.beam_flicker_rate)

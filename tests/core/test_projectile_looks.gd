@@ -120,7 +120,8 @@ func test_runes_and_orbit_shots_are_drawn_as_their_form() -> void:
 	mgr.update_draw(1.0)
 	check_equal(kind_at(mgr._rune_node, 0), ManagerScript.KIND_RUNE, "a rune is drawn as a rune")
 	check_equal(look_at(mgr._rune_node, 0), [1, 4, ManagerScript.pack_look(PackedInt32Array([2]))] as Array[int], "with its player, its zoom (radius 14) and its layers")
-	check_equal(kind_at(mgr._orbit_node, 0), ManagerScript.KIND_ORBIT, "an orbit shot is drawn as an orbit shot (a bolt whose tail bends)")
+	check_equal(kind_at(mgr._orbit_node, 0), ManagerScript.KIND_BOLT, "an orbit shot is drawn as a shot in flight, its trail round its circle")
+	check_equal(roundi(mgr._orbit_node.multimesh.buffer[5]), ManagerScript.TRAIL_HEAD | ManagerScript.TRAIL_ORBIT, "flagged an orbit shot")
 	check_equal(look_at(mgr._orbit_node, 0)[0], 2, "of its player")
 
 
@@ -169,84 +170,156 @@ func test_shots_are_drawn_about_their_hit_size_in_whole_pixels() -> void:
 	var slot: int = mgr.spawn(0, Vector2(100.0, 100.0), Vector2(100.0, 0.0), 1.0, 5.0)
 	mgr.update_draw(1.0)
 	var buffer: PackedFloat32Array = mgr._draw_node.multimesh.buffer
-	check(slot >= 0 and is_equal_approx(buffer[0], 72.0), "the drawn quad is look_length along the flight")
-	check(is_equal_approx(buffer[5], -24.0) and is_equal_approx(buffer[1], 0.0) and is_equal_approx(buffer[4], 0.0), "and look_size across")
-	check(is_equal_approx(buffer[3], mgr.get_position_of(slot).x - 24.0) and is_equal_approx(buffer[7], 100.0), "reaching 12 px ahead of the shot, the rest behind it for the tail")
+	check(slot >= 0 and is_equal_approx(buffer[3], 100.0) and is_equal_approx(buffer[7], 100.0), "a flying shot's instance holds its head where it is drawn")
+	check_equal(roundi(buffer[0]), mgr.get_trail_of(slot), "and its trail's row in the transform's x axis (TRAILS in the shader)")
+	check_equal(roundi(buffer[5]), ManagerScript.TRAIL_HEAD, "flagged alive: the core is drawn")
 
 
-## The bend a shot's instance carries, decoded as the shader does (1 / the radius, signed).
-func bend_at(node: MultiMeshInstance2D, i: int) -> float:
-	var coded: float = (1.0 - node.multimesh.buffer[i * ManagerScript.DRAW_STRIDE + 15]) * ManagerScript.KIND_STEPS
-	var code: float = coded - floorf(coded + 0.5)
-	return (code - ManagerScript.BEND_ZERO) / ManagerScript.BEND_SPAN / ManagerScript.BEND_RADIUS
+func test_a_flying_shot_leaves_its_path_behind() -> void:
+	var slot: int = mgr.spawn(0, Vector2(100.0, 100.0), Vector2(120.0, 0.0), 2.0)
+	var row: int = mgr.get_trail_of(slot)
+	check(row >= 0, "a bolt takes a trail row")
+	check_equal(mgr.get_trail_kept(row), 1, "starting where it was cast")
+	for i in 30:
+		mgr.step(1.0 / 60.0)
+	var kept: int = mgr.get_trail_kept(row)
+	check(kept >= 15 and kept <= 17, "half a second keeps about 15 points, one every TRAIL_EVERY (%d)" % kept)
+	var newest: Vector4 = mgr.get_trail_point(row, 0)
+	var older: Vector4 = mgr.get_trail_point(row, 1)
+	check(newest.x > older.x and is_equal_approx(newest.y, 100.0), "the points are where it flew")
+	check(is_equal_approx(newest.z - older.z, newest.x - older.x), "with how far it had gone")
+	check(newest.w > older.w and newest.w <= mgr.sim_time, "and when")
+	check(mgr.get_trail_point(row, kept).x == INF, "nothing past what it keeps")
 
 
-func test_a_long_quad_still_points_along_a_diagonal_flight() -> void:
-	var slot: int = mgr.spawn(0, Vector2(100.0, 100.0), Vector2(60.0, 80.0), 1.0, 5.0)
+func test_a_homing_turn_stays_in_the_path() -> void:
+	# The owner (2026-10-28): the tail turned with the shot. The path keeps where it went.
+	var slot: int = mgr.spawn(0, Vector2(100.0, 200.0), Vector2(0.0, -150.0), 2.0)
+	var row: int = mgr.get_trail_of(slot)
+	for i in 12:
+		mgr.step(1.0 / 60.0)
+	mgr._vel[slot] = Vector2(150.0, 0.0)
+	for i in 12:
+		mgr.step(1.0 / 60.0)
+	var oldest: Vector4 = mgr.get_trail_point(row, mgr.get_trail_kept(row) - 1)
+	var newest: Vector4 = mgr.get_trail_point(row, 0)
+	check(is_equal_approx(oldest.x, 100.0) and is_equal_approx(oldest.y, 200.0), "the tail still starts where it went up")
+	check(newest.x > 110.0 and newest.y < 180.0, "and ends where it turned to")
+
+
+func test_a_bounce_leaves_its_corner_in_the_path() -> void:
+	mgr.set_walls([Rect2(0.0, 0.0, 640.0, 40.0)] as Array[Rect2])
+	var slot: int = mgr.spawn(0, Vector2(100.0, 60.0), Vector2(0.0, -120.0), 2.0)
+	mgr.set_bounce(slot, 1)
+	var row: int = mgr.get_trail_of(slot)
+	var corner: bool = false
+	for i in 20:
+		mgr.step(1.0 / 60.0)
+		if mgr._vel[slot].y > 0.0 and not corner:
+			corner = mgr.get_trail_point(row, 0).y <= 40.5
+	check(corner, "the point where it bounced is kept, so the tail turns there")
+
+
+func test_a_trail_cools_where_its_shot_ended_then_goes() -> void:
+	var slot: int = mgr.spawn(1, Vector2(100.0, 100.0), Vector2(120.0, 0.0), 0.2)
+	mgr.set_core(slot, Color(0.878, 0.349, 0.184))
+	var row: int = mgr.get_trail_of(slot)
+	for i in 13:
+		mgr.step(1.0 / 60.0)
+	check(not mgr.is_alive(slot), "the shot's life ran out")
+	check_equal(mgr.get_trail_count(), 1, "its trail is still there")
+	check(mgr.get_trail_point(row, 0).x > 120.0, "with its last point where it ended")
+	mgr.update_draw(1.0)
+	check_equal(mgr.drawn, 0, "no shot is drawn")
+	check_equal(mgr.drawn_trails, 1, "but its trail is, without a core")
+	var buffer: PackedFloat32Array = mgr._draw_node.multimesh.buffer
+	check_equal(roundi(buffer[5]) & ManagerScript.TRAIL_HEAD, 0, "flagged without a head")
+	check(Color(buffer[12], buffer[13], buffer[14]).is_equal_approx(Color(0.878, 0.349, 0.184)), "in its shot's colours")
+	check_equal(look_at(mgr._draw_node, 0)[0], 1, "and its player")
+	for i in roundi(ManagerScript.TRAIL_KEEP * 60.0) + 3:
+		mgr.step(1.0 / 60.0)
+	check_equal(mgr.get_trail_count(), 0, "once all of it has cooled, the row is given back")
+	mgr.update_draw(1.0)
+	check_equal(mgr.drawn_trails, 0, "and nothing is drawn")
+
+
+func test_an_orbit_shot_is_drawn_spiralling_out_from_its_caster() -> void:
+	mgr.set_anchor(0, Vector2(200.0, 200.0))
+	var slot: int = mgr.spawn_orbit(0, 36.0, 0.0, 4.0, 5.0, 6.0)
+	var row: int = mgr.get_trail_of(slot)
+	check(mgr.get_trail_point(row, 0).is_equal_approx(Vector4(200.0, 200.0, 0.0, mgr.sim_time)), "its trail starts on its caster")
+	mgr.step(1.0 / 60.0)
+	check(is_equal_approx(mgr.get_position_of(slot).distance_to(Vector2(200.0, 200.0)), 36.0), "it hits at its circle from the start")
+	mgr.update_draw(1.0)
+	var buffer: PackedFloat32Array = mgr._orbit_node.multimesh.buffer
+	var drawn_out: float = Vector2(buffer[3], buffer[7]).distance_to(Vector2(200.0, 200.0))
+	check(drawn_out > 1.0 and drawn_out < 6.0, "but is drawn near its caster at first (%.1f px out)" % drawn_out)
+	check_equal(roundi(buffer[5]), ManagerScript.TRAIL_HEAD | ManagerScript.TRAIL_ORBIT, "as an orbit shot's trail")
+	for i in 20:
+		mgr.step(1.0 / 60.0)
+	mgr.update_draw(1.0)
+	buffer = mgr._orbit_node.multimesh.buffer
+	check(is_equal_approx(Vector2(buffer[3], buffer[7]).distance_to(Vector2(200.0, 200.0)), 36.0), "and on its circle after ORBIT_GROW")
+
+
+func test_a_blink_starts_the_trail_afresh() -> void:
+	var slot: int = mgr.spawn(0, Vector2(100.0, 100.0), Vector2(120.0, 0.0), 2.0)
+	for i in 10:
+		mgr.step(1.0 / 60.0)
+	mgr.move_shot(slot, Vector2(0.0, 60.0), 0.0)
+	var row: int = mgr.get_trail_of(slot)
+	check_equal(mgr.get_trail_kept(row), 1, "no tail across the gap")
+
+
+func test_a_caster_trail_follows_where_the_caster_goes() -> void:
+	mgr.set_anchor(2, Vector2(100.0, 100.0))
+	var row: int = mgr.follow_caster(2, Color.WHITE, 0, 0.2)
+	check(row >= 0, "a dash takes a row")
+	for i in 12:
+		mgr.set_anchor(2, Vector2(100.0, 100.0) + Vector2(cos(i * 0.2), sin(i * 0.2)) * 40.0)
+		mgr.step(1.0 / 60.0)
+	var newest: Vector4 = mgr.get_trail_point(row, 0)
+	check(Vector2(newest.x, newest.y).distance_to(Vector2(100.0, 100.0)) > 30.0, "its points are where the caster went, round a curve")
 	mgr.update_draw(1.0)
 	var buffer: PackedFloat32Array = mgr._draw_node.multimesh.buffer
-	var along := Vector2(buffer[0], buffer[4])
-	var across := Vector2(buffer[1], buffer[5])
-	check(along.is_equal_approx(Vector2(0.6, 0.8) * 72.0), "the quad's long axis is the heading (rows: x.x, y.x, _, o.x / x.y, y.y, _, o.y)")
-	check(across.is_equal_approx(Vector2(0.8, -0.6) * 24.0), "and its short axis crosses it")
-	check(is_equal_approx(along.dot(across), 0.0), "square to each other")
-	check(slot >= 0, "the shot was live")
-
-
-func test_a_straight_shot_does_not_bend() -> void:
-	var slot: int = mgr.spawn(0, Vector2(100.0, 100.0), Vector2(200.0, 0.0), 1.0)
-	for i in 3:
+	check_equal(roundi(buffer[5]), ManagerScript.TRAIL_DASH | ManagerScript.TRAIL_HEAD, "drawn as a dash, its head on the caster")
+	check_equal(look_at(mgr._draw_node, 0)[0], 2, "in its player's colours")
+	for i in roundi((0.2 + ManagerScript.TRAIL_KEEP) * 60.0) + 4:
 		mgr.step(1.0 / 60.0)
-	check_equal(mgr.bend_of(slot), 0.0, "a straight path has no bend")
+	check_equal(mgr.get_trail_count(), 0, "after its time and its cooling, the row is given back")
+	check_equal(mgr.follow_caster(3, Color.WHITE, 0, 0.2), -1, "a caster with no anchor has nothing to follow")
+	mgr.set_anchor(ManagerScript.FIRST_ENEMY_CASTER, Vector2(50.0, 50.0))
+	mgr.follow_caster(ManagerScript.FIRST_ENEMY_CASTER, Color.WHITE, 0, 0.2)
 	mgr.update_draw(1.0)
-	check(absf(bend_at(mgr._draw_node, 0)) < 0.0005, "and draws none")
-	check_equal(kind_at(mgr._draw_node, 0), ManagerScript.KIND_BOLT, "the bend leaves the kind as it was")
+	check_equal(mgr.drawn_trails, 1, "an enemy caster's dash is drawn")
+	check((look_at(mgr._enemy_node, 0)[2] & ManagerScript.LOOK_ENEMY_RAMP) != 0, "in the enemies' batch, in the enemy ramp")
 
 
-func test_an_orbit_shot_bends_round_its_circle_either_way() -> void:
-	mgr.set_anchor(0, Vector2(200.0, 200.0))
-	var clockwise: int = mgr.spawn_orbit(0, 36.0, 0.0, 4.0, 5.0, 6.0)
-	var back: int = mgr.spawn_orbit(0, 36.0, PI, -4.0, 5.0, 6.0)
-	var tight: int = mgr.spawn_orbit(0, 4.0, 0.0, 4.0, 5.0, 6.0)
-	mgr.step(1.0 / 60.0)
-	check(is_equal_approx(mgr.bend_of(clockwise), 1.0 / 36.0), "1 / its radius")
-	check(is_equal_approx(mgr.bend_of(back), -1.0 / 36.0), "the other way round, the other side")
-	check(is_equal_approx(mgr.bend_of(tight), 1.0 / ManagerScript.BEND_RADIUS), "a tighter circle draws as the tightest bend")
+func test_when_the_rows_run_out_a_shot_has_its_core_alone() -> void:
+	mgr.set_cap(2)
+	for i in 4:
+		mgr.spawn(0, Vector2(100.0, 50.0 + i * 20.0), Vector2(120.0, 0.0), 0.05)
+		mgr.step(1.0 / 60.0)
+		mgr.step(1.0 / 60.0)
+		mgr.step(1.0 / 60.0)
+		mgr.step(1.0 / 60.0)
+	var slot: int = mgr.spawn(0, Vector2(100.0, 300.0), Vector2(120.0, 0.0), 1.0)
+	check_equal(mgr.get_trail_count(), ManagerScript.TRAIL_ROWS_PER_SLOT * 2, "every row is held, by shots or cooling trails")
+	check_equal(mgr.get_trail_of(slot), -1, "a new shot finds none")
 	mgr.update_draw(1.0)
-	for i in 3:
-		check_equal(kind_at(mgr._orbit_node, i), ManagerScript.KIND_ORBIT, "orbit shot %d keeps its kind" % i)
-	var drawn: Array[float] = []
-	for i in 3:
-		drawn.append(bend_at(mgr._orbit_node, i))
-	drawn.sort()
-	check(absf(drawn[0] + 1.0 / 36.0) < 0.0005 and absf(drawn[1] - 1.0 / 36.0) < 0.0005 and absf(drawn[2] - 1.0 / 16.0) < 0.0005, "the bends travel to the shader (%s)" % str(drawn))
+	check_equal(mgr.drawn, 1, "and is still drawn")
 
 
-func test_a_turning_shot_bends_and_a_corner_does_not() -> void:
-	var slot: int = mgr.spawn(0, Vector2(100.0, 100.0), Vector2(100.0, 0.0), 1.0)
-	mgr._prev[slot] = Vector2(100.0, 100.0)
-	mgr._pos[slot] = Vector2(110.0, 100.0)
-	mgr._vel[slot] = Vector2(100.0, 0.0).rotated(0.1)
-	check(is_equal_approx(mgr.bend_of(slot), 2.0 * 0.1 / 10.0), "a heading 0.1 rad off a 10 px chord: a curve of radius 50")
-	mgr._vel[slot] = Vector2(100.0, 0.0).rotated(-0.1)
-	check(is_equal_approx(mgr.bend_of(slot), -0.02), "turning the other way bends the other way")
-	mgr._vel[slot] = Vector2(100.0, 0.0).rotated(2.5)
-	check_equal(mgr.bend_of(slot), 0.0, "a bounce is a corner, not a bend")
-	mgr._vel[slot] = Vector2(100.0, 0.0).rotated(0.45)
-	check(is_equal_approx(mgr.bend_of(slot), 1.0 / ManagerScript.BEND_RADIUS), "a sharp turn draws as the tightest bend")
-	mgr._pos[slot] = Vector2(100.1, 100.0)
-	check_equal(mgr.bend_of(slot), 0.0, "a shot that barely moved does not bend")
-
-
-func test_the_shader_holds_the_same_quad_and_bend_as_the_manager() -> void:
+func test_the_shader_holds_the_same_trail_numbers() -> void:
 	var shader: Shader = load("res://core/projectiles/shot_core.gdshader")
-	check(shader.code.contains("const float GRID = %d.0;" % ManagerScript.LOOK_GRID), "the same width")
-	check(shader.code.contains("const float LENGTH = %d.0;" % ManagerScript.LOOK_LENGTH), "the same length")
-	check(shader.code.contains("const float FRONT = %d.0;" % (ManagerScript.LOOK_GRID / 2)), "the shot as far from the front")
-	check(shader.code.contains("const float BEND_ZERO = %s;" % str(ManagerScript.BEND_ZERO)), "the same straight bend code")
-	check(shader.code.contains("const float BEND_SPAN = %s;" % str(ManagerScript.BEND_SPAN)), "the same span")
-	check(shader.code.contains("const float BEND_RADIUS = %d.0;" % int(ManagerScript.BEND_RADIUS)), "the same tightest bend")
-	check(ManagerScript.BEND_ZERO + ManagerScript.BEND_SPAN < 0.5 and ManagerScript.BEND_ZERO - ManagerScript.BEND_SPAN > 0.0, "the bend code rounds away from the kind")
+	check(shader.code.contains("const int TRAIL_SAMPLES = %d;" % ManagerScript.TRAIL_SAMPLES), "the same samples a row")
+	check(shader.code.contains("const float TF_HEAD = %d.0;" % ManagerScript.TRAIL_HEAD), "the same alive flag")
+	check(shader.code.contains("const float TF_ORBIT = %d.0;" % ManagerScript.TRAIL_ORBIT), "the same orbit flag")
+	check(shader.code.contains("const float TF_DASH = %d.0;" % ManagerScript.TRAIL_DASH), "the same dash flag")
+	check(shader.code.contains("const float TRAIL_LONGEST = %s;" % str(ManagerScript.TRAIL_KEEP)), "and a trail is drawn as long as it is kept")
+	check(ManagerScript.TRAIL_KEEP <= (ManagerScript.TRAIL_SAMPLES - 1) * ManagerScript.TRAIL_EVERY, "which the samples cover")
+	check(shader.code.contains("const float BEND_ZERO = %s;" % str(ManagerScript.BEND_ZERO)), "a familiar's bend code is the same")
+	check(shader.code.contains("const float BEND_SPAN = %s;" % str(ManagerScript.BEND_SPAN)), "and its span")
 
 
 ## The code beside a rune's kind, as the shader reads it.

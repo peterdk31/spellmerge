@@ -802,9 +802,6 @@ func cast_staff(player: int, staff: int, origin: Vector2, direction: Vector2, ma
 			break
 	var first: CompiledSpell = cast.group.spells[0]
 	_last_form[index] = first.form_id
-	var combo: StringName = combo_class(first)
-	if events != null and combo != &"" and first.fallback == CompiledSpell.FALLBACK_NONE:
-		events.combo_cast.emit(_ev(player), combo, origin, aim, first.tint)
 	return cast.mana
 
 
@@ -812,25 +809,6 @@ func cast_staff(player: int, staff: int, origin: Vector2, direction: Vector2, ma
 func _after_cast(index: int, compiled: CompiledStaff, cast: CompiledCast) -> void:
 	_cooldown[index] = cast.delay
 	_cursor[index] = 0 if cast.recharges else (_cursor[index] + 1) % compiled.casts.size()
-
-
-## Which kind of combination a compiled spell is, for the look of its cast (`combo_cast`):
-## `&"stacked"` for a trigger with two or more modifiers or a chain of three spells,
-## otherwise the event of its trigger (`&"on_hit"`, `&"on_expire"`, `&"timer"`), otherwise
-## `&"boosted"` for modifiers alone, and `&""` for a plain shot.
-func combo_class(spell: CompiledSpell) -> StringName:
-	if spell == null:
-		return &""
-	if spell.payload != null:
-		if spell.modifier_ids.size() >= 2 or spell.chain_length() >= 3:
-			return &"stacked"
-		match spell.trigger_event:
-			TriggerBase.Event.EXPIRE:
-				return &"on_expire"
-			TriggerBase.Event.TIMER:
-				return &"timer"
-		return &"on_hit"
-	return &"boosted" if not spell.modifier_ids.is_empty() else &""
 
 
 ## Runs the cooldowns and the timer triggers by `delta` seconds, and opens a new step for
@@ -963,6 +941,8 @@ func _move_caster(spell: CompiledSpell, tag: int, player: int, origin: Vector2, 
 				events.caster_move_requested.emit(_ev(player), &"dash", origin + offset, seconds, tag)
 				var reach: float = origin.distance_to(projectiles.clip_to_walls(origin, origin + offset))
 				events.form_shown.emit(_ev(player), &"dash", origin, direction, reach, spell.tint, spell.look)
+				# Its way is drawn where the caster really goes (it picks its own way and may home).
+				projectiles.follow_caster(player, spell.tint, spell.look, seconds)
 			else:
 				events.caster_move_requested.emit(_ev(player), &"teleport", projectiles.clip_to_walls(origin, origin + offset), 0.0, tag)
 		return 1

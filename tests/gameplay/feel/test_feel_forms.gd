@@ -9,6 +9,8 @@ const FeelPresetScript := preload("res://gameplay/feel/presets/feel_preset.gd")
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 
 const FROST := Color(0.5, 0.75, 0.94)
+## The look of a lightning card (its sparks).
+const SPARKS: int = 1 << (ProjectilesScript.LOOK_SPARKS - 1)
 
 var bus: EventsScript
 var feel: FeelScript
@@ -48,7 +50,10 @@ func test_a_beam_is_drawn_along_the_aim_as_long_as_it_got() -> void:
 	var beam: Sprite2D = shown[0]
 	check_equal(beam.global_position, Vector2(10, 20), "from the staff")
 	check(is_equal_approx(beam.rotation, PI / 2.0), "turned along the aim")
-	check_equal(beam.region_rect.size.x, 150.0, "as long as it got")
+	var material: ShaderMaterial = beam.material as ShaderMaterial
+	check_equal(material.get_shader_parameter(&"beam_length"), 150.0, "as long as it got")
+	check_equal(beam.region_rect.size.x, 150.0 + 2.0 * FeelScript.BEAM_LEAD, "its quad a little past each end, so the flares are whole")
+	check((material.get_shader_parameter(&"beam_end") as Vector2).is_equal_approx(Vector2(10, 170)), "which ends where it landed, upright on the world's pixels")
 	check(beam.texture == preset.beam_texture, "with the beam art")
 
 
@@ -77,20 +82,38 @@ func test_a_nova_is_a_ring_at_the_caster_in_its_elements_colours() -> void:
 	check_equal(feel.effects_of(FeelScript.KIND_RING_OUT), 0, "and gone after its seconds")
 
 
-func test_a_dash_leaves_its_trail_along_its_way() -> void:
-	bus.form_shown.emit(2, &"dash", Vector2(10, 20), Vector2.DOWN, 80.0, FROST, 5)
-	check_equal(feel.effects_of(FeelScript.KIND_DASH, 2), 1, "a dash effect for player 3")
-	check_equal(feel.effect_dress(FeelScript.KIND_DASH), [FROST, 5], "with the dash's colours and cards")
+func test_a_dash_kicks_up_dust_and_lands_in_a_ring() -> void:
+	# Its way is the caster's trail (the projectile manager's `follow_caster`), where the wizard
+	# really went (the owner, 2026-10-28: the dash look went the aim's way, not the wizard's).
+	bus.form_shown.emit(2, &"dash", Vector2(10, 20), Vector2.DOWN, 80.0, FROST, SPARKS)
+	check_equal(feel.effects_of(FeelScript.KIND_DASH, 2), 1, "dust where player 3 left")
+	check_equal(feel.effect_dress(FeelScript.KIND_DASH), [FROST, SPARKS], "with the dash's colours and cards")
 	feel.step(0.01)
 	var buffer: PackedFloat32Array = feel._effect_node.multimesh.buffer
-	check(Vector2(buffer[0], buffer[4]).is_equal_approx(Vector2.DOWN * (80.0 + 2.0 * FeelScript.DASH_MARGIN)), "along its way, a margin past each end")
-	check(is_equal_approx(buffer[3], 10.0) and is_equal_approx(buffer[7], 60.0), "centred half way along")
-	check_equal(roundi(buffer[8] * 255.0) / 4, 20, "its length travels in the zoom's place (80 px is 20 steps of 4)")
+	check(is_equal_approx(buffer[3], 12.0) and is_equal_approx(buffer[7], 20.0), "at its start, whatever the aim")
+	bus.caster_move_finished.emit(2, &"dash", Vector2(60, 30), 0)
+	check_equal(feel.effects_of(FeelScript.KIND_RING_OUT, 2), 1, "a ring where it landed")
+	check_equal(feel.effects_of(FeelScript.KIND_ARC, 2), 1, "lightning (its sparks) arcs from where it left")
+	check_equal(feel.effects_of(FeelScript.KIND_BURST, 2), 1, "and an infused dash lands in a flare of its element")
+	bus.caster_move_finished.emit(2, &"teleport", Vector2(60, 30), 0)
+	check_equal(feel.effects_of(FeelScript.KIND_RING_OUT, 2), 1, "a teleport is not a dash")
 	bus.form_shown.emit(2, &"dash", Vector2(10, 20), Vector2.DOWN, 0.0, FROST, 5)
 	check_equal(feel.effects_of(FeelScript.KIND_DASH), 1, "a dash that went nowhere shows nothing")
 	bus.form_shown.emit(-1, &"dash", Vector2(10, 20), Vector2.DOWN, 80.0, FROST, 5)
 	check_equal(feel.effects_of(FeelScript.KIND_DASH), 2, "an enemy's dash shows like a wizard's (staffs F7)")
 	check_equal(feel.effect_info(FeelScript.KIND_DASH)["player"], -1, "in the enemy ramp")
+
+
+func test_a_shot_whose_life_runs_out_pops() -> void:
+	projectiles.events = bus
+	projectiles.spawn(1, Vector2(50, 50), Vector2(100, 0), 0.05)
+	for i in 5:
+		projectiles.step(1.0 / 60.0)
+	check_equal(feel.effects_of(FeelScript.KIND_BURST, 1), 1, "a small pop where it ended (the mockup's)")
+	projectiles.spawn(1, Vector2(50, 50), Vector2.ZERO, 0.05, 14.0, ProjectilesScript.LAYER_ENEMY, 0, 0, ProjectilesScript.MOTION_STILL)
+	for i in 5:
+		projectiles.step(1.0 / 60.0)
+	check_equal(feel.effects_of(FeelScript.KIND_BURST, 1), 1, "a rune's end is its own burst, not a pop")
 
 
 func test_forms_end() -> void:
@@ -231,8 +254,11 @@ func test_a_live_beam_is_drawn_along_its_curve_every_frame() -> void:
 	var lines: Array[Line2D] = _live_lines()
 	check_equal(lines.size(), 1, "one live beam on screen")
 	var line: Line2D = lines[0]
-	check_equal(line.get_point_position(0), Vector2.ZERO, "from the staff")
-	check(line.get_point_position(line.get_point_count() - 1).is_equal_approx(Vector2(100, 40)), "to its end, on the target")
+	var material: ShaderMaterial = line.material as ShaderMaterial
+	check_equal(material.get_shader_parameter(&"beam_start"), Vector2.ZERO, "from the staff")
+	check((material.get_shader_parameter(&"beam_end") as Vector2).is_equal_approx(Vector2(100, 40)), "to its end, on the target")
+	check(is_equal_approx(line.get_point_position(0).length(), FeelScript.BEAM_LEAD), "its line a little past each end, so the flares are whole")
+	check(is_equal_approx(material.get_shader_parameter(&"sim_time"), feel._clock), "animated by Feel's clock (the owner, 2026-10-28: beams did not move)")
 	var middle: Vector2 = line.get_point_position(line.get_point_count() / 2)
 	check(middle.y > 0.0 and middle.y < 20.0, "bent, not straight: %s" % middle)
 	check((line.material as ShaderMaterial).get_shader_parameter(&"core_override").is_equal_approx(Color(FROST.r, FROST.g, FROST.b, 1.0)), "the core is the element's")
@@ -240,12 +266,13 @@ func test_a_live_beam_is_drawn_along_its_curve_every_frame() -> void:
 	check(is_equal_approx(tint.a, feel.preset.beam_alpha) and tint.a < 1.0, "a little see-through, so crossing beams all show: %f" % tint.a)
 	beams.reach = 50.0
 	feel.step(0.016)
-	var tip: Vector2 = line.get_point_position(line.get_point_count() - 1)
+	var tip: Vector2 = (line.material as ShaderMaterial).get_shader_parameter(&"beam_end")
 	check(absf(tip.length() - 50.0) < 3.0, "cut where it stopped: %s" % tip)
 	beams.reach = 500.0
 	beams.on_again = true
 	feel.step(0.016)
-	check(line.get_point_position(line.get_point_count() - 1).is_equal_approx(Vector2(160, 0)), "a beam bending on to a second target is drawn to it: %s" % line.get_point_position(line.get_point_count() - 1))
+	var second: Vector2 = (line.material as ShaderMaterial).get_shader_parameter(&"beam_end")
+	check(second.is_equal_approx(Vector2(160, 0)), "a beam bending on to a second target is drawn to it: %s" % second)
 	beams.on = false
 	feel.step(0.016)
 	check(_live_lines().is_empty(), "gone when it ends")

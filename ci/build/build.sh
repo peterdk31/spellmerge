@@ -92,10 +92,18 @@ setup_godot() {
   mkdir -p "$CACHE"
   fetch_verified "$EDITOR_ZIP" "$GODOT_EDITOR_SHA512"
   fetch_verified "$TEMPLATES_TPZ" "$GODOT_TEMPLATES_SHA512"
+  # Unpacked once per pinned version: a stamp names the archives it came from, so a later run
+  # (or a second worktree sharing build/godot) keeps it instead of wiping it while it is in use.
+  local stamp="$TOOLS/.installed" want="$GODOT_EDITOR_SHA512 $GODOT_TEMPLATES_SHA512"
+  if [[ -x "$GODOT" && -f "$stamp" && "$(cat "$stamp")" == "$want" ]]; then
+    "$GODOT" --version
+    return
+  fi
   rm -rf "$TOOLS" && mkdir -p "$TOOLS" "$TEMPLATES_DIR"
   unzip -oq "$CACHE/$EDITOR_ZIP" -d "$TOOLS"
   unzip -oq "$CACHE/$TEMPLATES_TPZ" -d "$TOOLS"
   mv "$TOOLS/templates/"* "$TEMPLATES_DIR/"
+  echo "$want" > "$stamp"
   "$GODOT" --version
 }
 
@@ -134,14 +142,43 @@ import_and_smoke() {
 }
 
 # Each unit test is its own SceneTree script that quits with a non-zero code on failure,
-# so each needs its own Godot process. Runs them all and then fails if any failed.
+# so each needs its own Godot process. They run side by side, up to TEST_JOBS at once (default:
+# the cores), each with a data folder of its own (user:// is under $XDG_DATA_HOME), so the
+# whole suite takes about a minute on a big machine instead of 20-40. The tests that time the
+# machine (TIMED_TESTS) run one at a time after the rest, so their budgets see a quiet machine.
+# A test fails on a non-zero exit or an ERROR line in its log, as godot_checked says.
+TIMED_TESTS='test_projectiles_kit|test_spell_fuzz|test_wave_balance'
+
+unit_test() { # unit_test <test path>: runs one test into its own log; prints PASS or FAIL
+  local test="$1" name; name="unit-$(basename "$test" .gd)"
+  local data="$PWD/build/test-runs/$name"
+  mkdir -p "$data"
+  if XDG_DATA_HOME="$data" godot_checked "$name" "$GODOT" --headless --path . --script "res://$test" \
+    >/dev/null 2>&1; then
+    echo "PASS $test"
+  else
+    echo "FAIL $test"
+  fi
+}
+
 unit_tests() {
-  local test failed=()
-  while IFS= read -r test; do
-    step "Unit test $test"
-    godot_checked "unit-$(basename "$test" .gd)" "$GODOT" --headless --path . --script "res://$test" \
-      || failed+=("$test")
-  done < <(find tests -name 'test_*.gd' -not -path '*/fixtures/*' | sort)
+  step "Unit tests"
+  local cores; cores=$(nproc)
+  local jobs="${TEST_JOBS:-$cores}" results="build/logs/unit-results.txt" failed=()
+  rm -rf build/test-runs && mkdir -p build/test-runs
+  export -f unit_test godot_checked
+  export GODOT
+  find tests -name 'test_*.gd' -not -path '*/fixtures/*' | { grep -vE "/($TIMED_TESTS)\.gd$" || true; } | sort \
+    | xargs -P "$jobs" -I{} bash -c 'unit_test "$1"' _ {} >"$results"
+  find tests -name 'test_*.gd' -not -path '*/fixtures/*' | { grep -E "/($TIMED_TESTS)\.gd$" || true; } | sort \
+    | xargs -P 1 -I{} bash -c 'unit_test "$1"' _ {} >>"$results"
+  echo "$(grep -c '^PASS' "$results") unit tests passed ($jobs at once)"
+  while read -r status test; do
+    [[ "$status" == FAIL ]] || continue
+    failed+=("$test")
+    step "Failed: $test"
+    cat "build/logs/unit-$(basename "$test" .gd).log"
+  done < <(sort "$results")
   if ((${#failed[@]})); then
     echo "::error::${#failed[@]} unit test(s) failed: ${failed[*]}"
     return 1

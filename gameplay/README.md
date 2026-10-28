@@ -48,7 +48,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `player_possessed` | `player` (the seat set aside, and back) | `hud` (the corner panel) |
 | `reaction_triggered` | `combat` | `feel` |
 | `discharge_arc` | `combat` | `feel` |
-| `damage_dealt` | `combat` | `feel`, `ai` (grudges, the looks) |
+| `damage_dealt` | `combat` | `feel`, `ai` (grudges, the looks), `actor` (the Face) |
 | `status_applied` | `combat` | `feel` |
 | `enemy_died` | `combat` (every actor not on the wizards' team) | `feel`, `flow` |
 | `player_downed` | `player` (Downed) | `ai`, `combat`, `feel`, `flow`, `run` |

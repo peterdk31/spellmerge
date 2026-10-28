@@ -42,6 +42,12 @@ func stopped(_actor: Actor) -> void:
 	pass
 
 
+## True while it winds up a cast it has committed to (an AI's telegraph): the face's furious
+## brows (`Face`). The base never does.
+func is_telegraphing() -> bool:
+	return false
+
+
 ## A possession took `actor`, the actor it drove, for `seconds`; it drives nothing meanwhile
 ## (`stopped` came first). It is handed back with `started`. The base does nothing.
 func set_aside(_actor: Actor, _seconds: float) -> void:

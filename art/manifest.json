@@ -1,6 +1,24 @@
 {
   "assets": [
     {
+      "path": "art/faces/brows.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "good",
+      "tool": "Claude (SVG rects written by a small generator from the pixel rules of the owner's living-staffs mockup, 2026-10-28)",
+      "prompt": "A sheet of floating cartoon eyebrows for the eye sheet above, 16x8 frames: five columns of moods (neutral, raised, angry, furious, worried) as 4px dark strokes stepping between 3 and 5 rows above the eyes, mirrored for the right brow; one row for a pair, one for a single brow. Only non-overlapping rect elements, whole-number coordinates, the outline colour from docs/STYLE.md."
+    },
+    {
+      "path": "art/faces/eyes.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "good",
+      "tool": "Claude (SVG rects written by a small generator from the pixel rules of the owner's living-staffs mockup, 2026-10-28)",
+      "prompt": "A sheet of cartoon eye pairs for a 32x32 living-staff character, 16x8 frames: ten columns (the pupils looking in nine directions, then a blink as a dark line) and six rows of styles: round eyes with 2x2 pupils and a highlight; the same with a second highlight and a gold sparkle; heavy-lidded sleepy eyes with a Bone lid and low pupils; narrow stern eyes with slit pupils; flat white 4x3 eyes with slit pupils to be tinted in an element colour; and one such eye alone. Bone whites shaded from the top-left, 1px dark outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no player colours."
+    },
+    {
       "path": "art/tilesets/crypt/floor.svg",
       "origin": "ai",
       "author": "Claude",

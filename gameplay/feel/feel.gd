@@ -118,6 +118,14 @@ const KIND_STATUS: int = 15
 ## The look bit that makes an effect take its colour exactly (a reaction's own colour) instead
 ## of the palette material it is nearest (kind 24 in the shader).
 const EXACT: int = 1 << 23
+## The look bit that turns a puff into a staff's poof (kind 22 in the shader; living staffs H4):
+## bone clouds swelling and shrinking along the staff, a few sparks in the player's colour.
+const POOF: int = 1 << 21
+## The poof: its seconds (the swap is at 35% of them, StaffLook's), its zoom (a quad of
+## EFFECT_GRID x 2 px, the staff's length) and its middle, this far from the hand along the aim.
+const POOF_SECONDS: float = 0.18
+const POOF_ZOOM: int = 2
+const POOF_ALONG: float = 4.0
 const SPRAY_SECONDS: float = 0.3
 const PUFF_SECONDS: float = 0.4
 const CHIPS_SECONDS: float = 0.5
@@ -276,7 +284,8 @@ var _effect_seconds: PackedFloat32Array = PackedFloat32Array()
 var _effect_length: PackedFloat32Array = PackedFloat32Array()
 ## The character an effect follows (a status), or null, and how far above it the effect sits.
 var _effect_follow: Array[Node2D] = []
-var _effect_rise: PackedFloat32Array = PackedFloat32Array()
+## Where a followed effect sits from its node (a status rises above it, a poof sits on the staff).
+var _effect_offset: PackedVector2Array = PackedVector2Array()
 var _next_effect: int = 0
 ## How many effects can show at once (`EffectSlots.DEFAULT` until the setting changes it; see
 ## `set_effect_slots`). Read only.
@@ -404,6 +413,7 @@ func _ready() -> void:
 	events.player_downed.connect(_on_player_downed)
 	events.spell_cast.connect(_on_spell_cast)
 	events.actor_cast.connect(_on_actor_cast)
+	events.staff_shown.connect(_on_staff_shown)
 	events.possess_started.connect(_on_possess_started)
 	events.possess_ended.connect(_on_possess_ended)
 	events.projectile_impact.connect(_on_projectile_impact)
@@ -1006,7 +1016,7 @@ func _size_effects(slots: int) -> void:
 	_effect_length.resize(slots)
 	_effect_follow.resize(slots)
 	_effect_follow.fill(null)
-	_effect_rise.resize(slots)
+	_effect_offset.resize(slots)
 	_next_effect = 0
 	# The statuses shown lost their effects; the next step shows them again.
 	_status_effect.fill(-1)
@@ -1050,7 +1060,7 @@ func show_effect(kind: int, at: Vector2, dir: Vector2, core: Color, ramp: int, l
 	_effect_seconds[slot] = maxf(seconds, 0.01)
 	_effect_length[slot] = 0.0
 	_effect_follow[slot] = follow
-	_effect_rise[slot] = STATUS_RISE if follow != null else 0.0
+	_effect_offset[slot] = Vector2(0.0, -STATUS_RISE) if follow != null else Vector2.ZERO
 	if kind == KIND_DASH or kind == KIND_ARC:
 		var steps: int = clampi(roundi(length / 4.0), 1, roundi(DASH_LONGEST / 4.0))
 		_effect_zoom[slot] = steps
@@ -1078,7 +1088,7 @@ func _step_effects(real_delta: float) -> void:
 			_effect_follow[slot] = null
 			continue
 		if follow != null:
-			_effect_at[slot] = (follow.global_position + Vector2(0.0, -_effect_rise[slot])).round()
+			_effect_at[slot] = (follow.global_position + _effect_offset[slot]).round()
 		var i: int = out * EFFECT_STRIDE
 		var d: float = EFFECT_GRID * _effect_zoom[slot]
 		var along: float = d
@@ -1417,6 +1427,18 @@ func _on_actor_cast(_caster: int, actor: Node) -> void:
 	if actor is Actor and (actor as Actor).mover != null and (actor as Actor).mover.is_moving():
 		return
 	_start_reaction(actor, preset.cast_squash_seconds, -preset.cast_squash, false)
+
+
+## Another staff went on show (the personality swap, living staffs H4): a poof along the staff,
+## in the actor's ramp, moving with it.
+func _on_staff_shown(caster: int, actor: Node, _staff: int) -> void:
+	var body: Actor = actor as Actor
+	if body == null or not is_instance_valid(body) or not body.is_inside_tree():
+		return
+	var offset: Vector2 = body.hand_offset + body.aim * POOF_ALONG
+	var slot: int = show_effect(KIND_PUFF, body.global_position + offset, body.aim, Color.WHITE, _ramp_of(caster), POOF, POOF_ZOOM, POOF_SECONDS, 0.0, body)
+	if slot >= 0:
+		_effect_offset[slot] = offset
 
 
 ## A possession started: a ring closes on the possessed actor in the driver's ramp, with the sound

@@ -36,12 +36,12 @@ func _wizard(cards: Array = BOLTS) -> Actor:
 	return _world.wizard(0, Vector2(100.0, 100.0), cards, null, true, _heads)
 
 
-## Press and let go of staff button `at`.
+## Press and let go of staff button `at`, and wait out the poof (H4) that swaps the body.
 func _press(at: int) -> void:
 	_world.hold(0, BUTTONS[at])
 	_world.run(1, false)
 	_world.release(0, BUTTONS[at])
-	_world.run(1, false)
+	_world.run(roundi(StaffLook.POOF_TIME / WizardFixture.STEP) + 1, false)
 
 
 func _face(body: Actor) -> Face:

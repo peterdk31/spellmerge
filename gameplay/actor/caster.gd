@@ -5,7 +5,8 @@ extends ActorComponent
 ## button without one is `staff`) and a row of card ids; `set_staff(at, cards)` builds one and
 ## installs it in `Spells` under the actor's caster number (`number`). `current` is the staff on
 ## show (living staffs H3): the one pressed or held last, set before it casts, so the cast leaves
-## from that staff's tip (`tip`, `Actor.muzzle_position`). Every step it gets mana back (`regen` a second and what siphon refunds, up
+## from that staff's tip (`tip`, `Actor.muzzle_position`); a change sends `staff_shown` (living
+## staffs H4: Feel's poof). Every step it gets mana back (`regen` a second and what siphon refunds, up
 ## to `max_mana`), tells the systems where the actor is and aims (the projectile manager's anchor
 ## for its orbits at the body, Spells' aim from the staff tip for its beams), and casts the staffs
 ## the intent asks for: a staff pressed this step, or held while it holds no sustained (`hold`)
@@ -218,9 +219,13 @@ func tip() -> float:
 	return staff_of(current).tip
 
 
-## Put staff `at` on show (`current`).
+## Put staff `at` on show (`current`); another than the one shown sends `staff_shown` (the poof).
 func _show(at: int) -> void:
+	if at == current:
+		return
 	current = at
+	if actor.events != null:
+		actor.events.staff_shown.emit(actor.id, actor, at)
 
 
 ## The plain view of staff `at` for a builder (`Spells.staff_view`); empty without Spells.

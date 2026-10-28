@@ -21,6 +21,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `device_joined`, `device_left` | `core/input` | `coop` |
 | `spell_cast` | `player` | `feel` |
 | `actor_cast` | `actor` (the Caster, every actor's cast; actors G8) | `feel` (the squash) |
+| `staff_shown` | `actor` (the Caster, another staff put on show; living staffs H4) | `feel` (the poof) |
 | `projectile_hit` | `core/projectiles` | `combat` |
 | `projectile_impact` | `core/projectiles` | `feel` |
 | `form_shown` | `core/spells` | `feel` |

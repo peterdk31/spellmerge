@@ -278,7 +278,7 @@ jobs:
         with:
           name: screenshots
           path: build/screenshots
-          retention-days: 2 # the preview runs until the next daily one use them (preview.yml)
+          retention-days: 1
           if-no-files-found: ignore
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:

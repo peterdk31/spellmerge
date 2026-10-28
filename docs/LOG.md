@@ -8,7 +8,7 @@ The Slow card was already done: the modifier `.tres`, icon, assets, combos and `
 
 ## 2026-10-28: Card arc (staffs C), already built
 
-The Arc card was already done: the modifier `.tres`, icon, assets, combos (`arc_nova_trap`, `lightning_orb`), lore, `test_arc.gd` and `test_spells_slow_return_arc.gd` exist. Ticked it off; no code changed.
+The Arc card was already done: the modifier `.tres`, icon, assets, combos (`arc_nova_trap`, `lightning_orb`), lore, `test_arc.gd` and `test_spells_slow_return_arc.gd` exist, and all 126 unit tests pass. Ticked it off; no code changed.
 
 ## 2026-10-28: Card return (staffs C), already built
 

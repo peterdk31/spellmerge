@@ -1,0 +1,9 @@
+{
+	"id": "scatter_kindle_flurry",
+	"name": "Scatter kindle flurry",
+	"does": "A fire nova, a void nova and a plain nova leave as one scatter: the rings reach the imp beside the caster whichever way they were sent, and hex with fire sets off Kindle.",
+	"casts": [{"staff": 0, "cards": ["scatter", "fire", "nova", "void", "nova", "nova"]}],
+	"imps": [[20, 0]],
+	"seconds": 1.0,
+	"checks": [{"kind": "reaction", "reaction": "kindle"}]
+}

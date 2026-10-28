@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-28: Card scatter (staffs C)
+
+Added the Scatter multicast card (data only: `.tres`, icon, assets, lore), two combos (`scatter_nova_flurry`, `scatter_kindle_flurry`) and `test_scatter.gd`. The combos put an imp 20 px from the caster and check reactions, since how much a scattered nova deals depends on its random turn. All 130 unit tests pass.
+
 ## 2026-10-28: Card burst (staffs C)
 
 Added the Burst multicast card (data only: `.tres`, icon, assets, lore), two combos (`burst_triple_bolt`, `burst_nova_pulse`) and `test_burst.gd`. The new card in the bag changed what the 4-bot smoke test's bots built (a `possess` staff) and the room was not cleared; bots now leave `possess` out, and the smoke test prints the builds when it fails. All 129 unit tests pass.

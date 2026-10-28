@@ -1669,3 +1669,9 @@ How it is built (parts F2–F10):
 - **Every hit now has a spell's profile.** Combat asks `Spells.hit_profile(tag)` for every shot; a tag without one does nothing. Tests that used the table as a quick "shot that does N" register a hit profile in Spells instead.
 - **An enemy without a staff only chases** (and hurts by touch, if its data has `contact_damage`). The same holds when every enemy caster row is taken.
 - **A NO_PLAYER shot is drawn as an enemy's spell:** in the enemy batch by the shot shader, in the enemy ramp, with a tail, and its impacts name its body's form (`bolt`), not `&""`. Nothing in the game spawns one any more; tests and tools still may.
+
+## 2026-10-28: The web stress run skips the desktop scenario
+
+- **The daily build failed** at the web stress run's 900 s timeout (run 40663824357), and the bot's bisect reverted the last merge, F10 (#351), though the enemy-fire setting draws nothing. The run is just slow: under CI's software renderer each of its 73 measured frames of the desktop scenario (200 enemies, 3,000 shots) took about 6 s, about seven of the run's fourteen minutes, so runner speed alone decided pass or fail.
+- **A web build now runs the three web scenarios only** (`StressRunner.scenarios_for`): the desktop scenario is the desktop's budget, and the desktop export measures it. The Linux export still runs all four, and the headless unit test too.
+- F10 comes back as it was, in its own PR.

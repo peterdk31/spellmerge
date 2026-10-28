@@ -1,7 +1,7 @@
 extends SceneTree
 ## The stress scene, started as a script: adds the runner (stress_runner.gd, which has the
 ## scenarios and the rules for passing) to the root; the runner quits with 0 or 1. It
-## prints `BENCH:` lines and `STRESS OK`, and takes about a minute (four scenarios, longer at the web's frame rate).
+## prints `BENCH:` lines and `STRESS OK`, and takes about a minute (four scenarios; three in a web build, longer at its frame rate).
 ##
 ## godot --headless --path . --script res://tests/benchmark/stress.gd
 ##

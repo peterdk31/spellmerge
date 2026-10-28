@@ -34,7 +34,6 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
 - [ ] **Card: wall (staffs C).** After B2. Data only (M2-staffs.md, "Working in parallel").
 - [ ] **Card: sticky (staffs C).** After B1 and B2. Data only (M2-staffs.md, "Working in parallel").
 - [ ] **Card: relay (staffs C).** After B1 and B2. Data only (M2-staffs.md, "Working in parallel").
-- [ ] **Card: on ally (staffs C).** After B1 and B2. Data only (M2-staffs.md, "Working in parallel").
 - [ ] **Card: on wall (staffs C).** After B1 and B2. Data only (M2-staffs.md, "Working in parallel").
 - [ ] **Card: heavy (staffs C).** After B1 and B3. Data only (M2-staffs.md, "Working in parallel").
 - [ ] **Card: magnet (staffs C).** After B1 and B3. Data only (M2-staffs.md, "Working in parallel").

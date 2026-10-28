@@ -185,8 +185,8 @@ func test_one_beam_hits_at_once_and_every_tick_of_its_life() -> void:
 
 func test_a_held_beam_stays_on_and_drains_mana_steadily() -> void:
 	_target(Vector2(60.0, 0.0))
-	# The starter staff: the beam's life covers a whole cast cycle, so held fire leaves no gap.
-	var staff: StaffBase = load("res://content/wizard/staffs/starter/starter.tres") as StaffBase
+	# A starter staff (the curl): the beam's life covers a whole cast cycle, so held fire leaves no gap.
+	var staff: StaffBase = load("res://content/wizard/staffs/curl/curl.tres") as StaffBase
 	_spells.install_staff(0, 0, _spells.compile_staff([&"beam"] as Array[StringName], staff))
 	var spell: CompiledSpell = StaffKit.first(_spells, [&"beam"] as Array[StringName])
 	var mana: float = 100.0

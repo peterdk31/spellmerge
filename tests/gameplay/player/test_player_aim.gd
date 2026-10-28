@@ -2,7 +2,7 @@ extends SceneTree
 ## Tests for gameplay/player (aim) on the wizard actor (actors G7): shots go where the wizard
 ## aims, not where it walks. The right stick aims and holds for AIM_HOLD_TIME, the keyboard
 ## player aims at the mouse, with no aim input the wizard aims the way it walks, and four players
-## aim independently. The look (WizardLook) turns the sprite, draws the reticle on the shot's line
+## aim independently. The look (StaffLook) points the staff at the aim, draws the reticle on the shot's line
 ## and stretches the sprite through a dash. Wizards are made from the real scene by the wizard
 ## fixture; input goes through the input manager's virtual devices; time moves by fixed deltas.
 ##
@@ -188,17 +188,16 @@ func _test_four_players_aim_alone() -> void:
 	_check(_near(_players[0].aim, Vector2.UP) and _near(_players[3].aim, Vector2.LEFT), "letting go of one stick leaves the others")
 
 
+## The staff points where it aims: the head sheet's column is the direction nearest the aim.
 func _test_sprite_turns_with_the_aim() -> void:
 	_setup(1)
 	var wizard: Actor = _players[0]
 	var sprite := wizard.get_node("Sprite") as Sprite2D
-	_input.send_virtual_aim(0, Vector2.LEFT)
-	_run(1)
-	_check(sprite.flip_h, "the sprite turns left when aiming left")
-	_check(WizardFixture.look(wizard).faces_left(), "the look says it faces left")
-	_input.send_virtual_aim(0, Vector2.RIGHT)
-	_run(1)
-	_check(not sprite.flip_h, "the sprite turns back when aiming right")
+	var cases: Array = [[Vector2.RIGHT, 0], [Vector2.DOWN, 4], [Vector2.LEFT, 8], [Vector2.UP, 12], [Vector2(1.0, -1.0).normalized(), 14]]
+	for case: Array in cases:
+		_input.send_virtual_aim(0, case[0])
+		_run(1)
+		_check(sprite.frame_coords.x == case[1], "aiming %s shows column %d, got %d" % [case[0], case[1], sprite.frame_coords.x])
 
 
 func _mouse_move(distance: float) -> InputEventMouseMotion:
@@ -207,18 +206,19 @@ func _mouse_move(distance: float) -> InputEventMouseMotion:
 	return motion
 
 
+## Between two directions the nearer one shows (16 directions, 22.5 degrees each).
 func _test_sprite_turn_has_a_band() -> void:
 	_setup(1)
-	var wizard: Actor = _players[0]
-	var sprite := wizard.get_node("Sprite") as Sprite2D
-	_input.send_virtual_aim(0, Vector2.LEFT)
+	var sprite := _players[0].get_node("Sprite") as Sprite2D
+	_input.send_virtual_aim(0, Vector2.from_angle(deg_to_rad(10.0)))
 	_run(1)
-	_input.send_virtual_aim(0, Vector2(0.2, 1.0).normalized())
+	_check(sprite.frame_coords.x == 0, "10 degrees still points right")
+	_input.send_virtual_aim(0, Vector2.from_angle(deg_to_rad(13.0)))
 	_run(1)
-	_check(sprite.flip_h, "a small wobble past straight down does not unflip the sprite")
-	_input.send_virtual_aim(0, Vector2(0.9, 0.4).normalized())
+	_check(sprite.frame_coords.x == 1, "13 degrees points one step round")
+	_input.send_virtual_aim(0, Vector2.from_angle(deg_to_rad(-170.0)))
 	_run(1)
-	_check(not sprite.flip_h, "aiming clearly right unflips the sprite")
+	_check(sprite.frame_coords.x == 8, "-170 degrees points left")
 
 
 ## The look draws the reticle only while the wizard stands (down, it draws only the revive ring).
@@ -226,7 +226,7 @@ func _test_sprite_turn_has_a_band() -> void:
 func _test_downed_wizard_hides_the_reticle() -> void:
 	_setup(1)
 	var wizard: Actor = _players[0]
-	var look: WizardLook = WizardFixture.look(wizard)
+	var look: StaffLook = WizardFixture.look(wizard)
 	_run(1)
 	_check(not wizard.is_down() and wizard.aim != Vector2.ZERO and not look._drawn_down, "a standing wizard shows the reticle")
 	wizard.health.take(wizard.health.max_health)
@@ -280,7 +280,7 @@ func _dashing_wizard(action: StringName) -> Actor:
 func _test_shot_and_reticle_line_up_with_the_mouse() -> void:
 	_setup(1, true)
 	var wizard: Actor = _players[0]
-	var look: WizardLook = WizardFixture.look(wizard)
+	var look: StaffLook = WizardFixture.look(wizard)
 	wizard.global_position = Vector2(100, 100)
 	_input.handle_event(_mouse_move(20.0))
 	for mouse: Vector2 in [Vector2(220, 60), Vector2(40, 150), Vector2(130, 20), Vector2(160, 104)]:
@@ -321,7 +321,7 @@ func _test_reticle_is_the_ramp_light_colour() -> void:
 	_setup(4)
 	var seen: Array[Color] = []
 	for index in 4:
-		var look: WizardLook = WizardFixture.look(_players[index])
+		var look: StaffLook = WizardFixture.look(_players[index])
 		var expected: Color = ProjectilesScript.ramp_light(index)
 		_check(look.light_color().is_equal_approx(expected), "seat %d's reticle is its ramp colour lightened" % index)
 		for other in seen:
@@ -333,10 +333,10 @@ func _test_reticle_is_the_ramp_light_colour() -> void:
 func _test_dash_look_applies_and_resets() -> void:
 	var wizard := _dashing_wizard(&"move_right")
 	var sprite := wizard.get_node("Sprite") as Sprite2D
-	var look: WizardLook = WizardFixture.look(wizard)
+	var look: StaffLook = WizardFixture.look(wizard)
 	_check(wizard.mover.is_moving(), "the wizard is dashing")
 	_check(look.is_dash_look(), "the dash look is on")
-	_check(sprite.scale == WizardLook.DASH_STRETCH, "the sprite stretches during the dash")
+	_check(sprite.scale == StaffLook.DASH_STRETCH, "the sprite stretches during the dash")
 	_check(sprite.rotation > 0.0, "the sprite leans into a dash to the right")
 	var steps: int = 0
 	while wizard.mover.is_moving() and steps < 60:
@@ -352,8 +352,8 @@ func _test_dash_look_applies_and_resets() -> void:
 func _test_dash_look_follows_direction() -> void:
 	var wizard := _dashing_wizard(&"move_left")
 	var sprite := wizard.get_node("Sprite") as Sprite2D
-	_check(sprite.scale == WizardLook.DASH_STRETCH and sprite.rotation < 0.0, "a dash to the left stretches sideways and leans left")
-	var vertical := Vector2(WizardLook.DASH_STRETCH.y, WizardLook.DASH_STRETCH.x)
+	_check(sprite.scale == StaffLook.DASH_STRETCH and sprite.rotation < 0.0, "a dash to the left stretches sideways and leans left")
+	var vertical := Vector2(StaffLook.DASH_STRETCH.y, StaffLook.DASH_STRETCH.x)
 	wizard = _dashing_wizard(&"move_up")
 	sprite = wizard.get_node("Sprite") as Sprite2D
 	_check(sprite.scale == vertical, "a dash up stretches upright, got %s" % [sprite.scale])
@@ -361,18 +361,18 @@ func _test_dash_look_follows_direction() -> void:
 	wizard = _dashing_wizard(&"move_down")
 	sprite = wizard.get_node("Sprite") as Sprite2D
 	_check(sprite.scale == vertical, "a dash down stretches upright, got %s" % [sprite.scale])
-	# A left-facing sprite (aim left) dashing right: flip and lean are independent.
+	# A staff aimed left dashing right: the way it points and the lean are independent.
 	wizard = _dashing_wizard(&"move_right")
 	sprite = wizard.get_node("Sprite") as Sprite2D
 	_input.send_virtual_aim(0, Vector2.LEFT)
 	_run(1)
-	_check(sprite.flip_h and sprite.rotation > 0.0, "a left-facing wizard dashing right still leans right")
+	_check(sprite.frame_coords.x == 8 and sprite.rotation > 0.0, "a staff aimed left dashing right still leans right")
 
 
 ## The ghosts start on the wizard and fall behind it as it moves, newest first.
 func _test_dash_ghosts_trail_the_wizard() -> void:
 	var wizard := _dashing_wizard(&"move_right")
-	var look: WizardLook = WizardFixture.look(wizard)
+	var look: StaffLook = WizardFixture.look(wizard)
 	_check(look._trail[0] == wizard.global_position and look._trail[2] == wizard.global_position, "the ghosts start on the wizard")
 	for i in 4:
 		wizard.global_position += Vector2(10.0, 0.0)

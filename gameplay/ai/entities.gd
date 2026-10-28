@@ -167,7 +167,8 @@ class Decoy extends Node2D:
 	func is_downed() -> bool:
 		return not active
 
-	## Look like `wizard` does now (its `Sprite` and `Sprite/Hat`); plain when it has none.
+	## Look like `wizard` does now (its `Sprite`, and a `Sprite/Hat` if it has one); plain when it
+	## has none.
 	func copy_look(wizard: Node2D) -> void:
 		var from: Sprite2D = wizard.get_node_or_null("Sprite") as Sprite2D if wizard != null else null
 		_copy(sprite, from)

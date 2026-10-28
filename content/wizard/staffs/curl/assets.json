@@ -1,0 +1,13 @@
+{
+	"assets": [
+		{
+			"path": "content/wizard/staffs/curl/head.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "good",
+			"tool": "Claude (SVG rects written by a small generator from the pixel rules of the owner's living-staffs mockup, 2026-10-28)",
+			"prompt": "A sheet of 48x48 frames of a floating living staff for a top-down 32x32 pixel game, the curl head: a big spiral a turn and three quarters round a gem in the player colour, with a gold collar; the curl stays on top of the shaft whichever way it points. A Wood shaft with a gold grip wrap, the grip at (24, 27) of every frame. 16 columns, the staff pointing clockwise from right in 22.5 degree steps; 4 rows, the same staff with the head in each player colour ramp (blue, rose, green, purple). Light from the top-left, 1px dark outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+		}
+	]
+}

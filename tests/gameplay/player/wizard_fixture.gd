@@ -70,14 +70,14 @@ func _init(root: Node, use_fake: bool = false) -> void:
 
 
 ## A wizard for `seat` (its virtual device joined) at `at`, with `cards` (four lists of card ids)
-## on `staff` (null: a plain staff of 4 slots and no delay), in the tree and ready. Set `ready`
-## false to get it seated and wired but not yet added (`add` it later).
-func wizard(seat: int, at: Vector2 = Vector2.ZERO, cards: Array = NO_CARDS, staff: StaffBase = null, ready: bool = true) -> Actor:
+## on `staff` (null: a plain staff of 4 slots and no delay) or `staffs` (one per button), in the
+## tree and ready. Set `ready` false to get it seated and wired but not yet added (`add` it later).
+func wizard(seat: int, at: Vector2 = Vector2.ZERO, cards: Array = NO_CARDS, staff: StaffBase = null, ready: bool = true, staffs: Array[StaffBase] = []) -> Actor:
 	if not input.is_joined(seat):
 		input.add_virtual_device(seat)
 	var body := WizardScene.instantiate() as Actor
 	body.name = "Wizard%d" % seat
-	PlayerController.seat_wizard(body, seat, staff, cards.duplicate(true))
+	PlayerController.seat_wizard(body, seat, staff, cards.duplicate(true), staffs)
 	var seat_controller: PlayerController = PlayerController.of(body)
 	seat_controller.input = input
 	seat_controller.registry = registry
@@ -115,10 +115,10 @@ static func downed(body: Actor) -> Downed:
 	return Downed.of(body)
 
 
-static func look(body: Actor) -> WizardLook:
+static func look(body: Actor) -> StaffLook:
 	for child in body.get_children():
-		if child is WizardLook:
-			return child as WizardLook
+		if child is StaffLook:
+			return child as StaffLook
 	return null
 
 

@@ -13,18 +13,21 @@ func _registry() -> RegistryScript:
 	return registry
 
 
-func test_the_starter_and_dev_staffs_are_found_under_wizard() -> void:
+func test_the_starter_heads_and_dev_staffs_are_found_under_wizard() -> void:
 	var registry: RegistryScript = _registry()
-	var starter: StaffBase = registry.get_resource(&"wizard", &"starter") as StaffBase
 	var dev: StaffBase = registry.get_resource(&"wizard", &"dev") as StaffBase
-	check(starter != null, "the starter staff is found")
 	check(dev != null, "the dev staff is found")
-	if starter == null or dev == null:
+	if dev == null:
 		return
-	check_equal(starter.slots, 4, "the starter staff has 4 slots (the owner's choice)")
-	check(dev.slots > starter.slots, "the sandbox staff has more slots than the starter")
-	check_equal(SpellValidator.check_staff(starter).size(), 0, "the starter staff is valid")
 	check_equal(SpellValidator.check_staff(dev).size(), 0, "the dev staff is valid")
+	for id: StringName in [&"curl", &"star", &"moon", &"crystal"]:
+		var head: StaffBase = registry.get_resource(&"wizard", id) as StaffBase
+		check(head != null, "the %s staff is found" % id)
+		if head == null:
+			continue
+		check_equal(head.slots, 4, "the %s staff has 4 slots (the owner's choice)" % id)
+		check(dev.slots > head.slots, "the sandbox staff has more slots than the %s staff" % id)
+		check_equal(SpellValidator.check_staff(head).size(), 0, "the %s staff is valid" % id)
 
 
 func test_a_staff_out_of_range_names_the_field() -> void:

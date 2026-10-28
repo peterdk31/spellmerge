@@ -113,9 +113,10 @@ func _ready() -> void:
 
 
 ## Get `body` (a wizard scene, not yet in the tree) ready for seat `seat_index`: its controller's
-## seat, its ramp (the seat's hat colour) and its four staffs (`staff`, and `cards`: four lists of
-## card ids, built when it enters the tree). Returns its controller, or null when `body` has none.
-static func seat_wizard(body: Actor, seat_index: int, staff: StaffBase, cards: Array) -> PlayerController:
+## seat, its ramp (the seat's colour) and its four staffs (`staff` for every button, or `staffs`,
+## one per button: the four heads; and `cards`: four lists of card ids, built when it enters the
+## tree). Returns its controller, or null when `body` has none.
+static func seat_wizard(body: Actor, seat_index: int, staff: StaffBase, cards: Array, staffs: Array[StaffBase] = []) -> PlayerController:
 	var controller: PlayerController = of(body)
 	if controller == null:
 		return null
@@ -124,6 +125,7 @@ static func seat_wizard(body: Actor, seat_index: int, staff: StaffBase, cards: A
 	for child in body.get_children():
 		if child is Caster:
 			(child as Caster).staff = staff
+			(child as Caster).staffs = staffs
 			(child as Caster).start_cards = cards
 	return controller
 
@@ -365,7 +367,7 @@ func _on_staff_change_requested(player: int, at: int, slot: int, card_id: String
 	if player != seat:
 		return
 	var caster: Caster = _builder_caster()
-	if caster == null or at < 0 or at >= caster.staff_count or slot < 0 or slot >= caster.slot_count():
+	if caster == null or at < 0 or at >= caster.staff_count or slot < 0 or slot >= caster.slot_count(at):
 		_refuse("There is no such slot.")
 		return
 	if card_id != &"" and not bag.has(card_id):
@@ -383,7 +385,7 @@ func _on_staff_cards_requested(player: int, at: int, cards: Array[StringName]) -
 	if player != seat:
 		return
 	var caster: Caster = _builder_caster()
-	if caster == null or at < 0 or at >= caster.staff_count or cards.size() > caster.slot_count():
+	if caster == null or at < 0 or at >= caster.staff_count or cards.size() > caster.slot_count(at):
 		_refuse("There is no such slot.")
 		return
 	for card_id in cards:
@@ -403,10 +405,9 @@ func _on_card_move_requested(player: int, from_staff: int, from_slot: int, to_st
 	if caster == null:
 		_refuse("There is no such slot.")
 		return
-	var slots: int = caster.slot_count()
 	var staffs: int = caster.staff_count
-	var from_ok: bool = (from_staff == BAG and from_slot >= 0 and from_slot < bag.size()) or (from_staff >= 0 and from_staff < staffs and from_slot >= 0 and from_slot < slots)
-	var to_ok: bool = to_staff == BAG or (to_staff >= 0 and to_staff < staffs and to_slot >= 0 and to_slot < slots)
+	var from_ok: bool = (from_staff == BAG and from_slot >= 0 and from_slot < bag.size()) or (from_staff >= 0 and from_staff < staffs and from_slot >= 0 and from_slot < caster.slot_count(from_staff))
+	var to_ok: bool = to_staff == BAG or (to_staff >= 0 and to_staff < staffs and to_slot >= 0 and to_slot < caster.slot_count(to_staff))
 	if not from_ok or not to_ok:
 		_refuse("There is no such slot.")
 		return

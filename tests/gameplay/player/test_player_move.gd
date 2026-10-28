@@ -115,50 +115,23 @@ func _test_wizard_scene() -> void:
 	_check(wizard.get_node_or_null("Downed") is Downed, "the wizard scene has a Downed")
 	_check(wizard.get_node_or_null("PlayerController") is PlayerController, "the wizard scene has a PlayerController")
 	_check(wizard.get_node_or_null("Sprite") is Sprite2D, "the wizard scene has a Sprite node")
-	_check(wizard.get_node_or_null("Sprite/Hat") is Sprite2D, "the sprite has a Hat")
-	_check(wizard.get_node_or_null("WizardLook") is WizardLook, "the wizard scene has a WizardLook")
+	_check(wizard.get_node_or_null("StaffLook") is StaffLook, "the wizard scene has a StaffLook")
+	_check(wizard.get_node_or_null("Face") is Face, "the wizard scene wears a Face")
 	_check(wizard.collision_mask == Actor.LAYER_WALLS and wizard.collision_mask == 1, "wizards collide only with walls")
 	_check(wizard.collision_layer == 0, "wizards are on no body layer")
 	_check(wizard.get_node("Sprite").texture_filter == CanvasItem.TEXTURE_FILTER_NEAREST, "the sprite is drawn with filtering off")
 	var caster := wizard.get_node("Caster") as Caster
 	_check(caster.staff_count == 4, "the wizard has four staffs")
 	wizard.free()
-	# Each seat shows a body strip of 32x32 frames (the same for all, with no player colour)
-	# under its own hat, whose most common colour (the outline apart) differs per player.
+	# Each seat shows its own row of the head sheet: the player colour is on the head.
 	_teardown()
 	_world = WizardFixture.new(root, true)
-	var hats: Array[Color] = []
 	for index in 4:
 		var instance: Actor = _world.wizard(index)
-		var look: WizardLook = WizardFixture.look(instance)
-		_check(look != null and look.textures.size() == 4 and look.hat_textures.size() == 4, "the wizard scene lists four strips and four hats")
+		_run(1)
 		var sprite: Sprite2D = instance.get_node("Sprite") as Sprite2D
-		var texture: Texture2D = sprite.texture
-		_check(texture != null, "wizard %d shows a sprite" % index)
-		if texture != null:
-			_check(texture.get_height() == 32 and texture.get_width() % 32 == 0, "wizard %d sprite is a strip of 32x32 frames" % index)
-		var hat: Sprite2D = sprite.get_node_or_null("Hat") as Sprite2D
-		_check(hat != null and hat.texture != null, "wizard %d shows a hat" % index)
-		if hat != null and hat.texture != null:
-			var colour_count: Dictionary = {}
-			var image := hat.texture.get_image()
-			for y in image.get_height():
-				for x in image.get_width():
-					var pixel := image.get_pixel(x, y)
-					if pixel.a > 0.0:
-						colour_count[pixel] = int(colour_count.get(pixel, 0)) + 1
-			var main := Color.BLACK
-			var best := 0
-			for pixel: Color in colour_count:
-				if pixel.is_equal_approx(Color("#14121f")):
-					continue
-				if int(colour_count[pixel]) > best:
-					best = int(colour_count[pixel])
-					main = pixel
-			_check(best > 0, "wizard %d has a hat colour" % index)
-			for other in hats:
-				_check(not other.is_equal_approx(main), "wizard %d hat colour differs from the others" % index)
-			hats.append(main)
+		_check(sprite.texture != null, "wizard %d shows a head" % index)
+		_check(sprite.frame_coords.y == index, "wizard %d shows its ramp's row of the head sheet" % index)
 	_teardown()
 
 

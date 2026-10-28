@@ -173,16 +173,14 @@ func _test_decoy_runs_out() -> void:
 
 func _test_decoy_copies_its_wizard() -> void:
 	_setup(1)
-	# The wizard is the real scene (actors G7): its own Sprite and Hat, facing left.
+	# The wizard is the real scene (living staffs H3): its Sprite shows a frame of its head sheet.
 	var sprite := _world.players[0].get_node("Sprite") as Sprite2D
-	sprite.flip_h = true
-	var hat := sprite.get_node("Hat") as Sprite2D
+	sprite.frame_coords = Vector2i(9, 0)
 	_spawn(0, EntitiesScript.DECOY, Vector2(10.0, 10.0))
 	var decoy: EntitiesScript.Decoy = _entities.lure(Vector2(10.0, 10.0)) as EntitiesScript.Decoy
 	_check(decoy != null and decoy.visible, "the decoy shows")
 	if decoy != null:
-		_check(decoy.sprite.texture == sprite.texture and decoy.sprite.flip_h, "it copies the wizard's sprite and facing")
-		_check(decoy.hat.texture == hat.texture, "and its hat (the player's colour)")
+		_check(decoy.sprite.texture == sprite.texture and decoy.sprite.frame == sprite.frame, "it copies the wizard's sprite and the way it points")
 		var material := decoy.sprite.material as ShaderMaterial
 		_check(decoy.modulate.a == 1.0 and material != null, "never see-through (the glow look): drawn by the shot shader")
 		_check((material.get_shader_parameter(&"dissolve") as float) > 0.0, "part fallen apart, so it never reads as a second wizard")

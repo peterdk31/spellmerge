@@ -29,8 +29,8 @@ extends CharacterBody2D
 ##
 ## The body's points: `body_offset` (the hurt circle's centre and the orbit anchor), `aim_pivot()`
 ## (the hand, `hand_offset` above the feet: the aim, the staff and the shot line up from it),
-## `muzzle_position()` (the staff tip, `staff_reach` from the hand along the aim; an imp's reach is
-## 0, so its spells start at its body) and `aim` (unit length).
+## `muzzle_position()` (the staff tip, `reach()` from the hand along the aim: the tip of the staff
+## on show, else `staff_reach`; an imp's reach is 0, so its spells start at its body) and `aim` (unit length).
 ##
 ## The step, in this order: the intent's presses are spent, Health counts its protection down,
 ## the controller thinks (writes `intent`), the aim follows the intent, the Caster steps (mana,
@@ -251,9 +251,16 @@ func aim_pivot() -> Vector2:
 	return global_position + hand_offset
 
 
-## Where spells start: the staff tip, `staff_reach` from the hand along the aim.
+## Where spells start: the staff tip, `reach()` from the hand along the aim.
 func muzzle_position() -> Vector2:
-	return aim_pivot() + aim * staff_reach
+	return aim_pivot() + aim * reach()
+
+
+## The staff tip's distance from the hand: the tip of the staff on show (`Caster.tip`, living
+## staffs H3), or `staff_reach` when that staff names none.
+func reach() -> float:
+	var tip: float = caster.tip() if caster != null else 0.0
+	return tip if tip > 0.0 else staff_reach
 
 
 ## The number it casts under in Spells and the projectile manager, -1 for none.

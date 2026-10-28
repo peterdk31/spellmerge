@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="StaffBase" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/base/staff_base.gd" id="1_base"]
+[ext_resource type="Texture2D" path="res://content/wizard/staffs/moon/head.svg" id="2_head"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"moon"
+display_name = "Moon staff"
+slots = 4
+draw = 1
+cast_delay = 0.0
+recharge = 0.05
+spread = 0.0
+head = ExtResource("2_head")
+tip = 15.0
+face_style = 2
+resting_mood = 0

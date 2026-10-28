@@ -22,11 +22,11 @@ extends ActorLook
 ## Poses: with `windup_texture` set (a strip of 32 px frames), the sprite shows it from the start
 ## of the windup and flips between its frames faster and faster (WINDUP_FLASHES), and goes
 ## brighter still for the last stretch (TELEGRAPH_LAST_FROM). With `hurt_texture` set, a hit on
-## the actor (`damage_dealt` naming it; a burn tick that does not kill sends none, so a burning
-## enemy does not flinch twice a second) shows it for HURT_TIME seconds, over the windup too. A hit
-## never cancels the windup: the shot still comes, so the telegraph stays honest (knockback and
-## Feel's flash and squash are Combat's and Feel's). The animation is paused while a pose other
-## than the idle shows.
+## the actor (its `Actor.damaged`, sent with each `damage_dealt` naming it; a burn tick that does
+## not kill sends none, so a burning enemy does not flinch twice a second) shows it for HURT_TIME
+## seconds, over the windup too. A hit never cancels the windup: the shot still comes, so the
+## telegraph stays honest (knockback and Feel's flash and squash are Combat's and Feel's). The
+## animation is paused while a pose other than the idle shows.
 ##
 ## Hop (living staffs H5, docs/milestones/M2-living-staffs.md, "The strays"): a stray moves on its
 ## tip, so while it walks (faster than HOP_SPEED) the sprite hops HOP_HEIGHT px HOP_RATE times a
@@ -35,7 +35,9 @@ extends ActorLook
 ## The actor's `Face` (its child of that kind, stepped after this look) is told the same lift
 ## (`Face.body_offset`), so its eyes and brows trail the hop.
 ##
-## Nothing here allocates per frame.
+## Nothing here allocates per frame, and a step sets nothing on the nodes that did not change:
+## the sprite's pose only when it changes, the hop's lift only when it moves a whole pixel
+## (performance pass, 2026-10-28).
 
 enum Pose { IDLE, WINDUP, HURT }
 
@@ -83,6 +85,9 @@ var _face: Face = null
 var _sprite_offset: Vector2 = Vector2.ZERO
 var _hop_time: float = 0.0
 var _lift: Vector2 = Vector2.ZERO
+## The controller driving the actor at the last step, and the same as an AI (or null).
+var _driver: ActorController = null
+var _ai: AIController = null
 
 
 func setup(owner_actor: Actor) -> void:
@@ -107,21 +112,31 @@ func setup(owner_actor: Actor) -> void:
 		telegraph.position = actor.hand_offset
 		telegraph.centered = false
 		telegraph.region_enabled = true
-	# Connected once; a look freed with its actor is disconnected by Godot.
-	if actor.events != null and not actor.events.damage_dealt.is_connected(_on_damage_dealt):
-		actor.events.damage_dealt.connect(_on_damage_dealt)
+	# Connected once, on its own actor (not the bus, where a listener per enemy was called for
+	# every hit on anyone).
+	if not actor.damaged.is_connected(_on_damaged):
+		actor.damaged.connect(_on_damaged)
 
 
 ## Draw the actor after this step: the telegraph and flash from its AI's windup, then the pose.
 func step(delta: float) -> void:
-	var ai: AIController = actor.controller as AIController
-	var telegraphing: bool = ai != null and ai.is_telegraphing()
+	if actor.controller != _driver:
+		_driver = actor.controller
+		_ai = _driver as AIController
+	var ai: AIController = _ai
+	var telegraphing: bool = ai != null and ai.state == AIController.State.WINDUP
 	if telegraphing != _showing:
 		_show_telegraph(telegraphing, ai)
 	elif telegraphing:
 		_update_telegraph(ai.telegraph_progress())
-	_hurt_left = maxf(_hurt_left - delta, 0.0)
-	_update_sprite()
+	if _hurt_left > 0.0:
+		_hurt_left = maxf(_hurt_left - delta, 0.0)
+		# A hurt pose that goes on changes nothing on the sprite.
+		if _hurt_left <= 0.0 or _pose != Pose.HURT:
+			_update_sprite()
+	elif _pose != Pose.IDLE or _showing:
+		# Idle with nothing showing changes nothing either.
+		_update_sprite()
 	_hop(delta)
 
 
@@ -133,12 +148,15 @@ func lift() -> float:
 ## The hop while walking, the bob while standing, on the sprite and the face.
 func _hop(delta: float) -> void:
 	_hop_time += delta
-	var walking: bool = actor.velocity.length() > HOP_SPEED
+	var walking: bool = actor.velocity.length_squared() > HOP_SPEED * HOP_SPEED
 	var up: float = 0.0
 	if walking:
 		up = roundf(absf(sin(_hop_time * HOP_RATE * PI)) * HOP_HEIGHT)
 	else:
 		up = roundf((sin(_hop_time * HOP_RATE) * 0.5 + 0.5) * HOP_IDLE)
+	if -up == _lift.y:
+		# Whole pixels: most steps the lift is where it was.
+		return
 	_lift = Vector2(0.0, -up)
 	if sprite != null:
 		sprite.offset = _sprite_offset + _lift
@@ -242,7 +260,6 @@ func _show_strip(strip: Texture2D) -> void:
 
 
 ## A hit on the actor shows the hurt pose at once.
-func _on_damage_dealt(_caster: int, target: Node, _amount: int, _position: Vector2) -> void:
-	if target == actor:
-		_hurt_left = HURT_TIME
-		_update_sprite()
+func _on_damaged(_by: int, _amount: int) -> void:
+	_hurt_left = HURT_TIME
+	_update_sprite()

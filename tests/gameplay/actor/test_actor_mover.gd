@@ -29,6 +29,13 @@ class FakeCombat:
 	func consume_knockback(_actor: Node2D, _delta: float) -> Vector2:
 		return push
 
+	# What an actor's own step asks (by its id).
+	func own_pace(_actor: Node2D, _id: int) -> float:
+		return factor
+
+	func own_knockback(_actor: Node2D, _id: int, _delta: float) -> Vector2:
+		return push
+
 
 var _world: Fixture
 var _combat: FakeCombat

@@ -64,6 +64,11 @@ const LAYER_WALLS: int = 1
 
 ## The actor died (`die`); `killer` is who landed the last hit (an event's player, or -1).
 signal died(killer: int)
+## Combat hurt this actor: sent with every `damage_dealt` that names it, right after it, for the
+## actor's own components and controller (`by` is the attacker's actor id or -1). Listening here
+## instead of on the bus keeps a hit to this actor's listeners: a bus listener per enemy was
+## called for every hit on anyone (performance pass, 2026-10-28).
+signal damaged(by: int, amount: int)
 
 ## The colour ramp of its spells: 0-3 the hat colours, 4 the enemy ramp.
 @export var ramp: int = ActorsScript.RAMP_ENEMY
@@ -179,8 +184,10 @@ func _physics_process(delta: float) -> void:
 ## Advance the actor by `delta` seconds and set `velocity` (see the class doc for the order). The
 ## caller moves the body (`_physics_process` does).
 func step(delta: float) -> void:
-	intent.begin_step()
-	if health != null:
+	# Each component is called only when it has something to do (performance pass, 2026-10-28):
+	# a step runs for every actor every frame, and a call costs more than the checks here.
+	intent.pressed_bits = 0
+	if health != null and health.protecting:
 		health.step(delta)
 	if possessed_by != null:
 		possessed_by.step(delta)
@@ -196,7 +203,7 @@ func step(delta: float) -> void:
 		mover.step(delta)
 	else:
 		velocity = Vector2.ZERO
-	if hurtbox != null:
+	if hurtbox != null and hurtbox.registered == _down:
 		hurtbox.step()
 	for look in _looks:
 		look.step(delta)

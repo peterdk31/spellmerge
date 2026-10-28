@@ -16,8 +16,9 @@ extends ActorComponent
 ## Where the circle's centre is, from the feet.
 @export var offset: Vector2 = Vector2(0.0, -12.0)
 
-## True while the actor is registered with Combat.
-var _on: bool = false
+## True while the actor is registered with Combat (read only). The actor steps the hurtbox only
+## while this equals its down state (something to do: register or forget it).
+var registered: bool = false
 
 
 func attach() -> void:
@@ -29,18 +30,19 @@ func detach() -> void:
 	_unregister()
 
 
-## Off while the actor is down, on again when it stands (the actor calls it each step).
+## Off while the actor is down, on again when it stands (the actor calls it when `registered`
+## equals its down state).
 func step() -> void:
 	var down: bool = actor.is_down()
-	if down and _on:
+	if down and registered:
 		_unregister()
-	elif not down and not _on:
+	elif not down and not registered:
 		_register()
 
 
 ## True while the hurtbox can be hit.
 func is_on() -> bool:
-	return _on
+	return registered
 
 
 func _register() -> void:
@@ -49,12 +51,12 @@ func _register() -> void:
 	var health: int = actor.health.health if actor.health != null else 1
 	var touch: int = actor.contact.damage if actor.contact != null else 0
 	actor.combat.register_actor(actor, maxi(health, 1), radius, touch, offset)
-	_on = true
+	registered = true
 	if actor.caster != null:
 		actor.caster.own_hurtbox()
 
 
 func _unregister() -> void:
-	if _on and actor.combat != null and is_instance_valid(actor.combat):
+	if registered and actor.combat != null and is_instance_valid(actor.combat):
 		actor.combat.unregister_actor(actor)
-	_on = false
+	registered = false

@@ -17,13 +17,15 @@ extends ActorController
 ## the same in a crowd. A downed wizard is no target there (its hurt circle is off), and a decoy
 ## within its lure range (`Entities.lure`) is chased first; a decoy that breaks is dropped at
 ## once. Retargeting runs every RETARGET_TIME seconds (staggered per controller, so 200 enemies
-## do not all look in one frame), at once when the target is lost or downed (`player_downed`),
-## and once at the first step. With nobody to chase it looks only every RETARGET_TIME.
+## do not all look in one frame), at once when the target is lost, downed or dying (checked each
+## step), and once at the first step. With nobody to chase it looks only every RETARGET_TIME.
 ##
 ## Grudges (infighting): when an actor of its own team hurts the actor it drives (a stray blast:
 ## everything hurts everything, teams only aim), it targets that actor for GRUDGE_TIME seconds,
-## then goes back to its team's targets. Heard from `damage_dealt` naming the actor it drives,
-## which carries the attacker's actor id for every hit (a shot, a touch, a reaction).
+## then goes back to its team's targets. Heard from the driven actor's own `Actor.damaged` (sent
+## with every `damage_dealt` naming it), which carries the attacker's actor id for every hit (a
+## shot, a touch, a reaction). Nothing here listens on the bus: a bus listener per enemy was
+## called for every hit on anyone (performance pass, 2026-10-28).
 ##
 ## The attack is a cast of the actor's staff 0 (its Caster, filled from the enemy's `data`): the
 ## windup starts only when the next cast is ready (`Caster.cast_ready(windup_time)`: its delay
@@ -42,7 +44,6 @@ extends ActorController
 ## All timing runs in `think(actor, delta)`, called by the actor's step, so tests drive it with
 ## fixed deltas. Nothing here allocates per step.
 
-const EventsScript := preload("res://core/events/events.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EntitiesScript := preload("res://gameplay/ai/entities.gd")
 
@@ -87,6 +88,8 @@ var _grudge_left: float = 0.0
 var _looked: bool = false
 ## Instance id of `target` when it was chosen, or 0 for none.
 var _target_id: int = 0
+## `target` typed, when it is an actor (most are): the step's "still there?" check is cheaper.
+var _target_actor: Actor = null
 ## The actor id it named to Entities (`set_enemy`), or -1.
 var _named: int = -1
 
@@ -111,22 +114,16 @@ func _exit_tree() -> void:
 func started(actor: Actor) -> void:
 	_actor = actor
 	_reset()
-	if actor.events != null:
-		if not actor.events.damage_dealt.is_connected(_on_damage_dealt):
-			actor.events.damage_dealt.connect(_on_damage_dealt)
-		if not actor.events.player_downed.is_connected(_on_player_downed):
-			actor.events.player_downed.connect(_on_player_downed)
+	if not actor.damaged.is_connected(_on_damaged):
+		actor.damaged.connect(_on_damaged)
 	if actor == get_parent():
 		_name_to_entities()
 
 
 ## It stops driving `actor` (a guest took over): it forgets its target and its windup.
 func stopped(actor: Actor) -> void:
-	if actor.events != null and is_instance_valid(actor.events):
-		if actor.events.damage_dealt.is_connected(_on_damage_dealt):
-			actor.events.damage_dealt.disconnect(_on_damage_dealt)
-		if actor.events.player_downed.is_connected(_on_player_downed):
-			actor.events.player_downed.disconnect(_on_player_downed)
+	if actor.damaged.is_connected(_on_damaged):
+		actor.damaged.disconnect(_on_damaged)
 	_reset()
 	_actor = null
 
@@ -142,22 +139,27 @@ func think(actor: Actor, delta: float) -> void:
 	# Look on the timer, at the first step (staggered afterwards) or when the target was just
 	# lost. With no target at all only the timer applies. A freed target reads as null, so the
 	# id tells "never had one" from "lost it".
-	var lost: bool = _target_id != 0 and not _is_valid_target(target)
+	var lost: bool = false
+	if _target_id != 0:
+		if _target_actor != null:
+			# `_is_valid_target`, written out for the usual target (this runs every step).
+			lost = not is_instance_valid(_target_actor) or _target_actor.is_down() or _target_actor.is_dying()
+		else:
+			lost = not _is_valid_target(target)
 	if _retarget_left <= 0.0 or lost or not _looked:
 		_retarget_left = RETARGET_TIME if _looked else _retarget_offset
 		_looked = true
 		target = _find_target(actor)
 		_target_id = target.get_instance_id() if target != null else 0
+		_target_actor = target as Actor
 	var intent: ActorIntent = actor.intent
 	intent.move = Vector2.ZERO
-	# Chill slows the attack timers, freeze stops them (the Mover slows the walk by the same pace).
-	var pace: float = actor.combat.pace(actor) if actor.combat != null else 1.0
 	match state:
 		State.CHASE:
 			_chase(actor)
 		State.WINDUP:
 			intent.aim = _locked_aim
-			_state_left -= delta * pace
+			_state_left -= delta * _pace(actor)
 			if _state_left <= 0.0:
 				# The cast leaves this step, from the staff tip along the locked aim.
 				intent.press(0)
@@ -165,7 +167,7 @@ func think(actor: Actor, delta: float) -> void:
 				_state_left = recover_time
 		State.RECOVER:
 			intent.aim = _locked_aim
-			_state_left -= delta * pace
+			_state_left -= delta * _pace(actor)
 			if _state_left <= 0.0:
 				state = State.CHASE
 
@@ -193,10 +195,9 @@ func _chase(actor: Actor) -> void:
 		return
 	var to_target: Vector2 = target.global_position - actor.global_position
 	var near: bool = to_target.length_squared() <= attack_range * attack_range
-	var armed: bool = actor.caster != null and actor.caster.has_staff(0)
 	if to_target != Vector2.ZERO:
 		actor.intent.aim = to_target
-	if near and armed:
+	if near and actor.caster != null and actor.caster.has_staff(0):
 		if not actor.caster.cast_ready(windup_time):
 			# In reach but the cast is not ready: hold, so the telegraph only ever shows a cast
 			# that comes.
@@ -237,9 +238,15 @@ func _is_valid_target(node: Variant) -> bool:
 	return not (node.has_method("is_downed") and node.is_downed())
 
 
+## Chill slows the attack timers, freeze stops them (the Mover slows the walk by the same pace).
+## Only the windup and the recovery ask.
+func _pace(actor: Actor) -> float:
+	return actor.combat.own_pace(actor, actor.id) if actor.combat != null else 1.0
+
+
 ## Someone hurt the actor it drives: an actor of its own team (not itself) earns a grudge.
-func _on_damage_dealt(caster: int, hurt: Node, _amount: int, _position: Vector2) -> void:
-	if _actor == null or hurt != _actor or caster < 0 or caster == _actor.id or _actor.actors == null:
+func _on_damaged(caster: int, _amount: int) -> void:
+	if _actor == null or caster < 0 or caster == _actor.id or _actor.actors == null:
 		return
 	if _actor.actors.team_of(caster) != _actor.team():
 		return
@@ -258,18 +265,12 @@ func _drop_grudge() -> void:
 	_retarget_left = 0.0
 
 
-func _on_player_downed(_player: int) -> void:
-	# Only enemies chasing the downed wizard look again at once; the rest keep their staggered
-	# timer, so a downing does not make every enemy search in one frame.
-	if target != null and not _is_valid_target(target):
-		_retarget_left = 0.0
-
-
 ## A fresh chase: no target, no grudge, no windup.
 func _reset() -> void:
 	state = State.CHASE
 	target = null
 	_target_id = 0
+	_target_actor = null
 	grudge = null
 	_grudge_left = 0.0
 	_state_left = 0.0

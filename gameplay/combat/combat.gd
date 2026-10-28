@@ -30,9 +30,9 @@ extends Node
 ## else damage and a push (a pull while hexed), the shock jump, the static discharge, then
 ## each element's reaction or status. Plain hits (`hit`, contact, reactions, burn) run `_hit`:
 ## a barrier takes the hit whole, then hex adds its share, static goes off, health goes down,
-## `hit_landed`, `damage_dealt` and `actor_hurt` are sent, and a body at 0 dies:
-## `kill_landed` (a spell's own hit only), `enemy_died` (for every body not on the wizards'
-## team; flow counts the wave by it), and the body is freed.
+## `hit_landed`, `damage_dealt` (and the actor's own `Actor.damaged`) and `actor_hurt` are sent,
+## and a body at 0 dies: `kill_landed` (a spell's own hit only), `enemy_died` (for every body not
+## on the wizards' team; flow counts the wave by it), and the body is freed.
 ##
 ## The one rules (owner, 2026-10-28), the same on every actor:
 ##  - **shock:** the next spell hit also jumps to the nearest other actor of the victim's team;
@@ -415,6 +415,31 @@ func pace_of(actor: Variant) -> float:
 	return _pace(_row_of(actor))
 
 
+## `pace` and `consume_knockback` for a body asking about itself with its own actor `id` (a kit
+## Actor's row is its id): the cheap way for an actor's own step, which asks every physics step
+## (no node lookup; performance pass, 2026-10-28). The same answer as by node: a body kept under
+## another row (or none) is looked up by node.
+func own_pace(actor: Node2D, id: int) -> float:
+	if id < 0 or id >= ACTORS or _nodes[id] != actor or _body[id] == BODY_NONE:
+		return _pace(_row_of_node(actor))
+	# `_pace`, written out: this runs for every actor every step.
+	if _freeze_left[id] > 0.0:
+		return 0.0
+	if _chill_left[id] > 0.0:
+		return 1.0 - _chill_slow[id]
+	return 1.0
+
+
+func own_knockback(actor: Node2D, id: int, delta: float) -> Vector2:
+	if id < 0 or id >= ACTORS or _nodes[id] != actor or _body[id] == BODY_NONE:
+		return _consume_knockback(_row_of_node(actor), delta)
+	# `_consume_knockback`, written out: this runs for every actor every step.
+	var push: Vector2 = _knock[id]
+	if push != Vector2.ZERO:
+		_knock[id] = push.move_toward(Vector2.ZERO, KNOCKBACK_DECAY * delta)
+	return push
+
+
 func _pace(row: int) -> float:
 	if row == ActorsScript.NONE:
 		return 1.0
@@ -643,6 +668,9 @@ func _hit(by: int, row: int, amount: int, direction: Vector2, strength: float, k
 	if events != null and not (quiet and left != 0):
 		events.hit_landed.emit(by, node, amount, where, kind)
 		events.damage_dealt.emit(by, node, amount, where)
+		if node is Actor:
+			# The actor's own listeners (its AI's grudge, its look's hurt pose) hear it directly.
+			(node as Actor).damaged.emit(by, amount)
 		# A burn tick is not a hit: cards that fire on hurt are not set off by it.
 		if not tick:
 			events.actor_hurt.emit(actor, amount, where, _tag, kind)

@@ -48,10 +48,10 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `possess_started`, `possess_ended` | `actor` (the Possession) | `feel` (a ring in the driver's ramp) |
 | `reaction_triggered` | `combat` | `feel` |
 | `discharge_arc` | `combat` | `feel` |
-| `damage_dealt` | `combat` | `feel`, `ai` (grudges, the looks), `actor` (the Face) |
+| `damage_dealt` | `combat` | `feel`, `ai` (`DummyLook` only; an actor's own components hear its `Actor.damaged`, which Combat sends with it) |
 | `status_applied` | `combat` | `feel` |
 | `enemy_died` | `combat` (every actor not on the players' team) | `feel`, `flow` |
-| `player_downed` | `player` (Downed) | `ai`, `combat`, `feel`, `flow`, `run` |
+| `player_downed` | `player` (Downed) | `combat`, `feel`, `flow`, `run` |
 | `player_revived` | `player` (Downed) | `combat`, `flow` |
 | `revive_progress` | `coop` | `player` (Downed) |
 | `player_stats_changed` | `player` (the seat's own body, also while it is away) | `hud` |

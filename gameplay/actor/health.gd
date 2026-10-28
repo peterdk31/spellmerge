@@ -20,6 +20,9 @@ signal depleted(killer: int)
 
 var health: int = 100
 
+## True from a `protect` until its time has run out: the actor steps Health only then (read only).
+var protecting: bool = false
+
 ## Seconds left of `protect`.
 var _protect_left: float = 0.0
 
@@ -29,9 +32,10 @@ func setup(owner_actor: Actor) -> void:
 	health = max_health
 
 
-## Counts the protection down (the actor calls it first in its step).
+## Counts the protection down (the actor calls it first in its step, while `protecting`).
 func step(delta: float) -> void:
 	_protect_left = maxf(_protect_left - delta, 0.0)
+	protecting = _protect_left > 0.0
 
 
 ## Lose `amount` (from `killer`, an event's player or -1). Ignored at 0 health, while protected,
@@ -67,6 +71,7 @@ func reset(amount: int) -> void:
 func protect(seconds: float) -> void:
 	if health > 0:
 		_protect_left = maxf(_protect_left, seconds)
+		protecting = _protect_left > 0.0
 
 
 func is_protected() -> bool:

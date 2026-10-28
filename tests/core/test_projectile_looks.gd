@@ -506,3 +506,26 @@ func test_a_crowd_of_looked_shots_stays_inside_the_cap() -> void:
 	var shown: float = float(mgr.particle_demand) * mgr.particle_share + float(mgr.trail_demand) * mgr.trail_share
 	check(shown <= float(mgr.particle_cap) + 0.5, "what is drawn is no more than the cap")
 	check_equal(mgr.trail_share, 0.0, "and the trails went first")
+
+
+## Regression (performance pass, 2026-10-28): what a shot is drawn as is worked out once and kept
+## with the slot; a new look, a radius that grew, or a new shot in the same slot redo it.
+func test_a_kept_look_follows_set_look_growth_and_a_new_shot_in_the_slot() -> void:
+	var slot: int = mgr.spawn(0, Vector2(50.0, 40.0), Vector2(100.0, 0.0), 2.0, 4.0, ManagerScript.LAYER_ENEMY, 0, 7)
+	mgr.set_look(slot, ManagerScript.pack_look(PackedInt32Array([1])))
+	mgr.update_draw(1.0)
+	check_equal(look_at(mgr._draw_node, 0)[2], ManagerScript.pack_look(PackedInt32Array([1])), "the first look")
+	mgr.set_look(slot, ManagerScript.pack_look(PackedInt32Array([2, 3])))
+	mgr.update_draw(1.0)
+	check_equal(look_at(mgr._draw_node, 0)[2], ManagerScript.pack_look(PackedInt32Array([2, 3])), "a new look is drawn at once")
+	mgr.set_growth(slot, 8.0)
+	for i in 30:
+		mgr.step(1.0 / 60.0)
+	mgr.update_draw(1.0)
+	check(look_at(mgr._draw_node, 0)[1] > 1, "a shot that grew is drawn bigger")
+	check_equal(mgr.remove_by_tag(7), 1, "the shot ends")
+	var again: int = mgr.spawn(ActorsScript.SEATS + 6, Vector2(50.0, 40.0), Vector2(100.0, 0.0), 2.0)
+	check_equal(again, slot, "a new shot of another ramp takes the slot")
+	mgr.update_draw(1.0)
+	check_equal(mgr._draw_node.multimesh.visible_instance_count - mgr.drawn_trails, 0, "no live hat-ramp shot is left")
+	check((look_at(mgr._enemy_node, 0)[2] & ManagerScript.LOOK_ENEMY_RAMP) != 0, "it is drawn in the enemy ramp, not the old shot's")

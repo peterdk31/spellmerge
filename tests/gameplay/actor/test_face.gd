@@ -117,7 +117,7 @@ func test_down_beats_a_windup_beats_a_shown_mood_beats_the_rest() -> void:
 func test_a_hit_shows_worried_for_a_moment() -> void:
 	var body := _wearer(Face.Style.CHEER)
 	var face := _face(body)
-	_world.bus.damage_dealt.emit(0, body, 5, body.global_position)
+	body.damaged.emit(0, 5)
 	_world.run(1)
 	check_equal(face.mood(), Face.Mood.WORRIED, "a hit is worried")
 	_run(Face.HURT_TIME + 0.25)

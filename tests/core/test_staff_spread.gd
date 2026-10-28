@@ -133,7 +133,7 @@ func test_four_players_spread_on_their_own_staffs() -> void:
 
 
 func test_the_dev_and_starter_staffs_aim_true() -> void:
-	for id: StringName in [&"dev", &"starter"]:
+	for id: StringName in [&"dev", &"curl", &"star", &"moon", &"crystal"]:
 		var staff: StaffBase = _registry.call("get_resource", &"wizard", id) as StaffBase
 		check(staff != null, "the %s staff is found" % id)
 		if staff != null:

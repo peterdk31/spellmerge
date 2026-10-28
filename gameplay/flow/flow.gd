@@ -32,9 +32,10 @@ extends Node
 ## projectiles left, and `Spells` cleared (every cooldown and build is forgotten; each
 ## new wizard builds its start staffs again).
 ##
-## Staffs (staffs A6a, docs/milestones/M2-staffs.md): every wizard gets the staff of the build
-## channel (`staff_for_channel`: `dev` in `dev` and `preview` builds, `starter` otherwise, from
-## `content/wizard/staffs/`) and `start_cards`, four lists of card ids (A `dash`, X `fire bolt`,
+## Staffs (staffs A6a, docs/milestones/M2-staffs.md; living staffs H3): every wizard gets the four
+## staffs of the build channel (`staffs_for_channel`: the starter heads STARTER_HEADS, one per
+## button, from `content/wizard/staffs/`; in `dev` and `preview` builds each with the numbers of
+## the `dev` staff, its slots, delay and recharge) and `start_cards`, four lists of card ids (A `dash`, X `fire bolt`,
 ## Y and B empty), and builds them itself; flow never touches a spell.
 ##
 ## Sandbox (staffs B7, docs/milestones/M2-staffs.md, "The sandbox"): `sandbox_requested` (the
@@ -76,9 +77,10 @@ const DUMMY_IDS: Array[StringName] = [&"training_dummy", &"shooting_dummy"]
 ## The actions of `sandbox_action_requested`.
 const ACTION_IMP_WAVE: StringName = &"imp_wave"
 const ACTION_RESET_DUMMIES: StringName = &"reset_dummies"
-## The staff of test builds (the sandbox) and of the normal game, by id under `wizard`.
+## The numbers of test builds' staffs (the sandbox), and the four starter heads by button (RB,
+## RT, LB, LT), by id under `wizard`.
 const DEV_STAFF: StringName = &"dev"
-const STARTER_STAFF: StringName = &"starter"
+const STARTER_HEADS: Array[StringName] = [&"curl", &"star", &"moon", &"crystal"]
 ## The build channels that get the dev staff (`BuildInfo.channel()`).
 const DEV_CHANNELS: Array[String] = ["dev", "preview"]
 ## The wave, sized for four players: one enemy per entry, placed at the room's
@@ -140,6 +142,9 @@ var _starter: int = 0
 var _room: RoomBase = null
 ## The wizard scene the run in progress started with (joiners get the same one).
 var _wizard_scene: PackedScene = null
+## The channel's staffs (`staffs_for_channel`) and the channel they were made for.
+var _channel_staffs: Array[StaffBase] = []
+var _channel_staffs_for: String = ""
 var _enemies: Array[Node] = []
 ## The sandbox's dummies still standing.
 var _dummies: Array[Node] = []
@@ -260,8 +265,8 @@ func start_run(requester: int) -> bool:
 	if spells == null:
 		push_warning("Flow: the Spells autoload is missing, so no run starts.")
 		return false
-	if staff_for_channel() == null:
-		push_warning("Flow: the staff for the %s channel is missing from the registry, so no run starts." % channel)
+	if staffs_for_channel().is_empty():
+		push_warning("Flow: a staff for the %s channel is missing from the registry, so no run starts." % channel)
 		return false
 	if not _is_wizard_scene(wizard_scene):
 		push_warning("Flow: the wizard scene is missing or has no player script, so no run starts.")
@@ -563,15 +568,35 @@ func _is_wizard_scene(scene: PackedScene) -> bool:
 
 ## The staff every wizard's four staffs are: the 20-slot `dev` staff in `dev` and `preview`
 ## builds (the sandbox for testing builds), the 4-slot `starter` otherwise. Null when missing.
-func staff_for_channel() -> StaffBase:
+## The four staffs a wizard holds in this build channel (empty when one is missing): the starter
+## heads, in a test build each a copy with the dev staff's numbers (made once per channel).
+func staffs_for_channel() -> Array[StaffBase]:
+	if not _channel_staffs.is_empty() and _channel_staffs_for == channel:
+		return _channel_staffs
+	var out: Array[StaffBase] = []
 	if registry == null:
-		return null
-	return registry.get_resource(&"wizard", DEV_STAFF if DEV_CHANNELS.has(channel) else STARTER_STAFF) as StaffBase
+		return out
+	var dev: StaffBase = registry.get_resource(&"wizard", DEV_STAFF) as StaffBase if DEV_CHANNELS.has(channel) else null
+	if DEV_CHANNELS.has(channel) and dev == null:
+		return out
+	for id in STARTER_HEADS:
+		var head: StaffBase = registry.get_resource(&"wizard", id) as StaffBase
+		if head == null:
+			out.clear()
+			return out
+		if dev != null:
+			head = head.duplicate() as StaffBase
+			for field: String in ["slots", "draw", "cast_delay", "recharge", "spread"]:
+				head.set(field, dev.get(field))
+		out.append(head)
+	_channel_staffs = out
+	_channel_staffs_for = channel
+	return out
 
 
 func _add_wizard(parent: Node2D, room: RoomBase, index: int, at: Vector2 = Vector2.INF) -> void:
 	var wizard := _wizard_scene.instantiate() as Actor
-	PlayerScript.seat_wizard(wizard, index, staff_for_channel(), start_cards.duplicate(true))
+	PlayerScript.seat_wizard(wizard, index, null, start_cards.duplicate(true), staffs_for_channel())
 	if at != Vector2.INF:
 		wizard.position = at
 	elif index < room.player_spawns.size():

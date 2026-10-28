@@ -30,7 +30,7 @@ hud/       panels and menus (send requests as events, show state from events)
 | change what a player may build with | the wizard's `bag` (filled from the registry until M3's rewards fill it); builds arrive as `staff_change_requested`, `card_move_requested` and `staff_cards_requested` | the builder, `core/spells` |
 | swap a sprite, tile or animation strip | replace the file, keep the contract below | scripts, node names in scenes, tests |
 | re-skin the shot, spark or hostile shot | another `FeelPreset` (or its texture fields), set before `Feel._ready` | `feel.gd` |
-| change a wizard's or an enemy's look | the textures on the look component in its scene (`WizardLook`, `CreatureLook`), or a new look component | the controllers, the other components |
+| change a wizard's or an enemy's look | the textures on the look component in its scene (`StaffLook` with the staffs' `head` sheets, `CreatureLook`; the `Face` for everyone), or a new look component | the controllers, the other components |
 | add behaviour that others must react to | a new typed signal in `core/events/events.gd`, one sender, listeners connect | the listeners' siblings |
 | tune feel or balance | a preset or a `.tres` number | tests (they do not assert tuning numbers) |
 
@@ -40,7 +40,7 @@ Art is data: scenes and resources point at files, and scripts never name a textu
 
 - A strip is one row of frames, **32 px high and a whole multiple of 32 wide**. The script reads the frame count from the width (`hframes`), so a strip may have more or fewer frames than today. The ember imp's idle needs two or more to animate.
 - The wizard has idle, walk and dash strips for **each of the four players** and a staff; the four idle looks must differ (colour is how players tell themselves apart).
-- A replacement `Flow.wizard_scene` must have an `Actor` root with a `PlayerController` child, and a `WizardLook` with the `textures`, `walk_textures` and `dash_textures` arrays (one strip per ramp), `hat_textures` and `staff_texture`, and the `Sprite`/`Sprite/Hat` nodes it draws on. `tests/content/wizard/test_wizard_art.gd` checks it, and `Flow` starts no run with a scene that is not an actor with a player controller.
+- A replacement `Flow.wizard_scene` must have an `Actor` root with a `PlayerController` child, and a `StaffLook` (with a `default_head`) drawing on its `Sprite` node, and a `Face`. `tests/content/wizard/test_wizard_art.gd` checks it, and `Flow` starts no run with a scene that is not an actor with a player controller.
 - Look rules (palette, rects only, whole numbers) are checked for every SVG at once by `tests/core/test_svg_art.gd`. The wiring (strip sizes, the nodes the AI drives) is checked by `tests/content/**/test_*_art.gd`. Nothing tests a pixel, a colour or a sprite's exact size, so a redraw does not fail a test. If a test fails after an art swap, the art broke the contract above, or the test checked a look and should be fixed.
 - Add the file to `art/manifest.json`; commit the `.import` and `.uid` files.
 

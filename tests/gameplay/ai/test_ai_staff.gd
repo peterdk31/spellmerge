@@ -9,7 +9,6 @@ extends "res://tests/support/suite.gd"
 ##
 ## godot --headless --path . --script res://tests/gameplay/ai/test_ai_staff.gd
 
-const AiScript := preload("res://gameplay/ai/ai.gd")
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const WizardScene := preload("res://content/wizard/base/wizard.tscn")
@@ -37,7 +36,7 @@ var _combat: CombatScript
 var _fake: FakeRegistry
 var _actors: ActorsScript
 var _wizard: Actor
-var _enemies: Array[AiScript] = []
+var _enemies: Array[Actor] = []
 
 
 func before_each() -> void:
@@ -50,11 +49,13 @@ func before_each() -> void:
 	_projectiles.actors = _actors
 	_spells = own(SpellsScript.new()) as SpellsScript
 	_spells.registry = _fake
+	_spells.actors = _actors
 	_spells.bind(_projectiles, _bus)
 	_combat = own(CombatScript.new()) as CombatScript
 	_combat.events = _bus
 	_combat.projectiles = _projectiles
 	_combat.spells = _spells
+	_combat.actors = _actors
 	_combat._ready()
 	_enemies.clear()
 	var bolt := FormBase.new()
@@ -114,18 +115,27 @@ func _data(cards: Array[StringName], max_mana: float = 6.0, regen: float = 0.0, 
 
 
 ## An enemy of `data` from the imp's scene (sprite, telegraph), in the tree at `at`.
-func _enemy(data: EnemyBase, at: Vector2 = Vector2.ZERO) -> AiScript:
-	var enemy: AiScript = ImpData.scene.instantiate()
+func _enemy(data: EnemyBase, at: Vector2 = Vector2.ZERO) -> Actor:
+	var enemy: Actor = ImpData.scene.instantiate()
 	enemy.data = data
 	enemy.events = _bus
 	enemy.combat = _combat
 	enemy.projectiles = _projectiles
 	enemy.spells = _spells
-	enemy.targets.append(_wizard)
+	enemy.actors = _actors
 	root.add_child(enemy)
 	enemy.position = at
 	_enemies.append(enemy)
 	return enemy
+
+
+## The enemy's AI and look (its home controller and its CreatureLook).
+func _ai(enemy: Actor) -> AIController:
+	return enemy.get_node("AIController") as AIController
+
+
+func _look(enemy: Actor) -> CreatureLook:
+	return enemy.get_node("CreatureLook") as CreatureLook
 
 
 func _run(seconds: float) -> void:
@@ -140,46 +150,47 @@ func _run(seconds: float) -> void:
 
 
 ## Steps until the enemy is telegraphing (at most `seconds`); true if it did.
-func _until_windup(enemy: AiScript, seconds: float) -> bool:
+func _until_windup(enemy: Actor, seconds: float) -> bool:
 	for i in int(seconds / STEP):
-		if enemy.is_telegraphing():
+		if _ai(enemy).is_telegraphing():
 			return true
 		_run(STEP)
-	return enemy.is_telegraphing()
+	return _ai(enemy).is_telegraphing()
 
 
 func test_it_opens_an_actor_and_owns_its_body() -> void:
 	var enemy := _enemy(_data([&"bolt"]))
-	check(enemy.uses_staff(), "an enemy with a staff and cards casts it")
-	check(_actors.is_open(enemy.caster) and enemy.caster != _wizard.id, "it opened an actor of its own: %d" % enemy.caster)
-	check_equal(_actors.team_of(enemy.caster), ActorsScript.TEAM_ENEMIES, "on the enemies' team")
-	check_equal(_actors.ramp_of(enemy.caster), ActorsScript.RAMP_ENEMY, "drawn in the enemy ramp")
-	check_equal(_actors.seat_of(enemy.caster), ActorsScript.NONE, "and driven by no seat")
-	check(_actors.node_of(enemy.caster) == enemy, "the actor's node is the enemy")
-	check_equal(_projectiles.target_owner_of(enemy), enemy.caster, "its body is its actor's, so its own spells skip it")
-	check_equal(enemy.mana, 6.0, "it starts with full mana")
-	enemy.mana = 1.0
+	check(enemy.caster != null and enemy.caster.has_staff(0), "an enemy with a staff and cards casts it")
+	check(_actors.is_open(enemy.id) and enemy.id != _wizard.id, "it opened an actor of its own: %d" % enemy.id)
+	check_equal(_actors.team_of(enemy.id), ActorsScript.TEAM_ENEMIES, "on the enemies' team")
+	check_equal(_actors.ramp_of(enemy.id), ActorsScript.RAMP_ENEMY, "drawn in the enemy ramp")
+	check_equal(_actors.seat_of(enemy.id), ActorsScript.NONE, "and driven by no seat")
+	check(_actors.node_of(enemy.id) == enemy, "the actor's node is the enemy")
+	check_equal(_projectiles.target_owner_of(enemy), enemy.id, "its body is its actor's, so its own spells skip it")
+	check_equal(enemy.caster.mana, 6.0, "it starts with full mana")
+	enemy.caster.mana = 1.0
 	_bus.mana_refund_requested.emit(_wizard.id, 2.0)
-	check_equal(enemy.mana, 1.0, "another actor's refund is not its own")
-	_bus.mana_refund_requested.emit(enemy.caster, 2.0)
-	check_equal(enemy.mana, 3.0, "siphon gives its actor mana back by the event")
-	_bus.mana_refund_requested.emit(enemy.caster, 100.0)
-	check_equal(enemy.mana, 6.0, "never above its most")
-	check(_spells.current_tag(enemy.caster, 0) != 0, "its staff is installed")
+	check_equal(enemy.caster.mana, 1.0, "another actor's refund is not its own")
+	_bus.mana_refund_requested.emit(enemy.id, 2.0)
+	check_equal(enemy.caster.mana, 3.0, "siphon gives its actor mana back by the event")
+	_bus.mana_refund_requested.emit(enemy.id, 100.0)
+	check_equal(enemy.caster.mana, 6.0, "never above its most")
+	check(_spells.current_tag(enemy.id, 0) != 0, "its staff is installed")
 	check(ImpData.staff != null and ImpData.cards == ([&"fire", &"bolt"] as Array[StringName]), "the ember imp casts a staff of player cards (F9)")
 	var none: EnemyBase = ImpData.duplicate() as EnemyBase
 	none.staff = null
 	none.cards = []
 	var plain := _enemy(none)
-	check(not plain.uses_staff() and plain.caster == -1, "an enemy without a staff keeps its old attack")
+	check(plain.caster == null and plain.caster_number() == -1, "an enemy without a staff has no caster")
+	check(_actors.is_open(plain.id), "but an actor id of its own all the same")
 
 
 func test_it_casts_its_staff_after_the_windup_and_hits_the_wizard() -> void:
 	var enemy := _enemy(_data([&"bolt"]))
 	check(_until_windup(enemy, 1.0), "in reach and ready, it winds up")
-	_run(enemy.windup_time + STEP)
-	check_equal(_projectiles.get_count_for(enemy.caster), 1, "then its bolt flies")
-	check_equal(enemy.mana, 4.0, "and it paid the cast's mana")
+	_run(_ai(enemy).windup_time + STEP)
+	check_equal(_projectiles.get_count_for(enemy.id), 1, "then its bolt flies")
+	check_equal(enemy.caster.mana, 4.0, "and it paid the cast's mana")
 	_run(0.5)
 	check(_wizard.health.health < _wizard.health.max_health, "the bolt hurt the wizard through combat")
 	check_equal(_combat.get_health(enemy), ImpData.max_health, "and not the enemy that cast it")
@@ -188,35 +199,35 @@ func test_it_casts_its_staff_after_the_windup_and_hits_the_wizard() -> void:
 func test_no_windup_without_the_mana_and_regen_brings_it() -> void:
 	var broke := _enemy(_data([&"bolt"], 1.0, 0.0))
 	check(not _until_windup(broke, 3.0), "with too little mana it never telegraphs")
-	check_equal(_projectiles.get_count_for(broke.caster), 0, "and never casts")
+	check_equal(_projectiles.get_count_for(broke.id), 0, "and never casts")
 	broke.free()
 	var slow := _enemy(_data([&"bolt"], 2.0, 1.0))
 	_run(enemy_windup_and_cast(slow))
-	check(slow.mana < 1.0, "the first cast spends it")
+	check(slow.caster.mana < 1.0, "the first cast spends it")
 	check(not _until_windup(slow, 1.5), "for about two seconds it cannot afford the next")
 	check(_until_windup(slow, 1.5), "then regen brings it")
 
 
 ## Seconds for one windup and cast of `enemy`.
-func enemy_windup_and_cast(enemy: AiScript) -> float:
-	return enemy.windup_time + 2.0 * STEP
+func enemy_windup_and_cast(enemy: Actor) -> float:
+	return _ai(enemy).windup_time + 2.0 * STEP
 
 
 func test_the_windup_waits_for_the_staffs_delay() -> void:
 	var enemy := _enemy(_data([&"bolt"], 100.0, 0.0, 3.0))
 	_run(enemy_windup_and_cast(enemy))
-	check_equal(_projectiles.get_count_for(enemy.caster), 1, "the first cast")
+	check_equal(_projectiles.get_count_for(enemy.id), 1, "the first cast")
 	var seen_early: bool = false
 	for i in int(4.0 / STEP):
 		_run(STEP)
-		if enemy.is_telegraphing() and _spells.cooldown_left(enemy.caster, 0) > enemy.windup_time:
+		if _ai(enemy).is_telegraphing() and _spells.cooldown_left(enemy.id, 0) > _ai(enemy).windup_time:
 			seen_early = true
-		if enemy.is_telegraphing():
+		if _ai(enemy).is_telegraphing():
 			break
 	check(not seen_early, "no telegraph while the delay is longer than the windup")
-	check(enemy.is_telegraphing(), "it winds up once the delay will be over in time")
-	_run(enemy.windup_time + STEP)
-	check(_projectiles.get_count_for(enemy.caster) >= 1 and enemy.mana <= 96.0, "and the promised cast comes")
+	check(_ai(enemy).is_telegraphing(), "it winds up once the delay will be over in time")
+	_run(_ai(enemy).windup_time + STEP)
+	check(_projectiles.get_count_for(enemy.id) >= 1 and enemy.caster.mana <= 96.0, "and the promised cast comes")
 
 
 func test_the_telegraph_shows_the_next_casts_reach() -> void:
@@ -224,11 +235,11 @@ func test_the_telegraph_shows_the_next_casts_reach() -> void:
 	_until_windup(enemy, 1.0)
 	var line: Sprite2D = enemy.get_node("Telegraph") as Sprite2D
 	check(line.visible, "a bolt shows its line")
-	check(is_equal_approx(enemy.telegraph_reach(), 200.0), "as far as the bolt flies (%.1f)" % enemy.telegraph_reach())
-	check(is_equal_approx(float((line.material as ShaderMaterial).get_shader_parameter(&"telegraph_lane")), 4.0 + AiScript.TELEGRAPH_LANE_MARGIN * 0.5), "as wide as the bolt, with a margin")
+	check(is_equal_approx(_look(enemy).telegraph_reach(), 200.0), "as far as the bolt flies (%.1f)" % _look(enemy).telegraph_reach())
+	check(is_equal_approx(float((line.material as ShaderMaterial).get_shader_parameter(&"telegraph_lane")), 4.0 + CreatureLook.TELEGRAPH_LANE_MARGIN * 0.5), "as wide as the bolt, with a margin")
 	var ring := _enemy(_data([&"nova"]), Vector2(0.0, 40.0))
 	_until_windup(ring, 1.0)
-	check(ring.is_telegraphing(), "a nova winds up too")
+	check(_ai(ring).is_telegraphing(), "a nova winds up too")
 	check(not (ring.get_node("Telegraph") as Node2D).visible, "but shows no line: the pose and flash say it")
 
 
@@ -236,11 +247,11 @@ func test_one_compile_per_enemy_type_and_its_actor_closes() -> void:
 	var data := _data([&"bolt"])
 	var first := _enemy(data)
 	var second := _enemy(data, Vector2(0.0, 30.0))
-	check(first.caster != second.caster, "each enemy has its own actor")
-	check(_spells.profile(_spells.current_tag(first.caster, 0)) == _spells.profile(_spells.current_tag(second.caster, 0)), "sharing one compiled staff")
-	check(_actors.is_open(first.caster) and _actors.is_open(second.caster), "two enemy actors open")
-	var id: int = first.caster
+	check(first.id != second.id, "each enemy has its own actor")
+	check(_spells.profile(_spells.current_tag(first.id, 0)) == _spells.profile(_spells.current_tag(second.id, 0)), "sharing one compiled staff")
+	check(_actors.is_open(first.id) and _actors.is_open(second.id), "two enemy actors open")
+	var id: int = first.id
 	first.free()
 	check(not _actors.is_open(id), "leaving the tree closes its actor")
 	check_equal(_spells.current_tag(id, 0), 0, "and its caster in Spells")
-	check(_actors.is_open(second.caster) and _spells.current_tag(second.caster, 0) != 0, "the other casts on")
+	check(_actors.is_open(second.id) and _spells.current_tag(second.id, 0) != 0, "the other casts on")

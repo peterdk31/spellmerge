@@ -1,670 +1,301 @@
-extends CharacterBody2D
-## Enemy AI (M1 part 12): chase the nearest standing player, then one telegraphed
-## attack. The script goes on the root of an enemy scene (content/enemies/ember_imp/
-## ember_imp.tscn); the spawner sets `data` (the enemy's `EnemyBase` resource)
-## before adding the node, like `index` on a wizard.
+class_name AIController
+extends ActorController
+## The enemy AI (M1 part 12; a controller since actors G6, docs/milestones/M2-actors.md): chase
+## the nearest actor of another team, then one telegraphed cast of its staff. It drives an actor
+## (gameplay/actor) like a seat's controller does: it only writes the actor's intent (where to
+## walk, where to aim, when to press its staff); the actor's components walk, cast, get hurt and
+## die. It is a child of an enemy's actor scene (content/enemies/ember_imp/ember_imp.tscn), that
+## actor's home controller; a possession (G9) may hand it another actor for a while.
 ##
-## States: CHASE (walk to the nearest player who is not downed), WINDUP (stand
-## still; the telegraph shows and the aim is locked at its start, so a player can
-## step aside), then the shot flies and RECOVER (stand still) before CHASE again.
-## An enemy never targets "the player": every player in the `players` group (or
-## in `targets`) is a candidate, indices 0-3, and a downed one is skipped.
+## States: CHASE (walk to the target), WINDUP (stand still; the aim is locked at its start, so a
+## wizard can step aside, while the actor's CreatureLook shows the telegraph), then the cast and
+## RECOVER (stand still, the aim still locked, so a beam it holds does not track a wizard who
+## stepped aside) before CHASE again.
 ##
-## The attack is a cast of the enemy's staff (below); an enemy without one (or without a free
-## actor id) only chases, and hurts by touch (`contact_damage`) if it hurts at all.
-## Health, hurt box and knockback live in `gameplay/combat`: _ready() registers the
-## enemy there and step() adds `consume_knockback_step` to the velocity. Death is
-## Combat's (it frees the node), so there is no death code here.
+## Targets: the nearest actor of another team than the actor's (`Actor.team`) that can be hit
+## now, from the projectile manager's target grid (`nearest_target` with the team), so it costs
+## the same in a crowd. A downed wizard is no target there (its hurt circle is off), and a decoy
+## within its lure range (`Entities.lure`) is chased first; a decoy that breaks is dropped at
+## once. Retargeting runs every RETARGET_TIME seconds (staggered per controller, so 200 enemies
+## do not all look in one frame), at once when the target is lost or downed (`player_downed`),
+## and once at the first step. With nobody to chase it looks only every RETARGET_TIME.
 ##
-## Telegraph: an optional `Sprite` child flashes (`modulate`) and an optional `Telegraph` child
-## (staffs F8b: a Sprite2D drawn by `telegraph.gdshader` in this folder, in Fire colours, its
-## material local to the scene) turns toward the locked aim and shows. It runs from
-## TELEGRAPH_START to the real reach of the next cast (`next_cast_reach`), its lane as wide as
-## what is coming plus a margin, and its dashes march, its arrowhead grows and it brightens with `telegraph_progress()`.
+## Grudges (infighting): when an actor of its own team hurts the actor it drives (a stray blast:
+## everything hurts everything, teams only aim), it targets that actor for GRUDGE_TIME seconds,
+## then goes back to its team's targets. Heard from `damage_dealt` naming the actor it drives,
+## which carries the attacker's actor id for every hit (a shot, a touch, a reaction).
 ##
-## Poses: with `windup_texture` set (a strip of 32 px frames), the `Sprite` shows it from the
-## start of the windup and flips between its frames faster and faster (WINDUP_FLASHES), and
-## goes brighter still for the last stretch (TELEGRAPH_LAST_FROM). With `hurt_texture` set,
-## a hit on this enemy (`damage_dealt` with this node as target) shows it for HURT_TIME
-## seconds, over the windup too. A hit never cancels the windup: the shot still comes,
-## so the telegraph stays honest (knockback and Feel's flash and squash are Combat's and
-## Feel's). An `AnimationPlayer` child is paused while a pose other than the idle shows.
-## Nothing here allocates per frame. Retargeting runs every RETARGET_TIME seconds
-## (staggered per enemy), at once when `player_downed` arrives or the current target
-## is lost, and once at the first step; with no explicit `targets` it reads the
-## `players` group then. With nobody to chase it looks only every RETARGET_TIME.
+## The attack is a cast of the actor's staff 0 (its Caster, filled from the enemy's `data`): the
+## windup starts only when the next cast is ready (`Caster.cast_ready(windup_time)`: its delay
+## nearly over and the mana there), so a telegraph is always followed by its cast; until then it
+## holds where it stands. At the end of the windup it presses the staff (`intent.press(0)`), and
+## the Caster casts from the actor's staff tip along the locked aim. An actor without a staff
+## only chases, all the way, and hurts by touch (its Contact) if it hurts at all.
 ##
-## Decoys and swaps (staffs B5): a decoy (`entities.gd`) within its lure range is chased
-## before any wizard, and a decoy that breaks is dropped at once (it reads as downed). A swap
-## card moves an enemy with `target_move_requested`; the enemy it names goes there at once and
-## keeps its state.
+## Statuses: the actor's Mover slows its walk by Combat's pace (chill slows, freeze stops); the
+## windup and recovery timers here slow by the same pace, so a frozen enemy's attack waits.
 ##
-## Staffs (staffs F8a, "Enemy staffs"): an enemy whose `data` has a staff and cards attacks by
-## casting them like a wizard (`uses_staff`). It opens an actor (`core/actors`: the enemies'
-## team, the enemy ramp, no seat) and its caster in `core/spells` when it is ready (`caster`,
-## the actor id; actors G3b) and closes both when it leaves the tree; the staff is compiled once
-## per enemy type and installed as its staff 0; its body is its actor's projectile target, so
-## its own spells skip it (every other actor's hit it); it tells the manager and the runtime where it stands and aims every step (orbits and
-## beams follow it). It pays each cast from `mana` (`data.max_mana`, `data.mana_regen` a second,
-## plus what siphon gives back, `mana_refund_requested` for its actor), so a dear staff casts less often. The windup starts only when the
-## next cast is ready (its delay nearly over and the mana there), so a telegraph is always followed
-## by its cast; until then it holds where it stands. The telegraph's reach is the next cast's
-## first carrier's (a shot's speed x life, a beam's length); a carrier that is not aimed (a nova,
-## an orbit) shows only the pose and the flash.
+## Entities: it names the actor it drives at home to Entities (`set_enemy`), so its decoys copy
+## it and its familiars circle it, and ends them when it leaves the tree (`enemy_gone`, before
+## the actor's caster closes, so their ends still count).
 ##
-## Moves (staffs F8c): the moves its own cards ask for (`caster_move_requested` for its actor id) move it as they move a wizard: a dash goes from its staff tip to where the
-## card says over the card's time, a hook and a swap pull it to a point, a recoil pushes it, all
-## through `velocity` (so walls stop it); a teleport jumps there at once, stopping short of a
-## wall and backing off until the body is clear. A dash, hook or teleport says where it ended
-## (`caster_move_finished`), where its card's blast and `on expire` go off. A later move replaces
-## one still running; a cast aims a move at the target, as it aims everything.
-##
-## Statuses: a chilled enemy walks and winds up slower, a frozen one stands still and its
-## attack waits (`Combat.speed_factor`); knockback still moves it.
-##
-## All timing runs in step(delta), so tests drive it with fixed deltas.
-## _physics_process() calls step() and then move_and_slide().
+## All timing runs in `think(actor, delta)`, called by the actor's step, so tests drive it with
+## fixed deltas. Nothing here allocates per step.
 
 const EventsScript := preload("res://core/events/events.gd")
-const CombatScript := preload("res://gameplay/combat/combat.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EntitiesScript := preload("res://gameplay/ai/entities.gd")
-const SpellsScript := preload("res://core/spells/spells.gd")
-const ActorsScript := preload("res://core/actors/actors.gd")
 
 enum State { CHASE, WINDUP, RECOVER }
-enum Pose { IDLE, WINDUP, HURT }
 
-## The group every wizard is in (player.gd adds it).
-const PLAYERS_GROUP: StringName = &"players"
-## Collision layers of this body (see player.gd's LAYER_PLAYERS): its own and the walls.
-const LAYER_ENEMIES: int = 4
-const LAYER_WALLS: int = 1
-## The telegraph line starts this far from the enemy; its look at 0% and 100% progress.
-const TELEGRAPH_START: float = 10.0
-## The telegraph's lane is the hit width of what is coming plus this margin.
-const TELEGRAPH_LANE_MARGIN: float = 8.0
-## The telegraph sprite's region height (its texture's), with the lane in its middle.
-const TELEGRAPH_HEIGHT: float = 32.0
-## Seconds between looking for the nearest player again.
+## Seconds between looking for the nearest target again.
 const RETARGET_TIME: float = 0.5
-## `Sprite` modulate while the telegraph shows, and for its last part.
-const TELEGRAPH_COLOR: Color = Color(1.6, 1.3, 1.3)
-const TELEGRAPH_COLOR_LAST: Color = Color(2.0, 1.8, 1.5)
-## Where the last part of the windup starts (0..1 progress): from here the sprite is drawn in
-## TELEGRAPH_COLOR_LAST and holds its bright frame instead of flipping.
-const TELEGRAPH_LAST_FROM: float = 0.8
-## Windup frame flips before the last part: frame = floor(progress² × this) mod frames, so it
-## starts slow and speeds up, to about 5 bright-dark cycles a second at most.
-const WINDUP_FLASHES: float = 5.0
-## Seconds the hurt pose shows after a hit.
-const HURT_TIME: float = 0.25
-## A teleport stops this far short of a wall, then backs off by steps of TELEPORT_BACKOFF until
-## the body (BODY_RADIUS, about the hurt circle's) is clear (as a wizard's, gameplay/player).
-const TELEPORT_CLEARANCE: float = 8.0
-const TELEPORT_BACKOFF: float = 4.0
-const BODY_RADIUS: float = 6.0
-## Recoil pushes that can run at once (more in one step are added to the last).
-const MAX_RECOILS: int = 4
+## Seconds it chases a teammate that hurt it before going back to its team's targets.
+const GRUDGE_TIME: float = 3.0
+## How far it looks for a target: farther than any room, so the nearest anywhere.
+const SIGHT: float = 100000.0
+## Closer than this to its target it stops walking (an enemy without a staff, on top of it).
+const CLOSE_ENOUGH: float = 1.0
 
-## The enemy's numbers (speed, health, contact damage). Set before adding to the tree.
-var data: EnemyBase = null
-## Players to chase. Left empty, the `players` group is used.
-var targets: Array = []
-
-## Walk until a player is this close, then start the attack.
+## Walk until the target is this close, then start the attack.
 @export var attack_range: float = 90.0
 ## Seconds the telegraph shows before the cast.
 @export var windup_time: float = 0.75
 ## Seconds standing still after the cast.
 @export var recover_time: float = 1.0
-## Radius of the enemy's hurt box in pixels.
-@export var hurt_radius: float = 11.0
-## Where the hurt circle, the shots and the telegraph start, relative to the node (the feet).
-## -12 and not the sprite's -14: a little below the sprite's centre, where the torso is.
-## Shots are not clipped at the spawn point, so an imp pressed against a wall can shoot
-## into it and the shot ends at once (the same as before for its feet).
-@export var hurt_offset: Vector2 = Vector2(0.0, -12.0)
-## Optional poses for the `Sprite`: strips of square frames (width / height frames).
-@export var windup_texture: Texture2D = null
-@export var hurt_texture: Texture2D = null
 
-## The event bus, Combat, the projectile manager and the decoys. Only tests set these, before
-## _ready(); otherwise the "Events", "Combat", "Projectiles" and "Entities" autoloads are used.
-var events: EventsScript = null
-var combat: CombatScript = null
-var projectiles: ProjectileManagerScript = null
+## The decoys (`Entities.lure`). Only tests set it, before the actor is added; otherwise the
+## "Entities" autoload is used.
 var entities: EntitiesScript = null
-var spells: SpellsScript = null
-## The actor table. Only tests set it; otherwise the projectile manager's, else the "Actors"
-## autoload.
-var actors: ActorsScript = null
 
 var state: State = State.CHASE
-## The player being chased, or null.
+## What it chases (a wizard, an actor, a decoy), or null.
 var target: Node2D = null
-## Direction of the attack, locked when the windup starts (unit length).
-var aim: Vector2 = Vector2.DOWN
-## How often the players were looked up (tests count it).
+## The teammate that hurt it last, chased while `grudge_left()` > 0, or null.
+var grudge: Node2D = null
+## How often it looked for a target (tests count it).
 var lookup_count: int = 0
-## This enemy's actor id (`core/actors`), its caster number in `core/spells` and the projectile
-## manager, while it casts a staff, else -1.
-var caster: int = -1
-## The mana it has to cast with (staffs F8a).
-var mana: float = 0.0
 
-## Each enemy type's staff, compiled once (EnemyBase -> CompiledStaff).
-static var _compiled: Dictionary = {}
-
-## The move a card asked for (dash, hook, swap): its mode, seconds left, velocity and tag.
-var _move_mode: StringName = &""
-var _move_left: float = 0.0
-var _move_velocity: Vector2 = Vector2.ZERO
-var _move_tag: int = 0
-## Recoil pushes running: velocity and seconds left each.
-var _recoil_velocity: PackedVector2Array = PackedVector2Array()
-var _recoil_left: PackedFloat32Array = PackedFloat32Array()
-
+## The actor it drives now, or null.
+var _actor: Actor = null
+## The aim locked at the start of the windup (unit length).
+var _locked_aim: Vector2 = Vector2.DOWN
 var _state_left: float = 0.0
 var _retarget_left: float = 0.0
 var _retarget_offset: float = 0.0
+var _grudge_left: float = 0.0
 var _looked: bool = false
 ## Instance id of `target` when it was chosen, or 0 for none.
 var _target_id: int = 0
-var _sprite: Sprite2D = null
-var _telegraph: Sprite2D = null
-var _animation: AnimationPlayer = null
-var _idle_texture: Texture2D = null
-var _idle_hframes: int = 1
-## Seconds the hurt pose still shows.
-var _hurt_left: float = 0.0
-## The pose now on the sprite.
-var _pose: Pose = Pose.IDLE
-
-
-func _init() -> void:
-	collision_layer = LAYER_ENEMIES
-	collision_mask = LAYER_WALLS
-	motion_mode = CharacterBody2D.MOTION_MODE_FLOATING
+## The actor id it named to Entities (`set_enemy`), or -1.
+var _named: int = -1
 
 
 func _ready() -> void:
-	_sprite = get_node_or_null("Sprite") as Sprite2D
-	_animation = get_node_or_null("AnimationPlayer") as AnimationPlayer
-	if _sprite != null:
-		_idle_texture = _sprite.texture
-		_idle_hframes = _sprite.hframes
-	_telegraph = get_node_or_null("Telegraph") as Sprite2D
-	if _telegraph != null:
-		_telegraph.visible = false
-		# Starts where the shot does (the body), whatever the scene says.
-		_telegraph.position = hurt_offset
-		_telegraph.centered = false
-		_telegraph.region_enabled = true
-	if events == null:
-		events = get_node_or_null("/root/Events") as EventsScript
-	if combat == null:
-		combat = get_node_or_null("/root/Combat") as CombatScript
-	if projectiles == null:
-		projectiles = get_node_or_null("/root/Projectiles") as ProjectileManagerScript
-	# Tests build enemies outside the tree, where absolute paths do not work.
-	if entities == null and is_inside_tree():
-		entities = get_node_or_null("/root/Entities") as EntitiesScript
-	if spells == null and is_inside_tree():
-		spells = get_node_or_null("/root/Spells") as SpellsScript
-	if events != null and not events.target_move_requested.is_connected(_on_target_move_requested):
-		events.target_move_requested.connect(_on_target_move_requested)
-	if events != null and not events.player_downed.is_connected(_on_player_downed):
-		events.player_downed.connect(_on_player_downed)
-	if events != null and not events.damage_dealt.is_connected(_on_damage_dealt):
-		events.damage_dealt.connect(_on_damage_dealt)
-	if events != null and not events.caster_move_requested.is_connected(_on_caster_move_requested):
-		events.caster_move_requested.connect(_on_caster_move_requested)
-	if events != null and not events.mana_refund_requested.is_connected(_on_mana_refund):
-		events.mana_refund_requested.connect(_on_mana_refund)
-	_recoil_velocity.resize(MAX_RECOILS)
-	_recoil_left.resize(MAX_RECOILS)
-	if data == null:
-		push_warning("Ai: no enemy data set, so this enemy stands still.")
-	if combat != null and data != null:
-		combat.register_enemy(self, data.max_health, hurt_radius, data.contact_damage, hurt_offset)
-	_open_staff()
 	# Spread retargeting over the half second so 200 enemies do not all look at once.
 	_retarget_offset = RETARGET_TIME * float(get_instance_id() % 8) / 8.0
-	_retarget_left = _retarget_offset
+
+
+func _enter_tree() -> void:
+	# Back in the tree (the actor opened a new id first, as a parent enters before its children).
+	if _actor != null and _actor == get_parent():
+		_name_to_entities()
 
 
 func _exit_tree() -> void:
-	if events != null and events.target_move_requested.is_connected(_on_target_move_requested):
-		events.target_move_requested.disconnect(_on_target_move_requested)
-	if events != null and events.player_downed.is_connected(_on_player_downed):
-		events.player_downed.disconnect(_on_player_downed)
-	if events != null and events.damage_dealt.is_connected(_on_damage_dealt):
-		events.damage_dealt.disconnect(_on_damage_dealt)
-	if events != null and events.caster_move_requested.is_connected(_on_caster_move_requested):
-		events.caster_move_requested.disconnect(_on_caster_move_requested)
-	if events != null and events.mana_refund_requested.is_connected(_on_mana_refund):
-		events.mana_refund_requested.disconnect(_on_mana_refund)
-	# Leaving the tree without being freed must not leave a target behind in Combat.
-	if combat != null and is_instance_valid(combat):
-		combat.unregister_enemy(self)
-	close_staff()
+	# Before the actor closes its caster and its id (children leave the tree first).
+	_forget_entities()
 
 
-## True when this enemy attacks by casting its staff (its data has a staff and cards).
-func uses_staff() -> bool:
-	return data != null and data.staff != null and not data.cards.is_empty()
+## It starts driving `actor` (its home actor's `_ready`, or a possession): a fresh chase.
+func started(actor: Actor) -> void:
+	_actor = actor
+	_reset()
+	if actor.events != null:
+		if not actor.events.damage_dealt.is_connected(_on_damage_dealt):
+			actor.events.damage_dealt.connect(_on_damage_dealt)
+		if not actor.events.player_downed.is_connected(_on_player_downed):
+			actor.events.player_downed.connect(_on_player_downed)
+	if actor == get_parent():
+		_name_to_entities()
 
 
-## Open its actor and its caster and install the staff (once, in `_ready`). With the actor table
-## full the enemy has no attack and only chases.
-func _open_staff() -> void:
-	if not uses_staff() or spells == null or caster >= 0:
-		return
-	var table: ActorsScript = _actor_table()
-	caster = table.open(ActorsScript.TEAM_ENEMIES, ActorsScript.RAMP_ENEMY) if table != null else ActorsScript.NONE
-	if caster < 0:
-		caster = -1
-		push_warning("Ai: the actor table is full, so %s casts nothing." % data.id)
-		return
-	table.set_node(caster, self)
-	spells.open_caster(caster)
-	var compiled: CompiledStaff = _compiled.get(data) as CompiledStaff
-	if compiled == null:
-		compiled = spells.compile_staff(data.cards, data.staff)
-		_compiled[data] = compiled
-	spells.install_staff(caster, 0, compiled)
-	mana = data.max_mana
-	if projectiles != null:
-		projectiles.set_target_owner(self, caster)
-		projectiles.set_anchor(caster, _position_of(self) + hurt_offset)
-	if entities != null:
-		entities.set_enemy(caster, self)
+## It stops driving `actor` (a guest took over): it forgets its target and its windup.
+func stopped(actor: Actor) -> void:
+	if actor.events != null and is_instance_valid(actor.events):
+		if actor.events.damage_dealt.is_connected(_on_damage_dealt):
+			actor.events.damage_dealt.disconnect(_on_damage_dealt)
+		if actor.events.player_downed.is_connected(_on_player_downed):
+			actor.events.player_downed.disconnect(_on_player_downed)
+	_reset()
+	_actor = null
 
 
-## Give the actor back (the enemy left the tree or died): its spells in the air fly on; its
-## decoys and familiars end where they are (F8d), before the caster closes, so their ends still
-## count.
-func close_staff() -> void:
-	if caster < 0:
-		return
-	if entities != null and is_instance_valid(entities):
-		entities.enemy_gone(caster)
-	if spells != null and is_instance_valid(spells):
-		spells.close_caster(caster)
-	if projectiles != null and is_instance_valid(projectiles):
-		projectiles.clear_anchor(caster)
-	var table: ActorsScript = _actor_table()
-	if table != null:
-		table.close(caster)
-	caster = -1
-
-
-## The actor table: `actors`, else the projectile manager's, else the "Actors" autoload.
-func _actor_table() -> ActorsScript:
-	if actors != null:
-		return actors if is_instance_valid(actors) else null
-	if projectiles != null and is_instance_valid(projectiles):
-		return projectiles.actor_table()
-	var tree: SceneTree = Engine.get_main_loop() as SceneTree
-	return tree.root.get_node_or_null(^"Actors") as ActorsScript if tree != null and tree.root != null else null
-
-
-## Siphon gives mana back to this enemy's actor (never above its maximum).
-func _on_mana_refund(caster_id: int, amount: float) -> void:
-	if caster < 0 or caster_id != caster or data == null or not is_finite(amount) or amount <= 0.0:
-		return
-	mana = minf(mana + amount, data.max_mana)
-
-
-## True when the next cast can leave the moment a windup started now would end: its delay is no
-## longer than the windup and the mana is there.
-func cast_ready() -> bool:
-	if caster < 0 or spells == null:
-		return false
-	var cost: float = spells.next_cast_mana(caster, 0)
-	if cost < 0.0:
-		return false
-	return spells.cooldown_left(caster, 0) <= windup_time and mana - spells.reserved_mana(caster) >= cost
-
-
-## How far the next cast reaches along the aim, for the telegraph: its first carrier's flight
-## (speed x life), a beam's or fissure's length, a rain's aim point; 0 for a carrier that is not
-## aimed (a nova, an orbit, a decoy...), which shows no line; 0 without a staff.
-func next_cast_reach() -> float:
-	if caster < 0 or spells == null:
-		return 0.0
-	return spells.next_cast_reach(caster, 0)
-
-
-func _physics_process(delta: float) -> void:
-	step(delta)
-	move_and_slide()
-
-
-## Advance the AI by `delta` seconds and set `velocity`. The caller moves the body
-## (_physics_process does).
-func step(delta: float) -> void:
+## Write the actor's intent for this step (`delta` seconds): look, chase, wind up, cast, recover.
+func think(actor: Actor, delta: float) -> void:
 	_retarget_left -= delta
-	# Look on the timer, at the first step (staggered afterwards) or when the target
-	# was just lost. With no target at all only the timer applies.
-	# A freed target reads as null, so the id tells "never had one" from "lost it".
+	if _grudge_left > 0.0:
+		_grudge_left -= delta
+		if _grudge_left <= 0.0 or not _is_valid_target(grudge):
+			# The grudge is over: back to its team's targets at once.
+			_drop_grudge()
+	# Look on the timer, at the first step (staggered afterwards) or when the target was just
+	# lost. With no target at all only the timer applies. A freed target reads as null, so the
+	# id tells "never had one" from "lost it".
 	var lost: bool = _target_id != 0 and not _is_valid_target(target)
 	if _retarget_left <= 0.0 or lost or not _looked:
 		_retarget_left = RETARGET_TIME if _looked else _retarget_offset
 		_looked = true
-		target = _find_target()
+		target = _find_target(actor)
 		_target_id = target.get_instance_id() if target != null else 0
-	# Chill slows the walk and the attack timers, freeze stops them (Combat's `speed_factor`).
-	var pace: float = combat.speed_factor(self) if combat != null else 1.0
-	if caster >= 0:
-		_step_staff(delta)
+	var intent: ActorIntent = actor.intent
+	intent.move = Vector2.ZERO
+	# Chill slows the attack timers, freeze stops them (the Mover slows the walk by the same pace).
+	var pace: float = actor.combat.pace(actor) if actor.combat != null else 1.0
 	match state:
 		State.CHASE:
-			_step_chase(pace)
+			_chase(actor)
 		State.WINDUP:
-			velocity = Vector2.ZERO
+			intent.aim = _locked_aim
 			_state_left -= delta * pace
 			if _state_left <= 0.0:
-				_attack()
-			else:
-				_update_telegraph()
+				# The cast leaves this step, from the staff tip along the locked aim.
+				intent.press(0)
+				state = State.RECOVER
+				_state_left = recover_time
 		State.RECOVER:
-			velocity = Vector2.ZERO
+			intent.aim = _locked_aim
 			_state_left -= delta * pace
 			if _state_left <= 0.0:
 				state = State.CHASE
-	_hurt_left = maxf(_hurt_left - delta, 0.0)
-	_update_sprite()
-	_step_moves(delta)
-	if combat != null:
-		velocity += combat.consume_knockback_step(self, delta)
 
 
-## True from the start of the windup until the shot leaves: the attack is coming.
+## True from the start of the windup until the cast leaves: the attack is coming.
 func is_telegraphing() -> bool:
 	return state == State.WINDUP
 
 
-## 0.0 at the start of the telegraph, 1.0 when the shot leaves; 0.0 when not telegraphing.
+## 0.0 at the start of the telegraph, 1.0 when the cast leaves; 0.0 when not telegraphing.
 func telegraph_progress() -> float:
 	if state != State.WINDUP or windup_time <= 0.0:
 		return 0.0
 	return clampf(1.0 - _state_left / windup_time, 0.0, 1.0)
 
 
-## Mana back, and where the caster stands and aims (its orbits circle it, its beams follow it).
-## The aim follows the target while it chases; the windup locks it, and so does the recovery, so
-## a beam it holds does not track a wizard who stepped aside.
-func _step_staff(delta: float) -> void:
-	mana = minf(mana + data.mana_regen * delta, data.max_mana)
-	var origin: Vector2 = _position_of(self) + hurt_offset
-	if state == State.CHASE and target != null:
-		var to_target: Vector2 = _position_of(target) - _position_of(self)
-		if to_target != Vector2.ZERO:
-			aim = to_target.normalized()
-	if projectiles != null:
-		projectiles.set_anchor(caster, origin)
-	spells.set_aim(caster, origin, aim)
+## Seconds the grudge still lasts (0 for none).
+func grudge_left() -> float:
+	return maxf(_grudge_left, 0.0) if grudge != null else 0.0
 
 
-func _step_chase(pace: float) -> void:
-	_show_telegraph(false)
-	if target == null or data == null:
-		velocity = Vector2.ZERO
+## Walk to the target; in reach, aim at it and wind up when the next cast is ready.
+func _chase(actor: Actor) -> void:
+	if target == null:
 		return
-	var to_target: Vector2 = _position_of(target) - _position_of(self)
-	if to_target.length_squared() <= attack_range * attack_range:
-		if to_target != Vector2.ZERO:
-			aim = to_target.normalized()
-		if not cast_ready():
-			# In reach but the cast is not ready (or there is no staff): hold, so the telegraph
-			# only ever shows a cast that comes.
-			velocity = Vector2.ZERO
+	var to_target: Vector2 = target.global_position - actor.global_position
+	var near: bool = to_target.length_squared() <= attack_range * attack_range
+	var armed: bool = actor.caster != null and actor.caster.has_staff(0)
+	if to_target != Vector2.ZERO:
+		actor.intent.aim = to_target
+	if near and armed:
+		if not actor.caster.cast_ready(windup_time):
+			# In reach but the cast is not ready: hold, so the telegraph only ever shows a cast
+			# that comes.
 			return
 		state = State.WINDUP
 		_state_left = windup_time
-		velocity = Vector2.ZERO
-		_show_telegraph(true)
+		_locked_aim = to_target.normalized() if to_target != Vector2.ZERO else actor.aim
+		actor.intent.aim = _locked_aim
 		return
-	velocity = to_target.normalized() * data.move_speed * pace
+	# Out of reach, or nothing to cast: walk on (one without a staff walks into its target).
+	if to_target.length_squared() > CLOSE_ENOUGH * CLOSE_ENOUGH:
+		actor.intent.move = to_target.normalized()
 
 
-func _attack() -> void:
-	if caster >= 0:
-		var spent: float = spells.cast_staff(caster, 0, _position_of(self) + hurt_offset, aim, mana - spells.reserved_mana(caster))
-		if spent > 0.0:
-			mana -= spent
-	state = State.RECOVER
-	_state_left = recover_time
-	_show_telegraph(false)
-
-
-## The telegraph from TELEGRAPH_START to `reach` along +X, its lane `radius` plus half the margin
-## either side (its sprite's region and the shader's length and lane).
-func _fit_telegraph(reach: float, radius: float) -> void:
-	var length: float = maxf(reach - TELEGRAPH_START, 1.0)
-	_telegraph.offset = Vector2(TELEGRAPH_START, -TELEGRAPH_HEIGHT * 0.5)
-	_telegraph.region_rect = Rect2(0.0, 0.0, length, TELEGRAPH_HEIGHT)
-	var material: ShaderMaterial = _telegraph.material as ShaderMaterial
-	if material != null:
-		material.set_shader_parameter(&"beam_length", length)
-		material.set_shader_parameter(&"telegraph_lane", radius + TELEGRAPH_LANE_MARGIN * 0.5)
-
-
-## How far the telegraph reaches now (0 when hidden), for tests.
-func telegraph_reach() -> float:
-	if _telegraph == null or not _telegraph.visible:
-		return 0.0
-	return TELEGRAPH_START + _telegraph.region_rect.size.x
-
-
-func _show_telegraph(on: bool) -> void:
-	if _telegraph != null:
-		var reach: float = next_cast_reach() if on else 0.0
-		if reach > TELEGRAPH_START:
-			_fit_telegraph(reach, spells.next_cast_radius(caster, 0))
-		# A cast that is not aimed (a nova, an orbit) shows no line: the pose and flash say it.
-		_telegraph.visible = on and reach > TELEGRAPH_START
-		if on:
-			_telegraph.rotation = aim.angle()
-			_update_telegraph()
-	if _sprite != null:
-		_sprite.modulate = TELEGRAPH_COLOR if on else Color.WHITE
-
-
-## Make the telegraph brighter, its dashes march and its arrowhead grow as the cast gets closer.
-func _update_telegraph() -> void:
-	var progress: float = telegraph_progress()
-	if _sprite != null:
-		_sprite.modulate = TELEGRAPH_COLOR_LAST if progress >= TELEGRAPH_LAST_FROM else TELEGRAPH_COLOR
-	if _telegraph == null:
-		return
-	var material: ShaderMaterial = _telegraph.material as ShaderMaterial
-	if material != null:
-		material.set_shader_parameter(&"telegraph_progress", progress)
-
-
-## True while the hurt pose shows (a hit landed in the last HURT_TIME seconds).
-func is_hurt() -> bool:
-	return _hurt_left > 0.0
-
-
-## Which pose the sprite shows: the hurt one over the windup one over the idle strip. A pose
-## without its texture is skipped.
-func _update_sprite() -> void:
-	if _sprite == null:
-		return
-	var pose: Pose = Pose.IDLE
-	if _hurt_left > 0.0 and hurt_texture != null:
-		pose = Pose.HURT
-	elif state == State.WINDUP and windup_texture != null:
-		pose = Pose.WINDUP
-	if pose != _pose:
-		_pose = pose
-		match pose:
-			Pose.HURT:
-				_show_strip(hurt_texture)
-			Pose.WINDUP:
-				_show_strip(windup_texture)
-			_:
-				_sprite.hframes = _idle_hframes
-				_sprite.texture = _idle_texture
-				if _animation != null and _animation.is_inside_tree():
-					_animation.play()
-	if pose == Pose.WINDUP:
-		var progress: float = telegraph_progress()
-		if progress >= TELEGRAPH_LAST_FROM:
-			_sprite.frame = _sprite.hframes - 1
-		else:
-			_sprite.frame = int(progress * progress * WINDUP_FLASHES) % _sprite.hframes
-
-
-## Show a strip of square frames on the sprite and stop the idle animation.
-func _show_strip(strip: Texture2D) -> void:
-	_sprite.hframes = maxi(roundi(float(strip.get_width()) / maxf(float(strip.get_height()), 1.0)), 1)
-	_sprite.texture = strip
-	_sprite.frame = 0
-	if _animation != null and _animation.is_inside_tree():
-		_animation.pause()
-
-
-func _on_damage_dealt(_player: int, target: Node, _amount: int, _position: Vector2) -> void:
-	if target == self:
-		_hurt_left = HURT_TIME
-		_update_sprite()
-
-
-func _find_target() -> Node2D:
+## The grudge, else a decoy in lure range, else the nearest standing actor of another team.
+func _find_target(actor: Actor) -> Node2D:
 	lookup_count += 1
-	var here: Vector2 = _position_of(self)
-	var decoy: Node2D = entities.lure(here) if entities != null else null
+	if grudge != null and _grudge_left > 0.0:
+		return grudge
+	var here: Vector2 = actor.global_position
+	var decoy: Node2D = _entities().lure(here) if _entities() != null else null
 	if decoy != null:
 		return decoy
-	var best: Node2D = null
-	var best_distance: float = INF
-	var candidates: Array = targets
-	if candidates.is_empty() and is_inside_tree():
-		candidates = get_tree().get_nodes_in_group(PLAYERS_GROUP)
-	for candidate: Variant in candidates:
-		if not _is_valid_target(candidate):
-			continue
-		var wizard: Node2D = candidate as Node2D
-		var distance: float = here.distance_squared_to(_position_of(wizard))
-		if distance < best_distance:
-			best_distance = distance
-			best = wizard
-	return best
+	if actor.projectiles == null:
+		return null
+	var found: Node2D = actor.projectiles.nearest_target(here + actor.body_offset, SIGHT, ProjectileManagerScript.ACTOR_LAYERS, actor, null, actor.team())
+	return found if _is_valid_target(found) else null
 
 
-## A freed player may still sit in `targets` or in `target`, hence the Variant.
+## A freed node may still sit in `target` or `grudge`, hence the Variant. A downed wizard, a down
+## actor and one that is dying are no targets.
 func _is_valid_target(node: Variant) -> bool:
 	if not is_instance_valid(node):
 		return false
+	if node is Actor:
+		var other: Actor = node as Actor
+		return not other.is_down() and not other.is_dying()
 	return not (node.has_method("is_downed") and node.is_downed())
 
 
-## True while a card's dash, hook or swap is moving this enemy.
-func is_moving() -> bool:
-	return _move_left > 0.0
-
-
-## A move its own card asked for (the event names its actor id, as does its tag).
-func _on_caster_move_requested(caster_id: int, mode: StringName, to: Vector2, seconds: float, tag: int) -> void:
-	if caster < 0 or caster_id != caster or not to.is_finite() or not SpellTag.is_spell_tag(tag) or SpellTag.caster_of(tag) != caster:
+## Someone hurt the actor it drives: an actor of its own team (not itself) earns a grudge.
+func _on_damage_dealt(caster: int, hurt: Node, _amount: int, _position: Vector2) -> void:
+	if _actor == null or hurt != _actor or caster < 0 or caster == _actor.id or _actor.actors == null:
 		return
-	var muzzle: Vector2 = _position_of(self) + hurt_offset
-	if mode == &"recoil":
-		var push_time: float = maxf(seconds, 0.01)
-		var free: int = _recoil_left.find(0.0)
-		var at: int = free if free >= 0 else MAX_RECOILS - 1
-		_recoil_velocity[at] += (to - muzzle) / push_time
-		_recoil_left[at] = maxf(_recoil_left[at], push_time)
+	if _actor.actors.team_of(caster) != _actor.team():
 		return
-	if mode != &"dash" and mode != &"teleport" and mode != &"hook" and mode != &"swap":
+	var attacker: Node2D = _actor.actors.node_of(caster) as Node2D
+	if attacker == null or attacker == _actor or not _is_valid_target(attacker):
 		return
-	if _move_left > 0.0:
-		_finish_move()
-	if mode == &"teleport":
-		_teleport(to, tag)
-		return
-	var time: float = maxf(seconds, 0.01)
-	# A dash is measured from the staff tip, a pull (hook, swap) is to the point itself.
-	var goal: Vector2 = _position_of(self) + (to - muzzle) if mode == &"dash" else to
-	_move_mode = mode
-	_move_left = time
-	_move_velocity = (goal - _position_of(self)) / time
-	_move_tag = tag
+	grudge = attacker
+	_grudge_left = GRUDGE_TIME
+	# Turn on it at the next step.
+	_retarget_left = 0.0
 
 
-## Jump to where a teleport card aimed (`to` is measured from the staff tip), stopping short of
-## the first wall and backing off until the body is clear, then say where it landed.
-func _teleport(to: Vector2, tag: int) -> void:
-	var start: Vector2 = _position_of(self)
-	var goal: Vector2 = start + (to - (start + hurt_offset))
-	if projectiles != null:
-		var reached: Vector2 = projectiles.clip_to_walls(start, goal)
-		if reached != goal:
-			reached = reached.move_toward(start, TELEPORT_CLEARANCE)
-		goal = reached
-		while goal != start and projectiles.circle_blocked(goal, BODY_RADIUS):
-			goal = goal.move_toward(start, TELEPORT_BACKOFF)
-	_set_position(goal)
-	if events != null:
-		events.caster_move_finished.emit(caster, &"teleport", goal, tag)
+func _drop_grudge() -> void:
+	grudge = null
+	_grudge_left = 0.0
+	_retarget_left = 0.0
 
 
-## The running move and the recoil pushes set `velocity` (walls stop them, as `move_and_slide`
-## does any walk); a move whose time is up says where it ended.
-func _step_moves(delta: float) -> void:
-	if _move_left > 0.0:
-		# The last step is shortened, so a move goes exactly its distance.
-		velocity = _move_velocity * minf(delta, _move_left) / delta
-		_move_left -= delta
-	elif _move_mode != &"":
-		# Answered the step after its last, when the body has got there.
-		_finish_move()
-	for i in MAX_RECOILS:
-		if _recoil_left[i] > 0.0:
-			velocity += _recoil_velocity[i] * minf(delta, _recoil_left[i]) / delta
-			_recoil_left[i] = maxf(_recoil_left[i] - delta, 0.0)
-			if _recoil_left[i] == 0.0:
-				_recoil_velocity[i] = Vector2.ZERO
-
-
-## The move is over: say where (a swap says nothing; its blast went off at the target).
-func _finish_move() -> void:
-	var mode: StringName = _move_mode
-	_move_left = 0.0
-	_move_mode = &""
-	_move_velocity = Vector2.ZERO
-	if events != null and mode != &"swap" and mode != &"":
-		events.caster_move_finished.emit(caster, mode, _position_of(self), _move_tag)
-
-
-func _set_position(at: Vector2) -> void:
-	if is_inside_tree():
-		global_position = at
-	else:
-		position = at
-
-
-## A swap card moved this enemy: it is there at once, its state and aim kept.
-func _on_target_move_requested(_player: int, moved: Node, to: Vector2) -> void:
-	if moved != self or not to.is_finite():
-		return
-	if is_inside_tree():
-		global_position = to
-	else:
-		position = to
-
-
-func _on_player_downed(player: int) -> void:
-	# Only enemies chasing the downed wizard look again at once; the rest keep their
-	# staggered timer, so a death does not make every enemy search in one frame.
-	if is_instance_valid(target) and target.get("index") == player:
+func _on_player_downed(_player: int) -> void:
+	# Only enemies chasing the downed wizard look again at once; the rest keep their staggered
+	# timer, so a downing does not make every enemy search in one frame.
+	if target != null and not _is_valid_target(target):
 		_retarget_left = 0.0
 
 
-func _position_of(node: Node2D) -> Vector2:
-	return node.global_position if node.is_inside_tree() else node.position
+## A fresh chase: no target, no grudge, no windup.
+func _reset() -> void:
+	state = State.CHASE
+	target = null
+	_target_id = 0
+	grudge = null
+	_grudge_left = 0.0
+	_state_left = 0.0
+	_looked = false
+	_retarget_left = _retarget_offset
+
+
+## `entities`, else the "Entities" autoload (only in the tree).
+func _entities() -> EntitiesScript:
+	if entities == null and is_inside_tree():
+		entities = get_node_or_null(^"/root/Entities") as EntitiesScript
+	return entities if entities != null and is_instance_valid(entities) else null
+
+
+## Name its home actor to Entities by its id, so its decoys copy it and its familiars circle it.
+func _name_to_entities() -> void:
+	if _actor == null or _actor.id < 0 or _entities() == null:
+		return
+	_named = _actor.id
+	entities.set_enemy(_named, _actor)
+
+
+## Its home actor leaves: its decoys and familiars end where they are.
+func _forget_entities() -> void:
+	if _named < 0:
+		return
+	if entities != null and is_instance_valid(entities):
+		entities.enemy_gone(_named)
+	_named = -1

@@ -41,7 +41,7 @@ func take() -> void:
 	var damage: int = 0
 	for standing: Node in _flow.call("dummies") as Array:
 		if (standing.get("data") as EnemyBase).id == &"training_dummy":
-			damage += int(standing.get("total_damage"))
+			damage += int(standing.get_node("DummyLook").get("total_damage"))
 	if damage <= 0:
 		fail("no training dummy took damage")
 		return
@@ -68,7 +68,7 @@ func take() -> void:
 	await create_timer(1.0).timeout
 	var shooter: Node = (_flow.call("dummies") as Array)[1]
 	for wait in 40:
-		if shooter.call("is_telegraphing"):
+		if shooter.get_node("AIController").call("is_telegraphing"):
 			break
 		await process_frame
 	await shot("sandbox_four_players")

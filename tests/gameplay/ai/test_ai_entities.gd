@@ -10,7 +10,6 @@ extends "res://tests/support/suite.gd"
 ##
 ## godot --headless --path . --script res://tests/gameplay/ai/test_ai_entities.gd
 
-const AiScript := preload("res://gameplay/ai/ai.gd")
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const EntitiesScript := preload("res://gameplay/ai/entities.gd")
 const EventsScript := preload("res://core/events/events.gd")
@@ -40,7 +39,7 @@ var _entities: EntitiesScript
 var _fake: FakeRegistry
 var _actors: ActorsScript
 var _wizard: Actor
-var _enemies: Array[AiScript] = []
+var _enemies: Array[Actor] = []
 ## Every familiar_cast_requested as [caster, tag], and entity_ended as [caster, kind, tag].
 var _casts: Array = []
 var _ended: Array = []
@@ -56,11 +55,13 @@ func before_each() -> void:
 	_projectiles.actors = _actors
 	_spells = own(SpellsScript.new()) as SpellsScript
 	_spells.registry = _fake
+	_spells.actors = _actors
 	_spells.bind(_projectiles, _bus)
 	_combat = own(CombatScript.new()) as CombatScript
 	_combat.events = _bus
 	_combat.projectiles = _projectiles
 	_combat.spells = _spells
+	_combat.actors = _actors
 	_combat._ready()
 	_entities = own(EntitiesScript.new()) as EntitiesScript
 	_entities.events = _bus
@@ -129,19 +130,28 @@ func _data(cards: Array[StringName]) -> EnemyBase:
 
 
 ## An enemy of `data` from the imp's scene (its Sprite), in the tree at `at`.
-func _enemy(data: EnemyBase, at: Vector2 = Vector2.ZERO) -> AiScript:
-	var enemy: AiScript = ImpData.scene.instantiate()
+func _enemy(data: EnemyBase, at: Vector2 = Vector2.ZERO) -> Actor:
+	var enemy: Actor = ImpData.scene.instantiate()
 	enemy.data = data
 	enemy.events = _bus
 	enemy.combat = _combat
 	enemy.projectiles = _projectiles
 	enemy.spells = _spells
-	enemy.entities = _entities
-	enemy.targets.append(_wizard)
+	enemy.actors = _actors
+	_ai(enemy).entities = _entities
 	root.add_child(enemy)
 	enemy.position = at
 	_enemies.append(enemy)
 	return enemy
+
+
+## The enemy's AI and look (its home controller and its CreatureLook).
+func _ai(enemy: Actor) -> AIController:
+	return enemy.get_node("AIController") as AIController
+
+
+func _look(enemy: Actor) -> CreatureLook:
+	return enemy.get_node("CreatureLook") as CreatureLook
 
 
 func _run(seconds: float) -> void:
@@ -157,17 +167,17 @@ func _run(seconds: float) -> void:
 
 func test_an_enemys_decoy_copies_it_and_every_hit_wears_it_down() -> void:
 	var enemy := _enemy(_data([&"decoy"]))
-	var tag: int = _spells.current_tag(enemy.caster, 0)
-	_run(enemy.windup_time + 2.0 * STEP)
-	check_equal(_entities.count_owned(EntitiesScript.DECOY, enemy.caster), 1, "its decoy card makes one decoy, the enemy's")
+	var tag: int = _spells.current_tag(enemy.id, 0)
+	_run(_ai(enemy).windup_time + 2.0 * STEP)
+	check_equal(_entities.count_owned(EntitiesScript.DECOY, enemy.id), 1, "its decoy card makes one decoy, the enemy's")
 	check_equal(_entities.count(EntitiesScript.DECOY, _wizard.id), 0, "not the wizard's")
-	var at: Vector2 = _entities.positions_of(enemy.caster, tag)[0]
+	var at: Vector2 = _entities.positions_of(enemy.id, tag)[0]
 	var decoy: Node2D = _projectiles.nearest_target(at, 16.0, ManagerScript.LAYER_ENEMY, enemy)
 	check(decoy is EntitiesScript.Decoy, "a target on the enemies' layer, where wizards' shots and homing look")
 	check(_projectiles.nearest_target(at, 16.0, ManagerScript.LAYER_PLAYER, _wizard) == null, "and not on the wizards' layer")
 	var copied: Sprite2D = (decoy as EntitiesScript.Decoy).sprite
 	var fresh: Node = ImpData.scene.instantiate()
-	var looks: Array = [(fresh.get_node("Sprite") as Sprite2D).texture, enemy.windup_texture, enemy.hurt_texture]
+	var looks: Array = [(fresh.get_node("Sprite") as Sprite2D).texture, _look(enemy).windup_texture, _look(enemy).hurt_texture]
 	fresh.free()
 	check(copied.texture != null and looks.has(copied.texture), "it copies the enemy's sprite")
 	check(_entities.lure(at) == null, "enemies never chase an enemy's decoy")
@@ -177,19 +187,19 @@ func test_an_enemys_decoy_copies_it_and_every_hit_wears_it_down() -> void:
 	var wizard_tag: int = SpellTag.make(_wizard.id, 0, 0, 0)
 	for i in EntitiesScript.DECOY_HITS - 2:
 		_bus.projectile_hit.emit(_wizard.id, decoy, at, wizard_tag)
-	check_equal(_entities.count_owned(EntitiesScript.DECOY, enemy.caster), 1, "it holds until its last hit")
+	check_equal(_entities.count_owned(EntitiesScript.DECOY, enemy.id), 1, "it holds until its last hit")
 	_bus.projectile_hit.emit(_wizard.id, decoy, at, wizard_tag)
-	check_equal(_entities.count_owned(EntitiesScript.DECOY, enemy.caster), 0, "DECOY_HITS hits break it, an enemy's among them")
-	check(_ended.size() == 1 and _ended[0][0] == enemy.caster and _ended[0][1] == EntitiesScript.DECOY and _ended[0][2] == tag, "and its end is said under the enemy's actor id with its tag")
+	check_equal(_entities.count_owned(EntitiesScript.DECOY, enemy.id), 0, "DECOY_HITS hits break it, an enemy's among them")
+	check(_ended.size() == 1 and _ended[0][0] == enemy.id and _ended[0][1] == EntitiesScript.DECOY and _ended[0][2] == tag, "and its end is said under the enemy's actor id with its tag")
 
 
 func test_an_enemys_familiar_circles_it_and_casts_at_the_wizard() -> void:
 	var enemy := _enemy(_data([&"familiar", &"bolt"]))
-	var tag: int = _spells.current_tag(enemy.caster, 0)
-	_run(enemy.windup_time + 2.0 * STEP)
-	check_equal(_entities.count_owned(EntitiesScript.FAMILIAR, enemy.caster), 1, "its familiar card makes one familiar")
+	var tag: int = _spells.current_tag(enemy.id, 0)
+	_run(_ai(enemy).windup_time + 2.0 * STEP)
+	check_equal(_entities.count_owned(EntitiesScript.FAMILIAR, enemy.id), 1, "its familiar card makes one familiar")
 	_run(0.25)
-	var at: Vector2 = _entities.positions_of(enemy.caster, tag)[0]
+	var at: Vector2 = _entities.positions_of(enemy.id, tag)[0]
 	var centre: Vector2 = enemy.global_position + EntitiesScript.FAMILIAR_CENTRE
 	check(is_equal_approx(at.distance_to(centre), EntitiesScript.FAMILIAR_ORBIT), "it circles the enemy (%.2f from it)" % at.distance_to(centre))
 	var hits: Array = []
@@ -198,15 +208,15 @@ func test_an_enemys_familiar_circles_it_and_casts_at_the_wizard() -> void:
 	for i in 12:
 		_run(STEP)
 		peak = maxi(peak, _projectiles.get_count())
-	check(_casts.size() >= 1 and _casts[0][0] == enemy.caster and _casts[0][1] == tag, "it casts at the wizard, under the enemy's actor id with its tag")
+	check(_casts.size() >= 1 and _casts[0][0] == enemy.id and _casts[0][1] == tag, "it casts at the wizard, under the enemy's actor id with its tag")
 	check(peak >= 1, "the enemy's spell (its bolt) leaves it")
-	check(hits.size() >= 1 and hits[0][0] == enemy.caster and hits[0][1] == _wizard, "and hits the wizard as the enemy's")
+	check(hits.size() >= 1 and hits[0][0] == enemy.id and hits[0][1] == _wizard, "and hits the wizard as the enemy's")
 	check_equal(_entities.drawn_familiars(), 1, "drawn with the others")
 
 
 func test_an_enemys_familiar_waits_without_a_wizard_in_range() -> void:
 	var enemy := _enemy(_data([&"familiar", &"bolt"]))
-	_run(enemy.windup_time + 2.0 * STEP)
+	_run(_ai(enemy).windup_time + 2.0 * STEP)
 	_wizard.position = Vector2(2000.0, 0.0)
 	_run(EntitiesScript.FAMILIAR_FIRST + 1.0)
 	check(_casts.is_empty(), "no wizard within its range: it does not cast (enemies are never its targets)")
@@ -214,11 +224,12 @@ func test_an_enemys_familiar_waits_without_a_wizard_in_range() -> void:
 
 func test_an_enemys_entities_end_with_it() -> void:
 	var enemy := _enemy(_data([&"familiar", &"bolt"]))
-	var tag: int = _spells.current_tag(enemy.caster, 0)
-	var caster: int = enemy.caster
-	_run(enemy.windup_time + 2.0 * STEP)
+	var tag: int = _spells.current_tag(enemy.id, 0)
+	var caster: int = enemy.id
+	_run(_ai(enemy).windup_time + 2.0 * STEP)
 	check_equal(_entities.count_owned(EntitiesScript.FAMILIAR, caster), 1, "a familiar is live")
-	enemy.close_staff()
+	# Leaving the tree (dying, a new room) ends them.
+	root.remove_child(enemy)
 	check_equal(_entities.count_owned(EntitiesScript.FAMILIAR, caster), 0, "the enemy gone, its familiar ends")
 	check(_ended.size() == 1 and _ended[0][0] == caster and _ended[0][2] == tag, "with entity_ended, so its end still counts")
 
@@ -258,9 +269,8 @@ func test_an_enemys_bolt_hits_another_enemy_in_its_way() -> void:
 	var caster := _enemy(_data([&"bolt"]), Vector2.ZERO)
 	_wizard.position = Vector2(80.0, 0.0)
 	var blocker := _enemy(_data([&"bolt"]), Vector2(40.0, 0.0))
-	blocker.data.max_mana = 0.0
-	blocker.mana = 0.0
+	blocker.caster.mana = 0.0
 	var health: int = _combat.get_health(blocker)
-	_run(caster.windup_time + 0.5)
+	_run(_ai(caster).windup_time + 0.5)
 	check(_combat.get_health(blocker) < health, "the enemy in the way is hit")
 	check(_combat.get_health(caster) == ImpData.max_health, "the caster is never hit by its own bolt")

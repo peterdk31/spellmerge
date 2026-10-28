@@ -44,7 +44,6 @@ const BotScript := preload("res://tests/bots/bot.gd")
 const ErrorLogScript := preload("res://tests/smoke/error_log.gd")
 const ProbeScript := preload("res://tests/benchmark/probe.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
-const AiScript := preload("res://gameplay/ai/ai.gd")
 
 const PLAYERS: int = 4
 ## The scenarios: label, enemies, shots, and (variants only) whether the scene is drawn and
@@ -302,13 +301,13 @@ func _time_parts() -> void:
 		if is_instance_valid(enemy):
 			enemy.call("step", 0.0)
 	var stepped: int = Time.get_ticks_usec()
-	# The two linear lookups an enemy's step makes in Combat (`Array.find` over the crowd).
+	# The two lookups an actor's step makes in Combat (its pace and its knockback).
 	for enemy in _enemies:
 		if is_instance_valid(enemy):
 			var combat: Object = enemy.get("combat")
 			if combat != null:
-				combat.call("speed_factor", enemy)
-				combat.call("consume_knockback_step", enemy, 0.0)
+				combat.call("pace", enemy)
+				combat.call("consume_knockback", enemy, 0.0)
 	var looked: int = Time.get_ticks_usec()
 	if _feel != null:
 		_feel.call("step", 0.0)
@@ -358,7 +357,7 @@ func _top_up_enemies() -> void:
 		return
 	var add: int = mini(_target_enemies - alive, SPAWN_PER_FRAME)
 	for i in add:
-		var enemy := _enemy_data.scene.instantiate() as AiScript
+		var enemy := _enemy_data.scene.instantiate() as Actor
 		if enemy == null:
 			continue
 		enemy.data = _enemy_data

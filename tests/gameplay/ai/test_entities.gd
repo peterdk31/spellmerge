@@ -7,7 +7,6 @@ extends SceneTree
 ## godot --headless --path . --script res://tests/gameplay/ai/test_entities.gd
 
 const AiFixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
-const AiScript := preload("res://gameplay/ai/ai.gd")
 const EntitiesScript := preload("res://gameplay/ai/entities.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
@@ -83,10 +82,10 @@ func _teardown() -> void:
 	_world = null
 
 
-func _imp(at: Vector2) -> AiScript:
-	var enemy: AiScript = _world.imp(at)
-	enemy.entities = _entities
-	return enemy
+## An imp of the fixture (an actor) whose AI asks these Entities for decoys.
+func _imp(at: Vector2) -> Actor:
+	_world.entities = _entities
+	return _world.imp(at)
 
 
 ## A still enemy as the projectile manager knows one (a target on LAYER_ENEMY), in the tree.
@@ -122,21 +121,21 @@ func _test_decoy_is_chased_before_a_nearer_wizard() -> void:
 	_setup(1)
 	_world.players[0].position = Vector2(60.0, 0.0)
 	_spawn(0, EntitiesScript.DECOY, Vector2(-150.0, 0.0))
-	var imp: AiScript = _imp(Vector2.ZERO)
+	var imp: Actor = _imp(Vector2.ZERO)
 	_run(1)
-	_check(imp.target != null and imp.target != _world.players[0], "an imp near a decoy chases the decoy, not the nearer wizard")
+	_check(AiFixture.ai(imp).target != null and AiFixture.ai(imp).target != _world.players[0], "an imp near a decoy chases the decoy, not the nearer wizard")
 	_check(imp.velocity.x < 0.0, "the imp walks toward the decoy")
 	_world.players[0].position = Vector2(1000.0, 0.0)
-	var far: AiScript = _imp(Vector2(600.0, 0.0))
+	var far: Actor = _imp(Vector2(600.0, 0.0))
 	_run(1)
-	_check(far.target == _world.players[0], "an imp beyond the lure range chases the wizard")
+	_check(AiFixture.ai(far).target == _world.players[0], "an imp beyond the lure range chases the wizard")
 
 
 func _test_enemy_shots_break_a_decoy() -> void:
 	_setup(1)
 	_world.players[0].position = Vector2(5000.0, 0.0)
 	_spawn(0, EntitiesScript.DECOY, Vector2(80.0, 0.0), 60.0)
-	var imp: AiScript = _imp(Vector2.ZERO)
+	var imp: Actor = _imp(Vector2.ZERO)
 	# Wind up, shoot and recover: about 3 s an attack. Three hits break the decoy.
 	_run(int(12.0 / STEP))
 	_check(_ended.size() == 1, "the decoy breaks once after enemy shots, got %d ends" % _ended.size())
@@ -145,7 +144,7 @@ func _test_enemy_shots_break_a_decoy() -> void:
 		_check((_ended[0][2] as Vector2).is_equal_approx(Vector2(80.0, 0.0)), "a decoy ends where it stood")
 	_check(_entities.count() == 0, "the broken decoy is gone")
 	_run(2)
-	_check(imp.target == _world.players[0], "the imp goes back to the wizard once the decoy breaks")
+	_check(AiFixture.ai(imp).target == _world.players[0], "the imp goes back to the wizard once the decoy breaks")
 
 
 ## Every hit wears a decoy down, a teammate's as well as an enemy's (actors G3c: no sides).
@@ -338,8 +337,8 @@ func _test_bad_requests_are_ignored() -> void:
 
 func _test_swap_moves_only_the_named_enemy() -> void:
 	_setup(1)
-	var moved: AiScript = _imp(Vector2(50.0, 0.0))
-	var other: AiScript = _imp(Vector2(-50.0, 0.0))
+	var moved: Actor = _imp(Vector2(50.0, 0.0))
+	var other: Actor = _imp(Vector2(-50.0, 0.0))
 	_world.bus.target_move_requested.emit(0, moved, Vector2(300.0, 200.0))
 	_check(moved.position.is_equal_approx(Vector2(300.0, 200.0)), "target_move_requested moves the enemy it names")
 	_check(other.position.is_equal_approx(Vector2(-50.0, 0.0)), "and no other")

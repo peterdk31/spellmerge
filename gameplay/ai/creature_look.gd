@@ -1,0 +1,203 @@
+class_name CreatureLook
+extends ActorLook
+## How a creature looks (actors G6, docs/milestones/M2-actors.md, "The components"): the poses,
+## the flash and the telegraph of an enemy actor (content/enemies/ember_imp/ember_imp.tscn). It
+## reads the actor and the AI driving it and draws; it changes nothing the game plays by. All of
+## an enemy's drawing is here, none in the AI (a straight port of what ai.gd drew before G6).
+##
+## It draws with three nodes of the actor's scene: `sprite` (the body, named "Sprite": Feel and
+## Entities find it by that name), `telegraph` (a Sprite2D drawn by `telegraph.gdshader` in this
+## folder, its material local to the scene) and `animation` (the idle animation). Left empty,
+## each is the actor's child of that name ("Sprite", "Telegraph", "AnimationPlayer"); none is
+## required.
+##
+## Telegraph: while the AI driving the actor winds up (`AIController.is_telegraphing`), the
+## sprite flashes (`modulate`) and the telegraph turns toward the locked aim and shows. It runs
+## from TELEGRAPH_START to the real reach of the next cast (`Caster.next_cast_reach`), its lane as
+## wide as what is coming plus a margin, and its dashes march, its arrowhead grows and it
+## brightens with `telegraph_progress()`. A cast that is not aimed (a nova, an orbit) shows only
+## the pose and the flash. An actor driven by a seat (possess, G9) shows no telegraph: a human
+## casts when they like.
+##
+## Poses: with `windup_texture` set (a strip of 32 px frames), the sprite shows it from the start
+## of the windup and flips between its frames faster and faster (WINDUP_FLASHES), and goes
+## brighter still for the last stretch (TELEGRAPH_LAST_FROM). With `hurt_texture` set, a hit on
+## the actor (`damage_dealt` naming it; a burn tick that does not kill sends none, so a burning
+## enemy does not flinch twice a second) shows it for HURT_TIME seconds, over the windup too. A hit
+## never cancels the windup: the shot still comes, so the telegraph stays honest (knockback and
+## Feel's flash and squash are Combat's and Feel's). The animation is paused while a pose other
+## than the idle shows.
+##
+## Nothing here allocates per frame.
+
+enum Pose { IDLE, WINDUP, HURT }
+
+## The telegraph line starts this far from the hand (where the cast leaves).
+const TELEGRAPH_START: float = 10.0
+## The telegraph's lane is the hit width of what is coming plus this margin.
+const TELEGRAPH_LANE_MARGIN: float = 8.0
+## The telegraph sprite's region height (its texture's), with the lane in its middle.
+const TELEGRAPH_HEIGHT: float = 32.0
+## `sprite` modulate while the telegraph shows, and for its last part.
+const TELEGRAPH_COLOR: Color = Color(1.6, 1.3, 1.3)
+const TELEGRAPH_COLOR_LAST: Color = Color(2.0, 1.8, 1.5)
+## Where the last part of the windup starts (0..1 progress): from here the sprite is drawn in
+## TELEGRAPH_COLOR_LAST and holds its bright frame instead of flipping.
+const TELEGRAPH_LAST_FROM: float = 0.8
+## Windup frame flips before the last part: frame = floor(progress² × this) mod frames, so it
+## starts slow and speeds up, to about 5 bright-dark cycles a second at most.
+const WINDUP_FLASHES: float = 5.0
+## Seconds the hurt pose shows after a hit.
+const HURT_TIME: float = 0.25
+
+## Optional poses for the sprite: strips of square frames (width / height frames).
+@export var windup_texture: Texture2D = null
+@export var hurt_texture: Texture2D = null
+## The nodes it draws with (see the class doc); empty: the actor's child of that name.
+@export var sprite: Sprite2D = null
+@export var telegraph: Sprite2D = null
+@export var animation: AnimationPlayer = null
+
+var _idle_texture: Texture2D = null
+var _idle_hframes: int = 1
+## Seconds the hurt pose still shows.
+var _hurt_left: float = 0.0
+## The pose now on the sprite.
+var _pose: Pose = Pose.IDLE
+## True while the telegraph (and the flash) is up.
+var _showing: bool = false
+
+
+func setup(owner_actor: Actor) -> void:
+	super.setup(owner_actor)
+	if sprite == null:
+		sprite = actor.get_node_or_null(^"Sprite") as Sprite2D
+	if telegraph == null:
+		telegraph = actor.get_node_or_null(^"Telegraph") as Sprite2D
+	if animation == null:
+		animation = actor.get_node_or_null(^"AnimationPlayer") as AnimationPlayer
+	if sprite != null:
+		_idle_texture = sprite.texture
+		_idle_hframes = sprite.hframes
+	if telegraph != null:
+		telegraph.visible = false
+		# Starts where the cast does (the hand; an imp's is its body), whatever the scene says.
+		telegraph.position = actor.hand_offset
+		telegraph.centered = false
+		telegraph.region_enabled = true
+	# Connected once; a look freed with its actor is disconnected by Godot.
+	if actor.events != null and not actor.events.damage_dealt.is_connected(_on_damage_dealt):
+		actor.events.damage_dealt.connect(_on_damage_dealt)
+
+
+## Draw the actor after this step: the telegraph and flash from its AI's windup, then the pose.
+func step(delta: float) -> void:
+	var ai: AIController = actor.controller as AIController
+	var telegraphing: bool = ai != null and ai.is_telegraphing()
+	if telegraphing != _showing:
+		_show_telegraph(telegraphing, ai)
+	elif telegraphing:
+		_update_telegraph(ai.telegraph_progress())
+	_hurt_left = maxf(_hurt_left - delta, 0.0)
+	_update_sprite()
+
+
+## True while the hurt pose shows (a hit landed in the last HURT_TIME seconds).
+func is_hurt() -> bool:
+	return _hurt_left > 0.0
+
+
+## How far the telegraph reaches now (0 when hidden), for tests.
+func telegraph_reach() -> float:
+	if telegraph == null or not telegraph.visible:
+		return 0.0
+	return TELEGRAPH_START + telegraph.region_rect.size.x
+
+
+## The telegraph from TELEGRAPH_START to `reach` along +X, its lane `radius` plus half the margin
+## either side (its sprite's region and the shader's length and lane).
+func _fit_telegraph(reach: float, radius: float) -> void:
+	var length: float = maxf(reach - TELEGRAPH_START, 1.0)
+	telegraph.offset = Vector2(TELEGRAPH_START, -TELEGRAPH_HEIGHT * 0.5)
+	telegraph.region_rect = Rect2(0.0, 0.0, length, TELEGRAPH_HEIGHT)
+	var material: ShaderMaterial = telegraph.material as ShaderMaterial
+	if material != null:
+		material.set_shader_parameter(&"beam_length", length)
+		material.set_shader_parameter(&"telegraph_lane", radius + TELEGRAPH_LANE_MARGIN * 0.5)
+
+
+func _show_telegraph(on: bool, ai: AIController) -> void:
+	_showing = on
+	if telegraph != null:
+		var caster: Caster = actor.caster
+		var reach: float = caster.next_cast_reach(0) if on and caster != null else 0.0
+		if reach > TELEGRAPH_START:
+			_fit_telegraph(reach, caster.next_cast_radius(0))
+		# A cast that is not aimed (a nova, an orbit) shows no line: the pose and flash say it.
+		telegraph.visible = on and reach > TELEGRAPH_START
+		if on:
+			telegraph.rotation = actor.aim.angle()
+	if on:
+		_update_telegraph(ai.telegraph_progress())
+	elif sprite != null:
+		sprite.modulate = Color.WHITE
+
+
+## Make the telegraph brighter, its dashes march and its arrowhead grow as the cast gets closer.
+func _update_telegraph(progress: float) -> void:
+	if sprite != null:
+		sprite.modulate = TELEGRAPH_COLOR_LAST if progress >= TELEGRAPH_LAST_FROM else TELEGRAPH_COLOR
+	if telegraph == null:
+		return
+	# The aim is locked through the windup; a swap or a possession may still turn the actor.
+	telegraph.rotation = actor.aim.angle()
+	var material: ShaderMaterial = telegraph.material as ShaderMaterial
+	if material != null:
+		material.set_shader_parameter(&"telegraph_progress", progress)
+
+
+## Which pose the sprite shows: the hurt one over the windup one over the idle strip. A pose
+## without its texture is skipped.
+func _update_sprite() -> void:
+	if sprite == null:
+		return
+	var pose: Pose = Pose.IDLE
+	if _hurt_left > 0.0 and hurt_texture != null:
+		pose = Pose.HURT
+	elif _showing and windup_texture != null:
+		pose = Pose.WINDUP
+	if pose != _pose:
+		_pose = pose
+		match pose:
+			Pose.HURT:
+				_show_strip(hurt_texture)
+			Pose.WINDUP:
+				_show_strip(windup_texture)
+			_:
+				sprite.hframes = _idle_hframes
+				sprite.texture = _idle_texture
+				if animation != null and animation.is_inside_tree():
+					animation.play()
+	if pose == Pose.WINDUP:
+		var ai: AIController = actor.controller as AIController
+		var progress: float = ai.telegraph_progress() if ai != null else 0.0
+		if progress >= TELEGRAPH_LAST_FROM:
+			sprite.frame = sprite.hframes - 1
+		else:
+			sprite.frame = int(progress * progress * WINDUP_FLASHES) % sprite.hframes
+
+
+## Show a strip of square frames on the sprite and stop the idle animation.
+func _show_strip(strip: Texture2D) -> void:
+	sprite.hframes = maxi(roundi(float(strip.get_width()) / maxf(float(strip.get_height()), 1.0)), 1)
+	sprite.texture = strip
+	sprite.frame = 0
+	if animation != null and animation.is_inside_tree():
+		animation.pause()
+
+
+## A hit on the actor shows the hurt pose at once.
+func _on_damage_dealt(_caster: int, target: Node, _amount: int, _position: Vector2) -> void:
+	if target == actor:
+		_hurt_left = HURT_TIME
+		_update_sprite()

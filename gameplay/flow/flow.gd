@@ -599,9 +599,12 @@ func _spawn_enemies(parent: Node2D, room: RoomBase, data: EnemyBase, count: int)
 		var spawn: int = entry % room.enemy_spawns.size()
 		var times: int = uses.get(spawn, 0)
 		uses[spawn] = times + 1
-		var enemy := data.scene.instantiate() as AiScript
+		var node: Node = data.scene.instantiate()
+		var enemy := node as Actor
 		if enemy == null:
-			push_warning("Flow: the enemy scene has no AI script on its root, so it is skipped.")
+			push_warning("Flow: the enemy scene's root is not an actor, so it is skipped.")
+			if node != null:
+				node.free()
 			continue
 		enemy.data = data
 		enemy.position = stacked_position(room.enemy_spawns[spawn], times)
@@ -624,13 +627,14 @@ func _spawn_dummies(parent: Node2D, room: RoomBase) -> void:
 		if data == null or data.scene == null:
 			push_warning("Flow: the dummy '%s' is missing from the registry, so the sandbox runs without it." % id)
 			continue
-		var dummy := data.scene.instantiate() as Node2D
-		if dummy == null or not "data" in dummy:
-			push_warning("Flow: the dummy '%s' has no enemy script on its root, so it is skipped." % id)
-			if dummy != null:
-				dummy.free()
+		var node: Node = data.scene.instantiate()
+		var dummy := node as Actor
+		if dummy == null:
+			push_warning("Flow: the dummy '%s' is not an actor, so it is skipped." % id)
+			if node != null:
+				node.free()
 			continue
-		dummy.set("data", data)
+		dummy.data = data
 		dummy.position = room.dummy_spawns[i]
 		parent.add_child(dummy)
 		_dummies.append(dummy)

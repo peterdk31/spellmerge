@@ -220,10 +220,11 @@ func _pick_detour(wizard: Node2D, target: Node2D) -> Vector2:
 ## The enemy about to shoot at the wizard (see DODGE_*), or null.
 func _incoming(world: Node2D, wizard: Node2D) -> Node2D:
 	for child in world.get_children():
-		var enemy := child as CharacterBody2D
-		if enemy == null or not enemy.has_method("telegraph_progress") or enemy.is_queued_for_deletion():
+		var enemy := child as Actor
+		var ai: AIController = _ai_of(enemy)
+		if ai == null or enemy.is_queued_for_deletion():
 			continue
-		if float(enemy.call("telegraph_progress")) < DODGE_FROM:
+		if ai.telegraph_progress() < DODGE_FROM:
 			continue
 		var to_wizard: Vector2 = wizard.global_position - enemy.global_position
 		if to_wizard.length() > DODGE_RANGE:
@@ -238,15 +239,20 @@ func _nearest_enemy(world: Node2D, from: Vector2) -> Node2D:
 	var best: Node2D = null
 	var best_distance: float = INF
 	for child in world.get_children():
-		# Enemies are the bodies with the AI script on their root.
-		var enemy := child as CharacterBody2D
-		if enemy == null or not enemy.has_method("telegraph_progress") or enemy.is_queued_for_deletion():
+		# Enemies are the actors an AI drives (actors G6).
+		var enemy := child as Actor
+		if _ai_of(enemy) == null or enemy.is_queued_for_deletion():
 			continue
 		var distance: float = from.distance_squared_to(enemy.global_position)
 		if distance < best_distance:
 			best_distance = distance
 			best = enemy
 	return best
+
+
+## The AI driving `enemy`, or null (not an actor, or no AI drives it).
+func _ai_of(enemy: Actor) -> AIController:
+	return enemy.controller as AIController if enemy != null else null
 
 
 func _track_stuck(at: Vector2) -> void:

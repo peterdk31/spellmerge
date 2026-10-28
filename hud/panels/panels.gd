@@ -17,11 +17,11 @@ extends CanvasLayer
 ## once per plan), and its next cast and delay are read each frame from `Spells.cast_index` and
 ## `Spells.cooldown_left`, plain numbers that allocate nothing (`step_staffs`).
 ##
-## A possessed seat (`player_possessed`, actors G9: another actor's controller drives that
-## player's wizard) shows "POSSESSED" and the whole seconds left on its panel, counted down here
-## each frame (`step_possessed`) until the seat drives again (`player_possessed` with 0). The
-## panel's numbers and staff rows are always the actor the seat drives (`player_stats_changed`,
-## `staff_changed`, `Spells.actor_of_seat`), so a seat driving a possessed imp shows the imp's.
+## A panel is always the player's own wizard (owner, 2026-10-28): its numbers and staff rows
+## (`player_stats_changed`, `staff_changed` and the timing of `Spells.home_of_seat`) stay the
+## wizard's while the seat drives another actor (possess, actors G9) and while an enemy's AI drives
+## the wizard, so a player always sees their wizard taking hits. The possession itself is drawn
+## in the world, over the possessed actor (`PossessedLook`).
 ##
 ## A red vignette (`vignette/`, node Root/Vignette, behind the panels) glows when a
 ## wizard's health falls, strongest toward that wizard's corner and fading in under
@@ -97,8 +97,6 @@ var _pause_menu: PauseMenuScript = null
 var _seen_pause: Array[int] = [0, 0, 0, 0]
 var _seen_back: Array[int] = [0, 0, 0, 0]
 var _had_menu: Array[bool] = [false, false, false, false]
-## Per seat: the seconds of possession left (0: not possessed).
-var _possessed_left: Array[float] = [0.0, 0.0, 0.0, 0.0]
 ## A wave is in progress (the wave line shows).
 var _wave_active: bool = false
 var _joined: Array[bool] = [false, false, false, false]
@@ -212,7 +210,6 @@ func _ready() -> void:
 		events.player_joined.connect(_on_player_joined)
 		events.player_left.connect(_on_player_left)
 		events.player_stats_changed.connect(_on_stats_changed)
-		events.player_possessed.connect(_on_player_possessed)
 		events.room_entered.connect(_on_room_entered)
 		events.wave_started.connect(_on_wave_started)
 		events.room_cleared.connect(_on_room_cleared)
@@ -230,7 +227,6 @@ func _process(delta: float) -> void:
 	_vignette.step(delta)
 	step_break(delta)
 	step_staffs()
-	step_possessed(delta)
 
 
 ## Count the break line down by `delta` seconds. It only draws; Flow decides when the wave
@@ -367,7 +363,6 @@ func _on_player_left(player: int) -> void:
 	if player < 0 or player >= PLAYER_COUNT:
 		return
 	_joined[player] = false
-	_possessed_left[player] = 0.0
 	_panels[player].reset()
 	_panels[player].clear_staffs()
 	_refresh(player)
@@ -437,26 +432,11 @@ func step_staffs() -> void:
 		var panel: PlayerPanelScript = _panels[player]
 		if not panel.visible:
 			continue
-		# Spells keeps staffs by caster: the actor this seat drives (actors G3b).
-		var actor: int = spells.actor_of_seat(player)
+		# Spells keeps staffs by caster (actors G3b): the seat's own wizard, also while the seat
+		# drives another actor.
+		var actor: int = spells.home_of_seat(player)
 		for staff in PlayerPanelScript.STAFF_COUNT:
 			panel.set_staff_timing(staff, spells.cast_index(actor, staff), spells.cooldown_left(actor, staff))
-
-
-## Count every possessed seat's time down by `delta` seconds on its panel. Only draws: the actor
-## kit ends the possession. Called every frame; tests call it directly.
-func step_possessed(delta: float) -> void:
-	for player in PLAYER_COUNT:
-		if _possessed_left[player] > 0.0:
-			_possessed_left[player] = maxf(_possessed_left[player] - delta, 0.0)
-			_panels[player].set_possessed(_possessed_left[player])
-
-
-func _on_player_possessed(player: int, seconds: float) -> void:
-	if player < 0 or player >= PLAYER_COUNT:
-		return
-	_possessed_left[player] = maxf(seconds, 0.0)
-	_panels[player].set_possessed(_possessed_left[player])
 
 
 ## The "Wave N" line, or null before the script's `_ready`.
@@ -487,7 +467,6 @@ func _reset_all() -> void:
 	for player in PLAYER_COUNT:
 		_builders[player].close_builder()
 		_radials[player].close_builder()
-		_possessed_left[player] = 0.0
 		_panels[player].reset()
 		_refresh(player)
 

@@ -2447,11 +2447,12 @@ func _actor_table() -> ActorsScript:
 	return tree.root.get_node_or_null(^"Actors") as ActorsScript if tree != null and tree.root != null else null
 
 
-## The actor the seat `seat` (0-3) drives now, or Actors.NONE: for the HUD, which knows seats
-## and asks Spells by caster (`cast_index`, `cooldown_left`).
-func actor_of_seat(seat: int) -> int:
+## The seat `seat`'s (0-3) own body, or Actors.NONE: for the HUD, which knows seats, shows the
+## player's own wizard also while the seat drives another actor (possess; owner, 2026-10-28) and
+## asks Spells by caster (`cast_index`, `cooldown_left`).
+func home_of_seat(seat: int) -> int:
 	var table: ActorsScript = _actor_table()
-	return table.actor_of_seat(seat) if table != null else ActorsScript.NONE
+	return table.home_of_seat(seat) if table != null else ActorsScript.NONE
 
 
 ## The team `actor` aims for (Actors.NONE for no actor): a chain's jump and an arc's zap skip its

@@ -8,13 +8,12 @@ extends RefCounted
 ##   the target ends first. Then the caster body's controller (`driver`) drives the target
 ##   (`Actor.drive`, which takes it off the caster's body: that body stands with no controller,
 ##   can be hit, and keeps its home team), and the target's own controller is put aside
-##   (`ActorController.set_aside`: a seat's panel shows the mark and the time). Team and seat
+##   (`ActorController.set_aside`; a seat's panel goes on showing its own wizard). Team and seat
 ##   follow the driver into the actor table on both bodies. Nothing starts when either body is
 ##   down, dying or out of the tree, or when the caster's body has no controller.
 ## - **It ends** (`end`) when its time is up, when the target dies or is down, or when the
 ##   caster's body is down or dies: the target gets its own controller back (`started`: an AI
-##   picks a fresh target and winds up again) and the staffs it had (a builder's changes made
-##   during the possession are undone), and the driver goes home to the caster's body. When
+##   picks a fresh target and winds up again), and the driver goes home to the caster's body. When
 ##   someone else possesses that body meanwhile, the driver waits behind that possession and comes
 ##   back when it ends.
 ## - **Nested:** a driver who possesses again from a possessed body moves on (`newer`); ending a
@@ -22,8 +21,10 @@ extends RefCounted
 ##
 ## The target keeps its possession in `Actor.possessed_by` and steps it (`step`); the caster's body
 ## lists those it cast in `Actor.possessions_cast`, so its death ends them. `possess_started` and
-## `possess_ended` (the caster's and the target's actor ids) tell Feel and the HUD. A ring in the
-## driver's colour (`PossessedLook`) is drawn round the target while it lasts.
+## `possess_ended` (the caster's and the target's actor ids) tell Feel. A ring in the driver's
+## colour with the time left (`PossessedLook`) is drawn round the target while it lasts, and over
+## an actor a seat drives that is not its own wizard, its health and mana too. A builder never
+## edits the target: a seat's builder edits its own wizard (owner, 2026-10-28).
 
 const EventsScript := preload("res://core/events/events.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
@@ -45,8 +46,6 @@ var ended: bool = false
 var by_id: int = -1
 var target_id: int = -1
 
-## The target's staffs at the start, one row of card ids per staff.
-var _cards: Array = []
 var _look: PossessedLook = null
 
 
@@ -77,7 +76,6 @@ static func begin(by_body: Actor, target_body: Actor, length: float) -> Possessi
 	if from != null and not from.ended and from.driver == taker:
 		possession.older = from
 		from.newer = possession
-	possession._keep_cards()
 	target_body.possessed_by = possession
 	by_body.possessions_cast.append(possession)
 	target_body.drive(taker)
@@ -136,7 +134,6 @@ func end() -> void:
 		if _look != null:
 			target.remove_look(_look)
 		if can_hold(target):
-			_give_cards_back()
 			target.drive(aside)
 		elif target.controller == driver:
 			target.drive(null)
@@ -164,20 +161,3 @@ func driver_ramp() -> int:
 		return driver.seat
 	return by.ramp if is_instance_valid(by) else ActorsScript.RAMP_ENEMY
 
-
-func _keep_cards() -> void:
-	_cards.clear()
-	if target.caster == null:
-		return
-	for at in target.caster.staff_count:
-		_cards.append(target.caster.cards_of(at))
-
-
-## The staffs the target had at the start, where a builder changed them meanwhile.
-func _give_cards_back() -> void:
-	if target.caster == null:
-		return
-	for at in mini(_cards.size(), target.caster.staff_count):
-		var row: Array[StringName] = _cards[at]
-		if target.caster.cards_of(at) != row:
-			target.caster.set_staff(at, row)

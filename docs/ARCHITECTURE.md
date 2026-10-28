@@ -6,28 +6,31 @@ How Spellmerge is put together, and where each kind of change goes, so a new fea
 
 ```
 content/   data and scenes: spells, enemies, rooms, the wizard   (found by folder)
-gameplay/  the rules: player, combat, ai, flow, feel, coop ...   (talk through events)
+gameplay/  the rules: actor, player, combat, ai, flow, feel, coop (talk through events)
 core/      services: events, registry, input, projectiles, pools (know nothing above)
 hud/       panels and menus (send requests as events, show state from events)
 ```
 
 - **Dependency direction:** `core` ← `gameplay` ← `content`. A lower layer never names a higher one. One known exception: `flow.gd` preloads `content/wizard/base/wizard.tscn` as the default `wizard_scene` (listed under "Foundation" in BACKLOG.md).
-- **Areas never call each other.** They send and listen to typed signals on `Events` (table in [gameplay/README.md](../gameplay/README.md)); each event has one sender.
+- **Areas never call each other.** They send and listen to typed signals on `Events` (table in [gameplay/README.md](../gameplay/README.md)); each event has one sender. One stated exception: every area may use the actor kit's public scripts (`gameplay/actor/`).
 - **Content is found, not listed.** `Registry` scans the folders, so a new spell, enemy or room is new files only. Code that needs content takes an id (`Flow.room_id_to_play`) and asks the registry; it names no file.
-- **Players are indices 0–3.** No system has a "the player".
+- **Everything that acts is an actor** (phase G, [M2-actors.md](milestones/M2-actors.md)): a body (`Actor`) made of components (Health, Hurtbox, Contact, Mover, Caster; Downed and a look for wizards) and driven by one controller (`PlayerController`, which is a seat 0–3; `AIController`). Core keys everything by the actor id from `Actors`; it asks an actor's team only to aim, its ramp to draw, its seat for the HUD and its budget for the shared limits. Every spell hurts every actor it hits. No system has a "the player".
+- **Components hold configuration, systems hold the hot state.** Combat, Spells and the projectile manager keep per-actor state in packed arrays indexed by actor id; only the actor runs `_physics_process`, stepping its components in a fixed order.
 - **Hot paths are pooled.** Shots are rows in `Projectiles`; nodes come from `Pool`; nothing allocates per frame.
 
 ## Where each change goes
 
 | I want to ... | Change | Never touch |
 | --- | --- | --- |
-| add a room, enemy or spell | copy the example folder in `content/` (see its README) | `flow.gd`, `registry.gd` |
+| add a room, enemy or spell | copy the example folder in `content/` (see its README); a new enemy is a sprite, an actor scene and a `.tres`, no code | `flow.gd`, `registry.gd` |
+| add a body behaviour (a new kind of part every actor may have) | a new component in `gameplay/actor/` (see its README), put in the scenes that want it | `player.gd`, `ai.gd` |
+| let something else drive a body (an AI teammate, a takeover) | a controller (`ActorController`), handed over with `Actor.drive` | the body's components |
 | use another room or enemy in a run | set `Flow.room_id_to_play`, `enemy_id_to_play` (a room picker does this) | the wave or spawn code |
 | start a run with other staffs | set `Flow.start_cards` (four lists of card ids) and the staffs in `content/wizard/staffs/` (`starter`, `dev`, by build channel); every wizard builds them itself | `flow.gd`'s spawn code, `player.gd` |
 | change what a player may build with | the wizard's `bag` (filled from the registry until M3's rewards fill it); builds arrive as `staff_change_requested`, `card_move_requested` and `staff_cards_requested` | the builder, `core/spells` |
 | swap a sprite, tile or animation strip | replace the file, keep the contract below | scripts, node names in scenes, tests |
 | re-skin the shot, spark or hostile shot | another `FeelPreset` (or its texture fields), set before `Feel._ready` | `feel.gd` |
-| change a wizard's look | the textures in `content/wizard/base/wizard.tscn`, or give `Flow.wizard_scene` another scene | `player.gd` |
+| change a wizard's or an enemy's look | the textures on the look component in its scene (`WizardLook`, `CreatureLook`), or a new look component | the controllers, the other components |
 | add behaviour that others must react to | a new typed signal in `core/events/events.gd`, one sender, listeners connect | the listeners' siblings |
 | tune feel or balance | a preset or a `.tres` number | tests (they do not assert tuning numbers) |
 
@@ -37,7 +40,7 @@ Art is data: scenes and resources point at files, and scripts never name a textu
 
 - A strip is one row of frames, **32 px high and a whole multiple of 32 wide**. The script reads the frame count from the width (`hframes`), so a strip may have more or fewer frames than today. The ember imp's idle needs two or more to animate.
 - The wizard has idle, walk and dash strips for **each of the four players** and a staff; the four idle looks must differ (colour is how players tell themselves apart).
-- A replacement `Flow.wizard_scene` must have `player.gd` on its root, the `textures`, `walk_textures` and `dash_textures` arrays (one strip per player), `staff_texture`, and the nodes `player.gd` reads. `tests/content/wizard/test_wizard_art.gd` checks it, and `Flow` starts no run with a scene that has no player script.
+- A replacement `Flow.wizard_scene` must have an `Actor` root with a `PlayerController` child, and a `WizardLook` with the `textures`, `walk_textures` and `dash_textures` arrays (one strip per ramp), `hat_textures` and `staff_texture`, and the `Sprite`/`Sprite/Hat` nodes it draws on. `tests/content/wizard/test_wizard_art.gd` checks it, and `Flow` starts no run with a scene that is not an actor with a player controller.
 - Look rules (palette, rects only, whole numbers) are checked for every SVG at once by `tests/core/test_svg_art.gd`. The wiring (strip sizes, the nodes the AI drives) is checked by `tests/content/**/test_*_art.gd`. Nothing tests a pixel, a colour or a sprite's exact size, so a redraw does not fail a test. If a test fails after an art swap, the art broke the contract above, or the test checked a look and should be fixed.
 - Add the file to `art/manifest.json`; commit the `.import` and `.uid` files.
 

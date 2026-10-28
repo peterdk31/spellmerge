@@ -1819,3 +1819,9 @@ The owner approved `possess` as a card (M2-actors.md, "Possess (a card)"); built
 - **The camera** keeps both a wizard's standing body and the actor its seat drives in view.
 - **Sound id** `possess` for Feel; no sound or Feel cue yet (`possess_started`/`possess_ended` have no listener).
 
+## 2026-10-28: The docs (actors G10)
+
+- **AGENTS.md's "No single the player" rule** now reads: everything that acts is an actor and takes its actor id; a seat (0–3) is a human, and only HUD, input and co-op rules take seats; never assume an actor id is a seat.
+- **docs/ARCHITECTURE.md** gains the actor layer: actors made of components and driven by one controller, systems keeping the hot state by actor id, and where a new body behaviour (a component) or a new driver (a controller) goes. The wizard scene's art contract is the `WizardLook`'s.
+- **Two rules phase G made by "one rule" without naming them in the plan** (G5): contact damage hurts only actors of other teams (an imp walking through imps hurts none), and `mend` heals the caster's team and is a plain hit on everyone else (an enemy's mend heals enemies).
+- **Tests run in parallel:** each unit test is its own Godot process, so the whole suite (with the 4-bot smoke test) runs in under a minute with one import and a data folder per test, instead of 20–40 minutes one by one. `test_projectiles_kit` times the manager and can fail under that load; it is run again alone.

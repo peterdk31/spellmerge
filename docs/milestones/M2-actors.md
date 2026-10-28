@@ -2,7 +2,7 @@
 
 **Goal:** a wizard and an enemy are the same kind of thing: an **actor**, a body built from components, driven by one **controller**. A wizard is an actor with a player controller and a seat (its HUD, its builder, being downed and revived); an enemy is an actor with an AI controller and no seat. Everything can hurt everything. Taking control of an enemy is moving a controller node, and a card does it: **possess**.
 
-**Status (2026-10-28):** approved by the owner ("Yes just go ahead"); the owner's decisions are in "Owner decisions". Phase G of M2, after phase F (enemy staffs) and before D3 (the stress run and C2), so C2 is asked on the new bodies. An owner exception like phase F's (docs/ROADMAP.md).
+**Status (2026-10-28):** built the same day, G1–G10 (#354–#367). The owner's decisions are in "Owner decisions"; what changed while building is in docs/DECISIONS.md. Phase G of M2, after phase F (enemy staffs) and before D3 (the stress run and C2), so C2 is asked on the new bodies. An owner exception like phase F's (docs/ROADMAP.md).
 
 **Why:** phase F gave enemies staffs in ten PRs, most of them spent teaching core that a caster can be something other than "player 0–3". The player index meant four things at once (below), so every system was sized and keyed by it, and enemies were added as a second identity beside it (caster rows 4+, `NO_PLAYER` in events with the real caster hidden in the tag). The code shows it:
 
@@ -110,13 +110,13 @@ All in `gameplay/actor/`, except the wizard rules in `gameplay/player/` and the 
 
 The owner, 2026-10-28: "Make this a card! A possess card, possess enemies hit for x seconds." And: an enemy with it takes over a wizard by the same rule.
 
-- **A modifier:** the next carrier's hits possess the actor they hit, for the card's `seconds` (tuned in G9; a first guess 3 s, with a high mana cost). A carrier that hits several actors possesses the first; one possession per cast.
+- **A modifier:** the next carrier's hits possess the actor they hit, for the card's `seconds` (3 s; 2.5× mana and 2× cooldown, the dearest modifier: at 4× some random staffs could not cast it with 100 mana). A carrier that hits several actors possesses the first; one possession per cast.
 - **What happens:** the caster's controller (and with it its seat, HUD and builder, or its AI) drives the hit actor; the hit actor's own controller is put aside; the caster's body has no controller and stands, vulnerable. Team and seat follow the controller.
 - **It ends** when its time is up, when the possessed actor dies or is downed, or when the caster's body is downed or dies: the controller goes home at once, the possessed actor's own controller comes back (an AI picks a fresh target; its windup starts over).
 - **Possessing the possessed:** a newer possession of an actor ends the older one first. A driver who possesses again from a possessed body moves on; each possession sends its controller home when it ends, so they unwind in order.
 - **An enemy with possess** takes a wizard: its AI drives the wizard for the time (the wizard's player sees their panel marked possessed with the time left), and the enemy stands. Its telegraph is the cast's, like every enemy spell. An enemy's possession of a wizard is capped at the card's time like any other; nothing special.
 - **Events:** `possess_requested(caster, target, seconds, tag)` from Spells on the hit; `possess_started(driver_actor, actor)` and `possess_ended(driver_actor, actor)` from the actor kit, for Feel and the HUD.
-- **Content:** `content/spells/possess/` with its icon, lore, look (a ring in the caster's ramp round the possessed), sound id, and two combo files, like every card (phase C's rules).
+- **Content:** `content/spells/modifiers/possess/` with its icon, lore, look (a ring in the caster's ramp round the possessed), sound id, and two combo files, like every card (phase C's rules).
 
 ## Core: the actor table and one caster number
 

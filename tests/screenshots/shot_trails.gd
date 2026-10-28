@@ -12,7 +12,6 @@ extends "res://tests/support/screenshot.gd"
 ## `trails` at 1x, `trails_4x` (the plain, fire and frost columns of the top two rows).
 
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
-const ActorsScript := preload("res://core/actors/actors.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
 const ELEMENTS: Array[Resource] = [
 	preload("res://content/spells/elements/fire/fire.tres"),
@@ -32,7 +31,7 @@ var _targets: Array[Node2D] = []
 
 
 func take() -> void:
-	if not need(["Projectiles", "Actors"]):
+	if not need(["Projectiles"]):
 		return
 	_shots = root.get_node("Projectiles")
 	lay_floor()
@@ -41,13 +40,19 @@ func take() -> void:
 	# The wall the middle row bounces off.
 	_shots.call("set_walls", [Rect2(0.0, 120.0, SCREEN.x, 8.0)] as Array[Rect2])
 	var speed: float = float(BOLT.get("speed"))
-	# The dashers: four seated wizards, then two enemies (their streaks are the enemy ramp).
-	var dashers: Array[int] = _casters()
+	var dashers: Array[int] = []
+	# Casters are actor ids (actors G8): the four wizards seated 0-3 (ids 0-3) and two enemies.
+	var actors: ActorSeats.ActorsScript = ActorSeats.autoload()
+	if actors == null:
+		fail("there is no Actors autoload")
+		return
+	ActorSeats.seat_wizards(actors)
+	var enemies: Array[int] = [ActorSeats.enemy(actors), ActorSeats.enemy(actors)]
 	for e in 6:
 		var x: float = 30.0 + e * COLUMN
 		var tint: Color = Color.WHITE if e == 0 else ELEMENTS[e - 1].get("tint") as Color
 		var look: int = 0 if e == 0 else ManagerScript.pack_look(PackedInt32Array([int(ELEMENTS[e - 1].get("look_layer"))]))
-		var player: int = dashers[e % 4]
+		var player: int = e % 4
 		var target := Node2D.new()
 		target.position = Vector2(x + 70.0, 30.0)
 		root.add_child(target)
@@ -59,8 +64,11 @@ func take() -> void:
 		var bounce: int = _shots.call("spawn", player, Vector2(x + 10.0, 200.0), Vector2(speed * 0.35, -speed), 2.0, float(BOLT.get("radius")), 0) as int
 		_shots.call("set_bounce", bounce, 1)
 		_dress(bounce, tint, look)
-		_shots.call("set_anchor", dashers[e], _dash_point(e, 0.0))
-		_shots.call("follow_caster", dashers[e], tint, look, 0.3)
+		# The dashers: players 0-3, then two enemy casters (their streaks are the enemy ramp).
+		var caster: int = e if e < 4 else enemies[e - 4]
+		_shots.call("set_anchor", caster, _dash_point(e, 0.0))
+		_shots.call("follow_caster", caster, tint, look, 0.3)
+		dashers.append(caster)
 	for n in STEPS:
 		await physics_frame
 		for e in 6:
@@ -72,17 +80,6 @@ func take() -> void:
 		return
 	save(image, "trails")
 	save_crop(image, Vector2(160.0, 110.0), "trails_4x", Vector2i(160, 100))
-
-
-## The casters' actor ids, opened in the `Actors` table: four seated wizards, then two enemies.
-func _casters() -> Array[int]:
-	var table: ActorsScript = ActorSeats.autoload()
-	var casters: Array[int] = []
-	for id in ActorSeats.seat_wizards(table):
-		casters.append(id)
-	casters.append(ActorSeats.enemy(table))
-	casters.append(ActorSeats.enemy(table))
-	return casters
 
 
 ## Where dasher `e` is `t` of the way through its dash: a quarter circle, as a wizard that dashes

@@ -21,7 +21,7 @@ extends ActorController
 ## - **The seat's events** (only from the actor it drives now, so an undriven body sends none):
 ##   `player_stats_changed` (when it starts driving, on a health change and when mana crosses a
 ##   whole number: the mana is looked at each step, so a regen shows a step later),
-##   `spell_cast` (the carrier, `Caster.last_form`), `staff_cast` and `wizard_cast` on every cast
+##   `spell_cast` (the carrier, `Caster.last_form`) and `staff_cast` on every cast
 ##   (with the cast sound `cast` from `core/registry`, nothing on null), `staff_changed` with the
 ##   plain view of every built staff (`Caster.plan_of`), `bag_changed` and `build_refused`.
 ## - **The builder** (`staff_change_requested`, `card_move_requested`, `staff_cards_requested`,
@@ -315,7 +315,6 @@ func _on_cast_done(at: int, origin: Vector2, direction: Vector2) -> void:
 		if form != &"":
 			bus.spell_cast.emit(seat, form, origin, direction)
 		bus.staff_cast.emit(seat, at, origin, direction)
-		bus.wizard_cast.emit(seat, _actor)
 	_play_cast_sound()
 
 

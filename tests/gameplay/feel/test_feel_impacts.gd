@@ -42,8 +42,8 @@ func _enemy() -> Node2D:
 
 
 func _wizard(index: int) -> Node2D:
-	var wizard: Node2D = own(WizardStandIn.new()) as Node2D
-	wizard.set("index", index)
+	var wizard: Actor = own(WizardStandIn.new()) as Actor
+	wizard.id = index  # the table's wizard of seat `index` (ramp `index`)
 	root.add_child(wizard)
 	return wizard
 

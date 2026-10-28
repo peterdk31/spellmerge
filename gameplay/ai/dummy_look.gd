@@ -162,7 +162,7 @@ func _show() -> void:
 func _take_health() -> void:
 	if actor.combat == null:
 		return
-	var health: int = actor.combat.get_health(actor)
+	var health: int = actor.combat.health_of(actor)
 	if health < 0:
 		return
 	var taken: int = _health - health if _health >= 0 else 0

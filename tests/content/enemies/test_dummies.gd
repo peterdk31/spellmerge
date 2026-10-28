@@ -51,7 +51,7 @@ func test_the_training_dummy_never_dies() -> void:
 	var dummy := _training()
 	for i in 50:
 		combat.call("hit", 0, dummy, 100000)
-	check(combat.call("is_enemy", dummy) as bool, "still a target after 5 million damage")
+	check(combat.call("is_registered", dummy) as bool, "still a target after 5 million damage")
 	check(is_instance_valid(dummy) and not dummy.is_queued_for_deletion(), "still standing")
 
 

@@ -193,7 +193,7 @@ func test_it_casts_its_staff_after_the_windup_and_hits_the_wizard() -> void:
 	check_equal(enemy.caster.mana, 4.0, "and it paid the cast's mana")
 	_run(0.5)
 	check(_wizard.health.health < _wizard.health.max_health, "the bolt hurt the wizard through combat")
-	check_equal(_combat.get_health(enemy), ImpData.max_health, "and not the enemy that cast it")
+	check_equal(_combat.health_of(enemy), ImpData.max_health, "and not the enemy that cast it")
 
 
 func test_no_windup_without_the_mana_and_regen_brings_it() -> void:

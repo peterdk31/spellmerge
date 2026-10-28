@@ -2,8 +2,8 @@ extends "res://tests/support/suite.gd"
 ## Tests for the caster kit on the wizard (staffs B4; the kit's Mover since actors G7 and G5): teleport (wall-safe), hook, swap and recoil moves asked by
 ## `caster_move_requested` and answered by `caster_move_finished`; the recoil requests of one step
 ## added up (so `mirror · recoil` cancels) while a later dash, teleport, hook or swap replaces an
-## earlier one; wizard statuses from Combat's seat slots (`apply_wizard_status`) that slow or
-## freeze walking; a hit's push (`consume_wizard_knockback`); and siphon's mana refund. Wizards
+## earlier one; wizard statuses from Combat (`apply_status` on its actor id) that slow or
+## freeze walking; a hit's push (`consume_knockback`); and siphon's mana refund. Wizards
 ## are the real scene (content/wizard/base/wizard.tscn) in the tree, stepped by hand. A move is
 ## the wizard's when its card's tag names the wizard's caster number (its actor id).
 ## The kit's own Mover is tested on bare actors in tests/gameplay/actor/test_actor_mover.gd.
@@ -57,10 +57,10 @@ func _run(count: int) -> void:
 	_world.run(count)
 
 
-## Chill the wizard of `seat` three times: a freeze.
-func _freeze(seat: int) -> void:
+## Chill `wizard` three times: a freeze.
+func _freeze(wizard: Actor) -> void:
 	for n in CombatScript.CHILL_STACKS_TO_FREEZE:
-		_world.combat.apply_wizard_status(EventsScript.NO_PLAYER, seat, CombatScript.CHILL, 5.0, 40.0)
+		_world.combat.apply_status(EventsScript.NO_PLAYER, wizard.id, CombatScript.CHILL, 5.0, 40.0)
 
 
 func test_teleport_jumps_at_once_and_answers() -> void:
@@ -304,11 +304,11 @@ func test_chill_slows_and_freeze_stops_walking() -> void:
 	_world.hold(1, &"move_right")
 	_run(1)
 	check_equal(player.velocity, Vector2(player.mover.speed, 0.0), "free pace")
-	check(_world.combat.apply_wizard_status(EventsScript.NO_PLAYER, 0, CombatScript.CHILL, 5.0, 40.0), "the chill takes on seat 0's wizard")
+	check(_world.combat.apply_status(EventsScript.NO_PLAYER, player.id, CombatScript.CHILL, 5.0, 40.0), "the chill takes on seat 0's wizard")
 	_run(1)
 	check(is_equal_approx(player.velocity.x, player.mover.speed * 0.6), "a chill slows, got %s" % player.velocity)
 	check_equal(other.velocity, Vector2(other.mover.speed, 0.0), "another seat's chill does not slow this wizard")
-	_freeze(0)
+	_freeze(player)
 	_run(1)
 	check_equal(player.velocity, Vector2.ZERO, "a freeze holds the wizard")
 
@@ -316,12 +316,12 @@ func test_chill_slows_and_freeze_stops_walking() -> void:
 func test_freeze_stops_a_dash_but_not_a_hook() -> void:
 	var player: Actor = _wizard(0)
 	player.aim = Vector2.RIGHT
-	_freeze(0)
+	_freeze(player)
 	_ask(player, &"dash", Vector2(55.0, 0.0), 0.25)
 	_run(1)
 	check_equal(player.velocity, Vector2.ZERO, "a frozen wizard cannot dash")
 	var pulled: Actor = _wizard(1)
-	_freeze(1)
+	_freeze(pulled)
 	_pull(pulled, &"hook", START + Vector2(0.0, 40.0), 0.25)
 	_run(1)
 	check(pulled.velocity.y > 0.0, "a hook still pulls a frozen wizard")

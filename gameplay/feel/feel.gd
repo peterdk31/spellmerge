@@ -31,6 +31,10 @@ extends Node
 ## On `spell_cast` it shows a cast flash at the staff tip in the player's colours (and a ring
 ## for a carrier whose cast look has one), and kicks the camera a little against the aim.
 ##
+## Every hit body is read by its actor (`Actor.id`): its ramp (`Actors.ramp_of`) colours the hit
+## (a hat ramp in its light shade, `ProjectileManager.ramp_light`; the enemy ramp in ember), and a
+## hit whose caster is the hit actor itself is a self-hit.
+##
 ## Effects (the glow look, 2026-10-27; the owner: "I only want the new style going forward"):
 ## every flare, spray, puff, ring, chip, arc and status is drawn by the shots' own shader
 ## (`shot_core.gdshader`, kinds KIND_BURST to KIND_STATUS) in one MultiMesh of `effect_slots`
@@ -38,8 +42,8 @@ extends Node
 ## each with the core colour and look of the shot it comes from (`impact_core`, `impact_look` of
 ## the projectile manager), so a frost bolt lands in frost flecks and a lightning one in sparks,
 ## all glowing. A new effect takes the oldest slot when they are all busy. On
-## `wizard_cast` (which carries the wizard node) the caster's `Sprite` gets thin and
-## tall for a moment. None of this touches the cast itself.
+## `actor_cast` (every actor's cast, from the kit's Caster, with the actor node) the caster's
+## `Sprite` gets thin and tall for a moment. None of this touches the cast itself.
 ##
 ## Nothing is allocated while playing: the effect batch and sound players are made once.
 ## They live under this autoload (top level, so in world space), never under the scene:
@@ -154,14 +158,14 @@ const EFFECT_STRIDE: int = 16
 ## The age code beside an effect's kind: TRACE_FROM + TRACE_SPAN x how far through it is.
 const EFFECT_FROM: float = 0.02
 const EFFECT_SPAN: float = 0.42
-## Muzzle flash colour of each player: the light colour of the player ramps in
-## docs/STYLE.md (the same as the reticle in `gameplay/player`).
-const PLAYER_COLORS: Array[Color] = [
-	Color("7fc0f0"), Color("f59ab8"), Color("8fd46a"), Color("c99af0"),
-]
 ## How long a muzzle flash is compared with its width.
 ## The biggest camera kick in pixels, however fast the casting.
 const MAX_KICK_PIXELS: float = 4.0
+## A possession's ring on the possessed actor (`possess_started`, `possess_ended`): its zoom and
+## seconds, and the sound when it starts.
+const POSSESS_ZOOM: int = 2
+const POSSESS_SECONDS: float = 0.35
+const POSSESS_SOUND: StringName = &"possess"
 
 ## The services. Only tests set these, before adding the node; otherwise the
 ## autoloads are used.
@@ -399,7 +403,9 @@ func _ready() -> void:
 	events.enemy_died.connect(_on_enemy_died)
 	events.player_downed.connect(_on_player_downed)
 	events.spell_cast.connect(_on_spell_cast)
-	events.wizard_cast.connect(_on_wizard_cast)
+	events.actor_cast.connect(_on_actor_cast)
+	events.possess_started.connect(_on_possess_started)
+	events.possess_ended.connect(_on_possess_ended)
 	events.projectile_impact.connect(_on_projectile_impact)
 	events.form_shown.connect(_on_form_shown)
 	events.reaction_triggered.connect(_on_reaction_triggered)
@@ -616,12 +622,12 @@ func _on_damage_dealt(caster: int, target: Node, amount: int, position: Vector2)
 	var size: float = 1.0
 	var colours: int = 0
 	if target != null and is_instance_valid(target):
-		tint = _target_tint(target)
-		# A wizard's hit is in their own colours: white, their player's ramp.
-		var ramp: int = _wizard_ramp(target)
+		# An actor of a hat ramp is hit in its own colours: white, its ramp; the rest in ember.
+		var ramp: int = _hat_ramp_of(target)
 		if ramp >= 0:
-			colours = clampi(ramp, 0, PLAYER_COLORS.size() - 1)
-			tint = Color.WHITE
+			colours = ramp
+		else:
+			tint = preset.enemy_hit_color
 		# The shot that did this hit told us where it struck and which way it flew.
 		if target.get_instance_id() == _impact_target and caster == _impact_caster and Engine.get_physics_frames() == _impact_frame:
 			aim = _impact_aim
@@ -648,14 +654,14 @@ func _on_damage_dealt(caster: int, target: Node, amount: int, position: Vector2)
 		_play(preset.self_hit_sound)
 
 
-## The kind of the hit that `damage_dealt` announces next, and whether a wizard hit themselves.
+## The kind of the hit that `damage_dealt` announces next, and whether an actor hit itself.
 func _on_hit_landed(caster: int, target: Node, _amount: int, _position: Vector2, kind: StringName) -> void:
 	if target == null:
 		return
 	_kind_target = target.get_instance_id()
 	_kind = kind
 	_kind_frame = Engine.get_physics_frames()
-	_kind_own = kind != &"heal" and kind != &"status" and target.is_in_group(&"players") and (target.get("actor_id") == caster or target.get("id") == caster)
+	_kind_own = kind != &"heal" and kind != &"status" and caster != ActorsScript.NONE and _actor_of(target) == caster
 
 
 ## A heal: a soft ring in green on the wizard, with no stop and no shake.
@@ -1146,31 +1152,19 @@ func effect_info(kind: int) -> Dictionary:
 	return {}
 
 
-## The colour of what was hit: a wizard's own colour, else the enemy ember.
-func _target_tint(target: Node) -> Color:
-	var ramp: int = _wizard_ramp(target)
-	if ramp >= 0:
-		return PLAYER_COLORS[clampi(ramp, 0, PLAYER_COLORS.size() - 1)]
-	return preset.enemy_hit_color
+## The actor id of a hit body (a kit Actor's `id`), or Actors.NONE for anything else.
+static func _actor_of(target: Node) -> int:
+	return (target as Actor).id if target is Actor else ActorsScript.NONE
 
 
-## The colour ramp of a wizard in the `players` group (a wizard actor's `ramp`, actors G7, or a
-## stand-in's `index`), or -1 for anything else. G8 reads every target by actor.
-func _wizard_ramp(target: Node) -> int:
-	if not target.is_in_group(&"players"):
+## The hat ramp (0-3) of the actor `target` is, or -1 for an actor of the enemy ramp, no actor or
+## an unknown one.
+func _hat_ramp_of(target: Node) -> int:
+	var id: int = _actor_of(target)
+	if id == ActorsScript.NONE:
 		return -1
-	var ramp: Variant = target.get("ramp")
-	if ramp is int:
-		return ramp as int
-	var index: Variant = target.get("index")
-	return index as int if index is int else -1
-
-
-## The colour of seat `player`'s light ramp, the enemy ramp's (Blight ochre) for no seat.
-func _shot_color(player: int) -> Color:
-	if player >= 0 and player < PLAYER_COLORS.size():
-		return PLAYER_COLORS[player]
-	return ProjectileManagerScript.ramp_color(ActorsScript.RAMP_ENEMY)
+	var ramp: int = _ramp_of(id)
+	return ramp if ProjectileManagerScript.is_hat_ramp(ramp) else -1
 
 
 ## The actor table: `actors`, else the "Actors" autoload.
@@ -1219,7 +1213,7 @@ func _form_look(form: StringName, cast: bool) -> Dictionary:
 
 
 func _on_spell_cast(player: int, spell_id: StringName, origin: Vector2, direction: Vector2) -> void:
-	if player < 0 or player >= PLAYER_COLORS.size():
+	if player < 0 or player >= ActorsScript.SEATS:
 		return
 	var slot: int = player
 	# Each form has its own flash on the wizard: a bolt a short streak along the aim, a beam a
@@ -1417,24 +1411,54 @@ func _pose_form(slot: int, t: float) -> void:
 	material.set_shader_parameter(&"beam_fade", t)
 
 
-func _on_wizard_cast(_player: int, wizard: Node) -> void:
+## Any actor cast (a wizard's or an enemy's): its `Sprite` squashes thin and tall.
+func _on_actor_cast(_caster: int, actor: Node) -> void:
 	# The dash look owns the sprite scale while dodging; a squash would fight it.
-	if wizard != null and ((wizard.has_method("is_dashing") and wizard.call("is_dashing")) or (wizard is Actor and (wizard as Actor).mover != null and (wizard as Actor).mover.is_moving())):
+	if actor is Actor and (actor as Actor).mover != null and (actor as Actor).mover.is_moving():
 		return
-	_start_reaction(wizard, preset.cast_squash_seconds, -preset.cast_squash, false)
+	_start_reaction(actor, preset.cast_squash_seconds, -preset.cast_squash, false)
+
+
+## A possession started: a ring closes on the possessed actor in the driver's ramp, with the sound
+## `possess`.
+func _on_possess_started(caster: int, actor: int) -> void:
+	if _show_possession(caster, actor, KIND_RING_IN):
+		_play(POSSESS_SOUND)
+
+
+## A possession ended: a ring in the driver's ramp goes out from the actor let go (if it is there).
+func _on_possess_ended(caster: int, actor: int) -> void:
+	_show_possession(caster, actor, KIND_RING_OUT)
+
+
+## A ring of `kind` on the body of `actor` (at its drawn body), in the ramp of `caster`. False
+## when the body is gone.
+func _show_possession(caster: int, actor: int, kind: int) -> bool:
+	var table: ActorsScript = _actor_table()
+	var body: Node2D = table.node_of(actor) as Node2D if table != null and actor != ActorsScript.NONE else null
+	if body == null or not is_instance_valid(body) or not body.is_inside_tree():
+		return false
+	var at: Vector2 = body.global_position + ((body as Actor).body_offset if body is Actor else Vector2.ZERO)
+	show_effect(kind, at, Vector2.RIGHT, Color.WHITE, _ramp_of(caster), 0, POSSESS_ZOOM, POSSESS_SECONDS)
+	return true
 
 
 func _on_player_downed(player: int) -> void:
 	# The event names no position, so a downed wizard gets stop, shake and sound only...
 	_juice(Vector2.INF, preset.death_stop_seconds, true, preset.downed_shake, preset.downed_sound)
-	# ...and, when their own (or a teammate's) spell did it, a note over them saying so.
-	if combat == null or not combat.has_method("downed_note"):
+	# ...and, when their own (or a teammate's) spell did it, a note over them saying so: the
+	# seat's own body (its home actor, also while the seat drives another), in its light shade.
+	if combat == null or not combat.has_method("home_actor_of"):
 		return
-	var note: String = combat.downed_note(player) as String
-	var wizard: Node2D = combat.wizard_of(player) as Node2D
+	var actor: int = combat.home_actor_of(player) as int
+	var table: ActorsScript = _actor_table()
+	if actor == ActorsScript.NONE or table == null:
+		return
+	var note: String = combat.downed_note_of(actor) as String
+	var wizard: Node2D = table.node_of(actor) as Node2D
 	if note.is_empty() or wizard == null:
 		return
-	_show_note(note, wizard.global_position if wizard.is_inside_tree() else wizard.position, _shot_color(player), preset.downed_note_seconds)
+	_show_note(note, wizard.global_position if wizard.is_inside_tree() else wizard.position, ProjectileManagerScript.ramp_light(table.ramp_of(actor)), preset.downed_note_seconds)
 
 
 ## `strong` is a death or a downed wizard: it ignores the rest after a hit-stop and

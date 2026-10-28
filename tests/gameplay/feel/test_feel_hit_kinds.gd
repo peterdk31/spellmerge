@@ -8,28 +8,31 @@ const EventsScript := preload("res://core/events/events.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
 const FeelPresetScript := preload("res://gameplay/feel/presets/feel_preset.gd")
 const WizardStandIn := preload("res://tests/gameplay/feel/fixtures/wizard_stand_in.gd")
+const ActorSeats := preload("res://tests/support/actor_seats.gd")
 
 ## The stand-in wizards' actor ids are their seat plus this, apart from the seats, so a test sees
 ## that a self-hit is told by the actor id (hits are keyed by caster, actors G3b).
 const FIRST_WIZARD_ID: int = 4
 
 
-## What combat tells Feel about a downed wizard.
+## What combat tells Feel about a downed wizard: the seat's home actor and why it went down.
 class FakeCombat:
 	extends Node
 	var note: String = ""
-	var wizard: Node2D = null
+	var wizard: Actor = null
 
-	func downed_note(_index: int) -> String:
+	func home_actor_of(_seat: int) -> int:
+		return wizard.id if wizard != null else -1
+
+	func downed_note_of(_actor: Variant) -> String:
 		return note
-
-	func wizard_of(_index: int) -> Node2D:
-		return wizard
 
 
 var bus: EventsScript
 var feel: FeelScript
 var preset: FeelPresetScript
+## Wizards seated 0-3 at ids FIRST_WIZARD_ID and up (ramps 0-3).
+var actors: ActorSeats.ActorsScript
 
 
 func before_each() -> void:
@@ -42,6 +45,8 @@ func before_each() -> void:
 	preset.self_hit_sound = &""
 	preset.heal_sound = &""
 	feel.events = bus
+	actors = own(ActorSeats.table(4, FIRST_WIZARD_ID)) as ActorSeats.ActorsScript
+	feel.actors = actors
 	feel.drive_engine = false
 	feel.preset = preset
 	root.add_child(feel)
@@ -53,10 +58,10 @@ func _enemy() -> Node2D:
 	return enemy
 
 
-func _wizard(index: int) -> Node2D:
-	var wizard: Node2D = own(WizardStandIn.new()) as Node2D
-	wizard.set("index", index)
-	wizard.set("actor_id", FIRST_WIZARD_ID + index)
+func _wizard(index: int) -> Actor:
+	var wizard: Actor = own(WizardStandIn.new()) as Actor
+	wizard.id = FIRST_WIZARD_ID + index
+	actors.set_node(wizard.id, wizard)
 	root.add_child(wizard)
 	return wizard
 
@@ -136,7 +141,7 @@ func test_a_heal_shows_a_ring_without_stop_or_shake() -> void:
 
 
 func test_a_wizard_downed_by_their_own_spell_is_told_so() -> void:
-	var wizard: Node2D = _wizard(0)
+	var wizard: Actor = _wizard(0)
 	var fake := own(FakeCombat.new()) as FakeCombat
 	fake.note = "downed by your own Blast"
 	fake.wizard = wizard
@@ -162,3 +167,27 @@ func test_the_note_fades_away() -> void:
 	for i in 80:
 		feel.step(0.0625)
 	check_equal(feel.live_labels(), 0, "gone after its seconds")
+
+
+func test_a_possession_rings_the_possessed_actor_in_the_drivers_ramp() -> void:
+	var driver: Actor = _wizard(2)
+	var imp: Actor = own(WizardStandIn.new()) as Actor
+	imp.id = ActorSeats.enemy(actors)
+	actors.set_node(imp.id, imp)
+	root.add_child(imp)
+	bus.possess_started.emit(driver.id, imp.id)
+	check_equal(feel.effects_of(FeelScript.KIND_RING_IN), 1, "a ring closes on the possessed actor")
+	check_equal(feel.effect_info(FeelScript.KIND_RING_IN)["ramp"], 2, "in the driver's ramp")
+	bus.possess_ended.emit(driver.id, imp.id)
+	check_equal(feel.effects_of(FeelScript.KIND_RING_OUT), 1, "a ring goes out when it ends")
+	bus.possess_started.emit(driver.id, 300)
+	check_equal(feel.effects_of(FeelScript.KIND_RING_IN), 1, "nothing for an actor with no body")
+
+
+func test_an_enemy_hit_by_its_own_spell_gets_the_self_ring_too() -> void:
+	var imp: Actor = own(WizardStandIn.new()) as Actor
+	imp.id = ActorSeats.enemy(actors)
+	root.add_child(imp)
+	var before: int = feel.effects_of(FeelScript.KIND_RING_OUT)
+	_hit(imp.id, imp, &"shot")
+	check(feel.effects_of(FeelScript.KIND_RING_OUT) > before, "a self-hit is told by the actor id, for every actor")

@@ -1,0 +1,9 @@
+{
+	"id": "wall_fire_barrier",
+	"name": "Wall fire barrier",
+	"does": "A fire wall stands across the aim and burns the two imps standing at its stones.",
+	"casts": [{"staff": 0, "cards": ["fire", "wall"]}],
+	"imps": [[28, 0], [28, 14]],
+	"seconds": 1.5,
+	"checks": [{"kind": "status", "imps": [0, 1], "status": "burn"}]
+}

@@ -2,6 +2,18 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-28: Wall card numbers
+
+Wall is a complexity-2 carrier: five still stones 9 px apart (a 36 px row plus the stone radius). The stones are 10 px across, so neighbours overlap by 1 px on purpose: the row has no gap to slip through, and an enemy touching two stones at once can take both hits, which is what a wall of stones should do raised 28 px ahead (the engine's `WALL_REACH`), 3 damage each, 6 mana, a 1 s cooldown, and stones that last 5 s. A stone is spent by its first hit (no pierce), so the row is a barrier of several small hits rather than one big trap like the rune. Not in the free demo.
+
+## 2026-10-28: Fissure card numbers
+
+Fissure is a complexity-2 carrier: 2 damage, 5 mana, a 0.8 s cooldown, a 200 px line 6 px wide (the engine pierces up to 16 targets). Its line is a little shorter than the beam's 240 px because it hits everything on it. Not in the free demo. Its `lifetime` is unused: a fissure hits once, as one instant ray. Its cast and impact looks are modelled on the beam's, to be tuned in the Feel work (B6b). `bounce · fissure` still stops at walls (backlog).
+
+## 2026-10-28: Rain card numbers
+
+Rain is a complexity-2 carrier: 6 mana and a 1.5 s cooldown (its payload pays its own on top), a 0.8 s warning before it lands, and an aim point 120 px ahead (the engine's default reach). It has no damage of its own. Not in the free demo.
+
 ## 2026-10-28: Mirror card numbers
 
 Mirror is a complexity-1 modifier with no mana or cooldown of its own (the back shot is free, so `mirror · recoil · bolt` cancels the push), strength 1.0 (the engine only tests for more than 0).
@@ -1925,6 +1937,31 @@ No rule, cap, limit or effect changed: the gain is in calls not made. A GDScript
 - **The hit test** (≈4.9 → 3.7 µs a shot): the path test comes before the hit memory (a call), and a distance to the path's middle turns most targets in the cells away first; the targets' teams are read with the table looked up once a step. A short wall check (at most one cell each way, corner cells clear) skips the cell walk.
 - **Tried and dropped:** 32 px target cells (more cells cost more than the fewer targets saved, worst on desktop); skipping the per-step aim for actors without a beam (a delayed launch or a dash's end can start a beam from the aim later, so it must stay current).
 - **Where the rest goes:** desktop is the projectile step (3,000 shots × 8 steps a frame; the hit-work budget already bounds the hit tests), and web's p95 is the frames with a physics step. Stress's "frame parts" physics and process figures are the engine's per-second maxima, not averages.
+
+## 2026-10-29: Shots stepped by behaviour (performance)
+
+The owner: restructure the projectile step from "for each shot, check every behaviour" to passes by behaviour, with exactly the same behaviour, and so that a new behaviour is easy to add. `ProjectileManager.step` now runs a common pass (life, and every straight shot flies on), one pass per behaviour over a list of only the shots that have it (stuck, growth, linger, orbit, return, homing, spiral, a card's move; one table, `B_*` with `BEHAVIOUR_PASSES`, says which there are and in which order, and the comment above it why), then the hit pass over every shot in the order the step always took (the ends the passes marked, bounds, walls, hits, events), then the passes after the hits (shield). The lists are kept by `_join`, `_leave` and `_kill` (swap-remove, no allocation). core/README.md has "How to add a shot behaviour": its numbers, its setter (`_join`), its `B_*` and pass name in the one table, and its pass; nothing else.
+
+- **Exactly the same:** `tests/core/test_projectiles_step_exact.gd` steps a busy scene with every behaviour (homing searches, orbits and returns round wizards and round shots in lower and higher slots, the cap dropping shots, the hit-work budget running out and resuming, handlers that spawn shots, push targets and take them away) and compares every event and every live shot's state, step by step, with a recording made on main (c900bd4; cacf0a9 passes it too). To be exact, a shot whose motion reads something a hit handler may change (a stuck shot's target, an orbit's or return's caster shot, the targets left for a homing search or a homing move) or the hit-work budget waits for its turn in the hit pass (`_wait`, `_catch_up`), and a caster shot is read where it was before its turn.
+- **What changes, at the edges:** a hit handler now sees every shot already moved for this step, also those whose turn has not come. So a handler's change to another shot (a hook pulling its carrier, a blink) takes effect from that shot's next step whatever the slot order; before, it took effect in this step when that shot's slot came later. A shot a handler ends before its turn had already moved, so its trail ends one step on.
+- **Numbers** (headless, one machine, main cacf0a9 and this branch back to back, two rounds; the machine was shared, so the whole-frame figures are noisy):
+
+| | main | this branch |
+|---|---|---|
+| step, 3,000 shots, no targets | 4.15 / 4.05 ms | 1.79 / 1.45 ms |
+| step, 3,000 shots, arena walls | 4.81 / 4.97 ms | 2.72 / 2.13 ms |
+| step, 3,000 shots, fresh hits in a crowd | 5.25 / 5.77 ms | 3.70 / 2.25 ms |
+| step, 3,000 shots, steady state | 3.20 / 3.12 ms | 2.02 / 2.07 ms |
+| step, 500 shots, fresh hits in a crowd | 1.70 / 1.94 ms | 1.31 / 0.95 ms |
+| stress web: frame avg / p95 | 9.29 / 19.08, 8.00 / 16.24 ms | 7.60 / 15.73, 7.22 / 15.06 ms |
+| stress desktop: frame avg / p95 | 102.8 / 219.0, 172.1 / 257.8 ms | 111.0 / 227.2, 88.5 / 227.4 ms |
+| final pair after merging main (59bc8c9): stress web avg / p95 | 8.28 / 16.71 ms | 7.75 / 15.71 ms |
+| final pair: stress desktop avg / p95 | 179.8 / 198.2 ms | 166.4 / 187.1 ms |
+| final pair: step, 3,000 shots, no targets / fresh hits | 2.93 / 4.13 ms | 1.81 / 3.33 ms |
+
+- **What each change bought:** the passes themselves (a plain shot costs one short loop; no behaviour checks per shot; the shield check walks its list, not every slot): the step without targets about 4.1 → 1.6 ms at 3,000. The trail sampling with its two calls a shot written out: 2.1 → 1.1 ms a sample at 3,000 shots (every other step). The hit test: a count and a box per grid cell, so a cell the path cannot touch is passed at once and charged to the budget in one go (2.6 → 2.2 µs a test in the stress crowd), the distance to the path's middle before anything else is read of a target, and the grid's corner kept as two numbers.
+- **Tried and dropped:** the wall check's one-cell answer written out in the hit pass (3%, not worth the lines); working a hit test's path out only at its first cell with a target near it (within the noise).
+- **Not met:** web p95 stays about 15 ms (aim was 13 or less). The projectile step is about 3 ms of the web physics step's 14 to 15 (0.5 ms of it the hit handlers in Combat, Spells and Feel); the rest is the enemies (2 ms), spells, combat, Feel and the engine. GDScript costs about 30 to 70 ns an operation here, so a hit test cannot go much below 1.5 µs. Desktop frames are 8 physics steps; the step's own cost is down by about a third, the frame by less, as the handlers and the rest of the game stay.
 
 ## 2026-10-29: One shader per kind, trails as ribbons (owner)
 

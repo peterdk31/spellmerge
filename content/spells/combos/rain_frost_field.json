@@ -1,0 +1,9 @@
+{
+	"id": "rain_frost_field",
+	"name": "Rain frost field",
+	"does": "A frost nova dropped from above chills two imps standing close round the spot ahead.",
+	"casts": [{"staff": 0, "cards": ["rain", "frost", "nova"]}],
+	"imps": [[120, 0], [120, 12]],
+	"seconds": 2.0,
+	"checks": [{"kind": "status", "imps": [0, 1], "status": "chill"}]
+}

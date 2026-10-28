@@ -20,7 +20,7 @@
 [sub_resource type="CircleShape2D" id="CircleShape2D_body"]
 radius = 6.0
 
-[node name="Wizard" type="CharacterBody2D" groups=["wizards", "players"]]
+[node name="Wizard" type="CharacterBody2D" groups=["wizards"]]
 script = ExtResource("1_actor")
 ramp = 0
 idle_team = 0

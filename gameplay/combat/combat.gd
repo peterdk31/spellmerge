@@ -10,9 +10,8 @@ extends Node
 ## can be hurt is a row of packed arrays sized `Actors.ACTORS` and indexed by its actor id, a
 ## wizard's and an enemy's alike, and every rule below is written once and applied to every
 ## row. Finding a row is an array read (by id) or one dictionary read (by node); freeing it
-## is O(1). A body's id is its own (`id` of a kit Actor, `actor_id` of a wizard, `caster` of an
-## enemy that casts) or, for a body that has none (an enemy that only chases, the training
-## dummy), one Combat opens for it in the actor table (the enemies' team, the enemy ramp) and
+## is O(1). A body's id is its own (`id` of a kit Actor; `actor_id` or `caster` of a plain
+## body) or, for a body that has none, one Combat opens for it in the actor table (the enemies' team, the enemy ramp) and
 ## closes when it goes, so every body has an owner; the projectile manager is told it
 ## (`add_target`'s owner).
 ##
@@ -23,11 +22,8 @@ extends Node
 ##
 ## Health: a kit Actor's is its Health component (Combat calls `take(amount, killer)` and
 ## `heal`; at 0 the actor dies, `die(killer)`, unless something downs it instead: a wizard's
-## Downed). A node without the kit given to `register_player` (none in the game since G7) keeps
-## its own: hits and heals reach it as `damage_dealt` and `heal_dealt`, a quiet hit through its
-## `take_damage`. A body that is neither (the old enemies,
-## until G6) has its health in Combat's row. A body's hurtbox rules: a kit Actor is not hurt
-## while down, dying or protected; a wizard asks its own `is_invulnerable` and `is_downed`.
+## Downed). A plain body without the kit (tests' stand-ins) has its health in Combat's row. A
+## kit Actor is not hurt while down, dying or protected.
 ##
 ## A spell's hit (`projectile_hit`, `area_hit_requested`) is looked up in Spells' hit profiles
 ## (`Spells.hit_profile(tag)`) and runs `_apply_spell`: a heal for the caster's team (a mend),
@@ -98,12 +94,10 @@ const AREA_DEPTH: int = 8
 
 ## How many rows there are: one per actor id.
 const ACTORS: int = ActorsScript.ACTORS
-## Seats: the seat wrappers find a wizard by its home seat (deprecated, until G8).
+## Seats: `home_actor_of` finds a wizard by its home seat.
 const PLAYER_SLOTS: int = ActorsScript.SEATS
 ## A barrier given for less than this many seconds lasts this long (a dash is shorter).
 const SHIELD_MIN_TIME: float = 0.5
-## Deprecated (actors G5): use SHIELD_MIN_TIME.
-const WIZARD_SHIELD_MIN_TIME: float = SHIELD_MIN_TIME
 ## An actor knocked at least this fast into a wall (one step ahead of it) takes the slam of a
 ## heavy hit, once.
 const SLAM_MIN_SPEED: float = 60.0
@@ -143,11 +137,10 @@ const MAX_EXTENDED_TIME: float = 8.0
 const MAX_EXTENDED_PERCENT: float = 100.0
 const MAX_EXTENDED_BURN: float = 20.0
 
-## What a row holds: nothing, a kit Actor (health in its Health), a wizard of
-## `gameplay/player` (health its own, until G7), or a plain body (health in the row, until G6).
+## What a row holds: nothing, a kit Actor (health in its Health), or a plain body (health in the
+## row).
 const BODY_NONE: int = 0
 const BODY_ACTOR: int = 1
-const BODY_WIZARD: int = 2
 const BODY_PLAIN: int = 3
 ## Where a body without the kit keeps its actor id, looked at in this order.
 const OWN_ID_PROPERTIES: Array[StringName] = [&"actor_id", &"caster"]
@@ -174,7 +167,7 @@ var _node_id: PackedInt64Array = PackedInt64Array()
 var _row_by_node: Dictionary[int, int] = {}
 var _live: PackedInt32Array = PackedInt32Array()
 var _live_at: PackedInt32Array = PackedInt32Array()
-# The row of the wizard each seat registered (`register_player`), or NONE.
+# The row of the actor whose home controller has each seat (a wizard body), or NONE.
 var _seat_row: PackedInt32Array = PackedInt32Array()
 
 # The body: health (plain bodies only), its most, the damage of its touch, its hurt circle,
@@ -393,8 +386,6 @@ func health_of(actor: Variant) -> int:
 		BODY_ACTOR:
 			var kit: Actor = _nodes[row] as Actor
 			return kit.health.health if kit.health != null else -1
-		BODY_WIZARD:
-			return _wizard_health(_nodes[row])
 	return _health[row]
 
 
@@ -591,6 +582,12 @@ func downed_note_of(actor: Variant) -> String:
 	return "downed by player %d's %s" % [seat + 1, what]
 
 
+## The registered actor whose home controller has seat `seat` (the wizard body that seat plays,
+## also while the seat drives another actor), or Actors.NONE. Feel finds a downed wizard by it.
+func home_actor_of(seat: int) -> int:
+	return _seat_row_of(seat)
+
+
 # --- The pipeline ------------------------------------------------------------
 
 ## The damage pipeline for a hit that does not come from a spell. The actor `caster` (or
@@ -650,7 +647,7 @@ func _hit(by: int, row: int, amount: int, direction: Vector2, strength: float, k
 		if not tick:
 			events.actor_hurt.emit(actor, amount, where, _tag, kind)
 	# A listener may have forgotten the body: it is not killed by Combat then.
-	if left == 0 and _same(row, node) and _body[row] != BODY_WIZARD:
+	if left == 0 and _same(row, node):
 		_die(row, by, where, team)
 	if discharge_share > 0.0:
 		# A charged actor is a lightning rod: the charge leaves in one step to the other teams near.
@@ -660,8 +657,7 @@ func _hit(by: int, row: int, amount: int, direction: Vector2, strength: float, k
 
 
 ## Take `amount` off the body's health; returns what is left (-1 for a kit Actor with no
-## Health, which never dies of hits). A wizard's health goes down when it hears `damage_dealt`,
-## or here at once for a quiet hit it survives (so its HUD still hears it).
+## Health, which never dies of hits).
 func _take(row: int, by: int, amount: int, quiet: bool) -> int:
 	match _body[row]:
 		BODY_ACTOR:
@@ -670,12 +666,6 @@ func _take(row: int, by: int, amount: int, quiet: bool) -> int:
 				return -1
 			kit.health.take(amount, by)
 			return kit.health.health
-		BODY_WIZARD:
-			var wizard: Node2D = _nodes[row]
-			var health: int = _wizard_health(wizard)
-			if quiet and health > amount:
-				wizard.call(&"take_damage", amount)
-			return maxi(health - amount, 0)
 	_health[row] = maxi(_health[row] - amount, 0)
 	return _health[row]
 
@@ -1075,7 +1065,7 @@ func _on_pull_requested(caster: int, position: Vector2, radius: float, strength:
 
 
 ## A wizard of seat `player` went down: its statuses, push and barrier go, and shots fly past it
-## (its target is removed) until it is revived. What hurt it last stays, for `downed_note`.
+## (its target is removed) until it is revived. What hurt it last stays, for `downed_note_of`.
 func _on_player_downed(player: int) -> void:
 	var row: int = _seat_row_of(player)
 	if row == ActorsScript.NONE:
@@ -1306,8 +1296,8 @@ func _register(node: Node2D, body: int, health: int, radius: float, contact: int
 	_hurt_offset[row] = offset
 	_clear_state(row)
 	if body == BODY_ACTOR:
-		# The seat wrappers (`downed_note(seat)`, ...) find a wizard by its home seat, never by the
-		# seat's driven actor (another one while it possesses).
+		# `home_actor_of(seat)` finds a wizard by its home seat, never by the seat's driven actor
+		# (another one while it possesses).
 		var home: ActorController = (node as Actor).home_controller
 		if home != null and home.seat >= 0 and home.seat < PLAYER_SLOTS:
 			_seat_row[home.seat] = row
@@ -1324,7 +1314,7 @@ func _register(node: Node2D, body: int, health: int, radius: float, contact: int
 func _add_target(row: int) -> void:
 	if projectiles == null or _is_down(row):
 		return
-	var wizards: bool = _body[row] == BODY_WIZARD or (_body[row] == BODY_ACTOR and _team(row) == ActorsScript.TEAM_WIZARDS)
+	var wizards: bool = _body[row] == BODY_ACTOR and _team(row) == ActorsScript.TEAM_WIZARDS
 	var layer: int = ProjectileManagerScript.LAYER_PLAYER if wizards else ProjectileManagerScript.LAYER_ENEMY
 	projectiles.add_target(_nodes[row], _hurt_radius[row], layer, _cast_id(row), _hurt_offset[row])
 
@@ -1436,7 +1426,7 @@ func _cast_id(row: int) -> int:
 
 
 ## True while a hit can hurt the row's body: it is there, not down, dying or protected (a kit
-## Actor), not dodging or downed (a wizard), or has health left (a plain body).
+## Actor), or has health left (a plain body).
 func _can_hurt(row: int) -> bool:
 	if not is_instance_valid(_nodes[row]):
 		return false
@@ -1447,10 +1437,6 @@ func _can_hurt(row: int) -> bool:
 			if kit.is_down() or kit.is_dying():
 				return false
 			return kit.health == null or (not kit.health.is_depleted() and not kit.health.is_protected())
-		BODY_WIZARD:
-			if node.has_method(&"is_invulnerable") and node.call(&"is_invulnerable"):
-				return false
-			return not _is_down(row)
 	return _health[row] > 0
 
 
@@ -1467,7 +1453,7 @@ func _can_heal(row: int) -> bool:
 	return true
 
 
-## True while the row's body is down (a kit Actor held down, a downed wizard).
+## True while the row's body is down (a kit Actor held down: a downed wizard).
 func _is_down(row: int) -> bool:
 	if not is_instance_valid(_nodes[row]):
 		return false
@@ -1475,14 +1461,7 @@ func _is_down(row: int) -> bool:
 	match _body[row]:
 		BODY_ACTOR:
 			return (node as Actor).is_down()
-		BODY_WIZARD:
-			return node.has_method(&"is_downed") and node.call(&"is_downed")
 	return false
-
-
-func _wizard_health(node: Node2D) -> int:
-	var value: Variant = node.get(&"health")
-	return value as int if value is int else 1 << 30
 
 
 ## Whom the row aims at (its actor's team), NONE when unknown.
@@ -1502,7 +1481,7 @@ func _seat_of(actor: int) -> int:
 	return table.seat_of(actor) if table != null else ActorsScript.NONE
 
 
-## The row of the wizard seat `seat` registered (`register_player`), or NONE.
+## The row of the actor whose home controller has seat `seat`, or NONE.
 func _seat_row_of(seat: int) -> int:
 	if seat < 0 or seat >= PLAYER_SLOTS:
 		return ActorsScript.NONE
@@ -1548,142 +1527,3 @@ func _give_scratch() -> void:
 
 func _position_of(node: Node2D) -> Vector2:
 	return node.global_position if node.is_inside_tree() else node.position
-
-
-# --- Deprecated (actors G5) --------------------------------------------------
-# Thin wrappers over the rows, so callers written before G5 (player.gd, ai.gd, flow, Feel, the
-# training dummy) keep working while G6-G8 move them onto the API above. G8/G10 remove them.
-
-## Deprecated (actors G5): use register_actor (a kit Actor's Hurtbox does).
-func register_enemy(enemy: Node2D, health: int, hurt_radius: float, contact_damage: int = 0, hurt_offset: Vector2 = Vector2.ZERO) -> void:
-	if enemy == null or health <= 0:
-		return
-	var body: int = BODY_ACTOR if enemy is Actor else BODY_PLAIN
-	_register(enemy, body, health, hurt_radius, contact_damage, hurt_offset, ActorsScript.NONE, ActorsScript.TEAM_ENEMIES, ActorsScript.RAMP_ENEMY, ActorsScript.NONE)
-
-
-## Deprecated (actors G5): use unregister_actor.
-func unregister_enemy(enemy: Node2D) -> void:
-	unregister_actor(enemy)
-
-
-## Deprecated (actors G5): use register_actor (G7: the wizard's Hurtbox). The wizard `node` of
-## seat `index` (0-3): its row is its `actor_id`, else the actor its seat drives, else one
-## Combat opens on the wizards' team for that seat. `radius` is its hurt circle, `hit_offset`
-## moves it from the feet to the drawn body.
-func register_player(index: int, node: Node2D, radius: float, hit_offset: Vector2 = Vector2.ZERO) -> void:
-	if index < 0 or index >= PLAYER_SLOTS:
-		push_warning("Combat: player index %d is not 0-3." % index)
-		return
-	var held: int = _seat_row[index]
-	if held != ActorsScript.NONE and _nodes[held] != node:
-		unregister_player(index)
-	var fallback: int = ActorsScript.NONE
-	var table: ActorsScript = _table()
-	if table != null:
-		var seated: int = table.actor_of_seat(index)
-		if seated != ActorsScript.NONE and _body[seated] == BODY_NONE:
-			var holder: Node = table.node_of(seated)
-			if holder == null or holder == node:
-				fallback = seated
-	var body: int = BODY_ACTOR if node is Actor else BODY_WIZARD
-	var row: int = _register(node, body, 1, radius, 0, hit_offset, fallback, ActorsScript.TEAM_WIZARDS, index, index)
-	if row != ActorsScript.NONE:
-		_seat_row[index] = row
-
-
-## Deprecated (actors G5): use unregister_actor.
-func unregister_player(index: int) -> void:
-	var row: int = _seat_row_of(index)
-	if row != ActorsScript.NONE:
-		_free_row(row)
-	if index >= 0 and index < PLAYER_SLOTS:
-		_seat_row[index] = ActorsScript.NONE
-
-
-## Deprecated (actors G5): use is_registered and the actor's team.
-func is_enemy(node: Node) -> bool:
-	var row: int = _row_of(node)
-	return row != ActorsScript.NONE and _body[row] != BODY_WIZARD and _team(row) != ActorsScript.TEAM_WIZARDS
-
-
-## Deprecated (actors G5): use actor_count.
-func get_enemy_count() -> int:
-	var count: int = 0
-	for i in _live.size():
-		var row: int = _live[i]
-		if _body[row] != BODY_WIZARD and _team(row) != ActorsScript.TEAM_WIZARDS:
-			count += 1
-	return count
-
-
-## Deprecated (actors G5): use health_of.
-func get_health(enemy: Node2D) -> int:
-	return health_of(enemy)
-
-
-## Deprecated (actors G5): use knockback_of.
-func get_knockback(enemy: Node2D) -> Vector2:
-	return knockback_of(enemy)
-
-
-## Deprecated (actors G5): use consume_knockback.
-func consume_knockback_step(enemy: Node2D, delta: float) -> Vector2:
-	return _consume_knockback(_row_of_node(enemy), delta)
-
-
-## Deprecated (actors G5): use pace.
-func speed_factor(enemy: Node2D) -> float:
-	return _pace(_row_of_node(enemy))
-
-
-## Deprecated (actors G5): use apply_status with the wizard's actor id.
-func apply_wizard_status(player: int, index: int, status_id: StringName, duration: float, strength: float) -> bool:
-	var row: int = _seat_row_of(index)
-	return apply_status(player, row, status_id, duration, strength) if row != ActorsScript.NONE else false
-
-
-## Deprecated (actors G5): use status_left with the wizard's actor id.
-func wizard_status_left(index: int, status_id: StringName) -> float:
-	var row: int = _seat_row_of(index)
-	return status_left(row, status_id) if row != ActorsScript.NONE else 0.0
-
-
-## Deprecated (actors G5): use pace.
-func wizard_speed_factor(index: int) -> float:
-	var row: int = _seat_row_of(index)
-	return _pace(row)
-
-
-## Deprecated (actors G5): use consume_knockback.
-func consume_wizard_knockback(index: int, delta: float) -> Vector2:
-	var row: int = _seat_row_of(index)
-	return _consume_knockback(row, delta)
-
-
-## Deprecated (actors G5): use give_shield with the actor id.
-func give_wizard_shield(index: int, charges: int, seconds: float, tag: int = 0) -> void:
-	var row: int = _seat_row_of(index)
-	if row != ActorsScript.NONE:
-		give_shield(row, charges, seconds, tag)
-
-
-## Deprecated (actors G5): use shield with the actor id.
-func wizard_shield(index: int) -> int:
-	var row: int = _seat_row_of(index)
-	return shield(row) if row != ActorsScript.NONE else 0
-
-
-## Deprecated (actors G5): use downed_note_of with the actor id. The note of the wizard seat
-## `index` registered.
-func downed_note(index: int) -> String:
-	var row: int = _seat_row_of(index)
-	return downed_note_of(row) if row != ActorsScript.NONE else ""
-
-
-## Deprecated (actors G5): use Actors.node_of. The wizard seat `index` registered, or null.
-func wizard_of(index: int) -> Node2D:
-	var row: int = _seat_row_of(index)
-	if row == ActorsScript.NONE or not is_instance_valid(_nodes[row]):
-		return null
-	return _nodes[row]

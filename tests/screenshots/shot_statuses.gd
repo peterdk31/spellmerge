@@ -38,7 +38,7 @@ func take() -> void:
 		imp.add_child(sprite)
 		root.add_child(imp)
 		imp.global_position = centre + Vector2((float(i) - 2.5) * GAP, 0.0)
-		combat.call("register_enemy", imp, 400, 10.0)
+		combat.call("register_actor", imp, 400, 10.0)
 		imps.append(imp)
 	for i in IDS.size():
 		var id: StringName = IDS[i]

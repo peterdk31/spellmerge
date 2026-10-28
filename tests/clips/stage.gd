@@ -204,7 +204,7 @@ func fingerprint() -> String:
 	var parts: PackedStringArray = PackedStringArray()
 	parts.append(str(projectiles.get_count()))
 	for imp in imps:
-		parts.append("%s@%s" % [combat.get_health(imp) if is_instance_valid(imp) else -1, imp.global_position if is_instance_valid(imp) else Vector2.ZERO])
+		parts.append("%s@%s" % [combat.health_of(imp) if is_instance_valid(imp) else -1, imp.global_position if is_instance_valid(imp) else Vector2.ZERO])
 	for row: Array in reactions:
 		parts.append("%s@%s" % [row[1], row[2]])
 	return ",".join(parts)
@@ -237,7 +237,7 @@ func _add_imp(at: Vector2) -> void:
 	imp.add_child(sprite)
 	world.add_child(imp)
 	imp.global_position = at
-	combat.register_enemy(imp, IMP_HEALTH, IMP_RADIUS)
+	combat.register_actor(imp, IMP_HEALTH, IMP_RADIUS)
 	imps.append(imp)
 
 

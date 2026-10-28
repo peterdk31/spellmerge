@@ -10,7 +10,7 @@ extends ActorComponent
 ## card on (then only a new press casts, which switches it off). `cast(at)` casts from the staff
 ## tip (`Actor.muzzle_position`, clipped to walls from the feet) along the actor's aim with the
 ## free mana (`free_mana`: what it has minus what its sustained cards hold) and pays what Spells
-## took.
+## took, then sends `actor_cast` (any actor's cast, for Feel's squash).
 ##
 ## For an AI: `cast_ready(within)` says the next cast can leave within that many seconds with the
 ## mana there (so a telegraph always comes true), `next_cast_mana`, `next_cast_reach` and
@@ -35,6 +35,7 @@ const MAX_STAFFS: int = SpellLimits.STAFFS
 const CACHE_SIZE: int = 256
 
 ## A staff was cast (`cast`): from `origin` along `direction` (`last_form(at)` names the carrier).
+## Sent before `actor_cast`.
 signal cast_done(at: int, origin: Vector2, direction: Vector2)
 ## Staff `at` was built (`set_staff`): `cards_of(at)` and `plan_of(at)` say what it is now.
 signal staff_built(at: int)
@@ -161,6 +162,8 @@ func cast(at: int) -> bool:
 		return false
 	mana = maxf(mana - spent, 0.0)
 	cast_done.emit(at, origin, direction)
+	if actor.events != null:
+		actor.events.actor_cast.emit(actor.id, actor)
 	return true
 
 

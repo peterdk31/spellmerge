@@ -54,13 +54,13 @@ func test_every_enemy_body_has_an_actor_id_and_closes_it_when_freed() -> void:
 		check_equal(fx.actors.seat_of(body.id), ActorsScript.NONE, "%s is driven by no seat" % what)
 		check(fx.actors.node_of(body.id) == body, "%s is its actor's node" % what)
 		check_equal(fx.projectiles.target_owner_of(body), body.id, "%s owns its hurt circle, so its own spells pass it" % what)
-		check(fx.combat.is_enemy(body), "%s can be hurt through Combat" % what)
+		check(fx.combat.is_registered(body.id), "%s can be hurt through Combat" % what)
 		ids.append(body.id)
 	check(not ids.has(fx.players[0].id), "no enemy shares the wizard's id")
 	for at in bodies.size():
 		bodies[at].free()
 		check(not fx.actors.is_open(ids[at]), "a freed enemy's id is closed (%d)" % ids[at])
-	check_equal(fx.combat.get_enemy_count(), 0, "and Combat forgot them all")
+	check_equal(fx.combat.actor_count(), fx.players.size(), "and Combat forgot them all (only the wizards are left)")
 
 
 func test_an_enemy_without_a_staff_only_chases_into_its_target() -> void:

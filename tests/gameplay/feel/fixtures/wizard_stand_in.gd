@@ -1,10 +1,20 @@
-extends Node2D
-## A stand-in for a wizard in the Feel tests: in the "players" group, with a player index (its
-## seat) and the actor id it casts as (a real wizard opens its own, actors G3b).
+extends Actor
+## A stand-in actor for the Feel tests: an `Actor` body whose `id` (and `ramp`, `mover`) the test
+## sets, with none of the kit started: no services, no components, no id of its own (Feel reads a
+## hit body by its actor id, actors G8; the test opens the id in its own actor table).
 
-var index: int = 0
-var actor_id: int = -1
+
+func _enter_tree() -> void:
+	pass
 
 
 func _ready() -> void:
-	add_to_group(&"players")
+	pass
+
+
+func _exit_tree() -> void:
+	pass
+
+
+func _physics_process(_delta: float) -> void:
+	pass

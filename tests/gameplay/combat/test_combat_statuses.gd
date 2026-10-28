@@ -316,9 +316,7 @@ func test_burn_ticks_send_no_damage_event_but_the_killing_one_does() -> void:
 
 
 func test_a_frozen_enemy_still_hurts_on_contact() -> void:
-	var wizard := own(Node2D.new()) as Node2D
-	root.add_child(wizard)
-	_combat.register_player(0, wizard, 8.0)
+	_foe(Vector2.ZERO)
 	var enemy := own(Node2D.new()) as Node2D
 	root.add_child(enemy)
 	_combat.register_actor(enemy, 50, 10.0, 1)
@@ -351,11 +349,10 @@ func test_bad_applications_are_refused() -> void:
 func test_a_wizard_a_spell_hits_gets_its_status_too() -> void:
 	# Staffs (B3): statuses on wizards exist; what reaches a wizard at all is the projectile
 	# manager's rule (every shot but the caster's own, which only once out of their hitbox).
-	var wizard := own(Node2D.new()) as Node2D
-	_combat.register_player(1, wizard, 8.0)
+	var wizard := _foe(Vector2.ZERO)
 	_hit(0, wizard, _tag(0, &"fire"))
 	check_equal(_applied, [[0, wizard, &"burn"]], "the fire hit set the wizard burning")
-	check(_combat.status_left(1, &"burn") > 0.0, "and combat keeps it for the wizard's index")
+	check(_combat.status_left(wizard, &"burn") > 0.0, "and combat keeps it for the wizard's actor")
 	check_equal(_damage.size(), 1, "the damage was sent")
 
 

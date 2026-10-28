@@ -32,7 +32,7 @@ func test_every_element_is_inside_its_ranges() -> void:
 func test_every_element_names_a_status_combat_knows() -> void:
 	var combat := own(CombatScript.new()) as CombatScript
 	var enemy := own(Node2D.new()) as Node2D
-	combat.register_enemy(enemy, 10, 5.0)
+	combat.register_actor(enemy, 10, 5.0)
 	for id in ELEMENTS:
 		var element: ElementBase = _load(id)
 		check(combat.apply_status(0, enemy, element.status_id, element.status_duration, element.status_strength), "%s: combat accepts %s" % [id, element.status_id])

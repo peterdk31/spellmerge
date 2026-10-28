@@ -54,7 +54,6 @@ const RegistryScript := preload("res://core/registry/registry.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const CombatScript := preload("res://gameplay/combat/combat.gd")
-const AiScript := preload("res://gameplay/ai/ai.gd")
 const PlayerScript := preload("res://gameplay/player/player.gd")
 const DownedScript := preload("res://gameplay/player/downed.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
@@ -644,8 +643,9 @@ func _spawn_dummies(parent: Node2D, room: RoomBase) -> void:
 ## they leave the tree) and the old world is freed.
 func _clear_run() -> void:
 	if combat != null:
-		for index in PLAYER_SLOTS:
-			combat.unregister_player(index)
+		for wizard: Node2D in _wizards:
+			if is_instance_valid(wizard):
+				combat.unregister_actor(wizard)
 	_wizards.clear()
 	_enemies.clear()
 	_dummies.clear()

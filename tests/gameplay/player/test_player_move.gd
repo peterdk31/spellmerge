@@ -106,7 +106,7 @@ func _test_wizard_scene() -> void:
 	_check(wizard != null, "the wizard scene's root is an Actor")
 	if wizard == null:
 		return
-	_check(wizard.is_in_group(&"wizards") and wizard.is_in_group(&"players"), "the wizard is in the wizards and players groups")
+	_check(wizard.is_in_group(&"wizards") and not wizard.is_in_group(&"players"), "the wizard is in the wizards group (the players group is gone, actors G8)")
 	_check(wizard.get_node_or_null("CollisionShape2D") is CollisionShape2D, "the wizard scene has a collision shape")
 	_check(wizard.get_node_or_null("Health") is Health, "the wizard scene has a Health")
 	_check(wizard.get_node_or_null("Hurtbox") is Hurtbox, "the wizard scene has the kit's Hurtbox")

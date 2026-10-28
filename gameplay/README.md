@@ -20,7 +20,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | --- | --- | --- |
 | `device_joined`, `device_left` | `core/input` | `coop` |
 | `spell_cast` | `player` | `feel` |
-| `wizard_cast` | `player` | `feel` |
+| `actor_cast` | `actor` (the Caster, every actor's cast; actors G8) | `feel` (the squash) |
 | `projectile_hit` | `core/projectiles` | `combat` |
 | `projectile_impact` | `core/projectiles` | `feel` |
 | `form_shown` | `core/spells` | `feel` |
@@ -31,28 +31,28 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `staff_cards_requested` | `hud` (the radial builder) | `player` |
 | `staff_changed` | `player` | `hud` (the builders) |
 | `staff_cast` | `player` | `hud` (the corner panel) |
-| `caster_move_requested` | `core/spells` | `ai`, `actor` (the Mover), each for its own actor id |
+| `caster_move_requested` | `core/spells` | `actor` (the Mover), each for its own actor id |
 | `mana_reserved` | `core/spells` (to the seat that drives the caster) | none (the Caster reads `Spells.reserved_mana`, actors G7) |
-| `mana_refund_requested` | `core/spells` (for every actor) | `ai`, `actor` (the Caster), each for its own actor id |
+| `mana_refund_requested` | `core/spells` (for every actor) | `actor` (the Caster), each for its own actor id |
 | `area_hit_requested` | `core/spells` | `combat` |
 | `target_move_requested`, `entity_spawn_requested`, `entity_end_requested` | `core/spells` (staffs B2) | `ai`; `target_move_requested` also `actor` (the Mover) |
-| `caster_move_finished` | `ai`, `actor` (the Mover), each with its own actor id | `core/spells`, `feel` (where a dash lands) |
-| `entity_ended`, `familiar_cast_requested` | `ai` | none yet (`core/spells`, staffs B2) |
-| `shot_blocked` | `core/projectiles` | none yet (`core/spells`, staffs B1) |
-| `shield_blocked`, `kill_landed`, `actor_hurt`, `reaction_landed` | `combat` | `core/spells` (on block, on kill, on hurt, on reaction) |
+| `caster_move_finished` | `actor` (the Mover), each with its own actor id | `core/spells`, `feel` (where a dash lands) |
+| `entity_ended`, `familiar_cast_requested` | `ai` (Entities) | `core/spells` |
+| `shot_blocked` | `core/projectiles` | `core/spells` (on block) |
+| `shield_blocked`, `kill_landed`, `actor_hurt`, `reaction_landed` | `combat` (for every actor: `actor_hurt` and `shield_blocked` name the hurt or shielded actor) | `core/spells` (on block, on kill, on hurt, on reaction) |
 | `hit_landed` | `combat` | `feel` |
 | `heal_dealt` | `combat` | `feel` |
 | `wizard_shield_requested`, `pull_requested`, `area_hit_requested` | `core/spells` (staffs B2) | `combat` |
 | `possess_requested` | `core/spells` (actors G9) | `actor` (each actor, for its own id: `Possession.begin`) |
-| `possess_started`, `possess_ended` | `actor` (the Possession) | none yet (Feel, later) |
+| `possess_started`, `possess_ended` | `actor` (the Possession) | `feel` (a ring in the driver's ramp) |
 | `player_possessed` | `player` (the seat set aside, and back) | `hud` (the corner panel) |
 | `reaction_triggered` | `combat` | `feel` |
 | `discharge_arc` | `combat` | `feel` |
-| `damage_dealt` | `combat` | `feel`, `ai` |
-| `status_applied` | `combat` | none yet |
-| `enemy_died` | `combat` | `feel`, `flow` |
-| `player_downed` | `player` | `ai`, `feel`, `flow`, `run` |
-| `player_revived` | `player` | none yet |
+| `damage_dealt` | `combat` | `feel`, `ai` (grudges, the looks) |
+| `status_applied` | `combat` | `feel` |
+| `enemy_died` | `combat` (every actor not on the wizards' team) | `feel`, `flow` |
+| `player_downed` | `player` (Downed) | `ai`, `combat`, `feel`, `flow`, `run` |
+| `player_revived` | `player` (Downed) | `combat`, `flow` |
 | `revive_progress` | `coop` | `player` (Downed) |
 | `player_stats_changed` | `player` | `hud` |
 | `player_joined`, `player_left` | `coop` | `difficulty`, `flow`, `hud` |

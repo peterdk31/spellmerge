@@ -1,6 +1,6 @@
 extends "res://tests/support/suite.gd"
 ## Tests for the tags and generations of the spell runtime (staffs A5/A6c; M2 part 5 before):
-## the tag layout (player, staff, generation, node; an enemy's row, staffs F3), every compiled spell of a staff registered
+## the tag layout (staff, generation, node and caster, every actor id 0-511 since actors G2), every compiled spell of a staff registered
 ## under its node, four players building at once, a rebuild mid-flight, the generation ring
 ## wrapping and revoking. It uses cards built in code and a stand-in registry, so no content is
 ## needed. The compiler's own rules are in test_staff_compiler.gd.
@@ -11,6 +11,7 @@ const StaffKit := preload("res://tests/support/staff_kit.gd")
 
 const SpellsScript := preload("res://core/spells/spells.gd")
 const EventsScript := preload("res://core/events/events.gd")
+const ActorsScript := preload("res://core/actors/actors.gd")
 
 
 ## A registry stand-in with the same question as the real one.
@@ -112,69 +113,66 @@ func _begin(player: int, staff: int, compiled: CompiledStaff) -> int:
 
 
 func test_tags_pack_and_unpack() -> void:
-	for player in SpellLimits.PLAYERS:
+	for caster in [0, 1, 3, 4, 259, 260, 300, SpellTag.CASTER_MASK]:
 		for staff in SpellLimits.STAFFS:
 			for node in [0, 1, 2, SpellTag.NODE_MASK]:
 				for generation in SpellLimits.GENERATIONS:
-					var tag: int = SpellTag.make(player, staff, node, generation)
+					var tag: int = SpellTag.make(caster, staff, node, generation)
 					check(tag > 0 and SpellTag.is_spell_tag(tag), "tag is positive")
-					check(SpellTag.player_of(tag) == player and SpellTag.staff_of(tag) == staff and SpellTag.node_of(tag) == node and SpellTag.generation_of(tag) == generation, "tag %d unpacks to what made it" % tag)
+					check(SpellTag.caster_of(tag) == caster and SpellTag.staff_of(tag) == staff and SpellTag.node_of(tag) == node and SpellTag.generation_of(tag) == generation, "tag %d unpacks to what made it" % tag)
 	check(not SpellTag.is_spell_tag(0), "0 is no tag")
+
+
+func test_every_actor_id_round_trips() -> void:
+	for caster in SpellTag.CASTER_MASK + 1:
+		var tag: int = SpellTag.make(caster, 2, 300, 5)
+		check(SpellTag.caster_of(tag) == caster and SpellTag.staff_of(tag) == 2 and SpellTag.node_of(tag) == 300 and SpellTag.generation_of(tag) == 5, "caster %d round trips" % caster)
+	check_equal(SpellTag.CASTER_MASK + 1, ActorsScript.ACTORS, "a tag holds every actor id")
 
 
 func test_all_tags_are_different() -> void:
 	var seen: Dictionary = {}
-	for player in SpellLimits.PLAYERS:
+	for caster in SpellTag.CASTER_MASK + 1:
 		for staff in SpellLimits.STAFFS:
-			for node in 3:
-				for generation in SpellLimits.GENERATIONS:
-					seen[SpellTag.make(player, staff, node, generation)] = true
-	check_equal(seen.size(), SpellLimits.PLAYERS * SpellLimits.STAFFS * 3 * SpellLimits.GENERATIONS, "every combination has its own tag")
-	check(SpellTag.make(3, 3, SpellTag.NODE_MASK, 7) < SpellTag.FLAG << 1, "the largest tag is still a spell tag")
+			for node in [0, 1, SpellTag.NODE_MASK]:
+				for generation in [0, 7]:
+					seen[SpellTag.make(caster, staff, node, generation)] = true
+	check_equal(seen.size(), (SpellTag.CASTER_MASK + 1) * SpellLimits.STAFFS * 3 * 2, "every combination has its own tag")
+	check(SpellTag.make(SpellTag.CASTER_MASK, 3, SpellTag.NODE_MASK, 7) < SpellTag.FLAG << 1, "the largest tag is still a spell tag")
 	check(not SpellTag.is_spell_tag(101000), "the highest enemy attack tag (gameplay/ai) is not a spell tag")
 
 
-func test_enemy_tags_pack_and_unpack() -> void:
+func test_tags_fit_an_int32_and_miss_the_ai_tags() -> void:
+	var largest: int = SpellTag.make(SpellTag.CASTER_MASK, 3, SpellTag.NODE_MASK, 7)
+	check(largest < SpellTag.LIMIT and SpellTag.is_spell_tag(largest), "the largest tag is a spell tag")
+	check(SpellTag.LIMIT <= 1 << 29, "every spell tag is below 2^29")
+	var shields := PackedInt32Array([largest])
+	check_equal(shields[0], largest, "an int32 array keeps the largest tag")
+	check(SpellTag.make(0, 0, 0, 0) > 101000, "the smallest tag is above the AI's attack tags")
+	check(not SpellTag.is_spell_tag(SpellTag.LIMIT), "nothing at the limit is a spell tag")
+	check_equal(SpellTag.generation_key(SpellTag.make(7, 0, 9, 2)), SpellTag.make(7, 0, 0, 2), "a generation key keeps its caster")
+	check(SpellTag.generation_key(SpellTag.make(7, 0, 9, 2)) != SpellTag.generation_key(SpellTag.make(8, 0, 9, 2)), "two casters have their own keys")
+
+
+## Deprecated helpers (actors G3 removes them): the same answers as before G2 for the casters
+## Spells numbers today, players 0-3 and enemy rows from FIRST_ENEMY_CASTER.
+func test_the_old_player_and_row_helpers_read_the_caster() -> void:
 	for row in [0, 1, 37, SpellTag.ROW_MASK]:
 		for staff in SpellLimits.STAFFS:
-			for node in [0, 5, SpellTag.NODE_MASK]:
-				for generation in SpellLimits.GENERATIONS:
-					var tag: int = SpellTag.make_enemy(row, staff, node, generation)
-					check(SpellTag.is_spell_tag(tag) and SpellTag.is_enemy_tag(tag), "enemy tag %d is a spell tag" % tag)
-					check(SpellTag.row_of(tag) == row and SpellTag.staff_of(tag) == staff and SpellTag.node_of(tag) == node and SpellTag.generation_of(tag) == generation, "enemy tag %d unpacks to what made it" % tag)
-					check_equal(SpellTag.player_of(tag), EventsScript.NO_PLAYER, "an enemy's spell has no player")
-					check_equal(SpellTag.caster_of(tag), SpellTag.FIRST_ENEMY_CASTER + row, "its caster is its row after the players")
+			var tag: int = SpellTag.make_enemy(row, staff, 5, 3)
+			check(SpellTag.is_spell_tag(tag) and SpellTag.is_enemy_tag(tag), "enemy tag %d is a spell tag" % tag)
+			check(SpellTag.row_of(tag) == row and SpellTag.staff_of(tag) == staff and SpellTag.node_of(tag) == 5 and SpellTag.generation_of(tag) == 3, "enemy tag %d unpacks to what made it" % tag)
+			check_equal(SpellTag.player_of(tag), EventsScript.NO_PLAYER, "an enemy's spell has no player")
+			check_equal(SpellTag.caster_of(tag), SpellTag.FIRST_ENEMY_CASTER + row, "its caster is its row after the players")
+			check_equal(SpellTag.make_for(SpellTag.FIRST_ENEMY_CASTER + row, staff, 5, 3), tag, "make_for makes the same tag")
 	for player in SpellLimits.PLAYERS:
 		var tag: int = SpellTag.make(player, 2, 9, 3)
 		check(not SpellTag.is_enemy_tag(tag), "a player's tag is not an enemy's")
+		check_equal(SpellTag.player_of(tag), player, "a player's tag names the player")
 		check_equal(SpellTag.caster_of(tag), player, "a player's caster is the player")
 		check_equal(SpellTag.row_of(tag), -1, "a player's tag has no enemy row")
-
-
-func test_enemy_tags_are_all_different_from_each_other_and_players() -> void:
-	var seen: Dictionary = {}
-	for row in SpellTag.ROW_MASK + 1:
-		for staff in SpellLimits.STAFFS:
-			for generation in [0, 7]:
-				seen[SpellTag.make_enemy(row, staff, 1, generation)] = true
-	for player in SpellLimits.PLAYERS:
-		for staff in SpellLimits.STAFFS:
-			for generation in [0, 7]:
-				seen[SpellTag.make(player, staff, 1, generation)] = true
-	check_equal(seen.size(), (SpellTag.ROW_MASK + 1 + SpellLimits.PLAYERS) * SpellLimits.STAFFS * 2, "every caster has its own tags")
-
-
-func test_enemy_tags_fit_an_int32_and_miss_the_ai_tags() -> void:
-	var largest: int = SpellTag.make_enemy(SpellTag.ROW_MASK, 3, SpellTag.NODE_MASK, 7)
-	check(largest < SpellTag.LIMIT and SpellTag.is_spell_tag(largest), "the largest enemy tag is a spell tag")
-	check(SpellTag.LIMIT <= 1 << 31, "every spell tag fits an int32")
-	var shields := PackedInt32Array([largest])
-	check_equal(shields[0], largest, "an int32 array keeps the largest tag")
-	check(SpellTag.make_enemy(0, 0, 0, 0) > 101000, "the smallest enemy tag is above the AI's attack tags")
-	check(not SpellTag.is_spell_tag(SpellTag.LIMIT), "nothing at the limit is a spell tag")
-	check(not SpellTag.is_enemy_tag(SpellTag.ENEMY_BIT), "the enemy bit alone is no tag")
-	check_equal(SpellTag.generation_key(SpellTag.make_enemy(3, 0, 9, 2)), SpellTag.make_enemy(3, 0, 0, 2), "an enemy's generation key keeps its row")
-	check(SpellTag.generation_key(SpellTag.make_enemy(3, 0, 9, 2)) != SpellTag.generation_key(SpellTag.make_enemy(4, 0, 9, 2)), "two rows have their own keys")
+		check_equal(SpellTag.make_for(player, 2, 9, 3), tag, "make_for makes the same tag")
+	check(not SpellTag.is_enemy_tag(SpellTag.FIRST_ENEMY_CASTER << SpellTag.CASTER_SHIFT), "a caster field alone is no tag")
 
 
 func test_a_built_staff_registers_every_node() -> void:

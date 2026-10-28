@@ -101,6 +101,7 @@ extends Node
 
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
+const ActorsScript := preload("res://core/actors/actors.gd")
 
 
 ## A launch that waits for its time: a group's later firing (burst) or one carrier's echo.
@@ -148,6 +149,8 @@ var revoked_tags: PackedInt64Array = PackedInt64Array()
 
 ## Registry stand-in for tests: anything with `get_resource(folder, id)`. Null uses `Registry`.
 var registry: Node = null
+## The actor table (actors G2); tests set their own. Null uses the `Actors` autoload.
+var actors: ActorsScript = null
 
 ## player * STAFFS + staff -> the current generation (0-7), -1 for no build
 var _current: PackedInt32Array = PackedInt32Array()
@@ -325,6 +328,8 @@ var _ring: PackedInt32Array = PackedInt32Array()
 ## Enemy caster rows free to open, oldest closed first, and which are open.
 var _enemy_free: PackedInt32Array = PackedInt32Array()
 var _enemy_open: PackedByteArray = PackedByteArray()
+## Enemy row -> the actor id it opened in the actor table, or Actors.NONE (actors G2).
+var _enemy_actor: PackedInt32Array = PackedInt32Array()
 ## Launches waiting for enemy casters, and live beams of enemy casters (their shares).
 var _enemy_pending: int = 0
 
@@ -353,6 +358,7 @@ func _init() -> void:
 	_ring.resize(SpellLimits.CASTERS * SpellLimits.STAFFS)
 	_ring.fill(-1)
 	_enemy_open.resize(SpellLimits.ENEMY_CASTERS)
+	_enemy_actor.resize(SpellLimits.ENEMY_CASTERS)
 	_free_enemy_rows()
 	_cooldown.resize(SpellLimits.CASTERS * SpellLimits.STAFFS)
 	_fires_used.resize(SpellLimits.BUDGETS)
@@ -2304,6 +2310,7 @@ func clear() -> void:
 	_landed_at.fill(0)
 	_move_heading.fill(Vector2.RIGHT)
 	_last_form.fill(&"")
+	_close_enemy_actors()
 	_free_enemy_rows()
 	_cast_count.fill(0)
 	delayed_dropped = 0
@@ -2337,13 +2344,17 @@ func clear() -> void:
 ## enemy then installs, casts and aims with it like a player (`install_staff`, `cast_staff`,
 ## `set_aim`), each with its own staffs, delays and generations; its spells hit wizards and
 ## decoys, and events name it NO_PLAYER (its tag names the row, `SpellTag.caster_of`). The row
-## closed longest ago is handed out first.
+## closed longest ago is handed out first. Underneath it opens an actor in the actor table (the
+## enemies' team and ramp, no seat; `actor_of_caster`); a full table leaves the row without one
+## (actors G2: nothing reads it yet, so the row still casts).
 func open_enemy_caster() -> int:
 	if _enemy_free.is_empty():
 		return -1
 	var row: int = _enemy_free[0]
 	_enemy_free.remove_at(0)
 	_enemy_open[row] = 1
+	var table: ActorsScript = _actor_table()
+	_enemy_actor[row] = table.open(ActorsScript.TEAM_ENEMIES, ActorsScript.RAMP_ENEMY) if table != null else ActorsScript.NONE
 	var caster: int = SpellLimits.FIRST_ENEMY_CASTER + row
 	_reset_caster(caster)
 	return caster
@@ -2367,8 +2378,17 @@ func close_enemy_caster(caster: int) -> void:
 		if _bm_on[at] != 0 and _bm_player[at] == caster:
 			_end_beam(at, false)
 	_reset_caster(caster)
+	_close_enemy_actor(row)
 	_enemy_open[row] = 0
 	_enemy_free.append(row)
+
+
+## The actor id under a caster (actors G2): an open enemy row's, or Actors.NONE (a player, whose
+## actor the wizard opens from G7, a closed row, or a row the full table had no id for).
+func actor_of_caster(caster: int) -> int:
+	if not is_enemy_caster_open(caster):
+		return ActorsScript.NONE
+	return _enemy_actor[caster - SpellLimits.FIRST_ENEMY_CASTER]
 
 
 ## True while the enemy caster row `caster` is open.
@@ -2450,12 +2470,45 @@ func _refund(player: int, amount: float) -> void:
 		_refunds[player] += amount
 
 
+## The actor table: the injected one, else the `Actors` autoload (null outside a game or test run).
+func _actor_table() -> ActorsScript:
+	if actors != null:
+		return actors if is_instance_valid(actors) else null
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	return tree.root.get_node_or_null(^"Actors") as ActorsScript if tree != null and tree.root != null else null
+
+
+## Closes the actor id an enemy row opened, if any.
+func _close_enemy_actor(row: int) -> void:
+	var id: int = _enemy_actor[row]
+	_enemy_actor[row] = ActorsScript.NONE
+	if id == ActorsScript.NONE:
+		return
+	var table: ActorsScript = _actor_table()
+	if table != null:
+		table.close(id)
+
+
+## Closes every open enemy row's actor id (on `clear`, and when the runtime is freed, so a
+## runtime a test made never keeps ids open in the shared table).
+func _close_enemy_actors() -> void:
+	for row in SpellLimits.ENEMY_CASTERS:
+		if _enemy_open[row] != 0:
+			_close_enemy_actor(row)
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE:
+		_close_enemy_actors()
+
+
 ## Every enemy row free, none open (at start and on `clear`).
 func _free_enemy_rows() -> void:
 	_enemy_free.resize(SpellLimits.ENEMY_CASTERS)
 	for row in SpellLimits.ENEMY_CASTERS:
 		_enemy_free[row] = row
 	_enemy_open.fill(0)
+	_enemy_actor.fill(ActorsScript.NONE)
 
 
 ## A caster's own state back to new (its builds are handled by the caller).

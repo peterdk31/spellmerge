@@ -173,17 +173,10 @@ func _test_decoy_runs_out() -> void:
 
 func _test_decoy_copies_its_wizard() -> void:
 	_setup(1)
-	var sprite := Sprite2D.new()
-	sprite.name = "Sprite"
-	sprite.texture = PlaceholderTexture2D.new()
-	sprite.hframes = 1
+	# The wizard is the real scene (actors G7): its own Sprite and Hat, facing left.
+	var sprite := _world.players[0].get_node("Sprite") as Sprite2D
 	sprite.flip_h = true
-	sprite.position = Vector2(0.0, -14.0)
-	var hat := Sprite2D.new()
-	hat.name = "Hat"
-	hat.texture = PlaceholderTexture2D.new()
-	sprite.add_child(hat)
-	_world.players[0].add_child(sprite)
+	var hat := sprite.get_node("Hat") as Sprite2D
 	_spawn(0, EntitiesScript.DECOY, Vector2(10.0, 10.0))
 	var decoy: EntitiesScript.Decoy = _entities.lure(Vector2(10.0, 10.0)) as EntitiesScript.Decoy
 	_check(decoy != null and decoy.visible, "the decoy shows")

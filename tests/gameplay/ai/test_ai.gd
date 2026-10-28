@@ -9,7 +9,6 @@ extends SceneTree
 ## godot --headless --path . --script res://tests/gameplay/ai/test_ai.gd
 
 const Fixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
-const PlayerScript := preload("res://gameplay/player/player.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const ImpData := preload("res://content/enemies/ember_imp/ember_imp.tres")
@@ -65,7 +64,7 @@ func _teardown() -> void:
 	_fx = null
 
 
-func _players() -> Array[PlayerScript]:
+func _players() -> Array[Actor]:
 	return _fx.players
 
 
@@ -143,7 +142,7 @@ func _test_downed_player_is_skipped() -> void:
 	_setup(2)
 	_players()[0].position = Vector2(100.0, 0.0)
 	_players()[1].position = Vector2(400.0, 0.0)
-	_players()[0].take_damage(PlayerScript.MAX_HEALTH)
+	_players()[0].health.take(_players()[0].health.max_health)
 	_check(_players()[0].is_downed(), "player 0 is downed")
 	var imp := _imp()
 	imp.step(STEP)
@@ -157,7 +156,7 @@ func _test_downed_event_retargets_at_once() -> void:
 	var imp := _imp()
 	imp.step(STEP)
 	_check(_ai(imp).target == _players()[0], "starts on the near player")
-	_players()[0].take_damage(PlayerScript.MAX_HEALTH)
+	_players()[0].health.take(_players()[0].health.max_health)
 	imp.step(STEP)
 	_check(_ai(imp).target == _players()[1], "the imp leaves a downed player on the very next step")
 
@@ -168,7 +167,7 @@ func _test_freed_player_is_dropped() -> void:
 	_players()[1].position = Vector2(400.0, 0.0)
 	var imp := _imp()
 	imp.step(STEP)
-	var gone: PlayerScript = _players()[0]
+	var gone: Actor = _players()[0]
 	_fx.players.remove_at(0)
 	gone.free()
 	imp.step(STEP)
@@ -186,7 +185,7 @@ func _test_shot_hurts_wizard_through_combat() -> void:
 	_run(imp, 6)
 	_check(damaged.size() == 1 and damaged[0][0] == imp.id and damaged[0][1] == _players()[0], "the bolt hurt player 0 once, as the imp's actor")
 	_check(damaged.size() == 1 and damaged[0][2] >= _bolt().base_damage, "for at least the bolt's damage")
-	_check(damaged.size() == 1 and _players()[0].health == PlayerScript.MAX_HEALTH - int(damaged[0][2]), "the wizard lost that health")
+	_check(damaged.size() == 1 and _players()[0].health.health == _players()[0].health.max_health - int(damaged[0][2]), "the wizard lost that health")
 
 
 ## Regression (#5): the shot and the telegraph start at the body (the hand, (0, -12)), not the
@@ -209,14 +208,14 @@ func _test_shot_can_be_dodged_by_stepping_aside() -> void:
 	var control := _imp()
 	control.step(STEP)
 	_run(control, int(_ai(control).windup_time / STEP) + 20)
-	_check(_players()[0].health < PlayerScript.MAX_HEALTH, "control: a player who stays on the line is hit")
+	_check(_players()[0].health.health < _players()[0].health.max_health, "control: a player who stays on the line is hit")
 	_setup(1)
 	_players()[0].position = Vector2(60.0, 0.0)
 	var imp := _imp()
 	imp.step(STEP)
 	_players()[0].position = Vector2(60.0, 40.0)
 	_run(imp, int(_ai(imp).windup_time / STEP) + 20)
-	_check(_players()[0].health == PlayerScript.MAX_HEALTH, "a player who stepped aside during the telegraph is not hit")
+	_check(_players()[0].health.health == _players()[0].health.max_health, "a player who stepped aside during the telegraph is not hit")
 
 
 ## Enemy shots are small bullets (#4): a wizard (hit circle 8) is hit by the imp's bolt passing
@@ -231,15 +230,15 @@ func _test_shot_is_small_and_dodgeable() -> void:
 		imp.step(STEP)
 		_players()[0].position = Vector2(60.0, offset)
 		_run(imp, int(_ai(imp).windup_time / STEP) + 20)
-		var hit: bool = _players()[0].health < PlayerScript.MAX_HEALTH
+		var hit: bool = _players()[0].health.health < _players()[0].health.max_health
 		_check(hit == (offset < reach), "a shot passing %.0f px from the wizard %s" % [offset, "hits" if offset < reach else "misses"])
 
 
 func _test_no_lookups_while_nobody_stands() -> void:
 	_setup(2)
 	var imp := _imp()
-	_players()[0].take_damage(PlayerScript.MAX_HEALTH)
-	_players()[1].take_damage(PlayerScript.MAX_HEALTH)
+	_players()[0].health.take(_players()[0].health.max_health)
+	_players()[1].health.take(_players()[1].health.max_health)
 	imp.step(STEP)
 	var before: int = _ai(imp).lookup_count
 	var steps: int = 160

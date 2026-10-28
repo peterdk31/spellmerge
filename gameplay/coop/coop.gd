@@ -5,8 +5,9 @@ extends Node
 ## gamepad, or a bot's virtual device) into `device_joined` / `device_left`. Coop
 ## turns those into `player_joined(player)` / `player_left(player)`, once each
 ## per change, in any order and in any slots. `flow` hears them and adds or
-## removes the wizard, `difficulty` counts the players. Coop knows nothing about
-## wizards beyond the `players` group, so the run simply goes on.
+## removes the wizard, `difficulty` counts the players. Coop knows the wizards only as the
+## actors in the `wizards` group (the wizard scene puts its root there; actors G7) and their
+## Downed component, so the run simply goes on.
 ##
 ## Friendly fire is no option any more (actors G3c): a player's shots always hit the other
 ## players, never the shooter (`core/projectiles`), and `combat` turns the hits into damage as
@@ -24,11 +25,12 @@ extends Node
 ## Shake (`feel`) moves only the camera's `offset`, so the two do not clash.
 ##
 ## Revive: a standing wizard within REVIVE_RANGE of a downed one holds the revive.
-## After REVIVE_HOLD_TIME the downed wizard comes back (`Player.revive(reviver)`,
-## the reviver being the nearest standing wizard) and is protected for
+## After REVIVE_HOLD_TIME the downed wizard comes back (`Downed.revive(reviver)`,
+## the reviver being the seat of the nearest standing wizard) and is protected for
 ## REVIVE_PROTECTION seconds. Out of reach the progress drains at twice the speed
 ## it fills, so a step away costs a little, not everything. Each downed wizard has
-## its own progress, so any number of revives run at once, for any indices 0-3, and
+## its own progress (by the wizard's seat, `Downed.seat`), so any number of revives run at
+## once, for any seats 0-3, and
 ## nobody waits for another. `revive_progress(player, progress)` is sent when the
 ## progress changes, for the ring the downed wizard draws. Reasoning: DECISIONS.md.
 ##
@@ -36,11 +38,11 @@ extends Node
 ## with fixed deltas.
 
 const EventsScript := preload("res://core/events/events.gd")
-const PlayerScript := preload("res://gameplay/player/player.gd")
+const DownedScript := preload("res://gameplay/player/downed.gd")
 
 const PLAYER_SLOTS: int = 4
-## The group every wizard is in (set by the player script).
-const PLAYERS_GROUP: StringName = &"players"
+## The group every wizard actor is in (its scene puts it there).
+const WIZARDS_GROUP: StringName = &"wizards"
 ## Space kept between the outermost wizards and the edge of the view, in pixels.
 const CAMERA_MARGIN: float = 48.0
 ## The camera never zooms in past 1 or out past 0.5 (Camera2D zoom: smaller sees more).
@@ -76,6 +78,8 @@ var target_zoom: float = MAX_ZOOM
 var _joined: Array[bool] = [false, false, false, false]
 var _joined_count: int = 0
 var _wizards: Array[Node2D] = []
+## The Downed component of each of `_wizards` (null for a body without one), found once.
+var _downs: Array[DownedScript] = []
 ## Per player index: how far the revive has got (0 to 1), and what was last sent.
 var _revive: Array[float] = [0.0, 0.0, 0.0, 0.0]
 var _revive_sent: Array[float] = [0.0, 0.0, 0.0, 0.0]
@@ -113,16 +117,18 @@ func set_camera(node: Camera2D) -> void:
 	refresh_wizards()
 
 
-## Read the wizards in the `players` group again. Done by itself after a join, a
+## Read the wizards in the `wizards` group again. Done by itself after a join, a
 ## leave and `room_entered`.
 func refresh_wizards() -> void:
 	_wizards.clear()
+	_downs.clear()
 	var tree: SceneTree = get_tree()
 	if tree == null:
 		return
-	for node: Node in tree.get_nodes_in_group(PLAYERS_GROUP):
+	for node: Node in tree.get_nodes_in_group(WIZARDS_GROUP):
 		if node is Node2D:
 			_wizards.append(node as Node2D)
+			_downs.append(DownedScript.of(node))
 
 
 ## Work out where the camera should be and how far out, from the wizards now.
@@ -224,17 +230,18 @@ func step_revive(delta: float) -> void:
 		return
 	if not _all_valid():
 		refresh_wizards()
-	for body: Node2D in _wizards:
+	for at in _wizards.size():
+		var body: Node2D = _wizards[at]
 		if not is_instance_valid(body) or not body.is_inside_tree():
 			continue
-		var wizard: PlayerScript = body as PlayerScript
-		var player: int = wizard.index
+		var wizard: DownedScript = _downs[at]
+		var player: int = wizard.seat() if wizard != null else -1
 		if player < 0 or player >= PLAYER_SLOTS:
 			continue
-		if not wizard.is_downed():
+		if not wizard.is_down():
 			_set_revive(player, 0.0)
 			continue
-		var reviver: int = _nearest_reviver(wizard)
+		var reviver: int = _nearest_reviver(body)
 		if reviver < 0:
 			_set_revive(player, _revive[player] - delta * REVIVE_DRAIN_FACTOR / REVIVE_HOLD_TIME)
 			continue
@@ -247,19 +254,21 @@ func step_revive(delta: float) -> void:
 			wizard.protect(REVIVE_PROTECTION)
 
 
-## The index of the standing wizard nearest to `body` within REVIVE_RANGE, or -1.
-func _nearest_reviver(body: PlayerScript) -> int:
+## The seat of the standing wizard nearest to `body` within REVIVE_RANGE, or -1.
+func _nearest_reviver(body: Node2D) -> int:
 	var best: int = -1
 	var best_distance: float = REVIVE_RANGE
-	for other: Node2D in _wizards:
+	for at in _wizards.size():
+		var other: Node2D = _wizards[at]
 		if other == body or not is_instance_valid(other) or not other.is_inside_tree():
 			continue
-		if (other as PlayerScript).is_downed():
+		var teammate: DownedScript = _downs[at]
+		if teammate == null or teammate.is_down():
 			continue
 		var distance: float = other.global_position.distance_to(body.global_position)
 		if distance <= best_distance:
 			best_distance = distance
-			best = (other as PlayerScript).index
+			best = teammate.seat()
 	return best
 
 

@@ -74,7 +74,7 @@ func take() -> void:
 	# renderer and the glow would be gone before it is drawn.
 	hud.set_process(false)
 	input.call("send_virtual", 0, &"staff_2", 1.0)
-	wizard4.call("take_damage", 30)
+	(wizard4 as Actor).health.take(30)
 	await physics_frame
 	await physics_frame
 	input.call("send_virtual", 0, &"staff_2", 0.0)
@@ -103,15 +103,15 @@ func take() -> void:
 		return
 	var imp_at: Transform2D = imp.get_global_transform_with_canvas()
 	# Hits name their caster by actor id: the actor wizard 1 opened (actors G3b).
-	combat.call("hit", int(wizard1.get("actor_id")), imp, 9999)
+	combat.call("hit", int(wizard1.get("id")), imp, 9999)
 	await settle(6)
 	save_crop(await grab(), imp_at.origin, "juice_death_animation")
 	await settle()
 	if not await _enemy_readability(flow, combat, wizard1):
 		return
-	wizard4.call("take_damage", 9999)
+	(wizard4 as Actor).health.take(9999)
 	await settle()
-	if not wizard4.call("is_downed"):
+	if not (wizard4 as Actor).is_down():
 		fail("player 4 is not down in hud_player_four_down")
 		return
 	await shot("hud_player_four_down")
@@ -120,16 +120,16 @@ func take() -> void:
 	wizard3.global_position = wizard4.global_position + Vector2(20.0, 0.0)
 	await create_timer(1.0).timeout
 	_crop_round(await grab(), wizard4, "revive_ring_half")
-	wizard4.call("revive", 0)
+	Downed.of(wizard4).revive(0)
 	_spread_wizards(flow)
 	# Wizard 1 is protected (as on a mid-run join; a dash gives no invulnerability since staffs
 	# A6a): translucent with a closing ring while it cannot be hurt.
 	wizard1.global_position = Vector2(320.0, 200.0)
 	await settle()
-	wizard1.call("protect", 1.0)
+	Downed.of(wizard1).protect(1.0)
 	await create_timer(0.05).timeout
 	var protected_image: Image = await grab()
-	if not wizard1.call("is_invulnerable"):
+	if not (wizard1 as Actor).health.is_protected():
 		fail("wizard 1 is not invulnerable in protected_invulnerable")
 		return
 	_crop_round(protected_image, wizard1, "protected_invulnerable")
@@ -176,7 +176,7 @@ func _enemy_readability(flow: Node, combat: Node, wizard: Node2D) -> bool:
 	if not winding_ai.call("is_telegraphing"):
 		fail("the imp is not winding up in enemy_windup")
 		return false
-	combat.call("hit", int(wizard.get("actor_id")), hurt, 1)
+	combat.call("hit", int(wizard.get("id")), hurt, 1)
 	hurt.call("step", 0.0)
 	if not hurt.get_node("CreatureLook").call("is_hurt"):
 		fail("the imp is not hurt in enemy_hurt")
@@ -189,7 +189,7 @@ func _enemy_readability(flow: Node, combat: Node, wizard: Node2D) -> bool:
 	for offset: Vector2 in [Vector2(120.0, 0.0), Vector2(-120.0, 0.0), Vector2(0.0, -70.0), Vector2(0.0, 70.0), Vector2(100.0, 60.0)]:
 		var spot: Vector2 = wizard.global_position + offset
 		var enemy_slot: int = int(shots.call("spawn", -1, spot + Vector2(0.0, 14.0), Vector2(1.0, 0.0), 5.0, 3.5, 2))
-		var player_slot: int = int(shots.call("spawn", int(wizard.get("actor_id")), spot + Vector2(0.0, -14.0), Vector2(1.0, 0.0), 5.0, 4.0))
+		var player_slot: int = int(shots.call("spawn", int(wizard.get("id")), spot + Vector2(0.0, -14.0), Vector2(1.0, 0.0), 5.0, 4.0))
 		if enemy_slot >= 0 and player_slot >= 0:
 			beside = offset
 			break

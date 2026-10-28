@@ -11,7 +11,7 @@ extends "res://tests/support/suite.gd"
 
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const EventsScript := preload("res://core/events/events.gd")
-const PlayerScript := preload("res://gameplay/player/player.gd")
+const WizardScene := preload("res://content/wizard/base/wizard.tscn")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const StaffKit := preload("res://tests/support/staff_kit.gd")
@@ -35,7 +35,7 @@ var _spells: SpellsScript
 var _combat: CombatScript
 var _fake: FakeRegistry
 var _actors: ActorsScript
-var _wizard: PlayerScript
+var _wizard: Actor
 var _enemies: Array[Actor] = []
 
 
@@ -73,13 +73,17 @@ func before_each() -> void:
 	nova.spread = 360.0
 	nova.mana_cost = 2.0
 	_put(nova, &"nova")
-	_wizard = own(PlayerScript.new()) as PlayerScript
-	_wizard.index = 0
+	# The wizard of seat 0 (actors G7: the real scene); its hurtbox registers it in Combat.
+	_wizard = own(WizardScene.instantiate()) as Actor
+	PlayerController.seat_wizard(_wizard, 0, null, [[], [], [], []])
 	_wizard.events = _bus
+	_wizard.combat = _combat
+	_wizard.projectiles = _projectiles
+	_wizard.spells = _spells
 	_wizard.actors = _actors
-	root.add_child(_wizard)
 	_wizard.position = Vector2(80.0, 0.0)
-	_combat.register_player(0, _wizard, 8.0, Vector2(0.0, -12.0))
+	root.add_child(_wizard)
+	_wizard.set_physics_process(false)
 
 
 func after_each() -> void:
@@ -157,7 +161,7 @@ func _until_windup(enemy: Actor, seconds: float) -> bool:
 func test_it_opens_an_actor_and_owns_its_body() -> void:
 	var enemy := _enemy(_data([&"bolt"]))
 	check(enemy.caster != null and enemy.caster.has_staff(0), "an enemy with a staff and cards casts it")
-	check(_actors.is_open(enemy.id) and enemy.id != _wizard.actor_id, "it opened an actor of its own: %d" % enemy.id)
+	check(_actors.is_open(enemy.id) and enemy.id != _wizard.id, "it opened an actor of its own: %d" % enemy.id)
 	check_equal(_actors.team_of(enemy.id), ActorsScript.TEAM_ENEMIES, "on the enemies' team")
 	check_equal(_actors.ramp_of(enemy.id), ActorsScript.RAMP_ENEMY, "drawn in the enemy ramp")
 	check_equal(_actors.seat_of(enemy.id), ActorsScript.NONE, "and driven by no seat")
@@ -165,7 +169,7 @@ func test_it_opens_an_actor_and_owns_its_body() -> void:
 	check_equal(_projectiles.target_owner_of(enemy), enemy.id, "its body is its actor's, so its own spells skip it")
 	check_equal(enemy.caster.mana, 6.0, "it starts with full mana")
 	enemy.caster.mana = 1.0
-	_bus.mana_refund_requested.emit(_wizard.actor_id, 2.0)
+	_bus.mana_refund_requested.emit(_wizard.id, 2.0)
 	check_equal(enemy.caster.mana, 1.0, "another actor's refund is not its own")
 	_bus.mana_refund_requested.emit(enemy.id, 2.0)
 	check_equal(enemy.caster.mana, 3.0, "siphon gives its actor mana back by the event")
@@ -188,7 +192,7 @@ func test_it_casts_its_staff_after_the_windup_and_hits_the_wizard() -> void:
 	check_equal(_projectiles.get_count_for(enemy.id), 1, "then its bolt flies")
 	check_equal(enemy.caster.mana, 4.0, "and it paid the cast's mana")
 	_run(0.5)
-	check(_wizard.health < PlayerScript.MAX_HEALTH, "the bolt hurt the wizard through combat")
+	check(_wizard.health.health < _wizard.health.max_health, "the bolt hurt the wizard through combat")
 	check_equal(_combat.get_health(enemy), ImpData.max_health, "and not the enemy that cast it")
 
 

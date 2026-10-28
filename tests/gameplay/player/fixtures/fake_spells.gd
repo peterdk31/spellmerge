@@ -1,6 +1,6 @@
 extends "res://core/spells/spells.gd"
 ## Test stand-in for the spell runtime (not content): every staff with a card in it builds,
-## `cast_staff` records who fired which staff from where and keeps a delay per player and staff,
+## `cast_staff` records who fired which staff from where and keeps a delay per caster and staff,
 ## and nothing is spawned. It lets the player tests run the wizard on its own, with `cost` and
 ## `cooldown_time` set per test. The carrier it reports for a cast (`last_form`) is the first
 ## card of the staff.
@@ -21,11 +21,15 @@ var _has: PackedByteArray = PackedByteArray()
 var _first: Array[StringName] = []
 
 
+## Room for every actor id's four staffs.
+const ROWS: int = 512 * 4
+
+
 func _init() -> void:
 	super()
-	_left.resize(16)
-	_has.resize(16)
-	for at in 16:
+	_left.resize(ROWS)
+	_has.resize(ROWS)
+	for at in ROWS:
 		_first.append(&"")
 
 

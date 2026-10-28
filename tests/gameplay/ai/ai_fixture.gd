@@ -9,7 +9,7 @@ extends RefCounted
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const EntitiesScript := preload("res://gameplay/ai/entities.gd")
-const PlayerScript := preload("res://gameplay/player/player.gd")
+const WizardScene := preload("res://content/wizard/base/wizard.tscn")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
@@ -28,11 +28,12 @@ var spells: Node
 ## The decoys the imps ask (`lure`); null leaves the "Entities" autoload, which has none.
 var entities: EntitiesScript = null
 var enemies: Array[Actor] = []
-var players: Array[PlayerScript] = []
+var players: Array[Actor] = []
 var _root: Node
 
 
-## `player_count` wizards are added to `root` (they must be in the tree to be hit).
+## `player_count` wizards (actors made from the real scene, actors G7) are added to `root` (they
+## must be in the tree to be hit).
 func _init(root: Node, player_count: int = 1) -> void:
 	_root = root
 	bus = EventsScript.new()
@@ -53,14 +54,23 @@ func _init(root: Node, player_count: int = 1) -> void:
 	combat.set("actors", actors)
 	combat._ready()
 	for index in player_count:
-		var wizard := PlayerScript.new()
-		wizard.index = index
-		wizard.events = bus
-		wizard.actors = actors
-		root.add_child(wizard)
-		wizard.position = Vector2(1000.0, 1000.0 * index)
-		players.append(wizard)
-		combat.register_player(index, wizard, 8.0, Vector2(0.0, -12.0))
+		players.append(wizard(index, Vector2(1000.0, 1000.0 * index)))
+
+
+## A wizard actor of seat `index` from the real scene (actors G7), wired to this world and in the
+## tree (its hurtbox registers it in Combat as it enters), stepped by nobody.
+func wizard(index: int, at: Vector2) -> Actor:
+	var body := WizardScene.instantiate() as Actor
+	PlayerController.seat_wizard(body, index, null, [[], [], [], []])
+	body.events = bus
+	body.combat = combat
+	body.projectiles = projectiles
+	body.spells = spells
+	body.actors = actors
+	body.position = at
+	_root.add_child(body)
+	body.set_physics_process(false)
+	return body
 
 
 ## An imp from the real scene (sprite, telegraph, poses) with the real data, in the tree at `at`.
@@ -145,9 +155,9 @@ func free_all() -> void:
 		if is_instance_valid(body):
 			body.free()
 	enemies.clear()
-	for wizard in players:
-		if is_instance_valid(wizard):
-			wizard.free()
+	for body in players:
+		if is_instance_valid(body):
+			body.free()
 	players.clear()
 	for node: Node in [combat, spells, registry, projectiles, actors, bus]:
 		if node != null and is_instance_valid(node):

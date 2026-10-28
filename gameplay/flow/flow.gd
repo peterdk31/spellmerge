@@ -11,8 +11,11 @@ extends Node
 ## whole thing is built in the same frame, far inside the 10 seconds allowed.
 ##
 ## Players: one wizard for every player slot that has a device (`core/input`), so
-## 1-4 players. The keyboard joins slot 0 if the Play button was pressed with the
-## mouse and nobody is joined there. Joining and leaving mid-run: `coop` sends
+## 1-4 players. A wizard is an actor (actors G7): the wizard scene, seated with
+## `PlayerController.seat_wizard` (its seat, its ramp, its staffs) before it is added; its
+## Downed component downs, revives and protects it, and its hurtbox registers it with Combat.
+## The keyboard joins slot 0 if the Play button was pressed with the mouse and nobody is
+## joined there. Joining and leaving mid-run: `coop` sends
 ## `player_joined` / `player_left` and Flow adds a wizard at the room's spawn for
 ## that slot, or removes it (the run goes on; nobody waits for anyone).
 ##
@@ -53,6 +56,7 @@ const ProjectileManagerScript := preload("res://core/projectiles/projectile_mana
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const AiScript := preload("res://gameplay/ai/ai.gd")
 const PlayerScript := preload("res://gameplay/player/player.gd")
+const DownedScript := preload("res://gameplay/player/downed.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const DefaultWizardScene: PackedScene = preload("res://content/wizard/base/wizard.tscn")
 
@@ -94,10 +98,6 @@ const WAVE_MAX: int = 24
 const BUILD_BREAK: float = 12.0
 ## Seconds from the last wizard going down until the room restarts (under 3).
 const RESTART_DELAY: float = 1.5
-## Hit circle of a wizard for enemy contact and shots, in pixels, and where it sits
-## above the wizard's feet (the body).
-const PLAYER_RADIUS: float = 8.0
-const PLAYER_HIT_OFFSET: Vector2 = Vector2(0.0, -12.0)
 ## Extra room around the room scene where projectiles may still fly, in pixels.
 const PROJECTILE_MARGIN: float = 32.0
 ## Name of the world node.
@@ -235,12 +235,19 @@ func dummies() -> Array[Node]:
 	return _dummies.duplicate()
 
 
-## The wizard of player `index` in the current world, or null.
+## The wizard of player `index` in the current world (the actor whose home seat it is), or
+## null. It stays the seat's wizard body while the seat drives another actor (possess, G9).
 func get_wizard(index: int) -> Node2D:
 	for wizard: Node2D in _wizards:
-		if is_instance_valid(wizard) and (wizard as PlayerScript).index == index:
+		if is_instance_valid(wizard) and _seat_of(wizard) == index:
 			return wizard
 	return null
+
+
+## The home seat of a wizard actor (its PlayerController's), or -1.
+func _seat_of(wizard: Node) -> int:
+	var controller: PlayerScript = PlayerScript.of(wizard)
+	return controller.seat if controller != null else -1
 
 
 ## Build the world and start the run now, replacing any run in progress. Returns
@@ -358,9 +365,9 @@ func _on_player_joined(player: int) -> void:
 	if get_wizard(player) != null:
 		return
 	_add_wizard(world, _room, player, _joiner_spawn(_room, player))
-	var joiner := get_wizard(player) as PlayerScript
+	var joiner: DownedScript = DownedScript.of(get_wizard(player))
 	if joiner != null:
-		joiner.protect(PlayerScript.JOIN_PROTECTION)
+		joiner.protect(DownedScript.JOIN_PROTECTION)
 	_downed[player] = false
 	if _restart_left >= 0.0 and not _all_down():
 		_restart_left = -1.0
@@ -374,8 +381,6 @@ func _on_player_left(player: int) -> void:
 	var wizard: Node2D = get_wizard(player)
 	if wizard == null:
 		return
-	if combat != null:
-		combat.unregister_player(player)
 	_wizards.erase(wizard)
 	_downed[player] = false
 	var parent: Node = wizard.get_parent()
@@ -407,13 +412,7 @@ func _start_next_wave() -> void:
 		return
 	if projectiles != null:
 		projectiles.clear()
-	for wizard: Node2D in _wizards:
-		var hero := wizard as PlayerScript
-		if not is_instance_valid(hero):
-			continue
-		if hero.revive(hero.index):
-			_downed[hero.index] = false
-		hero.protect(PlayerScript.JOIN_PROTECTION)
+	_stand_up_wizards()
 	_restart_left = -1.0
 	wave += 1
 	_spawn_wave(world, _room, _enemy_data, wave)
@@ -427,13 +426,19 @@ func _start_next_wave() -> void:
 func _stand_everyone_up() -> void:
 	if projectiles != null:
 		projectiles.clear()
+	_stand_up_wizards()
+
+
+## Every downed wizard stands up (revived by itself) and every wizard is protected for a moment.
+func _stand_up_wizards() -> void:
 	for wizard: Node2D in _wizards:
-		var hero := wizard as PlayerScript
-		if not is_instance_valid(hero):
+		var hero: DownedScript = DownedScript.of(wizard) if is_instance_valid(wizard) else null
+		if hero == null:
 			continue
-		if hero.revive(hero.index):
-			_downed[hero.index] = false
-		hero.protect(PlayerScript.JOIN_PROTECTION)
+		var seat: int = hero.seat()
+		if hero.revive(seat) and seat >= 0 and seat < PLAYER_SLOTS:
+			_downed[seat] = false
+		hero.protect(DownedScript.JOIN_PROTECTION)
 
 
 func _on_player_downed(player: int) -> void:
@@ -456,7 +461,8 @@ func _all_down() -> bool:
 	if _wizards.is_empty():
 		return false
 	for wizard: Node2D in _wizards:
-		if is_instance_valid(wizard) and not _downed[(wizard as PlayerScript).index]:
+		var seat: int = _seat_of(wizard) if is_instance_valid(wizard) else -1
+		if seat >= 0 and seat < PLAYER_SLOTS and not _downed[seat]:
 			return false
 	return true
 
@@ -545,12 +551,13 @@ func _joiner_spawn(room: RoomBase, index: int) -> Vector2:
 	return best
 
 
-## True when `scene` is set and its root is a player (a wizard scene must carry `player.gd`).
+## True when `scene` is set and its root is an actor with a player's controller (a wizard scene
+## must carry `PlayerController`, gameplay/player/player.gd).
 func _is_wizard_scene(scene: PackedScene) -> bool:
 	if scene == null:
 		return false
 	var probe: Node = scene.instantiate()
-	var ok: bool = probe is PlayerScript
+	var ok: bool = probe is Actor and PlayerScript.of(probe) != null
 	probe.free()
 	return ok
 
@@ -564,18 +571,15 @@ func staff_for_channel() -> StaffBase:
 
 
 func _add_wizard(parent: Node2D, room: RoomBase, index: int, at: Vector2 = Vector2.INF) -> void:
-	var wizard := _wizard_scene.instantiate() as PlayerScript
-	wizard.index = index
-	wizard.staff = staff_for_channel()
-	wizard.start_cards = start_cards.duplicate(true)
+	var wizard := _wizard_scene.instantiate() as Actor
+	PlayerScript.seat_wizard(wizard, index, staff_for_channel(), start_cards.duplicate(true))
 	if at != Vector2.INF:
 		wizard.position = at
 	elif index < room.player_spawns.size():
 		wizard.position = room.player_spawns[index]
+	# Its hurtbox registers it with Combat when it enters the tree.
 	parent.add_child(wizard)
 	_wizards.append(wizard)
-	if combat != null:
-		combat.register_player(index, wizard, PLAYER_RADIUS, PLAYER_HIT_OFFSET)
 
 
 func _spawn_wave(parent: Node2D, room: RoomBase, data: EnemyBase, number: int) -> void:

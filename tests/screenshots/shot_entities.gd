@@ -30,7 +30,7 @@ func take() -> void:
 		var wizard: Node2D = flow.call("get_wizard", index) as Node2D
 		var at: Vector2 = wizard.global_position
 		# Entities are owned by actor id: the actor this wizard opened (actors G3b).
-		var caster: int = int(wizard.get("actor_id"))
+		var caster: int = int(wizard.get("id"))
 		events.call("emit_signal", "entity_spawn_requested", caster, &"decoy", at + Vector2(0.0, 40.0), 30.0, TAG + index, -1)
 		events.call("emit_signal", "entity_spawn_requested", caster, &"familiar", at + Vector2(20.0, -14.0), 30.0, TAG + index, -1)
 		events.call("emit_signal", "entity_spawn_requested", caster, &"familiar", at + Vector2(-20.0, -14.0), 30.0, TAG + index, -1)

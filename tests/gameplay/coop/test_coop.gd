@@ -9,7 +9,6 @@ extends SceneTree
 
 const CoopScript := preload("res://gameplay/coop/coop.gd")
 const FlowScript := preload("res://gameplay/flow/flow.gd")
-const PlayerScript := preload("res://gameplay/player/player.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 
@@ -84,8 +83,25 @@ func _stop() -> void:
 	_left_events.clear()
 
 
-func _wizard(index: int) -> PlayerScript:
-	return _flow.get_wizard(index) as PlayerScript
+## The wizard actor of player `index` (actors G7), or null.
+func _wizard(index: int) -> Actor:
+	return _flow.get_wizard(index) as Actor
+
+
+## The seat of a wizard: its PlayerController's.
+func _seat(wizard: Actor) -> int:
+	var seat: PlayerController = PlayerController.of(wizard)
+	return seat.seat if seat != null else -1
+
+
+## The health of player `index`'s wizard.
+func _health(index: int) -> int:
+	return _wizard(index).health.health
+
+
+## A hit of `amount` on player `index`'s wizard; true if it was taken.
+func _hurt(index: int, amount: int) -> bool:
+	return _wizard(index).health.take(amount)
 
 
 ## True if `point` is one of arena_01's four player spawns.
@@ -146,7 +162,7 @@ func _everyone_in_view() -> bool:
 	if camera == null:
 		return false
 	for index in InputManagerScript.MAX_PLAYERS:
-		var wizard: PlayerScript = _wizard(index)
+		var wizard: Actor = _wizard(index)
 		if wizard != null and not _in_view(wizard, camera):
 			return false
 	return true
@@ -182,7 +198,7 @@ func _test_every_join_order() -> void:
 			_coop.snap()
 			_check(_everyone_in_view(), label + ": everyone is in view after slot %d joined" % slot)
 		for slot: int in sequence:
-			_check(_wizard(slot) != null and (_wizard(slot) as PlayerScript).index == slot, label + ": wizard %d has its own index" % slot)
+			_check(_wizard(slot) != null and _seat(_wizard(slot)) == slot and _wizard(slot).ramp == slot, label + ": wizard %d has its own seat and colour" % slot)
 	_stop()
 
 
@@ -251,7 +267,7 @@ func _test_leave_and_rejoin_same_slot() -> void:
 	_check(_wizard(1) == null and _wizard_count() == 1, "slot 2 left: only P1 plays")
 	_input.add_virtual_device(1)
 	_check(_wizard(1) != null and _wizard_count() == 2, "slot 2 rejoined with a fresh wizard")
-	_check((_wizard(1) as PlayerScript).health == PlayerScript.MAX_HEALTH, "the rejoined wizard is at full health")
+	_check(_health(1) == _wizard(1).health.max_health, "the rejoined wizard is at full health")
 	_check(_joined_events == [0, 1, 1] and _left_events == [1], "events: joined 0, 1, 1 and left 1, got %s and %s" % [_joined_events, _left_events])
 	_stop()
 
@@ -262,7 +278,7 @@ func _test_last_standing_leaves_restarts_the_room() -> void:
 	_stop()
 	_start_with(0)
 	_input.add_virtual_device(1)
-	(_wizard(0) as PlayerScript).take_damage(PlayerScript.MAX_HEALTH)
+	_down(0)
 	_check(not _flow.is_restarting(), "one wizard still stands: no restart")
 	_input.leave(1)
 	_check(_flow.is_restarting(), "the last standing wizard left and the rest are down: the room restarts")
@@ -309,7 +325,7 @@ func _test_camera_zooms_out_to_fit() -> void:
 	_coop.snap()
 	_check(is_equal_approx(camera.zoom.x, CoopScript.MAX_ZOOM), "together again: the zoom is back to 1, got %f" % camera.zoom.x)
 	# The downed are still in view.
-	(_wizard(3) as PlayerScript).take_damage(PlayerScript.MAX_HEALTH)
+	_down(3)
 	_wizard(3).global_position = Vector2(600.0, 340.0)
 	_wizard(0).global_position = Vector2(40.0, 40.0)
 	_coop.snap()
@@ -406,12 +422,12 @@ func _test_joiner_is_protected() -> void:
 	var enemy: Node2D = _flow._enemies[0] as Node2D
 	enemy.position = spawns[1]
 	_input.add_virtual_device(1)
-	var joiner: PlayerScript = _wizard(1)
+	var joiner: Actor = _wizard(1)
 	_check(joiner != null, "the joiner has a wizard")
 	if joiner == null:
 		return
-	_check(joiner.is_invulnerable(), "the joiner cannot be hurt at first")
-	_check(not joiner.take_damage(SHOT_DAMAGE) and joiner.health == PlayerScript.MAX_HEALTH, "a hit on the new joiner does nothing")
+	_check(joiner.health.is_protected(), "the joiner cannot be hurt at first")
+	_check(not joiner.health.take(SHOT_DAMAGE) and joiner.health.health == joiner.health.max_health, "a hit on the new joiner does nothing")
 	_check(joiner.position.distance_to(spawns[1]) > 1.0, "the joiner is not put under the enemy")
 	_check(joiner.position.distance_to(_wizard(0).position) > 1.0, "the joiner does not stand on another wizard")
 	_stop()
@@ -425,13 +441,13 @@ func _run_with(count: int) -> void:
 		_input.add_virtual_device(slot)
 	for slot in count:
 		# A joiner is protected for a while; let that run out so it can be hurt.
-		_wizard(slot).step(PlayerScript.JOIN_PROTECTION + 0.1)
+		_wizard(slot).step(Downed.JOIN_PROTECTION + 0.1)
 		_wizard(slot).position = Vector2(100.0 + 150.0 * slot, 100.0)
 	_coop.refresh_wizards()
 
 
 func _down(slot: int) -> void:
-	_wizard(slot).take_damage(PlayerScript.MAX_HEALTH)
+	_wizard(slot).health.take(_wizard(slot).health.max_health)
 
 
 ## Advance the revive by `seconds`, in steps of 0.1.
@@ -449,7 +465,7 @@ func _test_revive_two_players() -> void:
 	var on_revived: Callable = func(p: int, r: int) -> void: revived.append([p, r])
 	_events.connect("player_revived", on_revived)
 	_down(0)
-	_check(_wizard(0).is_downed(), "revive: wizard 0 is down")
+	_check(_wizard(0).is_down(), "revive: wizard 0 is down")
 	# Far away: nothing fills.
 	_hold(1.0)
 	_check(_coop.revive_progress_of(0) == 0.0 and progress.is_empty(), "revive: nobody near, no progress")
@@ -461,34 +477,34 @@ func _test_revive_two_players() -> void:
 	_wizard(1).position = _wizard(0).position + Vector2(CoopScript.REVIVE_RANGE - 4.0, 0.0)
 	_hold(CoopScript.REVIVE_HOLD_TIME * 0.5)
 	_check(absf(_coop.revive_progress_of(0) - 0.5) < 0.01, "revive: half the time, half the progress, got %f" % _coop.revive_progress_of(0))
-	_check(absf(_wizard(0).revive_progress() - 0.5) < 0.01, "revive: the downed wizard knows its progress (for the ring)")
+	_check(absf(Downed.of(_wizard(0)).revive_progress() - 0.5) < 0.01, "revive: the downed wizard knows its progress (for the ring)")
 	_check(not progress.is_empty() and progress[0][0] == 0, "revive: revive_progress names the downed player")
-	_check(_wizard(0).is_downed(), "revive: still down at half the time")
+	_check(_wizard(0).is_down(), "revive: still down at half the time")
 	# Stepping away drains at twice the speed: 0.2 s away undoes 0.2 of the hold
 	# (the same 0.2 s beside the body would have filled 0.1).
 	_wizard(1).position = _wizard(0).position + Vector2(300.0, 0.0)
 	_hold(0.2)
 	_check(absf(_coop.revive_progress_of(0) - 0.3) < 0.01, "revive: progress drains twice as fast as it fills, got %f" % _coop.revive_progress_of(0))
 	_hold(CoopScript.REVIVE_HOLD_TIME)
-	_check(_coop.revive_progress_of(0) == 0.0 and _wizard(0).revive_progress() == 0.0, "revive: the progress drains to nothing")
+	_check(_coop.revive_progress_of(0) == 0.0 and Downed.of(_wizard(0)).revive_progress() == 0.0, "revive: the progress drains to nothing")
 	# Back beside the body: the full hold revives.
 	_wizard(1).position = _wizard(0).position + Vector2(20.0, 0.0)
 	_hold(CoopScript.REVIVE_HOLD_TIME - 0.2)
-	_check(_wizard(0).is_downed(), "revive: not yet shortly before the end")
+	_check(_wizard(0).is_down(), "revive: not yet shortly before the end")
 	_hold(0.4)
-	_check(not _wizard(0).is_downed(), "revive: back up after the hold time")
+	_check(not _wizard(0).is_down(), "revive: back up after the hold time")
 	_check(revived == [[0, 1]], "revive: player_revived carries the player and the reviver, got %s" % [revived])
-	_check(_wizard(0).health == PlayerScript.REVIVE_HEALTH, "revive: the revive health")
-	_check(_coop.revive_progress_of(0) == 0.0 and _wizard(0).revive_progress() == 0.0, "revive: the ring is cleared")
+	_check(_health(0) == Downed.REVIVE_HEALTH, "revive: the revive health")
+	_check(_coop.revive_progress_of(0) == 0.0 and Downed.of(_wizard(0)).revive_progress() == 0.0, "revive: the ring is cleared")
 	_check(progress.back()[1] == 0.0, "revive: the last progress sent is 0")
 	# The protection window.
-	_check(_wizard(0).is_invulnerable(), "revive: protected after the revive")
-	_check(not _wizard(0).take_damage(SHOT_DAMAGE) and _wizard(0).health == PlayerScript.REVIVE_HEALTH, "revive: a hit right after does nothing")
+	_check(_wizard(0).health.is_protected(), "revive: protected after the revive")
+	_check(not _hurt(0, SHOT_DAMAGE) and _health(0) == Downed.REVIVE_HEALTH, "revive: a hit right after does nothing")
 	for i in roundi(CoopScript.REVIVE_PROTECTION / 0.1) + 2:
 		_wizard(0).step(0.1)
-	_check(not _wizard(0).is_invulnerable(), "revive: the protection ends after REVIVE_PROTECTION")
-	_check(_wizard(0).take_damage(SHOT_DAMAGE), "revive: hurt normally afterwards")
-	_check(_wizard(1).health == PlayerScript.MAX_HEALTH and not _wizard(1).is_downed(), "revive: the reviver is unharmed")
+	_check(not _wizard(0).health.is_protected(), "revive: the protection ends after REVIVE_PROTECTION")
+	_check(_hurt(0, SHOT_DAMAGE), "revive: hurt normally afterwards")
+	_check(_health(1) == _wizard(1).health.max_health and not _wizard(1).is_down(), "revive: the reviver is unharmed")
 	_events.disconnect("revive_progress", on_progress)
 	_events.disconnect("player_revived", on_revived)
 	_stop()
@@ -501,8 +517,8 @@ func _test_revive_four_players() -> void:
 		_down(fallen)
 		_wizard((fallen + 1) % 4).position = _wizard(fallen).position + Vector2(24.0, 0.0)
 		_hold(CoopScript.REVIVE_HOLD_TIME + 0.2)
-		_check(not _wizard(fallen).is_downed(), "revive x4: slot %d is back up" % fallen)
-		_check(_wizard(fallen).is_invulnerable(), "revive x4: slot %d is protected" % fallen)
+		_check(not _wizard(fallen).is_down(), "revive x4: slot %d is back up" % fallen)
+		_check(_wizard(fallen).health.is_protected(), "revive x4: slot %d is protected" % fallen)
 	# Three fall at once. Slot 2 stands beside slot 0 only; downed slots 1 and 3
 	# stand together but cannot revive each other.
 	_run_with(4)
@@ -512,8 +528,8 @@ func _test_revive_four_players() -> void:
 	_wizard(2).position = _wizard(0).position + Vector2(20.0, 0.0)
 	_wizard(3).position = _wizard(1).position + Vector2(20.0, 0.0)
 	_hold(CoopScript.REVIVE_HOLD_TIME + 0.2)
-	_check(not _wizard(0).is_downed(), "revive x4: slot 0 revived by slot 2")
-	_check(_wizard(1).is_downed() and _wizard(3).is_downed(), "revive x4: downed wizards do not revive each other")
+	_check(not _wizard(0).is_down(), "revive x4: slot 0 revived by slot 2")
+	_check(_wizard(1).is_down() and _wizard(3).is_down(), "revive x4: downed wizards do not revive each other")
 	# Slot 0 walks over: both are revived at once, each by the nearest standing wizard.
 	_wizard(0).position = _wizard(1).position + Vector2(10.0, 0.0)
 	_wizard(2).position = Vector2(900.0, 900.0)
@@ -521,7 +537,7 @@ func _test_revive_four_players() -> void:
 	var on_revived: Callable = func(p: int, r: int) -> void: revived.append([p, r])
 	_events.connect("player_revived", on_revived)
 	_hold(CoopScript.REVIVE_HOLD_TIME + 0.2)
-	_check(not _wizard(1).is_downed() and not _wizard(3).is_downed(), "revive x4: slots 1 and 3 are back up together")
+	_check(not _wizard(1).is_down() and not _wizard(3).is_down(), "revive x4: slots 1 and 3 are back up together")
 	_check(revived.has([1, 0]) and revived.has([3, 0]), "revive x4: slot 0 is the reviver of both, got %s" % [revived])
 	_events.disconnect("player_revived", on_revived)
 	_stop()
@@ -536,7 +552,7 @@ func _test_revive_edges() -> void:
 	_check(_coop.revive_progress_of(0) > 0.0, "revive edges: progress under way")
 	_input.leave(1)
 	_hold(CoopScript.REVIVE_HOLD_TIME * 2.0)
-	_check(_wizard(0).is_downed() and _coop.revive_progress_of(0) == 0.0, "revive edges: the reviver left, the progress drained away")
+	_check(_wizard(0).is_down() and _coop.revive_progress_of(0) == 0.0, "revive edges: the reviver left, the progress drained away")
 	_hold(1.0)
 	_input.leave(0)
 	_check(_coop.revive_progress_of(0) == 0.0, "revive edges: a leaver's progress is cleared")
@@ -548,7 +564,7 @@ func _test_camera_survives_a_restart() -> void:
 	_stop()
 	_start_with(0)
 	var old_camera: Camera2D = _coop.camera
-	(_wizard(0) as PlayerScript).take_damage(PlayerScript.MAX_HEALTH)
+	_down(0)
 	_flow.step(FlowScript.RESTART_DELAY)
 	_check(_flow.state == FlowScript.State.RUNNING, "the room restarted")
 	_check(_coop.camera != null and _coop.camera != old_camera and _coop.camera.is_inside_tree(), "Coop picked up the new world's camera")
@@ -584,16 +600,16 @@ func _test_a_wizards_bolt_hits_a_teammate() -> void:
 	_wizard(2).global_position = Vector2(100.0, 300.0)
 	_projectiles.clear()
 	# The shot is cast by wizard 0's actor (actors G3b: the caster is the actor id the wizard opened).
-	_projectiles.spawn((_wizard(0) as PlayerScript).actor_id, Vector2(100.0, 100.0), Vector2(400.0, 0.0), 1.0, 4.0, ProjectileManagerScript.LAYER_ENEMY, 0, BOLT_TAG)
+	_projectiles.spawn(_wizard(0).id, Vector2(100.0, 100.0), Vector2(400.0, 0.0), 1.0, 4.0, ProjectileManagerScript.LAYER_ENEMY, 0, BOLT_TAG)
 	_projectiles.step(0.1)
-	_check((_wizard(0) as PlayerScript).health == PlayerScript.MAX_HEALTH, "the shooter is never hit by its own shot")
-	_check((_wizard(2) as PlayerScript).health == PlayerScript.MAX_HEALTH, "a wizard off the line of fire is untouched")
-	_check((_wizard(1) as PlayerScript).health == PlayerScript.MAX_HEALTH - SHOT_DAMAGE, "the teammate is hurt, health %d" % (_wizard(1) as PlayerScript).health)
+	_check(_health(0) == _wizard(0).health.max_health, "the shooter is never hit by its own shot")
+	_check(_health(2) == _wizard(2).health.max_health, "a wizard off the line of fire is untouched")
+	_check(_health(1) == _wizard(1).health.max_health - SHOT_DAMAGE, "the teammate is hurt, health %d" % _health(1))
 	_check(_projectiles.get_count() == 0, "the shot ended on the hit")
 	# An enemy shot hurts players as ever.
 	_projectiles.clear()
 	_projectiles.spawn(-1, Vector2(100.0, 296.0), Vector2(0.0, 100.0), 0.2, 4.0, ProjectileManagerScript.LAYER_PLAYER, 0, BOLT_TAG)
 	_projectiles.step(0.05)
-	_check((_wizard(2) as PlayerScript).health == PlayerScript.MAX_HEALTH - SHOT_DAMAGE, "an enemy shot still hurts a wizard")
+	_check(_health(2) == _wizard(2).health.max_health - SHOT_DAMAGE, "an enemy shot still hurts a wizard")
 	spells.get("_profiles").erase(BOLT_TAG)
 	_stop()

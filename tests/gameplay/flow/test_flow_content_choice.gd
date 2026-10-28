@@ -59,12 +59,12 @@ func test_a_missing_staff_starts_no_run() -> void:
 func test_other_start_cards_reach_the_wizards() -> void:
 	flow.start_cards = [[&"nova"], [], [], [&"frost", &"bolt"]]
 	check(flow.start_run(0), "the run starts with other start cards")
-	var wizard: Node = flow.get_wizard(0)
-	var a: Array[StringName] = wizard.call("cards_of", 0)
-	var b: Array[StringName] = wizard.call("cards_of", 3)
+	var wizard: Actor = flow.get_wizard(0) as Actor
+	var a: Array[StringName] = wizard.caster.cards_of(0)
+	var b: Array[StringName] = wizard.caster.cards_of(3)
 	check_equal(a[0], &"nova", "staff A holds the chosen card")
 	check_equal(b.slice(0, 2), [&"frost", &"bolt"] as Array[StringName], "staff B too")
-	check(not bool(wizard.call("has_staff", 1)), "an empty start staff has no build")
+	check(not wizard.caster.has_staff(1), "an empty start staff has no build")
 
 
 func test_the_chosen_wizard_scene_is_the_one_spawned() -> void:
@@ -74,10 +74,11 @@ func test_the_chosen_wizard_scene_is_the_one_spawned() -> void:
 	check_equal(stand_in.pack(holder), OK, "the stand-in scene packs")
 	flow.wizard_scene = stand_in
 	check(flow.start_run(0), "the run starts with the swapped scene")
-	var wizard: Node = flow.get_wizard(0)
+	var wizard: Actor = flow.get_wizard(0) as Actor
 	check(wizard != null and wizard.name == &"SwappedWizard", "the player got the swapped wizard scene")
-	check_equal(wizard.get("index"), 0, "the swapped wizard is player 0")
-	check(wizard.call("has_staff", 1) as bool, "the swapped wizard holds its staffs")
+	var seat: PlayerController = PlayerController.of(wizard)
+	check_equal(seat.seat if seat != null else -1, 0, "the swapped wizard is player 0")
+	check(wizard != null and wizard.caster.has_staff(1), "the swapped wizard holds its staffs")
 
 
 func test_a_missing_wizard_scene_starts_no_run() -> void:

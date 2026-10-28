@@ -4,7 +4,7 @@ extends "res://tests/support/suite.gd"
 ## and enemies never chase it; an enemy's familiar circles the enemy and casts at the nearest wizard,
 ## in the enemy's own spell; each enemy keeps PER_ENEMY of a kind, enemies share rows of their own
 ## so a crowd never takes a wizard's, and an enemy's entities end with it. Every entity is its
-## owner's actor id (actors G3b): the enemy's `caster`, the wizard's `actor_id`, and whether a seat
+## owner's actor id (actors G3b): the enemy's `caster`, the wizard's `id`, and whether a seat
 ## drives the owner sorts it into the seats' rows or the others'. The same world as
 ## test_ai_moves.gd (with its actor table), plus Entities.
 ##
@@ -13,7 +13,7 @@ extends "res://tests/support/suite.gd"
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const EntitiesScript := preload("res://gameplay/ai/entities.gd")
 const EventsScript := preload("res://core/events/events.gd")
-const PlayerScript := preload("res://gameplay/player/player.gd")
+const WizardScene := preload("res://content/wizard/base/wizard.tscn")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const StaffKit := preload("res://tests/support/staff_kit.gd")
@@ -38,7 +38,7 @@ var _combat: CombatScript
 var _entities: EntitiesScript
 var _fake: FakeRegistry
 var _actors: ActorsScript
-var _wizard: PlayerScript
+var _wizard: Actor
 var _enemies: Array[Actor] = []
 ## Every familiar_cast_requested as [caster, tag], and entity_ended as [caster, kind, tag].
 var _casts: Array = []
@@ -89,13 +89,17 @@ func before_each() -> void:
 	_ended.clear()
 	_bus.familiar_cast_requested.connect(func(player: int, _at: Vector2, _direction: Vector2, tag: int) -> void: _casts.append([player, tag]))
 	_bus.entity_ended.connect(func(player: int, kind: StringName, _at: Vector2, tag: int) -> void: _ended.append([player, kind, tag]))
-	_wizard = own(PlayerScript.new()) as PlayerScript
-	_wizard.index = 0
+	# The wizard of seat 0 (actors G7: the real scene); its hurtbox registers it in Combat.
+	_wizard = own(WizardScene.instantiate()) as Actor
+	PlayerController.seat_wizard(_wizard, 0, null, [[], [], [], []])
 	_wizard.events = _bus
+	_wizard.combat = _combat
+	_wizard.projectiles = _projectiles
+	_wizard.spells = _spells
 	_wizard.actors = _actors
-	root.add_child(_wizard)
 	_wizard.position = Vector2(80.0, 0.0)
-	_combat.register_player(0, _wizard, 8.0, Vector2(0.0, -12.0))
+	root.add_child(_wizard)
+	_wizard.set_physics_process(false)
 
 
 func after_each() -> void:
@@ -166,7 +170,7 @@ func test_an_enemys_decoy_copies_it_and_every_hit_wears_it_down() -> void:
 	var tag: int = _spells.current_tag(enemy.id, 0)
 	_run(_ai(enemy).windup_time + 2.0 * STEP)
 	check_equal(_entities.count_owned(EntitiesScript.DECOY, enemy.id), 1, "its decoy card makes one decoy, the enemy's")
-	check_equal(_entities.count(EntitiesScript.DECOY, _wizard.actor_id), 0, "not the wizard's")
+	check_equal(_entities.count(EntitiesScript.DECOY, _wizard.id), 0, "not the wizard's")
 	var at: Vector2 = _entities.positions_of(enemy.id, tag)[0]
 	var decoy: Node2D = _projectiles.nearest_target(at, 16.0, ManagerScript.LAYER_ENEMY, enemy)
 	check(decoy is EntitiesScript.Decoy, "a target on the enemies' layer, where wizards' shots and homing look")
@@ -180,11 +184,11 @@ func test_an_enemys_decoy_copies_it_and_every_hit_wears_it_down() -> void:
 	# Another enemy's shot wears it too (its own enemy's never reach it: core/projectiles).
 	var other_enemy: int = _actors.open(ActorsScript.TEAM_ENEMIES, ActorsScript.RAMP_ENEMY)
 	_bus.projectile_hit.emit(other_enemy, decoy, at, SpellTag.make(other_enemy, 0, 0, 0))
-	var wizard_tag: int = SpellTag.make(_wizard.actor_id, 0, 0, 0)
+	var wizard_tag: int = SpellTag.make(_wizard.id, 0, 0, 0)
 	for i in EntitiesScript.DECOY_HITS - 2:
-		_bus.projectile_hit.emit(_wizard.actor_id, decoy, at, wizard_tag)
+		_bus.projectile_hit.emit(_wizard.id, decoy, at, wizard_tag)
 	check_equal(_entities.count_owned(EntitiesScript.DECOY, enemy.id), 1, "it holds until its last hit")
-	_bus.projectile_hit.emit(_wizard.actor_id, decoy, at, wizard_tag)
+	_bus.projectile_hit.emit(_wizard.id, decoy, at, wizard_tag)
 	check_equal(_entities.count_owned(EntitiesScript.DECOY, enemy.id), 0, "DECOY_HITS hits break it, an enemy's among them")
 	check(_ended.size() == 1 and _ended[0][0] == enemy.id and _ended[0][1] == EntitiesScript.DECOY and _ended[0][2] == tag, "and its end is said under the enemy's actor id with its tag")
 
@@ -232,7 +236,7 @@ func test_an_enemys_entities_end_with_it() -> void:
 
 func test_enemies_keep_their_share_and_never_take_a_wizards_rows() -> void:
 	# Seats 1-3 join the wizard of seat 0; the enemies are unseated actors of the same table.
-	var seated: Array[int] = [_wizard.actor_id]
+	var seated: Array[int] = [_wizard.id]
 	for seat in range(1, EntitiesScript.PLAYER_SLOTS):
 		seated.append(_actors.open(ActorsScript.TEAM_WIZARDS, seat, seat))
 	var first: int = _actors.open(ActorsScript.TEAM_ENEMIES, ActorsScript.RAMP_ENEMY)

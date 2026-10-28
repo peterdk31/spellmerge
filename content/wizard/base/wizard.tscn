@@ -1,6 +1,6 @@
-[gd_scene load_steps=11 format=3]
+[gd_scene load_steps=19 format=3]
 
-[ext_resource type="Script" path="res://gameplay/player/player.gd" id="1_player"]
+[ext_resource type="Script" path="res://gameplay/actor/actor.gd" id="1_actor"]
 [ext_resource type="Texture2D" path="res://content/wizard/base/wizard_idle.svg" id="2_idle"]
 [ext_resource type="Texture2D" path="res://content/wizard/base/wizard_walk.svg" id="3_walk"]
 [ext_resource type="Texture2D" path="res://content/wizard/base/wizard_dash.svg" id="4_dash"]
@@ -9,20 +9,54 @@
 [ext_resource type="Texture2D" path="res://content/wizard/base/wizard_hat_p3.svg" id="7_h3"]
 [ext_resource type="Texture2D" path="res://content/wizard/base/wizard_hat_p4.svg" id="8_h4"]
 [ext_resource type="Texture2D" path="res://content/wizard/base/staff.svg" id="9_staff"]
+[ext_resource type="Script" path="res://gameplay/actor/health.gd" id="10_health"]
+[ext_resource type="Script" path="res://gameplay/player/wizard_hurtbox.gd" id="11_hurtbox"]
+[ext_resource type="Script" path="res://gameplay/player/wizard_mover.gd" id="12_mover"]
+[ext_resource type="Script" path="res://gameplay/actor/caster.gd" id="13_caster"]
+[ext_resource type="Script" path="res://gameplay/player/downed.gd" id="14_downed"]
+[ext_resource type="Script" path="res://gameplay/player/player.gd" id="15_player"]
+[ext_resource type="Script" path="res://gameplay/player/wizard_look.gd" id="16_look"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_body"]
 radius = 6.0
 
-[node name="Wizard" type="CharacterBody2D"]
-script = ExtResource("1_player")
-textures = Array[Texture2D]([ExtResource("2_idle"), ExtResource("2_idle"), ExtResource("2_idle"), ExtResource("2_idle")])
-walk_textures = Array[Texture2D]([ExtResource("3_walk"), ExtResource("3_walk"), ExtResource("3_walk"), ExtResource("3_walk")])
-dash_textures = Array[Texture2D]([ExtResource("4_dash"), ExtResource("4_dash"), ExtResource("4_dash"), ExtResource("4_dash")])
-hat_textures = Array[Texture2D]([ExtResource("5_h1"), ExtResource("6_h2"), ExtResource("7_h3"), ExtResource("8_h4")])
-staff_texture = ExtResource("9_staff")
+[node name="Wizard" type="CharacterBody2D" groups=["wizards", "players"]]
+script = ExtResource("1_actor")
+ramp = 0
+idle_team = 0
+hand_offset = Vector2(0, -10)
+staff_reach = 14.0
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 shape = SubResource("CircleShape2D_body")
+
+[node name="Health" type="Node" parent="."]
+script = ExtResource("10_health")
+max_health = 100
+
+[node name="Hurtbox" type="Node" parent="."]
+script = ExtResource("11_hurtbox")
+radius = 8.0
+offset = Vector2(0, -12)
+
+[node name="Mover" type="Node" parent="."]
+script = ExtResource("12_mover")
+speed = 90.0
+body_radius = 6.0
+
+[node name="Caster" type="Node" parent="."]
+script = ExtResource("13_caster")
+staff_count = 4
+max_mana = 100.0
+regen = 10.0
+
+[node name="Downed" type="Node" parent="."]
+script = ExtResource("14_downed")
+
+[node name="PlayerController" type="Node" parent="."]
+script = ExtResource("15_player")
+team = 0
+seat = 0
 
 [node name="Sprite" type="Sprite2D" parent="."]
 texture_filter = 1
@@ -30,3 +64,11 @@ position = Vector2(0, -14)
 
 [node name="Hat" type="Sprite2D" parent="Sprite"]
 texture_filter = 1
+
+[node name="WizardLook" type="Node2D" parent="."]
+script = ExtResource("16_look")
+textures = Array[Texture2D]([ExtResource("2_idle"), ExtResource("2_idle"), ExtResource("2_idle"), ExtResource("2_idle")])
+walk_textures = Array[Texture2D]([ExtResource("3_walk"), ExtResource("3_walk"), ExtResource("3_walk"), ExtResource("3_walk")])
+dash_textures = Array[Texture2D]([ExtResource("4_dash"), ExtResource("4_dash"), ExtResource("4_dash"), ExtResource("4_dash")])
+hat_textures = Array[Texture2D]([ExtResource("5_h1"), ExtResource("6_h2"), ExtResource("7_h3"), ExtResource("8_h4")])
+staff_texture = ExtResource("9_staff")

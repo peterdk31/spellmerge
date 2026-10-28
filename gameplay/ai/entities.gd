@@ -542,13 +542,13 @@ func _rows_by_age() -> Array[int]:
 	return rows
 
 
-## The wizard whose actor is `actor` (in the `players` group, by its `actor_id`), or null. Only
-## at spawn.
+## The wizard whose actor is `actor` (in the `players` group, by its actor `id`; a stand-in's
+## `actor_id`), or null. Only at spawn.
 func _wizard_of(actor: int) -> Node2D:
 	if not is_inside_tree():
 		return null
 	for node: Node in get_tree().get_nodes_in_group(PLAYERS_GROUP):
-		if node is Node2D and node.get("actor_id") == actor:
+		if node is Node2D and (node.get("id") == actor or node.get("actor_id") == actor):
 			return node as Node2D
 	return null
 

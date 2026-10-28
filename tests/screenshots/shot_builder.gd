@@ -65,7 +65,7 @@ func take() -> void:
 		fail("player 4 has no wizard in builder_four_players")
 		return
 	for index in 4:
-		flow.call("get_wizard", index).call("protect", 60.0)
+		Downed.of(flow.call("get_wizard", index) as Node).protect(60.0)
 	await _open_builders([0, 1, 2, 3])
 	# P1: staff X. P2: staff A. P3: staff Y with a pick. P4: staff B. Players press side by side.
 	_focus_press(1, _hud.call("get_builder", 1).call("tab_button", 0))

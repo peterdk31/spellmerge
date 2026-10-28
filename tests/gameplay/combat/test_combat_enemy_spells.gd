@@ -14,7 +14,7 @@ extends "res://tests/support/suite.gd"
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
-const PlayerScript := preload("res://gameplay/player/player.gd")
+const WizardScene := preload("res://content/wizard/base/wizard.tscn")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
 
@@ -58,16 +58,22 @@ func before_each() -> void:
 	_bus.reaction_triggered.connect(func(_p: int, id: StringName, _at: Vector2) -> void: _triggered.append(id))
 
 
-func _wizard(index: int, at: Vector2) -> PlayerScript:
-	var wizard := own(PlayerScript.new()) as PlayerScript
-	wizard.index = index
+## A wizard actor of seat `index` from the real scene (actors G7), in the tree at `at`; its
+## hurtbox registers it in Combat's seat slot.
+func _wizard(index: int, at: Vector2) -> Actor:
+	# The wizard opens its own actor as it enters the tree: give it the seat's id in the test
+	# table (the lowest free one once the seat's is closed).
+	_actors.close(_actors.actor_of_seat(index))
+	var wizard := own(WizardScene.instantiate()) as Actor
+	PlayerController.seat_wizard(wizard, index, null, [[], [], [], []])
 	wizard.events = _bus
-	# The seat's actor in the test table is the wizard's (opened there, not by the wizard).
+	wizard.combat = _combat
+	wizard.projectiles = _projectiles
+	wizard.spells = _spells
 	wizard.actors = _actors
-	wizard.actor_id = _actors.actor_of_seat(index)
-	wizard._ready()
 	wizard.position = at
-	_combat.register_player(index, wizard, 8.0)
+	root.add_child(wizard)
+	wizard.set_physics_process(false)
 	return wizard
 
 
@@ -118,7 +124,7 @@ func test_an_enemys_spell_hurts_a_wizard_like_a_spell() -> void:
 	var profile := _element(5, &"fire", &"burn", 2.0, 2.0)
 	profile.knockback = 150.0
 	var tag: int = _hit(wizard, profile)
-	check_equal(wizard.health, PlayerScript.MAX_HEALTH - 5, "its damage")
+	check_equal(wizard.health.health, wizard.health.max_health - 5, "its damage")
 	check_equal(_hurt, [[1, 5, tag, &"shot"]], "actor_hurt names the wizard's actor and carries the enemy's tag")
 	check_equal(SpellTag.caster_of(_hurt[0][2]), _caster, "whose caster the runtime can find")
 	check_equal(_landed[0][0], _caster, "the hit is the enemy actor's")
@@ -136,9 +142,9 @@ func test_a_wizard_thaws_like_an_enemy() -> void:
 	check(_reactions.size() == 1 and _reactions[0][0] == _caster and _reactions[0][2] == wizard and _reactions[0][3] == tag, "reaction_landed names the enemy's tag, for its on reaction")
 	check_equal(_combat.wizard_status_left(0, &"burn"), 0.0, "the burn is used up")
 	check_equal(_combat.wizard_status_left(0, &"chill"), 0.0, "the reaction runs instead of the chill")
-	check_equal(wizard.health, PlayerScript.MAX_HEALTH - 2 - 3, "the hit and the burst")
-	check_equal(near.health, PlayerScript.MAX_HEALTH - 3, "the burst reaches the wizard beside")
-	check_equal(far.health, PlayerScript.MAX_HEALTH, "not one far away")
+	check_equal(wizard.health.health, wizard.health.max_health - 2 - 3, "the hit and the burst")
+	check_equal(near.health.health, near.health.max_health - 3, "the burst reaches the wizard beside")
+	check_equal(far.health.health, far.health.max_health, "not one far away")
 	check_equal(_hurt[-1][2], 0, "the burst's damage carries no spell tag")
 
 
@@ -149,7 +155,7 @@ func test_a_frozen_wizard_shatters_for_double() -> void:
 	check(_combat.wizard_status_left(0, &"freeze") > 0.0, "three chills freeze")
 	_hit(wizard, _element(1, &"storm", &"shock"))
 	check_equal(_triggered, [&"shatter"] as Array[StringName], "storm on a frozen wizard shatters")
-	check_equal(wizard.health, PlayerScript.MAX_HEALTH - 1 - 12, "the hit, then twice the shatter")
+	check_equal(wizard.health.health, wizard.health.max_health - 1 - 12, "the hit, then twice the shatter")
 	check_equal(_combat.wizard_status_left(0, &"freeze"), 0.0, "the freeze is gone")
 
 
@@ -190,15 +196,15 @@ func test_an_enemys_area_hit_hurts_everything_in_it() -> void:
 	blast.damage = 4
 	var tag: int = _enemy_tag(blast)
 	_bus.area_hit_requested.emit(_caster, Vector2.ZERO, 40.0, tag)
-	check_equal(wizard.health, PlayerScript.MAX_HEALTH - 4, "an enemy's blast hurts the wizard")
+	check_equal(wizard.health.health, wizard.health.max_health - 4, "an enemy's blast hurts the wizard")
 	check_equal(_combat.get_health(other), 96, "and the other enemy (G3c: enemies always hurt each other)")
 	check_equal(_combat.get_health(caster), 96, "and the enemy that cast it, as a wizard's own blast does the wizard")
 
 
 func test_an_enemys_mend_heals_no_wizard() -> void:
 	var wizard := _wizard(0, Vector2.ZERO)
-	wizard.health = 50
+	wizard.health.health = 50
 	var profile := HitProfile.new()
 	profile.heal = 10
 	_bus.area_hit_requested.emit(_caster, Vector2.ZERO, 40.0, _enemy_tag(profile))
-	check_equal(wizard.health, 50, "an enemy's mend is not the wizards' (no seat drives its caster)")
+	check_equal(wizard.health.health, 50, "an enemy's mend is not the wizards' (no seat drives its caster)")

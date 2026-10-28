@@ -63,7 +63,7 @@ func take() -> void:
 		fail("the sandbox did not start with four wizards")
 		return
 	for index in 4:
-		_flow.call("get_wizard", index).call("protect", 60.0)
+		Downed.of(_flow.call("get_wizard", index) as Node).protect(60.0)
 	events.emit_signal("sandbox_action_requested", 1, &"imp_wave")
 	await create_timer(1.0).timeout
 	var shooter: Node = (_flow.call("dummies") as Array)[1]

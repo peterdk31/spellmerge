@@ -6,7 +6,6 @@ extends "res://tests/support/suite.gd"
 
 const Fixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 const EventsScript := preload("res://core/events/events.gd")
-const PlayerScript := preload("res://gameplay/player/player.gd")
 
 var fx: Fixture
 
@@ -55,14 +54,14 @@ func test_a_wizard_who_steps_aside_is_not_hit() -> void:
 	imp.step(Fixture.STEP)
 	fx.players[0].position = Vector2(60.0, 40.0)
 	fx.run(imp, int(Fixture.ai(imp).windup_time / Fixture.STEP) + 20)
-	check_equal(fx.players[0].health, PlayerScript.MAX_HEALTH, "the shot missed")
+	check_equal(fx.players[0].health.health, fx.players[0].health.max_health, "the shot missed")
 
 
 func test_a_wizard_who_stays_is_hit() -> void:
 	var imp: Actor = fx.imp_facing_player(60.0)
 	imp.step(Fixture.STEP)
 	fx.run(imp, int(Fixture.ai(imp).windup_time / Fixture.STEP) + 20)
-	check(fx.players[0].health < PlayerScript.MAX_HEALTH, "the shot hit")
+	check(fx.players[0].health.health < fx.players[0].health.max_health, "the shot hit")
 
 
 func test_line_is_hidden_outside_the_windup() -> void:

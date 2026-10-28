@@ -389,6 +389,11 @@ const ACTOR_LAYERS: int = LAYER_ENEMY | LAYER_PLAYER
 const RAMP_COLORS: Array[Color] = [
 	Color("#3b73c9"), Color("#d9477a"), Color("#3f8f4f"), Color("#8a4fc4"), Color("#a68a2a"),
 ]
+## The light shade of each ramp (docs/STYLE.md), in the same order: a wizard's reticle, staff gem
+## and rings (`WizardLook`), Feel's flashes in a player's colours.
+const RAMP_LIGHT_COLORS: Array[Color] = [
+	Color("#7fc0f0"), Color("#f59ab8"), Color("#8fd46a"), Color("#c99af0"), Color("#e3cf6b"),
+]
 
 ## The art of the hat-ramp batches. Since staffs B6a the shader builds every shot (runes
 ## and orbit shots too) and never reads it; only the sprite path of Feel's lone flashes does.
@@ -2635,6 +2640,11 @@ static func ramp_tint(ramp: int) -> Color:
 ## The base colour of `ramp` (`RAMP_COLORS`): a hat colour, or Blight ochre for any other.
 static func ramp_color(ramp: int) -> Color:
 	return RAMP_COLORS[ramp] if is_hat_ramp(ramp) else RAMP_COLORS[ActorsScript.RAMP_ENEMY]
+
+
+## The light shade of `ramp` (`RAMP_LIGHT_COLORS`): a hat colour's, or Blight's for any other.
+static func ramp_light(ramp: int) -> Color:
+	return RAMP_LIGHT_COLORS[ramp] if is_hat_ramp(ramp) else RAMP_LIGHT_COLORS[ActorsScript.RAMP_ENEMY]
 
 
 func _kill(slot: int, announce: bool = true) -> void:

@@ -56,7 +56,7 @@ func test_every_enemy_body_has_an_actor_id_and_closes_it_when_freed() -> void:
 		check_equal(fx.projectiles.target_owner_of(body), body.id, "%s owns its hurt circle, so its own spells pass it" % what)
 		check(fx.combat.is_enemy(body), "%s can be hurt through Combat" % what)
 		ids.append(body.id)
-	check(not ids.has(fx.players[0].actor_id), "no enemy shares the wizard's id")
+	check(not ids.has(fx.players[0].id), "no enemy shares the wizard's id")
 	for at in bodies.size():
 		bodies[at].free()
 		check(not fx.actors.is_open(ids[at]), "a freed enemy's id is closed (%d)" % ids[at])
@@ -99,7 +99,7 @@ func test_no_grudge_against_the_other_team_or_itself() -> void:
 	var imp: Actor = fx.imp(Vector2.ZERO, _broke())
 	var ai: AIController = Fixture.ai(imp)
 	fx.run(imp, 1)
-	fx.combat.hit(fx.players[0].actor_id, imp, 1)
+	fx.combat.hit(fx.players[0].id, imp, 1)
 	fx.combat.hit(imp.id, imp, 1)
 	fx.run(imp, 1)
 	check(ai.grudge == null and ai.target == fx.players[0], "a wizard's hit and its own blast earn no grudge")

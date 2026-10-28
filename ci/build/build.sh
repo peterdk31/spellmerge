@@ -6,6 +6,9 @@
 # builds (docs/PLAN.md, "Daily run", step 6). Used by daily.yml and locally.
 #
 #   ci/build/build.sh [--version v0.20261017] [--channel nightly] [--commit SHA]
+#   ci/build/build.sh --web [--version V] [--channel preview] [--commit SHA]
+#                                 the web build only, zipped into dist/: no unit tests, screenshots
+#                                 or smoke tests (preview.yml; the daily run checks everything)
 #   ci/build/build.sh --quick     import and editor smoke test only (for development)
 #   ci/build/build.sh --quick --tests   the same, then every tests/**/test_*.gd unit test
 #   ci/build/build.sh --quick --screenshots   the same, then every tests/screenshots/shot_*.gd
@@ -43,12 +46,14 @@ VERSION="dev"
 CHANNEL="dev"
 COMMIT="$(git rev-parse HEAD 2>/dev/null || echo "")"
 QUICK=0
+WEB=0
 TESTS=0
 SHOTS=0
 CLIPS=0
 while (($#)); do
   case "$1" in
     --quick)   QUICK=1; shift ;;
+    --web)     WEB=1; shift ;;
     --tests)   TESTS=1; shift ;;
     --screenshots) SHOTS=1; shift ;;
     --clips)   CLIPS=1; shift ;;
@@ -278,15 +283,20 @@ clips() {
   echo "$(find build/clips -name meta.json | wc -l) clip(s) in build/clips"
 }
 
+export_preset() { # export_preset <preset>: a release export to the preset's export_path
+  local preset="$1" out
+  step "Exporting $preset"
+  out=$(sed -n "/^name=\"$preset\"\$/,/^export_path=/s/^export_path=\"\(.*\)\"\$/\1/p" export_presets.cfg)
+  rm -rf "$(dirname "$out")"
+  mkdir -p "$(dirname "$out")"
+  godot_checked "export-${preset,,}" "$GODOT" --headless --path . --export-release "$preset" "$out"
+  [[ -s "$out" ]] || { echo "::error::$preset export produced no $out"; exit 1; }
+}
+
 export_all() {
+  local preset
   for preset in Web Windows Linux; do
-    step "Exporting $preset"
-    local out
-    out=$(sed -n "/^name=\"$preset\"\$/,/^export_path=/s/^export_path=\"\(.*\)\"\$/\1/p" export_presets.cfg)
-    rm -rf "$(dirname "$out")"
-    mkdir -p "$(dirname "$out")"
-    godot_checked "export-${preset,,}" "$GODOT" --headless --path . --export-release "$preset" "$out"
-    [[ -s "$out" ]] || { echo "::error::$preset export produced no $out"; exit 1; }
+    export_preset "$preset"
   done
 
   step "Boot smoke test (exported Linux build)"
@@ -352,11 +362,12 @@ with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
 PY
 }
 
-package() {
+package() { # package [platform...]: zips build/<platform> into dist/ (default: all three)
+  local platforms=("$@") name platform
+  ((${#platforms[@]})) || platforms=(web windows linux)
   step "Packaging"
   rm -rf dist && mkdir -p dist
-  local name
-  for platform in web windows linux; do
+  for platform in "${platforms[@]}"; do
     name="$SLUG-$platform-$VERSION.zip"
     zip_dir "build/$platform" "dist/$name"
   done
@@ -369,7 +380,8 @@ package() {
   size=$(stat -c %s "dist/$SLUG-web-$VERSION.zip")
   echo "web: $((size / 1000)) kB of $((WEB_BUDGET / 1000)) kB"
   ((size <= WEB_BUDGET)) || echo "::warning::web download is over its $((WEB_BUDGET / 1000000)) MB budget (tests/build.json). Not a failure. Likely fixes: big textures or sounds added recently (art/manifest.json, audio/manifest.json), more content the Web preset could exclude (export_presets.cfg, the demo flag), uncompressed imports"
-  for platform in windows linux; do
+  for platform in "${platforms[@]}"; do
+    [[ "$platform" == web ]] && continue
     size=$(stat -c %s "dist/$SLUG-$platform-$VERSION.zip")
     echo "$platform: $((size / 1000)) kB of $((DESKTOP_BUDGET / 1000)) kB"
     ((size <= DESKTOP_BUDGET)) || echo "::warning::$platform download is over its $((DESKTOP_BUDGET / 1000000)) MB budget (tests/build.json). Not a failure. Likely fixes: big textures or sounds added recently, uncompressed imports, test or source files the export should exclude"
@@ -390,6 +402,14 @@ if ((QUICK)); then
 fi
 stamp
 trap reset_build_info EXIT
+if ((WEB)); then
+  step "Importing"
+  godot_checked import "$GODOT" --headless --path . --import
+  export_preset Web
+  package web
+  step "Done: dist/ (web only, unchecked)"
+  exit 0
+fi
 import_and_smoke
 unit_tests
 screenshots

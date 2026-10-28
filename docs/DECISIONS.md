@@ -1682,6 +1682,16 @@ How it is built (parts F2–F10):
 - **A web build now runs the three web scenarios only** (`StressRunner.scenarios_for`): the desktop scenario is the desktop's budget, and the desktop export measures it. The Linux export still runs all four, and the headless unit test too.
 - F10 comes back as it was, in its own PR.
 
+## 2026-10-28: Actors (actors G1, the plan)
+
+- **Why:** phase F gave enemies staffs in ten PRs, most of them teaching core that a caster can be something other than "player 0–3". The player index meant four things (seat, side, look, budget); the caster kit, mana and aiming were written twice, and Combat kept two body models whose status rules had drifted apart. The owner asked whether a player could be "just an entity with a HUD and a player controller" and an enemy "an entity with an AI controller and no HUD", swapped by moving nodes.
+- **A component architecture** (owner): an actor is a body of components (Health, Hurtbox, Contact, Mover, Caster; Downed and a look for wizards) driven by one controller (`PlayerController`, which is the seat; `AIController`). Components hold configuration and behaviour; Combat, Spells and the projectile manager keep the hot state in packed arrays indexed by one actor id; only the actor runs `_physics_process`, stepping its components in a fixed order. Design: [M2-actors.md](milestones/M2-actors.md).
+- **No sides** (owner: "Everything should be able to damage everything. So there should be no sides."): friendly fire and enemy fire are always on and both settings go (G3c). DESIGN.md's spell rule changed to match ("Everything hurts everything").
+- **Teams only aim** (owner): the AI's target, homing, chain and arc, familiars and the decoy lure pick another team; damage never asks. The team follows the controller, so a possessed body aims for its driver; an AI hurt by its own team may turn on the one who hurt it.
+- **Combat, one rule each** (owner, the recommended set): shock jumps to the nearest other actor; static discharge goes off on any hit, arcs to the victim's other-team actors and is always spent; hex pulls; pull and shields work on every actor; the complete later-status loop; quiet burn ticks.
+- **Possess is a card** (owner: "Make this a card! A possess card, possess enemies hit for x seconds"): the hit actor is driven by the caster's controller for its seconds; the caster's body stands, vulnerable. Enemies may possess wizards by the same rule (owner); the D3 playtest asks about it, as it is the nearest thing to making a player wait.
+- **Order:** G2, then G3a, G3b and G4 in parallel (G3c independent), G5 to G10 in turn, all before D3.
+
 ## 2026-10-28: The actor table (actors G2)
 
 - **`core/actors` (autoload `Actors`)** holds every actor's id (0–511), team, ramp and seat in packed arrays (docs/milestones/M2-actors.md). Ids are handed out lowest free first, so a run is the same every time. `budget_of` is the seat while a seat drives the actor, else `SHARED` (4).

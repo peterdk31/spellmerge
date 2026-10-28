@@ -4,6 +4,8 @@ Eight strictly sequential milestones (docs/PLAN.md, "Roadmap"). One milestone at
 
 One exception, by the owner on 2026-10-27: enemies casting spells from staffs moved from M3–M4 into M2 ([M2-staffs.md](milestones/M2-staffs.md), "Enemy staffs", phase F), so new enemy types are a sprite and a staff.
 
+A second, by the owner on 2026-10-28: wizards and enemies become one kind of body, an actor made of components and driven by a controller, with no sides and a `possess` card ([M2-actors.md](milestones/M2-actors.md), phase G), before D3.
+
 | # | Milestone | Status | Done when |
 | --- | --- | --- | --- |
 | M0 | [Foundation](milestones/M0-foundation.md) | **Closed early** on 2026-10-16 by the owner; its dry runs and release streak carry into M1 | 3 daily releases in a row work and every pipeline part passes its dry run |

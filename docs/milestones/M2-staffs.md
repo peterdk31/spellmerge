@@ -369,6 +369,10 @@ Owner sessions, one PR each, in this order: F2, F3 and F4 may run in parallel; F
 | F9b | **The old enemy attack removed** | `gameplay/ai`, `gameplay/combat`, `gameplay/feel`, `core/projectiles` | `ATTACK_TAG`, its hit-profile table, the attack exports, `imp_fireball.svg` and the hostile batch removed (split from F9 while building it, as F8 was) |
 | F10 | **Enemy fire setting** | `core/settings`, `hud/menus/pause`, `gameplay/ai` | `core/settings/enemy_fire.gd` (off by default), `enemy_fire_requested` and `enemy_fire_changed`, the pause menu row, applied to the projectile manager |
 
+### Phase G: actors (owner, 2026-10-28)
+
+Wizards and enemies become one kind of body (components and a controller), with no sides and a `possess` card. Its own document, with its parts: [M2-actors.md](M2-actors.md). Before D3.
+
 ### Phase D: proof
 
 | # | Part | Delivers |

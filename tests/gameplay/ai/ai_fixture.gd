@@ -8,7 +8,7 @@ extends RefCounted
 const AiScript := preload("res://gameplay/ai/ai.gd")
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const EventsScript := preload("res://core/events/events.gd")
-const PlayerScript := preload("res://gameplay/player/player.gd")
+const WizardScene := preload("res://content/wizard/base/wizard.tscn")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
@@ -25,11 +25,12 @@ var projectiles: Node
 var registry: Node
 var spells: Node
 var enemies: Array[AiScript] = []
-var players: Array[PlayerScript] = []
+var players: Array[Actor] = []
 var _root: Node
 
 
-## `player_count` wizards are added to `root` (they must be in the tree to be hit).
+## `player_count` wizards (actors made from the real scene, actors G7) are added to `root` (they
+## must be in the tree to be hit); each registers in its seat's slot of Combat as it enters.
 func _init(root: Node, player_count: int = 1) -> void:
 	_root = root
 	bus = EventsScript.new()
@@ -48,14 +49,17 @@ func _init(root: Node, player_count: int = 1) -> void:
 	combat.spells = spells
 	combat._ready()
 	for index in player_count:
-		var wizard := PlayerScript.new()
-		wizard.index = index
+		var wizard := WizardScene.instantiate() as Actor
+		PlayerController.seat_wizard(wizard, index, null, [[], [], [], []])
 		wizard.events = bus
+		wizard.combat = combat
+		wizard.projectiles = projectiles
+		wizard.spells = spells
 		wizard.actors = actors
-		root.add_child(wizard)
 		wizard.position = Vector2(1000.0, 1000.0 * index)
+		root.add_child(wizard)
+		wizard.set_physics_process(false)
 		players.append(wizard)
-		combat.register_player(index, wizard, 8.0, Vector2(0.0, -12.0))
 
 
 ## An imp made from the real scene (sprite, telegraph, poses) that chases every wizard.

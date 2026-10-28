@@ -9,7 +9,7 @@ const CombatScript := preload("res://gameplay/combat/combat.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
 const FeelPresetScript := preload("res://gameplay/feel/presets/feel_preset.gd")
-const PlayerScript := preload("res://gameplay/player/player.gd")
+const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 const RegistryScript :=preload("res://core/registry/registry.gd")
 
 const STEP: float = 0.0625
@@ -556,7 +556,10 @@ func _test_death_puff_is_limited() -> void:
 
 
 func _test_muzzle_colours_match_the_reticles() -> void:
-	_check(FeelScript.PLAYER_COLORS == PlayerScript.PLAYER_COLORS, "the muzzle colours are the reticle colours")
+	# The reticle is drawn by the wizard's look (actors G7) in its ramp's light colour.
+	for ramp in FeelScript.PLAYER_COLORS.size():
+		var reticle: Color = ProjectilesScript.ramp_light(ramp)
+		_check(FeelScript.PLAYER_COLORS[ramp].is_equal_approx(reticle), "the muzzle colour of ramp %d is its reticle colour (%s, reticle %s)" % [ramp, FeelScript.PLAYER_COLORS[ramp].to_html(false), reticle.to_html(false)])
 
 
 func _test_death_animation_starts_at_rest_scale() -> void:

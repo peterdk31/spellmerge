@@ -94,14 +94,15 @@ func _test_build_random(events: Node, bot: BotScript, wizard: Node) -> void:
 	var before: int = bot.requests_sent
 	_check(bot.build_random(5), "a bot with a wizard builds")
 	events.disconnect("staff_change_requested", on_build)
-	var slots: int = int(wizard.call("slot_count"))
+	var caster: Caster = (wizard as Actor).caster
+	var slots: int = caster.slot_count()
 	_check(bot.requests_sent - before == builds.size() and builds.size() == slots, "one counted request per slot")
 	var own: bool = true
 	for entry: Array in builds:
 		own = own and entry[0] == 0 and entry[1] == BotScript.BUILD_STAFF
 	_check(own, "all build calls are for the bot's own player and staff 3")
-	_check(wizard.call("cards_of", BotScript.BUILD_STAFF) == bot.built_cards, "staff 3 holds what the bot built")
-	_check(bool(wizard.call("has_staff", BotScript.BUILD_STAFF)), "and it can cast")
+	_check(caster.cards_of(BotScript.BUILD_STAFF) == bot.built_cards, "staff 3 holds what the bot built")
+	_check(caster.has_staff(BotScript.BUILD_STAFF), "and it can cast")
 
 
 func _test_idler_sends_nothing() -> void:

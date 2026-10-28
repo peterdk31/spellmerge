@@ -15,11 +15,12 @@ extends SceneTree
 ## godot --headless --path . --script res://tests/bots/test_wave_balance.gd
 
 const BotScript := preload("res://tests/bots/bot.gd")
-const PlayerScript := preload("res://gameplay/player/player.gd")
 
 const COUNTS: Array[int] = [1, 2, 3, 4]
 const TIME_LIMIT: float = 120.0
 const TIME_SCALE: float = 2.0
+## A wizard's full health (the Health of content/wizard/base/wizard.tscn).
+const MAX_HEALTH: int = 100
 
 var _failures: Array[String] = []
 
@@ -70,13 +71,13 @@ func _run(count: int, events: Node, flow: Node, input: Node) -> void:
 	Engine.time_scale = TIME_SCALE
 	events.emit_signal("play_requested", 0)
 	var elapsed: float = 0.0
-	var wizards: Array[Node] = []
+	var wizards: Array[Actor] = []
 	for index in count:
-		wizards.append(flow.call("get_wizard", index) as Node)
+		wizards.append(flow.call("get_wizard", index) as Actor)
 	# Health is sampled every frame, so a restart that frees the wizards cannot undercount.
 	var lowest: Array[int] = []
 	lowest.resize(count)
-	lowest.fill(PlayerScript.MAX_HEALTH)
+	lowest.fill(MAX_HEALTH)
 	var last: int = Time.get_ticks_usec()
 	while elapsed < TIME_LIMIT and not bool(tally["cleared"]) and int(tally["downed"]) < count:
 		await process_frame
@@ -86,7 +87,7 @@ func _run(count: int, events: Node, flow: Node, input: Node) -> void:
 		elapsed += delta
 		for index in count:
 			if is_instance_valid(wizards[index]):
-				lowest[index] = mini(lowest[index], int(wizards[index].get("health")))
+				lowest[index] = mini(lowest[index], wizards[index].health.health)
 		for bot in bots:
 			bot.step(delta)
 	Engine.time_scale = 1.0
@@ -98,7 +99,7 @@ func _run(count: int, events: Node, flow: Node, input: Node) -> void:
 	flow.call("stop_run")
 	var lost: int = 0
 	for health in lowest:
-		lost += PlayerScript.MAX_HEALTH - health
+		lost += MAX_HEALTH - health
 	var cleared: bool = bool(tally["cleared"])
 	print("BALANCE: %d player(s): %s in %.1f game seconds, %d health lost, %d downed, %d casts" % [
 		count, "cleared" if cleared else "NOT cleared", elapsed, lost, int(tally["downed"]), int(tally["casts"])])

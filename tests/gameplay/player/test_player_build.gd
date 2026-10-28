@@ -1,21 +1,22 @@
 extends "res://tests/support/suite.gd"
-## Tests for the wizard on staffs (staffs A6a): four staffs on four buttons, the start cards and
-## the bag, `staff_change_requested` and `card_move_requested` applied and announced
-## (`staff_changed`) or refused (`build_refused`), casting through `Spells.cast_staff`, a
-## sustained (`hold`) card switched off only by a new press, mana held by sustained cards, the
-## orbit anchor, and four players building at once. It runs the real `Spells`, projectile manager
-## and event bus, with cards built in code behind a stand-in registry.
+## Tests for the wizard on staffs (staffs A6a; the wizard actor and its seat since actors G7):
+## four staffs on four buttons, the start cards and the bag, `staff_change_requested`,
+## `staff_cards_requested` and `card_move_requested` applied and announced (`staff_changed`) or
+## refused (`build_refused`), casting through `Spells.cast_staff`, a sustained (`hold`) card
+## switched off only by a new press, mana held by sustained cards, the orbit anchor, and four
+## players building at once. And the seat (the PlayerController) on an actor that is not its
+## wizard: its input, HUD numbers and builder follow the actor it drives, `release` gives it
+## back, and a body no seat drives sends no seat events. It runs the real `Spells`, projectile
+## manager and event bus, with cards built in code behind a stand-in registry, and the real
+## wizard scene.
 ##
 ## godot --headless --path . --script res://tests/gameplay/player/test_player_build.gd
 
-const PlayerScript := preload("res://gameplay/player/player.gd")
-const InputManagerScript := preload("res://core/input/input_manager.gd")
-const EventsScript := preload("res://core/events/events.gd")
+const Fixture := preload("res://tests/gameplay/player/wizard_fixture.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
-const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
+const ActorsScript := preload("res://core/actors/actors.gd")
 
-const STEP: float = 0.0625
 const START: Array = [[&"dash"], [&"fire", &"bolt"], [], []]
 
 
@@ -35,13 +36,11 @@ class FakeRegistry:
 		return items.get(id) if folder == &"spells" else null
 
 
+var _world: Fixture
 var _registry: FakeRegistry
-var _bus: EventsScript
-var _input: InputManagerScript
-var _mgr: ManagerScript
 var _spells: SpellsScript
 var _staff: StaffBase
-var _players: Array[PlayerScript] = []
+var _players: Array[Actor] = []
 ## Every staff_changed as [player, staff, plan].
 var _changed: Array = []
 ## Every build_refused as [player, reason].
@@ -49,19 +48,26 @@ var _refused: Array = []
 ## Every staff_cast as [player, staff], and every spell_cast's form.
 var _staff_casts: Array = []
 var _cast_forms: Array[StringName] = []
+## Every player_stats_changed as [player, health, max_health, mana, max_mana].
+var _stats: Array = []
 
 
 func before_each() -> void:
-	_registry = own(FakeRegistry.new()) as FakeRegistry
-	_bus = own(EventsScript.new()) as EventsScript
-	_input = own(InputManagerScript.new()) as InputManagerScript
-	_input.events = _bus
-	_mgr = own(ManagerScript.new()) as ManagerScript
-	_mgr.events = _bus
-	_mgr.set_cap(512)
-	_spells = own(SpellsScript.new()) as SpellsScript
+	# The wizard world, with the real Spells reading the cards made here instead of the stand-in.
+	_world = Fixture.new(root, true)
+	_world.fake.bind(null, null)
+	_world.fake.free()
+	_world.fake = null
+	_world.registry.free()
+	_registry = FakeRegistry.new()
+	_world.registry = _registry
+	_spells = SpellsScript.new()
 	_spells.registry = _registry
-	_spells.bind(_mgr, _bus)
+	_spells.actors = _world.table
+	_spells.bind(_world.projectiles, _world.bus)
+	_world.spells = _spells
+	_world.combat.spells = _spells
+	_world.projectiles.set_cap(512)
 	_staff = StaffBase.new()
 	_staff.id = &"test"
 	_staff.slots = 6
@@ -72,10 +78,13 @@ func before_each() -> void:
 	_refused.clear()
 	_staff_casts.clear()
 	_cast_forms.clear()
-	_bus.staff_changed.connect(func(player: int, staff: int, plan: Dictionary) -> void: _changed.append([player, staff, plan]))
-	_bus.build_refused.connect(func(player: int, reason: String) -> void: _refused.append([player, reason]))
-	_bus.staff_cast.connect(func(player: int, staff: int, _o: Vector2, _d: Vector2) -> void: _staff_casts.append([player, staff]))
-	_bus.spell_cast.connect(func(_p: int, form: StringName, _o: Vector2, _d: Vector2) -> void: _cast_forms.append(form))
+	_stats.clear()
+	var bus := _world.bus
+	bus.staff_changed.connect(func(player: int, staff: int, plan: Dictionary) -> void: _changed.append([player, staff, plan]))
+	bus.build_refused.connect(func(player: int, reason: String) -> void: _refused.append([player, reason]))
+	bus.staff_cast.connect(func(player: int, staff: int, _o: Vector2, _d: Vector2) -> void: _staff_casts.append([player, staff]))
+	bus.spell_cast.connect(func(_p: int, form: StringName, _o: Vector2, _d: Vector2) -> void: _cast_forms.append(form))
+	bus.player_stats_changed.connect(func(p: int, h: int, mh: int, m: float, mm: float) -> void: _stats.append([p, h, mh, m, mm]))
 	var bolt := _card(FormBase.new(), &"bolt") as FormBase
 	bolt.cooldown = 0.25
 	var orbit := _card(FormBase.new(), &"orbit") as FormBase
@@ -96,6 +105,10 @@ func before_each() -> void:
 	hold.behaviour_strength = 1.0
 
 
+func after_each() -> void:
+	_world.free_all()
+
+
 func _card(card: SpellComponent, id: StringName) -> SpellComponent:
 	card.id = id
 	card.display_name = String(id).capitalize()
@@ -106,21 +119,34 @@ func _card(card: SpellComponent, id: StringName) -> SpellComponent:
 	return card
 
 
-## A wizard outside the tree for player `index`, with the start cards and a real device.
-func _wizard(index: int, start: Array = START) -> PlayerScript:
-	_input.add_virtual_device(index)
-	var player := own(PlayerScript.new()) as PlayerScript
-	player.index = index
-	player.input = _input
-	player.events = _bus
-	player.registry = _registry
-	player.projectiles = _mgr
-	player.spells = _spells
-	player.staff = _staff
-	player.start_cards = start
-	player._ready()
+## The wizard of seat `index`, in the tree, with the start cards and a real device.
+func _wizard(index: int, start: Array = START) -> Actor:
+	var player: Actor = _world.wizard(index, Vector2(40.0 * index, 0.0), start, _staff)
 	_players.append(player)
 	return player
+
+
+## A bare actor of the kit (not a wizard, no controller of its own) with Health (40), a Mover and
+## a Caster of two staffs (a bolt and an empty one) and 50 mana, in the tree.
+func _creature(at: Vector2) -> Actor:
+	var body := Actor.new()
+	body.name = "Creature"
+	var health := Health.new()
+	health.max_health = 40
+	body.add_child(health)
+	body.add_child(Mover.new())
+	var caster := Caster.new()
+	caster.staff_count = 2
+	caster.staff = _staff
+	caster.start_cards = [[&"bolt"], []]
+	caster.max_mana = 50.0
+	body.add_child(caster)
+	body.position = at
+	return _world.add(body)
+
+
+func _seat(player: Actor) -> PlayerController:
+	return Fixture.controller(player)
 
 
 func _ids(words: String) -> Array[StringName]:
@@ -131,28 +157,25 @@ func _ids(words: String) -> Array[StringName]:
 
 
 func _run(count: int) -> void:
-	for i in count:
-		_mgr.step(STEP)
-		_spells.step(STEP)
-		for player in _players:
-			player.step(STEP)
+	_world.run(count)
 
 
 func _tap(player: int, action: StringName) -> void:
-	_input.send_virtual(player, action, 1.0)
-	_input.send_virtual(player, action, 0.0)
+	_world.hold(player, action)
+	_world.release(player, action)
 
 
 func test_the_bag_holds_every_card_in_the_registry() -> void:
 	var player := _wizard(0)
-	check_equal(player.bag.size(), _registry.items.size(), "the bag has every card")
+	check_equal(_seat(player).bag.size(), _registry.items.size(), "the bag has every card")
 
 
 func test_the_start_cards_are_built_and_announced() -> void:
 	var player := _wizard(1)
-	check(player.has_staff(0) and player.has_staff(1), "the dash and the fire bolt staffs are built")
-	check(not player.has_staff(2) and not player.has_staff(3), "the empty staffs have no build")
-	check_equal(player.cards_of(1), _ids("fire bolt - - - -"), "staff X holds the fire bolt, as many slots as the staff")
+	var caster: Caster = player.caster
+	check(caster.has_staff(0) and caster.has_staff(1), "the dash and the fire bolt staffs are built")
+	check(not caster.has_staff(2) and not caster.has_staff(3), "the empty staffs have no build")
+	check_equal(caster.cards_of(1), _ids("fire bolt - - - -"), "staff X holds the fire bolt, as many slots as the staff")
 	check_equal(_changed.size(), 4, "every staff is announced once")
 	var plan: Dictionary = _changed[1][2]
 	check_equal(plan.get("cards"), _ids("fire bolt - - - -"), "the plan carries the cards")
@@ -161,14 +184,14 @@ func test_the_start_cards_are_built_and_announced() -> void:
 
 func test_each_button_casts_its_own_staff() -> void:
 	var player := _wizard(0, [[&"bolt"], [&"fire", &"bolt"], [], []])
-	_input.send_virtual(0, &"staff_2", 1.0)
+	_world.hold(0, &"staff_2")
 	_run(1)
 	check_equal(_staff_casts, [[0, 1]], "staff_2 casts staff 2")
 	check_equal(_cast_forms, [&"bolt"] as Array[StringName], "spell_cast names the carrier")
-	_input.send_virtual(0, &"staff_1", 1.0)
+	_world.hold(0, &"staff_1")
 	_run(1)
 	check(_staff_casts.has([0, 0]), "staff_1 casts staff 1, with staff 2 still held")
-	check(player.mana < PlayerScript.MAX_MANA, "the casts took mana")
+	check(player.caster.mana < player.caster.max_mana, "the casts took mana")
 
 
 func test_a_tap_just_before_the_staff_is_ready_still_casts() -> void:
@@ -184,97 +207,102 @@ func test_a_tap_just_before_the_staff_is_ready_still_casts() -> void:
 
 func test_a_dash_card_dashes_the_wizard() -> void:
 	var player := _wizard(0)
-	_input.send_virtual(0, &"move_right", 1.0)
+	_world.hold(0, &"move_right")
 	_run(1)
 	_tap(0, &"staff_1")
 	_run(2)
-	check(player.is_dashing(), "the A staff's dash card dashes")
-	check(not player.is_invulnerable(), "without invulnerability")
-	check(player.velocity.x > PlayerScript.MOVE_SPEED, "faster than walking, the way the wizard walks")
+	check(player.mover.is_moving(), "the A staff's dash card dashes")
+	check(not player.health.is_protected(), "without invulnerability")
+	check(player.velocity.x > player.mover.speed, "faster than walking, the way the wizard walks")
 
 
 func test_a_held_button_does_not_switch_a_hold_off_but_a_new_press_does() -> void:
 	var player := _wizard(0, [[], [], [&"hold", &"orbit"], []])
-	_input.send_virtual(0, &"staff_3", 1.0)
+	var caster: Caster = player.caster
+	_world.hold(0, &"staff_3")
 	_run(1)
-	check(_spells.is_holding(0, 2), "the press switches the orbit on")
-	check_equal(player.free_mana(), player.mana - 5.0, "its mana is held")
+	check(_spells.is_holding(player.id, 2), "the press switches the orbit on")
+	check_equal(caster.free_mana(), caster.mana - 5.0, "its mana is held")
 	_run(20)
-	check(_spells.is_holding(0, 2), "holding the button does not switch it off")
-	_input.send_virtual(0, &"staff_3", 0.0)
+	check(_spells.is_holding(player.id, 2), "holding the button does not switch it off")
+	_world.release(0, &"staff_3")
 	_tap(0, &"staff_3")
 	_run(1)
-	check(not _spells.is_holding(0, 2), "a new press switches it off")
-	check_equal(player.free_mana(), player.mana, "and frees its mana")
+	check(not _spells.is_holding(player.id, 2), "a new press switches it off")
+	check_equal(caster.free_mana(), caster.mana, "and frees its mana")
 
 
 func test_a_change_request_builds_the_staff_and_is_announced() -> void:
 	var player := _wizard(2)
 	_changed.clear()
-	_bus.staff_change_requested.emit(2, 3, 0, &"bolt")
-	check_equal(player.cards_of(3)[0], &"bolt", "the card is in the slot")
-	check(player.has_staff(3), "the staff can cast now")
+	_world.bus.staff_change_requested.emit(2, 3, 0, &"bolt")
+	check_equal(player.caster.cards_of(3)[0], &"bolt", "the card is in the slot")
+	check(player.caster.has_staff(3), "the staff can cast now")
 	check_equal(_changed.size(), 1, "the change is announced")
 	check_equal([_changed[0][0], _changed[0][1]], [2, 3], "for this player and staff")
-	_bus.staff_change_requested.emit(2, 3, 0, &"")
-	check(not player.has_staff(3), "emptying the slot leaves nothing to cast")
+	_world.bus.staff_change_requested.emit(2, 3, 0, &"")
+	check(not player.caster.has_staff(3), "emptying the slot leaves nothing to cast")
 
 
 func test_a_wrong_request_is_refused_and_changes_nothing() -> void:
 	var player := _wizard(0)
-	var before: Array[StringName] = player.cards_of(1)
-	_bus.staff_change_requested.emit(0, 1, 9, &"bolt")
-	_bus.staff_change_requested.emit(0, 4, 0, &"bolt")
-	_bus.staff_change_requested.emit(0, 1, 0, &"no_such_card")
+	var before: Array[StringName] = player.caster.cards_of(1)
+	_world.bus.staff_change_requested.emit(0, 1, 9, &"bolt")
+	_world.bus.staff_change_requested.emit(0, 4, 0, &"bolt")
+	_world.bus.staff_change_requested.emit(0, 1, 0, &"no_such_card")
 	check_equal(_refused.size(), 3, "three refusals")
-	check_equal(player.cards_of(1), before, "the staff is as it was")
+	check_equal(player.caster.cards_of(1), before, "the staff is as it was")
 
 
 func test_a_request_for_another_player_is_ignored() -> void:
 	var first := _wizard(0)
 	var second := _wizard(1)
-	_bus.staff_change_requested.emit(1, 2, 0, &"bolt")
-	check(not first.has_staff(2), "player 1's staff Y is untouched")
-	check(second.has_staff(2), "player 2's is built")
+	_world.bus.staff_change_requested.emit(1, 2, 0, &"bolt")
+	check(not first.caster.has_staff(2), "player 1's staff Y is untouched")
+	check(second.caster.has_staff(2), "player 2's is built")
 
 
 func test_cards_move_and_swap_between_slots_staffs_and_the_bag() -> void:
 	var player := _wizard(0)
-	_bus.card_move_requested.emit(0, 1, 0, 1, 1)
-	check_equal(player.cards_of(1).slice(0, 2), _ids("bolt fire"), "two slots of one staff swap")
-	_bus.card_move_requested.emit(0, 1, 0, 2, 3)
-	check_equal(player.cards_of(2)[3], &"bolt", "a card moves to another staff")
-	check_equal(player.cards_of(1)[0], &"", "and leaves its slot")
-	_bus.card_move_requested.emit(0, PlayerScript.BAG, player.bag.find(&"orbit"), 3, 0)
-	check_equal(player.cards_of(3)[0], &"orbit", "a card comes from the bag")
-	_bus.card_move_requested.emit(0, 3, 0, PlayerScript.BAG, 0)
-	check_equal(player.cards_of(3)[0], &"", "and goes back")
+	var caster: Caster = player.caster
+	var bus := _world.bus
+	bus.card_move_requested.emit(0, 1, 0, 1, 1)
+	check_equal(caster.cards_of(1).slice(0, 2), _ids("bolt fire"), "two slots of one staff swap")
+	bus.card_move_requested.emit(0, 1, 0, 2, 3)
+	check_equal(caster.cards_of(2)[3], &"bolt", "a card moves to another staff")
+	check_equal(caster.cards_of(1)[0], &"", "and leaves its slot")
+	bus.card_move_requested.emit(0, PlayerController.BAG, _seat(player).bag.find(&"orbit"), 3, 0)
+	check_equal(caster.cards_of(3)[0], &"orbit", "a card comes from the bag")
+	bus.card_move_requested.emit(0, 3, 0, PlayerController.BAG, 0)
+	check_equal(caster.cards_of(3)[0], &"", "and goes back")
 
 
 func test_a_whole_staff_request_sets_every_slot_in_one_change() -> void:
 	var player := _wizard(1)
+	var caster: Caster = player.caster
 	_changed.clear()
-	_bus.staff_cards_requested.emit(1, 2, _ids("fire bolt orbit"))
-	check_equal(player.cards_of(2).slice(0, 4), _ids("fire bolt orbit -"), "the cards fill the first slots, the rest is empty")
-	check_equal(player.cards_of(2).size(), player.slot_count(), "the row keeps the staff's slots")
+	_world.bus.staff_cards_requested.emit(1, 2, _ids("fire bolt orbit"))
+	check_equal(caster.cards_of(2).slice(0, 4), _ids("fire bolt orbit -"), "the cards fill the first slots, the rest is empty")
+	check_equal(caster.cards_of(2).size(), caster.slot_count(), "the row keeps the staff's slots")
 	check_equal(_changed.size(), 1, "one change, announced once")
-	_bus.staff_cards_requested.emit(1, 2, [] as Array[StringName])
-	check(not player.has_staff(2), "an empty list clears the staff")
+	_world.bus.staff_cards_requested.emit(1, 2, [] as Array[StringName])
+	check(not caster.has_staff(2), "an empty list clears the staff")
 
 
 func test_a_wrong_whole_staff_request_is_refused_and_changes_nothing() -> void:
 	var player := _wizard(0)
-	var before: Array[StringName] = player.cards_of(1)
+	var caster: Caster = player.caster
+	var before: Array[StringName] = caster.cards_of(1)
 	var too_many: Array[StringName] = []
-	for _slot in player.slot_count() + 1:
+	for _slot in caster.slot_count() + 1:
 		too_many.append(&"bolt")
-	_bus.staff_cards_requested.emit(0, 1, too_many)
-	_bus.staff_cards_requested.emit(0, 4, _ids("bolt"))
-	_bus.staff_cards_requested.emit(0, 1, _ids("bolt no_such_card"))
+	_world.bus.staff_cards_requested.emit(0, 1, too_many)
+	_world.bus.staff_cards_requested.emit(0, 4, _ids("bolt"))
+	_world.bus.staff_cards_requested.emit(0, 1, _ids("bolt no_such_card"))
 	check_equal(_refused.size(), 3, "three refusals")
-	check_equal(player.cards_of(1), before, "the staff is as it was")
-	_bus.staff_cards_requested.emit(1, 1, _ids("orbit"))
-	check_equal(player.cards_of(1), before, "another player's request is not this wizard's")
+	check_equal(caster.cards_of(1), before, "the staff is as it was")
+	_world.bus.staff_cards_requested.emit(1, 1, _ids("orbit"))
+	check_equal(caster.cards_of(1), before, "another player's request is not this wizard's")
 
 
 func test_four_players_build_different_staffs_at_once() -> void:
@@ -282,31 +310,142 @@ func test_four_players_build_different_staffs_at_once() -> void:
 		_wizard(index, [[], [], [], []])
 	var cards: Array[StringName] = [&"bolt", &"orbit", &"dash", &"fire"]
 	for index in 4:
-		_bus.staff_change_requested.emit(index, index, 0, cards[index])
+		_world.bus.staff_change_requested.emit(index, index, 0, cards[index])
 	for index in 4:
-		check_equal(_players[index].cards_of(index)[0], cards[index], "player %d built its own staff" % index)
+		check_equal(_players[index].caster.cards_of(index)[0], cards[index], "player %d built its own staff" % index)
 		for other in 4:
 			if other != index:
-				check_equal(_players[index].cards_of(other)[0], &"", "player %d's other staffs are empty" % index)
+				check_equal(_players[index].caster.cards_of(other)[0], &"", "player %d's other staffs are empty" % index)
 
 
 func test_the_orbit_anchor_follows_the_wizard_and_goes_when_it_falls() -> void:
 	var player := _wizard(0, [[], [&"orbit"], [], []])
 	player.global_position = Vector2(100, 50)
-	_input.send_virtual(0, &"staff_2", 1.0)
+	_world.hold(0, &"staff_2")
 	_run(1)
-	check(_mgr.get_count() > 0, "the orbit shot flies")
-	check(_mgr.get_anchor(0).is_finite(), "the anchor is set")
-	player.take_damage(1000)
+	check(_world.projectiles.get_count() > 0, "the orbit shot flies")
+	check(_world.projectiles.get_anchor(player.id).is_finite(), "the anchor is set")
+	_world.hurt(player, 1000)
 	_run(1)
-	check(not _mgr.get_anchor(0).is_finite(), "a downed wizard clears its anchor")
+	check(not _world.projectiles.get_anchor(player.id).is_finite(), "a downed wizard clears its anchor")
 
 
 func test_a_wizard_put_back_in_the_tree_hears_requests_again() -> void:
 	var player := _wizard(0)
-	root.add_child(player)
 	root.remove_child(player)
 	root.add_child(player)
-	_bus.staff_change_requested.emit(0, 2, 0, &"bolt")
-	check(player.has_staff(2), "it still listens")
-	root.remove_child(player)
+	_world.bus.staff_change_requested.emit(0, 2, 0, &"bolt")
+	check(player.caster.has_staff(2), "it still listens")
+
+
+# --- The seat on another actor (actors G7) ----------------------------------
+
+func test_a_seat_drives_another_actor_and_release_gives_it_back() -> void:
+	var wizard := _wizard(0)
+	var creature := _creature(Vector2(200.0, 0.0))
+	var seat: PlayerController = _seat(wizard)
+	var table: ActorsScript = _world.table
+	check_equal(table.actor_of_seat(0), wizard.id, "seat 0 drives its wizard at first")
+	_changed.clear()
+	_stats.clear()
+	# A possession as G9 will do it: the wizard's body is left without a controller, the seat drives
+	# the creature.
+	wizard.drive(null)
+	creature.drive(seat)
+	check(seat.driven() == creature, "the seat drives the creature")
+	check_equal(table.actor_of_seat(0), creature.id, "the actor table has seat 0 on the creature")
+	check_equal(table.seat_of(creature.id), 0, "the creature's seat is 0")
+	check_equal(table.seat_of(wizard.id), ActorsScript.NONE, "the wizard's body has no seat")
+	check_equal(creature.team(), ActorsScript.TEAM_WIZARDS, "the creature is on the seat's team")
+	check_equal(_stats, [[0, 40, 40, 50.0, 50.0]], "the seat's numbers are the creature's at once")
+	check_equal(_changed.size(), 2, "both of the creature's staffs are announced")
+	if _changed.size() == 2:
+		check_equal([_changed[0][0], _changed[0][1], _changed[1][0], _changed[1][1]], [0, 0, 0, 1], "for seat 0, staffs 0 and 1")
+		check_equal(_changed[0][2].get("cards"), _ids("bolt - - - - -"), "with the creature's cards")
+	# The seat's input moves and casts the creature, not the wizard.
+	_world.hold(0, &"move_right")
+	_run(1)
+	check(is_equal_approx(creature.velocity.x, creature.mover.speed), "seat 0's stick walks the creature: %s" % creature.velocity)
+	check_equal(wizard.velocity, Vector2.ZERO, "the wizard's body stands")
+	_world.release(0, &"move_right")
+	_staff_casts.clear()
+	_tap(0, &"staff_1")
+	_run(1)
+	check_equal(_staff_casts, [[0, 0]], "seat 0's button casts the creature's staff, sent for seat 0")
+	check(creature.caster.mana < creature.caster.max_mana, "with the creature's mana")
+	check_equal(wizard.caster.mana, wizard.caster.max_mana, "not the wizard's")
+	# Its numbers are the creature's.
+	_stats.clear()
+	_world.hurt(creature, 10)
+	check(not _stats.is_empty() and _stats.back()[0] == 0 and _stats.back()[1] == 30 and _stats.back()[2] == 40,
+		"a hit on the creature is seat 0's health: %s" % [_stats])
+	# The builder builds the creature's staffs.
+	_changed.clear()
+	var wizard_row: Array[StringName] = wizard.caster.cards_of(1)
+	_world.bus.staff_cards_requested.emit(0, 1, _ids("fire bolt"))
+	check_equal(creature.caster.cards_of(1), _ids("fire bolt - - - -"), "seat 0's builder builds the creature's staff")
+	check(creature.caster.has_staff(1), "which casts now")
+	check_equal(wizard.caster.cards_of(1), wizard_row, "not the wizard's")
+	check_equal(_changed.size(), 1, "the change is announced once")
+	if _changed.size() == 1:
+		check_equal([_changed[0][0], _changed[0][1]], [0, 1], "for seat 0, staff 1")
+		check_equal(_changed[0][2].get("cards"), _ids("fire bolt - - - -"), "with the creature's new cards")
+	_world.bus.staff_cards_requested.emit(0, 3, _ids("bolt"))
+	check_equal(_refused.size(), 1, "a staff the creature does not have is refused")
+	# Release: the creature stands again and the seat is its wizard's.
+	_stats.clear()
+	_changed.clear()
+	creature.release()
+	wizard.release()
+	check(seat.driven() == wizard, "the seat drives its wizard again")
+	check_equal(table.actor_of_seat(0), wizard.id, "the actor table has seat 0 on the wizard")
+	check_equal(table.seat_of(creature.id), ActorsScript.NONE, "the creature has no seat")
+	check_equal(creature.team(), ActorsScript.NONE, "nor the seat's team")
+	check(not _stats.is_empty() and _stats.back() == [0, 100, 100, 100.0, 100.0], "the seat's numbers are the wizard's again: %s" % [_stats])
+	check_equal(_changed.size(), 4, "the wizard's four staffs are announced again")
+	_world.hold(0, &"move_right")
+	_run(1)
+	check(is_equal_approx(wizard.velocity.x, wizard.mover.speed), "seat 0's stick walks the wizard again: %s" % wizard.velocity)
+	check_equal(creature.velocity, Vector2.ZERO, "the creature stands")
+
+
+func test_a_body_no_seat_drives_sends_no_seat_events() -> void:
+	var wizard := _wizard(0, [[&"bolt"], [], [], []])
+	var creature := _creature(Vector2(200.0, 0.0))
+	var seat: PlayerController = _seat(wizard)
+	wizard.drive(null)
+	_stats.clear()
+	_changed.clear()
+	_refused.clear()
+	_staff_casts.clear()
+	_world.hurt(wizard, 30)
+	check_equal(wizard.health.health, 70, "the body is still hurt")
+	check(wizard.caster.cast(0), "and can still be made to cast")
+	_run(16)
+	check(wizard.caster.mana > wizard.caster.max_mana - 5.0, "and gets mana back")
+	var row: Array[StringName] = wizard.caster.cards_of(1)
+	_world.bus.staff_cards_requested.emit(0, 1, _ids("orbit"))
+	_world.bus.staff_change_requested.emit(0, 1, 0, &"orbit")
+	_world.bus.card_move_requested.emit(0, 0, 0, 1, 0)
+	check(_stats.is_empty(), "no player_stats_changed for its hit, its cast or its mana: %s" % [_stats])
+	check(_staff_casts.is_empty(), "no staff_cast")
+	check(_changed.is_empty(), "no staff_changed")
+	check_equal(wizard.caster.cards_of(1), row, "seat 0's builder does not change its staffs")
+	check_equal(wizard.caster.cards_of(0)[0], &"bolt", "nor move its cards")
+	# The same while the seat drives another actor: what it hears is about that actor only.
+	creature.drive(seat)
+	_stats.clear()
+	_changed.clear()
+	_staff_casts.clear()
+	_world.hurt(wizard, 20)
+	wizard.caster.cast(0)
+	_run(16)
+	_world.bus.staff_cards_requested.emit(0, 1, _ids("orbit"))
+	check_equal(wizard.health.health, 50, "the body is hurt")
+	for sent: Array in _stats:
+		check_equal(sent[2], 40, "every player_stats_changed is the creature's (max health 40): %s" % [sent])
+	check(_staff_casts.is_empty(), "the body's cast is not seat 0's")
+	check_equal(wizard.caster.cards_of(1), row, "the builder does not change the body's staffs")
+	check_equal(creature.caster.cards_of(1)[0], &"orbit", "it changes the creature's")
+	for change: Array in _changed:
+		check_equal(change[2].get("cards"), creature.caster.cards_of(change[1]), "every staff_changed is the creature's")

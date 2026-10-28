@@ -34,7 +34,7 @@ func take() -> void:
 		fail("two wizards are needed")
 		return
 	# Shots, hits and impacts name their caster by actor id: the actor wizard 1 opened (actors G3b).
-	var caster: int = int(behind.get("actor_id"))
+	var caster: int = int(behind.get("id"))
 	behind.global_position = Vector2(170.0, 118.0)
 	front.global_position = Vector2(184.0, 172.0)
 	await settle()

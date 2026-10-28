@@ -105,6 +105,9 @@ func build_random(build_seed: int) -> bool:
 		return false
 	var bag: Array[StringName] = []
 	bag.assign(PlayerController.of(wizard).bag)
+	# A bot only reads the world to walk and shoot; one that possessed an enemy would stand in its
+	# body and leave the room uncleared, so the card is left out of what a bot builds.
+	bag.erase(&"possess")
 	var fuzzer := FuzzerScript.new(bag, func(id: StringName) -> StringName: return spells.call("component_kind", id))
 	if not fuzzer.can_build():
 		return false

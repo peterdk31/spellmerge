@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="MulticastBase" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/base/multicast_base.gd" id="1_base"]
+[ext_resource type="Texture2D" path="res://content/spells/multicasts/burst/icon.svg" id="2_icon"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"burst"
+display_name = "Burst"
+complexity = 3
+icon = ExtResource("2_icon")
+extra_draws = 0
+mode = 2
+repeats = 3
+repeat_interval = 0.1
+mana_cost = 4.0

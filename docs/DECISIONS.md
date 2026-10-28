@@ -2,6 +2,10 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-28: Burst card numbers; bots build without possess
+
+Burst fires the group 3 times, 0.1 s apart (the interval the engine tests use), for 4 mana once (like triple; the later firings are free), and draws no extra carrier. The 4-bot smoke test builds seeded random staffs from the whole bag, so a new card can change them; with Burst a bot built `possess` and the room never cleared, so `Bot.build_random` takes `possess` out of the bag. Whether a possessing player can strand a room is for the possess card's own test.
+
 ## 2026-10-26: Controls: staffs on the shoulders, a pause menu, the builder on B
 
 The owner's direction after B7a: "The 4 staffs should be mapped to lb/rb lt/rt instead of the face buttons", "The spellbuilder should open by pressing B", "The settings menu should be in a pause menu, opened by pressing start", "Friendly fire should be located in a settings menu under gameplay", "Slow-motion is not needed".

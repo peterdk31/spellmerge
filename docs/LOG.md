@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-28: Card burst (staffs C)
+
+Added the Burst multicast card (data only: `.tres`, icon, assets, lore), two combos (`burst_triple_bolt`, `burst_nova_pulse`) and `test_burst.gd`. The new card in the bag changed what the 4-bot smoke test's bots built (a `possess` staff) and the room was not cleared; bots now leave `possess` out, and the smoke test prints the builds when it fails. All 129 unit tests pass.
+
 ## 2026-10-28: Card echo (staffs C)
 
 Added the Echo modifier card (data only: `.tres`, icon, assets, lore), two combos (`echo_double_tap`, `echo_timer_nova`) and `test_echo.gd`. The combo test learned a `lost_at_least` check, with both combos as control rows (their checks fail without echo). All 128 unit tests pass.

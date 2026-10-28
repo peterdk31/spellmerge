@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://xl8wfl5yot2a"
-path="res://.godot/imported/hurt.svg-f9e49cfd8acb05d7342956c2b6548451.ctex"
+uid="uid://dkirqur75sjn4"
+path="res://.godot/imported/idle.svg-92bc0b18173f13fb44f6654900433eb4.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://content/enemies/ember_imp/hurt.svg"
-dest_files=["res://.godot/imported/hurt.svg-f9e49cfd8acb05d7342956c2b6548451.ctex"]
+source_file="res://content/enemies/splinter/idle.svg"
+dest_files=["res://.godot/imported/idle.svg-92bc0b18173f13fb44f6654900433eb4.ctex"]
 
 [params]
 

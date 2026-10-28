@@ -1848,3 +1848,13 @@ The owner approved `possess` as a card (M2-actors.md, "Possess (a card)"); built
 - **The style N wizard art stays** in `content/wizard/base/` for the villain (H6); the clips stage and the art screenshots still show it. `docs/STYLE.md` and the golden examples move to the staff in H7.
 - **The sheets** are drawn by a generator from the mockup's pixel rules (the same as the face sheets'); each head folder lists its sheet in an `assets.json`.
 
+## 2026-10-28: The strays (living staffs H5)
+
+- **The Cinder Rod keeps the id `ember_imp`.** Flow's default enemy, the sandbox's imp wave, the tests and the clips all name `ember_imp`; renaming it buys nothing a player sees. The look, the art and the staff's display name are the Cinder Rod's; its numbers and staff (fire · bolt) are unchanged.
+- **Built now: the Cinder Rod, the Splinter (dash, contact damage 8, one eye) and the Storm Fork (triple · lightning · bolt).** The Rime Crook waits for a `hook` card and the Bone Scepter for `rain` (the plan: a stray waits for its cards); both are in NEXT.
+- **The wave is unchanged:** flow spawns one enemy type (`enemy_id_to_play`) at the wave's spawns, so mixing strays into a wave is flow work, not data; the Splinter and the Storm Fork exist as content (and in the registry) until a mixed wave or M3's rooms use them.
+- **No poses on strays:** the imp's windup and hurt strips are gone; the face carries the mood (furious while winding up, worried when hit) and the flash and telegraph are unchanged. `CreatureLook` keeps the poses as an option (tested on strips made in code).
+- **The hop is the sprite's offset only,** so the telegraph and the hurt circle never move with it: dodging stays exactly as fair as before.
+- **Eye glow** is the light shade of the stray's element ramp (Fire `#ffa23c` for the Cinder Rod and the Splinter); the Storm Fork's eyes are Acid's base `#b4e82a`, since Acid's light shade is too pale to read as a glow.
+- **The dummies** are staffs staked in a Stone mound (the training dummy with a target on a straw crossbar, the shooting dummy with a muzzle head); no face, since they are props. Their behaviour is unchanged.
+

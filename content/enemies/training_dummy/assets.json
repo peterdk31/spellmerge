@@ -5,9 +5,9 @@
 			"origin": "ai",
 			"author": "Claude",
 			"license": "CC-BY-SA-4.0",
-			"tier": "placeholder",
-			"tool": "Claude (SVG rects written by a small generator from a pixel map)",
-			"prompt": "A 32x32 sandbox training dummy seen from the front: a Spark-gold straw sack on a Wood post, a round straw head with a highlight, a crossbar of Wood arms, a Bone target with a Fire bullseye on its chest, standing on a Stone base. 1px dark outline, light from the top-left. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no player colours."
+			"tier": "good",
+			"tool": "Claude (SVG rects written by a small generator from the pixel rules of the owner's living-staffs mockup, 2026-10-28)",
+			"prompt": "The training dummy as a staff staked in the floor: a Wood staff driven into a Stone mound, with a straw-gold crossbar and a Bone target with a Fire bullseye and a Spark centre on the shaft. A 32x32 sprite, 1px dark outline, light from the top-left. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no player colours."
 		}
 	]
 }

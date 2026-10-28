@@ -1,0 +1,81 @@
+[gd_scene load_steps=14 format=3]
+
+[ext_resource type="Script" path="res://gameplay/actor/actor.gd" id="1_actor"]
+[ext_resource type="Script" path="res://gameplay/actor/health.gd" id="2_health"]
+[ext_resource type="Script" path="res://gameplay/actor/hurtbox.gd" id="3_hurtbox"]
+[ext_resource type="Script" path="res://gameplay/actor/contact.gd" id="4_contact"]
+[ext_resource type="Script" path="res://gameplay/actor/mover.gd" id="5_mover"]
+[ext_resource type="Script" path="res://gameplay/actor/caster.gd" id="6_caster"]
+[ext_resource type="Script" path="res://gameplay/ai/ai.gd" id="7_ai"]
+[ext_resource type="Script" path="res://gameplay/ai/creature_look.gd" id="8_look"]
+[ext_resource type="Script" path="res://gameplay/actor/face.gd" id="9_face"]
+[ext_resource type="Texture2D" path="res://content/enemies/splinter/idle.svg" id="10_idle"]
+[ext_resource type="Shader" path="res://gameplay/ai/telegraph.gdshader" id="13_telegraph"]
+[ext_resource type="Texture2D" path="res://art/vfx/beam.svg" id="14_beam"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_telegraph"]
+resource_local_to_scene = true
+shader = ExtResource("13_telegraph")
+shader_parameter/ramp_base = Color(0.878, 0.349, 0.184, 1)
+shader_parameter/ramp_light = Color(1, 0.635, 0.235, 1)
+shader_parameter/beam_length = 165.0
+shader_parameter/telegraph_lane = 8.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_body"]
+radius = 6.0
+
+[node name="Splinter" type="CharacterBody2D"]
+script = ExtResource("1_actor")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("CircleShape2D_body")
+
+[node name="Health" type="Node" parent="."]
+script = ExtResource("2_health")
+
+[node name="Hurtbox" type="Node" parent="."]
+script = ExtResource("3_hurtbox")
+radius = 11.0
+
+[node name="Contact" type="Node" parent="."]
+script = ExtResource("4_contact")
+
+[node name="Mover" type="Node" parent="."]
+script = ExtResource("5_mover")
+
+[node name="Caster" type="Node" parent="."]
+script = ExtResource("6_caster")
+
+[node name="AIController" type="Node" parent="."]
+script = ExtResource("7_ai")
+attack_range = 60.0
+windup_time = 0.5
+recover_time = 0.8
+
+[node name="CreatureLook" type="Node2D" parent="." node_paths=PackedStringArray("sprite", "telegraph")]
+script = ExtResource("8_look")
+sprite = NodePath("../Sprite")
+telegraph = NodePath("../Telegraph")
+
+[node name="Telegraph" type="Sprite2D" parent="."]
+visible = false
+texture_filter = 1
+texture_repeat = 2
+material = SubResource("ShaderMaterial_telegraph")
+texture = ExtResource("14_beam")
+centered = false
+offset = Vector2(10, -16)
+region_enabled = true
+region_rect = Rect2(0, 0, 165, 32)
+
+[node name="Sprite" type="Sprite2D" parent="."]
+texture_filter = 1
+position = Vector2(0, -14)
+texture = ExtResource("10_idle")
+
+[node name="Face" type="Node2D" parent="."]
+script = ExtResource("9_face")
+style = 5
+resting_mood = 2
+anchor = Vector2(-2, -20)
+glow = Color(1, 0.635, 0.235, 1)

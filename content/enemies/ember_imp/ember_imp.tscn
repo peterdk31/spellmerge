@@ -1,4 +1,4 @@
-[gd_scene load_steps=18 format=3]
+[gd_scene load_steps=14 format=3]
 
 [ext_resource type="Script" path="res://gameplay/actor/actor.gd" id="1_actor"]
 [ext_resource type="Script" path="res://gameplay/actor/health.gd" id="2_health"]
@@ -8,9 +8,8 @@
 [ext_resource type="Script" path="res://gameplay/actor/caster.gd" id="6_caster"]
 [ext_resource type="Script" path="res://gameplay/ai/ai.gd" id="7_ai"]
 [ext_resource type="Script" path="res://gameplay/ai/creature_look.gd" id="8_look"]
+[ext_resource type="Script" path="res://gameplay/actor/face.gd" id="9_face"]
 [ext_resource type="Texture2D" path="res://content/enemies/ember_imp/idle.svg" id="10_idle"]
-[ext_resource type="Texture2D" path="res://content/enemies/ember_imp/windup.svg" id="11_windup"]
-[ext_resource type="Texture2D" path="res://content/enemies/ember_imp/hurt.svg" id="12_hurt"]
 [ext_resource type="Shader" path="res://gameplay/ai/telegraph.gdshader" id="13_telegraph"]
 [ext_resource type="Texture2D" path="res://art/vfx/beam.svg" id="14_beam"]
 
@@ -24,28 +23,6 @@ shader_parameter/telegraph_lane = 8.0
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_body"]
 radius = 6.0
-
-[sub_resource type="Animation" id="Animation_idle"]
-resource_name = "idle"
-length = 1.0
-loop_mode = 1
-tracks/0/type = "value"
-tracks/0/imported = false
-tracks/0/enabled = true
-tracks/0/path = NodePath("Sprite:frame")
-tracks/0/interp = 1
-tracks/0/loop_wrap = true
-tracks/0/keys = {
-"times": PackedFloat32Array(0, 0.5),
-"transitions": PackedFloat32Array(1, 1),
-"update": 1,
-"values": [0, 1]
-}
-
-[sub_resource type="AnimationLibrary" id="AnimationLibrary_imp"]
-_data = {
-&"idle": SubResource("Animation_idle")
-}
 
 [node name="EmberImp" type="CharacterBody2D"]
 script = ExtResource("1_actor")
@@ -72,13 +49,10 @@ script = ExtResource("6_caster")
 [node name="AIController" type="Node" parent="."]
 script = ExtResource("7_ai")
 
-[node name="CreatureLook" type="Node2D" parent="." node_paths=PackedStringArray("sprite", "telegraph", "animation")]
+[node name="CreatureLook" type="Node2D" parent="." node_paths=PackedStringArray("sprite", "telegraph")]
 script = ExtResource("8_look")
-windup_texture = ExtResource("11_windup")
-hurt_texture = ExtResource("12_hurt")
 sprite = NodePath("../Sprite")
 telegraph = NodePath("../Telegraph")
-animation = NodePath("../AnimationPlayer")
 
 [node name="Telegraph" type="Sprite2D" parent="."]
 visible = false
@@ -95,10 +69,10 @@ region_rect = Rect2(0, 0, 165, 32)
 texture_filter = 1
 position = Vector2(0, -14)
 texture = ExtResource("10_idle")
-hframes = 2
 
-[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
-libraries = {
-&"": SubResource("AnimationLibrary_imp")
-}
-autoplay = "idle"
+[node name="Face" type="Node2D" parent="."]
+script = ExtResource("9_face")
+style = 4
+resting_mood = 2
+anchor = Vector2(-5, -16)
+glow = Color(1, 0.635, 0.235, 1)

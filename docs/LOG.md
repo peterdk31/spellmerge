@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-28: Card on cast (staffs C)
+
+Added the On Cast trigger card (data only: `.tres`, icon, assets, lore), two combos (`on_cast_rune_bolt`, `on_cast_bolt_nova`) and `test_on_cast.gd`. The B2 engine already fired it. All 127 unit tests pass.
+
 ## 2026-10-28: Card growth (staffs C), already built
 
 The Growth card was already done: the modifier `.tres`, icon, assets, combos (`growth_far_shot`, `growth_slow_orb`) and `test_growth.gd` exist, and all 126 unit tests pass. Ticked it off; no code changed.

@@ -563,6 +563,13 @@ func _test_camera_survives_a_restart() -> void:
 
 
 func _test_friendly_fire() -> void:
+	# What the test shots do: a spell's hit profile under BOLT_TAG in Spells (Combat reads only
+	# those), set after each start, which resets Spells.
+	var spells: Node = root.get_node("Spells")
+	var hit := HitProfile.new()
+	hit.damage = SHOT_DAMAGE
+	var spell := CompiledSpell.new()
+	spell.hit = hit
 	for enabled: bool in [false, true]:
 		_stop()
 		# All three are in before Play: a mid-run joiner is invulnerable for 2 s.
@@ -572,7 +579,7 @@ func _test_friendly_fire() -> void:
 		# No enemy gets in the way of the test shots.
 		for enemy: Node in _flow._enemies.duplicate():
 			_combat.call("unregister_enemy", enemy)
-		_combat.call("set_hit_profile", BOLT_TAG, SHOT_DAMAGE, 0.0)
+		spells.get("_profiles")[BOLT_TAG] = spell
 		_coop.set_friendly_fire(enabled)
 		_check(_projectiles.friendly_fire == enabled, "Coop sets the projectile manager's flag (%s)" % enabled)
 		_wizard(0).global_position = Vector2(100.0, 100.0)
@@ -592,6 +599,7 @@ func _test_friendly_fire() -> void:
 		_projectiles.spawn(-1, Vector2(100.0, 296.0), Vector2(0.0, 100.0), 0.2, 4.0, ProjectileManagerScript.LAYER_PLAYER, 0, BOLT_TAG)
 		_projectiles.step(0.05)
 		_check((_wizard(2) as PlayerScript).health == PlayerScript.MAX_HEALTH - SHOT_DAMAGE, label + ": an enemy shot still hurts a wizard")
+	spells.get("_profiles").erase(BOLT_TAG)
 	# Turned off again, the flag does not stay on.
 	_coop.set_friendly_fire(true)
 	_coop.set_friendly_fire(false)

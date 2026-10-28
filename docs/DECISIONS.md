@@ -1662,3 +1662,10 @@ How it is built (parts F2–F10):
 - **The shooting dummy casts `slow · bolt`**: 66 px/s for 3.6 s (the old shot was 70 for 4), 5 damage (was 6), no element, so it stays a plain target for practising shields and blocks. 5 mana and 2 a second back: about one cast per windup plus recovery (2.75 s). Its telegraph stays Void, so the sandbox's two lanes stay told apart.
 - **Each staff is a sub-resource of its enemy's `.tres`:** an enemy type is still one folder, and no other content shares these staffs.
 - **The stress run at the web cap** (headless, same machine, before and after): web scenario frame 7.38 to 7.20 ms avg, p95 15.7 to 14.2 ms; one pass of the enemy step over 100 enemies 0.86 to 1.13 ms (the staff's mana, anchor and aim each step); enemies and shots at 100% of their targets. The desktop scenario was the same before and after.
+
+## 2026-10-28: The old enemy attack removed (staffs F9b)
+
+- **Gone:** the AI's own shot (`ATTACK_TAG_BASE`, `attack_tag`, the `attack_damage`, `attack_speed`, `attack_lifetime` and `attack_radius` exports), Combat's hit table (`set_hit_profile`, `clear_hit_profile`), the projectile manager's sprite batch for NO_PLAYER shots (`hostile_texture`, `drawn_hostile`), Feel's preset `hostile_texture` and `art/vfx/imp_fireball.svg`. `attack_range`, `windup_time` and `recover_time` stay: they pace a staff's casts.
+- **Every hit now has a spell's profile.** Combat asks `Spells.hit_profile(tag)` for every shot; a tag without one does nothing. Tests that used the table as a quick "shot that does N" register a hit profile in Spells instead.
+- **An enemy without a staff only chases** (and hurts by touch, if its data has `contact_damage`). The same holds when every enemy caster row is taken.
+- **A NO_PLAYER shot is drawn as an enemy's spell:** in the enemy batch by the shot shader, in the enemy ramp, with a tail, and its impacts name its body's form (`bolt`), not `&""`. Nothing in the game spawns one any more; tests and tools still may.

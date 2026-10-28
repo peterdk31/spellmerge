@@ -137,12 +137,10 @@ extends Resource
 ## never an edit to `feel.gd`. Each defaults to the shipped placeholder art.
 ## The hit spark, also used for the white flashes and puffs.
 @export var spark_texture: Texture2D = preload("res://art/vfx/hit_spark.svg")
-## A player's spell shot, and an enemy's shot (drawn apart, so it never reads as a spell).
-## The bolt is neutral bone with a Spark core: the owner tints the bone, the element
+## A spell shot's art (an enemy's spells are drawn like a wizard's, in the enemy ramp). The bolt is neutral bone with a Spark core: the owner tints the bone, the element
 ## colours the core (see `core/projectiles`). Since staffs B6a the shader builds a player's shot
 ## (a rune and an orbit orb included), so only Feel's lone sprites use this art.
 @export var bolt_texture: Texture2D = preload("res://art/vfx/bolt.svg")
-@export var hostile_texture: Texture2D = preload("res://art/vfx/imp_fireball.svg")
 ## The beam (a 32 px segment that repeats along its length) and the nova ring, drawn from
 ## `form_shown`, tinted like the bolt.
 @export var beam_texture: Texture2D = preload("res://art/vfx/beam.svg")

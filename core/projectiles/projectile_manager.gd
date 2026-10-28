@@ -42,11 +42,10 @@ extends Node2D
 ## glow look, 2026-10-27): a small white-hot core in the ramp of its first infusion's colour
 ## (`set_core`; its player's for a plain shot), a long tail that cools and frays and bends with
 ## its path (`bend_of`), a soft glow round both, and particles given off from its tail in the
-## styles of all its cards (`set_look`), mixed at random. It is drawn about its hit size (`look_size`). Shots
-## of owner NO_PLAYER (the AI's old attack, until staffs F9) have their own texture
-## (`hostile_texture`) and are not tinted; an enemy caster's spells are drawn by the same
-## shader in the enemy ramp (`ramp_look`). Both are drawn one layer above, so a dangerous shot
-## never hides under a friendly one.
+## styles of all its cards (`set_look`), mixed at random. It is drawn about its hit size (`look_size`). An
+## enemy caster's spells (and any shot of owner NO_PLAYER) are drawn by the same shader in the
+## enemy ramp (`ramp_look`), one layer above, so a dangerous shot never hides under a friendly
+## one (staffs F9b: the old enemy shot's own texture is gone).
 ##
 ## Casters (staffs F4, "Enemy staffs"): a shot's owner is a caster, a player 0-3, an enemy
 ## caster row FIRST_ENEMY_CASTER to CASTERS - 1 (one per enemy that casts a staff; the spell
@@ -245,13 +244,12 @@ const DRAW_STRIDE: int = 16
 ## as the busiest recent frame needed, rounded up to a power of two (never above the
 ## cap), so a quiet batch uploads a few KB a frame rather than cap x 16 floats.
 const MIN_BATCH: int = 64
-## The draw batches: player bolts, runes (still), orbit shots, NO_PLAYER's shots (the
-## texture), enemy casters' shots (every body kind, drawn by the shader above the players').
+## The draw batches: player bolts, runes (still), orbit shots, and enemies' shots (enemy
+## casters' and NO_PLAYER's, every body kind, drawn by the shader above the players').
 const BATCH_BOLT: int = 0
 const BATCH_RUNE: int = 1
 const BATCH_ORBIT: int = 2
-const BATCH_HOSTILE: int = 3
-const BATCH_ENEMY: int = 4
+const BATCH_ENEMY: int = 3
 ## The bodies a player's shot is drawn as (`shot_core.gdshader` builds them on a pixel grid;
 ## staffs B6a): a bolt with its tail, a rune (a diamond that pulses), an orbit shot (a bolt whose
 ## tail bends round its circle). Kind 0 is the texture, which only Feel's lone sprites use.
@@ -359,12 +357,6 @@ const ENEMY_COLOR: Color = Color("#a68a2a")
 var texture: Texture2D = null:
 	set(value):
 		texture = value
-		_apply_textures()
-## The art of enemy shots (owner NO_PLAYER), drawn apart from the players' shots: other
-## shape, no tint, on top. Left empty, they use `texture`.
-var hostile_texture: Texture2D = null:
-	set(value):
-		hostile_texture = value
 		_apply_textures()
 var events: EventsScript = null
 ## How many projectiles were dropped because the cap was full, since start.
@@ -528,17 +520,14 @@ var _draw_node: MultiMeshInstance2D = null
 var _draw_room: int = 0
 var _rune_room: int = 0
 var _orbit_room: int = 0
-var _hostile_room: int = 0
 ## Live shots per batch this frame (BATCH_*), refilled by _count_batches; a member so no array is made per frame.
-var _batch_counts: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0])
+var _batch_counts: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 var _draw_buffer: PackedFloat32Array = PackedFloat32Array()
 ## The batches of runes and orbit shots, beside the bolts' `_draw_node`.
 var _rune_node: MultiMeshInstance2D = null
 var _rune_buffer: PackedFloat32Array = PackedFloat32Array()
 var _orbit_node: MultiMeshInstance2D = null
 var _orbit_buffer: PackedFloat32Array = PackedFloat32Array()
-## The second batch, for enemy shots (see `hostile_texture`).
-var _hostile_node: MultiMeshInstance2D = null
 ## The enemy casters' shots, drawn by the shader one layer above the players'.
 var _enemy_node: MultiMeshInstance2D = null
 var _enemy_buffer: PackedFloat32Array = PackedFloat32Array()
@@ -548,9 +537,6 @@ var _enemy_room: int = 0
 var _friendly_slots: PackedInt32Array = PackedInt32Array()
 var _friendly_count: int = 0
 var _friendly_step: int = -1
-var _hostile_buffer: PackedFloat32Array = PackedFloat32Array()
-## Enemy shots written by the last update_draw() (part of `drawn`).
-var drawn_hostile: int = 0
 ## True inside step(): the grid is in use, so a target removed then is only
 ## switched off (layer 0) and swept at the start of the next step.
 var _stepping: bool = false
@@ -599,13 +585,13 @@ func _ready() -> void:
 	_draw_node = _make_batch(DRAW_Z, true)
 	_rune_node = _make_batch(DRAW_Z, true)
 	_orbit_node = _make_batch(DRAW_Z, true)
-	_hostile_node = _make_batch(DRAW_Z + 1, false)
 	_enemy_node = _make_batch(DRAW_Z + 1, true)
 	_apply_textures()
 	_fit_draw_bounds()
 
 
 ## One batched draw of up to `_cap` quads (TRANSFORM_2D plus a colour each), added as a child.
+## `cored`: drawn by the shot shader (every batch now; kept for a textured one).
 func _make_batch(z: int, cored: bool) -> MultiMeshInstance2D:
 	var node := MultiMeshInstance2D.new()
 	var quad := QuadMesh.new()
@@ -632,8 +618,6 @@ func _apply_textures() -> void:
 		_draw_node.texture = texture
 		_rune_node.texture = texture
 		_orbit_node.texture = texture
-	if _hostile_node != null:
-		_hostile_node.texture = hostile_texture if hostile_texture != null else texture
 
 
 func _physics_process(delta: float) -> void:
@@ -701,12 +685,10 @@ func set_cap(value: int) -> void:
 	_draw_buffer.resize(0)
 	_rune_buffer.resize(0)
 	_orbit_buffer.resize(0)
-	_hostile_buffer.resize(0)
 	_enemy_buffer.resize(0)
 	_draw_room = 0
 	_rune_room = 0
 	_orbit_room = 0
-	_hostile_room = 0
 	_enemy_room = 0
 	_alive.resize(_cap)
 	_free_slots.resize(_cap)
@@ -715,7 +697,6 @@ func set_cap(value: int) -> void:
 		_draw_node.multimesh.instance_count = 0
 		_rune_node.multimesh.instance_count = 0
 		_orbit_node.multimesh.instance_count = 0
-		_hostile_node.multimesh.instance_count = 0
 		_enemy_node.multimesh.instance_count = 0
 
 
@@ -876,7 +857,6 @@ func _fit_draw_bounds() -> void:
 	_draw_node.multimesh.custom_aabb = aabb
 	_rune_node.multimesh.custom_aabb = aabb
 	_orbit_node.multimesh.custom_aabb = aabb
-	_hostile_node.multimesh.custom_aabb = aabb
 	_enemy_node.multimesh.custom_aabb = aabb
 
 
@@ -1997,7 +1977,6 @@ func update_draw(fraction: float = -1.0) -> void:
 	if _high == 0 and drawn == 0:
 		return
 	var multimesh: MultiMesh = _draw_node.multimesh
-	var hostile_multimesh: MultiMesh = _hostile_node.multimesh
 	if fraction < 0.0:
 		fraction = Engine.get_physics_interpolation_fraction()
 	fraction = clampf(fraction, 0.0, 1.0)
@@ -2010,12 +1989,10 @@ func update_draw(fraction: float = -1.0) -> void:
 	_draw_room = _fit_batch(multimesh, _draw_buffer, _draw_room, counts[BATCH_BOLT])
 	_rune_room = _fit_batch(_rune_node.multimesh, _rune_buffer, _rune_room, counts[BATCH_RUNE])
 	_orbit_room = _fit_batch(_orbit_node.multimesh, _orbit_buffer, _orbit_room, counts[BATCH_ORBIT])
-	_hostile_room = _fit_batch(hostile_multimesh, _hostile_buffer, _hostile_room, counts[BATCH_HOSTILE])
 	_enemy_room = _fit_batch(_enemy_node.multimesh, _enemy_buffer, _enemy_room, counts[BATCH_ENEMY])
 	var out: int = 0
 	var rune_out: int = 0
 	var orbit_out: int = 0
-	var hostile_out: int = 0
 	var enemy_out: int = 0
 	var asked: int = 0
 	var trails: int = 0
@@ -2027,11 +2004,6 @@ func update_draw(fraction: float = -1.0) -> void:
 			dir = _vel[slot].normalized()
 		var at: Vector2 = _prev[slot].lerp(_pos[slot], fraction)
 		var batch: int = _batch_of(slot)
-		if batch == BATCH_HOSTILE:
-			var diameter: float = maxf(_radius[slot] * 2.0, 1.0) * DRAW_SCALE
-			_write_quad(_hostile_buffer, hostile_out * DRAW_STRIDE, dir, diameter, at, Color.WHITE, Color.WHITE, 0)
-			hostile_out += 1
-			continue
 		var size: float = look_size(_radius[slot])
 		var player_look: Color = _look_color(slot)
 		asked += particles_of(_look[slot])
@@ -2062,15 +2034,11 @@ func update_draw(fraction: float = -1.0) -> void:
 	if orbit_out > 0:
 		_orbit_node.multimesh.buffer = _orbit_buffer
 	_orbit_node.multimesh.visible_instance_count = orbit_out
-	if hostile_out > 0:
-		hostile_multimesh.buffer = _hostile_buffer
-	hostile_multimesh.visible_instance_count = hostile_out
-	drawn_hostile = hostile_out
 	if enemy_out > 0:
 		_enemy_node.multimesh.buffer = _enemy_buffer
 	_enemy_node.multimesh.visible_instance_count = enemy_out
 	drawn_enemy = enemy_out
-	drawn = out + rune_out + orbit_out + hostile_out + enemy_out
+	drawn = out + rune_out + orbit_out + enemy_out
 	_share_pool(asked, trails)
 
 
@@ -2119,9 +2087,7 @@ static func particles_of(look: int) -> int:
 ## Which draw batch a live slot belongs to (BATCH_*). The one rule both the counting and
 ## the writing use, so a batch always has the room its writes need.
 func _batch_of(slot: int) -> int:
-	if _player[slot] < 0:
-		return BATCH_HOSTILE
-	if _player[slot] >= FIRST_ENEMY_CASTER:
+	if _player[slot] < 0 or _player[slot] >= FIRST_ENEMY_CASTER:
 		return BATCH_ENEMY
 	if _motion[slot] == MOTION_STILL:
 		return BATCH_RUNE
@@ -2664,11 +2630,8 @@ func _emit_wall_impact(slot: int, velocity: Vector2) -> void:
 		impact_look = 0
 
 
-## The form of the shot in `slot`, by its body (`&""` for a NO_PLAYER shot, the texture).
+## The form of the shot in `slot`, by its body.
 func _form_of(slot: int) -> StringName:
-	var batch: int = _batch_of(slot)
-	if batch == BATCH_HOSTILE:
-		return &""
 	var kind: int = _kind_of(slot)
 	if kind == KIND_RUNE:
 		return &"rune"

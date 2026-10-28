@@ -107,10 +107,12 @@ func test_telegraph_grows_brighter_and_bigger() -> void:
 
 func test_lane_and_arrowhead_follow_the_reach() -> void:
 	var imp: AiScript = fx.imp_facing_player()
+	imp.step(Fixture.STEP)
 	var line: Sprite2D = imp.get_node("Telegraph")
 	var material: ShaderMaterial = line.material as ShaderMaterial
-	check(is_equal_approx(line.offset.x + line.region_rect.size.x, imp.attack_speed * imp.attack_lifetime), "the lane and its arrowhead end where the shot ends")
-	check(float(material.get_shader_parameter(&"telegraph_lane")) >= imp.attack_radius, "the lane is at least as wide as the shot")
+	var bolt: FormBase = fx.registry.call("get_resource", &"spells", &"bolt") as FormBase
+	check(is_equal_approx(line.offset.x + line.region_rect.size.x, bolt.speed * bolt.lifetime), "the lane and its arrowhead end where the bolt ends")
+	check(float(material.get_shader_parameter(&"telegraph_lane")) >= bolt.radius, "the lane is at least as wide as the bolt")
 
 
 func test_windup_pose_has_two_frames_and_idle_returns() -> void:

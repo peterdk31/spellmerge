@@ -10,8 +10,8 @@ extends CharacterBody2D
 ## An enemy never targets "the player": every player in the `players` group (or
 ## in `targets`) is a candidate, indices 0-3, and a downed one is skipped.
 ##
-## The attack is a shot from `core/projectiles` that hits wizards (LAYER_PLAYER);
-## Combat turns its hit into damage through a hit profile for `ATTACK_TAG`.
+## The attack is a cast of the enemy's staff (below); an enemy without one (or without a free
+## caster row) only chases, and hurts by touch (`contact_damage`) if it hurts at all.
 ## Health, hurt box and knockback live in `gameplay/combat`: _ready() registers the
 ## enemy there and step() adds `consume_knockback_step` to the velocity. Death is
 ## Combat's (it frees the node), so there is no death code here.
@@ -19,9 +19,8 @@ extends CharacterBody2D
 ## Telegraph: an optional `Sprite` child flashes (`modulate`) and an optional `Telegraph` child
 ## (staffs F8b: a Sprite2D drawn by `telegraph.gdshader` in this folder, in Fire colours, its
 ## material local to the scene) turns toward the locked aim and shows. It runs from
-## TELEGRAPH_START to the real reach of the next cast (`next_cast_reach`; the old attack's
-## `attack_speed * attack_lifetime`), its lane as wide as what is coming plus a margin, and its
-## dashes march, its arrowhead grows and it brightens with `telegraph_progress()`.
+## TELEGRAPH_START to the real reach of the next cast (`next_cast_reach`), its lane as wide as
+## what is coming plus a margin, and its dashes march, its arrowhead grows and it brightens with `telegraph_progress()`.
 ##
 ## Poses: with `windup_texture` set (a strip of 32 px frames), the `Sprite` shows it from the
 ## start of the windup and flips between its frames faster and faster (WINDUP_FLASHES), and
@@ -77,11 +76,6 @@ enum Pose { IDLE, WINDUP, HURT }
 
 ## The group every wizard is in (player.gd adds it).
 const PLAYERS_GROUP: StringName = &"players"
-## Hit profile tags of enemy shots start here, plus a number derived from the enemy
-## id (see `attack_tag`), so two enemy types do not overwrite each other's damage.
-## Tag 0 means "no tag"; the fire bolt will use other tags.
-const ATTACK_TAG_BASE: int = 1000
-const ATTACK_TAG_SPREAD: int = 100000
 ## Collision layers of this body (see player.gd's LAYER_PLAYERS): its own and the walls.
 const LAYER_ENEMIES: int = 4
 const LAYER_WALLS: int = 1
@@ -119,15 +113,10 @@ var targets: Array = []
 
 ## Walk until a player is this close, then start the attack.
 @export var attack_range: float = 90.0
-## Seconds the telegraph shows before the shot.
+## Seconds the telegraph shows before the cast.
 @export var windup_time: float = 0.75
-## Seconds standing still after the shot.
+## Seconds standing still after the cast.
 @export var recover_time: float = 1.0
-@export var attack_damage: int = 10
-## Shot speed in pixels per second and its life in seconds.
-@export var attack_speed: float = 140.0
-@export var attack_lifetime: float = 1.25
-@export var attack_radius: float = 3.5
 ## Radius of the enemy's hurt box in pixels.
 @export var hurt_radius: float = 11.0
 ## Where the hurt circle, the shots and the telegraph start, relative to the node (the feet).
@@ -152,8 +141,6 @@ var state: State = State.CHASE
 var target: Node2D = null
 ## Direction of the attack, locked when the windup starts (unit length).
 var aim: Vector2 = Vector2.DOWN
-## Hit profile tag of this enemy's shot, set in _ready() from `data.id`.
-var attack_tag: int = ATTACK_TAG_BASE
 ## How often the players were looked up (tests count it).
 var lookup_count: int = 0
 ## This enemy's caster row in `core/spells` while it casts a staff, else -1.
@@ -209,7 +196,6 @@ func _ready() -> void:
 		_telegraph.position = hurt_offset
 		_telegraph.centered = false
 		_telegraph.region_enabled = true
-		_fit_telegraph(maxf(attack_speed * attack_lifetime, TELEGRAPH_START), attack_radius)
 	if events == null:
 		events = get_node_or_null("/root/Events") as EventsScript
 	if combat == null:
@@ -233,12 +219,8 @@ func _ready() -> void:
 	_recoil_left.resize(MAX_RECOILS)
 	if data == null:
 		push_warning("Ai: no enemy data set, so this enemy stands still.")
-	if combat != null:
-		if data != null and not uses_staff():
-			attack_tag = ATTACK_TAG_BASE + absi(hash([data.id, attack_damage])) % ATTACK_TAG_SPREAD
-			combat.set_hit_profile(attack_tag, attack_damage, 0.0)
-		if data != null:
-			combat.register_enemy(self, data.max_health, hurt_radius, data.contact_damage, hurt_offset)
+	if combat != null and data != null:
+		combat.register_enemy(self, data.max_health, hurt_radius, data.contact_damage, hurt_offset)
 	_open_staff()
 	# Spread retargeting over the half second so 200 enemies do not all look at once.
 	_retarget_offset = RETARGET_TIME * float(get_instance_id() % 8) / 8.0
@@ -314,10 +296,10 @@ func cast_ready() -> bool:
 
 ## How far the next cast reaches along the aim, for the telegraph: its first carrier's flight
 ## (speed x life), a beam's or fissure's length, a rain's aim point; 0 for a carrier that is not
-## aimed (a nova, an orbit, a decoy...), which shows no line.
+## aimed (a nova, an orbit, a decoy...), which shows no line; 0 without a staff.
 func next_cast_reach() -> float:
 	if caster < 0 or spells == null:
-		return maxf(attack_speed * attack_lifetime, TELEGRAPH_START)
+		return 0.0
 	return spells.next_cast_reach(caster, 0)
 
 
@@ -401,8 +383,9 @@ func _step_chase(pace: float) -> void:
 	if to_target.length_squared() <= attack_range * attack_range:
 		if to_target != Vector2.ZERO:
 			aim = to_target.normalized()
-		if uses_staff() and not cast_ready():
-			# In reach but the cast is not ready: hold, so the telegraph only ever shows a cast that comes.
+		if not cast_ready():
+			# In reach but the cast is not ready (or there is no staff): hold, so the telegraph
+			# only ever shows a cast that comes.
 			velocity = Vector2.ZERO
 			return
 		state = State.WINDUP
@@ -418,9 +401,6 @@ func _attack() -> void:
 		var spent: float = spells.cast_staff(caster, 0, _position_of(self) + hurt_offset, aim, mana - spells.reserved_mana(caster))
 		if spent > 0.0:
 			mana -= spent
-	elif not uses_staff() and projectiles != null:
-		projectiles.spawn(EventsScript.NO_PLAYER, _position_of(self) + hurt_offset, aim * attack_speed,
-				attack_lifetime, attack_radius, ProjectileManagerScript.LAYER_PLAYER, 0, attack_tag)
 	state = State.RECOVER
 	_state_left = recover_time
 	_show_telegraph(false)
@@ -447,11 +427,11 @@ func telegraph_reach() -> float:
 
 func _show_telegraph(on: bool) -> void:
 	if _telegraph != null:
-		var reach: float = next_cast_reach() if on and caster >= 0 else 0.0
-		if on and caster >= 0 and reach > TELEGRAPH_START:
+		var reach: float = next_cast_reach() if on else 0.0
+		if reach > TELEGRAPH_START:
 			_fit_telegraph(reach, spells.next_cast_radius(caster, 0))
 		# A cast that is not aimed (a nova, an orbit) shows no line: the pose and flash say it.
-		_telegraph.visible = on and (caster < 0 or reach > TELEGRAPH_START)
+		_telegraph.visible = on and reach > TELEGRAPH_START
 		if on:
 			_telegraph.rotation = aim.angle()
 			_update_telegraph()

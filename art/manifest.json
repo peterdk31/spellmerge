@@ -163,15 +163,6 @@
       "prompt": "A 32x32 floor decal (transparent background) of a small skull seen from above: Bone light top, Bone base and shadow sides, two dark eye sockets and a row of teeth, a dark Outline. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
     },
     {
-      "path": "art/vfx/imp_fireball.svg",
-      "origin": "ai",
-      "author": "Claude",
-      "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (hand-written SVG rects)",
-      "prompt": "A 32x32 enemy shot: a round ember orb with four short spikes along the axes, drawn as concentric rings from a dark Outline edge through Fire shadow, base and light to a Spark core and a Spark light centre, so it is the brightest thing in the room. A different silhouette from the player's comet-shaped fire bolt. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no player colours."
-    },
-    {
       "path": "content/wizard/base/wizard_idle.svg",
       "origin": "ai",
       "author": "Claude",

@@ -433,10 +433,6 @@ func _ready() -> void:
 		spells = get_node_or_null("/root/Spells")
 	if projectiles != null and "texture" in projectiles and projectiles.texture == null:
 		projectiles.texture = preset.bolt_texture
-	# The AI's old shot (NO_PLAYER, until staffs F9) keeps its sprite; an enemy's spell is drawn
-	# like any spell, in the enemy ramp.
-	if projectiles != null and "hostile_texture" in projectiles and projectiles.hostile_texture == null:
-		projectiles.hostile_texture = preset.hostile_texture
 
 
 func _exit_tree() -> void:

@@ -27,19 +27,16 @@ func _start(preset: FeelPresetScript, projectiles: Node) -> Node:
 func test_preset_textures_reach_the_projectile_manager() -> void:
 	var preset := FeelPresetScript.new()
 	preset.bolt_texture = _texture()
-	preset.hostile_texture = _texture()
 	var projectiles: Node = own(ProjectilesScript.new()) as Node
 	_start(preset, projectiles)
-	check(projectiles.texture == preset.bolt_texture, "the player's shots use the preset's bolt")
-	check(projectiles.hostile_texture == preset.hostile_texture, "enemy shots use the preset's own art")
-	check(projectiles.texture != projectiles.hostile_texture, "the two kinds of shot are different art")
+	check(projectiles.texture == preset.bolt_texture, "the shots use the preset's bolt")
+	check(not "hostile_texture" in projectiles, "enemy shots have no art of their own (staffs F9b)")
 
 
 func test_the_shipped_preset_has_art_for_every_slot() -> void:
 	var preset := load("res://gameplay/feel/presets/punchy.tres") as FeelPresetScript
 	check(preset.spark_texture != null, "spark art")
 	check(preset.bolt_texture != null, "bolt art")
-	check(preset.hostile_texture != null, "hostile shot art")
 
 
 

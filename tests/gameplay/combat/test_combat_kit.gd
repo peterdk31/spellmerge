@@ -84,6 +84,16 @@ func _tag(profile: HitProfile) -> int:
 	return tag
 
 
+## Like `_tag`, for an enemy's spell (its caster row 0).
+func _enemy_tag(profile: HitProfile) -> int:
+	_next_tag += 1
+	var tag: int = SpellTag.make_enemy(0, 0, _next_tag, 1)
+	var spell := CompiledSpell.new()
+	spell.hit = profile
+	_spells._profiles[tag] = spell
+	return tag
+
+
 func _profile(damage: int, kind: StringName = &"shot") -> HitProfile:
 	var profile := HitProfile.new()
 	profile.damage = damage
@@ -108,12 +118,14 @@ func test_a_wizard_is_hurt_by_their_own_spell() -> void:
 	check_equal(_hurt, [[0, 6, tag, &"shot"]], "wizard_hurt names the wizard, the damage, the card's tag and the kind")
 
 
-func test_an_enemy_shot_hurts_a_wizard_with_tag_zero_in_wizard_hurt() -> void:
+func test_an_enemys_spell_hurts_a_wizard_with_its_tag_in_wizard_hurt() -> void:
 	var wizard := _wizard(1, Vector2.ZERO)
-	_combat.set_hit_profile(9, 4, 0.0)
+	var tag: int = _enemy_tag(_profile(4))
+	_bus.projectile_hit.emit(EventsScript.NO_PLAYER, wizard, Vector2(-5.0, 0.0), tag)
+	check_equal(wizard.health, PlayerScript.MAX_HEALTH - 4, "the enemy's spell hurt")
+	check_equal(_hurt, [[1, 4, tag, &"shot"]], "wizard_hurt names its tag (its caster row is the enemy's)")
 	_bus.projectile_hit.emit(EventsScript.NO_PLAYER, wizard, Vector2(-5.0, 0.0), 9)
-	check_equal(wizard.health, PlayerScript.MAX_HEALTH - 4, "the enemy shot hurt")
-	check_equal(_hurt, [[1, 4, 0, &"shot"]], "no spell tag for an enemy's hit")
+	check_equal(wizard.health, PlayerScript.MAX_HEALTH - 4, "a shot with no spell does nothing (staffs F9b: no table)")
 
 
 func test_a_spell_hit_pushes_the_wizard_it_hurts() -> void:
@@ -598,8 +610,7 @@ func test_the_note_names_a_teammate_and_is_empty_for_an_enemy() -> void:
 	_bus.projectile_hit.emit(0, wizard, Vector2(-5.0, 0.0), _tag(profile))
 	check_equal(_combat.downed_note(1), "downed by player 1's Frost Nova", "a teammate's spell")
 	var other := _wizard(3, Vector2(900.0, 0.0))
-	_combat.set_hit_profile(9, 1000, 0.0)
-	_bus.projectile_hit.emit(EventsScript.NO_PLAYER, other, Vector2(890.0, 0.0), 9)
+	_bus.projectile_hit.emit(EventsScript.NO_PLAYER, other, Vector2(890.0, 0.0), _enemy_tag(_profile(1000)))
 	check_equal(_combat.downed_note(3), "", "an enemy gets no note")
 	check_equal(_combat.downed_note(7), "", "a bad index gets none")
 

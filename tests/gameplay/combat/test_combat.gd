@@ -9,6 +9,7 @@ const CombatScript := preload("res://gameplay/combat/combat.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const PlayerScript := preload("res://gameplay/player/player.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
+const SpellsScript := preload("res://core/spells/spells.gd")
 
 const STEP: float = 0.0625
 
@@ -16,6 +17,8 @@ var _failures: Array[String] = []
 var _bus: Node
 var _combat: Node
 var _projectiles: Node
+## Where Combat reads what a shot does (`hit_profile`); `_profile` fills it.
+var _spells: Node
 var _enemies: Array = []
 var _players: Array[PlayerScript] = []
 ## Each damage_dealt as [player, target, amount].
@@ -71,6 +74,8 @@ func _setup(player_count: int = 0, with_projectiles: bool = false) -> void:
 	_bus = EventsScript.new()
 	_combat = CombatScript.new()
 	_combat.events = _bus
+	_spells = SpellsScript.new()
+	_combat.spells = _spells
 	if with_projectiles:
 		_projectiles = ProjectileManagerScript.new()
 		_combat.projectiles = _projectiles
@@ -97,14 +102,26 @@ func _teardown() -> void:
 	for wizard in _players:
 		wizard.free()
 	_players.clear()
-	for node: Node in [_combat, _projectiles, _bus]:
+	for node: Node in [_combat, _spells, _projectiles, _bus]:
 		if node != null:
 			node.free()
 	_combat = null
+	_spells = null
 	_projectiles = null
 	_bus = null
 	_damage.clear()
 	_deaths.clear()
+
+
+## Say what a shot with `tag` does, as a spell's hit profile in Spells (staffs F9b: Combat's own
+## table is gone).
+func _profile(tag: int, damage: int, knockback: float = 0.0) -> void:
+	var hit := HitProfile.new()
+	hit.damage = damage
+	hit.knockback = knockback
+	var spell := CompiledSpell.new()
+	spell.hit = hit
+	_spells.get("_profiles")[tag] = spell
 
 
 func _enemy(health: int, at: Vector2 = Vector2.ZERO, contact: int = 0) -> Node2D:
@@ -199,14 +216,11 @@ func _test_knockback_zero_strength_does_not_move() -> void:
 func _test_projectile_hit_uses_profile() -> void:
 	_setup()
 	var enemy := _enemy(20, Vector2(10.0, 0.0))
-	_combat.set_hit_profile(7, 5, 100.0)
+	_profile(7, 5, 100.0)
 	_bus.projectile_hit.emit(1, enemy, Vector2(0.0, 0.0), 7)
 	_check(_damage == [[1, enemy, 5]], "projectile_hit with tag 7 deals the profile's damage for the shooter")
 	_check(_combat.get_health(enemy) == 15, "health 20 minus 5")
 	_check(_combat.get_knockback(enemy).x > 0.0, "pushed away from the hit position")
-	_combat.clear_hit_profile(7)
-	_bus.projectile_hit.emit(1, enemy, Vector2.ZERO, 7)
-	_check(_combat.get_health(enemy) == 15, "a cleared profile does nothing")
 
 
 func _test_projectile_hit_without_profile_is_ignored() -> void:
@@ -272,7 +286,7 @@ func _test_contact_hurts_only_the_one_touched() -> void:
 
 func _test_four_players_kill_credit() -> void:
 	_setup(4)
-	_combat.set_hit_profile(1, 1, 0.0)
+	_profile(1, 1)
 	var enemy := _enemy(4)
 	for index in 4:
 		_bus.projectile_hit.emit(index, enemy, Vector2.ZERO, 1)
@@ -366,7 +380,7 @@ func _test_downed_wizard_is_not_a_projectile_target() -> void:
 func _test_hit_circles_follow_the_body_offset() -> void:
 	_setup(1, true)
 	_projectiles.events = _bus
-	_combat.set_hit_profile(9, 1, 0.0)
+	_profile(9, 1)
 	var body := Vector2(0.0, -12.0)
 	var wizard: Node2D = _players[0]
 	root.add_child(wizard)

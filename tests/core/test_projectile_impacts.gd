@@ -118,7 +118,7 @@ func test_each_impact_names_the_form_of_its_own_shot() -> void:
 	for form in forms:
 		names.append(String(form))
 	names.sort()
-	check_equal(names, ["", "beam", "bolt", "rune"] as Array[String], "an enemy shot, a beam, a bolt and a rune, each its own")
+	check_equal(names, ["beam", "bolt", "bolt", "rune"] as Array[String], "a beam, a rune and two bolts (an enemy's shot is drawn as a bolt too since staffs F9b), each its own")
 	check_equal(mgr.impact_form, &"", "no form once the impacts are sent")
 
 

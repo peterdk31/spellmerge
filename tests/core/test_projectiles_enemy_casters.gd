@@ -197,8 +197,7 @@ func test_enemy_casters_are_drawn_by_the_shader_above_the_players() -> void:
 	mgr.spawn(EventsScript.NO_PLAYER, Vector2(200.0, 100.0), Vector2(100.0, 0.0), 2.0, 4.0, ManagerScript.LAYER_PLAYER)
 	mgr.spawn(2, Vector2(250.0, 100.0), Vector2(100.0, 0.0), 2.0, 5.0)
 	mgr.update_draw(1.0)
-	check_equal(mgr.drawn_enemy, 3, "three enemy caster shots in their batch")
-	check_equal(mgr.drawn_hostile, 1, "the NO_PLAYER shot keeps its sprite")
+	check_equal(mgr.drawn_enemy, 4, "three enemy caster shots and the NO_PLAYER shot in their batch")
 	check_equal(mgr.drawn, 5, "and the player's bolt in its own")
 	var node: MultiMeshInstance2D = mgr._enemy_node
 	check(node.material is ShaderMaterial, "drawn by the shot shader")

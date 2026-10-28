@@ -35,7 +35,16 @@ func test_the_card_is_a_valid_multicast() -> void:
 func test_the_bolt_hits_three_times() -> void:
 	var plain: int = _lost(["bolt"], Vector2(100.0, 0.0), 1.5)
 	check(plain > 0, "a plain bolt hurts")
+	check(plain * 3 < ArenaScript.IMP_HEALTH, "the imp survives three bolts, so the sum is not capped")
 	check_equal(_lost(["burst", "bolt"], Vector2(100.0, 0.0), 1.5), plain * 3, "three bolts, three hits")
+
+
+func test_the_nova_rings_three_times() -> void:
+	var one: int = _lost(["frost", "nova"], Vector2(40.0, 0.0), 1.0)
+	var three: int = _lost(["burst", "frost", "nova"], Vector2(40.0, 0.0), 1.0)
+	check(one > 0, "a single frost nova hurts")
+	check(one * 3 < ArenaScript.IMP_HEALTH, "the imp survives three rings")
+	check_equal(three, one * 3, "three rings, three hits")
 
 
 func test_the_later_firings_come_after_the_first() -> void:
@@ -54,6 +63,7 @@ func test_the_burst_costs_more_mana_than_the_bolt_alone() -> void:
 
 func test_four_players_burst_at_once() -> void:
 	var plain: int = _lost(["bolt"], Vector2(100.0, 0.0), 1.5)
+	check(plain * 3 < ArenaScript.IMP_HEALTH, "an imp survives three bolts, so the sum is not capped")
 	var arena := ArenaScript.new(root)
 	var imps: Array[Node2D] = []
 	for player in 4:

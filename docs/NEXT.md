@@ -31,6 +31,7 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
 - [ ] **Card: on kill (staffs C).** After B1, B2 and B3. Data only (M2-staffs.md, "Working in parallel").
 - [ ] **Card: on hurt (staffs C).** After B1, B2 and B3. Data only (M2-staffs.md, "Working in parallel").
 - [ ] **Card: on reaction (staffs C).** After B1, B2 and B3. Data only (M2-staffs.md, "Working in parallel").
+- [ ] **Test: a possessing player cannot strand a room (staffs C).** Bots stopped building `possess` in the burst PR (`docs/DECISIONS.md`, 2026-10-28) because a bot that possessed an enemy left the room uncleared. Write a test that a player possessing an enemy still lets the room clear (or fix it if it does not), then put `possess` back in `Bot.build_random`'s bag in `tests/bots/bot.gd`. Do it with the possess card.
 - [ ] **Card: siphon (staffs C).** After B2 and B4. Data only (M2-staffs.md, "Working in parallel").
 - [ ] **Card: hold (staffs C).** After B2 and B4. Data only (M2-staffs.md, "Working in parallel").
 - [ ] **Card: teleport (staffs C).** After B2 and B4. Data only (M2-staffs.md, "Working in parallel"). Moved to the bot's queue by the owner on 2026-10-26.

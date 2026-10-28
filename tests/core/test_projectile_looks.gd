@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## The look of a shot (staffs B6a): a wizard's shot is drawn as a body kind (bolt, rune, orbit)
 ## with its ramp (actors G3a: its caster's `Actors.ramp_of`), its look layers and its core colour in the instance data that
-## `shot_core.gdshader` reads, at a size that follows its hit radius in whole pixels; cards
+## shot shaders read (`shot_trail.gdshader`, `shot_rune.gdshader`), at a size that follows its hit radius in whole pixels; cards
 ## give the layers (`look_layer`), the compiler combines every infusion's and modifier's look
 ## into one set, and the runtime hands it to the manager. Stepped and drawn by hand.
 
@@ -154,11 +154,14 @@ func test_an_enemy_is_drawn_in_the_enemy_ramp() -> void:
 	check_equal(ManagerScript.ramp_look(1, look | ManagerScript.LOOK_ENEMY_RAMP), look, "a hat ramp never carries the flag")
 	check(1 << (ManagerScript.LOOK_COUNT - 2) < ManagerScript.LOOK_ENEMY_RAMP, "no particle kind reaches the flag")
 	check_equal(ManagerScript.LOOK_ENEMY_RAMP, 1 << 22, "the flag is kind 23, below Feel's EXACT (kind 24)")
-	var shader: Shader = load("res://core/projectiles/shot_core.gdshader")
-	check(shader.code.contains("const float ENEMY_RAMP = 23.0;"), "the shader reads the same flag")
-	check(shader.code.contains("const float ENEMY_PLAYER = 4.0;"), "as a fifth ramp after the hats'")
-	check(shader.code.contains("vec3(0.651, 0.541, 0.165))"), "whose base is Blight ochre (#a68a2a), last in P_BASE")
-	check(shader.code.contains("beam_player < 0 ? ENEMY_PLAYER"), "and an enemy's beam uses it too")
+	var palette: ShaderInclude = load("res://core/projectiles/shot_palette.gdshaderinc")
+	check(palette.code.contains("const float ENEMY_RAMP = 23.0;"), "the shaders read the same flag")
+	check(palette.code.contains("const float ENEMY_PLAYER = 4.0;"), "as a fifth ramp after the hats'")
+	check(palette.code.contains("vec3(0.651, 0.541, 0.165))"), "whose base is Blight ochre (#a68a2a), last in P_BASE")
+	var look_code: ShaderInclude = load("res://core/projectiles/shot_look.gdshaderinc")
+	check(look_code.code.contains("bit_set(b, ENEMY_RAMP) ? ENEMY_PLAYER"), "every shot shader's look takes it")
+	var beam: Shader = load("res://core/projectiles/shot_beam.gdshader")
+	check(beam.code.contains("beam_player < 0 ? ENEMY_PLAYER"), "and an enemy's beam uses it too")
 	check(ManagerScript.ramp_color(ActorsScript.RAMP_ENEMY).is_equal_approx(Color("#a68a2a")), "the enemy ramp's colour is Blight ochre")
 	var enemy: int = ActorSeats.enemy(mgr.actors)
 	check(mgr.tint_of(enemy).is_equal_approx(Color.WHITE.lerp(Color("#a68a2a"), ManagerScript.TINT_STRENGTH)), "and so is an enemy's tint")
@@ -319,15 +322,41 @@ func test_when_the_rows_run_out_a_shot_has_its_core_alone() -> void:
 
 
 func test_the_shader_holds_the_same_trail_numbers() -> void:
-	var shader: Shader = load("res://core/projectiles/shot_core.gdshader")
+	var shader: Shader = load("res://core/projectiles/shot_trail.gdshader")
 	check(shader.code.contains("const int TRAIL_SAMPLES = %d;" % ManagerScript.TRAIL_SAMPLES), "the same samples a row")
 	check(shader.code.contains("const float TF_HEAD = %d.0;" % ManagerScript.TRAIL_HEAD), "the same alive flag")
 	check(shader.code.contains("const float TF_ORBIT = %d.0;" % ManagerScript.TRAIL_ORBIT), "the same orbit flag")
 	check(shader.code.contains("const float TF_DASH = %d.0;" % ManagerScript.TRAIL_DASH), "the same dash flag")
 	check(shader.code.contains("const float TRAIL_LONGEST = %s;" % str(ManagerScript.TRAIL_KEEP)), "and a trail is drawn as long as it is kept")
 	check(ManagerScript.TRAIL_KEEP <= (ManagerScript.TRAIL_SAMPLES - 1) * ManagerScript.TRAIL_EVERY, "which the samples cover")
-	check(shader.code.contains("const float BEND_ZERO = %s;" % str(ManagerScript.BEND_ZERO)), "a familiar's bend code is the same")
-	check(shader.code.contains("const float BEND_SPAN = %s;" % str(ManagerScript.BEND_SPAN)), "and its span")
+	var orbit: Shader = load("res://core/projectiles/shot_orbit.gdshader")
+	check(orbit.code.contains("const float BEND_ZERO = %s;" % str(ManagerScript.BEND_ZERO)), "a familiar's bend code is the same")
+	check(orbit.code.contains("const float BEND_SPAN = %s;" % str(ManagerScript.BEND_SPAN)), "and its span")
+
+
+## Regression (the owner, 2026-10-29: the web build lost its WebGL context on a real GPU): every
+## pixel of a trail's one big quad walked the whole path. A trail is a ribbon now, a quad per
+## piece of its path placed by the vertex shader, and no pixel reads the path.
+func test_a_trail_is_a_ribbon_and_no_pixel_walks_its_path() -> void:
+	var mesh: ArrayMesh = ManagerScript.trail_mesh()
+	check(mesh == ManagerScript.trail_mesh(), "one ribbon, made once")
+	var quads: int = (ManagerScript.TRAIL_SAMPLES + 1) * 2
+	var arrays: Array = mesh.surface_get_arrays(0)
+	check_equal((arrays[Mesh.ARRAY_VERTEX] as PackedVector2Array).size(), quads * 4, "a quad for the head and one per piece, in two passes")
+	check_equal((arrays[Mesh.ARRAY_INDEX] as PackedInt32Array).size(), quads * 6, "two triangles each")
+	var uvs: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV]
+	check_equal(floori(uvs[0].x), 0, "the light pass starts with the head")
+	check_equal(floori(uvs[0].y), 0, "in pass 0")
+	check_equal(floori(uvs[(quads - 1) * 4].x), 0, "the pixels pass ends with the head, on top")
+	check_equal(floori(uvs[(quads - 1) * 4].y), 1, "in pass 1")
+	check_equal(floori(uvs[(ManagerScript.TRAIL_SAMPLES + 1) * 4].x), ManagerScript.TRAIL_SAMPLES, "after the oldest piece first")
+	check(mgr._draw_node.multimesh.mesh == mesh and mgr._enemy_node.multimesh.mesh == mesh and mgr._orbit_node.multimesh.mesh == mesh, "every trail batch draws it")
+	var shader: Shader = load("res://core/projectiles/shot_trail.gdshader")
+	var fragments: String = shader.code.get_slice("// ---- Fragments ----", 1)
+	check(not fragments.is_empty(), "the shader marks where its fragment code starts")
+	check(not fragments.contains("trail_texel") and not fragments.contains("texelFetch") and not fragments.contains("TRAIL_SAMPLES"), "no pixel reads the path")
+	check(mgr._draw_node.material is ShaderMaterial and (mgr._draw_node.material as ShaderMaterial).shader == shader, "the bolts' batch is drawn by the trail shader")
+	check((mgr._rune_node.material as ShaderMaterial).shader == load("res://core/projectiles/shot_rune.gdshader"), "the runes' by the rune shader")
 
 
 ## The code beside a rune's kind, as the shader reads it.
@@ -447,9 +476,11 @@ func test_a_shot_asks_the_pool_for_four_plus_two_per_emitting_kind() -> void:
 
 
 func test_the_shader_holds_the_same_particle_rule_as_the_manager() -> void:
-	var shader: Shader = load("res://core/projectiles/shot_core.gdshader")
-	check(shader.code.contains("min(4.0 + 2.0 * emit_count, float(MAX_PARTICLES))"), "the shader asks 4 + 2 per kind")
-	check(shader.code.contains("const int MAX_PARTICLES = %d;" % ManagerScript.PARTICLES_PER_SHOT_MAX), "with the same cap")
+	for path: String in ["res://core/projectiles/shot_rune.gdshader", "res://core/projectiles/shot_orbit.gdshader"]:
+		var shader: Shader = load(path)
+		check(shader.code.contains("min(4.0 + 2.0 * emit_count(), float(MAX_PARTICLES))"), "%s asks 4 + 2 per kind" % path.get_file())
+	var palette: ShaderInclude = load("res://core/projectiles/shot_palette.gdshaderinc")
+	check(palette.code.contains("const int MAX_PARTICLES = %d;" % ManagerScript.PARTICLES_PER_SHOT_MAX), "with the same cap")
 	check_equal(ManagerScript.EMITTING_MASK & (1 << (ManagerScript.LOOK_WEAVE - 1)), 0, "the weave does not emit")
 
 

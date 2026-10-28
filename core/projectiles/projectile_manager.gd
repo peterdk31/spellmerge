@@ -38,16 +38,19 @@ extends Node2D
 ## The budget is per `step` call, not per frame: if the engine runs several
 ## physics steps in one frame to catch up, each has its own budget.
 ##
-## Drawing: a shot is built by `shot_core.gdshader` on a pixel grid (staffs B6a; the glow look,
+## Drawing: a shot is built by the shot shaders on a pixel grid (staffs B6a; the glow look,
 ## 2026-10-27): a small white-hot core in the ramp of its first infusion's colour (`set_core`;
 ## its caster's ramp for a plain shot), a long tail that cools and frays, a soft glow round both,
 ## and particles given off in the styles of all its cards (`set_look`), mixed at random. The tail
 ## and the particles are left in the world where the shot was (its trail, see TRAIL_SAMPLES; the
 ## owner, 2026-10-28), so they bend with any path and cool where it ended; a caster's dash is
 ## drawn the same way (`follow_caster`). It is drawn about its hit size (`look_size`). Shots in
-## the enemy ramp (`Actors.RAMP_ENEMY`, and a shot of no actor) are drawn by the same shader
+## the enemy ramp (`Actors.RAMP_ENEMY`, and a shot of no actor) are drawn by the same shaders
 ## (`ramp_look`), one layer above, so a dangerous shot never hides under a friendly one (staffs
-## F9b: the old enemy shot's own texture is gone).
+## F9b: the old enemy shot's own texture is gone). One shader per kind of thing drawn, each in a
+## batch of its own (the owner, 2026-10-29; core/README.md, "The shot shaders"): a flying shot
+## and its trail by `shot_trail.gdshader`, as a ribbon (`trail_mesh`: a quad per piece of its
+## path, so no pixel walks the whole path), a rune by `shot_rune.gdshader`.
 ##
 ## Casters (actors G3a, docs/milestones/M2-actors.md): a shot's caster is an actor id (0 to
 ## ACTORS - 1, `core/actors`) or NO_PLAYER (`Actors.NONE`, a shot of no actor). Nothing here
@@ -242,22 +245,25 @@ const RAY_PATH_POINTS: int = 80
 ## so how far a handler's own rays fan out) is bounded by the spell runtime's fire cap.
 const RAY_MAX_LENGTH: float = 360.0
 ## Floats per projectile in the MultiMesh buffer: 8 transform, 4 colour, 4 custom data
-## (the colour of the shot's core, read by `shot_core.gdshader`).
+## (the colour of the shot's core, read by the shot shaders).
 const DRAW_STRIDE: int = 16
 ## The smallest a batch's MultiMesh buffer gets, in shots. A batch holds as many shots
 ## as the busiest recent frame needed, rounded up to a power of two (never above the
 ## cap), so a quiet batch uploads a few KB a frame rather than cap x 16 floats.
 const MIN_BATCH: int = 64
-## The draw batches by ramp: bolts, runes (still) and orbit shots in the four hat ramps, and every
-## shot in the enemy ramp (`Actors.RAMP_ENEMY`, and a shot of no actor), every body kind, drawn
-## by the shader above the others.
+## The draw batches by ramp: bolts, runes (still) and orbit shots in the four hat ramps, and the
+## shots in the enemy ramp (`Actors.RAMP_ENEMY`, and a shot of no actor), flying ones and runes
+## apart (each batch has one shader), drawn above the others.
 const BATCH_BOLT: int = 0
 const BATCH_RUNE: int = 1
 const BATCH_ORBIT: int = 2
 const BATCH_ENEMY: int = 3
-## The bodies a shot is drawn as (`shot_core.gdshader` builds them on a pixel grid;
-## staffs B6a): a bolt with its tail, a rune (a diamond that pulses), an orbit shot (a bolt whose
-## tail bends round its circle). Kind 0 is the texture, which only Feel's lone sprites use.
+const BATCH_ENEMY_RUNE: int = 4
+const BATCHES: int = 5
+## The bodies a shot is drawn as (the shot shaders build them on a pixel grid; staffs B6a): a
+## bolt with its tail (`shot_trail.gdshader`), a rune (a diamond that pulses, `shot_rune.gdshader`),
+## an orbit shot drawn whole with its tail bent round its circle (`shot_orbit.gdshader`, Entities'
+## familiars; the manager's orbit shots are trails). Kind 0 is no body.
 const KIND_BOLT: int = 1
 const KIND_RUNE: int = 2
 const KIND_ORBIT: int = 3
@@ -266,7 +272,7 @@ const KIND_ORBIT: int = 3
 const KIND_STEPS: float = 16.0
 const KIND_MAX: int = 15
 ## The bend of a bolt or orbit shot: how its path curves (1 / the radius of the curve, signed:
-## positive turns the way the screen's +x turns to +y), so `shot_core.gdshader` bends its tail
+## positive turns the way the screen's +x turns to +y), so `shot_orbit.gdshader` bends its tail
 ## along it. It travels as a code beside the kind: BEND_ZERO for a straight path, BEND_SPAN
 ## either side for the tightest curve (radius BEND_RADIUS; tighter ones draw as that). The
 ## shader holds the same numbers. A shot that turned more than BEND_CORNER radians in its last
@@ -282,7 +288,7 @@ const TRACE_FROM: float = 0.02
 const TRACE_SPAN: float = 0.42
 ## The look kinds a card can give a shot (`look_layer` on infusions and modifiers; see
 ## `set_look`). The body stays plain; each kind is a style of particle the shot gives off from
-## its tail (`shot_core.gdshader`), and a shot shows every kind its cards bring, mixed at
+## its tail (`shot_trail.gdshader`), and a shot shows every kind its cards bring, mixed at
 ## random: the look is a set, one bit per kind. WEAVE and STREAKS also change the body (a
 ## weave, a longer core). A new kind of effect is a new number here (up to LOOK_MAX_KINDS) and
 ## a branch in the shader's `particle`; a new card with an old kind needs neither.
@@ -360,8 +366,9 @@ const ORBIT_GROW: float = 0.25
 const PARTICLES_PER_SHOT_MAX: int = 12
 ## The look bits of the kinds that give off particles: all of them but the weave.
 const EMITTING_MASK: int = ((1 << (LOOK_COUNT - 1)) - 1) & ~(1 << (LOOK_WEAVE - 1))
-## Builds every shot from its look (see "Drawing" above).
-const CORE_SHADER: Shader = preload("res://core/projectiles/shot_core.gdshader")
+## Build the shots from their looks (see "Drawing" above): flying shots and their trails, runes.
+const TRAIL_SHADER: Shader = preload("res://core/projectiles/shot_trail.gdshader")
+const RUNE_SHADER: Shader = preload("res://core/projectiles/shot_rune.gdshader")
 ## Draw order of the shots: above the room and the wizards. The autoload is drawn
 ## before the current scene, so at z_index 0 the room's floor hid every shot.
 const DRAW_Z: int = 50
@@ -584,17 +591,23 @@ var _draw_room: int = 0
 var _rune_room: int = 0
 var _orbit_room: int = 0
 ## Live shots per batch this frame (BATCH_*), refilled by _count_batches; a member so no array is made per frame.
-var _batch_counts: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
+var _batch_counts: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0])
 var _draw_buffer: PackedFloat32Array = PackedFloat32Array()
 ## The batches of runes and orbit shots, beside the bolts' `_draw_node`.
 var _rune_node: MultiMeshInstance2D = null
 var _rune_buffer: PackedFloat32Array = PackedFloat32Array()
 var _orbit_node: MultiMeshInstance2D = null
 var _orbit_buffer: PackedFloat32Array = PackedFloat32Array()
-## The shots in the enemy ramp, drawn by the shader one layer above the others.
+## The shots in the enemy ramp, drawn one layer above the others: flying ones and their trails,
+## and runes.
 var _enemy_node: MultiMeshInstance2D = null
 var _enemy_buffer: PackedFloat32Array = PackedFloat32Array()
 var _enemy_room: int = 0
+var _enemy_rune_node: MultiMeshInstance2D = null
+var _enemy_rune_buffer: PackedFloat32Array = PackedFloat32Array()
+var _enemy_rune_room: int = 0
+## The ribbon every trail instance is drawn as (`trail_mesh`), made once.
+static var _trail_mesh: ArrayMesh = null
 ## Trails (see TRAIL_SAMPLES): each shot's row (-1 for none), and per row its samples (`trail_data`
 ## in the shader), the number of its newest sample, how many it keeps, how far it has gone, its
 ## last point, what holds it (a slot or ROW_*), and, once its shot is gone (or for a caster's
@@ -677,35 +690,75 @@ func _init() -> void:
 func _ready() -> void:
 	if events == null:
 		events = get_node_or_null("/root/Events") as EventsScript
-	_draw_node = _make_batch(DRAW_Z, true)
-	_rune_node = _make_batch(DRAW_Z, true)
-	_orbit_node = _make_batch(DRAW_Z, true)
-	_enemy_node = _make_batch(DRAW_Z + 1, true)
+	_draw_node = _make_batch(DRAW_Z, TRAIL_SHADER, trail_mesh())
+	_rune_node = _make_batch(DRAW_Z, RUNE_SHADER, null)
+	_orbit_node = _make_batch(DRAW_Z, TRAIL_SHADER, trail_mesh())
+	_enemy_node = _make_batch(DRAW_Z + 1, TRAIL_SHADER, trail_mesh())
+	_enemy_rune_node = _make_batch(DRAW_Z + 1, RUNE_SHADER, null)
 	_apply_textures()
 	_fit_draw_bounds()
 
 
-## One batched draw of up to `_cap` quads (TRANSFORM_2D plus a colour each), added as a child.
-## `cored`: drawn by the shot shader (every batch now; kept for a textured one).
-func _make_batch(z: int, cored: bool) -> MultiMeshInstance2D:
+## One batched draw of up to `_cap` instances (TRANSFORM_2D plus a colour and custom data each)
+## by `shader`, added as a child: each a quad, or each a `mesh` (the trails' ribbon).
+func _make_batch(z: int, shader: Shader, mesh: Mesh) -> MultiMeshInstance2D:
 	var node := MultiMeshInstance2D.new()
-	var quad := QuadMesh.new()
-	quad.size = Vector2.ONE
+	if mesh == null:
+		var quad := QuadMesh.new()
+		quad.size = Vector2.ONE
+		mesh = quad
 	var multimesh := MultiMesh.new()
 	multimesh.transform_format = MultiMesh.TRANSFORM_2D
 	multimesh.use_colors = true
 	multimesh.use_custom_data = true
-	if cored:
-		var material := ShaderMaterial.new()
-		material.shader = CORE_SHADER
-		node.material = material
-	multimesh.mesh = quad
+	var material := ShaderMaterial.new()
+	material.shader = shader
+	node.material = material
+	multimesh.mesh = mesh
 	multimesh.instance_count = 0
 	multimesh.visible_instance_count = 0
 	node.multimesh = multimesh
 	node.z_index = z
 	add_child(node)
 	return node
+
+
+## The ribbon a trail is drawn as (`shot_trail.gdshader`, RIBBONS there): a quad for its head
+## (piece 0) and one for each piece of its path between two samples (pieces 1 to TRAIL_SAMPLES),
+## all twice: first the light (the head, then the pieces), then the pixels (the oldest piece
+## first, the head last). The shader places every quad from the trail's data; a vertex says which
+## quad and corner it is in its UV: x the piece + 0.25 or 0.75, y the pass (0 light, 1 pixels) +
+## 0.25 or 0.75. Made once, shared by every trail batch.
+static func trail_mesh() -> ArrayMesh:
+	if _trail_mesh != null:
+		return _trail_mesh
+	var pieces: PackedInt32Array = PackedInt32Array()
+	for piece in TRAIL_SAMPLES + 1:
+		pieces.append(piece)
+	for back in TRAIL_SAMPLES + 1:
+		pieces.append(TRAIL_SAMPLES - back)
+	var verts := PackedVector2Array()
+	var uvs := PackedVector2Array()
+	var colors := PackedColorArray()
+	var indices := PackedInt32Array()
+	var corners: Array[Vector2] = [Vector2(0.0, 0.0), Vector2(1.0, 0.0), Vector2(1.0, 1.0), Vector2(0.0, 1.0)]
+	for n in pieces.size():
+		var light_pass: int = 0 if n <= TRAIL_SAMPLES else 1
+		var base: int = verts.size()
+		for corner: Vector2 in corners:
+			verts.append(corner)
+			uvs.append(Vector2(float(pieces[n]) + 0.25 + 0.5 * corner.x, float(light_pass) + 0.25 + 0.5 * corner.y))
+			colors.append(Color.WHITE)
+		indices.append_array(PackedInt32Array([base, base + 1, base + 2, base, base + 2, base + 3]))
+	var arrays: Array = []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = verts
+	arrays[Mesh.ARRAY_TEX_UV] = uvs
+	arrays[Mesh.ARRAY_COLOR] = colors
+	arrays[Mesh.ARRAY_INDEX] = indices
+	_trail_mesh = ArrayMesh.new()
+	_trail_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	return _trail_mesh
 
 
 func _apply_textures() -> void:
@@ -812,10 +865,12 @@ func set_cap(value: int) -> void:
 	_rune_buffer.resize(0)
 	_orbit_buffer.resize(0)
 	_enemy_buffer.resize(0)
+	_enemy_rune_buffer.resize(0)
 	_draw_room = 0
 	_rune_room = 0
 	_orbit_room = 0
 	_enemy_room = 0
+	_enemy_rune_room = 0
 	_alive.resize(_cap)
 	_free_slots.resize(_cap)
 	clear()
@@ -824,6 +879,7 @@ func set_cap(value: int) -> void:
 		_rune_node.multimesh.instance_count = 0
 		_orbit_node.multimesh.instance_count = 0
 		_enemy_node.multimesh.instance_count = 0
+		_enemy_rune_node.multimesh.instance_count = 0
 
 
 func get_cap() -> int:
@@ -992,6 +1048,7 @@ func _fit_draw_bounds() -> void:
 	_rune_node.multimesh.custom_aabb = aabb
 	_orbit_node.multimesh.custom_aabb = aabb
 	_enemy_node.multimesh.custom_aabb = aabb
+	_enemy_rune_node.multimesh.custom_aabb = aabb
 
 
 ## Remove every projectile (targets stay registered).
@@ -1342,7 +1399,7 @@ func set_core(slot: int, color: Color) -> bool:
 
 
 ## Give the shot in `slot` its look, packed by `pack_look` (0 for none): every effect
-## `shot_core.gdshader` draws round its core. Returns false for an empty slot or a look with a
+## `shot_trail.gdshader` draws along its path. Returns false for an empty slot or a look with a
 ## bit for a kind that does not exist.
 func set_look(slot: int, look: int) -> bool:
 	if slot < 0 or slot >= _cap or _alive[slot] == 0 or look < 0 or look >= 1 << (LOOK_COUNT - 1):
@@ -2362,6 +2419,7 @@ func update_draw(fraction: float = -1.0) -> void:
 	_set_sim_time(_rune_node, fraction)
 	_set_sim_time(_orbit_node, fraction)
 	_set_sim_time(_enemy_node, fraction)
+	_set_sim_time(_enemy_rune_node, fraction)
 	_upload_trails()
 	_count_batches()
 	var counts: PackedInt32Array = _batch_counts
@@ -2370,10 +2428,12 @@ func update_draw(fraction: float = -1.0) -> void:
 	_rune_room = _fit_batch(_rune_node.multimesh, _rune_buffer, _rune_room, counts[BATCH_RUNE])
 	_orbit_room = _fit_batch(_orbit_node.multimesh, _orbit_buffer, _orbit_room, counts[BATCH_ORBIT])
 	_enemy_room = _fit_batch(_enemy_node.multimesh, _enemy_buffer, _enemy_room, counts[BATCH_ENEMY], _cap * (1 + TRAIL_ROWS_PER_SLOT))
+	_enemy_rune_room = _fit_batch(_enemy_rune_node.multimesh, _enemy_rune_buffer, _enemy_rune_room, counts[BATCH_ENEMY_RUNE])
 	var out: int = 0
 	var rune_out: int = 0
 	var orbit_out: int = 0
 	var enemy_out: int = 0
+	var enemy_rune_out: int = 0
 	var asked: int = 0
 	var trails: int = 0
 	for slot in _high:
@@ -2398,11 +2458,11 @@ func update_draw(fraction: float = -1.0) -> void:
 			trails += TRAIL_COST
 		var flags: int = TRAIL_HEAD | (TRAIL_ORBIT if motion == MOTION_ORBIT else 0)
 		if batch == BATCH_ENEMY:
-			if rune:
-				_write_quad(_enemy_buffer, enemy_out * DRAW_STRIDE, dir, size, at, look_data, _core[slot], KIND_RUNE, 0.0, trace_code(sim_time - _born[slot]))
-			else:
-				_write_trail(_enemy_buffer, enemy_out * DRAW_STRIDE, _trail[slot], at, flags, look_data, _core[slot])
+			_write_trail(_enemy_buffer, enemy_out * DRAW_STRIDE, _trail[slot], at, flags, look_data, _core[slot])
 			enemy_out += 1
+		elif batch == BATCH_ENEMY_RUNE:
+			_write_quad(_enemy_rune_buffer, enemy_rune_out * DRAW_STRIDE, dir, size, at, look_data, _core[slot], KIND_RUNE, 0.0, trace_code(sim_time - _born[slot]))
+			enemy_rune_out += 1
 		elif batch == BATCH_RUNE:
 			_write_quad(_rune_buffer, rune_out * DRAW_STRIDE, dir, size, at, look_data, _core[slot], KIND_RUNE, 0.0, trace_code(sim_time - _born[slot]))
 			rune_out += 1
@@ -2412,8 +2472,8 @@ func update_draw(fraction: float = -1.0) -> void:
 		else:
 			_write_trail(_draw_buffer, out * DRAW_STRIDE, _trail[slot], at, flags, look_data, _core[slot])
 			out += 1
-	var shots_out: int = out + rune_out + orbit_out + enemy_out
-	var enemy_shots: int = enemy_out
+	var shots_out: int = out + rune_out + orbit_out + enemy_out + enemy_rune_out
+	var enemy_shots: int = enemy_out + enemy_rune_out
 	# The trails held by no live shot: cooling where their shot ended, or following a caster.
 	for n in _loose_count:
 		var row: int = _loose[n]
@@ -2445,9 +2505,12 @@ func update_draw(fraction: float = -1.0) -> void:
 	if enemy_out > 0:
 		_enemy_node.multimesh.buffer = _enemy_buffer
 	_enemy_node.multimesh.visible_instance_count = enemy_out
+	if enemy_rune_out > 0:
+		_enemy_rune_node.multimesh.buffer = _enemy_rune_buffer
+	_enemy_rune_node.multimesh.visible_instance_count = enemy_rune_out
 	drawn_enemy = enemy_shots
 	drawn = shots_out
-	drawn_trails = out + rune_out + orbit_out + enemy_out - shots_out
+	drawn_trails = out + rune_out + orbit_out + enemy_out + enemy_rune_out - shots_out
 	_share_pool(asked, trails)
 
 
@@ -2462,7 +2525,7 @@ func _remember_drawn(slot: int) -> void:
 	_drawn_particles[slot] = particles_of(_look[slot])
 
 
-## Hand the shader the simulation clock (`shot_core.gdshader` animates from it), and the moment
+## Hand the shader the simulation clock (the shot shaders animate from it), and the moment
 ## the heads are drawn at, `fraction` of the way through the last step (`trail_now`).
 func _set_sim_time(node: MultiMeshInstance2D, fraction: float) -> void:
 	var material: ShaderMaterial = node.material as ShaderMaterial
@@ -2483,6 +2546,7 @@ func _share_pool(asked: int, trails: int) -> void:
 	_set_shares(_rune_node)
 	_set_shares(_orbit_node)
 	_set_shares(_enemy_node)
+	_set_shares(_enemy_rune_node)
 
 
 func _set_shares(node: MultiMeshInstance2D) -> void:
@@ -2493,7 +2557,8 @@ func _set_shares(node: MultiMeshInstance2D) -> void:
 
 ## How many particles the pool is asked for by a shot with the packed `look`: 4 + 2 per
 ## emitting kind (every kind but the weave, which changes the body), at most 12; none for a
-## plain shot. `shot_core.gdshader` (`emit_count`) holds the same rule; keep the two equal.
+## plain shot. The shot shaders (`shot_rune.gdshader`, `shot_orbit.gdshader`) hold the same rule;
+## keep them equal.
 static func particles_of(look: int) -> int:
 	if look == 0:
 		return 0
@@ -2511,7 +2576,7 @@ static func particles_of(look: int) -> int:
 ## the counting and the writing use, so a batch always has the room its writes need.
 func _batch_of(slot: int) -> int:
 	if not is_hat_ramp(_ramp[slot]):
-		return BATCH_ENEMY
+		return BATCH_ENEMY_RUNE if _motion[slot] == MOTION_STILL else BATCH_ENEMY
 	if _motion[slot] == MOTION_STILL:
 		return BATCH_RUNE
 	if _motion[slot] == MOTION_ORBIT:
@@ -2596,14 +2661,14 @@ static func trace_code(age: float) -> float:
 	return TRACE_FROM + TRACE_SPAN * age / RUNE_TRACE
 
 
-## The instance colour of a shot, which `shot_core.gdshader` reads as data, a byte per
+## The instance colour of a shot, which the shot shaders read as data, a byte per
 ## channel: the hat ramp and the zoom in red (`look_red`), the look's bits in green (kinds 1-8),
 ## blue (9-16) and alpha (17-24; `ramp_look` adds the enemy ramp's flag).
 func _look_color(slot: int) -> Color:
 	return look_color(_ramp[slot], look_zoom(_radius[slot]), _look[slot])
 
 
-## The instance colour `shot_core.gdshader` reads for a shot or effect in `ramp` (`Actors.
+## The instance colour the shot shaders read for a shot or effect in `ramp` (`Actors.
 ## ramp_of` of its caster: 0-3 a hat ramp, anything else the enemy ramp) at `zoom` (or a dash's
 ## length in steps, up to 63) with the packed `look`. Feel's effects and Entities' familiars use
 ## it too, so the encoding lives in one place.
@@ -2635,7 +2700,7 @@ static func ramp_look(ramp: int, look: int) -> int:
 ## reaches `diameter` / 2 ahead of `at` and the rest behind it (a bolt and its tail).
 ## `kind` (0 the texture, KIND_BOLT, KIND_RUNE or KIND_ORBIT; at most KIND_MAX) and `code`
 ## (0 to below 0.5: a bend, `bend_code`, or a rune's trace, `trace_code`) go in the alpha of the
-## custom data as 1 - (kind + code) / 16, which `shot_core.gdshader` reads back.
+## custom data as 1 - (kind + code) / 16, which the shot shaders read back.
 func _write_quad(buffer: PackedFloat32Array, i: int, dir: Vector2, diameter: float, at: Vector2, color: Color, core: Color, kind: int, length: float = 0.0, code: float = 0.0) -> void:
 	assert(kind >= 0 and kind <= KIND_MAX, "the kind must fit the alpha encoding")
 	assert(code >= 0.0 and code < 0.5, "the code must round away from the kind")
@@ -2663,8 +2728,9 @@ func _write_quad(buffer: PackedFloat32Array, i: int, dir: Vector2, diameter: flo
 
 
 ## Write trail `row`'s instance at float index `i` of `buffer` (-1: a shot without a trail, drawn
-## by its core alone): its data in the transform, which `shot_core.gdshader` reads back (TRAILS
-## there; the batch sits untransformed at the origin), the head `at`, the colour and the core.
+## by its core alone): its data in the transform, which `shot_trail.gdshader` reads back (its
+## ribbon is placed from it; the batch sits untransformed at the origin), the head `at`, the
+## colour and the core.
 func _write_trail(buffer: PackedFloat32Array, i: int, row: int, at: Vector2, flags: int, color: Color, core: Color) -> void:
 	buffer[i] = float(row)
 	buffer[i + 1] = float(_trail_kept[row]) if row >= 0 else 0.0

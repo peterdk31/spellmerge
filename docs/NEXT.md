@@ -14,8 +14,6 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
 - [x] **The old recipe path removed (staffs A6c).** Done in an owner session: `Spells.compile(recipe)`, `builder_view`, the recipe wrappers (`install`, `cast`, a spell's `begin_generation`) and the recipe compiler are gone, `begin_generation` takes a compiled staff; `CompiledSpell` lost `valid`, `reason`, `description`, `complexity`, `depth` and `held`; `SpellLimits` keeps only engine safeguards and tuning; the events `build_change_requested`, `spell_swap_requested`, `spell_changed`, `recipe_changed` and `active_spell_changed` are removed; tests build staffs (`tests/support/staff_kit.gd` turns the old recipe shorthand into card rows; `test_spell_tags.gd` replaces `test_spells_compile.gd`); the spells, core and gameplay READMEs say so. **Phase B and the cards can start; development is unpaused.**
 - [x] **Card: arc (staffs C).** After the slow, return and arc kit (owner, 2026-10-27). Data only.
 - [x] **Card: linger (staffs C).** After B1. Data only (M2-staffs.md, "Working in parallel").
-- [ ] **Card: scatter (staffs C).** After B2. Data only (M2-staffs.md, "Working in parallel").
-- [ ] **Card: mirror (staffs C).** After B2. Data only (M2-staffs.md, "Working in parallel").
 - [ ] **Card: rain (staffs C).** After B2. Data only (M2-staffs.md, "Working in parallel").
 - [ ] **Card: fissure (staffs C).** After B2. Data only (M2-staffs.md, "Working in parallel").
 - [ ] **Card: wall (staffs C).** After B2. Data only (M2-staffs.md, "Working in parallel").
@@ -82,6 +80,8 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 
 ## Done recently
 
+- [x] **Card: mirror (staffs C).** `content/spells/modifiers/mirror/` (`ModifierBase`, behaviour mirror, icon, `assets.json`), the lore entry, the combos `mirror_back_guard` and `mirror_frost_pincer`, and `tests/content/spells/test_mirror.gd`.
+- [x] **Card: scatter (staffs C).** `content/spells/multicasts/scatter/` (`MulticastBase`, mode scatter, 2 extra carriers, 4 mana, icon, `assets.json`), the lore entry, the combos `scatter_nova_flurry` and `scatter_kindle_flurry`, and `tests/content/spells/test_scatter.gd`.
 - [x] **Card: burst (staffs C).** `content/spells/multicasts/burst/` (`MulticastBase`, mode burst, 3 firings 0.1 s apart, 4 mana, icon, `assets.json`), the lore entry, the combos `burst_triple_bolt` and `burst_nova_pulse`, and `tests/content/spells/test_burst.gd`. Bots no longer build `possess` (see `docs/DECISIONS.md`).
 - [x] **Card: echo (staffs C).** `content/spells/modifiers/echo/` (`ModifierBase`, behaviour echo, 0.3 s, icon, `assets.json`), the lore entry, the combos `echo_double_tap` and `echo_timer_nova`, and `tests/content/spells/test_echo.gd`. The combo test got a check kind `lost_at_least` (health lost in all), since an echo shows as more damage, not a new status.
 - [x] **Card: on cast (staffs C).** `content/spells/triggers/on_cast/` (`TriggerBase`, event CAST, one fire, icon, `assets.json`), the lore entry, the combos `on_cast_rune_bolt` and `on_cast_bolt_nova`, and `tests/content/spells/test_on_cast.gd` (valid card; each combo holds with it and fails without it). The engine side was built in B2.

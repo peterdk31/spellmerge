@@ -1,0 +1,9 @@
+{
+	"id": "mirror_back_guard",
+	"name": "Mirror back guard",
+	"does": "A mirrored bolt flies ahead and behind: an imp at the caster's back is hit as well as the one in front.",
+	"casts": [{"staff": 0, "cards": ["mirror", "bolt"]}],
+	"imps": [[100, 0], [-100, 0]],
+	"seconds": 1.5,
+	"checks": [{"kind": "damaged", "imps": [0, 1]}]
+}

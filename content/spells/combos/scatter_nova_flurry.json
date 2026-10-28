@@ -1,0 +1,9 @@
+{
+	"id": "scatter_nova_flurry",
+	"name": "Scatter nova flurry",
+	"does": "A frost nova, a fire nova and a plain nova leave as one scatter: a nova rings from the caster whichever way it is sent, so the imp beside the caster is chilled and thawed at once.",
+	"casts": [{"staff": 0, "cards": ["scatter", "frost", "nova", "fire", "nova", "nova"]}],
+	"imps": [[20, 0]],
+	"seconds": 1.0,
+	"checks": [{"kind": "reaction", "reaction": "thaw"}]
+}

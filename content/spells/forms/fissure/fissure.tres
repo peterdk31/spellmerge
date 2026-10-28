@@ -20,3 +20,5 @@ spread = 0.0
 motion = 10
 pierce = 0
 ray_length = 200.0
+cast_look = {"seconds": 0.2, "size": 0.8, "stretch": 3.0, "tall": 0.4, "grow": 0.1}
+impact_look = {"seconds": 0.2, "size": 0.8, "stretch": 1.4, "aim": true, "grow": 0.1}

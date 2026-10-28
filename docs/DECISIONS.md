@@ -1632,3 +1632,10 @@ How it is built (parts F2–F10):
 - **Each enemy's material is its own** (`resource_local_to_scene`), since every telegraph has its own progress.
 - **A gotcha:** a `vec4` shader parameter saved in a `.tscn` must be a `Vector4`; a `Color` there is dropped on load (it reads as null), though `set_shader_parameter` with a Color works from code.
 - The shooting dummy keeps its Void telegraph, so the sandbox's two lanes stay told apart. `art/vfx/telegraph_dash.svg` is no longer in a scene; the art sheets still show it.
+
+## 2026-10-28: Moves on enemies (staffs F8c)
+
+- **The enemy answers its own row's moves as a wizard answers its own:** the same modes, the same distances (a dash from the staff tip, a pull to the point), the same end-point answer, so a card's blast or `on expire` goes off where the enemy lands. Walls stop it because it moves through `velocity`, as it walks.
+- **No separate move AI yet:** a staff's move is aimed at the target like any cast (a dash or teleport goes toward the wizard). Moving away, or around, is a later choice for staffs that want it; the owner's "AI to use and aim them" starts with the aim every cast already has.
+- **Barriers on the caster** (a shield on a dash or on the caster) are not built for wizards either (nothing sends `wizard_shield_requested` yet), so enemies get them when wizards do.
+- F8 grew a fourth part: decoys and familiars for enemies (F8d, Entities).

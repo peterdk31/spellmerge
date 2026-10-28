@@ -1,0 +1,9 @@
+{
+	"id": "mirror_frost_pincer",
+	"name": "Mirror frost pincer",
+	"does": "A mirrored frost bolt chills the imp ahead and the imp behind in one cast.",
+	"casts": [{"staff": 0, "cards": ["mirror", "frost", "bolt"]}],
+	"imps": [[100, 0], [-100, 0]],
+	"seconds": 1.5,
+	"checks": [{"kind": "status", "imps": [0, 1], "status": "chill"}]
+}

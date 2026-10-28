@@ -2,6 +2,10 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-28: Mirror card numbers
+
+Mirror is a complexity-1 modifier with no mana or cooldown of its own (the back shot is free, so `mirror · recoil · bolt` cancels the push), strength 1.0 (the engine only tests for more than 0).
+
 ## 2026-10-28: Scatter card numbers
 
 Scatter draws 2 extra carriers (three in all, as the design says) for 4 mana once, like triple. Its combos check reactions (thaw, kindle), which do not depend on the random direction, rather than damage totals; orbit combos were left out because an imp keeps one status at a time, so which orbit hexed or chilled it was not reliable.

@@ -82,7 +82,7 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 - [x] **The strays (living staffs H5).** (`content/enemies/`, `gameplay/ai/`) After H3; may run beside H4.
 - [ ] **The Rime Crook and the Bone Scepter (living staffs H5, waiting).** (`content/enemies/`) When the `hook` and `rain` cards exist: a folder each, copied from `splinter/` (frost · hook, a puller; void · rain, a zoner whose eyes are sparks in its sockets).
 - [x] **The intro (living staffs H6).** (`gameplay/flow/`, `content/story/`) After H3.
-- [ ] **The docs (living staffs H7).** (`docs/STYLE.md`, READMEs, `art/kit/`) Last.
+- [x] **The docs (living staffs H7).** (`docs/STYLE.md`, READMEs, `art/kit/`) Last.
 
 ## Blocked
 

@@ -1,10 +1,12 @@
-# Wizard
+# The player's staffs (`content/wizard`)
+
+The folder keeps its old name: the player character was a wizard until living staffs (2026-10-28); now the wizard is the villain.
 
 ## Purpose
 
-Everything that customises the single base wizard. **Cosmetics** (`cosmetics/`) change looks only: hat, robe, colours, staff look. **Staffs** (`staffs/`) hold the wizard's cards: every wizard has four, one per button, and a staff sets how many slots it has and how fast it casts and recharges (docs/milestones/M2-staffs.md, "Staffs").
+Everything that customises the single base player. **Cosmetics** (`cosmetics/`) change looks only: hat, robe, colours, staff look. **Staffs** (`staffs/`) hold the player's cards: every player has four, one per button, and a staff sets how many slots it has and how fast it casts and recharges (docs/milestones/M2-staffs.md, "Staffs").
 
-**Built in M4** (Polish and variety; see docs/ROADMAP.md). **The example to copy arrives with Claude's first wizard content in M4**; this README is updated then with its path.
+**Built in M4** (Polish and variety; see docs/ROADMAP.md). **The example to copy arrives with Claude's first player content in M4**; this README is updated then with its path.
 
 ## Contract
 

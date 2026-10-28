@@ -1,23 +1,23 @@
 {
   "status": "chosen",
-  "note": "Golden examples for the Style Guide (docs/STYLE.md, 'Golden examples'). The player character is in the style the owner chose on 2026-10-23 (style N, docs/DESIGN.md). The others are the best placeholder art so far and are redrawn in that style over later milestones. The starter kit zip includes these files next to the palette and templates.",
-  "intro": "The look: the wizard is style N; the rest is redrawn in it over time. Copy their approach, not their pixels.",
+  "note": "Golden examples for the Style Guide (docs/STYLE.md, 'Golden examples'). The player and the stray are the living staffs the owner chose on 2026-10-28 (docs/milestones/M2-living-staffs.md), each a body with its face as the game layers them. The others are the best placeholder art so far and are redrawn in that spirit over later milestones. The starter kit zip includes these files next to the palette and templates.",
+  "intro": "The look: every character is a living staff, a body with floating eyes and brows; the rest is redrawn to match over time. Copy their approach, not their pixels.",
   "screenshot": "arena_four_wizards.png",
-  "screenshot_alt": "The arena with four wizards",
+  "screenshot_alt": "The arena with four players",
   "examples": [
     {
-      "path": "art/kit/golden_wizard.svg",
-      "shows": "A player character, style N: a narrow Stone robe with a Spark placket, belt and hem, two big tall eyes and no mouth, Skin hands, under a hat in the Player 1 ramp (the only player colour). The game draws the body strip and the hat as two pictures (content/wizard/base/); this is the two together",
+      "path": "art/kit/golden_staff.svg",
+      "shows": "A player character: a floating staff (the curl, player 1) pointing up and to the right, a Wood shaft with a Spark grip wrap, the player colour on the head only, the Optimist's eyes and neutral brows 8 px above the grip, drawn over the staff. The game draws the head sheet and the two face layers as three pictures; this is the three together",
       "rules": [
         "outline",
         "three shades",
         "light from the top-left",
-        "player colour only on the hat"
+        "player colour only on the head"
       ]
     },
     {
-      "path": "content/enemies/ember_imp/idle.svg",
-      "shows": "An enemy: Fire body, Bone horns and Spark eyes, no player colour, a bold silhouette",
+      "path": "art/kit/golden_stray.svg",
+      "shows": "An enemy, a stray (the Cinder Rod): a charred rod with a burning crown, no player colour, eyes glowing in fire's light shade with slit pupils, angry brows; the body and the face as the game layers them",
       "rules": [
         "outline",
         "silhouette",

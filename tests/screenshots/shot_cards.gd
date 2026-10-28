@@ -15,7 +15,6 @@ const VFX_TOP: float = 248.0
 const PAGE_BOTTOM: float = 356.0
 const VFX: Array[Texture2D] = [
 	preload("res://art/vfx/bolt.svg"),
-	preload("res://art/vfx/imp_fireball.svg"),
 	preload("res://art/vfx/hit_spark.svg"),
 	preload("res://art/vfx/telegraph_dash.svg"),
 	preload("res://art/vfx/beam.svg"),

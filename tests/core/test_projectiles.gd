@@ -528,31 +528,24 @@ func _test_shot_core_colour_and_batches() -> void:
 	root.remove_child(_mgr)
 
 
-## Enemy shots are drawn in a batch of their own: other texture, untinted, one layer
-## above the players' shots (task "Enemy readability": shots must not read as a spell).
+## Enemy shots are drawn in a batch of their own, by the shot shader in the enemy ramp, one
+## layer above the players' shots (task "Enemy readability"; staffs F9b: a NO_PLAYER shot too,
+## the old untinted sprite is gone).
 func _test_enemy_shots_have_their_own_batch() -> void:
 	_setup()
 	root.add_child(_mgr)
-	var player_art := PlaceholderTexture2D.new()
-	var enemy_art := PlaceholderTexture2D.new()
-	_mgr.texture = player_art
-	_check(_mgr._hostile_node.texture == player_art, "without hostile art, enemy shots use the shared texture")
-	_mgr.hostile_texture = enemy_art
-	_check(_mgr._hostile_node.texture == enemy_art and _mgr._draw_node.texture == player_art, "enemy shots get their own texture")
-	_check(_mgr._hostile_node.z_index > _mgr._draw_node.z_index, "enemy shots are drawn above the players' shots")
+	_check(_mgr._enemy_node.material is ShaderMaterial, "enemy shots are drawn by the shot shader")
+	_check(_mgr._enemy_node.z_index > _mgr._draw_node.z_index, "enemy shots are drawn above the players' shots")
 	_mgr.spawn(0, Vector2(10.0, 0.0), Vector2(100.0, 0.0), 1.0)
 	_mgr.spawn(EventsScript.NO_PLAYER, Vector2(20.0, 0.0), Vector2(0.0, 100.0), 1.0, 5.0, ManagerScript.LAYER_PLAYER)
 	_mgr.spawn(EventsScript.NO_PLAYER, Vector2(30.0, 0.0), Vector2(0.0, 100.0), 1.0, 5.0, ManagerScript.LAYER_PLAYER)
 	_mgr.update_draw()
-	_check(_mgr.drawn == 3 and _mgr.drawn_hostile == 2, "drawn counts both batches (%d, %d hostile)" % [_mgr.drawn, _mgr.drawn_hostile])
+	_check(_mgr.drawn == 3 and _mgr.drawn_enemy == 2, "drawn counts both batches (%d, %d enemy)" % [_mgr.drawn, _mgr.drawn_enemy])
 	_check(_mgr._draw_node.multimesh.visible_instance_count == 1, "the player batch holds the one player shot")
-	_check(_mgr._hostile_node.multimesh.visible_instance_count == 2, "the enemy batch holds the two enemy shots")
-	var buffer: PackedFloat32Array = _mgr._hostile_node.multimesh.buffer
-	_check(buffer.size() > ManagerScript.DRAW_STRIDE and is_equal_approx(buffer[3], 20.0) and is_equal_approx(buffer[ManagerScript.DRAW_STRIDE + 3], 30.0), "the enemy batch has the enemy shots' positions")
-	_check(is_equal_approx(buffer[8], 1.0) and is_equal_approx(buffer[9], 1.0) and is_equal_approx(buffer[10], 1.0), "enemy shots are not tinted")
+	_check(_mgr._enemy_node.multimesh.visible_instance_count == 2, "the enemy batch holds the two enemy shots")
 	_mgr.clear()
 	_mgr.update_draw()
-	_check(_mgr.drawn == 0 and _mgr._hostile_node.multimesh.visible_instance_count == 0, "clear empties the enemy batch too")
+	_check(_mgr.drawn == 0 and _mgr._enemy_node.multimesh.visible_instance_count == 0, "clear empties the enemy batch too")
 	root.remove_child(_mgr)
 
 
@@ -635,7 +628,7 @@ func _test_every_batch_is_sized_to_its_own_shots() -> void:
 		[_mgr._draw_node, bolts, 128],
 		[_mgr._rune_node, runes, ManagerScript.MIN_BATCH],
 		[_mgr._orbit_node, orbits, ManagerScript.MIN_BATCH],
-		[_mgr._hostile_node, hostile, ManagerScript.MIN_BATCH],
+		[_mgr._enemy_node, hostile, ManagerScript.MIN_BATCH],
 	]
 	for row: Array in wanted:
 		var multimesh: MultiMesh = (row[0] as MultiMeshInstance2D).multimesh
@@ -645,12 +638,13 @@ func _test_every_batch_is_sized_to_its_own_shots() -> void:
 		_check(multimesh.buffer.size() == multimesh.instance_count * stride, "its buffer is instance_count x stride")
 	var bolt_buffer: PackedFloat32Array = _mgr._draw_node.multimesh.buffer
 	var rune_buffer: PackedFloat32Array = _mgr._rune_node.multimesh.buffer
-	var hostile_buffer: PackedFloat32Array = _mgr._hostile_node.multimesh.buffer
+	var hostile_buffer: PackedFloat32Array = _mgr._enemy_node.multimesh.buffer
 	var orbit_buffer: PackedFloat32Array = _mgr._orbit_node.multimesh.buffer
 	# A bolt's or orbit shot's quad reaches ahead of it and holds its tail behind (look_back).
 	_check(is_equal_approx(bolt_buffer[(bolts - 1) * stride + 3], float(bolts) - ManagerScript.look_back(5.0)), "the last bolt is at its place")
 	_check(is_equal_approx(rune_buffer[(runes - 1) * stride + 3], float(runes)) and is_equal_approx(rune_buffer[7], 50.0), "the last rune is at its place")
-	_check(is_equal_approx(hostile_buffer[stride + 3], 2.0) and is_equal_approx(hostile_buffer[stride + 7], 90.0), "the last enemy shot is at its place")
+	# Drawn by the shader like a bolt: its quad's centre is look_back behind it.
+	_check(is_equal_approx(hostile_buffer[stride + 3], 2.0) and is_equal_approx(hostile_buffer[stride + 7], 90.0 - ManagerScript.look_back(5.0)), "the last enemy shot is at its place")
 	var orbit_ok: bool = true
 	for i in orbits:
 		var slot: int = orbit_slots[i]

@@ -124,12 +124,10 @@ func test_runes_and_orbit_shots_are_drawn_as_their_form() -> void:
 	check_equal(look_at(mgr._orbit_node, 0)[0], 2, "of its player")
 
 
-func test_enemy_shots_keep_their_sprite() -> void:
+func test_a_no_player_shot_is_drawn_as_an_enemys_bolt() -> void:
 	mgr.spawn(-1, Vector2(80.0, 50.0), Vector2(60.0, 0.0), 1.0, 4.0, ManagerScript.LAYER_PLAYER)
 	mgr.update_draw(1.0)
-	check_equal(kind_at(mgr._hostile_node, 0), 0, "an enemy shot is the enemy sprite")
-	var buffer: PackedFloat32Array = mgr._hostile_node.multimesh.buffer
-	check(is_equal_approx(buffer[0], 8.0 * ManagerScript.DRAW_SCALE), "at DRAW_SCALE of its hit circle")
+	check_equal(kind_at(mgr._enemy_node, 0), ManagerScript.KIND_BOLT, "a NO_PLAYER shot is drawn by the shader as a bolt (staffs F9b: no sprite)")
 
 
 func test_the_instance_colour_keeps_every_players_bytes() -> void:
@@ -408,13 +406,13 @@ func test_four_players_share_one_pool() -> void:
 	check(is_equal_approx(mgr.particle_share, 240.0 / 320.0), "so everyone thins by the same share")
 
 
-func test_the_pool_asks_nothing_for_enemy_shots_or_plain_ones() -> void:
+func test_the_pool_asks_no_particles_for_plain_shots() -> void:
 	mgr.particle_cap = 10
 	mgr.spawn(-1, Vector2(50.0, 50.0), Vector2(1.0, 0.0), 1.0)
 	mgr.spawn(0, Vector2(80.0, 50.0), Vector2(1.0, 0.0), 1.0)
 	mgr.update_draw(1.0)
 	check_equal(mgr.particle_demand, 0, "no particles asked")
-	check_equal(mgr.trail_demand, ManagerScript.TRAIL_COST, "only the player's bolt has a trail")
+	check_equal(mgr.trail_demand, 2 * ManagerScript.TRAIL_COST, "both bolts have a trail (an enemy's shot is a shader bolt since staffs F9b)")
 	check_equal(mgr.trail_share, 1.0, "which fits")
 
 

@@ -131,11 +131,10 @@ func test_a_killing_hit_puts_no_status_on() -> void:
 	check(_applied.is_empty(), "no status on a dead enemy")
 
 
-func test_shots_with_no_spell_still_use_the_hit_table() -> void:
+func test_a_shot_with_no_spell_does_nothing() -> void:
 	var enemy := _enemy()
-	_combat.set_hit_profile(1234, 7, 0.0)
 	_hit(0, enemy, 1234)
-	check_equal(_combat.get_health(enemy), 93, "the table's damage")
+	check_equal(_combat.get_health(enemy), 100, "no profile, no damage (staffs F9b: Combat's table is gone)")
 	check(_applied.is_empty(), "and no status")
 
 
@@ -449,7 +448,6 @@ func test_a_hit_with_no_player_does_not_discharge() -> void:
 	_hit(EventsScript.NO_PLAYER, struck, _tag(0, &""))
 	check_equal(_combat.get_health(other), 100, "a hit that names no player discharges nothing")
 	check(_combat.has_status(struck, &"static"), "and keeps its charge")
-	_combat.set_hit_profile(4321, 5, 0.0)
 	_hit(0, struck, 4321)
 	check_equal(_combat.get_health(other), 100, "a shot that is not a spell does not discharge either")
 

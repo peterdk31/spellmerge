@@ -3,12 +3,11 @@ extends Node
 ## knockback and deaths. It is the only sender of `damage_dealt` and `enemy_died`.
 ##
 ##     Combat.register_enemy(enemy, 20, 10.0, 1)         # health, hurt radius, contact damage
-##     Combat.set_hit_profile(tag, 5, 200.0)             # what a shot with this tag does
 ##     Combat.register_player(0, wizard, 8.0)            # a wizard that enemies can touch
 ##
 ## A shot is hit by `core/projectiles`, which sends `projectile_hit(player, target,
-## position, tag)`. Combat looks `tag` up in the hit profiles (damage and knockback
-## strength) and runs the pipeline in hit(): ignore a bad hit, deal damage, push the
+## position, tag)`. Combat looks `tag` up in Spells' hit profiles (`Spells.hit_profile`: damage, knockback
+## and status) and runs the pipeline in hit(): ignore a bad hit, deal damage, push the
 ## enemy away from the hit, send `damage_dealt`, and on 0 health send `enemy_died`
 ## (naming the player who landed the last hit) and free the enemy.
 ##
@@ -129,10 +128,6 @@ var reactions: ReactionTable = null
 var _near: Array[Node2D] = []
 # The targets of a discharge, copied out of `_near` (a hit can reuse that one).
 var _discharge_targets: Array[Node2D] = []
-
-# Hit profiles: tag -> damage and knockback strength.
-var _profile_damage: Dictionary = {}
-var _profile_knockback: Dictionary = {}
 
 # Enemies, one row each.
 var _enemies: Array[Node2D] = []
@@ -263,24 +258,6 @@ func setup() -> void:
 
 func _physics_process(delta: float) -> void:
 	step(delta)
-
-
-## Say what a shot with `tag` does: `damage` and knockback `strength` (pixels per second).
-## Tag 0 means "no tag" and is refused. Whoever spawns the shots (a spell's bolt)
-## picks its tag; setting a different profile on a tag in use replaces it, with a warning.
-func set_hit_profile(tag: int, damage: int, strength: float = 0.0) -> void:
-	if tag == 0:
-		push_warning("Combat: tag 0 means no tag, so it has no hit profile.")
-		return
-	if _profile_damage.has(tag) and (_profile_damage[tag] != damage or _profile_knockback[tag] != strength):
-		push_warning("Combat: tag %d already had a different hit profile; replacing it." % tag)
-	_profile_damage[tag] = damage
-	_profile_knockback[tag] = strength
-
-
-func clear_hit_profile(tag: int) -> void:
-	_profile_damage.erase(tag)
-	_profile_knockback.erase(tag)
 
 
 ## Make `enemy` something that can be hurt and killed. Registering twice only
@@ -754,28 +731,22 @@ func _on_player_revived(player: int, _reviver: int) -> void:
 			projectiles.add_target(wizard, _player_radius[player], ProjectileManagerScript.LAYER_PLAYER, player, _player_offset[player])
 
 
-## A shot landed. A spell's shot is described by `Spells.hit_profile(tag)` (damage, knockback,
-## status); any other shot (an enemy's) by the table of `set_hit_profile`. A
-## shocked target also sends the hit on to its nearest neighbour; a hexed one is pulled toward
+## A shot landed. Every shot is a spell's, a wizard's or an enemy's (staffs F9b: the old enemy
+## shot and its table are gone), described by `Spells.hit_profile(tag)` (damage, knockback,
+## status); a shot with no profile does nothing. A shocked target also sends the hit on to its nearest neighbour; a hexed one is pulled toward
 ## the hit instead of pushed away. The hit's own status goes on after the damage, on a target
 ## that survived.
 func _on_projectile_hit(player: int, target: Node, position: Vector2, tag: int) -> void:
 	if not target is Node2D:
 		return
 	var profile: HitProfile = spells.hit_profile(tag) if spells != null else null
-	var damage: int = 0
-	var strength: float = 0.0
-	if profile != null:
-		damage = profile.damage
-		strength = profile.knockback
-	elif _profile_damage.has(tag):
-		damage = _profile_damage[tag] as int
-		strength = _profile_knockback[tag] as float
-	else:
+	if profile == null:
 		return
+	var damage: int = profile.damage
+	var strength: float = profile.knockback
 	var saved_tag: int = _tag
-	_tag = tag if profile != null else 0
-	var kind: StringName = profile.kind if profile != null else KIND_SHOT
+	_tag = tag
+	var kind: StringName = profile.kind
 	var index: int = _players.find(target)
 	if index >= 0:
 		_apply_to_wizard(player, index, position, profile, damage, strength, kind)
@@ -784,7 +755,7 @@ func _on_projectile_hit(player: int, target: Node, position: Vector2, tag: int) 
 	_tag = saved_tag
 
 
-## A spell's hit (or the AI's old shot, with `profile` null) on the wizard `index`: a heal for a
+## A spell's hit on the wizard `index`: a heal for a
 ## mend hit, else damage, a push away from `position`, then each element's reaction or status, as
 ## on an enemy (staffs F6: wizards react, from the same table, to every spell: an enemy's, a
 ## teammate's with friendly fire, their own). The caster's own spell hurts them like any other

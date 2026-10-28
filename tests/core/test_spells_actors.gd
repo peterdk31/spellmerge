@@ -39,10 +39,9 @@ var _table: ActorSeats.ActorsScript
 ## Every projectile_hit as [caster, target, tag].
 var _hits: Array = []
 ## The first argument (the actor id) and the tag of every caster_move_requested and
-## area_hit_requested; the caster of every combo_cast, form_shown and entity_spawn_requested.
+## area_hit_requested; the caster of every form_shown and entity_spawn_requested.
 var _moves: Array = []
 var _areas: Array = []
-var _combos: Array[int] = []
 var _shown: Array[int] = []
 var _spawns: Array[int] = []
 ## Every mana_refund_requested and mana_reserved as [first argument, amount].
@@ -61,12 +60,11 @@ func before_each() -> void:
 	_spells = own(SpellsScript.new()) as SpellsScript
 	_spells.registry = _fake
 	_spells.bind(_mgr, _bus)
-	for list: Array in [_hits, _moves, _areas, _combos, _shown, _spawns, _refunds, _reserved]:
+	for list: Array in [_hits, _moves, _areas, _shown, _spawns, _refunds, _reserved]:
 		list.clear()
 	_bus.projectile_hit.connect(func(caster: int, target: Node, _at: Vector2, tag: int) -> void: _hits.append([caster, target, tag]))
 	_bus.caster_move_requested.connect(func(caster: int, _mode: StringName, _to: Vector2, _seconds: float, tag: int) -> void: _moves.append([caster, tag]))
 	_bus.area_hit_requested.connect(func(caster: int, _at: Vector2, _radius: float, tag: int) -> void: _areas.append([caster, tag]))
-	_bus.combo_cast.connect(func(caster: int, _class: StringName, _at: Vector2, _dir: Vector2, _tint: Color) -> void: _combos.append(caster))
 	_bus.form_shown.connect(func(caster: int, _form: StringName, _at: Vector2, _dir: Vector2, _length: float, _tint: Color, _look: int) -> void: _shown.append(caster))
 	_bus.entity_spawn_requested.connect(func(caster: int, _kind: StringName, _at: Vector2, _seconds: float, _tag: int, _anchor: int) -> void: _spawns.append(caster))
 	_bus.mana_refund_requested.connect(func(caster: int, amount: float) -> void: _refunds.append([caster, amount]))
@@ -360,13 +358,6 @@ func test_an_enemys_hit_names_its_actor_id() -> void:
 	_cast(imp)
 	_tick(20)
 	check(_hits.size() == 1 and _hits[0][0] == imp, "the hit names the enemy's id: %s" % [_hits])
-
-
-func test_combo_cast_names_the_actor_id() -> void:
-	var imp: int = ActorSeats.enemy(_table)
-	_build(imp, [&"chain", &"bolt"])
-	_cast(imp)
-	check_equal(_combos, [imp] as Array[int], "a boosted cast names its caster")
 
 
 func test_form_shown_names_the_actor_id() -> void:

@@ -57,12 +57,10 @@ signal wizard_cast(player: int, wizard: Node)
 signal projectile_hit(caster: int, target: Node, position: Vector2, tag: int)
 ## Sender: core/projectiles. Where and which way a projectile struck, for looks only (sparks, dust). `target` is the node it hit, sent just before `projectile_hit` for the same hit, or `null` when it ended on a wall or pillar. `caster` is the actor who fired it (NO_PLAYER for a shot of no actor), `position` the point it stopped at and `direction` the unit vector it was flying.
 signal projectile_impact(caster: int, target: Node, position: Vector2, direction: Vector2)
-## Sender: core/projectiles. A projectile fired by the actor `caster` ended without a hit: its life ran out or it struck a wall. `tag` is the value given to `Projectiles.spawn()`.
+## Sender: core/projectiles. A projectile fired by the actor `caster` ended without a hit: its life ran out or it struck a wall. `tag` is the value given to `Projectiles.spawn()`. Heard by core/spells (on expire) and feel (a small pop where a life ran out).
 signal projectile_expired(caster: int, position: Vector2, tag: int)
 ## Sender: core/spells. A beam, a nova or a rain of the actor `caster` just fired, for looks only (they have no shot to draw). `form` is `&"rain"` (a telegraph: its payload falls on `origin` after `length` seconds) or `&"beam"` (`length` is how far it got, along `direction`) or `&"nova"` (a ring of shots leaves `origin`; `length` is 0) or `&"dash"` (the wizard dashes from `origin` along `direction` for `length` pixels, as far as the walls let it). `tint` is the colour of the spell's element (white for plain arcane) and `look` its packed look kinds (`CompiledSpell.look`), so the cue shows its cards.
 signal form_shown(caster: int, form: StringName, origin: Vector2, direction: Vector2, length: float, tint: Color, look: int)
-## Sender: core/spells. The actor `caster` just cast a spell that is more than a plain shot, for looks only. `combo_class` is `&"boosted"` (modifiers only), `&"on_hit"`, `&"on_expire"` or `&"timer"` (a trigger holds a second spell), or `&"stacked"` (a trigger with two or more modifiers, or a chain of three spells); a plain cast sends nothing. `tint` is the element's colour (white for plain arcane). Sent after the cast made a shot. Heard by feel.
-signal combo_cast(caster: int, combo_class: StringName, origin: Vector2, direction: Vector2, tint: Color)
 ## Sender: player. A build change asked for by `player` was refused; `reason` says why in plain words.
 signal build_refused(player: int, reason: String)
 ## Sender: player. The component ids `player` may build with, in registry order. Sent when the wizard appears and whenever the bag changes.
@@ -73,7 +71,7 @@ signal staff_changed(player: int, staff: int, plan: Dictionary)
 signal staff_cast(player: int, staff: int, origin: Vector2, direction: Vector2)
 ## Sender: core/spells. A card of the actor `caster` moves it: `mode` is `&"dash"`, `&"teleport"`, `&"hook"`, `&"swap"` or `&"recoil"`; `to` is where it wants to go (the body stops at walls), over `seconds` (0 is at once); `tag` is the card's tag. Heard by player (a wizard's actor) and ai (an enemy's), each for its own actor id, which answer with `caster_move_finished`. Several requests can come in one step (a scatter, a burst, `mirror`): the body adds up the `recoil` requests of a step (so `mirror · recoil` cancels) and lets a later dash, teleport, hook or swap replace an earlier one.
 signal caster_move_requested(caster: int, mode: StringName, to: Vector2, seconds: float, tag: int)
-## Sender: player (a wizard's move) and ai (an enemy's; staffs F8c). The move the actor `caster` was asked for by `caster_move_requested` ended at `position`: the end point of a dash, teleport or hook. Heard by core/spells.
+## Sender: player (a wizard's move) and ai (an enemy's; staffs F8c). The move the actor `caster` was asked for by `caster_move_requested` ended at `position`: the end point of a dash, teleport or hook. Heard by core/spells and feel (where a dash lands).
 signal caster_move_finished(caster: int, mode: StringName, position: Vector2, tag: int)
 ## Sender: core/spells. A card of the actor `caster` (swap) moves `target` to `to`. Heard by ai.
 signal target_move_requested(caster: int, target: Node, to: Vector2)

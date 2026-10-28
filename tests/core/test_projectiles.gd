@@ -573,12 +573,12 @@ func _test_batches_upload_only_the_used_slice() -> void:
 		_check(_mgr.drawn == count and multimesh.visible_instance_count == count, "%d shots are drawn (%d)" % [count, _mgr.drawn])
 		var buffer: PackedFloat32Array = multimesh.buffer
 		var room: int = multimesh.instance_count
-		_check(room >= count and room <= 200 and buffer.size() == room * stride, "the upload holds %d shots in room for %d" % [room, count])
+		_check(room >= count and room <= 256 and buffer.size() == room * stride, "the upload holds %d shots in room for %d" % [room, count])
 		_check(count > 1 or room == ManagerScript.MIN_BATCH, "one shot uploads only the smallest batch (%d)" % room)
 		var seen: int = 0
-		var back: float = ManagerScript.look_back(5.0)
 		for i in count:
-			if is_equal_approx(buffer[i * stride + 3], float(i) + 1.0 - back):
+			# A shot's instance holds its head where it is drawn (its trail is placed by the shader).
+			if is_equal_approx(buffer[i * stride + 3], float(i) + 1.0):
 				seen += 1
 		_check(seen == count, "all %d shots are in the upload at their places (%d)" % [count, seen])
 	_mgr.clear()
@@ -646,18 +646,16 @@ func _test_every_batch_is_sized_to_its_own_shots() -> void:
 	var rune_buffer: PackedFloat32Array = _mgr._rune_node.multimesh.buffer
 	var hostile_buffer: PackedFloat32Array = _mgr._enemy_node.multimesh.buffer
 	var orbit_buffer: PackedFloat32Array = _mgr._orbit_node.multimesh.buffer
-	# A bolt's or orbit shot's quad reaches ahead of it and holds its tail behind (look_back).
-	_check(is_equal_approx(bolt_buffer[(bolts - 1) * stride + 3], float(bolts) - ManagerScript.look_back(5.0)), "the last bolt is at its place")
+	# A shot in flight holds its head where it is drawn; the shader puts the quad round its trail.
+	_check(is_equal_approx(bolt_buffer[(bolts - 1) * stride + 3], float(bolts)), "the last bolt is at its place")
 	_check(is_equal_approx(rune_buffer[(runes - 1) * stride + 3], float(runes)) and is_equal_approx(rune_buffer[7], 50.0), "the last rune is at its place")
-	# Drawn by the shader like a bolt: its quad's centre is look_back behind it.
-	_check(is_equal_approx(hostile_buffer[stride + 3], 2.0) and is_equal_approx(hostile_buffer[stride + 7], 90.0 - ManagerScript.look_back(5.0)), "the last enemy shot is at its place")
+	_check(is_equal_approx(hostile_buffer[stride + 3], 2.0) and is_equal_approx(hostile_buffer[stride + 7], 90.0), "the last enemy shot is at its place")
 	var orbit_ok: bool = true
 	for i in orbits:
-		var slot: int = orbit_slots[i]
-		var centre: Vector2 = _mgr._pos[slot] - _mgr._vel[slot].normalized() * ManagerScript.look_back(_mgr._radius[slot])
-		orbit_ok = orbit_ok and is_equal_approx(orbit_buffer[i * stride + 3], centre.x)
-		orbit_ok = orbit_ok and is_equal_approx(orbit_buffer[i * stride + 7], centre.y)
-	_check(orbit_ok, "the orbit shots are at their places")
+		# Just cast: drawn on its caster, before it spirals out to its circle (ORBIT_GROW).
+		orbit_ok = orbit_ok and is_equal_approx(orbit_buffer[i * stride + 3], 100.0)
+		orbit_ok = orbit_ok and is_equal_approx(orbit_buffer[i * stride + 7], 100.0)
+	_check(orbit_ok and orbit_slots.min() >= 0, "the orbit shots are at their places")
 	root.remove_child(_mgr)
 
 
@@ -668,9 +666,10 @@ func _test_batch_room_grows_and_shrinks_with_hysteresis() -> void:
 	root.add_child(_mgr)
 	_mgr.set_cap(300)
 	var min_batch: int = ManagerScript.MIN_BATCH
-	# [shots drawn, expected room]: room 64 at 64, 128 at 65, 256 at 129, the cap at 257.
-	var steps: Array = [[1, min_batch], [64, min_batch], [65, 128], [129, 256], [257, 300], [300, 300],
-		[76, 300], [75, 128], [33, 128], [32, 64], [1, 64]]
+	# [shots drawn, expected room]: room 64 at 64, 128 at 65, 256 at 129, 512 at 257 (the bolt
+	# batch also draws the trails that outlive their shots, so it may grow past the cap).
+	var steps: Array = [[1, min_batch], [64, min_batch], [65, 128], [129, 256], [257, 512], [300, 512],
+		[129, 512], [128, 128], [33, 128], [32, 64], [1, 64]]
 	for step: Array in steps:
 		_mgr.clear()
 		for i in int(step[0]):

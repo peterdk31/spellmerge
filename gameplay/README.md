@@ -23,8 +23,8 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `wizard_cast` | `player` | `feel` |
 | `projectile_hit` | `core/projectiles` | `combat` |
 | `projectile_impact` | `core/projectiles` | `feel` |
-| `form_shown`, `combo_cast` | `core/spells` | `feel` |
-| `projectile_expired` | `core/projectiles` | none yet (`core/spells` from M2 part 6) |
+| `form_shown` | `core/spells` | `feel` |
+| `projectile_expired` | `core/projectiles` | `core/spells` (on expire), `feel` |
 | `build_refused` | `player` | `hud` (the builders) |
 | `bag_changed` | `player` | `hud` (the builders) |
 | `card_move_requested` | `hud` (the builders) | `player` |
@@ -36,7 +36,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `mana_refund_requested` | `core/spells` (for every actor) | `player`, `ai`, `actor` (the Caster), each for its own actor id |
 | `area_hit_requested` | `core/spells` | `combat` |
 | `target_move_requested`, `entity_spawn_requested`, `entity_end_requested` | `core/spells` (staffs B2) | `ai`; `target_move_requested` also `actor` (the Mover) |
-| `caster_move_finished` | `player`, `ai`, `actor` (the Mover), each with its own actor id | `core/spells` |
+| `caster_move_finished` | `player`, `ai`, `actor` (the Mover), each with its own actor id | `core/spells`, `feel` (where a dash lands) |
 | `entity_ended`, `familiar_cast_requested` | `ai` | none yet (`core/spells`, staffs B2) |
 | `shot_blocked` | `core/projectiles` | none yet (`core/spells`, staffs B1) |
 | `shield_blocked`, `kill_landed`, `actor_hurt`, `reaction_landed` | `combat` | `core/spells` (on block, on kill, on hurt, on reaction) |

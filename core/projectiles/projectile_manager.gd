@@ -40,12 +40,14 @@ extends Node2D
 ##
 ## Drawing: a shot is built by `shot_core.gdshader` on a pixel grid (staffs B6a; the glow look,
 ## 2026-10-27): a small white-hot core in the ramp of its first infusion's colour (`set_core`;
-## its caster's ramp for a plain shot), a long tail that cools and frays and bends with its path
-## (`bend_of`), a soft glow round both, and particles given off from its tail in the styles of
-## all its cards (`set_look`), mixed at random. It is drawn about its hit size (`look_size`).
-## Shots in the enemy ramp (`Actors.RAMP_ENEMY`, and a shot of no actor) are drawn by the same
-## shader (`ramp_look`), one layer above, so a dangerous shot never hides under a friendly one
-## (staffs F9b: the old enemy shot's own texture is gone).
+## its caster's ramp for a plain shot), a long tail that cools and frays, a soft glow round both,
+## and particles given off in the styles of all its cards (`set_look`), mixed at random. The tail
+## and the particles are left in the world where the shot was (its trail, see TRAIL_SAMPLES; the
+## owner, 2026-10-28), so they bend with any path and cool where it ended; a caster's dash is
+## drawn the same way (`follow_caster`). It is drawn about its hit size (`look_size`). Shots in
+## the enemy ramp (`Actors.RAMP_ENEMY`, and a shot of no actor) are drawn by the same shader
+## (`ramp_look`), one layer above, so a dangerous shot never hides under a friendly one (staffs
+## F9b: the old enemy shot's own texture is gone).
 ##
 ## Casters (actors G3a, docs/milestones/M2-actors.md): a shot's caster is an actor id (0 to
 ## ACTORS - 1, `core/actors`) or NO_PLAYER (`Actors.NONE`, a shot of no actor). Nothing here
@@ -325,6 +327,35 @@ const LOOK_ZOOM_MAX: int = 15
 const PARTICLE_CAP: int = 1024
 ## What a bolt's trail counts in the pool.
 const TRAIL_COST: int = 4
+## Trails (the owner, 2026-10-28: tails that stay where the shot was, as in the mockup): every
+## flying shot keeps the last TRAIL_SAMPLES points of its path, one every TRAIL_EVERY seconds and
+## one at every bounce, jump and end, each with how far the shot had gone and when. The shader
+## leaves the tail pixels and the card particles along that path in the world, so they bend with
+## it and stay behind; the rows go to the shader in one texture (`trail_data`, a row of
+## TRAIL_SAMPLES texels x, y, odometer, time per trail). A trail outlives its shot by TRAIL_KEEP
+## seconds (the longest any of it lives), so the tail cools where the shot ended. There are
+## TRAIL_ROWS_PER_SLOT x the cap rows; a shot that finds none is drawn without a tail. A step
+## longer than TRAIL_JUMP pixels (a teleport) starts the path afresh.
+const TRAIL_SAMPLES: int = 32
+const TRAIL_EVERY: float = 1.0 / 30.0
+const TRAIL_KEEP: float = 1.0
+const TRAIL_ROWS_PER_SLOT: int = 2
+const TRAIL_JUMP: float = 96.0
+## Floats per trail row in `trail_data`.
+const TRAIL_STRIDE: int = TRAIL_SAMPLES * 4
+## The smallest the trail texture gets, in rows (it grows by powers of two with the rows used).
+const MIN_TRAIL_ROWS: int = 64
+## A trail's flags in its instance (the shader's TF_*): its shot is alive (the core is drawn and
+## the path runs on to it), an orbit shot (a shorter tail), a wizard's dash (`follow_caster`).
+const TRAIL_HEAD: int = 1
+const TRAIL_ORBIT: int = 2
+const TRAIL_DASH: int = 4
+## What holds a trail row, when it is not a shot's slot.
+const ROW_FREE: int = -1
+const ROW_FADING: int = -2
+const ROW_CASTER: int = -3
+## An orbit shot spirals out from its caster to its circle over this many seconds.
+const ORBIT_GROW: float = 0.25
 ## Particles a shot keeps in the air at most (the same number as the shader's).
 const PARTICLES_PER_SHOT_MAX: int = 12
 ## The look bits of the kinds that give off particles: all of them but the weave.
@@ -378,10 +409,15 @@ var impact_form: StringName = &""
 ## beam and outside an impact). For looks only.
 var impact_core: Color = Color.WHITE
 var impact_look: int = 0
+## The way the shot was flying, while a `projectile_expired` is sent (with `impact_form`,
+## `impact_core` and `impact_look`, so Feel can show where its life ran out).
+var impact_heading: Vector2 = Vector2.ZERO
 ## How many projectiles ended on a wall, since start.
 var wall_hits: int = 0
 ## Projectiles written into the batch by the last update_draw().
 var drawn: int = 0
+## Trails drawn in the last `update_draw` that no live shot holds (cooling, or a caster's).
+var drawn_trails: int = 0
 ## The global count of the spark pool (see PARTICLE_CAP). Tests and a future effect quality
 ## setting change it; it never changes what a shot does.
 var particle_cap: int = PARTICLE_CAP
@@ -430,6 +466,8 @@ var _motion: PackedByteArray = PackedByteArray()
 var _orbit_radius: PackedFloat32Array = PackedFloat32Array()
 var _orbit_angle: PackedFloat32Array = PackedFloat32Array()
 var _orbit_speed: PackedFloat32Array = PackedFloat32Array()
+## Where an orbit shot's caster was at its last step (INF before its first), for `_drawn_at`.
+var _orbit_centre: PackedVector2Array = PackedVector2Array()
 ## Homing: turn rate in rad/s (0 for none) and the point last found (INF for none).
 var _turn: PackedFloat32Array = PackedFloat32Array()
 var _home_at: PackedVector2Array = PackedVector2Array()
@@ -541,6 +579,40 @@ var _orbit_buffer: PackedFloat32Array = PackedFloat32Array()
 var _enemy_node: MultiMeshInstance2D = null
 var _enemy_buffer: PackedFloat32Array = PackedFloat32Array()
 var _enemy_room: int = 0
+## Trails (see TRAIL_SAMPLES): each shot's row (-1 for none), and per row its samples (`trail_data`
+## in the shader), the number of its newest sample, how many it keeps, how far it has gone, its
+## last point, what holds it (a slot or ROW_*), and, once its shot is gone (or for a caster's
+## trail), what it is drawn as and until when.
+var _trail: PackedInt32Array = PackedInt32Array()
+var _trail_data: PackedFloat32Array = PackedFloat32Array()
+var _trail_newest: PackedInt32Array = PackedInt32Array()
+var _trail_kept: PackedInt32Array = PackedInt32Array()
+var _trail_odo: PackedFloat32Array = PackedFloat32Array()
+var _trail_last: PackedVector2Array = PackedVector2Array()
+var _trail_holder: PackedInt32Array = PackedInt32Array()
+var _trail_caster: PackedInt32Array = PackedInt32Array()
+## Each row's ramp (`Actors.ramp_of` of its caster when the row began; see `look_color`).
+var _trail_ramp: PackedInt32Array = PackedInt32Array()
+var _trail_look: PackedInt32Array = PackedInt32Array()
+var _trail_core: PackedColorArray = PackedColorArray()
+var _trail_zoom: PackedInt32Array = PackedInt32Array()
+var _trail_flags: PackedInt32Array = PackedInt32Array()
+var _trail_until: PackedFloat32Array = PackedFloat32Array()
+var _trail_free: PackedInt32Array = PackedInt32Array()
+var _trail_free_count: int = 0
+var _trail_high: int = 0
+## The rows held by no live shot (fading, or a caster's), so drawing never walks every row.
+var _loose: PackedInt32Array = PackedInt32Array()
+var _loose_count: int = 0
+## The last sample tick taken (sim_time / TRAIL_EVERY, floored), and whether a row changed since
+## the texture was last sent.
+var _trail_tick: int = -1
+var _trail_dirty: bool = false
+var _trail_image: Image = null
+var _trail_texture: ImageTexture = null
+var _trail_rows: int = 0
+## The length of the last step, so the drawing knows when its heads are (see `update_draw`).
+var _last_delta: float = 0.0
 ## True inside step(): the grid is in use, so a target removed then is only
 ## switched off (layer 0) and swept at the start of the next step.
 var _stepping: bool = false
@@ -651,6 +723,7 @@ func set_cap(value: int) -> void:
 	_orbit_radius.resize(_cap)
 	_orbit_angle.resize(_cap)
 	_orbit_speed.resize(_cap)
+	_orbit_centre.resize(_cap)
 	_turn.resize(_cap)
 	_home_at.resize(_cap)
 	_home_range.resize(_cap)
@@ -688,6 +761,25 @@ func set_cap(value: int) -> void:
 	_core.resize(_cap)
 	_look.resize(_cap)
 	_born.resize(_cap)
+	_trail.resize(_cap)
+	_trail.fill(-1)
+	var rows: int = _cap * TRAIL_ROWS_PER_SLOT
+	_trail_newest.resize(rows)
+	_trail_kept.resize(rows)
+	_trail_odo.resize(rows)
+	_trail_last.resize(rows)
+	_trail_holder.resize(rows)
+	_trail_caster.resize(rows)
+	_trail_ramp.resize(rows)
+	_trail_look.resize(rows)
+	_trail_core.resize(rows)
+	_trail_zoom.resize(rows)
+	_trail_flags.resize(rows)
+	_trail_until.resize(rows)
+	_trail_free.resize(rows)
+	_loose.resize(rows)
+	_trail_data.resize(0)
+	_trail_rows = 0
 	_draw_buffer.resize(0)
 	_rune_buffer.resize(0)
 	_orbit_buffer.resize(0)
@@ -880,6 +972,15 @@ func clear() -> void:
 	_owned.fill(0)
 	_own_head.fill(-1)
 	_own_tail.fill(-1)
+	_trail.fill(-1)
+	_trail_holder.fill(ROW_FREE)
+	var rows: int = _trail_free.size()
+	for i in rows:
+		_trail_free[i] = rows - 1 - i
+	_trail_free_count = rows
+	_trail_high = 0
+	_loose_count = 0
+	_trail_dirty = true
 	# `drawn` stays: the next update_draw() must still empty the batch.
 
 
@@ -1052,6 +1153,11 @@ func spawn_orbit(caster: int, orbit_radius: float, angle: float, angular_speed: 
 	_orbit_angle[slot] = angle
 	_orbit_speed[slot] = angular_speed
 	_vel[slot] = _orbit_tangent(slot)
+	# It is drawn spiralling out from its caster (`_drawn_at`), so its trail starts there.
+	_orbit_centre[slot] = around
+	if _trail[slot] >= 0:
+		_trail_kept[_trail[slot]] = 0
+		_trail_sample(_trail[slot], around)
 	return slot
 
 
@@ -1147,6 +1253,10 @@ func move_shot(slot: int, offset: Vector2, seconds: float, turn_rate: float = 0.
 		_pos[slot] = to
 		_prev[slot] = to
 		_move_left[slot] = 0.0
+		if _trail[slot] >= 0:
+			# A blink leaves no tail across the gap.
+			_trail_kept[_trail[slot]] = 0
+			_trail_sample(_trail[slot], to)
 		return true
 	_move_left[slot] = seconds
 	_move_vel[slot] = offset / seconds
@@ -1398,6 +1508,8 @@ func _spawn_row(caster: int, origin: Vector2, velocity: Vector2, lifetime: float
 	_move_turn[slot] = 0.0
 	for i in HIT_MEMORY:
 		_last_hit[slot * HIT_MEMORY + i] = 0
+	_orbit_centre[slot] = Vector2.INF
+	_trail[slot] = -1 if motion == MOTION_STILL else _open_row(slot, origin)
 	_alive[slot] = 1
 	_count += 1
 	var owner_index: int = _budget[slot]
@@ -1417,6 +1529,7 @@ func _spawn_row(caster: int, origin: Vector2, velocity: Vector2, lifetime: float
 ## Move every projectile by `delta` seconds, find hits and send the events.
 func step(delta: float) -> void:
 	sim_time += delta
+	_last_delta = delta
 	_refresh_targets()
 	var top: int = _high
 	var first_new: int = _next_seq
@@ -1504,6 +1617,7 @@ func step(delta: float) -> void:
 	_resume = maxi(starved_at, 0)
 	_step_index += 1
 	_stepping = false
+	_sample_trails()
 
 
 ## A shot met a wall: it bounces while it has bounces left, otherwise it ends there.
@@ -1532,6 +1646,9 @@ func _wall_end(slot: int) -> void:
 	_vel[slot] = velocity
 	_pos[slot] = at
 	_base[slot] = at
+	# The corner, so the tail turns there.
+	if _trail[slot] >= 0:
+		_trail_sample(_trail[slot], at)
 	# A bounced shot may hit what it hit before.
 	for i in HIT_MEMORY:
 		_last_hit[slot * HIT_MEMORY + i] = 0
@@ -1643,6 +1760,19 @@ func _orbit_move(slot: int, delta: float, centre: Vector2) -> void:
 	_orbit_angle[slot] = wrapf(_orbit_angle[slot] + _orbit_speed[slot] * delta, -PI, PI)
 	_pos[slot] = centre + Vector2.from_angle(_orbit_angle[slot]) * _orbit_radius[slot]
 	_vel[slot] = _orbit_tangent(slot)
+	_orbit_centre[slot] = centre
+
+
+## Where a shot is drawn when it is at `at`: where it is, except a new orbit shot, which is drawn
+## spiralling out from its caster to its circle over ORBIT_GROW seconds (the mockup's; it hits
+## at its circle from the start, so a ring's hits do not wait on the look).
+func _drawn_at(slot: int, at: Vector2) -> Vector2:
+	if _motion[slot] != MOTION_ORBIT:
+		return at
+	var out: float = (sim_time - _born[slot]) / ORBIT_GROW
+	if out >= 1.0 or not _orbit_centre[slot].is_finite():
+		return at
+	return _orbit_centre[slot].lerp(at, maxf(out, 0.0))
 
 
 func _orbit_tangent(slot: int) -> Vector2:
@@ -2000,26 +2130,195 @@ func _ray_keep(base: int, found: int, wanted: int, t: int, along: float, closest
 ## while there are no projectiles. `fraction` (0 to 1) fixes how far between the last two
 ## steps shots are drawn, instead of the engine's real time since the last physics tick;
 ## 1.0 draws every shot where its last step put it (the clip recorder needs that).
+## Take a trail row for `holder` (a slot, or ROW_CASTER) starting at `at`, or -1 when none is free.
+func _open_row(holder: int, at: Vector2) -> int:
+	if _trail_free_count == 0:
+		return -1
+	_trail_free_count -= 1
+	var row: int = _trail_free[_trail_free_count]
+	_trail_holder[row] = holder
+	_trail_kept[row] = 0
+	_trail_newest[row] = -1
+	_trail_odo[row] = 0.0
+	_trail_flags[row] = 0
+	if row >= _trail_high:
+		_trail_high = row + 1
+		_fit_trail_data()
+	_trail_sample(row, at)
+	return row
+
+
+## Add the point `at` (now) to trail `row`.
+func _trail_sample(row: int, at: Vector2) -> void:
+	var kept: int = _trail_kept[row]
+	if kept > 0:
+		var moved: float = at.distance_to(_trail_last[row])
+		if moved > TRAIL_JUMP:
+			kept = 0
+		else:
+			_trail_odo[row] += moved
+	var n: int = _trail_newest[row] + 1
+	var i: int = row * TRAIL_STRIDE + (n % TRAIL_SAMPLES) * 4
+	_trail_data[i] = at.x
+	_trail_data[i + 1] = at.y
+	_trail_data[i + 2] = _trail_odo[row]
+	_trail_data[i + 3] = sim_time
+	_trail_newest[row] = n
+	_trail_kept[row] = mini(kept + 1, TRAIL_SAMPLES)
+	_trail_last[row] = at
+	_trail_dirty = true
+
+
+## The shot in `slot` ended: its trail takes its last point and is drawn on by itself, without a
+## core, until all of it has cooled (TRAIL_KEEP).
+func _fade_row(row: int, slot: int) -> void:
+	_trail_sample(row, _drawn_at(slot, _pos[slot]))
+	_trail_caster[row] = _actor[slot]
+	_trail_ramp[row] = _ramp[slot]
+	_trail_look[row] = _look[slot]
+	_trail_core[row] = _core[slot]
+	_trail_zoom[row] = look_zoom(_radius[slot])
+	_trail_flags[row] = TRAIL_ORBIT if _motion[slot] == MOTION_ORBIT else 0
+	_let_loose(row, sim_time + TRAIL_KEEP)
+
+
+func _let_loose(row: int, until: float) -> void:
+	if _trail_holder[row] != ROW_CASTER:
+		_loose[_loose_count] = row
+		_loose_count += 1
+	_trail_holder[row] = ROW_FADING
+	_trail_until[row] = until
+
+
+## Draw an actor's dash (a wizard's, an enemy's): a trail that follows `caster`'s anchor (see
+## `set_anchor`) for `seconds`, in its ramp's colours with the card particles of `look` in the
+## ramp of `core`, then cools like a shot's. Returns its row, or -1 when there is no anchor or no
+## free row. The path is the caster's own, so a dash that slides along a wall or homes is drawn
+## where it went.
+func follow_caster(caster: int, core: Color, look: int, seconds: float) -> int:
+	if not is_caster(caster) or caster < 0 or not _anchors[caster].is_finite() or not (seconds >= 0.0):
+		return -1
+	var row: int = _open_row(ROW_CASTER, _anchors[caster])
+	if row < 0:
+		return -1
+	_trail_caster[row] = caster
+	_trail_ramp[row] = _ramp_of(caster)
+	_trail_look[row] = look
+	_trail_core[row] = Color(core.r, core.g, core.b, 1.0)
+	_trail_zoom[row] = 1
+	_trail_flags[row] = TRAIL_DASH
+	_trail_until[row] = sim_time + seconds
+	_loose[_loose_count] = row
+	_loose_count += 1
+	return row
+
+
+## Live trails: how many rows a shot or a caster holds, or that are still cooling (for tests).
+func get_trail_count() -> int:
+	return _trail_free.size() - _trail_free_count
+
+
+## The trail row of the shot in `slot` (-1 for none or an empty slot), for tests.
+func get_trail_of(slot: int) -> int:
+	if slot < 0 or slot >= _cap or _alive[slot] == 0:
+		return -1
+	return _trail[slot]
+
+
+## How many points trail `row` keeps, and its newest (x, y, odometer, time), for tests.
+func get_trail_kept(row: int) -> int:
+	return _trail_kept[row] if row >= 0 and row < _trail_kept.size() else 0
+
+
+func get_trail_point(row: int, back: int) -> Vector4:
+	if row < 0 or row >= _trail_kept.size() or back < 0 or back >= _trail_kept[row]:
+		return Vector4(INF, INF, INF, INF)
+	var i: int = row * TRAIL_STRIDE + ((_trail_newest[row] - back) % TRAIL_SAMPLES) * 4
+	return Vector4(_trail_data[i], _trail_data[i + 1], _trail_data[i + 2], _trail_data[i + 3])
+
+
+## Every TRAIL_EVERY seconds: each flying shot and each caster's trail takes its point, a caster's
+## trail whose time is up starts to cool, and the cooled rows are given back.
+func _sample_trails() -> void:
+	var tick: int = floori(sim_time / TRAIL_EVERY)
+	if tick == _trail_tick:
+		return
+	_trail_tick = tick
+	for slot in _high:
+		if _alive[slot] != 0 and _trail[slot] >= 0:
+			_trail_sample(_trail[slot], _drawn_at(slot, _pos[slot]))
+	var n: int = 0
+	while n < _loose_count:
+		var row: int = _loose[n]
+		if _trail_holder[row] == ROW_CASTER:
+			var at: Vector2 = _anchors[_trail_caster[row]]
+			if at.is_finite():
+				_trail_sample(row, at)
+			if sim_time >= _trail_until[row] or not at.is_finite():
+				_trail_holder[row] = ROW_FADING
+				_trail_until[row] = sim_time + TRAIL_KEEP
+		elif sim_time >= _trail_until[row]:
+			# Cooled: give the row back.
+			_trail_holder[row] = ROW_FREE
+			_trail_free[_trail_free_count] = row
+			_trail_free_count += 1
+			_loose_count -= 1
+			_loose[n] = _loose[_loose_count]
+			continue
+		n += 1
+	while _trail_high > 0 and _trail_holder[_trail_high - 1] == ROW_FREE:
+		_trail_high -= 1
+
+
+## Size `_trail_data` for the rows in use: a power of two, at least MIN_TRAIL_ROWS.
+func _fit_trail_data() -> void:
+	var wanted: int = maxi(_trail_rows, MIN_TRAIL_ROWS)
+	while wanted < _trail_high:
+		wanted *= 2
+	if wanted != _trail_rows:
+		_trail_rows = wanted
+		_trail_data.resize(wanted * TRAIL_STRIDE)
+		_trail_texture = null
+
+
+## Send the trails to the shader when a row changed: one texture of `_trail_rows` rows.
+func _upload_trails() -> void:
+	if not _trail_dirty or _trail_rows == 0:
+		return
+	_trail_dirty = false
+	if _trail_image == null:
+		_trail_image = Image.create_empty(TRAIL_SAMPLES, _trail_rows, false, Image.FORMAT_RGBAF)
+	_trail_image.set_data(TRAIL_SAMPLES, _trail_rows, false, Image.FORMAT_RGBAF, _trail_data.to_byte_array())
+	if _trail_texture == null or _trail_texture.get_height() != _trail_rows:
+		_trail_texture = ImageTexture.create_from_image(_trail_image)
+		for node: MultiMeshInstance2D in [_draw_node, _orbit_node, _enemy_node]:
+			(node.material as ShaderMaterial).set_shader_parameter(&"trail_data", _trail_texture)
+	else:
+		_trail_texture.update(_trail_image)
+
+
 func update_draw(fraction: float = -1.0) -> void:
 	if _draw_node == null:
 		drawn = 0
 		return
-	if _high == 0 and drawn == 0:
+	if _high == 0 and drawn == 0 and drawn_trails == 0 and _loose_count == 0:
 		return
 	var multimesh: MultiMesh = _draw_node.multimesh
 	if fraction < 0.0:
 		fraction = Engine.get_physics_interpolation_fraction()
 	fraction = clampf(fraction, 0.0, 1.0)
-	_set_sim_time(_draw_node)
-	_set_sim_time(_rune_node)
-	_set_sim_time(_orbit_node)
-	_set_sim_time(_enemy_node)
+	_set_sim_time(_draw_node, fraction)
+	_set_sim_time(_rune_node, fraction)
+	_set_sim_time(_orbit_node, fraction)
+	_set_sim_time(_enemy_node, fraction)
+	_upload_trails()
 	_count_batches()
 	var counts: PackedInt32Array = _batch_counts
-	_draw_room = _fit_batch(multimesh, _draw_buffer, _draw_room, counts[BATCH_BOLT])
+	# The bolts' and the enemies' batches also draw the loose trails (more than the cap).
+	_draw_room = _fit_batch(multimesh, _draw_buffer, _draw_room, counts[BATCH_BOLT], _cap * (1 + TRAIL_ROWS_PER_SLOT))
 	_rune_room = _fit_batch(_rune_node.multimesh, _rune_buffer, _rune_room, counts[BATCH_RUNE])
 	_orbit_room = _fit_batch(_orbit_node.multimesh, _orbit_buffer, _orbit_room, counts[BATCH_ORBIT])
-	_enemy_room = _fit_batch(_enemy_node.multimesh, _enemy_buffer, _enemy_room, counts[BATCH_ENEMY])
+	_enemy_room = _fit_batch(_enemy_node.multimesh, _enemy_buffer, _enemy_room, counts[BATCH_ENEMY], _cap * (1 + TRAIL_ROWS_PER_SLOT))
 	var out: int = 0
 	var rune_out: int = 0
 	var orbit_out: int = 0
@@ -2032,29 +2331,49 @@ func update_draw(fraction: float = -1.0) -> void:
 		var dir: Vector2 = Vector2.RIGHT
 		if _vel[slot].length_squared() > 0.0:
 			dir = _vel[slot].normalized()
-		var at: Vector2 = _prev[slot].lerp(_pos[slot], fraction)
+		var at: Vector2 = _drawn_at(slot, _prev[slot].lerp(_pos[slot], fraction))
 		var batch: int = _batch_of(slot)
 		var size: float = look_size(_radius[slot])
 		var look_data: Color = _look_color(slot)
 		asked += particles_of(_look[slot])
-		if batch == BATCH_BOLT or (batch == BATCH_ENEMY and _motion[slot] == MOTION_STRAIGHT):
+		var rune: bool = _motion[slot] == MOTION_STILL
+		if not rune:
 			trails += TRAIL_COST
+		var flags: int = TRAIL_HEAD | (TRAIL_ORBIT if _motion[slot] == MOTION_ORBIT else 0)
 		if batch == BATCH_ENEMY:
-			var kind: int = _kind_of(slot)
-			if kind == KIND_RUNE:
+			if rune:
 				_write_quad(_enemy_buffer, enemy_out * DRAW_STRIDE, dir, size, at, look_data, _core[slot], KIND_RUNE, 0.0, trace_code(sim_time - _born[slot]))
 			else:
-				_write_quad(_enemy_buffer, enemy_out * DRAW_STRIDE, dir, size, at, look_data, _core[slot], kind, look_length(_radius[slot]), bend_code(bend_of(slot)))
+				_write_trail(_enemy_buffer, enemy_out * DRAW_STRIDE, _trail[slot], at, flags, look_data, _core[slot])
 			enemy_out += 1
 		elif batch == BATCH_RUNE:
 			_write_quad(_rune_buffer, rune_out * DRAW_STRIDE, dir, size, at, look_data, _core[slot], KIND_RUNE, 0.0, trace_code(sim_time - _born[slot]))
 			rune_out += 1
 		elif batch == BATCH_ORBIT:
-			_write_quad(_orbit_buffer, orbit_out * DRAW_STRIDE, dir, size, at, look_data, _core[slot], KIND_ORBIT, look_length(_radius[slot]), bend_code(bend_of(slot)))
+			_write_trail(_orbit_buffer, orbit_out * DRAW_STRIDE, _trail[slot], at, flags, look_data, _core[slot])
 			orbit_out += 1
 		else:
-			_write_quad(_draw_buffer, out * DRAW_STRIDE, dir, size, at, look_data, _core[slot], KIND_BOLT, look_length(_radius[slot]), bend_code(bend_of(slot)))
+			_write_trail(_draw_buffer, out * DRAW_STRIDE, _trail[slot], at, flags, look_data, _core[slot])
 			out += 1
+	var shots_out: int = out + rune_out + orbit_out + enemy_out
+	var enemy_shots: int = enemy_out
+	# The trails held by no live shot: cooling where their shot ended, or following a caster.
+	for n in _loose_count:
+		var row: int = _loose[n]
+		var caster: int = _trail_caster[row]
+		var head: Vector2 = _trail_last[row]
+		var flags: int = _trail_flags[row]
+		if _trail_holder[row] == ROW_CASTER:
+			flags |= TRAIL_HEAD
+			if _anchors[caster].is_finite():
+				head = _anchors[caster]
+		var data: Color = look_color(_trail_ramp[row], _trail_zoom[row], _trail_look[row])
+		if is_hat_ramp(_trail_ramp[row]):
+			_write_trail(_draw_buffer, out * DRAW_STRIDE, row, head, flags, data, _trail_core[row])
+			out += 1
+		else:
+			_write_trail(_enemy_buffer, enemy_out * DRAW_STRIDE, row, head, flags, data, _trail_core[row])
+			enemy_out += 1
 	if out > 0:
 		multimesh.buffer = _draw_buffer
 	multimesh.visible_instance_count = out
@@ -2067,14 +2386,18 @@ func update_draw(fraction: float = -1.0) -> void:
 	if enemy_out > 0:
 		_enemy_node.multimesh.buffer = _enemy_buffer
 	_enemy_node.multimesh.visible_instance_count = enemy_out
-	drawn_enemy = enemy_out
-	drawn = out + rune_out + orbit_out + enemy_out
+	drawn_enemy = enemy_shots
+	drawn = shots_out
+	drawn_trails = out + rune_out + orbit_out + enemy_out - shots_out
 	_share_pool(asked, trails)
 
 
-## Hand the shader the simulation clock (`shot_core.gdshader` animates from it).
-func _set_sim_time(node: MultiMeshInstance2D) -> void:
-	(node.material as ShaderMaterial).set_shader_parameter(&"sim_time", sim_time)
+## Hand the shader the simulation clock (`shot_core.gdshader` animates from it), and the moment
+## the heads are drawn at, `fraction` of the way through the last step (`trail_now`).
+func _set_sim_time(node: MultiMeshInstance2D, fraction: float) -> void:
+	var material: ShaderMaterial = node.material as ShaderMaterial
+	material.set_shader_parameter(&"sim_time", sim_time)
+	material.set_shader_parameter(&"trail_now", sim_time - (1.0 - fraction) * _last_delta)
 
 
 ## Share the spark pool out for a frame that asked for `asked` particles and `trails` of trail:
@@ -2142,6 +2465,8 @@ func _count_batches() -> void:
 	for slot in _high:
 		if _alive[slot] != 0:
 			_batch_counts[_batch_of(slot)] += 1
+	for n in _loose_count:
+		_batch_counts[BATCH_BOLT if is_hat_ramp(_trail_ramp[_loose[n]]) else BATCH_ENEMY] += 1
 
 
 ## Size a batch's MultiMesh and buffer to draw `used` shots; returns the new room.
@@ -2195,26 +2520,6 @@ static func trace_code(age: float) -> float:
 	if age >= RUNE_TRACE or age < 0.0:
 		return 0.0
 	return TRACE_FROM + TRACE_SPAN * age / RUNE_TRACE
-
-
-## How the path of a live shot curves (see BEND_ZERO): 1 / the radius, signed. An orbit shot's
-## comes from its circle; any other shot's from its last step, whose chord lags its heading by
-## half the turn, so a homing, spiralling or returning shot bends its tail as it turns. 0 for a
-## straight path, a corner, or a shot that did not move.
-func bend_of(slot: int) -> float:
-	if _motion[slot] == MOTION_ORBIT:
-		var radius: float = _orbit_radius[slot]
-		if radius <= 0.0 or _orbit_speed[slot] == 0.0:
-			return 0.0
-		return signf(_orbit_speed[slot]) / maxf(radius, BEND_RADIUS)
-	var chord: Vector2 = _pos[slot] - _prev[slot]
-	var moved: float = chord.length()
-	if moved < 0.5 or _vel[slot].length_squared() == 0.0:
-		return 0.0
-	var turn: float = chord.angle_to(_vel[slot])
-	if absf(turn) > BEND_CORNER:
-		return 0.0
-	return clampf(2.0 * turn / moved, -1.0 / BEND_RADIUS, 1.0 / BEND_RADIUS)
 
 
 ## The instance colour of a shot, which `shot_core.gdshader` reads as data, a byte per
@@ -2283,6 +2588,28 @@ func _write_quad(buffer: PackedFloat32Array, i: int, dir: Vector2, diameter: flo
 	buffer[i + 15] = 1.0 - (kind + code) / KIND_STEPS
 
 
+## Write trail `row`'s instance at float index `i` of `buffer` (-1: a shot without a trail, drawn
+## by its core alone): its data in the transform, which `shot_core.gdshader` reads back (TRAILS
+## there; the batch sits untransformed at the origin), the head `at`, the colour and the core.
+func _write_trail(buffer: PackedFloat32Array, i: int, row: int, at: Vector2, flags: int, color: Color, core: Color) -> void:
+	buffer[i] = float(row)
+	buffer[i + 1] = float(_trail_kept[row]) if row >= 0 else 0.0
+	buffer[i + 2] = 0.0
+	buffer[i + 3] = at.x
+	buffer[i + 4] = float(_trail_newest[row]) if row >= 0 else 0.0
+	buffer[i + 5] = float(flags)
+	buffer[i + 6] = 0.0
+	buffer[i + 7] = at.y
+	buffer[i + 8] = color.r
+	buffer[i + 9] = color.g
+	buffer[i + 10] = color.b
+	buffer[i + 11] = color.a
+	buffer[i + 12] = core.r
+	buffer[i + 13] = core.g
+	buffer[i + 14] = core.b
+	buffer[i + 15] = 1.0 - float(KIND_BOLT) / KIND_STEPS
+
+
 ## Position of a live projectile, or Vector2.INF if the slot is empty.
 func get_position_of(slot: int) -> Vector2:
 	if slot < 0 or slot >= _cap or _alive[slot] == 0:
@@ -2313,6 +2640,9 @@ static func ramp_color(ramp: int) -> Color:
 func _kill(slot: int, announce: bool = true) -> void:
 	if announce and _tag[slot] != 0:
 		shot_ended.emit(_tag[slot])
+	if _trail[slot] >= 0:
+		_fade_row(_trail[slot], slot)
+		_trail[slot] = -1
 	_alive[slot] = 0
 	_free_slots[_free_count] = slot
 	_free_count += 1
@@ -2341,7 +2671,15 @@ func _expire(slot: int) -> void:
 	_kill(slot, false)
 	if events != null:
 		event_slot = slot
+		impact_form = _form_of(slot)
+		impact_core = _core[slot]
+		impact_look = _look[slot]
+		impact_heading = _vel[slot].normalized()
 		events.projectile_expired.emit(caster, at, tag)
+		impact_form = &""
+		impact_core = Color.WHITE
+		impact_look = 0
+		impact_heading = Vector2.ZERO
 		event_slot = -1
 	if tag != 0:
 		shot_ended.emit(tag)

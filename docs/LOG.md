@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-28: Card overcharge (staffs C), already built
+
+The Overcharge card was already done: the modifier `.tres` (x2 damage, x2 mana), icon, assets, two combos, lore and `test_overcharge.gd` exist. Ticked it off; no code changed.
+
 ## 2026-10-28: Card triple (staffs C), already built
 
 The Triple card was already done: the multicast `.tres`, icon, assets, two combos, lore and `test_triple.gd` exist, and all 122 unit tests pass. Ticked it off. `tools/check.sh` reports errors only for `.idea`, `.vscode` and `scripts`: unreadable folders of this environment that git doesn't track, so none come from the doc files changed here.

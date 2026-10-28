@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="FormBase" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://core/base/form_base.gd" id="1_base"]
+[ext_resource type="Texture2D" path="res://content/spells/forms/wall/icon.svg" id="2_icon"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"wall"
+display_name = "Wall"
+complexity = 2
+icon = ExtResource("2_icon")
+base_damage = 3
+mana_cost = 6.0
+cooldown = 1.0
+speed = 0.0
+lifetime = 5.0
+radius = 5.0
+shots = 5
+spread = 9.0
+motion = 8
+pierce = 0
+cast_look = {"seconds": 0.2, "size": 0.9, "stretch": 2.5, "tall": 0.5, "aim": false, "grow": 0.1}
+impact_look = {"seconds": 0.2, "size": 0.7, "grow": 1.0, "ring": true}

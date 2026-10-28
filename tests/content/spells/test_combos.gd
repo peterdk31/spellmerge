@@ -209,6 +209,8 @@ const CONTROLS: Dictionary = {
 	"rain_frost_field": "rain",
 	"fissure_fire_line": "fissure",
 	"fissure_hit_nova": "fissure",
+	"wall_fire_barrier": "wall",
+	"wall_frost_row": "wall",
 }
 
 

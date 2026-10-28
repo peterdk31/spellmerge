@@ -1,0 +1,9 @@
+{
+	"id": "wall_frost_row",
+	"name": "Wall frost row",
+	"does": "A frost wall spreads across the aim, so imps standing at both of its ends are chilled where a single frost bolt would pass between them.",
+	"casts": [{"staff": 0, "cards": ["frost", "wall"]}],
+	"imps": [[28, -18], [28, 18]],
+	"seconds": 1.5,
+	"checks": [{"kind": "status", "imps": [0, 1], "status": "chill"}]
+}

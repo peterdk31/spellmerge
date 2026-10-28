@@ -29,7 +29,7 @@ Follow the steps and test layout in [gameplay/README.md](../README.md).
 
 ## Example to copy
 
-`gameplay/ai/ai.gd` is the example, used by the enemy `content/enemies/ember_imp/` (`ember_imp.tscn` and `ember_imp.tres`). Its test `tests/gameplay/ai/test_ai.gd` shows how to test it: a fake bus, `Combat` and projectile manager, up to four wizards, and `step(delta)` with fixed deltas, moving the body by `velocity` as `move_and_slide()` would.
+`gameplay/ai/ai.gd` is the example, used by the enemy `content/enemies/ember_imp/` (`ember_imp.tscn` and `ember_imp.tres`). Its test `tests/gameplay/ai/test_ai.gd` shows how to test it: a fake bus, `Combat`, projectile manager and `Spells` (with the real cards from a scanned registry: the imp casts its staff), up to four wizards, and `step(delta)` with fixed deltas, moving the body by `velocity` as `move_and_slide()` would.
 
 ## Validate
 

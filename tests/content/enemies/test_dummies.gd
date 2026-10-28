@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## The sandbox dummies (staffs B7). The training dummy never dies or moves and shows damage
 ## numbers, damage per second over the last 5 s, its statuses and reactions; the shooting dummy
-## stands still and fires slow, telegraphed shots at the nearest wizard. Uses the real Combat,
+## stands still and fires slow, telegraphed shots at the nearest wizard (its staff: `slow · bolt`). Uses the real Combat,
 ## Events and Projectiles autoloads; time moves through step().
 
 const TrainingData := preload("res://content/enemies/training_dummy/training_dummy.tres")
@@ -123,7 +123,8 @@ func test_the_shooting_dummy_fires_slow_telegraphed_shots_at_the_nearest_wizard(
 	check(dummy.is_telegraphing(), "a wizard 200 px away is in range: the telegraph shows")
 	check(dummy.aim.is_equal_approx(Vector2.DOWN), "it aims at the nearest wizard")
 	check(dummy.windup_time >= 1.0, "the telegraph is long (%s s)" % dummy.windup_time)
-	check(dummy.attack_speed <= 80.0, "the shot is slow (%s px/s)" % dummy.attack_speed)
 	dummy.step(dummy.windup_time)
 	check_equal(projectiles.call("get_count") as int, 1, "the shot flies")
+	var speed: float = (projectiles.call("get_velocity_of", 0) as Vector2).length()
+	check(speed > 0.0 and speed <= 80.0, "its staff's shot (slow · bolt) is slow (%.1f px/s)" % speed)
 	check_equal(dummy.velocity, Vector2.ZERO, "it never walks")

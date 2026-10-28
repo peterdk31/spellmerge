@@ -77,9 +77,11 @@ func test_line_is_hidden_outside_the_windup() -> void:
 func test_line_is_as_long_as_the_shot_flies() -> void:
 	var imp: AiScript = fx.imp_facing_player()
 	imp.step(Fixture.STEP)
-	check(is_equal_approx(imp.telegraph_reach(), imp.attack_speed * imp.attack_lifetime), "the far end is the real reach")
+	var bolt: FormBase = fx.registry.call("get_resource", &"spells", &"bolt") as FormBase
+	var reach: float = bolt.speed * bolt.lifetime
+	check(is_equal_approx(imp.telegraph_reach(), reach), "the far end is the real reach of its bolt (%.1f)" % imp.telegraph_reach())
 	var material: ShaderMaterial = (imp.get_node("Telegraph") as Sprite2D).material as ShaderMaterial
-	check(is_equal_approx(material.get_shader_parameter(&"beam_length"), imp.attack_speed * imp.attack_lifetime - AiScript.TELEGRAPH_START), "the shader draws it that long")
+	check(is_equal_approx(material.get_shader_parameter(&"beam_length"), reach - AiScript.TELEGRAPH_START), "the shader draws it that long")
 
 
 func test_line_turns_toward_the_locked_aim() -> void:
@@ -172,8 +174,9 @@ func test_hit_does_not_cancel_the_windup_or_delay_the_shot() -> void:
 	fx.bus.damage_dealt.emit(0, imp, 1, Vector2.ZERO)
 	fx.run(imp, 1)
 	check(imp.state == AiScript.State.WINDUP and imp.get_node("Telegraph").visible, "still winding up, line still shown")
-	fx.run(imp, int(imp.windup_time / Fixture.STEP) + 2)
-	check_equal(fx.projectiles.get_count_for(EventsScript.NO_PLAYER), 1, "the shot still came on time")
+	# Four frames have run; the shot leaves the frame the windup ends, before it can reach anyone.
+	fx.run(imp, int(imp.windup_time / Fixture.STEP) - 3)
+	check_equal(fx.projectiles.get_count(), 1, "the shot still came on time")
 
 
 func test_hurt_pose_also_shows_while_recovering() -> void:

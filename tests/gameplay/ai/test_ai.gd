@@ -1,6 +1,7 @@
 extends SceneTree
 ## Tests for gameplay/ai and the ember imp: chase, nearest-player targeting with
-## up to four players, the telegraph before the attack, and the attack itself.
+## up to four players, the telegraph before the attack, and the attack itself: the imp casts
+## its staff (`fire · bolt`, staffs F9) through a real Spells with the real cards.
 ## Time moves by fixed binary-fraction deltas; the test moves the body by its
 ## velocity like move_and_slide() would.
 ##
@@ -11,6 +12,8 @@ const CombatScript := preload("res://gameplay/combat/combat.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const PlayerScript := preload("res://gameplay/player/player.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
+const RegistryScript := preload("res://core/registry/registry.gd")
+const SpellsScript := preload("res://core/spells/spells.gd")
 const ImpData := preload("res://content/enemies/ember_imp/ember_imp.tres")
 
 const STEP: float = 0.0625
@@ -19,6 +22,9 @@ var _failures: Array[String] = []
 var _bus: Node
 var _combat: Node
 var _projectiles: Node
+var _spells: Node
+## Scanned once: the real cards.
+var _registry: Node
 var _enemies: Array[AiScript] = []
 var _players: Array[PlayerScript] = []
 
@@ -26,6 +32,8 @@ var _players: Array[PlayerScript] = []
 func _initialize() -> void:
 	# The root joins the scene tree only after _initialize returns: wait one frame.
 	await process_frame
+	_registry = RegistryScript.new()
+	_registry.call("scan")
 	_test_imp_resource_and_scene()
 	_test_chase_walks_toward_player()
 	_test_chase_stops_without_players()
@@ -43,6 +51,7 @@ func _initialize() -> void:
 	_test_group_players_are_found()
 	_test_each_of_four_players_can_be_chased()
 	_teardown()
+	_registry.free()
 	if _failures.is_empty():
 		print("TEST OK: gameplay/ai (chase, telegraph, attack)")
 		quit(0)
@@ -62,9 +71,13 @@ func _setup(player_count: int = 0) -> void:
 	_bus = EventsScript.new()
 	_projectiles = ProjectileManagerScript.new()
 	_projectiles.events = _bus
+	_spells = SpellsScript.new()
+	_spells.set("registry", _registry)
+	_spells.call("bind", _projectiles, _bus)
 	_combat = CombatScript.new()
 	_combat.events = _bus
 	_combat.projectiles = _projectiles
+	_combat.spells = _spells
 	_combat._ready()
 	for index in player_count:
 		var wizard := PlayerScript.new()
@@ -86,10 +99,11 @@ func _teardown() -> void:
 		if is_instance_valid(wizard):
 			wizard.free()
 	_players.clear()
-	for node: Node in [_combat, _projectiles, _bus]:
+	for node: Node in [_combat, _spells, _projectiles, _bus]:
 		if node != null:
 			node.free()
 	_combat = null
+	_spells = null
 	_projectiles = null
 	_bus = null
 
@@ -102,6 +116,7 @@ func _imp(at: Vector2 = Vector2.ZERO) -> AiScript:
 	imp.events = _bus
 	imp.combat = _combat
 	imp.projectiles = _projectiles
+	imp.spells = _spells
 	for wizard in _players:
 		imp.targets.append(wizard)
 	imp._ready()
@@ -109,13 +124,19 @@ func _imp(at: Vector2 = Vector2.ZERO) -> AiScript:
 	return imp
 
 
-## One physics frame: the AI, then the body moves, then Combat and projectiles.
+## One physics frame: the AI, then the body moves, then Combat, projectiles and Spells.
 func _run(imp: AiScript, count: int) -> void:
 	for i in count:
 		imp.step(STEP)
 		imp.position += imp.velocity * STEP
 		_combat.step(STEP)
 		_projectiles.step(STEP)
+		_spells.call("step", STEP)
+
+
+## The imp's bolt card (its hit circle is the shot's).
+func _bolt() -> FormBase:
+	return _registry.call("get_resource", &"spells", &"bolt") as FormBase
 
 
 # --- Tests ------------------------------------------------------------------
@@ -210,9 +231,10 @@ func _test_shot_hurts_wizard_through_combat() -> void:
 	_bus.damage_dealt.connect(func(p: int, target: Node, amount: int, _at: Vector2) -> void:
 		damaged.append([p, target, amount]))
 	_run(imp, int(imp.windup_time / STEP) + 2)
-	_run(imp, 16)
-	_check(damaged == [[EventsScript.NO_PLAYER, _players[0], imp.attack_damage]], "the shot hurt player 0 once, as an enemy (NO_PLAYER)")
-	_check(_players[0].health == PlayerScript.MAX_HEALTH - imp.attack_damage, "the wizard lost attack_damage health")
+	_run(imp, 6)
+	_check(damaged.size() == 1 and damaged[0][0] == EventsScript.NO_PLAYER and damaged[0][1] == _players[0], "the bolt hurt player 0 once, as an enemy (NO_PLAYER)")
+	_check(damaged.size() == 1 and damaged[0][2] >= _bolt().base_damage, "for at least the bolt's damage")
+	_check(damaged.size() == 1 and _players[0].health == PlayerScript.MAX_HEALTH - int(damaged[0][2]), "the wizard lost that health")
 
 
 ## Regression (#5): the shot and the telegraph start at `hurt_offset`, the body, not the feet.
@@ -220,8 +242,9 @@ func _test_shot_and_telegraph_start_at_the_body() -> void:
 	_setup(0)
 	var imp := _imp(Vector2(10.0, 20.0))
 	imp.aim = Vector2.RIGHT
+	imp.step(0.0)
 	imp._attack()
-	_check(_projectiles.get_count() == 1, "the imp's attack spawns one shot")
+	_check(_projectiles.get_count() == 1, "the imp's cast spawns one shot")
 	_check(_projectiles.get_position_of(0) == Vector2(10.0, 20.0) + imp.hurt_offset, "the shot leaves from position + hurt_offset")
 	var scene_imp: AiScript = ImpData.scene.instantiate() as AiScript
 	root.add_child(scene_imp)
@@ -247,9 +270,10 @@ func _test_shot_can_be_dodged_by_stepping_aside() -> void:
 	_check(_players[0].health == PlayerScript.MAX_HEALTH, "a player who stepped aside during the telegraph is not hit")
 
 
-## Enemy shots are small bullets (#4): a wizard (hit circle 8) is hit by a shot passing inside
-## 8 + 3.5 = 11.5 px, and clears it with a 15 px sidestep.
+## Enemy shots are small bullets (#4): a wizard (hit circle 8) is hit by the imp's bolt passing
+## inside 8 + its radius (5: 13 px), and clears it with a 15 px sidestep.
 func _test_shot_is_small_and_dodgeable() -> void:
+	var reach: float = 8.0 + _bolt().radius
 	for offset: float in [10.0, 15.0]:
 		_setup(1)
 		_players[0].position = Vector2(60.0, 0.0)
@@ -258,7 +282,7 @@ func _test_shot_is_small_and_dodgeable() -> void:
 		_players[0].position = Vector2(60.0, offset)
 		_run(imp, int(imp.windup_time / STEP) + 20)
 		var hit: bool = _players[0].health < PlayerScript.MAX_HEALTH
-		_check(hit == (offset < 11.5), "a shot passing %.0f px from the wizard %s" % [offset, "hits" if offset < 11.5 else "misses"])
+		_check(hit == (offset < reach), "a shot passing %.0f px from the wizard %s" % [offset, "hits" if offset < reach else "misses"])
 
 
 func _test_no_lookups_while_nobody_stands() -> void:

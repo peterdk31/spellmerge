@@ -15,7 +15,7 @@ Regular enemies and their attack patterns. Enemies create the "readable chaos" o
 - Enemies come from pools; no per-frame allocations. Respect the particle and sprite sheet limits (1 MB per sprite sheet; validators for the rest arrive when M3 extends the base class).
 - Communicate only through `core/` events (`enemy_died`, ...). Original names and art only.
 
-- **Enemies cast staffs (staffs F8a, docs/milestones/M2-staffs.md "Enemy staffs"):** set `staff` (a `StaffBase`), `cards` (player card ids by slot), `max_mana` and `mana_regen` on the `.tres`, and the enemy attacks by casting them like a wizard and paying mana; its telegraph shows the next cast's reach. A new enemy type is then a sprite, a scene and a staff, with no code. The scene's attack exports (`attack_damage`, `attack_speed`...) are only for an enemy without a staff; until part F9 the imp and the shooting dummy still use them.
+- **Enemies cast staffs (staffs F8a, docs/milestones/M2-staffs.md "Enemy staffs"):** set `staff` (a `StaffBase`), `cards` (player card ids by slot), `max_mana` and `mana_regen` on the `.tres`, and the enemy attacks by casting them like a wizard and paying mana; its telegraph shows the next cast's reach. A new enemy type is then a sprite, a scene and a staff, with no code. The scene's attack exports (`attack_damage`, `attack_speed`...) are only for an enemy without a staff, and go in part F9b. The ember imp casts `fire · bolt` (10 mana, 3 a second back) and the shooting dummy `slow · bolt` (5 mana, 2 a second back), each staff a sub-resource of the enemy's `.tres` (staffs F9a).
 
 ## Allowed files
 

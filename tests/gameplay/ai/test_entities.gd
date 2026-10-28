@@ -101,7 +101,8 @@ func _spawn(player: int, kind: StringName, at: Vector2, seconds: float = 5.0, ta
 	_world.bus.entity_spawn_requested.emit(player, kind, at, seconds, tag, -1)
 
 
-## `count` physics frames of the whole world: every imp, Combat, the projectiles, the entities.
+## `count` physics frames of the whole world: every imp, Combat, the projectiles, Spells (the
+## imps cast their staffs), the entities.
 func _run(count: int) -> void:
 	for i in count:
 		for enemy in _world.enemies:
@@ -110,6 +111,7 @@ func _run(count: int) -> void:
 				enemy.position += enemy.velocity * STEP
 		_world.combat.step(STEP)
 		_world.projectiles.step(STEP)
+		_world.spells.call("step", STEP)
 		_entities.step(STEP)
 
 

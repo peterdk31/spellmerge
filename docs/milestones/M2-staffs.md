@@ -34,7 +34,7 @@ A card is a `.tres` on one of five classes in `core/base/`, in its own folder un
 | Carrier (14) | `FormBase` | Ends a group: something leaves the caster | bolt, beam, nova, rune, orbit, **dash, teleport, hook, swap, wall, rain, fissure, decoy, familiar** (the boomerang carrier became the `return` modifier, owner 2026-10-27) |
 | Modifier (27) | `ModifierBase` | Attaches to the next carrier | split, pierce, homing, chain, bigger, faster, **shield, blast, hold, recoil, bounce, echo, linger, heavy, siphon, overcharge, sticky, magnet, ghost, spiral, mirror, growth, relay, sniper, return, slow, arc** |
 | Infusion (6) | `ElementBase` | Attaches to the next carrier; several may | fire, frost, storm, void, lightning, **mend** |
-| Trigger (10) | `TriggerBase` | Attaches to the next carrier; the group read after that carrier is its payload | on hit, on expire, timer, **on block, on kill, on cast, on wall, on hurt, on reaction, on ally** |
+| Trigger (9) | `TriggerBase` | Attaches to the next carrier; the group read after that carrier is its payload | on hit, on expire, timer, **on block, on kill, on cast, on wall, on hurt, on reaction** |
 | Multicast (4) | `MulticastBase` | Pulls more carriers into the same group | **double, triple, scatter, burst** |
 
 58 cards: the 19 that exist and 39 new ones. Pillar 1 says "few components, many combinations"; the per-card tests and the emergent combo report (part D1) are there to find cards that add little, and such a card is cut, not tuned.
@@ -87,7 +87,7 @@ Numbers are first guesses for the card's own task to set. Examples are written i
 | spiral | Flies in a sine wave | covers an area; `spiral · split · bolt` is a curtain |
 | mirror | Also fires the carrier backwards | guards your back; `mirror · recoil · bolt` cancels the push |
 | growth | Grows the further it flies (x2 a second, up to 4x): a wider hit circle, the same damage (owner, 2026-10-27; damage is overcharge's) | rewards range; `growth · linger · bolt` is a huge slow orb; `growth · pierce · bolt` sweeps a wide lane |
-| relay | When the shot passes through a teammate it takes on the infusions of that player's last cast | your bolt plus their frost, with nobody waiting (docs/PLAN.md, cross-player linking) |
+| relay | When the shot hits an actor it takes on the infusions of that actor's last cast (owner, 2026-10-28: any actor, since shots no longer pass teammates) | your bolt plus a teammate's frost, or an imp's fire stolen off the imp |
 | short delay | Halves the carrier's delay for 25 % more mana (owner, 2026-10-27; named after the builder's "Delay", so it is not mistaken for `faster`) | `short delay · dash` dashes again sooner; `short delay · beam` keeps a beam on with a slower staff |
 | sniper | The carrier keeps a quarter of its staff's spread (`spread_mult` 0.25, a factor; owner, 2026-10-27). Free: the dev and starter staffs aim true, so it waits for staffs with spread (M3) | `sniper · pierce · bolt` lines up a crowd; `sniper · double · bolt · bolt`, one true bolt and one wild |
 | return | Flies out for half its life, then back to its caster (owner, 2026-10-27: a modifier, not a weak boomerang carrier). Wasted on a carrier that does not fly out (beam, rune, orbit, dash) | `pierce · return · bolt` hits twice; `blast · return · bolt` explodes on you unless you move; `spiral · return · bolt` is a wavy loop |
@@ -106,7 +106,6 @@ Numbers are first guesses for the card's own task to set. Examples are written i
 | on wall | the shot hits a wall | `bounce · on wall · bolt · nova`, a nova at every bounce |
 | on hurt | the caster takes damage while the carrier lives (use with `hold`) | `hold · on hurt · orbit · nova` is a thorns aura |
 | on reaction | the carrier's hit causes a reaction | `on reaction · frost · bolt · fire · nova`, reactions that start more reactions |
-| on ally | the shot passes through a teammate | `on ally · mend · bolt · nova` heals around a friend |
 
 **Multicast:** double (2 carriers in one group), triple (3), scatter (3, in random directions, seeded per cast), burst (the group fires 3 times in quick succession).
 
@@ -333,7 +332,7 @@ A card task touches only its own folder (`.tres`, icon, look, `assets.json`), `c
 | B1 | bounce, ghost, spiral, linger, growth |
 | Slow, return and arc kit (owner, 2026-10-27) | return, slow, arc |
 | B2 | on cast, echo, burst, scatter, mirror, rain, fissure, wall |
-| B1 + B2 | sticky, relay, on ally, on wall |
+| B1 + B2 | sticky, relay, on wall |
 | B1 + B3 | heavy, magnet |
 | B1 + B2 + B3 | shield, blast, mend, on block, on kill, on hurt, on reaction |
 | B2 + B4 | teleport, hook, recoil, siphon, hold |

@@ -17,6 +17,13 @@ extends ActorLook
 ## (`Face.body_offset`, before the face steps: this look comes first among the actor's children)
 ## and takes the personality of the staff on show (`face_style`, `resting_mood`).
 ##
+## The poof (living staffs H4): when another staff goes on show (`Caster.current` changes; the
+## cast has already left from the new tip), Feel draws a cloud over the staff (`staff_shown`) and
+## the body and face stay as they were until SWAP_AT of POOF_TIME, when the cloud is biggest; then
+## both change and the brows lift (`Face.show_mood`, RAISED for BROW_LIFT). Each press of another
+## staff starts the poof again, so the change is at the newest cloud's biggest. The same staff
+## again changes nothing.
+##
 ## A dash, hook or swap stretches and leans the sprite along its way (`Mover.move_direction`; a
 ## standing actor dashes the way it aims) and leaves three ghosts where the staff was: solid copies
 ## drawn by the shot shader (the glow look, 2026-10-27), turned to the ramp's light colour and
@@ -42,6 +49,11 @@ const GRIP: Vector2 = Vector2(24.0, 27.0)
 const HOVER_BOB: float = 1.2
 const HOVER_RATE: float = 2.5
 const HOVER_PHASE: float = 1.7
+## The poof: its seconds, the part of them at which body and face change, and how long the
+## brows stay lifted after.
+const POOF_TIME: float = 0.18
+const SWAP_AT: float = 0.35
+const BROW_LIFT: float = 0.25
 ## Down, the grip lies this many pixels above the feet.
 const DOWN_LIFT: float = 3.0
 ## Dash look: sprite stretch along the dash (a mostly vertical one swaps the axes), lean in
@@ -83,6 +95,9 @@ var _shadow: Node2D = null
 ## The staff whose head and personality show (-1 before the first step), and the time hovered.
 var _shown: int = -1
 var _time: float = 0.0
+## Seconds into the poof (-1: none), and the staff it swaps to (the staff on show).
+var _poof_age: float = -1.0
+var _target: int = -1
 var _faces_left: bool = false
 ## True while the dash look is applied (to reset it once when the move ends).
 var _dash_look: bool = false
@@ -120,7 +135,9 @@ func setup(owner_actor: Actor) -> void:
 		actor.add_child(_shadow)
 		actor.move_child(_shadow, _sprite.get_index() if _sprite != null else 0)
 	_shown = -1
-	_show_staff()
+	_poof_age = -1.0
+	_target = actor.caster.current if actor.caster != null else 0
+	_show_staff(_target)
 	_place_body(0.0)
 
 
@@ -134,7 +151,7 @@ func step(delta: float) -> void:
 		_trail_timer = GHOST_INTERVAL
 	elif _dash_look:
 		_tick_trail(delta)
-	_show_staff()
+	_step_poof(delta)
 	_place_body(_time)
 	if moving or _dash_look:
 		_apply_dash_look(moving)
@@ -150,6 +167,11 @@ func step(delta: float) -> void:
 ## The staff (button) whose head shows, -1 before the first step.
 func shown_staff() -> int:
 	return _shown
+
+
+## True while a poof is hiding a swap (before and after the body changes).
+func is_poofing() -> bool:
+	return _poof_age >= 0.0
 
 
 ## The column of the head sheet that shows: the direction nearest the aim (down: flat, the way
@@ -190,11 +212,27 @@ func light_color() -> Color:
 	return ProjectilesScript.ramp_light(actor.ramp)
 
 
-## The staff on show's head and personality, when it changed.
-func _show_staff() -> void:
-	var at: int = actor.caster.current if actor.caster != null else 0
-	if at == _shown:
+## A new staff on show starts a poof (each press of another staff its own, as Feel's clouds); at
+## SWAP_AT of it the body and face change, at its end it is over.
+func _step_poof(delta: float) -> void:
+	var wanted: int = actor.caster.current if actor.caster != null else 0
+	if wanted != _target:
+		_target = wanted
+		_poof_age = 0.0 if wanted != _shown else -1.0
+	elif _poof_age >= 0.0:
+		_poof_age += delta
+	if _poof_age < 0.0:
 		return
+	if _poof_age >= POOF_TIME * SWAP_AT and _target != _shown:
+		_show_staff(_target)
+		if _face != null:
+			_face.show_mood(Face.Mood.RAISED, BROW_LIFT)
+	if _poof_age >= POOF_TIME:
+		_poof_age = -1.0
+
+
+## Show staff `at`'s head and personality.
+func _show_staff(at: int) -> void:
 	_shown = at
 	var staff: StaffBase = actor.caster.staff_of(at) if actor.caster != null else null
 	var head: Texture2D = staff.head if staff != null and staff.head != null else default_head

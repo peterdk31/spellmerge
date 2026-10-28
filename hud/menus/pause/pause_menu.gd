@@ -22,9 +22,7 @@ extends PanelContainer
 ##   top back to the bottom), up and down leave it; each move sends `effect_slots_changed`, which
 ##   feel applies. It is kept in memory until core/save exists, as friendly fire is.
 ## - **Gameplay:** "Friendly fire: Off" (or On), which sends `friendly_fire_requested(player, on)`;
-##   the word follows `friendly_fire_changed` from coop, never the press itself. "Enemy fire: Off"
-##   (or On; `EnemyFire.DEFAULT`, staffs F10: enemies' spells also hit other enemies) the same way,
-##   through `enemy_fire_requested` and the AI's `enemy_fire_changed`. Back.
+##   the word follows `friendly_fire_changed` from coop, never the press itself. Back.
 ##
 ## Only the player who opened it works it, through `core/ui_focus`: up/left and down/right move,
 ## `accept` (A) activates, `back` (B) goes up a page and closes it from the main page; `pause`
@@ -45,7 +43,6 @@ const TITLES: Dictionary = {
 const ACTION_IMP_WAVE: StringName = &"imp_wave"
 const ACTION_RESET_DUMMIES: StringName = &"reset_dummies"
 const FRIENDLY_FIRE_TEXT: String = "Friendly fire: %s"
-const ENEMY_FIRE_TEXT: String = "Enemy fire: %s"
 const FOCUS_MARK: String = "> "
 ## The meta key that keeps a button's text without the focus mark.
 const BASE_TEXT_META: StringName = &"base_text"
@@ -77,7 +74,6 @@ var _events: EventsScript = null
 var _ui_focus: UIFocusScript = null
 var _sandbox_on: bool = false
 var _friendly_fire: bool = false
-var _enemy_fire: bool = EnemyFire.DEFAULT
 var _focused: Control = null
 var _controls: Array[Control] = []
 ## Page -> its buttons, in order.
@@ -111,7 +107,6 @@ var display: Node = null
 @onready var _effects_bar: HSlider = _add_slider(_effects)
 @onready var _settings_back: Button = _add(Page.SETTINGS, "SettingsBack", "Back")
 @onready var _friendly: Button = _add(Page.GAMEPLAY, "FriendlyFire", FRIENDLY_FIRE_TEXT % "Off")
-@onready var _enemy: Button = _add(Page.GAMEPLAY, "EnemyFire", ENEMY_FIRE_TEXT % ("On" if EnemyFire.DEFAULT else "Off"))
 @onready var _gameplay_back: Button = _add(Page.GAMEPLAY, "GameplayBack", "Back")
 
 
@@ -131,7 +126,6 @@ func bind(events: EventsScript, ui_focus: UIFocusScript) -> void:
 	if _events != null:
 		_events.sandbox_changed.connect(_on_sandbox_changed)
 		_events.friendly_fire_changed.connect(_on_friendly_fire_changed)
-		_events.enemy_fire_changed.connect(_on_enemy_fire_changed)
 	if _ui_focus != null:
 		_ui_focus.closed.connect(_on_closed)
 		_ui_focus.activated.connect(_on_activated)
@@ -299,12 +293,6 @@ func _on_friendly_fire_changed(on: bool) -> void:
 	_mark_focus()
 
 
-func _on_enemy_fire_changed(on: bool) -> void:
-	_enemy_fire = on
-	_enemy.set_meta(BASE_TEXT_META, ENEMY_FIRE_TEXT % ("On" if on else "Off"))
-	_mark_focus()
-
-
 func _on_closed(player: int) -> void:
 	if player != owner_player:
 		return
@@ -360,9 +348,6 @@ func _on_activated(player: int, control: Control) -> void:
 	elif control == _friendly:
 		if _events != null:
 			_events.friendly_fire_requested.emit(player, not _friendly_fire)
-	elif control == _enemy:
-		if _events != null:
-			_events.enemy_fire_requested.emit(player, not _enemy_fire)
 	elif control == _sandbox_back or control == _settings_back:
 		_go(Page.MAIN)
 	elif control == _gameplay_back:

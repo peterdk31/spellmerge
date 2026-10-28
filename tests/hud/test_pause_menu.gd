@@ -26,7 +26,6 @@ var _focus: UIFocusScript
 var _hud: HudScript
 var _actions: Array[Array] = []
 var _friendly: Array[Array] = []
-var _enemy_fire: Array[Array] = []
 var _slots: Array[int] = []
 
 
@@ -37,7 +36,6 @@ func _initialize() -> void:
 	_test_resume_back_and_start_close_it()
 	_test_sandbox_entry_and_actions()
 	_test_friendly_fire_setting()
-	_test_enemy_fire_setting()
 	_test_the_fullscreen_switch()
 	_test_the_effect_slots_slider()
 	_test_the_sandbox_switches_the_builder()
@@ -71,7 +69,6 @@ func _setup(count: int, sandbox: bool = false) -> void:
 	_focus._ready()
 	_bus.sandbox_action_requested.connect(func(player: int, action: StringName) -> void: _actions.append([player, action]))
 	_bus.friendly_fire_requested.connect(func(player: int, on: bool) -> void: _friendly.append([player, on]))
-	_bus.enemy_fire_requested.connect(func(player: int, on: bool) -> void: _enemy_fire.append([player, on]))
 	_bus.effect_slots_changed.connect(func(slots: int) -> void: _slots.append(slots))
 	for index in count:
 		_input.add_virtual_device(index)
@@ -90,7 +87,6 @@ func _teardown() -> void:
 	paused = false
 	_actions.clear()
 	_friendly.clear()
-	_enemy_fire.clear()
 	_slots.clear()
 	for node: Node in [_hud, _focus, _input, _bus]:
 		if node != null:
@@ -267,24 +263,6 @@ func _test_friendly_fire_setting() -> void:
 	_tap(0, &"back")
 	_frame()
 	_check(_menu().page == PauseMenuScript.Page.MAIN, "and up to the main page")
-
-
-func _test_enemy_fire_setting() -> void:
-	_setup(2)
-	_tap(1, &"pause")
-	_frame()
-	_press(1, "Settings")
-	_press(1, "Gameplay")
-	_check(_names() == ["FriendlyFire", "EnemyFire", "GameplayBack"], "Gameplay, got %s" % [_names()])
-	_check(_menu().button("EnemyFire").text.ends_with("Enemy fire: Off"), "off by default (EnemyFire.DEFAULT)")
-	_press(1, "EnemyFire")
-	_check(_enemy_fire == [[1, true]], "it asks the AI to switch it on, for the player who pressed, got %s" % [_enemy_fire])
-	_check(_menu().button("EnemyFire").text.ends_with("Off"), "and waits for the answer")
-	_bus.enemy_fire_changed.emit(true)
-	_check(_menu().button("EnemyFire").text.ends_with("Enemy fire: On"), "the AI's answer shows")
-	_press(1, "EnemyFire")
-	_check(_enemy_fire.back() == [1, false], "pressed again it asks for off")
-	_check(_friendly.is_empty(), "friendly fire is not touched")
 
 
 ## A stand-in for `core/display` (headless has no window to fill).

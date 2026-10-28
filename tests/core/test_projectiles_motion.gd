@@ -302,11 +302,17 @@ func _test_homing_search_is_charged_to_the_budget() -> void:
 	_mgr.set_homing(slot, 1.0, HOMING_REACH)
 	_mgr._refresh_targets()
 	_mgr._step_index = (4 - slot % 4) % 4
+	# The homing pass for this one shot, at its turn in the hit pass (`_catch_up`).
+	var one := PackedInt32Array([slot])
+	_mgr._catching_up = true
 	_mgr._work_left = 0
-	_mgr._steer(slot, DT)
+	_mgr._state[slot] = ManagerScript.S_MOVING
+	_mgr._pass_homing(one, 0, 1, DT)
 	_check(not _mgr._home_at[slot].is_finite(), "with the budget spent a search waits")
 	_mgr._work_left = 1000
-	_mgr._steer(slot, DT)
+	_mgr._state[slot] = ManagerScript.S_MOVING
+	_mgr._pass_homing(one, 0, 1, DT)
+	_mgr._catching_up = false
 	_check(_mgr._home_at[slot].is_finite() and _mgr._work_left < 1000, "with budget it searches and pays for the targets it examined")
 
 
@@ -408,7 +414,7 @@ func _test_homing_skips_wizards_and_freed_targets() -> void:
 	_mgr.set_homing(slot, 3.0, HOMING_REACH)
 	_mgr._refresh_targets()
 	gone.free()
-	_check(not _mgr._homing_point(slot).is_finite(), "homing neither picks another wizard (though it would hit one) nor a freed target")
+	_check(not _mgr._homing_point(slot, _mgr.get_position_of(slot)).is_finite(), "homing neither picks another wizard (though it would hit one) nor a freed target")
 
 
 func _test_ray_hits_in_order_and_reports_its_reach() -> void:

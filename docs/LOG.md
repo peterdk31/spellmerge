@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-28: Card triple (staffs C), already built
+
+The Triple card was already done: the multicast `.tres`, icon, assets, two combos, lore and `test_triple.gd` exist, and all 122 unit tests pass. Ticked it off.
+
 ## 2026-10-28: Card double (staffs C), already built
 
 The task found the Double card done: the multicast `.tres`, icon, assets, two combos and `test_double.gd` exist, and all 122 unit tests pass. Ticked it off.

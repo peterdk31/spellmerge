@@ -1,8 +1,9 @@
 extends "res://tests/support/suite.gd"
 ## The imp's telegraph and poses (gameplay/ai's CreatureLook, reading its AIController;
-## content/enemies/ember_imp): the warning comes before the shot, the aim is locked, the line,
-## lane and arrowhead show where the shot goes and how close it is, and the windup and hurt poses
-## never change when damage lands.
+## content/enemies/ember_imp, the Cinder Rod): the warning comes before the shot, the aim is
+## locked, the line, lane and arrowhead show where the shot goes and how close it is, and the
+## windup and hurt poses never change when damage lands. The strays' faces carry their mood
+## (living staffs H5), so no stray has pose strips; the poses are tested on strips made in code.
 
 const Fixture := preload("res://tests/gameplay/ai/ai_fixture.gd")
 const EventsScript := preload("res://core/events/events.gd")
@@ -16,6 +17,19 @@ func before_each() -> void:
 
 func after_each() -> void:
 	fx.free_all()
+
+
+## A plain strip of `frames` 32 px frames.
+func _strip(frames: int) -> Texture2D:
+	return ImageTexture.create_from_image(Image.create(32 * frames, 32, false, Image.FORMAT_RGBA8))
+
+
+## An imp facing the player, its look given a two-frame windup strip and a one-frame hurt pose.
+func _posed_imp() -> Actor:
+	var imp: Actor = fx.imp_facing_player()
+	Fixture.look(imp).windup_texture = _strip(2)
+	Fixture.look(imp).hurt_texture = _strip(1)
+	return imp
 
 
 func test_windup_starts_in_range_without_a_shot() -> void:
@@ -115,7 +129,7 @@ func test_lane_and_arrowhead_follow_the_reach() -> void:
 
 
 func test_windup_pose_has_two_frames_and_idle_returns() -> void:
-	var imp: Actor = fx.imp_facing_player()
+	var imp: Actor = _posed_imp()
 	var sprite: Sprite2D = imp.get_node("Sprite")
 	var idle_texture: Texture2D = sprite.texture
 	check(Fixture.look(imp).windup_texture != null and Fixture.look(imp).windup_texture != idle_texture, "the windup is its own art")
@@ -126,7 +140,7 @@ func test_windup_pose_has_two_frames_and_idle_returns() -> void:
 
 
 func test_windup_frames_flip_faster_toward_the_shot() -> void:
-	var imp: Actor = fx.imp_facing_player()
+	var imp: Actor = _posed_imp()
 	var sprite: Sprite2D = imp.get_node("Sprite")
 	fx.run(imp, 1)
 	var flips: Array[int] = []
@@ -160,7 +174,7 @@ func test_hit_on_another_enemy_does_not_hurt_this_one() -> void:
 
 
 func test_hit_shows_the_hurt_pose_at_once_and_it_ends() -> void:
-	var imp: Actor = fx.imp_facing_player()
+	var imp: Actor = _posed_imp()
 	var sprite: Sprite2D = imp.get_node("Sprite")
 	fx.run(imp, 3)
 	fx.bus.damage_dealt.emit(0, imp, 1, Vector2.ZERO)
@@ -181,11 +195,12 @@ func test_hit_does_not_cancel_the_windup_or_delay_the_shot() -> void:
 
 
 func test_hurt_pose_also_shows_while_recovering() -> void:
-	var imp: Actor = fx.imp_facing_player()
+	var imp: Actor = _posed_imp()
 	var sprite: Sprite2D = imp.get_node("Sprite")
+	var idle_texture: Texture2D = sprite.texture
 	fx.run(imp, int(Fixture.ai(imp).windup_time / Fixture.STEP) + 2)
 	fx.bus.damage_dealt.emit(0, imp, 1, Vector2.ZERO)
 	fx.run(imp, 1)
 	check(sprite.texture == Fixture.look(imp).hurt_texture, "a hit while recovering shows the hurt pose")
 	fx.run(imp, int(CreatureLook.HURT_TIME / Fixture.STEP) + 1)
-	check(sprite.hframes == 2 and sprite.texture != Fixture.look(imp).hurt_texture, "afterwards the idle strip is back")
+	check(sprite.texture == idle_texture, "afterwards the idle body is back")

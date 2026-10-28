@@ -59,27 +59,9 @@
       "origin": "ai",
       "author": "Claude",
       "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (hand-written SVG rects)",
-      "prompt": "A 2-frame idle strip (64x32; the second frame bobs one pixel and flaps the wings down) of a fire imp seen from the front, about 28 px wide with its wings: two curved Bone horns, a wide Fire head with angry dark brows and glowing Spark eyes, a fanged mouth, a Fire body with a lighter belly, Bone claws, small feet and two bat wings in Fire shadow with a dark outline, so the silhouette is a clear winged shape. 1px dark outline, light from the top-left. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no player colours."
-    },
-    {
-      "path": "content/enemies/ember_imp/windup.svg",
-      "origin": "ai",
-      "author": "Claude",
-      "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (hand-written SVG rects)",
-      "prompt": "A 2-frame windup strip (64x32) of the ember imp about to shoot, copied from its new idle frame: the mouth and belly glow Spark (frame 2 brighter, Spark light), Spark flecks above the wings. The game flips the frames faster as the shot gets close. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no player colours."
-    },
-    {
-      "path": "content/enemies/ember_imp/hurt.svg",
-      "origin": "ai",
-      "author": "Claude",
-      "license": "CC-BY-SA-4.0",
-      "tier": "placeholder",
-      "tool": "Claude (hand-written SVG rects)",
-      "prompt": "A single 32x32 hurt frame of the ember imp, copied from its new idle frame with the wings down: eyes squeezed shut in dark Outline patches, the mouth open wide, Spark flecks flying off. Only rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no player colours."
+      "tier": "good",
+      "tool": "Claude (SVG rects written by a small generator from the pixel rules of the owner's living-staffs mockup, 2026-10-28)",
+      "prompt": "The Cinder Rod, a stray (an old staff gone sour): a charred Wood rod with a round knob and a crown of Fire flames that never stopped burning, a Fire band on the shaft and a Bone ferrule. A 32x32 body with its ferrule at the bottom (row 28), 1px dark outline, light from the top-left; the face (eyes and brows) is a separate layer. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no player colours."
     },
     {
       "path": "art/vfx/telegraph_dash.svg",

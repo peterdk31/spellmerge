@@ -1866,3 +1866,13 @@ The owner's decision after G9: a player must always see their own wizard, which 
 - **Followed effects sit at an offset** (`_effect_offset`, was the status's fixed rise), so the cloud stays on the staff while it moves.
 - **Feel ages effects by the wall clock** (so hit-stop cannot slow them). On a software renderer a frame takes far longer than 1/60 s and a 0.18 s cloud is gone in a frame, so `shot_poof.gd` puts Feel on frame time for its pictures. The game is unaffected.
 
+## 2026-10-28: The strays (living staffs H5)
+
+- **The Cinder Rod keeps the id `ember_imp`.** Flow's default enemy, the sandbox's imp wave, the tests and the clips all name `ember_imp`; renaming it buys nothing a player sees. The look, the art and the staff's display name are the Cinder Rod's; its numbers and staff (fire · bolt) are unchanged.
+- **Built now: the Cinder Rod, the Splinter (dash, contact damage 8, one eye) and the Storm Fork (triple · lightning · bolt).** The Rime Crook waits for a `hook` card and the Bone Scepter for `rain` (the plan: a stray waits for its cards); both are in NEXT.
+- **The wave is unchanged:** flow spawns one enemy type (`enemy_id_to_play`) at the wave's spawns, so mixing strays into a wave is flow work, not data; the Splinter and the Storm Fork exist as content (and in the registry) until a mixed wave or M3's rooms use them.
+- **No poses on strays:** the imp's windup and hurt strips are gone; the face carries the mood (furious while winding up, worried when hit) and the flash and telegraph are unchanged. `CreatureLook` keeps the poses as an option (tested on strips made in code).
+- **The hop is the sprite's offset only,** so the telegraph and the hurt circle never move with it: dodging stays exactly as fair as before.
+- **Eye glow** is the light shade of the stray's element ramp (Fire `#ffa23c` for the Cinder Rod and the Splinter); the Storm Fork's eyes are Acid's base `#b4e82a`, since Acid's light shade is too pale to read as a glow.
+- **The dummies** are staffs staked in a Stone mound (the training dummy with a target on a straw crossbar, the shooting dummy with a muzzle head); no face, since they are props. Their behaviour is unchanged.
+

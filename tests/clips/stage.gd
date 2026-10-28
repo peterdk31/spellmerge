@@ -231,7 +231,6 @@ func _add_imp(at: Vector2) -> void:
 	var sprite := Sprite2D.new()
 	sprite.name = "Sprite"
 	sprite.texture = IMP_ART
-	sprite.hframes = 2
 	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	sprite.position = Vector2(0.0, -SPRITE_LIFT)
 	imp.add_child(sprite)

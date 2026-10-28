@@ -1848,3 +1848,14 @@ The owner approved `possess` as a card (M2-actors.md, "Possess (a card)"); built
 - **The style N wizard art stays** in `content/wizard/base/` for the villain (H6); the clips stage and the art screenshots still show it. `docs/STYLE.md` and the golden examples move to the staff in H7.
 - **The sheets** are drawn by a generator from the mockup's pixel rules (the same as the face sheets'); each head folder lists its sheet in an `assets.json`.
 
+## 2026-10-28: The intro (living staffs H6)
+
+- **"A new save" is a flag in a new save file.** There was no save yet (`core/save/` was empty), so H6 adds the smallest one: `SaveFile`, a ConfigFile at `user://save.cfg` holding flags. The intro sets `intro_seen` when it ends or is skipped; a missing or broken file is a new save. Runs, unlocks and settings move into it when they exist (M3).
+- **Only people see it:** Flow's `intro_enabled` is off when a test script is the main loop or the game was started with user arguments (the 4-bot test, the stress run, the timing run), since every automated run starts on a fresh `user://` and would otherwise sit through it. The intro's tests and its screenshot switch it on with a save file of their own. The sandbox never shows it.
+- **Skip by press count,** not "just pressed": a tap between two of Flow's steps still skips, for any joined player, on accept, back, pause or any staff button.
+- **Drawn in code, not a scene:** the world (tower room, shaft, crypt) is rects in docs/STYLE.md's palette, as in the owner's mockup, at 3× under a clipped window with the caption below. The dropped staffs are the curl head sheet; their eyes and brows are frames of `art/faces/` drawn directly, because `Face` needs an actor. Each staff is its player's colour.
+- **The villain wears Blight** (`art/story/wizard_hat.svg`, the style N hat recoloured): the hats in `content/wizard/base/` are all player colours, which stay the players' only. The Favourite (`art/story/favourite.svg`) is the mockup's 'fav' body pointing up.
+- **More players, same length:** the drops come 0.45, 0.3 and 0.2 s apart ("Oops. Oops. Oops. Oops."), the wizard leaves after the last, and the staffs land 0.12 s apart, so four players still finish at 14.5 s.
+- **The captions are in code** (`intro.gd`): `content/story/` takes only JSON, and there is no cutscene schema or loader yet (lore is the only story kind the registry reads). Moving them to story data is M3's, with the events schema.
+- **Kept from the mockup:** the closing line "Merge spells. Find your way home." after "Home is up there." (the owner saw it in round 9).
+

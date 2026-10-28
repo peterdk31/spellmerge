@@ -38,6 +38,12 @@ extends Node
 ## the `dev` staff, its slots, delay and recharge) and `start_cards`, four lists of card ids (A `dash`, X `fire bolt`,
 ## Y and B empty), and builds them itself; flow never touches a spell.
 ##
+## The intro (living staffs H6, `intro.gd`): on a new save (`save`, a `SaveFile`, has no
+## INTRO_SEEN flag) Play shows the intro first (state INTRO): one staff dropped per joined player,
+## skippable by any of them; when it ends or is skipped the save is marked and the run starts.
+## It plays only for people: off (`intro_enabled` false) when a test script is the main loop or
+## the game was started with user arguments (the 4-bot test, the stress run, the timing run).
+##
 ## Sandbox (staffs B7, docs/milestones/M2-staffs.md, "The sandbox"): `sandbox_requested` (the
 ## main menu's Sandbox button, in `dev` and `preview` builds) starts a run in the sandbox room
 ## (`sandbox`): no waves, the training dummy and the shooting dummy at the room's
@@ -59,6 +65,7 @@ const PlayerScript := preload("res://gameplay/player/player.gd")
 const DownedScript := preload("res://gameplay/player/downed.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const DefaultWizardScene: PackedScene = preload("res://content/wizard/base/wizard.tscn")
+const IntroScript := preload("res://gameplay/flow/intro.gd")
 
 const PLAYER_SLOTS: int = 4
 ## Registry folders, and the ids of the M1 content a run uses unless `room_id_to_play`,
@@ -103,8 +110,11 @@ const RESTART_DELAY: float = 1.5
 const PROJECTILE_MARGIN: float = 32.0
 ## Name of the world node.
 const WORLD_NAME: String = "Arena"
+## The intro's node name, and the save flag set once it has been seen (or skipped).
+const INTRO_NAME: String = "Intro"
+const INTRO_SEEN: StringName = &"intro_seen"
 
-enum State { IDLE, RUNNING, CLEARED }
+enum State { IDLE, RUNNING, CLEARED, INTRO }
 
 ## The services. Only tests set these, before adding the node; otherwise the
 ## autoloads are used.
@@ -127,6 +137,12 @@ var start_cards: Array = DEFAULT_START_CARDS.duplicate(true)
 ## The build channel, which picks the staff; `BuildInfo.channel()` unless a test sets it.
 var channel: String = BuildInfo.channel()
 var wizard_scene: PackedScene = DefaultWizardScene
+## Whether Play may show the intro (see the class doc), and the save it is remembered in.
+var intro_enabled: bool = true
+var save: SaveFile = null
+## The intro on show (null when none), and who pressed Play.
+var intro: IntroScript = null
+var _intro_requester: int = 0
 
 var state: State = State.IDLE
 ## The world of the run in progress (null before the first Play).
@@ -156,6 +172,10 @@ var _enemy_data: EnemyBase = null
 
 
 func _ready() -> void:
+	if save == null:
+		save = SaveFile.new()
+	if _is_automated():
+		intro_enabled = false
 	if events == null:
 		events = get_node_or_null("/root/Events") as EventsScript
 	if registry == null:
@@ -185,8 +205,10 @@ func _process(delta: float) -> void:
 	step(delta)
 
 
-## Advance the restart timer by `delta` seconds.
+## Advance the intro, the next wave's and the restart timers by `delta` seconds.
 func step(delta: float) -> void:
+	if intro != null:
+		intro.step(delta)
 	if _next_wave_left >= 0.0:
 		_next_wave_left -= delta
 		if _next_wave_left <= 0.0:
@@ -316,6 +338,11 @@ func start_run(requester: int) -> bool:
 ## End the run in progress and free its world. Flow is idle again, so the next
 ## `play_requested` starts a run. Nothing shows a menu yet; M3's run area will.
 func stop_run() -> void:
+	if intro != null:
+		var shown: IntroScript = intro
+		intro = null
+		if is_instance_valid(shown):
+			_detach(shown)
 	_restart_left = -1.0
 	_next_wave_left = -1.0
 	wave = 0
@@ -331,7 +358,49 @@ func _on_play_requested(player: int) -> void:
 	if state != State.IDLE:
 		return
 	sandbox = false
-	start_run(player)
+	if wants_intro():
+		play_intro(player)
+	else:
+		start_run(player)
+
+
+## True when Play should show the intro first: it is on and this save has not seen it.
+func wants_intro() -> bool:
+	return intro_enabled and save != null and not save.has_flag(INTRO_SEEN)
+
+
+## Show the intro for the joined players (`requester` joins first, as for a run); the run starts
+## when it ends or is skipped.
+func play_intro(requester: int) -> void:
+	_ensure_joined(requester)
+	_intro_requester = requester
+	intro = IntroScript.new()
+	intro.name = INTRO_NAME
+	intro.setup(_joined_players(), input)
+	intro.finished.connect(_on_intro_finished)
+	state = State.INTRO
+	_show_world(intro)
+
+
+func _on_intro_finished(_skipped: bool) -> void:
+	var shown: IntroScript = intro
+	intro = null
+	state = State.IDLE
+	if save != null:
+		save.set_flag(INTRO_SEEN)
+	var started: bool = start_run(_intro_requester)
+	# A run replaces the intro as the current scene; under `world_parent`, or with no run, it goes here.
+	if shown != null and is_instance_valid(shown) and shown.is_inside_tree():
+		_detach(shown)
+	if not started:
+		push_warning("Flow: the run after the intro did not start; Play starts a new one.")
+
+
+## True when nobody is playing: a test script is the main loop, or the game was started with user
+## arguments (the automated runs).
+func _is_automated() -> bool:
+	var tree: MainLoop = Engine.get_main_loop()
+	return (tree != null and tree.get_script() != null) or not OS.get_cmdline_user_args().is_empty()
 
 
 func _on_sandbox_requested(player: int) -> void:

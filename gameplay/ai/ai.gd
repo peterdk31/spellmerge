@@ -283,12 +283,17 @@ func _open_staff() -> void:
 	if projectiles != null:
 		projectiles.set_target_owner(self, caster)
 		projectiles.set_anchor(caster, _position_of(self) + hurt_offset)
+	if entities != null:
+		entities.set_enemy(caster, self)
 
 
-## Give the caster row back (the enemy left the tree or died): its spells in the air fly on.
+## Give the caster row back (the enemy left the tree or died): its spells in the air fly on; its
+## decoys and familiars end where they are (F8d), before the row closes, so their ends still count.
 func close_staff() -> void:
 	if caster < 0:
 		return
+	if entities != null and is_instance_valid(entities):
+		entities.enemy_gone(caster)
 	if spells != null and is_instance_valid(spells):
 		spells.close_enemy_caster(caster)
 	if projectiles != null and is_instance_valid(projectiles):

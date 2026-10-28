@@ -1,12 +1,12 @@
 {
 	"id": "shared_charge",
 	"name": "Shared charge",
-	"does": "One wizard's lightning ring charges three imps; the other's lightning bolt hits one and the charge jumps to the other two.",
+	"does": "One wizard's lightning ring charges three imps; the other's lightning bolt hits one and sets its charge off (it arcs to actors of other teams near; imps never zap imps).",
 	"casts": [
 		{"staff": 0, "cards": ["lightning", "bigger", "nova"], "player": 0},
 		{"staff": 0, "cards": ["lightning", "bolt"], "at": 0.6, "player": 1}
 	],
 	"imps": [[36, 0], [0, 36], [-36, 0]],
 	"seconds": 2.0,
-	"checks": [{"kind": "status", "imps": [0, 1, 2], "status": "static"}, {"kind": "reaction", "reaction": "discharge"}, {"kind": "damaged", "imps": [0, 1, 2]}]
+	"checks": [{"kind": "status", "imps": [0, 1, 2], "status": "static"}, {"kind": "damaged", "imps": [0, 1, 2]}]
 }

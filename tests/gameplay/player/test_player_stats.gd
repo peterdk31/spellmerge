@@ -71,9 +71,9 @@ func _test_sent_when_the_wizard_appears() -> void:
 func _test_hit_and_revive() -> void:
 	_setup(1)
 	_stats.clear()
-	_world.bus.damage_dealt.emit(-1, _players[0], 30, Vector2.ZERO)
+	_world.combat.hit(-1, _players[0], 30)
 	_check(_stats.size() == 1 and _stats[0][1] == 70, "a hit of 30 sends health 70, got %s" % [_stats])
-	_world.bus.damage_dealt.emit(-1, _players[0], 100, Vector2.ZERO)
+	_world.combat.hit(-1, _players[0], 100)
 	_check(_players[0].is_down() and _stats.back()[1] == 0, "being downed sends health 0")
 	_stats.clear()
 	Fixture.downed(_players[0]).revive(1)
@@ -111,10 +111,10 @@ func _test_mana_spent_and_regenerated() -> void:
 func _test_four_wizards_keep_their_own_numbers() -> void:
 	_setup(4)
 	_stats.clear()
-	_world.bus.damage_dealt.emit(-1, _players[2], 40, Vector2.ZERO)
+	_world.combat.hit(-1, _players[2], 40)
 	_check(_stats.size() == 1 and _stats[0][0] == 2 and _stats[0][1] == 60, "only player 2 reports its hit, got %s" % [_stats])
 	_stats.clear()
-	_world.bus.damage_dealt.emit(-1, _players[3], 10, Vector2.ZERO)
+	_world.combat.hit(-1, _players[3], 10)
 	_check(_stats.size() == 1 and _stats[0][0] == 3 and _stats[0][1] == 90, "only player 3 reports its hit, got %s" % [_stats])
 	_check(_players[0].health.health == _players[0].health.max_health and _players[1].health.health == _players[1].health.max_health,
 		"players 0 and 1 are untouched")

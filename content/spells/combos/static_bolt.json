@@ -1,12 +1,12 @@
 {
 	"id": "static_bolt",
 	"name": "Static discharge",
-	"does": "A lightning ring charges three imps standing close together; a lightning bolt then hits one of them and the charge jumps to the other two.",
+	"does": "A lightning ring charges three imps standing close together; a lightning bolt then hits one of them and sets its charge off (it arcs to actors of other teams near; imps never zap imps).",
 	"casts": [
 		{"staff": 0, "cards": ["lightning", "bigger", "nova"]},
 		{"staff": 1, "cards": ["lightning", "bolt"], "at": 0.6}
 	],
 	"imps": [[36, 0], [0, 36], [-36, 0]],
 	"seconds": 2.0,
-	"checks": [{"kind": "status", "imps": [0, 1, 2], "status": "static"}, {"kind": "reaction", "reaction": "discharge"}]
+	"checks": [{"kind": "status", "imps": [0, 1, 2], "status": "static"}]
 }

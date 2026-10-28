@@ -103,6 +103,10 @@ The owner's direction after B7a: "The 4 staffs should be mapped to lb/rb lt/rt i
 - **Passing a teammate** is reported once per teammate and shares the hit memory (the last three targets) of the shot. A piercing shot that passes three wizards in a 4-player game can therefore forget an enemy it hit and hit it again; accepted, since it is rare and costs one more hit. A bounce or the return turn clears the memory, so a wizard is passed again after it.
 - **A sticky shot keeps its velocity** while stuck (`_advance` never moves it by that), so its payloads fly the way it was flying; a shot that sticks on a step where it also reached a wall stays stuck.
 
+## 2026-10-28: Sticky card (staffs C)
+
+- **Sticky holds 1 s** (`behaviour_strength` 1.0), complexity 2, no mana change. A stuck shot's payload starts inside the target, so a nova planted by `sticky · on expire` hits the target itself with every shot of its ring, not its neighbours: the combos check the target's damage and chill, not an imp beside it.
+
 ## 2026-10-26: Player, input and builder on staffs (staffs A6a)
 
 - **Buttons:** A, X, Y, B cast staffs 0 to 3 (`cast_a` Space or Shift, `cast_x` left mouse, J, right trigger or RB, `cast_y` right mouse or K, `cast_b` Q or L). **Menus activate with A and go back with B**, the gamepad standard, now that the old activate (`cast`) and back (`dodge`) buttons are gone. **The overlay is on Start** (and Tab, E): the design said View/Back, but Back is `leave`; Start only joins a device that has not joined yet.

@@ -1,0 +1,9 @@
+{
+	"id": "sticky_plant_nova",
+	"name": "Sticky planted nova",
+	"does": "A bolt sticks in the imp it hits and, a second later, rings out a nova from inside it: the imp takes the bolt and the whole ring.",
+	"casts": [{"staff": 0, "cards": ["sticky", "on_expire", "bolt", "nova"]}],
+	"imps": [[100, 0]],
+	"seconds": 2.0,
+	"checks": [{"kind": "lost_at_least", "imps": [0], "min": 15}]
+}

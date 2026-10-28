@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-28: Card growth (staffs C), already built
+
+The Growth card was already done: the modifier `.tres`, icon, assets, combos (`growth_far_shot`, `growth_slow_orb`) and `test_growth.gd` exist, and all 126 unit tests pass. Ticked it off; no code changed.
+
 ## 2026-10-28: Card linger (staffs C), already built
 
 The Linger card was already done: the modifier `.tres`, icon, assets, combos (`linger_nova_mine`, `linger_frost_mines`), lore and `test_linger.gd` exist, and all 126 unit tests pass. Ticked it off; no code changed.

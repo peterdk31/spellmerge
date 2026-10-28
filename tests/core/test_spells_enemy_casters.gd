@@ -159,7 +159,9 @@ func test_rows_open_close_and_are_handed_out_oldest_closed_first() -> void:
 	check_equal(_spells.enemy_casters_open(), SpellLimits.ENEMY_CASTERS, "a player or a bad number closes nothing")
 
 
-func test_an_enemys_bolt_hits_a_wizard_never_an_enemy() -> void:
+## Enemies always hurt each other (actors G3c): an enemy's bolt stops on the first actor in its
+## way, an enemy or a wizard.
+func test_an_enemys_bolt_hits_the_first_in_its_way_an_enemy_too() -> void:
 	var imp: int = _spells.open_enemy_caster()
 	var tag: int = _build(imp, [&"bolt"])
 	check(SpellTag.is_enemy_tag(tag) and SpellTag.caster_of(tag) == imp, "its tags name its row")
@@ -167,8 +169,8 @@ func test_an_enemys_bolt_hits_a_wizard_never_an_enemy() -> void:
 	var wizard: Node2D = _target(Vector2(140.0, 0.0), ManagerScript.LAYER_PLAYER, 0)
 	check(_cast(imp) >= 0.0, "an enemy casts its staff")
 	_tick(40)
-	check_equal(_hit_targets(), [wizard] as Array[Node], "past the other enemy, into the wizard")
-	check(not _hit_targets().has(other), "never the other enemy")
+	check_equal(_hit_targets(), [other] as Array[Node], "it stops on the other enemy in its way")
+	check(not _hit_targets().has(wizard), "so the wizard behind it is safe")
 	check(_hits.size() == 1 and _hits[0][0] == EventsScript.NO_PLAYER and _hits[0][2] == tag, "the hit names NO_PLAYER and its tag")
 	check(_spells.hit_profile(tag) != null, "combat can read its numbers")
 

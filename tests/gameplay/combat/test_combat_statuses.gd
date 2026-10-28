@@ -322,7 +322,7 @@ func test_bad_applications_are_refused() -> void:
 
 func test_a_wizard_a_spell_hits_gets_its_status_too() -> void:
 	# Staffs (B3): statuses on wizards exist; what reaches a wizard at all is the projectile
-	# manager's rule (the caster once out of their hitbox, a teammate with friendly fire).
+	# manager's rule (every shot but the caster's own, which only once out of their hitbox).
 	var wizard := own(Node2D.new()) as Node2D
 	_combat.register_player(1, wizard, 8.0)
 	_hit(0, wizard, _tag(0, &"fire"))

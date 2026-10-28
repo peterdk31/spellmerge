@@ -244,7 +244,6 @@ func _test_homing_rules() -> void:
 
 func _test_homing_skips_its_own_wizard_and_the_target_just_hit() -> void:
 	_setup()
-	_mgr.friendly_fire = true
 	_target(Vector2(100.0, 130.0), 8.0, ManagerScript.LAYER_PLAYER, 0)
 	var slot: int = _mgr.spawn(0, Vector2(100.0, 100.0), Vector2(100.0, 0.0), 5.0, 4.0)
 	_mgr.set_homing(slot, 8.0, HOMING_REACH)
@@ -397,14 +396,13 @@ func _test_homing_picks_at_random_and_keeps_its_pick() -> void:
 
 func _test_homing_skips_wizards_and_freed_targets() -> void:
 	_setup()
-	_mgr.friendly_fire = true
 	_target(Vector2(300.0, 160.0), 8.0, ManagerScript.LAYER_PLAYER, 1)
 	var gone: Node2D = _target(Vector2(300.0, 40.0), 8.0)
 	var slot: int = _mgr.spawn(0, Vector2(100.0, 100.0), Vector2(100.0, 0.0), 5.0, 4.0)
 	_mgr.set_homing(slot, 3.0, HOMING_REACH)
 	_mgr._refresh_targets()
 	gone.free()
-	_check(not _mgr._homing_point(slot).is_finite(), "homing neither picks another wizard (friendly fire on) nor a freed target")
+	_check(not _mgr._homing_point(slot).is_finite(), "homing neither picks another wizard (though it would hit one) nor a freed target")
 
 
 func _test_ray_hits_in_order_and_reports_its_reach() -> void:
@@ -442,14 +440,11 @@ func _test_ray_width_layers_and_owner() -> void:
 	_mgr.ray(0, Vector2(50.0, 100.0), Vector2.RIGHT, 400.0, 3, ManagerScript.LAYER_PLAYER)
 	_check(_hits.is_empty(), "a beam never hits its own wizard")
 	_mgr.ray(1, Vector2(50.0, 100.0), Vector2.RIGHT, 400.0, 3)
-	_check(_hits.is_empty(), "a ray only hits the layers asked for")
-	_mgr.ray(1, Vector2(50.0, 100.0), Vector2.RIGHT, 400.0, 3, ManagerScript.LAYER_PLAYER)
-	_check(_hits.size() == 1 and _hits[0][1] == wizard, "another player's wizard can be asked for")
+	_check(_hits.size() == 1 and _hits[0][1] == wizard, "a teammate's beam hits the wizard, though it asked for enemies (G3c)")
 	_hits.clear()
 	_target(Vector2(300.0, 100.0))
-	_mgr.friendly_fire = true
-	_mgr.ray(1, Vector2(50.0, 100.0), Vector2.RIGHT, 400.0, 3)
-	_check(_hits.size() == 2, "friendly fire adds the wizards to a player's beam, as for a shot (%d)" % _hits.size())
+	_mgr.ray(EventsScript.NO_PLAYER, Vector2(50.0, 100.0), Vector2.RIGHT, 400.0, 3, ManagerScript.LAYER_PLAYER)
+	_check(_hits.size() == 2, "a NO_PLAYER beam hits the wizard and the enemy (%d)" % _hits.size())
 
 
 func _test_ray_stops_at_walls() -> void:

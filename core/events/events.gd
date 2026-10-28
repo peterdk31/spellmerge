@@ -25,10 +25,6 @@ signal reward_pick_requested(player: int, choice: int)
 signal door_vote_requested(player: int, door: int)
 ## A player asked to pause. Heard by run.
 signal pause_requested(player: int)
-## `player` switched friendly fire on or off in the pause menu (Settings, Gameplay). Heard by coop, which answers with `friendly_fire_changed`.
-signal friendly_fire_requested(player: int, on: bool)
-## Sender: hud. `player` switched enemy fire (an enemy's spells also hit other enemies; `EnemyFire` in core/settings) on or off in the pause menu (Settings, Gameplay). Heard by ai, which answers with `enemy_fire_changed`.
-signal enemy_fire_requested(player: int, on: bool)
 ## Sender: hud. The "Effect slots" slider in the pause menu (Settings) moved: how many effects
 ## (the glowing flares of casts, impacts, rings and dashes) may show at once. Heard by feel.
 signal effect_slots_changed(slots: int)
@@ -118,7 +114,7 @@ signal pull_requested(player: int, position: Vector2, radius: float, strength: f
 signal hit_landed(player: int, target: Node, amount: int, position: Vector2, kind: StringName)
 ## Sender: combat. A heal hit of `player` gave the wizard `target` `amount` health at `position`. Heard by player and feel.
 signal heal_dealt(player: int, target: Node, amount: int, position: Vector2)
-## Sender: core/projectiles. A shot of `player` with `tag` passed through the teammate `ally` at `position`. Heard by core/spells (relay, on ally).
+## Sender: none since actors G3c (core/projectiles before: every shot now hits teammates, none passes them). A shot of `player` with `tag` passed through the teammate `ally` at `position`. Heard by core/spells (relay, on ally).
 signal ally_passed(player: int, ally: Node, position: Vector2, tag: int)
 
 # --- Players ----------------------------------------------------------------
@@ -135,10 +131,6 @@ signal player_stats_changed(player: int, health: int, max_health: int, mana: flo
 signal player_joined(player: int)
 ## Sender: coop. `player` left the game.
 signal player_left(player: int)
-## Sender: coop. Friendly fire is now on or off (the answer to `friendly_fire_requested`, also sent by `Coop.set_friendly_fire`). Heard by hud.
-signal friendly_fire_changed(on: bool)
-## Sender: ai. Enemy fire is now on or off (the answer to `enemy_fire_requested`, also sent by `Entities.set_enemy_fire`). Heard by hud.
-signal enemy_fire_changed(on: bool)
 
 # --- Run and rooms ----------------------------------------------------------
 

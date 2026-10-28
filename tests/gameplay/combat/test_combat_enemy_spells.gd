@@ -3,7 +3,7 @@ extends "res://tests/support/suite.gd"
 ## spell hit on a wizard does what a spell does (damage, push, statuses) and wizards take
 ## reactions from the same table as enemies, for every spell (CONSUME, BURST, EXTEND, SPREAD, the
 ## reaction wait); `wizard_hurt` and `reaction_landed` carry the enemy's tag; an enemy's area hit
-## takes its side (wizards, other enemies only with enemy fire, never the enemy that cast it).
+## hurts everything in it (wizards, the other enemies and the enemy that cast it; actors G3c).
 ## Hits arrive as `projectile_hit` and `area_hit_requested` on a test bus, with hand-made hit
 ## profiles; time moves by `Combat.step` with a fixed delta.
 ##
@@ -171,7 +171,7 @@ func test_a_wizard_waits_before_reacting_again() -> void:
 	check_equal(_triggered.size(), 2, "after the wait it reacts again")
 
 
-func test_an_enemys_area_hit_takes_its_side() -> void:
+func test_an_enemys_area_hit_hurts_everything_in_it() -> void:
 	var wizard := _wizard(2, Vector2(10.0, 0.0))
 	var other := _enemy(Vector2(-10.0, 0.0))
 	var caster := _enemy(Vector2(0.0, 10.0))
@@ -181,12 +181,8 @@ func test_an_enemys_area_hit_takes_its_side() -> void:
 	var tag: int = _enemy_tag(blast)
 	_bus.area_hit_requested.emit(EventsScript.NO_PLAYER, Vector2.ZERO, 40.0, tag)
 	check_equal(wizard.health, PlayerScript.MAX_HEALTH - 4, "an enemy's blast hurts the wizard")
-	check_equal(_combat.get_health(other), 100, "and spares the other enemy")
-	check_equal(_combat.get_health(caster), 100, "and the enemy that cast it")
-	_projectiles.enemy_fire = true
-	_bus.area_hit_requested.emit(EventsScript.NO_PLAYER, Vector2.ZERO, 40.0, tag)
-	check_equal(_combat.get_health(other), 96, "with enemy fire it hits the other enemy")
-	check_equal(_combat.get_health(caster), 100, "never the one that cast it")
+	check_equal(_combat.get_health(other), 96, "and the other enemy (G3c: enemies always hurt each other)")
+	check_equal(_combat.get_health(caster), 96, "and the enemy that cast it, as a wizard's own blast does the wizard")
 
 
 func test_an_enemys_mend_heals_no_wizard() -> void:

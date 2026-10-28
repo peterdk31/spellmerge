@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## Decoys and familiars for enemies (staffs F8d, docs/milestones/M2-staffs.md, "Enemy staffs"):
-## an enemy's decoy copies the enemy, is a target wizards' shots hit (and only theirs wear it down)
-## and enemies never chase; an enemy's familiar circles the enemy and casts at the nearest wizard,
+## an enemy's decoy copies the enemy, is a target every shot but its enemy's hits and wears down,
+## and enemies never chase it; an enemy's familiar circles the enemy and casts at the nearest wizard,
 ## in the enemy's own spell; each enemy keeps PER_ENEMY of a kind, enemies share rows of their own
 ## so a crowd never takes a wizard's, and an enemy's entities end with it. The same world as
 ## test_ai_moves.gd, plus Entities.
@@ -143,7 +143,7 @@ func _run(seconds: float) -> void:
 		_entities.step(STEP)
 
 
-func test_an_enemys_decoy_copies_it_and_only_wizards_wear_it_down() -> void:
+func test_an_enemys_decoy_copies_it_and_every_hit_wears_it_down() -> void:
 	var enemy := _enemy(_data([&"decoy"]))
 	var tag: int = _spells.current_tag(enemy.caster, 0)
 	_run(enemy.windup_time + 2.0 * STEP)
@@ -159,13 +159,13 @@ func test_an_enemys_decoy_copies_it_and_only_wizards_wear_it_down() -> void:
 	fresh.free()
 	check(copied.texture != null and looks.has(copied.texture), "it copies the enemy's sprite")
 	check(_entities.lure(at) == null, "enemies never chase an enemy's decoy")
+	# Another enemy's shot wears it too (its own enemy's never reach it: core/projectiles).
 	_bus.projectile_hit.emit(EventsScript.NO_PLAYER, decoy, at, tag)
-	_bus.projectile_hit.emit(EventsScript.NO_PLAYER, decoy, at, tag)
-	_bus.projectile_hit.emit(EventsScript.NO_PLAYER, decoy, at, tag)
-	check_equal(_entities.count_owned(EntitiesScript.DECOY, enemy.caster), 1, "an enemy's shots do not wear it")
-	for i in EntitiesScript.DECOY_HITS:
+	for i in EntitiesScript.DECOY_HITS - 2:
 		_bus.projectile_hit.emit(0, decoy, at, SpellTag.make(0, 0, 0, 0))
-	check_equal(_entities.count_owned(EntitiesScript.DECOY, enemy.caster), 0, "a wizard's shots break it")
+	check_equal(_entities.count_owned(EntitiesScript.DECOY, enemy.caster), 1, "it holds until its last hit")
+	_bus.projectile_hit.emit(0, decoy, at, SpellTag.make(0, 0, 0, 0))
+	check_equal(_entities.count_owned(EntitiesScript.DECOY, enemy.caster), 0, "DECOY_HITS hits break it, an enemy's among them")
 	check(_ended.size() == 1 and _ended[0][0] == EventsScript.NO_PLAYER and _ended[0][1] == EntitiesScript.DECOY and _ended[0][2] == tag, "and its end is said as NO_PLAYER with its tag")
 
 
@@ -230,32 +230,15 @@ func test_enemies_keep_their_share_and_never_take_a_wizards_rows() -> void:
 	check_equal(_entities.count(), EntitiesScript.POOL_SIZE, "NO_PLAYER with a player's tag makes nothing; a player with an enemy's tag ends their own oldest")
 
 
-## Enemy fire (staffs F10): off by default; a request from the pause menu switches the projectile
-## manager's flag and is answered; then an enemy's bolt also hits another enemy in its way.
-func test_enemy_fire_is_off_by_default_and_a_request_switches_it() -> void:
-	var answers: Array[bool] = []
-	_bus.enemy_fire_changed.connect(func(on: bool) -> void: answers.append(on))
-	check(not _entities.enemy_fire and not _projectiles.enemy_fire, "off by default (EnemyFire.DEFAULT)")
-	_bus.enemy_fire_requested.emit(2, true)
-	check(_entities.enemy_fire and _projectiles.enemy_fire, "a player's request turns it on, in the projectile manager too")
-	_bus.enemy_fire_requested.emit(EventsScript.NO_PLAYER, false)
-	_bus.enemy_fire_requested.emit(4, false)
-	check(_projectiles.enemy_fire, "a request that names no player is ignored")
-	_entities.set_enemy_fire(false)
-	check(not _projectiles.enemy_fire, "and off again")
-	check_equal(answers, [true, false] as Array[bool], "every change is announced")
-
-
-func test_with_enemy_fire_on_an_enemys_bolt_hits_another_enemy() -> void:
-	for on: bool in [false, true]:
-		_entities.set_enemy_fire(on)
-		var caster := _enemy(_data([&"bolt"]), Vector2(0.0, 300.0 * float(on)))
-		_wizard.position = Vector2(80.0, 300.0 * float(on))
-		var blocker := _enemy(_data([&"bolt"]), Vector2(40.0, 300.0 * float(on)))
-		blocker.data.max_mana = 0.0
-		blocker.mana = 0.0
-		var health: int = _combat.get_health(blocker)
-		_run(caster.windup_time + 0.5)
-		var label: String = "enemy fire %s" % ("on" if on else "off")
-		check_equal(_combat.get_health(blocker) < health, on, label + ": the enemy in the way %s" % ("is hit" if on else "is not hit"))
-		check(_combat.get_health(caster) == ImpData.max_health, label + ": the caster is never hit by its own bolt")
+## Enemies always hurt each other (actors G3c: the Enemy fire setting is gone): an enemy's bolt
+## hits another enemy in its way, through the real AI, Spells, projectile manager and Combat.
+func test_an_enemys_bolt_hits_another_enemy_in_its_way() -> void:
+	var caster := _enemy(_data([&"bolt"]), Vector2.ZERO)
+	_wizard.position = Vector2(80.0, 0.0)
+	var blocker := _enemy(_data([&"bolt"]), Vector2(40.0, 0.0))
+	blocker.data.max_mana = 0.0
+	blocker.mana = 0.0
+	var health: int = _combat.get_health(blocker)
+	_run(caster.windup_time + 0.5)
+	check(_combat.get_health(blocker) < health, "the enemy in the way is hit")
+	check(_combat.get_health(caster) == ImpData.max_health, "the caster is never hit by its own bolt")

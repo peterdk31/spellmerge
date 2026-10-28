@@ -266,77 +266,67 @@ func test_on_hurt_stops_when_the_carrier_is_gone() -> void:
 	check_equal(_spells.live_shots(held), 0, "an expired carrier fires nothing")
 
 
+## Since actors G3c no shot passes a teammate (every shot hits one), so the projectile manager
+## never sends `ally_passed`; Spells still answers it, so the tests below send it by hand, as the
+## manager did: from the shot's slot (`event_slot`), naming a teammate it registered.
+func _pass(tag: int, ally: Node2D) -> void:
+	_mgr.event_slot = _first(tag)
+	_bus.ally_passed.emit(0, ally, ally.global_position, tag)
+	_mgr.event_slot = -1
+
+
 func test_on_ally_fires_from_the_teammate() -> void:
-	var friend: Node2D = _target(Vector2(60, 0), ManagerScript.LAYER_PLAYER, 1)
+	var friend: Node2D = _target(Vector2(60, 50), ManagerScript.LAYER_PLAYER, 1)
 	var held: int = _build(0, [&"on_ally", &"bolt", &"rune"])
 	_cast(0)
-	_tick(30)
+	_tick(1)
+	_pass(_spells.current_tag(0, 0, 0), friend)
 	var runes: Array[int] = _slots(held)
 	check_equal(runes.size(), 1, "passing a teammate fires the payload once")
 	check(runes.size() == 1 and absf(_mgr.get_position_of(runes[0]).x - friend.global_position.x) < 20.0, "from them")
 
 
-func test_relay_takes_on_the_infusion_of_a_teammates_last_cast() -> void:
-	_target(Vector2(60, 0), ManagerScript.LAYER_PLAYER, 1)
+## Player 1 casts frost (an infusion) or a plain bolt, then player 0 a bolt with the cards
+## `cards`, which passes player 1's teammate `passes` times on its way to an enemy. Returns the
+## hit profiles of player 0's hits.
+func _relay_hits(donor: Array[StringName], cards: Array[StringName], passes: int) -> Array[HitProfile]:
+	var friend: Node2D = _target(Vector2(60, 50), ManagerScript.LAYER_PLAYER, 1)
 	_target(Vector2(200, 0))
-	_build(1, [&"frost", &"bolt"])
-	_build(0, [&"relay", &"bolt"])
+	_build(1, donor)
+	_build(0, cards)
 	_spells.cast_staff(1, 0, Vector2(0, 100), Vector2.RIGHT, 10.0)
 	_cast(0)
+	_tick(1)
+	for i in passes:
+		_pass(_spells.current_tag(0, 0, 0), friend)
 	_tick(40)
-	var mine: Array = []
+	var mine: Array[HitProfile] = []
 	for hit: Array in _hits:
 		if hit[0] == 0:
-			mine.append(hit)
+			mine.append(hit[4] as HitProfile)
+	return mine
+
+
+func test_relay_takes_on_the_infusion_of_a_teammates_last_cast() -> void:
+	var mine: Array[HitProfile] = _relay_hits([&"frost", &"bolt"], [&"relay", &"bolt"], 1)
 	check_equal(mine.size(), 1, "the relay shot hit the enemy")
 	if not mine.is_empty():
-		var profile: HitProfile = mine[0][4]
+		var profile: HitProfile = mine[0]
 		check(profile != null and profile.element_ids.has(&"frost"), "with the teammate's frost")
 		check_equal(profile.status_id if profile != null else &"", &"chill", "and its status")
 	check_equal(_spells.hit_profile(_spells.current_tag(0, 0, 0)).element_ids.size(), 0, "the build itself stays plain")
 
 
 func test_relay_from_a_donor_without_infusion_changes_nothing() -> void:
-	_target(Vector2(60, 0), ManagerScript.LAYER_PLAYER, 1)
-	_target(Vector2(200, 0))
-	_build(1, [&"bolt"])
-	_build(0, [&"relay", &"bolt"])
-	_spells.cast_staff(1, 0, Vector2(0, 100), Vector2.RIGHT, 10.0)
-	_cast(0)
-	_tick(40)
-	var plain: bool = false
-	for hit: Array in _hits:
-		if hit[0] == 0:
-			plain = (hit[4] as HitProfile).element_ids.is_empty()
-	check(plain, "a teammate whose cast had no infusion gives nothing")
+	var mine: Array[HitProfile] = _relay_hits([&"bolt"], [&"relay", &"bolt"], 1)
+	check(mine.size() == 1 and mine[0].element_ids.is_empty(), "a teammate whose cast had no infusion gives nothing")
 
 
 func test_relay_passing_the_same_teammate_twice_adds_the_element_once() -> void:
-	_target(Vector2(50, 0), ManagerScript.LAYER_PLAYER, 1)
-	_target(Vector2(80, 0), ManagerScript.LAYER_PLAYER, 1)
-	_target(Vector2(200, 0))
-	_build(1, [&"frost", &"bolt"])
-	_build(0, [&"relay", &"bolt"])
-	_spells.cast_staff(1, 0, Vector2(0, 100), Vector2.RIGHT, 10.0)
-	_cast(0)
-	_tick(40)
-	var frosts: int = -1
-	for hit: Array in _hits:
-		if hit[0] == 0:
-			frosts = (hit[4] as HitProfile).element_ids.count(&"frost")
-	check_equal(frosts, 1, "frost joined the hit once")
+	var mine: Array[HitProfile] = _relay_hits([&"frost", &"bolt"], [&"relay", &"bolt"], 2)
+	check(mine.size() == 1 and mine[0].element_ids.count(&"frost") == 1, "frost joined the hit once")
 
 
 func test_a_plain_shot_takes_nothing_from_a_teammate() -> void:
-	_target(Vector2(60, 0), ManagerScript.LAYER_PLAYER, 1)
-	_target(Vector2(200, 0))
-	_build(1, [&"frost", &"bolt"])
-	_build(0, [&"bolt"])
-	_spells.cast_staff(1, 0, Vector2(0, 100), Vector2.RIGHT, 10.0)
-	_cast(0)
-	_tick(40)
-	var plain: bool = false
-	for hit: Array in _hits:
-		if hit[0] == 0:
-			plain = (hit[4] as HitProfile).element_ids.is_empty()
-	check(plain, "no relay card, no change")
+	var mine: Array[HitProfile] = _relay_hits([&"frost", &"bolt"], [&"bolt"], 1)
+	check(mine.size() == 1 and mine[0].element_ids.is_empty(), "no relay card, no change")

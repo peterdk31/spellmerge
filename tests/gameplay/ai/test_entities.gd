@@ -28,7 +28,7 @@ func _initialize() -> void:
 	await process_frame
 	_test_decoy_is_chased_before_a_nearer_wizard()
 	_test_enemy_shots_break_a_decoy()
-	_test_player_shots_do_not_wear_a_decoy()
+	_test_every_hit_wears_a_decoy()
 	_test_decoy_runs_out()
 	_test_decoy_copies_its_wizard()
 	_test_familiar_circles_its_wizard()
@@ -147,17 +147,17 @@ func _test_enemy_shots_break_a_decoy() -> void:
 	_check(imp.target == _world.players[0], "the imp goes back to the wizard once the decoy breaks")
 
 
-func _test_player_shots_do_not_wear_a_decoy() -> void:
+## Every hit wears a decoy down, a teammate's as well as an enemy's (actors G3c: no sides).
+func _test_every_hit_wears_a_decoy() -> void:
 	_setup(2)
 	_spawn(0, EntitiesScript.DECOY, Vector2(0.0, 0.0))
 	var decoy: Node2D = _entities.lure(Vector2.ZERO)
-	for i in 10:
-		_world.bus.projectile_hit.emit(1, decoy, Vector2.ZERO, TAG)
-		_world.bus.projectile_hit.emit(0, decoy, Vector2.ZERO, TAG)
-	_check(_entities.count(EntitiesScript.DECOY) == 1 and _ended.is_empty(), "players' shots never break a decoy")
-	for i in EntitiesScript.DECOY_HITS:
+	_world.bus.projectile_hit.emit(1, decoy, Vector2.ZERO, TAG)
+	for i in EntitiesScript.DECOY_HITS - 2:
 		_world.bus.projectile_hit.emit(EventsScript.NO_PLAYER, decoy, Vector2.ZERO, 1000)
-	_check(_entities.count() == 0 and _ended.size() == 1, "DECOY_HITS enemy hits break it")
+	_check(_entities.count(EntitiesScript.DECOY) == 1 and _ended.is_empty(), "it holds until its last hit")
+	_world.bus.projectile_hit.emit(EventsScript.NO_PLAYER, decoy, Vector2.ZERO, 1000)
+	_check(_entities.count() == 0 and _ended.size() == 1, "DECOY_HITS hits break it, a teammate's among them")
 
 
 func _test_decoy_runs_out() -> void:

@@ -8,8 +8,8 @@ extends Node2D
 ##     Projectiles.spawn(player, origin, direction * 300.0, 1.5, 4.0)
 ##
 ## Targets are Node2Ds registered with a radius and a layer. A projectile hits
-## the targets on the layers in its `hit_layers` mask: a fired spell hits
-## LAYER_ENEMY, an enemy's shot hits LAYER_PLAYER. A hit sends
+## the targets on the layers in its `hit_layers` mask and on both actor layers
+## (ACTOR_LAYERS, see "Everything hits everything" below). A hit sends
 ## `Events.projectile_hit(player, target, position, tag)`; the projectile then
 ## ends, unless it has `pierce` left, and `combat` turns the event into damage.
 ## The `tag` is the opaque int given to `spawn()`: the manager stores it and
@@ -53,14 +53,14 @@ extends Node2D
 ## events name it NO_PLAYER (`event_player`), so no listener takes it for a player, and its
 ## shots share NO_PLAYER's drop bucket at the cap. Unlike NO_PLAYER it has an anchor (its orbit
 ## shots), its own body (`set_target_owner`: its shots never hit it, unless self-hitting),
-## shields, homing (on wizards and decoys) and allies (the other enemies, for a mend shot).
+## shields and homing (on wizards and decoys).
 ##
-## Friendly fire: while `friendly_fire` is on, a shot fired by a player (0-3) also
-## hits targets on LAYER_PLAYER, except targets registered with that same player
-## as their `owner` (a wizard is never hit by its own shot). It is off by default
-## and read when a shot is spawned. `gameplay/coop` owns the option. `enemy_fire` is the
-## same for enemy casters' shots and LAYER_ENEMY (an enemy is never hit by its own);
-## `gameplay/ai` owns that one (Entities, the "Enemy fire" setting, staffs F10).
+## Everything hits everything (actors G3c, owner 2026-10-28: "Everything should be able to
+## damage everything. So there should be no sides."): every shot and beam hits targets on both
+## layers (ACTOR_LAYERS), whoever cast it: a wizard's hits other wizards, an enemy's other
+## enemies, a NO_PLAYER shot both. Only targets registered with the caster as their `owner` are
+## skipped (its own body and decoys), unless the shot is self-hitting. Sides still choose aim:
+## homing never picks its own side (`side_layer`), a shield stops the other side's shots.
 ##
 ## Walls: `set_walls(rects)` (or `add_wall_body(body)` for a room's static body) gives
 ## the solid parts of the room. They are rasterised into a grid of WALL_CELL
@@ -141,9 +141,8 @@ extends Node2D
 ##   sticky                 the first hit keeps it on the target for N seconds, then it expires
 ##   shield (players' shots) stops N enemy shots that touch it (`shot_blocked`)
 ##   self hit               may hit its caster once it has left the caster's hitbox
-##   ally hit               hits teammates' wizards; without it a shot passes them and sends
-##                          `ally_passed` once per teammate
-## Self-hit and ally-hit are off until `gameplay/combat` is ready for them (B3).
+## Self-hit is off until `gameplay/combat` is ready for it (B3). Teammates are always hit (G3c);
+## no shot passes them, so nothing sends `ally_passed` any more.
 ##
 ## Rays: `ray(...)` is an instant beam, `ray_curve(...)` a bent one, `ray_points(...)` one along
 ## any path of points (a live beam, which a homing one bends from target to target). They hold
@@ -192,7 +191,7 @@ const CASTER_POINT: int = -2
 ## Per-shot flags (`_flags`), set by the `set_*` calls below.
 const F_SELF: int = 1
 const F_SELF_LIVE: int = 2
-const F_ALLY: int = 4
+## Bit 4 was F_ALLY (a mend shot that hits teammates), gone in actors G3c: every shot does.
 const F_GHOST: int = 8
 const F_STUCK: int = 16
 const F_RETURN: int = 32
@@ -347,6 +346,8 @@ const BOUNDS_MARGIN: float = 128.0
 ## Target layers (bit mask).
 const LAYER_ENEMY: int = 1
 const LAYER_PLAYER: int = 2
+## What every shot and beam hits, added to the layers it was given (actors G3c).
+const ACTOR_LAYERS: int = LAYER_ENEMY | LAYER_PLAYER
 ## The base colour of each player's ramp (docs/STYLE.md); enemies' spells are Blight ochre.
 const PLAYER_COLORS: Array[Color] = [
 	Color("#3b73c9"), Color("#d9477a"), Color("#3f8f4f"), Color("#8a4fc4"),
@@ -388,11 +389,6 @@ var trail_demand: int = 0
 ## all of them; trails go down first).
 var particle_share: float = 1.0
 var trail_share: float = 1.0
-## Whether shots fired by players also hit other players' targets (see the class doc).
-var friendly_fire: bool = false
-## Whether enemy casters' shots also hit other enemies (off by default; staffs F10 makes it a
-## setting). Read when a shot is spawned, as `friendly_fire` is.
-var enemy_fire: bool = false
 ## Enemy casters' shots written into their batch by the last update_draw().
 var drawn_enemy: int = 0
 
@@ -460,9 +456,6 @@ var _move_left: PackedFloat32Array = PackedFloat32Array()
 var _move_vel: PackedVector2Array = PackedVector2Array()
 var _move_turn: PackedFloat32Array = PackedFloat32Array()
 var _move_range: PackedFloat32Array = PackedFloat32Array()
-var _passed: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
-var _passed_nodes: Array = [null, null, null, null]
-var _passed_at: PackedVector2Array = PackedVector2Array([Vector2.ZERO, Vector2.ZERO, Vector2.ZERO, Vector2.ZERO])
 var _hostile_slots: PackedInt32Array = PackedInt32Array()
 var _hostile_count: int = 0
 var _hostile_step: int = -1
@@ -919,7 +912,7 @@ static func _owner_index(caster: int) -> int:
 ## Register a Node2D as something projectiles can hit (`layer` is a non-zero
 ## bit mask). Registering twice only updates the radius, layer and owner. A freed target is dropped by itself.
 ## `owner` is the caster (a player 0-3, or an enemy caster) the target belongs to, or
-## Events.NO_PLAYER: shots of that caster never hit it (matters with friendly fire). `offset` moves the hit circle from the
+## Events.NO_PLAYER: shots of that caster never hit it (unless self-hitting). `offset` moves the hit circle from the
 ## node's origin (usually the feet) to the drawn body, so a shot that looks like it touches
 ## the sprite does hit.
 func add_target(node: Node2D, radius: float, layer: int = LAYER_ENEMY, owner: int = EventsScript.NO_PLAYER, offset: Vector2 = Vector2.ZERO) -> void:
@@ -1293,16 +1286,6 @@ func is_self_live(slot: int) -> bool:
 	return slot >= 0 and slot < _cap and _alive[slot] != 0 and (_flags[slot] & F_SELF_LIVE) != 0
 
 
-## The shot hits teammates' wizards as well as enemies (a mend shot). Without it, or friendly
-## fire, a shot passes through teammates and sends `ally_passed` for each, once.
-func set_ally_hit(slot: int) -> bool:
-	if slot < 0 or slot >= _cap or _alive[slot] == 0 or _player[slot] < 0:
-		return false
-	_flags[slot] |= F_ALLY
-	_layers[slot] |= side_layer(_player[slot])
-	return true
-
-
 func _spawn_row(player: int, origin: Vector2, velocity: Vector2, lifetime: float, radius: float, hit_layers: int, pierce: int, tag: int, motion: int) -> int:
 	# An orbit shot is held by its caster and ignores walls.
 	if motion != MOTION_ORBIT and _has_walls and _wall_hit(origin, origin) >= 0.0:
@@ -1327,11 +1310,7 @@ func _spawn_row(player: int, origin: Vector2, velocity: Vector2, lifetime: float
 	_life[slot] = lifetime
 	_radius[slot] = maxf(radius, 0.0)
 	_player[slot] = player
-	_layers[slot] = hit_layers
-	if friendly_fire and is_player_caster(player):
-		_layers[slot] |= LAYER_PLAYER
-	elif enemy_fire and player >= FIRST_ENEMY_CASTER:
-		_layers[slot] |= LAYER_ENEMY
+	_layers[slot] = hit_layers | ACTOR_LAYERS
 	_pierce[slot] = maxi(pierce, 0)
 	_tag[slot] = tag
 	_core[slot] = Color.WHITE
@@ -1700,7 +1679,7 @@ func homing_point(player: int, origin: Vector2, direction: Vector2, max_angle: f
 ## The one homing search: the target (an index, or -1) `homing_point` describes. For a shot
 ## (`slot` 0 or more) it also skips the targets the shot just hit and charges the work budget.
 func _home_pick(player: int, origin: Vector2, direction: Vector2, max_angle: float, layers: int, within: float, keep: int, pick_seed: int, slot: int, avoid: int) -> int:
-	# Homing never picks its own side (a wizard, for a player), even with friendly fire on.
+	# Homing never picks its own side (a wizard, for a player), though its shot hits both.
 	layers &= ~side_layer(player)
 	var any_way: bool = max_angle >= PI
 	var pick: int = -1
@@ -1739,7 +1718,7 @@ func _home_pick(player: int, origin: Vector2, direction: Vector2, max_angle: flo
 ## `projectile_impact` and `projectile_hit(player, target, point, tag)`, the point being
 ## where the beam passes closest to the target; a beam that ends on a wall sends an
 ## impact with a `null` target there. Targets owned by `player` are skipped and, as in
-## `spawn`, friendly fire adds LAYER_PLAYER. Returns how far the beam got in pixels: the
+## `spawn`, it hits ACTOR_LAYERS whatever `layers` says. Returns how far the beam got in pixels: the
 ## length, the distance to the wall, or the distance to the last target it could hit.
 ## 0.0 for bad arguments or an origin inside a wall. The hits are found before any event
 ## is sent, so a handler may remove or free targets, or fire another ray (up to
@@ -1840,10 +1819,7 @@ func _ray_path(player: int, segments: int, pierce: int, layers: int, tag: int, w
 	var skip: int = exclude.get_instance_id() if exclude != null else 0
 	if not _targets.is_empty() and reach > 0.0:
 		_query_ready()
-		if friendly_fire and is_player_caster(player):
-			layers |= LAYER_PLAYER
-		elif enemy_fire and player >= FIRST_ENEMY_CASTER:
-			layers |= LAYER_ENEMY
+		layers |= ACTOR_LAYERS
 		var wide: float = maxf(width, 0.0)
 		var pad: Vector2 = Vector2.ONE * (wide + _max_target_radius)
 		var start: float = 0.0
@@ -2527,7 +2503,6 @@ func _hit_test(slot: int) -> bool:
 	var shooter: int = _player[slot]
 	var flags: int = _flags[slot]
 	var inside: bool = false
-	var passed: int = 0
 	for y in range(y0, y1 + 1):
 		for x in range(x0, x1 + 1):
 			var t: int = _cell_head[y * _grid_w + x]
@@ -2547,15 +2522,6 @@ func _hit_test(slot: int) -> bool:
 						t = next_target
 						continue
 				elif (_target_layer[t] & layers) == 0:
-					# A teammate's wizard is passed through, once, and told.
-					if is_player_caster(shooter) and is_player_caster(owner_of) and (_target_layer[t] & LAYER_PLAYER) != 0 and passed < MAX_PLAYERS and not _remembers(slot, _target_id[t]):
-						var pass_at: float = 0.0
-						if path_sq > 0.0:
-							pass_at = clampf((_target_pos[t] - from).dot(path) / path_sq, 0.0, 1.0)
-						var pass_reach: float = _radius[slot] + _target_radius[t]
-						if (from + path * pass_at).distance_squared_to(_target_pos[t]) <= pass_reach * pass_reach:
-							_passed[passed] = t
-							passed += 1
 					t = next_target
 					continue
 				# Skip targets already hit, and the one a payload must not hit.
@@ -2574,42 +2540,11 @@ func _hit_test(slot: int) -> bool:
 				t = next_target
 	if (flags & F_SELF) != 0 and (flags & F_SELF_LIVE) == 0 and not inside:
 		_flags[slot] |= F_SELF_LIVE
-	if passed > 0:
-		_announce_passed(slot, passed, from, path, path_sq)
 	if best < 0:
 		return false
 	_work_left -= HIT_WORK
 	_register_hit(slot, best, best_point)
 	return true
-
-
-## Remember the teammates collected in `_passed` (`count` of them) and send `ally_passed` for
-## each. They are collected first because a handler may add or remove targets.
-func _announce_passed(slot: int, count: int, from: Vector2, path: Vector2, path_sq: float) -> void:
-	var seq: int = _seq[slot]
-	var player: int = _player[slot]
-	var tag: int = _tag[slot]
-	for n in count:
-		var t: int = _passed[n]
-		var along: float = 0.0
-		if path_sq > 0.0:
-			along = clampf((_target_pos[t] - from).dot(path) / path_sq, 0.0, 1.0)
-		_passed_nodes[n] = _targets[t]
-		_passed_at[n] = from + path * along
-		var memory: int = slot * HIT_MEMORY
-		for i in range(HIT_MEMORY - 1, 0, -1):
-			_last_hit[memory + i] = _last_hit[memory + i - 1]
-		_last_hit[memory] = _target_id[t]
-	if events == null:
-		return
-	for n in count:
-		if _alive[slot] == 0 or _seq[slot] != seq:
-			return
-		var node: Variant = _passed_nodes[n]
-		if is_instance_valid(node):
-			event_slot = slot
-			events.ally_passed.emit(player, node, _passed_at[n], tag)
-			event_slot = -1
 
 
 func _remembers(slot: int, id: int) -> bool:

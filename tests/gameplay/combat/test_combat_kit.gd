@@ -166,7 +166,7 @@ func test_a_burn_that_kills_is_kind_status_and_reaction_damage_is_kind_reaction(
 # --- Area hits ---
 
 
-func test_an_area_hit_reaches_enemies_and_the_caster_but_not_a_teammate() -> void:
+func test_an_area_hit_reaches_enemies_the_caster_and_a_teammate() -> void:
 	var caster := _wizard(0, Vector2.ZERO)
 	var mate := _wizard(1, Vector2(10.0, 0.0))
 	var near := _enemy(Vector2(15.0, 0.0))
@@ -174,19 +174,11 @@ func test_an_area_hit_reaches_enemies_and_the_caster_but_not_a_teammate() -> voi
 	_projectiles.step(STEP)
 	_bus.area_hit_requested.emit(0, Vector2.ZERO, 30.0, _tag(_profile(5)))
 	check_equal(caster.health, PlayerScript.MAX_HEALTH - 5, "the caster is inside their own blast")
-	check_equal(mate.health, PlayerScript.MAX_HEALTH, "a teammate is safe without friendly fire")
+	check_equal(mate.health, PlayerScript.MAX_HEALTH - 5, "and so is the teammate: friendly fire is always on (G3c)")
 	check_equal(_combat.get_health(near), 95, "the enemy in the circle was hit")
 	check_equal(_combat.get_health(far), 100, "the enemy outside was not")
 	for row: Array in _landed:
 		check_equal(row[3], &"burst", "an area hit is kind burst")
-
-
-func test_friendly_fire_lets_an_area_hit_reach_a_teammate() -> void:
-	_wizard(0, Vector2.ZERO)
-	var mate := _wizard(1, Vector2(10.0, 0.0))
-	_projectiles.friendly_fire = true
-	_bus.area_hit_requested.emit(0, Vector2.ZERO, 30.0, _tag(_profile(5)))
-	check_equal(mate.health, PlayerScript.MAX_HEALTH - 5, "hurt with friendly fire on")
 
 
 func test_an_area_hit_centred_on_the_caster_hits_at_once_and_pushes_nobody() -> void:
@@ -464,7 +456,7 @@ func test_a_heal_stops_at_full_health_and_skips_the_downed() -> void:
 	check(_healed.is_empty(), "a downed wizard is not healed")
 
 
-func test_a_heal_area_reaches_teammates_without_friendly_fire() -> void:
+func test_a_heal_area_reaches_teammates() -> void:
 	_wizard(0, Vector2.ZERO)
 	var mate := _wizard(1, Vector2(10.0, 0.0))
 	mate.take_damage(20)
@@ -604,7 +596,6 @@ func test_the_note_tells_who_downed_the_wizard() -> void:
 
 func test_the_note_names_a_teammate_and_is_empty_for_an_enemy() -> void:
 	var wizard := _wizard(1, Vector2.ZERO)
-	_projectiles.friendly_fire = true
 	var profile := _profile(1000)
 	profile.source_name = "Frost Nova"
 	_bus.projectile_hit.emit(0, wizard, Vector2(-5.0, 0.0), _tag(profile))

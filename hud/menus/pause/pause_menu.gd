@@ -14,17 +14,14 @@ extends PanelContainer
 ##   which `hud/panels` applies to every player's builder. "Reload: Button" (the default) or
 ##   "Next cast" (owner, 2026-10-27): where the corner panels' staff rows show a staff's delay;
 ##   each flip sends `reload_style_changed`, which `hud/panels` applies to every panel. Back.
-## - **Settings:** Gameplay, "Fullscreen: Off" (or On), "Effect slots: 256", Back. The switch asks
+## - **Settings:** "Fullscreen: Off" (or On), "Effect slots: 256", Back. The switch asks
 ##   `Display` (core) to fill the screen or not and stays on the page; its word follows the window
 ##   itself, read each time the page is shown, so leaving fullscreen with the browser's Escape shows
 ##   Off again. "Effect slots" is a slider (the owner, 2026-10-27): left and right move it a step
 ##   (`EffectSlots` in core/settings: its STEP, from MIN to MAX), `accept` a step up (from the
 ##   top back to the bottom), up and down leave it; each move sends `effect_slots_changed`, which
-##   feel applies. It is kept in memory until core/save exists, as friendly fire is.
-## - **Gameplay:** "Friendly fire: Off" (or On), which sends `friendly_fire_requested(player, on)`;
-##   the word follows `friendly_fire_changed` from coop, never the press itself. "Enemy fire: Off"
-##   (or On; `EnemyFire.DEFAULT`, staffs F10: enemies' spells also hit other enemies) the same way,
-##   through `enemy_fire_requested` and the AI's `enemy_fire_changed`. Back.
+##   feel applies. It is kept in memory until core/save exists. (The Gameplay page, with
+##   "Friendly fire" and "Enemy fire", went in actors G3c: every spell hits everything, always.)
 ##
 ## Only the player who opened it works it, through `core/ui_focus`: up/left and down/right move,
 ## `accept` (A) activates, `back` (B) goes up a page and closes it from the main page; `pause`
@@ -36,16 +33,14 @@ const EventsScript := preload("res://core/events/events.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
 
 const PLAYER_COUNT: int = 4
-enum Page { MAIN, SANDBOX, SETTINGS, GAMEPLAY }
+enum Page { MAIN, SANDBOX, SETTINGS }
 ## The title of each page.
 const TITLES: Dictionary = {
-	Page.MAIN: "PAUSED", Page.SANDBOX: "SANDBOX", Page.SETTINGS: "SETTINGS", Page.GAMEPLAY: "GAMEPLAY",
+	Page.MAIN: "PAUSED", Page.SANDBOX: "SANDBOX", Page.SETTINGS: "SETTINGS",
 }
 ## The sandbox actions, as flow knows them.
 const ACTION_IMP_WAVE: StringName = &"imp_wave"
 const ACTION_RESET_DUMMIES: StringName = &"reset_dummies"
-const FRIENDLY_FIRE_TEXT: String = "Friendly fire: %s"
-const ENEMY_FIRE_TEXT: String = "Enemy fire: %s"
 const FOCUS_MARK: String = "> "
 ## The meta key that keeps a button's text without the focus mark.
 const BASE_TEXT_META: StringName = &"base_text"
@@ -76,8 +71,6 @@ var page: Page = Page.MAIN
 var _events: EventsScript = null
 var _ui_focus: UIFocusScript = null
 var _sandbox_on: bool = false
-var _friendly_fire: bool = false
-var _enemy_fire: bool = EnemyFire.DEFAULT
 var _focused: Control = null
 var _controls: Array[Control] = []
 ## Page -> its buttons, in order.
@@ -105,14 +98,10 @@ var display: Node = null
 @onready var _put_style: Button = _add(Page.SANDBOX, "PutStyle", PUT_TEXT % "Push right")
 @onready var _reload_style: Button = _add(Page.SANDBOX, "ReloadStyle", RELOAD_TEXT % "Button")
 @onready var _sandbox_back: Button = _add(Page.SANDBOX, "SandboxBack", "Back")
-@onready var _gameplay: Button = _add(Page.SETTINGS, "Gameplay", "Gameplay")
 @onready var _fullscreen: Button = _add(Page.SETTINGS, "Fullscreen", FULLSCREEN_TEXT % "Off")
 @onready var _effects: Button = _add(Page.SETTINGS, "EffectSlots", EFFECT_SLOTS_TEXT % EffectSlots.DEFAULT)
 @onready var _effects_bar: HSlider = _add_slider(_effects)
 @onready var _settings_back: Button = _add(Page.SETTINGS, "SettingsBack", "Back")
-@onready var _friendly: Button = _add(Page.GAMEPLAY, "FriendlyFire", FRIENDLY_FIRE_TEXT % "Off")
-@onready var _enemy: Button = _add(Page.GAMEPLAY, "EnemyFire", ENEMY_FIRE_TEXT % ("On" if EnemyFire.DEFAULT else "Off"))
-@onready var _gameplay_back: Button = _add(Page.GAMEPLAY, "GameplayBack", "Back")
 
 
 func _ready() -> void:
@@ -130,8 +119,6 @@ func bind(events: EventsScript, ui_focus: UIFocusScript) -> void:
 	_ui_focus = ui_focus
 	if _events != null:
 		_events.sandbox_changed.connect(_on_sandbox_changed)
-		_events.friendly_fire_changed.connect(_on_friendly_fire_changed)
-		_events.enemy_fire_changed.connect(_on_enemy_fire_changed)
 	if _ui_focus != null:
 		_ui_focus.closed.connect(_on_closed)
 		_ui_focus.activated.connect(_on_activated)
@@ -293,18 +280,6 @@ func _on_sandbox_changed(on: bool) -> void:
 		_show_page(page)
 
 
-func _on_friendly_fire_changed(on: bool) -> void:
-	_friendly_fire = on
-	_friendly.set_meta(BASE_TEXT_META, FRIENDLY_FIRE_TEXT % ("On" if on else "Off"))
-	_mark_focus()
-
-
-func _on_enemy_fire_changed(on: bool) -> void:
-	_enemy_fire = on
-	_enemy.set_meta(BASE_TEXT_META, ENEMY_FIRE_TEXT % ("On" if on else "Off"))
-	_mark_focus()
-
-
 func _on_closed(player: int) -> void:
 	if player != owner_player:
 		return
@@ -349,24 +324,14 @@ func _on_activated(player: int, control: Control) -> void:
 		_reload_style.set_meta(BASE_TEXT_META, RELOAD_TEXT % ("Button" if reload_on_button else "Next cast"))
 		_mark_focus()
 		reload_style_changed.emit(reload_on_button)
-	elif control == _gameplay:
-		_go(Page.GAMEPLAY)
 	elif control == _fullscreen:
 		if display != null:
 			display.call("toggle_fullscreen")
 		_show_fullscreen()
 	elif control == _effects:
 		_set_effect_slots(EffectSlots.MIN if effect_slots >= EffectSlots.MAX else effect_slots + EffectSlots.STEP)
-	elif control == _friendly:
-		if _events != null:
-			_events.friendly_fire_requested.emit(player, not _friendly_fire)
-	elif control == _enemy:
-		if _events != null:
-			_events.enemy_fire_requested.emit(player, not _enemy_fire)
 	elif control == _sandbox_back or control == _settings_back:
 		_go(Page.MAIN)
-	elif control == _gameplay_back:
-		_go(Page.SETTINGS)
 
 
 ## `back` goes up a page; on the main page it resumes.
@@ -376,8 +341,6 @@ func _on_cancelled(player: int) -> void:
 	match page:
 		Page.MAIN:
 			close_menu()
-		Page.GAMEPLAY:
-			_go(Page.SETTINGS)
 		_:
 			_go(Page.MAIN)
 

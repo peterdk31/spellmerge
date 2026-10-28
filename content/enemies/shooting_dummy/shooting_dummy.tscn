@@ -21,9 +21,6 @@ script = ExtResource("1_ai")
 attack_range = 280.0
 windup_time = 1.5
 recover_time = 1.25
-attack_damage = 6
-attack_speed = 70.0
-attack_lifetime = 4.0
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 shape = SubResource("CircleShape2D_body")

@@ -350,7 +350,7 @@ C0 (after B6): the 19 existing cards get their look data and a second look at th
 
 ### Phase F: enemy staffs (owner, 2026-10-27)
 
-Owner sessions, one PR each, in this order: F2, F3 and F4 may run in parallel; F5 after F3 and F4; F6, F7 and F8a after F5, then F8b, F8c and F8d (split from F8 while building it: one area each); then F9; then F10. Before D3, so the stress run and the playtest see enemies that cast.
+Owner sessions, one PR each, in this order: F2, F3 and F4 may run in parallel; F5 after F3 and F4; F6, F7 and F8a after F5, then F8b, F8c and F8d (split from F8 while building it: one area each); then F9a and F9b; then F10. Before D3, so the stress run and the playtest see enemies that cast.
 
 | # | Part | Area | Delivers |
 | --- | --- | --- | --- |
@@ -365,7 +365,8 @@ Owner sessions, one PR each, in this order: F2, F3 and F4 may run in parallel; F
 | F8b | **The telegraph in the new style** | `gameplay/ai`, `gameplay/feel` | The windup's line drawn by the shot shader (an effect) instead of the `Line2D`, in the enemy ramp |
 | F8c | **Moves on enemies** | `gameplay/ai` | Dash, teleport, hook, swap and recoil moving the enemy (answering `caster_move_requested` by tag, `caster_move_finished` where it ends); a cast aims a move at the target as it aims everything |
 | F8d | **Decoys and familiars for enemies** | `gameplay/ai` (Entities) | An enemy's decoy (a copy of the enemy that wizards' shots hit and homing picks) and familiar (circling it, casting at the nearest wizard), in the enemy ramp; two of a kind per enemy in 32 rows of their own; they end with their enemy |
-| F9 | **The imp and the shooting dummy on staffs** | `content/enemies`, `gameplay/ai`, `core/projectiles` | Both on player-card staffs; `ATTACK_TAG`, its hit-profile table, `imp_fireball.svg` and the hostile batch removed. Tests: the dummies, the waves, the 4-bot test; a stress run at the web cap (numbers in DECISIONS) |
+| F9a | **The imp and the shooting dummy on staffs** | `content/enemies`, tests | Both on player-card staffs (`fire · bolt`, `slow · bolt`). Tests: the dummies, the waves, the 4-bot test; a stress run at the web cap (numbers in DECISIONS) |
+| F9b | **The old enemy attack removed** | `gameplay/ai`, `gameplay/combat`, `gameplay/feel`, `core/projectiles` | `ATTACK_TAG`, its hit-profile table, the attack exports, `imp_fireball.svg` and the hostile batch removed (split from F9 while building it, as F8 was) |
 | F10 | **Enemy fire setting** | `core/settings`, `hud/menus/pause`, `gameplay/ai` | `core/settings/enemy_fire.gd` (off by default), `enemy_fire_requested` and `enemy_fire_changed`, the pause menu row, applied to the projectile manager |
 
 ### Phase D: proof

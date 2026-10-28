@@ -144,7 +144,11 @@ func test_it_opens_a_row_and_owns_its_body() -> void:
 	check_equal(_projectiles.target_owner_of(enemy), enemy.caster, "its body is its row's, so its own spells skip it")
 	check_equal(enemy.mana, 6.0, "it starts with full mana")
 	check(_spells.current_tag(enemy.caster, 0) != 0, "its staff is installed")
-	var plain := _enemy(ImpData)
+	check(ImpData.staff != null and ImpData.cards == ([&"fire", &"bolt"] as Array[StringName]), "the ember imp casts a staff of player cards (F9)")
+	var none: EnemyBase = ImpData.duplicate() as EnemyBase
+	none.staff = null
+	none.cards = []
+	var plain := _enemy(none)
 	check(not plain.uses_staff() and plain.caster == -1, "an enemy without a staff keeps its old attack")
 
 

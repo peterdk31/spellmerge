@@ -1654,3 +1654,11 @@ How it is built (parts F2–F10):
 - **A share of their own:** two of a kind per enemy, in 32 rows after the players' 32. A crowd of casters fills only those; then the oldest enemy entity ends (with `entity_ended`, so Spells' count of live shots stays right). Wizards always get all four of each kind.
 - **They end with their enemy.** A wizard's familiar stays when its wizard is gone, but an enemy dies for good, and a `hold` familiar of a dead enemy would cast at wizards until the room ends. The AI ends its entities where they are as it closes its row (`Entities.enemy_gone`), with `entity_ended`, so their `on expire` and blast still go off there.
 - The AI hands Entities its body directly (`set_enemy`): both are `gameplay/ai`, so no event is needed.
+
+## 2026-10-28: The imp and the shooting dummy on staffs (staffs F9a)
+
+- **F9 is two parts:** the enemies move onto staffs (F9a, content and tests), then the unused old attack goes (F9b: `ATTACK_TAG`, Combat's table, the attack exports, `imp_fireball.svg`, the hostile batch), so each PR stays readable.
+- **The imp casts `fire · bolt`** (owner decision 4): 5 damage and a burn instead of the old 10, 220 px/s for 1.2 s instead of 140 for 1.25, radius 5 instead of 3.5 (a wizard clears it with a 13 px sidestep instead of 11.5), with knockback. 10 mana and 3 a second back: one cast every 1.7 s or so once its two full-mana casts are spent, about the old windup plus recovery (1.75 s).
+- **The shooting dummy casts `slow · bolt`**: 66 px/s for 3.6 s (the old shot was 70 for 4), 5 damage (was 6), no element, so it stays a plain target for practising shields and blocks. 5 mana and 2 a second back: about one cast per windup plus recovery (2.75 s). Its telegraph stays Void, so the sandbox's two lanes stay told apart.
+- **Each staff is a sub-resource of its enemy's `.tres`:** an enemy type is still one folder, and no other content shares these staffs.
+- **The stress run at the web cap** (headless, same machine, before and after): web scenario frame 7.38 to 7.20 ms avg, p95 15.7 to 14.2 ms; one pass of the enemy step over 100 enemies 0.86 to 1.13 ms (the staff's mana, anchor and aim each step); enemies and shots at 100% of their targets. The desktop scenario was the same before and after.

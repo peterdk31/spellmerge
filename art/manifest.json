@@ -244,6 +244,24 @@
       "prompt": "The golden example of a player character, style N: frame 1 of content/wizard/base/wizard_idle.svg (eyes open) with content/wizard/base/wizard_hat_p1.svg over it, as one 32x32 picture for the Style Guide page and the starter kit. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
     },
     {
+      "path": "art/kit/golden_staff.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "good",
+      "tool": "Claude (SVG rects composited by a small script from the game's own sheets)",
+      "prompt": "The golden example of a player character, a living staff: frame 15 (pointing up and to the right) of the player 1 row of content/wizard/staffs/curl/head.svg, with the cheer eyes looking up-right from art/faces/eyes.svg and the neutral brows from art/faces/brows.svg over it, the eyes' top-left 8 px above the grip, as one 48x48 picture. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
+      "path": "art/kit/golden_stray.svg",
+      "origin": "ai",
+      "author": "Claude",
+      "license": "CC-BY-SA-4.0",
+      "tier": "good",
+      "tool": "Claude (SVG rects composited by a small script from the game's own sheets)",
+      "prompt": "The golden example of an enemy, a stray: content/enemies/ember_imp/idle.svg (the Cinder Rod) with the stray eyes from art/faces/eyes.svg in fire's light shade #ffa23c and the angry brows from art/faces/brows.svg at its face anchor, as one 32x32 picture. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+    },
+    {
       "path": "content/wizard/base/wizard_walk.svg",
       "origin": "ai",
       "author": "Claude",

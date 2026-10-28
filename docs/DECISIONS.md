@@ -1887,3 +1887,9 @@ The owner's decision after G9: a player must always see their own wizard, which 
 - **The captions are in code** (`intro.gd`): `content/story/` takes only JSON, and there is no cutscene schema or loader yet (lore is the only story kind the registry reads). Moving them to story data is M3's, with the events schema.
 - **Kept from the mockup:** the closing line "Merge spells. Find your way home." after "Home is up there." (the owner saw it in round 9).
 
+## 2026-10-28: The docs (living staffs H7)
+
+- **"Player" in the prose, not "staff":** every README, docs/ARCHITECTURE.md and llms.txt now call the player's character the player (its body the staff where that is meant), never the wizard. "Staff" alone already names each of a player's four card rows, so "the staff's staffs" would not read; the plan's "staff for the player" is kept where it is unambiguous. The wizard in the prose is now only the villain.
+- **Identifiers keep "wizard":** `content/wizard/`, `wizard.tscn`, the `wizards` group, `TEAM_WIZARDS`, `seat_wizard`, `WizardFixture` and the like. Renaming them is a refactor across code, scenes, tests and the bot's scripts for no change in play; the folder's README says why it keeps its name.
+- **docs/STYLE.md** gains "The living staffs" (the face layers, moods and personalities, head sheets of 16 drawn directions, strays' glow and hop, silhouette families) and its player-colour rule moves from the hat to the head. **Golden examples:** `art/kit/golden_staff.svg` (the curl with the Optimist's face) and `art/kit/golden_stray.svg` (the Cinder Rod with its face), each composited from the game's own sheets as the game layers them; `golden_wizard.svg` stays in the kit as the villain's look and leaves the list.
+- **In the game,** the two combo descriptions that said "One wizard's" say "One player's"; the intro's lines about the wizard are about the villain.

@@ -2,7 +2,7 @@
 
 The art rules for Spellmerge, written so a person, an agent or a script can check an asset against them. The vision is in [DESIGN.md](DESIGN.md) (pillar 4, "Readable chaos"); the plan is in [PLAN.md](PLAN.md) ("Art and music").
 
-**Status: chosen, not provisional.** Claude drafted this style in M1; on 2026-10-23 the owner picked the look from Claude's samples: style N, recorded in [DESIGN.md](DESIGN.md) ("Art direction (locked)"). The wizard is drawn in it (`content/wizard/base/`: a narrow dusk robe with a Spark placket, belt and hem, two big tall eyes and no mouth, under a big pointed hat in the player's colour). Everything else is redrawn in the same spirit, one area at a time, over later milestones. These rules are the ones art is reviewed against.
+**Status: chosen, not provisional.** Claude drafted this style in M1; on 2026-10-23 the owner picked the look from Claude's samples: style N, recorded in [DESIGN.md](DESIGN.md). On 2026-10-28 the owner made every character a living staff ([milestones/M2-living-staffs.md](milestones/M2-living-staffs.md)): a player is a floating staff with cartoon eyes and brows, an enemy (a stray) a meaner staff with glowing eyes; the style N wizard, robe and pointed hat, is now the villain. Everything else is redrawn in the same spirit, one area at a time, over later milestones. These rules are the ones art is reviewed against.
 
 ## The short version
 
@@ -65,9 +65,19 @@ The player colours belong to the players: enemies, props and tiles don't use the
 - A silhouette must read at 1× in solid black. Check it before adding detail.
 - Enemy telegraphs use Fire colours and are larger and brighter than anything else on screen.
 - Colour is never the only signal for who a player is; the HUD adds a number or a shape next to the colour.
-- Player sprites differ only in the player colour ramp. The ramp covers the hat (and the panel and markers) and nothing else on the wizard: the robe is Stone and Spark for every player, the face and hands use Skin, the staff uses Wood. The hat is its own picture (`wizard_hat_pN.svg`), drawn over one shared body strip.
+- Player sprites differ only in the player colour ramp. The ramp covers the staff's head (the curl's gem, the star, the crescent, the crystal; and the panel and markers) and nothing else: the shaft is Wood with a Spark grip wrap for every player, the eyes are Bone. Each head sheet has one row per player ramp (`content/wizard/staffs/<head>/head.svg`).
 - The four player base colours (`#3b73c9`, `#d9477a`, `#3f8f4f`, `#8a4fc4`) are the comparison set: any two must differ clearly in hue, and nothing else on screen may use a colour close to one of them.
 - Floors use only Stone base and light, with Stone shadow only for small inner details. Players and enemies don't use Stone shadow for their own surfaces, so a silhouette doesn't melt into the floor.
+
+## The living staffs
+
+Every character is a body and a face (living staffs H2–H5; the code is `gameplay/actor/face.gd`):
+
+- **The face** is two floating eyes and two floating brows on their own layers (`art/faces/eyes.svg`, `art/faces/brows.svg`, 16×8 frames), drawn over the body. No mouth. The game moves them: the eyes trail the body by a tenth of a second and the brows trail the eyes, at most 2 px each; a cast pops them up; blinks, glances and the odd raised brow are timed per character. Draw no face into a body sprite.
+- **Brows carry the mood**, five shapes: neutral, raised, angry, furious, worried, 4 px each, 3 to 5 rows above the eyes. **Eyes carry the personality and the look**: round (the Optimist), round with a sparkle (the Show-off), heavy-lidded (the Dozer), narrow (the Sergeant); the pupils look one of nine ways.
+- **A player's body** is a head sheet: 48×48 frames, 16 columns of directions (clockwise from pointing right, 22.5° apart, each drawn, never rotated by the game, so the light stays top-left and an upright head stays upright), 4 rows of player ramps, the grip at (24, 27). The face sits 8 px above the grip ("Close"). It floats and bobs; it has no walk frames.
+- **A stray's body** is one 32×32 frame with no player colour; its eyes are drawn white and tinted in its element's light shade (a glow), with slit pupils, and its brows rest angry and turn furious while it winds up. Strays hop (the game lifts the sprite); players float, so the two read apart by motion.
+- **Silhouettes:** each head is its own shape family (spiral, spikes, solid curve, arrowhead), so four players read apart in black.
 
 ## Animation frame counts
 
@@ -87,7 +97,7 @@ One animation is one horizontal strip: frame 1 at the left, each frame 32 px wid
 | Impact / spark | 4 | no | 20 fps | Over in 0.2 s |
 | Animated tile | 4 | yes | 4 fps | Optional (torches, water); still tiles are 1 frame |
 
-The table is a guide; the wizard's real values are the constants in `gameplay/player/player.gd`.
+The table is a guide, and the living staffs need few of it: a player's body has no strips (a frame per direction, moved by the game) and a stray is one frame; the face's motion is code. The real values are the constants in `gameplay/player/staff_look.gd`, `gameplay/actor/face.gd` and `gameplay/ai/creature_look.gd`.
 
 A single still image has 1 frame and is a plain 32×32 file.
 
@@ -135,12 +145,12 @@ The HUD (M1 parts 18 and 19) and the Style Guide page build on these.
 
 ## Golden examples
 
-The pieces the Style Guide page shows as "this is the look", listed with what each one shows in [art/kit/golden.json](../art/kit/golden.json). The player character is in the chosen style N; the others are the best placeholder art so far and are redrawn in that style over later milestones, when they move here. Copy their approach, not their pixels.
+The pieces the Style Guide page shows as "this is the look", listed with what each one shows in [art/kit/golden.json](../art/kit/golden.json). The player and the stray are the living staffs (body and face as the game layers them); the others are the best placeholder art so far and are redrawn in that style over later milestones, when they move here. Copy their approach, not their pixels.
 
 | Kind | File | What to learn from it |
 | --- | --- | --- |
-| Player character | `art/kit/golden_wizard.svg` (the game's `content/wizard/base/wizard_idle.svg` under `wizard_hat_p1.svg`) | Style N: a narrow Stone robe with a Spark placket, belt and hem, two big tall eyes (2×3 px with a highlight), no mouth, Skin hands, under a hat in the player ramp; feet about 1 px above the bottom edge |
-| Enemy | `content/enemies/ember_imp/idle.svg` | Fire body, Bone horns and Spark eyes, no player colour, a bold silhouette |
+| Player character | `art/kit/golden_staff.svg` (the curl's head sheet, player 1, pointing up and to the right, under the Optimist's eyes and neutral brows) | A floating staff: a Wood shaft with a Spark grip wrap, the player colour on the head only, the face 8 px above the grip and drawn over the staff; the pupils look where it points |
+| Enemy | `art/kit/golden_stray.svg` (the Cinder Rod, `content/enemies/ember_imp/idle.svg`, with its face) | A stray: a charred rod with a burning crown, no player colour, eyes glowing in its element's light shade with slit pupils, angry brows |
 | Raised tile | `art/tilesets/crypt/wall.svg` | Lit top and left edge, shaded bottom and right edge |
 | Flat tile | `art/tilesets/crypt/floor.svg` | Stone base, a few inner details, nothing on the outer edge |
 | Projectile | `art/vfx/bolt.svg` | Neutral Bone streak with a Spark core (the owner tints the Bone, the element colours the core), outlined in its own shadow shade |

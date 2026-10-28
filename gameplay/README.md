@@ -50,11 +50,11 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `discharge_arc` | `combat` | `feel` |
 | `damage_dealt` | `combat` | `feel`, `ai` (grudges, the looks), `actor` (the Face) |
 | `status_applied` | `combat` | `feel` |
-| `enemy_died` | `combat` (every actor not on the wizards' team) | `feel`, `flow` |
+| `enemy_died` | `combat` (every actor not on the players' team) | `feel`, `flow` |
 | `player_downed` | `player` (Downed) | `ai`, `combat`, `feel`, `flow`, `run` |
 | `player_revived` | `player` (Downed) | `combat`, `flow` |
 | `revive_progress` | `coop` | `player` (Downed) |
-| `player_stats_changed` | `player` (the seat's own wizard, also while it is away) | `hud` |
+| `player_stats_changed` | `player` (the seat's own body, also while it is away) | `hud` |
 | `player_joined`, `player_left` | `coop` | `difficulty`, `flow`, `hud` |
 | `run_started`, `run_ended` | `run` | `run_started`: `difficulty`, `flow`; `run_ended`: `progression` |
 | `room_entered` | `flow` | `ai`, `coop`, `difficulty`, `hud` |
@@ -76,7 +76,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 
 ## Allowed files
 
-`.gd`, `.tres`, plus `.uid`, `.import` and `.license` files. Limit: 1 MB per file. This list follows the Areas table in docs/PLAN.md. `gameplay/` is script-only: it has no scenes. The scenes that gameplay scripts drive live with their content in `content/` (the wizard in `content/wizard/base/`, enemies in `content/enemies/`, rooms in `content/rooms/`) and in `hud/`; the scene's root node carries the gameplay script, and gameplay gets scenes through `core/registry`. Typed GDScript only (types on every variable, parameter and return); no banned APIs (see AGENTS.md, hard rules).
+`.gd`, `.tres`, plus `.uid`, `.import` and `.license` files. Limit: 1 MB per file. This list follows the Areas table in docs/PLAN.md. `gameplay/` is script-only: it has no scenes. The scenes that gameplay scripts drive live with their content in `content/` (the player in `content/wizard/base/`, enemies in `content/enemies/`, rooms in `content/rooms/`) and in `hud/`; the scene's root node carries the gameplay script, and gameplay gets scenes through `core/registry`. Typed GDScript only (types on every variable, parameter and return); no banned APIs (see AGENTS.md, hard rules).
 
 ## Steps
 

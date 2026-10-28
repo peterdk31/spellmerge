@@ -70,6 +70,18 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 - [ ] **Entity kit (staffs B5).** (`gameplay/ai/`) After A6c.
 - [ ] **Shot look, part 1: small layered shots (staffs B6a).** (`core/projectiles/` drawing, the card classes, `content/spells/`) After B1. Small shots (a 3-5 px core from the carrier), the trail in the player colour, up to four look layers per shot from the cards (`look_layer`, two infusions and two modifiers) drawn by one shader; a sheet of every carrier with every infusion and of four players firing the same card. Split from B6 by the owner on 2026-10-26, because the bot's B3 (#279) is changing `gameplay/feel/` at the same time.
 - [ ] **Builder (staffs B8).** (`hud/builder/`) After A6c.
+- [ ] **Actors: the plan (actors G1).** (`docs/`) The design, [M2-actors.md](milestones/M2-actors.md), with the owner's decisions of 2026-10-28.
+- [ ] **The actor table and tags (actors G2).** (`core/actors/`, `core/spells/spell_tag.gd`) After G1.
+- [ ] **The projectile manager by actor (actors G3a).** (`core/projectiles/`) After G2.
+- [ ] **Spells by actor (actors G3b).** (`core/spells/`, `core/events/`) After G2.
+- [ ] **No more fire settings (actors G3c).** (`core/settings/`, `gameplay/coop/`, `gameplay/ai/`, `hud/menus/pause/`) Independent of G2.
+- [ ] **The actor kit (actors G4).** (`gameplay/actor/`) After G2.
+- [ ] **Combat by actor (actors G5).** (`gameplay/combat/`) After G3 and G4.
+- [ ] **Enemies are actors (actors G6).** (`gameplay/ai/`, `content/enemies/`, `gameplay/flow/`) After G5.
+- [ ] **Wizards are actors (actors G7).** (`gameplay/player/`, `content/wizard/`, `gameplay/flow/`, `gameplay/coop/`) After G6.
+- [ ] **Feel and Entities by actor (actors G8).** (`gameplay/feel/`, `gameplay/ai/`) After G7.
+- [ ] **Possess (actors G9).** (`core/spells/`, `gameplay/actor/`, `content/spells/possess/`, `hud/`) After G8.
+- [ ] **The docs (actors G10).** (READMEs, `docs/ARCHITECTURE.md`, `AGENTS.md`) Last. While phase G runs, the bot's queue leaves `gameplay/player/`, `gameplay/ai/`, `gameplay/combat/` and `core/spells/` alone.
 
 ## Blocked
 

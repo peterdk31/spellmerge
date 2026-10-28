@@ -28,7 +28,7 @@ Starting cards: carriers (bolt, beam, nova, rune, orbit, dash, teleport, hook, s
 
 Spell rules (chosen on 2026-10-26, the pivot at C2):
 
-- **Self-harm:** a wizard's own spells hurt them. Hurting other players stays an option.
+- **Everything hurts everything** (the owner, 2026-10-28): a spell hurts every body it hits, its caster's included. Wizards' spells hurt each other, and enemies' spells hurt enemies; there is no friendly-fire setting. Teams only decide whom things aim at (the AI, homing), never whom a hit hurts.
 - **One mana pool per wizard**, shared by its staffs; sustained spells reserve part of it.
 - **No build limits** beyond what the engine needs to run; limits are added only when measurements ask for them.
 - **Small shots:** a shot is a small core; its cards add its look in layers.

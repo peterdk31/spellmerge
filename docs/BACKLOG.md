@@ -19,6 +19,12 @@ For later milestones; see `docs/milestones/M2-staffs.md`, "Later".
 - **Superseded by the pivot:** "Spell visuals round 2, part 2" (a burst per combo row) and the combo marks per combo class are replaced by the layered shot look (staffs B6); keep what still reads well.
 - **Fissure and `bounce` (from B2c).** The design says `bounce · fissure` turns at walls; the projectile manager gives a beam no wall normal, so the fissure stops at the wall. Needs a wall-normal query on the manager. Also: Feel draws only `beam` and `nova` cues; the `rain` cue (`form_shown`, `length` = seconds until it falls) needs a look (B6b).
 
+## From the actors rework (phase G, 2026-10-28)
+
+- **Decoys and familiars as actors** (a decoy: Health and Hurtbox, no controller; a familiar: a Caster and an orbiting controller), if Entities' pooled rows start to need the actor kit.
+- **AI teammates** for fewer than four players, and **bosses a player can take over**: a controller each, nothing new in the body.
+- **More teams** (enemy factions that fight each other) and more than five ramps: the actor table has room; the shot shader's ramp field grows from two bits and a flag.
+
 ## From the spell visuals (owner `/claude` on #244)
 
 - **More animation for advanced combinations (task).** The owner wants many more animations for combined spells (triggers, held spells, chains and modifiers together). Plan it after part 3 (reactions and statuses) as its own queue task: one look per combo row in `combos.json`, data-driven, with the clips `combo_*` as the proof. Also check, once the owner has seen the smaller bodies, whether `SHAPE_SCALE` is right (0.8 since #244 round 2, part 1). Part 1 of that work is done; the rest is the NEXT.md task "part 2".

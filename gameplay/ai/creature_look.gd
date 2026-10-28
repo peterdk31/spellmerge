@@ -22,13 +22,14 @@ extends ActorLook
 ## Poses: with `windup_texture` set (a strip of 32 px frames), the sprite shows it from the start
 ## of the windup and flips between its frames faster and faster (WINDUP_FLASHES), and goes
 ## brighter still for the last stretch (TELEGRAPH_LAST_FROM). With `hurt_texture` set, a hit on
-## the actor (`damage_dealt` naming it; a burn tick that does not kill sends none, so a burning
-## enemy does not flinch twice a second) shows it for HURT_TIME seconds, over the windup too. A hit
-## never cancels the windup: the shot still comes, so the telegraph stays honest (knockback and
-## Feel's flash and squash are Combat's and Feel's). The animation is paused while a pose other
-## than the idle shows.
+## the actor (its `Actor.damaged`, sent with each `damage_dealt` naming it; a burn tick that does
+## not kill sends none, so a burning enemy does not flinch twice a second) shows it for HURT_TIME
+## seconds, over the windup too. A hit never cancels the windup: the shot still comes, so the
+## telegraph stays honest (knockback and Feel's flash and squash are Combat's and Feel's). The
+## animation is paused while a pose other than the idle shows.
 ##
-## Nothing here allocates per frame.
+## Nothing here allocates per frame, and an idle creature's step is a few reads: nothing is set
+## on the nodes until its pose or telegraph changes (performance pass, 2026-10-28).
 
 enum Pose { IDLE, WINDUP, HURT }
 
@@ -66,6 +67,9 @@ var _hurt_left: float = 0.0
 var _pose: Pose = Pose.IDLE
 ## True while the telegraph (and the flash) is up.
 var _showing: bool = false
+## The controller driving the actor at the last step, and the same as an AI (or null).
+var _driver: ActorController = null
+var _ai: AIController = null
 
 
 func setup(owner_actor: Actor) -> void:
@@ -85,20 +89,30 @@ func setup(owner_actor: Actor) -> void:
 		telegraph.position = actor.hand_offset
 		telegraph.centered = false
 		telegraph.region_enabled = true
-	# Connected once; a look freed with its actor is disconnected by Godot.
-	if actor.events != null and not actor.events.damage_dealt.is_connected(_on_damage_dealt):
-		actor.events.damage_dealt.connect(_on_damage_dealt)
+	# Connected once, on its own actor (not the bus: see the class doc).
+	if not actor.damaged.is_connected(_on_damaged):
+		actor.damaged.connect(_on_damaged)
 
 
 ## Draw the actor after this step: the telegraph and flash from its AI's windup, then the pose.
 func step(delta: float) -> void:
-	var ai: AIController = actor.controller as AIController
-	var telegraphing: bool = ai != null and ai.is_telegraphing()
+	if actor.controller != _driver:
+		_driver = actor.controller
+		_ai = _driver as AIController
+	var ai: AIController = _ai
+	var telegraphing: bool = ai != null and ai.state == AIController.State.WINDUP
 	if telegraphing != _showing:
 		_show_telegraph(telegraphing, ai)
 	elif telegraphing:
 		_update_telegraph(ai.telegraph_progress())
-	_hurt_left = maxf(_hurt_left - delta, 0.0)
+	if _hurt_left > 0.0:
+		_hurt_left = maxf(_hurt_left - delta, 0.0)
+		if _hurt_left > 0.0 and _pose == Pose.HURT:
+			# The hurt pose goes on: nothing to change.
+			return
+	elif _pose == Pose.IDLE and not _showing:
+		# Idle and nothing showing: nothing to change.
+		return
 	_update_sprite()
 
 
@@ -197,7 +211,6 @@ func _show_strip(strip: Texture2D) -> void:
 
 
 ## A hit on the actor shows the hurt pose at once.
-func _on_damage_dealt(_caster: int, target: Node, _amount: int, _position: Vector2) -> void:
-	if target == actor:
-		_hurt_left = HURT_TIME
-		_update_sprite()
+func _on_damaged(_by: int, _amount: int) -> void:
+	_hurt_left = HURT_TIME
+	_update_sprite()

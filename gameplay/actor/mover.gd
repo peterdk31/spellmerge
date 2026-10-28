@@ -100,8 +100,8 @@ func step(delta: float) -> void:
 	if _done:
 		# The last step of the move has been walked (the body moved after the last step).
 		_finish()
-	# Combat's pace (chill slows, freeze stops) and its push on the actor.
-	var pace: float = actor.combat.pace(actor) if actor.combat != null else 1.0
+	# Combat's pace (chill slows, freeze stops) and its push on the actor, asked by its own id.
+	var pace: float = actor.combat.own_pace(actor, actor.id) if actor.combat != null else 1.0
 	var velocity: Vector2 = Vector2.ZERO
 	if _left > 0.0:
 		var dash: bool = _mode == &"dash"
@@ -116,9 +116,11 @@ func step(delta: float) -> void:
 		_done = _left <= 0.0
 	else:
 		velocity = actor.intent.move.limit_length(1.0) * speed * pace
-	velocity += _recoil_step(delta)
+	if _recoil_count > 0 or _recoil_pending_seconds > 0.0:
+		# Only with a push asked or running (a step without one adds nothing).
+		velocity += _recoil_step(delta)
 	if actor.combat != null:
-		velocity += actor.combat.consume_knockback(actor, delta)
+		velocity += actor.combat.own_knockback(actor, actor.id, delta)
 	actor.velocity = velocity
 
 

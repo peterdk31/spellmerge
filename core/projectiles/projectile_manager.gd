@@ -482,6 +482,17 @@ var _home_target: PackedInt64Array = PackedInt64Array()
 var _move_home: PackedInt64Array = PackedInt64Array()
 ## Spawn order, so "oldest" is the lowest.
 var _seq: PackedInt64Array = PackedInt64Array()
+## What `update_draw` worked out for the shot in each slot (its batch, look colour, quad size and
+## particles), kept with the spawn (`_seq`), radius and look it was worked out for: those change
+## seldom (a new shot, growth, `set_look`), and working them out for every shot every frame was
+## a dozen calls each (performance pass, 2026-10-28).
+var _drawn_seq: PackedInt64Array = PackedInt64Array()
+var _drawn_radius: PackedFloat32Array = PackedFloat32Array()
+var _drawn_look: PackedInt32Array = PackedInt32Array()
+var _drawn_batch: PackedByteArray = PackedByteArray()
+var _drawn_color: PackedColorArray = PackedColorArray()
+var _drawn_size: PackedFloat32Array = PackedFloat32Array()
+var _drawn_particles: PackedInt32Array = PackedInt32Array()
 # Behaviours of the projectile kit (B1), all reset in `_spawn_row`; a plain shot has flags 0.
 var _flags: PackedInt32Array = PackedInt32Array()
 var _bounce: PackedInt32Array = PackedInt32Array()
@@ -602,6 +613,9 @@ var _trail_look: PackedInt32Array = PackedInt32Array()
 var _trail_core: PackedColorArray = PackedColorArray()
 var _trail_zoom: PackedInt32Array = PackedInt32Array()
 var _trail_flags: PackedInt32Array = PackedInt32Array()
+## Each row's `look_color` of its ramp, zoom and look, worked out when the row is let loose (a
+## cooling trail is drawn every frame and never changes them).
+var _trail_color: PackedColorArray = PackedColorArray()
 var _trail_until: PackedFloat32Array = PackedFloat32Array()
 var _trail_free: PackedInt32Array = PackedInt32Array()
 var _trail_free_count: int = 0
@@ -758,6 +772,14 @@ func set_cap(value: int) -> void:
 	_move_turn.resize(_cap)
 	_move_range.resize(_cap)
 	_scan_slots.resize(_cap)
+	_drawn_seq.resize(_cap)
+	_drawn_seq.fill(-1)
+	_drawn_radius.resize(_cap)
+	_drawn_look.resize(_cap)
+	_drawn_batch.resize(_cap)
+	_drawn_color.resize(_cap)
+	_drawn_size.resize(_cap)
+	_drawn_particles.resize(_cap)
 	_skip_id.resize(_cap)
 	_skip_left.resize(_cap)
 	_last_hit.resize(_cap * HIT_MEMORY)
@@ -776,6 +798,7 @@ func set_cap(value: int) -> void:
 	_trail_holder.resize(rows)
 	_trail_caster.resize(rows)
 	_trail_ramp.resize(rows)
+	_trail_color.resize(rows)
 	_trail_look.resize(rows)
 	_trail_core.resize(rows)
 	_trail_zoom.resize(rows)
@@ -915,6 +938,14 @@ func _wall_hit(from: Vector2, to: Vector2) -> float:
 		if cx >= 0 and cx < _wall_w and cy >= 0 and cy < _wall_h and _wall_cells[cy * _wall_w + cx] != 0:
 			return 0.0
 		return -1.0
+	if absi(end_x - cx) <= 1 and absi(end_y - cy) <= 1 and mini(cx, end_x) >= 0 and maxi(cx, end_x) < _wall_w and mini(cy, end_y) >= 0 and maxi(cy, end_y) < _wall_h:
+		# A short path (a shot's step, a staff from the feet to its tip) only crosses the up to four
+		# cells of its corners: when none is solid it meets no wall, without the walk below
+		# (performance pass, 2026-10-28).
+		var row0: int = cy * _wall_w
+		var row1: int = end_y * _wall_w
+		if _wall_cells[row0 + cx] == 0 and _wall_cells[row0 + end_x] == 0 and _wall_cells[row1 + cx] == 0 and _wall_cells[row1 + end_x] == 0:
+			return -1.0
 	var step_x: int = 1 if delta.x > 0.0 else -1
 	var step_y: int = 1 if delta.y > 0.0 else -1
 	var next_x: float = INF
@@ -1171,6 +1202,17 @@ func spawn_orbit(caster: int, orbit_radius: float, angle: float, angular_speed: 
 func set_anchor(caster: int, position: Vector2) -> void:
 	if caster >= 0 and caster < ACTORS and position.is_finite():
 		_anchors[caster] = position
+
+
+## `set_anchor(caster, anchor)` and `clip_to_walls(from, to)` in one call: what every actor's
+## caster does every step (performance pass, 2026-10-28). Returns the clipped point.
+func place_caster(caster: int, anchor: Vector2, from: Vector2, to: Vector2) -> Vector2:
+	if caster >= 0 and caster < ACTORS and anchor.is_finite():
+		_anchors[caster] = anchor
+	if not _has_walls:
+		return to
+	var t: float = _wall_hit(from, to)
+	return to if t < 0.0 else from.lerp(to, t)
 
 
 ## The body is gone: its orbit shots end at the next step, quietly.
@@ -1552,7 +1594,9 @@ func step(delta: float) -> void:
 		if _alive[slot] == 0 or _seq[slot] >= first_new:
 			continue
 		_life[slot] -= delta
-		_skip_left[slot] -= delta
+		if _skip_left[slot] > 0.0:
+			# Only a payload's skip counts down (read only while above 0).
+			_skip_left[slot] -= delta
 		if _life[slot] <= 0.0:
 			_expire(slot)
 			continue
@@ -2184,6 +2228,7 @@ func _fade_row(row: int, slot: int) -> void:
 	_trail_core[row] = _core[slot]
 	_trail_zoom[row] = look_zoom(_radius[slot])
 	_trail_flags[row] = TRAIL_ORBIT if _motion[slot] == MOTION_ORBIT else 0
+	_trail_color[row] = look_color(_trail_ramp[row], _trail_zoom[row], _trail_look[row])
 	_let_loose(row, sim_time + TRAIL_KEEP)
 
 
@@ -2212,6 +2257,7 @@ func follow_caster(caster: int, core: Color, look: int, seconds: float) -> int:
 	_trail_core[row] = Color(core.r, core.g, core.b, 1.0)
 	_trail_zoom[row] = 1
 	_trail_flags[row] = TRAIL_DASH
+	_trail_color[row] = look_color(_trail_ramp[row], _trail_zoom[row], _trail_look[row])
 	_trail_until[row] = sim_time + seconds
 	_loose[_loose_count] = row
 	_loose_count += 1
@@ -2333,18 +2379,24 @@ func update_draw(fraction: float = -1.0) -> void:
 	for slot in _high:
 		if _alive[slot] == 0:
 			continue
+		var motion: int = _motion[slot]
+		var at: Vector2 = _prev[slot].lerp(_pos[slot], fraction)
+		if motion == MOTION_ORBIT:
+			at = _drawn_at(slot, at)
+		# `_count_batches` brought the slot's drawn data up to date.
+		var batch: int = _drawn_batch[slot]
+		var size: float = _drawn_size[slot]
+		var look_data: Color = _drawn_color[slot]
+		asked += _drawn_particles[slot]
+		var rune: bool = motion == MOTION_STILL
+		# Only a rune's quad turns with the shot (a trail is drawn along its path).
 		var dir: Vector2 = Vector2.RIGHT
-		if _vel[slot].length_squared() > 0.0:
-			dir = _vel[slot].normalized()
-		var at: Vector2 = _drawn_at(slot, _prev[slot].lerp(_pos[slot], fraction))
-		var batch: int = _batch_of(slot)
-		var size: float = look_size(_radius[slot])
-		var look_data: Color = _look_color(slot)
-		asked += particles_of(_look[slot])
-		var rune: bool = _motion[slot] == MOTION_STILL
-		if not rune:
+		if rune:
+			if _vel[slot].length_squared() > 0.0:
+				dir = _vel[slot].normalized()
+		else:
 			trails += TRAIL_COST
-		var flags: int = TRAIL_HEAD | (TRAIL_ORBIT if _motion[slot] == MOTION_ORBIT else 0)
+		var flags: int = TRAIL_HEAD | (TRAIL_ORBIT if motion == MOTION_ORBIT else 0)
 		if batch == BATCH_ENEMY:
 			if rune:
 				_write_quad(_enemy_buffer, enemy_out * DRAW_STRIDE, dir, size, at, look_data, _core[slot], KIND_RUNE, 0.0, trace_code(sim_time - _born[slot]))
@@ -2372,8 +2424,10 @@ func update_draw(fraction: float = -1.0) -> void:
 			flags |= TRAIL_HEAD
 			if _anchors[caster].is_finite():
 				head = _anchors[caster]
-		var data: Color = look_color(_trail_ramp[row], _trail_zoom[row], _trail_look[row])
-		if is_hat_ramp(_trail_ramp[row]):
+		var data: Color = _trail_color[row]
+		var ramp: int = _trail_ramp[row]
+		if ramp >= 0 and ramp < ActorsScript.RAMP_ENEMY:
+			# A hat ramp (`is_hat_ramp`, written out: this runs for every cooling trail every frame).
 			_write_trail(_draw_buffer, out * DRAW_STRIDE, row, head, flags, data, _trail_core[row])
 			out += 1
 		else:
@@ -2395,6 +2449,17 @@ func update_draw(fraction: float = -1.0) -> void:
 	drawn = shots_out
 	drawn_trails = out + rune_out + orbit_out + enemy_out - shots_out
 	_share_pool(asked, trails)
+
+
+## Work out what `update_draw` keeps for the shot in `slot` (see `_drawn_seq`).
+func _remember_drawn(slot: int) -> void:
+	_drawn_seq[slot] = _seq[slot]
+	_drawn_radius[slot] = _radius[slot]
+	_drawn_look[slot] = _look[slot]
+	_drawn_batch[slot] = _batch_of(slot)
+	_drawn_color[slot] = _look_color(slot)
+	_drawn_size[slot] = look_size(_radius[slot])
+	_drawn_particles[slot] = particles_of(_look[slot])
 
 
 ## Hand the shader the simulation clock (`shot_core.gdshader` animates from it), and the moment
@@ -2463,15 +2528,19 @@ func _kind_of(slot: int) -> int:
 	return KIND_BOLT
 
 
-## Count the live shots each batch will draw into _batch_counts, indexed by BATCH_*.
-## One extra pass over the live slots (reads only): the price of sizing before writing.
+## Count the live shots each batch will draw into _batch_counts, indexed by BATCH_*, and bring
+## each live shot's drawn data up to date (`_drawn_seq`). One extra pass over the live slots: the
+## price of sizing before writing.
 func _count_batches() -> void:
 	_batch_counts.fill(0)
 	for slot in _high:
 		if _alive[slot] != 0:
-			_batch_counts[_batch_of(slot)] += 1
+			if _drawn_seq[slot] != _seq[slot] or _drawn_radius[slot] != _radius[slot] or _drawn_look[slot] != _look[slot]:
+				_remember_drawn(slot)
+			_batch_counts[_drawn_batch[slot]] += 1
 	for n in _loose_count:
-		_batch_counts[BATCH_BOLT if is_hat_ramp(_trail_ramp[_loose[n]]) else BATCH_ENEMY] += 1
+		var ramp: int = _trail_ramp[_loose[n]]
+		_batch_counts[BATCH_BOLT if ramp >= 0 and ramp < ActorsScript.RAMP_ENEMY else BATCH_ENEMY] += 1
 
 
 ## Size a batch's MultiMesh and buffer to draw `used` shots; returns the new room.
@@ -2801,11 +2870,18 @@ func _refresh_targets() -> void:
 		at += 1
 	_cell_head.fill(-1)
 	_grid_stale = false
+	# The table once for every target (this runs every step for every body).
+	var table: ActorsScript = actor_table()
 	for i in _targets.size():
 		var node: Node2D = _targets[i]
 		_target_next[i] = -1
-		# A possession may have moved the owner to another team since the last step.
-		_target_team[i] = _team_of_target(_target_owner[i], _target_layer[i])
+		# A possession may have moved the owner to another team since the last step
+		# (`_team_of_target`, written out).
+		var owner: int = _target_owner[i]
+		var team: int = table.team_of(owner) if owner >= 0 and table != null else ActorsScript.NONE
+		if team == ActorsScript.NONE:
+			team = ActorsScript.TEAM_WIZARDS if (_target_layer[i] & LAYER_PLAYER) != 0 else ActorsScript.TEAM_ENEMIES
+		_target_team[i] = team
 		if not node.is_inside_tree():
 			_target_pos[i] = Vector2.INF
 			continue
@@ -2913,6 +2989,10 @@ func _hit_test(slot: int) -> bool:
 	var y1: int = clampi(floori((high.y - _bounds.position.y) / GRID_CELL), 0, _grid_h - 1)
 	var path: Vector2 = to - from
 	var path_sq: float = path.length_squared()
+	# A target farther from the path's middle than half the path plus both radii misses: that one
+	# distance turns most of the targets in the cells away before the full test.
+	var middle: Vector2 = (from + to) * 0.5
+	var half: float = sqrt(path_sq) * 0.5 + 0.01
 	var best: int = -1
 	var best_along: float = 0.0
 	var best_point: Vector2 = to
@@ -2920,6 +3000,8 @@ func _hit_test(slot: int) -> bool:
 	var shooter: int = _actor[slot]
 	var team: int = _team[slot]
 	var flags: int = _flags[slot]
+	var radius: float = _radius[slot]
+	var skip_left: bool = _skip_left[slot] > 0.0
 	var inside: bool = false
 	for y in range(y0, y1 + 1):
 		for x in range(x0, x1 + 1):
@@ -2934,7 +3016,7 @@ func _hit_test(slot: int) -> bool:
 						t = next_target
 						continue
 					if (flags & F_SELF_LIVE) == 0:
-						var near: float = _radius[slot] + _target_radius[t]
+						var near: float = radius + _target_radius[t]
 						if to.distance_squared_to(_target_pos[t]) <= near * near:
 							inside = true
 						t = next_target
@@ -2942,19 +3024,27 @@ func _hit_test(slot: int) -> bool:
 				elif (_target_layer[t] & layers) == 0:
 					t = next_target
 					continue
-				# Skip targets already hit, and the one a payload must not hit.
-				if _remembers(slot, _target_id[t]) or (_skip_left[slot] > 0.0 and _skip_id[slot] == _target_id[t]):
+				# The path test first, inline: most targets in the cells are missed, and the
+				# memory check below is a call (the cheap test first; the same target wins).
+				var centre: Vector2 = _target_pos[t]
+				var reach: float = radius + _target_radius[t]
+				if middle.distance_squared_to(centre) > (half + reach) * (half + reach):
 					t = next_target
 					continue
 				var along: float = 0.0
 				if path_sq > 0.0:
-					along = clampf((_target_pos[t] - from).dot(path) / path_sq, 0.0, 1.0)
+					along = clampf((centre - from).dot(path) / path_sq, 0.0, 1.0)
 				var closest: Vector2 = from + path * along
-				var reach: float = _radius[slot] + _target_radius[t]
-				if closest.distance_squared_to(_target_pos[t]) <= reach * reach and (best < 0 or along < best_along):
-					best = t
-					best_along = along
-					best_point = closest
+				if closest.distance_squared_to(centre) > reach * reach or (best >= 0 and along >= best_along):
+					t = next_target
+					continue
+				# Skip targets already hit, and the one a payload must not hit.
+				if _remembers(slot, _target_id[t]) or (skip_left and _skip_id[slot] == _target_id[t]):
+					t = next_target
+					continue
+				best = t
+				best_along = along
+				best_point = closest
 				t = next_target
 	if (flags & F_SELF) != 0 and (flags & F_SELF_LIVE) == 0 and not inside:
 		_flags[slot] |= F_SELF_LIVE

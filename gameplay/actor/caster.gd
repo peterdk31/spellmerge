@@ -4,8 +4,9 @@ extends ActorComponent
 ## mana. It holds 1-4 staffs (`staff_count`), all of one `StaffBase` (`staff`), each a row of card
 ## ids; `set_staff(at, cards)` builds one and installs it in `Spells` under the actor's caster
 ## number (`number`). Every step it gets mana back (`regen` a second and what siphon refunds, up
-## to `max_mana`), tells the systems where the actor is and aims (the projectile manager's anchor
-## for its orbits at the body, Spells' aim from the staff tip for its beams), and casts the staffs
+## to `max_mana`), tells the systems where the actor is and aims when it moved or turned (the
+## projectile manager's anchor for its orbits at the body, Spells' aim from the staff tip for its
+## beams; sent again before each cast), and casts the staffs
 ## the intent asks for: a staff pressed this step, or held while it holds no sustained (`hold`)
 ## card on (then only a new press casts, which switches it off). `cast(at)` casts from the staff
 ## tip (`Actor.muzzle_position`, clipped to walls from the feet) along the actor's aim with the
@@ -66,6 +67,12 @@ var _has_build: PackedByteArray = PackedByteArray()
 var _built: bool = false
 ## The plain staff used when `staff` is null.
 var _plain: StaffBase = null
+## What `_push_place` sent last: the feet and aim it was worked out from (INF: send at the next
+## step), the anchor and the staff tip it sent.
+var _placed_feet: Vector2 = Vector2.INF
+var _placed_aim: Vector2 = Vector2.INF
+var _placed_anchor: Vector2 = Vector2.INF
+var _placed_tip: Vector2 = Vector2.INF
 
 
 func setup(owner_actor: Actor) -> void:
@@ -117,28 +124,57 @@ func step(delta: float) -> void:
 			actor.projectiles.clear_anchor(number)
 		if actor.spells != null:
 			actor.spells.clear_aim(number)
+		_placed_feet = Vector2.INF
 		return
 	mana = minf(mana + regen * delta, max_mana)
-	_push_place()
+	if actor.global_position != _placed_feet or actor.aim != _placed_aim:
+		# Only when the body moved or turned: the systems still hold what was sent.
+		_push_place()
 	if actor.spells == null:
+		return
+	var intent: ActorIntent = actor.intent
+	if (intent.pressed_bits | intent.held_bits) == 0:
+		# No button: nothing to cast (most steps of most actors).
 		return
 	for at in staff_count:
 		if _has_build[at] == 0:
 			continue
 		# A held button casts whenever the staff is ready, except while it holds a sustained card:
 		# then only a new press casts, which switches it off.
-		var pressed: bool = actor.intent.is_pressed(at)
-		var held: bool = actor.intent.is_held(at) and not actor.spells.is_holding(number, at)
+		var pressed: bool = intent.is_pressed(at)
+		var held: bool = intent.is_held(at) and not actor.spells.is_holding(number, at)
 		if pressed or held:
 			cast(at)
 
 
-## The projectile manager's anchor at the body and Spells' aim from the staff tip.
+## The projectile manager's anchor at the body and Spells' aim from the staff tip. The step sends
+## them only when the body moved or turned since the last time, and works the points out here
+## rather than calling `muzzle_position` and `_origin` (the same points): every actor does this
+## every step (performance pass, 2026-10-28).
 func _push_place() -> void:
+	var feet: Vector2 = actor.global_position
+	var anchor: Vector2 = feet + actor.body_offset
+	var tip: Vector2 = feet + actor.hand_offset + actor.aim * actor.staff_reach
 	if actor.projectiles != null:
-		actor.projectiles.set_anchor(number, actor.global_position + actor.body_offset)
+		# The anchor and the staff tip clipped to walls, in one call.
+		tip = actor.projectiles.place_caster(number, anchor, feet, tip)
 	if actor.spells != null:
-		actor.spells.set_aim(number, _origin(), actor.aim)
+		actor.spells.set_aim(number, tip, actor.aim)
+	_placed_feet = feet
+	_placed_aim = actor.aim
+	_placed_anchor = anchor
+	_placed_tip = tip
+
+
+## Send what `_push_place` sent last again, before a cast: a new run may have cleared the systems
+## since, while the body stood still.
+func _push_place_again() -> void:
+	if not _placed_feet.is_finite():
+		return
+	if actor.projectiles != null:
+		actor.projectiles.set_anchor(number, _placed_anchor)
+	if actor.spells != null:
+		actor.spells.set_aim(number, _placed_tip, _placed_aim)
 
 
 ## Where a cast leaves: the staff tip, or where a wall cuts the staff (the manager takes no pool
@@ -155,6 +191,7 @@ func _origin() -> Vector2:
 func cast(at: int) -> bool:
 	if actor.is_down() or not has_staff(at):
 		return false
+	_push_place_again()
 	var origin: Vector2 = _origin()
 	var direction: Vector2 = actor.aim
 	var spent: float = actor.spells.cast_staff(number, at, origin, direction, free_mana())
@@ -242,10 +279,8 @@ func next_cast_radius(at: int = 0) -> float:
 ## True when the next cast of staff `at` can leave within `within` seconds: its delay is no
 ## longer than that and the mana is there.
 func cast_ready(within: float, at: int = 0) -> bool:
-	var cost: float = next_cast_mana(at)
-	if cost < 0.0:
-		return false
-	return actor.spells.cooldown_left(number, at) <= within and free_mana() >= cost
+	# An AI asks every step while its target is in reach: one call to Spells.
+	return has_staff(at) and actor.spells.cast_ready(number, at, within, mana)
 
 
 ## Name the actor's hurt circle as its caster number's (its actor id), so its own spells pass
@@ -303,6 +338,7 @@ func _close_number() -> void:
 		actor.projectiles.clear_anchor(number)
 	if actor.spells != null and is_instance_valid(actor.spells):
 		actor.spells.clear_aim(number)
+	_placed_feet = Vector2.INF
 	actor.close_caster_number()
 	number = -1
 	_has_build.fill(0)

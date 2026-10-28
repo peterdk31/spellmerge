@@ -155,7 +155,7 @@ func test_hit_on_another_enemy_does_not_hurt_this_one() -> void:
 	var imp: Actor = fx.imp_facing_player()
 	var other: Actor = fx.imp(Vector2(500.0, 0.0))
 	fx.run(imp, 3)
-	fx.bus.damage_dealt.emit(0, other, 1, Vector2.ZERO)
+	other.damaged.emit(0, 1)
 	check(not Fixture.look(imp).is_hurt(), "only a hit on this imp shows its hurt pose")
 
 
@@ -163,7 +163,7 @@ func test_hit_shows_the_hurt_pose_at_once_and_it_ends() -> void:
 	var imp: Actor = fx.imp_facing_player()
 	var sprite: Sprite2D = imp.get_node("Sprite")
 	fx.run(imp, 3)
-	fx.bus.damage_dealt.emit(0, imp, 1, Vector2.ZERO)
+	imp.damaged.emit(0, 1)
 	check(Fixture.look(imp).is_hurt() and sprite.texture == Fixture.look(imp).hurt_texture and sprite.hframes == 1, "the hurt pose shows at once")
 	fx.run(imp, int(CreatureLook.HURT_TIME / Fixture.STEP) + 1)
 	check(not Fixture.look(imp).is_hurt() and sprite.texture == Fixture.look(imp).windup_texture, "the windup pose comes back")
@@ -172,7 +172,7 @@ func test_hit_shows_the_hurt_pose_at_once_and_it_ends() -> void:
 func test_hit_does_not_cancel_the_windup_or_delay_the_shot() -> void:
 	var imp: Actor = fx.imp_facing_player()
 	fx.run(imp, 3)
-	fx.bus.damage_dealt.emit(0, imp, 1, Vector2.ZERO)
+	imp.damaged.emit(0, 1)
 	fx.run(imp, 1)
 	check(Fixture.ai(imp).state == AIController.State.WINDUP and imp.get_node("Telegraph").visible, "still winding up, line still shown")
 	# Four frames have run; the shot leaves the frame the windup ends, before it can reach anyone.
@@ -184,7 +184,7 @@ func test_hurt_pose_also_shows_while_recovering() -> void:
 	var imp: Actor = fx.imp_facing_player()
 	var sprite: Sprite2D = imp.get_node("Sprite")
 	fx.run(imp, int(Fixture.ai(imp).windup_time / Fixture.STEP) + 2)
-	fx.bus.damage_dealt.emit(0, imp, 1, Vector2.ZERO)
+	imp.damaged.emit(0, 1)
 	fx.run(imp, 1)
 	check(sprite.texture == Fixture.look(imp).hurt_texture, "a hit while recovering shows the hurt pose")
 	fx.run(imp, int(CreatureLook.HURT_TIME / Fixture.STEP) + 1)

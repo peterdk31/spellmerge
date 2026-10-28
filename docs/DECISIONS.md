@@ -1624,3 +1624,11 @@ How it is built (parts F2–F10):
 - **The telegraph is a promise:** the windup starts only when the next cast can leave as it ends (its delay no longer than the windup, its mana there), and the enemy holds in reach until then. A refused cast after a telegraph would teach players to ignore telegraphs.
 - **The aim is locked through the windup and the recovery,** so a beam the enemy holds follows where it aimed, not the wizard; it follows the target again once the enemy chases.
 - **F8 is three parts:** the casting (F8a), the telegraph in the new style (F8b, Feel) and caster-side cards on enemies (F8c, with Entities), so no PR touches two areas' internals at once.
+
+## 2026-10-28: The telegraph in the new style (staffs F8b)
+
+- **A beam mode, not an effect.** The effect batch has no kind left (the alpha holds kinds 0 to 15, all used), so the telegraph is beam mode 3 of the shot shader on the enemy's own `Telegraph` sprite, as Feel's beam sprites are mode 2. It needs no event and no Feel slot, and it goes when the enemy goes.
+- **What it shows:** the next cast's reach, a lane as wide as what is coming plus 4 px each side with dotted edges, dashes down the middle that march toward the tip as the windup runs, an arrowhead that grows, and a lane that brightens, white-hot for the last fifth (as the pose already does). Fire colours (docs/STYLE.md: enemy telegraphs use Fire), so a telegraph is never taken for an enemy's spell (Blight) or a player's.
+- **Each enemy's material is its own** (`resource_local_to_scene`), since every telegraph has its own progress.
+- **A gotcha:** a `vec4` shader parameter saved in a `.tscn` must be a `Vector4`; a `Color` there is dropped on load (it reads as null), though `set_shader_parameter` with a Color works from code.
+- The shooting dummy keeps its Void telegraph, so the sandbox's two lanes stay told apart. `art/vfx/telegraph_dash.svg` is no longer in a scene; the art sheets still show it.

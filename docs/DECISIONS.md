@@ -1670,6 +1670,12 @@ How it is built (parts F2–F10):
 - **An enemy without a staff only chases** (and hurts by touch, if its data has `contact_damage`). The same holds when every enemy caster row is taken.
 - **A NO_PLAYER shot is drawn as an enemy's spell:** in the enemy batch by the shot shader, in the enemy ramp, with a tail, and its impacts name its body's form (`bolt`), not `&""`. Nothing in the game spawns one any more; tests and tools still may.
 
+## 2026-10-28: The enemy-fire setting (staffs F10)
+
+- **Settings > Gameplay > "Enemy fire: Off/On"** (owner decision 3): off by default (`EnemyFire.DEFAULT` in `core/settings`), so a crowd of casters never thins itself. On, an enemy's spells also hit other enemies, never the enemy itself; it applies to shots cast from then on, as friendly fire does.
+- **The AI area owns it, in Entities** (its one autoload), the way coop owns friendly fire: `enemy_fire_requested(player, on)` from the pause menu, the projectile manager's `enemy_fire` set, `enemy_fire_changed(on)` back to the menu, whose word follows the answer, never the press. Kept in memory until core/save exists, as the other settings are.
+- That ends phase F: enemies cast player-card staffs, pay mana, telegraph each cast, move, make decoys and familiars, and with this setting may hurt each other.
+
 ## 2026-10-28: The web stress run skips the desktop scenario
 
 - **The daily build failed** at the web stress run's 900 s timeout (run 40663824357), and the bot's bisect reverted the last merge, F10 (#351), though the enemy-fire setting draws nothing. The run is just slow: under CI's software renderer each of its 73 measured frames of the desktop scenario (200 enemies, 3,000 shots) took about 6 s, about seven of the run's fourteen minutes, so runner speed alone decided pass or fail.

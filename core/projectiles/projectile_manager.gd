@@ -59,7 +59,8 @@ extends Node2D
 ## hits targets on LAYER_PLAYER, except targets registered with that same player
 ## as their `owner` (a wizard is never hit by its own shot). It is off by default
 ## and read when a shot is spawned. `gameplay/coop` owns the option. `enemy_fire` is the
-## same for enemy casters' shots and LAYER_ENEMY (an enemy is never hit by its own).
+## same for enemy casters' shots and LAYER_ENEMY (an enemy is never hit by its own);
+## `gameplay/ai` owns that one (Entities, the "Enemy fire" setting, staffs F10).
 ##
 ## Walls: `set_walls(rects)` (or `add_wall_body(body)` for a room's static body) gives
 ## the solid parts of the room. They are rasterised into a grid of WALL_CELL

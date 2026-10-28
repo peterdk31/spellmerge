@@ -323,7 +323,7 @@ func _test_four_players_keep_their_own() -> void:
 		for i in EntitiesScript.PER_PLAYER:
 			_spawn(player, EntitiesScript.DECOY, Vector2(float(player) * 100.0, float(i)), 5.0, TAG + player)
 			_spawn(player, EntitiesScript.FAMILIAR, Vector2(float(player) * 100.0, float(i)), 5.0, TAG + player)
-	_check(_entities.count() == EntitiesScript.POOL_SIZE and _ended.is_empty(), "four players fill the pool without ending each other's")
+	_check(_entities.count() == EntitiesScript.PLAYER_ROWS and _ended.is_empty(), "four players fill their rows without ending each other's")
 	_spawn(2, EntitiesScript.DECOY, Vector2.ZERO, 5.0, TAG + 2)
 	_check(_ended.size() == 1 and _ended[0][0] == 2, "a full pool ends only the asking player's oldest")
 	for player in 4:

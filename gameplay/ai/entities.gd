@@ -18,7 +18,18 @@ extends Node2D
 ## core/spells casts the familiar's payload. With its wizard gone it stays where it was; with its
 ## shot gone it circles where the shot was last.
 ##
-## Each player has up to PER_PLAYER of each kind; one more ends their oldest of that kind. An
+## An **enemy's** decoy and familiar (staffs F8d: an enemy that casts a staff with those cards;
+## `player` NO_PLAYER, and the tag's `SpellTag.caster_of` its caster row) are the same in the enemy
+## ramp: the decoy copies the enemy's `Sprite`, is a target on LAYER_ENEMY owned by its row (so
+## wizards' shots hit it and their homing picks it, while its enemy's own shots pass it) and is worn
+## down by wizards' shots; the familiar circles the enemy and casts at the nearest wizard (or a
+## wizard's decoy). Enemies never chase an enemy's decoy (`lure`). The AI names its node for its
+## row (`set_enemy`) and, when it dies or leaves, ends its entities where they are (`enemy_gone`),
+## so not even a `hold` one outlives it.
+##
+## Each player has up to PER_PLAYER of each kind, and each enemy PER_ENEMY; one more ends their
+## oldest of that kind. Enemies share ENEMY_ROWS rows of their own, so a crowd never takes a
+## wizard's; with those full, a new one ends the oldest enemy entity. An
 ## entity whose `seconds` is INF, or 0 or less, lasts until `entity_end_requested` with its tag
 ## (a `hold` switched off). Every end (time, hits, the cap, a request) sends `entity_ended` once,
 ## for core/spells (a decoy's end point). A new room or the end of the run clears them all
@@ -28,7 +39,7 @@ extends Node2D
 ##
 ## Nothing here allocates per frame; drawing is the pooled decoy nodes and one batch of the
 ## familiars, drawn by the shots' shader as orbit shots (the glow look, 2026-10-27): a small
-## white-hot core in its player's colours and a tail that bends round its circle. All timing runs in step(delta), so tests drive it with fixed deltas.
+## white-hot core in its player's colours (the enemy ramp for an enemy's) and a tail that bends round its circle. All timing runs in step(delta), so tests drive it with fixed deltas.
 
 const EventsScript := preload("res://core/events/events.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
@@ -39,10 +50,16 @@ const PLAYER_SLOTS: int = 4
 ## `entity_spawn_requested`'s caster when it is the wizard, and when it is the point it was made at.
 const CASTER_WIZARD: int = -1
 const CASTER_POINT: int = -2
-## Live entities of one kind one player may have.
+## Live entities of one kind one player, or one enemy, may have.
 const PER_PLAYER: int = 4
-## Rows in the pool: every kind for every player.
-const POOL_SIZE: int = PLAYER_SLOTS * PER_PLAYER * 2
+const PER_ENEMY: int = 2
+## Rows in the pool: every kind for every player first, then the rows all enemies share.
+const PLAYER_ROWS: int = PLAYER_SLOTS * PER_PLAYER * 2
+const ENEMY_ROWS: int = 32
+const POOL_SIZE: int = PLAYER_ROWS + ENEMY_ROWS
+## Enemy caster rows (`core/projectiles`): caster FIRST_ENEMY_CASTER + n is enemy row n.
+const FIRST_ENEMY_CASTER: int = ProjectileManagerScript.FIRST_ENEMY_CASTER
+const ENEMY_CASTERS: int = ProjectileManagerScript.ENEMY_CASTERS
 ## The group every wizard is in (player.gd adds it).
 const PLAYERS_GROUP: StringName = &"players"
 
@@ -84,9 +101,11 @@ const DRAW_Z: int = 40
 var events: EventsScript = null
 var projectiles: ProjectileManagerScript = null
 
-## Per row. `_kind` is &"" for a free row.
+## Per row. `_kind` is &"" for a free row. `_player` is the events' player (NO_PLAYER for an
+## enemy's), `_owner` the caster (0-3 a player, FIRST_ENEMY_CASTER and up an enemy).
 var _kind: Array[StringName] = []
 var _player: PackedInt32Array = PackedInt32Array()
+var _owner: PackedInt32Array = PackedInt32Array()
 var _tag: PackedInt32Array = PackedInt32Array()
 var _left: PackedFloat32Array = PackedFloat32Array()
 var _hits: PackedInt32Array = PackedInt32Array()
@@ -95,8 +114,10 @@ var _angle: PackedFloat32Array = PackedFloat32Array()
 var _position: PackedVector2Array = PackedVector2Array()
 ## Spawn order, to find a player's oldest.
 var _born: PackedInt64Array = PackedInt64Array()
-## The familiar's wizard, or null.
+## The familiar's wizard or enemy, or null.
 var _caster: Array[Node2D] = []
+## The enemy of each enemy caster row (`set_enemy`), or null.
+var _enemies: Array[Node2D] = []
 ## Without a wizard: the point a familiar circles (INF for none), and the slot and sequence number
 ## of the shot it follows (-1 for none).
 var _centre_at: PackedVector2Array = PackedVector2Array()
@@ -197,7 +218,9 @@ func _init() -> void:
 		decoy.name = "Decoy%d" % row
 		_decoys.append(decoy)
 		add_child(decoy)
+	_enemies.resize(ENEMY_CASTERS)
 	_player.resize(POOL_SIZE)
+	_owner.resize(POOL_SIZE)
 	_tag.resize(POOL_SIZE)
 	_left.resize(POOL_SIZE)
 	_hits.resize(POOL_SIZE)
@@ -263,12 +286,38 @@ func positions_of(player: int, tag: int) -> PackedVector2Array:
 	return out
 
 
-## The nearest live decoy within DECOY_LURE of `point`, or null. `ai.gd` asks it when it
-## looks for a target. Allocation-free.
+## How many entities of `kind` the caster `owner` has (0-3 a player, FIRST_ENEMY_CASTER and up
+## an enemy).
+func count_owned(kind: StringName, owner: int) -> int:
+	var found: int = 0
+	for row in POOL_SIZE:
+		if _kind[row] == kind and _owner[row] == owner:
+			found += 1
+	return found
+
+
+## The enemy of caster row `caster` (`ai.gd`, when it opens the row): its decoys copy it and its
+## familiars circle it.
+func set_enemy(caster: int, enemy: Node2D) -> void:
+	if caster >= FIRST_ENEMY_CASTER and caster < FIRST_ENEMY_CASTER + ENEMY_CASTERS:
+		_enemies[caster - FIRST_ENEMY_CASTER] = enemy
+
+
+## The enemy of caster row `caster` is gone (`ai.gd`, as it closes the row): its entities end
+## where they are, each with `entity_ended`, so their `on expire` and blast still happen.
+func enemy_gone(caster: int) -> void:
+	set_enemy(caster, null)
+	for row in range(PLAYER_ROWS, POOL_SIZE):
+		if _kind[row] != &"" and _owner[row] == caster:
+			_end(row, true)
+
+
+## The nearest live wizard's decoy within DECOY_LURE of `point`, or null (never an enemy's).
+## `ai.gd` asks it when it looks for a target. Allocation-free.
 func lure(point: Vector2) -> Node2D:
 	var best: Node2D = null
 	var best_sq: float = DECOY_LURE * DECOY_LURE
-	for row in POOL_SIZE:
+	for row in PLAYER_ROWS:
 		if _kind[row] != DECOY:
 			continue
 		var d: float = point.distance_squared_to(_position[row])
@@ -287,18 +336,25 @@ func clear() -> void:
 
 
 func _on_spawn_requested(player: int, kind: StringName, at: Vector2, seconds: float, tag: int, caster: int = CASTER_WIZARD) -> void:
-	if player < 0 or player >= PLAYER_SLOTS or not at.is_finite() or is_nan(seconds):
+	var owner: int = _owner_of(player, tag)
+	if owner < 0 or not at.is_finite() or is_nan(seconds):
 		return
 	if kind != DECOY and kind != FAMILIAR:
 		push_warning("Entities: no entity of kind %s." % kind)
 		return
-	if count(kind, player) >= PER_PLAYER:
-		_end(_oldest(kind, player), true)
-	var row: int = _kind.find(&"")
+	var enemy: bool = owner >= FIRST_ENEMY_CASTER
+	if count_owned(kind, owner) >= (PER_ENEMY if enemy else PER_PLAYER):
+		_end(_oldest(kind, owner), true)
+	var row: int = _free_row(enemy)
 	if row < 0:
-		return
+		# Only the enemies' rows fill up (the players' fit every kind of every player).
+		_end(_oldest(&"", owner), true)
+		row = _free_row(enemy)
+		if row < 0:
+			return
 	_kind[row] = kind
 	_player[row] = player
+	_owner[row] = owner
 	_tag[row] = tag
 	_left[row] = seconds if seconds > 0.0 else INF
 	_hits[row] = DECOY_HITS
@@ -308,7 +364,7 @@ func _on_spawn_requested(player: int, kind: StringName, at: Vector2, seconds: fl
 	_born[row] = _spawned
 	_spawned += 1
 	_live += 1
-	var wizard: Node2D = _wizard_of(player) if caster == CASTER_WIZARD or kind == DECOY else null
+	var wizard: Node2D = _body_of(owner) if caster == CASTER_WIZARD or kind == DECOY else null
 	_centre_at[row] = Vector2.INF
 	_centre_slot[row] = -1
 	if kind == FAMILIAR and caster != CASTER_WIZARD:
@@ -322,11 +378,13 @@ func _on_spawn_requested(player: int, kind: StringName, at: Vector2, seconds: fl
 		var decoy: Decoy = _decoys[row]
 		decoy.position = at
 		decoy.copy_look(wizard)
-		decoy.tint(ProjectileManagerScript.PLAYER_COLORS[clampi(player, 0, 3)].lerp(Color.WHITE, 0.4))
+		var colour: Color = ProjectileManagerScript.ENEMY_COLOR if enemy else ProjectileManagerScript.PLAYER_COLORS[owner]
+		decoy.tint(colour.lerp(Color.WHITE, 0.4))
 		decoy.active = true
 		decoy.visible = true
 		if projectiles != null:
-			projectiles.add_target(decoy, DECOY_RADIUS, ProjectileManagerScript.LAYER_PLAYER, player, DECOY_OFFSET)
+			var layer: int = ProjectileManagerScript.LAYER_ENEMY if enemy else ProjectileManagerScript.LAYER_PLAYER
+			projectiles.add_target(decoy, DECOY_RADIUS, layer, owner, DECOY_OFFSET)
 	else:
 		_caster[row] = wizard
 		if wizard != null:
@@ -345,12 +403,16 @@ func _on_end_requested(player: int, tag: int) -> void:
 			_end(row, true)
 
 
-## Only an enemy's shot (NO_PLAYER) wears a decoy down.
+## The other side's shots wear a decoy down: an enemy's (NO_PLAYER) a wizard's decoy, a wizard's
+## an enemy's.
 func _on_projectile_hit(player: int, target: Node, _position_hit: Vector2, _tag_hit: int) -> void:
-	if player != EventsScript.NO_PLAYER or not target is Decoy:
+	if not target is Decoy:
 		return
 	var row: int = _decoys.find(target as Decoy)
 	if row < 0 or _kind[row] != DECOY:
+		return
+	var by_enemy: bool = player == EventsScript.NO_PLAYER
+	if by_enemy == (_owner[row] >= FIRST_ENEMY_CASTER) or (not by_enemy and (player < 0 or player >= PLAYER_SLOTS)):
 		return
 	_hits[row] -= 1
 	if _hits[row] <= 0:
@@ -376,8 +438,10 @@ func _step_familiar(row: int, delta: float) -> void:
 	_cast_left[row] = FAMILIAR_INTERVAL
 	if projectiles == null or events == null:
 		return
-	var enemy: Node2D = projectiles.nearest_target(_position[row], FAMILIAR_RANGE, ProjectileManagerScript.LAYER_ENEMY)
-	if enemy == null:
+	# A wizard's familiar casts at the nearest enemy, an enemy's at the nearest wizard.
+	var foes: int = ProjectileManagerScript.LAYER_PLAYER if _owner[row] >= FIRST_ENEMY_CASTER else ProjectileManagerScript.LAYER_ENEMY
+	var foe: Node2D = projectiles.nearest_target(_position[row], FAMILIAR_RANGE, foes)
+	if foe == null:
 		return
 	var direction: Vector2 = _position[row].direction_to(projectiles.nearest_point)
 	if direction == Vector2.ZERO:
@@ -420,12 +484,45 @@ func _end(row: int, announce: bool) -> void:
 	queue_redraw()
 
 
-func _oldest(kind: StringName, player: int) -> int:
+## The oldest entity of `kind` that `owner` has; with `kind` empty, the oldest in `owner`'s part
+## of the pool (a player's or the enemies'), whoever has it.
+func _oldest(kind: StringName, owner: int) -> int:
 	var best: int = -1
-	for row in POOL_SIZE:
-		if _kind[row] == kind and _player[row] == player and (best < 0 or _born[row] < _born[best]):
+	var enemy: bool = owner >= FIRST_ENEMY_CASTER
+	for row in range(PLAYER_ROWS if enemy else 0, POOL_SIZE if enemy else PLAYER_ROWS):
+		if _kind[row] == &"" or (kind != &"" and (_kind[row] != kind or _owner[row] != owner)):
+			continue
+		if best < 0 or _born[row] < _born[best]:
 			best = row
 	return best
+
+
+## A free row in the players' part of the pool or the enemies', or -1.
+func _free_row(enemy: bool) -> int:
+	for row in range(PLAYER_ROWS if enemy else 0, POOL_SIZE if enemy else PLAYER_ROWS):
+		if _kind[row] == &"":
+			return row
+	return -1
+
+
+## The caster an `entity_spawn_requested` is for: the player 0-3, or for NO_PLAYER and an enemy's
+## tag its enemy caster row; -1 for anything else.
+func _owner_of(player: int, tag: int) -> int:
+	if player >= 0 and player < PLAYER_SLOTS:
+		return player
+	if player == EventsScript.NO_PLAYER and SpellTag.is_spell_tag(tag) and SpellTag.is_enemy_tag(tag):
+		var caster: int = SpellTag.caster_of(tag)
+		if caster >= FIRST_ENEMY_CASTER and caster < FIRST_ENEMY_CASTER + ENEMY_CASTERS:
+			return caster
+	return -1
+
+
+## The wizard or enemy that is caster `owner`, or null. Only at spawn.
+func _body_of(owner: int) -> Node2D:
+	if owner < PLAYER_SLOTS:
+		return _wizard_of(owner)
+	var enemy: Node2D = _enemies[owner - FIRST_ENEMY_CASTER]
+	return enemy if is_instance_valid(enemy) else null
 
 
 func _rows_by_age() -> Array[int]:

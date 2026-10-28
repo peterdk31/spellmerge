@@ -203,6 +203,8 @@ const CONTROLS: Dictionary = {
 	"burst_nova_pulse": "burst",
 	"scatter_nova_flurry": "scatter",
 	"scatter_kindle_flurry": "scatter",
+	"mirror_back_guard": "mirror",
+	"mirror_frost_pincer": "mirror",
 }
 
 

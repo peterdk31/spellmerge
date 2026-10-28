@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-28: Card mirror (staffs C)
+
+Added the Mirror modifier card (data only: `.tres`, icon, assets, lore), two combos (`mirror_back_guard`, `mirror_frost_pincer`) with an imp ahead and one behind, and `test_mirror.gd`. All 131 unit tests pass.
+
 ## 2026-10-28: Card scatter (staffs C)
 
 Added the Scatter multicast card (data only: `.tres`, icon, assets, lore), two combos (`scatter_nova_flurry`, `scatter_kindle_flurry`) and `test_scatter.gd`. The combos put an imp 20 px from the caster and check reactions, since how much a scattered nova deals depends on its random turn. All 130 unit tests pass.

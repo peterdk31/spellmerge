@@ -1,0 +1,9 @@
+{
+	"id": "fissure_hit_nova",
+	"name": "Fissure hit nova",
+	"does": "Every imp the fissure strikes sets off a frost nova, so an imp standing beside the line is chilled too.",
+	"casts": [{"staff": 0, "cards": ["on_hit", "fissure", "frost", "nova"]}],
+	"imps": [[100, 0], [100, 24]],
+	"seconds": 1.5,
+	"checks": [{"kind": "status", "imps": [0, 1], "status": "chill"}]
+}

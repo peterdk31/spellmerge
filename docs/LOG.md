@@ -2,6 +2,14 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-28: Card fissure (staffs C)
+
+Added the Fissure carrier card (data only: `.tres`, icon, assets, lore), two combos (`fissure_fire_line`, `fissure_hit_nova`) and `test_fissure.gd`.
+
+## 2026-10-28: Card rain (staffs C)
+
+Added the Rain carrier card (data only: `.tres`, icon, assets, lore), two combos (`rain_nova_drop`, `rain_frost_field`) and `test_rain.gd`. All 132 unit tests pass.
+
 ## 2026-10-28: Card mirror (staffs C)
 
 Added the Mirror modifier card (data only: `.tres`, icon, assets, lore), two combos (`mirror_back_guard`, `mirror_frost_pincer`) with an imp ahead and one behind, and `test_mirror.gd`. All 131 unit tests pass.

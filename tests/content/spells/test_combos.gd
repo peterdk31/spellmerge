@@ -205,6 +205,10 @@ const CONTROLS: Dictionary = {
 	"scatter_kindle_flurry": "scatter",
 	"mirror_back_guard": "mirror",
 	"mirror_frost_pincer": "mirror",
+	"rain_nova_drop": "rain",
+	"rain_frost_field": "rain",
+	"fissure_fire_line": "fissure",
+	"fissure_hit_nova": "fissure",
 }
 
 

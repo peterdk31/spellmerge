@@ -2,6 +2,14 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-28: Fissure card numbers
+
+Fissure is a complexity-2 carrier: 2 damage, 5 mana, a 0.8 s cooldown, a 200 px line 6 px wide (the engine pierces up to 16 targets). Its line is a little shorter than the beam's 240 px because it hits everything on it. Not in the free demo. Its `lifetime` is unused: a fissure hits once, as one instant ray. Its cast and impact looks are modelled on the beam's, to be tuned in the Feel work (B6b). `bounce · fissure` still stops at walls (backlog).
+
+## 2026-10-28: Rain card numbers
+
+Rain is a complexity-2 carrier: 6 mana and a 1.5 s cooldown (its payload pays its own on top), a 0.8 s warning before it lands, and an aim point 120 px ahead (the engine's default reach). It has no damage of its own. Not in the free demo.
+
 ## 2026-10-28: Mirror card numbers
 
 Mirror is a complexity-1 modifier with no mana or cooldown of its own (the back shot is free, so `mirror · recoil · bolt` cancels the push), strength 1.0 (the engine only tests for more than 0).
@@ -1943,6 +1951,9 @@ The owner: restructure the projectile step from "for each shot, check every beha
 | step, 500 shots, fresh hits in a crowd | 1.70 / 1.94 ms | 1.31 / 0.95 ms |
 | stress web: frame avg / p95 | 9.29 / 19.08, 8.00 / 16.24 ms | 7.60 / 15.73, 7.22 / 15.06 ms |
 | stress desktop: frame avg / p95 | 102.8 / 219.0, 172.1 / 257.8 ms | 111.0 / 227.2, 88.5 / 227.4 ms |
+| final pair after merging main (59bc8c9): stress web avg / p95 | 8.28 / 16.71 ms | 7.75 / 15.71 ms |
+| final pair: stress desktop avg / p95 | 179.8 / 198.2 ms | 166.4 / 187.1 ms |
+| final pair: step, 3,000 shots, no targets / fresh hits | 2.93 / 4.13 ms | 1.81 / 3.33 ms |
 
 - **What each change bought:** the passes themselves (a plain shot costs one short loop; no behaviour checks per shot; the shield check walks its list, not every slot): the step without targets about 4.1 → 1.6 ms at 3,000. The trail sampling with its two calls a shot written out: 2.1 → 1.1 ms a sample at 3,000 shots (every other step). The hit test: a count and a box per grid cell, so a cell the path cannot touch is passed at once and charged to the budget in one go (2.6 → 2.2 µs a test in the stress crowd), the distance to the path's middle before anything else is read of a target, and the grid's corner kept as two numbers.
 - **Tried and dropped:** the wall check's one-cell answer written out in the hit pass (3%, not worth the lines); working a hit test's path out only at its first cell with a target near it (within the noise).

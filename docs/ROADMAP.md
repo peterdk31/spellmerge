@@ -6,6 +6,8 @@ One exception, by the owner on 2026-10-27: enemies casting spells from staffs mo
 
 A second, by the owner on 2026-10-28: wizards and enemies become one kind of body, an actor made of components and driven by a controller, with no sides and a `possess` card ([M2-actors.md](milestones/M2-actors.md), phase G), before D3.
 
+A third, by the owner on 2026-10-28: every character becomes a living staff, with a new story and an intro ([M2-living-staffs.md](milestones/M2-living-staffs.md), phase H), after phase G and before D3.
+
 | # | Milestone | Status | Done when |
 | --- | --- | --- | --- |
 | M0 | [Foundation](milestones/M0-foundation.md) | **Closed early** on 2026-10-16 by the owner; its dry runs and release streak carry into M1 | 3 daily releases in a row work and every pipeline part passes its dry run |

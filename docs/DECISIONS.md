@@ -1772,3 +1772,12 @@ The owner compared the game with the carrier mockup (2026-10-27) and listed what
   - A wizard is on no physics body layer (layer 2 before); nothing read it.
 - **Colours have one home:** the ramps' light shades (docs/STYLE.md) join the base colours in the projectile manager (`RAMP_LIGHT_COLORS`, `ramp_light`); the look draws the reticle, gem and rings in them, the colours player.gd kept its own copy of. Feel's copy goes in G8.
 - **Feel and Entities** read a wizard by its actor `id` and `ramp` where they read `actor_id` and `index` (a small bridge; G8 reads every target by actor).
+
+## 2026-10-28: Living staffs (the owner; phase H planned)
+
+- **Every character is a living staff** (the owner: "every character in the game being an alive staff. So enemies are just staffs that look kinda evil. And our main protagonist is a goofy looking staff"). Designed over nine rounds of mockups in one owner session; the plan is [M2-living-staffs.md](milestones/M2-living-staffs.md), phase H, after phase G and before D3.
+- **The player:** a floating staff that points where it aims, with cartoon floating eyes and separate floating brows over the grip ("Close" height). Its four staffs are four personalities, one per button, each with its own head and face (curl, star, moon, crystal); a different button swaps them in a 0.18 s cloud poof that never delays the cast. The player colour is on the heads only.
+- **The story:** a wizard throws staffs down a hole in the tower floor just because (new is better); the staff thinks it was an accident. The strays are the wizard's earlier staffs; bosses are powerful old staffs; the final boss is the wizard's current staff, the Favourite, and then the wizard picking it up. Ending A: the wizard keeps your staff ("Huh. Still works.") and drops the Favourite down the hole. STORY.md's canon is rewritten.
+- **DESIGN.md:** the build element "Wizard" is now "Staff", and the locked art direction is the living staff; the style N wizard of 2026-10-23 becomes the villain (owner session, at the owner's direction).
+- **Actors G6 and G7** build one look for every actor instead of a `CreatureLook` and a `WizardLook`, so phase H's face layers have one home.
+- **Defaults not yet overruled:** the enemy name "strays"; strays hop while players float; the starter heads and personality names.

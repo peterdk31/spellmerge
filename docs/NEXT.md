@@ -14,7 +14,6 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
 - [x] **The old recipe path removed (staffs A6c).** Done in an owner session: `Spells.compile(recipe)`, `builder_view`, the recipe wrappers (`install`, `cast`, a spell's `begin_generation`) and the recipe compiler are gone, `begin_generation` takes a compiled staff; `CompiledSpell` lost `valid`, `reason`, `description`, `complexity`, `depth` and `held`; `SpellLimits` keeps only engine safeguards and tuning; the events `build_change_requested`, `spell_swap_requested`, `spell_changed`, `recipe_changed` and `active_spell_changed` are removed; tests build staffs (`tests/support/staff_kit.gd` turns the old recipe shorthand into card rows; `test_spell_tags.gd` replaces `test_spells_compile.gd`); the spells, core and gameplay READMEs say so. **Phase B and the cards can start; development is unpaused.**
 - [x] **Card: arc (staffs C).** After the slow, return and arc kit (owner, 2026-10-27). Data only.
 - [x] **Card: linger (staffs C).** After B1. Data only (M2-staffs.md, "Working in parallel").
-- [ ] **Card: growth (staffs C).** After B1. Data only (M2-staffs.md, "Working in parallel").
 - [ ] **Card: on cast (staffs C).** After B2. Data only (M2-staffs.md, "Working in parallel").
 - [ ] **Card: echo (staffs C).** After B2. Data only (M2-staffs.md, "Working in parallel").
 - [ ] **Card: burst (staffs C).** After B2. Data only (M2-staffs.md, "Working in parallel").
@@ -85,6 +84,7 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 
 ## Done recently
 
+- [x] **Card: growth (staffs C).** Found already built (commits fac4ce6 and 98ed9b8, checked 2026-10-28): `content/spells/modifiers/growth/` (`ModifierBase`, icon, `assets.json`), the combos `growth_far_shot` and `growth_slow_orb`, and `tests/content/spells/test_growth.gd`. All 126 unit tests pass in `ci/build/build.sh --quick --tests`. Only the checkbox was missing.
 - [x] **Card: slow (staffs C).** Found already built (commit 7ae7cac, checked 2026-10-28): `content/spells/modifiers/slow/` (`ModifierBase`, `speed_mult` 0.3, `lifetime_mult` 3.0, icon, `assets.json`), the combos `slow_nova_trail`, `slow_fire_fan` and `growth_slow_orb`, and `tests/content/spells/test_slow.gd`. All 126 unit tests pass in `ci/build/build.sh --quick --tests`. Only the checkbox was missing.
 - [x] **Card: return (staffs C).** Found already built (checked 2026-10-28): `content/spells/modifiers/return/` (`ModifierBase`, behaviour return, mana x1.25, icon, `assets.json`), the combos `return_pierce_twice` and `return_home_nova`, the lore entry and `tests/content/spells/test_return.gd`. All 126 unit tests pass in `ci/build/build.sh --quick --tests`. Only the checkbox was missing.
 - [x] **Card: spiral (staffs C).** Found already built (commit 4346c5a, checked 2026-10-28): `content/spells/modifiers/spiral/` (`ModifierBase`, behaviour spiral, strength 24, icon, `assets.json`), the combos `spiral_piercing_sweep` and `spiral_frost_sweep`, the lore entry and `tests/content/spells/test_spiral.gd`. All 125 unit tests pass in `ci/build/build.sh --quick --tests`. Only the checkbox was missing.

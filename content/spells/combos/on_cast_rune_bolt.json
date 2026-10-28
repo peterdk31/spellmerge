@@ -1,0 +1,9 @@
+{
+	"id": "on_cast_rune_bolt",
+	"name": "On cast rune bolt",
+	"does": "A rune is laid at your feet and a fire bolt leaves at the same moment; the bolt lights an imp ahead.",
+	"casts": [{"staff": 0, "cards": ["on_cast", "rune", "fire", "bolt"]}],
+	"imps": [[120, 0]],
+	"seconds": 1.5,
+	"checks": [{"kind": "status", "imps": [0], "status": "burn"}]
+}

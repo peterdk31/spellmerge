@@ -33,6 +33,7 @@ extends Node
 
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
+const ActorSeats := preload("res://tests/support/actor_seats.gd")
 
 const DT: float = 1.0 / 60.0
 ## How far round a shot homing looks (the Homing card's reach).
@@ -50,6 +51,10 @@ const FRAME_MS: float = 1000.0 / 60.0
 var _failures: Array[String] = []
 var _bus: Node
 var _mgr: Node2D
+## The manager's actor table: four wizards seated 0-3 (actors G3b: a shot's caster is an actor id,
+## and its team, ramp and budget come from the table), and their ids by seat.
+var _actors: ActorSeats.ActorsScript
+var _casters: PackedInt32Array = PackedInt32Array()
 var _targets: Array[Node2D] = []
 var _hits: int = 0
 
@@ -81,17 +86,21 @@ func _teardown() -> void:
 		if is_instance_valid(target):
 			target.free()
 	_targets.clear()
-	for node: Node in [_mgr, _bus]:
+	for node: Node in [_mgr, _bus, _actors]:
 		if node != null and is_instance_valid(node):
 			node.free()
 	_mgr = null
 	_bus = null
+	_actors = null
 
 
 func _run_cap(cap: int) -> void:
 	_teardown()
 	_bus = EventsScript.new()
 	_mgr = ManagerScript.new()
+	_actors = ActorSeats.ActorsScript.new()
+	_casters = ActorSeats.seat_wizards(_actors, PLAYERS)
+	_mgr.set("actors", _actors)
 	_mgr.events = _bus
 	get_tree().root.add_child(_mgr)
 	_mgr.set_cap(cap)
@@ -142,7 +151,7 @@ func _run_cap(cap: int) -> void:
 		_mgr.clear()
 		for n in cap:
 			var lane := Vector2(48.0 + float(n * 37 % 500), 40.0 + float(n * 53 % 80))
-			_mgr.spawn(n % PLAYERS, lane, Vector2(1500.0, 0.0), 1.0e6, 4.0, 0)
+			_mgr.spawn(_casters[n % PLAYERS], lane, Vector2(1500.0, 0.0), 1.0e6, 4.0, 0)
 		var long_start: int = Time.get_ticks_usec()
 		_mgr.step(DT)
 		long_us += float(Time.get_ticks_usec() - long_start)
@@ -199,7 +208,7 @@ func _run_motion_timings(cap: int) -> void:
 		_mgr.clear()
 		for n in cap:
 			var at := CROWD_CENTER + Vector2(float(n * 37 % 240) - 120.0, 90.0 + float(n * 53 % 60))
-			_mgr.spawn(n % PLAYERS, at, Vector2(0.0, -60.0), 1.0e6, 4.0, ManagerScript.LAYER_ENEMY, 1000000)
+			_mgr.spawn(_casters[n % PLAYERS], at, Vector2(0.0, -60.0), 1.0e6, 4.0, ManagerScript.LAYER_ENEMY, 1000000)
 		var begin: int = Time.get_ticks_usec()
 		_mgr.step(DT)
 		straight_us += float(Time.get_ticks_usec() - begin)
@@ -212,7 +221,7 @@ func _run_motion_timings(cap: int) -> void:
 		_mgr.clear()
 		for n in cap:
 			var at := CROWD_CENTER + Vector2(float(n * 37 % 240) - 120.0, 90.0 + float(n * 53 % 60))
-			var slot: int = _mgr.spawn(n % PLAYERS, at, Vector2(0.0, -60.0), 1.0e6, 4.0, ManagerScript.LAYER_ENEMY, 1000000)
+			var slot: int = _mgr.spawn(_casters[n % PLAYERS], at, Vector2(0.0, -60.0), 1.0e6, 4.0, ManagerScript.LAYER_ENEMY, 1000000)
 			_mgr.set_homing(slot, 3.0, HOMING_REACH)
 		var start: int = Time.get_ticks_usec()
 		_mgr.step(DT)
@@ -229,16 +238,16 @@ func _run_motion_timings(cap: int) -> void:
 	for i in REPEATS:
 		_mgr.clear()
 		for player in PLAYERS:
-			_mgr.set_anchor(player, CROWD_CENTER + Vector2(float(player) * 8.0 - 12.0, 0.0))
+			_mgr.set_anchor(_casters[player], CROWD_CENTER + Vector2(float(player) * 8.0 - 12.0, 0.0))
 		for n in cap:
-			_mgr.spawn_orbit(n % PLAYERS, 20.0 + float(n % 40), float(n) * 0.37, 2.0, 1.0e6, 4.0, ManagerScript.LAYER_ENEMY, 1000000)
+			_mgr.spawn_orbit(_casters[n % PLAYERS], 20.0 + float(n % 40), float(n) * 0.37, 2.0, 1.0e6, 4.0, ManagerScript.LAYER_ENEMY, 1000000)
 		var start: int = Time.get_ticks_usec()
 		_mgr.step(DT)
 		orbit_us += float(Time.get_ticks_usec() - start)
 	_check(_mgr.get_count() == cap, "cap %d: orbit shots survive" % cap)
 	_log("step, full cap of orbit shots through the crowd", orbit_us / float(REPEATS), 1, "per step")
 	for player in PLAYERS:
-		_mgr.clear_anchor(player)
+		_mgr.clear_anchor(_casters[player])
 	_mgr.clear()
 
 	# Rays: 100 beams through the crowd, thin, wide and piercing (each hits the signal).
@@ -250,7 +259,7 @@ func _run_motion_timings(cap: int) -> void:
 		var start: int = Time.get_ticks_usec()
 		for n in rays:
 			var at := CROWD_CENTER + Vector2(float(n % 10) * 12.0 - 60.0, 70.0)
-			_mgr.ray(n % PLAYERS, at, Vector2.UP, 300.0, 1000, ManagerScript.LAYER_ENEMY, 0, float(n % 3) * 4.0)
+			_mgr.ray(_casters[n % PLAYERS], at, Vector2.UP, 300.0, 1000, ManagerScript.LAYER_ENEMY, 0, float(n % 3) * 4.0)
 		ray_us += float(Time.get_ticks_usec() - start)
 		ray_hits += _hits
 	_check(ray_hits > 0, "cap %d: the beams really hit (%d)" % [cap, ray_hits])
@@ -288,7 +297,7 @@ func _fill(count: int, lifetime: float, pierce: bool) -> void:
 func _spawn(i: int, lifetime: float, pierce: bool) -> void:
 	var at := Vector2(float(i * 37 % int(ROOM.x)), float(i * 53 % int(ROOM.y)))
 	var velocity := Vector2(float(i % 7) - 3.0, float(i % 5) - 2.0) * 2.0
-	_mgr.spawn(i % PLAYERS, at, velocity, lifetime, 4.0, ManagerScript.LAYER_ENEMY, 1000000 if pierce else 0)
+	_mgr.spawn(_casters[i % PLAYERS], at, velocity, lifetime, 4.0, ManagerScript.LAYER_ENEMY, 1000000 if pierce else 0)
 
 
 ## Fill the manager to `count` fast piercing shots (200-400 px/s) that start inside
@@ -298,7 +307,7 @@ func _fill_hostile(count: int) -> void:
 	for i in count:
 		var at := CROWD_CENTER + Vector2(float(i * 37 % 80) - 40.0, float(i * 53 % 80) - 40.0)
 		var speed: float = 200.0 + float(i % 5) * 50.0
-		_mgr.spawn(i % PLAYERS, at, Vector2.from_angle(float(i) * 0.7) * speed, 1.0e6, 4.0, ManagerScript.LAYER_ENEMY, 1000000)
+		_mgr.spawn(_casters[i % PLAYERS], at, Vector2.from_angle(float(i) * 0.7) * speed, 1.0e6, 4.0, ManagerScript.LAYER_ENEMY, 1000000)
 
 
 ## Move every shot one step without testing it, so `_hit_test` can be timed alone.
@@ -313,7 +322,7 @@ func _on_hit(_player: int, _node: Node, _at: Vector2, _tag: int) -> void:
 
 
 ## 100 enemies packed 9 px apart (radius 10, so they overlap) in about four 64 px
-## cells, and four wizards (owners 0-3) at their lower edge.
+## cells, and four wizards (owned by the four seated actors) at their lower edge.
 func _add_crowd() -> void:
 	for i in ENEMIES:
 		var enemy := Node2D.new()
@@ -326,7 +335,7 @@ func _add_crowd() -> void:
 		get_tree().root.add_child(wizard)
 		wizard.global_position = CROWD_CENTER + Vector2(float(player) * 16.0 - 24.0, 52.0)
 		_targets.append(wizard)
-		_mgr.add_target(wizard, 8.0, ManagerScript.LAYER_PLAYER, player)
+		_mgr.add_target(wizard, 8.0, ManagerScript.LAYER_PLAYER, _casters[player])
 
 
 ## `total_us` is for `calls` calls.

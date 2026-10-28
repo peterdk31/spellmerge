@@ -1,8 +1,9 @@
 extends "res://tests/support/suite.gd"
-## Tests for the seven trigger events of the staffs (B2a): on block, on kill, on cast, on wall,
-## on hurt, on reaction and on ally fire their payload from where the event happened, each
-## shot only as often as its trigger allows, and `relay` takes on a teammate's infusion. It runs
-## a real projectile manager and event bus, stepped by hand, with cards built in code.
+## Tests for the trigger events of the staffs (B2a): on block, on kill, on cast, on wall, on hurt
+## and on reaction fire their payload from where the event happened, each shot only as often as
+## its trigger allows, and a `relay` shot that hits an actor takes on that actor's last infusion
+## (owner, 2026-10-28; `on ally` is gone). It runs a real projectile manager and event bus,
+## stepped by hand, with cards built in code, and a table of four wizards at actor ids 0-3.
 ##
 ## godot --headless --path . --script res://tests/core/test_spells_triggers.gd
 
@@ -10,6 +11,7 @@ const StaffKit := preload("res://tests/support/staff_kit.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
+const ActorSeats := preload("res://tests/support/actor_seats.gd")
 
 const DT: float = 1.0 / 60.0
 
@@ -26,7 +28,7 @@ var _fake: FakeRegistry
 var _spells: SpellsScript
 var _mgr: ManagerScript
 var _bus: EventsScript
-## Every projectile_hit as [player, target, position, tag, hit profile at that moment].
+## Every projectile_hit as [caster, target, position, tag, hit profile at that moment].
 var _hits: Array = []
 
 
@@ -36,11 +38,13 @@ func before_each() -> void:
 	_mgr = own(ManagerScript.new()) as ManagerScript
 	_mgr.events = _bus
 	_mgr.set_cap(512)
+	_mgr.actors = own(ActorSeats.table()) as ActorSeats.ActorsScript
 	_spells = own(SpellsScript.new()) as SpellsScript
 	_spells.registry = _fake
 	_spells.bind(_mgr, _bus)
 	_hits.clear()
-	_bus.projectile_hit.connect(func(player: int, target: Node, at: Vector2, tag: int) -> void: _hits.append([player, target, at, tag, _spells.hit_profile(tag)]))
+	# Connected after Spells, as Combat is: it sees the profile a relay has already changed.
+	_bus.projectile_hit.connect(func(caster: int, target: Node, at: Vector2, tag: int) -> void: _hits.append([caster, target, at, tag, _spells.hit_profile(tag)]))
 	_form(&"bolt", 300.0, 1.0)
 	_form(&"short", 300.0, 0.1)
 	var rune: FormBase = _form(&"rune", 0.0, 10.0)
@@ -57,13 +61,15 @@ func before_each() -> void:
 	_put(frost, &"frost")
 	_modifier(&"shield", ModifierBase.Behaviour.SHIELD, 1.0)
 	_modifier(&"relay", ModifierBase.Behaviour.RELAY, 1.0)
+	var pierce := ModifierBase.new()
+	pierce.extra_pierce = 1
+	_put(pierce, &"pierce")
 	_trigger(&"on_block", TriggerBase.Event.BLOCK, 1)
 	_trigger(&"on_kill", TriggerBase.Event.KILL, 1)
 	_trigger(&"on_cast", TriggerBase.Event.CAST, 1)
 	_trigger(&"on_wall", TriggerBase.Event.WALL, 1)
 	_trigger(&"on_hurt", TriggerBase.Event.HURT, 2)
 	_trigger(&"on_reaction", TriggerBase.Event.REACTION, 1)
-	_trigger(&"on_ally", TriggerBase.Event.ALLY, 1)
 
 
 func _put(component: SpellComponent, id: StringName) -> void:
@@ -97,18 +103,19 @@ func _trigger(id: StringName, event: TriggerBase.Event, max_fires: int) -> void:
 	_put(trigger, id)
 
 
-## Builds `cards` as `player`'s staff 0; returns the tag of the payload's first spell (node 1).
-func _build(player: int, cards: Array[StringName]) -> int:
-	StaffKit.build(_spells, player, 0, cards)
-	return _spells.current_tag(player, 0, 1)
+## Builds `cards` as `caster`'s staff 0; returns the tag of the payload's first spell (node 1).
+func _build(caster: int, cards: Array[StringName]) -> int:
+	StaffKit.build(_spells, caster, 0, cards)
+	return _spells.current_tag(caster, 0, 1)
 
 
-func _target(position: Vector2, layer: int = ManagerScript.LAYER_ENEMY, owner_player: int = EventsScript.NO_PLAYER) -> Node2D:
+## A body at `position`, the body of the actor `owner_actor` (none: -1).
+func _target(position: Vector2, layer: int = ManagerScript.LAYER_ENEMY, owner_actor: int = EventsScript.NO_PLAYER) -> Node2D:
 	var node := Node2D.new()
 	root.add_child(node)
 	node.global_position = position
 	own(node)
-	_mgr.add_target(node, 10.0, layer, owner_player)
+	_mgr.add_target(node, 10.0, layer, owner_actor)
 	return node
 
 
@@ -126,8 +133,8 @@ func _slots(tag: int) -> Array[int]:
 	return found
 
 
-func _cast(player: int, direction: Vector2 = Vector2.RIGHT) -> void:
-	_spells.cast_staff(player, 0, Vector2.ZERO, direction, 10.0)
+func _cast(caster: int, direction: Vector2 = Vector2.RIGHT) -> void:
+	_spells.cast_staff(caster, 0, Vector2.ZERO, direction, 10.0)
 
 
 ## The first live shot of `tag` (the carrier's), or -1.
@@ -232,7 +239,6 @@ func test_a_trigger_that_does_not_match_stays_quiet() -> void:
 	_cast(0)
 	var slot: int = _first(carrier)
 	_bus.reaction_landed.emit(0, &"steam", null, Vector2(10, 0), carrier)
-	_bus.ally_passed.emit(0, null, Vector2(10, 0), carrier)
 	_bus.shot_blocked.emit(0, Vector2(10, 0), carrier)
 	_bus.kill_landed.emit(0, null, Vector2(10, 0), 77)
 	_bus.projectile_expired.emit(0, Vector2(10, 0), carrier)
@@ -240,21 +246,21 @@ func test_a_trigger_that_does_not_match_stays_quiet() -> void:
 	check_equal(_spells.live_shots(held), 0, "no other event, a bad tag or a null target fired the kill payload")
 
 
-func test_on_hurt_fires_from_the_wizard_for_each_live_carrier_up_to_its_limit() -> void:
+func test_on_hurt_fires_from_the_hurt_actor_for_each_live_carrier_up_to_its_limit() -> void:
 	var long_held: int = _build(0, [&"on_hurt", &"bolt", &"rune"])
 	_cast(0)
 	_tick(2)
-	_bus.wizard_hurt.emit(1, 3, Vector2(5, 5), 0, &"hit")
-	check_equal(_slots(long_held).size(), 0, "another player's pain fires nothing")
-	_bus.wizard_hurt.emit(0, 3, Vector2(5, 5), 0, &"hit")
+	_bus.actor_hurt.emit(1, 3, Vector2(5, 5), 0, &"hit")
+	check_equal(_slots(long_held).size(), 0, "another actor's pain fires nothing")
+	_bus.actor_hurt.emit(0, 3, Vector2(5, 5), 0, &"hit")
 	var runes: Array[int] = _slots(long_held)
 	check_equal(runes.size(), 1, "the caster's pain fires the payload")
-	check(runes.size() == 1 and _mgr.get_position_of(runes[0]).is_equal_approx(Vector2(5, 5)), "from the wizard")
+	check(runes.size() == 1 and _mgr.get_position_of(runes[0]).is_equal_approx(Vector2(5, 5)), "from the hurt actor")
 	_tick(1)
-	_bus.wizard_hurt.emit(0, 3, Vector2(5, 5), 0, &"hit")
+	_bus.actor_hurt.emit(0, 3, Vector2(5, 5), 0, &"hit")
 	check_equal(_slots(long_held).size(), 2, "a second time (two fires)")
 	_tick(1)
-	_bus.wizard_hurt.emit(0, 3, Vector2(5, 5), 0, &"hit")
+	_bus.actor_hurt.emit(0, 3, Vector2(5, 5), 0, &"hit")
 	check_equal(_slots(long_held).size(), 2, "but not a third")
 
 
@@ -262,44 +268,23 @@ func test_on_hurt_stops_when_the_carrier_is_gone() -> void:
 	var held: int = _build(0, [&"on_hurt", &"short", &"rune"])
 	_cast(0)
 	_tick(20)
-	_bus.wizard_hurt.emit(0, 3, Vector2(5, 5), 0, &"hit")
+	_bus.actor_hurt.emit(0, 3, Vector2(5, 5), 0, &"hit")
 	check_equal(_spells.live_shots(held), 0, "an expired carrier fires nothing")
 
 
-## Since actors G3c no shot passes a teammate (every shot hits one), so the projectile manager
-## never sends `ally_passed`; Spells still answers it, so the tests below send it by hand, as the
-## manager did: from the shot's slot (`event_slot`), naming a teammate it registered.
-func _pass(tag: int, ally: Node2D) -> void:
-	_mgr.event_slot = _first(tag)
-	_bus.ally_passed.emit(0, ally, ally.global_position, tag)
-	_mgr.event_slot = -1
-
-
-func test_on_ally_fires_from_the_teammate() -> void:
-	var friend: Node2D = _target(Vector2(60, 50), ManagerScript.LAYER_PLAYER, 1)
-	var held: int = _build(0, [&"on_ally", &"bolt", &"rune"])
-	_cast(0)
-	_tick(1)
-	_pass(_spells.current_tag(0, 0, 0), friend)
-	var runes: Array[int] = _slots(held)
-	check_equal(runes.size(), 1, "passing a teammate fires the payload once")
-	check(runes.size() == 1 and absf(_mgr.get_position_of(runes[0]).x - friend.global_position.x) < 20.0, "from them")
-
-
-## Player 1 casts frost (an infusion) or a plain bolt, then player 0 a bolt with the cards
-## `cards`, which passes player 1's teammate `passes` times on its way to an enemy. Returns the
-## hit profiles of player 0's hits.
-func _relay_hits(donor: Array[StringName], cards: Array[StringName], passes: int) -> Array[HitProfile]:
-	var friend: Node2D = _target(Vector2(60, 50), ManagerScript.LAYER_PLAYER, 1)
+## The caster `donor` casts `donor_cards` away from everything, then wizard 0 casts a bolt with
+## `cards` at the body of `donor` (registered as `donor`'s target), with a body of no actor
+## behind it. Returns the hit profiles of wizard 0's hits, as a listener connected after Spells
+## (Combat) sees them, in order.
+func _relay_hits(donor: int, donor_cards: Array[StringName], cards: Array[StringName]) -> Array[HitProfile]:
+	var layer: int = ManagerScript.LAYER_PLAYER if donor < 4 else ManagerScript.LAYER_ENEMY
+	_target(Vector2(60, 0), layer, donor)
 	_target(Vector2(200, 0))
-	_build(1, donor)
+	_build(donor, donor_cards)
 	_build(0, cards)
-	_spells.cast_staff(1, 0, Vector2(0, 100), Vector2.RIGHT, 10.0)
+	_spells.cast_staff(donor, 0, Vector2(0, 100), Vector2.DOWN, 10.0)
 	_cast(0)
-	_tick(1)
-	for i in passes:
-		_pass(_spells.current_tag(0, 0, 0), friend)
-	_tick(40)
+	_tick(60)
 	var mine: Array[HitProfile] = []
 	for hit: Array in _hits:
 		if hit[0] == 0:
@@ -307,26 +292,34 @@ func _relay_hits(donor: Array[StringName], cards: Array[StringName], passes: int
 	return mine
 
 
-func test_relay_takes_on_the_infusion_of_a_teammates_last_cast() -> void:
-	var mine: Array[HitProfile] = _relay_hits([&"frost", &"bolt"], [&"relay", &"bolt"], 1)
-	check_equal(mine.size(), 1, "the relay shot hit the enemy")
+func test_relay_on_a_teammate_takes_their_last_infusion() -> void:
+	var mine: Array[HitProfile] = _relay_hits(1, [&"frost", &"bolt"], [&"relay", &"bolt"])
+	check_equal(mine.size(), 1, "the relay shot hit the teammate")
 	if not mine.is_empty():
-		var profile: HitProfile = mine[0]
-		check(profile != null and profile.element_ids.has(&"frost"), "with the teammate's frost")
-		check_equal(profile.status_id if profile != null else &"", &"chill", "and its status")
+		check(mine[0] != null and mine[0].element_ids.has(&"frost"), "with the teammate's frost")
+		check_equal(mine[0].status_id if mine[0] != null else &"", &"chill", "and its status")
 	check_equal(_spells.hit_profile(_spells.current_tag(0, 0, 0)).element_ids.size(), 0, "the build itself stays plain")
 
 
-func test_relay_from_a_donor_without_infusion_changes_nothing() -> void:
-	var mine: Array[HitProfile] = _relay_hits([&"bolt"], [&"relay", &"bolt"], 1)
+func test_relay_on_an_enemy_actor_takes_its_fire() -> void:
+	var imp: int = ActorSeats.enemy(_mgr.actors)
+	var mine: Array[HitProfile] = _relay_hits(imp, [&"fire", &"bolt"], [&"relay", &"bolt"])
+	check(mine.size() == 1 and mine[0] != null and mine[0].element_ids.has(&"fire"), "a hit on an enemy that cast fire takes fire")
+	check_equal(mine[0].status_id if mine.size() == 1 and mine[0] != null else &"", &"burn", "and burns")
+
+
+func test_relay_on_an_actor_that_never_cast_an_infusion_changes_nothing() -> void:
+	var mine: Array[HitProfile] = _relay_hits(1, [&"bolt"], [&"relay", &"bolt"])
 	check(mine.size() == 1 and mine[0].element_ids.is_empty(), "a teammate whose cast had no infusion gives nothing")
 
 
-func test_relay_passing_the_same_teammate_twice_adds_the_element_once() -> void:
-	var mine: Array[HitProfile] = _relay_hits([&"frost", &"bolt"], [&"relay", &"bolt"], 2)
-	check(mine.size() == 1 and mine[0].element_ids.count(&"frost") == 1, "frost joined the hit once")
+func test_a_relay_shot_keeps_what_it_took_for_its_later_hits() -> void:
+	var mine: Array[HitProfile] = _relay_hits(1, [&"frost", &"bolt"], [&"relay", &"pierce", &"bolt"])
+	check_equal(mine.size(), 2, "it pierced the teammate and hit the body behind")
+	if mine.size() == 2:
+		check_equal(mine[1].element_ids.count(&"frost"), 1, "the later hit keeps frost, once")
 
 
-func test_a_plain_shot_takes_nothing_from_a_teammate() -> void:
-	var mine: Array[HitProfile] = _relay_hits([&"frost", &"bolt"], [&"bolt"], 1)
+func test_a_plain_shot_takes_nothing() -> void:
+	var mine: Array[HitProfile] = _relay_hits(1, [&"frost", &"bolt"], [&"bolt"])
 	check(mine.size() == 1 and mine[0].element_ids.is_empty(), "no relay card, no change")

@@ -583,7 +583,8 @@ func _test_a_wizards_bolt_hits_a_teammate() -> void:
 	_wizard(1).global_position = Vector2(140.0, 100.0)
 	_wizard(2).global_position = Vector2(100.0, 300.0)
 	_projectiles.clear()
-	_projectiles.spawn(0, Vector2(100.0, 100.0), Vector2(400.0, 0.0), 1.0, 4.0, ProjectileManagerScript.LAYER_ENEMY, 0, BOLT_TAG)
+	# The shot is cast by wizard 0's actor (actors G3b: the caster is the actor id the wizard opened).
+	_projectiles.spawn((_wizard(0) as PlayerScript).actor_id, Vector2(100.0, 100.0), Vector2(400.0, 0.0), 1.0, 4.0, ProjectileManagerScript.LAYER_ENEMY, 0, BOLT_TAG)
 	_projectiles.step(0.1)
 	_check((_wizard(0) as PlayerScript).health == PlayerScript.MAX_HEALTH, "the shooter is never hit by its own shot")
 	_check((_wizard(2) as PlayerScript).health == PlayerScript.MAX_HEALTH, "a wizard off the line of fire is untouched")

@@ -3,6 +3,8 @@ extends "res://tests/support/suite.gd"
 ## and hex, read from `Spells.hit_profile`, with several players at once. Hits arrive as
 ## `projectile_hit` on a test bus, with the tag of a real compiled spell built from the real
 ## element resources; time moves by `Combat.step` with a fixed binary-fraction delta.
+## The players are actors 0-3 of the test's actor table, seated 0-3 (actors G3b: hits name actor
+## ids, and only a seated caster's hit discharges static).
 ##
 ## godot --headless --path . --script res://tests/gameplay/combat/test_combat_statuses.gd
 
@@ -11,6 +13,7 @@ const CombatScript := preload("res://gameplay/combat/combat.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
+const ActorSeats := preload("res://tests/support/actor_seats.gd")
 
 const STEP: float = 0.0625
 const ELEMENTS: Array[StringName] = [&"fire", &"frost", &"storm", &"void", &"lightning"]
@@ -28,6 +31,7 @@ var _bus: EventsScript
 var _projectiles: ManagerScript
 var _combat: CombatScript
 var _spells: SpellsScript
+var _actors: ActorSeats.ActorsScript
 var _fake: FakeRegistry
 ## Each status_applied as [player, target, id].
 var _applied: Array = []
@@ -39,6 +43,8 @@ func before_each() -> void:
 	_bus = own(EventsScript.new()) as EventsScript
 	_projectiles = own(ManagerScript.new()) as ManagerScript
 	_projectiles.events = _bus
+	_actors = own(ActorSeats.table()) as ActorSeats.ActorsScript
+	_projectiles.actors = _actors
 	_combat = own(CombatScript.new()) as CombatScript
 	_combat.events = _bus
 	_combat.projectiles = _projectiles
@@ -448,6 +454,10 @@ func test_a_hit_with_no_player_does_not_discharge() -> void:
 	_hit(EventsScript.NO_PLAYER, struck, _tag(0, &""))
 	check_equal(_combat.get_health(other), 100, "a hit that names no player discharges nothing")
 	check(_combat.has_status(struck, &"static"), "and keeps its charge")
+	var enemy_caster: int = ActorSeats.enemy(_actors)
+	_hit(enemy_caster, struck, _tag(enemy_caster, &""))
+	check_equal(_combat.get_health(other), 100, "nor does an enemy actor's spell (no seat drives it)")
+	check(_combat.has_status(struck, &"static"), "which keeps the charge too")
 	_hit(0, struck, 4321)
 	check_equal(_combat.get_health(other), 100, "a shot that is not a spell does not discharge either")
 

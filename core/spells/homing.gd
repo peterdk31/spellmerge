@@ -52,27 +52,27 @@ func homes() -> bool:
 
 ## `velocity` at `from` turned toward its target for `delta` seconds (a dash as it goes), or
 ## unchanged when it does not home or has nothing in reach.
-func steer(projectiles: ProjectilesScript, player: int, from: Vector2, velocity: Vector2, delta: float) -> Vector2:
+func steer(projectiles: ProjectilesScript, caster: int, from: Vector2, velocity: Vector2, delta: float) -> Vector2:
 	if not homes() or projectiles == null:
 		return velocity
-	var turned: Vector2 = projectiles.home_velocity(player, from, velocity, turn, reach, delta, keep, pick_seed)
+	var turned: Vector2 = projectiles.home_velocity(caster, from, velocity, turn, reach, delta, keep, pick_seed)
 	keep = projectiles.homing_target
 	return turned
 
 
 ## The centre of the target something at `from` going along `direction` bends to (a beam's
 ## leg), or INF when it does not home or has nothing in reach and in its bend.
-func point(projectiles: ProjectilesScript, player: int, from: Vector2, direction: Vector2) -> Vector2:
+func point(projectiles: ProjectilesScript, caster: int, from: Vector2, direction: Vector2) -> Vector2:
 	target_radius = 0.0
 	if not homes() or projectiles == null:
 		return Vector2.INF
-	var goal: Vector2 = projectiles.homing_point(player, from, direction, bend, ProjectilesScript.LAYER_ENEMY, reach, keep, pick_seed, avoid)
+	var goal: Vector2 = projectiles.homing_point(caster, from, direction, bend, ProjectilesScript.ACTOR_LAYERS, reach, keep, pick_seed, avoid)
 	keep = projectiles.homing_target
 	target_radius = projectiles.homing_target_radius
 	return goal
 
 
 ## `direction` bent toward that target (a teleport), or unchanged.
-func aim(projectiles: ProjectilesScript, player: int, from: Vector2, direction: Vector2) -> Vector2:
-	var goal: Vector2 = point(projectiles, player, from, direction)
+func aim(projectiles: ProjectilesScript, caster: int, from: Vector2, direction: Vector2) -> Vector2:
+	var goal: Vector2 = point(projectiles, caster, from, direction)
 	return direction if not goal.is_finite() else from.direction_to(goal)

@@ -9,6 +9,7 @@ const SpellsScript := preload("res://core/spells/spells.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
+const ActorSeats := preload("res://tests/support/actor_seats.gd")
 
 const AIM := Vector2.RIGHT
 const STAFF_SPREAD: float = 40.0
@@ -24,6 +25,8 @@ func before_each() -> void:
 	var bus: EventsScript = own(EventsScript.new()) as EventsScript
 	_mgr = own(ManagerScript.new()) as ManagerScript
 	_mgr.events = bus
+	# Four wizards seated 0-3 at actor ids 0-3, as the tests name their casters.
+	_mgr.actors = own(ActorSeats.table()) as ActorSeats.ActorsScript
 	_spells = own(SpellsScript.new()) as SpellsScript
 	_spells.registry = _registry
 	_spells.bind(_mgr, bus)
@@ -54,7 +57,7 @@ func _angles(cards: Array[StringName], spread: float, casts: int, player: int = 
 		_spells.step(1.0)
 		_spells.cast_staff(player, 0, Vector2.ZERO, AIM, 100.0)
 		for slot in _mgr.get_cap():
-			if not _mgr.is_alive(slot) or SpellTag.player_of(_mgr.get_tag_of(slot)) != player:
+			if not _mgr.is_alive(slot) or SpellTag.caster_of(_mgr.get_tag_of(slot)) != player:
 				continue
 			var key := Vector2i(slot, _mgr.get_seq_of(slot))
 			if seen.has(key):

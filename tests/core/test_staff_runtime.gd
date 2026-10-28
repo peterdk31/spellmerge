@@ -10,6 +10,7 @@ extends "res://tests/support/suite.gd"
 const SpellsScript := preload("res://core/spells/spells.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
+const ActorSeats := preload("res://tests/support/actor_seats.gd")
 
 const DT: float = 1.0 / 60.0
 const AIM: Vector2 = Vector2.RIGHT
@@ -40,6 +41,8 @@ func before_each() -> void:
 	_mgr = own(ManagerScript.new()) as ManagerScript
 	_mgr.events = _bus
 	_mgr.set_cap(512)
+	# Four wizards seated 0-3 at actor ids 0-3, as the tests name their casters.
+	_mgr.actors = own(ActorSeats.table()) as ActorSeats.ActorsScript
 	_spells = own(SpellsScript.new()) as SpellsScript
 	_spells.registry = _fake
 	_spells.bind(_mgr, _bus)
@@ -222,7 +225,7 @@ func test_an_empty_staff_has_no_build() -> void:
 
 func test_four_players_with_four_staffs_rebuild_mid_flight_without_mixing() -> void:
 	var tags: Array[int] = []
-	for player in SpellLimits.PLAYERS:
+	for player in 4:
 		for staff in SpellLimits.STAFFS:
 			tags.append(_install(player, staff, "fire bolt" if (player + staff) % 2 == 0 else "bolt"))
 			_spells.cast_staff(player, staff, Vector2(0, 40 * player), AIM, 100.0)

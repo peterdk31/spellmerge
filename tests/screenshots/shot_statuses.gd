@@ -23,7 +23,10 @@ func take() -> void:
 	input.call("add_virtual_device", 0)
 	flow.call("start_run", 0)
 	await settle()
-	var centre: Vector2 = (flow.call("get_wizard", 0) as Node2D).global_position + Vector2(0.0, -60.0)
+	var wizard: Node2D = flow.call("get_wizard", 0) as Node2D
+	var centre: Vector2 = wizard.global_position + Vector2(0.0, -60.0)
+	# Statuses and reactions name their caster by actor id: the actor the wizard opened (actors G3b).
+	var caster: int = int(wizard.get("actor_id"))
 	var imps: Array[Node2D] = []
 	for i in IDS.size():
 		var imp := Node2D.new()
@@ -42,12 +45,12 @@ func take() -> void:
 		if id == &"freeze":
 			# Three chills in a row freeze.
 			for k in 3:
-				combat.call("apply_status", 0, imps[i], &"chill", SECONDS, 30.0)
+				combat.call("apply_status", caster, imps[i], &"chill", SECONDS, 30.0)
 		else:
-			combat.call("apply_status", 0, imps[i], id, SECONDS, 5.0)
+			combat.call("apply_status", caster, imps[i], id, SECONDS, 5.0)
 	await _snap(centre, "statuses_4x", 4)
 	await _snap(centre, "statuses_1x", 1)
-	events.call("emit_signal", "reaction_triggered", 0, &"shatter", centre + Vector2(GAP * 0.5, 0.0))
+	events.call("emit_signal", "reaction_triggered", caster, &"shatter", centre + Vector2(GAP * 0.5, 0.0))
 	await _snap(centre, "status_reaction_1x", 1)
 
 

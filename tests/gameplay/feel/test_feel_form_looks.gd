@@ -10,6 +10,7 @@ const FeelScript := preload("res://gameplay/feel/feel.gd")
 const FeelPresetScript := preload("res://gameplay/feel/presets/feel_preset.gd")
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
+const ActorSeats := preload("res://tests/support/actor_seats.gd")
 
 
 ## A registry that knows one more carrier card, made in the test.
@@ -30,12 +31,17 @@ var feel: FeelScript
 var preset: FeelPresetScript
 var projectiles: Node
 var registry: CardsRegistry
+## Wizards seated 0-3 at the actor ids 0-3: a shot of caster 0-3 lands in hat ramp 0-3.
+var actors: ActorSeats.ActorsScript
 
 
 func before_each() -> void:
 	bus = own(EventsScript.new()) as EventsScript
 	feel = own(FeelScript.new()) as FeelScript
 	projectiles = own(ProjectilesScript.new()) as Node
+	actors = own(ActorSeats.table()) as ActorSeats.ActorsScript
+	projectiles.set("actors", actors)
+	feel.actors = actors
 	preset = FeelPresetScript.new()
 	preset.hit_sound = &""
 	feel.events = bus
@@ -205,12 +211,13 @@ func test_effects_past_the_slots_take_the_oldest() -> void:
 
 
 func test_an_enemy_shot_lands_like_a_spell_in_the_enemy_ramp() -> void:
-	# Staffs F7: no ember burst of its own any more; NO_PLAYER is the enemy ramp.
+	# Staffs F7: no ember burst of its own any more; an enemy actor's shot is in the enemy ramp.
+	var enemy: int = ActorSeats.enemy(actors)
 	for form in FORMS:
 		_cast(0, form)
-		bus.projectile_impact.emit(-1, null, Vector2(50, 50), Vector2.RIGHT)
+		bus.projectile_impact.emit(enemy, null, Vector2(50, 50), Vector2.RIGHT)
 		var shown: Dictionary = feel.effect_info(FeelScript.KIND_BURST)
-		check(not shown.is_empty() and shown["player"] == -1 and shown["core"] == Color.WHITE, "%s: an enemy's plain shot lands in a burst in the enemy ramp" % form)
+		check(not shown.is_empty() and shown["ramp"] == ActorSeats.ActorsScript.RAMP_ENEMY and shown["core"] == Color.WHITE, "%s: an enemy's plain shot lands in a burst in the enemy ramp" % form)
 		check(shown["core"] != preset.enemy_hit_color, "%s: not in ember" % form)
 		feel.step(1.0)
 
@@ -220,11 +227,12 @@ func test_an_enemy_shot_lands_like_a_spell_in_the_enemy_ramp() -> void:
 
 func test_four_players_casting_and_hitting_stay_in_the_pools() -> void:
 	var children: int = feel.get_child_count()
+	var enemy: int = ActorSeats.enemy(actors)
 	for round in 6:
 		for player in 4:
 			_cast(player, FORMS[(player + round) % FORMS.size()])
 			bus.projectile_impact.emit(player, null, Vector2(player * 10, 0), Vector2.RIGHT)
-			bus.projectile_impact.emit(-1, null, Vector2(player * 10, 5), Vector2.LEFT)
+			bus.projectile_impact.emit(enemy, null, Vector2(player * 10, 5), Vector2.LEFT)
 	check(feel.live_effects() <= feel.effect_slots, "inside the effect slots")
 	check_equal(feel.get_child_count(), children, "no new nodes were needed")
 
@@ -281,7 +289,7 @@ func test_a_beam_is_drawn_by_the_beam_mode_with_its_cards() -> void:
 	var material: ShaderMaterial = _the_shown_beam().material as ShaderMaterial
 	check_equal(material.get_shader_parameter(&"beam_mode"), 2, "a sprite beam")
 	check_equal(material.get_shader_parameter(&"beam_length"), 100.0, "as long as it got")
-	check_equal(material.get_shader_parameter(&"beam_player"), 3, "of its player")
+	check_equal(material.get_shader_parameter(&"beam_player"), 3, "in its caster's hat ramp")
 	check_equal(material.get_shader_parameter(&"beam_look"), 9, "with the cast's cards")
 	check(is_equal_approx(material.get_shader_parameter(&"beam_glow") as float, preset.beam_alpha), "glowing as the preset says")
 

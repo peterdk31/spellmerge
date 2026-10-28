@@ -33,6 +33,8 @@ func take() -> void:
 	if behind == null or front == null:
 		fail("two wizards are needed")
 		return
+	# Shots, hits and impacts name their caster by actor id: the actor wizard 1 opened (actors G3b).
+	var caster: int = int(behind.get("actor_id"))
 	behind.global_position = Vector2(170.0, 118.0)
 	front.global_position = Vector2(184.0, 172.0)
 	await settle()
@@ -40,7 +42,7 @@ func take() -> void:
 	save(image, "crypt_pillars_torches")
 	save_crop(image, on_screen(Vector2(176.0, 135.0)), "crypt_pillar_walk_behind")
 	# A shot that ends on the left wall.
-	shots.call("spawn", 0, Vector2(60.0, 250.0), Vector2(-300.0, 0.0), 1.0)
+	shots.call("spawn", caster, Vector2(60.0, 250.0), Vector2(-300.0, 0.0), 1.0)
 	for i in 4:
 		await physics_frame
 	await snap(Vector2(40.0, 250.0), "impact_wall")
@@ -56,8 +58,8 @@ func take() -> void:
 		fail("there is no imp to hit")
 		return
 	var imp_at: Vector2 = imp.get_global_transform_with_canvas().origin
-	events.call("emit_signal", "projectile_impact", 0, imp, imp.global_position + Vector2(-8.0, -12.0), Vector2.RIGHT)
-	combat.call("hit", 0, imp, 5)
+	events.call("emit_signal", "projectile_impact", caster, imp, imp.global_position + Vector2(-8.0, -12.0), Vector2.RIGHT)
+	combat.call("hit", caster, imp, 5)
 	await physics_frame
 	save_crop(await grab(), imp_at + Vector2(0.0, -12.0), "impact_hit_enemy")
 	await settle()

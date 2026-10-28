@@ -10,7 +10,6 @@ extends "res://tests/support/suite.gd"
 const StaffKit := preload("res://tests/support/staff_kit.gd")
 
 const SpellsScript := preload("res://core/spells/spells.gd")
-const EventsScript := preload("res://core/events/events.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 
 
@@ -108,8 +107,8 @@ func _holding(form: StringName, trigger: StringName, held: Dictionary) -> Dictio
 	return {"form": form, "trigger": trigger, "held": held}
 
 
-func _begin(player: int, staff: int, compiled: CompiledStaff) -> int:
-	return _spells.call("begin_generation", player, staff, compiled)
+func _begin(actor: int, staff: int, compiled: CompiledStaff) -> int:
+	return _spells.call("begin_generation", actor, staff, compiled)
 
 
 func test_tags_pack_and_unpack() -> void:
@@ -154,31 +153,10 @@ func test_tags_fit_an_int32_and_miss_the_ai_tags() -> void:
 	check(SpellTag.generation_key(SpellTag.make(7, 0, 9, 2)) != SpellTag.generation_key(SpellTag.make(8, 0, 9, 2)), "two casters have their own keys")
 
 
-## Deprecated helpers (actors G3 removes them): the same answers as before G2 for the casters
-## Spells numbers today, players 0-3 and enemy rows from FIRST_ENEMY_CASTER.
-func test_the_old_player_and_row_helpers_read_the_caster() -> void:
-	for row in [0, 1, 37, SpellTag.ROW_MASK]:
-		for staff in SpellLimits.STAFFS:
-			var tag: int = SpellTag.make_enemy(row, staff, 5, 3)
-			check(SpellTag.is_spell_tag(tag) and SpellTag.is_enemy_tag(tag), "enemy tag %d is a spell tag" % tag)
-			check(SpellTag.row_of(tag) == row and SpellTag.staff_of(tag) == staff and SpellTag.node_of(tag) == 5 and SpellTag.generation_of(tag) == 3, "enemy tag %d unpacks to what made it" % tag)
-			check_equal(SpellTag.player_of(tag), EventsScript.NO_PLAYER, "an enemy's spell has no player")
-			check_equal(SpellTag.caster_of(tag), SpellTag.FIRST_ENEMY_CASTER + row, "its caster is its row after the players")
-			check_equal(SpellTag.make_for(SpellTag.FIRST_ENEMY_CASTER + row, staff, 5, 3), tag, "make_for makes the same tag")
-	for player in SpellLimits.PLAYERS:
-		var tag: int = SpellTag.make(player, 2, 9, 3)
-		check(not SpellTag.is_enemy_tag(tag), "a player's tag is not an enemy's")
-		check_equal(SpellTag.player_of(tag), player, "a player's tag names the player")
-		check_equal(SpellTag.caster_of(tag), player, "a player's caster is the player")
-		check_equal(SpellTag.row_of(tag), -1, "a player's tag has no enemy row")
-		check_equal(SpellTag.make_for(player, 2, 9, 3), tag, "make_for makes the same tag")
-	check(not SpellTag.is_enemy_tag(SpellTag.FIRST_ENEMY_CASTER << SpellTag.CASTER_SHIFT), "a caster field alone is no tag")
-
-
 func test_a_built_staff_registers_every_node() -> void:
 	var staff: CompiledStaff = _staff(_holding(&"bolt", &"on_hit", _holding(&"nova", &"on_hit", {"form": &"bolt"})))
 	var tag: int = _begin(2, 1, staff)
-	check(SpellTag.player_of(tag) == 2 and SpellTag.staff_of(tag) == 1 and SpellTag.node_of(tag) == 0, "the first tag names player, staff and node 0")
+	check(SpellTag.caster_of(tag) == 2 and SpellTag.staff_of(tag) == 1 and SpellTag.node_of(tag) == 0, "the first tag names caster, staff and node 0")
 	for node in staff.nodes.size():
 		check(_spells.call("profile", _spells.call("current_tag", 2, 1, node)) == staff.nodes[node], "node %d finds its spell" % node)
 	check_equal(_spells.call("current_tag", 2, 0), 0, "the other staff was never built")
@@ -187,16 +165,17 @@ func test_a_built_staff_registers_every_node() -> void:
 func test_empty_staffs_and_bad_arguments_give_tag_zero() -> void:
 	check_equal(_begin(0, 0, StaffKit.compile(_spells, [] as Array[StringName])), 0, "an empty staff is not registered")
 	var good: CompiledStaff = _staff({"form": &"bolt"})
-	check_equal(_begin(4, 0, good), 0, "player 4 does not exist")
+	check_equal(_begin(ActorsScript.ACTORS, 0, good), 0, "actor 512 does not exist")
+	check(_begin(ActorsScript.ACTORS - 1, 0, good) != 0, "the last actor id may build")
 	check_equal(_begin(0, SpellLimits.STAFFS, good), 0, "a fifth staff does not exist")
-	check_equal(_begin(-1, 0, good), 0, "player -1 does not exist")
+	check_equal(_begin(-1, 0, good), 0, "actor -1 does not exist")
 	check_equal(_begin(0, 0, null), 0, "null is not a staff")
 
 
 func test_four_players_build_at_once_without_mixing() -> void:
 	var tags: Array[int] = []
 	var builds: Array[CompiledStaff] = []
-	for player in SpellLimits.PLAYERS:
+	for player in 4:
 		for staff in SpellLimits.STAFFS:
 			var built: CompiledStaff = _staff({"form": &"bolt", "modifiers": [&"pierce"]})
 			builds.append(built)

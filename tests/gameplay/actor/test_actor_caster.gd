@@ -1,6 +1,6 @@
 extends "res://tests/support/suite.gd"
 ## The Caster (actors G4): staffs built and installed in the real Spells under the actor's caster
-## number (a seat's, or an enemy row opened and closed with the actor); casts from the intent (a
+## number (its actor id, opened in Spells with the actor and closed when it leaves); casts from the intent (a
 ## press, or a hold while no sustained card is on) from the staff tip along the aim, paying mana;
 ## mana back each step and from siphon; `cast_ready` for an AI's windup; one compiled staff shared
 ## by every caster of the same staff and cards. Its cards' moves move the actor (ported from
@@ -10,7 +10,6 @@ extends "res://tests/support/suite.gd"
 
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
-const EventsScript := preload("res://core/events/events.gd")
 const StaffKit := preload("res://tests/support/staff_kit.gd")
 
 var _world: Fixture
@@ -37,19 +36,22 @@ func _press(body: Actor, staff: int = 0) -> void:
 	(body.controller as Fixture.Scripted).presses.append(staff)
 
 
-func test_a_seat_casts_under_its_seat_and_a_creature_under_an_enemy_row() -> void:
+func test_every_actor_casts_under_its_actor_id_opened_and_closed_with_it() -> void:
 	_world = Fixture.new(root)
 	var wizard: Actor = _seated(2, [[&"bolt"]])
 	var imp: Actor = _creature([[&"fire", &"bolt"]])
-	check_equal(wizard.caster_number(), 2, "a seat's number until Spells casts by actor id")
-	check(imp.caster_number() >= SpellLimits.FIRST_ENEMY_CASTER, "an enemy row: %d" % imp.caster_number())
-	check(_world.spells.is_enemy_caster_open(imp.caster_number()), "opened in Spells")
-	var row: int = imp.caster_number()
+	check(wizard.id >= 0 and imp.id >= 0 and wizard.id != imp.id, "two actor ids: %d, %d" % [wizard.id, imp.id])
+	check_equal(wizard.caster_number(), wizard.id, "a seated actor casts under its actor id")
+	check_equal(imp.caster_number(), imp.id, "and so does a creature")
+	check_equal(wizard.caster.number, wizard.id, "its Caster has the number")
+	var number: int = imp.caster_number()
+	check(_world.spells.current_tag(number, 0) != 0, "its staff is installed in Spells under it")
 	root.remove_child(imp)
-	check(not _world.spells.is_enemy_caster_open(row), "and closed when the actor leaves")
+	check_equal(_world.spells.current_tag(number, 0), 0, "and closed in Spells when the actor leaves")
 	check_equal(imp.caster_number(), -1, "it has none out of the tree")
 	root.add_child(imp)
-	check(imp.caster.has_staff(0), "back in the tree its staff is installed again")
+	check_equal(imp.caster_number(), imp.id, "back in the tree it casts under its id again")
+	check(imp.caster.has_staff(0), "with its staff installed again")
 
 
 func test_a_press_casts_from_the_staff_tip_along_the_aim_and_pays() -> void:
@@ -106,13 +108,17 @@ func test_mana_comes_back_up_to_the_most_and_siphon_refunds_it() -> void:
 	wizard.caster.mana = 10.0
 	_world.run(16)
 	check(is_equal_approx(wizard.caster.mana, 10.0 + wizard.caster.regen), "a second of regen: %f" % wizard.caster.mana)
-	_world.bus.mana_refund_requested.emit(1, 5.0)
-	check(is_equal_approx(wizard.caster.mana, 15.0 + wizard.caster.regen), "siphon refunds its seat")
-	_world.bus.mana_refund_requested.emit(0, 5.0)
-	_world.bus.mana_refund_requested.emit(1, -3.0)
+	_world.bus.mana_refund_requested.emit(wizard.id, 5.0)
+	check(is_equal_approx(wizard.caster.mana, 15.0 + wizard.caster.regen), "siphon refunds its actor id")
+	_world.bus.mana_refund_requested.emit(wizard.id + 1, 5.0)
+	_world.bus.mana_refund_requested.emit(wizard.id, -3.0)
 	check(is_equal_approx(wizard.caster.mana, 15.0 + wizard.caster.regen), "another number's or a negative refund changes nothing")
-	_world.bus.mana_refund_requested.emit(1, 1000.0)
+	_world.bus.mana_refund_requested.emit(wizard.id, 1000.0)
 	check_equal(wizard.caster.mana, wizard.caster.max_mana, "never above the most")
+	var imp: Actor = _creature([[&"fire", &"bolt"]])
+	imp.caster.mana = 10.0
+	_world.bus.mana_refund_requested.emit(imp.id, 5.0)
+	check(is_equal_approx(imp.caster.mana, 15.0), "a creature's refund comes by the same event: %f" % imp.caster.mana)
 
 
 func test_cast_ready_waits_for_the_delay_and_the_mana() -> void:
@@ -171,7 +177,7 @@ func test_a_dash_card_dashes_the_actor_and_its_blast_goes_off_where_it_ends() ->
 	_world.run(8)
 	check(not imp.mover.is_moving(), "for the card's time")
 	check(is_equal_approx(imp.position.x, 60.0), "the card's distance along its aim (%.2f)" % imp.position.x)
-	check(finished.size() == 1 and finished[0][0] == EventsScript.NO_PLAYER and finished[0][1] == &"dash" and finished[0][3] == tag, "it says where it ended, as an enemy row's: %s" % [finished])
+	check(finished.size() == 1 and finished[0][0] == imp.id and finished[0][1] == &"dash" and finished[0][3] == tag, "it says where it ended, under its actor id: %s" % [finished])
 	check(areas.size() == 1 and (areas[0][1] as Vector2).is_equal_approx(imp.position), "the card's blast goes off there")
 
 

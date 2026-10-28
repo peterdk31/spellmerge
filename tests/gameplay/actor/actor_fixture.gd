@@ -73,6 +73,7 @@ func _init(root: Node, fake: FakeRegistry = null) -> void:
 	projectiles.events = bus
 	projectiles.set_bounds(Rect2(-400.0, -400.0, 1040.0, 800.0))
 	table = ActorsScript.new()
+	projectiles.actors = table
 	if fake != null:
 		registry = fake
 	else:
@@ -86,6 +87,7 @@ func _init(root: Node, fake: FakeRegistry = null) -> void:
 	combat.events = bus
 	combat.projectiles = projectiles
 	combat.spells = spells
+	combat.actors = table
 	combat._ready()
 
 

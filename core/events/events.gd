@@ -1,12 +1,18 @@
 extends Node
 ## The event bus: one autoload ("Events"), one typed signal per event.
 ##
-## Areas never call each other; they emit and connect here. Every per-player
-## event takes the player index (0-3) as its first argument. Each event has
-## exactly one sender, named in its comment. Where an event has no player to
-## name (for example damage dealt by an enemy), the index is NO_PLAYER.
+## Areas never call each other; they emit and connect here. Each event has exactly one
+## sender, named in its comment. Two kinds of first argument (actors G3b,
+## docs/milestones/M2-actors.md, "Events"):
+##
+## - `caster` (or `actor`): an actor id (`core/actors`), for what an actor does or has done to
+##   it: spells, shots, hits, moves. A wizard and an enemy are named the same way; who it is
+##   (its seat, team, colour) is the actor table's to say. NO_PLAYER (`Actors.NONE`) only where
+##   no actor did it.
+## - `player`: a seat (0-3), a human: HUD intent, devices, the builder, stats, downed and
+##   revived, joined and left, and the casts the wizard announces for the HUD and Feel.
 
-## Player index for "no player involved", for example an enemy as the damage source.
+## "No actor" (`Actors.NONE`): the world, where no actor did it. Also "no seat".
 const NO_PLAYER: int = -1
 
 # --- Player intent from the HUD (sender: hud) -------------------------------
@@ -42,19 +48,19 @@ signal device_left(player: int, device: int)
 
 # --- Spells and combat ------------------------------------------------------
 
-## Sender: player. A cast left the wand of `player`.
+## Sender: player. A cast left the wand of the seat `player`'s wizard (seat-keyed: for the HUD and Feel).
 signal spell_cast(player: int, spell_id: StringName, origin: Vector2, direction: Vector2)
 ## Sender: player. The wizard node of `player` has just cast, for visual reactions only (a squash). Sent right after `spell_cast`.
 signal wizard_cast(player: int, wizard: Node)
-## Sender: core/projectiles. A projectile fired by `player` touched `target`.
+## Sender: core/projectiles. A projectile fired by the actor `caster` touched `target`.
 ## `tag` is the value given to `Projectiles.spawn()`, for looking up the damage.
-signal projectile_hit(player: int, target: Node, position: Vector2, tag: int)
-## Sender: core/projectiles. Where and which way a projectile struck, for looks only (sparks, dust). `target` is the node it hit, sent just before `projectile_hit` for the same hit, or `null` when it ended on a wall or pillar. `player` is who fired it (or NO_PLAYER for an enemy), `position` the point it stopped at and `direction` the unit vector it was flying.
-signal projectile_impact(player: int, target: Node, position: Vector2, direction: Vector2)
-## Sender: core/projectiles. A projectile fired by `player` ended without a hit: its life ran out or it struck a wall. `tag` is the value given to `Projectiles.spawn()`. Heard by core/spells (on expire) and feel (a small pop where a life ran out).
-signal projectile_expired(player: int, position: Vector2, tag: int)
-## Sender: core/spells. A beam, a nova or a rain of `player` just fired, for looks only (they have no shot to draw). `form` is `&"rain"` (a telegraph: its payload falls on `origin` after `length` seconds) or `&"beam"` (`length` is how far it got, along `direction`) or `&"nova"` (a ring of shots leaves `origin`; `length` is 0) or `&"dash"` (the wizard dashes from `origin` along `direction` for `length` pixels, as far as the walls let it). `tint` is the colour of the spell's element (white for plain arcane) and `look` its packed look kinds (`CompiledSpell.look`), so the cue shows its cards.
-signal form_shown(player: int, form: StringName, origin: Vector2, direction: Vector2, length: float, tint: Color, look: int)
+signal projectile_hit(caster: int, target: Node, position: Vector2, tag: int)
+## Sender: core/projectiles. Where and which way a projectile struck, for looks only (sparks, dust). `target` is the node it hit, sent just before `projectile_hit` for the same hit, or `null` when it ended on a wall or pillar. `caster` is the actor who fired it (NO_PLAYER for a shot of no actor), `position` the point it stopped at and `direction` the unit vector it was flying.
+signal projectile_impact(caster: int, target: Node, position: Vector2, direction: Vector2)
+## Sender: core/projectiles. A projectile fired by the actor `caster` ended without a hit: its life ran out or it struck a wall. `tag` is the value given to `Projectiles.spawn()`. Heard by core/spells (on expire) and feel (a small pop where a life ran out).
+signal projectile_expired(caster: int, position: Vector2, tag: int)
+## Sender: core/spells. A beam, a nova or a rain of the actor `caster` just fired, for looks only (they have no shot to draw). `form` is `&"rain"` (a telegraph: its payload falls on `origin` after `length` seconds) or `&"beam"` (`length` is how far it got, along `direction`) or `&"nova"` (a ring of shots leaves `origin`; `length` is 0) or `&"dash"` (the wizard dashes from `origin` along `direction` for `length` pixels, as far as the walls let it). `tint` is the colour of the spell's element (white for plain arcane) and `look` its packed look kinds (`CompiledSpell.look`), so the cue shows its cards.
+signal form_shown(caster: int, form: StringName, origin: Vector2, direction: Vector2, length: float, tint: Color, look: int)
 ## Sender: player. A build change asked for by `player` was refused; `reason` says why in plain words.
 signal build_refused(player: int, reason: String)
 ## Sender: player. The component ids `player` may build with, in registry order. Sent when the wizard appears and whenever the bag changes.
@@ -63,57 +69,55 @@ signal bag_changed(player: int, bag: Array[StringName])
 signal staff_changed(player: int, staff: int, plan: Dictionary)
 ## Sender: player. `player` cast their staff `staff` from `origin` along `direction`. Heard by feel.
 signal staff_cast(player: int, staff: int, origin: Vector2, direction: Vector2)
-## Sender: core/spells. A card of `player` moves the wizard: `mode` is `&"dash"`, `&"teleport"`, `&"hook"`, `&"swap"` or `&"recoil"`; `to` is where it wants to go (the wizard stops at walls), over `seconds` (0 is at once); `tag` is the card's tag. Heard by player, which answers with `caster_move_finished`, and by ai for an enemy's own card (`player` NO_PLAYER, the tag of its caster row; staffs F8c). Several requests can come in one step (a scatter, a burst, `mirror`): the player adds up the `recoil` requests of a step (so `mirror · recoil` cancels) and lets a later dash, teleport, hook or swap replace an earlier one.
-signal caster_move_requested(player: int, mode: StringName, to: Vector2, seconds: float, tag: int)
-## Sender: player (a wizard's move) and ai (an enemy's, with NO_PLAYER and its tag; staffs F8c). The move asked for by `caster_move_requested` ended at `position`: the end point of a dash, teleport or hook. Heard by core/spells and feel (where a dash lands).
-signal caster_move_finished(player: int, mode: StringName, position: Vector2, tag: int)
-## Sender: core/spells. A card of `player` (swap) moves `target` to `to`. Heard by ai.
-signal target_move_requested(player: int, target: Node, to: Vector2)
-## Sender: core/spells. A card of `player` (blast, a payload's fallback) hits everything in the circle at `position` of `radius`, the caster included, with the hit profile of `tag`. Heard by combat.
-signal area_hit_requested(player: int, position: Vector2, radius: float, tag: int)
-## Sender: core/spells. A card of `player` makes an entity of `kind` (`&"decoy"`, `&"familiar"`) at `position` that lasts `seconds` (INF, or 0 or less: until `entity_end_requested`, the room or the run ends); `tag` is the card's tag. `caster` is who cast it, what a familiar circles: -1 the wizard, a `core/projectiles` slot for the shot whose trigger made it, or -2 the point `position` (that shot is gone). An enemy's card sends NO_PLAYER and its tag (staffs F8d). Heard by ai.
-signal entity_spawn_requested(player: int, kind: StringName, position: Vector2, seconds: float, tag: int, caster: int)
-## Sender: core/spells. The entities of `player` made by the card with `tag` end now (a `hold` switched off, or its staff rebuilt). Heard by ai, which answers with `entity_ended` for each.
-signal entity_end_requested(player: int, tag: int)
-## Sender: ai. The entity of `player` of `kind` with `tag` ended at `position` (a decoy died, a familiar left). Heard by core/spells (its end point).
-signal entity_ended(player: int, kind: StringName, position: Vector2, tag: int)
-## Sender: ai. The familiar of `player` with `tag` casts its payload from `position` along `direction`. Heard by core/spells.
-signal familiar_cast_requested(player: int, position: Vector2, direction: Vector2, tag: int)
-## Sender: core/spells. Mana of `player` comes back (siphon). Heard by player.
-signal mana_refund_requested(player: int, amount: float)
-## Sender: core/spells. `amount` of the mana of `player` is now held by sustained cards (`hold`); 0 when none is on. Heard by player and hud.
+## Sender: core/spells. A card of the actor `caster` moves it: `mode` is `&"dash"`, `&"teleport"`, `&"hook"`, `&"swap"` or `&"recoil"`; `to` is where it wants to go (the body stops at walls), over `seconds` (0 is at once); `tag` is the card's tag. Heard by player (a wizard's actor) and ai (an enemy's), each for its own actor id, which answer with `caster_move_finished`. Several requests can come in one step (a scatter, a burst, `mirror`): the body adds up the `recoil` requests of a step (so `mirror · recoil` cancels) and lets a later dash, teleport, hook or swap replace an earlier one.
+signal caster_move_requested(caster: int, mode: StringName, to: Vector2, seconds: float, tag: int)
+## Sender: player (a wizard's move) and ai (an enemy's; staffs F8c). The move the actor `caster` was asked for by `caster_move_requested` ended at `position`: the end point of a dash, teleport or hook. Heard by core/spells and feel (where a dash lands).
+signal caster_move_finished(caster: int, mode: StringName, position: Vector2, tag: int)
+## Sender: core/spells. A card of the actor `caster` (swap) moves `target` to `to`. Heard by ai.
+signal target_move_requested(caster: int, target: Node, to: Vector2)
+## Sender: core/spells. A card of the actor `caster` (blast, a payload's fallback) hits everything in the circle at `position` of `radius`, the caster included, with the hit profile of `tag`. Heard by combat.
+signal area_hit_requested(caster: int, position: Vector2, radius: float, tag: int)
+## Sender: core/spells. A card of the actor `caster` makes an entity of `kind` (`&"decoy"`, `&"familiar"`) at `position` that lasts `seconds` (INF, or 0 or less: until `entity_end_requested`, the room or the run ends); `tag` is the card's tag. `anchor` is what a familiar circles: -1 the caster's body, a `core/projectiles` slot for the shot whose trigger made it, or -2 the point `position` (that shot is gone). Heard by ai.
+signal entity_spawn_requested(caster: int, kind: StringName, position: Vector2, seconds: float, tag: int, anchor: int)
+## Sender: core/spells. The entities of the actor `caster` made by the card with `tag` end now (a `hold` switched off, or its staff rebuilt). Heard by ai, which answers with `entity_ended` for each.
+signal entity_end_requested(caster: int, tag: int)
+## Sender: ai. The entity of the actor `caster` of `kind` with `tag` ended at `position` (a decoy died, a familiar left). Heard by core/spells (its end point).
+signal entity_ended(caster: int, kind: StringName, position: Vector2, tag: int)
+## Sender: ai. The familiar of the actor `caster` with `tag` casts its payload from `position` along `direction`. Heard by core/spells.
+signal familiar_cast_requested(caster: int, position: Vector2, direction: Vector2, tag: int)
+## Sender: core/spells. Mana of the actor `caster` comes back (siphon). Heard by player and ai, each for its own actor.
+signal mana_refund_requested(caster: int, amount: float)
+## Sender: core/spells. `amount` of the mana of the seat `player`'s actor is now held by sustained cards (`hold`); 0 when none is on. Sent only for an actor a seat drives (an AI reads `Spells.reserved_mana`). Heard by player and hud.
 signal mana_reserved(player: int, amount: float)
-## Sender: core/projectiles. A shot of `player` with `tag` stopped an enemy shot at `position` with one of its shield charges. Heard by core/spells and feel.
-signal shot_blocked(player: int, position: Vector2, tag: int)
-## Sender: combat. The reaction `reaction_id` (for example &"shatter") fired for `player` (or NO_PLAYER) at `position`.
-signal reaction_triggered(player: int, reaction_id: StringName, position: Vector2)
-## Sender: combat. A discharge of `player` jumped from `from` (the enemy struck) to `to` (an enemy zapped), both in world pixels; one is sent for each enemy zapped, next to its `reaction_triggered` `discharge`. Heard by feel, which draws the arc.
-signal discharge_arc(player: int, from: Vector2, to: Vector2)
-## Sender: combat. `player` (or NO_PLAYER) dealt `amount` damage to `target`.
-signal damage_dealt(player: int, target: Node, amount: int, position: Vector2)
-## Sender: combat. A status effect from `player` (or NO_PLAYER) was put on `target`.
-signal status_applied(player: int, target: Node, status_id: StringName)
-## Sender: combat. `enemy` died; `player` landed the last hit (or NO_PLAYER).
-signal enemy_died(player: int, enemy: Node, position: Vector2)
+## Sender: core/projectiles. A shot of the actor `caster` with `tag` stopped another team's shot at `position` with one of its shield charges. Heard by core/spells and feel.
+signal shot_blocked(caster: int, position: Vector2, tag: int)
+## Sender: combat. The reaction `reaction_id` (for example &"shatter") fired for the actor `caster` (or NO_PLAYER) at `position`.
+signal reaction_triggered(caster: int, reaction_id: StringName, position: Vector2)
+## Sender: combat. A discharge of the actor `caster` jumped from `from` (the body struck) to `to` (a body zapped), both in world pixels; one is sent for each body zapped, next to its `reaction_triggered` `discharge`. Heard by feel, which draws the arc.
+signal discharge_arc(caster: int, from: Vector2, to: Vector2)
+## Sender: combat. The actor `caster` (or NO_PLAYER) dealt `amount` damage to `target`.
+signal damage_dealt(caster: int, target: Node, amount: int, position: Vector2)
+## Sender: combat. A status effect from the actor `caster` (or NO_PLAYER) was put on `target`.
+signal status_applied(caster: int, target: Node, status_id: StringName)
+## Sender: combat. `enemy` died; the actor `killer` landed the last hit (or NO_PLAYER).
+signal enemy_died(killer: int, enemy: Node, position: Vector2)
 
-## Sender: combat. A barrier on the wizard `player` (shield charges from the card with `tag`) stopped a hit at `position`. Heard by core/spells and feel.
-signal shield_blocked(player: int, position: Vector2, tag: int)
-## Sender: combat. A hit of `player` with `tag` killed `target` at `position`. Heard by core/spells (on kill).
-signal kill_landed(player: int, target: Node, position: Vector2, tag: int)
-## Sender: combat. The wizard `player` took `amount` damage at `position` from a hit with `tag` (a spell's tag, an enemy's spell included, whose caster row `SpellTag.caster_of` gives; 0 for contact damage and a reaction's damage) of kind `kind` (`&"shot"`, `&"ray"`, `&"burst"`, `&"reaction"`, `&"status"`; a burn tick is not a hit, so it is not sent here). Heard by core/spells (on hurt), feel and hud.
-signal wizard_hurt(player: int, amount: int, position: Vector2, tag: int, kind: StringName)
-## Sender: combat. A hit of `player` with `tag` on `target` at `position` set off the reaction `reaction_id`. Heard by core/spells (on reaction); feel keeps `reaction_triggered`.
-signal reaction_landed(player: int, reaction_id: StringName, target: Node, position: Vector2, tag: int)
-## Sender: core/spells. The wizard `player` gets a barrier of `charges` blocked hits for `seconds` (shield on a dash, a teleport or the caster); the card has `tag`. Heard by combat.
-signal wizard_shield_requested(player: int, charges: int, seconds: float, tag: int)
-## Sender: core/spells. A card of `player` (magnet) pulls every enemy within `radius` of `position` toward it at `strength` pixels per second; the card has `tag`. Heard by combat.
-signal pull_requested(player: int, position: Vector2, radius: float, strength: float, tag: int)
-## Sender: combat. Just before `damage_dealt`: the hit of `player` on `target` for `amount` is of `kind` (`&"shot"`, `&"ray"`, `&"burst"`, `&"reaction"`, `&"status"`, and `&"heal"` for a heal). A wizard's contact hit counts as `&"shot"`. A wizard hit by their own spell has `player` equal to their index. Heard by feel.
-signal hit_landed(player: int, target: Node, amount: int, position: Vector2, kind: StringName)
-## Sender: combat. A heal hit of `player` gave the wizard `target` `amount` health at `position`. Heard by player and feel.
-signal heal_dealt(player: int, target: Node, amount: int, position: Vector2)
-## Sender: none since actors G3c (core/projectiles before: every shot now hits teammates, none passes them). A shot of `player` with `tag` passed through the teammate `ally` at `position`. Heard by core/spells (relay, on ally).
-signal ally_passed(player: int, ally: Node, position: Vector2, tag: int)
+## Sender: combat. A barrier on the actor `actor` (shield charges from the card with `tag`) stopped a hit at `position`. Heard by core/spells and feel.
+signal shield_blocked(actor: int, position: Vector2, tag: int)
+## Sender: combat. A hit of the actor `caster` with `tag` killed `target` at `position`. Heard by core/spells (on kill).
+signal kill_landed(caster: int, target: Node, position: Vector2, tag: int)
+## Sender: combat. The actor `actor` took `amount` damage at `position` from a hit with `tag` (a spell's tag, whose `SpellTag.caster_of` is the actor that cast it; 0 for contact damage and a reaction's damage) of kind `kind` (`&"shot"`, `&"ray"`, `&"burst"`, `&"reaction"`, `&"status"`; a burn tick is not a hit, so it is not sent here). Heard by core/spells (on hurt: the hurt actor's own carriers fire).
+signal actor_hurt(actor: int, amount: int, position: Vector2, tag: int, kind: StringName)
+## Sender: combat. A hit of the actor `caster` with `tag` on `target` at `position` set off the reaction `reaction_id`. Heard by core/spells (on reaction); feel keeps `reaction_triggered`.
+signal reaction_landed(caster: int, reaction_id: StringName, target: Node, position: Vector2, tag: int)
+## Sender: core/spells. The actor `caster` gets a barrier of `charges` blocked hits for `seconds` (shield on a dash, a teleport or the caster); the card has `tag`. Heard by combat.
+signal wizard_shield_requested(caster: int, charges: int, seconds: float, tag: int)
+## Sender: core/spells. A card of the actor `caster` (magnet) pulls every enemy within `radius` of `position` toward it at `strength` pixels per second; the card has `tag`. Heard by combat.
+signal pull_requested(caster: int, position: Vector2, radius: float, strength: float, tag: int)
+## Sender: combat. Just before `damage_dealt`: the hit of the actor `caster` on `target` for `amount` is of `kind` (`&"shot"`, `&"ray"`, `&"burst"`, `&"reaction"`, `&"status"`, and `&"heal"` for a heal). A wizard's contact hit counts as `&"shot"`. A wizard hit by their own spell has `caster` equal to their own actor id. Heard by feel.
+signal hit_landed(caster: int, target: Node, amount: int, position: Vector2, kind: StringName)
+## Sender: combat. A heal hit of the actor `caster` gave the wizard `target` `amount` health at `position`. Heard by player and feel.
+signal heal_dealt(caster: int, target: Node, amount: int, position: Vector2)
 
 # --- Players ----------------------------------------------------------------
 

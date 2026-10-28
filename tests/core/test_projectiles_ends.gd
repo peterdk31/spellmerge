@@ -7,6 +7,7 @@ extends "res://tests/support/suite.gd"
 
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
+const ActorSeats := preload("res://tests/support/actor_seats.gd")
 
 const DT: float = 1.0 / 60.0
 const TAG: int = 300
@@ -23,6 +24,7 @@ var _hits: int = 0
 func before_each() -> void:
 	_bus = own(EventsScript.new()) as EventsScript
 	_mgr = own(ManagerScript.new()) as ManagerScript
+	_mgr.actors = own(ActorSeats.table()) as ActorSeats.ActorsScript
 	_mgr.events = _bus
 	_mgr.set_cap(16)
 	_ended.clear()
@@ -112,7 +114,7 @@ func test_remove_by_tag_is_quiet_and_exact() -> void:
 	_mgr.spawn(0, Vector2.ZERO, Vector2(10, 0), 5.0, 4.0, ManagerScript.LAYER_ENEMY, 0, TAG)
 	_mgr.spawn(1, Vector2.ZERO, Vector2(10, 0), 5.0, 4.0, ManagerScript.LAYER_ENEMY, 0, TAG)
 	_mgr.spawn(2, Vector2.ZERO, Vector2(10, 0), 5.0, 4.0, ManagerScript.LAYER_ENEMY, 0, TAG + 1)
-	check_equal(_mgr.remove_by_tag(TAG), 2, "both shots of the tag, of any player")
+	check_equal(_mgr.remove_by_tag(TAG), 2, "both shots of the tag, of any caster")
 	check_equal(_mgr.get_count(), 1, "the other tag stays")
 	check_equal(_mgr.get_count_for(0), 0, "the owner's count follows")
 	check(_ended.is_empty() and _seen_slots.is_empty(), "no end and no event")

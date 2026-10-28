@@ -16,6 +16,7 @@ extends "res://tests/support/screenshot.gd"
 ## `looks_sheet_4x`: the top rows at 4x. `looks_combined_4x`: the combined shots at 4x.
 
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
+const ActorSeats := preload("res://tests/support/actor_seats.gd")
 const ELEMENTS: Array[Resource] = [
 	preload("res://content/spells/elements/fire/fire.tres"),
 	preload("res://content/spells/elements/frost/frost.tres"),
@@ -30,12 +31,22 @@ const HOMING := preload("res://content/spells/modifiers/homing/homing.tres")
 const BOLT_RADIUS: float = 5.0
 
 var _shots: Node = null
+## An enemy actor: its shots take the enemy ramp.
+var _enemy: int = -1
 
 
 func take() -> void:
 	if not need(["Projectiles"]):
 		return
 	_shots = root.get_node("Projectiles")
+	# A shot's caster is an actor id (actors G3b): open the four wizards in the Actors table,
+	# seated 0-3 at the ids 0-3 (so the casters 0-3 below are the four players), and an enemy.
+	var actors: ActorSeats.ActorsScript = ActorSeats.autoload()
+	if actors == null:
+		fail("there is no Actors autoload")
+		return
+	ActorSeats.seat_wizards(actors)
+	_enemy = ActorSeats.enemy(actors)
 	lay_floor()
 	_shots.call("set_bounds", Rect2(Vector2.ZERO, SCREEN))
 	_shots.call("set_cap", 200)
@@ -77,10 +88,10 @@ func take() -> void:
 	# Four players, the same fire bolt, twice: in colour on the left, grey on the right.
 	for half in 2:
 		for p in 5:
-			var caster: int = p if p < 4 else ManagerScript.FIRST_ENEMY_CASTER
+			var caster: int = p if p < 4 else _enemy
 			_bolt(caster, Vector2(40.0 + half * 320.0 + p * 60.0, 230.0), BOLT_RADIUS, fire_tint, PackedInt32Array([fire_look]))
 			_bolt(caster, Vector2(40.0 + half * 320.0 + p * 60.0, 290.0), BOLT_RADIUS, ELEMENTS[4].get("tint") as Color, PackedInt32Array([int(ELEMENTS[4].get("look_layer"))]))
-		_bolt(ManagerScript.FIRST_ENEMY_CASTER, Vector2(40.0 + half * 320.0 + 4 * 60.0, 260.0), BOLT_RADIUS, Color.WHITE, PackedInt32Array())
+		_bolt(_enemy, Vector2(40.0 + half * 320.0 + 4 * 60.0, 260.0), BOLT_RADIUS, Color.WHITE, PackedInt32Array())
 	var grey := ColorRect.new()
 	grey.position = Vector2(320.0, 200.0)
 	grey.size = Vector2(320.0, 160.0)
@@ -101,9 +112,9 @@ func take() -> void:
 	save_crop(image, Vector2(460.0, 140.0), "looks_combined_4x", Vector2i(150, 40))
 
 
-## A bolt of `player` that barely moves (the sheet is a still), with a core and layers.
-func _bolt(player: int, at: Vector2, radius: float, tint: Color, look: PackedInt32Array) -> void:
-	var slot: int = _shots.call("spawn", player, at, Vector2(0.01, 0.0), 600.0, radius) as int
+## A bolt of `caster` that barely moves (the sheet is a still), with a core and layers.
+func _bolt(caster: int, at: Vector2, radius: float, tint: Color, look: PackedInt32Array) -> void:
+	var slot: int = _shots.call("spawn", caster, at, Vector2(0.01, 0.0), 600.0, radius) as int
 	_dress(slot, tint, look)
 
 

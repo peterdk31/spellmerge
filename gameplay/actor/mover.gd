@@ -21,7 +21,7 @@ extends ActorComponent
 ## nothing: its blast went off at the target): a teleport at once, the others the step after
 ## their last, once the body has walked it (the last step is shortened, so a move goes exactly
 ## its distance). A card's move is the actor's own when the card's tag names the actor's caster
-## number (`Actor.caster_number`); the event's player argument is not asked.
+## number (`Actor.caster_number`, its actor id), which is also the event's `caster`.
 ##
 ## Statuses (`Combat.pace`: chill slows, freeze stops) scale walking and dashing (the actor's
 ## own legs), not a hook, a swap or a recoil (the spell moves it). Combat's push on the actor
@@ -199,7 +199,7 @@ func _teleport(to: Vector2, tag: int) -> void:
 			goal = goal.move_toward(start, TELEPORT_BACKOFF)
 	actor.global_position = goal
 	if actor.events != null:
-		actor.events.caster_move_finished.emit(ProjectilesScript.event_player(_caster_number()), &"teleport", goal, tag)
+		actor.events.caster_move_finished.emit(_caster_number(), &"teleport", goal, tag)
 
 
 ## The move ended: say where, so its card can go off there (blast, a trigger). A swap sends
@@ -211,7 +211,7 @@ func _finish() -> void:
 	_mode = &""
 	_homing = null
 	if actor.events != null and mode != &"swap" and mode != &"":
-		actor.events.caster_move_finished.emit(ProjectilesScript.event_player(_caster_number()), mode, actor.global_position, _tag)
+		actor.events.caster_move_finished.emit(_caster_number(), mode, actor.global_position, _tag)
 
 
 ## The move and the pushes end unanswered (the actor went down).

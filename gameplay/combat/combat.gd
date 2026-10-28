@@ -5,11 +5,17 @@ extends Node
 ##     Combat.register_enemy(enemy, 20, 10.0, 1)         # health, hurt radius, contact damage
 ##     Combat.register_player(0, wizard, 8.0)            # a wizard that enemies can touch
 ##
-## A shot is hit by `core/projectiles`, which sends `projectile_hit(player, target,
+## A shot is hit by `core/projectiles`, which sends `projectile_hit(caster, target,
 ## position, tag)`. Combat looks `tag` up in Spells' hit profiles (`Spells.hit_profile`: damage, knockback
 ## and status) and runs the pipeline in hit(): ignore a bad hit, deal damage, push the
 ## enemy away from the hit, send `damage_dealt`, and on 0 health send `enemy_died`
-## (naming the player who landed the last hit) and free the enemy.
+## (naming the actor who landed the last hit) and free the enemy.
+##
+## Who hit (actors G3b, until G5 gives Combat one body model by actor id): every attacker Combat
+## hears and sends is an actor id (`core/actors`), passed through as it came, NO_PLAYER for none.
+## Wizards are still kept in four slots by seat (`register_player`); where a rule needs a seat
+## (a teammate's mend, "downed by player 2's", only a seat's spell discharges) it asks the actor
+## table (`_seat_of`), and a wizard's own actor id is `_wizard_actor`.
 ##
 ## Hurt boxes: an enemy is registered with a hurt radius and added to
 ## `core/projectiles` as a target on LAYER_ENEMY; a wizard's hurt box is its own
@@ -40,6 +46,7 @@ extends Node
 
 const EventsScript := preload("res://core/events/events.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
+const ActorsScript := preload("res://core/actors/actors.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 ## The element reactions, loaded by their literal path (the registry skips the table).
@@ -123,6 +130,8 @@ var registry: RegistryScript = null
 var spells: SpellsScript = null
 ## The reaction table. Tests may set another one; null means REACTIONS.
 var reactions: ReactionTable = null
+## The actor table (actors G3b). Null uses the projectile manager's, else the `Actors` autoload.
+var actors: ActorsScript = null
 
 # Scratch list for the targets of a burst or a spread (reused, so a reaction allocates nothing).
 var _near: Array[Node2D] = []
@@ -200,13 +209,13 @@ var _w_react_wait: PackedFloat32Array = PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
 var _w_shield: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
 var _w_shield_left: PackedFloat32Array = PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
 var _w_shield_tag: PackedInt32Array = PackedInt32Array([0, 0, 0, 0])
-# Who hurt each wizard last, for "downed by ...": the player (or NO_PLAYER), the hit kind and the spell's name.
+# Who hurt each wizard last, for "downed by ...": the actor (or NO_PLAYER), the hit kind and the spell's name.
 var _w_last_player: PackedInt32Array = PackedInt32Array([-1, -1, -1, -1])
 var _w_last_kind: Array[StringName] = [&"", &"", &"", &""]
 var _w_last_name: PackedStringArray = PackedStringArray(["", "", "", ""])
 
 ## The tag of the spell hit being dealt now (0 for none): `kill_landed`, `reaction_landed` and
-## `wizard_hurt` carry it. Set around a spell's hit, restored after, so hits inside hits are right.
+## `actor_hurt` carry it. Set around a spell's hit, restored after, so hits inside hits are right.
 var _tag: int = 0
 # Heavy hits armed on enemies: the slam damage waiting for a wall, and who dealt it.
 var _slam: PackedInt32Array = PackedInt32Array()
@@ -317,6 +326,10 @@ func unregister_enemy(enemy: Node2D) -> void:
 ## damage its touch does. Registering again resets its numbers.
 func register_actor(actor: Node2D, health: int, radius: float, contact_damage: int, offset: Vector2) -> void:
 	register_enemy(actor, health, radius, contact_damage, offset)
+	# Its hurt circle is owned by its actor id, so aim reads its team (actors G3a).
+	var id: Variant = actor.get("id")
+	if projectiles != null and id is int and (id as int) >= 0:
+		projectiles.set_target_owner(actor, id as int)
 
 
 ## Forget `actor` without killing it (no event).
@@ -353,7 +366,7 @@ func register_player(index: int, node: Node2D, radius: float, hit_offset: Vector
 	# Enemy shots (LAYER_PLAYER) find the wizard as a projectile target.
 	# A downed wizard is not a target, so shots fly past it to the standing ones.
 	if projectiles != null and not _is_downed(node):
-		projectiles.add_target(node, radius, ProjectileManagerScript.LAYER_PLAYER, index, hit_offset)
+		projectiles.add_target(node, radius, ProjectileManagerScript.LAYER_PLAYER, _wizard_actor(index), hit_offset)
 
 
 func unregister_player(index: int) -> void:
@@ -493,7 +506,7 @@ func speed_factor(enemy: Node2D) -> float:
 	return 1.0
 
 
-## The damage pipeline. `player` (or EventsScript.NO_PLAYER) dealt `amount` to
+## The damage pipeline. The actor `player` (or EventsScript.NO_PLAYER) dealt `amount` to
 ## `target`, pushing it along `direction` (unit length, or zero) at `strength`
 ## pixels per second. Returns true if the hit counted: it did damage, so
 ## `damage_dealt` was sent. A hit on an unknown node, a dead target, a dodging
@@ -652,7 +665,7 @@ func _hit_player(player: int, target: Node, amount: int, direction: Vector2, str
 		if _w_shield[index] == 0:
 			_w_shield_left[index] = 0.0
 		if events != null:
-			events.shield_blocked.emit(index, where, _w_shield_tag[index])
+			events.shield_blocked.emit(_wizard_actor(index), where, _w_shield_tag[index])
 		return false
 	var discharge_share: float = 0.0
 	# A status tick (a burn) is not a hit: no hex bonus, and it spends no shock or static.
@@ -677,19 +690,20 @@ func _hit_player(player: int, target: Node, amount: int, direction: Vector2, str
 		events.damage_dealt.emit(player, target, amount, where)
 		# A burn tick is not a hit: cards that fire on hurt are not set off by it.
 		if kind != KIND_STATUS:
-			events.wizard_hurt.emit(index, amount, where, _tag, kind)
+			events.actor_hurt.emit(_wizard_actor(index), amount, where, _tag, kind)
 	if discharge_share > 0.0:
 		# A charged wizard is a lightning rod: the charge leaves in one step to the enemies near.
 		_wizard_discharge(index, where, maxi(roundi(float(amount) * discharge_share / 100.0), 1))
 	return true
 
 
-## A charged wizard was hit: every enemy within STATIC_RANGE takes `amount`, credited to the wizard.
-## One step: the damage sets off nothing else (`_discharging`).
+## A charged wizard was hit: every enemy within STATIC_RANGE takes `amount`, credited to the
+## wizard's actor. One step: the damage sets off nothing else (`_discharging`).
 func _wizard_discharge(index: int, from: Vector2, amount: int) -> void:
 	if projectiles == null or _discharging:
 		return
 	_discharging = true
+	var actor: int = _wizard_actor(index)
 	var spell_tag: int = _tag
 	_tag = 0
 	var count: int = projectiles.targets_in(from, STATIC_RANGE, ProjectileManagerScript.LAYER_ENEMY, _near)
@@ -702,9 +716,9 @@ func _wizard_discharge(index: int, from: Vector2, amount: int) -> void:
 			var row: int = _enemies.find(near)
 			if row >= 0 and events != null:
 				var zapped: Vector2 = _position_of(near) + _hurt_offset[row]
-				events.reaction_triggered.emit(index, DISCHARGE, zapped)
-				events.discharge_arc.emit(index, from, zapped)
-			hit(index, near, amount, Vector2.ZERO, 0.0, KIND_REACTION)
+				events.reaction_triggered.emit(actor, DISCHARGE, zapped)
+				events.discharge_arc.emit(actor, from, zapped)
+			hit(actor, near, amount, Vector2.ZERO, 0.0, KIND_REACTION)
 	_tag = spell_tag
 	_discharging = false
 
@@ -752,7 +766,7 @@ func _on_player_revived(player: int, _reviver: int) -> void:
 	if projectiles != null and player >= 0 and player < PLAYER_SLOTS:
 		var wizard: Node2D = _players[player]
 		if wizard != null and is_instance_valid(wizard):
-			projectiles.add_target(wizard, _player_radius[player], ProjectileManagerScript.LAYER_PLAYER, player, _player_offset[player])
+			projectiles.add_target(wizard, _player_radius[player], ProjectileManagerScript.LAYER_PLAYER, _wizard_actor(player), _player_offset[player])
 
 
 ## A shot landed. Every shot is a spell's, a wizard's or an enemy's (staffs F9b: the old enemy
@@ -783,8 +797,8 @@ func _on_projectile_hit(player: int, target: Node, position: Vector2, tag: int) 
 ## mend hit, else damage, a push away from `position`, then each element's reaction or status, as
 ## on an enemy (staffs F6: wizards react, from the same table, to every spell: an enemy's, a
 ## teammate's, their own). The caster's own spell hurts them like any other (self-harm is always
-## on); `core/projectiles` decides which shots can reach a wizard at all (every shot but the
-## caster's own, which only once out of their hitbox).
+## on); `core/projectiles` decides which shots can reach a wizard at all (every spell's but the
+## caster's own while it is still in their hitbox).
 func _apply_to_wizard(player: int, index: int, position: Vector2, profile: HitProfile, damage: int, strength: float, kind: StringName) -> void:
 	if profile != null and profile.heal > 0:
 		_heal_player(player, index, profile.heal)
@@ -983,8 +997,8 @@ func _apply_to_enemy(player: int, enemy: Node2D, position: Vector2, profile: Hit
 		if _shock_left[at] > 0.0:
 			jump_share = _shock_share[at]
 			jump_from = _position_of(enemy) + _hurt_offset[at]
-		# Only a player's spell discharges: the hit must carry a player index.
-		if _static_left[at] > 0.0 and profile != null and player >= 0 and player < PLAYER_SLOTS:
+		# Only a seat's spell discharges (until G5's one rule: any hit does).
+		if _static_left[at] > 0.0 and profile != null and _seat_of(player) != ActorsScript.NONE:
 			discharge_share = _static_share[at]
 			discharge_from = _position_of(enemy) + _hurt_offset[at]
 	# The reaction is chosen from the statuses the target had when the shot arrived.
@@ -1289,10 +1303,11 @@ func _remove_enemy_at(at: int) -> void:
 
 
 ## Area hits (`area_hit_requested`, from blast and a payload's fallback): the spell's hit lands
-## on every enemy and every wizard in the circle, the caster included, whoever cast it (actors
-## G3c: no sides; an enemy's blast at its feet hurts it as a wizard's hurts the wizard), with kind
-## `burst`. A mend hit heals whoever stands in it, but an enemy's mend heals no wizard. Nested
-## area hits (on kill, on hit chains) are cut at AREA_DEPTH.
+## on every enemy and every wizard in the circle, the caster included, whoever cast it, with
+## kind `burst` (everything hurts everything, actors G3b: no friendly fire or enemy fire to ask).
+## A mend hit heals every wizard who stands in it, when a seat cast it; a mend of an actor no
+## seat drives (an enemy's) heals no wizard (until G5). Nested area hits (on kill, on hit chains)
+## are cut at AREA_DEPTH.
 func _on_area_hit_requested(player: int, position: Vector2, radius: float, tag: int) -> void:
 	var profile: HitProfile = spells.hit_profile(tag) if spells != null else null
 	if profile == null or _area_depth >= AREA_DEPTH:
@@ -1306,7 +1321,7 @@ func _on_area_hit_requested(player: int, position: Vector2, radius: float, tag: 
 	targets.clear()
 	var saved_tag: int = _tag
 	_tag = tag
-	var enemy_side: bool = SpellTag.is_enemy_tag(tag)
+	var seated: bool = _seat_of(player) != ActorsScript.NONE
 	if projectiles != null:
 		var count: int = projectiles.targets_in(position, radius, ProjectileManagerScript.LAYER_ENEMY, _near)
 		for i in count:
@@ -1323,7 +1338,7 @@ func _on_area_hit_requested(player: int, position: Vector2, radius: float, tag: 
 		var reach: float = radius + _player_radius[index]
 		if (_position_of(wizard) + _player_offset[index]).distance_squared_to(position) > reach * reach:
 			continue
-		if enemy_side and profile.heal > 0:
+		if not seated and profile.heal > 0:
 			continue
 		_apply_to_wizard(player, index, position, profile, profile.damage, profile.knockback, KIND_BURST)
 	_tag = saved_tag
@@ -1343,8 +1358,10 @@ func give_wizard_shield(index: int, charges: int, seconds: float, tag: int = 0) 
 	_w_shield_tag[index] = tag
 
 
-func _on_wizard_shield_requested(player: int, charges: int, seconds: float, tag: int) -> void:
-	give_wizard_shield(player, charges, seconds, tag)
+## The barrier goes to the wizard of the seat that drives the caster (until G5 gives every
+## actor shields, an actor no seat drives gets none).
+func _on_wizard_shield_requested(caster: int, charges: int, seconds: float, tag: int) -> void:
+	give_wizard_shield(_seat_of(caster), charges, seconds, tag)
 
 
 ## Hits the barrier on the wizard `index` still blocks; 0 when none.
@@ -1555,20 +1572,24 @@ func _clear_wizard(index: int) -> void:
 
 
 ## Why the wizard `index` went down, in plain words, for the screen: "downed by your own Blast"
-## when their own spell did it, "downed by player 2's Frost Nova" for a teammate's, and an empty
-## string for an enemy or when nothing is known. Read it when `player_downed` arrives.
+## when their own spell did it, "downed by player 2's Frost Nova" for a teammate's (the seat
+## that drives the actor who did it), and an empty string for an actor no seat drives or when
+## nothing is known. Read it when `player_downed` arrives.
 func downed_note(index: int) -> String:
 	if index < 0 or index >= PLAYER_SLOTS:
 		return ""
 	var who: int = _w_last_player[index]
-	if who < 0 or who >= PLAYER_SLOTS:
+	if who < 0:
 		return ""
 	var what: String = _w_last_name[index]
 	if what.is_empty():
 		what = KIND_NAMES.get(_w_last_kind[index], "spell") as String
-	if who == index:
+	if who == _wizard_actor(index):
 		return "downed by your own %s" % what
-	return "downed by player %d's %s" % [who + 1, what]
+	var seat: int = _seat_of(who)
+	if seat == ActorsScript.NONE:
+		return ""
+	return "downed by player %d's %s" % [seat + 1, what]
 
 
 ## The wizard registered as player `index`, or null.
@@ -1581,3 +1602,33 @@ func wizard_of(index: int) -> Node2D:
 
 func _position_of(node: Node2D) -> Vector2:
 	return node.global_position if node.is_inside_tree() else node.position
+
+
+## The actor table: `actors`, else the projectile manager's, else the `Actors` autoload.
+func _actor_table() -> ActorsScript:
+	if actors != null:
+		return actors if is_instance_valid(actors) else null
+	if projectiles != null and is_instance_valid(projectiles):
+		return projectiles.actor_table()
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	return tree.root.get_node_or_null(^"Actors") as ActorsScript if tree != null and tree.root != null else null
+
+
+## The seat (0-3) that drives the actor `actor`, or Actors.NONE (until G5).
+func _seat_of(actor: int) -> int:
+	var table: ActorsScript = _actor_table()
+	return table.seat_of(actor) if table != null else ActorsScript.NONE
+
+
+## The actor id of the wizard in slot `index` (until G5 keys wizards by actor): its own
+## `actor_id`, else the actor its seat drives, else Actors.NONE.
+func _wizard_actor(index: int) -> int:
+	if index < 0 or index >= PLAYER_SLOTS:
+		return ActorsScript.NONE
+	var wizard: Node2D = _players[index]
+	if wizard != null and is_instance_valid(wizard):
+		var id: Variant = wizard.get("actor_id")
+		if id is int and (id as int) >= 0:
+			return id as int
+	var table: ActorsScript = _actor_table()
+	return table.actor_of_seat(index) if table != null else ActorsScript.NONE

@@ -7,11 +7,11 @@ const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
 
 const DT: float = 1.0 / 60.0
-const NO_PLAYER_SHOT: int = -1
+const NO_ACTOR_SHOT: int = -1
 
 var bus: EventsScript
 var mgr: ManagerScript
-## Every impact as [player, target, position, direction], and every hit as the same order of events.
+## Every impact as [caster, target, position, direction], and every hit as the same order of events.
 var impacts: Array = []
 var order: Array[String] = []
 ## The manager's `impact_form` as each impact was sent.
@@ -26,11 +26,11 @@ func before_each() -> void:
 	impacts.clear()
 	order.clear()
 	forms.clear()
-	bus.projectile_impact.connect(func(player: int, target: Node, position: Vector2, direction: Vector2) -> void:
+	bus.projectile_impact.connect(func(caster: int, target: Node, position: Vector2, direction: Vector2) -> void:
 		forms.append(mgr.impact_form)
-		impacts.append([player, target, position, direction])
+		impacts.append([caster, target, position, direction])
 		order.append("impact"))
-	bus.projectile_hit.connect(func(_player: int, _target: Node, _position: Vector2, _tag: int) -> void: order.append("hit"))
+	bus.projectile_hit.connect(func(_caster: int, _target: Node, _position: Vector2, _tag: int) -> void: order.append("hit"))
 
 
 func test_a_shot_that_ends_on_a_wall_says_where_and_which_way() -> void:
@@ -41,7 +41,7 @@ func test_a_shot_that_ends_on_a_wall_says_where_and_which_way() -> void:
 	check_equal(impacts.size(), 1, "one impact for one shot")
 	if impacts.is_empty():
 		return
-	check_equal(impacts[0][0], 2, "the player who fired it")
+	check_equal(impacts[0][0], 2, "the actor who fired it")
 	check(impacts[0][1] == null, "a wall has no target")
 	check((impacts[0][2] as Vector2).x >= 88.0 and (impacts[0][2] as Vector2).x <= 100.0, "at the wall's face, not past it")
 	check((impacts[0][3] as Vector2).is_equal_approx(Vector2.RIGHT), "flying right")
@@ -68,14 +68,14 @@ func test_a_piercing_shot_is_reported_once_on_the_wall() -> void:
 	check_equal(impacts.size(), 1, "the shot ends once, so it is reported once")
 
 
-func test_an_enemy_shot_reports_no_player() -> void:
+func test_a_shot_of_no_actor_reports_no_actor() -> void:
 	mgr.set_walls([Rect2(96.0, 0.0, 32.0, 200.0)] as Array[Rect2])
 	mgr.spawn(EventsScript.NO_PLAYER, Vector2(50.0, 100.0), Vector2(120.0, 0.0), 5.0)
 	for _i in 60:
 		mgr.step(DT)
 	check_equal(impacts.size(), 1, "one impact")
 	if not impacts.is_empty():
-		check_equal(impacts[0][0], EventsScript.NO_PLAYER, "the enemy's shot has no player")
+		check_equal(impacts[0][0], EventsScript.NO_PLAYER, "a shot of no actor names none")
 
 
 func test_a_shot_born_in_a_wall_shows_no_impact() -> void:
@@ -109,7 +109,7 @@ func test_each_impact_names_the_form_of_its_own_shot() -> void:
 	target.global_position = Vector2(30.0, 300.0)
 	mgr.add_target(target, 10.0, ManagerScript.LAYER_ENEMY)
 	mgr.spawn(0, Vector2(50.0, 100.0), Vector2(120.0, 0.0), 5.0)
-	mgr.spawn(NO_PLAYER_SHOT, Vector2(50.0, 120.0), Vector2(120.0, 0.0), 5.0)
+	mgr.spawn(NO_ACTOR_SHOT, Vector2(50.0, 120.0), Vector2(120.0, 0.0), 5.0)
 	mgr.spawn(1, Vector2(30.0, 300.0), Vector2.ZERO, 5.0, 4.0, ManagerScript.LAYER_ENEMY, 0, 0, ManagerScript.MOTION_STILL)
 	mgr.ray(2, Vector2(50.0, 140.0), Vector2.RIGHT, 300.0)
 	for _i in 60:

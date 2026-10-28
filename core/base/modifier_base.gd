@@ -47,7 +47,7 @@ enum Behaviour {
 	## Grows `behaviour_strength` times bigger per second of flight, up to `GROWTH_MAX` (B1): a
 	## wider hit circle, the same damage (owner, 2026-10-27: size is the card; damage is overcharge's).
 	GROWTH,
-	## Takes on a teammate's infusions when it passes through them (B1, B2).
+	## Takes on the infusions of the last cast of any actor its shot hits (B2; owner, 2026-10-28).
 	RELAY,
 	## Flies out for half its life, then back to its caster (owner, 2026-10-27: a modifier, not
 	## a boomerang carrier). Only on a carrier that flies (`StaffCompiler.behaviour_runs`).

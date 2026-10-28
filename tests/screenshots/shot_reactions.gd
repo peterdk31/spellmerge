@@ -39,20 +39,25 @@ func take() -> void:
 	flow.call("start_run", 0)
 	await settle()
 	var centre: Vector2 = (flow.call("get_wizard", 0) as Node2D).global_position + Vector2(0.0, -60.0)
-	events.call("emit_signal", "reaction_triggered", 0, NAMES[0], centre)
+	# A reaction names its caster by actor id: the actor each wizard opened (actors G3b).
+	var casters: Array[int] = []
+	for index in 4:
+		var wizard: Node = flow.call("get_wizard", index) as Node
+		casters.append(int(wizard.get("actor_id")) if wizard != null else -1)
+	events.call("emit_signal", "reaction_triggered", casters[0], NAMES[0], centre)
 	await _snap(centre, "reaction_one")
 	await settle()
 	for player in 4:
 		var at: Vector2 = centre + Vector2(float(player - 2) * 40.0 + 20.0, float(player % 2) * 14.0)
-		events.call("emit_signal", "reaction_triggered", player, NAMES[player], at)
+		events.call("emit_signal", "reaction_triggered", casters[player], NAMES[player], at)
 	await _snap(centre, "reaction_four_players")
 	await create_timer(1.2).timeout
-	await _six(events, root.get_canvas_transform().affine_inverse() * (root.get_visible_rect().size * 0.5))
+	await _six(events, root.get_canvas_transform().affine_inverse() * (root.get_visible_rect().size * 0.5), casters[0])
 
 
 ## Make each of the six reactions with two real hits in the combo arena, then show them in the
-## live game, all in a row, saved at 4x and at 1x.
-func _six(events: Node, centre: Vector2) -> void:
+## live game (as `caster`'s), all in a row, saved at 4x and at 1x.
+func _six(events: Node, centre: Vector2, caster: int) -> void:
 	var seen: Array[StringName] = []
 	for row: Dictionary in SIX:
 		var arena: RefCounted = ArenaScript.new(root)
@@ -73,7 +78,7 @@ func _six(events: Node, centre: Vector2) -> void:
 	for group in 2:
 		for i in 3:
 			var at: Vector2 = centre + Vector2((float(i) - 1.0) * SIX_GAP, 0.0)
-			events.call("emit_signal", "reaction_triggered", 0, seen[group * 3 + i], at)
+			events.call("emit_signal", "reaction_triggered", caster, seen[group * 3 + i], at)
 		await _snap(centre, "reactions_%s_4x" % GROUPS[group], 4)
 		await _snap(centre, "reactions_%s_1x" % GROUPS[group], 1)
 		# Let the names of this group fade (three times a reaction's seconds) before the next.

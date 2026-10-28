@@ -1,12 +1,14 @@
 extends "res://tests/support/suite.gd"
-## The look of a shot (staffs B6a): a player's shot is drawn as a body kind (bolt, rune, orbit)
-## with its player, its look layers and its core colour in the instance data that
+## The look of a shot (staffs B6a): a wizard's shot is drawn as a body kind (bolt, rune, orbit)
+## with its ramp (actors G3a: its caster's `Actors.ramp_of`), its look layers and its core colour in the instance data that
 ## `shot_core.gdshader` reads, at a size that follows its hit radius in whole pixels; cards
 ## give the layers (`look_layer`), the compiler combines every infusion's and modifier's look
 ## into one set, and the runtime hands it to the manager. Stepped and drawn by hand.
 
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
+const ActorSeats := preload("res://tests/support/actor_seats.gd")
+const ActorsScript := preload("res://core/actors/actors.gd")
 const ELEMENTS: Array[String] = [
 	"res://content/spells/elements/fire/fire.tres",
 	"res://content/spells/elements/frost/frost.tres",
@@ -27,6 +29,8 @@ var mgr: ManagerScript
 
 func before_each() -> void:
 	mgr = own(ManagerScript.new()) as ManagerScript
+	# Wizards at ids 0-3, seated (and drawn in hat ramps) 0-3.
+	mgr.actors = own(ActorSeats.table()) as ActorsScript
 	mgr.events = own(EventsScript.new()) as EventsScript
 	mgr.set_bounds(Rect2(0.0, 0.0, 640.0, 360.0))
 	mgr.set_cap(600)
@@ -39,7 +43,7 @@ func kind_at(node: MultiMeshInstance2D, i: int) -> int:
 	return roundi((1.0 - buffer[i * ManagerScript.DRAW_STRIDE + 15]) * ManagerScript.KIND_STEPS)
 
 
-## The instance colour of instance `i`, decoded as the shader does: [player, zoom, look].
+## The instance colour of instance `i`, decoded as the shader does: [ramp, zoom, look].
 func look_at(node: MultiMeshInstance2D, i: int) -> Array[int]:
 	var buffer: PackedFloat32Array = node.multimesh.buffer
 	var at: int = i * ManagerScript.DRAW_STRIDE + 8
@@ -89,7 +93,7 @@ func test_a_reused_slot_starts_plain() -> void:
 	check_equal(mgr.get_look_of(again), 0, "a new shot has no layers, not the last one's")
 
 
-func test_player_shots_carry_their_body_player_look_and_core() -> void:
+func test_wizard_shots_carry_their_body_ramp_look_and_core() -> void:
 	var looks: Array[int] = []
 	for player in 4:
 		var slot: int = mgr.spawn(player, Vector2(50.0, 40.0 + player * 40.0), Vector2(100.0, 0.0), 1.0)
@@ -102,14 +106,14 @@ func test_player_shots_carry_their_body_player_look_and_core() -> void:
 		check_equal(kind_at(mgr._draw_node, i), ManagerScript.KIND_BOLT, "a straight shot is drawn as a bolt")
 		var decoded: Array[int] = look_at(mgr._draw_node, i)
 		var want: int = ManagerScript.pack_look(PackedInt32Array([decoded[0] + 1, 7, 8, 11, 9 + decoded[0]]))
-		check_equal(decoded[2], want, "player %d's five layers decode as the shader reads them" % (decoded[0] + 1))
+		check_equal(decoded[2], want, "ramp %d's five layers decode as the shader reads them" % (decoded[0] + 1))
 		check_equal(decoded[1], 1, "a bolt has zoom 1")
 		seen.append(decoded[0])
 		var buffer: PackedFloat32Array = mgr._draw_node.multimesh.buffer
 		var core: Color = Color(buffer[i * ManagerScript.DRAW_STRIDE + 12], buffer[i * ManagerScript.DRAW_STRIDE + 13], buffer[i * ManagerScript.DRAW_STRIDE + 14])
 		check(core.is_equal_approx(Color(0.25, 0.5, 0.75)), "the core colour is in the custom data")
 	seen.sort()
-	check_equal(seen, [0, 1, 2, 3] as Array[int], "each shot names its own player")
+	check_equal(seen, [0, 1, 2, 3] as Array[int], "each shot names its wizard's ramp")
 
 
 func test_runes_and_orbit_shots_are_drawn_as_their_form() -> void:
@@ -119,43 +123,46 @@ func test_runes_and_orbit_shots_are_drawn_as_their_form() -> void:
 	mgr.spawn_orbit(2, 20.0, 0.0, 1.0, 1.0)
 	mgr.update_draw(1.0)
 	check_equal(kind_at(mgr._rune_node, 0), ManagerScript.KIND_RUNE, "a rune is drawn as a rune")
-	check_equal(look_at(mgr._rune_node, 0), [1, 4, ManagerScript.pack_look(PackedInt32Array([2]))] as Array[int], "with its player, its zoom (radius 14) and its layers")
+	check_equal(look_at(mgr._rune_node, 0), [1, 4, ManagerScript.pack_look(PackedInt32Array([2]))] as Array[int], "with its ramp, its zoom (radius 14) and its layers")
 	check_equal(kind_at(mgr._orbit_node, 0), ManagerScript.KIND_BOLT, "an orbit shot is drawn as a shot in flight, its trail round its circle")
 	check_equal(roundi(mgr._orbit_node.multimesh.buffer[5]), ManagerScript.TRAIL_HEAD | ManagerScript.TRAIL_ORBIT, "flagged an orbit shot")
-	check_equal(look_at(mgr._orbit_node, 0)[0], 2, "of its player")
+	check_equal(look_at(mgr._orbit_node, 0)[0], 2, "in its caster's ramp")
 
 
-func test_a_no_player_shot_is_drawn_as_an_enemys_bolt() -> void:
+func test_a_shot_of_no_actor_is_drawn_as_an_enemys_bolt() -> void:
 	mgr.spawn(-1, Vector2(80.0, 50.0), Vector2(60.0, 0.0), 1.0, 4.0, ManagerScript.LAYER_PLAYER)
 	mgr.update_draw(1.0)
-	check_equal(kind_at(mgr._enemy_node, 0), ManagerScript.KIND_BOLT, "a NO_PLAYER shot is drawn by the shader as a bolt (staffs F9b: no sprite)")
+	check_equal(kind_at(mgr._enemy_node, 0), ManagerScript.KIND_BOLT, "a shot of no actor is drawn by the shader as a bolt (staffs F9b: no sprite)")
 
 
-func test_the_instance_colour_keeps_every_players_bytes() -> void:
-	for player in 4:
+func test_the_instance_colour_keeps_every_hat_ramps_bytes() -> void:
+	for ramp in 4:
 		for zoom in [1, 4, 15, 63]:
 			var look: int = ManagerScript.pack_look(PackedInt32Array([1, 5, 12])) | (1 << 23)
-			var data: Color = ManagerScript.look_color(player, zoom, look)
-			check_equal(roundi(data.r * 255.0), player + zoom * 4, "player %d at zoom %d: red is player + zoom x 4" % [player, zoom])
+			var data: Color = ManagerScript.look_color(ramp, zoom, look)
+			check_equal(roundi(data.r * 255.0), ramp + zoom * 4, "ramp %d at zoom %d: red is ramp + zoom x 4" % [ramp, zoom])
 			check_equal(roundi(data.g * 255.0) | (roundi(data.b * 255.0) << 8) | (roundi(data.a * 255.0) << 16), look, "and the look's bytes, Feel's EXACT included, are as they were")
 
 
 func test_an_enemy_is_drawn_in_the_enemy_ramp() -> void:
 	var look: int = ManagerScript.pack_look(PackedInt32Array([1, 9]))
-	var data: Color = ManagerScript.look_color(EventsScript.NO_PLAYER, 2, look)
-	check_equal(roundi(data.r * 255.0), 2 * 4, "an enemy takes player 0's place in red")
+	var data: Color = ManagerScript.look_color(ActorsScript.RAMP_ENEMY, 2, look)
+	check_equal(roundi(data.r * 255.0), 2 * 4, "the enemy ramp takes ramp 0's place in red")
+	check_equal(ManagerScript.look_color(ActorsScript.NONE, 2, look), data, "no ramp draws as the enemy ramp")
 	var bits: int = roundi(data.g * 255.0) | (roundi(data.b * 255.0) << 8) | (roundi(data.a * 255.0) << 16)
 	check_equal(bits, look | ManagerScript.LOOK_ENEMY_RAMP, "with the enemy ramp's flag beside its kinds")
-	check_equal(ManagerScript.ramp_look(1, look | ManagerScript.LOOK_ENEMY_RAMP), look, "a player's shot never carries the flag")
+	check_equal(ManagerScript.ramp_look(1, look | ManagerScript.LOOK_ENEMY_RAMP), look, "a hat ramp never carries the flag")
 	check(1 << (ManagerScript.LOOK_COUNT - 2) < ManagerScript.LOOK_ENEMY_RAMP, "no particle kind reaches the flag")
 	check_equal(ManagerScript.LOOK_ENEMY_RAMP, 1 << 22, "the flag is kind 23, below Feel's EXACT (kind 24)")
 	var shader: Shader = load("res://core/projectiles/shot_core.gdshader")
 	check(shader.code.contains("const float ENEMY_RAMP = 23.0;"), "the shader reads the same flag")
-	check(shader.code.contains("const float ENEMY_PLAYER = 4.0;"), "as a fifth ramp after the players'")
+	check(shader.code.contains("const float ENEMY_PLAYER = 4.0;"), "as a fifth ramp after the hats'")
 	check(shader.code.contains("vec3(0.651, 0.541, 0.165))"), "whose base is Blight ochre (#a68a2a), last in P_BASE")
 	check(shader.code.contains("beam_player < 0 ? ENEMY_PLAYER"), "and an enemy's beam uses it too")
-	check(ManagerScript.ENEMY_COLOR.is_equal_approx(Color("#a68a2a")), "the enemy colour is Blight ochre")
-	check(mgr.tint_of(EventsScript.NO_PLAYER).is_equal_approx(Color.WHITE.lerp(Color("#a68a2a"), ManagerScript.TINT_STRENGTH)), "and so is an enemy's tint")
+	check(ManagerScript.ramp_color(ActorsScript.RAMP_ENEMY).is_equal_approx(Color("#a68a2a")), "the enemy ramp's colour is Blight ochre")
+	var enemy: int = ActorSeats.enemy(mgr.actors)
+	check(mgr.tint_of(enemy).is_equal_approx(Color.WHITE.lerp(Color("#a68a2a"), ManagerScript.TINT_STRENGTH)), "and so is an enemy's tint")
+	check(mgr.tint_of(EventsScript.NO_PLAYER).is_equal_approx(mgr.tint_of(enemy)), "and a shot's of no actor")
 
 
 func test_shots_are_drawn_about_their_hit_size_in_whole_pixels() -> void:
@@ -288,10 +295,11 @@ func test_a_caster_trail_follows_where_the_caster_goes() -> void:
 		mgr.step(1.0 / 60.0)
 	check_equal(mgr.get_trail_count(), 0, "after its time and its cooling, the row is given back")
 	check_equal(mgr.follow_caster(3, Color.WHITE, 0, 0.2), -1, "a caster with no anchor has nothing to follow")
-	mgr.set_anchor(ManagerScript.FIRST_ENEMY_CASTER, Vector2(50.0, 50.0))
-	mgr.follow_caster(ManagerScript.FIRST_ENEMY_CASTER, Color.WHITE, 0, 0.2)
+	var enemy: int = ActorSeats.enemy(mgr.actors)
+	mgr.set_anchor(enemy, Vector2(50.0, 50.0))
+	mgr.follow_caster(enemy, Color.WHITE, 0, 0.2)
 	mgr.update_draw(1.0)
-	check_equal(mgr.drawn_trails, 1, "an enemy caster's dash is drawn")
+	check_equal(mgr.drawn_trails, 1, "an enemy actor's dash is drawn")
 	check((look_at(mgr._enemy_node, 0)[2] & ManagerScript.LOOK_ENEMY_RAMP) != 0, "in the enemies' batch, in the enemy ramp")
 
 
@@ -348,7 +356,7 @@ func test_a_new_rune_traces_itself_onto_the_floor() -> void:
 var _seen_impacts: Array = []
 
 
-func _on_impact(_player: int, _target: Node, _position: Vector2, _direction: Vector2) -> void:
+func _on_impact(_caster: int, _target: Node, _position: Vector2, _direction: Vector2) -> void:
 	_seen_impacts.append([mgr.impact_form, mgr.impact_core, mgr.impact_look])
 
 
@@ -418,7 +426,7 @@ func test_the_compiler_combines_every_card_with_a_look() -> void:
 	check_equal(StaffCompiler._look_of([] as Array[ElementBase], [SPLIT] as Array[ModifierBase]), 0, "no card with a look, no layers")
 
 
-## Spawn `count` bolts for `player`, each with the look of `kinds`.
+## Spawn `count` bolts for the actor `player`, each with the look of `kinds`.
 func _volley(count: int, player: int, kinds: PackedInt32Array) -> void:
 	var look: int = ManagerScript.pack_look(kinds)
 	for i in count:

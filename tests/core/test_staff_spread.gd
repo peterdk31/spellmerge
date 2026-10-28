@@ -9,6 +9,7 @@ extends "res://tests/support/suite.gd"
 const SpellsScript := preload("res://core/spells/spells.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
+const ActorSeats := preload("res://tests/support/actor_seats.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 
 const AIM := Vector2.RIGHT
@@ -28,6 +29,8 @@ func _build_runtime() -> void:
 	var bus: EventsScript = own(EventsScript.new()) as EventsScript
 	_mgr = own(ManagerScript.new()) as ManagerScript
 	_mgr.events = bus
+	# Four wizards seated 0-3 at actor ids 0-3, as the tests name their casters.
+	_mgr.actors = own(ActorSeats.table()) as ActorSeats.ActorsScript
 	_spells = own(SpellsScript.new()) as SpellsScript
 	_spells.registry = _registry
 	_spells.bind(_mgr, bus)
@@ -50,7 +53,7 @@ func _cast_angles(cards: Array[StringName], spread: float, player: int = 0) -> A
 	_spells.cast_staff(player, 0, Vector2.ZERO, AIM, 100.0)
 	var angles: Array[float] = []
 	for slot in _mgr.get_cap():
-		if _mgr.is_alive(slot) and SpellTag.player_of(_mgr.get_tag_of(slot)) == player:
+		if _mgr.is_alive(slot) and SpellTag.caster_of(_mgr.get_tag_of(slot)) == player:
 			angles.append(rad_to_deg(AIM.angle_to(_mgr.get_velocity_of(slot))))
 	return angles
 
@@ -122,7 +125,7 @@ func test_four_players_spread_on_their_own_staffs() -> void:
 		if not _mgr.is_alive(slot):
 			continue
 		total += 1
-		if SpellTag.player_of(_mgr.get_tag_of(slot)) == 0:
+		if SpellTag.caster_of(_mgr.get_tag_of(slot)) == 0:
 			check(absf(AIM.angle_to(_mgr.get_velocity_of(slot))) < 0.001, "player 0's bolts aim true")
 			true_aim += 1
 	check_equal(total, 8, "two bolts each")

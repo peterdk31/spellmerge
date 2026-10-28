@@ -9,7 +9,9 @@ extends "res://tests/support/suite.gd"
 ## and the white rim when a staff is ready again.
 ##
 ## The HUD runs on its own bus with the real `Spells` (a projectile manager and made-up carriers
-## from `tests/support/fake_cards.gd`), stepped by hand.
+## from `tests/support/fake_cards.gd`), stepped by hand. Spells keeps staffs by caster (actors
+## G3b): the four wizards sit at actor ids apart from their seats, so the HUD has to ask which
+## actor a seat drives.
 ##
 ## godot --headless --path . --script res://tests/hud/test_staff_strip.gd
 
@@ -21,11 +23,14 @@ const HudScript := preload("res://hud/panels/panels.gd")
 const PanelScript := preload("res://hud/panels/player_panel/player_panel.gd")
 const RowScript := preload("res://hud/panels/player_panel/staff_row.gd")
 const FakeCards := preload("res://tests/support/fake_cards.gd")
+const ActorSeats := preload("res://tests/support/actor_seats.gd")
 ## Loaded, not preloaded: the scene is also the "Hud" autoload (tests/README.md).
 const HUD_SCENE_PATH: String = "res://hud/panels/panels.tscn"
 
 const DT: float = 1.0 / 60.0
 const CARDS: int = 20
+## Unseated actors opened before the wizards: seat s is driving the actor id s + FIRST_WIZARD.
+const FIRST_WIZARD: int = 3
 
 var _bus: EventsScript
 var _spells: SpellsScript
@@ -39,6 +44,7 @@ func before_each() -> void:
 	_mgr = own(ManagerScript.new()) as ManagerScript
 	_mgr.events = _bus
 	_mgr.set_cap(512)
+	_mgr.actors = own(ActorSeats.table(4, FIRST_WIZARD)) as ActorSeats.ActorsScript
 	_spells = own(SpellsScript.new()) as SpellsScript
 	# Every made-up card a carrier, so each card is a cast of its own.
 	_spells.registry = own(FakeCards.registry(CARDS, &"form"))
@@ -58,12 +64,17 @@ func before_each() -> void:
 	_bus.room_entered.emit(&"arena_01")
 
 
+## The actor id `player`'s seat drives: what Spells keeps its staffs by.
+func _caster(player: int) -> int:
+	return _mgr.actors.actor_of_seat(player)
+
+
 ## Build `count` made-up carriers into `player`'s staff `staff` and announce it as the player does.
 func _build(player: int, staff: int, count: int) -> void:
 	var row: Array[StringName] = []
 	for at in CARDS:
 		row.append(FakeCards.id(at) if at < count else &"")
-	_spells.install_staff(player, staff, _spells.compile_staff(row, _staff))
+	_spells.install_staff(_caster(player), staff, _spells.compile_staff(row, _staff))
 	_bus.staff_changed.emit(player, staff, _spells.staff_view(row, _staff))
 
 
@@ -75,13 +86,13 @@ func _tick(steps: int) -> void:
 
 
 func _cast(player: int, staff: int) -> void:
-	check(_spells.cast_staff(player, staff, Vector2.ZERO, Vector2.RIGHT, 1000.0) >= 0.0, "staff %d of player %d cast" % [staff, player])
+	check(_spells.cast_staff(_caster(player), staff, Vector2.ZERO, Vector2.RIGHT, 1000.0) >= 0.0, "staff %d of player %d cast" % [staff, player])
 	_hud.step_staffs()
 
 
 func _wait_ready(player: int, staff: int) -> void:
 	var guard: int = 0
-	while _spells.cooldown_left(player, staff) > 0.0 and guard < 600:
+	while _spells.cooldown_left(_caster(player), staff) > 0.0 and guard < 600:
 		_tick(1)
 		guard += 1
 
@@ -159,7 +170,7 @@ func test_the_delay_empties() -> void:
 	_cast(0, 0)
 	check(is_equal_approx(row.cooldown_fill(), 1.0), "full right after a cast, got %s" % row.cooldown_fill())
 	check(not row.is_recharging(), "a cast before the last is a plain delay")
-	var total: float = _spells.cooldown_left(0, 0)
+	var total: float = _spells.cooldown_left(_caster(0), 0)
 	_tick(roundi(total * 0.5 / DT))
 	check(row.cooldown_fill() > 0.3 and row.cooldown_fill() < 0.7, "about half way, got %s" % row.cooldown_fill())
 	_wait_ready(0, 0)

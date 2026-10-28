@@ -269,7 +269,7 @@ func test_other_casters_moves_are_ignored() -> void:
 		bodies.append(_mover(seat))
 	var imp: Actor = _world.actor(START, [&"mover", &"caster"], Fixture.Scripted.new())
 	bodies.append(imp)
-	check(imp.caster_number() >= 4, "the imp has an enemy row: %d" % imp.caster_number())
+	check_equal(imp.caster_number(), imp.id, "the imp casts under its own actor id")
 	for mover in bodies.size():
 		for other in bodies:
 			other.global_position = START

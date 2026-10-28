@@ -167,12 +167,15 @@ func _test_cooldowns_reset_on_a_new_run() -> void:
 	_play()
 	var wizard := _flow.get_wizard(1) as PlayerScript
 	var at := Vector2(100.0, 100.0)
-	_check(_spells.cast_staff(1, 1, at, Vector2.RIGHT, 100.0) != SpellsScript.REFUSED, "staff X fires for player 2")
-	_check(_spells.cast_staff(1, 1, at, Vector2.RIGHT, 100.0) == SpellsScript.REFUSED, "staff X waits out its delay for player 2")
-	_check(_spells.cast_staff(1, 0, at, Vector2.RIGHT, 100.0) != SpellsScript.REFUSED, "staff A has its own delay")
+	# Spells keeps staffs by caster: the actor id the wizard of player 2 opened (actors G3b).
+	var caster: int = wizard.actor_id
+	_check(_spells.cast_staff(caster, 1, at, Vector2.RIGHT, 100.0) != SpellsScript.REFUSED, "staff X fires for player 2")
+	_check(_spells.cast_staff(caster, 1, at, Vector2.RIGHT, 100.0) == SpellsScript.REFUSED, "staff X waits out its delay for player 2")
+	_check(_spells.cast_staff(caster, 0, at, Vector2.RIGHT, 100.0) != SpellsScript.REFUSED, "staff A has its own delay")
 	_flow.stop_run()
 	_play()
-	_check(_spells.cast_staff(1, 1, at, Vector2.RIGHT, 100.0) != SpellsScript.REFUSED, "a new run forgot the delays")
+	caster = (_flow.get_wizard(1) as PlayerScript).actor_id
+	_check(_spells.cast_staff(caster, 1, at, Vector2.RIGHT, 100.0) != SpellsScript.REFUSED, "a new run forgot the delays")
 	_check(wizard != null, "the wizard of player 2 existed")
 	_stop()
 
@@ -490,9 +493,11 @@ func _test_walls_reach_the_projectile_manager() -> void:
 	_play()
 	var projectiles: Node = root.get_node("Projectiles")
 	_check_arena_walls(projectiles, "after start_run")
+	# Shots are cast by actor id: each wizard's own (actors G3b).
+	var casters: Array[int] = [(_flow.get_wizard(0) as PlayerScript).actor_id, (_flow.get_wizard(1) as PlayerScript).actor_id]
 	for index in 2:
-		projectiles.call("spawn", index, Vector2(100.0 + 20.0 * index, 100.0), Vector2(0.0, -300.0), 5.0, 2.0, 0)
-	_check(projectiles.call("get_count_for", 0) == 1 and projectiles.call("get_count_for", 1) == 1, "each player has a shot in the air")
+		projectiles.call("spawn", casters[index], Vector2(100.0 + 20.0 * index, 100.0), Vector2(0.0, -300.0), 5.0, 2.0, 0)
+	_check(projectiles.call("get_count_for", casters[0]) == 1 and projectiles.call("get_count_for", casters[1]) == 1, "each player has a shot in the air")
 	projectiles.call("step", 0.25)
 	_check(projectiles.call("get_count") == 0, "both players' shots ended on the border, %d left" % projectiles.call("get_count"))
 	# A restart builds a new world and must give the walls again.

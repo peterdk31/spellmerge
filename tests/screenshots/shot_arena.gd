@@ -102,7 +102,8 @@ func take() -> void:
 		fail("there is no imp to kill in juice_death_animation")
 		return
 	var imp_at: Transform2D = imp.get_global_transform_with_canvas()
-	combat.call("hit", 0, imp, 9999)
+	# Hits name their caster by actor id: the actor wizard 1 opened (actors G3b).
+	combat.call("hit", int(wizard1.get("actor_id")), imp, 9999)
 	await settle(6)
 	save_crop(await grab(), imp_at.origin, "juice_death_animation")
 	await settle()
@@ -173,7 +174,7 @@ func _enemy_readability(flow: Node, combat: Node, wizard: Node2D) -> bool:
 	if not winding.call("is_telegraphing"):
 		fail("the imp is not winding up in enemy_windup")
 		return false
-	combat.call("hit", 0, hurt, 1)
+	combat.call("hit", int(wizard.get("actor_id")), hurt, 1)
 	hurt.call("step", 0.0)
 	if not hurt.call("is_hurt"):
 		fail("the imp is not hurt in enemy_hurt")
@@ -186,7 +187,7 @@ func _enemy_readability(flow: Node, combat: Node, wizard: Node2D) -> bool:
 	for offset: Vector2 in [Vector2(120.0, 0.0), Vector2(-120.0, 0.0), Vector2(0.0, -70.0), Vector2(0.0, 70.0), Vector2(100.0, 60.0)]:
 		var spot: Vector2 = wizard.global_position + offset
 		var enemy_slot: int = int(shots.call("spawn", -1, spot + Vector2(0.0, 14.0), Vector2(1.0, 0.0), 5.0, 3.5, 2))
-		var player_slot: int = int(shots.call("spawn", 0, spot + Vector2(0.0, -14.0), Vector2(1.0, 0.0), 5.0, 4.0))
+		var player_slot: int = int(shots.call("spawn", int(wizard.get("actor_id")), spot + Vector2(0.0, -14.0), Vector2(1.0, 0.0), 5.0, 4.0))
 		if enemy_slot >= 0 and player_slot >= 0:
 			beside = offset
 			break

@@ -5,6 +5,8 @@ extends "res://tests/support/screenshot.gd"
 ## where an enemy's shot ends, which is the same ember mark in every column. Each column is its
 ## own take (a flash lasts a tenth of a second), put together into one sheet.
 
+const ActorSeats := preload("res://tests/support/actor_seats.gd")
+
 const COLUMN := 128
 const FORMS: Array[StringName] = [&"bolt", &"beam", &"nova", &"rune", &"orbit"]
 const ROWS_Y: Array[float] = [70.0, 170.0, 270.0]
@@ -19,6 +21,14 @@ func take() -> void:
 	root.get_node("Feel").set("drive_engine", false)
 	var events: Node = root.get_node("Events")
 	var projectiles: Node = root.get_node("Projectiles")
+	# Feel reads a caster's ramp from the Actors table (actors G3b): open player 1's wizard (seat 0)
+	# and an enemy, and cast as them.
+	var actors: ActorSeats.ActorsScript = ActorSeats.autoload()
+	if actors == null:
+		fail("there is no Actors autoload")
+		return
+	var wizard: int = ActorSeats.seat_wizards(actors, 1)[0]
+	var enemy: int = ActorSeats.enemy(actors)
 	lay_floor()
 	await settle()
 	var sheet: Image = null
@@ -27,14 +37,14 @@ func take() -> void:
 		var x: float = COLUMN * i + COLUMN * 0.5
 		events.call("emit_signal", "spell_cast", 0, form, Vector2(x - 20.0, ROWS_Y[0]), Vector2.RIGHT)
 		if form == &"beam":
-			events.call("emit_signal", "form_shown", 0, &"beam", Vector2(x - 20.0, ROWS_Y[0]), Vector2.RIGHT, 56.0, Color("e0592f"), 0)
+			events.call("emit_signal", "form_shown", wizard, &"beam", Vector2(x - 20.0, ROWS_Y[0]), Vector2.RIGHT, 56.0, Color("e0592f"), 0)
 		elif form == &"nova":
-			events.call("emit_signal", "form_shown", 0, &"nova", Vector2(x, ROWS_Y[0]), Vector2.RIGHT, 0.0, Color("e0592f"), 0)
+			events.call("emit_signal", "form_shown", wizard, &"nova", Vector2(x, ROWS_Y[0]), Vector2.RIGHT, 0.0, Color("e0592f"), 0)
 		# The manager names the form of the shot while it sends the impact.
 		projectiles.set("impact_form", form)
-		events.call("emit_signal", "projectile_impact", 0, null, Vector2(x, ROWS_Y[1]), Vector2.RIGHT)
+		events.call("emit_signal", "projectile_impact", wizard, null, Vector2(x, ROWS_Y[1]), Vector2.RIGHT)
 		projectiles.set("impact_form", &"")
-		events.call("emit_signal", "projectile_impact", -1, null, Vector2(x, ROWS_Y[2]), Vector2.RIGHT)
+		events.call("emit_signal", "projectile_impact", enemy, null, Vector2(x, ROWS_Y[2]), Vector2.RIGHT)
 		await process_frame
 		var image: Image = await grab()
 		if sheet == null:

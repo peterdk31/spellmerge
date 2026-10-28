@@ -3,6 +3,8 @@ extends "res://tests/support/suite.gd"
 ## `content/spells/reactions.tres` and the four effect kinds, both ways round for each pair,
 ## with several players at once. Hits arrive as `projectile_hit` with the tag of a real
 ## compiled spell built from the real element resources; time moves by `Combat.step`.
+## The players are actors 0-3 of the test's actor table, seated 0-3 (actors G3b: hits name actor
+## ids, and only a seated caster's hit discharges static).
 ##
 ## godot --headless --path . --script res://tests/gameplay/combat/test_combat_reactions.gd
 
@@ -11,6 +13,7 @@ const CombatScript := preload("res://gameplay/combat/combat.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
+const ActorSeats := preload("res://tests/support/actor_seats.gd")
 
 const STEP: float = 0.0625
 const ELEMENTS: Array[StringName] = [&"fire", &"frost", &"storm", &"void"]
@@ -30,6 +33,7 @@ var _bus: EventsScript
 var _projectiles: ManagerScript
 var _combat: CombatScript
 var _spells: SpellsScript
+var _actors: ActorSeats.ActorsScript
 var _fake: FakeRegistry
 ## Each reaction_triggered as [player, id, position].
 var _reacted: Array = []
@@ -41,6 +45,8 @@ func before_each() -> void:
 	_bus = own(EventsScript.new()) as EventsScript
 	_projectiles = own(ManagerScript.new()) as ManagerScript
 	_projectiles.events = _bus
+	_actors = own(ActorSeats.table()) as ActorSeats.ActorsScript
+	_projectiles.actors = _actors
 	_combat = own(CombatScript.new()) as CombatScript
 	_combat.events = _bus
 	_combat.projectiles = _projectiles

@@ -11,7 +11,7 @@ extends CharacterBody2D
 ## in `targets`) is a candidate, indices 0-3, and a downed one is skipped.
 ##
 ## The attack is a cast of the enemy's staff (below); an enemy without one (or without a free
-## caster row) only chases, and hurts by touch (`contact_damage`) if it hurts at all.
+## actor id) only chases, and hurts by touch (`contact_damage`) if it hurts at all.
 ## Health, hurt box and knockback live in `gameplay/combat`: _ready() registers the
 ## enemy there and step() adds `consume_knockback_step` to the velocity. Death is
 ## Combat's (it frees the node), so there is no death code here.
@@ -40,19 +40,19 @@ extends CharacterBody2D
 ## keeps its state.
 ##
 ## Staffs (staffs F8a, "Enemy staffs"): an enemy whose `data` has a staff and cards attacks by
-## casting them like a wizard (`uses_staff`). It opens a caster row in `core/spells` when it is
-## ready (`caster`) and closes it when it leaves the tree; the staff is compiled once per enemy
-## type and installed as its staff 0; its body is its row's projectile target, so its own spells
-## skip it; it tells the manager and the runtime where it stands and aims every step (orbits and
+## casting them like a wizard (`uses_staff`). It opens an actor (`core/actors`: the enemies'
+## team, the enemy ramp, no seat) and its caster in `core/spells` when it is ready (`caster`,
+## the actor id; actors G3b) and closes both when it leaves the tree; the staff is compiled once
+## per enemy type and installed as its staff 0; its body is its actor's projectile target, so
+## its own spells skip it (every other actor's hit it); it tells the manager and the runtime where it stands and aims every step (orbits and
 ## beams follow it). It pays each cast from `mana` (`data.max_mana`, `data.mana_regen` a second,
-## plus what siphon gives back), so a dear staff casts less often. The windup starts only when the
+## plus what siphon gives back, `mana_refund_requested` for its actor), so a dear staff casts less often. The windup starts only when the
 ## next cast is ready (its delay nearly over and the mana there), so a telegraph is always followed
 ## by its cast; until then it holds where it stands. The telegraph's reach is the next cast's
 ## first carrier's (a shot's speed x life, a beam's length); a carrier that is not aimed (a nova,
 ## an orbit) shows only the pose and the flash.
 ##
-## Moves (staffs F8c): the moves its own cards ask for (`caster_move_requested` with NO_PLAYER and
-## a tag of its row) move it as they move a wizard: a dash goes from its staff tip to where the
+## Moves (staffs F8c): the moves its own cards ask for (`caster_move_requested` for its actor id) move it as they move a wizard: a dash goes from its staff tip to where the
 ## card says over the card's time, a hook and a swap pull it to a point, a recoil pushes it, all
 ## through `velocity` (so walls stop it); a teleport jumps there at once, stopping short of a
 ## wall and backing off until the body is clear. A dash, hook or teleport says where it ended
@@ -70,6 +70,7 @@ const CombatScript := preload("res://gameplay/combat/combat.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EntitiesScript := preload("res://gameplay/ai/entities.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
+const ActorsScript := preload("res://core/actors/actors.gd")
 
 enum State { CHASE, WINDUP, RECOVER }
 enum Pose { IDLE, WINDUP, HURT }
@@ -135,6 +136,9 @@ var combat: CombatScript = null
 var projectiles: ProjectileManagerScript = null
 var entities: EntitiesScript = null
 var spells: SpellsScript = null
+## The actor table. Only tests set it; otherwise the projectile manager's, else the "Actors"
+## autoload.
+var actors: ActorsScript = null
 
 var state: State = State.CHASE
 ## The player being chased, or null.
@@ -143,7 +147,8 @@ var target: Node2D = null
 var aim: Vector2 = Vector2.DOWN
 ## How often the players were looked up (tests count it).
 var lookup_count: int = 0
-## This enemy's caster row in `core/spells` while it casts a staff, else -1.
+## This enemy's actor id (`core/actors`), its caster number in `core/spells` and the projectile
+## manager, while it casts a staff, else -1.
 var caster: int = -1
 ## The mana it has to cast with (staffs F8a).
 var mana: float = 0.0
@@ -215,6 +220,8 @@ func _ready() -> void:
 		events.damage_dealt.connect(_on_damage_dealt)
 	if events != null and not events.caster_move_requested.is_connected(_on_caster_move_requested):
 		events.caster_move_requested.connect(_on_caster_move_requested)
+	if events != null and not events.mana_refund_requested.is_connected(_on_mana_refund):
+		events.mana_refund_requested.connect(_on_mana_refund)
 	_recoil_velocity.resize(MAX_RECOILS)
 	_recoil_left.resize(MAX_RECOILS)
 	if data == null:
@@ -236,6 +243,8 @@ func _exit_tree() -> void:
 		events.damage_dealt.disconnect(_on_damage_dealt)
 	if events != null and events.caster_move_requested.is_connected(_on_caster_move_requested):
 		events.caster_move_requested.disconnect(_on_caster_move_requested)
+	if events != null and events.mana_refund_requested.is_connected(_on_mana_refund):
+		events.mana_refund_requested.disconnect(_on_mana_refund)
 	# Leaving the tree without being freed must not leave a target behind in Combat.
 	if combat != null and is_instance_valid(combat):
 		combat.unregister_enemy(self)
@@ -247,15 +256,19 @@ func uses_staff() -> bool:
 	return data != null and data.staff != null and not data.cards.is_empty()
 
 
-## Open a caster row and install the staff (once, in `_ready`). With every row taken the
-## enemy has no attack and only chases.
+## Open its actor and its caster and install the staff (once, in `_ready`). With the actor table
+## full the enemy has no attack and only chases.
 func _open_staff() -> void:
 	if not uses_staff() or spells == null or caster >= 0:
 		return
-	caster = spells.open_enemy_caster()
+	var table: ActorsScript = _actor_table()
+	caster = table.open(ActorsScript.TEAM_ENEMIES, ActorsScript.RAMP_ENEMY) if table != null else ActorsScript.NONE
 	if caster < 0:
-		push_warning("Ai: every enemy caster row is open, so %s casts nothing." % data.id)
+		caster = -1
+		push_warning("Ai: the actor table is full, so %s casts nothing." % data.id)
 		return
+	table.set_node(caster, self)
+	spells.open_caster(caster)
 	var compiled: CompiledStaff = _compiled.get(data) as CompiledStaff
 	if compiled == null:
 		compiled = spells.compile_staff(data.cards, data.staff)
@@ -269,18 +282,39 @@ func _open_staff() -> void:
 		entities.set_enemy(caster, self)
 
 
-## Give the caster row back (the enemy left the tree or died): its spells in the air fly on; its
-## decoys and familiars end where they are (F8d), before the row closes, so their ends still count.
+## Give the actor back (the enemy left the tree or died): its spells in the air fly on; its
+## decoys and familiars end where they are (F8d), before the caster closes, so their ends still
+## count.
 func close_staff() -> void:
 	if caster < 0:
 		return
 	if entities != null and is_instance_valid(entities):
 		entities.enemy_gone(caster)
 	if spells != null and is_instance_valid(spells):
-		spells.close_enemy_caster(caster)
+		spells.close_caster(caster)
 	if projectiles != null and is_instance_valid(projectiles):
 		projectiles.clear_anchor(caster)
+	var table: ActorsScript = _actor_table()
+	if table != null:
+		table.close(caster)
 	caster = -1
+
+
+## The actor table: `actors`, else the projectile manager's, else the "Actors" autoload.
+func _actor_table() -> ActorsScript:
+	if actors != null:
+		return actors if is_instance_valid(actors) else null
+	if projectiles != null and is_instance_valid(projectiles):
+		return projectiles.actor_table()
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	return tree.root.get_node_or_null(^"Actors") as ActorsScript if tree != null and tree.root != null else null
+
+
+## Siphon gives mana back to this enemy's actor (never above its maximum).
+func _on_mana_refund(caster_id: int, amount: float) -> void:
+	if caster < 0 or caster_id != caster or data == null or not is_finite(amount) or amount <= 0.0:
+		return
+	mana = minf(mana + amount, data.max_mana)
 
 
 ## True when the next cast can leave the moment a windup started now would end: its delay is no
@@ -363,7 +397,7 @@ func telegraph_progress() -> float:
 ## The aim follows the target while it chases; the windup locks it, and so does the recovery, so
 ## a beam it holds does not track a wizard who stepped aside.
 func _step_staff(delta: float) -> void:
-	mana = minf(mana + data.mana_regen * delta + spells.take_refund(caster), data.max_mana)
+	mana = minf(mana + data.mana_regen * delta, data.max_mana)
 	var origin: Vector2 = _position_of(self) + hurt_offset
 	if state == State.CHASE and target != null:
 		var to_target: Vector2 = _position_of(target) - _position_of(self)
@@ -535,9 +569,9 @@ func is_moving() -> bool:
 	return _move_left > 0.0
 
 
-## A move its own card asked for (a tag of its caster row; the event names NO_PLAYER for an enemy).
-func _on_caster_move_requested(player: int, mode: StringName, to: Vector2, seconds: float, tag: int) -> void:
-	if caster < 0 or player != EventsScript.NO_PLAYER or not to.is_finite() or not SpellTag.is_spell_tag(tag) or SpellTag.caster_of(tag) != caster:
+## A move its own card asked for (the event names its actor id, as does its tag).
+func _on_caster_move_requested(caster_id: int, mode: StringName, to: Vector2, seconds: float, tag: int) -> void:
+	if caster < 0 or caster_id != caster or not to.is_finite() or not SpellTag.is_spell_tag(tag) or SpellTag.caster_of(tag) != caster:
 		return
 	var muzzle: Vector2 = _position_of(self) + hurt_offset
 	if mode == &"recoil":
@@ -577,7 +611,7 @@ func _teleport(to: Vector2, tag: int) -> void:
 			goal = goal.move_toward(start, TELEPORT_BACKOFF)
 	_set_position(goal)
 	if events != null:
-		events.caster_move_finished.emit(EventsScript.NO_PLAYER, &"teleport", goal, tag)
+		events.caster_move_finished.emit(caster, &"teleport", goal, tag)
 
 
 ## The running move and the recoil pushes set `velocity` (walls stop them, as `move_and_slide`
@@ -605,7 +639,7 @@ func _finish_move() -> void:
 	_move_mode = &""
 	_move_velocity = Vector2.ZERO
 	if events != null and mode != &"swap" and mode != &"":
-		events.caster_move_finished.emit(EventsScript.NO_PLAYER, mode, _position_of(self), _move_tag)
+		events.caster_move_finished.emit(caster, mode, _position_of(self), _move_tag)
 
 
 func _set_position(at: Vector2) -> void:

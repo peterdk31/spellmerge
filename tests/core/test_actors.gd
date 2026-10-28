@@ -3,8 +3,8 @@ extends "res://tests/support/suite.gd"
 ## actor table and one caster number"): ids handed out lowest free first and freed again, a full
 ## table, team, ramp and seat, a seat held by one actor at a time, the budget of seated and
 ## unseated actors, a node lookup that forgets freed nodes, safe answers for bad ids, and the
-## spell runtime opening and closing an actor under each enemy caster row. Each test makes its
-## own table.
+## spell runtime leaving the table to the bodies (actors G3b: Spells opens no actor; it asks the
+## table for a seat's actor). Each test makes its own table.
 ##
 ## godot --headless --path . --script res://tests/core/test_actors.gd
 
@@ -166,41 +166,16 @@ func test_clear_closes_everything() -> void:
 	check_equal(_actors.open(ActorsScript.TEAM_ENEMIES, ActorsScript.RAMP_ENEMY), 0, "ids start again at 0")
 
 
-func test_enemy_caster_rows_open_and_close_actors() -> void:
+func test_spells_opens_no_actors_and_finds_seats_in_the_table() -> void:
 	var spells: SpellsScript = own(SpellsScript.new()) as SpellsScript
 	spells.actors = _actors
-	var first: int = spells.open_enemy_caster()
-	var second: int = spells.open_enemy_caster()
-	check_equal(first, SpellLimits.FIRST_ENEMY_CASTER, "the caster numbers are as before")
-	var actor: int = spells.actor_of_caster(second)
-	check(_actors.is_open(actor), "the row opened an actor")
-	check_equal(_actors.team_of(actor), ActorsScript.TEAM_ENEMIES, "on the enemies' team")
-	check_equal(_actors.ramp_of(actor), ActorsScript.RAMP_ENEMY, "in the enemy ramp")
-	check_equal(_actors.budget_of(actor), ActorsScript.SHARED, "spending the shared budget")
-	check_equal(spells.actor_of_caster(0), ActorsScript.NONE, "a player has no actor from Spells yet")
-	spells.close_enemy_caster(second)
-	check(not _actors.is_open(actor), "closing the row closes the actor")
-	check_equal(spells.actor_of_caster(second), ActorsScript.NONE, "a closed row has none")
+	var imp: int = _actors.open(ActorsScript.TEAM_ENEMIES, ActorsScript.RAMP_ENEMY)
+	var wizard: int = _actors.open(ActorsScript.TEAM_WIZARDS, 2, 2)
+	check(spells.open_caster(imp) and spells.open_caster(wizard), "the bodies' ids open as casters")
+	check_equal(_actors.open_count(), 2, "opening a caster opens no actor")
+	check_equal(spells.actor_of_seat(2), wizard, "Spells finds a seat's actor in the table")
+	check_equal(spells.actor_of_seat(0), ActorsScript.NONE, "and no actor for an empty seat")
+	spells.close_caster(imp)
+	check(_actors.is_open(imp), "closing a caster leaves its actor to its body")
 	spells.clear()
-	check_equal(_actors.open_count(), 0, "clear closes the rest")
-
-
-func test_a_freed_runtime_closes_its_actors() -> void:
-	var spells: SpellsScript = SpellsScript.new()
-	spells.actors = _actors
-	for i in 3:
-		spells.open_enemy_caster()
-	check_equal(_actors.open_count(), 3, "three rows, three actors")
-	spells.free()
-	check_equal(_actors.open_count(), 0, "none left open in the table")
-
-
-func test_a_full_table_leaves_the_row_working() -> void:
-	_open_enemies(ActorsScript.ACTORS)
-	var spells: SpellsScript = own(SpellsScript.new()) as SpellsScript
-	spells.actors = _actors
-	var caster: int = spells.open_enemy_caster()
-	check_equal(caster, SpellLimits.FIRST_ENEMY_CASTER, "the row still opens")
-	check_equal(spells.actor_of_caster(caster), ActorsScript.NONE, "without an actor")
-	spells.close_enemy_caster(caster)
-	check_equal(_actors.open_count(), ActorsScript.ACTORS, "and closing it closes none of the others")
+	check_equal(_actors.open_count(), 2, "nor does clear close any")

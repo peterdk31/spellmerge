@@ -21,9 +21,8 @@ extends ActorComponent
 ## cards, so a crowd of one enemy type compiles its staff once, and a wizard who builds a row
 ## back gets the same compiled staff.
 ##
-## The caster number (`number`) comes from the actor (`Actor.open_caster_number`, the one seam
-## between the kit and Spells' numbering) when the actor enters the tree, and goes back when it
-## leaves; from actors G3 it is the actor id.
+## The caster number (`number`) is the actor's id (`Actor.open_caster_number` opens its caster
+## in Spells when the actor enters the tree, and closes it when it leaves; actors G3b).
 ##
 ## Nothing here allocates in `step`.
 
@@ -53,7 +52,7 @@ signal staff_built(at: int)
 
 var mana: float = 100.0
 ## The number the actor casts under in Spells (and is the anchor of in the projectile manager),
-## -1 while it has none (out of the tree, or every enemy row taken).
+## -1 while it has none (out of the tree, or no actor id): the actor's `id` (actors G3b).
 var number: int = -1
 
 ## Every compiled staff, by "spells id|staff id|cards".
@@ -118,8 +117,7 @@ func step(delta: float) -> void:
 		if actor.spells != null:
 			actor.spells.clear_aim(number)
 		return
-	var refund: float = actor.spells.take_refund(number) if actor.spells != null else 0.0
-	mana = minf(mana + regen * delta + refund, max_mana)
+	mana = minf(mana + regen * delta, max_mana)
 	_push_place()
 	if actor.spells == null:
 		return
@@ -247,8 +245,9 @@ func cast_ready(within: float, at: int = 0) -> bool:
 	return actor.spells.cooldown_left(number, at) <= within and free_mana() >= cost
 
 
-## Name the actor's hurt circle as its caster number's, so its own spells pass it (as an
-## enemy's do today; actors G3 makes every spell hit every actor). The Hurtbox calls it too.
+## Name the actor's hurt circle as its caster number's (its actor id), so its own spells pass
+## it unless they self-hit, as a wizard's always did; every other actor's spells hit it. The
+## Hurtbox calls it too.
 func own_hurtbox() -> void:
 	if number >= 0 and actor.projectiles != null:
 		actor.projectiles.set_target_owner(actor, number)
@@ -306,9 +305,9 @@ func _close_number() -> void:
 	_has_build.fill(0)
 
 
-## Siphon gives mana back as an event for a seat's number (an enemy row's comes by
-## `Spells.take_refund` in `step`); never above `max_mana`.
-func _on_mana_refund(player: int, amount: float) -> void:
-	if number < 0 or player != number or actor.is_down() or not is_finite(amount) or amount <= 0.0:
+## Siphon gives mana back as an event for its caster number, whoever drives it; never above
+## `max_mana`.
+func _on_mana_refund(caster: int, amount: float) -> void:
+	if number < 0 or caster != number or actor.is_down() or not is_finite(amount) or amount <= 0.0:
 		return
 	mana = minf(mana + amount, max_mana)

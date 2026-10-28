@@ -1,7 +1,7 @@
 extends SceneTree
 ## Tests for core/events: the autoload is registered, every event exists with
-## the player index first where it has one, and signals reach listeners for all
-## four player indices.
+## its seat (`player`) or actor id (`caster`, `actor`, `killer`) first where it
+## has one, and signals reach listeners for all four player indices.
 ##
 ## godot --headless --path . --script res://tests/core/test_events.gd
 
@@ -27,40 +27,39 @@ const EVENTS: Dictionary = {
 	# Spells and combat.
 	&"wizard_cast": [["player", TYPE_INT], ["wizard", TYPE_OBJECT]],
 	&"spell_cast": [["player", TYPE_INT], ["spell_id", TYPE_STRING_NAME], ["origin", TYPE_VECTOR2], ["direction", TYPE_VECTOR2]],
-	&"projectile_hit": [["player", TYPE_INT], ["target", TYPE_OBJECT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT]],
-	&"projectile_impact": [["player", TYPE_INT], ["target", TYPE_OBJECT], ["position", TYPE_VECTOR2], ["direction", TYPE_VECTOR2]],
-	&"projectile_expired": [["player", TYPE_INT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT]],
-	&"form_shown": [["player", TYPE_INT], ["form", TYPE_STRING_NAME], ["origin", TYPE_VECTOR2], ["direction", TYPE_VECTOR2], ["length", TYPE_FLOAT], ["tint", TYPE_COLOR], ["look", TYPE_INT]],
+	&"projectile_hit": [["caster", TYPE_INT], ["target", TYPE_OBJECT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT]],
+	&"projectile_impact": [["caster", TYPE_INT], ["target", TYPE_OBJECT], ["position", TYPE_VECTOR2], ["direction", TYPE_VECTOR2]],
+	&"projectile_expired": [["caster", TYPE_INT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT]],
+	&"form_shown": [["caster", TYPE_INT], ["form", TYPE_STRING_NAME], ["origin", TYPE_VECTOR2], ["direction", TYPE_VECTOR2], ["length", TYPE_FLOAT], ["tint", TYPE_COLOR], ["look", TYPE_INT]],
 	&"build_refused": [["player", TYPE_INT], ["reason", TYPE_STRING]],
 	&"bag_changed": [["player", TYPE_INT], ["bag", TYPE_ARRAY]],
-	&"reaction_triggered": [["player", TYPE_INT], ["reaction_id", TYPE_STRING_NAME], ["position", TYPE_VECTOR2]],
-	&"discharge_arc": [["player", TYPE_INT], ["from", TYPE_VECTOR2], ["to", TYPE_VECTOR2]],
-	&"damage_dealt": [["player", TYPE_INT], ["target", TYPE_OBJECT], ["amount", TYPE_INT], ["position", TYPE_VECTOR2]],
-	&"status_applied": [["player", TYPE_INT], ["target", TYPE_OBJECT], ["status_id", TYPE_STRING_NAME]],
-	&"enemy_died": [["player", TYPE_INT], ["enemy", TYPE_OBJECT], ["position", TYPE_VECTOR2]],
+	&"reaction_triggered": [["caster", TYPE_INT], ["reaction_id", TYPE_STRING_NAME], ["position", TYPE_VECTOR2]],
+	&"discharge_arc": [["caster", TYPE_INT], ["from", TYPE_VECTOR2], ["to", TYPE_VECTOR2]],
+	&"damage_dealt": [["caster", TYPE_INT], ["target", TYPE_OBJECT], ["amount", TYPE_INT], ["position", TYPE_VECTOR2]],
+	&"status_applied": [["caster", TYPE_INT], ["target", TYPE_OBJECT], ["status_id", TYPE_STRING_NAME]],
+	&"enemy_died": [["killer", TYPE_INT], ["enemy", TYPE_OBJECT], ["position", TYPE_VECTOR2]],
 	# Staffs (docs/milestones/M2-staffs.md, "Events").
 	&"staff_changed": [["player", TYPE_INT], ["staff", TYPE_INT], ["plan", TYPE_DICTIONARY]],
 	&"staff_cast": [["player", TYPE_INT], ["staff", TYPE_INT], ["origin", TYPE_VECTOR2], ["direction", TYPE_VECTOR2]],
-	&"caster_move_requested": [["player", TYPE_INT], ["mode", TYPE_STRING_NAME], ["to", TYPE_VECTOR2], ["seconds", TYPE_FLOAT], ["tag", TYPE_INT]],
-	&"caster_move_finished": [["player", TYPE_INT], ["mode", TYPE_STRING_NAME], ["position", TYPE_VECTOR2], ["tag", TYPE_INT]],
-	&"target_move_requested": [["player", TYPE_INT], ["target", TYPE_OBJECT], ["to", TYPE_VECTOR2]],
-	&"area_hit_requested": [["player", TYPE_INT], ["position", TYPE_VECTOR2], ["radius", TYPE_FLOAT], ["tag", TYPE_INT]],
-	&"entity_spawn_requested": [["player", TYPE_INT], ["kind", TYPE_STRING_NAME], ["position", TYPE_VECTOR2], ["seconds", TYPE_FLOAT], ["tag", TYPE_INT], ["caster", TYPE_INT]],
-	&"entity_end_requested": [["player", TYPE_INT], ["tag", TYPE_INT]],
-	&"entity_ended": [["player", TYPE_INT], ["kind", TYPE_STRING_NAME], ["position", TYPE_VECTOR2], ["tag", TYPE_INT]],
-	&"familiar_cast_requested": [["player", TYPE_INT], ["position", TYPE_VECTOR2], ["direction", TYPE_VECTOR2], ["tag", TYPE_INT]],
-	&"mana_refund_requested": [["player", TYPE_INT], ["amount", TYPE_FLOAT]],
+	&"caster_move_requested": [["caster", TYPE_INT], ["mode", TYPE_STRING_NAME], ["to", TYPE_VECTOR2], ["seconds", TYPE_FLOAT], ["tag", TYPE_INT]],
+	&"caster_move_finished": [["caster", TYPE_INT], ["mode", TYPE_STRING_NAME], ["position", TYPE_VECTOR2], ["tag", TYPE_INT]],
+	&"target_move_requested": [["caster", TYPE_INT], ["target", TYPE_OBJECT], ["to", TYPE_VECTOR2]],
+	&"area_hit_requested": [["caster", TYPE_INT], ["position", TYPE_VECTOR2], ["radius", TYPE_FLOAT], ["tag", TYPE_INT]],
+	&"entity_spawn_requested": [["caster", TYPE_INT], ["kind", TYPE_STRING_NAME], ["position", TYPE_VECTOR2], ["seconds", TYPE_FLOAT], ["tag", TYPE_INT], ["anchor", TYPE_INT]],
+	&"entity_end_requested": [["caster", TYPE_INT], ["tag", TYPE_INT]],
+	&"entity_ended": [["caster", TYPE_INT], ["kind", TYPE_STRING_NAME], ["position", TYPE_VECTOR2], ["tag", TYPE_INT]],
+	&"familiar_cast_requested": [["caster", TYPE_INT], ["position", TYPE_VECTOR2], ["direction", TYPE_VECTOR2], ["tag", TYPE_INT]],
+	&"mana_refund_requested": [["caster", TYPE_INT], ["amount", TYPE_FLOAT]],
 	&"mana_reserved": [["player", TYPE_INT], ["amount", TYPE_FLOAT]],
-	&"shot_blocked": [["player", TYPE_INT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT]],
-	&"shield_blocked": [["player", TYPE_INT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT]],
-	&"kill_landed": [["player", TYPE_INT], ["target", TYPE_OBJECT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT]],
-	&"wizard_hurt": [["player", TYPE_INT], ["amount", TYPE_INT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT], ["kind", TYPE_STRING_NAME]],
-	&"reaction_landed": [["player", TYPE_INT], ["reaction_id", TYPE_STRING_NAME], ["target", TYPE_OBJECT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT]],
-	&"wizard_shield_requested": [["player", TYPE_INT], ["charges", TYPE_INT], ["seconds", TYPE_FLOAT], ["tag", TYPE_INT]],
-	&"pull_requested": [["player", TYPE_INT], ["position", TYPE_VECTOR2], ["radius", TYPE_FLOAT], ["strength", TYPE_FLOAT], ["tag", TYPE_INT]],
-	&"hit_landed": [["player", TYPE_INT], ["target", TYPE_OBJECT], ["amount", TYPE_INT], ["position", TYPE_VECTOR2], ["kind", TYPE_STRING_NAME]],
-	&"heal_dealt": [["player", TYPE_INT], ["target", TYPE_OBJECT], ["amount", TYPE_INT], ["position", TYPE_VECTOR2]],
-	&"ally_passed": [["player", TYPE_INT], ["ally", TYPE_OBJECT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT]],
+	&"shot_blocked": [["caster", TYPE_INT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT]],
+	&"shield_blocked": [["actor", TYPE_INT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT]],
+	&"kill_landed": [["caster", TYPE_INT], ["target", TYPE_OBJECT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT]],
+	&"actor_hurt": [["actor", TYPE_INT], ["amount", TYPE_INT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT], ["kind", TYPE_STRING_NAME]],
+	&"reaction_landed": [["caster", TYPE_INT], ["reaction_id", TYPE_STRING_NAME], ["target", TYPE_OBJECT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT]],
+	&"wizard_shield_requested": [["caster", TYPE_INT], ["charges", TYPE_INT], ["seconds", TYPE_FLOAT], ["tag", TYPE_INT]],
+	&"pull_requested": [["caster", TYPE_INT], ["position", TYPE_VECTOR2], ["radius", TYPE_FLOAT], ["strength", TYPE_FLOAT], ["tag", TYPE_INT]],
+	&"hit_landed": [["caster", TYPE_INT], ["target", TYPE_OBJECT], ["amount", TYPE_INT], ["position", TYPE_VECTOR2], ["kind", TYPE_STRING_NAME]],
+	&"heal_dealt": [["caster", TYPE_INT], ["target", TYPE_OBJECT], ["amount", TYPE_INT], ["position", TYPE_VECTOR2]],
 	# Players.
 	&"player_downed": [["player", TYPE_INT]],
 	&"player_revived": [["player", TYPE_INT], ["reviver", TYPE_INT]],
@@ -85,11 +84,14 @@ const EVENTS: Dictionary = {
 	&"currency_changed": [["currency_id", TYPE_STRING_NAME], ["amount", TYPE_INT]],
 }
 
-## Events about the run, a room or the account, with no player index.
+## Events about the run, a room or the account, with no seat and no actor.
 const NOT_PER_PLAYER: Array[StringName] = [
 	&"run_started", &"run_ended", &"room_entered", &"room_cleared", &"wave_started",
 	&"sandbox_changed", &"effect_slots_changed", &"build_break_started", &"difficulty_changed", &"reward_rolled", &"unlock_gained", &"currency_changed",
 ]
+
+## The names of a first argument that is a seat (`player`) or an actor id (the rest).
+const FIRST_KEYS: Array[String] = ["player", "caster", "actor", "killer"]
 
 var _failures: Array[String] = []
 var _received: Array[int] = []
@@ -140,14 +142,14 @@ func _test_signals_exist() -> void:
 			_check(args[i]["name"] == expected[i][0] and args[i]["type"] == expected[i][1],
 				"%s argument %d is %s (type %d), got %s (type %d)" % [event, i, expected[i][0], expected[i][1], args[i]["name"], args[i]["type"]])
 		var has_player: bool = not NOT_PER_PLAYER.has(event)
-		_check(has_player == (expected[0][0] == "player"),
-			"%s has the player index first exactly when it is per-player" % event)
+		_check(has_player == FIRST_KEYS.has(expected[0][0]),
+			"%s has a seat or an actor id first exactly when it is per-player or per-actor" % event)
 	for event: StringName in signals:
 		_check(EVENTS.has(event), "signal %s in events.gd is covered by this test" % event)
 
 
 func _test_no_player_value() -> void:
-	_check(EventsScript.NO_PLAYER == -1, "NO_PLAYER is -1, outside the player indices 0-3")
+	_check(EventsScript.NO_PLAYER == -1, "NO_PLAYER is -1, outside the seats and the actor ids")
 
 
 func _test_play_requested_all_players() -> void:

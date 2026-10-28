@@ -10,9 +10,9 @@ extends RefCounted
 ## and keeps every tag above 0, which means "no tag" to `gameplay/combat`. Every tag stays below
 ## `LIMIT` (1 << 29), so it fits the int32 arrays combat keeps shield tags in.
 ##
-## The caster is the number the spell runtime casts under. Until actors G3b that is still a
-## player (0-3) or `FIRST_ENEMY_CASTER` plus an enemy row (4-259), and the deprecated helpers
-## below read it that way; from G3b it is the actor id (`core/actors`).
+## The caster is the actor id (`core/actors`) of whoever cast it, the number the spell runtime
+## and the projectile manager keep every caster under (actors G3b). Nothing reads a seat, a
+## side or a colour out of it: those are the actor table's.
 ##
 ##     var tag: int = SpellTag.make(caster, staff, node, generation)
 ##     SpellTag.caster_of(tag)  # the other fields read back the same way
@@ -28,12 +28,6 @@ const NODE_MASK: int = 511
 const CASTER_MASK: int = 511
 ## Every spell tag is below this.
 const LIMIT: int = 1 << 29
-## Deprecated (actors G3): the caster number of enemy row 0; 0-3 are the players.
-const FIRST_ENEMY_CASTER: int = 4
-## Deprecated (actors G3): the largest enemy row; there are `ROW_MASK + 1` enemy casters.
-const ROW_MASK: int = 255
-## Deprecated (actors G3): `Events.NO_PLAYER`, the player of an enemy's spell.
-const NO_PLAYER: int = -1
 
 
 ## The tag of a shot. Arguments outside their range are wrapped into it, never an error.
@@ -71,30 +65,3 @@ static func generation_of(tag: int) -> int:
 static func generation_key(tag: int) -> int:
 	return tag & ~(NODE_MASK << NODE_SHIFT)
 
-
-## Deprecated (actors G3): the same as `make`, which takes every caster now.
-static func make_for(caster: int, staff: int, node: int, generation: int) -> int:
-	return make(caster, staff, node, generation)
-
-
-## Deprecated (actors G3): the tag of an enemy row's shot, `make` of `FIRST_ENEMY_CASTER` plus
-## the row (wrapped into 0-255).
-static func make_enemy(row: int, staff: int, node: int, generation: int) -> int:
-	return make(FIRST_ENEMY_CASTER + (row & ROW_MASK), staff, node, generation)
-
-
-## Deprecated (actors G3): true for a spell tag whose caster is an enemy row (4 and up).
-static func is_enemy_tag(tag: int) -> bool:
-	return is_spell_tag(tag) and caster_of(tag) >= FIRST_ENEMY_CASTER
-
-
-## Deprecated (actors G3): the player (0-3) who cast it, or `NO_PLAYER` for any other caster.
-static func player_of(tag: int) -> int:
-	var caster: int = caster_of(tag)
-	return caster if caster < FIRST_ENEMY_CASTER else NO_PLAYER
-
-
-## Deprecated (actors G3): the enemy row of an enemy's spell, or -1 for a player's.
-static func row_of(tag: int) -> int:
-	var caster: int = caster_of(tag)
-	return caster - FIRST_ENEMY_CASTER if caster >= FIRST_ENEMY_CASTER else -1

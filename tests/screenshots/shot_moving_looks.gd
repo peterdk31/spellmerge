@@ -12,6 +12,7 @@ extends "res://tests/support/screenshot.gd"
 ## `moving_orbits_4x`: the first three orbit columns at 4x.
 
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
+const ActorSeats := preload("res://tests/support/actor_seats.gd")
 const ELEMENTS: Array[Resource] = [
 	preload("res://content/spells/elements/fire/fire.tres"),
 	preload("res://content/spells/elements/frost/frost.tres"),
@@ -30,6 +31,13 @@ func take() -> void:
 	if not need(["Projectiles"]):
 		return
 	_shots = root.get_node("Projectiles")
+	# A shot's caster is an actor id (actors G3b): open the four wizards in the Actors table, so
+	# each player's shots take its hat ramp.
+	var actors: ActorSeats.ActorsScript = ActorSeats.autoload()
+	if actors == null:
+		fail("there is no Actors autoload")
+		return
+	var wizards: PackedInt32Array = ActorSeats.seat_wizards(actors)
 	lay_floor()
 	_shots.call("set_bounds", Rect2(Vector2.ZERO, SCREEN))
 	_shots.call("set_cap", 300)
@@ -41,7 +49,7 @@ func take() -> void:
 		var look: PackedInt32Array = PackedInt32Array() if e == 0 else PackedInt32Array([int(ELEMENTS[e - 1].get("look_layer"))])
 		# Each column is its own player's (0-3, then 0 and 1 again), so the orbits have anchors
 		# of their own; the plain ones show that player's colour.
-		var player: int = e % 4
+		var player: int = wizards[e % 4]
 		if e < 4:
 			_shots.call("set_anchor", player, Vector2(x, 60.0))
 		for n in 3:

@@ -67,9 +67,9 @@ signal bag_changed(player: int, bag: Array[StringName])
 signal staff_changed(player: int, staff: int, plan: Dictionary)
 ## Sender: player. `player` cast their staff `staff` from `origin` along `direction`. Heard by feel.
 signal staff_cast(player: int, staff: int, origin: Vector2, direction: Vector2)
-## Sender: core/spells. A card of `player` moves the wizard: `mode` is `&"dash"`, `&"teleport"`, `&"hook"`, `&"swap"` or `&"recoil"`; `to` is where it wants to go (the wizard stops at walls), over `seconds` (0 is at once); `tag` is the card's tag. Heard by player, which answers with `caster_move_finished`. Several requests can come in one step (a scatter, a burst, `mirror`): the player adds up the `recoil` requests of a step (so `mirror · recoil` cancels) and lets a later dash, teleport, hook or swap replace an earlier one.
+## Sender: core/spells. A card of `player` moves the wizard: `mode` is `&"dash"`, `&"teleport"`, `&"hook"`, `&"swap"` or `&"recoil"`; `to` is where it wants to go (the wizard stops at walls), over `seconds` (0 is at once); `tag` is the card's tag. Heard by player, which answers with `caster_move_finished`, and by ai for an enemy's own card (`player` NO_PLAYER, the tag of its caster row; staffs F8c). Several requests can come in one step (a scatter, a burst, `mirror`): the player adds up the `recoil` requests of a step (so `mirror · recoil` cancels) and lets a later dash, teleport, hook or swap replace an earlier one.
 signal caster_move_requested(player: int, mode: StringName, to: Vector2, seconds: float, tag: int)
-## Sender: player. The move asked for by `caster_move_requested` ended at `position`: the end point of a dash, teleport or hook. Heard by core/spells.
+## Sender: player (a wizard's move) and ai (an enemy's, with NO_PLAYER and its tag; staffs F8c). The move asked for by `caster_move_requested` ended at `position`: the end point of a dash, teleport or hook. Heard by core/spells.
 signal caster_move_finished(player: int, mode: StringName, position: Vector2, tag: int)
 ## Sender: core/spells. A card of `player` (swap) moves `target` to `to`. Heard by ai.
 signal target_move_requested(player: int, target: Node, to: Vector2)

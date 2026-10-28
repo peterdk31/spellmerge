@@ -253,8 +253,8 @@ Added in part A3, so later parts in different areas don't all edit `core/events/
 | `staff_cards_requested(player, staff, cards)` (the whole staff at once; the radial builder) | hud | player |
 | `staff_changed(player, staff, plan: Dictionary)` | player | hud |
 | `staff_cast(player, staff, origin, direction)` | player | feel |
-| `caster_move_requested(player, mode: StringName, to: Vector2, seconds: float, tag: int)` (dash, teleport, hook, swap, recoil) | spells | player |
-| `caster_move_finished(player, mode: StringName, position: Vector2, tag: int)` | player | spells (the end point of dash, teleport, hook) |
+| `caster_move_requested(player, mode: StringName, to: Vector2, seconds: float, tag: int)` (dash, teleport, hook, swap, recoil) | spells | player, ai (an enemy's own row, F8c) |
+| `caster_move_finished(player, mode: StringName, position: Vector2, tag: int)` | player, ai (an enemy's, F8c) | spells (the end point of dash, teleport, hook) |
 | `target_move_requested(target: Node, to: Vector2)` (swap) | spells | ai |
 | `area_hit_requested(player, position: Vector2, radius: float, tag: int)` | spells | combat |
 | `entity_spawn_requested(player, kind: StringName, position: Vector2, seconds: float, tag: int, caster: int)` (decoy, familiar; `caster` -1 the wizard, a projectile slot, or -2 the point) | spells | ai |
@@ -350,7 +350,7 @@ C0 (after B6): the 19 existing cards get their look data and a second look at th
 
 ### Phase F: enemy staffs (owner, 2026-10-27)
 
-Owner sessions, one PR each, in this order: F2, F3 and F4 may run in parallel; F5 after F3 and F4; F6, F7 and F8a after F5, then F8b and F8c (split from F8 while building it: one area each); then F9; then F10. Before D3, so the stress run and the playtest see enemies that cast.
+Owner sessions, one PR each, in this order: F2, F3 and F4 may run in parallel; F5 after F3 and F4; F6, F7 and F8a after F5, then F8b, F8c and F8d (split from F8 while building it: one area each); then F9; then F10. Before D3, so the stress run and the playtest see enemies that cast.
 
 | # | Part | Area | Delivers |
 | --- | --- | --- | --- |
@@ -363,7 +363,8 @@ Owner sessions, one PR each, in this order: F2, F3 and F4 may run in parallel; F
 | F7 | **Feel** | `gameplay/feel` | Enemy impacts, casts, beams and rain markers as normal effects in the enemy ramp; the ember burst and the hostile texture hand-off removed |
 | F8a | **Enemies cast staffs** | `core/base/enemy_base.gd`, `gameplay/ai` | `staff`, `cards`, `max_mana`, `mana_regen` on `EnemyBase`; the AI's mana, caster row, anchor and aim; the windup gated on the next cast; the telegraph's reach from the cast; one compile per enemy type |
 | F8b | **The telegraph in the new style** | `gameplay/ai`, `gameplay/feel` | The windup's line drawn by the shot shader (an effect) instead of the `Line2D`, in the enemy ramp |
-| F8c | **Caster-side cards on enemies** | `gameplay/ai` | Dash, teleport, hook, swap and recoil moving the enemy (answering `caster_move_requested` by tag); decoys and familiars for enemies in Entities; the AI choosing when and where to use them |
+| F8c | **Moves on enemies** | `gameplay/ai` | Dash, teleport, hook, swap and recoil moving the enemy (answering `caster_move_requested` by tag, `caster_move_finished` where it ends); a cast aims a move at the target as it aims everything |
+| F8d | **Decoys and familiars for enemies** | `gameplay/ai` (Entities) | An enemy's decoy (a copy of the enemy that wizards' shots hit and homing picks) and familiar (circling it, casting at the nearest wizard), in the enemy ramp |
 | F9 | **The imp and the shooting dummy on staffs** | `content/enemies`, `gameplay/ai`, `core/projectiles` | Both on player-card staffs; `ATTACK_TAG`, its hit-profile table, `imp_fireball.svg` and the hostile batch removed. Tests: the dummies, the waves, the 4-bot test; a stress run at the web cap (numbers in DECISIONS) |
 | F10 | **Enemy fire setting** | `core/settings`, `hud/menus/pause`, `gameplay/ai` | `core/settings/enemy_fire.gd` (off by default), `enemy_fire_requested` and `enemy_fire_changed`, the pause menu row, applied to the projectile manager |
 

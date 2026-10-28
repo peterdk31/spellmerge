@@ -52,6 +52,14 @@ extends CharacterBody2D
 ## first carrier's (a shot's speed x life, a beam's length); a carrier that is not aimed (a nova,
 ## an orbit) shows only the pose and the flash.
 ##
+## Moves (staffs F8c): the moves its own cards ask for (`caster_move_requested` with NO_PLAYER and
+## a tag of its row) move it as they move a wizard: a dash goes from its staff tip to where the
+## card says over the card's time, a hook and a swap pull it to a point, a recoil pushes it, all
+## through `velocity` (so walls stop it); a teleport jumps there at once, stopping short of a
+## wall and backing off until the body is clear. A dash, hook or teleport says where it ended
+## (`caster_move_finished`), where its card's blast and `on expire` go off. A later move replaces
+## one still running; a cast aims a move at the target, as it aims everything.
+##
 ## Statuses: a chilled enemy walks and winds up slower, a frozen one stands still and its
 ## attack waits (`Combat.speed_factor`); knockback still moves it.
 ##
@@ -96,6 +104,13 @@ const TELEGRAPH_LAST_FROM: float = 0.8
 const WINDUP_FLASHES: float = 5.0
 ## Seconds the hurt pose shows after a hit.
 const HURT_TIME: float = 0.25
+## A teleport stops this far short of a wall, then backs off by steps of TELEPORT_BACKOFF until
+## the body (BODY_RADIUS, about the hurt circle's) is clear (as a wizard's, gameplay/player).
+const TELEPORT_CLEARANCE: float = 8.0
+const TELEPORT_BACKOFF: float = 4.0
+const BODY_RADIUS: float = 6.0
+## Recoil pushes that can run at once (more in one step are added to the last).
+const MAX_RECOILS: int = 4
 
 ## The enemy's numbers (speed, health, contact damage). Set before adding to the tree.
 var data: EnemyBase = null
@@ -148,6 +163,15 @@ var mana: float = 0.0
 
 ## Each enemy type's staff, compiled once (EnemyBase -> CompiledStaff).
 static var _compiled: Dictionary = {}
+
+## The move a card asked for (dash, hook, swap): its mode, seconds left, velocity and tag.
+var _move_mode: StringName = &""
+var _move_left: float = 0.0
+var _move_velocity: Vector2 = Vector2.ZERO
+var _move_tag: int = 0
+## Recoil pushes running: velocity and seconds left each.
+var _recoil_velocity: PackedVector2Array = PackedVector2Array()
+var _recoil_left: PackedFloat32Array = PackedFloat32Array()
 
 var _state_left: float = 0.0
 var _retarget_left: float = 0.0
@@ -203,6 +227,10 @@ func _ready() -> void:
 		events.player_downed.connect(_on_player_downed)
 	if events != null and not events.damage_dealt.is_connected(_on_damage_dealt):
 		events.damage_dealt.connect(_on_damage_dealt)
+	if events != null and not events.caster_move_requested.is_connected(_on_caster_move_requested):
+		events.caster_move_requested.connect(_on_caster_move_requested)
+	_recoil_velocity.resize(MAX_RECOILS)
+	_recoil_left.resize(MAX_RECOILS)
 	if data == null:
 		push_warning("Ai: no enemy data set, so this enemy stands still.")
 	if combat != null:
@@ -224,6 +252,8 @@ func _exit_tree() -> void:
 		events.player_downed.disconnect(_on_player_downed)
 	if events != null and events.damage_dealt.is_connected(_on_damage_dealt):
 		events.damage_dealt.disconnect(_on_damage_dealt)
+	if events != null and events.caster_move_requested.is_connected(_on_caster_move_requested):
+		events.caster_move_requested.disconnect(_on_caster_move_requested)
 	# Leaving the tree without being freed must not leave a target behind in Combat.
 	if combat != null and is_instance_valid(combat):
 		combat.unregister_enemy(self)
@@ -325,6 +355,7 @@ func step(delta: float) -> void:
 				state = State.CHASE
 	_hurt_left = maxf(_hurt_left - delta, 0.0)
 	_update_sprite()
+	_step_moves(delta)
 	if combat != null:
 		velocity += combat.consume_knockback_step(self, delta)
 
@@ -512,6 +543,91 @@ func _is_valid_target(node: Variant) -> bool:
 	if not is_instance_valid(node):
 		return false
 	return not (node.has_method("is_downed") and node.is_downed())
+
+
+## True while a card's dash, hook or swap is moving this enemy.
+func is_moving() -> bool:
+	return _move_left > 0.0
+
+
+## A move its own card asked for (a tag of its caster row; the event names NO_PLAYER for an enemy).
+func _on_caster_move_requested(player: int, mode: StringName, to: Vector2, seconds: float, tag: int) -> void:
+	if caster < 0 or player != EventsScript.NO_PLAYER or not to.is_finite() or not SpellTag.is_spell_tag(tag) or SpellTag.caster_of(tag) != caster:
+		return
+	var muzzle: Vector2 = _position_of(self) + hurt_offset
+	if mode == &"recoil":
+		var push_time: float = maxf(seconds, 0.01)
+		var free: int = _recoil_left.find(0.0)
+		var at: int = free if free >= 0 else MAX_RECOILS - 1
+		_recoil_velocity[at] += (to - muzzle) / push_time
+		_recoil_left[at] = maxf(_recoil_left[at], push_time)
+		return
+	if mode != &"dash" and mode != &"teleport" and mode != &"hook" and mode != &"swap":
+		return
+	if _move_left > 0.0:
+		_finish_move()
+	if mode == &"teleport":
+		_teleport(to, tag)
+		return
+	var time: float = maxf(seconds, 0.01)
+	# A dash is measured from the staff tip, a pull (hook, swap) is to the point itself.
+	var goal: Vector2 = _position_of(self) + (to - muzzle) if mode == &"dash" else to
+	_move_mode = mode
+	_move_left = time
+	_move_velocity = (goal - _position_of(self)) / time
+	_move_tag = tag
+
+
+## Jump to where a teleport card aimed (`to` is measured from the staff tip), stopping short of
+## the first wall and backing off until the body is clear, then say where it landed.
+func _teleport(to: Vector2, tag: int) -> void:
+	var start: Vector2 = _position_of(self)
+	var goal: Vector2 = start + (to - (start + hurt_offset))
+	if projectiles != null:
+		var reached: Vector2 = projectiles.clip_to_walls(start, goal)
+		if reached != goal:
+			reached = reached.move_toward(start, TELEPORT_CLEARANCE)
+		goal = reached
+		while goal != start and projectiles.circle_blocked(goal, BODY_RADIUS):
+			goal = goal.move_toward(start, TELEPORT_BACKOFF)
+	_set_position(goal)
+	if events != null:
+		events.caster_move_finished.emit(EventsScript.NO_PLAYER, &"teleport", goal, tag)
+
+
+## The running move and the recoil pushes set `velocity` (walls stop them, as `move_and_slide`
+## does any walk); a move whose time is up says where it ended.
+func _step_moves(delta: float) -> void:
+	if _move_left > 0.0:
+		# The last step is shortened, so a move goes exactly its distance.
+		velocity = _move_velocity * minf(delta, _move_left) / delta
+		_move_left -= delta
+	elif _move_mode != &"":
+		# Answered the step after its last, when the body has got there.
+		_finish_move()
+	for i in MAX_RECOILS:
+		if _recoil_left[i] > 0.0:
+			velocity += _recoil_velocity[i] * minf(delta, _recoil_left[i]) / delta
+			_recoil_left[i] = maxf(_recoil_left[i] - delta, 0.0)
+			if _recoil_left[i] == 0.0:
+				_recoil_velocity[i] = Vector2.ZERO
+
+
+## The move is over: say where (a swap says nothing; its blast went off at the target).
+func _finish_move() -> void:
+	var mode: StringName = _move_mode
+	_move_left = 0.0
+	_move_mode = &""
+	_move_velocity = Vector2.ZERO
+	if events != null and mode != &"swap" and mode != &"":
+		events.caster_move_finished.emit(EventsScript.NO_PLAYER, mode, _position_of(self), _move_tag)
+
+
+func _set_position(at: Vector2) -> void:
+	if is_inside_tree():
+		global_position = at
+	else:
+		position = at
 
 
 ## A swap card moved this enemy: it is there at once, its state and aim kept.

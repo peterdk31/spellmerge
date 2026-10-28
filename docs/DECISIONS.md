@@ -2,6 +2,10 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-28: Fissure card numbers
+
+Fissure is a complexity-2 carrier: 2 damage, 5 mana, a 0.8 s cooldown, a 200 px line 6 px wide (the engine pierces up to 16 targets). Its line is a little shorter than the beam's 240 px because it hits everything on it. Not in the free demo. `bounce · fissure` still stops at walls (backlog).
+
 ## 2026-10-28: Rain card numbers
 
 Rain is a complexity-2 carrier: 6 mana and a 1.5 s cooldown (its payload pays its own on top), a 0.8 s warning before it lands, and an aim point 120 px ahead (the engine's default reach). It has no damage of its own. Not in the free demo.

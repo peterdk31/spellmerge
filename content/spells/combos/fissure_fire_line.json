@@ -1,0 +1,9 @@
+{
+	"id": "fissure_fire_line",
+	"name": "Fissure fire line",
+	"does": "A fire fissure splits the ground ahead and burns both imps standing on its line, the far one well out of a nova's reach.",
+	"casts": [{"staff": 0, "cards": ["fire", "fissure"]}],
+	"imps": [[60, 0], [150, 0]],
+	"seconds": 1.5,
+	"checks": [{"kind": "status", "imps": [0, 1], "status": "burn"}]
+}

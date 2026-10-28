@@ -43,7 +43,7 @@ func take() -> void:
 	var casters: Array[int] = []
 	for index in 4:
 		var wizard: Node = flow.call("get_wizard", index) as Node
-		casters.append(int(wizard.get("actor_id")) if wizard != null else -1)
+		casters.append(int(wizard.get("id")) if wizard != null else -1)
 	events.call("emit_signal", "reaction_triggered", casters[0], NAMES[0], centre)
 	await _snap(centre, "reaction_one")
 	await settle()

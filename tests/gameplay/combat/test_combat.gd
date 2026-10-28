@@ -7,7 +7,8 @@ extends SceneTree
 
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const EventsScript := preload("res://core/events/events.gd")
-const PlayerScript := preload("res://gameplay/player/player.gd")
+const ActorsScript := preload("res://core/actors/actors.gd")
+const WizardScene := preload("res://content/wizard/base/wizard.tscn")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 
@@ -20,7 +21,9 @@ var _projectiles: Node
 ## Where Combat reads what a shot does (`hit_profile`); `_profile` fills it.
 var _spells: Node
 var _enemies: Array = []
-var _players: Array[PlayerScript] = []
+var _players: Array[Actor] = []
+## The wizards' actor table (not the autoload).
+var _actors: ActorsScript
 ## Each damage_dealt as [player, target, amount].
 var _damage: Array = []
 ## Each enemy_died as [player, enemy].
@@ -84,14 +87,25 @@ func _setup(player_count: int = 0, with_projectiles: bool = false) -> void:
 		_damage.append([p, target, amount]))
 	_bus.enemy_died.connect(func(p: int, enemy: Node, _at: Vector2) -> void:
 		_deaths.append([p, enemy]))
+	_actors = ActorsScript.new()
+	# One actor table for the wizards, Combat and the projectile manager (teams aim contact).
+	_combat.actors = _actors
+	if _projectiles != null:
+		_projectiles.actors = _actors
 	for index in player_count:
-		var wizard := PlayerScript.new()
-		wizard.index = index
+		# A wizard actor of the real scene (actors G7), in the tree: its hurtbox registers it in
+		# Combat's seat slot (8 px, at the body).
+		var wizard := WizardScene.instantiate() as Actor
+		PlayerController.seat_wizard(wizard, index, null, [[], [], [], []])
 		wizard.events = _bus
-		wizard._ready()
+		wizard.combat = _combat
+		wizard.spells = _spells
+		wizard.projectiles = _projectiles
+		wizard.actors = _actors
 		wizard.position = Vector2(1000.0 * index, 1000.0)
+		root.add_child(wizard)
+		wizard.set_physics_process(false)
 		_players.append(wizard)
-		_combat.register_player(index, wizard, 8.0)
 
 
 func _teardown() -> void:
@@ -102,12 +116,13 @@ func _teardown() -> void:
 	for wizard in _players:
 		wizard.free()
 	_players.clear()
-	for node: Node in [_combat, _spells, _projectiles, _bus]:
+	for node: Node in [_combat, _spells, _projectiles, _actors, _bus]:
 		if node != null:
 			node.free()
 	_combat = null
 	_spells = null
 	_projectiles = null
+	_actors = null
 	_bus = null
 	_damage.clear()
 	_deaths.clear()
@@ -242,8 +257,8 @@ func _test_projectile_target_added_and_removed() -> void:
 func _test_player_takes_damage_through_event() -> void:
 	_setup(2)
 	_check(_combat.hit(EventsScript.NO_PLAYER, _players[1], 3), "a hit on a wizard counts")
-	_check(_players[1].health == PlayerScript.MAX_HEALTH - 3, "the wizard lost 3 health through damage_dealt")
-	_check(_players[0].health == PlayerScript.MAX_HEALTH, "the other wizard is untouched")
+	_check(_players[1].health.health == _players[1].health.max_health - 3, "the wizard lost 3 health through damage_dealt")
+	_check(_players[0].health.health == _players[0].health.max_health, "the other wizard is untouched")
 	var other := Node2D.new()
 	_enemies.append(other)
 	_check(not _combat.hit(0, other, 3), "an unregistered node is not a wizard")
@@ -251,10 +266,10 @@ func _test_player_takes_damage_through_event() -> void:
 
 func _test_dodging_and_downed_player_get_no_event() -> void:
 	_setup(2)
-	_players[0]._invulnerable_left = 0.25
+	_players[0].health.protect(0.25)
 	_check(not _combat.hit(EventsScript.NO_PLAYER, _players[0], 3), "a dodging wizard is not hit")
-	_check(_damage.is_empty() and _players[0].health == PlayerScript.MAX_HEALTH, "no event, no damage")
-	_players[1].take_damage(1000)
+	_check(_damage.is_empty() and _players[0].health.health == _players[0].health.max_health, "no event, no damage")
+	_players[1].health.take(1000)
 	_check(not _combat.hit(EventsScript.NO_PLAYER, _players[1], 3), "a downed wizard is not hit")
 	_check(_damage.is_empty(), "still no event")
 
@@ -263,16 +278,16 @@ func _test_contact_damage_and_cooldown() -> void:
 	_setup(1)
 	var enemy := _enemy(10, _players[0].position + Vector2(5.0, 0.0), 2)
 	_run(1)
-	_check(_players[0].health == PlayerScript.MAX_HEALTH - 2, "touching the enemy costs its contact damage")
+	_check(_players[0].health.health == _players[0].health.max_health - 2, "touching the enemy costs its contact damage")
 	_check(_damage.size() == 1 and _damage[0][0] == _combat.actor_of(enemy), "the source is the actor that touched (actors G5)")
 	_run(8)
-	_check(_players[0].health == PlayerScript.MAX_HEALTH - 2, "no second hit inside the cooldown")
+	_check(_players[0].health.health == _players[0].health.max_health - 2, "no second hit inside the cooldown")
 	_run(int(CombatScript.CONTACT_COOLDOWN / STEP))
-	_check(_players[0].health == PlayerScript.MAX_HEALTH - 4, "a second hit after the cooldown")
+	_check(_players[0].health.health == _players[0].health.max_health - 4, "a second hit after the cooldown")
 	enemy.position += Vector2(500.0, 0.0)
-	var before: int = _players[0].health
+	var before: int = _players[0].health.health
 	_run(int(CombatScript.CONTACT_COOLDOWN / STEP) + 1)
-	_check(_players[0].health == before, "an enemy out of reach does nothing")
+	_check(_players[0].health.health == before, "an enemy out of reach does nothing")
 
 
 func _test_contact_hurts_only_the_one_touched() -> void:
@@ -280,8 +295,8 @@ func _test_contact_hurts_only_the_one_touched() -> void:
 	_enemy(10, _players[2].position, 1)
 	_run(1)
 	for index in 4:
-		var expected: int = PlayerScript.MAX_HEALTH - (1 if index == 2 else 0)
-		_check(_players[index].health == expected, "player %d health is %d" % [index, expected])
+		var expected: int = _players[index].health.max_health - (1 if index == 2 else 0)
+		_check(_players[index].health.health == expected, "player %d health is %d" % [index, expected])
 
 
 func _test_four_players_kill_credit() -> void:
@@ -360,16 +375,19 @@ func _test_wizard_is_a_projectile_target_for_enemy_shots() -> void:
 	_check(_projectiles.get_target_count() == 1, "an unregistered wizard stops being a target")
 	_combat.register_player(1, _players[0], 8.0)
 	_check(_projectiles.get_target_count() == 1, "re-registering index 1 with another wizard replaces its target")
+	# Slot 1 holds wizard 0 now; empty it before the wizards leave, or wizard 1's hurtbox asks
+	# Combat about a slot whose wizard was freed first.
+	_combat.unregister_player(1)
 
 
 func _test_downed_wizard_is_not_a_projectile_target() -> void:
 	_setup(2, true)
-	_players[0].take_damage(1000)
+	_players[0].health.take(1000)
 	_check(_players[0].is_downed(), "the wizard is downed")
 	_check(_projectiles.get_target_count() == 1, "a downed wizard stops being a projectile target")
-	_players[0].revive(1)
+	Downed.of(_players[0]).revive(1)
 	_check(_projectiles.get_target_count() == 2, "a revived wizard is a projectile target again")
-	_players[0].take_damage(1000)
+	_players[0].health.take(1000)
 	_combat.register_player(0, _players[0], 8.0)
 	_check(_projectiles.get_target_count() == 1, "registering a downed wizard does not make it a target")
 
@@ -382,16 +400,15 @@ func _test_hit_circles_follow_the_body_offset() -> void:
 	_projectiles.events = _bus
 	_profile(9, 1)
 	var body := Vector2(0.0, -12.0)
-	var wizard: Node2D = _players[0]
-	root.add_child(wizard)
+	var wizard: Actor = _players[0]
 	wizard.position = Vector2(100.0, 0.0)
 	_combat.register_player(0, wizard, 8.0, body)
 	_shoot_at_wizard(-12.0)
 	_check(_damage.size() == 1, "an enemy shot through the wizard's body hits")
 	_shoot_at_wizard(0.0)
 	_check(_damage.size() == 1, "an enemy shot along the wizard's feet misses")
-	wizard.take_damage(1000)
-	wizard.revive(1)
+	wizard.health.take(1000)
+	Downed.of(wizard).revive(1)
 	_damage.clear()
 	_shoot_at_wizard(-12.0)
 	_check(_damage.size() == 1, "a revived wizard is still hit at the body")
@@ -427,4 +444,4 @@ func _test_contact_uses_the_body_offset() -> void:
 	_enemies.append(enemy)
 	_combat.register_actor(enemy, 5, 10.0, 2)
 	_run(1)
-	_check(_players[0].health == PlayerScript.MAX_HEALTH - 2, "contact when the wizard's body touches the enemy (17 px, though the origins are 29 apart)")
+	_check(_players[0].health.health == _players[0].health.max_health - 2, "contact when the wizard's body touches the enemy (17 px, though the origins are 29 apart)")

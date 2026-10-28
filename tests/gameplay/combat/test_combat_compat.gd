@@ -9,7 +9,7 @@ extends "res://tests/support/suite.gd"
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
-const PlayerScript := preload("res://gameplay/player/player.gd")
+const WizardScene := preload("res://content/wizard/base/wizard.tscn")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
 
 const STEP: float = 0.0625
@@ -41,17 +41,18 @@ func _enemy(at: Vector2, health: int = 20) -> Node2D:
 	return enemy
 
 
-func _wizard(index: int, at: Vector2) -> PlayerScript:
-	var wizard := own(PlayerScript.new()) as PlayerScript
-	wizard.index = index
+## A wizard actor of seat `index` from the real scene, in the tree at `at` (its hurtbox registers it).
+func _wizard(index: int, at: Vector2) -> Actor:
+	_actors.close(_actors.actor_of_seat(index))
+	var wizard := own(WizardScene.instantiate()) as Actor
+	PlayerController.seat_wizard(wizard, index, null, [[], [], [], []])
 	wizard.events = _bus
-	wizard.actors = _actors
-	wizard.actor_id = _actors.actor_of_seat(index)
-	wizard.projectiles = _projectiles
 	wizard.combat = _combat
+	wizard.projectiles = _projectiles
+	wizard.actors = _actors
 	wizard.position = at
 	root.add_child(wizard)
-	_combat.register_player(index, wizard, 8.0)
+	wizard.set_physics_process(false)
 	return wizard
 
 
@@ -74,23 +75,33 @@ func test_the_enemy_calls_are_the_actor_calls() -> void:
 func test_the_wizard_calls_by_seat_are_the_actor_calls_by_id() -> void:
 	_wizard(0, Vector2(300.0, 0.0))
 	var wizard := _wizard(2, Vector2.ZERO)
-	var id: int = wizard.actor_id
-	check_equal(_combat.actor_of(wizard), id, "register_player keeps the wizard under its actor id")
+	var id: int = wizard.id
+	check_equal(_combat.actor_of(wizard), id, "the wizard is kept under its actor id")
 	check(not _combat.is_enemy(wizard), "a wizard is no enemy")
-	check_equal(_combat.wizard_of(2), wizard, "wizard_of finds it by seat")
+	check_equal(_combat.wizard_of(2), wizard, "wizard_of finds it by its home seat")
 	check(_combat.apply_wizard_status(1, 2, CombatScript.CHILL, 3.0, 40.0), "apply_wizard_status")
 	check_equal(_combat.wizard_status_left(2, CombatScript.CHILL), _combat.status_left(id, CombatScript.CHILL), "wizard_status_left is status_left")
 	check_equal(_combat.wizard_speed_factor(2), _combat.pace(wizard), "wizard_speed_factor is pace")
 	_combat.give_wizard_shield(2, 2, 1.0, 4)
 	check_equal(_combat.wizard_shield(2), _combat.shield(id), "give_wizard_shield and wizard_shield are the barrier")
-	_combat.give_shield(id, 0, 0.0)
 	_combat.hit(1, wizard, 1)
 	_combat.hit(1, wizard, 1)
 	_combat.hit(1, wizard, 1000)
-	check(wizard.is_downed(), "downed")
+	check(wizard.is_down(), "downed")
 	check_equal(_combat.downed_note(2), _combat.downed_note_of(id), "downed_note is downed_note_of")
 	check(_combat.consume_wizard_knockback(2, STEP) == _combat.knockback_of(id), "consume_wizard_knockback reads the same push")
 	_combat.unregister_player(2)
 	check(not _combat.is_registered(id), "unregister_player is unregister_actor")
 	check(_combat.wizard_of(2) == null, "and the seat is empty")
 	check(_combat.wizard_of(0) != null, "the other seat is kept")
+
+
+func test_a_freed_wizard_leaves_its_seat_empty() -> void:
+	var wizard := _wizard(1, Vector2.ZERO)
+	var id: int = wizard.id
+	root.remove_child(wizard)
+	root.add_child(wizard)
+	check_equal(_combat.wizard_of(1), wizard, "registered again")
+	wizard.free()
+	check(_combat.wizard_of(1) == null, "a freed wizard is nobody's (no error on the freed node)")
+	check(not _combat.is_registered(id), "and its id finds nothing")

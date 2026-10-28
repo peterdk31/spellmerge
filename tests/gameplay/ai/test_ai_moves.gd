@@ -12,7 +12,7 @@ extends "res://tests/support/suite.gd"
 const AiScript := preload("res://gameplay/ai/ai.gd")
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const EventsScript := preload("res://core/events/events.gd")
-const PlayerScript := preload("res://gameplay/player/player.gd")
+const WizardScene := preload("res://content/wizard/base/wizard.tscn")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const StaffKit := preload("res://tests/support/staff_kit.gd")
@@ -36,7 +36,7 @@ var _spells: SpellsScript
 var _combat: CombatScript
 var _fake: FakeRegistry
 var _actors: ActorsScript
-var _wizard: PlayerScript
+var _wizard: Actor
 var _enemies: Array[AiScript] = []
 ## Every caster_move_finished as [caster, mode, position, tag], and area_hit_requested as
 ## [caster, position, tag].
@@ -100,13 +100,17 @@ func before_each() -> void:
 	_areas.clear()
 	_bus.caster_move_finished.connect(func(player: int, mode: StringName, at: Vector2, tag: int) -> void: _finished.append([player, mode, at, tag]))
 	_bus.area_hit_requested.connect(func(player: int, at: Vector2, _radius: float, tag: int) -> void: _areas.append([player, at, tag]))
-	_wizard = own(PlayerScript.new()) as PlayerScript
-	_wizard.index = 0
+	# The wizard of seat 0 (actors G7: the real scene); its hurtbox registers it in Combat.
+	_wizard = own(WizardScene.instantiate()) as Actor
+	PlayerController.seat_wizard(_wizard, 0, null, [[], [], [], []])
 	_wizard.events = _bus
+	_wizard.combat = _combat
+	_wizard.projectiles = _projectiles
+	_wizard.spells = _spells
 	_wizard.actors = _actors
-	root.add_child(_wizard)
 	_wizard.position = Vector2(80.0, 0.0)
-	_combat.register_player(0, _wizard, 8.0, Vector2(0.0, -12.0))
+	root.add_child(_wizard)
+	_wizard.set_physics_process(false)
 
 
 func after_each() -> void:
@@ -221,7 +225,7 @@ func test_hooks_and_swaps_pull_the_enemy_and_others_moves_are_not_its_own() -> v
 	var other := _enemy(_data([&"bolt"]), Vector2(0.0, 200.0))
 	var other_tag: int = _spells.current_tag(other.caster, 0)
 	_bus.caster_move_requested.emit(other.caster, &"hook", Vector2(100.0, 0.0), 0.25, other_tag)
-	_bus.caster_move_requested.emit(_wizard.actor_id, &"hook", Vector2(100.0, 0.0), 0.25, tag)
-	_bus.caster_move_requested.emit(enemy.caster, &"hook", Vector2(100.0, 0.0), 0.25, SpellTag.make(_wizard.actor_id, 0, 0, 0))
+	_bus.caster_move_requested.emit(_wizard.id, &"hook", Vector2(100.0, 0.0), 0.25, tag)
+	_bus.caster_move_requested.emit(enemy.caster, &"hook", Vector2(100.0, 0.0), 0.25, SpellTag.make(_wizard.id, 0, 0, 0))
 	_run(0.5)
 	check(enemy.position.is_equal_approx(Vector2.ZERO), "another enemy's move, a wizard's, or one with a wizard's tag do not move it")

@@ -5,7 +5,6 @@ extends "res://tests/support/suite.gd"
 ## staffs kept. 1, 2 and 4 players. Uses the real autoloads; time moves through Flow.step().
 
 const FlowScript := preload("res://gameplay/flow/flow.gd")
-const PlayerScript := preload("res://gameplay/player/player.gd")
 
 var flow: FlowScript
 var input: Node
@@ -57,10 +56,10 @@ func _start(count: int) -> void:
 	events.emit_signal("sandbox_requested", 0)
 
 
-func _wizards() -> Array[PlayerScript]:
-	var found: Array[PlayerScript] = []
+func _wizards() -> Array[Actor]:
+	var found: Array[Actor] = []
 	for index in 4:
-		var wizard := flow.get_wizard(index) as PlayerScript
+		var wizard := flow.get_wizard(index) as Actor
 		if wizard != null:
 			found.append(wizard)
 	return found
@@ -181,15 +180,15 @@ func test_everyone_down_stands_up_with_their_staffs() -> void:
 		_start(count)
 		var world: Node = flow.world
 		var first := _wizards()[0]
-		first.call("_on_staff_change_requested", first.index, 2, 0, &"nova")
+		events.emit_signal("staff_change_requested", PlayerController.of(first).seat, 2, 0, &"nova")
 		for wizard in _wizards():
-			wizard.take_damage(PlayerScript.MAX_HEALTH)
+			wizard.health.take(wizard.health.max_health)
 		check(flow.is_restarting(), "%d players: all down starts the timer" % count)
 		flow.step(FlowScript.RESTART_DELAY)
 		check(flow.world == world, "%d players: the same room, no restart" % count)
 		for wizard in _wizards():
-			check(not wizard.is_downed(), "%d players: wizard %d stands again" % [count, wizard.index])
-		var cards: Array[StringName] = first.call("cards_of", 2)
+			check(not wizard.is_down(), "%d players: wizard %d stands again" % [count, PlayerController.of(wizard).seat])
+		var cards: Array[StringName] = first.caster.cards_of(2)
 		check_equal(cards[0], &"nova", "%d players: the staffs are kept" % count)
 		check(not flow.is_restarting(), "%d players: the timer is off" % count)
 		flow.stop_run()

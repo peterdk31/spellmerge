@@ -192,17 +192,17 @@ func _check() -> Array[String]:
 	elif _cleared != 1:
 		failed.append("room_cleared was received %d times, expected once" % _cleared)
 	for index in IDLER:
-		var wizard := _flow.call("get_wizard", index) as Node
-		if wizard == null or bool(wizard.call("is_downed")) or _downed[index]:
+		var wizard := _flow.call("get_wizard", index) as Actor
+		if wizard == null or wizard.is_down() or _downed[index]:
 			failed.append("player %d is down at the end (and was not revived)" % (index + 1))
 	if _casts == 0:
 		failed.append("no bot ever cast a spell")
 	failed.append_array(_builds_failed)
 	failed.append_array(_refusals)
 	for index in IDLER:
-		var wizard := _flow.call("get_wizard", index) as Node
+		var wizard := _flow.call("get_wizard", index) as Actor
 		var bot: BotScript = _bots[index]
-		if wizard != null and not bot.built_cards.is_empty() and wizard.call("cards_of", BotScript.BUILD_STAFF) != bot.built_cards:
+		if wizard != null and not bot.built_cards.is_empty() and wizard.caster.cards_of(BotScript.BUILD_STAFF) != bot.built_cards:
 			failed.append("bot %d: staff 3 is not the staff it built" % (index + 1))
 	if not _builder_seen_open:
 		failed.append("the builder of bot %d never opened" % (IDLER + 1))

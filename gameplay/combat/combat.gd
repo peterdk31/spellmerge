@@ -22,10 +22,10 @@ extends Node
 ## (`caster`, `by`) are actor ids, `Events.NO_PLAYER` for none, passed through as they came.
 ##
 ## Health: a kit Actor's is its Health component (Combat calls `take(amount, killer)` and
-## `heal`; at 0 the actor dies, `die(killer)`, unless something downs it instead). A wizard of
-## `gameplay/player` (registered by seat, `register_player`) keeps its own until G7: its hits
-## and heals reach it as `damage_dealt` and `heal_dealt`, and a quiet hit (a burn tick) through
-## its `take_damage`, so its HUD hears every change. A body that is neither (the old enemies,
+## `heal`; at 0 the actor dies, `die(killer)`, unless something downs it instead: a wizard's
+## Downed). A node without the kit given to `register_player` (none in the game since G7) keeps
+## its own: hits and heals reach it as `damage_dealt` and `heal_dealt`, a quiet hit through its
+## `take_damage`. A body that is neither (the old enemies,
 ## until G6) has its health in Combat's row. A body's hurtbox rules: a kit Actor is not hurt
 ## while down, dying or protected; a wizard asks its own `is_invulnerable` and `is_downed`.
 ##
@@ -98,7 +98,7 @@ const AREA_DEPTH: int = 8
 
 ## How many rows there are: one per actor id.
 const ACTORS: int = ActorsScript.ACTORS
-## Seats: the wizards `register_player` keeps by seat (deprecated, until G7).
+## Seats: the seat wrappers find a wizard by its home seat (deprecated, until G8).
 const PLAYER_SLOTS: int = ActorsScript.SEATS
 ## A barrier given for less than this many seconds lasts this long (a dash is shorter).
 const SHIELD_MIN_TIME: float = 0.5
@@ -1305,6 +1305,12 @@ func _register(node: Node2D, body: int, health: int, radius: float, contact: int
 	_hurt_radius[row] = radius
 	_hurt_offset[row] = offset
 	_clear_state(row)
+	if body == BODY_ACTOR:
+		# The seat wrappers (`downed_note(seat)`, ...) find a wizard by its home seat, never by the
+		# seat's driven actor (another one while it possesses).
+		var home: ActorController = (node as Actor).home_controller
+		if home != null and home.seat >= 0 and home.seat < PLAYER_SLOTS:
+			_seat_row[home.seat] = row
 	_contact_left[row] = 0.0
 	_last_by[row] = EventsScript.NO_PLAYER
 	_last_kind[row] = &""
@@ -1325,9 +1331,9 @@ func _add_target(row: int) -> void:
 
 ## Forget the row: its target, its node and, if Combat opened it, its actor id. O(1).
 func _free_row(row: int) -> void:
-	var node: Node2D = _nodes[row]
+	var node: Variant = _nodes[row]
 	if projectiles != null and is_instance_valid(node):
-		projectiles.remove_target(node)
+		projectiles.remove_target(node as Node2D)
 	_row_by_node.erase(_node_id[row])
 	var at: int = _live_at[row]
 	var last: int = _live[_live.size() - 1]
@@ -1384,20 +1390,23 @@ func _row_of(actor: Variant) -> int:
 		if id < 0 or id >= ACTORS:
 			return ActorsScript.NONE
 		if _body[id] != BODY_NONE:
-			return id
+			# A body freed since the last step is no actor any more.
+			return id if is_instance_valid(_nodes[id]) else ActorsScript.NONE
 		# A body registered before it opened its own actor (an enemy that casts, until G6).
 		var table: ActorsScript = _table()
 		var node: Node = table.node_of(id) if table != null else null
 		return _row_of_node(node) if node != null else ActorsScript.NONE
 	if actor is Object:
-		return _row_of_node(actor as Object) if is_instance_valid(actor) else ActorsScript.NONE
+		return _row_of_node(actor)
 	return ActorsScript.NONE
 
 
-func _row_of_node(node: Object) -> int:
-	if node == null:
+## The row of a node (a freed one, or one not registered: NONE). Takes a Variant, so a freed
+## node can be asked about.
+func _row_of_node(node: Variant) -> int:
+	if not is_instance_valid(node):
 		return ActorsScript.NONE
-	return _row_by_node.get(node.get_instance_id(), ActorsScript.NONE)
+	return _row_by_node.get((node as Object).get_instance_id(), ActorsScript.NONE)
 
 
 ## True while the row still holds `node`.
@@ -1429,9 +1438,9 @@ func _cast_id(row: int) -> int:
 ## True while a hit can hurt the row's body: it is there, not down, dying or protected (a kit
 ## Actor), not dodging or downed (a wizard), or has health left (a plain body).
 func _can_hurt(row: int) -> bool:
-	var node: Node2D = _nodes[row]
-	if node == null or not is_instance_valid(node):
+	if not is_instance_valid(_nodes[row]):
 		return false
+	var node: Node2D = _nodes[row]
 	match _body[row]:
 		BODY_ACTOR:
 			var kit: Actor = node as Actor
@@ -1446,9 +1455,9 @@ func _can_hurt(row: int) -> bool:
 
 
 func _can_heal(row: int) -> bool:
-	var node: Node2D = _nodes[row]
-	if node == null or not is_instance_valid(node) or _is_down(row):
+	if not is_instance_valid(_nodes[row]) or _is_down(row):
 		return false
+	var node: Node2D = _nodes[row]
 	match _body[row]:
 		BODY_ACTOR:
 			var kit: Actor = node as Actor
@@ -1460,9 +1469,9 @@ func _can_heal(row: int) -> bool:
 
 ## True while the row's body is down (a kit Actor held down, a downed wizard).
 func _is_down(row: int) -> bool:
-	var node: Node2D = _nodes[row]
-	if node == null or not is_instance_valid(node):
+	if not is_instance_valid(_nodes[row]):
 		return false
+	var node: Node2D = _nodes[row]
 	match _body[row]:
 		BODY_ACTOR:
 			return (node as Actor).is_down()
@@ -1675,7 +1684,6 @@ func downed_note(index: int) -> String:
 ## Deprecated (actors G5): use Actors.node_of. The wizard seat `index` registered, or null.
 func wizard_of(index: int) -> Node2D:
 	var row: int = _seat_row_of(index)
-	if row == ActorsScript.NONE:
+	if row == ActorsScript.NONE or not is_instance_valid(_nodes[row]):
 		return null
-	var wizard: Node2D = _nodes[row]
-	return wizard if wizard != null and is_instance_valid(wizard) else null
+	return _nodes[row]

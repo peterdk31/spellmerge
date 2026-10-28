@@ -251,6 +251,16 @@ func set_down(on: bool) -> void:
 	_down = on
 
 
+## The names Combat's wizard slots ask a wizard by (`is_downed`, `is_invulnerable`), until
+## Combat reads Health and `is_down` itself (G5); the AI's target check and the bots ask them too.
+func is_downed() -> bool:
+	return _down
+
+
+func is_invulnerable() -> bool:
+	return health != null and health.is_protected()
+
+
 ## The actor is dead: it sends `died` and frees itself (once).
 func die(killer: int) -> void:
 	if _dying:

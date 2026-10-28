@@ -9,7 +9,6 @@ extends SceneTree
 ## godot --headless --path . --script res://tests/gameplay/flow/test_flow.gd
 
 const FlowScript := preload("res://gameplay/flow/flow.gd")
-const PlayerScript := preload("res://gameplay/player/player.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 
@@ -102,13 +101,29 @@ func _play(requester: int = 0) -> void:
 	_events.emit_signal("play_requested", requester)
 
 
-func _wizards() -> Array[PlayerScript]:
-	var found: Array[PlayerScript] = []
+func _wizards() -> Array[Actor]:
+	var found: Array[Actor] = []
 	for index in InputManagerScript.MAX_PLAYERS:
-		var wizard := _flow.get_wizard(index) as PlayerScript
+		var wizard := _flow.get_wizard(index) as Actor
 		if wizard != null:
 			found.append(wizard)
 	return found
+
+
+## The wizard actor of player `index` (actors G7: a wizard is an Actor; its seat is its
+## PlayerController's).
+func _wizard(index: int) -> Actor:
+	return _flow.get_wizard(index) as Actor
+
+
+func _seat(wizard: Actor) -> int:
+	var seat: PlayerController = PlayerController.of(wizard)
+	return seat.seat if seat != null else -1
+
+
+## A hit that takes all of `wizard`'s health.
+func _down(wizard: Actor) -> void:
+	wizard.health.take(wizard.health.max_health)
 
 
 func _test_restart_delay_is_under_three_seconds() -> void:
@@ -126,9 +141,9 @@ func _test_play_starts_the_room(count: int) -> void:
 	_check(_entered == [&"arena_01"], "%d players: room_entered(arena_01) was sent once, got %s" % [count, _entered])
 	_check(_wizards().size() == count, "%d players: %d wizards spawned" % [count, _wizards().size()])
 	for index in count:
-		var wizard := _flow.get_wizard(index) as PlayerScript
-		_check(wizard != null and wizard.index == index and wizard.has_staff(0) and wizard.has_staff(1), "%d players: wizard %d has its index and its dash and bolt staffs" % [count, index])
-		_check(wizard != null and wizard.cards_of(0)[0] == &"dash" and wizard.cards_of(1).slice(0, 2) == ([&"fire", &"bolt"] as Array[StringName]), "%d players: wizard %d has the start cards" % [count, index])
+		var wizard: Actor = _wizard(index)
+		_check(wizard != null and _seat(wizard) == index and wizard.ramp == index and wizard.caster.has_staff(0) and wizard.caster.has_staff(1), "%d players: wizard %d has its seat, its ramp and its dash and bolt staffs" % [count, index])
+		_check(wizard != null and wizard.caster.cards_of(0)[0] == &"dash" and wizard.caster.cards_of(1).slice(0, 2) == ([&"fire", &"bolt"] as Array[StringName]), "%d players: wizard %d has the start cards" % [count, index])
 		_check(wizard != null and wizard.position == Vector2(224.0 + 64.0 * index, 320.0), "%d players: wizard %d stands on its spawn" % [count, index])
 	_check(_flow.enemies_left() == FlowScript.WAVE.size(), "%d players: the wave has %d enemies, got %d" % [count, FlowScript.WAVE.size(), _flow.enemies_left()])
 	_check(_combat.call("get_enemy_count") == FlowScript.WAVE.size(), "%d players: every enemy is registered with combat" % count)
@@ -165,16 +180,16 @@ func _test_unjoined_requester_other_than_p1_starts_nothing() -> void:
 func _test_cooldowns_reset_on_a_new_run() -> void:
 	_setup(2)
 	_play()
-	var wizard := _flow.get_wizard(1) as PlayerScript
+	var wizard: Actor = _wizard(1)
 	var at := Vector2(100.0, 100.0)
 	# Spells keeps staffs by caster: the actor id the wizard of player 2 opened (actors G3b).
-	var caster: int = wizard.actor_id
+	var caster: int = wizard.id
 	_check(_spells.cast_staff(caster, 1, at, Vector2.RIGHT, 100.0) != SpellsScript.REFUSED, "staff X fires for player 2")
 	_check(_spells.cast_staff(caster, 1, at, Vector2.RIGHT, 100.0) == SpellsScript.REFUSED, "staff X waits out its delay for player 2")
 	_check(_spells.cast_staff(caster, 0, at, Vector2.RIGHT, 100.0) != SpellsScript.REFUSED, "staff A has its own delay")
 	_flow.stop_run()
 	_play()
-	caster = (_flow.get_wizard(1) as PlayerScript).actor_id
+	caster = _wizard(1).id
 	_check(_spells.cast_staff(caster, 1, at, Vector2.RIGHT, 100.0) != SpellsScript.REFUSED, "a new run forgot the delays")
 	_check(wizard != null, "the wizard of player 2 existed")
 	_stop()
@@ -203,7 +218,7 @@ func _test_restart_when_all_down() -> void:
 		_play()
 		var old_world: Node = _flow.world
 		for wizard in _wizards():
-			wizard.take_damage(PlayerScript.MAX_HEALTH)
+			_down(wizard)
 		_check(_flow.is_restarting(), "%d players: all down starts the restart timer" % count)
 		_flow.step(FlowScript.RESTART_DELAY - 0.5)
 		_check(_flow.world == old_world, "%d players: no restart before the delay" % count)
@@ -212,7 +227,7 @@ func _test_restart_when_all_down() -> void:
 		_check(_entered.size() == 2, "%d players: room_entered was sent again for the new room, got %d" % [count, _entered.size()])
 		_check(_wizards().size() == count, "%d players: the wizards are back" % count)
 		for wizard in _wizards():
-			_check(wizard.health == PlayerScript.MAX_HEALTH and not wizard.is_downed(), "%d players: wizard %d is standing at full health" % [count, wizard.index])
+			_check(wizard.health.health == wizard.health.max_health and not wizard.is_down(), "%d players: wizard %d is standing at full health" % [count, _seat(wizard)])
 		_check(_flow.enemies_left() == FlowScript.WAVE.size(), "%d players: a new wave stands" % count)
 		_check(not _flow.is_restarting(), "%d players: the timer is off after the restart" % count)
 		_stop()
@@ -222,7 +237,7 @@ func _test_no_restart_while_one_stands() -> void:
 	_setup(4)
 	_play()
 	for index in 3:
-		(_flow.get_wizard(index) as PlayerScript).take_damage(PlayerScript.MAX_HEALTH)
+		_down(_wizard(index))
 	_check(not _flow.is_restarting(), "three of four down: no restart")
 	var world: Node = _flow.world
 	_flow.step(10.0)
@@ -233,10 +248,10 @@ func _test_no_restart_while_one_stands() -> void:
 func _test_revive_cancels_the_restart() -> void:
 	_setup(2)
 	_play()
-	(_flow.get_wizard(0) as PlayerScript).take_damage(PlayerScript.MAX_HEALTH)
-	(_flow.get_wizard(1) as PlayerScript).take_damage(PlayerScript.MAX_HEALTH)
+	_down(_wizard(0))
+	_down(_wizard(1))
 	_check(_flow.is_restarting(), "two of two down: restarting")
-	(_flow.get_wizard(0) as PlayerScript).revive(1)
+	Downed.of(_wizard(0)).revive(1)
 	_check(not _flow.is_restarting(), "a revive cancels the restart")
 	_stop()
 
@@ -246,7 +261,7 @@ func _test_no_restart_after_clear() -> void:
 	_play()
 	for enemy: Node in _flow._enemies.duplicate():
 		_events.emit_signal("enemy_died", 0, enemy, Vector2.ZERO)
-	(_flow.get_wizard(0) as PlayerScript).take_damage(PlayerScript.MAX_HEALTH)
+	_down(_wizard(0))
 	_check(not _flow.is_restarting(), "a cleared room does not restart when the players go down")
 	_stop()
 
@@ -258,7 +273,7 @@ func _test_last_enemy_dies_after_all_down() -> void:
 	_play()
 	var old_world: Node = _flow.world
 	for wizard in _wizards():
-		wizard.take_damage(PlayerScript.MAX_HEALTH)
+		_down(wizard)
 	_check(_flow.is_restarting(), "all down: restarting")
 	for enemy: Node in _flow._enemies.duplicate():
 		_events.emit_signal("enemy_died", 0, enemy, Vector2.ZERO)
@@ -276,7 +291,7 @@ func _test_failed_restart_goes_idle() -> void:
 	_play()
 	var registry: Node = _flow.registry
 	_flow.registry = null
-	(_flow.get_wizard(0) as PlayerScript).take_damage(PlayerScript.MAX_HEALTH)
+	_down(_wizard(0))
 	_flow.step(FlowScript.RESTART_DELAY)
 	_flow.registry = registry
 	_check(_flow.state == FlowScript.State.IDLE and _flow.world == null, "a failed restart returns flow to idle")
@@ -353,7 +368,7 @@ func _test_restart_leaves_no_old_enemies_or_shots() -> void:
 	var projectiles: Node = root.get_node("Projectiles")
 	projectiles.call("spawn", 0, Vector2(100.0, 100.0), Vector2(10.0, 0.0), 5.0)
 	_check(projectiles.call("get_count") == 1, "a shot is in the air")
-	(_flow.get_wizard(0) as PlayerScript).take_damage(PlayerScript.MAX_HEALTH)
+	_down(_wizard(0))
 	_flow.step(FlowScript.RESTART_DELAY)
 	_check(projectiles.call("get_count") == 0, "the restart cleared the shots")
 	_check(_combat.call("get_enemy_count") == FlowScript.WAVE.size(), "combat knows only the new wave, got %d" % _combat.call("get_enemy_count"))
@@ -434,8 +449,8 @@ func _test_build_break_ignores_builders() -> void:
 		_flow.step(0.1)
 		_check(_flow.wave == 2 and _flow.state == FlowScript.State.RUNNING, "%d players: the wave starts on time while someone builds" % count)
 		_check(_flow.enemies_left() == FlowScript.wave_size(2), "%d players: the next wave is whole" % count)
-		for wizard: PlayerScript in _wizards():
-			_check(not wizard.is_downed(), "%d players: every wizard stands for the wave" % count)
+		for wizard: Actor in _wizards():
+			_check(not wizard.is_down(), "%d players: every wizard stands for the wave" % count)
 		focus.call("close", count - 1)
 		builder.free()
 		_stop()
@@ -455,13 +470,15 @@ func _test_wave_size_is_capped() -> void:
 func _test_next_wave_stands_up_downed_wizards() -> void:
 	_setup(2)
 	_play()
-	(_flow.get_wizard(1) as PlayerScript).take_damage(PlayerScript.MAX_HEALTH)
+	_down(_wizard(1))
+	_check(_wizard(1).is_down(), "wizard 2 is down")
 	_check(not _flow.is_restarting(), "one of two down: no restart")
 	_kill_wave()
 	_flow.step(FlowScript.BUILD_BREAK)
-	var wizard := _flow.get_wizard(1) as PlayerScript
-	_check(not wizard.is_downed() and wizard.health > 0, "the downed wizard is up for wave 2")
-	_check(wizard.is_invulnerable(), "the wizard is protected for a moment at the start of wave 2")
+	var wizard: Actor = _wizard(1)
+	_check(not wizard.is_down() and wizard.health.health > 0, "the downed wizard is up for wave 2")
+	_check(wizard.health.health == Downed.REVIVE_HEALTH, "it stands with the revive health")
+	_check(wizard.health.is_protected(), "the wizard is protected for a moment at the start of wave 2")
 	_check(not _flow.is_restarting(), "no restart is pending in wave 2")
 	_stop()
 
@@ -473,9 +490,9 @@ func _test_restart_goes_back_to_wave_one() -> void:
 	_kill_wave()
 	_flow.step(FlowScript.BUILD_BREAK)
 	_check(_flow.wave == 2, "the test reached wave 2")
-	var wizard := _flow.get_wizard(0) as PlayerScript
-	wizard._invulnerable_left = 0.0 # the wave-start protection would absorb the hit
-	wizard.take_damage(PlayerScript.MAX_HEALTH)
+	var wizard: Actor = _wizard(0)
+	wizard.health.step(Downed.JOIN_PROTECTION) # the wave-start protection would absorb the hit
+	_down(wizard)
 	_flow.step(FlowScript.RESTART_DELAY)
 	_check(_flow.wave == 1 and _waves.back() == 1, "the restart begins at wave 1, got %d" % _flow.wave)
 	_check(_flow.enemies_left() == FlowScript.wave_size(1), "the restart has the wave 1 size")
@@ -494,15 +511,15 @@ func _test_walls_reach_the_projectile_manager() -> void:
 	var projectiles: Node = root.get_node("Projectiles")
 	_check_arena_walls(projectiles, "after start_run")
 	# Shots are cast by actor id: each wizard's own (actors G3b).
-	var casters: Array[int] = [(_flow.get_wizard(0) as PlayerScript).actor_id, (_flow.get_wizard(1) as PlayerScript).actor_id]
+	var casters: Array[int] = [_wizard(0).id, _wizard(1).id]
 	for index in 2:
 		projectiles.call("spawn", casters[index], Vector2(100.0 + 20.0 * index, 100.0), Vector2(0.0, -300.0), 5.0, 2.0, 0)
 	_check(projectiles.call("get_count_for", casters[0]) == 1 and projectiles.call("get_count_for", casters[1]) == 1, "each player has a shot in the air")
 	projectiles.call("step", 0.25)
 	_check(projectiles.call("get_count") == 0, "both players' shots ended on the border, %d left" % projectiles.call("get_count"))
 	# A restart builds a new world and must give the walls again.
-	(_flow.get_wizard(0) as PlayerScript).take_damage(PlayerScript.MAX_HEALTH)
-	(_flow.get_wizard(1) as PlayerScript).take_damage(PlayerScript.MAX_HEALTH)
+	_down(_wizard(0))
+	_down(_wizard(1))
 	_flow.step(FlowScript.RESTART_DELAY)
 	_check(_flow.state == FlowScript.State.RUNNING, "the run restarted")
 	_check_arena_walls(projectiles, "after a restart")

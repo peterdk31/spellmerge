@@ -31,26 +31,26 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `staff_cards_requested` | `hud` (the radial builder) | `player` |
 | `staff_changed` | `player` | `hud` (the builders) |
 | `staff_cast` | `player` | `hud` (the corner panel) |
-| `caster_move_requested` | `core/spells` | `player`, `ai`, `actor` (the Mover), each for its own actor id |
-| `mana_reserved` | `core/spells` (to the seat that drives the caster) | `player` |
-| `mana_refund_requested` | `core/spells` (for every actor) | `player`, `ai`, `actor` (the Caster), each for its own actor id |
+| `caster_move_requested` | `core/spells` | `ai`, `actor` (the Mover), each for its own actor id |
+| `mana_reserved` | `core/spells` (to the seat that drives the caster) | none (the Caster reads `Spells.reserved_mana`, actors G7) |
+| `mana_refund_requested` | `core/spells` (for every actor) | `ai`, `actor` (the Caster), each for its own actor id |
 | `area_hit_requested` | `core/spells` | `combat` |
 | `target_move_requested`, `entity_spawn_requested`, `entity_end_requested` | `core/spells` (staffs B2) | `ai`; `target_move_requested` also `actor` (the Mover) |
-| `caster_move_finished` | `player`, `ai`, `actor` (the Mover), each with its own actor id | `core/spells`, `feel` (where a dash lands) |
+| `caster_move_finished` | `ai`, `actor` (the Mover), each with its own actor id | `core/spells`, `feel` (where a dash lands) |
 | `entity_ended`, `familiar_cast_requested` | `ai` | none yet (`core/spells`, staffs B2) |
 | `shot_blocked` | `core/projectiles` | none yet (`core/spells`, staffs B1) |
 | `shield_blocked`, `kill_landed`, `actor_hurt`, `reaction_landed` | `combat` | `core/spells` (on block, on kill, on hurt, on reaction) |
 | `hit_landed` | `combat` | `feel` |
-| `heal_dealt` | `combat` | `feel`, `player` |
+| `heal_dealt` | `combat` | `feel` |
 | `wizard_shield_requested`, `pull_requested`, `area_hit_requested` | `core/spells` (staffs B2) | `combat` |
 | `reaction_triggered` | `combat` | `feel` |
 | `discharge_arc` | `combat` | `feel` |
-| `damage_dealt` | `combat` | `feel`, `player` |
+| `damage_dealt` | `combat` | `feel`, `ai` |
 | `status_applied` | `combat` | none yet |
 | `enemy_died` | `combat` | `feel`, `flow` |
 | `player_downed` | `player` | `ai`, `feel`, `flow`, `run` |
 | `player_revived` | `player` | none yet |
-| `revive_progress` | `coop` | `player` |
+| `revive_progress` | `coop` | `player` (Downed) |
 | `player_stats_changed` | `player` | `hud` |
 | `player_joined`, `player_left` | `coop` | `difficulty`, `flow`, `hud` |
 | `run_started`, `run_ended` | `run` | `run_started`: `difficulty`, `flow`; `run_ended`: `progression` |

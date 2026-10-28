@@ -26,7 +26,7 @@ func take() -> void:
 	var wizard: Node2D = flow.call("get_wizard", 0) as Node2D
 	var centre: Vector2 = wizard.global_position + Vector2(0.0, -60.0)
 	# Statuses and reactions name their caster by actor id: the actor the wizard opened (actors G3b).
-	var caster: int = int(wizard.get("actor_id"))
+	var caster: int = int(wizard.get("id"))
 	var imps: Array[Node2D] = []
 	for i in IDS.size():
 		var imp := Node2D.new()

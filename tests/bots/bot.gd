@@ -95,22 +95,22 @@ func tap_back() -> void:
 
 ## Build a random staff into staff 3, slot by slot. The cards are chosen from the wizard's bag
 ## with `build_seed`. Returns false when the bot has no wizard or the bag has no carrier. True
-## means the requests were sent; check the wizard's `cards_of(BUILD_STAFF)`.
+## means the requests were sent; check the wizard's `caster.cards_of(BUILD_STAFF)`.
 func build_random(build_seed: int) -> bool:
 	var root: Node = _flow.get_tree().root
 	var events: Node = root.get_node_or_null("Events")
 	var spells: Node = root.get_node_or_null("Spells")
-	var wizard: Node = _flow.call("get_wizard", player) as Node
-	if events == null or spells == null or wizard == null:
+	var wizard := _flow.call("get_wizard", player) as Actor
+	if events == null or spells == null or wizard == null or wizard.caster == null:
 		return false
 	var bag: Array[StringName] = []
-	bag.assign(wizard.get("bag"))
+	bag.assign(PlayerController.of(wizard).bag)
 	var fuzzer := FuzzerScript.new(bag, func(id: StringName) -> StringName: return spells.call("component_kind", id))
 	if not fuzzer.can_build():
 		return false
 	var rng := RandomNumberGenerator.new()
 	rng.seed = build_seed
-	var slots: int = int(wizard.call("slot_count"))
+	var slots: int = wizard.caster.slot_count()
 	var cards: Array[StringName] = fuzzer.random_cards(rng, mini(BUILD_CARDS, slots))
 	built_cards.clear()
 	for slot in slots:
@@ -135,9 +135,9 @@ func leave() -> void:
 func step(_delta: float) -> void:
 	if mode == Mode.IDLER:
 		return
-	var wizard := _flow.call("get_wizard", player) as Node2D
+	var wizard := _flow.call("get_wizard", player) as Actor
 	var world := _flow.get("world") as Node2D
-	if wizard == null or world == null or bool(wizard.call("is_downed")):
+	if wizard == null or world == null or wizard.is_down():
 		_release()
 		return
 	var target: Node2D = _nearest_enemy(world, wizard.global_position)
@@ -171,7 +171,7 @@ func step(_delta: float) -> void:
 		var side: Vector2 = away - aim * away.dot(aim)
 		direction = side.normalized() if side.length() > 1.0 else aim.orthogonal() * _sidestep_sign
 	_hold_move(direction)
-	if threat != null and threat.get_instance_id() != _dodged_enemy and bool(wizard.call("has_staff", 0)):
+	if threat != null and threat.get_instance_id() != _dodged_enemy and wizard.caster.has_staff(0):
 		_dodged_enemy = threat.get_instance_id()
 		_input.call("send_virtual", player, &"staff_1", 1.0)
 		_input.call("send_virtual", player, &"staff_1", 0.0)

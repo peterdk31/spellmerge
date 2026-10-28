@@ -44,7 +44,6 @@ const BotScript := preload("res://tests/bots/bot.gd")
 const ErrorLogScript := preload("res://tests/smoke/error_log.gd")
 const ProbeScript := preload("res://tests/benchmark/probe.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
-const PlayerScript := preload("res://gameplay/player/player.gd")
 const AiScript := preload("res://gameplay/ai/ai.gd")
 
 const PLAYERS: int = 4
@@ -122,6 +121,9 @@ var _probe: Node
 var _rng := RandomNumberGenerator.new()
 var _enemies: Array[Node2D] = []
 var _enemy_data: EnemyBase = null
+## The wizards of the scenario running and their Downed components, by seat.
+var _wizards: Array[Actor] = []
+var _downs: Array[Downed] = []
 var _casts: Array[int] = [0, 0, 0, 0]
 var _current: int = -1
 var _target_enemies: int = 0
@@ -235,15 +237,19 @@ func _next_scenario() -> void:
 	if _enemy_data == null:
 		_finish(["the enemy data is missing"])
 		return
+	_wizards.clear()
+	_downs.clear()
 	for index in PLAYERS:
-		var wizard := _flow.call("get_wizard", index) as PlayerScript
+		var wizard := _flow.call("get_wizard", index) as Actor
 		if wizard == null:
 			_finish(["the wizard of player %d is missing" % (index + 1)])
 			return
+		_wizards.append(wizard)
+		_downs.append(Downed.of(wizard))
 		for at in 2:
 			var cards: Array[StringName] = []
 			cards.assign(STAFFS[index][at])
-			if not wizard.set_staff(at + 1, cards):
+			if not wizard.caster.set_staff(at + 1, cards):
 				_finish(["the stress staff %d of player %d was refused" % [at + 1, index + 1]])
 				return
 	print("BENCH: stress scenario %s: %d players, %d enemies, %d shots (cap %d), warm-up %.0f s, measured %.0f s" % [scenario["label"], PLAYERS, _target_enemies, _target_shots, int(_projectiles.call("get_cap")), warm_up, measure])
@@ -330,14 +336,13 @@ func _physics_process(_delta: float) -> void:
 
 ## Nobody dies and nobody runs dry: this is a stress scene, not a balance test.
 func _keep_wizards_up() -> void:
-	for index in PLAYERS:
-		var wizard := _flow.call("get_wizard", index) as PlayerScript
-		if wizard == null:
+	for index in _wizards.size():
+		var wizard: Actor = _wizards[index]
+		if not is_instance_valid(wizard):
 			continue
-		wizard.mana = PlayerScript.MAX_MANA
-		if wizard.is_downed():
-			wizard.revive(index)
-		wizard.protect(1.0)
+		wizard.caster.mana = wizard.caster.max_mana
+		_downs[index].revive(index)
+		_downs[index].protect(1.0)
 
 
 func _top_up_enemies() -> void:
@@ -373,13 +378,13 @@ func _top_up_shots() -> void:
 	var count: int = mini(missing, TOP_UP_PER_STEP)
 	for i in count:
 		var owner_index: int = i % PLAYERS
-		var wizard := _flow.call("get_wizard", owner_index) as PlayerScript
+		var wizard := _flow.call("get_wizard", owner_index) as Actor
 		if wizard == null:
 			continue
 		var angle: float = _rng.randf() * TAU
 		var speed: float = _rng.randf_range(FILLER_SPEED_MIN, FILLER_SPEED_MAX)
 		# A shot's caster is the wizard's actor id (actors G3b), not its seat.
-		_projectiles.call("spawn", wizard.actor_id, wizard.global_position, Vector2.from_angle(angle) * speed, FILLER_LIFE, FILLER_RADIUS, ProjectileManagerScript.LAYER_ENEMY, FILLER_PIERCE)
+		_projectiles.call("spawn", wizard.id, wizard.global_position, Vector2.from_angle(angle) * speed, FILLER_LIFE, FILLER_RADIUS, ProjectileManagerScript.LAYER_ENEMY, FILLER_PIERCE)
 
 
 func _on_spell_cast(player: int, _spell_id: StringName, _origin: Vector2, _direction: Vector2) -> void:

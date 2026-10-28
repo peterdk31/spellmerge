@@ -2,6 +2,22 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-28: Card overcharge (staffs C), already built
+
+The Overcharge card was already done: the modifier `.tres` (x2 damage, x2 mana), icon, assets, two combos, lore and `test_overcharge.gd` exist. Ticked it off; no code changed.
+
+## 2026-10-28: Card triple (staffs C), already built
+
+The Triple card was already done: the multicast `.tres`, icon, assets, two combos, lore and `test_triple.gd` exist, and all 122 unit tests pass. Ticked it off. `tools/check.sh` reports errors only for `.idea`, `.vscode` and `scripts`: unreadable folders of this environment that git doesn't track, so none come from the doc files changed here.
+
+## 2026-10-28: Card double (staffs C), already built
+
+The task found the Double card done: the multicast `.tres`, icon, assets, two combos and `test_double.gd` exist, and all 122 unit tests pass. Ticked it off.
+
+## 2026-10-28: Sandbox (staffs B7), already built
+
+The task found B7 done: the sandbox room, both dummies, flow's sandbox events, the main menu button and the pause menu's Sandbox page exist with tests, which pass (`test_flow_sandbox.gd`, `test_sandbox_data.gd`, `test_main_menu_sandbox.gd`, `test_pause_menu.gd`). They landed in owner sessions (#295, #296). The session only ticked it in `docs/NEXT.md`; no code changed. The "Friendly fire" setting in the design row no longer applies since actors G3c; `docs/milestones/M2-staffs.md` now carries a note on those rows. `tools/check.sh` was rerun: none of its findings are in the doc files changed here.
+
 ## 2026-10-26: Caster kit (staffs B4)
 
 The wizard now acts on every move a card can ask for. Teleport jumps along the aim and stops short of the first wall; hook and swap pull the wizard to a point over the time asked; recoil pushes it back, with the recoils of a step added up so a mirrored recoil cancels. A later dash, teleport, hook or swap replaces an earlier one, which is still answered (`caster_move_finished`) where the wizard is, so its blast is not lost. Chill and freeze slow and stop walking and dashing, hits push the wizard (combat's knockback), and siphon's refund gives mana back. A move now walks its whole time (before, the last step of a dash was not walked) and is answered by the next step. Tests: `test_player_caster.gd` (14).

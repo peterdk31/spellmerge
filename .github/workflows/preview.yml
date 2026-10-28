@@ -1,7 +1,9 @@
 # Web preview of main between daily runs.
 #
-# After each merge to main (about hourly, as the develop sessions merge), the same build and
-# smoke tests as the daily run, then the web build goes to Pages at /preview/. No release,
+# After each merge to main (about hourly, as the develop sessions merge), the web build only
+# (build.sh --web: no unit tests or smoke tests; the daily run checks everything and its bisect
+# reverts a breaking merge), then it goes to Pages at /preview/. It takes the screenshots for the
+# gallery too (about a minute), but a failed one never keeps the build off Pages. No release,
 # no itch.io, no AI and no secrets. /nightly/ and /play/ stay the daily releases
 # (smbot.site --preview). A newer merge cancels a build still running, so a burst of merges
 # builds once.
@@ -20,7 +22,7 @@ env:
 
 jobs:
   build:
-    name: build and smoke test
+    name: web build
     if: github.ref == 'refs/heads/main' && vars.AUTOMATION_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -42,11 +44,12 @@ jobs:
           path: ~/.cache/pinned-godot
           key: godot-${{ hashFiles('ci/build/godot.env') }}
       - name: Virtual display for the screenshots
+        continue-on-error: true # no display: no screenshots, the build still goes out
         run: sudo apt-get update -qq && sudo apt-get install -y -qq xvfb
-      - name: Build, unit tests, screenshots, smoke test and package
+      - name: Web build, package and screenshots
         env:
           VERSION: ${{ steps.plan.outputs.version }}
-        run: ci/build/build.sh --version "$VERSION" --channel preview --commit "$(git rev-parse HEAD)"
+        run: ci/build/build.sh --web --screenshots --version "$VERSION" --channel preview --commit "$(git rev-parse HEAD)"
       - name: Keep the build logs
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

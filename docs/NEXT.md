@@ -79,7 +79,7 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 - [x] **Living staffs: the plan (living staffs H1).** (`docs/`) The design, [M2-living-staffs.md](milestones/M2-living-staffs.md), with the owner's decisions of 2026-10-28.
 - [x] **The face (living staffs H2).** (`gameplay/actor/`, `art/`) After G10.
 - [x] **The floating staff (living staffs H3).** (`gameplay/player/`, `content/wizard/`) After H2.
-- [ ] **The poof (living staffs H4).** (`gameplay/player/`, `core/projectiles/`, `gameplay/feel/`) After H3.
+- [x] **The poof (living staffs H4).** (`gameplay/player/`, `core/projectiles/`, `gameplay/feel/`) After H3.
 - [ ] **The strays (living staffs H5).** (`content/enemies/`, `gameplay/ai/`) After H3; may run beside H4.
 - [ ] **The intro (living staffs H6).** (`gameplay/flow/`, `content/story/`) After H3.
 - [ ] **The docs (living staffs H7).** (`docs/STYLE.md`, READMEs, `art/kit/`) Last.

@@ -1858,3 +1858,11 @@ The owner's decision after G9: a player must always see their own wizard, which 
 - **The style N wizard art stays** in `content/wizard/base/` for the villain (H6); the clips stage and the art screenshots still show it. `docs/STYLE.md` and the golden examples move to the staff in H7.
 - **The sheets** are drawn by a generator from the mockup's pixel rules (the same as the face sheets'); each head folder lists its sheet in an `assets.json`.
 
+## 2026-10-28: The poof (living staffs H4)
+
+- **The poof is a look bit on the puff, not a new effect kind:** the shot shader's kinds 1–15 are all taken (the kind travels in four bits of the instance data), so `KIND_POOF` from the plan is `KIND_PUFF` with the `POOF` look bit (kind 22, `1 << 21`), as `EXACT` is. Bone clouds along the staff that peak at 35% and dot away, sparks in the ramp; no new pool.
+- **A new event, `staff_shown(caster, actor, staff)`,** sent by the Caster when another staff goes on show, before that press casts (the cast is never delayed). Feel draws the cloud from it; `StaffLook` needs no event (it reads `Caster.current`).
+- **The body changes at 35% of the newest cloud:** every press of another staff starts the poof again (Feel shows a cloud per press), so a fast double swap lands on the last staff at the last cloud's biggest. The same staff again, or holding one, never poofs.
+- **Followed effects sit at an offset** (`_effect_offset`, was the status's fixed rise), so the cloud stays on the staff while it moves.
+- **Feel ages effects by the wall clock** (so hit-stop cannot slow them). On a software renderer a frame takes far longer than 1/60 s and a 0.18 s cloud is gone in a frame, so `shot_poof.gd` puts Feel on frame time for its pictures. The game is unaffected.
+

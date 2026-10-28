@@ -28,6 +28,13 @@ extends ActorLook
 ## Feel's flash and squash are Combat's and Feel's). The animation is paused while a pose other
 ## than the idle shows.
 ##
+## Hop (living staffs H5, docs/milestones/M2-living-staffs.md, "The strays"): a stray moves on its
+## tip, so while it walks (faster than HOP_SPEED) the sprite hops HOP_HEIGHT px HOP_RATE times a
+## second, and while it stands it bobs HOP_IDLE px; players float, so the two sides read apart by
+## motion alone. The hop is the sprite's `offset` only (the telegraph and the hurt circle stay).
+## The actor's `Face` (its child of that kind, stepped after this look) is told the same lift
+## (`Face.body_offset`), so its eyes and brows trail the hop.
+##
 ## Nothing here allocates per frame.
 
 enum Pose { IDLE, WINDUP, HURT }
@@ -49,6 +56,11 @@ const TELEGRAPH_LAST_FROM: float = 0.8
 const WINDUP_FLASHES: float = 5.0
 ## Seconds the hurt pose shows after a hit.
 const HURT_TIME: float = 0.25
+## The hop: pixels high, hops a second, the speed (px/s) from which it hops, and the bob standing.
+const HOP_HEIGHT: float = 3.0
+const HOP_RATE: float = 2.5
+const HOP_SPEED: float = 5.0
+const HOP_IDLE: float = 1.0
 
 ## Optional poses for the sprite: strips of square frames (width / height frames).
 @export var windup_texture: Texture2D = null
@@ -66,6 +78,11 @@ var _hurt_left: float = 0.0
 var _pose: Pose = Pose.IDLE
 ## True while the telegraph (and the flash) is up.
 var _showing: bool = false
+## The actor's Face (null without one), the sprite's own offset, and the time hopped.
+var _face: Face = null
+var _sprite_offset: Vector2 = Vector2.ZERO
+var _hop_time: float = 0.0
+var _lift: Vector2 = Vector2.ZERO
 
 
 func setup(owner_actor: Actor) -> void:
@@ -79,6 +96,11 @@ func setup(owner_actor: Actor) -> void:
 	if sprite != null:
 		_idle_texture = sprite.texture
 		_idle_hframes = sprite.hframes
+		_sprite_offset = sprite.offset
+	for child in actor.get_children():
+		if child is Face:
+			_face = child as Face
+			break
 	if telegraph != null:
 		telegraph.visible = false
 		# Starts where the cast does (the hand; an imp's is its body), whatever the scene says.
@@ -100,6 +122,29 @@ func step(delta: float) -> void:
 		_update_telegraph(ai.telegraph_progress())
 	_hurt_left = maxf(_hurt_left - delta, 0.0)
 	_update_sprite()
+	_hop(delta)
+
+
+## How high the body is off its rest this step (px, up is positive), for tests.
+func lift() -> float:
+	return -_lift.y
+
+
+## The hop while walking, the bob while standing, on the sprite and the face.
+func _hop(delta: float) -> void:
+	_hop_time += delta
+	var walking: bool = actor.velocity.length() > HOP_SPEED
+	var up: float = 0.0
+	if walking:
+		up = roundf(absf(sin(_hop_time * HOP_RATE * PI)) * HOP_HEIGHT)
+	else:
+		up = roundf((sin(_hop_time * HOP_RATE) * 0.5 + 0.5) * HOP_IDLE)
+	_lift = Vector2(0.0, -up)
+	if sprite != null:
+		sprite.offset = _sprite_offset + _lift
+	if _face != null:
+		_face.body_offset = _lift
+
 
 
 ## True while the hurt pose shows (a hit landed in the last HURT_TIME seconds).

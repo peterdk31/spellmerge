@@ -143,7 +143,10 @@ const float TRACE_SPAN = 0.42;
 //                 along it, motes running down it, flares at both ends and its card particles
 //   K_SPRAY       a hit on a character: sparks thrown on along the hit's way, cooling
 //   K_PUFF        sparks all round and a dotted white-hot puff (a kill, a reaction, a hit
-//                 with no way)
+//                 with no way); with the POOF bit (kind 22) a staff's personality swap instead
+//                 (living staffs H4): bone clouds along the staff (+x) that swell to their
+//                 biggest at 35% of the effect (where the body changes) and shrink away, and a
+//                 few sparks in the player's colour
 //   K_CHIPS       stone chips knocked back off a wall, falling; stone does not glow
 //   K_ARC         lightning jumping from the effect's place along its aim for zoom x 4 pixels
 //                 (a discharge): a jagged line re-rolled 30 times a second; its quad is that long
@@ -166,6 +169,7 @@ const float K_PUFF = 12.0;
 const float K_CHIPS = 13.0;
 const float K_ARC = 14.0;
 const float K_STATUS = 15.0;
+const float POOF = 22.0;
 const float ENEMY_RAMP = 23.0;
 const float EXACT = 24.0;
 const float ARC_MARGIN = 4.0;
@@ -208,6 +212,8 @@ const vec3 VOID_LIGHT = vec3(0.878, 0.541, 0.847);
 const vec3 ARC_BASE = vec3(0.706, 0.910, 0.165);
 const vec3 ARC_LIGHT = vec3(0.933, 1.0, 0.651);
 const vec3 BONE_LIGHT = vec3(0.957, 0.945, 0.918);
+const vec3 BONE_BASE = vec3(0.831, 0.816, 0.878);
+const vec3 BONE_SHADOW = vec3(0.639, 0.624, 0.722);
 // The materials a core's tint can name, three shades each (shadow, base, light): Fire, Spark,
 // Ice, Void, Arc, Bone.
 const int MATERIALS = 6;
@@ -1078,6 +1084,34 @@ vec4 effect(vec2 uv) {
 			}
 		}
 		lit = (1.0 - a) * (0.5 * falloff(abs(m - wide), 6.0) + (a < 0.25 ? 0.8 : 0.0) * falloff(m, RUNE_REACH));
+	} else if (kind == K_PUFF && bit_set(bits, POOF)) {
+		// A staff's poof: four bone clouds along the staff, biggest at 35%, dotted as they go.
+		float swell = a < 0.35 ? a / 0.35 : 1.0 - (a - 0.35) / 0.65;
+		for (int n = 0; n < 4; n++) {
+			float i = float(n);
+			vec2 c = vec2((i - 1.5) * 6.0, (hash(i, 17.0, 31.0) - 0.5) * 3.0) * zoom * 0.5;
+			float size = (2.5 + 1.5 * hash(i, 18.0, 31.0)) * swell * zoom * 0.5 + 0.5;
+			float q = length(d - c);
+			if (q <= size && (a < 0.7 || mod(d.x + d.y, 2.0) == 0.0)) {
+				// Lit from the top-left: light on that side, shadow on the far rim.
+				vec2 side = (d - c) / max(size, 1.0);
+				vec3 shade = side.x + side.y < -0.5 ? BONE_LIGHT : (q > size - 1.0 && side.x + side.y > 0.3 ? BONE_SHADOW : BONE_BASE);
+				colour = vec4(shade, 1.0);
+				break;
+			}
+		}
+		for (int n = 0; n < 6; n++) {
+			if (colour.a > 0.0) {
+				break;
+			}
+			float i = float(n);
+			float ang = i / 6.0 * 6.2832 + hash(i, 19.0, 31.0);
+			float reach = (4.0 + 6.0 * hash(i, 20.0, 31.0) * ease) * zoom;
+			if (a < 0.8 && on(d + 0.5, vec2(cos(ang) * 1.6, sin(ang)) * reach + 0.5)) {
+				colour = vec4(a < 0.4 ? hi : mid, 1.0);
+			}
+		}
+		lit = (1.0 - a) * 0.3 * falloff(r, 6.0 * zoom);
 	} else if (kind == K_SPRAY || kind == K_PUFF) {
 		bool round_about = kind == K_PUFF;
 		// A small white-hot cross where it struck, or a dotted puff.

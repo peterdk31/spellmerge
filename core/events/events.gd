@@ -52,6 +52,8 @@ signal device_left(player: int, device: int)
 signal spell_cast(player: int, spell_id: StringName, origin: Vector2, direction: Vector2)
 ## Sender: the actor kit (`Caster`). The actor `caster` (its node `actor`) has just cast, any actor, for visual reactions only (Feel's squash). For a seat's actor it comes right after `spell_cast`.
 signal actor_cast(caster: int, actor: Node)
+## Sender: the actor kit (`Caster`). The actor `caster` (its node `actor`) put another of its staffs on show, `staff` (living staffs H4: a press of a different staff button; the personality swap), before that press casts. For visual reactions only (Feel's poof).
+signal staff_shown(caster: int, actor: Node, staff: int)
 ## Sender: core/projectiles. A projectile fired by the actor `caster` touched `target`.
 ## `tag` is the value given to `Projectiles.spawn()`, for looking up the damage.
 signal projectile_hit(caster: int, target: Node, position: Vector2, tag: int)

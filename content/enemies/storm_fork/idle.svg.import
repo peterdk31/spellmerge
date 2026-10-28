@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bvokaymtlk3pk"
-path="res://.godot/imported/windup.svg-68394bf33ff931fd0a5dde71c579b5f2.ctex"
+uid="uid://cj786fym51t3v"
+path="res://.godot/imported/idle.svg-09029102f67336855ca8fd530b5b17ad.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://content/enemies/ember_imp/windup.svg"
-dest_files=["res://.godot/imported/windup.svg-68394bf33ff931fd0a5dde71c579b5f2.ctex"]
+source_file="res://content/enemies/storm_fork/idle.svg"
+dest_files=["res://.godot/imported/idle.svg-09029102f67336855ca8fd530b5b17ad.ctex"]
 
 [params]
 

@@ -1858,6 +1858,24 @@ The owner's decision after G9: a player must always see their own wizard, which 
 - **The style N wizard art stays** in `content/wizard/base/` for the villain (H6); the clips stage and the art screenshots still show it. `docs/STYLE.md` and the golden examples move to the staff in H7.
 - **The sheets** are drawn by a generator from the mockup's pixel rules (the same as the face sheets'); each head folder lists its sheet in an `assets.json`.
 
+## 2026-10-28: The poof (living staffs H4)
+
+- **The poof is a look bit on the puff, not a new effect kind:** the shot shader's kinds 1–15 are all taken (the kind travels in four bits of the instance data), so `KIND_POOF` from the plan is `KIND_PUFF` with the `POOF` look bit (kind 22, `1 << 21`), as `EXACT` is. Bone clouds along the staff that peak at 35% and dot away, sparks in the ramp; no new pool.
+- **A new event, `staff_shown(caster, actor, staff)`,** sent by the Caster when another staff goes on show, before that press casts (the cast is never delayed). Feel draws the cloud from it; `StaffLook` needs no event (it reads `Caster.current`).
+- **The body changes at 35% of the newest cloud:** every press of another staff starts the poof again (Feel shows a cloud per press), so a fast double swap lands on the last staff at the last cloud's biggest. The same staff again, or holding one, never poofs.
+- **Followed effects sit at an offset** (`_effect_offset`, was the status's fixed rise), so the cloud stays on the staff while it moves.
+- **Feel ages effects by the wall clock** (so hit-stop cannot slow them). On a software renderer a frame takes far longer than 1/60 s and a 0.18 s cloud is gone in a frame, so `shot_poof.gd` puts Feel on frame time for its pictures. The game is unaffected.
+
+## 2026-10-28: The strays (living staffs H5)
+
+- **The Cinder Rod keeps the id `ember_imp`.** Flow's default enemy, the sandbox's imp wave, the tests and the clips all name `ember_imp`; renaming it buys nothing a player sees. The look, the art and the staff's display name are the Cinder Rod's; its numbers and staff (fire · bolt) are unchanged.
+- **Built now: the Cinder Rod, the Splinter (dash, contact damage 8, one eye) and the Storm Fork (triple · lightning · bolt).** The Rime Crook waits for a `hook` card and the Bone Scepter for `rain` (the plan: a stray waits for its cards); both are in NEXT.
+- **The wave is unchanged:** flow spawns one enemy type (`enemy_id_to_play`) at the wave's spawns, so mixing strays into a wave is flow work, not data; the Splinter and the Storm Fork exist as content (and in the registry) until a mixed wave or M3's rooms use them.
+- **No poses on strays:** the imp's windup and hurt strips are gone; the face carries the mood (furious while winding up, worried when hit) and the flash and telegraph are unchanged. `CreatureLook` keeps the poses as an option (tested on strips made in code).
+- **The hop is the sprite's offset only,** so the telegraph and the hurt circle never move with it: dodging stays exactly as fair as before.
+- **Eye glow** is the light shade of the stray's element ramp (Fire `#ffa23c` for the Cinder Rod and the Splinter); the Storm Fork's eyes are Acid's base `#b4e82a`, since Acid's light shade is too pale to read as a glow.
+- **The dummies** are staffs staked in a Stone mound (the training dummy with a target on a straw crossbar, the shooting dummy with a muzzle head); no face, since they are props. Their behaviour is unchanged.
+
 ## 2026-10-28: The intro (living staffs H6)
 
 - **"A new save" is a flag in a new save file.** There was no save yet (`core/save/` was empty), so H6 adds the smallest one: `SaveFile`, a ConfigFile at `user://save.cfg` holding flags. The intro sets `intro_seen` when it ends or is skipped; a missing or broken file is a new save. Runs, unlocks and settings move into it when they exist (M3).

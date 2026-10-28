@@ -102,6 +102,9 @@ var _eyes_frame: Vector2i = Vector2i(-1, -1)
 var _brows_frame: Vector2i = Vector2i(-1, -1)
 var _eyes_at: Vector2 = Vector2.INF
 var _brows_at: Vector2 = Vector2.INF
+## How far the layers close on the body in one step of `_k_delta` seconds.
+var _k_delta: float = -1.0
+var _k: float = 0.0
 
 
 func setup(owner_actor: Actor) -> void:
@@ -183,13 +186,27 @@ func step(delta: float) -> void:
 	_shown_left = maxf(_shown_left - delta, 0.0)
 	_step_habits(delta)
 	_follow(delta)
-	var looking: Vector2i = look()
-	var column: int = BLINK_COLUMN if is_shut() else (looking.y + 1) * 3 + looking.x + 1
+	# `is_shut`, `look` and `mood` written out (one `is_down` for all three): every actor wears a
+	# face and steps it every frame.
+	var down: bool = actor.is_down()
+	var column: int = BLINK_COLUMN
+	if _blink_left <= 0.0 and not down:
+		var looking: Vector2i = _glance if _glance_left > 0.0 else Vector2i(_lean(actor.aim.x), _lean(actor.aim.y))
+		column = (looking.y + 1) * 3 + looking.x + 1
 	var eyes: Vector2i = Vector2i(column, style)
 	if eyes != _eyes_frame:
 		_eyes_frame = eyes
 		_eyes.frame_coords = eyes
-	var brows: Vector2i = Vector2i(mood(), 1 if style == Style.STRAY_ONE else 0)
+	var feeling: Mood = resting_mood
+	if down:
+		feeling = Mood.WORRIED
+	elif actor.controller != null and actor.controller.is_telegraphing():
+		feeling = Mood.FURIOUS
+	elif _shown_left > 0.0:
+		feeling = _shown_mood
+	elif _raise_left > 0.0:
+		feeling = Mood.RAISED
+	var brows: Vector2i = Vector2i(feeling, 1 if style == Style.STRAY_ONE else 0)
 	if brows != _brows_frame:
 		_brows_frame = brows
 		_brows.frame_coords = brows
@@ -198,15 +215,20 @@ func step(delta: float) -> void:
 ## The layers trail the body (eyes after it, brows after the eyes) and pop on a cast.
 func _follow(delta: float) -> void:
 	var body: Vector2 = actor.global_position + body_offset
-	if not _placed or _eye_point.distance_to(body) > SNAP:
+	if not _placed or _eye_point.distance_squared_to(body) > SNAP * SNAP:
 		_eye_point = body
 		_brow_point = body
 		_placed = true
-	var k: float = 1.0 - exp(-delta / LAG)
+	if delta != _k_delta:
+		# The same step length every physics step: worked out once.
+		_k_delta = delta
+		_k = 1.0 - exp(-delta / LAG)
+	var k: float = _k
 	_eye_point += (body - _eye_point) * k
 	_brow_point += (_eye_point - _brow_point) * k
-	var eye_lag: Vector2 = _clamped(_eye_point - body)
-	var brow_lag: Vector2 = _clamped(_brow_point - _eye_point)
+	# Each layer trails at most MAX_LAG whole pixels per axis.
+	var eye_lag: Vector2 = (_eye_point - body).clampf(-MAX_LAG, MAX_LAG).round()
+	var brow_lag: Vector2 = (_brow_point - _eye_point).clampf(-MAX_LAG, MAX_LAG).round()
 	if _pop_left > 0.0:
 		eye_lag.y -= POP_EYES
 		brow_lag.y -= POP_BROWS
@@ -270,10 +292,6 @@ static func _lean(value: float) -> int:
 	if value < -LOOK_LEAN:
 		return -1
 	return 0
-
-
-static func _clamped(lag: Vector2) -> Vector2:
-	return Vector2(roundf(clampf(lag.x, -MAX_LAG, MAX_LAG)), roundf(clampf(lag.y, -MAX_LAG, MAX_LAG)))
 
 
 func _on_cast_done(_staff: int, _origin: Vector2, _direction: Vector2) -> void:

@@ -97,7 +97,8 @@ func test_telegraph_grows_brighter_and_bigger() -> void:
 	var early: float = material.get_shader_parameter(&"telegraph_progress")
 	fx.run(imp, int(imp.windup_time / Fixture.STEP) - 4)
 	check(float(material.get_shader_parameter(&"telegraph_progress")) > early + 0.5, "the shader is told the shot is near: dashes on, arrowhead bigger, brighter")
-	check_equal(material.get_shader_parameter(&"beam_mode"), 3, "drawn by the shot shader's telegraph mode")
+	check_equal(material.shader.resource_path, "res://gameplay/ai/telegraph.gdshader", "drawn by the telegraph's own shader, not the shot shader (its cost in a crowd)")
+	check(material.get_shader_parameter(&"ramp_base") is Color and material.get_shader_parameter(&"ramp_light") is Color, "the ramp loads from the scene")
 	var other: AiScript = fx.imp(Vector2(0.0, 400.0))
 	check(other.get_node("Telegraph").material != line.material, "each enemy has its own telegraph material")
 

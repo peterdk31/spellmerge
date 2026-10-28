@@ -72,12 +72,6 @@ uniform int beam_look = 0;
 uniform float beam_fade = 1.0;
 uniform float beam_swell = 1.0;
 uniform float beam_glow = 1.0;
-// Beam mode 3 is an enemy's telegraph (staffs F8b; a Sprite2D whose region is the lane, as mode
-// 2): where its next cast goes, `beam_length` pixels along the aim and `telegraph_lane` pixels
-// either side of the middle. `telegraph_progress` runs 0 to 1 over the windup: the dashes march
-// toward the tip, the arrowhead grows, the lane brightens, and the last part is white-hot.
-uniform float telegraph_progress = 0.0;
-uniform float telegraph_lane = 6.0;
 
 // The quad: GRID pixels across (and along, for a rune); LENGTH along for a bolt or orbit shot,
 // the shot FRONT pixels from the front. LOOK_GRID, LOOK_LENGTH in projectile_manager.gd.
@@ -983,42 +977,8 @@ vec4 effect(vec2 uv) {
 	return vec4(glow * lit * glow_strength, 0.0);
 }
 
-// An enemy's telegraph (beam mode 3): its pixel at `along` pixels from the enemy and `across`
-// from the middle of its lane. Drawn in the ramp of `core_override` (Fire, docs/STYLE.md: enemy
-// telegraphs use Fire colours and are brighter than anything else on screen).
-vec4 telegraph(float along, float across) {
-	float len = max(beam_length, 1.0);
-	float at = floor(along);
-	float y = floor(across);
-	float p = clamp(telegraph_progress, 0.0, 1.0);
-	bool last = p >= 0.8;
-	float lane = clamp(round(telegraph_lane), 1.0, 14.0);
-	// The arrowhead at the far end, growing as the cast nears.
-	float head = round(mix(3.0, 7.0, p));
-	float back = len - at;
-	if (back >= 0.0 && back <= head && abs(y + 0.5) <= back * 0.9 + 0.5) {
-		return vec4(last || back < 1.5 ? hot : hi, 1.0);
-	}
-	if (at < 0.0 || at > len) {
-		return vec4(0.0);
-	}
-	// Dashes down the middle, marching toward the tip as the windup runs.
-	if ((y == 0.0 || y == -1.0) && mod(at - floor(p * 24.0), 8.0) < 4.0 && back > head) {
-		return vec4(last ? hot : hi, 1.0);
-	}
-	// The lane's edges, dotted, so the hit width reads.
-	if (abs(y + 0.5) == lane + 0.5 && mod(at, 3.0) < 1.0) {
-		return vec4(mid, 1.0);
-	}
-	float inside = abs(y + 0.5) <= lane + 0.5 ? 1.0 : falloff(abs(y + 0.5) - lane, 3.0);
-	float lit = inside * (0.14 + 0.3 * p) + 0.4 * p * falloff(abs(y + 0.5), 2.0);
-	return vec4(glow * lit * beam_glow * glow_strength, 0.0);
-}
-
 void fragment() {
-	if (beam_mode == 3) {
-		COLOR = telegraph(UV.x / TEXTURE_PIXEL_SIZE.x, UV.y / TEXTURE_PIXEL_SIZE.y - 0.5 / TEXTURE_PIXEL_SIZE.y);
-	} else if (beam_mode == 1) {
+	if (beam_mode == 1) {
 		COLOR = beam(UV.x * beam_length, (UV.y - 0.5) * beam_width);
 	} else if (beam_mode == 2) {
 		COLOR = beam(UV.x / TEXTURE_PIXEL_SIZE.x, UV.y / TEXTURE_PIXEL_SIZE.y - 0.5 / TEXTURE_PIXEL_SIZE.y);

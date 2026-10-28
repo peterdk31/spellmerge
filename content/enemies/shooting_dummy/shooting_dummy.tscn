@@ -2,14 +2,14 @@
 
 [ext_resource type="Script" path="res://gameplay/ai/ai.gd" id="1_ai"]
 [ext_resource type="Texture2D" path="res://content/enemies/shooting_dummy/idle.svg" id="2_idle"]
-[ext_resource type="Shader" path="res://core/projectiles/shot_core.gdshader" id="8_shot"]
+[ext_resource type="Shader" path="res://gameplay/ai/telegraph.gdshader" id="8_telegraph"]
 [ext_resource type="Texture2D" path="res://art/vfx/beam.svg" id="9_beam"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_telegraph"]
 resource_local_to_scene = true
-shader = ExtResource("8_shot")
-shader_parameter/beam_mode = 3
-shader_parameter/core_override = Vector4(0.627, 0.188, 0.604, 1)
+shader = ExtResource("8_telegraph")
+shader_parameter/ramp_base = Color(0.627, 0.188, 0.604, 1)
+shader_parameter/ramp_light = Color(0.878, 0.541, 0.847, 1)
 shader_parameter/beam_length = 165.0
 shader_parameter/telegraph_lane = 8.0
 

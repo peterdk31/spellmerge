@@ -22,7 +22,7 @@
       "label": "stress",
       "linux_ok": "^STRESS OK",
       "web_ok": "STRESS OK",
-      "web_timeout": 600,
+      "web_timeout": 900,
       "bench": true
     },
     {

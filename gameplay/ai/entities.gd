@@ -37,6 +37,11 @@ extends Node2D
 ##
 ## Swap (`target_move_requested`) is heard by each enemy itself (`ai.gd`), not here.
 ##
+## The "Enemy fire" setting (staffs F10) lives here too, as the AI area's one autoload: off by
+## default (`EnemyFire.DEFAULT`); `enemy_fire_requested(player, on)` (the pause menu) or
+## `set_enemy_fire` switches the projectile manager's `enemy_fire` (enemies' spells also hit
+## other enemies; read when a shot is spawned) and announces it with `enemy_fire_changed(on)`.
+##
 ## Nothing here allocates per frame; drawing is the pooled decoy nodes and one batch of the
 ## familiars, drawn by the shots' shader as orbit shots (the glow look, 2026-10-27): a small
 ## white-hot core in its player's colours (the enemy ramp for an enemy's) and a tail that bends round its circle. All timing runs in step(delta), so tests drive it with fixed deltas.
@@ -127,6 +132,8 @@ var _centre_seq: PackedInt64Array = PackedInt64Array()
 var _decoys: Array[Decoy] = []
 var _spawned: int = 0
 var _live: int = 0
+## Whether enemies' spells also hit other enemies (see `set_enemy_fire`).
+var enemy_fire: bool = EnemyFire.DEFAULT
 
 
 ## A decoy as other code sees it: a Node2D that enemies may chase and shots may hit. It is
@@ -243,6 +250,9 @@ func _ready() -> void:
 	events.projectile_hit.connect(_on_projectile_hit)
 	events.room_entered.connect(_on_room_entered)
 	events.run_ended.connect(_on_run_ended)
+	events.enemy_fire_requested.connect(_on_enemy_fire_requested)
+	if projectiles != null:
+		projectiles.enemy_fire = enemy_fire
 
 
 func _physics_process(delta: float) -> void:
@@ -325,6 +335,16 @@ func lure(point: Vector2) -> Node2D:
 			best_sq = d
 			best = _decoys[row]
 	return best
+
+
+## Turn enemy fire on or off: from now on an enemy's spells also hit other enemies (never the
+## enemy itself). Takes effect for shots cast from now on; announced with `enemy_fire_changed`.
+func set_enemy_fire(on: bool) -> void:
+	enemy_fire = on
+	if projectiles != null:
+		projectiles.enemy_fire = on
+	if events != null:
+		events.enemy_fire_changed.emit(on)
 
 
 ## End every entity quietly (no `entity_ended`).
@@ -417,6 +437,11 @@ func _on_projectile_hit(player: int, target: Node, _position_hit: Vector2, _tag_
 	_hits[row] -= 1
 	if _hits[row] <= 0:
 		_end(row, true)
+
+
+func _on_enemy_fire_requested(player: int, on: bool) -> void:
+	if player >= 0 and player < PLAYER_SLOTS:
+		set_enemy_fire(on)
 
 
 func _on_room_entered(_room_id: StringName) -> void:

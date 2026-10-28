@@ -228,3 +228,34 @@ func test_enemies_keep_their_share_and_never_take_a_wizards_rows() -> void:
 	_bus.entity_spawn_requested.emit(EventsScript.NO_PLAYER, EntitiesScript.DECOY, Vector2.ZERO, 5.0, SpellTag.make(0, 0, 0, 1), EntitiesScript.CASTER_POINT)
 	_bus.entity_spawn_requested.emit(0, EntitiesScript.DECOY, Vector2.ZERO, 5.0, SpellTag.make_enemy(0, 0, 0, 1), EntitiesScript.CASTER_POINT)
 	check_equal(_entities.count(), EntitiesScript.POOL_SIZE, "NO_PLAYER with a player's tag makes nothing; a player with an enemy's tag ends their own oldest")
+
+
+## Enemy fire (staffs F10): off by default; a request from the pause menu switches the projectile
+## manager's flag and is answered; then an enemy's bolt also hits another enemy in its way.
+func test_enemy_fire_is_off_by_default_and_a_request_switches_it() -> void:
+	var answers: Array[bool] = []
+	_bus.enemy_fire_changed.connect(func(on: bool) -> void: answers.append(on))
+	check(not _entities.enemy_fire and not _projectiles.enemy_fire, "off by default (EnemyFire.DEFAULT)")
+	_bus.enemy_fire_requested.emit(2, true)
+	check(_entities.enemy_fire and _projectiles.enemy_fire, "a player's request turns it on, in the projectile manager too")
+	_bus.enemy_fire_requested.emit(EventsScript.NO_PLAYER, false)
+	_bus.enemy_fire_requested.emit(4, false)
+	check(_projectiles.enemy_fire, "a request that names no player is ignored")
+	_entities.set_enemy_fire(false)
+	check(not _projectiles.enemy_fire, "and off again")
+	check_equal(answers, [true, false] as Array[bool], "every change is announced")
+
+
+func test_with_enemy_fire_on_an_enemys_bolt_hits_another_enemy() -> void:
+	for on: bool in [false, true]:
+		_entities.set_enemy_fire(on)
+		var caster := _enemy(_data([&"bolt"]), Vector2(0.0, 300.0 * float(on)))
+		_wizard.position = Vector2(80.0, 300.0 * float(on))
+		var blocker := _enemy(_data([&"bolt"]), Vector2(40.0, 300.0 * float(on)))
+		blocker.data.max_mana = 0.0
+		blocker.mana = 0.0
+		var health: int = _combat.get_health(blocker)
+		_run(caster.windup_time + 0.5)
+		var label: String = "enemy fire %s" % ("on" if on else "off")
+		check_equal(_combat.get_health(blocker) < health, on, label + ": the enemy in the way %s" % ("is hit" if on else "is not hit"))
+		check(_combat.get_health(caster) == ImpData.max_health, label + ": the caster is never hit by its own bolt")

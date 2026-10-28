@@ -1,88 +1,58 @@
 class_name SpellTag
 extends RefCounted
 ## The int `tag` every shot carries, which is how a hit finds its spell (staffs A5,
-## docs/milestones/M2-staffs.md, "Tags"). It packs the player (0-3), the staff (0-3: the A, X,
-## Y and B buttons), the node (0-511: the compiled spell's index in its staff's cycle,
-## `CompiledSpell.node`) and a
-## generation (0-7, a ring that advances on each build change of that staff). `FLAG` sits above
-## every enemy attack tag of gameplay/ai (1,000 to 101,000), so the two never meet, and keeps
-## every tag above 0, which means "no tag" to `gameplay/combat`.
-##
-## An enemy's spell (staffs F3, "Enemy staffs") has `ENEMY_BIT` set and its enemy row (0-255)
-## above the flag instead of a player: `caster_of` gives the caster (a player 0-3, or
-## `FIRST_ENEMY_CASTER` plus the row) and `player_of` gives `NO_PLAYER`. Every tag stays below
+## docs/milestones/M2-staffs.md, "Tags"; one caster field since actors G2,
+## docs/milestones/M2-actors.md, "Tags"). It packs the staff (0-3: the A, X, Y and B buttons) in
+## bits 0-1, a generation (0-7, a ring that advances on each build change of that staff) in bits
+## 2-4, the node (0-511: the compiled spell's index in its staff's cycle, `CompiledSpell.node`)
+## in bits 5-13 and the caster (0-511, `caster_of`) in bits 14-22, under `FLAG` (bit 23). `FLAG`
+## sits above every enemy attack tag of gameplay/ai (1,000 to 101,000), so the two never meet,
+## and keeps every tag above 0, which means "no tag" to `gameplay/combat`. Every tag stays below
 ## `LIMIT` (1 << 29), so it fits the int32 arrays combat keeps shield tags in.
 ##
-##     var tag: int = SpellTag.make(player, staff, node, generation)
-##     SpellTag.player_of(tag)  # the other fields read back the same way
-##     var enemy_tag: int = SpellTag.make_enemy(row, staff, node, generation)
+## The caster is the number the spell runtime casts under. Until actors G3b that is still a
+## player (0-3) or `FIRST_ENEMY_CASTER` plus an enemy row (4-259), and the deprecated helpers
+## below read it that way; from G3b it is the actor id (`core/actors`).
+##
+##     var tag: int = SpellTag.make(caster, staff, node, generation)
+##     SpellTag.caster_of(tag)  # the other fields read back the same way
 
-const FLAG: int = 1 << 20
-const PLAYER_SHIFT: int = 0
-const STAFF_SHIFT: int = 2
-const GENERATION_SHIFT: int = 4
-const NODE_SHIFT: int = 7
+const FLAG: int = 1 << 23
+const STAFF_SHIFT: int = 0
+const GENERATION_SHIFT: int = 2
+const NODE_SHIFT: int = 5
+const CASTER_SHIFT: int = 14
 ## The largest node a tag holds; a cycle never makes more spells than this plus one.
 const NODE_MASK: int = 511
-## Set on an enemy's spell tag (bits 16-19 are otherwise free).
-const ENEMY_BIT: int = 1 << 16
-## An enemy's row sits above the flag, in bits 21-28.
-const ROW_SHIFT: int = 21
-## The largest enemy row; there are `ROW_MASK + 1` enemy casters.
-const ROW_MASK: int = 255
-## The caster number of enemy row 0 (`caster_of`); 0-3 are the players.
-const FIRST_ENEMY_CASTER: int = 4
+## The largest caster a tag holds: every actor id (`Actors.ACTORS` is 512).
+const CASTER_MASK: int = 511
 ## Every spell tag is below this.
 const LIMIT: int = 1 << 29
-## `Events.NO_PLAYER`, the player of an enemy's spell.
+## Deprecated (actors G3): the caster number of enemy row 0; 0-3 are the players.
+const FIRST_ENEMY_CASTER: int = 4
+## Deprecated (actors G3): the largest enemy row; there are `ROW_MASK + 1` enemy casters.
+const ROW_MASK: int = 255
+## Deprecated (actors G3): `Events.NO_PLAYER`, the player of an enemy's spell.
 const NO_PLAYER: int = -1
 
 
 ## The tag of a shot. Arguments outside their range are wrapped into it, never an error.
-static func make(player: int, staff: int, node: int, generation: int) -> int:
+static func make(caster: int, staff: int, node: int, generation: int) -> int:
 	return FLAG \
-		| ((player & 3) << PLAYER_SHIFT) \
 		| ((staff & 3) << STAFF_SHIFT) \
 		| ((generation & 7) << GENERATION_SHIFT) \
-		| ((node & NODE_MASK) << NODE_SHIFT)
+		| ((node & NODE_MASK) << NODE_SHIFT) \
+		| ((caster & CASTER_MASK) << CASTER_SHIFT)
 
 
-## The tag of a shot of `caster` (`caster_of`): a player's (`make`) or an enemy row's
-## (`make_enemy`).
-static func make_for(caster: int, staff: int, node: int, generation: int) -> int:
-	if caster < FIRST_ENEMY_CASTER:
-		return make(caster, staff, node, generation)
-	return make_enemy(caster - FIRST_ENEMY_CASTER, staff, node, generation)
+## Who cast it: the caster given to `make`.
+static func caster_of(tag: int) -> int:
+	return (tag >> CASTER_SHIFT) & CASTER_MASK
 
 
-## The tag of an enemy's shot, from its enemy row. Arguments are wrapped as in `make`.
-static func make_enemy(row: int, staff: int, node: int, generation: int) -> int:
-	return make(0, staff, node, generation) | ENEMY_BIT | ((row & ROW_MASK) << ROW_SHIFT)
-
-
-## True for a tag made by `make` or `make_enemy`.
+## True for a tag made by `make`.
 static func is_spell_tag(tag: int) -> bool:
 	return tag >= FLAG and tag < LIMIT
-
-
-## True for a tag made by `make_enemy`.
-static func is_enemy_tag(tag: int) -> bool:
-	return is_spell_tag(tag) and tag & ENEMY_BIT != 0
-
-
-## The player who cast it, or `NO_PLAYER` for an enemy's spell.
-static func player_of(tag: int) -> int:
-	return NO_PLAYER if tag & ENEMY_BIT != 0 else (tag >> PLAYER_SHIFT) & 3
-
-
-## The enemy row of an enemy's spell, or -1 for a player's.
-static func row_of(tag: int) -> int:
-	return (tag >> ROW_SHIFT) & ROW_MASK if tag & ENEMY_BIT != 0 else -1
-
-
-## Who cast it: the player (0-3), or `FIRST_ENEMY_CASTER` plus the enemy row.
-static func caster_of(tag: int) -> int:
-	return FIRST_ENEMY_CASTER + row_of(tag) if tag & ENEMY_BIT != 0 else (tag >> PLAYER_SHIFT) & 3
 
 
 static func staff_of(tag: int) -> int:
@@ -100,3 +70,31 @@ static func generation_of(tag: int) -> int:
 ## The tag with its node cleared: one key for every spell of one generation of one staff.
 static func generation_key(tag: int) -> int:
 	return tag & ~(NODE_MASK << NODE_SHIFT)
+
+
+## Deprecated (actors G3): the same as `make`, which takes every caster now.
+static func make_for(caster: int, staff: int, node: int, generation: int) -> int:
+	return make(caster, staff, node, generation)
+
+
+## Deprecated (actors G3): the tag of an enemy row's shot, `make` of `FIRST_ENEMY_CASTER` plus
+## the row (wrapped into 0-255).
+static func make_enemy(row: int, staff: int, node: int, generation: int) -> int:
+	return make(FIRST_ENEMY_CASTER + (row & ROW_MASK), staff, node, generation)
+
+
+## Deprecated (actors G3): true for a spell tag whose caster is an enemy row (4 and up).
+static func is_enemy_tag(tag: int) -> bool:
+	return is_spell_tag(tag) and caster_of(tag) >= FIRST_ENEMY_CASTER
+
+
+## Deprecated (actors G3): the player (0-3) who cast it, or `NO_PLAYER` for any other caster.
+static func player_of(tag: int) -> int:
+	var caster: int = caster_of(tag)
+	return caster if caster < FIRST_ENEMY_CASTER else NO_PLAYER
+
+
+## Deprecated (actors G3): the enemy row of an enemy's spell, or -1 for a player's.
+static func row_of(tag: int) -> int:
+	var caster: int = caster_of(tag)
+	return caster - FIRST_ENEMY_CASTER if caster >= FIRST_ENEMY_CASTER else -1

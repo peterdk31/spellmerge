@@ -6,6 +6,10 @@ What each run did, newest first. Claude appends a short entry after each develop
 
 The Ghost card was already done: the modifier `.tres`, icon, assets, two combos, lore and `test_ghost.gd` exist, and all 122 unit tests pass. Ticked it off; no code changed.
 
+## 2026-10-28: Card spiral (staffs C), already built
+
+The Spiral card was already done: the modifier `.tres`, icon, assets, two combos, lore and `test_spiral.gd` exist, and all 125 unit tests pass. Ticked it off; no code changed.
+
 ## 2026-10-28: Card bounce (staffs C), already built
 
 The Bounce card was already done: the modifier `.tres`, icon, assets, two combos, lore and `test_bounce.gd` exist, and all 122 unit tests pass. Ticked it off; no code changed.

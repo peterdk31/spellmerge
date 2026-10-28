@@ -19,8 +19,8 @@ Spellmerge is a 2D top-down action roguelite for 1–4 local co-op players, wher
 
 | Element | Role |
 | --- | --- |
-| Wizard | One base character; cosmetics only (hat, robe, colours, staff look). |
-| Staffs | Four per wizard, one per shoulder button (RB, RT, LB, LT; the face buttons work the menus). A staff is a row of slots; there is no separate attack or dodge, only what the player puts in their staffs. Staffs found later differ in slots, speed and recharge. |
+| Staff | The player character is a living staff (the owner, 2026-10-28): a floating face and four personalities, one per staff button, each with its own head and face. Cosmetics only beyond that. |
+| Staffs | Four per player, one per shoulder button (RB, RT, LB, LT; the face buttons work the menus). A staff is a row of slots; there is no separate attack or dodge, only what the player puts in their staffs. Staffs found later differ in slots, speed and recharge. |
 | Spells | Cards placed in a staff in any order and read left to right: carriers (what leaves the caster), modifiers and infusions (change the next carrier, or the caster when none follows), multicast (more carriers per cast) and triggers (the next cast becomes the payload). Reading wraps around the staff. Every arrangement is legal and does something; there is no complexity budget. |
 | Relics | Passives found in runs, some altering how cards behave. |
 
@@ -28,8 +28,8 @@ Starting cards: carriers (bolt, beam, nova, rune, orbit, dash, teleport, hook, s
 
 Spell rules (chosen on 2026-10-26, the pivot at C2):
 
-- **Everything hurts everything** (the owner, 2026-10-28): a spell hurts every body it hits, its caster's included. Wizards' spells hurt each other, and enemies' spells hurt enemies; there is no friendly-fire setting. Teams only decide whom things aim at (the AI, homing), never whom a hit hurts.
-- **One mana pool per wizard**, shared by its staffs; sustained spells reserve part of it.
+- **Everything hurts everything** (the owner, 2026-10-28): a spell hurts every body it hits, its caster's included. Players' spells hurt each other, and enemies' spells hurt enemies; there is no friendly-fire setting. Teams only decide whom things aim at (the AI, homing), never whom a hit hurts.
+- **One mana pool per player**, shared by its staffs; sustained spells reserve part of it.
 - **No build limits** beyond what the engine needs to run; limits are added only when measurements ask for them.
 - **Small shots:** a shot is a small core; its cards add its look in layers.
 - **Test builds are a sandbox:** preview builds start in a room with large staffs, every card and a training dummy.
@@ -61,4 +61,4 @@ Professional-looking, very few bugs, genuinely good art, music and gameplay. Qua
 
 ## Art direction (locked)
 
-Chosen on 2026-10-23: style N, a narrow dusk (Stone) robe with a Spark placket, belt and hem, two big tall eyes and no mouth, under a big pointed hat in the player's colour (the only player colour on the wizard). The rules and golden examples are in docs/STYLE.md and art/kit/golden.json. Spell shots are the one thing that glows (the owner, 2026-10-27): small white-hot cores, long cooling tails and a soft glow in their colour, drawn by the shot shader (docs/milestones/M2-staffs.md, "The look of a shot").
+Chosen on 2026-10-28 (docs/milestones/M2-living-staffs.md): every character is a living staff. A player is a floating staff that points where it aims, with cartoon floating eyes and brows drawn over its grip; its four staffs are four personalities, each with its own head and face, and the player's colour is only on the heads. Enemies are thrown-out staffs with glowing eyes and angry brows. The style N wizard of 2026-10-23 (a narrow dusk robe with a Spark placket, belt and hem, two big tall eyes and no mouth, under a big pointed hat) is now the villain. The rules and golden examples are in docs/STYLE.md and art/kit/golden.json. Spell shots are the one thing that glows (the owner, 2026-10-27): small white-hot cores, long cooling tails and a soft glow in their colour, drawn by the shot shader (docs/milestones/M2-staffs.md, "The look of a shot").

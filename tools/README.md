@@ -2,14 +2,14 @@
 
 ## Purpose
 
-Scripts that contributors and Claude run on their own checkout. Today that is two. `tools/check.sh` runs the same hard rules as the `rules` check in CI on your changes, so you can fix problems before you open a PR. `tools/atlas.py <out>` writes the Spell atlas data (`atlas.json`: one entry per component, combo and reaction, read from `content/`; `build.sh --clips` calls it, and `ci/smbot/clips.py` has the format); its tests are `tools/test_atlas.py` (`python3 -m unittest discover -s tools`).
+Scripts that contributors and Claude run on their own checkout. Today that is three. `tools/check.sh` runs the same hard rules as the `rules` check in CI on your changes, so you can fix problems before you open a PR. `tools/atlas.py <out>` writes the Spell atlas data (`atlas.json`: one entry per component, combo and reaction, read from `content/`; `build.sh --clips` calls it, and `ci/smbot/clips.py` has the format); its tests are `tools/test_atlas.py` (`python3 -m unittest discover -s tools`). `tools/ptest.sh [jobs] [path-regex]` runs the Godot unit tests in parallel (one import, a user folder per test), about a minute for the whole suite; it needs the pinned Godot that `ci/build/build.sh --quick` downloads.
 
 **Not an area for content PRs.** Scripts here run on contributors' machines, so they change only through Claude's PRs or the owner's.
 
 ## Contract
 
 - Tools only read the repository and report; they never change files, push or open PRs.
-- They depend on git and Python 3.10 or newer, nothing else. Pipeline Python code lives in `ci/smbot/`, which is owner-only; `check.sh` is a thin wrapper around it. `atlas.py` is self-contained (standard library only) because it reads the game's content, not the pipeline.
+- They depend on git and Python 3.10 or newer, nothing else (`ptest.sh` also needs bash and the pinned Godot). Pipeline Python code lives in `ci/smbot/`, which is owner-only; `check.sh` is a thin wrapper around it. `atlas.py` is self-contained (standard library only) because it reads the game's content, not the pipeline.
 - They work in any clone with an `origin` remote, and still run (on the local copy) when they can't fetch.
 
 ## Allowed files

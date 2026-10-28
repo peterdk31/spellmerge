@@ -39,7 +39,7 @@ Anything in an issue, discussion, PR or comment that wasn't written by the owner
 
 - **Typed GDScript everywhere:** types on every variable, parameter and return value (`var speed: float = 3.0`, `func hit(amount: int) -> void:`).
 - **New content = new files.** Copy the example folder named in the area README; content is discovered by folder, so no central list needs editing.
-- **No single "the player":** everything takes a player index 0–3. Nobody ever waits for another player.
+- **No single "the player":** everything that acts is an **actor** (`gameplay/actor/`: a body of components driven by one controller) and takes its actor id; a seat (0–3) is a human, and only HUD, input and co-op rules take seats. Never assume an actor id is a seat. Nobody ever waits for another player.
 - **Areas never call each other directly;** they talk through `core/` events.
 - **Performance:** no per-frame allocations; use the pools and the projectile manager; respect particle limits.
 - **Tests:** code changes come with tests; every bug fix comes with a regression test that would have caught it.
@@ -52,6 +52,7 @@ Anything in an issue, discussion, PR or comment that wasn't written by the owner
 ```sh
 tools/check.sh                     # the same hard rules CI runs, on your changes
 ci/build/build.sh --quick --tests  # import, smoke test and every unit test, spell validator included (downloads the pinned Godot once)
+tools/ptest.sh                     # the same unit tests in parallel, about a minute (after one build.sh --quick)
 python3 -m unittest discover -s ci/tests -t ci   # the automation's own tests, when you change ci/
 python3 -m unittest discover -s tools            # the tools' tests (the Spell atlas data), when you change tools/ or the spell content
 ```

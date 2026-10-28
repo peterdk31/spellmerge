@@ -17,8 +17,8 @@ extends CharacterBody2D
 ## Combat's (it frees the node), so there is no death code here.
 ##
 ## Telegraph: an optional `Sprite` child flashes (`modulate`) and an optional `Telegraph` child
-## (staffs F8b: a Sprite2D drawn by the shot shader's telegraph mode, `beam_mode` 3, in Fire
-## colours, its material local to the scene) turns toward the locked aim and shows. It runs from
+## (staffs F8b: a Sprite2D drawn by `telegraph.gdshader` in this folder, in Fire colours, its
+## material local to the scene) turns toward the locked aim and shows. It runs from
 ## TELEGRAPH_START to the real reach of the next cast (`next_cast_reach`; the old attack's
 ## `attack_speed * attack_lifetime`), its lane as wide as what is coming plus a margin, and its
 ## dashes march, its arrowhead grows and it brightens with `telegraph_progress()`.

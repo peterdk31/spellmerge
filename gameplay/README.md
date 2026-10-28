@@ -2,12 +2,12 @@
 
 ## Purpose
 
-The rules of the game, in 10 sub-areas: `player`, `combat`, `feel`, `coop`, `ai`, `run`, `flow`, `rewards`, `difficulty` and `progression`. Each has its own README with its job and when it is built (docs/PLAN.md, "Gameplay sub-areas"). This file holds the text they share.
+The rules of the game, in 11 sub-areas: `actor` (the shared body kit, actors G4), `player`, `combat`, `feel`, `coop`, `ai`, `run`, `flow`, `rewards`, `difficulty` and `progression`. Each has its own README with its job and when it is built (docs/PLAN.md, "Gameplay sub-areas"). This file holds the text they share.
 
 ## Contract shared by every sub-area
 
 - **Entry script:** `gameplay/<area>/<area>.gd`. Other code uses only that script and the area's events.
-- **Dependency direction:** `core` ← `gameplay` ← `content`. A sub-area may use `core/` and the registry. Areas never call each other directly; they talk through events.
+- **Dependency direction:** `core` ← `gameplay` ← `content`. A sub-area may use `core/` and the registry. Areas never call each other directly; they talk through events. The one stated exception is the actor kit: every area may use the public scripts of `gameplay/actor` (see its README).
 - **Events:** `core/events` owns the event definitions. A sub-area README only lists which events the area sends and which it listens to, and each event has exactly one sender. The lists must match `core/events/events.gd` and the table below.
 - **Players:** everything that acts per player takes a player index 0–3. Nothing assumes a single player, and nobody ever waits for another player.
 - **Performance:** no per-frame allocations; use the pools and the projectile manager from `core/`; respect the particle limits.
@@ -31,20 +31,20 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `staff_cards_requested` | `hud` (the radial builder) | `player` |
 | `staff_changed` | `player` | `hud` (the builders) |
 | `staff_cast` | `player` | `hud` (the corner panel) |
-| `caster_move_requested` | `core/spells` | `player`, `ai` (an enemy's own row, F8c) |
-| `mana_reserved`, `mana_refund_requested` | `core/spells` | `player` |
+| `caster_move_requested` | `core/spells` | `player`, `ai` (an enemy's own row, F8c), `actor` (the Mover) |
+| `mana_reserved`, `mana_refund_requested` | `core/spells` | `player`; `mana_refund_requested` also `actor` (the Caster) |
 | `area_hit_requested` | `core/spells` | `combat` |
-| `target_move_requested`, `entity_spawn_requested`, `entity_end_requested` | `core/spells` (staffs B2) | `ai` |
-| `caster_move_finished` | `player`, `ai` (an enemy's own row, F8c) | `core/spells` |
+| `target_move_requested`, `entity_spawn_requested`, `entity_end_requested` | `core/spells` (staffs B2) | `ai`; `target_move_requested` also `actor` (the Mover) |
+| `caster_move_finished` | `player`, `ai` (an enemy's own row, F8c), `actor` (the Mover) | `core/spells` |
 | `entity_ended`, `familiar_cast_requested` | `ai` | none yet (`core/spells`, staffs B2) |
 | `shot_blocked`, `ally_passed` | `core/projectiles` | none yet (`core/spells`, staffs B1) |
 | `shield_blocked`, `kill_landed`, `wizard_hurt`, `reaction_landed` | `combat` | none yet (`core/spells`, staffs B2) |
 | `hit_landed` | `combat` | `feel` |
-| `heal_dealt` | `combat` | `feel`, `player` |
+| `heal_dealt` | `combat` | `feel`, `player`, `actor` (Health) |
 | `wizard_shield_requested`, `pull_requested`, `area_hit_requested` | `core/spells` (staffs B2) | `combat` |
 | `reaction_triggered` | `combat` | `feel` |
 | `discharge_arc` | `combat` | `feel` |
-| `damage_dealt` | `combat` | `feel`, `player` |
+| `damage_dealt` | `combat` | `feel`, `player`, `actor` (Health) |
 | `status_applied` | `combat` | none yet |
 | `enemy_died` | `combat` | `feel`, `flow` |
 | `player_downed` | `player` | `ai`, `feel`, `flow`, `run` |

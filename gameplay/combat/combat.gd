@@ -310,6 +310,30 @@ func unregister_enemy(enemy: Node2D) -> void:
 		_remove_enemy_at(at)
 
 
+# The actor API (actors G4, docs/milestones/M2-actors.md): what the actor kit (gameplay/actor)
+# calls. Part G5 reimplements these four by actor id; until then they run on the enemy model.
+
+## An actor's hurtbox: `health`, its hurt circle (`radius` at `offset` from the feet) and the
+## damage its touch does. Registering again resets its numbers.
+func register_actor(actor: Node2D, health: int, radius: float, contact_damage: int, offset: Vector2) -> void:
+	register_enemy(actor, health, radius, contact_damage, offset)
+
+
+## Forget `actor` without killing it (no event).
+func unregister_actor(actor: Node2D) -> void:
+	unregister_enemy(actor)
+
+
+## The share of its walking pace `actor` keeps: 1.0 free, less chilled, 0.0 frozen.
+func pace(actor: Node2D) -> float:
+	return speed_factor(actor)
+
+
+## The push on `actor` to add to its velocity this step (fades as it is taken).
+func consume_knockback(actor: Node2D, delta: float) -> Vector2:
+	return consume_knockback_step(actor, delta)
+
+
 ## Make wizard `node` (player `index`, 0-3) something enemy contact can hurt.
 ## `radius` is its hit circle in pixels; `hit_offset` moves the circle for enemy shots
 ## from the node's origin (the feet) to the drawn body.

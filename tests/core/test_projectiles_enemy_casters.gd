@@ -190,11 +190,15 @@ func test_enemy_casters_are_drawn_by_the_shader_above_the_players() -> void:
 	for i in 3:
 		var buffer: PackedFloat32Array = node.multimesh.buffer
 		var at: int = i * ManagerScript.DRAW_STRIDE
-		kinds.append(roundi((1.0 - buffer[at + 15]) * ManagerScript.KIND_STEPS))
+		var kind: int = roundi((1.0 - buffer[at + 15]) * ManagerScript.KIND_STEPS)
+		# A shot in flight is drawn as its trail; an orbit shot's is flagged so.
+		if kind == ManagerScript.KIND_BOLT and (roundi(buffer[at + 5]) & ManagerScript.TRAIL_ORBIT) != 0:
+			kind = ManagerScript.KIND_ORBIT
+		kinds.append(kind)
 		var red: int = roundi(buffer[at + 8] * 255.0)
 		var bits: int = roundi(buffer[at + 9] * 255.0) | (roundi(buffer[at + 10] * 255.0) << 8) | (roundi(buffer[at + 11] * 255.0) << 16)
 		check(red % 4 == 0 and (bits & ManagerScript.LOOK_ENEMY_RAMP) != 0, "shot %d is in the enemy ramp" % i)
-		if kinds[i] == ManagerScript.KIND_BOLT:
+		if kind == ManagerScript.KIND_BOLT:
 			check_equal(bits & ~ManagerScript.LOOK_ENEMY_RAMP, ManagerScript.pack_look(PackedInt32Array([ManagerScript.LOOK_EMBERS])), "with its cards' look")
 	kinds.sort()
 	check_equal(kinds, [ManagerScript.KIND_BOLT, ManagerScript.KIND_RUNE, ManagerScript.KIND_ORBIT] as Array[int], "a bolt, a rune and an orbit shot, each its own body")

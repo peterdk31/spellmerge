@@ -44,8 +44,6 @@ extends Resource
 @export_range(0.0, 0.6, 0.01) var cast_squash: float = 0.2
 ## Seconds a dead enemy's copy takes to turn white-hot and fall apart.
 @export_range(0.0, 0.6, 0.01) var death_anim_seconds: float = 0.25
-## How long the mark of a combo cast (`combo_cast`) stays on the wizard; 0 turns it off.
-@export_range(0.0, 1.0, 0.01) var combo_mark_seconds: float = 0.36
 ## The white-hot ring where an enemy dies: seconds and biggest size.
 @export_range(0.0, 0.5, 0.01) var death_puff_seconds: float = 0.14
 @export_range(0.1, 6.0, 0.1) var death_puff_size: float = 1.6

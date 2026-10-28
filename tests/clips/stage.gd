@@ -64,6 +64,8 @@ var _owned: Array[Object] = []
 var _pending: Array[Dictionary] = []
 ## Where each player stands: {player: Vector2}.
 var _anchors: Dictionary = {}
+## Each caster's aim, held as a player holds it, so a live beam stays on its line.
+var _aims: Dictionary = {}
 
 
 func _init(root: Node, registry: Node) -> void:
@@ -93,6 +95,8 @@ func start(scenario: Dictionary) -> bool:
 	feel.events = bus
 	feel.registry = _registry as RegistryScript
 	feel.projectiles = projectiles
+	# Live beams are drawn from the spell runtime's beam slots.
+	feel.spells = spells
 	feel.drive_engine = false
 	feel.particles_enabled = HIT_SPRAYS
 	world = _own(Node2D.new()) as Node2D
@@ -122,6 +126,7 @@ func start(scenario: Dictionary) -> bool:
 			return false
 		spells.install_staff(int(entry["player"]), int(entry["staff"]), built)
 		_anchors[int(entry["player"])] = entry["origin"]
+		_aims[int(entry["player"])] = entry["aim"]
 	for at: Vector2 in scenario["imps"]:
 		_add_imp(at)
 	for player: int in _anchors:
@@ -155,6 +160,7 @@ func tick() -> void:
 	# Orbits circle their caster's anchor, which has to be current every step, as in the game.
 	for player: int in _anchors:
 		projectiles.set_anchor(player, _anchors[player] as Vector2)
+		spells.set_aim(player, _anchors[player] as Vector2, _aims[player] as Vector2)
 	projectiles.step(STEP)
 	spells.step(STEP)
 	combat.step(STEP)
@@ -201,6 +207,7 @@ func free_all() -> void:
 	reactions.clear()
 	_pending.clear()
 	_anchors.clear()
+	_aims.clear()
 	time = 0.0
 
 

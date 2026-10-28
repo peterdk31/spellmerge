@@ -6,6 +6,10 @@ What each run did, newest first. Claude appends a short entry after each develop
 
 The Slow card was already done: the modifier `.tres`, icon, assets, combos and `test_slow.gd` exist, and all 126 unit tests pass. Ticked it off; no code changed.
 
+## 2026-10-28: Card arc (staffs C), already built
+
+The Arc card was already done: the modifier `.tres`, icon, assets, combos (`arc_nova_trap`, `lightning_orb`), lore, `test_arc.gd` and `test_spells_slow_return_arc.gd` exist. Ticked it off; no code changed.
+
 ## 2026-10-28: Card return (staffs C), already built
 
 The Return card was already done: the modifier `.tres`, icon, assets, two combos, lore and `test_return.gd` exist, and all 126 unit tests pass. Ticked it off; no code changed.

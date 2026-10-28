@@ -117,7 +117,7 @@ func test_enemy_data_goes_to_the_components() -> void:
 	check(imp.caster != null and imp.caster.has_staff(0), "its staff is built")
 	check_equal(imp.caster.cards_of(0).slice(0, ImpData.cards.size()), ImpData.cards, "with its cards")
 	check_equal(imp.caster.max_mana, ImpData.max_mana, "its mana")
-	check(_world.combat.is_enemy(imp), "the hurtbox registered it with Combat")
+	check(_world.combat.is_registered(imp), "the hurtbox registered it with Combat")
 	var plain_data: EnemyBase = ImpData.duplicate() as EnemyBase
 	plain_data.staff = null
 	var chaser := Actor.new()

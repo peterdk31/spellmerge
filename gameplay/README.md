@@ -41,11 +41,11 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `shot_blocked` | `core/projectiles` | none yet (`core/spells`, staffs B1) |
 | `shield_blocked`, `kill_landed`, `actor_hurt`, `reaction_landed` | `combat` | `core/spells` (on block, on kill, on hurt, on reaction) |
 | `hit_landed` | `combat` | `feel` |
-| `heal_dealt` | `combat` | `feel`, `player`, `actor` (Health) |
+| `heal_dealt` | `combat` | `feel`, `player` |
 | `wizard_shield_requested`, `pull_requested`, `area_hit_requested` | `core/spells` (staffs B2) | `combat` |
 | `reaction_triggered` | `combat` | `feel` |
 | `discharge_arc` | `combat` | `feel` |
-| `damage_dealt` | `combat` | `feel`, `player`, `actor` (Health) |
+| `damage_dealt` | `combat` | `feel`, `player` |
 | `status_applied` | `combat` | none yet |
 | `enemy_died` | `combat` | `feel`, `flow` |
 | `player_downed` | `player` | `ai`, `feel`, `flow`, `run` |

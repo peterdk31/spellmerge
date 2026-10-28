@@ -5,9 +5,8 @@ extends ActorComponent
 ## makes it unhurtable for a while (a wizard who joins mid-run). At 0 it sends `depleted` once;
 ## the actor dies, or a Downed component (gameplay/player, G7) downs it instead.
 ##
-## Nobody else keeps an actor's health: Combat calls this (G5). Until then the actor's hits and
-## heals come as `damage_dealt` and `heal_dealt` with the actor as target, as they come to a
-## wizard today (Combat still keeps an enemy's own count beside it, and frees it at 0).
+## Nobody else keeps an actor's health: Combat calls `take` and `heal` (actors G5), and the
+## events it sends after (`damage_dealt`, `heal_dealt`) are for the rest of the game, not for this.
 ##
 ## Signals are local (to the actor's own components and controller), never on the bus.
 
@@ -28,24 +27,6 @@ var _protect_left: float = 0.0
 func setup(owner_actor: Actor) -> void:
 	super.setup(owner_actor)
 	health = max_health
-
-
-func attach() -> void:
-	if actor == null or actor.events == null:
-		return
-	if not actor.events.damage_dealt.is_connected(_on_damage_dealt):
-		actor.events.damage_dealt.connect(_on_damage_dealt)
-	if not actor.events.heal_dealt.is_connected(_on_heal_dealt):
-		actor.events.heal_dealt.connect(_on_heal_dealt)
-
-
-func detach() -> void:
-	if actor == null or actor.events == null or not is_instance_valid(actor.events):
-		return
-	if actor.events.damage_dealt.is_connected(_on_damage_dealt):
-		actor.events.damage_dealt.disconnect(_on_damage_dealt)
-	if actor.events.heal_dealt.is_connected(_on_heal_dealt):
-		actor.events.heal_dealt.disconnect(_on_heal_dealt)
 
 
 ## Counts the protection down (the actor calls it first in its step).
@@ -99,13 +80,3 @@ func protect_left() -> float:
 
 func is_depleted() -> bool:
 	return health <= 0
-
-
-func _on_damage_dealt(player: int, target: Node, amount: int, _position: Vector2) -> void:
-	if target == actor:
-		take(amount, player)
-
-
-func _on_heal_dealt(_player: int, target: Node, amount: int, _position: Vector2) -> void:
-	if target == actor:
-		heal(amount)

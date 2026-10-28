@@ -1,8 +1,8 @@
 extends "res://tests/support/suite.gd"
 ## Health (actors G4): `take` and `heal` within 0 and `max_health`, `protect` for a while,
-## `changed` on every change and `depleted` once at 0; hits and heals come as `damage_dealt` and
-## `heal_dealt` with the actor as target (until Combat calls Health itself, G5). Contact and
-## Hurtbox hand the actor's circle and touch damage to Combat.
+## `changed` on every change and `depleted` once at 0; Combat takes and heals through it (actors
+## G5), and the bus's `damage_dealt` and `heal_dealt` are not its way in. Contact and Hurtbox hand
+## the actor's circle and touch damage to Combat.
 ##
 ## godot --headless --path . --script res://tests/gameplay/actor/test_actor_health.gd
 
@@ -63,18 +63,25 @@ func test_protection_holds_for_its_time() -> void:
 	check(body.health.take(10), "then it can be hurt")
 
 
-func test_hits_and_heals_come_by_the_bus() -> void:
-	var body: Actor = _body()
-	var other: Actor = _world.actor(Vector2.ZERO, [&"health"])
-	_world.bus.damage_dealt.emit(0, body, 15, Vector2.ZERO)
-	check_equal(body.health.health, 35, "its own hit")
+func test_combat_takes_and_heals_through_health_and_the_bus_does_not() -> void:
+	var body: Actor = _world.actor(Vector2.ZERO, [&"health", &"hurtbox"])
+	var other: Actor = _world.actor(Vector2(200.0, 0.0), [&"health", &"hurtbox"])
+	check(_world.combat.hit(0, body, 15), "Combat's hit counts")
+	check_equal(body.health.health, 35, "and takes from its Health")
 	check_equal(other.health.health, 50, "another actor is untouched")
-	_world.bus.heal_dealt.emit(0, body, 5, Vector2.ZERO)
-	check_equal(body.health.health, 40, "its own heal")
-	root.remove_child(body)
 	_world.bus.damage_dealt.emit(0, body, 15, Vector2.ZERO)
-	check_equal(body.health.health, 40, "out of the tree it hears nothing")
-	root.add_child(body)
+	_world.bus.heal_dealt.emit(0, body, 15, Vector2.ZERO)
+	check_equal(body.health.health, 35, "the bus is for the rest of the game: Health does not hear it")
+	# A mend heals its caster's team: the actor's own, cast on itself.
+	_world.table.set_driver(body.id, Actor.ActorsScript.TEAM_WIZARDS, -1)
+	var mend := HitProfile.new()
+	mend.heal = 5
+	var spell := CompiledSpell.new()
+	spell.hit = mend
+	var tag: int = SpellTag.make(body.id, 0, 1, 1)
+	_world.spells._profiles[tag] = spell
+	_world.bus.area_hit_requested.emit(body.id, body.position, 40.0, tag)
+	check_equal(body.health.health, 40, "a mend heals it through its Health")
 
 
 func test_the_hurtbox_hands_its_circle_and_the_touch_to_combat() -> void:
@@ -88,9 +95,10 @@ func test_the_hurtbox_hands_its_circle_and_the_touch_to_combat() -> void:
 	for component: Node in [health, hurtbox, contact]:
 		imp.add_child(component)
 	_world.add(imp, Vector2(40.0, 0.0))
-	check(_world.combat.is_enemy(imp), "registered with Combat")
-	check_equal(_world.combat.get_health(imp), 30, "with its health")
+	check(_world.combat.is_registered(imp), "registered with Combat")
+	check_equal(_world.combat.actor_of(imp), imp.id, "under its actor id")
+	check_equal(_world.combat.health_of(imp), 30, "with its health")
 	root.remove_child(imp)
-	check(not _world.combat.is_enemy(imp), "forgotten when it leaves the tree")
+	check(not _world.combat.is_registered(imp), "forgotten when it leaves the tree")
 	root.add_child(imp)
-	check(_world.combat.is_enemy(imp), "and registered again when it comes back")
+	check(_world.combat.is_registered(imp), "and registered again when it comes back")

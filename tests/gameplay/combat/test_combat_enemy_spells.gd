@@ -65,8 +65,12 @@ func _wizard(index: int, at: Vector2) -> PlayerScript:
 	# The seat's actor in the test table is the wizard's (opened there, not by the wizard).
 	wizard.actors = _actors
 	wizard.actor_id = _actors.actor_of_seat(index)
-	wizard._ready()
+	wizard.projectiles = _projectiles
+	wizard.spells = _spells
+	wizard.combat = _combat
 	wizard.position = at
+	# In the tree: area hits, bursts and pulls find bodies by the projectile manager's grid.
+	root.add_child(wizard)
 	_combat.register_player(index, wizard, 8.0)
 	return wizard
 
@@ -75,7 +79,7 @@ func _enemy(at: Vector2, health: int = 100) -> Node2D:
 	var enemy := own(Node2D.new()) as Node2D
 	enemy.position = at
 	root.add_child(enemy)
-	_combat.register_enemy(enemy, health, 10.0)
+	_combat.register_actor(enemy, health, 10.0)
 	return enemy
 
 
@@ -122,20 +126,20 @@ func test_an_enemys_spell_hurts_a_wizard_like_a_spell() -> void:
 	check_equal(_hurt, [[1, 5, tag, &"shot"]], "actor_hurt names the wizard's actor and carries the enemy's tag")
 	check_equal(SpellTag.caster_of(_hurt[0][2]), _caster, "whose caster the runtime can find")
 	check_equal(_landed[0][0], _caster, "the hit is the enemy actor's")
-	check(_combat.wizard_status_left(1, &"burn") > 0.0, "its status goes on")
-	check(_combat.consume_wizard_knockback(1, 0.0).x > 0.0, "and it pushes")
+	check(_combat.status_left(1, &"burn") > 0.0, "its status goes on")
+	check(_combat.knockback_of(1).x > 0.0, "and it pushes")
 
 
 func test_a_wizard_thaws_like_an_enemy() -> void:
 	var wizard := _wizard(0, Vector2(100.0, 0.0))
 	var near := _wizard(1, Vector2(120.0, 0.0))
 	var far := _wizard(2, Vector2(400.0, 0.0))
-	_combat.apply_wizard_status(EventsScript.NO_PLAYER, 0, &"burn", 3.0, 1.0)
+	_combat.apply_status(EventsScript.NO_PLAYER, 0, &"burn", 3.0, 1.0)
 	var tag: int = _hit(wizard, _element(2, &"frost", &"chill"))
 	check_equal(_triggered, [&"thaw"] as Array[StringName], "frost on a burning wizard thaws")
 	check(_reactions.size() == 1 and _reactions[0][0] == _caster and _reactions[0][2] == wizard and _reactions[0][3] == tag, "reaction_landed names the enemy's tag, for its on reaction")
-	check_equal(_combat.wizard_status_left(0, &"burn"), 0.0, "the burn is used up")
-	check_equal(_combat.wizard_status_left(0, &"chill"), 0.0, "the reaction runs instead of the chill")
+	check_equal(_combat.status_left(0, &"burn"), 0.0, "the burn is used up")
+	check_equal(_combat.status_left(0, &"chill"), 0.0, "the reaction runs instead of the chill")
 	check_equal(wizard.health, PlayerScript.MAX_HEALTH - 2 - 3, "the hit and the burst")
 	check_equal(near.health, PlayerScript.MAX_HEALTH - 3, "the burst reaches the wizard beside")
 	check_equal(far.health, PlayerScript.MAX_HEALTH, "not one far away")
@@ -145,38 +149,38 @@ func test_a_wizard_thaws_like_an_enemy() -> void:
 func test_a_frozen_wizard_shatters_for_double() -> void:
 	var wizard := _wizard(0, Vector2.ZERO)
 	for i in 3:
-		_combat.apply_wizard_status(EventsScript.NO_PLAYER, 0, &"chill", 3.0, 30.0)
-	check(_combat.wizard_status_left(0, &"freeze") > 0.0, "three chills freeze")
+		_combat.apply_status(EventsScript.NO_PLAYER, 0, &"chill", 3.0, 30.0)
+	check(_combat.status_left(0, &"freeze") > 0.0, "three chills freeze")
 	_hit(wizard, _element(1, &"storm", &"shock"))
 	check_equal(_triggered, [&"shatter"] as Array[StringName], "storm on a frozen wizard shatters")
 	check_equal(wizard.health, PlayerScript.MAX_HEALTH - 1 - 12, "the hit, then twice the shatter")
-	check_equal(_combat.wizard_status_left(0, &"freeze"), 0.0, "the freeze is gone")
+	check_equal(_combat.status_left(0, &"freeze"), 0.0, "the freeze is gone")
 
 
 func test_a_chilled_wizard_is_stilled_and_a_burn_kindles_the_wizards_near() -> void:
 	var wizard := _wizard(0, Vector2.ZERO)
 	_wizard(1, Vector2(30.0, 0.0))
-	_combat.apply_wizard_status(EventsScript.NO_PLAYER, 0, &"chill", 3.0, 30.0)
+	_combat.apply_status(EventsScript.NO_PLAYER, 0, &"chill", 3.0, 30.0)
 	_hit(wizard, _element(1, &"void", &"hex"))
-	check(_triggered.has(&"stillness") and _combat.wizard_status_left(0, &"freeze") > 0.0, "void on a chilled wizard freezes them")
+	check(_triggered.has(&"stillness") and _combat.status_left(0, &"freeze") > 0.0, "void on a chilled wizard freezes them")
 	_triggered.clear()
 	_run(1.0)
-	_combat.apply_wizard_status(EventsScript.NO_PLAYER, 0, &"burn", 3.0, 1.0)
+	_combat.apply_status(EventsScript.NO_PLAYER, 0, &"burn", 3.0, 1.0)
 	_hit(wizard, _element(1, &"void", &"hex"))
 	check(_triggered.has(&"kindle"), "void on a burning wizard kindles")
-	check(_combat.wizard_status_left(1, &"burn") > 0.0, "and the wizard beside catches the burn")
+	check(_combat.status_left(1, &"burn") > 0.0, "and the wizard beside catches the burn")
 
 
 func test_a_wizard_waits_before_reacting_again() -> void:
 	var wizard := _wizard(0, Vector2.ZERO)
-	_combat.apply_wizard_status(EventsScript.NO_PLAYER, 0, &"burn", 5.0, 1.0)
+	_combat.apply_status(EventsScript.NO_PLAYER, 0, &"burn", 5.0, 1.0)
 	_hit(wizard, _element(1, &"storm", &"shock"))
 	check_equal(_triggered, [&"flare"] as Array[StringName], "the first hit reacts")
-	_combat.apply_wizard_status(EventsScript.NO_PLAYER, 0, &"burn", 5.0, 1.0)
+	_combat.apply_status(EventsScript.NO_PLAYER, 0, &"burn", 5.0, 1.0)
 	_hit(wizard, _element(1, &"storm", &"shock"))
 	check_equal(_triggered.size(), 1, "one right after does not")
 	_run(0.75)
-	_combat.apply_wizard_status(EventsScript.NO_PLAYER, 0, &"burn", 5.0, 1.0)
+	_combat.apply_status(EventsScript.NO_PLAYER, 0, &"burn", 5.0, 1.0)
 	_hit(wizard, _element(1, &"storm", &"shock"))
 	check_equal(_triggered.size(), 2, "after the wait it reacts again")
 
@@ -191,14 +195,18 @@ func test_an_enemys_area_hit_hurts_everything_in_it() -> void:
 	var tag: int = _enemy_tag(blast)
 	_bus.area_hit_requested.emit(_caster, Vector2.ZERO, 40.0, tag)
 	check_equal(wizard.health, PlayerScript.MAX_HEALTH - 4, "an enemy's blast hurts the wizard")
-	check_equal(_combat.get_health(other), 96, "and the other enemy (G3c: enemies always hurt each other)")
-	check_equal(_combat.get_health(caster), 96, "and the enemy that cast it, as a wizard's own blast does the wizard")
+	check_equal(_combat.health_of(other), 96, "and the other enemy (G3c: enemies always hurt each other)")
+	check_equal(_combat.health_of(caster), 96, "and the enemy that cast it, as a wizard's own blast does the wizard")
 
 
-func test_an_enemys_mend_heals_no_wizard() -> void:
+func test_an_enemys_mend_heals_its_team_and_hurts_the_wizards() -> void:
 	var wizard := _wizard(0, Vector2.ZERO)
 	wizard.health = 50
+	var imp := _enemy(Vector2(10.0, 0.0))
+	_combat.hit(_caster, imp, 30)
 	var profile := HitProfile.new()
+	profile.damage = 2
 	profile.heal = 10
 	_bus.area_hit_requested.emit(_caster, Vector2.ZERO, 40.0, _enemy_tag(profile))
-	check_equal(wizard.health, 50, "an enemy's mend is not the wizards' (no seat drives its caster)")
+	check_equal(wizard.health, 48, "an enemy's mend is not the wizards': they take its damage")
+	check_equal(_combat.health_of(imp), 80, "it heals its caster's team (actors G5: a mend is for friends)")

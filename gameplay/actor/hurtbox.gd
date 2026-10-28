@@ -7,9 +7,9 @@ extends ActorComponent
 ## While the actor is down the hurtbox is off (shots fly past to the standing ones) and comes
 ## back when it stands up.
 ##
-## Until Combat works by actor id (G5) the actor is registered on Combat's enemy model, so it is
-## hurt and pushed as an enemy is; the hurtbox owner (whose own spells pass it) is set by the
-## Caster.
+## Combat keeps the actor's row under its actor id (actors G5): its hits go to its Health, its
+## statuses and push are read back by the Mover; the hurtbox owner (whose own spells pass it) is
+## the actor id, set again by the Caster.
 
 ## Radius of the hurt circle in pixels (an imp 11, a wizard 8).
 @export var radius: float = 8.0

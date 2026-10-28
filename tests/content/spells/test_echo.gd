@@ -59,6 +59,7 @@ func test_the_timer_nova_is_rung_twice() -> void:
 
 
 func test_four_players_echo_at_once() -> void:
+	var plain: int = _lost(["bolt"], Vector2(100.0, 0.0), 1.5)
 	var arena := ArenaScript.new(root)
 	var imps: Array[Node2D] = []
 	for player in 4:
@@ -70,5 +71,5 @@ func test_four_players_echo_at_once() -> void:
 		check(arena.cast(player, 0), "player %d casts" % player)
 	arena.run(1.5)
 	for imp in imps:
-		check_equal(arena.lost(imp), 8,"every imp took the bolt and its echo")
+		check_equal(arena.lost(imp), plain + roundi(plain * 0.5), "every imp took the bolt and its echo")
 	arena.free_all()

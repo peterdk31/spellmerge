@@ -127,7 +127,7 @@ func _test_imp_resource_and_scene() -> void:
 	var imp: Node = ImpData.scene.instantiate()
 	_check(imp is AiScript, "the scene root carries the AI script")
 	_check(imp.get_node_or_null("Sprite") is Sprite2D and (imp.get_node("Sprite") as Sprite2D).texture != null, "the scene shows the part 4 sprite")
-	_check(imp.get_node_or_null("Telegraph") is Line2D, "the scene has a telegraph line")
+	_check(imp.get_node_or_null("Telegraph") is Sprite2D, "the scene has a telegraph, drawn by the shot shader")
 	imp.free()
 
 

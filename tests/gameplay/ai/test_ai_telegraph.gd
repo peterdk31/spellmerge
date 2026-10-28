@@ -67,7 +67,7 @@ func test_a_wizard_who_stays_is_hit() -> void:
 
 func test_line_is_hidden_outside_the_windup() -> void:
 	var imp: AiScript = fx.imp_facing_player()
-	var line: Line2D = imp.get_node("Telegraph")
+	var line: Sprite2D = imp.get_node("Telegraph")
 	check(not line.visible, "hidden before the windup")
 	fx.run(imp, int(imp.windup_time / Fixture.STEP) + 2)
 	check(not line.visible, "hidden after the shot")
@@ -76,42 +76,38 @@ func test_line_is_hidden_outside_the_windup() -> void:
 
 func test_line_is_as_long_as_the_shot_flies() -> void:
 	var imp: AiScript = fx.imp_facing_player()
-	var line: Line2D = imp.get_node("Telegraph")
-	check(is_equal_approx(line.get_point_position(1).x, imp.attack_speed * imp.attack_lifetime), "the far end is the real reach")
+	imp.step(Fixture.STEP)
+	check(is_equal_approx(imp.telegraph_reach(), imp.attack_speed * imp.attack_lifetime), "the far end is the real reach")
+	var material: ShaderMaterial = (imp.get_node("Telegraph") as Sprite2D).material as ShaderMaterial
+	check(is_equal_approx(material.get_shader_parameter(&"beam_length"), imp.attack_speed * imp.attack_lifetime - AiScript.TELEGRAPH_START), "the shader draws it that long")
 
 
 func test_line_turns_toward_the_locked_aim() -> void:
 	var imp: AiScript = fx.imp_facing_player()
 	imp.step(Fixture.STEP)
-	var line: Line2D = imp.get_node("Telegraph")
+	var line: Sprite2D = imp.get_node("Telegraph")
 	check(line.visible and is_equal_approx(line.rotation, imp.aim.angle()), "the line shows, turned to the aim")
 
 
 func test_telegraph_grows_brighter_and_bigger() -> void:
 	var imp: AiScript = fx.imp_facing_player()
 	imp.step(Fixture.STEP)
-	var line: Line2D = imp.get_node("Telegraph")
-	var tip: Polygon2D = imp.get_node("Telegraph/Tip")
-	var early_width: float = line.width
-	var early_scale: float = tip.scale.x
-	var early_alpha: float = line.modulate.a
+	var line: Sprite2D = imp.get_node("Telegraph")
+	var material: ShaderMaterial = line.material as ShaderMaterial
+	var early: float = material.get_shader_parameter(&"telegraph_progress")
 	fx.run(imp, int(imp.windup_time / Fixture.STEP) - 4)
-	check_equal(line.width, early_width, "the line keeps its width, so the dashes do not stretch")
-	check(tip.scale.x > early_scale, "the arrowhead is bigger near the shot")
-	check(line.modulate.a > early_alpha, "the line is brighter near the shot")
+	check(float(material.get_shader_parameter(&"telegraph_progress")) > early + 0.5, "the shader is told the shot is near: dashes on, arrowhead bigger, brighter")
+	check_equal(material.get_shader_parameter(&"beam_mode"), 3, "drawn by the shot shader's telegraph mode")
+	var other: AiScript = fx.imp(Vector2(0.0, 400.0))
+	check(other.get_node("Telegraph").material != line.material, "each enemy has its own telegraph material")
 
 
 func test_lane_and_arrowhead_follow_the_reach() -> void:
 	var imp: AiScript = fx.imp_facing_player()
-	var reach: float = imp.attack_speed * imp.attack_lifetime
-	var tip: Polygon2D = imp.get_node("Telegraph/Tip")
-	var lane: Polygon2D = imp.get_node("Telegraph/Lane")
-	check(is_equal_approx(tip.position.x, reach) and tip.position.y == 0.0, "the arrowhead sits at the far end, on the line")
-	var far: float = 0.0
-	for point in lane.polygon:
-		far = maxf(far, point.x)
-	check(is_equal_approx(far, reach), "the lane ends where the shot ends")
-	check(lane.polygon[2].y - lane.polygon[1].y >= imp.attack_radius * 2.0, "the lane is at least as wide as the shot")
+	var line: Sprite2D = imp.get_node("Telegraph")
+	var material: ShaderMaterial = line.material as ShaderMaterial
+	check(is_equal_approx(line.offset.x + line.region_rect.size.x, imp.attack_speed * imp.attack_lifetime), "the lane and its arrowhead end where the shot ends")
+	check(float(material.get_shader_parameter(&"telegraph_lane")) >= imp.attack_radius, "the lane is at least as wide as the shot")
 
 
 func test_windup_pose_has_two_frames_and_idle_returns() -> void:

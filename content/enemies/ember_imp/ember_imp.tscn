@@ -1,10 +1,19 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://gameplay/ai/ai.gd" id="1_ai"]
 [ext_resource type="Texture2D" path="res://content/enemies/ember_imp/idle.svg" id="2_idle"]
 [ext_resource type="Texture2D" path="res://content/enemies/ember_imp/windup.svg" id="3_windup"]
 [ext_resource type="Texture2D" path="res://content/enemies/ember_imp/hurt.svg" id="4_hurt"]
-[ext_resource type="Texture2D" path="res://art/vfx/telegraph_dash.svg" id="5_dash"]
+[ext_resource type="Shader" path="res://core/projectiles/shot_core.gdshader" id="8_shot"]
+[ext_resource type="Texture2D" path="res://art/vfx/beam.svg" id="9_beam"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_telegraph"]
+resource_local_to_scene = true
+shader = ExtResource("8_shot")
+shader_parameter/beam_mode = 3
+shader_parameter/core_override = Vector4(0.878, 0.349, 0.184, 1)
+shader_parameter/beam_length = 165.0
+shader_parameter/telegraph_lane = 8.0
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_body"]
 radius = 6.0
@@ -39,25 +48,16 @@ hurt_texture = ExtResource("4_hurt")
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 shape = SubResource("CircleShape2D_body")
 
-[node name="Telegraph" type="Line2D" parent="."]
+[node name="Telegraph" type="Sprite2D" parent="."]
 visible = false
 texture_filter = 1
-texture_repeat = 1
-points = PackedVector2Array(10, 0, 175, 0)
-width = 6.0
-default_color = Color(1, 1, 1, 1)
-texture = ExtResource("5_dash")
-texture_mode = 1
-
-[node name="Lane" type="Polygon2D" parent="Telegraph"]
-show_behind_parent = true
-color = Color(0.878, 0.349, 0.184, 0.28)
-polygon = PackedVector2Array(10, -8, 175, -8, 175, 8, 10, 8)
-
-[node name="Tip" type="Polygon2D" parent="Telegraph"]
-position = Vector2(175, 0)
-color = Color(1, 0.635, 0.235, 1)
-polygon = PackedVector2Array(-7, -8, 7, 0, -7, 8)
+texture_repeat = 2
+material = SubResource("ShaderMaterial_telegraph")
+texture = ExtResource("9_beam")
+centered = false
+offset = Vector2(10, -16)
+region_enabled = true
+region_rect = Rect2(0, 0, 165, 32)
 
 [node name="Sprite" type="Sprite2D" parent="."]
 texture_filter = 1

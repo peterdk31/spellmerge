@@ -42,8 +42,8 @@ func test_poses_are_different_art() -> void:
 
 
 func test_scene_has_the_telegraph_parts() -> void:
-	check(imp.get_node_or_null("Telegraph") is Line2D, "a Telegraph line")
+	check(imp.get_node_or_null("Telegraph") is Sprite2D and (imp.get_node("Telegraph") as Sprite2D).material is ShaderMaterial, "a Telegraph drawn by the shot shader")
 
 
 func test_telegraph_is_hidden_until_the_windup() -> void:
-	check(not (imp.get_node("Telegraph") as Line2D).visible, "the telegraph starts hidden")
+	check(not (imp.get_node("Telegraph") as Sprite2D).visible, "the telegraph starts hidden")

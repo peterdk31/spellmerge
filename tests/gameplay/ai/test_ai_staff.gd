@@ -196,9 +196,10 @@ func test_the_windup_waits_for_the_staffs_delay() -> void:
 func test_the_telegraph_shows_the_next_casts_reach() -> void:
 	var enemy := _enemy(_data([&"bolt"]))
 	_until_windup(enemy, 1.0)
-	var line: Line2D = enemy.get_node("Telegraph") as Line2D
+	var line: Sprite2D = enemy.get_node("Telegraph") as Sprite2D
 	check(line.visible, "a bolt shows its line")
-	check(is_equal_approx(line.get_point_position(1).x, 200.0), "as far as the bolt flies (%.1f)" % line.get_point_position(1).x)
+	check(is_equal_approx(enemy.telegraph_reach(), 200.0), "as far as the bolt flies (%.1f)" % enemy.telegraph_reach())
+	check(is_equal_approx(float((line.material as ShaderMaterial).get_shader_parameter(&"telegraph_lane")), 4.0 + AiScript.TELEGRAPH_LANE_MARGIN * 0.5), "as wide as the bolt, with a margin")
 	var ring := _enemy(_data([&"nova"]), Vector2(0.0, 40.0))
 	_until_windup(ring, 1.0)
 	check(ring.is_telegraphing(), "a nova winds up too")

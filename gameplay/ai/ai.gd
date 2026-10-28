@@ -16,11 +16,12 @@ extends CharacterBody2D
 ## enemy there and step() adds `consume_knockback_step` to the velocity. Death is
 ## Combat's (it frees the node), so there is no death code here.
 ##
-## Telegraph: an optional `Sprite` child flashes (`modulate`) and an optional
-## `Telegraph` child (a Line2D along +X, dashed by its texture) turns toward the locked aim
-## and shows. Its far end is set to the real reach of the shot (`attack_speed * attack_lifetime`),
-## and it grows brighter (and its arrowhead bigger) with `telegraph_progress()`. Its optional children `Lane`
-## (a danger strip) and `Tip` (an arrowhead at the far end) follow it.
+## Telegraph: an optional `Sprite` child flashes (`modulate`) and an optional `Telegraph` child
+## (staffs F8b: a Sprite2D drawn by the shot shader's telegraph mode, `beam_mode` 3, in Fire
+## colours, its material local to the scene) turns toward the locked aim and shows. It runs from
+## TELEGRAPH_START to the real reach of the next cast (`next_cast_reach`; the old attack's
+## `attack_speed * attack_lifetime`), its lane as wide as what is coming plus a margin, and its
+## dashes march, its arrowhead grows and it brightens with `telegraph_progress()`.
 ##
 ## Poses: with `windup_texture` set (a strip of 32 px frames), the `Sprite` shows it from the
 ## start of the windup and flips between its frames faster and faster (WINDUP_FLASHES), and
@@ -78,12 +79,10 @@ const LAYER_ENEMIES: int = 4
 const LAYER_WALLS: int = 1
 ## The telegraph line starts this far from the enemy; its look at 0% and 100% progress.
 const TELEGRAPH_START: float = 10.0
-## The arrowhead grows from this scale to 1.0 as the shot nears. The line keeps its width,
-## because its dashed texture is tiled by width and the dashes would stretch.
-const TELEGRAPH_TIP_SCALE_MIN: float = 0.7
-## The `Lane` strip behind the dashes is the shot's hit width plus this margin.
+## The telegraph's lane is the hit width of what is coming plus this margin.
 const TELEGRAPH_LANE_MARGIN: float = 8.0
-const TELEGRAPH_ALPHA_MIN: float = 0.5
+## The telegraph sprite's region height (its texture's), with the lane in its middle.
+const TELEGRAPH_HEIGHT: float = 32.0
 ## Seconds between looking for the nearest player again.
 const RETARGET_TIME: float = 0.5
 ## `Sprite` modulate while the telegraph shows, and for its last part.
@@ -157,8 +156,7 @@ var _looked: bool = false
 ## Instance id of `target` when it was chosen, or 0 for none.
 var _target_id: int = 0
 var _sprite: Sprite2D = null
-var _telegraph: Node2D = null
-var _telegraph_line: Line2D = null
+var _telegraph: Sprite2D = null
 var _animation: AnimationPlayer = null
 var _idle_texture: Texture2D = null
 var _idle_hframes: int = 1
@@ -180,17 +178,14 @@ func _ready() -> void:
 	if _sprite != null:
 		_idle_texture = _sprite.texture
 		_idle_hframes = _sprite.hframes
-	_telegraph = get_node_or_null("Telegraph") as Node2D
-	_telegraph_line = _telegraph as Line2D
+	_telegraph = get_node_or_null("Telegraph") as Sprite2D
 	if _telegraph != null:
 		_telegraph.visible = false
 		# Starts where the shot does (the body), whatever the scene says.
 		_telegraph.position = hurt_offset
-	if _telegraph_line != null and _telegraph_line.get_point_count() >= 2:
-		var reach: float = maxf(attack_speed * attack_lifetime, TELEGRAPH_START)
-		_telegraph_line.set_point_position(0, Vector2(TELEGRAPH_START, 0.0))
-		_telegraph_line.set_point_position(1, Vector2(reach, 0.0))
-		_fit_telegraph_parts(reach)
+		_telegraph.centered = false
+		_telegraph.region_enabled = true
+		_fit_telegraph(maxf(attack_speed * attack_lifetime, TELEGRAPH_START), attack_radius)
 	if events == null:
 		events = get_node_or_null("/root/Events") as EventsScript
 	if combat == null:
@@ -395,26 +390,30 @@ func _attack() -> void:
 	_show_telegraph(false)
 
 
-## The optional `Lane` (a Polygon2D, the danger strip behind the dashes) spans the whole reach
-## and the optional `Tip` (a Polygon2D arrowhead) sits at its far end.
-func _fit_telegraph_parts(reach: float) -> void:
-	var lane: Polygon2D = _telegraph.get_node_or_null("Lane") as Polygon2D
-	if lane != null:
-		var half: float = attack_radius + TELEGRAPH_LANE_MARGIN * 0.5
-		lane.polygon = PackedVector2Array([
-			Vector2(TELEGRAPH_START, -half), Vector2(reach, -half),
-			Vector2(reach, half), Vector2(TELEGRAPH_START, half)])
-	var tip: Node2D = _telegraph.get_node_or_null("Tip") as Node2D
-	if tip != null:
-		tip.position = Vector2(reach, 0.0)
+## The telegraph from TELEGRAPH_START to `reach` along +X, its lane `radius` plus half the margin
+## either side (its sprite's region and the shader's length and lane).
+func _fit_telegraph(reach: float, radius: float) -> void:
+	var length: float = maxf(reach - TELEGRAPH_START, 1.0)
+	_telegraph.offset = Vector2(TELEGRAPH_START, -TELEGRAPH_HEIGHT * 0.5)
+	_telegraph.region_rect = Rect2(0.0, 0.0, length, TELEGRAPH_HEIGHT)
+	var material: ShaderMaterial = _telegraph.material as ShaderMaterial
+	if material != null:
+		material.set_shader_parameter(&"beam_length", length)
+		material.set_shader_parameter(&"telegraph_lane", radius + TELEGRAPH_LANE_MARGIN * 0.5)
+
+
+## How far the telegraph reaches now (0 when hidden), for tests.
+func telegraph_reach() -> float:
+	if _telegraph == null or not _telegraph.visible:
+		return 0.0
+	return TELEGRAPH_START + _telegraph.region_rect.size.x
 
 
 func _show_telegraph(on: bool) -> void:
 	if _telegraph != null:
 		var reach: float = next_cast_reach() if on and caster >= 0 else 0.0
-		if on and caster >= 0 and _telegraph_line != null and _telegraph_line.get_point_count() >= 2 and reach > TELEGRAPH_START:
-			_telegraph_line.set_point_position(1, Vector2(reach, 0.0))
-			_fit_telegraph_parts(reach)
+		if on and caster >= 0 and reach > TELEGRAPH_START:
+			_fit_telegraph(reach, spells.next_cast_radius(caster, 0))
 		# A cast that is not aimed (a nova, an orbit) shows no line: the pose and flash say it.
 		_telegraph.visible = on and (caster < 0 or reach > TELEGRAPH_START)
 		if on:
@@ -424,17 +423,16 @@ func _show_telegraph(on: bool) -> void:
 		_sprite.modulate = TELEGRAPH_COLOR if on else Color.WHITE
 
 
-## Make the telegraph brighter and its arrowhead bigger as the shot gets closer.
+## Make the telegraph brighter, its dashes march and its arrowhead grow as the cast gets closer.
 func _update_telegraph() -> void:
 	var progress: float = telegraph_progress()
 	if _sprite != null:
 		_sprite.modulate = TELEGRAPH_COLOR_LAST if progress >= TELEGRAPH_LAST_FROM else TELEGRAPH_COLOR
 	if _telegraph == null:
 		return
-	_telegraph.modulate.a = lerpf(TELEGRAPH_ALPHA_MIN, 1.0, progress)
-	var tip: Node2D = _telegraph.get_node_or_null("Tip") as Node2D
-	if tip != null:
-		tip.scale = Vector2.ONE * lerpf(TELEGRAPH_TIP_SCALE_MIN, 1.0, progress)
+	var material: ShaderMaterial = _telegraph.material as ShaderMaterial
+	if material != null:
+		material.set_shader_parameter(&"telegraph_progress", progress)
 
 
 ## True while the hurt pose shows (a hit landed in the last HURT_TIME seconds).

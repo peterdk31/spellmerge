@@ -112,7 +112,7 @@ Everything runs as GitHub Actions on GitHub's servers, free for public repos; no
 
 ### Per PR (`checks.yml`, seconds, no secrets)
 
-Runs the hard rules check and the automation's unit tests. There is no build per PR: results show up in the preview build after each merge and in the next daily release.
+Runs the hard rules check and the automation's unit tests. There is no build per PR, and the preview build after each merge is the web build only (no tests): a merge is checked by the next daily run, whose bisect reverts it if it broke the build.
 
 ### Daily run (`daily.yml`, 03:00 UTC, `main` only, has the Claude token)
 

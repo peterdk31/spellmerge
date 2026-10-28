@@ -65,7 +65,7 @@ signal form_shown(caster: int, form: StringName, origin: Vector2, direction: Vec
 signal build_refused(player: int, reason: String)
 ## Sender: player. The component ids `player` may build with, in registry order. Sent when the wizard appears and whenever the bag changes.
 signal bag_changed(player: int, bag: Array[StringName])
-## Sender: player. The staff `staff` (0-3) of `player` was built or changed. `plan` holds plain values for the builder (the cards, the casts of its cycle, wasted cards with their reasons, the numbers), as `Spells.staff_view` gives them. Heard by hud.
+## Sender: player. The staff `staff` (0-3) of `player`'s own wizard was built or changed (never another actor's the seat drives). `plan` holds plain values for the builder (the cards, the casts of its cycle, wasted cards with their reasons, the numbers), as `Spells.staff_view` gives them. Heard by hud.
 signal staff_changed(player: int, staff: int, plan: Dictionary)
 ## Sender: player. `player` cast their staff `staff` from `origin` along `direction`. Heard by feel.
 signal staff_cast(player: int, staff: int, origin: Vector2, direction: Vector2)
@@ -131,11 +131,9 @@ signal heal_dealt(caster: int, target: Node, amount: int, position: Vector2)
 signal player_downed(player: int)
 ## Sender: player. `player` was revived by `reviver`.
 signal player_revived(player: int, reviver: int)
-## Sender: player. Another actor's controller took the actor `player` drives (possess): `player` drives nothing for `seconds`. 0 when `player` drives again. Heard by hud (the corner panel's mark and time left).
-signal player_possessed(player: int, seconds: float)
 ## Sender: coop. `player` is downed and being revived: `progress` (0 to 1) is how far the hold has got. Sent when it changes (so every frame while a revive fills or drains); 0 means the revive stopped or is done.
 signal revive_progress(player: int, progress: float)
-## Sender: player. The health or the whole-number mana of `player` changed, or the wizard appeared. Carries all the numbers so a listener never has to ask.
+## Sender: player. The health or the whole-number mana of `player`'s own wizard changed (also while the seat drives another actor or an enemy drives the wizard), or the wizard appeared. Carries all the numbers so a listener never has to ask.
 signal player_stats_changed(player: int, health: int, max_health: int, mana: float, max_mana: float)
 ## Sender: coop. `player` joined the game.
 signal player_joined(player: int)

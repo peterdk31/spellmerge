@@ -35,7 +35,9 @@ extends CharacterBody2D
 ## The step, in this order: the intent's presses are spent, Health counts its protection down,
 ## the controller thinks (writes `intent`), the aim follows the intent, the Caster steps (mana,
 ## anchor and aim to the systems, the casts asked for), the Mover steps (sets `velocity`), the
-## Hurtbox follows down and up, the looks step (read only). `_physics_process` then calls
+## Hurtbox follows down and up, the looks step (read only), and a home controller that is away
+## (it drives another actor, or another controller drives this one) watches its body
+## (`ActorController.watch_home`, read only). `_physics_process` then calls
 ## `move_and_slide()`. Tests call `step(delta)` with fixed deltas and move the body themselves.
 ##
 ## Data: `data` (an `EnemyBase`) is applied to the components in `_ready`, before they are set up:
@@ -198,6 +200,10 @@ func step(delta: float) -> void:
 		hurtbox.step()
 	for look in _looks:
 		look.step(delta)
+	if home_controller != null and home_controller != controller:
+		# Its own controller is away (it drives another actor, or another drives this one): it
+		# still watches its body (a seat's panel shows its own wizard; owner, 2026-10-28).
+		home_controller.watch_home(self, delta)
 
 
 ## Whom it aims at: its driver's team (its home controller's while none drives it).
@@ -283,14 +289,10 @@ func set_down(on: bool) -> void:
 	_down = on
 
 
-## The names Combat's wizard slots ask a wizard by (`is_downed`, `is_invulnerable`), until
-## Combat reads Health and `is_down` itself (G5); the AI's target check and the bots ask them too.
+## The name the old wizard slots asked by (`is_down`); the AI's target check and the bots still
+## ask it.
 func is_downed() -> bool:
 	return _down
-
-
-func is_invulnerable() -> bool:
-	return health != null and health.is_protected()
 
 
 ## The actor is dead: every possession it is part of ends, it sends `died` and frees itself
@@ -449,6 +451,9 @@ func _open_id() -> void:
 		push_warning("Actor %s: the actor table is full, so this actor has no id." % name)
 		return
 	actors.set_node(id, self)
+	# The seat whose own body it is (a wizard): the HUD finds it there while it is away.
+	if home_controller != null:
+		actors.set_home(id, home_controller.seat)
 
 
 func _close_id() -> void:

@@ -109,6 +109,7 @@ Sounds the game asks for by id and does not have yet. A missing sound is silent 
 - **`player_downed`** (M1 part 16). A wizard going down: a low, soft thud or sigh, under 0.8 s, calm rather than alarming.
 
 - **`reaction_discharge`, `reaction_overload`, `reaction_superconduct`** (#243 part 2). Feel asks for each by id when the reaction fires and nothing plays until the `.ogg` is in `audio/sfx/`. Same family as the six older `reaction_<id>` sounds (none exists yet): short (under 0.4 s), a crackle for the discharge, a dull thump for overload, a glassy ping for superconduct. Heard in every fight with lightning, so they must not tire.
+- **`possess`** (actors G9). A possession starting: Feel plays it on `possess_started` (`POSSESS_SOUND`), and the `possess` card names it; silent until the `.ogg` exists. A short, eerie swell or reversed whoosh, under 0.5 s, that says "someone else drives this body now", clearly apart from `cast` and `hit`. Rare (a dear card, one possession per cast), so it may stand out more than the cast sound.
 
 ## Foundation
 

@@ -10,8 +10,8 @@ extends "res://tests/support/suite.gd"
 ##
 ## The HUD runs on its own bus with the real `Spells` (a projectile manager and made-up carriers
 ## from `tests/support/fake_cards.gd`), stepped by hand. Spells keeps staffs by caster (actors
-## G3b): the four wizards sit at actor ids apart from their seats, so the HUD has to ask which
-## actor a seat drives.
+## G3b): the four wizards sit at actor ids apart from their seats, so the HUD has to ask for a
+## seat's own wizard (`Spells.home_of_seat`).
 ##
 ## godot --headless --path . --script res://tests/hud/test_staff_strip.gd
 
@@ -64,9 +64,9 @@ func before_each() -> void:
 	_bus.room_entered.emit(&"arena_01")
 
 
-## The actor id `player`'s seat drives: what Spells keeps its staffs by.
+## The actor id of `player`'s own wizard: what Spells keeps its staffs by.
 func _caster(player: int) -> int:
-	return _mgr.actors.actor_of_seat(player)
+	return _mgr.actors.home_of_seat(player)
 
 
 ## Build `count` made-up carriers into `player`'s staff `staff` and announce it as the player does.

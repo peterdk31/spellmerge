@@ -2,6 +2,10 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-28: Rain card numbers
+
+Rain is a complexity-2 carrier: 6 mana and a 1.5 s cooldown (its payload pays its own on top), a 0.8 s warning before it lands, and an aim point 120 px ahead (the engine's default reach). It has no damage of its own. Not in the free demo.
+
 ## 2026-10-28: Mirror card numbers
 
 Mirror is a complexity-1 modifier with no mana or cooldown of its own (the back shot is free, so `mirror · recoil · bolt` cancels the push), strength 1.0 (the engine only tests for more than 0).

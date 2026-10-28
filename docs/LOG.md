@@ -4,7 +4,7 @@ What each run did, newest first. Claude appends a short entry after each develop
 
 ## 2026-10-28: Sandbox (staffs B7), already built
 
-The task found B7 done: the sandbox room, both dummies, flow's sandbox events, the main menu button and the pause menu's Sandbox page exist with tests (`test_flow_sandbox.gd`, `test_sandbox_data.gd`, `test_main_menu_sandbox.gd`, `test_pause_menu.gd`). The session only ticked it in `docs/NEXT.md`; no code changed.
+The task found B7 done: the sandbox room, both dummies, flow's sandbox events, the main menu button and the pause menu's Sandbox page exist with tests, which pass (`test_flow_sandbox.gd`, `test_sandbox_data.gd`, `test_main_menu_sandbox.gd`, `test_pause_menu.gd`). The session only ticked it in `docs/NEXT.md`; no code changed.
 
 ## 2026-10-26: Caster kit (staffs B4)
 

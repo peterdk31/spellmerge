@@ -10,7 +10,9 @@ extends Node
 ## web frame time (docs/DECISIONS.md, 2026-10-23): one with the render loop off (nothing is
 ## drawn, so the frame is game logic only) and one with the hit particles off. The four
 ## scenarios (web, web with the render loop off, web with hit particles off, desktop) run one
-## after the other.
+## after the other. A web build skips the desktop one (`scenarios_for`): it is the desktop's
+## budget, which the desktop export measures, and in CI's software renderer it alone took about
+## seven of the web run's fourteen minutes (2026-10-28, when the run went past its timeout).
 ##
 ## How the numbers are held. The bots cast their built spells through the real input
 ## path (`staff_2` and `staff_3` held together, so both built staffs are used). Their
@@ -103,7 +105,8 @@ const STAFFS: Array[Array] = [
 ## tree) for a short run.
 var warm_up: float = WARM_UP
 var measure: float = MEASURE
-## The scenarios to run, in order (indexes into SCENARIOS).
+## The scenarios to run, in order (indexes into SCENARIOS); `_ready` keeps the ones for this
+## build (`scenarios_for`).
 var scenarios: Array[int] = [0, 2, 3, 1]
 
 var _log: Logger = ErrorLogScript.new()
@@ -159,11 +162,21 @@ func _ready() -> void:
 		_finish(["the Events, PlayerInput, Flow and Projectiles autoloads must exist"])
 		return
 	_default_cap = int(_projectiles.call("get_cap"))
+	scenarios = scenarios_for(scenarios, OS.has_feature("web"))
 	_events.connect("spell_cast", _on_spell_cast)
 	_events.connect("build_refused", _on_build_refused)
 	_events.connect("projectile_hit", _on_projectile_hit)
 	_events.connect("reaction_triggered", _on_reaction_triggered)
 	_next_scenario()
+
+
+## `wanted` without the desktop scenario when `web` (a web build measures the web budget only).
+static func scenarios_for(wanted: Array[int], web: bool) -> Array[int]:
+	var out: Array[int] = []
+	for index in wanted:
+		if not (web and SCENARIOS[index]["label"] == "desktop"):
+			out.append(index)
+	return out
 
 
 func _exit_tree() -> void:

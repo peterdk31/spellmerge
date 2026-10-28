@@ -59,6 +59,17 @@ const VIEW_TOP: float = 12.0
 const WATCHERS: Array[Vector2] = [Vector2(64, 130), Vector2(92, 205), Vector2(63, 290), Vector2(93, 350)]
 ## Where the hand holding the old staff is on the wizard, and the Favourite's hand.
 const STAFF_HAND: Vector2 = Vector2(6.0, 31.0)
+## Where the wizard stands to drop: on the hole's edge, the staff hand over the hole.
+const STAND_X: float = 66.0
+## The shaft's dark column (the hole) and the lanes the staffs fall down: the grip stays inside
+## it, LANE_SPREAD apart when several fall at once.
+const SHAFT_LEFT: float = 70.0
+const SHAFT_RIGHT: float = 86.0
+const LANE_SPREAD: float = 3.5
+## The falling staff rocks about upright (FALL_ROCK radians, FALL_ROCK_RATE a second) instead
+## of tumbling, so it never pokes through the shaft walls.
+const FALL_ROCK: float = 0.35
+const FALL_ROCK_RATE: float = 7.0
 const FAVOURITE_HAND: Vector2 = Vector2(-5.0, 31.0)
 ## The face on a staff: the eyes' anchor from the grip (the "Close" height) and the sheet frames.
 const FACE_ANCHOR: Vector2 = Vector2(-5.0, -8.0)
@@ -133,6 +144,11 @@ func drop_time(index: int) -> float:
 
 func hit_time(index: int) -> float:
 	return HIT_TIME + HIT_STAGGER * float(index)
+
+
+## Where staff `index`'s grip is in the world now (the world is 128 px wide; y grows downward).
+func staff_position(index: int) -> Vector2:
+	return _staff_at[index]
 
 
 ## True once it has finished (played out or skipped).
@@ -272,16 +288,16 @@ func _pose() -> void:
 	var pose: int = 0
 	var leave: float = last_drop + 1.6
 	if time < 2.5:
-		wx = lerpf(10.0, 58.0, time / 2.5)
+		wx = lerpf(10.0, STAND_X, time / 2.5)
 		wy = -roundf(absf(sin(time * 9.0)))
 	elif time < FIRST_DROP:
-		wx = 58.0
+		wx = STAND_X
 		pose = 2 if time < 2.9 else (3 if time < 3.3 else 1)
 	elif time < leave:
-		wx = 58.0
+		wx = STAND_X
 		pose = 0 if time < last_drop + 0.8 else 1
 	elif time < leave + 0.8:
-		wx = lerpf(58.0, 160.0, (time - leave) / 0.8)
+		wx = lerpf(STAND_X, 160.0, (time - leave) / 0.8)
 		wy = -roundf(absf(sin(time * 14.0)) * 2.0)
 		pose = 1
 	var on_stage: bool = wx < 150.0
@@ -313,7 +329,9 @@ func _pose() -> void:
 func _pose_staff(index: int, hand: Vector2, next_held: int) -> void:
 	var drop: float = _drops[index]
 	var hit: float = hit_time(index)
-	var land_x: float = 78.0 + (float(index) - float(_seats.size() - 1) * 0.5) * 14.0
+	var lane: float = float(index) - float(_seats.size() - 1) * 0.5
+	var land_x: float = 78.0 + lane * 14.0
+	var shaft_x: float = (SHAFT_LEFT + SHAFT_RIGHT) * 0.5 + lane * LANE_SPREAD
 	var at := Vector2.ZERO
 	var angle: float = -PI * 0.5
 	var shut: bool = true
@@ -328,8 +346,16 @@ func _pose_staff(index: int, hand: Vector2, next_held: int) -> void:
 	elif time < hit:
 		var k: float = (time - drop) / (hit - drop)
 		var fall: float = (k / 0.2) * (k / 0.2) * 0.1 if k < 0.2 else 0.1 + (k - 0.2) / 0.8 * 0.9
-		at = Vector2(lerpf(64.0, land_x, minf(k / 0.15, 1.0)) + roundf(sin(time * 9.0)), 31.0 + (FLOOR - 4.0 - 31.0) * fall)
-		angle = -PI * 0.5 + k * PI * 7.0
+		var y: float = 31.0 + (FLOOR - 4.0 - 31.0) * fall
+		# From the hand (over the hole) into its lane, down the shaft inside its walls, and out
+		# into the crypt toward where it lands.
+		var x: float = lerpf(hand.x if hand.x < 150.0 else shaft_x, shaft_x, minf(k / 0.1, 1.0))
+		if y < SHAFT_END:
+			x = clampf(x + roundf(sin(time * 9.0 + float(index)) * 0.6), SHAFT_LEFT + 2.0, SHAFT_RIGHT - 2.0)
+		else:
+			x = lerpf(shaft_x, land_x, (y - SHAFT_END) / (FLOOR - 4.0 - SHAFT_END))
+		at = Vector2(x, y)
+		angle = -PI * 0.5 + sin((time - drop) * FALL_ROCK_RATE) * FALL_ROCK
 		if k >= 0.3:
 			shut = false
 			mood = MOOD_WORRIED
@@ -418,7 +444,7 @@ func _draw_world() -> void:
 	g.draw_rect(Rect2(0, FLOOR, WORLD_W, 1), STONE[2])
 	# A whistled note over the wizard.
 	if time >= 2.6 and time < FIRST_DROP:
-		var nx: float = 62.0
+		var nx: float = STAND_X + 4.0
 		var ny: float = 6.0 + roundf(sin(time * 6.0))
 		g.draw_rect(Rect2(nx, ny, 1, 4), BONE[2])
 		g.draw_rect(Rect2(nx + 1, ny, 2, 1), BONE[2])

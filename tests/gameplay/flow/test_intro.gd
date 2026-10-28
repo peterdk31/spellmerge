@@ -101,6 +101,35 @@ func test_one_staff_drops_per_player_faster_each_time() -> void:
 	check_equal(shown.caption_at(shown.drop_time(3) + 0.1), "\"Oops. Oops. Oops. Oops.\"", "an oops for each drop")
 
 
+## Every staff leaves the hand over the hole and falls inside the shaft's walls, for 1-4 players.
+func test_every_staff_drops_down_the_hole_and_falls_inside_the_shaft() -> void:
+	for count in range(1, 5):
+		var seats: Array[int] = []
+		for seat in count:
+			seats.append(seat)
+		var shown := IntroScript.new()
+		own(shown)
+		shown.setup(seats, null)
+		var inside: bool = true
+		var seen_in_shaft: PackedInt32Array = PackedInt32Array()
+		seen_in_shaft.resize(count)
+		while not shown.is_done():
+			shown.step(STEP)
+			for i in count:
+				var at: Vector2 = shown.staff_position(i)
+				var falling: bool = shown.time >= shown.drop_time(i) and shown.time < shown.hit_time(i)
+				if falling and at.y > IntroScript.SHAFT_TOP - 4.0 and at.y < IntroScript.SHAFT_END:
+					seen_in_shaft[i] += 1
+					if at.x <= IntroScript.SHAFT_LEFT or at.x >= IntroScript.SHAFT_RIGHT:
+						inside = false
+						check(false, "%d players: staff %d at %s is outside the shaft" % [count, i, at])
+						break
+			if not inside:
+				break
+		for i in count:
+			check(seen_in_shaft[i] > 0, "%d players: staff %d falls down the shaft" % [count, i])
+
+
 func test_the_captions_run_in_order() -> void:
 	var shown := IntroScript.new()
 	own(shown)

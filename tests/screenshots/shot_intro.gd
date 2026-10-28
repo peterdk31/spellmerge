@@ -1,5 +1,5 @@
 extends "res://tests/support/screenshot.gd"
-## Screenshots of the intro (living staffs H6) with three players: the wizard walking in, the
+## Screenshots of the intro (living staffs H6) with four players (the widest spread down the shaft): the wizard walking in, the
 ## drops ("Oops. Oops. Oops."), the fall down the shaft, the thud, and the staffs looking up the
 ## shaft. The intro is put at each moment by hand (its time, then a zero step), so the shots do
 ## not depend on the frame rate.
@@ -17,7 +17,7 @@ func take() -> void:
 	DirAccess.remove_absolute(SAVE_PATH)
 	flow.set("save", SaveFile.new(SAVE_PATH))
 	flow.set("intro_enabled", true)
-	for index in 3:
+	for index in 4:
 		input.call("add_virtual_device", index)
 	root.get_node("Events").emit_signal("play_requested", 0)
 	var intro: Node = flow.get("intro") as Node

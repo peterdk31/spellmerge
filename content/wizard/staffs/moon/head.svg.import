@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bvokaymtlk3pk"
-path="res://.godot/imported/windup.svg-68394bf33ff931fd0a5dde71c579b5f2.ctex"
+uid="uid://d1lhj3lyykcso"
+path="res://.godot/imported/head.svg-73ac1d033801e66dd9f5b0287c0bf77e.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://content/enemies/ember_imp/windup.svg"
-dest_files=["res://.godot/imported/windup.svg-68394bf33ff931fd0a5dde71c579b5f2.ctex"]
+source_file="res://content/wizard/staffs/moon/head.svg"
+dest_files=["res://.godot/imported/head.svg-73ac1d033801e66dd9f5b0287c0bf77e.ctex"]
 
 [params]
 

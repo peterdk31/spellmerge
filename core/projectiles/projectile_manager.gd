@@ -390,7 +390,7 @@ const RAMP_COLORS: Array[Color] = [
 	Color("#3b73c9"), Color("#d9477a"), Color("#3f8f4f"), Color("#8a4fc4"), Color("#a68a2a"),
 ]
 ## The light shade of each ramp (docs/STYLE.md), in the same order: a wizard's reticle, staff gem
-## and rings (`WizardLook`), Feel's flashes in a player's colours.
+## and rings (`StaffLook`), Feel's flashes in a player's colours.
 const RAMP_LIGHT_COLORS: Array[Color] = [
 	Color("#7fc0f0"), Color("#f59ab8"), Color("#8fd46a"), Color("#c99af0"), Color("#e3cf6b"),
 ]

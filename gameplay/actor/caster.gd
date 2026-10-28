@@ -1,12 +1,15 @@
 class_name Caster
 extends ActorComponent
 ## The caster (actors G4, docs/milestones/M2-actors.md, "The components"): an actor's staffs and
-## mana. It holds 1-4 staffs (`staff_count`), all of one `StaffBase` (`staff`), each a row of card
-## ids; `set_staff(at, cards)` builds one and installs it in `Spells` under the actor's caster
-## number (`number`). Every step it gets mana back (`regen` a second and what siphon refunds, up
-## to `max_mana`), tells the systems where the actor is and aims when it moved or turned (the
-## projectile manager's anchor for its orbits at the body, Spells' aim from the staff tip for its
-## beams; sent again before each cast), and casts the staffs
+## mana. It holds 1-4 staffs (`staff_count`), each a `StaffBase` (`staffs`, one per button; a
+## button without one is `staff`) and a row of card ids; `set_staff(at, cards)` builds one and
+## installs it in `Spells` under the actor's caster number (`number`). `current` is the staff on
+## show (living staffs H3): the one pressed or held last, set before it casts, so the cast leaves
+## from that staff's tip (`tip`, `Actor.muzzle_position`); a change sends `staff_shown` (living
+## staffs H4: Feel's poof). Every step it gets mana back (`regen` a second and what siphon refunds, up
+## to `max_mana`), tells the systems where the actor is and aims when it moved, turned or showed
+## another staff (the projectile manager's anchor for its orbits at the body, Spells' aim from the
+## staff tip for its beams; sent again before each cast), and casts the staffs
 ## the intent asks for: a staff pressed this step, or held while it holds no sustained (`hold`)
 ## card on (then only a new press casts, which switches it off). `cast(at)` casts from the staff
 ## tip (`Actor.muzzle_position`, clipped to walls from the feet) along the actor's aim with the
@@ -43,9 +46,11 @@ signal staff_built(at: int)
 
 ## How many staffs (1-4): a wizard has four, an enemy one.
 @export_range(1, 4) var staff_count: int = 1
-## The staff every one of them is (its slots, delay and recharge); without one a staff has 4
-## slots and casts with no delay of its own.
+## The staff of a button with none in `staffs` (its slots, delay and recharge); without one a
+## staff has 4 slots and casts with no delay of its own.
 @export var staff: StaffBase = null
+## The staff of each button (a player's four heads); shorter or null entries fall back to `staff`.
+@export var staffs: Array[StaffBase] = []
 ## The card ids built into each staff when the actor is ready (a list per staff).
 @export var start_cards: Array = []
 ## The mana pool, full at the start, and the mana back a second.
@@ -53,6 +58,8 @@ signal staff_built(at: int)
 @export var regen: float = 10.0
 
 var mana: float = 100.0
+## The staff on show: the one pressed or held last (0 at the start).
+var current: int = 0
 ## The number the actor casts under in Spells (and is the anchor of in the projectile manager),
 ## -1 while it has none (out of the tree, or no actor id): the actor's `id` (actors G3b).
 var number: int = -1
@@ -67,10 +74,11 @@ var _has_build: PackedByteArray = PackedByteArray()
 var _built: bool = false
 ## The plain staff used when `staff` is null.
 var _plain: StaffBase = null
-## What `_push_place` sent last: the feet and aim it was worked out from (INF: send at the next
-## step), the anchor and the staff tip it sent.
+## What `_push_place` sent last: the feet, aim and staff on show it was worked out from (INF feet:
+## send at the next step), the anchor and the staff tip it sent.
 var _placed_feet: Vector2 = Vector2.INF
 var _placed_aim: Vector2 = Vector2.INF
+var _placed_current: int = -1
 var _placed_anchor: Vector2 = Vector2.INF
 var _placed_tip: Vector2 = Vector2.INF
 
@@ -127,41 +135,46 @@ func step(delta: float) -> void:
 		_placed_feet = Vector2.INF
 		return
 	mana = minf(mana + regen * delta, max_mana)
-	if actor.global_position != _placed_feet or actor.aim != _placed_aim:
-		# Only when the body moved or turned: the systems still hold what was sent.
+	if actor.global_position != _placed_feet or actor.aim != _placed_aim or current != _placed_current:
+		# Only when the body moved, turned or showed another staff: the systems still hold what
+		# was sent (performance pass, 2026-10-28).
 		_push_place()
 	if actor.spells == null:
 		return
 	var intent: ActorIntent = actor.intent
 	if (intent.pressed_bits | intent.held_bits) == 0:
-		# No button: nothing to cast (most steps of most actors).
+		# No button: nothing to cast or show (most steps of most actors).
 		return
 	for at in staff_count:
 		if _has_build[at] == 0:
+			# An empty staff casts nothing, but pressing it still puts it on show.
+			if intent.is_pressed(at):
+				_show(at)
 			continue
 		# A held button casts whenever the staff is ready, except while it holds a sustained card:
 		# then only a new press casts, which switches it off.
 		var pressed: bool = intent.is_pressed(at)
 		var held: bool = intent.is_held(at) and not actor.spells.is_holding(number, at)
 		if pressed or held:
+			_show(at)
 			cast(at)
 
 
-## The projectile manager's anchor at the body and Spells' aim from the staff tip. The step sends
-## them only when the body moved or turned since the last time, and works the points out here
-## rather than calling `muzzle_position` and `_origin` (the same points): every actor does this
-## every step (performance pass, 2026-10-28).
+## The projectile manager's anchor at the body and Spells' aim from the staff tip.
+## The step sends them only when the body moved, turned or showed another staff since the last
+## time (every actor does this every step; performance pass, 2026-10-28).
 func _push_place() -> void:
 	var feet: Vector2 = actor.global_position
 	var anchor: Vector2 = feet + actor.body_offset
-	var tip: Vector2 = feet + actor.hand_offset + actor.aim * actor.staff_reach
+	var tip: Vector2 = actor.muzzle_position()
 	if actor.projectiles != null:
-		# The anchor and the staff tip clipped to walls, in one call.
+		# The anchor and the staff tip clipped to walls (`_origin`), in one call.
 		tip = actor.projectiles.place_caster(number, anchor, feet, tip)
 	if actor.spells != null:
 		actor.spells.set_aim(number, tip, actor.aim)
 	_placed_feet = feet
 	_placed_aim = actor.aim
+	_placed_current = current
 	_placed_anchor = anchor
 	_placed_tip = tip
 
@@ -228,16 +241,37 @@ func cards_of(at: int) -> Array[StringName]:
 	return out
 
 
-## How many slots every staff has.
-func slot_count() -> int:
-	return _staff_or_plain().slots
+## How many slots staff `at` has.
+func slot_count(at: int = 0) -> int:
+	return staff_of(at).slots
+
+
+## The staff of button `at`: its own in `staffs`, else `staff`, else a plain one of 4 slots.
+func staff_of(at: int) -> StaffBase:
+	if at >= 0 and at < staffs.size() and staffs[at] != null:
+		return staffs[at]
+	return _staff_or_plain()
+
+
+## Pixels from the hand to the tip of the staff on show (0: the actor's own reach).
+func tip() -> float:
+	return staff_of(current).tip
+
+
+## Put staff `at` on show (`current`); another than the one shown sends `staff_shown` (the poof).
+func _show(at: int) -> void:
+	if at == current:
+		return
+	current = at
+	if actor.events != null:
+		actor.events.staff_shown.emit(actor.id, actor, at)
 
 
 ## The plain view of staff `at` for a builder (`Spells.staff_view`); empty without Spells.
 func plan_of(at: int) -> Dictionary:
 	if actor.spells == null or at < 0 or at >= staff_count:
 		return {}
-	return actor.spells.staff_view(cards_of(at), _staff_or_plain())
+	return actor.spells.staff_view(cards_of(at), staff_of(at))
 
 
 ## The form of the carrier staff `at` cast last (`Spells.last_form`), or &"".
@@ -253,7 +287,7 @@ func set_staff(at: int, cards: Array[StringName]) -> bool:
 	if at < 0 or at >= staff_count:
 		return false
 	var row: Array[StringName] = []
-	for slot in slot_count():
+	for slot in slot_count(at):
 		row.append(cards[slot] if slot < cards.size() else &"")
 	_cards[at] = row
 	_install(at)
@@ -296,12 +330,11 @@ func _install(at: int) -> void:
 	if actor.spells == null or number < 0:
 		_has_build[at] = 0
 		return
-	var compiled: CompiledStaff = _compiled(_cards[at])
+	var compiled: CompiledStaff = _compiled(_cards[at], staff_of(at))
 	_has_build[at] = 1 if actor.spells.install_staff(number, at, compiled) != 0 else 0
 
 
-func _compiled(cards: Array[StringName]) -> CompiledStaff:
-	var base: StaffBase = _staff_or_plain()
+func _compiled(cards: Array[StringName], base: StaffBase) -> CompiledStaff:
 	var key: String = "%d|%d|%s" % [actor.spells.get_instance_id(), base.get_instance_id(), ",".join(PackedStringArray(cards))]
 	var found: CompiledStaff = _cache.get(key) as CompiledStaff
 	if found != null:

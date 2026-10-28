@@ -7,7 +7,7 @@
 [sub_resource type="Resource" id="Resource_staff"]
 script = ExtResource("3_staff")
 id = &"ember_imp"
-display_name = "Ember imp's staff"
+display_name = "Cinder Rod's staff"
 slots = 2
 draw = 1
 cast_delay = 0.0

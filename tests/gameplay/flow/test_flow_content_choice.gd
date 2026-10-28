@@ -44,16 +44,20 @@ func test_an_unknown_enemy_starts_no_run() -> void:
 	check(not flow.start_run(0), "a missing enemy must not start a run")
 
 
-func test_a_missing_staff_starts_no_run() -> void:
-	flow.channel = "no_such_channel"
+func test_each_channel_gets_the_four_starter_heads() -> void:
 	var registry: Node = root.get_node("Registry")
-	check(flow.staff_for_channel() == registry.call("get_resource", &"wizard", &"starter"), "an unknown channel plays the starter staff")
-	flow.channel = "dev"
-	check(flow.staff_for_channel() == registry.call("get_resource", &"wizard", &"dev"), "dev builds get the sandbox staff")
-	flow.channel = "preview"
-	check(flow.staff_for_channel() == registry.call("get_resource", &"wizard", &"dev"), "preview builds get the sandbox staff")
-	flow.channel = "stable"
-	check(flow.staff_for_channel() == registry.call("get_resource", &"wizard", &"starter"), "stable builds get the starter staff")
+	var dev: StaffBase = registry.call("get_resource", &"wizard", &"dev") as StaffBase
+	for name: String in ["no_such_channel", "stable", "dev", "preview"]:
+		flow.channel = name
+		var staffs: Array[StaffBase] = flow.staffs_for_channel()
+		check_equal(staffs.size(), 4, "%s: four staffs" % name)
+		if staffs.size() != 4:
+			continue
+		for at in 4:
+			var head: StaffBase = registry.call("get_resource", &"wizard", flow.STARTER_HEADS[at]) as StaffBase
+			check(staffs[at].head == head.head and staffs[at].face_style == head.face_style, "%s: button %d has the %s head" % [name, at, flow.STARTER_HEADS[at]])
+			var slots: int = dev.slots if name == "dev" or name == "preview" else head.slots
+			check_equal(staffs[at].slots, slots, "%s: button %d has the channel's slots" % [name, at])
 
 
 func test_other_start_cards_reach_the_wizards() -> void:

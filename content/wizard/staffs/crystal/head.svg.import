@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://xl8wfl5yot2a"
-path="res://.godot/imported/hurt.svg-f9e49cfd8acb05d7342956c2b6548451.ctex"
+uid="uid://rxsuvyw40lpq"
+path="res://.godot/imported/head.svg-c040dcd4c523d71f375e00cc33931bb0.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://content/enemies/ember_imp/hurt.svg"
-dest_files=["res://.godot/imported/hurt.svg-f9e49cfd8acb05d7342956c2b6548451.ctex"]
+source_file="res://content/wizard/staffs/crystal/head.svg"
+dest_files=["res://.godot/imported/head.svg-c040dcd4c523d71f375e00cc33931bb0.ctex"]
 
 [params]
 

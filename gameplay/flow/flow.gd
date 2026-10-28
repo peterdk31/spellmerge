@@ -32,10 +32,17 @@ extends Node
 ## projectiles left, and `Spells` cleared (every cooldown and build is forgotten; each
 ## new wizard builds its start staffs again).
 ##
-## Staffs (staffs A6a, docs/milestones/M2-staffs.md): every wizard gets the staff of the build
-## channel (`staff_for_channel`: `dev` in `dev` and `preview` builds, `starter` otherwise, from
-## `content/wizard/staffs/`) and `start_cards`, four lists of card ids (A `dash`, X `fire bolt`,
+## Staffs (staffs A6a, docs/milestones/M2-staffs.md; living staffs H3): every wizard gets the four
+## staffs of the build channel (`staffs_for_channel`: the starter heads STARTER_HEADS, one per
+## button, from `content/wizard/staffs/`; in `dev` and `preview` builds each with the numbers of
+## the `dev` staff, its slots, delay and recharge) and `start_cards`, four lists of card ids (A `dash`, X `fire bolt`,
 ## Y and B empty), and builds them itself; flow never touches a spell.
+##
+## The intro (living staffs H6, `intro.gd`): on a new save (`save`, a `SaveFile`, has no
+## INTRO_SEEN flag) Play shows the intro first (state INTRO): one staff dropped per joined player,
+## skippable by any of them; when it ends or is skipped the save is marked and the run starts.
+## It plays only for people: off (`intro_enabled` false) when a test script is the main loop or
+## the game was started with user arguments (the 4-bot test, the stress run, the timing run).
 ##
 ## Sandbox (staffs B7, docs/milestones/M2-staffs.md, "The sandbox"): `sandbox_requested` (the
 ## main menu's Sandbox button, in `dev` and `preview` builds) starts a run in the sandbox room
@@ -58,6 +65,7 @@ const PlayerScript := preload("res://gameplay/player/player.gd")
 const DownedScript := preload("res://gameplay/player/downed.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const DefaultWizardScene: PackedScene = preload("res://content/wizard/base/wizard.tscn")
+const IntroScript := preload("res://gameplay/flow/intro.gd")
 
 const PLAYER_SLOTS: int = 4
 ## Registry folders, and the ids of the M1 content a run uses unless `room_id_to_play`,
@@ -76,9 +84,10 @@ const DUMMY_IDS: Array[StringName] = [&"training_dummy", &"shooting_dummy"]
 ## The actions of `sandbox_action_requested`.
 const ACTION_IMP_WAVE: StringName = &"imp_wave"
 const ACTION_RESET_DUMMIES: StringName = &"reset_dummies"
-## The staff of test builds (the sandbox) and of the normal game, by id under `wizard`.
+## The numbers of test builds' staffs (the sandbox), and the four starter heads by button (RB,
+## RT, LB, LT), by id under `wizard`.
 const DEV_STAFF: StringName = &"dev"
-const STARTER_STAFF: StringName = &"starter"
+const STARTER_HEADS: Array[StringName] = [&"curl", &"star", &"moon", &"crystal"]
 ## The build channels that get the dev staff (`BuildInfo.channel()`).
 const DEV_CHANNELS: Array[String] = ["dev", "preview"]
 ## The wave, sized for four players: one enemy per entry, placed at the room's
@@ -101,8 +110,11 @@ const RESTART_DELAY: float = 1.5
 const PROJECTILE_MARGIN: float = 32.0
 ## Name of the world node.
 const WORLD_NAME: String = "Arena"
+## The intro's node name, and the save flag set once it has been seen (or skipped).
+const INTRO_NAME: String = "Intro"
+const INTRO_SEEN: StringName = &"intro_seen"
 
-enum State { IDLE, RUNNING, CLEARED }
+enum State { IDLE, RUNNING, CLEARED, INTRO }
 
 ## The services. Only tests set these, before adding the node; otherwise the
 ## autoloads are used.
@@ -125,6 +137,12 @@ var start_cards: Array = DEFAULT_START_CARDS.duplicate(true)
 ## The build channel, which picks the staff; `BuildInfo.channel()` unless a test sets it.
 var channel: String = BuildInfo.channel()
 var wizard_scene: PackedScene = DefaultWizardScene
+## Whether Play may show the intro (see the class doc), and the save it is remembered in.
+var intro_enabled: bool = true
+var save: SaveFile = null
+## The intro on show (null when none), and who pressed Play.
+var intro: IntroScript = null
+var _intro_requester: int = 0
 
 var state: State = State.IDLE
 ## The world of the run in progress (null before the first Play).
@@ -140,6 +158,9 @@ var _starter: int = 0
 var _room: RoomBase = null
 ## The wizard scene the run in progress started with (joiners get the same one).
 var _wizard_scene: PackedScene = null
+## The channel's staffs (`staffs_for_channel`) and the channel they were made for.
+var _channel_staffs: Array[StaffBase] = []
+var _channel_staffs_for: String = ""
 var _enemies: Array[Node] = []
 ## The sandbox's dummies still standing.
 var _dummies: Array[Node] = []
@@ -151,6 +172,10 @@ var _enemy_data: EnemyBase = null
 
 
 func _ready() -> void:
+	if save == null:
+		save = SaveFile.new()
+	if _is_automated():
+		intro_enabled = false
 	if events == null:
 		events = get_node_or_null("/root/Events") as EventsScript
 	if registry == null:
@@ -180,8 +205,10 @@ func _process(delta: float) -> void:
 	step(delta)
 
 
-## Advance the restart timer by `delta` seconds.
+## Advance the intro, the next wave's and the restart timers by `delta` seconds.
 func step(delta: float) -> void:
+	if intro != null:
+		intro.step(delta)
 	if _next_wave_left >= 0.0:
 		_next_wave_left -= delta
 		if _next_wave_left <= 0.0:
@@ -260,8 +287,8 @@ func start_run(requester: int) -> bool:
 	if spells == null:
 		push_warning("Flow: the Spells autoload is missing, so no run starts.")
 		return false
-	if staff_for_channel() == null:
-		push_warning("Flow: the staff for the %s channel is missing from the registry, so no run starts." % channel)
+	if staffs_for_channel().is_empty():
+		push_warning("Flow: a staff for the %s channel is missing from the registry, so no run starts." % channel)
 		return false
 	if not _is_wizard_scene(wizard_scene):
 		push_warning("Flow: the wizard scene is missing or has no player script, so no run starts.")
@@ -311,6 +338,11 @@ func start_run(requester: int) -> bool:
 ## End the run in progress and free its world. Flow is idle again, so the next
 ## `play_requested` starts a run. Nothing shows a menu yet; M3's run area will.
 func stop_run() -> void:
+	if intro != null:
+		var shown: IntroScript = intro
+		intro = null
+		if is_instance_valid(shown):
+			_detach(shown)
 	_restart_left = -1.0
 	_next_wave_left = -1.0
 	wave = 0
@@ -326,7 +358,49 @@ func _on_play_requested(player: int) -> void:
 	if state != State.IDLE:
 		return
 	sandbox = false
-	start_run(player)
+	if wants_intro():
+		play_intro(player)
+	else:
+		start_run(player)
+
+
+## True when Play should show the intro first: it is on and this save has not seen it.
+func wants_intro() -> bool:
+	return intro_enabled and save != null and not save.has_flag(INTRO_SEEN)
+
+
+## Show the intro for the joined players (`requester` joins first, as for a run); the run starts
+## when it ends or is skipped.
+func play_intro(requester: int) -> void:
+	_ensure_joined(requester)
+	_intro_requester = requester
+	intro = IntroScript.new()
+	intro.name = INTRO_NAME
+	intro.setup(_joined_players(), input)
+	intro.finished.connect(_on_intro_finished)
+	state = State.INTRO
+	_show_world(intro)
+
+
+func _on_intro_finished(_skipped: bool) -> void:
+	var shown: IntroScript = intro
+	intro = null
+	state = State.IDLE
+	if save != null:
+		save.set_flag(INTRO_SEEN)
+	var started: bool = start_run(_intro_requester)
+	# A run replaces the intro as the current scene; under `world_parent`, or with no run, it goes here.
+	if shown != null and is_instance_valid(shown) and shown.is_inside_tree():
+		_detach(shown)
+	if not started:
+		push_warning("Flow: the run after the intro did not start; Play starts a new one.")
+
+
+## True when nobody is playing: a test script is the main loop, or the game was started with user
+## arguments (the automated runs).
+func _is_automated() -> bool:
+	var tree: MainLoop = Engine.get_main_loop()
+	return (tree != null and tree.get_script() != null) or not OS.get_cmdline_user_args().is_empty()
 
 
 func _on_sandbox_requested(player: int) -> void:
@@ -563,15 +637,35 @@ func _is_wizard_scene(scene: PackedScene) -> bool:
 
 ## The staff every wizard's four staffs are: the 20-slot `dev` staff in `dev` and `preview`
 ## builds (the sandbox for testing builds), the 4-slot `starter` otherwise. Null when missing.
-func staff_for_channel() -> StaffBase:
+## The four staffs a wizard holds in this build channel (empty when one is missing): the starter
+## heads, in a test build each a copy with the dev staff's numbers (made once per channel).
+func staffs_for_channel() -> Array[StaffBase]:
+	if not _channel_staffs.is_empty() and _channel_staffs_for == channel:
+		return _channel_staffs
+	var out: Array[StaffBase] = []
 	if registry == null:
-		return null
-	return registry.get_resource(&"wizard", DEV_STAFF if DEV_CHANNELS.has(channel) else STARTER_STAFF) as StaffBase
+		return out
+	var dev: StaffBase = registry.get_resource(&"wizard", DEV_STAFF) as StaffBase if DEV_CHANNELS.has(channel) else null
+	if DEV_CHANNELS.has(channel) and dev == null:
+		return out
+	for id in STARTER_HEADS:
+		var head: StaffBase = registry.get_resource(&"wizard", id) as StaffBase
+		if head == null:
+			out.clear()
+			return out
+		if dev != null:
+			head = head.duplicate() as StaffBase
+			for field: String in ["slots", "draw", "cast_delay", "recharge", "spread"]:
+				head.set(field, dev.get(field))
+		out.append(head)
+	_channel_staffs = out
+	_channel_staffs_for = channel
+	return out
 
 
 func _add_wizard(parent: Node2D, room: RoomBase, index: int, at: Vector2 = Vector2.INF) -> void:
 	var wizard := _wizard_scene.instantiate() as Actor
-	PlayerScript.seat_wizard(wizard, index, staff_for_channel(), start_cards.duplicate(true))
+	PlayerScript.seat_wizard(wizard, index, null, start_cards.duplicate(true), staffs_for_channel())
 	if at != Vector2.INF:
 		wizard.position = at
 	elif index < room.player_spawns.size():

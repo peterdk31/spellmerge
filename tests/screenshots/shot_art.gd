@@ -20,8 +20,8 @@ const HATS: Array[Texture2D] = [
 ]
 const STAFF := preload("res://content/wizard/base/staff.svg")
 const IMP := preload("res://content/enemies/ember_imp/idle.svg")
-const IMP_WINDUP := preload("res://content/enemies/ember_imp/windup.svg")
-const IMP_HURT := preload("res://content/enemies/ember_imp/hurt.svg")
+const SPLINTER := preload("res://content/enemies/splinter/idle.svg")
+const FORK := preload("res://content/enemies/storm_fork/idle.svg")
 const WALL_TOP := preload("res://art/tilesets/crypt/wall_top.svg")
 const PILLAR := preload("res://art/tilesets/crypt/pillar.svg")
 const PILLAR_TOP := preload("res://art/tilesets/crypt/pillar_top.svg")
@@ -59,10 +59,11 @@ func take() -> void:
 	for texture: Texture2D in [WALL, WALL_TOP, PILLAR_TOP, PILLAR, DOOR, TORCH, RUBBLE, SKULL, DASH]:
 		_frame(texture, 0, x, 200.0)
 		x += FRAME * SCALE
-	# Row 4: the imp's windup and hurt poses, then the torch flame and glow frames.
-	x = _strip(IMP_WINDUP, 32.0, 266.0)
-	_frame(IMP_HURT, 0, x, 266.0)
-	_strip(TORCH_FLAME, x + FRAME * SCALE, 266.0)
+	# Row 4: the other strays (the face carries their mood), then the torch flame and glow frames.
+	_frame(SPLINTER, 0, 32.0, 266.0)
+	_frame(FORK, 0, 32.0 + FRAME * SCALE, 266.0)
+	x = 32.0 + FRAME * SCALE * 2.0
+	_strip(TORCH_FLAME, x, 266.0)
 	await shot("art_sheet")
 
 

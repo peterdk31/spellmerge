@@ -1846,3 +1846,50 @@ The owner's decision after G9: a player must always see their own wizard, which 
 - **Gone:** the panel's "POSSESSED n" word and `player_possessed` (no other listener); the empty staffs announced while driving an actor with fewer; the builder on a possessed actor's staffs and the possession putting them back (`Possession._keep_cards`, `_give_cards_back`), now dead; `Actor.is_invulnerable()` (no callers).
 - **Over the possessed actor** (`PossessedLook`), just above the 32 px character: the timer as a small ring like the wizard's revive ring (outline, Stone back ring, the time left as an arc in the driver's light shade). Over an actor a seat drives that is not its own wizard, its health (Fire) and mana (Spark) beside it as two 16x2 px bars in a 1 px outline on a Stone trough, the panel's bar colours. A wizard an enemy's AI drives shows only the timer. The ring round the body is gone (Feel's rings mark the start and the end).
 - **The sound `possess`** is listed in docs/BACKLOG.md, "Audio needs".
+
+## 2026-10-28: The floating staff (living staffs H3)
+
+- **A staff per button** (the owner, 2026-10-28, asked in this part): a player's Caster holds one `StaffBase` per button (`Caster.staffs`; `staff` stays for a button without one and for enemies), so a head, its tip and its personality are the staff's, and a staff found in a run (M3) is a data swap of one button. The four starter heads are four staffs, `curl`, `star`, `moon` and `crystal` (RB, RT, LB, LT), each with the old starter's numbers; `starter` is gone (moved to `curl`). Dev and preview builds give each head the `dev` staff's numbers (copies made once by flow), so the sandbox keeps its 20 slots with the new heads.
+- **The staff on show is the Caster's `current`:** the staff pressed or held last, set before it casts, so the shot leaves from the new head's tip on the press (`Actor.reach`: the staff's `tip`, else `staff_reach`). Pressing an empty staff shows it too: the button picks the personality. Until the poof (H4) the swap is instant.
+- **`StaffBase` gains its look:** `head` (a sheet of 48×48 frames, 16 directions × 4 ramps, the grip at (24, 27)), `tip` (0–32 px), `face_style` and `resting_mood` as ints in `Face`'s order (core cannot name gameplay's enums).
+- **The hurt circle is unchanged** (radius 8 at (0, -12)): it already covers the face and the grip, and moving it up 3 px broke the dodge distances the AI tests hold (the plan: hits stay as fair as now). The grip (`hand_offset`) is at (0, -12), 2 px above the old hand.
+- **The moon is redrawn sharper:** a thin crescent with its horns up, carved straight down instead of to the upper right, so it no longer reads as a blob (the mockup's weak spot).
+- **No more flip:** each direction has its own frame (the curl's spiral is drawn on top either way), so `flip_h` and the turn band are gone; between two directions the nearer shows.
+- **The style N wizard art stays** in `content/wizard/base/` for the villain (H6); the clips stage and the art screenshots still show it. `docs/STYLE.md` and the golden examples move to the staff in H7.
+- **The sheets** are drawn by a generator from the mockup's pixel rules (the same as the face sheets'); each head folder lists its sheet in an `assets.json`.
+
+## 2026-10-28: The poof (living staffs H4)
+
+- **The poof is a look bit on the puff, not a new effect kind:** the shot shader's kinds 1–15 are all taken (the kind travels in four bits of the instance data), so `KIND_POOF` from the plan is `KIND_PUFF` with the `POOF` look bit (kind 22, `1 << 21`), as `EXACT` is. Bone clouds along the staff that peak at 35% and dot away, sparks in the ramp; no new pool.
+- **A new event, `staff_shown(caster, actor, staff)`,** sent by the Caster when another staff goes on show, before that press casts (the cast is never delayed). Feel draws the cloud from it; `StaffLook` needs no event (it reads `Caster.current`).
+- **The body changes at 35% of the newest cloud:** every press of another staff starts the poof again (Feel shows a cloud per press), so a fast double swap lands on the last staff at the last cloud's biggest. The same staff again, or holding one, never poofs.
+- **Followed effects sit at an offset** (`_effect_offset`, was the status's fixed rise), so the cloud stays on the staff while it moves.
+- **Feel ages effects by the wall clock** (so hit-stop cannot slow them). On a software renderer a frame takes far longer than 1/60 s and a 0.18 s cloud is gone in a frame, so `shot_poof.gd` puts Feel on frame time for its pictures. The game is unaffected.
+
+## 2026-10-28: The strays (living staffs H5)
+
+- **The Cinder Rod keeps the id `ember_imp`.** Flow's default enemy, the sandbox's imp wave, the tests and the clips all name `ember_imp`; renaming it buys nothing a player sees. The look, the art and the staff's display name are the Cinder Rod's; its numbers and staff (fire · bolt) are unchanged.
+- **Built now: the Cinder Rod, the Splinter (dash, contact damage 8, one eye) and the Storm Fork (triple · lightning · bolt).** The Rime Crook waits for a `hook` card and the Bone Scepter for `rain` (the plan: a stray waits for its cards); both are in NEXT.
+- **The wave is unchanged:** flow spawns one enemy type (`enemy_id_to_play`) at the wave's spawns, so mixing strays into a wave is flow work, not data; the Splinter and the Storm Fork exist as content (and in the registry) until a mixed wave or M3's rooms use them.
+- **No poses on strays:** the imp's windup and hurt strips are gone; the face carries the mood (furious while winding up, worried when hit) and the flash and telegraph are unchanged. `CreatureLook` keeps the poses as an option (tested on strips made in code).
+- **The hop is the sprite's offset only,** so the telegraph and the hurt circle never move with it: dodging stays exactly as fair as before.
+- **Eye glow** is the light shade of the stray's element ramp (Fire `#ffa23c` for the Cinder Rod and the Splinter); the Storm Fork's eyes are Acid's base `#b4e82a`, since Acid's light shade is too pale to read as a glow.
+- **The dummies** are staffs staked in a Stone mound (the training dummy with a target on a straw crossbar, the shooting dummy with a muzzle head); no face, since they are props. Their behaviour is unchanged.
+
+## 2026-10-28: The intro (living staffs H6)
+
+- **"A new save" is a flag in a new save file.** There was no save yet (`core/save/` was empty), so H6 adds the smallest one: `SaveFile`, a ConfigFile at `user://save.cfg` holding flags. The intro sets `intro_seen` when it ends or is skipped; a missing or broken file is a new save. Runs, unlocks and settings move into it when they exist (M3).
+- **Only people see it:** Flow's `intro_enabled` is off when a test script is the main loop or the game was started with user arguments (the 4-bot test, the stress run, the timing run), since every automated run starts on a fresh `user://` and would otherwise sit through it. The intro's tests and its screenshot switch it on with a save file of their own. The sandbox never shows it.
+- **Skip by press count,** not "just pressed": a tap between two of Flow's steps still skips, for any joined player, on accept, back, pause or any staff button.
+- **Drawn in code, not a scene:** the world (tower room, shaft, crypt) is rects in docs/STYLE.md's palette, as in the owner's mockup, at 3× under a clipped window with the caption below. The dropped staffs are the curl head sheet; their eyes and brows are frames of `art/faces/` drawn directly, because `Face` needs an actor. Each staff is its player's colour.
+- **The villain wears Blight** (`art/story/wizard_hat.svg`, the style N hat recoloured): the hats in `content/wizard/base/` are all player colours, which stay the players' only. The Favourite (`art/story/favourite.svg`) is the mockup's 'fav' body pointing up.
+- **More players, same length:** the drops come 0.45, 0.3 and 0.2 s apart ("Oops. Oops. Oops. Oops."), the wizard leaves after the last, and the staffs land 0.12 s apart, so four players still finish at 14.5 s.
+- **The captions are in code** (`intro.gd`): `content/story/` takes only JSON, and there is no cutscene schema or loader yet (lore is the only story kind the registry reads). Moving them to story data is M3's, with the events schema.
+- **Kept from the mockup:** the closing line "Merge spells. Find your way home." after "Home is up there." (the owner saw it in round 9).
+
+## 2026-10-28: The docs (living staffs H7)
+
+- **"Player" in the prose, not "staff":** every README, docs/ARCHITECTURE.md and llms.txt now call the player's character the player (its body the staff where that is meant), never the wizard. "Staff" alone already names each of a player's four card rows, so "the staff's staffs" would not read; the plan's "staff for the player" is kept where it is unambiguous. The wizard in the prose is now only the villain.
+- **Identifiers keep "wizard":** `content/wizard/`, `wizard.tscn`, the `wizards` group, `TEAM_WIZARDS`, `seat_wizard`, `WizardFixture` and the like. Renaming them is a refactor across code, scenes, tests and the bot's scripts for no change in play; the folder's README says why it keeps its name.
+- **docs/STYLE.md** gains "The living staffs" (the face layers, moods and personalities, head sheets of 16 drawn directions, strays' glow and hop, silhouette families) and its player-colour rule moves from the hat to the head. **Golden examples:** `art/kit/golden_staff.svg` (the curl with the Optimist's face) and `art/kit/golden_stray.svg` (the Cinder Rod with its face), each composited from the game's own sheets as the game layers them; `golden_wizard.svg` stays in the kit as the villain's look and leaves the list.
+- **In the game,** the two combo descriptions that said "One wizard's" say "One player's"; the intro's lines about the wizard are about the villain.

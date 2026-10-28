@@ -5,9 +5,9 @@
 			"origin": "ai",
 			"author": "Claude",
 			"license": "CC-BY-SA-4.0",
-			"tier": "placeholder",
-			"tool": "Claude (SVG rects written by a small generator from a pixel map)",
-			"prompt": "A 32x32 sandbox shooting dummy: the training dummy (Spark-gold straw sack on a Wood post, Stone base) with two dark eyes, a Void rune in place of the target, and a short Stone barrel sticking out to the right from its shoulder. 1px dark outline, light from the top-left. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no player colours."
+			"tier": "good",
+			"tool": "Claude (SVG rects written by a small generator from the pixel rules of the owner's living-staffs mockup, 2026-10-28)",
+			"prompt": "The shooting dummy as a staff staked in the floor: a Wood staff driven into a Stone mound, with a gold wrap and a round Stone head around a gold-ringed dark muzzle. A 32x32 sprite, 1px dark outline, light from the top-left. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md; no player colours."
 		}
 	]
 }

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Shared pixel art used by more than one thing: tilesets (`tilesets/`), UI art (`ui/`) and visual effects (`vfx/`). Art that belongs to a single item (a spell icon, an enemy sprite) lives in that item's folder under `content/`, not here. The look is 32×32 pixel art; the vision is in docs/DESIGN.md, and the rules are in [docs/STYLE.md](../docs/STYLE.md) (provisional until M2): the palette, light from the top-left, 1px dark outline, no gradients, at most 3 shades per material, frame counts.
+Shared pixel art used by more than one thing: tilesets (`tilesets/`), UI art (`ui/`), visual effects (`vfx/`) the face layers every living staff wears (`faces/`: the eye and brow sheets of `gameplay/actor/face.gd`) and the intro's own pieces (`story/`: the wizard's Blight hat and the Favourite, for `gameplay/flow/intro.gd`). Art that belongs to a single item (a spell icon, an enemy sprite) lives in that item's folder under `content/`, not here. The look is 32×32 pixel art; the vision is in docs/DESIGN.md, and the rules are in [docs/STYLE.md](../docs/STYLE.md) (provisional until M2): the palette, light from the top-left, 1px dark outline, no gradients, at most 3 shades per material, frame counts.
 
 Palette files, grid templates and the one-page checklist are in [kit/](kit/README.md). The three art direction samples the owner picks from (nothing uses them) are in [samples/](samples/README.md).
 
@@ -44,7 +44,7 @@ The manifest drives the Steam AI disclosure and the list of placeholders still t
 
 ## Steps
 
-1. Add the file in the right sub-folder (`tilesets/`, `ui/` or `vfx/`).
+1. Add the file in the right sub-folder (`tilesets/`, `ui/`, `vfx/`, `faces/` or `story/`).
 2. Add its entry to `art/manifest.json`.
 3. Run the checks below, then open a PR using the template.
 

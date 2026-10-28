@@ -2,9 +2,53 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-28: Card growth (staffs C), already built
+
+The Growth card was already done: the modifier `.tres`, icon, assets, combos (`growth_far_shot`, `growth_slow_orb`) and `test_growth.gd` exist, and all 126 unit tests pass. Ticked it off; no code changed.
+
+## 2026-10-28: Card linger (staffs C), already built
+
+The Linger card was already done: the modifier `.tres`, icon, assets, combos (`linger_nova_mine`, `linger_frost_mines`), lore and `test_linger.gd` exist, and all 126 unit tests pass. Ticked it off; no code changed.
+
+## 2026-10-28: Card slow (staffs C), already built
+
+The Slow card was already done: the modifier `.tres`, icon, assets, combos and `test_slow.gd` exist, and all 126 unit tests pass. Ticked it off; no code changed.
+
+## 2026-10-28: Card arc (staffs C), already built
+
+The Arc card was already done: the modifier `.tres`, icon, assets, combos (`arc_nova_trap`, `lightning_orb`), lore, `test_arc.gd` and `test_spells_slow_return_arc.gd` exist, and all 126 unit tests pass. Ticked it off; no code changed.
+
+## 2026-10-28: Card return (staffs C), already built
+
+The Return card was already done: the modifier `.tres`, icon, assets, two combos, lore and `test_return.gd` exist, and all 126 unit tests pass. Ticked it off; no code changed.
+
+## 2026-10-28: Card ghost (staffs C), already built
+
+The Ghost card was already done: the modifier `.tres`, icon, assets, two combos, lore and `test_ghost.gd` exist, and all 122 unit tests pass. Ticked it off; no code changed.
+
+## 2026-10-28: Card spiral (staffs C), already built
+
+The Spiral card was already done: the modifier `.tres`, icon, assets, two combos, lore and `test_spiral.gd` exist, and all 125 unit tests pass. Ticked it off; no code changed.
+
+## 2026-10-28: Card bounce (staffs C), already built
+
+The Bounce card was already done: the modifier `.tres`, icon, assets, two combos, lore and `test_bounce.gd` exist, and all 122 unit tests pass. Ticked it off; no code changed.
+
+## 2026-10-28: Card overcharge (staffs C), already built
+
+The Overcharge card was already done: the modifier `.tres` (x2 damage, x2 mana), icon, assets, two combos, lore and `test_overcharge.gd` exist. Ticked it off; no code changed.
+
+## 2026-10-28: Card triple (staffs C), already built
+
+The Triple card was already done: the multicast `.tres`, icon, assets, two combos, lore and `test_triple.gd` exist, and all 122 unit tests pass. Ticked it off. `tools/check.sh` reports errors only for `.idea`, `.vscode` and `scripts`: unreadable folders of this environment that git doesn't track, so none come from the doc files changed here.
+
+## 2026-10-28: Card double (staffs C), already built
+
+The task found the Double card done: the multicast `.tres`, icon, assets, two combos and `test_double.gd` exist, and all 122 unit tests pass. Ticked it off.
+
 ## 2026-10-28: Sandbox (staffs B7), already built
 
-The task found B7 done: the sandbox room, both dummies, flow's sandbox events, the main menu button and the pause menu's Sandbox page exist with tests, which pass (`test_flow_sandbox.gd`, `test_sandbox_data.gd`, `test_main_menu_sandbox.gd`, `test_pause_menu.gd`). The session only ticked it in `docs/NEXT.md`; no code changed.
+The task found B7 done: the sandbox room, both dummies, flow's sandbox events, the main menu button and the pause menu's Sandbox page exist with tests, which pass (`test_flow_sandbox.gd`, `test_sandbox_data.gd`, `test_main_menu_sandbox.gd`, `test_pause_menu.gd`). They landed in owner sessions (#295, #296). The session only ticked it in `docs/NEXT.md`; no code changed. The "Friendly fire" setting in the design row no longer applies since actors G3c; `docs/milestones/M2-staffs.md` now carries a note on those rows. `tools/check.sh` was rerun: none of its findings are in the doc files changed here.
 
 ## 2026-10-26: Caster kit (staffs B4)
 

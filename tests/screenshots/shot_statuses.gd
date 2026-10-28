@@ -33,7 +33,6 @@ func take() -> void:
 		var sprite := Sprite2D.new()
 		sprite.name = "Sprite"
 		sprite.texture = load("res://content/enemies/ember_imp/idle.svg") as Texture2D
-		sprite.hframes = 2
 		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		imp.add_child(sprite)
 		root.add_child(imp)

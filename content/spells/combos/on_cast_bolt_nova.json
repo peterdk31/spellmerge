@@ -1,7 +1,7 @@
 {
 	"id": "on_cast_bolt_nova",
 	"name": "On cast bolt nova",
-	"does": "A bolt leaves while a fire nova bursts round you at the same moment, lighting an imp at your side that the bolt misses.",
+	"does": "A bolt leaves while a fire nova bursts round you at the same moment, lighting an imp at your side.",
 	"casts": [{"staff": 0, "cards": ["on_cast", "bolt", "fire", "nova"]}],
 	"imps": [[0, 40]],
 	"seconds": 1.0,

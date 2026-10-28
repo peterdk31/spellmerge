@@ -1,0 +1,13 @@
+{
+	"assets": [
+		{
+			"path": "content/spells/modifiers/possess/icon.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "placeholder",
+			"tool": "Claude (SVG rects written by a small generator)",
+			"prompt": "A 16x16 icon for the Possess card: a small void-purple ghost with two pale eyes on a dark void disc inside a light void-pink ring, a closed 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+		}
+	]
+}

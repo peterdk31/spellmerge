@@ -1,13 +1,14 @@
 extends PanelContainer
 ## One player's corner panel, in the player's border colour: a health bar and a mana bar with
-## their numbers, a word over the health bar when the player is down ("DOWN") or has their
+## their numbers, a word over the health bar when the player is down ("DOWN"), possessed by
+## another actor's controller ("POSSESSED 3", with the whole seconds left; actors G9) or has their
 ## overlay open ("MENU"), and under the mana bar one row per staff that has cards
 ## (`staff_row.gd`: the staff's button glyph, its cast sequence and its delay). The word means
 ## the state is never shown by colour alone. There is no "P1" or "Staff 2" line (owner,
 ## 2026-10-27): the corner and the border say whose panel it is, and the rows say more than the
 ## staff cast last did.
 ##
-## It only shows what it is told: `set_stats`, `set_menu_open`, `set_staff_plan`,
+## It only shows what it is told: `set_stats`, `set_menu_open`, `set_possessed`, `set_staff_plan`,
 ## `set_staff_timing` and the dev switch `set_reload_style` are called by `hud/panels/panels.gd`,
 ## which hears the events and reads the staffs' timing from `Spells`. The panel takes no input and listens to nothing itself, so it is
 ## the same for any player index 0-3. Colours come from the shared theme (type variations
@@ -23,6 +24,7 @@ const PLAYER_COUNT: int = 4
 const STAFF_COUNT: int = 4
 const DOWN_TEXT: String = "DOWN"
 const MENU_TEXT: String = "MENU"
+const POSSESSED_TEXT: String = "POSSESSED %d"
 
 ## The player index 0-3. Set before adding the node to the tree.
 @export var index: int = 0
@@ -31,6 +33,8 @@ var _health: int = -1
 var _mana: int = -1
 var _downed: bool = false
 var _menu_open: bool = false
+## Whole seconds of possession left shown (0: not possessed).
+var _possessed: int = 0
 var _rows: Array[StaffRowScript] = []
 ## Per staff: whether its plan has a card (an empty staff shows no row).
 var _has_cards: Array[bool] = [false, false, false, false]
@@ -83,6 +87,20 @@ func set_menu_open(open: bool) -> void:
 		_menu_open = open
 		_refresh_status()
 		_refresh_rows()
+
+
+## Show the player possessed with `seconds` left (0 or less: not possessed). Only a change of
+## whole seconds changes the text.
+func set_possessed(seconds: float) -> void:
+	var whole: int = ceili(seconds) if seconds > 0.0 else 0
+	if whole != _possessed:
+		_possessed = whole
+		_refresh_status()
+
+
+## The whole seconds of possession shown, 0 when not possessed.
+func possessed_seconds() -> int:
+	return _possessed
 
 
 ## Show staff `staff` (0-3) as the plan of `staff_changed` says (`Spells.staff_view`), with
@@ -153,6 +171,7 @@ func reset() -> void:
 	_mana = -1
 	_downed = false
 	_menu_open = false
+	_possessed = 0
 	_health_bar.value = 0
 	_mana_bar.value = 0
 	_health_value.text = ""
@@ -194,6 +213,8 @@ func _refresh_rows() -> void:
 func _refresh_status() -> void:
 	if _downed:
 		_status.text = DOWN_TEXT
+	elif _possessed > 0:
+		_status.text = POSSESSED_TEXT % _possessed
 	elif _menu_open:
 		_status.text = MENU_TEXT
 	else:

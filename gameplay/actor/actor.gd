@@ -16,9 +16,16 @@ extends CharacterBody2D
 ## `home_controller`. Components reach each other only through the actor, never by node path.
 ##
 ## Controllers: `controller` is the one driving it now: its home controller, a guest handed over
-## by `drive` (possess, G9), or none. `release` gives the guest back. Every change of driver tells
-## the actor table the new team and seat at once. With no controller the body stands, aims where
-## it last aimed and casts nothing. With none at all the actor keeps `idle_team`.
+## by `drive` (possess, G9), or none. `release` gives the guest back. A controller drives one actor
+## at a time: `drive` takes it off the actor it drove before (that one stands with none), so its
+## signals are never bound twice and a seat's events only come from the actor it drives. Every
+## change of driver tells the actor table the new team and seat at once. With no controller the
+## body stands, aims where it last aimed and casts nothing; its team is its home controller's, and
+## with none at all `idle_team`.
+##
+## Possess (G9, `possession.gd`): the actor hears `possess_requested` for its own id and starts a
+## `Possession` by the caster's body; it steps the one holding it (`possessed_by`) before its
+## controller thinks, and ends every possession it is part of when it dies or leaves the tree.
 ##
 ## The body's points: `body_offset` (the hurt circle's centre and the orbit anchor), `aim_pivot()`
 ## (the hand, `hand_offset` above the feet: the aim, the staff and the shot line up from it),
@@ -96,6 +103,10 @@ var caster: Caster = null
 ## True when something downs the actor at 0 health instead of letting it die (a Downed
 ## component, G7, sets it).
 var downable: bool = false
+## The possession holding this actor now (another body's controller drives it), or null.
+var possessed_by: Possession = null
+## The possessions this body cast that still go on (its controller drives another actor).
+var possessions_cast: Array[Possession] = []
 
 ## The number it casts under in Spells and the projectile manager: its `id` while its caster is
 ## open (see `open_caster_number`), else -1.
@@ -106,6 +117,8 @@ var _looks: Array[ActorLook] = []
 var _is_ready: bool = false
 var _down: bool = false
 var _dying: bool = false
+## True from the moment it starts leaving the tree until it is back.
+var _leaving: bool = false
 
 
 func _init() -> void:
@@ -115,7 +128,9 @@ func _init() -> void:
 
 
 func _enter_tree() -> void:
+	_leaving = false
 	_find_services()
+	_listen()
 	if not _is_ready:
 		# The first time, `_ready` opens the id once the controller is known.
 		return
@@ -138,12 +153,17 @@ func _ready() -> void:
 	_is_ready = true
 	_open_id()
 	if controller != null:
+		controller.driving = self
 		controller.started(self)
 	for component in _components:
 		component.attach()
 
 
 func _exit_tree() -> void:
+	_leaving = true
+	_end_possessions()
+	if events != null and is_instance_valid(events) and events.possess_requested.is_connected(_on_possess_requested):
+		events.possess_requested.disconnect(_on_possess_requested)
 	for at in range(_components.size() - 1, -1, -1):
 		_components[at].detach()
 	_close_id()
@@ -160,6 +180,8 @@ func step(delta: float) -> void:
 	intent.begin_step()
 	if health != null:
 		health.step(delta)
+	if possessed_by != null:
+		possessed_by.step(delta)
 	if controller != null:
 		controller.think(self, delta)
 	else:
@@ -190,15 +212,25 @@ func seat() -> int:
 
 
 ## Hand the actor to `guest` (a controller from elsewhere: possess), or to nobody with null. The
-## controller driving it until now stops; the intent starts empty.
+## controller driving it until now stops; the intent starts empty. A guest still driving another
+## actor is taken off it first (that actor stands with no controller), so no controller ever
+## drives two bodies.
 func drive(guest: ActorController) -> void:
 	if guest == controller:
 		return
+	if guest != null and is_instance_valid(guest.driving) and guest.driving != self:
+		guest.driving.drive(null)
 	if controller != null:
-		controller.stopped(self)
+		var before: ActorController = controller
+		controller = null
+		if is_instance_valid(before):
+			before.stopped(self)
+			if before.driving == self:
+				before.driving = null
 	controller = guest
 	intent.clear()
 	if controller != null:
+		controller.driving = self
 		controller.started(self)
 	_tell_driver()
 
@@ -261,11 +293,13 @@ func is_invulnerable() -> bool:
 	return health != null and health.is_protected()
 
 
-## The actor is dead: it sends `died` and frees itself (once).
+## The actor is dead: every possession it is part of ends, it sends `died` and frees itself
+## (once).
 func die(killer: int) -> void:
 	if _dying:
 		return
 	_dying = true
+	_end_possessions()
 	died.emit(killer)
 	queue_free()
 
@@ -273,6 +307,54 @@ func die(killer: int) -> void:
 ## True once `die` was called.
 func is_dying() -> bool:
 	return _dying
+
+
+## True while it leaves the tree (its `_exit_tree` runs).
+func is_leaving() -> bool:
+	return _leaving
+
+
+## Step and draw `look` from now on (a look made while the game runs: the possession ring). It
+## is added as a child.
+func add_look(look: ActorLook) -> void:
+	if look == null or _looks.has(look):
+		return
+	look.setup(self)
+	add_child(look)
+	_looks.append(look)
+
+
+## Stop stepping `look` and free it.
+func remove_look(look: ActorLook) -> void:
+	if look == null:
+		return
+	_looks.erase(look)
+	if is_instance_valid(look):
+		look.queue_free()
+
+
+## The controller of the actor `caster` takes this actor (`possess_requested` for this id).
+func _on_possess_requested(caster: int, target: int, seconds: float, _tag: int) -> void:
+	if target != id or id == ActorsScript.NONE or actors == null:
+		return
+	var by: Actor = actors.node_of(caster) as Actor
+	if by != null:
+		Possession.begin(by, self, seconds)
+
+
+## Every possession this body is in ends: the one holding it, and the ones it cast.
+func _end_possessions() -> void:
+	if possessed_by != null:
+		possessed_by.end()
+	var cast: Array[Possession] = possessions_cast.duplicate()
+	possessions_cast.clear()
+	for at in range(cast.size() - 1, -1, -1):
+		cast[at].end()
+
+
+func _listen() -> void:
+	if events != null and not events.possess_requested.is_connected(_on_possess_requested):
+		events.possess_requested.connect(_on_possess_requested)
 
 
 func _on_depleted(killer: int) -> void:

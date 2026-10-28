@@ -18,7 +18,9 @@ extends Node
 ## body can still be found) and zooms out until everyone is inside the view with
 ## CAMERA_MARGIN pixels to spare. Zoom stays between MIN_ZOOM and MAX_ZOOM, and
 ## the camera eases towards its target (FOLLOW_SPEED), so a join or a dodge never
-## jerks the picture, and nobody leaves the view while it eases. The room's camera
+## jerks the picture, and nobody leaves the view while it eases. A wizard whose seat drives
+## another actor (possess, actors G9) counts twice: its own standing body and the actor its seat
+## drives (`ActorController.driving` of its home controller), so both stay in view. The room's camera
 ## limits keep the view inside the room, so the zoom-out stops where the view
 ## would be bigger than the room (in a room not much bigger than the view, that
 ## is no zoom-out at all) and the camera is pushed in from the edge instead.
@@ -144,6 +146,15 @@ func fit_camera() -> bool:
 		low = low.min(at)
 		high = high.max(at)
 		seen += 1
+		var body := wizard as Actor
+		if body == null or body.home_controller == null:
+			continue
+		if not is_instance_valid(body.home_controller.driving):
+			continue
+		var driven: Actor = body.home_controller.driving
+		if driven != body and driven.is_inside_tree():
+			low = low.min(driven.global_position)
+			high = high.max(driven.global_position)
 	if seen == 0:
 		return false
 	var view: Vector2 = _view_size()

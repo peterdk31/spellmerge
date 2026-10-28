@@ -1,0 +1,9 @@
+{
+	"id": "possess_chain_bolt",
+	"name": "Possess chain",
+	"does": "The bolt possesses the first imp it hits and jumps on to hurt the next; only the first is taken.",
+	"casts": [{"staff": 0, "cards": ["possess", "chain", "bolt"]}],
+	"imps": [[100, 0], [150, 40]],
+	"seconds": 1.5,
+	"checks": [{"kind": "damaged", "imps": [0, 1]}]
+}

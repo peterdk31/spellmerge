@@ -100,7 +100,8 @@ func step(delta: float) -> void:
 	if _done:
 		# The last step of the move has been walked (the body moved after the last step).
 		_finish()
-	var pace: float = _pace()
+	# Combat's pace (chill slows, freeze stops) and its push on the actor.
+	var pace: float = actor.combat.pace(actor) if actor.combat != null else 1.0
 	var velocity: Vector2 = Vector2.ZERO
 	if _left > 0.0:
 		var dash: bool = _mode == &"dash"
@@ -115,18 +116,10 @@ func step(delta: float) -> void:
 		_done = _left <= 0.0
 	else:
 		velocity = actor.intent.move.limit_length(1.0) * speed * pace
-	velocity += _recoil_step(delta) + _push(delta)
+	velocity += _recoil_step(delta)
+	if actor.combat != null:
+		velocity += actor.combat.consume_knockback(actor, delta)
 	actor.velocity = velocity
-
-
-## The share of its pace the actor keeps now (`Combat.pace`: chill slows, freeze stops).
-func _pace() -> float:
-	return actor.combat.pace(actor) if actor.combat != null else 1.0
-
-
-## Combat's push on the actor to add this step (`Combat.consume_knockback`).
-func _push(delta: float) -> Vector2:
-	return actor.combat.consume_knockback(actor, delta) if actor.combat != null else Vector2.ZERO
 
 
 ## True while a dash, hook or swap moves the actor.

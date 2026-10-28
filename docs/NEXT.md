@@ -78,7 +78,7 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 - [x] **Combat by actor (actors G5).** (`gameplay/combat/`) After G3 and G4.
 - [x] **Enemies are actors (actors G6).** (`gameplay/ai/`, `content/enemies/`, `gameplay/flow/`) After G5.
 - [x] **Wizards are actors (actors G7).** (`gameplay/player/`, `content/wizard/`, `gameplay/flow/`, `gameplay/coop/`) After G6.
-- [ ] **Feel and Entities by actor (actors G8).** (`gameplay/feel/`, `gameplay/ai/`) After G7.
+- [x] **Feel and Entities by actor (actors G8).** (`gameplay/feel/`, `gameplay/ai/`) After G7.
 - [x] **Possess (actors G9).** (`core/spells/`, `gameplay/actor/`, `content/spells/possess/`, `hud/`) After G8.
 - [x] **The docs (actors G10).** (READMEs, `docs/ARCHITECTURE.md`, `AGENTS.md`) Last. While phase G runs, the bot's queue leaves `gameplay/player/`, `gameplay/ai/`, `gameplay/combat/` and `core/spells/` alone.
 - [ ] **Living staffs: the plan (living staffs H1).** (`docs/`) The design, [M2-living-staffs.md](milestones/M2-living-staffs.md), with the owner's decisions of 2026-10-28.

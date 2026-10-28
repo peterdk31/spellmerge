@@ -9,6 +9,7 @@ extends "res://tests/support/screenshot.gd"
 ## `dash_looks_4x` (the plain, fire and frost rows half way).
 
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
+const ActorSeats := preload("res://tests/support/actor_seats.gd")
 const ELEMENTS: Array[Resource] = [
 	preload("res://content/spells/elements/fire/fire.tres"),
 	preload("res://content/spells/elements/frost/frost.tres"),
@@ -34,16 +35,22 @@ func take() -> void:
 	await settle()
 	var length: float = float(MEDIUM_DASH.get("ray_length"))
 	var casters: Array[int] = []
+	# Casters are actor ids (actors G8): the four wizards seated 0-3 (ids 0-3) and two enemies.
+	var actors: ActorSeats.ActorsScript = ActorSeats.autoload()
+	if actors == null:
+		fail("there is no Actors autoload")
+		return
+	ActorSeats.seat_wizards(actors)
+	var enemies: Array[int] = [ActorSeats.enemy(actors), ActorSeats.enemy(actors)]
 	for e in 6:
 		var tint: Color = Color.WHITE if e == 0 else ELEMENTS[e - 1].get("tint") as Color
 		var look: int = 0 if e == 0 else ManagerScript.pack_look(PackedInt32Array([int(ELEMENTS[e - 1].get("look_layer"))]))
 		# Players 0-3, then two enemy casters (their streaks are the enemy ramp).
-		var caster: int = e if e < 4 else ManagerScript.FIRST_ENEMY_CASTER + e
-		var player: int = e if e < 4 else -1
+		var caster: int = e if e < 4 else enemies[e - 4]
 		casters.append(caster)
 		shots.call("set_anchor", caster, _at(e, 0.0, length))
 		shots.call("follow_caster", caster, tint, look, float(STEPS) / 60.0)
-		events.emit_signal("form_shown", player, &"dash", _at(e, 0.0, length), Vector2.UP, length, tint, look)
+		events.emit_signal("form_shown", caster, &"dash", _at(e, 0.0, length), Vector2.UP, length, tint, look)
 	for n in STEPS + 4:
 		await physics_frame
 		for e in 6:

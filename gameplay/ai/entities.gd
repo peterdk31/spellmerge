@@ -7,7 +7,7 @@ extends Node2D
 ## Every entity belongs to the actor that cast it, its `owner` (the event's `caster`, an actor
 ## id; actors G3b). Whether that actor is seated (`Actors.seat_of`: a human drives it) or not
 ## sorts it into the pool's two parts; its team says whom a familiar casts at; its ramp colours
-## both (until G8 keys Entities by actor throughout).
+## both; its body (`Actors.node_of`) is what a decoy copies and a familiar circles.
 ##
 ## A **decoy** is a still copy of its caster's body (the `Sprite` and its `Hat`, copied at
 ## spawn, a little see-through). Every shot but its owner's hits it and wears it down (G3c: it is
@@ -63,8 +63,6 @@ const ENEMY_ROWS: int = 32
 const POOL_SIZE: int = PLAYER_ROWS + ENEMY_ROWS
 ## Every owner there is: the actor ids.
 const ACTORS: int = ActorsScript.ACTORS
-## The group every wizard is in (player.gd adds it).
-const PLAYERS_GROUP: StringName = &"players"
 
 ## Hits a decoy takes before it breaks.
 const DECOY_HITS: int = 3
@@ -350,7 +348,7 @@ func _on_spawn_requested(caster: int, kind: StringName, at: Vector2, seconds: fl
 	if kind != DECOY and kind != FAMILIAR:
 		push_warning("Entities: no entity of kind %s." % kind)
 		return
-	# The unseated owners' part of the pool (an enemy's), until G8.
+	# The unseated owners' part of the pool (no seat drives the owner).
 	var enemy: bool = not _seated(owner)
 	if count_owned(kind, owner) >= (PER_ENEMY if enemy else PER_PLAYER):
 		_end(_oldest(kind, owner), true)
@@ -520,15 +518,12 @@ func _owner_of(caster: int, tag: int) -> int:
 	return caster
 
 
-## The body of the actor `owner` (an enemy named by `set_enemy`, a wizard by its `actor_id`, or
-## the node the actor table knows), or null. Only at spawn.
+## The body of the actor `owner` (an enemy named by `set_enemy`, else the node the actor table
+## knows), or null. Only at spawn.
 func _body_of(owner: int) -> Node2D:
 	var enemy: Node2D = _enemies[owner]
 	if is_instance_valid(enemy):
 		return enemy
-	var wizard: Node2D = _wizard_of(owner)
-	if wizard != null:
-		return wizard
 	var table: ActorsScript = _actor_table()
 	return table.node_of(owner) as Node2D if table != null else null
 
@@ -540,17 +535,6 @@ func _rows_by_age() -> Array[int]:
 			rows.append(row)
 	rows.sort_custom(func(a: int, b: int) -> bool: return _born[a] < _born[b])
 	return rows
-
-
-## The wizard whose actor is `actor` (in the `players` group, by its actor `id`; a stand-in's
-## `actor_id`), or null. Only at spawn.
-func _wizard_of(actor: int) -> Node2D:
-	if not is_inside_tree():
-		return null
-	for node: Node in get_tree().get_nodes_in_group(PLAYERS_GROUP):
-		if node is Node2D and (node.get("id") == actor or node.get("actor_id") == actor):
-			return node as Node2D
-	return null
 
 
 ## The actor table: `actors`, else the projectile manager's, else the "Actors" autoload.

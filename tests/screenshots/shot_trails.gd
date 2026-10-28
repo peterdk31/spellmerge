@@ -12,6 +12,7 @@ extends "res://tests/support/screenshot.gd"
 ## `trails` at 1x, `trails_4x` (the plain, fire and frost columns of the top two rows).
 
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
+const ActorSeats := preload("res://tests/support/actor_seats.gd")
 const ELEMENTS: Array[Resource] = [
 	preload("res://content/spells/elements/fire/fire.tres"),
 	preload("res://content/spells/elements/frost/frost.tres"),
@@ -40,6 +41,13 @@ func take() -> void:
 	_shots.call("set_walls", [Rect2(0.0, 120.0, SCREEN.x, 8.0)] as Array[Rect2])
 	var speed: float = float(BOLT.get("speed"))
 	var dashers: Array[int] = []
+	# Casters are actor ids (actors G8): the four wizards seated 0-3 (ids 0-3) and two enemies.
+	var actors: ActorSeats.ActorsScript = ActorSeats.autoload()
+	if actors == null:
+		fail("there is no Actors autoload")
+		return
+	ActorSeats.seat_wizards(actors)
+	var enemies: Array[int] = [ActorSeats.enemy(actors), ActorSeats.enemy(actors)]
 	for e in 6:
 		var x: float = 30.0 + e * COLUMN
 		var tint: Color = Color.WHITE if e == 0 else ELEMENTS[e - 1].get("tint") as Color
@@ -57,7 +65,7 @@ func take() -> void:
 		_shots.call("set_bounce", bounce, 1)
 		_dress(bounce, tint, look)
 		# The dashers: players 0-3, then two enemy casters (their streaks are the enemy ramp).
-		var caster: int = e if e < 4 else ManagerScript.FIRST_ENEMY_CASTER + e
+		var caster: int = e if e < 4 else enemies[e - 4]
 		_shots.call("set_anchor", caster, _dash_point(e, 0.0))
 		_shots.call("follow_caster", caster, tint, look, 0.3)
 		dashers.append(caster)

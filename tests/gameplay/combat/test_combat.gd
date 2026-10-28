@@ -371,13 +371,12 @@ func _test_listener_may_change_registrations() -> void:
 func _test_wizard_is_a_projectile_target_for_enemy_shots() -> void:
 	_setup(2, true)
 	_check(_projectiles.get_target_count() == 2, "both wizards are projectile targets")
-	_combat.unregister_player(0)
+	_combat.unregister_actor(_players[0])
 	_check(_projectiles.get_target_count() == 1, "an unregistered wizard stops being a target")
-	_combat.register_player(1, _players[0], 8.0)
-	_check(_projectiles.get_target_count() == 1, "re-registering index 1 with another wizard replaces its target")
-	# Slot 1 holds wizard 0 now; empty it before the wizards leave, or wizard 1's hurtbox asks
-	# Combat about a slot whose wizard was freed first.
-	_combat.unregister_player(1)
+	_combat.register_actor(_players[0], 1, 8.0)
+	_check(_projectiles.get_target_count() == 2, "registered again, it is a target again")
+	_combat.register_actor(_players[0], 1, 8.0)
+	_check(_projectiles.get_target_count() == 2, "registering it twice keeps one target")
 
 
 func _test_downed_wizard_is_not_a_projectile_target() -> void:
@@ -388,7 +387,7 @@ func _test_downed_wizard_is_not_a_projectile_target() -> void:
 	Downed.of(_players[0]).revive(1)
 	_check(_projectiles.get_target_count() == 2, "a revived wizard is a projectile target again")
 	_players[0].health.take(1000)
-	_combat.register_player(0, _players[0], 8.0)
+	_combat.register_actor(_players[0], 1, 8.0)
 	_check(_projectiles.get_target_count() == 1, "registering a downed wizard does not make it a target")
 
 
@@ -402,7 +401,7 @@ func _test_hit_circles_follow_the_body_offset() -> void:
 	var body := Vector2(0.0, -12.0)
 	var wizard: Actor = _players[0]
 	wizard.position = Vector2(100.0, 0.0)
-	_combat.register_player(0, wizard, 8.0, body)
+	_combat.register_actor(wizard, 1, 8.0, 0, body)
 	_shoot_at_wizard(-12.0)
 	_check(_damage.size() == 1, "an enemy shot through the wizard's body hits")
 	_shoot_at_wizard(0.0)
@@ -438,7 +437,7 @@ func _shoot_at_wizard(y: float) -> void:
 func _test_contact_uses_the_body_offset() -> void:
 	_setup(1)
 	var body := Vector2(0.0, -12.0)
-	_combat.register_player(0, _players[0], 8.0, body)
+	_combat.register_actor(_players[0], 1, 8.0, 0, body)
 	var enemy := Node2D.new()
 	enemy.position = _players[0].position + Vector2(0.0, -29.0)
 	_enemies.append(enemy)

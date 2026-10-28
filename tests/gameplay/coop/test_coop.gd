@@ -593,7 +593,7 @@ func _test_a_wizards_bolt_hits_a_teammate() -> void:
 	_start_with(0)
 	# No enemy gets in the way of the test shots.
 	for enemy: Node in _flow._enemies.duplicate():
-		_combat.call("unregister_enemy", enemy)
+		_combat.call("unregister_actor", enemy)
 	spells.get("_profiles")[BOLT_TAG] = spell
 	_wizard(0).global_position = Vector2(100.0, 100.0)
 	_wizard(1).global_position = Vector2(140.0, 100.0)

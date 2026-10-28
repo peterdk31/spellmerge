@@ -269,7 +269,7 @@ func _test_knockback_moves_the_enemy() -> void:
 	_fx.combat.hit(0, imp, 1, Vector2.LEFT, 100.0)
 	imp.step(STEP)
 	_check(imp.velocity.x < ImpData.move_speed, "knockback is added to the chase velocity")
-	_check(_fx.combat.get_health(imp) == ImpData.max_health - 1, "the imp is registered in Combat with its health")
+	_check(_fx.combat.health_of(imp) == ImpData.max_health - 1, "the imp is registered in Combat with its health")
 
 
 ## Teams only aim: an imp never chases another enemy (an imp, a dummy), only another team.

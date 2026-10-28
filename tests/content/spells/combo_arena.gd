@@ -80,7 +80,7 @@ func add_imp(at: Vector2, health: int = IMP_HEALTH) -> Node2D:
 	var imp := _own(Node2D.new()) as Node2D
 	_root.add_child(imp)
 	imp.global_position = at
-	combat.register_enemy(imp, health, IMP_RADIUS)
+	combat.register_actor(imp, health, IMP_RADIUS)
 	imps.append(imp)
 	return imp
 
@@ -141,7 +141,7 @@ func run(seconds: float) -> void:
 
 ## Health `imp` has lost (all of it once it is dead and gone).
 func lost(imp: Node2D) -> int:
-	var left: int = combat.get_health(imp) if is_instance_valid(imp) else -1
+	var left: int = combat.health_of(imp) if is_instance_valid(imp) else -1
 	return IMP_HEALTH if left < 0 else IMP_HEALTH - left
 
 

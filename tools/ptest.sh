@@ -7,8 +7,9 @@
 # so they can run side by side: one import, then up to `jobs` (default 12) tests at once, each
 # with its own user:// folder. The whole suite takes about a minute instead of 20-40. Needs the
 # pinned Godot in build/godot (run ci/build/build.sh --quick once). Logs: build/logs/ptest/.
-# test_projectiles_kit times the projectile manager and can fail under load: run it alone
-# (tools/ptest.sh 1 test_projectiles_kit). The daily build still runs them one by one.
+# A test fails on a non-zero exit or an ERROR line in its log, as in build.sh. The tests that
+# time the machine (build.sh's TIMED_TESTS) can fail under load here: run them alone
+# (tools/ptest.sh 1 test_projectiles_kit). build.sh --quick --tests runs them after the rest.
 set -u
 cd "$(dirname "$0")/.."
 JOBS="${1:-12}"
@@ -28,7 +29,8 @@ export GODOT LOG
 find tests -name 'test_*.gd' -not -path '*/fixtures/*' | grep -E "$FILTER" | sort \
   | xargs -P "$JOBS" -I{} bash -c 'name=$(echo {} | tr / _); mkdir -p "$LOG/data/$name"
       if XDG_DATA_HOME="$LOG/data/$name" timeout 900 "$GODOT" --headless --path . --script "res://{}" \
-        >"$LOG/$name.log" 2>&1; then echo "PASS {}"; else echo "FAIL {}"; fi' \
+        >"$LOG/$name.log" 2>&1 && ! grep -qE "^(SCRIPT )?ERROR:" "$LOG/$name.log"; then echo "PASS {}"
+      else echo "FAIL {}"; fi' \
   | sort >"$LOG/_summary.txt"
 echo "passed: $(grep -c PASS "$LOG/_summary.txt")"
 if grep FAIL "$LOG/_summary.txt"; then

@@ -11,6 +11,7 @@ const StaffKit := preload("res://tests/support/staff_kit.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
+const ActorSeats := preload("res://tests/support/actor_seats.gd")
 
 const DT: float = 1.0 / 60.0
 
@@ -39,6 +40,8 @@ func before_each() -> void:
 	_mgr = own(ManagerScript.new()) as ManagerScript
 	_mgr.events = _bus
 	_mgr.set_cap(512)
+	# Four wizards seated 0-3 at actor ids 0-3, as the tests name their casters.
+	_mgr.actors = own(ActorSeats.table()) as ActorSeats.ActorsScript
 	_spells = own(SpellsScript.new()) as SpellsScript
 	_spells.registry = _fake
 	_spells.bind(_mgr, _bus)
@@ -274,7 +277,7 @@ func test_a_beam_and_a_nova_announce_themselves_for_looks() -> void:
 	for i in _spells.beam_slots():
 		if _spells.beam_on(i):
 			at = i
-	check_equal(_spells.beam_player(at), 2, "from the caster")
+	check_equal(_spells.beam_caster(at), 2, "from the caster")
 	check_equal(_spells.beam_origin(at), Vector2(5, 6), "from the staff")
 	check(_spells.beam_origin(at).direction_to(_spells.beam_end(at)).is_equal_approx(Vector2.DOWN), "along the aim")
 	check(is_equal_approx(_spells.beam_reach(at), 200.0), "as long as it got (%s)" % str(_spells.beam_reach(at)))

@@ -71,7 +71,7 @@ func test_every_new_enum_value_is_inside_the_validator_range() -> void:
 	modifier.behaviour_strength = 1.0
 	check(modifier.range_problems().is_empty(), "the last behaviour is in range")
 	var trigger := TriggerBase.new()
-	trigger.event = TriggerBase.Event.ALLY
+	trigger.event = TriggerBase.Event.REACTION
 	check(trigger.range_problems().is_empty(), "the last trigger event is in range")
 	var form := FormBase.new()
 	form.motion = FormBase.Motion.FAMILIAR

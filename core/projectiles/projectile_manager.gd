@@ -4,13 +4,13 @@ extends Node2D
 ## rows in packed arrays, never nodes, so thousands cost little (PLAN budgets:
 ## 500 on the web, 3,000 on desktop).
 ##
-##     Projectiles.add_target(enemy, 10.0, Projectiles.LAYER_ENEMY)
-##     Projectiles.spawn(player, origin, direction * 300.0, 1.5, 4.0)
+##     Projectiles.add_target(enemy, 10.0, Projectiles.LAYER_ENEMY, actor_id)
+##     Projectiles.spawn(caster, origin, direction * 300.0, 1.5, 4.0, Projectiles.ACTOR_LAYERS)
 ##
-## Targets are Node2Ds registered with a radius and a layer. A projectile hits
-## the targets on the layers in its `hit_layers` mask and on both actor layers
-## (ACTOR_LAYERS, see "Everything hits everything" below). A hit sends
-## `Events.projectile_hit(player, target, position, tag)`; the projectile then
+## Targets are Node2Ds registered with a radius, a layer and their owner actor. A projectile
+## hits the targets on the layers in its `hit_layers` mask and on both actor layers
+## (ACTOR_LAYERS: everything hurts everything, actors G3c). A hit sends
+## `Events.projectile_hit(caster, target, position, tag)`; the projectile then
 ## ends, unless it has `pierce` left, and `combat` turns the event into damage.
 ## The `tag` is the opaque int given to `spawn()`: the manager stores it and
 ## sends it back unread, so whoever spawned the shot (a spell) can look up its
@@ -38,29 +38,30 @@ extends Node2D
 ## The budget is per `step` call, not per frame: if the engine runs several
 ## physics steps in one frame to catch up, each has its own budget.
 ##
-## Drawing: a player's shot is built by `shot_core.gdshader` on a pixel grid (staffs B6a; the
-## glow look, 2026-10-27): a small white-hot core in the ramp of its first infusion's colour
-## (`set_core`; its player's for a plain shot), a long tail that cools and frays and bends with
-## its path (`bend_of`), a soft glow round both, and particles given off from its tail in the
-## styles of all its cards (`set_look`), mixed at random. It is drawn about its hit size (`look_size`). An
-## enemy caster's spells (and any shot of owner NO_PLAYER) are drawn by the same shader in the
-## enemy ramp (`ramp_look`), one layer above, so a dangerous shot never hides under a friendly
-## one (staffs F9b: the old enemy shot's own texture is gone).
+## Drawing: a shot is built by `shot_core.gdshader` on a pixel grid (staffs B6a; the glow look,
+## 2026-10-27): a small white-hot core in the ramp of its first infusion's colour (`set_core`;
+## its caster's ramp for a plain shot), a long tail that cools and frays and bends with its path
+## (`bend_of`), a soft glow round both, and particles given off from its tail in the styles of
+## all its cards (`set_look`), mixed at random. It is drawn about its hit size (`look_size`).
+## Shots in the enemy ramp (`Actors.RAMP_ENEMY`, and a shot of no actor) are drawn by the same
+## shader (`ramp_look`), one layer above, so a dangerous shot never hides under a friendly one
+## (staffs F9b: the old enemy shot's own texture is gone).
 ##
-## Casters (staffs F4, "Enemy staffs"): a shot's owner is a caster, a player 0-3, an enemy
-## caster row FIRST_ENEMY_CASTER to CASTERS - 1 (one per enemy that casts a staff; the spell
-## runtime hands them out), or NO_PLAYER. An enemy caster is the enemies' side, like NO_PLAYER:
-## events name it NO_PLAYER (`event_player`), so no listener takes it for a player, and its
-## shots share NO_PLAYER's drop bucket at the cap. Unlike NO_PLAYER it has an anchor (its orbit
-## shots), its own body (`set_target_owner`: its shots never hit it, unless self-hitting),
-## shields and homing (on wizards and decoys).
-##
-## Everything hits everything (actors G3c, owner 2026-10-28: "Everything should be able to
-## damage everything. So there should be no sides."): every shot and beam hits targets on both
-## layers (ACTOR_LAYERS), whoever cast it: a wizard's hits other wizards, an enemy's other
-## enemies, a NO_PLAYER shot both. Only targets registered with the caster as their `owner` are
-## skipped (its own body and decoys), unless the shot is self-hitting. Sides still choose aim:
-## homing never picks its own side (`side_layer`), a shield stops the other side's shots.
+## Casters (actors G3a, docs/milestones/M2-actors.md): a shot's caster is an actor id (0 to
+## ACTORS - 1, `core/actors`) or NO_PLAYER (`Actors.NONE`, a shot of no actor). Nothing here
+## asks whether a caster is a wizard or an enemy; the actor table answers four questions, read
+## once when a shot is spawned and kept with it (a shot keeps the caster it was cast by):
+## - **team** (`team_of`), only for aim: homing and `nearest_target`'s team skip pick other
+##   teams, and a shield stops other teams' shots. Never for whether a hit lands: every shot and
+##   beam hits both actor layers (ACTOR_LAYERS, actors G3c, owner 2026-10-28: "Everything should
+##   be able to damage everything."), and only the caster's own body (and decoys) is skipped,
+##   unless the shot is self-hitting.
+## - **ramp** (`ramp_of`): which batch draws it and in which colours (`look_color`, `tint_of`).
+## - **budget** (`budget_of`): whose share of the pool the cap drops from first: one bucket per
+##   seat and one that every actor no seat drives shares (`Actors.SHARED`).
+## - **body**: targets name their owner actor (`add_target`, `set_target_owner`).
+## The table is `actors` (tests set their own), else the `Actors` autoload; with none, every
+## caster is no actor (no team, the enemy ramp, the shared budget).
 ##
 ## Walls: `set_walls(rects)` (or `add_wall_body(body)` for a room's static body) gives
 ## the solid parts of the room. They are rasterised into a grid of WALL_CELL
@@ -75,20 +76,22 @@ extends Node2D
 ## `clip_to_walls(from, to)` shortens a segment to the first wall. `spawn` refuses
 ## (-1, counted in `wall_hits`) a shot that starts inside a wall, so it takes no
 ## pool slot and evicts nobody at the cap. Each wall end, and each hit on a
-## target, also sends `Events.projectile_impact(player, target, position,
+## target, also sends `Events.projectile_impact(caster, target, position,
 ## direction)` (target `null` for a wall), so a listener can show dust or a spray
 ## without asking the manager anything; it changes nothing here.
 ##
 ## The global cap (`get_cap()`, set by platform: DEFAULT_CAP_WEB or
 ## DEFAULT_CAP_DESKTOP) degrades gracefully. When it is full, a new projectile
-## is never refused: the oldest projectile of whoever owns the most of them is
-## dropped (in constant time: each owner's projectiles are a list in spawn
-## order). Nobody is starved, and a player who floods the screen only loses
-## their own old shots. `dropped` counts these. Spell limits (projectiles per
-## cast, trigger depth) keep the cap from being reached often.
+## is never refused: the oldest projectile of the budget that owns the most of them
+## is dropped (in constant time: each budget's projectiles are a list in spawn
+## order). The budgets are one per seat and one every actor no seat drives shares
+## (`Actors.budget_of`), so nobody is starved, a seat that floods the screen only
+## loses its own old shots, and a crowd of enemies only its own. `dropped` counts
+## these. Spell limits (projectiles per cast, trigger depth) keep the cap from
+## being reached often.
 ##
 ## Expiry: a shot that ends because its life ran out, or on a wall, sends
-## `Events.projectile_expired(player, position, tag)` once, after it is removed (so a
+## `Events.projectile_expired(caster, position, tag)` once, after it is removed (so a
 ## handler may spawn at that spot). A shot that ends on a hit (`projectile_hit`), that
 ## leaves the bounds, or that the cap drops sends nothing: those did not run out.
 ##
@@ -103,9 +106,9 @@ extends Node2D
 ## step (a query after `add_target` and before the next step refreshes the grid
 ## first), so inside a hit handler they are exact for that step.
 ##
-## Orbit: `spawn_orbit` starts a shot that circles its owner (or its caster, see Casters). The owner's position comes
-## from a per-player anchor that `set_anchor(player, position)` is given every physics step
-## (by `player`), so the manager never looks up a node. The shot's place is the anchor plus
+## Orbit: `spawn_orbit` starts a shot that circles its caster's body (or a shot or a point, see
+## "Casters" below). The body's position comes from a per-actor anchor that `set_anchor(caster,
+## position)` is given every physics step (by the body), so the manager never looks up a node. The shot's place is the anchor plus
 ## a turning offset, so it follows a walking wizard; its velocity is the tangent, for the
 ## drawing. An orbit shot ignores walls (it is held by its caster, who is never inside one)
 ## and ends quietly, with no event, when its owner's anchor is cleared (`clear_anchor`:
@@ -118,7 +121,8 @@ extends Node2D
 ## is no default here, so a new caller cannot quietly get another form's reach.
 ## The search runs on the grid and only every HOMING_PERIOD-th step of a shot (slots take
 ## turns, so the cost is spread); in between the shot keeps turning toward the point it
-## found. It never homes on its shooter's own body or on targets it just hit. The search
+## found. It never homes on its shooter's own body, on a body of its shooter's team or on
+## targets it just hit. The search
 ## is charged to the step's hit-work budget (1 per target examined); when the budget is
 ## spent the search waits for the shot's next turn. `homing_aim` does the same for a ray.
 ##
@@ -139,16 +143,15 @@ extends Node2D
 ##   linger                 hangs still for N seconds at half its life, without using it up
 ##   growth                 radius x factor per second, up to GROWTH_MAX; `get_growth_of`
 ##   sticky                 the first hit keeps it on the target for N seconds, then it expires
-##   shield (players' shots) stops N enemy shots that touch it (`shot_blocked`)
+##   shield                 stops N shots of other teams that touch it (`shot_blocked`)
 ##   self hit               may hit its caster once it has left the caster's hitbox
-## Self-hit is off until `gameplay/combat` is ready for it (B3). Teammates are always hit (G3c);
-## no shot passes them, so nothing sends `ally_passed` any more.
+## Self-hit is off until `gameplay/combat` is ready for it (B3). Teammates are always hit (G3c).
 ##
 ## Rays: `ray(...)` is an instant beam, `ray_curve(...)` a bent one, `ray_points(...)` one along
 ## any path of points (a live beam, which a homing one bends from target to target). They hold
 ## no row; see their comments. The spell runtime keeps a live beam on by casting one every step.
 ##
-## Casters: every shot has a caster, its player's anchor unless `set_caster_shot` (a payload's
+## Casters: every shot has a caster, its actor's anchor unless `set_caster_shot` (a payload's
 ## shot, cast by the shot whose trigger fired it) or `set_caster_point` says otherwise. An orbit
 ## circles its caster and a returning shot flies back to it; a caster shot that ends leaves the
 ## point where it was last. `move_shot` moves a shot by a card (a payload's dash, hook, recoil).
@@ -170,22 +173,21 @@ extends Node2D
 ## those start moving on the next step. Tests call `step()` directly.
 
 const EventsScript := preload("res://core/events/events.gd")
+const ActorsScript := preload("res://core/actors/actors.gd")
 
 ## A shot with a non-zero tag ended; see "Ends" above.
 signal shot_ended(tag: int)
 
-const MAX_PLAYERS: int = 4
-## Enemy casters (see Casters): the first caster number after the players, how many there are
-## (SpellTag.ROW_MASK + 1 enemy rows), and every caster number there is.
-const FIRST_ENEMY_CASTER: int = MAX_PLAYERS
-const ENEMY_CASTERS: int = 256
-const CASTERS: int = FIRST_ENEMY_CASTER + ENEMY_CASTERS
+## Every caster number there is: the actor ids (see "Casters").
+const ACTORS: int = ActorsScript.ACTORS
+## The drop buckets (`_owned`): one per seat and the shared one (`Actors.budget_of`).
+const BUDGETS: int = ActorsScript.SHARED + 1
 ## Motion modes of a shot (see the class doc).
 const MOTION_STRAIGHT: int = 0
 const MOTION_STILL: int = 1
 ## Only `spawn_orbit` makes this one.
 const MOTION_ORBIT: int = 2
-## `_caster_slot` values that are no slot: the player's anchor, or a fixed point.
+## `_caster_slot` values that are no slot: the caster's anchor, or a fixed point.
 const CASTER_WIZARD: int = -1
 const CASTER_POINT: int = -2
 ## Per-shot flags (`_flags`), set by the `set_*` calls below.
@@ -244,13 +246,14 @@ const DRAW_STRIDE: int = 16
 ## as the busiest recent frame needed, rounded up to a power of two (never above the
 ## cap), so a quiet batch uploads a few KB a frame rather than cap x 16 floats.
 const MIN_BATCH: int = 64
-## The draw batches: player bolts, runes (still), orbit shots, and enemies' shots (enemy
-## casters' and NO_PLAYER's, every body kind, drawn by the shader above the players').
+## The draw batches by ramp: bolts, runes (still) and orbit shots in the four hat ramps, and every
+## shot in the enemy ramp (`Actors.RAMP_ENEMY`, and a shot of no actor), every body kind, drawn
+## by the shader above the others.
 const BATCH_BOLT: int = 0
 const BATCH_RUNE: int = 1
 const BATCH_ORBIT: int = 2
 const BATCH_ENEMY: int = 3
-## The bodies a player's shot is drawn as (`shot_core.gdshader` builds them on a pixel grid;
+## The bodies a shot is drawn as (`shot_core.gdshader` builds them on a pixel grid;
 ## staffs B6a): a bolt with its tail, a rune (a diamond that pulses), an orbit shot (a bolt whose
 ## tail bends round its circle). Kind 0 is the texture, which only Feel's lone sprites use.
 const KIND_BOLT: int = 1
@@ -297,11 +300,12 @@ const LOOK_GLITTER: int = 12
 const LOOK_COUNT: int = 13
 ## The most kinds the instance data has room for: three bytes of bits (`_look_color`).
 const LOOK_MAX_KINDS: int = 24
-## A flag in the look, not a kind (kind 23 of the shader): an enemy's spell, drawn in the enemy
-## ramp (Blight ochre, docs/STYLE.md) wherever a player's colour would show (staffs F2). Set by
-## `ramp_look` for a caster below 0; kind 24 is Feel's EXACT.
+## A flag in the look, not a kind (kind 23 of the shader): drawn in the enemy ramp (Blight
+## ochre, docs/STYLE.md) wherever a hat colour would show (staffs F2). Set by `ramp_look` for
+## any ramp that is not a hat ramp (0-3): the shader's ramp field is two bits and this flag;
+## kind 24 is Feel's EXACT.
 const LOOK_ENEMY_RAMP: int = 1 << 22
-## A player's shot is drawn in a quad of LOOK_GRID x zoom screen pixels across: a rune's is
+## A shot is drawn in a quad of LOOK_GRID x zoom screen pixels across: a rune's is
 ## square round its centre, a bolt's or orbit shot's LOOK_LENGTH x zoom long with the shot
 ## LOOK_GRID / 2 x zoom from its front, for its tail (48 px at zoom 1), the particles it gives off
 ## and its glow. Its core is about 3 x zoom pixels across, and every line stays one pixel. The
@@ -325,7 +329,7 @@ const TRAIL_COST: int = 4
 const PARTICLES_PER_SHOT_MAX: int = 12
 ## The look bits of the kinds that give off particles: all of them but the weave.
 const EMITTING_MASK: int = ((1 << (LOOK_COUNT - 1)) - 1) & ~(1 << (LOOK_WEAVE - 1))
-## Builds the players' shots from their look (see "Drawing" above).
+## Builds every shot from its look (see "Drawing" above).
 const CORE_SHADER: Shader = preload("res://core/projectiles/shot_core.gdshader")
 ## Draw order of the shots: above the room and the wizards. The autoload is drawn
 ## before the current scene, so at z_index 0 the room's floor hid every shot.
@@ -333,7 +337,7 @@ const DRAW_Z: int = 50
 ## A shot is drawn this many times wider than its hit circle (the art has empty
 ## margins and a pixel-art bolt is small on a 640x360 view).
 const DRAW_SCALE: float = 3.0
-## How much of the owner's colour tints the art (the rest stays white): a full
+## How much of the caster's ramp colour tints the art (the rest stays white): a full
 ## multiply turned the orange bolt of a blue wizard nearly black.
 const TINT_STRENGTH: float = 0.45
 ## Wall grid cell size in pixels. Walls are rounded out to whole cells, so they are
@@ -343,18 +347,19 @@ const WALL_CELL: float = 8.0
 const GRID_CELL: float = 64.0
 ## Projectiles that leave the bounds by more than this are removed.
 const BOUNDS_MARGIN: float = 128.0
-## Target layers (bit mask).
+## Target layers (bit mask): the hurtboxes of wizards' and enemies' bodies, kept apart for now
+## (actors G3a); every spell hits both (ACTOR_LAYERS). They say nothing about aim: teams do.
 const LAYER_ENEMY: int = 1
 const LAYER_PLAYER: int = 2
 ## What every shot and beam hits, added to the layers it was given (actors G3c).
 const ACTOR_LAYERS: int = LAYER_ENEMY | LAYER_PLAYER
-## The base colour of each player's ramp (docs/STYLE.md); enemies' spells are Blight ochre.
-const PLAYER_COLORS: Array[Color] = [
-	Color("#3b73c9"), Color("#d9477a"), Color("#3f8f4f"), Color("#8a4fc4"),
+## The base colour of each ramp (docs/STYLE.md), by `Actors.ramp_of`: the four hat colours, then
+## the enemy ramp (Blight ochre, `Actors.RAMP_ENEMY`). The one home of these colours.
+const RAMP_COLORS: Array[Color] = [
+	Color("#3b73c9"), Color("#d9477a"), Color("#3f8f4f"), Color("#8a4fc4"), Color("#a68a2a"),
 ]
-const ENEMY_COLOR: Color = Color("#a68a2a")
 
-## The art of the player batches. Since staffs B6a the shader builds every player's shot (runes
+## The art of the hat-ramp batches. Since staffs B6a the shader builds every shot (runes
 ## and orbit shots too) and never reads it; only the sprite path of Feel's lone flashes does.
 var texture: Texture2D = null:
 	set(value):
@@ -366,12 +371,11 @@ var dropped: int = 0
 ## The slot of the shot whose hit or expiry event is being sent, else -1. See "Ends".
 var event_slot: int = -1
 ## The form of the shot whose `projectile_impact` is being sent: `&"bolt"`, `&"rune"`, `&"orbit"`
-## or `&"beam"`, an enemy caster's too (a NO_PLAYER shot, and any time outside an impact:
-## `&""`). For looks only.
+## or `&"beam"`, whoever cast it (any time outside an impact: `&""`). For looks only.
 var impact_form: StringName = &""
 ## The core colour and the look (`set_core`, `set_look`) of the shot whose `projectile_impact`
 ## is being sent, so its flare can take the shot's colours and card effects (white and 0 for a
-## beam, a NO_PLAYER shot, and outside an impact). For looks only.
+## beam and outside an impact). For looks only.
 var impact_core: Color = Color.WHITE
 var impact_look: int = 0
 ## How many projectiles ended on a wall, since start.
@@ -389,8 +393,11 @@ var trail_demand: int = 0
 ## all of them; trails go down first).
 var particle_share: float = 1.0
 var trail_share: float = 1.0
-## Enemy casters' shots written into their batch by the last update_draw().
+## Shots in the enemy ramp written into their batch by the last update_draw().
 var drawn_enemy: int = 0
+## The actor table (see "Casters"); tests set their own. Null uses the `Actors` autoload.
+var actors: ActorsScript = null
+var _auto_actors: ActorsScript = null
 
 var _cap: int = 0
 var _count: int = 0
@@ -408,7 +415,11 @@ var _prev: PackedVector2Array = PackedVector2Array()
 var _vel: PackedVector2Array = PackedVector2Array()
 var _life: PackedFloat32Array = PackedFloat32Array()
 var _radius: PackedFloat32Array = PackedFloat32Array()
-var _player: PackedInt32Array = PackedInt32Array()
+## The caster's actor id, and its team, ramp and budget when the shot was spawned.
+var _actor: PackedInt32Array = PackedInt32Array()
+var _team: PackedInt32Array = PackedInt32Array()
+var _ramp: PackedInt32Array = PackedInt32Array()
+var _budget: PackedByteArray = PackedByteArray()
 var _layers: PackedInt32Array = PackedInt32Array()
 var _pierce: PackedInt32Array = PackedInt32Array()
 ## The opaque value given to spawn(), sent with every hit.
@@ -444,7 +455,7 @@ var _stick: PackedFloat32Array = PackedFloat32Array()
 var _stuck_to: Array = []
 var _stuck_off: PackedVector2Array = PackedVector2Array()
 var _speed: PackedFloat32Array = PackedFloat32Array()
-## The shot's caster, which an orbit circles and a returning shot flies back to: the player's
+## The shot's caster, which an orbit circles and a returning shot flies back to: its actor's
 ## anchor (CASTER_WIZARD), a fixed point in `_caster_at` (CASTER_POINT), or the shot in that slot
 ## while it is the one with `_caster_seq` (a payload's carrier); once that shot is gone, the
 ## point where it was last seen.
@@ -456,16 +467,18 @@ var _move_left: PackedFloat32Array = PackedFloat32Array()
 var _move_vel: PackedVector2Array = PackedVector2Array()
 var _move_turn: PackedFloat32Array = PackedFloat32Array()
 var _move_range: PackedFloat32Array = PackedFloat32Array()
-var _hostile_slots: PackedInt32Array = PackedInt32Array()
-var _hostile_count: int = 0
-var _hostile_step: int = -1
+## The live shots a shield checks, made once a step the first time a shield needs it (see
+## `_shield_block`).
+var _scan_slots: PackedInt32Array = PackedInt32Array()
+var _scan_count: int = 0
+var _scan_step: int = -1
 ## True while a `projectile_expired` is sent for a shot that ended on a wall (the `on wall`
 ## trigger reads it); false for every other end.
 var expired_on_wall: bool = false
 ## HIT_MEMORY target ids per slot, newest first (0 for none).
 var _last_hit: PackedInt64Array = PackedInt64Array()
-## Per-owner list of live slots in spawn order (oldest at the head), indexed
-## like _owned: head and tail slot per owner (-1 for none), and the links.
+## Per-budget list of live slots in spawn order (oldest at the head), indexed
+## like _owned: head and tail slot per budget (-1 for none), and the links.
 var _own_head: PackedInt32Array = PackedInt32Array([-1, -1, -1, -1, -1])
 var _own_tail: PackedInt32Array = PackedInt32Array([-1, -1, -1, -1, -1])
 var _own_prev: PackedInt32Array = PackedInt32Array()
@@ -474,8 +487,8 @@ var _alive: PackedByteArray = PackedByteArray()
 ## Stack of free slots.
 var _free_slots: PackedInt32Array = PackedInt32Array()
 var _free_count: int = 0
-## Live projectiles per owner; index 0 is the enemies' (NO_PLAYER and every enemy caster), 1..4
-## are players 0..3 (`_owner_index`).
+## Live projectiles per budget (`Actors.budget_of` of the caster when the shot was spawned):
+## 0-3 the seats', SHARED every other actor's and a shot of no actor's.
 var _owned: PackedInt32Array = PackedInt32Array([0, 0, 0, 0, 0])
 
 # Targets, one row each.
@@ -487,6 +500,8 @@ var _target_pos: PackedVector2Array = PackedVector2Array()
 var _target_offset: PackedVector2Array = PackedVector2Array()
 var _target_id: PackedInt64Array = PackedInt64Array()
 var _target_owner: PackedInt32Array = PackedInt32Array()
+## Each target's team, read from its owner actor when the grid is filled (see `_team_of_target`).
+var _target_team: PackedInt32Array = PackedInt32Array()
 ## The grid: first target in each cell (-1 for none), and the next in its chain.
 var _grid_w: int = 1
 var _grid_h: int = 1
@@ -522,15 +537,10 @@ var _rune_node: MultiMeshInstance2D = null
 var _rune_buffer: PackedFloat32Array = PackedFloat32Array()
 var _orbit_node: MultiMeshInstance2D = null
 var _orbit_buffer: PackedFloat32Array = PackedFloat32Array()
-## The enemy casters' shots, drawn by the shader one layer above the players'.
+## The shots in the enemy ramp, drawn by the shader one layer above the others.
 var _enemy_node: MultiMeshInstance2D = null
 var _enemy_buffer: PackedFloat32Array = PackedFloat32Array()
 var _enemy_room: int = 0
-## The players' shots a shield of an enemy caster's shot checks, made once a step like
-## `_hostile_slots` (see `_shield_block`).
-var _friendly_slots: PackedInt32Array = PackedInt32Array()
-var _friendly_count: int = 0
-var _friendly_step: int = -1
 ## True inside step(): the grid is in use, so a target removed then is only
 ## switched off (layer 0) and swept at the start of the next step.
 var _stepping: bool = false
@@ -540,10 +550,10 @@ var _work_left: int = 0
 var _resume: int = 0
 ## Steps taken so far (staggers the homing searches).
 var _step_index: int = 0
-## Where each caster's orbit shots circle (INF for no anchor), see `set_anchor`; CASTERS of them.
 ## Per slot: the target a shot must not hit, and the seconds left of that.
 var _skip_id: PackedInt64Array = PackedInt64Array()
 var _skip_left: PackedFloat32Array = PackedFloat32Array()
+## Where each actor's orbit shots circle (INF for no anchor), see `set_anchor`; ACTORS of them.
 var _anchors: PackedVector2Array = PackedVector2Array()
 ## Scratch for `ray`, RAY_MAX_HITS rows per nesting level: the best hits so far, nearest
 ## first (reused, never grows). `_ray_depth` is how many rays are in progress.
@@ -567,7 +577,7 @@ func _init() -> void:
 	_ray_points.resize(RAY_MAX_HITS * RAY_MAX_DEPTH)
 	_ray_heads.resize(RAY_MAX_HITS * RAY_MAX_DEPTH)
 	_path.resize(RAY_PATH_POINTS)
-	_anchors.resize(CASTERS)
+	_anchors.resize(ACTORS)
 	_anchors.fill(Vector2.INF)
 	set_cap(DEFAULT_CAP_WEB if OS.has_feature("web") else DEFAULT_CAP_DESKTOP)
 	set_bounds(_bounds)
@@ -630,7 +640,10 @@ func set_cap(value: int) -> void:
 	_vel.resize(_cap)
 	_life.resize(_cap)
 	_radius.resize(_cap)
-	_player.resize(_cap)
+	_actor.resize(_cap)
+	_team.resize(_cap)
+	_ramp.resize(_cap)
+	_budget.resize(_cap)
 	_layers.resize(_cap)
 	_pierce.resize(_cap)
 	_tag.resize(_cap)
@@ -666,8 +679,7 @@ func set_cap(value: int) -> void:
 	_move_vel.resize(_cap)
 	_move_turn.resize(_cap)
 	_move_range.resize(_cap)
-	_hostile_slots.resize(_cap)
-	_friendly_slots.resize(_cap)
+	_scan_slots.resize(_cap)
 	_skip_id.resize(_cap)
 	_skip_left.resize(_cap)
 	_last_hit.resize(_cap * HIT_MEMORY)
@@ -876,43 +888,74 @@ func get_count() -> int:
 	return _count
 
 
-## Live projectiles owned by `player` (Events.NO_PLAYER or an enemy caster: every enemy shot,
-## which share one count).
-func get_count_for(player: int) -> int:
-	if not is_caster(player):
+## Live projectiles in the drop bucket of `caster`'s budget (`Actors.budget_of`): a seat's
+## actor counts its seat's shots; every actor no seat drives, and NO_PLAYER, the shared count.
+func get_count_for(caster: int) -> int:
+	if not is_caster(caster):
 		return 0
-	return _owned[_owner_index(player)]
+	return _owned[_budget_of(caster)]
 
 
-## True for a caster number a shot may have: a player, an enemy caster or NO_PLAYER.
+## Live projectiles in one budget's drop bucket (0-3 a seat's, `Actors.SHARED`).
+func get_count_for_budget(budget: int) -> int:
+	return _owned[budget] if budget >= 0 and budget < BUDGETS else 0
+
+
+## True for a caster number a shot may have: an actor id or NO_PLAYER (no actor).
 static func is_caster(caster: int) -> bool:
-	return caster >= EventsScript.NO_PLAYER and caster < CASTERS
+	return caster >= ActorsScript.NONE and caster < ACTORS
 
 
-## True for a player's caster number (0-3).
-static func is_player_caster(caster: int) -> bool:
-	return caster >= 0 and caster < MAX_PLAYERS
+## True for a ramp drawn in a hat colour (0-3); anything else is drawn in the enemy ramp.
+static func is_hat_ramp(ramp: int) -> bool:
+	return ramp >= 0 and ramp < ActorsScript.RAMP_ENEMY
 
 
-## The player events name for a caster: the player, or NO_PLAYER for the enemies' side.
-static func event_player(caster: int) -> int:
-	return caster if is_player_caster(caster) else EventsScript.NO_PLAYER
+## The actor table: `actors`, else the `Actors` autoload (looked up once), else null.
+func actor_table() -> ActorsScript:
+	if actors != null:
+		return actors if is_instance_valid(actors) else null
+	if _auto_actors == null or not is_instance_valid(_auto_actors):
+		_auto_actors = null
+		var tree: SceneTree = Engine.get_main_loop() as SceneTree
+		if tree != null and tree.root != null:
+			_auto_actors = tree.root.get_node_or_null(^"Actors") as ActorsScript
+	return _auto_actors
 
 
-## The layer of a caster's own side: LAYER_PLAYER for a player, LAYER_ENEMY for an enemy.
-static func side_layer(caster: int) -> int:
-	return LAYER_PLAYER if is_player_caster(caster) else LAYER_ENEMY
+## The team `caster` aims for (NONE for no actor).
+func _team_of(caster: int) -> int:
+	var table: ActorsScript = actor_table()
+	return table.team_of(caster) if table != null else ActorsScript.NONE
 
 
-## The drop bucket (`_owned`) of a caster: 0 for the enemies, 1-4 for players 0-3.
-static func _owner_index(caster: int) -> int:
-	return caster + 1 if is_player_caster(caster) else 0
+## The ramp `caster`'s spells are drawn in (NONE for no actor: drawn in the enemy ramp).
+func _ramp_of(caster: int) -> int:
+	var table: ActorsScript = actor_table()
+	return table.ramp_of(caster) if table != null else ActorsScript.NONE
+
+
+## The budget (and drop bucket) `caster` spends: its seat's, or SHARED.
+func _budget_of(caster: int) -> int:
+	var table: ActorsScript = actor_table()
+	return table.budget_of(caster) if table != null else ActorsScript.SHARED
+
+
+## The team a target aims as: its owner actor's. A target no actor owns (until actors G6 every
+## enemy that casts nothing, and the dummies) is on the team of its layer's bodies: the wizards'
+## for LAYER_PLAYER, else the enemies'.
+func _team_of_target(owner: int, layer: int) -> int:
+	var team: int = _team_of(owner) if owner >= 0 else ActorsScript.NONE
+	if team != ActorsScript.NONE:
+		return team
+	return ActorsScript.TEAM_WIZARDS if (layer & LAYER_PLAYER) != 0 else ActorsScript.TEAM_ENEMIES
 
 
 ## Register a Node2D as something projectiles can hit (`layer` is a non-zero
 ## bit mask). Registering twice only updates the radius, layer and owner. A freed target is dropped by itself.
-## `owner` is the caster (a player 0-3, or an enemy caster) the target belongs to, or
-## Events.NO_PLAYER: shots of that caster never hit it (unless self-hitting). `offset` moves the hit circle from the
+## `owner` is the actor whose body it is (or whose decoy), or Events.NO_PLAYER: shots of that
+## actor never hit it (unless they self-hit), and its team is what aim reads (see
+## `_team_of_target`). `offset` moves the hit circle from the
 ## node's origin (usually the feet) to the drawn body, so a shot that looks like it touches
 ## the sprite does hit.
 func add_target(node: Node2D, radius: float, layer: int = LAYER_ENEMY, owner: int = EventsScript.NO_PLAYER, offset: Vector2 = Vector2.ZERO) -> void:
@@ -924,6 +967,7 @@ func add_target(node: Node2D, radius: float, layer: int = LAYER_ENEMY, owner: in
 		_target_radius[at] = radius
 		_target_layer[at] = layer
 		_target_owner[at] = owner
+		_target_team[at] = _team_of_target(owner, layer)
 		_target_offset[at] = offset
 		_max_target_radius = maxf(_max_target_radius, radius)
 		return
@@ -932,6 +976,7 @@ func add_target(node: Node2D, radius: float, layer: int = LAYER_ENEMY, owner: in
 	_target_radius.append(radius)
 	_target_layer.append(layer)
 	_target_owner.append(owner)
+	_target_team.append(_team_of_target(owner, layer))
 	_target_pos.append(Vector2.ZERO)
 	_target_offset.append(offset)
 	_target_next.append(-1)
@@ -940,7 +985,7 @@ func add_target(node: Node2D, radius: float, layer: int = LAYER_ENEMY, owner: in
 
 
 ## Give a registered target a new `owner` (see `add_target`): an enemy that casts a staff
-## names its caster row, so its own shots skip it. Returns false for a node not registered.
+## names its actor, so its own shots skip it. Returns false for a node not registered.
 func set_target_owner(node: Node2D, owner: int) -> bool:
 	if node == null or not is_caster(owner):
 		return false
@@ -948,6 +993,7 @@ func set_target_owner(node: Node2D, owner: int) -> bool:
 	if at < 0:
 		return false
 	_target_owner[at] = owner
+	_target_team[at] = _team_of_target(owner, _target_layer[at])
 	return true
 
 
@@ -968,37 +1014,37 @@ func get_target_count() -> int:
 	return _targets.size()
 
 
-## Start a projectile for `player` (a caster: 0-3, an enemy caster, or Events.NO_PLAYER) at
+## Start a projectile for `caster` (an actor id, or Events.NO_PLAYER for no actor) at
 ## `origin`, moving `velocity` pixels per second for `lifetime` seconds.
 ## `pierce` is how many targets it passes through before it ends. Returns its
 ## slot, or -1 for bad arguments or an origin inside a wall.
 ## `motion` is MOTION_STRAIGHT or MOTION_STILL (then `velocity` is ignored).
 ## `tag` is stored and sent back with every hit of this projectile. A full cap never refuses: see the class doc.
-func spawn(player: int, origin: Vector2, velocity: Vector2, lifetime: float, radius: float = 4.0, hit_layers: int = LAYER_ENEMY, pierce: int = 0, tag: int = 0, motion: int = MOTION_STRAIGHT) -> int:
+func spawn(caster: int, origin: Vector2, velocity: Vector2, lifetime: float, radius: float = 4.0, hit_layers: int = LAYER_ENEMY, pierce: int = 0, tag: int = 0, motion: int = MOTION_STRAIGHT) -> int:
 	if motion != MOTION_STRAIGHT and motion != MOTION_STILL:
 		return -1
-	if not is_caster(player):
+	if not is_caster(caster):
 		return -1
 	if not (lifetime > 0.0) or not origin.is_finite() or not velocity.is_finite():
 		return -1
-	return _spawn_row(player, origin, velocity, lifetime, radius, hit_layers, pierce, tag, motion)
+	return _spawn_row(caster, origin, velocity, lifetime, radius, hit_layers, pierce, tag, motion)
 
 
-## Start a shot that circles `player`'s anchor (see `set_anchor`) at `orbit_radius`
+## Start a shot that circles `caster`'s anchor (see `set_anchor`) at `orbit_radius`
 ## pixels, starting at `angle` (radians, 0 = east of the owner) and turning
 ## `angular_speed` radians a second (negative turns the other way). The other arguments
 ## are those of `spawn`. Returns its slot, or -1 for bad arguments, NO_PLAYER or a caster
-## outside 0 to CASTERS - 1, or a caster with no anchor. With a finite `centre` it circles that point instead (a
+## outside 0 to ACTORS - 1, or a caster with no anchor. With a finite `centre` it circles that point instead (a
 ## payload's orbit, whose caster is a shot or the point where one ended; `set_caster_shot`
 ## then makes it follow the shot), and needs no anchor.
-func spawn_orbit(player: int, orbit_radius: float, angle: float, angular_speed: float, lifetime: float, radius: float = 4.0, hit_layers: int = LAYER_ENEMY, pierce: int = 0, tag: int = 0, centre: Vector2 = Vector2.INF) -> int:
-	if player < 0 or player >= CASTERS or not (centre.is_finite() or _anchors[player].is_finite()):
+func spawn_orbit(caster: int, orbit_radius: float, angle: float, angular_speed: float, lifetime: float, radius: float = 4.0, hit_layers: int = LAYER_ENEMY, pierce: int = 0, tag: int = 0, centre: Vector2 = Vector2.INF) -> int:
+	if caster < 0 or caster >= ACTORS or not (centre.is_finite() or _anchors[caster].is_finite()):
 		return -1
 	if not (lifetime > 0.0) or not is_finite(orbit_radius) or not is_finite(angle) or not is_finite(angular_speed):
 		return -1
 	var offset: Vector2 = Vector2.from_angle(angle) * maxf(orbit_radius, 0.0)
-	var around: Vector2 = centre if centre.is_finite() else _anchors[player]
-	var slot: int = _spawn_row(player, around + offset, Vector2.ZERO, lifetime, radius, hit_layers, pierce, tag, MOTION_ORBIT)
+	var around: Vector2 = centre if centre.is_finite() else _anchors[caster]
+	var slot: int = _spawn_row(caster, around + offset, Vector2.ZERO, lifetime, radius, hit_layers, pierce, tag, MOTION_ORBIT)
 	if centre.is_finite():
 		_caster_slot[slot] = CASTER_POINT
 		_caster_at[slot] = centre
@@ -1009,17 +1055,17 @@ func spawn_orbit(player: int, orbit_radius: float, angle: float, angular_speed: 
 	return slot
 
 
-## Tell the manager where `player`'s wizard (or an enemy caster's enemy) is, for its orbit
-## shots. Call it every physics step before the manager's (the owner of the body does).
-func set_anchor(player: int, position: Vector2) -> void:
-	if player >= 0 and player < CASTERS and position.is_finite():
-		_anchors[player] = position
+## Tell the manager where the body of the actor `caster` is, for its orbit shots. Call it
+## every physics step before the manager's (the owner of the body does).
+func set_anchor(caster: int, position: Vector2) -> void:
+	if caster >= 0 and caster < ACTORS and position.is_finite():
+		_anchors[caster] = position
 
 
-## The wizard (or enemy) is gone: its orbit shots end at the next step, quietly.
-func clear_anchor(player: int) -> void:
-	if player >= 0 and player < CASTERS:
-		_anchors[player] = Vector2.INF
+## The body is gone: its orbit shots end at the next step, quietly.
+func clear_anchor(caster: int) -> void:
+	if caster >= 0 and caster < ACTORS:
+		_anchors[caster] = Vector2.INF
 
 
 ## The shot in `slot` was cast by the shot in `caster` (a payload's carrier): an orbit circles
@@ -1044,7 +1090,7 @@ func set_caster_point(slot: int, point: Vector2) -> bool:
 	return true
 
 
-## Where the caster of the shot in `slot` is now: its player's anchor (INF without one), the
+## Where the caster of the shot in `slot` is now: its actor's anchor (INF without one), the
 ## shot that cast it, or a point. INF for an empty slot.
 func get_caster_of(slot: int) -> Vector2:
 	if slot < 0 or slot >= _cap or _alive[slot] == 0:
@@ -1064,7 +1110,7 @@ func caster_shot_of(slot: int) -> int:
 	return -1
 
 
-## True when the shot in `slot` was cast by its player's wizard (not by another shot or from a
+## True when the shot in `slot` was cast by its actor's body (not by another shot or from a
 ## point). Like `caster_shot_of`, it still answers for a shot ended by the hit being sent.
 func is_cast_by_wizard(slot: int) -> bool:
 	return slot >= 0 and slot < _cap and _caster_slot[slot] == CASTER_WIZARD
@@ -1073,7 +1119,7 @@ func is_cast_by_wizard(slot: int) -> bool:
 func _caster_position(slot: int) -> Vector2:
 	var caster: int = _caster_slot[slot]
 	if caster == CASTER_WIZARD:
-		return _anchors[_player[slot]] if _player[slot] >= 0 else Vector2.INF
+		return _anchors[_actor[slot]] if _actor[slot] >= 0 else Vector2.INF
 	if caster >= 0:
 		if _alive[caster] != 0 and _seq[caster] == _caster_seq[slot]:
 			_caster_at[slot] = _pos[caster]
@@ -1257,10 +1303,10 @@ func set_sticky(slot: int, seconds: float) -> bool:
 	return true
 
 
-## The shot stops `charges` enemy shots that touch it (each costs one charge and sends
-## `shot_blocked`). A zero or negative count takes the shield away.
+## The shot stops `charges` shots of other teams that touch it (each costs one charge and sends
+## `shot_blocked`). A zero or negative count takes the shield away. A shot of no actor has none.
 func set_shield(slot: int, charges: int) -> bool:
-	if slot < 0 or slot >= _cap or _alive[slot] == 0 or _player[slot] < 0:
+	if slot < 0 or slot >= _cap or _alive[slot] == 0 or _actor[slot] < 0:
 		return false
 	_shield[slot] = maxi(charges, 0)
 	return true
@@ -1272,9 +1318,10 @@ func get_shield_of(slot: int) -> int:
 
 
 ## The shot may hit its own caster, once it has left the caster's hitbox (the first step it
-## no longer overlaps it). Off by default; `gameplay/combat` decides what such a hit does.
+## no longer overlaps it). Off by default; `gameplay/combat` decides what such a hit does. A shot
+## of no actor has no caster to hit.
 func set_self_hit(slot: int) -> bool:
-	if slot < 0 or slot >= _cap or _alive[slot] == 0 or _player[slot] < 0:
+	if slot < 0 or slot >= _cap or _alive[slot] == 0 or _actor[slot] < 0:
 		return false
 	_flags[slot] |= F_SELF
 	_flags[slot] &= ~F_SELF_LIVE
@@ -1286,7 +1333,7 @@ func is_self_live(slot: int) -> bool:
 	return slot >= 0 and slot < _cap and _alive[slot] != 0 and (_flags[slot] & F_SELF_LIVE) != 0
 
 
-func _spawn_row(player: int, origin: Vector2, velocity: Vector2, lifetime: float, radius: float, hit_layers: int, pierce: int, tag: int, motion: int) -> int:
+func _spawn_row(caster: int, origin: Vector2, velocity: Vector2, lifetime: float, radius: float, hit_layers: int, pierce: int, tag: int, motion: int) -> int:
 	# An orbit shot is held by its caster and ignores walls.
 	if motion != MOTION_ORBIT and _has_walls and _wall_hit(origin, origin) >= 0.0:
 		# Born inside a wall it would end in the next step: count it as ended, but
@@ -1309,7 +1356,20 @@ func _spawn_row(player: int, origin: Vector2, velocity: Vector2, lifetime: float
 	_move_home[slot] = 0
 	_life[slot] = lifetime
 	_radius[slot] = maxf(radius, 0.0)
-	_player[slot] = player
+	_actor[slot] = caster
+	# What the actor table says of the caster now; the shot keeps it for its life. A caster that
+	# is no open actor has no team, the enemy ramp and the shared budget.
+	var table: ActorsScript = actors if actors != null else _auto_actors
+	if table == null or not is_instance_valid(table):
+		table = actor_table()
+	if table != null and table.is_open(caster):
+		_team[slot] = table.team_of(caster)
+		_ramp[slot] = table.ramp_of(caster)
+		_budget[slot] = table.budget_of(caster)
+	else:
+		_team[slot] = ActorsScript.NONE
+		_ramp[slot] = ActorsScript.NONE
+		_budget[slot] = ActorsScript.SHARED
 	_layers[slot] = hit_layers | ACTOR_LAYERS
 	_pierce[slot] = maxi(pierce, 0)
 	_tag[slot] = tag
@@ -1340,7 +1400,7 @@ func _spawn_row(player: int, origin: Vector2, velocity: Vector2, lifetime: float
 		_last_hit[slot * HIT_MEMORY + i] = 0
 	_alive[slot] = 1
 	_count += 1
-	var owner_index: int = _owner_index(player)
+	var owner_index: int = _budget[slot]
 	_owned[owner_index] += 1
 	_own_prev[slot] = _own_tail[owner_index]
 	_own_next[slot] = -1
@@ -1406,7 +1466,7 @@ func step(delta: float) -> void:
 			var part: float = minf(delta, _move_left[slot])
 			_move_left[slot] -= delta
 			if _move_turn[slot] > 0.0:
-				_move_vel[slot] = home_velocity(_player[slot], _pos[slot], _move_vel[slot], _move_turn[slot], _move_range[slot], part, _move_home[slot], int(_seq[slot]), _layers[slot])
+				_move_vel[slot] = home_velocity(_actor[slot], _pos[slot], _move_vel[slot], _move_turn[slot], _move_range[slot], part, _move_home[slot], int(_seq[slot]), _layers[slot])
 				_move_home[slot] = homing_target
 			_pos[slot] += _move_vel[slot] * part
 			_base[slot] += _move_vel[slot] * part
@@ -1538,33 +1598,26 @@ func _advance(slot: int, delta: float, flags: int) -> int:
 	return ADVANCE_OK
 
 
-## Check a shielded shot against the other side's shots (a player's shield against enemy
-## shots, an enemy caster's against players' shots): every one it touches is stopped, one
-## shield charge each, and `shot_blocked` is sent. Each side's list is made once per step, the
-## first time a shield needs it; the scan is charged to the hit-work budget.
+## Check a shielded shot against the shots of other teams (aim, actors G3a: a shield stops
+## every shot whose caster was on another team when it was cast, a shot of no actor included,
+## never its own team's): every one it touches is stopped, one shield charge each, and
+## `shot_blocked` is sent. The list of live shots is made once per step, the first time a shield
+## needs it; the scan is charged to the hit-work budget.
 func _shield_block(slot: int) -> void:
-	var mine: bool = is_player_caster(_player[slot])
-	if mine and _hostile_step != _step_index:
-		_hostile_step = _step_index
-		_hostile_count = 0
+	if _scan_step != _step_index:
+		_scan_step = _step_index
+		_scan_count = 0
 		for other in _high:
-			if _alive[other] != 0 and not is_player_caster(_player[other]):
-				_hostile_slots[_hostile_count] = other
-				_hostile_count += 1
-	elif not mine and _friendly_step != _step_index:
-		_friendly_step = _step_index
-		_friendly_count = 0
-		for other in _high:
-			if _alive[other] != 0 and is_player_caster(_player[other]):
-				_friendly_slots[_friendly_count] = other
-				_friendly_count += 1
-	var count: int = _hostile_count if mine else _friendly_count
-	for n in count:
+			if _alive[other] != 0:
+				_scan_slots[_scan_count] = other
+				_scan_count += 1
+	var mine: int = _team[slot]
+	for n in _scan_count:
 		if _shield[slot] <= 0 or _work_left <= 0:
 			return
 		_work_left -= 1
-		var other: int = _hostile_slots[n] if mine else _friendly_slots[n]
-		if _alive[other] == 0 or is_player_caster(_player[other]) == mine:
+		var other: int = _scan_slots[n]
+		if _alive[other] == 0 or other == slot or _team[other] == mine:
 			continue
 		var reach: float = _radius[slot] + _radius[other]
 		# Both shots move during the step: in the enemy shot's frame the shield goes along
@@ -1581,7 +1634,7 @@ func _shield_block(slot: int) -> void:
 		_kill(other)
 		if events != null:
 			event_slot = slot
-			events.shot_blocked.emit(event_player(_player[slot]), at, _tag[slot])
+			events.shot_blocked.emit(_actor[slot], at, _tag[slot])
 			event_slot = -1
 
 
@@ -1624,14 +1677,14 @@ static func turned_toward(velocity: Vector2, want: Vector2, most: float) -> Vect
 ## For anything else homing moves (a shot carried by a dash, a wizard dashing): `velocity` at
 ## `from` turned toward a target on `layers` no further than `within` pixels, in any
 ## direction, by at most `turn_rate` radians a second for `delta` seconds, as a homing shot
-## turns. The target is picked as `homing_point` picks it (`keep`, `pick_seed`); `homing_target`
-## says which, to hand back as `keep` next step. Allocation-free.
-func home_velocity(player: int, from: Vector2, velocity: Vector2, turn_rate: float, within: float, delta: float, keep: int, pick_seed: int, layers: int = LAYER_ENEMY) -> Vector2:
+## turns. The target is picked as `homing_point` picks it for `caster` (`keep`, `pick_seed`);
+## `homing_target` says which, to hand back as `keep` next step. Allocation-free.
+func home_velocity(caster: int, from: Vector2, velocity: Vector2, turn_rate: float, within: float, delta: float, keep: int, pick_seed: int, layers: int = ACTOR_LAYERS) -> Vector2:
 	homing_target = 0
 	homing_target_radius = 0.0
 	if not (turn_rate > 0.0) or not velocity.is_finite() or velocity.is_zero_approx():
 		return velocity
-	var goal: Vector2 = homing_point(player, from, velocity, PI, layers, within, keep, pick_seed)
+	var goal: Vector2 = homing_point(caster, from, velocity, PI, layers, within, keep, pick_seed)
 	if not goal.is_finite():
 		return velocity
 	return turned_toward(velocity, goal - from, turn_rate * delta)
@@ -1640,35 +1693,35 @@ func home_velocity(player: int, from: Vector2, velocity: Vector2, turn_rate: flo
 ## Where a homing shot steers: the target it kept, while it may still home on it, or else a
 ## new one picked at random (`_home_pick`), or INF. Charges the work budget.
 func _homing_point(slot: int) -> Vector2:
-	var t: int = _home_pick(_player[slot], _pos[slot], Vector2.RIGHT, PI, _layers[slot], _home_range[slot], _home_target[slot], int(_seq[slot]), slot, 0)
+	var t: int = _home_pick(_actor[slot], _team[slot], _pos[slot], Vector2.RIGHT, PI, _layers[slot], _home_range[slot], _home_target[slot], int(_seq[slot]), slot, 0)
 	_home_target[slot] = _target_id[t] if t >= 0 else 0
 	return _target_pos[t] if t >= 0 else Vector2.INF
 
 
 ## For a beam or a teleport, which cannot turn: `direction` (a unit vector) bent toward the
 ## target `homing_point` picks, or `direction` unchanged when there is none. Allocation-free.
-func homing_aim(player: int, origin: Vector2, direction: Vector2, max_angle: float, layers: int, within: float, keep: int, pick_seed: int) -> Vector2:
-	var goal: Vector2 = homing_point(player, origin, direction, max_angle, layers, within, keep, pick_seed)
+func homing_aim(caster: int, origin: Vector2, direction: Vector2, max_angle: float, layers: int, within: float, keep: int, pick_seed: int) -> Vector2:
+	var goal: Vector2 = homing_point(caster, origin, direction, max_angle, layers, within, keep, pick_seed)
 	return direction if not goal.is_finite() else origin.direction_to(goal)
 
 
 ## The centre of the target a homing thing at `origin` going along `direction` steers to, or
 ## INF when there is none: one on `layers` no further than `within` pixels (cut to
 ## RAY_MAX_LENGTH) whose centre lies within `max_angle` radians of `direction` (PI for any
-## way). Targets owned by `player` and its own side's (wizards for a player, enemies for an
-## enemy caster: `side_layer`) are skipped. The target whose
+## way). Targets owned by `caster` and those of its team (`Actors.team_of`; homing aims at
+## other teams only, actors G3a) are skipped. The target whose
 ## instance id is `keep` stays the pick while it qualifies; otherwise one is picked at random
 ## among those that do, from `pick_seed` (the same seed and targets give the same pick), so a
 ## group of shots spreads over a group of enemies. The target whose id is `avoid` (the one it
 ## just reached) is picked only when no other qualifies. `homing_target` is left at the pick's
 ## id (0 for none), for the caller to keep. Allocation-free.
-func homing_point(player: int, origin: Vector2, direction: Vector2, max_angle: float, layers: int, within: float, keep: int, pick_seed: int, avoid: int = 0) -> Vector2:
+func homing_point(caster: int, origin: Vector2, direction: Vector2, max_angle: float, layers: int, within: float, keep: int, pick_seed: int, avoid: int = 0) -> Vector2:
 	homing_target = 0
 	homing_target_radius = 0.0
 	if not origin.is_finite() or not direction.is_finite() or direction.is_zero_approx() or not is_finite(max_angle) or not is_finite(within) or within <= 0.0:
 		return Vector2.INF
 	_query_ready()
-	var t: int = _home_pick(player, origin, direction, max_angle, layers, minf(within, RAY_MAX_LENGTH), keep, pick_seed, -1, avoid)
+	var t: int = _home_pick(caster, _team_of(caster), origin, direction, max_angle, layers, minf(within, RAY_MAX_LENGTH), keep, pick_seed, -1, avoid)
 	if t < 0:
 		return Vector2.INF
 	homing_target = _target_id[t]
@@ -1676,11 +1729,11 @@ func homing_point(player: int, origin: Vector2, direction: Vector2, max_angle: f
 	return _target_pos[t]
 
 
-## The one homing search: the target (an index, or -1) `homing_point` describes. For a shot
-## (`slot` 0 or more) it also skips the targets the shot just hit and charges the work budget.
-func _home_pick(player: int, origin: Vector2, direction: Vector2, max_angle: float, layers: int, within: float, keep: int, pick_seed: int, slot: int, avoid: int) -> int:
-	# Homing never picks its own side (a wizard, for a player), though its shot hits both.
-	layers &= ~side_layer(player)
+## The one homing search: the target (an index, or -1) `homing_point` describes, for `caster`
+## of `team` (NONE: no team, every target but its own body). For a shot (`slot` 0 or more) it
+## also skips the targets the shot just hit and charges the work budget.
+func _home_pick(caster: int, team: int, origin: Vector2, direction: Vector2, max_angle: float, layers: int, within: float, keep: int, pick_seed: int, slot: int, avoid: int) -> int:
+	# Homing never picks its own team (a teammate, for a wizard), though every spell hits it.
 	var any_way: bool = max_angle >= PI
 	var pick: int = -1
 	var avoided: int = -1
@@ -1692,7 +1745,7 @@ func _home_pick(player: int, origin: Vector2, direction: Vector2, max_angle: flo
 			while t >= 0:
 				if slot >= 0:
 					_work_left -= 1
-				if (_target_layer[t] & layers) != 0 and (player < 0 or _target_owner[t] != player) and is_instance_valid(_targets[t]) and (slot < 0 or not _remembers(slot, _target_id[t])):
+				if (_target_layer[t] & layers) != 0 and (caster < 0 or _target_owner[t] != caster) and (team == ActorsScript.NONE or _target_team[t] != team) and is_instance_valid(_targets[t]) and (slot < 0 or not _remembers(slot, _target_id[t])):
 					var to_target: Vector2 = _target_pos[t] - origin
 					var reach: float = within + _target_radius[t]
 					if to_target.length_squared() <= reach * reach and (any_way or (not to_target.is_zero_approx() and absf(direction.angle_to(to_target)) <= max_angle)):
@@ -1711,26 +1764,26 @@ func _home_pick(player: int, origin: Vector2, direction: Vector2, max_angle: flo
 
 
 ## An instant beam from `origin` along `direction` for up to `length` pixels, fired by
-## `player`. It holds no row in the pool. It stops at the first wall and hits the
+## the actor `caster`. It holds no row in the pool. It stops at the first wall and hits the
 ## nearest `pierce + 1` targets on `layers` (at most RAY_MAX_HITS) whose circle the beam
 ## touches (`width` pixels either side of the line; `exclude` is a target it never hits,
 ## for a beam that starts on the one that fired it). For each, nearest first, it sends
-## `projectile_impact` and `projectile_hit(player, target, point, tag)`, the point being
+## `projectile_impact` and `projectile_hit(caster, target, point, tag)`, the point being
 ## where the beam passes closest to the target; a beam that ends on a wall sends an
-## impact with a `null` target there. Targets owned by `player` are skipped and, as in
-## `spawn`, it hits ACTOR_LAYERS whatever `layers` says. Returns how far the beam got in pixels: the
+## impact with a `null` target there. Targets owned by `caster` (its own body) are skipped and,
+## as in `spawn`, it hits ACTOR_LAYERS whatever `layers` says. Returns how far the beam got in pixels: the
 ## length, the distance to the wall, or the distance to the last target it could hit.
 ## 0.0 for bad arguments or an origin inside a wall. The hits are found before any event
 ## is sent, so a handler may remove or free targets, or fire another ray (up to
 ## RAY_MAX_DEPTH deep, a deeper one returns 0.0). A `length` over RAY_MAX_LENGTH is cut
 ## to it. Where it ended and its heading there are left in `ray_end` and `ray_end_heading`.
 ## Allocation-free.
-func ray(player: int, origin: Vector2, direction: Vector2, length: float, pierce: int = 0, layers: int = LAYER_ENEMY, tag: int = 0, width: float = 0.0, exclude: Node = null) -> float:
+func ray(caster: int, origin: Vector2, direction: Vector2, length: float, pierce: int = 0, layers: int = LAYER_ENEMY, tag: int = 0, width: float = 0.0, exclude: Node = null) -> float:
 	if not direction.is_finite() or direction.is_zero_approx() or not is_finite(length) or length <= 0.0 or not origin.is_finite():
 		return 0.0
 	_path[0] = origin
 	_path[1] = origin + direction.normalized() * minf(length, RAY_MAX_LENGTH)
-	return _ray_path(player, 1, pierce, layers, tag, width, exclude, true)
+	return _ray_path(caster, 1, pierce, layers, tag, width, exclude, true)
 
 
 ## A beam like `ray` along the path `points[offset]` to `points[offset + count - 1]` (at most
@@ -1739,7 +1792,7 @@ func ray(player: int, origin: Vector2, direction: Vector2, length: float, pierce
 ## length. With `hit` false it only finds how far the beam gets (walls, and the target that
 ## spends it) and sends nothing, for the look of a beam between its hits. Returns how far it
 ## got along the path; `ray_end` and `ray_end_heading` say where. Allocation-free.
-func ray_points(player: int, points: PackedVector2Array, offset: int, count: int, length: float, pierce: int = 0, layers: int = LAYER_ENEMY, tag: int = 0, width: float = 0.0, exclude: Node = null, hit: bool = true) -> float:
+func ray_points(caster: int, points: PackedVector2Array, offset: int, count: int, length: float, pierce: int = 0, layers: int = LAYER_ENEMY, tag: int = 0, width: float = 0.0, exclude: Node = null, hit: bool = true) -> float:
 	if count < 2 or offset < 0 or offset + count > points.size() or not is_finite(length) or length <= 0.0 or not points[offset].is_finite():
 		return 0.0
 	var most: float = minf(length, RAY_MAX_LENGTH)
@@ -1759,7 +1812,7 @@ func ray_points(player: int, points: PackedVector2Array, offset: int, count: int
 		_path[i] = point
 	if used == 0:
 		return 0.0
-	return _ray_path(player, used, pierce, layers, tag, width, exclude, hit)
+	return _ray_path(caster, used, pierce, layers, tag, width, exclude, hit)
 
 
 ## A beam like `ray`, bent: it follows the quadratic curve from `origin` to `end` pulled
@@ -1768,7 +1821,7 @@ func ray_points(player: int, points: PackedVector2Array, offset: int, count: int
 ## far the beam gets (walls, and the target that spends it) and sends nothing, for the look of a
 ## beam between its hits. Returns how far it got along the curve; `ray_end` and
 ## `ray_end_heading` say where. Allocation-free.
-func ray_curve(player: int, origin: Vector2, bend: Vector2, end: Vector2, pierce: int = 0, layers: int = LAYER_ENEMY, tag: int = 0, width: float = 0.0, exclude: Node = null, hit: bool = true) -> float:
+func ray_curve(caster: int, origin: Vector2, bend: Vector2, end: Vector2, pierce: int = 0, layers: int = LAYER_ENEMY, tag: int = 0, width: float = 0.0, exclude: Node = null, hit: bool = true) -> float:
 	if not origin.is_finite() or not bend.is_finite() or not end.is_finite() or origin.is_equal_approx(end):
 		return 0.0
 	_path[0] = origin
@@ -1785,14 +1838,14 @@ func ray_curve(player: int, origin: Vector2, bend: Vector2, end: Vector2, pierce
 			break
 		total += piece
 		_path[i] = point
-	return _ray_path(player, count, pierce, layers, tag, width, exclude, hit)
+	return _ray_path(caster, count, pierce, layers, tag, width, exclude, hit)
 
 
 ## The beam along the first `segments` pieces of `_path` (see `ray` and `ray_curve`).
-func _ray_path(player: int, segments: int, pierce: int, layers: int, tag: int, width: float, exclude: Node, hit: bool) -> float:
+func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, width: float, exclude: Node, hit: bool) -> float:
 	ray_end = Vector2.INF
 	ray_end_heading = Vector2.ZERO
-	if not is_caster(player):
+	if not is_caster(caster):
 		return 0.0
 	if hit and _ray_depth >= RAY_MAX_DEPTH:
 		return 0.0
@@ -1840,7 +1893,7 @@ func _ray_path(player: int, segments: int, pierce: int, layers: int, tag: int, w
 				for x in range(x0, x1 + 1):
 					var t: int = _cell_head[y * _grid_w + x]
 					while t >= 0:
-						if (_target_layer[t] & layers) != 0 and (player < 0 or _target_owner[t] != player) and _target_id[t] != skip and is_instance_valid(_targets[t]):
+						if (_target_layer[t] & layers) != 0 and (caster < 0 or _target_owner[t] != caster) and _target_id[t] != skip and is_instance_valid(_targets[t]):
 							var along: float = clampf((_target_pos[t] - a).dot(heading), 0.0, piece)
 							var closest: Vector2 = a + heading * along
 							var touch: float = wide + _target_radius[t]
@@ -1870,11 +1923,11 @@ func _ray_path(player: int, segments: int, pierce: int, layers: int, tag: int, w
 			impact_form = &"beam"
 			impact_core = Color.WHITE
 			impact_look = 0
-			events.projectile_impact.emit(event_player(player), node, _ray_points[base + i], _ray_heads[base + i])
+			events.projectile_impact.emit(caster, node, _ray_points[base + i], _ray_heads[base + i])
 			impact_form = &""
 			impact_core = Color.WHITE
 			impact_look = 0
-			events.projectile_hit.emit(event_player(player), node, _ray_points[base + i], tag)
+			events.projectile_hit.emit(caster, node, _ray_points[base + i], tag)
 		_ray_nodes[base + i] = null
 	_ray_depth -= 1
 	event_slot = outer_slot
@@ -1882,7 +1935,7 @@ func _ray_path(player: int, segments: int, pierce: int, layers: int, tag: int, w
 		impact_form = &"beam"
 		impact_core = Color.WHITE
 		impact_look = 0
-		events.projectile_impact.emit(event_player(player), null, end, end_heading)
+		events.projectile_impact.emit(caster, null, end, end_heading)
 		impact_form = &""
 		impact_core = Color.WHITE
 		impact_look = 0
@@ -1982,25 +2035,25 @@ func update_draw(fraction: float = -1.0) -> void:
 		var at: Vector2 = _prev[slot].lerp(_pos[slot], fraction)
 		var batch: int = _batch_of(slot)
 		var size: float = look_size(_radius[slot])
-		var player_look: Color = _look_color(slot)
+		var look_data: Color = _look_color(slot)
 		asked += particles_of(_look[slot])
 		if batch == BATCH_BOLT or (batch == BATCH_ENEMY and _motion[slot] == MOTION_STRAIGHT):
 			trails += TRAIL_COST
 		if batch == BATCH_ENEMY:
 			var kind: int = _kind_of(slot)
 			if kind == KIND_RUNE:
-				_write_quad(_enemy_buffer, enemy_out * DRAW_STRIDE, dir, size, at, player_look, _core[slot], KIND_RUNE, 0.0, trace_code(sim_time - _born[slot]))
+				_write_quad(_enemy_buffer, enemy_out * DRAW_STRIDE, dir, size, at, look_data, _core[slot], KIND_RUNE, 0.0, trace_code(sim_time - _born[slot]))
 			else:
-				_write_quad(_enemy_buffer, enemy_out * DRAW_STRIDE, dir, size, at, player_look, _core[slot], kind, look_length(_radius[slot]), bend_code(bend_of(slot)))
+				_write_quad(_enemy_buffer, enemy_out * DRAW_STRIDE, dir, size, at, look_data, _core[slot], kind, look_length(_radius[slot]), bend_code(bend_of(slot)))
 			enemy_out += 1
 		elif batch == BATCH_RUNE:
-			_write_quad(_rune_buffer, rune_out * DRAW_STRIDE, dir, size, at, player_look, _core[slot], KIND_RUNE, 0.0, trace_code(sim_time - _born[slot]))
+			_write_quad(_rune_buffer, rune_out * DRAW_STRIDE, dir, size, at, look_data, _core[slot], KIND_RUNE, 0.0, trace_code(sim_time - _born[slot]))
 			rune_out += 1
 		elif batch == BATCH_ORBIT:
-			_write_quad(_orbit_buffer, orbit_out * DRAW_STRIDE, dir, size, at, player_look, _core[slot], KIND_ORBIT, look_length(_radius[slot]), bend_code(bend_of(slot)))
+			_write_quad(_orbit_buffer, orbit_out * DRAW_STRIDE, dir, size, at, look_data, _core[slot], KIND_ORBIT, look_length(_radius[slot]), bend_code(bend_of(slot)))
 			orbit_out += 1
 		else:
-			_write_quad(_draw_buffer, out * DRAW_STRIDE, dir, size, at, player_look, _core[slot], KIND_BOLT, look_length(_radius[slot]), bend_code(bend_of(slot)))
+			_write_quad(_draw_buffer, out * DRAW_STRIDE, dir, size, at, look_data, _core[slot], KIND_BOLT, look_length(_radius[slot]), bend_code(bend_of(slot)))
 			out += 1
 	if out > 0:
 		multimesh.buffer = _draw_buffer
@@ -2061,10 +2114,10 @@ static func particles_of(look: int) -> int:
 	return mini(4 + 2 * kinds, PARTICLES_PER_SHOT_MAX)
 
 
-## Which draw batch a live slot belongs to (BATCH_*). The one rule both the counting and
-## the writing use, so a batch always has the room its writes need.
+## Which draw batch a live slot belongs to (BATCH_*), by its ramp and body. The one rule both
+## the counting and the writing use, so a batch always has the room its writes need.
 func _batch_of(slot: int) -> int:
-	if _player[slot] < 0 or _player[slot] >= FIRST_ENEMY_CASTER:
+	if not is_hat_ramp(_ramp[slot]):
 		return BATCH_ENEMY
 	if _motion[slot] == MOTION_STILL:
 		return BATCH_RUNE
@@ -2111,12 +2164,12 @@ func _fit_batch(multimesh: MultiMesh, buffer: PackedFloat32Array, room: int, use
 	return wanted
 
 
-## The zoom of a player's shot of hit radius `radius` (see LOOK_CELL_PER_RADIUS).
+## The zoom of a shot of hit radius `radius` (see LOOK_CELL_PER_RADIUS).
 static func look_zoom(radius: float) -> int:
 	return clampi(roundi(radius * LOOK_CELL_PER_RADIUS), 1, LOOK_ZOOM_MAX)
 
 
-## The drawn size in pixels of a player's shot of hit radius `radius`.
+## The drawn size in pixels of a shot of hit radius `radius`.
 static func look_size(radius: float) -> float:
 	return float(LOOK_GRID * look_zoom(radius))
 
@@ -2164,31 +2217,37 @@ func bend_of(slot: int) -> float:
 	return clampf(2.0 * turn / moved, -1.0 / BEND_RADIUS, 1.0 / BEND_RADIUS)
 
 
-## The instance colour of a player's shot, which `shot_core.gdshader` reads as data, a byte
-## per channel: the player index and the zoom in red (`look_red`), the look's bits in green
-## (kinds 1-8), blue (9-16) and alpha (17-24; `ramp_look` adds the enemy ramp's flag).
+## The instance colour of a shot, which `shot_core.gdshader` reads as data, a byte per
+## channel: the hat ramp and the zoom in red (`look_red`), the look's bits in green (kinds 1-8),
+## blue (9-16) and alpha (17-24; `ramp_look` adds the enemy ramp's flag).
 func _look_color(slot: int) -> Color:
-	return look_color(_player[slot], look_zoom(_radius[slot]), _look[slot])
+	return look_color(_ramp[slot], look_zoom(_radius[slot]), _look[slot])
 
 
-## The instance colour `shot_core.gdshader` reads for `player`'s shot or effect (NO_PLAYER: an
-## enemy's) at `zoom` (or a dash's length in steps, up to 63) with the packed `look`. Feel's
-## effects and Entities' familiars use it too, so the encoding lives in one place.
-static func look_color(player: int, zoom: int, look: int) -> Color:
-	var bits: int = ramp_look(player, look)
-	return Color(float(look_red(player, zoom)) / 255.0, float(bits & 255) / 255.0, float((bits >> 8) & 255) / 255.0, float((bits >> 16) & 255) / 255.0)
+## The instance colour `shot_core.gdshader` reads for a shot or effect in `ramp` (`Actors.
+## ramp_of` of its caster: 0-3 a hat ramp, anything else the enemy ramp) at `zoom` (or a dash's
+## length in steps, up to 63) with the packed `look`. Feel's effects and Entities' familiars use
+## it too, so the encoding lives in one place.
+static func look_color(ramp: int, zoom: int, look: int) -> Color:
+	var bits: int = ramp_look(ramp, look)
+	return Color(float(look_red(ramp, zoom)) / 255.0, float(bits & 255) / 255.0, float((bits >> 8) & 255) / 255.0, float((bits >> 16) & 255) / 255.0)
 
 
-## The red byte of the instance colour: the player (0-3; 0 for an enemy, whose ramp is a look
-## flag) plus the zoom x 4.
-static func look_red(player: int, zoom: int) -> int:
-	return (player if is_player_caster(player) else 0) + clampi(zoom, 0, 63) * 4
+## `look_color` for the actor `caster`'s ramp (a shot or an effect of its).
+func look_color_for(caster: int, zoom: int, look: int) -> Color:
+	return look_color(_ramp_of(caster), zoom, look)
 
 
-## `look` with the enemy ramp's flag for a caster that is not a player (NO_PLAYER or an enemy
-## caster), as it is for a player.
-static func ramp_look(player: int, look: int) -> int:
-	return look & ~LOOK_ENEMY_RAMP if is_player_caster(player) else look | LOOK_ENEMY_RAMP
+## The red byte of the instance colour: the hat ramp (0-3; 0 for the enemy ramp, which is a
+## look flag) plus the zoom x 4.
+static func look_red(ramp: int, zoom: int) -> int:
+	return (ramp if is_hat_ramp(ramp) else 0) + clampi(zoom, 0, 63) * 4
+
+
+## `look` with the enemy ramp's flag for any ramp that is not a hat ramp (the enemy ramp, or no
+## actor's), without it for a hat ramp.
+static func ramp_look(ramp: int, look: int) -> int:
+	return look & ~LOOK_ENEMY_RAMP if is_hat_ramp(ramp) else look | LOOK_ENEMY_RAMP
 
 
 ## Write one quad at float index `i` of `buffer` (packed arrays are shared, not copied):
@@ -2235,16 +2294,20 @@ func is_alive(slot: int) -> bool:
 	return slot >= 0 and slot < _cap and _alive[slot] != 0
 
 
-## The tint of the bone body of `player`'s shots (the enemy's colour for NO_PLAYER or an enemy
-## caster), also used for the beams and rings `feel` draws.
-func tint_of(player: int) -> Color:
-	return _color_of(player)
+## The tint of the bone body of the actor `caster`'s shots, by its ramp (the enemy ramp's for
+## no actor), also used for the beams and rings `feel` draws.
+func tint_of(caster: int) -> Color:
+	return ramp_tint(_ramp_of(caster))
 
 
-func _color_of(player: int) -> Color:
-	if not is_player_caster(player):
-		return Color.WHITE.lerp(ENEMY_COLOR, TINT_STRENGTH)
-	return Color.WHITE.lerp(PLAYER_COLORS[player], TINT_STRENGTH)
+## The tint of `ramp` (see `tint_of`): a hat ramp's, or the enemy ramp's for any other.
+static func ramp_tint(ramp: int) -> Color:
+	return Color.WHITE.lerp(ramp_color(ramp), TINT_STRENGTH)
+
+
+## The base colour of `ramp` (`RAMP_COLORS`): a hat colour, or Blight ochre for any other.
+static func ramp_color(ramp: int) -> Color:
+	return RAMP_COLORS[ramp] if is_hat_ramp(ramp) else RAMP_COLORS[ActorsScript.RAMP_ENEMY]
 
 
 func _kill(slot: int, announce: bool = true) -> void:
@@ -2254,7 +2317,7 @@ func _kill(slot: int, announce: bool = true) -> void:
 	_free_slots[_free_count] = slot
 	_free_count += 1
 	_count -= 1
-	var owner_index: int = _owner_index(_player[slot])
+	var owner_index: int = _budget[slot]
 	_owned[owner_index] -= 1
 	var before: int = _own_prev[slot]
 	var after: int = _own_next[slot]
@@ -2272,13 +2335,13 @@ func _kill(slot: int, announce: bool = true) -> void:
 
 ## End a shot whose life ran out or that met a wall, and say so.
 func _expire(slot: int) -> void:
-	var player: int = _player[slot]
+	var caster: int = _actor[slot]
 	var at: Vector2 = _pos[slot]
 	var tag: int = _tag[slot]
 	_kill(slot, false)
 	if events != null:
 		event_slot = slot
-		events.projectile_expired.emit(event_player(player), at, tag)
+		events.projectile_expired.emit(caster, at, tag)
 		event_slot = -1
 	if tag != 0:
 		shot_ended.emit(tag)
@@ -2319,13 +2382,13 @@ func get_velocity_of(slot: int) -> Vector2:
 	return _vel[slot] if slot >= 0 and slot < _cap else Vector2.ZERO
 
 
-## Where `player`'s anchor is (see `set_anchor`), or `Vector2.INF` when it has none.
-func get_anchor(player: int) -> Vector2:
-	return _anchors[player] if player >= 0 and player < CASTERS else Vector2.INF
+## Where the actor `caster`'s anchor is (see `set_anchor`), or `Vector2.INF` when it has none.
+func get_anchor(caster: int) -> Vector2:
+	return _anchors[caster] if caster >= 0 and caster < ACTORS else Vector2.INF
 
 
-## The player (0-3) a registered target belongs to (`add_target`'s `owner`), or
-## `Events.NO_PLAYER` for an enemy, an unknown node or null.
+## The actor a registered target belongs to (`add_target`'s `owner`), or `Events.NO_PLAYER`
+## for a target no actor owns, an unknown node or null.
 func target_owner_of(node: Node) -> int:
 	if node == null or not is_instance_valid(node):
 		return EventsScript.NO_PLAYER
@@ -2343,10 +2406,11 @@ var homing_target_radius: float = 0.0
 var nearest_point: Vector2 = Vector2.INF
 
 
-## Make room: drop the oldest projectile of the owner with the most.
+## Make room: drop the oldest projectile of the budget with the most (the shared one on a tie,
+## so the seats keep theirs).
 func _drop_one() -> void:
-	var richest: int = 0
-	for i in range(1, _owned.size()):
+	var richest: int = ActorsScript.SHARED
+	for i in ActorsScript.SHARED:
 		if _owned[i] > _owned[richest]:
 			richest = i
 	_kill(_own_head[richest])
@@ -2360,6 +2424,7 @@ func _remove_target_at(at: int) -> void:
 	_target_radius[at] = _target_radius[last]
 	_target_layer[at] = _target_layer[last]
 	_target_owner[at] = _target_owner[last]
+	_target_team[at] = _target_team[last]
 	_target_pos[at] = _target_pos[last]
 	_target_offset[at] = _target_offset[last]
 	_targets.resize(last)
@@ -2367,6 +2432,7 @@ func _remove_target_at(at: int) -> void:
 	_target_radius.resize(last)
 	_target_layer.resize(last)
 	_target_owner.resize(last)
+	_target_team.resize(last)
 	_target_pos.resize(last)
 	_target_offset.resize(last)
 	_target_next.resize(last)
@@ -2390,6 +2456,8 @@ func _refresh_targets() -> void:
 	for i in _targets.size():
 		var node: Node2D = _targets[i]
 		_target_next[i] = -1
+		# A possession may have moved the owner to another team since the last step.
+		_target_team[i] = _team_of_target(_target_owner[i], _target_layer[i])
 		if not node.is_inside_tree():
 			_target_pos[i] = Vector2.INF
 			continue
@@ -2401,9 +2469,10 @@ func _refresh_targets() -> void:
 
 ## The nearest target on `layers` whose hit circle overlaps the circle (`point`,
 ## `radius`), by distance to its centre, or null. `exclude` is skipped (the target
-## just hit, for a chain) and so is `exclude_also`. The hit circle's centre of the target
-## returned is left in `nearest_point`. Allocation-free.
-func nearest_target(point: Vector2, radius: float, layers: int, exclude: Node2D = null, exclude_also: Node2D = null) -> Node2D:
+## just hit, for a chain) and so is `exclude_also`. With a `team` (not NONE), targets of that
+## team are skipped too: aim at other teams (a chain's jump, an arc's zap, a familiar's cast).
+## The hit circle's centre of the target returned is left in `nearest_point`. Allocation-free.
+func nearest_target(point: Vector2, radius: float, layers: int, exclude: Node2D = null, exclude_also: Node2D = null, team: int = ActorsScript.NONE) -> Node2D:
 	nearest_point = Vector2.INF
 	if not point.is_finite() or not is_finite(radius):
 		return null
@@ -2417,7 +2486,7 @@ func nearest_target(point: Vector2, radius: float, layers: int, exclude: Node2D 
 		for x in range(cells.x, cells.z + 1):
 			var t: int = _cell_head[y * _grid_w + x]
 			while t >= 0:
-				if _query_match(t, point, radius, layers, skip) and (skip_also == 0 or _target_id[t] != skip_also):
+				if _query_match(t, point, radius, layers, skip) and (skip_also == 0 or _target_id[t] != skip_also) and (team == ActorsScript.NONE or _target_team[t] != team):
 					var d: float = _target_pos[t].distance_squared_to(point)
 					if d < best_sq:
 						best_sq = d
@@ -2500,7 +2569,8 @@ func _hit_test(slot: int) -> bool:
 	var best_along: float = 0.0
 	var best_point: Vector2 = to
 	var layers: int = _layers[slot]
-	var shooter: int = _player[slot]
+	var shooter: int = _actor[slot]
+	var team: int = _team[slot]
 	var flags: int = _flags[slot]
 	var inside: bool = false
 	for y in range(y0, y1 + 1):
@@ -2560,7 +2630,7 @@ func _emit_wall_impact(slot: int, velocity: Vector2) -> void:
 		impact_form = _form_of(slot)
 		impact_core = _core[slot]
 		impact_look = _look[slot]
-		events.projectile_impact.emit(event_player(_player[slot]), null, _pos[slot], velocity.normalized())
+		events.projectile_impact.emit(_actor[slot], null, _pos[slot], velocity.normalized())
 		impact_form = &""
 		impact_core = Color.WHITE
 		impact_look = 0
@@ -2578,7 +2648,7 @@ func _form_of(slot: int) -> StringName:
 
 func _register_hit(slot: int, target: int, at: Vector2) -> void:
 	var node: Variant = _targets[target]
-	var player: int = _player[slot]
+	var caster: int = _actor[slot]
 	var tag: int = _tag[slot]
 	var heading: Vector2 = _vel[slot].normalized()
 	if heading == Vector2.ZERO:
@@ -2609,12 +2679,12 @@ func _register_hit(slot: int, target: int, at: Vector2) -> void:
 		impact_form = _form_of(slot)
 		impact_core = _core[slot]
 		impact_look = _look[slot]
-		events.projectile_impact.emit(event_player(player), node, at, heading)
+		events.projectile_impact.emit(caster, node, at, heading)
 		impact_form = &""
 		impact_core = Color.WHITE
 		impact_look = 0
 		event_slot = slot
-		events.projectile_hit.emit(event_player(player), node, at, tag)
+		events.projectile_hit.emit(caster, node, at, tag)
 		event_slot = -1
 	if spent and tag != 0:
 		shot_ended.emit(tag)

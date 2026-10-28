@@ -1,10 +1,11 @@
 extends "res://tests/support/suite.gd"
 ## Enemies that cast staffs (staffs F8a, docs/milestones/M2-staffs.md, "Enemy staffs"): an enemy
-## whose data has a staff and cards opens a caster row, owns its body there, casts its staff
-## after the windup, pays mana and gets it back, winds up only when the next cast is ready (so a
-## telegraph always comes true), shows the next cast's reach, compiles its staff once per enemy
-## type, and gives its row back when it leaves. A world of its own (bus, projectiles, spells with
-## cards built in code, combat, one wizard), stepped by hand.
+## whose data has a staff and cards opens an actor (the enemies' team and ramp, no seat; actors
+## G3b) and its caster in Spells, owns its body there, casts its staff after the windup, pays mana
+## and gets it back (siphon's `mana_refund_requested` for its actor), winds up only when the next
+## cast is ready (so a telegraph always comes true), shows the next cast's reach, compiles its
+## staff once per enemy type, and closes its actor when it leaves. A world of its own (bus, an
+## actor table, projectiles, spells with cards built in code, combat, one wizard), stepped by hand.
 ##
 ## godot --headless --path . --script res://tests/gameplay/ai/test_ai_staff.gd
 
@@ -15,6 +16,7 @@ const PlayerScript := preload("res://gameplay/player/player.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const StaffKit := preload("res://tests/support/staff_kit.gd")
+const ActorsScript := preload("res://core/actors/actors.gd")
 const ImpData := preload("res://content/enemies/ember_imp/ember_imp.tres")
 
 const STEP: float = 0.0625
@@ -33,6 +35,7 @@ var _projectiles: ManagerScript
 var _spells: SpellsScript
 var _combat: CombatScript
 var _fake: FakeRegistry
+var _actors: ActorsScript
 var _wizard: PlayerScript
 var _enemies: Array[AiScript] = []
 
@@ -42,6 +45,9 @@ func before_each() -> void:
 	_bus = own(EventsScript.new()) as EventsScript
 	_projectiles = own(ManagerScript.new()) as ManagerScript
 	_projectiles.events = _bus
+	# The services (and the enemies, through the manager) use this table, not the autoload.
+	_actors = own(ActorsScript.new()) as ActorsScript
+	_projectiles.actors = _actors
 	_spells = own(SpellsScript.new()) as SpellsScript
 	_spells.registry = _fake
 	_spells.bind(_projectiles, _bus)
@@ -69,6 +75,7 @@ func before_each() -> void:
 	_wizard = own(PlayerScript.new()) as PlayerScript
 	_wizard.index = 0
 	_wizard.events = _bus
+	_wizard.actors = _actors
 	root.add_child(_wizard)
 	_wizard.position = Vector2(80.0, 0.0)
 	_combat.register_player(0, _wizard, 8.0, Vector2(0.0, -12.0))
@@ -137,12 +144,23 @@ func _until_windup(enemy: AiScript, seconds: float) -> bool:
 	return enemy.is_telegraphing()
 
 
-func test_it_opens_a_row_and_owns_its_body() -> void:
+func test_it_opens_an_actor_and_owns_its_body() -> void:
 	var enemy := _enemy(_data([&"bolt"]))
 	check(enemy.uses_staff(), "an enemy with a staff and cards casts it")
-	check(enemy.caster >= SpellLimits.FIRST_ENEMY_CASTER and _spells.is_enemy_caster_open(enemy.caster), "it opened a caster row")
-	check_equal(_projectiles.target_owner_of(enemy), enemy.caster, "its body is its row's, so its own spells skip it")
+	check(_actors.is_open(enemy.caster) and enemy.caster != _wizard.actor_id, "it opened an actor of its own: %d" % enemy.caster)
+	check_equal(_actors.team_of(enemy.caster), ActorsScript.TEAM_ENEMIES, "on the enemies' team")
+	check_equal(_actors.ramp_of(enemy.caster), ActorsScript.RAMP_ENEMY, "drawn in the enemy ramp")
+	check_equal(_actors.seat_of(enemy.caster), ActorsScript.NONE, "and driven by no seat")
+	check(_actors.node_of(enemy.caster) == enemy, "the actor's node is the enemy")
+	check_equal(_projectiles.target_owner_of(enemy), enemy.caster, "its body is its actor's, so its own spells skip it")
 	check_equal(enemy.mana, 6.0, "it starts with full mana")
+	enemy.mana = 1.0
+	_bus.mana_refund_requested.emit(_wizard.actor_id, 2.0)
+	check_equal(enemy.mana, 1.0, "another actor's refund is not its own")
+	_bus.mana_refund_requested.emit(enemy.caster, 2.0)
+	check_equal(enemy.mana, 3.0, "siphon gives its actor mana back by the event")
+	_bus.mana_refund_requested.emit(enemy.caster, 100.0)
+	check_equal(enemy.mana, 6.0, "never above its most")
 	check(_spells.current_tag(enemy.caster, 0) != 0, "its staff is installed")
 	check(ImpData.staff != null and ImpData.cards == ([&"fire", &"bolt"] as Array[StringName]), "the ember imp casts a staff of player cards (F9)")
 	var none: EnemyBase = ImpData.duplicate() as EnemyBase
@@ -156,7 +174,7 @@ func test_it_casts_its_staff_after_the_windup_and_hits_the_wizard() -> void:
 	var enemy := _enemy(_data([&"bolt"]))
 	check(_until_windup(enemy, 1.0), "in reach and ready, it winds up")
 	_run(enemy.windup_time + STEP)
-	check_equal(_projectiles.get_count_for(EventsScript.NO_PLAYER), 1, "then its bolt flies")
+	check_equal(_projectiles.get_count_for(enemy.caster), 1, "then its bolt flies")
 	check_equal(enemy.mana, 4.0, "and it paid the cast's mana")
 	_run(0.5)
 	check(_wizard.health < PlayerScript.MAX_HEALTH, "the bolt hurt the wizard through combat")
@@ -166,7 +184,7 @@ func test_it_casts_its_staff_after_the_windup_and_hits_the_wizard() -> void:
 func test_no_windup_without_the_mana_and_regen_brings_it() -> void:
 	var broke := _enemy(_data([&"bolt"], 1.0, 0.0))
 	check(not _until_windup(broke, 3.0), "with too little mana it never telegraphs")
-	check_equal(_projectiles.get_count_for(EventsScript.NO_PLAYER), 0, "and never casts")
+	check_equal(_projectiles.get_count_for(broke.caster), 0, "and never casts")
 	broke.free()
 	var slow := _enemy(_data([&"bolt"], 2.0, 1.0))
 	_run(enemy_windup_and_cast(slow))
@@ -183,7 +201,7 @@ func enemy_windup_and_cast(enemy: AiScript) -> float:
 func test_the_windup_waits_for_the_staffs_delay() -> void:
 	var enemy := _enemy(_data([&"bolt"], 100.0, 0.0, 3.0))
 	_run(enemy_windup_and_cast(enemy))
-	check_equal(_projectiles.get_count_for(EventsScript.NO_PLAYER), 1, "the first cast")
+	check_equal(_projectiles.get_count_for(enemy.caster), 1, "the first cast")
 	var seen_early: bool = false
 	for i in int(4.0 / STEP):
 		_run(STEP)
@@ -194,7 +212,7 @@ func test_the_windup_waits_for_the_staffs_delay() -> void:
 	check(not seen_early, "no telegraph while the delay is longer than the windup")
 	check(enemy.is_telegraphing(), "it winds up once the delay will be over in time")
 	_run(enemy.windup_time + STEP)
-	check(_projectiles.get_count_for(EventsScript.NO_PLAYER) >= 1 and enemy.mana <= 96.0, "and the promised cast comes")
+	check(_projectiles.get_count_for(enemy.caster) >= 1 and enemy.mana <= 96.0, "and the promised cast comes")
 
 
 func test_the_telegraph_shows_the_next_casts_reach() -> void:
@@ -210,14 +228,15 @@ func test_the_telegraph_shows_the_next_casts_reach() -> void:
 	check(not (ring.get_node("Telegraph") as Node2D).visible, "but shows no line: the pose and flash say it")
 
 
-func test_one_compile_per_enemy_type_and_its_row_goes_back() -> void:
+func test_one_compile_per_enemy_type_and_its_actor_closes() -> void:
 	var data := _data([&"bolt"])
 	var first := _enemy(data)
 	var second := _enemy(data, Vector2(0.0, 30.0))
-	check(first.caster != second.caster, "each enemy has its own row")
+	check(first.caster != second.caster, "each enemy has its own actor")
 	check(_spells.profile(_spells.current_tag(first.caster, 0)) == _spells.profile(_spells.current_tag(second.caster, 0)), "sharing one compiled staff")
-	check_equal(_spells.enemy_casters_open(), 2, "two rows open")
-	var row: int = first.caster
+	check(_actors.is_open(first.caster) and _actors.is_open(second.caster), "two enemy actors open")
+	var id: int = first.caster
 	first.free()
-	check(not _spells.is_enemy_caster_open(row), "leaving the tree gives the row back")
-	check_equal(_spells.enemy_casters_open(), 1, "one left")
+	check(not _actors.is_open(id), "leaving the tree closes its actor")
+	check_equal(_spells.current_tag(id, 0), 0, "and its caster in Spells")
+	check(_actors.is_open(second.caster) and _spells.current_tag(second.caster, 0) != 0, "the other casts on")

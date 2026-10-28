@@ -6,6 +6,8 @@ extends "res://tests/support/screenshot.gd"
 ## its colour. A mark lasts a third of a second, so the two takes of each column are put
 ## together into one sheet.
 
+const ActorSeats := preload("res://tests/support/actor_seats.gd")
+
 const COLUMN := 128
 const LOWER := 95
 const CLASSES: Array[StringName] = [&"boosted", &"on_hit", &"on_expire", &"timer", &"stacked"]
@@ -19,13 +21,20 @@ func take() -> void:
 	settle_frames = 30
 	var events: Node = root.get_node("Events")
 	var height: int = int(SCREEN.y)
+	# A combo cast names its caster's actor id and Feel marks the seat that drives it (actors
+	# G3b): open the four wizards in the Actors table, one per row.
+	var actors: ActorSeats.ActorsScript = ActorSeats.autoload()
+	if actors == null:
+		fail("there is no Actors autoload")
+		return
+	var wizards: PackedInt32Array = ActorSeats.seat_wizards(actors)
 	lay_floor()
 	await settle()
 	var sheet: Image = null
 	for i in CLASSES.size():
 		var x: float = COLUMN * i + COLUMN * 0.5
 		for row in ROWS_Y.size():
-			events.call("emit_signal", "combo_cast", row, CLASSES[i], Vector2(x, ROWS_Y[row]), Vector2.RIGHT, TINTS[row])
+			events.call("emit_signal", "combo_cast", wizards[row], CLASSES[i], Vector2(x, ROWS_Y[row]), Vector2.RIGHT, TINTS[row])
 		await process_frame
 		var early: Image = await grab()
 		if sheet == null:

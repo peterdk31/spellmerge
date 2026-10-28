@@ -17,6 +17,7 @@ const EventsScript := preload("res://core/events/events.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const CombatScript := preload("res://gameplay/combat/combat.gd")
+const ActorSeats := preload("res://tests/support/actor_seats.gd")
 
 const STEP: float = 1.0 / 60.0
 ## Health of an imp, high enough that no combo kills it by accident.
@@ -32,11 +33,11 @@ var spells: SpellsScript
 var combat: CombatScript
 ## Every imp added, in order.
 var imps: Array[Node2D] = []
-## Every caster_move_requested as [player, mode] (a dash card moves its caster, staffs A6a).
+## Every caster_move_requested as [caster, mode] (a dash card moves its caster, staffs A6a).
 var caster_moves: Array = []
-## Every reaction_triggered as [player, id, position].
+## Every reaction_triggered as [caster, id, position].
 var reactions: Array = []
-## Every status_applied as [player, imp, status id, health the imp had lost by then].
+## Every status_applied as [caster, imp, status id, health the imp had lost by then].
 var statuses: Array = []
 ## The most live shots seen after any step.
 var peak_shots: int = 0
@@ -58,6 +59,9 @@ func _init(root: Node) -> void:
 	projectiles = _own(ManagerScript.new()) as ManagerScript
 	projectiles.events = bus
 	projectiles.set_cap(512)
+	# Four wizards seated 0-3 at actor ids 0-3, as the combos name their casters; spells and
+	# combat find the table through the manager.
+	projectiles.actors = _own(ActorSeats.table()) as ActorSeats.ActorsScript
 	spells = _own(SpellsScript.new()) as SpellsScript
 	spells.registry = registry
 	spells.bind(projectiles, bus)

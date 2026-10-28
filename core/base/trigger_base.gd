@@ -25,8 +25,6 @@ enum Event {
 	HURT,
 	## The carrier's hit sets off a reaction; the payload fires from the target (B2, B3).
 	REACTION,
-	## The shot passes through a teammate; the payload fires from them (B1, B2).
-	ALLY,
 }
 
 @export var event: Event = Event.HIT

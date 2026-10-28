@@ -8,12 +8,15 @@ const FeelScript := preload("res://gameplay/feel/feel.gd")
 const FeelPresetScript := preload("res://gameplay/feel/presets/feel_preset.gd")
 const ComboMarks := preload("res://gameplay/feel/combo_marks.gd")
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
+const ActorSeats := preload("res://tests/support/actor_seats.gd")
 
 const FIRE: Color = Color("#e0592f")
 
 var bus: EventsScript
 var feel: FeelScript
 var preset: FeelPresetScript
+## Wizards seated 0-3 at the actor ids 0-3: a combo cast names its caster, the mark its seat.
+var actors: ActorSeats.ActorsScript
 
 
 func before_each() -> void:
@@ -22,6 +25,8 @@ func before_each() -> void:
 	preset = FeelPresetScript.new()
 	preset.hit_sound = &""
 	feel.events = bus
+	actors = own(ActorSeats.table()) as ActorSeats.ActorsScript
+	feel.actors = actors
 	feel.projectiles = own(ProjectilesScript.new()) as Node
 	feel.drive_engine = false
 	feel.preset = preset
@@ -113,6 +118,8 @@ func test_a_bad_cast_shows_nothing_and_a_plain_one_stays_silent() -> void:
 	bus.combo_cast.emit(4, ComboMarks.BOOSTED, Vector2.ZERO, Vector2.RIGHT, FIRE)
 	bus.combo_cast.emit(0, &"unknown", Vector2.ZERO, Vector2.RIGHT, FIRE)
 	bus.combo_cast.emit(0, ComboMarks.BOOSTED, Vector2(INF, 0), Vector2.RIGHT, FIRE)
+	# An actor no seat drives (an enemy) has no mark of its own.
+	bus.combo_cast.emit(ActorSeats.enemy(actors), ComboMarks.BOOSTED, Vector2.ZERO, Vector2.RIGHT, FIRE)
 	for player in 4:
 		check(not feel.combo_mark(player).visible, "player %d: nothing shown" % player)
 

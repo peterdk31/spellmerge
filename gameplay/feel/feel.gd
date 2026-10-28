@@ -54,6 +54,7 @@ const FLASH_SHADER: Shader = preload("res://gameplay/feel/hit_flash.gdshader")
 ## Draws the beam and the nova ring like a shot: bone body tinted by the player, core by the element.
 const CORE_SHADER: Shader = preload("res://core/projectiles/shot_core.gdshader")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
+const ActorsScript := preload("res://core/actors/actors.gd")
 ## Bone light: the white-hot of a plain thing (a death's ring).
 const BONE_LIGHT: Color = Color("#f4f1ea")
 ## Beams and nova rings on screen per player: one cast makes at most 24 shots (the spell limit),
@@ -173,6 +174,9 @@ var projectiles: Node = null
 var combat: Node = null
 ## The spell runtime, asked only for its live beams (`beam_*`) to draw them every frame.
 var spells: Node = null
+## The actor table, which says the ramp, seat and budget of a caster (actors G3b). Only tests set
+## it; otherwise the "Actors" autoload.
+var actors: ActorsScript = null
 ## Tests turn this off: no Engine.time_scale changes.
 var drive_engine: bool = true
 ## The stress benchmark turns this off to time a scene without hit particles (the bursts are
@@ -263,7 +267,8 @@ var _effect_kind: PackedInt32Array = PackedInt32Array()
 var _effect_at: PackedVector2Array = PackedVector2Array()
 var _effect_dir: PackedVector2Array = PackedVector2Array()
 var _effect_core: PackedColorArray = PackedColorArray()
-var _effect_player: PackedInt32Array = PackedInt32Array()
+## Each effect's ramp (`Actors.ramp_of` of its caster; 0-3 a hat ramp, anything else the enemy ramp).
+var _effect_ramp: PackedInt32Array = PackedInt32Array()
 var _effect_zoom: PackedInt32Array = PackedInt32Array()
 var _effect_look: PackedInt32Array = PackedInt32Array()
 var _effect_age: PackedFloat32Array = PackedFloat32Array()
@@ -282,8 +287,8 @@ var _label_id: Array[StringName] = []
 ## Where, along which way and in whom the latest shot on a character struck, from
 ## `projectile_impact` (sent just before the damage), so the damage can aim its spray.
 var _impact_target: int = 0
-## The player whose shot it was: a contact hit (another player value) never takes it.
-var _impact_player: int = 0
+## The actor whose shot it was: a contact hit (another caster value) never takes it.
+var _impact_caster: int = 0
 ## The physics frame it was sent in: the damage follows at once, or the record is stale.
 var _impact_frame: int = -1
 ## The latest hit kind (`hit_landed`): the target it was for, the kind, the frame, and whether a
@@ -626,7 +631,7 @@ func trauma() -> float:
 	return _trauma
 
 
-func _on_damage_dealt(player: int, target: Node, amount: int, position: Vector2) -> void:
+func _on_damage_dealt(caster: int, target: Node, amount: int, position: Vector2) -> void:
 	_react(target)
 	var aim: Vector2 = Vector2.ZERO
 	var at: Vector2 = position
@@ -640,7 +645,7 @@ func _on_damage_dealt(player: int, target: Node, amount: int, position: Vector2)
 			colours = clampi(target.get("index") as int, 0, PLAYER_COLORS.size() - 1)
 			tint = Color.WHITE
 		# The shot that did this hit told us where it struck and which way it flew.
-		if target.get_instance_id() == _impact_target and player == _impact_player and Engine.get_physics_frames() == _impact_frame:
+		if target.get_instance_id() == _impact_target and caster == _impact_caster and Engine.get_physics_frames() == _impact_frame:
 			aim = _impact_aim
 			at = _impact_at
 			size = clampf(1.0 + float(amount - SPRAY_REF_DAMAGE) * preset.hit_spray_per_damage, SPRAY_MIN_SIZE, SPRAY_MAX_SIZE)
@@ -666,13 +671,13 @@ func _on_damage_dealt(player: int, target: Node, amount: int, position: Vector2)
 
 
 ## The kind of the hit that `damage_dealt` announces next, and whether a wizard hit themselves.
-func _on_hit_landed(player: int, target: Node, _amount: int, _position: Vector2, kind: StringName) -> void:
+func _on_hit_landed(caster: int, target: Node, _amount: int, _position: Vector2, kind: StringName) -> void:
 	if target == null:
 		return
 	_kind_target = target.get_instance_id()
 	_kind = kind
 	_kind_frame = Engine.get_physics_frames()
-	_kind_own = kind != &"heal" and kind != &"status" and target.is_in_group(&"players") and target.get("index") == player
+	_kind_own = kind != &"heal" and kind != &"status" and target.is_in_group(&"players") and target.get("actor_id") == caster
 
 
 ## A heal: a soft ring in green on the wizard, with no stop and no shake.
@@ -900,26 +905,27 @@ func live_labels() -> int:
 
 ## A shot struck. On a character, remember how, for the damage event that follows at once;
 ## on a wall or pillar (`target` is null), show the impact.
-func _on_projectile_impact(player: int, target: Node, position: Vector2, direction: Vector2) -> void:
+func _on_projectile_impact(caster: int, target: Node, position: Vector2, direction: Vector2) -> void:
+	var ramp: int = _ramp_of(caster)
 	if target != null:
 		_impact_target = target.get_instance_id()
-		_impact_player = player
+		_impact_caster = caster
 		_impact_frame = Engine.get_physics_frames()
 		_impact_at = position
 		_impact_aim = direction
-		_show_impact(player, position, direction)
+		_show_impact(ramp, position, direction)
 		return
 	# Stone chips knocked back off the surface.
 	if particles_enabled:
 		show_effect(KIND_CHIPS, position, -direction, Color.WHITE, 0, 0, clampi(roundi(preset.wall_chip_size), 1, 3), CHIPS_SECONDS)
-	_show_impact(player, position, direction)
+	_show_impact(ramp, position, direction)
 
 
 ## The payoff of a shot: a flare in the shot's colour, shaped by the form of the shot itself
 ## (the projectile manager's `impact_form` while the impact is sent; a rune goes off, a nova's
-## adds a ring). An enemy's shot (NO_PLAYER) lands the same way, in the enemy ramp where a
-## player's colour would show (staffs F7: one look for every spell).
-func _show_impact(player: int, position: Vector2, direction: Vector2) -> void:
+## adds a ring), in its caster's `ramp`: an enemy's lands the same way, in the enemy ramp where a
+## hat colour would show (staffs F7: one look for every spell).
+func _show_impact(ramp: int, position: Vector2, direction: Vector2) -> void:
 	var form: StringName = &""
 	if projectiles != null and "impact_form" in projectiles:
 		form = projectiles.impact_form as StringName
@@ -931,12 +937,12 @@ func _show_impact(player: int, position: Vector2, direction: Vector2) -> void:
 		core = projectiles.impact_core as Color
 		bits = projectiles.impact_look as int
 	if form == &"rune":
-		show_effect(KIND_RUNE_BURST, position, Vector2.RIGHT, core, player, bits, 3, RUNE_BURST_SECONDS)
+		show_effect(KIND_RUNE_BURST, position, Vector2.RIGHT, core, ramp, bits, 3, RUNE_BURST_SECONDS)
 		return
 	var zoom: int = clampi(roundi(size * 2.0), 1, 3)
-	show_effect(KIND_BURST, position, direction, core, player, bits, zoom, BURST_SECONDS)
+	show_effect(KIND_BURST, position, direction, core, ramp, bits, zoom, BURST_SECONDS)
 	if look.get("ring", false) as bool:
-		show_effect(KIND_RING_OUT, position, direction, core, player, 0, 1, RING_SECONDS)
+		show_effect(KIND_RING_OUT, position, direction, core, ramp, 0, 1, RING_SECONDS)
 
 
 ## Make the effect batch (see "Effects" above): one MultiMesh of `effect_slots` quads in world
@@ -974,7 +980,7 @@ func _size_effects(slots: int) -> void:
 	_effect_at.resize(slots)
 	_effect_dir.resize(slots)
 	_effect_core.resize(slots)
-	_effect_player.resize(slots)
+	_effect_ramp.resize(slots)
 	_effect_zoom.resize(slots)
 	_effect_look.resize(slots)
 	_effect_age.resize(slots)
@@ -1005,13 +1011,14 @@ func _on_effect_slots_changed(slots: int) -> void:
 
 
 ## Show an effect of `kind` (KIND_BURST to KIND_CAST) at `at`, aimed along `dir`, in the ramp of
-## `core` (white: `player`'s colours, the enemy ramp for NO_PLAYER) with the particles of the packed `look`, at `zoom`, for
+## `core` (white: the colours of `ramp`, a caster's `Actors.ramp_of`: 0-3 a hat ramp, anything else
+## from NONE up the enemy ramp) with the particles of the packed `look`, at `zoom`, for
 ## `seconds`. A dash or an arc runs `length` pixels from `at` along `dir` (its zoom is then the
 ## length). An effect given a `follow` node moves with it (a status), and ends when it is gone.
 ## It takes the next slot, the oldest effect when they are all busy, and returns it (-1 for
 ## none).
-func show_effect(kind: int, at: Vector2, dir: Vector2, core: Color, player: int, look: int, zoom: int, seconds: float, length: float = 0.0, follow: Node2D = null) -> int:
-	if _effect_node == null or not at.is_finite() or player < EventsScript.NO_PLAYER or player >= PLAYER_COLORS.size():
+func show_effect(kind: int, at: Vector2, dir: Vector2, core: Color, ramp: int, look: int, zoom: int, seconds: float, length: float = 0.0, follow: Node2D = null) -> int:
+	if _effect_node == null or not at.is_finite() or ramp < ActorsScript.NONE or ramp > ActorsScript.RAMP_ENEMY:
 		return -1
 	var slot: int = _next_effect
 	_next_effect = (_next_effect + 1) % effect_slots
@@ -1019,7 +1026,7 @@ func show_effect(kind: int, at: Vector2, dir: Vector2, core: Color, player: int,
 	_effect_at[slot] = at.round()
 	_effect_dir[slot] = dir.normalized() if dir != Vector2.ZERO else Vector2.RIGHT
 	_effect_core[slot] = core
-	_effect_player[slot] = player
+	_effect_ramp[slot] = ramp
 	_effect_zoom[slot] = clampi(zoom, 1, 15)
 	_effect_look[slot] = look
 	_effect_age[slot] = 0.0
@@ -1074,7 +1081,7 @@ func _step_effects(real_delta: float) -> void:
 		_effect_buffer[i + 5] = -dir.x * d
 		_effect_buffer[i + 6] = 0.0
 		_effect_buffer[i + 7] = at.y
-		var data: Color = ProjectileManagerScript.look_color(_effect_player[slot], _effect_zoom[slot], _effect_look[slot])
+		var data: Color = ProjectileManagerScript.look_color(_effect_ramp[slot], _effect_zoom[slot], _effect_look[slot])
 		_effect_buffer[i + 8] = data.r
 		_effect_buffer[i + 9] = data.g
 		_effect_buffer[i + 10] = data.b
@@ -1099,11 +1106,11 @@ func live_effects() -> int:
 	return live
 
 
-## How many live effects are of `kind`, and (with `player` 0-3) of that player.
-func effects_of(kind: int, player: int = -1) -> int:
+## How many live effects are of `kind`, and (with a `ramp` 0-4) in that ramp.
+func effects_of(kind: int, ramp: int = -1) -> int:
 	var found: int = 0
 	for slot in effect_slots:
-		if _effect_seconds[slot] > 0.0 and _effect_kind[slot] == kind and (player < 0 or _effect_player[slot] == player):
+		if _effect_seconds[slot] > 0.0 and _effect_kind[slot] == kind and (ramp < 0 or _effect_ramp[slot] == ramp):
 			found += 1
 	return found
 
@@ -1117,13 +1124,13 @@ func effect_dress(kind: int) -> Array:
 	return []
 
 
-## The newest live effect of `kind` (for tests): its place, way, core colour, player, zoom and
+## The newest live effect of `kind` (for tests): its place, way, core colour, ramp, zoom and
 ## look, or an empty dictionary when none shows.
 func effect_info(kind: int) -> Dictionary:
 	for n in effect_slots:
 		var slot: int = (_next_effect - 1 - n + effect_slots) % effect_slots
 		if _effect_seconds[slot] > 0.0 and _effect_kind[slot] == kind:
-			return {"at": _effect_at[slot], "dir": _effect_dir[slot], "core": _effect_core[slot], "player": _effect_player[slot],
+			return {"at": _effect_at[slot], "dir": _effect_dir[slot], "core": _effect_core[slot], "ramp": _effect_ramp[slot],
 					"zoom": _effect_zoom[slot], "look": _effect_look[slot], "seconds": _effect_seconds[slot]}
 	return {}
 
@@ -1137,11 +1144,25 @@ func _target_tint(target: Node) -> Color:
 	return preset.enemy_hit_color
 
 
-## The colour of a shot: its player's colour, the enemy ramp's (Blight ochre) for an enemy's.
+## The colour of seat `player`'s light ramp, the enemy ramp's (Blight ochre) for no seat.
 func _shot_color(player: int) -> Color:
 	if player >= 0 and player < PLAYER_COLORS.size():
 		return PLAYER_COLORS[player]
-	return ProjectileManagerScript.ENEMY_COLOR
+	return ProjectileManagerScript.ramp_color(ActorsScript.RAMP_ENEMY)
+
+
+## The actor table: `actors`, else the "Actors" autoload.
+func _actor_table() -> ActorsScript:
+	if actors != null:
+		return actors if is_instance_valid(actors) else null
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	return tree.root.get_node_or_null(^"Actors") as ActorsScript if tree != null and tree.root != null else null
+
+
+## The ramp of `caster`'s spells (NONE for no actor: the enemy ramp).
+func _ramp_of(caster: int) -> int:
+	var table: ActorsScript = _actor_table()
+	return table.ramp_of(caster) if table != null else ActorsScript.NONE
 
 
 func _on_enemy_died(_player: int, enemy: Node, position: Vector2) -> void:
@@ -1188,7 +1209,10 @@ func _on_spell_cast(player: int, spell_id: StringName, origin: Vector2, directio
 
 ## A cast that is more than a plain shot gets a mark on the wizard, in the element's colour,
 ## whose shape tells the class (`combo_marks.gd`). Flat colour and whole-pixel steps, no fade.
-func _on_combo_cast(player: int, combo_class: StringName, origin: Vector2, direction: Vector2, tint: Color) -> void:
+func _on_combo_cast(caster: int, combo_class: StringName, origin: Vector2, direction: Vector2, tint: Color) -> void:
+	# One mark per seat: the seat that drives the caster (an actor no seat drives shows none).
+	var table: ActorsScript = _actor_table()
+	var player: int = table.seat_of(caster) if table != null else ActorsScript.NONE
 	if player < 0 or player >= COMBO_SLOTS or preset.combo_mark_seconds <= 0.0:
 		return
 	var texture: Texture2D = _combo_textures.get(combo_class) as Texture2D
@@ -1237,33 +1261,35 @@ func combo_mark(player: int) -> Sprite2D:
 
 
 ## A beam (drawn by the shot shader's beam mode in the element's ramp), a nova's ring, a dash and
-## a rain's marker (effects), each with the cast's cards. An enemy's (NO_PLAYER) look the same,
-## in the enemy ramp (staffs F7). A rain's marker is a ring closing on the point for as long as
+## a rain's marker (effects), each with the cast's cards, in the caster's ramp: an enemy's look
+## the same, in the enemy ramp (staffs F7). A rain's marker is a ring closing on the point for as long as
 ## the rain takes to fall (`length` seconds), so nobody is hit by a rain they could not see.
-func _on_form_shown(player: int, form: StringName, origin: Vector2, direction: Vector2, length: float, tint: Color, look: int) -> void:
-	if player < EventsScript.NO_PLAYER or player >= PLAYER_COLORS.size() or not origin.is_finite():
+func _on_form_shown(caster: int, form: StringName, origin: Vector2, direction: Vector2, length: float, tint: Color, look: int) -> void:
+	if caster < ActorsScript.NONE or caster >= ActorsScript.ACTORS or not origin.is_finite():
 		return
+	var ramp: int = _ramp_of(caster)
 	if form == &"rain":
 		if length > 0.0:
-			show_effect(KIND_RING_IN, origin, Vector2.RIGHT, tint, player, look, RAIN_MARK_ZOOM, length)
+			show_effect(KIND_RING_IN, origin, Vector2.RIGHT, tint, ramp, look, RAIN_MARK_ZOOM, length)
 		return
 	if form == &"nova":
 		if preset.nova_seconds > 0.0:
 			var zoom: int = clampi(roundi(preset.nova_ring_size / 20.0), 1, 15)
-			show_effect(KIND_RING_OUT, origin, Vector2.RIGHT, tint, player, look, zoom, preset.nova_seconds)
+			show_effect(KIND_RING_OUT, origin, Vector2.RIGHT, tint, ramp, look, zoom, preset.nova_seconds)
 		return
 	if form == &"dash":
 		if length > 0.0 and direction != Vector2.ZERO:
-			show_effect(KIND_DASH, origin, direction, tint, player, look, 1, DASH_SECONDS, length)
+			show_effect(KIND_DASH, origin, direction, tint, ramp, look, 1, DASH_SECONDS, length)
 		return
 	if form != &"beam" or length <= 0.0 or direction == Vector2.ZERO:
 		return
 	var seconds: float = preset.beam_seconds
 	if seconds <= 0.0:
 		return
-	# Each player reuses only their own oldest slots, so nobody's beams push out another's; the
-	# enemies share one player's worth, so a crowd of them never takes a player's.
-	var who: int = player if player >= 0 else ENEMY_FORMS
+	# Each seat's caster reuses only its own oldest slots, so nobody's beams push out another's;
+	# the actors no seat drives share one seat's worth (by budget), so a crowd never takes a seat's.
+	var table: ActorsScript = _actor_table()
+	var who: int = table.budget_of(caster) if table != null else ENEMY_FORMS
 	var slot: int = who * FORMS_PER_PLAYER + _next_form[who]
 	_next_form[who] = (_next_form[who] + 1) % FORMS_PER_PLAYER
 	var sprite: Sprite2D = _forms[slot]
@@ -1279,12 +1305,12 @@ func _on_form_shown(player: int, form: StringName, origin: Vector2, direction: V
 	material.set_shader_parameter(&"core_override", Color(tint.r, tint.g, tint.b, 1.0))
 	material.set_shader_parameter(&"beam_mode", 2)
 	material.set_shader_parameter(&"beam_length", length)
-	material.set_shader_parameter(&"beam_player", player)
+	material.set_shader_parameter(&"beam_player", _beam_ramp(ramp))
 	material.set_shader_parameter(&"beam_look", look)
 	material.set_shader_parameter(&"beam_glow", preset.beam_alpha)
 	var body: Color = Color.WHITE
 	if projectiles != null and projectiles.has_method("tint_of"):
-		body = projectiles.call("tint_of", player) as Color
+		body = projectiles.call("tint_of", caster) as Color
 	_form_body[slot] = body
 	_form_left[slot] = seconds
 	_form_total[slot] = seconds
@@ -1357,10 +1383,10 @@ func _draw_live_beams() -> void:
 		line.width = BEAM_WIDTH
 		line.texture = preset.beam_texture
 		line.texture_mode = Line2D.LINE_TEXTURE_STRETCH
-		var player: int = spells.call("beam_player", i)
+		var caster: int = spells.call("beam_caster", i)
 		var body: Color = Color.WHITE
 		if projectiles != null and projectiles.has_method("tint_of"):
-			body = projectiles.call("tint_of", player) as Color
+			body = projectiles.call("tint_of", caster) as Color
 		var tint: Color = spells.call("beam_tint", i)
 		var material: ShaderMaterial = line.material as ShaderMaterial
 		material.set_shader_parameter(&"core_override", Color(tint.r, tint.g, tint.b, 1.0))
@@ -1368,7 +1394,7 @@ func _draw_live_beams() -> void:
 		material.set_shader_parameter(&"beam_mode", 1)
 		material.set_shader_parameter(&"beam_length", walked)
 		material.set_shader_parameter(&"beam_width", BEAM_WIDTH)
-		material.set_shader_parameter(&"beam_player", player)
+		material.set_shader_parameter(&"beam_player", _beam_ramp(_ramp_of(caster)))
 		material.set_shader_parameter(&"beam_look", int(spells.call("beam_look", i)) if spells.has_method("beam_look") else 0)
 		material.set_shader_parameter(&"beam_fade", fade)
 		material.set_shader_parameter(&"beam_swell", maxf(fade, 0.35) * flare * flicker)
@@ -1501,3 +1527,8 @@ func _reset_camera() -> void:
 	shake_offset = Vector2.ZERO
 	_refresh_camera()
 	_apply_camera()
+
+
+## The shader's `beam_player` for `ramp`: the hat ramp 0-3, or -1 for the enemy ramp.
+static func _beam_ramp(ramp: int) -> int:
+	return ramp if ProjectileManagerScript.is_hat_ramp(ramp) else -1

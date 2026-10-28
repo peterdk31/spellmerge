@@ -8,15 +8,18 @@ extends RefCounted
 ## (tests/benchmark/stress_runner.gd) or the emergent combo report shows a staff that freezes
 ## the game, a limit, a mana cost or a cheaper effect is decided then (owner, 2026-10-26).
 
+const ActorsScript := preload("res://core/actors/actors.gd")
+
 ## Staffs (A4): the numbers of a fallback, the hit made when cards land on the caster or on a
 ## payload's origin with no carrier (docs/milestones/M2-staffs.md, "Reading a staff").
 const FALLBACK_DAMAGE: float = 4.0
 const FALLBACK_RADIUS: float = 8.0
 
-## Engine safeguard: payloads all of one player's triggers may fire in one physics step; the
-## rest are dropped, never queued, so a cascade cannot snowball across frames.
+## Engine safeguard: payloads all of one budget's triggers (a seat's, or the shared one) may fire
+## in one physics step; the rest are dropped, never queued, so a cascade cannot snowball across
+## frames.
 const MAX_FIRES_PER_STEP: int = 32
-## Engine safeguard: chain jumps one player may make in one physics step; the rest are dropped.
+## Engine safeguard: chain jumps one budget may make in one physics step; the rest are dropped.
 const MAX_CHAINS_PER_STEP: int = 16
 ## Engine safeguard: launches (a burst's later firings, echoes) that may wait at once; the rest
 ## are dropped.
@@ -35,7 +38,7 @@ const MAX_ARCS_PER_STEP: int = 32
 const SPLIT_SPREAD: float = 30.0
 ## Builds of one staff (the generations) whose shots can be in the air at once.
 const GENERATIONS: int = 8
-## Staffs per player, one per button: A, X, Y and B.
+## Staffs per caster, one per button for a seat: A, X, Y and B.
 const STAFFS: int = 4
 ## Pixels ahead of the caster that a rain falls when the form gives no `ray_length`, and that
 ## the middle of a wall is placed.
@@ -50,22 +53,16 @@ const HOLD_LIFETIME: float = 100000.0
 const HOOK_SECONDS: float = 0.15
 const SWAP_SECONDS: float = 0.1
 const RECOIL_SECONDS: float = 0.1
-## Players, indexes 0 to 3.
-const PLAYERS: int = 4
-## Enemy casters (staffs F5, "Enemy staffs"): rows FIRST_ENEMY_CASTER to CASTERS - 1, one per
-## enemy that casts a staff (`Spells.open_enemy_caster`); the same numbers as the projectile
-## manager's and `SpellTag`'s enemy rows.
-const FIRST_ENEMY_CASTER: int = PLAYERS
-const ENEMY_CASTERS: int = 256
-const CASTERS: int = FIRST_ENEMY_CASTER + ENEMY_CASTERS
-## The per-step fire and chain caps count per player and once for all enemies together, so a
-## crowd of casters shares one budget the size of one player's.
-const BUDGETS: int = PLAYERS + 1
-## Of the shared live beams and waiting launches (BEAMS, MAX_PENDING), the most enemies hold at
-## once. Enemies never end a player's beam or take a player's launch slot.
-const ENEMY_BEAMS: int = 16
-const ENEMY_PENDING: int = 32
-## Live beams at once over every player (one more ends the oldest), and the seconds between a
+## The per-step fire and chain caps count per budget (`Actors.budget_of`): one for each seat's
+## actor, and one that every actor no seat drives shares (`Actors.SHARED`), so a crowd of
+## enemy casters shares one budget the size of one player's (actors G3b).
+const BUDGETS: int = ActorsScript.SHARED + 1
+## Of the shared live beams and waiting launches (BEAMS, MAX_PENDING), the most the shared
+## budget holds at once. The actors no seat drives never end a seat's beam or take a seat's
+## launch slot.
+const SHARED_BEAMS: int = 16
+const SHARED_PENDING: int = 32
+## Live beams at once over every caster (one more ends the oldest), and the seconds between a
 ## live beam's hits. A beam lives its carrier's `lifetime`, so a held staff keeps one on.
 const BEAMS: int = 64
 const BEAM_TICK: float = 0.15

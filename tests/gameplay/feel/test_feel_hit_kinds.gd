@@ -9,6 +9,10 @@ const FeelScript := preload("res://gameplay/feel/feel.gd")
 const FeelPresetScript := preload("res://gameplay/feel/presets/feel_preset.gd")
 const WizardStandIn := preload("res://tests/gameplay/feel/fixtures/wizard_stand_in.gd")
 
+## The stand-in wizards' actor ids are their seat plus this, apart from the seats, so a test sees
+## that a self-hit is told by the actor id (hits are keyed by caster, actors G3b).
+const FIRST_WIZARD_ID: int = 4
+
 
 ## What combat tells Feel about a downed wizard.
 class FakeCombat:
@@ -52,6 +56,7 @@ func _enemy() -> Node2D:
 func _wizard(index: int) -> Node2D:
 	var wizard: Node2D = own(WizardStandIn.new()) as Node2D
 	wizard.set("index", index)
+	wizard.set("actor_id", FIRST_WIZARD_ID + index)
 	root.add_child(wizard)
 	return wizard
 
@@ -101,22 +106,23 @@ func test_a_stale_kind_is_not_applied_to_a_later_hit() -> void:
 func test_a_wizard_hit_by_their_own_spell_gets_a_ring() -> void:
 	var wizard: Node2D = _wizard(1)
 	var before: int = feel.effects_of(FeelScript.KIND_RING_OUT)
-	_hit(1, wizard, &"shot")
+	_hit(FIRST_WIZARD_ID + 1, wizard, &"shot")
 	check(feel.effects_of(FeelScript.KIND_RING_OUT) > before, "a ring on the hit's frame")
 
 
 func test_a_wizard_hit_by_another_player_or_an_enemy_gets_no_self_ring() -> void:
 	var wizard: Node2D = _wizard(1)
 	var before: int = feel.effects_of(FeelScript.KIND_RING_OUT)
-	_hit(2, wizard, &"shot")
+	_hit(FIRST_WIZARD_ID + 2, wizard, &"shot")
 	_hit(-1, wizard, &"shot")
+	_hit(1, wizard, &"shot")  # the seat's number is not the wizard's caster
 	check_equal(feel.effects_of(FeelScript.KIND_RING_OUT), before, "only a self-hit has the ring")
 
 
 func test_a_self_inflicted_burn_tick_gets_no_ring() -> void:
 	var wizard: Node2D = _wizard(1)
 	var before: int = feel.effects_of(FeelScript.KIND_RING_OUT)
-	_hit(1, wizard, &"status")
+	_hit(FIRST_WIZARD_ID + 1, wizard, &"status")
 	check_equal(feel.effects_of(FeelScript.KIND_RING_OUT), before, "a burn tick is not a hit: no self-hit ring")
 
 

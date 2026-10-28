@@ -7,16 +7,19 @@ extends SceneTree
 
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
+const ActorSeats := preload("res://tests/support/actor_seats.gd")
 
 const DT: float = 1.0 / 60.0
 
 var _failures: Array[String] = []
 var _bus: Node
 var _mgr: Node2D
+## Wizards at ids 0-3, seated 0-3 (the casters these tests use).
+var _table: ActorSeats.ActorsScript
 var _targets: Array[Node2D] = []
-## Every projectile_hit as [player, target, position, tag].
+## Every projectile_hit as [caster, target, position, tag].
 var _hits: Array = []
-## Every projectile_expired as [player, position, tag].
+## Every projectile_expired as [caster, position, tag].
 var _expired: Array = []
 
 
@@ -100,11 +103,13 @@ func _setup() -> void:
 	_teardown()
 	_bus = EventsScript.new()
 	_mgr = ManagerScript.new()
+	_table = ActorSeats.table()
+	_mgr.actors = _table
 	_mgr.events = _bus
 	_hits.clear()
 	_expired.clear()
-	_bus.projectile_expired.connect(func(player: int, position: Vector2, tag: int) -> void: _expired.append([player, position, tag]))
-	_bus.projectile_hit.connect(func(player: int, target: Node, position: Vector2, tag: int) -> void: _hits.append([player, target, position, tag]))
+	_bus.projectile_expired.connect(func(caster: int, position: Vector2, tag: int) -> void: _expired.append([caster, position, tag]))
+	_bus.projectile_hit.connect(func(caster: int, target: Node, position: Vector2, tag: int) -> void: _hits.append([caster, target, position, tag]))
 
 
 func _teardown() -> void:
@@ -112,11 +117,12 @@ func _teardown() -> void:
 		if is_instance_valid(target):
 			target.free()
 	_targets.clear()
-	for node: Node in [_mgr, _bus]:
+	for node: Node in [_mgr, _bus, _table]:
 		if node != null and is_instance_valid(node):
 			node.free()
 	_mgr = null
 	_bus = null
+	_table = null
 
 
 ## A target in the tree at `position`.
@@ -180,8 +186,8 @@ func _test_layers() -> void:
 	_target(Vector2(30.0, 0.0), 10.0, ManagerScript.LAYER_PLAYER)
 	_mgr.spawn(EventsScript.NO_PLAYER, Vector2.ZERO, Vector2(1200.0, 0.0), 1.0, 4.0, ManagerScript.LAYER_PLAYER)
 	_mgr.step(DT)
-	_check(_hits.size() == 1 and _hits[0][0] == EventsScript.NO_PLAYER, "an enemy shot hits a player target, with NO_PLAYER")
-	_check(_mgr.get_count_for(EventsScript.NO_PLAYER) == 0, "the enemy shot ended")
+	_check(_hits.size() == 1 and _hits[0][0] == EventsScript.NO_PLAYER, "a shot of no actor hits a wizard's target, naming no actor")
+	_check(_mgr.get_count_for(EventsScript.NO_PLAYER) == 0, "the shot ended")
 
 
 func _test_miss() -> void:
@@ -345,13 +351,13 @@ func _test_default_cap_follows_the_platform() -> void:
 
 func _test_bad_arguments() -> void:
 	_setup()
-	_check(_mgr.spawn(ManagerScript.CASTERS, Vector2.ZERO, Vector2.RIGHT, 1.0) == -1, "a caster past the last enemy row is refused")
-	_check(_mgr.spawn(-2, Vector2.ZERO, Vector2.RIGHT, 1.0) == -1, "player -2 is refused")
+	_check(_mgr.spawn(ManagerScript.ACTORS, Vector2.ZERO, Vector2.RIGHT, 1.0) == -1, "a caster past the last actor id is refused")
+	_check(_mgr.spawn(-2, Vector2.ZERO, Vector2.RIGHT, 1.0) == -1, "caster -2 is refused")
 	_check(_mgr.spawn(0, Vector2.ZERO, Vector2.RIGHT, 0.0) == -1, "zero lifetime is refused")
 	_check(_mgr.spawn(0, Vector2(NAN, 0.0), Vector2.RIGHT, 1.0) == -1, "a NaN position is refused")
 	_check(_mgr.spawn(0, Vector2.ZERO, Vector2(INF, 0.0), 1.0) == -1, "an infinite velocity is refused")
 	_check(_mgr.get_count() == 0, "refused spawns leave nothing behind")
-	_check(_mgr.get_count_for(ManagerScript.CASTERS) == 0, "counting an invalid caster gives 0")
+	_check(_mgr.get_count_for(ManagerScript.ACTORS) == 0, "counting an invalid caster gives 0")
 
 
 func _test_cap_drops_the_oldest_of_the_richest() -> void:
@@ -365,7 +371,7 @@ func _test_cap_drops_the_oldest_of_the_richest() -> void:
 	_check(slot >= 0, "a full cap still accepts the new shot")
 	_check(_mgr.get_count() == 10, "and stays at the cap")
 	_check(_mgr.dropped == 1, "one projectile was dropped")
-	_check(_mgr.get_count_for(0) == 9 and _mgr.get_count_for(1) == 1, "from the player who owned the most")
+	_check(_mgr.get_count_for(0) == 9 and _mgr.get_count_for(1) == 1, "from the budget (seat 0) that owned the most")
 	_check(slot == oldest, "the oldest one's slot was reused")
 	var survivors: int = 0
 	for s in 10:
@@ -508,13 +514,13 @@ func _test_shot_core_colour_and_batches() -> void:
 	var body: PackedFloat32Array = _mgr._draw_node.multimesh.buffer
 	# The instance colour carries the owner as data (staffs B6a); the shader colours the outline
 	# and the trail by it (test_projectile_looks.gd).
-	_check(roundi(body[8] * 255.0) % 4 == 1, "the body names its owner, player 2 (red is player + zoom x 4)")
+	_check(roundi(body[8] * 255.0) % 4 == 1, "the body names its owner's ramp, 1 (red is ramp + zoom x 4)")
 	var owner_tint: Color = _mgr.tint_of(1)
 	_check(owner_tint != frost, "the owner's tint and the element's colour are separate")
 	var seen: Array[Color] = []
 	for player in 4:
 		var tint: Color = _mgr.tint_of(player)
-		_check(not seen.has(tint), "player %d has a tint of their own" % player)
+		_check(not seen.has(tint), "the wizard of seat %d has a tint of their own" % player)
 		seen.append(tint)
 	# A reused slot starts plain again.
 	_mgr.clear()
@@ -681,13 +687,14 @@ func _test_batch_room_grows_and_shrinks_with_hysteresis() -> void:
 func _test_shot_colours_differ_and_stay_bright() -> void:
 	_setup()
 	var colours: Array[Color] = []
-	for owner_index in [-1, 0, 1, 2, 3]:
-		colours.append(_mgr._color_of(owner_index))
+	# Every ramp: the four hat ramps and the enemy ramp.
+	for ramp in ManagerScript.RAMP_COLORS.size():
+		colours.append(ManagerScript.ramp_tint(ramp))
 	for i in colours.size():
-		_check(colours[i].get_luminance() >= 0.45, "shot colour %d is not dark (luminance %.2f)" % [i, colours[i].get_luminance()])
+		_check(colours[i].get_luminance() >= 0.45, "ramp %d's tint is not dark (luminance %.2f)" % [i, colours[i].get_luminance()])
 		for j in range(i + 1, colours.size()):
 			var gap: float = absf(colours[i].r - colours[j].r) + absf(colours[i].g - colours[j].g) + absf(colours[i].b - colours[j].b)
-			_check(gap >= 0.15, "shot colours %d and %d differ (gap %.2f)" % [i, j, gap])
+			_check(gap >= 0.15, "ramp tints %d and %d differ (gap %.2f)" % [i, j, gap])
 
 
 func _test_freed_target_is_dropped() -> void:

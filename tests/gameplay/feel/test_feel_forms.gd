@@ -7,6 +7,7 @@ const EventsScript := preload("res://core/events/events.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
 const FeelPresetScript := preload("res://gameplay/feel/presets/feel_preset.gd")
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
+const ActorSeats := preload("res://tests/support/actor_seats.gd")
 
 const FROST := Color(0.5, 0.75, 0.94)
 
@@ -14,12 +15,18 @@ var bus: EventsScript
 var feel: FeelScript
 var preset: FeelPresetScript
 var projectiles: ProjectilesScript
+## Wizards seated 0-3 at the actor ids 0-3 (caster 0-3 draws in hat ramp 0-3), shared by Feel and
+## the projectile manager.
+var actors: ActorSeats.ActorsScript
 
 
 func before_each() -> void:
 	bus = own(EventsScript.new()) as EventsScript
 	feel = own(FeelScript.new()) as FeelScript
 	projectiles = own(ProjectilesScript.new()) as ProjectilesScript
+	actors = own(ActorSeats.table()) as ActorSeats.ActorsScript
+	projectiles.actors = actors
+	feel.actors = actors
 	preset = FeelPresetScript.new()
 	preset.hit_sound = &""
 	feel.events = bus
@@ -88,9 +95,9 @@ func test_a_dash_leaves_its_trail_along_its_way() -> void:
 	check_equal(roundi(buffer[8] * 255.0) / 4, 20, "its length travels in the zoom's place (80 px is 20 steps of 4)")
 	bus.form_shown.emit(2, &"dash", Vector2(10, 20), Vector2.DOWN, 0.0, FROST, 5)
 	check_equal(feel.effects_of(FeelScript.KIND_DASH), 1, "a dash that went nowhere shows nothing")
-	bus.form_shown.emit(-1, &"dash", Vector2(10, 20), Vector2.DOWN, 80.0, FROST, 5)
+	bus.form_shown.emit(ActorSeats.enemy(actors), &"dash", Vector2(10, 20), Vector2.DOWN, 80.0, FROST, 5)
 	check_equal(feel.effects_of(FeelScript.KIND_DASH), 2, "an enemy's dash shows like a wizard's (staffs F7)")
-	check_equal(feel.effect_info(FeelScript.KIND_DASH)["player"], -1, "in the enemy ramp")
+	check_equal(feel.effect_info(FeelScript.KIND_DASH)["ramp"], ActorSeats.ActorsScript.RAMP_ENEMY, "in the enemy ramp")
 
 
 func test_forms_end() -> void:
@@ -137,8 +144,9 @@ func test_one_cast_with_many_rays_shows_every_ray() -> void:
 
 
 func test_an_enemys_beams_take_only_the_enemies_share() -> void:
+	var enemy: int = ActorSeats.enemy(actors)
 	for i in FeelScript.FORMS_PER_PLAYER + 6:
-		bus.form_shown.emit(-1, &"beam", Vector2(0.0, i), Vector2.RIGHT, 100.0, FROST, 0)
+		bus.form_shown.emit(enemy, &"beam", Vector2(0.0, i), Vector2.RIGHT, 100.0, FROST, 0)
 	check_equal(_shown().size(), FeelScript.FORMS_PER_PLAYER, "enemies' beams show, in their one share")
 	bus.form_shown.emit(0, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, FROST, 0)
 	check_equal(_shown().size(), FeelScript.FORMS_PER_PLAYER + 1, "and never take a player's slot")
@@ -148,7 +156,7 @@ func test_an_enemys_beams_take_only_the_enemies_share() -> void:
 
 func test_a_rain_shows_its_marker_until_it_falls() -> void:
 	bus.form_shown.emit(1, &"rain", Vector2(40, 40), Vector2.RIGHT, 0.6, FROST, 3)
-	bus.form_shown.emit(-1, &"rain", Vector2(80, 40), Vector2.RIGHT, 0.6, FROST, 3)
+	bus.form_shown.emit(ActorSeats.enemy(actors), &"rain", Vector2(80, 40), Vector2.RIGHT, 0.6, FROST, 3)
 	check_equal(feel.effects_of(FeelScript.KIND_RING_IN), 2, "a ring closes on each rain's point, a wizard's and an enemy's")
 	check(is_equal_approx(feel.effect_info(FeelScript.KIND_RING_IN)["seconds"], 0.6), "for as long as it takes to fall")
 	feel.step(0.5)
@@ -162,13 +170,15 @@ func test_the_shipped_preset_has_the_form_art() -> void:
 	check(shipped.beam_texture != null and shipped.nova_texture != null, "beam and ring art")
 
 
-## Stands in for core/spells' live beams: one beam of player 1 bending from (0, 0) to (100, 40),
+## Stands in for core/spells' live beams: one beam of `caster` (the actor id of the wizard in
+## seat 1) bending from (0, 0) to (100, 40),
 ## and with `on_again` bending on from there to (160, 0).
 class FakeBeams:
 	extends Node
 	var on: bool = true
 	var reach: float = 500.0
 	var on_again: bool = false
+	var caster: int = 1
 
 	func beam_point_count(_at: int) -> int:
 		return 17 if on_again else 9
@@ -188,8 +198,8 @@ class FakeBeams:
 	func beam_on(at: int) -> bool:
 		return on and at == 1
 
-	func beam_player(_at: int) -> int:
-		return 1
+	func beam_caster(_at: int) -> int:
+		return caster
 
 	func beam_look(_at: int) -> int:
 		return 6
@@ -260,7 +270,10 @@ func test_a_live_beam_is_drawn_by_the_beam_mode_as_long_as_it_got() -> void:
 	var material: ShaderMaterial = line.material as ShaderMaterial
 	check_equal(material.get_shader_parameter(&"beam_mode"), 1, "a line beam")
 	check(is_equal_approx(material.get_shader_parameter(&"beam_length") as float, 50.0), "as long as it got along its curve")
-	check_equal(material.get_shader_parameter(&"beam_player"), 1, "of its player")
+	check_equal(material.get_shader_parameter(&"beam_player"), 1, "in its caster's hat ramp")
 	check_equal(material.get_shader_parameter(&"beam_look"), 6, "with its cards")
 	check_equal(line.width, FeelScript.BEAM_WIDTH, "a fixed width: the shader swells its rim, never its pixels")
 	check_equal(line.texture_mode, Line2D.LINE_TEXTURE_STRETCH, "its UV runs once along it")
+	beams.caster = ActorSeats.enemy(actors)
+	feel.step(0.016)
+	check_equal(material.get_shader_parameter(&"beam_player"), -1, "an enemy's beam is in the enemy ramp")

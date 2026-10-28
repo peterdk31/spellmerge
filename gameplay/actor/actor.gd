@@ -97,10 +97,9 @@ var caster: Caster = null
 ## component, G7, sets it).
 var downable: bool = false
 
-## The number it casts under in Spells and the projectile manager (see `open_caster_number`).
+## The number it casts under in Spells and the projectile manager: its `id` while its caster is
+## open (see `open_caster_number`), else -1.
 var _caster_number: int = -1
-## True when `_caster_number` is an enemy row it opened (and must close).
-var _opened_row: bool = false
 
 var _components: Array[ActorComponent] = []
 var _looks: Array[ActorLook] = []
@@ -224,32 +223,22 @@ func caster_number() -> int:
 	return _caster_number
 
 
-## Take a caster number (the Caster does, when the actor enters the tree) and return it; -1 when
-## every enemy row is taken. The one seam between the kit and Spells' numbering: until Spells
-## casts by actor id (actors G3) it is the seat (0-3) of the home controller, or an enemy row of
-## Spells (`open_enemy_caster`, 4 and up, which opens an actor of its own beside `id` for now)
-## for an actor without a seat. After G3 it is simply `id`.
+## Open its caster in Spells (the Caster does, when the actor enters the tree) and return the
+## number it casts under: its `id`, since Spells and the projectile manager cast by actor id
+## (actors G3b); -1 when it has no id (a full table) or no Spells.
 func open_caster_number() -> int:
-	if _caster_number >= 0 or spells == null:
+	if _caster_number >= 0 or spells == null or id == ActorsScript.NONE:
 		return _caster_number
-	var home_seat: int = home_controller.seat if home_controller != null else ActorsScript.NONE
-	if home_seat >= 0 and home_seat < ActorsScript.SEATS:
-		_caster_number = home_seat
-		_opened_row = false
-		return _caster_number
-	_caster_number = spells.open_enemy_caster()
-	_opened_row = _caster_number >= 0
-	if _caster_number < 0:
-		push_warning("Actor %s: every enemy caster row is open, so it casts nothing." % name)
+	if spells.open_caster(id):
+		_caster_number = id
 	return _caster_number
 
 
-## Give the caster number back (the actor leaves the tree).
+## Close its caster in Spells (the actor leaves the tree): its staffs, holds and beams end.
 func close_caster_number() -> void:
-	if _caster_number >= 0 and _opened_row and spells != null and is_instance_valid(spells):
-		spells.close_enemy_caster(_caster_number)
+	if _caster_number >= 0 and spells != null and is_instance_valid(spells):
+		spells.close_caster(_caster_number)
 	_caster_number = -1
-	_opened_row = false
 
 
 ## True while the actor is down (a Downed component holds it; G7).

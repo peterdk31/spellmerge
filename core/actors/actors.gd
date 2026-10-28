@@ -20,8 +20,8 @@ extends Node
 ##
 ## Packed arrays sized ACTORS, nothing allocated after start. An id outside the table or not
 ## open is safe everywhere: the questions answer NONE (`budget_of` SHARED, `node_of` null) and
-## the changes do nothing. In G2 only Spells' enemy casters open ids; wizards (G7) and every
-## actor (G6) follow.
+## the changes do nothing. The bodies open their own ids (wizards, enemies that cast, the actor
+## kit's actors); every system keys its arrays by them (actors G3).
 
 ## How many actors there can be at once: four seats, 256 enemies, room to grow.
 const ACTORS: int = 512

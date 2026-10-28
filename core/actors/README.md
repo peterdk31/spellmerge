@@ -14,7 +14,7 @@ The actor table: the one place an actor's id, team, look and seat are known (act
 - **Nodes:** `set_node(id, node)` keeps only the node's instance id; `node_of(id)` gives the node, or null once it is freed or the actor is closed.
 - **Safe:** an id outside the table or not open answers `NONE` (`budget_of` `SHARED`, `node_of` null) and changes nothing. `clear()` closes everything (a new run, and tests).
 - **Performance:** packed arrays sized `ACTORS`; nothing is allocated after start.
-- **Who opens ids (G2):** only Spells, one per open enemy caster row (`Spells.actor_of_caster`). Enemies (G6) and wizards (G7) open their own as actors, and the systems key their arrays by actor id from G3.
+- **Who opens ids (G3b):** the bodies themselves: a wizard (`gameplay/player`, `actor_id`: the wizards' team, ramp and seat of its index), an enemy that casts a staff (`gameplay/ai`, `caster`: the enemies' team, `RAMP_ENEMY`, no seat) and every actor of the kit (`gameplay/actor`, `id`). Spells, the projectile manager, Combat, Entities and Feel key their arrays and events by actor id and ask the table for team (aim), ramp (looks), budget (limits) and seat (HUD events); none of them opens ids.
 
 ## Allowed files
 

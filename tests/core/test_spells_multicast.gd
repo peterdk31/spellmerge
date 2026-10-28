@@ -10,6 +10,7 @@ const StaffKit := preload("res://tests/support/staff_kit.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
+const ActorSeats := preload("res://tests/support/actor_seats.gd")
 
 const DT: float = 1.0 / 60.0
 
@@ -36,6 +37,8 @@ func before_each() -> void:
 	_mgr = own(ManagerScript.new()) as ManagerScript
 	_mgr.events = _bus
 	_mgr.set_cap(512)
+	# Four wizards seated 0-3 at actor ids 0-3, as the tests name their casters.
+	_mgr.actors = own(ActorSeats.table()) as ActorSeats.ActorsScript
 	_spells = own(SpellsScript.new()) as SpellsScript
 	_spells.registry = _fake
 	_spells.bind(_mgr, _bus)

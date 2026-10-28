@@ -13,6 +13,7 @@ const SpellsScript := preload("res://core/spells/spells.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
+const ActorSeats := preload("res://tests/support/actor_seats.gd")
 
 const DT: float = 1.0 / 60.0
 const TRIGGERS: Array[StringName] = [&"on_hit", &"on_expire", &"timer"]
@@ -37,6 +38,8 @@ func before_each() -> void:
 	_mgr = own(ManagerScript.new()) as ManagerScript
 	_mgr.events = _bus
 	_mgr.set_cap(512)
+	# Four wizards seated 0-3 at actor ids 0-3, as the tests name their casters.
+	_mgr.actors = own(ActorSeats.table()) as ActorSeats.ActorsScript
 	_spells = own(SpellsScript.new()) as SpellsScript
 	_spells.registry = _registry
 	_spells.bind(_mgr, _bus)
@@ -351,5 +354,5 @@ func test_every_trigger_works_for_all_four_players_at_once() -> void:
 			elif id == &"on_expire":
 				expected = 1
 			check_equal(_born(held_tag), expected, "%s: player %d's held spell fired %d time(s)" % [id, player, expected])
-			check_equal(SpellTag.player_of(held_tag), player, "%s: and carries player %d's tag" % [id, player])
+			check_equal(SpellTag.caster_of(held_tag), player, "%s: and carries player %d's tag" % [id, player])
 		_spells.clear()

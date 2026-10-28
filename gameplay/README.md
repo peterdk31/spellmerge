@@ -9,12 +9,12 @@ The rules of the game, in 11 sub-areas: `actor` (the shared body kit, actors G4)
 - **Entry script:** `gameplay/<area>/<area>.gd`. Other code uses only that script and the area's events.
 - **Dependency direction:** `core` ← `gameplay` ← `content`. A sub-area may use `core/` and the registry. Areas never call each other directly; they talk through events. The one stated exception is the actor kit: every area may use the public scripts of `gameplay/actor` (see its README).
 - **Events:** `core/events` owns the event definitions. A sub-area README only lists which events the area sends and which it listens to, and each event has exactly one sender. The lists must match `core/events/events.gd` and the table below.
-- **Players:** everything that acts per player takes a player index 0–3. Nothing assumes a single player, and nobody ever waits for another player.
+- **Actors and seats:** what acts (casts, is hit, moves) is keyed by its actor id (`core/actors`, actors G3); a seat (0–3) is a human, and only HUD, input and co-op rules take seats. Caster-keyed events name the actor id (`caster`), seat-keyed ones the seat (`player`); see `core/events/events.gd`. Nothing assumes a single player, and nobody ever waits for another player.
 - **Performance:** no per-frame allocations; use the pools and the projectile manager from `core/`; respect the particle limits.
 
 ## Events at a glance
 
-One table for all sub-areas, so "each event has exactly one sender" can be checked in one place. The event names and senders match `core/events/events.gd`; the listener column is kept by hand, because `events.gd` records only the HUD's receivers. The per-area lists must match this table.
+One table for all sub-areas, so "each event has exactly one sender" can be checked in one place. Since actors G3b every caster-keyed event names the actor id as `caster` (`NO_PLAYER` only where no actor did it), and `wizard_hurt` is `actor_hurt` (the victim's actor id); the HUD, devices, builder, stats, downed and joined events stay keyed by seat (`player`). The event names and senders match `core/events/events.gd`; the listener column is kept by hand, because `events.gd` records only the HUD's receivers. The per-area lists must match this table.
 
 | Event | Sender | Listeners |
 | --- | --- | --- |
@@ -31,15 +31,15 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `staff_cards_requested` | `hud` (the radial builder) | `player` |
 | `staff_changed` | `player` | `hud` (the builders) |
 | `staff_cast` | `player` | `hud` (the corner panel) |
-| `caster_move_requested` | `core/spells` | `player`, `ai` (an enemy's own row, F8c), `actor` (the Mover) |
-| `mana_reserved`, `mana_refund_requested` | `core/spells` | `player`; `mana_refund_requested` also `actor` (the Caster) |
+| `caster_move_requested` | `core/spells` | `player`, `ai`, `actor` (the Mover), each for its own actor id |
+| `mana_reserved` | `core/spells` (to the seat that drives the caster) | `player` |
+| `mana_refund_requested` | `core/spells` (for every actor) | `player`, `ai`, `actor` (the Caster), each for its own actor id |
 | `area_hit_requested` | `core/spells` | `combat` |
 | `target_move_requested`, `entity_spawn_requested`, `entity_end_requested` | `core/spells` (staffs B2) | `ai`; `target_move_requested` also `actor` (the Mover) |
-| `caster_move_finished` | `player`, `ai` (an enemy's own row, F8c), `actor` (the Mover) | `core/spells` |
+| `caster_move_finished` | `player`, `ai`, `actor` (the Mover), each with its own actor id | `core/spells` |
 | `entity_ended`, `familiar_cast_requested` | `ai` | none yet (`core/spells`, staffs B2) |
 | `shot_blocked` | `core/projectiles` | none yet (`core/spells`, staffs B1) |
-| `ally_passed` | nobody since actors G3c (shots hit teammates, none passes them) | `core/spells` (relay, `on ally`) |
-| `shield_blocked`, `kill_landed`, `wizard_hurt`, `reaction_landed` | `combat` | none yet (`core/spells`, staffs B2) |
+| `shield_blocked`, `kill_landed`, `actor_hurt`, `reaction_landed` | `combat` | `core/spells` (on block, on kill, on hurt, on reaction) |
 | `hit_landed` | `combat` | `feel` |
 | `heal_dealt` | `combat` | `feel`, `player`, `actor` (Health) |
 | `wizard_shield_requested`, `pull_requested`, `area_hit_requested` | `core/spells` (staffs B2) | `combat` |

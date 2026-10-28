@@ -14,6 +14,7 @@ const PlayerScript := preload("res://gameplay/player/player.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
+const ActorsScript := preload("res://core/actors/actors.gd")
 const ImpData := preload("res://content/enemies/ember_imp/ember_imp.tres")
 
 const STEP: float = 0.0625
@@ -23,6 +24,8 @@ var _bus: Node
 var _combat: Node
 var _projectiles: Node
 var _spells: Node
+## The actor table of the services, the wizards and the imps (not the autoload).
+var _actors: ActorsScript
 ## Scanned once: the real cards.
 var _registry: Node
 var _enemies: Array[AiScript] = []
@@ -71,6 +74,8 @@ func _setup(player_count: int = 0) -> void:
 	_bus = EventsScript.new()
 	_projectiles = ProjectileManagerScript.new()
 	_projectiles.events = _bus
+	_actors = ActorsScript.new()
+	_projectiles.actors = _actors
 	_spells = SpellsScript.new()
 	_spells.set("registry", _registry)
 	_spells.call("bind", _projectiles, _bus)
@@ -83,6 +88,7 @@ func _setup(player_count: int = 0) -> void:
 		var wizard := PlayerScript.new()
 		wizard.index = index
 		wizard.events = _bus
+		wizard.actors = _actors
 		# In the tree, or the projectile manager never sees the wizard as a target.
 		root.add_child(wizard)
 		wizard.position = Vector2(1000.0, 1000.0 * index)
@@ -99,12 +105,13 @@ func _teardown() -> void:
 		if is_instance_valid(wizard):
 			wizard.free()
 	_players.clear()
-	for node: Node in [_combat, _spells, _projectiles, _bus]:
+	for node: Node in [_combat, _spells, _projectiles, _actors, _bus]:
 		if node != null:
 			node.free()
 	_combat = null
 	_spells = null
 	_projectiles = null
+	_actors = null
 	_bus = null
 
 
@@ -232,7 +239,7 @@ func _test_shot_hurts_wizard_through_combat() -> void:
 		damaged.append([p, target, amount]))
 	_run(imp, int(imp.windup_time / STEP) + 2)
 	_run(imp, 6)
-	_check(damaged.size() == 1 and damaged[0][0] == EventsScript.NO_PLAYER and damaged[0][1] == _players[0], "the bolt hurt player 0 once, as an enemy (NO_PLAYER)")
+	_check(damaged.size() == 1 and damaged[0][0] == imp.caster and damaged[0][1] == _players[0], "the bolt hurt player 0 once, as the imp's actor")
 	_check(damaged.size() == 1 and damaged[0][2] >= _bolt().base_damage, "for at least the bolt's damage")
 	_check(damaged.size() == 1 and _players[0].health == PlayerScript.MAX_HEALTH - int(damaged[0][2]), "the wizard lost that health")
 

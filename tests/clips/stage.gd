@@ -18,6 +18,7 @@ const RegistryScript := preload("res://core/registry/registry.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
+const ActorSeats := preload("res://tests/support/actor_seats.gd")
 
 const STEP: float = 1.0 / 60.0
 const IMP_HEALTH: int = 400
@@ -49,11 +50,15 @@ var projectiles: ManagerScript
 var spells: SpellsScript
 var combat: CombatScript
 var feel: FeelScript
+## The stage's actor table (actors G3b): the four wizards seated 0-3, so a scenario's "player"
+## casts as the actor its seat drives, in its hat's ramp. The projectile manager hands it on to
+## Spells and Combat; Feel is given it too.
+var actors: ActorSeats.ActorsScript
 ## The node everything visible hangs under.
 var world: Node2D
 var camera: Camera2D
 var imps: Array[Node2D] = []
-## Every reaction_triggered as [player, id, position].
+## Every reaction_triggered as [caster, id, position].
 var reactions: Array = []
 ## Seconds of stage time that have passed.
 var time: float = 0.0
@@ -76,7 +81,9 @@ func _init(root: Node, registry: Node) -> void:
 func start(scenario: Dictionary) -> bool:
 	free_all()
 	bus = _own(EventsScript.new()) as EventsScript
+	actors = _own(ActorSeats.table()) as ActorSeats.ActorsScript
 	projectiles = _own(ManagerScript.new()) as ManagerScript
+	projectiles.actors = actors
 	projectiles.events = bus
 	projectiles.set_cap(SHOT_CAP)
 	projectiles.set_bounds(BOUNDS)
@@ -88,9 +95,10 @@ func start(scenario: Dictionary) -> bool:
 	combat.projectiles = projectiles
 	combat.spells = spells
 	combat.setup()
-	bus.reaction_triggered.connect(func(player: int, id: StringName, at: Vector2) -> void: reactions.append([player, id, at]))
+	bus.reaction_triggered.connect(func(caster: int, id: StringName, at: Vector2) -> void: reactions.append([caster, id, at]))
 	feel = _own(FeelScript.new()) as FeelScript
 	feel.events = bus
+	feel.actors = actors
 	feel.registry = _registry as RegistryScript
 	feel.projectiles = projectiles
 	feel.drive_engine = false
@@ -120,7 +128,7 @@ func start(scenario: Dictionary) -> bool:
 		if built.is_empty():
 			printerr("CLIP SKIPPED: %s: the staff casts nothing" % scenario["id"])
 			return false
-		spells.install_staff(int(entry["player"]), int(entry["staff"]), built)
+		spells.install_staff(caster_of(int(entry["player"])), int(entry["staff"]), built)
 		_anchors[int(entry["player"])] = entry["origin"]
 	for at: Vector2 in scenario["imps"]:
 		_add_imp(at)
@@ -150,16 +158,23 @@ func tick() -> void:
 	while not _pending.is_empty() and float(_pending[0]["at"]) <= time + STEP * 0.5:
 		var entry: Dictionary = _pending.pop_front()
 		var origin: Vector2 = entry["origin"] as Vector2
-		projectiles.set_anchor(int(entry["player"]), origin)
-		spells.cast_staff(int(entry["player"]), int(entry["staff"]), origin, entry["aim"] as Vector2, MANA)
+		var caster: int = caster_of(int(entry["player"]))
+		projectiles.set_anchor(caster, origin)
+		spells.cast_staff(caster, int(entry["staff"]), origin, entry["aim"] as Vector2, MANA)
 	# Orbits circle their caster's anchor, which has to be current every step, as in the game.
 	for player: int in _anchors:
-		projectiles.set_anchor(player, _anchors[player] as Vector2)
+		projectiles.set_anchor(caster_of(player), _anchors[player] as Vector2)
 	projectiles.step(STEP)
 	spells.step(STEP)
 	combat.step(STEP)
 	feel.step(STEP)
 	time += STEP
+
+
+## The actor id the wizard in seat `player` casts as (Spells and the projectile manager key
+## everything by actor id).
+func caster_of(player: int) -> int:
+	return actors.actor_of_seat(player) if actors != null else player
 
 
 ## Writes the shots into the draw batch; call before the frame is drawn.

@@ -7,7 +7,7 @@ extends CharacterBody2D
 ## Set `index` before adding the node to the tree.
 ##
 ## Dash (staffs A6a): there is no dodge button any more. A `dash` card in a staff makes the
-## spell runtime send `caster_move_requested(player, &"dash", to, seconds, tag)`; the wizard
+## spell runtime send `caster_move_requested(actor_id, &"dash", to, seconds, tag)`; the wizard
 ## then dashes the way it walks (the way it faces when standing) as far and as long as asked,
 ## and sends `caster_move_finished` where it stops. A dash gives no invulnerability: shields
 ## do that (staffs B1, B3). `protect(seconds)` still makes the wizard unhurtable for a while (a
@@ -88,6 +88,7 @@ const RegistryScript := preload("res://core/registry/registry.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const CombatScript := preload("res://gameplay/combat/combat.gd")
+const ActorsScript := preload("res://core/actors/actors.gd")
 
 ## Walking speed in pixels per second (the view is 640x360).
 const MOVE_SPEED: float = 90.0
@@ -198,8 +199,16 @@ const ORBIT_ANCHOR_OFFSET: Vector2 = Vector2(0.0, -12.0)
 const LAYER_WALLS: int = 1
 const LAYER_PLAYERS: int = 2
 
-## The player index 0-3.
+## The player index 0-3: the seat. Seat-keyed things (input, the HUD's events, the builder,
+## stats, downed and revived) use it.
 @export var index: int = 0
+## The wizard's actor id (actors G3b, `core/actors`): opened in `_ready` on the wizards' team,
+## ramp and seat `index`, closed when the wizard is freed. Everything it asks of Spells and the
+## projectile manager, and the caster-keyed events it hears and sends, use it, never `index`.
+var actor_id: int = ActorsScript.NONE
+## The actor table. Only tests set this; otherwise the projectile manager's, else the "Actors"
+## autoload.
+var actors: ActorsScript = null
 
 ## One idle strip per player index. The scene lists the four strips (the body has no
 ## player colour, so they can be the same file); _ready() shows the one for `index` on
@@ -439,6 +448,7 @@ func _ready() -> void:
 	if combat == null and in_tree:
 		combat = get_node_or_null("/root/Combat") as CombatScript
 	_connect_build_events()
+	_open_actor()
 	_fill_bag()
 	for at in STAFF_COUNT:
 		var cards: Array[StringName] = []
@@ -497,9 +507,55 @@ func _exit_tree() -> void:
 		if events.mana_refund_requested.is_connected(_on_mana_refund):
 			events.mana_refund_requested.disconnect(_on_mana_refund)
 	if projectiles != null:
-		projectiles.clear_anchor(index)
+		projectiles.clear_anchor(actor_id)
 	if spells != null:
-		spells.clear_aim(index)
+		spells.clear_aim(actor_id)
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE:
+		_close_actor()
+
+
+## Opens the wizard's actor (once): the wizards' team, its seat's ramp, driven by its seat; and
+## its caster in Spells.
+func _open_actor() -> void:
+	if actor_id != ActorsScript.NONE:
+		return
+	var table: ActorsScript = _actor_table()
+	if table == null:
+		return
+	actor_id = table.open(ActorsScript.TEAM_WIZARDS, index, index)
+	if actor_id == ActorsScript.NONE:
+		push_warning("Wizard %d: the actor table is full, so this wizard casts nothing." % index)
+		return
+	table.set_node(actor_id, self)
+	if spells != null:
+		spells.open_caster(actor_id)
+	# Combat may have registered the body before its actor was open (a wizard added to a room
+	# outside the tree): name the owner now, so its own shots skip it.
+	if projectiles != null:
+		projectiles.set_target_owner(self, actor_id)
+
+
+func _close_actor() -> void:
+	if actor_id == ActorsScript.NONE:
+		return
+	if spells != null and is_instance_valid(spells):
+		spells.close_caster(actor_id)
+	var table: ActorsScript = _actor_table()
+	if table != null:
+		table.close(actor_id)
+	actor_id = ActorsScript.NONE
+
+
+func _actor_table() -> ActorsScript:
+	if actors != null:
+		return actors if is_instance_valid(actors) else null
+	if projectiles != null and is_instance_valid(projectiles):
+		return projectiles.actor_table()
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	return tree.root.get_node_or_null(^"Actors") as ActorsScript if tree != null and tree.root != null else null
 
 
 func _physics_process(delta: float) -> void:
@@ -512,13 +568,13 @@ func _physics_process(delta: float) -> void:
 func step(delta: float) -> void:
 	if projectiles != null:
 		if _downed:
-			projectiles.clear_anchor(index)
+			projectiles.clear_anchor(actor_id)
 		else:
-			projectiles.set_anchor(index, global_position + ORBIT_ANCHOR_OFFSET)
+			projectiles.set_anchor(actor_id, global_position + ORBIT_ANCHOR_OFFSET)
 	if _downed:
 		if spells != null:
 			# A downed wizard holds no beam.
-			spells.clear_aim(index)
+			spells.clear_aim(actor_id)
 		velocity = Vector2.ZERO
 		_clear_recoil()
 		# Presses made while downed are not held against the wizard after a revive.
@@ -550,14 +606,14 @@ func step(delta: float) -> void:
 	if spells != null:
 		# A beam this wizard cast follows the staff tip and the aim while it lives.
 		var tip: Vector2 = muzzle_position()
-		spells.set_aim(index, projectiles.clip_to_walls(global_position, tip) if projectiles != null else tip, aim)
+		spells.set_aim(actor_id, projectiles.clip_to_walls(global_position, tip) if projectiles != null else tip, aim)
 	if _dash_look:
 		_tick_trail(delta)
 	var pace: float = combat.wizard_speed_factor(index) if combat != null else 1.0
 	if is_dashing():
 		if _dash_mode == &"dash" and _dash_homing != null:
 			# A homing dash turns toward an enemy as it goes, as a homing shot does.
-			_dash_direction = _dash_homing.steer(projectiles, index, global_position, _dash_direction, delta)
+			_dash_direction = _dash_homing.steer(projectiles, actor_id, global_position, _dash_direction, delta)
 		velocity = _dash_direction * _dash_speed
 		if _dash_mode == &"dash":
 			velocity *= pace
@@ -589,7 +645,7 @@ func step(delta: float) -> void:
 			continue
 		# A held button casts whenever the staff is ready, except while it holds a sustained
 		# card: then only a new press casts, which switches it off.
-		var held: bool = input.is_action_pressed(index, CAST_ACTIONS[at]) and not spells.is_holding(index, at)
+		var held: bool = input.is_action_pressed(index, CAST_ACTIONS[at]) and not spells.is_holding(actor_id, at)
 		if (held or _buffer_left[at] > 0.0) and cast_staff(at):
 			_buffer_left[at] = 0.0
 
@@ -892,7 +948,7 @@ func set_staff(at: int, cards: Array[StringName]) -> bool:
 	for slot in slot_count():
 		row.append(cards[slot] if slot < cards.size() else &"")
 	_cards[at] = row
-	_has_build[at] = spells.install_staff(index, at, spells.compile_staff(row, _staff_or_default())) != 0
+	_has_build[at] = spells.install_staff(actor_id, at, spells.compile_staff(row, _staff_or_default())) != 0
 	if events != null:
 		events.staff_changed.emit(index, at, spells.staff_view(row, _staff_or_default()))
 	return true
@@ -995,9 +1051,9 @@ func _on_mana_reserved(player: int, amount: float) -> void:
 		_reserved = maxf(amount, 0.0)
 
 
-## Siphon gives mana back (never above MAX_MANA).
-func _on_mana_refund(player: int, amount: float) -> void:
-	if player != index or _downed or not is_finite(amount) or amount <= 0.0:
+## Siphon gives mana back to this wizard's actor (never above MAX_MANA).
+func _on_mana_refund(caster: int, amount: float) -> void:
+	if caster != actor_id or caster == ActorsScript.NONE or _downed or not is_finite(amount) or amount <= 0.0:
 		return
 	mana = minf(mana + amount, MAX_MANA)
 	_announce_stats()
@@ -1018,13 +1074,13 @@ func cast_staff(at: int) -> bool:
 		# A staff tip behind a wall: the shot starts at the wall and ends on it
 		# (the manager takes no pool slot for a shot that starts inside a wall).
 		origin = projectiles.clip_to_walls(global_position, origin)
-	var spent: float = spells.cast_staff(index, at, origin, aim, free_mana())
+	var spent: float = spells.cast_staff(actor_id, at, origin, aim, free_mana())
 	if spent == SpellsScript.REFUSED:
 		return false
 	mana -= spent
 	_announce_stats()
 	if events != null:
-		var form: StringName = spells.last_form(index, at)
+		var form: StringName = spells.last_form(actor_id, at)
 		if form != &"":
 			events.spell_cast.emit(index, form, origin, aim)
 		events.staff_cast.emit(index, at, origin, aim)
@@ -1036,8 +1092,8 @@ func cast_staff(at: int) -> bool:
 ## A card of this wizard asked to move it (staffs A6a, B4). A dash goes the way the wizard walks
 ## (or faces), a teleport jumps, a hook or swap pulls it to a point, a recoil pushes it back.
 ## Anything but a recoil replaces the move in progress, which is answered where the wizard is.
-func _on_caster_move_requested(player: int, mode: StringName, to: Vector2, seconds: float, tag: int) -> void:
-	if player != index or _downed or not to.is_finite():
+func _on_caster_move_requested(caster: int, mode: StringName, to: Vector2, seconds: float, tag: int) -> void:
+	if caster != actor_id or caster == ActorsScript.NONE or _downed or not to.is_finite():
 		return
 	if mode == &"recoil":
 		_recoil_pending += to - muzzle_position()
@@ -1057,7 +1113,7 @@ func _on_caster_move_requested(player: int, mode: StringName, to: Vector2, secon
 		if input != null and input.get_move(index) != Vector2.ZERO:
 			_dash_direction = input.get_move(index).normalized()
 		_dash_speed = (to - muzzle_position()).length() / time
-		_dash_homing = spells.move_homing(index) if spells != null else null
+		_dash_homing = spells.move_homing(actor_id) if spells != null else null
 	else:
 		var pull: Vector2 = to - global_position
 		_dash_direction = pull.normalized()
@@ -1084,7 +1140,7 @@ func _teleport(to: Vector2, tag: int) -> void:
 			goal = goal.move_toward(start, TELEPORT_BACKOFF)
 	global_position = goal
 	if events != null:
-		events.caster_move_finished.emit(index, &"teleport", goal, tag)
+		events.caster_move_finished.emit(actor_id, &"teleport", goal, tag)
 
 
 ## The move ended: say where, so its card can go off there (blast, a trigger; staffs B2). A swap
@@ -1093,7 +1149,7 @@ func _finish_dash() -> void:
 	_dash_left = 0.0
 	_dash_done = false
 	if events != null and _dash_mode != &"swap":
-		events.caster_move_finished.emit(index, _dash_mode, global_position, _dash_tag)
+		events.caster_move_finished.emit(actor_id, _dash_mode, global_position, _dash_tag)
 
 
 ## The recoil asked for since the last step becomes a push of that distance over the time asked,

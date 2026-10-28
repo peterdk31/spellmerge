@@ -18,9 +18,10 @@ const TAG: int = 1 << 20
 var _failures: Array[String] = []
 var _world: AiFixture = null
 var _entities: EntitiesScript = null
-## Every entity_ended as [player, kind, position, tag].
+## Every entity_ended as [caster, kind, position, tag] (the owner's actor id; the fixture's
+## wizards are the actors 0-3, seated 0-3).
 var _ended: Array[Array] = []
-## Every familiar_cast_requested as [player, position, direction, tag].
+## Every familiar_cast_requested as [caster, position, direction, tag].
 var _casts: Array[Array] = []
 
 
@@ -97,8 +98,8 @@ func _enemy_target(at: Vector2) -> Node2D:
 	return enemy
 
 
-func _spawn(player: int, kind: StringName, at: Vector2, seconds: float = 5.0, tag: int = TAG) -> void:
-	_world.bus.entity_spawn_requested.emit(player, kind, at, seconds, tag, -1)
+func _spawn(caster: int, kind: StringName, at: Vector2, seconds: float = 5.0, tag: int = TAG) -> void:
+	_world.bus.entity_spawn_requested.emit(caster, kind, at, seconds, tag, -1)
 
 
 ## `count` physics frames of the whole world: every imp, Combat, the projectiles, Spells (the
@@ -334,11 +335,12 @@ func _test_four_players_keep_their_own() -> void:
 
 func _test_bad_requests_are_ignored() -> void:
 	_setup(1)
-	_spawn(4, EntitiesScript.DECOY, Vector2.ZERO)
+	_spawn(EntitiesScript.ACTORS, EntitiesScript.DECOY, Vector2.ZERO)
 	_spawn(-1, EntitiesScript.DECOY, Vector2.ZERO)
 	_spawn(0, EntitiesScript.DECOY, Vector2(NAN, 0.0))
 	_spawn(0, EntitiesScript.DECOY, Vector2.ZERO, NAN)
-	_check(_entities.count() == 0, "bad players, positions and times make nothing")
+	_spawn(0, EntitiesScript.DECOY, Vector2.ZERO, 5.0, SpellTag.make(1, 0, 0, 1))
+	_check(_entities.count() == 0, "bad actor ids, positions and times make nothing, nor a spell tag of another caster")
 
 
 func _test_swap_moves_only_the_named_enemy() -> void:

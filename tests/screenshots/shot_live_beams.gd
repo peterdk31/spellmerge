@@ -4,6 +4,7 @@ extends "res://tests/support/screenshot.gd"
 ## beams (the glow look), each kept on with `hold` so the shot catches it. `live_beams` is the whole screen and `live_beams_bend` a crop of the
 ## bent one.
 
+const ActorSeats := preload("res://tests/support/actor_seats.gd")
 const DUMMY := preload("res://content/enemies/training_dummy/idle.svg")
 const STARTER := preload("res://content/wizard/staffs/starter/starter.tres")
 ## Each row: the cards, the beam's start and the dummy it may hit (the homing one is off its line).
@@ -24,6 +25,13 @@ func take() -> void:
 	var spells: Node = root.get_node("Spells")
 	var projectiles: Node = root.get_node("Projectiles")
 	projectiles.call("set_bounds", Rect2(Vector2.ZERO, SCREEN))
+	# Spells keeps staffs by actor id and a beam takes its caster's ramp (actors G3b): open the
+	# wizards of players 1 and 2 in the Actors table and cast as them.
+	var actors: ActorSeats.ActorsScript = ActorSeats.autoload()
+	if actors == null:
+		fail("there is no Actors autoload")
+		return
+	var wizards: PackedInt32Array = ActorSeats.seat_wizards(actors, 2)
 	lay_floor()
 	for row: Array in ROWS:
 		var dummy := Node2D.new()
@@ -36,8 +44,8 @@ func take() -> void:
 		var cards: Array[StringName] = []
 		cards.assign(row[0])
 		# A wizard has four staffs; the last rows are player 2's.
-		spells.call("install_staff", i / 4, i % 4, spells.call("compile_staff", cards, STARTER))
-		spells.call("cast_staff", i / 4, i % 4, row[1], Vector2.RIGHT, 100.0)
+		spells.call("install_staff", wizards[i / 4], i % 4, spells.call("compile_staff", cards, STARTER))
+		spells.call("cast_staff", wizards[i / 4], i % 4, row[1], Vector2.RIGHT, 100.0)
 		label(" ".join(PackedStringArray(cards)), row[1] + Vector2(0.0, -24.0))
 	await settle()
 	await shot("live_beams")

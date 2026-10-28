@@ -367,18 +367,19 @@ func _top_up_enemies() -> void:
 		_enemy_samples += 1
 
 
-## Fill the manager up to the target with plain shots, owned by the players in turn.
+## Fill the manager up to the target with plain shots, cast by the players' wizards in turn.
 func _top_up_shots() -> void:
 	var missing: int = _target_shots - int(_projectiles.call("get_count"))
 	var count: int = mini(missing, TOP_UP_PER_STEP)
 	for i in count:
 		var owner_index: int = i % PLAYERS
-		var wizard := _flow.call("get_wizard", owner_index) as Node2D
+		var wizard := _flow.call("get_wizard", owner_index) as PlayerScript
 		if wizard == null:
 			continue
 		var angle: float = _rng.randf() * TAU
 		var speed: float = _rng.randf_range(FILLER_SPEED_MIN, FILLER_SPEED_MAX)
-		_projectiles.call("spawn", owner_index, wizard.global_position, Vector2.from_angle(angle) * speed, FILLER_LIFE, FILLER_RADIUS, ProjectileManagerScript.LAYER_ENEMY, FILLER_PIERCE)
+		# A shot's caster is the wizard's actor id (actors G3b), not its seat.
+		_projectiles.call("spawn", wizard.actor_id, wizard.global_position, Vector2.from_angle(angle) * speed, FILLER_LIFE, FILLER_RADIUS, ProjectileManagerScript.LAYER_ENEMY, FILLER_PIERCE)
 
 
 func _on_spell_cast(player: int, _spell_id: StringName, _origin: Vector2, _direction: Vector2) -> void:
@@ -387,12 +388,12 @@ func _on_spell_cast(player: int, _spell_id: StringName, _origin: Vector2, _direc
 
 
 ## Only shots made by spells have a tag; the fillers have tag 0.
-func _on_projectile_hit(_player: int, _target: Node, _position: Vector2, tag: int) -> void:
+func _on_projectile_hit(_caster: int, _target: Node, _position: Vector2, tag: int) -> void:
 	if tag != 0:
 		_hits += 1
 
 
-func _on_reaction_triggered(_player: int, _reaction_id: StringName, _position: Vector2) -> void:
+func _on_reaction_triggered(_caster: int, _reaction_id: StringName, _position: Vector2) -> void:
 	_reactions += 1
 
 

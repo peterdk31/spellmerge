@@ -426,8 +426,10 @@ func step_staffs() -> void:
 		var panel: PlayerPanelScript = _panels[player]
 		if not panel.visible:
 			continue
+		# Spells keeps staffs by caster: the actor this seat drives (actors G3b).
+		var actor: int = spells.actor_of_seat(player)
 		for staff in PlayerPanelScript.STAFF_COUNT:
-			panel.set_staff_timing(staff, spells.cast_index(player, staff), spells.cooldown_left(player, staff))
+			panel.set_staff_timing(staff, spells.cast_index(actor, staff), spells.cooldown_left(actor, staff))
 
 
 ## The "Wave N" line, or null before the script's `_ready`.

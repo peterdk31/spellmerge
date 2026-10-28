@@ -2,8 +2,10 @@ extends "res://tests/support/suite.gd"
 ## Enemy spells in combat (staffs F6, docs/milestones/M2-staffs.md, "Enemy staffs"): an enemy's
 ## spell hit on a wizard does what a spell does (damage, push, statuses) and wizards take
 ## reactions from the same table as enemies, for every spell (CONSUME, BURST, EXTEND, SPREAD, the
-## reaction wait); `wizard_hurt` and `reaction_landed` carry the enemy's tag; an enemy's area hit
+## reaction wait); `actor_hurt` and `reaction_landed` carry the enemy's tag; an enemy's area hit
 ## hurts everything in it (wizards, the other enemies and the enemy that cast it; actors G3c).
+## The enemy is an unseated actor of the test's actor table (actors G3b: hits name actor ids);
+## the wizards are seated 0-3 at the actor ids 0-3.
 ## Hits arrive as `projectile_hit` and `area_hit_requested` on a test bus, with hand-made hit
 ## profiles; time moves by `Combat.step` with a fixed delta.
 ##
@@ -14,16 +16,17 @@ const EventsScript := preload("res://core/events/events.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const PlayerScript := preload("res://gameplay/player/player.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
+const ActorSeats := preload("res://tests/support/actor_seats.gd")
 
 const STEP: float = 0.0625
-## The enemy row the tests' spells come from, and its caster number.
-const ROW: int = 3
-const CASTER: int = SpellLimits.FIRST_ENEMY_CASTER + ROW
 
 var _bus: EventsScript
 var _projectiles: ManagerScript
 var _combat: CombatScript
 var _spells: SpellsScript
+var _actors: ActorSeats.ActorsScript
+## The enemy actor the tests' spells come from.
+var _caster: int = -1
 var _next_tag: int = 0
 var _hurt: Array = []
 var _landed: Array = []
@@ -35,17 +38,21 @@ func before_each() -> void:
 	_bus = own(EventsScript.new()) as EventsScript
 	_projectiles = own(ManagerScript.new()) as ManagerScript
 	_projectiles.events = _bus
+	_actors = own(ActorSeats.table()) as ActorSeats.ActorsScript
+	_projectiles.actors = _actors
+	_caster = ActorSeats.enemy(_actors)
 	_combat = own(CombatScript.new()) as CombatScript
 	_combat.events = _bus
 	_combat.projectiles = _projectiles
 	_spells = own(SpellsScript.new()) as SpellsScript
 	_spells.bind(_projectiles, _bus)
 	_combat.spells = _spells
+	_combat.actors = _actors
 	_combat._ready()
 	_next_tag = 0
 	for list: Array in [_hurt, _landed, _reactions, _triggered]:
 		list.clear()
-	_bus.wizard_hurt.connect(func(p: int, a: int, _at: Vector2, tag: int, k: StringName) -> void: _hurt.append([p, a, tag, k]))
+	_bus.actor_hurt.connect(func(p: int, a: int, _at: Vector2, tag: int, k: StringName) -> void: _hurt.append([p, a, tag, k]))
 	_bus.hit_landed.connect(func(p: int, t: Node, a: int, _at: Vector2, k: StringName) -> void: _landed.append([p, t, a, k]))
 	_bus.reaction_landed.connect(func(p: int, id: StringName, t: Node, _at: Vector2, tag: int) -> void: _reactions.append([p, id, t, tag]))
 	_bus.reaction_triggered.connect(func(_p: int, id: StringName, _at: Vector2) -> void: _triggered.append(id))
@@ -55,6 +62,9 @@ func _wizard(index: int, at: Vector2) -> PlayerScript:
 	var wizard := own(PlayerScript.new()) as PlayerScript
 	wizard.index = index
 	wizard.events = _bus
+	# The seat's actor in the test table is the wizard's (opened there, not by the wizard).
+	wizard.actors = _actors
+	wizard.actor_id = _actors.actor_of_seat(index)
 	wizard._ready()
 	wizard.position = at
 	_combat.register_player(index, wizard, 8.0)
@@ -69,10 +79,10 @@ func _enemy(at: Vector2, health: int = 100) -> Node2D:
 	return enemy
 
 
-## An enemy spell's tag (row ROW) whose hit profile is `profile`.
+## A spell tag of the enemy actor `_caster` whose hit profile is `profile`.
 func _enemy_tag(profile: HitProfile) -> int:
 	_next_tag += 1
-	var tag: int = SpellTag.make_enemy(ROW, 0, _next_tag, 1)
+	var tag: int = SpellTag.make(_caster, 0, _next_tag, 1)
 	var spell := CompiledSpell.new()
 	spell.hit = profile
 	_spells._profiles[tag] = spell
@@ -94,7 +104,7 @@ func _element(damage: int, element: StringName, status: StringName, duration: fl
 
 func _hit(wizard: Node2D, profile: HitProfile) -> int:
 	var tag: int = _enemy_tag(profile)
-	_bus.projectile_hit.emit(EventsScript.NO_PLAYER, wizard, wizard.position + Vector2(-5.0, 0.0), tag)
+	_bus.projectile_hit.emit(_caster, wizard, wizard.position + Vector2(-5.0, 0.0), tag)
 	return tag
 
 
@@ -109,9 +119,9 @@ func test_an_enemys_spell_hurts_a_wizard_like_a_spell() -> void:
 	profile.knockback = 150.0
 	var tag: int = _hit(wizard, profile)
 	check_equal(wizard.health, PlayerScript.MAX_HEALTH - 5, "its damage")
-	check_equal(_hurt, [[1, 5, tag, &"shot"]], "wizard_hurt carries the enemy's tag")
-	check_equal(SpellTag.caster_of(_hurt[0][2]), CASTER, "whose row the runtime can find")
-	check_equal(_landed[0][0], EventsScript.NO_PLAYER, "the hit is no player's")
+	check_equal(_hurt, [[1, 5, tag, &"shot"]], "actor_hurt names the wizard's actor and carries the enemy's tag")
+	check_equal(SpellTag.caster_of(_hurt[0][2]), _caster, "whose caster the runtime can find")
+	check_equal(_landed[0][0], _caster, "the hit is the enemy actor's")
 	check(_combat.wizard_status_left(1, &"burn") > 0.0, "its status goes on")
 	check(_combat.consume_wizard_knockback(1, 0.0).x > 0.0, "and it pushes")
 
@@ -123,7 +133,7 @@ func test_a_wizard_thaws_like_an_enemy() -> void:
 	_combat.apply_wizard_status(EventsScript.NO_PLAYER, 0, &"burn", 3.0, 1.0)
 	var tag: int = _hit(wizard, _element(2, &"frost", &"chill"))
 	check_equal(_triggered, [&"thaw"] as Array[StringName], "frost on a burning wizard thaws")
-	check(_reactions.size() == 1 and _reactions[0][0] == EventsScript.NO_PLAYER and _reactions[0][2] == wizard and _reactions[0][3] == tag, "reaction_landed names the enemy's tag, for its on reaction")
+	check(_reactions.size() == 1 and _reactions[0][0] == _caster and _reactions[0][2] == wizard and _reactions[0][3] == tag, "reaction_landed names the enemy's tag, for its on reaction")
 	check_equal(_combat.wizard_status_left(0, &"burn"), 0.0, "the burn is used up")
 	check_equal(_combat.wizard_status_left(0, &"chill"), 0.0, "the reaction runs instead of the chill")
 	check_equal(wizard.health, PlayerScript.MAX_HEALTH - 2 - 3, "the hit and the burst")
@@ -175,11 +185,11 @@ func test_an_enemys_area_hit_hurts_everything_in_it() -> void:
 	var wizard := _wizard(2, Vector2(10.0, 0.0))
 	var other := _enemy(Vector2(-10.0, 0.0))
 	var caster := _enemy(Vector2(0.0, 10.0))
-	_projectiles.set_target_owner(caster, CASTER)
+	_projectiles.set_target_owner(caster, _caster)
 	var blast := HitProfile.new()
 	blast.damage = 4
 	var tag: int = _enemy_tag(blast)
-	_bus.area_hit_requested.emit(EventsScript.NO_PLAYER, Vector2.ZERO, 40.0, tag)
+	_bus.area_hit_requested.emit(_caster, Vector2.ZERO, 40.0, tag)
 	check_equal(wizard.health, PlayerScript.MAX_HEALTH - 4, "an enemy's blast hurts the wizard")
 	check_equal(_combat.get_health(other), 96, "and the other enemy (G3c: enemies always hurt each other)")
 	check_equal(_combat.get_health(caster), 96, "and the enemy that cast it, as a wizard's own blast does the wizard")
@@ -190,5 +200,5 @@ func test_an_enemys_mend_heals_no_wizard() -> void:
 	wizard.health = 50
 	var profile := HitProfile.new()
 	profile.heal = 10
-	_bus.area_hit_requested.emit(EventsScript.NO_PLAYER, Vector2.ZERO, 40.0, _enemy_tag(profile))
-	check_equal(wizard.health, 50, "an enemy's mend is not the wizards'")
+	_bus.area_hit_requested.emit(_caster, Vector2.ZERO, 40.0, _enemy_tag(profile))
+	check_equal(wizard.health, 50, "an enemy's mend is not the wizards' (no seat drives its caster)")

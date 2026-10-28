@@ -1,5 +1,6 @@
 extends RefCounted
-## A small world for the enemy tests: its own event bus, projectile manager, Spells (with the
+## A small world for the enemy tests: its own event bus, actor table (`actors`, which the services,
+## the wizards and the imps use instead of the autoload), projectile manager, Spells (with the
 ## real cards, from a scanned registry) and Combat, a number of wizards, and imps made from the
 ## real scene and data (staffs F9: the imp casts its staff). `free_all()` frees everything, so a
 ## test that builds a world with this leaves nothing behind.
@@ -11,12 +12,14 @@ const PlayerScript := preload("res://gameplay/player/player.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
+const ActorsScript := preload("res://core/actors/actors.gd")
 const ImpData := preload("res://content/enemies/ember_imp/ember_imp.tres")
 
 ## Time moves by this fixed binary fraction.
 const STEP: float = 0.0625
 
 var bus: Node
+var actors: ActorsScript
 var combat: Node
 var projectiles: Node
 var registry: Node
@@ -32,6 +35,8 @@ func _init(root: Node, player_count: int = 1) -> void:
 	bus = EventsScript.new()
 	projectiles = ProjectileManagerScript.new()
 	projectiles.events = bus
+	actors = ActorsScript.new()
+	projectiles.actors = actors
 	registry = RegistryScript.new()
 	registry.call("scan")
 	spells = SpellsScript.new()
@@ -46,6 +51,7 @@ func _init(root: Node, player_count: int = 1) -> void:
 		var wizard := PlayerScript.new()
 		wizard.index = index
 		wizard.events = bus
+		wizard.actors = actors
 		root.add_child(wizard)
 		wizard.position = Vector2(1000.0, 1000.0 * index)
 		players.append(wizard)
@@ -93,11 +99,12 @@ func free_all() -> void:
 		if is_instance_valid(wizard):
 			wizard.free()
 	players.clear()
-	for node: Node in [combat, spells, registry, projectiles, bus]:
+	for node: Node in [combat, spells, registry, projectiles, actors, bus]:
 		if node != null:
 			node.free()
 	combat = null
 	spells = null
 	registry = null
 	projectiles = null
+	actors = null
 	bus = null

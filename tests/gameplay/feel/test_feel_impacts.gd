@@ -8,12 +8,16 @@ const EventsScript := preload("res://core/events/events.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
 const FeelPresetScript := preload("res://gameplay/feel/presets/feel_preset.gd")
 const WizardStandIn := preload("res://tests/gameplay/feel/fixtures/wizard_stand_in.gd")
+const ActorSeats := preload("res://tests/support/actor_seats.gd")
+const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 
 const STEP: float = 0.0625
 
 var bus: EventsScript
 var feel: FeelScript
 var preset: FeelPresetScript
+## Wizards seated 0-3 at the actor ids 0-3, so caster 0-3 shows in hat ramp 0-3.
+var actors: ActorSeats.ActorsScript
 
 
 func before_each() -> void:
@@ -24,6 +28,8 @@ func before_each() -> void:
 	preset.death_sound = &""
 	preset.downed_sound = &""
 	feel.events = bus
+	actors = own(ActorSeats.table()) as ActorSeats.ActorsScript
+	feel.actors = actors
 	feel.drive_engine = false
 	feel.preset = preset
 	root.add_child(feel)
@@ -75,7 +81,7 @@ func test_a_wizard_is_hit_in_its_own_colours() -> void:
 	for index in 4:
 		_strike(EventsScript.NO_PLAYER, _wizard(index), Vector2.ZERO, Vector2.LEFT, 5)
 		var spray: Dictionary = feel.effect_info(FeelScript.KIND_SPRAY)
-		check(spray["core"] == Color.WHITE and spray["player"] == index, "wizard %d is hit in its own ramp" % index)
+		check(spray["core"] == Color.WHITE and spray["ramp"] == index, "wizard %d is hit in its own ramp" % index)
 
 
 func test_more_damage_is_a_bigger_spray() -> void:
@@ -132,18 +138,20 @@ func test_a_wall_hit_knocks_chips_back_off_the_wall() -> void:
 	check((chips["at"] as Vector2).is_equal_approx(Vector2(96.0, 100.0)), "at the wall")
 
 
-func test_a_wall_hit_shows_an_effect_for_its_player() -> void:
+func test_a_wall_hit_shows_an_effect_in_its_casters_ramp() -> void:
 	for player in 4:
 		bus.projectile_impact.emit(player, null, Vector2(10.0 * float(player), 0.0), Vector2.UP)
 	for player in 4:
-		check_equal(feel.effects_of(FeelScript.KIND_BURST, player), 1, "player %d's burst" % player)
+		check_equal(feel.effects_of(FeelScript.KIND_BURST, player), 1, "player %d's burst, in its hat ramp" % player)
 	check_equal(feel.effects_of(FeelScript.KIND_CHIPS), 4, "and four sprays of chips")
 
 
 func test_an_enemy_shot_on_a_wall_lands_in_the_enemy_ramp() -> void:
-	bus.projectile_impact.emit(EventsScript.NO_PLAYER, null, Vector2.ZERO, Vector2.UP)
+	bus.projectile_impact.emit(ActorSeats.enemy(actors), null, Vector2.ZERO, Vector2.UP)
 	var shown: Dictionary = feel.effect_info(FeelScript.KIND_BURST)
-	check(shown["player"] == EventsScript.NO_PLAYER and shown["core"] == Color.WHITE, "an enemy shot's burst is a spell's, in the enemy ramp (staffs F7)")
+	check(shown["ramp"] == ActorSeats.ActorsScript.RAMP_ENEMY and shown["core"] == Color.WHITE, "an enemy shot's burst is a spell's, in the enemy ramp (staffs F7)")
+	bus.projectile_impact.emit(EventsScript.NO_PLAYER, null, Vector2.ZERO, Vector2.UP)
+	check(not ProjectilesScript.is_hat_ramp(feel.effect_info(FeelScript.KIND_BURST)["ramp"] as int), "a shot of no actor too")
 
 
 func test_wall_effects_are_limited_and_end() -> void:

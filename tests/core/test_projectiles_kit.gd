@@ -8,20 +8,22 @@ extends SceneTree
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const EventsScript :=preload("res://core/events/events.gd")
+const ActorSeats := preload("res://tests/support/actor_seats.gd")
 
 const DT: float = 1.0 / 60.0
 
 var _failures: Array[String] = []
 var _bus: Node
 var _mgr: Node2D
+## Wizards at ids 0-3 (seated 0-3) and one enemy, `_imp`.
+var _table: ActorSeats.ActorsScript
+var _imp: int = -1
 var _targets: Array[Node2D] = []
-## Every projectile_hit as [player, target, position, tag].
+## Every projectile_hit as [caster, target, position, tag].
 var _hits: Array = []
-## Every projectile_expired as [player, position, tag, on_wall].
+## Every projectile_expired as [caster, position, tag, on_wall].
 var _expired: Array = []
-## Every ally_passed as [player, ally, tag]: none since actors G3c.
-var _passed: Array = []
-## Every shot_blocked as [player, position, tag].
+## Every shot_blocked as [caster, position, tag].
 var _blocked: Array = []
 
 
@@ -40,7 +42,7 @@ func _initialize() -> void:
 	_test_growth_is_capped()
 	_test_sticky_follows_its_target()
 	_test_shield_blocks_enemy_shots()
-	_test_shield_only_for_players_shots()
+	_test_shield_only_for_actors_shots()
 	_test_self_hit_waits_until_the_shot_leaves_the_caster()
 	_test_every_shot_hits_both_sides()
 	_test_sticky_shot_keeps_its_direction_and_stays_stuck_at_a_wall()
@@ -67,16 +69,17 @@ func _setup() -> void:
 	_teardown()
 	_bus = EventsScript.new()
 	_mgr = ManagerScript.new()
+	_table = ActorSeats.table()
+	_imp = ActorSeats.enemy(_table)
+	_mgr.actors = _table
 	_mgr.events = _bus
 	_mgr.set_bounds(Rect2(0.0, 0.0, 640.0, 360.0))
 	_hits.clear()
 	_expired.clear()
-	_passed.clear()
 	_blocked.clear()
-	_bus.projectile_expired.connect(func(player: int, position: Vector2, tag: int) -> void: _expired.append([player, position, tag, _mgr.expired_on_wall]))
-	_bus.projectile_hit.connect(func(player: int, target: Node, position: Vector2, tag: int) -> void: _hits.append([player, target, position, tag]))
-	_bus.ally_passed.connect(func(player: int, ally: Node, _position: Vector2, tag: int) -> void: _passed.append([player, ally, tag]))
-	_bus.shot_blocked.connect(func(player: int, position: Vector2, tag: int) -> void: _blocked.append([player, position, tag]))
+	_bus.projectile_expired.connect(func(caster: int, position: Vector2, tag: int) -> void: _expired.append([caster, position, tag, _mgr.expired_on_wall]))
+	_bus.projectile_hit.connect(func(caster: int, target: Node, position: Vector2, tag: int) -> void: _hits.append([caster, target, position, tag]))
+	_bus.shot_blocked.connect(func(caster: int, position: Vector2, tag: int) -> void: _blocked.append([caster, position, tag]))
 
 
 func _teardown() -> void:
@@ -84,11 +87,12 @@ func _teardown() -> void:
 		if is_instance_valid(target):
 			target.free()
 	_targets.clear()
-	for node: Node in [_mgr, _bus]:
+	for node: Node in [_mgr, _bus, _table]:
 		if node != null and is_instance_valid(node):
 			node.free()
 	_mgr = null
 	_bus = null
+	_table = null
 
 
 func _target(position: Vector2, radius: float = 10.0, layer: int = ManagerScript.LAYER_ENEMY, owner: int = EventsScript.NO_PLAYER) -> Node2D:
@@ -105,8 +109,8 @@ func _run(steps: int) -> void:
 		_mgr.step(DT)
 
 
-func _fire(velocity: Vector2, at: Vector2 = Vector2(50.0, 100.0), life: float = 3.0, tag: int = 1, player: int = 0) -> int:
-	return _mgr.spawn(player, at, velocity, life, 3.0, ManagerScript.LAYER_ENEMY, 0, tag)
+func _fire(velocity: Vector2, at: Vector2 = Vector2(50.0, 100.0), life: float = 3.0, tag: int = 1, caster: int = 0) -> int:
+	return _mgr.spawn(caster, at, velocity, life, 3.0, ManagerScript.LAYER_ENEMY, 0, tag)
 
 
 func _test_a_plain_shot_has_no_behaviours() -> void:
@@ -287,7 +291,7 @@ func _test_shield_blocks_enemy_shots() -> void:
 	_mgr.set_shield(shield, 2)
 	var spawned: Array[int] = []
 	for i in 3:
-		spawned.append(_mgr.spawn(EventsScript.NO_PLAYER, Vector2(160.0 + 20.0 * i, 100.0), Vector2(-100.0, 0.0), 3.0, 3.0, ManagerScript.LAYER_PLAYER, 0, 0))
+		spawned.append(_mgr.spawn(_imp, Vector2(160.0 + 20.0 * i, 100.0), Vector2(-100.0, 0.0), 3.0, 3.0, ManagerScript.LAYER_PLAYER, 0, 0))
 	var ended: Array[int] = []
 	_mgr.shot_ended.connect(func(tag: int) -> void: ended.append(tag))
 	_run(90)
@@ -304,19 +308,19 @@ func _test_shield_blocks_enemy_shots() -> void:
 	_mgr.set_shield(wall, 1)
 	var fast: int = _mgr.spawn(EventsScript.NO_PLAYER, Vector2(300.0, 100.0), Vector2(-3000.0, 0.0), 3.0, 3.0, ManagerScript.LAYER_PLAYER, 0, 0)
 	_run(6)
-	_check(not _mgr.is_alive(fast) and _blocked.size() == 1, "a very fast enemy shot is still stopped")
+	_check(not _mgr.is_alive(fast) and _blocked.size() == 1, "a very fast shot (of no actor: no team) is still stopped")
 
 
-func _test_shield_only_for_players_shots() -> void:
+func _test_shield_only_for_actors_shots() -> void:
 	_setup()
-	var enemy_shot: int = _mgr.spawn(EventsScript.NO_PLAYER, Vector2(100.0, 100.0), Vector2.ZERO, 1.0, 3.0, ManagerScript.LAYER_PLAYER, 0, 0)
-	_check(not _mgr.set_shield(enemy_shot, 1), "an enemy shot cannot have a shield")
+	var stray: int = _mgr.spawn(EventsScript.NO_PLAYER, Vector2(100.0, 100.0), Vector2.ZERO, 1.0, 3.0, ManagerScript.LAYER_PLAYER, 0, 0)
+	_check(not _mgr.set_shield(stray, 1), "a shot of no actor cannot have a shield")
 	_mgr.clear()
 	var mine: int = _fire(Vector2.ZERO, Vector2(100.0, 100.0))
 	var friend: int = _fire(Vector2.ZERO, Vector2(100.0, 100.0), 1.0, 2, 1)
 	_mgr.set_shield(mine, 1)
 	_run(5)
-	_check(_mgr.is_alive(friend) and _blocked.is_empty(), "a shield stops enemy shots only, never a teammate's")
+	_check(_mgr.is_alive(friend) and _blocked.is_empty(), "a shield stops other teams' shots only, never a teammate's")
 
 
 func _test_self_hit_waits_until_the_shot_leaves_the_caster() -> void:
@@ -333,7 +337,7 @@ func _test_self_hit_waits_until_the_shot_leaves_the_caster() -> void:
 	caster = _target(Vector2(50.0, 100.0), 8.0, ManagerScript.LAYER_PLAYER, 0)
 	var slot: int = _fire(Vector2(200.0, 0.0))
 	_mgr.set_bounce(slot, 1)
-	_check(_mgr.set_self_hit(slot), "self-hit is accepted for a player's shot")
+	_check(_mgr.set_self_hit(slot), "self-hit is accepted for a wizard's shot")
 	_run(3)
 	_check(_hits.is_empty() and _mgr.is_alive(slot), "it does not hit the caster it starts inside")
 	_check(not _mgr.is_self_live(slot) or _mgr.get_position_of(slot).distance_to(Vector2(50.0, 100.0)) > 10.0, "and is not live while it overlaps them")
@@ -343,12 +347,11 @@ func _test_self_hit_waits_until_the_shot_leaves_the_caster() -> void:
 	_check(_hits.size() == 1 and _hits[0][1] == caster and _hits[0][0] == 0, "and hits the caster when it comes back")
 	_check(_hits[0][2].x > 50.0 and _hits[0][2].x < 70.0, "at the caster")
 	_check(not _mgr.is_alive(slot), "that spends it")
-	_check(not _mgr.set_self_hit(_mgr.spawn(EventsScript.NO_PLAYER, Vector2(10.0, 10.0), Vector2.ZERO, 1.0)), "an enemy shot has no caster")
+	_check(not _mgr.set_self_hit(_mgr.spawn(EventsScript.NO_PLAYER, Vector2(10.0, 10.0), Vector2.ZERO, 1.0)), "a shot of no actor has no caster to hit")
 
 
-## Everything hits everything (actors G3c): a wizard's shot hits a teammate, never passes one
-## (nothing sends `ally_passed`); an enemy caster's hits another enemy; a NO_PLAYER shot hits a
-## wizard and an enemy alike. Only the caster's own body is skipped.
+## Everything hits everything (actors G3c): a wizard's shot hits a teammate, never passes one;
+## an enemy's hits another enemy; a shot of no actor hits a wizard and an enemy alike. Only the caster's own body is skipped.
 func _test_every_shot_hits_both_sides() -> void:
 	_setup()
 	var friend: Node2D = _target(Vector2(100.0, 100.0), 8.0, ManagerScript.LAYER_PLAYER, 1)
@@ -356,27 +359,27 @@ func _test_every_shot_hits_both_sides() -> void:
 	var slot: int = _fire(Vector2(200.0, 0.0), Vector2(50.0, 100.0), 2.0, 12)
 	_run(30)
 	_check(_hits.size() == 1 and _hits[0][1] == friend and _hits[0][0] == 0 and _hits[0][3] == 12, "a wizard's shot hits the teammate in its way, not its own wizard (%d hits)" % _hits.size())
-	_check(not _mgr.is_alive(slot) and _passed.is_empty(), "the hit spends it and nothing is passed")
+	_check(not _mgr.is_alive(slot), "the hit spends it")
 	# A still shot over a teammate hits them.
 	_setup()
 	friend = _target(Vector2(100.0, 100.0), 8.0, ManagerScript.LAYER_PLAYER, 2)
 	_mgr.spawn(3, Vector2(100.0, 100.0), Vector2.ZERO, 1.0, 3.0, ManagerScript.LAYER_ENEMY, 0, 13, ManagerScript.MOTION_STILL)
 	_run(5)
-	_check(_hits.size() == 1 and _hits[0][1] == friend and _passed.is_empty(), "a still shot over a teammate hits them")
-	# An enemy caster's shot hits the other enemy, never its own body.
+	_check(_hits.size() == 1 and _hits[0][1] == friend, "a still shot over a teammate hits them")
+	# An enemy's shot hits the other enemy, never its own body.
 	_setup()
-	var own: Node2D = _target(Vector2(50.0, 100.0), 8.0, ManagerScript.LAYER_ENEMY, ManagerScript.FIRST_ENEMY_CASTER)
+	var own: Node2D = _target(Vector2(50.0, 100.0), 8.0, ManagerScript.LAYER_ENEMY, _imp)
 	var other: Node2D = _target(Vector2(100.0, 100.0), 8.0, ManagerScript.LAYER_ENEMY)
-	_mgr.spawn(ManagerScript.FIRST_ENEMY_CASTER, Vector2(50.0, 100.0), Vector2(200.0, 0.0), 2.0, 3.0, ManagerScript.LAYER_PLAYER, 0, 0)
+	_mgr.spawn(_imp, Vector2(50.0, 100.0), Vector2(200.0, 0.0), 2.0, 3.0, ManagerScript.LAYER_PLAYER, 0, 0)
 	_run(30)
 	_check(_hits.size() == 1 and _hits[0][1] == other and _hits[0][1] != own, "an enemy's shot hits another enemy (%d hits)" % _hits.size())
-	# A NO_PLAYER shot, piercing, hits a wizard and an enemy on its line.
+	# A shot of no actor, piercing, hits a wizard and an enemy on its line.
 	_setup()
 	var wizard: Node2D = _target(Vector2(100.0, 100.0), 8.0, ManagerScript.LAYER_PLAYER, 0)
 	var enemy: Node2D = _target(Vector2(150.0, 100.0), 8.0, ManagerScript.LAYER_ENEMY)
 	_mgr.spawn(EventsScript.NO_PLAYER, Vector2(50.0, 100.0), Vector2(200.0, 0.0), 2.0, 3.0, ManagerScript.LAYER_PLAYER, 1, 0)
 	_run(40)
-	_check(_hits.size() == 2 and _hits[0][1] == wizard and _hits[1][1] == enemy, "a NO_PLAYER shot hits the wizard, then the enemy (%d hits)" % _hits.size())
+	_check(_hits.size() == 2 and _hits[0][1] == wizard and _hits[1][1] == enemy, "a shot of no actor hits the wizard, then the enemy (%d hits)" % _hits.size())
 
 
 func _test_sticky_shot_keeps_its_direction_and_stays_stuck_at_a_wall() -> void:

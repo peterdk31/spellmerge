@@ -1,5 +1,5 @@
 extends SceneTree
-## Tests for core/projectiles, part 2: orbit shots with per-player anchors, homing
+## Tests for core/projectiles, part 2: orbit shots with per-actor anchors, homing
 ## (turn rate, every 4th step, work budget), `homing_aim` for a beam, and `ray()`.
 ## The manager is stepped by hand.
 ##
@@ -7,6 +7,7 @@ extends SceneTree
 
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const EventsScript := preload("res://core/events/events.gd")
+const ActorSeats := preload("res://tests/support/actor_seats.gd")
 
 const DT: float = 1.0 / 60.0
 ## How far round a shot homing looks here (the Homing card's reach).
@@ -15,10 +16,12 @@ const HOMING_REACH: float = 160.0
 var _failures: Array[String] = []
 var _bus: Node
 var _mgr: Node2D
+## Wizards at ids 0-3, seated 0-3 (the casters these tests use).
+var _table: ActorSeats.ActorsScript
 var _targets: Array[Node2D] = []
-## Every projectile_hit as [player, target, position, tag].
+## Every projectile_hit as [caster, target, position, tag].
 var _hits: Array = []
-## Every projectile_expired as [player, position, tag].
+## Every projectile_expired as [caster, position, tag].
 var _expired: Array = []
 ## Every projectile_impact as [target, position].
 var _impacts: Array = []
@@ -28,7 +31,7 @@ func _initialize() -> void:
 	# The root joins the scene tree only after _initialize returns: wait one frame.
 	await process_frame
 	_test_orbit_circles_the_anchor()
-	_test_orbit_follows_each_players_anchor()
+	_test_orbit_follows_each_actors_anchor()
 	_test_orbit_hits_what_crosses_it_and_ignores_walls()
 	_test_orbit_pierce_and_expiry()
 	_test_orbit_ring_over_a_crowd()
@@ -66,13 +69,15 @@ func _setup() -> void:
 	_teardown()
 	_bus = EventsScript.new()
 	_mgr = ManagerScript.new()
+	_table = ActorSeats.table()
+	_mgr.actors = _table
 	_mgr.events = _bus
 	_hits.clear()
 	_expired.clear()
 	_impacts.clear()
-	_bus.projectile_expired.connect(func(player: int, position: Vector2, tag: int) -> void: _expired.append([player, position, tag]))
-	_bus.projectile_hit.connect(func(player: int, target: Node, position: Vector2, tag: int) -> void: _hits.append([player, target, position, tag]))
-	_bus.projectile_impact.connect(func(_player: int, target: Node, position: Vector2, _direction: Vector2) -> void: _impacts.append([target, position]))
+	_bus.projectile_expired.connect(func(caster: int, position: Vector2, tag: int) -> void: _expired.append([caster, position, tag]))
+	_bus.projectile_hit.connect(func(caster: int, target: Node, position: Vector2, tag: int) -> void: _hits.append([caster, target, position, tag]))
+	_bus.projectile_impact.connect(func(_caster: int, target: Node, position: Vector2, _direction: Vector2) -> void: _impacts.append([target, position]))
 
 
 func _teardown() -> void:
@@ -80,11 +85,12 @@ func _teardown() -> void:
 		if is_instance_valid(target):
 			target.free()
 	_targets.clear()
-	for node: Node in [_mgr, _bus]:
+	for node: Node in [_mgr, _bus, _table]:
 		if node != null and is_instance_valid(node):
 			node.free()
 	_mgr = null
 	_bus = null
+	_table = null
 
 
 func _target(position: Vector2, radius: float = 10.0, layer: int = ManagerScript.LAYER_ENEMY, owner: int = EventsScript.NO_PLAYER) -> Node2D:
@@ -116,12 +122,12 @@ func _test_orbit_circles_the_anchor() -> void:
 	var back: int = _mgr.spawn_orbit(0, 40.0, 0.0, -3.0, 5.0)
 	_mgr.step(DT)
 	_check(_mgr.get_position_of(back).y < 100.0, "a negative speed turns the other way")
-	_check(_mgr.spawn_orbit(4, 40.0, 0.0, 3.0, 5.0) == -1 and _mgr.spawn_orbit(-1, 40.0, 0.0, 3.0, 5.0) == -1, "only players 0-3 orbit")
+	_check(_mgr.spawn_orbit(ManagerScript.ACTORS, 40.0, 0.0, 3.0, 5.0) == -1 and _mgr.spawn_orbit(-1, 40.0, 0.0, 3.0, 5.0) == -1, "only an actor orbits")
 	_check(_mgr.spawn_orbit(0, 40.0, 0.0, 3.0, 0.0) == -1 and _mgr.spawn_orbit(0, INF, 0.0, 3.0, 1.0) == -1, "bad numbers are refused")
 	_check(_mgr.get_count() == 2, "refused orbits took no slot")
 
 
-func _test_orbit_follows_each_players_anchor() -> void:
+func _test_orbit_follows_each_actors_anchor() -> void:
 	_setup()
 	var slots: Array[int] = []
 	for p in 4:
@@ -135,10 +141,10 @@ func _test_orbit_follows_each_players_anchor() -> void:
 	for p in 4:
 		var anchor := Vector2(100.0 * float(p + 1) + 29.0, 50.0 + float(p))
 		ok = ok and absf(_mgr.get_position_of(slots[p]).distance_to(anchor) - 20.0) < 0.01
-	_check(ok, "each player's orbit shot circles its own, moving anchor")
+	_check(ok, "each actor's orbit shot circles its own, moving anchor")
 	_mgr.clear_anchor(2)
 	_mgr.step(DT)
-	_check(not _mgr.is_alive(slots[2]) and _mgr.is_alive(slots[1]) and _mgr.is_alive(slots[3]), "clearing an anchor ends that player's orbit shots only")
+	_check(not _mgr.is_alive(slots[2]) and _mgr.is_alive(slots[1]) and _mgr.is_alive(slots[3]), "clearing an anchor ends that actor's orbit shots only")
 	_check(_expired.is_empty(), "and sends no expiry")
 	_check(_mgr.get_count_for(2) == 0, "the owner's count follows")
 
@@ -444,7 +450,7 @@ func _test_ray_width_layers_and_owner() -> void:
 	_hits.clear()
 	_target(Vector2(300.0, 100.0))
 	_mgr.ray(EventsScript.NO_PLAYER, Vector2(50.0, 100.0), Vector2.RIGHT, 400.0, 3, ManagerScript.LAYER_PLAYER)
-	_check(_hits.size() == 2, "a NO_PLAYER beam hits the wizard and the enemy (%d)" % _hits.size())
+	_check(_hits.size() == 2, "a beam of no actor hits the wizard and the enemy (%d)" % _hits.size())
 
 
 func _test_ray_stops_at_walls() -> void:
@@ -468,7 +474,7 @@ func _test_ray_bad_arguments() -> void:
 	_check(_mgr.ray(0, Vector2(0.0, 100.0), Vector2.RIGHT, 0.0) == 0.0, "no length")
 	_check(_mgr.ray(0, Vector2(0.0, 100.0), Vector2.RIGHT, NAN) == 0.0, "NaN length")
 	_check(_mgr.ray(0, Vector2.INF, Vector2.RIGHT, 100.0) == 0.0, "infinite origin")
-	_check(_mgr.ray(ManagerScript.CASTERS, Vector2(0.0, 100.0), Vector2.RIGHT, 100.0) == 0.0, "bad caster")
+	_check(_mgr.ray(ManagerScript.ACTORS, Vector2(0.0, 100.0), Vector2.RIGHT, 100.0) == 0.0, "bad caster")
 	_check(_hits.is_empty(), "none of them hit anything")
 	_check(absf(_mgr.ray(0, Vector2(0.0, 100.0), Vector2.RIGHT, 50.0, -3) - 50.0) < 0.001, "a negative pierce counts as 0")
 

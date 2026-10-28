@@ -165,18 +165,20 @@ func _enemy_readability(flow: Node, combat: Node, wizard: Node2D) -> bool:
 	wizard.global_position = Vector2(200.0, 180.0)
 	winding.global_position = Vector2(200.0, 130.0)
 	hurt.global_position = Vector2(470.0, 130.0)
-	winding.set("targets", [wizard])
+	# The imps are actors (actors G6): the AI and the look are their own nodes. The wizard is the
+	# nearest of the other team, so it is the target.
+	var winding_ai: Node = winding.get_node("AIController")
 	# From chasing, whatever it was doing (a slow frame rate can leave it recovering from an
 	# attack), so the 8 steps always end half-way through the windup.
-	winding.set("state", 0)
+	winding_ai.set("state", 0)
 	for i in 8:
 		winding.call("step", 0.0625)
-	if not winding.call("is_telegraphing"):
+	if not winding_ai.call("is_telegraphing"):
 		fail("the imp is not winding up in enemy_windup")
 		return false
 	combat.call("hit", int(wizard.get("actor_id")), hurt, 1)
 	hurt.call("step", 0.0)
-	if not hurt.call("is_hurt"):
+	if not hurt.get_node("CreatureLook").call("is_hurt"):
 		fail("the imp is not hurt in enemy_hurt")
 		return false
 	# Past the white hit flash, the hurt pose is what is left (the imp is held still, so it stays).

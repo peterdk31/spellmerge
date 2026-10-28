@@ -1,34 +1,27 @@
-extends Node2D
-## The training dummy of the sandbox (staffs B7, docs/milestones/M2-staffs.md, "The sandbox"):
-## a target that never dies and never moves, and shows what each hit did. Flow puts it at the
-## sandbox room's first dummy spawn and sets `data` before adding it, as for any enemy.
+class_name DummyLook
+extends ActorLook
+## What the sandbox's training dummy shows (staffs B7, docs/milestones/M2-staffs.md, "The
+## sandbox"; a look since actors G6): the training dummy (content/enemies/training_dummy) is an
+## actor with Health (its data's billion), a Hurtbox, no controller and no Mover, so it never
+## moves (knockback, a swap or a pull leave it where it is) and no build takes it down; "Reset
+## dummies" in the sandbox page puts a fresh one there. Enemies never target it: it is on the
+## enemies' team (the actor's `idle_team`).
 ##
-## Combat holds its health like any enemy's, only far more of it (HEALTH), so no build takes it
-## down; "Reset dummies" in the sandbox page puts a fresh one there. It never moves: it is a plain
-## node, so nothing adds Combat's knockback to it, and a swap (`target_move_requested`) or a pull
-## leaves it where it is. Enemies never target it (they chase the `players` group).
-##
-## What it shows, all from events about itself:
-## - **Damage numbers:** each `damage_dealt` on it rises from its head for NUMBER_TIME seconds,
-##   from a pool of NUMBER_COUNT labels (the oldest is reused when all are up).
+## What it shows, all about its actor, with the scene's labels `%Dps`, `%Status` and `%Number`:
+## - **Damage numbers:** each `damage_dealt` on the actor rises from its head for NUMBER_TIME
+##   seconds, from a pool of NUMBER_COUNT labels (the oldest is reused when all are up).
 ## - **Damage per second** over the last DPS_WINDOW seconds, in DPS_BUCKETS buckets, read from
 ##   the drop of its health in Combat each step, so burn ticks (which send no `damage_dealt` on a
-##   target that lives) count too; while a streak is younger than the window it is divided by the streak's age (at least one second),
-##   so a short burst reads true. A streak ends when no damage came for a whole window.
+##   target that lives) count too; while a streak is younger than the window it is divided by the
+##   streak's age (at least one second), so a short burst reads true. A streak ends when no damage
+##   came for a whole window.
 ## - **Statuses** on it (Combat's `has_status`), and the last **reaction** for REACTION_TIME
-##   seconds (`reaction_triggered` at its body).
-## The labels change every REFRESH seconds at most; nothing is allocated per frame.
-##
-## All timing runs in step(delta), so tests drive it with fixed deltas.
+##   seconds (`reaction_triggered` at its body, `Actor.body_offset`).
+## The labels change every REFRESH seconds at most; nothing is allocated per step. The actor
+## steps it (`step`), so tests drive it with fixed deltas through the actor's step.
 
-const EventsScript := preload("res://core/events/events.gd")
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 
-## Health in Combat: more than any build deals in a session.
-const HEALTH: int = 1000000000
-## The hurt circle, and where it sits above the feet (the straw body).
-const HURT_RADIUS: float = 11.0
-const HURT_OFFSET: Vector2 = Vector2(0.0, -14.0)
 ## Seconds of damage the damage per second covers, and its buckets.
 const DPS_WINDOW: float = 5.0
 const DPS_BUCKETS: int = 20
@@ -51,20 +44,13 @@ const STATUSES: Array[StringName] = [
 	CombatScript.HEX, CombatScript.STATIC,
 ]
 
-## The enemy data flow hands every enemy (kept for the id; the numbers here are constants).
-var data: EnemyBase = null
-## The event bus and Combat. Only tests set these, before adding the node; otherwise the
-## "Events" and "Combat" autoloads are used.
-var events: EventsScript = null
-var combat: CombatScript = null
-
 ## Damage taken since this dummy stood up.
 var total_damage: int = 0
 
 var _buckets: PackedInt32Array = PackedInt32Array()
 var _bucket: int = 0
-## Health in Combat at the last step.
-var _health: int = HEALTH
+## Health in Combat at the last step (-1 for not known yet).
+var _health: int = -1
 var _bucket_left: float = 0.0
 ## Seconds since the first hit of the streak, or -1 with no streak.
 var _streak: float = -1.0
@@ -83,11 +69,8 @@ var _next_number: int = 0
 @onready var _number_template: Label = %Number
 
 
-func _ready() -> void:
-	if events == null:
-		events = get_node_or_null("/root/Events") as EventsScript
-	if combat == null:
-		combat = get_node_or_null("/root/Combat") as CombatScript
+func setup(owner_actor: Actor) -> void:
+	super.setup(owner_actor)
 	_buckets.resize(DPS_BUCKETS)
 	_buckets.fill(0)
 	_bucket_left = DPS_WINDOW / float(DPS_BUCKETS)
@@ -102,26 +85,12 @@ func _ready() -> void:
 	_number_left.fill(0.0)
 	_number_x.resize(NUMBER_COUNT)
 	_number_x.fill(0.0)
-	if combat != null:
-		combat.register_enemy(self, HEALTH, HURT_RADIUS, 0, HURT_OFFSET)
-	if events != null:
-		events.damage_dealt.connect(_on_damage_dealt)
-		events.reaction_triggered.connect(_on_reaction_triggered)
+	# Combat registers the actor with its full health once it is in the tree (the Hurtbox).
+	_health = actor.health.max_health if actor.health != null else -1
+	if actor.events != null:
+		actor.events.damage_dealt.connect(_on_damage_dealt)
+		actor.events.reaction_triggered.connect(_on_reaction_triggered)
 	_show()
-
-
-func _exit_tree() -> void:
-	if events != null:
-		if events.damage_dealt.is_connected(_on_damage_dealt):
-			events.damage_dealt.disconnect(_on_damage_dealt)
-		if events.reaction_triggered.is_connected(_on_reaction_triggered):
-			events.reaction_triggered.disconnect(_on_reaction_triggered)
-	if combat != null and is_instance_valid(combat):
-		combat.unregister_enemy(self)
-
-
-func _process(delta: float) -> void:
-	step(delta)
 
 
 ## Move time on by `delta` seconds: the damage window, the numbers and the labels.
@@ -166,9 +135,9 @@ func dps() -> float:
 ## The status line: the statuses on the dummy and the last reaction, or "" for none.
 func status_text() -> String:
 	var words: PackedStringArray = PackedStringArray()
-	if combat != null:
+	if actor.combat != null:
 		for status: StringName in STATUSES:
-			if combat.has_status(self, status):
+			if actor.combat.has_status(actor, status):
 				words.append(String(status).capitalize())
 	if _reaction_left > 0.0:
 		words.append(_reaction + "!")
@@ -191,12 +160,12 @@ func _show() -> void:
 
 ## Count what Combat took off since the last look.
 func _take_health() -> void:
-	if combat == null:
+	if actor.combat == null:
 		return
-	var health: int = combat.get_health(self)
+	var health: int = actor.combat.get_health(actor)
 	if health < 0:
 		return
-	var taken: int = _health - health
+	var taken: int = _health - health if _health >= 0 else 0
 	_health = health
 	if taken <= 0:
 		return
@@ -207,8 +176,8 @@ func _take_health() -> void:
 	_quiet = 0.0
 
 
-func _on_damage_dealt(_player: int, target: Node, amount: int, _position: Vector2) -> void:
-	if target != self or amount <= 0:
+func _on_damage_dealt(_caster: int, target: Node, amount: int, _position: Vector2) -> void:
+	if target != actor or amount <= 0:
 		return
 	var label: Label = _numbers[_next_number]
 	_number_left[_next_number] = NUMBER_TIME
@@ -220,8 +189,8 @@ func _on_damage_dealt(_player: int, target: Node, amount: int, _position: Vector
 	_next_number = (_next_number + 1) % NUMBER_COUNT
 
 
-func _on_reaction_triggered(_player: int, reaction_id: StringName, position: Vector2) -> void:
-	var body: Vector2 = (global_position if is_inside_tree() else self.position) + HURT_OFFSET
+func _on_reaction_triggered(_caster: int, reaction_id: StringName, position: Vector2) -> void:
+	var body: Vector2 = actor.global_position + actor.body_offset
 	if position.distance_to(body) > REACTION_REACH:
 		return
 	_reaction = String(reaction_id).capitalize()

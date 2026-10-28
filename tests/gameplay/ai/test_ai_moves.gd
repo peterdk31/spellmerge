@@ -9,7 +9,6 @@ extends "res://tests/support/suite.gd"
 ##
 ## godot --headless --path . --script res://tests/gameplay/ai/test_ai_moves.gd
 
-const AiScript := preload("res://gameplay/ai/ai.gd")
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const PlayerScript := preload("res://gameplay/player/player.gd")
@@ -37,7 +36,7 @@ var _combat: CombatScript
 var _fake: FakeRegistry
 var _actors: ActorsScript
 var _wizard: PlayerScript
-var _enemies: Array[AiScript] = []
+var _enemies: Array[Actor] = []
 ## Every caster_move_finished as [caster, mode, position, tag], and area_hit_requested as
 ## [caster, position, tag].
 var _finished: Array = []
@@ -54,11 +53,13 @@ func before_each() -> void:
 	_projectiles.actors = _actors
 	_spells = own(SpellsScript.new()) as SpellsScript
 	_spells.registry = _fake
+	_spells.actors = _actors
 	_spells.bind(_projectiles, _bus)
 	_combat = own(CombatScript.new()) as CombatScript
 	_combat.events = _bus
 	_combat.projectiles = _projectiles
 	_combat.spells = _spells
+	_combat.actors = _actors
 	_combat._ready()
 	_enemies.clear()
 	var bolt := FormBase.new()
@@ -138,18 +139,27 @@ func _data(cards: Array[StringName], max_mana: float = 6.0, regen: float = 0.0, 
 
 
 ## An enemy of `data` from the imp's scene (sprite, telegraph), in the tree at `at`.
-func _enemy(data: EnemyBase, at: Vector2 = Vector2.ZERO) -> AiScript:
-	var enemy: AiScript = ImpData.scene.instantiate()
+func _enemy(data: EnemyBase, at: Vector2 = Vector2.ZERO) -> Actor:
+	var enemy: Actor = ImpData.scene.instantiate()
 	enemy.data = data
 	enemy.events = _bus
 	enemy.combat = _combat
 	enemy.projectiles = _projectiles
 	enemy.spells = _spells
-	enemy.targets.append(_wizard)
+	enemy.actors = _actors
 	root.add_child(enemy)
 	enemy.position = at
 	_enemies.append(enemy)
 	return enemy
+
+
+## The enemy's AI and look (its home controller and its CreatureLook).
+func _ai(enemy: Actor) -> AIController:
+	return enemy.get_node("AIController") as AIController
+
+
+func _look(enemy: Actor) -> CreatureLook:
+	return enemy.get_node("CreatureLook") as CreatureLook
 
 
 func _run(seconds: float) -> void:
@@ -164,64 +174,62 @@ func _run(seconds: float) -> void:
 
 
 ## Steps until the enemy is telegraphing (at most `seconds`); true if it did.
-func _until_windup(enemy: AiScript, seconds: float) -> bool:
+func _until_windup(enemy: Actor, seconds: float) -> bool:
 	for i in int(seconds / STEP):
-		if enemy.is_telegraphing():
+		if _ai(enemy).is_telegraphing():
 			return true
 		_run(STEP)
-	return enemy.is_telegraphing()
+	return _ai(enemy).is_telegraphing()
 
 
 func test_a_dash_card_dashes_the_enemy_and_its_blast_goes_off_where_it_ends() -> void:
 	var enemy := _enemy(_data([&"blast", &"dash"]))
-	var tag: int = _spells.current_tag(enemy.caster, 0)
+	var tag: int = _spells.current_tag(enemy.id, 0)
 	check(_until_windup(enemy, 1.0), "a dash staff winds up")
-	check_equal(enemy.telegraph_reach(), 0.0, "with no line: a dash is not a shot")
-	_run(enemy.windup_time + STEP)
-	check(enemy.is_moving(), "then the enemy dashes")
+	check_equal(_look(enemy).telegraph_reach(), 0.0, "with no line: a dash is not a shot")
+	_run(_ai(enemy).windup_time + STEP)
+	check(enemy.mover.is_moving(), "then the enemy dashes")
 	_run(0.5)
-	check(not enemy.is_moving(), "for the card's time")
+	check(not enemy.mover.is_moving(), "for the card's time")
 	check(is_equal_approx(enemy.position.x, 60.0), "the card's distance toward its aim (%.2f)" % enemy.position.x)
-	check(_finished.size() == 1 and _finished[0][0] == enemy.caster and _finished[0][1] == &"dash" and _finished[0][3] == tag, "and says where it ended, under its actor id with its tag")
+	check(_finished.size() == 1 and _finished[0][0] == enemy.id and _finished[0][1] == &"dash" and _finished[0][3] == tag, "and says where it ended, under its actor id with its tag")
 	check(_areas.size() == 1 and (_areas[0][1] as Vector2).is_equal_approx(enemy.position) and _areas[0][2] == tag, "the card's blast goes off there")
 
 
 func test_a_teleport_jumps_at_once_and_stops_short_of_a_wall() -> void:
 	var enemy := _enemy(_data([&"teleport"]))
-	_run(enemy.windup_time + 2.0 * STEP)
+	_run(_ai(enemy).windup_time + 2.0 * STEP)
 	check(is_equal_approx(enemy.position.x, 70.0), "a teleport lands its distance along the aim (%.2f)" % enemy.position.x)
-	check(_finished.size() == 1 and _finished[0][0] == enemy.caster and _finished[0][1] == &"teleport", "and says where at once, under its actor id")
+	check(_finished.size() == 1 and _finished[0][0] == enemy.id and _finished[0][1] == &"teleport", "and says where at once, under its actor id")
 	_finished.clear()
 	var walled := _enemy(_data([&"teleport"]), Vector2(0.0, 100.0))
 	_wizard.position = Vector2(80.0, 100.0)
-	walled.target = _wizard
 	_projectiles.set_walls([Rect2(40.0, 80.0, 16.0, 60.0)] as Array[Rect2])
-	_run(walled.windup_time + 4.0 * STEP)
-	check(walled.position.x < 40.0 - AiScript.BODY_RADIUS + 0.01, "it stops short of the wall, its body clear (%.2f)" % walled.position.x)
+	_run(_ai(walled).windup_time + 4.0 * STEP)
+	check(walled.position.x < 40.0 - walled.mover.body_radius + 0.01, "it stops short of the wall, its body clear (%.2f)" % walled.position.x)
 
 
 func test_a_recoil_pushes_the_enemy_back_from_its_shot() -> void:
 	var enemy := _enemy(_data([&"recoil", &"bolt"]))
-	_run(enemy.windup_time + STEP)
+	_run(_ai(enemy).windup_time + STEP)
 	_run(0.5)
 	check(is_equal_approx(enemy.position.x, -30.0), "pushed the recoil's distance back from the aim (%.2f)" % enemy.position.x)
 
 
 func test_hooks_and_swaps_pull_the_enemy_and_others_moves_are_not_its_own() -> void:
 	var enemy := _enemy(_data([&"bolt"]))
-	var tag: int = _spells.current_tag(enemy.caster, 0)
-	_bus.caster_move_requested.emit(enemy.caster, &"hook", Vector2(40.0, 20.0), 0.25, tag)
+	var tag: int = _spells.current_tag(enemy.id, 0)
+	_bus.caster_move_requested.emit(enemy.id, &"hook", Vector2(40.0, 20.0), 0.25, tag)
 	_run(0.5)
 	check(enemy.position.is_equal_approx(Vector2(40.0, 20.0)), "a hook pulls it to the hit (%s)" % enemy.position)
 	check(_finished.size() == 1 and _finished[0][1] == &"hook", "and says it arrived")
-	_bus.caster_move_requested.emit(enemy.caster, &"swap", Vector2(0.0, 0.0), 0.1, tag)
+	_bus.caster_move_requested.emit(enemy.id, &"swap", Vector2(0.0, 0.0), 0.1, tag)
 	_run(0.25)
 	check(enemy.position.is_equal_approx(Vector2.ZERO), "a swap takes it to the target's place")
 	check_equal(_finished.size(), 1, "and says nothing (its blast went off at the target)")
 	var other := _enemy(_data([&"bolt"]), Vector2(0.0, 200.0))
-	var other_tag: int = _spells.current_tag(other.caster, 0)
-	_bus.caster_move_requested.emit(other.caster, &"hook", Vector2(100.0, 0.0), 0.25, other_tag)
-	_bus.caster_move_requested.emit(_wizard.actor_id, &"hook", Vector2(100.0, 0.0), 0.25, tag)
-	_bus.caster_move_requested.emit(enemy.caster, &"hook", Vector2(100.0, 0.0), 0.25, SpellTag.make(_wizard.actor_id, 0, 0, 0))
+	var other_tag: int = _spells.current_tag(other.id, 0)
+	_bus.caster_move_requested.emit(other.id, &"hook", Vector2(100.0, 0.0), 0.25, other_tag)
+	_bus.caster_move_requested.emit(enemy.id, &"hook", Vector2(100.0, 0.0), 0.25, SpellTag.make(_wizard.actor_id, 0, 0, 0))
 	_run(0.5)
-	check(enemy.position.is_equal_approx(Vector2.ZERO), "another enemy's move, a wizard's, or one with a wizard's tag do not move it")
+	check(enemy.position.is_equal_approx(Vector2.ZERO), "another enemy's move, or one with a wizard's tag, do not move it (the tag says whose move it is: the actor kit's rule)")

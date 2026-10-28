@@ -10,7 +10,7 @@ extends SceneTree
 const AiScript := preload("res://gameplay/ai/ai.gd")
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const EventsScript := preload("res://core/events/events.gd")
-const PlayerScript := preload("res://gameplay/player/player.gd")
+const WizardScene := preload("res://content/wizard/base/wizard.tscn")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
@@ -29,7 +29,7 @@ var _actors: ActorsScript
 ## Scanned once: the real cards.
 var _registry: Node
 var _enemies: Array[AiScript] = []
-var _players: Array[PlayerScript] = []
+var _players: Array[Actor] = []
 
 
 func _initialize() -> void:
@@ -85,15 +85,26 @@ func _setup(player_count: int = 0) -> void:
 	_combat.spells = _spells
 	_combat._ready()
 	for index in player_count:
-		var wizard := PlayerScript.new()
-		wizard.index = index
-		wizard.events = _bus
-		wizard.actors = _actors
-		# In the tree, or the projectile manager never sees the wizard as a target.
-		root.add_child(wizard)
-		wizard.position = Vector2(1000.0, 1000.0 * index)
+		# In the tree, or the projectile manager never sees the wizard as a target. Its hurtbox
+		# registers it in Combat's seat slot (8 px at the body).
+		var wizard := _wizard(index, Vector2(1000.0, 1000.0 * index))
 		_players.append(wizard)
-		_combat.register_player(index, wizard, 8.0, Vector2(0.0, -12.0))
+
+
+## A wizard actor of seat `index` from the real scene (actors G7), wired to this world and in the
+## tree, stepped by nobody.
+func _wizard(index: int, at: Vector2) -> Actor:
+	var wizard := WizardScene.instantiate() as Actor
+	PlayerController.seat_wizard(wizard, index, null, [[], [], [], []])
+	wizard.events = _bus
+	wizard.combat = _combat
+	wizard.projectiles = _projectiles
+	wizard.spells = _spells
+	wizard.actors = _actors
+	wizard.position = at
+	root.add_child(wizard)
+	wizard.set_physics_process(false)
+	return wizard
 
 
 func _teardown() -> void:
@@ -198,7 +209,7 @@ func _test_downed_player_is_skipped() -> void:
 	_setup(2)
 	_players[0].position = Vector2(100.0, 0.0)
 	_players[1].position = Vector2(400.0, 0.0)
-	_players[0].take_damage(PlayerScript.MAX_HEALTH)
+	_players[0].health.take(_players[0].health.max_health)
 	_check(_players[0].is_downed(), "player 0 is downed")
 	var imp := _imp()
 	imp.step(STEP)
@@ -212,7 +223,7 @@ func _test_downed_event_retargets_at_once() -> void:
 	var imp := _imp()
 	imp.step(STEP)
 	_check(imp.target == _players[0], "starts on the near player")
-	_players[0].take_damage(PlayerScript.MAX_HEALTH)
+	_players[0].health.take(_players[0].health.max_health)
 	imp.step(STEP)
 	_check(imp.target == _players[1], "the imp leaves a downed player on the very next step")
 
@@ -223,7 +234,7 @@ func _test_freed_player_is_dropped() -> void:
 	_players[1].position = Vector2(400.0, 0.0)
 	var imp := _imp()
 	imp.step(STEP)
-	var gone: PlayerScript = _players[0]
+	var gone: Actor = _players[0]
 	_players.remove_at(0)
 	gone.free()
 	imp.step(STEP)
@@ -241,7 +252,7 @@ func _test_shot_hurts_wizard_through_combat() -> void:
 	_run(imp, 6)
 	_check(damaged.size() == 1 and damaged[0][0] == imp.caster and damaged[0][1] == _players[0], "the bolt hurt player 0 once, as the imp's actor")
 	_check(damaged.size() == 1 and damaged[0][2] >= _bolt().base_damage, "for at least the bolt's damage")
-	_check(damaged.size() == 1 and _players[0].health == PlayerScript.MAX_HEALTH - int(damaged[0][2]), "the wizard lost that health")
+	_check(damaged.size() == 1 and _players[0].health.health == _players[0].health.max_health - int(damaged[0][2]), "the wizard lost that health")
 
 
 ## Regression (#5): the shot and the telegraph start at `hurt_offset`, the body, not the feet.
@@ -267,14 +278,14 @@ func _test_shot_can_be_dodged_by_stepping_aside() -> void:
 	var control := _imp()
 	control.step(STEP)
 	_run(control, int(control.windup_time / STEP) + 20)
-	_check(_players[0].health < PlayerScript.MAX_HEALTH, "control: a player who stays on the line is hit")
+	_check(_players[0].health.health < _players[0].health.max_health, "control: a player who stays on the line is hit")
 	_setup(1)
 	_players[0].position = Vector2(60.0, 0.0)
 	var imp := _imp()
 	imp.step(STEP)
 	_players[0].position = Vector2(60.0, 40.0)
 	_run(imp, int(imp.windup_time / STEP) + 20)
-	_check(_players[0].health == PlayerScript.MAX_HEALTH, "a player who stepped aside during the telegraph is not hit")
+	_check(_players[0].health.health == _players[0].health.max_health, "a player who stepped aside during the telegraph is not hit")
 
 
 ## Enemy shots are small bullets (#4): a wizard (hit circle 8) is hit by the imp's bolt passing
@@ -288,7 +299,7 @@ func _test_shot_is_small_and_dodgeable() -> void:
 		imp.step(STEP)
 		_players[0].position = Vector2(60.0, offset)
 		_run(imp, int(imp.windup_time / STEP) + 20)
-		var hit: bool = _players[0].health < PlayerScript.MAX_HEALTH
+		var hit: bool = _players[0].health.health < _players[0].health.max_health
 		_check(hit == (offset < reach), "a shot passing %.0f px from the wizard %s" % [offset, "hits" if offset < reach else "misses"])
 
 
@@ -296,8 +307,8 @@ func _test_no_lookups_while_nobody_stands() -> void:
 	_setup(2)
 	var imp := _imp()
 	imp.targets.clear()
-	_players[0].take_damage(PlayerScript.MAX_HEALTH)
-	_players[1].take_damage(PlayerScript.MAX_HEALTH)
+	_players[0].health.take(_players[0].health.max_health)
+	_players[1].health.take(_players[1].health.max_health)
 	imp.step(STEP)
 	var before: int = imp.lookup_count
 	var steps: int = 160
@@ -332,11 +343,7 @@ func _test_knockback_moves_the_enemy() -> void:
 
 func _test_group_players_are_found() -> void:
 	_setup(0)
-	var wizard := PlayerScript.new()
-	wizard.index = 3
-	wizard.events = _bus
-	root.add_child(wizard)
-	wizard.position = Vector2(200.0, 0.0)
+	var wizard := _wizard(3, Vector2(200.0, 0.0))
 	var imp := AiScript.new()
 	imp.data = ImpData
 	imp.events = _bus

@@ -56,7 +56,7 @@ func take() -> void:
 		fail("the sandbox did not start with four wizards")
 		return
 	for index in 4:
-		_flow.call("get_wizard", index).call("protect", 60.0)
+		Downed.of(_flow.call("get_wizard", index) as Node).protect(60.0)
 	await settle(5)
 	await _cast_all(4)
 	image = await grab()

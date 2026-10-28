@@ -1,24 +1,31 @@
 extends "res://tests/support/suite.gd"
 ## The wizard's art is wired so the game can use it (content/wizard/base): one idle, walk and dash
-## strip per player index 0-3, each a row of whole 32 px frames, and a staff. How the wizard looks
-## is free to change; these checks only hold the contract the player script relies on.
+## strip per ramp 0-3 (the player's colour), each a row of whole 32 px frames, and a staff. How the
+## wizard looks is free to change; these checks only hold the contract its look relies on. The art
+## is set on the scene's WizardLook node (actors G7), by ramp.
 
 const WizardScene := preload("res://content/wizard/base/wizard.tscn")
-const PlayerScript := preload("res://gameplay/player/player.gd")
 const FRAME: int = 32
 const PLAYERS: int = 4
 
 var wizard: Node
+var look: WizardLook
 
 
 func before_each() -> void:
 	wizard = own(WizardScene.instantiate()) as Node
+	look = wizard.get_node_or_null(^"WizardLook") as WizardLook
 
 
 func _strips(property: String) -> Array[Texture2D]:
 	var strips: Array[Texture2D] = []
-	strips.assign(wizard.get(property))
+	if look != null:
+		strips.assign(look.get(property))
 	return strips
+
+
+func test_the_scene_has_a_wizard_look() -> void:
+	check(look != null, "the wizard's art is on its WizardLook node")
 
 
 func _check_whole_frames(property: String) -> void:
@@ -60,9 +67,9 @@ func test_bob_tables_match_the_strip_lengths() -> void:
 	var walk: Array[Texture2D] = _strips("walk_textures")
 	var dash: Array[Texture2D] = _strips("dash_textures")
 	for i in walk.size():
-		check_equal(walk[i].get_width() / FRAME, PlayerScript.WALK_BOB.size(), "walk strip %d has one bob per frame" % i)
+		check_equal(walk[i].get_width() / FRAME, WizardLook.WALK_BOB.size(), "walk strip %d has one bob per frame" % i)
 	for i in dash.size():
-		check_equal(dash[i].get_width() / FRAME, PlayerScript.DASH_BOB.size(), "dash strip %d has one bob per frame" % i)
+		check_equal(dash[i].get_width() / FRAME, WizardLook.DASH_BOB.size(), "dash strip %d has one bob per frame" % i)
 
 
 func test_the_scene_has_a_hat_node_under_the_sprite() -> void:
@@ -72,9 +79,9 @@ func test_the_scene_has_a_hat_node_under_the_sprite() -> void:
 func test_the_idle_has_four_poses_for_the_blink_and_the_glances() -> void:
 	var idle: Texture2D = _strips("textures")[0]
 	check_equal(idle.get_width() / FRAME, 4, "open, closed, glance left, glance right")
-	for pose: int in PlayerScript.IDLE_SEQUENCE:
+	for pose: int in WizardLook.IDLE_SEQUENCE:
 		check(pose >= 0 and pose < 4, "IDLE_SEQUENCE only names poses of the strip")
 
 
 func test_the_staff_is_set() -> void:
-	check(wizard.get("staff_texture") != null, "the wizard has a staff texture")
+	check(look != null and look.staff_texture != null, "the wizard has a staff texture")

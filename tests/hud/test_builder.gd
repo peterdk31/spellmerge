@@ -15,7 +15,7 @@ const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
-const PlayerScript := preload("res://gameplay/player/player.gd")
+const WizardFixture := preload("res://tests/gameplay/player/wizard_fixture.gd")
 const HudScript := preload("res://hud/panels/panels.gd")
 const BuilderScript := preload("res://hud/builder/builder.gd")
 const HintLineScript := preload("res://hud/widgets/hint_line.gd")
@@ -37,7 +37,9 @@ var _focus: UIFocusScript
 var _mgr: ManagerScript
 var _spells: SpellsScript
 var _hud: HudScript
-var _players: Array[PlayerScript] = []
+## The world the wizards live in (its services are the ones below).
+var _world: WizardFixture
+var _players: Array[Actor] = []
 ## Every staff_change_requested as [player, staff, slot, id].
 var _requests: Array = []
 ## Every build_refused as [player, reason].
@@ -47,20 +49,19 @@ var _moves: Array = []
 
 
 func before_each() -> void:
-	_registry = own(RegistryScript.new()) as RegistryScript
-	_registry.scan()
-	_bus = own(EventsScript.new()) as EventsScript
-	_input = own(InputManagerScript.new()) as InputManagerScript
-	_input.events = _bus
+	# The wizard fixture's world: the real registry and spell runtime, its own bus and input.
+	_world = WizardFixture.new(root)
+	_registry = own(_world.registry) as RegistryScript
+	_bus = own(_world.bus) as EventsScript
+	_input = own(_world.input) as InputManagerScript
 	_focus = own(UIFocusScript.new()) as UIFocusScript
 	_focus.input = _input
 	_focus.events = _bus
 	_focus._ready()
-	_mgr = own(ManagerScript.new()) as ManagerScript
-	_mgr.events = _bus
-	_spells = own(SpellsScript.new()) as SpellsScript
-	_spells.registry = _registry
-	_spells.bind(_mgr, _bus)
+	_mgr = own(_world.projectiles) as ManagerScript
+	_spells = own(_world.spells) as SpellsScript
+	own(_world.combat)
+	own(_world.table)
 	_players.clear()
 	_requests.clear()
 	_refused.clear()
@@ -88,16 +89,8 @@ func _start(count: int, gamepads: bool = false) -> void:
 			_input.join(index)
 		else:
 			_input.add_virtual_device(index)
-		var player := own(PlayerScript.new()) as PlayerScript
-		player.index = index
-		player.input = _input
-		player.events = _bus
-		player.registry = _registry
-		player.projectiles = _mgr
-		player.spells = _spells
-		player.staff = _registry.get_resource(&"wizard", &"dev") as StaffBase
-		player.start_cards = START
-		player._ready()
+		# A real wizard actor (actors G7), seated as flow seats it and in the tree.
+		var player := own(_world.wizard(index, Vector2.ZERO, START, _registry.get_resource(&"wizard", &"dev") as StaffBase)) as Actor
 		_players.append(player)
 		_bus.player_joined.emit(index)
 	_bus.room_entered.emit(&"test_room")

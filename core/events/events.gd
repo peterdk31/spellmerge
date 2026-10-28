@@ -87,7 +87,7 @@ signal entity_ended(caster: int, kind: StringName, position: Vector2, tag: int)
 signal familiar_cast_requested(caster: int, position: Vector2, direction: Vector2, tag: int)
 ## Sender: core/spells. Mana of the actor `caster` comes back (siphon). Heard by player and ai, each for its own actor.
 signal mana_refund_requested(caster: int, amount: float)
-## Sender: core/spells. `amount` of the mana of the seat `player`'s actor is now held by sustained cards (`hold`); 0 when none is on. Sent only for an actor a seat drives (an AI reads `Spells.reserved_mana`). Heard by player and hud.
+## Sender: core/spells. `amount` of the mana of the seat `player`'s actor is now held by sustained cards (`hold`); 0 when none is on. Sent only for an actor a seat drives (every actor's Caster reads `Spells.reserved_mana`). Heard by nobody yet.
 signal mana_reserved(player: int, amount: float)
 ## Sender: core/projectiles. A shot of the actor `caster` with `tag` stopped another team's shot at `position` with one of its shield charges. Heard by core/spells and feel.
 signal shot_blocked(caster: int, position: Vector2, tag: int)

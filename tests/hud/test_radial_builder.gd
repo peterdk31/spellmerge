@@ -15,7 +15,7 @@ const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
-const PlayerScript := preload("res://gameplay/player/player.gd")
+const WizardFixture := preload("res://tests/gameplay/player/wizard_fixture.gd")
 const HudScript := preload("res://hud/panels/panels.gd")
 const RadialScript := preload("res://hud/builder/radial_builder.gd")
 ## Loaded when needed, not preloaded: this scene is also the "Hud" autoload.
@@ -31,7 +31,9 @@ var _focus: UIFocusScript
 var _mgr: ManagerScript
 var _spells: SpellsScript
 var _hud: HudScript
-var _players: Array[PlayerScript] = []
+## The world the wizards live in (its services are the ones below).
+var _world: WizardFixture
+var _players: Array[Actor] = []
 ## Every rumble as [device, weak, strong, seconds].
 var _rumbles: Array = []
 ## Every staff_cards_requested as [player, staff, cards].
@@ -41,21 +43,20 @@ var _single: Array = []
 
 
 func before_each() -> void:
-	_registry = own(RegistryScript.new()) as RegistryScript
-	_registry.scan()
-	_bus = own(EventsScript.new()) as EventsScript
-	_input = own(InputManagerScript.new()) as InputManagerScript
-	_input.events = _bus
+	# The wizard fixture's world: the real registry and spell runtime, its own bus and input.
+	_world = WizardFixture.new(root)
+	_registry = own(_world.registry) as RegistryScript
+	_bus = own(_world.bus) as EventsScript
+	_input = own(_world.input) as InputManagerScript
 	_input.vibrator = func(device: int, weak: float, strong: float, seconds: float) -> void: _rumbles.append([device, weak, strong, seconds])
 	_focus = own(UIFocusScript.new()) as UIFocusScript
 	_focus.input = _input
 	_focus.events = _bus
 	_focus._ready()
-	_mgr = own(ManagerScript.new()) as ManagerScript
-	_mgr.events = _bus
-	_spells = own(SpellsScript.new()) as SpellsScript
-	_spells.registry = _registry
-	_spells.bind(_mgr, _bus)
+	_mgr = own(_world.projectiles) as ManagerScript
+	_spells = own(_world.spells) as SpellsScript
+	own(_world.combat)
+	own(_world.table)
 	_players.clear()
 	_rumbles.clear()
 	_whole.clear()
@@ -76,16 +77,8 @@ func before_each() -> void:
 func _start(count: int) -> void:
 	for index in count:
 		_input.add_virtual_device(index)
-		var player := own(PlayerScript.new()) as PlayerScript
-		player.index = index
-		player.input = _input
-		player.events = _bus
-		player.registry = _registry
-		player.projectiles = _mgr
-		player.spells = _spells
-		player.staff = _registry.get_resource(&"wizard", &"dev") as StaffBase
-		player.start_cards = START
-		player._ready()
+		# A real wizard actor (actors G7), seated as flow seats it and in the tree.
+		var player := own(_world.wizard(index, Vector2.ZERO, START, _registry.get_resource(&"wizard", &"dev") as StaffBase)) as Actor
 		_players.append(player)
 		_bus.player_joined.emit(index)
 	_bus.room_entered.emit(&"test_room")
@@ -150,7 +143,7 @@ func test_the_ring_holds_every_card_once_grouped_by_kind() -> void:
 	_start(1)
 	var radial: RadialScript = _open(0)
 	var entries: Array[Dictionary] = radial.ring_entries()
-	check_equal(entries.size(), _players[0].bag.size(), "every card of the bag")
+	check_equal(entries.size(), PlayerController.of(_players[0]).bag.size(), "every card of the bag")
 	var last: int = 0
 	for entry in entries:
 		var order: int = RadialScript.KINDS.find(entry["kind"])
@@ -248,7 +241,7 @@ func test_a_full_staff_refuses_a_push() -> void:
 	_start(1)
 	var radial: RadialScript = _open(0)
 	var full: Array[StringName] = []
-	for _slot in _players[0].slot_count():
+	for _slot in _players[0].caster.slot_count():
 		full.append(&"bolt")
 	_bus.staff_cards_requested.emit(0, 1, full)
 	radial.mark_slot(0)
@@ -340,7 +333,7 @@ func test_lb_rb_switch_staffs_and_the_left_stick_moves_the_marker() -> void:
 	_frame()
 	_input.send_virtual(0, &"move_down", 0.0)
 	check_equal(radial.marked_slot(), at + RadialScript.SLOT_COLUMNS, "down moves one row")
-	check(not _players[0].has_staff(2), "the move keys never walked or cast anything")
+	check(not _players[0].caster.has_staff(2), "the move keys never walked or cast anything")
 
 
 func test_the_one_kind_ring_flips_with_the_dpad() -> void:
@@ -364,11 +357,11 @@ func test_the_one_kind_ring_flips_with_the_dpad() -> void:
 func test_the_numbers_show_the_mana_share_and_what_rt_would_change() -> void:
 	_start(1)
 	var radial: RadialScript = _open(0)
-	var view: Dictionary = _spells.staff_view(_players[0].cards_of(1), _players[0].staff)
+	var view: Dictionary = _spells.staff_view(_players[0].caster.cards_of(1), _players[0].caster.staff)
 	var mana: float = 0.0
 	for cast: Dictionary in view["casts"]:
 		mana = maxf(mana, float(cast["mana"]))
-	var share: int = roundi(mana / PlayerScript.MAX_MANA * 100.0)
+	var share: int = roundi(mana / _players[0].caster.max_mana * 100.0)
 	check_equal(radial.number_lines()[0], "Mana %d%%" % share, "the dearest cast as a share of the wizard's mana")
 	check_equal(radial.hub_lines()[0], "Staff 2", "with nothing pointed at, the hub shows the staff")
 	_point(0, &"nova")
@@ -381,7 +374,7 @@ func test_the_numbers_show_the_mana_share_and_what_rt_would_change() -> void:
 func test_a_bag_with_several_of_a_card_counts_them() -> void:
 	_start(1)
 	var radial: RadialScript = _open(0)
-	var bag: Array[StringName] = _players[0].bag.duplicate()
+	var bag: Array[StringName] = PlayerController.of(_players[0]).bag.duplicate()
 	bag.append(&"bolt")
 	bag.append(&"bolt")
 	_bus.bag_changed.emit(0, bag)

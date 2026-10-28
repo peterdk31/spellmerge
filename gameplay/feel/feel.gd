@@ -618,8 +618,9 @@ func _on_damage_dealt(caster: int, target: Node, amount: int, position: Vector2)
 	if target != null and is_instance_valid(target):
 		tint = _target_tint(target)
 		# A wizard's hit is in their own colours: white, their player's ramp.
-		if target.is_in_group(&"players") and target.get("index") is int:
-			colours = clampi(target.get("index") as int, 0, PLAYER_COLORS.size() - 1)
+		var ramp: int = _wizard_ramp(target)
+		if ramp >= 0:
+			colours = clampi(ramp, 0, PLAYER_COLORS.size() - 1)
 			tint = Color.WHITE
 		# The shot that did this hit told us where it struck and which way it flew.
 		if target.get_instance_id() == _impact_target and caster == _impact_caster and Engine.get_physics_frames() == _impact_frame:
@@ -654,7 +655,7 @@ func _on_hit_landed(caster: int, target: Node, _amount: int, _position: Vector2,
 	_kind_target = target.get_instance_id()
 	_kind = kind
 	_kind_frame = Engine.get_physics_frames()
-	_kind_own = kind != &"heal" and kind != &"status" and target.is_in_group(&"players") and target.get("actor_id") == caster
+	_kind_own = kind != &"heal" and kind != &"status" and target.is_in_group(&"players") and (target.get("actor_id") == caster or target.get("id") == caster)
 
 
 ## A heal: a soft ring in green on the wizard, with no stop and no shake.
@@ -1147,11 +1148,22 @@ func effect_info(kind: int) -> Dictionary:
 
 ## The colour of what was hit: a wizard's own colour, else the enemy ember.
 func _target_tint(target: Node) -> Color:
-	if target.is_in_group(&"players"):
-		var index: Variant = target.get("index")
-		if index is int:
-			return PLAYER_COLORS[clampi(index as int, 0, PLAYER_COLORS.size() - 1)]
+	var ramp: int = _wizard_ramp(target)
+	if ramp >= 0:
+		return PLAYER_COLORS[clampi(ramp, 0, PLAYER_COLORS.size() - 1)]
 	return preset.enemy_hit_color
+
+
+## The colour ramp of a wizard in the `players` group (a wizard actor's `ramp`, actors G7, or a
+## stand-in's `index`), or -1 for anything else. G8 reads every target by actor.
+func _wizard_ramp(target: Node) -> int:
+	if not target.is_in_group(&"players"):
+		return -1
+	var ramp: Variant = target.get("ramp")
+	if ramp is int:
+		return ramp as int
+	var index: Variant = target.get("index")
+	return index as int if index is int else -1
 
 
 ## The colour of seat `player`'s light ramp, the enemy ramp's (Blight ochre) for no seat.
@@ -1407,7 +1419,7 @@ func _pose_form(slot: int, t: float) -> void:
 
 func _on_wizard_cast(_player: int, wizard: Node) -> void:
 	# The dash look owns the sprite scale while dodging; a squash would fight it.
-	if wizard != null and wizard.has_method("is_dashing") and wizard.call("is_dashing"):
+	if wizard != null and ((wizard.has_method("is_dashing") and wizard.call("is_dashing")) or (wizard is Actor and (wizard as Actor).mover != null and (wizard as Actor).mover.is_moving())):
 		return
 	_start_reaction(wizard, preset.cast_squash_seconds, -preset.cast_squash, false)
 

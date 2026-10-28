@@ -12,7 +12,7 @@ extends "res://tests/support/suite.gd"
 const CombatScript := preload("res://gameplay/combat/combat.gd")
 const EventsScript := preload("res://core/events/events.gd")
 const ManagerScript := preload("res://core/projectiles/projectile_manager.gd")
-const PlayerScript := preload("res://gameplay/player/player.gd")
+const WizardScene := preload("res://content/wizard/base/wizard.tscn")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
 
@@ -25,7 +25,7 @@ var _spells: SpellsScript
 var _actors: ActorSeats.ActorsScript
 ## The enemy actor the enemies' spells come from.
 var _enemy_caster: int = -1
-var _wizards: Array[PlayerScript] = []
+var _wizards: Array[Actor] = []
 var _next_tag: int = 0
 ## Each event as an array of its arguments.
 var _landed: Array = []
@@ -65,17 +65,23 @@ func before_each() -> void:
 	_bus.status_applied.connect(func(p: int, t: Node, id: StringName) -> void: _applied.append([p, t, id]))
 
 
-func _wizard(index: int, at: Vector2) -> PlayerScript:
-	var wizard := own(PlayerScript.new()) as PlayerScript
-	wizard.index = index
+## A wizard actor of seat `index` from the real scene (actors G7), in the tree at `at`.
+func _wizard(index: int, at: Vector2) -> Actor:
+	# The wizard opens its own actor as it enters the tree: give it the seat's id in the test
+	# table (the lowest free one once the seat's is closed).
+	_actors.close(_actors.actor_of_seat(index))
+	var wizard := own(WizardScene.instantiate()) as Actor
+	PlayerController.seat_wizard(wizard, index, null, [[], [], [], []])
 	wizard.events = _bus
-	# The seat's actor in the test table is the wizard's (opened there, not by the wizard).
+	wizard.combat = _combat
+	wizard.projectiles = _projectiles
+	wizard.spells = _spells
 	wizard.actors = _actors
-	wizard.actor_id = _actors.actor_of_seat(index)
-	wizard._ready()
 	wizard.position = at
+	root.add_child(wizard)
+	wizard.set_physics_process(false)
+	# Its hurtbox registered it in Combat's seat slot.
 	_wizards.append(wizard)
-	_combat.register_player(index, wizard, 8.0)
 	return wizard
 
 
@@ -121,7 +127,7 @@ func test_a_wizard_is_hurt_by_their_own_spell() -> void:
 	var wizard := _wizard(0, Vector2(100.0, 0.0))
 	var tag: int = _tag(_profile(6))
 	_bus.projectile_hit.emit(0, wizard, Vector2(90.0, 0.0), tag)
-	check_equal(wizard.health, PlayerScript.MAX_HEALTH - 6, "their own shot took health")
+	check_equal(wizard.health.health, wizard.health.max_health - 6, "their own shot took health")
 	check_equal(_landed, [[0, wizard, 6, &"shot"]], "hit_landed names the caster as both the source and the target")
 	check_equal(_hurt, [[0, 6, tag, &"shot"]], "actor_hurt names the wizard's actor, the damage, the card's tag and the kind")
 
@@ -130,10 +136,10 @@ func test_an_enemys_spell_hurts_a_wizard_with_its_tag_in_actor_hurt() -> void:
 	var wizard := _wizard(1, Vector2.ZERO)
 	var tag: int = _enemy_tag(_profile(4))
 	_bus.projectile_hit.emit(_enemy_caster, wizard, Vector2(-5.0, 0.0), tag)
-	check_equal(wizard.health, PlayerScript.MAX_HEALTH - 4, "the enemy's spell hurt")
+	check_equal(wizard.health.health, wizard.health.max_health - 4, "the enemy's spell hurt")
 	check_equal(_hurt, [[1, 4, tag, &"shot"]], "actor_hurt names the wizard's actor and the tag (its caster is the enemy actor)")
 	_bus.projectile_hit.emit(_enemy_caster, wizard, Vector2(-5.0, 0.0), 9)
-	check_equal(wizard.health, PlayerScript.MAX_HEALTH - 4, "a shot with no spell does nothing (staffs F9b: no table)")
+	check_equal(wizard.health.health, wizard.health.max_health - 4, "a shot with no spell does nothing (staffs F9b: no table)")
 
 
 func test_a_spell_hit_pushes_the_wizard_it_hurts() -> void:
@@ -181,8 +187,8 @@ func test_an_area_hit_reaches_enemies_the_caster_and_a_teammate() -> void:
 	var far := _enemy(Vector2(100.0, 0.0))
 	_projectiles.step(STEP)
 	_bus.area_hit_requested.emit(0, Vector2.ZERO, 30.0, _tag(_profile(5)))
-	check_equal(caster.health, PlayerScript.MAX_HEALTH - 5, "the caster is inside their own blast")
-	check_equal(mate.health, PlayerScript.MAX_HEALTH - 5, "and so is the teammate: friendly fire is always on (G3c)")
+	check_equal(caster.health.health, caster.health.max_health - 5, "the caster is inside their own blast")
+	check_equal(mate.health.health, mate.health.max_health - 5, "and so is the teammate: friendly fire is always on (G3c)")
 	check_equal(_combat.get_health(near), 95, "the enemy in the circle was hit")
 	check_equal(_combat.get_health(far), 100, "the enemy outside was not")
 	for row: Array in _landed:
@@ -194,14 +200,14 @@ func test_an_area_hit_centred_on_the_caster_hits_at_once_and_pushes_nobody() -> 
 	var profile := _profile(3)
 	profile.knockback = 100.0
 	_bus.area_hit_requested.emit(0, Vector2(50.0, 50.0), 12.0, _tag(profile))
-	check_equal(caster.health, PlayerScript.MAX_HEALTH - 3, "hit at once")
+	check_equal(caster.health.health, caster.health.max_health - 3, "hit at once")
 	check_equal(_combat.consume_wizard_knockback(0, 0.0), Vector2.ZERO, "centred: no direction to push")
 
 
 func test_an_area_hit_without_a_profile_does_nothing() -> void:
 	var caster := _wizard(0, Vector2.ZERO)
 	_bus.area_hit_requested.emit(0, Vector2.ZERO, 30.0, SpellTag.make(0, 0, 99, 1))
-	check_equal(caster.health, PlayerScript.MAX_HEALTH, "unknown tag, no hit")
+	check_equal(caster.health.health, caster.health.max_health, "unknown tag, no hit")
 
 
 func test_area_hits_started_by_a_kill_are_cut_at_the_depth_limit() -> void:
@@ -214,7 +220,7 @@ func test_area_hits_started_by_a_kill_are_cut_at_the_depth_limit() -> void:
 			_bus.area_hit_requested.emit(0, Vector2.ZERO, 30.0, tag))
 	_bus.area_hit_requested.emit(0, Vector2.ZERO, 30.0, tag)
 	check(count[0] <= CombatScript.AREA_DEPTH + 1, "a chain of area hits stops at AREA_DEPTH")
-	check(caster.health > 0, "and the game goes on")
+	check(caster.health.health > 0, "and the game goes on")
 
 
 # --- Several elements ---
@@ -301,7 +307,7 @@ func test_a_burn_tick_spends_no_shock_and_no_static_and_adds_no_hex() -> void:
 	check(_combat.wizard_status_left(0, &"shock") > 0.0, "the shock is still on after the ticks")
 	check(_combat.wizard_status_left(0, &"static") > 0.0, "so is the static")
 	check_equal(_combat.get_health(near), 100, "no discharge from the wizard's own burn")
-	check_equal(wizard.health, PlayerScript.MAX_HEALTH - 4, "the ticks took plain damage, no shock bonus")
+	check_equal(wizard.health.health, wizard.health.max_health - 4, "the ticks took plain damage, no shock bonus")
 
 
 func test_a_burn_tick_sends_a_status_hit_kind_that_feel_gives_no_stop() -> void:
@@ -327,7 +333,7 @@ func test_burn_on_a_wizard_hurts_over_time_as_kind_status() -> void:
 	var wizard := _wizard(0, Vector2.ZERO)
 	check(_combat.apply_wizard_status(0, 0, &"burn", 1.0, 4.0), "the burn took")
 	_run(1.0)
-	check(wizard.health <= PlayerScript.MAX_HEALTH - 3, "burn took health")
+	check(wizard.health.health <= wizard.health.max_health - 3, "burn took health")
 	check(_hurt.is_empty(), "a burn tick is not a hit: no actor_hurt for cards")
 	check(_landed.size() > 0 and _landed[0][3] == &"status", "ticks are kind status")
 	check_equal(_applied[0], [0, wizard, &"burn"], "status_applied names the wizard")
@@ -353,9 +359,9 @@ func test_a_hex_makes_a_wizard_take_more_and_a_shock_is_spent_by_one_hit() -> vo
 	_combat.apply_wizard_status(0, 0, &"hex", 5.0, 50.0)
 	_combat.apply_wizard_status(0, 0, &"shock", 5.0, 100.0)
 	check(_combat.hit(EventsScript.NO_PLAYER, wizard, 4), "hit")
-	check_equal(wizard.health, PlayerScript.MAX_HEALTH - 12, "4 plus 50 % (hex) plus 100 % of that (shock)")
+	check_equal(wizard.health.health, wizard.health.max_health - 12, "4 plus 50 % (hex) plus 100 % of that (shock)")
 	check(_combat.hit(EventsScript.NO_PLAYER, wizard, 4), "hit again")
-	check_equal(wizard.health, PlayerScript.MAX_HEALTH - 18, "the shock was spent, the hex stays")
+	check_equal(wizard.health.health, wizard.health.max_health - 18, "the shock was spent, the hex stays")
 
 
 func test_a_charged_wizard_discharges_into_enemies_near_on_the_next_hit() -> void:
@@ -373,7 +379,7 @@ func test_a_charged_wizard_discharges_into_enemies_near_on_the_next_hit() -> voi
 
 func test_a_downed_wizard_takes_no_status() -> void:
 	var wizard := _wizard(0, Vector2.ZERO)
-	wizard.take_damage(1000)
+	wizard.health.take(1000)
 	check(not _combat.apply_wizard_status(0, 0, &"burn", 1.0, 4.0), "refused")
 	check_equal(_combat.wizard_status_left(0, &"burn"), 0.0, "nothing on")
 
@@ -397,10 +403,10 @@ func test_a_barrier_blocks_hits_one_charge_each() -> void:
 	check_equal(_combat.wizard_shield(0), 2, "two charges")
 	check(not _combat.hit(EventsScript.NO_PLAYER, wizard, 5), "the first hit is blocked")
 	check(not _combat.hit(EventsScript.NO_PLAYER, wizard, 5), "so is the second")
-	check_equal(wizard.health, PlayerScript.MAX_HEALTH, "no damage")
+	check_equal(wizard.health.health, wizard.health.max_health, "no damage")
 	check_equal(_blocked, [[0, 77], [0, 77]], "shield_blocked names the wizard's actor and the card, once per charge")
 	check(_combat.hit(EventsScript.NO_PLAYER, wizard, 5), "the third lands")
-	check_equal(wizard.health, PlayerScript.MAX_HEALTH - 5, "damage")
+	check_equal(wizard.health.health, wizard.health.max_health - 5, "damage")
 
 
 func test_a_barrier_ends_with_its_time_and_stacks() -> void:
@@ -422,7 +428,7 @@ func test_a_barrier_blocks_a_spell_hit_with_its_status_and_push() -> void:
 	profile.knockback = 100.0
 	_combat.give_wizard_shield(0, 1, 2.0, 3)
 	_bus.projectile_hit.emit(0, wizard, Vector2(90.0, 0.0), _tag(profile))
-	check_equal(wizard.health, PlayerScript.MAX_HEALTH, "no damage")
+	check_equal(wizard.health.health, wizard.health.max_health, "no damage")
 	check_equal(_combat.wizard_status_left(0, &"burn"), 0.0, "no status")
 	check_equal(_combat.consume_wizard_knockback(0, 0.0), Vector2.ZERO, "no push")
 
@@ -432,7 +438,7 @@ func test_burning_goes_through_a_barrier_without_using_it_up() -> void:
 	_combat.apply_wizard_status(0, 0, &"burn", 1.0, 4.0)
 	_combat.give_wizard_shield(0, 1, 5.0, 3)
 	_run(1.0)
-	check(wizard.health < PlayerScript.MAX_HEALTH, "the burn still hurts")
+	check(wizard.health.health < wizard.health.max_health, "the burn still hurts")
 	check_equal(_combat.wizard_shield(0), 1, "and the barrier is still there")
 
 
@@ -442,11 +448,11 @@ func test_burning_goes_through_a_barrier_without_using_it_up() -> void:
 func test_a_heal_hit_gives_a_wizard_health_whoever_cast_it() -> void:
 	var mate := _wizard(1, Vector2.ZERO)
 	_wizard(0, Vector2(500.0, 0.0))
-	mate.take_damage(30)
+	mate.health.take(30)
 	var profile := _profile(1)
 	profile.heal = 12
 	_bus.projectile_hit.emit(0, mate, Vector2(-5.0, 0.0), _tag(profile))
-	check_equal(mate.health, PlayerScript.MAX_HEALTH - 18, "healed 12")
+	check_equal(mate.health.health, mate.health.max_health - 18, "healed 12")
 	check_equal(_healed, [[0, mate, 12]], "heal_dealt")
 	check_equal(_landed[0][3], &"heal", "kind heal")
 	check(_hurt.is_empty(), "a heal hurts nobody")
@@ -457,8 +463,8 @@ func test_a_heal_stops_at_full_health_and_skips_the_downed() -> void:
 	var profile := _profile(1)
 	profile.heal = 500
 	_bus.projectile_hit.emit(0, wizard, Vector2(-5.0, 0.0), _tag(profile))
-	check_equal(wizard.health, PlayerScript.MAX_HEALTH, "never above the maximum")
-	wizard.take_damage(1000)
+	check_equal(wizard.health.health, wizard.health.max_health, "never above the maximum")
+	wizard.health.take(1000)
 	_healed.clear()
 	_bus.projectile_hit.emit(0, wizard, Vector2(-5.0, 0.0), _tag(profile))
 	check(_healed.is_empty(), "a downed wizard is not healed")
@@ -467,11 +473,11 @@ func test_a_heal_stops_at_full_health_and_skips_the_downed() -> void:
 func test_a_heal_area_reaches_teammates() -> void:
 	_wizard(0, Vector2.ZERO)
 	var mate := _wizard(1, Vector2(10.0, 0.0))
-	mate.take_damage(20)
+	mate.health.take(20)
 	var profile := _profile(1)
 	profile.heal = 8
 	_bus.area_hit_requested.emit(0, Vector2.ZERO, 30.0, _tag(profile))
-	check_equal(mate.health, PlayerScript.MAX_HEALTH - 12, "the teammate was healed")
+	check_equal(mate.health.health, mate.health.max_health - 12, "the teammate was healed")
 
 
 # --- Pulls and the slam ---
@@ -598,7 +604,7 @@ func test_the_note_tells_who_downed_the_wizard() -> void:
 	check_equal(_combat.downed_note(0), "downed by your own Twice-Thawing Blast", "their own spell, by name")
 	var plain := _wizard(2, Vector2(900.0, 0.0))
 	_bus.area_hit_requested.emit(2, Vector2(900.0, 0.0), 20.0, _tag(_profile(1000, &"burst")))
-	check(plain.is_downed(), "downed")
+	check(plain.is_down(), "downed")
 	check_equal(_combat.downed_note(2), "downed by your own Blast", "no name: the kind's word")
 
 
@@ -621,7 +627,7 @@ func test_a_wizard_whose_actor_id_is_not_its_seat_is_named_by_its_actor_id() -> 
 	_combat.actors = _actors
 	var wizard := _wizard(0, Vector2.ZERO)
 	var mate := _wizard(1, Vector2(500.0, 0.0))
-	check_equal([wizard.actor_id, mate.actor_id], [5, 6], "the seats' actors")
+	check_equal([wizard.id, mate.id], [5, 6], "the seats' actors")
 	var damage: Array = []
 	_bus.damage_dealt.connect(func(p: int, t: Node, a: int, _at: Vector2) -> void: damage.append([p, t, a]))
 	var profile := _profile(1000)
@@ -645,6 +651,6 @@ func test_downing_clears_a_wizards_statuses_and_barrier() -> void:
 	_combat.apply_wizard_status(0, 0, &"hex", 5.0, 50.0)
 	_combat.give_wizard_shield(0, 2, 5.0, 1)
 	_bus.player_downed.emit(0)
-	wizard.take_damage(0)
+	wizard.health.take(0)
 	check_equal(_combat.wizard_status_left(0, &"hex"), 0.0, "no hex on a downed wizard")
 	check_equal(_combat.wizard_shield(0), 0, "no barrier either")

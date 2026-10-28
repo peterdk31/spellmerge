@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-28: Sandbox (staffs B7) was already built
+
+Checked the queue task against `main`: the sandbox room, both dummies, the flow run, the main menu button, the pause menu's Sandbox page and the controls rework all landed in owner sessions (#295, #296), with tests. No code changed; the task is ticked in `docs/NEXT.md`. The "Friendly fire" setting in the design row no longer applies since actors G3c.
+
 ## 2026-10-26: Caster kit (staffs B4)
 
 The wizard now acts on every move a card can ask for. Teleport jumps along the aim and stops short of the first wall; hook and swap pull the wizard to a point over the time asked; recoil pushes it back, with the recoils of a step added up so a mirrored recoil cancels. A later dash, teleport, hook or swap replaces an earlier one, which is still answered (`caster_move_finished`) where the wizard is, so its blast is not lost. Chill and freeze slow and stop walking and dashing, hits push the wizard (combat's knockback), and siphon's refund gives mana back. A move now walks its whole time (before, the last step of a dash was not walked) and is answered by the next step. Tests: `test_player_caster.gd` (14).

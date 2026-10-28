@@ -10,7 +10,7 @@ extends Node
 ##  - update_draw with a full cap (the per-frame copy into the batch),
 ##  - step with a full cap and no targets (movement alone),
 ##  - step with a full cap, 100 enemies packed into a few cells and four wizards as
-##    targets, friendly fire on, with fast shots (200-400 px/s) fired through them:
+##    targets (every shot hits both, actors G3c), with fast shots (200-400 px/s) fired through them:
 ##    the shots are refilled before each timed step, so every step does fresh hits
 ##    and sends `projectile_hit` (the first-hit path),
 ##  - the hit test alone (`_hit_test` for every live slot) on the same fresh state,
@@ -197,7 +197,6 @@ func _run_motion_timings(cap: int) -> void:
 	var straight_us: float = 0.0
 	for i in REPEATS:
 		_mgr.clear()
-		_mgr.friendly_fire = false
 		for n in cap:
 			var at := CROWD_CENTER + Vector2(float(n * 37 % 240) - 120.0, 90.0 + float(n * 53 % 60))
 			_mgr.spawn(n % PLAYERS, at, Vector2(0.0, -60.0), 1.0e6, 4.0, ManagerScript.LAYER_ENEMY, 1000000)
@@ -211,7 +210,6 @@ func _run_motion_timings(cap: int) -> void:
 	var turned: int = 0
 	for i in REPEATS:
 		_mgr.clear()
-		_mgr.friendly_fire = false
 		for n in cap:
 			var at := CROWD_CENTER + Vector2(float(n * 37 % 240) - 120.0, 90.0 + float(n * 53 % 60))
 			var slot: int = _mgr.spawn(n % PLAYERS, at, Vector2(0.0, -60.0), 1.0e6, 4.0, ManagerScript.LAYER_ENEMY, 1000000)
@@ -290,15 +288,13 @@ func _fill(count: int, lifetime: float, pierce: bool) -> void:
 func _spawn(i: int, lifetime: float, pierce: bool) -> void:
 	var at := Vector2(float(i * 37 % int(ROOM.x)), float(i * 53 % int(ROOM.y)))
 	var velocity := Vector2(float(i % 7) - 3.0, float(i % 5) - 2.0) * 2.0
-	_mgr.friendly_fire = pierce
 	_mgr.spawn(i % PLAYERS, at, velocity, lifetime, 4.0, ManagerScript.LAYER_ENEMY, 1000000 if pierce else 0)
 
 
 ## Fill the manager to `count` fast piercing shots (200-400 px/s) that start inside
-## the crowd and fly in all directions, friendly fire on.
+## the crowd and fly in all directions, hitting wizards and enemies alike.
 func _fill_hostile(count: int) -> void:
 	_mgr.clear()
-	_mgr.friendly_fire = true
 	for i in count:
 		var at := CROWD_CENTER + Vector2(float(i * 37 % 80) - 40.0, float(i * 53 % 80) - 40.0)
 		var speed: float = 200.0 + float(i % 5) * 50.0

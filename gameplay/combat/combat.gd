@@ -782,9 +782,9 @@ func _on_projectile_hit(player: int, target: Node, position: Vector2, tag: int) 
 ## A spell's hit on the wizard `index`: a heal for a
 ## mend hit, else damage, a push away from `position`, then each element's reaction or status, as
 ## on an enemy (staffs F6: wizards react, from the same table, to every spell: an enemy's, a
-## teammate's with friendly fire, their own). The caster's own spell hurts them like any other
-## (self-harm is always on); `core/projectiles` decides which shots can reach a wizard at all
-## (an enemy's, the caster once out of their hitbox, a teammate with friendly fire).
+## teammate's, their own). The caster's own spell hurts them like any other (self-harm is always
+## on); `core/projectiles` decides which shots can reach a wizard at all (every shot but the
+## caster's own, which only once out of their hitbox).
 func _apply_to_wizard(player: int, index: int, position: Vector2, profile: HitProfile, damage: int, strength: float, kind: StringName) -> void:
 	if profile != null and profile.heal > 0:
 		_heal_player(player, index, profile.heal)
@@ -1289,12 +1289,10 @@ func _remove_enemy_at(at: int) -> void:
 
 
 ## Area hits (`area_hit_requested`, from blast and a payload's fallback): the spell's hit lands
-## on every enemy and every wizard in the circle, the caster included, with kind `burst`.
-## A teammate is only hurt with friendly fire (`Projectiles.friendly_fire`); a mend hit heals
-## whoever stands in it. Nested area hits (on kill, on hit chains) are cut at AREA_DEPTH.
-## An enemy's area hit (its tag is an enemy's, staffs F6) takes its side: it hurts every wizard
-## in the circle, other enemies only with `Projectiles.enemy_fire` and never the enemy that cast
-## it (the target its caster row owns); an enemy's mend heals no wizard.
+## on every enemy and every wizard in the circle, the caster included, whoever cast it (actors
+## G3c: no sides; an enemy's blast at its feet hurts it as a wizard's hurts the wizard), with kind
+## `burst`. A mend hit heals whoever stands in it, but an enemy's mend heals no wizard. Nested
+## area hits (on kill, on hit chains) are cut at AREA_DEPTH.
 func _on_area_hit_requested(player: int, position: Vector2, radius: float, tag: int) -> void:
 	var profile: HitProfile = spells.hit_profile(tag) if spells != null else null
 	if profile == null or _area_depth >= AREA_DEPTH:
@@ -1309,17 +1307,15 @@ func _on_area_hit_requested(player: int, position: Vector2, radius: float, tag: 
 	var saved_tag: int = _tag
 	_tag = tag
 	var enemy_side: bool = SpellTag.is_enemy_tag(tag)
-	var caster: int = SpellTag.caster_of(tag)
-	if projectiles != null and (not enemy_side or projectiles.enemy_fire):
+	if projectiles != null:
 		var count: int = projectiles.targets_in(position, radius, ProjectileManagerScript.LAYER_ENEMY, _near)
 		for i in count:
 			targets.append(_near[i])
 		_near.clear()
 	for enemy in targets:
-		if is_instance_valid(enemy) and _enemies.has(enemy) and not (enemy_side and projectiles.target_owner_of(enemy) == caster):
+		if is_instance_valid(enemy) and _enemies.has(enemy):
 			_apply_to_enemy(player, enemy, position, profile, profile.damage, profile.knockback, KIND_BURST)
 	targets.clear()
-	var friendly: bool = projectiles != null and projectiles.friendly_fire
 	for index in PLAYER_SLOTS:
 		var wizard: Node2D = _players[index]
 		if wizard == null or not is_instance_valid(wizard) or _is_downed(wizard):
@@ -1328,8 +1324,6 @@ func _on_area_hit_requested(player: int, position: Vector2, radius: float, tag: 
 		if (_position_of(wizard) + _player_offset[index]).distance_squared_to(position) > reach * reach:
 			continue
 		if enemy_side and profile.heal > 0:
-			continue
-		if not enemy_side and index != player and not friendly and profile.heal <= 0:
 			continue
 		_apply_to_wizard(player, index, position, profile, profile.damage, profile.knockback, KIND_BURST)
 	_tag = saved_tag

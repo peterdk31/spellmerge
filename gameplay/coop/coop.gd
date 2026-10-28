@@ -1,6 +1,5 @@
 extends Node
-## Co-op (autoload `Coop`): joining and leaving mid-run, friendly fire and the
-## shared camera. Up to four players; nobody ever waits for another player.
+## Co-op (autoload `Coop`): joining and leaving mid-run and the shared camera. Up to four players; nobody ever waits for another player.
 ##
 ## Joining and leaving: `core/input` turns a button press (or an unplugged
 ## gamepad, or a bot's virtual device) into `device_joined` / `device_left`. Coop
@@ -9,12 +8,9 @@ extends Node
 ## removes the wizard, `difficulty` counts the players. Coop knows nothing about
 ## wizards beyond the `players` group, so the run simply goes on.
 ##
-## Friendly fire is off by default. `friendly_fire_requested(player, on)` (the pause menu's
-## Settings, Gameplay) or `set_friendly_fire(true)` makes shots fired by
-## a player also hit the other players (never the shooter): the switch is
-## `Projectiles.friendly_fire` in `core/projectiles`, and `combat` turns the hits
-## into damage as for any wizard. Every change is announced with `friendly_fire_changed(on)`.
-## The option lives in memory; saving it waits for `core/save`.
+## Friendly fire is no option any more (actors G3c): a player's shots always hit the other
+## players, never the shooter (`core/projectiles`), and `combat` turns the hits into damage as
+## for any wizard.
 ##
 ## The shared camera: after `room_entered` Coop takes the current `Camera2D` and,
 ## every frame, moves it to the middle of all wizards (downed ones too, so a
@@ -40,7 +36,6 @@ extends Node
 ## with fixed deltas.
 
 const EventsScript := preload("res://core/events/events.gd")
-const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const PlayerScript := preload("res://gameplay/player/player.gd")
 
 const PLAYER_SLOTS: int = 4
@@ -69,13 +64,8 @@ const REVIVE_PROTECTION: float = 1.5
 ## The services. Only tests set these, before adding the node; otherwise the
 ## autoloads are used.
 var events: EventsScript = null
-var projectiles: ProjectileManagerScript = null
 ## The size of the view in pixels. Only tests set this; otherwise the viewport's.
 var view_size: Vector2 = Vector2.ZERO
-
-## Whether shots of players also hit other players (default off).
-var friendly_fire: bool = false:
-	set = set_friendly_fire
 
 ## The camera being driven (null before the first `room_entered`).
 var camera: Camera2D = null
@@ -94,17 +84,12 @@ var _revive_sent: Array[float] = [0.0, 0.0, 0.0, 0.0]
 func _ready() -> void:
 	if events == null:
 		events = get_node_or_null("/root/Events") as EventsScript
-	if projectiles == null:
-		projectiles = get_node_or_null("/root/Projectiles") as ProjectileManagerScript
 	if events == null:
 		push_warning("Coop: the Events autoload is missing, so nobody can join.")
 		return
 	events.device_joined.connect(_on_device_joined)
 	events.device_left.connect(_on_device_left)
 	events.room_entered.connect(_on_room_entered)
-	events.friendly_fire_requested.connect(_on_friendly_fire_requested)
-	if projectiles != null:
-		projectiles.friendly_fire = friendly_fire
 
 
 func _process(delta: float) -> void:
@@ -119,20 +104,6 @@ func joined_count() -> int:
 
 func is_joined(player: int) -> bool:
 	return player >= 0 and player < PLAYER_SLOTS and _joined[player]
-
-
-## Turn friendly fire on or off. Takes effect for shots fired from now on.
-func set_friendly_fire(enabled: bool) -> void:
-	friendly_fire = enabled
-	if projectiles != null:
-		projectiles.friendly_fire = enabled
-	if events != null:
-		events.friendly_fire_changed.emit(enabled)
-
-
-func _on_friendly_fire_requested(player: int, on: bool) -> void:
-	if player >= 0 and player < PLAYER_SLOTS:
-		set_friendly_fire(on)
 
 
 ## Use `node` as the shared camera (normally found by itself after `room_entered`).

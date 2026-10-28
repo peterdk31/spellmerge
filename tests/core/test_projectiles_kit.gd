@@ -1,7 +1,7 @@
 extends SceneTree
 ## Tests for core/projectiles, the projectile kit (staffs B1): bounce, ghost, spiral, return,
-## linger, growth, sticky, shield, shots that hit their caster, passing through teammates and
-## the wall flag of an expiry. The manager is stepped by hand.
+## linger, growth, sticky, shield, shots that hit their caster, every shot hitting both sides
+## (actors G3c) and the wall flag of an expiry. The manager is stepped by hand.
 ##
 ## godot --headless --path . --script res://tests/core/test_projectiles_kit.gd
 
@@ -19,7 +19,7 @@ var _targets: Array[Node2D] = []
 var _hits: Array = []
 ## Every projectile_expired as [player, position, tag, on_wall].
 var _expired: Array = []
-## Every ally_passed as [player, ally, tag].
+## Every ally_passed as [player, ally, tag]: none since actors G3c.
 var _passed: Array = []
 ## Every shot_blocked as [player, position, tag].
 var _blocked: Array = []
@@ -42,7 +42,7 @@ func _initialize() -> void:
 	_test_shield_blocks_enemy_shots()
 	_test_shield_only_for_players_shots()
 	_test_self_hit_waits_until_the_shot_leaves_the_caster()
-	_test_ally_is_passed_once_or_hit()
+	_test_every_shot_hits_both_sides()
 	_test_sticky_shot_keeps_its_direction_and_stays_stuck_at_a_wall()
 	_test_shield_catches_fast_shots_in_any_slot_order()
 	_test_apply_travel_maps_cards_to_the_shot()
@@ -346,45 +346,37 @@ func _test_self_hit_waits_until_the_shot_leaves_the_caster() -> void:
 	_check(not _mgr.set_self_hit(_mgr.spawn(EventsScript.NO_PLAYER, Vector2(10.0, 10.0), Vector2.ZERO, 1.0)), "an enemy shot has no caster")
 
 
-func _test_ally_is_passed_once_or_hit() -> void:
+## Everything hits everything (actors G3c): a wizard's shot hits a teammate, never passes one
+## (nothing sends `ally_passed`); an enemy caster's hits another enemy; a NO_PLAYER shot hits a
+## wizard and an enemy alike. Only the caster's own body is skipped.
+func _test_every_shot_hits_both_sides() -> void:
 	_setup()
 	var friend: Node2D = _target(Vector2(100.0, 100.0), 8.0, ManagerScript.LAYER_PLAYER, 1)
+	_target(Vector2(60.0, 100.0), 8.0, ManagerScript.LAYER_PLAYER, 0)
 	var slot: int = _fire(Vector2(200.0, 0.0), Vector2(50.0, 100.0), 2.0, 12)
 	_run(30)
-	_check(_passed.size() == 1 and _passed[0][0] == 0 and _passed[0][1] == friend and _passed[0][2] == 12, "a shot flying through a teammate sends ally_passed once, with its tag (%d)" % _passed.size())
-	_check(_hits.is_empty() and _mgr.is_alive(slot), "and is not stopped")
-	# Staying inside the friend does not repeat it.
+	_check(_hits.size() == 1 and _hits[0][1] == friend and _hits[0][0] == 0 and _hits[0][3] == 12, "a wizard's shot hits the teammate in its way, not its own wizard (%d hits)" % _hits.size())
+	_check(not _mgr.is_alive(slot) and _passed.is_empty(), "the hit spends it and nothing is passed")
+	# A still shot over a teammate hits them.
 	_setup()
-	friend = _target(Vector2(100.0, 100.0), 8.0, ManagerScript.LAYER_PLAYER, 1)
-	_mgr.spawn(0, Vector2(100.0, 100.0), Vector2.ZERO, 1.0, 3.0, ManagerScript.LAYER_ENEMY, 0, 13, ManagerScript.MOTION_STILL)
-	_run(20)
-	_check(_passed.size() == 1, "a still shot over a teammate says it once (%d)" % _passed.size())
-	# The caster's own body is not an ally.
+	friend = _target(Vector2(100.0, 100.0), 8.0, ManagerScript.LAYER_PLAYER, 2)
+	_mgr.spawn(3, Vector2(100.0, 100.0), Vector2.ZERO, 1.0, 3.0, ManagerScript.LAYER_ENEMY, 0, 13, ManagerScript.MOTION_STILL)
+	_run(5)
+	_check(_hits.size() == 1 and _hits[0][1] == friend and _passed.is_empty(), "a still shot over a teammate hits them")
+	# An enemy caster's shot hits the other enemy, never its own body.
 	_setup()
-	_target(Vector2(60.0, 100.0), 8.0, ManagerScript.LAYER_PLAYER, 0)
-	_fire(Vector2(200.0, 0.0))
-	_run(20)
-	_check(_passed.is_empty(), "a shot leaving its caster passes nobody")
-	# An enemy's shot hits wizards as it always did and passes nobody.
-	_setup()
-	_target(Vector2(100.0, 100.0), 8.0, ManagerScript.LAYER_PLAYER, 1)
-	_mgr.spawn(EventsScript.NO_PLAYER, Vector2(50.0, 100.0), Vector2(200.0, 0.0), 2.0, 3.0, ManagerScript.LAYER_PLAYER, 0, 0)
+	var own: Node2D = _target(Vector2(50.0, 100.0), 8.0, ManagerScript.LAYER_ENEMY, ManagerScript.FIRST_ENEMY_CASTER)
+	var other: Node2D = _target(Vector2(100.0, 100.0), 8.0, ManagerScript.LAYER_ENEMY)
+	_mgr.spawn(ManagerScript.FIRST_ENEMY_CASTER, Vector2(50.0, 100.0), Vector2(200.0, 0.0), 2.0, 3.0, ManagerScript.LAYER_PLAYER, 0, 0)
 	_run(30)
-	_check(_passed.is_empty() and _hits.size() == 1, "enemy shots hit a wizard and pass nobody")
-	# A mend shot hits the teammate.
+	_check(_hits.size() == 1 and _hits[0][1] == other and _hits[0][1] != own, "an enemy's shot hits another enemy (%d hits)" % _hits.size())
+	# A NO_PLAYER shot, piercing, hits a wizard and an enemy on its line.
 	_setup()
-	friend = _target(Vector2(100.0, 100.0), 8.0, ManagerScript.LAYER_PLAYER, 1)
-	var mend: int = _fire(Vector2(200.0, 0.0), Vector2(50.0, 100.0), 2.0, 14)
-	_check(_mgr.set_ally_hit(mend), "ally-hit is accepted")
-	_run(30)
-	_check(_hits.size() == 1 and _hits[0][1] == friend and _passed.is_empty(), "a shot that may hit teammates hits one")
-	# Friendly fire hits too, and does not announce a pass.
-	_setup()
-	_mgr.friendly_fire = true
-	friend = _target(Vector2(100.0, 100.0), 8.0, ManagerScript.LAYER_PLAYER, 1)
-	_fire(Vector2(200.0, 0.0))
-	_run(30)
-	_check(_hits.size() == 1 and _passed.is_empty(), "with friendly fire a teammate is hit, not passed")
+	var wizard: Node2D = _target(Vector2(100.0, 100.0), 8.0, ManagerScript.LAYER_PLAYER, 0)
+	var enemy: Node2D = _target(Vector2(150.0, 100.0), 8.0, ManagerScript.LAYER_ENEMY)
+	_mgr.spawn(EventsScript.NO_PLAYER, Vector2(50.0, 100.0), Vector2(200.0, 0.0), 2.0, 3.0, ManagerScript.LAYER_PLAYER, 1, 0)
+	_run(40)
+	_check(_hits.size() == 2 and _hits[0][1] == wizard and _hits[1][1] == enemy, "a NO_PLAYER shot hits the wizard, then the enemy (%d hits)" % _hits.size())
 
 
 func _test_sticky_shot_keeps_its_direction_and_stays_stuck_at_a_wall() -> void:

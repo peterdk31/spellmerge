@@ -88,8 +88,8 @@ extends Node
 ## a player 0-3, or an enemy row (`open_enemy_caster`, SpellLimits.FIRST_ENEMY_CASTER and up)
 ## that installs, casts and aims its staffs as a player does. Its tags carry the row
 ## (`SpellTag.make_for`, `caster_of`), so the handlers find it from the tag; every event names it
-## NO_PLAYER (`_ev`). Its spells hit what is foe to it (`_foes`: wizards and decoys), its moves,
-## areas and entities are asked for with NO_PLAYER and its tag, its siphon refunds wait in
+## NO_PLAYER (`_ev`). Its spells hit everything, as every caster's do (G3c); its chains aim at
+## its foes (`_foes`: wizards and decoys). Its moves, areas and entities are asked for with NO_PLAYER and its tag, its siphon refunds wait in
 ## `take_refund`, and its AI reads `next_cast_mana` and `reserved_mana`. All enemies share one
 ## per-step fire and chain count (`_budget`) and hold at most SpellLimits.ENEMY_BEAMS beams and
 ## ENEMY_PENDING waiting launches, so they never take a player's. `close_enemy_caster` ends what
@@ -2534,8 +2534,8 @@ static func _ev(player: int) -> int:
 	return ProjectilesScript.event_player(player)
 
 
-## What a caster's spells hit: enemies for a player, wizards and decoys for an enemy (the
-## projectile manager adds the other enemies when `enemy_fire` is on).
+## A caster's other side, for aim (chain and arc jumps): enemies for a player, wizards and decoys
+## for an enemy. What a shot hits is both sides, always: the projectile manager adds them (G3c).
 static func _foes(player: int) -> int:
 	return ProjectilesScript.LAYER_ENEMY if player < SpellLimits.PLAYERS else ProjectilesScript.LAYER_PLAYER
 

@@ -44,7 +44,7 @@ Each area README states the area's job, the milestone that builds and opens it, 
 - [gameplay/README.md](gameplay/README.md): shared rules for the gameplay sub-areas and an events-at-a-glance table.
 - [gameplay/ai/README.md](gameplay/ai/README.md): shared enemy behaviours: steering, targeting, attack patterns.
 - [gameplay/combat/README.md](gameplay/combat/README.md): damage pipeline, hit and hurt boxes, knockback, status effects, element reactions.
-- [gameplay/coop/README.md](gameplay/coop/README.md): joining and leaving mid-run, friendly fire, shared camera.
+- [gameplay/coop/README.md](gameplay/coop/README.md): joining and leaving mid-run, shared camera.
 - [gameplay/difficulty/README.md](gameplay/difficulty/README.md): scaling by player count, depth and setting.
 - [gameplay/feel/README.md](gameplay/feel/README.md): hit-stop, screen shake and juice presets.
 - [gameplay/flow/README.md](gameplay/flow/README.md): room sequence, door voting, transitions, waiting for builders.

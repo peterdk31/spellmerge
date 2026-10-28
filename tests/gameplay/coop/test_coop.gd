@@ -2,8 +2,8 @@ extends SceneTree
 ## Tests for gameplay/coop, on the real autoloads: every join order of 1-4 players
 ## (the first is in when Play is pressed, the rest join mid-run), every leave
 ## order, no duplicate events, the camera keeps everyone in view (zooms out as the
-## players spread, never past its limits, eases instead of jumping), and friendly
-## fire (off by default, never hits the shooter, switches back off).
+## players spread, never past its limits, eases instead of jumping), and a
+## wizard's bolt hits a teammate (friendly fire is always on), never the shooter.
 ##
 ## godot --headless --path . --script res://tests/gameplay/coop/test_coop.gd
 
@@ -60,10 +60,10 @@ func _initialize() -> void:
 	_test_revive_two_players()
 	_test_revive_four_players()
 	_test_revive_edges()
-	_test_friendly_fire()
+	_test_a_wizards_bolt_hits_a_teammate()
 	_stop()
 	if _failures.is_empty():
-		print("TEST OK: gameplay/coop (join orders, leave orders, camera, friendly fire)")
+		print("TEST OK: gameplay/coop (join orders, leave orders, camera, a bolt hits a teammate)")
 		quit(0)
 	else:
 		for failure in _failures:
@@ -80,7 +80,6 @@ func _stop() -> void:
 	_flow.stop_run()
 	for index in InputManagerScript.MAX_PLAYERS:
 		_input.leave(index)
-	_coop.set_friendly_fire(false)
 	_joined_events.clear()
 	_left_events.clear()
 
@@ -154,7 +153,6 @@ func _everyone_in_view() -> bool:
 
 
 func _test_defaults() -> void:
-	_check(not _coop.friendly_fire and not _projectiles.friendly_fire, "friendly fire is off by default")
 	_check(_coop.joined_count() == 0, "nobody is joined at the start")
 
 
@@ -562,57 +560,39 @@ func _test_camera_survives_a_restart() -> void:
 	_check(true, "stepping with no wizards is safe")
 
 
-func _test_friendly_fire() -> void:
+## Friendly fire is always on (actors G3c): a wizard's bolt hits a teammate in its way, through
+## the real projectile manager and Combat, never the shooter and never a wizard off its line.
+func _test_a_wizards_bolt_hits_a_teammate() -> void:
 	# What the test shots do: a spell's hit profile under BOLT_TAG in Spells (Combat reads only
-	# those), set after each start, which resets Spells.
+	# those), set after the start, which resets Spells.
 	var spells: Node = root.get_node("Spells")
 	var hit := HitProfile.new()
 	hit.damage = SHOT_DAMAGE
 	var spell := CompiledSpell.new()
 	spell.hit = hit
-	for enabled: bool in [false, true]:
-		_stop()
-		# All three are in before Play: a mid-run joiner is invulnerable for 2 s.
-		_input.add_virtual_device(1)
-		_input.add_virtual_device(2)
-		_start_with(0)
-		# No enemy gets in the way of the test shots.
-		for enemy: Node in _flow._enemies.duplicate():
-			_combat.call("unregister_enemy", enemy)
-		spells.get("_profiles")[BOLT_TAG] = spell
-		_coop.set_friendly_fire(enabled)
-		_check(_projectiles.friendly_fire == enabled, "Coop sets the projectile manager's flag (%s)" % enabled)
-		_wizard(0).global_position = Vector2(100.0, 100.0)
-		_wizard(1).global_position = Vector2(140.0, 100.0)
-		_wizard(2).global_position = Vector2(100.0, 300.0)
-		_projectiles.clear()
-		_projectiles.spawn(0, Vector2(100.0, 100.0), Vector2(400.0, 0.0), 1.0, 4.0, ProjectileManagerScript.LAYER_ENEMY, 0, BOLT_TAG)
-		_projectiles.step(0.1)
-		var label: String = "friendly fire %s" % ("on" if enabled else "off")
-		_check((_wizard(0) as PlayerScript).health == PlayerScript.MAX_HEALTH, label + ": the shooter is never hit by its own shot")
-		_check((_wizard(2) as PlayerScript).health == PlayerScript.MAX_HEALTH, label + ": a wizard off the line of fire is untouched")
-		var expected: int = PlayerScript.MAX_HEALTH - SHOT_DAMAGE if enabled else PlayerScript.MAX_HEALTH
-		_check((_wizard(1) as PlayerScript).health == expected, label + ": the teammate's health is %d, got %d" % [expected, (_wizard(1) as PlayerScript).health])
-		_check(_projectiles.get_count() == (0 if enabled else 1), label + ": the shot %s" % ("ended on the hit" if enabled else "flew on"))
-		# An enemy shot hurts players either way.
-		_projectiles.clear()
-		_projectiles.spawn(-1, Vector2(100.0, 296.0), Vector2(0.0, 100.0), 0.2, 4.0, ProjectileManagerScript.LAYER_PLAYER, 0, BOLT_TAG)
-		_projectiles.step(0.05)
-		_check((_wizard(2) as PlayerScript).health == PlayerScript.MAX_HEALTH - SHOT_DAMAGE, label + ": an enemy shot still hurts a wizard")
+	_stop()
+	# All three are in before Play: a mid-run joiner is invulnerable for 2 s.
+	_input.add_virtual_device(1)
+	_input.add_virtual_device(2)
+	_start_with(0)
+	# No enemy gets in the way of the test shots.
+	for enemy: Node in _flow._enemies.duplicate():
+		_combat.call("unregister_enemy", enemy)
+	spells.get("_profiles")[BOLT_TAG] = spell
+	_wizard(0).global_position = Vector2(100.0, 100.0)
+	_wizard(1).global_position = Vector2(140.0, 100.0)
+	_wizard(2).global_position = Vector2(100.0, 300.0)
+	_projectiles.clear()
+	_projectiles.spawn(0, Vector2(100.0, 100.0), Vector2(400.0, 0.0), 1.0, 4.0, ProjectileManagerScript.LAYER_ENEMY, 0, BOLT_TAG)
+	_projectiles.step(0.1)
+	_check((_wizard(0) as PlayerScript).health == PlayerScript.MAX_HEALTH, "the shooter is never hit by its own shot")
+	_check((_wizard(2) as PlayerScript).health == PlayerScript.MAX_HEALTH, "a wizard off the line of fire is untouched")
+	_check((_wizard(1) as PlayerScript).health == PlayerScript.MAX_HEALTH - SHOT_DAMAGE, "the teammate is hurt, health %d" % (_wizard(1) as PlayerScript).health)
+	_check(_projectiles.get_count() == 0, "the shot ended on the hit")
+	# An enemy shot hurts players as ever.
+	_projectiles.clear()
+	_projectiles.spawn(-1, Vector2(100.0, 296.0), Vector2(0.0, 100.0), 0.2, 4.0, ProjectileManagerScript.LAYER_PLAYER, 0, BOLT_TAG)
+	_projectiles.step(0.05)
+	_check((_wizard(2) as PlayerScript).health == PlayerScript.MAX_HEALTH - SHOT_DAMAGE, "an enemy shot still hurts a wizard")
 	spells.get("_profiles").erase(BOLT_TAG)
-	# Turned off again, the flag does not stay on.
-	_coop.set_friendly_fire(true)
-	_coop.set_friendly_fire(false)
-	_check(not _projectiles.friendly_fire and not _coop.friendly_fire, "friendly fire switches back off")
-	# The pause menu's setting: a request from any player switches it, and every change is announced.
-	var announced: Array[bool] = []
-	var listen := func(on: bool) -> void: announced.append(on)
-	_events.connect("friendly_fire_changed", listen)
-	_events.emit_signal("friendly_fire_requested", 2, true)
-	_check(_coop.friendly_fire and _projectiles.friendly_fire, "friendly_fire_requested switches it on")
-	_events.emit_signal("friendly_fire_requested", 7, false)
-	_check(_coop.friendly_fire, "a request with a bad player index is ignored")
-	_coop.set_friendly_fire(false)
-	_check(announced == ([true, false] as Array[bool]), "friendly_fire_changed follows each change, got %s" % [announced])
-	_events.disconnect("friendly_fire_changed", listen)
 	_stop()

@@ -175,7 +175,7 @@ func _test_layers() -> void:
 	_target(Vector2(30.0, 0.0), 10.0, ManagerScript.LAYER_PLAYER)
 	_mgr.spawn(0, Vector2.ZERO, Vector2(1200.0, 0.0), 1.0, 4.0, ManagerScript.LAYER_ENEMY)
 	_mgr.step(DT)
-	_check(_hits.is_empty() and _mgr.get_count() == 1, "a shot at enemies passes a player target")
+	_check(_hits.size() == 1 and _mgr.get_count() == 0, "a shot at enemies hits a player target too (actors G3c: every shot hits both layers)")
 	_setup()
 	_target(Vector2(30.0, 0.0), 10.0, ManagerScript.LAYER_PLAYER)
 	_mgr.spawn(EventsScript.NO_PLAYER, Vector2.ZERO, Vector2(1200.0, 0.0), 1.0, 4.0, ManagerScript.LAYER_PLAYER)

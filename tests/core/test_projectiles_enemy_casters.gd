@@ -1,8 +1,8 @@
 extends "res://tests/support/suite.gd"
 ## Enemy casters in core/projectiles (staffs F4, docs/milestones/M2-staffs.md, "Enemy staffs"):
 ## shots owned by an enemy caster row (FIRST_ENEMY_CASTER and up) are the enemies' side. Events
-## name them NO_PLAYER; they skip their own enemy's body, hit wizards and decoys, and hit other
-## enemies only with `enemy_fire`; they share NO_PLAYER's drop bucket at the cap; they orbit
+## name them NO_PLAYER; they skip their own enemy's body, hit wizards and decoys, and hit the
+## other enemies too (actors G3c); they share NO_PLAYER's drop bucket at the cap; they orbit
 ## their own anchor; shields and homing work by side; and they are drawn by the shot shader in
 ## the enemy ramp, above the players' shots. The manager is stepped by hand.
 ##
@@ -97,25 +97,19 @@ func test_an_enemy_casters_shot_hits_a_wizard_and_names_no_player() -> void:
 	check_equal(expired, [EventsScript.NO_PLAYER] as Array[int], "and so does the last row's expiry")
 
 
-func test_enemy_fire_lets_an_enemy_hit_the_others_but_never_itself() -> void:
+## Enemies always hurt each other (actors G3c): an enemy's spell hits the other enemies, never its
+## own body; a NO_PLAYER shot hits enemies too.
+func test_an_enemys_spell_hits_the_others_but_never_itself() -> void:
 	var imp: Node2D = _enemy(Vector2(100.0, 100.0), IMP)
 	var other: Node2D = _enemy(Vector2(200.0, 100.0), IMP + 1)
 	mgr.spawn(IMP, Vector2(100.0, 100.0), Vector2(300.0, 0.0), 2.0, 4.0, ManagerScript.LAYER_PLAYER)
-	_run(40)
-	check(hits.is_empty(), "with enemy fire off, an enemy's spell passes the others")
-	mgr.enemy_fire = true
-	mgr.spawn(IMP, Vector2(100.0, 100.0), Vector2(300.0, 0.0), 2.0, 4.0, ManagerScript.LAYER_PLAYER)
 	mgr.spawn(EventsScript.NO_PLAYER, Vector2(200.0, 160.0), Vector2(0.0, -300.0), 2.0, 4.0, ManagerScript.LAYER_PLAYER)
 	_run(40)
-	check_equal(_hit_targets(), [other] as Array[Node], "with it on, it hits the other enemy, and not itself; the old NO_PLAYER attack still passes enemies")
+	check_equal(_hit_targets(), [other, other] as Array[Node], "an enemy's shot and a NO_PLAYER one each hit the other enemy, never the caster")
 	check(not _hit_targets().has(imp), "never its own body")
 	hits.clear()
 	mgr.ray(IMP, Vector2(100.0, 100.0), Vector2.RIGHT, 200.0, 0, ManagerScript.LAYER_PLAYER)
 	check_equal(_hit_targets(), [other] as Array[Node], "an enemy's beam hits the other enemy too")
-	mgr.enemy_fire = false
-	hits.clear()
-	mgr.ray(IMP, Vector2(100.0, 100.0), Vector2.RIGHT, 200.0, 0, ManagerScript.LAYER_PLAYER)
-	check(hits.is_empty(), "and passes it with enemy fire off")
 
 
 func test_enemy_casters_share_the_enemies_drop_bucket() -> void:
@@ -176,16 +170,6 @@ func test_an_enemy_casters_homing_picks_wizards_and_a_players_never_does() -> vo
 	check_equal(point, wizard.global_position, "an enemy's homing finds the wizard, never an enemy")
 	point = mgr.homing_point(0, Vector2(100.0, 100.0), Vector2.RIGHT, PI, ManagerScript.LAYER_PLAYER | ManagerScript.LAYER_ENEMY, 300.0, 0, 1)
 	check_equal(point, imp.global_position, "a player's finds the enemy, never a wizard")
-
-
-func test_an_enemy_mend_shot_hits_the_other_enemies() -> void:
-	var imp: Node2D = _enemy(Vector2(100.0, 100.0), IMP)
-	var other: Node2D = _enemy(Vector2(200.0, 100.0), IMP + 1)
-	var slot: int = mgr.spawn(IMP, Vector2(100.0, 100.0), Vector2(300.0, 0.0), 2.0, 4.0, ManagerScript.LAYER_PLAYER)
-	check(mgr.set_ally_hit(slot), "an enemy caster's shot can hit allies")
-	_run(40)
-	check_equal(_hit_targets(), [other] as Array[Node], "its allies are the other enemies")
-	check(not _hit_targets().has(imp), "never itself")
 
 
 func test_enemy_casters_are_drawn_by_the_shader_above_the_players() -> void:

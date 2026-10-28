@@ -37,7 +37,8 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `target_move_requested`, `entity_spawn_requested`, `entity_end_requested` | `core/spells` (staffs B2) | `ai`; `target_move_requested` also `actor` (the Mover) |
 | `caster_move_finished` | `player`, `ai` (an enemy's own row, F8c), `actor` (the Mover) | `core/spells` |
 | `entity_ended`, `familiar_cast_requested` | `ai` | none yet (`core/spells`, staffs B2) |
-| `shot_blocked`, `ally_passed` | `core/projectiles` | none yet (`core/spells`, staffs B1) |
+| `shot_blocked` | `core/projectiles` | none yet (`core/spells`, staffs B1) |
+| `ally_passed` | nobody since actors G3c (shots hit teammates, none passes them) | `core/spells` (relay, `on ally`) |
 | `shield_blocked`, `kill_landed`, `wizard_hurt`, `reaction_landed` | `combat` | none yet (`core/spells`, staffs B2) |
 | `hit_landed` | `combat` | `feel` |
 | `heal_dealt` | `combat` | `feel`, `player`, `actor` (Health) |
@@ -57,8 +58,6 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `room_cleared` | `flow` | `rewards`, `run` |
 | `wave_started`, `build_break_started` | `flow` | `hud` |
 | `sandbox_changed` | `flow` | `hud` |
-| `friendly_fire_changed` | `coop` | `hud` |
-| `enemy_fire_changed` | `ai` (Entities) | `hud` |
 | `door_voted` | `flow` | none yet |
 | `difficulty_changed` | `difficulty` | none yet |
 | `reward_rolled`, `reward_taken` | `rewards` | none yet |
@@ -69,8 +68,6 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `door_vote_requested` | HUD | `flow` |
 | `pause_requested` | HUD | `run` |
 | `sandbox_requested`, `sandbox_action_requested` | HUD | `flow` |
-| `friendly_fire_requested` | HUD | `coop` |
-| `enemy_fire_requested` | HUD | `ai` (Entities) |
 
 `device_joined` and `device_left` come from `core/input` (a button press joins or leaves; `device` is the device id from `core/input/input_manager.gd`); `coop` turns them into `player_joined` and `player_left`. The rows sent by the HUD are its player-intent requests (see `hud/README.md`); each carries a player index 0–3. The gameplay area checks the request and announces the result as a state event: `door_voted` is flow's result of `door_vote_requested`, and `reward_taken` is rewards' result of `reward_pick_requested`. `play_requested` (the Play button) carries the index of the player who pressed it (0 if the pointer is not tied to a player) and makes `flow` load the first room and send `room_entered`.
 

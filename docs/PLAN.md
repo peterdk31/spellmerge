@@ -224,7 +224,7 @@ The full rules and the starting cards are in docs/DESIGN.md and docs/milestones/
 
 ### Co-op rules
 
-Downed players can be revived. Enemy HP and count scale with player count. Friendly fire is an option. The camera is a single shared view that zooms out to fit everyone. A later idea is cross-player spell linking (one player's frost plus another's storm), done asynchronously with no waiting.
+Downed players can be revived. Enemy HP and count scale with player count. Friendly fire is always on: every spell hurts every wizard and every enemy (actors G3c, 2026-10-28). The camera is a single shared view that zooms out to fit everyone. A later idea is cross-player spell linking (one player's frost plus another's storm), done asynchronously with no waiting.
 
 ### Fun
 
@@ -316,7 +316,7 @@ Code gets structure; content and assets stay flat and simple. Structure exists t
 | `player` | Wizard controller: move, dodge, cast, mana, health, downed/revive | M1 |
 | `combat` | Damage pipeline, hit/hurt boxes, knockback, status effects, applying element reactions | M1 |
 | `feel` | Hit-stop, screen shake, juice presets | M1 |
-| `coop` | Join/leave mid-run, friendly fire, shared camera | M1 |
+| `coop` | Join/leave mid-run, shared camera | M1 |
 | `ai` | Shared enemy behaviours: steering, targeting, attack patterns | M1–M3 |
 | `run` | Run lifecycle: start, seed, end, summary screen | M3 |
 | `flow` | Room sequence, door voting, transitions, waiting for builders | M3 |

@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-28: Card return (staffs C), already built
+
+The Return card was already done: the modifier `.tres`, icon, assets, two combos, lore and `test_return.gd` exist, and all 126 unit tests pass. Ticked it off; no code changed.
+
 ## 2026-10-28: Card ghost (staffs C), already built
 
 The Ghost card was already done: the modifier `.tres`, icon, assets, two combos, lore and `test_ghost.gd` exist, and all 122 unit tests pass. Ticked it off; no code changed.

@@ -81,8 +81,9 @@ const FORM_Z: int = 18
 ## Live beams made at once (more are made when core/spells has more: no beam limit, owner
 ## 2026-10-29), and the most points of each one's drawn path (BEAM_POINTS in `shot_beam.gdshader`):
 ## a homing beam bends from target to target and a bouncing one turns at walls, so it is drawn
-## along its path's points; a path with more is thinned evenly for its look (`_draw_live_beams`;
-## its hits and turns are the runtime's, whole).
+## along its path's points; a path with more keeps its ends and its sharpest turns and drops the
+## points of its gentlest curves for its look (`_thin_beam`; its hits and turns are the runtime's,
+## whole).
 const LIVE_BEAM_POINTS: int = 80
 const LIVE_BEAMS: int = 64
 ## How wide a beam that is shown whole (a short beam) is drawn: its core, rim, flares and glow.
@@ -287,6 +288,12 @@ var _flash_material: ShaderMaterial = null
 ## path as the shader takes it (x, y and how far along the beam; `beam_path`).
 var _live_beams: Array[MeshInstance2D] = []
 var _live_paths: Array[PackedVector3Array] = []
+## Scratch of `_thin_beam`: the points of a long path (read once, drawn from here), which of them
+## are drawn, how sharply it turns at each, and those turns sorted.
+var _thin_points: PackedVector2Array = PackedVector2Array()
+var _thin_keep: PackedByteArray = PackedByteArray()
+var _thin_turn: PackedFloat32Array = PackedFloat32Array()
+var _thin_sorted: PackedFloat32Array = PackedFloat32Array()
 ## Beams shown whole (beam meshes made once) and their paths of two points: seconds left and in
 ## all, the owner's body tint and the beam's length in pixels.
 var _forms: Array[MeshInstance2D] = []
@@ -1473,6 +1480,49 @@ func _step_forms(real_delta: float) -> void:
 ## Draw every live beam where it is this frame: along its curve, as far as it got, in its owner's
 ## tint with its element's colour in the core. It flares on each hit, flickers a little and fades
 ## over the last quarter of its life. Nothing is allocated.
+## Marks in `_thin_keep` which of the `all` points of live beam `i` to draw when it has more than
+## LIVE_BEAM_POINTS: its two ends and the LIVE_BEAM_POINTS - 2 points where it turns most (a wall
+## it bounces off turns it sharply, a target it bends at less, a point of a gentle curve hardly),
+## the first of equal ones; the points of its gentlest curves are dropped. Only a path that long
+## (many pierce cards on a homing beam, many bounces) comes here; its scratch grows to the
+## longest path seen.
+func _thin_beam(i: int, all: int) -> void:
+	if _thin_keep.size() < all:
+		_thin_keep.resize(all)
+		_thin_turn.resize(all)
+		_thin_points.resize(all)
+	_thin_sorted.resize(all - 2)
+	for n in all:
+		_thin_points[n] = spells.call("beam_point", i, n)
+	var prev: Vector2 = _thin_points[0]
+	var here: Vector2 = _thin_points[1]
+	for n in range(1, all - 1):
+		var next: Vector2 = _thin_points[n + 1]
+		var into: Vector2 = here - prev
+		var out: Vector2 = next - here
+		var turn: float = 0.0 if into.is_zero_approx() or out.is_zero_approx() else absf(into.angle_to(out))
+		_thin_turn[n] = turn
+		_thin_sorted[n - 1] = turn
+		prev = here
+		here = next
+	_thin_sorted.sort()
+	var room: int = LIVE_BEAM_POINTS - 2
+	var least: float = _thin_sorted[all - 2 - room]
+	var above: int = 0
+	for n in range(1, all - 1):
+		if _thin_turn[n] > least:
+			above += 1
+	var equal_room: int = room - above
+	_thin_keep[0] = 1
+	_thin_keep[all - 1] = 1
+	for n in range(1, all - 1):
+		var keep: bool = _thin_turn[n] > least
+		if not keep and _thin_turn[n] == least and equal_room > 0:
+			keep = true
+			equal_room -= 1
+		_thin_keep[n] = 1 if keep else 0
+
+
 func _draw_live_beams() -> void:
 	var count: int = 0
 	if spells != null and spells.has_method("beam_slots"):
@@ -1488,8 +1538,10 @@ func _draw_live_beams() -> void:
 			continue
 		var all: int = int(spells.call("beam_point_count", i))
 		var points: int = mini(all, LIVE_BEAM_POINTS)
-		# Every `every`-th point of a longer path (and its last), so the whole beam is drawn.
-		var every: float = float(all - 1) / float(points - 1) if points > 1 and all > points else 1.0
+		# A longer path keeps the points that shape it most (`_thin_beam`).
+		var thin: bool = all > LIVE_BEAM_POINTS
+		if thin:
+			_thin_beam(i, all)
 		var reach: float = spells.call("beam_reach", i)
 		var origin: Vector2 = spells.call("beam_point", i, 0) if points > 0 else Vector2.INF
 		if reach <= 0.0 or points < 2 or not origin.is_finite():
@@ -1504,8 +1556,12 @@ func _draw_live_beams() -> void:
 		var used: int = 1
 		var end_at: Vector2 = origin
 		path[0] = Vector3(origin.x, origin.y, 0.0)
-		for n in range(1, points):
-			var point: Vector2 = spells.call("beam_point", i, mini(roundi(n * every), all - 1))
+		for n in range(1, all):
+			if used == LIVE_BEAM_POINTS:
+				break
+			if thin and _thin_keep[n] == 0:
+				continue
+			var point: Vector2 = _thin_points[n] if thin else spells.call("beam_point", i, n)
 			var piece: float = prev.distance_to(point)
 			if walked + piece >= reach:
 				end_at = prev.move_toward(point, reach - walked)

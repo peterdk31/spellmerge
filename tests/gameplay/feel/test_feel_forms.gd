@@ -297,6 +297,42 @@ func test_a_live_beam_is_drawn_along_its_curve_every_frame() -> void:
 	check(_live_lines().is_empty(), "gone when it ends")
 
 
+## A live beam longer than the shader holds: a zig-zag of 200 points, one pixel apart, turning
+## sharply at every 40th (a beam bouncing between two walls).
+class LongBeams:
+	extends FakeBeams
+
+	func beam_point_count(_at: int) -> int:
+		return 200
+
+	func beam_point(_at: int, n: int) -> Vector2:
+		var leg: int = n / 40
+		var into: float = float(n % 40)
+		var y: float = into if leg % 2 == 0 else 40.0 - into
+		return Vector2(float(n), y)
+
+
+func test_a_beam_longer_than_the_shader_holds_keeps_its_ends_and_its_turns() -> void:
+	var beams := own(LongBeams.new()) as LongBeams
+	feel.spells = beams
+	feel.step(0.016)
+	var lines: Array[MeshInstance2D] = _live_lines()
+	check_equal(lines.size(), 1, "one live beam on screen")
+	if lines.is_empty():
+		return
+	var material: ShaderMaterial = lines[0].material as ShaderMaterial
+	var points: int = material.get_shader_parameter(&"beam_points")
+	check(points <= FeelScript.LIVE_BEAM_POINTS, "it fits the shader: %d points" % points)
+	var path: PackedVector3Array = _path(lines[0])
+	var drawn: Array[Vector2] = []
+	for n in points:
+		drawn.append(Vector2(path[n].x, path[n].y))
+	check(drawn[0].is_equal_approx(Vector2.ZERO), "from its start")
+	check(drawn[points - 1].is_equal_approx(beams.beam_point(1, 199)), "to its end: %s" % drawn[points - 1])
+	for corner in [40, 80, 120, 160]:
+		check(drawn.has(beams.beam_point(1, corner)), "the turn at point %d is drawn, not cut across" % corner)
+
+
 func test_a_live_beam_is_drawn_by_the_beam_mode_as_long_as_it_got() -> void:
 	var beams := own(FakeBeams.new()) as FakeBeams
 	beams.reach = 50.0

@@ -1,0 +1,15 @@
+{
+	"id": "familiar_and_frost",
+	"name": "Familiar and frost",
+	"does": "Two staffs side by side: one sends a familiar out, the other throws a frost bolt that chills the imp.",
+	"casts": [
+		{"staff": 0, "cards": ["familiar", "bolt"]},
+		{"staff": 1, "cards": ["frost", "bolt"], "at": 0.1}
+	],
+	"imps": [[100, 0]],
+	"seconds": 1.5,
+	"checks": [
+		{"kind": "spawned", "entity": "familiar", "min": 1},
+		{"kind": "status", "imps": [0], "status": "chill"}
+	]
+}

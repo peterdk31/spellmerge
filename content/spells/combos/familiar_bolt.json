@@ -1,0 +1,13 @@
+{
+	"id": "familiar_bolt",
+	"name": "Familiar bolt",
+	"does": "A familiar is sent out with a fire bolt as its payload; the cast asks for it.",
+	"casts": [
+		{"staff": 0, "cards": ["familiar", "fire", "bolt"]}
+	],
+	"imps": [[100, 0]],
+	"seconds": 1.5,
+	"checks": [
+		{"kind": "spawned", "entity": "familiar", "min": 1}
+	]
+}

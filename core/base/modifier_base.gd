@@ -30,7 +30,7 @@ enum Behaviour {
 	ECHO,
 	## Stops mid-air for `behaviour_strength` seconds, then goes on (B1).
 	LINGER,
-	## Knockback times `behaviour_strength`; a knock into a wall hurts (B3).
+	## Knockback times `behaviour_strength` (more cards multiply); a knock into a wall hurts (B3).
 	HEAVY,
 	## Hits refund `behaviour_strength` mana each (B2, B4).
 	SIPHON,
@@ -44,7 +44,7 @@ enum Behaviour {
 	SPIRAL,
 	## Also fires the carrier backwards (B2).
 	MIRROR,
-	## Grows `behaviour_strength` times bigger per second of flight, up to the room's size (B1): a
+	## Grows `behaviour_strength` times bigger per second of flight (more cards multiply), up to the room's size (B1): a
 	## wider hit circle, the same damage (owner, 2026-10-27: size is the card; damage is overcharge's).
 	GROWTH,
 	## Takes on the infusions of the last cast of any actor its shot hits (B2; owner, 2026-10-28).
@@ -62,6 +62,11 @@ enum Behaviour {
 	## bodies it possesses and the others copy its intent; the caster's body stands. The rule is in
 	## `gameplay/actor/possession.gd`.
 	POSSESS,
+	## Shots of another team that touch the carrier turn and become its caster's, each time
+	## `SpellLimits.DEFLECT_SPEEDUP` times faster (melee I3; owner, 2026-10-29): on every carrier
+	## that touches shots (a shot, a swing's sweep, a beam's line). It turns as many as touch it, goes
+	## before a shield (which keeps its charge) and sets off `on block`. Strength unused (1).
+	DEFLECT,
 }
 
 @export var damage_mult: float = 1.0

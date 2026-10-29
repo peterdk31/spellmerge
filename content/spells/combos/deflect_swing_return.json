@@ -1,0 +1,11 @@
+{
+	"id": "deflect_swing_return",
+	"name": "Return to sender",
+	"does": "An enemy bolt flies at the caster; the deflecting swing bats it back, faster and the caster's now, and it hits the imp standing behind where it was shot from.",
+	"casts": [{"staff": 0, "cards": ["deflect", "swing"]}],
+	"imps": [[150, 0]],
+	"guard": true,
+	"foes": [[60, 0]],
+	"seconds": 1.5,
+	"checks": [{"kind": "deflected", "min": 1}, {"kind": "damaged", "imps": [0]}]
+}

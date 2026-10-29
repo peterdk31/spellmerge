@@ -151,6 +151,8 @@ extends Node2D
 ##   growth                 radius x factor per second, up to the room's size; `get_growth_of`
 ##   sticky                 the first hit keeps it on the target for N seconds, then it expires
 ##   shield                 stops N shots of other teams that touch it (`shot_blocked`)
+##   deflect                turns every shot of another team that touches it and makes it its
+##                          caster's, 1.7x faster (`deflect_shot`, `shot_deflected`); before a shield
 ##   self hit               may hit its caster once it has left the caster's hitbox
 ## Self-hit is off until `gameplay/combat` is ready for it (B3). Teammates are always hit (G3c).
 ##
@@ -465,7 +467,8 @@ var dropped: int = 0
 ## The slot of the shot whose hit or expiry event is being sent, else -1. See "Ends".
 var event_slot: int = -1
 ## The form of the shot whose `projectile_impact` is being sent: `&"bolt"`, `&"rune"`, `&"orbit"`
-## or `&"beam"`, whoever cast it (any time outside an impact: `&""`). For looks only.
+## or `&"beam"`, whoever cast it, and the carrier's while `block_shot` sends `shot_blocked` (a
+## swing's: a parry) (any time outside these: `&""`). For looks only.
 var impact_form: StringName = &""
 ## The core colour and the look (`set_core`, `set_look`) of the shot whose `projectile_impact`
 ## is being sent, so its flare can take the shot's colours and card effects (white and 0 for a
@@ -554,6 +557,8 @@ var _drawn_particles: PackedInt32Array = PackedInt32Array()
 var _flags: PackedInt32Array = PackedInt32Array()
 var _bounce: PackedInt32Array = PackedInt32Array()
 var _shield: PackedInt32Array = PackedInt32Array()
+## 1 for a shot that deflects the shots of other teams it touches (`set_deflect`).
+var _deflect: PackedByteArray = PackedByteArray()
 var _span: PackedFloat32Array = PackedFloat32Array()
 var _radius0: PackedFloat32Array = PackedFloat32Array()
 var _growth: PackedFloat32Array = PackedFloat32Array()
@@ -794,6 +799,9 @@ var ray_end_heading: Vector2 = Vector2.ZERO
 var sweep_nodes: Array = []
 var sweep_points: PackedVector2Array = PackedVector2Array()
 var sweep_heads: PackedVector2Array = PackedVector2Array()
+## The shots the last `shots_in_wedge` or `shots_on_segment` found (reused; grows). Read right
+## after the call: deflecting or blocking them can start other queries.
+var guard_slots: PackedInt32Array = PackedInt32Array()
 
 
 func _init() -> void:
@@ -925,6 +933,7 @@ func set_cap(value: int) -> void:
 	_flags.resize(_cap)
 	_bounce.resize(_cap)
 	_shield.resize(_cap)
+	_deflect.resize(_cap)
 	_span.resize(_cap)
 	_radius0.resize(_cap)
 	_growth.resize(_cap)
@@ -1730,6 +1739,161 @@ func get_shield_of(slot: int) -> int:
 	return _shield[slot] if slot >= 0 and slot < _cap and _alive[slot] != 0 else 0
 
 
+## The shot turns every shot of another team that touches it and makes it its caster's
+## (`deflect_shot`; melee I3), as many as touch it while it lives. Deflect goes before a shield
+## (owner, 2026-10-29): a touching shot is turned, and the shield keeps its charge. A shot of no
+## actor has none.
+func set_deflect(slot: int, on: bool) -> bool:
+	if slot < 0 or slot >= _cap or _alive[slot] == 0 or _actor[slot] < 0:
+		return false
+	_deflect[slot] = 1 if on else 0
+	if on:
+		_join(slot, B_SHIELD)
+	elif _shield[slot] <= 0:
+		_leave(slot, B_SHIELD)
+	return true
+
+
+func is_deflecting(slot: int) -> bool:
+	return slot >= 0 and slot < _cap and _alive[slot] != 0 and _deflect[slot] != 0
+
+
+## Deflects the shot in `slot` (melee I3; docs/milestones/M2-staffs.md, "Deflect"): it turns off
+## what touched it, `normal` the way out from that at the touch (a shot coming in along it is
+## mirrored; one already going out keeps its way), flies `SpellLimits.DEFLECT_SPEEDUP` times
+## faster (each deflect again: a rally speeds up) and its life starts again, and it becomes the
+## actor `by`'s: its team, ramp, budget and hit credit, and a homing or returning shot hunts or
+## comes back for its new caster. An orbiting shot leaves its circle and flies straight on. It
+## keeps its own cards (its tag: damage, infusions, payloads), may hit what it hit before, and
+## `shot_deflected(by, where, by_tag)` is sent. False when there is no such shot or `by` is no
+## actor.
+func deflect_shot(slot: int, by: int, normal: Vector2, by_tag: int) -> bool:
+	if slot < 0 or slot >= _cap or _alive[slot] == 0 or by < 0 or not normal.is_finite():
+		return false
+	var out: Vector2 = normal.normalized() if not normal.is_zero_approx() else Vector2.ZERO
+	if _motion[slot] == MOTION_ORBIT:
+		_vel[slot] = _orbit_tangent(slot)
+		_motion[slot] = MOTION_STRAIGHT
+		_leave(slot, B_ORBIT)
+	var velocity: Vector2 = _vel[slot]
+	if out != Vector2.ZERO and velocity.dot(out) < 0.0:
+		velocity -= 2.0 * velocity.dot(out) * out
+	_vel[slot] = velocity * SpellLimits.DEFLECT_SPEEDUP
+	_speed[slot] *= SpellLimits.DEFLECT_SPEEDUP
+	_base[slot] = _pos[slot]
+	_life[slot] = _span[slot]
+	_actor[slot] = by
+	var table: ActorsScript = actors if actors != null else _auto_actors
+	if table == null or not is_instance_valid(table):
+		table = actor_table()
+	var budget: int = ActorsScript.SHARED
+	if table != null and table.is_open(by):
+		_team[slot] = table.team_of(by)
+		_ramp[slot] = table.ramp_of(by)
+		budget = table.budget_of(by)
+	else:
+		_team[slot] = ActorsScript.NONE
+		_ramp[slot] = ActorsScript.NONE
+	_owned[_budget[slot]] -= 1
+	_budget[slot] = budget
+	_owned[budget] += 1
+	_caster_slot[slot] = CASTER_WIZARD
+	_home_target[slot] = 0
+	_home_at[slot] = Vector2.INF
+	_skip_left[slot] = 0.0
+	_forget_all(slot)
+	# Its colours are its new caster's: work its look out again.
+	_drawn_seq[slot] = -1
+	if events != null:
+		var outer_slot: int = event_slot
+		event_slot = slot
+		events.shot_deflected.emit(by, _pos[slot], by_tag)
+		event_slot = outer_slot
+	return true
+
+
+## Stops the shot in `slot` as a shield charge does (`shot_blocked(by, where, by_tag)`), for a
+## carrier that is no shot (a swing, a beam). `form` is that carrier's (`&"swing"`, `&"beam"`),
+## told to looks as `impact_form` while the event is sent: a swing's block is a parry (melee I5).
+## False when there is no such shot.
+func block_shot(slot: int, by: int, by_tag: int, form: StringName = &"") -> bool:
+	if slot < 0 or slot >= _cap or _alive[slot] == 0:
+		return false
+	var at: Vector2 = _pos[slot]
+	_kill(slot)
+	if events != null:
+		var outer_form: StringName = impact_form
+		impact_form = form
+		events.shot_blocked.emit(by, at, by_tag)
+		impact_form = outer_form
+	return true
+
+
+## The shots of another team than the actor `caster`'s (a shot of no actor included, as a shield
+## has it) whose circle reaches into the wedge round `origin` from `from_angle` to `to_angle`
+## radians off `direction` (`side` as `sweep`), out to `reach`: a swing's guard (melee I3). Fills
+## `guard_slots` and returns how many. Allocation-free once the list has grown.
+func shots_in_wedge(caster: int, origin: Vector2, direction: Vector2, side: int, from_angle: float, to_angle: float, reach: float) -> int:
+	if not origin.is_finite() or not direction.is_finite() or direction.is_zero_approx() or not (reach > 0.0) or to_angle < from_angle:
+		return 0
+	var mine: int = _team_now(caster)
+	var base: float = direction.angle()
+	var turn: float = 1.0 if side >= 0 else -1.0
+	var found: int = 0
+	for slot in _high:
+		if _alive[slot] == 0 or _team[slot] == mine:
+			continue
+		var to: Vector2 = _pos[slot] - origin
+		var distance: float = to.length()
+		var radius: float = _radius[slot]
+		if distance > reach + radius:
+			continue
+		var width: float = PI if distance <= radius else asin(radius / distance)
+		var local: float = angle_difference(base, to.angle()) * turn
+		if local + width >= from_angle and local - width <= to_angle:
+			found = _guard_add(found, slot)
+	return found
+
+
+## The shots of another team than `caster`'s whose circle touches the segment from `a` to `b`
+## widened by `width` each side: a beam's guard (melee I3). Fills `guard_slots`, after the first
+## `first` already there, and returns how many there are in all.
+func shots_on_segment(caster: int, a: Vector2, b: Vector2, width: float, first: int = 0) -> int:
+	if not a.is_finite() or not b.is_finite():
+		return first
+	var mine: int = _team_now(caster)
+	var found: int = first
+	for slot in _high:
+		if _alive[slot] == 0 or _team[slot] == mine or _guard_has(found, slot):
+			continue
+		var reach: float = width + _radius[slot]
+		if Geometry2D.get_closest_point_to_segment(_pos[slot], a, b).distance_squared_to(_pos[slot]) <= reach * reach:
+			found = _guard_add(found, slot)
+	return found
+
+
+func _guard_has(found: int, slot: int) -> bool:
+	for n in found:
+		if guard_slots[n] == slot:
+			return true
+	return false
+
+
+func _guard_add(found: int, slot: int) -> int:
+	if found == guard_slots.size():
+		guard_slots.resize(maxi(found * 2, 8))
+	guard_slots[found] = slot
+	return found + 1
+
+
+## The team of the actor `caster` now (NONE for no open actor), as `_spawn_row` reads it.
+func _team_now(caster: int) -> int:
+	var table: ActorsScript = actors if actors != null else _auto_actors
+	if table == null or not is_instance_valid(table):
+		table = actor_table()
+	return table.team_of(caster) if table != null and table.is_open(caster) else ActorsScript.NONE
+
+
 ## The shot may hit its own caster, once it has left the caster's hitbox (the first step it
 ## no longer overlaps it). Off by default; `gameplay/combat` decides what such a hit does. A shot
 ## of no actor has no caster to hit.
@@ -1794,6 +1958,7 @@ func _spawn_row(caster: int, origin: Vector2, velocity: Vector2, lifetime: float
 	_flags[slot] = 0
 	_bounce[slot] = 0
 	_shield[slot] = 0
+	_deflect[slot] = 0
 	_span[slot] = lifetime
 	_radius0[slot] = maxf(radius, 0.0)
 	_growth[slot] = 1.0
@@ -2284,7 +2449,7 @@ func _pass_shield(list: PackedInt32Array, first: int, count: int, _delta: float)
 	for n in count:
 		var slot: int = _shield_order[n]
 		# A shot spawned during this step (S_IDLE) waits for the next one.
-		if _alive[slot] != 0 and _shield[slot] > 0 and _state[slot] == S_DONE:
+		if _alive[slot] != 0 and (_shield[slot] > 0 or _deflect[slot] != 0) and _state[slot] == S_DONE:
 			_shield_block(slot)
 
 
@@ -2351,7 +2516,7 @@ func _shield_block(slot: int) -> void:
 				_scan_count += 1
 	var mine: int = _team[slot]
 	for n in _scan_count:
-		if _shield[slot] <= 0 or _work_left <= 0:
+		if (_shield[slot] <= 0 and _deflect[slot] == 0) or _work_left <= 0:
 			return
 		_work_left -= 1
 		var other: int = _scan_slots[n]
@@ -2366,6 +2531,10 @@ func _shield_block(slot: int) -> void:
 		if not path.is_zero_approx():
 			along = clampf(-start.dot(path) / path.length_squared(), 0.0, 1.0)
 		if (start + path * along).length_squared() > reach * reach:
+			continue
+		if _deflect[slot] != 0:
+			# Deflect goes first and keeps the shield's charge (owner, 2026-10-29).
+			deflect_shot(other, _actor[slot], _pos[other] - _pos[slot], _tag[slot])
 			continue
 		_shield[slot] -= 1
 		var at: Vector2 = _pos[other]
@@ -3593,6 +3762,11 @@ func get_seq_of(slot: int) -> int:
 ## The tag of the shot in `slot` (kept after it ended, until the slot is reused).
 func get_tag_of(slot: int) -> int:
 	return _tag[slot] if slot >= 0 and slot < _cap else 0
+
+
+## The actor whose shot the shot in `slot` is now (a deflect changes it), -1 for none.
+func get_actor_of(slot: int) -> int:
+	return _actor[slot] if slot >= 0 and slot < _cap else -1
 
 
 ## The velocity of the shot in `slot` (kept after it ended, until the slot is reused).

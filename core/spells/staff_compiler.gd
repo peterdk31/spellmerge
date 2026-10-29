@@ -11,6 +11,9 @@ extends RefCounted
 ## land on the caster (the cast's own group) or on the payload's origin (a payload). Nothing is
 ## refused: a card that does nothing is listed as wasted, with the reason.
 
+## The behaviours whose strength is a factor: more cards multiply it (`stacked`).
+const MULTIPLIED: Array[int] = [ModifierBase.Behaviour.HEAVY, ModifierBase.Behaviour.GROWTH]
+
 ## `CompiledCast.targets` value for a card that landed on the caster, and on a payload's origin.
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 const TARGET_CASTER: int = -1
@@ -22,7 +25,7 @@ const TRAVEL_ONLY: Array[int] = [
 	ModifierBase.Behaviour.LINGER, ModifierBase.Behaviour.STICKY, ModifierBase.Behaviour.GHOST,
 	ModifierBase.Behaviour.SPIRAL, ModifierBase.Behaviour.MIRROR, ModifierBase.Behaviour.GROWTH,
 	ModifierBase.Behaviour.RELAY, ModifierBase.Behaviour.RETURN, ModifierBase.Behaviour.ARC,
-	ModifierBase.Behaviour.POSSESS, ModifierBase.Behaviour.MAGNET,
+	ModifierBase.Behaviour.POSSESS, ModifierBase.Behaviour.MAGNET, ModifierBase.Behaviour.DEFLECT,
 ]
 
 ## How the description says when a trigger fires, by `TriggerBase.Event`.
@@ -145,8 +148,11 @@ func _read_group(want: int, payload: bool) -> CompiledGroup:
 			# A behaviour its form cannot run (homing on a rune, return on a beam) is wasted, and
 			# changes nothing else either.
 			var kept_modifiers: Array[ModifierBase] = []
+			var deflects: bool = false
 			for modifier in modifiers:
-				if behaviour_runs(modifier.behaviour, form.motion):
+				deflects = deflects or (modifier.behaviour == ModifierBase.Behaviour.DEFLECT and behaviour_runs(modifier.behaviour, form.motion))
+			for modifier in modifiers:
+				if behaviour_runs(modifier.behaviour, form.motion) and not (deflects and _shield_outrun(modifier, form.motion)):
 					kept_modifiers.append(modifier)
 			var spell: CompiledSpell = _build(form, elements, kept_modifiers, trigger, CompiledSpell.FALLBACK_NONE)
 			spell.slot = slot
@@ -154,7 +160,8 @@ func _read_group(want: int, payload: bool) -> CompiledGroup:
 			for at: int in kept:
 				var modifier := _cards[at] as ModifierBase
 				if modifier != null and not kept_modifiers.has(modifier):
-					_waste(at, "%s does nothing on a %s: %s." % [_name(modifier), _name(form), _why_not(modifier.behaviour)])
+					var why: String = "deflect turns every shot that touches it first" if deflects and _shield_outrun(modifier, form.motion) else _why_not(modifier.behaviour)
+					_waste(at, "%s does nothing on a %s: %s." % [_name(modifier), _name(form), why])
 				else:
 					_attach(at, slot)
 			if form.carries_payload():
@@ -286,7 +293,7 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 		spell.lifetime *= modifier.lifetime_mult
 		if modifier.behaviour == ModifierBase.Behaviour.ARC:
 			spell.arc_reach = maxf(spell.arc_reach, modifier.behaviour_reach)
-		spell.behaviours[modifier.behaviour] += modifier.behaviour_strength
+		spell.behaviours[modifier.behaviour] = stacked(modifier.behaviour, spell.behaviours[modifier.behaviour], modifier.behaviour_strength)
 		match modifier.behaviour:
 			ModifierBase.Behaviour.HOMING:
 				# Homing stacks by multiplying: the strongest card's turn rate, x HOMING_STACK for
@@ -336,32 +343,15 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 		spell.hit.knockback *= heavy
 		spell.hit.slam = roundi(float(spell.damage) * SpellLimits.SLAM_SHARE)
 	if spell.behaviour(ModifierBase.Behaviour.ECHO) > 0.0:
-		spell.echo_hit = HitProfile.new()
-		spell.echo_hit.damage = maxi(roundi(spell.damage * SpellLimits.ECHO_DAMAGE), 1)
-		spell.echo_hit.knockback = spell.hit.knockback
-		spell.echo_hit.element_id = spell.element_id
-		spell.echo_hit.element_ids = spell.element_ids
-		spell.echo_hit.status_id = spell.status_id
-		spell.echo_hit.status_duration = spell.status_duration
-		spell.echo_hit.status_strength = spell.status_strength
+		spell.echo_hit = spell.hit.scaled(SpellLimits.ECHO_DAMAGE, 1.0)
 	var arc: float = spell.behaviour(ModifierBase.Behaviour.ARC)
 	if arc > 0.0:
 		# Zaps per second add up over arc cards (a shot zaps at most once a physics step); a zap
 		# hits like a ray, at ARC_DAMAGE of the shot.
 		spell.arc_interval = 1.0 / arc
-		spell.arc_hit = HitProfile.new()
-		spell.arc_hit.damage = maxi(roundi(spell.hit.damage * SpellLimits.ARC_DAMAGE), 1)
-		spell.arc_hit.heal = roundi(spell.hit.heal * SpellLimits.ARC_DAMAGE)
-		spell.arc_hit.knockback = spell.hit.knockback * SpellLimits.ARC_DAMAGE
-		spell.arc_hit.element_id = spell.element_id
-		spell.arc_hit.element_ids = spell.element_ids
-		spell.arc_hit.status_id = spell.status_id
-		spell.arc_hit.status_duration = spell.status_duration
-		spell.arc_hit.status_strength = spell.status_strength
-		spell.arc_hit.later_status_ids = later_ids
-		spell.arc_hit.later_status_durations = later_durations
-		spell.arc_hit.later_status_strengths = later_strengths
-		spell.arc_hit.kind = &"ray"
+		spell.arc_hit = zap_hit(spell.hit)
+		if spell.echo_hit != null:
+			spell.echo_arc_hit = zap_hit(spell.echo_hit)
 	if trigger != null:
 		spell.trigger_id = trigger.id
 		spell.trigger_event = trigger.event
@@ -369,6 +359,24 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 	_cast.mana += spell.mana_cost
 	_cast.delay += spell.cooldown
 	return spell
+
+
+## What a zap (`arc`) of a shot that hits with `hit` does: the same hit, ray kind, at ARC_DAMAGE of
+## its strength and knockback. Spells asks it again for a shot whose hit changed (`relay`).
+static func zap_hit(hit: HitProfile) -> HitProfile:
+	var zap: HitProfile = hit.scaled(SpellLimits.ARC_DAMAGE, SpellLimits.ARC_DAMAGE)
+	zap.kind = &"ray"
+	return zap
+
+
+## The strength of `behaviour` after one more card of `strength` on top of `before` (0 for none):
+## counts add (bounces, shields, seconds, pixels) and multipliers multiply (heavy's knockback,
+## growth's factor; rule 3, docs/milestones/M2-rules.md R1c), so two heavy cards are 4 x 4, not 4 + 4.
+## Homing multiplies too, by its own rule (HOMING_STACK).
+static func stacked(behaviour: int, before: float, strength: float) -> float:
+	if before > 0.0 and MULTIPLIED.has(behaviour):
+		return before * strength
+	return before + strength
 
 
 ## Whether homing can steer a carrier of `motion`: what it moves turns toward a target as it
@@ -397,7 +405,25 @@ static func behaviour_runs(behaviour: int, motion: FormBase.Motion) -> bool:
 				FormBase.Motion.STRAIGHT, FormBase.Motion.STILL, FormBase.Motion.ORBIT, FormBase.Motion.HOOK, FormBase.Motion.SWAP, FormBase.Motion.WALL:
 					return true
 			return false
+		ModifierBase.Behaviour.DEFLECT:
+			return guards(motion) or motion == FormBase.Motion.HOOK or motion == FormBase.Motion.SWAP
 	return true
+
+
+## True for the carriers whose shield only stops shots that touch them (a shot, a beam's line, a
+## swing's sweep): on these a deflect turns every such shot first (owner, 2026-10-29), so a shield
+## with it never blocks. A hook's shield also guards its caster on the pull, a dash's and a
+## teleport's is a barrier on the caster: those keep it.
+static func guards(motion: FormBase.Motion) -> bool:
+	match motion:
+		FormBase.Motion.STRAIGHT, FormBase.Motion.STILL, FormBase.Motion.ORBIT, FormBase.Motion.WALL, FormBase.Motion.RAY, FormBase.Motion.FISSURE, FormBase.Motion.SWING:
+			return true
+	return false
+
+
+## True when `modifier` is a shield that a deflect on a carrier of `motion` leaves with nothing to do.
+static func _shield_outrun(modifier: ModifierBase, motion: FormBase.Motion) -> bool:
+	return modifier.behaviour == ModifierBase.Behaviour.SHIELD and guards(motion)
 
 
 ## Why a carrier cannot run `behaviour`, for the wasted card's reason.
@@ -409,6 +435,8 @@ static func _why_not(behaviour: int) -> String:
 			return "it does not fly out"
 		ModifierBase.Behaviour.ARC:
 			return "it is not a shot that stays in the air"
+		ModifierBase.Behaviour.DEFLECT:
+			return "it touches no shots"
 	return "it cannot run it"
 
 

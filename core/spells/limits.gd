@@ -65,6 +65,10 @@ const BUDGETS: int = ActorsScript.SHARED + 1
 ## `lifetime`, so a held staff keeps one on.
 const BEAM_ROWS_START: int = 64
 const BEAM_TICK: float = 0.15
+## A deflected shot flies this many times faster, again at every deflect, so a rally speeds up
+## (melee I3; the owner's playground, 2026-10-29). Its pool and the hit pass's sweep of its whole
+## path each step are the engine's limits; nothing caps the speed.
+const DEFLECT_SPEEDUP: float = 1.7
 ## A homing carrier that is over at once (a beam, a teleport) has no time to turn, so it bends
 ## toward a target as far as its turn rate turns in this many seconds (the Homing card's 3
 ## radians a second bend it 43 degrees; more homing bends it further, all the way round).

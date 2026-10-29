@@ -110,3 +110,14 @@ func test_four_players_at_once() -> void:
 			hurt = hurt or arena.lost(imp) > 0
 		check(hurt, "player %d's growth combo lands" % player)
 	arena.free_all()
+
+
+func test_growth_cards_multiply() -> void:
+	# Rule 3 (docs/milestones/M2-rules.md, R1c): growth is a factor, so three cards are 2 x 2 x 2,
+	# not 2 + 2 + 2 (two cards agree either way).
+	var arena := ArenaScript.new(root)
+	var strength: float = _card().behaviour_strength
+	var staff: CompiledStaff = arena.install_cards(0, 0, ["growth", "growth", "growth", "bolt"])
+	var spell: CompiledSpell = staff.casts[0].group.spells[0]
+	arena.free_all()
+	check_equal(spell.behaviour(ModifierBase.Behaviour.GROWTH), strength * strength * strength, "three cards multiply")

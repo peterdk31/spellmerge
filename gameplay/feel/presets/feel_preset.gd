@@ -132,6 +132,22 @@ extends Resource
 @export_range(0.05, 1.0, 0.01) var heal_seconds: float = 0.4
 @export_range(0.2, 4.0, 0.1) var heal_size: float = 1.0
 @export var heal_sound: StringName = &"heal"
+## A deflected shot (melee I5, the owner's pick from the mockup): it flashes big and white where
+## it turned, a white-hot cross in its new caster's colours, `deflect_size` times a burst's grid
+## (a shot's landing flare is 1 to 3, a hit's spray 1 to 3), for `deflect_seconds`; then it leaves
+## 1.7x faster, so its tail (a pixel per pixel of travel) is longer by itself. Sound id as above.
+@export_range(1.0, 15.0, 1.0) var deflect_size: float = 4.0
+@export_range(0.05, 1.0, 0.01) var deflect_seconds: float = 0.3
+@export var deflect_sound: StringName = &"deflect"
+## A parry (`shield · swing`, melee I5, the owner's pick): a big four-point star in Spark gold
+## (STYLE.md's Spark base) where the swing stopped the shot, and a local stop of `parry_stop_seconds`
+## on the parrying actor alone (the stopped shot is gone; nobody else holds, as for every local
+## stop). The playground's parry stop is 0.06 s.
+@export var parry_color: Color = Color("f2c230")
+@export_range(1.0, 15.0, 1.0) var parry_size: float = 5.0
+@export_range(0.05, 1.0, 0.01) var parry_seconds: float = 0.35
+@export_range(0.0, 0.3, 0.005) var parry_stop_seconds: float = 0.06
+@export var parry_sound: StringName = &"parry"
 ## How long the "downed by your own ..." note rises over a downed wizard, in seconds.
 @export_range(0.5, 6.0, 0.1) var downed_note_seconds: float = 2.5
 ## Sound ids asked from `core/registry`. A missing sound is silent.

@@ -8,6 +8,7 @@ script = ExtResource("1_base")
 id = &"bigger"
 demo = true
 display_name = "Bigger"
+name_words = PackedStringArray("Hefty", "Plump")
 complexity = 1
 icon = ExtResource("2_icon")
 damage_mult = 1.3

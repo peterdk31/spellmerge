@@ -7,6 +7,7 @@
 script = ExtResource("1_base")
 id = &"on_kill"
 display_name = "On Kill"
+name_words = PackedStringArray("Gleeful", "Vengeful")
 complexity = 1
 icon = ExtResource("2_icon")
 event = 4

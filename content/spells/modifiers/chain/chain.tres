@@ -8,6 +8,7 @@ script = ExtResource("1_base")
 id = &"chain"
 demo = true
 display_name = "Chain"
+name_words = PackedStringArray("Chaining", "Jangling")
 complexity = 2
 icon = ExtResource("2_icon")
 damage_mult = 0.8

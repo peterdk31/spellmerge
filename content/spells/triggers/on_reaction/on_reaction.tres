@@ -7,6 +7,7 @@
 script = ExtResource("1_base")
 id = &"on_reaction"
 display_name = "On Reaction"
+name_words = PackedStringArray("Fizzing", "Chemical")
 complexity = 1
 icon = ExtResource("2_icon")
 event = 8

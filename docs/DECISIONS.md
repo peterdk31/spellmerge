@@ -2,6 +2,10 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-29: How a spell is named
+
+The name is made from the cards' own `name_words` (in each `.tres`, so a new card edits no shared list), by `SpellNamer` in `core/spells/`. Rules: modifiers are adjectives (only the first three are said, to keep a name readable aloud), infusions fuse into one word (Firefrost), a multicast card is a hyphenated prefix, and a carrier's trigger and payload follow "of" with the trigger's word and the payload in the plural. A plain carrier says its card's first word; otherwise a card with several words has one picked by a djb2 hash of its own id (so editing other cards never rewords it; not `String.hash`, which Godot may change), so a name is the same on every machine and run. A card with no words says its display name, so a missing list never breaks a build, but the real-registry test requires them. Cards left on the caster or a payload's origin are called "Aura" and "Flare". A name says at most 3 carriers per group ("and more"), 2 payload levels and 90 characters. Not done yet: the radial builder shows no names, and cast names are not in staff codes (D2).
+
 ## 2026-10-29: Builder tab glyphs sit in a box inside the tab
 
 A tab is a Button with no text of its own: an `HBoxContainer` inside it holds a "[" label (with the focus mark before it), the `ActionGlyph` and a "]" label, so the layout places the glyph, and the tab grows to its content (`minimum_size_changed`) when a key is wider than a pad button. The tab keeps the button theme and the mouse hit area, its name is in its tooltip, and the "[ ]" mark means the shown staff is not told by colour alone. An earlier version padded the tab text with spaces and worked out the glyph's place by hand; it was dropped as fragile and slow.

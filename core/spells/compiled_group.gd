@@ -12,6 +12,8 @@ var spells: Array[CompiledSpell] = []
 var scatter: bool = false
 ## How often the group fires (burst cards multiply it), `repeat_interval` seconds apart.
 var repeats: int = 1
+## The multicast cards read into the group, in slot order (for its name).
+var multicast_ids: Array[StringName] = []
 var repeat_interval: float = 0.0
 
 

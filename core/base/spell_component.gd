@@ -20,6 +20,13 @@ extends Resource
 @export var demo: bool = false
 ## Name shown in the builder, for example "Frost". Original names only.
 @export var display_name: String = ""
+## The words the card brings to the name `SpellNamer` builds for a cast (staffs E1), most
+## plain first; a second word is an alternative the namer picks by the cast's cards. A form:
+## its noun ("Bolt"). An infusion: a prefix fused into one word with the others ("Frost" ->
+## "Firefrost"). A modifier: an adjective. A trigger: the word before its payload ("Sudden"
+## in "of Sudden Novas"). A multicast: a prefix joined with a hyphen ("Twice-"). Original
+## words only. Empty falls back to `display_name`.
+@export var name_words: PackedStringArray = PackedStringArray()
 ## A rough measure of the card's power (1-4). There is no complexity budget since the staffs
 ## rework; the validator still keeps it in range, and it may come back as a price.
 @export var complexity: int = 1

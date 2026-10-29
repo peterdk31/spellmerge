@@ -249,6 +249,8 @@ func test_the_plan_and_the_notes_follow_the_staff() -> void:
 	var builder: BuilderScript = _builder(0)
 	check(builder.plan_text().begins_with("1: "), "the plan has a line per cast: %s" % builder.plan_text())
 	check(builder.plan_text().contains("Bolt"), "naming the bolt")
+	var lines: PackedStringArray = builder.plan_text().split("\n")
+	check(lines.size() >= 2 and lines[0].begins_with("1: ") and lines[1].begins_with("   "), "the spell's name is above its description: %s" % builder.plan_text())
 	# Homing alone in staff Y lands on the caster, where it does nothing.
 	_bus.staff_change_requested.emit(0, Y, 0, &"homing")
 	_press(0, builder.tab_button(Y))

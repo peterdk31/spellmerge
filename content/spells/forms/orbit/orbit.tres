@@ -8,6 +8,7 @@ script = ExtResource("1_base")
 id = &"orbit"
 demo = true
 display_name = "Orbit"
+name_words = PackedStringArray("Orbit", "Halo")
 complexity = 2
 icon = ExtResource("2_icon")
 base_damage = 3

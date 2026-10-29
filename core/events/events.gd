@@ -95,6 +95,8 @@ signal mana_refund_requested(caster: int, amount: float)
 signal mana_reserved(player: int, amount: float)
 ## Sender: core/projectiles. A shot of the actor `caster` with `tag` stopped another team's shot at `position` with one of its shield charges. Heard by core/spells and feel.
 signal shot_blocked(caster: int, position: Vector2, tag: int)
+## Sender: core/projectiles. The carrier with `tag` of the actor `caster` (a deflecting shot, a swing or a beam) deflected another team's shot at `position`: it turned, sped up and is `caster`'s now (melee I3). The deflected shot is `Projectiles.event_slot` while this is sent. Heard by core/spells (`on block`: a deflect is a block, owner 2026-10-29).
+signal shot_deflected(caster: int, position: Vector2, tag: int)
 ## Sender: combat. The reaction `reaction_id` (for example &"shatter") fired for the actor `caster` (or NO_PLAYER) at `position`.
 signal reaction_triggered(caster: int, reaction_id: StringName, position: Vector2)
 ## Sender: combat. A discharge of the actor `caster` jumped from `from` (the body struck) to `to` (a body zapped), both in world pixels; one is sent for each body zapped, next to its `reaction_triggered` `discharge`. Heard by feel, which draws the arc.

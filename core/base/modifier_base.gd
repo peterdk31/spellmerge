@@ -62,6 +62,11 @@ enum Behaviour {
 	## bodies it possesses and the others copy its intent; the caster's body stands. The rule is in
 	## `gameplay/actor/possession.gd`.
 	POSSESS,
+	## Shots of another team that touch the carrier turn and become its caster's, each time
+	## `SpellLimits.DEFLECT_SPEEDUP` times faster (melee I3; owner, 2026-10-29): on every carrier
+	## that touches shots (a shot, a swing's sweep, a beam's line). It turns as many as touch it, goes
+	## before a shield (which keeps its charge) and sets off `on block`. Strength unused (1).
+	DEFLECT,
 }
 
 @export var damage_mult: float = 1.0

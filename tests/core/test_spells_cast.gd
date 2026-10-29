@@ -416,6 +416,26 @@ func test_fires_past_a_steps_room_wait_for_the_next_step() -> void:
 	check_equal(_born(_spells.current_tag(0, 0, 1)) + _born(_spells.current_tag(0, 1, 1)), 48, "and fire as the next step opens")
 
 
+## Regression (rules R4a): an edit dropped the payloads still waiting for a step's room.
+func test_an_edit_keeps_the_payloads_waiting_for_room() -> void:
+	for n in 24:
+		_target(Vector2.from_angle(TAU * n / 24.0) * 120.0)
+	_spells.fire_shots_per_step = 8
+	_build(0, 0, {"form": &"ring", "trigger": &"on_hit", "held": {"form": &"bolt"}})
+	var held: int = _spells.current_tag(0, 0, 1)
+	_cast(0)
+	for _i in 30:
+		_mgr.step(DT)
+		if _born(held) > 0:
+			break
+		_spells.step(DT)
+	check_equal(_born(held), 8, "the step's room fired, the rest wait")
+	_build(0, 0, {"form": &"bolt"})
+	_tick(5)
+	check_equal(_born(held), 24, "the edit leaves the waiting payloads: all 24 fired")
+	check(_spells.hit_profile(held) != null, "with their old build's numbers")
+
+
 func test_chain_jumps_to_new_targets_only() -> void:
 	var a: Node2D = _target(Vector2(60, 0))
 	var b: Node2D = _target(Vector2(110, 0))

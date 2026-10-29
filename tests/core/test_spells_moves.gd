@@ -401,6 +401,21 @@ func test_a_hook_works_for_player_two() -> void:
 	check(found, "its payload is player 2's and leaves the arrival point")
 
 
+## Regression (rules R4a): a hook with pierce left fired `on expire` at the arrival and again
+## where the shot ended. Its end is the shot's: the end of its flight.
+func test_a_piercing_hook_ends_once_where_its_shot_ends() -> void:
+	var tag: int = _build(0, [&"on_expire", &"pierce", &"hook", &"spark"])
+	var spark: int = _spells.current_tag(0, 0, 1)
+	_target(Vector2(60, 0))
+	_cast()
+	_tick(30)
+	check(_moves.size() == 1 and _moves[0][1] == &"hook", "the hit pulls: %s" % [_moves])
+	_bus.caster_move_finished.emit(0, &"hook", Vector2(45, 0), tag)
+	check_equal(_spells.live_shots(spark), 0, "nothing goes off where the caster arrives")
+	_tick(35)
+	check_equal(_spells.live_shots(spark), 1, "the payload goes off once, where the hook shot ended")
+
+
 func test_a_swap_reads_the_casters_own_anchor() -> void:
 	_mgr.set_anchor(0, Vector2(-500, 0))
 	_mgr.set_anchor(3, Vector2(-10, 4))

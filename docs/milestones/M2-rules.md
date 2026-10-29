@@ -46,12 +46,12 @@ Line numbers are from main after #453 and drift; the function names hold. The fi
 | 16 | `staff_compiler.gd` (behaviour strengths summed), `heavy.tres` (4) | heavy × heavy (and growth × growth) | 3 | Strengths are summed but heavy multiplies knockback: two heavy cards give ×8, not ×16. Growth (2+2 = 2×2) agrees by chance only. |
 
 **Suspected (check while fixing nearby):**
-- `projectile_manager.gd` `_pass_return`: a returning shot stops homing (pass-order comment).
+- ~~`projectile_manager.gd` `_pass_return`: a returning shot stops homing (pass-order comment).~~ (fixed in R4a: homing bends the way home.)
 - `_register_hit`: sticky ends the remaining pierce at the first hit.
 - ~~`_jump`: flying jumps get pierce 0~~ (fixed in R1b; a ray jump still pierces nothing, R4).
 - `_fire_payload` from a beam hit uses CASTER_POINT: an orbit payload circles the hit point, not the beam.
 - `_on_familiar_cast` uses CASTER_POINT while the familiar lives: an orbit, return or dash payload ignores the familiar.
-- `_shield_block`: when the hit-work budget runs out a block is skipped, not deferred (an enemy shot flies through).
+- ~~`_shield_block`: when the hit-work budget runs out a block is skipped, not deferred (an enemy shot flies through).~~ (fixed in R4a: blocks spend no budget.)
 - Fissure ends inside its call: `hold · fissure` silently does nothing.
 
 ## Card × carrier (audit, before R)
@@ -150,6 +150,7 @@ The test keeps no list of cards or carriers. It finds them itself, so a new card
 The owner re-decides these under the new rule; each "yes, it should work" becomes a part that turns W into ✓ (with a probe in R3). Present them in one session, with a recommendation each:
 
 - **Decided before, now in question:** mirror only on carriers that "have a back" (DECISIONS); a hold carrier does not echo (silent); a beam has no timer (contradicts the timer-for-hold decision); relay shots only, not on chain children or payloads; hold does nothing on rain; recoil skipped on dash and teleport; a beam's chain jump is a beam that pierces nothing; a hook with pierce fires `on expire` twice ("accepted for now"); a returning shot stops homing; a payload with no live shot is cast by its point (a payload dash or hook does nothing); **recoil pushes past 8 at once are dropped** (`mover.gd` `MAX_RECOILS`: a cap missed by #450, fix under rule 5 without a decision); hit-work starvation skipping shield blocks (defer, not skip). **Editing a staff or switching off a hold drops all its waiting launches** (`_release_hold` calls `_drop_pending` first): payload fires of carriers without hold that only wait for the per-step pacing (`FIRE_SHOTS_PER_STEP`) are lost too, against rule 5 (found in R1f, 2026-10-29).
+- **R4a, fixes (done, owner 2026-10-29):** every recoil push runs (the mover's list grows, no `MAX_RECOILS`); shield and deflect checks spend no hit-work budget and look only at the shots on the grid cells their path could touch; a hold switch-off drops only its hold carriers' waiting firings, and an edit only the cast's own (burst repeats, echoes, a rain, `on cast`), never a waiting payload of a shot or point; a piercing hook fires `on expire` once, where its shot ends; a returning homing shot homes on the way back (its way home bends up to 60°); an arc zap that ends on a wall sets off no `on wall`; the dead "through a friend" phrase is gone. DECISIONS "Card rules R4a".
 - **Cells to decide (W or ✓):** travel behaviours on orbit, rune, wall (growth on a rune grows the rune; linger and spiral on an orbit?); ghost, magnet, shield, relay on beams and fissures; **dash and teleport hitting what they pass** (makes `heavy · dash` the shoulder charge the card table promises, and chain, siphon, possess, relay on a dash); triggers on rain, decoy, familiar; mirror on any aimed carrier; one shield rule for every carrier that moves its caster.
 
 ## Notes for the sessions

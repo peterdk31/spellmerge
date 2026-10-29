@@ -248,6 +248,9 @@ const WORK_PER_STEP: int = 6000
 const MAX_WALL_VISITS: int = 64
 ## The work one hit counts for: the event, its handlers and the bookkeeping.
 const HIT_WORK: int = 40
+## The most a returning homing shot's way home bends off the line to its caster (radians): under
+## a right angle, so it always closes in (`_pass_return`).
+const RETURN_BEND: float = PI / 3.0
 ## A homing shot looks for a target one step in this many (slots take turns).
 const HOMING_PERIOD: int = 4
 ## The straight pieces a bent beam (`ray_curve`) is walked as.
@@ -611,10 +614,13 @@ var _one: PackedInt32Array = PackedInt32Array([0])
 var _shield_order: PackedInt32Array = PackedInt32Array()
 ## True while `_catch_up` runs a waiting shot's passes (they do not make it wait again).
 var _catching_up: bool = false
-## The live shots a shield checks, made once a step the first time a shield needs it (see
-## `_shield_block`).
-var _scan_slots: PackedInt32Array = PackedInt32Array()
-var _scan_count: int = 0
+## The live shots on the target grid's cells, made once a step the first time a shield needs
+## them (see `_shield_block`): the first shot in each cell (-1 for none), the next in its chain
+## (slot order), and the most any of them reaches from where it is (its radius and its step's
+## path).
+var _shot_head: PackedInt32Array = PackedInt32Array()
+var _shot_next: PackedInt32Array = PackedInt32Array()
+var _shot_reach: float = 0.0
 var _scan_step: int = -1
 ## True while a `projectile_expired` is sent for a shot that ended on a wall (the `on wall`
 ## trigger reads it); false for every other end.
@@ -956,7 +962,7 @@ func set_cap(value: int) -> void:
 		_move_head[slot] = -1
 	if _move_left.is_empty():
 		_grow_moves(MOVES_START)
-	_scan_slots.resize(_cap)
+	_shot_next.resize(_cap)
 	_members.resize(_cap * BEHAVIOURS)
 	_member_at.resize(_cap * BEHAVIOURS)
 	_kinds.resize(_cap)
@@ -1043,6 +1049,8 @@ func set_bounds(rect: Rect2) -> void:
 	_cell_count.resize(_grid_w * _grid_h)
 	_cell_count.fill(0)
 	_cell_box.resize(_grid_w * _grid_h)
+	_shot_head.resize(_grid_w * _grid_h)
+	_scan_step = -1
 	_grid_stale = true
 	_wall_w = maxi(ceili(rect.size.x / WALL_CELL), 1)
 	_wall_h = maxi(ceili(rect.size.y / WALL_CELL), 1)
@@ -2140,7 +2148,8 @@ func _pass_hits(top: int, delta: float) -> void:
 #   its caster with the radius it has now.
 # - linger before return, homing and spiral: a shot that hangs still does none of them.
 # - orbit: on its own (an orbit shot has no other motion behaviour).
-# - return before homing: a shot on its way back does not home.
+# - return before homing: a shot on its way back heads for its caster, bent toward the target its
+#   homing found (`_pass_return`); the homing pass only searches for it.
 # - homing before spiral: a spiral weaves round the line it turned to.
 # - a card's move last: it carries the shot on from wherever its own motion put it.
 # - shield after the hits: it checks every shot's whole path of this step.
@@ -2327,7 +2336,8 @@ func _pass_return(list: PackedInt32Array, first: int, count: int, delta: float) 
 			_wait(slot, B_RETURN)
 			continue
 		var flags: int = _flags[slot]
-		if (flags & F_TURNED) == 0:
+		var turned: bool = (flags & F_TURNED) == 0
+		if turned:
 			_flags[slot] |= F_TURNED
 			_speed[slot] = _vel[slot].length()
 			_forget_all(slot)
@@ -2342,7 +2352,18 @@ func _pass_return(list: PackedInt32Array, first: int, count: int, delta: float) 
 			_pos[slot] = anchor
 			_state[slot] = S_EXPIRE
 			continue
-		_vel[slot] = way.normalized() * _speed[slot]
+		var heading: Vector2 = way.normalized()
+		if _turn[slot] > 0.0:
+			# Homing bends the way home (rules R4a): the shot's angle off the line to its caster
+			# turns toward its target at the homing rate (back to 0 with none in reach), never past
+			# RETURN_BEND, so it always closes in on its caster and never circles.
+			var bend: float = 0.0 if turned else clampf(heading.angle_to(_vel[slot]), -RETURN_BEND, RETURN_BEND)
+			var goal: Vector2 = _home_at[slot]
+			var want: float = 0.0
+			if goal.is_finite() and not goal.is_equal_approx(here):
+				want = clampf(heading.angle_to(goal - here), -RETURN_BEND, RETURN_BEND)
+			heading = heading.rotated(move_toward(bend, want, _turn[slot] * delta))
+		_vel[slot] = heading * _speed[slot]
 		_pos[slot] = _prev[slot] + _vel[slot] * delta
 		_state[slot] = S_RETURNING
 
@@ -2350,10 +2371,12 @@ func _pass_return(list: PackedInt32Array, first: int, count: int, delta: float) 
 ## Homing (`set_homing`): the shot turns toward the point it last found, at most its turn rate, and
 ## flies on along its new velocity. On its search step (one in HOMING_PERIOD, slots taking turns)
 ## it waits for its turn, then looks for a target while there is hit work left (`_homing_point`).
+## A returning shot on its way back only searches: `_pass_return` bends its way with the point.
 func _pass_homing(list: PackedInt32Array, first: int, count: int, delta: float) -> void:
 	for n in range(first, first + count):
 		var slot: int = list[n]
-		if _state[slot] != S_MOVING:
+		var state: int = _state[slot]
+		if state != S_MOVING and state != S_RETURNING:
 			continue
 		if ((slot + _step_index) % HOMING_PERIOD) == 0:
 			if not _catching_up:
@@ -2361,6 +2384,8 @@ func _pass_homing(list: PackedInt32Array, first: int, count: int, delta: float) 
 				continue
 			if _work_left > 0:
 				_home_at[slot] = _homing_point(slot, _prev[slot])
+		if state == S_RETURNING:
+			continue
 		var goal: Vector2 = _home_at[slot]
 		var velocity: Vector2 = _vel[slot]
 		if not goal.is_finite() or velocity.is_zero_approx():
@@ -2438,7 +2463,7 @@ func _has_homing_move(slot: int) -> bool:
 ## path touched this step (`_shield_block`), in slot order.
 func _pass_shield(list: PackedInt32Array, first: int, count: int, _delta: float) -> void:
 	# The list in slot order (insertion sort into the scratch: shields are few), as blocks spend
-	# charges and the hit-work budget in that order.
+	# charges in that order.
 	for n in count:
 		var slot: int = list[first + n]
 		var at: int = n
@@ -2503,46 +2528,74 @@ func _solid_at(point: Vector2) -> bool:
 
 ## Check a shielded shot against the shots of other teams (aim, actors G3a: a shield stops
 ## every shot whose caster was on another team when it was cast, a shot of no actor included,
-## never its own team's): every one it touches is stopped, one shield charge each, and
-## `shot_blocked` is sent. The list of live shots is made once per step, the first time a shield
-## needs it; the scan is charged to the hit-work budget.
+## never its own team's): every one it touches is stopped, one shield charge each (cell by cell,
+## in slot order within a cell), and `shot_blocked` is sent. It looks only at the shots on the
+## grid cells its path could touch (the shots are put on the target grid's cells once per step,
+## the first time a shield needs them). Not charged to the hit-work budget: a block always
+## happens (rules R4).
 func _shield_block(slot: int) -> void:
 	if _scan_step != _step_index:
 		_scan_step = _step_index
-		_scan_count = 0
-		for other in _high:
-			if _alive[other] != 0:
-				_scan_slots[_scan_count] = other
-				_scan_count += 1
+		_fill_shot_grid()
+	# Every shot that may touch this one's path this step: its box, widened by the reach.
+	var pad: float = _radius[slot] + _shot_reach
+	var low: Vector2 = _prev[slot].min(_pos[slot]) - Vector2(pad, pad)
+	var high: Vector2 = _prev[slot].max(_pos[slot]) + Vector2(pad, pad)
+	var x0: int = clampi(floori((low.x - _grid_x) / GRID_CELL), 0, _grid_w - 1)
+	var x1: int = clampi(floori((high.x - _grid_x) / GRID_CELL), 0, _grid_w - 1)
+	var y0: int = clampi(floori((low.y - _grid_y) / GRID_CELL), 0, _grid_h - 1)
+	var y1: int = clampi(floori((high.y - _grid_y) / GRID_CELL), 0, _grid_h - 1)
 	var mine: int = _team[slot]
-	for n in _scan_count:
-		if (_shield[slot] <= 0 and _deflect[slot] == 0) or _work_left <= 0:
-			return
-		_work_left -= 1
-		var other: int = _scan_slots[n]
-		if _alive[other] == 0 or other == slot or _team[other] == mine:
-			continue
-		var reach: float = _radius[slot] + _radius[other]
-		# Both shots move during the step: in the enemy shot's frame the shield goes along
-		# the relative path, so the test is the distance from that segment to the origin.
-		var start: Vector2 = _prev[slot] - _prev[other]
-		var path: Vector2 = (_pos[slot] - _pos[other]) - start
-		var along: float = 0.0
-		if not path.is_zero_approx():
-			along = clampf(-start.dot(path) / path.length_squared(), 0.0, 1.0)
-		if (start + path * along).length_squared() > reach * reach:
-			continue
-		if _deflect[slot] != 0:
-			# Deflect goes first and keeps the shield's charge (owner, 2026-10-29).
-			deflect_shot(other, _actor[slot], _pos[other] - _pos[slot], _tag[slot])
-			continue
-		_shield[slot] -= 1
-		var at: Vector2 = _pos[other]
-		_kill(other)
-		if events != null:
-			event_slot = slot
-			events.shot_blocked.emit(_actor[slot], at, _tag[slot])
-			event_slot = -1
+	for y in range(y0, y1 + 1):
+		for x in range(x0, x1 + 1):
+			var other: int = _shot_head[y * _grid_w + x]
+			while other >= 0:
+				if _shield[slot] <= 0 and _deflect[slot] == 0:
+					return
+				if _alive[other] != 0 and other != slot and _team[other] != mine:
+					_shield_meets(slot, other)
+				other = _shot_next[other]
+
+
+## `_shield_block` for one shot of another team: stopped or deflected when it touches the shield.
+func _shield_meets(slot: int, other: int) -> void:
+	var reach: float = _radius[slot] + _radius[other]
+	# Both shots move during the step: in the enemy shot's frame the shield goes along
+	# the relative path, so the test is the distance from that segment to the origin.
+	var start: Vector2 = _prev[slot] - _prev[other]
+	var path: Vector2 = (_pos[slot] - _pos[other]) - start
+	var along: float = 0.0
+	if not path.is_zero_approx():
+		along = clampf(-start.dot(path) / path.length_squared(), 0.0, 1.0)
+	if (start + path * along).length_squared() > reach * reach:
+		return
+	if _deflect[slot] != 0:
+		# Deflect goes first and keeps the shield's charge (owner, 2026-10-29).
+		deflect_shot(other, _actor[slot], _pos[other] - _pos[slot], _tag[slot])
+		return
+	_shield[slot] -= 1
+	var at: Vector2 = _pos[other]
+	_kill(other)
+	if events != null:
+		event_slot = slot
+		events.shot_blocked.emit(_actor[slot], at, _tag[slot])
+		event_slot = -1
+
+
+## Put every live shot on the target grid's cell where it is now (chains in slot order), and
+## find the most any reaches from there this step (radius and path), for `_shield_block`.
+func _fill_shot_grid() -> void:
+	_shot_head.fill(-1)
+	_shot_reach = 0.0
+	var other: int = _high - 1
+	while other >= 0:
+		if _alive[other] != 0:
+			var at: Vector2 = _pos[other]
+			var cell: int = clampi(floori((at.y - _grid_y) / GRID_CELL), 0, _grid_h - 1) * _grid_w + clampi(floori((at.x - _grid_x) / GRID_CELL), 0, _grid_w - 1)
+			_shot_next[other] = _shot_head[cell]
+			_shot_head[cell] = other
+			_shot_reach = maxf(_shot_reach, _radius[other] + at.distance_to(_prev[other]))
+		other -= 1
 
 
 ## Where a shot is drawn when it is at `at`: where it is, except a new orbit shot, which is drawn

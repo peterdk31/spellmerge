@@ -1,9 +1,11 @@
 {
 	"id": "shield_orbit_ring",
 	"name": "Shielded frost ring",
-	"does": "A ring of frost shots round the caster, each one a ward that stops an enemy shot, chilling an imp that comes close.",
+	"does": "A ring of frost shots round the caster, each one a ward that stops an enemy shot flying at the caster, and chills an imp that comes close.",
 	"casts": [{"staff": 0, "cards": ["shield", "frost", "orbit"]}],
 	"imps": [[36, 0], [-36, 0]],
-	"seconds": 2.0,
-	"checks": [{"kind": "status", "imps": [0, 1], "status": "chill"}]
+	"guard": true,
+	"foes": [[61, 35]],
+	"seconds": 2.5,
+	"checks": [{"kind": "status", "imps": [0, 1], "status": "chill"}, {"kind": "blocked", "min": 1}]
 }

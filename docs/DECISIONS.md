@@ -115,8 +115,9 @@ The owner's direction after B7a: "The 4 staffs should be mapped to lb/rb lt/rt i
 
 ## 2026-10-29: Shield card (staffs C)
 
-- **Shield is one charge a card** (`behaviour_strength` 1.0, charges add), complexity 2, no mana change, look layer 10 (orbiting sparks, as the design says). Its combos check that the shielded carrier still works; the blocking itself is in `test_shield.gd`, since combo imps cannot shoot.
-- **The caster barrier is not wired.** `Spells` hands charges to shots and wall stones (`set_shield`) but never sends `wizard_shield_requested`, so `shield · dash` and a shield on the caster do nothing yet, though combat can take the barrier. That is engine work, not this data-only card: added to `docs/BACKLOG.md`.
+- **Shield is one charge a card** (`behaviour_strength` 1.0, charges add), complexity 2, no mana change, look layer 10 (orbiting sparks, as the design says). Its combos check the blocking itself: a combo may name a `guard` (the caster's own body, so a barrier on it works), enemy `foes` (a real enemy bolt cast at the caster from a point) and the check `blocked` (enemy shots stopped). Each of the three combos is a control row (without the card its checks fail).
+- **The caster barrier is wired in this card** (as Magnet's pull was): `Spells._shield_caster` sends `wizard_shield_requested(actor, charges, seconds, tag)` when the wizard's own dash, teleport, a hook that hit, or cards that landed on the caster (a fallback) carry `shield`. Charges are `behaviour(SHIELD)`; seconds are the carrier's lifetime or the move's time, whichever is longer, and combat keeps at least its 0.5 s minimum (so a dash's barrier is half a second). A fallback sends it after its area hit, which can reach the caster and would spend the charge. A payload's fallback (a point) and a shot that dashes get none.
+- **Orbit and still shots were never shielded:** `_apply_travel` only ran for flying shots, so `shield · orbit` set no charge. `_apply_shield` now covers them too (found by the first real block in `shield_orbit_ring`).
 
 ## 2026-10-29: Heavy card (staffs C)
 

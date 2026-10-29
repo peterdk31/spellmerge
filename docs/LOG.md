@@ -8,7 +8,7 @@ Added the Magnet modifier card (`.tres`, icon, assets, lore), two combos (`magne
 
 ## 2026-10-29: Card shield (staffs C)
 
-Added the Shield modifier card (data only: `.tres`, icon, assets, lore), two combos (`shield_wall_fire`, `shield_orbit_ring`) and `test_shield.gd` (valid card, charges add up, a shielded bolt and each wall stone block enemy shots, a plain one does not). The caster barrier is not sent yet, see DECISIONS.
+Added the Shield modifier card (`.tres`, icon, assets, lore), three combos (`shield_dash`, `shield_wall_fire`, `shield_orbit_ring`; combo files may now name a `guard`, enemy `foes` and the check `blocked`, so each combo shows a real block) and `test_shield.gd` (valid card, charges add up, a shielded bolt and each wall stone block enemy shots from every seat, a shield on a dash or on the caster is a barrier on it). Engine: `Spells` now sends `wizard_shield_requested` (dash, teleport, hook, caster) and gives orbit and still shots their shield, which it never had. See DECISIONS.
 
 ## 2026-10-29: Card heavy (staffs C)
 

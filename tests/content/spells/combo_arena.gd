@@ -26,6 +26,10 @@ const IMP_RADIUS: float = 10.0
 ## Mana handed to every cast.
 const MANA: float = 100.0
 
+## A body that is the actor `actor_id` (Combat registers it under that id).
+class Guard extends Node2D:
+	var actor_id: int = -1
+
 var registry: Node
 var bus: EventsScript
 var projectiles: ManagerScript
@@ -41,6 +45,8 @@ var reactions: Array = []
 var statuses: Array = []
 ## The most live shots seen after any step.
 var peak_shots: int = 0
+## Every enemy shot a barrier or a shielded shot stopped (`shield_blocked`, `shot_blocked`).
+var blocks: Array = []
 ## When true, `run` moves the imps by the push combat keeps for them (a pull or a knockback); off,
 ## imps stand where they are put.
 var pushable: bool = false
@@ -75,6 +81,8 @@ func _init(root: Node) -> void:
 	combat._ready()
 	bus.reaction_triggered.connect(func(player: int, id: StringName, at: Vector2) -> void: reactions.append([player, id, at]))
 	bus.caster_move_requested.connect(func(player: int, mode: StringName, _to: Vector2, _seconds: float, _tag: int) -> void: caster_moves.append([player, mode]))
+	bus.shield_blocked.connect(func(actor: int, _at: Vector2, _tag: int) -> void: blocks.append(actor))
+	bus.shot_blocked.connect(func(actor: int, _at: Vector2, _tag: int) -> void: blocks.append(actor))
 	bus.status_applied.connect(func(player: int, target: Node, id: StringName) -> void: statuses.append([player, target, id, lost(target as Node2D)]))
 
 
@@ -86,6 +94,27 @@ func add_imp(at: Vector2, health: int = IMP_HEALTH) -> Node2D:
 	combat.register_actor(imp, health, IMP_RADIUS)
 	imps.append(imp)
 	return imp
+
+
+## Puts a body for the actor `player` at `at` that Combat knows (so a barrier on it works) and
+## shots hit. Returns the node.
+func add_guard(player: int, at: Vector2) -> Node2D:
+	var guard := _own(Guard.new()) as Guard
+	guard.actor_id = player
+	_root.add_child(guard)
+	guard.global_position = at
+	combat.register_actor(guard, IMP_HEALTH, IMP_RADIUS)
+	return guard
+
+
+## Sends an enemy bolt (a real cast, with a hit that hurts) from `from` toward `to`, cast by an
+## actor no wizard drives.
+func shoot_at(from: Vector2, to: Vector2) -> void:
+	var enemy: int = ActorSeats.enemy(projectiles.actors)
+	var ids: Array[StringName] = [&"bolt"]
+	spells.install_staff(enemy, 0, spells.compile_staff(ids, plain_staff(1)))
+	projectiles.set_anchor(enemy, from)
+	spells.cast_staff(enemy, 0, from, from.direction_to(to), MANA)
 
 
 ## Puts the body of teammate `player` at `at`: a shot of another actor hits it (and `relay` reads

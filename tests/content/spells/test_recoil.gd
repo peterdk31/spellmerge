@@ -79,7 +79,7 @@ func test_mirror_cancels_the_push() -> void:
 		check(absf(absf(apart.x) - 2.0 * _card().behaviour_strength) < 0.01 and absf(apart.y) < 0.01, "in opposite directions, equally hard (%s)" % [apart])
 
 
-func test_the_combos_hold_with_the_card() -> void:
+func test_the_combos_exist() -> void:
 	for id: String in COMBOS:
 		check(not _combo(id).is_empty(), "the combo %s exists" % id)
 

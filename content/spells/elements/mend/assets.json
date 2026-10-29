@@ -1,0 +1,13 @@
+{
+	"assets": [
+		{
+			"path": "content/spells/elements/mend/icon.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "placeholder",
+			"tool": "Claude (SVG rects written by hand)",
+			"prompt": "A 16x16 icon for the Mend card: a green plus sign with a light upper-left edge and a dark lower-right edge, 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+		}
+	]
+}

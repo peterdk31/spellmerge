@@ -1,0 +1,11 @@
+{
+	"id": "mend_pierce_party",
+	"name": "Mend through the party",
+	"does": "A piercing mend bolt heals the hurt teammate in its way, then barely scratches the imp behind.",
+	"casts": [{"staff": 0, "cards": ["mend", "pierce", "bolt"]}],
+	"imps": [[110, 0]],
+	"allies": [[60, 0, 1]],
+	"hurt": 40,
+	"seconds": 1.5,
+	"checks": [{"kind": "healed", "min": 1}, {"kind": "damaged", "imps": [0]}, {"kind": "lost_at_most", "imps": [0], "max": 3}]
+}

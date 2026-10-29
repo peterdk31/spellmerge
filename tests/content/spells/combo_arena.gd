@@ -211,6 +211,11 @@ func lost(imp: Node2D) -> int:
 	return IMP_HEALTH if left < 0 else IMP_HEALTH - left
 
 
+## True when `imp` has died (a spell's hit or anything else took all its health).
+func died(imp: Node2D) -> bool:
+	return not is_instance_valid(imp) or combat.health_of(imp) < 0
+
+
 ## True when `status_id` was ever put on `imp`.
 func was_given(imp: Node2D, status_id: StringName) -> bool:
 	for row: Array in statuses:

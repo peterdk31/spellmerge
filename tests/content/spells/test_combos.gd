@@ -16,7 +16,7 @@ extends "res://tests/support/suite.gd"
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const ComboFiles := preload("res://tests/support/combo_files.gd")
 const MIN_COMBOS: int = 20
-const CHECK_KINDS: Array[String] = ["damaged", "status", "status_count", "keeps_burning", "reaction", "max_shots", "caster_moved", "lost_at_least", "blocked", "healed", "lost_at_most"]
+const CHECK_KINDS: Array[String] = ["damaged", "status", "status_count", "keeps_burning", "reaction", "max_shots", "caster_moved", "lost_at_least", "blocked", "healed", "lost_at_most", "killed"]
 
 var _combos: Array = []
 ## Files of the catalogue that are not a JSON object.
@@ -35,7 +35,7 @@ func _play(combo: Dictionary, quiet: bool = false) -> ArenaScript:
 	var arena := ArenaScript.new(root)
 	arena.pushable = bool(combo.get("pushed", false))
 	for at: Array in combo.get("imps", []):
-		arena.add_imp(Vector2(float(at[0]), float(at[1])))
+		arena.add_imp(Vector2(float(at[0]), float(at[1])), int(at[2]) if at.size() > 2 else ArenaScript.IMP_HEALTH)
 	for mate: Array in combo.get("mates", []):
 		arena.add_mate(Vector2(float(mate[0]), float(mate[1])), int(mate[2]))
 	for rect: Array in combo.get("walls", []):
@@ -118,6 +118,10 @@ func _problem_with(arena: ArenaScript, check_row: Dictionary) -> String:
 				var lost_most: int = arena.lost(arena.imps[index])
 				if lost_most > int(check_row["max"]):
 					return "imp %d lost %d, over %d" % [index, lost_most, int(check_row["max"])]
+		"killed":
+			for index: int in check_row["imps"]:
+				if not arena.died(arena.imps[index]):
+					return "imp %d is still alive" % index
 		"blocked":
 			if arena.blocks.size() < int(check_row["min"]):
 				return "%d enemy shots blocked, wanted %d" % [arena.blocks.size(), int(check_row["min"])]

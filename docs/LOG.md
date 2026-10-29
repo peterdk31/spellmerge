@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-29: Card on kill (staffs C)
+
+Added the On Kill trigger (data only: `.tres`, icon, assets, lore), two combos (`on_kill_bolt_nova`, `on_kill_bolt_frost`) and `test_on_kill.gd`. Combo imps may now carry a health (`[x, y, health]`) and the check `killed` exists. All unit tests pass except `test_svg_art` on the Shield icon, already on main (see BACKLOG).
+
 ## 2026-10-29: Card on block (staffs C)
 
 Added the On Block trigger (data only: `.tres`, icon, assets, lore), two combos (`on_block_dash_nova`, `on_block_bolt_nova`) and `test_on_block.gd`. All unit tests pass except `test_svg_art` on the Shield icon, already on main (see BACKLOG).

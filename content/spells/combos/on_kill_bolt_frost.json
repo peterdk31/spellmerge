@@ -1,0 +1,9 @@
+{
+	"id": "on_kill_bolt_frost",
+	"name": "On kill bolt frost",
+	"does": "A bolt kills the weak imp at the front of a crowd and a frost nova bursts there, chilling the sturdy imp behind it.",
+	"casts": [{"staff": 0, "cards": ["on_kill", "bolt", "frost", "nova"]}],
+	"imps": [[40, 0, 3], [55, -20], [30, 20]],
+	"seconds": 1.5,
+	"checks": [{"kind": "killed", "imps": [0]}, {"kind": "status", "imps": [1, 2], "status": "chill"}]
+}

@@ -1,0 +1,5 @@
+{
+	"id": "on_kill",
+	"about": "component",
+	"text": "Casts its spell where its shot kills."
+}

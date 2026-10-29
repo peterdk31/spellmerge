@@ -154,13 +154,18 @@ func _read_group(want: int, payload: bool) -> CompiledGroup:
 			for modifier in modifiers:
 				if behaviour_runs(modifier.behaviour, form.motion) and not (deflects and _shield_outrun(modifier, form.motion)):
 					kept_modifiers.append(modifier)
+			# A trigger its carrier never sets off is wasted too and holds no payload: the cards
+			# after it read as they would without it.
+			if trigger != null and not CardRules.trigger_runs(trigger.event, form.motion):
+				_waste(trigger_slot, "%s does nothing on a %s: %s." % [_name(trigger), _name(form), CardRules.trigger_why_not(trigger.event, form.motion)])
+				trigger = null
 			var spell: CompiledSpell = _build(form, elements, kept_modifiers, trigger, CompiledSpell.FALLBACK_NONE)
 			spell.slot = slot
 			_useful[slot] = true
 			for at: int in kept:
 				var modifier := _cards[at] as ModifierBase
 				if modifier != null and not kept_modifiers.has(modifier):
-					var why: String = "deflect turns every shot that touches it first" if deflects and _shield_outrun(modifier, form.motion) else _why_not(modifier.behaviour)
+					var why: String = "deflect turns every shot that touches it first" if deflects and _shield_outrun(modifier, form.motion) else CardRules.behaviour_why_not(modifier.behaviour, form.motion)
 					_waste(at, "%s does nothing on a %s: %s." % [_name(modifier), _name(form), why])
 				else:
 					_attach(at, slot)
@@ -383,34 +388,17 @@ static func stacked(behaviour: int, before: float, strength: float) -> float:
 
 
 ## Whether homing can steer a carrier of `motion`: what it moves turns toward a target as it
-## goes, at the turn rate (a shot in flight, a dash, whether it carries the wizard or a shot),
-## and what is over at once bends its way toward one, up to `homing_angle` (a beam, a
-## teleport). On any other form a homing card is wasted. A new motion that should home goes here, and the homing
-## test of every form card (tests/content/spells/test_homing_forms.gd) checks it reaches.
+## goes (a shot in flight, a dash), and what is over at once bends its way toward one, up to
+## `homing_angle` (a beam, a teleport). The row is in `CardRules`, the one table of what runs
+## where; the homing test of every form card (tests/content/spells/test_homing_forms.gd) checks it reaches.
 static func homing_steers(motion: FormBase.Motion) -> bool:
-	match motion:
-		FormBase.Motion.STRAIGHT, FormBase.Motion.HOOK, FormBase.Motion.SWAP, FormBase.Motion.RAY, FormBase.Motion.DASH, FormBase.Motion.TELEPORT:
-			return true
-	return false
+	return CardRules.homing_steers(motion)
 
 
-## True when a carrier of `motion` can run `behaviour`: homing where `homing_steers` says,
-## return on a shot that flies out, arc on a shot that stays in the air (a bolt, a rune, an orbit,
-## a wall); every other behaviour anywhere. A card whose behaviour cannot run is wasted.
+## True when a carrier of `motion` can run `behaviour` (`CardRules`). A card whose behaviour
+## cannot run is wasted, with `CardRules.behaviour_why_not` as the reason.
 static func behaviour_runs(behaviour: int, motion: FormBase.Motion) -> bool:
-	match behaviour:
-		ModifierBase.Behaviour.HOMING:
-			return homing_steers(motion)
-		ModifierBase.Behaviour.RETURN:
-			return motion == FormBase.Motion.STRAIGHT or motion == FormBase.Motion.HOOK or motion == FormBase.Motion.SWAP
-		ModifierBase.Behaviour.ARC:
-			match motion:
-				FormBase.Motion.STRAIGHT, FormBase.Motion.STILL, FormBase.Motion.ORBIT, FormBase.Motion.HOOK, FormBase.Motion.SWAP, FormBase.Motion.WALL:
-					return true
-			return false
-		ModifierBase.Behaviour.DEFLECT:
-			return guards(motion) or motion == FormBase.Motion.HOOK or motion == FormBase.Motion.SWAP
-	return true
+	return CardRules.behaviour_runs(behaviour, motion)
 
 
 ## True for the carriers whose shield only stops shots that touch them (a shot, a beam's line, a
@@ -418,29 +406,12 @@ static func behaviour_runs(behaviour: int, motion: FormBase.Motion) -> bool:
 ## with it never blocks. A hook's shield also guards its caster on the pull, a dash's and a
 ## teleport's is a barrier on the caster: those keep it.
 static func guards(motion: FormBase.Motion) -> bool:
-	match motion:
-		FormBase.Motion.STRAIGHT, FormBase.Motion.STILL, FormBase.Motion.ORBIT, FormBase.Motion.WALL, FormBase.Motion.RAY, FormBase.Motion.FISSURE, FormBase.Motion.SWING, FormBase.Motion.SLAM:
-			return true
-	return false
+	return CardRules.guards(motion)
 
 
 ## True when `modifier` is a shield that a deflect on a carrier of `motion` leaves with nothing to do.
 static func _shield_outrun(modifier: ModifierBase, motion: FormBase.Motion) -> bool:
 	return modifier.behaviour == ModifierBase.Behaviour.SHIELD and guards(motion)
-
-
-## Why a carrier cannot run `behaviour`, for the wasted card's reason.
-static func _why_not(behaviour: int) -> String:
-	match behaviour:
-		ModifierBase.Behaviour.HOMING:
-			return "it cannot be steered"
-		ModifierBase.Behaviour.RETURN:
-			return "it does not fly out"
-		ModifierBase.Behaviour.ARC:
-			return "it is not a shot that stays in the air"
-		ModifierBase.Behaviour.DEFLECT:
-			return "it touches no shots"
-	return "it cannot run it"
 
 
 ## How far a homing carrier looks for its target, the one rule for every form: as far as its

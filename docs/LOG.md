@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-29: The compiler says what does nothing (phase R, R2)
+
+One table, `CardRules` (`core/spells/card_rules.gd`): every modifier behaviour and trigger event against every carrier motion, runs or a reason. The compiler asks it; the audit's silent cells (growth on a rune, heavy on a dash, timer on a beam, on hit on a familiar, on wall on an orbit, the melee carriers) are now listed as wasted with a reason in the builder and staff view. No shipped combo changed; `test_card_rules_table.gd` checks every cell and that the compiler wastes exactly what the table says. R3 next.
+
 ## 2026-10-29: Freezes in co-op (melee I7)
 
 Feel's hit-stop is local now. A hit holds its attacker, its target and the shot that did it (new `Actors.hold` / `spend_hold`, which `Actor.step` obeys, and `Projectiles.freeze_shot`, a frozen shot keeps its life and tests no hits); a kill holds its killer; a reaction holds its caster. Another player, another enemy and every other shot run on. `Engine.time_scale` drops only for `player_downed` and the death of an `EnemyBase.boss`. A body rests `hit_stop_rest` before a plain hit holds it again (per actor). Tests: `test_feel_local_stop.gd` (a hit does not hold another player, a bystander or an unrelated shot; a down still stops the game), `test_projectiles_freeze.gd`; the old feel tests now read the holds.

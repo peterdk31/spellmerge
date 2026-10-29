@@ -22,7 +22,7 @@ func _combo(id: String) -> Dictionary:
 	return {}
 
 
-## Plays `combo` without `drop`; returns each imp's lost health.
+## Plays `combo` without `drop`; returns each imp's lost health. Handles only the `imps` and `walls` keys, which the two Blast combos use; a combo with `pushed`, `mates` or `guard` needs the setup in test_combos.gd.
 func _lost(combo: Dictionary, drop: String = "") -> Array[int]:
 	var arena := ArenaScript.new(root)
 	for at: Array in combo["imps"]:

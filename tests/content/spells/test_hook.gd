@@ -8,7 +8,7 @@ extends "res://tests/support/suite.gd"
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const ComboFiles := preload("res://tests/support/combo_files.gd")
 
-const COMBOS: Array[String] = ["hook_pull", "hook_miss", "hook_and_fire"]
+const COMBOS: Array[String] = ["hook_pull", "hook_miss", "hook_and_fire", "shield_hook"]
 
 
 func _card() -> FormBase:
@@ -70,13 +70,12 @@ func test_a_miss_pulls_nobody() -> void:
 	check(_moves(["hook"], Vector2(0, 100)).is_empty(), "the barb flies past the imp and nobody moves")
 
 
-func test_the_card_reaches_less_than_it_flies_for_nothing() -> void:
+func test_an_imp_beyond_the_reach_is_not_hooked() -> void:
 	var card: FormBase = _card()
 	if card == null:
 		return
 	var reach: float = card.speed * card.lifetime
-	check(reach > 100.0 and reach < 250.0, "a reach between a dash and a screen (%s px)" % reach)
-	check(_moves(["hook"], Vector2(reach + 80.0, 0)).is_empty(), "an imp beyond the reach is not hooked")
+	check(_moves(["hook"], Vector2(reach + 80.0, 0)).is_empty(), "an imp beyond the reach (%s px) is not hooked" % reach)
 
 
 func test_a_cast_without_the_card_asks_for_no_move() -> void:

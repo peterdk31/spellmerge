@@ -60,8 +60,7 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 
 ## Done recently
 
-- [x] **Card: hook (staffs C).** `content/spells/forms/hook/` (`FormBase`, motion HOOK, a 150 px shot, 3 mana, 2 s cooldown, icon, `assets.json`), the lore entry, the combos `hook_pull`, `hook_miss` and `hook_and_fire`, and `tests/content/spells/test_hook.gd`. The engine side was built in B2 and B4.
-
+- [x] **Card: hook (staffs C).** `content/spells/forms/hook/` (`FormBase`, motion HOOK, a 150 px shot, 3 mana, 2 s cooldown, icon, `assets.json`), the lore entry, the combos `hook_pull`, `hook_miss`, `hook_and_fire` and `shield_hook`, and `tests/content/spells/test_hook.gd`. The engine side was built in B2 and B4. The `blast · hook` showcase waits for a combo arena that moves its caster.
 - [x] **Card: teleport (staffs C).** `content/spells/forms/teleport/` (`FormBase`, motion TELEPORT, 96 px, 4 mana, 2.5 s cooldown, icon, `assets.json`), the lore entry, the combos `teleport_away`, `teleport_and_fire` and `shield_teleport`, and `tests/content/spells/test_teleport.gd`. The engine side was built in B2 and B4.
 - [x] **Card: hold (staffs C).** `content/spells/modifiers/hold/` (`ModifierBase`, HOLD, icon, `assets.json`), the lore entry, the combos `hold_fire_orbit` and `hold_shield_orbit`, and `tests/content/spells/test_hold.gd` (valid card; the combos keep their shots past an orbit's 3 s and reserve mana only with the card, the next cast ends them and frees the mana; four players). The engine side was built in A5/B4.
 - [x] **Card: siphon (staffs C).** `content/spells/modifiers/siphon/` (`ModifierBase`, SIPHON, 1 mana back per hit, icon, `assets.json`), the lore entry, the combos `siphon_split_bolts` and `siphon_chain_bolt`, and `tests/content/spells/test_siphon.gd` (valid card; the combos hurt and refund with it, nothing without; four players). The engine side was built in B2.

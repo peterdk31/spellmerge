@@ -9,6 +9,7 @@
     "number": 399
   },
   "errors_in_a_row": 0,
+  "idle": null,
   "intake_tasks": {
     "208": {
       "author": "Brianmanden",
@@ -47,7 +48,15 @@
   },
   "panel_problems": [],
   "paused_by_command": false,
-  "pending_instructions": [],
+  "pending_instructions": [
+    {
+      "at": "2026-10-29T11:20:32Z",
+      "kind": "claude",
+      "number": 417,
+      "text": "remove this issue",
+      "url": "https://github.com/peterdk31/spellmerge/issues/417#issuecomment-6495258241"
+    }
+  ],
   "processed_comments": [
     6241847784,
     6251160604,
@@ -84,7 +93,8 @@
     6403591111,
     6404318237,
     6405166432,
-    6415196364
+    6415196364,
+    6495258241
   ],
   "task_failures": {
     "**Stress and C2 (staffs D3).** Last: when every other task in both lanes has merged. Then the C2 checkpoint, with the owner's sandbox playtest on `/preview/`.": {

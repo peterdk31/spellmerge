@@ -86,9 +86,9 @@ vec4 particle(float look, vec2 from, float a, float i, float cyc, vec2 q, float 
 			return vec4(SPARK_LIGHT, 1.0);
 		}
 	} else if (look == L_HOPS) {
-		// Chain: a pixel that jumps sideways in steps, every other frame.
+		// Chain: a pixel that jumps sideways in steps, blinking two frames in three.
 		vec2 at = from + vec2(-2.0 * a, (h < 0.5 ? -1.0 : 1.0) * (1.0 + floor(a * 4.0)) * 3.0) * z;
-		if (a < 0.6 && mod(floor(sim_time * 24.0 + i), 2.0) < 0.5 && on(q, at)) {
+		if (a < 0.8 && mod(floor(sim_time * 24.0 + i), 3.0) < 2.0 && on(q, at)) {
 			return vec4(a < 0.3 ? BONE_LIGHT : SPARK_LIGHT, 1.0);
 		}
 	} else if (look == L_WAKE) {

@@ -87,8 +87,11 @@ const float M_LINE = 3.0;
 const vec2 FAR = vec2(1.0e7);
 
 // ---- LOOK TABLE: one row per particle kind ----
-// Rows 1-12 are the look kinds (L_*; 11, the weave, gives off nothing); row 0 a plain shot's
-// twinkle; rows 16 and 17 the kinds 13 and 14 (chain's hops, faster's wake); rows 13-15 a dash's own: its speed streaks, and fire and frost from its feet.
+// The rows are:
+//   0       a plain shot's twinkle
+//   1-12    the look kinds by number (L_*; 11, the weave, gives off nothing)
+//   13-15   a dash's own: its speed streaks, and fire and frost from its feet
+//   16, 17  the kinds L_HOPS (chain) and L_WAKE (faster), moved up past the dash's rows
 // A particle `j` born at moment `id` where the shot was (`at`, flying along `dir`, `side` its
 // left) with its numbers h(n) in [0, 1) (`th`) and `ago` seconds old, `u` of its life:
 //   life                   LIFE_BACK.x + LIFE_BACK.y h
@@ -118,25 +121,25 @@ const int ROW_HOPS = 16;
 const int ROW_WAKE = 17;
 const int ROWS = 18;
 //                                  twinkle                embers                    flecks                    gusts                    pull                      sparks                    motes                    glints                    streaks              burst                orbiters             weave                glitter              dash streak            dash ember             dash fleck             hops                   wake
-const vec4 LIFE_BACK[ROWS] = vec4[](vec4(0.3, 0.3, 0.0, -8.0), vec4(0.3, 0.35, 0.0, -4.0), vec4(0.5, 0.4, 0.0, -14.0), vec4(0.1, 0.12, 0.0, 0.0), vec4(0.22, 0.18, 0.0, 0.0), vec4(0.05, 0.1, 0.0, -10.0), vec4(0.5, 0.3, 0.0, 0.0), vec4(0.6, 0.0, 0.0, -6.0), vec4(0.25, 0.0, 0.0, 0.0), vec4(0.5, 0.0, 0.0, 0.0), vec4(0.8, 0.0, 0.0, 0.0), vec4(0.0), vec4(0.5, 0.0, 0.0, 0.0), vec4(0.1, 0.08, -4.0, 8.0), vec4(0.45, 0.4, 0.0, 0.0), vec4(0.6, 0.4, 0.0, 0.0), vec4(0.15, 0.1, 0.0, -4.0), vec4(0.2, 0.15, 0.0, -2.0));
+const vec4 LIFE_BACK[ROWS] = vec4[](vec4(0.3, 0.3, 0.0, -8.0), vec4(0.3, 0.35, 0.0, -4.0), vec4(0.5, 0.4, 0.0, -14.0), vec4(0.1, 0.12, 0.0, 0.0), vec4(0.22, 0.18, 0.0, 0.0), vec4(0.05, 0.1, 0.0, -10.0), vec4(0.5, 0.3, 0.0, 0.0), vec4(0.6, 0.0, 0.0, -6.0), vec4(0.25, 0.0, 0.0, 0.0), vec4(0.5, 0.0, 0.0, 0.0), vec4(0.8, 0.0, 0.0, 0.0), vec4(0.0), vec4(0.5, 0.0, 0.0, 0.0), vec4(0.1, 0.08, -4.0, 8.0), vec4(0.45, 0.4, 0.0, 0.0), vec4(0.6, 0.4, 0.0, 0.0), vec4(0.3, 0.2, 0.0, -4.0), vec4(0.2, 0.15, 0.0, -2.0));
 const vec4 JITTER[ROWS] = vec4[](vec4(4.0, 4.0, 0.0, 0.0), vec4(0.0, 2.0, 0.0, 0.0), vec4(3.0, 3.0, 0.0, 0.0), vec4(0.0, 0.0, 0.0, 7.0), vec4(0.0), vec4(0.0, 0.0, 6.0, 0.0), vec4(4.0, 4.0, 0.0, 0.0), vec4(4.0, 4.0, 0.0, 0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 13.0), vec4(0.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 6.0), vec4(0.0, 0.0, 0.0, 5.0));
-const vec4 VELOCITY[ROWS] = vec4[](vec4(0.0), vec4(14.0, 0.0, 0.0, 14.0), vec4(0.0), vec4(80.0, 70.0, 40.0, 0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(60.0, 50.0, 0.0, 0.0), vec4(0.0), vec4(0.0), vec4(0.0, 0.0, 70.0, 0.0), vec4(110.0, 60.0, 20.0, 0.0));
+const vec4 VELOCITY[ROWS] = vec4[](vec4(0.0), vec4(14.0, 0.0, 0.0, 14.0), vec4(0.0), vec4(80.0, 70.0, 40.0, 0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(60.0, 50.0, 0.0, 0.0), vec4(0.0), vec4(0.0), vec4(0.0, 0.0, 110.0, 0.0), vec4(110.0, 60.0, 20.0, 0.0));
 const vec4 UP_DRAG[ROWS] = vec4[](vec4(0.0, 0.0, 1.0, 0.0), vec4(10.0, 24.0, 0.97, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 9.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 0.94, 0.0));
 const vec4 CIRCLE[ROWS] = vec4[](vec4(6.0, 0.0, 0.0, 0.0), vec4(0.0), vec4(0.0, 0.0, 4.0, 0.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0), vec4(14.0, 0.0, 0.0, 0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0), vec4(4.0, 8.0, 0.0, 0.0), vec4(0.0), vec4(0.0), vec4(0.0));
 const vec4 RADIUS[ROWS] = vec4[](vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(6.0, 6.0, 0.0, 1.4), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(2.0, 0.0, 6.0, 0.0), vec4(4.5, 0.0, 0.0, 0.0), vec4(0.0), vec4(2.5, 1.5, 0.0, 0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0));
-const vec4 SPIN[ROWS] = vec4[](vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(1.0, 0.0, 0.0, 0.0), vec4(1.0, 5.0, 0.0, 0.0), vec4(0.0), vec4(1.0, 0.0, 0.0, 0.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0));
-const vec4 TIP[ROWS] = vec4[](vec4(0.0, 0.0, 0.7, 0.18), vec4(0.0, 0.0, 1.0, 0.45), vec4(0.0, 0.0, 0.9, 0.32), vec4(0.025, 0.0, 0.8, 0.4), vec4(0.0, 0.0, 0.7, 0.55), vec4(0.0, 0.0, 1.2, 0.45), vec4(0.0, 0.0, 0.7, 0.25), vec4(0.0, 0.0, 0.8, 0.25), vec4(0.0, 1.0, 0.6, 0.25), vec4(0.0, 0.0, 0.8, 0.25), vec4(0.0, 0.0, 0.6, 0.25), vec4(0.0), vec4(0.0, 0.0, 0.6, 0.25), vec4(0.025, 0.0, 0.4, 1.0), vec4(0.0, 0.0, 1.0, 1.0), vec4(0.0, 0.0, 0.8, 1.0), vec4(0.06, 0.0, 0.7, 0.35), vec4(0.0, 0.0, 0.6, 0.45));
+const vec4 SPIN[ROWS] = vec4[](vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(1.0, 0.0, 0.0, 0.0), vec4(1.0, 5.0, 0.0, 0.0), vec4(0.0), vec4(1.0, 0.0, 0.0, 0.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0));
+const vec4 TIP[ROWS] = vec4[](vec4(0.0, 0.0, 0.7, 0.18), vec4(0.0, 0.0, 1.0, 0.45), vec4(0.0, 0.0, 0.9, 0.32), vec4(0.025, 0.0, 0.8, 0.4), vec4(0.0, 0.0, 0.7, 0.55), vec4(0.0, 0.0, 1.2, 0.45), vec4(0.0, 0.0, 0.7, 0.25), vec4(0.0, 0.0, 0.8, 0.25), vec4(0.0, 1.0, 0.6, 0.25), vec4(0.0, 0.0, 0.8, 0.25), vec4(0.0, 0.0, 0.6, 0.25), vec4(0.0), vec4(0.0, 0.0, 0.6, 0.25), vec4(0.025, 0.0, 0.4, 1.0), vec4(0.0, 0.0, 1.0, 1.0), vec4(0.0, 0.0, 0.8, 1.0), vec4(0.14, 0.0, 0.9, 1.0), vec4(0.04, 0.0, 0.9, 0.7));
 const vec4 SHINE[ROWS] = vec4[](vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 3.0, 0.0, 1.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0));
 const vec4 BLINK[ROWS] = vec4[](vec4(3.0, 1.0, 0.0, 7.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(3.0, 1.0, 0.0, 7.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(1.0, 0.0, 3.0, 6.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(3.0, 1.0, 0.0, 7.0), vec4(0.0, 0.0, 0.0, 2.0), vec4(0.0, 0.0, 0.0, 1.0));
-const vec4 SHOW[ROWS] = vec4[](vec4(2.0, 0.0, -1.0, 0.0), vec4(0.0, 0.22, -1.0, 0.0), vec4(2.0, 0.0, -1.0, 0.3), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, 0.2, 1.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(3.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.3, -1.0, 0.0), vec4(2.0, 0.0, -1.0, 0.0), vec4(1.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0));
+const vec4 SHOW[ROWS] = vec4[](vec4(2.0, 0.0, -1.0, 0.0), vec4(0.0, 0.22, -1.0, 0.0), vec4(2.0, 0.0, -1.0, 0.3), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, 0.2, 1.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(3.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.3, -1.0, 0.0), vec4(2.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0));
 const vec4 ARM[ROWS] = vec4[](vec4(2.0, 0.0, 0.0, 3.0), vec4(2.0, 0.0, 0.0, 4.0), vec4(0.0, 0.2, 8.0, 4.0), vec4(2.0, 0.0, 0.0, 3.0), vec4(2.0, 0.0, 0.0, 4.0), vec4(2.0, 0.0, 0.0, 3.0), vec4(2.0, 0.0, 0.0, 2.0), vec4(0.35, 0.6, 17.0, 1.0), vec4(2.0, 0.0, 0.0, 1.0), vec4(2.0, 0.0, 0.0, 2.0), vec4(2.0, 0.0, 0.0, 1.0), vec4(2.0, 0.0, 0.0, 1.0), vec4(2.0, 0.0, 0.0, 1.0), vec4(2.0, 0.0, 0.0, 2.0), vec4(2.0, 0.0, 0.0, 4.0), vec4(2.0, 0.0, 0.0, 4.0), vec4(2.0, 0.0, 0.0, 2.0), vec4(2.0, 0.0, 0.0, 3.0));
-const vec4 COLOURS[ROWS] = vec4[](vec4(17.0, 18.0, 18.0, 18.0), vec4(5.0, 2.0, 1.0, 0.0), vec4(17.0, 8.0, 8.0, 7.0), vec4(5.0, 4.0, 3.0, 3.0), vec4(9.0, 10.0, 11.0, 11.0), vec4(17.0, 14.0, 13.0, 13.0), vec4(14.0, 13.0, 13.0, 13.0), vec4(17.0), vec4(17.0), vec4(2.0, 1.0, 1.0, 1.0), vec4(17.0), vec4(17.0), vec4(5.0), vec4(19.0, 20.0, 20.0, 20.0), vec4(5.0, 2.0, 1.0, 0.0), vec4(17.0, 8.0, 8.0, 7.0), vec4(17.0, 4.0, 4.0, 4.0), vec4(17.0, 16.0, 15.0, 15.0));
+const vec4 COLOURS[ROWS] = vec4[](vec4(17.0, 18.0, 18.0, 18.0), vec4(5.0, 2.0, 1.0, 0.0), vec4(17.0, 8.0, 8.0, 7.0), vec4(5.0, 4.0, 3.0, 3.0), vec4(9.0, 10.0, 11.0, 11.0), vec4(17.0, 14.0, 13.0, 13.0), vec4(14.0, 13.0, 13.0, 13.0), vec4(17.0), vec4(17.0), vec4(2.0, 1.0, 1.0, 1.0), vec4(17.0), vec4(17.0), vec4(5.0), vec4(19.0, 20.0, 20.0, 20.0), vec4(5.0, 2.0, 1.0, 0.0), vec4(17.0, 8.0, 8.0, 7.0), vec4(18.0, 17.0, 4.0, 4.0), vec4(18.0, 17.0, 16.0, 15.0));
 
 // How long a trail with each kind draws its particles (seconds; x a shot, y a dash): the trail's
 // window is the longest of its kinds' and its tail's (a dash's at least 0.18 s; a plain shot's,
 // with no kind among 1-9, its twinkles' 0.6 s), so a kind that lives longer than its trail's
 // window (void's pull, a shield's sparks) is cut there, as the mockup's trails are.
-const vec2 WINDOW[15] = vec2[](vec2(0.6, 0.0), vec2(0.65, 0.85), vec2(0.9, 1.0), vec2(0.22), vec2(0.0), vec2(0.15), vec2(0.8), vec2(0.6), vec2(0.25), vec2(0.5), vec2(0.0), vec2(0.0), vec2(0.0), vec2(0.15, 0.2), vec2(0.35));
+const vec2 WINDOW[15] = vec2[](vec2(0.6, 0.0), vec2(0.65, 0.85), vec2(0.9, 1.0), vec2(0.22), vec2(0.0), vec2(0.15), vec2(0.8), vec2(0.6), vec2(0.25), vec2(0.5), vec2(0.0), vec2(0.0), vec2(0.0), vec2(0.5), vec2(0.35));
 
 // What the vertex stage hands a pixel (by mode; see `fragment`): the pixel's world position, the
 // mode, three numbers and three colours.
@@ -233,6 +236,10 @@ float trail_window(vec3 b, bool dash, float tail) {
 // kinds, picked at random, each at its own rate (TIP.w); a plain shot's twinkle is -1. A dash
 // gives off two speed streaks (kind 0) and its cards at twice a shot's rate, fire and frost
 // always.
+int kind_row(float kind) {
+	return kind == L_HOPS ? ROW_HOPS : (kind == L_WAKE ? ROW_WAKE : int(kind + 0.5));
+}
+
 float trail_kind(float id, float j, bool dash, vec4 kinds, float row) {
 	if (dash && j < 1.5) {
 		return 0.0;
@@ -243,7 +250,7 @@ float trail_kind(float id, float j, bool dash, vec4 kinds, float row) {
 	float i = min(floor(th(id, j, 152.0, row) * kinds.w), kinds.w - 1.0);
 	float word = i < 4.0 ? kinds.x : (i < 8.0 ? kinds.y : kinds.z);
 	float look = mod(floor(word / exp2(mod(i, 4.0) * 4.0) + 0.001), 16.0);
-	float rate = TIP[int(look)].w;
+	float rate = TIP[kind_row(look)].w;
 	if (dash) {
 		rate = look == L_EMBERS || look == L_FLECKS ? 1.0 : min(rate * 2.0, 1.0);
 	}
@@ -299,8 +306,7 @@ Spark spark(float row, float newest, float count, float skip, vec4 head_end, flo
 	vec2 at = mix(A.xy, B.xy, clamp((t - A.w) / max(B.w - A.w, 0.0001), 0.0, 1.0));
 	// Its row: a shot's kinds circle the shot; a dash's circle where they were born, from beside
 	// its body, and its fire and frost fall from its feet.
-	int r = kind < 0.0 ? ROW_TWINKLE : int(kind + 0.5);
-	r = r == 13 ? ROW_HOPS : (r == 14 ? ROW_WAKE : r);
+	int r = kind < 0.0 ? ROW_TWINKLE : kind_row(kind);
 	vec2 base = at;
 	vec2 centre = target;
 	if (dash) {

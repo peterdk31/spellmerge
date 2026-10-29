@@ -111,6 +111,9 @@ func take() -> void:
 	save(image, "looks_sheet")
 	save_crop(image, Vector2(160.0, 85.0), "looks_sheet_4x", Vector2i(160, 85))
 	save_crop(image, Vector2(460.0, 140.0), "looks_combined_4x", Vector2i(150, 40))
+	# The first cards' own kinds, close up: hops (chain) and wake (faster) on a fire bolt.
+	save_crop(image, Vector2(520.0, 63.0), "looks_hops_4x", Vector2i(80, 36))
+	save_crop(image, Vector2(310.0, 101.0), "looks_wake_4x", Vector2i(80, 36))
 
 
 ## A bolt of `caster` that barely moves (the sheet is a still), with a core and layers.

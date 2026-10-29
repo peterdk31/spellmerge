@@ -6,6 +6,10 @@ What each run did, newest first. Claude appends a short entry after each develop
 
 Added the Magnet modifier card (`.tres`, icon, assets, lore), two combos (`magnet_pull_bolt`, `magnet_void_hex`) and `test_magnet.gd`. Unlike the other cards it was not data only: nothing sent `pull_requested` for a magnet shot, so `Spells` now does (`_step_magnets`). The combo arena can move its imps by combat's push (`pushable`, the combo key `pushed`). All 140 unit tests pass.
 
+## 2026-10-29: Card shield (staffs C)
+
+Added the Shield modifier card (`.tres`, icon, assets, lore), three combos (`shield_dash`, `shield_wall_fire`, `shield_orbit_ring`; combo files may now name a `guard`, enemy `foes` and the check `blocked`, so each combo shows a real block) and `test_shield.gd` (valid card, charges add up, a shielded bolt and each wall stone block enemy shots from every seat, a shield on a dash or on the caster is a barrier on it). Engine: `Spells` now sends `wizard_shield_requested` (dash, teleport, hook, caster) and gives orbit and still shots their shield, which it never had. See DECISIONS.
+
 ## 2026-10-29: Card heavy (staffs C)
 
 Added the Heavy modifier card (data only: `.tres`, icon, assets, lore), two combos (`heavy_wall_slam`, `heavy_hex_slam`) and `test_heavy.gd`. All 139 unit tests pass.

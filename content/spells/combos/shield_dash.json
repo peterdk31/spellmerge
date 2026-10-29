@@ -1,0 +1,11 @@
+{
+	"id": "shield_dash",
+	"name": "Shielded dash",
+	"does": "The dash card moves its caster and puts a shield on them, which stops the enemy shot flying at the caster.",
+	"casts": [{"staff": 0, "cards": ["shield", "dash"]}],
+	"imps": [],
+	"guard": true,
+	"foes": [[30, 0]],
+	"seconds": 1.5,
+	"checks": [{"kind": "caster_moved", "mode": "dash"}, {"kind": "blocked", "min": 1}]
+}

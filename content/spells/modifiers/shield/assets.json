@@ -1,0 +1,13 @@
+{
+	"assets": [
+		{
+			"path": "content/spells/modifiers/shield/icon.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "placeholder",
+			"tool": "Claude (SVG paths written by hand)",
+			"prompt": "A 16x16 icon for the Shield card: a dark kite shield with a light-blue rim, a light left edge and a 1 px outline. A few whole-number paths and rects, so it reads at 16 px beside the grey cards."
+		}
+	]
+}

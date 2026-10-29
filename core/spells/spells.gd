@@ -905,9 +905,11 @@ func _launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direct
 					var shot: int = _caster_shot()
 					centre = projectiles.get_position_of(shot) if shot >= 0 else origin
 				slot = projectiles.spawn_orbit(actor, spell.orbit_radius, base + TAU * n / count, turn, lifetime, spell.radius, HITS, spell.pierce, tag, centre)
+				_apply_shield(slot, spell)
 			FormBase.Motion.STILL:
 				var at: Vector2 = origin if count == 1 else origin + heading * spell.radius * 2.0
 				slot = projectiles.spawn(actor, at, Vector2.ZERO, lifetime, spell.radius, HITS, spell.pierce, tag, ProjectilesScript.MOTION_STILL)
+				_apply_shield(slot, spell)
 			_:
 				slot = projectiles.spawn(actor, origin, heading * spell.speed, lifetime, spell.radius, HITS, spell.pierce, tag)
 				if slot >= 0 and spell.homing_range > 0.0:
@@ -965,6 +967,7 @@ func _move_caster(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, d
 				projectiles.follow_caster(actor, spell.tint, spell.look, seconds)
 			else:
 				events.caster_move_requested.emit(actor, &"teleport", projectiles.clip_to_walls(origin, origin + offset), 0.0, tag)
+			_shield_caster(spell, tag, actor, seconds)
 		return 1
 	var shot: int = _caster_shot()
 	var turn: float = spell.homing_turn if spell.homing_range > 0.0 else 0.0
@@ -1215,6 +1218,14 @@ func _apply_travel(slot: int, spell: CompiledSpell) -> void:
 	var sticky: float = spell.behaviour(ModifierBase.Behaviour.STICKY)
 	if sticky > 0.0:
 		projectiles.set_sticky(slot, sticky)
+	_apply_shield(slot, spell)
+
+
+## A shot with `shield` blocks that many enemy shots (an orbit's and a still shot's too, which
+## `_apply_travel` does not reach).
+func _apply_shield(slot: int, spell: CompiledSpell) -> void:
+	if slot < 0 or spell.behaviours.is_empty():
+		return
 	var shield: float = spell.behaviour(ModifierBase.Behaviour.SHIELD)
 	if shield > 0.0:
 		projectiles.set_shield(slot, roundi(shield))
@@ -1414,11 +1425,23 @@ func _drop_pending(actor: int, staff: int) -> void:
 		i -= 1
 
 
+## `shield` on the caster itself: a barrier on the casting actor with the card's charges, for as
+## long as the carrier lasts (a move's own time at least). It comes with a dash, a teleport, a
+## hook that hit, and the cards landing on the caster. Combat gives it a minimum time.
+func _shield_caster(spell: CompiledSpell, tag: int, actor: int, move_seconds: float) -> void:
+	var charges: int = roundi(spell.behaviour(ModifierBase.Behaviour.SHIELD))
+	if charges > 0 and events != null:
+		events.wizard_shield_requested.emit(actor, charges, maxf(spell.lifetime, move_seconds), tag)
+
+
 ## The cards that landed on the caster or on a payload's origin: an area hit there with the
 ## spell's profile (a blast is as wide as its strength). Combat decides what it does (staffs B3).
 func _fallback_hit(spell: CompiledSpell, tag: int, actor: int, at: Vector2) -> int:
 	if events != null:
 		events.area_hit_requested.emit(actor, at, maxf(spell.radius, spell.behaviour(ModifierBase.Behaviour.BLAST)), tag)
+	# After the area hit, which can reach the caster itself and would spend the barrier.
+	if _caster == CASTER_WIZARD:
+		_shield_caster(spell, tag, actor, 0.0)
 	return 1
 
 
@@ -2125,6 +2148,7 @@ func _on_hit_effects(spell: CompiledSpell, tag: int, actor: int, target: Node, p
 			var anchor: Vector2 = projectiles.get_anchor(actor)
 			_move_heading[actor] = anchor.direction_to(position) if anchor.is_finite() and not anchor.is_equal_approx(position) else Vector2.RIGHT
 			events.caster_move_requested.emit(actor, &"hook", position, SpellLimits.HOOK_SECONDS, tag)
+			_shield_caster(spell, tag, actor, SpellLimits.HOOK_SECONDS)
 			pulled = true
 		elif caster >= 0:
 			var from: Vector2 = projectiles.get_position_of(caster)

@@ -7,16 +7,16 @@ extends "res://tests/support/suite.gd"
 ##
 ## A combo file: `id` (also the file name), `name`, `does` (plain words), `casts` (`staff`,
 ## `cards`: one card id per slot, read as a staff reads them; optional `at` seconds, `player`, `dir` [x, y] to cast toward), `imps` ([x, y] from the caster at (0, 0), aiming
-## along +x), optional `mates` ([x, y, player]: a teammate's body that shots hit, for `relay`), optional `walls` ([x, y, width, height] rects), optional `pushed` (true: imps move with the push combat gives them, for `magnet`), `seconds` and `checks`. Check kinds: `damaged` (imps), `status` (imps, status),
+## along +x), optional `mates` ([x, y, player]: a teammate's body that shots hit, for `relay`), optional `walls` ([x, y, width, height] rects), optional `pushed` (true: imps move with the push combat gives them, for `magnet`), optional `guard` (true: the caster's own body stands at (0, 0), so a barrier on it works) and `foes` ([x, y] each: an enemy shot sent from there at the caster, which needs a `guard`), `seconds` and `checks`. Check kinds: `damaged` (imps), `status` (imps, status),
 ## `status_count` (status, min), `lost_at_least` (imps, min: health lost in all), `keeps_burning` (imp), `reaction` (reaction), `max_shots` (max),
-## `caster_moved` (mode: a card moved its caster, for example a dash).
+## `caster_moved` (mode: a card moved its caster, for example a dash), `blocked` (min: enemy shots a barrier or a shielded shot stopped).
 ##
 ## godot --headless --path . --script res://tests/content/spells/test_combos.gd
 
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const ComboFiles := preload("res://tests/support/combo_files.gd")
 const MIN_COMBOS: int = 20
-const CHECK_KINDS: Array[String] = ["damaged", "status", "status_count", "keeps_burning", "reaction", "max_shots", "caster_moved", "lost_at_least"]
+const CHECK_KINDS: Array[String] = ["damaged", "status", "status_count", "keeps_burning", "reaction", "max_shots", "caster_moved", "lost_at_least", "blocked"]
 
 var _combos: Array = []
 ## Files of the catalogue that are not a JSON object.
@@ -40,6 +40,10 @@ func _play(combo: Dictionary, quiet: bool = false) -> ArenaScript:
 		arena.add_mate(Vector2(float(mate[0]), float(mate[1])), int(mate[2]))
 	for rect: Array in combo.get("walls", []):
 		arena.add_wall(Rect2(float(rect[0]), float(rect[1]), float(rect[2]), float(rect[3])))
+	if bool(combo.get("guard", false)):
+		arena.add_guard(0, Vector2.ZERO)
+	for foe: Array in combo.get("foes", []):
+		arena.shoot_at(Vector2(float(foe[0]), float(foe[1])), Vector2.ZERO)
 	var casts: Array = (combo.get("casts", []) as Array).duplicate()
 	for entry: Dictionary in casts:
 		var built: CompiledStaff = arena.install_cards(int(entry.get("player", 0)), int(entry["staff"]), entry["cards"] as Array)
@@ -102,6 +106,9 @@ func _problem_with(arena: ArenaScript, check_row: Dictionary) -> String:
 				moved = moved or move[1] == StringName(check_row["mode"])
 			if not moved:
 				return "no %s moved the caster, saw %s" % [check_row["mode"], arena.caster_moves]
+		"blocked":
+			if arena.blocks.size() < int(check_row["min"]):
+				return "%d enemy shots blocked, wanted %d" % [arena.blocks.size(), int(check_row["min"])]
 		_:
 			return "unknown check kind %s" % kind
 	return ""
@@ -217,6 +224,9 @@ const CONTROLS: Dictionary = {
 	"wall_frost_row": "wall",
 	"relay_teammate_frost": "relay",
 	"relay_teammate_fire": "relay",
+	"shield_dash": "shield",
+	"shield_wall_fire": "shield",
+	"shield_orbit_ring": "shield",
 }
 
 

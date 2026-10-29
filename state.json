@@ -9,7 +9,6 @@
     "number": 399
   },
   "errors_in_a_row": 0,
-  "idle": null,
   "intake_tasks": {
     "208": {
       "author": "Brianmanden",
@@ -36,7 +35,7 @@
       "title": "Downed wizard shrinks into its hat; revive pops back out"
     }
   },
-  "last_own_merge": "2026-10-29T04:15:13Z",
+  "last_own_merge": "2026-10-29T04:38:07Z",
   "last_plan": "2026-10-26T11:52:51Z",
   "last_weekly": "2026-10-25T10:11:43Z",
   "panel_applied": {

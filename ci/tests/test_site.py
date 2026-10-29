@@ -43,6 +43,49 @@ class ContributePageTest(unittest.TestCase):
         log_md = "## 2026-10-22: Events (M2 part 2)\n\nSee (M2 part 3) in passing.\n"
         m = contribute.parse_progress(contribute.Milestone(code="M2"), design, next_md, log_md)
         self.assertEqual((m.parts_done, m.parts_total), (2, 4))
+        self.assertEqual(m.parts_left, [("3", "c"), ("4", "d")])
+
+    def test_lettered_parts_count(self) -> None:
+        """The staffs design names its parts A1, B6, F9a: the bar read "0 of 0" (2026-10-29)."""
+        design = ("| # | Part | Delivers |\n| --- | --- | --- |\n"
+                  "| A1 | **The plan** | x |\n| B2 | **Trigger kit** | x |\n| B6 | **Shot look** | x |\n"
+                  "| F9a | **The imp on staffs** | x |\n| D1 | **Bots** | x |\n\n"
+                  "| Needs | Cards |\n| --- | --- |\n| B2 | echo, burst |\n| B1 + B2 | sticky |\n")
+        next_md = ("- [x] **Trigger kit, part 1 (staffs B2a).**\n- [x] **Trigger kit, part 2 (staffs B2b).**\n"
+                   "- [ ] **Shot look, part 1 (staffs B6a).**\n- [x] **Shot look, part 2 (staffs B6b).**\n"
+                   "- [x] **Leftover (staffs D1 leftover).** not the part itself\n")
+        log_md = "## 2026-10-26: Pivot at C2 (staffs A1)\n"
+        commits = "The imp and the shooting dummy on staffs (part F9a)\n\nCo-authored-by: x"
+        m = contribute.parse_progress(contribute.Milestone(code="M2"), design, next_md, log_md)
+        self.assertEqual((m.parts_done, m.parts_total), (2, 5))
+        m = contribute.parse_progress(contribute.Milestone(code="M2"), design, next_md, log_md, commits)
+        self.assertEqual((m.parts_done, m.parts_total), (3, 5))
+        self.assertEqual(m.parts_left, [("B6", "Shot look"), ("D1", "Bots")])
+
+    def test_the_real_design_has_parts(self) -> None:
+        current, _ = contribute.parse_roadmap((ROOT / "docs/ROADMAP.md").read_text())
+        design = ROOT / "docs" / current.design
+        if current.design and design.exists():
+            contribute.parse_progress(current, design.read_text())
+            self.assertGreater(current.parts_total, 0, f"no parts found in {current.design}")
+
+    def test_commits_come_from_the_api_and_fail_soft(self) -> None:
+        now = contribute.dt.datetime(2026, 10, 29, tzinfo=contribute.dt.timezone.utc)
+        found = [{"commit": {"message": "Enemy tags (part F3)"}}, {"commit": {"message": "Card: echo"}}]
+        with mock.patch.object(contribute.gh, "api_paginated", return_value=found) as call:
+            self.assertEqual(contribute.recent_commits(config.load(), now), "Enemy tags (part F3)\nCard: echo")
+        self.assertIn("since=2026-07-31T00:00:00+00:00", call.call_args.args[0])
+        with mock.patch.object(contribute.gh, "api_paginated", side_effect=contribute.gh.GhError("x")):
+            self.assertEqual(contribute.recent_commits(config.load(), now), "")
+
+    def test_render_lists_the_parts_left(self) -> None:
+        m = contribute.Milestone("M2", "Spells", parts_done=1, parts_total=2, parts_left=[("D1", "Bots & <b>")])
+        page = contribute.render(config.load(), contribute.PageData(current=m), "v0.1", "nightly", "v0.0")
+        self.assertIn("Still to build", page)
+        self.assertIn("<strong>D1</strong> Bots &amp; &lt;b&gt;", page)
+        done = contribute.Milestone("M2", "Spells", parts_done=2, parts_total=2)
+        page = contribute.render(config.load(), contribute.PageData(current=done), "v0.1", "nightly", "v0.0")
+        self.assertNotIn("Still to build", page)
 
     def test_recently_merged_is_newest_merge_first(self) -> None:
         """Search sorted by update time: a comment after the merge moved an old PR to the top."""

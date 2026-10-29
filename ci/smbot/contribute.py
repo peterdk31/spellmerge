@@ -30,6 +30,7 @@ class Milestone:
     done_when: str = ""
     parts_done: int = 0
     parts_total: int = 0
+    parts_left: list[tuple[str, str]] = field(default_factory=list)  # id, name, in the design's order
     checks_done: int = 0
     checks_total: int = 0
 
@@ -59,17 +60,40 @@ def parse_roadmap(text: str) -> tuple[Milestone, list[tuple[str, str, str]]]:
     return current, upcoming
 
 
-def parse_progress(m: Milestone, text: str, next_md: str = "", log_md: str = "") -> Milestone:
-    """Parts built: a "Built" status in the design's parts table (M0's form), or the part's task
-    done in docs/NEXT.md ("- [x] **...** (M2 part 5)") or in a docs/LOG.md heading. Follow-ups,
-    halves and polish ("(M2 part 25 follow-up)") don't count; only the bare "(M2 part N)"."""
-    parts = {int(n) for n in re.findall(r"^\| (\d+) \|", text, re.MULTILINE)}
-    done = {int(n) for n in re.findall(r"^\| (\d+) \|.*\| Built", text, re.MULTILINE)}
-    marker = rf"\({re.escape(m.code)} part (\d+)\)"
-    done |= {int(n) for n in re.findall(rf"^- \[[xX]\].*?{marker}", next_md, re.MULTILINE)}
-    done |= {int(n) for n in re.findall(rf"^## .*?{marker}", log_md, re.MULTILINE)}
+# A part's id in a design's parts table: a number (M0 and M1's form) or a phase letter and a
+# number, with a letter for a split part ("A6c", "F9a"; the staffs design's form).
+PART_ID = r"\d+|[A-Z]\d+[a-z]?"
+
+
+def _part_markers(m: Milestone, text: str, done: bool | None = None) -> set[str]:
+    """Part ids named the way tasks and commits name them: "(M2 part 5)", or for a lettered id
+    "(part F9a)" or "(staffs B6a)". Follow-ups, halves and polish ("(M2 part 25 follow-up)")
+    don't count; only the bare form. `done` keeps only ticked (True) or open (False) tasks."""
+    box = {None: r"", True: r"^- \[[xX]\].*?", False: r"^- \[ \].*?"}[done]
+    found = set(re.findall(rf"{box}\({re.escape(m.code)} part (\d+)\)", text, re.MULTILINE))
+    found |= set(re.findall(rf"{box}\((?:part|[a-z][a-z ]*) ([A-Z]\d+[a-z]?)\)", text, re.MULTILINE))
+    return found
+
+
+def parse_progress(m: Milestone, text: str, next_md: str = "", log_md: str = "", commits: str = "") -> Milestone:
+    """Parts built: a "Built" status in the design's parts table (M0's form), or the part named
+    by a ticked task in docs/NEXT.md, a docs/LOG.md heading or a commit on main. A part built in
+    pieces ("B2a" to "B2d" for B2) is built once every piece named anywhere is, and none is open."""
+    parts: dict[str, str] = {}
+    for row in re.finditer(rf"^\| ({PART_ID}) \| ([^|]*)\|", text, re.MULTILINE):
+        parts.setdefault(row.group(1), row.group(2).strip().strip("*").strip())
+    done = set(re.findall(rf"^\| ({PART_ID}) \|.*\| Built", text, re.MULTILINE))
+    done |= _part_markers(m, next_md, done=True)
+    done |= {d for line in re.findall(r"^## .*$", log_md, re.MULTILINE) for d in _part_markers(m, line)}
+    done |= _part_markers(m, commits)
+    open_ = _part_markers(m, next_md, done=False)
+    for part in parts:
+        pieces = {p for p in done | open_ if re.fullmatch(rf"{part}[a-z]", p)}
+        if part not in done and pieces and pieces <= done:
+            done.add(part)
     m.parts_total = len(parts)
-    m.parts_done = len(parts & done)
+    m.parts_done = len(parts.keys() & done)
+    m.parts_left = [(part, name) for part, name in parts.items() if part not in done]
     m.checks_total = len(re.findall(r"^- \[[ xX]\]", text, re.MULTILINE))
     m.checks_done = len(re.findall(r"^- \[[xX]\]", text, re.MULTILINE))
     return m
@@ -85,7 +109,8 @@ def gather(cfg: config_mod.Config, root: Path = Path("."), now: dt.datetime | No
         if data.current.design and design.exists():
             plan = {name: (root / "docs" / name).read_text() if (root / "docs" / name).exists() else ""
                     for name in ("NEXT.md", "LOG.md")}
-            parse_progress(data.current, design.read_text(), plan["NEXT.md"], plan["LOG.md"])
+            parse_progress(data.current, design.read_text(), plan["NEXT.md"], plan["LOG.md"],
+                           recent_commits(cfg, now))
     try:
         data.queue = {label: len([i for i in gh.api_paginated(
             f"repos/{cfg.repo}/issues?state=open&labels={label}&per_page=100") if "pull_request" not in i])
@@ -110,6 +135,18 @@ def gather(cfg: config_mod.Config, root: Path = Path("."), now: dt.datetime | No
     except gh.GhError:
         pass
     return data
+
+
+def recent_commits(cfg: config_mod.Config, now: dt.datetime) -> str:
+    """The messages of main's commits from the last RECENT_DAYS days: owner sessions name their
+    part only there ("(part F9a)"). The checkout is shallow, so they come from the API; empty if
+    it can't be read, and the bar then counts from the plan files alone."""
+    since = (now - dt.timedelta(days=RECENT_DAYS)).isoformat(timespec="seconds")
+    try:
+        found = gh.api_paginated(f"repos/{cfg.repo}/commits?sha=main&since={since}&per_page=100")
+        return "\n".join(((c.get("commit") or {}).get("message") or "") for c in found)
+    except (gh.GhError, ValueError, AttributeError):
+        return ""
 
 
 def _bar(done: int, total: int) -> str:
@@ -142,6 +179,9 @@ def render(cfg: config_mod.Config, data: PageData, version: str, channel: str, s
     design_link = f"{repo_url}/blob/main/docs/{e(m.design)}" if m.design else f"{repo_url}/blob/main/docs/ROADMAP.md"
     # Only designs with a checklist (M0's dry runs) have checks; "0 of 0" says nothing.
     checks = f"<p>Checks passed</p>{_bar(m.checks_done, m.checks_total)}" if m.checks_total else ""
+    left = ("<p class='small'>Still to build:</p><ul class='small'>" + "".join(
+        f"<li><strong>{e(part)}</strong> {e(name)}</li>" for part, name in m.parts_left) + "</ul>"
+            if m.parts_left else "")
 
     return f"""<!doctype html>
 <html lang="en">
@@ -192,6 +232,7 @@ def render(cfg: config_mod.Config, data: PageData, version: str, channel: str, s
       <h2>Now: {e(m.code)} {e(m.name)}</h2>
       <p class="small">Done when: {e(m.done_when)}</p>
       <p>Parts built</p>{_bar(m.parts_done, m.parts_total)}
+      {left}
       {checks}
       <p class="small"><a href="{design_link}">Milestone design</a> &middot;
          <a href="{repo_url}/blob/main/docs/NEXT.md">What Claude does next</a></p>

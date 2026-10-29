@@ -2,6 +2,12 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-29: Bots and the emergent combo report (staffs D1)
+
+The bots (`Bot.build_random`, seeded) and the staff fuzz already existed from A6a/A6b; D1 adds the report. `test_spell_fuzz.gd` now prints `REPORT` lines after each run: the five best of its 600 random staffs by kills and by reactions, and the five costliest by mean step time and by safeguards met (dropped shots, then peak live shots), each with its cards and generated name. The fuzz imps now have 60 health (they had 400 and nothing died). Run it with `ci/build/build.sh --quick --tests` and read `build/logs`; paste a run here when cards land.
+
+First run (seed 20261026, 600 staffs, 2 s each): kills are rare (the best staff kills 2 of 7 imps, a beam with pierce); reactions are rarer (the best has 4, one kind, from lightning and storm staffs); no staff drops a shot at the pool, the most live shots are 105 (`burst wall mirror split echo`) and the slowest mean step is 0.18 ms. So random staffs mostly do little, and nothing needs a limit yet. Test: `test_report_ranking`.
+
 ## 2026-10-29: The first cards' looks (staffs C0)
 
 Review round: seen at 4x (`looks_hops_4x`, `looks_wake_4x` in `shot_looks.gd`), hops did not draw at all, for three reasons now fixed: its trail window (0.15 s) cut its particles, the spawn rate was read from the wrong table row (`kind_row` now maps kinds 13 and 14 to rows 16 and 17 everywhere), and its every-other-frame blink hid it whenever a still shot was captured on an even frame (now always shown; the dash lines jump sideways). Wake is brighter dashes. READMEs and comments updated.

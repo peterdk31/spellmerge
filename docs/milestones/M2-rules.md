@@ -2,7 +2,7 @@
 
 **Goal:** every card follows a small set of general rules on every carrier, with no special cases, so a player can try any combination and get the result the rules predict. A card that cannot mean anything on a carrier is listed as wasted, with the reason, before the cast. Nothing does nothing silently.
 
-**Status (2026-10-29):** planned, not started. The owner asked for "a pass that checks for the general rules, in which there are custom cases that break them" after a homing beam stopped homing at a wall (#453). An audit of the compiler, the runtime and the projectile manager (on main after #453) found 16 confirmed breaks and 7 suspected ones; they are below. Same day as "No limits on spell interactions" (#450).
+**Status (2026-10-29):** R1a done (echo, zaps, relay and jumps keep the whole hit; DECISIONS.md). Next: R1b. The owner asked for "a pass that checks for the general rules, in which there are custom cases that break them" after a homing beam stopped homing at a wall (#453). An audit of the compiler, the runtime and the projectile manager (on main after #453) found 16 confirmed breaks and 7 suspected ones; they are below. Same day as "No limits on spell interactions" (#450).
 
 **The owner's words:** "A general rule should be, that we dont limit the interactions, they follow the rules. Then player can then experiment and always get expected results." And: "It should be the general rule for everything."
 
@@ -67,7 +67,7 @@ Line numbers are from main after #453 and drift; the function names hold. The fi
 | hold | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ |
 | recoil | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | bounce | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ |
-| echo | ✓ | ✓ | ✓ | ✓(14) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| echo | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | linger | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | heavy / siphon / possess | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ |
 | sticky | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |

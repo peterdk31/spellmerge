@@ -334,32 +334,15 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 		spell.hit.knockback *= heavy
 		spell.hit.slam = roundi(float(spell.damage) * SpellLimits.SLAM_SHARE)
 	if spell.behaviour(ModifierBase.Behaviour.ECHO) > 0.0:
-		spell.echo_hit = HitProfile.new()
-		spell.echo_hit.damage = maxi(roundi(spell.damage * SpellLimits.ECHO_DAMAGE), 1)
-		spell.echo_hit.knockback = spell.hit.knockback
-		spell.echo_hit.element_id = spell.element_id
-		spell.echo_hit.element_ids = spell.element_ids
-		spell.echo_hit.status_id = spell.status_id
-		spell.echo_hit.status_duration = spell.status_duration
-		spell.echo_hit.status_strength = spell.status_strength
+		spell.echo_hit = spell.hit.scaled(SpellLimits.ECHO_DAMAGE, 1.0)
 	var arc: float = spell.behaviour(ModifierBase.Behaviour.ARC)
 	if arc > 0.0:
 		# Zaps per second add up over arc cards (a shot zaps at most once a physics step); a zap
 		# hits like a ray, at ARC_DAMAGE of the shot.
 		spell.arc_interval = 1.0 / arc
-		spell.arc_hit = HitProfile.new()
-		spell.arc_hit.damage = maxi(roundi(spell.hit.damage * SpellLimits.ARC_DAMAGE), 1)
-		spell.arc_hit.heal = roundi(spell.hit.heal * SpellLimits.ARC_DAMAGE)
-		spell.arc_hit.knockback = spell.hit.knockback * SpellLimits.ARC_DAMAGE
-		spell.arc_hit.element_id = spell.element_id
-		spell.arc_hit.element_ids = spell.element_ids
-		spell.arc_hit.status_id = spell.status_id
-		spell.arc_hit.status_duration = spell.status_duration
-		spell.arc_hit.status_strength = spell.status_strength
-		spell.arc_hit.later_status_ids = later_ids
-		spell.arc_hit.later_status_durations = later_durations
-		spell.arc_hit.later_status_strengths = later_strengths
-		spell.arc_hit.kind = &"ray"
+		spell.arc_hit = zap_hit(spell.hit)
+		if spell.echo_hit != null:
+			spell.echo_arc_hit = zap_hit(spell.echo_hit)
 	if trigger != null:
 		spell.trigger_id = trigger.id
 		spell.trigger_event = trigger.event
@@ -367,6 +350,14 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 	_cast.mana += spell.mana_cost
 	_cast.delay += spell.cooldown
 	return spell
+
+
+## What a zap (`arc`) of a shot that hits with `hit` does: the same hit, ray kind, at ARC_DAMAGE of
+## its strength and knockback. Spells asks it again for a shot whose hit changed (`relay`).
+static func zap_hit(hit: HitProfile) -> HitProfile:
+	var zap: HitProfile = hit.scaled(SpellLimits.ARC_DAMAGE, SpellLimits.ARC_DAMAGE)
+	zap.kind = &"ray"
+	return zap
 
 
 ## Whether homing can steer a carrier of `motion`: what it moves turns toward a target as it

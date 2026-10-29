@@ -34,3 +34,31 @@ var heal: int = 0
 var slam: int = 0
 ## The spell's own name, for "downed by your own <name>"; empty when not known.
 var source_name: String = ""
+
+
+## A new profile with everything this one has: every element and status, the kind, heal and slam.
+## For a hit that changes later (`relay`), so the shared one is never written.
+func copy() -> HitProfile:
+	return scaled(1.0, 1.0)
+
+
+## This hit at `share` of its strength (an echo, an arc zap): damage (at least 1), heal and slam
+## scaled, knockback by `knock_share`, and the rest (elements, statuses, kind) all kept, so a scaled
+## hit is the same hit, weaker: an echoed mend still heals, an echoed heavy hit still slams.
+func scaled(share: float, knock_share: float) -> HitProfile:
+	var made: HitProfile = HitProfile.new()
+	made.damage = damage if share == 1.0 else maxi(roundi(float(damage) * share), 1)
+	made.heal = heal if share == 1.0 else roundi(float(heal) * share)
+	made.slam = slam if share == 1.0 else roundi(float(slam) * share)
+	made.knockback = knockback * knock_share
+	made.element_id = element_id
+	made.element_ids = element_ids.duplicate()
+	made.status_id = status_id
+	made.status_duration = status_duration
+	made.status_strength = status_strength
+	made.later_status_ids = later_status_ids.duplicate()
+	made.later_status_durations = later_status_durations.duplicate()
+	made.later_status_strengths = later_status_strengths.duplicate()
+	made.kind = kind
+	made.source_name = source_name
+	return made

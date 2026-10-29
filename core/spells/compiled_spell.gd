@@ -46,7 +46,8 @@ var look: int = 0
 
 ## What a hit does, for `Spells.hit_profile`; set by the compiler.
 var hit: HitProfile = null
-## What an echo's second firing does: the hit at half damage. Null without an `echo` modifier.
+## What an echo's second firing does: the whole hit at ECHO_DAMAGE (heal, slam, every status
+## and the kind kept). Null without an `echo` modifier.
 var echo_hit: HitProfile = null
 
 ## Radians per second a shot turns toward a target; 0 means no homing.
@@ -66,6 +67,8 @@ var spread_mult: float = 1.0
 var arc_interval: float = 0.0
 var arc_reach: float = 0.0
 var arc_hit: HitProfile = null
+## An echoed shot's zap: `arc_hit` at ECHO_DAMAGE. Null without both `arc` and `echo`.
+var echo_arc_hit: HitProfile = null
 
 ## A `TriggerBase.Event` value, meaningful only when `payload` is not null.
 var trigger_event: int = TriggerBase.Event.HIT

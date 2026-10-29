@@ -231,6 +231,10 @@ var _rec_arc_clock: PackedFloat32Array = PackedFloat32Array()
 ## profile is the shot's `arc_hit` (see `hit_profile`).
 var _arcs_used: int = 0
 var _arc_spell: CompiledSpell = null
+## Slots of live shots with `magnet`, `_magnet_count` of them, flagged in `_rec_magnet`.
+var _magnets: PackedInt32Array = PackedInt32Array()
+var _magnet_count: int = 0
+var _rec_magnet: PackedByteArray = PackedByteArray()
 ## Slots of live shots with an `on hurt` trigger, `_hurt_count` of them, flagged in `_rec_hurt`.
 var _hurt_slots: PackedInt32Array = PackedInt32Array()
 var _hurt_count: int = 0
@@ -388,6 +392,7 @@ func _init() -> void:
 	_jq_prev.resize(JUMP_QUEUE)
 	_timers.resize(64)
 	_arcs.resize(64)
+	_magnets.resize(64)
 	_bm_on.resize(SpellLimits.BEAMS)
 	_bm_born.resize(SpellLimits.BEAMS)
 	_bm_spell.resize(SpellLimits.BEAMS)
@@ -855,6 +860,7 @@ func step(delta: float) -> void:
 			continue
 		i += 1
 	_step_arcs(delta)
+	_step_magnets()
 	_run_pending()
 
 
@@ -1459,6 +1465,7 @@ func _register(slot: int, tag: int, spell: CompiledSpell, fires: int, chain: int
 		_rec_timed.resize(size)
 		_rec_hurt.resize(size)
 		_rec_arc.resize(size)
+		_rec_magnet.resize(size)
 		_rec_arc_clock.resize(size)
 		_rec_relay.resize(size)
 		_hurt_slots.resize(size)
@@ -1493,6 +1500,12 @@ func _register(slot: int, tag: int, spell: CompiledSpell, fires: int, chain: int
 			_arcs[_arc_count] = slot
 			_arc_count += 1
 			_rec_arc[slot] = 1
+	if spell.behaviour(ModifierBase.Behaviour.MAGNET) > 0.0 and _rec_magnet[slot] == 0:
+		if _magnet_count == _magnets.size():
+			_magnets.resize(_magnets.size() * 2)
+		_magnets[_magnet_count] = slot
+		_magnet_count += 1
+		_rec_magnet[slot] = 1
 	if spell.payload != null and spell.trigger_event == TriggerBase.Event.HURT and _rec_hurt[slot] == 0:
 		_hurt_slots[_hurt_count] = slot
 		_hurt_count += 1
@@ -1967,6 +1980,24 @@ func _step_arcs(delta: float) -> void:
 		i += 1
 
 
+## Every `magnet` shot pulls the enemies within its card's reach toward where it is, each step
+## (`pull_requested`; combat keeps the pull as a push that the next pull replaces).
+func _step_magnets() -> void:
+	var i: int = 0
+	while i < _magnet_count:
+		var slot: int = _magnets[i]
+		if not _knows(slot):
+			_rec_magnet[slot] = 0
+			_magnet_count -= 1
+			_magnets[i] = _magnets[_magnet_count]
+			continue
+		var tag: int = projectiles.get_tag_of(slot)
+		var spell: CompiledSpell = _profiles.get(tag)
+		if spell != null:
+			events.pull_requested.emit(SpellTag.caster_of(tag), projectiles.get_position_of(slot), spell.behaviour(ModifierBase.Behaviour.MAGNET), SpellLimits.MAGNET_PULL, tag)
+		i += 1
+
+
 ## Shot `slot`'s zap: a short ray to the nearest body of another team within its `arc_reach`, hitting with its
 ## `arc_hit` (`hit_profile`). It is a hit of the shot like any other: it uses the shot's trigger
 ## fires and chain jumps, so `on hit` payloads and chains go off from the zapped body. With no
@@ -2323,6 +2354,8 @@ func clear() -> void:
 	delayed_dropped = 0
 	_timer_count = 0
 	_arc_count = 0
+	_magnet_count = 0
+	_rec_magnet.fill(0)
 	_rec_seq.fill(-1)
 	_rec_timed.fill(0)
 	_rec_arc.fill(0)

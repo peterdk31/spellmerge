@@ -1,0 +1,10 @@
+{
+	"id": "magnet_void_hex",
+	"name": "Magnet void hex",
+	"does": "A magnet void bolt pulls an imp off to the side into its path and hexes it.",
+	"casts": [{"staff": 0, "cards": ["magnet", "void", "bolt"]}],
+	"imps": [[130, 40]],
+	"pushed": true,
+	"seconds": 1.5,
+	"checks": [{"kind": "status", "imps": [0], "status": "hex"}]
+}

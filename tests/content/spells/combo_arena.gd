@@ -41,6 +41,9 @@ var reactions: Array = []
 var statuses: Array = []
 ## The most live shots seen after any step.
 var peak_shots: int = 0
+## When true, `run` moves the imps by the push combat keeps for them (a pull or a knockback); off,
+## imps stand where they are put.
+var pushable: bool = false
 ## Seconds of arena time that have passed.
 var time: float = 0.0
 
@@ -145,6 +148,10 @@ func run(seconds: float) -> void:
 		projectiles.step(STEP)
 		spells.step(STEP)
 		combat.step(STEP)
+		if pushable:
+			for imp in imps:
+				if is_instance_valid(imp):
+					imp.global_position += combat.consume_knockback(imp, STEP) * STEP
 		time += STEP
 		peak_shots = maxi(peak_shots, projectiles.get_count())
 

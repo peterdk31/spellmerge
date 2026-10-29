@@ -107,6 +107,12 @@ The owner's direction after B7a: "The 4 staffs should be mapped to lb/rb lt/rt i
 
 - **Relay is complexity 2, strength 1.0, no mana change.** The combo format gained two optional keys so a combo can show it: `mates` (`[x, y, player]`, a teammate's body that shots hit, `ComboArena.add_mate`) and a cast's `dir` (`[x, y]`). The donor teammate casts away from everything, then the relay bolt (with `pierce`) hits the donor's body and carries its element on to the imp behind. The imps in the arena cannot cast, so the "steal from an enemy" case stays in `test_spells_triggers.gd`. The clip recorder ignores the two keys, so the relay combos' clips show no teammate.
 
+## 2026-10-29: Magnet card (staffs C)
+
+- **Magnet reaches 70 px and pulls at 200 px/s** (`behaviour_strength`; `SpellLimits.MAGNET_PULL`), complexity 2, no mana change. Each step every live magnet shot sends `pull_requested` from where it is; combat keeps the pull as a push that the next pull replaces, so it does not pile up. Wizards are pulled or not as combat decides (`pull`). A bolt (220 px/s) drags an imp 40 px off its line into its path; 140 px/s was not enough.
+- **The engine hook was missing**, so this card added `Spells._step_magnets` (a list of magnet slots, like arc's). Magnet is listed as wasted on a payload that fires from a point (`TRAVEL_ONLY`).
+- **Combo arena imps can now be pushed**, opt in: `ComboArena.pushable`, and the combo key `pushed`. Off by default so other combos behave as before. The clip recorder ignores `pushed`, so the magnet clips show no pull.
+
 ## 2026-10-29: Heavy card (staffs C)
 
 - **Heavy is knockback x4 and speed x0.6**, complexity 2, no mana change. The slam is combat's (`SLAM_SHARE`: as much as the hit's damage). The combos put the wall within 12 px of the imp (combat looks `SLAM_REACH` past its hurt circle), because arena imps are not moved by knockback.

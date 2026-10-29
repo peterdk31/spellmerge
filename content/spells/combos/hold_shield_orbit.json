@@ -1,0 +1,11 @@
+{
+	"id": "hold_shield_orbit",
+	"name": "Hold shield orbit",
+	"does": "A barrier ring that stays on: its wards stop an enemy shot flying at the caster, and it still circles after an orbit's three seconds.",
+	"casts": [{"staff": 0, "cards": ["hold", "shield", "orbit"]}],
+	"imps": [[36, 0]],
+	"guard": true,
+	"foes": [[61, 35]],
+	"seconds": 4.0,
+	"checks": [{"kind": "damaged", "imps": [0]}, {"kind": "blocked", "min": 1}]
+}

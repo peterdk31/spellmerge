@@ -1,0 +1,9 @@
+{
+	"id": "hold_fire_orbit",
+	"name": "Hold fire orbit",
+	"does": "A ring of fire that does not run out: it circles the caster well past an orbit's three seconds and lights an imp that comes close.",
+	"casts": [{"staff": 0, "cards": ["hold", "fire", "orbit"]}],
+	"imps": [[36, 0]],
+	"seconds": 4.0,
+	"checks": [{"kind": "status", "imps": [0], "status": "burn"}]
+}

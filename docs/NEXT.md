@@ -16,7 +16,6 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
 - [x] **Card: linger (staffs C).** After B1. Data only (M2-staffs.md, "Working in parallel").
 - [x] **Card rules: the compiler says what does nothing (rules R2).** Done (#468). (`core/spells/`, builder text) Design: [M2-rules.md](milestones/M2-rules.md), "R2". One table `behaviour × motion` (runs, or a reason a player understands) kept next to the runtime that asks it (R2a); `trigger_runs(event, motion)` for triggers (R2b); the builder and staff view show the reasons (R2c). Tests: every ✗ of the audit matrix that R4 does not turn into ✓ is listed as wasted with a reason; the melee carriers (swing, slam) are in the matrix.
 - [x] **Card rules: the permanent check (rules R3).** Done (landed with #468; the rule 2 checks are deferred to `docs/BACKLOG.md`). (`tests/core/test_card_rules.gd`) After R2. Finds every modifier, trigger, infusion and multicast card and every carrier by itself; a card is either listed as wasted with a reason or changes a recorded trace; per-behaviour probes; a behaviour or event with no probe fails with "no probe for `<name>`"; prints the matrix. See M2-rules.md, "R3" and "Automatic discovery".
-- [ ] **Clip recorder: combo `mates` and cast `dir`.** `tests/clips/scenarios.gd` ignores them, so the clips of `relay_teammate_frost` and `relay_teammate_fire` show a bolt hitting nothing; teach the recorder both keys. (Moved up from "Done recently" on 2026-10-29.)
 - [ ] **Stress and C2 (staffs D3).** Last: when every other task in both lanes has merged, R4 included. Then the C2 checkpoint, with the owner's sandbox playtest on `/preview/`.
 
 ## Owner lane
@@ -60,6 +59,8 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 ## Blocked
 
 ## Done recently
+
+- [x] **Clip recorder: combo `mates` and cast `dir`.** `scenarios.gd` keeps both (`mates` as `{at, player}`, a cast's `dir` as its `aim`); `stage.gd` stands each mate as a wizard body that shots hit. Tests in `test_clip_scenarios.gd`.
 
 - [x] **Freezes in co-op (melee I7).** A hit or a kill holds only its attacker, target and shot (`Actors.hold`, `Projectiles.freeze_shot`); a reaction holds its caster; `Engine.time_scale` drops only for a downed player and a boss kill (`EnemyBase.boss`). Tests: `test_feel_local_stop.gd`, `test_projectiles_freeze.gd`. **Still to do when I5 lands:** the parry's local stop (call `_hold_bodies` from the parry's event).
 

@@ -6,8 +6,11 @@ extends RefCounted
 ##
 ## A scenario is a Dictionary: `id` (the clip's folder name, `^[a-z0-9_]{1,60}$`), `kind` (one
 ## of the kinds in ci/smbot/clips.py), `title`, `imps` (Vector2s, from the caster at (0, 0)),
-## `casts` (each `player`, `staff`, `cards`: card ids by slot, `at` seconds, `origin` and `aim`)
-## and `seconds`.
+## `mates` (each a teammate's body that shots can hit: `at` Vector2 and `player`), `casts` (each
+## `player`, `staff`, `cards`: card ids by slot, `at` seconds, `origin` and `aim`) and `seconds`.
+## A combo row's `mates` ([x, y, player]) and cast `dir` ([x, y], along +x when left out) are kept.
+## A cast always starts at the origin (as in `combo_arena.gd`), whoever the player is; a mate is
+## only the body a bolt meets.
 ## Ids: `combo_<id>`, `<kind>_<id>` for a component (`element_fire`), `reaction_<id>` and
 ## `reaction_<id>_coop`. The kind prefix keeps the combo "shatter" and the reaction "shatter"
 ## apart.
@@ -102,8 +105,18 @@ static func _combo(combo: Dictionary) -> Dictionary:
 		imps.append(Vector2(float(at[0]), float(at[1])))
 	var casts: Array[Dictionary] = []
 	for entry: Dictionary in combo.get("casts", []):
-		casts.append(_cast(int(entry.get("player", 0)), int(entry["staff"]), entry["cards"] as Array, float(entry.get("at", 0.0))))
-	return _scenario("combo_" + str(combo["id"]), "combo", str(combo.get("name", combo["id"])), imps, casts, float(combo.get("seconds", 1.0)))
+		var made: Dictionary = _cast(int(entry.get("player", 0)), int(entry["staff"]), entry["cards"] as Array, float(entry.get("at", 0.0)))
+		var dir: Array = entry.get("dir", [1, 0])
+		var aim: Vector2 = Vector2(float(dir[0]), float(dir[1]))
+		if not aim.is_zero_approx():
+			made["aim"] = aim.normalized()
+		casts.append(made)
+	var scenario: Dictionary = _scenario("combo_" + str(combo["id"]), "combo", str(combo.get("name", combo["id"])), imps, casts, float(combo.get("seconds", 1.0)))
+	var mates: Array[Dictionary] = []
+	for mate: Array in combo.get("mates", []):
+		mates.append({"at": Vector2(float(mate[0]), float(mate[1])), "player": int(mate[2])})
+	scenario["mates"] = mates
+	return scenario
 
 
 static func _component(id: StringName, kind: StringName, title: String) -> Dictionary:

@@ -1,0 +1,10 @@
+{
+	"id": "on_wall_bolt_rune",
+	"name": "On wall bolt rune",
+	"does": "A bolt flies at the wall ahead and a fire rune is laid where it strikes, lighting an imp that stands by the wall off the aim.",
+	"casts": [{"staff": 0, "cards": ["on_wall", "bolt", "fire", "rune"]}],
+	"imps": [[70, 17]],
+	"walls": [[80, -200, 16, 400]],
+	"seconds": 2.0,
+	"checks": [{"kind": "status", "imps": [0], "status": "burn"}]
+}

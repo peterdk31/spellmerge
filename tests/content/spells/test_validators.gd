@@ -178,6 +178,23 @@ func test_a_form_needs_what_its_motion_uses() -> void:
 	check_equal(SpellValidator.check_component(form, _listed()).size(), 0, "a rune needs nothing more")
 
 
+func test_a_staff_pose_must_be_known_keys_in_order_and_in_range() -> void:
+	var form := _fine(FormBase.new()) as FormBase
+	form.motion = FormBase.Motion.STILL
+	form.staff_pose = [{"phase": "wind", "at": 1.0, "lift": 10, "push": -5, "ease": "out", "mood": "angry"}, {"phase": "after", "at": 0.1}] as Array[Dictionary]
+	check_equal(SpellValidator.check_component(form, _listed()).size(), 0, "two keys in order are fine")
+	form.staff_pose = [{"phase": "later", "at": 0.1}] as Array[Dictionary]
+	check(_has_rule(SpellValidator.check_component(form, _listed()), "pose"), "an unknown phase is reported")
+	form.staff_pose = [{"phase": "after", "at": 0.1}, {"phase": "wind", "at": 1.0}] as Array[Dictionary]
+	check(_has_rule(SpellValidator.check_component(form, _listed()), "pose"), "a key before the one before it is reported")
+	form.staff_pose = [{"phase": "after", "at": 0.1, "glow": 2.0}] as Array[Dictionary]
+	check(_has_rule(SpellValidator.check_component(form, _listed()), "pose"), "a glow above 1 is reported")
+	form.staff_pose = [{"phase": "after", "at": 0.1, "wobble": 1.0}] as Array[Dictionary]
+	check(_has_rule(SpellValidator.check_component(form, _listed()), "pose"), "an unknown channel is reported")
+	form.staff_pose = [{"phase": "after", "at": 0.1, "mood": "sleepy"}] as Array[Dictionary]
+	check(_has_rule(SpellValidator.check_component(form, _listed()), "pose"), "an unknown mood is reported")
+
+
 func test_an_icon_missing_from_the_manifest_is_reported() -> void:
 	var element := _component("res://content/spells/elements/fire/fire.tres")
 	check_equal(SpellValidator.check_component(element, _manifest()).size(), 0, "fire is fine with the real manifest")

@@ -153,3 +153,22 @@ func test_strays_hop_while_walking_and_the_face_goes_with_them() -> void:
 		look.step(AiFixture.STEP)
 		highest = maxf(highest, look.lift())
 	check(highest <= CreatureLook.HOP_IDLE, "standing, it only bobs (got %.1f)" % highest)
+
+
+func test_a_stray_plays_its_carriers_staff_animation() -> void:
+	# The Bone Scepter casts void · rain · nova: its rain's animation raises the staff, glowing,
+	# until the rain falls, as a wizard's does (ActorLook's pose, shared by every look).
+	var world := AiFixture.new(root, 1)
+	world.players[0].position = Vector2(70.0, 0.0)
+	var body: Actor = world.enemy(STRAYS[4].scene, STRAYS[4], Vector2.ZERO)
+	var look := body.get_node(^"CreatureLook") as CreatureLook
+	var sprite := body.get_node(^"Sprite") as Sprite2D
+	var glowed: bool = false
+	var highest: float = 0.0
+	for step in 480:
+		world.run_all(1)
+		glowed = glowed or look.is_glowing(sprite)
+		highest = maxf(highest, look.lift())
+	check(glowed, "its staff glowed while it cast")
+	check(highest > CreatureLook.HOP_HEIGHT + 1.0, "and rose higher than a hop: %f" % highest)
+	world.free_all()

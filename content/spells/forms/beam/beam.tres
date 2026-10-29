@@ -24,3 +24,4 @@ pierce = 0
 ray_length = 240.0
 cast_look = {"seconds": 0.16, "size": 0.7, "stretch": 3.4, "tall": 0.5, "grow": 0.2}
 impact_look = {"seconds": 0.16, "size": 0.7, "stretch": 1.8, "aim": true, "grow": 0.2}
+staff_pose = Array[Dictionary]([{"phase": "hold", "at": 0.06, "push": -2, "stretch": 0.1, "glow": 0.5, "shake": 0.5, "ease": "out", "mood": "angry"}, {"phase": "hold", "at": 0.16, "push": -2, "stretch": 0.1, "glow": 0.3, "shake": 0.5}, {"phase": "after", "at": 0.15}])

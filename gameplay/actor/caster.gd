@@ -14,7 +14,7 @@ extends ActorComponent
 ## card on (then only a new press casts, which switches it off). `cast(at)` casts from the staff
 ## tip (`Actor.muzzle_position`, clipped to walls from the feet) along the actor's aim with the
 ## free mana (`free_mana`: what it has minus what its sustained cards hold) and pays what Spells
-## took, then sends `actor_cast` (any actor's cast, for Feel's squash).
+## took, then sends `actor_cast` (any actor's cast, for visual reactions).
 ##
 ## For an AI: `cast_ready(within)` says the next cast can leave within that many seconds with the
 ## mana there (so a telegraph always comes true), `next_cast_mana`, `next_cast_reach` and

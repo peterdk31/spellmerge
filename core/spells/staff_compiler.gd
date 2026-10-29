@@ -380,6 +380,7 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 		spell.ray_length = form.ray_length
 		spell.arc = form.arc
 		spell.wind_up = form.wind_up
+		spell.staff_pose = form.packed_pose()
 		spell.spread = form.spread
 		damage = form.base_damage
 		mana = form.mana_cost

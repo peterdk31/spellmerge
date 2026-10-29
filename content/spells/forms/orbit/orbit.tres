@@ -24,3 +24,4 @@ pierce = 4
 orbit_radius = 36.0
 cast_look = {"seconds": 0.2, "size": 0.7, "stretch": 1.0, "tall": 1.0, "aim": false, "grow": -0.6, "ring": true}
 impact_look = {"seconds": 0.07, "size": 0.35, "grow": 0.0}
+staff_pose = Array[Dictionary]([{"phase": "after", "at": 0.12, "turn": -180, "glow": 0.4, "ease": "in"}, {"phase": "after", "at": 0.26, "turn": -360, "ease": "out"}])

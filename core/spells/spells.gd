@@ -418,14 +418,28 @@ var _sw_last_side: PackedInt32Array = PackedInt32Array()
 var _sw_last_end: PackedFloat32Array = PackedFloat32Array()
 ## actor -> when its last swing started: the swings of one cast (a split, a mirror) turn the same way.
 var _sw_last_start: PackedFloat32Array = PackedFloat32Array()
-## actor -> its body's last swing, for its look (`swing_pose`): when it began (INF for none), its
-## wind-up and sweep in seconds, half its arc in radians, the locked aim and which way it turned.
+## actor -> its body's last staff animation (`staff_pose`): when it began (INF for none), the
+## carrier's wind-up and strike in seconds (its strike ends early when its last shot does: the tag
+## it plays for), the aim locked at the cast, which way it turns (a swing's side), its keys
+## (`FormBase.packed_pose`), the carrier's tint (its glow's colour), and where the staff was when it
+## began (POSE_CHANNELS numbers a body, in its own frame: what the first key starts from).
 var _pose_start: PackedFloat32Array = PackedFloat32Array()
 var _pose_wind: PackedFloat32Array = PackedFloat32Array()
-var _pose_sweep: PackedFloat32Array = PackedFloat32Array()
-var _pose_half: PackedFloat32Array = PackedFloat32Array()
+var _pose_strike: PackedFloat32Array = PackedFloat32Array()
+var _pose_tag: PackedInt64Array = PackedInt64Array()
 var _pose_dir: PackedVector2Array = PackedVector2Array()
+## 1 when the animation keeps the aim of the cast (a swing, a slam: their aim is locked), 0 when
+## it turns with the live aim (a held beam follows it).
+var _pose_lock: PackedByteArray = PackedByteArray()
 var _pose_side: PackedInt32Array = PackedInt32Array()
+var _pose_keys: Array[PackedFloat32Array] = []
+var _pose_tint: PackedColorArray = PackedColorArray()
+var _pose_from: PackedFloat32Array = PackedFloat32Array()
+## The pose worked out last (`_pose_now`), for whom and when: the channels and the mood.
+var _pose_out: PackedFloat32Array = PackedFloat32Array()
+var _pose_out_mood: int = 0
+var _pose_out_actor: int = -1
+var _pose_out_clock: float = -1.0
 ## actor -> the wizard's staff tip and aim from `set_aim` (INF when it holds none), and 1 once
 ## the actor has sent one (a test that never does keeps its beams where they were cast).
 var _aim_origin: PackedVector2Array = PackedVector2Array()
@@ -469,10 +483,15 @@ func _init() -> void:
 	_pose_start.resize(ACTORS)
 	_pose_start.fill(INF)
 	_pose_wind.resize(ACTORS)
-	_pose_sweep.resize(ACTORS)
-	_pose_half.resize(ACTORS)
+	_pose_strike.resize(ACTORS)
 	_pose_dir.resize(ACTORS)
 	_pose_side.resize(ACTORS)
+	_pose_keys.resize(ACTORS)
+	_pose_tag.resize(ACTORS)
+	_pose_lock.resize(ACTORS)
+	_pose_tint.resize(ACTORS)
+	_pose_from.resize(ACTORS * POSE_CHANNELS)
+	_pose_out.resize(POSE_CHANNELS)
 	_ring.resize(ACTORS * SpellLimits.STAFFS)
 	_ring.fill(-1)
 	_cooldown.resize(ACTORS * SpellLimits.STAFFS)
@@ -811,6 +830,7 @@ func shot_ended(tag: int) -> void:
 	if live == 1:
 		_live.erase(tag)
 		_end_hold_of(tag)
+		_end_pose_strike(tag)
 	else:
 		_live[tag] = live - 1
 	var key: int = SpellTag.generation_key(tag)
@@ -987,6 +1007,11 @@ func _launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direct
 	var made: int = 0
 	var carried: int = spell.chain_jumps if chain < 0 else chain
 	var lifetime: float = SpellLimits.HOLD_LIFETIME if _holds(spell, tag) else spell.lifetime
+	# Any carrier may move the staff (its card's `staff_pose`); a swing's and a slam's start theirs
+	# with their own wind-up, side and strike.
+	if not spell.staff_pose.is_empty() and spell.motion != FormBase.Motion.SWING and spell.motion != FormBase.Motion.SLAM:
+		if _caster == CASTER_WIZARD and actor >= 0 and actor < ACTORS and _pose_start[actor] != _clock and direction.is_finite() and not direction.is_zero_approx():
+			_start_pose(actor, spell, tag, maxf(spell.wind_up, 0.0), _pose_strike_of(spell, lifetime), direction.normalized(), up_side(direction))
 	if spell.motion == FormBase.Motion.DASH or spell.motion == FormBase.Motion.TELEPORT:
 		return _move_caster(spell, tag, actor, origin, direction)
 	if spell.motion == FormBase.Motion.DECOY or spell.motion == FormBase.Motion.FAMILIAR:
@@ -2219,12 +2244,7 @@ func _start_swing(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, h
 		if mine and _aim_pivot[actor].is_finite():
 			_sw_origin[at] = _aim_pivot[actor]
 		if mine and first:
-			_pose_start[actor] = _clock
-			_pose_wind[actor] = wind
-			_pose_sweep[actor] = maxf(spell.lifetime, 0.001)
-			_pose_half[actor] = half
-			_pose_dir[actor] = _sw_dir[at]
-			_pose_side[actor] = side
+			_start_pose(actor, spell, tag, wind, maxf(spell.lifetime, 0.001), _sw_dir[at], side, true)
 	elif _caster_shot() < 0:
 		_sw_caster[at] = CASTER_POINT
 	shot_started(tag)
@@ -2453,6 +2473,8 @@ func _start_slam(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, he
 	if _caster == CASTER_WIZARD:
 		if mine and _aim_pivot[actor].is_finite():
 			_sl_origin[at] = _aim_pivot[actor]
+		if mine and _pose_start[actor] != _clock:
+			_start_pose(actor, spell, tag, _sl_wind[at], maxf(spell.lifetime, 0.001), _sl_dir[at], up_side(_sl_dir[at]), true)
 	elif _caster_shot() < 0:
 		_sl_caster[at] = CASTER_POINT
 	shot_started(tag)
@@ -2653,31 +2675,206 @@ func _step_swings(delta: float) -> void:
 			_swing_step(at, delta)
 
 
-## The way `actor`'s staff points now for its look while it swings (melee I2), or
-## `Vector2.ZERO` when it is not swinging (the look follows the aim). It leans back over the
-## wind-up, sweeps the arc and SWING_LEAN past each end, holds SWING_HOLD seconds, then settles
-## back onto the aim locked at the cast over SWING_SETTLE; a swing chained on takes over where
-## this one ended. A swing cast by a shot or a point moves no body.
-func swing_pose(actor: int) -> Vector2:
-	if actor < 0 or actor >= ACTORS or not is_finite(_pose_start[actor]):
-		return Vector2.ZERO
-	var s: float = _clock - _pose_start[actor]
-	var lean: float = _pose_half[actor] + deg_to_rad(SpellLimits.SWING_LEAN)
-	var wind: float = _pose_wind[actor]
-	var sweep: float = _pose_sweep[actor]
-	var turn: float = 0.0
-	if s < wind:
-		var x: float = s / wind
-		turn = -lean * (1.0 - (1.0 - x) * (1.0 - x))
-	elif s < wind + sweep:
-		turn = lerpf(-lean, lean, swing_ease((s - wind) / sweep))
-	elif s < wind + sweep + SpellLimits.SWING_HOLD:
-		turn = lean
-	elif s < wind + sweep + SpellLimits.SWING_HOLD + SpellLimits.SWING_SETTLE:
-		turn = lerpf(lean, 0.0, swing_ease((s - wind - sweep - SpellLimits.SWING_HOLD) / SpellLimits.SWING_SETTLE))
+## Numbers a pose has: FormBase.POSE_CHANNELS (turn, lift, push, glow, stretch, shake).
+const POSE_CHANNELS: int = 6
+
+
+## How long `spell`'s strike lasts for its staff animation (`FormBase.staff_pose`): the working time
+## of a carrier the staff keeps working (a beam's, rain's or dash's `lifetime`, a held one's until its
+## last shot ends); none for one that leaves the staff (a bolt, a rune, an orbit).
+static func _pose_strike_of(spell: CompiledSpell, lifetime: float) -> float:
+	match spell.motion:
+		FormBase.Motion.RAY, FormBase.Motion.RAIN, FormBase.Motion.DASH:
+			return maxf(lifetime, 0.0)
+	return 0.0
+
+
+## Starts `actor`'s staff animation for `spell` (its `staff_pose`, cast with `tag`) now: `wind` and
+## `strike` seconds of wind-up and strike, the aim `dir` locked now, turning `side` (1, or -1 for a
+## backhand). It starts from where the last one has the staff now, so a new cast never jumps.
+func _start_pose(actor: int, spell: CompiledSpell, tag: int, wind: float, strike: float, dir: Vector2, side: int, lock: bool = false) -> void:
+	var at: int = actor * POSE_CHANNELS
+	var was: Vector2 = staff_pose_dir(actor)
+	if was.is_zero_approx():
+		for c in POSE_CHANNELS:
+			_pose_from[at + c] = 0.0
 	else:
+		_pose_now(actor)
+		var heading: float = was.angle() + deg_to_rad(_pose_out[0]) * _pose_side[actor]
+		for c in POSE_CHANNELS:
+			_pose_from[at + c] = _pose_out[c]
+		_pose_from[at] = rad_to_deg(angle_difference(dir.angle(), heading)) * side
+	_pose_out_actor = -1
+	if spell.staff_pose.is_empty():
+		_pose_start[actor] = INF
+		return
+	_pose_start[actor] = _clock
+	_pose_wind[actor] = wind
+	_pose_strike[actor] = strike
+	_pose_tag[actor] = tag
+	_pose_dir[actor] = dir
+	_pose_lock[actor] = 1 if lock else 0
+	_pose_side[actor] = side
+	_pose_keys[actor] = spell.staff_pose
+	_pose_tint[actor] = spell.tint
+
+
+## The carrier with `tag` has no shot left: the strike of the animation it plays ends now.
+func _end_pose_strike(tag: int) -> void:
+	var actor: int = SpellTag.caster_of(tag)
+	if actor < 0 or actor >= ACTORS or not is_finite(_pose_start[actor]) or _pose_tag[actor] != tag:
+		return
+	var into: float = maxf(_clock - _pose_start[actor] - _pose_wind[actor], 0.0)
+	if into < _pose_strike[actor]:
+		_pose_strike[actor] = into
+		_pose_out_actor = -1
+
+
+## Where `actor`'s staff is in its animation now (its carrier's `staff_pose`), for its look: x the
+## turn off the aim locked at the cast (radians, a backhand's the other way), y the lift and z the
+## push along that aim (pixels). Zero when it plays none: then `staff_pose_dir` is zero too and the
+## look follows the aim. A new animation starts from where the last one had the staff.
+func staff_pose(actor: int) -> Vector3:
+	if not _pose_now(actor):
+		return Vector3.ZERO
+	return Vector3(deg_to_rad(_pose_out[0]) * _pose_side[actor], _pose_out[1], _pose_out[2])
+
+
+## How strongly `actor`'s staff glows now (0 to 1), and in what colour: its carrier's infusion's,
+## or white for a plain one (the look takes the player's colour then).
+func staff_glow(actor: int) -> float:
+	return _pose_out[3] if _pose_now(actor) else 0.0
+
+
+func staff_glow_tint(actor: int) -> Color:
+	return _pose_tint[actor] if actor >= 0 and actor < ACTORS else Color.WHITE
+
+
+## How much `actor`'s staff is stretched along its aim now (0 none, negative squashed), and the
+## pixels it shakes by.
+func staff_stretch(actor: int) -> float:
+	return _pose_out[4] if _pose_now(actor) else 0.0
+
+
+func staff_shake(actor: int) -> float:
+	return _pose_out[5] if _pose_now(actor) else 0.0
+
+
+## The mood `actor`'s staff animation shows on its face now (`FormBase.POSE_MOODS`), or empty.
+func staff_mood(actor: int) -> StringName:
+	if not _pose_now(actor) or _pose_out_mood <= 0:
+		return &""
+	return FormBase.POSE_MOODS[_pose_out_mood - 1]
+
+
+## The aim `actor`'s staff animation turns from, or zero when it plays none: the aim of the cast
+## for a carrier that locks it (a swing, a slam), else the live aim (a held beam turns with it).
+func staff_pose_dir(actor: int) -> Vector2:
+	if not _pose_now(actor):
 		return Vector2.ZERO
-	return _pose_dir[actor].rotated(turn * _pose_side[actor])
+	if _pose_lock[actor] == 0 and _aim_dir[actor].is_finite() and not _aim_dir[actor].is_zero_approx():
+		return _aim_dir[actor]
+	return _pose_dir[actor]
+
+
+## Works out `actor`'s animation now into `_pose_out` and `_pose_out_mood` (once per actor and
+## clock); false when it plays none (none started, or past its last key). The keys run from where
+## the staff was at the cast; "hold" keys repeat, each round from the last of them, while the
+## strike lasts. Allocation-free.
+func _pose_now(actor: int) -> bool:
+	if actor < 0 or actor >= ACTORS or not is_finite(_pose_start[actor]):
+		return false
+	if _pose_out_actor == actor and _pose_out_clock == _clock:
+		return _pose_out_mood >= 0
+	_pose_out_actor = actor
+	_pose_out_clock = _clock
+	var keys: PackedFloat32Array = _pose_keys[actor]
+	var s: float = _clock - _pose_start[actor]
+	var wind: float = _pose_wind[actor]
+	var strike: float = _pose_strike[actor]
+	var stride: int = FormBase.POSE_STRIDE
+	var count: int = keys.size() / stride
+	# Where the last key passed left the staff (the start: where it was at the cast), and when.
+	var base: int = actor * POSE_CHANNELS
+	var from_key: int = -1
+	var from_t: float = 0.0
+	var mood: int = 0
+	var k: int = 0
+	while k < count:
+		var phase: int = roundi(keys[k * stride + FormBase.PK_PHASE])
+		if phase == FormBase.POSE_PHASES["hold"]:
+			# The run of hold keys, played round and round through the strike.
+			var first: int = k
+			while k < count and roundi(keys[k * stride + FormBase.PK_PHASE]) == phase:
+				k += 1
+			var last: int = k - 1
+			var period: float = keys[last * stride + FormBase.PK_AT]
+			if s < wind and strike > 0.0:
+				# Still winding up past its last wind key: it stays there until the strike.
+				return _pose_between(keys, actor, from_key, first, 0.0, mood)
+			if s >= wind and s < wind + strike and period > 0.0:
+				var into: float = s - wind
+				var round_n: int = floori(into / period)
+				var u: float = into - round_n * period
+				var h_from: int = from_key if round_n == 0 else last
+				var h_t: float = 0.0
+				for h in range(first, last + 1):
+					var t: float = keys[h * stride + FormBase.PK_AT]
+					if u < t:
+						return _pose_between(keys, actor, h_from, h, clampf((u - h_t) / (t - h_t), 0.0, 1.0) if t > h_t else 1.0, mood)
+					h_from = h
+					h_t = t
+					mood = _mood_of(keys, h, mood)
+				return _pose_between(keys, actor, h_from, h_from, 1.0, mood)
+			if s >= wind + strike or strike <= 0.0:
+				from_key = last if strike > 0.0 else from_key
+				from_t = wind + strike
+			continue
+		var at: float = keys[k * stride + FormBase.PK_AT]
+		var t: float = at * wind if phase == 0 else (wind + at * strike if phase == 1 else wind + strike + at)
+		if s < t:
+			return _pose_between(keys, actor, from_key, k, clampf((s - from_t) / (t - from_t), 0.0, 1.0) if t > from_t else 1.0, mood)
+		from_key = k
+		from_t = t
+		mood = _mood_of(keys, k, mood)
+		k += 1
+	_pose_out_mood = -1
+	return false
+
+
+## The mood shown once key `k` is passed: its own, else the one before.
+static func _mood_of(keys: PackedFloat32Array, k: int, mood: int) -> int:
+	var own: int = roundi(keys[k * FormBase.POSE_STRIDE + FormBase.PK_MOOD])
+	return own if own > 0 else mood
+
+
+## Puts into `_pose_out` the pose `x` of the way from key `from` (-1: where the staff was at the
+## cast) to key `to`, eased by `to`'s ease, with `mood`; true.
+func _pose_between(keys: PackedFloat32Array, actor: int, from: int, to: int, x: float, mood: int) -> bool:
+	var stride: int = FormBase.POSE_STRIDE
+	var eased: float = pose_ease(x, roundi(keys[to * stride + FormBase.PK_EASE]))
+	for c in POSE_CHANNELS:
+		var a: float = _pose_from[actor * POSE_CHANNELS + c] if from < 0 else keys[from * stride + FormBase.PK_CHANNELS + c]
+		_pose_out[c] = lerpf(a, keys[to * stride + FormBase.PK_CHANNELS + c], eased)
+	_pose_out_mood = mood
+	return true
+
+
+## The side a staff animation turns for a carrier that is no swing: the one where a negative turn
+## lifts the head (toward the top of the screen) whichever way it faces.
+static func up_side(aim: Vector2) -> int:
+	return 1 if aim.x >= 0.0 else -1
+
+
+## `x` (0 to 1) of the way into a key, eased by `ease` (`FormBase.POSE_EASES`: 0 slow, fast, slow;
+## 1 slowing into the key; 2 speeding up into it).
+static func pose_ease(x: float, ease: int) -> float:
+	match ease:
+		1:
+			return 1.0 - (1.0 - x) * (1.0 - x)
+		2:
+			return x * x
+	return swing_ease(x)
 
 
 ## The live swings, for their look (`gameplay/feel`): `swing_slots()` rows, each on or off. A

@@ -1,0 +1,11 @@
+{
+	"id": "on_block_bolt_nova",
+	"name": "On block bolt nova",
+	"does": "A shielded bolt flies at an enemy shot and stops it; where it blocks, a frost nova bursts and chills an imp standing there.",
+	"casts": [{"staff": 0, "cards": ["shield", "on_block", "bolt", "frost", "nova"]}],
+	"imps": [[50, 25]],
+	"guard": true,
+	"foes": [[100, 0]],
+	"seconds": 2.0,
+	"checks": [{"kind": "blocked", "min": 1}, {"kind": "status", "imps": [0], "status": "chill"}]
+}

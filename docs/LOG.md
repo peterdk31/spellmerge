@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-29: Card on block (staffs C)
+
+Added the On Block trigger (data only: `.tres`, icon, assets, lore), two combos (`on_block_dash_nova`, `on_block_bolt_nova`) and `test_on_block.gd`. All unit tests pass except `test_svg_art` on the Shield icon, already on main (see BACKLOG).
+
 ## 2026-10-29: Card mend (staffs C)
 
 Added the Mend infusion (`.tres`, icon, assets, lore), two combos (`mend_blast_self`, `mend_pierce_party`) and `test_mend.gd`. The combo arena gained hurt wizard bodies and heal checks. All unit tests pass except `test_svg_art` on the Shield icon, already on main (see BACKLOG).

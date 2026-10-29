@@ -1,0 +1,11 @@
+{
+	"id": "on_block_dash_nova",
+	"name": "On block dash nova",
+	"does": "A shielded dash puts a barrier on the caster; when it stops an enemy shot, a fire nova bursts at the caster and lights an imp standing close.",
+	"casts": [{"staff": 0, "cards": ["shield", "on_block", "dash", "fire", "nova"]}],
+	"imps": [[0, 22]],
+	"guard": true,
+	"foes": [[30, 0]],
+	"seconds": 1.5,
+	"checks": [{"kind": "blocked", "min": 1}, {"kind": "status", "imps": [0], "status": "burn"}]
+}

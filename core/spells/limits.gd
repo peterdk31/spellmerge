@@ -83,6 +83,19 @@ const LAND_CLEARANCE: float = 6.0
 const BEAM_LEGS: int = 8
 ## Each homing card after the first multiplies the turn rate (and an instant carrier's bend) by this.
 const HOMING_STACK: float = 1.5
+## Live swings at once over every caster (one more ends the oldest), and the most bodies one
+## swing can hit (it hits each once).
+const SWINGS: int = 64
+const SWING_TARGETS: int = 16
+## A swing cast within this many seconds of the last one's sweep ending chains straight on: no
+## wind-up, the other way round (melee I2; the playground's chain window).
+const SWING_CHAIN: float = 0.25
+## Degrees the staff leans back past the start of the arc before a sweep and swings on past its
+## end; the sweep's ease runs over the whole turn, and only the arc itself hits.
+const SWING_LEAN: float = 22.5
+## Seconds a swinging body holds at the end of its swing, then settles back onto its aim (its look).
+const SWING_HOLD: float = 0.08
+const SWING_SETTLE: float = 0.3
 ## Moves of shots at once whose end point is still to come (a dash whose caster is a shot).
 const SHOT_MOVES: int = 64
 

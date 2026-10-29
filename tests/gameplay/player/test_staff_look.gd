@@ -3,7 +3,8 @@ extends "res://tests/support/suite.gd"
 ## staff button puts its own head and personality on show, and the shot leaves from that head's
 ## tip in every direction; pressing an empty staff still shows it; the staff hovers on the hand
 ## and the face goes with it; down, it lies flat with its eyes shut, and stands up again when
-## revived; the hurt circle covers the face and the grip. The real wizard scene and the four
+## revived; the hurt circle covers the face and the grip; while it swings (melee I2) the body
+## shows the column of its swing, not of its aim. The real wizard scene and the four
 ## starter heads, on the stand-in spell runtime.
 ##
 ## godot --headless --path . --script res://tests/gameplay/player/test_staff_look.gd
@@ -124,3 +125,19 @@ func test_the_hurt_circle_covers_the_face_and_the_grip() -> void:
 	check(eyes.distance_to(hurtbox.offset) <= hurtbox.radius, "the eyes are inside the hurt circle")
 	check(body.hand_offset.distance_to(hurtbox.offset) <= hurtbox.radius, "and so is the grip")
 	check(hurtbox.radius >= 8.0, "as big as the wizard's was")
+
+
+func test_while_it_swings_the_body_shows_the_swing_not_the_aim() -> void:
+	var body := _wizard()
+	var look: StaffLook = WizardFixture.look(body)
+	var sprite := body.get_node(^"Sprite") as Sprite2D
+	_world.input.send_virtual_aim(0, Vector2.RIGHT)
+	_world.run(1, false)
+	check_equal(look.direction(), 0, "aimed right, the right column")
+	_world.fake.swing_poses[body.id] = Vector2.from_angle(deg_to_rad(60.0))
+	_world.run(1, false)
+	check_equal(look.direction(), StaffLook.direction_of(Vector2.from_angle(deg_to_rad(60.0))), "mid-swing, the column of the swing")
+	check_equal(sprite.frame_coords.x, look.direction(), "and the sprite shows it")
+	_world.fake.swing_poses.erase(body.id)
+	_world.run(1, false)
+	check_equal(look.direction(), 0, "after the swing, the aim again")

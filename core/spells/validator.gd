@@ -221,6 +221,11 @@ static func _check_form(form: FormBase) -> Array[Dictionary]:
 		FormBase.Motion.RAY:
 			if form.ray_length <= 0.0:
 				problems.append(_problem("required-field", file, "ray_length", "A RAY form needs a `ray_length` above 0."))
+		FormBase.Motion.SWING:
+			if form.ray_length <= 0.0:
+				problems.append(_problem("required-field", file, "ray_length", "A SWING form needs a `ray_length` (its reach) above 0."))
+			if form.arc <= 0.0:
+				problems.append(_problem("required-field", file, "arc", "A SWING form needs an `arc` (degrees it sweeps) above 0."))
 	return problems
 
 

@@ -175,11 +175,17 @@ func is_poofing() -> bool:
 	return _poof_age >= 0.0
 
 
-## The column of the head sheet that shows: the direction nearest the aim (down: flat, the way
+## The column of the head sheet that shows: the direction nearest the aim, or while the staff
+## swings (a `swing` carrier, `Spells.swing_pose`) the way it points in its swing, so the body
+## steps through the columns while the swing's trail follows the true arc (down: flat, the way
 ## the staff faced).
 func direction() -> int:
 	if actor.is_down():
 		return DIRECTIONS / 2 if _faces_left else 0
+	if actor.spells != null:
+		var pose: Vector2 = actor.spells.swing_pose(actor.id)
+		if not pose.is_zero_approx():
+			return direction_of(pose)
 	return direction_of(actor.aim)
 
 

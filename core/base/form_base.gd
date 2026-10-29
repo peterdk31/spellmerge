@@ -34,6 +34,10 @@ enum Motion {
 	DECOY,
 	## A helper that orbits the caster and casts its payload every `cooldown` seconds (B2, B5).
 	FAMILIAR,
+	## Melee (I2): the staff leans back for `wind_up` seconds, then sweeps `arc` degrees round the
+	## hand, centred on the aim locked at the cast, out to `ray_length`, in `lifetime` seconds,
+	## hitting each body in the swept wedge once. Forehand and backhand by turns.
+	SWING,
 }
 
 ## Damage of one hit before the element and modifiers.
@@ -61,6 +65,13 @@ enum Motion {
 ## RAY, FISSURE and RAIN: how far it reaches in pixels. DASH and TELEPORT: how far the caster
 ## moves (fixed: speed only changes how long a dash takes).
 @export var ray_length: float = 0.0
+## SWING: degrees the sweep hits over, centred on the aim.
+@export var arc: float = 0.0
+## SWING: seconds the staff leans back before it sweeps (none when it chains straight on from
+## the last swing, `SpellLimits.SWING_CHAIN`).
+@export var wind_up: float = 0.0
+## Knockback of one hit in pixels per second; 0 for the usual `SpellLimits.KNOCKBACK`.
+@export var knockback: float = 0.0
 ## How the wizard's cast flash looks for this carrier (staffs B6b; `gameplay/feel` reads it, and
 ## an empty one gets the plain muzzle flash). Keys, all optional: `seconds`, `size`, `stretch`
 ## (length along the aim), `tall`, `aim` (turned along the aim, else upright), `grow` (0.5 bursts
@@ -95,5 +106,8 @@ func ranges() -> Dictionary:
 		"pierce": Vector2(0, 16),
 		"orbit_radius": Vector2(0.0, 256.0),
 		"ray_length": Vector2(0.0, 1024.0),
+		"arc": Vector2(0.0, 360.0),
+		"wind_up": Vector2(0.0, 2.0),
+		"knockback": Vector2(0.0, 2000.0),
 	})
 	return limits

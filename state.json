@@ -9,7 +9,6 @@
     "number": 399
   },
   "errors_in_a_row": 0,
-  "idle": null,
   "intake_tasks": {
     "208": {
       "author": "Brianmanden",
@@ -88,7 +87,13 @@
     6415196364,
     6495258241
   ],
-  "task_failures": {},
+  "task_failures": {
+    "**Card rules: the compiler says what does nothing (rules R2).** (`core/spells/`, builder text) Design: [M2-rules.md](milestones/M2-rules.md), \"R2\". One table `behaviour \u00d7 motion` (runs, or a reason a player understands) kept next to the runtime that asks it (R2a); `trigger_runs(event, motion)` for triggers (R2b); the builder and staff view show the reasons (R2c). Tests: every \u2717 of the audit matrix that R4 does not turn into \u2713 is listed as wasted with a reason; the melee carriers (swing, slam) are in the matrix.": {
+      "count": 1,
+      "pr": "469",
+      "problems": "- Approved, but PR #469 conflicts with main, so it couldn't merge. Fix: `git fetch origin main && git merge origin/main`, resolve the conflicts, and keep both sides' entries in the plan files."
+    }
+  },
   "usage": [
     {
       "at": "2026-10-21T19:47:33Z",

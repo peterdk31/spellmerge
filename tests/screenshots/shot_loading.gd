@@ -1,7 +1,11 @@
 extends "res://tests/support/screenshot.gd"
 ## The loading screen before the first room (owner, 2026-10-29), half way through compiling the
 ## shaders: `loading_half`. The load is held still, so the shot does not depend on the frame
-## rate.
+## rate. The shaders are not compiled first (`warm_first`), or there would be no load to show.
+
+
+func _init() -> void:
+	warm_first = false
 
 
 func take() -> void:

@@ -33,7 +33,7 @@ const EVENTS: Dictionary = {
 	&"projectile_impact": [["caster", TYPE_INT], ["target", TYPE_OBJECT], ["position", TYPE_VECTOR2], ["direction", TYPE_VECTOR2]],
 	&"projectile_expired": [["caster", TYPE_INT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT]],
 	&"form_shown": [["caster", TYPE_INT], ["form", TYPE_STRING_NAME], ["origin", TYPE_VECTOR2], ["direction", TYPE_VECTOR2], ["length", TYPE_FLOAT], ["tint", TYPE_COLOR], ["look", TYPE_INT]],
-	&"explosion_shown": [["caster", TYPE_INT], ["at", TYPE_VECTOR2], ["radius", TYPE_FLOAT], ["style", TYPE_STRING_NAME], ["tint", TYPE_COLOR], ["look", TYPE_INT]],
+	&"cue_shown": [["caster", TYPE_INT], ["cue", TYPE_STRING_NAME], ["at", TYPE_VECTOR2], ["direction", TYPE_VECTOR2], ["size", TYPE_FLOAT], ["tint", TYPE_COLOR], ["look", TYPE_INT]],
 	&"build_refused": [["player", TYPE_INT], ["reason", TYPE_STRING]],
 	&"bag_changed": [["player", TYPE_INT], ["bag", TYPE_ARRAY]],
 	&"reaction_triggered": [["caster", TYPE_INT], ["reaction_id", TYPE_STRING_NAME], ["position", TYPE_VECTOR2]],

@@ -423,6 +423,8 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 		if modifier.behaviour == ModifierBase.Behaviour.ARC:
 			spell.arc_reach = maxf(spell.arc_reach, modifier.behaviour_reach)
 		spell.behaviours[modifier.behaviour] = stacked(modifier.behaviour, spell.behaviours[modifier.behaviour], modifier.behaviour_strength)
+		if modifier.cue != &"" and not spell.behaviour_cues.has(modifier.behaviour):
+			spell.behaviour_cues[modifier.behaviour] = modifier.cue
 		match modifier.behaviour:
 			ModifierBase.Behaviour.HOMING:
 				# Homing stacks by multiplying: the strongest card's turn rate, x HOMING_STACK for

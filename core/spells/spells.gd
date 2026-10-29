@@ -1467,13 +1467,13 @@ func _recoil(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, headin
 
 
 ## The area hit of a `blast` at the end point `at` of the carrier with `tag`, as wide as its
-## strength, with the hit profile of its tag, and its explosion (`explosion_shown`, style
-## `blast`). Nothing without a blast.
+## strength, with the hit profile of its tag, and its explosion (`cue_shown`, the cue its blast card
+## names). Nothing without a blast.
 func _blast(spell: CompiledSpell, tag: int, actor: int, at: Vector2) -> void:
 	var radius: float = spell.behaviour(ModifierBase.Behaviour.BLAST)
 	if radius > 0.0 and events != null and at.is_finite():
 		events.area_hit_requested.emit(actor, at, radius, tag)
-		events.explosion_shown.emit(actor, at, radius, &"blast", spell.tint, spell.look)
+		events.cue_shown.emit(actor, spell.cue_of(ModifierBase.Behaviour.BLAST), at, Vector2.ZERO, radius, spell.tint, spell.look)
 
 
 ## Where a dash, teleport or hook ended: the carrier's end point. Its `blast` and its `on expire`
@@ -1599,7 +1599,7 @@ func _fallback_hit(spell: CompiledSpell, tag: int, actor: int, at: Vector2) -> i
 		var blast: float = spell.behaviour(ModifierBase.Behaviour.BLAST)
 		events.area_hit_requested.emit(actor, at, maxf(spell.radius, blast), tag)
 		if blast > 0.0 and at.is_finite():
-			events.explosion_shown.emit(actor, at, blast, &"blast", spell.tint, spell.look)
+			events.cue_shown.emit(actor, spell.cue_of(ModifierBase.Behaviour.BLAST), at, Vector2.ZERO, blast, spell.tint, spell.look)
 	# After the area hit, which can reach the caster itself and would spend the barrier.
 	if _caster == CASTER_WIZARD:
 		_shield_caster(spell, tag, actor, 0.0)

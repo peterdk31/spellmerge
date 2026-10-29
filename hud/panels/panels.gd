@@ -23,6 +23,9 @@ extends CanvasLayer
 ## the wizard, so a player always sees their wizard taking hits. The possession itself is drawn
 ## in the world, over the possessed actor (`PossessedLook`).
 ##
+## The loading screen (`loading/`, node Root/Loading, over everything) shows from
+## `loading_started` to `loading_finished`, while flow compiles the shaders before the first room.
+##
 ## A red vignette (`vignette/`, node Root/Vignette, behind the panels) glows when a
 ## wizard's health falls, strongest toward that wizard's corner and fading in under
 ## half a second. It is read from `player_stats_changed` alone (a drop in health),
@@ -58,6 +61,7 @@ const RadialScript := preload("res://hud/builder/radial_builder.gd")
 const PlayerPanelScript := preload("res://hud/panels/player_panel/player_panel.gd")
 const StaffRowScript := preload("res://hud/panels/player_panel/staff_row.gd")
 const VignetteScript := preload("res://hud/panels/vignette/vignette.gd")
+const LoadingScript := preload("res://hud/panels/loading/loading_screen.gd")
 const HammerIconScript := preload("res://hud/widgets/hammer_icon.gd")
 
 const PLAYER_COUNT: int = 4
@@ -102,6 +106,7 @@ var _wave_active: bool = false
 var _joined: Array[bool] = [false, false, false, false]
 var _in_room: bool = false
 var _vignette: VignetteScript = null
+var _loading: LoadingScript = null
 ## The strip in the middle of the view that holds the wave line and the break line.
 var _strip: HBoxContainer = null
 var _wave_label: Label = null
@@ -192,6 +197,10 @@ func _ready() -> void:
 		input = get_node_or_null("/root/PlayerInput") as InputManagerScript
 	if spells == null:
 		spells = get_node_or_null("/root/Spells") as SpellsScript
+	# Over everything: the loading screen before the first room.
+	_loading = LoadingScript.new()
+	_loading.events = events
+	root_control.add_child(_loading)
 	for player in PLAYER_COUNT:
 		_panels[player].minimum_size_changed.connect(_place_builder.bind(player))
 		_place_builder(player)

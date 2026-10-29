@@ -1,22 +1,24 @@
-extends Node2D
+extends "res://core/loading/load_task.gd"
 ## Compiles every shader in the game before anyone plays (core/README.md, "The shot shaders";
 ## docs/DECISIONS.md, 2026-10-29, "Shader warm-up"). A browser on Windows compiles WebGL through
 ## Direct3D, and a shot shader takes it up to a few seconds there; Godot compiles a shader the
 ## first time something draws with it, so without this the first room stood still for 12-14 s
 ## while every one of them compiled.
 ##
-## The projectile manager adds one of these at start. It waits WAIT_FRAMES (so the main menu is
-## drawn first), then draws one shader a frame the way the game draws it, and frees itself when
-## the last has drawn. Each draw puts nothing on the screen (a quad of no size that is never
-## culled, or a sprite too small to cover a pixel), but the shader is compiled and kept for the
-## game. Godot's own canvas shader is drawn too, by a batch and a mesh with no material.
+## A LoadTask (`core/loading/`): Flow puts one in the work before the first room (`play_tasks`)
+## while `warmed` is false, so it runs behind the loading screen (owner, 2026-10-29: not on the
+## main menu, not in the room). Each unit draws one shader for a frame the way the game draws it;
+## `warmed` stays true for the session, as Godot keeps them. A draw puts nothing on the screen (a
+## quad of no size that is never culled, or a sprite too small to cover a pixel), but the shader
+## is compiled and kept for the game. Godot's own canvas shader is drawn too, by a batch and a
+## mesh with no material.
 ##
 ## **Every shader is warmed:** the shot shaders are listed here (BATCH_SHADERS, MESH_SHADERS,
 ## RECT_SHADERS); an area's own shader is handed over with `want(shader, how)` by the area that
-## uses it, before the first draw (an autoload's `_ready`). How it is drawn picks the variant
-## Godot compiles: BATCH a MultiMeshInstance2D, MESH a MeshInstance2D, RECT a Sprite2D or
-## Control. `tests/core/test_shader_warmup.gd` fails for any `.gdshader` in the project that is
-## neither listed nor wanted, so a new shader cannot be forgotten.
+## uses it, before the first Play (an autoload's `_ready`, a node's `_init`). How it is drawn
+## picks the variant Godot compiles: BATCH a MultiMeshInstance2D, MESH a MeshInstance2D, RECT a
+## Sprite2D or Control. `tests/core/test_shader_warmup.gd` fails for any `.gdshader` in the project
+## that is neither listed nor wanted, so a new shader cannot be forgotten.
 
 ## How a shader is drawn.
 const BATCH: int = 0
@@ -38,21 +40,20 @@ const MESH_SHADERS: Array[Shader] = [
 const RECT_SHADERS: Array[Shader] = [
 	preload("res://core/projectiles/shot_sprite.gdshader"),
 ]
-## Frames to wait before the first draw, so the screen under it is up first.
-const WAIT_FRAMES: int = 3
 ## The world, as far as a draw needs to reach to never be culled.
 const WORLD := AABB(Vector3(-100000.0, -100000.0, -1.0), Vector3(200000.0, 200000.0, 2.0))
 
+## True once a warm-up has finished in this session: the shaders stay compiled.
+static var warmed: bool = false
 ## The areas' shaders (`want`), and how each is drawn.
 static var _wanted: Array[Shader] = []
 static var _wanted_how: PackedInt32Array = PackedInt32Array()
 
-## Every draw, shown one at a time in this order (made when the wait is over).
+## Every draw, shown one a unit in this order (made by `begin`), what holds them, and the one
+## on show (-1 before the first).
 var _draws: Array[CanvasItem] = []
-var _frames: int = 0
-## How many have drawn (for tests).
-var drawn: int = 0
-
+var _holder: Node2D = null
+var _shown: int = -1
 
 ## Warm `shader` too, drawn `how` (BATCH, MESH or RECT). Called by the area that uses it, before
 ## the first draw; asking twice is the same as once.
@@ -74,29 +75,41 @@ static func shaders() -> Array[Shader]:
 	return all
 
 
-func _ready() -> void:
-	top_level = true
+func units() -> int:
+	return maxi(_draws.size(), 1) if _holder != null else shaders().size() + 2
 
 
-func _process(_delta: float) -> void:
-	_frames += 1
-	var at: int = _frames - WAIT_FRAMES
-	if at < 0 or (at > 0 and at > _draws.size()):
-		return
-	if at == 0:
-		_make_draws()
-	if at > 0:
-		_draws[at - 1].visible = false
-		drawn = at
-	if at >= _draws.size():
-		queue_free()
-		return
-	_draws[at].visible = true
+func units_done() -> int:
+	return clampi(_shown, 0, _draws.size())
 
 
-## How many draws it makes in all (once the wait is over).
-func draws() -> int:
-	return _draws.size()
+func begin(host: Node) -> void:
+	_holder = Node2D.new()
+	_holder.name = "ShaderWarmup"
+	_holder.top_level = true
+	host.add_child(_holder)
+	_make_draws()
+
+
+## Take the last one off and show the next (each shows for one frame, when it is compiled).
+func step() -> void:
+	if _shown >= 0 and _shown < _draws.size():
+		_draws[_shown].visible = false
+	_shown += 1
+	if _shown < _draws.size():
+		_draws[_shown].visible = true
+	else:
+		warmed = true
+
+
+func is_done() -> bool:
+	return _holder != null and _shown >= _draws.size()
+
+
+func end() -> void:
+	if _holder != null and is_instance_valid(_holder):
+		_holder.queue_free()
+	_draws.clear()
 
 
 func _make_draws() -> void:
@@ -158,7 +171,7 @@ func _batch(shader: Shader, mesh: Mesh) -> MultiMeshInstance2D:
 	node.multimesh = multimesh
 	node.material = _material(shader)
 	node.visible = false
-	add_child(node)
+	_holder.add_child(node)
 	return node
 
 
@@ -167,7 +180,7 @@ func _mesh(shader: Shader, mesh: Mesh) -> MeshInstance2D:
 	node.mesh = mesh
 	node.material = _material(shader)
 	node.visible = false
-	add_child(node)
+	_holder.add_child(node)
 	return node
 
 
@@ -178,5 +191,5 @@ func _rect(shader: Shader, pixel: Texture2D) -> Sprite2D:
 	node.scale = Vector2(0.001, 0.001)
 	node.material = _material(shader)
 	node.visible = false
-	add_child(node)
+	_holder.add_child(node)
 	return node

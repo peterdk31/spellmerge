@@ -44,6 +44,15 @@ extends Node
 ## It plays only for people: off (`intro_enabled` false) when a test script is the main loop or
 ## the game was started with user arguments (the 4-bot test, the stress run, the timing run).
 ##
+## Loading (owner, 2026-10-29): Play and Sandbox first do the work that must be ready before a
+## room (`play_tasks`, LoadTasks) behind the loading screen (state LOADING), through
+## `core/loading` (the autoload `Loading`, which sends the events the HUD's screen is drawn from);
+## then the intro or the run starts. Today that work is the shader warm-up
+## (`core/projectiles/shader_warmup.gd`), once a session; with nothing to do Play starts at once.
+## To load something more before playing, add a LoadTask in `play_tasks`. It is off
+## (`loading_enabled` false) when a test script is the main loop; the stress run turns it off too
+## (it times the room itself).
+##
 ## Sandbox (staffs B7, docs/milestones/M2-staffs.md, "The sandbox"): `sandbox_requested` (the
 ## main menu's Sandbox button, in `dev` and `preview` builds) starts a run in the sandbox room
 ## (`sandbox`): no waves, the training dummy and the shooting dummy at the room's
@@ -66,6 +75,9 @@ const DownedScript := preload("res://gameplay/player/downed.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const DefaultWizardScene: PackedScene = preload("res://content/wizard/base/wizard.tscn")
 const IntroScript := preload("res://gameplay/flow/intro.gd")
+const LoadingScript := preload("res://core/loading/loading.gd")
+const ShaderWarmupScript := preload("res://core/projectiles/shader_warmup.gd")
+const LoadTask := preload("res://core/loading/load_task.gd")
 
 const PLAYER_SLOTS: int = 4
 ## Registry folders, and the ids of the M1 content a run uses unless `room_id_to_play`,
@@ -114,7 +126,7 @@ const WORLD_NAME: String = "Arena"
 const INTRO_NAME: String = "Intro"
 const INTRO_SEEN: StringName = &"intro_seen"
 
-enum State { IDLE, RUNNING, CLEARED, INTRO }
+enum State { IDLE, RUNNING, CLEARED, INTRO, LOADING }
 
 ## The services. Only tests set these, before adding the node; otherwise the
 ## autoloads are used.
@@ -143,6 +155,9 @@ var save: SaveFile = null
 ## The intro on show (null when none), and who pressed Play.
 var intro: IntroScript = null
 var _intro_requester: int = 0
+## Whether Play loads `play_tasks` behind the loading screen first, and the loading service.
+var loading_enabled: bool = true
+var loading: LoadingScript = null
 
 var state: State = State.IDLE
 ## The world of the run in progress (null before the first Play).
@@ -176,6 +191,9 @@ func _ready() -> void:
 		save = SaveFile.new()
 	if _is_automated():
 		intro_enabled = false
+	var tree: MainLoop = Engine.get_main_loop()
+	if tree != null and tree.get_script() != null:
+		loading_enabled = false
 	if events == null:
 		events = get_node_or_null("/root/Events") as EventsScript
 	if registry == null:
@@ -338,6 +356,8 @@ func start_run(requester: int) -> bool:
 ## End the run in progress and free its world. Flow is idle again, so the next
 ## `play_requested` starts a run. Nothing shows a menu yet; M3's run area will.
 func stop_run() -> void:
+	if state == State.LOADING and loading != null:
+		loading.cancel()
 	if intro != null:
 		var shown: IntroScript = intro
 		intro = null
@@ -357,6 +377,12 @@ func stop_run() -> void:
 func _on_play_requested(player: int) -> void:
 	if state != State.IDLE:
 		return
+	if not _load_then(_start_play.bind(player)):
+		_start_play(player)
+
+
+## Play, once the work before a room is loaded: the intro first on a new save, else the run.
+func _start_play(player: int) -> void:
 	sandbox = false
 	if wants_intro():
 		play_intro(player)
@@ -396,6 +422,34 @@ func _on_intro_finished(_skipped: bool) -> void:
 		push_warning("Flow: the run after the intro did not start; Play starts a new one.")
 
 
+## What must be ready before a room starts, as LoadTasks done behind the loading screen (empty:
+## nothing to wait for). Add a task here to load something more before playing.
+func play_tasks() -> Array[LoadTask]:
+	var tasks: Array[LoadTask] = []
+	if not ShaderWarmupScript.warmed:
+		tasks.append(ShaderWarmupScript.new())
+	return tasks
+
+
+## Runs `play_tasks` behind the loading screen; when they are done, `next` starts what was
+## pressed. False when there is nothing to do or loading is off: the caller starts at once.
+func _load_then(next: Callable) -> bool:
+	# The autoload comes after Flow (last, so the game's exit frees what it should): found on use.
+	if loading == null:
+		loading = get_node_or_null("/root/Loading") as LoadingScript
+	if not loading_enabled or loading == null:
+		return false
+	if not loading.run(play_tasks(), _on_loaded.bind(next)):
+		return false
+	state = State.LOADING
+	return true
+
+
+func _on_loaded(next: Callable) -> void:
+	state = State.IDLE
+	next.call()
+
+
 ## True when nobody is playing: a test script is the main loop, or the game was started with user
 ## arguments (the automated runs).
 func _is_automated() -> bool:
@@ -406,6 +460,11 @@ func _is_automated() -> bool:
 func _on_sandbox_requested(player: int) -> void:
 	if state != State.IDLE:
 		return
+	if not _load_then(_start_sandbox.bind(player)):
+		_start_sandbox(player)
+
+
+func _start_sandbox(player: int) -> void:
 	sandbox = true
 	if not start_run(player):
 		sandbox = false

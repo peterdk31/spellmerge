@@ -42,7 +42,9 @@ func _holds(combo: Dictionary, drop: String = "", shot: bool = true) -> bool:
 	arena.run(float(combo["seconds"]))
 	var held: bool = true
 	for row: Dictionary in combo["checks"]:
-		if str(row["kind"]) == "status":
+		if str(row["kind"]) == "blocked":
+			held = held and arena.blocks.size() >= int(row["min"])
+		elif str(row["kind"]) == "status":
 			for index: int in row["imps"]:
 				held = held and arena.was_given(arena.imps[index], StringName(row["status"]))
 	arena.free_all()

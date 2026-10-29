@@ -35,13 +35,13 @@ static func encode(cards: Array[StringName]) -> String:
 ## Read `text`: `{"ok": true, "cards": Array[StringName], "error": ""}` or `{"ok": false,
 ## "cards": [], "error": reason}`. `known` is a Callable (id: StringName) -> bool. The cards
 ## are padded with empty slots to `slots` when it is above 0, and a code with more cards than
-## that is refused. Spaces and line breaks round the code are ignored; the prefix is not case
-## sensitive and ids are written in lower case.
+## that is refused. Spaces and line breaks round the code are ignored; the whole code is not case
+## sensitive (it is read in lower case).
 static func parse(text: String, known: Callable, slots: int = 0) -> Dictionary:
-	var body: String = text.strip_edges()
+	var body: String = text.strip_edges().to_lower()
 	if body.length() > MAX_LENGTH:
 		return _fail("That code is too long.")
-	if not body.to_lower().begins_with(PREFIX):
+	if not body.begins_with(PREFIX):
 		return _fail("That is not a staff code (it starts with \"%s\")." % PREFIX)
 	body = body.substr(PREFIX.length())
 	var cards: Array[StringName] = []

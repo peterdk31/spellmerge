@@ -54,6 +54,12 @@ func test_parse_ignores_spaces_and_the_case_of_the_tag() -> void:
 	check_equal(read["cards"], _cards(["fire", "bolt"]), "the cards")
 
 
+func test_parse_reads_an_upper_cased_code() -> void:
+	var read: Dictionary = StaffCode.parse("SM1:FIRE,-,BOLT", _known)
+	check(bool(read["ok"]), "capitals are fine: %s" % read["error"])
+	check_equal(read["cards"], _cards(["fire", "", "bolt"]), "the cards, in lower case")
+
+
 func test_parse_refuses_what_is_not_a_code() -> void:
 	for text: String in ["", "fire,bolt", "sm2:fire", "hello world", "sm1:fire;bolt"]:
 		var read: Dictionary = StaffCode.parse(text, _known)
@@ -65,7 +71,7 @@ func test_parse_refuses_what_is_not_a_code() -> void:
 func test_parse_refuses_unknown_cards_and_anything_but_names() -> void:
 	var read: Dictionary = StaffCode.parse("sm1:fire,nope", _known)
 	check(not bool(read["ok"]) and "nope" in str(read["error"]), "an unknown card is named: %s" % read["error"])
-	for bad: String in ["sm1:res://x.gd", "sm1:fire,Bolt", "sm1:../fire", "sm1:fire,$(ls)", "sm1:fire,,bolt", "sm1:fire bolt"]:
+	for bad: String in ["sm1:res://x.gd", "sm1:fire,bo-lt", "sm1:../fire", "sm1:fire,$(ls)", "sm1:fire,,bolt", "sm1:fire bolt"]:
 		check(not bool(StaffCode.parse(bad, _known)["ok"]), "'%s' is refused" % bad)
 
 

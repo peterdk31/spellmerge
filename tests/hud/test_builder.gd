@@ -313,6 +313,32 @@ func test_paste_builds_the_staff_from_a_code_and_a_bad_code_changes_nothing() ->
 		check_equal(builder.cards_of(X).slice(0, 4), [&"frost", &"fire", &"", &"nova"] as Array[StringName], "the staff stays")
 
 
+func test_copy_does_not_echo_the_code_and_an_empty_clipboard_says_so() -> void:
+	_start(1)
+	_open(0)
+	var builder: BuilderScript = _builder(0)
+	var board: Dictionary = _clipboard(0)
+	_press(0, builder.copy_button())
+	check(not builder.note_text().contains("sm1:"), "the note does not show the code: %s" % builder.note_text())
+	check(builder.note_text().contains("2 cards"), "it counts the cards: %s" % builder.note_text())
+	board["text"] = "  "
+	_press(0, builder.paste_button())
+	check_equal(builder.note_text(), BuilderScript.REFUSED_PREFIX + BuilderScript.CLIPBOARD_EMPTY, "an empty clipboard is named")
+
+
+func test_paste_drops_a_held_card() -> void:
+	_start(1)
+	_open(0)
+	var builder: BuilderScript = _builder(0)
+	var board: Dictionary = _clipboard(0)
+	_press(0, builder.slot_button(0))
+	check_equal(builder.held(), [X, 0] as Array[int], "a card is held")
+	board["text"] = "sm1:frost,nova"
+	_press(0, builder.paste_button())
+	check_equal(builder.held(), [BuilderScript.NOTHING, -1] as Array[int], "the paste drops it")
+	check_equal(builder.cards_of(X).slice(0, 2), [&"frost", &"nova"] as Array[StringName], "and the staff is the pasted one")
+
+
 func test_a_pasted_code_travels_from_one_player_to_another() -> void:
 	_start(2)
 	_open(0)

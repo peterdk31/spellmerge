@@ -111,7 +111,8 @@ const HINT_BACK_ACTION: StringName = &"back"
 const HINT_BAG_ACTION: StringName = &"alternate"
 const REFUSED_PREFIX: String = "Refused: "
 const WASTED_PREFIX: String = "Does nothing: "
-const COPIED_PREFIX: String = "Copied: "
+const COPIED_PREFIX: String = "Copied the staff code"
+const CLIPBOARD_EMPTY: String = "The clipboard is empty, or the browser blocked it."
 const PASTED_TEXT: String = "Pasted the code."
 const NOTHING_TO_COPY: String = "The staff is empty."
 
@@ -917,7 +918,11 @@ func _copy_code() -> void:
 		_message = NOTHING_TO_COPY
 	else:
 		clipboard_set.call(code)
-		_message = COPIED_PREFIX + code
+		var count: int = 0
+		for card in cards_of(_viewed):
+			if card != NO_CARD:
+				count += 1
+		_message = "%s (%d cards)." % [COPIED_PREFIX, count]
 	_reason = ""
 	_render_note()
 
@@ -932,11 +937,18 @@ func _paste_code() -> void:
 	var slots: int = cards_of(_viewed).size()
 	if _spells == null or slots == 0:
 		return
-	var read: Dictionary = _spells.parse_staff_code(str(clipboard_get.call()), slots)
+	var text: String = str(clipboard_get.call())
+	if text.strip_edges().is_empty():
+		_reason = CLIPBOARD_EMPTY
+		_render_note()
+		return
+	var read: Dictionary = _spells.parse_staff_code(text, slots)
 	if not bool(read.get("ok", false)):
 		_reason = str(read.get("error", ""))
 		_render_note()
 		return
+	if _held_staff != NOTHING:
+		_drop()
 	if _events != null:
 		_events.staff_cards_requested.emit(index, _viewed, read["cards"] as Array[StringName])
 	if _reason == "":

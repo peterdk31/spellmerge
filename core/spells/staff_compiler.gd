@@ -153,17 +153,31 @@ func _read_group(want: int, payload: bool) -> CompiledGroup:
 			for modifier in modifiers:
 				deflects = deflects or (modifier.behaviour == ModifierBase.Behaviour.DEFLECT and behaviour_runs(modifier.behaviour, form.motion))
 				blasts = blasts or (modifier.behaviour == ModifierBase.Behaviour.BLAST and behaviour_runs(modifier.behaviour, form.motion))
+			var life: float = _life_of(form, modifiers)
+			var why_not: Dictionary = {}
 			for modifier in modifiers:
-				if behaviour_runs(modifier.behaviour, form.motion, blasts) and not (deflects and _shield_outrun(modifier, form.motion)):
+				var why: String = "deflect turns every shot that touches it first" if deflects and _shield_outrun(modifier, form.motion) else behaviour_waste(modifier.behaviour, form.motion, blasts)
+				if why.is_empty():
+					why = _numbers_waste(modifier, form.motion, blasts)
+				if why.is_empty() and modifier.behaviour == ModifierBase.Behaviour.ARC and life <= 1.0 / _strength_of(modifiers, ModifierBase.Behaviour.ARC):
+					why = "it ends before its first zap (%.2f s)" % life
+				if why.is_empty():
 					kept_modifiers.append(modifier)
-			var spell: CompiledSpell = _build(form, elements, kept_modifiers, trigger, CompiledSpell.FALLBACK_NONE)
+				else:
+					why_not[modifier] = why
+			# An infusion is a hit's element: on a carrier that hits nothing itself, only a blast carries it.
+			var kept_elements: Array[ElementBase] = []
+			if hits(form.motion) or blasts:
+				kept_elements = elements
+			var spell: CompiledSpell = _build(form, kept_elements, kept_modifiers, trigger, CompiledSpell.FALLBACK_NONE)
 			spell.slot = slot
 			_useful[slot] = true
 			for at: int in kept:
 				var modifier := _cards[at] as ModifierBase
 				if modifier != null and not kept_modifiers.has(modifier):
-					var why: String = "deflect turns every shot that touches it first" if deflects and _shield_outrun(modifier, form.motion) else behaviour_waste(modifier.behaviour, form.motion, blasts)
-					_waste(at, "%s does nothing on a %s: %s." % [_name(modifier), _name(form), why])
+					_waste(at, "%s does nothing on a %s: %s." % [_name(modifier), _name(form), why_not[modifier]])
+				elif _cards[at] is ElementBase and kept_elements.is_empty():
+					_waste(at, "%s does nothing on a %s: %s, and it has no blast to carry it." % [_name(_cards[at]), _name(form), _hits_nothing(form.motion)])
 				else:
 					_attach(at, slot)
 			if form.carries_payload():
@@ -172,7 +186,7 @@ func _read_group(want: int, payload: bool) -> CompiledGroup:
 				# A trigger whose event never happens on this carrier still reads its payload, so the
 				# cards after it are read in the same order whether it fires or not; the payload is
 				# then wasted with it (rules R2b).
-				var never: String = _trigger_never(trigger, form, elements, kept_modifiers)
+				var never: String = _trigger_never(trigger, form, kept_elements, kept_modifiers, life)
 				var first: int = _cast.slots.size()
 				var mana: float = _cast.mana
 				var delay: float = _cast.delay
@@ -253,7 +267,7 @@ func _means_something_there(modifier: ModifierBase, payload: bool) -> bool:
 ## it: a block needs a shield or deflect, a reaction an infusion (or relay), and a kill or reaction
 ## on a carrier that hits nothing itself needs a blast, whose area hit carries the carrier's tag.
 ## A ghost shot never meets a wall.
-func _trigger_never(trigger: TriggerBase, form: FormBase, elements: Array[ElementBase], modifiers: Array[ModifierBase]) -> String:
+func _trigger_never(trigger: TriggerBase, form: FormBase, elements: Array[ElementBase], modifiers: Array[ModifierBase], life: float) -> String:
 	var head: String = "%s does nothing on a %s" % [_name(trigger), _name(form)]
 	var why: String = trigger_why_not(trigger.event, form.motion)
 	if not why.is_empty():
@@ -270,10 +284,70 @@ func _trigger_never(trigger: TriggerBase, form: FormBase, elements: Array[Elemen
 				return "%s without a blast: %s." % [head, _hits_nothing(form.motion)]
 			if trigger.event == TriggerBase.Event.REACTION and elements.is_empty() and not has.has(ModifierBase.Behaviour.RELAY):
 				return "%s without an infusion: a hit with no element sets off no reaction." % head
+		TriggerBase.Event.TIMER:
+			if life <= trigger.interval:
+				return "%s: it ends before its first tick (%.2f s, every %.2f s)." % [head, life, trigger.interval]
 		TriggerBase.Event.WALL:
 			if has.has(ModifierBase.Behaviour.GHOST) and flies(form.motion):
 				return "%s with ghost: a ghost shot passes through walls." % head
 	return ""
+
+
+## How long a carrier of `form` with `modifiers` lives: its lifetime times their `lifetime_mult`,
+## or for ever with a hold that runs on it (it is on until switched off).
+static func _life_of(form: FormBase, modifiers: Array[ModifierBase]) -> float:
+	var life: float = form.lifetime
+	for modifier in modifiers:
+		if modifier.behaviour == ModifierBase.Behaviour.HOLD and behaviour_runs(modifier.behaviour, form.motion):
+			return INF
+		life *= modifier.lifetime_mult
+	return life
+
+
+## The summed strength of the `behaviour` cards among `modifiers`.
+static func _strength_of(modifiers: Array[ModifierBase], behaviour: int) -> float:
+	var sum: float = 0.0
+	for modifier in modifiers:
+		if modifier.behaviour == behaviour:
+			sum += modifier.behaviour_strength
+	return maxf(sum, 0.001)
+
+
+## Why a modifier's numbers do nothing on a carrier of `motion`, or "" when one of them counts. Its
+## costs (more mana, a slower cast, less damage) are no effect; an effect counts where the carrier
+## uses that number: damage where it hits (or blasts), speed and lifetime where it moves or lasts,
+## shots, spread and pierce where it fires shots that use them. A behaviour card is judged by its
+## behaviour (`behaviour_waste`), its numbers ride with it.
+static func _numbers_waste(modifier: ModifierBase, motion: FormBase.Motion, blasts: bool) -> String:
+	if modifier.behaviour != ModifierBase.Behaviour.NONE:
+		return ""
+	var any: bool = false
+	if modifier.cooldown_mult < 1.0 or not is_equal_approx(modifier.radius_mult, 1.0):
+		return ""
+	if modifier.damage_mult > 1.0:
+		any = true
+		if hits(motion) or blasts:
+			return ""
+	if not is_equal_approx(modifier.speed_mult, 1.0) or not is_equal_approx(modifier.lifetime_mult, 1.0):
+		any = true
+		if motion != FormBase.Motion.FISSURE and motion != FormBase.Motion.TELEPORT:
+			return ""
+	if modifier.shot_mult != 1:
+		any = true
+		if motion != FormBase.Motion.DASH and motion != FormBase.Motion.TELEPORT:
+			return ""
+	if not is_equal_approx(modifier.spread_mult, 1.0):
+		any = true
+		match motion:
+			FormBase.Motion.STRAIGHT, FormBase.Motion.RAY, FormBase.Motion.FISSURE, FormBase.Motion.HOOK, FormBase.Motion.SWAP, FormBase.Motion.SWING:
+				return ""
+	if modifier.extra_pierce != 0:
+		any = true
+		if stays(motion) or motion == FormBase.Motion.RAY:
+			return ""
+	if not any:
+		return ""
+	return "none of its numbers count here: %s" % _what(motion)
 
 
 ## A compiled spell from a carrier (or none, for a fallback) and the cards that attach to it.

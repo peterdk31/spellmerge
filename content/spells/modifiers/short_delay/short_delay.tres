@@ -13,3 +13,4 @@ complexity = 1
 icon = ExtResource("2_icon")
 cooldown_mult = 0.5
 mana_mult = 1.25
+look_layer = 21

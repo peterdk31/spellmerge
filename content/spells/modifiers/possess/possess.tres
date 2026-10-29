@@ -14,4 +14,4 @@ mana_mult = 2.5
 cooldown_mult = 2.0
 behaviour = 21
 behaviour_strength = 3.0
-look_layer = 10
+look_layer = 20

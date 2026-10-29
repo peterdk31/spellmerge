@@ -14,4 +14,4 @@ mana_mult = 1.5
 behaviour = 20
 behaviour_strength = 2.0
 behaviour_reach = 60.0
-look_layer = 10
+look_layer = 18

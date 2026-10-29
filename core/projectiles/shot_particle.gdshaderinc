@@ -111,6 +111,50 @@ Particle place_particle(float look, vec2 from, float a, float i, float cyc, floa
 		p.at = from + vec2(-(3.0 + 14.0 * a) * z, (h - 0.5) * 4.0 * z);
 		p.shown = a < 0.5;
 		p.rgb = a < 0.25 ? BONE_LIGHT : SPARK_LIGHT;
+	} else if (look == L_WEIGHT) {
+		// Heavy: a grey drip that falls, as long as it is fast.
+		p.at = floor(from + vec2((h - 0.5) * 6.0 * z, (2.0 + 9.0 * a * a) * z));
+		p.shown = a < 0.8;
+		p.rgb = a < 0.4 ? BONE_LIGHT : BONE_SHADOW;
+	} else if (look == L_RIPPLE) {
+		// Growth: a two-pixel dash on a ring that opens round the core.
+		float ang = h * 6.2832;
+		p.at = floor(from + vec2(cos(ang), sin(ang)) * (2.0 + 9.0 * a) * z);
+		p.shown = a < 0.8;
+		p.run = 1.0;
+		p.rgb = a < 0.5 ? BONE_LIGHT : BONE_BASE;
+	} else if (look == L_CURL) {
+		// Spiral and return: a two-pixel dash that swings out and curls back.
+		float ang = h * 6.2832 + a * 7.0;
+		p.at = floor(from + vec2(cos(ang) * 6.0 * a - 3.0 * a, sin(ang) * 6.0 * a) * z);
+		p.shown = a < 0.9;
+		p.run = 1.0;
+		p.rgb = a < 0.5 ? BONE_LIGHT : BONE_BASE;
+	} else if (look == L_ZIG) {
+		// Bounce: a dash thrown back at an angle, either side.
+		float side = h < 0.5 ? -1.0 : 1.0;
+		p.at = floor(from + vec2(-3.0 - 6.0 * a, side * (1.0 + 7.0 * a)) * z);
+		p.shown = a < 0.5;
+		p.run = 1.0;
+		p.rgb = a < 0.25 ? BONE_LIGHT : SPARK_LIGHT;
+	} else if (look == L_DOUBLE) {
+		// Echo, mirror, ghost: a steady dash peeling away to each side, a copy of the path.
+		float side = h < 0.5 ? -1.0 : 1.0;
+		p.at = floor(from + vec2(-2.0 * a * z, side * (2.0 + 5.0 * a) * z));
+		p.shown = a < 0.7;
+		p.run = 1.0 + z;
+		p.rgb = BONE_SHADOW;
+	} else if (look == L_CONVERGE) {
+		// Magnet, siphon, possess: a two-pixel dash pulled in towards the core from ahead.
+		p.at = floor(from + vec2((12.0 - 12.0 * a) * z, (h - 0.5) * 6.0 * (1.0 - a) * z));
+		p.shown = a < 0.9;
+		p.run = 1.0;
+		p.rgb = a < 0.6 ? SPARK_LIGHT : BONE_LIGHT;
+	} else if (look == L_DRIFT) {
+		// Slow, hold, short delay: a cool grey pixel that hangs where it was and fades.
+		p.at = from + vec2(-2.0 * z - (h - 0.5) * 3.0 * z, (h - 0.5) * 3.0 * z);
+		p.shown = a < 0.95 && mod(floor(sim_time * 12.0 + i), 3.0) > 0.5;
+		p.rgb = a < 0.5 ? BONE_SHADOW : STONE_LIGHT;
 	}
 	return p;
 }

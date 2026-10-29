@@ -422,3 +422,84 @@ func test_pointing_at_a_card_shows_the_casts_as_rt_would_leave_them() -> void:
 	check_equal(radial.cards_of(1).slice(0, 3), _ids("fire bolt -"), "the staff itself is unchanged")
 	_let_go(0)
 	check_equal(Array(radial.slot_groups().slice(0, 3)), [0, 0, -1], "the staff's own casts again after letting go")
+
+
+## A fake clipboard for `player`'s radial: a Dictionary {"text": ...} it reads and writes.
+func _clipboard(player: int) -> Dictionary:
+	var board: Dictionary = {"text": ""}
+	var radial: RadialScript = _radial(player)
+	radial.clipboard_get = func() -> String: return str(board["text"])
+	radial.clipboard_set = func(text: String) -> void: board["text"] = text
+	return board
+
+
+func test_x_copies_the_shown_staff_as_a_code_and_says_so() -> void:
+	_start(1)
+	var radial: RadialScript = _open(0)
+	var board: Dictionary = _clipboard(0)
+	_tap(0, &"alternate")
+	_frame()
+	check_equal(board["text"], "sm1:fire,bolt", "the staff's code is on the clipboard")
+	check_equal(radial.result_text(), "Copied 2 cards", "the row says what was copied")
+	_bus.staff_cards_requested.emit(0, 1, _ids("-"))
+	board["text"] = "kept"
+	_tap(0, &"alternate")
+	_frame()
+	check_equal(board["text"], "kept", "an empty staff copies nothing")
+	check_equal(radial.result_text(), RadialScript.NOTHING_TO_COPY, "and says so")
+
+
+func test_a_pastes_the_clipboards_code_over_the_staff() -> void:
+	_start(1)
+	var radial: RadialScript = _open(0)
+	var board: Dictionary = _clipboard(0)
+	board["text"] = "sm1:double,fire,-,bolt"
+	_tap(0, &"accept")
+	_frame()
+	check_equal(radial.cards_of(1).slice(0, 5), _ids("double fire - bolt -"), "all the slots at once")
+	check_equal(radial.result_text(), "Pasted 3 cards", "the row says how many cards")
+	check_equal(_whole.size(), 1, "one request for the whole staff")
+	board["text"] = "sm1:fire"
+	_tap(0, &"accept")
+	_frame()
+	check_equal(radial.result_text(), "Pasted 1 card", "one card is not plural")
+	for _step in int(RadialScript.RESULT_TIME / STEP) + 2:
+		_frame()
+	check_equal(radial.result_text(), "", "the result goes after a few seconds")
+
+
+func test_a_refused_paste_changes_nothing_and_says_why() -> void:
+	_start(1)
+	var radial: RadialScript = _open(0)
+	var board: Dictionary = _clipboard(0)
+	var before: Array[StringName] = radial.cards_of(1)
+	for text: String in ["hello", "sm1:fire,nosuchcard", "sm1:" + ",".join(PackedStringArray(["fire"])) + ",fire".repeat(40)]:
+		board["text"] = text
+		_tap(0, &"accept")
+		_frame()
+		check(radial.result_text() != "", "a result for %s" % text.left(12))
+		check_equal(radial.cards_of(1), before, "the staff is unchanged for %s" % text.left(12))
+	check_equal(_whole.size(), 0, "nothing was asked for")
+	board["text"] = ""
+	_tap(0, &"accept")
+	_frame()
+	check_equal(radial.result_text(), RadialScript.CLIPBOARD_EMPTY, "an empty clipboard is named")
+	board["text"] = "sm1:fire"
+	_bus.staff_cards_requested.connect(func(player: int, _staff: int, _cards: Array[StringName]) -> void: _bus.build_refused.emit(player, "You do not have that card."))
+	_tap(0, &"accept")
+	_frame()
+	check_equal(radial.result_text(), "You do not have that card.", "the player's own refusal is the result")
+
+
+func test_the_names_of_the_casts_show_for_each_cast() -> void:
+	_start(1)
+	var radial: RadialScript = _open(0)
+	_bus.staff_cards_requested.emit(0, 1, _ids("fire bolt frost nova"))
+	var names: PackedStringArray = radial.cast_names()
+	check_equal(names.size(), 2, "a name for each of the two casts")
+	for word in names:
+		check(word != "", "the name is not empty")
+	_bus.staff_cards_requested.emit(0, 1, _ids("fire bolt"))
+	check_equal(radial.cast_names().size(), 1, "one cast, one name")
+	_bus.staff_cards_requested.emit(0, 1, _ids("-"))
+	check_equal(radial.cast_names().size(), 0, "no cast, no name")

@@ -2,6 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-29: Staff codes in the radial builder
+
+- **X copies, A pastes.** The shoulders are the staffs and the paging, RT/LT/Y/B are taken, and the d-pad's sides flip the kind; X (`alternate`) and A (`accept`) were free in this builder. A paste replaces the whole staff, so it is the plain "confirm" button; it is also refused with a result line when the code is bad, and the player still refuses cards it does not own.
+- **The result replaces the two buttons' row** for 3.5 s instead of using the 3-line note box, which is 108 px wide and would cut a refusal's reason; the row is as wide as the ring's side, and longer text is cut with "..".
+- **The cast names are one line** (joined with " / ") above that row, cut to fit, because the column under the slots is full.
+- The test lives in `test_radial_builder.gd`, where the radial builder's tests are, not `test_builder.gd` (the list builder's).
+
 ## 2026-10-29: The Rime Crook and the Bone Scepter
 
 - **The Scepter's eyes glow Void light, not Spark.** The design says its eyes are sparks in the sockets; the stray rule (README) is the light shade of the element's ramp, and Void pink reads against the dark sockets, which are painted Void shadow.

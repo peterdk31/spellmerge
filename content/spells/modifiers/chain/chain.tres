@@ -14,3 +14,4 @@ icon = ExtResource("2_icon")
 damage_mult = 0.8
 behaviour = 2
 behaviour_strength = 2.0
+look_layer = 5

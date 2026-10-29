@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-29: The first cards' looks (staffs C0)
+
+The three original modifiers without a look now have one: split a burst (9), chain sparks and a jagged tail (5), faster streaks (8). Carriers and infusions already had theirs; the numbers were reviewed and kept. `test_projectile_looks.gd` uses echo as its card without a look. Test: `test_original_looks.gd`.
+
 ## 2026-10-29: Spell names (staffs E1)
 
 Every cast of a staff now has a generated name: `SpellNamer` reads a compiled cast and builds "Twice-Seeking Firefrost Bolt of Sudden Novas" from the cards' `name_words` (a new field on every card, two words each so a name can vary; a plain bolt is "Bolt"). Same cards, same name (a djb2 hash picks between a card's words). `Spells.staff_view` returns it as `name`, and the list builder prints it above each cast of the plan. Tests: `test_spell_names.gd` (exact names, plurals, growth, determinism, and that every real card has words).

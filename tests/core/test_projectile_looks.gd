@@ -22,7 +22,7 @@ const STORM := preload("res://content/spells/elements/storm/storm.tres")
 const BIGGER := preload("res://content/spells/modifiers/bigger/bigger.tres")
 const PIERCE := preload("res://content/spells/modifiers/pierce/pierce.tres")
 const HOMING := preload("res://content/spells/modifiers/homing/homing.tres")
-const SPLIT := preload("res://content/spells/modifiers/split/split.tres")
+const NO_LOOK := preload("res://content/spells/modifiers/echo/echo.tres")
 
 var mgr: ManagerScript
 
@@ -457,13 +457,13 @@ func test_the_elements_have_looks_of_their_own() -> void:
 
 func test_the_compiler_combines_every_card_with_a_look() -> void:
 	var elements: Array[ElementBase] = [FIRE, FROST, STORM, FIRE]
-	var modifiers: Array[ModifierBase] = [SPLIT, BIGGER, PIERCE, HOMING]
+	var modifiers: Array[ModifierBase] = [NO_LOOK, BIGGER, PIERCE, HOMING]
 	var look: int = StaffCompiler._look_of(elements, modifiers)
 	var want: int = ManagerScript.pack_look(PackedInt32Array([FIRE.look_layer, FROST.look_layer, STORM.look_layer, BIGGER.look_layer, PIERCE.look_layer, HOMING.look_layer]))
-	check_equal(look, want, "three infusions and three modifiers all show; split has none, and fire twice shows once")
+	check_equal(look, want, "three infusions and three modifiers all show; echo has none, and fire twice shows once")
 	var only_modifiers: int = StaffCompiler._look_of([] as Array[ElementBase], [HOMING] as Array[ModifierBase])
 	check_equal(only_modifiers, ManagerScript.pack_look(PackedInt32Array([HOMING.look_layer])), "a plain shot shows its modifier's look")
-	check_equal(StaffCompiler._look_of([] as Array[ElementBase], [SPLIT] as Array[ModifierBase]), 0, "no card with a look, no layers")
+	check_equal(StaffCompiler._look_of([] as Array[ElementBase], [NO_LOOK] as Array[ModifierBase]), 0, "no card with a look, no layers")
 
 
 ## Spawn `count` bolts for the actor `player`, each with the look of `kinds`.

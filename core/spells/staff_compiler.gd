@@ -149,10 +149,12 @@ func _read_group(want: int, payload: bool) -> CompiledGroup:
 			# changes nothing else either.
 			var kept_modifiers: Array[ModifierBase] = []
 			var deflects: bool = false
+			var blasts: bool = false
 			for modifier in modifiers:
 				deflects = deflects or (modifier.behaviour == ModifierBase.Behaviour.DEFLECT and behaviour_runs(modifier.behaviour, form.motion))
+				blasts = blasts or (modifier.behaviour == ModifierBase.Behaviour.BLAST and behaviour_runs(modifier.behaviour, form.motion))
 			for modifier in modifiers:
-				if behaviour_runs(modifier.behaviour, form.motion) and not (deflects and _shield_outrun(modifier, form.motion)):
+				if behaviour_runs(modifier.behaviour, form.motion, blasts) and not (deflects and _shield_outrun(modifier, form.motion)):
 					kept_modifiers.append(modifier)
 			var spell: CompiledSpell = _build(form, elements, kept_modifiers, trigger, CompiledSpell.FALLBACK_NONE)
 			spell.slot = slot
@@ -160,7 +162,7 @@ func _read_group(want: int, payload: bool) -> CompiledGroup:
 			for at: int in kept:
 				var modifier := _cards[at] as ModifierBase
 				if modifier != null and not kept_modifiers.has(modifier):
-					var why: String = "deflect turns every shot that touches it first" if deflects and _shield_outrun(modifier, form.motion) else behaviour_waste(modifier.behaviour, form.motion)
+					var why: String = "deflect turns every shot that touches it first" if deflects and _shield_outrun(modifier, form.motion) else behaviour_waste(modifier.behaviour, form.motion, blasts)
 					_waste(at, "%s does nothing on a %s: %s." % [_name(modifier), _name(form), why])
 				else:
 					_attach(at, slot)
@@ -393,8 +395,8 @@ static func homing_steers(motion: FormBase.Motion) -> bool:
 
 ## True when a carrier of `motion` can run `behaviour` (`behaviour_waste` gives no reason). A
 ## card whose behaviour cannot run is wasted.
-static func behaviour_runs(behaviour: int, motion: FormBase.Motion) -> bool:
-	return behaviour_waste(behaviour, motion).is_empty()
+static func behaviour_runs(behaviour: int, motion: FormBase.Motion, blasts: bool = false) -> bool:
+	return behaviour_waste(behaviour, motion, blasts).is_empty()
 
 
 ## Why a carrier of `motion` cannot run `behaviour`, for the wasted card's reason, or "" when it
@@ -403,7 +405,9 @@ static func behaviour_runs(behaviour: int, motion: FormBase.Motion) -> bool:
 ## left silent, and a wasted card changes nothing else either (its numbers too). When the runtime
 ## learns a behaviour on a new carrier, the carrier comes off its list here in the same change;
 ## tests/core/test_card_rules.gd plays every card on every carrier and fails on a silent one.
-static func behaviour_waste(behaviour: int, motion: FormBase.Motion) -> String:
+## `blasts` is true when the carrier also has a blast: its area hit carries heavy's knockback and
+## slam even on a carrier that hits nothing itself (it sends no shot hit, so no chain or siphon).
+static func behaviour_waste(behaviour: int, motion: FormBase.Motion, blasts: bool = false) -> String:
 	match behaviour:
 		ModifierBase.Behaviour.HOMING:
 			return "" if homing_steers(motion) else "it cannot be steered"
@@ -421,7 +425,9 @@ static func behaviour_waste(behaviour: int, motion: FormBase.Motion) -> String:
 			if flies(motion) or motion == FormBase.Motion.RAY or motion == FormBase.Motion.FISSURE:
 				return ""
 			return "it turns a shot or a beam at walls, and %s" % _what(motion)
-		ModifierBase.Behaviour.CHAIN, ModifierBase.Behaviour.HEAVY, ModifierBase.Behaviour.SIPHON, ModifierBase.Behaviour.POSSESS:
+		ModifierBase.Behaviour.HEAVY:
+			return "" if hits(motion) or blasts else "it acts on what the carrier hits, and %s (a blast would carry it)" % _what(motion)
+		ModifierBase.Behaviour.CHAIN, ModifierBase.Behaviour.SIPHON, ModifierBase.Behaviour.POSSESS:
 			return "" if hits(motion) else "it acts on what the carrier hits, and %s" % _what(motion)
 		ModifierBase.Behaviour.MAGNET, ModifierBase.Behaviour.RELAY:
 			return "" if stays(motion) else "it needs a shot that stays in the world, and %s" % _what(motion)

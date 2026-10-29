@@ -43,6 +43,14 @@ func test_cards_that_work_are_not_listed() -> void:
 		check(not staff.wasted.has(0), "%s counts: %s" % [cards, staff.wasted])
 
 
+func test_heavy_counts_on_a_dash_with_a_blast() -> void:
+	# The blast's area hit is the dash's hit: heavy's knockback and slam ride on it.
+	var staff: CompiledStaff = _staff(["heavy", "blast", "dash"])
+	check(not staff.wasted.has(0), "heavy counts with a blast: %s" % staff.wasted)
+	check(staff.casts[0].group.spells[0].hit.slam > 0, "the blast slams")
+	check(_staff(["siphon", "blast", "dash"]).wasted.has(0), "siphon still does not: a blast is no shot hit")
+
+
 func test_a_wasted_card_changes_nothing_else() -> void:
 	# Heavy slows what it is on; wasted on a dash, the dash is as fast as a plain one.
 	var plain: CompiledSpell = _staff(["dash"]).casts[0].group.spells[0]

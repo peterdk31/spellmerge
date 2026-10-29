@@ -6,7 +6,9 @@ extends SceneTree
 ## a target again after it has left it, owner's rule: the first change is a slow shot that pushes a
 ## target ahead of it and hits it again when it catches up; and again when the moves on a shot came
 ## to add up, rules R1e: the shots do the same, only the state line now shows the moves under way,
-## added up, where it showed a finished move's stale numbers).
+## added up, where it showed a finished move's stale numbers; and again in rules R4a, when a
+## shield's scan stopped spending the hit-work budget: the shots do the same, only the work left
+## is higher).
 ##
 ## The scene has every behaviour the manager knows: plain shots that pierce, homing shots (their
 ## searches included), orbit shots round wizards and round other shots (in lower and higher slots),

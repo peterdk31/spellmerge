@@ -39,7 +39,7 @@ func _initialize() -> void:
 	_test_spiral_weaves_round_its_line()
 	_test_return_comes_back_and_hits_twice()
 	_test_linger_stops_then_goes_on()
-	_test_growth_is_capped()
+	_test_growth_grows_to_the_room()
 	_test_sticky_follows_its_target()
 	_test_shield_blocks_enemy_shots()
 	_test_shield_only_for_actors_shots()
@@ -236,14 +236,18 @@ func _test_linger_stops_then_goes_on() -> void:
 	_check(absf(_expired[0][1].x - 100.0 - 50.0) < 6.0, "having flown the whole flight (%s)" % _expired[0][1])
 
 
-func _test_growth_is_capped() -> void:
+func _test_growth_grows_to_the_room() -> void:
 	_setup()
 	var slot: int = _fire(Vector2(10.0, 0.0), Vector2(50.0, 100.0), 10.0)
 	_mgr.set_growth(slot, 2.0)
 	_run(60)
 	_check(absf(_mgr.get_growth_of(slot) - 2.0) < 0.05, "a shot growing x2 a second is twice as big after a second (%f)" % _mgr.get_growth_of(slot))
-	_run(300)
-	_check(absf(_mgr.get_growth_of(slot) - ManagerScript.GROWTH_MAX) < 0.01, "and stops at %s times" % ManagerScript.GROWTH_MAX)
+	_run(60)
+	_check(absf(_mgr.get_growth_of(slot) - 4.0) < 0.1, "and four times after two: no cap at a few times (%f)" % _mgr.get_growth_of(slot))
+	_mgr.set_growth(slot, 1000.0)
+	_run(60)
+	# Its radius starts at 3 px (`_fire`).
+	_check(absf(_mgr.get_growth_of(slot) * 3.0 - 640.0) < 1.0, "it grows until it is as big as the room, 640 px (%f)" % (_mgr.get_growth_of(slot) * 3.0))
 	# A grown shot hits what the small one would miss.
 	_setup()
 	var big: int = _fire(Vector2(20.0, 0.0), Vector2(50.0, 100.0), 10.0)

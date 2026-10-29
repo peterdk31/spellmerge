@@ -52,11 +52,12 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 - [ ] **Card: swing (melee I4).** (`content/spells/forms/swing/`) After I2.
 - [ ] **Card: deflect (melee I5).** (`content/spells/modifiers/deflect/`) After I3 and I4.
 - [ ] **Card: slam (melee I8).** (the playground, `core/spells/`, `content/spells/forms/slam/`) After I4.
-- [ ] **Freezes in co-op (melee I7).** (`gameplay/feel/`, `core/projectiles/`) Decided by the owner on 2026-10-29: local stops, game-wide only for a downed player and a boss kill (M2-staffs.md, "Freezes in co-op").
 
 ## Blocked
 
 ## Done recently
+
+- [x] **Freezes in co-op (melee I7).** A hit or a kill holds only its attacker, target and shot (`Actors.hold`, `Projectiles.freeze_shot`); a reaction holds its caster; `Engine.time_scale` drops only for a downed player and a boss kill (`EnemyBase.boss`). Tests: `test_feel_local_stop.gd`, `test_projectiles_freeze.gd`. **Still to do when I5 lands:** the parry's local stop (call `_hold_bodies` from the parry's event).
 
 - [x] **Screen shake setting (melee I6).** Settings has "Screen shake: On/Off" (on by default). It sends `screen_shake_changed` to feel (`Feel.shake_enabled`) and is saved in `SaveFile` (new `get_setting`/`set_setting`), read again when the menu is bound. Tests: `test_pause_menu.gd`, `test_feel_form_looks.gd`, `test_events.gd`.
 

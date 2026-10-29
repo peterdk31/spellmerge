@@ -224,11 +224,11 @@ func test_burst_fires_a_scatter_group_in_new_directions() -> void:
 	check(first.size() == 3, "three at first")
 
 
-func test_the_waiting_launches_are_capped() -> void:
+func test_the_waiting_launches_are_never_dropped_for_room() -> void:
 	_build(0, [&"burst", &"bolt"])
-	for i in SpellLimits.MAX_PENDING + 10:
+	for i in SpellLimits.PENDING_START + 10:
 		_spells._delay(1.0, null, null, 0, 0, 0, Vector2.ZERO, Vector2.RIGHT, null, false)
-	check_equal(_spells.delayed_dropped, 10, "the rest are dropped, not queued")
+	check_equal(_spells._pending.size(), SpellLimits.PENDING_START + 10, "all of them wait: the queue grows")
 
 
 func test_echo_fires_the_carrier_again_at_half_damage() -> void:
@@ -363,7 +363,6 @@ func test_releasing_a_hold_drops_the_waiting_firings() -> void:
 func _trigger_card(id: StringName, event: TriggerBase.Event) -> void:
 	var trigger := TriggerBase.new()
 	trigger.event = event
-	trigger.max_fires = 1
 	_put(trigger, id)
 
 

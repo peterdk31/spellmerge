@@ -44,7 +44,7 @@ enum Behaviour {
 	SPIRAL,
 	## Also fires the carrier backwards (B2).
 	MIRROR,
-	## Grows `behaviour_strength` times bigger per second of flight, up to `GROWTH_MAX` (B1): a
+	## Grows `behaviour_strength` times bigger per second of flight, up to the room's size (B1): a
 	## wider hit circle, the same damage (owner, 2026-10-27: size is the card; damage is overcharge's).
 	GROWTH,
 	## Takes on the infusions of the last cast of any actor its shot hits (B2; owner, 2026-10-28).

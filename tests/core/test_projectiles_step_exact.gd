@@ -1,7 +1,10 @@
 extends SceneTree
 ## The exactness test of the projectile step (shots stepped by behaviour, 2026-10-28): one busy,
 ## mixed scene stepped by hand, compared line by line with a recording of what the step did before
-## it was split into passes (`fixtures/projectile_step/expected.json`, recorded on main c900bd4).
+## it was split into passes (`fixtures/projectile_step/expected.json`, recorded on main c900bd4;
+## recorded again 2026-10-29 when a piercing shot came to hit every target it passes in a step, and
+## a target again after it has left it, owner's rule: the first change is a slow shot that pushes a
+## target ahead of it and hits it again when it catches up).
 ##
 ## The scene has every behaviour the manager knows: plain shots that pierce, homing shots (their
 ## searches included), orbit shots round wizards and round other shots (in lower and higher slots),

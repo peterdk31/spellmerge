@@ -13,6 +13,9 @@ extends Resource
 ## Damage a player takes from touching the enemy.
 @export var contact_damage: int = 0
 @export var scene: PackedScene
+## True for a boss: its death stops the whole game for a moment (Feel); other kills hold only the
+## bodies in them.
+@export var boss: bool = false
 
 # Staffs F8 (docs/milestones/M2-staffs.md, "Enemy staffs"): an enemy that has a staff and
 # cards attacks by casting them through core/spells like a wizard, player cards only, and pays

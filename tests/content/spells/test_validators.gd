@@ -120,7 +120,6 @@ func test_the_broken_modifier_fails() -> void:
 func test_the_broken_trigger_fails() -> void:
 	var problems := SpellValidator.check_component(_component(FIXTURES + "/trigger/broken_trigger.tres"), _manifest())
 	check(_fields(problems, "range").has("event"), "an unknown event")
-	check(_fields(problems, "range").has("max_fires"), "too many fires")
 	check(not _has_rule(problems, "required-field"), "a trigger that is no timer needs no interval")
 
 

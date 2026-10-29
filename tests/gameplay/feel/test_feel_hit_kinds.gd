@@ -72,40 +72,40 @@ func _hit(player: int, target: Node, kind: StringName) -> void:
 	bus.damage_dealt.emit(player, target, 5, Vector2.ZERO)
 
 
-func test_a_burst_stops_the_game_longer_and_shakes_harder_than_a_shot() -> void:
+func test_a_burst_holds_its_attacker_longer_and_shakes_harder_than_a_shot() -> void:
 	_hit(0, _enemy(), &"shot")
-	var shot_stop: float = feel.stop_left
+	var shot_stop: float = actors.held_left(0)
 	var shot_shake: float = feel.trauma()
-	check(shot_stop > 0.0 and shot_shake > 0.0, "a shot stops and shakes")
-	feel.stop_left = 0.0
-	feel.rest_left = 0.0
+	check(shot_stop > 0.0 and shot_shake > 0.0, "a shot holds and shakes")
 	feel._trauma = 0.0
-	_hit(0, _enemy(), &"burst")
-	check(feel.stop_left > shot_stop, "a burst stops longer")
+	_hit(1, _enemy(), &"burst")
+	check(actors.held_left(1) > shot_stop, "a burst holds longer")
 	check(feel.trauma() > shot_shake, "and shakes harder")
+	check_equal(feel.stop_left, 0.0, "neither stops the whole game")
 
 
 func test_damage_over_time_neither_stops_nor_shakes() -> void:
 	_hit(0, _enemy(), &"status")
-	check_equal(feel.stop_left, 0.0, "no stop")
+	check_equal(actors.held_left(0), 0.0, "no stop")
 	check_equal(feel.trauma(), 0.0, "no shake")
 
 
 func test_a_beam_is_gentler_than_a_shot() -> void:
 	_hit(0, _enemy(), &"ray")
-	check(feel.stop_left > 0.0 and feel.stop_left < preset.hit_stop_seconds, "a shorter stop")
+	var held: float = actors.held_left(0)
+	check(held > 0.0 and held < preset.hit_stop_seconds, "a shorter stop")
 
 
 func test_a_hit_with_no_kind_feels_like_a_shot() -> void:
 	bus.damage_dealt.emit(0, _enemy(), 5, Vector2.ZERO)
-	check_equal(feel.stop_left, preset.hit_stop_seconds, "the old default")
+	check(is_equal_approx(actors.held_left(0), preset.hit_stop_seconds), "the old default")
 
 
 func test_a_stale_kind_is_not_applied_to_a_later_hit() -> void:
 	var other: Node2D = _enemy()
 	bus.hit_landed.emit(0, other, 5, Vector2.ZERO, &"burst")
 	bus.damage_dealt.emit(0, _enemy(), 5, Vector2.ZERO)
-	check_equal(feel.stop_left, preset.hit_stop_seconds, "the kind belongs to the target it was sent for")
+	check(is_equal_approx(actors.held_left(0), preset.hit_stop_seconds), "the kind belongs to the target it was sent for")
 
 
 func test_a_wizard_hit_by_their_own_spell_gets_a_ring() -> void:
@@ -137,6 +137,7 @@ func test_a_heal_shows_a_ring_without_stop_or_shake() -> void:
 	bus.heal_dealt.emit(1, wizard, 5, Vector2(10.0, 10.0))
 	check(feel.effects_of(FeelScript.KIND_RING_OUT) > before, "a ring")
 	check_equal(feel.stop_left, 0.0, "no stop")
+	check_equal(actors.held_count, 0, "nobody held")
 	check_equal(feel.trauma(), 0.0, "no shake")
 
 

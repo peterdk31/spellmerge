@@ -251,8 +251,8 @@ static func _check_modifier(modifier: ModifierBase) -> Array[Dictionary]:
 
 static func _check_trigger(trigger: TriggerBase) -> Array[Dictionary]:
 	var problems: Array[Dictionary] = []
-	if trigger.event == TriggerBase.Event.TIMER and trigger.interval < SpellLimits.MIN_TIMER_INTERVAL:
-		problems.append(_problem("required-field", trigger.resource_path, "interval", "A TIMER trigger needs an `interval` of at least %s seconds." % str(SpellLimits.MIN_TIMER_INTERVAL)))
+	if trigger.event == TriggerBase.Event.TIMER and not trigger.interval > 0.0:
+		problems.append(_problem("required-field", trigger.resource_path, "interval", "A TIMER trigger needs an `interval` above 0 seconds (it fires at most once a physics step)."))
 	return problems
 
 

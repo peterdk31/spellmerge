@@ -28,10 +28,10 @@ enum Event {
 }
 
 @export var event: Event = Event.HIT
-## TIMER only: seconds between fires.
+## TIMER only: seconds between fires. A trigger fires every time its event happens, for as
+## long as its carrier lives (owner, 2026-10-29: no per-shot count; the spell runtime's per-step
+## fire cap is the only bound).
 @export var interval: float = 0.0
-## How often one shot may fire the held spell at most.
-@export var max_fires: int = 1
 
 
 func kind() -> StringName:
@@ -43,6 +43,5 @@ func ranges() -> Dictionary:
 	limits.merge({
 		"event": Vector2(0, Event.size() - 1),
 		"interval": Vector2(0.0, 10.0),
-		"max_fires": Vector2(1, 4),
 	})
 	return limits

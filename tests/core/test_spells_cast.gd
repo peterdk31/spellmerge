@@ -92,10 +92,9 @@ func before_each() -> void:
 	homing.behaviour_strength = 6.0
 	homing.behaviour_reach = 160.0
 	_put(homing, &"homing")
-	_trigger(&"on_hit", TriggerBase.Event.HIT, 1)
-	_trigger(&"on_hit_twice", TriggerBase.Event.HIT, 2)
-	_trigger(&"on_expire", TriggerBase.Event.EXPIRE, 1)
-	var timer: TriggerBase = _trigger(&"timer", TriggerBase.Event.TIMER, 4)
+	_trigger(&"on_hit", TriggerBase.Event.HIT)
+	_trigger(&"on_expire", TriggerBase.Event.EXPIRE)
+	var timer: TriggerBase = _trigger(&"timer", TriggerBase.Event.TIMER)
 	timer.interval = 0.5
 
 
@@ -116,10 +115,9 @@ func _form(id: StringName, damage: int, speed: float, lifetime: float) -> FormBa
 	return form
 
 
-func _trigger(id: StringName, event: TriggerBase.Event, max_fires: int) -> TriggerBase:
+func _trigger(id: StringName, event: TriggerBase.Event) -> TriggerBase:
 	var trigger := TriggerBase.new()
 	trigger.event = event
-	trigger.max_fires = max_fires
 	_put(trigger, id)
 	return trigger
 
@@ -363,7 +361,7 @@ func test_on_expire_at_a_wall_fires_in_front_of_it() -> void:
 		check(_mgr.get_position_of(shots[0]).x < 100.0, "in front of the wall, not inside it")
 
 
-func test_a_timer_fires_at_most_four_times() -> void:
+func test_a_timer_fires_every_interval_for_as_long_as_its_shot_lives() -> void:
 	var tag: int = _build(0, 0, _held(&"slow", &"timer", &"rune"))
 	var held_tag: int = _spells.current_tag(0, 0, 1)
 	_cast(0)
@@ -372,11 +370,14 @@ func test_a_timer_fires_at_most_four_times() -> void:
 	_tick(15)
 	check_equal(_spells.live_shots(held_tag), 1, "one after 0.5 s")
 	_tick(200)
-	check_equal(_spells.live_shots(held_tag), 4, "four in all, then it stops")
+	check_equal(_spells.live_shots(held_tag), 7, "one every 0.5 s: seven by 3.9 s, no count stops it")
 	check_equal(_spells.live_shots(tag), 1, "the timer shot flies on")
+	_tick(120)
+	check_equal(_spells.live_shots(tag), 0, "until its 5 s life is over")
+	check(_spells.live_shots(held_tag) >= 9, "and it fired all its life (%d)" % _spells.live_shots(held_tag))
 
 
-func test_each_shot_fires_a_trigger_up_to_max_fires_only() -> void:
+func test_a_trigger_fires_every_time_its_event_happens() -> void:
 	for x in [40.0, 70.0, 100.0, 130.0]:
 		_target(Vector2(x, 0))
 	_build(0, 0, {"form": &"bolt", "modifiers": [&"pierce"], "trigger": &"on_hit", "held": {"form": &"bolt"}})
@@ -386,30 +387,33 @@ func test_each_shot_fires_a_trigger_up_to_max_fires_only() -> void:
 	for hit in _hits:
 		first_hits += 1 if hit[3] == _spells.current_tag(0, 0) else 0
 	check_equal(first_hits, 4, "the shot pierced four targets")
-	check_equal(_born(_spells.current_tag(0, 0, 1)), 1, "but its trigger fired once")
-	_build(1, 0, {"form": &"bolt", "modifiers": [&"pierce"], "trigger": &"on_hit_twice", "held": {"form": &"bolt"}})
-	_cast(1)
-	_tick(30)
-	check_equal(_born(_spells.current_tag(1, 0, 1)), 2, "a trigger with max_fires 2 fired twice")
+	check_equal(_born(_spells.current_tag(0, 0, 1)), 4, "and its trigger fired at every hit")
 
 
-func test_the_fire_cap_drops_the_extra_held_spells_of_one_player() -> void:
+func test_fires_past_a_steps_room_wait_for_the_next_step() -> void:
 	for n in 24:
 		_target(Vector2.from_angle(TAU * n / 24.0) * 120.0)
 	var hold: Dictionary = {"form": &"ring", "trigger": &"on_hit", "held": {"form": &"bolt"}}
+	_spells.fire_shots_per_step = 32
 	_build(0, 0, hold)
 	_build(0, 1, hold)
 	_build(1, 0, hold)
 	_cast(0, 0)
 	_cast(0, 1)
 	_cast(1, 0)
-	_tick(24)
-	var fired_0: int = _born(_spells.current_tag(0, 0, 1)) + _born(_spells.current_tag(0, 1, 1))
-	check_equal(fired_0, SpellLimits.MAX_FIRES_PER_STEP, "player 0 fired the cap, from 48 hits")
-	check_equal(_born(_spells.current_tag(1, 0, 1)), 24, "player 1 fired all 24: the cap is per player")
-	check_equal(_spells.fires_dropped, 48 - SpellLimits.MAX_FIRES_PER_STEP, "the rest were dropped, not queued")
-	_tick(4)
-	check_equal(_born(_spells.current_tag(0, 0, 1)) + _born(_spells.current_tag(0, 1, 1)), fired_0, "nothing was fired later")
+	var fired_0: int = 0
+	for _i in 30:
+		# The hits are in the manager's step; the runtime's step opens the next room.
+		_mgr.step(DT)
+		fired_0 = _born(_spells.current_tag(0, 0, 1)) + _born(_spells.current_tag(0, 1, 1))
+		if fired_0 > 0:
+			break
+		_spells.step(DT)
+	check_equal(fired_0, 32, "player 0 fired the step's room, from 48 hits")
+	check_equal(_born(_spells.current_tag(1, 0, 1)), 24, "player 1 fired all 24: the room is per player")
+	check_equal(_spells.fires_waited, 16, "the rest wait, not dropped")
+	_spells.step(DT)
+	check_equal(_born(_spells.current_tag(0, 0, 1)) + _born(_spells.current_tag(0, 1, 1)), 48, "and fire as the next step opens")
 
 
 func test_chain_jumps_to_new_targets_only() -> void:
@@ -616,22 +620,19 @@ func test_a_shot_replaced_in_its_slot_is_timed_once() -> void:
 	check(_born(_spells.current_tag(0, 0, 1)) <= 2, "the held spell fired at the timer's rate (1 s of life, every 0.5 s)")
 
 
-func test_chains_are_capped_per_step() -> void:
+func test_every_chain_jump_happens_however_many_in_one_step() -> void:
+	# A dense crowd, so every jump finds a new target in reach.
 	for x in range(20, 190, 8):
 		for y in range(-60, 61, 8):
 			_target(Vector2(x, y))
-	var recipe: Dictionary = {"form": &"beam", "modifiers": [&"split", &"pierce", &"chain"]}
+	var recipe: Dictionary = {"form": &"beam", "modifiers": [&"split", &"split", &"split", &"chain", &"chain", &"chain"]}
 	var spell: CompiledSpell = _compile(recipe)
+	check(spell.shots * spell.chain_jumps > SpellsScript.JUMP_QUEUE, "more jumps in one step than the jump ring starts with (%d)" % (spell.shots * spell.chain_jumps))
 	_build(0, 0, recipe)
 	_cast(0)
-	check(_spells.chains_dropped > 0, "the jumps over the cap were dropped and counted")
-	var direct: int = spell.shots * (spell.pierce + 1)
-	check(_hits.size() <= direct + SpellLimits.MAX_CHAINS_PER_STEP, "hits stay under the beams plus the jump budget: %d" % _hits.size())
-	var before: int = _hits.size()
-	_tick(60)
-	_cast(0)
-	check(_hits.size() > before, "the budget is renewed by the next step")
-
+	# Up to shots x (jumps + 1); a beam at the fan's edge that misses the crowd makes none.
+	check(_hits.size() > spell.shots + SpellsScript.JUMP_QUEUE, "more jumps landed in this one step than the ring starts with (%d hits)" % _hits.size())
+	check(_hits.size() <= spell.shots * (spell.chain_jumps + 1), "and no more than the cards give")
 
 func test_the_spell_runtime_steps_after_the_projectile_manager() -> void:
 	check(ProjectSettings.get_order("autoload/Projectiles") < ProjectSettings.get_order("autoload/Spells"), "Projectiles is listed before Spells in project.godot")

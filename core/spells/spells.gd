@@ -994,8 +994,6 @@ func _launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direct
 				_apply_shield(slot, spell)
 			_:
 				slot = projectiles.spawn(actor, origin, heading * spell.speed, lifetime, spell.radius, HITS, spell.pierce, tag)
-				if slot >= 0 and spell.homing_range > 0.0:
-					projectiles.set_homing(slot, spell.homing_turn, spell.homing_range)
 				if slot >= 0:
 					_apply_travel(slot, spell)
 		if slot < 0:
@@ -1282,9 +1280,12 @@ func _end_entities(tag: int) -> void:
 		events.entity_end_requested.emit(SpellTag.caster_of(tag), tag)
 
 
-## Hand a flying shot the behaviours of its cards that the projectile manager runs (staffs B1).
-## A plain shot costs one comparison per behaviour and no call.
+## Hand a flying shot the behaviours of its cards that the projectile manager runs (staffs B1):
+## a shot from the staff and a chain jump alike (rules R1b). A plain shot costs one comparison
+## per behaviour and no call.
 func _apply_travel(slot: int, spell: CompiledSpell) -> void:
+	if spell.homing_range > 0.0:
+		projectiles.set_homing(slot, spell.homing_turn, spell.homing_range)
 	if spell.behaviour(ModifierBase.Behaviour.RETURN) > 0.0:
 		projectiles.set_return(slot)
 	if spell.behaviours.is_empty():
@@ -2865,11 +2866,17 @@ func _jump(spell: CompiledSpell, tag: int, actor: int, position: Vector2, target
 		_jq_prev[end] = struck
 		_jq_hit[end] = hit
 		return
+	# A flying jump is its carrier fired again from the hit (rules R1b, rule 2): every card it has
+	# (homing, bounce, ghost, spiral, linger, growth, sticky, return, shield, pierce, arc, magnet,
+	# its trigger), one jump fewer. Only its aim, its source exclusion and its speed (at least
+	# CHAIN_MIN_SPEED, for a carrier that does not fly) differ; it flies as far as its carrier
+	# would, and at least far enough to reach the target.
 	var speed: float = maxf(spell.speed, SpellLimits.CHAIN_MIN_SPEED)
-	var life: float = (distance + 16.0) / speed * 1.5 + 0.05
-	var slot: int = projectiles.spawn(actor, position, along * speed, life, spell.radius, HITS, 0, tag)
+	var life: float = maxf((distance + 16.0) / speed * 1.5 + 0.05, spell.lifetime * spell.speed / speed)
+	var slot: int = projectiles.spawn(actor, position, along * speed, life, spell.radius, HITS, spell.pierce, tag)
 	if slot < 0:
 		return
+	_apply_travel(slot, spell)
 	_register(slot, tag, spell, chain, struck)
 	_rec_relay[slot] = hit
 	_rec_zap[slot] = zap

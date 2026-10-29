@@ -2,9 +2,9 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
-## 2026-10-29: Card rules check confirmed (rules R3)
+## 2026-10-29: Card rules R2 and R3 ticked off
 
-R2 and R3 had already landed on main (#468). This session confirmed `tests/core/test_card_rules.gd` passes (179 unit tests) and ticked both off in `docs/NEXT.md`. The rule 2 checks (a card survives a bounce, jump, echo, payload) are in the backlog.
+R2 and R3 landed on main in #468; ticked off in `docs/NEXT.md`. The rule 2 checks (a card survives a bounce, jump, echo, payload) are deferred to `docs/BACKLOG.md`.
 
 ## 2026-10-29: Freezes in co-op (melee I7)
 

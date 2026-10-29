@@ -2203,3 +2203,10 @@ The owner: restructure the projectile step from "for each shot, check every beha
 - **Now:** a shot keeps a list of the moves under way (one growing pool, as the hit memory; no cap), and each runs on its own time, added on top of the shot's motion. Two opposite pushes cancel; a hook after a recoil gets both. A blink (a teleport or swap) moves the shot at once and keeps the moves under way. `move_shot` is the one place this lives; `Spells` did not change.
 - **What a player sees:** a payload with `mirror · recoil` leaves its shot on its line, and a shot's recoil is not lost when it hooks or dashes.
 - `test_projectiles_step_exact`'s recording was made again: the shots do the same; only its state line shows the moves under way, added up, where it showed a finished move's stale numbers.
+
+## 2026-10-29: Planning with an empty queue (M2 is not done)
+
+- **Why the queue ran empty:** the only open bot task was D3, which waits for both lanes. The rules phase (R2, R3) had no tasks in `docs/NEXT.md`, so they are added to the bot's Queue, with the clip recorder leftover. The owner-lane melee tasks I2, I3, I4, I5 and I8 have merged (#457, #460, #463, #464) and are ticked off. Still open in the owner lane: B5, B6a, B8, and R4.
+- **M2 is not at its checkpoint:** R2, R3, R4, the owner-lane tasks and D3 remain, so no checkpoint is opened.
+- **R4 waits on the owner.** It needs the owner's re-decisions (M2-rules.md, "R4"); D3 waits for it.
+- **Backlog #417 (downed wizard shrinks into its hat):** wizards are living staffs now (phase H) and have no hat; it stays on the backlog and should be reworded for the staff body when M4 polish starts. #416 (the Nuke relic) belongs to M3 relics. #208 (pet) is not for M2; it stays on the backlog for the M3/M5 designs, where a spell form or relic comes before a separate system (DESIGN.md: the focus is building spells).

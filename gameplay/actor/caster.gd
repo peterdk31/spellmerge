@@ -81,6 +81,8 @@ var _placed_aim: Vector2 = Vector2.INF
 var _placed_current: int = -1
 var _placed_anchor: Vector2 = Vector2.INF
 var _placed_tip: Vector2 = Vector2.INF
+## The hand when the place was last sent (what a swing turns round).
+var _placed_pivot: Vector2 = Vector2.INF
 
 
 func setup(owner_actor: Actor) -> void:
@@ -171,12 +173,13 @@ func _push_place() -> void:
 		# The anchor and the staff tip clipped to walls (`_origin`), in one call.
 		tip = actor.projectiles.place_caster(number, anchor, feet, tip)
 	if actor.spells != null:
-		actor.spells.set_aim(number, tip, actor.aim)
+		actor.spells.set_aim(number, tip, actor.aim, actor.aim_pivot())
 	_placed_feet = feet
 	_placed_aim = actor.aim
 	_placed_current = current
 	_placed_anchor = anchor
 	_placed_tip = tip
+	_placed_pivot = actor.aim_pivot()
 
 
 ## Send what `_push_place` sent last again, before a cast: a new run may have cleared the systems
@@ -187,7 +190,7 @@ func _push_place_again() -> void:
 	if actor.projectiles != null:
 		actor.projectiles.set_anchor(number, _placed_anchor)
 	if actor.spells != null:
-		actor.spells.set_aim(number, _placed_tip, _placed_aim)
+		actor.spells.set_aim(number, _placed_tip, _placed_aim, _placed_pivot)
 
 
 ## Where a cast leaves: the staff tip, or where a wall cuts the staff (the manager takes no pool

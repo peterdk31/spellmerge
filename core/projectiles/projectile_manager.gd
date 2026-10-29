@@ -248,6 +248,8 @@ const HIT_WORK: int = 40
 const HOMING_PERIOD: int = 4
 ## The straight pieces a bent beam (`ray_curve`) is walked as.
 const RAY_SEGMENTS: int = 8
+## Rows `sweep`'s results hold at first; they grow when a sweep finds more.
+const SWEEP_START: int = 32
 ## Points a ray's path holds at first; it grows when a path is longer (a homing beam bending on
 ## from target to target, a beam turning at many walls), so nothing limits a ray (owner,
 ## 2026-10-29: a beam hits every target its pierce gives, is as long as its card says, turns at
@@ -779,6 +781,11 @@ var ray_path_count: int = 0
 ## did nothing). Read right after the call: a nested ray in a hit handler changes them.
 var ray_end: Vector2 = Vector2.INF
 var ray_end_heading: Vector2 = Vector2.ZERO
+## What the last `sweep` found (reused; grows when a sweep finds more): the bodies, where the
+## wedge meets each, and the sweep's way there. Read right after the call: a hit handler's sweep changes them.
+var sweep_nodes: Array = []
+var sweep_points: PackedVector2Array = PackedVector2Array()
+var sweep_heads: PackedVector2Array = PackedVector2Array()
 
 
 func _init() -> void:
@@ -788,6 +795,9 @@ func _init() -> void:
 	_member_count.resize(BEHAVIOURS)
 	_path.resize(RAY_PATH_START)
 	ray_path.resize(RAY_PATH_START)
+	sweep_nodes.resize(SWEEP_START)
+	sweep_points.resize(SWEEP_START)
+	sweep_heads.resize(SWEEP_START)
 	_anchors.resize(ACTORS)
 	_anchors.fill(Vector2.INF)
 	set_cap(DEFAULT_CAP_WEB if OS.has_feature("web") else DEFAULT_CAP_DESKTOP)
@@ -2504,6 +2514,78 @@ func _ray_level(level: int) -> void:
 		_ray_heads.append([])
 		_ray_walks.append([])
 		_ray_turns.append([])
+
+
+## The bodies a swing's sweep touches (melee I2): every target on `layers` (and ACTOR_LAYERS, as
+## in `ray`) whose hit circle reaches into the wedge round `origin` from `from_angle` to
+## `to_angle` radians off `direction` (`side` 1 counts clockwise on screen, -1 the other way;
+## `to_angle` not below `from_angle`), out to `reach` pixels, with no wall between it and
+## `origin`. Targets `caster` owns (its body) and `exclude` are skipped. It sends nothing: it
+## fills `sweep_nodes`, `sweep_points` (where the wedge meets the body, on its line from
+## `origin`) and `sweep_heads` (the way the sweep moves there) and returns how many (every one:
+## the results grow). Each step of a swing asks for the wedge it turned through since the last, so
+## a fast sweep misses nothing between two steps. Allocation-free.
+func sweep(caster: int, origin: Vector2, direction: Vector2, side: int, from_angle: float, to_angle: float, reach: float, layers: int = LAYER_ENEMY, exclude: Node = null) -> int:
+	if not is_caster(caster) or not origin.is_finite() or not direction.is_finite() or direction.is_zero_approx():
+		return 0
+	if not is_finite(reach) or reach <= 0.0 or not is_finite(from_angle) or not is_finite(to_angle) or to_angle < from_angle or _targets.is_empty():
+		return 0
+	_query_ready()
+	layers |= ACTOR_LAYERS
+	var base: float = direction.angle()
+	var turn: float = 1.0 if side >= 0 else -1.0
+	var skip: int = exclude.get_instance_id() if exclude != null else 0
+	var pad: Vector2 = Vector2.ONE * (reach + _max_target_radius)
+	var x0: int = clampi(floori((origin.x - pad.x - _bounds.position.x) / GRID_CELL), 0, _grid_w - 1)
+	var x1: int = clampi(floori((origin.x + pad.x - _bounds.position.x) / GRID_CELL), 0, _grid_w - 1)
+	var y0: int = clampi(floori((origin.y - pad.y - _bounds.position.y) / GRID_CELL), 0, _grid_h - 1)
+	var y1: int = clampi(floori((origin.y + pad.y - _bounds.position.y) / GRID_CELL), 0, _grid_h - 1)
+	var found: int = 0
+	for y in range(y0, y1 + 1):
+		for x in range(x0, x1 + 1):
+			var t: int = _cell_head[y * _grid_w + x]
+			while t >= 0:
+				if (_target_layer[t] & layers) != 0 and (caster < 0 or _target_owner[t] != caster) and _target_id[t] != skip and is_instance_valid(_targets[t]):
+					var to: Vector2 = _target_pos[t] - origin
+					var radius: float = _target_radius[t]
+					var distance: float = to.length()
+					if distance <= reach + radius:
+						# How far either side of its centre line the body's circle reaches.
+						var width: float = PI if distance <= radius else asin(radius / distance)
+						var local: float = angle_difference(base, to.angle()) * turn
+						if local + width >= from_angle and local - width <= to_angle and not (_has_walls and _wall_hit(origin, _target_pos[t]) >= 0.0):
+							var way: Vector2 = to / distance if distance > 0.0 else direction.normalized()
+							if found == sweep_nodes.size():
+								sweep_nodes.resize(found * 2)
+								sweep_points.resize(found * 2)
+								sweep_heads.resize(found * 2)
+							sweep_nodes[found] = _targets[t]
+							sweep_points[found] = origin + way * maxf(distance - radius, 0.0)
+							sweep_heads[found] = Vector2(-way.y, way.x) * turn
+							found += 1
+				t = _target_next[t]
+	return found
+
+
+## One hit of an instant carrier on `target` (a swing's, `sweep`): `projectile_impact` with `form`
+## for its look, then `projectile_hit(caster, target, point, tag)`, as a beam's hit sends them.
+## Returns false when it sent nothing (no events, or a gone target). It nests one ray level, as a
+## ray's hits do, so a ray its handlers fire has scratch of its own.
+func strike(caster: int, target: Node, point: Vector2, heading: Vector2, tag: int, form: StringName) -> bool:
+	if events == null or not is_instance_valid(target) or not is_caster(caster):
+		return false
+	_ray_depth += 1
+	var outer_slot: int = event_slot
+	event_slot = -1
+	impact_form = form
+	impact_core = Color.WHITE
+	impact_look = 0
+	events.projectile_impact.emit(caster, target, point, heading)
+	impact_form = &""
+	events.projectile_hit.emit(caster, target, point, tag)
+	_ray_depth -= 1
+	event_slot = outer_slot
+	return true
 
 
 ## The beam along the first `segments` pieces of `_path` (see `ray` and `ray_curve`).

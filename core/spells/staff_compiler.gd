@@ -248,6 +248,8 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 		spell.lifetime = form.lifetime
 		spell.orbit_radius = form.orbit_radius
 		spell.ray_length = form.ray_length
+		spell.arc = form.arc
+		spell.wind_up = form.wind_up
 		spell.spread = form.spread
 		damage = form.base_damage
 		mana = form.mana_cost
@@ -309,7 +311,7 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 		spell.spread = SpellLimits.SPLIT_SPREAD
 	spell.hit = HitProfile.new()
 	spell.hit.damage = spell.damage
-	spell.hit.knockback = SpellLimits.KNOCKBACK
+	spell.hit.knockback = form.knockback if form != null and form.knockback > 0.0 else SpellLimits.KNOCKBACK
 	spell.hit.element_id = spell.element_id
 	spell.hit.element_ids = spell.element_ids
 	spell.hit.status_id = spell.status_id

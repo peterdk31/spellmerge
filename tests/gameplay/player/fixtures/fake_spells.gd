@@ -15,6 +15,8 @@ var origins: Array[Vector2] = []
 var directions: Array[Vector2] = []
 ## [player, staff] for every install, in order.
 var installed: Array[Vector2i] = []
+## actor -> the way its staff points in a swing, as a test sets it (`swing_pose`).
+var swing_poses: Dictionary = {}
 
 var _left: PackedFloat32Array = PackedFloat32Array()
 var _has: PackedByteArray = PackedByteArray()
@@ -74,6 +76,10 @@ func cast_staff(player: int, staff: int, origin: Vector2, direction: Vector2, ma
 
 func last_form(player: int, staff: int) -> StringName:
 	return _first[player * 4 + staff]
+
+
+func swing_pose(actor: int) -> Vector2:
+	return swing_poses.get(actor, Vector2.ZERO)
 
 
 func is_holding(_player: int, _staff: int) -> bool:

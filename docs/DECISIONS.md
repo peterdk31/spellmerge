@@ -2,9 +2,9 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
-## 2026-10-29: Builder tab glyphs sit over blank tab text
+## 2026-10-29: Builder tab glyphs sit in a box inside the tab
 
-A tab is a Button whose text is only blank room for its glyph (between "[" and "]" on the shown staff), with an `ActionGlyph` child placed over it. This keeps the button theme, the focus mark and the mouse hit area, and the "[ ]" mark means the shown staff is not told by colour alone. The room is re-measured when the player's device changes (a deferred render, after the glyphs have redrawn).
+A tab is a Button with no text of its own: an `HBoxContainer` inside it holds a "[" label (with the focus mark before it), the `ActionGlyph` and a "]" label, so the layout places the glyph, and the tab grows to its content (`minimum_size_changed`) when a key is wider than a pad button. The tab keeps the button theme and the mouse hit area, its name is in its tooltip, and the "[ ]" mark means the shown staff is not told by colour alone. An earlier version padded the tab text with spaces and worked out the glyph's place by hand; it was dropped as fragile and slow.
 
 ## 2026-10-28: Wall card numbers
 

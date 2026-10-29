@@ -79,7 +79,16 @@ func take() -> void:
 			fail("the builder of player %d is not open in builder_four_players (focus panel open: %s)" % [index + 1, _focus.call("is_open", index)])
 			return
 	await shot("builder_four_players")
-	for index in 4:
+	# Player 1 moves to the keyboard: the tabs show its (wider) keys, and all four still fit.
+	_input.call("leave", 0)
+	_input.call("join", -1)
+	await settle(STEP_FRAMES)
+	var first: Node = _hud.call("get_builder", 0)
+	if not first.call("is_open"):
+		first.call("open_builder")
+		await settle(STEP_FRAMES)
+	await shot("builder_keyboard_tabs")
+	for index in range(1, 4):
 		tap(index, &"pause")
 	await settle()
 	flow.call("stop_run")

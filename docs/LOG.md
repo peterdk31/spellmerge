@@ -4,7 +4,7 @@ What each run did, newest first. Claude appends a short entry after each develop
 
 ## 2026-10-29: Builder tab glyphs
 
-The builder's staff tabs now show the staff button (RB, RT, LB, LT on a pad, keys on the keyboard) drawn by `ActionGlyph`, still marked "[ ]" on the shown staff. The tab text is blank spaces (measured as a whole run) that hold the glyph; the glyph is placed over them. New test in `test_builder.gd`.
+The builder's staff tabs now show the staff button (RB, RT, LB, LT on a pad, keys on the keyboard) drawn by `ActionGlyph`, still marked "[ ]" on the shown staff. Each tab holds a box with its marks and the glyph, so the layout places it; tests check the glyph sits centred in its tab, also on the keyboard, and that four builders still fit. New shot `builder_keyboard_tabs`.
 
 ## 2026-10-29: Card familiar (staffs C)
 

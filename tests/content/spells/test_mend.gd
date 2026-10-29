@@ -54,13 +54,19 @@ func test_a_mend_bolt_carries_a_heal_and_a_small_enemy_hit() -> void:
 	arena.free_all()
 
 
-func test_a_mend_bolt_heals_a_hurt_teammate_and_a_plain_one_hurts_them() -> void:
+func test_a_mend_bolt_heals_a_hurt_teammate_and_a_plain_one_does_not() -> void:
 	var mended: Array[int] = _party(["mend", "pierce", "bolt"])
 	check(mended[0] > 0, "the mend bolt healed the teammate")
 	check(mended[2] < ALLY_HURT, "the teammate lacks less health than before (%d)" % mended[2])
 	var plain: Array[int] = _party(["pierce", "bolt"])
 	check_equal(plain[0], 0, "a plain bolt heals nobody")
 	check(plain[2] >= ALLY_HURT, "and the teammate is no better off (%d)" % plain[2])
+
+
+func test_the_builder_says_it_heals_wizards() -> void:
+	var arena := ArenaScript.new(root)
+	check(arena.spells.component_stats(&"mend").has("Heals wizards"), "the hub line: %s" % [arena.spells.component_stats(&"mend")])
+	arena.free_all()
 
 
 func test_a_mend_bolt_barely_hurts_an_imp() -> void:

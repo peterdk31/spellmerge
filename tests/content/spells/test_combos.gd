@@ -173,6 +173,10 @@ func test_every_row_has_its_fields_and_an_unseen_id() -> void:
 		check((combo.get("checks", []) as Array).size() > 0, "%s has a check" % id)
 		for row: Dictionary in combo.get("checks", []):
 			check(CHECK_KINDS.has(str(row.get("kind", ""))), "%s: check kind %s is known" % [id, row.get("kind")])
+			for index: Variant in row.get("imps", []):
+				check(int(index) >= 0 and int(index) < (combo.get("imps", []) as Array).size(), "%s: check imp %s is one of the combo's imps" % [id, index])
+		if combo.has("hurt"):
+			check(bool(combo.get("guard", false)) or (combo.get("allies", []) as Array).size() > 0, "%s: hurt needs a guard or allies to apply to" % id)
 
 
 func test_every_staff_casts_something() -> void:

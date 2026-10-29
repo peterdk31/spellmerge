@@ -20,6 +20,8 @@ const HudScript := preload("res://hud/panels/panels.gd")
 const RadialScript := preload("res://hud/builder/radial_builder.gd")
 ## Loaded when needed, not preloaded: this scene is also the "Hud" autoload.
 const HUD_SCENE_PATH: String = "res://hud/panels/panels.tscn"
+## A save no test writes, so a Hud never reads the real `user://save.cfg`.
+const NO_SAVE: String = "user://test_no_save.cfg"
 
 const STEP: float = 0.0625
 const START: Array = [[&"dash"], [&"fire", &"bolt"], [], []]
@@ -65,6 +67,7 @@ func before_each() -> void:
 	_bus.staff_change_requested.connect(func(player: int, staff: int, slot: int, id: StringName) -> void: _single.append([player, staff, slot, id]))
 	_hud = own((load(HUD_SCENE_PATH) as PackedScene).instantiate()) as HudScript
 	_hud.events = _bus
+	_hud.save = SaveFile.new(NO_SAVE)
 	_hud.ui_focus = _focus
 	_hud.input = _input
 	_hud.spells = _spells

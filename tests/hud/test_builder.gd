@@ -21,6 +21,8 @@ const BuilderScript := preload("res://hud/builder/builder.gd")
 const HintLineScript := preload("res://hud/widgets/hint_line.gd")
 ## Loaded when needed, not preloaded: this scene is also the "Hud" autoload.
 const HUD_SCENE_PATH: String = "res://hud/panels/panels.tscn"
+## A save no test writes, so a Hud never reads the real `user://save.cfg`.
+const NO_SAVE: String = "user://test_no_save.cfg"
 
 const STEP: float = 0.0625
 const START: Array = [[&"dash"], [&"fire", &"bolt"], [], []]
@@ -72,6 +74,7 @@ func before_each() -> void:
 	# The HUD first, as in the game (the autoload exists before any wizard appears).
 	_hud = own((load(HUD_SCENE_PATH) as PackedScene).instantiate()) as HudScript
 	_hud.events = _bus
+	_hud.save = SaveFile.new(NO_SAVE)
 	_hud.ui_focus = _focus
 	_hud.input = _input
 	_hud.spells = _spells

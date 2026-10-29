@@ -23,6 +23,8 @@ const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
 const HudScript := preload("res://hud/panels/panels.gd")
 ## Loaded, not preloaded: the scene is also the "Hud" autoload (tests/README.md).
 const HUD_SCENE_PATH: String = "res://hud/panels/panels.tscn"
+## A save no test writes, so a Hud never reads the real `user://save.cfg`.
+const NO_SAVE: String = "user://test_no_save.cfg"
 
 ## The card's seconds (content/spells/modifiers/possess/possess.tres).
 const SECONDS: float = 3.0
@@ -439,6 +441,7 @@ func test_the_builder_edits_the_wizard_an_ai_drives_and_the_change_stays() -> vo
 func _hud() -> HudScript:
 	var hud := (load(HUD_SCENE_PATH) as PackedScene).instantiate() as HudScript
 	hud.events = _world.bus
+	hud.save = SaveFile.new(NO_SAVE)
 	hud.ui_focus = own(UIFocusScript.new()) as UIFocusScript
 	hud.spells = _world.spells
 	root.add_child(hud)

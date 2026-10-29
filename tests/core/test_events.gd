@@ -20,6 +20,7 @@ const EVENTS: Dictionary = {
 	&"pause_requested": [["player", TYPE_INT]],
 	&"sandbox_requested": [["player", TYPE_INT]],
 	&"effect_slots_changed": [["slots", TYPE_INT]],
+	&"screen_shake_changed": [["enabled", TYPE_BOOL]],
 	&"sandbox_action_requested": [["player", TYPE_INT], ["action", TYPE_STRING_NAME]],
 	# Devices.
 	&"device_joined": [["player", TYPE_INT], ["device", TYPE_INT]],
@@ -95,7 +96,7 @@ const EVENTS: Dictionary = {
 const NOT_PER_PLAYER: Array[StringName] = [
 	&"run_started", &"run_ended", &"room_entered", &"room_cleared", &"wave_started",
 	&"loading_started", &"loading_progressed", &"loading_finished",
-	&"sandbox_changed", &"effect_slots_changed", &"build_break_started", &"difficulty_changed", &"reward_rolled", &"unlock_gained", &"currency_changed",
+	&"sandbox_changed", &"effect_slots_changed", &"screen_shake_changed", &"build_break_started", &"difficulty_changed", &"reward_rolled", &"unlock_gained", &"currency_changed",
 ]
 
 ## The names of a first argument that is a seat (`player`) or an actor id (the rest).

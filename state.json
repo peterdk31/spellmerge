@@ -9,6 +9,7 @@
     "number": 399
   },
   "errors_in_a_row": 0,
+  "idle": null,
   "intake_tasks": {
     "208": {
       "author": "Brianmanden",
@@ -2674,6 +2675,11 @@
       "at": "2026-10-29T01:53:25Z",
       "kind": "review",
       "tokens": 76904
+    },
+    {
+      "at": "2026-10-29T02:03:12Z",
+      "kind": "dev",
+      "tokens": 222661
     }
   ],
   "version": 1

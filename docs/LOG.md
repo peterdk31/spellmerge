@@ -4,7 +4,7 @@ What each run did, newest first. Claude appends a short entry after each develop
 
 ## 2026-10-29: Card siphon (staffs C)
 
-Added the Siphon modifier (data only: `.tres`, icon, assets, lore), two combos (`siphon_split_bolts`, `siphon_chain_bolt`) and `test_siphon.gd`, which checks the refunds through `mana_refund_requested`. Strength: 3 mana per hit. All unit tests pass except `test_svg_art` on the Shield icon, already on main (see BACKLOG).
+Added the Siphon modifier (data only: `.tres`, icon, assets, lore), two combos (`siphon_split_bolts`, `siphon_chain_bolt`) and `test_siphon.gd`, which checks the refunds through `mana_refund_requested`. Strength: 1 mana per hit. The bolt costs 5 and split costs 1.5 times that, so a volley of three hits gives back about 3 of 7.5: Siphon softens a cast and never pays for it (a first try at 3 per hit made split bolts net positive; a test now keeps a combo's refund under a bolt's cost). All unit tests pass except `test_svg_art` on the Shield icon, already on main (see BACKLOG).
 
 ## 2026-10-29: A possessing player cannot strand a room (staffs C)
 

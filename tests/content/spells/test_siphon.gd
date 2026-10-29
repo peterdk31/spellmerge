@@ -69,6 +69,10 @@ func test_the_combos_hurt_and_refund_only_with_the_card() -> void:
 		var with_card: Array = _play(combo)
 		check(with_card[1] as bool, "%s hurts what it promises" % id)
 		check((with_card[0] as float) >= _card().behaviour_strength * 2.0, "%s refunds mana for several hits (%s)" % [id, with_card[0]])
+		# Siphon softens a cast's cost and never pays it: even a volley refunds less than the
+		# bolt alone costs, so no combo is free to repeat.
+		var bolt_cost: float = (load("res://content/spells/forms/bolt/bolt.tres") as FormBase).mana_cost
+		check((with_card[0] as float) < bolt_cost, "%s refunds less than a bolt costs (%s < %s)" % [id, with_card[0], bolt_cost])
 		var without: Array = _play(combo, "siphon")
 		check_equal(without[0], 0.0, "%s refunds nothing without Siphon" % id)
 

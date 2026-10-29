@@ -237,6 +237,15 @@ class RepoTest(unittest.TestCase):
         self.assertIn(("file-size", "error", "audio/music/long.ogg"), found)
         self.assertIn(("file-type", "error", "content/relics/a/a.gdextension"), found)
 
+    def test_godot_shaders_and_shader_includes_are_allowed(self) -> None:
+        # The shot shaders share code through includes (the owner, 2026-10-29).
+        self.write("content/relics/a/glow.gdshader", "shader_type canvas_item;\n#include \"res://content/relics/a/glow.gdshaderinc\"\n")
+        self.write("content/relics/a/glow.gdshaderinc", "const float GLOW = 1.0;\n")
+        self.write("content/relics/a/glow.gdshaderinc.uid", "uid://b1234567890ab\n")
+        self.commit()
+        found = [f for f in self.check() if f[0] == "file-type"]
+        self.assertEqual(found, [])
+
     def test_symlinks_are_rejected(self) -> None:
         (self.tmp / "content").mkdir()
         os.symlink("/etc/passwd", self.tmp / "content/link.json")

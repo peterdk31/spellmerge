@@ -72,7 +72,7 @@ const DECOY_RADIUS: float = 8.0
 const DECOY_OFFSET: Vector2 = Vector2(0.0, -12.0)
 ## An enemy this close to a decoy chases the decoy rather than any wizard.
 const DECOY_LURE: float = 240.0
-## How far the copy has fallen apart (the shot shader's dissolve: its pixels in its player's
+## How far the copy has fallen apart (`shot_sprite.gdshader`'s dissolve: its pixels in its player's
 ## colour, part of them gone, with a glow), so it never reads as a second wizard; never
 ## see-through (the glow look, 2026-10-27).
 const DECOY_DISSOLVE: float = 0.3
@@ -90,7 +90,10 @@ const FAMILIAR_RANGE: float = 200.0
 ## The orb: radius in pixels, outline and core.
 ## A familiar is drawn as an orbit shot of this hit radius (its zoom, see `look_zoom`).
 const FAMILIAR_SIZE: float = 3.0
-const CORE_SHADER: Shader = preload("res://core/projectiles/shot_core.gdshader")
+## The shot shaders (core/README.md, "The shot shaders"): a decoy's copy is a sprite in the shots'
+## style, a familiar an orbit shot drawn whole with its tail bent round its circle.
+const SPRITE_SHADER: Shader = preload("res://core/projectiles/shot_sprite.gdshader")
+const ORBIT_SHADER: Shader = preload("res://core/projectiles/shot_orbit.gdshader")
 const STRIDE: int = 16
 
 ## Above the room and the wizards, below the shots (`ProjectileManagerScript.DRAW_Z`): the
@@ -153,7 +156,7 @@ class Decoy extends Node2D:
 
 	func _material() -> ShaderMaterial:
 		var material := ShaderMaterial.new()
-		material.shader = CORE_SHADER
+		material.shader = SPRITE_SHADER
 		material.set_shader_parameter(&"core_override", Color.WHITE)
 		material.set_shader_parameter(&"dissolve", DECOY_DISSOLVE)
 		material.set_shader_parameter(&"sprite_glow", DECOY_GLOW)
@@ -208,7 +211,7 @@ func _init() -> void:
 	multimesh.custom_aabb = AABB(Vector3(-100000.0, -100000.0, -1.0), Vector3(200000.0, 200000.0, 2.0))
 	_familiar_node.multimesh = multimesh
 	var material := ShaderMaterial.new()
-	material.shader = CORE_SHADER
+	material.shader = ORBIT_SHADER
 	_familiar_node.material = material
 	_familiar_node.name = "Familiars"
 	add_child(_familiar_node)

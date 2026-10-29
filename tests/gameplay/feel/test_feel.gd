@@ -520,7 +520,7 @@ func _test_death_animation() -> void:
 	var copy: Sprite2D = _feel.ghost(0)
 	_check(copy.global_position == Vector2(40, 30) and copy.texture == texture, "the copy sits where the enemy was")
 	var dissolve: ShaderMaterial = copy.material as ShaderMaterial
-	_check(dissolve != null and dissolve.shader == FeelScript.CORE_SHADER, "drawn by the shot shader")
+	_check(dissolve != null and dissolve.shader == FeelScript.SPRITE_SHADER, "drawn by the shots' sprite shader")
 	var start: float = dissolve.get_shader_parameter(&"dissolve") as float
 	_feel.step(0.1875)
 	_check((dissolve.get_shader_parameter(&"dissolve") as float) > start, "the copy falls apart pixel by pixel")

@@ -632,3 +632,39 @@ func test_recoil_in_a_payload_pushes_the_shot_that_fired_it() -> void:
 	_tick(60)
 	check_equal(_moves.size(), 0, "the wizard is not pushed")
 	check(_mgr.is_alive(bolt) and _mgr.get_position_of(bolt).x < 300.0 - 10.0, "the bolt was pushed back: %s" % _mgr.get_position_of(bolt))
+
+
+func test_mirror_cancels_the_recoil_of_a_payload_too() -> void:
+	# Rules R1e: the two pushes on the shot add up and cancel, as the wizard's do; the second
+	# replaced the first before, and the bolt was pushed forward at every fire.
+	_distance_cards()
+	_build(0, [&"timer", &"bolt", &"mirror", &"recoil", &"spark"])
+	_cast(0)
+	var bolt: int = _others(-1)[0]
+	_tick(50)
+	check_equal(_moves.size(), 0, "the wizard is not pushed")
+	check(_mgr.is_alive(bolt), "the bolt still flies")
+	check(absf(_mgr.get_position_of(bolt).x - 250.0) < 1.0, "the pushes cancel: the bolt flew its own way only: %s" % _mgr.get_position_of(bolt))
+
+
+func test_a_hook_after_a_recoil_on_a_shot_gets_both_moves() -> void:
+	# Rules R1e: the hook ran in place of the recoil before, so the shot lost what was left of its
+	# push back. Player 0's payload has recoil, player 1's the same without it.
+	_distance_cards()
+	var quick: FormBase = _form(&"quick_hook", 900.0, 1.0)
+	quick.motion = FormBase.Motion.HOOK
+	_mgr.set_anchor(1, Vector2(0.0, 100.0))
+	_target(Vector2(130.0, 0.0))
+	_target(Vector2(130.0, 100.0))
+	_build(0, [&"timer", &"pierce", &"bolt", &"recoil", &"quick_hook"])
+	_build(1, [&"timer", &"pierce", &"bolt", &"quick_hook"])
+	_cast(0)
+	var pushed: int = _others(-1)[0]
+	_spells.cast_staff(1, 0, Vector2(0.0, 100.0), Vector2.RIGHT, 100.0)
+	var plain: int = _others(pushed)[0]
+	# The timer fires at 0.25 s; the hook hits before the push is over, and both are over before
+	# the next fire.
+	_tick(29)
+	check(_mgr.is_alive(pushed) and _mgr.is_alive(plain), "both bolts still fly")
+	var behind: float = _mgr.get_position_of(plain).x - _mgr.get_position_of(pushed).x
+	check(behind > 3.0 and behind < 20.0, "the rest of the push after the pull still moves it back: %s px behind" % behind)

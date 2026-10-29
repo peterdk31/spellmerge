@@ -235,6 +235,8 @@ const DEFAULT_CAP_DESKTOP: int = 3000
 ## hits one projectile can register in a single step.
 ## Remembered hits (see `_remember`) made room for at first; more are made when needed.
 const HIT_MEMORY_START: int = 1024
+## Moves under way (see `move_shot`) made room for at first; more are made when needed.
+const MOVES_START: int = 64
 ## The most hit-test work one step does, in units: each target examined costs 1,
 ## each hit costs HIT_WORK. Once it is spent, the remaining projectiles are not
 ## tested this step (see the class doc). Normal play uses a tiny part of it.
@@ -533,9 +535,8 @@ var _orbit_centre: PackedVector2Array = PackedVector2Array()
 var _turn: PackedFloat32Array = PackedFloat32Array()
 var _home_at: PackedVector2Array = PackedVector2Array()
 var _home_range: PackedFloat32Array = PackedFloat32Array()
-## The instance id of the target each homing shot (and each homing move) keeps, 0 for none.
+## The instance id of the target each homing shot keeps, 0 for none.
 var _home_target: PackedInt64Array = PackedInt64Array()
-var _move_home: PackedInt64Array = PackedInt64Array()
 ## Spawn order, so "oldest" is the lowest.
 var _seq: PackedInt64Array = PackedInt64Array()
 ## What `update_draw` worked out for the shot in each slot (its batch, look colour, quad size and
@@ -574,11 +575,18 @@ var _speed: PackedFloat32Array = PackedFloat32Array()
 var _caster_slot: PackedInt32Array = PackedInt32Array()
 var _caster_seq: PackedInt64Array = PackedInt64Array()
 var _caster_at: PackedVector2Array = PackedVector2Array()
-## A move a card asked for (`move_shot`): seconds left and the velocity it adds meanwhile.
+## The moves cards asked for (`move_shot`) that are still under way: a list per slot
+## (`_move_head`, -1 for none) through one growing pool, as the hit memory. Each has its seconds
+## left, the velocity it adds meanwhile, a homing move's turn rate, reach and the target it keeps
+## (0 for none), and the link (`_move_free` heads the free entries). The moves of a shot add up.
+var _move_head: PackedInt32Array = PackedInt32Array()
 var _move_left: PackedFloat32Array = PackedFloat32Array()
 var _move_vel: PackedVector2Array = PackedVector2Array()
 var _move_turn: PackedFloat32Array = PackedFloat32Array()
 var _move_range: PackedFloat32Array = PackedFloat32Array()
+var _move_home: PackedInt64Array = PackedInt64Array()
+var _move_next: PackedInt32Array = PackedInt32Array()
+var _move_free: int = -1
 ## Shot behaviours (see "Shot behaviours, stepped in passes"): each behaviour's list of the shots
 ## that have it (BEHAVIOURS lists of up to `_cap` slots, one after the other), how many each has,
 ## where each shot is in each list, and per shot a bit per behaviour it has.
@@ -913,7 +921,6 @@ func set_cap(value: int) -> void:
 	_home_at.resize(_cap)
 	_home_range.resize(_cap)
 	_home_target.resize(_cap)
-	_move_home.resize(_cap)
 	_seq.resize(_cap)
 	_flags.resize(_cap)
 	_bounce.resize(_cap)
@@ -934,10 +941,12 @@ func set_cap(value: int) -> void:
 	_caster_slot.resize(_cap)
 	_caster_seq.resize(_cap)
 	_caster_at.resize(_cap)
-	_move_left.resize(_cap)
-	_move_vel.resize(_cap)
-	_move_turn.resize(_cap)
-	_move_range.resize(_cap)
+	var move_heads: int = _move_head.size()
+	_move_head.resize(_cap)
+	for slot in range(move_heads, _cap):
+		_move_head[slot] = -1
+	if _move_left.is_empty():
+		_grow_moves(MOVES_START)
 	_scan_slots.resize(_cap)
 	_members.resize(_cap * BEHAVIOURS)
 	_member_at.resize(_cap * BEHAVIOURS)
@@ -1479,8 +1488,10 @@ func _caster_position(slot: int) -> Vector2:
 
 ## Move the shot in `slot` by `offset` pixels over `seconds` on top of its own motion (a dash,
 ## hook or recoil card whose caster is this shot), or at once for `seconds` 0 or less (a
-## teleport or swap, stopped short at the first wall). A moving shot still hits what it passes
-## and still ends on a wall. A homing move (`turn_rate` above 0) turns toward the nearest
+## teleport or swap, stopped short at the first wall). Moves add up, as the wizard's pushes do: a
+## new move runs beside the ones under way, each on its own time (two opposite pushes cancel, a
+## hook after a recoil gets both). A moving shot still hits what it passes and still ends on a
+## wall. A homing move (`turn_rate` above 0) turns toward the nearest
 ## target within `within` pixels as it goes (`home_velocity`), the same distance in all.
 ## Returns false for an empty slot, an orbit shot (its caster holds it), or an offset or time
 ## that is not finite.
@@ -1494,21 +1505,57 @@ func move_shot(slot: int, offset: Vector2, seconds: float, turn_rate: float = 0.
 		_base[slot] += to - _pos[slot]
 		_pos[slot] = to
 		_prev[slot] = to
-		_move_left[slot] = 0.0
-		_leave(slot, B_MOVE)
 		if _trail[slot] >= 0:
 			# A blink leaves no tail across the gap.
 			_trail_kept[_trail[slot]] = 0
 			_trail_sample(_trail[slot], to)
 		return true
-	_move_left[slot] = seconds
-	_move_vel[slot] = offset / seconds
+	if _move_free < 0:
+		_grow_moves(_move_left.size() * 2)
+	var at: int = _move_free
+	_move_free = _move_next[at]
+	_move_left[at] = seconds
+	_move_vel[at] = offset / seconds
 	var homes: bool = turn_rate > 0.0 and within > 0.0 and is_finite(turn_rate) and is_finite(within)
-	_move_turn[slot] = turn_rate if homes else 0.0
-	_move_range[slot] = within if homes else 0.0
-	_move_home[slot] = 0
+	_move_turn[at] = turn_rate if homes else 0.0
+	_move_range[at] = within if homes else 0.0
+	_move_home[at] = 0
+	# At the end of the list, so the moves run in the order they were asked.
+	_move_next[at] = -1
+	var last: int = _move_head[slot]
+	if last < 0:
+		_move_head[slot] = at
+	else:
+		while _move_next[last] >= 0:
+			last = _move_next[last]
+		_move_next[last] = at
 	_join(slot, B_MOVE)
 	return true
+
+
+## End every move of the shot in `slot` (it is new or it ended).
+func _drop_moves(slot: int) -> void:
+	var at: int = _move_head[slot]
+	while at >= 0:
+		var next: int = _move_next[at]
+		_move_next[at] = _move_free
+		_move_free = at
+		at = next
+	_move_head[slot] = -1
+
+
+## Room for `size` moves under way in all (the new entries go on the free list).
+func _grow_moves(size: int) -> void:
+	var old: int = _move_left.size()
+	_move_left.resize(size)
+	_move_vel.resize(size)
+	_move_turn.resize(size)
+	_move_range.resize(size)
+	_move_home.resize(size)
+	_move_next.resize(size)
+	for at in range(size - 1, old - 1, -1):
+		_move_next[at] = _move_free
+		_move_free = at
 
 
 ## Make the straight shot in `slot` home on targets no further than `within` pixels from
@@ -1719,7 +1766,6 @@ func _spawn_row(caster: int, origin: Vector2, velocity: Vector2, lifetime: float
 	_home_at[slot] = Vector2.INF
 	_home_range[slot] = 0.0
 	_home_target[slot] = 0
-	_move_home[slot] = 0
 	_life[slot] = lifetime
 	_radius[slot] = maxf(radius, 0.0)
 	_actor[slot] = caster
@@ -1761,8 +1807,7 @@ func _spawn_row(caster: int, origin: Vector2, velocity: Vector2, lifetime: float
 	_base[slot] = origin
 	_caster_slot[slot] = CASTER_WIZARD
 	_caster_at[slot] = Vector2.INF
-	_move_left[slot] = 0.0
-	_move_turn[slot] = 0.0
+	_drop_moves(slot)
 	_forget_all(slot)
 	_orbit_centre[slot] = Vector2.INF
 	_trail[slot] = -1 if motion == MOTION_STILL else _open_row(slot, origin)
@@ -2179,24 +2224,49 @@ func _pass_spiral(list: PackedInt32Array, first: int, count: int, delta: float) 
 		_pos[slot] = _base[slot] + side * (_wave[slot] * sin(TAU * _wave_age[slot] / SPIRAL_PERIOD))
 
 
-## A card's move (`move_shot`): while it lasts, it carries the shot on top of its own motion (a
-## lingering shot too). A homing move waits for its turn: it picks among the targets still there.
+## A card's moves (`move_shot`): while each lasts, it carries the shot on top of its own motion (a
+## lingering shot too), and the moves under way add up. A shot with a homing move waits for its
+## turn: it picks among the targets still there. A move that is over is let go.
 func _pass_move(list: PackedInt32Array, first: int, count: int, delta: float) -> void:
 	for n in range(first, first + count):
 		var slot: int = list[n]
 		var state: int = _state[slot]
-		if (state != S_MOVING and state != S_HELD and state != S_RETURNING) or _move_left[slot] <= 0.0:
+		if (state != S_MOVING and state != S_HELD and state != S_RETURNING) or _move_head[slot] < 0:
 			continue
-		if _move_turn[slot] > 0.0 and not _catching_up:
+		if not _catching_up and _has_homing_move(slot):
 			_wait(slot, B_MOVE)
 			continue
-		var part: float = minf(delta, _move_left[slot])
-		_move_left[slot] -= delta
-		if _move_turn[slot] > 0.0:
-			_move_vel[slot] = home_velocity(_actor[slot], _pos[slot], _move_vel[slot], _move_turn[slot], _move_range[slot], part, _move_home[slot], int(_seq[slot]), _layers[slot])
-			_move_home[slot] = homing_target
-		_pos[slot] += _move_vel[slot] * part
-		_base[slot] += _move_vel[slot] * part
+		var before: int = -1
+		var at: int = _move_head[slot]
+		while at >= 0:
+			var next: int = _move_next[at]
+			var part: float = minf(delta, _move_left[at])
+			_move_left[at] -= delta
+			if _move_turn[at] > 0.0:
+				_move_vel[at] = home_velocity(_actor[slot], _pos[slot], _move_vel[at], _move_turn[at], _move_range[at], part, _move_home[at], int(_seq[slot]), _layers[slot])
+				_move_home[at] = homing_target
+			_pos[slot] += _move_vel[at] * part
+			_base[slot] += _move_vel[at] * part
+			if _move_left[at] <= 0.0:
+				if before < 0:
+					_move_head[slot] = next
+				else:
+					_move_next[before] = next
+				_move_next[at] = _move_free
+				_move_free = at
+			else:
+				before = at
+			at = next
+
+
+## True when one of the moves under way of the shot in `slot` homes.
+func _has_homing_move(slot: int) -> bool:
+	var at: int = _move_head[slot]
+	while at >= 0:
+		if _move_turn[at] > 0.0:
+			return true
+		at = _move_next[at]
+	return false
 
 
 ## Shield (`set_shield`), after the hits: each shielded shot stops the shots of other teams that its
@@ -3429,6 +3499,7 @@ static func ramp_light(ramp: int) -> Color:
 
 func _kill(slot: int, announce: bool = true) -> void:
 	_forget_all(slot)
+	_drop_moves(slot)
 	if announce and _tag[slot] != 0:
 		shot_ended.emit(_tag[slot])
 	if _trail[slot] >= 0:

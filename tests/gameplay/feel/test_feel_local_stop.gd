@@ -27,8 +27,6 @@ func before_each() -> void:
 	_feel.drive_engine = false
 	var preset: FeelPresetScript = FeelPresetScript.new()
 	preset.hit_sound = &""
-	preset.death_sound = &""
-	preset.downed_sound = &""
 	_feel.preset = preset
 	root.add_child(_feel)
 	# Stands in for combat: a shot's hit is a hit of 5 damage, sent while the shot's event is.
@@ -98,7 +96,7 @@ func test_a_kill_holds_its_killer_not_the_game() -> void:
 	var killer: Actor = _body(Vector2.ZERO)
 	var other: Actor = _body(Vector2(100.0, 0.0))
 	_world.bus.enemy_died.emit(killer.id, null, Vector2.ZERO)
-	check(_world.table.held_left(killer.id) >= _feel.preset.death_stop_seconds, "the killer is held for the kill")
+	check(_world.table.held_left(killer.id) >= _feel.cue_of(&"enemy_death").hold, "the killer is held for the kill")
 	check_equal(_world.table.held_left(other.id), 0.0, "nobody else is")
 	check_equal(_feel.stop_left, 0.0, "the game runs on")
 

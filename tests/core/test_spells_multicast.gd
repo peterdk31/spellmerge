@@ -352,12 +352,27 @@ func test_a_mirrored_returning_shot_goes_both_ways() -> void:
 	check(headings.size() == 2 and headings[0].is_equal_approx(-headings[1]), "opposite ways")
 
 
-func test_releasing_a_hold_drops_the_waiting_firings() -> void:
-	_build(0, [&"burst", &"bolt"])
+func test_switching_a_hold_off_drops_its_waiting_firings() -> void:
+	(_fake.items[&"bolt"] as FormBase).cooldown = 0.0
+	_build(0, [&"burst", &"hold", &"bolt"])
 	_cast()
-	_spells._release_hold(0)
+	check(_spells.is_holding(0, 0), "the burst's first firing switched the hold on")
+	_cast()
 	_tick(30)
-	check_equal(_mgr.get_count(), 1, "the later firings never came")
+	check_equal(_mgr.get_count(), 0, "switched off: its later firings never came")
+
+
+## Regression (rules R4a): a switch-off dropped every waiting launch of the staff.
+func test_switching_a_hold_off_keeps_the_staffs_other_waiting_firings() -> void:
+	(_fake.items[&"bolt"] as FormBase).cooldown = 0.0
+	_build(0, [&"burst", &"bolt", &"hold", &"bolt"])
+	_cast()
+	_cast()
+	check(_spells.is_holding(0, 0), "the second cast is the hold")
+	_cast()
+	check(not _spells.is_holding(0, 0), "the third press switched it off")
+	_tick(30)
+	check_equal(_mgr.get_count(), 3, "the first cast's burst fired all three times")
 
 
 func _trigger_card(id: StringName, event: TriggerBase.Event) -> void:

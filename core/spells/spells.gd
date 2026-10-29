@@ -182,6 +182,9 @@ var _installed: Array[CompiledStaff] = []
 var _cursor: PackedInt32Array = PackedInt32Array()
 ## caster -> the way the wizard's (or enemy's) last asked move goes, for the payload fired where it ends
 var _move_heading: PackedVector2Array = PackedVector2Array()
+## caster -> 1 when its hook move in progress ends its hook shot (the hit spent it), so the
+## arrival is the carrier's end point; 0 when the shot flies on and ends by itself (rules R4a).
+var _hook_ends: PackedByteArray = PackedByteArray()
 ## Per actor, the homing of the wizard's last dash; the actor steers with it (`move_homing`).
 var _dash_homing: Array[Homing] = []
 ## The homing of the teleport being cast (it is over at once), and one that never homes.
@@ -481,6 +484,7 @@ func _init() -> void:
 		_last_infused.append(null)
 	_move_heading.resize(ACTORS)
 	_move_heading.fill(Vector2.RIGHT)
+	_hook_ends.resize(ACTORS)
 	_landed_at.resize(ACTORS)
 	_aim_origin.resize(ACTORS)
 	_aim_origin.fill(Vector2.INF)
@@ -790,6 +794,9 @@ func begin_generation(actor: int, staff: int, compiled: CompiledStaff) -> int:
 		return 0
 	var index: int = actor * SpellLimits.STAFFS + staff
 	_release_hold(index)
+	# The old build casts no more: its cast's later firings go (a payload of a shot in the air
+	# fires on, as the shot flies on).
+	_drop_pending(func(launch: PendingLaunch) -> bool: return launch.actor == actor and launch.staff == staff and launch.caster == CASTER_WIZARD)
 	var old: int = _current[index]
 	if compiled.is_empty():
 		_installed[index] = null
@@ -808,6 +815,8 @@ func begin_generation(actor: int, staff: int, compiled: CompiledStaff) -> int:
 			revoked_tags.append(stale)
 		_profiles.erase(stale)
 		_live.erase(stale)
+	# The revoked build's waiting payloads go with its shots (its numbers are the new build's now).
+	_drop_pending(func(launch: PendingLaunch) -> bool: return launch.actor == actor and launch.staff == staff and launch.generation == generation)
 	_generation_live.erase(key)
 	for spell in compiled.nodes:
 		_profiles[SpellTag.make(actor, staff, spell.node, generation)] = spell
@@ -848,6 +857,12 @@ func shot_ended(tag: int) -> void:
 		_end_pose_strike(tag)
 	else:
 		_live[tag] = live - 1
+	_generation_gone(tag)
+
+
+## One shot of `tag`'s generation, or one launch that keeps it (`_delay`), is gone: an old
+## generation with none left is freed.
+func _generation_gone(tag: int) -> void:
 	var key: int = SpellTag.generation_key(tag)
 	var in_air: int = _generation_live.get(key, 0) - 1
 	if in_air > 0:
@@ -1056,17 +1071,14 @@ func _launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direct
 					var shot: int = _caster_shot()
 					centre = projectiles.get_position_of(shot) if shot >= 0 else origin
 				slot = projectiles.spawn_orbit(actor, spell.orbit_radius, base + TAU * n / count, turn, lifetime, spell.radius, HITS, spell.pierce, tag, centre)
-				_apply_shield(slot, spell)
 			FormBase.Motion.STILL:
 				var at: Vector2 = origin if count == 1 else origin + heading * spell.radius * 2.0
 				slot = projectiles.spawn(actor, at, Vector2.ZERO, lifetime, spell.radius, HITS, spell.pierce, tag, ProjectilesScript.MOTION_STILL)
-				_apply_shield(slot, spell)
 			_:
 				slot = projectiles.spawn(actor, origin, heading * spell.speed, lifetime, spell.radius, HITS, spell.pierce, tag)
-				if slot >= 0:
-					_apply_travel(slot, spell)
 		if slot < 0:
 			continue
+		_apply_travel(slot, spell)
 		made += 1
 		_register(slot, tag, spell, carried, prev)
 		if source != null:
@@ -1238,14 +1250,15 @@ func _launch_as(group: CompiledGroup, actor: int, staff: int, generation: int, o
 
 ## Rain: for each of its shots, a cue at the aim point and a launch of its payload there after
 ## its `lifetime`. The aim point is `ray_length` (or `SpellLimits.RAIN_REACH`) along the shot's
-## heading, stopped at a wall. Returns how many were set.
+## heading, stopped at a wall; homing moves it onto a target near it (`_homed_place`). Returns
+## how many were set.
 ## `hold` does nothing for a rain: it always falls after its `lifetime` and is no sustained carrier.
 func _telegraph_rain(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading: Vector2) -> int:
 	var reach: float = spell.ray_length if spell.ray_length > 0.0 else SpellLimits.RAIN_REACH
 	var placed: int = 0
 	for n in spell.shots:
 		var along: Vector2 = heading.rotated(_fan_angle(n, spell.shots, spell))
-		var point: Vector2 = projectiles.clip_to_walls(origin, origin + along * reach)
+		var point: Vector2 = _homed_place(spell, actor, tag + n, origin, projectiles.clip_to_walls(origin, origin + along * reach))
 		var group: CompiledGroup = spell.own_payload if spell.own_payload != null else CompiledGroup.new()
 		var launch: PendingLaunch = _delay(spell.lifetime, group, null, actor, SpellTag.staff_of(tag), SpellTag.generation_of(tag), point, along, null, false)
 		launch.landing = spell
@@ -1267,13 +1280,13 @@ func _land_rain(spell: CompiledSpell, group: CompiledGroup, actor: int, staff: i
 
 
 ## Wall: `shots` still shots in a line across `direction`, `spread` pixels apart (the shot's
-## diameter when the form has none), centred `SpellLimits.WALL_REACH` ahead of `origin`. A shot
-## born in a wall is skipped. Shield charges apply, so `shield . wall` stops other teams' shots.
+## diameter when the form has none), centred `SpellLimits.WALL_REACH` ahead of `origin` (homing
+## moves the centre onto a target near it, `_homed_place`). A shot born in a wall is skipped.
+## Shield charges apply, so `shield . wall` stops other teams' shots.
 func _launch_wall(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direction: Vector2, source: Node, lifetime: float, carried: int, prev: int) -> int:
-	var centre: Vector2 = projectiles.clip_to_walls(origin, origin + direction * SpellLimits.WALL_REACH)
+	var centre: Vector2 = _homed_place(spell, actor, tag, origin, projectiles.clip_to_walls(origin, origin + direction * SpellLimits.WALL_REACH))
 	var across: Vector2 = direction.orthogonal()
 	var gap: float = spell.spread if spell.spread > 0.0 else spell.radius * 2.0
-	var shield: int = roundi(spell.behaviour(ModifierBase.Behaviour.SHIELD))
 	var made: int = 0
 	for n in spell.shots:
 		var at: Vector2 = centre + across * (n - (spell.shots - 1) * 0.5) * gap
@@ -1281,14 +1294,24 @@ func _launch_wall(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, d
 		if slot < 0:
 			continue
 		made += 1
+		_apply_travel(slot, spell)
+		if spell.homing_range > 0.0:
+			# Its homing went into where the wall stands: its shots keep still (a chain jump homes).
+			projectiles.set_homing(slot, 0.0, spell.homing_range)
 		_register(slot, tag, spell, carried, prev)
-		if shield > 0:
-			projectiles.set_shield(slot, shield)
-		if spell.behaviour(ModifierBase.Behaviour.DEFLECT) > 0.0:
-			projectiles.set_deflect(slot, true)
 		if source != null:
 			projectiles.exclude(slot, source, SpellLimits.SOURCE_EXCLUSION)
 	return made
+
+
+## Where a carrier placed at `point` ahead of its caster at `origin` (a rain, a wall) goes when it
+## homes (rules R4i): onto a target within its homing reach of the point, picked as a homing
+## shot picks one (`homing_point`, any way round), stopped at a wall on the way; else `point`.
+func _homed_place(spell: CompiledSpell, actor: int, tag: int, origin: Vector2, point: Vector2) -> Vector2:
+	if spell.homing_range <= 0.0:
+		return point
+	var goal: Vector2 = projectiles.homing_point(actor, point, Vector2.RIGHT, PI, ProjectilesScript.ACTOR_LAYERS, spell.homing_range, 0, hash(Vector3i(actor, tag, roundi(_clock * 1000.0))))
+	return point if not goal.is_finite() else projectiles.clip_to_walls(origin, goal)
 
 
 ## Decoys and familiars: `ai` makes the entity (`entity_spawn_requested`, `lifetime` seconds, or
@@ -1362,9 +1385,10 @@ func _end_entities(tag: int) -> void:
 		events.entity_end_requested.emit(SpellTag.caster_of(tag), tag)
 
 
-## Hand a flying shot the behaviours of its cards that the projectile manager runs (staffs B1):
-## a shot from the staff and a chain jump alike (rules R1b). A plain shot costs one comparison
-## per behaviour and no call.
+## Hand a shot the behaviours of its cards that the projectile manager runs (staffs B1): a bolt,
+## a rune, an orbit and a wall's shots from the staff and a chain jump alike (rules R1b). Each
+## setter takes what the shot can do and refuses the rest (rules R4h: a rune does not move, an
+## orbit does not fly). A plain shot costs one comparison per behaviour and no call.
 func _apply_travel(slot: int, spell: CompiledSpell) -> void:
 	if spell.homing_range > 0.0:
 		projectiles.set_homing(slot, spell.homing_turn, spell.homing_range)
@@ -1392,8 +1416,7 @@ func _apply_travel(slot: int, spell: CompiledSpell) -> void:
 	_apply_shield(slot, spell)
 
 
-## A shot with `shield` blocks that many enemy shots (an orbit's and a still shot's too, which
-## `_apply_travel` does not reach).
+## A shot with `shield` blocks that many enemy shots.
 func _apply_shield(slot: int, spell: CompiledSpell) -> void:
 	if slot < 0 or spell.behaviours.is_empty():
 		return
@@ -1483,13 +1506,13 @@ func _recoil(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, headin
 
 
 ## The area hit of a `blast` at the end point `at` of the carrier with `tag`, as wide as its
-## strength, with the hit profile of its tag, and its explosion (`explosion_shown`, style
-## `blast`). Nothing without a blast.
+## strength, with the hit profile of its tag, and its explosion (`cue_shown`, the cue its blast card
+## names). Nothing without a blast.
 func _blast(spell: CompiledSpell, tag: int, actor: int, at: Vector2) -> void:
 	var radius: float = spell.behaviour(ModifierBase.Behaviour.BLAST)
 	if radius > 0.0 and events != null and at.is_finite():
 		events.area_hit_requested.emit(actor, at, radius, tag)
-		events.explosion_shown.emit(actor, at, radius, &"blast", spell.tint, spell.look)
+		events.cue_shown.emit(actor, spell.cue_of(ModifierBase.Behaviour.BLAST), at, Vector2.ZERO, radius, spell.tint, spell.look)
 
 
 ## Where a dash, teleport or hook ended: the carrier's end point. Its `blast` and its `on expire`
@@ -1499,12 +1522,16 @@ func _on_move_finished(actor: int, mode: StringName, position: Vector2, tag: int
 		return
 	if not SpellTag.is_spell_tag(tag) or actor != SpellTag.caster_of(tag) or not position.is_finite():
 		return
+	if mode == &"hook" and _hook_ends[actor] == 0:
+		return
 	# The caster's body moved, so it casts what its end point fires.
 	_move_end(tag, position, _move_heading[actor], CASTER_WIZARD)
 
 
 ## Queues a launch `wait` seconds from now: `group` (a burst's later firing) or, with no group,
-## `spell` (an echo). The queue grows as needed; nothing is dropped for room.
+## `spell` (an echo). The queue grows as needed; nothing is dropped for room. A launch the wizard
+## casts (`caster` CASTER_WIZARD: the cast's later firings) goes when its staff is rebuilt; any
+## other (a payload of a shot or a point) keeps its build, as a shot in the air does, and fires.
 func _delay(wait: float, group: CompiledGroup, spell: CompiledSpell, actor: int, staff: int, generation: int, origin: Vector2, heading: Vector2, source: Node, from_caster: bool) -> PendingLaunch:
 	if _pending_free.is_empty():
 		_pending_free.append(PendingLaunch.new())
@@ -1526,12 +1553,15 @@ func _delay(wait: float, group: CompiledGroup, spell: CompiledSpell, actor: int,
 	launch.caster_seq = _caster_seq
 	if from_caster and projectiles != null:
 		launch.anchor = projectiles.get_anchor(actor)
+	if launch.caster != CASTER_WIZARD:
+		var key: int = SpellTag.generation_key(SpellTag.make(actor, staff, 0, generation))
+		_generation_live[key] = _generation_live.get(key, 0) + 1
 	_pending.append(launch)
 	return launch
 
 
-## Fires the queued launches that are due. One whose staff was rebuilt or switched off since is
-## dropped. A cast's own launch starts as far from where it was cast as the caster has moved.
+## Fires the queued launches that are due. A cast's later firing whose staff was rebuilt since is
+## dropped (`_delay`). A cast's own launch starts as far from where it was cast as the caster has moved.
 func _run_pending() -> void:
 	var i: int = 0
 	while i < _pending.size():
@@ -1540,9 +1570,10 @@ func _run_pending() -> void:
 			i += 1
 			continue
 		_pending.remove_at(i)
-		if _current[launch.actor * SpellLimits.STAFFS + launch.staff] != launch.generation:
+		if launch.caster == CASTER_WIZARD and _current[launch.actor * SpellLimits.STAFFS + launch.staff] != launch.generation:
 			_release_launch(launch)
 			continue
+		var keeps: bool = launch.caster != CASTER_WIZARD
 		var origin: Vector2 = launch.origin
 		var from_caster: bool = launch.anchor.is_finite()
 		if from_caster and projectiles != null:
@@ -1576,6 +1607,8 @@ func _run_pending() -> void:
 			_fire_spell(spell, actor, staff, generation, origin, heading, source, from_caster, true)
 		_caster = saved
 		_caster_seq = saved_seq
+		if keeps:
+			_generation_gone(SpellTag.make(actor, staff, 0, generation))
 
 
 ## Gives a finished record back to the pool.
@@ -1588,14 +1621,31 @@ func _release_launch(launch: PendingLaunch) -> void:
 	_pending_free.append(launch)
 
 
-## Forgets the launches still waiting for this staff.
-func _drop_pending(actor: int, staff: int) -> void:
+## Forgets the waiting launches `drops` picks (an edit, a switch-off or a closed caster; never
+## per frame). One that kept its build (`_delay`) lets go of it.
+func _drop_pending(drops: Callable) -> void:
 	var i: int = _pending.size() - 1
 	while i >= 0:
-		if _pending[i].actor == actor and _pending[i].staff == staff:
-			_release_launch(_pending[i])
+		var launch: PendingLaunch = _pending[i]
+		if drops.call(launch):
 			_pending.remove_at(i)
+			var keeps: bool = launch.caster != CASTER_WIZARD
+			var tag: int = SpellTag.make(launch.actor, launch.staff, 0, launch.generation)
+			_release_launch(launch)
+			if keeps:
+				_generation_gone(tag)
 		i -= 1
+
+
+## True when `launch` fires a carrier with one of `tags` (its group's own carriers, or its echo).
+func _fires_any(launch: PendingLaunch, tags: PackedInt64Array) -> bool:
+	if launch.spell != null:
+		return tags.has(SpellTag.make(launch.actor, launch.staff, launch.spell.node, launch.generation))
+	if launch.group != null:
+		for spell in launch.group.spells:
+			if tags.has(SpellTag.make(launch.actor, launch.staff, spell.node, launch.generation)):
+				return true
+	return false
 
 
 ## `shield` on the caster itself: a barrier on the casting actor with the card's charges, for as
@@ -1615,7 +1665,7 @@ func _fallback_hit(spell: CompiledSpell, tag: int, actor: int, at: Vector2) -> i
 		var blast: float = spell.behaviour(ModifierBase.Behaviour.BLAST)
 		events.area_hit_requested.emit(actor, at, maxf(spell.radius, blast), tag)
 		if blast > 0.0 and at.is_finite():
-			events.explosion_shown.emit(actor, at, blast, &"blast", spell.tint, spell.look)
+			events.cue_shown.emit(actor, spell.cue_of(ModifierBase.Behaviour.BLAST), at, Vector2.ZERO, blast, spell.tint, spell.look)
 	# After the area hit, which can reach the caster itself and would spend the barrier.
 	if _caster == CASTER_WIZARD:
 		_shield_caster(spell, tag, actor, 0.0)
@@ -3168,7 +3218,7 @@ func _shots_of(group: CompiledGroup) -> int:
 
 
 ## The fires that waited for room (`_fire`), oldest first, while their budget has room in this
-## step; one of a staff rebuilt or switched off since is dropped with its build.
+## step; a cast's own (`on cast`) whose staff was rebuilt since is dropped (`_delay`).
 func _run_waiting_fires() -> void:
 	var i: int = 0
 	while i < _pending.size():
@@ -3181,9 +3231,10 @@ func _run_waiting_fires() -> void:
 			i += 1
 			continue
 		_pending.remove_at(i)
-		if _current[launch.actor * SpellLimits.STAFFS + launch.staff] != launch.generation:
+		if launch.caster == CASTER_WIZARD and _current[launch.actor * SpellLimits.STAFFS + launch.staff] != launch.generation:
 			_release_launch(launch)
 			continue
+		var keeps: bool = launch.caster != CASTER_WIZARD
 		_fires_used[budget] += launch.cost
 		fires_made += 1
 		var origin: Vector2 = launch.origin
@@ -3213,6 +3264,8 @@ func _run_waiting_fires() -> void:
 			_caster_seq = saved_seq
 		else:
 			_launch_as(group, actor, staff, generation, origin, heading, source, caster)
+		if keeps:
+			_generation_gone(SpellTag.make(actor, staff, 0, generation))
 
 
 ## True when the record of `slot` was made for the shot the manager last had there (it may
@@ -3511,16 +3564,22 @@ func _on_hit_effects(spell: CompiledSpell, tag: int, actor: int, target: Node, p
 	var caster: int = projectiles.caster_shot_of(slot) if not by_wizard else -1
 	var pulled: bool = false
 	if spell.motion == FormBase.Motion.HOOK:
+		# The hook's end is its shot's (rules R4a): where what it pulls arrives when this hit
+		# spent the shot; a shot with pierce left flies on and ends by itself (`_on_expired`).
+		var spent: bool = slot < 0 or not projectiles.is_alive(slot)
 		if by_wizard and events != null:
 			var anchor: Vector2 = projectiles.get_anchor(actor)
 			_move_heading[actor] = anchor.direction_to(position) if anchor.is_finite() and not anchor.is_equal_approx(position) else Vector2.RIGHT
 			events.caster_move_requested.emit(actor, &"hook", position, SpellLimits.HOOK_SECONDS, tag)
+			# After the request: a hook move it replaced was answered with the old value.
+			_hook_ends[actor] = 1 if spent else 0
 			_shield_caster(spell, tag, actor, SpellLimits.HOOK_SECONDS)
 			pulled = true
 		elif caster >= 0:
 			var from: Vector2 = projectiles.get_position_of(caster)
 			if projectiles.move_shot(caster, position - from, SpellLimits.HOOK_SECONDS):
-				_track_move(caster, tag, SpellLimits.HOOK_SECONDS, from.direction_to(position))
+				if spent:
+					_track_move(caster, tag, SpellLimits.HOOK_SECONDS, from.direction_to(position))
 				pulled = true
 	elif spell.motion == FormBase.Motion.SWAP and events != null:
 		var node := target as Node2D
@@ -3610,8 +3669,11 @@ func _on_expired(actor: int, position: Vector2, tag: int) -> void:
 
 ## `on wall` at every wall that does not end the shot (a bounce) and at every wall a beam or
 ## fissure turns at or ends on (owner, 2026-10-29); a shot's last wall is `_on_expired`'s. The
-## payload goes the way the shot or beam goes on.
+## payload goes the way the shot or beam goes on. A zap (`_zap`, its shot's tag) that ends on a
+## wall is not its shot meeting one: it sets off nothing (rules R4a).
 func _on_wall_met(actor: int, position: Vector2, heading: Vector2, tag: int) -> void:
+	if _arc_slot >= 0:
+		return
 	_fire_event(TriggerBase.Event.WALL, actor, position, tag, null, false, heading)
 
 
@@ -3777,6 +3839,7 @@ func clear() -> void:
 	_ring.fill(-1)
 	_landed_at.fill(0)
 	_move_heading.fill(Vector2.RIGHT)
+	_hook_ends.fill(0)
 	_last_form.fill(&"")
 	_cast_count.fill(0)
 	_lc_count = 0
@@ -3825,6 +3888,7 @@ func open_caster(actor: int) -> bool:
 func close_caster(actor: int) -> void:
 	if actor < 0 or actor >= ACTORS:
 		return
+	_drop_pending(func(launch: PendingLaunch) -> bool: return launch.actor == actor)
 	for staff in SpellLimits.STAFFS:
 		var index: int = actor * SpellLimits.STAFFS + staff
 		_release_hold(index)
@@ -3967,6 +4031,7 @@ func _reset_caster(caster: int) -> void:
 		_hold_mana[index] = 0.0
 		_last_form[index] = &""
 	_move_heading[caster] = Vector2.RIGHT
+	_hook_ends[caster] = 0
 	_landed_at[caster] = 0
 	_aim_origin[caster] = Vector2.INF
 	_aim_dir[caster] = Vector2.INF
@@ -4049,12 +4114,14 @@ func _group_has(group: CompiledGroup, node: int) -> bool:
 	return false
 
 
-## Switches off the sustained carriers of this staff: their shots go, their mana is free.
+## Switches off the sustained carriers of this staff: their shots go, their waiting firings
+## (a burst's later ones, a payload that fires them) go, their mana is free. Other waiting
+## launches of the staff fire on.
 func _release_hold(index: int) -> void:
-	_drop_pending(floori(float(index) / SpellLimits.STAFFS), index % SpellLimits.STAFFS)
 	if _hold_tags[index].is_empty():
 		return
 	var tags: PackedInt64Array = _hold_tags[index].duplicate()
+	_drop_pending(func(launch: PendingLaunch) -> bool: return _fires_any(launch, tags))
 	_hold_tags[index].clear()
 	_hold_mana[index] = 0.0
 	if events != null:

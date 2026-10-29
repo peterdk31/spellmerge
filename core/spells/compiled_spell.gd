@@ -49,7 +49,7 @@ var echo_hit: HitProfile = null
 ## Radians per second a shot turns toward a target; 0 means no homing.
 var homing_turn: float = 0.0
 ## Degrees off its aim a homing beam or teleport still bends to a target: what `homing_turn`
-## turns in SpellLimits.INSTANT_HOMING_SECONDS, at most INSTANT_HOMING_MAX (0 without homing).
+## turns in SpellLimits.INSTANT_HOMING_SECONDS, up to all the way round (0 without homing).
 var homing_angle: float = 0.0
 ## Pixels away a homing spell looks for its target (`StaffCompiler.homing_range`); 0 when it does
 ## not home, or its form cannot be steered (its homing cards are then listed as wasted).
@@ -67,7 +67,6 @@ var arc_hit: HitProfile = null
 ## A `TriggerBase.Event` value, meaningful only when `payload` is not null.
 var trigger_event: int = TriggerBase.Event.HIT
 var trigger_interval: float = 0.0
-var trigger_max_fires: int = 1
 
 ## `fallback` values: a carrier's spell, the cards that landed on the caster, or on a
 ## payload's origin.

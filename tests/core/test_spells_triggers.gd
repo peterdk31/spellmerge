@@ -61,15 +61,19 @@ func before_each() -> void:
 	_put(frost, &"frost")
 	_modifier(&"shield", ModifierBase.Behaviour.SHIELD, 1.0)
 	_modifier(&"relay", ModifierBase.Behaviour.RELAY, 1.0)
+	_modifier(&"bounce", ModifierBase.Behaviour.BOUNCE, 1.0)
+	var beam: FormBase = _form(&"beam", 0.0, 0.1)
+	beam.motion = FormBase.Motion.RAY
+	beam.ray_length = 200.0
 	var pierce := ModifierBase.new()
 	pierce.extra_pierce = 1
 	_put(pierce, &"pierce")
-	_trigger(&"on_block", TriggerBase.Event.BLOCK, 1)
-	_trigger(&"on_kill", TriggerBase.Event.KILL, 1)
-	_trigger(&"on_cast", TriggerBase.Event.CAST, 1)
-	_trigger(&"on_wall", TriggerBase.Event.WALL, 1)
-	_trigger(&"on_hurt", TriggerBase.Event.HURT, 2)
-	_trigger(&"on_reaction", TriggerBase.Event.REACTION, 1)
+	_trigger(&"on_block", TriggerBase.Event.BLOCK)
+	_trigger(&"on_kill", TriggerBase.Event.KILL)
+	_trigger(&"on_cast", TriggerBase.Event.CAST)
+	_trigger(&"on_wall", TriggerBase.Event.WALL)
+	_trigger(&"on_hurt", TriggerBase.Event.HURT)
+	_trigger(&"on_reaction", TriggerBase.Event.REACTION)
 
 
 func _put(component: SpellComponent, id: StringName) -> void:
@@ -96,10 +100,9 @@ func _modifier(id: StringName, behaviour: ModifierBase.Behaviour, strength: floa
 	_put(modifier, id)
 
 
-func _trigger(id: StringName, event: TriggerBase.Event, max_fires: int) -> void:
+func _trigger(id: StringName, event: TriggerBase.Event) -> void:
 	var trigger := TriggerBase.new()
 	trigger.event = event
-	trigger.max_fires = max_fires
 	_put(trigger, id)
 
 
@@ -168,6 +171,64 @@ func test_on_wall_fires_at_a_wall_only() -> void:
 	check(runes.size() == 1 and _mgr.get_position_of(runes[0]).x < 100.0, "in front of the wall")
 
 
+## Two walls, at x = 60 and x = -60: a bolt cast right with one bounce meets the first, turns,
+## and ends on the second.
+func _two_walls() -> void:
+	_mgr.set_walls([Rect2(60, -50, 20, 100), Rect2(-80, -50, 20, 100)] as Array[Rect2])
+
+
+func test_on_wall_fires_at_every_bounce_and_at_the_last_wall() -> void:
+	_two_walls()
+	var held: int = _build(0, [&"bounce", &"on_wall", &"bolt", &"rune"])
+	_cast(0)
+	_tick(60)
+	var runes: Array[int] = _slots(held)
+	check_equal(runes.size(), 2, "one at the bounce, one where it ended")
+	var xs: Array[float] = []
+	for slot in runes:
+		xs.append(_mgr.get_position_of(slot).x)
+	xs.sort()
+	check(xs.size() == 2 and xs[0] > -60.0 and xs[0] < -50.0 and xs[1] < 60.0 and xs[1] > 50.0, "in front of each wall (%s)" % str(xs))
+
+
+func test_on_wall_sends_a_bounced_payload_the_way_the_shot_goes_on() -> void:
+	_mgr.set_walls([Rect2(60, -50, 20, 100)] as Array[Rect2])
+	var held: int = _build(0, [&"bounce", &"on_wall", &"bolt", &"short"])
+	_cast(0)
+	var shots: Array[int] = []
+	for _i in 30:
+		_tick(1)
+		shots = _slots(held)
+		if not shots.is_empty():
+			break
+	check_equal(shots.size(), 1, "the payload flies")
+	check(shots.size() == 1 and _mgr.get_velocity_of(shots[0]).x < 0.0, "back off the wall, as the bolt does")
+
+
+func test_a_beam_fires_on_wall_where_it_meets_one() -> void:
+	_mgr.set_walls([Rect2(100, -50, 20, 100)] as Array[Rect2])
+	var held: int = _build(0, [&"on_wall", &"beam", &"rune"])
+	_cast(0)
+	var runes: Array[int] = _slots(held)
+	check_equal(runes.size(), 1, "at once, where it stops")
+	check(runes.size() == 1 and absf(_mgr.get_position_of(runes[0]).x - 100.0) < 8.0, "at the wall (%s)" % (str(_mgr.get_position_of(runes[0])) if runes.size() == 1 else ""))
+	_tick(30)
+	check_equal(_slots(held).size(), 1, "a 0.1 s beam has one tick, so once")
+
+
+func test_a_bouncing_beam_fires_on_wall_at_its_turn_and_its_end() -> void:
+	_two_walls()
+	var held: int = _build(0, [&"bounce", &"on_wall", &"beam", &"rune"])
+	_cast(0)
+	var runes: Array[int] = _slots(held)
+	check_equal(runes.size(), 2, "at the turn and where it ends, on the other wall")
+	var xs: Array[float] = []
+	for slot in runes:
+		xs.append(_mgr.get_position_of(slot).x)
+	xs.sort()
+	check(xs.size() == 2 and xs[0] < -50.0 and xs[1] > 50.0, "at both walls (%s)" % str(xs))
+
+
 func test_on_block_fires_where_the_shield_stopped_the_shot() -> void:
 	var held: int = _build(0, [&"shield", &"on_block", &"bolt", &"rune"])
 	_cast(0, Vector2.RIGHT)
@@ -177,17 +238,17 @@ func test_on_block_fires_where_the_shield_stopped_the_shot() -> void:
 	check_equal(_slots(held).size(), 1, "one block, one payload (a shield of one charge)")
 
 
-func test_on_block_respects_max_fires_with_a_bigger_shield() -> void:
+func test_on_block_fires_at_every_block_of_a_bigger_shield() -> void:
 	_modifier(&"shield2", ModifierBase.Behaviour.SHIELD, 2.0)
 	var held: int = _build(0, [&"shield2", &"on_block", &"bolt", &"rune"])
 	_cast(0, Vector2.RIGHT)
 	_mgr.spawn(EventsScript.NO_PLAYER, Vector2(160, 0), Vector2(-100, 0), 3.0, 3.0, ManagerScript.LAYER_PLAYER, 0, 0)
 	_mgr.spawn(EventsScript.NO_PLAYER, Vector2(200, 0), Vector2(-100, 0), 3.0, 3.0, ManagerScript.LAYER_PLAYER, 0, 0)
 	_tick(60)
-	check_equal(_slots(held).size(), 1, "two blocks of a two-charge shield, but max_fires 1: one payload")
+	check_equal(_slots(held).size(), 2, "two blocks of a two-charge shield, two payloads")
 
 
-func test_a_beam_on_kill_respects_max_fires() -> void:
+func test_a_beam_on_kill_fires_at_every_kill() -> void:
 	var beam: FormBase = _form(&"beam", 0.0, 0.1)
 	beam.motion = FormBase.Motion.RAY
 	beam.ray_length = 300.0
@@ -204,7 +265,7 @@ func test_a_beam_on_kill_respects_max_fires() -> void:
 		if hit[3] == killed:
 			from_kill += 1
 	check(_hits.size() >= 2, "the beam hit both targets")
-	check_equal(from_kill, 1, "a beam that kills two targets fires an on kill of max_fires 1 once")
+	check_equal(from_kill, 2, "a beam that kills two targets fires its on kill twice")
 
 
 func test_on_kill_and_on_reaction_fire_from_the_hit() -> void:
@@ -246,7 +307,7 @@ func test_a_trigger_that_does_not_match_stays_quiet() -> void:
 	check_equal(_spells.live_shots(held), 0, "no other event, a bad tag or a null target fired the kill payload")
 
 
-func test_on_hurt_fires_from_the_hurt_actor_for_each_live_carrier_up_to_its_limit() -> void:
+func test_on_hurt_fires_from_the_hurt_actor_for_each_live_carrier_every_time() -> void:
 	var long_held: int = _build(0, [&"on_hurt", &"bolt", &"rune"])
 	_cast(0)
 	_tick(2)
@@ -258,10 +319,10 @@ func test_on_hurt_fires_from_the_hurt_actor_for_each_live_carrier_up_to_its_limi
 	check(runes.size() == 1 and _mgr.get_position_of(runes[0]).is_equal_approx(Vector2(5, 5)), "from the hurt actor")
 	_tick(1)
 	_bus.actor_hurt.emit(0, 3, Vector2(5, 5), 0, &"hit")
-	check_equal(_slots(long_held).size(), 2, "a second time (two fires)")
+	check_equal(_slots(long_held).size(), 2, "a second time")
 	_tick(1)
 	_bus.actor_hurt.emit(0, 3, Vector2(5, 5), 0, &"hit")
-	check_equal(_slots(long_held).size(), 2, "but not a third")
+	check_equal(_slots(long_held).size(), 3, "and a third: no count stops it")
 
 
 func test_on_hurt_stops_when_the_carrier_is_gone() -> void:

@@ -140,6 +140,10 @@ var _shot_samples: int = 0
 var _hits: int = 0
 var _reactions: int = 0
 var _refused: int = 0
+## The projectile manager's `dropped` and the spell runtime's `fires_waited` when the measured
+## window began: what the cap dropped and what the fire pacing held back while measured.
+var _dropped_at: int = 0
+var _waited_at: int = 0
 ## Microseconds spent in each timed part over the measured frames (see `_time_parts`).
 var _enemy_step_usec: int = 0
 var _lookup_usec: int = 0
@@ -297,6 +301,8 @@ func _process(delta: float) -> void:
 	if not _measuring and _elapsed >= warm_up:
 		_measuring = true
 		_casts = [0, 0, 0, 0]
+		_dropped_at = int(_projectiles.get("dropped"))
+		_waited_at = _fires_waited()
 		_probe = ProbeScript.new()
 		add_child(_probe)
 	if _elapsed >= warm_up + measure:
@@ -433,6 +439,9 @@ func _end_scenario() -> void:
 	var mean_enemies: float = float(_enemy_sum) / maxf(1.0, float(_enemy_samples))
 	var mean_shots: float = float(_shot_sum) / maxf(1.0, float(_shot_samples))
 	print("BENCH: stress %s: enemies mean %.0f peak %d of %d, shots mean %.0f peak %d of %d, spell hits %d, reactions %d, casts per player (measured window) %s" % [label, mean_enemies, _peak_enemies, _target_enemies, mean_shots, _peak_shots, _target_shots, _hits, _reactions, str(_casts)])
+	# The run holds the cap full on purpose, so `dropped` is how often shots pushed past it; the
+	# fires that waited are the trigger fires the pacing moved to a later step (none is lost).
+	print("BENCH: stress %s: shots dropped by the cap %d, trigger fires that waited for a later step %d (measured window)" % [label, int(_projectiles.get("dropped")) - _dropped_at, _fires_waited() - _waited_at])
 	if mean_enemies < float(_target_enemies) * REACH:
 		_failures.append("%s: on average only %.0f of %d enemies stood" % [label, mean_enemies, _target_enemies])
 	if mean_shots < float(_target_shots) * REACH:
@@ -446,6 +455,12 @@ func _end_scenario() -> void:
 		_failures.append("%s: no frames were measured" % label)
 	_teardown_scenario()
 	_next_scenario()
+
+
+## The spell runtime's `fires_waited`, or 0 without the Spells autoload.
+func _fires_waited() -> int:
+	var spells: Node = get_tree().root.get_node_or_null("Spells")
+	return int(spells.get("fires_waited")) if spells != null else 0
 
 
 ## One `BENCH:` line each for the timed parts: milliseconds for one pass over the crowd.

@@ -11,7 +11,7 @@ extends "res://tests/support/suite.gd"
 
 ## Fields that only a spell has: any receiver counts. (`burst.lifetime` is a CPUParticles2D
 ## property in gameplay/feel, and is dropped before the scan.)
-const UNIQUE_FIELDS: String = "(mana_cost|cooldown|lifetime|display_name|base_damage|damage_scale|orbit_radius|ray_length|shot_mult|damage_mult|speed_mult|radius_mult|cooldown_mult|mana_mult|extra_pierce|behaviour_strength|max_fires|chain_jumps|homing_turn|trigger_interval|trigger_max_fires|trigger_event|shots_requested|shots_clamped|element_name|form_name)"
+const UNIQUE_FIELDS: String = "(mana_cost|cooldown|lifetime|display_name|base_damage|damage_scale|orbit_radius|ray_length|shot_mult|damage_mult|speed_mult|radius_mult|cooldown_mult|mana_mult|extra_pierce|behaviour_strength|chain_jumps|homing_turn|trigger_interval|trigger_event|shots_requested|shots_clamped|element_name|form_name)"
 ## Fields with common names (`HitProfile` has some of them, and `gameplay/combat` may read that):
 ## only a variable named like a spell, or declared as a spell class.
 const COMMON_FIELDS: String = "(id|demo|damage|speed|complexity|shots|radius|pierce|tint|motion|spread|icon|event|interval|status_id|status_duration|status_strength|element_id|form_id|trigger_id|behaviour)"
@@ -35,7 +35,7 @@ func test_the_scanner_catches_field_reads() -> void:
 		"var scale: float = element.damage_scale",
 		"n = spell.complexity",
 		"var path: int = recipe_spell.shots",
-		"if x.max_fires > 1:",
+		"if x.chain_jumps > 1:",
 	]
 	for line in bad:
 		check(_reads_field(line), "caught: " + line)

@@ -322,7 +322,8 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 		spell.hit.kind = &"ray"
 	if spell.homing_turn > 0.0:
 		spell.homing_range = homing_range(spell.motion, spell.ray_length, homing_reach)
-		spell.homing_angle = minf(rad_to_deg(spell.homing_turn * SpellLimits.INSTANT_HOMING_SECONDS), SpellLimits.INSTANT_HOMING_MAX)
+		# Past 180 degrees it would be bending back the other way: that is all the way round.
+		spell.homing_angle = minf(rad_to_deg(spell.homing_turn * SpellLimits.INSTANT_HOMING_SECONDS), 180.0)
 	if heals:
 		spell.hit.heal = spell.damage
 		spell.hit.damage = maxi(roundi(float(spell.damage) * SpellLimits.HEAL_ENEMY_SHARE), 1)
@@ -341,8 +342,9 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 		spell.echo_hit.status_strength = spell.status_strength
 	var arc: float = spell.behaviour(ModifierBase.Behaviour.ARC)
 	if arc > 0.0:
-		# Zaps per second add up over arc cards; a zap hits like a ray, at ARC_DAMAGE of the shot.
-		spell.arc_interval = maxf(1.0 / arc, SpellLimits.ARC_MIN_INTERVAL)
+		# Zaps per second add up over arc cards (a shot zaps at most once a physics step); a zap
+		# hits like a ray, at ARC_DAMAGE of the shot.
+		spell.arc_interval = 1.0 / arc
 		spell.arc_hit = HitProfile.new()
 		spell.arc_hit.damage = maxi(roundi(spell.hit.damage * SpellLimits.ARC_DAMAGE), 1)
 		spell.arc_hit.heal = roundi(spell.hit.heal * SpellLimits.ARC_DAMAGE)
@@ -360,7 +362,6 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 		spell.trigger_id = trigger.id
 		spell.trigger_event = trigger.event
 		spell.trigger_interval = trigger.interval
-		spell.trigger_max_fires = trigger.max_fires
 	_cast.mana += spell.mana_cost
 	_cast.delay += spell.cooldown
 	return spell

@@ -6,7 +6,6 @@ Ideas and future work outside the current milestone (docs/PLAN.md, "Planning sys
 
 For later milestones; see `docs/milestones/M2-staffs.md`, "Later".
 
-- **`on wall` at every bounce.** A bouncing shot does not end, so `projectile_expired` is not sent and `on wall` fires only at the last wall. The card text (`bounce · on wall · bolt · nova`, a nova at every bounce) needs a manager event for a bounce (for example `shot_bounced`) that B2's trigger relay can read; decide before the `on wall` card.
 
 - **More melee carriers (owner 2026-10-29, after `swing` has been played).** `lunge` (a short step forward with a hit at its end), `whirl` (a 360° sweep round the caster) and `saw` (tiny repeated hits at the tip, close to 0 mana and delay; `hold · saw`, `siphon · saw`). See M2-staffs.md, "Phase I".
 - **Staff types (M3).** An always-cast slot, a shuffle staff (random order), built-in recoil, cheaper `hold`; staffs found in runs with other slot counts, delays and recharges.
@@ -18,7 +17,7 @@ For later milestones; see `docs/milestones/M2-staffs.md`, "Later".
 - **A map view, and other uses for A, X and Y (task, owner 2026-10-26).** The staffs moved to the shoulders, so A, X and Y do nothing in play (B opens the builder). The owner's first idea is a map view (the room sequence and where the players are, once M3 has rooms and doors); A, X and Y get their jobs then.
 - **Codex of discoveries (M5).** The first time a reaction, a combo or an unknown chain happens, the game notes it (with a short clip if the recorder can do it cheaply).
 - **Superseded by the pivot:** "Spell visuals round 2, part 2" (a burst per combo row) and the combo marks per combo class are replaced by the layered shot look (staffs B6); keep what still reads well.
-- **Fissure and `bounce` (from B2c).** The design says `bounce · fissure` turns at walls; the projectile manager gives a beam no wall normal, so the fissure stops at the wall. Needs a wall-normal query on the manager. Also: Feel draws only `beam` and `nova` cues; the `rain` cue (`form_shown`, `length` = seconds until it falls) needs a look (B6b).
+- **The `rain` cue (from B2c).** Feel draws only `beam` and `nova` cues; the `rain` cue (`form_shown`, `length` = seconds until it falls) needs a look (B6b).
 
 ## From the actors rework (phase G, 2026-10-28)
 

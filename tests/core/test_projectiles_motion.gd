@@ -35,6 +35,8 @@ func _initialize() -> void:
 	_test_orbit_hits_what_crosses_it_and_ignores_walls()
 	_test_orbit_pierce_and_expiry()
 	_test_orbit_ring_over_a_crowd()
+	_test_orbit_hits_again_each_time_it_comes_round()
+	_test_a_piercing_shot_hits_everything_it_passes_in_one_step()
 	_test_homing_skips_wizards_and_freed_targets()
 	_test_homing_turns_toward_a_target()
 	_test_homing_rules()
@@ -186,16 +188,15 @@ func _test_orbit_pierce_and_expiry() -> void:
 func _test_orbit_ring_over_a_crowd() -> void:
 	_setup()
 	_mgr.set_anchor(0, Vector2(200.0, 200.0))
-	# Five enemies stacked under a ring that stands still (speed 0): more than the shot's
-	# HIT_MEMORY. The documented rule: an orbit shot is a piercing shot, so with enough
-	# pierce it hits the 3 it remembers, then the others, then repeats.
+	# Five enemies stacked under a ring that stands still (speed 0). The rule (owner, 2026-10-29):
+	# a piercing shot hits a target once while it touches it, however many it touches.
 	for i in 5:
 		_target(Vector2(240.0 + float(i), 200.0), 10.0)
 	var slot: int = _mgr.spawn_orbit(0, 40.0, 0.0, 0.0, 5.0, 4.0, ManagerScript.LAYER_ENEMY, 100, 1)
 	for _i in 10:
 		_mgr.step(DT)
 	_check(_mgr.is_alive(slot), "a ring with pierce left survives a crowd")
-	_check(_hits.size() > 5, "a ring over more than HIT_MEMORY enemies hits some again (%d hits)" % _hits.size())
+	_check(_hits.size() == 5, "a ring standing on five enemies hits each once, not again while it stays (%d hits)" % _hits.size())
 	_check(_mgr._pierce[slot] == 100 - _hits.size(), "pierce left is 100 minus the hits")
 	# With no pierce it ends on its first touch, like any shot.
 	_mgr.clear()
@@ -203,6 +204,29 @@ func _test_orbit_ring_over_a_crowd() -> void:
 	var thin: int = _mgr.spawn_orbit(0, 40.0, 0.0, 0.0, 5.0, 4.0, ManagerScript.LAYER_ENEMY, 0, 1)
 	_mgr.step(DT)
 	_check(not _mgr.is_alive(thin) and _hits.size() == 1, "a ring with pierce 0 ends on its first touch")
+
+
+func _test_orbit_hits_again_each_time_it_comes_round() -> void:
+	_setup()
+	_mgr.set_anchor(0, Vector2(200.0, 200.0))
+	_target(Vector2(240.0, 200.0), 6.0)
+	# One turn a second; it starts on the target, so it touches it at 0, 1, 2 and 3 seconds.
+	var slot: int = _mgr.spawn_orbit(0, 40.0, 0.0, TAU, 3.4, 4.0, ManagerScript.LAYER_ENEMY, 100, 1)
+	for _i in 200:
+		_mgr.step(DT)
+	_check(_hits.size() == 4, "a ring hits a target again each time it comes round to it (%d hits)" % _hits.size())
+	_check(not _mgr.is_alive(slot) or _mgr._pierce[slot] == 96, "each a hit of its own")
+
+
+func _test_a_piercing_shot_hits_everything_it_passes_in_one_step() -> void:
+	_setup()
+	for i in 10:
+		_target(Vector2(120.0 + 8.0 * i, 100.0), 3.0)
+	# 120 px a step: the whole row in one step, more than the old three a step.
+	var slot: int = _mgr.spawn(0, Vector2(100.0, 100.0), Vector2(7200.0, 0.0), 0.1, 2.0, ManagerScript.LAYER_ENEMY, 20, 1)
+	_mgr.step(DT)
+	_check(_hits.size() == 10, "all ten in the one step (%d)" % _hits.size())
+	_check(_mgr.is_alive(slot), "with pierce to spare")
 
 
 func _test_homing_turns_toward_a_target() -> void:
@@ -341,8 +365,8 @@ func _test_homing_aim_for_a_beam() -> void:
 	_check(aim.is_equal_approx(Vector2(100.0, 650.0).direction_to(far.global_position)), "with a longer range (a beam's length) it is")
 	aim = _mgr.homing_aim(0, Vector2(100.0, 650.0), Vector2.DOWN, deg_to_rad(30.0), ManagerScript.LAYER_ENEMY, 0.0, 0, 0)
 	_check(aim == Vector2.DOWN, "a zero reach finds nothing")
-	var ray_len: float = _mgr.ray(0, Vector2(10.0, 600.0), Vector2.RIGHT, 100000.0)
-	_check(ray_len <= ManagerScript.RAY_MAX_LENGTH, "a very long beam is cut to RAY_MAX_LENGTH (%f)" % ray_len)
+	var ray_len: float = _mgr.ray(0, Vector2(10.0, 600.0), Vector2.RIGHT, 1000.0)
+	_check(is_equal_approx(ray_len, 1000.0), "a beam is as long as it says, however long (%f)" % ray_len)
 
 
 func _test_home_velocity_turns_anything_that_moves() -> void:

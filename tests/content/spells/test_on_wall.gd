@@ -55,7 +55,6 @@ func test_the_card_is_a_valid_trigger() -> void:
 		return
 	check_equal(card.id, &"on_wall", "its id is its folder")
 	check_equal(card.event, TriggerBase.Event.WALL, "it fires at a wall")
-	check_equal(card.max_fires, 1, "once")
 	check(card.range_problems().is_empty(), "inside every range: %s" % [card.range_problems()])
 
 

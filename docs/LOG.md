@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-29: Card familiar (staffs C)
+
+Added the Familiar carrier (data only: `.tres`, icon, assets, lore), the combos `familiar_bolt` and `familiar_and_frost`, and `test_familiar.gd` (the card's data, the entity it asks for near the caster, four players). The combo arena has no `ai`, so the combos check that the cast asks for a familiar (the `spawned` check) and that the other staff works beside it; the familiar's casts are covered by the Entities and spells tests.
+
 ## 2026-10-29: Card decoy (staffs C)
 
 Added the Decoy carrier (data only: `.tres`, icon, assets, lore), the combos `decoy_and_fire` and `decoy_frost_cover`, and `test_decoy.gd` (the card's data, the entity it asks for at the caster's feet, four players). The combos check, with a new combo check kind `spawned` (the arena now records entity spawns), that the cast asks for a decoy and that the other staff works beside it. The combo arena has no `ai`, so the lure and the end point are covered by the Entities and spells tests.

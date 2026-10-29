@@ -2034,3 +2034,7 @@ The owner: restructure the projectile step from "for each shot, check every beha
 ## 2026-10-29: Decoy numbers (staffs C)
 
 - **Decoy lasts 4 s, 5 mana, 4 s cooldown, complexity 2, base damage 1 (the range's minimum; a decoy deals none).** The cooldown is the lifetime because it starts at the cast, so a decoy can be recast the moment the last one ends; 5 mana is what limits how often. Its two combos check that the cast asks for a decoy (the new combo check `spawned`, which fails without the card) and that the wizard's other staff works beside it; they are not showcases. The combo arena has no `ai`, so the lure and the end point (`blast · decoy`, `on expire · decoy`) are tested in `test_entities.gd` and `test_spells_payload_carriers.gd`.
+
+## 2026-10-29: Familiar numbers (staffs C)
+
+- **Familiar lasts 8 s, 6 mana, 8 s cooldown, complexity 2, base damage 1 (it deals none itself; its payload does).** It casts every second, so 8 s is about eight payload casts for one cast of mana; the cooldown equals the lifetime so there is one familiar per card at a time, and the payload's own cost limits the rest. Its combos check that the cast asks for a familiar; the casting is tested in `test_entities.gd` and `test_spells_payload_carriers.gd` (the combo arena has no `ai`).

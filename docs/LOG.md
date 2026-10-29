@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-29: Staff codes (staffs D2)
+
+A staff copies as one line, `sm1:double,fire,-,bolt` (card ids by slot, `-` for an empty slot, the empty tail left off), and pastes back. `StaffCode` (`core/spells`) is pure text work: it takes only lower-case names, at most 40 cards and 600 characters, checks every id with the registry, and never loads or runs anything from the text. The list builder gained a row of "Copy code" and "Paste code" buttons (system clipboard; the d-pad reaches them between the tabs and the slots); a paste sends one `staff_cards_requested`, so the player still refuses cards it does not own. The radial builder and the pause menu have no code buttons yet.
+
 ## 2026-10-29: Bots and the emergent combo report (staffs D1)
 
 The bots (`Bot.build_random`, seeded) and the staff fuzz already existed from A6a/A6b; D1 adds the report. `test_spell_fuzz.gd` now prints `REPORT` lines after each run: the five best of its 600 random staffs by kills and by reactions, and the five costliest by mean step time and by safeguards met (dropped shots, then peak live shots), each with its cards and generated name. The fuzz imps now have 60 health (they had 400 and nothing died). Run it with `ci/build/build.sh --quick --tests` and read `build/logs`; paste a run here when cards land.

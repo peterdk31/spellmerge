@@ -502,6 +502,21 @@ func staff_view(cards: Array[StringName], staff: StaffBase) -> Dictionary:
 	return {"empty": compiled.is_empty(), "cards": row, "casts": casts, "wasted": compiled.wasted.duplicate(), "staff": staff}
 
 
+## The shareable text code of a staff's cards (staffs D2, `StaffCode`).
+static func staff_code(cards: Array[StringName]) -> String:
+	return StaffCode.encode(cards)
+
+
+## Read a pasted staff code: `{ok, cards, error}` (`StaffCode.parse`), every id checked against
+## the registry. `slots` pads the cards to that many (0: as written).
+func parse_staff_code(text: String, slots: int = 0) -> Dictionary:
+	return StaffCode.parse(text, _is_card, slots)
+
+
+func _is_card(id: StringName) -> bool:
+	return _component(id) != null
+
+
 ## The damage one cast deals if every shot of it lands once (a beam: every hit of its life):
 ## each carrier's hit times its shots, times the group's repeats. Payloads are left out (they
 ## depend on what is hit), so it is the builder's "at least" number.

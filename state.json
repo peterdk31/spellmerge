@@ -9,6 +9,7 @@
     "number": 399
   },
   "errors_in_a_row": 0,
+  "idle": null,
   "intake_tasks": {
     "208": {
       "author": "Brianmanden",
@@ -95,26 +96,6 @@
     }
   },
   "usage": [
-    {
-      "at": "2026-10-21T11:44:43Z",
-      "kind": "dev",
-      "tokens": 192744
-    },
-    {
-      "at": "2026-10-21T11:45:39Z",
-      "kind": "review",
-      "tokens": 49380
-    },
-    {
-      "at": "2026-10-21T11:49:43Z",
-      "kind": "dev",
-      "tokens": 43988
-    },
-    {
-      "at": "2026-10-21T11:50:39Z",
-      "kind": "review",
-      "tokens": 22162
-    },
     {
       "at": "2026-10-21T12:53:06Z",
       "kind": "dev",
@@ -3209,6 +3190,11 @@
       "at": "2026-10-29T11:27:08Z",
       "kind": "review",
       "tokens": 19748
+    },
+    {
+      "at": "2026-10-29T12:42:10Z",
+      "kind": "dev",
+      "tokens": 264955
     }
   ],
   "version": 1

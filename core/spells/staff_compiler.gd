@@ -31,6 +31,11 @@ const TRAVEL_ONLY: Array[int] = [
 ## How the description says when a trigger fires, by `TriggerBase.Event`.
 const WHEN: Array[String] = ["on hit", "when it ends", "every %s s", "when its shield blocks", "on a kill", "at once", "on a wall", "when you are hurt", "on a reaction", "through a friend"]
 
+## Test only (tests/core/test_card_rules.gd): true keeps every card the waste table would drop on
+## its carrier (a behaviour, numbers, an infusion, a trigger that "never fires"), so the runtime
+## alone decides what it does and the test can see whether a W cell really changes nothing.
+static var keep_wasted: bool = false
+
 ## id -> SpellComponent (or null for an unknown id).
 var _lookup: Callable
 
@@ -161,13 +166,13 @@ func _read_group(want: int, payload: bool) -> CompiledGroup:
 					why = _numbers_waste(modifier, form.motion, blasts)
 				if why.is_empty() and modifier.behaviour == ModifierBase.Behaviour.ARC and life <= 1.0 / _strength_of(modifiers, ModifierBase.Behaviour.ARC):
 					why = "it ends before its first zap (%.2f s)" % life
-				if why.is_empty():
+				if why.is_empty() or keep_wasted:
 					kept_modifiers.append(modifier)
 				else:
 					why_not[modifier] = why
 			# An infusion is a hit's element: on a carrier that hits nothing itself, only a blast carries it.
 			var kept_elements: Array[ElementBase] = []
-			if hits(form.motion) or blasts:
+			if hits(form.motion) or blasts or keep_wasted:
 				kept_elements = elements
 			var spell: CompiledSpell = _build(form, kept_elements, kept_modifiers, trigger, CompiledSpell.FALLBACK_NONE)
 			spell.slot = slot
@@ -186,7 +191,7 @@ func _read_group(want: int, payload: bool) -> CompiledGroup:
 				# A trigger whose event never happens on this carrier still reads its payload, so the
 				# cards after it are read in the same order whether it fires or not; the payload is
 				# then wasted with it (rules R2b).
-				var never: String = _trigger_never(trigger, form, kept_elements, kept_modifiers, life)
+				var never: String = "" if keep_wasted else _trigger_never(trigger, form, kept_elements, kept_modifiers, life)
 				var first: int = _cast.slots.size()
 				var mana: float = _cast.mana
 				var delay: float = _cast.delay
@@ -418,6 +423,8 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 		if modifier.behaviour == ModifierBase.Behaviour.ARC:
 			spell.arc_reach = maxf(spell.arc_reach, modifier.behaviour_reach)
 		spell.behaviours[modifier.behaviour] = stacked(modifier.behaviour, spell.behaviours[modifier.behaviour], modifier.behaviour_strength)
+		if modifier.cue != &"" and not spell.behaviour_cues.has(modifier.behaviour):
+			spell.behaviour_cues[modifier.behaviour] = modifier.cue
 		match modifier.behaviour:
 			ModifierBase.Behaviour.HOMING:
 				# Homing stacks by multiplying: the strongest card's turn rate, x HOMING_STACK for

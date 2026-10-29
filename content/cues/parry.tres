@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="CueBase" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/cue_base.gd" id="1_base"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"parry"
+parts = Array[Dictionary]([{"effect": &"burst", "zoom": 5, "seconds": 0.35, "color": Color(0.9490196, 0.7607843, 0.1882353, 1), "way": &"right"}])
+hold = 0.06
+sound = &"parry"

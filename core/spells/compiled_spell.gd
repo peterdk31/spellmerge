@@ -87,6 +87,9 @@ var element_ids: Array[StringName] = []
 ## The stacked `behaviour_strength` of the modifiers, indexed by `ModifierBase.Behaviour`
 ## (`StaffCompiler.stacked`: three shields give 3 at SHIELD, two heavy cards 16 at HEAVY).
 var behaviours: PackedFloat32Array = PackedFloat32Array()
+## The cue each behaviour goes off with (`ModifierBase.cue`), by `ModifierBase.Behaviour`: the
+## first card of that behaviour in slot order that names one. Only the named ones are kept.
+var behaviour_cues: Dictionary = {}
 ## The group the trigger fires, or null.
 var payload: CompiledGroup = null
 ## The group a payload carrier (rain, familiar) carries, or null.
@@ -100,6 +103,11 @@ var slot: int = -1
 ## The stacked strength of `behaviour` (a `ModifierBase.Behaviour`) on this spell, 0 for none.
 func behaviour(kind: int) -> float:
 	return behaviours[kind] if kind >= 0 and kind < behaviours.size() else 0.0
+
+
+## The cue `behaviour` (a `ModifierBase.Behaviour`) goes off with on this spell, `&""` for none.
+func cue_of(kind: int) -> StringName:
+	return behaviour_cues.get(kind, &"") as StringName
 
 
 ## How many spells there are in this chain of payloads, this one included (following the first

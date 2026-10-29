@@ -16,6 +16,19 @@ const ActorSeats := preload("res://tests/support/actor_seats.gd")
 const STEP: float = 0.0625
 const FIXTURE: String = "res://tests/core/fixtures/registry"
 
+
+## The fixture's content and sounds, with the game's own cues (`content/cues`, from the Registry
+## autoload): a death and a downed wizard are cues.
+class FixtureRegistry:
+	extends RegistryScript
+	var cues: RegistryScript = null
+
+	func get_resource(folder: StringName, id: StringName) -> Resource:
+		if folder == &"cues" and cues != null:
+			return cues.get_resource(folder, id)
+		return super(folder, id)
+
+
 var _failures: Array[String] = []
 var _bus: Node
 var _feel: Node
@@ -74,8 +87,10 @@ func _check(condition: bool, message: String) -> void:
 func _setup(sound_id: StringName = &"", projectiles: Node = null) -> void:
 	_teardown()
 	_bus = EventsScript.new()
-	_registry = RegistryScript.new()
-	_registry.scan(FIXTURE + "/content", FIXTURE + "/audio", PackedStringArray(["tres"]))
+	var registry := FixtureRegistry.new()
+	registry.cues = root.get_node_or_null("Registry") as RegistryScript
+	registry.scan(FIXTURE + "/content", FIXTURE + "/audio", PackedStringArray(["tres"]))
+	_registry = registry
 	_feel = FeelScript.new()
 	_feel.events = _bus
 	_feel.registry = _registry
@@ -85,8 +100,6 @@ func _setup(sound_id: StringName = &"", projectiles: Node = null) -> void:
 	_feel.drive_engine = false
 	var preset := FeelPresetScript.new()
 	preset.hit_sound = sound_id
-	preset.death_sound = sound_id
-	preset.downed_sound = sound_id
 	_feel.preset = preset
 	_camera = Camera2D.new()
 	root.add_child(_camera)
@@ -131,7 +144,8 @@ func _test_default_preset_loads() -> void:
 	if preset == null:
 		return
 	_check(preset.id == &"punchy", "the preset names itself")
-	_check(preset.hit_stop_seconds <= 0.1 and preset.death_stop_seconds <= 0.15, "hit-stop is short")
+	var death := load("res://content/cues/enemy_death.tres") as CueBase
+	_check(preset.hit_stop_seconds <= 0.1 and death != null and death.hold <= 0.15, "hit-stop is short")
 	_check(preset.hit_stop_scale > 0.0, "hit-stop never freezes the physics step")
 
 

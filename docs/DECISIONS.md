@@ -110,6 +110,7 @@ The owner's direction after B7a: "The 4 staffs should be mapped to lb/rb lt/rt i
 ## 2026-10-29: Heavy card (staffs C)
 
 - **Heavy is knockback x4 and speed x0.6**, complexity 2, no mana change. The slam is combat's (`SLAM_SHARE`: as much as the hit's damage). The combos put the wall within 12 px of the imp (combat looks `SLAM_REACH` past its hurt circle), because arena imps are not moved by knockback.
+- **Heavy shares look layer 8 with Pierce for now.** The look layers run 0 to 12 and all are taken; some already double up (Bigger and Growth share 7, Arc and Possess share 10). A layer of its own means a shader change, which is left to the art pass.
 
 ## 2026-10-28: Sticky card (staffs C)
 

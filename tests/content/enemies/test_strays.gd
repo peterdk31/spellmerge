@@ -1,6 +1,6 @@
 extends "res://tests/support/suite.gd"
 ## The strays (living staffs H5, docs/milestones/M2-living-staffs.md, "The strays"): the Cinder
-## Rod (`ember_imp`), the Splinter and the Storm Fork are actors whose art is one 32 px body; each
+## Rod (`ember_imp`), the Splinter, the Storm Fork, the Rime Crook and the Bone Scepter are actors whose art is one 32 px body; each
 ## wears the shared Face in a stray style (one eye on the Splinter), angry at rest, its eyes in its
 ## element's colour, and the face goes furious while it winds up; each has the telegraph parts;
 ## each staff compiles from player cards and its first cast is affordable on full mana; and they
@@ -13,10 +13,20 @@ const STRAYS: Array[EnemyBase] = [
 	preload("res://content/enemies/ember_imp/ember_imp.tres"),
 	preload("res://content/enemies/splinter/splinter.tres"),
 	preload("res://content/enemies/storm_fork/storm_fork.tres"),
+	preload("res://content/enemies/rime_crook/rime_crook.tres"),
+	preload("res://content/enemies/bone_scepter/bone_scepter.tres"),
 ]
 ## Each stray's face style and eye glow (its element's light shade, docs/STYLE.md).
-const STYLES: Array[Face.Style] = [Face.Style.STRAY, Face.Style.STRAY_ONE, Face.Style.STRAY]
-const GLOWS: Array[Color] = [Color(1, 0.635, 0.235, 1), Color(1, 0.635, 0.235, 1), Color(0.706, 0.91, 0.165, 1)]
+const STYLES: Array[Face.Style] = [Face.Style.STRAY, Face.Style.STRAY_ONE, Face.Style.STRAY, Face.Style.STRAY, Face.Style.STRAY]
+const GLOWS: Array[Color] = [
+	Color(1, 0.635, 0.235, 1),
+	Color(1, 0.635, 0.235, 1),
+	Color(0.706, 0.91, 0.165, 1),
+	Color(0.769, 0.965, 0.949, 1),
+	Color(0.878, 0.541, 0.847, 1),
+]
+## The cards each stray's staff holds, in the same order.
+const CARDS: Array[Array] = [[&"fire", &"bolt"], [&"dash"], [&"triple", &"lightning", &"bolt"], [&"frost", &"hook"], [&"void", &"rain"]]
 const FRAME: int = 32
 
 var _world: AiFixture
@@ -82,6 +92,35 @@ func test_each_staff_compiles_and_its_first_cast_is_affordable() -> void:
 		if body.caster != null and body.caster.has_staff(0):
 			var cost: float = body.caster.next_cast_mana(0)
 			check(cost >= 0.0 and cost <= data.max_mana, "%s: the first cast (%.1f mana) fits its pool (%.1f)" % [data.id, cost, data.max_mana])
+
+
+func test_each_stray_casts_the_cards_it_was_planned_with() -> void:
+	for i in STRAYS.size():
+		var held: Array = []
+		for card in STRAYS[i].cards:
+			held.append(card)
+		check_equal(held, CARDS[i], "%s: its cards" % STRAYS[i].id)
+
+
+## Four players in the room: the Rime Crook and the Bone Scepter wind up, cast their spells (frost
+## · hook, void · rain) at the nearest of them and nobody waits (they are actors on the enemy team).
+func test_the_new_strays_attack_four_players() -> void:
+	for data in [STRAYS[3], STRAYS[4]]:
+		var world := AiFixture.new(root, 4)
+		for seat in 4:
+			world.players[seat].position = Vector2(60.0 + 20.0 * seat, 10.0 * seat)
+		var body: Actor = world.enemy(data.scene, data, Vector2.ZERO)
+		var casts: Array[int] = []
+		world.bus.actor_cast.connect(func(actor_id: int, _actor: Node) -> void: casts.append(actor_id))
+		var winded_up: bool = false
+		var mind: AIController = AiFixture.ai(body)
+		for step in 480:
+			world.run_all(1)
+			winded_up = winded_up or mind.is_telegraphing()
+		check(winded_up, "%s: winds up against four players" % data.id)
+		check(not casts.is_empty(), "%s: casts its staff (%d casts)" % [data.id, casts.size()])
+		check(body.is_inside_tree() and not body.is_down(), "%s: stays a live actor" % data.id)
+		world.free_all()
 
 
 func test_strays_hop_while_walking_and_the_face_goes_with_them() -> void:

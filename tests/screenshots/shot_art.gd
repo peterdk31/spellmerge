@@ -22,6 +22,8 @@ const STAFF := preload("res://content/wizard/base/staff.svg")
 const IMP := preload("res://content/enemies/ember_imp/idle.svg")
 const SPLINTER := preload("res://content/enemies/splinter/idle.svg")
 const FORK := preload("res://content/enemies/storm_fork/idle.svg")
+const CROOK := preload("res://content/enemies/rime_crook/idle.svg")
+const SCEPTER := preload("res://content/enemies/bone_scepter/idle.svg")
 const WALL_TOP := preload("res://art/tilesets/crypt/wall_top.svg")
 const PILLAR := preload("res://art/tilesets/crypt/pillar.svg")
 const PILLAR_TOP := preload("res://art/tilesets/crypt/pillar_top.svg")
@@ -62,7 +64,9 @@ func take() -> void:
 	# Row 4: the other strays (the face carries their mood), then the torch flame and glow frames.
 	_frame(SPLINTER, 0, 32.0, 266.0)
 	_frame(FORK, 0, 32.0 + FRAME * SCALE, 266.0)
-	x = 32.0 + FRAME * SCALE * 2.0
+	_frame(CROOK, 0, 32.0 + FRAME * SCALE * 2.0, 266.0)
+	_frame(SCEPTER, 0, 32.0 + FRAME * SCALE * 3.0, 266.0)
+	x = 32.0 + FRAME * SCALE * 4.0
 	_strip(TORCH_FLAME, x, 266.0)
 	await shot("art_sheet")
 

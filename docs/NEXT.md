@@ -8,7 +8,6 @@ The ordered task queue for the current milestone, M2, now in its **staffs rework
 
 M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97). The second C2 checkpoint (#264) was answered with **pivot** on 2026-10-26: spells are built in staffs (M2-staffs.md). Nothing from M3+ is built (rewards, relics, staff types, rooms, the door rule).
 
-- [ ] **The Rime Crook and the Bone Scepter (living staffs H5, unblocked).** (`content/enemies/`) Moved from the owner lane by the planning run of 2026-10-29: the `hook` and `rain` cards have merged, and the owner lane is waiting on the bigger parts. A folder each, copied from `splinter/`: the Rime Crook (frost · hook, a puller) and the Bone Scepter (void · rain, a zoner whose eyes are sparks in its sockets). Each folder gets an `assets.json` (and its art listed as the other strays' are). Staffs: the Rime Crook casts frost · hook, the Bone Scepter void · rain, as planned. Extend `tests/content/enemies/test_strays.gd` (a valid enemy, its staff casts, 4-bot smoke test).
 - [ ] **Polish: staff codes in the radial builder (staffs D2 follow-up).** (`hud/builder/`) Re-examined on 2026-10-29: D2 works in the list builder only, and D3 asks the owner to share staffs in the sandbox, so the owner may meet the radial builder first. Give it "Copy code" and "Paste code" too, with a one-line result ("Pasted 4 cards" or why it was refused), and show the cast names (E1) beside it (its own test line: the names appear for each cast). Goes before B8; B8 rebases onto it. Test: `test_builder.gd`.
 
 - [x] **The staff runtime (staffs A5).** Done in an owner session (development paused meanwhile): `SpellTag` is player, staff, generation, node above `1 << 20`; `install_staff`, `cast_staff`, `cast_index`, `is_holding`, `reserved_mana`; four staffs per player with their own cursor and delay; multicast groups fan out; payloads fire as groups under their own node's tag; fallbacks send `area_hit_requested`; `hold` keeps its shots until switched off (`mana_reserved`); a recipe runs as a staff of one cast, so there is one runtime. Tests: `tests/core/test_staff_runtime.gd`.
@@ -54,6 +53,8 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 ## Blocked
 
 ## Done recently
+
+- [x] **The Rime Crook and the Bone Scepter (living staffs H5).** `content/enemies/rime_crook/` (frost · hook, a puller; 20 health, speed 40) and `content/enemies/bone_scepter/` (void · rain, a zoner; 18 health, speed 30), each copied from the Splinter with its own body, face anchor, glow, telegraph colours and an `assets.json`. Tests: `test_strays.gd` (both are valid strays with their cards, and a four-player fight winds up and casts).
 
 - [x] **Staff codes (staffs D2).** `StaffCode` (`core/spells/staff_code.gd`): `sm1:double,fire,-,bolt`, card ids by slot, `-` for a gap, only known ids (`Spells.staff_code`, `Spells.parse_staff_code`); the list builder has "Copy code" and "Paste code" buttons (system clipboard) for the shown staff. Tests: `tests/core/test_staff_code.gd`, `test_builder.gd`. The radial builder has none yet.
 

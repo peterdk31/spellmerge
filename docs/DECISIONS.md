@@ -2,6 +2,11 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-29: Planning run on an empty queue
+
+- The bot's queue held only D3, which waits for both lanes. The owner is on melee I2 (#448); B5, B6a, B8 and I3-I8 stay in the owner lane. **I7 (freezes in co-op) moves to the bot's queue**: it is decided, sits in `gameplay/feel/` and `core/projectiles/` mostly apart from the swing and deflect kits, and I6 moved the same way. The owner can move it back. I2 and I3 may also edit `core/projectiles/`, so I7 keeps its edits there small. The parry's local stop is added when I5 lands.
+- Backlog issues #416 (relic, M3), #208 (pet, "not for M2") and #417 stay on the backlog; none fits M2 now. M2 is not done (D3 and the owner lane remain), so there is no checkpoint yet.
+
 ## 2026-10-29: Screen shake setting (melee I6)
 
 - **The switch lives on the Settings page and talks to feel by an event.** Areas only talk through `core/` events, so the pause menu sends `screen_shake_changed(enabled)` and feel sets `shake_enabled`; the menu never touches `Feel`. The saved choice is read when the menu is bound (the Hud loads after Feel) and sent only when it is off, since on is feel's default. Settings go in a `settings` section of the same `SaveFile`; only flags make a save "not new", so the intro is unaffected.

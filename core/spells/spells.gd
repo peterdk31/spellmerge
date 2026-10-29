@@ -1052,17 +1052,14 @@ func _launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direct
 					var shot: int = _caster_shot()
 					centre = projectiles.get_position_of(shot) if shot >= 0 else origin
 				slot = projectiles.spawn_orbit(actor, spell.orbit_radius, base + TAU * n / count, turn, lifetime, spell.radius, HITS, spell.pierce, tag, centre)
-				_apply_shield(slot, spell)
 			FormBase.Motion.STILL:
 				var at: Vector2 = origin if count == 1 else origin + heading * spell.radius * 2.0
 				slot = projectiles.spawn(actor, at, Vector2.ZERO, lifetime, spell.radius, HITS, spell.pierce, tag, ProjectilesScript.MOTION_STILL)
-				_apply_shield(slot, spell)
 			_:
 				slot = projectiles.spawn(actor, origin, heading * spell.speed, lifetime, spell.radius, HITS, spell.pierce, tag)
-				if slot >= 0:
-					_apply_travel(slot, spell)
 		if slot < 0:
 			continue
+		_apply_travel(slot, spell)
 		made += 1
 		_register(slot, tag, spell, carried, prev)
 		if source != null:
@@ -1266,7 +1263,6 @@ func _launch_wall(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, d
 	var centre: Vector2 = projectiles.clip_to_walls(origin, origin + direction * SpellLimits.WALL_REACH)
 	var across: Vector2 = direction.orthogonal()
 	var gap: float = spell.spread if spell.spread > 0.0 else spell.radius * 2.0
-	var shield: int = roundi(spell.behaviour(ModifierBase.Behaviour.SHIELD))
 	var made: int = 0
 	for n in spell.shots:
 		var at: Vector2 = centre + across * (n - (spell.shots - 1) * 0.5) * gap
@@ -1274,11 +1270,8 @@ func _launch_wall(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, d
 		if slot < 0:
 			continue
 		made += 1
+		_apply_travel(slot, spell)
 		_register(slot, tag, spell, carried, prev)
-		if shield > 0:
-			projectiles.set_shield(slot, shield)
-		if spell.behaviour(ModifierBase.Behaviour.DEFLECT) > 0.0:
-			projectiles.set_deflect(slot, true)
 		if source != null:
 			projectiles.exclude(slot, source, SpellLimits.SOURCE_EXCLUSION)
 	return made
@@ -1346,9 +1339,10 @@ func _end_entities(tag: int) -> void:
 		events.entity_end_requested.emit(SpellTag.caster_of(tag), tag)
 
 
-## Hand a flying shot the behaviours of its cards that the projectile manager runs (staffs B1):
-## a shot from the staff and a chain jump alike (rules R1b). A plain shot costs one comparison
-## per behaviour and no call.
+## Hand a shot the behaviours of its cards that the projectile manager runs (staffs B1): a bolt,
+## a rune, an orbit and a wall's shots from the staff and a chain jump alike (rules R1b). Each
+## setter takes what the shot can do and refuses the rest (rules R4h: a rune does not move, an
+## orbit does not fly). A plain shot costs one comparison per behaviour and no call.
 func _apply_travel(slot: int, spell: CompiledSpell) -> void:
 	if spell.homing_range > 0.0:
 		projectiles.set_homing(slot, spell.homing_turn, spell.homing_range)
@@ -1376,8 +1370,7 @@ func _apply_travel(slot: int, spell: CompiledSpell) -> void:
 	_apply_shield(slot, spell)
 
 
-## A shot with `shield` blocks that many enemy shots (an orbit's and a still shot's too, which
-## `_apply_travel` does not reach).
+## A shot with `shield` blocks that many enemy shots.
 func _apply_shield(slot: int, spell: CompiledSpell) -> void:
 	if slot < 0 or spell.behaviours.is_empty():
 		return

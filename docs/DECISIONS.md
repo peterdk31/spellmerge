@@ -2030,3 +2030,7 @@ The owner: restructure the projectile step from "for each shot, check every beha
 ## 2026-10-29: Swap numbers (staffs C)
 
 - **Swap flies 300 px/s for 0.5 s (150 px reach), 3 mana, 2.5 s cooldown, 1 damage, complexity 2.** Same flight and mana as the hook; the cooldown is 0.5 s longer because a swap also moves the target (an escape through an enemy; it can leave a chilled foe where you stood). A miss trades nobody. Its combos do not test an end point: the combo arena does not move its caster, as for dash, teleport and hook.
+
+## 2026-10-29: Decoy numbers (staffs C)
+
+- **Decoy lasts 4 s, 5 mana, 4 s cooldown, complexity 2, base damage 1 (the range's minimum; a decoy deals none).** The cooldown matches the lifetime, so one decoy is out at a time unless `hold` is used. Its combos only test the wizard's other staffs beside it: the combo arena has no `ai`, so the lure and the end point (`blast · decoy`, `on expire · decoy`) are tested in `test_entities.gd` and `test_spells_payload_carriers.gd`.

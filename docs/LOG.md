@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-29: Card decoy (staffs C)
+
+Added the Decoy carrier (data only: `.tres`, icon, assets, lore), the combos `decoy_and_fire` and `decoy_frost_cover`, and `test_decoy.gd` (the card's data, the entity it asks for at the caster's feet, four players). The combo arena has no `ai`, so the combos check the wizard's other staffs beside the decoy; the lure and the end point are covered by the Entities and spells tests.
+
 ## 2026-10-29: Card swap (staffs C)
 
 Added the Swap carrier (data only: `.tres`, icon, assets, lore), the combos `swap_trade`, `swap_miss` and `swap_frost`, and `test_swap.gd` (the card's data, the caster and target moves it asks for, four players).

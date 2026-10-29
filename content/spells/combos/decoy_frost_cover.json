@@ -1,0 +1,12 @@
+{
+	"id": "decoy_frost_cover",
+	"name": "Frost from cover",
+	"does": "A decoy goes down, then a frost bolt from another staff chills the imp while it looks at the decoy.",
+	"casts": [
+		{"staff": 0, "cards": ["decoy"]},
+		{"staff": 1, "cards": ["frost", "bolt"], "at": 0.1}
+	],
+	"imps": [[100, 0]],
+	"seconds": 1.5,
+	"checks": [{"kind": "status", "imps": [0], "status": "chill"}]
+}

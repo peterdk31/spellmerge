@@ -166,6 +166,7 @@ Weak spots found in the architecture review of 2026-10-20 (docs/ARCHITECTURE.md)
 - **Element shape and status look as fields (proposal).** `shape` numbers are drawn in the shader and the manager; the status look is a preset dictionary. An element that names a palette ramp and an overlay colour would not need the Feel preset or the STYLE palette edited for a look that reuses existing ones.
 - **A colour-distance check on the table, not a hand count (task).** `test_feel_reactions.gd` asserts the number of colours (nine); it should read the reaction ids from `reactions.tres` plus `discharge` so a new reaction fails only if its colour is missing or too close.
 - **The discharge arc is a straight-segment zigzag (polish).** At the clip's 2x scale it reads as bracket-like corners; a thinner line with more corners, or a short flicker (two frames of a different jag), would look more like lightning.
+- **The Shield icon fails `test_svg_art` (found 2026-10-29).** `content/spells/modifiers/shield/icon.svg` uses `<path>` (only `<rect>` is allowed) and has gaps in its outline; redraw it with rects like the Blast icon.
 
 ## Ideas from the community
 

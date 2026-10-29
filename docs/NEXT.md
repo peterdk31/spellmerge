@@ -75,6 +75,8 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 
 ## Done recently
 
+- [ ] **Clip recorder: combo `mates` and cast `dir`.** `tests/clips/scenarios.gd` ignores them, so the clips of `relay_teammate_frost` and `relay_teammate_fire` show a bolt hitting nothing; teach the recorder both keys.
+
 - [x] **Card: relay (staffs C).** `content/spells/modifiers/relay/` (`ModifierBase`, behaviour RELAY, icon, `assets.json`), the lore entry, the combos `relay_teammate_frost` and `relay_teammate_fire` (combo files may now name `mates` and a cast `dir`), and `tests/content/spells/test_relay.gd`.
 - [x] **Card: sticky (staffs C).** `content/spells/modifiers/sticky/` (`ModifierBase`, behaviour STICKY, 1 s on the target, icon, `assets.json`), the lore entry, the combos `sticky_plant_nova` and `sticky_frost_plant`, and `tests/content/spells/test_sticky.gd`.
 - [x] **Card: wall (staffs C).** `content/spells/forms/wall/` (`FormBase`, motion WALL, 5 stones 9 px apart, 3 damage each, 6 mana, 1 s cooldown, 5 s life, icon, `assets.json`), the lore entry, the combos `wall_fire_barrier` and `wall_frost_row`, and `tests/content/spells/test_wall.gd`.

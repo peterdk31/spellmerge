@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## The strays (living staffs H5, docs/milestones/M2-living-staffs.md, "The strays"): the Cinder
-## Rod (`ember_imp`), the Splinter, the Storm Fork, the Rime Crook and the Bone Scepter are actors whose art is one 32 px body; each
-## wears the shared Face in a stray style (one eye on the Splinter), angry at rest, its eyes in its
+## Rod (`ember_imp`), the Splinter, the Storm Fork, the Rime Crook and the Bone Scepter are actors
+## whose art is one 32 px body; each wears the shared Face in a stray style (one eye on the Splinter), angry at rest, its eyes in its
 ## element's colour, and the face goes furious while it winds up; each has the telegraph parts;
 ## each staff compiles from player cards and its first cast is affordable on full mana; and they
 ## hop on their tips while they walk (the face goes with the body) and bob while they stand.
@@ -26,7 +26,7 @@ const GLOWS: Array[Color] = [
 	Color(0.878, 0.541, 0.847, 1),
 ]
 ## The cards each stray's staff holds, in the same order.
-const CARDS: Array[Array] = [[&"fire", &"bolt"], [&"dash"], [&"triple", &"lightning", &"bolt"], [&"frost", &"hook"], [&"void", &"rain"]]
+const CARDS: Array[Array] = [[&"fire", &"bolt"], [&"dash"], [&"triple", &"lightning", &"bolt"], [&"frost", &"hook"], [&"void", &"rain", &"nova"]]
 const FRAME: int = 32
 
 var _world: AiFixture
@@ -109,7 +109,12 @@ func test_the_new_strays_attack_four_players() -> void:
 		var world := AiFixture.new(root, 4)
 		for seat in 4:
 			world.players[seat].position = Vector2(60.0 + 20.0 * seat, 10.0 * seat)
+		var start: Array[Vector2] = []
+		for player in world.players:
+			start.append(player.position)
 		var body: Actor = world.enemy(data.scene, data, Vector2.ZERO)
+		var hits: Array[int] = []
+		world.bus.hit_landed.connect(func(caster: int, _t: Node, _a: int, _p: Vector2, _k: StringName) -> void: hits.append(caster))
 		var casts: Array[int] = []
 		world.bus.actor_cast.connect(func(actor_id: int, _actor: Node) -> void: casts.append(actor_id))
 		var winded_up: bool = false
@@ -119,6 +124,12 @@ func test_the_new_strays_attack_four_players() -> void:
 			winded_up = winded_up or mind.is_telegraphing()
 		check(winded_up, "%s: winds up against four players" % data.id)
 		check(not casts.is_empty(), "%s: casts its staff (%d casts)" % [data.id, casts.size()])
+		var moved: bool = false
+		var hurt: bool = false
+		for seat in 4:
+			moved = moved or not world.players[seat].position.is_equal_approx(start[seat])
+			hurt = hurt or world.players[seat].health.health < world.players[seat].health.max_health
+		check(not hits.is_empty() or moved or hurt, "%s: its spell reaches a player (%d hits)" % [data.id, hits.size()])
 		check(body.is_inside_tree() and not body.is_down(), "%s: stays a live actor" % data.id)
 		world.free_all()
 

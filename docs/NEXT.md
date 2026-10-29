@@ -54,7 +54,7 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 
 ## Done recently
 
-- [x] **The Rime Crook and the Bone Scepter (living staffs H5).** `content/enemies/rime_crook/` (frost · hook, a puller; 20 health, speed 40) and `content/enemies/bone_scepter/` (void · rain, a zoner; 18 health, speed 30), each copied from the Splinter with its own body, face anchor, glow, telegraph colours and an `assets.json`. Tests: `test_strays.gd` (both are valid strays with their cards, and a four-player fight winds up and casts).
+- [x] **The Rime Crook and the Bone Scepter (living staffs H5).** `content/enemies/rime_crook/` (frost · hook, a puller; 20 health, speed 40) and `content/enemies/bone_scepter/` (void · rain · nova, a zoner; 18 health, speed 30), each copied from the Splinter with its own body, face anchor, glow, telegraph colours and an `assets.json`. Tests: `test_strays.gd` (both are valid strays with their cards, and a four-player fight winds up, casts and reaches a player).
 
 - [x] **Staff codes (staffs D2).** `StaffCode` (`core/spells/staff_code.gd`): `sm1:double,fire,-,bolt`, card ids by slot, `-` for a gap, only known ids (`Spells.staff_code`, `Spells.parse_staff_code`); the list builder has "Copy code" and "Paste code" buttons (system clipboard) for the shown staff. Tests: `tests/core/test_staff_code.gd`, `test_builder.gd`. The radial builder has none yet.
 

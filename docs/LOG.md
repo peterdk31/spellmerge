@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-29: Card swap (staffs C)
+
+Added the Swap carrier (data only: `.tres`, icon, assets, lore), the combos `swap_trade`, `swap_miss` and `swap_frost`, and `test_swap.gd` (the card's data, the caster and target moves it asks for, four players).
+
 ## 2026-10-29: Card recoil (staffs C)
 
 Added the Recoil modifier (data only: `.tres`, icon, assets, lore), two combos (`recoil_blast_bolt`, the rocket jump, and `recoil_split_bolts`) and `test_recoil.gd`. Strength: 24 px, about three-quarters of a tile, over `RECOIL_SECONDS`. Recoil is asked once per firing, so a split volley kicks once and `mirror · recoil · bolt` asks two opposite pushes that the player adds up to nothing. All unit tests pass except `test_svg_art` on the Shield icon, already on main (see BACKLOG).

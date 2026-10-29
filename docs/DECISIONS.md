@@ -2026,3 +2026,7 @@ The owner: restructure the projectile step from "for each shot, check every beha
 ## 2026-10-29: Hook numbers (staffs C)
 
 - **Hook flies 300 px/s for 0.5 s (150 px reach), 3 mana, 2 s cooldown, 1 damage, complexity 2.** It reaches farther than the long dash (128 px) but not across a room, and the pull takes `HOOK_SECONDS`, so it is a gap-closer that can be hit on the way; it costs a little less than the instant teleport (4 mana, 2.5 s). A miss pulls nobody. Its combos do not test an end point (blast, on expire): the combo arena does not move its caster, as for dash and teleport.
+
+## 2026-10-29: Swap numbers (staffs C)
+
+- **Swap flies 300 px/s for 0.5 s (150 px reach), 3 mana, 2.5 s cooldown, 1 damage, complexity 2.** Same flight and mana as the hook; the cooldown is 0.5 s longer because a swap also moves the target (an escape through an enemy; it can leave a chilled foe where you stood). A miss trades nobody. Its combos do not test an end point: the combo arena does not move its caster, as for dash, teleport and hook.

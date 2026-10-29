@@ -1,0 +1,9 @@
+{
+	"id": "swap_miss",
+	"name": "Swap miss",
+	"does": "A swap that hits nothing trades nobody: the charm flies out and is gone.",
+	"casts": [{"staff": 0, "cards": ["swap"]}],
+	"imps": [[0, 100]],
+	"seconds": 1.0,
+	"checks": [{"kind": "max_shots", "max": 1}, {"kind": "lost_at_most", "imps": [0], "max": 0}]
+}

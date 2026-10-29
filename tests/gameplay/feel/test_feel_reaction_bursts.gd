@@ -8,6 +8,8 @@ const FeelScript := preload("res://gameplay/feel/feel.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const FeelPresetScript := preload("res://gameplay/feel/presets/feel_preset.gd")
 
+const ActorSeats := preload("res://tests/support/actor_seats.gd")
+
 const STEP: float = 0.0625
 
 
@@ -35,14 +37,17 @@ class Enemy:
 var _bus: EventsScript
 var _feel: FeelScript
 var _combat: FakeCombat
+var _actors: ActorSeats.ActorsScript
 
 
 func before_each() -> void:
 	_bus = own(EventsScript.new()) as EventsScript
+	_actors = own(ActorSeats.table()) as ActorSeats.ActorsScript
 	_combat = own(FakeCombat.new()) as FakeCombat
 	_feel = own(FeelScript.new()) as FeelScript
 	_feel.events = _bus
 	_feel.combat = _combat
+	_feel.actors = _actors
 	_feel.drive_engine = false
 	_feel.preset = FeelPresetScript.new()
 	root.add_child(_feel)
@@ -64,7 +69,8 @@ func test_a_reaction_stops_longer_and_shakes_more_than_a_plain_hit() -> void:
 	check(preset.reaction_stop_seconds > preset.death_stop_seconds, "longer than a death's stop")
 	check(preset.reaction_shake > preset.death_shake * 0.5, "a strong shake")
 	_bus.reaction_triggered.emit(0, &"flare", Vector2.ZERO)
-	check(_feel.stop_left >= preset.reaction_stop_seconds, "hit-stop began with the reaction")
+	check(_actors.held_left(0) >= preset.reaction_stop_seconds, "its caster is held for the reaction")
+	check_equal(_feel.stop_left, 0.0, "and the game runs on")
 	check(_feel.trauma() >= preset.reaction_shake, "and shake")
 
 

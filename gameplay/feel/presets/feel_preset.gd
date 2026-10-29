@@ -6,14 +6,17 @@ extends Resource
 
 ## Unique name of the preset, also its file name.
 @export var id: StringName = &""
-## Seconds the game slows on a hit. Short, and the same for every player.
+## Seconds a plain hit holds the bodies in it (attacker, target and the shot) and nothing else.
+## Short, and the same for every player.
 @export_range(0.0, 0.2, 0.005) var hit_stop_seconds: float = 0.04
-## Seconds after a plain hit's stop in which plain hits cannot stop the game again.
-## Keeps a crowded fight from sitting near 5% speed (0.04 s of every 0.19 s is 21%).
+## Seconds after a body's plain hit-stop in which a plain hit does not hold that body again, per
+## body. Keeps a body in a crowded fight from being held for ever (0.04 s of every 0.19 s is 21%).
 @export_range(0.0, 0.5, 0.01) var hit_stop_rest: float = 0.15
-## Seconds for an enemy death or a downed wizard (a little longer than a plain hit).
+## Seconds an enemy death holds its killer, and a downed wizard stops the game (a little longer
+## than a plain hit).
 @export_range(0.0, 0.3, 0.005) var death_stop_seconds: float = 0.07
-## Engine.time_scale while the hit-stop lasts (0 would freeze the physics step).
+## Engine.time_scale while the game-wide stop lasts, which only a downed wizard and a boss kill
+## use (0 would freeze the physics step).
 @export_range(0.01, 1.0, 0.01) var hit_stop_scale: float = 0.05
 ## Shake added by a hit, a death and a downed wizard (0 to 1, "trauma").
 @export_range(0.0, 1.0, 0.01) var hit_shake: float = 0.15
@@ -67,7 +70,8 @@ extends Resource
 	&"superconduct": Color("14a38b"),
 }
 @export var reaction_sound_prefix: String = "reaction_"
-## The burst a reaction adds to its flash, bigger than any plain hit: its hit-stop in seconds
+## The burst a reaction adds to its flash, bigger than any plain hit: how long it holds its
+## caster (and the target of its hit) in seconds
 ## (longer than a death's), the size of its particle burst, and the size of the ring that
 ## opens (1.0 is the nova ring art's size; it grows as it fades). `reaction_power` scales
 ## these and the flash and shake by reaction id (a reaction not listed is 1.0).

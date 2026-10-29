@@ -14,7 +14,6 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
 - [x] **The old recipe path removed (staffs A6c).** Done in an owner session: `Spells.compile(recipe)`, `builder_view`, the recipe wrappers (`install`, `cast`, a spell's `begin_generation`) and the recipe compiler are gone, `begin_generation` takes a compiled staff; `CompiledSpell` lost `valid`, `reason`, `description`, `complexity`, `depth` and `held`; `SpellLimits` keeps only engine safeguards and tuning; the events `build_change_requested`, `spell_swap_requested`, `spell_changed`, `recipe_changed` and `active_spell_changed` are removed; tests build staffs (`tests/support/staff_kit.gd` turns the old recipe shorthand into card rows; `test_spell_tags.gd` replaces `test_spells_compile.gd`); the spells, core and gameplay READMEs say so. **Phase B and the cards can start; development is unpaused.**
 - [x] **Card: arc (staffs C).** After the slow, return and arc kit (owner, 2026-10-27). Data only.
 - [x] **Card: linger (staffs C).** After B1. Data only (M2-staffs.md, "Working in parallel").
-- [ ] **Freezes in co-op (melee I7).** (`gameplay/feel/`, `core/projectiles/`) Moved here by the planning run on 2026-10-29 (the queue was empty; I7 needs none of I2–I5 and the owner already decided it): local stops on the attacker, target and shot for hits and kills; `Engine.time_scale` only for a downed player and a boss kill (M2-staffs.md, "Freezes in co-op"). Tests: one player's hit does not slow another player or an unrelated shot; a down still stops the game. The parry's stop is added when I5 lands. Keep the `core/projectiles/` edits small and rebase on I2/I3 if they merge first.
 - [ ] **Stress and C2 (staffs D3).** Last: when every other task in both lanes has merged. Then the C2 checkpoint, with the owner's sandbox playtest on `/preview/`.
 
 ## Owner lane
@@ -57,6 +56,8 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 ## Blocked
 
 ## Done recently
+
+- [x] **Freezes in co-op (melee I7).** A hit or a kill holds only its attacker, target and shot (`Actors.hold`, `Projectiles.freeze_shot`); a reaction holds its caster; `Engine.time_scale` drops only for a downed player and a boss kill (`EnemyBase.boss`). Tests: `test_feel_local_stop.gd`, `test_projectiles_freeze.gd`. **Still to do when I5 lands:** the parry's local stop (call `_hold_bodies` from the parry's event).
 
 - [x] **Screen shake setting (melee I6).** Settings has "Screen shake: On/Off" (on by default). It sends `screen_shake_changed` to feel (`Feel.shake_enabled`) and is saved in `SaveFile` (new `get_setting`/`set_setting`), read again when the menu is bound. Tests: `test_pause_menu.gd`, `test_feel_form_looks.gd`, `test_events.gd`.
 

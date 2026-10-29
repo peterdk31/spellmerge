@@ -7,10 +7,11 @@ extends Node
 ##     Feel.preset = load("res://gameplay/feel/presets/punchy.tres")
 ##
 ## On a hit it does four things, all the same for every player:
-## - hit-stop: Engine.time_scale drops for a few hundredths of a second (real time).
-##   Overlapping stops do not add up: the longest one wins. After a plain hit's stop
-##   there is a short rest in which plain hits do not stop the game again (a
-##   crowded fight must not feel like lag); deaths and downed wizards always stop.
+## - hit-stop, a local stop (freezes in co-op): the attacker, the target and the shot of a hit
+##   hold still for a few hundredths of a second while the rest of the game runs on. After a
+##   plain hit's stop a body rests, and plain hits do not hold it again (a crowded fight must
+##   not feel like lag); kills hold at once. Only a downed player and a boss kill drop
+##   Engine.time_scale (real time); overlapping stops do not add up: the longest one wins.
 ## - screen shake: trauma on the current Camera2D, off when `shake_enabled` is false.
 ## - an effect (see "Effects" below): sparks sprayed on along the hit, or a puff all
 ##   round for a hit with no way. A kill turns its killing blow's spray into a bigger
@@ -246,10 +247,16 @@ var shake_enabled: bool = true:
 			_trauma = 0.0
 			_kick = Vector2.ZERO
 			_reset_camera()
-## Seconds of hit-stop left, in real time.
+## Seconds of the game-wide stop left, in real time (`Engine.time_scale`): only for a downed
+## player and a boss kill. Every other hit holds only its own bodies (see `_hold_bodies`).
 var stop_left: float = 0.0
-## Seconds left in which plain hits cannot start a hit-stop, in real time.
+## Seconds left after a game-wide stop, in real time.
 var rest_left: float = 0.0
+## The time (`_clock`) before which a plain hit does not hold this actor again, by actor id, so a
+## stream of hits on one body cannot keep it held for ever.
+var _rest_until: PackedFloat32Array = PackedFloat32Array()
+## The body (instance id) each rest belongs to, so a reused actor id starts with no rest.
+var _rest_body: PackedInt64Array = PackedInt64Array()
 ## Current offset applied to the camera.
 var shake_offset: Vector2 = Vector2.ZERO
 
@@ -378,6 +385,8 @@ var _impact_look_cache: Dictionary = {}
 
 func _ready() -> void:
 	_rng.seed = 1
+	_rest_until.resize(ActorsScript.ACTORS)
+	_rest_body.resize(ActorsScript.ACTORS)
 	if events == null:
 		events = get_node_or_null("/root/Events") as EventsScript
 	if registry == null:
@@ -689,7 +698,8 @@ func _on_damage_dealt(caster: int, target: Node, amount: int, position: Vector2)
 		sound = look.get("sound", preset.hit_sound) as StringName
 		own = _kind_own
 	_kind_target = 0
-	_juice(position, stop, false, shake, sound, aim, tint, size, at, colours)
+	_hold_bodies(caster, _actor_of(target), stop, false)
+	_juice(position, false, shake, sound, aim, tint, size, at, colours)
 	if own:
 		# Their own spell: a ring in its own colour on this frame, so it is never taken for an enemy's hit.
 		_show_ring(position, preset.self_hit_color, preset.self_hit_seconds, preset.self_hit_size)
@@ -736,7 +746,7 @@ func _show_note(text: String, position: Vector2, tint: Color, seconds: float) ->
 ## An element reaction fired at `position`: a puff and a ring in the reaction's colour, its
 ## name rising from the spot, a little shake and the sound `reaction_<id>`. The same for every
 ## player; it changes nothing in the fight.
-func _on_reaction_triggered(_player: int, reaction_id: StringName, position: Vector2) -> void:
+func _on_reaction_triggered(caster: int, reaction_id: StringName, position: Vector2) -> void:
 	var tint: Color = preset.reaction_colors.get(reaction_id, Color.WHITE) as Color
 	var power: float = preset.reaction_power.get(reaction_id, 1.0) as float
 	var slot: int = _next_reaction
@@ -762,11 +772,10 @@ func _on_reaction_triggered(_player: int, reaction_id: StringName, position: Vec
 	if _clock - (_reaction_heard.get(reaction_id, -REACTION_REPEAT) as float) < REACTION_REPEAT:
 		return
 	_reaction_heard[reaction_id] = _clock
-	# The hit-stop is longer than a death's and, like a death's, ignores the rest after a stop.
-	var stop: float = preset.reaction_stop_seconds * power
-	if stop > stop_left:
-		stop_left = stop
-		_set_time_scale(preset.hit_stop_scale)
+	# The hit-stop is longer than a death's and, like a death's, ignores the rest after a stop. The
+	# reaction's own hit (kind `reaction`) holds its target by the plain rule; a hold only ever
+	# lengthens, so whichever of the two comes first, the caster is held for the longer one.
+	_hold_bodies(caster, ActorsScript.NONE, preset.reaction_stop_seconds * power, true)
 	if shake_enabled:
 		_refresh_camera()
 		_trauma = minf(_trauma + preset.reaction_shake * power, 1.0)
@@ -1336,11 +1345,16 @@ func _ramp_of(caster: int) -> int:
 	return table.ramp_of(caster) if table != null else ActorsScript.NONE
 
 
-func _on_enemy_died(_player: int, enemy: Node, position: Vector2) -> void:
+func _on_enemy_died(killer: int, enemy: Node, position: Vector2) -> void:
 	_start_ghost(enemy)
 	if preset.death_puff_seconds > 0.0:
 		_show_ring(position, BONE_LIGHT, preset.death_puff_seconds, preset.death_puff_size)
-	_juice(position, preset.death_stop_seconds, true, preset.death_shake, preset.death_sound)
+	# The killer and the shot hold for the kill (the dead body is freed at once); only a boss's
+	# death stops the whole game.
+	_hold_bodies(killer, ActorsScript.NONE, preset.death_stop_seconds, true)
+	if _is_boss(enemy):
+		_stop_game(preset.death_stop_seconds)
+	_juice(position, true, preset.death_shake, preset.death_sound)
 
 
 ## The look a carrier's card brings (`FormBase.cast_look` or `impact_look`), empty when the card
@@ -1599,7 +1613,8 @@ func _show_possession(caster: int, actor: int, kind: int) -> bool:
 
 func _on_player_downed(player: int) -> void:
 	# The event names no position, so a downed wizard gets stop, shake and sound only...
-	_juice(Vector2.INF, preset.death_stop_seconds, true, preset.downed_shake, preset.downed_sound)
+	_stop_game(preset.death_stop_seconds)
+	_juice(Vector2.INF, true, preset.downed_shake, preset.downed_sound)
 	# ...and, when their own (or a teammate's) spell did it, a note over them saying so: the
 	# seat's own body (its home actor, also while the seat drives another), in its light shade.
 	if combat == null or not combat.has_method("home_actor_of"):
@@ -1615,17 +1630,12 @@ func _on_player_downed(player: int) -> void:
 	_show_note(note, wizard.global_position if wizard.is_inside_tree() else wizard.position, ProjectileManagerScript.ramp_light(table.ramp_of(actor)), preset.downed_note_seconds)
 
 
-## `strong` is a death or a downed wizard: it ignores the rest after a hit-stop and
-## gets the bigger puff.
+## `strong` is a death or a downed wizard: it gets the bigger puff. The stop of its kind is
+## already applied by the callers (`_hold_bodies`, `_stop_game`); this is looks and sound only.
 ## A plain hit with an `aim` (the way the shot flew) sprays along it, `size` times as big,
 ## from `at`, in the ramp of `tint` (white: `player`'s colours); without one it is a puff at
 ## `position`.
-func _juice(position: Vector2, stop: float, strong: bool, shake: float, sound: StringName, aim: Vector2 = Vector2.ZERO, tint: Color = Color.WHITE, size: float = 1.0, at: Vector2 = Vector2.INF, player: int = 0) -> void:
-	# A plain hit only starts a stop when none runs and the rest is over (or a stream
-	# of hits would extend it for ever); a strong one may lengthen a shorter stop.
-	if stop > stop_left and (strong or (stop_left <= 0.0 and rest_left <= 0.0)):
-		stop_left = stop
-		_set_time_scale(preset.hit_stop_scale)
+func _juice(position: Vector2, strong: bool, shake: float, sound: StringName, aim: Vector2 = Vector2.ZERO, tint: Color = Color.WHITE, size: float = 1.0, at: Vector2 = Vector2.INF, player: int = 0) -> void:
 	if shake_enabled:
 		_refresh_camera()
 		_trauma = minf(_trauma + shake, 1.0)
@@ -1677,6 +1687,52 @@ func _play(id: StringName) -> int:
 	voice.stream = sound
 	voice.play()
 	return used
+
+
+## The game-wide stop: `Engine.time_scale` drops for `seconds` of real time, for everyone. Only a
+## downed player and a boss kill use it (melee I7, M2-staffs.md "Freezes in co-op"); a longer
+## stop replaces a shorter one.
+func _stop_game(seconds: float) -> void:
+	if seconds > stop_left:
+		stop_left = seconds
+		_set_time_scale(preset.hit_stop_scale)
+
+
+## The local stop of a hit or a kill: the attacker `attacker`, the target `target` and the shot
+## whose hit is being sent (the projectile manager's `event_slot`) hold for `seconds`, and nothing
+## else does: another player, another enemy and every other shot run on. A plain hit (not
+## `strong`) holds a body only when its rest from the last stop is over, so a crowd of hits does
+## not freeze it for ever; a kill or a reaction always holds. Either actor may be NONE.
+func _hold_bodies(attacker: int, target: int, seconds: float, strong: bool) -> void:
+	var table: ActorsScript = _actor_table()
+	if table == null or seconds <= 0.0:
+		return
+	var held: bool = _hold_actor(table, attacker, seconds, strong)
+	held = _hold_actor(table, target, seconds, strong) or held
+	if held and projectiles != null and "event_slot" in projectiles:
+		var slot: int = projectiles.event_slot as int
+		if slot >= 0:
+			projectiles.freeze_shot(slot, seconds)
+
+
+func _hold_actor(table: ActorsScript, id: int, seconds: float, strong: bool) -> bool:
+	if not table.is_open(id):
+		return false
+	# An id handed to a new body does not inherit the last body's rest.
+	var node: Node = table.node_of(id)
+	var body: int = node.get_instance_id() if node != null else 0
+	if _rest_body[id] != body:
+		_rest_body[id] = body
+		_rest_until[id] = 0.0
+	if not strong and _clock < _rest_until[id]:
+		return false
+	_rest_until[id] = _clock + seconds + preset.hit_stop_rest
+	return table.hold(id, seconds)
+
+
+## True for the death of a boss: an enemy whose data says `boss`.
+static func _is_boss(enemy: Node) -> bool:
+	return enemy is Actor and (enemy as Actor).data != null and (enemy as Actor).data.boss
 
 
 func _set_time_scale(value: float) -> void:

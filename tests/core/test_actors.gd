@@ -203,3 +203,56 @@ func test_spells_opens_no_actors_and_finds_seats_in_the_table() -> void:
 	check(_actors.is_open(imp), "closing a caster leaves its actor to its body")
 	spells.clear()
 	check_equal(_actors.open_count(), 2, "nor does clear close any")
+
+
+func test_hold_needs_an_open_actor_and_some_seconds() -> void:
+	var id: int = _actors.open(ActorsScript.TEAM_ENEMIES, ActorsScript.RAMP_ENEMY)
+	check(not _actors.hold(id + 1, 0.5), "a closed actor cannot be held")
+	check(not _actors.hold(ActorsScript.NONE, 0.5), "nor no actor")
+	check(not _actors.hold(id, 0.0), "no seconds is no hold")
+	check_equal(_actors.held_count, 0, "nothing is held")
+	check(_actors.hold(id, 0.5), "an open actor is held")
+	check_equal(_actors.held_count, 1, "one held")
+	check_equal(_actors.held_left(id), 0.5, "for its seconds")
+
+
+func test_the_longer_hold_wins_and_counts_once() -> void:
+	var id: int = _actors.open(ActorsScript.TEAM_ENEMIES, ActorsScript.RAMP_ENEMY)
+	_actors.hold(id, 0.5)
+	_actors.hold(id, 0.25)
+	check_equal(_actors.held_left(id), 0.5, "a shorter hold does not cut it")
+	_actors.hold(id, 1.0)
+	check_equal(_actors.held_left(id), 1.0, "a longer one lengthens it")
+	check_equal(_actors.held_count, 1, "still one actor held")
+
+
+func test_spend_hold_over_a_partial_an_exact_and_a_long_step() -> void:
+	var id: int = _actors.open(ActorsScript.TEAM_ENEMIES, ActorsScript.RAMP_ENEMY)
+	check_equal(_actors.spend_hold(id, 0.25), 0.25, "a free actor runs the whole step")
+	_actors.hold(id, 0.75)
+	check_equal(_actors.spend_hold(id, 0.5), 0.0, "a hold longer than the step covers it")
+	check_equal(_actors.held_left(id), 0.25, "and keeps what is left")
+	check_equal(_actors.spend_hold(id, 0.25), 0.0, "a hold equal to the step covers it")
+	check_equal(_actors.held_count, 0, "and ends")
+	_actors.hold(id, 0.25)
+	check_equal(_actors.spend_hold(id, 0.75), 0.5, "a hold shorter than the step runs the rest")
+	check_equal(_actors.held_count, 0, "and ends")
+	check_equal(_actors.spend_hold(99999, 0.25), 0.25, "a bad id is never held")
+
+
+func test_a_hold_ends_when_the_actor_closes_opens_again_or_the_table_clears() -> void:
+	var id: int = _actors.open(ActorsScript.TEAM_ENEMIES, ActorsScript.RAMP_ENEMY)
+	_actors.hold(id, 1.0)
+	_actors.close(id)
+	check_equal(_actors.held_count, 0, "closing drops the hold")
+	check_equal(_actors.held_left(id), 0.0, "and the seconds")
+	var again: int = _actors.open(ActorsScript.TEAM_ENEMIES, ActorsScript.RAMP_ENEMY)
+	check_equal(again, id, "the id is reused")
+	check_equal(_actors.held_left(again), 0.0, "a reused id starts free")
+	_actors.hold(again, 1.0)
+	var other: int = _actors.open(ActorsScript.TEAM_ENEMIES, ActorsScript.RAMP_ENEMY)
+	_actors.hold(other, 1.0)
+	check_equal(_actors.held_count, 2, "two held")
+	_actors.clear()
+	check_equal(_actors.held_count, 0, "clear releases every hold")
+	check_equal(_actors.held_left(again), 0.0, "and the seconds")

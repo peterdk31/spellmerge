@@ -35,6 +35,11 @@ func _training() -> Actor:
 	return dummy
 
 
+## The seconds Feel's local stop still holds `dummy` for (a hit just landed on it).
+func _held_seconds(dummy: Actor) -> float:
+	return (root.get_node("Actors") as Node).call("held_left", dummy.id) as float
+
+
 ## What the training dummy shows.
 func _look(dummy: Actor) -> DummyLook:
 	return dummy.get_node("DummyLook") as DummyLook
@@ -91,7 +96,8 @@ func test_dps_covers_the_last_five_seconds() -> void:
 func test_a_short_burst_is_not_watered_down() -> void:
 	var dummy := _training()
 	combat.call("hit", 0, dummy, 30)
-	dummy.step(1.0)
+	# Feel holds a body in a hit for a few hundredths of a second (a local stop): it runs the rest.
+	dummy.step(1.0 + _held_seconds(dummy))
 	check(absf(_look(dummy).dps() - 30.0) < 0.5, "30 in the first second reads 30, not 6, got %s" % _look(dummy).dps())
 
 
@@ -112,7 +118,7 @@ func test_statuses_and_reactions_show() -> void:
 	check(_look(dummy).status_text().contains("Shatter!"), "a reaction on it is named")
 	events.emit_signal("reaction_triggered", 0, &"thaw", Vector2(400.0, 400.0))
 	check(not _look(dummy).status_text().contains("Thaw"), "a reaction elsewhere is not")
-	dummy.step(DummyLook.REACTION_TIME + 0.1)
+	dummy.step(DummyLook.REACTION_TIME + 0.1 + _held_seconds(dummy))
 	check(not _look(dummy).status_text().contains("Shatter"), "the reaction's name goes after a while")
 
 

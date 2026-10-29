@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-29: Freezes in co-op (melee I7)
+
+Feel's hit-stop is local now. A hit holds its attacker, its target and the shot that did it (new `Actors.hold` / `spend_hold`, which `Actor.step` obeys, and `Projectiles.freeze_shot`, a frozen shot keeps its life and tests no hits); a kill holds its killer; a reaction holds its caster. Another player, another enemy and every other shot run on. `Engine.time_scale` drops only for `player_downed` and the death of an `EnemyBase.boss`. A body rests `hit_stop_rest` before a plain hit holds it again (per actor). Tests: `test_feel_local_stop.gd` (a hit does not hold another player, a bystander or an unrelated shot; a down still stops the game), `test_projectiles_freeze.gd`; the old feel tests now read the holds.
+
 ## 2026-10-29: Screen shake setting (melee I6)
 
 The pause menu's Settings page has a "Screen shake: On/Off" switch. It sends the new `screen_shake_changed(enabled)` event, which feel turns into `Feel.shake_enabled`, and the choice is saved in `user://save.cfg` (`SaveFile.get_setting`/`set_setting`, a `settings` section beside the flags) and read when the menu is bound. Hit-stop, particles and sound stay. Tests in `test_pause_menu.gd` (flip, save, reload), `test_feel_form_looks.gd` and `test_events.gd`.

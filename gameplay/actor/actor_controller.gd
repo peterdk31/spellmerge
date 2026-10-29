@@ -16,6 +16,11 @@ extends Node
 ##
 ## `driving` is the actor it drives now (null for none), kept by `Actor.drive` only: a controller
 ## drives at most one actor, and handing it to another takes it off the first.
+##
+## Possess (G9, `possession.gd`): `possessions` are the bodies it possesses, oldest first. It
+## drives the oldest; the others are driven by puppets (`PuppetController`) that copy its intent.
+## `home_actor` is the body whose home controller it is, and `leader()` the controller a
+## possession cast from the body it drives belongs to (a puppet's is its leader's).
 
 const ActorsScript := preload("res://core/actors/actors.gd")
 
@@ -26,6 +31,10 @@ const ActorsScript := preload("res://core/actors/actors.gd")
 
 ## The actor it drives now, or null. Set by `Actor.drive` (and the home actor's `_ready`) only.
 var driving: Actor = null
+## The actor whose home controller it is (set by that actor's `_ready`), or null.
+var home_actor: Actor = null
+## The possessions it holds, oldest first (kept by `Possession` only).
+var possessions: Array[Possession] = []
 
 
 ## Write `actor.intent` for this step (`delta` seconds). The base wants nothing.
@@ -60,3 +69,23 @@ func set_aside(_actor: Actor, _seconds: float) -> void:
 ## writes the intent. The base does nothing.
 func watch_home(_home: Actor, _delta: float) -> void:
 	pass
+
+
+## The controller whose possession a hit cast from the body it drives starts: itself.
+func leader() -> ActorController:
+	return self
+
+
+## True when `body` is one of the bodies it possesses.
+func possesses(body: Actor) -> bool:
+	for possession in possessions:
+		if possession.target == body:
+			return true
+	return false
+
+
+## End every possession it holds, newest first (its home body leaves the tree with it).
+func end_possessions() -> void:
+	for at in range(possessions.size() - 1, -1, -1):
+		if at < possessions.size():
+			possessions[at].end()

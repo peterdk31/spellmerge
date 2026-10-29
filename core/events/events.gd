@@ -116,11 +116,11 @@ signal reaction_landed(caster: int, reaction_id: StringName, target: Node, posit
 signal wizard_shield_requested(caster: int, charges: int, seconds: float, tag: int)
 ## Sender: core/spells. A card of the actor `caster` (magnet) pulls every enemy within `radius` of `position` toward it at `strength` pixels per second; the card has `tag`. Heard by combat.
 signal pull_requested(caster: int, position: Vector2, radius: float, strength: float, tag: int)
-## Sender: core/spells. A carrier of the actor `caster` with `possess` hit the actor `target` (an actor id): the caster's controller is to drive it for `seconds`; the card has `tag`. One per cast. Heard by actor (the Possession rule).
+## Sender: core/spells. A carrier of the actor `caster` with `possess` hit the actor `target` (an actor id): the caster's controller is to possess it for `seconds`; the card has `tag`. One per hit. Heard by actor (the Possession rule).
 signal possess_requested(caster: int, target: int, seconds: float, tag: int)
-## Sender: actor. The controller of the actor `caster` (the body that cast `possess`) now drives the actor `actor`; the caster's body stands with no controller. Heard by feel (a ring in the caster's ramp and the sound `possess`).
+## Sender: actor. A controller now possesses the actor `actor` (it drives it, or a puppet copies it); `caster` is that controller's home body (the body that cast `possess` when it has none). Heard by feel (a ring in the caster's ramp and the sound `possess`).
 signal possess_started(caster: int, actor: int)
-## Sender: actor. The possession of the actor `actor` by the controller of the actor `caster` ended (time up, a body down or dead, a newer possession); each controller is home again. Heard by feel (a ring going out).
+## Sender: actor. The possession of the actor `actor` by the controller whose home body is `caster` ended (time up, the actor down or dead, a newer possession); the actor has its own controller back. Heard by feel (a ring going out).
 signal possess_ended(caster: int, actor: int)
 ## Sender: combat. Just before `damage_dealt`: the hit of the actor `caster` on `target` for `amount` is of `kind` (`&"shot"`, `&"ray"`, `&"burst"`, `&"reaction"`, `&"status"`, and `&"heal"` for a heal). A wizard's contact hit counts as `&"shot"`. A wizard hit by their own spell has `caster` equal to their own actor id. Heard by feel.
 signal hit_landed(caster: int, target: Node, amount: int, position: Vector2, kind: StringName)

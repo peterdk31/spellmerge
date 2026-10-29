@@ -76,7 +76,7 @@ extends Node
 ## (`caster_move_finished`) is the carrier's end point: its `blast` and its `on expire` payload
 ## happen there. A shot or beam with `blast` asks combat for an area hit where it ends (a hook's
 ## blast waits for the arrival); `siphon` sends `mana_refund_requested` for each hit; `possess`
-## sends `possess_requested` for the first actor a cast's carriers hit (actors G9).
+## sends `possess_requested` for every actor a carrier with it hits (actors G9; owner, 2026-10-29).
 ##
 ## Tags (`SpellTag`): the caster's actor id, staff, generation and node. `begin_generation(actor, staff,
 ## compiled)` registers every compiled spell of a staff under a new generation and returns the
@@ -255,9 +255,6 @@ var _clock: float = 0.0
 var delayed_dropped: int = 0
 ## actor * STAFFS + staff -> casts made, which seeds the next cast's scatter and staff spread.
 var _cast_count: PackedInt32Array = PackedInt32Array()
-## actor * STAFFS + staff -> 1 once the staff's last cast possessed an actor (`possess`: one
-## possession per cast; a new cast of the staff clears it).
-var _possess_spent: PackedByteArray = PackedByteArray()
 var _scatter: RandomNumberGenerator = RandomNumberGenerator.new()
 ## The carrier whose echo is being launched: its shots hit at the echo's half damage.
 var _echo_spell: CompiledSpell = null
@@ -362,7 +359,6 @@ func _init() -> void:
 	_cursor.resize(ACTORS * SpellLimits.STAFFS)
 	_hold_mana.resize(ACTORS * SpellLimits.STAFFS)
 	_cast_count.resize(ACTORS * SpellLimits.STAFFS)
-	_possess_spent.resize(ACTORS * SpellLimits.STAFFS)
 	for i in ACTORS * SpellLimits.STAFFS:
 		_hold_tags.append(PackedInt64Array())
 		_last_form.append(&"")
@@ -813,7 +809,6 @@ func cast_staff(actor: int, staff: int, origin: Vector2, direction: Vector2, man
 	if _launch_group(cast.group, actor, staff, _current[index], origin, aim, null, true) == 0:
 		return REFUSED
 	_cast_count[index] += 1
-	_possess_spent[index] = 0
 	_after_cast(index, compiled, cast)
 	_start_hold(index, actor, staff, cast)
 	_last_infused[actor] = null
@@ -2173,20 +2168,15 @@ func _on_hit_effects(spell: CompiledSpell, tag: int, actor: int, target: Node, p
 		_blast(spell, tag, actor, position)
 
 
-## `possess` (actors G9): the first actor a carrier of this cast hits is possessed for `seconds`
-## (`possess_requested`; the actor kit hands the caster's controller to it). One possession per
-## cast: the staff's next cast may possess again. A target no actor owns, and the caster's own
-## body, are not possessed and spend nothing.
+## `possess` (actors G9; owner, 2026-10-29): every actor a carrier with it hits is possessed for
+## `seconds` (`possess_requested`; the actor kit adds it to the caster's controller's bodies and
+## skips one that is already its). A target no actor owns, and the caster's own body, are not.
 func _possess(actor: int, target: Node, seconds: float, tag: int) -> void:
 	if events == null or not is_instance_valid(target) or actor < 0 or actor >= ACTORS:
-		return
-	var index: int = actor * SpellLimits.STAFFS + SpellTag.staff_of(tag)
-	if _possess_spent[index] != 0:
 		return
 	var victim: int = projectiles.target_owner_of(target)
 	if victim < 0 or victim >= ACTORS or victim == actor:
 		return
-	_possess_spent[index] = 1
 	events.possess_requested.emit(actor, victim, seconds, tag)
 
 
@@ -2388,7 +2378,6 @@ func clear() -> void:
 	_move_heading.fill(Vector2.RIGHT)
 	_last_form.fill(&"")
 	_cast_count.fill(0)
-	_possess_spent.fill(0)
 	delayed_dropped = 0
 	_timer_count = 0
 	_arc_count = 0
@@ -2571,7 +2560,6 @@ func _reset_caster(caster: int) -> void:
 		_cooldown[index] = 0.0
 		_cursor[index] = 0
 		_cast_count[index] = 0
-		_possess_spent[index] = 0
 		_hold_mana[index] = 0.0
 		_last_form[index] = &""
 	_move_heading[caster] = Vector2.RIGHT

@@ -1,0 +1,9 @@
+{
+	"id": "possess_split_bolt",
+	"name": "Possess split",
+	"does": "A split possess bolt takes every imp its bolts hit: you drive the first and the others copy your every move.",
+	"casts": [{"staff": 0, "cards": ["possess", "split", "bolt"]}],
+	"imps": [[100, -14], [100, 0], [100, 14]],
+	"seconds": 1.5,
+	"checks": [{"kind": "damaged", "imps": [0, 1, 2]}]
+}

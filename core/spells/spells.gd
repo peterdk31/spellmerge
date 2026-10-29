@@ -1656,10 +1656,13 @@ func _drop_pending(drops: Callable) -> void:
 		i -= 1
 
 
-## True when `launch` fires a carrier with one of `tags` (its group's own carriers, or its echo).
+## True when `launch` fires a carrier with one of `tags` (its group's own carriers, its echo, or
+## a rain of it landing).
 func _fires_any(launch: PendingLaunch, tags: PackedInt64Array) -> bool:
 	if launch.spell != null:
 		return tags.has(SpellTag.make(launch.actor, launch.staff, launch.spell.node, launch.generation))
+	if launch.landing != null and tags.has(SpellTag.make(launch.actor, launch.staff, launch.landing.node, launch.generation)):
+		return true
 	if launch.group != null:
 		for spell in launch.group.spells:
 			if tags.has(SpellTag.make(launch.actor, launch.staff, spell.node, launch.generation)):
@@ -4162,6 +4165,7 @@ func _release_hold(index: int) -> void:
 	for tag in tags:
 		_end_beams_of(tag)
 		_end_swings_of(tag)
+		_lc_leave(tag, true)
 	if projectiles != null:
 		for tag in tags:
 			# remove_by_tag sends no shot_ended, so the counts are ended here.

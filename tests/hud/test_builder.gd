@@ -190,6 +190,45 @@ func test_a_tab_shows_another_staff() -> void:
 	check_equal(_requests.back(), [0, A, 1, &"bolt"], "a pick goes to the staff shown")
 
 
+func test_the_tabs_show_the_staff_buttons_and_follow_the_device() -> void:
+	_start(4)
+	root.size = Vector2i(640, 360)
+	for player in 4:
+		_open(player)
+	await process_frame
+	await process_frame
+	var builder: BuilderScript = _builder(0)
+	check(builder.is_open(), "the builder is open")
+	for staff in 4:
+		check_equal(builder.tab_glyph(staff).action(), StringName("staff_%d" % (staff + 1)), "tab %d shows staff_%d" % [staff + 1, staff + 1])
+		check_equal(builder.tab_button(staff).tooltip_text, "Staff %s" % BuilderScript.STAFF_NAMES[staff], "tab %d is named by its tooltip" % (staff + 1))
+		_check_glyph_inside_tab(builder, staff)
+	check_equal(builder.tab_marks(X), "[]", "the shown staff keeps its [ ] mark")
+	check_equal(builder.tab_marks(A), "", "and the others do not")
+	_input.leave(0)
+	_input.join(InputManagerScript.KEYBOARD)
+	if not builder.is_open():
+		builder.open_builder()
+	await process_frame
+	await process_frame
+	check_equal(builder.tab_glyph(A).current_glyph()["label"], "Space", "on the keyboard the tabs show keys, live")
+	for staff in 4:
+		_check_glyph_inside_tab(builder, staff)
+	for player in 4:
+		check(Rect2(0, 0, 640, 360).encloses(_builder(player).get_global_rect()), "builder %d still fits 640x360 with a key on every tab, got %s" % [player + 1, _builder(player).get_global_rect()])
+
+
+## The glyph sits inside its tab, centred when no mark is beside it, as the layout placed it.
+func _check_glyph_inside_tab(builder: BuilderScript, staff: int) -> void:
+	var tab_rect: Rect2 = builder.tab_button(staff).get_global_rect()
+	var glyph_rect: Rect2 = builder.tab_glyph(staff).get_global_rect()
+	check(glyph_rect.size.x > 0.0, "tab %d: the glyph has a size" % (staff + 1))
+	check(tab_rect.encloses(glyph_rect), "tab %d holds its glyph, got %s in %s" % [staff + 1, glyph_rect, tab_rect])
+	if builder.tab_marks(staff).is_empty():
+		check(absf(glyph_rect.get_center().x - tab_rect.get_center().x) <= 1.0, "tab %d: the glyph is centred, got %s in %s" % [staff + 1, glyph_rect, tab_rect])
+	check_equal(roundf(glyph_rect.get_center().y), roundf(tab_rect.get_center().y), "tab %d: the glyph is vertically centred" % (staff + 1))
+
+
 func test_back_on_a_card_returns_to_the_slot_and_elsewhere_closes() -> void:
 	_start(1)
 	_open(0)

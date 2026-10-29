@@ -49,6 +49,7 @@ const EventsScript := preload("res://core/events/events.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const HintLineScript := preload("res://hud/widgets/hint_line.gd")
+const ActionGlyphScript := preload("res://hud/widgets/action_glyph.gd")
 const RowWindowScript := preload("res://hud/widgets/row_window.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 
@@ -142,6 +143,11 @@ var _pressed: Control = null
 
 var _title: Label = null
 var _tabs: Array[Button] = []
+## The staff button each tab shows (`staff_1` to `staff_4`), laid out inside the tab.
+var _tab_glyphs: Array[ActionGlyphScript] = []
+## The text before the glyph (the focus mark and "[") and after it ("]") on each tab.
+var _tab_leads: Array[Label] = []
+var _tab_tails: Array[Label] = []
 var _close: Button = null
 var _slots: Array[Button] = []
 var _slots_window: Control = null
@@ -182,6 +188,30 @@ func _ready() -> void:
 		var tab: Button = _make_button(tabs, "Tab%s" % STAFF_NAMES[staff])
 		tab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		_tabs.append(tab)
+		tab.tooltip_text = "Staff %s" % STAFF_NAMES[staff]
+		var content := HBoxContainer.new()
+		content.name = "Content"
+		content.alignment = BoxContainer.ALIGNMENT_CENTER
+		content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		content.add_theme_constant_override("separation", 0)
+		content.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		tab.add_child(content)
+		var lead := Label.new()
+		lead.name = "Lead"
+		lead.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		content.add_child(lead)
+		var glyph := ActionGlyphScript.new()
+		glyph.name = "Glyph"
+		content.add_child(glyph)
+		var tail := Label.new()
+		tail.name = "Tail"
+		tail.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		content.add_child(tail)
+		_tab_glyphs.append(glyph)
+		_tab_leads.append(lead)
+		_tab_tails.append(tail)
+		# A wider key or mark changes the content's size only now and then: the tab follows.
+		content.minimum_size_changed.connect(_fit_tab.bind(staff))
 	_close = _make_button(tabs, "Close")
 	_close.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var lists := HBoxContainer.new()
@@ -209,6 +239,9 @@ func _ready() -> void:
 ## and descriptions (called once by `panels.gd`).
 func bind(events: EventsScript, ui_focus: UIFocusScript, spells: SpellsScript, input: InputManagerScript = null) -> void:
 	_hint.bind(input)
+	for staff in STAFF_COUNT:
+		_tab_glyphs[staff].bind(input)
+		_tab_glyphs[staff].show_action(index, StringName("staff_%d" % (staff + 1)))
 	_events = events
 	_ui_focus = ui_focus
 	_spells = spells
@@ -298,6 +331,16 @@ func slot_count() -> int:
 
 func tab_button(staff: int) -> Button:
 	return _tabs[staff]
+
+
+## The glyph drawn on staff `staff`'s tab.
+func tab_glyph(staff: int) -> ActionGlyphScript:
+	return _tab_glyphs[staff]
+
+
+## The marks around staff `staff`'s glyph: the focus mark and "[" before it, "]" after it.
+func tab_marks(staff: int) -> String:
+	return _tab_leads[staff].text + _tab_tails[staff].text
 
 
 func close_button() -> Button:
@@ -428,8 +471,7 @@ func _render() -> void:
 	var cards: Array[StringName] = cards_of(_viewed)
 	_slot = clampi(_slot, 0, maxi(cards.size() - 1, 0))
 	_title.text = "P%d Staff %s" % [index + 1, STAFF_NAMES[_viewed]]
-	for staff in STAFF_COUNT:
-		_set_text(_tabs[staff], STAFF_NAMES[staff] if staff != _viewed else "[%s]" % STAFF_NAMES[staff])
+	_render_tabs()
 	_set_text(_close, "Close")
 	while _slots.size() < cards.size():
 		_slots.append(_make_row(_slots_holder, "Slot%d" % _slots.size()))
@@ -584,18 +626,41 @@ func _rebuild_controls() -> void:
 		_controls.append(_rows[row])
 
 
+## A tab holds its glyph between its marks, which the layout places: "[" and "]" on the shown
+## staff, so it is not told by colour alone, and the focus mark before them on the focused tab.
+func _render_tabs() -> void:
+	for staff in STAFF_COUNT:
+		var shown: bool = staff == _viewed
+		var lead: Label = _tab_leads[staff]
+		var tail: Label = _tab_tails[staff]
+		lead.text = (FOCUS_MARK if _tabs[staff] == _focused else "") + ("[" if shown else "")
+		tail.text = "]" if shown else ""
+		lead.visible = not lead.text.is_empty()
+		tail.visible = shown
+
+
+## The tab is at least as wide as its content (a key wider than a pad button, and the marks).
+func _fit_tab(staff: int) -> void:
+	var tab: Button = _tabs[staff]
+	var content: Control = _tab_glyphs[staff].get_parent() as Control
+	# An empty button has no text height of its own, so the content gives both sizes.
+	tab.custom_minimum_size = content.get_combined_minimum_size() + tab.get_theme_stylebox("normal").get_minimum_size()
+
+
 func _set_text(button: Button, text: String) -> void:
 	button.set_meta(BASE_TEXT_META, text)
 	button.text = (FOCUS_MARK if button == _focused else "") + text
 
 
-## Show the focus mark on the focused control only.
+## Show the focus mark on the focused control only (a tab shows it in its own lead label).
 func _apply_marks() -> void:
 	for control in _controls:
 		var button := control as Button
-		var base: String = str(button.get_meta(BASE_TEXT_META, ""))
-		button.text = (FOCUS_MARK if button == _focused else "") + base
+		if not _tabs.has(button):
+			var base: String = str(button.get_meta(BASE_TEXT_META, ""))
+			button.text = (FOCUS_MARK if button == _focused else "") + base
 		button.theme_type_variation = FOCUS_VARIATION if button == _focused else BUTTON_VARIATION
+	_render_tabs()
 	# The note and the hint follow the focus, however it moved.
 	_render_note()
 

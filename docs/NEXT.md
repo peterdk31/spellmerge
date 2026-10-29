@@ -53,7 +53,7 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 
 ## Done recently
 
-- [x] **The existing cards' looks and numbers (staffs C0).** Split (burst), chain (sparks) and faster (streaks) got a `look_layer`; the carriers and infusions already had their looks from B6b. Numbers kept. Test: `test_original_looks.gd`.
+- [x] **The existing cards' looks and numbers (staffs C0).** Split (burst), chain (hops, new kind 13) and faster (wake, new kind 14) got a `look_layer`, none shared with an infusion or another first card; the carriers and infusions already had their looks from B6b. Numbers kept. Test: `test_original_looks.gd`.
 
 - [x] **Spell names (staffs E1).** `SpellNamer` (`core/spells/`) names every cast from its cards; `name_words` on every card's `.tres`; `Spells.staff_view` gives each cast's `name`; the list builder's plan shows it above each cast. Tests: `tests/core/test_spell_names.gd`, `test_builder.gd`. The radial builder and the staff codes (D2) do not show names yet; the combo report (D1) can read `name` from the view.
 

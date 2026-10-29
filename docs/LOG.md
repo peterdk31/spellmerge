@@ -4,7 +4,7 @@ What each run did, newest first. Claude appends a short entry after each develop
 
 ## 2026-10-29: The first cards' looks (staffs C0)
 
-The three original modifiers without a look now have one: split a burst (9), chain sparks and a jagged tail (5), faster streaks (8). Carriers and infusions already had theirs; the numbers were reviewed and kept. `test_projectile_looks.gd` uses echo as its card without a look. Test: `test_original_looks.gd`.
+The three original modifiers without a look now have one: split a burst (9), chain hops (13, new: a pixel that jumps sideways), faster a wake (14, new: pixels flung back fast); sparks and streaks were taken by lightning, pierce and heavy. Carriers and infusions already had theirs; the numbers were reviewed and kept. `test_projectile_looks.gd` uses echo as its card without a look. Test: `test_original_looks.gd`.
 
 ## 2026-10-29: Spell names (staffs E1)
 

@@ -14,4 +14,4 @@ icon = ExtResource("2_icon")
 speed_mult = 1.5
 cooldown_mult = 0.75
 damage_mult = 0.85
-look_layer = 8
+look_layer = 14

@@ -69,10 +69,11 @@ func take() -> void:
 	var fire_tint: Color = fire.get("tint") as Color
 	var fire_look: int = int(fire.get("look_layer"))
 	var extra: Array[int] = [int(BIGGER.get("look_layer")), int(PIERCE.get("look_layer")), int(HOMING.get("look_layer")),
-			ManagerScript.LOOK_MOTES, ManagerScript.LOOK_BURST, ManagerScript.LOOK_ORBITERS, ManagerScript.LOOK_GLITTER]
+			ManagerScript.LOOK_MOTES, ManagerScript.LOOK_BURST, ManagerScript.LOOK_ORBITERS, ManagerScript.LOOK_GLITTER,
+				ManagerScript.LOOK_HOPS, ManagerScript.LOOK_WAKE]
 	for n in extra.size():
 		var radius: float = BOLT_RADIUS * (float(BIGGER.get("radius_mult")) if n == 0 else 1.0)
-		_bolt(0, Vector2(330.0 + (n % 4) * 70.0, 30.0 + (n / 4) * 50.0), radius, fire_tint, PackedInt32Array([fire_look, extra[n]]))
+		_bolt(0, Vector2(330.0 + (n % 4) * 70.0, 25.0 + (n / 4) * 38.0), radius, fire_tint, PackedInt32Array([fire_look, extra[n]]))
 	# Combined: all five infusions on one bolt, then every kind at once.
 	var infusions := PackedInt32Array()
 	for element: Resource in ELEMENTS:

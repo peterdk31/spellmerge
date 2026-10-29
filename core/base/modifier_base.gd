@@ -86,7 +86,7 @@ enum Behaviour {
 ## The particles this card makes its shots give off: a LOOK_* kind of `core/projectiles` (0
 ## none, 1 embers, 2 frost flecks, 3 gusts, 4 pulled-in pixels, 5 sparks, 6 rising motes,
 ## 7 glints, 8 streaks and a longer core, 9 a burst, 10 orbiting sparks, 11 a weave of the
-## body, 12 glitter). A shot gives off the kinds of all its infusions and modifiers, mixed at
+## body, 12 glitter, 13 hops, 14 wake). A shot gives off the kinds of all its infusions and modifiers, mixed at
 ## random from its tail; two cards with the same kind add nothing more.
 @export var look_layer: int = 0
 
@@ -116,7 +116,7 @@ func ranges() -> Dictionary:
 		"cooldown_mult": Vector2(0.1, 4.0),
 		"mana_mult": Vector2(0.1, 4.0),
 		"shot_mult": Vector2(1, 8),
-		"look_layer": Vector2(0.0, 12.0),
+		"look_layer": Vector2(0.0, 14.0),
 		"extra_pierce": Vector2(0, 8),
 		"behaviour": Vector2(0, Behaviour.size() - 1),
 		"behaviour_strength": Vector2(0.0, 256.0),

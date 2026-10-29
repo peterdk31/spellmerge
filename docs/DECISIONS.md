@@ -4,7 +4,7 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 
 ## 2026-10-29: The first cards' looks (staffs C0)
 
-Split, chain and faster take the burst (9), sparks (5) and streaks (8) looks; no numbers change. Modifiers may share a style (blast and overcharge share 9); only infusions need one of their own. Without the budget, the first cards' numbers still sit well beside the newer cards' (complexity and mana already price them), so rebalancing waits for the C2 playtest.
+Split takes the burst look (9); chain and faster get two new kinds, hops (13: a pixel that jumps sideways) and wake (14: pixels flung back fast), because sparks (5) is lightning's and streaks (8) is pierce's and heavy's, and a look is a set of kinds, so a card that shares a kind with a card beside it adds nothing to the shot. No numbers change. Rule: a modifier never shares a kind with an infusion, and the first six never share with one another (a test checks this); later modifiers that are rarely stacked (blast and overcharge share 9) may still share until the kinds run out (up to 24). Without the budget, the first cards' numbers still sit well beside the newer cards' (complexity and mana already price them), so rebalancing waits for the C2 playtest.
 
 ## 2026-10-29: How a spell is named
 

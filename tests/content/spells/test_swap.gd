@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## The Swap card (content/spells/forms/swap/, staffs C): a straight shot that trades places with
 ## the target it hits. The engine side is tested in `tests/core/test_spells_moves.gd` and
-## `tests/gameplay/player/test_player_caster.gd`; here the card's data and its combos.
+## `tests/gameplay/player/test_player_caster.gd`; here the card's data. Its combos run in `test_combos.gd`; here they are only checked to exist.
 ##
 ## godot --headless --path . --script res://tests/content/spells/test_swap.gd
 
@@ -66,7 +66,8 @@ func test_a_hit_trades_places() -> void:
 		return
 	check_equal(moves[0][1], &"swap", "a swap")
 	var to: Vector2 = moves[0][2]
-	check(to.x > 60.0 and to.x < 110.0 and absf(to.y) < 1.0, "the caster goes to the imp (%s)" % [to])
+	check(to.distance_to(Vector2(100, 0)) < 30.0, "the caster goes to the imp (%s)" % [to])
+	check(moves[0][3] > 0.0, "the swap takes time (%s s)" % [moves[0][3]])
 	var back: Vector2 = target_moves[0][1]
 	check(back.length() < 1.0, "the imp goes to where the caster stood (%s)" % [back])
 

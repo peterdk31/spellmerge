@@ -66,6 +66,7 @@ Numbers are first guesses for the card's own task to set. Examples are written i
 | fissure | A crack along the ground that hits everything on its line | `on hit · fissure · nova` sets off a nova on every enemy in the line; `bounce · fissure` turns at walls |
 | decoy | A still copy of the wizard that enemies target. End point: where it dies | `blast · decoy` is an exploding decoy; `on expire · decoy · nova` |
 | familiar | A small helper that orbits the caster and casts its payload at the nearest enemy every second | `hold · familiar · bolt` keeps it; `familiar · mend · bolt` is a healer |
+| swing | Melee (owner, 2026-10-29; see "Phase I"): the staff sweeps a 90° arc in front of its tip, about 24 px, hitting every body in it. No mana, a short delay, strong knockback. End point: the end of the arc | `shield · swing` is a parry; `heavy · swing` bats enemies into walls |
 
 **Modifiers**
 
@@ -93,6 +94,7 @@ Numbers are first guesses for the card's own task to set. Examples are written i
 | return | Flies out for half its life, then back to its caster (owner, 2026-10-27: a modifier, not a weak boomerang carrier). Wasted on a carrier that does not fly out (beam, rune, orbit, dash) | `pierce · return · bolt` hits twice; `blast · return · bolt` explodes on you unless you move; `spiral · return · bolt` is a wavy loop |
 | slow | A third of the speed for three times the life, so it crawls about as far (`lifetime_mult`, owner 2026-10-27) | `slow · lightning · arc · bolt`, the lightning orb; `slow · growth · bolt` grows three times as long |
 | arc | While the shot lives it zaps the nearest enemy within 60 px twice a second, at half its damage, with its infusions. A zap is a hit: it sets off `on hit` and chains (owner, 2026-10-27; see BACKLOG for making that a staff mod or relic later). Wasted on a carrier that is not a shot in the air (beam, dash) | `slow · lightning · arc · bolt` is a lightning orb; `arc · orbit` a ring of zappers; `arc · on hit · rune · nova` a trap that rings out at whatever comes near |
+| deflect | Shots of another team that touch the carrier turn around and become its caster's (owner, 2026-10-29; see "Phase I"). Works on every carrier | `deflect · swing` bats shots back; `deflect · orbit` is a reflecting ring; `deflect · wall` a mirror wall |
 
 **Infusion:** mend: hits heal wizards (whatever the friendly-fire setting) and do almost nothing to enemies. `mend · blast` is a self-heal burst; `mend · chain · bolt` jumps a heal through the party.
 
@@ -373,6 +375,39 @@ Owner sessions, one PR each, in this order: F2, F3 and F4 may run in parallel; F
 ### Phase G: actors (owner, 2026-10-28)
 
 Wizards and enemies become one kind of body (components and a controller), with no sides and a `possess` card. Its own document, with its parts: [M2-actors.md](M2-actors.md). Before D3.
+
+### Phase I: melee (owner, 2026-10-29)
+
+Owner sessions, not queued for the bot. Melee is **carriers**, not a staff type, so every modifier, infusion and trigger works on it through the rules it already follows, with no special cases. Only `swing` for now; `lunge`, `whirl` and `saw` (a chainsaw: tiny hits at the tip, close to 0 delay) wait in the backlog until swing has been played. The player is a living staff, so a swing is the staff head swinging.
+
+- **Mana-free:** a swing costs no mana, like the dashes; its price is standing next to the enemies. This makes it a candidate for the story's starting spell (owner: to be discussed).
+- **Built on the live beam:** a swing is a short beam that turns through its arc over its life, anchored at the staff tip, so hits, infusions, triggers and the beam's tick come from the beam. Check in I2 that a beam can be turned that way; if not, the arc is a few shots along it.
+- **Everything hurts everything:** a swing skips only its caster's body, so it hits a teammate in its arc.
+- **Enemies get it for free** (they cast from staffs); a melee stray needs a clear wind-up, like every attack.
+- **Aim:** the arc is centred on the aim and locks to it at the cast (the swing's beam keeps its start angle, unlike a live beam). Swings alternate forehand and backhand; a backhand right after a forehand starts where it ended, with no wind-up. The body steps through the head sheet's 16 directions (lean back to −67.5°, sweep to +67.5°; only −45° to +45° hits) while the trail follows the true arc. The staff covering the face when aiming up or down is accepted.
+- **The look** (owner's picks from the mockup, 2026-10-29): the head swings (Feel's squash) through its 16 frames, and a world-space trail in the glow style follows the arc; no new art style.
+  - Trail: a brief line at the arc's reach that sheds pixel sparks outward, cooling through the ramp.
+  - Hit: small streaks flung along the swing, and a small screen shake (2 px), off with the screen shake setting (I6).
+  - Parry (`shield · swing`): a big four-point star in Spark gold. The mockup also froze the game for 60 ms; no new freeze until I7 settles freezes in co-op.
+  - Deflect: the bolt flashes big and white, then leaves faster with a longer tail. The speed-up is a rule too (owner): every deflect makes the shot 1.7× faster, so a rally speeds up each time, within the engine's limits.
+  - A stray's wind-up: the head leans back and its orb swells and pulls in sparks until the swing.
+- **Wasted on a swing:** `return`, `bounce`, `ghost` (it does not fly out), as on `beam` and `rune`.
+
+Combos to prove (two per card in its task, the rest for the combo report): `shield · swing` (parry), `shield · on block · swing · nova` (riposte), `heavy · swing`, `fire · swing`, `echo · swing`, `burst · swing` (flurry), `on hit · swing · bolt`, `mirror · swing`, `split · swing` (cleave), `relay · swing` (a teammate enchants your blade), `linger · swing` (a hanging arc), `deflect · swing`.
+
+**Freezes in co-op (open, owner 2026-10-29):** Feel's hit-stop drops `Engine.time_scale` on hits, kills and downs, so one player's hit freezes all four players. The owner wants this rethought before any new freeze (the parry's) is added. Options for the I7 session: (a) a local stop: only the bodies in the hit (the attacker, the target, the shot) hold for a moment while the rest of the world runs on; (b) no game-wide stop with more than one player, the flash, squash and shake carry the hit; (c) game-wide stops only for rare moments (a downed player, a boss kill); (d) keep it as it is. Recommendation: (a), with (c) for the rare moments.
+
+**Deflect:** a shot of another team touching the carrier turns around and takes the carrier's caster (its actor, team and hit credit), so a homing shot deflected hunts the new caster's targets. Open for I3: whether `deflect` and `shield` on one carrier deflect first and keep the shield, and whether a deflect sets off `on block`. A shot can be deflected again (a rally), within the engine's limits.
+
+| # | Part | Area | Delivers |
+| --- | --- | --- | --- |
+| I1 | **Mockup** | scratchpad, artifact | A playable HTML mockup of swing, parry and deflect, to feel the arc, reach, knockback and delay before anything is built. The look is already picked (the art mockup, 2026-10-29) |
+| I2 | **Swing kit** | `core/spells`, `core/projectiles` | The turning anchored beam (`motion` or a beam field for the arc), the swing's knockback, the head's swing on the actor (a cast look). Tests: the arc hits what is in it and nothing behind, the caster is skipped, a teammate is hit |
+| I3 | **Deflect kit** | `core/projectiles`, `core/spells` | Turning a shot and handing it to a new caster (tag, team, hit credit) and making it 1.7× faster, on every carrier. Tests: swing, orbit and wall deflect; a deflected homing shot changes target; a rally speeds up each time |
+| I4 | **Card: swing** | `content/spells/forms/swing/` | The card (data), icon, look, two combos, lore, `test_swing.gd` |
+| I5 | **Card: deflect** | `content/spells/modifiers/deflect/` | The same for deflect |
+| I6 | **Screen shake setting** | `hud/menus/`, `core/save` | `Feel.shake_enabled` as a saved option in the menu (on by default), so players can turn screen shake off. Independent of I1–I5 |
+| I7 | **Freezes in co-op** | `gameplay/feel/` | The owner decides first, then it is built: see "Freezes in co-op" below |
 
 ### Phase D: proof
 

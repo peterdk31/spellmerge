@@ -46,6 +46,13 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 - Rime Crook and Bone Scepter (living staffs H5): moved to the bot's Queue on 2026-10-29.
 - [x] **The intro (living staffs H6).** (`gameplay/flow/`, `content/story/`) After H3.
 - [x] **The docs (living staffs H7).** (`docs/STYLE.md`, READMEs, `art/kit/`) Last.
+- [ ] **Melee: the playable mockup (melee I1).** (scratchpad, artifact) Swing, parry and deflect to feel the arc, reach, knockback and delay; the look is picked (M2-staffs.md, "Phase I: melee").
+- [ ] **Melee: the swing kit (melee I2).** (`core/spells/`, `core/projectiles/`) After I1.
+- [ ] **Melee: the deflect kit (melee I3).** (`core/projectiles/`, `core/spells/`) After I2.
+- [ ] **Card: swing (melee I4).** (`content/spells/forms/swing/`) After I2.
+- [ ] **Card: deflect (melee I5).** (`content/spells/modifiers/deflect/`) After I3 and I4.
+- [ ] **Screen shake setting (melee I6).** (`hud/menus/`, `core/save/`) Independent; the owner may move it to the bot's queue.
+- [ ] **Freezes in co-op (melee I7).** (`gameplay/feel/`) The owner picks an option first (M2-staffs.md, "Freezes in co-op"), then it is built.
 
 ## Blocked
 

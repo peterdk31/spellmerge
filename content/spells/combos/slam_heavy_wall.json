@@ -1,0 +1,10 @@
+{
+	"id": "slam_heavy_wall",
+	"name": "Heavy slam into the wall",
+	"does": "A heavy slam throws the imp beside the impact outward into the wall behind it, and the imp takes the wall's knock on top of the slam.",
+	"casts": [{"staff": 0, "cards": ["heavy", "slam"]}],
+	"imps": [[34, 0]],
+	"walls": [[46, -200, 16, 400]],
+	"seconds": 1.5,
+	"checks": [{"kind": "lost_at_least", "imps": [0], "min": 4}]
+}

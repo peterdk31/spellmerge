@@ -1,0 +1,9 @@
+{
+	"id": "slam_ring_throw",
+	"name": "Slam ring",
+	"does": "The slam strikes the floor ahead and its ring hurts the three imps round the impact, while the imp behind the caster is not touched.",
+	"casts": [{"staff": 0, "cards": ["slam"]}],
+	"imps": [[34, 0], [20, 14], [20, -14], [-20, 0]],
+	"seconds": 1.0,
+	"checks": [{"kind": "damaged", "imps": [0, 1, 2]}, {"kind": "lost_at_most", "imps": [3], "max": 0}]
+}

@@ -69,6 +69,10 @@ const BEAM_TICK: float = 0.15
 ## (melee I3; the owner's playground, 2026-10-29). Its pool and the hit pass's sweep of its whole
 ## path each step are the engine's limits; nothing caps the speed.
 const DEFLECT_SPEEDUP: float = 1.7
+## Slam rows made at once (more when every one is on), and the share of a slam's `lifetime` its
+## ring takes to grow to its radius; it holds for the rest (the playground's 0.08 s of 0.12 s).
+const SLAM_ROWS_START: int = 16
+const SLAM_GROW: float = 0.67
 ## A homing carrier that is over at once (a beam, a teleport) has no time to turn, so it bends
 ## toward a target as far as its turn rate turns in this many seconds (the Homing card's 3
 ## radians a second bend it 43 degrees; more homing bends it further, all the way round).

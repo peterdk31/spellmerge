@@ -184,3 +184,28 @@ func test_a_scenario_with_a_staff_that_casts_nothing_is_refused() -> void:
 	var stage := StageScript.new(root, _registry)
 	check(not stage.start(scenario), "start says no")
 	stage.free_all()
+
+
+func test_a_combo_keeps_its_mates_and_the_cast_direction() -> void:
+	var scenario: Dictionary = _find(_all(), "combo_relay_teammate_frost")
+	check(not scenario.is_empty(), "the relay combo is a clip")
+	if scenario.is_empty():
+		return
+	check_equal(scenario["mates"], [{"at": Vector2(60.0, 0.0), "player": 1}], "its teammate body")
+	check_equal((scenario["casts"] as Array)[0]["aim"], Vector2.DOWN, "the cast with a dir aims along it")
+	check_equal((scenario["casts"] as Array)[1]["aim"], Vector2.RIGHT, "a cast without one aims along +x")
+
+
+func test_the_relay_clips_show_the_bolt_reach_the_imp() -> void:
+	for id in ["combo_relay_teammate_frost", "combo_relay_teammate_fire"]:
+		var scenario: Dictionary = _find(_all(), id)
+		check(not scenario.is_empty(), "%s is a clip" % id)
+		if scenario.is_empty():
+			continue
+		var stage := StageScript.new(root, _registry)
+		check(stage.start(scenario), "%s builds on the stage" % id)
+		var first_health: int = stage.combat.health_of(stage.imps[0])
+		for i in int(float(scenario["seconds"]) * 60.0):
+			stage.tick()
+		check(stage.combat.health_of(stage.imps[0]) < first_health, "%s: the bolt that passed the teammate hurts the imp" % id)
+		stage.free_all()

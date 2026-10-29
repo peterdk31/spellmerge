@@ -139,6 +139,13 @@ func start(scenario: Dictionary) -> bool:
 		_add_imp(at)
 	for player: int in _anchors:
 		world.add_child(_wizard(player, _anchors[player] as Vector2))
+	# A teammate's body: shots hit it (or pass it, as a card says); it is drawn as a wizard.
+	for mate: Dictionary in scenario.get("mates", []):
+		var body := Node2D.new()
+		body.position = mate["at"] as Vector2
+		world.add_child(body)
+		projectiles.add_target(body, IMP_RADIUS, ManagerScript.LAYER_PLAYER, caster_of(int(mate["player"])))
+		body.add_child(_wizard(int(mate["player"]), Vector2.ZERO))
 	_pending.assign(scenario["casts"])
 	_pending.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["at"]) < float(b["at"]))
 	return true
@@ -152,6 +159,8 @@ static func centre_of(scenario: Dictionary) -> Vector2:
 	points.assign(scenario["imps"])
 	for entry: Dictionary in scenario["casts"]:
 		points.append(entry["origin"] as Vector2)
+	for mate: Dictionary in scenario.get("mates", []):
+		points.append(mate["at"] as Vector2)
 	for point in points:
 		low = low.min(point)
 		high = high.max(point)

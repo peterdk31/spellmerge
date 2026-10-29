@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-29: Clip recorder knows combo `mates` and cast `dir`
+
+The relay clips now show the teammate (a wizard body shots can hit) and the cast direction, so the bolt reaches the imp. Tests in `tests/clips/test_clip_scenarios.gd`.
+
 ## 2026-10-29: Card rules R2 and R3 ticked off
 
 R2 and R3 landed on main in #468; ticked off in `docs/NEXT.md`. The rule 2 checks (a card survives a bounce, jump, echo, payload) are deferred to `docs/BACKLOG.md`.

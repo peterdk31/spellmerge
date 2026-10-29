@@ -16,6 +16,10 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - **The Scepter's staff is void · rain · nova, three slots.** A rain with no payload hurts nobody (`test_rain.gd`), so `void · rain` alone never touched a player; the nova is what falls where the rain marks. The four-player test now checks that each new stray's spell reaches a player. No contact damage: both hurt only by the telegraphed cast.
 - **Bodies are laid out by hand** as rects (no script could be run in the session) and kept to the palette.
 
+## 2026-10-29: #417 removed (owner)
+
+- **#417 (downed wizard shrinks into its hat) is dropped,** on the owner's `/claude`. Its backlog entry is deleted and the issue closed. Wizards are floating staffs with no hat; the downed look exists.
+
 ## 2026-10-29: Planning run, queue empty
 
 - **#417 (downed wizard shrinks into its hat) goes back to the backlog.** The wizard is a floating staff after living staffs H3, so there is no body or hat to shrink into; the downed look (lying flat) exists. #416 and #208 stay on the backlog: both belong to M3 and later.

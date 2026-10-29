@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-29: #417 removed
+
+On the owner's word, the "downed wizard shrinks into its hat" idea left the backlog and its issue is closed.
+
 ## 2026-10-29: The later cards' looks (staffs C0b)
 
 The thirteen modifiers with no look got one, and the shares that hid a card on a common build were split. Seven new kinds are table rows in `shot_trail.gdshader` (plus a branch in `shot_particle.gdshaderinc`); a shot's kinds are packed 5 bits each now (4 bits only reached kind 15). The test lists every modifier and the shares allowed. Looked at 4x in `looks_later_*_4x`: zig, double, weight and drift read; ripple and curl and converge are faint (small, sparse pixels), noted in the backlog.

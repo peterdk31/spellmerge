@@ -64,7 +64,8 @@ func test_a_cast_asks_for_one_familiar_at_the_caster() -> void:
 	check_equal(spawns[0][1], &"familiar", "a familiar, not a decoy")
 	var at: Vector2 = spawns[0][2]
 	check(at.distance_to(Vector2(40, 20)) < 40.0, "near the caster (%s)" % [at])
-	check_equal(spawns[0][3], _card().lifetime, "for the card's lifetime")
+	check_equal(_card().lifetime, 8.0, "the card lasts eight seconds")
+	check_equal(spawns[0][3], 8.0, "and the familiar is asked for that long")
 
 
 func test_a_cast_without_the_card_asks_for_none() -> void:

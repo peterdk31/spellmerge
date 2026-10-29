@@ -1,7 +1,7 @@
 {
 	"id": "familiar_bolt",
 	"name": "Familiar bolt",
-	"does": "A familiar is sent out with a fire bolt as its payload; the cast asks for it.",
+	"does": "A cast of familiar, fire and bolt asks for one familiar. The arena has no AI, so this checks the request, not the fire payload.",
 	"casts": [
 		{"staff": 0, "cards": ["familiar", "fire", "bolt"]}
 	],

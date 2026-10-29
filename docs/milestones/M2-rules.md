@@ -80,7 +80,21 @@ Line numbers are from main after #453 and drift; the function names hold. The fi
 | return | ✓ | W | W | W | W | W | ✓ | ✓ | W | W | W | W | W |
 | arc | ✓ | ✓ | ✓ | W | W | W | ✓ | ✓ | ✓ | W | W | W | W |
 
-Triggers are not in the matrix yet: R2 adds a row per trigger (findings 7 and 8). The melee carriers (swing, slam) arrived on main after the audit: R2 and R3 cover them like the rest.
+**Triggers (R2b, what the runtime does today):** `StaffCompiler.trigger_runs` and `trigger_why_not`. ✓ fires · W listed as wasted with its payload · s only with a shield or deflect on the carrier (a dash's or teleport's is a barrier on the wizard) · b only with a blast, whose area hit carries the carrier's tag. On reaction also needs an infusion or relay, and on wall is wasted on a ghost shot. Every W is a cell for R4.
+
+| | Bolt | Rune | Orbit | Beam | Dash | Telep | Hook | Swap | Wall | Rain | Fiss | Decoy | Famil | Swing |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| on hit | ✓ | ✓ | ✓ | ✓ | W | W | ✓ | ✓ | ✓ | W | ✓ | W | W | ✓ |
+| on expire | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| timer | ✓ | ✓ | ✓ | W | W | W | ✓ | ✓ | ✓ | W | W | W | W | W |
+| on block | s | s | s | s | s | s | s | s | s | W | s | W | W | s |
+| on kill | ✓ | ✓ | ✓ | ✓ | b | b | ✓ | ✓ | ✓ | b | ✓ | b | b | ✓ |
+| on cast | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| on wall | ✓ | W | W | ✓ | W | W | ✓ | ✓ | W | W | ✓ | W | W | W |
+| on hurt | ✓ | ✓ | ✓ | W | W | W | ✓ | ✓ | ✓ | W | W | W | W | W |
+| on reaction | ✓ | ✓ | ✓ | ✓ | b | b | ✓ | ✓ | ✓ | b | ✓ | b | b | ✓ |
+
+The melee carriers (swing, slam) arrived on main after the audit: R2 and R3 cover them like the rest.
 
 ## Plan
 

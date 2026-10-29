@@ -277,7 +277,8 @@ func test_on_kill_and_on_reaction_fire_from_the_hit() -> void:
 			_bus.reaction_landed.emit(player, &"steam", target, at, tag))
 	_target(Vector2(100, 0))
 	var killed: int = _build(0, [&"on_kill", &"bolt", &"rune"])
-	var reacted: int = _build(1, [&"on_reaction", &"bolt", &"rune"])
+	# A hit with no element sets off no reaction (rules R2b): the bolt carries fire.
+	var reacted: int = _build(1, [&"on_reaction", &"fire", &"bolt", &"rune"])
 	_cast(0)
 	_spells.cast_staff(1, 0, Vector2.ZERO, Vector2.RIGHT, 10.0)
 	_tick(30)
@@ -384,3 +385,45 @@ func test_a_relay_shot_keeps_what_it_took_for_its_later_hits() -> void:
 func test_a_plain_shot_takes_nothing() -> void:
 	var mine: Array[HitProfile] = _relay_hits(1, [&"frost", &"bolt"], [&"bolt"])
 	check(mine.size() == 1 and mine[0].element_ids.is_empty(), "no relay card, no change")
+
+
+func test_a_carrier_that_hits_nothing_fires_on_kill_from_its_blast() -> void:
+	# A rain hits nothing itself, but its blast's area hit carries its tag, so a kill by it is the
+	# rain's: `on kill` on a rain is kept when it has a blast (rules R2b).
+	var rain: FormBase = _form(&"rain", 0.0, 0.1)
+	rain.motion = FormBase.Motion.RAIN
+	_modifier(&"blast", ModifierBase.Behaviour.BLAST, 24.0)
+	StaffKit.build(_spells, 0, 0, [&"on_kill", &"blast", &"rain", &"bolt", &"rune"])
+	var carrier: int = _spells.current_tag(0, 0, 0)
+	var held: int = _spells.current_tag(0, 0, 2)
+	_bus.kill_landed.emit(0, null, Vector2(40, 0), carrier)
+	check_equal(_slots(held).size(), 1, "a kill under the rain's tag fires its payload")
+	var bare: CompiledStaff = _spells.compile_staff([&"on_kill", &"rain", &"bolt", &"rune"] as Array[StringName], null)
+	check(bare.wasted.has(0), "without a blast it is wasted: %s" % bare.wasted)
+
+
+func test_a_fissure_fires_on_wall_and_a_swing_fires_on_hit() -> void:
+	# Two cells of the trigger table (rules R2b) observed: a fissure's ray meets walls, a swing's
+	# sweep hits under its own tag.
+	var fissure: FormBase = _form(&"fissure", 0.0, 0.1)
+	fissure.motion = FormBase.Motion.FISSURE
+	fissure.ray_length = 200.0
+	var swing: FormBase = _form(&"swing", 0.0, 0.1)
+	swing.motion = FormBase.Motion.SWING
+	swing.ray_length = 40.0
+	swing.arc = 120.0
+	_mgr.set_walls([Rect2(100, -50, 20, 100)] as Array[Rect2])
+	var walled: int = _build(0, [&"on_wall", &"fissure", &"rune"])
+	_cast(0)
+	check_equal(_slots(walled).size(), 1, "the fissure's on wall fired at the wall")
+	_trigger(&"on_hit", TriggerBase.Event.HIT)
+	_target(Vector2(25, 0))
+	var struck: int = _build(1, [&"on_hit", &"swing", &"rune"])
+	_cast(1)
+	_tick(20)
+	# The payload is a rune born on the target, so it hits at once: count those hits.
+	var from_swing: int = 0
+	for hit: Array in _hits:
+		if hit[3] == struck:
+			from_swing += 1
+	check_equal(from_swing, 1, "the swing's on hit fired")

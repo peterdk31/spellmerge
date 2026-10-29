@@ -1,0 +1,9 @@
+{
+	"id": "recoil_blast_bolt",
+	"name": "Recoil blast bolt",
+	"does": "A rocket: the bolt bursts on the imp ahead and the cast kicks its caster backwards, a rocket jump.",
+	"casts": [{"staff": 0, "cards": ["recoil", "blast", "bolt"]}],
+	"imps": [[100, 0]],
+	"seconds": 1.0,
+	"checks": [{"kind": "caster_moved", "mode": "recoil"}, {"kind": "damaged", "imps": [0]}]
+}

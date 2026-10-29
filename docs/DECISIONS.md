@@ -109,7 +109,7 @@ The owner's direction after B7a: "The 4 staffs should be mapped to lb/rb lt/rt i
 
 ## 2026-10-29: Magnet card (staffs C)
 
-- **Magnet reaches 70 px and pulls at 200 px/s** (`behaviour_strength`; `SpellLimits.MAGNET_PULL`), complexity 2, no mana change. Each step every live magnet shot sends `pull_requested` from where it is; combat keeps the pull as a push that the next pull replaces, so it does not pile up. Wizards are pulled or not as combat decides (`pull`). A bolt (220 px/s) drags an imp 40 px off its line into its path; 140 px/s was not enough.
+- **Magnet reaches 70 px and pulls at 200 px/s** (`behaviour_strength`; `SpellLimits.MAGNET_PULL`), complexity 2, no mana change. Each step every live magnet shot sends `pull_requested` from where it is; combat keeps the pull as a push that the next pull replaces, so it does not pile up. The event pulls enemies only (`Combat.pull(..., foes_only)`): the caster, who is inside the reach for the first 0.3 s, and teammates in co-op are left alone and keep their push and slam arming. `Combat.pull` called directly still pulls every actor (the owner's rule). At most `SpellLimits.MAX_PULLS_PER_STEP` (16) magnet shots pull per step, rotating, so a many-shot staff costs at most 16 grid queries a step. A bolt (220 px/s) drags an imp 40 px off its line into its path; 140 px/s was not enough.
 - **The engine hook was missing**, so this card added `Spells._step_magnets` (a list of magnet slots, like arc's). Magnet is listed as wasted on a payload that fires from a point (`TRAVEL_ONLY`).
 - **Combo arena imps can now be pushed**, opt in: `ComboArena.pushable`, and the combo key `pushed`. Off by default so other combos behave as before. The clip recorder ignores `pushed`, so the magnet clips show no pull.
 

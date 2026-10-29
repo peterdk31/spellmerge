@@ -34,6 +34,8 @@ const ARC_DAMAGE: float = 0.5
 const ARC_MIN_INTERVAL: float = 0.1
 ## Zaps all shots together may make in one physics step; more wait for the next.
 const MAX_ARCS_PER_STEP: int = 32
+## Magnet shots that may pull in one physics step; the others take turns.
+const MAX_PULLS_PER_STEP: int = 16
 ## Pixels per second a `magnet` shot pulls the enemies near it toward itself.
 const MAGNET_PULL: float = 200.0
 ## Degrees a split fan covers when the form has no spread of its own.

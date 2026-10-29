@@ -234,6 +234,8 @@ var _arc_spell: CompiledSpell = null
 ## Slots of live shots with `magnet`, `_magnet_count` of them, flagged in `_rec_magnet`.
 var _magnets: PackedInt32Array = PackedInt32Array()
 var _magnet_count: int = 0
+## Where in `_magnets` the next step's pulls start (it rotates when there are more than the cap).
+var _magnet_from: int = 0
 var _rec_magnet: PackedByteArray = PackedByteArray()
 ## Slots of live shots with an `on hurt` trigger, `_hurt_count` of them, flagged in `_rec_hurt`.
 var _hurt_slots: PackedInt32Array = PackedInt32Array()
@@ -1981,21 +1983,31 @@ func _step_arcs(delta: float) -> void:
 
 
 ## Every `magnet` shot pulls the enemies within its card's reach toward where it is, each step
-## (`pull_requested`; combat keeps the pull as a push that the next pull replaces).
+## (`pull_requested`; combat keeps the pull as a push that the next pull replaces). At most
+## `SpellLimits.MAX_PULLS_PER_STEP` shots pull in a step; which ones rotates, so none starves.
 func _step_magnets() -> void:
 	var i: int = 0
 	while i < _magnet_count:
 		var slot: int = _magnets[i]
-		if not _knows(slot):
+		var spell: CompiledSpell = null
+		if _knows(slot):
+			spell = _profiles.get(projectiles.get_tag_of(slot))
+		# A slot that a spent magnet shot left to a shot without the card goes off the list, too.
+		if spell == null or spell.behaviour(ModifierBase.Behaviour.MAGNET) <= 0.0:
 			_rec_magnet[slot] = 0
 			_magnet_count -= 1
 			_magnets[i] = _magnets[_magnet_count]
 			continue
+		i += 1
+	if _magnet_count == 0:
+		return
+	var pulls: int = mini(_magnet_count, SpellLimits.MAX_PULLS_PER_STEP)
+	for k in pulls:
+		var slot: int = _magnets[(_magnet_from + k) % _magnet_count]
 		var tag: int = projectiles.get_tag_of(slot)
 		var spell: CompiledSpell = _profiles.get(tag)
-		if spell != null:
-			events.pull_requested.emit(SpellTag.caster_of(tag), projectiles.get_position_of(slot), spell.behaviour(ModifierBase.Behaviour.MAGNET), SpellLimits.MAGNET_PULL, tag)
-		i += 1
+		events.pull_requested.emit(SpellTag.caster_of(tag), projectiles.get_position_of(slot), spell.behaviour(ModifierBase.Behaviour.MAGNET), SpellLimits.MAGNET_PULL, tag)
+	_magnet_from = (_magnet_from + pulls) % _magnet_count
 
 
 ## Shot `slot`'s zap: a short ray to the nearest body of another team within its `arc_reach`, hitting with its
@@ -2355,6 +2367,7 @@ func clear() -> void:
 	_timer_count = 0
 	_arc_count = 0
 	_magnet_count = 0
+	_magnet_from = 0
 	_rec_magnet.fill(0)
 	_rec_seq.fill(-1)
 	_rec_timed.fill(0)

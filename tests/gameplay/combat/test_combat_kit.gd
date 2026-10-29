@@ -554,9 +554,33 @@ func test_a_pull_leaves_actors_out_of_reach_and_moves_wizards_too() -> void:
 	var far := _enemy(Vector2(500.0, 0.0))
 	_wizard(0, Vector2(20.0, 0.0))
 	_projectiles.step(STEP)
-	_bus.pull_requested.emit(0, Vector2.ZERO, 80.0, 150.0, 1)
+	_combat.pull(0, Vector2.ZERO, 80.0, 150.0)
 	check_equal(_combat.knockback_of(far), Vector2.ZERO, "out of reach")
 	check_equal(_combat.consume_knockback(_wizards[0], 0.0).length(), 150.0, "a wizard is pulled like any actor (actors G5)")
+
+
+func test_a_pull_event_pulls_enemies_but_not_the_caster_or_a_teammate() -> void:
+	var enemy := _enemy(Vector2(50.0, 0.0))
+	var caster := _wizard(0, Vector2(20.0, 0.0))
+	var mate := _wizard(1, Vector2(0.0, 30.0))
+	_projectiles.step(STEP)
+	_bus.pull_requested.emit(0, Vector2.ZERO, 80.0, 150.0, 1)
+	check_equal(_combat.knockback_of(enemy), Vector2(-150.0, 0.0), "the enemy is pulled")
+	check_equal(_combat.knockback_of(caster), Vector2.ZERO, "the caster is not")
+	check_equal(_combat.knockback_of(mate), Vector2.ZERO, "nor is a teammate")
+
+
+func test_a_pull_event_keeps_a_teammates_push_but_replaces_an_enemys() -> void:
+	var enemy := _enemy(Vector2(50.0, 0.0))
+	_wizard(0, Vector2(20.0, 0.0))
+	var mate := _wizard(1, Vector2(0.0, 30.0))
+	_projectiles.step(STEP)
+	_combat.pull(1, Vector2(0.0, 500.0), 600.0, 90.0)
+	var before: Vector2 = _combat.knockback_of(mate)
+	check(before.length() > 0.0, "the teammate has a push to keep")
+	_bus.pull_requested.emit(0, Vector2.ZERO, 80.0, 150.0, 1)
+	check_equal(_combat.knockback_of(mate), before, "a teammate's push survives the pull")
+	check_equal(_combat.knockback_of(enemy), Vector2(-150.0, 0.0), "an enemy's is replaced")
 
 
 func test_a_heavy_hit_that_knocks_an_enemy_into_a_wall_hurts_once() -> void:

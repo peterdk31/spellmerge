@@ -110,6 +110,38 @@ func test_the_pull_ends_with_the_shot() -> void:
 	arena.free_all()
 
 
+func test_the_pull_replaces_the_push_instead_of_piling_up() -> void:
+	var arena := ArenaScript.new(root)
+	arena.pushable = true
+	var imp: Node2D = arena.add_imp(Vector2(60.0, 50.0))
+	arena.install_cards(0, 0, ["magnet", "bolt"])
+	arena.cast(0, 0)
+	var fastest: float = 0.0
+	for step in 40:
+		arena.run(1.0 / 60.0)
+		fastest = maxf(fastest, arena.combat.knockback_of(imp).length())
+	check(fastest > 0.0, "the imp was pulled")
+	check(fastest <= SpellLimits.MAGNET_PULL + 0.01, "never faster than one pull (%f)" % fastest)
+	arena.free_all()
+
+
+func test_only_live_magnet_shots_ask_for_a_pull() -> void:
+	var arena := ArenaScript.new(root)
+	arena.add_imp(Vector2(60.0, 400.0))
+	arena.install_cards(0, 0, ["magnet", "bolt"])
+	arena.install_cards(0, 1, ["bolt"])
+	var radii: Array[float] = []
+	arena.bus.pull_requested.connect(func(_c: int, _p: Vector2, r: float, _s: float, _t: int) -> void: radii.append(r))
+	arena.cast(0, 0)
+	arena.run(5.0)
+	arena.cast(0, 1)
+	arena.run(1.0)
+	check(not radii.is_empty(), "the magnet shot pulled")
+	for r: float in radii:
+		check(r > 0.0, "every pull has a reach")
+	arena.free_all()
+
+
 func test_four_players_at_once() -> void:
 	var arena := ArenaScript.new(root)
 	arena.pushable = true

@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-29: Staff codes in the radial builder (staffs D2 follow-up)
+
+The radial builder copies and pastes staff codes like the list one: X copies the shown staff, A pastes the clipboard over it. A row under the ring shows both buttons, then for 3.5 s a one-line result ("Copied 2 cards", "Pasted 4 cards", or the reason it was refused). The names of the casts (E1) show on a line above it, from the staff as RT would leave it while a card is pointed at. Tests are in `test_radial_builder.gd`.
+
 ## 2026-10-29: The Rime Crook and the Bone Scepter (living staffs H5)
 
 Two more strays, content only. The Rime Crook (`content/enemies/rime_crook/`) is a wooden crook with ice fangs and bands that casts frost · hook: it pulls a player toward it from 120 px. The Bone Scepter (`bone_scepter/`) is a skull on a stick whose dark sockets the shared face lights in Void pink; it casts void · rain from 130 px as a zoner. Folders are discovered, so nothing else lists them. `test_strays.gd` now covers five strays (style, glow, cards, valid staff) and runs each new one against four players.

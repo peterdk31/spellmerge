@@ -35,6 +35,12 @@ extends Control
 ##   (every shot landing once) and the cycle's time; with a card pointed at, what RT would make
 ##   of each ("> 31%"). The hub shows the same when no card is pointed at.
 ##
+## - **Staff codes** (staffs D2): **X** (`alternate`) copies the shown staff as a code
+##   (`sm1:double,fire,-,bolt`) to the system clipboard, **A** (`accept`) pastes the clipboard's
+##   code over the shown staff. Their row, under the ring, turns into a one-line result for a
+##   few seconds ("Pasted 4 cards", or why it was refused). Above it, the names of the shown
+##   staff's casts (staffs E1), as the staff would be with the pointed card.
+##
 ## What it shows comes only from events: `staff_changed` (the plain `Spells.staff_view`),
 ## `bag_changed`, `build_refused` and `player_stats_changed` (the wizard's maximum mana). What it
 ## asks for goes out as `staff_change_requested` (one slot) or `staff_cards_requested` (the whole
@@ -136,12 +142,20 @@ const GAP_VERB: String = "Close gap"
 const CLEAR_VERB: String = "Clear"
 const CLOSE_VERB: String = "Close"
 const FULL_NOTE: String = "The staff is full"
+const COPY_VERB: String = "Copy code"
+const PASTE_VERB: String = "Paste code"
+const NOTHING_TO_COPY: String = "Nothing to copy"
+const CLEARED: String = "Cleared the staff"
+const CLIPBOARD_EMPTY: String = "The clipboard is empty, or the browser blocked it."
+const RESULT_TIME: float = 3.5
 const POINT_NOTE: String = "Point at a card first"
 const EMPTY_NOTE: String = "Nothing to take out"
 const NO_CARDS_TEXT: String = "No cards"
 ## The hint row's buttons (RT, LT, Y, B) and the buttons read here by press count.
 const HINT_ACTIONS: Array[StringName] = [&"staff_2", &"staff_4", &"extra", &"back"]
-const READ_ACTIONS: Array[StringName] = [&"staff_2", &"staff_3", &"staff_4", &"kind_prev", &"kind_next"]
+const READ_ACTIONS: Array[StringName] = [&"staff_2", &"staff_3", &"staff_4", &"kind_prev", &"kind_next", &"alternate", &"accept"]
+## The code row's buttons (X, A).
+const CODE_ACTIONS: Array[StringName] = [&"alternate", &"accept"]
 ## What LT does on the marked slot.
 const LT_TAKE: StringName = &"take"
 const LT_UNDO: StringName = &"undo"
@@ -167,6 +181,10 @@ var _events: EventsScript = null
 var _ui_focus: UIFocusScript = null
 var _spells: SpellsScript = null
 var _input: InputManagerScript = null
+
+## The system clipboard, as callables so tests do not touch the real one.
+var clipboard_get: Callable = DisplayServer.clipboard_get
+var clipboard_set: Callable = DisplayServer.clipboard_set
 
 ## Mirrors of what the player announced: each staff's view, the bag, the wizard's maximum mana.
 var _plans: Array[Dictionary] = [{}, {}, {}, {}]
@@ -207,6 +225,11 @@ var _clear_done: bool = false
 var _note: String = ""
 var _note_left: float = 0.0
 var _clock: float = 0.0
+## The last code result (copied, pasted or refused), and whether a paste is being answered.
+var _result: String = ""
+var _result_ok: bool = true
+var _result_left: float = 0.0
+var _pasting: bool = false
 var _pointed_at: float = -1.0
 ## The pointing direction last drawn, so the pointer line follows the stick.
 var _drawn_aim: Vector2 = Vector2.ZERO
@@ -228,6 +251,11 @@ var _numbers_at: Vector2 = Vector2.ZERO
 var _center: Vector2 = Vector2.ZERO
 var _hints_at: Vector2 = Vector2.ZERO
 var _kinds_at: Vector2 = Vector2.ZERO
+var _codes_at: Vector2 = Vector2.ZERO
+var _names_at: Vector2 = Vector2.ZERO
+var _names_width: float = 0.0
+var _names_line: String = ""
+var _result_line: String = ""
 
 ## Button glyphs: the staff tabs (LB, RB), the hints (RT, LT, Y, B) and the kind row (d-pad).
 var _glyph_prev: ActionGlyphScript = null
@@ -237,6 +265,8 @@ var _hint_verbs: Array[String] = ["", "", "", ""]
 var _hint_live: Array[bool] = [true, true, true, true]
 var _hint_text_x: PackedFloat32Array = PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
 var _kind_glyphs: Array[ActionGlyphScript] = []
+var _code_glyphs: Array[ActionGlyphScript] = []
+var _code_text_x: PackedFloat32Array = PackedFloat32Array([0.0, 0.0])
 
 
 func _ready() -> void:
@@ -250,6 +280,8 @@ func _ready() -> void:
 		_hint_glyphs.append(_make_glyph("Hint_%s" % action))
 	_kind_glyphs.append(_make_glyph("KindPrev"))
 	_kind_glyphs.append(_make_glyph("KindNext"))
+	for action in CODE_ACTIONS:
+		_code_glyphs.append(_make_glyph("Code_%s" % action))
 	for action in READ_ACTIONS:
 		_seen[action] = 0
 
@@ -261,7 +293,7 @@ func bind(events: EventsScript, ui_focus: UIFocusScript, spells: SpellsScript, i
 	_ui_focus = ui_focus
 	_spells = spells
 	_input = input
-	for glyph in [_glyph_prev, _glyph_next] + _hint_glyphs + _kind_glyphs:
+	for glyph in [_glyph_prev, _glyph_next] + _hint_glyphs + _kind_glyphs + _code_glyphs:
 		(glyph as ActionGlyphScript).bind(input)
 	_glyph_prev.show_action(index, &"page_prev")
 	_glyph_next.show_action(index, &"page_next")
@@ -269,6 +301,8 @@ func bind(events: EventsScript, ui_focus: UIFocusScript, spells: SpellsScript, i
 		_hint_glyphs[at].show_action(index, HINT_ACTIONS[at])
 	_kind_glyphs[0].show_action(index, &"kind_prev")
 	_kind_glyphs[1].show_action(index, &"kind_next")
+	for at in CODE_ACTIONS.size():
+		_code_glyphs[at].show_action(index, CODE_ACTIONS[at])
 	if _events != null:
 		_events.staff_changed.connect(_on_staff_changed)
 		_events.bag_changed.connect(_on_bag_changed)
@@ -299,6 +333,8 @@ func open_builder() -> bool:
 	_open = true
 	_pointed = NONE
 	_note = ""
+	_result = ""
+	_result_left = 0.0
 	_clear_held = -1.0
 	_clear_done = false
 	_move_dir = Vector2i.ZERO
@@ -396,6 +432,82 @@ func note_text() -> String:
 	return _note if _note_left > 0.0 else ""
 
 
+## The code row's one-line result while it shows, or "".
+func result_text() -> String:
+	return _result if _result_left > 0.0 else ""
+
+
+## The names of the shown staff's casts (staffs E1), in cycle order, as the staff would be with
+## the pointed card; casts without a name are left out.
+func cast_names() -> PackedStringArray:
+	var plan: Dictionary = _preview_view if not _preview_cards.is_empty() else _plans[_viewed]
+	var out := PackedStringArray()
+	var casts: Variant = plan.get("casts", [])
+	if casts is Array:
+		for cast: Variant in casts:
+			var word: String = str((cast as Dictionary).get("name", "")) if cast is Dictionary else ""
+			if word != "":
+				out.append(word)
+	return out
+
+
+## Copy the shown staff's code to the clipboard and say so.
+func copy_code() -> void:
+	var cards: Array[StringName] = cards_of(_viewed)
+	var count: int = _card_count(cards)
+	if count == 0:
+		_report(NOTHING_TO_COPY, false)
+		return
+	clipboard_set.call(SpellsScript.staff_code(cards))
+	_report("Copied %s" % _cards_word(count), true)
+
+
+## Put the clipboard's staff code into the shown staff, all its slots at once. A code the
+## registry does not fully know, or with more cards than the staff has slots, changes nothing
+## and says why; whether the player owns the cards is the player's to answer (`build_refused`).
+func paste_code() -> void:
+	var slots: int = cards_of(_viewed).size()
+	if _spells == null or slots == 0:
+		return
+	var text: String = str(clipboard_get.call())
+	if text.strip_edges().is_empty():
+		_report(CLIPBOARD_EMPTY, false)
+		return
+	var read: Dictionary = _spells.parse_staff_code(text, slots)
+	if not bool(read.get("ok", false)):
+		_report(str(read.get("error", "")), false)
+		return
+	var cards: Array[StringName] = []
+	cards.assign(read["cards"])
+	_result = ""
+	_pasting = true
+	_ask_all(cards)
+	_pasting = false
+	if _result == "":
+		var count: int = _card_count(cards)
+		_report(CLEARED if count == 0 else "Pasted %s" % _cards_word(count), true)
+	_changed()
+
+
+func _card_count(cards: Array[StringName]) -> int:
+	var count: int = 0
+	for card in cards:
+		if card != NO_CARD:
+			count += 1
+	return count
+
+
+func _cards_word(count: int) -> String:
+	return "%d card%s" % [count, "" if count == 1 else "s"]
+
+
+func _report(text: String, ok: bool) -> void:
+	_result = text
+	_result_ok = ok
+	_result_left = RESULT_TIME
+	_changed()
+
+
 ## Move the marker as a click on a slot does (for P1's mouse and tests).
 func mark_slot(slot: int) -> void:
 	var count: int = cards_of(_viewed).size()
@@ -420,6 +532,9 @@ func step(delta: float) -> void:
 	_poll_clear(delta)
 	if _note_left > 0.0:
 		_note_left -= delta
+		_dirty = true
+	if _result_left > 0.0:
+		_result_left -= delta
 		_dirty = true
 	if not _flyers.is_empty() or not _fading.is_empty() or _clear_held >= 0.0 or _clock - _pointed_at < POP_TIME or _clock - _marker_at < POP_TIME:
 		_dirty = true
@@ -471,6 +586,10 @@ func _poll_buttons() -> void:
 			_take_out()
 	for _press in _presses(&"staff_4"):
 		_take_out()
+	for _press in _presses(&"alternate"):
+		copy_code()
+	for _press in _presses(&"accept"):
+		paste_code()
 	var flips: int = _presses(&"kind_next") - _presses(&"kind_prev")
 	if flips != 0 and layout == Layout.KIND and not _kinds.is_empty():
 		_kind_page = posmod(_kind_page + flips, _kinds.size())
@@ -826,7 +945,11 @@ func _on_bag_changed(player: int, bag: Array[StringName]) -> void:
 
 
 func _on_build_refused(player: int, reason: String) -> void:
-	if player == index:
+	if player != index:
+		return
+	if _pasting:
+		_report(reason, false)
+	else:
 		_say(reason)
 
 
@@ -936,6 +1059,9 @@ func _place() -> void:
 	_center = Vector2(floorf((ring_left + ring_right) * 0.5), _quarter.position.y + RING_FROM_EDGE)
 	_hints_at = Vector2(ring_left, _quarter.end.y - HINT_HEIGHT - 2.0)
 	_kinds_at = Vector2(_center.x, _quarter.position.y + 2.0)
+	_codes_at = Vector2(ring_left, _hints_at.y - HINT_HEIGHT - 1.0)
+	_names_at = Vector2(ring_left, _codes_at.y - HINT_HEIGHT)
+	_names_width = ring_right - ring_left
 	var tab_x: float = _tabs_at.x
 	_glyph_prev.position = Vector2(tab_x, _tabs_at.y)
 	_glyph_next.position = Vector2(tab_x + _glyph_prev.custom_minimum_size.x + 3.0 + 13.0 * STAFF_COUNT + 1.0, _tabs_at.y)
@@ -979,6 +1105,18 @@ func _refresh_hints() -> void:
 		x += glyph.custom_minimum_size.x + 2.0
 		_hint_text_x[at] = x
 		x += _text_width(_hint_verbs[at]) + 6.0
+	var names: PackedStringArray = cast_names()
+	_names_line = _fit(" / ".join(names), _names_width) if not names.is_empty() else ""
+	var shown: String = result_text()
+	_result_line = _fit(shown, _names_width) if shown != "" else ""
+	var cx: float = _codes_at.x
+	for at in _code_glyphs.size():
+		var glyph: ActionGlyphScript = _code_glyphs[at]
+		glyph.position = Vector2(cx, _codes_at.y)
+		glyph.visible = result_text() == ""
+		cx += glyph.custom_minimum_size.x + 2.0
+		_code_text_x[at] = cx
+		cx += _text_width(COPY_VERB if at == 0 else PASTE_VERB) + 6.0
 	var show_kinds: bool = layout == Layout.KIND and _kinds.size() > 1
 	for glyph in _kind_glyphs:
 		glyph.visible = show_kinds
@@ -1031,7 +1169,9 @@ func _draw() -> void:
 	_draw_numbers()
 	_draw_ring()
 	_draw_hub()
+	_draw_names()
 	_draw_hints()
+	_draw_codes()
 	_draw_flyers()
 
 
@@ -1290,6 +1430,35 @@ func _draw_hub() -> void:
 func _draw_hints() -> void:
 	for at in _hint_verbs.size():
 		_text(_hint_verbs[at], Vector2(_hint_text_x[at], _hints_at.y + 1.0), TEXT if _hint_live[at] else DIM)
+
+
+## The names of the casts, joined, cut to the width of the ring's side.
+func _draw_names() -> void:
+	if _names_line == "":
+		return
+	draw_rect(Rect2(_names_at, Vector2(_text_width(_names_line) + 2.0, HINT_HEIGHT - 1.0)), OUTLINE)
+	_text(_names_line, _names_at + Vector2(1.0, 0.0), GOLD)
+
+
+## The code row: its two buttons, or for a few seconds the last result in their place.
+func _draw_codes() -> void:
+	if _result_line != "":
+		draw_rect(Rect2(_codes_at, Vector2(_text_width(_result_line) + 2.0, HINT_HEIGHT - 1.0)), OUTLINE)
+		_text(_result_line, _codes_at + Vector2(1.0, 1.0), TEXT if _result_ok else WARN)
+		return
+	var empty: bool = _card_count(cards_of(_viewed)) == 0
+	_text(COPY_VERB, Vector2(_code_text_x[0], _codes_at.y + 1.0), DIM if empty else TEXT)
+	_text(PASTE_VERB, Vector2(_code_text_x[1], _codes_at.y + 1.0), TEXT)
+
+
+## `text` cut with ".." to fit `width` pixels.
+func _fit(text: String, width: float) -> String:
+	if _text_width(text) <= width:
+		return text
+	var cut: String = text
+	while cut.length() > 1 and _text_width(cut + "..") > width:
+		cut = cut.left(cut.length() - 1)
+	return cut + ".."
 
 
 func _draw_flyers() -> void:

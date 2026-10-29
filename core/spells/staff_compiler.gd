@@ -567,7 +567,7 @@ static func behaviour_waste(behaviour: int, motion: FormBase.Motion, blasts: boo
 			return "only a straight shot, a beam, a fissure, a swing and a slam fire backwards"
 		ModifierBase.Behaviour.HOLD:
 			match motion:
-				FormBase.Motion.DASH, FormBase.Motion.TELEPORT, FormBase.Motion.RAIN, FormBase.Motion.FISSURE, FormBase.Motion.SWING, FormBase.Motion.SLAM:
+				FormBase.Motion.DASH, FormBase.Motion.TELEPORT, FormBase.Motion.SLAM:
 					return "nothing keeps it on: %s" % _what(motion)
 		ModifierBase.Behaviour.RECOIL:
 			match motion:

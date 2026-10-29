@@ -68,6 +68,10 @@ func before_each() -> void:
 	blast.behaviour = ModifierBase.Behaviour.BLAST
 	blast.behaviour_strength = 30.0
 	_put(blast, &"blast")
+	var hold := ModifierBase.new()
+	hold.behaviour = ModifierBase.Behaviour.HOLD
+	hold.behaviour_strength = 1.0
+	_put(hold, &"hold")
 
 
 func _put(component: SpellComponent, id: StringName) -> void:
@@ -309,3 +313,42 @@ func test_the_split_swings_of_one_cast_turn_the_same_way() -> void:
 		if _spells.swing_on(at):
 			sides.append(_spells.swing_side(at))
 	check_equal(sides, [1, 1] as Array[int], "both swings of a cleave are forehands")
+
+
+func test_a_held_swing_sweeps_back_and_forth_until_switched_off() -> void:
+	# Rules R4e (owner, 2026-10-29): a held swing used to sweep once.
+	var front: Node2D = _at(0.0)
+	_build([&"hold", &"swing"])
+	_cast()
+	check(_spells.is_holding(0, 0), "a held swing is on")
+	var sides: Array[int] = []
+	for step in 60:
+		_tick(1)
+		var at: int = _row()
+		if at >= 0 and (sides.is_empty() or sides[-1] != _spells.swing_side(at)):
+			sides.append(_spells.swing_side(at))
+	check(sides.size() >= 4, "it swung again and again: %s" % [sides])
+	for n in range(1, sides.size()):
+		check(sides[n] == -sides[n - 1], "each sweep turns back the other way: %s" % [sides])
+	check(_struck(front) >= 4, "and struck the body in front each time (%d)" % _struck(front))
+	_cast()
+	check(not _spells.is_holding(0, 0), "the next press switches it off")
+	var struck: int = _struck(front)
+	_tick(60)
+	check_equal(_struck(front), struck, "and it swings no more")
+	check_equal(_spells.swing_count(), 0, "no swing is left")
+
+
+func test_a_held_swing_turns_with_the_aim() -> void:
+	_build([&"hold", &"swing"])
+	_spells.set_aim(0, Vector2.ZERO, Vector2.RIGHT)
+	_cast()
+	_tick(12)
+	_spells.set_aim(0, Vector2.ZERO, Vector2.DOWN)
+	var dirs: Array[Vector2] = []
+	for step in 30:
+		_tick(1)
+		var at: int = _row()
+		if at >= 0:
+			dirs.append(_spells.swing_dir(at))
+	check(not dirs.is_empty() and dirs[-1].is_equal_approx(Vector2.DOWN), "a later sweep is centred on the aim now: %s" % [dirs])

@@ -66,7 +66,7 @@ Since R3 the live matrix is printed by `tests/core/test_card_rules.gd` (✓ work
 | chain | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ |
 | shield | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
 | blast | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| hold | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ |
+| hold | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | recoil | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | bounce | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ |
 | echo | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
@@ -150,6 +150,7 @@ The test keeps no list of cards or carriers. It finds them itself, so a new card
 The owner re-decides these under the new rule; each "yes, it should work" becomes a part that turns W into ✓ (with a probe in R3). Present them in one session, with a recommendation each:
 
 - **Decided before, now in question:** mirror only on carriers that "have a back" (DECISIONS); a hold carrier does not echo (silent); a beam has no timer (contradicts the timer-for-hold decision); relay shots only, not on chain children or payloads; hold does nothing on rain; recoil skipped on dash and teleport; a beam's chain jump is a beam that pierces nothing; a hook with pierce fires `on expire` twice ("accepted for now"); a returning shot stops homing; a payload with no live shot is cast by its point (a payload dash or hook does nothing); **recoil pushes past 8 at once are dropped** (`mover.gd` `MAX_RECOILS`: a cap missed by #450, fix under rule 5 without a decision); hit-work starvation skipping shield blocks (defer, not skip). **Editing a staff or switching off a hold drops all its waiting launches** (`_release_hold` calls `_drop_pending` first): payload fires of carriers without hold that only wait for the per-step pacing (`FIRE_SHOTS_PER_STEP`) are lost too, against rule 5 (found in R1f, 2026-10-29).
+- **R4e (hold), done:** hold keeps a carrier on until switched off: a lasting one lives on (a held fissure is a beam that pierces everything, so it stays open and hits its line every beam tick), and one over at once is cast again every wind-up and lifetime along the aim (`Spells._repeats`: a rain falls again, a swing sweeps back). Slam, dashes and teleport stay wasted. An echo on a hold carrier is a second held copy at half damage, switched off with it, reserving nothing more.
 - **Cells to decide (W or ✓):** travel behaviours on orbit, rune, wall (growth on a rune grows the rune; linger and spiral on an orbit?); ghost, magnet, shield, relay on beams and fissures; **dash and teleport hitting what they pass** (makes `heavy · dash` the shoulder charge the card table promises, and chain, siphon, possess, relay on a dash); triggers on rain, decoy, familiar; mirror on any aimed carrier; one shield rule for every carrier that moves its caster.
 
 ## Notes for the sessions

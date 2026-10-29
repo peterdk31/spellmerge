@@ -82,8 +82,8 @@ const FALLBACK_POINT: int = 2
 var fallback: int = FALLBACK_NONE
 ## Every infusion on the shot, in slot order; `element_id` is the first.
 var element_ids: Array[StringName] = []
-## The summed `behaviour_strength` of the modifiers, indexed by `ModifierBase.Behaviour`
-## (three shields give 3 at SHIELD).
+## The stacked `behaviour_strength` of the modifiers, indexed by `ModifierBase.Behaviour`
+## (`StaffCompiler.stacked`: three shields give 3 at SHIELD, two heavy cards 16 at HEAVY).
 var behaviours: PackedFloat32Array = PackedFloat32Array()
 ## The group the trigger fires, or null.
 var payload: CompiledGroup = null
@@ -95,7 +95,7 @@ var node: int = -1
 var slot: int = -1
 
 
-## The summed strength of `behaviour` (a `ModifierBase.Behaviour`) on this spell, 0 for none.
+## The stacked strength of `behaviour` (a `ModifierBase.Behaviour`) on this spell, 0 for none.
 func behaviour(kind: int) -> float:
 	return behaviours[kind] if kind >= 0 and kind < behaviours.size() else 0.0
 

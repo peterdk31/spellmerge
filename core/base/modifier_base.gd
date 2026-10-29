@@ -30,7 +30,7 @@ enum Behaviour {
 	ECHO,
 	## Stops mid-air for `behaviour_strength` seconds, then goes on (B1).
 	LINGER,
-	## Knockback times `behaviour_strength`; a knock into a wall hurts (B3).
+	## Knockback times `behaviour_strength` (more cards multiply); a knock into a wall hurts (B3).
 	HEAVY,
 	## Hits refund `behaviour_strength` mana each (B2, B4).
 	SIPHON,
@@ -44,7 +44,7 @@ enum Behaviour {
 	SPIRAL,
 	## Also fires the carrier backwards (B2).
 	MIRROR,
-	## Grows `behaviour_strength` times bigger per second of flight, up to the room's size (B1): a
+	## Grows `behaviour_strength` times bigger per second of flight (more cards multiply), up to the room's size (B1): a
 	## wider hit circle, the same damage (owner, 2026-10-27: size is the card; damage is overcharge's).
 	GROWTH,
 	## Takes on the infusions of the last cast of any actor its shot hits (B2; owner, 2026-10-28).

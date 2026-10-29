@@ -9,7 +9,6 @@
     "number": 399
   },
   "errors_in_a_row": 0,
-  "idle": null,
   "intake_tasks": {
     "208": {
       "author": "Brianmanden",
@@ -90,9 +89,11 @@
   ],
   "task_failures": {
     "**Card rules: the compiler says what does nothing (rules R2).** (`core/spells/`, builder text) Design: [M2-rules.md](milestones/M2-rules.md), \"R2\". One table `behaviour \u00d7 motion` (runs, or a reason a player understands) kept next to the runtime that asks it (R2a); `trigger_runs(event, motion)` for triggers (R2b); the builder and staff view show the reasons (R2c). Tests: every \u2717 of the audit matrix that R4 does not turn into \u2713 is listed as wasted with a reason; the melee carriers (swing, slam) are in the matrix.": {
-      "count": 1,
+      "count": 2,
+      "parked_reason": "the final review didn't approve it 2 times in a row",
+      "parked_until": "2026-10-30T16:45:04Z",
       "pr": "469",
-      "problems": "- Approved, but PR #469 conflicts with main, so it couldn't merge. Fix: `git fetch origin main && git merge origin/main`, resolve the conflicts, and keep both sides' entries in the plan files."
+      "problems": "- The new 'Done recently' entry is missing its trailing newline. It ends with `test_card_rules.gd`.` and the Freezes entry (`- [x] **Freezes in co-op (melee I7).**`) follows on the same line, so the two list items run together and the Freezes item no longer renders as its own entry. Tools that parse the checklist could also miss it. Fix: Put the Freezes entry on its own line, and match the blank-line spacing between the other items in that section.\n- The log entry's last clause ('the branch equals main apart from the ticked tasks') only describes this branch's state. It will mean nothing once the PR is merged. Fix: Shorten it to what landed, for example: 'main's R2/R3 kept; #469's duplicate CardRules table dropped'."
     }
   },
   "usage": [

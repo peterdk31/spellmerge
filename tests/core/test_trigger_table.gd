@@ -14,7 +14,7 @@ const M := FormBase.Motion
 ## fire on. Every motion not listed is wasted. A change here is a change of the rules: say so in
 ## M2-rules.md ("Triggers" under "Card x carrier") and docs/DECISIONS.md.
 const SHOTS: Array = [M.STRAIGHT, M.STILL, M.ORBIT, M.HOOK, M.SWAP, M.WALL]
-const HITTERS: Array = [M.STRAIGHT, M.STILL, M.ORBIT, M.HOOK, M.SWAP, M.WALL, M.RAY, M.FISSURE, M.SWING]
+const HITTERS: Array = [M.STRAIGHT, M.STILL, M.ORBIT, M.HOOK, M.SWAP, M.WALL, M.RAY, M.FISSURE, M.SWING, M.SLAM]
 
 var _items: Dictionary = {}
 var _compiler: StaffCompiler

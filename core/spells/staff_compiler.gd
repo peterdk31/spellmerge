@@ -339,7 +339,7 @@ static func _numbers_waste(modifier: ModifierBase, motion: FormBase.Motion, blas
 	if not is_equal_approx(modifier.spread_mult, 1.0):
 		any = true
 		match motion:
-			FormBase.Motion.STRAIGHT, FormBase.Motion.RAY, FormBase.Motion.FISSURE, FormBase.Motion.HOOK, FormBase.Motion.SWAP, FormBase.Motion.SWING:
+			FormBase.Motion.STRAIGHT, FormBase.Motion.RAY, FormBase.Motion.FISSURE, FormBase.Motion.HOOK, FormBase.Motion.SWAP, FormBase.Motion.SWING, FormBase.Motion.SLAM:
 				return ""
 	if modifier.extra_pierce != 0:
 		any = true
@@ -561,12 +561,12 @@ static func behaviour_waste(behaviour: int, motion: FormBase.Motion, blasts: boo
 					return "it blocks shots that touch the carrier or guards the caster on a move, and %s" % _what(motion)
 		ModifierBase.Behaviour.MIRROR:
 			match motion:
-				FormBase.Motion.STRAIGHT, FormBase.Motion.RAY, FormBase.Motion.FISSURE, FormBase.Motion.SWING:
+				FormBase.Motion.STRAIGHT, FormBase.Motion.RAY, FormBase.Motion.FISSURE, FormBase.Motion.SWING, FormBase.Motion.SLAM:
 					return ""
-			return "only a straight shot, a beam, a fissure and a swing fire backwards"
+			return "only a straight shot, a beam, a fissure, a swing and a slam fire backwards"
 		ModifierBase.Behaviour.HOLD:
 			match motion:
-				FormBase.Motion.DASH, FormBase.Motion.TELEPORT, FormBase.Motion.RAIN, FormBase.Motion.FISSURE, FormBase.Motion.SWING:
+				FormBase.Motion.DASH, FormBase.Motion.TELEPORT, FormBase.Motion.RAIN, FormBase.Motion.FISSURE, FormBase.Motion.SWING, FormBase.Motion.SLAM:
 					return "nothing keeps it on: %s" % _what(motion)
 		ModifierBase.Behaviour.RECOIL:
 			match motion:
@@ -589,10 +589,10 @@ static func stays(motion: FormBase.Motion) -> bool:
 	return false
 
 
-## True for the carriers that hit under their own tag (a shot, a beam, a fissure, a swing):
+## True for the carriers that hit under their own tag (a shot, a beam, a fissure, a swing, a slam):
 ## a rain's payload, a dash, a teleport, a decoy and a familiar hit nothing themselves.
 static func hits(motion: FormBase.Motion) -> bool:
-	return stays(motion) or motion == FormBase.Motion.RAY or motion == FormBase.Motion.FISSURE or motion == FormBase.Motion.SWING
+	return stays(motion) or motion == FormBase.Motion.RAY or motion == FormBase.Motion.FISSURE or motion == FormBase.Motion.SWING or motion == FormBase.Motion.SLAM
 
 
 ## What a carrier of `motion` is, for a wasted card's reason.
@@ -622,6 +622,8 @@ static func _what(motion: FormBase.Motion) -> String:
 			return "a familiar is a body that hits nothing"
 		FormBase.Motion.SWING:
 			return "a swing is a sweep that is over at once"
+		FormBase.Motion.SLAM:
+			return "a slam is a strike that is over at once"
 	return "this carrier cannot run it"
 
 
@@ -682,6 +684,8 @@ static func trigger_why_not(event: int, motion: FormBase.Motion) -> String:
 						return "an orbit passes through walls"
 					FormBase.Motion.SWING:
 						return "a swing's sweep never meets a wall"
+					FormBase.Motion.SLAM:
+						return "a slam strikes short of a wall and its ring never meets one"
 					FormBase.Motion.DASH, FormBase.Motion.TELEPORT:
 						return "it stops before walls"
 				return _hits_nothing(motion)

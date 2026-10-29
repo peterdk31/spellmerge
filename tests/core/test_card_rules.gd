@@ -226,6 +226,9 @@ static func reach(form: FormBase) -> float:
 			return minf(form.ray_length * 0.5, 90.0)
 		FormBase.Motion.SWING:
 			return form.ray_length * 0.75
+		FormBase.Motion.SLAM:
+			# The ring's middle: it strikes `ray_length` ahead and grows to `radius`.
+			return form.ray_length
 		FormBase.Motion.STILL:
 			return form.radius
 		FormBase.Motion.ORBIT:
@@ -259,7 +262,7 @@ func test_the_same_cast_writes_the_same_trace() -> void:
 		if form.carries_payload():
 			cards.append(_payload.id)
 		for scene: Dictionary in [CROWD_AGAIN, SHOOTER]:
-			var seconds: float = minf(form.lifetime + AFTER_LIFE, LONGEST)
+			var seconds: float = minf(form.wind_up + form.lifetime + AFTER_LIFE, LONGEST)
 			var first: PackedStringArray = _run(cards, form, scene, seconds)
 			var second: PackedStringArray = _run(cards, form, scene, seconds)
 			check(first == second, "`%s` in the scene %s writes another trace the second time: %s" % [form.id, scene["name"], _first_difference(first, second)])
@@ -336,12 +339,12 @@ func _cell(card: SpellComponent, form: FormBase) -> String:
 		if compiled.wasted.has(0):
 			check(not String(compiled.wasted[0]).strip_edges().is_empty(), "`%s` on `%s` is wasted with no reason" % [card.id, form.id])
 			return WASTED
-		var seconds: float = minf(form.lifetime + AFTER_LIFE, LONGEST)
+		var seconds: float = minf(form.wind_up + form.lifetime + AFTER_LIFE, LONGEST)
 		if scene.get("repeat", false):
 			# Long enough for the second cast to land (its delay is every carrier's cooldown).
 			var plain: CompiledStaff = _compiler.compile_staff(without, _staff)
 			var delay: float = plain.casts[0].delay if not plain.is_empty() else 0.0
-			seconds = minf(delay + form.lifetime + AFTER_LIFE, LONGEST)
+			seconds = minf(delay + form.wind_up + form.lifetime + AFTER_LIFE, LONGEST)
 		var key: String = "%s|%s|%s|%s" % [form.id, scene["name"], ",".join(PackedStringArray(without)), seconds]
 		var before: PackedStringArray
 		if _baselines.has(key):

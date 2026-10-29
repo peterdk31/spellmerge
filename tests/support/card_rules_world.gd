@@ -9,7 +9,7 @@ extends RefCounted
 ## event that changes the game (hits with their whole profile, damage, heals, statuses, kills,
 ## area hits, moves, spawns, blocks, deflects, pulls, possessions, refunds, zaps, expiries, walls
 ## met), and every SAMPLE_EVERY steps the live shots (who cast them, their spell node, place and
-## size), the beams' points, the swings' sweep, and the actors' places and health when they
+## size), the beams' points, the swings' sweep, the slams, and the actors' places and health when they
 ## changed. Looks (tint, particles, the cast flash) are left out: a card that only changes its look
 ## changes nothing. Two worlds built alike and cast alike write the same trace (the runtime's
 ## randomness is seeded by the cast).
@@ -277,7 +277,7 @@ func _shot_within(distance: float) -> bool:
 
 
 func _is_quiet() -> bool:
-	if projectiles.get_count() > 0 or spells.beam_count() > 0 or spells.swing_count() > 0:
+	if projectiles.get_count() > 0 or spells.beam_count() > 0 or spells.swing_count() > 0 or spells.slam_count() > 0:
 		return false
 	if not spells._pending.is_empty() or spells._mv_count > 0 or spells._jq_count > 0:
 		return false
@@ -397,6 +397,10 @@ func _sample() -> void:
 			for n in spells.beam_point_count(at):
 				points.append(_at(spells.beam_point(at, n)))
 			_put("beam %s %s" % [_who(spells.beam_caster(at)), " ".join(points)])
+	for at in spells.slam_slots():
+		if spells.slam_on(at):
+			# A slam's row is read directly: Spells has no getter for its caster and aim.
+			_put("slam %s %s from %s way %s impact %s" % [_who(spells._sl_actor[at]), _node(spells._sl_tag[at]), _at(spells._sl_origin[at]), _at(spells._sl_dir[at] * 100.0), _at(spells.slam_impact(at)) if spells.slam_impact(at).is_finite() else "-"])
 	for at in spells.swing_slots():
 		if spells.swing_on(at):
 			_put("swing %s %s at %s to %s side %d turned %d reach %d" % [_who(spells.swing_actor(at)), _node(spells.swing_tag(at)), _at(spells.swing_origin(at)), _at(spells.swing_dir(at) * 100.0), spells.swing_side(at), roundi(rad_to_deg(spells.swing_turned(at))), roundi(spells.swing_reach(at))])

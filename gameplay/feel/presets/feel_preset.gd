@@ -145,8 +145,13 @@ extends Resource
 @export_range(0.05, 1.0, 0.01) var parry_seconds: float = 0.35
 @export_range(0.0, 0.3, 0.005) var parry_stop_seconds: float = 0.06
 @export var parry_sound: StringName = &"parry"
-## The shake a slam's impact adds (melee I8; 0 to 1, as `hit_shake`), on top of its hits' own.
-@export_range(0.0, 1.0, 0.01) var slam_shake: float = 0.35
+## The ground struck (`Feel.strike_ground`: a slam's impact, a carrier whose impact look says
+## `quake`): the shake it adds (0 to 1, as `hit_shake`) on top of its hits' own, the camera punch
+## down the screen in pixels (given back as a cast's kick), and how long its caster holds (a local
+## stop, as a hit's), hit or miss.
+@export_range(0.0, 1.0, 0.01) var quake_shake: float = 0.45
+@export_range(0.0, 4.0, 0.1) var quake_kick_pixels: float = 3.0
+@export_range(0.0, 0.2, 0.01) var quake_stop_seconds: float = 0.06
 ## How long the "downed by your own ..." note rises over a downed wizard, in seconds.
 @export_range(0.5, 6.0, 0.1) var downed_note_seconds: float = 2.5
 ## Sound ids asked from `core/registry`. A missing sound is silent.

@@ -23,6 +23,10 @@ render_mode blend_premul_alpha;
 //                 biggest at 35% of the effect (where the body changes) and shrink away, and a
 //                 few sparks in the player's colour
 //   K_CHIPS       stone chips knocked back off a wall, falling; stone does not glow
+//   K_QUAKE       a slam's mark on the floor (Feel's floor batch, under the bodies): cracks out from
+//                 the impact, white-hot and cooling to dark stone, a glow on the floor, rubble
+//                 thrown up that lands and lies, dust rolling out along the floor; its reach is
+//                 QUAKE_REACH x zoom pixels
 // Lightning (K_ARC) and statuses (K_STATUS) have shaders and batches of their own.
 //
 // PARTICLES ARE GEOMETRY (as in `shot_trail.gdshader`; the owner, 2026-10-29): an effect is one
@@ -34,7 +38,8 @@ render_mode blend_premul_alpha;
 //   Q_PARTICLE  one of the shot's card particles (`place_particle`), the newest on top
 //   Q_SPARK     a spark (or a chip, or a speck of a dash's dust); the first is on top
 //   Q_CLOUD     one of a poof's bone clouds; the first is on top
-//   Q_SHAPE     the flash: a cross, a dotted disc, a fraying ring (drawn last, on top)
+//   Q_SHAPE     the flash: a cross, a dotted disc, a fraying ring (drawn last, on top); a quake's
+//               cracks
 // The instance's square is drawn from the mesh's own corners: a pixel `d` (whole pixels from the
 // middle; from where a dash left) is at UV (d + o) / size of the square, as a QuadMesh has it.
 
@@ -47,6 +52,15 @@ const float DASH_MARGIN = 12.0;
 const float DASH_ACROSS = 32.0;
 // A rune's reach at its rest (the 14 px of rune.tres, as `shot_rune.gdshader` draws it at zoom 4).
 const float RUNE_REACH = 14.4;
+// The floor batch's kind (KIND_QUAKE in gameplay/feel/feel.gd): below K_BURST, where the shots'
+// kinds are, which never come to this shader.
+const float K_QUAKE = 3.0;
+// A quake's reach per zoom in pixels, its cracks, the share of its life its rubble flies, and how
+// flat the floor is seen (y over x).
+const float QUAKE_REACH = 8.0;
+const float QUAKE_CRACKS = 7.0;
+const float QUAKE_FLIGHT = 0.3;
+const float QUAKE_FLAT = 0.6;
 // The quad kinds (EFFECT_Q_* in gameplay/feel/feel.gd), in UV.y, and the slots of each.
 const float Q_LIGHT = 0.0;
 const float Q_PARTICLE = 1.0;
@@ -58,6 +72,7 @@ const float M_LIGHT = 0.0;
 const float M_PIXELS = 1.0;
 const float M_CLOUD = 2.0;
 const float M_SHAPE = 3.0;
+const float M_CRACK = 4.0;
 
 // What the vertex stage hands a pixel (by mode; see `fragment`): where it is in the effect's
 // pixels, the mode, three numbers and three colours.
@@ -142,6 +157,26 @@ Spark effect_spark(float kind, float n, float a, float ease, float z, Look L) {
 		S.shown = n < 6.0 && a < 0.5;
 		at = vec2(way * (1.0 + 9.0 * hash_seeded(i, 4.0, 51.0, s)) * travel, 8.0 - 3.0 * hash_seeded(i, 5.0, 51.0, s) * travel);
 		S.rgb = a < 0.25 ? STONE_LIGHT : STONE_BASE;
+	} else if (kind == K_QUAKE && n < 8.0) {
+		// Rubble thrown up all round, landing on the floor and lying there until it fades.
+		float reach = QUAKE_REACH * z;
+		float ang = i / 8.0 * 6.2832 + (hash_seeded(i, 40.0, 31.0, s) - 0.5) * 0.6;
+		float far = reach * (0.35 + 0.55 * hash_seeded(i, 41.0, 31.0, s));
+		float t = min(a / QUAKE_FLIGHT, 1.0);
+		float high = (2.0 + 2.5 * hash_seeded(i, 42.0, 31.0, s)) * z;
+		S.shown = a < 0.75 || hash_seeded(i, 43.0, 31.0, s) > (a - 0.75) / 0.2;
+		at = vec2(cos(ang), sin(ang) * QUAKE_FLAT) * far * (1.0 - (1.0 - t) * (1.0 - t)) - vec2(0.0, 4.0 * t * (1.0 - t) * high);
+		S.run = hash_seeded(i, 44.0, 31.0, s) < 0.5 ? 1.0 : 0.0;
+		S.rgb = t < 1.0 ? BONE_BASE : STONE_LIGHT;
+	} else if (kind == K_QUAKE) {
+		// Dust rolling out along the floor, slowing, rising a little as it thins.
+		float reach = QUAKE_REACH * z;
+		float ang = (i - 8.0) / 8.0 * 6.2832 + hash_seeded(i, 45.0, 31.0, s) * 0.5;
+		float roll = 1.0 - pow(1.0 - min(a / 0.6, 1.0), 3.0);
+		S.shown = a < 0.6 && hash_seeded(i, 46.0, 31.0, s) > (a - 0.4) / 0.2;
+		at = vec2(cos(ang), sin(ang) * QUAKE_FLAT) * reach * (0.3 + 1.0 * roll) - vec2(0.0, roll * z);
+		S.run = 2.0;
+		S.rgb = a < 0.25 ? BONE_SHADOW : STONE_LIGHT;
 	}
 	S.at = floor(at + 0.5);
 	return S;
@@ -232,8 +267,14 @@ void vertex() {
 			}
 			k = (1.0 - a) * (1.0 - a);
 			lit = vec4(0.7, 3.0 * z, 0.3, 9.0 * z);
+		} else if (kind == K_QUAKE) {
+			// A glow on the floor round the impact, gone well before the cracks cool.
+			k = max(1.0 - a * 2.5, 0.0);
+			k *= k;
+			lit = vec4(0.8, QUAKE_REACH * z * 0.6, 0.0, 1.0);
 		}
-		shown = glows && (quad == Q_LIGHT || arm >= 0.0 || disc >= 0.0 || ring >= 0.0);
+		bool quake = kind == K_QUAKE;
+		shown = glows && (quad == Q_LIGHT || arm >= 0.0 || disc >= 0.0 || ring >= 0.0 || quake);
 		q_lo = -o;
 		q_hi = size - o;
 		if (quad == Q_LIGHT) {
@@ -241,6 +282,14 @@ void vertex() {
 			a0 = vec4(metric, ring < 0.0 ? 0.0 : ring, k * (bit_set(L.bits, L_PULL) ? 0.6 : 1.0), 0.0);
 			a1 = lit;
 			k0 = vec4(L.glow, 1.0);
+		} else if (quake) {
+			// The cracks: their reach, the age and seed, and the ramp they cool down.
+			m = M_CRACK;
+			a0 = vec4(QUAKE_REACH * z, a, s, 0.0);
+			a2 = vec4(L.lo, 0.0);
+			k0 = vec4(L.hot, 1.0);
+			k1 = vec4(L.hi, 1.0);
+			k2 = vec4(L.mid, 1.0);
 		} else {
 			m = M_SHAPE;
 			a0 = vec4(metric, arm, disc, ring);
@@ -265,7 +314,7 @@ void vertex() {
 		q_lo = floor(c - reach) - 1.0;
 		q_hi = floor(c + reach) + 2.0;
 		a0 = vec4(c, reach, a < 0.7 ? 0.0 : 1.0);
-	} else if (quad == Q_PARTICLE && glows && kind != K_CAST) {
+	} else if (quad == Q_PARTICLE && glows && kind != K_CAST && kind != K_QUAKE) {
 		// The shot's cards: its particles, set off from round the middle at the start.
 		float n = L.emits.w;
 		float count = min(4.0 + 2.0 * n, float(MAX_PARTICLES));
@@ -342,7 +391,7 @@ void fragment() {
 			vec2 side = (d - c) / max(reach, 1.0);
 			colour = vec4(side.x + side.y < -0.5 ? BONE_LIGHT : (q > reach - 1.0 && side.x + side.y > 0.3 ? BONE_SHADOW : BONE_BASE), 1.0);
 		}
-	} else {
+	} else if (mode < M_SHAPE + 0.5) {
 		// The flash: a dotted disc of reach v0.z in c0, a ring at v0.w in c1 fraying with the age
 		// v1.y (its hash salt v1.x, seed v1.z), a cross of arms v0.y (white-hot c0 in the middle).
 		if (v0.z >= 0.0 && r <= v0.z && mod(d.x + d.y, 2.0) == 0.0) {
@@ -355,6 +404,33 @@ void fragment() {
 		if (v0.y >= 0.0 && ((d.x == 0.0 && abs(d.y) <= v0.y) || (d.y == 0.0 && abs(d.x) <= v0.y))) {
 			colour = d.x == 0.0 && d.y == 0.0 ? c0 : c1;
 		}
+	} else {
+		// A quake's cracks, on a floor seen flat: the crack nearest the pixel's way (one of
+		// QUAKE_CRACKS round about, each turned and as long as its hash says, v0.x at most), its
+		// line measured in whole pixels, jagged every 4 px, 2 px wide near the middle with a dark
+		// rim (cut into the floor), dotted at the tip. They open at once, white-hot (c0), cool
+		// from the tips in through c1, c2, v2 to dark stone, and crumble away.
+		float s = v0.z;
+		float a = v0.y;
+		vec2 e = vec2(d.x, d.y / QUAKE_FLAT);
+		float k = floor(atan(e.y, e.x) / 6.2832 * QUAKE_CRACKS + 0.5);
+		float way = (k + (hash_seeded(k, 50.0, 31.0, s) - 0.5) * 0.5) * 6.2832 / QUAKE_CRACKS;
+		vec2 u = vec2(cos(way), sin(way) * QUAKE_FLAT);
+		float flat_len = length(u);
+		u /= flat_len;
+		float along = dot(d, u);
+		float reach = v0.x * flat_len * (0.6 + 0.4 * hash_seeded(k, 51.0, 31.0, s)) * min(a / 0.04, 1.0);
+		float rung = max(along, 0.0) / 4.0;
+		float jag = mix(hash_seeded(k, floor(rung), 52.0, s), hash_seeded(k, floor(rung) + 1.0, 52.0, s), fract(rung)) - 0.5;
+		float side = abs(u.x * d.y - u.y * d.x - jag * min(along, 10.0) * 0.5);
+		float wide = along < reach * 0.4 ? 1.0 : 0.6;
+		bool inside = along > 1.5 && along <= reach && (along < reach * 0.8 || mod(d.x + d.y, 2.0) == 0.0);
+		bool crack = inside && side < wide;
+		bool rim = inside && !crack && side < wide + 1.0 && along < reach * 0.6;
+		bool kept = a < 0.7 || hash_seeded(d.x, d.y, 53.0, s) > (a - 0.7) / 0.3;
+		float heat = a * 1.5 + along / max(reach, 1.0) * 0.4;
+		vec3 rgb = heat < 0.12 ? c0.rgb : (heat < 0.3 ? c1.rgb : (heat < 0.5 ? c2.rgb : (heat < 0.7 ? v2.rgb : STONE_SHADOW)));
+		colour = kept && crack ? vec4(rgb, 1.0) : (kept && rim ? vec4(STONE_SHADOW, 1.0) : vec4(0.0));
 	}
 	COLOR = colour;
 }

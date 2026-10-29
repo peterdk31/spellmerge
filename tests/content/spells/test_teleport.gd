@@ -45,6 +45,7 @@ func test_the_card_is_a_valid_carrier() -> void:
 	check_equal(card.kind(), &"form", "a carrier card")
 	check_equal(card.motion, FormBase.Motion.TELEPORT, "it is a teleport")
 	check(card.ray_length > 0.0, "it has a distance")
+	check_equal(card.speed, 0.0, "speed is a placeholder: the distance is ray_length alone")
 	check(card.mana_cost > 0.0, "it costs mana, which a dash does not")
 	check(card.range_problems().is_empty(), "inside every range: %s" % [card.range_problems()])
 

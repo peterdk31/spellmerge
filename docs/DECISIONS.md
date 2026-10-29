@@ -2021,4 +2021,4 @@ The owner: restructure the projectile step from "for each shot, check every beha
 
 ## 2026-10-29: Teleport numbers (staffs C)
 
-- **Teleport blinks 96 px for 4 mana, 2.5 s cooldown, complexity 2.** The short dash moves 48 px for free every 2 s and the long one 128. A blink is at once, so it costs mana and a longer cooldown, and its distance sits between the two dashes. Its combos do not test an end point (blast, on expire): the combo arena does not move its caster, as for dash.
+- **Teleport blinks 96 px for 4 mana, 2.5 s cooldown, complexity 2.** The three dashes move 48, 80 and 128 px, all free every 2 s. A blink is at once (a dash takes time to travel and can be hit on the way), so it costs mana and a longer cooldown; 96 px is only a little past the medium dash and short of the long one, so the 4 mana and 2.5 s pay for the instant arrival, not for range. `speed` (0) and `lifetime` (0.1) are placeholders: the compiler takes the distance from `ray_length` alone. Its combos do not test an end point (blast, on expire): the combo arena does not move its caster, as for dash.

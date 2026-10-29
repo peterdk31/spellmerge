@@ -1,0 +1,9 @@
+{
+	"id": "siphon_chain_bolt",
+	"name": "Siphon chain bolt",
+	"does": "A chain bolt jumps from imp to imp and every jump is a hit that pays mana back, so a crowd pays for the cast.",
+	"casts": [{"staff": 0, "cards": ["siphon", "chain", "bolt"]}],
+	"imps": [[100, 0], [140, 30], [140, -30]],
+	"seconds": 1.5,
+	"checks": [{"kind": "damaged", "imps": [0, 1]}]
+}

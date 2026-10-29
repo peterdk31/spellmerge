@@ -1,0 +1,9 @@
+{
+	"id": "siphon_split_bolts",
+	"name": "Siphon split bolts",
+	"does": "A split bolt volley, each bolt paying mana back as it hits: a fan that feeds the next cast. The imps ahead are all hurt.",
+	"casts": [{"staff": 0, "cards": ["siphon", "split", "bolt"]}],
+	"imps": [[100, -14], [100, 0], [100, 14]],
+	"seconds": 1.0,
+	"checks": [{"kind": "damaged", "imps": [0, 1, 2]}]
+}

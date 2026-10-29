@@ -8,6 +8,8 @@ A second, by the owner on 2026-10-28: wizards and enemies become one kind of bod
 
 A third, by the owner on 2026-10-28: every character becomes a living staff, with a new story and an intro ([M2-living-staffs.md](milestones/M2-living-staffs.md), phase H), after phase G and before D3.
 
+A fourth, by the owner on 2026-10-29: every card follows the general rules on every carrier, with no special cases and no silent no-ops, checked automatically on every pull request ([M2-rules.md](milestones/M2-rules.md), phase R), before D3.
+
 | # | Milestone | Status | Done when |
 | --- | --- | --- | --- |
 | M0 | [Foundation](milestones/M0-foundation.md) | **Closed early** on 2026-10-16 by the owner; its dry runs and release streak carry into M1 | 3 daily releases in a row work and every pipeline part passes its dry run |

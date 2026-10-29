@@ -9,7 +9,7 @@
 **Done when:**
 
 1. Every finding in "Findings" is fixed, listed as wasted on purpose, or re-decided by the owner (R4), and says which in docs/DECISIONS.md.
-2. `tests/core/test_card_rules.gd` (R3) runs every modifier and trigger card on every carrier and passes, and is enforced automatically (R3, "Enforcement"): it runs on every pull request and in the daily build, and no new card, carrier, behaviour or trigger event can land without it covering them.
+2. `tests/core/test_card_rules.gd` (R3) runs every card on every carrier and passes, finding both by itself (R3, "Automatic discovery"), so a new card or carrier is checked with nobody updating the test.
 3. The matrix in "Card × carrier" has no ✗ left.
 4. `tools/ptest.sh` is green; `test_projectiles_step_exact` recorded again where a rule changed what shots do (say why in the PR).
 
@@ -120,15 +120,14 @@ The owner's "pass that checks for the general rules", as a test that runs in the
 
 Build R3 right after R2 (it needs the honest compiler); R1 parts can land before or after.
 
-#### Enforcement (owner, 2026-10-29: "Make sure that 3. is enforced automatically")
+#### Automatic discovery (owner, 2026-10-29: "It should just auto discover new cards and carriers")
 
-The check must hold without anyone remembering it. Today a pull request runs only the rules check and the Python tests (`.github/workflows/checks.yml`); the Godot suite runs in the daily build, whose bisect reverts a breaking merge. R3 adds, in its PR (owner paths: `.github/`, `ci/`):
+The test keeps no list of cards or carriers. It finds them itself, so a new card or carrier is checked the day it lands, with nobody updating the test:
 
-1. **On every pull request:** a `card-rules` job in `checks.yml` that installs the pinned Godot (cached, as `ci/build/build.sh` does), imports, and runs `test_card_rules.gd` and the compiler table tests alone (a minute, not the whole suite). Required for merging, like `rules` and `ci-tests` (branch protection; the merge script checks it too).
-2. **In the daily build:** it is a `tests/**/test_*.gd`, so `build.sh --tests` runs it and the bisect reverts a merge that breaks it.
-3. **Nothing can slip past by being new:** the test reads the cards and carrier forms from `content/spells/` through the registry, and walks every value of `ModifierBase.Behaviour`, `FormBase.Motion` and `TriggerBase.Event`. A new value with no row in R2's table, a table row with no probe in R3, or a probe that no longer sees its effect fails the test (an exhaustiveness check, not a list someone updates by hand).
-4. **No hidden exceptions:** a card may be ✗ only through an entry in an explicit allow list in the test, each with the DECISIONS.md reference of the owner decision; the list starts empty and the test prints it, so a review sees every exception.
-5. **For agents:** AGENTS.md gets a line under "Do the work": "a card behaves the same on every carrier or is listed as wasted with a reason; never add a special case; `test_card_rules.gd` must pass", and `ci/merge` and the reviewer prompt (owner paths) treat a change to the allow list as needing the owner.
+- **Cards:** every modifier, trigger, infusion and multicast card the registry finds in `content/spells/` (the folders it already scans for the game).
+- **Carriers:** every form card the registry finds (`content/spells/forms/`), the melee carriers included; the carrier's `motion` picks the scene it runs in.
+- **What they do:** every value of `ModifierBase.Behaviour` and `TriggerBase.Event`, read from the enums. A card whose behaviour or event has no probe yet fails with "no probe for `<behaviour>`", so adding a new kind of card asks for its probe in the same PR.
+- It is a `tests/**/test_*.gd`, so it runs with the rest of the suite (`tools/ptest.sh`, and the daily build, whose bisect reverts a merge that breaks it).
 
 ### R4: decide with the owner, then implement (rules 1, 4, 5)
 

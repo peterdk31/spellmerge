@@ -43,6 +43,7 @@ func _initialize() -> void:
 	_test_homing_turns_toward_a_target()
 	_test_a_homing_shot_homes_after_it_bounces()
 	_test_homing_rules()
+	_test_a_homing_still_shot_creeps_toward_its_target()
 	_test_homing_skips_its_own_wizard_and_the_target_just_hit()
 	_test_homing_checks_every_fourth_step()
 	_test_homing_search_is_charged_to_the_budget()
@@ -346,7 +347,7 @@ func _test_homing_rules() -> void:
 	var rune: int = _mgr.spawn(0, Vector2(50.0, 50.0), Vector2.ZERO, 1.0, 4.0, ManagerScript.LAYER_ENEMY, 0, 0, ManagerScript.MOTION_STILL)
 	_mgr.set_anchor(0, Vector2(200.0, 200.0))
 	var orbit: int = _mgr.spawn_orbit(0, 10.0, 0.0, 1.0, 1.0)
-	_check(not _mgr.set_homing(rune, 3.0, HOMING_REACH) and not _mgr.set_homing(orbit, 3.0, HOMING_REACH), "still and orbit shots cannot home")
+	_check(_mgr.set_homing(rune, 3.0, HOMING_REACH) and not _mgr.set_homing(orbit, 3.0, HOMING_REACH), "a still shot can home (it creeps), an orbit shot cannot (rules R4i)")
 	_check(not _mgr.set_homing(-1, 3.0, HOMING_REACH) and not _mgr.set_homing(slot, -1.0, HOMING_REACH) and not _mgr.set_homing(slot, NAN, HOMING_REACH), "bad slots and rates are refused")
 	_check(not _mgr.set_homing(slot, 3.0, 0.0) and not _mgr.set_homing(slot, 3.0, INF), "a range not above 0 and finite is refused")
 	_check(_mgr.set_homing(slot, 0.0, HOMING_REACH) and _mgr._turn[slot] == 0.0, "a rate of 0 turns homing off and is accepted")
@@ -357,6 +358,29 @@ func _test_homing_rules() -> void:
 	_mgr.clear()
 	var again: int = _mgr.spawn(0, Vector2.ZERO, Vector2(1.0, 0.0), 1.0)
 	_check(again == gone and _mgr._turn[again] == 0.0, "a reused slot starts without homing")
+
+
+## A homing rune (rules R4i, owner 2026-10-30): a shot with no speed creeps toward the target its
+## homing picks at SpellLimits.HOMING_DRIFT, the same pick and reach as a bolt's; with nothing
+## in reach it stays put.
+func _test_a_homing_still_shot_creeps_toward_its_target() -> void:
+	_setup()
+	var enemy: Node2D = _target(Vector2(250.0, 100.0), 8.0)
+	var lone: int = _mgr.spawn(0, Vector2(100.0, 400.0), Vector2.ZERO, 30.0, 14.0, ManagerScript.LAYER_ENEMY, 0, 0, ManagerScript.MOTION_STILL)
+	_mgr.set_homing(lone, 3.0, HOMING_REACH)
+	var rune: int = _mgr.spawn(0, Vector2(100.0, 100.0), Vector2.ZERO, 30.0, 14.0, ManagerScript.LAYER_ENEMY, 0, 0, ManagerScript.MOTION_STILL)
+	_check(_mgr.set_homing(rune, 3.0, HOMING_REACH), "a rune takes homing")
+	for _i in 60:
+		_mgr.step(DT)
+	var moved: float = _mgr.get_position_of(rune).x - 100.0
+	_check(absf(moved - SpellLimits.HOMING_DRIFT) < SpellLimits.HOMING_DRIFT * DT * ManagerScript.HOMING_PERIOD + 0.01, "it creeps toward its target at HOMING_DRIFT: %s px in a second" % moved)
+	_check(is_equal_approx(_mgr.get_position_of(rune).y, 100.0), "straight at it")
+	_check(_mgr.get_position_of(lone) == Vector2(100.0, 400.0), "a rune with nothing in reach stays put")
+	for _i in 600:
+		_mgr.step(DT)
+		if not _hits.is_empty():
+			break
+	_check(_hits.size() == 1 and _hits[0][1] == enemy, "and reaches it")
 
 
 func _test_homing_skips_its_own_wizard_and_the_target_just_hit() -> void:

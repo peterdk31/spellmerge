@@ -1229,14 +1229,15 @@ func _launch_as(group: CompiledGroup, actor: int, staff: int, generation: int, o
 
 ## Rain: for each of its shots, a cue at the aim point and a launch of its payload there after
 ## its `lifetime`. The aim point is `ray_length` (or `SpellLimits.RAIN_REACH`) along the shot's
-## heading, stopped at a wall. Returns how many were set.
+## heading, stopped at a wall; homing moves it onto a target near it (`_homed_place`). Returns
+## how many were set.
 ## `hold` does nothing for a rain: it always falls after its `lifetime` and is no sustained carrier.
 func _telegraph_rain(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading: Vector2) -> int:
 	var reach: float = spell.ray_length if spell.ray_length > 0.0 else SpellLimits.RAIN_REACH
 	var placed: int = 0
 	for n in spell.shots:
 		var along: Vector2 = heading.rotated(_fan_angle(n, spell.shots, spell))
-		var point: Vector2 = projectiles.clip_to_walls(origin, origin + along * reach)
+		var point: Vector2 = _homed_place(spell, actor, tag + n, origin, projectiles.clip_to_walls(origin, origin + along * reach))
 		var group: CompiledGroup = spell.own_payload if spell.own_payload != null else CompiledGroup.new()
 		var launch: PendingLaunch = _delay(spell.lifetime, group, null, actor, SpellTag.staff_of(tag), SpellTag.generation_of(tag), point, along, null, false)
 		launch.landing = spell
@@ -1257,10 +1258,11 @@ func _land_rain(spell: CompiledSpell, group: CompiledGroup, actor: int, staff: i
 
 
 ## Wall: `shots` still shots in a line across `direction`, `spread` pixels apart (the shot's
-## diameter when the form has none), centred `SpellLimits.WALL_REACH` ahead of `origin`. A shot
-## born in a wall is skipped. Shield charges apply, so `shield . wall` stops other teams' shots.
+## diameter when the form has none), centred `SpellLimits.WALL_REACH` ahead of `origin` (homing
+## moves the centre onto a target near it, `_homed_place`). A shot born in a wall is skipped.
+## Shield charges apply, so `shield . wall` stops other teams' shots.
 func _launch_wall(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direction: Vector2, source: Node, lifetime: float, carried: int, prev: int) -> int:
-	var centre: Vector2 = projectiles.clip_to_walls(origin, origin + direction * SpellLimits.WALL_REACH)
+	var centre: Vector2 = _homed_place(spell, actor, tag, origin, projectiles.clip_to_walls(origin, origin + direction * SpellLimits.WALL_REACH))
 	var across: Vector2 = direction.orthogonal()
 	var gap: float = spell.spread if spell.spread > 0.0 else spell.radius * 2.0
 	var made: int = 0
@@ -1271,10 +1273,23 @@ func _launch_wall(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, d
 			continue
 		made += 1
 		_apply_travel(slot, spell)
+		if spell.homing_range > 0.0:
+			# Its homing went into where the wall stands: its shots keep still (a chain jump homes).
+			projectiles.set_homing(slot, 0.0, spell.homing_range)
 		_register(slot, tag, spell, carried, prev)
 		if source != null:
 			projectiles.exclude(slot, source, SpellLimits.SOURCE_EXCLUSION)
 	return made
+
+
+## Where a carrier placed at `point` ahead of its caster at `origin` (a rain, a wall) goes when it
+## homes (rules R4i): onto a target within its homing reach of the point, picked as a homing
+## shot picks one (`homing_point`, any way round), stopped at a wall on the way; else `point`.
+func _homed_place(spell: CompiledSpell, actor: int, tag: int, origin: Vector2, point: Vector2) -> Vector2:
+	if spell.homing_range <= 0.0:
+		return point
+	var goal: Vector2 = projectiles.homing_point(actor, point, Vector2.RIGHT, PI, ProjectilesScript.ACTOR_LAYERS, spell.homing_range, 0, hash(Vector3i(actor, tag, roundi(_clock * 1000.0))))
+	return point if not goal.is_finite() else projectiles.clip_to_walls(origin, goal)
 
 
 ## Decoys and familiars: `ai` makes the entity (`entity_spawn_requested`, `lifetime` seconds, or

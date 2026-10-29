@@ -508,12 +508,14 @@ static func stacked(behaviour: int, before: float, strength: float) -> float:
 
 ## Whether homing can steer a carrier of `motion`: what it moves turns toward a target as it
 ## goes, at the turn rate (a shot in flight, a dash, whether it carries the wizard or a shot),
-## and what is over at once bends its way toward one, up to `homing_angle` (a beam, a
-## teleport). On any other form a homing card is wasted. A new motion that should home goes here, and the homing
-## test of every form card (tests/content/spells/test_homing_forms.gd) checks it reaches.
+## a still shot (a rune) creeps toward one at SpellLimits.HOMING_DRIFT, what is over at once
+## bends its way toward one, up to `homing_angle` (a beam, a teleport), and what is placed ahead
+## of its caster is placed on one near that point (a wall, a rain; rules R4i). On any other form
+## a homing card is wasted. A new motion that should home goes here, and the homing test of
+## every form card (tests/content/spells/test_homing_forms.gd) checks it reaches.
 static func homing_steers(motion: FormBase.Motion) -> bool:
 	match motion:
-		FormBase.Motion.STRAIGHT, FormBase.Motion.HOOK, FormBase.Motion.SWAP, FormBase.Motion.RAY, FormBase.Motion.DASH, FormBase.Motion.TELEPORT:
+		FormBase.Motion.STRAIGHT, FormBase.Motion.STILL, FormBase.Motion.HOOK, FormBase.Motion.SWAP, FormBase.Motion.RAY, FormBase.Motion.DASH, FormBase.Motion.TELEPORT, FormBase.Motion.WALL, FormBase.Motion.RAIN:
 			return true
 	return false
 
@@ -535,7 +537,7 @@ static func behaviour_runs(behaviour: int, motion: FormBase.Motion, blasts: bool
 static func behaviour_waste(behaviour: int, motion: FormBase.Motion, blasts: bool = false) -> String:
 	match behaviour:
 		ModifierBase.Behaviour.HOMING:
-			return "" if homing_steers(motion) else "it cannot be steered"
+			return "" if homing_steers(motion) else "it has nothing to aim, and %s" % _what(motion)
 		ModifierBase.Behaviour.RETURN:
 			return "" if flies(motion) else "it does not fly out"
 		ModifierBase.Behaviour.ARC:

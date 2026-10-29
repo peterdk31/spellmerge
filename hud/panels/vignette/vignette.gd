@@ -6,6 +6,7 @@ extends ColorRect
 ##     vignette.step(delta)    # called every frame by the HUD
 
 const SHADER: Shader = preload("res://hud/panels/vignette/vignette.gdshader")
+const ShaderWarmupScript := preload("res://core/projectiles/shader_warmup.gd")
 ## How much each hit adds, the most it shows, and how fast it fades (per second).
 const HIT_STRENGTH: float = 0.7
 const MAX_STRENGTH: float = 1.0
@@ -27,6 +28,7 @@ func _init() -> void:
 	color = Color.WHITE
 	_material = ShaderMaterial.new()
 	_material.shader = SHADER
+	ShaderWarmupScript.want(SHADER, ShaderWarmupScript.RECT)
 	material = _material
 	visible = false
 

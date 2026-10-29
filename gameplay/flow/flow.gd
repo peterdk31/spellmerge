@@ -50,8 +50,8 @@ extends Node
 ## then the intro or the run starts. Today that work is the shader warm-up
 ## (`core/projectiles/shader_warmup.gd`), once a session; with nothing to do Play starts at once.
 ## To load something more before playing, add a LoadTask in `play_tasks`. It is off
-## (`loading_enabled` false) when a test script is the main loop; the stress run turns it off too
-## (it times the room itself).
+## (`loading_enabled` false) only when a test script is the main loop; the automated runs (the
+## four-bot and stress runs) load like a player, and wait for `room_entered`.
 ##
 ## Sandbox (staffs B7, docs/milestones/M2-staffs.md, "The sandbox"): `sandbox_requested` (the
 ## main menu's Sandbox button, in `dev` and `preview` builds) starts a run in the sandbox room

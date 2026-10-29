@@ -91,6 +91,8 @@ func before_each() -> void:
 	_modifier(&"hold", ModifierBase.Behaviour.HOLD, 1.0)
 	_modifier(&"shield", ModifierBase.Behaviour.SHIELD, 2.0)
 	_modifier(&"blast", ModifierBase.Behaviour.BLAST, 30.0)
+	_modifier(&"mirror", ModifierBase.Behaviour.MIRROR, 1.0)
+	_modifier(&"echo", ModifierBase.Behaviour.ECHO, 0.2)
 	_trigger(&"on_expire", TriggerBase.Event.EXPIRE)
 	_trigger(&"on_hit", TriggerBase.Event.HIT)
 	var spark: FormBase = _form(&"spark", 100.0, 1.0)
@@ -208,6 +210,65 @@ func test_a_rain_with_nothing_after_it_does_nothing() -> void:
 	_cast()
 	_tick(60)
 	check_equal(_mgr.get_count(), 0, "no payload, no shots")
+
+
+func test_a_rain_strikes_what_is_under_it_as_it_lands() -> void:
+	# Rules R4g: the rain hits with its own hit and cards where it lands, then drops its payload.
+	var under: Node2D = _target(Vector2(SpellLimits.RAIN_REACH, 0.0))
+	_target(Vector2(SpellLimits.RAIN_REACH + 40.0, 0.0))
+	var tag: int = _build(0, [&"rain"])
+	_cast()
+	_tick(20)
+	check(_hits.is_empty(), "nothing before it lands")
+	_tick(20)
+	check_equal(_hits.size(), 1, "one body under it is struck")
+	check(_hits.size() == 1 and _hits[0][1] == under and _hits[0][3] == tag, "the one on the aim point, by the rain itself")
+
+
+func test_a_landing_rain_fires_its_on_hit() -> void:
+	_target(Vector2(SpellLimits.RAIN_REACH, 0.0))
+	_build(0, [&"on_hit", &"rain", &"bolt"])
+	_cast()
+	_tick(31)
+	check_equal(_mgr.get_count(), 1, "its on-hit payload left from the target")
+
+
+func test_an_echoed_rain_strikes_at_half() -> void:
+	_target(Vector2(SpellLimits.RAIN_REACH, 0.0))
+	var damage: Array[int] = []
+	_bus.projectile_hit.connect(func(_player: int, _target_hit: Node, _at: Vector2, tag: int) -> void:
+		damage.append(_spells.hit_profile(tag).damage))
+	_build(0, [&"echo", &"rain"])
+	_cast()
+	_tick(90)
+	check_equal(damage.size(), 2, "the rain and its echo strike")
+	check(damage.size() == 2 and damage[1] < damage[0], "the echo at half: %s" % [damage])
+
+
+func test_a_mirrored_rain_lands_through_the_caster() -> void:
+	_build(0, [&"mirror", &"rain", &"bolt"])
+	_cast()
+	check_equal(_shown.size(), 2, "two cues")
+	check(_shown.size() == 2 and is_equal_approx(_shown[1][2].x, -SpellLimits.RAIN_REACH), "the second behind the caster: %s" % [_shown])
+
+
+func test_a_mirrored_wall_stands_behind() -> void:
+	_build(0, [&"mirror", &"wall"])
+	_cast()
+	var ahead: int = 0
+	var behind: int = 0
+	for at in _positions():
+		if is_equal_approx(at.x, SpellLimits.WALL_REACH):
+			ahead += 1
+		elif is_equal_approx(at.x, -SpellLimits.WALL_REACH):
+			behind += 1
+	check_equal([ahead, behind], [3, 3], "a wall ahead and one behind")
+
+
+func test_a_mirrored_decoy_is_a_second_decoy() -> void:
+	_build(0, [&"mirror", &"decoy"])
+	_cast()
+	check_equal(_spawns.size(), 2, "two decoys")
 
 
 func test_rain_payload_counts_as_live_until_it_ends() -> void:

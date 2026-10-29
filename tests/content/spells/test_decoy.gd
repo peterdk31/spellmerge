@@ -8,6 +8,8 @@ extends "res://tests/support/suite.gd"
 
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const ComboFiles := preload("res://tests/support/combo_files.gd")
+const World := preload("res://tests/support/card_rules_world.gd")
+const RegistryScript := preload("res://core/registry/registry.gd")
 
 const COMBOS: Array[String] = ["decoy_and_fire", "decoy_frost_cover"]
 
@@ -75,3 +77,53 @@ func test_four_players_leave_their_own() -> void:
 		check_equal(spawns.size(), 1, "player %d leaves one decoy" % seat)
 		if not spawns.is_empty():
 			check_equal(spawns[0][0], seat, "player %d: the decoy is theirs" % seat)
+
+
+## Casts `cards` once while an enemy past the aim shoots bolts at the wizard all along, and counts
+## the wizard's blocks and deflects by the decoy's card (its node), and the payloads fired.
+func _guarded(cards: Array[StringName]) -> Dictionary:
+	var registry: Node = own(RegistryScript.new()) as Node
+	registry.call("scan")
+	var shelf := own(World.Shelf.new()) as World.Shelf
+	shelf.base = registry
+	var staff := StaffBase.new()
+	staff.id = &"decoy_guard"
+	staff.slots = 16
+	staff.cast_delay = 0.0
+	staff.recharge = 0.0
+	var world := World.new(root, shelf, staff)
+	var wizard: Actor = world.add_wizard(cards)
+	world.add_enemy(&"E", Vector2(140.0, 0.0), World.HEALTH, [&"bolt"], Vector2.LEFT, true)
+	var got: Dictionary = {"blocked": 0, "deflected": 0, "fired": 0}
+	var me: int = wizard.caster_number()
+	world.bus.shot_blocked.connect(func(caster: int, _at: Vector2, tag: int) -> void:
+		if caster == me and SpellTag.node_of(tag) == 0:
+			got["blocked"] += 1)
+	world.bus.shot_deflected.connect(func(caster: int, _at: Vector2, tag: int) -> void:
+		if caster == me and SpellTag.node_of(tag) == 0:
+			got["deflected"] += 1)
+	world.press()
+	world.run(2.0, 2.0)
+	got["fired"] = world.spells.fires_made
+	world.free_all()
+	return got
+
+
+func test_a_shielded_decoy_blocks_shots_that_touch_it() -> void:
+	# Rules R4g: a shield on a decoy stops the other teams' shots at it, one charge each.
+	check_equal(_guarded([&"decoy"])["blocked"], 0, "a plain decoy blocks nothing")
+	var shield: ModifierBase = load("res://content/spells/modifiers/shield/shield.tres") as ModifierBase
+	var got: Dictionary = _guarded([&"shield", &"decoy"])
+	check_equal(got["blocked"], roundi(shield.behaviour_strength), "a shielded one blocks as many as its charges")
+
+
+func test_a_deflecting_decoy_turns_shots_away() -> void:
+	var got: Dictionary = _guarded([&"deflect", &"decoy"])
+	check(got["deflected"] > 1, "it turns every shot that reaches it (%d)" % got["deflected"])
+	check_equal(got["blocked"], 0, "and stops none")
+
+
+func test_on_block_fires_from_a_decoy() -> void:
+	var got: Dictionary = _guarded([&"on_block", &"shield", &"decoy", &"bolt"])
+	check(got["blocked"] > 0, "it blocks")
+	check_equal(got["fired"], got["blocked"], "and each block fires its payload")

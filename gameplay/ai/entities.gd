@@ -14,7 +14,10 @@ extends Node2D
 ## a `core/projectiles` target owned by its owner, so the owner's own shots pass it as they pass
 ## its body: on LAYER_PLAYER for a seated owner, LAYER_ENEMY for another), and enemies within
 ## DECOY_LURE of a seated owner's decoy chase it before any wizard (`lure`, asked by `ai.gd`). It
-## ends after DECOY_HITS hits or when its time runs out; where it ended is its end point.
+## ends after DECOY_HITS hits or when its time runs out; where it ended is its end point. A decoy
+## whose card has a shield or deflect guards itself (rules R4g): every step Spells turns away
+## (`Spells.guard_decoy`) the other teams' shots within DECOY_GUARD of its body, deflecting them
+## or stopping them while its shield charges last, as a swing's guard does; each is a block.
 ##
 ## A **familiar** is a small orb circling its caster (FAMILIAR_ORBIT px): the wizard, or for a
 ## familiar a trigger made the shot that fired it (a `core/projectiles` slot, followed while it
@@ -47,6 +50,7 @@ extends Node2D
 const EventsScript := preload("res://core/events/events.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
+const SpellsScript := preload("res://core/spells/spells.gd")
 
 const DECOY: StringName = &"decoy"
 const FAMILIAR: StringName = &"familiar"
@@ -70,6 +74,9 @@ const DECOY_HITS: int = 3
 ## for a wizard, see flow.gd).
 const DECOY_RADIUS: float = 8.0
 const DECOY_OFFSET: Vector2 = Vector2(0.0, -12.0)
+## How far from its body's centre a guarding decoy turns shots away: twice its hit circle, so a
+## shot is met a step before it would hit.
+const DECOY_GUARD: float = DECOY_RADIUS * 2.0
 ## An enemy this close to a decoy chases the decoy rather than any wizard.
 const DECOY_LURE: float = 240.0
 ## How far the copy has fallen apart (`shot_sprite.gdshader`'s dissolve: its pixels in its player's
@@ -107,6 +114,8 @@ const DRAW_Z: int = 40
 ## otherwise the "Events" and "Projectiles" autoloads.
 var events: EventsScript = null
 var projectiles: ProjectileManagerScript = null
+## Spells, for a decoy's guard. Only tests set it; otherwise the "Spells" autoload.
+var spells: SpellsScript = null
 ## The actor table. Only tests set it; otherwise the projectile manager's, else the "Actors"
 ## autoload.
 var actors: ActorsScript = null
@@ -119,6 +128,9 @@ var _ramp: PackedInt32Array = PackedInt32Array()
 var _tag: PackedInt32Array = PackedInt32Array()
 var _left: PackedFloat32Array = PackedFloat32Array()
 var _hits: PackedInt32Array = PackedInt32Array()
+## A decoy's shield charges left, and 1 when it deflects (its guard, rules R4g).
+var _shield: PackedInt32Array = PackedInt32Array()
+var _deflect: PackedByteArray = PackedByteArray()
 var _cast_left: PackedFloat32Array = PackedFloat32Array()
 var _angle: PackedFloat32Array = PackedFloat32Array()
 var _position: PackedVector2Array = PackedVector2Array()
@@ -235,6 +247,8 @@ func _init() -> void:
 	_tag.resize(POOL_SIZE)
 	_left.resize(POOL_SIZE)
 	_hits.resize(POOL_SIZE)
+	_shield.resize(POOL_SIZE)
+	_deflect.resize(POOL_SIZE)
 	_cast_left.resize(POOL_SIZE)
 	_angle.resize(POOL_SIZE)
 	_position.resize(POOL_SIZE)
@@ -247,6 +261,8 @@ func _ready() -> void:
 		events = get_node_or_null("/root/Events") as EventsScript
 	if projectiles == null:
 		projectiles = get_node_or_null("/root/Projectiles") as ProjectileManagerScript
+	if spells == null:
+		spells = get_node_or_null("/root/Spells") as SpellsScript
 	if events == null:
 		push_warning("Entities: the Events autoload is missing, so no decoy or familiar is ever made.")
 		return
@@ -276,6 +292,8 @@ func step(delta: float) -> void:
 			continue
 		if _kind[row] == FAMILIAR:
 			_step_familiar(row, delta)
+		elif (_shield[row] > 0 or _deflect[row] != 0) and spells != null:
+			_shield[row] = spells.guard_decoy(_owner[row], _tag[row], _position[row] + DECOY_OFFSET, DECOY_GUARD, _shield[row])
 	queue_redraw()
 	_write_familiars()
 
@@ -373,6 +391,8 @@ func _on_spawn_requested(caster: int, kind: StringName, at: Vector2, seconds: fl
 	_tag[row] = tag
 	_left[row] = seconds if seconds > 0.0 else INF
 	_hits[row] = DECOY_HITS
+	_shield[row] = spells.decoy_shield(tag) if kind == DECOY and spells != null else 0
+	_deflect[row] = 1 if kind == DECOY and spells != null and spells.decoy_deflects(tag) else 0
 	_cast_left[row] = FAMILIAR_FIRST
 	_angle[row] = 0.0
 	_position[row] = at

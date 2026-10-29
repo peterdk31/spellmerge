@@ -86,15 +86,15 @@ Since R3 the live matrix is printed by `tests/core/test_card_rules.gd` (✓ work
 
 | | Bolt | Rune | Orbit | Beam | Dash | Telep | Hook | Swap | Wall | Rain | Fiss | Decoy | Famil | Swing |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| on hit | ✓ | ✓ | ✓ | ✓ | W | W | ✓ | ✓ | ✓ | W | ✓ | W | W | ✓ |
+| on hit | ✓ | ✓ | ✓ | ✓ | W | W | ✓ | ✓ | ✓ | ✓ | ✓ | W | W | ✓ |
 | on expire | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | timer | ✓ | ✓ | ✓ | W | W | W | ✓ | ✓ | ✓ | W | W | W | W | W |
-| on block | s | s | s | s | s | s | s | s | s | W | s | W | W | s |
-| on kill | ✓ | ✓ | ✓ | ✓ | b | b | ✓ | ✓ | ✓ | b | ✓ | b | b | ✓ |
+| on block | s | s | s | s | s | s | s | s | s | W | s | s | W | s |
+| on kill | ✓ | ✓ | ✓ | ✓ | b | b | ✓ | ✓ | ✓ | ✓ | ✓ | b | b | ✓ |
 | on cast | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | on wall | ✓ | W | W | ✓ | W | W | ✓ | ✓ | W | W | ✓ | W | W | W |
 | on hurt | ✓ | ✓ | ✓ | W | W | W | ✓ | ✓ | ✓ | W | W | W | W | W |
-| on reaction | ✓ | ✓ | ✓ | ✓ | b | b | ✓ | ✓ | ✓ | b | ✓ | b | b | ✓ |
+| on reaction | ✓ | ✓ | ✓ | ✓ | b | b | ✓ | ✓ | ✓ | ✓ | ✓ | b | b | ✓ |
 
 The melee carriers (swing, slam) arrived on main after the audit: R2 and R3 cover them like the rest.
 
@@ -151,6 +151,7 @@ The owner re-decides these under the new rule; each "yes, it should work" become
 
 - **Decided before, now in question:** mirror only on carriers that "have a back" (DECISIONS); a hold carrier does not echo (silent); a beam has no timer (contradicts the timer-for-hold decision); relay shots only, not on chain children or payloads; hold does nothing on rain; recoil skipped on dash and teleport; a beam's chain jump is a beam that pierces nothing; a hook with pierce fires `on expire` twice ("accepted for now"); a returning shot stops homing; a payload with no live shot is cast by its point (a payload dash or hook does nothing); **recoil pushes past 8 at once are dropped** (`mover.gd` `MAX_RECOILS`: a cap missed by #450, fix under rule 5 without a decision); hit-work starvation skipping shield blocks (defer, not skip). **Editing a staff or switching off a hold drops all its waiting launches** (`_release_hold` calls `_drop_pending` first): payload fires of carriers without hold that only wait for the per-step pacing (`FIRE_SHOTS_PER_STEP`) are lost too, against rule 5 (found in R1f, 2026-10-29).
 - **Cells to decide (W or ✓):** travel behaviours on orbit, rune, wall (growth on a rune grows the rune; linger and spiral on an orbit?); ghost, magnet, shield, relay on beams and fissures; **dash and teleport hitting what they pass** (makes `heavy · dash` the shoulder charge the card table promises, and chain, siphon, possess, relay on a dash); triggers on rain, decoy, familiar; mirror on any aimed carrier; one shield rule for every carrier that moves its caster.
+- **R4g, bodies and mirror (done, owner decisions 2026-10-29):** a rain strikes every body within `RAIN_SPLASH` of where it lands with its own hit and cards (infusions, heavy, chain, siphon, possess, on hit, on kill, on reaction), then drops its payload. A familiar hands its infusions and hit cards to every carrier it casts (compiled in, costs included; wasted when nothing it casts takes them on). A decoy with a shield stops the other teams' shots that reach it, one charge each; with deflect it turns them; each is a block (`on block`). Mirror is one rule: the carrier fired again with its aim reversed, on every carrier but dash and teleport (wasted: "a move and its mirror cancel"); the allow-list in `_fire_spell` and the MIRROR rows of `behaviour_waste` are gone but for the moves. Left for the owner: a rune, decoy or familiar is made at the caster, so its mirror lands on the same spot; two hook pulls on the wizard replace each other (the mover's rule), they do not add.
 
 ## Notes for the sessions
 

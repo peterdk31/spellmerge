@@ -109,6 +109,7 @@ func _init(root: Node, shelf: Shelf, staff: StaffBase) -> void:
 	entities = EntitiesScript.new()
 	entities.events = bus
 	entities.projectiles = projectiles
+	entities.spells = spells
 	entities.actors = table
 	_root.add_child(entities)
 	entities.set_physics_process(false)

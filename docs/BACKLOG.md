@@ -170,4 +170,7 @@ Weak spots found in the architecture review of 2026-10-20 (docs/ARCHITECTURE.md)
 
 ## Ideas from the community
 
+- **Downed wizard shrinks into its hat (#417, p3, idea).** Moved off the queue on 2026-10-29: wizards are floating staffs now (living staffs H3), with no hat, and the downed look (lying flat, eyes shut) exists. If the wizard's hat gets a role in the story (the intro, the final boss), a hat gag could return then.
+- **Relic idea: The Nuke (#416, p3, idea).** For M3, when relics arrive: no mana regeneration, every cast spends all current mana, a full refill every X seconds. Open: how a cast scales with the mana spent, and the refill interval.
+
 - **Summonable pet that draws enemy fire (#208, p3, idea).** Kept on the backlog on 2026-10-23, not scheduled; deferred until M3's design is written (reasoning in `docs/DECISIONS.md`). Prefer a spell route (a "familiar" form or modifier) over a pet system; decide in M3 (relics, run rewards) and M5 (unlock). Needs: an enemy targeting rule in `gameplay/ai` that can prefer a decoy, and health for a shot-like target in `gameplay/combat`.

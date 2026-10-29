@@ -2,6 +2,10 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-29: Screen shake setting (melee I6)
+
+- **The switch lives on the Settings page and talks to feel by an event.** Areas only talk through `core/` events, so the pause menu sends `screen_shake_changed(enabled)` and feel sets `shake_enabled`; the menu never touches `Feel`. The saved choice is read when the menu is bound (the Hud loads after Feel) and sent only when it is off, since on is feel's default. Settings go in a `settings` section of the same `SaveFile`; only flags make a save "not new", so the intro is unaffected.
+
 ## 2026-10-29: Staff codes in the radial builder
 
 - **X copies, A pastes.** The shoulders are the staffs and the paging, RT/LT/Y/B are taken, and the d-pad's sides flip the kind; X (`alternate`) and A (`accept`) were free in this builder. A paste replaces the whole staff, so it is the plain "confirm" button; it is also refused with a result line when the code is bad, and the player still refuses cards it does not own.

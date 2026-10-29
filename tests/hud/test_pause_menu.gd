@@ -37,6 +37,7 @@ func _initialize() -> void:
 	_test_the_settings_page()
 	_test_the_fullscreen_switch()
 	_test_the_effect_slots_slider()
+	_test_the_screen_shake_switch()
 	_test_the_sandbox_switches_the_builder()
 	_test_the_sandbox_switches_the_reload()
 	_test_b_opens_the_builder_in_play_only()
@@ -57,7 +58,7 @@ func _check(condition: bool, message: String) -> void:
 		_failures.append(message)
 
 
-func _setup(count: int, sandbox: bool = false) -> void:
+func _setup(count: int, sandbox: bool = false, save: SaveFile = null) -> void:
 	_teardown()
 	_bus = EventsScript.new()
 	_input = InputManagerScript.new()
@@ -74,6 +75,8 @@ func _setup(count: int, sandbox: bool = false) -> void:
 	_hud.events = _bus
 	_hud.ui_focus = _focus
 	_hud.input = _input
+	# Tests never touch the real save: an empty one of their own.
+	_hud.save = save if save != null else SaveFile.new(SAVE_PATH)
 	root.add_child(_hud)
 	for index in count:
 		_bus.player_joined.emit(index)
@@ -246,11 +249,42 @@ func _test_the_settings_page() -> void:
 	_tap(0, &"pause")
 	_frame()
 	_press(0, "Settings")
-	_check(_names() == ["Fullscreen", "EffectSlots", "SettingsBack"], "Settings, got %s" % [_names()])
+	_check(_names() == ["Fullscreen", "EffectSlots", "ScreenShake", "SettingsBack"], "Settings, got %s" % [_names()])
 	_check(_menu().button("FriendlyFire") == null and _menu().button("EnemyFire") == null, "no fire settings")
 	_tap(0, &"back")
 	_frame()
 	_check(_menu().page == PauseMenuScript.Page.MAIN, "B goes up to the main page")
+
+
+const SAVE_PATH: String = "user://test_pause_menu_save.cfg"
+
+
+## Screen shake is on by default, flips on accept, tells feel, and is kept in the save: a menu
+## bound to the same save later starts with it off and tells feel.
+func _test_the_screen_shake_switch() -> void:
+	DirAccess.remove_absolute(SAVE_PATH)
+	_setup(1, false, SaveFile.new(SAVE_PATH))
+	var sent: Array[bool] = []
+	_bus.screen_shake_changed.connect(func(enabled: bool) -> void: sent.append(enabled))
+	_tap(0, &"pause")
+	_frame()
+	_press(0, "Settings")
+	_check(_menu().button("ScreenShake").text.ends_with("Screen shake: On"), "shake is on by default")
+	_press(0, "ScreenShake")
+	_check(_menu().button("ScreenShake").text.ends_with("Screen shake: Off"), "it flips off")
+	_check(sent == [false], "and feel is told, got %s" % [sent])
+	_check(SaveFile.new(SAVE_PATH).get_setting(&"screen_shake", true) == false, "the save remembers it")
+	_press(0, "ScreenShake")
+	_check(sent == [false, true] and SaveFile.new(SAVE_PATH).get_setting(&"screen_shake", false) == true, "and flips back on, saved")
+	_press(0, "ScreenShake")
+	_setup(1, false, SaveFile.new(SAVE_PATH))
+	var late: Array[bool] = []
+	_bus.screen_shake_changed.connect(func(enabled: bool) -> void: late.append(enabled))
+	_check(not _menu().screen_shake, "a later menu starts with it off")
+	_menu().call("_load_shake")
+	_check(late == [false], "and tells feel when it loads it")
+	_teardown()
+	DirAccess.remove_absolute(SAVE_PATH)
 
 
 ## A stand-in for `core/display` (headless has no window to fill).
@@ -325,7 +359,7 @@ func _test_the_effect_slots_slider() -> void:
 	_focus.focus(0, row)
 	_tap(0, &"move_down")
 	_frame()
-	_check(_focus.focused(0) == _menu().button("SettingsBack"), "down leaves the slider")
+	_check(_focus.focused(0) == _menu().button("ScreenShake"), "down leaves the slider")
 	_check(_menu().page == PauseMenuScript.Page.SETTINGS, "all on the Settings page")
 
 

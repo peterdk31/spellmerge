@@ -88,6 +88,8 @@ var events: EventsScript = null
 var ui_focus: UIFocusScript = null
 var input: InputManagerScript = null
 var spells: SpellsScript = null
+## The save that keeps the menu's settings; the default one (`user://save.cfg`) when null.
+var save: SaveFile = null
 
 var _panels: Array[PlayerPanelScript] = []
 var _builders: Array[BuilderScript] = []
@@ -208,6 +210,7 @@ func _ready() -> void:
 		for player in PLAYER_COUNT:
 			_seen_pause[player] = input.get_press_count(player, PAUSE_ACTION)
 			_seen_back[player] = input.get_press_count(player, BUILDER_ACTION)
+	_pause_menu.save = save
 	_pause_menu.bind(events, ui_focus)
 	for builder in _builders:
 		builder.bind(events, ui_focus, spells, input)

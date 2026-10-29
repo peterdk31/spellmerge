@@ -20,7 +20,10 @@ extends PanelContainer
 ##   Off again. "Effect slots" is a slider (the owner, 2026-10-27): left and right move it a step
 ##   (`EffectSlots` in core/settings: its STEP, from MIN to MAX), `accept` a step up (from the
 ##   top back to the bottom), up and down leave it; each move sends `effect_slots_changed`, which
-##   feel applies. It is kept in memory until core/save exists. (The Gameplay page, with
+##   feel applies. It is kept in memory until core/save exists. "Screen shake: On" (or Off), the
+##   last switch above Back (melee I6): `accept` flips it, it sends `screen_shake_changed`, which
+##   feel applies, and the choice is saved (`SaveFile` setting `screen_shake`) and read again
+##   when the menu is bound, so it holds between plays. (The Gameplay page, with
 ##   "Friendly fire" and "Enemy fire", went in actors G3c: every spell hits everything, always.)
 ##
 ## Only the player who opened it works it, through `core/ui_focus`: up/left and down/right move,
@@ -60,6 +63,9 @@ const PUT_TEXT: String = "Full slot: %s"
 const RELOAD_TEXT: String = "Reload: %s"
 const FULLSCREEN_TEXT: String = "Fullscreen: %s"
 const EFFECT_SLOTS_TEXT: String = "Effect slots: %d"
+const SHAKE_TEXT: String = "Screen shake: %s"
+## The saved setting that holds the choice.
+const SHAKE_SETTING: StringName = &"screen_shake"
 ## The slider bar beside the words: this wide, at the right of the row.
 const SLIDER_WIDTH: float = 64.0
 
@@ -83,6 +89,10 @@ var put_push: bool = true
 var reload_on_button: bool = true
 ## The "Effect slots" setting (see the top).
 var effect_slots: int = EffectSlots.DEFAULT
+## The "Screen shake" setting (see the top): on by default.
+var screen_shake: bool = true
+## The save that keeps settings; made when the menu is bound, unless a test set its own first.
+var save: SaveFile = null
 ## The window service (`core/display`, the `Display` autoload); tests may set their own first.
 var display: Node = null
 
@@ -101,6 +111,7 @@ var display: Node = null
 @onready var _fullscreen: Button = _add(Page.SETTINGS, "Fullscreen", FULLSCREEN_TEXT % "Off")
 @onready var _effects: Button = _add(Page.SETTINGS, "EffectSlots", EFFECT_SLOTS_TEXT % EffectSlots.DEFAULT)
 @onready var _effects_bar: HSlider = _add_slider(_effects)
+@onready var _shake: Button = _add(Page.SETTINGS, "ScreenShake", SHAKE_TEXT % "On")
 @onready var _settings_back: Button = _add(Page.SETTINGS, "SettingsBack", "Back")
 
 
@@ -117,6 +128,9 @@ func _ready() -> void:
 func bind(events: EventsScript, ui_focus: UIFocusScript) -> void:
 	_events = events
 	_ui_focus = ui_focus
+	if save == null:
+		save = SaveFile.new()
+	_load_shake()
 	if _events != null:
 		_events.sandbox_changed.connect(_on_sandbox_changed)
 	if _ui_focus != null:
@@ -330,6 +344,8 @@ func _on_activated(player: int, control: Control) -> void:
 		_show_fullscreen()
 	elif control == _effects:
 		_set_effect_slots(EffectSlots.MIN if effect_slots >= EffectSlots.MAX else effect_slots + EffectSlots.STEP)
+	elif control == _shake:
+		_set_shake(not screen_shake)
 	elif control == _sandbox_back or control == _settings_back:
 		_go(Page.MAIN)
 
@@ -343,6 +359,25 @@ func _on_cancelled(player: int) -> void:
 			close_menu()
 		_:
 			_go(Page.MAIN)
+
+
+## Read the saved choice and show it; feel is told only when it is off (on is feel's own default).
+func _load_shake() -> void:
+	screen_shake = bool(save.get_setting(SHAKE_SETTING, true))
+	_shake.set_meta(BASE_TEXT_META, SHAKE_TEXT % ("On" if screen_shake else "Off"))
+	_mark_focus()
+	if not screen_shake and _events != null:
+		_events.screen_shake_changed.emit(false)
+
+
+## Flip the switch: show it, save it and tell feel.
+func _set_shake(on: bool) -> void:
+	screen_shake = on
+	_shake.set_meta(BASE_TEXT_META, SHAKE_TEXT % ("On" if on else "Off"))
+	_mark_focus()
+	save.set_setting(SHAKE_SETTING, on)
+	if _events != null:
+		_events.screen_shake_changed.emit(on)
 
 
 ## Write the fullscreen switch's word from the window itself.

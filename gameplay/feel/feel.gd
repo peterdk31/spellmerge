@@ -3,7 +3,7 @@ extends Node
 ## `damage_dealt`, `enemy_died` and `player_downed`. It never changes damage,
 ## health or who wins, and it sends no events.
 ##
-##     Feel.shake_enabled = false     # the setting: no screen shake (kept in memory until core/save exists)
+##     Feel.shake_enabled = false     # the setting: no screen shake (the pause menu's "Screen shake" switch, saved by core/save)
 ##     Feel.preset = load("res://gameplay/feel/presets/punchy.tres")
 ##
 ## On a hit it does four things, all the same for every player:
@@ -451,6 +451,7 @@ func _ready() -> void:
 	events.discharge_arc.connect(_on_discharge_arc)
 	events.status_applied.connect(_on_status_applied)
 	events.effect_slots_changed.connect(_on_effect_slots_changed)
+	events.screen_shake_changed.connect(_on_screen_shake_changed)
 	events.caster_move_finished.connect(_on_caster_move_finished)
 	events.projectile_expired.connect(_on_projectile_expired)
 	if combat == null:
@@ -1146,6 +1147,10 @@ func set_effect_slots(slots: int) -> int:
 
 func _on_effect_slots_changed(slots: int) -> void:
 	set_effect_slots(slots)
+
+
+func _on_screen_shake_changed(enabled: bool) -> void:
+	shake_enabled = enabled
 
 
 ## Show an effect of `kind` (KIND_BURST to KIND_CAST) at `at`, aimed along `dir`, in the ramp of

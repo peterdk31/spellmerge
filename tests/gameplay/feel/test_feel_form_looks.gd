@@ -302,6 +302,14 @@ func test_a_flare_of_zero_leaves_the_beam_as_before() -> void:
 	check_equal(_swell(), 1.0, "at rest at the start")
 
 
+func test_the_screen_shake_setting_follows_the_event() -> void:
+	check(feel.shake_enabled, "on by default")
+	bus.screen_shake_changed.emit(false)
+	check(not feel.shake_enabled, "the event turns it off")
+	bus.screen_shake_changed.emit(true)
+	check(feel.shake_enabled, "and on again")
+
+
 func test_the_effect_slots_setting_sizes_the_batch() -> void:
 	check_equal(feel.effect_slots, EffectSlots.DEFAULT, "the default at the start")
 	_impact(0, &"bolt")

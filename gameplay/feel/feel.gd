@@ -78,9 +78,11 @@ const FORM_SLOTS: int = FORMS_PER_PLAYER * 5
 const ENEMY_FORMS: int = 4
 ## Beams and rings draw above the room, under the shots (50) and the flashes (20).
 const FORM_Z: int = 18
-## Live beams drawn at once (core/spells keeps at most as many), and the most points of each
-## one's path: a homing beam bends from target to target, so it is drawn along its path's points
-## (BEAM_POINTS in `shot_beam.gdshader`).
+## Live beams made at once (more are made when core/spells has more: no beam limit, owner
+## 2026-10-29), and the most points of each one's drawn path (BEAM_POINTS in `shot_beam.gdshader`):
+## a homing beam bends from target to target and a bouncing one turns at walls, so it is drawn
+## along its path's points; a path with more is thinned evenly for its look (`_draw_live_beams`;
+## its hits and turns are the runtime's, whole).
 const LIVE_BEAM_POINTS: int = 80
 const LIVE_BEAMS: int = 64
 ## How wide a beam that is shown whole (a short beam) is drawn: its core, rim, flares and glow.
@@ -1468,14 +1470,20 @@ func _step_forms(real_delta: float) -> void:
 func _draw_live_beams() -> void:
 	var count: int = 0
 	if spells != null and spells.has_method("beam_slots"):
-		count = mini(int(spells.call("beam_slots")), LIVE_BEAMS)
-	for i in LIVE_BEAMS:
+		count = int(spells.call("beam_slots"))
+	while _live_beams.size() < count:
+		_live_beams.append(_make_beam())
+		_live_paths.append(_make_beam_path())
+	for i in _live_beams.size():
 		var node: MeshInstance2D = _live_beams[i]
 		if i >= count or not bool(spells.call("beam_on", i)):
 			if node.visible:
 				node.visible = false
 			continue
-		var points: int = mini(int(spells.call("beam_point_count", i)), LIVE_BEAM_POINTS)
+		var all: int = int(spells.call("beam_point_count", i))
+		var points: int = mini(all, LIVE_BEAM_POINTS)
+		# Every `every`-th point of a longer path (and its last), so the whole beam is drawn.
+		var every: float = float(all - 1) / float(points - 1) if points > 1 and all > points else 1.0
 		var reach: float = spells.call("beam_reach", i)
 		var origin: Vector2 = spells.call("beam_point", i, 0) if points > 0 else Vector2.INF
 		if reach <= 0.0 or points < 2 or not origin.is_finite():
@@ -1491,7 +1499,7 @@ func _draw_live_beams() -> void:
 		var end_at: Vector2 = origin
 		path[0] = Vector3(origin.x, origin.y, 0.0)
 		for n in range(1, points):
-			var point: Vector2 = spells.call("beam_point", i, n)
+			var point: Vector2 = spells.call("beam_point", i, mini(roundi(n * every), all - 1))
 			var piece: float = prev.distance_to(point)
 			if walked + piece >= reach:
 				end_at = prev.move_toward(point, reach - walked)

@@ -17,7 +17,7 @@ const ActorSeats := preload("res://tests/support/actor_seats.gd")
 
 const DT: float = 1.0 / 60.0
 const TRIGGERS: Array[StringName] = [&"on_hit", &"on_expire", &"timer"]
-## Event, interval, max_fires and complexity from the M2 design.
+## Event, interval and complexity from the M2 design.
 const EVENTS: Dictionary = {&"on_hit": TriggerBase.Event.HIT, &"on_expire": TriggerBase.Event.EXPIRE, &"timer": TriggerBase.Event.TIMER}
 const COMPLEXITY: Dictionary = {&"on_hit": 1, &"on_expire": 1, &"timer": 2}
 
@@ -114,12 +114,10 @@ func test_every_trigger_loads_and_matches_its_folder() -> void:
 		check_equal(trigger.range_problems().size(), 0, "%s: %s" % [id, ", ".join(trigger.range_problems())])
 
 
-func test_the_timer_waits_half_a_second_and_fires_at_most_four_times() -> void:
+func test_the_timer_waits_half_a_second() -> void:
 	var timer: TriggerBase = _trigger(&"timer")
 	check_equal(timer.interval, 0.5, "the timer fires every half second")
-	check_equal(timer.max_fires, 4, "and at most four times (its own number; there is no build limit)")
-	check_equal(_trigger(&"on_hit").max_fires, 1, "on hit fires once per shot")
-	check_equal(_trigger(&"on_expire").max_fires, 1, "on expire fires once per shot")
+	check(not &"max_fires" in timer, "no trigger counts its fires (owner, 2026-10-29)")
 
 
 func test_the_registry_finds_the_three_triggers_and_the_validator_passes_them() -> void:
@@ -147,7 +145,6 @@ func test_a_trigger_compiles_into_the_spell_numbers() -> void:
 		var trigger: TriggerBase = _trigger(id)
 		check_equal(spell.trigger_event, trigger.event, "%s: the event is compiled" % id)
 		check_equal(spell.trigger_interval, trigger.interval, "%s: the interval is compiled" % id)
-		check_equal(spell.trigger_max_fires, trigger.max_fires, "%s: max_fires is compiled" % id)
 		check(spell.payload != null and spell.payload.spells[0].form_id == &"nova", "%s: the payload is the nova" % id)
 
 
@@ -181,7 +178,7 @@ func test_on_hit_does_not_fire_without_a_hit() -> void:
 	check_equal(_born(_spells.current_tag(0, 0, 1)), 0, "a bolt that hits nothing fires nothing")
 
 
-func test_on_hit_fires_once_per_shot_even_through_a_pierce() -> void:
+func test_on_hit_fires_at_every_hit_of_a_pierce() -> void:
 	_target(Vector2(60.0, 0.0))
 	_target(Vector2(110.0, 0.0))
 	_target(Vector2(160.0, 0.0))
@@ -192,7 +189,7 @@ func test_on_hit_fires_once_per_shot_even_through_a_pierce() -> void:
 		if SpellTag.node_of(hit[3] as int) == 0:
 			from_pierce += 1
 	check(from_pierce >= 2, "the pierce bolt hit more than one target")
-	check_equal(_born(_spells.current_tag(0, 0, 1)), 1, "but fired its held spell once (max_fires 1)")
+	check_equal(_born(_spells.current_tag(0, 0, 1)), from_pierce, "and fired its held spell at every hit")
 
 
 # --- On expire --------------------------------------------------------------
@@ -232,7 +229,7 @@ func test_on_expire_does_not_fire_when_the_shot_hit_something() -> void:
 
 # --- Timer ------------------------------------------------------------------
 
-func test_a_timer_fires_every_half_second_four_times_and_no_more() -> void:
+func test_a_timer_fires_every_half_second_as_long_as_its_shot_lives() -> void:
 	_build_and_cast(0, 0, {"form": &"rune", "trigger": &"timer", "held": {"form": &"bolt"}})
 	var held_tag: int = _spells.current_tag(0, 0, 1)
 	_tick(29)
@@ -244,7 +241,7 @@ func test_a_timer_fires_every_half_second_four_times_and_no_more() -> void:
 	_tick(60)
 	check_equal(_born(held_tag), 4, "the fourth at 2.0 s")
 	_tick(300)
-	check_equal(_born(held_tag), 4, "and never a fifth, though the rune lives on")
+	check_equal(_born(held_tag), 14, "and on, every half second, while the rune lives (7 s)")
 
 
 func test_a_timer_fires_from_where_its_shot_is() -> void:
@@ -285,7 +282,7 @@ func test_a_spell_three_levels_deep_fires_all_the_way_down() -> void:
 	var depth_2: int = _born(_spells.current_tag(0, 0, 2))
 	check_equal(depth_1, 8, "the nova of depth 1 was born")
 	check(depth_2 >= 1, "and at least one bolt of depth 2 after it: %d" % depth_2)
-	check(depth_2 <= 8, "no more than one per nova shot (max_fires 1): %d" % depth_2)
+	check(depth_2 <= 8, "no more than one per nova shot (each ends on its hit): %d" % depth_2)
 	check_equal(SpellTag.node_of(_spells.current_tag(0, 0, 2)), 2, "the last level is depth 2")
 
 
@@ -313,22 +310,29 @@ func test_the_three_triggers_mix_at_three_levels() -> void:
 	_mgr.remove_target(victim)
 	_tick(150)
 	check_equal(_born(_spells.current_tag(0, 0, 1)), 1, "the rune was dropped on the hit")
-	check_equal(_born(_spells.current_tag(0, 0, 2)), 4, "it threw four bolts in 2 s")
+	check_equal(_born(_spells.current_tag(0, 0, 2)), 5, "it threw a bolt every half second, five in the 2.5 s")
 
 
-func test_the_fire_cap_holds_with_the_real_triggers() -> void:
+func test_fires_past_a_steps_room_wait_for_the_next_step_with_the_real_triggers() -> void:
 	for n in 24:
 		_target(Vector2.from_angle(TAU * n / 24.0) * 40.0, 3.0)
 	var hold: Dictionary = {"form": &"nova", "modifiers": [&"split"], "trigger": &"on_hit", "held": {"form": &"bolt"}}
 	check_equal(_compile(hold).shots, 24, "the nova is 24 shots")
+	_spells.fire_shots_per_step = 32
 	_build_and_cast(0, 0, hold)
 	_build_and_cast(0, 1, hold)
-	_tick(40)
-	var fired: int = _born(_spells.current_tag(0, 0, 1)) + _born(_spells.current_tag(0, 1, 1))
-	check_equal(fired, SpellLimits.MAX_FIRES_PER_STEP, "the player fired the cap from 48 hits in one step")
-	check_equal(_spells.fires_dropped, 48 - SpellLimits.MAX_FIRES_PER_STEP, "the rest were dropped, not queued")
-	_tick(10)
-	check_equal(_born(_spells.current_tag(0, 0, 1)) + _born(_spells.current_tag(0, 1, 1)), fired, "nothing fired later")
+	var fired: int = 0
+	for _i in 40:
+		# The hits are in the manager's step; the runtime's step opens the next room.
+		_mgr.step(DT)
+		fired = _born(_spells.current_tag(0, 0, 1)) + _born(_spells.current_tag(0, 1, 1))
+		if fired > 0:
+			break
+		_spells.step(DT)
+	check_equal(fired, 32, "48 hits in one step: the step's room of 32 bolts fire at once")
+	check_equal(_spells.fires_waited, 16, "the other 16 wait")
+	_spells.step(DT)
+	check_equal(_born(_spells.current_tag(0, 0, 1)) + _born(_spells.current_tag(0, 1, 1)), 48, "and fire as the next step opens: none is dropped")
 
 
 func test_every_trigger_works_for_all_four_players_at_once() -> void:

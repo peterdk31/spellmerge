@@ -121,7 +121,6 @@ func _modifier(id: StringName, behaviour: ModifierBase.Behaviour, strength: floa
 func _trigger(id: StringName, event: TriggerBase.Event) -> TriggerBase:
 	var trigger := TriggerBase.new()
 	trigger.event = event
-	trigger.max_fires = 1
 	_put(trigger, id)
 	return trigger
 
@@ -502,8 +501,8 @@ func test_a_dash_in_a_payload_moves_the_shot_that_fired_it_not_the_wizard() -> v
 	_tick(60)
 	check_equal(_moves.size(), 0, "the wizard is not asked to move")
 	check(_mgr.is_alive(bolt), "the bolt still flies")
-	# One second at 300 px/s, plus the dash's 48 px.
-	check(absf(_mgr.get_position_of(bolt).x - (300.0 + 48.0)) < 6.0, "the bolt dashed 48 px: %s" % _mgr.get_position_of(bolt))
+	# One second at 300 px/s, plus 48 px for each of the timer's three fires (every 0.25 s).
+	check(absf(_mgr.get_position_of(bolt).x - (300.0 + 3.0 * 48.0)) < 6.0, "the bolt dashed 48 px three times: %s" % _mgr.get_position_of(bolt))
 
 
 func test_a_homing_dash_tells_the_wizard_how_to_turn_and_a_plain_one_does_not() -> void:

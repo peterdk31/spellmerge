@@ -87,7 +87,7 @@ func before_each() -> void:
 	_modifier(&"shield", ModifierBase.Behaviour.SHIELD, 2.0)
 	_modifier(&"blast", ModifierBase.Behaviour.BLAST, 30.0)
 	_trigger(&"on_expire", TriggerBase.Event.EXPIRE)
-	_trigger(&"on_hit", TriggerBase.Event.HIT).max_fires = 3
+	_trigger(&"on_hit", TriggerBase.Event.HIT)
 	var spark: FormBase = _form(&"spark", 100.0, 1.0)
 	spark.base_damage = 3
 
@@ -119,7 +119,6 @@ func _modifier(id: StringName, behaviour: ModifierBase.Behaviour, strength: floa
 func _trigger(id: StringName, event: TriggerBase.Event) -> TriggerBase:
 	var trigger := TriggerBase.new()
 	trigger.event = event
-	trigger.max_fires = 1
 	_put(trigger, id)
 	return trigger
 
@@ -393,12 +392,12 @@ func test_fissure_hits_everything_on_its_line() -> void:
 	check_equal(_hits.size(), 5, "all five on the line")
 
 
-func test_fissure_hits_at_most_its_pierce_cap() -> void:
+func test_fissure_hits_everything_on_its_line_however_many() -> void:
 	_build(0, [&"fissure"])
-	for n in SpellLimits.FISSURE_PIERCE + 4:
-		_target(Vector2(20.0 + n * 12.0, 0.0))
+	for n in 100:
+		_target(Vector2(20.0 + n * 1.5, 0.0))
 	_cast()
-	check_equal(_hits.size(), SpellLimits.FISSURE_PIERCE, "exactly the cap, not one more")
+	check_equal(_hits.size(), 100, "all of them, however many")
 
 
 func test_a_beam_with_no_pierce_hits_only_the_first() -> void:

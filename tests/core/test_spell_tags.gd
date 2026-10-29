@@ -58,7 +58,6 @@ func before_each() -> void:
 	_trigger(&"on_expire", 1, TriggerBase.Event.EXPIRE)
 	var timer: TriggerBase = _trigger(&"timer", 2, TriggerBase.Event.TIMER)
 	timer.interval = 0.5
-	timer.max_fires = 4
 
 
 func _put(component: SpellComponent, id: StringName, complexity: int) -> void:

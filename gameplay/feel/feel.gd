@@ -255,6 +255,8 @@ var rest_left: float = 0.0
 ## The time (`_clock`) before which a plain hit does not hold this actor again, by actor id, so a
 ## stream of hits on one body cannot keep it held for ever.
 var _rest_until: PackedFloat32Array = PackedFloat32Array()
+## The body (instance id) each rest belongs to, so a reused actor id starts with no rest.
+var _rest_body: PackedInt64Array = PackedInt64Array()
 ## Current offset applied to the camera.
 var shake_offset: Vector2 = Vector2.ZERO
 
@@ -383,6 +385,8 @@ var _impact_look_cache: Dictionary = {}
 
 func _ready() -> void:
 	_rng.seed = 1
+	_rest_until.resize(ActorsScript.ACTORS)
+	_rest_body.resize(ActorsScript.ACTORS)
 	if events == null:
 		events = get_node_or_null("/root/Events") as EventsScript
 	if registry == null:
@@ -695,7 +699,7 @@ func _on_damage_dealt(caster: int, target: Node, amount: int, position: Vector2)
 		own = _kind_own
 	_kind_target = 0
 	_hold_bodies(caster, _actor_of(target), stop, false)
-	_juice(position, stop, false, shake, sound, aim, tint, size, at, colours)
+	_juice(position, false, shake, sound, aim, tint, size, at, colours)
 	if own:
 		# Their own spell: a ring in its own colour on this frame, so it is never taken for an enemy's hit.
 		_show_ring(position, preset.self_hit_color, preset.self_hit_seconds, preset.self_hit_size)
@@ -768,7 +772,9 @@ func _on_reaction_triggered(caster: int, reaction_id: StringName, position: Vect
 	if _clock - (_reaction_heard.get(reaction_id, -REACTION_REPEAT) as float) < REACTION_REPEAT:
 		return
 	_reaction_heard[reaction_id] = _clock
-	# The hit-stop is longer than a death's and, like a death's, ignores the rest after a stop.
+	# The hit-stop is longer than a death's and, like a death's, ignores the rest after a stop. The
+	# reaction's own hit (kind `reaction`) holds its target by the plain rule; a hold only ever
+	# lengthens, so whichever of the two comes first, the caster is held for the longer one.
 	_hold_bodies(caster, ActorsScript.NONE, preset.reaction_stop_seconds * power, true)
 	if shake_enabled:
 		_refresh_camera()
@@ -1348,7 +1354,7 @@ func _on_enemy_died(killer: int, enemy: Node, position: Vector2) -> void:
 	_hold_bodies(killer, ActorsScript.NONE, preset.death_stop_seconds, true)
 	if _is_boss(enemy):
 		_stop_game(preset.death_stop_seconds)
-	_juice(position, preset.death_stop_seconds, true, preset.death_shake, preset.death_sound)
+	_juice(position, true, preset.death_shake, preset.death_sound)
 
 
 ## The look a carrier's card brings (`FormBase.cast_look` or `impact_look`), empty when the card
@@ -1608,7 +1614,7 @@ func _show_possession(caster: int, actor: int, kind: int) -> bool:
 func _on_player_downed(player: int) -> void:
 	# The event names no position, so a downed wizard gets stop, shake and sound only...
 	_stop_game(preset.death_stop_seconds)
-	_juice(Vector2.INF, preset.death_stop_seconds, true, preset.downed_shake, preset.downed_sound)
+	_juice(Vector2.INF, true, preset.downed_shake, preset.downed_sound)
 	# ...and, when their own (or a teammate's) spell did it, a note over them saying so: the
 	# seat's own body (its home actor, also while the seat drives another), in its light shade.
 	if combat == null or not combat.has_method("home_actor_of"):
@@ -1625,11 +1631,11 @@ func _on_player_downed(player: int) -> void:
 
 
 ## `strong` is a death or a downed wizard: it gets the bigger puff. The stop of its kind is
-## already applied by the callers (`_hold_bodies`, `_stop_game`); `_stop` is unused.
+## already applied by the callers (`_hold_bodies`, `_stop_game`); this is looks and sound only.
 ## A plain hit with an `aim` (the way the shot flew) sprays along it, `size` times as big,
 ## from `at`, in the ramp of `tint` (white: `player`'s colours); without one it is a puff at
 ## `position`.
-func _juice(position: Vector2, _stop: float, strong: bool, shake: float, sound: StringName, aim: Vector2 = Vector2.ZERO, tint: Color = Color.WHITE, size: float = 1.0, at: Vector2 = Vector2.INF, player: int = 0) -> void:
+func _juice(position: Vector2, strong: bool, shake: float, sound: StringName, aim: Vector2 = Vector2.ZERO, tint: Color = Color.WHITE, size: float = 1.0, at: Vector2 = Vector2.INF, player: int = 0) -> void:
 	if shake_enabled:
 		_refresh_camera()
 		_trauma = minf(_trauma + shake, 1.0)
@@ -1712,8 +1718,12 @@ func _hold_bodies(attacker: int, target: int, seconds: float, strong: bool) -> v
 func _hold_actor(table: ActorsScript, id: int, seconds: float, strong: bool) -> bool:
 	if not table.is_open(id):
 		return false
-	if _rest_until.size() < ActorsScript.ACTORS:
-		_rest_until.resize(ActorsScript.ACTORS)
+	# An id handed to a new body does not inherit the last body's rest.
+	var node: Node = table.node_of(id)
+	var body: int = node.get_instance_id() if node != null else 0
+	if _rest_body[id] != body:
+		_rest_body[id] = body
+		_rest_until[id] = 0.0
 	if not strong and _clock < _rest_until[id]:
 		return false
 	_rest_until[id] = _clock + seconds + preset.hit_stop_rest

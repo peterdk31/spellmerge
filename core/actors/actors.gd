@@ -51,11 +51,11 @@ var _seat_actor: PackedInt32Array = PackedInt32Array()
 ## Per actor: the seat whose own body it is, or NONE; per seat: its own body, or NONE.
 var _home_seat: PackedInt32Array = PackedInt32Array()
 var _seat_home: PackedInt32Array = PackedInt32Array()
-## No id below this is free: where `open` starts looking.
 ## Seconds each actor is still held by a local stop (hit-stop in co-op, melee I7), and how many
 ## actors are held now, so a step with none held costs one comparison.
 var _held: PackedFloat32Array = PackedFloat32Array()
 var held_count: int = 0
+## No id below this is free: where `open` starts looking.
 var _lowest_free: int = 0
 var _count: int = 0
 

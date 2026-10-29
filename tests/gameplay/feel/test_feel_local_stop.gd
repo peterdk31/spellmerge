@@ -103,6 +103,28 @@ func test_a_kill_holds_its_killer_not_the_game() -> void:
 	check_equal(_feel.stop_left, 0.0, "the game runs on")
 
 
+func test_a_reaction_holds_its_caster_not_the_game() -> void:
+	var caster: Actor = _body(Vector2.ZERO)
+	var other: Actor = _body(Vector2(100.0, 0.0))
+	_world.bus.reaction_triggered.emit(caster.id, &"steam", Vector2.ZERO)
+	var power: float = _feel.preset.reaction_power.get(&"steam", 1.0) as float
+	check(_world.table.held_left(caster.id) >= _feel.preset.reaction_stop_seconds * power - 0.0001, "the caster is held for the reaction")
+	check_equal(_world.table.held_left(other.id), 0.0, "nobody else is")
+	check_equal(_feel.stop_left, 0.0, "the game runs on")
+
+
+func test_a_reused_actor_id_starts_with_no_rest() -> void:
+	var first: Actor = _body(Vector2.ZERO)
+	var id: int = first.id
+	_world.bus.damage_dealt.emit(ActorsScript.NONE, first, 5, Vector2.ZERO)
+	check(_world.table.held_left(id) > 0.0, "a plain hit holds the body")
+	root.remove_child(first)
+	var second: Actor = _body(Vector2.ZERO)
+	check_equal(second.id, id, "the id came back")
+	_world.bus.damage_dealt.emit(ActorsScript.NONE, second, 5, Vector2.ZERO)
+	check(_world.table.held_left(id) > 0.0, "the new body's first plain hit holds it")
+
+
 func test_a_boss_kill_stops_the_game() -> void:
 	var boss: Actor = _body(Vector2.ZERO)
 	var data: EnemyBase = ImpData.duplicate() as EnemyBase

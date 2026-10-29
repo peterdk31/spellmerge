@@ -91,3 +91,35 @@ func test_a_gone_shot_cannot_be_frozen_and_a_new_one_starts_free() -> void:
 	var again: int = mgr.spawn(0, Vector2.ZERO, Vector2(80.0, 0.0), 5.0)
 	check_equal(mgr.freeze_left_of(again), 0.0, "a shot in a reused slot is not held")
 	check(not mgr.freeze_shot(again, 0.0), "a stop of no seconds is no stop")
+
+
+func test_a_frozen_shot_hits_nothing_until_it_thaws() -> void:
+	var target: Node2D = own(Node2D.new()) as Node2D
+	root.add_child(target)
+	target.position = Vector2(2.0, 0.0)
+	mgr.add_target(target, 6.0, ManagerScript.LAYER_ENEMY)
+	var hits: Array[int] = [0]
+	bus.projectile_hit.connect(func(_c: int, _t: Node, _p: Vector2, _tag: int) -> void: hits[0] += 1)
+	var slot: int = mgr.spawn(0, Vector2.ZERO, Vector2(160.0, 0.0), 5.0, 4.0, ManagerScript.LAYER_ENEMY)
+	mgr.freeze_shot(slot, 0.25)
+	_run(2)
+	check_equal(hits[0], 0, "a frozen shot touching a target hits nothing")
+	_run(2)
+	check_equal(hits[0], 1, "it hits once it thaws")
+
+
+func test_frozen_homing_returning_and_lingering_shots_neither_move_nor_expire() -> void:
+	var homing: int = mgr.spawn(0, Vector2.ZERO, Vector2(80.0, 0.0), 0.25)
+	mgr.set_homing(homing, 4.0, 200.0)
+	var back: int = mgr.spawn(0, Vector2(0.0, 50.0), Vector2(80.0, 0.0), 0.25)
+	mgr.set_return(back)
+	var linger: int = mgr.spawn(0, Vector2(0.0, 100.0), Vector2(80.0, 0.0), 0.25)
+	mgr.set_linger(linger, 1.0)
+	var starts: Array[Vector2] = [Vector2.ZERO, Vector2(0.0, 50.0), Vector2(0.0, 100.0)]
+	var slots: Array[int] = [homing, back, linger]
+	for slot in slots:
+		mgr.freeze_shot(slot, 0.5)
+	_run(3)
+	for i in 3:
+		check_equal(mgr.get_position_of(slots[i]), starts[i], "frozen shot %d has not moved" % i)
+	check_equal(expired, 0, "none has expired")

@@ -2,6 +2,12 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-29: Card rules R4b, a wasted card is checked too (owner)
+
+- **A W cell is played with the card forced on** (owner item 22): the card rules test failed only on a card that does nothing unlisted, not on a card listed as wasted that would work (slam's was found by hand). Now every W cell also runs with the card kept, and a different trace fails the test. Still auto-discovering, no new job.
+- **One seam:** `StaffCompiler.keep_wasted`, a test-only static switch that keeps every card the waste table would drop; the runtime never reads the table, so it alone decides. Costs (mana, a slower cast, less damage) are no effect and are paid by both casts.
+- **Findings:** none on main today; every W cell changes nothing when forced. Item 23 (rule 2 checks) stays in docs/BACKLOG.md.
+
 ## 2026-10-29: Staff animations are carrier data (owner)
 
 - **Every carrier says how the staff moves** (`FormBase.staff_pose`), as it says its cast flash and impact (`cast_look`, `impact_look`): the owner asked for staff animations for slam and saw that every carrier could use the same thing for variety. One player of that data (`Spells.staff_pose` and the rest), drawn the same way by every look (`ActorLook`), so the strays play the same animations as the wizards.

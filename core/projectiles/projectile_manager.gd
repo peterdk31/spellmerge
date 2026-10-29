@@ -465,7 +465,8 @@ var dropped: int = 0
 ## The slot of the shot whose hit or expiry event is being sent, else -1. See "Ends".
 var event_slot: int = -1
 ## The form of the shot whose `projectile_impact` is being sent: `&"bolt"`, `&"rune"`, `&"orbit"`
-## or `&"beam"`, whoever cast it (any time outside an impact: `&""`). For looks only.
+## or `&"beam"`, whoever cast it, and the carrier's while `block_shot` sends `shot_blocked` (a
+## swing's: a parry) (any time outside these: `&""`). For looks only.
 var impact_form: StringName = &""
 ## The core colour and the look (`set_core`, `set_look`) of the shot whose `projectile_impact`
 ## is being sent, so its flare can take the shot's colours and card effects (white and 0 for a
@@ -1765,14 +1766,19 @@ func deflect_shot(slot: int, by: int, normal: Vector2, by_tag: int) -> bool:
 
 
 ## Stops the shot in `slot` as a shield charge does (`shot_blocked(by, where, by_tag)`), for a
-## carrier that is no shot (a swing, a beam). False when there is no such shot.
-func block_shot(slot: int, by: int, by_tag: int) -> bool:
+## carrier that is no shot (a swing, a beam). `form` is that carrier's (`&"swing"`, `&"beam"`),
+## told to looks as `impact_form` while the event is sent: a swing's block is a parry (melee I5).
+## False when there is no such shot.
+func block_shot(slot: int, by: int, by_tag: int, form: StringName = &"") -> bool:
 	if slot < 0 or slot >= _cap or _alive[slot] == 0:
 		return false
 	var at: Vector2 = _pos[slot]
 	_kill(slot)
 	if events != null:
+		var outer_form: StringName = impact_form
+		impact_form = form
 		events.shot_blocked.emit(by, at, by_tag)
+		impact_form = outer_form
 	return true
 
 

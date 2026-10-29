@@ -93,9 +93,9 @@ signal familiar_cast_requested(caster: int, position: Vector2, direction: Vector
 signal mana_refund_requested(caster: int, amount: float)
 ## Sender: core/spells. `amount` of the mana of the seat `player`'s actor is now held by sustained cards (`hold`); 0 when none is on. Sent only for an actor a seat drives (every actor's Caster reads `Spells.reserved_mana`). Heard by nobody yet.
 signal mana_reserved(player: int, amount: float)
-## Sender: core/projectiles. A shot of the actor `caster` with `tag` stopped another team's shot at `position` with one of its shield charges. Heard by core/spells and feel.
+## Sender: core/projectiles. A shot of the actor `caster` with `tag` stopped another team's shot at `position` with one of its shield charges (or a swing's or beam's shield did: `Projectiles.impact_form` is then `swing` or `beam` while this is sent; a swing's is a parry). Heard by core/spells and feel.
 signal shot_blocked(caster: int, position: Vector2, tag: int)
-## Sender: core/projectiles. The carrier with `tag` of the actor `caster` (a deflecting shot, a swing or a beam) deflected another team's shot at `position`: it turned, sped up and is `caster`'s now (melee I3). The deflected shot is `Projectiles.event_slot` while this is sent. Heard by core/spells (`on block`: a deflect is a block, owner 2026-10-29).
+## Sender: core/projectiles. The carrier with `tag` of the actor `caster` (a deflecting shot, a swing or a beam) deflected another team's shot at `position`: it turned, sped up and is `caster`'s now (melee I3). The deflected shot is `Projectiles.event_slot` while this is sent. Heard by core/spells (`on block`: a deflect is a block, owner 2026-10-29) and feel (the deflect's flash).
 signal shot_deflected(caster: int, position: Vector2, tag: int)
 ## Sender: combat. The reaction `reaction_id` (for example &"shatter") fired for the actor `caster` (or NO_PLAYER) at `position`.
 signal reaction_triggered(caster: int, reaction_id: StringName, position: Vector2)

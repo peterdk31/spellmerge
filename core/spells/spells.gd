@@ -1702,7 +1702,8 @@ func _guard_path(spell: CompiledSpell, tag: int, actor: int, points: PackedVecto
 
 ## Deflects (with `deflects`) or stops (while `charges` last) the `found` shots of
 ## `Projectiles.guard_slots` that touched a carrier of `actor` with `tag`: outward from `a` when
-## `b` is INF (a swing's hand), else off the segment from `a` to `b`. Returns the charges left.
+## `b` is INF (a swing's hand), else off the segment from `a` to `b` (a beam's or fissure's line);
+## a block is sent with that form (`block_shot`). Returns the charges left.
 ## The list is copied first: what a deflect sets off can run another guard.
 func _guard(found: int, actor: int, tag: int, deflects: bool, charges: int, a: Vector2, b: Vector2) -> int:
 	if found == 0:
@@ -1720,7 +1721,8 @@ func _guard(found: int, actor: int, tag: int, deflects: bool, charges: int, a: V
 			projectiles.deflect_shot(slot, actor, normal, tag)
 		elif charges > 0:
 			charges -= 1
-			projectiles.block_shot(slot, actor, tag)
+			# A swing's block is a parry; Feel tells them apart by the form.
+			projectiles.block_shot(slot, actor, tag, &"swing" if not b.is_finite() else &"beam")
 	return charges
 
 

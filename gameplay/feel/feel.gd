@@ -32,6 +32,11 @@ extends Node
 ## On `spell_cast` it shows a cast flash at the staff tip in the player's colours (and a ring
 ## for a carrier whose cast look has one), and kicks the camera a little against the aim.
 ##
+## A deflected shot (`shot_deflected`) flashes big and white where it turned, in its new caster's
+## colours; a swing's block (`shot_blocked` while the projectile manager's `impact_form` is
+## `swing`) is a parry: a big four-point star in Spark gold and a local stop on the parrying actor
+## (melee I5).
+##
 ## Every hit body is read by its actor (`Actor.id`): its ramp (`Actors.ramp_of`) colours the hit
 ## (a hat ramp in its light shade, `ProjectileManager.ramp_light`; the enemy ramp in ember), and a
 ## hit whose caster is the hit actor itself is a self-hit.
@@ -478,6 +483,8 @@ func _ready() -> void:
 	events.screen_shake_changed.connect(_on_screen_shake_changed)
 	events.caster_move_finished.connect(_on_caster_move_finished)
 	events.projectile_expired.connect(_on_projectile_expired)
+	events.shot_deflected.connect(_on_shot_deflected)
+	events.shot_blocked.connect(_on_shot_blocked)
 	if combat == null:
 		combat = get_node_or_null("/root/Combat")
 	if projectiles == null:
@@ -1002,6 +1009,37 @@ func _on_projectile_expired(caster: int, position: Vector2, _tag: int) -> void:
 		return
 	var heading: Vector2 = projectiles.get("impact_heading") as Vector2 if "impact_heading" in projectiles else Vector2.RIGHT
 	show_effect(KIND_BURST, position, heading, projectiles.impact_core as Color, _ramp_of(caster), projectiles.impact_look as int, POP_ZOOM, POP_SECONDS)
+
+
+## A shot was deflected (melee I5; docs/milestones/M2-staffs.md, "The look"): it flashes big and
+## white where it turned, a white-hot cross in its new caster's (`caster`'s) colours, bigger than
+## a hit's, aimed the way it leaves (the projectile manager's `event_slot` is the shot). Its
+## longer tail needs nothing here: it flies 1.7x faster, and its tail is a pixel per pixel of travel.
+func _on_shot_deflected(caster: int, position: Vector2, _tag: int) -> void:
+	if not position.is_finite() or caster < ActorsScript.NONE or caster >= ActorsScript.ACTORS:
+		return
+	var heading: Vector2 = Vector2.RIGHT
+	if projectiles != null and "event_slot" in projectiles:
+		var slot: int = projectiles.event_slot as int
+		if slot >= 0:
+			heading = projectiles.get_velocity_of(slot) as Vector2
+	show_effect(KIND_BURST, position, heading, Color.WHITE, _ramp_of(caster), 0, roundi(preset.deflect_size), preset.deflect_seconds)
+	_play(preset.deflect_sound)
+
+
+## A shot was blocked. A swing's block is a parry (`shield · swing`; the projectile manager's
+## `impact_form` says which carrier blocked): a big four-point star in Spark gold, and a local stop
+## on the parrying actor alone. Other blocks show nothing of their own.
+func _on_shot_blocked(caster: int, position: Vector2, _tag: int) -> void:
+	if projectiles == null or not ("impact_form" in projectiles) or (projectiles.impact_form as StringName) != &"swing":
+		return
+	if not position.is_finite():
+		return
+	show_effect(KIND_BURST, position, Vector2.RIGHT, preset.parry_color, 0, EXACT, roundi(preset.parry_size), preset.parry_seconds)
+	var table: ActorsScript = _actor_table()
+	if table != null and preset.parry_stop_seconds > 0.0:
+		_hold_actor(table, caster, preset.parry_stop_seconds, true)
+	_play(preset.parry_sound)
 
 
 ## The payoff of a shot: a flare in the shot's colour, shaped by the form of the shot itself

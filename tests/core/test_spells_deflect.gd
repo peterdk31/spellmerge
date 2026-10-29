@@ -5,8 +5,8 @@ extends "res://tests/support/suite.gd"
 ## speeds up each time. It works on every carrier that touches shots: a shot (bolt, orbit, wall),
 ## a swing's sweep and a beam's line. With a shield on the same carrier the deflect goes first
 ## (owner, 2026-10-29), so the compiler lists the shield as wasted; a deflect sets off `on block`.
-## Swings and beams now touch shots, so a shield on them blocks too (the parry). The deflect card
-## is made in code here (its card is I5); the rest are the real cards, in the combo arena.
+## Swings and beams now touch shots, so a shield on them blocks too (the parry). All are the real
+## cards (the Deflect card is content/spells/modifiers/deflect/, melee I5), in the combo arena.
 ##
 ## godot --headless --path . --script res://tests/core/test_spells_deflect.gd
 
@@ -23,13 +23,6 @@ var blocked: Array = []
 
 func before_each() -> void:
 	arena = ArenaScript.new(root)
-	var card := ModifierBase.new()
-	card.id = &"deflect"
-	card.display_name = "Deflect"
-	card.complexity = 2
-	card.behaviour = ModifierBase.Behaviour.DEFLECT
-	card.behaviour_strength = 1.0
-	(arena.registry.get("_resources")[&"spells"] as Dictionary)[&"deflect"] = card
 	enemy = ActorSeats.enemy(arena.projectiles.actors)
 	deflected.clear()
 	blocked.clear()

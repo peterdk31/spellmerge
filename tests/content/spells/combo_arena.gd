@@ -51,6 +51,8 @@ var bodies: Array[Node2D] = []
 var peak_shots: int = 0
 ## Every enemy shot a barrier or a shielded shot stopped (`shield_blocked`, `shot_blocked`).
 var blocks: Array = []
+## Every enemy shot a deflect turned (`shot_deflected`), as the deflecting actor.
+var deflects: Array = []
 ## Every entity a cast asked for (decoys, familiars), as [actor, kind].
 var spawns: Array = []
 ## When true, `run` moves the imps by the push combat keeps for them (a pull or a knockback); off,
@@ -89,6 +91,7 @@ func _init(root: Node) -> void:
 	bus.caster_move_requested.connect(func(player: int, mode: StringName, _to: Vector2, _seconds: float, _tag: int) -> void: caster_moves.append([player, mode]))
 	bus.shield_blocked.connect(func(actor: int, _at: Vector2, _tag: int) -> void: blocks.append(actor))
 	bus.shot_blocked.connect(func(actor: int, _at: Vector2, _tag: int) -> void: blocks.append(actor))
+	bus.shot_deflected.connect(func(actor: int, _at: Vector2, _tag: int) -> void: deflects.append(actor))
 	bus.entity_spawn_requested.connect(func(actor: int, kind: StringName, _at: Vector2, _seconds: float, _tag: int, _caster: int) -> void: spawns.append([actor, kind]))
 	bus.heal_dealt.connect(func(caster: int, target: Node, amount: int, _at: Vector2) -> void: heals.append([caster, target, amount]))
 	bus.status_applied.connect(func(player: int, target: Node, id: StringName) -> void: statuses.append([player, target, id, lost(target as Node2D)]))

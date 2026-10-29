@@ -341,6 +341,8 @@ A card task touches only its own folder (`.tres`, icon, look, `assets.json`), `c
 
 C0 (after B6): the 19 existing cards get their look data and a second look at their numbers without the budget.
 
+C0b (after C0): the later modifiers get their look data, the same way (owner, 2026-10-29).
+
 ### Phase E: extras the owner asked for along the way
 
 | # | Part | Area | After | Delivers |

@@ -338,3 +338,29 @@ func test_a_bouncing_fissure_turns_and_shows_every_leg() -> void:
 	if legs.size() == 2:
 		check((legs[0][0] as Vector2).is_zero_approx(), "the first from the caster")
 		check(absf(float(legs[0][1]) + float(legs[1][1]) - 200.0) < 1.0, "together its whole length")
+
+
+## The general rule (owner, 2026-10-29): a turn at a wall takes none of a beam's cards away, so a
+## homing beam homes again from the wall, as a homing shot does after it bounces. The target is
+## outside the beam's homing cone from the staff (52 degrees off its aim) and inside it from the
+## turn, off the straight line back.
+func test_a_homing_beam_homes_again_after_it_turns_at_a_wall() -> void:
+	_turning_room()
+	var long: FormBase = _form(&"long_beam", 0.0, 0.3)
+	long.motion = FormBase.Motion.RAY
+	long.ray_length = 300.0
+	long.radius = 6.0
+	var behind: Node2D = _target(Vector2(-5.0, 120.0))
+	_build([&"bounce", &"long_beam"])
+	_cast(Vector2.ZERO, Vector2(1.0, 1.0).normalized())
+	check_equal(_hits.size(), 0, "without homing it turns and goes straight, past the target")
+	_tick(60)
+	_build([&"homing", &"bounce", &"long_beam"])
+	_cast(Vector2.ZERO, Vector2(1.0, 1.0).normalized())
+	check_equal(_hits.size(), 1, "with homing it bends onto it after the turn")
+	if not _hits.is_empty():
+		check(_hits[0][1] == behind, "the target past the turn")
+	var at: int = _beam()
+	if at >= 0:
+		check(_spells.beam_point_count(at) > 3, "its drawn path bends after the turn (%d points)" % _spells.beam_point_count(at))
+

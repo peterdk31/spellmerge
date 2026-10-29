@@ -762,6 +762,8 @@ var _ray_along: Array[Array] = []
 var _ray_points: Array[Array] = []
 var _ray_heads: Array[Array] = []
 var _ray_walks: Array[Array] = []
+## The indices of a ray's turns at walls in its path, one list per nesting level.
+var _ray_turns: Array[Array] = []
 var _ray_depth: int = 0
 ## The path of the ray being found (`ray`, `ray_curve`): up to RAY_SEGMENTS pieces.
 var _path: PackedVector2Array = PackedVector2Array()
@@ -2439,10 +2441,13 @@ func ray(caster: int, origin: Vector2, direction: Vector2, length: float, pierce
 ## `length` pixels along it: a live beam, whose homing bends it from target to target, and which
 ## never reaches past its own length. With `hit` false it only finds how far the beam gets
 ## (walls, and the target that spends it) and sends nothing, for the look of a beam between its
-## hits. With `bounces` it turns at walls as `ray` does, and goes on straight from there. Returns
+## hits. With `bounces` it turns at walls as `ray` does, and goes on from there along `steer`'s
+## path when it is given one (a homing beam homes again after every turn: `steer.call(turn, at,
+## way, left)` gets the turn's index in the path, where it is, the way off the wall and the length
+## left, and returns the points that follow `at`; empty for straight on), else straight. Returns
 ## how far it got along the path; `ray_end` and `ray_end_heading` say where, and `ray_path` what
 ## it walked.
-func ray_points(caster: int, points: PackedVector2Array, offset: int, count: int, length: float, pierce: int = 0, layers: int = LAYER_ENEMY, tag: int = 0, width: float = 0.0, exclude: Node = null, hit: bool = true, bounces: int = 0) -> float:
+func ray_points(caster: int, points: PackedVector2Array, offset: int, count: int, length: float, pierce: int = 0, layers: int = LAYER_ENEMY, tag: int = 0, width: float = 0.0, exclude: Node = null, hit: bool = true, bounces: int = 0, steer: Callable = Callable()) -> float:
 	ray_path_count = 0
 	if count < 2 or offset < 0 or offset + count > points.size() or not is_finite(length) or length <= 0.0 or not points[offset].is_finite():
 		return 0.0
@@ -2463,7 +2468,7 @@ func ray_points(caster: int, points: PackedVector2Array, offset: int, count: int
 		_path[i] = point
 	if used == 0:
 		return 0.0
-	return _ray_path(caster, used, pierce, layers, tag, width, exclude, hit, bounces)
+	return _ray_path(caster, used, pierce, layers, tag, width, exclude, hit, bounces, steer)
 
 
 ## A beam like `ray`, bent: it follows the quadratic curve from `origin` to `end` pulled
@@ -2498,17 +2503,21 @@ func _ray_level(level: int) -> void:
 		_ray_points.append([])
 		_ray_heads.append([])
 		_ray_walks.append([])
+		_ray_turns.append([])
 
 
 ## The beam along the first `segments` pieces of `_path` (see `ray` and `ray_curve`).
-func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, width: float, exclude: Node, hit: bool, bounces: int = 0) -> float:
+func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, width: float, exclude: Node, hit: bool, bounces: int = 0, steer: Callable = Callable()) -> float:
 	ray_end = Vector2.INF
 	ray_end_heading = Vector2.ZERO
 	ray_path_count = 0
 	if not is_caster(caster):
 		return 0.0
+	var level: int = _ray_depth
+	_ray_level(level)
 	# Cut the path at the first wall, or turn there while it has bounces: the rest of the path
-	# is dropped and it goes on straight, off the wall, for the length the rest had.
+	# is dropped and it goes on, off the wall, for the length the rest had: along `steer`'s path
+	# (a homing beam homes again), else straight.
 	var left_turns: int = maxi(bounces, 0)
 	var left: float = 0.0
 	if left_turns > 0:
@@ -2517,8 +2526,8 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 	var reach: float = 0.0
 	var walled: bool = false
 	var used: int = 0
-	# The turns are the points `first_turn` on, `turned` of them.
-	var first_turn: int = 0
+	# The turns: their indices in the path, `turned` of them.
+	var turns: Array = _ray_turns[level]
 	var turned: int = 0
 	var at_piece: int = 0
 	while at_piece < segments:
@@ -2535,17 +2544,40 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 				left -= piece * cut
 				if left_turns > 0 and reach + piece * cut > 0.0 and left > 0.5 and not heading.is_zero_approx():
 					# Step back out of the wall, as a bouncing shot does, and turn there.
-					if turned == 0:
-						first_turn = at_piece + 1
+					if turns.size() <= turned:
+						turns.resize(maxi(8, turned * 2))
+					turns[turned] = at_piece + 1
 					turned += 1
 					left_turns -= 1
 					at -= heading * 0.5
 					left += 0.5
 					reach += a.distance_to(at)
-					_fit_path(at_piece + 3)
+					var way: Vector2 = _bounced(at, heading, heading)
+					_fit_path(at_piece + 2)
 					_path[at_piece + 1] = at
-					_path[at_piece + 2] = at + _bounced(at, heading, heading) * left
-					segments = at_piece + 2
+					var added: int = 0
+					if steer.is_valid():
+						# Its own path from the turn on, cut to the length it has left.
+						var more: PackedVector2Array = steer.call(at_piece + 1, at, way, left)
+						var from: Vector2 = at
+						var gone: float = 0.0
+						for point in more:
+							if not point.is_finite() or gone >= left:
+								break
+							var step: float = from.distance_to(point)
+							_fit_path(at_piece + 3 + added)
+							if gone + step >= left:
+								point = from.move_toward(point, left - gone)
+								step = left - gone
+							_path[at_piece + 2 + added] = point
+							added += 1
+							gone += step
+							from = point
+					if added == 0:
+						_fit_path(at_piece + 3)
+						_path[at_piece + 2] = at + way * left
+						added = 1
+					segments = at_piece + 1 + added
 					at_piece += 1
 					continue
 				walled = true
@@ -2555,8 +2587,6 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 		left -= piece
 		reach += piece
 		at_piece += 1
-	var level: int = _ray_depth
-	_ray_level(level)
 	var nodes: Array = _ray_nodes[level]
 	var alongs: Array = _ray_along[level]
 	var points: Array = _ray_points[level]
@@ -2634,7 +2664,10 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 		nodes[i] = null
 	# A spark at every wall it turned at before it ended, and at the wall it ended on; then
 	# `wall_met` for each (a handler's payload may fire rays: this level's scratch is kept).
-	for n in range(first_turn, mini(first_turn + turned, walked - 1)):
+	for k in turned:
+		var n: int = turns[k]
+		if n >= walked - 1:
+			break
 		var turn: Vector2 = walk[n]
 		if events != null:
 			impact_form = &"beam"
@@ -2652,7 +2685,10 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 		impact_form = &""
 		impact_core = Color.WHITE
 		impact_look = 0
-	for n in range(first_turn, mini(first_turn + turned, walked - 1)):
+	for k in turned:
+		var n: int = turns[k]
+		if n >= walked - 1:
+			break
 		var turn: Vector2 = walk[n]
 		wall_met.emit(caster, turn, turn.direction_to(walk[n + 1]), tag)
 	if walled:

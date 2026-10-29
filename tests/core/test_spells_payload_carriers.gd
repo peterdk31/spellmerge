@@ -36,6 +36,8 @@ var _end_requests: Array = []
 var _areas: Array = []
 ## Every form_shown as [player, form, origin, direction, length].
 var _shown: Array = []
+## Every explosion_shown as [player, at, radius, style].
+var _explosions: Array = []
 
 
 func before_each() -> void:
@@ -52,6 +54,9 @@ func before_each() -> void:
 	_end_requests.clear()
 	_areas.clear()
 	_shown.clear()
+	_explosions.clear()
+	_bus.explosion_shown.connect(func(player: int, at: Vector2, radius: float, style: StringName, _tint: Color, _look: int) -> void:
+		_explosions.append([player, at, radius, style]))
 	_bus.projectile_hit.connect(func(player: int, target: Node, at: Vector2, tag: int) -> void:
 		_hits.append([player, target, at, tag]))
 	_bus.entity_spawn_requested.connect(func(player: int, kind: StringName, at: Vector2, seconds: float, tag: int, caster: int) -> void:
@@ -329,6 +334,26 @@ func test_a_blast_decoy_explodes_where_it_ends() -> void:
 	_bus.entity_ended.emit(0, &"decoy", Vector2(50, 20), tag)
 	check_equal(_areas.size(), 1, "one area hit")
 	check(_areas.size() == 1 and _areas[0][1].is_equal_approx(Vector2(50, 20)) and is_equal_approx(_areas[0][2], 30.0) and _areas[0][3] == tag, "at the end point, as wide as the blast: %s" % [_areas])
+
+
+func test_a_blast_shows_its_explosion_where_it_goes_off() -> void:
+	var tag: int = _build(0, [&"blast", &"decoy"])
+	_cast()
+	_bus.entity_ended.emit(0, &"decoy", Vector2(50, 20), tag)
+	check(_explosions.size() == 1 and _explosions[0][1].is_equal_approx(Vector2(50, 20)) and is_equal_approx(_explosions[0][2], 30.0), "one explosion at the area hit, as wide: %s" % [_explosions])
+	check(_explosions.size() == 1 and _explosions[0][0] == 0 and _explosions[0][3] == &"blast", "of its caster, in blast's style")
+
+
+func test_a_lone_blast_explodes_on_its_caster_and_a_decoy_without_one_does_not() -> void:
+	_build(0, [&"blast"])
+	_cast()
+	check_equal(_explosions.size(), 1, "blast alone falls back on the caster and explodes there")
+	check(_areas.size() == 1 and _explosions.size() == 1 and _explosions[0][1].is_equal_approx(_areas[0][1]), "where its area hit is")
+	_explosions.clear()
+	var tag: int = _build(0, [&"decoy"])
+	_cast()
+	_bus.entity_ended.emit(0, &"decoy", Vector2(50, 20), tag)
+	check_equal(_explosions.size(), 0, "nothing explodes without a blast")
 
 
 func test_a_decoy_ending_twice_counts_once() -> void:

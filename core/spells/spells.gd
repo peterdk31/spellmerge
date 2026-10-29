@@ -1322,9 +1322,7 @@ func _on_entity_ended(actor: int, _kind: StringName, position: Vector2, tag: int
 		_entities[tag] = count - 1
 	var spell: CompiledSpell = _profiles.get(tag)
 	if spell != null and position.is_finite():
-		var blast: float = spell.behaviour(ModifierBase.Behaviour.BLAST)
-		if blast > 0.0 and events != null:
-			events.area_hit_requested.emit(actor, position, blast, tag)
+		_blast(spell, tag, actor, position)
 		if spell.payload != null and spell.trigger_event == TriggerBase.Event.EXPIRE:
 			_fire(spell.payload, actor, SpellTag.staff_of(tag), SpellTag.generation_of(tag), position, Vector2.RIGHT, null, CASTER_POINT)
 	shot_ended(tag)
@@ -1469,11 +1467,13 @@ func _recoil(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, headin
 
 
 ## The area hit of a `blast` at the end point `at` of the carrier with `tag`, as wide as its
-## strength, with the hit profile of its tag. Nothing without a blast.
+## strength, with the hit profile of its tag, and its explosion (`explosion_shown`, style
+## `blast`). Nothing without a blast.
 func _blast(spell: CompiledSpell, tag: int, actor: int, at: Vector2) -> void:
 	var radius: float = spell.behaviour(ModifierBase.Behaviour.BLAST)
 	if radius > 0.0 and events != null and at.is_finite():
 		events.area_hit_requested.emit(actor, at, radius, tag)
+		events.explosion_shown.emit(actor, at, radius, &"blast", spell.tint, spell.look)
 
 
 ## Where a dash, teleport or hook ended: the carrier's end point. Its `blast` and its `on expire`
@@ -1592,10 +1592,14 @@ func _shield_caster(spell: CompiledSpell, tag: int, actor: int, move_seconds: fl
 
 
 ## The cards that landed on the caster or on a payload's origin: an area hit there with the
-## spell's profile (a blast is as wide as its strength). Combat decides what it does (staffs B3).
+## spell's profile (a blast is as wide as its strength, and explodes). Combat decides what it does
+## (staffs B3).
 func _fallback_hit(spell: CompiledSpell, tag: int, actor: int, at: Vector2) -> int:
 	if events != null:
-		events.area_hit_requested.emit(actor, at, maxf(spell.radius, spell.behaviour(ModifierBase.Behaviour.BLAST)), tag)
+		var blast: float = spell.behaviour(ModifierBase.Behaviour.BLAST)
+		events.area_hit_requested.emit(actor, at, maxf(spell.radius, blast), tag)
+		if blast > 0.0 and at.is_finite():
+			events.explosion_shown.emit(actor, at, blast, &"blast", spell.tint, spell.look)
 	# After the area hit, which can reach the caster itself and would spend the barrier.
 	if _caster == CASTER_WIZARD:
 		_shield_caster(spell, tag, actor, 0.0)

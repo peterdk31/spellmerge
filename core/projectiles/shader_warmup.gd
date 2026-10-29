@@ -33,6 +33,7 @@ const BATCH_SHADERS: Array[Shader] = [
 	preload("res://core/projectiles/shot_orbit.gdshader"),
 	preload("res://core/projectiles/shot_status.gdshader"),
 	preload("res://core/projectiles/shot_arc.gdshader"),
+	preload("res://core/projectiles/shot_blast.gdshader"),
 ]
 const MESH_SHADERS: Array[Shader] = [
 	preload("res://core/projectiles/shot_beam.gdshader"),

@@ -228,6 +228,8 @@ func _next_scenario() -> void:
 			_finish(["bot %d could not take its virtual device" % (index + 1)])
 			return
 		_bots.append(bot)
+	# The room is timed as it is: no loading screen before it (it would start a few frames later).
+	_flow.set("loading_enabled", false)
 	_events.emit_signal("play_requested", 0)
 	if _flow.get("world") == null:
 		_finish(["the run did not start"])

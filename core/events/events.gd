@@ -150,6 +150,13 @@ signal run_started(player_count: int)
 signal run_ended(victory: bool)
 ## Sender: flow. The players entered the room `room_id`.
 signal room_entered(room_id: StringName)
+## Sender: core/loading. Work before playing has begun behind the loading screen (`Loading.run`;
+## Flow runs `play_tasks` on Play). Heard by hud, which shows the screen until `loading_finished`.
+signal loading_started()
+## Sender: core/loading. `done` of the load's `total` units are done (the screen's bar). Heard by hud.
+signal loading_progressed(done: int, total: int)
+## Sender: core/loading. The load is over (done, or cancelled). Heard by hud.
+signal loading_finished()
 ## Sender: flow. The room `room_id` was cleared.
 signal room_cleared(room_id: StringName)
 ## Sender: flow. A run started in the sandbox (`on` true) or out of it (false), or the sandbox run ended (false). Heard by hud, whose pause menu shows its Sandbox entry only while it is on.

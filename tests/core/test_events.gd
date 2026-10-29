@@ -76,6 +76,9 @@ const EVENTS: Dictionary = {
 	&"run_ended": [["victory", TYPE_BOOL]],
 	&"room_entered": [["room_id", TYPE_STRING_NAME]],
 	&"room_cleared": [["room_id", TYPE_STRING_NAME]],
+	&"loading_started": [],
+	&"loading_progressed": [["done", TYPE_INT], ["total", TYPE_INT]],
+	&"loading_finished": [],
 	&"wave_started": [["wave", TYPE_INT]],
 	&"sandbox_changed": [["on", TYPE_BOOL]],
 	&"build_break_started": [["seconds", TYPE_FLOAT]],
@@ -91,6 +94,7 @@ const EVENTS: Dictionary = {
 ## Events about the run, a room or the account, with no seat and no actor.
 const NOT_PER_PLAYER: Array[StringName] = [
 	&"run_started", &"run_ended", &"room_entered", &"room_cleared", &"wave_started",
+	&"loading_started", &"loading_progressed", &"loading_finished",
 	&"sandbox_changed", &"effect_slots_changed", &"build_break_started", &"difficulty_changed", &"reward_rolled", &"unlock_gained", &"currency_changed",
 ]
 
@@ -146,7 +150,8 @@ func _test_signals_exist() -> void:
 			_check(args[i]["name"] == expected[i][0] and args[i]["type"] == expected[i][1],
 				"%s argument %d is %s (type %d), got %s (type %d)" % [event, i, expected[i][0], expected[i][1], args[i]["name"], args[i]["type"]])
 		var has_player: bool = not NOT_PER_PLAYER.has(event)
-		_check(has_player == FIRST_KEYS.has(expected[0][0]),
+		var first: String = "" if expected.is_empty() else expected[0][0]
+		_check(has_player == FIRST_KEYS.has(first),
 			"%s has a seat or an actor id first exactly when it is per-player or per-actor" % event)
 	for event: StringName in signals:
 		_check(EVENTS.has(event), "signal %s in events.gd is covered by this test" % event)

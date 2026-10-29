@@ -1184,9 +1184,10 @@ func _telegraph_rain(spell: CompiledSpell, tag: int, actor: int, origin: Vector2
 	return placed
 
 
-## A rain lands: its payload falls (a group, so a burst repeats it), then its own `on expire`
-## trigger fires, both from the aim point.
+## A rain lands: its `blast` goes off, its payload falls (a group, so a burst repeats it), then
+## its own `on expire` trigger fires, all at the aim point (its end point, rules R1d).
 func _land_rain(spell: CompiledSpell, group: CompiledGroup, actor: int, staff: int, generation: int, point: Vector2, heading: Vector2) -> void:
+	_blast(spell, SpellTag.make(actor, staff, spell.node, generation), actor, point)
 	if group != null and not group.is_empty():
 		_fire(group, actor, staff, generation, point, heading, null, CASTER_POINT)
 	if spell.payload != null and spell.trigger_event == TriggerBase.Event.EXPIRE:
@@ -2888,7 +2889,8 @@ func _on_expired(actor: int, position: Vector2, tag: int) -> void:
 	var spell: CompiledSpell = _profiles.get(tag)
 	if spell != null and spell.trigger_event == TriggerBase.Event.WALL and projectiles.expired_on_wall:
 		event = TriggerBase.Event.WALL
-	if spell != null and spell.motion != FormBase.Motion.HOOK:
+	# Every carrier blasts at its end point (rules R1d): a hook that missed, where it ended.
+	if spell != null:
 		_blast(spell, tag, actor, position)
 	_fire_event(event, actor, position, tag, null, true)
 

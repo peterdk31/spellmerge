@@ -227,7 +227,8 @@ func test_a_hook_that_misses_pulls_nothing() -> void:
 	_cast()
 	_tick(90)
 	check_equal(_moves.size(), 0, "no pull")
-	check_equal(_areas.size(), 0, "and no blast: it waits for an arrival that never comes")
+	# Every carrier blasts at its end point (rules R1d): a hook that misses, where it ended.
+	check_equal(_areas.size(), 1, "one blast, where the hook ended")
 
 
 func test_a_blast_hook_explodes_on_arrival_not_at_the_hit() -> void:

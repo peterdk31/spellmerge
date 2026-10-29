@@ -2236,4 +2236,3 @@ The owner: restructure the projectile step from "for each shot, check every beha
 - **R3, the permanent check:** `tests/core/test_card_rules.gd` finds every card and carrier through the registry and every behaviour and event from the enums (no list), plays each card on each carrier in a small world with and without it, and fails on a card that changes nothing and is not listed as wasted, or on a behaviour or event with no probe. Rule 2 checks (an effect survives a bounce, jump, echo, payload) are not in it yet.
 - **R2c:** the builder, the radial builder and the staff row already show every wasted slot with its reason; nothing changed there.
 - **For R4:** every W here is a cell the owner may turn into ✓ (M2-rules.md R4).
-- **PR #469 dropped:** a parallel `CardRules` table (bot branch) did the same job as these and was removed in the merge, so there is one table, not two that drift.

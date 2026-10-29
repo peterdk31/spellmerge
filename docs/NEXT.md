@@ -59,8 +59,7 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 
 ## Done recently
 
-- [x] **Card rules: the compiler says what does nothing, and the permanent check (rules R2, R3).** Landed on main with the owner's rules-r2-honest-compiler branch (#468): `StaffCompiler.behaviour_waste` and `trigger_runs`, tested by `test_behaviour_table.gd`, `test_trigger_table.gd` and `test_card_rules.gd`. PR #469's duplicate `CardRules` table was dropped.
-- [x] **Freezes in co-op (melee I7).** A hit or a kill holds only its attacker, target and shot (`Actors.hold`, `Projectiles.freeze_shot`); a reaction holds its caster; `Engine.time_scale` drops only for a downed player and a boss kill (`EnemyBase.boss`). Tests: `test_feel_local_stop.gd`, `test_projectiles_freeze.gd`. **Still to do when I5 lands:** the parry's local stop (call `_hold_bodies` from the parry's event).
+- [x] **Card rules: the compiler says what does nothing, and the permanent check (rules R2, R3).** Landed on main with the owner's rules-r2-honest-compiler branch (#468): `StaffCompiler.behaviour_waste` and `trigger_runs`, tested by `test_behaviour_table.gd`, `test_trigger_table.gd` and `test_card_rules.gd`.- [x] **Freezes in co-op (melee I7).** A hit or a kill holds only its attacker, target and shot (`Actors.hold`, `Projectiles.freeze_shot`); a reaction holds its caster; `Engine.time_scale` drops only for a downed player and a boss kill (`EnemyBase.boss`). Tests: `test_feel_local_stop.gd`, `test_projectiles_freeze.gd`. **Still to do when I5 lands:** the parry's local stop (call `_hold_bodies` from the parry's event).
 
 - [x] **Screen shake setting (melee I6).** Settings has "Screen shake: On/Off" (on by default). It sends `screen_shake_changed` to feel (`Feel.shake_enabled`) and is saved in `SaveFile` (new `get_setting`/`set_setting`), read again when the menu is bound. Tests: `test_pause_menu.gd`, `test_feel_form_looks.gd`, `test_events.gd`.
 

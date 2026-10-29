@@ -266,7 +266,7 @@ func _means_something_there(modifier: ModifierBase, payload: bool) -> bool:
 ## reason; "" when it can. First the carrier (`trigger_runs`), then the cards the event needs on
 ## it: a block needs a shield or deflect, a reaction an infusion (or relay), and a kill or reaction
 ## on a carrier that hits nothing itself needs a blast, whose area hit carries the carrier's tag.
-## A ghost shot never meets a wall.
+## A ghost shot, beam or fissure never meets a wall.
 func _trigger_never(trigger: TriggerBase, form: FormBase, elements: Array[ElementBase], modifiers: Array[ModifierBase], life: float) -> String:
 	var head: String = "%s does nothing on a %s" % [_name(trigger), _name(form)]
 	var why: String = trigger_why_not(trigger.event, form.motion)
@@ -288,8 +288,8 @@ func _trigger_never(trigger: TriggerBase, form: FormBase, elements: Array[Elemen
 			if life <= trigger.interval:
 				return "%s: it ends before its first tick (%.2f s, every %.2f s)." % [head, life, trigger.interval]
 		TriggerBase.Event.WALL:
-			if has.has(ModifierBase.Behaviour.GHOST) and flies(form.motion):
-				return "%s with ghost: a ghost shot passes through walls." % head
+			if has.has(ModifierBase.Behaviour.GHOST) and behaviour_runs(ModifierBase.Behaviour.GHOST, form.motion):
+				return "%s with ghost: it passes through walls." % head
 	return ""
 
 
@@ -544,20 +544,25 @@ static func behaviour_waste(behaviour: int, motion: FormBase.Motion, blasts: boo
 			return "" if stays(motion) else "it is not a shot that stays in the air"
 		ModifierBase.Behaviour.DEFLECT:
 			return "" if guards(motion) or motion == FormBase.Motion.HOOK or motion == FormBase.Motion.SWAP else "it touches no shots"
-		ModifierBase.Behaviour.SPIRAL, ModifierBase.Behaviour.LINGER, ModifierBase.Behaviour.GROWTH, ModifierBase.Behaviour.STICKY:
+		ModifierBase.Behaviour.SPIRAL, ModifierBase.Behaviour.GROWTH:
+			# A beam waves and widens while it is on (rules R4f); a fissure is over at once.
+			return "" if flies(motion) or motion == FormBase.Motion.RAY else "it only changes a shot in flight or a beam, and %s" % _what(motion)
+		ModifierBase.Behaviour.LINGER, ModifierBase.Behaviour.STICKY:
 			return "" if flies(motion) else "it only changes a shot in flight, and %s" % _what(motion)
 		ModifierBase.Behaviour.GHOST:
-			return "" if flies(motion) else "it only takes a flying shot through walls, and %s" % _what(motion)
+			return "" if flies(motion) or rays(motion) else "it only takes a flying shot or a line through walls, and %s" % _what(motion)
 		ModifierBase.Behaviour.BOUNCE:
-			if flies(motion) or motion == FormBase.Motion.RAY or motion == FormBase.Motion.FISSURE:
+			if flies(motion) or rays(motion):
 				return ""
 			return "it turns a shot or a beam at walls, and %s" % _what(motion)
 		ModifierBase.Behaviour.HEAVY:
 			return "" if hits(motion) or blasts else "it acts on what the carrier hits, and %s (a blast would carry it)" % _what(motion)
 		ModifierBase.Behaviour.CHAIN, ModifierBase.Behaviour.SIPHON, ModifierBase.Behaviour.POSSESS:
 			return "" if hits(motion) else "it acts on what the carrier hits, and %s" % _what(motion)
-		ModifierBase.Behaviour.MAGNET, ModifierBase.Behaviour.RELAY:
-			return "" if stays(motion) else "it needs a shot that stays in the world, and %s" % _what(motion)
+		ModifierBase.Behaviour.MAGNET:
+			return "" if stays(motion) or motion == FormBase.Motion.RAY else "it needs a shot or a beam that stays in the world, and %s" % _what(motion)
+		ModifierBase.Behaviour.RELAY:
+			return "" if stays(motion) or rays(motion) else "it needs a shot or a line that hits, and %s" % _what(motion)
 		ModifierBase.Behaviour.SHIELD:
 			match motion:
 				FormBase.Motion.RAIN, FormBase.Motion.DECOY, FormBase.Motion.FAMILIAR:
@@ -583,6 +588,12 @@ static func flies(motion: FormBase.Motion) -> bool:
 	return motion == FormBase.Motion.STRAIGHT or motion == FormBase.Motion.HOOK or motion == FormBase.Motion.SWAP
 
 
+## True for the carriers that are a line walked at once (a beam, a fissure): what a ray walk runs
+## (bounce, ghost, relay) runs on them.
+static func rays(motion: FormBase.Motion) -> bool:
+	return motion == FormBase.Motion.RAY or motion == FormBase.Motion.FISSURE
+
+
 ## True for the carriers that are shots staying in the world for a while (a bolt, a rune, an orbit,
 ## a wall, a hook, a swap): what rides on a live shot (arc, magnet, relay) runs on them.
 static func stays(motion: FormBase.Motion) -> bool:
@@ -595,7 +606,7 @@ static func stays(motion: FormBase.Motion) -> bool:
 ## True for the carriers that hit under their own tag (a shot, a beam, a fissure, a swing, a slam):
 ## a rain's payload, a dash, a teleport, a decoy and a familiar hit nothing themselves.
 static func hits(motion: FormBase.Motion) -> bool:
-	return stays(motion) or motion == FormBase.Motion.RAY or motion == FormBase.Motion.FISSURE or motion == FormBase.Motion.SWING or motion == FormBase.Motion.SLAM
+	return stays(motion) or rays(motion) or motion == FormBase.Motion.SWING or motion == FormBase.Motion.SLAM
 
 
 ## What a carrier of `motion` is, for a wasted card's reason.

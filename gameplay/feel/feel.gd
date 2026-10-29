@@ -1859,11 +1859,13 @@ func _draw_live_beams() -> void:
 		material.set_shader_parameter(&"beam_end", end_at)
 		material.set_shader_parameter(&"beam_end_dir", end_dir)
 		material.set_shader_parameter(&"sim_time", _clock)
-		material.set_shader_parameter(&"beam_width", BEAM_WIDTH)
+		# A growing beam is drawn wider as it hits wider (growth, rules R4f).
+		var grown: float = float(spells.call("beam_growth", i)) if spells.has_method("beam_growth") else 1.0
+		material.set_shader_parameter(&"beam_width", BEAM_WIDTH * grown)
 		material.set_shader_parameter(&"beam_player", _beam_ramp(_ramp_of(caster)))
 		material.set_shader_parameter(&"beam_look", int(spells.call("beam_look", i)) if spells.has_method("beam_look") else 0)
 		material.set_shader_parameter(&"beam_fade", fade)
-		material.set_shader_parameter(&"beam_swell", maxf(fade, 0.35) * flare * flicker)
+		material.set_shader_parameter(&"beam_swell", maxf(fade, 0.35) * flare * flicker * grown)
 		material.set_shader_parameter(&"beam_glow", preset.beam_alpha)
 		node.visible = true
 

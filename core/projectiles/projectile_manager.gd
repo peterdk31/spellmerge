@@ -1050,6 +1050,11 @@ func set_bounds(rect: Rect2) -> void:
 	clear_walls()
 
 
+## The longer side of the room (`set_bounds`): what a growing shot or beam grows to at most.
+func room_size() -> float:
+	return maxf(_bounds.size.x, _bounds.size.y)
+
+
 ## Make these world rectangles solid, replacing any walls set before. Parts outside
 ## the bounds are ignored. Call it after `set_bounds()`, which removes the walls.
 func set_walls(rects: Array[Rect2]) -> void:
@@ -2265,7 +2270,7 @@ func _pass_stuck(list: PackedInt32Array, first: int, count: int, _delta: float) 
 
 ## Growth (`set_growth`): the radius grows by its factor a second, until it is as big as the room.
 func _pass_growth(list: PackedInt32Array, first: int, count: int, delta: float) -> void:
-	var room: float = maxf(_bounds.size.x, _bounds.size.y)
+	var room: float = room_size()
 	for n in range(first, first + count):
 		var slot: int = list[n]
 		if _state[slot] == S_MOVING:
@@ -2676,14 +2681,15 @@ func _home_pick(caster: int, team: int, origin: Vector2, direction: Vector2, max
 ## inside a wall. The hits are found before any event is sent, so a handler may remove or free
 ## targets, or fire another ray, as deep as it likes. Nothing caps a ray (RAY_PATH_START). Where
 ## it ended and its heading there are left in `ray_end` and `ray_end_heading`, and the path it
-## walked in `ray_path`. It allocates only when a ray is bigger than any before it.
-func ray(caster: int, origin: Vector2, direction: Vector2, length: float, pierce: int = 0, layers: int = LAYER_ENEMY, tag: int = 0, width: float = 0.0, exclude: Node = null, bounces: int = 0) -> float:
+## walked in `ray_path`. A `ghost` ray passes through walls (it never turns or ends at one). It
+## allocates only when a ray is bigger than any before it.
+func ray(caster: int, origin: Vector2, direction: Vector2, length: float, pierce: int = 0, layers: int = LAYER_ENEMY, tag: int = 0, width: float = 0.0, exclude: Node = null, bounces: int = 0, ghost: bool = false) -> float:
 	ray_path_count = 0
 	if not direction.is_finite() or direction.is_zero_approx() or not is_finite(length) or length <= 0.0 or not origin.is_finite():
 		return 0.0
 	_path[0] = origin
 	_path[1] = origin + direction.normalized() * length
-	return _ray_path(caster, 1, pierce, layers, tag, width, exclude, true, bounces)
+	return _ray_path(caster, 1, pierce, layers, tag, width, exclude, true, bounces, Callable(), ghost)
 
 
 ## A beam like `ray` along the path `points[offset]` to `points[offset + count - 1]`, cut to
@@ -2693,10 +2699,10 @@ func ray(caster: int, origin: Vector2, direction: Vector2, length: float, pierce
 ## hits. With `bounces` it turns at walls as `ray` does, and goes on from there along `steer`'s
 ## path when it is given one (a homing beam homes again after every turn: `steer.call(turn, at,
 ## way, left)` gets the turn's index in the path, where it is, the way off the wall and the length
-## left, and returns the points that follow `at`; empty for straight on), else straight. Returns
-## how far it got along the path; `ray_end` and `ray_end_heading` say where, and `ray_path` what
-## it walked.
-func ray_points(caster: int, points: PackedVector2Array, offset: int, count: int, length: float, pierce: int = 0, layers: int = LAYER_ENEMY, tag: int = 0, width: float = 0.0, exclude: Node = null, hit: bool = true, bounces: int = 0, steer: Callable = Callable()) -> float:
+## left, and returns the points that follow `at`; empty for straight on), else straight. A
+## `ghost` one passes through walls. Returns how far it got along the path; `ray_end` and
+## `ray_end_heading` say where, and `ray_path` what it walked.
+func ray_points(caster: int, points: PackedVector2Array, offset: int, count: int, length: float, pierce: int = 0, layers: int = LAYER_ENEMY, tag: int = 0, width: float = 0.0, exclude: Node = null, hit: bool = true, bounces: int = 0, steer: Callable = Callable(), ghost: bool = false) -> float:
 	ray_path_count = 0
 	if count < 2 or offset < 0 or offset + count > points.size() or not is_finite(length) or length <= 0.0 or not points[offset].is_finite():
 		return 0.0
@@ -2717,7 +2723,7 @@ func ray_points(caster: int, points: PackedVector2Array, offset: int, count: int
 		_path[i] = point
 	if used == 0:
 		return 0.0
-	return _ray_path(caster, used, pierce, layers, tag, width, exclude, hit, bounces, steer)
+	return _ray_path(caster, used, pierce, layers, tag, width, exclude, hit, bounces, steer, ghost)
 
 
 ## A beam like `ray`, bent: it follows the quadratic curve from `origin` to `end` pulled
@@ -2828,7 +2834,7 @@ func strike(caster: int, target: Node, point: Vector2, heading: Vector2, tag: in
 
 
 ## The beam along the first `segments` pieces of `_path` (see `ray` and `ray_curve`).
-func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, width: float, exclude: Node, hit: bool, bounces: int = 0, steer: Callable = Callable()) -> float:
+func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, width: float, exclude: Node, hit: bool, bounces: int = 0, steer: Callable = Callable(), ghost: bool = false) -> float:
 	ray_end = Vector2.INF
 	ray_end_heading = Vector2.ZERO
 	ray_path_count = 0
@@ -2856,7 +2862,7 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 		var b: Vector2 = _path[at_piece + 1]
 		var piece: float = a.distance_to(b)
 		used = at_piece + 1
-		if _has_walls:
+		if _has_walls and not ghost:
 			# A ray walks every cell it crosses, however long it is.
 			var cut: float = _wall_hit(a, b, 1 << 30)
 			if cut >= 0.0:
@@ -3909,19 +3915,21 @@ func nearest_target(point: Vector2, radius: float, layers: int, exclude: Node2D 
 
 
 ## Fill `out` (cleared first) with the targets on `layers` whose hit circle overlaps
-## the circle (`point`, `radius`), and return how many. Pass the same array each time
+## the circle (`point`, `radius`), and return how many; with a finite `to`, the circles round
+## every point of the line from `point` to `to` (a beam's magnet). Pass the same array each time
 ## so nothing is allocated. Order is not defined.
-func targets_in(point: Vector2, radius: float, layers: int, out: Array[Node2D]) -> int:
+func targets_in(point: Vector2, radius: float, layers: int, out: Array[Node2D], to: Vector2 = Vector2.INF) -> int:
 	out.clear()
 	if not point.is_finite() or not is_finite(radius):
 		return 0
+	var end: Vector2 = to if to.is_finite() else point
 	_query_ready()
-	var cells: Vector4i = _query_cells(point, radius)
+	var cells: Vector4i = _query_cells((point + end) * 0.5, radius + point.distance_to(end) * 0.5)
 	for y in range(cells.y, cells.w + 1):
 		for x in range(cells.x, cells.z + 1):
 			var t: int = _cell_head[y * _grid_w + x]
 			while t >= 0:
-				if _query_match(t, point, radius, layers, 0):
+				if _query_match(t, Geometry2D.get_closest_point_to_segment(_target_pos[t], point, end), radius, layers, 0):
 					out.append(_targets[t])
 				t = _target_next[t]
 	return out.size()

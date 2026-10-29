@@ -165,4 +165,8 @@ func test_the_cards_an_event_needs() -> void:
 	# A ghost shot flies through walls.
 	var ghost: String = str(_compile([&"on_wall", &"ghost", &"straight", &"straight"]).wasted.get(0, ""))
 	check(ghost.contains("passes through walls"), "on wall on a ghost bolt says why: %s" % ghost)
-	check(not _compile([&"on_wall", &"ghost", &"ray", &"straight"]).wasted.has(0), "a ghost beam still meets walls")
+	# So do a ghost beam and a ghost fissure (rules R4f).
+	for form: StringName in [&"ray", &"fissure"]:
+		var ghost_line: String = str(_compile([&"on_wall", &"ghost", form, &"straight"]).wasted.get(0, ""))
+		check(ghost_line.contains("passes through walls"), "on wall on a ghost %s says why: %s" % [form, ghost_line])
+	check(not _compile([&"on_wall", &"ray", &"straight"]).wasted.has(0), "a plain beam meets walls")

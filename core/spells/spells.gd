@@ -342,11 +342,16 @@ var _steer_goals: PackedInt32Array = PackedInt32Array()
 var _steer_goal_count: int = 0
 var _steer_points: PackedVector2Array = PackedVector2Array()
 var _steer_call: Callable = _beam_steer
+## The scratch of `_wave` (a spiral beam's path).
+var _wave_points: PackedVector2Array = PackedVector2Array()
+var _wave_index: PackedInt32Array = PackedInt32Array()
 var _bm_count: PackedInt32Array = PackedInt32Array()
 var _bm_turn: PackedFloat32Array = PackedFloat32Array()
 var _bm_chain: PackedInt32Array = PackedInt32Array()
 var _bm_prev: PackedInt64Array = PackedInt64Array()
-var _bm_echo: PackedByteArray = PackedByteArray()
+## What live beam `at` hits with when not its spell's own `hit` (null): an echo's half, and what
+## `relay` took on while it is on (`_relay`).
+var _bm_hit: Array[HitProfile] = []
 ## Shield charges live beam `at` has left for shots it touches (melee I3, `_guard_path`).
 var _bm_shield: PackedInt32Array = PackedInt32Array()
 ## The path of a fissure or a beam's jump, for its guard (`_shoot_ray`); RAY_SEGMENTS is plenty for
@@ -531,7 +536,7 @@ func _init() -> void:
 	_bm_count.resize(SpellLimits.BEAM_ROWS_START)
 	_bm_chain.resize(SpellLimits.BEAM_ROWS_START)
 	_bm_prev.resize(SpellLimits.BEAM_ROWS_START)
-	_bm_echo.resize(SpellLimits.BEAM_ROWS_START)
+	_bm_hit.resize(SpellLimits.BEAM_ROWS_START)
 	_bm_shield.resize(SpellLimits.BEAM_ROWS_START)
 	_ray_guard_points.resize(64)
 	_bm_origin.resize(SpellLimits.BEAM_ROWS_START)
@@ -1037,7 +1042,7 @@ func _launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direct
 				made += 1
 			continue
 		if spell.motion == FormBase.Motion.FISSURE:
-			_shoot_ray(spell, tag, actor, origin, heading, carried, prev, source, -1.0, PIERCE_ALL, spell.echo_hit if _echo_spell == spell else null)
+			_shoot_ray(spell, tag, actor, origin, heading, carried, prev, source, -1.0, spell.echo_hit if _echo_spell == spell else null)
 			made += 1
 			continue
 		var slot: int = -1
@@ -1698,8 +1703,9 @@ func _register(slot: int, tag: int, spell: CompiledSpell, chain: int, prev: int)
 		_rec_hurt[slot] = 1
 
 
-## One beam: counted while it is cast, with its context set for the hit handler.
-func _shoot_ray(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading: Vector2, chain: int, prev: int, source: Node, length: float = -1.0, pierce: int = -1, hit: HitProfile = null) -> void:
+## One beam (a fissure, a chain jump of any ray): counted while it is cast, with its context set
+## for the hit handler. It pierces as its carrier does (`_ray_pierce`) and passes walls with ghost.
+func _shoot_ray(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading: Vector2, chain: int, prev: int, source: Node, length: float = -1.0, hit: HitProfile = null) -> void:
 	shot_started(tag)
 	var saved_tag: int = _ray_tag
 	var saved_dir: Vector2 = _ray_dir
@@ -1714,7 +1720,7 @@ func _shoot_ray(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, hea
 	_ray_hit = hit
 	_arc_slot = -1
 	var reach: float = spell.ray_length if length < 0.0 else length
-	var got: float = projectiles.ray(actor, origin, heading, reach, spell.pierce if pierce < 0 else pierce, HITS, tag, spell.radius * 0.5, source, _bounces(spell))
+	var got: float = projectiles.ray(actor, origin, heading, reach, _ray_pierce(spell), HITS, tag, spell.radius * 0.5, source, _bounces(spell), _ghost(spell))
 	var end: Vector2 = origin + heading * got
 	var end_heading: Vector2 = heading
 	if got > 0.0 and (spell.behaviour(ModifierBase.Behaviour.DEFLECT) > 0.0 or spell.behaviour(ModifierBase.Behaviour.SHIELD) > 0.0):
@@ -1725,7 +1731,7 @@ func _shoot_ray(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, hea
 			count = mini(projectiles.ray_path_count, _ray_guard_points.size())
 			for n in count:
 				_ray_guard_points[n] = projectiles.ray_path[n]
-		_guard_path(spell, tag, actor, _ray_guard_points, 0, count, got, roundi(spell.behaviour(ModifierBase.Behaviour.SHIELD)))
+		_guard_path(spell, tag, actor, _ray_guard_points, 0, count, got, spell.radius * 0.5, roundi(spell.behaviour(ModifierBase.Behaviour.SHIELD)))
 	if got > 0.0 and projectiles.ray_path_count > 2:
 		# It turned at walls: a cue for every straight leg, and it ends where the last one does.
 		end = projectiles.ray_end
@@ -1754,10 +1760,10 @@ func _shoot_ray(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, hea
 
 
 ## The shots of other teams touching the path `points[first]` to `points[first + count - 1]`
-## (cut `reach` pixels along) of a beam or fissure with `tag`, as wide as its hits: each is
-## deflected off the line (`deflect`), else stopped while `charges` last (melee I3). Returns
-## the charges left.
-func _guard_path(spell: CompiledSpell, tag: int, actor: int, points: PackedVector2Array, first: int, count: int, reach: float, charges: int) -> int:
+## (cut `reach` pixels along) of a beam or fissure with `tag`, `width` pixels either side as its
+## hits: each is deflected off the line (`deflect`), else stopped while `charges` last (melee
+## I3). Returns the charges left.
+func _guard_path(spell: CompiledSpell, tag: int, actor: int, points: PackedVector2Array, first: int, count: int, reach: float, width: float, charges: int) -> int:
 	var deflects: bool = spell.behaviour(ModifierBase.Behaviour.DEFLECT) > 0.0
 	if (not deflects and charges <= 0) or count < 2 or reach <= 0.0:
 		return charges
@@ -1768,7 +1774,7 @@ func _guard_path(spell: CompiledSpell, tag: int, actor: int, points: PackedVecto
 		var piece: float = a.distance_to(b)
 		if walked + piece > reach:
 			b = a.move_toward(b, reach - walked)
-		var found: int = projectiles.shots_on_segment(actor, a, b, spell.radius * 0.5)
+		var found: int = projectiles.shots_on_segment(actor, a, b, width)
 		charges = _guard(found, actor, tag, deflects, charges, a, b)
 		walked += piece
 		if walked >= reach or (not deflects and charges <= 0):
@@ -1831,7 +1837,7 @@ func _start_beam(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, he
 	_bm_tick[at] = 0.0
 	_bm_chain[at] = chain
 	_bm_prev[at] = prev
-	_bm_echo[at] = 1 if _echo_spell == spell else 0
+	_bm_hit[at] = spell.echo_hit if _echo_spell == spell else null
 	_bm_shield[at] = roundi(spell.behaviour(ModifierBase.Behaviour.SHIELD))
 	_bm_origin[at] = origin
 	_bm_dir[at] = heading.normalized()
@@ -1880,7 +1886,7 @@ func _beam_step(at: int, delta: float) -> void:
 	_beam_cast(at, hit)
 	# Every step, not only on its hits: a shot must not slip through between two ticks.
 	if _bm_on[at] != 0 and _bm_spell[at] == spell and _bm_tag[at] == tag:
-		_bm_shield[at] = _guard_path(spell, tag, _bm_actor[at], _bm_points, at * _bm_stride, _bm_count[at], _bm_reach[at], _bm_shield[at])
+		_bm_shield[at] = _guard_path(spell, tag, _bm_actor[at], _bm_points, at * _bm_stride, _bm_count[at], _bm_reach[at], _beam_width(at), _bm_shield[at])
 
 
 ## Puts live beam `at` where its caster holds it now. A beam whose wizard has no aim any more
@@ -1907,8 +1913,9 @@ func _beam_follow(at: int) -> void:
 ## The path live beam `at` follows (`_bm_points`): straight along its way for its `ray_length`,
 ## or, when it homes, bent onto a target in front of it (picked by `Projectiles.homing_point` and
 ## kept while it can), then for each pierce it has bent on from there toward another, as a homing
-## shot picks a new target after a hit; past the last it goes straight on. Its hits cut it at
-## its `ray_length` (`ray_points`). `beam_bend` and `beam_end` keep its first curve. Where each
+## shot picks a new target after a hit; past the last it goes straight on. With spiral the whole
+## path waves sideways (`_wave`). Its hits cut it at its `ray_length` (`ray_points`). `beam_bend`
+## and `beam_end` keep its first curve. Where each
 ## leg's target is in the path goes to `_steer_goals`, for `_beam_steer`: a homing beam that turns
 ## at a wall homes again from there with the legs it has not reached.
 func _beam_path(at: int) -> void:
@@ -1952,27 +1959,39 @@ func _beam_path(at: int) -> void:
 	if walked < length:
 		_bm_points[base + count] = from + way * (length - walked)
 		count += 1
+	var spiral: float = spell.behaviour(ModifierBase.Behaviour.SPIRAL)
+	if spiral > 0.0:
+		# It waves along the whole path; its legs' targets keep their place in it.
+		var made: int = _wave(_bm_points, base + 1, count - 1, spiral * 0.5, origin)
+		_fit_beam_points(made + 1)
+		base = at * _bm_stride
+		for n in made:
+			_bm_points[base + 1 + n] = _wave_points[n]
+		for k in _steer_goal_count:
+			_steer_goals[k] = _wave_index[_steer_goals[k] - 1]
+		count = made + 1
 	_bm_count[at] = count
 
 
-## A homing live beam (`_steer_row`) turned off a wall at point `turn` of its path (`at`, going
-## `way` off the wall, `left` pixels of it left): it homes again from there, as it did from its
-## staff, with the legs it had not reached before the wall (a leg's target past the turn was not
-## reached: `_steer_goals`), then goes straight on for what is left. Returns the points after
-## `at` (`Projectiles.ray_points` asks at every turn); the same rule as a homing shot, which
-## steers again after it bounces.
+## A homing or spiral live beam (`_steer_row`) turned off a wall at point `turn` of its path
+## (`at`, going `way` off the wall, `left` pixels of it left): it homes again from there, as it did
+## from its staff, with the legs it had not reached before the wall (a leg's target past the turn
+## was not reached: `_steer_goals`), then goes straight on for what is left, waving all the way
+## with spiral. Returns the points after `at` (`Projectiles.ray_points` asks at every turn); the
+## same rule as a homing or spiral shot, which steers and weaves again after it bounces.
 func _beam_steer(turn: int, at: Vector2, way: Vector2, left: float) -> PackedVector2Array:
 	var row: int = _steer_row
 	var spell: CompiledSpell = _bm_spell[row] if row >= 0 else null
 	var count: int = 0
-	if spell == null or spell.homing_range <= 0.0:
+	var spiral: float = spell.behaviour(ModifierBase.Behaviour.SPIRAL) if spell != null else 0.0
+	if spell == null or (spell.homing_range <= 0.0 and spiral <= 0.0):
 		_steer_points.resize(0)
 		return _steer_points
 	var reached: int = 0
 	while reached < _steer_goal_count and _steer_goals[reached] < turn:
 		reached += 1
 	_steer_goal_count = reached
-	var legs: int = maxi(spell.pierce, 0) + 1
+	var legs: int = maxi(spell.pierce, 0) + 1 if spell.homing_range > 0.0 else 0
 	var from: Vector2 = at
 	var heading: Vector2 = way
 	var walked: float = 0.0
@@ -2004,6 +2023,15 @@ func _beam_steer(turn: int, at: Vector2, way: Vector2, left: float) -> PackedVec
 			_steer_points.resize(count + 1)
 		_steer_points[count] = from + heading * (left - walked)
 		count += 1
+	if spiral > 0.0 and count > 0:
+		var made: int = _wave(_steer_points, 0, count, spiral * 0.5, at)
+		for k in range(reached, _steer_goal_count):
+			_steer_goals[k] = turn + _wave_index[_steer_goals[k] - turn - 1]
+		if _steer_points.size() < made:
+			_steer_points.resize(made)
+		for n in made:
+			_steer_points[n] = _wave_points[n]
+		count = made
 	_steer_points.resize(count)
 	return _steer_points
 
@@ -2034,11 +2062,13 @@ func _beam_cast(at: int, hit: bool) -> void:
 	var actor: int = _bm_actor[at]
 	var source: Node = _bm_source[at] if is_instance_valid(_bm_source[at]) else null
 	var bounces: int = _bounces(spell)
-	# A homing beam that turns at a wall homes again from there (`_beam_steer`).
-	var steer: Callable = _steer_call if bounces > 0 and spell.homing_range > 0.0 else Callable()
+	var ghost: bool = _ghost(spell)
+	var width: float = _beam_width(at)
+	# A homing or spiral beam that turns at a wall homes and waves again from there (`_beam_steer`).
+	var steer: Callable = _steer_call if bounces > 0 and (spell.homing_range > 0.0 or spell.behaviour(ModifierBase.Behaviour.SPIRAL) > 0.0) else Callable()
 	_steer_row = at
 	if not hit:
-		_bm_reach[at] = projectiles.ray_points(actor, _bm_points, at * _bm_stride, _bm_count[at], spell.ray_length, spell.pierce, HITS, tag, spell.radius * 0.5, source, false, bounces, steer)
+		_bm_reach[at] = projectiles.ray_points(actor, _bm_points, at * _bm_stride, _bm_count[at], spell.ray_length, spell.pierce, HITS, tag, width, source, false, bounces, steer, ghost)
 		_bm_tip[at] = projectiles.ray_end
 		_bm_tip_dir[at] = projectiles.ray_end_heading
 		if bounces > 0:
@@ -2054,12 +2084,14 @@ func _beam_cast(at: int, hit: bool) -> void:
 	_ray_dir = _bm_dir[at]
 	_ray_chain = _bm_chain[at]
 	_ray_prev = _bm_prev[at]
-	_ray_hit = spell.echo_hit if _bm_echo[at] != 0 else null
+	_ray_hit = _bm_hit[at]
 	_arc_slot = -1
-	var got: float = projectiles.ray_points(actor, _bm_points, at * _bm_stride, _bm_count[at], spell.ray_length, spell.pierce, HITS, tag, spell.radius * 0.5, source, true, bounces, steer)
+	var got: float = projectiles.ray_points(actor, _bm_points, at * _bm_stride, _bm_count[at], spell.ray_length, spell.pierce, HITS, tag, width, source, true, bounces, steer, ghost)
 	var tip: Vector2 = projectiles.ray_end
 	var tip_dir: Vector2 = projectiles.ray_end_heading
 	var turned: bool = bounces > 0 and projectiles.ray_path_count > 0
+	# What relay took on stays for its later hits.
+	var took: HitProfile = _ray_hit
 	_ray_tag = saved_tag
 	_ray_dir = saved_dir
 	_ray_chain = saved_chain
@@ -2068,6 +2100,7 @@ func _beam_cast(at: int, hit: bool) -> void:
 	_arc_slot = saved_arc
 	# A hit handler may have ended this beam (a rebuild) or reused its row.
 	if _bm_on[at] != 0 and _bm_spell[at] == spell and _bm_tag[at] == tag:
+		_bm_hit[at] = took
 		_bm_reach[at] = got
 		_bm_tip[at] = tip
 		_bm_tip_dir[at] = tip_dir
@@ -2095,6 +2128,77 @@ func _bounces(spell: CompiledSpell) -> int:
 	return roundi(spell.behaviour(ModifierBase.Behaviour.BOUNCE))
 
 
+## True when `spell`'s rays pass through walls (ghost), as its shots do.
+static func _ghost(spell: CompiledSpell) -> bool:
+	return spell.behaviour(ModifierBase.Behaviour.GHOST) > 0.0
+
+
+## How many targets past the first a ray of `spell` hits, a chain jump of it too (rules R4f): a
+## fissure every one on its line, anything else its pierce.
+static func _ray_pierce(spell: CompiledSpell) -> int:
+	return PIERCE_ALL if spell.motion == FormBase.Motion.FISSURE else spell.pierce
+
+
+## How far either side of its line live beam `at` hits: half its carrier's size, times its
+## growth for every second it has been on, up to the room's size (as a growing shot).
+func _beam_width(at: int) -> float:
+	var spell: CompiledSpell = _bm_spell[at]
+	var width: float = spell.radius * 0.5
+	var growth: float = spell.behaviour(ModifierBase.Behaviour.GROWTH)
+	if growth > 1.0:
+		width = minf(width * pow(growth, _bm_span[at] - _bm_life[at]), maxf(projectiles.room_size(), width))
+	return width
+
+
+## Live beam `at` pulls (magnet) the enemies within its card's reach toward its line: one pull for
+## each piece of its path, as far as it got (`pull_requested` with the piece's two ends).
+func _beam_pull(at: int) -> void:
+	var spell: CompiledSpell = _bm_spell[at]
+	var reach: float = spell.behaviour(ModifierBase.Behaviour.MAGNET)
+	var base: int = at * _bm_stride
+	var walked: float = 0.0
+	for n in _bm_count[at] - 1:
+		if walked >= _bm_reach[at]:
+			break
+		var a: Vector2 = _bm_points[base + n]
+		var b: Vector2 = _bm_points[base + n + 1]
+		var piece: float = a.distance_to(b)
+		if walked + piece > _bm_reach[at]:
+			b = a.move_toward(b, _bm_reach[at] - walked)
+		events.pull_requested.emit(_bm_actor[at], a, reach, SpellLimits.MAGNET_PULL, _bm_tag[at], b)
+		walked += piece
+
+
+## The path `start`, `points[first]` .. `points[first + count - 1]` waving sideways (spiral on a
+## beam, rules R4f), as a spiral shot weaves round its line: every piece cut into pieces of
+## BEAM_WAVE / BEAM_WAVE_STEPS pixels at most, each new point moved `amp * sin` of how far along
+## it is (a wave every BEAM_WAVE pixels; `start` stays put) off its piece. The points after
+## `start` go to `_wave_points`; `_wave_index[i]` is how many of them reach `points[first + i]`
+## (its index in the waved path, `start` being 0). Returns how many. Allocation-free once grown.
+func _wave(points: PackedVector2Array, first: int, count: int, amp: float, start: Vector2) -> int:
+	var most: float = SpellLimits.BEAM_WAVE / SpellLimits.BEAM_WAVE_STEPS
+	if _wave_index.size() < count:
+		_wave_index.resize(count)
+	var made: int = 0
+	var walked: float = 0.0
+	var from: Vector2 = start
+	for i in count:
+		var to: Vector2 = points[first + i]
+		var piece: float = from.distance_to(to)
+		var pieces: int = maxi(ceili(piece / most), 1)
+		var side: Vector2 = from.direction_to(to).orthogonal()
+		if _wave_points.size() < made + pieces:
+			_wave_points.resize(maxi(made + pieces, _wave_points.size() * 2))
+		for n in range(1, pieces + 1):
+			var t: float = float(n) / pieces
+			_wave_points[made] = from.lerp(to, t) + side * (amp * sin(TAU * (walked + piece * t) / SpellLimits.BEAM_WAVE))
+			made += 1
+		_wave_index[i] = made
+		walked += piece
+		from = to
+	return made
+
+
 ## Live beam `at` is over. With `finished` (its life ran out), its `blast` and its `on expire`
 ## payload happen where it ends; a beam switched off, rebuilt or dropped ends quietly.
 func _end_beam(at: int, finished: bool) -> void:
@@ -2106,6 +2210,7 @@ func _end_beam(at: int, finished: bool) -> void:
 	var actor: int = _bm_actor[at]
 	_bm_spell[at] = null
 	_bm_source[at] = null
+	_bm_hit[at] = null
 	var tip: Vector2 = _bm_tip[at]
 	if finished and spell != null and _bm_reach[at] > 0.0 and tip.is_finite():
 		_blast(spell, tag, actor, tip)
@@ -2133,7 +2238,7 @@ func _grow_beams() -> void:
 	_bm_count.resize(size)
 	_bm_chain.resize(size)
 	_bm_prev.resize(size)
-	_bm_echo.resize(size)
+	_bm_hit.resize(size)
 	_bm_shield.resize(size)
 	_bm_origin.resize(size)
 	_bm_dir.resize(size)
@@ -2570,7 +2675,9 @@ func _slam_cast(at: int, reach: float) -> void:
 	var saved_chain: int = _ray_chain
 	var saved_prev: int = _ray_prev
 	var saved_echo: CompiledSpell = _echo_spell
+	var saved_hit: HitProfile = _ray_hit
 	_ray_tag = tag
+	_ray_hit = null
 	_ray_chain = _sl_chain[at]
 	_ray_prev = _sl_prev[at]
 	_echo_spell = spell if _sl_echo[at] != 0 else null
@@ -2591,6 +2698,7 @@ func _slam_cast(at: int, reach: float) -> void:
 	_ray_chain = saved_chain
 	_ray_prev = saved_prev
 	_echo_spell = saved_echo
+	_ray_hit = saved_hit
 	_cast_jumps()
 
 
@@ -3024,6 +3132,14 @@ func beam_reach(at: int) -> float:
 	return _bm_reach[at]
 
 
+## How many times wider than its carrier live beam `at` is now (growth; 1.0 for a plain beam).
+func beam_growth(at: int) -> float:
+	var spell: CompiledSpell = _bm_spell[at]
+	if spell == null or spell.radius <= 0.0:
+		return 1.0
+	return _beam_width(at) / (spell.radius * 0.5)
+
+
 func beam_tint(at: int) -> Color:
 	return _bm_spell[at].tint if _bm_spell[at] != null else Color.WHITE
 
@@ -3064,7 +3180,7 @@ func _cast_jumps() -> void:
 		_jq_hit[at] = null
 		if spell == null or not is_instance_valid(target):
 			continue
-		_shoot_ray(spell, _jq_tag[at], _jq_actor[at], _jq_pos[at], _jq_dir[at], _jq_chain[at], _jq_prev[at], target, _jq_len[at], 0, hit)
+		_shoot_ray(spell, _jq_tag[at], _jq_actor[at], _jq_pos[at], _jq_dir[at], _jq_chain[at], _jq_prev[at], target, _jq_len[at], hit)
 	_jq_busy = false
 
 
@@ -3259,9 +3375,14 @@ func _step_arcs(delta: float) -> void:
 
 
 ## Every `magnet` shot pulls the enemies within its card's reach toward where it is, each step
-## (`pull_requested`; combat keeps the pull as a push that the next pull replaces). At most
-## `SpellLimits.MAX_PULLS_PER_STEP` shots pull in a step; which ones rotates, so none starves.
+## (`pull_requested`; combat keeps the pull as a push that the next pull replaces), and every
+## live `magnet` beam toward its line (`_beam_pull`). At most `SpellLimits.MAX_PULLS_PER_STEP`
+## shots pull in a step; which ones rotates, so none starves.
 func _step_magnets() -> void:
+	# A live beam with magnet pulls toward its line every step it is on (rules R4f).
+	for at in _bm_on.size():
+		if _bm_on[at] != 0 and _bm_spell[at].behaviour(ModifierBase.Behaviour.MAGNET) > 0.0:
+			_beam_pull(at)
 	var i: int = 0
 	while i < _magnet_count:
 		var slot: int = _magnets[i]
@@ -3282,7 +3403,8 @@ func _step_magnets() -> void:
 		var slot: int = _magnets[(_magnet_from + k) % _magnet_count]
 		var tag: int = projectiles.get_tag_of(slot)
 		var spell: CompiledSpell = _profiles.get(tag)
-		events.pull_requested.emit(SpellTag.caster_of(tag), projectiles.get_position_of(slot), spell.behaviour(ModifierBase.Behaviour.MAGNET), SpellLimits.MAGNET_PULL, tag)
+		var at: Vector2 = projectiles.get_position_of(slot)
+		events.pull_requested.emit(SpellTag.caster_of(tag), at, spell.behaviour(ModifierBase.Behaviour.MAGNET), SpellLimits.MAGNET_PULL, tag, at)
 	_magnet_from = (_magnet_from + pulls) % _magnet_count
 
 
@@ -3569,8 +3691,9 @@ func _on_hurt(actor: int, _amount: int, position: Vector2, _tag: int, _kind: Str
 ## teammate, whoever) takes on the infusions of that actor's last cast that had one
 ## (`_last_infused`): their elements, each with its status, join this hit and its later ones,
 ## its zaps and its chain jumps. The rest of the hit stays as it was (heal, slam, damage, kind).
-## An actor that never cast an infused carrier gives nothing. Shots and their zaps only (a beam
-## has no slot to keep it in). Allocates two profiles per such hit, never per frame.
+## An actor that never cast an infused carrier gives nothing. A ray with it (a beam, a fissure, a
+## jump of either; rules R4f) keeps what it took on in `_ray_hit` for its later hits, a live beam
+## for as long as it is on (`_bm_hit`). Allocates two profiles per such hit, never per frame.
 func _relay(target: Node, tag: int) -> void:
 	var spell: CompiledSpell = _profiles.get(tag)
 	if spell == null or spell.behaviour(ModifierBase.Behaviour.RELAY) <= 0.0 or not is_instance_valid(target):
@@ -3581,10 +3704,13 @@ func _relay(target: Node, tag: int) -> void:
 	var slot: int = projectiles.event_slot
 	if slot < 0 and tag == _ray_tag:
 		slot = _arc_slot
+	var by_ray: bool = slot < 0 and tag == _ray_tag
 	var donor: CompiledSpell = _last_infused[donor_actor]
-	if donor == null or slot < 0 or not _same(slot) or projectiles.get_tag_of(slot) != tag:
+	if donor == null or (not by_ray and (slot < 0 or not _same(slot) or projectiles.get_tag_of(slot) != tag)):
 		return
-	var base: HitProfile = _rec_relay[slot] if _rec_relay[slot] != null else spell.hit
+	var base: HitProfile = _ray_hit if by_ray else _rec_relay[slot]
+	if base == null:
+		base = spell.hit
 	var merged: HitProfile = null
 	for n in donor.hit.element_ids.size():
 		var id: StringName = donor.hit.element_ids[n]
@@ -3594,6 +3720,9 @@ func _relay(target: Node, tag: int) -> void:
 			merged = base.copy()
 		_add_element(merged, donor.hit, n)
 	if merged == null:
+		return
+	if by_ray:
+		_ray_hit = merged
 		return
 	if base.element_id == &"":
 		projectiles.set_core(slot, donor.tint)

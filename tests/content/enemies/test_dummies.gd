@@ -64,7 +64,7 @@ func test_it_never_moves() -> void:
 	var dummy := _training()
 	combat.call("hit", 0, dummy, 5, Vector2.RIGHT, 400.0)
 	events.emit_signal("target_move_requested", 0, dummy, Vector2(300.0, 300.0))
-	events.emit_signal("pull_requested", 0, Vector2(140.0, 100.0), 80.0, 300.0, 0)
+	events.emit_signal("pull_requested", 0, Vector2(140.0, 100.0), 80.0, 300.0, 0, Vector2(140.0, 100.0))
 	dummy.step(0.5)
 	check_equal(dummy.position, Vector2(100.0, 100.0), "knockback, a swap and a pull leave it where it is")
 

@@ -32,7 +32,7 @@ Line numbers are from main after #453 and drift; the function names hold. The fi
 | 2 | `spells.gd` `_relay` | relay × mend, heavy, multi-infusion | 2 | The merged profile drops `heal`, `slam`, later statuses, `kind`: a relay mend bolt that takes on an element hurts friends. |
 | 3 | `spells.gd` `_jump` | chain × homing, bounce, ghost, spiral, linger, growth, sticky, return, shield, pierce | 2, 6 | A jump is spawned with pierce 0 and `_register` without `_apply_travel` / `set_homing`: each jump is a plain bolt. |
 | 4 | `spells.gd` `_launch`, `projectile_manager.gd` `_is_flyer` | bounce, ghost, spiral, linger, growth, sticky × orbit, rune, wall | 1 | `_apply_travel` runs only for STRAIGHT, HOOK, SWAP and the setters refuse other motions: `growth · rune`, `sticky · orbit`, `linger · wall` do nothing, nothing is listed. |
-| 5 | `_start_beam`, `_shoot_ray`, `ray` | ghost, spiral, linger, growth, sticky, magnet, shield, relay × beam, fissure | 1 | A ray stops at walls (ghost does nothing), beams are never `_register`ed (magnet), no `_apply_shield` for rays, relay is shots only. Silent. |
+| 5 | `_start_beam`, `_shoot_ray`, `ray` | ghost, spiral, linger, growth, sticky, magnet, shield, relay × beam, fissure | 1 | A ray stops at walls (ghost does nothing), beams are never `_register`ed (magnet), no `_apply_shield` for rays, relay is shots only. Silent. **R4f:** ghost and relay on both, magnet, growth and spiral on a beam work; the rest are wasted with a reason. |
 | 6 | `_move_caster` (no hit path for moves) | chain, siphon, possess, heavy, relay, pierce, bounce, ghost, spiral, linger, growth, sticky, magnet × dash, teleport | 1 | A dash hits nothing: **`heavy · dash` ("shoulder charge", M2-staffs.md) does nothing**, nor the rest. |
 | 7 | `_register` (only slot shots get trackers) | timer, on hurt × beam, fissure, wizard dash/teleport, rain, decoy, familiar | 4 | `timer · beam`, `hold · on hurt · beam` never fire; the compiler accepts them (against DECISIONS "a hold carrier's timer for as long as it is on"). |
 | 8 | `_land_rain`, entities, moves | on hit, on kill, on reaction, on block, on wall × rain, decoy, familiar, dash, teleport | 4 | These carriers never hit under their own tag: `on hit · familiar`, `on wall · dash` never fire, silently. |
@@ -48,7 +48,7 @@ Line numbers are from main after #453 and drift; the function names hold. The fi
 **Suspected (check while fixing nearby):**
 - `projectile_manager.gd` `_pass_return`: a returning shot stops homing (pass-order comment).
 - `_register_hit`: sticky ends the remaining pierce at the first hit.
-- ~~`_jump`: flying jumps get pierce 0~~ (fixed in R1b; a ray jump still pierces nothing, R4).
+- ~~`_jump`: flying jumps get pierce 0~~ (fixed in R1b; a ray jump pierces as its carrier since R4f).
 - `_fire_payload` from a beam hit uses CASTER_POINT: an orbit payload circles the hit point, not the beam.
 - `_on_familiar_cast` uses CASTER_POINT while the familiar lives: an orbit, return or dash payload ignores the familiar.
 - `_shield_block`: when the hit-work budget runs out a block is skipped, not deferred (an enemy shot flies through).
@@ -151,6 +151,7 @@ The owner re-decides these under the new rule; each "yes, it should work" become
 
 - **Decided before, now in question:** mirror only on carriers that "have a back" (DECISIONS); a hold carrier does not echo (silent); a beam has no timer (contradicts the timer-for-hold decision); relay shots only, not on chain children or payloads; hold does nothing on rain; recoil skipped on dash and teleport; a beam's chain jump is a beam that pierces nothing; a hook with pierce fires `on expire` twice ("accepted for now"); a returning shot stops homing; a payload with no live shot is cast by its point (a payload dash or hook does nothing); **recoil pushes past 8 at once are dropped** (`mover.gd` `MAX_RECOILS`: a cap missed by #450, fix under rule 5 without a decision); hit-work starvation skipping shield blocks (defer, not skip). **Editing a staff or switching off a hold drops all its waiting launches** (`_release_hold` calls `_drop_pending` first): payload fires of carriers without hold that only wait for the per-step pacing (`FIRE_SHOTS_PER_STEP`) are lost too, against rule 5 (found in R1f, 2026-10-29).
 - **Cells to decide (W or ✓):** travel behaviours on orbit, rune, wall (growth on a rune grows the rune; linger and spiral on an orbit?); ghost, magnet, shield, relay on beams and fissures; **dash and teleport hitting what they pass** (makes `heavy · dash` the shoulder charge the card table promises, and chain, siphon, possess, relay on a dash); triggers on rain, decoy, familiar; mirror on any aimed carrier; one shield rule for every carrier that moves its caster.
+- **R4f (rays) done:** a beam's chain jump pierces as the beam does, a fissure's everything (item 13); relay on a beam and a fissure, from the actors its line hits, for every hit after while it is on (15); ghost on a beam and a fissure, magnet, growth and spiral on a beam (20). Linger, sticky and return stay wasted on both, magnet, growth and spiral on a fissure (DECISIONS.md, "Card rules R4f").
 
 ## Notes for the sessions
 

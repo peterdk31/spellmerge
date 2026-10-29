@@ -9,6 +9,8 @@ extends RefCounted
 ## `mates` (each a teammate's body that shots can hit: `at` Vector2 and `player`), `casts` (each
 ## `player`, `staff`, `cards`: card ids by slot, `at` seconds, `origin` and `aim`) and `seconds`.
 ## A combo row's `mates` ([x, y, player]) and cast `dir` ([x, y], along +x when left out) are kept.
+## A cast always starts at the origin (as in `combo_arena.gd`), whoever the player is; a mate is
+## only the body a bolt meets.
 ## Ids: `combo_<id>`, `<kind>_<id>` for a component (`element_fire`), `reaction_<id>` and
 ## `reaction_<id>_coop`. The kind prefix keeps the combo "shatter" and the reaction "shatter"
 ## apart.

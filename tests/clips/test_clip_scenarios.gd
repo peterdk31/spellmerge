@@ -209,3 +209,21 @@ func test_the_relay_clips_show_the_bolt_reach_the_imp() -> void:
 			stage.tick()
 		check(stage.combat.health_of(stage.imps[0]) < first_health, "%s: the bolt that passed the teammate hurts the imp" % id)
 		stage.free_all()
+
+
+func test_the_stage_holds_the_mate_as_a_body_and_crops_round_it() -> void:
+	var scenario: Dictionary = _find(_all(), "combo_relay_teammate_frost")
+	if scenario.is_empty():
+		check(false, "the relay combo is a clip")
+		return
+	var wide: Dictionary = scenario.duplicate()
+	wide["mates"] = [{"at": Vector2(400.0, 200.0), "player": 1}]
+	check_equal(StageScript.centre_of(wide), Vector2(200.0, 100.0), "the crop is round the mate")
+	var stage := StageScript.new(root, _registry)
+	check(stage.start(scenario), "the relay clip builds on the stage")
+	var bodies: int = 0
+	for child in stage.world.get_children():
+		if child is Node2D and (child as Node2D).position == Vector2(60.0, 0.0):
+			bodies += 1
+	check_equal(bodies, 1, "one body stands where the mate is")
+	stage.free_all()

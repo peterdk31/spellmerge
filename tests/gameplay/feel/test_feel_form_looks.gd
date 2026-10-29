@@ -237,11 +237,11 @@ func test_four_players_casting_and_hitting_stay_in_the_pools() -> void:
 	check_equal(feel.get_child_count(), children, "no new nodes were needed")
 
 
-func _the_shown_beam() -> Sprite2D:
-	var beam: Sprite2D = null
-	for sprite in feel._forms:
-		if sprite.visible:
-			beam = sprite
+func _the_shown_beam() -> MeshInstance2D:
+	var beam: MeshInstance2D = null
+	for node in feel._forms:
+		if node.visible:
+			beam = node
 	return beam
 
 
@@ -257,6 +257,7 @@ func test_a_beam_opens_wide_then_thins() -> void:
 	check(_swell() < first, "thinner after")
 	check(_swell() < 1.0, "thinner than at rest at last")
 	check(_the_shown_beam().scale == Vector2.ONE, "its pixels are never stretched")
+	check_equal((_the_shown_beam().material as ShaderMaterial).get_shader_parameter(&"beam_width"), FeelScript.BEAM_TEXTURE_HEIGHT, "nor its width: the shader swells its rim")
 
 
 func test_a_beam_flickers_by_the_preset_depth_on_every_other_step() -> void:
@@ -284,10 +285,11 @@ func test_a_beam_with_no_flicker_depth_is_steady() -> void:
 	check(is_equal_approx(fade, t), "and dissolves it by as much")
 
 
-func test_a_beam_is_drawn_by_the_beam_mode_with_its_cards() -> void:
+func test_a_beam_is_drawn_by_the_beam_shader_with_its_cards() -> void:
 	bus.form_shown.emit(3, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, Color.RED, 9)
 	var material: ShaderMaterial = _the_shown_beam().material as ShaderMaterial
-	check_equal(material.get_shader_parameter(&"beam_mode"), 2, "a sprite beam")
+	check(material.shader == FeelScript.BEAM_SHADER, "a beam")
+	check_equal(material.get_shader_parameter(&"beam_points"), 2, "along a path of two points")
 	check_equal(material.get_shader_parameter(&"beam_length"), 100.0, "as long as it got")
 	check_equal(material.get_shader_parameter(&"beam_player"), 3, "in its caster's hat ramp")
 	check_equal(material.get_shader_parameter(&"beam_look"), 9, "with the cast's cards")

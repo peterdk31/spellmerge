@@ -578,6 +578,8 @@ func component_stats(id: StringName) -> PackedStringArray:
 		var element: ElementBase = component
 		if element.status_id != &"":
 			out.append("%s %ss" % [String(element.status_id).capitalize(), _short(element.status_duration)])
+		if element.heals:
+			out.append("Heals wizards")
 		if not is_equal_approx(element.damage_scale, 1.0):
 			out.append("Dmg x" + _short(element.damage_scale))
 	elif component is TriggerBase:

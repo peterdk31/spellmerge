@@ -1,0 +1,12 @@
+{
+	"id": "mend_blast_self",
+	"name": "Self-heal burst",
+	"does": "A mend blast bolt ends on a near wall and bursts there, healing the hurt caster standing in the circle.",
+	"casts": [{"staff": 0, "cards": ["mend", "blast", "bolt"]}],
+	"imps": [],
+	"walls": [[30, -100, 8, 200]],
+	"guard": true,
+	"hurt": 60,
+	"seconds": 1.5,
+	"checks": [{"kind": "healed", "min": 1}]
+}

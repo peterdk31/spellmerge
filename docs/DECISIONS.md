@@ -113,6 +113,10 @@ The owner's direction after B7a: "The 4 staffs should be mapped to lb/rb lt/rt i
 - **The engine hook was missing**, so this card added `Spells._step_magnets` (a list of magnet slots, like arc's). Magnet is listed as wasted on a payload that fires from a point (`TRAVEL_ONLY`).
 - **Combo arena imps can now be pushed**, opt in: `ComboArena.pushable`, and the combo key `pushed`. Off by default so other combos behave as before. The clip recorder ignores `pushed`, so the magnet clips show no pull.
 
+## 2026-10-29: Mend card (staffs C)
+
+- **Mend is an infusion** (`heals`, no status, damage x1, complexity 2, look layer 6 green motes, tint Player 3's light green). Combat already healed, so the card is data only; the builder hub now says "Heals wizards". Its combos use hurt wizard bodies in the arena (`guard`, `allies`, `hurt`) and the checks `healed` and `lost_at_most`. The tint is close to Player 3's green; the art pass may pick another.
+
 ## 2026-10-29: Blast card (staffs C)
 
 - **Blast is a 40 px radius**, complexity 2, no mana change, look layer 9. The engine already ran it (`Spells._blast`, combat's area hit), so the card is data only. Its combos use a bolt (a hit, and a wall end), each with an imp that only the burst reaches. A blast on a dash cannot be a combo yet: the combo arena does not move its caster, so no move ever ends (`test_spells_moves` covers it).

@@ -43,6 +43,10 @@ var caster_moves: Array = []
 var reactions: Array = []
 ## Every status_applied as [caster, imp, status id, health the imp had lost by then].
 var statuses: Array = []
+## Every heal_dealt as [caster, body, amount].
+var heals: Array = []
+## Every wizard body added (`add_guard`), in order.
+var bodies: Array[Node2D] = []
 ## The most live shots seen after any step.
 var peak_shots: int = 0
 ## Every enemy shot a barrier or a shielded shot stopped (`shield_blocked`, `shot_blocked`).
@@ -83,6 +87,7 @@ func _init(root: Node) -> void:
 	bus.caster_move_requested.connect(func(player: int, mode: StringName, _to: Vector2, _seconds: float, _tag: int) -> void: caster_moves.append([player, mode]))
 	bus.shield_blocked.connect(func(actor: int, _at: Vector2, _tag: int) -> void: blocks.append(actor))
 	bus.shot_blocked.connect(func(actor: int, _at: Vector2, _tag: int) -> void: blocks.append(actor))
+	bus.heal_dealt.connect(func(caster: int, target: Node, amount: int, _at: Vector2) -> void: heals.append([caster, target, amount]))
 	bus.status_applied.connect(func(player: int, target: Node, id: StringName) -> void: statuses.append([player, target, id, lost(target as Node2D)]))
 
 
@@ -104,7 +109,22 @@ func add_guard(player: int, at: Vector2) -> Node2D:
 	_root.add_child(guard)
 	guard.global_position = at
 	combat.register_actor(guard, IMP_HEALTH, IMP_RADIUS)
+	bodies.append(guard)
 	return guard
+
+
+## Takes `amount` of health off the wizard body `body`, hit by an actor no wizard drives (so a
+## mend has something to heal).
+func hurt(body: Node2D, amount: int) -> void:
+	combat.hit(ActorSeats.enemy(projectiles.actors), body, amount)
+
+
+## Health given to wizard bodies by heals, all together.
+func healed() -> int:
+	var total: int = 0
+	for row: Array in heals:
+		total += int(row[2])
+	return total
 
 
 ## Sends an enemy bolt (a real cast, with a hit that hurts) from `from` toward `to`, cast by an

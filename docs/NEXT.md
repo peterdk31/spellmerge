@@ -14,7 +14,6 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
 - [x] **The old recipe path removed (staffs A6c).** Done in an owner session: `Spells.compile(recipe)`, `builder_view`, the recipe wrappers (`install`, `cast`, a spell's `begin_generation`) and the recipe compiler are gone, `begin_generation` takes a compiled staff; `CompiledSpell` lost `valid`, `reason`, `description`, `complexity`, `depth` and `held`; `SpellLimits` keeps only engine safeguards and tuning; the events `build_change_requested`, `spell_swap_requested`, `spell_changed`, `recipe_changed` and `active_spell_changed` are removed; tests build staffs (`tests/support/staff_kit.gd` turns the old recipe shorthand into card rows; `test_spell_tags.gd` replaces `test_spells_compile.gd`); the spells, core and gameplay READMEs say so. **Phase B and the cards can start; development is unpaused.**
 - [x] **Card: arc (staffs C).** After the slow, return and arc kit (owner, 2026-10-27). Data only.
 - [x] **Card: linger (staffs C).** After B1. Data only (M2-staffs.md, "Working in parallel").
-- [ ] **The later cards' looks (staffs C0b).** (`content/spells/modifiers/`, `core/projectiles/` drawing if a new kind is needed, `tests/content/spells/`) After C0 (#431). Thirteen modifiers give off no look (bounce, echo, ghost, linger, magnet, mirror, recoil, relay, return, short_delay, siphon, spiral, sticky), and several share a kind with a card often stacked beside them (growth and bigger 7, heavy and pierce 8, arc, possess and shield 10, hold and sniper 12, slow and mend's motes 6). Give each a `look_layer`, untangle the shares that hide a card on a common build, and add new kinds (15–22 are free) only where no existing one fits, as C0 added hops and wake. Keep C0's rule (the first six never share with each other or an infusion) and record which later shares are allowed in DECISIONS. Widen `test_original_looks.gd`, or add a test, so every modifier has a look and no modifier shares one with an infusion. Read the looks sheets at 4x to confirm the new kinds can be seen (C0 could not see hops and wake clearly).
 - [ ] **Stress and C2 (staffs D3).** Last: when every other task in both lanes has merged. Then the C2 checkpoint, with the owner's sandbox playtest on `/preview/`.
 
 ## Owner lane
@@ -47,10 +46,21 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 - Rime Crook and Bone Scepter (living staffs H5): moved to the bot's Queue on 2026-10-29.
 - [x] **The intro (living staffs H6).** (`gameplay/flow/`, `content/story/`) After H3.
 - [x] **The docs (living staffs H7).** (`docs/STYLE.md`, READMEs, `art/kit/`) Last.
+- [x] **Melee: the playable mockup (melee I1).** Done in an owner session on 2026-10-29 (an artifact, no PR); the numbers are in M2-staffs.md, "Phase I: melee", "Tuning".
+- [ ] **Melee: the swing kit (melee I2).** (`core/spells/`, `core/projectiles/`) After I1.
+- [ ] **Melee: the deflect kit (melee I3).** (`core/projectiles/`, `core/spells/`) After I2.
+- [ ] **Card: swing (melee I4).** (`content/spells/forms/swing/`) After I2.
+- [ ] **Card: deflect (melee I5).** (`content/spells/modifiers/deflect/`) After I3 and I4.
+- [ ] **Card: slam (melee I8).** (the playground, `core/spells/`, `content/spells/forms/slam/`) After I4.
+- [ ] **Freezes in co-op (melee I7).** (`gameplay/feel/`, `core/projectiles/`) Decided by the owner on 2026-10-29: local stops, game-wide only for a downed player and a boss kill (M2-staffs.md, "Freezes in co-op").
 
 ## Blocked
 
 ## Done recently
+
+- [x] **Screen shake setting (melee I6).** Settings has "Screen shake: On/Off" (on by default). It sends `screen_shake_changed` to feel (`Feel.shake_enabled`) and is saved in `SaveFile` (new `get_setting`/`set_setting`), read again when the menu is bound. Tests: `test_pause_menu.gd`, `test_feel_form_looks.gd`, `test_events.gd`.
+
+- [x] **The later cards' looks (staffs C0b).** All 29 modifiers have a `look_layer`; seven new kinds (15 weight, 16 ripple, 17 curl, 18 zig, 19 double, 20 converge, 21 drift), and no modifier shares a kind with an infusion. The shares that remain are listed in DECISIONS and checked by `test_original_looks.gd`. Kind 22 is the poof flag, so only 15–21 were free.
 
 - [x] **Polish: staff codes in the radial builder (staffs D2 follow-up).** X copies and A pastes a staff code in the radial builder; a code row under the ring shows "Copy code", "Paste code", then a one-line result ("Pasted 4 cards" or why it was refused); the staff's cast names (E1) show above it. Tests: `test_radial_builder.gd` (copy, paste, refusals, names for each cast).
 

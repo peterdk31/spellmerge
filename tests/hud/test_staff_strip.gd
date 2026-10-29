@@ -26,6 +26,8 @@ const FakeCards := preload("res://tests/support/fake_cards.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
 ## Loaded, not preloaded: the scene is also the "Hud" autoload (tests/README.md).
 const HUD_SCENE_PATH: String = "res://hud/panels/panels.tscn"
+## A save no test writes, so a Hud never reads the real `user://save.cfg`.
+const NO_SAVE: String = "user://test_no_save.cfg"
 
 const DT: float = 1.0 / 60.0
 const CARDS: int = 20
@@ -55,6 +57,7 @@ func before_each() -> void:
 	_staff.recharge = 0.5
 	_hud = (load(HUD_SCENE_PATH) as PackedScene).instantiate() as HudScript
 	_hud.events = _bus
+	_hud.save = SaveFile.new(NO_SAVE)
 	_hud.ui_focus = own(UIFocusScript.new()) as UIFocusScript
 	_hud.spells = _spells
 	root.add_child(_hud)

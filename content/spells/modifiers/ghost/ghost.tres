@@ -13,3 +13,4 @@ icon = ExtResource("2_icon")
 mana_mult = 1.2
 behaviour = 14
 behaviour_strength = 1.0
+look_layer = 19

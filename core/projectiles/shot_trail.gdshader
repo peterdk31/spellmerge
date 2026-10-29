@@ -92,6 +92,7 @@ const vec2 FAR = vec2(1.0e7);
 //   1-12    the look kinds by number (L_*; 11, the weave, gives off nothing)
 //   13-15   a dash's own: its speed streaks, and fire and frost from its feet
 //   16, 17  the kinds L_HOPS (chain) and L_WAKE (faster), moved up past the dash's rows
+//   18-24   the kinds 15-21 the same way (kind + 3): weight, ripple, curl, zig, double, converge, drift
 // A particle `j` born at moment `id` where the shot was (`at`, flying along `dir`, `side` its
 // left) with its numbers h(n) in [0, 1) (`th`) and `ago` seconds old, `u` of its life:
 //   life                   LIFE_BACK.x + LIFE_BACK.y h
@@ -119,27 +120,27 @@ const int ROW_DASH_EMBER = 14;
 const int ROW_DASH_FLECK = 15;
 const int ROW_HOPS = 16;
 const int ROW_WAKE = 17;
-const int ROWS = 18;
+const int ROWS = 25;
 //                                  twinkle                embers                    flecks                    gusts                    pull                      sparks                    motes                    glints                    streaks              burst                orbiters             weave                glitter              dash streak            dash ember             dash fleck             hops                   wake
-const vec4 LIFE_BACK[ROWS] = vec4[](vec4(0.3, 0.3, 0.0, -8.0), vec4(0.3, 0.35, 0.0, -4.0), vec4(0.5, 0.4, 0.0, -14.0), vec4(0.1, 0.12, 0.0, 0.0), vec4(0.22, 0.18, 0.0, 0.0), vec4(0.05, 0.1, 0.0, -10.0), vec4(0.5, 0.3, 0.0, 0.0), vec4(0.6, 0.0, 0.0, -6.0), vec4(0.25, 0.0, 0.0, 0.0), vec4(0.5, 0.0, 0.0, 0.0), vec4(0.8, 0.0, 0.0, 0.0), vec4(0.0), vec4(0.5, 0.0, 0.0, 0.0), vec4(0.1, 0.08, -4.0, 8.0), vec4(0.45, 0.4, 0.0, 0.0), vec4(0.6, 0.4, 0.0, 0.0), vec4(0.3, 0.2, 0.0, -4.0), vec4(0.2, 0.15, 0.0, -2.0));
-const vec4 JITTER[ROWS] = vec4[](vec4(4.0, 4.0, 0.0, 0.0), vec4(0.0, 2.0, 0.0, 0.0), vec4(3.0, 3.0, 0.0, 0.0), vec4(0.0, 0.0, 0.0, 7.0), vec4(0.0), vec4(0.0, 0.0, 6.0, 0.0), vec4(4.0, 4.0, 0.0, 0.0), vec4(4.0, 4.0, 0.0, 0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 13.0), vec4(0.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 6.0), vec4(0.0, 0.0, 0.0, 5.0));
-const vec4 VELOCITY[ROWS] = vec4[](vec4(0.0), vec4(14.0, 0.0, 0.0, 14.0), vec4(0.0), vec4(80.0, 70.0, 40.0, 0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(60.0, 50.0, 0.0, 0.0), vec4(0.0), vec4(0.0), vec4(0.0, 0.0, 110.0, 0.0), vec4(110.0, 60.0, 20.0, 0.0));
-const vec4 UP_DRAG[ROWS] = vec4[](vec4(0.0, 0.0, 1.0, 0.0), vec4(10.0, 24.0, 0.97, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 9.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 0.94, 0.0));
-const vec4 CIRCLE[ROWS] = vec4[](vec4(6.0, 0.0, 0.0, 0.0), vec4(0.0), vec4(0.0, 0.0, 4.0, 0.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0), vec4(14.0, 0.0, 0.0, 0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0), vec4(4.0, 8.0, 0.0, 0.0), vec4(0.0), vec4(0.0), vec4(0.0));
-const vec4 RADIUS[ROWS] = vec4[](vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(6.0, 6.0, 0.0, 1.4), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(2.0, 0.0, 6.0, 0.0), vec4(4.5, 0.0, 0.0, 0.0), vec4(0.0), vec4(2.5, 1.5, 0.0, 0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0));
-const vec4 SPIN[ROWS] = vec4[](vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(1.0, 0.0, 0.0, 0.0), vec4(1.0, 5.0, 0.0, 0.0), vec4(0.0), vec4(1.0, 0.0, 0.0, 0.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0));
-const vec4 TIP[ROWS] = vec4[](vec4(0.0, 0.0, 0.7, 0.18), vec4(0.0, 0.0, 1.0, 0.45), vec4(0.0, 0.0, 0.9, 0.32), vec4(0.025, 0.0, 0.8, 0.4), vec4(0.0, 0.0, 0.7, 0.55), vec4(0.0, 0.0, 1.2, 0.45), vec4(0.0, 0.0, 0.7, 0.25), vec4(0.0, 0.0, 0.8, 0.25), vec4(0.0, 1.0, 0.6, 0.25), vec4(0.0, 0.0, 0.8, 0.25), vec4(0.0, 0.0, 0.6, 0.25), vec4(0.0), vec4(0.0, 0.0, 0.6, 0.25), vec4(0.025, 0.0, 0.4, 1.0), vec4(0.0, 0.0, 1.0, 1.0), vec4(0.0, 0.0, 0.8, 1.0), vec4(0.14, 0.0, 0.9, 1.0), vec4(0.04, 0.0, 0.9, 0.7));
-const vec4 SHINE[ROWS] = vec4[](vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 3.0, 0.0, 1.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0));
-const vec4 BLINK[ROWS] = vec4[](vec4(3.0, 1.0, 0.0, 7.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(3.0, 1.0, 0.0, 7.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(1.0, 0.0, 3.0, 6.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(3.0, 1.0, 0.0, 7.0), vec4(0.0, 0.0, 0.0, 2.0), vec4(0.0, 0.0, 0.0, 1.0));
-const vec4 SHOW[ROWS] = vec4[](vec4(2.0, 0.0, -1.0, 0.0), vec4(0.0, 0.22, -1.0, 0.0), vec4(2.0, 0.0, -1.0, 0.3), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, 0.2, 1.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(3.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.3, -1.0, 0.0), vec4(2.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0));
-const vec4 ARM[ROWS] = vec4[](vec4(2.0, 0.0, 0.0, 3.0), vec4(2.0, 0.0, 0.0, 4.0), vec4(0.0, 0.2, 8.0, 4.0), vec4(2.0, 0.0, 0.0, 3.0), vec4(2.0, 0.0, 0.0, 4.0), vec4(2.0, 0.0, 0.0, 3.0), vec4(2.0, 0.0, 0.0, 2.0), vec4(0.35, 0.6, 17.0, 1.0), vec4(2.0, 0.0, 0.0, 1.0), vec4(2.0, 0.0, 0.0, 2.0), vec4(2.0, 0.0, 0.0, 1.0), vec4(2.0, 0.0, 0.0, 1.0), vec4(2.0, 0.0, 0.0, 1.0), vec4(2.0, 0.0, 0.0, 2.0), vec4(2.0, 0.0, 0.0, 4.0), vec4(2.0, 0.0, 0.0, 4.0), vec4(2.0, 0.0, 0.0, 2.0), vec4(2.0, 0.0, 0.0, 3.0));
-const vec4 COLOURS[ROWS] = vec4[](vec4(17.0, 18.0, 18.0, 18.0), vec4(5.0, 2.0, 1.0, 0.0), vec4(17.0, 8.0, 8.0, 7.0), vec4(5.0, 4.0, 3.0, 3.0), vec4(9.0, 10.0, 11.0, 11.0), vec4(17.0, 14.0, 13.0, 13.0), vec4(14.0, 13.0, 13.0, 13.0), vec4(17.0), vec4(17.0), vec4(2.0, 1.0, 1.0, 1.0), vec4(17.0), vec4(17.0), vec4(5.0), vec4(19.0, 20.0, 20.0, 20.0), vec4(5.0, 2.0, 1.0, 0.0), vec4(17.0, 8.0, 8.0, 7.0), vec4(18.0, 17.0, 4.0, 4.0), vec4(18.0, 17.0, 16.0, 15.0));
+const vec4 LIFE_BACK[ROWS] = vec4[](vec4(0.3, 0.3, 0.0, -8.0), vec4(0.3, 0.35, 0.0, -4.0), vec4(0.5, 0.4, 0.0, -14.0), vec4(0.1, 0.12, 0.0, 0.0), vec4(0.22, 0.18, 0.0, 0.0), vec4(0.05, 0.1, 0.0, -10.0), vec4(0.5, 0.3, 0.0, 0.0), vec4(0.6, 0.0, 0.0, -6.0), vec4(0.25, 0.0, 0.0, 0.0), vec4(0.5, 0.0, 0.0, 0.0), vec4(0.8, 0.0, 0.0, 0.0), vec4(0.0), vec4(0.5, 0.0, 0.0, 0.0), vec4(0.1, 0.08, -4.0, 8.0), vec4(0.45, 0.4, 0.0, 0.0), vec4(0.6, 0.4, 0.0, 0.0), vec4(0.3, 0.2, 0.0, -4.0), vec4(0.2, 0.15, 0.0, -2.0), vec4(0.45, 0.3, 0.0, -2.0), vec4(0.5, 0.1, 0.0, -4.0), vec4(0.35, 0.2, 0.0, -2.0), vec4(0.22, 0.1, 0.0, -2.0), vec4(0.4, 0.1, 0.0, -4.0), vec4(0.3, 0.1, 10.0, 4.0), vec4(0.7, 0.2, 0.0, -3.0));
+const vec4 JITTER[ROWS] = vec4[](vec4(4.0, 4.0, 0.0, 0.0), vec4(0.0, 2.0, 0.0, 0.0), vec4(3.0, 3.0, 0.0, 0.0), vec4(0.0, 0.0, 0.0, 7.0), vec4(0.0), vec4(0.0, 0.0, 6.0, 0.0), vec4(4.0, 4.0, 0.0, 0.0), vec4(4.0, 4.0, 0.0, 0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 13.0), vec4(0.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 6.0), vec4(0.0, 0.0, 0.0, 5.0), vec4(0.0, 0.0, 0.0, 6.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 3.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 4.0), vec4(0.0, 0.0, 0.0, 6.0), vec4(0.0, 0.0, 0.0, 2.0));
+const vec4 VELOCITY[ROWS] = vec4[](vec4(0.0), vec4(14.0, 0.0, 0.0, 14.0), vec4(0.0), vec4(80.0, 70.0, 40.0, 0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(60.0, 50.0, 0.0, 0.0), vec4(0.0), vec4(0.0), vec4(0.0, 0.0, 110.0, 0.0), vec4(110.0, 60.0, 20.0, 0.0), vec4(0.0), vec4(0.0), vec4(22.0, 20.0, 0.0, 0.0), vec4(20.0, 10.0, 80.0, 0.0), vec4(8.0, 0.0, 44.0, 0.0), vec4(45.0, 10.0, 0.0, 0.0), vec4(-8.0, 0.0, 0.0, 0.0));
+const vec4 UP_DRAG[ROWS] = vec4[](vec4(0.0, 0.0, 1.0, 0.0), vec4(10.0, 24.0, 0.97, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 9.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 0.94, 0.0), vec4(-16.0, -14.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 11.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0));
+const vec4 CIRCLE[ROWS] = vec4[](vec4(6.0, 0.0, 0.0, 0.0), vec4(0.0), vec4(0.0, 0.0, 4.0, 0.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0), vec4(14.0, 0.0, 0.0, 0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0), vec4(4.0, 8.0, 0.0, 0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0));
+const vec4 RADIUS[ROWS] = vec4[](vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(6.0, 6.0, 0.0, 1.4), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(2.0, 0.0, 6.0, 0.0), vec4(4.5, 0.0, 0.0, 0.0), vec4(0.0), vec4(2.5, 1.5, 0.0, 0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(1.0, 0.0, 9.0, 0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0));
+const vec4 SPIN[ROWS] = vec4[](vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(1.0, 0.0, 0.0, 0.0), vec4(1.0, 5.0, 0.0, 0.0), vec4(0.0), vec4(1.0, 0.0, 0.0, 0.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(1.0, 0.0, 0.0, 0.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0), vec4(0.0));
+const vec4 TIP[ROWS] = vec4[](vec4(0.0, 0.0, 0.7, 0.18), vec4(0.0, 0.0, 1.0, 0.45), vec4(0.0, 0.0, 0.9, 0.32), vec4(0.025, 0.0, 0.8, 0.4), vec4(0.0, 0.0, 0.7, 0.55), vec4(0.0, 0.0, 1.2, 0.45), vec4(0.0, 0.0, 0.7, 0.25), vec4(0.0, 0.0, 0.8, 0.25), vec4(0.0, 1.0, 0.6, 0.25), vec4(0.0, 0.0, 0.8, 0.25), vec4(0.0, 0.0, 0.6, 0.25), vec4(0.0), vec4(0.0, 0.0, 0.6, 0.25), vec4(0.025, 0.0, 0.4, 1.0), vec4(0.0, 0.0, 1.0, 1.0), vec4(0.0, 0.0, 0.8, 1.0), vec4(0.14, 0.0, 0.9, 1.0), vec4(0.04, 0.0, 0.9, 0.7), vec4(0.12, 0.0, 0.5, 0.4), vec4(0.0, 0.0, 0.9, 1.0), vec4(0.07, 0.0, 0.9, 1.0), vec4(0.06, 0.0, 0.8, 0.5), vec4(0.0, 1.0, 0.5, 0.5), vec4(0.0, 0.0, 0.9, 1.0), vec4(0.0, 0.0, 0.5, 0.4));
+const vec4 SHINE[ROWS] = vec4[](vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 3.0, 0.0, 1.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0));
+const vec4 BLINK[ROWS] = vec4[](vec4(3.0, 1.0, 0.0, 7.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(3.0, 1.0, 0.0, 7.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(1.0, 0.0, 3.0, 6.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(3.0, 1.0, 0.0, 7.0), vec4(0.0, 0.0, 0.0, 2.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(3.0, 1.0, 0.0, 5.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 3.0));
+const vec4 SHOW[ROWS] = vec4[](vec4(2.0, 0.0, -1.0, 0.0), vec4(0.0, 0.22, -1.0, 0.0), vec4(2.0, 0.0, -1.0, 0.3), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, 0.2, 1.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(3.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.3, -1.0, 0.0), vec4(2.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(1.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(1.0, 0.0, -1.0, 0.0));
+const vec4 ARM[ROWS] = vec4[](vec4(2.0, 0.0, 0.0, 3.0), vec4(2.0, 0.0, 0.0, 4.0), vec4(0.0, 0.2, 8.0, 4.0), vec4(2.0, 0.0, 0.0, 3.0), vec4(2.0, 0.0, 0.0, 4.0), vec4(2.0, 0.0, 0.0, 3.0), vec4(2.0, 0.0, 0.0, 2.0), vec4(0.35, 0.6, 17.0, 1.0), vec4(2.0, 0.0, 0.0, 1.0), vec4(2.0, 0.0, 0.0, 2.0), vec4(2.0, 0.0, 0.0, 1.0), vec4(2.0, 0.0, 0.0, 1.0), vec4(2.0, 0.0, 0.0, 1.0), vec4(2.0, 0.0, 0.0, 2.0), vec4(2.0, 0.0, 0.0, 4.0), vec4(2.0, 0.0, 0.0, 4.0), vec4(2.0, 0.0, 0.0, 2.0), vec4(2.0, 0.0, 0.0, 3.0), vec4(2.0, 0.0, 0.0, 3.0), vec4(2.0, 0.0, 0.0, 3.0), vec4(2.0, 0.0, 0.0, 3.0), vec4(2.0, 0.0, 0.0, 3.0), vec4(2.0, 0.0, 0.0, 3.0), vec4(2.0, 0.0, 0.0, 3.0), vec4(2.0, 0.0, 0.0, 3.0));
+const vec4 COLOURS[ROWS] = vec4[](vec4(17.0, 18.0, 18.0, 18.0), vec4(5.0, 2.0, 1.0, 0.0), vec4(17.0, 8.0, 8.0, 7.0), vec4(5.0, 4.0, 3.0, 3.0), vec4(9.0, 10.0, 11.0, 11.0), vec4(17.0, 14.0, 13.0, 13.0), vec4(14.0, 13.0, 13.0, 13.0), vec4(17.0), vec4(17.0), vec4(2.0, 1.0, 1.0, 1.0), vec4(17.0), vec4(17.0), vec4(5.0), vec4(19.0, 20.0, 20.0, 20.0), vec4(5.0, 2.0, 1.0, 0.0), vec4(17.0, 8.0, 8.0, 7.0), vec4(18.0, 17.0, 4.0, 4.0), vec4(18.0, 17.0, 16.0, 15.0), vec4(16.0, 15.0, 15.0, 15.0), vec4(17.0, 16.0, 15.0, 15.0), vec4(18.0, 17.0, 16.0, 16.0), vec4(17.0, 5.0, 4.0, 4.0), vec4(16.0, 16.0, 15.0, 15.0), vec4(17.0, 5.0, 4.0, 4.0), vec4(4.0, 3.0, 3.0, 3.0));
 
 // How long a trail with each kind draws its particles (seconds; x a shot, y a dash): the trail's
 // window is the longest of its kinds' and its tail's (a dash's at least 0.18 s; a plain shot's,
 // with no kind among 1-9, its twinkles' 0.6 s), so a kind that lives longer than its trail's
 // window (void's pull, a shield's sparks) is cut there, as the mockup's trails are.
-const vec2 WINDOW[15] = vec2[](vec2(0.6, 0.0), vec2(0.65, 0.85), vec2(0.9, 1.0), vec2(0.22), vec2(0.0), vec2(0.15), vec2(0.8), vec2(0.6), vec2(0.25), vec2(0.5), vec2(0.0), vec2(0.0), vec2(0.0), vec2(0.5), vec2(0.35));
+const vec2 WINDOW[22] = vec2[](vec2(0.6, 0.0), vec2(0.65, 0.85), vec2(0.9, 1.0), vec2(0.22), vec2(0.0), vec2(0.15), vec2(0.8), vec2(0.6), vec2(0.25), vec2(0.5), vec2(0.0), vec2(0.0), vec2(0.0), vec2(0.5), vec2(0.35), vec2(0.7), vec2(0.6), vec2(0.5), vec2(0.3), vec2(0.5), vec2(0.4), vec2(0.9));
 
 // What the vertex stage hands a pixel (by mode; see `fragment`): the pixel's world position, the
 // mode, three numbers and three colours.
@@ -160,25 +161,27 @@ vec4 trail_texel(float row, float newest, float k) {
 	return texelFetch(trail_data, ivec2(int(mod(n, float(TRAIL_SAMPLES))), int(row)), 0);
 }
 
-// The newest sample from `first` back to `last` whose time (`by_time`) or odometer is at most
-// `v`, the older end of the piece `v` is on: its k, or -1 when even the oldest is later.
-float sample_before(float row, float newest, float first, float last, float v, bool by_time) {
-	float lo_k = first;
-	float hi_k = last;
+// For each of `v`'s two numbers, the newest sample from `first` back to `last` whose time
+// (`by_time`) or odometer is at most it, the older end of the piece it is on: its k, or -1 when
+// even the oldest is later. Both are searched at once, and the vertex stage searches the path in
+// one place only (`vertex`): the compiler builds a loop once for every place it is called from,
+// and the Direct3D one takes its time over each.
+vec2 samples_before(float row, float newest, float first, float last, vec2 v, bool by_time) {
+	vec2 lo_k = vec2(first);
+	vec2 hi_k = vec2(last);
 	for (int i = 0; i < SEARCH_STEPS; i++) {
-		float half_k = floor((lo_k + hi_k) * 0.5);
-		vec4 s = trail_texel(row, newest, half_k);
-		if ((by_time ? s.w : s.z) <= v) {
-			hi_k = half_k;
-		} else {
-			lo_k = half_k + 1.0;
-		}
+		vec2 half_k = floor((lo_k + hi_k) * 0.5);
+		vec4 s0 = trail_texel(row, newest, half_k.x);
+		vec4 s1 = trail_texel(row, newest, half_k.y);
+		vec2 earlier = vec2(lessThanEqual(by_time ? vec2(s0.w, s1.w) : vec2(s0.z, s1.z), v));
+		hi_k = mix(hi_k, half_k, earlier);
+		lo_k = mix(half_k + 1.0, lo_k, earlier);
 	}
-	if (lo_k > last || first > last) {
-		return -1.0;
-	}
-	vec4 s = trail_texel(row, newest, lo_k);
-	return (by_time ? s.w : s.z) <= v ? lo_k : -1.0;
+	vec4 s0 = trail_texel(row, newest, lo_k.x);
+	vec4 s1 = trail_texel(row, newest, lo_k.y);
+	vec2 earlier = vec2(lessThanEqual(by_time ? vec2(s0.w, s1.w) : vec2(s0.z, s1.z), v));
+	vec2 inside = vec2(lessThanEqual(lo_k, vec2(last))) * (first <= last ? 1.0 : 0.0);
+	return mix(vec2(-1.0), lo_k, earlier * inside);
 }
 
 // A number in [0, 1) from three whole numbers and the trail's row: an integer hash, so a pixel's
@@ -220,7 +223,7 @@ vec3 tone(float i, Look L) {
 float trail_window(vec3 b, bool dash, float tail) {
 	float longest = dash ? max(tail, 0.18) : tail;
 	bool any = false;
-	for (int k = 1; k <= 14; k++) {
+	for (int k = 1; k <= 21; k++) {
 		if (bit_set(b, float(k))) {
 			longest = max(longest, dash ? WINDOW[k].y : WINDOW[k].x);
 			any = any || k <= 9;
@@ -237,7 +240,7 @@ float trail_window(vec3 b, bool dash, float tail) {
 // gives off two speed streaks (kind 0) and its cards at twice a shot's rate, fire and frost
 // always.
 int kind_row(float kind) {
-	return kind == L_HOPS ? ROW_HOPS : (kind == L_WAKE ? ROW_WAKE : int(kind + 0.5));
+	return int(kind + (kind > 12.5 ? 3.5 : 0.5));
 }
 
 float trail_kind(float id, float j, bool dash, vec4 kinds, float row) {
@@ -249,7 +252,7 @@ float trail_kind(float id, float j, bool dash, vec4 kinds, float row) {
 	}
 	float i = min(floor(th(id, j, 152.0, row) * kinds.w), kinds.w - 1.0);
 	float word = i < 4.0 ? kinds.x : (i < 8.0 ? kinds.y : kinds.z);
-	float look = mod(floor(word / exp2(mod(i, 4.0) * 4.0) + 0.001), 16.0);
+	float look = mod(floor(word / exp2(mod(i, 4.0) * 5.0) + 0.001), 32.0);
 	float rate = TIP[kind_row(look)].w;
 	if (dash) {
 		rate = look == L_EMBERS || look == L_FLECKS ? 1.0 : min(rate * 2.0, 1.0);
@@ -272,8 +275,9 @@ struct Spark {
 
 // One routine for every kind, driven by its row of the LOOK TABLE. `t_top` is when the path
 // ends (now for a live shot), `head_end` its newest end, `window` the trail's (WINDOW), `target`
-// where the shot is (or was last: void pulls in to it, shields circle it).
-Spark spark(float row, float newest, float count, float skip, vec4 head_end, float t_top, float window, vec2 target, bool dash, float id, float j, Look L) {
+// where the shot is (or was last: void pulls in to it, shields circle it), `k` the sample before
+// its moment (`samples_before`, by time).
+Spark spark(float row, float newest, float count, float skip, vec4 head_end, float t_top, float window, vec2 target, bool dash, float id, float j, float k, Look L) {
 	Spark S;
 	S.alive = false;
 	S.pos = vec2(0.0);
@@ -293,7 +297,6 @@ Spark spark(float row, float newest, float count, float skip, vec4 head_end, flo
 		return S;
 	}
 	// The piece it was born on, and where on it.
-	float k = sample_before(row, newest, skip, count - 1.0, t, true);
 	if (k < 0.0) {
 		return S;
 	}
@@ -429,11 +432,18 @@ void vertex() {
 	bool shown = false;
 	// A particle's slot: its moment back from now, and which of the moment's.
 	bool is_spark = quad == Q_SPARK_LIGHT || quad == Q_SPARK || (dash && slot < 32.0 && (quad == Q_PIECE_LIGHT || quad == Q_TAIL));
+	bool streak_slot = quad == Q_PIECE_LIGHT || quad == Q_TAIL;
+	float id = floor(trail_now * BIRTHS) - (streak_slot ? floor(slot * 0.5) : slot);
+	// A tail pixel's number (its place on the path), and the ends of a step of lightning's line.
+	float n = ceil(o_top) - 1.0 - slot;
+	float o_hi = min(4.0 * (floor(o_top / 4.0) - slot + 1.0), o_top);
+	float o_lo = 4.0 * (floor(o_top / 4.0) - slot);
+	// The one search of the path: the pieces the quad's moment, pixel or step ends are on.
+	vec2 key = is_spark ? vec2(id / BIRTHS) : (quad == Q_TAIL ? vec2(n) : vec2(o_hi, o_lo));
+	vec2 before = samples_before(row, newest, skip, count - 1.0, key, is_spark);
 	if (is_spark) {
-		bool streak_slot = quad == Q_PIECE_LIGHT || quad == Q_TAIL;
-		float back = streak_slot ? floor(slot * 0.5) : slot;
 		float j = streak_slot ? mod(slot, 2.0) : (dash ? 2.0 : 0.0);
-		Spark S = spark(row, newest, count, skip, head_end, t_top, trail_window(b, dash, tail), target, dash, floor(trail_now * BIRTHS) - back, j, L);
+		Spark S = spark(row, newest, count, skip, head_end, t_top, trail_window(b, dash, tail), target, dash, id, j, before.x, L);
 		if (S.alive) {
 			vec2 px = floor(S.pos);
 			if (quad == Q_SPARK_LIGHT || quad == Q_PIECE_LIGHT) {
@@ -533,8 +543,7 @@ void vertex() {
 	} else if (quad == Q_TAIL && !dash) {
 		// Tail pixel `slot` back from the head: one pixel per pixel of travel, thrown back a
 		// little, cooling as it ages (and lightning's only now and then).
-		float n = ceil(o_top) - 1.0 - slot;
-		float k = sample_before(row, newest, skip, count - 1.0, n, false);
+		float k = before.x;
 		if (k >= 0.0) {
 			vec4 A = trail_texel(row, newest, k);
 			vec4 B = k < skip + 0.5 ? head_end : trail_texel(row, newest, k - 1.0);
@@ -572,15 +581,13 @@ void vertex() {
 		// Step `slot` back from the head of the jagged line lightning draws behind its shot along
 		// the last tenth of a second of its path: it bends every 4 pixels, re-rolled every other
 		// frame, newer than 0.05 s in its light.
-		float o_hi = min(4.0 * (floor(o_top / 4.0) - slot + 1.0), o_top);
-		float o_lo = 4.0 * (floor(o_top / 4.0) - slot);
 		float jf = floor(trail_now * 30.0);
 		vec2 ends[2];
 		float agos[2];
 		bool found = o_hi > o_lo;
 		for (int e = 0; e < 2; e++) {
 			float o = e == 0 ? o_hi : o_lo;
-			float k = sample_before(row, newest, skip, count - 1.0, o, false);
+			float k = e == 0 ? before.x : before.y;
 			found = found && k >= 0.0;
 			vec4 A = trail_texel(row, newest, max(k, 0.0));
 			vec4 B = k < skip + 0.5 ? head_end : trail_texel(row, newest, k - 1.0);

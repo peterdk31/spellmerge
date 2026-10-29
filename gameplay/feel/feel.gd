@@ -3,7 +3,7 @@ extends Node
 ## `damage_dealt`, `enemy_died` and `player_downed`. It never changes damage,
 ## health or who wins, and it sends no events.
 ##
-##     Feel.shake_enabled = false     # the setting: no screen shake (kept in memory until core/save exists)
+##     Feel.shake_enabled = false     # the setting: no screen shake (the pause menu's "Screen shake" switch, saved by core/save)
 ##     Feel.preset = load("res://gameplay/feel/presets/punchy.tres")
 ##
 ## On a hit it does four things, all the same for every player:
@@ -56,6 +56,7 @@ const RegistryScript := preload("res://core/registry/registry.gd")
 const NO_LOOK: Dictionary = {}
 const FeelPresetScript :=preload("res://gameplay/feel/presets/feel_preset.gd")
 const FLASH_SHADER: Shader = preload("res://gameplay/feel/hit_flash.gdshader")
+const ShaderWarmupScript := preload("res://core/projectiles/shader_warmup.gd")
 ## The shot shaders Feel draws with (core/README.md, "The shot shaders"): beams; the effects'
 ## batches (flares, arcs, statuses); the sprite path of the death and afterimage copies.
 const BEAM_SHADER: Shader = preload("res://core/projectiles/shot_beam.gdshader")
@@ -76,13 +77,33 @@ const FORM_SLOTS: int = FORMS_PER_PLAYER * 5
 const ENEMY_FORMS: int = 4
 ## Beams and rings draw above the room, under the shots (50) and the flashes (20).
 const FORM_Z: int = 18
-## Lines for live beams, and points of each line, made at once; both grow to what core/spells has
-## (its beam rows and their paths grow too: no beam limit, owner 2026-10-29). A homing beam bends
-## from target to target and a bouncing one turns at walls, so it is drawn along its path's points.
-const LIVE_BEAMS_START: int = 64
-const LIVE_BEAM_POINTS_START: int = 80
-## The beam texture's height: a line this wide shows it at its own size.
+## Live beams made at once (more are made when core/spells has more: no beam limit, owner
+## 2026-10-29), and the most points of each one's drawn path (BEAM_POINTS in `shot_beam.gdshader`):
+## a homing beam bends from target to target and a bouncing one turns at walls, so it is drawn
+## along its path's points; a path with more is thinned evenly for its look (`_draw_live_beams`;
+## its hits and turns are the runtime's, whole).
+const LIVE_BEAM_POINTS: int = 80
+const LIVE_BEAMS: int = 64
+## How wide a beam that is shown whole (a short beam) is drawn: its core, rim, flares and glow.
 const BEAM_TEXTURE_HEIGHT: float = 32.0
+## The quad kinds of a beam's mesh (`beam_mesh`; Q_* in `shot_beam.gdshader`, PARTICLES ARE
+## GEOMETRY there): the light round each piece of its path, a splash spark's light, its card
+## particles, the splash sparks, each piece's pixels.
+const BEAM_Q_PIECE_LIGHT: int = 0
+const BEAM_Q_SPLASH_LIGHT: int = 1
+const BEAM_Q_PARTICLE: int = 2
+const BEAM_Q_SPLASH: int = 3
+const BEAM_Q_PIECE: int = 4
+## The mesh's quads in drawing order, as (kind, slots, 1 when the slots run backwards): the
+## lights first, then the particles (the newest on top), the splash (the first on top), the
+## beam's own pixels last. 12 particles (MAX_PARTICLES in the shot shaders), 6 splash sparks.
+const BEAM_QUADS: Array[Vector3i] = [
+	Vector3i(BEAM_Q_PIECE_LIGHT, LIVE_BEAM_POINTS - 1, 0),
+	Vector3i(BEAM_Q_SPLASH_LIGHT, 6, 0),
+	Vector3i(BEAM_Q_PARTICLE, 12, 0),
+	Vector3i(BEAM_Q_SPLASH, 6, 1),
+	Vector3i(BEAM_Q_PIECE, LIVE_BEAM_POINTS - 1, 0),
+]
 
 ## Sounds that can play at once.
 const SOUND_VOICES: int = 8
@@ -173,6 +194,23 @@ const EFFECT_STRIDE: int = 16
 ## The age code beside an effect's kind: TRACE_FROM + TRACE_SPAN x how far through it is.
 const EFFECT_FROM: float = 0.02
 const EFFECT_SPAN: float = 0.42
+## The quad kinds of an effect's mesh (`effect_mesh`; Q_* in `shot_effect.gdshader`, PARTICLES ARE
+## GEOMETRY there): its light, its card particles, its sparks, a poof's clouds and its flash.
+const EFFECT_Q_LIGHT: int = 0
+const EFFECT_Q_PARTICLE: int = 1
+const EFFECT_Q_SPARK: int = 2
+const EFFECT_Q_CLOUD: int = 3
+const EFFECT_Q_SHAPE: int = 4
+## The mesh's quads in drawing order, as (kind, slots, 1 when the slots run backwards): the light
+## first, then the particles (the newest on top), the sparks and clouds (the first on top), the
+## flash last. 12 particles (MAX_PARTICLES in the shot shaders), 16 sparks (a rune's), 4 clouds.
+const EFFECT_QUADS: Array[Vector3i] = [
+	Vector3i(EFFECT_Q_LIGHT, 1, 0),
+	Vector3i(EFFECT_Q_PARTICLE, 12, 0),
+	Vector3i(EFFECT_Q_SPARK, 16, 1),
+	Vector3i(EFFECT_Q_CLOUD, 4, 1),
+	Vector3i(EFFECT_Q_SHAPE, 1, 0),
+]
 ## How long a muzzle flash is compared with its width.
 ## The biggest camera kick in pixels, however fast the casting.
 const MAX_KICK_PIXELS: float = 4.0
@@ -238,13 +276,14 @@ var _react_left: PackedFloat32Array = PackedFloat32Array()
 var _react_total: PackedFloat32Array = PackedFloat32Array()
 var _react_amount: PackedFloat32Array = PackedFloat32Array()
 var _flash_material: ShaderMaterial = null
-## The live beams (`Spells.beam_*`), one line each, made once.
-var _live_beams: Array[Line2D] = []
-## Scratch for the points of the live beam being drawn.
-var _beam_line: PackedVector2Array = PackedVector2Array()
-## Beams (sprites made once): seconds left and in all, the owner's body tint and the beam's
-## length in pixels.
-var _forms: Array[Sprite2D] = []
+## The live beams (`Spells.beam_*`), one beam mesh each (`beam_mesh`), made once, and each one's
+## path as the shader takes it (x, y and how far along the beam; `beam_path`).
+var _live_beams: Array[MeshInstance2D] = []
+var _live_paths: Array[PackedVector3Array] = []
+## Beams shown whole (beam meshes made once) and their paths of two points: seconds left and in
+## all, the owner's body tint and the beam's length in pixels.
+var _forms: Array[MeshInstance2D] = []
+var _form_paths: Array[PackedVector3Array] = []
 var _form_left: PackedFloat32Array = PackedFloat32Array()
 var _form_total: PackedFloat32Array = PackedFloat32Array()
 var _form_body: PackedColorArray = PackedColorArray()
@@ -280,6 +319,8 @@ var _clock: float = 0.0
 ## statuses; each has room for every slot.
 var _effect_node: MultiMeshInstance2D = null
 var _effect_buffer: PackedFloat32Array = PackedFloat32Array()
+static var _effect_mesh: ArrayMesh = null
+static var _beam_mesh: ArrayMesh = null
 var _arc_node: MultiMeshInstance2D = null
 var _arc_buffer: PackedFloat32Array = PackedFloat32Array()
 var _status_node: MultiMeshInstance2D = null
@@ -346,23 +387,14 @@ func _ready() -> void:
 	_last_usec = Time.get_ticks_usec()
 	_flash_material = ShaderMaterial.new()
 	_flash_material.shader = FLASH_SHADER
+	ShaderWarmupScript.want(FLASH_SHADER, ShaderWarmupScript.RECT)
 	for i in FORM_SLOTS:
-		var form := Sprite2D.new()
-		var material := ShaderMaterial.new()
-		material.shader = BEAM_SHADER
-		form.material = material
-		form.top_level = true
-		form.visible = false
-		form.z_index = FORM_Z
-		form.centered = false
-		form.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		form.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
-		add_child(form)
-		_forms.append(form)
+		_forms.append(_make_beam())
+		_form_paths.append(_make_beam_path())
 	_make_effects()
-	_beam_line.resize(LIVE_BEAM_POINTS_START)
-	for i in LIVE_BEAMS_START:
-		_add_beam_line()
+	for i in LIVE_BEAMS:
+		_live_beams.append(_make_beam())
+		_live_paths.append(_make_beam_path())
 	_form_left.resize(FORM_SLOTS)
 	_form_total.resize(FORM_SLOTS)
 	_form_body.resize(FORM_SLOTS)
@@ -421,6 +453,7 @@ func _ready() -> void:
 	events.discharge_arc.connect(_on_discharge_arc)
 	events.status_applied.connect(_on_status_applied)
 	events.effect_slots_changed.connect(_on_effect_slots_changed)
+	events.screen_shake_changed.connect(_on_screen_shake_changed)
 	events.caster_move_finished.connect(_on_caster_move_finished)
 	events.projectile_expired.connect(_on_projectile_expired)
 	if combat == null:
@@ -971,25 +1004,96 @@ func _show_impact(ramp: int, position: Vector2, direction: Vector2) -> void:
 		show_effect(KIND_RING_OUT, position, direction, core, ramp, 0, 1, RING_SECONDS)
 
 
+## A beam's node: a beam mesh in world space drawn by the beam shader, hidden until shown.
+func _make_beam() -> MeshInstance2D:
+	var node := MeshInstance2D.new()
+	node.mesh = beam_mesh()
+	var material := ShaderMaterial.new()
+	material.shader = BEAM_SHADER
+	node.material = material
+	node.top_level = true
+	node.visible = false
+	node.z_index = FORM_Z
+	add_child(node)
+	return node
+
+
+func _make_beam_path() -> PackedVector3Array:
+	var path := PackedVector3Array()
+	path.resize(LIVE_BEAM_POINTS)
+	return path
+
+
+## The mesh a beam is drawn as (`shot_beam.gdshader`, PARTICLES ARE GEOMETRY there): small quads
+## told in their UV which quad kind (BEAM_Q_*) and slot they are, in BEAM_QUADS' order, as
+## `effect_mesh`. The shader places them along the beam's path in the world, so the mesh says
+## nothing of where: it is never culled (its box is the whole world). Made once.
+static func beam_mesh() -> ArrayMesh:
+	if _beam_mesh == null:
+		_beam_mesh = _quads_mesh(BEAM_QUADS)
+		_beam_mesh.custom_aabb = AABB(Vector3(-100000.0, -100000.0, -1.0), Vector3(200000.0, 200000.0, 2.0))
+	return _beam_mesh
+
+
 ## Make the effect batches (see "Effects" above): a MultiMesh of `effect_slots` quads in world
 ## space for each of the flares, the arcs and the statuses, each drawn by its own shot shader,
 ## and the arrays behind them.
 func _make_effects() -> void:
-	_status_node = _make_effect_batch(STATUS_SHADER)
-	_effect_node = _make_effect_batch(EFFECT_SHADER)
-	_arc_node = _make_effect_batch(ARC_SHADER)
+	var quad := QuadMesh.new()
+	quad.size = Vector2.ONE
+	_status_node = _make_effect_batch(STATUS_SHADER, quad)
+	_effect_node = _make_effect_batch(EFFECT_SHADER, effect_mesh())
+	_arc_node = _make_effect_batch(ARC_SHADER, quad)
 	_size_effects(effect_slots)
 
 
-func _make_effect_batch(shader: Shader) -> MultiMeshInstance2D:
+## The mesh an effect is drawn as (`shot_effect.gdshader`, PARTICLES ARE GEOMETRY there): small
+## quads, each told in its UV which quad kind (EFFECT_Q_*) and slot it is, in EFFECT_QUADS'
+## order. The shader places every quad in the effect's square, or folds it away; a vertex says
+## which quad and corner it is in its UV: x the slot + 0.25 or 0.75, y the kind + 0.25 or 0.75.
+## Made once.
+static func effect_mesh() -> ArrayMesh:
+	if _effect_mesh == null:
+		_effect_mesh = _quads_mesh(EFFECT_QUADS)
+	return _effect_mesh
+
+
+## A mesh of small quads, (kind, slots, 1 when the slots run backwards) for each entry of `quads`
+## in order: a vertex says which quad and corner it is in its UV, x the slot + 0.25 or 0.75, y
+## the kind + 0.25 or 0.75 (its position is a unit square round the origin).
+static func _quads_mesh(quads: Array[Vector3i]) -> ArrayMesh:
+	var verts := PackedVector2Array()
+	var uvs := PackedVector2Array()
+	var colors := PackedColorArray()
+	var indices := PackedInt32Array()
+	var corners: Array[Vector2] = [Vector2(0.0, 0.0), Vector2(1.0, 0.0), Vector2(1.0, 1.0), Vector2(0.0, 1.0)]
+	for entry: Vector3i in quads:
+		for n in entry.y:
+			var slot: int = entry.y - 1 - n if entry.z == 1 else n
+			var base: int = verts.size()
+			for corner: Vector2 in corners:
+				verts.append(corner - Vector2(0.5, 0.5))
+				uvs.append(Vector2(float(slot) + 0.25 + 0.5 * corner.x, float(entry.x) + 0.25 + 0.5 * corner.y))
+				colors.append(Color.WHITE)
+			indices.append_array(PackedInt32Array([base, base + 1, base + 2, base, base + 2, base + 3]))
+	var arrays: Array = []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = verts
+	arrays[Mesh.ARRAY_TEX_UV] = uvs
+	arrays[Mesh.ARRAY_COLOR] = colors
+	arrays[Mesh.ARRAY_INDEX] = indices
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	return mesh
+
+
+func _make_effect_batch(shader: Shader, mesh: Mesh) -> MultiMeshInstance2D:
 	var node := MultiMeshInstance2D.new()
-	var quad := QuadMesh.new()
-	quad.size = Vector2.ONE
 	var multimesh := MultiMesh.new()
 	multimesh.transform_format = MultiMesh.TRANSFORM_2D
 	multimesh.use_colors = true
 	multimesh.use_custom_data = true
-	multimesh.mesh = quad
+	multimesh.mesh = mesh
 	multimesh.visible_instance_count = 0
 	# Effects show anywhere in the world; there is no room to fit a box to.
 	multimesh.custom_aabb = AABB(Vector3(-100000.0, -100000.0, -1.0), Vector3(200000.0, 200000.0, 2.0))
@@ -1045,6 +1149,10 @@ func set_effect_slots(slots: int) -> int:
 
 func _on_effect_slots_changed(slots: int) -> void:
 	set_effect_slots(slots)
+
+
+func _on_screen_shake_changed(enabled: bool) -> void:
+	shake_enabled = enabled
 
 
 ## Show an effect of `kind` (KIND_BURST to KIND_CAST) at `at`, aimed along `dir`, in the ramp of
@@ -1307,23 +1415,21 @@ func _on_form_shown(caster: int, form: StringName, origin: Vector2, direction: V
 	var who: int = _budget_of(caster)
 	var slot: int = who * FORMS_PER_PLAYER + _next_form[who]
 	_next_form[who] = (_next_form[who] + 1) % FORMS_PER_PLAYER
-	var sprite: Sprite2D = _forms[slot]
-	sprite.global_position = origin
-	sprite.texture = preset.beam_texture
-	sprite.centered = false
-	# BEAM_LEAD past each end, so the flares are whole.
-	sprite.offset = Vector2(-BEAM_LEAD, -16.0)
-	sprite.region_enabled = true
-	sprite.region_rect = Rect2(0.0, 0.0, length + 2.0 * BEAM_LEAD, 32.0)
-	sprite.rotation = direction.angle()
-	sprite.scale = Vector2.ONE
-	var material: ShaderMaterial = sprite.material as ShaderMaterial
+	var node: MeshInstance2D = _forms[slot]
+	var end: Vector2 = origin + direction.normalized() * length
+	var path: PackedVector3Array = _form_paths[slot]
+	path[0] = Vector3(origin.x, origin.y, 0.0)
+	path[1] = Vector3(end.x, end.y, length)
+	var material: ShaderMaterial = node.material as ShaderMaterial
 	material.set_shader_parameter(&"core_override", Color(tint.r, tint.g, tint.b, 1.0))
-	material.set_shader_parameter(&"beam_mode", 2)
+	# A path of two points, BEAM_LEAD past each end, so the flares are whole.
+	material.set_shader_parameter(&"beam_path", path)
+	material.set_shader_parameter(&"beam_points", 2)
+	material.set_shader_parameter(&"beam_width", BEAM_TEXTURE_HEIGHT)
 	material.set_shader_parameter(&"beam_length", length)
 	material.set_shader_parameter(&"beam_lead", BEAM_LEAD)
 	material.set_shader_parameter(&"beam_start", origin)
-	material.set_shader_parameter(&"beam_end", origin + direction.normalized() * length)
+	material.set_shader_parameter(&"beam_end", end)
 	material.set_shader_parameter(&"beam_end_dir", direction.normalized())
 	material.set_shader_parameter(&"beam_player", _beam_ramp(ramp))
 	material.set_shader_parameter(&"beam_look", look)
@@ -1334,7 +1440,7 @@ func _on_form_shown(caster: int, form: StringName, origin: Vector2, direction: V
 	_form_body[slot] = body
 	_form_left[slot] = seconds
 	_form_total[slot] = seconds
-	sprite.visible = true
+	node.visible = true
 	_pose_form(slot, 1.0)
 
 
@@ -1350,101 +1456,73 @@ func _step_forms(real_delta: float) -> void:
 		_pose_form(i, _form_left[i] / _form_total[i])
 
 
-## One more line for a live beam, hidden until a beam is drawn on it.
-func _add_beam_line() -> void:
-	var line := Line2D.new()
-	var material := ShaderMaterial.new()
-	material.shader = BEAM_SHADER
-	line.material = material
-	line.top_level = true
-	line.visible = false
-	line.z_index = FORM_Z
-	line.texture_mode = Line2D.LINE_TEXTURE_TILE
-	line.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	line.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
-	line.joint_mode = Line2D.LINE_JOINT_ROUND
-	line.add_point(Vector2.ZERO)
-	line.add_point(Vector2.ZERO)
-	add_child(line)
-	_live_beams.append(line)
-
-
 ## Draw every live beam where it is this frame: along its curve, as far as it got, in its owner's
 ## tint with its element's colour in the core. It flares on each hit, flickers a little and fades
-## over the last quarter of its life. Nothing is allocated, but the first time there are more
-## beams, or longer paths, than ever before.
+## over the last quarter of its life. Nothing is allocated.
 func _draw_live_beams() -> void:
 	var count: int = 0
 	if spells != null and spells.has_method("beam_slots"):
 		count = int(spells.call("beam_slots"))
 	while _live_beams.size() < count:
-		_add_beam_line()
+		_live_beams.append(_make_beam())
+		_live_paths.append(_make_beam_path())
 	for i in _live_beams.size():
-		var line: Line2D = _live_beams[i]
+		var node: MeshInstance2D = _live_beams[i]
 		if i >= count or not bool(spells.call("beam_on", i)):
-			if line.visible:
-				line.visible = false
+			if node.visible:
+				node.visible = false
 			continue
-		var points: int = int(spells.call("beam_point_count", i))
-		if _beam_line.size() < points:
-			_beam_line.resize(maxi(points, _beam_line.size() * 2))
+		var all: int = int(spells.call("beam_point_count", i))
+		var points: int = mini(all, LIVE_BEAM_POINTS)
+		# Every `every`-th point of a longer path (and its last), so the whole beam is drawn.
+		var every: float = float(all - 1) / float(points - 1) if points > 1 and all > points else 1.0
 		var reach: float = spells.call("beam_reach", i)
 		var origin: Vector2 = spells.call("beam_point", i, 0) if points > 0 else Vector2.INF
 		if reach <= 0.0 or points < 2 or not origin.is_finite():
-			line.visible = false
+			node.visible = false
 			continue
-		# Its path up to where it got: whole pieces, then the last one cut short.
+		# Its path up to where it got: whole pieces, then the last one cut short, each point with
+		# how far along the beam it is. The shader draws it BEAM_LEAD past each end, so the flares
+		# there are whole.
+		var path: PackedVector3Array = _live_paths[i]
 		var walked: float = 0.0
 		var prev: Vector2 = origin
 		var used: int = 1
-		_beam_line[0] = origin
+		var end_at: Vector2 = origin
+		path[0] = Vector3(origin.x, origin.y, 0.0)
 		for n in range(1, points):
-			var point: Vector2 = spells.call("beam_point", i, n)
+			var point: Vector2 = spells.call("beam_point", i, mini(roundi(n * every), all - 1))
 			var piece: float = prev.distance_to(point)
 			if walked + piece >= reach:
-				_beam_line[used] = prev.move_toward(point, reach - walked)
+				end_at = prev.move_toward(point, reach - walked)
 				walked = reach
+				path[used] = Vector3(end_at.x, end_at.y, walked)
 				used += 1
 				break
 			walked += piece
-			_beam_line[used] = point
+			path[used] = Vector3(point.x, point.y, walked)
+			end_at = point
 			used += 1
 			prev = point
-		# The line only changes its number of points when the path does. It reaches BEAM_LEAD past
-		# each end, so the flares there are whole.
-		while line.get_point_count() < used:
-			line.add_point(Vector2.ZERO)
-		while line.get_point_count() > used:
-			line.remove_point(line.get_point_count() - 1)
-		var start_dir: Vector2 = _beam_line[0].direction_to(_beam_line[1])
-		var end_at: Vector2 = _beam_line[used - 1]
-		var end_dir: Vector2 = _beam_line[used - 2].direction_to(end_at)
-		for n in used:
-			var point: Vector2 = _beam_line[n]
-			if n == 0:
-				point -= start_dir * BEAM_LEAD
-			elif n == used - 1:
-				point += end_dir * BEAM_LEAD
-			line.set_point_position(n, point)
+		var before: Vector3 = path[used - 2]
+		var end_dir: Vector2 = Vector2(before.x, before.y).direction_to(end_at)
 		var since: float = spells.call("beam_since_hit", i)
 		var left: float = spells.call("beam_left", i)
 		var fade: float = clampf(left * 4.0, 0.0, 1.0)
 		var flare: float = 1.0 + preset.beam_flare * maxf(1.0 - since / maxf(preset.beam_seconds * preset.beam_flare_share, 0.001), 0.0)
 		var flicker: float = 1.0 - preset.beam_flicker_depth * float(int(since * preset.beam_flicker_rate) % 2)
-		# Drawn by the shader's beam mode across a fixed width; flare, flicker and fade swell and
-		# dissolve its pixels instead of stretching them.
-		line.width = BEAM_WIDTH
-		line.texture = preset.beam_texture
-		line.texture_mode = Line2D.LINE_TEXTURE_STRETCH
+		# Drawn across a fixed width; flare, flicker and fade swell and dissolve its pixels instead
+		# of stretching them.
 		var caster: int = spells.call("beam_caster", i)
 		var body: Color = Color.WHITE
 		if projectiles != null and projectiles.has_method("tint_of"):
 			body = projectiles.call("tint_of", caster) as Color
 		var tint: Color = spells.call("beam_tint", i)
-		var material: ShaderMaterial = line.material as ShaderMaterial
+		var material: ShaderMaterial = node.material as ShaderMaterial
 		material.set_shader_parameter(&"core_override", Color(tint.r, tint.g, tint.b, 1.0))
 		material.set_shader_parameter(&"body_tint", Color(body.r, body.g, body.b, fade * preset.beam_alpha))
-		material.set_shader_parameter(&"beam_mode", 1)
+		material.set_shader_parameter(&"beam_path", path)
+		material.set_shader_parameter(&"beam_points", used)
 		material.set_shader_parameter(&"beam_length", walked)
 		material.set_shader_parameter(&"beam_lead", BEAM_LEAD)
 		material.set_shader_parameter(&"beam_start", origin)
@@ -1457,16 +1535,15 @@ func _draw_live_beams() -> void:
 		material.set_shader_parameter(&"beam_fade", fade)
 		material.set_shader_parameter(&"beam_swell", maxf(fade, 0.35) * flare * flicker)
 		material.set_shader_parameter(&"beam_glow", preset.beam_alpha)
-		line.visible = true
+		node.visible = true
 
 
 ## Show beam `slot` at `t` (1 just shown, 0 gone): its rim and glow swell for its first moments
 ## (the payoff), then thin and flicker, and it dissolves into pixels (`beam_swell`, `beam_fade`).
 func _pose_form(slot: int, t: float) -> void:
-	var sprite: Sprite2D = _forms[slot]
 	var body: Color = _form_body[slot]
 	var age: float = 1.0 - t
-	var material: ShaderMaterial = sprite.material as ShaderMaterial
+	var material: ShaderMaterial = _forms[slot].material as ShaderMaterial
 	material.set_shader_parameter(&"sim_time", _clock)
 	material.set_shader_parameter(&"body_tint", Color(body.r, body.g, body.b, t * preset.beam_alpha))
 	var flare: float = 1.0 + preset.beam_flare * maxf(1.0 - age / preset.beam_flare_share, 0.0)

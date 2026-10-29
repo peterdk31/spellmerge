@@ -34,6 +34,8 @@ signal pause_requested(player: int)
 ## Sender: hud. The "Effect slots" slider in the pause menu (Settings) moved: how many effects
 ## (the glowing flares of casts, impacts, rings and dashes) may show at once. Heard by feel.
 signal effect_slots_changed(slots: int)
+## Sender: hud. The "Screen shake" switch in the pause menu (Settings) flipped, or the saved choice was loaded when the menu was bound. Heard by feel, which sets `shake_enabled`.
+signal screen_shake_changed(enabled: bool)
 ## The Sandbox button was pressed (only shown in `dev` and `preview` builds). Heard by flow, which starts the sandbox (staffs B7).
 signal sandbox_requested(player: int)
 ## `player` picked a sandbox action on the pause menu's sandbox page: `imp_wave` or `reset_dummies`. Heard by flow (staffs B7).
@@ -150,6 +152,13 @@ signal run_started(player_count: int)
 signal run_ended(victory: bool)
 ## Sender: flow. The players entered the room `room_id`.
 signal room_entered(room_id: StringName)
+## Sender: core/loading. Work before playing has begun behind the loading screen (`Loading.run`;
+## Flow runs `play_tasks` on Play). Heard by hud, which shows the screen until `loading_finished`.
+signal loading_started()
+## Sender: core/loading. `done` of the load's `total` units are done (the screen's bar). Heard by hud.
+signal loading_progressed(done: int, total: int)
+## Sender: core/loading. The load is over (done, or cancelled). Heard by hud.
+signal loading_finished()
 ## Sender: flow. The room `room_id` was cleared.
 signal room_cleared(room_id: StringName)
 ## Sender: flow. A run started in the sandbox (`on` true) or out of it (false), or the sandbox run ended (false). Heard by hud, whose pause menu shows its Sandbox entry only while it is on.

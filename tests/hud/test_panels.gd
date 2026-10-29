@@ -16,6 +16,8 @@ const PanelScene := preload("res://hud/panels/player_panel/player_panel.tscn")
 ## Loaded when needed, not preloaded: this scene is also the "Hud" autoload, and
 ## preloading it here makes the autoload's own load fail at start (cyclic resource).
 const HUD_SCENE_PATH: String = "res://hud/panels/panels.tscn"
+## A save no test writes, so a Hud never reads the real `user://save.cfg`.
+const NO_SAVE: String = "user://test_no_save.cfg"
 const HudScript := preload("res://hud/panels/panels.gd")
 const SpellmergeTheme := preload("res://hud/theme/spellmerge_theme.tres")
 ## Panel background alpha must stay below 1 (a wizard or enemy under a corner panel shows
@@ -68,6 +70,7 @@ func _make_hud() -> Array:
 	var focus: UIFocusScript = UIFocusScript.new()
 	var hud: HudScript = (load(HUD_SCENE_PATH) as PackedScene).instantiate() as HudScript
 	hud.events = bus
+	hud.save = SaveFile.new(NO_SAVE)
 	hud.ui_focus = focus
 	root.add_child(hud)
 	return [hud, bus, focus]

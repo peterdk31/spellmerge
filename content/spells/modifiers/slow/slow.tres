@@ -12,4 +12,4 @@ complexity = 1
 icon = ExtResource("2_icon")
 speed_mult = 0.3
 lifetime_mult = 3.0
-look_layer = 6
+look_layer = 21

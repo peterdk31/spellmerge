@@ -228,7 +228,22 @@ func _next_scenario() -> void:
 			_finish(["bot %d could not take its virtual device" % (index + 1)])
 			return
 		_bots.append(bot)
+	# As a player starts: the first Play loads behind the loading screen (the shaders compile
+	# there, not while this run is measured); the scenario goes on when the room is up.
 	_events.emit_signal("play_requested", 0)
+	var loading: Node = get_tree().root.get_node_or_null("Loading")
+	if loading != null and bool(loading.call("is_loading")):
+		_events.connect("room_entered", _on_loaded, CONNECT_ONE_SHOT)
+		return
+	_start_measuring(scenario)
+
+
+func _on_loaded(_room_id: StringName) -> void:
+	_start_measuring(SCENARIOS[scenarios[_current]])
+
+
+## The room is up (or should be): give the wizards their stress staffs and start the scenario.
+func _start_measuring(scenario: Dictionary) -> void:
 	if _flow.get("world") == null:
 		_finish(["the run did not start"])
 		return

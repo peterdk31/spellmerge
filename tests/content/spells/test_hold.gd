@@ -69,7 +69,7 @@ func test_the_card_is_a_valid_modifier() -> void:
 	check_equal(card.kind(), &"modifier", "a modifier card")
 	check_equal(card.behaviour, ModifierBase.Behaviour.HOLD, "the hold behaviour")
 	check(card.behaviour_strength > 0.0, "with a strength")
-	check_equal(card.look_layer, 12, "and glitters")
+	check_equal(card.look_layer, 21, "and drifts, a look of its own beside sniper's glitter")
 	check(card.range_problems().is_empty(), "inside every range: %s" % [card.range_problems()])
 
 

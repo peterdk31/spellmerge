@@ -7,6 +7,7 @@ Ideas and future work outside the current milestone (docs/PLAN.md, "Planning sys
 For later milestones; see `docs/milestones/M2-staffs.md`, "Later".
 
 
+- **More melee carriers (owner 2026-10-29, after `swing` has been played).** `lunge` (a short step forward with a hit at its end), `whirl` (a 360° sweep round the caster) and `saw` (tiny repeated hits at the tip, close to 0 mana and delay; `hold · saw`, `siphon · saw`). See M2-staffs.md, "Phase I".
 - **Staff types (M3).** An always-cast slot, a shuffle staff (random order), built-in recoil, cheaper `hold`; staffs found in runs with other slot counts, delays and recharges.
 - **Arc zaps and `on hit` (M3 staffs or relics, owner 2026-10-27).** For now an `arc` zap is a hit like any other, so it sets off `on hit` payloads and chains. Later that should not be the card's default but something a build earns: either an implicit mod on a staff type ("zaps count as hits") or a relic. Then the plain arc zap stops setting off `on hit`.
 - **Staff spread (M3, owner 2026-10-27).** Found staffs have a `spread`: either rolled at random, or starting high and upgradable to lower values. The runtime and `spread_mult` (Sniper) are in since 2026-10-27; the dev and starter staffs aim true.
@@ -169,7 +170,6 @@ Weak spots found in the architecture review of 2026-10-20 (docs/ARCHITECTURE.md)
 
 ## Ideas from the community
 
-- **Downed wizard shrinks into its hat (#417, p3, idea).** Moved off the queue on 2026-10-29: wizards are floating staffs now (living staffs H3), with no hat, and the downed look (lying flat, eyes shut) exists. If the wizard's hat gets a role in the story (the intro, the final boss), a hat gag could return then.
 - **Relic idea: The Nuke (#416, p3, idea).** For M3, when relics arrive: no mana regeneration, every cast spends all current mana, a full refill every X seconds. Open: how a cast scales with the mana spent, and the refill interval.
 
 - **Summonable pet that draws enemy fire (#208, p3, idea).** Kept on the backlog on 2026-10-23, not scheduled; deferred until M3's design is written (reasoning in `docs/DECISIONS.md`). Prefer a spell route (a "familiar" form or modifier) over a pet system; decide in M3 (relics, run rewards) and M5 (unlock). Needs: an enemy targeting rule in `gameplay/ai` that can prefer a decoy, and health for a shot-like target in `gameplay/combat`.

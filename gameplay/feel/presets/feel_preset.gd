@@ -2,7 +2,8 @@ class_name FeelPreset
 extends Resource
 ## One set of juice numbers for `gameplay/feel`: how long the hit-stop lasts, how
 ## hard the screen shakes and how the hit particles look. A preset only tunes
-## reactions; it can never change damage or outcomes.
+## reactions; it can never change damage or outcomes. The point moments (a parry, a
+## deflect, a death, a downed wizard, a self-hit, a heal) are cues in `content/cues/`.
 
 ## Unique name of the preset, also its file name.
 @export var id: StringName = &""
@@ -12,16 +13,11 @@ extends Resource
 ## Seconds after a body's plain hit-stop in which a plain hit does not hold that body again, per
 ## body. Keeps a body in a crowded fight from being held for ever (0.04 s of every 0.19 s is 21%).
 @export_range(0.0, 0.5, 0.01) var hit_stop_rest: float = 0.15
-## Seconds an enemy death holds its killer, and a downed wizard stops the game (a little longer
-## than a plain hit).
-@export_range(0.0, 0.3, 0.005) var death_stop_seconds: float = 0.07
 ## Engine.time_scale while the game-wide stop lasts, which only a downed wizard and a boss kill
 ## use (0 would freeze the physics step).
 @export_range(0.01, 1.0, 0.01) var hit_stop_scale: float = 0.05
-## Shake added by a hit, a death and a downed wizard (0 to 1, "trauma").
+## Shake added by a plain hit (0 to 1, "trauma").
 @export_range(0.0, 1.0, 0.01) var hit_shake: float = 0.15
-@export_range(0.0, 1.0, 0.01) var death_shake: float = 0.3
-@export_range(0.0, 1.0, 0.01) var downed_shake: float = 0.5
 ## Biggest camera offset in pixels at full trauma.
 @export_range(0.0, 32.0, 0.5) var max_shake_pixels: float = 6.0
 ## Trauma lost per second.
@@ -44,9 +40,6 @@ extends Resource
 @export_range(0.0, 0.6, 0.01) var hit_squash: float = 0.25
 ## Seconds a dead enemy's copy takes to turn white-hot and fall apart.
 @export_range(0.0, 0.6, 0.01) var death_anim_seconds: float = 0.25
-## The white-hot ring where an enemy dies: seconds and biggest size.
-@export_range(0.0, 0.5, 0.01) var death_puff_seconds: float = 0.14
-@export_range(0.1, 6.0, 0.1) var death_puff_size: float = 1.6
 ## Camera kick of a cast: pixels pushed against the aim, and pixels given back per second.
 @export_range(0.0, 8.0, 0.1) var cast_kick_pixels: float = 1.5
 @export_range(1.0, 200.0, 1.0) var cast_kick_decay: float = 40.0
@@ -118,39 +111,10 @@ extends Resource
 	&"reaction": {"stop": 1.0, "shake": 1.0, "sound": &"hit_reaction"},
 	&"status": {"stop": 0.0, "shake": 0.0, "sound": &""},
 }
-## A wizard hit by their own spell: a ring in this colour on the frame of the hit, so a self-hit
-## is never mistaken for an enemy's (seconds, size as `reaction_ring_size`, and the sound id).
-@export var self_hit_color: Color = Color("ff5fa8")
-@export_range(0.05, 1.0, 0.01) var self_hit_seconds: float = 0.35
-@export_range(0.2, 4.0, 0.1) var self_hit_size: float = 1.3
-@export var self_hit_sound: StringName = &"self_hit"
-## A heal hit: a soft ring in this colour, no stop, no shake (seconds, size, sound id).
-@export var heal_color: Color = Color("6be36b")
-@export_range(0.05, 1.0, 0.01) var heal_seconds: float = 0.4
-@export_range(0.2, 4.0, 0.1) var heal_size: float = 1.0
-@export var heal_sound: StringName = &"heal"
-## A deflected shot (melee I5, the owner's pick from the mockup): it flashes big and white where
-## it turned, a white-hot cross in its new caster's colours, `deflect_size` times a burst's grid
-## (a shot's landing flare is 1 to 3, a hit's spray 1 to 3), for `deflect_seconds`; then it leaves
-## 1.7x faster, so its tail (a pixel per pixel of travel) is longer by itself. Sound id as above.
-@export_range(1.0, 15.0, 1.0) var deflect_size: float = 4.0
-@export_range(0.05, 1.0, 0.01) var deflect_seconds: float = 0.3
-@export var deflect_sound: StringName = &"deflect"
-## A parry (`shield · swing`, melee I5, the owner's pick): a big four-point star in Spark gold
-## (STYLE.md's Spark base) where the swing stopped the shot, and a local stop of `parry_stop_seconds`
-## on the parrying actor alone (the stopped shot is gone; nobody else holds, as for every local
-## stop). The playground's parry stop is 0.06 s.
-@export var parry_color: Color = Color("f2c230")
-@export_range(1.0, 15.0, 1.0) var parry_size: float = 5.0
-@export_range(0.05, 1.0, 0.01) var parry_seconds: float = 0.35
-@export_range(0.0, 0.3, 0.005) var parry_stop_seconds: float = 0.06
-@export var parry_sound: StringName = &"parry"
 ## How long the "downed by your own ..." note rises over a downed wizard, in seconds.
 @export_range(0.5, 6.0, 0.1) var downed_note_seconds: float = 2.5
 ## Sound ids asked from `core/registry`. A missing sound is silent.
 @export var hit_sound: StringName = &"hit"
-@export var death_sound: StringName = &"enemy_death"
-@export var downed_sound: StringName = &"player_downed"
 ## The art feel draws, so a re-skin is a new preset (or new files at these paths) and
 ## never an edit to `feel.gd`. Each defaults to the shipped placeholder art.
 ## The hit spark, also used for the white flashes and puffs.

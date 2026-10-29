@@ -74,8 +74,6 @@ const SPRITE_SHADER: Shader = preload("res://core/projectiles/shot_sprite.gdshad
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const SwingTrailsScript := preload("res://gameplay/feel/swing_trails.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
-## Bone light: the white-hot of a plain thing (a death's ring).
-const BONE_LIGHT: Color = Color("#f4f1ea")
 ## Beams and nova rings on screen per player: one cast makes at most 24 shots (the spell limit),
 ## so a split fan is drawn whole; past that the player's oldest slot is taken over.
 const FORMS_PER_PLAYER: int = 24
@@ -779,11 +777,11 @@ func _on_damage_dealt(caster: int, target: Node, amount: int, position: Vector2)
 		own = _kind_own
 	_kind_target = 0
 	_hold_bodies(caster, _actor_of(target), stop, false)
-	_juice(position, false, shake, sound, aim, tint, size, at, colours)
+	_juice(position, shake, sound, aim, tint, size, at, colours)
 	if own:
-		# Their own spell: a ring in its own colour on this frame, so it is never taken for an enemy's hit.
-		_show_ring(position, preset.self_hit_color, preset.self_hit_seconds, preset.self_hit_size)
-		_play(preset.self_hit_sound)
+		# Their own spell: the cue `self_hit` (a ring in its own colour) on this frame, so it is
+		# never taken for an enemy's hit.
+		play_cue(&"self_hit", caster, position)
 
 
 ## The kind of the hit that `damage_dealt` announces next, and whether an actor hit itself.
@@ -796,10 +794,10 @@ func _on_hit_landed(caster: int, target: Node, _amount: int, _position: Vector2,
 	_kind_own = kind != &"heal" and kind != &"status" and caster != ActorsScript.NONE and _actor_of(target) == caster
 
 
-## A heal: a soft ring in green on the wizard, with no stop and no shake.
+## A heal: the cue `heal` (a soft ring in green on the wizard, with no stop and no shake). Its
+## ring is in its own colour, whoever healed.
 func _on_heal_dealt(_player: int, _target: Node, _amount: int, position: Vector2) -> void:
-	_show_ring(position, preset.heal_color, preset.heal_seconds, preset.heal_size)
-	_play(preset.heal_sound)
+	play_cue(&"heal", ActorsScript.NONE, position)
 
 
 ## A ring that flashes out from `position` in exactly `tint`, `size` as wide as the old ring
@@ -1069,10 +1067,10 @@ func _on_projectile_expired(caster: int, position: Vector2, _tag: int) -> void:
 	show_effect(KIND_BURST, position, heading, projectiles.impact_core as Color, _ramp_of(caster), projectiles.impact_look as int, POP_ZOOM, POP_SECONDS)
 
 
-## A shot was deflected (melee I5; docs/milestones/M2-staffs.md, "The look"): it flashes big and
-## white where it turned, a white-hot cross in its new caster's (`caster`'s) colours, bigger than
-## a hit's, aimed the way it leaves (the projectile manager's `event_slot` is the shot). Its
-## longer tail needs nothing here: it flies 1.7x faster, and its tail is a pixel per pixel of travel.
+## A shot was deflected (melee I5; docs/milestones/M2-staffs.md, "The look"): the cue `deflect`,
+## a big white-hot cross in its new caster's (`caster`'s) colours, bigger than a hit's, aimed the
+## way it leaves (the projectile manager's `event_slot` is the shot). Its longer tail needs
+## nothing here: it flies 1.7x faster, and its tail is a pixel per pixel of travel.
 func _on_shot_deflected(caster: int, position: Vector2, _tag: int) -> void:
 	if not position.is_finite() or caster < ActorsScript.NONE or caster >= ActorsScript.ACTORS:
 		return
@@ -1081,23 +1079,18 @@ func _on_shot_deflected(caster: int, position: Vector2, _tag: int) -> void:
 		var slot: int = projectiles.event_slot as int
 		if slot >= 0:
 			heading = projectiles.get_velocity_of(slot) as Vector2
-	show_effect(KIND_BURST, position, heading, Color.WHITE, _ramp_of(caster), 0, roundi(preset.deflect_size), preset.deflect_seconds)
-	_play(preset.deflect_sound)
+	play_cue(&"deflect", caster, position, heading)
 
 
 ## A shot was blocked. A swing's block is a parry (`shield · swing`; the projectile manager's
-## `impact_form` says which carrier blocked): a big four-point star in Spark gold, and a local stop
-## on the parrying actor alone. Other blocks show nothing of their own.
+## `impact_form` says which carrier blocked): the cue `parry`, a big four-point star in Spark gold
+## and a local stop on the parrying actor alone. Other blocks show nothing of their own.
 func _on_shot_blocked(caster: int, position: Vector2, _tag: int) -> void:
 	if projectiles == null or not ("impact_form" in projectiles) or (projectiles.impact_form as StringName) != &"swing":
 		return
 	if not position.is_finite():
 		return
-	show_effect(KIND_BURST, position, Vector2.RIGHT, preset.parry_color, 0, EXACT, roundi(preset.parry_size), preset.parry_seconds)
-	var table: ActorsScript = _actor_table()
-	if table != null and preset.parry_stop_seconds > 0.0:
-		_hold_actor(table, caster, preset.parry_stop_seconds, true)
-	_play(preset.parry_sound)
+	play_cue(&"parry", caster, position)
 
 
 ## The payoff of a shot: a flare in the shot's colour, shaped by the form of the shot itself
@@ -1607,16 +1600,20 @@ func _ramp_of(caster: int) -> int:
 	return table.ramp_of(caster) if table != null else ActorsScript.NONE
 
 
+## A death: its ghost, the cue `enemy_death` (a white-hot ring; the killer and the shot hold for
+## the kill, the dead body is freed at once) or, for a boss, `boss_death`, which also stops the
+## whole game; and a puff. The puff is the killing blow's own spray turned into a bigger one when
+## it is at this spot (one slot, and the hit's sound gives way to the death's), else a new puff
+## in the enemy colour after the cue's ring.
 func _on_enemy_died(killer: int, enemy: Node, position: Vector2) -> void:
 	_start_ghost(enemy)
-	if preset.death_puff_seconds > 0.0:
-		_show_ring(position, BONE_LIGHT, preset.death_puff_seconds, preset.death_puff_size)
-	# The killer and the shot hold for the kill (the dead body is freed at once); only a boss's
-	# death stops the whole game.
-	_hold_bodies(killer, ActorsScript.NONE, preset.death_stop_seconds, true)
-	if _is_boss(enemy):
-		_stop_game(preset.death_stop_seconds)
-	_juice(position, true, preset.death_shake, preset.death_sound)
+	var zoom: int = clampi(roundi(preset.death_particle_size), 1, 3)
+	var upgraded: bool = particles_enabled and _upgrade_hit(position, zoom)
+	if upgraded and _hit_voice >= 0:
+		_voices[_hit_voice].stop()
+	play_cue(&"boss_death" if _is_boss(enemy) else &"enemy_death", killer, position)
+	if particles_enabled and not upgraded:
+		show_effect(KIND_PUFF, position, Vector2.RIGHT, preset.enemy_hit_color, 0, 0, zoom, PUFF_SECONDS)
 
 
 ## The look a carrier's card brings (`FormBase.cast_look` or `impact_look`), empty when the card
@@ -1932,9 +1929,9 @@ func _show_possession(caster: int, actor: int, kind: int) -> bool:
 
 
 func _on_player_downed(player: int) -> void:
-	# The event names no position, so a downed wizard gets stop, shake and sound only...
-	_stop_game(preset.death_stop_seconds)
-	_juice(Vector2.INF, true, preset.downed_shake, preset.downed_sound)
+	# The event names no position, so a downed wizard's cue draws nothing: the game-wide stop,
+	# shake and sound only (its point is never used)...
+	play_cue(&"player_downed", ActorsScript.NONE, Vector2.ZERO)
 	# ...and, when their own (or a teammate's) spell did it, a note over them saying so: the
 	# seat's own body (its home actor, also while the seat drives another), in its light shade.
 	if combat == null or not combat.has_method("home_actor_of"):
@@ -1950,48 +1947,35 @@ func _on_player_downed(player: int) -> void:
 	_show_note(note, wizard.global_position if wizard.is_inside_tree() else wizard.position, ProjectileManagerScript.ramp_light(table.ramp_of(actor)), preset.downed_note_seconds)
 
 
-## `strong` is a death or a downed wizard: it gets the bigger puff. The stop of its kind is
-## already applied by the callers (`_hold_bodies`, `_stop_game`); this is looks and sound only.
-## A plain hit with an `aim` (the way the shot flew) sprays along it, `size` times as big,
-## from `at`, in the ramp of `tint` (white: `player`'s colours); without one it is a puff at
-## `position`.
-func _juice(position: Vector2, strong: bool, shake: float, sound: StringName, aim: Vector2 = Vector2.ZERO, tint: Color = Color.WHITE, size: float = 1.0, at: Vector2 = Vector2.INF, player: int = 0) -> void:
+## A hit's shake, looks and sound; its stop is already applied by the caller (`_hold_bodies`).
+## A hit with an `aim` (the way the shot flew) sprays along it, `size` times as big, from `at`,
+## in the ramp of `tint` (white: `player`'s colours); without one it is a puff at `position`.
+func _juice(position: Vector2, shake: float, sound: StringName, aim: Vector2 = Vector2.ZERO, tint: Color = Color.WHITE, size: float = 1.0, at: Vector2 = Vector2.INF, player: int = 0) -> void:
 	if shake_enabled:
 		_refresh_camera()
 		_trauma = minf(_trauma + shake, 1.0)
-	var upgraded: bool = false
 	if position != Vector2.INF and particles_enabled:
-		if strong:
-			upgraded = _burst_death(position)
+		var from: Vector2 = position if at == Vector2.INF else at
+		var zoom: int = clampi(roundi(size), 1, 3)
+		if aim != Vector2.ZERO:
+			_hit_effect = show_effect(KIND_SPRAY, from, aim, tint, player, 0, zoom, SPRAY_SECONDS)
 		else:
-			var from: Vector2 = position if at == Vector2.INF else at
-			var zoom: int = clampi(roundi(size), 1, 3)
-			if aim != Vector2.ZERO:
-				_hit_effect = show_effect(KIND_SPRAY, from, aim, tint, player, 0, zoom, SPRAY_SECONDS)
-			else:
-				_hit_effect = show_effect(KIND_PUFF, from, Vector2.RIGHT, tint, player, 0, zoom, PUFF_SECONDS)
-			_hit_position = position
-	if upgraded and _hit_voice >= 0:
-		_voices[_hit_voice].stop()
-	var voice: int = _play(sound)
-	if not strong:
-		_hit_voice = voice
+			_hit_effect = show_effect(KIND_PUFF, from, Vector2.RIGHT, tint, player, 0, zoom, PUFF_SECONDS)
+		_hit_position = position
+	_hit_voice = _play(sound)
 
 
-## A death puff: the killing blow's own spray turned into a bigger puff when it is at this
-## spot (one slot, one sound), else a new puff in the enemy colour. Returns true when it
-## upgraded the hit's effect (which then needs no second sound).
-func _burst_death(position: Vector2) -> bool:
-	var zoom: int = clampi(roundi(preset.death_particle_size), 1, 3)
+## Turns the last hit's effect into a puff `zoom` big, as new, when it is still showing at
+## `position` (a killing blow's spray becomes the death's puff: one slot). Returns true when it did.
+func _upgrade_hit(position: Vector2, zoom: int) -> bool:
 	var slot: int = _hit_effect
-	if slot >= 0 and _hit_position == position and _effect_seconds[slot] > 0.0:
-		_effect_kind[slot] = KIND_PUFF
-		_effect_zoom[slot] = zoom
-		_effect_age[slot] = 0.0
-		_effect_seconds[slot] = PUFF_SECONDS
-		return true
-	show_effect(KIND_PUFF, position, Vector2.RIGHT, preset.enemy_hit_color, 0, 0, zoom, PUFF_SECONDS)
-	return false
+	if slot < 0 or _hit_position != position or _effect_seconds[slot] <= 0.0:
+		return false
+	_effect_kind[slot] = KIND_PUFF
+	_effect_zoom[slot] = zoom
+	_effect_age[slot] = 0.0
+	_effect_seconds[slot] = PUFF_SECONDS
+	return true
 
 
 ## Plays a sound; returns the voice used, or -1 for none.

@@ -201,3 +201,31 @@ func test_a_big_cue_draws_bigger_and_a_small_one_smaller() -> void:
 func test_every_part_name_has_an_effect() -> void:
 	for effect: StringName in CueBase.EFFECTS:
 		check(FeelScript.CUE_EFFECTS.has(effect), "%s is drawn" % effect)
+
+
+func test_a_death_plays_its_cue() -> void:
+	var cue: CueBase = feel.cue_of(&"enemy_death")
+	bus.enemy_died.emit(0, null, Vector2(30.0, 30.0))
+	check_equal(feel.effect_dress(FeelScript.KIND_RING_OUT), [cue.parts[0]["color"], FeelScript.EXACT], "the white-hot ring, exactly its colour")
+	check_equal(feel.effect_info(FeelScript.KIND_RING_OUT).get("zoom"), cue.parts[0]["zoom"], "as big as the cue says")
+	check(is_equal_approx(feel.actors.held_left(0), cue.hold), "the killer held")
+	check(is_equal_approx(feel.trauma(), cue.shake), "a shake")
+	check_equal(feel.stop_left, 0.0, "the game runs on")
+	check_equal(feel.effects_of(FeelScript.KIND_PUFF), 1, "and a puff of its own (no hit to take over)")
+
+
+func test_a_downed_wizard_plays_its_cue() -> void:
+	var cue: CueBase = feel.cue_of(&"player_downed")
+	bus.player_downed.emit(1)
+	check(is_equal_approx(feel.stop_left, cue.stop_game), "the whole game stopped")
+	check(is_equal_approx(feel.trauma(), cue.shake), "a shake")
+	check_equal(feel.live_effects(), 0, "nothing drawn: the event names no position")
+	check_equal(feel.actors.held_count, 0, "nobody held")
+
+
+func test_a_heal_plays_its_cue() -> void:
+	var cue: CueBase = feel.cue_of(&"heal")
+	bus.heal_dealt.emit(0, null, 5, Vector2(10.0, 10.0))
+	check_equal(feel.effect_dress(FeelScript.KIND_RING_OUT), [cue.parts[0]["color"], FeelScript.EXACT], "a ring in exactly its colour")
+	check_equal(feel.effect_info(FeelScript.KIND_RING_OUT).get("zoom"), cue.parts[0]["zoom"], "as big as the cue says")
+	check_equal(feel.trauma(), 0.0, "no shake")

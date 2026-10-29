@@ -25,8 +25,22 @@ func test_every_cue_is_valid_and_named_for_its_file() -> void:
 
 
 func test_the_cues_the_game_names_are_there() -> void:
-	for id: StringName in [&"blast", &"fireball", &"quake"]:
+	for id: StringName in [&"blast", &"fireball", &"quake", &"parry", &"deflect", &"enemy_death", &"boss_death", &"player_downed", &"self_hit", &"heal"]:
 		check(registry.get_resource(&"cues", id) is CueBase, "%s" % id)
+
+
+## Until a boss has a look of its own, its death is an enemy's and the game-wide stop.
+func test_a_boss_death_is_a_death_that_stops_the_game() -> void:
+	var death: CueBase = registry.get_resource(&"cues", &"enemy_death") as CueBase
+	var boss: CueBase = registry.get_resource(&"cues", &"boss_death") as CueBase
+	if death == null or boss == null:
+		check(false, "both death cues are there")
+		return
+	check_equal(boss.parts, death.parts, "the same flashes")
+	check(is_equal_approx(boss.shake, death.shake) and is_equal_approx(boss.hold, death.hold) and boss.hold_shot == death.hold_shot, "the same weight")
+	check_equal(boss.sound, death.sound, "the same sound")
+	check_equal(death.stop_game, 0.0, "an enemy's death stops nobody else")
+	check(boss.stop_game > 0.0, "a boss's stops the whole game")
 
 
 func test_problems_names_what_is_wrong() -> void:

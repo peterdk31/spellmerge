@@ -2,6 +2,30 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-29: Staff codes (staffs D2)
+
+A staff copies as one line, `sm1:double,fire,-,bolt` (card ids by slot, `-` for an empty slot, the empty tail left off), and pastes back. `StaffCode` (`core/spells`) is pure text work: it takes only lower-case names, at most 40 cards and 600 characters, checks every id with the registry, and never loads or runs anything from the text. The list builder gained a row of "Copy code" and "Paste code" buttons (system clipboard; the d-pad reaches them between the tabs and the slots); a paste sends one `staff_cards_requested`, so the player still refuses cards it does not own. The radial builder and the pause menu have no code buttons yet.
+
+## 2026-10-29: Bots and the emergent combo report (staffs D1)
+
+The bots (`Bot.build_random`, seeded) and the staff fuzz already existed from A6a/A6b; D1 adds the report. `test_spell_fuzz.gd` now prints `REPORT` lines after each run: the five best of its 600 random staffs by kills and by reactions, and the five costliest by mean step time and by safeguards met (dropped shots, then peak live shots), each with its cards and generated name. The fuzz imps now have 60 health (they had 400 and nothing died). Run it with `ci/build/build.sh --quick --tests` and read `build/logs`; paste a run here when cards land.
+
+Review round: ties in a ranking now go to the lower staff number (`sort_custom` is not stable), each line starts with the ranked value and shows `(unnamed)` for a staff without a name, and a `REPORT WARNING` prints when no staff kills an imp, so an empty report is noticed. Tests: `test_report_ranking`, `test_report_ties_are_total`.
+
+First run (seed 20261026, 600 staffs, 2 s each), the lines that do not depend on the machine (cards shortened):
+
+```
+REPORT BEST BY KILLS: 2 kills | Skewering Lazy Patient Beam | staff 44 [on_cast pierce slow sniper sniper beam]
+REPORT BEST BY KILLS: 1 kills | Overcharged Echoing Rime Beam | staff 191
+REPORT BEST BY KILLS: 1 kills | Stuttering-Magnetic Plump Bolt | staff 315
+REPORT BEST BY REACTIONS: 4 reactions | Arcing Bloom | staff 89 [arc nova triple storm lightning faster void]
+REPORT BEST BY REACTIONS: 4 reactions | Zippy Bloom | staff 531
+REPORT BEST BY REACTIONS: 2 reactions | Bolt | staff 70 [bolt frost fire]
+REPORT COSTLIEST BY SAFEGUARDS: 105 | Stuttering-Wall | staff 462 [burst wall mirror split echo]
+```
+
+So random staffs mostly do little: kills are rare, reactions rarer (one kind), no staff drops a shot at the pool, and nothing needs a limit yet.
+
 ## 2026-10-29: The first cards' looks (staffs C0)
 
 Review round: seen at 4x (`looks_hops_4x`, `looks_wake_4x` in `shot_looks.gd`), hops did not draw at all, for three reasons now fixed: its trail window (0.15 s) cut its particles, the spawn rate was read from the wrong table row (`kind_row` now maps kinds 13 and 14 to rows 16 and 17 everywhere), and its every-other-frame blink hid it whenever a still shot was captured on an even frame (now always shown; the dash lines jump sideways). Wake is brighter dashes. READMEs and comments updated.

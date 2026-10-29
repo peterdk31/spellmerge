@@ -1,11 +1,13 @@
 extends "res://tests/support/suite.gd"
-## Possess (actors G9, docs/milestones/M2-actors.md, "Possess (a card)"): the card's carrier hands
-## its caster's controller to the first actor it hits; the seat then drives that actor (its staff
-## on the seat's buttons); the caster's body stands and can be hurt; it ends when the time is up,
-## when the target or the caster's body dies or is down, and when a newer possession of the target
-## starts; nested possessions unwind in order; an enemy's controller possesses a wizard the same
-## way (a scripted controller stands in for the AI); and `Actor.drive` never leaves a controller on
-## two bodies. The HUD stays the player's (owner, 2026-10-28): the seat's numbers, its corner panel
+## Possess (actors G9, docs/milestones/M2-actors.md, "Possess (a card)"; owner, 2026-10-29): every
+## actor the card's carriers hit is possessed by the caster's controller; it drives the oldest
+## (its staff on the seat's buttons) and puppets copy its intent on the others; the caster's body
+## stands and can be hurt, and its being down or dead ends nothing; a possession ends when the
+## time is up, when the target dies or is down, and when another driver's newer possession of the
+## target starts; the controller then moves to its next oldest body, else home, else waits behind
+## whoever possesses its home; an enemy's controller possesses a wizard the same way (a scripted
+## controller stands in for the AI), and goes on after its body dies; and `Actor.drive` never
+## leaves a controller on two bodies. The HUD stays the player's (owner, 2026-10-28): the seat's numbers, its corner panel
 ## (a real Hud) and its builder are its own wizard's, live, while it drives an imp and while an AI
 ## drives the wizard; the PossessedLook draws bars and the timer over a seat-driven imp, only the
 ## timer over an AI-driven wizard. Real wizard scene, real Spells and registry (the `possess` card).
@@ -139,16 +141,78 @@ func test_a_wizard_possesses_the_imp_its_bolt_hits_and_casts_its_staff_from_the_
 	check(_look(imp) != null, "the possession is drawn over the imp")
 
 
-func test_one_possession_per_cast() -> void:
+func test_every_actor_a_cast_hits_is_possessed_and_the_seat_drives_the_first() -> void:
 	var wizard := _possessor([&"possess", &"chain", &"bolt"])
 	var first := _imp(Vector2(0.0, 60.0))
 	var second := _imp(Vector2(30.0, 90.0))
+	var seat := _seat(wizard)
 	_tap(0, &"staff_1")
 	_world.run(12)
-	check(first.controller == _seat(wizard), "the first imp hit is possessed")
+	check(first.controller == seat, "the first imp hit is driven by the seat")
 	check(second.health.health < 50, "the chain jumps on and hurts the second")
-	check(second.controller == _brain(second), "but does not possess it")
+	check(second.controller is PuppetController, "and possesses it too, as a puppet")
+	check_equal(_started.size(), 2, "two possessions: %s" % [_started])
+	check_equal(seat.possessions.size(), 2, "the seat holds both, oldest first")
+	check(seat.possessions[0].target == first, "the first imp is the oldest")
+	check_equal(_world.table.actor_of_seat(0), first.id, "the seat is on the first imp only")
+	check_equal(_world.table.team_of(second.id), ActorsScript.TEAM_WIZARDS, "the puppet is on the seat's team")
+	check_equal(_world.table.seat_of(second.id), ActorsScript.NONE, "and is no seat")
+
+
+func test_a_split_bolt_possesses_both_imps_it_hits() -> void:
+	var wizard := _possessor([&"possess", &"split", &"bolt"])
+	var left := _imp(Vector2(-14.0, 70.0))
+	var right := _imp(Vector2(14.0, 70.0))
+	_tap(0, &"staff_1")
+	_world.run(12)
+	check(left.possessed_by != null and right.possessed_by != null, "both imps are possessed: %s" % [_started])
+	check_equal(_seat(wizard).possessions.size(), 2, "by seat 0")
+
+
+func test_a_puppet_copies_the_seats_walk_aim_and_casts() -> void:
+	var wizard := _world.wizard(0)
+	var driven := _imp(Vector2(0.0, 60.0))
+	var puppet := _imp(Vector2(40.0, 60.0))
+	var seat := _seat(wizard)
+	Possession.begin(wizard, driven, SECONDS)
+	Possession.begin(wizard, puppet, SECONDS)
+	check(driven.controller == seat and puppet.controller is PuppetController, "the seat drives the first, a puppet the second")
+	_world.hold(0, &"move_right")
+	_world.run(2)
+	check(driven.velocity.x > 0.0 and puppet.velocity.x > 0.0, "both walk right: %s %s" % [driven.velocity, puppet.velocity])
+	check_equal(wizard.velocity, Vector2.ZERO, "the wizard's body stands")
+	_world.release(0, &"move_right")
+	var mana: float = puppet.caster.mana
+	_tap(0, &"staff_1")
+	_world.run(2)
+	check(puppet.caster.mana < mana, "the seat's button casts the puppet's staff too")
+	check(puppet.aim.is_equal_approx(driven.aim), "in the same direction: %s %s" % [puppet.aim, driven.aim])
+
+
+func test_a_hit_on_a_body_already_possessed_does_nothing() -> void:
+	var wizard := _world.wizard(0)
+	var imp := _imp(Vector2(0.0, 60.0))
+	var possession := Possession.begin(wizard, imp, SECONDS)
+	_world.run(8)
+	check(Possession.begin(wizard, imp, SECONDS) == null, "from the wizard")
+	check(Possession.begin(imp, imp, SECONDS) == null, "or from the imp itself")
+	check(imp.possessed_by == possession and possession.left < SECONDS, "the first goes on, not refreshed")
 	check_equal(_started.size(), 1, "one possession")
+
+
+func test_a_puppet_casting_possess_adds_to_the_seats_bodies() -> void:
+	var wizard := _world.wizard(0)
+	var driven := _imp(Vector2(0.0, 60.0))
+	var puppet := _imp(Vector2(40.0, 60.0))
+	var far := _imp(Vector2(40.0, 120.0))
+	var seat := _seat(wizard)
+	Possession.begin(wizard, driven, SECONDS)
+	Possession.begin(wizard, puppet, SECONDS)
+	check(Possession.begin(puppet, far, SECONDS) != null, "a puppet's hit possesses")
+	check(seat.possessions.size() == 3 and seat.possessions[2].target == far, "for the seat, newest last")
+	check(far.controller is PuppetController, "as a puppet")
+	check(driven.controller == seat, "the seat stays in the oldest")
+	check(Possession.begin(puppet, wizard, SECONDS) == null, "the seat's own wizard is never possessed by it")
 
 
 # --- How it ends ---------------------------------------------------------------------------
@@ -171,7 +235,7 @@ func test_it_ends_when_the_time_is_up_and_each_controller_goes_home() -> void:
 	check_equal(_world.table.team_of(imp.id), ActorsScript.TEAM_ENEMIES, "the imp's team is its own again")
 	check(not _stats.is_empty() and _stats.back() == [0, 100, 100], "the wizard's numbers are sent again on coming home: %s" % [_stats])
 	check_equal(_ended, [[wizard.id, imp.id]], "possess_ended")
-	check(imp.possessed_by == null and wizard.possessions_cast.is_empty(), "nothing is left of it")
+	check(imp.possessed_by == null and seat.possessions.is_empty(), "nothing is left of it")
 	# The ring is gone (freed at the end of the frame).
 	var ring: bool = false
 	for child in imp.get_children():
@@ -204,27 +268,36 @@ func test_it_ends_when_a_possessed_wizard_is_downed_and_the_seat_comes_back_to_i
 	check(not seat_one.is_set_aside(), "and is no longer set aside")
 
 
-func test_it_ends_when_the_casters_body_is_downed() -> void:
+func test_the_casters_body_downed_ends_nothing_and_the_seat_comes_home_to_it_after() -> void:
 	var wizard := _world.wizard(0)
 	var imp := _imp(Vector2(0.0, 60.0))
-	Possession.begin(wizard, imp, SECONDS)
+	Possession.begin(wizard, imp, 1.0)
 	_world.hurt(wizard, 100)
 	check(wizard.is_down(), "the standing body is downed")
 	_world.run(1)
-	check(wizard.controller == _seat(wizard), "the seat goes home to its downed wizard")
-	check(imp.controller == _brain(imp), "the imp's own controller is back")
+	check(imp.controller == _seat(wizard), "the seat still drives the imp")
+	_world.run(int(1.0 / Fixture.STEP) + 1)
+	check(wizard.controller == _seat(wizard), "then goes home to its downed wizard")
+	check(imp.controller == _brain(imp), "and the imp's own controller is back")
 
 
-func test_it_ends_when_the_casters_body_dies() -> void:
+func test_an_enemy_that_dies_goes_on_driving_the_wizard_until_the_time_is_up() -> void:
 	var imp := _imp(Vector2(0.0, 60.0))
+	var brain := _brain(imp)
 	var wizard := _world.wizard(0)
-	Possession.begin(imp, wizard, SECONDS)
+	Possession.begin(imp, wizard, 1.0)
 	imp.die(-1)
-	check(wizard.controller == _seat(wizard), "the wizard's seat is back at once")
+	check(wizard.controller == brain, "the dead imp's controller still drives the wizard")
+	check(is_instance_valid(brain) and brain.get_parent() != imp, "it left the body before it was freed")
+	check(_ended.is_empty(), "nothing ended")
+	_world.run(int(1.0 / Fixture.STEP) + 1)
+	check(wizard.controller == _seat(wizard), "the wizard's seat is back at the end")
 	check_equal(_ended, [[imp.id, wizard.id]], "possess_ended")
+	await process_frame
+	check(not is_instance_valid(brain), "the homeless controller is freed")
 
 
-func test_a_newer_possession_of_an_actor_ends_the_older_first() -> void:
+func test_a_newer_possession_of_an_actor_ends_the_other_drivers_older_first() -> void:
 	var first := _world.wizard(0)
 	var second := _world.wizard(1, Vector2(40.0, 0.0))
 	var imp := _imp(Vector2(0.0, 60.0))
@@ -239,9 +312,9 @@ func test_a_newer_possession_of_an_actor_ends_the_older_first() -> void:
 	check(second.controller == _seat(second), "and seat 1 is home")
 
 
-# --- Nested --------------------------------------------------------------------------------
+# --- Moving on ----------------------------------------------------------------------------
 
-func test_a_possession_from_a_possessed_body_moves_on_and_they_unwind_in_order() -> void:
+func test_a_possession_from_the_driven_body_adds_a_puppet_and_the_seat_moves_on_when_it_ends() -> void:
 	var wizard := _possessor()
 	var near := _imp(Vector2(0.0, 60.0), [[&"possess", &"bolt"]])
 	var far := _imp(Vector2(0.0, 120.0))
@@ -252,30 +325,51 @@ func test_a_possession_from_a_possessed_body_moves_on_and_they_unwind_in_order()
 	# From the near imp (aiming down) the seat possesses the far one.
 	_tap(0, &"staff_1")
 	_world.run(8)
-	check(far.controller == seat, "the seat moved on to the far imp")
-	check(near.controller == null, "the near imp stands with no controller")
+	check(far.controller is PuppetController, "the far imp is a puppet")
+	check(near.controller == seat, "the seat stays in the oldest, the near imp")
 	check(wizard.controller == null, "and the wizard's body still stands")
-	check_equal(_world.table.actor_of_seat(0), far.id, "seat 0 is on the far imp only")
-	# The far one dies: the seat goes back to the near imp, whose possession goes on.
-	far.health.take(500, 0)
-	check(near.controller == seat, "the seat is back on the near imp")
+	# The near one dies: the seat moves on to the far imp, not home.
+	near.health.take(500, 0)
+	check(far.controller == seat, "the seat moves on to the far imp")
 	check(wizard.controller == null, "not yet home")
+	check_equal(_world.table.actor_of_seat(0), far.id, "seat 0 is on the far imp")
 	_world.run(int(SECONDS / Fixture.STEP) + 1)
 	check(wizard.controller == seat, "then home")
-	check(near.controller == _brain(near), "and the near imp has its own controller")
+	check(far.controller == _brain(far), "and the far imp has its own controller")
 
 
-func test_ending_the_older_possession_unwinds_the_newer_first() -> void:
-	var wizard := _world.wizard(0)
+func test_when_the_driven_body_is_stolen_the_seat_moves_on() -> void:
+	var first := _world.wizard(0)
+	var second := _world.wizard(1, Vector2(80.0, 0.0))
 	var near := _imp(Vector2(0.0, 60.0))
 	var far := _imp(Vector2(0.0, 120.0))
-	var outer := Possession.begin(wizard, near, SECONDS)
-	Possession.begin(near, far, SECONDS)
-	check(far.controller == _seat(wizard) and near.controller == null, "nested")
-	outer.end()
-	check_equal(_ended, [[near.id, far.id], [wizard.id, near.id]], "the newer ends first")
-	check(far.controller == _brain(far) and near.controller == _brain(near), "both imps have their own controllers")
-	check(wizard.controller == _seat(wizard), "the seat is home")
+	Possession.begin(first, near, SECONDS)
+	Possession.begin(first, far, SECONDS)
+	Possession.begin(second, near, SECONDS)
+	check(near.controller == _seat(second), "seat 1 took the near imp")
+	check(far.controller == _seat(first), "seat 0 moved on to the far one")
+	check(first.controller == null, "seat 0's wizard still stands")
+	Possession.begin(second, far, SECONDS)
+	check(far.controller is PuppetController and (far.controller as PuppetController).leader_controller == _seat(second),
+		"seat 1 steals the far one too, as its puppet")
+	check(first.controller == _seat(first), "and seat 0, with nothing left, is home")
+
+
+func test_a_seat_with_nothing_left_waits_behind_whoever_possesses_its_wizard() -> void:
+	var wizard := _world.wizard(0)
+	var imp := _imp(Vector2(0.0, 60.0))
+	var other := _imp(Vector2(60.0, 0.0))
+	var seat := _seat(wizard)
+	Possession.begin(wizard, imp, 1.0)
+	check(Possession.begin(other, wizard, 2.0) != null, "an imp possesses the empty wizard")
+	check(wizard.controller == _brain(other), "the imp's controller drives it")
+	_world.run(int(1.0 / Fixture.STEP) + 1)
+	check(imp.controller == _brain(imp), "seat 0's possession of the imp is over")
+	check(seat.driving == null and seat.is_set_aside(), "seat 0 waits: it drives nothing")
+	check(wizard.controller == _brain(other), "while the imp's controller goes on")
+	_world.run(int(1.0 / Fixture.STEP) + 1)
+	check(wizard.controller == seat, "then seat 0 is home")
+	check(other.controller == _brain(other), "and the other imp's controller too")
 
 
 # --- An enemy possesses a wizard -------------------------------------------------------------

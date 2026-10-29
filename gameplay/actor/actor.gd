@@ -24,8 +24,10 @@ extends CharacterBody2D
 ## with none at all `idle_team`.
 ##
 ## Possess (G9, `possession.gd`): the actor hears `possess_requested` for its own id and starts a
-## `Possession` by the caster's body; it steps the one holding it (`possessed_by`) before its
-## controller thinks, and ends every possession it is part of when it dies or leaves the tree.
+## `Possession` by the caster's body's controller; it steps the one holding it (`possessed_by`)
+## before its controller thinks, and ends it when it dies or leaves the tree. Its home controller's
+## possessions end when the body leaves the tree with it; when the body dies, a home controller
+## that is away possessing goes on (it moves to the body's parent) until its last one ends.
 ##
 ## The body's points: `body_offset` (the hurt circle's centre and the orbit anchor), `aim_pivot()`
 ## (the hand, `hand_offset` above the feet: the aim, the staff and the shot line up from it),
@@ -110,10 +112,8 @@ var caster: Caster = null
 ## True when something downs the actor at 0 health instead of letting it die (a Downed
 ## component, G7, sets it).
 var downable: bool = false
-## The possession holding this actor now (another body's controller drives it), or null.
+## The possession holding this actor now (another controller possesses it), or null.
 var possessed_by: Possession = null
-## The possessions this body cast that still go on (its controller drives another actor).
-var possessions_cast: Array[Possession] = []
 
 ## The number it casts under in Spells and the projectile manager: its `id` while its caster is
 ## open (see `open_caster_number`), else -1.
@@ -157,6 +157,8 @@ func _ready() -> void:
 	for look in _looks:
 		look.setup(self)
 	controller = home_controller
+	if home_controller != null:
+		home_controller.home_actor = self
 	_is_ready = true
 	_open_id()
 	if controller != null:
@@ -309,13 +311,19 @@ func is_downed() -> bool:
 	return _down
 
 
-## The actor is dead: every possession it is part of ends, it sends `died` and frees itself
-## (once).
+## The actor is dead: the possession holding it ends, a home controller that is away possessing
+## goes on without it, and it sends `died` and frees itself (once).
 func die(killer: int) -> void:
 	if _dying:
 		return
 	_dying = true
-	_end_possessions()
+	if possessed_by != null:
+		possessed_by.end()
+	var away: ActorController = home_controller
+	if away != null and away.get_parent() == self and not away.possessions.is_empty() and get_parent() != null:
+		# Its possessions go on (owner, 2026-10-29): the controller leaves the body before it is
+		# freed, and is freed itself when its last possession ends (`Possession.move_on`).
+		away.reparent(get_parent())
 	died.emit(killer)
 	queue_free()
 
@@ -358,14 +366,13 @@ func _on_possess_requested(caster: int, target: int, seconds: float, _tag: int) 
 		Possession.begin(by, self, seconds)
 
 
-## Every possession this body is in ends: the one holding it, and the ones it cast.
+## The body leaves the tree: the possession holding it ends, and so do its home controller's when
+## that controller leaves with it.
 func _end_possessions() -> void:
 	if possessed_by != null:
 		possessed_by.end()
-	var cast: Array[Possession] = possessions_cast.duplicate()
-	possessions_cast.clear()
-	for at in range(cast.size() - 1, -1, -1):
-		cast[at].end()
+	if home_controller != null and is_instance_valid(home_controller) and home_controller.get_parent() == self:
+		home_controller.end_possessions()
 
 
 func _listen() -> void:

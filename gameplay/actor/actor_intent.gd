@@ -52,6 +52,14 @@ func begin_step() -> void:
 	pressed_bits = 0
 
 
+## Want what `other` wants: its walk, aim, presses and held buttons (a puppet, possess).
+func copy_from(other: ActorIntent) -> void:
+	move = other.move
+	aim = other.aim
+	pressed_bits = other.pressed_bits
+	held_bits = other.held_bits
+
+
 ## Nothing wanted: stand, keep the aim, cast nothing.
 func clear() -> void:
 	move = Vector2.ZERO

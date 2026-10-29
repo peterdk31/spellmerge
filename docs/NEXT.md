@@ -15,8 +15,6 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
 - [x] **Card: arc (staffs C).** After the slow, return and arc kit (owner, 2026-10-27). Data only.
 - [x] **Card: linger (staffs C).** After B1. Data only (M2-staffs.md, "Working in parallel").
 - [ ] **The later cards' looks (staffs C0b).** (`content/spells/modifiers/`, `core/projectiles/` drawing if a new kind is needed, `tests/content/spells/`) After C0 (#431). Thirteen modifiers give off no look (bounce, echo, ghost, linger, magnet, mirror, recoil, relay, return, short_delay, siphon, spiral, sticky), and several share a kind with a card often stacked beside them (growth and bigger 7, heavy and pierce 8, arc, possess and shield 10, hold and sniper 12, slow and mend's motes 6). Give each a `look_layer`, untangle the shares that hide a card on a common build, and add new kinds (15–22 are free) only where no existing one fits, as C0 added hops and wake. Keep C0's rule (the first six never share with each other or an infusion) and record which later shares are allowed in DECISIONS. Widen `test_original_looks.gd`, or add a test, so every modifier has a look and no modifier shares one with an infusion. Read the looks sheets at 4x to confirm the new kinds can be seen (C0 could not see hops and wake clearly).
-- [ ] **Bots and the emergent combo report (staffs D1).** (`tests/bots/`, `docs/LOG.md`) After A6c; the report gets richer as cards land.
-- [ ] **Staff codes (staffs D2).** (`hud/`, `core/spells/`) After B7 and B8. Moved to the bot's queue by the owner on 2026-10-26.
 - [ ] **Stress and C2 (staffs D3).** Last: when every other task in both lanes has merged. Then the C2 checkpoint, with the owner's sandbox playtest on `/preview/`.
 
 ## Owner lane
@@ -54,7 +52,11 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 
 ## Done recently
 
+- [x] **Staff codes (staffs D2).** `StaffCode` (`core/spells/staff_code.gd`): `sm1:double,fire,-,bolt`, card ids by slot, `-` for a gap, only known ids (`Spells.staff_code`, `Spells.parse_staff_code`); the list builder has "Copy code" and "Paste code" buttons (system clipboard) for the shown staff. Tests: `tests/core/test_staff_code.gd`, `test_builder.gd`. The radial builder has none yet.
+
 - [x] **The existing cards' looks and numbers (staffs C0).** Split (burst), chain (hops, new kind 13) and faster (wake, new kind 14) got a `look_layer`, none shared with an infusion or another first card; the carriers and infusions already had their looks from B6b. Numbers kept. Test: `test_original_looks.gd`.
+
+- [x] **Bots and the emergent combo report (staffs D1).** `REPORT` lines in `tests/bots/test_spell_fuzz.gd` (the best random staffs by kills and by reactions, the costliest by frame time and by safeguards); the first run is in `docs/LOG.md`. Bots and the fuzz existed from A6a/A6b; paste a new run in the log as cards land.
 
 - [x] **Spell names (staffs E1).** `SpellNamer` (`core/spells/`) names every cast from its cards; `name_words` on every card's `.tres`; `Spells.staff_view` gives each cast's `name`; the list builder's plan shows it above each cast. Tests: `tests/core/test_spell_names.gd`, `test_builder.gd`. The radial builder and the staff codes (D2) do not show names yet; the combo report (D1) can read `name` from the view.
 

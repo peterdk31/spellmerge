@@ -11,6 +11,11 @@ const ComboFiles := preload("res://tests/support/combo_files.gd")
 const COMBOS: Array[String] = ["hold_fire_orbit", "hold_shield_orbit"]
 ## Past an orbit's own lifetime (3 s).
 const LONG: float = 4.0
+## Just past an orbit's lifetime, where only a held shot is still alive.
+const JUST_PAST: float = 3.5
+
+## Shots alive at JUST_PAST in the last _play.
+var _mid: int = 0
 
 
 func _card() -> ModifierBase:
@@ -43,7 +48,9 @@ func _play(combo: Dictionary, drop: String = "", again: bool = false) -> Array:
 	var staff: int = int(entry["staff"])
 	arena.install_cards(0, staff, cards)
 	arena.cast(0, staff)
-	arena.run(float(combo["seconds"]))
+	arena.run(JUST_PAST)
+	_mid = arena.projectiles.get_count()
+	arena.run(float(combo["seconds"]) - JUST_PAST)
 	var result: Array = [arena.projectiles.get_count(), arena.spells.is_holding(0, staff), reserved[0]]
 	if again:
 		arena.cast(0, staff)
@@ -62,6 +69,7 @@ func test_the_card_is_a_valid_modifier() -> void:
 	check_equal(card.kind(), &"modifier", "a modifier card")
 	check_equal(card.behaviour, ModifierBase.Behaviour.HOLD, "the hold behaviour")
 	check(card.behaviour_strength > 0.0, "with a strength")
+	check_equal(card.look_layer, 12, "and glitters")
 	check(card.range_problems().is_empty(), "inside every range: %s" % [card.range_problems()])
 
 
@@ -77,10 +85,12 @@ func test_the_carrier_outlives_its_lifetime_only_with_the_card() -> void:
 			continue
 		check(float(combo["seconds"]) >= LONG, "%s runs past an orbit's three seconds" % id)
 		var held: Array = _play(combo)
+		check(_mid > 0, "%s has a shot alive past the orbit's lifetime" % id)
 		check((held[0] as int) > 0, "%s still has its shots after %s s" % [id, combo["seconds"]])
 		check(held[1] as bool, "%s keeps the staff holding" % id)
 		check((held[2] as float) > 0.0, "%s reserves mana (%s)" % [id, held[2]])
 		var plain: Array = _play(combo, "hold")
+		check_equal(_mid, 0, "%s has no shot past the orbit's lifetime without Hold" % id)
 		check_equal(plain[0], 0, "%s has no shots left without Hold" % id)
 		check(not (plain[1] as bool), "%s is not holding without Hold" % id)
 

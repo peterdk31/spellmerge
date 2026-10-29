@@ -9,7 +9,6 @@
     "number": 399
   },
   "errors_in_a_row": 0,
-  "idle": null,
   "intake_tasks": {
     "208": {
       "author": "Brianmanden",
@@ -92,6 +91,11 @@
       "count": 0,
       "parked_reason": "I made no changes, and the branch has no commits. Issue #417 describes a downed wizard shrinking into its hat, but since living staffs (2026-10-28) the player is a floating staff with no hat. A downed player already lies flat on the floor with a revive ring, in `gameplay/player/staff_look.gd` and `docs/milestones/M2-living-staffs.md` H3, and `tests/gameplay/player/test_staff_look.gd` covers it. The pointed-hat wizard art survives only for the villain in the intro cutscene, and that wizard is nev",
       "parked_until": "2026-10-30T03:53:22Z"
+    },
+    "**The existing cards' looks and numbers (staffs C0).** (`content/spells/`) After B6a and B6b.": {
+      "count": 1,
+      "pr": "431",
+      "problems": "- The area README, which is the contract for card authors, is now wrong. Lines 33 and 34 say `look_layer` 0\u201312, but the validator now accepts 0\u201314. Line 42 lists the styles only up to 12 glitter and omits 13 hops (chain) and 14 wake (faster). The PR touched the validator ranges and added kinds but did not update this README. Fix: Change `look_layer` 0\u201312 to 0\u201314 on lines 33 and 34. Add '13 hops (chain), 14 wake (faster)' to the style list on line 42. Check `core/README.md`'s shot shader section for a kind list too.\n- The PR description admits the new hops and wake particles could not be seen in any screenshot. Both are tiny, so their look is unverified. The quality bar says 'OK' is not done, and these are the main player-facing change of the task. The rune/beam branch (`particle`) and the trail rows 16 and 17 were tuned blind. The hops branch also draws only on alternate 1/24 s frames and only while a < 0.6, so it may flicker to near-invisible. Fix: Render the new kinds at a size that can be judged, for example a 4x crop of the extra row in `shot_looks.gd`, or a short clip. Tune the values until both are visibly distinct from sparks (5) and streaks (8), and say so in the PR.\n- The doc comment's line is now over-long after '13 hops, 14 wake' was appended. The same happens in `modifier_base.gd:89`. Fix: Re-wrap the comment lines at the file's usual width.\n- The look-table header comment is a muddled run-on: 'rows 16 and 17 the kinds 13 and 14 ... rows 13-15 a dash's own'. Rows 1\u201312 are kinds by index, but kinds 13 and 14 map to rows 16 and 17 through the magic numbers in `r = r == 13 ? ROW_HOPS : (r == 14 ? ROW_WAKE : r)` on line 303. Fix: Rewrite the comment as a short list, and use named constants (for example `L_HOPS`/`L_WAKE`) in the remap instead of the literals 13 and 14."
     }
   },
   "usage": [

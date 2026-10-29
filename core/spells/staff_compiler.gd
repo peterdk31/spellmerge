@@ -320,7 +320,9 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 	spell.hit.later_status_ids = later_ids
 	spell.hit.later_status_durations = later_durations
 	spell.hit.later_status_strengths = later_strengths
-	if spell.ray_length > 0.0 and spell.motion != FormBase.Motion.DASH and spell.motion != FormBase.Motion.TELEPORT:
+	if spell.motion == FormBase.Motion.SWING:
+		spell.hit.kind = &"swing"
+	elif spell.ray_length > 0.0 and spell.motion != FormBase.Motion.DASH and spell.motion != FormBase.Motion.TELEPORT:
 		spell.hit.kind = &"ray"
 	if spell.homing_turn > 0.0:
 		spell.homing_range = homing_range(spell.motion, spell.ray_length, homing_reach)

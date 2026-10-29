@@ -14,7 +14,6 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
 - [x] **The old recipe path removed (staffs A6c).** Done in an owner session: `Spells.compile(recipe)`, `builder_view`, the recipe wrappers (`install`, `cast`, a spell's `begin_generation`) and the recipe compiler are gone, `begin_generation` takes a compiled staff; `CompiledSpell` lost `valid`, `reason`, `description`, `complexity`, `depth` and `held`; `SpellLimits` keeps only engine safeguards and tuning; the events `build_change_requested`, `spell_swap_requested`, `spell_changed`, `recipe_changed` and `active_spell_changed` are removed; tests build staffs (`tests/support/staff_kit.gd` turns the old recipe shorthand into card rows; `test_spell_tags.gd` replaces `test_spells_compile.gd`); the spells, core and gameplay READMEs say so. **Phase B and the cards can start; development is unpaused.**
 - [x] **Card: arc (staffs C).** After the slow, return and arc kit (owner, 2026-10-27). Data only.
 - [x] **Card: linger (staffs C).** After B1. Data only (M2-staffs.md, "Working in parallel").
-- [ ] **Card: relay (staffs C).** After B1 and B2. Data only (M2-staffs.md, "Working in parallel").
 - [ ] **Card: on wall (staffs C).** After B1 and B2. Data only (M2-staffs.md, "Working in parallel").
 - [ ] **Card: heavy (staffs C).** After B1 and B3. Data only (M2-staffs.md, "Working in parallel").
 - [ ] **Card: magnet (staffs C).** After B1 and B3. Data only (M2-staffs.md, "Working in parallel").
@@ -76,6 +75,7 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 
 ## Done recently
 
+- [x] **Card: relay (staffs C).** `content/spells/modifiers/relay/` (`ModifierBase`, behaviour RELAY, icon, `assets.json`), the lore entry, the combos `relay_teammate_frost` and `relay_teammate_fire` (combo files may now name `mates` and a cast `dir`), and `tests/content/spells/test_relay.gd`.
 - [x] **Card: sticky (staffs C).** `content/spells/modifiers/sticky/` (`ModifierBase`, behaviour STICKY, 1 s on the target, icon, `assets.json`), the lore entry, the combos `sticky_plant_nova` and `sticky_frost_plant`, and `tests/content/spells/test_sticky.gd`.
 - [x] **Card: wall (staffs C).** `content/spells/forms/wall/` (`FormBase`, motion WALL, 5 stones 9 px apart, 3 damage each, 6 mana, 1 s cooldown, 5 s life, icon, `assets.json`), the lore entry, the combos `wall_fire_barrier` and `wall_frost_row`, and `tests/content/spells/test_wall.gd`.
 - [x] **Card: fissure (staffs C).** `content/spells/forms/fissure/` (`FormBase`, motion FISSURE, 2 damage, 5 mana, 0.8 s cooldown, 200 px line, icon, `assets.json`), the lore entry, the combos `fissure_fire_line` and `fissure_hit_nova`, and `tests/content/spells/test_fissure.gd`.

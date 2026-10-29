@@ -103,6 +103,10 @@ The owner's direction after B7a: "The 4 staffs should be mapped to lb/rb lt/rt i
 - **Passing a teammate** is reported once per teammate and shares the hit memory (the last three targets) of the shot. A piercing shot that passes three wizards in a 4-player game can therefore forget an enemy it hit and hit it again; accepted, since it is rare and costs one more hit. A bounce or the return turn clears the memory, so a wizard is passed again after it.
 - **A sticky shot keeps its velocity** while stuck (`_advance` never moves it by that), so its payloads fly the way it was flying; a shot that sticks on a step where it also reached a wall stays stuck.
 
+## 2026-10-29: Relay card (staffs C)
+
+- **Relay is complexity 2, strength 1.0, no mana change.** The combo format gained two optional keys so a combo can show it: `mates` (`[x, y, player]`, a teammate's body that shots hit, `ComboArena.add_mate`) and a cast's `dir` (`[x, y]`). The donor teammate casts away from everything, then the relay bolt (with `pierce`) hits the donor's body and carries its element on to the imp behind. The imps in the arena cannot cast, so the "steal from an enemy" case stays in `test_spells_triggers.gd`. The clip recorder ignores the two keys, so the relay combos' clips show no teammate.
+
 ## 2026-10-28: Sticky card (staffs C)
 
 - **Sticky holds 1 s** (`behaviour_strength` 1.0), complexity 2, no mana change. A stuck shot's payload starts inside the target, so a nova planted by `sticky · on expire` hits the target itself with every shot of its ring, not its neighbours: the combos check the target's damage and chill, not an imp beside it.

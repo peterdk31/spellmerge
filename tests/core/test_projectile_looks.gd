@@ -74,6 +74,17 @@ func test_pack_look_combines_every_kind() -> void:
 	check(ManagerScript.LOOK_COUNT - 1 <= ManagerScript.LOOK_MAX_KINDS, "the kinds fit the instance data")
 
 
+func test_hops_and_wake_are_kinds_that_pack_and_emit() -> void:
+	var look: int = ManagerScript.pack_look(PackedInt32Array([ManagerScript.LOOK_HOPS, ManagerScript.LOOK_WAKE]))
+	check(ManagerScript.look_has(look, ManagerScript.LOOK_HOPS), "hops is in the look")
+	check(ManagerScript.look_has(look, ManagerScript.LOOK_WAKE), "wake is in the look")
+	check(not ManagerScript.look_has(look, ManagerScript.LOOK_HOPS - 1), "its neighbour is not")
+	check(ManagerScript.LOOK_WAKE < ManagerScript.LOOK_COUNT, "both kinds are inside the look range")
+	check(ManagerScript.LOOK_COUNT - 1 <= ManagerScript.LOOK_MAX_KINDS, "and inside what the instance data holds")
+	for kind: int in [ManagerScript.LOOK_HOPS, ManagerScript.LOOK_WAKE]:
+		check((ManagerScript.EMITTING_MASK >> (kind - 1)) & 1 == 1, "kind %d gives off particles" % kind)
+
+
 func test_set_look_takes_a_live_shot_and_a_valid_look_only() -> void:
 	var slot: int = mgr.spawn(0, Vector2(50.0, 50.0), Vector2(100.0, 0.0), 1.0)
 	var look: int = ManagerScript.pack_look(all_kinds())

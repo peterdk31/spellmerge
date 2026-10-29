@@ -14,7 +14,6 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
 - [x] **The old recipe path removed (staffs A6c).** Done in an owner session: `Spells.compile(recipe)`, `builder_view`, the recipe wrappers (`install`, `cast`, a spell's `begin_generation`) and the recipe compiler are gone, `begin_generation` takes a compiled staff; `CompiledSpell` lost `valid`, `reason`, `description`, `complexity`, `depth` and `held`; `SpellLimits` keeps only engine safeguards and tuning; the events `build_change_requested`, `spell_swap_requested`, `spell_changed`, `recipe_changed` and `active_spell_changed` are removed; tests build staffs (`tests/support/staff_kit.gd` turns the old recipe shorthand into card rows; `test_spell_tags.gd` replaces `test_spells_compile.gd`); the spells, core and gameplay READMEs say so. **Phase B and the cards can start; development is unpaused.**
 - [x] **Card: arc (staffs C).** After the slow, return and arc kit (owner, 2026-10-27). Data only.
 - [x] **Card: linger (staffs C).** After B1. Data only (M2-staffs.md, "Working in parallel").
-- [ ] **Card: siphon (staffs C).** After B2 and B4. Data only (M2-staffs.md, "Working in parallel").
 - [ ] **Card: hold (staffs C).** After B2 and B4. Data only (M2-staffs.md, "Working in parallel").
 - [ ] **Card: teleport (staffs C).** After B2 and B4. Data only (M2-staffs.md, "Working in parallel"). Moved to the bot's queue by the owner on 2026-10-26.
 - [ ] **Card: hook (staffs C).** After B2 and B4. Data only (M2-staffs.md, "Working in parallel"). Moved to the bot's queue by the owner on 2026-10-26.
@@ -64,6 +63,7 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 
 ## Done recently
 
+- [x] **Card: siphon (staffs C).** `content/spells/modifiers/siphon/` (`ModifierBase`, SIPHON, 3 mana back per hit, icon, `assets.json`), the lore entry, the combos `siphon_split_bolts` and `siphon_chain_bolt`, and `tests/content/spells/test_siphon.gd` (valid card; the combos hurt and refund with it, nothing without; four players). The engine side was built in B2.
 - [x] **Test: a possessing player cannot strand a room (staffs C).** It could: a possessed enemy that died was on the wizards' team, so `Combat._die` sent no `enemy_died` and the wave never cleared. Fixed in `combat.gd`; regression test `_test_possessed_enemy_does_not_strand_the_room` in `tests/gameplay/flow/test_flow.gd`; `possess` is back in `Bot.build_random`'s bag.
 - [x] **Card: on wall (staffs C).** `content/spells/triggers/on_wall/` (`TriggerBase`, event WALL, one fire, icon, `assets.json`), the lore entry, the combos `on_wall_bolt_nova` and `on_wall_bolt_rune`, and `tests/content/spells/test_on_wall.gd` (valid card; each combo holds with it, fails without it and with no wall). The engine side was built in B2.
 - [ ] **Clip recorder: combo `mates` and cast `dir`.** `tests/clips/scenarios.gd` ignores them, so the clips of `relay_teammate_frost` and `relay_teammate_fire` show a bolt hitting nothing; teach the recorder both keys.

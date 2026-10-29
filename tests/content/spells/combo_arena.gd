@@ -85,6 +85,16 @@ func add_imp(at: Vector2, health: int = IMP_HEALTH) -> Node2D:
 	return imp
 
 
+## Puts the body of teammate `player` at `at`: a shot of another actor hits it (and `relay` reads
+## what `player` last cast), and it is nothing else, so it takes no damage. Returns the node.
+func add_mate(at: Vector2, player: int) -> Node2D:
+	var mate := _own(Node2D.new()) as Node2D
+	_root.add_child(mate)
+	mate.global_position = at
+	projectiles.add_target(mate, IMP_RADIUS, ManagerScript.LAYER_PLAYER, player)
+	return mate
+
+
 ## Puts a wall over `rect` (pixels, the caster at (0, 0)): shots end, bounce or pass on it as
 ## their cards say.
 func add_wall(rect: Rect2) -> void:

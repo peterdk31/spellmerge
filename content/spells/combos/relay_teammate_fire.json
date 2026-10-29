@@ -1,0 +1,13 @@
+{
+	"id": "relay_teammate_fire",
+	"name": "Relay teammate fire",
+	"does": "A plain bolt pierces a teammate who just cast fire, takes on the fire and sets the imp behind alight.",
+	"casts": [
+		{"player": 1, "staff": 0, "cards": ["fire", "bolt"], "dir": [0, 1]},
+		{"player": 0, "staff": 0, "cards": ["relay", "pierce", "bolt"], "at": 0.1}
+	],
+	"mates": [[60, 0, 1]],
+	"imps": [[130, 0]],
+	"seconds": 2.0,
+	"checks": [{"kind": "status", "imps": [0], "status": "burn"}]
+}

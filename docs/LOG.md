@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-29: Card relay (staffs C)
+
+Added the Relay modifier card (data only: `.tres`, icon, assets, lore), two combos (`relay_teammate_frost`, `relay_teammate_fire`) and `test_relay.gd`. The combo format got optional `mates` and a cast `dir`.
+
 ## 2026-10-28: Card sticky (staffs C)
 
 Added the Sticky modifier card (data only: `.tres`, icon, assets, lore), two combos (`sticky_plant_nova`, `sticky_frost_plant`) and `test_sticky.gd`. All 136 unit tests pass.

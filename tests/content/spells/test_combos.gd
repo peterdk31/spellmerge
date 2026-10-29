@@ -6,8 +6,8 @@ extends "res://tests/support/suite.gd"
 ## a new combo file is covered without a new test.
 ##
 ## A combo file: `id` (also the file name), `name`, `does` (plain words), `casts` (`staff`,
-## `cards`: one card id per slot, read as a staff reads them; optional `at` seconds, `player`), `imps` ([x, y] from the caster at (0, 0), aiming
-## along +x), optional `walls` ([x, y, width, height] rects), `seconds` and `checks`. Check kinds: `damaged` (imps), `status` (imps, status),
+## `cards`: one card id per slot, read as a staff reads them; optional `at` seconds, `player`, `dir` [x, y] to cast toward), `imps` ([x, y] from the caster at (0, 0), aiming
+## along +x), optional `mates` ([x, y, player]: a teammate's body that shots hit, for `relay`), optional `walls` ([x, y, width, height] rects), `seconds` and `checks`. Check kinds: `damaged` (imps), `status` (imps, status),
 ## `status_count` (status, min), `lost_at_least` (imps, min: health lost in all), `keeps_burning` (imp), `reaction` (reaction), `max_shots` (max),
 ## `caster_moved` (mode: a card moved its caster, for example a dash).
 ##
@@ -35,6 +35,8 @@ func _play(combo: Dictionary, quiet: bool = false) -> ArenaScript:
 	var arena := ArenaScript.new(root)
 	for at: Array in combo.get("imps", []):
 		arena.add_imp(Vector2(float(at[0]), float(at[1])))
+	for mate: Array in combo.get("mates", []):
+		arena.add_mate(Vector2(float(mate[0]), float(mate[1])), int(mate[2]))
 	for rect: Array in combo.get("walls", []):
 		arena.add_wall(Rect2(float(rect[0]), float(rect[1]), float(rect[2]), float(rect[3])))
 	var casts: Array = (combo.get("casts", []) as Array).duplicate()
@@ -48,7 +50,8 @@ func _play(combo: Dictionary, quiet: bool = false) -> ArenaScript:
 		var at: float = float(entry.get("at", 0.0))
 		if at > arena.time:
 			arena.run(at - arena.time)
-		var made: bool = arena.cast(int(entry.get("player", 0)), int(entry["staff"]))
+		var dir: Array = entry.get("dir", [1, 0])
+		var made: bool = arena.cast(int(entry.get("player", 0)), int(entry["staff"]), Vector2(float(dir[0]), float(dir[1])))
 		if not quiet:
 			check(made, "%s: the cast of staff %d is made" % [combo["id"], int(entry["staff"])])
 	arena.run(maxf(seconds - arena.time, 0.0))
@@ -211,6 +214,8 @@ const CONTROLS: Dictionary = {
 	"fissure_hit_nova": "fissure",
 	"wall_fire_barrier": "wall",
 	"wall_frost_row": "wall",
+	"relay_teammate_frost": "relay",
+	"relay_teammate_fire": "relay",
 }
 
 

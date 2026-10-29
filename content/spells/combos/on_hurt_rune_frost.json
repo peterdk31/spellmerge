@@ -1,0 +1,11 @@
+{
+	"id": "on_hurt_rune_frost",
+	"name": "On hurt rune frost",
+	"does": "A rune is laid at the caster's feet; when an enemy shot hurts the caster, a frost nova bursts from them and chills an imp standing close.",
+	"casts": [{"staff": 0, "cards": ["on_hurt", "rune", "frost", "nova"]}],
+	"imps": [[0, -45]],
+	"guard": true,
+	"foes": [[100, 0]],
+	"seconds": 2.0,
+	"checks": [{"kind": "status", "imps": [0], "status": "chill"}]
+}

@@ -1,0 +1,13 @@
+{
+	"assets": [
+		{
+			"path": "content/spells/triggers/on_hurt/icon.svg",
+			"origin": "ai",
+			"author": "Claude",
+			"license": "CC-BY-SA-4.0",
+			"tier": "placeholder",
+			"tool": "Claude (SVG rects written by hand)",
+			"prompt": "A 16x16 icon for the On Hurt trigger: a Fire-red heart with a lighter highlight, a darker lower half and a 1 px outline. Only non-overlapping rect elements, whole-number coordinates, palette colours from docs/STYLE.md."
+		}
+	]
+}

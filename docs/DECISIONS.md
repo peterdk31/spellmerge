@@ -113,6 +113,11 @@ The owner's direction after B7a: "The 4 staffs should be mapped to lb/rb lt/rt i
 - **The engine hook was missing**, so this card added `Spells._step_magnets` (a list of magnet slots, like arc's). Magnet is listed as wasted on a payload that fires from a point (`TRAVEL_ONLY`).
 - **Combo arena imps can now be pushed**, opt in: `ComboArena.pushable`, and the combo key `pushed`. Off by default so other combos behave as before. The clip recorder ignores `pushed`, so the magnet clips show no pull.
 
+## 2026-10-29: Shield card (staffs C)
+
+- **Shield is one charge a card** (`behaviour_strength` 1.0, charges add), complexity 2, no mana change, look layer 10 (orbiting sparks, as the design says). Its combos check that the shielded carrier still works; the blocking itself is in `test_shield.gd`, since combo imps cannot shoot.
+- **The caster barrier is not wired.** `Spells` hands charges to shots and wall stones (`set_shield`) but never sends `wizard_shield_requested`, so `shield · dash` and a shield on the caster do nothing yet, though combat can take the barrier. That is engine work, not this data-only card: added to `docs/BACKLOG.md`.
+
 ## 2026-10-29: Heavy card (staffs C)
 
 - **Heavy is knockback x4 and speed x0.6**, complexity 2, no mana change. The slam is combat's (`SLAM_SHARE`: as much as the hit's damage). The combos put the wall within 12 px of the imp (combat looks `SLAM_REACH` past its hurt circle), because arena imps are not moved by knockback.

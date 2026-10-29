@@ -1,0 +1,9 @@
+{
+	"id": "shield_wall_fire",
+	"name": "Shielded fire wall",
+	"does": "A fire wall whose stones each stop one enemy shot, and still burns the two imps standing at its stones.",
+	"casts": [{"staff": 0, "cards": ["shield", "fire", "wall"]}],
+	"imps": [[28, 0], [28, 14]],
+	"seconds": 1.5,
+	"checks": [{"kind": "status", "imps": [0, 1], "status": "burn"}]
+}

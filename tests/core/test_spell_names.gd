@@ -97,7 +97,7 @@ func test_a_trigger_names_its_payload_in_the_plural() -> void:
 
 func test_a_multicast_is_a_hyphenated_prefix() -> void:
 	check_equal(_name("double bolt bolt"), "Twice-Bolt and Bolt", "the first carrier takes the prefix")
-	check_equal(_name("double triple bolt bolt bolt bolt"), "Twice-Thrice-Bolt and Bolt and Bolt and Bolt", "prefixes chain")
+	check_equal(_name("double triple bolt bolt bolt bolt"), "Twice-Thrice-Bolt and Bolt and Bolt and more", "prefixes chain, three carriers are said")
 
 
 func test_a_card_with_several_words_gives_the_first_when_plain_and_one_of_them_otherwise() -> void:
@@ -131,6 +131,28 @@ func test_cards_with_no_carrier_are_named_for_where_they_land() -> void:
 	check_equal(_name("on_hit bolt fire"), "Bolt of Sudden Fire Flares", "an infusion alone in a payload lands on its origin")
 
 
+func test_a_card_keeps_its_word_when_other_cards_change() -> void:
+	var word: String = _name("homing bolt").split(" ")[0]
+	for extra in ["fire", "slow", "bigger", "double"]:
+		var said: String = _name("%s homing bolt" % extra)
+		check(said.contains(word), "'%s' stays in '%s'" % [word, said])
+
+
+func test_a_multi_word_head_is_pluralized_on_its_last_word() -> void:
+	(_fake.items[&"fox"] as SpellComponent).name_words = PackedStringArray(["Seeking Fox"])
+	check_equal(_name("on_hit bolt fox"), "Bolt of Sudden Seeking Foxes", "the last word takes the plural")
+
+
+func test_a_worst_case_build_has_a_short_name() -> void:
+	var cards: String = "double triple slow bigger faster homing fire frost on_hit bolt "
+	cards += "on_hit nova on_hit fox on_hit fly bolt nova fox fly bolt nova fox fly"
+	var said: String = _name(cards)
+	check(said != "", "it has a name")
+	check(said.length() <= SpellNamer.MAX_LENGTH, "%d characters: %s" % [said.length(), said])
+	var many: String = _name("double triple bolt bolt bolt bolt bolt bolt")
+	check(many.ends_with("and more"), "more carriers than said ends 'and more': %s" % many)
+
+
 func test_every_cast_of_the_cycle_has_a_name() -> void:
 	var names: PackedStringArray = _names("fire bolt frost nova")
 	check_equal(names.size(), 2, "two casts")
@@ -147,7 +169,6 @@ func test_every_real_card_has_name_words() -> void:
 	var arena := ArenaScript.new(root)
 	var ids: Array[StringName] = arena.registry.call("get_ids", &"spells")
 	check(ids.size() > 0, "the registry finds cards")
-	var seen: Dictionary = {}
 	for id in ids:
 		var card := arena.registry.call("get_resource", &"spells", id) as SpellComponent
 		if card == null:
@@ -155,6 +176,4 @@ func test_every_real_card_has_name_words() -> void:
 		check(not card.name_words.is_empty(), "%s: set `name_words` in its .tres (see SpellComponent)" % id)
 		for word in card.name_words:
 			check(word.strip_edges() != "" and word == word.strip_edges(), "%s: a name word has no blank edges ('%s')" % [id, word])
-		if card is FormBase and not card.name_words.is_empty():
-			seen[card.name_words[0]] = true
 	arena.free_all()

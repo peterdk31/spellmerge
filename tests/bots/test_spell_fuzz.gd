@@ -36,6 +36,10 @@ const STEP_LIMIT_MS: float = 100.0
 const MIN_COVERAGE: Dictionary = {"payload": 20, "multicast": 10, "fallback": 10, "wrapped": 20, "wasted": 20}
 ## The costliest staffs named on the FUZZ line.
 const COSTLIEST: int = 3
+## Staffs named on each REPORT line of the emergent combo report.
+const REPORT_TOP: int = 5
+## Health of the imps in this run: low enough that a good staff kills some within `SECONDS`.
+const IMP_HEALTH: int = 60
 
 var _log: Logger = ErrorLogScript.new()
 
@@ -63,7 +67,7 @@ func _has_kind(kind: StringName) -> bool:
 ## Imps in a ring and a line, so straight, orbit, still and chaining spells all meet some.
 func _populate(arena: ArenaScript) -> void:
 	for at: Vector2 in [Vector2(60, 0), Vector2(110, 20), Vector2(110, -20), Vector2(160, 0), Vector2(-50, 30), Vector2(0, 70), Vector2(0, -70)]:
-		arena.add_imp(at)
+		arena.add_imp(at, IMP_HEALTH)
 
 
 ## Which features a compiled staff has (0 or 1 each), under the keys of MIN_COVERAGE.
@@ -95,6 +99,8 @@ func test_random_staffs_compile_and_cast_without_errors() -> void:
 	var coverage: Dictionary = {}
 	## [peak live shots, label] of every staff, for the costliest.
 	var costs: Array = []
+	## One row per staff for the report (see `_report_row`).
+	var rows: Array[Dictionary] = []
 	for number in STAFFS:
 		var cards: Array[StringName] = fuzzer.random_cards(rng, SLOTS)
 		var label: String = "seed %d, staff %d %s" % [SEED, number, str(cards)]
@@ -123,6 +129,7 @@ func test_random_staffs_compile_and_cast_without_errors() -> void:
 			slow.append("%s: a step took %.2f ms on average" % [label, mean])
 		peak = maxi(peak, fresh.peak_shots)
 		dropped += fresh.projectiles.dropped
+		rows.append(_report_row(number, fresh, staff, label, mean))
 		costs.append([fresh.peak_shots, label])
 		var counted: Dictionary = _coverage(staff)
 		for key: String in counted:
@@ -143,7 +150,59 @@ func test_random_staffs_compile_and_cast_without_errors() -> void:
 	costs.sort_custom(func(a: Array, b: Array) -> bool: return int(a[0]) > int(b[0]))
 	for i in mini(COSTLIEST, costs.size()):
 		print("FUZZ COSTLY: %d live shots: %s" % [int(costs[i][0]), costs[i][1]])
+	_print_report(rows)
 	print("FUZZ:%d staffs, slowest mean step %.3f ms, slowest step %.3f ms, most live shots %d, shots dropped at the pool %d" % [STAFFS, slowest_mean, slowest_step, peak, dropped])
+
+
+## The numbers of one staff's run for the report: its name (the first cast's, from its cards),
+## the imps it killed, the reactions it set off (and how many kinds), its peak live shots, the
+## shots the pool dropped and its mean step time.
+func _report_row(number: int, arena: ArenaScript, staff: CompiledStaff, label: String, mean: float) -> Dictionary:
+	var kills: int = 0
+	for imp in arena.imps:
+		kills += 1 if arena.died(imp) else 0
+	var kinds: Dictionary = {}
+	for id in arena.reaction_ids():
+		kinds[id] = true
+	var title: String = ""
+	for cast in staff.casts:
+		if not cast.spell_name.is_empty():
+			title = cast.spell_name
+			break
+	return {"index": number, "label": label, "name": title, "kills": kills, "reactions": arena.reactions.size(), "kinds": kinds.size(), "shots": arena.peak_shots, "dropped": arena.projectiles.dropped, "safeguard": arena.projectiles.dropped * 1000 + arena.peak_shots, "mean": mean}
+
+
+## The first `REPORT_TOP` of `rows` by `key`, biggest first. A tie goes to the lower staff
+## `index`, so the order is total and a run repeats (`sort_custom` is not stable).
+func _top(rows: Array[Dictionary], key: String) -> Array[Dictionary]:
+	var ranked: Array[Dictionary] = []
+	ranked.assign(rows)
+	ranked.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		if float(a[key]) != float(b[key]):
+			return float(a[key]) > float(b[key])
+		return int(a["index"]) < int(b["index"]))
+	return ranked.slice(0, REPORT_TOP)
+
+
+## The emergent combo report (staffs D1): the best random staffs by kills and by reactions, the
+## costliest by frame time and by shots dropped at the pool (the safeguard). A run's lines go
+## into docs/LOG.md; frame times depend on the machine, the rest does not. Each line starts with
+## the ranked value, then the staff's name and cards, then the other numbers.
+func _print_report(rows: Array[Dictionary]) -> void:
+	var views: Array = [
+		["kills", "REPORT BEST BY KILLS", "%d kills"],
+		["reactions", "REPORT BEST BY REACTIONS", "%d reactions"],
+		["mean", "REPORT COSTLIEST BY FRAME TIME", "%.2f ms"],
+		["safeguard", "REPORT COSTLIEST BY SAFEGUARDS", "%d (dropped x 1000 + peak shots)"],
+	]
+	for view: Array in views:
+		var key: String = view[0]
+		for row in _top(rows, key):
+			var value: String = (view[2] as String) % (float(row[key]) if key == "mean" else int(row[key]))
+			var title: String = row["name"] if not (row["name"] as String).is_empty() else "(unnamed)"
+			print("%s: %s | %s | %s | %d kills, %d reactions (%d kinds), %d peak shots, %d dropped, %.2f ms" % [view[1], value, title, row["label"], int(row["kills"]), int(row["reactions"]), int(row["kinds"]), int(row["shots"]), int(row["dropped"]), float(row["mean"])])
+	if not rows.is_empty() and int(_top(rows, "kills")[0]["kills"]) == 0:
+		print("REPORT WARNING: no staff killed an imp; the imps' health (%d) may be too high for the cards" % IMP_HEALTH)
 
 
 ## The same seed gives the same staffs, which is what makes a failure replayable.
@@ -172,3 +231,24 @@ func test_a_random_staff_has_a_carrier() -> void:
 		check(has_form, "staff %d has a carrier" % i)
 	check(not FuzzerScript.new([&"fire"] as Array[StringName], func(_id: StringName) -> StringName: return &"element").can_build(), "no carrier in the bag, no build")
 	arena.free_all()
+
+
+## More tied staffs than the report holds: the lowest indexes are named, in order, however the rows come.
+func test_report_ties_are_total() -> void:
+	var rows: Array[Dictionary] = []
+	for i in 40:
+		rows.append({"index": 39 - i, "kills": 0, "label": str(39 - i)})
+	var top: Array[Dictionary] = _top(rows, "kills")
+	for i in REPORT_TOP:
+		check(int(top[i]["index"]) == i, "tied staffs are named by index: place %d is staff %d" % [i, int(top[i]["index"])])
+
+
+## The report ranks biggest first, breaks a tie by the lower staff index and names at most REPORT_TOP.
+func test_report_ranking() -> void:
+	var rows: Array[Dictionary] = []
+	for i in 8:
+		rows.append({"index": i, "kills": i % 3, "label": str(i)})
+	var top: Array[Dictionary] = _top(rows, "kills")
+	check(top.size() == REPORT_TOP, "the report names %d staffs" % REPORT_TOP)
+	check(top[0]["label"] == "2" and top[1]["label"] == "5", "ties keep the staff order")
+	check(int(top[REPORT_TOP - 1]["kills"]) >= 1, "the smallest are left out")

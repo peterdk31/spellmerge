@@ -94,9 +94,6 @@ const SWING_CHAIN: float = 0.25
 ## Degrees the staff leans back past the start of the arc before a sweep and swings on past its
 ## end; the sweep's ease runs over the whole turn, and only the arc itself hits.
 const SWING_LEAN: float = 22.5
-## Seconds a swinging body holds at the end of its swing, then settles back onto its aim (its look).
-const SWING_HOLD: float = 0.08
-const SWING_SETTLE: float = 0.3
 ## Moves of shots whose end point is still to come (a dash whose caster is a shot) with room made
 ## at once; more is made when needed.
 const SHOT_MOVES_START: int = 64

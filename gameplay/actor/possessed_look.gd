@@ -17,7 +17,6 @@ extends ActorLook
 ## when it ends (`Actor.add_look`, `remove_look`); it redraws only when the arc moves a step
 ## (ARC_STEPS) or a bar a pixel, and allocates nothing per step.
 
-const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 
 ## The bottom of the overlay above the feet: just over a 32 px character.
 const TOP: float = -31.0

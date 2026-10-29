@@ -140,3 +140,33 @@ func test_four_players_slam_at_once() -> void:
 	for imp in imps:
 		check_equal(arena.lost(imp), _card().base_damage, "every imp past its player's impact took the hit")
 	arena.free_all()
+
+
+func test_its_staff_rises_glowing_drops_and_settles() -> void:
+	# The card's animation (`staff_pose`), played for the wizard's body by Spells.
+	var arena := ArenaScript.new(root)
+	arena.install_cards(0, 0, ["slam"])
+	arena.spells.set_aim(0, Vector2.ZERO, Vector2.RIGHT)
+	arena.cast(0, 0)
+	arena.run(0.18)
+	var risen: Vector3 = arena.spells.staff_pose(0)
+	check(risen.y > 4.0 and risen.z < -2.0 and risen.x < -0.5, "in the wind-up it rises, tilts up and draws back: %s" % risen)
+	check(arena.spells.staff_glow(0) > 0.5, "glowing as it charges: %f" % arena.spells.staff_glow(0))
+	arena.run(0.1)
+	var struck: Vector3 = arena.spells.staff_pose(0)
+	check(struck.y < 2.0 and struck.z > 3.0 and struck.x > 0.3, "at the impact it is down, tilted at the floor and thrust ahead: %s" % struck)
+	arena.run(0.8)
+	check_equal(arena.spells.staff_pose_dir(0), Vector2.ZERO, "then back on the aim")
+	check_equal(arena.spells.staff_glow(0), 0.0, "and dark")
+	arena.free_all()
+
+
+func test_a_payload_slam_moves_no_body() -> void:
+	var arena := ArenaScript.new(root)
+	arena.install_cards(0, 0, ["on_hit", "bolt", "slam"])
+	arena.add_imp(Vector2(60.0, 0.0))
+	arena.spells.set_aim(0, Vector2.ZERO, Vector2.RIGHT)
+	arena.cast(0, 0)
+	arena.run(0.5)
+	check_equal(arena.spells.staff_glow(0), 0.0, "the bolt's slam, cast where it hit, does not lift the wizard's staff")
+	arena.free_all()

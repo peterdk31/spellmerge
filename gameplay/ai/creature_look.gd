@@ -145,7 +145,8 @@ func lift() -> float:
 	return -_lift.y
 
 
-## The hop while walking, the bob while standing, on the sprite and the face.
+## The hop while walking, the bob while standing, and its cast's staff animation, on the sprite and
+## the face.
 func _hop(delta: float) -> void:
 	_hop_time += delta
 	var walking: bool = actor.velocity.length_squared() > HOP_SPEED * HOP_SPEED
@@ -154,10 +155,13 @@ func _hop(delta: float) -> void:
 		up = roundf(absf(sin(_hop_time * HOP_RATE * PI)) * HOP_HEIGHT)
 	else:
 		up = roundf((sin(_hop_time * HOP_RATE) * 0.5 + 0.5) * HOP_IDLE)
-	if -up == _lift.y:
-		# Whole pixels: most steps the lift is where it was.
+	# The staff animation of its cast (ActorLook's pose: lift, push, shake) on top.
+	var at: Vector2 = Vector2(0.0, -up) + pose_offset(_hop_time)
+	apply_pose(sprite, _face, false)
+	if at == _lift:
+		# Whole pixels: most steps the body is where it was.
 		return
-	_lift = Vector2(0.0, -up)
+	_lift = at
 	if sprite != null:
 		sprite.offset = _sprite_offset + _lift
 	if _face != null:

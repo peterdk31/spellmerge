@@ -11,7 +11,6 @@ const FeelScript := preload("res://gameplay/feel/feel.gd")
 const FeelPresetScript := preload("res://gameplay/feel/presets/feel_preset.gd")
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 const RegistryScript :=preload("res://core/registry/registry.gd")
-const ActorStandIn := preload("res://tests/gameplay/feel/fixtures/wizard_stand_in.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
 
 const STEP: float = 0.0625
@@ -51,10 +50,8 @@ func _initialize() -> void:
 	_test_death_puff_is_limited()
 	_test_muzzle_flash_follows_aim_and_colour()
 	_test_muzzle_flash_stays_small()
-	_test_cast_squash()
 	_test_death_animation()
 	_test_death_animation_starts_at_rest_scale()
-	_test_cast_squash_skips_a_dash()
 	_teardown()
 	# The audio server drops stopped playbacks on its next mix; without this wait they
 	# are reported as leaked objects (and a resource still in use) at exit.
@@ -491,35 +488,6 @@ func _test_muzzle_flash_follows_aim_and_colour() -> void:
 	_check(is_equal_approx(buffer[3], 10.0) and is_equal_approx(buffer[7], 5.0), "at the staff tip")
 
 
-func _test_cast_squash() -> void:
-	_setup()
-	var wizard := Node2D.new()
-	var sprite := Sprite2D.new()
-	sprite.name = "Sprite"
-	wizard.add_child(sprite)
-	root.add_child(wizard)
-	_bus.actor_cast.emit(0, wizard)
-	_check(_feel.reacting_sprites() == 1, "a cast starts a reaction on the caster")
-	_check(sprite.material == null, "a cast squash has no white flash")
-	_feel.step(0.015625)
-	_check(sprite.scale.x < 1.0 and sprite.scale.y > 1.0, "the caster gets thin and tall")
-	# A hit during the cast squash takes it over; a cast during a hit does not.
-	_bus.damage_dealt.emit(0, wizard, 1, Vector2.ZERO)
-	_check(sprite.material != null and _feel.reacting_sprites() == 1, "a hit replaces the cast squash")
-	_bus.actor_cast.emit(0, wizard)
-	_check(sprite.material != null, "a cast does not replace a hit's flash")
-	for i in 4:
-		_feel.step(STEP)
-	_check(sprite.scale == Vector2.ONE and sprite.material == null and _feel.reacting_sprites() == 0, "the sprite is back at rest")
-	wizard.free()
-	# Nothing to squash: no node, or a node without a Sprite.
-	var bare := Node.new()
-	_bus.actor_cast.emit(0, null)
-	_bus.actor_cast.emit(0, bare)
-	_check(_feel.reacting_sprites() == 0, "nothing reacts without a Sprite")
-	bare.free()
-
-
 func _test_death_animation() -> void:
 	_setup()
 	var texture := load("res://art/vfx/hit_spark.svg") as Texture2D
@@ -589,26 +557,3 @@ func _test_death_animation_starts_at_rest_scale() -> void:
 	var copy: Sprite2D = _feel.ghost(0)
 	_check(copy.scale.is_equal_approx(Vector2(2.0, 2.0)), "the copy starts at the rest scale, not the squashed one")
 	_check(not copy.centered, "the copy keeps the sprite's centring")
-
-
-## A mover in the middle of a dash.
-class DashingMover:
-	extends Mover
-
-	func is_moving() -> bool:
-		return true
-
-
-func _test_cast_squash_skips_a_dash() -> void:
-	_setup()
-	var wizard := ActorStandIn.new() as Actor
-	var mover := DashingMover.new()
-	wizard.mover = mover
-	wizard.add_child(mover)
-	var sprite := Sprite2D.new()
-	sprite.name = "Sprite"
-	wizard.add_child(sprite)
-	root.add_child(wizard)
-	_bus.actor_cast.emit(0, wizard)
-	_check(_feel.reacting_sprites() == 0 and sprite.scale == Vector2.ONE, "a cast during a dash does not touch the sprite scale")
-	wizard.free()

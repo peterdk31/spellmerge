@@ -22,3 +22,4 @@ spread = 0.0
 motion = 4
 pierce = 0
 ray_length = 80.0
+staff_pose = Array[Dictionary]([{"phase": "strike", "at": 0.5, "push": 3, "glow": 0.3, "mood": "raised"}, {"phase": "after", "at": 0.12}])

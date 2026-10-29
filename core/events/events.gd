@@ -52,7 +52,7 @@ signal device_left(player: int, device: int)
 
 ## Sender: player. A cast left the wand of the seat `player`'s wizard (seat-keyed: for the HUD and Feel).
 signal spell_cast(player: int, spell_id: StringName, origin: Vector2, direction: Vector2)
-## Sender: the actor kit (`Caster`). The actor `caster` (its node `actor`) has just cast, any actor, for visual reactions only (Feel's squash). For a seat's actor it comes right after `spell_cast`.
+## Sender: the actor kit (`Caster`). The actor `caster` (its node `actor`) has just cast, any actor, for visual reactions only (its body's movement is its carrier's `staff_pose`, drawn by its look from Spells). For a seat's actor it comes right after `spell_cast`. Heard by nobody in the game yet (tests count casts with it).
 signal actor_cast(caster: int, actor: Node)
 ## Sender: the actor kit (`Caster`). The actor `caster` (its node `actor`) put another of its staffs on show, `staff` (living staffs H4: a press of a different staff button; the personality swap), before that press casts. For visual reactions only (Feel's poof).
 signal staff_shown(caster: int, actor: Node, staff: int)

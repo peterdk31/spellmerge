@@ -2,12 +2,17 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-29: Deflect's look and price (melee I5)
+
+- **Look: zig (18), shared with bounce and arc.** Every kind is taken (22 to 24 are flags), so the card shares one. Zig is streaks thrown back at an angle, which is what a deflect does to a shot: it is a bounce off the carrier instead of a wall, so it sits with bounce in the "turning off something" group. `test_original_looks.gd` lists it.
+- **Price: mana ×1.25, delay ×1.2, complexity 2.** Shield (one block, a charge per card) has no price of its own; deflect turns every shot that touches the carrier and hands it to the caster 1.7× faster, so it costs a little more, about what return and bounce cost. On a swing (no mana) the price is the delay.
+
 ## 2026-10-29: Freezes in co-op (melee I7)
 
 - **The hold lives in `core/`, Feel only asks for it.** Areas only talk through `core/`, so the per-actor hold is in the actor table (`Actors.hold`, read by `Actor.step` with `spend_hold`) and the per-shot hold in the projectile manager (`freeze_shot`, state `S_FROZEN`); Feel decides who is held and for how long. A step longer than the hold runs for the rest, so a hold never eats a long step.
 - **Which bodies:** the attacker and the target of a hit, plus the shot whose `projectile_hit` is being sent (`event_slot`; a ray has none). A spent shot is already gone, so only a piercing, lingering or orbiting shot is held. A kill holds the killer (the dead body is freed at once). A reaction, which used to stop the whole game, holds its caster: it is a hit, not a rare moment.
 - **The rest is per actor** (`hit_stop_rest` after a hold), so one body is not frozen for ever by a stream of hits, while two players' hits never gate each other. Kills and reactions ignore the rest, as deaths did.
-- **Game-wide stop:** only `player_downed` and the death of an enemy whose `EnemyBase.boss` is true (a new flag; no boss exists yet). The parry's local stop is added when I5 lands.
+- **Game-wide stop:** only `player_downed` and the death of an enemy whose `EnemyBase.boss` is true (a new flag; no boss exists yet). The parry's local stop is added when I5 lands (done: Feel's `parry_stop_seconds` on the parrying actor).
 - **Held bodies stop in Feel's own time:** the hold counts down in the simulation's time, not real time; with `Engine.time_scale` at 1 they are the same.
 
 ## 2026-10-29: Planning run on an empty queue
@@ -133,7 +138,7 @@ The owner's direction after B7a: "The 4 staffs should be mapped to lb/rb lt/rt i
 - **Where each card asks for movement.** Teleport (and dash) ask at cast; hook and swap ask when their shot hits (a miss moves nobody); recoil asks for each firing of the cast's own group (not payloads), `strength` pixels against the firing's heading, so `mirror` pushes both ways and cancels. Durations are `SpellLimits.HOOK_SECONDS`, `SWAP_SECONDS`, `RECOIL_SECONDS`; a teleport is at once. Why: the design describes the cards this way; recoil per firing makes `mirror · recoil` cancel without special cases.
 - **Swap needs the caster's place**, read from the manager's anchor; without one nothing is traded. `target_move_requested` carries the player first (as in `events.gd`, which differs from the milestone table).
 - **End points from `caster_move_finished`** (dash, teleport, hook; other modes are ignored) fire the carrier's `blast` and its `on expire` payload at the arrival. The payload goes along the move's heading. A forgotten build (tag unknown) does nothing.
-- **Blast on shots** goes off where a spent shot hit, where a shot expired (also a sticky one, or a wall), and at the end of a beam or fissure. A piercing shot or beam does not blast per target. A hook's blast waits for the arrival, so a missing hook does not explode.
+- **Blast on shots** goes off where a spent shot hit, where a shot expired (also a sticky one, or a wall), and at the end of a beam or fissure. A piercing shot or beam does not blast per target. A hook's blast waits for the arrival; a missing hook blasts where it ends (since rules R1d, 2026-10-29; before, it did not explode).
 - **Simultaneous moves.** The player (B4) sums the `recoil` requests of one step and lets a later non-recoil move replace an earlier one (written in `events.gd` and the B4 task). `Spells` keeps one move heading per player, so the last asked move wins: of two moves in flight, the first one's `on expire` payload leaves along the later heading. A hook with pierce left can fire its `on expire` payload at the arrival and again when the shot expires; both are accepted for now.
 - **Every spent shot blasts.** The blast rule is per shot: each chain jump shot, each echo and each shot of a wall or orbit blasts where it is spent, so a wall of N shots expiring together sends N area hits in one step. A piercing shot does not blast at a hit it survives. Pinned by tests.
 - **Siphon** sends one refund of its strength per hit (a beam's every target too); the pool is `player`'s concern (B4).
@@ -149,7 +154,7 @@ The owner's direction after B7a: "The 4 staffs should be mapped to lb/rb lt/rt i
 
 - **Scatter is the full circle:** each carrier of a scatter group leaves at a random angle from 0 to 360 degrees off the aim, as the design says "random directions"; the owner's fairness question at D3 covers it. The generator is seeded from player, staff and the staff's cast count, so a replay is the same; a burst's later firings and an echo each carry a seed derived from the cast's, so they point the same way whatever else is cast in between. A payload fired from a hit draws from whatever stream is current, so its directions depend on when the hit lands; only the cast's own firings are reproducible.
 - **Later firings are queued, not timed on shots:** a burst's later firings and an echo wait in `Spells` (`SpellLimits.MAX_PENDING` records made once and reused, so a cast allocates nothing; overflow is counted in `delayed_dropped`), start from the original point moved by however far the caster's anchor has moved (the cast's own group only; a payload's stay where they were), and are dropped when the staff is rebuilt or switched off. They cost no mana; the cast paid once.
-- **Echo** hits through a second shared `HitProfile` (`echo_hit`, half damage rounded, at least 1), built by the compiler, so no hit allocates. It fires after the strength in seconds, does not echo again, keeps its half damage on chain jumps, and a `hold` carrier does not echo (a sustained shot has nothing to repeat). An echo of a carrier with a trigger registers its own trigger, which is why `echo` doubles triggers. `on cast` fires on the carrier's first launch and again on its echo.
+- **Echo** hits through a second shared `HitProfile` (`echo_hit`, half damage rounded, at least 1), built by the compiler, so no hit allocates. It fires after the strength in seconds, does not echo again, keeps its half damage on chain jumps (on every tick of a beam or swing since R1a), and a `hold` carrier does not echo (a sustained shot has nothing to repeat). An echo of a carrier with a trigger registers its own trigger, which is why `echo` doubles triggers. `on cast` fires on the carrier's first launch and again on its echo.
 - **Mirror** fires the second shot straight behind the first and only for straight, returning and beam carriers (an orbit, a rune and a dash have no back). Like every modifier it is on one carrier only. `on cast` fires once, not for the back shot.
 - **Burst of a payload:** a burst inside a payload fires the payload group again from the same point. Burst repeats of a `scatter` group draw new directions.
 
@@ -2164,6 +2169,25 @@ The owner: restructure the projectile step from "for each shot, check every beha
 - **The owner:** "A homing beam, should also home after bouncing on a wall! [...] This should be the general case for projectiles aswell". A turn at a wall takes none of a beam's cards away: from the turn, along its way off the wall, it homes again as it did from the staff, with the legs (one per pierce, plus one) it had not reached before the wall, then goes on straight for the length left. The projectile manager walks the walls and asks the spell runtime at each turn (`ray_points(..., steer)`, `Spells._beam_steer`), so the rule is the runtime's one homing rule, not a second copy. Shots already did this (a bounce only turns their velocity; they stay homing); a test now holds it.
 - **The general-rules pass:** the owner asked for a pass that finds every card that breaks the general rules (special cases, silent no-ops, effects dropped by another event, caps). An audit of the compiler, the runtime and the manager is the first step; a permanent test of every card against every carrier is the proposed follow-up.
 
+## 2026-10-29: Echo, zaps, relay and jumps keep the whole hit (phase R, R1a)
+
+- **Rule 2 (nothing takes a card away), docs/milestones/M2-rules.md findings 1, 2, 14:** an echo hit, an arc zap and a relay's merge are the carrier's whole `HitProfile` (`HitProfile.scaled(share, knock_share)`, `copy()`): heal, slam, every element and status, the kind. Only the strength changes: an echo at ECHO_DAMAGE (knockback whole, as before), a zap at ARC_DAMAGE (knockback too; a heavy shot's zap now slams for its share). An echoed mend bolt heals teammates; a relay mend bolt that takes on frost still heals.
+- **Relay adds each element with its status** (as the donor's hit had it), after the shot's own; before, it took only the first status, and only when the shot had none.
+- **A hit carries on:** a chain jump hits with what the hit it jumped from hit with (an echo's half, a relay's merge), on every tick of a live beam or swing, not only the first; a zap's jumps hit as the zap's shot does. A relay shot's zaps take on the merge too, and a zap is a hit of its shot for relay. No allocation per hit except a relay merge (two profiles, as before one).
+
+## 2026-10-29: A chain jump keeps every card (phase R, R1b)
+
+- **Rules 2 and 6, docs/milestones/M2-rules.md finding 3:** a flying chain jump is its carrier fired again from the hit: homing, bounce, ghost, spiral, linger, growth, sticky, return, shield and pierce ride on (`Spells._apply_travel`, which now also sets homing, is the one place for a shot from the staff and a jump), as arc, magnet and its trigger already did, with one jump fewer. Before, each jump was a plain bolt with pierce 0.
+- **Only the aim, the source exclusion and the speed differ:** a jump flies at least `CHAIN_MIN_SPEED` (a rune or a slow orb has no speed of its own to jump at) and as far as its carrier would fly (`lifetime × speed`, at least far enough to reach its target); before, it lived just long enough to reach its target.
+- **Not changed (R4):** a beam's or fissure's jump is still a ray that pierces nothing.
+
+## 2026-10-29: Heavy and growth cards multiply (phase R, R1c)
+
+- **Rule 3, docs/milestones/M2-rules.md finding 16:** behaviour strengths were summed for every card, but heavy's strength is a knockback factor and growth's a growth rate: two heavy cards gave ×8, not ×16. `StaffCompiler.stacked` now multiplies the behaviours in `MULTIPLIED` (heavy, growth) and adds the rest (counts, seconds, pixels). Homing keeps its own stacking (`HOMING_STACK`). Two growth cards are ×4 either way; three are ×8 now (×6 before).
+
+## 2026-10-29: Every carrier blasts at its end point (phase R, R1d)
+
+- **Rule 1, docs/milestones/M2-rules.md findings 10 and 11:** a hook that misses now blasts where it ends, as every expired shot does (before, its blast waited for an arrival that never came). A hook that hits still blasts where its caster arrives. A rain blasts where it lands, before its payload falls (before, `blast · rain` did nothing).
 
 ## 2026-10-29: Hold in a payload is a hold (phase R, R1f)
 

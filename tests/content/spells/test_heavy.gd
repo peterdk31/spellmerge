@@ -125,3 +125,15 @@ func test_four_players_at_once() -> void:
 	for player in 4:
 		check(arena.lost(imps[player]) >= 10, "player %d's heavy bolt slams its imp" % player)
 	arena.free_all()
+
+
+func test_two_heavy_cards_multiply() -> void:
+	# Rule 3 (docs/milestones/M2-rules.md, R1c): knockback is a multiplier, so two cards are
+	# 4 x 4, not 4 + 4.
+	var strength: float = _card().behaviour_strength
+	var one: CompiledSpell = _first(["heavy", "bolt"])
+	var two: CompiledSpell = _first(["heavy", "heavy", "bolt"])
+	var plain: CompiledSpell = _first(["bolt"])
+	check_equal(one.behaviour(ModifierBase.Behaviour.HEAVY), strength, "one card")
+	check_equal(two.behaviour(ModifierBase.Behaviour.HEAVY), strength * strength, "two cards multiply")
+	check(is_equal_approx(two.hit.knockback, plain.hit.knockback * strength * strength), "two cards knock back %s times as far (got %s)" % [strength * strength, two.hit.knockback / plain.hit.knockback])

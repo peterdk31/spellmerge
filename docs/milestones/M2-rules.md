@@ -2,7 +2,7 @@
 
 **Goal:** every card follows a small set of general rules on every carrier, with no special cases, so a player can try any combination and get the result the rules predict. A card that cannot mean anything on a carrier is listed as wasted, with the reason, before the cast. Nothing does nothing silently.
 
-**Status (2026-10-29):** planned, not started. The owner asked for "a pass that checks for the general rules, in which there are custom cases that break them" after a homing beam stopped homing at a wall (#453). An audit of the compiler, the runtime and the projectile manager (on main after #453) found 16 confirmed breaks and 7 suspected ones; they are below. Same day as "No limits on spell interactions" (#450).
+**Status (2026-10-29):** R1a done (echo, zaps, relay and jumps keep the whole hit), R1b done (a flying chain jump keeps every card), R1c done (heavy and growth multiply), R1d done (a missed hook and a rain blast at their end point; DECISIONS.md). R1e and R1f in progress. The owner asked for "a pass that checks for the general rules, in which there are custom cases that break them" after a homing beam stopped homing at a wall (#453). An audit of the compiler, the runtime and the projectile manager (on main after #453) found 16 confirmed breaks and 7 suspected ones; they are below. Same day as "No limits on spell interactions" (#450).
 
 **The owner's words:** "A general rule should be, that we dont limit the interactions, they follow the rules. Then player can then experiment and always get expected results." And: "It should be the general rule for everything."
 
@@ -48,7 +48,7 @@ Line numbers are from main after #453 and drift; the function names hold. The fi
 **Suspected (check while fixing nearby):**
 - `projectile_manager.gd` `_pass_return`: a returning shot stops homing (pass-order comment).
 - `_register_hit`: sticky ends the remaining pierce at the first hit.
-- `_jump`: flying jumps get pierce 0 (only the beam case is documented).
+- ~~`_jump`: flying jumps get pierce 0~~ (fixed in R1b; a ray jump still pierces nothing, R4).
 - `_fire_payload` from a beam hit uses CASTER_POINT: an orbit payload circles the hit point, not the beam.
 - `_on_familiar_cast` uses CASTER_POINT while the familiar lives: an orbit, return or dash payload ignores the familiar.
 - `_shield_block`: when the hit-work budget runs out a block is skipped, not deferred (an enemy shot flies through).
@@ -63,11 +63,11 @@ Line numbers are from main after #453 and drift; the function names hold. The fi
 | homing | ✓ | W | W | ✓ | ✓ | ✓ | ✓ | ✓ | W | W | W | W | W |
 | chain | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ |
 | shield | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
-| blast | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗(11) | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ |
+| blast | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | hold | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ |
 | recoil | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | bounce | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ |
-| echo | ✓ | ✓ | ✓ | ✓(14) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| echo | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | linger | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | heavy / siphon / possess | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ |
 | sticky | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
@@ -133,7 +133,7 @@ The test keeps no list of cards or carriers. It finds them itself, so a new card
 
 The owner re-decides these under the new rule; each "yes, it should work" becomes a part that turns W into ✓ (with a probe in R3). Present them in one session, with a recommendation each:
 
-- **Decided before, now in question:** mirror only on carriers that "have a back" (DECISIONS); a hold carrier does not echo (silent); a beam has no timer (contradicts the timer-for-hold decision); relay shots only, not on chain children or payloads; hold does nothing on rain; recoil skipped on dash and teleport; a beam's chain jump is a beam that pierces nothing; a hook with pierce fires `on expire` twice ("accepted for now"); a returning shot stops homing; a payload with no live shot is cast by its point (a payload dash or hook does nothing); **recoil pushes past 8 at once are dropped** (`mover.gd` `MAX_RECOILS`: a cap missed by #450, fix under rule 5 without a decision); hit-work starvation skipping shield blocks (defer, not skip).
+- **Decided before, now in question:** mirror only on carriers that "have a back" (DECISIONS); a hold carrier does not echo (silent); a beam has no timer (contradicts the timer-for-hold decision); relay shots only, not on chain children or payloads; hold does nothing on rain; recoil skipped on dash and teleport; a beam's chain jump is a beam that pierces nothing; a hook with pierce fires `on expire` twice ("accepted for now"); a returning shot stops homing; a payload with no live shot is cast by its point (a payload dash or hook does nothing); **recoil pushes past 8 at once are dropped** (`mover.gd` `MAX_RECOILS`: a cap missed by #450, fix under rule 5 without a decision); hit-work starvation skipping shield blocks (defer, not skip). **Editing a staff or switching off a hold drops all its waiting launches** (`_release_hold` calls `_drop_pending` first): payload fires of carriers without hold that only wait for the per-step pacing (`FIRE_SHOTS_PER_STEP`) are lost too, against rule 5 (found in R1f, 2026-10-29).
 - **Cells to decide (W or ✓):** travel behaviours on orbit, rune, wall (growth on a rune grows the rune; linger and spiral on an orbit?); ghost, magnet, shield, relay on beams and fissures; **dash and teleport hitting what they pass** (makes `heavy · dash` the shoulder charge the card table promises, and chain, siphon, possess, relay on a dash); triggers on rain, decoy, familiar; mirror on any aimed carrier; one shield rule for every carrier that moves its caster.
 
 ## Notes for the sessions

@@ -9,6 +9,7 @@
     "number": 399
   },
   "errors_in_a_row": 0,
+  "idle": null,
   "intake_tasks": {
     "208": {
       "author": "Brianmanden",
@@ -87,13 +88,7 @@
     6415196364,
     6495258241
   ],
-  "task_failures": {
-    "**Stress and C2 (staffs D3).** Last: when every other task in both lanes has merged. Then the C2 checkpoint, with the owner's sandbox playtest on `/preview/`.": {
-      "count": 0,
-      "parked_reason": "Stress and C2 (staffs D3) is the last task: it waits until every other task in both lanes has merged. `docs/NEXT.md` still lists these as unchecked: Entity kit (B5), Shot look part 1 (B6a), Builder (B8), the Rime Crook and Bone Scepter (H5, waiting) and a clip-recorder item. I made no changes and created no commits; the `claude/20261029-stress-and-c2-staffs-d3-last` branch holds nothing new.",
-      "parked_until": "2026-10-30T09:45:39Z"
-    }
-  },
+  "task_failures": {},
   "usage": [
     {
       "at": "2026-10-21T19:47:33Z",

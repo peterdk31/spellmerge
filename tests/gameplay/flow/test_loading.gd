@@ -11,6 +11,7 @@ const FlowScript := preload("res://gameplay/flow/flow.gd")
 const WarmupScript := preload("res://core/projectiles/shader_warmup.gd")
 const LoadingScript := preload("res://core/loading/loading.gd")
 const ScreenScript := preload("res://hud/panels/loading/loading_screen.gd")
+const WarmUp := preload("res://tests/support/warm_up.gd")
 
 var flow: FlowScript
 var input: Node
@@ -123,3 +124,16 @@ func test_presses_while_loading_are_ignored() -> void:
 	check_equal(_started, 1, "one loading")
 	_load()
 	check(not flow.sandbox and flow.state == FlowScript.State.RUNNING, "the first press's run starts")
+
+
+## The screenshot scripts and the clip recorder compile the shaders first the same way
+## (tests/support/warm_up.gd): Flow's play tasks through `Loading`, waited for, the screen gone.
+func test_the_rendered_runs_warm_up_like_play() -> void:
+	check(await WarmUp.run(root), "the warm-up finishes")
+	check(WarmupScript.warmed, "the shaders are warmed")
+	check(not loading.is_loading(), "the load is over")
+	check(not screen.visible, "the loading screen is gone")
+	check_equal(_started, 1, "it went through the loading screen")
+	check_equal(_finished, 1, "and the screen was told it is done")
+	check(await WarmUp.run(root), "a second warm-up has nothing to do and says so")
+	check_equal(_started, 1, "nothing more was loaded")

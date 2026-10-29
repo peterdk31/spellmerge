@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="CueBase" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/cue_base.gd" id="1_base"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"self_hit"
+parts = Array[Dictionary]([{"effect": &"ring_out", "zoom": 2, "seconds": 0.35, "color": Color(1, 0.372549, 0.6588235, 1), "way": &"right"}])
+sound = &"self_hit"

@@ -1067,17 +1067,14 @@ func _launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direct
 					var shot: int = _caster_shot()
 					centre = projectiles.get_position_of(shot) if shot >= 0 else origin
 				slot = projectiles.spawn_orbit(actor, spell.orbit_radius, base + TAU * n / count, turn, lifetime, spell.radius, HITS, spell.pierce, tag, centre)
-				_apply_shield(slot, spell)
 			FormBase.Motion.STILL:
 				var at: Vector2 = origin if count == 1 else origin + heading * spell.radius * 2.0
 				slot = projectiles.spawn(actor, at, Vector2.ZERO, lifetime, spell.radius, HITS, spell.pierce, tag, ProjectilesScript.MOTION_STILL)
-				_apply_shield(slot, spell)
 			_:
 				slot = projectiles.spawn(actor, origin, heading * spell.speed, lifetime, spell.radius, HITS, spell.pierce, tag)
-				if slot >= 0:
-					_apply_travel(slot, spell)
 		if slot < 0:
 			continue
+		_apply_travel(slot, spell)
 		made += 1
 		_register(slot, tag, spell, carried, prev)
 		if source != null:
@@ -1247,14 +1244,15 @@ func _launch_as(group: CompiledGroup, actor: int, staff: int, generation: int, o
 
 ## Rain: for each of its shots, a cue at the aim point and a launch of its payload there after
 ## its `lifetime`. The aim point is `ray_length` (or `SpellLimits.RAIN_REACH`) along the shot's
-## heading, stopped at a wall. Returns how many were set.
+## heading, stopped at a wall; homing moves it onto a target near it (`_homed_place`). Returns
+## how many were set.
 ## `hold` does nothing for a rain: it always falls after its `lifetime` and is no sustained carrier.
 func _telegraph_rain(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading: Vector2) -> int:
 	var reach: float = spell.ray_length if spell.ray_length > 0.0 else SpellLimits.RAIN_REACH
 	var placed: int = 0
 	for n in spell.shots:
 		var along: Vector2 = heading.rotated(_fan_angle(n, spell.shots, spell))
-		var point: Vector2 = projectiles.clip_to_walls(origin, origin + along * reach)
+		var point: Vector2 = _homed_place(spell, actor, tag + n, origin, projectiles.clip_to_walls(origin, origin + along * reach))
 		var group: CompiledGroup = spell.own_payload if spell.own_payload != null else CompiledGroup.new()
 		var launch: PendingLaunch = _delay(spell.lifetime, group, null, actor, SpellTag.staff_of(tag), SpellTag.generation_of(tag), point, along, null, false)
 		launch.landing = spell
@@ -1275,13 +1273,13 @@ func _land_rain(spell: CompiledSpell, group: CompiledGroup, actor: int, staff: i
 
 
 ## Wall: `shots` still shots in a line across `direction`, `spread` pixels apart (the shot's
-## diameter when the form has none), centred `SpellLimits.WALL_REACH` ahead of `origin`. A shot
-## born in a wall is skipped. Shield charges apply, so `shield . wall` stops other teams' shots.
+## diameter when the form has none), centred `SpellLimits.WALL_REACH` ahead of `origin` (homing
+## moves the centre onto a target near it, `_homed_place`). A shot born in a wall is skipped.
+## Shield charges apply, so `shield . wall` stops other teams' shots.
 func _launch_wall(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direction: Vector2, source: Node, lifetime: float, carried: int, prev: int) -> int:
-	var centre: Vector2 = projectiles.clip_to_walls(origin, origin + direction * SpellLimits.WALL_REACH)
+	var centre: Vector2 = _homed_place(spell, actor, tag, origin, projectiles.clip_to_walls(origin, origin + direction * SpellLimits.WALL_REACH))
 	var across: Vector2 = direction.orthogonal()
 	var gap: float = spell.spread if spell.spread > 0.0 else spell.radius * 2.0
-	var shield: int = roundi(spell.behaviour(ModifierBase.Behaviour.SHIELD))
 	var made: int = 0
 	for n in spell.shots:
 		var at: Vector2 = centre + across * (n - (spell.shots - 1) * 0.5) * gap
@@ -1289,14 +1287,24 @@ func _launch_wall(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, d
 		if slot < 0:
 			continue
 		made += 1
+		_apply_travel(slot, spell)
+		if spell.homing_range > 0.0:
+			# Its homing went into where the wall stands: its shots keep still (a chain jump homes).
+			projectiles.set_homing(slot, 0.0, spell.homing_range)
 		_register(slot, tag, spell, carried, prev)
-		if shield > 0:
-			projectiles.set_shield(slot, shield)
-		if spell.behaviour(ModifierBase.Behaviour.DEFLECT) > 0.0:
-			projectiles.set_deflect(slot, true)
 		if source != null:
 			projectiles.exclude(slot, source, SpellLimits.SOURCE_EXCLUSION)
 	return made
+
+
+## Where a carrier placed at `point` ahead of its caster at `origin` (a rain, a wall) goes when it
+## homes (rules R4i): onto a target within its homing reach of the point, picked as a homing
+## shot picks one (`homing_point`, any way round), stopped at a wall on the way; else `point`.
+func _homed_place(spell: CompiledSpell, actor: int, tag: int, origin: Vector2, point: Vector2) -> Vector2:
+	if spell.homing_range <= 0.0:
+		return point
+	var goal: Vector2 = projectiles.homing_point(actor, point, Vector2.RIGHT, PI, ProjectilesScript.ACTOR_LAYERS, spell.homing_range, 0, hash(Vector3i(actor, tag, roundi(_clock * 1000.0))))
+	return point if not goal.is_finite() else projectiles.clip_to_walls(origin, goal)
 
 
 ## Decoys and familiars: `ai` makes the entity (`entity_spawn_requested`, `lifetime` seconds, or
@@ -1361,9 +1369,10 @@ func _end_entities(tag: int) -> void:
 		events.entity_end_requested.emit(SpellTag.caster_of(tag), tag)
 
 
-## Hand a flying shot the behaviours of its cards that the projectile manager runs (staffs B1):
-## a shot from the staff and a chain jump alike (rules R1b). A plain shot costs one comparison
-## per behaviour and no call.
+## Hand a shot the behaviours of its cards that the projectile manager runs (staffs B1): a bolt,
+## a rune, an orbit and a wall's shots from the staff and a chain jump alike (rules R1b). Each
+## setter takes what the shot can do and refuses the rest (rules R4h: a rune does not move, an
+## orbit does not fly). A plain shot costs one comparison per behaviour and no call.
 func _apply_travel(slot: int, spell: CompiledSpell) -> void:
 	if spell.homing_range > 0.0:
 		projectiles.set_homing(slot, spell.homing_turn, spell.homing_range)
@@ -1391,8 +1400,7 @@ func _apply_travel(slot: int, spell: CompiledSpell) -> void:
 	_apply_shield(slot, spell)
 
 
-## A shot with `shield` blocks that many enemy shots (an orbit's and a still shot's too, which
-## `_apply_travel` does not reach).
+## A shot with `shield` blocks that many enemy shots.
 func _apply_shield(slot: int, spell: CompiledSpell) -> void:
 	if slot < 0 or spell.behaviours.is_empty():
 		return
@@ -1482,13 +1490,13 @@ func _recoil(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, headin
 
 
 ## The area hit of a `blast` at the end point `at` of the carrier with `tag`, as wide as its
-## strength, with the hit profile of its tag, and its explosion (`explosion_shown`, style
-## `blast`). Nothing without a blast.
+## strength, with the hit profile of its tag, and its explosion (`cue_shown`, the cue its blast card
+## names). Nothing without a blast.
 func _blast(spell: CompiledSpell, tag: int, actor: int, at: Vector2) -> void:
 	var radius: float = spell.behaviour(ModifierBase.Behaviour.BLAST)
 	if radius > 0.0 and events != null and at.is_finite():
 		events.area_hit_requested.emit(actor, at, radius, tag)
-		events.explosion_shown.emit(actor, at, radius, &"blast", spell.tint, spell.look)
+		events.cue_shown.emit(actor, spell.cue_of(ModifierBase.Behaviour.BLAST), at, Vector2.ZERO, radius, spell.tint, spell.look)
 
 
 ## Where a dash, teleport or hook ended: the carrier's end point. Its `blast` and its `on expire`
@@ -1641,7 +1649,7 @@ func _fallback_hit(spell: CompiledSpell, tag: int, actor: int, at: Vector2) -> i
 		var blast: float = spell.behaviour(ModifierBase.Behaviour.BLAST)
 		events.area_hit_requested.emit(actor, at, maxf(spell.radius, blast), tag)
 		if blast > 0.0 and at.is_finite():
-			events.explosion_shown.emit(actor, at, blast, &"blast", spell.tint, spell.look)
+			events.cue_shown.emit(actor, spell.cue_of(ModifierBase.Behaviour.BLAST), at, Vector2.ZERO, blast, spell.tint, spell.look)
 	# After the area hit, which can reach the caster itself and would spend the barrier.
 	if _caster == CASTER_WIZARD:
 		_shield_caster(spell, tag, actor, 0.0)

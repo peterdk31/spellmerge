@@ -37,11 +37,13 @@ func _initialize() -> void:
 	_test_orbit_pierce_and_expiry()
 	_test_orbit_ring_over_a_crowd()
 	_test_orbit_hits_again_each_time_it_comes_round()
+	_test_orbit_and_still_shots_take_the_travel_cards_they_can()
 	_test_a_piercing_shot_hits_everything_it_passes_in_one_step()
 	_test_homing_skips_wizards_and_freed_targets()
 	_test_homing_turns_toward_a_target()
 	_test_a_homing_shot_homes_after_it_bounces()
 	_test_homing_rules()
+	_test_a_homing_still_shot_creeps_toward_its_target()
 	_test_homing_skips_its_own_wizard_and_the_target_just_hit()
 	_test_homing_checks_every_fourth_step()
 	_test_homing_search_is_charged_to_the_budget()
@@ -130,6 +132,64 @@ func _test_orbit_circles_the_anchor() -> void:
 	_check(_mgr.spawn_orbit(ManagerScript.ACTORS, 40.0, 0.0, 3.0, 5.0) == -1 and _mgr.spawn_orbit(-1, 40.0, 0.0, 3.0, 5.0) == -1, "only an actor orbits")
 	_check(_mgr.spawn_orbit(0, 40.0, 0.0, 3.0, 0.0) == -1 and _mgr.spawn_orbit(0, INF, 0.0, 3.0, 1.0) == -1, "bad numbers are refused")
 	_check(_mgr.get_count() == 2, "refused orbits took no slot")
+
+
+## Rules R4h: growth grows any shot (a rune's trigger circle too); on an orbit, linger stops the
+## circling, spiral weaves the radius and sticky takes the shot off its circle onto what it hits; a
+## still shot does not move, so linger, spiral and sticky are refused for it.
+func _test_orbit_and_still_shots_take_the_travel_cards_they_can() -> void:
+	_setup()
+	_mgr.set_bounds(Rect2(0.0, 0.0, 640.0, 360.0))
+	var centre: Vector2 = Vector2(200.0, 200.0)
+	_mgr.set_anchor(0, centre)
+	var rune: int = _mgr.spawn(0, Vector2(400.0, 100.0), Vector2.ZERO, 5.0, 6.0, ManagerScript.LAYER_ENEMY, 0, 1, ManagerScript.MOTION_STILL)
+	_check(_mgr.set_growth(rune, 2.0), "a rune takes growth")
+	_check(not (_mgr.set_linger(rune, 1.0) or _mgr.set_spiral(rune, 10.0) or _mgr.set_sticky(rune, 1.0)), "a rune does not move: no linger, spiral or sticky")
+	var grown: int = _mgr.spawn_orbit(0, 40.0, 0.0, 1.0, 5.0)
+	_check(_mgr.set_growth(grown, 2.0), "an orbit takes growth")
+	for _i in 60:
+		_mgr.step(DT)
+	_check(absf(_mgr.get_growth_of(rune) - 2.0) < 0.05 and absf(_mgr.get_growth_of(grown) - 2.0) < 0.05, "a rune and an orbit shot grow by the factor a second (%f, %f)" % [_mgr.get_growth_of(rune), _mgr.get_growth_of(grown)])
+	_check(_mgr.get_position_of(rune).is_equal_approx(Vector2(400.0, 100.0)), "the rune stays where it is")
+	# Linger: half way through its 2 s life the orbit stops turning for 1 s, still round its caster.
+	var held: int = _mgr.spawn_orbit(0, 40.0, 0.0, 1.0, 2.0)
+	_check(_mgr.set_linger(held, 1.0), "an orbit takes linger")
+	for _i in 66:
+		_mgr.step(DT)
+	var angle: float = (_mgr.get_position_of(held) - centre).angle()
+	_mgr.set_anchor(0, centre + Vector2(30.0, 0.0))
+	for _i in 30:
+		_mgr.step(DT)
+	var now: Vector2 = _mgr.get_position_of(held) - centre - Vector2(30.0, 0.0)
+	_check(absf(angle_difference(now.angle(), angle)) < 0.01 and absf(now.length() - 40.0) < 0.01, "a lingering orbit stops circling and keeps to its caster (%f -> %f)" % [angle, now.angle()])
+	for _i in 60:
+		_mgr.step(DT)
+	_check(_mgr.is_alive(held) and absf(angle_difference((_mgr.get_position_of(held) - centre - Vector2(30.0, 0.0)).angle(), angle)) > 0.3, "then it circles on, its life made longer by the linger")
+	_mgr.set_anchor(0, centre)
+	# Spiral: the radius weaves `width` pixels (half each way) round the circle.
+	var weave: int = _mgr.spawn_orbit(0, 40.0, 0.0, 1.0, 5.0)
+	_check(_mgr.set_spiral(weave, 10.0), "an orbit takes spiral")
+	var nearest: float = INF
+	var farthest: float = 0.0
+	for _i in 60:
+		_mgr.step(DT)
+		var reach: float = _mgr.get_position_of(weave).distance_to(centre)
+		nearest = minf(nearest, reach)
+		farthest = maxf(farthest, reach)
+	_check(absf(nearest - 35.0) < 0.2 and absf(farthest - 45.0) < 0.2, "a spiral orbit weaves its radius 10 px (%f to %f)" % [nearest, farthest])
+	# Sticky: the orbit shot that hits leaves its circle and rides its target.
+	_mgr.clear()
+	var foe: Node2D = _target(centre + Vector2(0.0, 40.0), 6.0)
+	var sticker: int = _mgr.spawn_orbit(0, 40.0, 0.0, 2.0, 5.0)
+	_check(_mgr.set_sticky(sticker, 1.0), "an orbit takes sticky")
+	for _i in 60:
+		_mgr.step(DT)
+	_check(_hits.size() == 1 and _mgr.is_alive(sticker), "it hits once and stays (%d hits)" % _hits.size())
+	var off: Vector2 = _mgr.get_position_of(sticker) - foe.global_position
+	foe.global_position += Vector2(100.0, 0.0)
+	for _i in 10:
+		_mgr.step(DT)
+	_check(off.length() < 50.0 and (_mgr.get_position_of(sticker) - foe.global_position).is_equal_approx(off) and _mgr.get_position_of(sticker).distance_to(centre) > 60.0, "a sticky orbit shot leaves its circle and rides its target")
 
 
 func _test_orbit_follows_each_actors_anchor() -> void:
@@ -287,7 +347,7 @@ func _test_homing_rules() -> void:
 	var rune: int = _mgr.spawn(0, Vector2(50.0, 50.0), Vector2.ZERO, 1.0, 4.0, ManagerScript.LAYER_ENEMY, 0, 0, ManagerScript.MOTION_STILL)
 	_mgr.set_anchor(0, Vector2(200.0, 200.0))
 	var orbit: int = _mgr.spawn_orbit(0, 10.0, 0.0, 1.0, 1.0)
-	_check(not _mgr.set_homing(rune, 3.0, HOMING_REACH) and not _mgr.set_homing(orbit, 3.0, HOMING_REACH), "still and orbit shots cannot home")
+	_check(_mgr.set_homing(rune, 3.0, HOMING_REACH) and not _mgr.set_homing(orbit, 3.0, HOMING_REACH), "a still shot can home (it creeps), an orbit shot cannot (rules R4i)")
 	_check(not _mgr.set_homing(-1, 3.0, HOMING_REACH) and not _mgr.set_homing(slot, -1.0, HOMING_REACH) and not _mgr.set_homing(slot, NAN, HOMING_REACH), "bad slots and rates are refused")
 	_check(not _mgr.set_homing(slot, 3.0, 0.0) and not _mgr.set_homing(slot, 3.0, INF), "a range not above 0 and finite is refused")
 	_check(_mgr.set_homing(slot, 0.0, HOMING_REACH) and _mgr._turn[slot] == 0.0, "a rate of 0 turns homing off and is accepted")
@@ -298,6 +358,29 @@ func _test_homing_rules() -> void:
 	_mgr.clear()
 	var again: int = _mgr.spawn(0, Vector2.ZERO, Vector2(1.0, 0.0), 1.0)
 	_check(again == gone and _mgr._turn[again] == 0.0, "a reused slot starts without homing")
+
+
+## A homing rune (rules R4i, owner 2026-10-30): a shot with no speed creeps toward the target its
+## homing picks at SpellLimits.HOMING_DRIFT, the same pick and reach as a bolt's; with nothing
+## in reach it stays put.
+func _test_a_homing_still_shot_creeps_toward_its_target() -> void:
+	_setup()
+	var enemy: Node2D = _target(Vector2(250.0, 100.0), 8.0)
+	var lone: int = _mgr.spawn(0, Vector2(100.0, 400.0), Vector2.ZERO, 30.0, 14.0, ManagerScript.LAYER_ENEMY, 0, 0, ManagerScript.MOTION_STILL)
+	_mgr.set_homing(lone, 3.0, HOMING_REACH)
+	var rune: int = _mgr.spawn(0, Vector2(100.0, 100.0), Vector2.ZERO, 30.0, 14.0, ManagerScript.LAYER_ENEMY, 0, 0, ManagerScript.MOTION_STILL)
+	_check(_mgr.set_homing(rune, 3.0, HOMING_REACH), "a rune takes homing")
+	for _i in 60:
+		_mgr.step(DT)
+	var moved: float = _mgr.get_position_of(rune).x - 100.0
+	_check(absf(moved - SpellLimits.HOMING_DRIFT) < SpellLimits.HOMING_DRIFT * DT * ManagerScript.HOMING_PERIOD + 0.01, "it creeps toward its target at HOMING_DRIFT: %s px in a second" % moved)
+	_check(is_equal_approx(_mgr.get_position_of(rune).y, 100.0), "straight at it")
+	_check(_mgr.get_position_of(lone) == Vector2(100.0, 400.0), "a rune with nothing in reach stays put")
+	for _i in 600:
+		_mgr.step(DT)
+		if not _hits.is_empty():
+			break
+	_check(_hits.size() == 1 and _hits[0][1] == enemy, "and reaches it")
 
 
 func _test_homing_skips_its_own_wizard_and_the_target_just_hit() -> void:

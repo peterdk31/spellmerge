@@ -104,8 +104,8 @@ extends Node2D
 ## leaves the bounds, or that the cap drops sends nothing: those did not run out.
 ##
 ## Motion: `MOTION_STRAIGHT` (default) flies on its velocity; `MOTION_STILL` (the
-## rune) never moves: its velocity is ignored and it waits for a target to enter its
-## circle. It still ends by life or by a hit, as any shot does.
+## rune) does not fly: its velocity is ignored and it waits for a target to enter its
+## circle (homing creeps it toward one). It still ends by life or by a hit, as any shot does.
 ##
 ## Queries: `nearest_target(point, radius, layers, exclude)` and `targets_in(point,
 ## radius, layers, out)` use the same grid as hits, so chain, homing and area effects
@@ -125,7 +125,7 @@ extends Node2D
 ##
 ## Homing: `set_homing(slot, turn_rate, within)` makes a straight shot turn toward a
 ## target no further than `within` pixels from it (picked at random and kept while it can), at most `turn_rate` radians a
-## second, keeping its speed. The caller says how far (`CompiledSpell.homing_range`); there
+## second, keeping its speed; a still shot creeps toward it at SpellLimits.HOMING_DRIFT. The caller says how far (`CompiledSpell.homing_range`); there
 ## is no default here, so a new caller cannot quietly get another form's reach.
 ## The search runs on the grid and only every HOMING_PERIOD-th step of a shot (slots take
 ## turns, so the cost is spread); in between the shot keeps turning toward the point it
@@ -1575,12 +1575,13 @@ func _grow_moves(size: int) -> void:
 		_move_free = at
 
 
-## Make the straight shot in `slot` home on targets no further than `within` pixels from
-## it, turning at most `turn_rate` radians a second. Returns false for an empty slot, a shot
-## that is not straight, a rate that is negative or not finite, or a `within` that is not
-## above 0 and finite; true when the rate was applied, 0 included (0 stops homing).
+## Make the shot in `slot` home on targets no further than `within` pixels from it: a straight
+## shot turns at most `turn_rate` radians a second, a still one (a rune) creeps toward its
+## target at SpellLimits.HOMING_DRIFT. Returns false for an empty slot, an orbit shot (held on
+## its circle), a rate that is negative or not finite, or a `within` that is not above 0 and
+## finite; true when the rate was applied, 0 included (0 stops homing).
 func set_homing(slot: int, turn_rate: float, within: float) -> bool:
-	if slot < 0 or slot >= _cap or _alive[slot] == 0 or _motion[slot] != MOTION_STRAIGHT:
+	if slot < 0 or slot >= _cap or _alive[slot] == 0 or _motion[slot] == MOTION_ORBIT:
 		return false
 	if not is_finite(turn_rate) or turn_rate < 0.0 or not is_finite(within) or within <= 0.0:
 		return false
@@ -1648,11 +1649,18 @@ func get_core_of(slot: int) -> Color:
 
 # --- Behaviours of the projectile kit (staffs B1) -------------------------------------
 # Each setter takes the slot `spawn` returned, right after spawning, and returns false (and
-# does nothing) for a slot that is not a live straight shot or a bad number. Orbit and still
-# shots keep their own motion, so the travel behaviours do not apply to them.
+# does nothing) for an empty slot, a bad number, or a shot that cannot do it (rules R4h): what
+# turns or steers a flight (bounce, ghost, return) needs a straight shot; what changes a motion
+# (linger, spiral, sticky) needs a shot that moves, an orbit too; homing any shot but an orbit
+# (a rune creeps, R4i); growth takes any shot.
 
 func _is_flyer(slot: int) -> bool:
 	return slot >= 0 and slot < _cap and _alive[slot] != 0 and _motion[slot] == MOTION_STRAIGHT
+
+
+## A live shot that moves: a straight shot or an orbit (a still shot does not move).
+func _moves(slot: int) -> bool:
+	return slot >= 0 and slot < _cap and _alive[slot] != 0 and _motion[slot] != MOTION_STILL
 
 
 ## The shot bounces off walls `times` times instead of ending on the first (a bounce may hit
@@ -1672,14 +1680,15 @@ func set_ghost(slot: int) -> bool:
 	return true
 
 
-## The shot flies in a sine wave `width` pixels wide (SPIRAL_PERIOD seconds a wave); its centre
-## line is the straight path.
+## The shot weaves a sine wave `width` pixels wide (SPIRAL_PERIOD seconds a wave) round its path:
+## a flying shot round its straight line, an orbit shot in and out round its circle (`_pass_orbit`).
 func set_spiral(slot: int, width: float) -> bool:
-	if not _is_flyer(slot) or not (width > 0.0) or not is_finite(width):
+	if not _moves(slot) or not (width > 0.0) or not is_finite(width):
 		return false
 	_wave[slot] = width * 0.5
 	_flags[slot] |= F_WAVE
-	_join(slot, B_SPIRAL)
+	if _motion[slot] == MOTION_STRAIGHT:
+		_join(slot, B_SPIRAL)
 	return true
 
 
@@ -1693,19 +1702,20 @@ func set_return(slot: int) -> bool:
 	return true
 
 
-## The shot stops in mid-air for `seconds` when half its life is gone, then goes on.
+## The shot stops for `seconds` when half its life is gone, then goes on: a flying shot hangs in
+## mid-air, an orbit shot stops circling (it keeps to its caster).
 func set_linger(slot: int, seconds: float) -> bool:
-	if not _is_flyer(slot) or not (seconds > 0.0) or not is_finite(seconds):
+	if not _moves(slot) or not (seconds > 0.0) or not is_finite(seconds):
 		return false
 	_linger[slot] = seconds
 	_join(slot, B_LINGER)
 	return true
 
 
-## The shot's radius grows by `factor` each second of flight, until it is as big as the room
-## (`set_bounds`; nothing is bigger): a wider hit circle, the same damage. `get_growth_of` tells how much bigger it is.
+## The shot's radius grows by `factor` each second it lives, until it is as big as the room
+## (`set_bounds`; nothing is bigger): a wider hit circle (a rune's trigger circle), the same damage. `get_growth_of` tells how much bigger it is.
 func set_growth(slot: int, factor: float) -> bool:
-	if not _is_flyer(slot) or not (factor > 1.0) or not is_finite(factor):
+	if slot < 0 or slot >= _cap or _alive[slot] == 0 or not (factor > 1.0) or not is_finite(factor):
 		return false
 	_growth[slot] = factor
 	_join(slot, B_GROWTH)
@@ -1720,10 +1730,10 @@ func get_growth_of(slot: int) -> float:
 	return _radius[slot] / _radius0[slot]
 
 
-## The shot sticks to the first target it hits for `seconds`, then ends there (an expiry).
-## The hit is sent as usual, and a stuck shot hits nothing more.
+## The shot sticks to the first target it hits for `seconds`, then ends there (an expiry); an
+## orbit shot leaves its circle for it. The hit is sent as usual, and a stuck shot hits nothing more.
 func set_sticky(slot: int, seconds: float) -> bool:
-	if not _is_flyer(slot) or not (seconds > 0.0) or not is_finite(seconds):
+	if not _moves(slot) or not (seconds > 0.0) or not is_finite(seconds):
 		return false
 	_stick[slot] = seconds
 	return true
@@ -2147,7 +2157,7 @@ func _pass_hits(top: int, delta: float) -> void:
 # - growth before linger and return: a lingering shot still grows, and a returning one reaches
 #   its caster with the radius it has now.
 # - linger before return, homing and spiral: a shot that hangs still does none of them.
-# - orbit: on its own (an orbit shot has no other motion behaviour).
+# - orbit after linger: a lingering orbit stops turning; it weaves its own spiral (no spiral pass).
 # - return before homing: a shot on its way back heads for its caster, bent toward the target its
 #   homing found (`_pass_return`); the homing pass only searches for it.
 # - homing before spiral: a spiral weaves round the line it turned to.
@@ -2299,11 +2309,13 @@ func _pass_linger(list: PackedInt32Array, first: int, count: int, delta: float) 
 
 ## Orbit (`spawn_orbit`): the shot turns round its caster, its velocity the tangent (for the
 ## drawing). It vanishes quietly when its caster's anchor is gone. One whose caster is a shot waits
-## for its turn, so it circles that shot where it was when the step came to it.
+## for its turn, so it circles that shot where it was when the step came to it. A lingering one
+## (S_HELD) keeps to its caster without turning; a spiral (`set_spiral`) weaves its radius.
 func _pass_orbit(list: PackedInt32Array, first: int, count: int, delta: float) -> void:
 	for n in range(first, first + count):
 		var slot: int = list[n]
-		if _state[slot] != S_MOVING:
+		var state: int = _state[slot]
+		if state != S_MOVING and state != S_HELD:
 			continue
 		var caster: int = _caster_slot[slot]
 		var centre: Vector2 = _caster_at[slot]
@@ -2317,9 +2329,11 @@ func _pass_orbit(list: PackedInt32Array, first: int, count: int, delta: float) -
 		if not centre.is_finite():
 			_state[slot] = S_GONE
 			continue
-		_orbit_angle[slot] = wrapf(_orbit_angle[slot] + _orbit_speed[slot] * delta, -PI, PI)
+		if state == S_MOVING:
+			_orbit_angle[slot] = wrapf(_orbit_angle[slot] + _orbit_speed[slot] * delta, -PI, PI)
+			_wave_age[slot] += delta
 		var away: Vector2 = Vector2.from_angle(_orbit_angle[slot])
-		_pos[slot] = centre + away * _orbit_radius[slot]
+		_pos[slot] = centre + away * (_orbit_radius[slot] + _wave[slot] * sin(TAU * _wave_age[slot] / SPIRAL_PERIOD))
 		_vel[slot] = Vector2(-away.y, away.x) * (_orbit_radius[slot] * _orbit_speed[slot])
 		_orbit_centre[slot] = centre
 
@@ -2369,7 +2383,8 @@ func _pass_return(list: PackedInt32Array, first: int, count: int, delta: float) 
 
 
 ## Homing (`set_homing`): the shot turns toward the point it last found, at most its turn rate, and
-## flies on along its new velocity. On its search step (one in HOMING_PERIOD, slots taking turns)
+## flies on along its new velocity; a shot with no speed (a rune) creeps toward it at
+## SpellLimits.HOMING_DRIFT. On its search step (one in HOMING_PERIOD, slots taking turns)
 ## it waits for its turn, then looks for a target while there is hit work left (`_homing_point`).
 ## A returning shot on its way back only searches: `_pass_return` bends its way with the point.
 func _pass_homing(list: PackedInt32Array, first: int, count: int, delta: float) -> void:
@@ -2387,11 +2402,14 @@ func _pass_homing(list: PackedInt32Array, first: int, count: int, delta: float) 
 		if state == S_RETURNING:
 			continue
 		var goal: Vector2 = _home_at[slot]
-		var velocity: Vector2 = _vel[slot]
-		if not goal.is_finite() or velocity.is_zero_approx():
+		if not goal.is_finite():
 			continue
 		var want: Vector2 = goal - _prev[slot]
 		if want.is_zero_approx():
+			continue
+		var velocity: Vector2 = _vel[slot]
+		if velocity.is_zero_approx():
+			_pos[slot] = _prev[slot] + want.limit_length(SpellLimits.HOMING_DRIFT * delta)
 			continue
 		# `turned_toward`, written out (this runs for every homing shot every step).
 		var most: float = _turn[slot] * delta

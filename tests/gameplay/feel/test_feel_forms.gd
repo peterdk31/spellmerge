@@ -7,6 +7,7 @@ const EventsScript := preload("res://core/events/events.gd")
 const FeelScript := preload("res://gameplay/feel/feel.gd")
 const FeelPresetScript := preload("res://gameplay/feel/presets/feel_preset.gd")
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
+const RegistryScript := preload("res://core/registry/registry.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
 
 const FROST := Color(0.5, 0.75, 0.94)
@@ -35,6 +36,10 @@ func before_each() -> void:
 	feel.projectiles = projectiles
 	feel.drive_engine = false
 	feel.preset = preset
+	# The nova's ring and the rain's marker are cues (`content/cues`).
+	var registry: RegistryScript = own(RegistryScript.new()) as RegistryScript
+	registry.scan()
+	feel.registry = registry
 	root.add_child(feel)
 
 
@@ -88,8 +93,8 @@ func test_a_nova_is_a_ring_at_the_caster_in_its_elements_colours() -> void:
 	var buffer: PackedFloat32Array = feel._effect_node.multimesh.buffer
 	check(is_equal_approx(buffer[3], 50.0) and is_equal_approx(buffer[7], 60.0), "at the caster")
 	var across: float = buffer[0]
-	check(across >= preset.nova_ring_size * 0.9, "as wide as the preset's ring (%f)" % across)
-	feel.step(preset.nova_seconds)
+	check(across >= 120.0 * 0.9, "as wide as the cue's ring, 120 px (%f)" % across)
+	feel.step(0.25)
 	check_equal(feel.effects_of(FeelScript.KIND_RING_OUT), 0, "and gone after its seconds")
 
 

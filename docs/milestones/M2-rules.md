@@ -2,7 +2,7 @@
 
 **Goal:** every card follows a small set of general rules on every carrier, with no special cases, so a player can try any combination and get the result the rules predict. A card that cannot mean anything on a carrier is listed as wasted, with the reason, before the cast. Nothing does nothing silently.
 
-**Status (2026-10-29):** R1a done (echo, zaps, relay and jumps keep the whole hit), R1b done (a flying chain jump keeps every card), R1c done (heavy and growth multiply), R1d done (a missed hook and a rain blast at their end point; DECISIONS.md). R1e and R1f in progress. The owner asked for "a pass that checks for the general rules, in which there are custom cases that break them" after a homing beam stopped homing at a wall (#453). An audit of the compiler, the runtime and the projectile manager (on main after #453) found 16 confirmed breaks and 7 suspected ones; they are below. Same day as "No limits on spell interactions" (#450).
+**Status (2026-10-29):** R1a done (echo, zaps, relay and jumps keep the whole hit), R1b done (a flying chain jump keeps every card), R1c done (heavy and growth multiply), R1d done (a missed hook and a rain blast at their end point), R1e and R1f done (moves on a shot add; a hold in a payload is a hold): R1 is complete. R2 and R3 done (the compiler lists every card that does nothing, and `tests/core/test_card_rules.gd` plays every card on every carrier and prints the live matrix; DECISIONS.md). Next: R4 (owner decisions). The owner asked for "a pass that checks for the general rules, in which there are custom cases that break them" after a homing beam stopped homing at a wall (#453). An audit of the compiler, the runtime and the projectile manager (on main after #453) found 16 confirmed breaks and 7 suspected ones; they are below. Same day as "No limits on spell interactions" (#450).
 
 **The owner's words:** "A general rule should be, that we dont limit the interactions, they follow the rules. Then player can then experiment and always get expected results." And: "It should be the general rule for everything."
 
@@ -56,6 +56,8 @@ Line numbers are from main after #453 and drift; the function names hold. The fi
 
 ## Card × carrier (audit, before R)
 
+Since R3 the live matrix is printed by `tests/core/test_card_rules.gd` (✓ works, W listed as wasted, ✗ silent: fails). The table below is the audit's, kept for history.
+
 ✓ works · W listed as wasted · ✗ silently ignored or special-cased · (n) the finding.
 
 | | Bolt | Rune | Orbit | Beam | Dash | Telep | Hook | Swap | Wall | Rain | Fiss | Decoy | Famil |
@@ -80,7 +82,21 @@ Line numbers are from main after #453 and drift; the function names hold. The fi
 | return | ✓ | W | W | W | W | W | ✓ | ✓ | W | W | W | W | W |
 | arc | ✓ | ✓ | ✓ | W | W | W | ✓ | ✓ | ✓ | W | W | W | W |
 
-Triggers are not in the matrix yet: R2 adds a row per trigger (findings 7 and 8). The melee carriers (swing, slam) arrived on main after the audit: R2 and R3 cover them like the rest.
+**Triggers (R2b, what the runtime does today):** `StaffCompiler.trigger_runs` and `trigger_why_not`. ✓ fires · W listed as wasted with its payload · s only with a shield or deflect on the carrier (a dash's or teleport's is a barrier on the wizard) · b only with a blast, whose area hit carries the carrier's tag. On reaction also needs an infusion or relay, and on wall is wasted on a ghost shot. Every W is a cell for R4.
+
+| | Bolt | Rune | Orbit | Beam | Dash | Telep | Hook | Swap | Wall | Rain | Fiss | Decoy | Famil | Swing |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| on hit | ✓ | ✓ | ✓ | ✓ | W | W | ✓ | ✓ | ✓ | W | ✓ | W | W | ✓ |
+| on expire | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| timer | ✓ | ✓ | ✓ | W | W | W | ✓ | ✓ | ✓ | W | W | W | W | W |
+| on block | s | s | s | s | s | s | s | s | s | W | s | W | W | s |
+| on kill | ✓ | ✓ | ✓ | ✓ | b | b | ✓ | ✓ | ✓ | b | ✓ | b | b | ✓ |
+| on cast | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| on wall | ✓ | W | W | ✓ | W | W | ✓ | ✓ | W | W | ✓ | W | W | W |
+| on hurt | ✓ | ✓ | ✓ | W | W | W | ✓ | ✓ | ✓ | W | W | W | W | W |
+| on reaction | ✓ | ✓ | ✓ | ✓ | b | b | ✓ | ✓ | ✓ | b | ✓ | b | b | ✓ |
+
+The melee carriers (swing, slam) arrived on main after the audit: R2 and R3 cover them like the rest.
 
 ## Plan
 

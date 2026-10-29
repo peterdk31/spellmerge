@@ -4,7 +4,9 @@ extends SceneTree
 ## it was split into passes (`fixtures/projectile_step/expected.json`, recorded on main c900bd4;
 ## recorded again 2026-10-29 when a piercing shot came to hit every target it passes in a step, and
 ## a target again after it has left it, owner's rule: the first change is a slow shot that pushes a
-## target ahead of it and hits it again when it catches up).
+## target ahead of it and hits it again when it catches up; and again when the moves on a shot came
+## to add up, rules R1e: the shots do the same, only the state line now shows the moves under way,
+## added up, where it showed a finished move's stale numbers).
 ##
 ## The scene has every behaviour the manager knows: plain shots that pierce, homing shots (their
 ## searches included), orbit shots round wizards and round other shots (in lower and higher slots),
@@ -335,6 +337,26 @@ func _on_ended(tag: int) -> void:
 	_events.append("ended t%d" % tag)
 
 
+## The seconds left of the moves under way of the shot in `slot`, added up (0 for none).
+func _moves_left(slot: int) -> float:
+	var total: float = 0.0
+	var at: int = _mgr._move_head[slot]
+	while at >= 0:
+		total += _mgr._move_left[at]
+		at = _mgr._move_next[at]
+	return total
+
+
+## The velocity the moves under way of the shot in `slot` add, added up.
+func _moves_velocity(slot: int) -> Vector2:
+	var total: Vector2 = Vector2.ZERO
+	var at: int = _mgr._move_head[slot]
+	while at >= 0:
+		total += _mgr._move_vel[at]
+		at = _mgr._move_next[at]
+	return total
+
+
 ## The step's line: how many events it sent and a digest of them and of every live shot's state and
 ## the counters (with `--full`, all of that in full instead).
 func _log_step(step: int) -> void:
@@ -350,7 +372,7 @@ func _log_step(step: int) -> void:
 			slot, m.get_seq_of(slot), _v(m._pos[slot]), _v(m._prev[slot]), _v(m._vel[slot]), _f(m._life[slot]),
 			_f(m._radius[slot]), m._pierce[slot], m._flags[slot], m._bounce[slot], m._shield[slot],
 			_f(m._hold[slot]), _v(m._home_at[slot]), int(m._home_target[slot] != 0), _v(m._caster_at[slot]),
-			_f(m._move_left[slot]), _v(m._move_vel[slot]), int(row >= 0), m.get_trail_kept(row), var_to_str(newest)])
+			_f(_moves_left(slot)), _v(_moves_velocity(slot)), int(row >= 0), m.get_trail_kept(row), var_to_str(newest)])
 	var events: String = "\n".join(_events)
 	var state: String = "\n".join(parts)
 	if _full:

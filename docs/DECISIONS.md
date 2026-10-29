@@ -2196,3 +2196,10 @@ The owner: restructure the projectile step from "for each shot, check every beha
 - **Many firings, one hold.** Every firing of one carrier has the same tag, so a payload that fires ten times is listed once, and the next press ends all its shots. The staff reserves the mana of the cast the carrier belongs to (`CompiledCast.mana`, payloads included), once, as before.
 - **It may switch on again.** A shot of the cast still in the air after the hold was switched off can fire the payload again; that switches the hold on again and reserves the mana again. It follows the rule: a held carrier is on while it lives.
 - **An old build holds nothing.** An edit (or a closed caster) switches the staff's holds off. A shot of the old build that fires its held payload later makes a carrier that lives its own lifetime, not `HOLD_LIFETIME`, because no press could end it.
+
+## 2026-10-29: Moves on a shot add up (phase R, R1e)
+
+- **The bug** (finding 12, rules 3 and 6): a shot kept one move at a time, so `move_shot` replaced the move under way. A payload's `mirror · recoil` pushed its shot forward (the second push replaced the first, where on the wizard the two add up and cancel), and a hook or dash on a shot dropped the rest of a recoil.
+- **Now:** a shot keeps a list of the moves under way (one growing pool, as the hit memory; no cap), and each runs on its own time, added on top of the shot's motion. Two opposite pushes cancel; a hook after a recoil gets both. A blink (a teleport or swap) moves the shot at once and keeps the moves under way. `move_shot` is the one place this lives; `Spells` did not change.
+- **What a player sees:** a payload with `mirror · recoil` leaves its shot on its line, and a shot's recoil is not lost when it hooks or dashes.
+- `test_projectiles_step_exact`'s recording was made again: the shots do the same; only its state line shows the moves under way, added up, where it showed a finished move's stale numbers.

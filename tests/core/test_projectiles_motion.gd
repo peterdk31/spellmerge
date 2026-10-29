@@ -1,6 +1,7 @@
 extends SceneTree
 ## Tests for core/projectiles, part 2: orbit shots with per-actor anchors, homing
-## (turn rate, every 4th step, work budget), `homing_aim` for a beam, and `ray()`.
+## (turn rate, every 4th step, work budget), `homing_aim` for a beam, a card's moves on a shot
+## (`move_shot`: they add up), and `ray()`.
 ## The manager is stepped by hand.
 ##
 ## godot --headless --path . --script res://tests/core/test_projectiles_motion.gd
@@ -47,6 +48,7 @@ func _initialize() -> void:
 	_test_homing_aim_for_a_beam()
 	_test_home_velocity_turns_anything_that_moves()
 	_test_homing_picks_at_random_and_keeps_its_pick()
+	_test_moves_on_a_shot_add_up()
 	_test_ray_hits_in_order_and_reports_its_reach()
 	_test_ray_width_layers_and_owner()
 	_test_ray_stops_at_walls()
@@ -415,6 +417,30 @@ func _test_home_velocity_turns_anything_that_moves() -> void:
 	for i in 30:
 		_mgr.step(DT)
 	_check(_mgr.get_position_of(slot).y > 300.5, "a shot's homing move turns toward the target: %s" % _mgr.get_position_of(slot))
+
+
+## Rules R1e: the moves a shot is given add up while they run, each on its own time, as the
+## wizard's pushes do (a later move replaced the one under way before).
+func _test_moves_on_a_shot_add_up() -> void:
+	_setup()
+	var slot: int = _mgr.spawn(0, Vector2(300.0, 300.0), Vector2.ZERO, 2.0, 2.0)
+	_mgr.move_shot(slot, Vector2(-20.0, 0.0), 0.1)
+	_mgr.move_shot(slot, Vector2(20.0, 0.0), 0.1)
+	for i in 12:
+		_mgr.step(DT)
+	_check(_mgr.get_position_of(slot).is_equal_approx(Vector2(300.0, 300.0)), "two opposite pushes cancel: %s" % _mgr.get_position_of(slot))
+	_mgr.move_shot(slot, Vector2(-20.0, 0.0), 0.1)
+	_mgr.step(DT)
+	_mgr.move_shot(slot, Vector2(0.0, 60.0), 0.15)
+	for i in 12:
+		_mgr.step(DT)
+	_check(_mgr.get_position_of(slot).is_equal_approx(Vector2(280.0, 360.0)), "a pull after a push gets both: %s" % _mgr.get_position_of(slot))
+	_mgr.move_shot(slot, Vector2(30.0, 0.0), 0.1)
+	_mgr.step(DT)
+	_mgr.move_shot(slot, Vector2(0.0, -40.0), 0.0)
+	for i in 12:
+		_mgr.step(DT)
+	_check(_mgr.get_position_of(slot).is_equal_approx(Vector2(310.0, 320.0)), "a blink keeps the move under way: %s" % _mgr.get_position_of(slot))
 
 
 func _test_homing_picks_at_random_and_keeps_its_pick() -> void:

@@ -14,11 +14,13 @@ extends SceneTree
 ## The ids to record are the user arguments; none means all of them. `--list` prints the ids
 ## and records nothing. Recording a clip twice gives the same frames (docs/DECISIONS.md).
 ## The simulation steps by hand, 1/60 s at a time, and a frame is drawn every third step
-## (20 frames a second), so the frames do not depend on how fast the machine renders.
+## (20 frames a second), so the frames do not depend on how fast the machine renders. The shaders
+## are compiled first, behind the loading screen as on Play (`tests/support/warm_up.gd`).
 
 const ScenariosScript := preload("res://tests/clips/scenarios.gd")
 const StageScript := preload("res://tests/clips/stage.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
+const WarmUp := preload("res://tests/support/warm_up.gd")
 
 const CLIPS_DIR := "user://clips"
 const FPS: int = 20
@@ -58,6 +60,11 @@ func _initialize() -> void:
 		quit(0)
 		return
 	var chosen: Array[Dictionary] = _choose(all, wanted)
+	# The clips start as the game does: the shaders compiled behind the loading screen first.
+	if not await WarmUp.run(root):
+		printerr("CLIPS FAILED: the shaders were not compiled first (Flow's play tasks through Loading)")
+		quit(1)
+		return
 	var failed: PackedStringArray = PackedStringArray()
 	var stage := StageScript.new(root, registry)
 	for scenario in chosen:

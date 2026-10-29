@@ -53,9 +53,14 @@ func _forms() -> Array[FormBase]:
 	return forms
 
 
-## How far a form gets: a beam, a dash or a teleport its length, a shot in flight its speed for
-## its life.
+## How far a form gets: a beam, a dash, a teleport or a rain its length, a shot in flight its
+## speed for its life, a rune as far as it creeps in its life, a wall a little past where it
+## stands (rules R4i: homing places it on a target near that point).
 static func _reach(form: FormBase) -> float:
+	if form.motion == FormBase.Motion.STILL:
+		return SpellLimits.HOMING_DRIFT * form.lifetime
+	if form.motion == FormBase.Motion.WALL:
+		return SpellLimits.WALL_REACH * 3.0
 	return form.ray_length if form.ray_length > 0.0 else form.speed * form.lifetime
 
 
@@ -102,6 +107,9 @@ func test_a_homing_form_reaches_a_target_off_its_line_near_the_end_of_its_reach(
 		if _moves_caster(form):
 			_check_move(form, at)
 			continue
+		if form.motion == FormBase.Motion.RAIN:
+			_check_rain(form, at)
+			continue
 		# A lone shot on its line misses it, so a hit below is the homing's doing.
 		if form.shots == 1 and form.spread <= 0.0:
 			check(not _hits(0, [form.id] as Array[StringName], target, seconds), "a plain %s misses a target %s px off at %s degrees" % [form.id, roundi(at.length()), OFF_AIM])
@@ -124,6 +132,49 @@ func _check_move(form: FormBase, at: Vector2) -> void:
 	else:
 		var homing: Homing = _spells.move_homing(1)
 		check(homing.homes() and homing.reach >= at.length(), "a homing %s turns the wizard toward a target %s px off (reach %s)" % [form.id, roundi(at.length()), homing.reach])
+
+
+## A rain hits nothing itself: a homing one falls on the target, a plain one where it was aimed.
+func _check_rain(form: FormBase, at: Vector2) -> void:
+	var falls: Array[Vector2] = []
+	var seen: Callable = func(_actor: int, kind: StringName, point: Vector2, _dir: Vector2, _seconds: float, _tint: Color, _look: int) -> void:
+		if kind == &"rain":
+			falls.append(point)
+	_bus.form_shown.connect(seen)
+	var casts: Array = [[form.id] as Array[StringName], [&"homing", form.id] as Array[StringName]]
+	for player in casts.size():
+		StaffKit.build(_spells, player, 0, casts[player])
+		check(_spells.cast_staff(player, 0, Vector2.ZERO, Vector2.RIGHT, 100.0) != SpellsScript.REFUSED, "%s is cast" % [casts[player]])
+	_bus.form_shown.disconnect(seen)
+	check_equal(falls.size(), 2, "a plain and a homing %s each fall once" % form.id)
+	if falls.size() == 2:
+		check(not falls[0].is_equal_approx(at) and falls[1].is_equal_approx(at), "a homing %s falls on a target %s px off at %s degrees, a plain one where it was aimed: %s" % [form.id, roundi(at.length()), OFF_AIM, falls])
+
+
+## Homing places a wall on a target near where it stands (rules R4i); its shots then keep still
+## (they do not creep as a rune does), so it stays a wall.
+func test_a_homing_wall_stands_on_its_target_and_keeps_still() -> void:
+	var target := Node2D.new()
+	root.add_child(target)
+	own(target)
+	target.global_position = Vector2(70.0, 30.0)
+	_mgr.add_target(target, 8.0, ManagerScript.LAYER_ENEMY)
+	StaffKit.build(_spells, 1, 0, [&"homing", &"wall"] as Array[StringName])
+	check(_spells.cast_staff(1, 0, Vector2.ZERO, Vector2.RIGHT, 100.0) != SpellsScript.REFUSED, "a homing wall is cast")
+	var placed: Dictionary = {}
+	for slot in _mgr._cap:
+		if _mgr.is_alive(slot):
+			placed[slot] = _mgr.get_position_of(slot)
+	check_equal(placed.size(), 5, "the wall stands")
+	var middle: Vector2 = Vector2.ZERO
+	for at: Vector2 in placed.values():
+		middle += at / placed.size()
+	check(middle.is_equal_approx(target.global_position), "its middle is on the target: %s" % middle)
+	# A shot that crept would move about 4 px in these steps (and die on the target soon after).
+	for i in 10:
+		_mgr.step(DT)
+	for slot: int in placed:
+		check(not _mgr.is_alive(slot) or _mgr.get_position_of(slot) == placed[slot], "a wall's shot keeps still")
 
 
 func test_homing_on_a_form_it_cannot_steer_is_wasted_and_changes_nothing() -> void:

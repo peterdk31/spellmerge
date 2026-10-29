@@ -280,11 +280,38 @@ func test_an_echo_is_dropped_when_the_staff_is_rebuilt() -> void:
 	check_equal(_mgr.get_count(), 0, "the old build's echo never came")
 
 
-func test_a_held_carrier_does_not_echo() -> void:
+func test_a_held_carriers_echo_is_a_second_held_copy_switched_off_with_it() -> void:
+	# Rules R4e (owner, 2026-10-29): it used to be skipped silently.
+	_build(0, [&"echo", &"hold", &"bolt"])
+	var mana: float = _cast()
+	check_equal(_spells.reserved_mana(0), mana, "the hold reserves its cast")
+	_tick(30)
+	check_equal(_mgr.get_count(), 2, "the held shot and its echo")
+	check_equal(_spells.reserved_mana(0), mana, "the echo reserves nothing more")
+	_cast()
+	check_equal(_mgr.get_count(), 0, "one press switches both off")
+	_tick(30)
+	check_equal(_mgr.get_count(), 0, "and nothing comes back")
+
+
+func test_a_held_carriers_echo_hits_at_half_damage() -> void:
+	_target(Vector2(60, 0))
 	_build(0, [&"echo", &"hold", &"bolt"])
 	_cast()
+	_tick(40)
+	var damage: Array = []
+	for hit in _hits:
+		damage.append(hit[4])
+	check_equal(damage, [10, 5], "the held shot at full damage, its echo at half")
+
+
+func test_switching_a_hold_off_before_its_echo_drops_the_echo() -> void:
+	_build(0, [&"echo", &"hold", &"bolt"])
+	_cast()
+	_tick(5)
+	_spells._release_hold(0)
 	_tick(30)
-	check_equal(_mgr.get_count(), 1, "one held shot")
+	check_equal(_mgr.get_count(), 0, "the echo never came")
 
 
 func test_mirror_also_fires_backwards() -> void:
@@ -352,12 +379,27 @@ func test_a_mirrored_returning_shot_goes_both_ways() -> void:
 	check(headings.size() == 2 and headings[0].is_equal_approx(-headings[1]), "opposite ways")
 
 
-func test_releasing_a_hold_drops_the_waiting_firings() -> void:
-	_build(0, [&"burst", &"bolt"])
+func test_switching_a_hold_off_drops_its_waiting_firings() -> void:
+	(_fake.items[&"bolt"] as FormBase).cooldown = 0.0
+	_build(0, [&"burst", &"hold", &"bolt"])
 	_cast()
-	_spells._release_hold(0)
+	check(_spells.is_holding(0, 0), "the burst's first firing switched the hold on")
+	_cast()
 	_tick(30)
-	check_equal(_mgr.get_count(), 1, "the later firings never came")
+	check_equal(_mgr.get_count(), 0, "switched off: its later firings never came")
+
+
+## Regression (rules R4a): a switch-off dropped every waiting launch of the staff.
+func test_switching_a_hold_off_keeps_the_staffs_other_waiting_firings() -> void:
+	(_fake.items[&"bolt"] as FormBase).cooldown = 0.0
+	_build(0, [&"burst", &"bolt", &"hold", &"bolt"])
+	_cast()
+	_cast()
+	check(_spells.is_holding(0, 0), "the second cast is the hold")
+	_cast()
+	check(not _spells.is_holding(0, 0), "the third press switched it off")
+	_tick(30)
+	check_equal(_mgr.get_count(), 3, "the first cast's burst fired all three times")
 
 
 func _trigger_card(id: StringName, event: TriggerBase.Event) -> void:

@@ -388,14 +388,14 @@ Owner sessions, not queued for the bot. Melee is **carriers**, not a staff type,
 - **The look** (owner's picks from the mockup, 2026-10-29): the head swings (Feel's squash) through its 16 frames, and a world-space trail in the glow style follows the arc; no new art style.
   - Trail: a brief line at the arc's reach that sheds pixel sparks outward, cooling through the ramp.
   - Hit: small streaks flung along the swing, and a small screen shake (2 px), off with the screen shake setting (I6).
-  - Parry (`shield · swing`): a big four-point star in Spark gold. The mockup also froze the game for 60 ms; no new freeze until I7 settles freezes in co-op.
+  - Parry (`shield · swing`): a big four-point star in Spark gold, and a 60 ms local stop (I7) on the parrying player and the shot.
   - Deflect: the bolt flashes big and white, then leaves faster with a longer tail. The speed-up is a rule too (owner): every deflect makes the shot 1.7× faster, so a rally speeds up each time, within the engine's limits.
   - A stray's wind-up: the head leans back and its orb swells and pulls in sparks until the swing.
 - **Wasted on a swing:** `return`, `bounce`, `ghost` (it does not fly out), as on `beam` and `rune`.
 
 Combos to prove (two per card in its task, the rest for the combo report): `shield · swing` (parry), `shield · on block · swing · nova` (riposte), `heavy · swing`, `fire · swing`, `echo · swing`, `burst · swing` (flurry), `on hit · swing · bolt`, `mirror · swing`, `split · swing` (cleave), `relay · swing` (a teammate enchants your blade), `linger · swing` (a hanging arc), `deflect · swing`.
 
-**Freezes in co-op (open, owner 2026-10-29):** Feel's hit-stop drops `Engine.time_scale` on hits, kills and downs, so one player's hit freezes all four players. The owner wants this rethought before any new freeze (the parry's) is added. Options for the I7 session: (a) a local stop: only the bodies in the hit (the attacker, the target, the shot) hold for a moment while the rest of the world runs on; (b) no game-wide stop with more than one player, the flash, squash and shake carry the hit; (c) game-wide stops only for rare moments (a downed player, a boss kill); (d) keep it as it is. Recommendation: (a), with (c) for the rare moments.
+**Freezes in co-op (owner, 2026-10-29):** Feel's hit-stop dropped `Engine.time_scale` on hits, kills and downs, so one player's hit froze all four players. Decided: (1) a **local stop** for hits and kills: only the bodies in the hit (the attacker, the target and the shot) hold for a moment while the rest of the world, the other players included, runs on; (2) a **game-wide stop only for rare moments**: a downed player and a boss kill. The parry's freeze is a local stop too.
 
 **Deflect:** a shot of another team touching the carrier turns around and takes the carrier's caster (its actor, team and hit credit), so a homing shot deflected hunts the new caster's targets. Open for I3: whether `deflect` and `shield` on one carrier deflect first and keep the shield, and whether a deflect sets off `on block`. A shot can be deflected again (a rally), within the engine's limits.
 
@@ -407,7 +407,7 @@ Combos to prove (two per card in its task, the rest for the combo report): `shie
 | I4 | **Card: swing** | `content/spells/forms/swing/` | The card (data), icon, look, two combos, lore, `test_swing.gd` |
 | I5 | **Card: deflect** | `content/spells/modifiers/deflect/` | The same for deflect |
 | I6 | **Screen shake setting** | `hud/menus/`, `core/save` | `Feel.shake_enabled` as a saved option in the menu (on by default), so players can turn screen shake off. Independent of I1–I5 |
-| I7 | **Freezes in co-op** | `gameplay/feel/` | The owner decides first, then it is built: see "Freezes in co-op" below |
+| I7 | **Freezes in co-op** | `gameplay/feel/`, `core/projectiles` | Feel's hit-stop as a local stop on the attacker, target and shot ("Freezes in co-op" below); `Engine.time_scale` only for a downed player and a boss kill; the parry's local stop. Tests: one player's hit does not slow another player or an unrelated shot; a down still stops the game |
 
 ### Phase D: proof
 

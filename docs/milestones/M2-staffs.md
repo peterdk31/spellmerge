@@ -67,6 +67,7 @@ Numbers are first guesses for the card's own task to set. Examples are written i
 | decoy | A still copy of the wizard that enemies target. End point: where it dies | `blast · decoy` is an exploding decoy; `on expire · decoy · nova` |
 | familiar | A small helper that orbits the caster and casts its payload at the nearest enemy every second | `hold · familiar · bolt` keeps it; `familiar · mend · bolt` is a healer |
 | swing | Melee (owner, 2026-10-29; see "Phase I"): the staff sweeps a 90° arc in front of its tip, about 24 px, hitting every body in it. No mana, a short delay, strong knockback. End point: the end of the arc | `shield · swing` is a parry; `heavy · swing` bats enemies into walls |
+| slam | Melee (owner, 2026-10-29; see "Phase I"): the staff rises and slams the floor in front of its tip, a shockwave ring that hits every body in it and throws them outward. No mana, a longer wind-up and delay than swing. End point: the impact | `burst · swing` then `slam` is a combo string; `on expire · swing · slam` ends a sweep in a slam |
 
 **Modifiers**
 
@@ -392,6 +393,10 @@ Owner sessions, not queued for the bot. Melee is **carriers**, not a staff type,
   - Deflect: the bolt flashes big and white, then leaves faster with a longer tail. The speed-up is a rule too (owner): every deflect makes the shot 1.7× faster, so a rally speeds up each time, within the engine's limits.
   - A stray's wind-up: the head leans back and its orb swells and pulls in sparks until the swing.
 - **Wasted on a swing:** `return`, `bounce`, `ghost` (it does not fly out), as on `beam` and `rune`.
+- **Tuning** (the playground, owner 2026-10-29: "felt good"; the sweep as short as possible). Starting numbers, not rules: they live in the swing card's data and named constants, and change freely after playtests. Arc 90°, reach 24 px, wind-up 0.12 s, sweep 0.06 s (`heavy` 1.3× longer), delay 0.3 s, chain window 0.25 s (a press within it after a sweep chains the backhand with no wind-up), knockback 170 px/s with drag 7 (about 24 px), damage 2, local hit stop 0.05 s, parry stop 0.06 s, deflect 1.7×, a stray's wind-up 0.55 s, slower walking (0.35×) while swinging, 1 damage when knocked into a wall above 95 px/s.
+- **Hits between ticks:** a 0.06 s sweep is about four physics ticks, so the beam turns about 34° a tick. Each tick hits what lies in the whole wedge swept since the last tick, not only on the beam's line, so nothing slips between two angles.
+
+**Slam** (owner, 2026-10-29): a second melee carrier. The staff rises (the wind-up) and slams the floor in front of its tip; a shockwave ring hits every body in it and throws them outward from the impact, with a crack and dust in the glow style and a shake. Proposed, to be tuned in the playground before its card: no mana, wind-up 0.25 s, delay 0.6 s, impact 20 px ahead of the hand, ring radius 16 px, knockback outward. End point: the impact, so `blast`, `on expire` and payloads happen there. Wasted on it: `return`, `bounce`, `ghost`, like swing. Combos by the reading rules, with no special cases: a staff of `burst · swing` then `slam` is a combo string (one press: three swings, forehand and backhand by turns; the next press: the slam); `on expire · swing · slam` ends one sweep in a slam in a single press; `double · swing · slam` swings and slams at once; `shield · slam` blocks shots in its ring; `deflect · slam` throws them back outward.
 
 Combos to prove (two per card in its task, the rest for the combo report): `shield · swing` (parry), `shield · on block · swing · nova` (riposte), `heavy · swing`, `fire · swing`, `echo · swing`, `burst · swing` (flurry), `on hit · swing · bolt`, `mirror · swing`, `split · swing` (cleave), `relay · swing` (a teammate enchants your blade), `linger · swing` (a hanging arc), `deflect · swing`.
 
@@ -401,12 +406,13 @@ Combos to prove (two per card in its task, the rest for the combo report): `shie
 
 | # | Part | Area | Delivers |
 | --- | --- | --- | --- |
-| I1 | **Mockup** | scratchpad, artifact | A playable HTML mockup of swing, parry and deflect, to feel the arc, reach, knockback and delay before anything is built. The look is already picked (the art mockup, 2026-10-29) |
+| I1 | **Mockup** | scratchpad, artifact | A playable HTML mockup of swing, parry and deflect, to feel the arc, reach, knockback and delay before anything is built. Done 2026-10-29: the numbers are under "Tuning" |
 | I2 | **Swing kit** | `core/spells`, `core/projectiles` | The turning anchored beam (`motion` or a beam field for the arc), the swing's knockback, the head's swing on the actor (a cast look). Tests: the arc hits what is in it and nothing behind, the caster is skipped, a teammate is hit |
 | I3 | **Deflect kit** | `core/projectiles`, `core/spells` | Turning a shot and handing it to a new caster (tag, team, hit credit) and making it 1.7× faster, on every carrier. Tests: swing, orbit and wall deflect; a deflected homing shot changes target; a rally speeds up each time |
 | I4 | **Card: swing** | `content/spells/forms/swing/` | The card (data), icon, look, two combos, lore, `test_swing.gd` |
 | I5 | **Card: deflect** | `content/spells/modifiers/deflect/` | The same for deflect |
 | I6 | **Screen shake setting** | `hud/menus/`, `core/save` | `Feel.shake_enabled` as a saved option in the menu (on by default), so players can turn screen shake off. Independent of I1–I5 |
+| I8 | **Card: slam** | the playground, `core/spells`, `content/spells/forms/slam/` | Slam in the playground first (tune its wind-up, ring and knockback), then the card on the area hit at its impact; tests: the ring hits what is in it, the caster is skipped, outward knockback, `on expire · swing · slam` |
 | I7 | **Freezes in co-op** | `gameplay/feel/`, `core/projectiles` | Feel's hit-stop as a local stop on the attacker, target and shot ("Freezes in co-op" below); `Engine.time_scale` only for a downed player and a boss kill; the parry's local stop. Tests: one player's hit does not slow another player or an unrelated shot; a down still stops the game |
 
 ### Phase D: proof

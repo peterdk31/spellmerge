@@ -39,6 +39,7 @@ func _initialize() -> void:
 	_test_a_piercing_shot_hits_everything_it_passes_in_one_step()
 	_test_homing_skips_wizards_and_freed_targets()
 	_test_homing_turns_toward_a_target()
+	_test_a_homing_shot_homes_after_it_bounces()
 	_test_homing_rules()
 	_test_homing_skips_its_own_wizard_and_the_target_just_hit()
 	_test_homing_checks_every_fourth_step()
@@ -227,6 +228,31 @@ func _test_a_piercing_shot_hits_everything_it_passes_in_one_step() -> void:
 	_mgr.step(DT)
 	_check(_hits.size() == 10, "all ten in the one step (%d)" % _hits.size())
 	_check(_mgr.is_alive(slot), "with pierce to spare")
+
+
+## The general rule (owner, 2026-10-29): a bounce turns a shot, it takes none of its cards away.
+## Fired right and a little down at a wall, the shot comes no nearer than 43 px to the target on
+## its way there (its homing reaches 20 px past the target's edge, 26 from its centre), and on its
+## way back, further down, it passes 13 px from it: too far to hit flying straight, close enough
+## to home onto it, if it still homes after the bounce.
+func _test_a_homing_shot_homes_after_it_bounces() -> void:
+	_setup()
+	_mgr.set_walls([Rect2(100.0, 0.0, 16.0, 360.0)] as Array[Rect2])
+	var enemy: Node2D = _target(Vector2(40.0, 150.0), 6.0)
+	var slot: int = _mgr.spawn(0, Vector2(20.0, 100.0), Vector2(150.0, 40.0), 3.0, 3.0)
+	_mgr.set_bounce(slot, 1)
+	_mgr.set_homing(slot, 6.0, 20.0)
+	for _i in 120:
+		_mgr.step(DT)
+		if not _mgr.is_alive(slot):
+			break
+	_check(_hits.size() == 1 and _hits[0][1] == enemy, "it bounced, then homed onto the target (%d hits)" % _hits.size())
+	_hits.clear()
+	var plain: int = _mgr.spawn(0, Vector2(20.0, 100.0), Vector2(150.0, 40.0), 3.0, 3.0)
+	_mgr.set_bounce(plain, 1)
+	for _i in 120:
+		_mgr.step(DT)
+	_check(_hits.is_empty(), "without homing the bounced shot flies past it")
 
 
 func _test_homing_turns_toward_a_target() -> void:

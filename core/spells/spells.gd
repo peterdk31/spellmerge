@@ -327,6 +327,14 @@ var _bm_legs: int = SpellLimits.BEAM_LEGS_START
 ## Each live beam's path, `_bm_stride` points a row (see `_beam_path`), and how many it uses.
 var _bm_points: PackedVector2Array = PackedVector2Array()
 var _bm_stride: int = BEAM_POINTS_START
+## For `_beam_steer`: the beam being walked, where its legs' targets are in its path (made by
+## `_beam_path`, the reached ones kept at each turn), the points it hands back, and the Callable
+## made once.
+var _steer_row: int = -1
+var _steer_goals: PackedInt32Array = PackedInt32Array()
+var _steer_goal_count: int = 0
+var _steer_points: PackedVector2Array = PackedVector2Array()
+var _steer_call: Callable = _beam_steer
 var _bm_count: PackedInt32Array = PackedInt32Array()
 var _bm_turn: PackedFloat32Array = PackedFloat32Array()
 var _bm_chain: PackedInt32Array = PackedInt32Array()
@@ -1743,7 +1751,9 @@ func _beam_follow(at: int) -> void:
 ## or, when it homes, bent onto a target in front of it (picked by `Projectiles.homing_point` and
 ## kept while it can), then for each pierce it has bent on from there toward another, as a homing
 ## shot picks a new target after a hit; past the last it goes straight on. Its hits cut it at
-## its `ray_length` (`ray_points`). `beam_bend` and `beam_end` keep its first curve.
+## its `ray_length` (`ray_points`). `beam_bend` and `beam_end` keep its first curve. Where each
+## leg's target is in the path goes to `_steer_goals`, for `_beam_steer`: a homing beam that turns
+## at a wall homes again from there with the legs it has not reached.
 func _beam_path(at: int) -> void:
 	var spell: CompiledSpell = _bm_spell[at]
 	var origin: Vector2 = _bm_origin[at]
@@ -1758,6 +1768,7 @@ func _beam_path(at: int) -> void:
 	_bm_end[at] = origin + way * length
 	var from: Vector2 = origin
 	var walked: float = 0.0
+	_steer_goal_count = 0
 	if spell.homing_range > 0.0:
 		for leg in legs:
 			var homing: Homing = _bm_homing[at * _bm_legs + leg]
@@ -1776,6 +1787,7 @@ func _beam_path(at: int) -> void:
 				walked += _bm_points[base + count - 1].distance_to(point)
 				_bm_points[base + count] = point
 				count += 1
+			_add_steer_goal(count - 1)
 			# It leaves the target the way the curve came in.
 			if not goal.is_equal_approx(bend):
 				way = bend.direction_to(goal)
@@ -1784,6 +1796,67 @@ func _beam_path(at: int) -> void:
 		_bm_points[base + count] = from + way * (length - walked)
 		count += 1
 	_bm_count[at] = count
+
+
+## A homing live beam (`_steer_row`) turned off a wall at point `turn` of its path (`at`, going
+## `way` off the wall, `left` pixels of it left): it homes again from there, as it did from its
+## staff, with the legs it had not reached before the wall (a leg's target past the turn was not
+## reached: `_steer_goals`), then goes straight on for what is left. Returns the points after
+## `at` (`Projectiles.ray_points` asks at every turn); the same rule as a homing shot, which
+## steers again after it bounces.
+func _beam_steer(turn: int, at: Vector2, way: Vector2, left: float) -> PackedVector2Array:
+	var row: int = _steer_row
+	var spell: CompiledSpell = _bm_spell[row] if row >= 0 else null
+	var count: int = 0
+	if spell == null or spell.homing_range <= 0.0:
+		_steer_points.resize(0)
+		return _steer_points
+	var reached: int = 0
+	while reached < _steer_goal_count and _steer_goals[reached] < turn:
+		reached += 1
+	_steer_goal_count = reached
+	var legs: int = maxi(spell.pierce, 0) + 1
+	var from: Vector2 = at
+	var heading: Vector2 = way
+	var walked: float = 0.0
+	if _steer_points.size() < legs * ProjectilesScript.RAY_SEGMENTS + 1:
+		_steer_points.resize(legs * ProjectilesScript.RAY_SEGMENTS + 1)
+	for leg in range(reached, mini(legs, _bm_legs)):
+		var homing: Homing = _bm_homing[row * _bm_legs + leg]
+		var goal: Vector2 = homing.point(projectiles, _bm_actor[row], from, heading)
+		if not goal.is_finite() or walked >= left or _picked_before(row, leg):
+			homing.keep = 0
+			break
+		var bend: Vector2 = from + heading * (from.distance_to(goal) * 0.6)
+		var prev: Vector2 = from
+		for n in range(1, ProjectilesScript.RAY_SEGMENTS + 1):
+			var t: float = float(n) / ProjectilesScript.RAY_SEGMENTS
+			var u: float = 1.0 - t
+			var point: Vector2 = from * (u * u) + bend * (2.0 * u * t) + goal * (t * t)
+			walked += prev.distance_to(point)
+			_steer_points[count] = point
+			count += 1
+			prev = point
+		# The goal's index in the path: the turn's, plus the points after it.
+		_add_steer_goal(turn + count)
+		if not goal.is_equal_approx(bend):
+			heading = bend.direction_to(goal)
+		from = goal
+	if walked < left:
+		if _steer_points.size() <= count:
+			_steer_points.resize(count + 1)
+		_steer_points[count] = from + heading * (left - walked)
+		count += 1
+	_steer_points.resize(count)
+	return _steer_points
+
+
+## Notes that a leg's target is point `index` of the steered beam's path.
+func _add_steer_goal(index: int) -> void:
+	if _steer_goal_count == _steer_goals.size():
+		_steer_goals.resize(maxi(8, _steer_goal_count * 2))
+	_steer_goals[_steer_goal_count] = index
+	_steer_goal_count += 1
 
 
 ## True when leg `leg` of live beam `at` picked a target an earlier leg already bent to: the
@@ -1804,8 +1877,11 @@ func _beam_cast(at: int, hit: bool) -> void:
 	var actor: int = _bm_actor[at]
 	var source: Node = _bm_source[at] if is_instance_valid(_bm_source[at]) else null
 	var bounces: int = _bounces(spell)
+	# A homing beam that turns at a wall homes again from there (`_beam_steer`).
+	var steer: Callable = _steer_call if bounces > 0 and spell.homing_range > 0.0 else Callable()
+	_steer_row = at
 	if not hit:
-		_bm_reach[at] = projectiles.ray_points(actor, _bm_points, at * _bm_stride, _bm_count[at], spell.ray_length, spell.pierce, HITS, tag, spell.radius * 0.5, source, false, bounces)
+		_bm_reach[at] = projectiles.ray_points(actor, _bm_points, at * _bm_stride, _bm_count[at], spell.ray_length, spell.pierce, HITS, tag, spell.radius * 0.5, source, false, bounces, steer)
 		_bm_tip[at] = projectiles.ray_end
 		_bm_tip_dir[at] = projectiles.ray_end_heading
 		if bounces > 0:
@@ -1821,7 +1897,7 @@ func _beam_cast(at: int, hit: bool) -> void:
 	_ray_chain = _bm_chain[at]
 	_ray_prev = _bm_prev[at]
 	_echo_spell = spell if _bm_echo[at] != 0 else null
-	var got: float = projectiles.ray_points(actor, _bm_points, at * _bm_stride, _bm_count[at], spell.ray_length, spell.pierce, HITS, tag, spell.radius * 0.5, source, true, bounces)
+	var got: float = projectiles.ray_points(actor, _bm_points, at * _bm_stride, _bm_count[at], spell.ray_length, spell.pierce, HITS, tag, spell.radius * 0.5, source, true, bounces, steer)
 	var tip: Vector2 = projectiles.ray_end
 	var tip_dir: Vector2 = projectiles.ray_end_heading
 	var turned: bool = bounces > 0 and projectiles.ray_path_count > 0

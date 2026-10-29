@@ -5,7 +5,7 @@
 // windup: the dashes march toward the tip, the arrowhead grows, the lane brightens, and the last
 // part is white-hot.
 //
-// Its own small shader, not a mode of shot_core.gdshader: with a crowd winding up at once the
+// Its own small shader, not a mode of a shot shader: with a crowd winding up at once the
 // shot shader's size made every telegraph pixel cost as much as a shot's, and the web build (and
 // the stress run in the software renderer CI uses) went over its frame budget. The look is the
 // shot shader's beam look: the ramp of a material (docs/STYLE.md: enemy telegraphs use Fire

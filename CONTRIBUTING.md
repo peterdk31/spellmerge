@@ -37,7 +37,7 @@ In short ([CLA.md](CLA.md)): you keep the copyright, the project may use and rel
 **Pull requests.** When Claude schedules your PR, it doesn't rewrite it: a development session builds on your commits (your name stays on them), reviews and finishes the work, and sends it through the same reviews as its own changes. When that merges, your PR is closed with credit. Before it can be scheduled, the `rules` check must pass:
 
 1. Don't change `.github/`, `ci/`, `tools/`, `setup.sh`, `docs/DESIGN.md` or the license files.
-2. Allowed files: `.png` and `.svg` images (up to 1 MB), `.ogg` audio (up to 5 MB), Godot text files and typed GDScript. No binaries.
+2. Allowed files: `.png` and `.svg` images (up to 1 MB), `.ogg` audio (up to 5 MB), Godot text files (`.tscn`, `.tres`, `.gdshader`, `.gdshaderinc`, `.import`, `.uid`) and typed GDScript. No binaries.
 3. No code that starts programs, uses the network, calls JavaScript or loads code at runtime.
 4. Only your own work, or work under a compatible license, and no names or art from other games or films.
 

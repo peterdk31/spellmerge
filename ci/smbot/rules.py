@@ -63,7 +63,7 @@ BOT_PATHS = (
 # File types outside contributors may add: images, .ogg, Godot text files,
 # GDScript and JSON, plus REUSE .license sidecars and empty-folder markers.
 CONTRIBUTOR_TYPES = frozenset(
-    {".png", ".svg", ".ogg", ".gd", ".tscn", ".tres", ".import", ".uid", ".gdshader", ".json", ".license"}
+    {".png", ".svg", ".ogg", ".gd", ".tscn", ".tres", ".import", ".uid", ".gdshader", ".gdshaderinc", ".json", ".license"}
 )
 CONTRIBUTOR_NAMES = frozenset({".gitkeep"})
 # The bot also maintains docs and the Godot project files, and tools/ scripts.

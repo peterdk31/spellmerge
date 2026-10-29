@@ -26,7 +26,7 @@ extends ActorLook
 ##
 ## A dash, hook or swap stretches and leans the sprite along its way (`Mover.move_direction`; a
 ## standing actor dashes the way it aims) and leaves three ghosts where the staff was: solid copies
-## drawn by the shot shader (the glow look, 2026-10-27), turned to the ramp's light colour and
+## drawn by the shots' sprite shader (the glow look, 2026-10-27), turned to the ramp's light colour and
 ## falling apart pixel by pixel, the older the more (GHOST_DISSOLVE), never see-through.
 ##
 ## Drawn by this node: the aim reticle (a chevron), the closing ring while the actor cannot be hurt
@@ -63,7 +63,8 @@ const DASH_LEAN: float = 0.1
 const GHOST_INTERVAL: float = 0.04
 const GHOST_DISSOLVE: Array[float] = [0.2, 0.45, 0.7]
 const GHOST_GLOW: float = 0.7
-const CORE_SHADER: Shader = preload("res://core/projectiles/shot_core.gdshader")
+## The shots' sprite shader (core/README.md, "The shot shaders"): the ghosts' dissolve and glow.
+const SPRITE_SHADER: Shader = preload("res://core/projectiles/shot_sprite.gdshader")
 ## The reticle: its distance from the hand and its size, in pixels.
 const RETICLE_DISTANCE: float = 38.0
 const RETICLE_SIZE: float = 4.0
@@ -346,7 +347,7 @@ func _make_ghosts() -> void:
 
 func _ghost_material(dissolve: float) -> ShaderMaterial:
 	var material := ShaderMaterial.new()
-	material.shader = CORE_SHADER
+	material.shader = SPRITE_SHADER
 	material.set_shader_parameter(&"core_override", Color.WHITE)
 	material.set_shader_parameter(&"dissolve", dissolve)
 	material.set_shader_parameter(&"sprite_glow", GHOST_GLOW)

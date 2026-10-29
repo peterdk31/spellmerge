@@ -540,7 +540,7 @@ func _test_shot_core_colour_and_batches() -> void:
 func _test_enemy_shots_have_their_own_batch() -> void:
 	_setup()
 	root.add_child(_mgr)
-	_check(_mgr._enemy_node.material is ShaderMaterial, "enemy shots are drawn by the shot shader")
+	_check(_mgr._enemy_node.material is ShaderMaterial, "enemy shots are drawn by the shot shaders")
 	_check(_mgr._enemy_node.z_index > _mgr._draw_node.z_index, "enemy shots are drawn above the players' shots")
 	_mgr.spawn(0, Vector2(10.0, 0.0), Vector2(100.0, 0.0), 1.0)
 	_mgr.spawn(EventsScript.NO_PLAYER, Vector2(20.0, 0.0), Vector2(0.0, 100.0), 1.0, 5.0, ManagerScript.LAYER_PLAYER)
@@ -549,9 +549,16 @@ func _test_enemy_shots_have_their_own_batch() -> void:
 	_check(_mgr.drawn == 3 and _mgr.drawn_enemy == 2, "drawn counts both batches (%d, %d enemy)" % [_mgr.drawn, _mgr.drawn_enemy])
 	_check(_mgr._draw_node.multimesh.visible_instance_count == 1, "the player batch holds the one player shot")
 	_check(_mgr._enemy_node.multimesh.visible_instance_count == 2, "the enemy batch holds the two enemy shots")
+	# A batch has one shader (the owner, 2026-10-29): an enemy's rune is in a batch of its own.
+	_mgr.spawn(EventsScript.NO_PLAYER, Vector2(40.0, 0.0), Vector2.ZERO, 1.0, 8.0, ManagerScript.LAYER_PLAYER, 0, 0, ManagerScript.MOTION_STILL)
+	_mgr.update_draw()
+	_check(_mgr.drawn == 4 and _mgr.drawn_enemy == 3, "the rune is drawn and counted as an enemy shot")
+	_check(_mgr._enemy_node.multimesh.visible_instance_count == 2 and _mgr._enemy_rune_node.multimesh.visible_instance_count == 1, "in the enemy rune batch, not with the trails")
+	_check((_mgr._enemy_rune_node.material as ShaderMaterial).shader == ManagerScript.RUNE_SHADER, "drawn by the rune shader")
+	_check(_mgr._enemy_rune_node.z_index == _mgr._enemy_node.z_index, "on the enemy shots' layer")
 	_mgr.clear()
 	_mgr.update_draw()
-	_check(_mgr.drawn == 0 and _mgr._enemy_node.multimesh.visible_instance_count == 0, "clear empties the enemy batch too")
+	_check(_mgr.drawn == 0 and _mgr._enemy_node.multimesh.visible_instance_count == 0 and _mgr._enemy_rune_node.multimesh.visible_instance_count == 0, "clear empties the enemy batches too")
 	root.remove_child(_mgr)
 
 

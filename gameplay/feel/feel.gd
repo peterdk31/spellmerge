@@ -36,9 +36,10 @@ extends Node
 ## hit whose caster is the hit actor itself is a self-hit.
 ##
 ## Effects (the glow look, 2026-10-27; the owner: "I only want the new style going forward"):
-## every flare, spray, puff, ring, chip, arc and status is drawn by the shots' own shader
-## (`shot_core.gdshader`, kinds KIND_BURST to KIND_STATUS) in one MultiMesh of `effect_slots`
-## (a setting: Settings, "Effect slots", through `effect_slots_changed`),
+## every flare, spray, puff, ring, chip, arc and status is drawn by the shots' own shaders
+## (core/projectiles: `shot_effect.gdshader` for the flares, kinds KIND_BURST to KIND_CHIPS;
+## `shot_arc.gdshader` for KIND_ARC; `shot_status.gdshader` for KIND_STATUS), one MultiMesh each,
+## sharing `effect_slots` (a setting: Settings, "Effect slots", through `effect_slots_changed`),
 ## each with the core colour and look of the shot it comes from (`impact_core`, `impact_look` of
 ## the projectile manager), so a frost bolt lands in frost flecks and a lightning one in sparks,
 ## all glowing. A new effect takes the oldest slot when they are all busy. On
@@ -55,8 +56,13 @@ const RegistryScript := preload("res://core/registry/registry.gd")
 const NO_LOOK: Dictionary = {}
 const FeelPresetScript :=preload("res://gameplay/feel/presets/feel_preset.gd")
 const FLASH_SHADER: Shader = preload("res://gameplay/feel/hit_flash.gdshader")
-## Draws the beam and the nova ring like a shot: bone body tinted by the player, core by the element.
-const CORE_SHADER: Shader = preload("res://core/projectiles/shot_core.gdshader")
+## The shot shaders Feel draws with (core/README.md, "The shot shaders"): beams; the effects'
+## batches (flares, arcs, statuses); the sprite path of the death and afterimage copies.
+const BEAM_SHADER: Shader = preload("res://core/projectiles/shot_beam.gdshader")
+const EFFECT_SHADER: Shader = preload("res://core/projectiles/shot_effect.gdshader")
+const ARC_SHADER: Shader = preload("res://core/projectiles/shot_arc.gdshader")
+const STATUS_SHADER: Shader = preload("res://core/projectiles/shot_status.gdshader")
+const SPRITE_SHADER: Shader = preload("res://core/projectiles/shot_sprite.gdshader")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 ## Bone light: the white-hot of a plain thing (a death's ring).
@@ -101,8 +107,8 @@ const SPRAY_MAX_SIZE: float = 1.6
 ## room and the wizards, under the shots and effects.
 const GHOST_SLOTS: int = 8
 const GHOST_Z: int = 21
-## The effects drawn with the shot shader (see "Effects" above): the kinds it knows (K_* in
-## shot_core.gdshader), their seconds and their draw layer (with the shots, above the room and
+## The effects drawn with the shot shaders (see "Effects" above): the kinds they know (K_* in
+## core/projectiles/shot_palette.gdshaderinc), their seconds and their draw layer (with the shots, above the room and
 ## the wizards). How many can show at once is a setting (`EffectSlots` in core/settings).
 const KIND_BURST: int = 4
 const KIND_RING_OUT: int = 5
@@ -155,7 +161,7 @@ const ARC_ACROSS: float = 16.0
 ## A status effect's zoom (round a character of about 16 px) and how far above its feet it sits.
 const STATUS_ZOOM: int = 2
 const STATUS_RISE: float = 8.0
-## A beam is drawn this wide (its core, rim, flares and glow; `shot_core.gdshader`'s beam mode).
+## A beam is drawn this wide (its core, rim, flares and glow; `shot_beam.gdshader`'s mode 1).
 const BEAM_WIDTH: float = 16.0
 ## How far a beam's quad reaches past each end, so its flares are whole (the shader's beam_lead).
 const BEAM_LEAD: float = 8.0
@@ -269,8 +275,14 @@ var _reaction_sounds: Dictionary = {}
 var _reaction_names: Dictionary = {}
 ## Real seconds since feel started, and when each reaction id last gave a sound and a shake.
 var _clock: float = 0.0
+## The effects' batches, one per shader (see "Effects" above): the flares, the arcs, the
+## statuses; each has room for every slot.
 var _effect_node: MultiMeshInstance2D = null
 var _effect_buffer: PackedFloat32Array = PackedFloat32Array()
+var _arc_node: MultiMeshInstance2D = null
+var _arc_buffer: PackedFloat32Array = PackedFloat32Array()
+var _status_node: MultiMeshInstance2D = null
+var _status_buffer: PackedFloat32Array = PackedFloat32Array()
 var _effect_kind: PackedInt32Array = PackedInt32Array()
 var _effect_at: PackedVector2Array = PackedVector2Array()
 var _effect_dir: PackedVector2Array = PackedVector2Array()
@@ -308,7 +320,7 @@ var _kind_frame: int = -1
 var _kind_own: bool = false
 var _impact_at: Vector2 = Vector2.ZERO
 var _impact_aim: Vector2 = Vector2.ZERO
-## Death animations: sprites made once (drawn by the shot shader's dissolve), seconds left
+## Death animations: sprites made once (drawn by `shot_sprite.gdshader`'s dissolve), seconds left
 ## and seconds they started with (parallel arrays of GHOST_SLOTS).
 var _ghosts: Array[Sprite2D] = []
 var _ghost_left: PackedFloat32Array = PackedFloat32Array()
@@ -336,7 +348,7 @@ func _ready() -> void:
 	for i in FORM_SLOTS:
 		var form := Sprite2D.new()
 		var material := ShaderMaterial.new()
-		material.shader = CORE_SHADER
+		material.shader = BEAM_SHADER
 		form.material = material
 		form.top_level = true
 		form.visible = false
@@ -351,7 +363,7 @@ func _ready() -> void:
 	for i in LIVE_BEAMS:
 		var line := Line2D.new()
 		var material := ShaderMaterial.new()
-		material.shader = CORE_SHADER
+		material.shader = BEAM_SHADER
 		line.material = material
 		line.top_level = true
 		line.visible = false
@@ -389,8 +401,8 @@ func _ready() -> void:
 		ghost.visible = false
 		ghost.z_index = GHOST_Z
 		var dissolve := ShaderMaterial.new()
-		dissolve.shader = CORE_SHADER
-		# The sprite path of the shot shader, as itself: a white core leaves its colours be.
+		dissolve.shader = SPRITE_SHADER
+		# The shots' sprite shader, as itself: a white core leaves its colours be.
 		dissolve.set_shader_parameter(&"core_override", Color.WHITE)
 		dissolve.set_shader_parameter(&"sprite_glow", 0.8)
 		ghost.material = dissolve
@@ -972,10 +984,18 @@ func _show_impact(ramp: int, position: Vector2, direction: Vector2) -> void:
 		show_effect(KIND_RING_OUT, position, direction, core, ramp, 0, 1, RING_SECONDS)
 
 
-## Make the effect batch (see "Effects" above): one MultiMesh of `effect_slots` quads in world
-## space, drawn by the shot shader, and the arrays behind it.
+## Make the effect batches (see "Effects" above): a MultiMesh of `effect_slots` quads in world
+## space for each of the flares, the arcs and the statuses, each drawn by its own shot shader,
+## and the arrays behind them.
 func _make_effects() -> void:
-	_effect_node = MultiMeshInstance2D.new()
+	_status_node = _make_effect_batch(STATUS_SHADER)
+	_effect_node = _make_effect_batch(EFFECT_SHADER)
+	_arc_node = _make_effect_batch(ARC_SHADER)
+	_size_effects(effect_slots)
+
+
+func _make_effect_batch(shader: Shader) -> MultiMeshInstance2D:
+	var node := MultiMeshInstance2D.new()
 	var quad := QuadMesh.new()
 	quad.size = Vector2.ONE
 	var multimesh := MultiMesh.new()
@@ -986,23 +1006,26 @@ func _make_effects() -> void:
 	multimesh.visible_instance_count = 0
 	# Effects show anywhere in the world; there is no room to fit a box to.
 	multimesh.custom_aabb = AABB(Vector3(-100000.0, -100000.0, -1.0), Vector3(200000.0, 200000.0, 2.0))
-	_effect_node.multimesh = multimesh
+	node.multimesh = multimesh
 	var material := ShaderMaterial.new()
-	material.shader = CORE_SHADER
-	_effect_node.material = material
-	_effect_node.top_level = true
-	_effect_node.z_index = EFFECT_Z
-	add_child(_effect_node)
-	_size_effects(effect_slots)
+	material.shader = shader
+	node.material = material
+	node.top_level = true
+	node.z_index = EFFECT_Z
+	add_child(node)
+	return node
 
 
 ## Make room for `slots` effects: the MultiMesh, its buffer and the arrays behind it. The
 ## effects showing end (a setting changed in a menu: nobody misses a tenth of a second of sparks).
 func _size_effects(slots: int) -> void:
 	effect_slots = slots
-	_effect_node.multimesh.visible_instance_count = 0
-	_effect_node.multimesh.instance_count = slots
+	for node: MultiMeshInstance2D in [_effect_node, _arc_node, _status_node]:
+		node.multimesh.visible_instance_count = 0
+		node.multimesh.instance_count = slots
 	_effect_buffer.resize(slots * EFFECT_STRIDE)
+	_arc_buffer.resize(slots * EFFECT_STRIDE)
+	_status_buffer.resize(slots * EFFECT_STRIDE)
 	_effect_kind.resize(slots)
 	_effect_at.resize(slots)
 	_effect_dir.resize(slots)
@@ -1068,12 +1091,16 @@ func show_effect(kind: int, at: Vector2, dir: Vector2, core: Color, ramp: int, l
 	return slot
 
 
-## Age the effects by `real_delta` and write the live ones into the batch, oldest first.
+## Age the effects by `real_delta` and write the live ones into their batches, oldest first.
 func _step_effects(real_delta: float) -> void:
 	if _effect_node == null:
 		return
 	(_effect_node.material as ShaderMaterial).set_shader_parameter(&"sim_time", _clock)
+	(_arc_node.material as ShaderMaterial).set_shader_parameter(&"sim_time", _clock)
+	(_status_node.material as ShaderMaterial).set_shader_parameter(&"sim_time", _clock)
 	var out: int = 0
+	var arcs: int = 0
+	var statuses: int = 0
 	for n in effect_slots:
 		var slot: int = (_next_effect + n) % effect_slots
 		if _effect_seconds[slot] <= 0.0:
@@ -1089,39 +1116,56 @@ func _step_effects(real_delta: float) -> void:
 			continue
 		if follow != null:
 			_effect_at[slot] = (follow.global_position + _effect_offset[slot]).round()
+		var kind: int = _effect_kind[slot]
+		var buffer: PackedFloat32Array = _effect_buffer
 		var i: int = out * EFFECT_STRIDE
+		if kind == KIND_ARC:
+			buffer = _arc_buffer
+			i = arcs * EFFECT_STRIDE
+			arcs += 1
+		elif kind == KIND_STATUS:
+			buffer = _status_buffer
+			i = statuses * EFFECT_STRIDE
+			statuses += 1
+		else:
+			out += 1
 		var d: float = EFFECT_GRID * _effect_zoom[slot]
 		var along: float = d
 		var dir: Vector2 = _effect_dir[slot]
 		var at: Vector2 = _effect_at[slot]
 		if _effect_length[slot] > 0.0:
 			# A dash or an arc: from where it starts along its way, a margin past each end.
-			var arc: bool = _effect_kind[slot] == KIND_ARC
+			var arc: bool = kind == KIND_ARC
 			d = ARC_ACROSS if arc else DASH_ACROSS
 			along = _effect_length[slot] + 2.0 * (ARC_MARGIN if arc else DASH_MARGIN)
 			at += dir * _effect_length[slot] * 0.5
-		_effect_buffer[i] = dir.x * along
-		_effect_buffer[i + 1] = dir.y * d
-		_effect_buffer[i + 2] = 0.0
-		_effect_buffer[i + 3] = at.x
-		_effect_buffer[i + 4] = dir.y * along
-		_effect_buffer[i + 5] = -dir.x * d
-		_effect_buffer[i + 6] = 0.0
-		_effect_buffer[i + 7] = at.y
+		buffer[i] = dir.x * along
+		buffer[i + 1] = dir.y * d
+		buffer[i + 2] = 0.0
+		buffer[i + 3] = at.x
+		buffer[i + 4] = dir.y * along
+		buffer[i + 5] = -dir.x * d
+		buffer[i + 6] = 0.0
+		buffer[i + 7] = at.y
 		var data: Color = ProjectileManagerScript.look_color(_effect_ramp[slot], _effect_zoom[slot], _effect_look[slot])
-		_effect_buffer[i + 8] = data.r
-		_effect_buffer[i + 9] = data.g
-		_effect_buffer[i + 10] = data.b
-		_effect_buffer[i + 11] = data.a
+		buffer[i + 8] = data.r
+		buffer[i + 9] = data.g
+		buffer[i + 10] = data.b
+		buffer[i + 11] = data.a
 		var core: Color = _effect_core[slot]
-		_effect_buffer[i + 12] = core.r
-		_effect_buffer[i + 13] = core.g
-		_effect_buffer[i + 14] = core.b
-		_effect_buffer[i + 15] = 1.0 - (float(_effect_kind[slot]) + EFFECT_FROM + EFFECT_SPAN * through) / 16.0
-		out += 1
+		buffer[i + 12] = core.r
+		buffer[i + 13] = core.g
+		buffer[i + 14] = core.b
+		buffer[i + 15] = 1.0 - (float(kind) + EFFECT_FROM + EFFECT_SPAN * through) / 16.0
 	if out > 0:
 		_effect_node.multimesh.buffer = _effect_buffer
 	_effect_node.multimesh.visible_instance_count = out
+	if arcs > 0:
+		_arc_node.multimesh.buffer = _arc_buffer
+	_arc_node.multimesh.visible_instance_count = arcs
+	if statuses > 0:
+		_status_node.multimesh.buffer = _status_buffer
+	_status_node.multimesh.visible_instance_count = statuses
 
 
 ## How many effects are showing (for tests and the sheets).
@@ -1239,7 +1283,7 @@ func _on_spell_cast(player: int, spell_id: StringName, origin: Vector2, directio
 		_kick = (_kick - direction.normalized() * preset.cast_kick_pixels).limit_length(MAX_KICK_PIXELS)
 
 
-## A beam (drawn by the shot shader's beam mode in the element's ramp), a nova's ring, a dash and
+## A beam (drawn by `shot_beam.gdshader` in the element's ramp), a nova's ring, a dash and
 ## a rain's marker (effects), each with the cast's cards, in the caster's ramp: an enemy's look
 ## the same, in the enemy ramp (staffs F7). A rain's marker is a ring closing on the point for as long as
 ## the rain takes to fall (`length` seconds), so nobody is hit by a rain they could not see.

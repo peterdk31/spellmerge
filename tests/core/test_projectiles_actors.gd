@@ -260,13 +260,19 @@ func test_enemy_shots_are_drawn_by_the_shader_above_the_hats() -> void:
 	mgr.spawn(IMP, Vector2(150.0, 100.0), Vector2.ZERO, 2.0, 14.0, ManagerScript.LAYER_PLAYER, 0, 0, ManagerScript.MOTION_STILL)
 	mgr.spawn_orbit(IMP, 20.0, 0.0, 1.0, 2.0, 5.0, ManagerScript.LAYER_PLAYER)
 	mgr.update_draw(1.0)
-	check_equal(mgr.drawn_enemy, 3, "a bolt, a rune and an orbit shot in the enemy batch")
+	check_equal(mgr.drawn_enemy, 3, "a bolt, a rune and an orbit shot in the enemy batches")
 	var node: MultiMeshInstance2D = mgr._enemy_node
-	check(node.material is ShaderMaterial, "drawn by the shot shader")
+	check(node.material is ShaderMaterial, "drawn by the shot shaders")
 	check_equal(node.z_index, mgr._draw_node.z_index + 1, "one layer above the hat ramps' shots")
+	check_equal(mgr._enemy_rune_node.z_index, node.z_index, "the enemy runes too")
 	var kinds: Array[int] = []
+	# A batch has one shader (the owner, 2026-10-29): the flying shots in one, the rune in another.
+	var rune_buffer: PackedFloat32Array = mgr._enemy_rune_node.multimesh.buffer
+	check_equal(mgr._enemy_rune_node.multimesh.visible_instance_count, 1, "the rune in the enemy rune batch")
+	kinds.append(roundi((1.0 - rune_buffer[15]) * ManagerScript.KIND_STEPS))
 	var buffer: PackedFloat32Array = node.multimesh.buffer
-	for i in 3:
+	check_equal(node.multimesh.visible_instance_count, 2, "the bolt and the orbit shot in the enemy trail batch")
+	for i in 2:
 		var at: int = i * ManagerScript.DRAW_STRIDE
 		var kind: int = roundi((1.0 - buffer[at + 15]) * ManagerScript.KIND_STEPS)
 		# A shot in flight is drawn as its trail; an orbit shot's is flagged so.

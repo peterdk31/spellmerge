@@ -541,7 +541,8 @@ static func behaviour_waste(behaviour: int, motion: FormBase.Motion, blasts: boo
 		ModifierBase.Behaviour.ARC:
 			return "" if stays(motion) else "it is not a shot that stays in the air"
 		ModifierBase.Behaviour.DEFLECT:
-			return "" if guards(motion) or motion == FormBase.Motion.HOOK or motion == FormBase.Motion.SWAP else "it touches no shots"
+			# What hits touches shots too: its shot, line, sweep or ring, a dash's way, a teleport's landing.
+			return "" if hits(motion) else "it touches no shots"
 		ModifierBase.Behaviour.SPIRAL, ModifierBase.Behaviour.LINGER, ModifierBase.Behaviour.GROWTH, ModifierBase.Behaviour.STICKY:
 			return "" if flies(motion) else "it only changes a shot in flight, and %s" % _what(motion)
 		ModifierBase.Behaviour.GHOST:
@@ -569,10 +570,6 @@ static func behaviour_waste(behaviour: int, motion: FormBase.Motion, blasts: boo
 			match motion:
 				FormBase.Motion.DASH, FormBase.Motion.TELEPORT, FormBase.Motion.RAIN, FormBase.Motion.FISSURE, FormBase.Motion.SWING, FormBase.Motion.SLAM:
 					return "nothing keeps it on: %s" % _what(motion)
-		ModifierBase.Behaviour.RECOIL:
-			match motion:
-				FormBase.Motion.DASH, FormBase.Motion.TELEPORT:
-					return "it moves the wizard itself"
 	return ""
 
 
@@ -590,10 +587,14 @@ static func stays(motion: FormBase.Motion) -> bool:
 	return false
 
 
-## True for the carriers that hit under their own tag (a shot, a beam, a fissure, a swing, a slam):
-## a rain's payload, a dash, a teleport, a decoy and a familiar hit nothing themselves.
+## True for the carriers that hit under their own tag (a shot, a beam, a fissure, a swing, a slam,
+## a dash what it passes, a teleport where it lands: rules R4c): a rain's payload, a decoy and a
+## familiar hit nothing themselves.
 static func hits(motion: FormBase.Motion) -> bool:
-	return stays(motion) or motion == FormBase.Motion.RAY or motion == FormBase.Motion.FISSURE or motion == FormBase.Motion.SWING or motion == FormBase.Motion.SLAM
+	match motion:
+		FormBase.Motion.RAY, FormBase.Motion.FISSURE, FormBase.Motion.SWING, FormBase.Motion.SLAM, FormBase.Motion.DASH, FormBase.Motion.TELEPORT:
+			return true
+	return stays(motion)
 
 
 ## What a carrier of `motion` is, for a wasted card's reason.
@@ -608,9 +609,9 @@ static func _what(motion: FormBase.Motion) -> String:
 		FormBase.Motion.RAY:
 			return "a beam is a line, not a shot"
 		FormBase.Motion.DASH:
-			return "a dash moves the wizard and hits nothing"
+			return "a dash moves its caster and hits what it passes, once each"
 		FormBase.Motion.TELEPORT:
-			return "a teleport moves the wizard and hits nothing"
+			return "a teleport moves its caster at once and hits where it lands"
 		FormBase.Motion.WALL:
 			return "a wall stands still"
 		FormBase.Motion.RAIN:
@@ -650,12 +651,12 @@ static func _shield_outrun(modifier: ModifierBase, motion: FormBase.Motion) -> b
 ## wasted (rules R2b, docs/milestones/M2-rules.md). The table is what the runtime does today:
 ## - on expire and on cast: every carrier (each has an end point; each is cast).
 ## - on kill and on reaction: every carrier, by its hits, or by its blast's area hit on one
-##   that hits nothing itself (dash, teleport, rain, decoy, familiar).
+##   that hits nothing itself (rain, decoy, familiar).
 ## - on hit: the carriers that hit (`hits`).
 ## - timer and on hurt: only shots the projectile manager holds (`_register` keeps their clock
 ##   and their hurt slot); a beam, fissure, swing, move, rain or entity has none (R4).
-## - on block: a shot, beam, fissure or swing with a shield or deflect, and a dash's or
-##   teleport's barrier; a rain, decoy or familiar has nothing that blocks.
+## - on block: a carrier that hits (`hits`) with a shield or deflect (a dash's or teleport's
+##   shield is a barrier on its caster); a rain, decoy or familiar has nothing that blocks.
 ## - on wall: a flying shot (bolt, hook, swap) at a wall it bounces off or ends on, and a beam
 ##   or fissure at a wall it turns at or ends on.
 static func trigger_runs(event: int, motion: FormBase.Motion) -> bool:
@@ -674,7 +675,7 @@ static func trigger_why_not(event: int, motion: FormBase.Motion) -> String:
 				var what: String = "keeps a timer" if event == TriggerBase.Event.TIMER else "hears you get hurt"
 				return "only a shot that flies or stays %s for now" % what
 		TriggerBase.Event.BLOCK:
-			if not (stays(motion) or hits(motion) or motion == FormBase.Motion.DASH or motion == FormBase.Motion.TELEPORT):
+			if not hits(motion):
 				return "nothing on it can block a shot"
 		TriggerBase.Event.WALL:
 			if not (flies(motion) or motion == FormBase.Motion.RAY or motion == FormBase.Motion.FISSURE):
@@ -696,10 +697,6 @@ static func trigger_why_not(event: int, motion: FormBase.Motion) -> String:
 ## Why a carrier that hits nothing under its own tag sets off no hit, for a reason.
 static func _hits_nothing(motion: FormBase.Motion) -> String:
 	match motion:
-		FormBase.Motion.DASH:
-			return "a dash moves you and hits nothing"
-		FormBase.Motion.TELEPORT:
-			return "a teleport moves you and hits nothing"
 		FormBase.Motion.RAIN:
 			return "a rain hits nothing itself, only what it drops does"
 		FormBase.Motion.DECOY:

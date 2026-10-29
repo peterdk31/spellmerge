@@ -14,7 +14,7 @@ const M := FormBase.Motion
 ## fire on. Every motion not listed is wasted. A change here is a change of the rules: say so in
 ## M2-rules.md ("Triggers" under "Card x carrier") and docs/DECISIONS.md.
 const SHOTS: Array = [M.STRAIGHT, M.STILL, M.ORBIT, M.HOOK, M.SWAP, M.WALL]
-const HITTERS: Array = [M.STRAIGHT, M.STILL, M.ORBIT, M.HOOK, M.SWAP, M.WALL, M.RAY, M.FISSURE, M.SWING, M.SLAM]
+const HITTERS: Array = [M.STRAIGHT, M.STILL, M.ORBIT, M.HOOK, M.SWAP, M.WALL, M.RAY, M.FISSURE, M.SWING, M.SLAM, M.DASH, M.TELEPORT]
 
 var _items: Dictionary = {}
 var _compiler: StaffCompiler
@@ -66,7 +66,7 @@ func _expected(event: int, motion: int) -> bool:
 		E.TIMER, E.HURT:
 			return SHOTS.has(motion)
 		E.BLOCK:
-			return SHOTS.has(motion) or HITTERS.has(motion) or motion == M.DASH or motion == M.TELEPORT
+			return HITTERS.has(motion)
 		E.WALL:
 			return [M.STRAIGHT, M.HOOK, M.SWAP, M.RAY, M.FISSURE].has(motion)
 	return true
@@ -119,7 +119,7 @@ func test_wasted_cells_say_why() -> void:
 		[&"on_timer", &"fissure", "keeps a timer"],
 		[&"on_timer", &"teleport", "keeps a timer"],
 		[&"on_block", &"rain", "nothing on it can block"],
-		[&"on_kill", &"teleport", "without a blast"],
+		[&"on_kill", &"decoy", "without a blast"],
 		[&"on_reaction", &"familiar", "without a blast"],
 	]
 	for cell: Array in cells:

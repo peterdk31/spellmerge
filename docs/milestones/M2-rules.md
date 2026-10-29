@@ -82,19 +82,19 @@ Since R3 the live matrix is printed by `tests/core/test_card_rules.gd` (✓ work
 | return | ✓ | W | W | W | W | W | ✓ | ✓ | W | W | W | W | W |
 | arc | ✓ | ✓ | ✓ | W | W | W | ✓ | ✓ | ✓ | W | W | W | W |
 
-**Triggers (R2b, what the runtime does today):** `StaffCompiler.trigger_runs` and `trigger_why_not`. ✓ fires · W listed as wasted with its payload · s only with a shield or deflect on the carrier (a dash's or teleport's is a barrier on the wizard) · b only with a blast, whose area hit carries the carrier's tag. On reaction also needs an infusion or relay, and on wall is wasted on a ghost shot. Every W is a cell for R4.
+**Triggers (R2b, what the runtime does today):** `StaffCompiler.trigger_runs` and `trigger_why_not`. ✓ fires · W listed as wasted with its payload · s only with a shield or deflect on the carrier (a dash's or teleport's shield is a barrier on the wizard; since R4c a dash and a teleport hit, and their deflect turns the shots they pass or land by) · b only with a blast, whose area hit carries the carrier's tag. On reaction also needs an infusion or relay, and on wall is wasted on a ghost shot. Every W is a cell for R4.
 
 | | Bolt | Rune | Orbit | Beam | Dash | Telep | Hook | Swap | Wall | Rain | Fiss | Decoy | Famil | Swing |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| on hit | ✓ | ✓ | ✓ | ✓ | W | W | ✓ | ✓ | ✓ | W | ✓ | W | W | ✓ |
+| on hit | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | W | ✓ | W | W | ✓ |
 | on expire | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | timer | ✓ | ✓ | ✓ | W | W | W | ✓ | ✓ | ✓ | W | W | W | W | W |
 | on block | s | s | s | s | s | s | s | s | s | W | s | W | W | s |
-| on kill | ✓ | ✓ | ✓ | ✓ | b | b | ✓ | ✓ | ✓ | b | ✓ | b | b | ✓ |
+| on kill | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | b | ✓ | b | b | ✓ |
 | on cast | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | on wall | ✓ | W | W | ✓ | W | W | ✓ | ✓ | W | W | ✓ | W | W | W |
 | on hurt | ✓ | ✓ | ✓ | W | W | W | ✓ | ✓ | ✓ | W | W | W | W | W |
-| on reaction | ✓ | ✓ | ✓ | ✓ | b | b | ✓ | ✓ | ✓ | b | ✓ | b | b | ✓ |
+| on reaction | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | b | ✓ | b | b | ✓ |
 
 The melee carriers (swing, slam) arrived on main after the audit: R2 and R3 cover them like the rest.
 
@@ -151,6 +151,13 @@ The owner re-decides these under the new rule; each "yes, it should work" become
 
 - **Decided before, now in question:** mirror only on carriers that "have a back" (DECISIONS); a hold carrier does not echo (silent); a beam has no timer (contradicts the timer-for-hold decision); relay shots only, not on chain children or payloads; hold does nothing on rain; recoil skipped on dash and teleport; a beam's chain jump is a beam that pierces nothing; a hook with pierce fires `on expire` twice ("accepted for now"); a returning shot stops homing; a payload with no live shot is cast by its point (a payload dash or hook does nothing); **recoil pushes past 8 at once are dropped** (`mover.gd` `MAX_RECOILS`: a cap missed by #450, fix under rule 5 without a decision); hit-work starvation skipping shield blocks (defer, not skip). **Editing a staff or switching off a hold drops all its waiting launches** (`_release_hold` calls `_drop_pending` first): payload fires of carriers without hold that only wait for the per-step pacing (`FIRE_SHOTS_PER_STEP`) are lost too, against rule 5 (found in R1f, 2026-10-29).
 - **Cells to decide (W or ✓):** travel behaviours on orbit, rune, wall (growth on a rune grows the rune; linger and spiral on an orbit?); ghost, magnet, shield, relay on beams and fissures; **dash and teleport hitting what they pass** (makes `heavy · dash` the shoulder charge the card table promises, and chain, siphon, possess, relay on a dash); triggers on rain, decoy, familiar; mirror on any aimed carrier; one shield rule for every carrier that moves its caster.
+
+#### R4c: moves (owner decisions 2026-10-29; DECISIONS.md "Card rules R4c")
+
+- **Dash and teleport hit.** A dash strikes every body its mover (the wizard's body, or the shot a payload dash moves) passes, once each, within `PASS_REACH` (8 px) of its way, sampled so a fast dash misses nothing; a teleport strikes the bodies within `LAND_REACH` (24 px) of where it lands. Both go through the swing's path (`Projectiles.sweep`, `strike`, the beam hit context), so every hit card works as on a shot: the six infusions, chain, heavy (the shoulder charge of M2-staffs.md), siphon, possess, overcharge, on hit, on kill, on reaction; deflect turns the shots within `MOVE_GUARD_REACH` (24 px, before they reach the body). Pierce is wasted on a dash ("it hits what it passes, once each": it already hits everything on its way); split and sniper stay wasted (one body, no spread). `hits()` now includes them; their `_hits_nothing` rows and the recoil row are gone, and deflect runs on every carrier that hits.
+- **Recoil adds to the move.** A dash's recoil is the usual push, which the body adds to the dash; a teleport, over at once, has it taken off its distance (past it, it goes backwards).
+- **One shield rule for every move** (`Spells._shield_move`): dash, teleport, hook and swap guard what they move, the wizard by a barrier for the move, a shot (a payload move) by that many more shield charges (kept until spent: a shot's shield has no clock).
+- **A point cannot move:** a teleport cast by a point blinks the wizard to it, and a hook or swap cast by one moves the wizard (to the hit, as the wizard's own). A dash cast by a point still does nothing: the wizard's dash goes the way its body walks (staffs A6a), so the mover would need to take a way from the card (open question).
 
 ## Notes for the sessions
 

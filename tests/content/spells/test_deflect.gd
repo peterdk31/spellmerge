@@ -120,9 +120,11 @@ func test_a_deflected_shot_is_faster() -> void:
 
 
 func test_it_is_wasted_where_nothing_touches_shots() -> void:
-	# A dash moves its caster and touches no shots; a hook pulls through them and keeps it.
+	# A decoy hits nothing and touches no shots; a hook pulls through them and keeps it, and a dash
+	# turns the shots it passes (rules R4c).
 	var arena := ArenaScript.new(root)
-	check(arena.install_cards(0, 0, ["deflect", "dash"]).wasted.has(0), "a deflect on a dash is listed as wasted")
+	check(arena.install_cards(0, 0, ["deflect", "decoy"]).wasted.has(0), "a deflect on a decoy is listed as wasted")
+	check(not arena.install_cards(0, 0, ["deflect", "dash"]).wasted.has(0), "a dash keeps it")
 	check(not arena.install_cards(0, 0, ["deflect", "hook"]).wasted.has(0), "a hook keeps it")
 	check(not arena.install_cards(0, 0, ["deflect", "swing"]).wasted.has(0), "a swing keeps it")
 	arena.free_all()

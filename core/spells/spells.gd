@@ -72,7 +72,10 @@ extends Node
 ## (`caster_move_requested`, cut short at the first wall); a `hook` shot that hits asks the body
 ## to move to the hit point; a `swap` shot that hits moves its target to where the caster stands
 ## (`target_move_requested`) and the caster to the target; `recoil` pushes the caster back from
-## each firing of its cast (so `mirror` cancels it). Where a dash, teleport or hook ends
+## each firing of its cast (so `mirror` cancels it; a teleport's is taken off its distance). A dash
+## strikes every body it passes once and a teleport the bodies where it lands, so the hit cards
+## work on them; a move's `shield` guards what it moves; a move cast by a point moves the wizard
+## (rules R4c). Where a dash, teleport or hook ends
 ## (`caster_move_finished`) is the carrier's end point: its `blast` and its `on expire` payload
 ## happen there. A shot or beam with `blast` asks combat for an area hit where it ends (a hook's
 ## blast waits for the arrival); `siphon` sends `mana_refund_requested` for each hit; `possess`
@@ -143,6 +146,26 @@ class PendingLaunch:
 	var seed: int = 0
 	## The rain whose payload this is, so its own trigger (`on expire`) fires as it lands.
 	var landing: CompiledSpell = null
+
+
+## A dash under way (rules R4c, `_start_pass`): it strikes every body its mover passes, once each.
+class MovePass:
+	extends RefCounted
+	var tag: int = 0
+	var spell: CompiledSpell = null
+	var actor: int = 0
+	## The shot it moves and that shot's seq, or -1 for the actor's own body.
+	var shot: int = -1
+	var seq: int = 0
+	## Where the mover was at the last step (where it started, before the first), and the seconds left.
+	var last: Vector2 = Vector2.INF
+	var left: float = 0.0
+	## The chain jumps its hits carry, the body before them, and what it hits with when not its
+	## spell's own `hit` (an echo's), as a swing's.
+	var chain: int = 0
+	var prev: int = 0
+	var hit: HitProfile = null
+	var struck: Array[Node] = []
 
 
 ## What `cast` returns when the spell did not fire (cooling down, too little mana, no spell).
@@ -284,6 +307,9 @@ var _mv_left: PackedFloat32Array = PackedFloat32Array()
 var _mv_heading: PackedVector2Array = PackedVector2Array()
 var _mv_at: PackedVector2Array = PackedVector2Array()
 var _mv_count: int = 0
+## The dashes under way (`_start_pass`), and spare records for the next ones.
+var _passes: Array[MovePass] = []
+var _passes_free: Array[MovePass] = []
 
 ## The beam being cast: its tag and direction.
 var _ray_tag: int = 0
@@ -980,6 +1006,7 @@ func step(delta: float) -> void:
 	_clock += delta
 	_run_waiting_fires()
 	_step_moves(delta)
+	_step_passes(delta)
 	_step_beams(delta)
 	_step_swings(delta)
 	_step_slams(delta)
@@ -1013,7 +1040,7 @@ func _launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direct
 		if _caster == CASTER_WIZARD and actor >= 0 and actor < ACTORS and _pose_start[actor] != _clock and direction.is_finite() and not direction.is_zero_approx():
 			_start_pose(actor, spell, tag, maxf(spell.wind_up, 0.0), _pose_strike_of(spell, lifetime), direction.normalized(), up_side(direction))
 	if spell.motion == FormBase.Motion.DASH or spell.motion == FormBase.Motion.TELEPORT:
-		return _move_caster(spell, tag, actor, origin, direction)
+		return _move_caster(spell, tag, actor, origin, direction, carried, prev)
 	if spell.motion == FormBase.Motion.DECOY or spell.motion == FormBase.Motion.FAMILIAR:
 		return _spawn_entities(spell, tag, actor, origin, count, lifetime)
 	if spell.motion == FormBase.Motion.RAIN:
@@ -1082,10 +1109,26 @@ func _launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direct
 ## wizard's through `move_homing`, a shot's in `move_shot`) and bends a teleport's way at once,
 ## landing it at its target's edge when that is nearer than its distance. A teleport's payload
 ## is cast by the wizard where it lands, so teleports in payloads hop on from there.
-## With nothing to move (a payload whose shot is gone) it does nothing and returns 0.
-func _move_caster(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direction: Vector2) -> int:
+## A dash strikes every body its mover passes (`_start_pass`) and a teleport the bodies where it
+## lands (`_land_strike`), with its hit (rules R4c). Moves add up: a teleport is over at once, so
+## its `recoil` is taken off its distance (past it, it goes backwards); a dash's is a push that
+## runs with it (`_recoil`). Its `shield` guards what it moves (`_shield_move`). A point cannot
+## move: a teleport cast by one blinks the wizard to it (rules R4c). A dash cast by a point, or a
+## move with nothing to move, does nothing and returns 0.
+func _move_caster(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direction: Vector2, chain: int, prev: int) -> int:
 	var dash: bool = spell.motion == FormBase.Motion.DASH
 	var distance: float = move_distance(spell.ray_length, spell.speed, spell.lifetime)
+	var shot: int = _caster_shot()
+	var wizard: bool = _caster == CASTER_WIZARD
+	if not wizard and shot < 0:
+		var anchor: Vector2 = projectiles.get_anchor(actor)
+		if dash or not anchor.is_finite() or not _aim_origin[actor].is_finite() or anchor.is_equal_approx(origin):
+			return 0
+		# Its wizard blinks to the point: from its staff tip, as far as its body is from the point.
+		direction = anchor.direction_to(origin)
+		distance = anchor.distance_to(origin)
+		origin = _aim_origin[actor]
+		wizard = true
 	if not dash:
 		# A teleport is over at once: like a beam, it bends its way toward a target, and like a
 		# beam it ends there when the target is within its distance: at the target's edge.
@@ -1098,9 +1141,10 @@ func _move_caster(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, d
 			if gap <= distance and actor >= 0 and actor < _landed_at.size():
 				_landed_at[actor] = _teleport_homing.keep
 			distance = minf(distance, maxf(gap, 0.0))
+		distance -= spell.behaviour(ModifierBase.Behaviour.RECOIL)
 	var offset: Vector2 = direction * distance
 	var seconds: float = move_seconds(spell.ray_length, spell.speed, spell.lifetime) if dash else 0.0
-	if _caster == CASTER_WIZARD:
+	if wizard:
 		if events != null:
 			_move_heading[actor] = direction
 			if dash:
@@ -1110,16 +1154,146 @@ func _move_caster(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, d
 				events.form_shown.emit(actor, &"dash", origin, direction, reach, spell.tint, spell.look)
 				# Its way is drawn where the caster really goes (it picks its own way and may home).
 				projectiles.follow_caster(actor, spell.tint, spell.look, seconds)
+				_start_pass(spell, tag, actor, -1, seconds, chain, prev)
 			else:
 				events.caster_move_requested.emit(actor, &"teleport", projectiles.clip_to_walls(origin, origin + offset), 0.0, tag)
-			_shield_caster(spell, tag, actor, seconds)
+			_shield_move(spell, tag, actor, -1, seconds)
 		return 1
-	var shot: int = _caster_shot()
 	var turn: float = spell.homing_turn if spell.homing_range > 0.0 else 0.0
-	if shot < 0 or not projectiles.move_shot(shot, offset, seconds, turn, spell.homing_range):
+	if not projectiles.move_shot(shot, offset, seconds, turn, spell.homing_range):
 		return 0
+	_shield_move(spell, tag, actor, shot, seconds)
+	if dash:
+		_start_pass(spell, tag, actor, shot, seconds, chain, prev)
 	_track_move(shot, tag, seconds, direction)
 	return 1
+
+
+## A dash under way (rules R4c): for its `seconds` (and SpellLimits.PASS_GRACE more, as its mover
+## is moved and told a step later) it strikes every body its mover passes, once each, with its hit
+## (`_pass_step`): the actor's own body (`shot` -1, its anchor) or the shot it moves. A new dash of
+## the same body ends the one before (its mover replaces the move). Its echo hits as an echo.
+func _start_pass(spell: CompiledSpell, tag: int, actor: int, shot: int, seconds: float, chain: int, prev: int) -> void:
+	for other in _passes:
+		if other.actor == actor and other.shot == shot:
+			other.left = 0.0
+	if _passes_free.is_empty():
+		_passes_free.append(MovePass.new())
+	var dash: MovePass = _passes_free.pop_back()
+	dash.tag = tag
+	dash.spell = spell
+	dash.actor = actor
+	dash.shot = shot
+	dash.seq = projectiles.get_seq_of(shot) if shot >= 0 else 0
+	dash.last = projectiles.get_anchor(actor) if shot < 0 else projectiles.get_position_of(shot)
+	dash.left = seconds + SpellLimits.PASS_GRACE
+	dash.chain = chain
+	dash.prev = prev
+	dash.hit = spell.echo_hit if _echo_spell == spell else null
+	dash.struck.clear()
+	_passes.append(dash)
+	shot_started(tag)
+
+
+## Runs the dashes under way on by `delta`: each strikes what its mover passed since the last step
+## (and deflects the shots it passed, with `deflect`), then ends when its time is up, its mover is
+## gone or its build is forgotten.
+func _step_passes(delta: float) -> void:
+	var i: int = 0
+	while i < _passes.size():
+		var dash: MovePass = _passes[i]
+		var at: Vector2 = Vector2.INF
+		if dash.shot < 0:
+			at = projectiles.get_anchor(dash.actor)
+		elif projectiles.is_alive(dash.shot) and projectiles.get_seq_of(dash.shot) == dash.seq:
+			at = projectiles.get_position_of(dash.shot)
+		if dash.left > 0.0 and at.is_finite() and _profiles.get(dash.tag) == dash.spell:
+			_pass_step(dash, dash.last if dash.last.is_finite() else at, at)
+			dash.last = at
+			dash.left -= delta
+		else:
+			dash.left = 0.0
+		if dash.left > 0.0:
+			i += 1
+			continue
+		_passes.remove_at(i)
+		var tag: int = dash.tag
+		dash.spell = null
+		dash.hit = null
+		dash.struck.clear()
+		_passes_free.append(dash)
+		shot_ended(tag)
+
+
+## The dash `dash` moved from `from` to `to`: it strikes each body within SpellLimits.PASS_REACH of that
+## way that it has not struck yet (`Projectiles.sweep` all round points PASS_REACH apart, so a
+## fast dash misses nothing), and with `deflect` turns the shots within MOVE_GUARD_REACH of it.
+func _pass_step(dash: MovePass, from: Vector2, to: Vector2) -> void:
+	var spell: CompiledSpell = dash.spell
+	var reach: float = SpellLimits.PASS_REACH
+	var way: Vector2 = from.direction_to(to) if not from.is_equal_approx(to) else _move_heading[dash.actor]
+	if spell.behaviour(ModifierBase.Behaviour.DEFLECT) > 0.0:
+		_guard(projectiles.shots_on_segment(dash.actor, from, to, SpellLimits.MOVE_GUARD_REACH), dash.actor, dash.tag, true, 0, from, to)
+	var samples: int = maxi(ceili(from.distance_to(to) / reach), 1)
+	for n in samples:
+		var point: Vector2 = from.lerp(to, float(n + 1) / samples)
+		var found: int = projectiles.sweep(dash.actor, point, way, 1, -PI, PI, reach, HITS)
+		if found > 0:
+			_strike_bodies(spell, dash.tag, dash.actor, found, dash.struck, point, way, dash.chain, dash.prev, dash.hit)
+		if dash.left <= 0.0 or _profiles.get(dash.tag) != spell:
+			return
+
+
+## A teleport landed at `at` (rules R4c): it strikes each body within SpellLimits.LAND_REACH of it,
+## pushed outward from there, and with `deflect` turns the shots within MOVE_GUARD_REACH.
+func _land_strike(spell: CompiledSpell, tag: int, actor: int, at: Vector2, heading: Vector2) -> void:
+	if spell.behaviour(ModifierBase.Behaviour.DEFLECT) > 0.0:
+		_guard(projectiles.shots_on_segment(actor, at, at, SpellLimits.MOVE_GUARD_REACH), actor, tag, true, 0, at, at)
+	var found: int = projectiles.sweep(actor, at, heading, 1, -PI, PI, SpellLimits.LAND_REACH, HITS)
+	if found > 0:
+		var struck: Array[Node] = []
+		_strike_bodies(spell, tag, actor, found, struck, at, heading, spell.chain_jumps, 0, spell.echo_hit if _echo_spell == spell else null)
+
+
+## Strikes the first `found` bodies of `Projectiles.sweep` that are not in `struck` yet (and adds
+## them), each pushed outward from `centre` (along `way` when it is on it), in the beam context
+## `_ray_*` that `_on_hit` reads, as a swing's and a slam's: its hits carry its cards, payloads
+## and chains. `hit` is what it hits with when not its spell's own (an echo's), else null.
+func _strike_bodies(spell: CompiledSpell, tag: int, actor: int, found: int, struck: Array[Node], centre: Vector2, way: Vector2, chain: int, prev: int, hit: HitProfile) -> void:
+	var first: int = struck.size()
+	for i in found:
+		var node: Node = projectiles.sweep_nodes[i]
+		if not struck.has(node):
+			struck.append(node)
+	var last: int = struck.size()
+	if last == first:
+		return
+	var saved_tag: int = _ray_tag
+	var saved_dir: Vector2 = _ray_dir
+	var saved_chain: int = _ray_chain
+	var saved_prev: int = _ray_prev
+	var saved_hit: HitProfile = _ray_hit
+	var saved_arc: int = _arc_slot
+	_ray_tag = tag
+	_ray_chain = chain
+	_ray_prev = prev
+	_ray_hit = hit
+	_arc_slot = -1
+	_ray_dir = way
+	for row in range(first, last):
+		var node: Node = struck[row]
+		if not is_instance_valid(node) or not (node is Node2D):
+			continue
+		var body: Vector2 = (node as Node2D).global_position
+		var out: Vector2 = centre.direction_to(body) if not centre.is_equal_approx(body) else way
+		projectiles.strike(actor, node, centre, out, tag, spell.form_id)
+	_ray_tag = saved_tag
+	_ray_dir = saved_dir
+	_ray_chain = saved_chain
+	_ray_prev = saved_prev
+	_ray_hit = saved_hit
+	_arc_slot = saved_arc
+	_cast_jumps()
 
 
 ## The homing of `actor`'s last dash, for the wizard to turn it as it goes (`Homing.steer`); one
@@ -1193,13 +1367,16 @@ func _step_moves(delta: float) -> void:
 		shot_ended(tag)
 
 
-## A move by the carrier `tag` ended at `at`: its `blast` goes off there and its `on expire`
-## payload leaves from there, cast by `caster` (the wizard, the shot that moved, or the point).
+## A move by the carrier `tag` ended at `at`: a teleport strikes what is where it landed
+## (`_land_strike`), its `blast` goes off there and its `on expire` payload leaves from there,
+## cast by `caster` (the wizard, the shot that moved, or the point).
 func _move_end(tag: int, at: Vector2, heading: Vector2, caster: int) -> void:
 	var spell: CompiledSpell = _profiles.get(tag)
 	var actor: int = SpellTag.caster_of(tag)
 	if spell == null or not at.is_finite():
 		return
+	if spell.motion == FormBase.Motion.TELEPORT:
+		_land_strike(spell, tag, actor, at, heading)
 	_blast(spell, tag, actor, at)
 	if spell.payload != null and spell.trigger_event == TriggerBase.Event.EXPIRE:
 		_fire(spell.payload, actor, SpellTag.staff_of(tag), SpellTag.generation_of(tag), at, heading, null, caster)
@@ -1451,10 +1628,11 @@ func _fire_spell(spell: CompiledSpell, actor: int, staff: int, generation: int, 
 
 
 ## `recoil`: the caster is pushed back from a firing along `heading` (a firing the other way
-## pushes the other way, so `mirror` cancels it). Dash and teleport move the caster themselves.
+## pushes the other way, so `mirror` cancels it). Moves add up: a dash's push runs with the dash,
+## and a teleport, over at once, has it taken off its distance instead (`_move_caster`).
 func _recoil(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading: Vector2) -> void:
 	var push: float = spell.behaviour(ModifierBase.Behaviour.RECOIL)
-	if push <= 0.0 or spell.motion == FormBase.Motion.DASH or spell.motion == FormBase.Motion.TELEPORT:
+	if push <= 0.0 or spell.motion == FormBase.Motion.TELEPORT:
 		return
 	if _caster != CASTER_WIZARD:
 		# A payload's recoil pushes the shot that cast it (a point has nothing to push).
@@ -1583,12 +1761,24 @@ func _drop_pending(actor: int, staff: int) -> void:
 
 
 ## `shield` on the caster itself: a barrier on the casting actor with the card's charges, for as
-## long as the carrier lasts (a move's own time at least). It comes with a dash, a teleport, a
-## hook that hit, and the cards landing on the caster. Combat gives it a minimum time.
+## long as the carrier lasts (a move's own time at least). It comes with every move of the
+## wizard (`_shield_move`) and the cards landing on the caster. Combat gives it a minimum time.
 func _shield_caster(spell: CompiledSpell, tag: int, actor: int, move_seconds: float) -> void:
 	var charges: int = roundi(spell.behaviour(ModifierBase.Behaviour.SHIELD))
 	if charges > 0 and events != null:
 		events.wizard_shield_requested.emit(actor, charges, maxf(spell.lifetime, move_seconds), tag)
+
+
+## `shield` on a move, one rule for every spell that moves its caster (dash, teleport, hook, swap;
+## rules R4c): what it moves is guarded for the move, the wizard (`shot` -1) by a barrier
+## (`_shield_caster`), a shot by that many more shield charges, kept until they are spent.
+func _shield_move(spell: CompiledSpell, tag: int, actor: int, shot: int, seconds: float) -> void:
+	if shot < 0:
+		_shield_caster(spell, tag, actor, seconds)
+		return
+	var charges: int = roundi(spell.behaviour(ModifierBase.Behaviour.SHIELD))
+	if charges > 0:
+		projectiles.set_shield(shot, projectiles.get_shield_of(shot) + charges)
 
 
 ## The cards that landed on the caster or on a payload's origin: an area hit there with the
@@ -3386,33 +3576,36 @@ func _on_hit_effects(spell: CompiledSpell, tag: int, actor: int, target: Node, p
 	if possess > 0.0:
 		_possess(actor, target, possess, tag)
 	# A hook pulls its caster and a swap trades places with it: the body (through its owner),
-	# or the shot that cast this one; one cast from a point has nothing to move.
-	var by_wizard: bool = slot < 0 or projectiles.is_cast_by_wizard(slot)
-	var caster: int = projectiles.caster_shot_of(slot) if not by_wizard else -1
+	# or the shot that cast this one. A point cannot move, so one cast from a point moves the
+	# wizard (rules R4c). Either is guarded by the card's shield for the move (`_shield_move`).
+	var caster: int = projectiles.caster_shot_of(slot) if slot >= 0 and not projectiles.is_cast_by_wizard(slot) else -1
 	var pulled: bool = false
 	if spell.motion == FormBase.Motion.HOOK:
-		if by_wizard and events != null:
+		if caster < 0 and events != null:
 			var anchor: Vector2 = projectiles.get_anchor(actor)
 			_move_heading[actor] = anchor.direction_to(position) if anchor.is_finite() and not anchor.is_equal_approx(position) else Vector2.RIGHT
 			events.caster_move_requested.emit(actor, &"hook", position, SpellLimits.HOOK_SECONDS, tag)
-			_shield_caster(spell, tag, actor, SpellLimits.HOOK_SECONDS)
+			_shield_move(spell, tag, actor, -1, SpellLimits.HOOK_SECONDS)
 			pulled = true
 		elif caster >= 0:
 			var from: Vector2 = projectiles.get_position_of(caster)
 			if projectiles.move_shot(caster, position - from, SpellLimits.HOOK_SECONDS):
+				_shield_move(spell, tag, actor, caster, SpellLimits.HOOK_SECONDS)
 				_track_move(caster, tag, SpellLimits.HOOK_SECONDS, from.direction_to(position))
 				pulled = true
 	elif spell.motion == FormBase.Motion.SWAP and events != null:
 		var node := target as Node2D
-		if by_wizard:
+		if caster < 0:
 			var anchor: Vector2 = projectiles.get_anchor(actor)
 			if node != null and anchor.is_finite():
 				events.target_move_requested.emit(actor, target, anchor)
 				events.caster_move_requested.emit(actor, &"swap", node.global_position, SpellLimits.SWAP_SECONDS, tag)
-		elif caster >= 0 and node != null:
+				_shield_move(spell, tag, actor, -1, SpellLimits.SWAP_SECONDS)
+		elif node != null:
 			var from: Vector2 = projectiles.get_position_of(caster)
 			events.target_move_requested.emit(actor, target, from)
 			projectiles.move_shot(caster, node.global_position - from, 0.0)
+			_shield_move(spell, tag, actor, caster, 0.0)
 	# A spent shot's blast goes off where it hit; a hook's waits for the arrival of what it pulls.
 	if slot >= 0 and not projectiles.is_alive(slot) and not pulled:
 		_blast(spell, tag, actor, position)
@@ -3641,6 +3834,12 @@ func clear() -> void:
 	_jq_head = 0
 	_jq_count = 0
 	_mv_count = 0
+	for dash in _passes:
+		dash.spell = null
+		dash.hit = null
+		dash.struck.clear()
+		_passes_free.append(dash)
+	_passes.clear()
 	_caster = CASTER_WIZARD
 	_bm_on.fill(0)
 	_bm_spell.fill(null)

@@ -1,0 +1,9 @@
+{
+	"id": "swap_frost",
+	"name": "Frost swap",
+	"does": "A chilling swap: the caster takes the imp's place and the imp, chilled, is left where the caster stood.",
+	"casts": [{"staff": 0, "cards": ["frost", "swap"]}],
+	"imps": [[100, 0]],
+	"seconds": 1.0,
+	"checks": [{"kind": "caster_moved", "mode": "swap"}, {"kind": "status", "imps": [0], "status": "chill"}]
+}

@@ -1,0 +1,9 @@
+{
+	"id": "swap_trade",
+	"name": "Swap trade",
+	"does": "The swap card throws a charm that hurts the imp it hits and trades places with it: the caster goes to the imp.",
+	"casts": [{"staff": 0, "cards": ["swap"]}],
+	"imps": [[100, 0]],
+	"seconds": 1.0,
+	"checks": [{"kind": "caster_moved", "mode": "swap"}, {"kind": "damaged", "imps": [0]}]
+}

@@ -248,6 +248,8 @@ const CONTROLS: Dictionary = {
 	"shield_teleport": "shield",
 	"hook_pull": "hook",
 	"hook_and_fire": "hook",
+	"swap_trade": "swap",
+	"swap_frost": "swap",
 	"shield_wall_fire": "shield",
 	"shield_orbit_ring": "shield",
 	"blast_rocket": "blast",

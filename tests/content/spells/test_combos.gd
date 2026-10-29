@@ -9,14 +9,14 @@ extends "res://tests/support/suite.gd"
 ## `cards`: one card id per slot, read as a staff reads them; optional `at` seconds, `player`, `dir` [x, y] to cast toward), `imps` ([x, y] from the caster at (0, 0), aiming
 ## along +x), optional `mates` ([x, y, player]: a teammate's body that shots hit, for `relay`), optional `walls` ([x, y, width, height] rects), optional `pushed` (true: imps move with the push combat gives them, for `magnet`), optional `guard` (true: the caster's own body stands at (0, 0), so a barrier on it works) and `foes` ([x, y] each: an enemy shot sent from there at the caster, which needs a `guard`), optional `allies` ([x, y, player]: a teammate's wizard body that heals and damage reach), `hurt` (health each wizard body, the `guard` and the `allies`, has lost before the casts, so a heal has room) and `seconds` and `checks`. Check kinds: `damaged` (imps), `status` (imps, status),
 ## `status_count` (status, min), `lost_at_least` (imps, min: health lost in all), `keeps_burning` (imp), `reaction` (reaction), `max_shots` (max),
-## `caster_moved` (mode: a card moved its caster, for example a dash), `blocked` (min: enemy shots a barrier or a shielded shot stopped), `healed` (min: health heals gave wizard bodies), `lost_at_most` (imps, max: health each imp lost, for a hit that should barely hurt), `spawned` (entity, min: decoys or familiars a cast asked for).
+## `caster_moved` (mode: a card moved its caster, for example a dash), `blocked` (min: enemy shots a barrier or a shielded shot stopped), `deflected` (min: enemy shots a deflect turned), `healed` (min: health heals gave wizard bodies), `lost_at_most` (imps, max: health each imp lost, for a hit that should barely hurt), `spawned` (entity, min: decoys or familiars a cast asked for).
 ##
 ## godot --headless --path . --script res://tests/content/spells/test_combos.gd
 
 const ArenaScript := preload("res://tests/content/spells/combo_arena.gd")
 const ComboFiles := preload("res://tests/support/combo_files.gd")
 const MIN_COMBOS: int = 20
-const CHECK_KINDS: Array[String] = ["damaged", "status", "status_count", "keeps_burning", "reaction", "max_shots", "caster_moved", "lost_at_least", "blocked", "healed", "lost_at_most", "killed", "spawned"]
+const CHECK_KINDS: Array[String] = ["damaged", "status", "status_count", "keeps_burning", "reaction", "max_shots", "caster_moved", "lost_at_least", "blocked", "healed", "lost_at_most", "killed", "spawned", "deflected"]
 
 var _combos: Array = []
 ## Files of the catalogue that are not a JSON object.
@@ -132,6 +132,9 @@ func _problem_with(arena: ArenaScript, check_row: Dictionary) -> String:
 		"blocked":
 			if arena.blocks.size() < int(check_row["min"]):
 				return "%d enemy shots blocked, wanted %d" % [arena.blocks.size(), int(check_row["min"])]
+		"deflected":
+			if arena.deflects.size() < int(check_row["min"]):
+				return "%d enemy shots deflected, wanted %d" % [arena.deflects.size(), int(check_row["min"])]
 		_:
 			return "unknown check kind %s" % kind
 	return ""
@@ -263,6 +266,8 @@ const CONTROLS: Dictionary = {
 	"blast_wall_burst": "blast",
 	"mend_blast_self": "mend",
 	"mend_pierce_party": "mend",
+	"deflect_swing_return": "deflect",
+	"deflect_wall_mirror": "deflect",
 }
 
 

@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-29: Card hook (staffs C)
+
+Added the Hook carrier (data only: `.tres`, icon, assets, lore), the combos `hook_pull`, `hook_miss` and `hook_and_fire`, and `test_hook.gd` (the card's data, the pull on a hit, no pull on a miss or beyond the reach, four players). `tests/core/test_svg_art.gd` still fails on `modifiers/shield/icon.svg` (a `<path>`, open outline), which is not part of this card.
+
 ## 2026-10-29: Card teleport (staffs C)
 
 Added the Teleport carrier (data only: `.tres`, icon, assets, lore), the combos `teleport_away`, `teleport_and_fire` and `shield_teleport`, and `test_teleport.gd` (the card's data, the move it asks for, four players).

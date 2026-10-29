@@ -246,6 +246,8 @@ const CONTROLS: Dictionary = {
 	"relay_teammate_fire": "relay",
 	"shield_dash": "shield",
 	"shield_teleport": "shield",
+	"hook_pull": "hook",
+	"hook_and_fire": "hook",
 	"shield_wall_fire": "shield",
 	"shield_orbit_ring": "shield",
 	"blast_rocket": "blast",

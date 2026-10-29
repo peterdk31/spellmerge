@@ -1,0 +1,9 @@
+{
+	"id": "hook_pull",
+	"name": "Hook pull",
+	"does": "The hook card throws a barb that hurts the imp it hits and pulls its caster toward it.",
+	"casts": [{"staff": 0, "cards": ["hook"]}],
+	"imps": [[100, 0]],
+	"seconds": 1.0,
+	"checks": [{"kind": "caster_moved", "mode": "hook"}, {"kind": "damaged", "imps": [0]}]
+}

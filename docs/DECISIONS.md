@@ -113,6 +113,10 @@ The owner's direction after B7a: "The 4 staffs should be mapped to lb/rb lt/rt i
 - **The engine hook was missing**, so this card added `Spells._step_magnets` (a list of magnet slots, like arc's). Magnet is listed as wasted on a payload that fires from a point (`TRAVEL_ONLY`).
 - **Combo arena imps can now be pushed**, opt in: `ComboArena.pushable`, and the combo key `pushed`. Off by default so other combos behave as before. The clip recorder ignores `pushed`, so the magnet clips show no pull.
 
+## 2026-10-29: Blast card (staffs C)
+
+- **Blast is a 40 px radius**, complexity 2, no mana change, look layer 9. The engine already ran it (`Spells._blast`, combat's area hit), so the card is data only. Its combos use a bolt (a hit, and a wall end), each with an imp that only the burst reaches. A blast on a dash cannot be a combo yet: the combo arena does not move its caster, so no move ever ends (`test_spells_moves` covers it).
+
 ## 2026-10-29: Shield card (staffs C)
 
 - **Shield is one charge a card** (`behaviour_strength` 1.0, charges add), complexity 2, no mana change, look layer 10 (orbiting sparks, as the design says). Its combos check the blocking itself: a combo may name a `guard` (the caster's own body, so a barrier on it works), enemy `foes` (a real enemy bolt cast at the caster from a point) and the check `blocked` (enemy shots stopped). Each of the three combos is a control row (without the card its checks fail).

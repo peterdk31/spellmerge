@@ -1,0 +1,10 @@
+{
+	"id": "blast_wall_burst",
+	"name": "Burst on the wall",
+	"does": "A blast bolt ends on the wall and bursts there, hurting the imp that waits beside the wall.",
+	"casts": [{"staff": 0, "cards": ["blast", "bolt"]}],
+	"imps": [[135, 30]],
+	"walls": [[150, -200, 16, 400]],
+	"seconds": 1.5,
+	"checks": [{"kind": "damaged", "imps": [0]}]
+}

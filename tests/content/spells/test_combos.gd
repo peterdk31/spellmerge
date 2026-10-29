@@ -227,6 +227,8 @@ const CONTROLS: Dictionary = {
 	"shield_dash": "shield",
 	"shield_wall_fire": "shield",
 	"shield_orbit_ring": "shield",
+	"blast_rocket": "blast",
+	"blast_wall_burst": "blast",
 }
 
 

@@ -9,7 +9,6 @@
     "number": 399
   },
   "errors_in_a_row": 0,
-  "idle": null,
   "intake_tasks": {
     "208": {
       "author": "Brianmanden",
@@ -36,7 +35,7 @@
       "title": "Downed wizard shrinks into its hat; revive pops back out"
     }
   },
-  "last_own_merge": "2026-10-29T11:20:11Z",
+  "last_own_merge": "2026-10-29T11:27:37Z",
   "last_plan": "2026-10-29T09:54:15Z",
   "last_weekly": "2026-10-25T10:11:43Z",
   "panel_applied": {
@@ -48,15 +47,7 @@
   },
   "panel_problems": [],
   "paused_by_command": false,
-  "pending_instructions": [
-    {
-      "at": "2026-10-29T11:20:32Z",
-      "kind": "claude",
-      "number": 417,
-      "text": "remove this issue",
-      "url": "https://github.com/peterdk31/spellmerge/issues/417#issuecomment-6495258241"
-    }
-  ],
+  "pending_instructions": [],
   "processed_comments": [
     6241847784,
     6251160604,

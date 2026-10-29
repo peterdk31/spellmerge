@@ -2,6 +2,12 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-29: Planning run, queue empty
+
+- **#417 (downed wizard shrinks into its hat) goes back to the backlog.** The wizard is a floating staff after living staffs H3, so there is no body or hat to shrink into; the downed look (lying flat) exists. #416 and #208 stay on the backlog: both belong to M3 and later.
+- **The Rime Crook and the Bone Scepter move from the owner lane to the bot's Queue.** Their cards (`hook`, `rain`) have merged, the task is content only, and the bot's queue was down to the C0b looks and D3, which waits for the owner lane. The owner can move it back.
+- **D3 still waits** for the owner lane's B5, B6a and B8. A polish task for staff codes in the radial builder was added after re-examining D2.
+
 ## 2026-10-29: Staff codes are text of card ids (staffs D2)
 
 The format is `sm1:` and card ids joined by commas (no levels, no staff type: a staff has only cards). The version tag lets a later format change be told apart. Copy and paste sit in the list builder as two buttons in their own row, not in the tab row, which has no room; the clipboard is the system one. Pasting replaces the whole shown staff and asks the player for it, so a card the player lacks is refused as for any build. A code never names a path, so nothing can be loaded from it.

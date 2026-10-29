@@ -226,10 +226,10 @@ var _arcs: PackedInt32Array = PackedInt32Array()
 var _arc_count: int = 0
 var _rec_arc: PackedByteArray = PackedByteArray()
 var _rec_arc_clock: PackedFloat32Array = PackedFloat32Array()
-## Zaps made in this step (`SpellLimits.MAX_ARCS_PER_STEP`), and the zap being sent: its hit
-## profile is the shot's `arc_hit` (see `hit_profile`).
+## Zaps made in this step (`SpellLimits.MAX_ARCS_PER_STEP`), and the slot of the shot whose zap
+## is being sent (-1 for none): the zap is a hit of that shot (`relay`, chain jumps).
 var _arcs_used: int = 0
-var _arc_spell: CompiledSpell = null
+var _arc_slot: int = -1
 ## Slots of live shots with `magnet`, `_magnet_count` of them, flagged in `_rec_magnet`.
 var _magnets: PackedInt32Array = PackedInt32Array()
 var _magnet_count: int = 0
@@ -240,8 +240,11 @@ var _rec_magnet: PackedByteArray = PackedByteArray()
 var _hurt_slots: PackedInt32Array = PackedInt32Array()
 var _hurt_count: int = 0
 var _rec_hurt: PackedByteArray = PackedByteArray()
-## What a relay shot's hit became after it hit an actor that had cast an infusion, by slot (null for none).
+## What a shot hits with when it is not its spell's own `hit`, by slot (null: `hit`): an echo's
+## `echo_hit`, what a relay shot became after it hit an actor that had cast an infusion, or what
+## the hit a chain jump came from hit with. `_rec_zap` is the same for the shot's zaps (`arc_hit`).
 var _rec_relay: Array[HitProfile] = []
+var _rec_zap: Array[HitProfile] = []
 ## The carrier of each actor's last cast that had an infusion (for `relay`), or null.
 var _last_infused: Array[CompiledSpell] = []
 
@@ -287,6 +290,9 @@ var _ray_tag: int = 0
 var _ray_dir: Vector2 = Vector2.ZERO
 var _ray_chain: int = 0
 var _ray_prev: int = 0
+## What the ray being sent hits with when not its spell's own `hit` (null): an echo's, a zap's,
+## or what the hit a chain jump came from hit with.
+var _ray_hit: HitProfile = null
 ## Beam jumps waiting to be cast. A jump is made in a hit handler, i.e. inside the previous
 ## beam's `ray()`, so casting it there would nest one `ray()` deeper per jump (a long chain
 ## would recurse as deep as it jumps). The outermost beam casts them, first in first out, once
@@ -302,6 +308,7 @@ var _jq_dir: PackedVector2Array = PackedVector2Array()
 var _jq_len: PackedFloat32Array = PackedFloat32Array()
 var _jq_chain: PackedInt32Array = PackedInt32Array()
 var _jq_prev: PackedInt64Array = PackedInt64Array()
+var _jq_hit: Array[HitProfile] = []
 var _jq_head: int = 0
 var _jq_count: int = 0
 var _jq_busy: bool = false
@@ -458,6 +465,7 @@ func _init() -> void:
 	_jq_len.resize(JUMP_QUEUE)
 	_jq_chain.resize(JUMP_QUEUE)
 	_jq_prev.resize(JUMP_QUEUE)
+	_jq_hit.resize(JUMP_QUEUE)
 	_timers.resize(64)
 	_arcs.resize(64)
 	_magnets.resize(64)
@@ -818,12 +826,10 @@ func hit_profile(tag: int) -> HitProfile:
 	var slot: int = projectiles.event_slot if projectiles != null else -1
 	if slot >= 0 and slot < _rec_relay.size() and _rec_relay[slot] != null and _same(slot) and projectiles.get_tag_of(slot) == tag:
 		return _rec_relay[slot]
-	# An arc zap has no slot either: it hits with its shot's `arc_hit`.
-	if _arc_spell != null and tag == _ray_tag and spell == _arc_spell:
-		return _arc_spell.arc_hit
-	# A beam's echo has no slot: it hits at half damage while it is being cast.
-	if _echo_spell != null and tag == _ray_tag and _profiles.get(tag) == _echo_spell:
-		return _echo_spell.echo_hit
+	# A ray (a beam, a fissure, a swing, a zap, a jump of any) has no slot: it hits with what the
+	# one being sent carries (an echo's half, a zap's share, a jump's parent hit).
+	if _ray_hit != null and tag == _ray_tag:
+		return _ray_hit
 	return spell.hit
 
 
@@ -977,7 +983,7 @@ func _launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direct
 				made += 1
 			continue
 		if spell.motion == FormBase.Motion.FISSURE:
-			_shoot_ray(spell, tag, actor, origin, heading, carried, prev, source, -1.0, PIERCE_ALL)
+			_shoot_ray(spell, tag, actor, origin, heading, carried, prev, source, -1.0, PIERCE_ALL, spell.echo_hit if _echo_spell == spell else null)
 			made += 1
 			continue
 		var slot: int = -1
@@ -1585,8 +1591,10 @@ func _register(slot: int, tag: int, spell: CompiledSpell, chain: int, prev: int)
 		_rec_magnet.resize(size)
 		_rec_arc_clock.resize(size)
 		_rec_relay.resize(size)
+		_rec_zap.resize(size)
 		_hurt_slots.resize(size)
 	_rec_relay[slot] = spell.echo_hit if spell == _echo_spell else null
+	_rec_zap[slot] = spell.echo_arc_hit if spell == _echo_spell else null
 	if _caster != CASTER_WIZARD:
 		# A payload's shot: an orbit circles the shot that cast it and a returning one flies back
 		# to it, or to the point it was cast from.
@@ -1629,16 +1637,20 @@ func _register(slot: int, tag: int, spell: CompiledSpell, chain: int, prev: int)
 
 
 ## One beam: counted while it is cast, with its context set for the hit handler.
-func _shoot_ray(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading: Vector2, chain: int, prev: int, source: Node, length: float = -1.0, pierce: int = -1) -> void:
+func _shoot_ray(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading: Vector2, chain: int, prev: int, source: Node, length: float = -1.0, pierce: int = -1, hit: HitProfile = null) -> void:
 	shot_started(tag)
 	var saved_tag: int = _ray_tag
 	var saved_dir: Vector2 = _ray_dir
 	var saved_chain: int = _ray_chain
 	var saved_prev: int = _ray_prev
+	var saved_hit: HitProfile = _ray_hit
+	var saved_arc: int = _arc_slot
 	_ray_tag = tag
 	_ray_dir = heading
 	_ray_chain = chain
 	_ray_prev = prev
+	_ray_hit = hit
+	_arc_slot = -1
 	var reach: float = spell.ray_length if length < 0.0 else length
 	var got: float = projectiles.ray(actor, origin, heading, reach, spell.pierce if pierce < 0 else pierce, HITS, tag, spell.radius * 0.5, source, _bounces(spell))
 	var end: Vector2 = origin + heading * got
@@ -1673,6 +1685,8 @@ func _shoot_ray(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, hea
 	_ray_dir = saved_dir
 	_ray_chain = saved_chain
 	_ray_prev = saved_prev
+	_ray_hit = saved_hit
+	_arc_slot = saved_arc
 	shot_ended(tag)
 	_cast_jumps()
 
@@ -1968,12 +1982,14 @@ func _beam_cast(at: int, hit: bool) -> void:
 	var saved_dir: Vector2 = _ray_dir
 	var saved_chain: int = _ray_chain
 	var saved_prev: int = _ray_prev
-	var saved_echo: CompiledSpell = _echo_spell
+	var saved_hit: HitProfile = _ray_hit
+	var saved_arc: int = _arc_slot
 	_ray_tag = tag
 	_ray_dir = _bm_dir[at]
 	_ray_chain = _bm_chain[at]
 	_ray_prev = _bm_prev[at]
-	_echo_spell = spell if _bm_echo[at] != 0 else null
+	_ray_hit = spell.echo_hit if _bm_echo[at] != 0 else null
+	_arc_slot = -1
 	var got: float = projectiles.ray_points(actor, _bm_points, at * _bm_stride, _bm_count[at], spell.ray_length, spell.pierce, HITS, tag, spell.radius * 0.5, source, true, bounces, steer)
 	var tip: Vector2 = projectiles.ray_end
 	var tip_dir: Vector2 = projectiles.ray_end_heading
@@ -1982,7 +1998,8 @@ func _beam_cast(at: int, hit: bool) -> void:
 	_ray_dir = saved_dir
 	_ray_chain = saved_chain
 	_ray_prev = saved_prev
-	_echo_spell = saved_echo
+	_ray_hit = saved_hit
+	_arc_slot = saved_arc
 	# A hit handler may have ended this beam (a rebuild) or reused its row.
 	if _bm_on[at] != 0 and _bm_spell[at] == spell and _bm_tag[at] == tag:
 		_bm_reach[at] = got
@@ -2271,11 +2288,13 @@ func _swing_cast(at: int, from: float, to: float) -> void:
 	var saved_dir: Vector2 = _ray_dir
 	var saved_chain: int = _ray_chain
 	var saved_prev: int = _ray_prev
-	var saved_echo: CompiledSpell = _echo_spell
+	var saved_hit: HitProfile = _ray_hit
+	var saved_arc: int = _arc_slot
 	_ray_tag = tag
 	_ray_chain = _sw_chain[at]
 	_ray_prev = _sw_prev[at]
-	_echo_spell = spell if _sw_echo[at] != 0 else null
+	_ray_hit = spell.echo_hit if _sw_echo[at] != 0 else null
+	_arc_slot = -1
 	for row in range(first, last):
 		# A hit handler may have ended this swing (a rebuild) or reused its row.
 		if _sw_on[at] == 0 or _sw_tag[at] != tag:
@@ -2287,7 +2306,8 @@ func _swing_cast(at: int, from: float, to: float) -> void:
 	_ray_dir = saved_dir
 	_ray_chain = saved_chain
 	_ray_prev = saved_prev
-	_echo_spell = saved_echo
+	_ray_hit = saved_hit
+	_arc_slot = saved_arc
 	_cast_jumps()
 
 
@@ -2567,11 +2587,13 @@ func _cast_jumps() -> void:
 		_jq_count -= 1
 		var spell: CompiledSpell = _jq_spell[at]
 		var target: Node2D = _jq_target[at]
+		var hit: HitProfile = _jq_hit[at]
 		_jq_spell[at] = null
 		_jq_target[at] = null
+		_jq_hit[at] = null
 		if spell == null or not is_instance_valid(target):
 			continue
-		_shoot_ray(spell, _jq_tag[at], _jq_actor[at], _jq_pos[at], _jq_dir[at], _jq_chain[at], _jq_prev[at], target, _jq_len[at], 0)
+		_shoot_ray(spell, _jq_tag[at], _jq_actor[at], _jq_pos[at], _jq_dir[at], _jq_chain[at], _jq_prev[at], target, _jq_len[at], 0, hit)
 	_jq_busy = false
 
 
@@ -2587,6 +2609,7 @@ func _grow_jumps() -> void:
 	var lengths := PackedFloat32Array()
 	var chains := PackedInt32Array()
 	var prevs := PackedInt64Array()
+	var hits: Array[HitProfile] = []
 	for n in size * 2:
 		var at: int = (_jq_head + n) % size
 		var kept: bool = n < _jq_count
@@ -2599,6 +2622,7 @@ func _grow_jumps() -> void:
 		lengths.append(_jq_len[at] if kept else 0.0)
 		chains.append(_jq_chain[at] if kept else 0)
 		prevs.append(_jq_prev[at] if kept else 0)
+		hits.append(_jq_hit[at] if kept else null)
 	_jq_spell = spells
 	_jq_target = targets
 	_jq_tag = tags
@@ -2608,6 +2632,7 @@ func _grow_jumps() -> void:
 	_jq_len = lengths
 	_jq_chain = chains
 	_jq_prev = prevs
+	_jq_hit = hits
 	_jq_head = 0
 
 
@@ -2815,18 +2840,21 @@ func _zap(slot: int) -> void:
 	var saved_dir: Vector2 = _ray_dir
 	var saved_chain: int = _ray_chain
 	var saved_prev: int = _ray_prev
-	var saved_arc: CompiledSpell = _arc_spell
+	var saved_hit: HitProfile = _ray_hit
+	var saved_arc: int = _arc_slot
 	_ray_tag = tag
 	_ray_dir = way
 	_ray_chain = _rec_chain[slot]
 	_ray_prev = _rec_prev[slot]
-	_arc_spell = spell
+	_ray_hit = _rec_zap[slot] if _rec_zap[slot] != null else spell.arc_hit
+	_arc_slot = slot
 	var got: float = projectiles.ray(actor, at, way, at.distance_to(aim) + 2.0, 0, HITS, tag, 0.0, null)
 	_ray_tag = saved_tag
 	_ray_dir = saved_dir
 	_ray_chain = saved_chain
 	_ray_prev = saved_prev
-	_arc_spell = saved_arc
+	_ray_hit = saved_hit
+	_arc_slot = saved_arc
 	if got > 0.0 and events != null:
 		events.form_shown.emit(actor, &"beam", at, way, got, spell.tint, spell.look)
 	_cast_jumps()
@@ -2857,15 +2885,23 @@ func _on_hit(actor: int, target: Node, position: Vector2, tag: int) -> void:
 			chain = _rec_chain[slot]
 			prev = _rec_prev[slot]
 		heading = _heading(spell, slot, position, actor)
-	# A chain from an echoed shot goes on at the echo's damage.
-	var echoed: bool = not by_ray and _same(slot) and spell.echo_hit != null and _rec_relay[slot] == spell.echo_hit
+	# A chain goes on hitting as the hit it jumps from did (an echo's half, a relay's merge); a
+	# zap's jumps as its shot does.
+	var carried: HitProfile = null
+	var carried_zap: HitProfile = null
+	var from: int = _arc_slot if by_ray else slot
+	if from >= 0 and _same(from):
+		carried = _rec_relay[from]
+		carried_zap = _rec_zap[from]
+	elif by_ray:
+		carried = _ray_hit
 	var held: bool = spell.payload != null and spell.trigger_event == TriggerBase.Event.HIT
 	var struck: int = target.get_instance_id()
 	_on_hit_effects(spell, tag, actor, target, position, slot)
 	if held:
 		_fire_payload(spell, tag, actor, position, heading, target, slot)
 	if chain > 0:
-		_jump(spell, tag, actor, position, target as Node2D, struck, prev, chain - 1, by_ray, echoed)
+		_jump(spell, tag, actor, position, target as Node2D, struck, prev, chain - 1, by_ray, carried, carried_zap)
 
 
 ## What a hit of a carrier does besides its payload and chain: siphon refunds mana; a hook pulls
@@ -2923,8 +2959,9 @@ func _possess(actor: int, target: Node, seconds: float, tag: int) -> void:
 	events.possess_requested.emit(actor, victim, seconds, tag)
 
 
-## Sends a chain on from `position` to the nearest other target, if there is one in range.
-func _jump(spell: CompiledSpell, tag: int, actor: int, position: Vector2, target: Node2D, struck: int, prev: int, chain: int, by_ray: bool, echoed: bool = false) -> void:
+## Sends a chain on from `position` to the nearest other target, if there is one in range. The
+## jump hits with `hit` and zaps with `zap` (null: the spell's own), as the hit it came from did.
+func _jump(spell: CompiledSpell, tag: int, actor: int, position: Vector2, target: Node2D, struck: int, prev: int, chain: int, by_ray: bool, hit: HitProfile = null, zap: HitProfile = null) -> void:
 	var before: Node2D = null
 	if prev != 0:
 		before = instance_from_id(prev) as Node2D
@@ -2950,6 +2987,7 @@ func _jump(spell: CompiledSpell, tag: int, actor: int, position: Vector2, target
 		_jq_len[end] = distance + spell.radius + 8.0
 		_jq_chain[end] = chain
 		_jq_prev[end] = struck
+		_jq_hit[end] = hit
 		return
 	var speed: float = maxf(spell.speed, SpellLimits.CHAIN_MIN_SPEED)
 	var life: float = (distance + 16.0) / speed * 1.5 + 0.05
@@ -2957,8 +2995,8 @@ func _jump(spell: CompiledSpell, tag: int, actor: int, position: Vector2, target
 	if slot < 0:
 		return
 	_register(slot, tag, spell, chain, struck)
-	if echoed:
-		_rec_relay[slot] = spell.echo_hit
+	_rec_relay[slot] = hit
+	_rec_zap[slot] = zap
 	projectiles.exclude(slot, target, SpellLimits.SOURCE_EXCLUSION)
 
 
@@ -3051,9 +3089,10 @@ func _on_hurt(actor: int, _amount: int, position: Vector2, _tag: int, _kind: Str
 
 ## `relay` (owner, 2026-10-28): a shot with it that hits any actor (a wizard, an enemy, a
 ## teammate, whoever) takes on the infusions of that actor's last cast that had one
-## (`_last_infused`): their elements join this hit and its later ones, and the status is theirs
-## if the shot had none. An actor that never cast an infused carrier gives nothing. Shots only
-## (a beam has no slot to keep it in). Allocates one profile per such hit, never per frame.
+## (`_last_infused`): their elements, each with its status, join this hit and its later ones,
+## its zaps and its chain jumps. The rest of the hit stays as it was (heal, slam, damage, kind).
+## An actor that never cast an infused carrier gives nothing. Shots and their zaps only (a beam
+## has no slot to keep it in). Allocates two profiles per such hit, never per frame.
 func _relay(target: Node, tag: int) -> void:
 	var spell: CompiledSpell = _profiles.get(tag)
 	if spell == null or spell.behaviour(ModifierBase.Behaviour.RELAY) <= 0.0 or not is_instance_valid(target):
@@ -3062,33 +3101,59 @@ func _relay(target: Node, tag: int) -> void:
 	if donor_actor < 0 or donor_actor >= ACTORS:
 		return
 	var slot: int = projectiles.event_slot
+	if slot < 0 and tag == _ray_tag:
+		slot = _arc_slot
 	var donor: CompiledSpell = _last_infused[donor_actor]
 	if donor == null or slot < 0 or not _same(slot) or projectiles.get_tag_of(slot) != tag:
 		return
 	var base: HitProfile = _rec_relay[slot] if _rec_relay[slot] != null else spell.hit
-	var merged: HitProfile = HitProfile.new()
-	merged.damage = base.damage
-	merged.knockback = base.knockback
-	merged.element_id = base.element_id
-	merged.element_ids = base.element_ids.duplicate()
-	merged.status_id = base.status_id
-	merged.status_duration = base.status_duration
-	merged.status_strength = base.status_strength
-	var added: bool = false
-	for id in donor.element_ids:
-		if not merged.element_ids.has(id):
-			merged.element_ids.append(id)
-			added = true
-	if not added:
+	var merged: HitProfile = null
+	for n in donor.hit.element_ids.size():
+		var id: StringName = donor.hit.element_ids[n]
+		if base.element_ids.has(id) or (merged != null and merged.element_ids.has(id)):
+			continue
+		if merged == null:
+			merged = base.copy()
+		_add_element(merged, donor.hit, n)
+	if merged == null:
 		return
-	if merged.element_id == &"":
-		merged.element_id = donor.element_id
+	if base.element_id == &"":
 		projectiles.set_core(slot, donor.tint)
-	if merged.status_id == &"":
-		merged.status_id = donor.status_id
-		merged.status_duration = donor.status_duration
-		merged.status_strength = donor.status_strength
 	_rec_relay[slot] = merged
+	_rec_zap[slot] = StaffCompiler.zap_hit(merged) if spell.arc_hit != null else null
+	if slot == _arc_slot:
+		_ray_hit = _rec_zap[slot]
+
+
+## Adds element `n` of `from` to `onto`, with its status (none if `from` has none for it), as
+## its last element.
+static func _add_element(onto: HitProfile, from: HitProfile, n: int) -> void:
+	var id: StringName = &""
+	var duration: float = 0.0
+	var strength: float = 0.0
+	if n == 0:
+		id = from.status_id
+		duration = from.status_duration
+		strength = from.status_strength
+	elif n - 1 < from.later_status_ids.size():
+		id = from.later_status_ids[n - 1]
+		duration = from.later_status_durations[n - 1]
+		strength = from.later_status_strengths[n - 1]
+	onto.element_ids.append(from.element_ids[n])
+	if onto.element_ids.size() == 1:
+		onto.element_id = from.element_ids[n]
+		onto.status_id = id
+		onto.status_duration = duration
+		onto.status_strength = strength
+		return
+	var later: int = onto.element_ids.size() - 2
+	while onto.later_status_ids.size() < later:
+		onto.later_status_ids.append(&"")
+		onto.later_status_durations.append(0.0)
+		onto.later_status_strengths.append(0.0)
+	onto.later_status_ids.append(id)
+	onto.later_status_durations.append(duration)
+	onto.later_status_strengths.append(strength)
 
 
 ## Forgets every registered spell and shot count (a new run, and tests).
@@ -3134,6 +3199,8 @@ func clear() -> void:
 	_rec_hurt.fill(0)
 	_hurt_count = 0
 	_rec_relay.fill(null)
+	_rec_zap.fill(null)
+	_jq_hit.fill(null)
 	_last_infused.fill(null)
 	fires_made = 0
 	fires_waited = 0

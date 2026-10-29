@@ -160,25 +160,27 @@ vec4 trail_texel(float row, float newest, float k) {
 	return texelFetch(trail_data, ivec2(int(mod(n, float(TRAIL_SAMPLES))), int(row)), 0);
 }
 
-// The newest sample from `first` back to `last` whose time (`by_time`) or odometer is at most
-// `v`, the older end of the piece `v` is on: its k, or -1 when even the oldest is later.
-float sample_before(float row, float newest, float first, float last, float v, bool by_time) {
-	float lo_k = first;
-	float hi_k = last;
+// For each of `v`'s two numbers, the newest sample from `first` back to `last` whose time
+// (`by_time`) or odometer is at most it, the older end of the piece it is on: its k, or -1 when
+// even the oldest is later. Both are searched at once, and the vertex stage searches the path in
+// one place only (`vertex`): the compiler builds a loop once for every place it is called from,
+// and the Direct3D one takes its time over each.
+vec2 samples_before(float row, float newest, float first, float last, vec2 v, bool by_time) {
+	vec2 lo_k = vec2(first);
+	vec2 hi_k = vec2(last);
 	for (int i = 0; i < SEARCH_STEPS; i++) {
-		float half_k = floor((lo_k + hi_k) * 0.5);
-		vec4 s = trail_texel(row, newest, half_k);
-		if ((by_time ? s.w : s.z) <= v) {
-			hi_k = half_k;
-		} else {
-			lo_k = half_k + 1.0;
-		}
+		vec2 half_k = floor((lo_k + hi_k) * 0.5);
+		vec4 s0 = trail_texel(row, newest, half_k.x);
+		vec4 s1 = trail_texel(row, newest, half_k.y);
+		vec2 earlier = vec2(lessThanEqual(by_time ? vec2(s0.w, s1.w) : vec2(s0.z, s1.z), v));
+		hi_k = mix(hi_k, half_k, earlier);
+		lo_k = mix(half_k + 1.0, lo_k, earlier);
 	}
-	if (lo_k > last || first > last) {
-		return -1.0;
-	}
-	vec4 s = trail_texel(row, newest, lo_k);
-	return (by_time ? s.w : s.z) <= v ? lo_k : -1.0;
+	vec4 s0 = trail_texel(row, newest, lo_k.x);
+	vec4 s1 = trail_texel(row, newest, lo_k.y);
+	vec2 earlier = vec2(lessThanEqual(by_time ? vec2(s0.w, s1.w) : vec2(s0.z, s1.z), v));
+	vec2 inside = vec2(lessThanEqual(lo_k, vec2(last))) * (first <= last ? 1.0 : 0.0);
+	return mix(vec2(-1.0), lo_k, earlier * inside);
 }
 
 // A number in [0, 1) from three whole numbers and the trail's row: an integer hash, so a pixel's
@@ -272,8 +274,9 @@ struct Spark {
 
 // One routine for every kind, driven by its row of the LOOK TABLE. `t_top` is when the path
 // ends (now for a live shot), `head_end` its newest end, `window` the trail's (WINDOW), `target`
-// where the shot is (or was last: void pulls in to it, shields circle it).
-Spark spark(float row, float newest, float count, float skip, vec4 head_end, float t_top, float window, vec2 target, bool dash, float id, float j, Look L) {
+// where the shot is (or was last: void pulls in to it, shields circle it), `k` the sample before
+// its moment (`samples_before`, by time).
+Spark spark(float row, float newest, float count, float skip, vec4 head_end, float t_top, float window, vec2 target, bool dash, float id, float j, float k, Look L) {
 	Spark S;
 	S.alive = false;
 	S.pos = vec2(0.0);
@@ -293,7 +296,6 @@ Spark spark(float row, float newest, float count, float skip, vec4 head_end, flo
 		return S;
 	}
 	// The piece it was born on, and where on it.
-	float k = sample_before(row, newest, skip, count - 1.0, t, true);
 	if (k < 0.0) {
 		return S;
 	}
@@ -429,11 +431,18 @@ void vertex() {
 	bool shown = false;
 	// A particle's slot: its moment back from now, and which of the moment's.
 	bool is_spark = quad == Q_SPARK_LIGHT || quad == Q_SPARK || (dash && slot < 32.0 && (quad == Q_PIECE_LIGHT || quad == Q_TAIL));
+	bool streak_slot = quad == Q_PIECE_LIGHT || quad == Q_TAIL;
+	float id = floor(trail_now * BIRTHS) - (streak_slot ? floor(slot * 0.5) : slot);
+	// A tail pixel's number (its place on the path), and the ends of a step of lightning's line.
+	float n = ceil(o_top) - 1.0 - slot;
+	float o_hi = min(4.0 * (floor(o_top / 4.0) - slot + 1.0), o_top);
+	float o_lo = 4.0 * (floor(o_top / 4.0) - slot);
+	// The one search of the path: the pieces the quad's moment, pixel or step ends are on.
+	vec2 key = is_spark ? vec2(id / BIRTHS) : (quad == Q_TAIL ? vec2(n) : vec2(o_hi, o_lo));
+	vec2 before = samples_before(row, newest, skip, count - 1.0, key, is_spark);
 	if (is_spark) {
-		bool streak_slot = quad == Q_PIECE_LIGHT || quad == Q_TAIL;
-		float back = streak_slot ? floor(slot * 0.5) : slot;
 		float j = streak_slot ? mod(slot, 2.0) : (dash ? 2.0 : 0.0);
-		Spark S = spark(row, newest, count, skip, head_end, t_top, trail_window(b, dash, tail), target, dash, floor(trail_now * BIRTHS) - back, j, L);
+		Spark S = spark(row, newest, count, skip, head_end, t_top, trail_window(b, dash, tail), target, dash, id, j, before.x, L);
 		if (S.alive) {
 			vec2 px = floor(S.pos);
 			if (quad == Q_SPARK_LIGHT || quad == Q_PIECE_LIGHT) {
@@ -533,8 +542,7 @@ void vertex() {
 	} else if (quad == Q_TAIL && !dash) {
 		// Tail pixel `slot` back from the head: one pixel per pixel of travel, thrown back a
 		// little, cooling as it ages (and lightning's only now and then).
-		float n = ceil(o_top) - 1.0 - slot;
-		float k = sample_before(row, newest, skip, count - 1.0, n, false);
+		float k = before.x;
 		if (k >= 0.0) {
 			vec4 A = trail_texel(row, newest, k);
 			vec4 B = k < skip + 0.5 ? head_end : trail_texel(row, newest, k - 1.0);
@@ -572,15 +580,13 @@ void vertex() {
 		// Step `slot` back from the head of the jagged line lightning draws behind its shot along
 		// the last tenth of a second of its path: it bends every 4 pixels, re-rolled every other
 		// frame, newer than 0.05 s in its light.
-		float o_hi = min(4.0 * (floor(o_top / 4.0) - slot + 1.0), o_top);
-		float o_lo = 4.0 * (floor(o_top / 4.0) - slot);
 		float jf = floor(trail_now * 30.0);
 		vec2 ends[2];
 		float agos[2];
 		bool found = o_hi > o_lo;
 		for (int e = 0; e < 2; e++) {
 			float o = e == 0 ? o_hi : o_lo;
-			float k = sample_before(row, newest, skip, count - 1.0, o, false);
+			float k = e == 0 ? before.x : before.y;
 			found = found && k >= 0.0;
 			vec4 A = trail_texel(row, newest, max(k, 0.0));
 			vec4 B = k < skip + 0.5 ? head_end : trail_texel(row, newest, k - 1.0);

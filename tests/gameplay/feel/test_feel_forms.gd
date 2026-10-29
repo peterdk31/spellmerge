@@ -38,35 +38,39 @@ func before_each() -> void:
 	root.add_child(feel)
 
 
-func _shown() -> Array[Sprite2D]:
-	var found: Array[Sprite2D] = []
-	for sprite in feel._forms:
-		if sprite.visible:
-			found.append(sprite)
+func _shown() -> Array[MeshInstance2D]:
+	var found: Array[MeshInstance2D] = []
+	for node in feel._forms:
+		if node.visible:
+			found.append(node)
 	return found
 
 
-func _param(sprite: Sprite2D, name: StringName) -> Color:
-	return (sprite.material as ShaderMaterial).get_shader_parameter(name) as Color
+func _param(node: MeshInstance2D, name: StringName) -> Variant:
+	return (node.material as ShaderMaterial).get_shader_parameter(name)
+
+
+func _path(node: MeshInstance2D) -> PackedVector3Array:
+	return _param(node, &"beam_path") as PackedVector3Array
 
 
 func test_a_beam_is_drawn_along_the_aim_as_long_as_it_got() -> void:
 	bus.form_shown.emit(1, &"beam", Vector2(10, 20), Vector2.DOWN, 150.0, FROST, 0)
-	var shown: Array[Sprite2D] = _shown()
+	var shown: Array[MeshInstance2D] = _shown()
 	check_equal(shown.size(), 1, "one beam on screen")
-	var beam: Sprite2D = shown[0]
-	check_equal(beam.global_position, Vector2(10, 20), "from the staff")
-	check(is_equal_approx(beam.rotation, PI / 2.0), "turned along the aim")
-	var material: ShaderMaterial = beam.material as ShaderMaterial
-	check_equal(material.get_shader_parameter(&"beam_length"), 150.0, "as long as it got")
-	check_equal(beam.region_rect.size.x, 150.0 + 2.0 * FeelScript.BEAM_LEAD, "its quad a little past each end, so the flares are whole")
-	check((material.get_shader_parameter(&"beam_end") as Vector2).is_equal_approx(Vector2(10, 170)), "which ends where it landed, upright on the world's pixels")
-	check(beam.texture == preset.beam_texture, "with the beam art")
+	var beam: MeshInstance2D = shown[0]
+	check(beam.mesh == FeelScript.beam_mesh(), "drawn as the beam mesh")
+	check_equal(_param(beam, &"beam_points"), 2, "a path of two points")
+	check(_path(beam)[0].is_equal_approx(Vector3(10, 20, 0)), "from the staff")
+	check(_path(beam)[1].is_equal_approx(Vector3(10, 170, 150)), "along the aim, 150 px along")
+	check_equal(_param(beam, &"beam_length"), 150.0, "as long as it got")
+	check_equal(_param(beam, &"beam_lead"), FeelScript.BEAM_LEAD, "drawn a little past each end, so the flares are whole")
+	check((_param(beam, &"beam_end") as Vector2).is_equal_approx(Vector2(10, 170)), "which ends where it landed, upright on the world's pixels")
 
 
 func test_the_core_has_the_element_colour_and_the_body_the_owners() -> void:
 	bus.form_shown.emit(2, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, FROST, 0)
-	var beam: Sprite2D = _shown()[0]
+	var beam: MeshInstance2D = _shown()[0]
 	var core: Color = _param(beam, &"core_override")
 	check(core.is_equal_approx(Color(FROST.r, FROST.g, FROST.b, 1.0)), "the core is frost")
 	var body: Color = _param(beam, &"body_tint")
@@ -157,7 +161,7 @@ func test_one_players_many_beams_never_push_out_another_players_beam() -> void:
 			if feel._forms[slot].visible:
 				seen += 1
 		check(seen >= 1, "player %d still has a visible beam" % player)
-	check_equal(feel._forms[FeelScript.FORMS_PER_PLAYER].global_position, Vector2(10, 0), "player 1's beam is untouched")
+	check(_path(feel._forms[FeelScript.FORMS_PER_PLAYER])[0].is_equal_approx(Vector3(10, 0, 0)), "player 1's beam is untouched")
 
 
 func test_one_cast_with_many_rays_shows_every_ray() -> void:
@@ -173,8 +177,8 @@ func test_an_enemys_beams_take_only_the_enemies_share() -> void:
 	check_equal(_shown().size(), FeelScript.FORMS_PER_PLAYER, "enemies' beams show, in their one share")
 	bus.form_shown.emit(0, &"beam", Vector2.ZERO, Vector2.RIGHT, 100.0, FROST, 0)
 	check_equal(_shown().size(), FeelScript.FORMS_PER_PLAYER + 1, "and never take a player's slot")
-	var enemy_sprite: Sprite2D = feel._forms[FeelScript.ENEMY_FORMS * FeelScript.FORMS_PER_PLAYER]
-	check_equal((enemy_sprite.material as ShaderMaterial).get_shader_parameter(&"beam_player"), -1, "drawn in the enemy ramp")
+	var enemy_beam: MeshInstance2D = feel._forms[FeelScript.ENEMY_FORMS * FeelScript.FORMS_PER_PLAYER]
+	check_equal(_param(enemy_beam, &"beam_player"), -1, "drawn in the enemy ramp")
 
 
 func test_a_rain_shows_its_marker_until_it_falls() -> void:
@@ -249,11 +253,11 @@ class FakeBeams:
 		return 1.0
 
 
-func _live_lines() -> Array[Line2D]:
-	var found: Array[Line2D] = []
-	for line in feel._live_beams:
-		if line.visible:
-			found.append(line)
+func _live_lines() -> Array[MeshInstance2D]:
+	var found: Array[MeshInstance2D] = []
+	for node in feel._live_beams:
+		if node.visible:
+			found.append(node)
 	return found
 
 
@@ -261,16 +265,21 @@ func test_a_live_beam_is_drawn_along_its_curve_every_frame() -> void:
 	var beams := own(FakeBeams.new()) as FakeBeams
 	feel.spells = beams
 	feel.step(0.016)
-	var lines: Array[Line2D] = _live_lines()
+	var lines: Array[MeshInstance2D] = _live_lines()
 	check_equal(lines.size(), 1, "one live beam on screen")
-	var line: Line2D = lines[0]
+	var line: MeshInstance2D = lines[0]
 	var material: ShaderMaterial = line.material as ShaderMaterial
 	check_equal(material.get_shader_parameter(&"beam_start"), Vector2.ZERO, "from the staff")
 	check((material.get_shader_parameter(&"beam_end") as Vector2).is_equal_approx(Vector2(100, 40)), "to its end, on the target")
-	check(is_equal_approx(line.get_point_position(0).length(), FeelScript.BEAM_LEAD), "its line a little past each end, so the flares are whole")
+	check_equal(material.get_shader_parameter(&"beam_lead"), FeelScript.BEAM_LEAD, "drawn a little past each end, so the flares are whole")
 	check(is_equal_approx(material.get_shader_parameter(&"sim_time"), feel._clock), "animated by Feel's clock (the owner, 2026-10-28: beams did not move)")
-	var middle: Vector2 = line.get_point_position(line.get_point_count() / 2)
+	var path: PackedVector3Array = _path(line)
+	var points: int = material.get_shader_parameter(&"beam_points")
+	check(points > 2, "along its path's points: %d" % points)
+	check(path[0].is_equal_approx(Vector3.ZERO), "from the staff, 0 px along")
+	var middle: Vector3 = path[points / 2]
 	check(middle.y > 0.0 and middle.y < 20.0, "bent, not straight: %s" % middle)
+	check(is_equal_approx(path[points - 1].z, material.get_shader_parameter(&"beam_length") as float), "each point says how far along it is, the last as far as the beam got")
 	check((line.material as ShaderMaterial).get_shader_parameter(&"core_override").is_equal_approx(Color(FROST.r, FROST.g, FROST.b, 1.0)), "the core is the element's")
 	var tint: Color = (line.material as ShaderMaterial).get_shader_parameter(&"body_tint")
 	check(is_equal_approx(tint.a, feel.preset.beam_alpha) and tint.a < 1.0, "a little see-through, so crossing beams all show: %f" % tint.a)
@@ -293,14 +302,55 @@ func test_a_live_beam_is_drawn_by_the_beam_mode_as_long_as_it_got() -> void:
 	beams.reach = 50.0
 	feel.spells = beams
 	feel.step(0.016)
-	var line: Line2D = _live_lines()[0]
+	var line: MeshInstance2D = _live_lines()[0]
 	var material: ShaderMaterial = line.material as ShaderMaterial
-	check_equal(material.get_shader_parameter(&"beam_mode"), 1, "a line beam")
+	check(material.shader == FeelScript.BEAM_SHADER and line.mesh == FeelScript.beam_mesh(), "a beam")
 	check(is_equal_approx(material.get_shader_parameter(&"beam_length") as float, 50.0), "as long as it got along its curve")
 	check_equal(material.get_shader_parameter(&"beam_player"), 1, "in its caster's hat ramp")
 	check_equal(material.get_shader_parameter(&"beam_look"), 6, "with its cards")
-	check_equal(line.width, FeelScript.BEAM_WIDTH, "a fixed width: the shader swells its rim, never its pixels")
-	check_equal(line.texture_mode, Line2D.LINE_TEXTURE_STRETCH, "its UV runs once along it")
+	check_equal(material.get_shader_parameter(&"beam_width"), FeelScript.BEAM_WIDTH, "a fixed width: the shader swells its rim, never its pixels")
 	beams.caster = ActorSeats.enemy(actors)
 	feel.step(0.016)
 	check_equal(material.get_shader_parameter(&"beam_player"), -1, "an enemy's beam is in the enemy ramp")
+
+
+## The quad kind and slot a mesh made by Feel's `_quads_mesh` gives its `n`th quad.
+func _quad(mesh: ArrayMesh, n: int) -> Vector2i:
+	var uv: Vector2 = (mesh.surface_get_arrays(0)[Mesh.ARRAY_TEX_UV] as PackedVector2Array)[n * 4]
+	return Vector2i(floori(uv.y), floori(uv.x))
+
+
+func test_an_effect_is_one_mesh_of_small_quads() -> void:
+	var mesh: ArrayMesh = FeelScript.effect_mesh()
+	check(mesh == FeelScript.effect_mesh(), "one mesh, made once")
+	var quads: int = 0
+	for entry: Vector3i in FeelScript.EFFECT_QUADS:
+		quads += entry.y
+	var arrays: Array = mesh.surface_get_arrays(0)
+	check_equal((arrays[Mesh.ARRAY_VERTEX] as PackedVector2Array).size(), quads * 4, "a quad for every slot of every kind")
+	check_equal((arrays[Mesh.ARRAY_INDEX] as PackedInt32Array).size(), quads * 6, "two triangles each")
+	check_equal(_quad(mesh, 0), Vector2i(FeelScript.EFFECT_Q_LIGHT, 0), "the light first, under everything")
+	check_equal(_quad(mesh, 1), Vector2i(FeelScript.EFFECT_Q_PARTICLE, 0), "then the particles, the newest on top")
+	check_equal(_quad(mesh, 13), Vector2i(FeelScript.EFFECT_Q_SPARK, 15), "then the sparks, the first on top")
+	check_equal(_quad(mesh, quads - 1), Vector2i(FeelScript.EFFECT_Q_SHAPE, 0), "the flash last, on top")
+	check(feel._effect_node.multimesh.mesh == mesh, "the effect batch draws it")
+	check(feel._arc_node.multimesh.mesh != mesh and feel._status_node.multimesh.mesh != mesh, "the arcs and statuses keep their one quad")
+
+
+func test_a_beam_is_one_mesh_of_small_quads_never_culled() -> void:
+	var mesh: ArrayMesh = FeelScript.beam_mesh()
+	check(mesh == FeelScript.beam_mesh(), "one mesh, made once")
+	var pieces: int = FeelScript.LIVE_BEAM_POINTS - 1
+	check_equal(_quad(mesh, 0), Vector2i(FeelScript.BEAM_Q_PIECE_LIGHT, 0), "the pieces' light first")
+	check_equal(_quad(mesh, pieces), Vector2i(FeelScript.BEAM_Q_SPLASH_LIGHT, 0), "then the splash's light")
+	check_equal(_quad(mesh, pieces + 6), Vector2i(FeelScript.BEAM_Q_PARTICLE, 0), "then the particles")
+	check_equal(_quad(mesh, pieces + 18), Vector2i(FeelScript.BEAM_Q_SPLASH, 5), "then the splash, the first on top")
+	check_equal(_quad(mesh, pieces + 24), Vector2i(FeelScript.BEAM_Q_PIECE, 0), "the beam's own pixels last, on top")
+	check(mesh.custom_aabb.size.x >= 100000.0 and mesh.custom_aabb.size.y >= 100000.0, "its box is the world: the shader places it, so it is never culled")
+	var shader: Shader = FeelScript.BEAM_SHADER
+	check(shader.code.contains("uniform vec3 beam_path[%d];" % FeelScript.LIVE_BEAM_POINTS), "the shader takes as many points as a path has")
+	var drawn: int = 0
+	for node: MeshInstance2D in feel._forms + feel._live_beams:
+		if node.mesh == mesh:
+			drawn += 1
+	check_equal(drawn, FeelScript.FORM_SLOTS + FeelScript.LIVE_BEAMS, "every beam draws it")

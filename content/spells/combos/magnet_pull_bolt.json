@@ -1,0 +1,10 @@
+{
+	"id": "magnet_pull_bolt",
+	"name": "Magnet pull bolt",
+	"does": "A magnet bolt flies past an imp off to the side, drags it into its path and hits it.",
+	"casts": [{"staff": 0, "cards": ["magnet", "bolt"]}],
+	"imps": [[130, 40]],
+	"pushed": true,
+	"seconds": 1.5,
+	"checks": [{"kind": "damaged", "imps": [0]}]
+}

@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-29: Card magnet (staffs C)
+
+Added the Magnet modifier card (`.tres`, icon, assets, lore), two combos (`magnet_pull_bolt`, `magnet_void_hex`) and `test_magnet.gd`. Unlike the other cards it was not data only: nothing sent `pull_requested` for a magnet shot, so `Spells` now does (`_step_magnets`). The combo arena can move its imps by combat's push (`pushable`, the combo key `pushed`). All 140 unit tests pass.
+
 ## 2026-10-29: Card heavy (staffs C)
 
 Added the Heavy modifier card (data only: `.tres`, icon, assets, lore), two combos (`heavy_wall_slam`, `heavy_hex_slam`) and `test_heavy.gd`. All 139 unit tests pass.

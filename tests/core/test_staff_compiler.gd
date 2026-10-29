@@ -200,6 +200,16 @@ func test_a_trigger_with_nothing_after_it_is_wasted() -> void:
 	check(staff.casts[0].recharges, "it wrapped, so it recharges")
 
 
+func test_magnet_on_a_payload_fired_from_a_point_is_wasted() -> void:
+	var magnet: ModifierBase = _modifier(&"magnet")
+	magnet.behaviour = ModifierBase.Behaviour.MAGNET
+	magnet.behaviour_strength = 70.0
+	var staff: CompiledStaff = _compile("magnet bolt")
+	check(not staff.wasted.has(0), "on a bolt it counts")
+	staff = _compile("on_hit bolt magnet")
+	check(staff.wasted.has(2), "in a payload from a point it is wasted: %s" % staff.wasted)
+
+
 func test_a_trigger_in_the_last_slot_wraps_and_is_wasted() -> void:
 	var staff: CompiledStaff = _compile("bolt on_hit")
 	check_equal(staff.casts.size(), 2, "two casts")

@@ -7,7 +7,7 @@ extends "res://tests/support/suite.gd"
 ##
 ## A combo file: `id` (also the file name), `name`, `does` (plain words), `casts` (`staff`,
 ## `cards`: one card id per slot, read as a staff reads them; optional `at` seconds, `player`, `dir` [x, y] to cast toward), `imps` ([x, y] from the caster at (0, 0), aiming
-## along +x), optional `mates` ([x, y, player]: a teammate's body that shots hit, for `relay`), optional `walls` ([x, y, width, height] rects), `seconds` and `checks`. Check kinds: `damaged` (imps), `status` (imps, status),
+## along +x), optional `mates` ([x, y, player]: a teammate's body that shots hit, for `relay`), optional `walls` ([x, y, width, height] rects), optional `pushed` (true: imps move with the push combat gives them, for `magnet`), `seconds` and `checks`. Check kinds: `damaged` (imps), `status` (imps, status),
 ## `status_count` (status, min), `lost_at_least` (imps, min: health lost in all), `keeps_burning` (imp), `reaction` (reaction), `max_shots` (max),
 ## `caster_moved` (mode: a card moved its caster, for example a dash).
 ##
@@ -33,6 +33,7 @@ func before_each() -> void:
 ## control runs below drop a card on purpose).
 func _play(combo: Dictionary, quiet: bool = false) -> ArenaScript:
 	var arena := ArenaScript.new(root)
+	arena.pushable = bool(combo.get("pushed", false))
 	for at: Array in combo.get("imps", []):
 		arena.add_imp(Vector2(float(at[0]), float(at[1])))
 	for mate: Array in combo.get("mates", []):

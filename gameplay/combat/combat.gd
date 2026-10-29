@@ -570,15 +570,20 @@ func shield(actor: Variant) -> int:
 ## Pull every actor whose hurt circle is within `radius` of `position` toward it at `strength`
 ## pixels per second, through the push Combat keeps (whoever moves the actor already adds it).
 ## A pull replaces the push an actor had, so a magnet each step does not pile speed up. `caster`
-## is who pulls (for the record; a pull does no damage).
-func pull(_caster: int, position: Vector2, radius: float, strength: float) -> void:
+## is who pulls (a pull does no damage). With `foes_only`, actors on the caster's team (the caster
+## too) are left alone, their push and slam arming included; a caster with no team pulls everyone.
+func pull(caster: int, position: Vector2, radius: float, strength: float, foes_only: bool = false) -> void:
 	if projectiles == null or strength <= 0.0:
 		return
+	var table: ActorsScript = _table()
+	var own_team: int = table.team_of(caster) if foes_only and table != null else ActorsScript.NONE
 	var near: Array[Node2D] = _take_scratch()
 	var count: int = projectiles.targets_in(position, radius, ProjectileManagerScript.ACTOR_LAYERS, near)
 	for i in count:
 		var row: int = _row_of_node(near[i])
 		if row == ActorsScript.NONE:
+			continue
+		if own_team != ActorsScript.NONE and _team(row) == own_team:
 			continue
 		var toward: Vector2 = (position - (_position_of(_nodes[row]) + _hurt_offset[row])).normalized()
 		_knock[row] = toward * strength
@@ -1089,7 +1094,7 @@ func _on_wizard_shield_requested(caster: int, charges: int, seconds: float, tag:
 
 
 func _on_pull_requested(caster: int, position: Vector2, radius: float, strength: float, _tag_of_card: int) -> void:
-	pull(caster, position, radius, strength)
+	pull(caster, position, radius, strength, true)
 
 
 ## A wizard of seat `player` went down: its statuses, push and barrier go, and shots fly past it

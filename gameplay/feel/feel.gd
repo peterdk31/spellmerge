@@ -1472,6 +1472,23 @@ func _on_form_shown(caster: int, form: StringName, origin: Vector2, direction: V
 	if caster < ActorsScript.NONE or caster >= ActorsScript.ACTORS or not origin.is_finite():
 		return
 	var ramp: int = _ramp_of(caster)
+	if form == &"slam_mark":
+		# A slam winding up (melee I8): a ring closing on where it will strike, for the seconds until
+		# then, so nobody is hit by a slam they could not see coming.
+		if length > 0.0:
+			show_effect(KIND_RING_IN, origin, Vector2.RIGHT, tint, ramp, look, RAIN_MARK_ZOOM, length)
+		return
+	if form == &"slam":
+		# Its impact: a white-hot star, the shockwave ring out to its radius (`length`), stone chips
+		# thrown up off the floor and a shake.
+		show_effect(KIND_BURST, origin, direction, tint, ramp, look, 3, BURST_SECONDS)
+		show_effect(KIND_RING_OUT, origin, direction, tint, ramp, look, clampi(roundi(length * 2.0 / 20.0), 1, 15), RING_SECONDS)
+		if particles_enabled:
+			show_effect(KIND_CHIPS, origin, -direction, Color.WHITE, 0, 0, 2, CHIPS_SECONDS)
+		if shake_enabled and preset.slam_shake > 0.0:
+			_refresh_camera()
+			_trauma = minf(_trauma + preset.slam_shake, 1.0)
+		return
 	if form == &"rain":
 		if length > 0.0:
 			show_effect(KIND_RING_IN, origin, Vector2.RIGHT, tint, ramp, look, RAIN_MARK_ZOOM, length)

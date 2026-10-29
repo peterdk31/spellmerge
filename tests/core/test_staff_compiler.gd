@@ -404,6 +404,14 @@ func test_a_swing_is_a_swing_hit_though_it_has_a_reach() -> void:
 	check_equal((_compile("swing").casts[0].group.spells[0] as CompiledSpell).hit.kind, &"swing", "its own kind, for its own stop and shake")
 
 
+func test_a_slam_is_an_area_hit() -> void:
+	var slam: FormBase = _form(&"slam", 3, 1)
+	slam.motion = FormBase.Motion.SLAM
+	slam.ray_length = 20.0
+	slam.radius = 16.0
+	check_equal((_compile("slam").casts[0].group.spells[0] as CompiledSpell).hit.kind, &"burst", "a shockwave hits as an area hit")
+
+
 func test_the_builder_view_counts_a_casts_damage() -> void:
 	# A bolt hits for 5 once, a nova for 4 with 8 shots: 5 + 32, the on-hit payload left out.
 	var ids: Array[StringName] = [&"double", &"bolt", &"nova"]

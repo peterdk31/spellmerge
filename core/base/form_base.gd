@@ -38,6 +38,10 @@ enum Motion {
 	## hand, centred on the aim locked at the cast, out to `ray_length`, in `lifetime` seconds,
 	## hitting each body in the swept wedge once. Forehand and backhand by turns.
 	SWING,
+	## Melee (I8): the staff rises for `wind_up` seconds, then strikes the floor `ray_length` ahead
+	## of the hand, aimed as at the cast; a ring grows from the impact to `radius` and holds for
+	## `lifetime` seconds, striking each body in it once and throwing it outward.
+	SLAM,
 }
 
 ## Damage of one hit before the element and modifiers.
@@ -68,7 +72,7 @@ enum Motion {
 ## SWING: degrees the sweep hits over, centred on the aim.
 @export var arc: float = 0.0
 ## SWING: seconds the staff leans back before it sweeps (none when it chains straight on from
-## the last swing, `SpellLimits.SWING_CHAIN`).
+## the last swing, `SpellLimits.SWING_CHAIN`). SLAM: seconds it rises before it strikes.
 @export var wind_up: float = 0.0
 ## Knockback of one hit in pixels per second; 0 for the usual `SpellLimits.KNOCKBACK`.
 @export var knockback: float = 0.0

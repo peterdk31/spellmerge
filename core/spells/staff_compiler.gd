@@ -452,6 +452,9 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 	spell.hit.later_status_strengths = later_strengths
 	if spell.motion == FormBase.Motion.SWING:
 		spell.hit.kind = &"swing"
+	elif spell.motion == FormBase.Motion.SLAM:
+		# A shockwave on an area: the hit kind of an area hit.
+		spell.hit.kind = &"burst"
 	elif spell.ray_length > 0.0 and spell.motion != FormBase.Motion.DASH and spell.motion != FormBase.Motion.TELEPORT:
 		spell.hit.kind = &"ray"
 	if spell.homing_turn > 0.0:
@@ -628,7 +631,7 @@ static func _what(motion: FormBase.Motion) -> String:
 ## teleport's is a barrier on the caster: those keep it.
 static func guards(motion: FormBase.Motion) -> bool:
 	match motion:
-		FormBase.Motion.STRAIGHT, FormBase.Motion.STILL, FormBase.Motion.ORBIT, FormBase.Motion.WALL, FormBase.Motion.RAY, FormBase.Motion.FISSURE, FormBase.Motion.SWING:
+		FormBase.Motion.STRAIGHT, FormBase.Motion.STILL, FormBase.Motion.ORBIT, FormBase.Motion.WALL, FormBase.Motion.RAY, FormBase.Motion.FISSURE, FormBase.Motion.SWING, FormBase.Motion.SLAM:
 			return true
 	return false
 

@@ -2204,6 +2204,13 @@ The owner: restructure the projectile step from "for each shot, check every beha
 - **What a player sees:** a payload with `mirror · recoil` leaves its shot on its line, and a shot's recoil is not lost when it hooks or dashes.
 - `test_projectiles_step_exact`'s recording was made again: the shots do the same; only its state line shows the moves under way, added up, where it showed a finished move's stale numbers.
 
+## 2026-10-29: Planning with an empty queue (M2 is not done)
+
+- **Why the queue ran empty:** the only open bot task was D3, which waits for both lanes. The rules phase (R2, R3) had no tasks in `docs/NEXT.md`, so they are added to the bot's Queue, with the clip recorder leftover. The owner-lane melee tasks I2, I3, I4, I5 and I8 have merged (#457, #460, #463, #464) and are ticked off. Still open in the owner lane: B5, B6a, B8, and R4.
+- **M2 is not at its checkpoint:** R2, R3, R4, the owner-lane tasks and D3 remain, so no checkpoint is opened.
+- **R4 waits on the owner.** It needs the owner's re-decisions (M2-rules.md, "R4"); D3 waits for it.
+- **Backlog #417 (downed wizard shrinks into its hat):** wizards are living staffs now (phase H) and have no hat; it stays on the backlog and should be reworded for the staff body when M4 polish starts. #416 (the Nuke relic) belongs to M3 relics. #208 (pet) is not for M2; it stays on the backlog for the M3/M5 designs, where a spell form or relic comes before a separate system (DESIGN.md: the focus is building spells).
+
 ## 2026-10-29: The compiler lists triggers that cannot fire (phase R, R2b)
 
 - **Rules 1 and 4, docs/milestones/M2-rules.md findings 7 and 8:** a trigger whose event never happens on its carrier is listed as wasted, with the reason, instead of doing nothing silently. `StaffCompiler.trigger_runs(event, motion)` and `trigger_why_not` are the table, read from what the runtime does today (the table is in M2-rules.md). The missing triggers are not built here; R4 decides them.

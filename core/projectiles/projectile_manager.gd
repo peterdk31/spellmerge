@@ -316,7 +316,9 @@ const LOOK_BURST: int = 9
 const LOOK_ORBITERS: int = 10
 const LOOK_WEAVE: int = 11
 const LOOK_GLITTER: int = 12
-const LOOK_COUNT: int = 13
+const LOOK_HOPS: int = 13
+const LOOK_WAKE: int = 14
+const LOOK_COUNT: int = 15
 ## The most kinds the instance data has room for: three bytes of bits (`_look_color`).
 const LOOK_MAX_KINDS: int = 24
 ## A flag in the look, not a kind (kind 23 of the shader): drawn in the enemy ramp (Blight

@@ -48,7 +48,9 @@ const float L_BURST = 9.0;
 const float L_ORBITERS = 10.0;
 const float L_WEAVE = 11.0;
 const float L_GLITTER = 12.0;
-const float KIND_COUNT = 12.0;
+const float L_HOPS = 13.0;
+const float L_WAKE = 14.0;
+const float KIND_COUNT = 14.0;
 // Flags in the look, not particles: Feel's poof (living staffs H4), the enemy ramp (Blight ochre
 // takes the player's place; staffs F2), and an exact colour (a reaction's own, its ramp made from
 // it instead of the palette material it is nearest).

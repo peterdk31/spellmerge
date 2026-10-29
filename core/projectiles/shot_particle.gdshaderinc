@@ -85,6 +85,18 @@ vec4 particle(float look, vec2 from, float a, float i, float cyc, vec2 q, float 
 		if (mod(floor(sim_time * 10.0 + i), 2.0) < 0.5 && on(q, at)) {
 			return vec4(SPARK_LIGHT, 1.0);
 		}
+	} else if (look == L_HOPS) {
+		// Chain: a pixel that jumps sideways in steps, blinking two frames in three.
+		vec2 at = from + vec2(-2.0 * a, (h < 0.5 ? -1.0 : 1.0) * (1.0 + floor(a * 4.0)) * 3.0) * z;
+		if (a < 0.8 && mod(floor(sim_time * 24.0 + i), 3.0) < 2.0 && on(q, at)) {
+			return vec4(a < 0.3 ? BONE_LIGHT : SPARK_LIGHT, 1.0);
+		}
+	} else if (look == L_WAKE) {
+		// Faster: pixels flung straight back, fast, thinning out.
+		vec2 at = from + vec2(-(3.0 + 14.0 * a) * z, (h - 0.5) * 4.0 * z);
+		if (a < 0.5 && on(q, at)) {
+			return vec4(a < 0.25 ? BONE_LIGHT : SPARK_LIGHT, 1.0);
+		}
 	}
 	return vec4(0.0);
 }

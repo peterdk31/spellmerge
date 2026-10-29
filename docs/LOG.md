@@ -2,6 +2,12 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-29: The first cards' looks (staffs C0)
+
+Review round: seen at 4x (`looks_hops_4x`, `looks_wake_4x` in `shot_looks.gd`), hops did not draw at all, for three reasons now fixed: its trail window (0.15 s) cut its particles, the spawn rate was read from the wrong table row (`kind_row` now maps kinds 13 and 14 to rows 16 and 17 everywhere), and its every-other-frame blink hid it whenever a still shot was captured on an even frame (now always shown; the dash lines jump sideways). Wake is brighter dashes. READMEs and comments updated.
+
+The three original modifiers without a look now have one: split a burst (9), chain hops (13, new: a pixel that jumps sideways), faster a wake (14, new: pixels flung back fast); sparks and streaks were taken by lightning, pierce and heavy. Carriers and infusions already had theirs; the numbers were reviewed and kept. `test_projectile_looks.gd` uses echo as its card without a look. Test: `test_original_looks.gd`.
+
 ## 2026-10-29: Spell names (staffs E1)
 
 Every cast of a staff now has a generated name: `SpellNamer` reads a compiled cast and builds "Twice-Seeking Firefrost Bolt of Sudden Novas" from the cards' `name_words` (a new field on every card, two words each so a name can vary; a plain bolt is "Bolt"). Same cards, same name (a djb2 hash picks between a card's words). `Spells.staff_view` returns it as `name`, and the list builder prints it above each cast of the plan. Tests: `test_spell_names.gd` (exact names, plurals, growth, determinism, and that every real card has words).

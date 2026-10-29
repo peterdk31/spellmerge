@@ -14,3 +14,4 @@ icon = ExtResource("2_icon")
 damage_mult = 0.5
 mana_mult = 1.5
 shot_mult = 3
+look_layer = 9

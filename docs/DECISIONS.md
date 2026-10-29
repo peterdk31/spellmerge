@@ -2,6 +2,10 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-29: The first cards' looks (staffs C0)
+
+Split takes the burst look (9); chain and faster get two new kinds, hops (13: a pixel that jumps sideways) and wake (14: pixels flung back fast), because sparks (5) is lightning's and streaks (8) is pierce's and heavy's, and a look is a set of kinds, so a card that shares a kind with a card beside it adds nothing to the shot. No numbers change. Rule: the first six modifiers never share a kind with an infusion, and never share with one another (a test checks this); later modifiers that are rarely stacked (blast and overcharge share 9) may still share until the kinds run out (up to 24). Without the budget, the first cards' numbers still sit well beside the newer cards' (complexity and mana already price them), so rebalancing waits for the C2 playtest.
+
 ## 2026-10-29: How a spell is named
 
 The name is made from the cards' own `name_words` (in each `.tres`, so a new card edits no shared list), by `SpellNamer` in `core/spells/`. Rules: modifiers are adjectives (only the first three are said, to keep a name readable aloud), infusions fuse into one word (Firefrost), a multicast card is a hyphenated prefix, and a carrier's trigger and payload follow "of" with the trigger's word and the payload in the plural. A plain carrier says its card's first word; otherwise a card with several words has one picked by a djb2 hash of its own id (so editing other cards never rewords it; not `String.hash`, which Godot may change), so a name is the same on every machine and run. A card with no words says its display name, so a missing list never breaks a build, but the real-registry test requires them. Cards left on the caster or a payload's origin are called "Aura" and "Flare". A name says at most 3 carriers per group ("and more"), 2 payload levels and 90 characters. Not done yet: the radial builder shows no names, and cast names are not in staff codes (D2).

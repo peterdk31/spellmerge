@@ -1,0 +1,11 @@
+{
+	"id": "shield_teleport",
+	"name": "Shielded blink",
+	"does": "The teleport card blinks its caster and puts a shield on them, which stops the enemy shot flying at the caster.",
+	"casts": [{"staff": 0, "cards": ["shield", "teleport"]}],
+	"imps": [],
+	"guard": true,
+	"foes": [[30, 0]],
+	"seconds": 1.5,
+	"checks": [{"kind": "caster_moved", "mode": "teleport"}, {"kind": "blocked", "min": 1}]
+}

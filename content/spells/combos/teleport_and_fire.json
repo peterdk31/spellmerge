@@ -1,0 +1,12 @@
+{
+	"id": "teleport_and_fire",
+	"name": "Teleport and fire",
+	"does": "Blink with one staff, then a fire bolt from another: the imp burns.",
+	"casts": [
+		{"staff": 0, "cards": ["teleport"]},
+		{"staff": 1, "cards": ["fire", "bolt"], "at": 0.1}
+	],
+	"imps": [[100, 0]],
+	"seconds": 1.5,
+	"checks": [{"kind": "caster_moved", "mode": "teleport"}, {"kind": "status", "imps": [0], "status": "burn"}]
+}

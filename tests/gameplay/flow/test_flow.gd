@@ -47,6 +47,7 @@ func _initialize() -> void:
 	_test_unjoined_requester_other_than_p1_starts_nothing()
 	_test_cooldowns_reset_on_a_new_run()
 	_test_room_cleared_once_when_the_wave_is_dead()
+	_test_possessed_enemy_does_not_strand_the_room()
 	_test_restart_when_all_down()
 	_test_no_restart_while_one_stands()
 	_test_revive_cancels_the_restart()
@@ -210,6 +211,28 @@ func _test_room_cleared_once_when_the_wave_is_dead() -> void:
 	_events.emit_signal("enemy_died", 0, enemies[0], Vector2.ZERO)
 	_check(_cleared.size() == 1, "a repeated death does not send room_cleared again")
 	_stop()
+
+
+## A player who possesses an enemy of the wave still lets the room clear: the possessed body is on
+## the wizards' team while it is driven, and its death must still count as an enemy's. Bots stopped
+## building `possess` because the room stayed uncleared.
+func _test_possessed_enemy_does_not_strand_the_room() -> void:
+	for possessed_first: bool in [true, false]:
+		_setup(1)
+		_play()
+		var wizard: Actor = _wizard(0)
+		var enemies: Array[Node] = _flow._enemies.duplicate()
+		var held := enemies[0] as Actor
+		var possession: Possession = Possession.begin(wizard, held, 3.0)
+		_check(possession != null and held.controller == wizard.home_controller, "the wizard possesses an enemy of the wave")
+		var order: Array[Node] = enemies.duplicate()
+		if not possessed_first:
+			order.reverse()
+		for enemy: Node in order:
+			_combat.call("hit", 0, enemy, 100000)
+		_check(_flow.enemies_left() == 0, "possessed killed first %s: no enemy is left, %d are" % [possessed_first, _flow.enemies_left()])
+		_check(_cleared == [&"arena_01"], "possessed killed first %s: the room clears, got %s" % [possessed_first, _cleared])
+		_stop()
 
 
 func _test_restart_when_all_down() -> void:

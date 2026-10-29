@@ -32,7 +32,8 @@ extends Node
 ## a barrier takes the hit whole, then hex adds its share, static goes off, health goes down,
 ## `hit_landed`, `damage_dealt` (and the actor's own `Actor.damaged`) and `actor_hurt` are sent,
 ## and a body at 0 dies: `kill_landed` (a spell's own hit only), `enemy_died` (for every body not
-## on the wizards' team; flow counts the wave by it), and the body is freed.
+## on the wizards' team, a kit actor by its own controller's team so a possessed enemy still
+## counts; flow counts the wave by it), and the body is freed.
 ##
 ## The one rules (owner, 2026-10-28), the same on every actor:
 ##  - **shock:** the next spell hit also jumps to the nearest other actor of the victim's team;
@@ -704,8 +705,9 @@ func _take(row: int, by: int, amount: int, quiet: bool) -> int:
 
 
 ## The body at row `row` died, killed by `by`: forget it, tell (`kill_landed` for a spell's own
-## hit, `enemy_died` for a body not on the wizards' team) and free it. A kit Actor that something
-## downs instead (`downable`) stays.
+## hit, `enemy_died` for a body not on the wizards' team, a kit actor by its own controller's team
+## so a possessed enemy still counts) and free it. A kit Actor that something downs instead
+## (`downable`) stays.
 func _die(row: int, by: int, where: Vector2, team: int) -> void:
 	var node: Node2D = _nodes[row]
 	var kit: Actor = node as Actor if _body[row] == BODY_ACTOR else null
@@ -715,7 +717,11 @@ func _die(row: int, by: int, where: Vector2, team: int) -> void:
 	if events != null:
 		if _tag != 0:
 			events.kill_landed.emit(by, node, where, _tag)
-		if team != ActorsScript.TEAM_WIZARDS:
+		# A possessed enemy is on its driver's team while it lasts, but its death is an enemy's
+		# (the wave counts on it): an actor counts by its own controller's team. Its depletion
+		# already ended the possession, so `team` (read before the hit) is the driver's.
+		var own_team: int = kit.home_controller.team if kit != null and kit.home_controller != null else team
+		if own_team != ActorsScript.TEAM_WIZARDS:
 			events.enemy_died.emit(by, node, where)
 	if kit != null:
 		kit.die(by)

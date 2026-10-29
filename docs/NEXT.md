@@ -29,6 +29,7 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 - [ ] **Entity kit (staffs B5).** (`gameplay/ai/`) After A6c.
 - [ ] **Shot look, part 1: small layered shots (staffs B6a).** (`core/projectiles/` drawing, the card classes, `content/spells/`) After B1. Small shots (a 3-5 px core from the carrier), the trail in the player colour, up to four look layers per shot from the cards (`look_layer`, two infusions and two modifiers) drawn by one shader; a sheet of every carrier with every infusion and of four players firing the same card. Split from B6 by the owner on 2026-10-26, because the bot's B3 (#279) is changing `gameplay/feel/` at the same time.
 - [ ] **Builder (staffs B8).** (`hud/builder/`) After A6c.
+- [ ] **Card rules: the owner's re-decisions and their implementation (rules R4).** (`core/spells/`, `content/spells/`) Needs the owner session: see [M2-rules.md](milestones/M2-rules.md), "R4". Stress and C2 (D3) waits for it.
 - [x] **Actors: the plan (actors G1).** (`docs/`) The design, [M2-actors.md](milestones/M2-actors.md), with the owner's decisions of 2026-10-28.
 - [x] **The actor table and tags (actors G2).** (`core/actors/`, `core/spells/spell_tag.gd`) After G1.
 - [x] **The projectile manager by actor (actors G3a).** (`core/projectiles/`) After G2.

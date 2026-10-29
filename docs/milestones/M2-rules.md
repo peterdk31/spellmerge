@@ -68,16 +68,16 @@ Since R3 the live matrix is printed by `tests/core/test_card_rules.gd` (✓ work
 | blast | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | hold | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ |
 | recoil | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| bounce | ✓ | W | W | ✓ | ✗ | ✗ | ✓ | ✓ | W | ✗ | ✓ | ✗ | ✗ |
+| bounce | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ |
 | echo | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| linger | ✓ | W | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | W | ✗ | ✗ | ✗ | ✗ |
+| linger | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | heavy / siphon / possess | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ |
-| sticky | ✓ | W | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | W | ✗ | ✗ | ✗ | ✗ |
+| sticky | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | magnet | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
-| ghost | ✓ | W | W | ✗ | ✗ | ✗ | ✓ | ✓ | W | ✗ | ✗ | ✗ | ✗ |
-| spiral | ✓ | W | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | W | ✗ | ✗ | ✗ | ✗ |
+| ghost | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
+| spiral | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | mirror | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ | ✗ |
-| growth | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
+| growth | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | relay | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
 | return | ✓ | W | W | W | W | W | ✓ | ✓ | W | W | W | W | W |
 | arc | ✓ | ✓ | ✓ | W | W | W | ✓ | ✓ | ✓ | W | W | W | W |
@@ -132,6 +132,7 @@ The owner's "pass that checks for the general rules", as a test that runs in the
 - Otherwise the card must change something observable: run the cast in a small scene (walls, a few targets, an ally), record a trace (hits and their profiles, shots and their paths, events, payload fires, the caster's moves) and compare with the same cast without the card. Identical traces mean a silent no-op: fail with "`<card>` on `<carrier>` does nothing and is not listed as wasted".
 - Per-behaviour probes where a plain diff is not enough (homing needs a target off the line, bounce a wall, ghost a wall behind a target, timer a long life, on wall a wall, on kill a target that dies): a small table of scene setups per card, chosen by the card's behaviour or event, not per carrier.
 - Prints the matrix (✓, W, ✗) so the PR shows coverage; a ✗ fails.
+- The other way round (R4b, owner item 22): every W cell is also played with the card forced on (`StaffCompiler.keep_wasted`, a test-only switch that keeps what the waste table would drop; the runtime decides). If that changes the cast (effects only: a wasted card's costs are no effect), the listing is wrong: "`<card>` on `<carrier>` is listed as wasted (`<reason>`) but changes the cast". Done; it found no false W on main (2026-10-29), slam's was already fixed by hand.
 - Rule 2 checks in the same test: a card's effect survives a bounce, a chain jump, an echo and a payload firing (the trace of the second leg still shows it). **Deferred:** not built in #468; tracked in docs/BACKLOG.md ("Card rules R3, rule 2 checks"). Done-when 2 holds without it.
 
 Build R3 right after R2 (it needs the honest compiler); R1 parts can land before or after.

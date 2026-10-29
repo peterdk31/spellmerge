@@ -889,7 +889,6 @@ func cast_staff(actor: int, staff: int, origin: Vector2, direction: Vector2, man
 		return REFUSED
 	_cast_count[index] += 1
 	_after_cast(index, compiled, cast)
-	_start_hold(index, actor, staff, cast)
 	_last_infused[actor] = null
 	for carrier in cast.group.spells:
 		if not carrier.element_ids.is_empty():
@@ -944,7 +943,7 @@ func _launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direct
 	var count: int = spell.shots
 	var made: int = 0
 	var carried: int = spell.chain_jumps if chain < 0 else chain
-	var lifetime: float = SpellLimits.HOLD_LIFETIME if spell.behaviour(ModifierBase.Behaviour.HOLD) > 0.0 else spell.lifetime
+	var lifetime: float = SpellLimits.HOLD_LIFETIME if _holds(spell, tag) else spell.lifetime
 	if spell.motion == FormBase.Motion.DASH or spell.motion == FormBase.Motion.TELEPORT:
 		return _move_caster(spell, tag, actor, origin, direction)
 	if spell.motion == FormBase.Motion.DECOY or spell.motion == FormBase.Motion.FAMILIAR:
@@ -1361,6 +1360,8 @@ func _fire_spell(spell: CompiledSpell, actor: int, staff: int, generation: int, 
 		if backwards > 0:
 			_recoil(spell, tag, actor, origin, -heading)
 	_echo_spell = null
+	if launched > 0 and _holds(spell, tag):
+		_start_hold(tag)
 	# `on cast`: the payload leaves at once, from where the carrier did, cast by the carrier's caster.
 	if launched > 0 and spell.payload != null and spell.trigger_event == TriggerBase.Event.CAST:
 		if from_caster:
@@ -3246,18 +3247,49 @@ func _release_generation(actor: int, staff: int, generation: int) -> void:
 		_erase_generation(key)
 
 
-## After a cast: its sustained (`hold`) carriers that made shots stay on and reserve the cast's
-## mana until they are switched off (`cast_staff` again, an edit) or their last shot ends.
-func _start_hold(index: int, actor: int, staff: int, cast: CompiledCast) -> void:
-	var tags: PackedInt64Array = _hold_tags[index]
-	for spell in cast.group.spells:
-		if spell.fallback == CompiledSpell.FALLBACK_NONE and spell.behaviour(ModifierBase.Behaviour.HOLD) > 0.0:
-			var tag: int = SpellTag.make(actor, staff, spell.node, _current[index])
-			if _live.get(tag, 0) > 0:
-				tags.append(tag)
-	if not tags.is_empty():
-		_hold_mana[index] = cast.mana
-		_send_reserved(actor)
+## True when `spell`, fired under `tag`, is a sustained (`hold`) carrier: it has the card and its
+## build is still its staff's. A hold of an older build (the staff was edited, or its caster
+## closed, while a shot that fires it was in the air) was switched off with it: it lives its own life.
+func _holds(spell: CompiledSpell, tag: int) -> bool:
+	return spell.behaviour(ModifierBase.Behaviour.HOLD) > 0.0 and _is_current(tag)
+
+
+## A sustained (`hold`) carrier made shots: it stays on and its staff reserves the mana of the
+## cast it belongs to until it is switched off (`cast_staff` again, an edit) or its last shot ends.
+## The same for every firing: the cast's own carrier, a payload's, a burst's later firing. The
+## firings of one carrier share its tag, so it is listed once; a staff reserves one cast's mana.
+func _start_hold(tag: int) -> void:
+	if _live.get(tag, 0) <= 0:
+		return
+	var actor: int = SpellTag.caster_of(tag)
+	var index: int = actor * SpellLimits.STAFFS + SpellTag.staff_of(tag)
+	if _hold_tags[index].has(tag):
+		return
+	if _hold_tags[index].is_empty():
+		_hold_mana[index] = _cast_mana_of(_installed[index], SpellTag.node_of(tag))
+	_hold_tags[index].append(tag)
+	_send_reserved(actor)
+
+
+## The mana of the cast of `compiled` that `node` belongs to (its own carrier or one of its
+## payloads), or 0.0 when none has it.
+func _cast_mana_of(compiled: CompiledStaff, node: int) -> float:
+	if compiled == null:
+		return 0.0
+	for cast in compiled.casts:
+		if _group_has(cast.group, node):
+			return cast.mana
+	return 0.0
+
+
+## True when `node` is a carrier of `group` or of a payload below it.
+func _group_has(group: CompiledGroup, node: int) -> bool:
+	if group == null:
+		return false
+	for spell in group.spells:
+		if spell.node == node or _group_has(spell.payload, node) or _group_has(spell.own_payload, node):
+			return true
+	return false
 
 
 ## Switches off the sustained carriers of this staff: their shots go, their mana is free.

@@ -119,3 +119,67 @@ func test_four_players_hold_each() -> void:
 		check(arena.spells.is_holding(player, 0), "player %d is holding" % player)
 		check(float(reserved.get(player, 0.0)) > 0.0, "player %d has mana reserved" % player)
 	arena.free_all()
+
+
+## The held orbit a bolt fires when it hits (`on hit · bolt · hold · orbit`), as a node and its
+## tag, from `compiled`; -1 when the cards do not read that way.
+func _payload_node(compiled: CompiledStaff) -> int:
+	if compiled == null or compiled.casts.is_empty():
+		return -1
+	var bolt: CompiledSpell = compiled.casts[0].group.spells[0]
+	if bolt.payload == null or bolt.payload.is_empty():
+		return -1
+	var orbit: CompiledSpell = bolt.payload.spells[0]
+	return orbit.node if orbit.behaviour(ModifierBase.Behaviour.HOLD) > 0.0 else -1
+
+
+## Phase R, R1f (docs/milestones/M2-rules.md, finding 13): a hold carrier in a payload is a hold
+## like the cast's own. It switches its staff on, reserves the cast's mana, and the next cast
+## switches it off. It used to live for ever, unlisted: no reservation, and no way to end it.
+func test_a_held_payload_holds_and_the_next_cast_ends_it() -> void:
+	var arena := ArenaScript.new(root)
+	var reserved: Array[float] = [0.0]
+	arena.bus.mana_reserved.connect(func(seat: int, amount: float) -> void:
+		if seat == 0:
+			reserved[0] = amount)
+	arena.add_imp(Vector2(60.0, 0.0), 100000)
+	var compiled: CompiledStaff = arena.install_cards(0, 0, ["on_hit", "bolt", "hold", "orbit"])
+	var node: int = _payload_node(compiled)
+	check(node >= 0, "the bolt carries a held orbit as its payload")
+	if node < 0:
+		arena.free_all()
+		return
+	var tag: int = arena.spells.current_tag(0, 0, node)
+	check(arena.cast(0, 0), "the bolt is cast")
+	arena.run(LONG + 1.0)
+	check(arena.spells.live_shots(tag) > 0, "the held orbit outlives its lifetime")
+	check(arena.spells.is_holding(0, 0), "and switches its staff on")
+	check_equal(arena.spells.reserved_mana(0), compiled.casts[0].mana, "it reserves the cast's mana")
+	check_equal(reserved[0], compiled.casts[0].mana, "and tells the seat's HUD")
+	check(arena.cast(0, 0), "the next press is taken")
+	arena.run(0.5)
+	check_equal(arena.spells.live_shots(tag), 0, "and switches the held orbit off")
+	check(not arena.spells.is_holding(0, 0), "the staff holds nothing")
+	check_equal(arena.spells.reserved_mana(0), 0.0, "and its mana is free")
+	check_equal(reserved[0], 0.0, "the HUD hears it")
+	arena.free_all()
+
+
+## An edit switches a staff's holds off. A shot of the old build still in the air may fire its
+## held payload later: that build holds nothing any more, so the payload lives its own life.
+func test_a_held_payload_of_an_edited_build_lives_its_own_life() -> void:
+	var arena := ArenaScript.new(root)
+	arena.add_imp(Vector2(150.0, 0.0), 100000)
+	var compiled: CompiledStaff = arena.install_cards(0, 0, ["on_hit", "bolt", "hold", "orbit"])
+	var node: int = _payload_node(compiled)
+	var tag: int = arena.spells.current_tag(0, 0, node)
+	check(arena.cast(0, 0), "the bolt is cast")
+	arena.run(0.05)
+	arena.install_cards(0, 0, ["on_hit", "bolt", "hold", "orbit"])
+	arena.run(1.0)
+	check(arena.spells.live_shots(tag) > 0, "the old bolt hit and fired its orbit")
+	check(not arena.spells.is_holding(0, 0), "which switches nothing on")
+	check_equal(arena.spells.reserved_mana(0), 0.0, "and reserves nothing")
+	arena.run(LONG)
+	check_equal(arena.spells.live_shots(tag), 0, "it ends after an orbit's lifetime")
+	arena.free_all()

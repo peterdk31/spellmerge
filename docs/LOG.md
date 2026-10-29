@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-29: Builder tab glyphs
+
+The builder's staff tabs now show the staff button (RB, RT, LB, LT on a pad, keys on the keyboard) drawn by `ActionGlyph`, still marked "[ ]" on the shown staff. The tab text is blank spaces (measured as a whole run) that hold the glyph; the glyph is placed over them. New test in `test_builder.gd`.
+
 ## 2026-10-29: Card familiar (staffs C)
 
 Added the Familiar carrier (data only: `.tres`, icon, assets, lore), the combos `familiar_bolt` and `familiar_and_frost`, and `test_familiar.gd` (the card's data, the entity it asks for near the caster, four players). The combo arena has no `ai`, so the combos check that the cast asks for a familiar (the `spawned` check) and that the other staff works beside it; the familiar's casts are covered by the Entities and spells tests.

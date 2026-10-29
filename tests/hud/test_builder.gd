@@ -190,6 +190,36 @@ func test_a_tab_shows_another_staff() -> void:
 	check_equal(_requests.back(), [0, A, 1, &"bolt"], "a pick goes to the staff shown")
 
 
+func test_the_tabs_show_the_staff_buttons_and_follow_the_device() -> void:
+	_start(4, true)
+	root.size = Vector2i(640, 360)
+	for player in 4:
+		_open(player)
+	await process_frame
+	await process_frame
+	var builder: BuilderScript = _builder(0)
+	var labels: Array[String] = []
+	for staff in 4:
+		check_equal(builder.tab_glyph(staff).action(), StringName("staff_%d" % (staff + 1)), "tab %d shows staff_%d" % [staff + 1, staff + 1])
+		labels.append(builder.tab_glyph(staff).current_glyph()["label"])
+		check(_tab_room(builder, staff) >= builder.tab_glyph(staff).custom_minimum_size.x, "tab %d leaves room for its glyph: '%s'" % [staff + 1, builder.tab_button(staff).text])
+	check_equal(labels, ["RB", "RT", "LB", "LT"], "the pad's shoulder buttons")
+	check(builder.tab_button(X).text.contains("[") and builder.tab_button(X).text.contains("]"), "the shown staff keeps its [ ] mark: '%s'" % builder.tab_button(X).text)
+	check(not builder.tab_button(A).text.contains("["), "and the others do not: '%s'" % builder.tab_button(A).text)
+	_input.leave(0)
+	_input.join(InputManagerScript.KEYBOARD)
+	await process_frame
+	check_equal(builder.tab_glyph(A).current_glyph()["label"], "Space", "on the keyboard the tabs show keys, live")
+	check(_tab_room(builder, A) >= builder.tab_glyph(A).custom_minimum_size.x, "and the wider key has its room: '%s'" % builder.tab_button(A).text)
+
+
+## The width of the blank between a tab's brackets (all of its text but the marks).
+func _tab_room(builder: BuilderScript, staff: int) -> float:
+	var tab: Button = builder.tab_button(staff)
+	var blank: String = tab.text.replace("[", "").replace("]", "").replace(">", "")
+	return tab.get_theme_font("font").get_string_size(blank, HORIZONTAL_ALIGNMENT_LEFT, -1, tab.get_theme_font_size("font_size")).x
+
+
 func test_back_on_a_card_returns_to_the_slot_and_elsewhere_closes() -> void:
 	_start(1)
 	_open(0)

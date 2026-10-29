@@ -49,6 +49,7 @@ const EventsScript := preload("res://core/events/events.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
 const SpellsScript := preload("res://core/spells/spells.gd")
 const HintLineScript := preload("res://hud/widgets/hint_line.gd")
+const ActionGlyphScript := preload("res://hud/widgets/action_glyph.gd")
 const RowWindowScript := preload("res://hud/widgets/row_window.gd")
 const InputManagerScript := preload("res://core/input/input_manager.gd")
 
@@ -102,6 +103,8 @@ const HINT_DROP: String = "Drop"
 const HINT_ROW: String = "Put in"
 const HINT_BACK: String = "back"
 const HINT_TAB: String = "Show staff"
+## The most spaces a tab holds its glyph in.
+const TAB_ROOM_MAX: int = 40
 const HINT_CLOSE: String = "Close"
 const HINT_ACTION: StringName = &"accept"
 const HINT_BACK_ACTION: StringName = &"back"
@@ -142,6 +145,8 @@ var _pressed: Control = null
 
 var _title: Label = null
 var _tabs: Array[Button] = []
+## The staff button each tab shows (`staff_1` to `staff_4`), drawn over the room its text leaves.
+var _tab_glyphs: Array[ActionGlyphScript] = []
 var _close: Button = null
 var _slots: Array[Button] = []
 var _slots_window: Control = null
@@ -182,6 +187,11 @@ func _ready() -> void:
 		var tab: Button = _make_button(tabs, "Tab%s" % STAFF_NAMES[staff])
 		tab.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		_tabs.append(tab)
+		var glyph := ActionGlyphScript.new()
+		glyph.name = "Glyph"
+		tab.add_child(glyph)
+		_tab_glyphs.append(glyph)
+		tab.resized.connect(_layout_tab_glyphs)
 	_close = _make_button(tabs, "Close")
 	_close.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var lists := HBoxContainer.new()
@@ -209,6 +219,13 @@ func _ready() -> void:
 ## and descriptions (called once by `panels.gd`).
 func bind(events: EventsScript, ui_focus: UIFocusScript, spells: SpellsScript, input: InputManagerScript = null) -> void:
 	_hint.bind(input)
+	for staff in STAFF_COUNT:
+		_tab_glyphs[staff].bind(input)
+		_tab_glyphs[staff].show_action(index, StringName("staff_%d" % (staff + 1)))
+	# A new device changes a glyph's width: the tabs make room for it once the glyphs have redrawn.
+	var manager: InputManagerScript = input if input != null else get_node_or_null("/root/PlayerInput") as InputManagerScript
+	if manager != null:
+		manager.glyph_kind_changed.connect(_on_glyph_kind_changed)
 	_events = events
 	_ui_focus = ui_focus
 	_spells = spells
@@ -298,6 +315,11 @@ func slot_count() -> int:
 
 func tab_button(staff: int) -> Button:
 	return _tabs[staff]
+
+
+## The glyph drawn on staff `staff`'s tab.
+func tab_glyph(staff: int) -> ActionGlyphScript:
+	return _tab_glyphs[staff]
 
 
 func close_button() -> Button:
@@ -428,8 +450,7 @@ func _render() -> void:
 	var cards: Array[StringName] = cards_of(_viewed)
 	_slot = clampi(_slot, 0, maxi(cards.size() - 1, 0))
 	_title.text = "P%d Staff %s" % [index + 1, STAFF_NAMES[_viewed]]
-	for staff in STAFF_COUNT:
-		_set_text(_tabs[staff], STAFF_NAMES[staff] if staff != _viewed else "[%s]" % STAFF_NAMES[staff])
+	_render_tabs()
 	_set_text(_close, "Close")
 	while _slots.size() < cards.size():
 		_slots.append(_make_row(_slots_holder, "Slot%d" % _slots.size()))
@@ -584,9 +605,55 @@ func _rebuild_controls() -> void:
 		_controls.append(_rows[row])
 
 
+## A tab's text is only the room for its glyph: blank, or between "[" and "]" on the shown
+## staff, so the shown tab is not told by colour alone. The glyph can change width when the
+## player's device changes, so the room is made again then.
+func _render_tabs() -> void:
+	for staff in STAFF_COUNT:
+		var room: String = " ".repeat(_tab_room(staff))
+		_set_text(_tabs[staff], "[%s]" % room if staff == _viewed else room)
+
+
+func _on_glyph_kind_changed(player: int) -> void:
+	if player == index:
+		_render_tabs.call_deferred()
+
+
+## How many spaces hold staff `staff`'s glyph.
+func _tab_room(staff: int) -> int:
+	var tab: Button = _tabs[staff]
+	var font: Font = tab.get_theme_font("font")
+	var size: int = tab.get_theme_font_size("font_size")
+	var wanted: float = _tab_glyphs[staff].custom_minimum_size.x + 2.0
+	var spaces: int = 1
+	# Measure the whole run: spaces do not add up one by one (kerning, rounding).
+	while spaces < TAB_ROOM_MAX and font.get_string_size(" ".repeat(spaces), HORIZONTAL_ALIGNMENT_LEFT, -1, size).x < wanted:
+		spaces += 1
+	return spaces
+
+
+## Put each glyph in its tab's blank: the text is centred, so measure what comes before it.
+func _layout_tab_glyphs() -> void:
+	for staff in STAFF_COUNT:
+		var tab: Button = _tabs[staff]
+		var glyph: Control = _tab_glyphs[staff]
+		var font: Font = tab.get_theme_font("font")
+		var size: int = tab.get_theme_font_size("font_size")
+		var text: String = tab.text
+		var room_chars: int = _tab_room(staff)
+		var tail: int = room_chars + (1 if text.ends_with("]") else 0)
+		var total: float = font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+		var before: float = font.get_string_size(text.substr(0, text.length() - tail), HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+		var room: float = font.get_string_size(" ".repeat(room_chars), HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+		var x: float = (tab.size.x - total) * 0.5 + before + (room - glyph.custom_minimum_size.x) * 0.5
+		glyph.position = Vector2(roundf(x), roundf((tab.size.y - glyph.custom_minimum_size.y) * 0.5))
+
+
 func _set_text(button: Button, text: String) -> void:
 	button.set_meta(BASE_TEXT_META, text)
 	button.text = (FOCUS_MARK if button == _focused else "") + text
+	if _tabs.has(button):
+		_layout_tab_glyphs()
 
 
 ## Show the focus mark on the focused control only.
@@ -596,6 +663,7 @@ func _apply_marks() -> void:
 		var base: String = str(button.get_meta(BASE_TEXT_META, ""))
 		button.text = (FOCUS_MARK if button == _focused else "") + base
 		button.theme_type_variation = FOCUS_VARIATION if button == _focused else BUTTON_VARIATION
+	_layout_tab_glyphs()
 	# The note and the hint follow the focus, however it moved.
 	_render_note()
 

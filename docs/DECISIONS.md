@@ -2,6 +2,10 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-29: Builder tab glyphs sit over blank tab text
+
+A tab is a Button whose text is only blank room for its glyph (between "[" and "]" on the shown staff), with an `ActionGlyph` child placed over it. This keeps the button theme, the focus mark and the mouse hit area, and the "[ ]" mark means the shown staff is not told by colour alone. The room is re-measured when the player's device changes (a deferred render, after the glyphs have redrawn).
+
 ## 2026-10-28: Wall card numbers
 
 Wall is a complexity-2 carrier: five still stones 9 px apart (a 36 px row plus the stone radius). The stones are 10 px across, so neighbours overlap by 1 px on purpose: the row has no gap to slip through, and an enemy touching two stones at once can take both hits, which is what a wall of stones should do raised 28 px ahead (the engine's `WALL_REACH`), 3 damage each, 6 mana, a 1 s cooldown, and stones that last 5 s. A stone is spent by its first hit (no pierce), so the row is a barrier of several small hits rather than one big trap like the rune. Not in the free demo.

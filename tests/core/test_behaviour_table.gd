@@ -57,3 +57,13 @@ func test_a_wasted_card_changes_nothing_else() -> void:
 	var heavy: CompiledSpell = _staff(["heavy", "dash"]).casts[0].group.spells[0]
 	check_equal(heavy.speed, plain.speed, "the same speed")
 	check_equal(heavy.behaviour(ModifierBase.Behaviour.HEAVY), 0.0, "no heavy strength")
+
+
+func test_infusions_and_numbers_that_mean_nothing_are_listed() -> void:
+	# Found by tests/core/test_card_rules.gd: silent on main before R2.
+	for cards: Array in [["fire", "dash"], ["frost", "decoy"], ["mend", "rain"], ["overcharge", "teleport"], ["sniper", "rune"], ["split", "dash"], ["slow", "fissure"], ["pierce", "swing"], ["timer", "hook", "nova"], ["arc", "nova"]]:
+		var staff: CompiledStaff = _staff(cards)
+		check(staff.wasted.has(0), "%s is listed as wasted: %s" % [cards, staff.wasted])
+	for cards: Array in [["fire", "blast", "dash"], ["overcharge", "blast", "teleport"], ["sniper", "bolt"], ["pierce", "rune"], ["timer", "bolt", "nova"], ["arc", "bolt"], ["slow", "bolt"]]:
+		var staff: CompiledStaff = _staff(cards)
+		check(not staff.wasted.has(0), "%s counts: %s" % [cards, staff.wasted])

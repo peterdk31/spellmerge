@@ -2175,3 +2175,7 @@ The owner: restructure the projectile step from "for each shot, check every beha
 - **Rules 2 and 6, docs/milestones/M2-rules.md finding 3:** a flying chain jump is its carrier fired again from the hit: homing, bounce, ghost, spiral, linger, growth, sticky, return, shield and pierce ride on (`Spells._apply_travel`, which now also sets homing, is the one place for a shot from the staff and a jump), as arc, magnet and its trigger already did, with one jump fewer. Before, each jump was a plain bolt with pierce 0.
 - **Only the aim, the source exclusion and the speed differ:** a jump flies at least `CHAIN_MIN_SPEED` (a rune or a slow orb has no speed of its own to jump at) and as far as its carrier would fly (`lifetime × speed`, at least far enough to reach its target); before, it lived just long enough to reach its target.
 - **Not changed (R4):** a beam's or fissure's jump is still a ray that pierces nothing.
+
+## 2026-10-29: Heavy and growth cards multiply (phase R, R1c)
+
+- **Rule 3, docs/milestones/M2-rules.md finding 16:** behaviour strengths were summed for every card, but heavy's strength is a knockback factor and growth's a growth rate: two heavy cards gave ×8, not ×16. `StaffCompiler.stacked` now multiplies the behaviours in `MULTIPLIED` (heavy, growth) and adds the rest (counts, seconds, pixels). Homing keeps its own stacking (`HOMING_STACK`). Two growth cards are ×4 either way; three are ×8 now (×6 before).

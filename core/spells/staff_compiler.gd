@@ -11,6 +11,9 @@ extends RefCounted
 ## land on the caster (the cast's own group) or on the payload's origin (a payload). Nothing is
 ## refused: a card that does nothing is listed as wasted, with the reason.
 
+## The behaviours whose strength is a factor: more cards multiply it (`stacked`).
+const MULTIPLIED: Array[int] = [ModifierBase.Behaviour.HEAVY, ModifierBase.Behaviour.GROWTH]
+
 ## `CompiledCast.targets` value for a card that landed on the caster, and on a payload's origin.
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 const TARGET_CASTER: int = -1
@@ -290,7 +293,7 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 		spell.lifetime *= modifier.lifetime_mult
 		if modifier.behaviour == ModifierBase.Behaviour.ARC:
 			spell.arc_reach = maxf(spell.arc_reach, modifier.behaviour_reach)
-		spell.behaviours[modifier.behaviour] += modifier.behaviour_strength
+		spell.behaviours[modifier.behaviour] = stacked(modifier.behaviour, spell.behaviours[modifier.behaviour], modifier.behaviour_strength)
 		match modifier.behaviour:
 			ModifierBase.Behaviour.HOMING:
 				# Homing stacks by multiplying: the strongest card's turn rate, x HOMING_STACK for
@@ -364,6 +367,16 @@ static func zap_hit(hit: HitProfile) -> HitProfile:
 	var zap: HitProfile = hit.scaled(SpellLimits.ARC_DAMAGE, SpellLimits.ARC_DAMAGE)
 	zap.kind = &"ray"
 	return zap
+
+
+## The strength of `behaviour` after one more card of `strength` on top of `before` (0 for none):
+## counts add (bounces, shields, seconds, pixels) and multipliers multiply (heavy's knockback,
+## growth's factor; rule 3, docs/milestones/M2-rules.md R1c), so two heavy cards are 4 x 4, not 4 + 4.
+## Homing multiplies too, by its own rule (HOMING_STACK).
+static func stacked(behaviour: int, before: float, strength: float) -> float:
+	if before > 0.0 and MULTIPLIED.has(behaviour):
+		return before * strength
+	return before + strength
 
 
 ## Whether homing can steer a carrier of `motion`: what it moves turns toward a target as it

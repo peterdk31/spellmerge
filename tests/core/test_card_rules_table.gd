@@ -2,7 +2,8 @@ extends "res://tests/support/suite.gd"
 ## Tests for the table of what a card does on a carrier (`CardRules`, rules R2): every behaviour
 ## and trigger event against every motion is "runs" or has a reason, the audit's silent cells
 ## (docs/milestones/M2-rules.md, "Card x carrier") are listed as wasted, and the compiler lists
-## exactly what the table says, melee carriers included.
+## exactly what the table says, melee carriers included. That the runtime does what a "runs" cell
+## says is not tested here (rules R3).
 ##
 ## godot --headless --path . --script res://tests/core/test_card_rules_table.gd
 
@@ -130,9 +131,6 @@ func test_the_compiler_wastes_exactly_what_the_table_says() -> void:
 		for behaviour in ModifierBase.Behaviour.values():
 			if behaviour == ModifierBase.Behaviour.NONE:
 				continue
-			# Shield and deflect also meet each other (a deflect first), tested with deflect.
-			if behaviour == ModifierBase.Behaviour.DEFLECT or behaviour == ModifierBase.Behaviour.SHIELD:
-				continue
 			_modifier(behaviour)
 			var staff: CompiledStaff = _compile([&"card", &"carrier"])
 			var where: String = "%s on %s" % [ModifierBase.Behaviour.keys()[behaviour], _motion_name(motion)]
@@ -141,6 +139,28 @@ func test_the_compiler_wastes_exactly_what_the_table_says() -> void:
 			if expected:
 				var reason: String = staff.wasted[0]
 				check(reason.contains(CardRules.behaviour_why_not(behaviour, motion)), "%s: the reason is the table's: %s" % [where, reason])
+
+
+func test_shield_and_deflect_meet_on_every_carrier() -> void:
+	var shield := ModifierBase.new()
+	shield.behaviour = ModifierBase.Behaviour.SHIELD
+	shield.behaviour_strength = 1.0
+	_put(shield, &"shield")
+	var deflect := ModifierBase.new()
+	deflect.behaviour = ModifierBase.Behaviour.DEFLECT
+	deflect.behaviour_strength = 1.0
+	_put(deflect, &"deflect")
+	for motion in FormBase.Motion.values():
+		_carrier(motion)
+		var where: String = _motion_name(motion)
+		var alone: CompiledStaff = _compile([&"shield", &"carrier"])
+		check_equal(alone.wasted.has(0), not CardRules.behaviour_runs(ModifierBase.Behaviour.SHIELD, motion), "shield on %s: wasted as the table says" % where)
+		alone = _compile([&"deflect", &"carrier"])
+		check_equal(alone.wasted.has(0), not CardRules.behaviour_runs(ModifierBase.Behaviour.DEFLECT, motion), "deflect on %s: wasted as the table says" % where)
+		var both: CompiledStaff = _compile([&"deflect", &"shield", &"carrier"])
+		var meet: bool = CardRules.behaviour_runs(ModifierBase.Behaviour.SHIELD, motion) and CardRules.behaviour_runs(ModifierBase.Behaviour.DEFLECT, motion)
+		if meet and both.wasted.has(1):
+			check(String(both.wasted[1]).contains("deflect turns every shot"), "shield with deflect on %s: the reason says so: %s" % [where, both.wasted[1]])
 
 
 func test_the_compiler_wastes_a_trigger_its_carrier_never_sets_off() -> void:

@@ -6,6 +6,12 @@ extends RefCounted
 ## cannot run is listed as wasted with the reason, and the runtime never sees it), and the
 ## runtime's own checks (`homing_steers`, `guards`) read the same rows, so the two cannot drift.
 ##
+## Not in the table, by design: what a card means on a fallback (cards left over with no carrier to
+## ride: `TRAVEL_ONLY` in the compiler) and a shield that a deflect on the same carrier leaves with
+## nothing to do (`_shield_outrun`). Both are about how cards meet each other, not about a carrier.
+## The table is also only what the compiler lists: that the runtime does what a "runs" cell says is
+## rules R3's job.
+##
 ## Adding a carrier (a `FormBase.Motion`) or a card kind: add its row or column here. A motion
 ## with no entry runs only what is `ALL`, and every other card on it is listed as wasted.
 ## Making a wasted cell work (R4) means changing the runtime and the row in one PR.
@@ -117,8 +123,8 @@ const BEHAVIOUR_NEEDS: Dictionary = {
 	Behaviour.POSSESS: "a hit to take over with",
 	Behaviour.SHIELD: "something that blocks shots",
 	Behaviour.DEFLECT: "something that touches shots",
-	Behaviour.HOLD: "a carrier that lasts",
-	Behaviour.RECOIL: "a push that is not already its move",
+	Behaviour.HOLD: "a carrier that stays in the room",
+	Behaviour.RECOIL: "a shot or beam to push you back",
 	Behaviour.BOUNCE: "a shot that reaches walls",
 	Behaviour.LINGER: "a shot that flies",
 	Behaviour.STICKY: "a shot that flies",
@@ -129,7 +135,7 @@ const BEHAVIOUR_NEEDS: Dictionary = {
 	Behaviour.MAGNET: "a shot that stays in the air",
 	Behaviour.RELAY: "a shot that stays in the air",
 	Behaviour.ARC: "a shot that stays in the air",
-	Behaviour.MIRROR: "an aimed carrier that can fire backwards",
+	Behaviour.MIRROR: "a carrier you aim",
 }
 
 ## What each trigger needs.

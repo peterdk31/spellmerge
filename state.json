@@ -9,7 +9,6 @@
     "number": 399
   },
   "errors_in_a_row": 0,
-  "idle": null,
   "intake_tasks": {
     "208": {
       "author": "Brianmanden",
@@ -28,7 +27,7 @@
       "title": "Spell visuals round 2: particles per type, combo animations, polish"
     }
   },
-  "last_own_merge": "2026-10-29T03:14:00Z",
+  "last_own_merge": "2026-10-29T03:23:00Z",
   "last_plan": "2026-10-26T11:52:51Z",
   "last_weekly": "2026-10-25T10:11:43Z",
   "panel_applied": {

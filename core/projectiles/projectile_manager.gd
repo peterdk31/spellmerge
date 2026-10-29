@@ -49,8 +49,9 @@ extends Node2D
 ## (`ramp_look`), one layer above, so a dangerous shot never hides under a friendly one (staffs
 ## F9b: the old enemy shot's own texture is gone). One shader per kind of thing drawn, each in a
 ## batch of its own (the owner, 2026-10-29; core/README.md, "The shot shaders"): a flying shot
-## and its trail by `shot_trail.gdshader`, as a ribbon (`trail_mesh`: a quad per piece of its
-## path, so no pixel walks the whole path), a rune by `shot_rune.gdshader`.
+## and its trail by `shot_trail.gdshader`, as small quads its vertex stage places (`trail_mesh`:
+## a quad per tail pixel, particle and light, so the fragment stage stays small), a rune by
+## `shot_rune.gdshader`.
 ##
 ## Casters (actors G3a, docs/milestones/M2-actors.md): a shot's caster is an actor id (0 to
 ## ACTORS - 1, `core/actors`) or NO_PLAYER (`Actors.NONE`, a shot of no actor). Nothing here
@@ -366,6 +367,33 @@ const MIN_TRAIL_ROWS: int = 64
 const TRAIL_HEAD: int = 1
 const TRAIL_ORBIT: int = 2
 const TRAIL_DASH: int = 4
+## The quad kinds of a trail's mesh (`trail_mesh`; the shader's Q_*): the core's light, a piece's
+## light (a dash: a speed streak's), a particle's light, a particle, a tail pixel (a dash: a speed
+## streak), a step of lightning's jagged line, the core.
+const TRAIL_Q_HEAD_LIGHT: int = 0
+const TRAIL_Q_PIECE_LIGHT: int = 1
+const TRAIL_Q_SPARK_LIGHT: int = 2
+const TRAIL_Q_SPARK: int = 3
+const TRAIL_Q_TAIL: int = 4
+const TRAIL_Q_JAG: int = 5
+const TRAIL_Q_CORE: int = 6
+## Slots a trail has for its particles (one per 60th of a second it keeps), its tail pixels (one
+## per pixel of travel; a tail longer than this, a very fast shot's, loses its oldest end) and the
+## steps of lightning's line (a tenth of a second at 4 px a step).
+const TRAIL_SPARKS: int = int(TRAIL_KEEP * 60.0) + 1
+const TRAIL_TAIL_PIXELS: int = 128
+const TRAIL_JAGS: int = 16
+## The quads of a trail's mesh in draw order: (kind, slots, 1 when drawn oldest first). The
+## lights are added, so only the head's goes first (void's dark heart dims what is under it).
+const TRAIL_QUADS: Array[Vector3i] = [
+	Vector3i(TRAIL_Q_HEAD_LIGHT, 1, 0),
+	Vector3i(TRAIL_Q_PIECE_LIGHT, TRAIL_SAMPLES, 0),
+	Vector3i(TRAIL_Q_SPARK_LIGHT, TRAIL_SPARKS, 0),
+	Vector3i(TRAIL_Q_SPARK, TRAIL_SPARKS, 1),
+	Vector3i(TRAIL_Q_TAIL, TRAIL_TAIL_PIXELS, 1),
+	Vector3i(TRAIL_Q_JAG, TRAIL_JAGS, 1),
+	Vector3i(TRAIL_Q_CORE, 1, 0),
+]
 ## What holds a trail row, when it is not a shot's slot.
 const ROW_FREE: int = -1
 const ROW_FADING: int = -2
@@ -642,7 +670,7 @@ var _enemy_room: int = 0
 var _enemy_rune_node: MultiMeshInstance2D = null
 var _enemy_rune_buffer: PackedFloat32Array = PackedFloat32Array()
 var _enemy_rune_room: int = 0
-## The ribbon every trail instance is drawn as (`trail_mesh`), made once.
+## The mesh every trail instance is drawn as (`trail_mesh`), made once.
 static var _trail_mesh: ArrayMesh = null
 ## Trails (see TRAIL_SAMPLES): each shot's row (-1 for none), and per row its samples (`trail_data`
 ## in the shader), the number of its newest sample, how many it keeps, how far it has gone, its
@@ -740,7 +768,7 @@ func _ready() -> void:
 
 
 ## One batched draw of up to `_cap` instances (TRANSFORM_2D plus a colour and custom data each)
-## by `shader`, added as a child: each a quad, or each a `mesh` (the trails' ribbon).
+## by `shader`, added as a child: each a quad, or each a `mesh` (the trails' mesh).
 func _make_batch(z: int, shader: Shader, mesh: Mesh) -> MultiMeshInstance2D:
 	var node := MultiMeshInstance2D.new()
 	if mesh == null:
@@ -763,33 +791,29 @@ func _make_batch(z: int, shader: Shader, mesh: Mesh) -> MultiMeshInstance2D:
 	return node
 
 
-## The ribbon a trail is drawn as (`shot_trail.gdshader`, RIBBONS there): a quad for its head
-## (piece 0) and one for each piece of its path between two samples (pieces 1 to TRAIL_SAMPLES),
-## all twice: first the light (the head, then the pieces), then the pixels (the oldest piece
-## first, the head last). The shader places every quad from the trail's data; a vertex says which
-## quad and corner it is in its UV: x the piece + 0.25 or 0.75, y the pass (0 light, 1 pixels) +
-## 0.25 or 0.75. Made once, shared by every trail batch.
+## The mesh a trail is drawn as (`shot_trail.gdshader`, PARTICLES ARE GEOMETRY there): small
+## quads, each told in its UV which quad kind (TRAIL_Q_*) and slot it is, in TRAIL_QUADS' order
+## (the lights first, then the pixels, oldest first and the core last). The shader places every
+## quad from the trail's data, or folds it away; a vertex says which quad and corner it is in its
+## UV: x the slot + 0.25 or 0.75, y the kind + 0.25 or 0.75. Made once, shared by every trail
+## batch.
 static func trail_mesh() -> ArrayMesh:
 	if _trail_mesh != null:
 		return _trail_mesh
-	var pieces: PackedInt32Array = PackedInt32Array()
-	for piece in TRAIL_SAMPLES + 1:
-		pieces.append(piece)
-	for back in TRAIL_SAMPLES + 1:
-		pieces.append(TRAIL_SAMPLES - back)
 	var verts := PackedVector2Array()
 	var uvs := PackedVector2Array()
 	var colors := PackedColorArray()
 	var indices := PackedInt32Array()
 	var corners: Array[Vector2] = [Vector2(0.0, 0.0), Vector2(1.0, 0.0), Vector2(1.0, 1.0), Vector2(0.0, 1.0)]
-	for n in pieces.size():
-		var light_pass: int = 0 if n <= TRAIL_SAMPLES else 1
-		var base: int = verts.size()
-		for corner: Vector2 in corners:
-			verts.append(corner)
-			uvs.append(Vector2(float(pieces[n]) + 0.25 + 0.5 * corner.x, float(light_pass) + 0.25 + 0.5 * corner.y))
-			colors.append(Color.WHITE)
-		indices.append_array(PackedInt32Array([base, base + 1, base + 2, base, base + 2, base + 3]))
+	for entry: Vector3i in TRAIL_QUADS:
+		for n in entry.y:
+			var slot: int = entry.y - 1 - n if entry.z == 1 else n
+			var base: int = verts.size()
+			for corner: Vector2 in corners:
+				verts.append(corner)
+				uvs.append(Vector2(float(slot) + 0.25 + 0.5 * corner.x, float(entry.x) + 0.25 + 0.5 * corner.y))
+				colors.append(Color.WHITE)
+			indices.append_array(PackedInt32Array([base, base + 1, base + 2, base, base + 2, base + 3]))
 	var arrays: Array = []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = verts
@@ -3077,7 +3101,7 @@ func _write_quad(buffer: PackedFloat32Array, i: int, dir: Vector2, diameter: flo
 
 ## Write trail `row`'s instance at float index `i` of `buffer` (-1: a shot without a trail, drawn
 ## by its core alone): its data in the transform, which `shot_trail.gdshader` reads back (its
-## ribbon is placed from it; the batch sits untransformed at the origin), the head `at`, the
+## quads are placed from it; the batch sits untransformed at the origin), the head `at`, the
 ## colour and the core.
 func _write_trail(buffer: PackedFloat32Array, i: int, row: int, at: Vector2, flags: int, color: Color, core: Color) -> void:
 	buffer[i] = float(row)

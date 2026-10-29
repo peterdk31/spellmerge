@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 shader_type canvas_item;
-// world_vertex_coords: VERTEX is in world space in vertex(), so each piece places its own quad
+// world_vertex_coords: VERTEX is in world space in vertex(), so each quad is placed in the world
 // and every pixel can be found on the world's pixel grid (nothing else moves its vertices).
 render_mode blend_premul_alpha, world_vertex_coords;
 
@@ -19,24 +19,30 @@ render_mode blend_premul_alpha, world_vertex_coords;
 // Everything is drawn on the world's pixel grid, axis-aligned: the core is a `+` whatever way
 // the shot flies, and a line is one pixel per step, as the mockup draws it.
 //
-// RIBBONS (the owner, 2026-10-29: the web build lost its WebGL context on a real GPU when every
-// pixel of one big quad walked the whole path). A trail is one instance of a ribbon mesh
-// (`trail_mesh` in projectile_manager.gd): a quad for its HEAD (piece 0) and one per PIECE of its
-// path, the piece between two samples (piece 1 + k runs from sample k to the next newer, or to
-// the head for k = 0). The vertex shader reads its piece's two ends from `trail_data` and puts
-// the quad round that piece alone (a piece outside the trail's window is folded away), so a
-// pixel works out only the tail pixels and the particles born on its own piece: no pixel loops
-// over the path. What needs the whole history has a per-piece stand-in: the tail's light is the
-// nearest piece's (its neighbours' far ends travel with it), not the brightest of all; the
-// particles that circle the shot (void's pull, shields, glitter) are the head's, which walks the
-// moments of their short lives (at most BIRTHS_MAX) in its own small quad.
-// The mesh draws every quad in two PASSES: first the light (the head's, with void's dark heart,
-// then every piece's), then the pixels, oldest piece first and the head last, so the shot's own
-// light never lands on its pixels and the newest pixel is on top.
+// PARTICLES ARE GEOMETRY (the owner, 2026-10-29). Windows browsers compile WebGL through
+// Direct3D, and the big, branchy fragment stage this shader had (every pixel walking its piece's
+// tail pixels and births, a branch per look kind) took the compiler about 90 s on a real GPU,
+// until the browser killed its GPU process. So the VERTEX stage does the work and the fragment
+// stage only colours a pixel of its own quad: a few small modes, no loops, no kinds.
+// A trail is one instance of a mesh (`trail_mesh` in projectile_manager.gd) of small quads, each
+// told in its UV which QUAD KIND (Q_*) and which slot it is. The vertex shader works out, from
+// `trail_data`, what that slot is now and puts its quad round it alone, or folds it away:
+//   Q_HEAD_LIGHT  the core's light (and void's dark heart);
+//   Q_PIECE_LIGHT a piece of the path between two samples, the tail's light round it (a dash:
+//                 the light of a speed streak instead);
+//   Q_SPARK_LIGHT the light of the particle born at moment `slot` back from now;
+//   Q_SPARK       that particle's pixel (a one-pixel line for a streak, a small star or cross);
+//   Q_TAIL        tail pixel `slot` back from the head along the path (a dash: a speed streak);
+//   Q_JAG         a 4-pixel step of the jagged line lightning draws behind its shot;
+//   Q_CORE        the core: a white-hot `+`, pierce's run, void's dark heart.
+// The mesh draws the lights first (added; the head's first, as its dark heart dims what is
+// under it), then the pixels, oldest first and the core last, so the newest is on top.
+// The particle kinds are DATA, not code: one row each in the tables below (LOOK TABLE), read by
+// one routine (`spark`), so a new kind is a new row.
 // The instance carries its data in its transform (the batch must sit untransformed at the
 // origin): origin the head (where the shot is drawn this frame), x axis (row, newest sample's
 // number), y axis (samples kept, TF_* flags). The colour and the custom data are the look
-// (`shot_look.gdshaderinc`).
+// (`shot_look.gdshaderinc`; worked out per vertex here, `look_from_color`).
 
 #include "res://core/projectiles/shot_palette.gdshaderinc"
 #include "res://core/projectiles/shot_look.gdshaderinc"
@@ -50,40 +56,98 @@ uniform float trail_share = 1.0;
 uniform sampler2D trail_data : filter_nearest;
 uniform float trail_now = 0.0;
 
-// Samples a row holds (TRAIL_SAMPLES in projectile_manager.gd), the moments a particle may be
-// born a second, and the flags (TRAIL_* there): the shot is alive (its core is drawn and its path
-// runs on to the head), an orbit shot (a shorter tail), a wizard's dash (speed streaks in the
-// player's colours and the dash's cards, no tail, no core).
+// Samples a row holds (TRAIL_SAMPLES in projectile_manager.gd), the steps of a search through
+// them (2^5 = 32), the moments a particle may be born a second, and the flags (TRAIL_* there):
+// the shot is alive (its core is drawn and its path runs on to the head), an orbit shot (a
+// shorter tail), a wizard's dash (speed streaks in the player's colours and the dash's cards, no
+// tail, no core).
 const int TRAIL_SAMPLES = 32;
+const int SEARCH_STEPS = 5;
 const float BIRTHS = 60.0;
 const float TF_HEAD = 1.0;
 const float TF_ORBIT = 2.0;
 const float TF_DASH = 4.0;
-// The longest anything of a trail lives, so the pieces drawn stop there.
+// The longest anything of a trail lives (TRAIL_KEEP; no particle row lives longer).
 const float TRAIL_LONGEST = 1.0;
-// The most moments the head walks for the particles that circle the shot.
-const int BIRTHS_MAX = 64;
-// How far round the shot void's pulled pixels are (6-12 px) and their light reaches (7 px more).
-const float PULL_REACH = 20.0;
-// The most tail pixels a pixel looks at either side of its place on the path.
-const float SPAN_MAX = 24.0;
-// A neighbour that is not there.
+// The quad kinds (TRAIL_Q_* in projectile_manager.gd), in UV.y.
+const float Q_HEAD_LIGHT = 0.0;
+const float Q_PIECE_LIGHT = 1.0;
+const float Q_SPARK_LIGHT = 2.0;
+const float Q_SPARK = 3.0;
+const float Q_TAIL = 4.0;
+const float Q_JAG = 5.0;
+const float Q_CORE = 6.0;
+// The fragment's modes: a round light, the tail's light round a piece, pixels (a square, a
+// cross, a line beside it), a one-pixel line.
+const float M_GLOW = 0.0;
+const float M_TAIL_GLOW = 1.0;
+const float M_PIXELS = 2.0;
+const float M_LINE = 3.0;
+// A neighbour or a line that is not there.
 const vec2 FAR = vec2(1.0e7);
 
-// The world position of the pixel.
+// ---- LOOK TABLE: one row per particle kind ----
+// Rows 1-12 are the look kinds (L_*; 11, the weave, gives off nothing); row 0 a plain shot's
+// twinkle; rows 13-15 a dash's own: its speed streaks, and fire and frost from its feet.
+// A particle `j` born at moment `id` where the shot was (`at`, flying along `dir`, `side` its
+// left) with its numbers h(n) in [0, 1) (`th`) and `ago` seconds old, `u` of its life:
+//   life                   LIFE_BACK.x + LIFE_BACK.y h
+//   start  at (or the shot, CIRCLE.w 1) + dir (LIFE_BACK.z + LIFE_BACK.w h)
+//          + (h - 0.5, h - 0.5) JITTER.xy + the same re-rolled every frame x JITTER.z
+//          + side (h - 0.5) JITTER.w
+//   thrown v = -dir (VELOCITY.x + VELOCITY.y h) + side (h - 0.5) VELOCITY.z
+//          + ((h - 0.5) VELOCITY.w, -(UP_DRAG.x + UP_DRAG.y h)), slowed by UP_DRAG.z each 60th
+//          of a second (1 none), and turning at (h - 0.5) UP_DRAG.w radians a second
+//   floats (h - 0.5, h - 0.5) CIRCLE.z ago, and up (CIRCLE.x + CIRCLE.y h) ago
+//   circles at (RADIUS.x + RADIUS.y h + RADIUS.z u) (x zoom if SPIN.x) (1 - u)^RADIUS.w, at the
+//          angle h 2 pi + SPIN.y ago + SPIN.z u (1.2 + h) either way
+//   drawn  a pixel, or with SPIN.w a one-pixel line back to - v TIP.x - dir TIP.y (2 + zoom);
+//          a small cross round it in ARM.z while u is in ARM.x-ARM.y (for a share SHOW.w)
+//   shown  when (frame + id BLINK.x + j BLINK.y + BLINK.z) mod BLINK.w >= SHOW.x, its number
+//          re-rolled every frame >= SHOW.y, and u > SHOW.z
+//   colour COLOURS[u x ARM.w steps] (SHADES 0-17, 18 the shot's light, 19 and 20 the player's
+//          light and base)
+//   light  TIP.z (1 - 0.75 u) (SHINE.x falloff(r, SHINE.y) + SHINE.z falloff(r, SHINE.w))
+//   given off by TIP.w of the moments (one of the shot's kinds picked at random; a dash twice
+//          as often, its feet always).
+const int ROW_TWINKLE = 0;
+const int ROW_DASH_STREAK = 13;
+const int ROW_DASH_EMBER = 14;
+const int ROW_DASH_FLECK = 15;
+const int ROWS = 16;
+//                                  twinkle                embers                    flecks                    gusts                    pull                      sparks                    motes                    glints                    streaks              burst                orbiters             weave                glitter              dash streak            dash ember             dash fleck
+const vec4 LIFE_BACK[ROWS] = vec4[](vec4(0.3, 0.3, 0.0, -8.0), vec4(0.3, 0.35, 0.0, -4.0), vec4(0.5, 0.4, 0.0, -14.0), vec4(0.1, 0.12, 0.0, 0.0), vec4(0.22, 0.18, 0.0, 0.0), vec4(0.05, 0.1, 0.0, -10.0), vec4(0.5, 0.3, 0.0, 0.0), vec4(0.6, 0.0, 0.0, -6.0), vec4(0.25, 0.0, 0.0, 0.0), vec4(0.5, 0.0, 0.0, 0.0), vec4(0.8, 0.0, 0.0, 0.0), vec4(0.0), vec4(0.5, 0.0, 0.0, 0.0), vec4(0.1, 0.08, -4.0, 8.0), vec4(0.45, 0.4, 0.0, 0.0), vec4(0.6, 0.4, 0.0, 0.0));
+const vec4 JITTER[ROWS] = vec4[](vec4(4.0, 4.0, 0.0, 0.0), vec4(0.0, 2.0, 0.0, 0.0), vec4(3.0, 3.0, 0.0, 0.0), vec4(0.0, 0.0, 0.0, 7.0), vec4(0.0), vec4(0.0, 0.0, 6.0, 0.0), vec4(4.0, 4.0, 0.0, 0.0), vec4(4.0, 4.0, 0.0, 0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 13.0), vec4(0.0), vec4(0.0));
+const vec4 VELOCITY[ROWS] = vec4[](vec4(0.0), vec4(14.0, 0.0, 0.0, 14.0), vec4(0.0), vec4(80.0, 70.0, 40.0, 0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(60.0, 50.0, 0.0, 0.0), vec4(0.0), vec4(0.0));
+const vec4 UP_DRAG[ROWS] = vec4[](vec4(0.0, 0.0, 1.0, 0.0), vec4(10.0, 24.0, 0.97, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 9.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0, 0.0, 1.0, 0.0));
+const vec4 CIRCLE[ROWS] = vec4[](vec4(6.0, 0.0, 0.0, 0.0), vec4(0.0), vec4(0.0, 0.0, 4.0, 0.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0), vec4(14.0, 0.0, 0.0, 0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0), vec4(4.0, 8.0, 0.0, 0.0), vec4(0.0));
+const vec4 RADIUS[ROWS] = vec4[](vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(6.0, 6.0, 0.0, 1.4), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(2.0, 0.0, 6.0, 0.0), vec4(4.5, 0.0, 0.0, 0.0), vec4(0.0), vec4(2.5, 1.5, 0.0, 0.0), vec4(0.0), vec4(0.0), vec4(0.0));
+const vec4 SPIN[ROWS] = vec4[](vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 1.0, 0.0), vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(1.0, 0.0, 0.0, 0.0), vec4(1.0, 5.0, 0.0, 0.0), vec4(0.0), vec4(1.0, 0.0, 0.0, 0.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0), vec4(0.0));
+const vec4 TIP[ROWS] = vec4[](vec4(0.0, 0.0, 0.7, 0.18), vec4(0.0, 0.0, 1.0, 0.45), vec4(0.0, 0.0, 0.9, 0.32), vec4(0.025, 0.0, 0.8, 0.4), vec4(0.0, 0.0, 0.7, 0.55), vec4(0.0, 0.0, 1.2, 0.45), vec4(0.0, 0.0, 0.7, 0.25), vec4(0.0, 0.0, 0.8, 0.25), vec4(0.0, 1.0, 0.6, 0.25), vec4(0.0, 0.0, 0.8, 0.25), vec4(0.0, 0.0, 0.6, 0.25), vec4(0.0), vec4(0.0, 0.0, 0.6, 0.25), vec4(0.025, 0.0, 0.4, 1.0), vec4(0.0, 0.0, 1.0, 1.0), vec4(0.0, 0.0, 0.8, 1.0));
+const vec4 SHINE[ROWS] = vec4[](vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 3.0, 0.0, 1.0), vec4(0.16, 2.5, 0.07, 7.0), vec4(0.16, 2.5, 0.07, 7.0));
+const vec4 BLINK[ROWS] = vec4[](vec4(3.0, 1.0, 0.0, 7.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(3.0, 1.0, 0.0, 7.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(1.0, 0.0, 3.0, 6.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(0.0, 0.0, 0.0, 1.0), vec4(3.0, 1.0, 0.0, 7.0));
+const vec4 SHOW[ROWS] = vec4[](vec4(2.0, 0.0, -1.0, 0.0), vec4(0.0, 0.22, -1.0, 0.0), vec4(2.0, 0.0, -1.0, 0.3), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, 0.2, 1.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(3.0, 0.0, -1.0, 0.0), vec4(0.0, 0.0, -1.0, 0.0), vec4(0.0, 0.3, -1.0, 0.0), vec4(2.0, 0.0, -1.0, 0.0));
+const vec4 ARM[ROWS] = vec4[](vec4(2.0, 0.0, 0.0, 3.0), vec4(2.0, 0.0, 0.0, 4.0), vec4(0.0, 0.2, 8.0, 4.0), vec4(2.0, 0.0, 0.0, 3.0), vec4(2.0, 0.0, 0.0, 4.0), vec4(2.0, 0.0, 0.0, 3.0), vec4(2.0, 0.0, 0.0, 2.0), vec4(0.35, 0.6, 17.0, 1.0), vec4(2.0, 0.0, 0.0, 1.0), vec4(2.0, 0.0, 0.0, 2.0), vec4(2.0, 0.0, 0.0, 1.0), vec4(2.0, 0.0, 0.0, 1.0), vec4(2.0, 0.0, 0.0, 1.0), vec4(2.0, 0.0, 0.0, 2.0), vec4(2.0, 0.0, 0.0, 4.0), vec4(2.0, 0.0, 0.0, 4.0));
+const vec4 COLOURS[ROWS] = vec4[](vec4(17.0, 18.0, 18.0, 18.0), vec4(5.0, 2.0, 1.0, 0.0), vec4(17.0, 8.0, 8.0, 7.0), vec4(5.0, 4.0, 3.0, 3.0), vec4(9.0, 10.0, 11.0, 11.0), vec4(17.0, 14.0, 13.0, 13.0), vec4(14.0, 13.0, 13.0, 13.0), vec4(17.0), vec4(17.0), vec4(2.0, 1.0, 1.0, 1.0), vec4(17.0), vec4(17.0), vec4(5.0), vec4(19.0, 20.0, 20.0, 20.0), vec4(5.0, 2.0, 1.0, 0.0), vec4(17.0, 8.0, 8.0, 7.0));
+
+// How long a trail with each kind draws its particles (seconds; x a shot, y a dash): the trail's
+// window is the longest of its kinds' and its tail's (a dash's at least 0.18 s; a plain shot's,
+// with no kind among 1-9, its twinkles' 0.6 s), so a kind that lives longer than its trail's
+// window (void's pull, a shield's sparks) is cut there, as the mockup's trails are.
+const vec2 WINDOW[13] = vec2[](vec2(0.6, 0.0), vec2(0.65, 0.85), vec2(0.9, 1.0), vec2(0.22), vec2(0.0), vec2(0.15), vec2(0.8), vec2(0.6), vec2(0.25), vec2(0.5), vec2(0.0), vec2(0.0), vec2(0.0));
+
+// What the vertex stage hands a pixel (by mode; see `fragment`): the pixel's world position, the
+// mode, three numbers and three colours.
 varying vec2 world;
-// A piece: its older end and its newer end (x, y, odometer, time), and the far ends of its older
-// and newer neighbours (xy, zw; FAR for none). The head: the moments its circling particles were
-// born between (x to y, in seconds; z 1 when there are any), and the way the shot flies (seg_b.xy).
-varying flat vec4 seg_a;
-varying flat vec4 seg_b;
-varying flat vec4 seg_near;
-// Where the shot is (or was last: the void pulls in to it, shields circle it), its row, its flags.
-varying flat vec4 trail_v;
-// How far back the trail is drawn (seconds), how long its tail pixels live at most, how far round
-// a piece its particles may wander (pixels), and the piece (0 the head) + 64 x the pass (0 the
-// light, 1 the pixels).
-varying flat vec4 trail_info;
+varying flat float mode;
+varying flat vec4 v0;
+varying flat vec4 v1;
+varying flat vec4 v2;
+varying flat vec4 c0;
+varying flat vec4 c1;
+varying flat vec4 c2;
+
+// ---- Vertices ----
 
 // Sample `k` back from the newest (0) of trail `row`: x, y, odometer, time.
 vec4 trail_texel(float row, float newest, float k) {
@@ -91,165 +155,28 @@ vec4 trail_texel(float row, float newest, float k) {
 	return texelFetch(trail_data, ivec2(int(mod(n, float(TRAIL_SAMPLES))), int(row)), 0);
 }
 
-// How long a trail with these look bits and flags is drawn back from its head (seconds), and how
-// far round its path its particles may wander (pixels): the longest life and reach of its tail
-// and of its kinds (`trail_particle`).
-vec2 trail_reach(vec3 b, float flags, float z, float tail) {
-	bool dash = flag_set(flags, TF_DASH);
-	float longest = tail;
-	// The glow round the core and the tail reaches this far.
-	float margin = 9.0 + 2.0 * z;
-	if (dash) {
-		longest = max(longest, 0.18);
-		margin = max(margin, 12.0);
+// The newest sample from `first` back to `last` whose time (`by_time`) or odometer is at most
+// `v`, the older end of the piece `v` is on: its k, or -1 when even the oldest is later.
+float sample_before(float row, float newest, float first, float last, float v, bool by_time) {
+	float lo_k = first;
+	float hi_k = last;
+	for (int i = 0; i < SEARCH_STEPS; i++) {
+		float half_k = floor((lo_k + hi_k) * 0.5);
+		vec4 s = trail_texel(row, newest, half_k);
+		if ((by_time ? s.w : s.z) <= v) {
+			hi_k = half_k;
+		} else {
+			lo_k = half_k + 1.0;
+		}
 	}
-	if (!bit_set(b, L_EMBERS) && !bit_set(b, L_FLECKS) && !bit_set(b, L_GUSTS) && !bit_set(b, L_PULL) && !bit_set(b, L_SPARKS) && !bit_set(b, L_MOTES) && !bit_set(b, L_GLINTS) && !bit_set(b, L_STREAKS) && !bit_set(b, L_BURST) && !dash) {
-		// A plain shot's twinkles.
-		longest = max(longest, 0.6);
-		margin = max(margin, 9.0);
+	if (lo_k > last || first > last) {
+		return -1.0;
 	}
-	if (bit_set(b, L_EMBERS)) {
-		longest = max(longest, dash ? 0.85 : 0.65);
-		margin = max(margin, 18.0);
-	}
-	if (bit_set(b, L_FLECKS)) {
-		longest = max(longest, dash ? 1.0 : 0.9);
-		margin = max(margin, 18.0);
-	}
-	if (bit_set(b, L_GUSTS)) {
-		longest = max(longest, 0.22);
-		margin = max(margin, 36.0);
-	}
-	if (bit_set(b, L_PULL)) {
-		margin = max(margin, 14.0);
-	}
-	if (bit_set(b, L_SPARKS)) {
-		longest = max(longest, 0.15);
-		margin = max(margin, 14.0);
-	}
-	if (bit_set(b, L_MOTES)) {
-		longest = max(longest, 0.8);
-		margin = max(margin, 14.0);
-	}
-	if (bit_set(b, L_GLINTS)) {
-		longest = max(longest, 0.6);
-		margin = max(margin, 8.0);
-	}
-	if (bit_set(b, L_STREAKS)) {
-		longest = max(longest, 0.25);
-	}
-	if (bit_set(b, L_BURST)) {
-		longest = max(longest, 0.5);
-		margin = max(margin, 4.0 + 8.0 * z);
-	}
-	if (bit_set(b, L_ORBITERS) || bit_set(b, L_GLITTER)) {
-		margin = max(margin, 3.0 + 6.0 * z);
-	}
-	return vec2(min(longest, TRAIL_LONGEST), margin);
+	vec4 s = trail_texel(row, newest, lo_k);
+	return (by_time ? s.w : s.z) <= v ? lo_k : -1.0;
 }
 
-void vertex() {
-	float row = MODEL_MATRIX[0].x;
-	float newest = MODEL_MATRIX[0].y;
-	float count = row < 0.0 ? 0.0 : MODEL_MATRIX[1].x;
-	float flags = MODEL_MATRIX[1].y;
-	vec2 head = MODEL_MATRIX[3].xy;
-	// The ribbon mesh's vertex: its piece and corner in UV.x (piece + 0.25 or 0.75), its pass and
-	// corner in UV.y (pass + 0.25 or 0.75).
-	float piece = floor(UV.x);
-	float pass = floor(UV.y);
-	vec2 corner = vec2(fract(UV.x) > 0.5 ? 1.0 : 0.0, fract(UV.y) > 0.5 ? 1.0 : 0.0);
-	float red = floor(COLOR.r * 255.0 + 0.5);
-	float z = max(floor(red / 4.0), 1.0);
-	vec3 b = floor(COLOR.gba * 255.0 + 0.5);
-	bool live = flag_set(flags, TF_HEAD);
-	bool dash = flag_set(flags, TF_DASH);
-	float mul = bit_set(b, L_FLECKS) ? 1.5 : (bit_set(b, L_SPARKS) ? 0.7 : (bit_set(b, L_PULL) ? 1.1 : 1.0));
-	if (flag_set(flags, TF_ORBIT)) {
-		mul *= 0.8;
-	}
-	float tail = dash ? 0.0 : 0.3 * mul * trail_share;
-	vec2 reach = trail_reach(b, flags, z, tail);
-	// The newest samples can be later than the moment drawn (taken in the step being drawn
-	// towards): they are not drawn yet.
-	float skip = 0.0;
-	for (int j = 0; j < 4; j++) {
-		if (float(j) >= count || trail_texel(row, newest, float(j)).w <= trail_now + 0.0001) {
-			break;
-		}
-		skip += 1.0;
-	}
-	vec2 target = head;
-	if (!live && skip < count) {
-		target = trail_texel(row, newest, skip).xy;
-	}
-	vec4 a = vec4(0.0);
-	vec4 bb = vec4(0.0);
-	vec4 near = vec4(FAR, FAR);
-	bool shown = false;
-	if (piece < 0.5) {
-		// The head: the core and its light, and the particles that circle the shot.
-		bool circling = !dash && (bit_set(b, L_PULL) || bit_set(b, L_ORBITERS) || bit_set(b, L_GLITTER));
-		bool births = live ? count - skip >= 1.0 : count - skip >= 2.0;
-		float half_size = live && !dash ? 8.0 + 2.0 * z : 0.0;
-		if (circling && births) {
-			half_size = max(half_size, bit_set(b, L_PULL) ? max(reach.y, PULL_REACH) : reach.y);
-			vec4 oldest = trail_texel(row, newest, count - 1.0);
-			vec4 last = trail_texel(row, newest, skip);
-			// The particles that circle it live 0.8 s at most.
-			a = vec4(max(oldest.w, trail_now - min(reach.x, 0.8)), live ? trail_now : last.w, 1.0, 0.0);
-		}
-		if (half_size > 0.0) {
-			shown = true;
-			// The way it flies: from its newest sample to the head.
-			vec2 last_at = count > 0.0 ? trail_texel(row, newest, 0.0).xy : head - vec2(1.0, 0.0);
-			vec2 fly = head - last_at;
-			bb = vec4(length(fly) > 0.01 ? normalize(fly) : vec2(1.0, 0.0), 0.0, 0.0);
-			VERTEX = target + (corner * 2.0 - 1.0) * (half_size + 1.0);
-		}
-	} else {
-		// A piece: from sample k + skip to the next newer (or the head).
-		float k = piece - 1.0;
-		float ia = k + skip;
-		if (ia < count && (k > 0.5 || live)) {
-			a = trail_texel(row, newest, ia);
-			bb = k < 0.5 ? vec4(head, a.z + distance(head, a.xy), trail_now) : trail_texel(row, newest, ia - 1.0);
-			if (trail_now - bb.w <= reach.x) {
-				shown = true;
-				if (ia + 1.0 < count && trail_now - a.w <= reach.x) {
-					near.xy = trail_texel(row, newest, ia + 1.0).xy;
-				}
-				if (k > 1.5) {
-					near.zw = trail_texel(row, newest, ia - 2.0).xy;
-				} else if (k > 0.5 && live) {
-					near.zw = head;
-				}
-				vec2 ab = bb.xy - a.xy;
-				float len = length(ab);
-				vec2 axis = len > 0.5 ? ab / len : vec2(1.0, 0.0);
-				vec2 side = vec2(-axis.y, axis.x);
-				float m = reach.y;
-				VERTEX = a.xy + axis * mix(-m, len + m, corner.x) + side * mix(-m, m, corner.y);
-			}
-		}
-	}
-	if (!shown) {
-		// Folded away: nothing to draw.
-		VERTEX = vec2(-1.0e6);
-	}
-	world = VERTEX;
-	seg_a = a;
-	seg_b = bb;
-	seg_near = near;
-	trail_v = vec4(target, row, flags);
-	trail_info = vec4(reach.x, tail, reach.y, piece + 64.0 * pass);
-	Look L = look_from_color(COLOR, INSTANCE_CUSTOM.rgb, row < 0.0 ? 0.0 : mod(row, 61.0) * 1.618, true);
-	SET_LOOK(L);
-}
-
-// ---- Fragments ----
-
-// A number in [0, 1) from three whole numbers and the trail: an integer hash, so a pixel's
+// A number in [0, 1) from three whole numbers and the trail's row: an integer hash, so a pixel's
 // number (its place on the path, its moment) keeps its looks however large it grows.
 uint mix_bits(uint x) {
 	x ^= x >> 16u;
@@ -260,8 +187,8 @@ uint mix_bits(uint x) {
 	return x;
 }
 
-float th(float a, float b, float c) {
-	uint h = mix_bits(uint(int(a)) ^ mix_bits(uint(int(b)) + mix_bits(uint(int(c)) + uint(int(trail_v.z)) * 7919u + 40503u)));
+float th(float a, float b, float c, float row) {
+	uint h = mix_bits(uint(int(a)) ^ mix_bits(uint(int(b)) + mix_bits(uint(int(c)) + uint(int(row)) * 7919u + 40503u)));
 	return float(h & 16777215u) / 16777216.0;
 }
 
@@ -272,552 +199,491 @@ float dragged(float ago, float drag) {
 	return drag * (1.0 - pow(drag, f)) / (1.0 - drag) / 60.0;
 }
 
-// True when the pixel at `P` is pixel `at` of a shot of zoom `z` (a z x z square).
-bool on_pixel(vec2 P, vec2 at, float z) {
-	vec2 d = floor(P) - floor(at - vec2(floor((z - 1.0) * 0.5)));
-	return d.x >= 0.0 && d.y >= 0.0 && d.x < z && d.y < z;
+// Component `i` (0-3) of `v`.
+float pick4(vec4 v, float i) {
+	return i < 0.5 ? v.x : (i < 1.5 ? v.y : (i < 2.5 ? v.z : v.w));
 }
 
-// True when the pixel at `P` is on the one-pixel line from `a` to `b`, drawn as the mockup's
-// lines are: one pixel per step along the longer axis.
-bool on_line(vec2 P, vec2 a, vec2 b) {
-	vec2 ab = b - a;
-	float l = length(ab);
-	if (l < 0.5) {
-		return on_pixel(P, a, 1.0);
-	}
-	vec2 dir = ab / l;
-	vec2 c = floor(P) + 0.5;
-	float t = dot(c - a, dir);
-	float s = dot(c - a, vec2(-dir.y, dir.x));
-	float thin = 0.5 * max(abs(dir.x), abs(dir.y));
-	return t >= -0.5 && t <= l + 0.5 && s >= -thin && s < thin;
+// Colour `i` of a table row: SHADES 0-17, 18 the shot's light, 19 and 20 its player's.
+vec3 tone(float i, Look L) {
+	int k = int(i + 0.5);
+	int pi = int(L.player);
+	return k < 18 ? SHADES[k] : (k == 18 ? L.hi : (k == 19 ? P_LIGHT[pi] : P_BASE[pi]));
 }
 
-// Put `rgb` on the pixel if it is younger than what is there (the mockup draws the newest last).
-void put(vec3 rgb, float ago, inout vec4 colour, inout float best) {
-	if (ago < best) {
-		colour = vec4(rgb, 1.0);
-		best = ago;
+// The trail's window (WINDOW): how far back from now its particles are drawn.
+float trail_window(vec3 b, bool dash, float tail) {
+	float longest = dash ? max(tail, 0.18) : tail;
+	bool any = false;
+	for (int k = 1; k <= 12; k++) {
+		if (bit_set(b, float(k))) {
+			longest = max(longest, dash ? WINDOW[k].y : WINDOW[k].x);
+			any = any || k <= 9;
+		}
 	}
+	if (!any && !dash) {
+		longest = max(longest, WINDOW[0].x);
+	}
+	return min(longest, TRAIL_LONGEST);
 }
 
-// A particle of kind `look` given off `ago` seconds ago where the shot was (`at`, flying along
-// `dir`), numbered `id` (its moment) and `j` (its place among that moment's): drawn on `P` if it
-// is there, its light added to `lit`. `target` is where the shot is now (the void pulls in to
-// it). The motions are the mockup's: the starting spread and speeds, the drag, the lives.
-void trail_particle(float look, vec2 at, vec2 dir, float ago, float id, float j, vec2 P, vec2 target, float z, inout vec4 colour, inout float best, inout float lit) {
-	vec2 side = vec2(-dir.y, dir.x);
-	float frame = floor(trail_now * 60.0);
-	vec3 rgb = vec3(0.0);
-	float e = 0.0;
-	vec2 pos = at;
-	bool shown = false;
-	float life = 1.0;
-	bool streak = false;
-	vec2 tip = at;
-	if (look == L_EMBERS) {
-		// Fire: an ember that drifts back and rises, flickering, spark yellow to red.
-		life = 0.3 + 0.35 * th(id, j, 21.0);
-		vec2 v = vec2(-dir.x * 14.0 + (th(id, j, 22.0) - 0.5) * 14.0, -dir.y * 14.0 - 10.0 - th(id, j, 23.0) * 24.0);
-		pos = at - dir * th(id, j, 24.0) * 4.0 + vec2(0.0, (th(id, j, 25.0) - 0.5) * 2.0) + v * dragged(ago, 0.97);
-		float u = ago / life;
-		rgb = shade4(SPARK_LIGHT, FIRE_LIGHT, FIRE_BASE, SHADES[0], u);
-		e = 1.0;
-		shown = th(id, frame, 26.0) >= 0.22;
-	} else if (look == L_FLECKS) {
-		// Frost: a fleck left hanging behind, twinkling; some open into a small star.
-		life = 0.5 + 0.4 * th(id, j, 31.0);
-		pos = at - dir * th(id, j, 32.0) * 14.0 + (vec2(th(id, j, 33.0), th(id, j, 34.0)) - 0.5) * 3.0 + (vec2(th(id, j, 35.0), th(id, j, 36.0)) - 0.5) * 4.0 * ago;
-		float u = ago / life;
-		rgb = shade4(BONE_LIGHT, ICE_LIGHT, ICE_LIGHT, SHADES[7], u);
-		e = 0.9;
-		shown = mod(frame + id * 3.0 + j, 7.0) >= 2.0;
-		if (shown && th(id, j, 37.0) < 0.3 && u < 0.2) {
-			vec2 d = abs(floor(P) - floor(pos));
-			if (d.x + d.y == 1.0) {
-				put(ICE_LIGHT, ago, colour, best);
-			}
-		}
-	} else if (look == L_GUSTS) {
-		// Storm: a short streak blown back fast past the shot, curling.
-		life = 0.1 + 0.12 * th(id, j, 41.0);
-		vec2 v = -dir * (80.0 + 70.0 * th(id, j, 42.0)) + side * (th(id, j, 43.0) - 0.5) * 40.0;
-		float curl = (th(id, j, 44.0) - 0.5) * 9.0;
-		float a = curl * ago;
-		vec2 moved = abs(curl) < 0.01 ? v * ago : vec2(v.x * sin(a) - v.y * (1.0 - cos(a)), v.x * (1.0 - cos(a)) + v.y * sin(a)) / curl;
-		pos = at + side * (th(id, j, 45.0) - 0.5) * 7.0 + moved;
-		vec2 now_v = vec2(v.x * cos(a) - v.y * sin(a), v.x * sin(a) + v.y * cos(a));
-		tip = pos - now_v * 0.025;
-		streak = true;
-		rgb = shade3(SPARK_LIGHT, SHADES[4], SHADES[3], ago / life);
-		e = 0.8;
-		shown = true;
-	} else if (look == L_PULL) {
-		// Void: a pixel drawn in from round about, spiralling in to the shot.
-		life = 0.22 + 0.18 * th(id, j, 51.0);
-		float a = clamp(ago / life, 0.0, 1.0);
-		float ang = th(id, j, 52.0) * 6.2832 + a * (th(id, j, 53.0) < 0.5 ? -1.0 : 1.0) * (1.2 + th(id, j, 54.0));
-		pos = target + vec2(cos(ang), sin(ang)) * (6.0 + 6.0 * th(id, j, 55.0)) * pow(1.0 - a, 1.4);
-		rgb = shade4(SHADES[9], VOID_BASE, VOID_LIGHT, VOID_LIGHT, a);
-		e = 0.7;
-		shown = true;
-	} else if (look == L_SPARKS) {
-		// Lightning: a quick spark that jumps about every frame.
-		life = 0.05 + 0.1 * th(id, j, 61.0);
-		pos = at - dir * th(id, j, 62.0) * 10.0 + (vec2(th(id, frame, 63.0), th(id, frame, 64.0)) - 0.5) * 6.0;
-		rgb = shade3(BONE_LIGHT, ARC_LIGHT, ARC_BASE, ago / life);
-		e = 1.2;
-		shown = true;
-	} else if (look == L_MOTES) {
-		// Mend: a mote that rises.
-		life = 0.5 + 0.3 * th(id, j, 71.0);
-		pos = at + (vec2(th(id, j, 72.0), th(id, j, 73.0)) - 0.5) * 4.0 + vec2(0.0, -14.0) * ago;
-		rgb = ago / life < 0.5 ? ARC_LIGHT : ARC_BASE;
-		e = 0.7;
-		shown = true;
-	} else if (look == L_GLINTS) {
-		// Bigger: a glint that opens into a small cross and closes.
-		life = 0.6;
-		pos = at - dir * th(id, j, 81.0) * 6.0 + (vec2(th(id, j, 82.0), th(id, j, 83.0)) - 0.5) * 4.0;
-		float u = ago / life;
-		rgb = BONE_LIGHT;
-		e = 0.8;
-		shown = u > 0.2;
-		vec2 d = abs(floor(P) - floor(pos));
-		if (u > 0.35 && u < 0.6 && d.x + d.y == 1.0) {
-			put(BONE_LIGHT, ago, colour, best);
-		}
-	} else if (look == L_STREAKS) {
-		// Pierce: a thin streak left along the path.
-		life = 0.25;
-		pos = at;
-		tip = at - dir * (2.0 + z);
-		streak = true;
-		rgb = BONE_LIGHT;
-		e = 0.6;
-		shown = true;
-	} else if (look == L_BURST) {
-		// Blast: a spark thrown out from where the shot was.
-		life = 0.5;
-		float ang = th(id, j, 91.0) * 6.2832;
-		pos = at + vec2(cos(ang), sin(ang)) * (2.0 + 6.0 * ago / life) * z;
-		rgb = ago / life < 0.5 ? FIRE_LIGHT : FIRE_BASE;
-		e = 0.8;
-		shown = true;
-	} else if (look == L_ORBITERS) {
-		// Shield: a spark circling the shot.
-		life = 0.8;
-		float ang = th(id, j, 101.0) * 6.2832 + ago * 5.0;
-		pos = target + vec2(cos(ang), sin(ang)) * 4.5 * z;
-		rgb = BONE_LIGHT;
-		e = 0.6;
-		shown = true;
-	} else if (look == L_GLITTER) {
-		// Hold: glitter that stays close to the shot and blinks.
-		life = 0.5;
-		float ang = th(id, j, 111.0) * 6.2832;
-		pos = target + vec2(cos(ang), sin(ang)) * (2.5 + 1.5 * th(id, j, 112.0)) * z;
-		rgb = SPARK_LIGHT;
-		e = 0.6;
-		shown = mod(frame + id, 6.0) < 3.0;
-	} else if (look < 0.0) {
-		// A plain shot's twinkle (look -1): a white-hot pixel left near the tail that rises and
-		// blinks in the shot's colour.
-		life = 0.3 + 0.3 * th(id, j, 121.0);
-		pos = at - dir * th(id, j, 122.0) * 8.0 + (vec2(th(id, j, 123.0), th(id, j, 124.0)) - 0.5) * 4.0 + vec2(0.0, -6.0) * ago;
-		rgb = shade3(BONE_LIGHT, hi, hi, ago / life);
-		e = 0.7;
-		shown = mod(frame + id * 3.0 + j, 7.0) >= 2.0;
-	}
-	if (ago >= life) {
-		return;
-	}
-	float u = ago / life;
-	float glow_e = e * (1.0 - 0.75 * u);
-	float r = length(floor(P) + 0.5 - (floor(pos) + 0.5));
-	lit += glow_e * (0.16 * falloff(r, 2.5) + 0.07 * falloff(r, 7.0));
-	if (!shown) {
-		return;
-	}
-	if (streak ? on_line(P, pos, tip) : on_pixel(P, pos, 1.0)) {
-		put(rgb, ago, colour, best);
-	}
-}
-
-// A wizard's dash, given off along its way (TF_DASH): speed streaks in the player's colours
-// blown back past the body, and the dash's cards from its feet.
-void dash_particle(float look, vec2 at, vec2 dir, float ago, float id, float j, vec2 P, float z, inout vec4 colour, inout float best, inout float lit) {
-	int pi = int(player);
-	vec2 side = vec2(-dir.y, dir.x);
-	if (look == 0.0) {
-		float life = 0.1 + 0.08 * th(id, j, 131.0);
-		if (ago >= life) {
-			return;
-		}
-		vec2 v = -dir * (60.0 + 50.0 * th(id, j, 132.0));
-		vec2 pos = at + side * (th(id, j, 133.0) - 0.5) * 13.0 + dir * (th(id, j, 134.0) - 0.5) * 8.0 + v * ago;
-		float u = ago / life;
-		float r = length(floor(P) - floor(pos));
-		lit += 0.4 * (1.0 - 0.75 * u) * 0.16 * falloff(r, 3.0);
-		if (on_line(P, pos, pos - v * 0.025)) {
-			put(u < 0.5 ? P_LIGHT[pi] : P_BASE[pi], ago, colour, best);
-		}
-		return;
-	}
-	// The cards from the feet: fire leaves flames on the floor, frost flecks that stay a while,
-	// anything else its own particles round the body.
-	vec2 feet = at + vec2(0.0, 8.0) + vec2((th(id, j, 135.0) - 0.5) * 8.0, (th(id, j, 136.0) - 0.5) * 2.0);
-	if (look == L_EMBERS) {
-		float life = 0.45 + 0.4 * th(id, j, 137.0);
-		if (ago >= life) {
-			return;
-		}
-		vec2 pos = feet + vec2(0.0, -(4.0 + 8.0 * th(id, j, 138.0)) * ago);
-		float u = ago / life;
-		float r = length(floor(P) - floor(pos));
-		lit += (1.0 - 0.75 * u) * (0.16 * falloff(r, 2.5) + 0.07 * falloff(r, 7.0));
-		if (th(id, floor(trail_now * 60.0), 139.0) >= 0.3 && on_pixel(P, pos, 1.0)) {
-			put(shade4(SPARK_LIGHT, FIRE_LIGHT, FIRE_BASE, SHADES[0], u), ago, colour, best);
-		}
-	} else if (look == L_FLECKS) {
-		float life = 0.6 + 0.4 * th(id, j, 140.0);
-		if (ago >= life) {
-			return;
-		}
-		vec2 pos = feet + vec2(0.0, -1.0);
-		float u = ago / life;
-		float r = length(floor(P) - floor(pos));
-		lit += 0.8 * (1.0 - 0.75 * u) * (0.16 * falloff(r, 2.5) + 0.07 * falloff(r, 7.0));
-		if (mod(floor(trail_now * 60.0) + id * 3.0 + j, 7.0) >= 2.0 && on_pixel(P, pos, 1.0)) {
-			put(shade4(BONE_LIGHT, ICE_LIGHT, ICE_LIGHT, SHADES[7], u), ago, colour, best);
-		}
-	} else {
-		trail_particle(look, at + side * (th(id, j, 141.0) - 0.5) * 10.0, dir, ago, id, j, P, at, z, colour, best, lit);
-	}
-}
-
-// The kind given off by particle `j` born at moment `id`, or 0 for none: one of the shot's kinds,
-// picked at random, each at its own rate (the mockup's); a plain shot's twinkle is -1. A dash
-// gives off two speed streaks (kind 0) and its cards at twice a shot's rate.
-float trail_kind(float id, float j, bool dash) {
+// The kind given off by particle `j` born at moment `id`, or -2 for none: one of the shot's
+// kinds, picked at random, each at its own rate (TIP.w); a plain shot's twinkle is -1. A dash
+// gives off two speed streaks (kind 0) and its cards at twice a shot's rate, fire and frost
+// always.
+float trail_kind(float id, float j, bool dash, vec4 kinds, float row) {
 	if (dash && j < 1.5) {
 		return 0.0;
 	}
-	if (emit_count() < 0.5) {
-		return !dash && j < 0.5 && th(id, j, 151.0) < 0.18 * particle_share ? -1.0 : -2.0;
+	if (kinds.w < 0.5) {
+		return !dash && j < 0.5 && th(id, j, 151.0, row) < TIP[ROW_TWINKLE].w * particle_share ? -1.0 : -2.0;
 	}
-	float look = emitter(int(min(floor(th(id, j, 152.0) * emit_count()), emit_count() - 1.0)));
-	float rate = look == L_EMBERS ? 0.45 : (look == L_FLECKS ? 0.32 : (look == L_GUSTS ? 0.4 : (look == L_PULL ? 0.55 : (look == L_SPARKS ? 0.45 : 0.25))));
+	float i = min(floor(th(id, j, 152.0, row) * kinds.w), kinds.w - 1.0);
+	float word = i < 4.0 ? kinds.x : (i < 8.0 ? kinds.y : kinds.z);
+	float look = mod(floor(word / exp2(mod(i, 4.0) * 4.0) + 0.001), 16.0);
+	float rate = TIP[int(look)].w;
 	if (dash) {
-		rate = look == L_EMBERS ? 1.0 : (look == L_FLECKS ? 1.0 : min(rate * 2.0, 1.0));
+		rate = look == L_EMBERS || look == L_FLECKS ? 1.0 : min(rate * 2.0, 1.0);
 	}
-	return th(id, j, 153.0) < rate * particle_share ? look : -2.0;
+	return th(id, j, 153.0, row) < rate * particle_share ? look : -2.0;
 }
 
-// How far `c` is from the piece `p`-`q`, or very far when there is no such piece (FAR, or no
-// length: it draws no light).
+// The particle `j` born at moment `id`, as it is now: where (`pos`, and `tip` for a line), its
+// colours (alpha 0 for hidden) and its light.
+struct Spark {
+	bool alive;
+	vec2 pos;
+	vec2 tip;
+	bool line;
+	vec4 rgb;
+	vec4 arm;
+	float glow;
+	vec4 light;
+};
+
+// One routine for every kind, driven by its row of the LOOK TABLE. `t_top` is when the path
+// ends (now for a live shot), `head_end` its newest end, `window` the trail's (WINDOW), `target`
+// where the shot is (or was last: void pulls in to it, shields circle it).
+Spark spark(float row, float newest, float count, float skip, vec4 head_end, float t_top, float window, vec2 target, bool dash, float id, float j, Look L) {
+	Spark S;
+	S.alive = false;
+	S.pos = vec2(0.0);
+	S.tip = vec2(0.0);
+	S.line = false;
+	S.rgb = vec4(0.0);
+	S.arm = vec4(0.0);
+	S.glow = 0.0;
+	S.light = vec4(0.0);
+	float t = id / BIRTHS;
+	float ago = trail_now - t;
+	if (ago < 0.0 || ago > window || t >= t_top) {
+		return S;
+	}
+	float kind = trail_kind(id, j, dash, L.emits, row);
+	if (kind < -1.5) {
+		return S;
+	}
+	// The piece it was born on, and where on it.
+	float k = sample_before(row, newest, skip, count - 1.0, t, true);
+	if (k < 0.0) {
+		return S;
+	}
+	vec4 A = trail_texel(row, newest, k);
+	vec4 B = k < skip + 0.5 ? head_end : trail_texel(row, newest, k - 1.0);
+	vec2 ab = B.xy - A.xy;
+	float len = length(ab);
+	vec2 dir = len > 0.001 ? ab / len : vec2(1.0, 0.0);
+	vec2 side = vec2(-dir.y, dir.x);
+	vec2 at = mix(A.xy, B.xy, clamp((t - A.w) / max(B.w - A.w, 0.0001), 0.0, 1.0));
+	// Its row: a shot's kinds circle the shot; a dash's circle where they were born, from beside
+	// its body, and its fire and frost fall from its feet.
+	int r = kind < 0.0 ? ROW_TWINKLE : int(kind + 0.5);
+	vec2 base = at;
+	vec2 centre = target;
+	if (dash) {
+		centre = at;
+		if (kind < 0.5) {
+			r = ROW_DASH_STREAK;
+		} else if (kind == L_EMBERS || kind == L_FLECKS) {
+			r = kind == L_EMBERS ? ROW_DASH_EMBER : ROW_DASH_FLECK;
+			base = at + vec2(0.0, r == ROW_DASH_FLECK ? 7.0 : 8.0) + (vec2(th(id, j, 135.0, row), th(id, j, 136.0, row)) - 0.5) * vec2(8.0, 2.0);
+		} else {
+			base = at + side * (th(id, j, 141.0, row) - 0.5) * 10.0;
+		}
+	}
+	float hs = 200.0 + 20.0 * float(r);
+	vec4 lb = LIFE_BACK[r];
+	float life = lb.x + lb.y * th(id, j, hs, row);
+	if (ago >= life) {
+		return S;
+	}
+	float u = ago / life;
+	float z = L.zoom;
+	float frame = floor(trail_now * 60.0);
+	vec4 jit = JITTER[r];
+	vec4 vel = VELOCITY[r];
+	vec4 ud = UP_DRAG[r];
+	vec4 ci = CIRCLE[r];
+	vec4 ra = RADIUS[r];
+	vec4 sp = SPIN[r];
+	vec4 tp = TIP[r];
+	vec2 pos = mix(base, centre, ci.w) + dir * (lb.z + lb.w * th(id, j, hs + 1.0, row));
+	pos += (vec2(th(id, j, hs + 2.0, row), th(id, j, hs + 3.0, row)) - 0.5) * jit.xy;
+	pos += (vec2(th(id, frame, hs + 4.0, row), th(id, frame, hs + 5.0, row)) - 0.5) * jit.z;
+	pos += side * (th(id, j, hs + 6.0, row) - 0.5) * jit.w;
+	vec2 v = -dir * (vel.x + vel.y * th(id, j, hs + 7.0, row)) + side * (th(id, j, hs + 8.0, row) - 0.5) * vel.z;
+	v += vec2((th(id, j, hs + 9.0, row) - 0.5) * vel.w, -(ud.x + ud.y * th(id, j, hs + 10.0, row)));
+	float curl = (th(id, j, hs + 11.0, row) - 0.5) * ud.w;
+	float turn = curl * ago;
+	vec2 v_now = vec2(v.x * cos(turn) - v.y * sin(turn), v.x * sin(turn) + v.y * cos(turn));
+	if (abs(curl) < 0.01) {
+		pos += v * (ud.z < 0.999 ? dragged(ago, ud.z) : ago);
+	} else {
+		pos += vec2(v.x * sin(turn) - v.y * (1.0 - cos(turn)), v.x * (1.0 - cos(turn)) + v.y * sin(turn)) / curl;
+	}
+	pos += (vec2(th(id, j, hs + 12.0, row), th(id, j, hs + 13.0, row)) - 0.5) * ci.z * ago;
+	pos.y -= (ci.x + ci.y * th(id, j, hs + 14.0, row)) * ago;
+	float ang = th(id, j, hs + 15.0, row) * 6.2832 + sp.y * ago + sp.z * u * (th(id, j, hs + 16.0, row) < 0.5 ? -1.0 : 1.0) * (1.2 + th(id, j, hs + 17.0, row));
+	float radius = (ra.x + ra.y * th(id, j, hs + 18.0, row) + ra.z * u) * (sp.x > 0.5 ? z : 1.0) * pow(max(1.0 - u, 0.0001), ra.w);
+	pos += vec2(cos(ang), sin(ang)) * radius;
+	vec4 bl = BLINK[r];
+	vec4 sh = SHOW[r];
+	vec4 arm = ARM[r];
+	bool shown = mod(frame + id * bl.x + j * bl.y + bl.z, bl.w) >= sh.x && th(id, frame, hs + 19.0, row) >= sh.y && u > sh.z;
+	float steps = arm.w;
+	S.alive = true;
+	S.pos = pos;
+	S.line = sp.w > 0.5;
+	S.tip = pos - v_now * tp.x - dir * tp.y * (2.0 + z);
+	S.rgb = shown ? vec4(tone(pick4(COLOURS[r], min(floor(u * steps), steps - 1.0)), L), 1.0) : vec4(0.0);
+	S.arm = shown && u >= arm.x && u < arm.y && th(id, j, hs + 20.0, row) < sh.w ? vec4(tone(arm.z, L), 1.0) : vec4(0.0);
+	S.glow = tp.z * (1.0 - 0.75 * u);
+	S.light = SHINE[r];
+	return S;
+}
+
+void vertex() {
+	float row = MODEL_MATRIX[0].x;
+	float newest = MODEL_MATRIX[0].y;
+	float count = row < 0.0 ? 0.0 : MODEL_MATRIX[1].x;
+	float flags = MODEL_MATRIX[1].y;
+	vec2 head = MODEL_MATRIX[3].xy;
+	// The mesh's vertex: its slot and corner in UV.x (slot + 0.25 or 0.75), its quad kind and
+	// corner in UV.y (kind + 0.25 or 0.75).
+	float slot = floor(UV.x);
+	float quad = floor(UV.y);
+	vec2 corner = vec2(fract(UV.x) > 0.5 ? 1.0 : 0.0, fract(UV.y) > 0.5 ? 1.0 : 0.0);
+	Look L = look_from_color(COLOR, INSTANCE_CUSTOM.rgb, row < 0.0 ? 0.0 : mod(row, 61.0) * 1.618, true);
+	float z = L.zoom;
+	vec3 b = L.bits;
+	int pi = int(L.player);
+	bool live = flag_set(flags, TF_HEAD);
+	bool dash = flag_set(flags, TF_DASH);
+	bool lightning = bit_set(b, L_SPARKS);
+	bool pull = bit_set(b, L_PULL);
+	float mul = bit_set(b, L_FLECKS) ? 1.5 : (bit_set(b, L_SPARKS) ? 0.7 : (pull ? 1.1 : 1.0));
+	if (flag_set(flags, TF_ORBIT)) {
+		mul *= 0.8;
+	}
+	float tail = dash ? 0.0 : 0.3 * mul * trail_share;
+	// Every light of the trail: lightning flickers, void's is dimmer; a dash's in its player's colour.
+	float flicker = (lightning ? 0.55 + 0.9 * hash_seeded(floor(sim_time * 20.0), 0.0, 21.0, L.seed) : 1.0) * (pull ? 0.6 : 1.0);
+	vec3 hue = dash ? P_BASE[pi] : L.glow;
+	// The newest samples can be later than the moment drawn (taken in the step being drawn
+	// towards): they are not drawn yet.
+	float skip = 0.0;
+	for (int j = 0; j < 4; j++) {
+		if (float(j) >= count || trail_texel(row, newest, float(j)).w <= trail_now + 0.0001) {
+			break;
+		}
+		skip += 1.0;
+	}
+	// Where the shot is (or was last), and the newest end of its path: the head while it lives.
+	vec4 last = count > skip ? trail_texel(row, newest, skip) : vec4(head, 0.0, trail_now);
+	vec2 target = live || count <= skip ? head : last.xy;
+	vec4 head_end = vec4(head, last.z + distance(head, last.xy), trail_now);
+	float o_top = live ? head_end.z : last.z;
+	float t_top = live ? trail_now : last.w;
+	if (count <= skip || (!live && count - skip < 2.0)) {
+		t_top = -1.0e9;
+		o_top = -1.0e9;
+	}
+	vec2 q_lo = vec2(0.0);
+	vec2 q_hi = vec2(0.0);
+	float m = M_PIXELS;
+	vec4 a0 = vec4(0.0);
+	vec4 a1 = vec4(FAR, FAR);
+	vec4 a2 = vec4(0.0);
+	vec4 k0 = vec4(0.0);
+	vec4 k1 = vec4(0.0);
+	vec4 k2 = vec4(0.0);
+	bool shown = false;
+	// A particle's slot: its moment back from now, and which of the moment's.
+	bool is_spark = quad == Q_SPARK_LIGHT || quad == Q_SPARK || (dash && slot < 32.0 && (quad == Q_PIECE_LIGHT || quad == Q_TAIL));
+	if (is_spark) {
+		bool streak_slot = quad == Q_PIECE_LIGHT || quad == Q_TAIL;
+		float back = streak_slot ? floor(slot * 0.5) : slot;
+		float j = streak_slot ? mod(slot, 2.0) : (dash ? 2.0 : 0.0);
+		Spark S = spark(row, newest, count, skip, head_end, t_top, trail_window(b, dash, tail), target, dash, floor(trail_now * BIRTHS) - back, j, L);
+		if (S.alive) {
+			vec2 px = floor(S.pos);
+			if (quad == Q_SPARK_LIGHT || quad == Q_PIECE_LIGHT) {
+				m = M_GLOW;
+				shown = true;
+				float reach = max(S.light.y, S.light.w);
+				q_lo = px + 0.5 - reach;
+				q_hi = px + 0.5 + reach;
+				a0 = vec4(px + 0.5, 0.0, 1.0);
+				a1 = vec4(S.glow * flicker * S.light.x, S.light.y, S.glow * flicker * S.light.z, S.light.w);
+				k0 = vec4(hue, 1.0);
+			} else if (S.line) {
+				m = M_LINE;
+				shown = S.rgb.a > 0.0;
+				q_lo = min(S.pos, S.tip) - 1.0;
+				q_hi = max(S.pos, S.tip) + 1.0;
+				a0 = vec4(S.pos, S.tip);
+				a2 = vec4(1.0e9, 0.0, 0.0, 0.0);
+				k0 = S.rgb;
+			} else {
+				shown = S.rgb.a > 0.0 || S.arm.a > 0.0;
+				q_lo = px - 1.0;
+				q_hi = px + 2.0;
+				a0 = vec4(px, 1.0, 1.0);
+				k0 = S.rgb;
+				k1 = S.arm;
+			}
+		}
+	} else if (quad == Q_HEAD_LIGHT || quad == Q_CORE) {
+		// The head, while the shot lives: the core and its light.
+		if (live && !dash) {
+			shown = true;
+			// The way it flies: from its newest sample to the head.
+			vec2 last_at = count > 0.0 ? trail_texel(row, newest, 0.0).xy : head - vec2(1.0, 0.0);
+			vec2 fly = head - last_at;
+			fly = length(fly) > 0.01 ? normalize(fly) : vec2(1.0, 0.0);
+			vec2 at = head;
+			if (bit_set(b, L_WEAVE)) {
+				// Homing weaves it a pixel either side.
+				at += vec2(-fly.y, fly.x) * (triangle(sim_time * 3.0 + L.seed * 0.25) > 0.0 ? 1.0 : 0.0);
+			}
+			vec2 px = floor(at);
+			if (quad == Q_HEAD_LIGHT) {
+				m = M_GLOW;
+				float reach = 8.0 + 2.0 * z;
+				q_lo = px + 0.5 - reach;
+				q_hi = px + 0.5 + reach;
+				a0 = vec4(px + 0.5, pull ? 0.45 : 0.0, 6.0);
+				a1 = vec4(0.8 * flicker, 3.0 + z, 0.35 * flicker, reach);
+				k0 = vec4(hue, 1.0);
+			} else {
+				// A white-hot pixel with four round it, a pixel more each side a zoom; pierce
+				// lengthens it along the flight; void's is a dark heart ringed in pink.
+				float half_size = 3.0 + 2.0 * z;
+				q_lo = px - half_size;
+				q_hi = px + half_size + 1.0;
+				a0 = vec4(px, 1.0, z);
+				if (bit_set(b, L_STREAKS)) {
+					a1 = vec4(at, at - fly * (2.0 + z));
+				}
+				k0 = vec4(pull ? OUTLINE : L.hot, 1.0);
+				k1 = vec4(pull ? VOID_LIGHT : L.hi, 1.0);
+				k2 = pull ? vec4(VOID_BASE, 1.0) : vec4(0.0);
+			}
+		}
+	} else if (quad == Q_PIECE_LIGHT && !dash) {
+		// A piece of the path: from sample `slot` + skip to the next newer (or the head), and the
+		// tail's light round it while it is young.
+		float ia = slot + skip;
+		if (ia < count && (slot > 0.5 || live)) {
+			vec4 A = trail_texel(row, newest, ia);
+			vec4 B = slot < 0.5 ? head_end : trail_texel(row, newest, ia - 1.0);
+			vec2 ab = B.xy - A.xy;
+			float len = length(ab);
+			if (trail_now - B.w <= tail && len >= 0.001 && B.z - A.z >= 0.001) {
+				shown = true;
+				m = M_TAIL_GLOW;
+				// The far ends of its neighbours: a pixel takes its light from the piece nearest it.
+				if (ia + 1.0 < count) {
+					a1.xy = trail_texel(row, newest, ia + 1.0).xy;
+				}
+				if (slot > 1.5) {
+					a1.zw = trail_texel(row, newest, ia - 2.0).xy;
+				} else if (slot > 0.5 && live) {
+					a1.zw = head;
+				}
+				float reach = 8.0 + 2.0 * z;
+				q_lo = min(A.xy, B.xy) - reach;
+				q_hi = max(A.xy, B.xy) + reach;
+				float speed = len / max(B.w - A.w, 0.001);
+				float tl = max(tail, 0.01);
+				a0 = vec4(A.xy, B.xy);
+				a2 = vec4((trail_now - A.w) / tl, (trail_now - B.w) / tl, 3.0 + z + speed * 0.012 + 6.0, z);
+				k0 = vec4(hue, (pull ? 0.45 : 0.75) * flicker);
+			}
+		}
+	} else if (quad == Q_TAIL && !dash) {
+		// Tail pixel `slot` back from the head: one pixel per pixel of travel, thrown back a
+		// little, cooling as it ages (and lightning's only now and then).
+		float n = ceil(o_top) - 1.0 - slot;
+		float k = sample_before(row, newest, skip, count - 1.0, n, false);
+		if (k >= 0.0) {
+			vec4 A = trail_texel(row, newest, k);
+			vec4 B = k < skip + 0.5 ? head_end : trail_texel(row, newest, k - 1.0);
+			vec2 ab = B.xy - A.xy;
+			float len = length(ab);
+			float fr = (n - A.z) / max(B.z - A.z, 0.001);
+			float tn = mix(A.w, B.w, fr);
+			float ago = trail_now - tn;
+			float life = (0.1 + 0.2 * th(n, 0.0, 162.0, row)) / 0.3 * tail;
+			if (len >= 0.001 && B.z - A.z >= 0.001 && ago >= 0.0 && ago < life && !(lightning && th(n, 0.0, 161.0, row) > 0.35)) {
+				vec2 dir = ab / len;
+				float speed = len / max(B.w - A.w, 0.001);
+				vec2 v = -dir * speed * 0.04 + (vec2(th(n, 0.0, 163.0, row), th(n, 0.0, 164.0, row)) - 0.5) * 5.0;
+				vec2 pos = mix(A.xy, B.xy, fr) + (vec2(th(n, 0.0, 165.0, row), th(n, 0.0, 166.0, row)) - 0.5) * 0.8 + v * dragged(ago, 0.94);
+				if (bit_set(b, L_GUSTS)) {
+					// Storm: the tail sways side to side as it is left.
+					pos += vec2(-dir.y, dir.x) * sin(tn * 30.0) * 1.4;
+				}
+				float u = ago / life;
+				vec3 rgb = u < 0.17 ? L.hot : (u < 0.45 ? L.hi : (u < 0.8 ? L.mid : L.lo));
+				if (L.plain < 0.5 && th(n, 0.0, 167.0, row) < 0.25) {
+					// A quarter of an infused tail is its player's colour.
+					rgb = u < 0.25 ? P_LIGHT[pi] : (u < 0.75 ? P_BASE[pi] : P_SHADOW[pi]);
+				}
+				float size = max(z - 1.0, 1.0);
+				vec2 px = floor(pos) - floor((size - 1.0) * 0.5);
+				shown = true;
+				q_lo = px;
+				q_hi = px + size;
+				a0 = vec4(px, size, 0.0);
+				k0 = vec4(rgb, 1.0);
+			}
+		}
+	} else if (quad == Q_JAG && lightning && !dash) {
+		// Step `slot` back from the head of the jagged line lightning draws behind its shot along
+		// the last tenth of a second of its path: it bends every 4 pixels, re-rolled every other
+		// frame, newer than 0.05 s in its light.
+		float o_hi = min(4.0 * (floor(o_top / 4.0) - slot + 1.0), o_top);
+		float o_lo = 4.0 * (floor(o_top / 4.0) - slot);
+		float jf = floor(trail_now * 30.0);
+		vec2 ends[2];
+		float agos[2];
+		bool found = o_hi > o_lo;
+		for (int e = 0; e < 2; e++) {
+			float o = e == 0 ? o_hi : o_lo;
+			float k = sample_before(row, newest, skip, count - 1.0, o, false);
+			found = found && k >= 0.0;
+			vec4 A = trail_texel(row, newest, max(k, 0.0));
+			vec4 B = k < skip + 0.5 ? head_end : trail_texel(row, newest, k - 1.0);
+			float fr = clamp((o - A.z) / max(B.z - A.z, 0.001), 0.0, 1.0);
+			vec2 ab = B.xy - A.xy;
+			vec2 dir = length(ab) > 0.001 ? normalize(ab) : vec2(1.0, 0.0);
+			agos[e] = trail_now - mix(A.w, B.w, fr);
+			float node = floor(o / 4.0);
+			float off = mix((th(node, jf, 171.0, row) - 0.5) * 4.0, (th(node + 1.0, jf, 171.0, row) - 0.5) * 4.0, fract(o / 4.0)) * min(agos[e] / 0.02, 1.0);
+			ends[e] = mix(A.xy, B.xy, fr) + vec2(-dir.y, dir.x) * off;
+		}
+		if (found && agos[0] <= 0.1) {
+			vec2 p0 = ends[0];
+			vec2 p1 = ends[1];
+			float span = max(agos[1] - agos[0], 0.0001);
+			if (agos[1] > 0.1) {
+				// Cut where it is a tenth of a second old.
+				p1 = mix(p0, p1, (0.1 - agos[0]) / span);
+			}
+			shown = true;
+			m = M_LINE;
+			q_lo = min(p0, p1) - 1.0;
+			q_hi = max(p0, p1) + 1.0;
+			a0 = vec4(p0, p1);
+			a2 = vec4(clamp((0.05 - agos[0]) / span, 0.0, 1.0) * distance(ends[0], ends[1]), 0.0, 0.0, 0.0);
+			k0 = vec4(ARC_LIGHT, 1.0);
+			k1 = vec4(ARC_BASE, 1.0);
+		}
+	}
+	// Folded away when there is nothing to draw.
+	VERTEX = shown ? mix(q_lo, q_hi, corner) : vec2(-1.0e6);
+	world = VERTEX;
+	mode = m;
+	v0 = a0;
+	v1 = a1;
+	v2 = a2;
+	c0 = k0;
+	c1 = k1;
+	c2 = k2;
+}
+
+// ---- Fragments ----
+// Small on purpose (core/README.md, "The shot shaders"): a pixel only colours itself from what
+// its quad's vertices worked out. No loops, no look kinds, nothing read from the path.
+
+// True when the pixel at `P` is on the one-pixel line from `a` to `b`, drawn as the mockup's
+// lines are: one pixel per step along the longer axis; `along` is how far along it is.
+bool on_line(vec2 P, vec2 a, vec2 b, out float along) {
+	vec2 ab = b - a;
+	float l = length(ab);
+	vec2 c = floor(P) + 0.5;
+	if (l < 0.5) {
+		along = 0.0;
+		return all(equal(floor(P), floor(a)));
+	}
+	vec2 dir = ab / l;
+	along = dot(c - a, dir);
+	float s = dot(c - a, vec2(-dir.y, dir.x));
+	float thin = 0.5 * max(abs(dir.x), abs(dir.y));
+	return along >= -0.5 && along <= l + 0.5 && s >= -thin && s < thin;
+}
+
+// How far `c` is from the piece `p`-`q`, or very far when there is no such piece.
 float piece_distance(vec2 c, vec2 p, vec2 q) {
 	vec2 pq = q - p;
 	float len = length(pq);
 	if (p.x > 1.0e6 || q.x > 1.0e6 || len < 0.001) {
 		return 1.0e9;
 	}
-	float f = clamp(dot(c - p, pq) / (len * len), 0.0, 1.0);
-	return length(c - (p + pq * f));
-}
-
-// The light of the tail round the piece from `A` to `B` (each x, y, odometer, time; A the
-// older), as bright as the tail is young there. A pixel takes it from the piece nearest it (of
-// this piece and its two neighbours), which stands in for the brightest of the whole path.
-float tail_light(vec4 A, vec4 B, vec2 P, float z) {
-	vec2 ab = B.xy - A.xy;
-	float len = length(ab);
-	if (len < 0.001 || B.z - A.z < 0.001) {
-		return 0.0;
-	}
-	vec2 dir = ab / len;
-	float speed = len / max(B.w - A.w, 0.001);
-	vec2 c = floor(P) + 0.5;
-	float f = clamp(dot(c - A.xy, dir) / len, 0.0, 1.0);
-	float dist = length(c - (A.xy + ab * f));
-	if (dist > 3.0 + z + speed * 0.012 + 6.0) {
-		return 0.0;
-	}
-	// The older neighbour's piece ends at A, the newer one's starts at B; a tie goes to the newer.
-	if (dist > piece_distance(c, seg_near.xy, A.xy) || dist >= piece_distance(c, B.xy, seg_near.zw)) {
-		return 0.0;
-	}
-	float tail_life = trail_info.y;
-	float t_near = mix(A.w, B.w, f);
-	float u_near = clamp((trail_now - t_near) / max(tail_life, 0.01), 0.0, 1.0);
-	float glow_e = (has_layer(L_PULL) ? 0.45 : 0.75) * (1.0 - 0.75 * u_near) * (1.0 - u_near);
-	return glow_e * (0.32 * falloff(dist, 2.0 + z) + 0.36 * falloff(dist, 7.0 + 2.0 * z));
-}
-
-// The tail pixels of the piece from `A` to `B`: one pixel per pixel of travel, thrown back a
-// little, cooling as it ages.
-void tail_pixels(vec4 A, vec4 B, vec2 P, float z, inout vec4 colour, inout float best) {
-	vec2 ab = B.xy - A.xy;
-	float len = length(ab);
-	if (len < 0.001 || B.z - A.z < 0.001) {
-		return;
-	}
-	vec2 dir = ab / len;
-	float speed = len / max(B.w - A.w, 0.001);
-	vec2 c = floor(P) + 0.5;
-	float f = clamp(dot(c - A.xy, dir) / len, 0.0, 1.0);
-	float dist = length(c - (A.xy + ab * f));
-	// What is back along the path from the head drifts at most a few pixels.
-	if (dist > 3.0 + z + speed * 0.012) {
-		return;
-	}
-	float tail_life = trail_info.y;
-	int pi = int(player);
-	bool storm = has_layer(L_GUSTS);
-	bool lightning = has_layer(L_SPARKS);
-	float o = mix(A.z, B.z, f);
-	float drift = 0.04 * speed + 3.0;
-	float span = min(ceil(drift * dragged(tail_life, 0.94) + 2.0 + z), SPAN_MAX);
-	for (int s = 0; s <= int(SPAN_MAX) * 2; s++) {
-		float k = float(s) - span;
-		if (k > span) {
-			break;
-		}
-		float n = floor(o) + k;
-		if (n < A.z || n >= B.z) {
-			continue;
-		}
-		if (lightning && th(n, 0.0, 161.0) > 0.35) {
-			continue;
-		}
-		float fr = (n - A.z) / (B.z - A.z);
-		float tn = mix(A.w, B.w, fr);
-		float ago = trail_now - tn;
-		float life = (0.1 + 0.2 * th(n, 0.0, 162.0)) / 0.3 * tail_life;
-		if (ago < 0.0 || ago >= life) {
-			continue;
-		}
-		vec2 base = mix(A.xy, B.xy, fr);
-		vec2 v = -dir * speed * 0.04 + (vec2(th(n, 0.0, 163.0), th(n, 0.0, 164.0)) - 0.5) * 5.0;
-		vec2 pos = base + (vec2(th(n, 0.0, 165.0), th(n, 0.0, 166.0)) - 0.5) * 0.8 + v * dragged(ago, 0.94);
-		if (storm) {
-			// Storm: the tail sways side to side as it is left.
-			pos += vec2(-dir.y, dir.x) * sin(tn * 30.0) * 1.4;
-		}
-		if (!on_pixel(P, pos, max(z - 1.0, 1.0))) {
-			continue;
-		}
-		float u = ago / life;
-		vec3 rgb = u < 0.17 ? hot : (u < 0.45 ? hi : (u < 0.8 ? mid : lo));
-		if (plain < 0.5 && th(n, 0.0, 167.0) < 0.25) {
-			// A quarter of an infused tail is its player's colour.
-			rgb = u < 0.25 ? P_LIGHT[pi] : (u < 0.75 ? P_BASE[pi] : P_SHADOW[pi]);
-		}
-		put(rgb, ago, colour, best);
-	}
-}
-
-// The kinds whose particles circle the shot, not the place they were born.
-bool circles(float look) {
-	return look == L_PULL || look == L_ORBITERS || look == L_GLITTER;
-}
-
-// The particles born on the piece from `A` to `B`: one moment every 60th of a second, each
-// moment up to `per` particles. A shot's circling particles are the head's (`head_births`); a
-// dash's are drawn round where they were born, near its head.
-void piece_births(vec4 A, vec4 B, vec2 P, float z, float reach, bool dash, vec2 target, inout vec4 colour, inout float best, inout float lit) {
-	vec2 ab = B.xy - A.xy;
-	float len = length(ab);
-	vec2 dir = len > 0.001 ? ab / len : vec2(1.0, 0.0);
-	vec2 c = floor(P) + 0.5;
-	float f = len > 0.001 ? clamp(dot(c - A.xy, dir) / len, 0.0, 1.0) : 0.0;
-	bool near_path = length(c - (A.xy + ab * f)) <= reach;
-	bool near_head = length(c - target) <= reach;
-	if (!near_path && !(dash && near_head)) {
-		return;
-	}
-	float from = ceil(A.w * BIRTHS);
-	float to = B.w * BIRTHS;
-	float per = dash ? 3.0 : 1.0;
-	float window = trail_info.x;
-	for (int m = 0; m < 6; m++) {
-		float id = from + float(m);
-		if (id >= to) {
-			break;
-		}
-		float t = id / BIRTHS;
-		float ago = trail_now - t;
-		if (ago < 0.0 || ago > window) {
-			continue;
-		}
-		vec2 at = mix(A.xy, B.xy, clamp((t - A.w) / max(B.w - A.w, 0.0001), 0.0, 1.0));
-		for (float j = 0.0; j < 3.0; j += 1.0) {
-			if (j >= per) {
-				break;
-			}
-			float look = trail_kind(id, j, dash);
-			if (look < -1.5) {
-				continue;
-			}
-			if (circles(look)) {
-				if (!dash || (!near_head && !(look == L_PULL && near_path))) {
-					continue;
-				}
-			} else if (!near_path) {
-				continue;
-			}
-			if (dash) {
-				dash_particle(look, at, dir, ago, id, j, P, z, colour, best, lit);
-			} else {
-				trail_particle(look, at, dir, ago, id, j, P, target, z, colour, best, lit);
-			}
-		}
-	}
-}
-
-// The particles that circle the shot (void's pull, shields, glitter), born at the moments
-// seg_a.x to seg_a.y: wherever on its path they were born, they are round the shot now.
-void head_births(vec2 P, float z, float reach, vec2 target, inout vec4 colour, inout float best, inout float lit) {
-	if (seg_a.z < 0.5) {
-		return;
-	}
-	bool near_head = length(floor(P) + 0.5 - target) <= reach;
-	float from = ceil(seg_a.x * BIRTHS);
-	float to = seg_a.y * BIRTHS;
-	float window = trail_info.x;
-	for (int m = 0; m < BIRTHS_MAX; m++) {
-		float id = from + float(m);
-		if (id >= to) {
-			break;
-		}
-		float ago = trail_now - id / BIRTHS;
-		if (ago < 0.0 || ago > window) {
-			continue;
-		}
-		float look = trail_kind(id, 0.0, false);
-		if (!circles(look) || (!near_head && look != L_PULL)) {
-			continue;
-		}
-		trail_particle(look, target, vec2(1.0, 0.0), ago, id, 0.0, P, target, z, colour, best, lit);
-	}
-}
-
-// The jagged line lightning draws behind its shot, from the head back along the last tenth of a
-// second of its path: bends every 4 pixels, re-rolled every other frame.
-bool lightning_tail(vec4 A, vec4 B, vec2 P, out bool newer) {
-	newer = false;
-	vec2 ab = B.xy - A.xy;
-	float len = length(ab);
-	if (len < 0.5) {
-		return false;
-	}
-	vec2 dir = ab / len;
-	vec2 c = floor(P) + 0.5;
-	float along = dot(c - A.xy, dir);
-	if (along < -0.5 || along > len + 0.5) {
-		return false;
-	}
-	float o = A.z + along;
-	float ago = trail_now - mix(A.w, B.w, clamp(along / len, 0.0, 1.0));
-	if (ago > 0.1) {
-		return false;
-	}
-	float node = floor(o / 4.0);
-	float jf = floor(trail_now * 30.0);
-	float o0 = (th(node, jf, 171.0) - 0.5) * 4.0;
-	float o1 = (th(node + 1.0, jf, 171.0) - 0.5) * 4.0;
-	float off = mix(o0, o1, fract(o / 4.0)) * min(ago / 0.02, 1.0);
-	float s = dot(c - A.xy, vec2(-dir.y, dir.x)) - off;
-	float thin = 0.5 * max(abs(dir.x), abs(dir.y));
-	newer = ago < 0.05;
-	return s >= -thin && s < thin;
+	return length(c - (p + pq * clamp(dot(c - p, pq) / (len * len), 0.0, 1.0)));
 }
 
 void fragment() {
 	vec2 P = world;
-	float z = zoom;
-	vec2 target = trail_v.xy;
-	float flags = trail_v.w;
-	bool live = flag_set(flags, TF_HEAD);
-	bool dash = flag_set(flags, TF_DASH);
-	float reach = trail_info.z;
-	float piece = mod(trail_info.w, 64.0);
-	bool light = trail_info.w < 63.5;
-	bool lightning = has_layer(L_SPARKS);
+	vec2 c = floor(P) + 0.5;
 	vec4 colour = vec4(0.0);
-	float best = 1e9;
-	float lit = 0.0;
-	float dark = 0.0;
-	if (piece < 0.5) {
-		// The head.
-		head_births(P, z, reach, target, colour, best, lit);
-		if (live && !dash) {
-			// The core: a white-hot pixel with four round it, a pixel more each side a zoom; pierce
-			// lengthens it along the flight; homing weaves it a pixel either side; void's is a dark
-			// heart ringed in pink.
-			vec2 head = target;
-			vec2 fly = seg_b.xy;
-			if (has_layer(L_WEAVE)) {
-				head += vec2(-fly.y, fly.x) * (triangle(sim_time * 3.0 + seed * 0.25) > 0.0 ? 1.0 : 0.0);
-			}
-			vec2 d = floor(P) - floor(head);
-			float arm = z;
-			float m = abs(d.x) + abs(d.y);
-			bool cross_px = (d.x == 0.0 || d.y == 0.0) && m <= arm;
-			if (has_layer(L_STREAKS)) {
-				// Pierce: the core runs on a pixel or two along the flight.
-				cross_px = cross_px || on_line(P, head, head - fly * (2.0 + arm));
-			}
-			if (has_layer(L_PULL)) {
-				if (m == 0.0) {
-					colour = vec4(OUTLINE, 1.0);
-				} else if (cross_px) {
-					colour = vec4(VOID_LIGHT, 1.0);
-				} else if (abs(d.x) == 1.0 && abs(d.y) == 1.0) {
-					colour = vec4(VOID_BASE, 1.0);
-				}
-			} else if (cross_px) {
-				colour = vec4(m < 0.5 ? hot : hi, 1.0);
-			}
-			float r = length(floor(P) + 0.5 - (floor(head) + 0.5));
-			lit += 0.8 * falloff(r, 3.0 + z) + 0.35 * falloff(r, 8.0 + 2.0 * z);
-			if (has_layer(L_PULL)) {
-				// Void pulls the light down round its heart.
-				dark = 0.45 * falloff(length(floor(P) - floor(trail_v.xy)), 6.0);
-			}
+	if (mode < M_GLOW + 0.5) {
+		// A round light (v0 its middle, the dark it casts and how far; v1 two falloffs).
+		float r = length(c - v0.xy);
+		float lit = v1.x * falloff(r, v1.y) + v1.z * falloff(r, v1.w);
+		colour = vec4(c0.rgb * lit * glow_strength, v0.z * falloff(r, v0.w));
+	} else if (mode < M_TAIL_GLOW + 0.5) {
+		// The tail's light round its piece v0.xy-v0.zw, as bright as the tail is young there (v2.xy
+		// its age at the ends, in tail lives), from the nearest piece (v1 the neighbours' far ends).
+		vec2 ab = v0.zw - v0.xy;
+		float f = clamp(dot(c - v0.xy, ab) / dot(ab, ab), 0.0, 1.0);
+		float dist = length(c - (v0.xy + ab * f));
+		float u = clamp(mix(v2.x, v2.y, f), 0.0, 1.0);
+		float z = v2.w;
+		float lit = c0.a * (1.0 - 0.75 * u) * (1.0 - u) * (0.32 * falloff(dist, 2.0 + z) + 0.36 * falloff(dist, 7.0 + 2.0 * z));
+		// A tie goes to the newer piece.
+		bool nearest = dist <= piece_distance(c, v1.xy, v0.xy) && dist < piece_distance(c, v0.zw, v1.zw);
+		colour = vec4(c0.rgb * (dist <= v2.z && nearest ? lit : 0.0) * glow_strength, 0.0);
+	} else if (mode < M_PIXELS + 0.5) {
+		// Pixels: a square of v0.z from v0.xy in c0, a cross of arms v0.w round its pixel and a
+		// line v1.xy-v1.zw in c1, the pixels between the arms in c2.
+		vec2 d = floor(P) - v0.xy;
+		vec2 a = abs(d);
+		float along;
+		if (d.x >= 0.0 && d.y >= 0.0 && d.x < v0.z && d.y < v0.z) {
+			colour = c0;
+		} else if (((a.x == 0.0 || a.y == 0.0) && a.x + a.y <= v0.w) || (v1.x < 1.0e6 && on_line(P, v1.xy, v1.zw, along))) {
+			colour = c1;
+		} else if (a.x == 1.0 && a.y == 1.0) {
+			colour = c2;
 		}
 	} else {
-		// A piece of the path.
-		vec4 A = seg_a;
-		vec4 B = seg_b;
-		if (!dash) {
-			if (light) {
-				lit += tail_light(A, B, P, z);
-			} else {
-				tail_pixels(A, B, P, z, colour, best);
-				if (lightning) {
-					bool newer;
-					if (lightning_tail(A, B, P, newer)) {
-						put(newer ? ARC_LIGHT : ARC_BASE, 0.0, colour, best);
-					}
-				}
-			}
+		// A one-pixel line from v0.xy to v0.zw: c0 for its first v2.x pixels, then c1.
+		float along;
+		if (on_line(P, v0.xy, v0.zw, along)) {
+			colour = along < v2.x ? c0 : c1;
 		}
-		piece_births(A, B, P, z, reach, dash, target, colour, best, lit);
 	}
-	if (!light) {
-		// The pixels pass: what is not a pixel of the shot adds nothing.
-		COLOR = colour.a > 0.0 ? colour : vec4(0.0);
-	} else {
-		if (lightning) {
-			// Lightning flickers.
-			lit *= 0.55 + 0.9 * hash(floor(sim_time * 20.0), 0.0, 21.0);
-		}
-		if (has_layer(L_PULL)) {
-			lit *= 0.6;
-		}
-		vec3 hue = dash ? P_BASE[int(player)] : glow;
-		COLOR = vec4(hue * lit * glow_strength, dark);
-	}
+	COLOR = colour;
 }

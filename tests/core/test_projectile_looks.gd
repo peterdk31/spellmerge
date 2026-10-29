@@ -334,27 +334,38 @@ func test_the_shader_holds_the_same_trail_numbers() -> void:
 	check(orbit.code.contains("const float BEND_SPAN = %s;" % str(ManagerScript.BEND_SPAN)), "and its span")
 
 
-## Regression (the owner, 2026-10-29: the web build lost its WebGL context on a real GPU): every
-## pixel of a trail's one big quad walked the whole path. A trail is a ribbon now, a quad per
-## piece of its path placed by the vertex shader, and no pixel reads the path.
-func test_a_trail_is_a_ribbon_and_no_pixel_walks_its_path() -> void:
+## Regression (the owner, 2026-10-29: the web build lost its WebGL context on a real GPU, then
+## the GPU process died ~90 s after the menu while Direct3D compiled the trail's fragment stage):
+## every pixel of a trail's quad walked its path, then its piece's tail pixels and births, a
+## branch per look kind. A trail is small quads now, each placed by the vertex shader, and the
+## fragment stage is small: it reads nothing of the path, has no loops and no look kinds.
+func test_trail_particles_are_geometry_and_the_fragment_stage_is_small() -> void:
 	var mesh: ArrayMesh = ManagerScript.trail_mesh()
-	check(mesh == ManagerScript.trail_mesh(), "one ribbon, made once")
-	var quads: int = (ManagerScript.TRAIL_SAMPLES + 1) * 2
+	check(mesh == ManagerScript.trail_mesh(), "one mesh, made once")
+	var quads: int = 0
+	for entry: Vector3i in ManagerScript.TRAIL_QUADS:
+		quads += entry.y
 	var arrays: Array = mesh.surface_get_arrays(0)
-	check_equal((arrays[Mesh.ARRAY_VERTEX] as PackedVector2Array).size(), quads * 4, "a quad for the head and one per piece, in two passes")
+	check_equal((arrays[Mesh.ARRAY_VERTEX] as PackedVector2Array).size(), quads * 4, "a quad for every slot of every kind")
 	check_equal((arrays[Mesh.ARRAY_INDEX] as PackedInt32Array).size(), quads * 6, "two triangles each")
 	var uvs: PackedVector2Array = arrays[Mesh.ARRAY_TEX_UV]
-	check_equal(floori(uvs[0].x), 0, "the light pass starts with the head")
-	check_equal(floori(uvs[0].y), 0, "in pass 0")
-	check_equal(floori(uvs[(quads - 1) * 4].x), 0, "the pixels pass ends with the head, on top")
-	check_equal(floori(uvs[(quads - 1) * 4].y), 1, "in pass 1")
-	check_equal(floori(uvs[(ManagerScript.TRAIL_SAMPLES + 1) * 4].x), ManagerScript.TRAIL_SAMPLES, "after the oldest piece first")
+	check_equal(floori(uvs[0].y), ManagerScript.TRAIL_Q_HEAD_LIGHT, "the head's light first (void's dark heart)")
+	check_equal(floori(uvs[(quads - 1) * 4].y), ManagerScript.TRAIL_Q_CORE, "the core last, on top")
+	var first_pixel: int = 1 + ManagerScript.TRAIL_SAMPLES + ManagerScript.TRAIL_SPARKS
+	check_equal(floori(uvs[first_pixel * 4].y), ManagerScript.TRAIL_Q_SPARK, "the particles' pixels after every light")
+	check_equal(floori(uvs[first_pixel * 4].x), ManagerScript.TRAIL_SPARKS - 1, "the oldest first")
+	check(ManagerScript.TRAIL_SPARKS >= int(ManagerScript.TRAIL_KEEP * 60.0) + 1, "a particle slot for every moment a trail keeps")
 	check(mgr._draw_node.multimesh.mesh == mesh and mgr._enemy_node.multimesh.mesh == mesh and mgr._orbit_node.multimesh.mesh == mesh, "every trail batch draws it")
 	var shader: Shader = load("res://core/projectiles/shot_trail.gdshader")
+	for kind: Array in [["Q_HEAD_LIGHT", ManagerScript.TRAIL_Q_HEAD_LIGHT], ["Q_PIECE_LIGHT", ManagerScript.TRAIL_Q_PIECE_LIGHT], ["Q_SPARK_LIGHT", ManagerScript.TRAIL_Q_SPARK_LIGHT], ["Q_SPARK", ManagerScript.TRAIL_Q_SPARK], ["Q_TAIL", ManagerScript.TRAIL_Q_TAIL], ["Q_JAG", ManagerScript.TRAIL_Q_JAG], ["Q_CORE", ManagerScript.TRAIL_Q_CORE]]:
+		check(shader.code.contains("const float %s = %d.0;" % kind), "the shader's %s is the manager's" % kind[0])
 	var fragments: String = shader.code.get_slice("// ---- Fragments ----", 1)
 	check(not fragments.is_empty(), "the shader marks where its fragment code starts")
 	check(not fragments.contains("trail_texel") and not fragments.contains("texelFetch") and not fragments.contains("TRAIL_SAMPLES"), "no pixel reads the path")
+	check(not fragments.contains("for (") and not fragments.contains("while ("), "no pixel loops")
+	var kinds := RegEx.create_from_string("\\bL_[A-Z]+\\b|has_layer|bit_set|emitter")
+	check(kinds.search(fragments) == null, "no pixel asks for a look kind")
+	check(fragments.split("\n").size() < 100, "the fragment stage is small (%d lines)" % fragments.split("\n").size())
 	check(mgr._draw_node.material is ShaderMaterial and (mgr._draw_node.material as ShaderMaterial).shader == shader, "the bolts' batch is drawn by the trail shader")
 	check((mgr._rune_node.material as ShaderMaterial).shader == load("res://core/projectiles/shot_rune.gdshader"), "the runes' by the rune shader")
 

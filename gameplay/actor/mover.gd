@@ -14,7 +14,7 @@ extends ActorComponent
 ## - `hook` and `swap`: pull the actor to the world point `to` over the time asked.
 ## - `recoil`: a push back. The recoils asked in one step are added up first (so `mirror ·
 ##   recoil` cancels) and become one push over the longest time asked, which then runs on its
-##   own time (up to MAX_RECOILS at once; a push past that is dropped).
+##   own time (any number at once: the list of running pushes grows when full).
 ##
 ## A dash, teleport, hook or swap replaces the move in progress, which is answered where the
 ## actor is. A dash, hook or teleport answers `caster_move_finished` where it ended (a swap sends
@@ -29,7 +29,7 @@ extends ActorComponent
 ## target (`target_move_requested`) puts it there at once. While the actor is down it stands: a
 ## move in progress ends unanswered, the recoil is dropped and new requests are ignored.
 ##
-## Nothing here allocates in `step`.
+## Nothing here allocates in `step` (but the recoil list growing when full).
 
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 
@@ -37,8 +37,8 @@ const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd
 ## steps of TELEPORT_BACKOFF until the body is clear.
 const TELEPORT_CLEARANCE: float = 8.0
 const TELEPORT_BACKOFF: float = 4.0
-## Most recoil pushes that run at once (a push past this is dropped).
-const MAX_RECOILS: int = 8
+## Room for this many running recoil pushes at first; the list doubles when it is full.
+const RECOIL_ROOM: int = 8
 ## The shortest time a move or push takes.
 const MIN_SECONDS: float = 0.01
 
@@ -68,8 +68,8 @@ var _recoil_count: int = 0
 
 
 func _init() -> void:
-	_recoil_velocities.resize(MAX_RECOILS)
-	_recoil_lefts.resize(MAX_RECOILS)
+	_recoil_velocities.resize(RECOIL_ROOM)
+	_recoil_lefts.resize(RECOIL_ROOM)
 
 
 func attach() -> void:
@@ -232,7 +232,11 @@ func _cancel() -> void:
 ## which ends on its own time; returns the velocity of all pushes to add now (a push's last step
 ## is shortened, so each moves exactly its distance).
 func _recoil_step(delta: float) -> Vector2:
-	if _recoil_pending != Vector2.ZERO and _recoil_count < MAX_RECOILS:
+	if _recoil_pending != Vector2.ZERO:
+		if _recoil_count == _recoil_velocities.size():
+			# Full: grow (rare; the steady state allocates nothing).
+			_recoil_velocities.resize(_recoil_count * 2)
+			_recoil_lefts.resize(_recoil_count * 2)
 		_recoil_velocities[_recoil_count] = _recoil_pending / _recoil_pending_seconds
 		_recoil_lefts[_recoil_count] = _recoil_pending_seconds
 		_recoil_count += 1

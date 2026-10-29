@@ -34,7 +34,7 @@ Line numbers are from main after #453 and drift; the function names hold. The fi
 | 4 | `spells.gd` `_launch`, `projectile_manager.gd` `_is_flyer` | bounce, ghost, spiral, linger, growth, sticky × orbit, rune, wall | 1 | `_apply_travel` runs only for STRAIGHT, HOOK, SWAP and the setters refuse other motions: `growth · rune`, `sticky · orbit`, `linger · wall` do nothing, nothing is listed. |
 | 5 | `_start_beam`, `_shoot_ray`, `ray` | ghost, spiral, linger, growth, sticky, magnet, shield, relay × beam, fissure | 1 | A ray stops at walls (ghost does nothing), beams are never `_register`ed (magnet), no `_apply_shield` for rays, relay is shots only. Silent. |
 | 6 | `_move_caster` (no hit path for moves) | chain, siphon, possess, heavy, relay, pierce, bounce, ghost, spiral, linger, growth, sticky, magnet × dash, teleport | 1 | A dash hits nothing: **`heavy · dash` ("shoulder charge", M2-staffs.md) does nothing**, nor the rest. |
-| 7 | `_register` (only slot shots get trackers) | timer, on hurt × beam, fissure, wizard dash/teleport, rain, decoy, familiar | 4 | `timer · beam`, `hold · on hurt · beam` never fire; the compiler accepts them (against DECISIONS "a hold carrier's timer for as long as it is on"). |
+| 7 | `_register` (only slot shots get trackers; fixed in R4d: one list of live carriers) | timer, on hurt × beam, fissure, wizard dash/teleport, rain, decoy, familiar | 4 | `timer · beam`, `hold · on hurt · beam` never fire; the compiler accepts them (against DECISIONS "a hold carrier's timer for as long as it is on"). |
 | 8 | `_land_rain`, entities, moves | on hit, on kill, on reaction, on block, on wall × rain, decoy, familiar, dash, teleport | 4 | These carriers never hit under their own tag: `on hit · familiar`, `on wall · dash` never fire, silently. |
 | 9 | `_fire_spell` (mirror) | mirror × hook, swap, wall, rain, dash, teleport, orbit, rune, decoy, familiar | 1 | Mirror fires backwards only for STRAIGHT, RAY, FISSURE (hook and swap are straight shots yet excluded); silent elsewhere. Partly decided (R4). |
 | 10 | `_land_rain` / `_telegraph_rain` | blast × rain | 1 | No `_blast` where the rain lands. |
@@ -46,12 +46,12 @@ Line numbers are from main after #453 and drift; the function names hold. The fi
 | 16 | `staff_compiler.gd` (behaviour strengths summed), `heavy.tres` (4) | heavy × heavy (and growth × growth) | 3 | Strengths are summed but heavy multiplies knockback: two heavy cards give ×8, not ×16. Growth (2+2 = 2×2) agrees by chance only. |
 
 **Suspected (check while fixing nearby):**
-- `projectile_manager.gd` `_pass_return`: a returning shot stops homing (pass-order comment).
+- ~~`projectile_manager.gd` `_pass_return`: a returning shot stops homing (pass-order comment).~~ (fixed in R4a: homing bends the way home.)
 - `_register_hit`: sticky ends the remaining pierce at the first hit.
 - ~~`_jump`: flying jumps get pierce 0~~ (fixed in R1b; a ray jump still pierces nothing, R4).
 - `_fire_payload` from a beam hit uses CASTER_POINT: an orbit payload circles the hit point, not the beam.
 - `_on_familiar_cast` uses CASTER_POINT while the familiar lives: an orbit, return or dash payload ignores the familiar.
-- `_shield_block`: when the hit-work budget runs out a block is skipped, not deferred (an enemy shot flies through).
+- ~~`_shield_block`: when the hit-work budget runs out a block is skipped, not deferred (an enemy shot flies through).~~ (fixed in R4a: blocks spend no budget.)
 - Fissure ends inside its call: `hold · fissure` silently does nothing.
 
 ## Card × carrier (audit, before R)
@@ -66,7 +66,7 @@ Since R3 the live matrix is printed by `tests/core/test_card_rules.gd` (✓ work
 | chain | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ |
 | shield | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
 | blast | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| hold | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| hold | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ |
 | recoil | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | bounce | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ | ✓ | ✓ | ✗ | ✗ | ✓ | ✗ | ✗ |
 | echo | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
@@ -82,18 +82,18 @@ Since R3 the live matrix is printed by `tests/core/test_card_rules.gd` (✓ work
 | return | ✓ | W | W | W | W | W | ✓ | ✓ | W | W | W | W | W |
 | arc | ✓ | ✓ | ✓ | W | W | W | ✓ | ✓ | ✓ | W | W | W | W |
 
-**Triggers (R2b, what the runtime does today):** `StaffCompiler.trigger_runs` and `trigger_why_not`. ✓ fires · W listed as wasted with its payload · s only with a shield or deflect on the carrier (a dash's or teleport's is a barrier on the wizard) · b only with a blast, whose area hit carries the carrier's tag. On reaction also needs an infusion or relay, and on wall is wasted on a ghost shot. Every W is a cell for R4.
+**Triggers (R2b, what the runtime does today; timer and on hurt after R4d):** `StaffCompiler.trigger_runs` and `trigger_why_not`. ✓ fires · W listed as wasted with its payload · s only with a shield or deflect on the carrier (a dash's or teleport's is a barrier on the wizard) · b only with a blast, whose area hit carries the carrier's tag. On reaction also needs an infusion or relay, and on wall is wasted on a ghost shot. Every W is a cell for R4.
 
 | | Bolt | Rune | Orbit | Beam | Dash | Telep | Hook | Swap | Wall | Rain | Fiss | Decoy | Famil | Swing |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | on hit | ✓ | ✓ | ✓ | ✓ | W | W | ✓ | ✓ | ✓ | W | ✓ | W | W | ✓ |
 | on expire | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| timer | ✓ | ✓ | ✓ | W | W | W | ✓ | ✓ | ✓ | W | W | W | W | W |
+| timer | ✓ | ✓ | ✓ | ✓ | ✓ | W | ✓ | ✓ | ✓ | ✓ | W | ✓ | ✓ | ✓ |
 | on block | s | s | s | s | s | s | s | s | s | W | s | W | W | s |
 | on kill | ✓ | ✓ | ✓ | ✓ | b | b | ✓ | ✓ | ✓ | b | ✓ | b | b | ✓ |
 | on cast | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | on wall | ✓ | W | W | ✓ | W | W | ✓ | ✓ | W | W | ✓ | W | W | W |
-| on hurt | ✓ | ✓ | ✓ | W | W | W | ✓ | ✓ | ✓ | W | W | W | W | W |
+| on hurt | ✓ | ✓ | ✓ | ✓ | ✓ | W | ✓ | ✓ | ✓ | ✓ | W | ✓ | ✓ | ✓ |
 | on reaction | ✓ | ✓ | ✓ | ✓ | b | b | ✓ | ✓ | ✓ | b | ✓ | b | b | ✓ |
 
 The melee carriers (swing, slam) arrived on main after the audit: R2 and R3 cover them like the rest.
@@ -132,6 +132,7 @@ The owner's "pass that checks for the general rules", as a test that runs in the
 - Otherwise the card must change something observable: run the cast in a small scene (walls, a few targets, an ally), record a trace (hits and their profiles, shots and their paths, events, payload fires, the caster's moves) and compare with the same cast without the card. Identical traces mean a silent no-op: fail with "`<card>` on `<carrier>` does nothing and is not listed as wasted".
 - Per-behaviour probes where a plain diff is not enough (homing needs a target off the line, bounce a wall, ghost a wall behind a target, timer a long life, on wall a wall, on kill a target that dies): a small table of scene setups per card, chosen by the card's behaviour or event, not per carrier.
 - Prints the matrix (✓, W, ✗) so the PR shows coverage; a ✗ fails.
+- The other way round (R4b, owner item 22): every W cell is also played with the card forced on (`StaffCompiler.keep_wasted`, a test-only switch that keeps what the waste table would drop; the runtime decides). If that changes the cast (effects only: a wasted card's costs are no effect), the listing is wrong: "`<card>` on `<carrier>` is listed as wasted (`<reason>`) but changes the cast". Done; it found no false W on main (2026-10-29), slam's was already fixed by hand.
 - Rule 2 checks in the same test: a card's effect survives a bounce, a chain jump, an echo and a payload firing (the trace of the second leg still shows it). **Deferred:** not built in #468; tracked in docs/BACKLOG.md ("Card rules R3, rule 2 checks"). Done-when 2 holds without it.
 
 Build R3 right after R2 (it needs the honest compiler); R1 parts can land before or after.
@@ -150,8 +151,12 @@ The test keeps no list of cards or carriers. It finds them itself, so a new card
 The owner re-decides these under the new rule; each "yes, it should work" becomes a part that turns W into ✓ (with a probe in R3). Present them in one session, with a recommendation each:
 
 - **Decided before, now in question:** mirror only on carriers that "have a back" (DECISIONS); a hold carrier does not echo (silent); a beam has no timer (contradicts the timer-for-hold decision); relay shots only, not on chain children or payloads; hold does nothing on rain; recoil skipped on dash and teleport; a beam's chain jump is a beam that pierces nothing; a hook with pierce fires `on expire` twice ("accepted for now"); a returning shot stops homing; a payload with no live shot is cast by its point (a payload dash or hook does nothing); **recoil pushes past 8 at once are dropped** (`mover.gd` `MAX_RECOILS`: a cap missed by #450, fix under rule 5 without a decision); hit-work starvation skipping shield blocks (defer, not skip). **Editing a staff or switching off a hold drops all its waiting launches** (`_release_hold` calls `_drop_pending` first): payload fires of carriers without hold that only wait for the per-step pacing (`FIRE_SHOTS_PER_STEP`) are lost too, against rule 5 (found in R1f, 2026-10-29).
+- **R4a, fixes (done, owner 2026-10-29):** every recoil push runs (the mover's list grows, no `MAX_RECOILS`); shield and deflect checks spend no hit-work budget and look only at the shots on the grid cells their path could touch; a hold switch-off drops only its hold carriers' waiting firings, and an edit only the cast's own (burst repeats, echoes, a rain, `on cast`), never a waiting payload of a shot or point; a piercing hook fires `on expire` once, where its shot ends; a returning homing shot homes on the way back (its way home bends up to 60°); an arc zap that ends on a wall sets off no `on wall`; the dead "through a friend" phrase is gone. DECISIONS "Card rules R4a".
+- **R4d (done, owner 2026-10-29):** every carrier that lasts keeps a timer and hears `on hurt` while it lives (a beam while it is on, a rain while it falls, a decoy and familiar while they live, a swing while it sweeps, a dash while the caster moves), firing from where it is now; fissure, slam and teleport are over at once and stay wasted. A timer's first tick and an arc's first zap come after the interval or half the carrier's life, whichever is shorter, so hook, swap and nova tick and zap too. One list of live carriers (`_lc_*`, `_lc_where`) replaces the per-slot timer and hurt lists.
 - **R4e (hold), done:** hold keeps a carrier on until switched off: a lasting one lives on (a held fissure is a beam that pierces everything, so it stays open and hits its line every beam tick), and one over at once is cast again every wind-up and lifetime along the aim (`Spells._repeats`: a rain falls again, a swing sweeps back). Slam, dashes and teleport stay wasted. An echo on a hold carrier is a second held copy at half damage, switched off with it, reserving nothing more.
 - **Cells to decide (W or ✓):** travel behaviours on orbit, rune, wall (growth on a rune grows the rune; linger and spiral on an orbit?); ghost, magnet, shield, relay on beams and fissures; **dash and teleport hitting what they pass** (makes `heavy · dash` the shoulder charge the card table promises, and chain, siphon, possess, relay on a dash); triggers on rain, decoy, familiar; mirror on any aimed carrier; one shield rule for every carrier that moves its caster.
+- **R4h travel (done 2026-10-29):** every shot a carrier makes gets every travel card, and the shot takes what it can do: growth grows a rune (its trigger circle), an orbit's and a wall's shots; on an orbit, linger stops the circling, spiral weaves its radius and sticky takes the shot that hits off its circle onto the target. Still wasted: bounce and return on all three (they do not fly), homing on an orbit (R4i), ghost on an orbit (it passes walls already), linger, spiral and sticky on a rune and a wall (they do not move).
+- **R4i homing on placed carriers (done 2026-10-30):** a homing rune creeps toward its target at `SpellLimits.HOMING_DRIFT` (24 px/s, below the slowest walker), with a bolt's pick and reach, and stays put with nothing in reach: one line in `_pass_homing` (a shot with no speed drifts). A rain's and a wall's aim point moves onto a target within the card's reach of it (`Spells._homed_place`, the one homing search); the wall's shots then keep still. Homing is still wasted on an orbit (it circles its caster: nothing to aim), a fissure, a swing, a slam, a decoy and a familiar.
 
 ## Notes for the sessions
 

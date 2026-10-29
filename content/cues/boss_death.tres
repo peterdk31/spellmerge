@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="CueBase" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/base/cue_base.gd" id="1_base"]
+
+[resource]
+script = ExtResource("1_base")
+id = &"boss_death"
+parts = Array[Dictionary]([{"effect": &"ring_out", "zoom": 3, "seconds": 0.14, "color": Color(0.9568627, 0.945098, 0.9176471, 1), "way": &"right"}])
+shake = 0.38
+hold = 0.09
+hold_shot = true
+stop_game = 0.09
+sound = &"enemy_death"

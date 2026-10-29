@@ -15,7 +15,11 @@ extends SceneTree
 ##       await shot("arena")
 ##
 ## godot --path . --script res://tests/screenshots/shot_<name>.gd
+##
+## Before `take()`, the shaders are compiled behind the loading screen as on Play (`warm_up.gd`).
+## A script that shows the load itself sets `warm_first = false` in its `_init()`.
 
+const WarmUp := preload("res://tests/support/warm_up.gd")
 const SHOTS_DIR := "user://screenshots"
 ## The game's screen, which every sheet is laid out on.
 const SCREEN := Vector2(640.0, 360.0)
@@ -23,12 +27,17 @@ const FLOOR := preload("res://art/tilesets/crypt/floor.svg")
 
 ## The frames `settle()` waits when it is given none.
 var settle_frames: int = 20
+## Whether the shaders are compiled (Flow's play tasks run) before `take()`.
+var warm_first: bool = true
 var _failed: bool = false
 
 
 func _initialize() -> void:
 	await process_frame
 	DirAccess.make_dir_recursive_absolute(SHOTS_DIR)
+	if warm_first and not await WarmUp.run(root):
+		fail("the shaders were not compiled before the shots (Flow's play tasks through Loading)")
+		return
 	await take()
 	if not _failed:
 		quit(0)

@@ -2,6 +2,12 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-29: Card rules R4b, a wasted card is checked too (owner)
+
+- **A W cell is played with the card forced on** (owner item 22): the card rules test failed only on a card that does nothing unlisted, not on a card listed as wasted that would work (slam's was found by hand). Now every W cell also runs with the card kept, and a different trace fails the test. Still auto-discovering, no new job.
+- **One seam:** `StaffCompiler.keep_wasted`, a test-only static switch that keeps every card the waste table would drop; the runtime never reads the table, so it alone decides. Costs (mana, a slower cast, less damage) are no effect and are paid by both casts.
+- **Findings:** none on main today; every W cell changes nothing when forced. Item 23 (rule 2 checks) stays in docs/BACKLOG.md.
+
 ## 2026-10-29: Card rules R4e: hold (owner)
 
 - **One rule: hold keeps the carrier going until the staff is pressed again.** A carrier that lasts lives on (as before); one that is over at once is cast again every wind-up + lifetime (`Spells._repeats`): a held rain falls again every 0.8 s, a held swing sweeps back and forth, along the wizard's aim now. Its hold (and mana reservation) ends only when switched off, not between two repeats.
@@ -28,7 +34,7 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - **The hold lives in `core/`, Feel only asks for it.** Areas only talk through `core/`, so the per-actor hold is in the actor table (`Actors.hold`, read by `Actor.step` with `spend_hold`) and the per-shot hold in the projectile manager (`freeze_shot`, state `S_FROZEN`); Feel decides who is held and for how long. A step longer than the hold runs for the rest, so a hold never eats a long step.
 - **Which bodies:** the attacker and the target of a hit, plus the shot whose `projectile_hit` is being sent (`event_slot`; a ray has none). A spent shot is already gone, so only a piercing, lingering or orbiting shot is held. A kill holds the killer (the dead body is freed at once). A reaction, which used to stop the whole game, holds its caster: it is a hit, not a rare moment.
 - **The rest is per actor** (`hit_stop_rest` after a hold), so one body is not frozen for ever by a stream of hits, while two players' hits never gate each other. Kills and reactions ignore the rest, as deaths did.
-- **Game-wide stop:** only `player_downed` and the death of an enemy whose `EnemyBase.boss` is true (a new flag; no boss exists yet). The parry's local stop is added when I5 lands (done: Feel's `parry_stop_seconds` on the parrying actor).
+- **Game-wide stop:** only `player_downed` and the death of an enemy whose `EnemyBase.boss` is true (a new flag; no boss exists yet). The parry's local stop is added when I5 lands (done: the parry cue's `hold` on the parrying actor, `content/cues/parry.tres`).
 - **Held bodies stop in Feel's own time:** the hold counts down in the simulation's time, not real time; with `Engine.time_scale` at 1 they are the same.
 
 ## 2026-10-29: Planning run on an empty queue
@@ -155,7 +161,7 @@ The owner's direction after B7a: "The 4 staffs should be mapped to lb/rb lt/rt i
 - **Swap needs the caster's place**, read from the manager's anchor; without one nothing is traded. `target_move_requested` carries the player first (as in `events.gd`, which differs from the milestone table).
 - **End points from `caster_move_finished`** (dash, teleport, hook; other modes are ignored) fire the carrier's `blast` and its `on expire` payload at the arrival. The payload goes along the move's heading. A forgotten build (tag unknown) does nothing.
 - **Blast on shots** goes off where a spent shot hit, where a shot expired (also a sticky one, or a wall), and at the end of a beam or fissure. A piercing shot or beam does not blast per target. A hook's blast waits for the arrival; a missing hook blasts where it ends (since rules R1d, 2026-10-29; before, it did not explode).
-- **Simultaneous moves.** The player (B4) sums the `recoil` requests of one step and lets a later non-recoil move replace an earlier one (written in `events.gd` and the B4 task). `Spells` keeps one move heading per player, so the last asked move wins: of two moves in flight, the first one's `on expire` payload leaves along the later heading. A hook with pierce left can fire its `on expire` payload at the arrival and again when the shot expires; both are accepted for now.
+- **Simultaneous moves.** The player (B4) sums the `recoil` requests of one step and lets a later non-recoil move replace an earlier one (written in `events.gd` and the B4 task). `Spells` keeps one move heading per player, so the last asked move wins: of two moves in flight, the first one's `on expire` payload leaves along the later heading. A hook's `on expire` fires once, where the hook shot ends (rules R4a, replacing "both accepted for now"): at the arrival when the hit spent it, at the end of its flight when it had pierce left.
 - **Every spent shot blasts.** The blast rule is per shot: each chain jump shot, each echo and each shot of a wall or orbit blasts where it is spent, so a wall of N shots expiring together sends N area hits in one step. A piercing shot does not blast at a hit it survives. Pinned by tests.
 - **Siphon** sends one refund of its strength per hit (a beam's every target too); the pool is `player`'s concern (B4).
 
@@ -717,7 +723,7 @@ The frost tint is Ice base (`#4fd6dc`), not Ice light (`#c4f6f2`, nearly white);
 **Decided by:** Claude, from the owner's bug report on #102.
 
 - `muzzle_flash_size` goes from 2.4 to 0.5 (the `@export_range` minimum was already 0.1). With the 32 px `hit_spark.svg`, `MUZZLE_STRETCH` 1.8 and the 1.5× growth while it fades, the flash is 29 px long at the start and 43 px at its largest, about the size of the 32 px wizard. Before it was 138 px growing to 207 px.
-- The stretch stays, so the flash still reads along the aim. The death puff has its own size (`death_puff_size`) and is unchanged.
+- The stretch stays, so the flash still reads along the aim. The death puff has its own size (`death_puff_size`, now the cue `enemy_death`'s ring) and is unchanged.
 - `test_feel.gd` fails if the `punchy` muzzle flash is longer than 48 px at any step.
 
 ## 2026-10-18: Wave pacing: waves in the same room, +2 enemies a wave, downed wizards stand up between waves
@@ -1855,7 +1861,7 @@ How it is built (parts F2–F10):
   - **Dash direction:** the way the intent walks; standing, the way the actor aims. A walking wizard dashes as before and a standing AI along its aim as before; a standing wizard now dashes along its aim instead of its last walk direction, which is the same unless it aims with the stick or mouse.
   - **Pace:** chill and freeze scale walking and a dash (the actor's own legs), not a hook, a swap or a recoil (the spell moves it): the wizard's rule. A frozen enemy no longer dashes.
   - **Homing dash** (`Spells.move_homing`) for every actor, as wizards had it.
-  - **Recoil:** the recoils of one step are added up (`mirror · recoil` cancels) into one push over the longest time asked; at most 8 run at once and a push past that is dropped (the wizard's; the AI kept 4 and added the extra to the last).
+  - **Recoil:** the recoils of one step are added up (`mirror · recoil` cancels) into one push over the longest time asked; any number run at once: the list grows when full (rules R4a; before, a ninth push was dropped).
   - **Exact distance:** a move's and a push's last step is shortened, so each goes exactly its distance even when its time is not a whole number of steps (the AI did this for moves, the wizard for pushes only).
   - **Answers:** a dash, hook or teleport answers `caster_move_finished` (a teleport at once, the others the step after their last); a replaced move is answered where the actor stands, also when it had arrived and its answer was due (the AI lost that answer).
   - **Teleport and recoil are measured from the staff tip** (`muzzle_position`), as both copies did; a cast leaves from the staff tip clipped to walls from the feet for every actor (the AI did not clip).
@@ -2243,3 +2249,30 @@ The owner: restructure the projectile step from "for each shot, check every beha
 - **R3, the permanent check:** `tests/core/test_card_rules.gd` finds every card and carrier through the registry and every behaviour and event from the enums (no list), plays each card on each carrier in a small world with and without it, and fails on a card that changes nothing and is not listed as wasted, or on a behaviour or event with no probe. Rule 2 checks (an effect survives a bounce, jump, echo, payload) are not in it yet.
 - **R2c:** the builder, the radial builder and the staff row already show every wasted slot with its reason; nothing changed there.
 - **For R4:** every W here is a cell the owner may turn into ✓ (M2-rules.md R4).
+
+## 2026-10-29: Card rules R4a: fixes (owner decisions, phase R)
+
+- **Every recoil runs.** The actor's mover kept 8 pushes and dropped a ninth (rule 5); its list of running pushes now grows when full (no allocation in the steady state).
+- **A shield always blocks.** Shield and deflect checks no longer spend the per-step hit-work budget, so a crowded step cannot let an enemy shot through. Measured first: the plain full scan was 4–6× slower in a 1,500-shot scene with 250 shields, so a shield now looks only at the shots on the target grid's cells its path could touch (the shots are put on the cells once a step, the first time a shield needs them); within about 1.2–1.5× of the budgeted scan (which skipped blocks), and the step recording only changes its work counter.
+- **Switch-off and edit drop only what they end.** A hold switch-off drops the waiting firings of its hold carriers only. An edit drops the cast's own waiting launches (the wizard casts them: burst repeats, echoes, a rain, a waiting `on cast`); a waiting payload of a shot or a point keeps its old build registered, as a shot in the air does, and fires. A caster that closes still drops all of its own.
+- **A hook ends once, where its shot ends:** at the caster's arrival when the hit spent the hook shot, at the end of its flight when it had pierce left. Its `on expire` and `blast` go off there only (replaces "both accepted for now").
+- **A returning shot keeps homing.** On the way back the shot heads for its caster, and homing bends that heading toward its target at the homing card's turn rate (back toward the straight line with no target), never more than 60° off, so it always closes in and cannot circle. It still ends at its caster, or when its life runs out, as before.
+- **A zap is not its shot meeting a wall:** an arc zap that ends on a wall sets off no `on wall`. The dead tenth `WHEN` phrase ("through a friend", the removed on ally trigger) is gone.
+
+## 2026-10-29: Card rules R4h: travel cards on orbit, rune and wall (owner decisions, item 19)
+
+- **The owner's decision:** growth grows a rune (its trigger circle), an orbit's shots and a wall's shots each second. On an orbit, linger stops the circling for its seconds (the shot keeps to its caster), spiral weaves its radius by its width, and sticky takes an orbit shot that hits off its circle onto the target. Still wasted: bounce, return and homing on all three ("it does not fly"), ghost on an orbit ("an orbit already passes walls"), linger, spiral and sticky on a rune and a wall ("it does not move").
+- **One mechanism:** `Spells._apply_travel` runs on every shot a carrier makes (bolt, rune, orbit, a wall's shots, a chain jump), and each `ProjectileManager` setter takes what the shot can physically do: growth any shot, linger, spiral and sticky a shot that moves (`_moves`), bounce, ghost, return and homing a straight shot. The wall's own copy of shield and deflect is gone (it calls `_apply_travel`). The existing passes do the rest: linger holds the orbit (the orbit pass keeps a held shot on its caster without turning), the stuck pass takes a sticky orbit shot, and the orbit pass adds the spiral's sine to its radius (an orbit joins no spiral pass).
+- **The waste table lists fewer cells:** `behaviour_waste` lists growth off shots that stay in the world, and linger, spiral, sticky off a rune and a wall only.
+
+## 2026-10-30: Card rules R4i: homing on placed carriers (owner decisions, 2026-10-30)
+
+- **The owner's decision:** homing was wasted on a rune, a wall and a rain. A homing rune drifts: it creeps toward its target at `SpellLimits.HOMING_DRIFT` (24 px/s: below the slowest walking enemy, 30, so it is a trap that follows, not a chaser; over a rune's 8 s about the card's 160 px reach), with a bolt's pick and reach; with nothing in reach it stays put. A rain's and a wall's aim point moves onto a target near it, as homing bends a beam's or a teleport's aim. An orbit stays wasted: it circles its caster, nothing to aim.
+- **One mechanism each:** `set_homing` takes any shot but an orbit, and `_pass_homing` moves a shot with no speed at HOMING_DRIFT (one branch, no rune case elsewhere). `Spells._homed_place` asks the one homing search (`homing_point`, any way round, the card's reach round the point) for a rain and a wall. A wall's shots then keep still (its homing went into where it stands; a wall's chain jump, a flying shot, still homes).
+- **The waste table lists fewer cells:** `homing_steers` adds rune, wall and rain; homing is wasted on an orbit, a fissure, a swing, a slam, a decoy and a familiar ("it has nothing to aim, and ...").
+
+## 2026-10-29: Card rules R4d: every lasting carrier keeps a clock (owner decisions)
+
+- **Items 7 and 10 of the R4 list** (owner, 2026-10-29). Timer and on hurt now work on every carrier that lasts: a shot, a beam while it is on, a rain while it falls, a decoy and a familiar while they live, a swing while it sweeps, a dash while the caster moves. The payload fires from where the carrier is now: the shot, the beam's tip, the rain's spot, the decoy, what a familiar circles (its wizard, shot or point), the caster during a dash (on hurt, as before, from the hurt actor). Fissure, slam and teleport stay wasted: "it is over at once" (`StaffCompiler.lasts`).
+- **The first tick:** a timer's first tick and an arc's first zap come after the interval or half the carrier's life, whichever is shorter (`Spells.first_tick`), then every interval. A hook or swap (0.5 s) ticks at 0.25 s, a nova (0.4 s) at 0.2 s; a bolt, orbit, rune and wall are unchanged. The compiler's "ends before its first tick / zap" wastes are gone.
+- **One mechanism:** the per-slot timer list and hurt list are replaced by one list of live carriers (`_lc_*` in `spells.gd`): every lasting carrier with a timer or on hurt joins it as it starts, with where it is (a slot, a beam row, a swing row, an actor's body, a fixed point), and leaves when that row ends, its time is up, or its entity ends. `_lc_where` is the one "where is it now".

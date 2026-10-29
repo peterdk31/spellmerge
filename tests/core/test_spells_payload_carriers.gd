@@ -36,7 +36,7 @@ var _end_requests: Array = []
 var _areas: Array = []
 ## Every form_shown as [player, form, origin, direction, length].
 var _shown: Array = []
-## Every explosion_shown as [player, at, radius, style].
+## Every cue_shown as [player, at, size, cue].
 var _explosions: Array = []
 
 
@@ -55,8 +55,8 @@ func before_each() -> void:
 	_areas.clear()
 	_shown.clear()
 	_explosions.clear()
-	_bus.explosion_shown.connect(func(player: int, at: Vector2, radius: float, style: StringName, _tint: Color, _look: int) -> void:
-		_explosions.append([player, at, radius, style]))
+	_bus.cue_shown.connect(func(player: int, cue: StringName, at: Vector2, _direction: Vector2, size: float, _tint: Color, _look: int) -> void:
+		_explosions.append([player, at, size, cue]))
 	_bus.projectile_hit.connect(func(player: int, target: Node, at: Vector2, tag: int) -> void:
 		_hits.append([player, target, at, tag]))
 	_bus.entity_spawn_requested.connect(func(player: int, kind: StringName, at: Vector2, seconds: float, tag: int, caster: int) -> void:
@@ -90,7 +90,9 @@ func before_each() -> void:
 	beam.radius = 6.0
 	_modifier(&"hold", ModifierBase.Behaviour.HOLD, 1.0)
 	_modifier(&"shield", ModifierBase.Behaviour.SHIELD, 2.0)
-	_modifier(&"blast", ModifierBase.Behaviour.BLAST, 30.0)
+	_modifier(&"blast", ModifierBase.Behaviour.BLAST, 30.0).cue = &"blast"
+	# A barrel's blast: the same behaviour, naming another cue.
+	_modifier(&"barrel", ModifierBase.Behaviour.BLAST, 30.0).cue = &"fireball"
 	_trigger(&"on_expire", TriggerBase.Event.EXPIRE)
 	_trigger(&"on_hit", TriggerBase.Event.HIT)
 	var spark: FormBase = _form(&"spark", 100.0, 1.0)
@@ -114,11 +116,12 @@ func _form(id: StringName, speed: float, lifetime: float) -> FormBase:
 	return form
 
 
-func _modifier(id: StringName, behaviour: ModifierBase.Behaviour, strength: float) -> void:
+func _modifier(id: StringName, behaviour: ModifierBase.Behaviour, strength: float) -> ModifierBase:
 	var modifier := ModifierBase.new()
 	modifier.behaviour = behaviour
 	modifier.behaviour_strength = strength
 	_put(modifier, id)
+	return modifier
 
 
 func _trigger(id: StringName, event: TriggerBase.Event) -> TriggerBase:
@@ -385,6 +388,27 @@ func test_a_blast_shows_its_explosion_where_it_goes_off() -> void:
 	_bus.entity_ended.emit(0, &"decoy", Vector2(50, 20), tag)
 	check(_explosions.size() == 1 and _explosions[0][1].is_equal_approx(Vector2(50, 20)) and is_equal_approx(_explosions[0][2], 30.0), "one explosion at the area hit, as wide: %s" % [_explosions])
 	check(_explosions.size() == 1 and _explosions[0][0] == 0 and _explosions[0][3] == &"blast", "of its caster, in blast's style")
+
+
+func test_a_blast_plays_the_cue_its_card_names_the_first_in_slot_order() -> void:
+	var tag: int = _build(0, [&"barrel", &"decoy"])
+	_cast()
+	_bus.entity_ended.emit(0, &"decoy", Vector2(50, 20), tag)
+	check(_explosions.size() == 1 and _explosions[0][3] == &"fireball", "the barrel card's cue: %s" % [_explosions])
+	_explosions.clear()
+	tag = _build(1, [&"barrel", &"blast", &"decoy"])
+	_cast(1)
+	_bus.entity_ended.emit(1, &"decoy", Vector2(50, 20), tag)
+	check(_explosions.size() == 1 and _explosions[0][3] == &"fireball", "two blast cards: the first's cue: %s" % [_explosions])
+	_explosions.clear()
+	_build(2, [&"blast", &"barrel"])
+	_cast(2)
+	check(_explosions.size() == 1 and _explosions[0][3] == &"blast", "fallen back on the caster, the first's too: %s" % [_explosions])
+
+
+func test_the_shipped_blast_card_names_the_blast_cue() -> void:
+	var card: ModifierBase = load("res://content/spells/modifiers/blast/blast.tres") as ModifierBase
+	check_equal(card.cue, &"blast", "blast.tres says which cue it plays")
 
 
 func test_a_lone_blast_explodes_on_its_caster_and_a_decoy_without_one_does_not() -> void:

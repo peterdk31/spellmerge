@@ -2,7 +2,7 @@
 shader_type canvas_item;
 render_mode blend_premul_alpha;
 
-// An explosion (gameplay/feel/feel.gd, `explode`; core/README.md, "The shot shaders"): its parts,
+// An explosion (gameplay/feel/feel.gd, the cue parts `shell`, `fireball`, `debris`, `scorch`; core/README.md, "The shot shaders"): its parts,
 // each an instance of Feel's blast mesh (`Feel.blast_mesh`) in a square BLAST_SPAN x 2 radii
 // across round where it went off, in the ramp and look of what went off; the radius is the
 // zoom x 2 pixels, the age the code beside the kind (`coded_age`). The parts (B_* here,

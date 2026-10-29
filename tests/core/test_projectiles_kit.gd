@@ -38,6 +38,7 @@ func _initialize() -> void:
 	_test_ghost_passes_walls()
 	_test_spiral_weaves_round_its_line()
 	_test_return_comes_back_and_hits_twice()
+	_test_a_returning_shot_homes_on_its_way_back()
 	_test_linger_stops_then_goes_on()
 	_test_growth_grows_to_the_room()
 	_test_sticky_follows_its_target()
@@ -47,6 +48,7 @@ func _initialize() -> void:
 	_test_every_shot_hits_both_sides()
 	_test_sticky_shot_keeps_its_direction_and_stays_stuck_at_a_wall()
 	_test_shield_catches_fast_shots_in_any_slot_order()
+	_test_shield_blocks_in_a_step_whose_hit_work_is_spent()
 	_test_apply_travel_maps_cards_to_the_shot()
 	_test_setters_refuse_bad_slots()
 	_test_many_shots_with_behaviours_stay_cheap()
@@ -218,6 +220,27 @@ func _test_return_comes_back_and_hits_twice() -> void:
 	_mgr.set_return(lost)
 	_run(40)
 	_check(not _mgr.is_alive(lost), "a returning shot with no caster to return to ends")
+
+
+## Rules R4a: a returning shot keeps homing on its way back: its way home bends toward a target
+## near its path at the homing rate, and it still gets home (the bend stays under a right angle).
+func _test_a_returning_shot_homes_on_its_way_back() -> void:
+	_setup()
+	_mgr.set_anchor(0, Vector2(50.0, 100.0))
+	var slot: int = _mgr.spawn(0, Vector2(50.0, 100.0), Vector2(240.0, 0.0), 3.0, 3.0, ManagerScript.LAYER_ENEMY, 5, 7)
+	_mgr.set_return(slot)
+	_mgr.set_homing(slot, 4.0, 80.0)
+	_run(95)
+	_check(_mgr.is_alive(slot) and _mgr.get_velocity_of(slot).x < 0.0, "it is on its way back")
+	# A target off its straight way home, after it turned (the way out never saw it).
+	_mgr.set_anchor(0, Vector2(150.0, 100.0))
+	var enemy: Node2D = _target(Vector2(330.0, 128.0), 8.0)
+	var steps: int = 0
+	while _mgr.is_alive(slot) and steps < 120:
+		_mgr.step(DT)
+		steps += 1
+	_check(_hits.size() == 1 and _hits[0][1] == enemy, "it turned to the target near its path (%d hits)" % _hits.size())
+	_check(not _mgr.is_alive(slot) and _expired.size() == 1 and _expired[0][1].distance_to(Vector2(150.0, 100.0)) < 12.0, "and still ended back at its caster (%s)" % [_expired])
 
 
 func _test_linger_stops_then_goes_on() -> void:
@@ -419,6 +442,23 @@ func _test_shield_catches_fast_shots_in_any_slot_order() -> void:
 	_mgr.set_shield(second, 1)
 	_run(8)
 	_check(first < second and not _mgr.is_alive(first) and _blocked.size() == 1, "and a fast shot in a lower slot")
+
+
+## Regression (rules R4a): a shield's scan was charged to the hit-work budget, so in a step a
+## crowd spent it, an enemy shot crossing the shield flew through.
+func _test_shield_blocks_in_a_step_whose_hit_work_is_spent() -> void:
+	_setup()
+	_mgr.set_cap(2000)
+	var shield: int = _fire(Vector2.ZERO, Vector2(100.0, 100.0), 3.0, 5)
+	_mgr.set_shield(shield, 1)
+	var enemy: int = _mgr.spawn(_imp, Vector2(125.0, 100.0), Vector2(-1500.0, 0.0), 3.0, 3.0, ManagerScript.LAYER_PLAYER, 0, 0)
+	# A crowd that spends the step's hit work on a target far away.
+	_target(Vector2(500.0, 300.0))
+	for i in 3 * ManagerScript.WORK_PER_STEP / ManagerScript.HIT_WORK:
+		_mgr.spawn(i % 4, Vector2(500.0 + float(i % 5), 300.0), Vector2(1.0, 0.0), 10.0)
+	_mgr.step(DT)
+	_check(_mgr._work_left <= 0, "the crowd spent the step's hit work (%d left)" % _mgr._work_left)
+	_check(not _mgr.is_alive(enemy) and _blocked.size() == 1, "the shield still blocks the enemy shot crossing it")
 
 
 func _test_apply_travel_maps_cards_to_the_shot() -> void:

@@ -19,13 +19,21 @@
       "task": "A player idea: after a kill milestone (for example 100 kills) a wizard unlocks a small companion, such as a little dragon, that follows them, pulls enemy shots toward itself, has its own health, and disappears at 0 health. Nothing like it exists yet (no summons, no taunt or aggro targeting for enemies). It needs a per-player pet that takes player index 0-3, an enemy targeting rule that can prefer it, a health bar, and a say in how a kill-count unlock fits with runs and progression (M3 run structure and M5 meta-progression). It must not make co-op worse: with four players there could be four pets, so shot and particle budgets must hold. It must also fit DESIGN.md's focus on building spells; one option is to make the pet a spell form or relic rather than a separate system. Done when the weekly planning has weighed it against the M3 and M5 designs and either scheduled it or declined it with a reason. Not for M2.",
       "title": "Idea: summonable pet that draws enemy fire"
     },
-    "244": {
+    "416": {
       "author": "peterdk31",
       "kind": "idea",
-      "priority": "p2",
-      "source": "https://github.com/peterdk31/spellmerge/issues/244",
-      "task": "Follow-up to the spell visuals pass (#244, owner direction). Two owner comments came after parts 1-3 were merged. (1) The new shaped visuals were too big; the owner preferred the earlier coloured bolts, with particle effects added to show the element or type. Check the current shot sizes at 1x (SHAPE_SCALE is 0.62 now) and bring the body closer to the old bolt size, with per-element particle trails or sparks carrying the identity. (2) Advanced combinations need many more animations, and the effects, bursts and combos need to be more polished, easier to tell apart and have a wow factor; currently things look plain. Work through the combos in combos.json and give the multi-component ones (modifier + trigger + element chains, reactions, held spells) their own distinct animation or burst, within docs/STYLE.md (palette, 32x32 grid, no gradients/blur/partial transparency), the particle limit, the pools and the projectile manager, and readability with four players. The owner also asks whether the render resolution should be raised. Do not change the locked art direction; write a short assessment of resolution (what it would cost on web, what it would change) in docs/DECISIONS.md, and name it as a question for the owner at the next C2 checkpoint instead of changing it. Done when: the clips and sheets (Spell atlas) show each combo class reading differently at 1x, before/after screenshots are in the PR, tests cover new data and limits, and manifest lines exist for any new assets. Split into several PRs if large and list the parts in docs/NEXT.md.",
-      "title": "Spell visuals round 2: particles per type, combo animations, polish"
+      "priority": "p3",
+      "source": "https://github.com/peterdk31/spellmerge/discussions/285",
+      "task": "Owner's relic idea for M3, when relics arrive. The Nuke: the wizard has zero mana regeneration, every spellcast spends all current mana however much or little there is, and mana refills completely every X seconds (X to be tuned). Done when it exists as a relic content folder with tests and the spell cost and mana rules support it. Open points for design then: how a cast scales with the mana spent, and the refill interval.",
+      "title": "Relic idea: The Nuke (no mana regen, all-in casts, timed refill)"
+    },
+    "417": {
+      "author": "peterdk31",
+      "kind": "idea",
+      "priority": "p3",
+      "source": "https://github.com/peterdk31/spellmerge/discussions/286",
+      "task": "Add a downed animation for wizards: when downed, the wizard shrinks into its hat so only the hat remains visible; on revive it pops back out of the hat. Use the existing wizard animation strips and actor downed/revive state (actor id, not seat). Placeholder pixel art in 32x32 style following docs/STYLE.md, listed in the asset manifest. Done when the downed and revive states play these visuals, with a test for the animation state switching.",
+      "title": "Downed wizard shrinks into its hat; revive pops back out"
     }
   },
   "last_own_merge": "2026-10-29T03:23:00Z",

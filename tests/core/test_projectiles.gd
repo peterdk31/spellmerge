@@ -772,8 +772,10 @@ func _test_hit_work_per_step_is_bounded() -> void:
 func _test_spent_budget_resumes_at_the_first_untested_shot() -> void:
 	_setup()
 	_mgr.set_cap(200)
-	for i in 100:
-		_target(Vector2(float(i % 3), 0.0))
+	# Three targets each shot hits once and stays on (owner, 2026-10-29: a piercing shot hits a
+	# target again only after it has left it), so its first test is the costly one.
+	for i in 3:
+		_target(Vector2(float(i), 0.0))
 	var count: int = 150
 	for i in count:
 		_mgr.spawn(i % 4, Vector2.ZERO, Vector2(0.1, 0.0), 10.0, 4.0, ManagerScript.LAYER_ENEMY, 100000, i)

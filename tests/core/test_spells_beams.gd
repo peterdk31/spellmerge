@@ -55,6 +55,11 @@ func before_each() -> void:
 	beam.radius = 6.0
 	var bolt: FormBase = _form(&"bolt", 300.0, 1.0)
 	bolt.radius = 2.0
+	var fissure: FormBase = _form(&"fissure", 0.0, 0.3)
+	fissure.motion = FormBase.Motion.FISSURE
+	fissure.ray_length = 200.0
+	fissure.radius = 6.0
+	_modifier(&"bounce", ModifierBase.Behaviour.BOUNCE, 3.0)
 	_modifier(&"homing", ModifierBase.Behaviour.HOMING, 3.0)
 	(_fake.items[&"homing"] as ModifierBase).behaviour_reach = 160.0
 	_modifier(&"far_homing", ModifierBase.Behaviour.HOMING, 3.0)
@@ -67,7 +72,6 @@ func before_each() -> void:
 	var timer := TriggerBase.new()
 	timer.event = TriggerBase.Event.TIMER
 	timer.interval = 0.25
-	timer.max_fires = 1
 	_put(timer, &"timer")
 
 
@@ -202,7 +206,6 @@ func test_a_homing_beam_with_pierce_bends_on_to_another_target_after_a_hit() -> 
 	check(hit.has(first) and hit.has(second), "with pierce it hits one, then bends on to the other: %s" % [hit])
 	var at: int = _beam()
 	check(_spells.beam_point_count(at) > ManagerScript.RAY_SEGMENTS + 1, "its path has a second bend (%d points)" % _spells.beam_point_count(at))
-	check(SpellsScript.BEAM_POINTS <= ManagerScript.RAY_PATH_POINTS, "a beam's whole path fits a ray's")
 
 
 func test_a_held_beam_stays_on_until_its_staff_is_cast_again() -> void:
@@ -261,7 +264,9 @@ func test_homing_cards_stack_by_multiplying() -> void:
 	check(is_equal_approx(two.homing_turn, 3.0 * SpellLimits.HOMING_STACK), "two turn %s times faster: %s" % [SpellLimits.HOMING_STACK, two.homing_turn])
 	check(is_equal_approx(three.homing_turn, 3.0 * SpellLimits.HOMING_STACK * SpellLimits.HOMING_STACK), "three faster again: %s" % three.homing_turn)
 	check(is_equal_approx(two.homing_angle, rad_to_deg(two.homing_turn * SpellLimits.INSTANT_HOMING_SECONDS)), "a beam bends wider with two, as it turns faster: %s" % two.homing_angle)
-	check(is_equal_approx(three.homing_angle, SpellLimits.INSTANT_HOMING_MAX), "up to the most: %s" % three.homing_angle)
+	check(is_equal_approx(three.homing_angle, rad_to_deg(three.homing_turn * SpellLimits.INSTANT_HOMING_SECONDS)), "and wider with three, past 90 degrees: %s" % three.homing_angle)
+	var many: CompiledSpell = StaffKit.first(_spells, [&"homing", &"homing", &"homing", &"homing", &"homing", &"bolt"] as Array[StringName])
+	check(is_equal_approx(many.homing_angle, 180.0), "until it bends all the way round: %s" % many.homing_angle)
 
 
 func test_two_homing_cards_bend_a_beam_onto_a_target_one_cannot_reach() -> void:
@@ -274,3 +279,62 @@ func test_two_homing_cards_bend_a_beam_onto_a_target_one_cannot_reach() -> void:
 	_build([&"homing", &"homing", &"beam"])
 	_cast()
 	check(_spells.beam_end(_beam()).is_equal_approx(off.global_position), "two do: %s" % _spells.beam_end(_beam()))
+
+
+## A wall the beam meets on its way down to the right, at x = 80: a beam that turns off it comes
+## back down to the left, over (40, 120).
+func _turning_room() -> void:
+	_mgr.set_walls([Rect2(80.0, -200.0, 16.0, 400.0)] as Array[Rect2])
+
+
+func test_a_bouncing_beam_turns_at_a_wall_and_hits_what_is_past_the_turn() -> void:
+	_turning_room()
+	var behind: Node2D = _target(Vector2(40.0, 120.0))
+	_build([&"beam"])
+	_cast(Vector2.ZERO, Vector2(1.0, 1.0).normalized())
+	check_equal(_hits.size(), 0, "a plain beam stops at the wall")
+	_tick(60)
+	_build([&"bounce", &"beam"])
+	_cast(Vector2.ZERO, Vector2(1.0, 1.0).normalized())
+	check_equal(_hits.size(), 1, "the bouncing beam hits it")
+	if not _hits.is_empty():
+		check(_hits[0][1] == behind, "the target past the turn")
+	var at: int = _beam()
+	check(at >= 0, "the beam is on")
+	if at < 0:
+		return
+	check(_spells.beam_reach(at) > 114.0, "it got past the turn, to the target that spends it (%s)" % str(_spells.beam_reach(at)))
+	check(_spells.beam_point_count(at) >= 3, "its path has the turn, so it is drawn along it")
+	var turn: Vector2 = _spells.beam_point(at, 1)
+	check(turn.x > 79.0 and turn.x < 80.0, "the turn is at the wall (%s)" % str(turn))
+	_tick(30)
+	check_equal(_hits.size(), SpellsScript.beam_hits(FormBase.Motion.RAY, 0.3), "it hits it every tick of its life, along the same turn")
+
+
+func test_a_bouncing_beam_ends_its_blast_past_the_turn() -> void:
+	_turning_room()
+	_build([&"bounce", &"blast", &"beam"])
+	_cast(Vector2.ZERO, Vector2(1.0, 1.0).normalized())
+	_tick(30)
+	check_equal(_areas.size(), 1, "one blast at its end")
+	if not _areas.is_empty():
+		var at: Vector2 = _areas[0][1]
+		check(at.x < 80.0 and at.y > 80.0, "back off the wall, where it got (%s)" % str(at))
+
+
+func test_a_bouncing_fissure_turns_and_shows_every_leg() -> void:
+	_turning_room()
+	var legs: Array = []
+	_bus.form_shown.connect(func(_caster: int, form: StringName, origin: Vector2, _direction: Vector2, length: float, _tint: Color, _look: int) -> void:
+		if form == &"beam":
+			legs.append([origin, length]))
+	var behind: Node2D = _target(Vector2(40.0, 120.0))
+	_build([&"bounce", &"fissure"])
+	_cast(Vector2.ZERO, Vector2(1.0, 1.0).normalized())
+	check_equal(_hits.size(), 1, "the fissure turns and hits it")
+	if not _hits.is_empty():
+		check(_hits[0][1] == behind, "the target past the turn")
+	check_equal(legs.size(), 2, "a cue for each leg")
+	if legs.size() == 2:
+		check((legs[0][0] as Vector2).is_zero_approx(), "the first from the caster")
+		check(absf(float(legs[0][1]) + float(legs[1][1]) - 200.0) < 1.0, "together its whole length")

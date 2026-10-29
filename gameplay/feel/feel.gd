@@ -76,10 +76,11 @@ const FORM_SLOTS: int = FORMS_PER_PLAYER * 5
 const ENEMY_FORMS: int = 4
 ## Beams and rings draw above the room, under the shots (50) and the flashes (20).
 const FORM_Z: int = 18
-## Live beams drawn at once (core/spells keeps at most as many), and the most points of each
-## one's line: a homing beam bends from target to target, so it is drawn along its path's points.
-const LIVE_BEAMS: int = 64
-const LIVE_BEAM_POINTS: int = 80
+## Lines for live beams, and points of each line, made at once; both grow to what core/spells has
+## (its beam rows and their paths grow too: no beam limit, owner 2026-10-29). A homing beam bends
+## from target to target and a bouncing one turns at walls, so it is drawn along its path's points.
+const LIVE_BEAMS_START: int = 64
+const LIVE_BEAM_POINTS_START: int = 80
 ## The beam texture's height: a line this wide shows it at its own size.
 const BEAM_TEXTURE_HEIGHT: float = 32.0
 
@@ -359,23 +360,9 @@ func _ready() -> void:
 		add_child(form)
 		_forms.append(form)
 	_make_effects()
-	_beam_line.resize(LIVE_BEAM_POINTS)
-	for i in LIVE_BEAMS:
-		var line := Line2D.new()
-		var material := ShaderMaterial.new()
-		material.shader = BEAM_SHADER
-		line.material = material
-		line.top_level = true
-		line.visible = false
-		line.z_index = FORM_Z
-		line.texture_mode = Line2D.LINE_TEXTURE_TILE
-		line.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		line.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
-		line.joint_mode = Line2D.LINE_JOINT_ROUND
-		line.add_point(Vector2.ZERO)
-		line.add_point(Vector2.ZERO)
-		add_child(line)
-		_live_beams.append(line)
+	_beam_line.resize(LIVE_BEAM_POINTS_START)
+	for i in LIVE_BEAMS_START:
+		_add_beam_line()
 	_form_left.resize(FORM_SLOTS)
 	_form_total.resize(FORM_SLOTS)
 	_form_body.resize(FORM_SLOTS)
@@ -1363,20 +1350,44 @@ func _step_forms(real_delta: float) -> void:
 		_pose_form(i, _form_left[i] / _form_total[i])
 
 
+## One more line for a live beam, hidden until a beam is drawn on it.
+func _add_beam_line() -> void:
+	var line := Line2D.new()
+	var material := ShaderMaterial.new()
+	material.shader = BEAM_SHADER
+	line.material = material
+	line.top_level = true
+	line.visible = false
+	line.z_index = FORM_Z
+	line.texture_mode = Line2D.LINE_TEXTURE_TILE
+	line.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	line.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
+	line.joint_mode = Line2D.LINE_JOINT_ROUND
+	line.add_point(Vector2.ZERO)
+	line.add_point(Vector2.ZERO)
+	add_child(line)
+	_live_beams.append(line)
+
+
 ## Draw every live beam where it is this frame: along its curve, as far as it got, in its owner's
 ## tint with its element's colour in the core. It flares on each hit, flickers a little and fades
-## over the last quarter of its life. Nothing is allocated.
+## over the last quarter of its life. Nothing is allocated, but the first time there are more
+## beams, or longer paths, than ever before.
 func _draw_live_beams() -> void:
 	var count: int = 0
 	if spells != null and spells.has_method("beam_slots"):
-		count = mini(int(spells.call("beam_slots")), LIVE_BEAMS)
-	for i in LIVE_BEAMS:
+		count = int(spells.call("beam_slots"))
+	while _live_beams.size() < count:
+		_add_beam_line()
+	for i in _live_beams.size():
 		var line: Line2D = _live_beams[i]
 		if i >= count or not bool(spells.call("beam_on", i)):
 			if line.visible:
 				line.visible = false
 			continue
-		var points: int = mini(int(spells.call("beam_point_count", i)), LIVE_BEAM_POINTS)
+		var points: int = int(spells.call("beam_point_count", i))
+		if _beam_line.size() < points:
+			_beam_line.resize(maxi(points, _beam_line.size() * 2))
 		var reach: float = spells.call("beam_reach", i)
 		var origin: Vector2 = spells.call("beam_point", i, 0) if points > 0 else Vector2.INF
 		if reach <= 0.0 or points < 2 or not origin.is_finite():

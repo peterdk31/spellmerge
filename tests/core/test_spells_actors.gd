@@ -73,9 +73,9 @@ func before_each() -> void:
 	_form(&"slow", 30.0, 5.0)
 	var rune: FormBase = _form(&"rune", 0.0, 3.0)
 	rune.motion = FormBase.Motion.STILL
-	# Many shots at once, each with its own timer: one cast fills a budget's fires for a step.
+	# Many shots at once, each with its own timer: one cast fills a budget's room for a step.
 	var swarm: FormBase = _form(&"swarm", 30.0, 5.0)
-	swarm.shots = SpellLimits.MAX_FIRES_PER_STEP
+	swarm.shots = SpellLimits.FIRE_SHOTS_PER_STEP
 	swarm.spread = 360.0
 	var beam: FormBase = _form(&"beam", 0.0, 5.0)
 	beam.motion = FormBase.Motion.RAY
@@ -94,8 +94,8 @@ func before_each() -> void:
 	_modifier(&"blast", ModifierBase.Behaviour.BLAST, 24.0)
 	_modifier(&"hold", ModifierBase.Behaviour.HOLD, 1.0)
 	_modifier(&"arc", ModifierBase.Behaviour.ARC, 2.0).behaviour_reach = 60.0
-	_trigger(&"on_hurt", TriggerBase.Event.HURT, 1)
-	_trigger(&"timer", TriggerBase.Event.TIMER, 1).interval = 0.5
+	_trigger(&"on_hurt", TriggerBase.Event.HURT)
+	_trigger(&"timer", TriggerBase.Event.TIMER).interval = 0.5
 
 
 func _put(component: SpellComponent, id: StringName) -> void:
@@ -123,10 +123,9 @@ func _modifier(id: StringName, behaviour: ModifierBase.Behaviour, strength: floa
 	return modifier
 
 
-func _trigger(id: StringName, event: TriggerBase.Event, max_fires: int) -> TriggerBase:
+func _trigger(id: StringName, event: TriggerBase.Event) -> TriggerBase:
 	var trigger := TriggerBase.new()
 	trigger.event = event
-	trigger.max_fires = max_fires
 	_put(trigger, id)
 	return trigger
 
@@ -257,7 +256,7 @@ func test_each_seat_has_its_own_fire_count_a_step() -> void:
 		_build(W0 + seat, [&"timer", &"swarm", &"rune"])
 		_cast(W0 + seat, Vector2(300.0 * seat, 0.0))
 	_tick(31)
-	check_equal(_spells.fires_dropped, 0, "two seats fire a full step's worth each")
+	check_equal(_spells.fires_waited, 0, "two seats fire a full step's worth each")
 
 
 func test_unseated_casters_share_one_fire_count_a_step() -> void:
@@ -267,9 +266,15 @@ func test_unseated_casters_share_one_fire_count_a_step() -> void:
 	_build(W0, [&"timer", &"bolt", &"rune"])
 	_cast(W0, Vector2(600.0, 0.0), Vector2.DOWN)
 	var payload: int = _spells.current_tag(W0, 0, 1)
-	_tick(31)
-	check_equal(_spells.fires_dropped, SpellLimits.MAX_FIRES_PER_STEP, "two enemies together fire one budget's worth")
+	for _i in 40:
+		_tick(1)
+		if _spells.fires_waited > 0:
+			break
+	check_equal(_spells.fires_waited, SpellLimits.FIRE_SHOTS_PER_STEP, "two enemies together fire one budget's worth; the rest wait")
 	check(_spells.live_shots(payload) > 0, "and the wizard's timer fires anyway")
+	var made: int = _spells.fires_made
+	_tick(1)
+	check_equal(_spells.fires_made - made, SpellLimits.FIRE_SHOTS_PER_STEP, "the waiting ones fire in the next step")
 
 
 ## `count` unseated casters: the table's enemies (ids 0-6), then new ones (ids 11 on).
@@ -291,53 +296,46 @@ func _chain_rows(casters: Array[int], layer: int, first: int = 0) -> void:
 		_cast(casters[i], Vector2(0.0, y))
 
 
-func test_unseated_casters_share_one_chain_count_a_step() -> void:
-	_chain_rows(_unseated(SpellLimits.MAX_CHAINS_PER_STEP + 4), ManagerScript.LAYER_PLAYER)
+func test_every_casters_chain_jumps_however_many_jump_at_once() -> void:
+	# The crowd and the four seats chain in the same step; no budget holds a jump back.
+	_chain_rows(_unseated(20), ManagerScript.LAYER_PLAYER)
+	_chain_rows([W0, W0 + 1, W0 + 2, W0 + 3] as Array[int], ManagerScript.LAYER_ENEMY, 20)
 	_tick(20)
-	check_equal(_spells.chains_dropped, 4, "past one budget's jumps the rest are dropped")
-
-
-func test_each_seat_has_its_own_chain_count() -> void:
-	# The four seats chain in the same step as a crowd that spends all the shared jumps.
-	_chain_rows(_unseated(SpellLimits.MAX_CHAINS_PER_STEP), ManagerScript.LAYER_PLAYER)
-	_chain_rows([W0, W0 + 1, W0 + 2, W0 + 3] as Array[int], ManagerScript.LAYER_ENEMY, SpellLimits.MAX_CHAINS_PER_STEP)
-	_tick(20)
-	check_equal(_spells.chains_dropped, 0, "the crowd used the shared jumps, the seats their own")
 	var by_seats: int = 0
 	for hit: Array in _hits:
 		if hit[0] >= W0 and hit[0] < W0 + 4:
 			by_seats += 1
 	check_equal(by_seats, 8, "each wizard's bolt and its jump hit")
+	check_equal(_hits.size(), 48, "and each of the 20 unseated casters' too")
 
 
-func test_unseated_casters_share_a_capped_part_of_the_beams() -> void:
+func test_no_beam_ends_another_however_many_are_on() -> void:
 	_build(W0, [&"beam"])
 	_spells.set_aim(W0, Vector2(0.0, 300.0), Vector2.RIGHT)
 	_cast(W0, Vector2(0.0, 300.0))
-	var imps: Array[int] = _unseated(SpellLimits.SHARED_BEAMS + 4)
+	var imps: Array[int] = _unseated(SpellLimits.BEAM_ROWS_START + 4)
 	for i in imps.size():
 		var imp: int = imps[i]
 		_build(imp, [&"beam"])
 		_spells.set_aim(imp, Vector2(0.0, 10.0 * i), Vector2.RIGHT)
 		_cast(imp, Vector2(0.0, 10.0 * i))
-	check_equal(_spells.beam_count(), SpellLimits.SHARED_BEAMS + 1, "the shared budget holds its share and no more")
+	check_equal(_spells.beam_count(), SpellLimits.BEAM_ROWS_START + 5, "every beam is on: the rows grew")
 	var seated: int = 0
 	for at in _spells.beam_slots():
 		if _spells.beam_on(at) and _spells.beam_caster(at) == W0:
 			seated += 1
-	check_equal(seated, 1, "the wizard's beam was never ended by an unseated caster's")
+	check_equal(seated, 1, "and the wizard's beam was never ended by another")
 
 
-func test_unseated_casters_share_a_capped_part_of_the_waiting_launches() -> void:
-	var imps: Array[int] = _unseated(SpellLimits.SHARED_PENDING + 8)
+func test_every_waiting_launch_waits_its_turn_however_many_casters() -> void:
+	var imps: Array[int] = _unseated(40)
 	for i in imps.size():
 		var imp: int = imps[i]
 		_build(imp, [&"echo", &"slow"])
 		_cast(imp, Vector2(0.0, 4.0 * i))
-	check_equal(_spells.delayed_dropped, 8, "past their share the unseated casters' echoes are dropped")
 	_build(W0 + 3, [&"echo", &"slow"])
 	_cast(W0 + 3, Vector2(0.0, 300.0))
-	check_equal(_spells.delayed_dropped, 8, "a seat's echo still waits its turn")
+	check_equal(_spells._pending.size(), 41, "every echo waits, the crowd's and the seat's")
 
 
 # --- Events carry the actor id ------------------------------------------------------------

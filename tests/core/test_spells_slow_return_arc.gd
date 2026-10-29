@@ -68,7 +68,6 @@ func before_each() -> void:
 	arc.behaviour_reach = 60.0
 	var on_hit := TriggerBase.new()
 	on_hit.event = TriggerBase.Event.HIT
-	on_hit.max_fires = 1
 	_put(on_hit, &"on_hit")
 	var lightning := ElementBase.new()
 	lightning.status_id = &"static"
@@ -226,7 +225,7 @@ func test_zaps_keep_to_the_clock() -> void:
 
 
 func test_a_zap_sets_off_on_hit() -> void:
-	# `on hit` fires its payload once (max_fires 1) at the first zapped imp, from there.
+	# `on hit` fires its payload at the first zapped imp, from there.
 	var imp: Node2D = _target(Vector2(0.0, 40.0))
 	_build(0, [&"arc", &"on_hit", &"rune", &"nova"])
 	_cast()

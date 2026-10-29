@@ -25,9 +25,11 @@ extends Node2D
 ## any speed; the cost only grows with the length of the step. When a segment
 ## touches several targets, the one nearest the start of the path is hit first,
 ## and the event carries the point on the path closest to it. A piercing
-## projectile can hit up to HIT_MEMORY targets in one step (a fast shot passing
-## through a crowd), nearest first. It remembers the last HIT_MEMORY targets it
-## hit and does not hit them again until it has hit that many others.
+## projectile hits every target its path passes through in one step (a fast shot
+## through a crowd), nearest first, as its pierce allows. It hits a target once
+## while it touches it, and again only after it has left it (owner, 2026-10-29:
+## an orbit ring hits a target each time it comes round): it remembers the targets
+## it is touching, as many as they are, and forgets one its path no longer touches.
 ##
 ## The hit work of one step is bounded (WORK_PER_STEP), so a crowd of packed
 ## targets with thousands of piercing shots inside it cannot stall a frame.
@@ -132,10 +134,9 @@ extends Node2D
 ## is charged to the step's hit-work budget (1 per target examined); when the budget is
 ## spent the search waits for the shot's next turn. `homing_aim` does the same for a ray.
 ##
-## An orbit shot is an ordinary piercing shot: `pierce` is how many hits it survives, and
-## it remembers only its last HIT_MEMORY targets, so a ring that overlaps more than
-## HIT_MEMORY enemies at once hits some of them again on later steps. There is no
-## once-per-revolution rule; the orbit form (part 10) picks `pierce` for what it wants.
+## An orbit shot is an ordinary piercing shot: `pierce` is how many hits it survives, and it
+## hits a target again each time it comes round to it (after leaving it), however big the
+## crowd; the orbit form (part 10) picks `pierce` for what it wants.
 ##
 ## The projectile kit (staffs B1): behaviours a card gives a flying shot, set with `set_*`
 ## right after `spawn` (the spell runtime does it from the compiled card numbers). A plain
@@ -147,7 +148,7 @@ extends Node2D
 ##   return                 out for half its life, then back to its owner's anchor (an
 ##                          expiry there); it can hit again on the way back
 ##   linger                 hangs still for N seconds at half its life, without using it up
-##   growth                 radius x factor per second, up to GROWTH_MAX; `get_growth_of`
+##   growth                 radius x factor per second, up to the room's size; `get_growth_of`
 ##   sticky                 the first hit keeps it on the target for N seconds, then it expires
 ##   shield                 stops N shots of other teams that touch it (`shot_blocked`)
 ##   self hit               may hit its caster once it has left the caster's hitbox
@@ -193,6 +194,12 @@ const ActorsScript := preload("res://core/actors/actors.gd")
 
 ## A shot with a non-zero tag ended; see "Ends" above.
 signal shot_ended(tag: int)
+## Something met a wall and was not over (for `on wall`, which also fires on a shot's last wall
+## through `projectile_expired` and `expired_on_wall`): a shot bounced off one, or a ray (sent
+## with `hit`) turned at one or ended on one. `position` is just out of the wall and `heading`
+## the way it goes on (at a ray's end, the way it came). While a shot's is sent, `event_slot`
+## is that shot; a ray's has -1.
+signal wall_met(caster: int, position: Vector2, heading: Vector2, tag: int)
 
 ## Every caster number there is: the actor ids (see "Casters").
 const ACTORS: int = ActorsScript.ACTORS
@@ -218,8 +225,6 @@ const F_WAVE: int = 128
 
 ## Seconds one sine wave of a spiral shot takes.
 const SPIRAL_PERIOD: float = 0.5
-## A growing shot never gets bigger than this many times its first radius.
-const GROWTH_MAX: float = 4.0
 
 ## Default global caps on live projectiles for each platform. The web cap was 1,000 (the PLAN
 ## budget) until the first web stress run: a physics step of 14 to 20 ms made the engine
@@ -228,7 +233,8 @@ const DEFAULT_CAP_WEB: int = 500
 const DEFAULT_CAP_DESKTOP: int = 3000
 ## How many recently hit targets a piercing projectile remembers; also the most
 ## hits one projectile can register in a single step.
-const HIT_MEMORY: int = 3
+## Remembered hits (see `_remember`) made room for at first; more are made when needed.
+const HIT_MEMORY_START: int = 1024
 ## The most hit-test work one step does, in units: each target examined costs 1,
 ## each hit costs HIT_WORK. Once it is spent, the remaining projectiles are not
 ## tested this step (see the class doc). Normal play uses a tiny part of it.
@@ -240,21 +246,14 @@ const MAX_WALL_VISITS: int = 64
 const HIT_WORK: int = 40
 ## A homing shot looks for a target one step in this many (slots take turns).
 const HOMING_PERIOD: int = 4
-## The most targets one ray can hit.
-const RAY_MAX_HITS: int = 64
-## How many rays can be in progress at once: a hit handler that fires another ray (an
-## on-hit trigger) nests one level. A deeper one returns 0.0.
-const RAY_MAX_DEPTH: int = 4
 ## The straight pieces a bent beam (`ray_curve`) is walked as.
 const RAY_SEGMENTS: int = 8
-## The most points a beam's path (`ray_points`) may have: a homing beam that bends on from
-## target to target is RAY_SEGMENTS pieces a leg.
-const RAY_PATH_POINTS: int = 80
-## The longest beam in pixels: what the wall walk (MAX_WALL_VISITS cells) covers even on
-## a diagonal. A longer `length` is cut to this, so a beam never ends on a wall it did
-## not look at. Rays are not charged to the hit-work budget; how many a spell fires (and
-## so how far a handler's own rays fan out) is bounded by the spell runtime's fire cap.
-const RAY_MAX_LENGTH: float = 360.0
+## Points a ray's path holds at first; it grows when a path is longer (a homing beam bending on
+## from target to target, a beam turning at many walls), so nothing limits a ray (owner,
+## 2026-10-29: a beam hits every target its pierce gives, is as long as its card says, turns at
+## every wall its bounces give, and nests as deep as its payloads go). Rays are not charged to
+## the hit-work budget.
+const RAY_PATH_START: int = 80
 ## Floats per projectile in the MultiMesh buffer: 8 transform, 4 colour, 4 custom data
 ## (the colour of the shot's core, read by the shot shaders).
 const DRAW_STRIDE: int = 16
@@ -595,8 +594,27 @@ var _scan_step: int = -1
 ## True while a `projectile_expired` is sent for a shot that ended on a wall (the `on wall`
 ## trigger reads it); false for every other end.
 var expired_on_wall: bool = false
-## HIT_MEMORY target ids per slot, newest first (0 for none).
-var _last_hit: PackedInt64Array = PackedInt64Array()
+## The targets each shot is touching and has hit, so it hits them once until it leaves them: a
+## list per slot (`_mem_head`, -1 for none) through one growing pool (`_mem_id` the target's
+## instance id, `_mem_seen` the step its path last touched it, `_mem_next` the link; `_mem_free`
+## heads the free entries). `_mem_step` counts the steps.
+var _mem_head: PackedInt32Array = PackedInt32Array()
+var _mem_id: PackedInt64Array = PackedInt64Array()
+## The target's index when it was hit: a hint, checked against its id (`_mark_memory`).
+var _mem_target: PackedInt32Array = PackedInt32Array()
+var _mem_seen: PackedInt32Array = PackedInt32Array()
+var _mem_next: PackedInt32Array = PackedInt32Array()
+var _mem_free: int = -1
+var _mem_step: int = 0
+## Per target, set by `_mark_memory`: the stamp of the last marking that found it remembered, and
+## its memory entry then.
+var _target_mark: PackedInt32Array = PackedInt32Array()
+var _target_entry: PackedInt32Array = PackedInt32Array()
+var _mark_stamp: int = 0
+## The hit test's candidates, nearest first (`_keep_candidate`).
+var _cand_target: PackedInt32Array = PackedInt32Array()
+var _cand_along: PackedFloat32Array = PackedFloat32Array()
+var _cand_point: PackedVector2Array = PackedVector2Array()
 ## Per-budget list of live slots in spawn order (oldest at the head), indexed
 ## like _owned: head and tail slot per budget (-1 for none), and the links.
 var _own_head: PackedInt32Array = PackedInt32Array([-1, -1, -1, -1, -1])
@@ -725,16 +743,26 @@ var _skip_id: PackedInt64Array = PackedInt64Array()
 var _skip_left: PackedFloat32Array = PackedFloat32Array()
 ## Where each actor's orbit shots circle (INF for no anchor), see `set_anchor`; ACTORS of them.
 var _anchors: PackedVector2Array = PackedVector2Array()
-## Scratch for `ray`, RAY_MAX_HITS rows per nesting level: the best hits so far, nearest
-## first (reused, never grows). `_ray_depth` is how many rays are in progress.
-var _ray_nodes: Array = []
-var _ray_along: PackedFloat32Array = PackedFloat32Array()
-var _ray_points: PackedVector2Array = PackedVector2Array()
-var _ray_heads: PackedVector2Array = PackedVector2Array()
+## Scratch for `ray`, one set per nesting level (a hit handler may fire a ray of its own, as deep
+## as the payloads go; `_ray_depth` is how many are in progress): the best hits so far, nearest
+## first, and the path walked, kept while its hit handlers run. Plain Arrays, shared by
+## reference, so a level grows in place and a busy frame allocates only the first time.
+var _ray_nodes: Array[Array] = []
+var _ray_along: Array[Array] = []
+var _ray_points: Array[Array] = []
+var _ray_heads: Array[Array] = []
+var _ray_walks: Array[Array] = []
 var _ray_depth: int = 0
 ## The path of the ray being found (`ray`, `ray_curve`): up to RAY_SEGMENTS pieces.
 var _path: PackedVector2Array = PackedVector2Array()
 var _path_heading: Vector2 = Vector2.ZERO
+## The piece of `_path` that the last `_path_point` ended on.
+var _path_piece: int = 0
+## The path the last `ray`, `ray_points` or `ray_curve` walked, from its start to `ray_end`
+## (`ray_path_count` points, 0 when it did nothing): straight on, it is its start and end; a
+## beam that turned at walls has a point at every turn. Read right after the call, like `ray_end`.
+var ray_path: PackedVector2Array = PackedVector2Array()
+var ray_path_count: int = 0
 ## Where the last `ray` or `ray_curve` ended, and the beam's heading there (INF and zero when it
 ## did nothing). Read right after the call: a nested ray in a hit handler changes them.
 var ray_end: Vector2 = Vector2.INF
@@ -746,11 +774,8 @@ func _init() -> void:
 		_passes.append(Callable(self, pass_name))
 	assert(_passes.size() == BEHAVIOURS, "one pass per behaviour, in the order of B_*")
 	_member_count.resize(BEHAVIOURS)
-	_ray_nodes.resize(RAY_MAX_HITS * RAY_MAX_DEPTH)
-	_ray_along.resize(RAY_MAX_HITS * RAY_MAX_DEPTH)
-	_ray_points.resize(RAY_MAX_HITS * RAY_MAX_DEPTH)
-	_ray_heads.resize(RAY_MAX_HITS * RAY_MAX_DEPTH)
-	_path.resize(RAY_PATH_POINTS)
+	_path.resize(RAY_PATH_START)
+	ray_path.resize(RAY_PATH_START)
 	_anchors.resize(ACTORS)
 	_anchors.fill(Vector2.INF)
 	set_cap(DEFAULT_CAP_WEB if OS.has_feature("web") else DEFAULT_CAP_DESKTOP)
@@ -908,7 +933,12 @@ func set_cap(value: int) -> void:
 	_drawn_particles.resize(_cap)
 	_skip_id.resize(_cap)
 	_skip_left.resize(_cap)
-	_last_hit.resize(_cap * HIT_MEMORY)
+	var heads: int = _mem_head.size()
+	_mem_head.resize(_cap)
+	for slot in range(heads, _cap):
+		_mem_head[slot] = -1
+	if _mem_id.is_empty():
+		_grow_memory(HIT_MEMORY_START)
 	_own_prev.resize(_cap)
 	_own_next.resize(_cap)
 	_core.resize(_cap)
@@ -1058,7 +1088,7 @@ func circle_blocked(center: Vector2, radius: float) -> bool:
 ## How far along `from`->`to` (0 to 1) the path first enters a solid cell, or -1.0
 ## when it does not. Walks the cells the path crosses (Amanatides and Woo), at
 ## most |dx| + |dy| + 1 of them, in cells.
-func _wall_hit(from: Vector2, to: Vector2) -> float:
+func _wall_hit(from: Vector2, to: Vector2, max_visits: int = MAX_WALL_VISITS) -> float:
 	if not _has_walls:
 		return -1.0
 	var start: Vector2 = (from - _bounds.position) / WALL_CELL
@@ -1097,7 +1127,7 @@ func _wall_hit(from: Vector2, to: Vector2) -> float:
 	# that is still unchecked after that counts as a hit, so a shot never
 	# crosses a wall it did not look at.
 	var full: int = absi(end_x - cx) + absi(end_y - cy) + 1
-	var visits: int = mini(full, MAX_WALL_VISITS)
+	var visits: int = mini(full, max_visits)
 	for _n in visits:
 		if cx >= 0 and cx < _wall_w and cy >= 0 and cy < _wall_h and _wall_cells[cy * _wall_w + cx] != 0:
 			return t
@@ -1585,8 +1615,8 @@ func set_linger(slot: int, seconds: float) -> bool:
 	return true
 
 
-## The shot's radius grows by `factor` each second of flight, up to GROWTH_MAX times its
-## first size: a wider hit circle, the same damage. `get_growth_of` tells how much bigger it is.
+## The shot's radius grows by `factor` each second of flight, until it is as big as the room
+## (`set_bounds`; nothing is bigger): a wider hit circle, the same damage. `get_growth_of` tells how much bigger it is.
 func set_growth(slot: int, factor: float) -> bool:
 	if not _is_flyer(slot) or not (factor > 1.0) or not is_finite(factor):
 		return false
@@ -1709,8 +1739,7 @@ func _spawn_row(caster: int, origin: Vector2, velocity: Vector2, lifetime: float
 	_caster_at[slot] = Vector2.INF
 	_move_left[slot] = 0.0
 	_move_turn[slot] = 0.0
-	for i in HIT_MEMORY:
-		_last_hit[slot * HIT_MEMORY + i] = 0
+	_forget_all(slot)
 	_orbit_centre[slot] = Vector2.INF
 	_trail[slot] = -1 if motion == MOTION_STILL else _open_row(slot, origin)
 	_state[slot] = S_IDLE
@@ -1751,6 +1780,7 @@ func _spawn_row(caster: int, origin: Vector2, velocity: Vector2, lifetime: float
 ## trails take their points.
 func step(delta: float) -> void:
 	sim_time += delta
+	_mem_step += 1
 	_last_delta = delta
 	_refresh_targets()
 	var top: int = _high
@@ -1837,12 +1867,13 @@ func _pass_hits(top: int, delta: float) -> void:
 				elif starved_at < 0:
 					starved_at = slot
 				continue
-			# A piercing shot may pass through several targets this step. A
-			# hit handler may end it or even reuse the slot, so check each time.
+			# A piercing shot passes through every target on its path this step, each hit once
+			# (it remembers it). A hit handler may end it or even reuse the slot.
 			var seq: int = _seq[slot]
-			for _hit in HIT_MEMORY:
-				if not _hit_test(slot) or _alive[slot] == 0 or _seq[slot] != seq or (_flags[slot] & F_STUCK) != 0:
-					break
+			_hit_test(slot)
+			# What its path no longer touches it may hit again.
+			if _alive[slot] != 0 and _seq[slot] == seq:
+				_forget_left(slot)
 		# A shot that stuck to a target this step stays stuck, even at a wall.
 		if walled and _alive[slot] != 0 and (_flags[slot] & F_STUCK) == 0:
 			_wall_end(slot)
@@ -1989,12 +2020,13 @@ func _pass_stuck(list: PackedInt32Array, first: int, count: int, _delta: float) 
 		_state[slot] = S_STUCK
 
 
-## Growth (`set_growth`): the radius grows by its factor a second, up to GROWTH_MAX times the first.
+## Growth (`set_growth`): the radius grows by its factor a second, until it is as big as the room.
 func _pass_growth(list: PackedInt32Array, first: int, count: int, delta: float) -> void:
+	var room: float = maxf(_bounds.size.x, _bounds.size.y)
 	for n in range(first, first + count):
 		var slot: int = list[n]
 		if _state[slot] == S_MOVING:
-			_radius[slot] = minf(_radius[slot] * pow(_growth[slot], delta), _radius0[slot] * GROWTH_MAX)
+			_radius[slot] = minf(_radius[slot] * pow(_growth[slot], delta), maxf(room, _radius0[slot]))
 
 
 ## Linger (`set_linger`): half way through its life the shot stops for its linger time, which does
@@ -2055,8 +2087,7 @@ func _pass_return(list: PackedInt32Array, first: int, count: int, delta: float) 
 		if (flags & F_TURNED) == 0:
 			_flags[slot] |= F_TURNED
 			_speed[slot] = _vel[slot].length()
-			for i in HIT_MEMORY:
-				_last_hit[slot * HIT_MEMORY + i] = 0
+			_forget_all(slot)
 		var anchor: Vector2 = _caster_position(slot)
 		if not anchor.is_finite():
 			_pos[slot] = _prev[slot]
@@ -2168,24 +2199,32 @@ func _wall_end(slot: int) -> void:
 	# Step back out of the wall cell, then find which face was hit: a face is hit when the
 	# cell one cell further along that axis is solid.
 	var at: Vector2 = _pos[slot] - heading * 0.5
-	var flip_x: bool = _solid_at(at + Vector2(signf(heading.x) * WALL_CELL, 0.0))
-	var flip_y: bool = _solid_at(at + Vector2(0.0, signf(heading.y) * WALL_CELL))
-	var velocity: Vector2 = _vel[slot]
-	if flip_x == flip_y:
-		velocity = -velocity
-	elif flip_x:
-		velocity.x = -velocity.x
-	else:
-		velocity.y = -velocity.y
-	_vel[slot] = velocity
+	_vel[slot] = _bounced(at, heading, _vel[slot])
 	_pos[slot] = at
 	_base[slot] = at
 	# The corner, so the tail turns there.
 	if _trail[slot] >= 0:
 		_trail_sample(_trail[slot], at)
 	# A bounced shot may hit what it hit before.
-	for i in HIT_MEMORY:
-		_last_hit[slot * HIT_MEMORY + i] = 0
+	_forget_all(slot)
+	# Last: a handler's payload may take this slot over (a cap drop).
+	var outer_slot: int = event_slot
+	event_slot = slot
+	wall_met.emit(_actor[slot], at, _vel[slot].normalized(), _tag[slot])
+	event_slot = outer_slot
+
+
+## `velocity` turned off the wall face met at `at` (just out of the wall, heading `heading`): a
+## face is hit when the cell one cell further along that axis is solid; both or neither (a
+## corner) send it back the way it came. A shot's bounce and a beam's turn share it.
+func _bounced(at: Vector2, heading: Vector2, velocity: Vector2) -> Vector2:
+	var flip_x: bool = _solid_at(at + Vector2(signf(heading.x) * WALL_CELL, 0.0))
+	var flip_y: bool = _solid_at(at + Vector2(0.0, signf(heading.y) * WALL_CELL))
+	if flip_x == flip_y:
+		return -velocity
+	if flip_x:
+		return Vector2(-velocity.x, velocity.y)
+	return Vector2(velocity.x, -velocity.y)
 
 
 func _solid_at(point: Vector2) -> bool:
@@ -2292,8 +2331,7 @@ func homing_aim(caster: int, origin: Vector2, direction: Vector2, max_angle: flo
 
 
 ## The centre of the target a homing thing at `origin` going along `direction` steers to, or
-## INF when there is none: one on `layers` no further than `within` pixels (cut to
-## RAY_MAX_LENGTH) whose centre lies within `max_angle` radians of `direction` (PI for any
+## INF when there is none: one on `layers` no further than `within` pixels whose centre lies within `max_angle` radians of `direction` (PI for any
 ## way). Targets owned by `caster` and those of its team (`Actors.team_of`; homing aims at
 ## other teams only, actors G3a) are skipped. The target whose
 ## instance id is `keep` stays the pick while it qualifies; otherwise one is picked at random
@@ -2307,7 +2345,7 @@ func homing_point(caster: int, origin: Vector2, direction: Vector2, max_angle: f
 	if not origin.is_finite() or not direction.is_finite() or direction.is_zero_approx() or not is_finite(max_angle) or not is_finite(within) or within <= 0.0:
 		return Vector2.INF
 	_query_ready()
-	var t: int = _home_pick(caster, _team_of(caster), origin, direction, max_angle, layers, minf(within, RAY_MAX_LENGTH), keep, pick_seed, -1, avoid)
+	var t: int = _home_pick(caster, _team_of(caster), origin, direction, max_angle, layers, within, keep, pick_seed, -1, avoid)
 	if t < 0:
 		return Vector2.INF
 	homing_target = _target_id[t]
@@ -2319,7 +2357,9 @@ func homing_point(caster: int, origin: Vector2, direction: Vector2, max_angle: f
 ## of `team` (NONE: no team, every target but its own body). For a shot (`slot` 0 or more) it
 ## also skips the targets the shot just hit and charges the work budget.
 func _home_pick(caster: int, team: int, origin: Vector2, direction: Vector2, max_angle: float, layers: int, within: float, keep: int, pick_seed: int, slot: int, avoid: int) -> int:
-	# Homing never picks its own team (a teammate, for a wizard), though every spell hits it.
+	# Homing never picks its own team (a teammate, for a wizard), though every spell hits it, nor
+	# a target the shot is still on (`_mark_memory`).
+	var stamp: int = _mark_memory(slot) if slot >= 0 else -1
 	var any_way: bool = max_angle >= PI
 	var pick: int = -1
 	var avoided: int = -1
@@ -2331,7 +2371,7 @@ func _home_pick(caster: int, team: int, origin: Vector2, direction: Vector2, max
 			while t >= 0:
 				if slot >= 0:
 					_work_left -= 1
-				if (_target_layer[t] & layers) != 0 and (caster < 0 or _target_owner[t] != caster) and (team == ActorsScript.NONE or _target_team[t] != team) and is_instance_valid(_targets[t]) and (slot < 0 or not _remembers(slot, _target_id[t])):
+				if (_target_layer[t] & layers) != 0 and (caster < 0 or _target_owner[t] != caster) and (team == ActorsScript.NONE or _target_team[t] != team) and is_instance_valid(_targets[t]) and (slot < 0 or _target_mark[t] != stamp):
 					var to_target: Vector2 = _target_pos[t] - origin
 					var reach: float = within + _target_radius[t]
 					if to_target.length_squared() <= reach * reach and (any_way or (not to_target.is_zero_approx() and absf(direction.angle_to(to_target)) <= max_angle)):
@@ -2349,111 +2389,158 @@ func _home_pick(caster: int, team: int, origin: Vector2, direction: Vector2, max
 	return pick if pick >= 0 else avoided
 
 
-## An instant beam from `origin` along `direction` for up to `length` pixels, fired by
-## the actor `caster`. It holds no row in the pool. It stops at the first wall and hits the
-## nearest `pierce + 1` targets on `layers` (at most RAY_MAX_HITS) whose circle the beam
-## touches (`width` pixels either side of the line; `exclude` is a target it never hits,
-## for a beam that starts on the one that fired it). For each, nearest first, it sends
-## `projectile_impact` and `projectile_hit(caster, target, point, tag)`, the point being
-## where the beam passes closest to the target; a beam that ends on a wall sends an
-## impact with a `null` target there. Targets owned by `caster` (its own body) are skipped and,
-## as in `spawn`, it hits ACTOR_LAYERS whatever `layers` says. Returns how far the beam got in pixels: the
-## length, the distance to the wall, or the distance to the last target it could hit.
-## 0.0 for bad arguments or an origin inside a wall. The hits are found before any event
-## is sent, so a handler may remove or free targets, or fire another ray (up to
-## RAY_MAX_DEPTH deep, a deeper one returns 0.0). A `length` over RAY_MAX_LENGTH is cut
-## to it. Where it ended and its heading there are left in `ray_end` and `ray_end_heading`.
-## Allocation-free.
-func ray(caster: int, origin: Vector2, direction: Vector2, length: float, pierce: int = 0, layers: int = LAYER_ENEMY, tag: int = 0, width: float = 0.0, exclude: Node = null) -> float:
+## An instant beam from `origin` along `direction` for `length` pixels, fired by the actor
+## `caster`. It holds no row in the pool. It stops at the first wall (or, with `bounces`, turns
+## off it as a bouncing shot does, that many times, and goes on for the length it has left) and
+## hits the nearest `pierce + 1` targets on `layers` whose circle the beam touches (`width`
+## pixels either side of the line; `exclude` is a target it never hits, for a beam that starts
+## on the one that fired it). For each, nearest first, it sends `projectile_impact` and
+## `projectile_hit(caster, target, point, tag)`, the point being where the beam passes closest
+## to the target; a beam that ends on a wall sends an impact with a `null` target there, and one
+## that turns at a wall one at every turn (each wall also sends `wall_met`, after the hits).
+## Targets owned by `caster` (its own body) are skipped and, as in `spawn`, it hits ACTOR_LAYERS
+## whatever `layers` says. Returns how far the beam got in pixels: the length, the distance to
+## the wall, or the distance to the last target it could hit. 0.0 for bad arguments or an origin
+## inside a wall. The hits are found before any event is sent, so a handler may remove or free
+## targets, or fire another ray, as deep as it likes. Nothing caps a ray (RAY_PATH_START). Where
+## it ended and its heading there are left in `ray_end` and `ray_end_heading`, and the path it
+## walked in `ray_path`. It allocates only when a ray is bigger than any before it.
+func ray(caster: int, origin: Vector2, direction: Vector2, length: float, pierce: int = 0, layers: int = LAYER_ENEMY, tag: int = 0, width: float = 0.0, exclude: Node = null, bounces: int = 0) -> float:
+	ray_path_count = 0
 	if not direction.is_finite() or direction.is_zero_approx() or not is_finite(length) or length <= 0.0 or not origin.is_finite():
 		return 0.0
 	_path[0] = origin
-	_path[1] = origin + direction.normalized() * minf(length, RAY_MAX_LENGTH)
-	return _ray_path(caster, 1, pierce, layers, tag, width, exclude, true)
+	_path[1] = origin + direction.normalized() * length
+	return _ray_path(caster, 1, pierce, layers, tag, width, exclude, true, bounces)
 
 
-## A beam like `ray` along the path `points[offset]` to `points[offset + count - 1]` (at most
-## RAY_PATH_POINTS points), cut to `length` pixels along it (and to RAY_MAX_LENGTH): a live
-## beam, whose homing bends it from target to target, and which never reaches past its own
-## length. With `hit` false it only finds how far the beam gets (walls, and the target that
-## spends it) and sends nothing, for the look of a beam between its hits. Returns how far it
-## got along the path; `ray_end` and `ray_end_heading` say where. Allocation-free.
-func ray_points(caster: int, points: PackedVector2Array, offset: int, count: int, length: float, pierce: int = 0, layers: int = LAYER_ENEMY, tag: int = 0, width: float = 0.0, exclude: Node = null, hit: bool = true) -> float:
+## A beam like `ray` along the path `points[offset]` to `points[offset + count - 1]`, cut to
+## `length` pixels along it: a live beam, whose homing bends it from target to target, and which
+## never reaches past its own length. With `hit` false it only finds how far the beam gets
+## (walls, and the target that spends it) and sends nothing, for the look of a beam between its
+## hits. With `bounces` it turns at walls as `ray` does, and goes on straight from there. Returns
+## how far it got along the path; `ray_end` and `ray_end_heading` say where, and `ray_path` what
+## it walked.
+func ray_points(caster: int, points: PackedVector2Array, offset: int, count: int, length: float, pierce: int = 0, layers: int = LAYER_ENEMY, tag: int = 0, width: float = 0.0, exclude: Node = null, hit: bool = true, bounces: int = 0) -> float:
+	ray_path_count = 0
 	if count < 2 or offset < 0 or offset + count > points.size() or not is_finite(length) or length <= 0.0 or not points[offset].is_finite():
 		return 0.0
-	var most: float = minf(length, RAY_MAX_LENGTH)
+	_fit_path(count)
 	_path[0] = points[offset]
 	var total: float = 0.0
 	var used: int = 0
-	for i in range(1, mini(count, RAY_PATH_POINTS)):
+	for i in range(1, count):
 		var point: Vector2 = points[offset + i]
 		if not point.is_finite():
 			break
 		var piece: float = _path[i - 1].distance_to(point)
 		used = i
-		if total + piece >= most:
-			_path[i] = _path[i - 1].move_toward(point, most - total)
+		if total + piece >= length:
+			_path[i] = _path[i - 1].move_toward(point, length - total)
 			break
 		total += piece
 		_path[i] = point
 	if used == 0:
 		return 0.0
-	return _ray_path(caster, used, pierce, layers, tag, width, exclude, hit)
+	return _ray_path(caster, used, pierce, layers, tag, width, exclude, hit, bounces)
 
 
 ## A beam like `ray`, bent: it follows the quadratic curve from `origin` to `end` pulled
 ## toward `bend` (a homing beam: `bend` along the aim, `end` on the target), walked as
-## RAY_SEGMENTS straight pieces and cut to RAY_MAX_LENGTH. With `hit` false it only finds how
-## far the beam gets (walls, and the target that spends it) and sends nothing, for the look of a
-## beam between its hits. Returns how far it got along the curve; `ray_end` and
-## `ray_end_heading` say where. Allocation-free.
-func ray_curve(caster: int, origin: Vector2, bend: Vector2, end: Vector2, pierce: int = 0, layers: int = LAYER_ENEMY, tag: int = 0, width: float = 0.0, exclude: Node = null, hit: bool = true) -> float:
+## RAY_SEGMENTS straight pieces. With `hit` false it only finds how far the beam gets (walls, and
+## the target that spends it) and sends nothing, for the look of a beam between its hits. With
+## `bounces` it turns at walls as `ray` does. Returns how far it got along the curve; `ray_end`
+## and `ray_end_heading` say where, and `ray_path` what it walked.
+func ray_curve(caster: int, origin: Vector2, bend: Vector2, end: Vector2, pierce: int = 0, layers: int = LAYER_ENEMY, tag: int = 0, width: float = 0.0, exclude: Node = null, hit: bool = true, bounces: int = 0) -> float:
+	ray_path_count = 0
 	if not origin.is_finite() or not bend.is_finite() or not end.is_finite() or origin.is_equal_approx(end):
 		return 0.0
 	_path[0] = origin
-	var total: float = 0.0
-	var count: int = 0
 	for i in range(1, RAY_SEGMENTS + 1):
 		var t: float = float(i) / RAY_SEGMENTS
 		var u: float = 1.0 - t
-		var point: Vector2 = origin * (u * u) + bend * (2.0 * u * t) + end * (t * t)
-		var piece: float = _path[i - 1].distance_to(point)
-		count = i
-		if total + piece >= RAY_MAX_LENGTH:
-			_path[i] = _path[i - 1].move_toward(point, RAY_MAX_LENGTH - total)
-			break
-		total += piece
-		_path[i] = point
-	return _ray_path(caster, count, pierce, layers, tag, width, exclude, hit)
+		_path[i] = origin * (u * u) + bend * (2.0 * u * t) + end * (t * t)
+	return _ray_path(caster, RAY_SEGMENTS, pierce, layers, tag, width, exclude, hit, bounces)
+
+
+## `_path` holds at least `count` points.
+func _fit_path(count: int) -> void:
+	if _path.size() < count:
+		_path.resize(maxi(count, _path.size() * 2))
+
+
+## The scratch of nesting level `level`, made the first time a ray goes that deep.
+func _ray_level(level: int) -> void:
+	while _ray_nodes.size() <= level:
+		_ray_nodes.append([])
+		_ray_along.append([])
+		_ray_points.append([])
+		_ray_heads.append([])
+		_ray_walks.append([])
 
 
 ## The beam along the first `segments` pieces of `_path` (see `ray` and `ray_curve`).
-func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, width: float, exclude: Node, hit: bool) -> float:
+func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, width: float, exclude: Node, hit: bool, bounces: int = 0) -> float:
 	ray_end = Vector2.INF
 	ray_end_heading = Vector2.ZERO
+	ray_path_count = 0
 	if not is_caster(caster):
 		return 0.0
-	if hit and _ray_depth >= RAY_MAX_DEPTH:
-		return 0.0
-	# Cut the path at the first wall.
+	# Cut the path at the first wall, or turn there while it has bounces: the rest of the path
+	# is dropped and it goes on straight, off the wall, for the length the rest had.
+	var left_turns: int = maxi(bounces, 0)
+	var left: float = 0.0
+	if left_turns > 0:
+		for i in segments:
+			left += _path[i].distance_to(_path[i + 1])
 	var reach: float = 0.0
 	var walled: bool = false
 	var used: int = 0
-	for i in segments:
-		var a: Vector2 = _path[i]
-		var b: Vector2 = _path[i + 1]
+	# The turns are the points `first_turn` on, `turned` of them.
+	var first_turn: int = 0
+	var turned: int = 0
+	var at_piece: int = 0
+	while at_piece < segments:
+		var a: Vector2 = _path[at_piece]
+		var b: Vector2 = _path[at_piece + 1]
 		var piece: float = a.distance_to(b)
-		used = i + 1
+		used = at_piece + 1
 		if _has_walls:
-			var cut: float = _wall_hit(a, b)
+			# A ray walks every cell it crosses, however long it is.
+			var cut: float = _wall_hit(a, b, 1 << 30)
 			if cut >= 0.0:
+				var at: Vector2 = a.lerp(b, cut)
+				var heading: Vector2 = (b - a) / piece if piece > 0.0 else Vector2.ZERO
+				left -= piece * cut
+				if left_turns > 0 and reach + piece * cut > 0.0 and left > 0.5 and not heading.is_zero_approx():
+					# Step back out of the wall, as a bouncing shot does, and turn there.
+					if turned == 0:
+						first_turn = at_piece + 1
+					turned += 1
+					left_turns -= 1
+					at -= heading * 0.5
+					left += 0.5
+					reach += a.distance_to(at)
+					_fit_path(at_piece + 3)
+					_path[at_piece + 1] = at
+					_path[at_piece + 2] = at + _bounced(at, heading, heading) * left
+					segments = at_piece + 2
+					at_piece += 1
+					continue
 				walled = true
-				_path[i + 1] = a.lerp(b, cut)
+				_path[at_piece + 1] = at
 				reach += piece * cut
 				break
+		left -= piece
 		reach += piece
-	var base: int = mini(_ray_depth, RAY_MAX_DEPTH - 1) * RAY_MAX_HITS
-	var wanted: int = mini(maxi(pierce, 0) + 1, RAY_MAX_HITS)
+		at_piece += 1
+	var level: int = _ray_depth
+	_ray_level(level)
+	var nodes: Array = _ray_nodes[level]
+	var alongs: Array = _ray_along[level]
+	var points: Array = _ray_points[level]
+	var heads: Array = _ray_heads[level]
+	var wanted: int = maxi(pierce, 0) + 1
 	var found: int = 0
 	var skip: int = exclude.get_instance_id() if exclude != null else 0
 	if not _targets.is_empty() and reach > 0.0:
@@ -2484,39 +2571,58 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 							var closest: Vector2 = a + heading * along
 							var touch: float = wide + _target_radius[t]
 							if closest.distance_squared_to(_target_pos[t]) <= touch * touch:
-								found = _ray_keep(base, found, wanted, t, start + along, closest, heading)
+								found = _ray_keep(nodes, alongs, points, heads, found, wanted, t, start + along, closest, heading)
 						t = _target_next[t]
 			start += piece
 	var got: float = reach
-	if found > 0 and found == maxi(pierce, 0) + 1:
+	if found > 0 and found == wanted:
 		# The beam is spent on its last target.
-		got = _ray_along[base + found - 1]
+		got = alongs[found - 1]
 		walled = false
 	var end: Vector2 = _path_point(used, got)
 	var end_heading: Vector2 = _path_heading
+	# What it walked, kept for `ray_path` (and its turns' events) past the hit handlers' rays.
+	var walk: Array = _ray_walks[level]
+	var walked: int = _path_piece + 2
+	if walk.size() < walked:
+		walk.resize(walked)
+	for n in _path_piece + 1:
+		walk[n] = _path[n]
+	walk[_path_piece + 1] = end
 	if not hit:
-		for i in found:
-			_ray_nodes[base + i] = null
+		for n in found:
+			nodes[n] = null
 		ray_end = end
 		ray_end_heading = end_heading
+		_keep_ray_path(walk, walked)
 		return got
 	_ray_depth += 1
 	var outer_slot: int = event_slot
 	event_slot = -1
 	for i in found:
-		var node: Variant = _ray_nodes[base + i]
+		var node: Variant = nodes[i]
 		if events != null and is_instance_valid(node):
 			impact_form = &"beam"
 			impact_core = Color.WHITE
 			impact_look = 0
-			events.projectile_impact.emit(caster, node, _ray_points[base + i], _ray_heads[base + i])
+			events.projectile_impact.emit(caster, node, points[i], heads[i])
 			impact_form = &""
 			impact_core = Color.WHITE
 			impact_look = 0
-			events.projectile_hit.emit(caster, node, _ray_points[base + i], tag)
-		_ray_nodes[base + i] = null
-	_ray_depth -= 1
-	event_slot = outer_slot
+			events.projectile_hit.emit(caster, node, points[i], tag)
+		nodes[i] = null
+	# A spark at every wall it turned at before it ended, and at the wall it ended on; then
+	# `wall_met` for each (a handler's payload may fire rays: this level's scratch is kept).
+	for n in range(first_turn, mini(first_turn + turned, walked - 1)):
+		var turn: Vector2 = walk[n]
+		if events != null:
+			impact_form = &"beam"
+			impact_core = Color.WHITE
+			impact_look = 0
+			events.projectile_impact.emit(caster, null, turn, (walk[n - 1] as Vector2).direction_to(turn))
+			impact_form = &""
+			impact_core = Color.WHITE
+			impact_look = 0
 	if walled and events != null:
 		impact_form = &"beam"
 		impact_core = Color.WHITE
@@ -2525,20 +2631,39 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 		impact_form = &""
 		impact_core = Color.WHITE
 		impact_look = 0
+	for n in range(first_turn, mini(first_turn + turned, walked - 1)):
+		var turn: Vector2 = walk[n]
+		wall_met.emit(caster, turn, turn.direction_to(walk[n + 1]), tag)
+	if walled:
+		wall_met.emit(caster, end - end_heading * 0.5, end_heading, tag)
+	_ray_depth -= 1
+	event_slot = outer_slot
 	ray_end = end
 	ray_end_heading = end_heading
+	_keep_ray_path(walk, walked)
 	return got
 
 
+## Copy the first `count` points of `walk` into `ray_path`.
+func _keep_ray_path(walk: Array, count: int) -> void:
+	if ray_path.size() < count:
+		ray_path.resize(maxi(count, ray_path.size() * 2))
+	for n in count:
+		ray_path[n] = walk[n]
+	ray_path_count = count
+
+
 ## The point `distance` pixels along the first `segments` pieces of `_path`; its heading there
-## is left in `_path_heading`.
+## is left in `_path_heading`, and the piece it is on in `_path_piece`.
 func _path_point(segments: int, distance: float) -> Vector2:
 	var left: float = maxf(distance, 0.0)
 	_path_heading = Vector2.ZERO
+	_path_piece = 0
 	for i in segments:
 		var a: Vector2 = _path[i]
 		var b: Vector2 = _path[i + 1]
 		var piece: float = a.distance_to(b)
+		_path_piece = i
 		if piece > 0.0:
 			_path_heading = (b - a) / piece
 		if left <= piece or i == segments - 1:
@@ -2548,35 +2673,42 @@ func _path_point(segments: int, distance: float) -> Vector2:
 
 
 ## Put target `t` (at `along` pixels, nearest point `closest`, the beam heading `heading` there)
-## into the sorted scratch of the best hits if it is among the `wanted` nearest; returns the new
-## count. A target a bent beam touches on two pieces keeps its nearer place.
-func _ray_keep(base: int, found: int, wanted: int, t: int, along: float, closest: Vector2, heading: Vector2) -> int:
+## into a level's sorted scratch of the best hits (`nodes`, `alongs`, `points`, `heads`) if it is
+## among the `wanted` nearest; returns the new count. A target a bent beam touches on two pieces
+## keeps its nearer place. The scratch grows when it is full.
+func _ray_keep(nodes: Array, alongs: Array, points: Array, heads: Array, found: int, wanted: int, t: int, along: float, closest: Vector2, heading: Vector2) -> int:
 	for i in found:
-		if _ray_nodes[base + i] == _targets[t]:
-			if along >= _ray_along[base + i]:
+		if nodes[i] == _targets[t]:
+			if along >= alongs[i]:
 				return found
 			# Nearer on this piece: take it out and insert it again below.
 			for j in range(i, found - 1):
-				_ray_along[base + j] = _ray_along[base + j + 1]
-				_ray_points[base + j] = _ray_points[base + j + 1]
-				_ray_nodes[base + j] = _ray_nodes[base + j + 1]
-				_ray_heads[base + j] = _ray_heads[base + j + 1]
+				alongs[j] = alongs[j + 1]
+				points[j] = points[j + 1]
+				nodes[j] = nodes[j + 1]
+				heads[j] = heads[j + 1]
 			found -= 1
-			_ray_nodes[base + found] = null
+			nodes[found] = null
 			break
-	if found == wanted and along >= _ray_along[base + found - 1]:
+	if found == wanted and along >= alongs[found - 1]:
 		return found
+	if found == nodes.size():
+		var size: int = maxi(16, found * 2)
+		nodes.resize(size)
+		alongs.resize(size)
+		points.resize(size)
+		heads.resize(size)
 	var at: int = mini(found, wanted - 1)
-	while at > 0 and _ray_along[base + at - 1] > along:
-		_ray_along[base + at] = _ray_along[base + at - 1]
-		_ray_points[base + at] = _ray_points[base + at - 1]
-		_ray_nodes[base + at] = _ray_nodes[base + at - 1]
-		_ray_heads[base + at] = _ray_heads[base + at - 1]
+	while at > 0 and alongs[at - 1] > along:
+		alongs[at] = alongs[at - 1]
+		points[at] = points[at - 1]
+		nodes[at] = nodes[at - 1]
+		heads[at] = heads[at - 1]
 		at -= 1
-	_ray_along[base + at] = along
-	_ray_points[base + at] = closest
-	_ray_nodes[base + at] = _targets[t]
-	_ray_heads[base + at] = heading
+	alongs[at] = along
+	points[at] = closest
+	nodes[at] = _targets[t]
+	heads[at] = heading
 	return mini(found + 1, wanted)
 
 
@@ -3157,6 +3289,7 @@ static func ramp_light(ramp: int) -> Color:
 
 
 func _kill(slot: int, announce: bool = true) -> void:
+	_forget_all(slot)
 	if announce and _tag[slot] != 0:
 		shot_ended.emit(_tag[slot])
 	if _trail[slot] >= 0:
@@ -3422,9 +3555,13 @@ func _query_match(t: int, point: Vector2, radius: float, layers: int, skip: int)
 	return _target_pos[t].distance_squared_to(point) <= reach * reach
 
 
-## Hit the first target along this step's path (nearest its start) and say
-## whether there was one. The cells searched are those the path touches,
-## widened by both radii.
+## Test the path of the shot in `slot` this step against the targets on the grid, and hit every
+## target it touches that it has not hit since it last left it, nearest first, as long as it
+## lives (its pierce); returns true when it hit any. One scan finds them all: the shot's
+## remembered targets are marked first (`_mark_memory`), so the cost is the targets touched plus
+## the ones remembered. The search widens with the largest target radius, so a big target whose
+## centre is cells away is still found. The cells searched are those the path touches, widened
+## by both radii.
 func _hit_test(slot: int) -> bool:
 	var from: Vector2 = _prev[slot]
 	var to: Vector2 = _pos[slot]
@@ -3454,9 +3591,8 @@ func _hit_test(slot: int) -> bool:
 	var shooter: int = _actor[slot]
 	var flags: int = _flags[slot]
 	var skip_left: bool = _skip_left[slot] > 0.0
-	var best: int = -1
-	var best_along: float = 0.0
-	var best_point: Vector2 = to
+	var stamp: int = _mark_memory(slot)
+	var found: int = 0
 	var inside: bool = false
 	for y in range(y0, y1 + 1):
 		for x in range(x0, x1 + 1):
@@ -3496,32 +3632,139 @@ func _hit_test(slot: int) -> bool:
 				if path_sq > 0.0:
 					along = clampf((centre - from).dot(path) / path_sq, 0.0, 1.0)
 				var closest: Vector2 = from + path * along
-				if closest.distance_squared_to(centre) > reach * reach or (best >= 0 and along >= best_along):
+				if closest.distance_squared_to(centre) > reach * reach:
 					t = _target_next[t]
 					continue
-				# Skip targets already hit, and the one a payload must not hit (the cheap tests
-				# first: this is a call).
-				if _remembers(slot, _target_id[t]) or (skip_left and _skip_id[slot] == _target_id[t]):
+				# A target already hit: the path still touches it, so it stays remembered.
+				if _target_mark[t] == stamp:
+					_mem_seen[_target_entry[t]] = _mem_step
 					t = _target_next[t]
 					continue
-				best = t
-				best_along = along
-				best_point = closest
+				if skip_left and _skip_id[slot] == _target_id[t]:
+					t = _target_next[t]
+					continue
+				found = _keep_candidate(found, t, along, closest)
 				t = _target_next[t]
 	if (flags & F_SELF) != 0 and (flags & F_SELF_LIVE) == 0 and not inside:
 		_flags[slot] |= F_SELF_LIVE
-	if best < 0:
-		return false
-	_work_left -= HIT_WORK
-	_register_hit(slot, best, best_point)
-	return true
+	# Hit them nearest first. A hit handler may end the shot or take its slot; a stuck one stops.
+	var seq: int = _seq[slot]
+	var hit: bool = false
+	for n in found:
+		if _alive[slot] == 0 or _seq[slot] != seq or (_flags[slot] & F_STUCK) != 0:
+			break
+		var t: int = _cand_target[n]
+		if _target_layer[t] == 0 or not is_instance_valid(_targets[t]):
+			continue
+		_work_left -= HIT_WORK
+		hit = true
+		_register_hit(slot, t, _cand_point[n])
+	return hit
 
 
-func _remembers(slot: int, id: int) -> bool:
-	for i in HIT_MEMORY:
-		if _last_hit[slot * HIT_MEMORY + i] == id:
-			return true
-	return false
+## Put target `t` (`along` its path, 0 to 1, nearest point `closest`) into the sorted candidates
+## of the hit test (`_cand_*`, which grow when full); returns the new count.
+func _keep_candidate(found: int, t: int, along: float, closest: Vector2) -> int:
+	if found == _cand_target.size():
+		var size: int = maxi(16, found * 2)
+		_cand_target.resize(size)
+		_cand_along.resize(size)
+		_cand_point.resize(size)
+	var at: int = found
+	while at > 0 and _cand_along[at - 1] > along:
+		_cand_target[at] = _cand_target[at - 1]
+		_cand_along[at] = _cand_along[at - 1]
+		_cand_point[at] = _cand_point[at - 1]
+		at -= 1
+	_cand_target[at] = t
+	_cand_along[at] = along
+	_cand_point[at] = closest
+	return found + 1
+
+
+## Mark the targets the shot in `slot` remembers (`_target_mark` set to the returned stamp,
+## `_target_entry` to their memory entry). An entry keeps the target's index as a hint and finds
+## it again by its id when the targets were packed since; one whose target is gone is dropped.
+func _mark_memory(slot: int) -> int:
+	_mark_stamp += 1
+	if _target_mark.size() < _targets.size():
+		_target_mark.resize(_targets.size())
+		_target_entry.resize(_targets.size())
+	var before: int = -1
+	var at: int = _mem_head[slot]
+	while at >= 0:
+		var next: int = _mem_next[at]
+		var t: int = _mem_target[at]
+		if t < 0 or t >= _targets.size() or _target_id[t] != _mem_id[at]:
+			t = _target_id.find(_mem_id[at])
+			_mem_target[at] = t
+		if t < 0:
+			if before < 0:
+				_mem_head[slot] = next
+			else:
+				_mem_next[before] = next
+			_mem_next[at] = _mem_free
+			_mem_free = at
+		else:
+			_target_mark[t] = _mark_stamp
+			_target_entry[t] = at
+			before = at
+		at = next
+	return _mark_stamp
+
+
+## The shot in `slot` hit target `t` this step: remember it until it leaves it.
+func _remember(slot: int, t: int) -> void:
+	if _mem_free < 0:
+		_grow_memory(_mem_id.size() * 2)
+	var at: int = _mem_free
+	_mem_free = _mem_next[at]
+	_mem_id[at] = _target_id[t]
+	_mem_target[at] = t
+	_mem_seen[at] = _mem_step
+	_mem_next[at] = _mem_head[slot]
+	_mem_head[slot] = at
+
+
+## Forget the targets the path of the shot in `slot` did not touch this step: it has left them.
+func _forget_left(slot: int) -> void:
+	var before: int = -1
+	var at: int = _mem_head[slot]
+	while at >= 0:
+		var next: int = _mem_next[at]
+		if _mem_seen[at] != _mem_step:
+			if before < 0:
+				_mem_head[slot] = next
+			else:
+				_mem_next[before] = next
+			_mem_next[at] = _mem_free
+			_mem_free = at
+		else:
+			before = at
+		at = next
+
+
+## Forget every target of the shot in `slot` (it is new, it turned back or it bounced).
+func _forget_all(slot: int) -> void:
+	var at: int = _mem_head[slot]
+	while at >= 0:
+		var next: int = _mem_next[at]
+		_mem_next[at] = _mem_free
+		_mem_free = at
+		at = next
+	_mem_head[slot] = -1
+
+
+## Room for `size` remembered hits in all (the new entries go on the free list).
+func _grow_memory(size: int) -> void:
+	var old: int = _mem_id.size()
+	_mem_id.resize(size)
+	_mem_target.resize(size)
+	_mem_seen.resize(size)
+	_mem_next.resize(size)
+	for at in range(size - 1, old - 1, -1):
+		_mem_next[at] = _mem_free
+		_mem_free = at
 
 
 ## Tell listeners the shot in `slot` ended on a wall where it stands, flying along `velocity`.
@@ -3569,10 +3812,7 @@ func _register_hit(slot: int, target: int, at: Vector2) -> void:
 		# or on a timer) still goes the way the shot was flying.
 	elif _pierce[slot] > 0:
 		_pierce[slot] -= 1
-		var memory: int = slot * HIT_MEMORY
-		for i in range(HIT_MEMORY - 1, 0, -1):
-			_last_hit[memory + i] = _last_hit[memory + i - 1]
-		_last_hit[memory] = _target_id[target]
+		_remember(slot, target)
 	else:
 		spent = true
 		_kill(slot, false)

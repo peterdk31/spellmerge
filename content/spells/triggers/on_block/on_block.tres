@@ -12,4 +12,3 @@ complexity = 1
 icon = ExtResource("2_icon")
 event = 3
 interval = 0.0
-max_fires = 1

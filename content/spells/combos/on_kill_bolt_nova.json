@@ -1,0 +1,9 @@
+{
+	"id": "on_kill_bolt_nova",
+	"name": "On kill bolt nova",
+	"does": "A bolt kills a weak imp ahead and a fire nova bursts where it died, lighting a sturdy imp standing beside the spot.",
+	"casts": [{"staff": 0, "cards": ["on_kill", "bolt", "fire", "nova"]}],
+	"imps": [[60, 0, 3], [75, 25]],
+	"seconds": 1.5,
+	"checks": [{"kind": "killed", "imps": [0]}, {"kind": "status", "imps": [1], "status": "burn"}]
+}

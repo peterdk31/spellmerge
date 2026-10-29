@@ -22,7 +22,8 @@ func _combo(id: String) -> Dictionary:
 
 
 ## Plays `combo` (teammate bodies, imps, then its casts in order of `at`) with every copy of `drop` taken out of the cards.
-## Returns the arena; the caller frees it.
+## Returns the arena; the caller frees it. Kept apart from test_combos.gd's player on purpose: it also drops a card and moves the
+## whole scene (the four-player test), which the shared player has no use for.
 func _play(combo: Dictionary, drop: String = "", offset: Vector2 = Vector2.ZERO, first_player: int = 0) -> ArenaScript:
 	var arena := ArenaScript.new(root)
 	for mate: Array in combo["mates"]:
@@ -88,7 +89,7 @@ func test_the_status_is_the_donors_not_the_casters() -> void:
 
 
 func test_four_players_at_once() -> void:
-	# Two pairs (donor and relayer) far apart: player 1 donates to player 0, player 3 to player 2.
+	# Two pairs (donor and relayer) far apart: player 1 donates frost to player 0, player 3 donates fire to player 2.
 	var combo: Dictionary = _combo(COMBOS[0])
 	if combo.is_empty():
 		return
@@ -101,7 +102,7 @@ func test_four_players_at_once() -> void:
 		arena.place_caster(first + 1, at)
 		arena.add_mate(at + Vector2(60.0, 0.0), first + 1)
 		imps.append(arena.add_imp(at + Vector2(130.0, 0.0)))
-		arena.install_cards(first + 1, 0, ["frost", "bolt"])
+		arena.install_cards(first + 1, 0, [["frost", "fire"][pair], "bolt"])
 		arena.install_cards(first, 0, ["relay", "pierce", "bolt"])
 	for pair in 2:
 		check(arena.cast(pair * 2 + 1, 0, Vector2.DOWN), "donor %d casts" % (pair * 2 + 1))
@@ -109,6 +110,8 @@ func test_four_players_at_once() -> void:
 	for pair in 2:
 		check(arena.cast(pair * 2, 0), "player %d casts" % (pair * 2))
 	arena.run(2.0)
-	for pair in 2:
-		check(arena.was_given(imps[pair], &"chill"), "pair %d's relay bolt chills its imp" % pair)
+	check(arena.was_given(imps[0], &"chill"), "pair 0's relay bolt chills its imp")
+	check(not arena.was_given(imps[0], &"burn"), "pair 0's imp does not burn")
+	check(arena.was_given(imps[1], &"burn"), "pair 1's relay bolt burns its imp")
+	check(not arena.was_given(imps[1], &"chill"), "pair 1's imp does not chill")
 	arena.free_all()

@@ -25,13 +25,13 @@ func test_every_cue_is_valid_and_named_for_its_file() -> void:
 
 
 func test_the_cues_the_game_names_are_there() -> void:
-	for id: StringName in [&"blast", &"fireball", &"quake"]:
+	for id: StringName in [&"blast", &"fireball", &"quake", &"slam", &"nova", &"telegraph"]:
 		check(registry.get_resource(&"cues", id) is CueBase, "%s" % id)
 
 
 func test_problems_names_what_is_wrong() -> void:
 	var cue := CueBase.new()
-	cue.parts = [{"effect": &"sparkles"}, {"effect": &"burst", "colour": Color.RED}, {"effect": &"burst", "way": &"sideways"}, {"effect": &"burst", "zoom": 2, "reach": 1.0}, {"effect": &"burst", "seconds": 0.0}]
+	cue.parts = [{"effect": &"sparkles"}, {"effect": &"burst", "colour": Color.RED}, {"effect": &"burst", "way": &"sideways"}, {"effect": &"burst", "zoom": 2, "reach": 1.0}, {"effect": &"burst", "seconds": 0.0}, {"effect": &"ring_in", "lasts_size": true, "seconds": 0.5}]
 	cue.kick_way = &"left"
 	var found: PackedStringArray = cue.problems()
-	check_equal(found.size(), 7, "an id, the kick way and one a part: %s" % [found])
+	check_equal(found.size(), 8, "an id, the kick way and one a part: %s" % [found])

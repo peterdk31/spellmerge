@@ -4,15 +4,17 @@ extends Resource
 ## `cue_shown` event). One `.tres` per cue under `content/cues/`, found by its `id` (the registry's
 ## folder `cues`), so a new moment (an exploding barrel, a boss's death) is a new file and no list
 ## is edited. A cue is played at a point with what set it off: who (its ramp), which way, how big
-## (its `size` in pixels, the radius of an explosion or the reach of a ground strike), its
-## element's colour and its cards. Feel's moments with a life of their own (beams, swing trails,
-## statuses, ghosts) are not cues.
+## (its `size` in pixels, the radius of an explosion or the reach of a ground strike; seconds for
+## a telegraph), its element's colour and its cards. Feel's moments with a life of their own
+## (beams, dashes, swing trails, statuses, ghosts) are not cues.
 ##
 ## The cue's `parts` are flashes Feel draws, each a Dictionary:
 ##   `effect`     one of EFFECTS (required)
 ##   `zoom`       its size step, fixed (1 when neither this nor `reach` is given)
 ##   `reach`      its size from the cue's: `size` x reach pixels (Feel turns pixels into its zoom)
 ##   `seconds`    how long it shows (the effect's own when not given)
+##   `lasts_size` true: it lasts the cue's `size` in seconds instead (a telegraph: the wait until
+##                what it warns of comes), and is left out when that is 0
 ##   `color`      this exact colour, instead of the caster's ramp and the cue's tint
 ##   `plain`      true: white in no one's ramp, without the cards (stone chips)
 ##   `way`        `aim` (the cue's direction, the default), `back` (against it), `right` or `up`
@@ -33,7 +35,7 @@ const EFFECTS: Array[StringName] = [
 const WAYS: Array[StringName] = [&"aim", &"back", &"right", &"up"]
 const KICK_WAYS: Array[StringName] = [&"down", &"away", &"back", &"aim"]
 ## The keys a part may have.
-const PART_KEYS: Array[String] = ["effect", "zoom", "reach", "seconds", "color", "plain", "way", "particles"]
+const PART_KEYS: Array[String] = ["effect", "zoom", "reach", "seconds", "lasts_size", "color", "plain", "way", "particles"]
 
 ## Its name; the registry finds it by this under `cues`, and the file is `<id>.tres`.
 @export var id: StringName = &""
@@ -72,6 +74,8 @@ func problems() -> PackedStringArray:
 			found.append("%s: part %d's way '%s' is not one of %s" % [id, i, part["way"], WAYS])
 		if part.has("zoom") and part.has("reach"):
 			found.append("%s: part %d has both zoom and reach" % [id, i])
+		if part.has("lasts_size") and (part.has("seconds") or part.has("reach")):
+			found.append("%s: part %d lasts the cue's size, so it takes no seconds or reach" % [id, i])
 		if float(part.get("seconds", 1.0)) <= 0.0 or float(part.get("reach", 1.0)) <= 0.0 or int(part.get("zoom", 1)) < 1:
 			found.append("%s: part %d has a seconds, reach or zoom of 0 or less" % [id, i])
 	return found

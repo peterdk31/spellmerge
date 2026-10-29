@@ -160,6 +160,49 @@ func test_a_part_faces_the_way_it_says() -> void:
 	check_equal(feel.effect_info(FeelScript.KIND_PUFF).get("dir"), Vector2.UP, "up the screen")
 
 
+func test_a_part_can_last_the_cues_size_in_seconds() -> void:
+	_made([{"effect": &"ring_in", "zoom": 2, "lasts_size": true}, {"effect": &"burst"}])
+	_cue(&"test_cue", Vector2.ZERO, 0.6)
+	check(is_equal_approx(feel.effect_info(FeelScript.KIND_RING_IN)["seconds"], 0.6), "as long as the cue is big")
+	check_equal(feel.effect_info(FeelScript.KIND_RING_IN).get("zoom"), 2, "its zoom still its own")
+	check(is_equal_approx(feel.effect_info(FeelScript.KIND_BURST)["seconds"], FeelScript.BURST_SECONDS), "the other parts keep theirs")
+	feel.step(FeelScript.BURST_SECONDS + 0.4)
+	_cue(&"test_cue", Vector2.ZERO, 0.0)
+	check_equal(feel.effects_of(FeelScript.KIND_RING_IN), 0, "left out when the cue's size is 0")
+	check_equal(feel.effects_of(FeelScript.KIND_BURST), 1, "the rest still shows")
+
+
+func test_the_telegraph_closes_on_its_point_for_its_seconds() -> void:
+	_cue(&"telegraph", Vector2(40.0, 40.0), 0.6)
+	check_equal(feel.effects_of(FeelScript.KIND_RING_IN), 1, "a ring closing")
+	check_equal(feel.effect_info(FeelScript.KIND_RING_IN).get("zoom"), 2, "2 steps across")
+	check_equal(feel.effect_info(FeelScript.KIND_RING_IN).get("dir"), Vector2.RIGHT, "upright")
+	feel.step(0.5)
+	check_equal(feel.effects_of(FeelScript.KIND_RING_IN), 1, "still there just before")
+	feel.step(0.2)
+	check_equal(feel.effects_of(FeelScript.KIND_RING_IN), 0, "gone when the wait is over")
+
+
+func test_the_nova_is_a_ring_120_px_across_for_a_quarter_second() -> void:
+	_cue(&"nova", Vector2(50.0, 60.0), 0.0)
+	check_equal(feel.effects_of(FeelScript.KIND_RING_OUT), 1, "a ring flashes out")
+	check_equal(feel.effect_info(FeelScript.KIND_RING_OUT).get("zoom"), 6, "6 steps of 20 px across")
+	check(is_equal_approx(feel.effect_info(FeelScript.KIND_RING_OUT)["seconds"], 0.25), "a quarter second")
+	check_equal(feel.trauma(), 0.0, "no weight")
+
+
+func test_the_slam_is_a_star_and_the_ground_struck() -> void:
+	_cue(&"slam", Vector2(20.0, 0.0), 16.0)
+	check_equal(feel.effects_of(FeelScript.KIND_BURST), 1, "a white-hot star")
+	check_equal(feel.effect_info(FeelScript.KIND_BURST).get("zoom"), 3, "3 steps big")
+	check_equal(feel.effects_of(FeelScript.KIND_QUAKE), 1, "cracks in the floor")
+	check_equal(feel.effect_info(FeelScript.KIND_QUAKE).get("zoom"), roundi(16.0 * FeelScript.QUAKE_PAST / FeelScript.QUAKE_REACH), "out past its reach")
+	check_equal(feel.effects_of(FeelScript.KIND_CHIPS), 1, "stone chips")
+	var quake: CueBase = feel.cue_of(&"quake")
+	var slam: CueBase = feel.cue_of(&"slam")
+	check(slam.shake == quake.shake and slam.kick == quake.kick and slam.hold == quake.hold and slam.kick_way == quake.kick_way, "the quake's weight")
+
+
 func test_particles_off_leaves_out_the_parts_that_say_so() -> void:
 	feel.particles_enabled = false
 	_cue(&"blast")

@@ -100,3 +100,29 @@ func test_four_players_at_once() -> void:
 	for player in 4:
 		check(arena.lost(near[player]) > 0, "player %d's blast hurts the imp beside the hit" % player)
 	arena.free_all()
+
+
+## Health an imp at `at` lost after `cards` were cast to the right and `seconds` went by.
+func _lost_at(cards: Array, at: Vector2, seconds: float) -> int:
+	var arena := ArenaScript.new(root)
+	var imp: Node2D = arena.add_imp(at)
+	arena.install_cards(0, 0, cards)
+	arena.cast(0, 0)
+	arena.run(seconds)
+	var lost: int = arena.lost(imp)
+	arena.free_all()
+	return lost
+
+
+func test_a_hook_that_misses_blasts_where_it_ends() -> void:
+	# Rule 1 (docs/milestones/M2-rules.md, R1d): every carrier blasts at its end point. The hook
+	# flies 150 px and passes the imp by; it ends beside it.
+	var at := Vector2(150.0, 30.0)
+	check_equal(_lost_at(["hook"], at, 1.0), 0, "the hook passes the imp by")
+	check(_lost_at(["blast", "hook"], at, 1.0) > 0, "its blast where it ends reaches the imp")
+
+
+func test_a_rain_blasts_where_it_lands() -> void:
+	var at := Vector2(120.0, 0.0)
+	check_equal(_lost_at(["rain"], at, 1.5), 0, "an empty rain hurts nothing")
+	check(_lost_at(["blast", "rain"], at, 1.5) > 0, "its blast where it lands hurts the imp")

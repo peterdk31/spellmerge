@@ -50,6 +50,16 @@ func _holds(combo: Dictionary, drop: String = "", sturdy: bool = false) -> bool:
 	return held
 
 
+## True when `_holds` replays every part of `combo`: a single cast and only the check kinds it reads.
+func _understood(combo: Dictionary) -> bool:
+	if (combo["casts"] as Array).size() != 1 or (combo["checks"] as Array).is_empty():
+		return false
+	for row: Dictionary in combo["checks"]:
+		if not ["killed", "status"].has(str(row["kind"])):
+			return false
+	return true
+
+
 func test_the_card_is_a_valid_trigger() -> void:
 	var card: TriggerBase = _card()
 	check(card != null, "on_kill.tres loads as a TriggerBase")
@@ -67,6 +77,7 @@ func test_the_combos_hold_with_the_card_and_fail_without_it() -> void:
 		check(not combo.is_empty(), "the combo %s exists" % id)
 		if combo.is_empty():
 			continue
+		check(_understood(combo), "%s only uses what this test replays: one cast and killed or status checks" % id)
 		check(_holds(combo), "%s does what it promises" % id)
 		check(not _holds(combo, "on_kill"), "%s fails without On Kill" % id)
 		check(not _holds(combo, "", true), "%s does nothing when the imp survives the hit" % id)

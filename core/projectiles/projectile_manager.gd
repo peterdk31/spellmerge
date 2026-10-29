@@ -3840,6 +3840,11 @@ func get_actor_of(slot: int) -> int:
 	return _actor[slot] if slot >= 0 and slot < _cap else -1
 
 
+## The seconds the shot in `slot` has left to live, 0 for an empty slot.
+func get_life_of(slot: int) -> float:
+	return _life[slot] if is_alive(slot) else 0.0
+
+
 ## The velocity of the shot in `slot` (kept after it ended, until the slot is reused).
 func get_velocity_of(slot: int) -> Vector2:
 	return _vel[slot] if slot >= 0 and slot < _cap else Vector2.ZERO

@@ -99,7 +99,11 @@ func test_a_jump_pulls() -> void:
 
 
 func test_a_jump_keeps_its_timer() -> void:
-	var timed: Callable = func(a: ArenaScript, s: int) -> bool: return a.spells._rec_timed[s] == 1
+	var timed: Callable = func(a: ArenaScript, s: int) -> bool:
+		for i in a.spells._lc_count:
+			if a.spells._lc_kind[i] == a.spells.LC_SLOT and a.spells._lc_ref[i] == s and a.spells._lc_seq[i] == a.projectiles.get_seq_of(s):
+				return true
+		return false
 	check(_on_jump(["timer", "chain", "bolt", "nova"], timed) == true, "a timer bolt's jump runs the timer")
 
 

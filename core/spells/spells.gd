@@ -19,10 +19,12 @@ extends Node
 ## (`caster_move_requested`). A `hold` carrier lives until its staff is cast again or edited.
 ##
 ## Payloads: a trigger's payload (a group) is fired by its shot's `projectile_hit` (on hit),
-## `projectile_expired` (on expire) or every `trigger_interval` seconds (timer, in `step`). It
-## starts at the hit point (the shot's place at expiry, a little back from a wall; the shot's
-## place for a timer), flies along the shot's velocity (outward from the caster through the shot
-## for an orbit or still shot, along the beam for a ray) and cannot hit the target that fired it
+## `projectile_expired` (on expire) or every `trigger_interval` seconds (timer, `_step_live`; the
+## first tick after the interval or half the carrier's life, whichever is shorter). It starts at
+## the hit point (the shot's place at expiry, a little back from a wall; where the carrier is now
+## for a timer: every carrier that lasts has one, `_lc_tag`), flies along the shot's velocity
+## (outward from the caster through the shot for an orbit or still shot, along the beam for a
+## ray) and cannot hit the target that fired it
 ## for `SpellLimits.SOURCE_EXCLUSION` seconds (a beam never hits it). A payload is cast by the
 ## shot that fired it while that shot flies, else by the point (`_caster`): dash, teleport, hook,
 ## swap and recoil move that shot, orbit, familiar and return circle it. A trigger fires every
@@ -30,7 +32,7 @@ extends Node
 ## One budget's trigger fires make at most `fire_shots_per_step` shots per `step` (pacing, not a
 ## limit): a fire past it waits for the next step, oldest first, and none is dropped
 ## (`fires_waited` counts them). A beam fires an on-expire payload where it ends when its
-## life is over, and has no timer.
+## life is over, and a timer from its tip while it is on.
 ##
 ## Beams: a beam lives its `lifetime` (`_start_beam`), held by its caster (the wizard's aim from
 ## `set_aim`, or its shot), hits at once and every `SpellLimits.BEAM_TICK`, and a homing one bends
@@ -215,14 +217,31 @@ var _fires_used: PackedInt32Array = PackedInt32Array()
 ## What each shot knows, by projectile slot; valid while `_rec_seq` matches the manager's.
 var _rec_seq: PackedInt64Array = PackedInt64Array()
 var _rec_chain: PackedInt32Array = PackedInt32Array()
-var _rec_clock: PackedFloat32Array = PackedFloat32Array()
 ## Instance id of the target a chain came from.
 var _rec_prev: PackedInt64Array = PackedInt64Array()
-## 1 while `_timers` lists the slot (a stale entry stays until `step` prunes it).
-var _rec_timed: PackedByteArray = PackedByteArray()
-## Slots of shots with a timer trigger.
-var _timers: PackedInt32Array = PackedInt32Array()
-var _timer_count: int = 0
+## The live carriers with a `timer` or `on hurt` trigger, `_lc_count` of them (rules R4d): every
+## carrier that lasts joins as it starts (`_lc_join`), whatever it is, and `_lc_where` says where
+## it is now: the shot in a slot (`LC_SLOT`; also the shot a dash moves), a beam's tip, a swing's
+## tip, an actor's body (a wizard's dash, a familiar round its wizard) or a fixed point (a rain's
+## spot, a decoy). One `_lc_tied` to its row ends with it (a shot, a beam, a swing); the others
+## live `_lc_left` seconds (a rain, a dash, an entity) or until they leave (`_lc_leave`: an
+## entity that ended). `_lc_clock` is the seconds to the next tick, `_lc_at` where it was last,
+## `_lc_way` its way where nothing else gives one.
+const LC_SLOT: int = 0
+const LC_BEAM: int = 1
+const LC_SWING: int = 2
+const LC_ACTOR: int = 3
+const LC_POINT: int = 4
+var _lc_tag: PackedInt64Array = PackedInt64Array()
+var _lc_kind: PackedInt32Array = PackedInt32Array()
+var _lc_ref: PackedInt32Array = PackedInt32Array()
+var _lc_seq: PackedInt64Array = PackedInt64Array()
+var _lc_tied: PackedByteArray = PackedByteArray()
+var _lc_left: PackedFloat32Array = PackedFloat32Array()
+var _lc_clock: PackedFloat32Array = PackedFloat32Array()
+var _lc_at: PackedVector2Array = PackedVector2Array()
+var _lc_way: PackedVector2Array = PackedVector2Array()
+var _lc_count: int = 0
 ## Slots of live shots with `arc`, `_arc_count` of them, flagged in `_rec_arc`; `_rec_arc_clock` is
 ## the seconds to each one's next zap.
 var _arcs: PackedInt32Array = PackedInt32Array()
@@ -239,10 +258,6 @@ var _magnet_count: int = 0
 ## Where in `_magnets` the next step's pulls start (it rotates when there are more than the cap).
 var _magnet_from: int = 0
 var _rec_magnet: PackedByteArray = PackedByteArray()
-## Slots of live shots with an `on hurt` trigger, `_hurt_count` of them, flagged in `_rec_hurt`.
-var _hurt_slots: PackedInt32Array = PackedInt32Array()
-var _hurt_count: int = 0
-var _rec_hurt: PackedByteArray = PackedByteArray()
 ## What a shot hits with when it is not its spell's own `hit`, by slot (null: `hit`): an echo's
 ## `echo_hit`, what a relay shot became after it hit an actor that had cast an infusion, or what
 ## the hit a chain jump came from hit with. `_rec_zap` is the same for the shot's zaps (`arc_hit`).
@@ -512,7 +527,7 @@ func _init() -> void:
 	_jq_chain.resize(JUMP_QUEUE)
 	_jq_prev.resize(JUMP_QUEUE)
 	_jq_hit.resize(JUMP_QUEUE)
-	_timers.resize(64)
+	_lc_grow(64)
 	_arcs.resize(64)
 	_magnets.resize(64)
 	_bm_on.resize(SpellLimits.BEAM_ROWS_START)
@@ -998,18 +1013,7 @@ func step(delta: float) -> void:
 	_step_beams(delta)
 	_step_swings(delta)
 	_step_slams(delta)
-	var i: int = 0
-	while i < _timer_count:
-		var slot: int = _timers[i]
-		if not _knows(slot) or not _is_timer(slot):
-			_rec_timed[slot] = 0
-			_timer_count -= 1
-			_timers[i] = _timers[_timer_count]
-			continue
-		_rec_clock[slot] -= delta
-		if _rec_clock[slot] <= 0.0:
-			_fire_timer(slot)
-		i += 1
+	_step_live(delta)
 	_step_arcs(delta)
 	_step_magnets()
 	_run_pending()
@@ -1122,6 +1126,7 @@ func _move_caster(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, d
 				events.form_shown.emit(actor, &"dash", origin, direction, reach, spell.tint, spell.look)
 				# Its way is drawn where the caster really goes (it picks its own way and may home).
 				projectiles.follow_caster(actor, spell.tint, spell.look, seconds)
+				_lc_join(spell, tag, LC_ACTOR, actor, 0, false, seconds, origin, direction)
 			else:
 				events.caster_move_requested.emit(actor, &"teleport", projectiles.clip_to_walls(origin, origin + offset), 0.0, tag)
 			_shield_caster(spell, tag, actor, seconds)
@@ -1131,6 +1136,7 @@ func _move_caster(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, d
 	if shot < 0 or not projectiles.move_shot(shot, offset, seconds, turn, spell.homing_range):
 		return 0
 	_track_move(shot, tag, seconds, direction)
+	_lc_join(spell, tag, LC_SLOT, shot, projectiles.get_seq_of(shot), false, seconds, projectiles.get_position_of(shot), direction)
 	return 1
 
 
@@ -1256,6 +1262,7 @@ func _telegraph_rain(spell: CompiledSpell, tag: int, actor: int, origin: Vector2
 		var group: CompiledGroup = spell.own_payload if spell.own_payload != null else CompiledGroup.new()
 		var launch: PendingLaunch = _delay(spell.lifetime, group, null, actor, SpellTag.staff_of(tag), SpellTag.generation_of(tag), point, along, null, false)
 		launch.landing = spell
+		_lc_join(spell, tag, LC_POINT, -1, 0, false, spell.lifetime, point, along)
 		placed += 1
 		if events != null:
 			events.form_shown.emit(actor, &"rain", point, along, spell.lifetime, spell.tint, spell.look)
@@ -1315,10 +1322,17 @@ func _spawn_entities(spell: CompiledSpell, tag: int, actor: int, origin: Vector2
 		return 0
 	var kind: StringName = &"decoy" if spell.motion == FormBase.Motion.DECOY else &"familiar"
 	var seconds: float = INF if lifetime >= SpellLimits.HOLD_LIFETIME else lifetime
+	var anchor: int = _entity_caster()
+	# Where it is: a decoy stays where it was made, a familiar circles its caster.
+	var where: int = LC_POINT
+	if kind == &"familiar" and anchor != -2:
+		where = LC_ACTOR if anchor == -1 else LC_SLOT
+	var ref: int = actor if where == LC_ACTOR else anchor
 	for n in count:
 		_entities[tag] = _entities.get(tag, 0) + 1
 		shot_started(tag)
-		events.entity_spawn_requested.emit(actor, kind, origin, seconds, tag, _entity_caster())
+		events.entity_spawn_requested.emit(actor, kind, origin, seconds, tag, anchor)
+		_lc_join(spell, tag, where, ref, projectiles.get_seq_of(ref) if where == LC_SLOT else 0, false, seconds, origin, Vector2.RIGHT)
 	return count
 
 
@@ -1343,6 +1357,7 @@ func _on_entity_ended(actor: int, _kind: StringName, position: Vector2, tag: int
 		_entities.erase(tag)
 	else:
 		_entities[tag] = count - 1
+	_lc_leave(tag, false)
 	var spell: CompiledSpell = _profiles.get(tag)
 	if spell != null and position.is_finite():
 		_blast(spell, tag, actor, position)
@@ -1365,6 +1380,7 @@ func _on_familiar_cast(actor: int, position: Vector2, direction: Vector2, tag: i
 
 ## A revoked build's entities are told to end, and forgotten (their `entity_ended` is then ignored).
 func _end_entities(tag: int) -> void:
+	_lc_leave(tag, true)
 	if _entities.erase(tag) and events != null:
 		events.entity_end_requested.emit(SpellTag.caster_of(tag), tag)
 
@@ -1695,16 +1711,12 @@ func _register(slot: int, tag: int, spell: CompiledSpell, chain: int, prev: int)
 		for at in range(old_size, size):
 			_rec_seq[at] = -1
 		_rec_chain.resize(size)
-		_rec_clock.resize(size)
 		_rec_prev.resize(size)
-		_rec_timed.resize(size)
-		_rec_hurt.resize(size)
 		_rec_arc.resize(size)
 		_rec_magnet.resize(size)
 		_rec_arc_clock.resize(size)
 		_rec_relay.resize(size)
 		_rec_zap.resize(size)
-		_hurt_slots.resize(size)
 	_rec_relay[slot] = spell.echo_hit if spell == _echo_spell else null
 	_rec_zap[slot] = spell.echo_arc_hit if spell == _echo_spell else null
 	if _caster != CASTER_WIZARD:
@@ -1718,18 +1730,12 @@ func _register(slot: int, tag: int, spell: CompiledSpell, chain: int, prev: int)
 	_rec_seq[slot] = projectiles.get_seq_of(slot)
 	_rec_chain[slot] = chain
 	_rec_prev[slot] = prev
-	_rec_clock[slot] = spell.trigger_interval
 	shot_started(tag)
-	if spell.payload != null and spell.trigger_event == TriggerBase.Event.TIMER:
-		# A shot that ended and was replaced in this slot before `step` is still listed once.
-		if _rec_timed[slot] == 0:
-			if _timer_count == _timers.size():
-				_timers.resize(_timers.size() * 2)
-			_timers[_timer_count] = slot
-			_timer_count += 1
-			_rec_timed[slot] = 1
+	var life: float = projectiles.get_life_of(slot)
+	var at: Vector2 = projectiles.get_position_of(slot)
+	_lc_join(spell, tag, LC_SLOT, slot, projectiles.get_seq_of(slot), true, life, at, projectiles.get_velocity_of(slot))
 	if spell.arc_interval > 0.0 and spell.arc_reach > 0.0:
-		_rec_arc_clock[slot] = spell.arc_interval
+		_rec_arc_clock[slot] = first_tick(spell.arc_interval, life)
 		if _rec_arc[slot] == 0:
 			if _arc_count == _arcs.size():
 				_arcs.resize(_arcs.size() * 2)
@@ -1742,10 +1748,6 @@ func _register(slot: int, tag: int, spell: CompiledSpell, chain: int, prev: int)
 		_magnets[_magnet_count] = slot
 		_magnet_count += 1
 		_rec_magnet[slot] = 1
-	if spell.payload != null and spell.trigger_event == TriggerBase.Event.HURT and _rec_hurt[slot] == 0:
-		_hurt_slots[_hurt_count] = slot
-		_hurt_count += 1
-		_rec_hurt[slot] = 1
 
 
 ## One beam: counted while it is cast, with its context set for the hit handler.
@@ -1908,6 +1910,8 @@ func _start_beam(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, he
 			_bm_turn[at] = way.angle_to(heading)
 	shot_started(tag)
 	_beam_step(at, 0.0)
+	if _bm_on[at] != 0:
+		_lc_join(spell, tag, LC_BEAM, at, _bm_born[at], true, lifetime, _bm_tip[at], _bm_dir[at])
 	return true
 
 
@@ -2303,6 +2307,8 @@ func _start_swing(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, h
 		_sw_caster[at] = CASTER_POINT
 	shot_started(tag)
 	_swing_step(at, 0.0)
+	if _sw_on[at] != 0:
+		_lc_join(spell, tag, LC_SWING, at, _sw_born[at], true, wind + spell.lifetime, swing_tip(at), _sw_dir[at])
 	return true
 
 
@@ -2450,6 +2456,14 @@ func _end_swing(at: int, finished: bool) -> void:
 ## degrees out to `reach`: where its arc ends.
 static func swing_end_point(origin: Vector2, direction: Vector2, side: int, arc: float, reach: float) -> Vector2:
 	return origin + direction.normalized().rotated(deg_to_rad(arc) * 0.5 * (1.0 if side >= 0 else -1.0)) * reach
+
+
+## Where the tip of swing `at`'s staff is now: on its arc as far as it has turned (leaning back
+## before its sweep), `ray_length` out.
+func swing_tip(at: int) -> Vector2:
+	var half: float = deg_to_rad(swing_arc(at)) * 0.5
+	var turned: float = clampf(_sw_turned[at], -half, half) * (1.0 if _sw_side[at] >= 0 else -1.0)
+	return _sw_origin[at] + _sw_dir[at].rotated(turned) * swing_reach(at)
 
 
 ## Makes room for `size` swing rows (the new ones off, each with its own struck list).
@@ -3157,12 +3171,6 @@ func _grow_jumps() -> void:
 	_jq_head = 0
 
 
-## True when the shot in `slot` fires its payload on a timer.
-func _is_timer(slot: int) -> bool:
-	var spell: CompiledSpell = _profiles.get(projectiles.get_tag_of(slot))
-	return spell != null and spell.payload != null and spell.trigger_event == TriggerBase.Event.TIMER
-
-
 ## Fires the payload of `spell` (whose shot has `tag`) from `at` along `heading`, in the same
 ## actor's staff and generation as the shot.
 ## Fires the payload of `spell` from `at`. Its caster is the shot in `slot` that fired it while
@@ -3282,15 +3290,127 @@ func _heading(spell: CompiledSpell, slot: int, at: Vector2, actor: int) -> Vecto
 	return Vector2.RIGHT if velocity.is_zero_approx() else velocity.normalized()
 
 
-func _fire_timer(slot: int) -> void:
-	var tag: int = projectiles.get_tag_of(slot)
-	var spell: CompiledSpell = _profiles.get(tag)
-	if spell == null or spell.payload == null:
+## When a carrier that lives `life` seconds first does what it does every `interval` (a timer's
+## tick, an arc's zap): after the interval, or half its life when that is shorter, so a short
+## carrier (a hook, a swap, a nova, a beam) does it once before it ends (owner, 2026-10-29).
+static func first_tick(interval: float, life: float) -> float:
+	return minf(interval, life * 0.5)
+
+
+## Lists a carrier of `tag` that lasts, when it has a `timer` or `on hurt` trigger (see `_lc_tag`):
+## `kind` and `ref` (with `seq`, the row's birth) say where it is, `tied` that it ends with that
+## row, else it lives `life` seconds; `at` is where it starts and `way` its way.
+func _lc_join(spell: CompiledSpell, tag: int, kind: int, ref: int, seq: int, tied: bool, life: float, at: Vector2, way: Vector2) -> void:
+	if spell.payload == null or (spell.trigger_event != TriggerBase.Event.TIMER and spell.trigger_event != TriggerBase.Event.HURT):
 		return
+	if _lc_count == _lc_tag.size():
+		_lc_grow(_lc_count * 2)
+	var i: int = _lc_count
+	_lc_count += 1
+	_lc_tag[i] = tag
+	_lc_kind[i] = kind
+	_lc_ref[i] = ref
+	_lc_seq[i] = seq
+	_lc_tied[i] = 1 if tied else 0
+	_lc_left[i] = INF if tied else life
+	_lc_clock[i] = first_tick(spell.trigger_interval, life)
+	_lc_at[i] = at
+	_lc_way[i] = way.normalized() if way.is_finite() and not way.is_zero_approx() else Vector2.RIGHT
+
+
+func _lc_grow(size: int) -> void:
+	_lc_tag.resize(size)
+	_lc_kind.resize(size)
+	_lc_ref.resize(size)
+	_lc_seq.resize(size)
+	_lc_tied.resize(size)
+	_lc_left.resize(size)
+	_lc_clock.resize(size)
+	_lc_at.resize(size)
+	_lc_way.resize(size)
+
+
+## Takes live carrier `i` off the list (the last one takes its place).
+func _lc_remove(i: int) -> void:
+	_lc_count -= 1
+	_lc_tag[i] = _lc_tag[_lc_count]
+	_lc_kind[i] = _lc_kind[_lc_count]
+	_lc_ref[i] = _lc_ref[_lc_count]
+	_lc_seq[i] = _lc_seq[_lc_count]
+	_lc_tied[i] = _lc_tied[_lc_count]
+	_lc_left[i] = _lc_left[_lc_count]
+	_lc_clock[i] = _lc_clock[_lc_count]
+	_lc_at[i] = _lc_at[_lc_count]
+	_lc_way[i] = _lc_way[_lc_count]
+
+
+## A carrier of `tag` that is not tied to a row ended (an entity): one of its entries leaves, or
+## with `every` all of them (its build was revoked).
+func _lc_leave(tag: int, every: bool) -> void:
+	var i: int = _lc_count - 1
+	while i >= 0:
+		if _lc_tag[i] == tag and _lc_tied[i] == 0:
+			_lc_remove(i)
+			if not every:
+				return
+		i -= 1
+
+
+## Where live carrier `i` is now, or `Vector2.INF` when the row it follows is gone.
+func _lc_where(i: int) -> Vector2:
+	var ref: int = _lc_ref[i]
+	match _lc_kind[i]:
+		LC_SLOT:
+			return projectiles.get_position_of(ref) if projectiles.get_seq_of(ref) == _lc_seq[i] else Vector2.INF
+		LC_BEAM:
+			return _bm_tip[ref] if _bm_on[ref] != 0 and _bm_born[ref] == _lc_seq[i] else Vector2.INF
+		LC_SWING:
+			return swing_tip(ref) if _sw_on[ref] != 0 and _sw_born[ref] == _lc_seq[i] else Vector2.INF
+		LC_ACTOR:
+			return projectiles.get_anchor(ref)
+	return _lc_at[i]
+
+
+## Runs the live carriers on by `delta`: each that ended leaves the list, each timer whose clock
+## runs out fires its payload from where its carrier is. Payloads may list more carriers; they
+## run from this step on.
+func _step_live(delta: float) -> void:
+	var i: int = 0
+	while i < _lc_count:
+		var spell: CompiledSpell = _profiles.get(_lc_tag[i])
+		var at: Vector2 = _lc_where(i)
+		_lc_left[i] -= delta
+		if spell == null or _lc_left[i] <= 0.0 or (_lc_tied[i] == 1 and not at.is_finite()):
+			_lc_remove(i)
+			continue
+		if at.is_finite():
+			_lc_at[i] = at
+		if spell.trigger_event == TriggerBase.Event.TIMER:
+			_lc_clock[i] -= delta
+			if _lc_clock[i] <= 0.0:
+				_lc_clock[i] += spell.trigger_interval
+				_lc_fire(i, spell, _lc_at[i])
+		i += 1
+
+
+## Fires the payload of live carrier `i` from `from`, along its way where it is: a shot's own
+## (`_heading`), else outward from its caster's body through it, else its `_lc_way`. Its shot casts
+## the payload while it flies, else the point does.
+func _lc_fire(i: int, spell: CompiledSpell, from: Vector2) -> void:
+	var tag: int = _lc_tag[i]
 	var actor: int = SpellTag.caster_of(tag)
-	_rec_clock[slot] += spell.trigger_interval
-	var at: Vector2 = projectiles.get_position_of(slot)
-	_fire_payload(spell, tag, actor, at, _heading(spell, slot, at, actor), null, slot)
+	var at: Vector2 = _lc_at[i]
+	var slot: int = _lc_ref[i]
+	if _lc_kind[i] != LC_SLOT or not projectiles.is_alive(slot) or projectiles.get_seq_of(slot) != _lc_seq[i]:
+		slot = -1
+	var way: Vector2 = _lc_way[i]
+	if slot >= 0:
+		way = _heading(spell, slot, at, actor)
+	else:
+		var body: Vector2 = projectiles.get_anchor(actor)
+		if body.is_finite() and not (at - body).is_zero_approx():
+			way = (at - body).normalized()
+	_fire_payload(spell, tag, actor, from, way, null, slot)
 
 
 ## Runs the `arc` shots on by `delta`: each whose clock runs out zaps (`_zap`), at most
@@ -3600,31 +3720,24 @@ func _fire_event(event: int, actor: int, at: Vector2, tag: int, source: Node, ba
 
 
 ## `on hurt`: every live carrier of the hurt actor with that trigger fires its payload from where
-## it was hurt (a wizard or an enemy alike, actors G3b).
+## the actor was hurt (a wizard or an enemy alike, actors G3b), whatever the carrier is (a shot, a
+## beam, a dash, an entity...; `_lc_tag`).
 func _on_hurt(actor: int, _amount: int, position: Vector2, _tag: int, _kind: StringName) -> void:
-	if actor < 0 or actor >= ACTORS or _hurt_count == 0:
+	if actor < 0 or actor >= ACTORS:
 		return
-	var i: int = 0
-	while i < _hurt_count:
-		var slot: int = _hurt_slots[i]
-		var spell: CompiledSpell = null
-		if _knows(slot):
-			spell = _profiles.get(projectiles.get_tag_of(slot))
-		if spell == null or spell.payload == null or spell.trigger_event != TriggerBase.Event.HURT:
-			_rec_hurt[slot] = 0
-			_hurt_count -= 1
-			_hurt_slots[i] = _hurt_slots[_hurt_count]
-			continue
-		i += 1
-	# Payloads may start more such shots; they sit past `count` and wait for the next hurt.
-	var count: int = _hurt_count
-	for n in count:
-		var slot: int = _hurt_slots[n]
-		var tag: int = projectiles.get_tag_of(slot)
+	# Payloads may list more such carriers; they sit past `count` and wait for the next hurt.
+	var count: int = _lc_count
+	for i in count:
+		var tag: int = _lc_tag[i]
 		var spell: CompiledSpell = _profiles.get(tag)
-		if spell == null or not _knows(slot) or SpellTag.caster_of(tag) != actor:
+		if spell == null or spell.trigger_event != TriggerBase.Event.HURT or SpellTag.caster_of(tag) != actor:
 			continue
-		_fire_payload(spell, tag, actor, position, _heading(spell, slot, projectiles.get_position_of(slot), actor), null, slot)
+		var at: Vector2 = _lc_where(i)
+		if at.is_finite():
+			_lc_at[i] = at
+		elif _lc_tied[i] == 1:
+			continue
+		_lc_fire(i, spell, position)
 
 
 ## `relay` (owner, 2026-10-28): a shot with it that hits any actor (a wizard, an enemy, a
@@ -3729,16 +3842,13 @@ func clear() -> void:
 	_hook_ends.fill(0)
 	_last_form.fill(&"")
 	_cast_count.fill(0)
-	_timer_count = 0
+	_lc_count = 0
 	_arc_count = 0
 	_magnet_count = 0
 	_magnet_from = 0
 	_rec_magnet.fill(0)
 	_rec_seq.fill(-1)
-	_rec_timed.fill(0)
 	_rec_arc.fill(0)
-	_rec_hurt.fill(0)
-	_hurt_count = 0
 	_rec_relay.fill(null)
 	_rec_zap.fill(null)
 	_jq_hit.fill(null)

@@ -613,11 +613,11 @@ func test_counts_return_to_zero_after_a_busy_fight() -> void:
 		check_equal(_spells.generations_held(player, 0), 1, "player %d holds only the current build" % player)
 
 
-## How many times the timer list names `slot`.
+## How many live entries of the live-carrier list (whose clocks run) name `slot`.
 func _timer_entries(slot: int) -> int:
 	var found: int = 0
-	for i in _spells._timer_count:
-		if _spells._timers[i] == slot:
+	for i in _spells._lc_count:
+		if _spells._lc_kind[i] == SpellsScript.LC_SLOT and _spells._lc_ref[i] == slot and _spells._lc_where(i).is_finite():
 			found += 1
 	return found
 

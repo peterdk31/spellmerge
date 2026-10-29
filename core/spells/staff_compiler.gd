@@ -158,14 +158,11 @@ func _read_group(want: int, payload: bool) -> CompiledGroup:
 			for modifier in modifiers:
 				deflects = deflects or (modifier.behaviour == ModifierBase.Behaviour.DEFLECT and behaviour_runs(modifier.behaviour, form.motion))
 				blasts = blasts or (modifier.behaviour == ModifierBase.Behaviour.BLAST and behaviour_runs(modifier.behaviour, form.motion))
-			var life: float = _life_of(form, modifiers)
 			var why_not: Dictionary = {}
 			for modifier in modifiers:
 				var why: String = "deflect turns every shot that touches it first" if deflects and _shield_outrun(modifier, form.motion) else behaviour_waste(modifier.behaviour, form.motion, blasts)
 				if why.is_empty():
 					why = _numbers_waste(modifier, form.motion, blasts)
-				if why.is_empty() and modifier.behaviour == ModifierBase.Behaviour.ARC and life <= 1.0 / _strength_of(modifiers, ModifierBase.Behaviour.ARC):
-					why = "it ends before its first zap (%.2f s)" % life
 				if why.is_empty() or keep_wasted:
 					kept_modifiers.append(modifier)
 				else:
@@ -191,7 +188,7 @@ func _read_group(want: int, payload: bool) -> CompiledGroup:
 				# A trigger whose event never happens on this carrier still reads its payload, so the
 				# cards after it are read in the same order whether it fires or not; the payload is
 				# then wasted with it (rules R2b).
-				var never: String = "" if keep_wasted else _trigger_never(trigger, form, kept_elements, kept_modifiers, life)
+				var never: String = "" if keep_wasted else _trigger_never(trigger, form, kept_elements, kept_modifiers)
 				var first: int = _cast.slots.size()
 				var mana: float = _cast.mana
 				var delay: float = _cast.delay
@@ -272,7 +269,7 @@ func _means_something_there(modifier: ModifierBase, payload: bool) -> bool:
 ## it: a block needs a shield or deflect, a reaction an infusion (or relay), and a kill or reaction
 ## on a carrier that hits nothing itself needs a blast, whose area hit carries the carrier's tag.
 ## A ghost shot never meets a wall.
-func _trigger_never(trigger: TriggerBase, form: FormBase, elements: Array[ElementBase], modifiers: Array[ModifierBase], life: float) -> String:
+func _trigger_never(trigger: TriggerBase, form: FormBase, elements: Array[ElementBase], modifiers: Array[ModifierBase]) -> String:
 	var head: String = "%s does nothing on a %s" % [_name(trigger), _name(form)]
 	var why: String = trigger_why_not(trigger.event, form.motion)
 	if not why.is_empty():
@@ -289,33 +286,10 @@ func _trigger_never(trigger: TriggerBase, form: FormBase, elements: Array[Elemen
 				return "%s without a blast: %s." % [head, _hits_nothing(form.motion)]
 			if trigger.event == TriggerBase.Event.REACTION and elements.is_empty() and not has.has(ModifierBase.Behaviour.RELAY):
 				return "%s without an infusion: a hit with no element sets off no reaction." % head
-		TriggerBase.Event.TIMER:
-			if life <= trigger.interval:
-				return "%s: it ends before its first tick (%.2f s, every %.2f s)." % [head, life, trigger.interval]
 		TriggerBase.Event.WALL:
 			if has.has(ModifierBase.Behaviour.GHOST) and flies(form.motion):
 				return "%s with ghost: a ghost shot passes through walls." % head
 	return ""
-
-
-## How long a carrier of `form` with `modifiers` lives: its lifetime times their `lifetime_mult`,
-## or for ever with a hold that runs on it (it is on until switched off).
-static func _life_of(form: FormBase, modifiers: Array[ModifierBase]) -> float:
-	var life: float = form.lifetime
-	for modifier in modifiers:
-		if modifier.behaviour == ModifierBase.Behaviour.HOLD and behaviour_runs(modifier.behaviour, form.motion):
-			return INF
-		life *= modifier.lifetime_mult
-	return life
-
-
-## The summed strength of the `behaviour` cards among `modifiers`.
-static func _strength_of(modifiers: Array[ModifierBase], behaviour: int) -> float:
-	var sum: float = 0.0
-	for modifier in modifiers:
-		if modifier.behaviour == behaviour:
-			sum += modifier.behaviour_strength
-	return maxf(sum, 0.001)
 
 
 ## Why a modifier's numbers do nothing on a carrier of `motion`, or "" when one of them counts. Its
@@ -605,6 +579,12 @@ static func stays(motion: FormBase.Motion) -> bool:
 	return false
 
 
+## True for the carriers that last a while (all but a fissure, a slam and a teleport, which are
+## over at once): a timer ticks and `on hurt` listens on them while they live (rules R4d).
+static func lasts(motion: FormBase.Motion) -> bool:
+	return motion != FormBase.Motion.FISSURE and motion != FormBase.Motion.SLAM and motion != FormBase.Motion.TELEPORT
+
+
 ## True for the carriers that hit under their own tag (a shot, a beam, a fissure, a swing, a slam):
 ## a rain's payload, a dash, a teleport, a decoy and a familiar hit nothing themselves.
 static func hits(motion: FormBase.Motion) -> bool:
@@ -667,8 +647,7 @@ static func _shield_outrun(modifier: ModifierBase, motion: FormBase.Motion) -> b
 ## - on kill and on reaction: every carrier, by its hits, or by its blast's area hit on one
 ##   that hits nothing itself (dash, teleport, rain, decoy, familiar).
 ## - on hit: the carriers that hit (`hits`).
-## - timer and on hurt: only shots the projectile manager holds (`_register` keeps their clock
-##   and their hurt slot); a beam, fissure, swing, move, rain or entity has none (R4).
+## - timer and on hurt: every carrier that lasts (`lasts`), while it lives (R4d).
 ## - on block: a shot, beam, fissure or swing with a shield or deflect, and a dash's or
 ##   teleport's barrier; a rain, decoy or familiar has nothing that blocks.
 ## - on wall: a flying shot (bolt, hook, swap) at a wall it bounces off or ends on, and a beam
@@ -685,9 +664,8 @@ static func trigger_why_not(event: int, motion: FormBase.Motion) -> String:
 			if not hits(motion):
 				return _hits_nothing(motion)
 		TriggerBase.Event.TIMER, TriggerBase.Event.HURT:
-			if not stays(motion):
-				var what: String = "keeps a timer" if event == TriggerBase.Event.TIMER else "hears you get hurt"
-				return "only a shot that flies or stays %s for now" % what
+			if not lasts(motion):
+				return "it is over at once"
 		TriggerBase.Event.BLOCK:
 			if not (stays(motion) or hits(motion) or motion == FormBase.Motion.DASH or motion == FormBase.Motion.TELEPORT):
 				return "nothing on it can block a shot"

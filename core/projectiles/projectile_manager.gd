@@ -1640,11 +1640,17 @@ func get_core_of(slot: int) -> Color:
 
 # --- Behaviours of the projectile kit (staffs B1) -------------------------------------
 # Each setter takes the slot `spawn` returned, right after spawning, and returns false (and
-# does nothing) for a slot that is not a live straight shot or a bad number. Orbit and still
-# shots keep their own motion, so the travel behaviours do not apply to them.
+# does nothing) for an empty slot, a bad number, or a shot that cannot do it (rules R4h): what
+# turns or steers a flight (bounce, ghost, return, homing) needs a straight shot; what changes a
+# motion (linger, spiral, sticky) needs a shot that moves, an orbit too; growth takes any shot.
 
 func _is_flyer(slot: int) -> bool:
 	return slot >= 0 and slot < _cap and _alive[slot] != 0 and _motion[slot] == MOTION_STRAIGHT
+
+
+## A live shot that moves: a straight shot or an orbit (a still shot does not move).
+func _moves(slot: int) -> bool:
+	return slot >= 0 and slot < _cap and _alive[slot] != 0 and _motion[slot] != MOTION_STILL
 
 
 ## The shot bounces off walls `times` times instead of ending on the first (a bounce may hit
@@ -1664,14 +1670,15 @@ func set_ghost(slot: int) -> bool:
 	return true
 
 
-## The shot flies in a sine wave `width` pixels wide (SPIRAL_PERIOD seconds a wave); its centre
-## line is the straight path.
+## The shot weaves a sine wave `width` pixels wide (SPIRAL_PERIOD seconds a wave) round its path:
+## a flying shot round its straight line, an orbit shot in and out round its circle (`_pass_orbit`).
 func set_spiral(slot: int, width: float) -> bool:
-	if not _is_flyer(slot) or not (width > 0.0) or not is_finite(width):
+	if not _moves(slot) or not (width > 0.0) or not is_finite(width):
 		return false
 	_wave[slot] = width * 0.5
 	_flags[slot] |= F_WAVE
-	_join(slot, B_SPIRAL)
+	if _motion[slot] == MOTION_STRAIGHT:
+		_join(slot, B_SPIRAL)
 	return true
 
 
@@ -1685,19 +1692,20 @@ func set_return(slot: int) -> bool:
 	return true
 
 
-## The shot stops in mid-air for `seconds` when half its life is gone, then goes on.
+## The shot stops for `seconds` when half its life is gone, then goes on: a flying shot hangs in
+## mid-air, an orbit shot stops circling (it keeps to its caster).
 func set_linger(slot: int, seconds: float) -> bool:
-	if not _is_flyer(slot) or not (seconds > 0.0) or not is_finite(seconds):
+	if not _moves(slot) or not (seconds > 0.0) or not is_finite(seconds):
 		return false
 	_linger[slot] = seconds
 	_join(slot, B_LINGER)
 	return true
 
 
-## The shot's radius grows by `factor` each second of flight, until it is as big as the room
-## (`set_bounds`; nothing is bigger): a wider hit circle, the same damage. `get_growth_of` tells how much bigger it is.
+## The shot's radius grows by `factor` each second it lives, until it is as big as the room
+## (`set_bounds`; nothing is bigger): a wider hit circle (a rune's trigger circle), the same damage. `get_growth_of` tells how much bigger it is.
 func set_growth(slot: int, factor: float) -> bool:
-	if not _is_flyer(slot) or not (factor > 1.0) or not is_finite(factor):
+	if slot < 0 or slot >= _cap or _alive[slot] == 0 or not (factor > 1.0) or not is_finite(factor):
 		return false
 	_growth[slot] = factor
 	_join(slot, B_GROWTH)
@@ -1712,10 +1720,10 @@ func get_growth_of(slot: int) -> float:
 	return _radius[slot] / _radius0[slot]
 
 
-## The shot sticks to the first target it hits for `seconds`, then ends there (an expiry).
-## The hit is sent as usual, and a stuck shot hits nothing more.
+## The shot sticks to the first target it hits for `seconds`, then ends there (an expiry); an
+## orbit shot leaves its circle for it. The hit is sent as usual, and a stuck shot hits nothing more.
 func set_sticky(slot: int, seconds: float) -> bool:
-	if not _is_flyer(slot) or not (seconds > 0.0) or not is_finite(seconds):
+	if not _moves(slot) or not (seconds > 0.0) or not is_finite(seconds):
 		return false
 	_stick[slot] = seconds
 	return true
@@ -2139,7 +2147,7 @@ func _pass_hits(top: int, delta: float) -> void:
 # - growth before linger and return: a lingering shot still grows, and a returning one reaches
 #   its caster with the radius it has now.
 # - linger before return, homing and spiral: a shot that hangs still does none of them.
-# - orbit: on its own (an orbit shot has no other motion behaviour).
+# - orbit after linger: a lingering orbit stops turning; it weaves its own spiral (no spiral pass).
 # - return before homing: a shot on its way back does not home.
 # - homing before spiral: a spiral weaves round the line it turned to.
 # - a card's move last: it carries the shot on from wherever its own motion put it.
@@ -2290,11 +2298,13 @@ func _pass_linger(list: PackedInt32Array, first: int, count: int, delta: float) 
 
 ## Orbit (`spawn_orbit`): the shot turns round its caster, its velocity the tangent (for the
 ## drawing). It vanishes quietly when its caster's anchor is gone. One whose caster is a shot waits
-## for its turn, so it circles that shot where it was when the step came to it.
+## for its turn, so it circles that shot where it was when the step came to it. A lingering one
+## (S_HELD) keeps to its caster without turning; a spiral (`set_spiral`) weaves its radius.
 func _pass_orbit(list: PackedInt32Array, first: int, count: int, delta: float) -> void:
 	for n in range(first, first + count):
 		var slot: int = list[n]
-		if _state[slot] != S_MOVING:
+		var state: int = _state[slot]
+		if state != S_MOVING and state != S_HELD:
 			continue
 		var caster: int = _caster_slot[slot]
 		var centre: Vector2 = _caster_at[slot]
@@ -2308,9 +2318,11 @@ func _pass_orbit(list: PackedInt32Array, first: int, count: int, delta: float) -
 		if not centre.is_finite():
 			_state[slot] = S_GONE
 			continue
-		_orbit_angle[slot] = wrapf(_orbit_angle[slot] + _orbit_speed[slot] * delta, -PI, PI)
+		if state == S_MOVING:
+			_orbit_angle[slot] = wrapf(_orbit_angle[slot] + _orbit_speed[slot] * delta, -PI, PI)
+			_wave_age[slot] += delta
 		var away: Vector2 = Vector2.from_angle(_orbit_angle[slot])
-		_pos[slot] = centre + away * _orbit_radius[slot]
+		_pos[slot] = centre + away * (_orbit_radius[slot] + _wave[slot] * sin(TAU * _wave_age[slot] / SPIRAL_PERIOD))
 		_vel[slot] = Vector2(-away.y, away.x) * (_orbit_radius[slot] * _orbit_speed[slot])
 		_orbit_centre[slot] = centre
 

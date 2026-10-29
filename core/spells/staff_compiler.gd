@@ -542,9 +542,15 @@ static func behaviour_waste(behaviour: int, motion: FormBase.Motion, blasts: boo
 			return "" if stays(motion) else "it is not a shot that stays in the air"
 		ModifierBase.Behaviour.DEFLECT:
 			return "" if guards(motion) or motion == FormBase.Motion.HOOK or motion == FormBase.Motion.SWAP else "it touches no shots"
-		ModifierBase.Behaviour.SPIRAL, ModifierBase.Behaviour.LINGER, ModifierBase.Behaviour.GROWTH, ModifierBase.Behaviour.STICKY:
-			return "" if flies(motion) else "it only changes a shot in flight, and %s" % _what(motion)
+		ModifierBase.Behaviour.GROWTH:
+			return "" if stays(motion) else "it grows a shot in the world, and %s" % _what(motion)
+		ModifierBase.Behaviour.SPIRAL, ModifierBase.Behaviour.LINGER, ModifierBase.Behaviour.STICKY:
+			if flies(motion) or motion == FormBase.Motion.ORBIT:
+				return ""
+			return "it does not move" if stays(motion) else "it only changes a moving shot, and %s" % _what(motion)
 		ModifierBase.Behaviour.GHOST:
+			if motion == FormBase.Motion.ORBIT:
+				return "an orbit already passes walls"
 			return "" if flies(motion) else "it only takes a flying shot through walls, and %s" % _what(motion)
 		ModifierBase.Behaviour.BOUNCE:
 			if flies(motion) or motion == FormBase.Motion.RAY or motion == FormBase.Motion.FISSURE:

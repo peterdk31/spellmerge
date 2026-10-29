@@ -2188,3 +2188,11 @@ The owner: restructure the projectile step from "for each shot, check every beha
 ## 2026-10-29: Every carrier blasts at its end point (phase R, R1d)
 
 - **Rule 1, docs/milestones/M2-rules.md findings 10 and 11:** a hook that misses now blasts where it ends, as every expired shot does (before, its blast waited for an arrival that never came). A hook that hits still blasts where its caster arrives. A rain blasts where it lands, before its payload falls (before, `blast · rain` did nothing).
+
+## 2026-10-29: Hold in a payload is a hold (phase R, R1f)
+
+- **Finding 13** (docs/milestones/M2-rules.md): a `hold` carrier in a payload (`on hit · bolt · hold · orbit`) got the hold's long life but was not listed as the staff's hold. It never switched off, reserved no mana, and lived until the staff was rebuilt.
+- **One path for every firing (rule 6).** `_fire_spell` switches a hold on whenever a hold carrier made shots: the cast's own, a payload's, a burst's later firing. The cast no longer lists its holds afterwards. A held payload sets `is_holding`, so the next press switches it off and casts nothing, as for the cast's own hold.
+- **Many firings, one hold.** Every firing of one carrier has the same tag, so a payload that fires ten times is listed once, and the next press ends all its shots. The staff reserves the mana of the cast the carrier belongs to (`CompiledCast.mana`, payloads included), once, as before.
+- **It may switch on again.** A shot of the cast still in the air after the hold was switched off can fire the payload again; that switches the hold on again and reserves the mana again. It follows the rule: a held carrier is on while it lives.
+- **An old build holds nothing.** An edit (or a closed caster) switches the staff's holds off. A shot of the old build that fires its held payload later makes a carrier that lives its own lifetime, not `HOLD_LIFETIME`, because no press could end it.

@@ -145,6 +145,7 @@ const FULL_NOTE: String = "The staff is full"
 const COPY_VERB: String = "Copy code"
 const PASTE_VERB: String = "Paste code"
 const NOTHING_TO_COPY: String = "Nothing to copy"
+const CLEARED: String = "Cleared the staff"
 const CLIPBOARD_EMPTY: String = "The clipboard is empty, or the browser blocked it."
 const RESULT_TIME: float = 3.5
 const POINT_NOTE: String = "Point at a card first"
@@ -253,6 +254,8 @@ var _kinds_at: Vector2 = Vector2.ZERO
 var _codes_at: Vector2 = Vector2.ZERO
 var _names_at: Vector2 = Vector2.ZERO
 var _names_width: float = 0.0
+var _names_line: String = ""
+var _result_line: String = ""
 
 ## Button glyphs: the staff tabs (LB, RB), the hints (RT, LT, Y, B) and the kind row (d-pad).
 var _glyph_prev: ActionGlyphScript = null
@@ -481,7 +484,8 @@ func paste_code() -> void:
 	_ask_all(cards)
 	_pasting = false
 	if _result == "":
-		_report("Pasted %s" % _cards_word(_card_count(cards)), true)
+		var count: int = _card_count(cards)
+		_report(CLEARED if count == 0 else "Pasted %s" % _cards_word(count), true)
 	_changed()
 
 
@@ -1101,6 +1105,10 @@ func _refresh_hints() -> void:
 		x += glyph.custom_minimum_size.x + 2.0
 		_hint_text_x[at] = x
 		x += _text_width(_hint_verbs[at]) + 6.0
+	var names: PackedStringArray = cast_names()
+	_names_line = _fit(" / ".join(names), _names_width) if not names.is_empty() else ""
+	var shown: String = result_text()
+	_result_line = _fit(shown, _names_width) if shown != "" else ""
 	var cx: float = _codes_at.x
 	for at in _code_glyphs.size():
 		var glyph: ActionGlyphScript = _code_glyphs[at]
@@ -1426,19 +1434,17 @@ func _draw_hints() -> void:
 
 ## The names of the casts, joined, cut to the width of the ring's side.
 func _draw_names() -> void:
-	var names: PackedStringArray = cast_names()
-	if names.is_empty():
+	if _names_line == "":
 		return
-	var line: String = _fit(" / ".join(names), _names_width)
-	draw_rect(Rect2(_names_at, Vector2(_text_width(line) + 2.0, HINT_HEIGHT - 1.0)), OUTLINE)
-	_text(line, _names_at + Vector2(1.0, 0.0), GOLD)
+	draw_rect(Rect2(_names_at, Vector2(_text_width(_names_line) + 2.0, HINT_HEIGHT - 1.0)), OUTLINE)
+	_text(_names_line, _names_at + Vector2(1.0, 0.0), GOLD)
 
 
 ## The code row: its two buttons, or for a few seconds the last result in their place.
 func _draw_codes() -> void:
-	var shown: String = result_text()
-	if shown != "":
-		_text(_fit(shown, _names_width), _codes_at + Vector2(0.0, 1.0), TEXT if _result_ok else WARN)
+	if _result_line != "":
+		draw_rect(Rect2(_codes_at, Vector2(_text_width(_result_line) + 2.0, HINT_HEIGHT - 1.0)), OUTLINE)
+		_text(_result_line, _codes_at + Vector2(1.0, 1.0), TEXT if _result_ok else WARN)
 		return
 	var empty: bool = _card_count(cards_of(_viewed)) == 0
 	_text(COPY_VERB, Vector2(_code_text_x[0], _codes_at.y + 1.0), DIM if empty else TEXT)

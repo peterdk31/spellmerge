@@ -503,3 +503,40 @@ func test_the_names_of_the_casts_show_for_each_cast() -> void:
 	check_equal(radial.cast_names().size(), 1, "one cast, one name")
 	_bus.staff_cards_requested.emit(0, 1, _ids("-"))
 	check_equal(radial.cast_names().size(), 0, "no cast, no name")
+
+
+func test_a_code_with_only_gaps_clears_the_staff_and_says_so() -> void:
+	_start(1)
+	var radial: RadialScript = _open(0)
+	var board: Dictionary = _clipboard(0)
+	board["text"] = "sm1:-"
+	_tap(0, &"accept")
+	_frame()
+	check_equal(radial.cards_of(1).slice(0, 3), _ids("- - -"), "the staff is emptied")
+	check_equal(radial.result_text(), RadialScript.CLEARED, "and the row says so, not 'Pasted 0 cards'")
+
+
+func test_copy_and_paste_work_for_the_last_seat_and_stay_off_the_others() -> void:
+	_start(4)
+	var first: RadialScript = _open(0)
+	var last: RadialScript = _open(3)
+	var board_first: Dictionary = _clipboard(0)
+	var board_last: Dictionary = _clipboard(3)
+	_bus.staff_cards_requested.emit(3, 1, _ids("frost nova"))
+	_tap(0, &"alternate")
+	_frame()
+	check_equal(board_first["text"], "sm1:fire,bolt", "X for player 1 copies player 1's staff")
+	check_equal(board_last["text"], "", "and not player 4's")
+	check_equal(last.result_text(), "", "player 4's row is quiet")
+	_tap(3, &"alternate")
+	_frame()
+	check_equal(board_last["text"], "sm1:frost,nova", "X for player 4 copies player 4's staff")
+	board_last["text"] = "sm1:double,fire"
+	_tap(3, &"accept")
+	_frame()
+	check_equal(last.cards_of(1).slice(0, 3), _ids("double fire -"), "A pastes into player 4's staff")
+	check_equal(last.result_text(), "Pasted 2 cards", "player 4's row says so")
+	check_equal(first.cards_of(1).slice(0, 3), _ids("fire bolt -"), "player 1's staff is untouched")
+	_bus.build_refused.emit(3, "You do not have that card.")
+	check_equal(first.result_text(), "Copied 2 cards", "player 4's refusal does not replace player 1's row")
+	check_equal(first.note_text(), "", "nor become a note there")

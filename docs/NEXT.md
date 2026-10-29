@@ -46,11 +46,12 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 - Rime Crook and Bone Scepter (living staffs H5): moved to the bot's Queue on 2026-10-29.
 - [x] **The intro (living staffs H6).** (`gameplay/flow/`, `content/story/`) After H3.
 - [x] **The docs (living staffs H7).** (`docs/STYLE.md`, READMEs, `art/kit/`) Last.
-- [ ] **Melee: the playable mockup (melee I1).** (scratchpad, artifact) Swing, parry and deflect to feel the arc, reach, knockback and delay; the look is picked (M2-staffs.md, "Phase I: melee").
+- [x] **Melee: the playable mockup (melee I1).** Done in an owner session on 2026-10-29 (an artifact, no PR); the numbers are in M2-staffs.md, "Phase I: melee", "Tuning".
 - [ ] **Melee: the swing kit (melee I2).** (`core/spells/`, `core/projectiles/`) After I1.
 - [ ] **Melee: the deflect kit (melee I3).** (`core/projectiles/`, `core/spells/`) After I2.
 - [ ] **Card: swing (melee I4).** (`content/spells/forms/swing/`) After I2.
 - [ ] **Card: deflect (melee I5).** (`content/spells/modifiers/deflect/`) After I3 and I4.
+- [ ] **Card: slam (melee I8).** (the playground, `core/spells/`, `content/spells/forms/slam/`) After I4.
 - [ ] **Freezes in co-op (melee I7).** (`gameplay/feel/`, `core/projectiles/`) Decided by the owner on 2026-10-29: local stops, game-wide only for a downed player and a boss kill (M2-staffs.md, "Freezes in co-op").
 
 ## Blocked

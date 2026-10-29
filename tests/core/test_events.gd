@@ -54,6 +54,7 @@ const EVENTS: Dictionary = {
 	&"mana_refund_requested": [["caster", TYPE_INT], ["amount", TYPE_FLOAT]],
 	&"mana_reserved": [["player", TYPE_INT], ["amount", TYPE_FLOAT]],
 	&"shot_blocked": [["caster", TYPE_INT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT]],
+	&"shot_deflected": [["caster", TYPE_INT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT]],
 	&"shield_blocked": [["actor", TYPE_INT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT]],
 	&"kill_landed": [["caster", TYPE_INT], ["target", TYPE_OBJECT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT]],
 	&"actor_hurt": [["actor", TYPE_INT], ["amount", TYPE_INT], ["position", TYPE_VECTOR2], ["tag", TYPE_INT], ["kind", TYPE_STRING_NAME]],

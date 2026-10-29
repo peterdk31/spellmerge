@@ -56,6 +56,7 @@ const RegistryScript := preload("res://core/registry/registry.gd")
 const NO_LOOK: Dictionary = {}
 const FeelPresetScript :=preload("res://gameplay/feel/presets/feel_preset.gd")
 const FLASH_SHADER: Shader = preload("res://gameplay/feel/hit_flash.gdshader")
+const ShaderWarmupScript := preload("res://core/projectiles/shader_warmup.gd")
 ## The shot shaders Feel draws with (core/README.md, "The shot shaders"): beams; the effects'
 ## batches (flares, arcs, statuses); the sprite path of the death and afterimage copies.
 const BEAM_SHADER: Shader = preload("res://core/projectiles/shot_beam.gdshader")
@@ -384,6 +385,7 @@ func _ready() -> void:
 	_last_usec = Time.get_ticks_usec()
 	_flash_material = ShaderMaterial.new()
 	_flash_material.shader = FLASH_SHADER
+	ShaderWarmupScript.want(FLASH_SHADER, ShaderWarmupScript.RECT)
 	for i in FORM_SLOTS:
 		_forms.append(_make_beam())
 		_form_paths.append(_make_beam_path())

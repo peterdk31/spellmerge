@@ -94,6 +94,9 @@ const FAMILIAR_SIZE: float = 3.0
 ## style, a familiar an orbit shot drawn whole with its tail bent round its circle.
 const SPRITE_SHADER: Shader = preload("res://core/projectiles/shot_sprite.gdshader")
 const ORBIT_SHADER: Shader = preload("res://core/projectiles/shot_orbit.gdshader")
+## A creature's telegraph (`creature_look.gd`), compiled before the first room (shader_warmup.gd).
+const TELEGRAPH_SHADER: Shader = preload("res://gameplay/ai/telegraph.gdshader")
+const ShaderWarmupScript := preload("res://core/projectiles/shader_warmup.gd")
 const STRIDE: int = 16
 
 ## Above the room and the wizards, below the shots (`ProjectileManagerScript.DRAW_Z`): the
@@ -239,6 +242,7 @@ func _init() -> void:
 
 
 func _ready() -> void:
+	ShaderWarmupScript.want(TELEGRAPH_SHADER, ShaderWarmupScript.RECT)
 	if events == null:
 		events = get_node_or_null("/root/Events") as EventsScript
 	if projectiles == null:

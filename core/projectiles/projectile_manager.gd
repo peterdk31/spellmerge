@@ -417,6 +417,7 @@ const EMITTING_MASK: int = ((1 << (LOOK_COUNT - 1)) - 1) & ~(1 << (LOOK_WEAVE - 
 ## Build the shots from their looks (see "Drawing" above): flying shots and their trails, runes.
 const TRAIL_SHADER: Shader = preload("res://core/projectiles/shot_trail.gdshader")
 const RUNE_SHADER: Shader = preload("res://core/projectiles/shot_rune.gdshader")
+const WarmupScript := preload("res://core/projectiles/shader_warmup.gd")
 ## Draw order of the shots: above the room and the wizards. The autoload is drawn
 ## before the current scene, so at z_index 0 the room's floor hid every shot.
 const DRAW_Z: int = 50
@@ -775,6 +776,8 @@ func _ready() -> void:
 	_enemy_rune_node = _make_batch(DRAW_Z + 1, RUNE_SHADER, null)
 	_apply_textures()
 	_fit_draw_bounds()
+	# Compile every shot shader before the first room (shader_warmup.gd).
+	add_child(WarmupScript.new())
 
 
 ## One batched draw of up to `_cap` instances (TRANSFORM_2D plus a colour and custom data each)

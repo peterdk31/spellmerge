@@ -66,6 +66,7 @@ const ARC_SHADER: Shader = preload("res://core/projectiles/shot_arc.gdshader")
 const STATUS_SHADER: Shader = preload("res://core/projectiles/shot_status.gdshader")
 const SPRITE_SHADER: Shader = preload("res://core/projectiles/shot_sprite.gdshader")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
+const SwingTrailsScript := preload("res://gameplay/feel/swing_trails.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 ## Bone light: the white-hot of a plain thing (a death's ring).
 const BONE_LIGHT: Color = Color("#f4f1ea")
@@ -287,6 +288,8 @@ var _flash_material: ShaderMaterial = null
 ## The live beams (`Spells.beam_*`), one beam mesh each (`beam_mesh`), made once, and each one's
 ## path as the shader takes it (x, y and how far along the beam; `beam_path`).
 var _live_beams: Array[MeshInstance2D] = []
+## The swings' trails (`swing_trails.gd`, melee I4), drawn from `Spells`' live swings every frame.
+var _swing_trails: SwingTrailsScript = null
 var _live_paths: Array[PackedVector3Array] = []
 ## Scratch of `_thin_beam`: the points of a long path (read once, drawn from here), which of them
 ## are drawn, how sharply it turns at each, and those turns sorted.
@@ -335,6 +338,7 @@ var _effect_node: MultiMeshInstance2D = null
 var _effect_buffer: PackedFloat32Array = PackedFloat32Array()
 static var _effect_mesh: ArrayMesh = null
 static var _beam_mesh: ArrayMesh = null
+static var _swing_mesh: ArrayMesh = null
 var _arc_node: MultiMeshInstance2D = null
 var _arc_buffer: PackedFloat32Array = PackedFloat32Array()
 var _status_node: MultiMeshInstance2D = null
@@ -411,6 +415,8 @@ func _ready() -> void:
 	for i in LIVE_BEAMS:
 		_live_beams.append(_make_beam())
 		_live_paths.append(_make_beam_path())
+	_swing_trails = SwingTrailsScript.new(swing_mesh())
+	add_child(_swing_trails)
 	_form_left.resize(FORM_SLOTS)
 	_form_total.resize(FORM_SLOTS)
 	_form_body.resize(FORM_SLOTS)
@@ -521,6 +527,8 @@ func step(real_delta: float) -> void:
 	_step_forms(real_delta)
 	_step_effects(real_delta)
 	_draw_live_beams()
+	if _swing_trails != null:
+		_swing_trails.step(spells, _clock, _swing_ramp, preset.beam_alpha)
 	_step_labels(real_delta)
 	_step_statuses(real_delta)
 	_step_ghosts(real_delta)
@@ -1049,6 +1057,25 @@ static func beam_mesh() -> ArrayMesh:
 		_beam_mesh = _quads_mesh(BEAM_QUADS)
 		_beam_mesh.custom_aabb = AABB(Vector3(-100000.0, -100000.0, -1.0), Vector3(200000.0, 200000.0, 2.0))
 	return _beam_mesh
+
+
+## The mesh a swing's trail is drawn as (`SwingTrailsScript.SWING_QUADS`; Q_* in
+## `shot_swing.gdshader`), as `beam_mesh`. Made once.
+static func swing_mesh() -> ArrayMesh:
+	if _swing_mesh == null:
+		_swing_mesh = _quads_mesh(SwingTrailsScript.SWING_QUADS)
+		_swing_mesh.custom_aabb = AABB(Vector3(-100000.0, -100000.0, -1.0), Vector3(200000.0, 200000.0, 2.0))
+	return _swing_mesh
+
+
+## The swing trails (for tests).
+func swing_trails() -> SwingTrailsScript:
+	return _swing_trails
+
+
+## The shader's player for a swing of `actor` (`_beam_ramp` of its ramp).
+func _swing_ramp(actor: int) -> int:
+	return _beam_ramp(_ramp_of(actor))
 
 
 ## Make the effect batches (see "Effects" above): a MultiMesh of `effect_slots` quads in world

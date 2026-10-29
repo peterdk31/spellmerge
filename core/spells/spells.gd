@@ -2339,6 +2339,34 @@ func swing_reach(at: int) -> float:
 	return _sw_spell[at].ray_length if _sw_spell[at] != null else 0.0
 
 
+## Which swing row `at` holds: a number no other swing had, so its look knows a new swing in a
+## row used again.
+func swing_born(at: int) -> int:
+	return _sw_born[at]
+
+
+## Seconds swing `at` has run (its wind-up first), its wind-up and its sweep.
+func swing_age(at: int) -> float:
+	return _sw_age[at]
+
+
+func swing_wind(at: int) -> float:
+	return _sw_wind[at]
+
+
+func swing_sweep(at: int) -> float:
+	return maxf(_sw_spell[at].lifetime, 0.001) if _sw_spell[at] != null else 0.001
+
+
+## The tint and packed look kinds of swing `at` (`CompiledSpell.tint`, `look`), so it shows its cards.
+func swing_tint(at: int) -> Color:
+	return _sw_spell[at].tint if _sw_spell[at] != null else Color.WHITE
+
+
+func swing_look(at: int) -> int:
+	return _sw_spell[at].look if _sw_spell[at] != null else 0
+
+
 ## Live swings over every caster.
 func swing_count() -> int:
 	return _sw_on.count(1)

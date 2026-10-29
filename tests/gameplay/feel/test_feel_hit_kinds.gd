@@ -96,6 +96,15 @@ func test_a_beam_is_gentler_than_a_shot() -> void:
 	check(held > 0.0 and held < preset.hit_stop_seconds, "a shorter stop")
 
 
+func test_a_swing_holds_a_little_longer_and_shakes_the_screen_about_two_pixels() -> void:
+	# The melee playground's numbers (owner, 2026-10-29): a 0.05 s local stop, a 2 px shake.
+	_hit(0, _enemy(), &"swing")
+	check(is_equal_approx(actors.held_left(0), 0.05), "a 0.05 s stop: %f" % actors.held_left(0))
+	var pixels: float = feel.trauma() * feel.trauma() * preset.max_shake_pixels
+	check(pixels > 1.5 and pixels < 2.5, "about 2 px of shake: %f" % pixels)
+	check_equal(feel.stop_left, 0.0, "it does not stop the whole game")
+
+
 func test_a_hit_with_no_kind_feels_like_a_shot() -> void:
 	bus.damage_dealt.emit(0, _enemy(), 5, Vector2.ZERO)
 	check(is_equal_approx(actors.held_left(0), preset.hit_stop_seconds), "the old default")

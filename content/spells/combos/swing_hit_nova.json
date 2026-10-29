@@ -1,0 +1,9 @@
+{
+	"id": "swing_hit_nova",
+	"name": "Swing hit nova",
+	"does": "Every imp the swing strikes sets off a frost nova, so an imp standing beside the caster, out of the arc, is chilled too.",
+	"casts": [{"staff": 0, "cards": ["on_hit", "swing", "frost", "nova"]}],
+	"imps": [[20, 0], [10, 40]],
+	"seconds": 1.0,
+	"checks": [{"kind": "status", "imps": [1], "status": "chill"}]
+}

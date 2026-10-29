@@ -73,10 +73,11 @@ const STATIC: StringName = &"static"
 ## The id a discharge is announced with on `reaction_triggered`, at each actor it hits.
 const DISCHARGE: StringName = &"discharge"
 
-## The kinds of a hit (M2-staffs.md, "Self-harm and hits"). A shot or beam of a spell, an area
-## hit (blast, a fallback), a reaction's damage, damage over time, and a heal.
+## The kinds of a hit (M2-staffs.md, "Self-harm and hits"). A shot, beam or swing of a spell, an
+## area hit (blast, a fallback), a reaction's damage, damage over time, and a heal.
 const KIND_SHOT: StringName = &"shot"
 const KIND_RAY: StringName = &"ray"
+const KIND_SWING: StringName = &"swing"
 const KIND_BURST: StringName = &"burst"
 const KIND_REACTION: StringName = &"reaction"
 const KIND_STATUS: StringName = &"status"
@@ -86,6 +87,7 @@ const KIND_HEAL: StringName = &"heal"
 const KIND_NAMES: Dictionary = {
 	KIND_SHOT: "Shot",
 	KIND_RAY: "Beam",
+	KIND_SWING: "Swing",
 	KIND_BURST: "Blast",
 	KIND_REACTION: "Reaction",
 	KIND_STATUS: "Burn",

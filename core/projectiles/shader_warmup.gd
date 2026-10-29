@@ -25,7 +25,7 @@ const BATCH: int = 0
 const MESH: int = 1
 const RECT: int = 2
 ## The shot shaders by how they are drawn: batches of instances (TRANSFORM_2D, a colour and
-## custom data each), one mesh each (`Feel`'s beams), sprites (deaths, ghosts, staffs).
+## custom data each), one mesh each (`Feel`'s beams and swing trails), sprites (deaths, ghosts, staffs).
 const BATCH_SHADERS: Array[Shader] = [
 	preload("res://core/projectiles/shot_trail.gdshader"),
 	preload("res://core/projectiles/shot_effect.gdshader"),
@@ -36,6 +36,7 @@ const BATCH_SHADERS: Array[Shader] = [
 ]
 const MESH_SHADERS: Array[Shader] = [
 	preload("res://core/projectiles/shot_beam.gdshader"),
+	preload("res://core/projectiles/shot_swing.gdshader"),
 ]
 const RECT_SHADERS: Array[Shader] = [
 	preload("res://core/projectiles/shot_sprite.gdshader"),

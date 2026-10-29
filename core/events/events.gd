@@ -110,7 +110,7 @@ signal enemy_died(killer: int, enemy: Node, position: Vector2)
 signal shield_blocked(actor: int, position: Vector2, tag: int)
 ## Sender: combat. A hit of the actor `caster` with `tag` killed `target` at `position`. Heard by core/spells (on kill).
 signal kill_landed(caster: int, target: Node, position: Vector2, tag: int)
-## Sender: combat. The actor `actor` took `amount` damage at `position` from a hit with `tag` (a spell's tag, whose `SpellTag.caster_of` is the actor that cast it; 0 for contact damage and a reaction's damage) of kind `kind` (`&"shot"`, `&"ray"`, `&"burst"`, `&"reaction"`, `&"status"`; a burn tick is not a hit, so it is not sent here). Heard by core/spells (on hurt: the hurt actor's own carriers fire).
+## Sender: combat. The actor `actor` took `amount` damage at `position` from a hit with `tag` (a spell's tag, whose `SpellTag.caster_of` is the actor that cast it; 0 for contact damage and a reaction's damage) of kind `kind` (`&"shot"`, `&"ray"`, `&"swing"`, `&"burst"`, `&"reaction"`, `&"status"`; a burn tick is not a hit, so it is not sent here). Heard by core/spells (on hurt: the hurt actor's own carriers fire).
 signal actor_hurt(actor: int, amount: int, position: Vector2, tag: int, kind: StringName)
 ## Sender: combat. A hit of the actor `caster` with `tag` on `target` at `position` set off the reaction `reaction_id`. Heard by core/spells (on reaction); feel keeps `reaction_triggered`.
 signal reaction_landed(caster: int, reaction_id: StringName, target: Node, position: Vector2, tag: int)
@@ -124,7 +124,7 @@ signal possess_requested(caster: int, target: int, seconds: float, tag: int)
 signal possess_started(caster: int, actor: int)
 ## Sender: actor. The possession of the actor `actor` by the controller whose home body is `caster` ended (time up, the actor down or dead, a newer possession); the actor has its own controller back. Heard by feel (a ring going out).
 signal possess_ended(caster: int, actor: int)
-## Sender: combat. Just before `damage_dealt`: the hit of the actor `caster` on `target` for `amount` is of `kind` (`&"shot"`, `&"ray"`, `&"burst"`, `&"reaction"`, `&"status"`, and `&"heal"` for a heal). A wizard's contact hit counts as `&"shot"`. A wizard hit by their own spell has `caster` equal to their own actor id. Heard by feel.
+## Sender: combat. Just before `damage_dealt`: the hit of the actor `caster` on `target` for `amount` is of `kind` (`&"shot"`, `&"ray"`, `&"swing"`, `&"burst"`, `&"reaction"`, `&"status"`, and `&"heal"` for a heal). A wizard's contact hit counts as `&"shot"`. A wizard hit by their own spell has `caster` equal to their own actor id. Heard by feel.
 signal hit_landed(caster: int, target: Node, amount: int, position: Vector2, kind: StringName)
 ## Sender: combat. A heal hit of the actor `caster` gave the wizard `target` `amount` health at `position`. Heard by player and feel.
 signal heal_dealt(caster: int, target: Node, amount: int, position: Vector2)

@@ -1,0 +1,9 @@
+{
+	"id": "swing_fire_arc",
+	"name": "Swing fire arc",
+	"does": "A fire swing sweeps through the three imps in front of the caster and sets every one alight, while the imp behind the caster is not touched.",
+	"casts": [{"staff": 0, "cards": ["fire", "swing"]}],
+	"imps": [[16, -12], [20, 0], [16, 12], [-20, 0]],
+	"seconds": 1.0,
+	"checks": [{"kind": "status", "imps": [0, 1, 2], "status": "burn"}, {"kind": "lost_at_most", "imps": [3], "max": 0}]
+}

@@ -7,6 +7,7 @@
 script = ExtResource("1_base")
 id = &"heavy"
 display_name = "Heavy"
+name_words = PackedStringArray("Weighty", "Hulking")
 complexity = 2
 icon = ExtResource("2_icon")
 speed_mult = 0.6

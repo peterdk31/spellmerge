@@ -7,6 +7,7 @@
 script = ExtResource("1_base")
 id = &"wall"
 display_name = "Wall"
+name_words = PackedStringArray("Wall", "Rampart")
 complexity = 2
 icon = ExtResource("2_icon")
 base_damage = 3

@@ -7,6 +7,7 @@
 script = ExtResource("1_base")
 id = &"relay"
 display_name = "Relay"
+name_words = PackedStringArray("Passing", "Relaying")
 complexity = 2
 icon = ExtResource("2_icon")
 behaviour = 18

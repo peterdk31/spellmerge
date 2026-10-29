@@ -7,6 +7,7 @@
 script = ExtResource("1_base")
 id = &"hook"
 display_name = "Hook"
+name_words = PackedStringArray("Hook", "Tug")
 complexity = 2
 icon = ExtResource("2_icon")
 base_damage = 1

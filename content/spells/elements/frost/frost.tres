@@ -8,6 +8,7 @@ script = ExtResource("1_base")
 id = &"frost"
 demo = true
 display_name = "Frost"
+name_words = PackedStringArray("Frost", "Rime")
 complexity = 1
 icon = ExtResource("2_icon")
 status_id = &"chill"

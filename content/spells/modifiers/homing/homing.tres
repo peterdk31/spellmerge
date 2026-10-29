@@ -8,6 +8,7 @@ script = ExtResource("1_base")
 id = &"homing"
 demo = true
 display_name = "Homing"
+name_words = PackedStringArray("Seeking", "Nosy")
 complexity = 2
 icon = ExtResource("2_icon")
 damage_mult = 0.9

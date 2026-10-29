@@ -14,7 +14,6 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
 - [x] **The old recipe path removed (staffs A6c).** Done in an owner session: `Spells.compile(recipe)`, `builder_view`, the recipe wrappers (`install`, `cast`, a spell's `begin_generation`) and the recipe compiler are gone, `begin_generation` takes a compiled staff; `CompiledSpell` lost `valid`, `reason`, `description`, `complexity`, `depth` and `held`; `SpellLimits` keeps only engine safeguards and tuning; the events `build_change_requested`, `spell_swap_requested`, `spell_changed`, `recipe_changed` and `active_spell_changed` are removed; tests build staffs (`tests/support/staff_kit.gd` turns the old recipe shorthand into card rows; `test_spell_tags.gd` replaces `test_spells_compile.gd`); the spells, core and gameplay READMEs say so. **Phase B and the cards can start; development is unpaused.**
 - [x] **Card: arc (staffs C).** After the slow, return and arc kit (owner, 2026-10-27). Data only.
 - [x] **Card: linger (staffs C).** After B1. Data only (M2-staffs.md, "Working in parallel").
-- [ ] **Spell names (staffs E1).** (`core/spells/`, `hud/builder/`) After A6c and B8 (B8 rewrites `hud/builder/` in an owner session; owner, 2026-10-26). A name for every cast, generated from its cards (owner's idea): see M2-staffs.md, "The builder" and part E1.
 - [ ] **The existing cards' looks and numbers (staffs C0).** (`content/spells/`) After B6a and B6b.
 - [ ] **Bots and the emergent combo report (staffs D1).** (`tests/bots/`, `docs/LOG.md`) After A6c; the report gets richer as cards land.
 - [ ] **Staff codes (staffs D2).** (`hud/`, `core/spells/`) After B7 and B8. Moved to the bot's queue by the owner on 2026-10-26.
@@ -54,6 +53,8 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 ## Blocked
 
 ## Done recently
+
+- [x] **Spell names (staffs E1).** `SpellNamer` (`core/spells/`) names every cast from its cards; `name_words` on every card's `.tres`; `Spells.staff_view` gives each cast's `name`; the list builder's plan shows it above each cast. Tests: `tests/core/test_spell_names.gd`, `test_builder.gd`. The radial builder and the staff codes (D2) do not show names yet; the combo report (D1) can read `name` from the view.
 
 - [x] **Builder tabs show button glyphs (staffs B8 leftover).** (`hud/builder/`) Each staff tab draws its `staff_1` to `staff_4` glyph (`ActionGlyph`) for its player's device, redrawn live on `glyph_kind_changed`; the shown staff keeps its "[ ]" mark around the glyph. Test: `test_builder.gd` (glyph actions, live device change, glyph placement, four builders still fit 640x360); shots `builder_four_players`, `builder_keyboard_tabs`.
 - [x] **Card: familiar (staffs C).** `content/spells/forms/familiar/` (`FormBase`, motion FAMILIAR, 8 s, 6 mana, 8 s cooldown, icon, `assets.json`), the lore entry, the combos `familiar_bolt` and `familiar_and_frost`, and `tests/content/spells/test_familiar.gd`. The engine side was built in B2 and B5.

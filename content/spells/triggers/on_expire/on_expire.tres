@@ -8,6 +8,7 @@ script = ExtResource("1_base")
 id = &"on_expire"
 demo = true
 display_name = "On Expire"
+name_words = PackedStringArray("Farewell", "Final")
 complexity = 1
 icon = ExtResource("2_icon")
 event = 1

@@ -8,6 +8,7 @@ script = ExtResource("1_base")
 id = &"on_hit"
 demo = true
 display_name = "On Hit"
+name_words = PackedStringArray("Sudden", "Surprise")
 complexity = 1
 icon = ExtResource("2_icon")
 event = 0

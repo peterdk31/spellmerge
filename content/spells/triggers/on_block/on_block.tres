@@ -7,6 +7,7 @@
 script = ExtResource("1_base")
 id = &"on_block"
 display_name = "On Block"
+name_words = PackedStringArray("Defiant", "Stubborn")
 complexity = 1
 icon = ExtResource("2_icon")
 event = 3

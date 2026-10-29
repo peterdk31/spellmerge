@@ -8,6 +8,7 @@ script = ExtResource("1_base")
 id = &"faster"
 demo = true
 display_name = "Faster"
+name_words = PackedStringArray("Zippy", "Speedy")
 complexity = 1
 icon = ExtResource("2_icon")
 speed_mult = 1.5

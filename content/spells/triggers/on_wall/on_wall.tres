@@ -7,6 +7,7 @@
 script = ExtResource("1_base")
 id = &"on_wall"
 display_name = "On Wall"
+name_words = PackedStringArray("Rebounding", "Bumped")
 complexity = 1
 icon = ExtResource("2_icon")
 event = 6

@@ -7,6 +7,7 @@
 script = ExtResource("1_base")
 id = &"on_cast"
 display_name = "On Cast"
+name_words = PackedStringArray("Instant", "Eager")
 complexity = 1
 icon = ExtResource("2_icon")
 event = 5

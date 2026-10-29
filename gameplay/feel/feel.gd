@@ -152,9 +152,8 @@ const KIND_PUFF: int = 12
 const KIND_CHIPS: int = 13
 const KIND_ARC: int = 14
 const KIND_STATUS: int = 15
-## The ground struck (the cue `quake`: a slam's impact, or any carrier whose impact look says
-## `quake`): cracks cooling from white-hot, rubble and dust, drawn by
-## the flares' shader in a batch of its own under the bodies (`FLOOR_Z`). Below KIND_BURST, where
+## The ground struck (a part of the cues `quake` and `slam`): cracks cooling from white-hot,
+## rubble and dust, drawn by the flares' shader in a batch of its own under the bodies (`FLOOR_Z`). Below KIND_BURST, where
 ## the shots' kinds are, which never come to that shader.
 const KIND_QUAKE: int = 3
 ## The look bit that makes an effect take its colour exactly (a reaction's own colour) instead
@@ -212,8 +211,12 @@ const CUE_EFFECTS: Dictionary = {
 const FOREVER: float = 1.0e9
 const BURST_SECONDS: float = 0.3
 const RING_SECONDS: float = 0.22
-## How big a rain's marker ring is (its zoom: GRID x zoom pixels across).
-const RAIN_MARK_ZOOM: int = 2
+## The moments `form_shown` names that are a cue each (`content/cues`), played with its `length`
+## as the cue's size: a nova's ring leaving the caster, and the telegraph of a rain or of a slam
+## winding up (a ring closing on where it falls or strikes for the `length` seconds until then, so
+## nobody is hit by one they could not see coming). A slam's impact (`slam`) plays the cue its
+## card's impact look names.
+const FORM_CUES: Dictionary = {&"nova": &"nova", &"rain": &"telegraph", &"slam_mark": &"telegraph"}
 const RUNE_BURST_SECONDS: float = 0.45
 const CAST_SECONDS: float = 0.14
 ## A dash's dust where it left (its way is the caster's trail, drawn by the projectile manager
@@ -1096,9 +1099,8 @@ func _on_shot_blocked(caster: int, position: Vector2, _tag: int) -> void:
 ## The payoff of a shot: a flare in the shot's colour, shaped by the form of the shot itself
 ## (the projectile manager's `impact_form` while the impact is sent; a rune goes off, a nova's
 ## adds a ring), in its caster's `ramp`: an enemy's lands the same way, in the enemy ramp where a
-## hat colour would show (staffs F7: one look for every spell). A carrier whose impact look says
-## `quake` strikes the ground where it ends on no body (`on_body` false), out to its card's radius
-## times the quake.
+## hat colour would show (staffs F7: one look for every spell). A carrier whose impact look names
+## a `cue` plays it where it ends on no body (`on_body` false), as big as its card's radius.
 func _show_impact(caster: int, ramp: int, position: Vector2, direction: Vector2, on_body: bool) -> void:
 	var form: StringName = &""
 	if projectiles != null and "impact_form" in projectiles:
@@ -1117,16 +1119,15 @@ func _show_impact(caster: int, ramp: int, position: Vector2, direction: Vector2,
 	show_effect(KIND_BURST, position, direction, core, ramp, bits, zoom, BURST_SECONDS)
 	if look.get("ring", false) as bool:
 		show_effect(KIND_RING_OUT, position, direction, core, ramp, 0, 1, RING_SECONDS)
-	var quake: float = look.get("quake", 0.0) as float
-	if quake > 0.0 and not on_body:
-		play_cue(&"quake", caster, position, direction, (look.get("radius", 0.0) as float) * quake, core, bits)
+	if look.has("cue") and not on_body:
+		play_cue(StringName(look["cue"]), caster, position, direction, look.get("radius", 0.0) as float, core, bits)
 
 
 ## Play the cue `id` (a `CueBase`, `content/cues/<id>.tres`; `cue_shown` calls this) at `at`, set
 ## off by `caster` (NONE for none: the enemy ramp; its body is where `away` punches from) along
-## `dir`, `size` pixels big (what a part's `reach` is times), in its ramp with `tint` (as
-## `show_effect`'s `core`) and the cards of the packed `look`, on `target` (an actor, for
-## `hold_target`). Draws its parts, then its weight: holds, the game-wide stop, shake and punch
+## `dir`, `size` pixels big (what a part's `reach` is times; the seconds a `lasts_size` part
+## lasts), in its ramp with `tint` (as `show_effect`'s `core`) and the cards of the packed `look`,
+## on `target` (an actor, for `hold_target`). Draws its parts, then its weight: holds, the game-wide stop, shake and punch
 ## (both off with the screen shake setting) and its sound. An unknown cue plays nothing.
 func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.ZERO, size: float = 0.0, tint: Color = Color.WHITE, look: int = 0, target: int = ActorsScript.NONE) -> void:
 	if not at.is_finite() or caster < ActorsScript.NONE or caster >= ActorsScript.ACTORS:
@@ -1140,6 +1141,11 @@ func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.Z
 		var row: Array = CUE_EFFECTS.get(StringName(part.get("effect", "")), []) as Array
 		if row.is_empty() or (bool(part.get("particles", false)) and not particles_enabled):
 			continue
+		var seconds: float = float(part.get("seconds", row[2]))
+		if bool(part.get("lasts_size", false)):
+			if size <= 0.0:
+				continue
+			seconds = size
 		var zoom: int = int(part.get("zoom", 1))
 		if part.has("reach"):
 			zoom = roundi(size * float(part["reach"]) / float(row[1]))
@@ -1152,11 +1158,11 @@ func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.Z
 			&"up":
 				way = Vector2.UP
 		if part.has("color"):
-			show_effect(int(row[0]), at, way, part["color"] as Color, 0, EXACT, zoom, float(part.get("seconds", row[2])))
+			show_effect(int(row[0]), at, way, part["color"] as Color, 0, EXACT, zoom, seconds)
 		elif bool(part.get("plain", false)):
-			show_effect(int(row[0]), at, way, Color.WHITE, 0, 0, zoom, float(part.get("seconds", row[2])))
+			show_effect(int(row[0]), at, way, Color.WHITE, 0, 0, zoom, seconds)
 		else:
-			show_effect(int(row[0]), at, way, tint, ramp, look, zoom, float(part.get("seconds", row[2])))
+			show_effect(int(row[0]), at, way, tint, ramp, look, zoom, seconds)
 	var table: ActorsScript = _actor_table()
 	if table != null:
 		var held: bool = cue.hold > 0.0 and _hold_actor(table, caster, cue.hold, true)
@@ -1630,8 +1636,8 @@ func _form_look(form: StringName, cast: bool) -> Dictionary:
 	var card: Resource = registry.get_resource(&"spells", form)
 	if card is FormBase:
 		look = ((card as FormBase).cast_look if cast else (card as FormBase).impact_look).duplicate()
-		# A quake reaches as far as the card's radius times itself.
-		if look.has("quake"):
+		# Its cue is as big as the card's radius.
+		if look.has("cue"):
 			look["radius"] = (card as FormBase).radius
 	cache[form] = look
 	return look
@@ -1654,37 +1660,22 @@ func _on_spell_cast(player: int, spell_id: StringName, origin: Vector2, directio
 		_kick = (_kick - direction.normalized() * preset.cast_kick_pixels).limit_length(MAX_KICK_PIXELS)
 
 
-## A beam (drawn by `shot_beam.gdshader` in the element's ramp), a nova's ring, a dash and
-## a rain's marker (effects), each with the cast's cards, in the caster's ramp: an enemy's look
-## the same, in the enemy ramp (staffs F7). A rain's marker is a ring closing on the point for as long as
-## the rain takes to fall (`length` seconds), so nobody is hit by a rain they could not see.
+## A beam (drawn by `shot_beam.gdshader` in the element's ramp), a dash, and the moments that are
+## cues (FORM_CUES, and a slam's impact), each with the cast's cards, in the caster's ramp: an
+## enemy's look the same, in the enemy ramp (staffs F7). The beam and the dash keep state of their
+## own (a beam's slot while it fades, where a dash left until it lands), so they stay in code.
 func _on_form_shown(caster: int, form: StringName, origin: Vector2, direction: Vector2, length: float, tint: Color, look: int) -> void:
 	if caster < ActorsScript.NONE or caster >= ActorsScript.ACTORS or not origin.is_finite():
 		return
-	var ramp: int = _ramp_of(caster)
-	if form == &"slam_mark":
-		# A slam winding up (melee I8): a ring closing on where it will strike, for the seconds until
-		# then, so nobody is hit by a slam they could not see coming.
-		if length > 0.0:
-			show_effect(KIND_RING_IN, origin, Vector2.RIGHT, tint, ramp, look, RAIN_MARK_ZOOM, length)
-		return
+	var cue: StringName = FORM_CUES.get(form, &"") as StringName
 	if form == &"slam":
-		# Its impact: a white-hot star (no ring, owner 2026-10-29: it looked too uniform), and the
-		# ground struck out to its radius (`length`) when its card's impact look says `quake`.
-		show_effect(KIND_BURST, origin, direction, tint, ramp, look, 3, BURST_SECONDS)
-		var quake: float = _form_look(form, false).get("quake", 0.0) as float
-		if quake > 0.0:
-			play_cue(&"quake", caster, origin, direction, length * quake, tint, look)
+		# A slam's impact is where its carrier ends: the cue its card's impact look names, as big as
+		# its ring (`length`).
+		cue = StringName(str(_form_look(form, false).get("cue", "")))
+	if cue != &"":
+		play_cue(cue, caster, origin, direction, length, tint, look)
 		return
-	if form == &"rain":
-		if length > 0.0:
-			show_effect(KIND_RING_IN, origin, Vector2.RIGHT, tint, ramp, look, RAIN_MARK_ZOOM, length)
-		return
-	if form == &"nova":
-		if preset.nova_seconds > 0.0:
-			var zoom: int = clampi(roundi(preset.nova_ring_size / 20.0), 1, 15)
-			show_effect(KIND_RING_OUT, origin, Vector2.RIGHT, tint, ramp, look, zoom, preset.nova_seconds)
-		return
+	var ramp: int = _ramp_of(caster)
 	if form == &"dash":
 		# Only its dust here: the wizard picks its way (where it walks), so its streaks and cards
 		# are its trail, and the ring comes where it lands.

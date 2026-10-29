@@ -127,11 +127,8 @@ extends Resource
 ## `form_shown`, tinted like the bolt.
 @export var beam_texture: Texture2D = preload("res://art/vfx/beam.svg")
 @export var nova_texture: Texture2D = preload("res://art/vfx/nova_ring.svg")
-## How long a beam stays on screen, and how long a nova ring takes to grow to
-## `nova_ring_size` pixels across.
+## How long a beam stays on screen (a nova's ring is the cue `nova`, `content/cues`).
 @export_range(0.0, 0.5, 0.01) var beam_seconds: float = 0.25
-@export_range(0.0, 1.0, 0.01) var nova_seconds: float = 0.25
-@export_range(8.0, 400.0, 1.0) var nova_ring_size: float = 120.0
 ## How much wider a beam's rim and glow are in its first moments (1.0 is twice as wide).
 @export_range(0.0, 3.0, 0.1) var beam_flare: float = 1.0
 ## The share of a beam's life the extra width lasts (0.2 is the first fifth).

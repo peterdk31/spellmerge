@@ -127,10 +127,9 @@ var _pose_packed: bool = false
 ## outwards; negative gathers inwards) and `ring` (the nova ring art instead of the spark).
 @export var cast_look: Dictionary = {}
 ## The same keys for the flare where this carrier's shot ends or hits (an empty one gets the wall
-## spark), and `quake`: the ground struck where it lands (the cue `quake`: cracks cooling
-## from white-hot, rubble, dust, a punch), out to `radius` times this, where a shot ends on no body
-## and at a slam's impact. A new carrier brings its looks in its own `.tres`; Feel's preset has
-## none of them.
+## spark), and `cue`: the id of a cue (`content/cues`, e.g. `quake`, the ground struck) Feel plays
+## where the carrier ends on no body, as big as its `radius`, and at a slam's impact, as big as its
+## ring. A new carrier brings its looks in its own `.tres`; Feel's preset has none of them.
 @export var impact_look: Dictionary = {}
 
 

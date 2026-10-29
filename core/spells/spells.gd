@@ -127,9 +127,12 @@ class PendingLaunch:
 	var actor: int = 0
 	var staff: int = 0
 	var generation: int = 0
-	## The group to fire, or null for the single `spell` of an echo.
+	## The group to fire, or null for the single `spell` of an echo or a held carrier's repeat.
 	var group: CompiledGroup = null
 	var spell: CompiledSpell = null
+	## For a single `spell`: an echo's copy (half damage), and a held carrier cast again (`_repeats`).
+	var echoed: bool = false
+	var again: bool = false
 	var origin: Vector2 = Vector2.ZERO
 	var heading: Vector2 = Vector2.RIGHT
 	var source: Node = null
@@ -1025,7 +1028,9 @@ func _launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direct
 	var count: int = spell.shots
 	var made: int = 0
 	var carried: int = spell.chain_jumps if chain < 0 else chain
-	var lifetime: float = SpellLimits.HOLD_LIFETIME if _holds(spell, tag) else spell.lifetime
+	# A held carrier lives until switched off; one that repeats (`_repeats`) lives its own life each time.
+	var held: bool = _holds(spell, tag)
+	var lifetime: float = SpellLimits.HOLD_LIFETIME if held and not _repeats(spell) else spell.lifetime
 	# Any carrier may move the staff (its card's `staff_pose`); a swing's and a slam's start theirs
 	# with their own wind-up, side and strike.
 	if not spell.staff_pose.is_empty() and spell.motion != FormBase.Motion.SWING and spell.motion != FormBase.Motion.SLAM:
@@ -1043,7 +1048,8 @@ func _launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direct
 	for n in count:
 		var angle: float = base + _fan_angle(n, count, spell) + _staff_spread(tag, spell)
 		var heading: Vector2 = Vector2.from_angle(angle)
-		if spell.motion == FormBase.Motion.RAY:
+		# A held fissure stays open: a beam that pierces everything on its line (`_pierce_of`).
+		if spell.motion == FormBase.Motion.RAY or (held and spell.motion == FormBase.Motion.FISSURE):
 			if _start_beam(spell, tag, actor, origin, heading, carried, prev, source, lifetime):
 				made += 1
 			continue
@@ -1056,7 +1062,7 @@ func _launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direct
 				made += 1
 			continue
 		if spell.motion == FormBase.Motion.FISSURE:
-			_shoot_ray(spell, tag, actor, origin, heading, carried, prev, source, -1.0, PIERCE_ALL, spell.echo_hit if _echo_spell == spell else null)
+			_shoot_ray(spell, tag, actor, origin, heading, carried, prev, source, -1.0, _pierce_of(spell), spell.echo_hit if _echo_spell == spell else null)
 			made += 1
 			continue
 		var slot: int = -1
@@ -1251,8 +1257,7 @@ func _launch_as(group: CompiledGroup, actor: int, staff: int, generation: int, o
 ## Rain: for each of its shots, a cue at the aim point and a launch of its payload there after
 ## its `lifetime`. The aim point is `ray_length` (or `SpellLimits.RAIN_REACH`) along the shot's
 ## heading, stopped at a wall; homing moves it onto a target near it (`_homed_place`). Returns
-## how many were set.
-## `hold` does nothing for a rain: it always falls after its `lifetime` and is no sustained carrier.
+## how many were set. A held rain falls again and again (`_repeats`).
 func _telegraph_rain(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading: Vector2) -> int:
 	var reach: float = spell.ray_length if spell.ray_length > 0.0 else SpellLimits.RAIN_REACH
 	var placed: int = 0
@@ -1460,8 +1465,9 @@ func _fire_group(group: CompiledGroup, actor: int, staff: int, generation: int, 
 
 ## One carrier of a group, launched; returns the shots made. `mirror` also sends it backwards
 ## (straight, returning and beam carriers), and `echo` schedules it once more. `echoed` is true
-## for that second firing, which hits at half damage and does not echo again.
-func _fire_spell(spell: CompiledSpell, actor: int, staff: int, generation: int, origin: Vector2, heading: Vector2, source: Node, from_caster: bool, echoed: bool) -> int:
+## for that second firing, which hits at half damage and does not echo again; on a held carrier
+## it is a second held copy. `again` is a held carrier cast again (`_repeats`): it echoes no more.
+func _fire_spell(spell: CompiledSpell, actor: int, staff: int, generation: int, origin: Vector2, heading: Vector2, source: Node, from_caster: bool, echoed: bool, again: bool = false) -> int:
 	var tag: int = SpellTag.make(actor, staff, spell.node, generation)
 	if spell.fallback != CompiledSpell.FALLBACK_NONE:
 		return _fallback_hit(spell, tag, actor, origin)
@@ -1477,6 +1483,10 @@ func _fire_spell(spell: CompiledSpell, actor: int, staff: int, generation: int, 
 	_echo_spell = null
 	if launched > 0 and _holds(spell, tag):
 		_start_hold(tag)
+		if _repeats(spell):
+			var repeat: PendingLaunch = _delay(maxf(spell.wind_up, 0.0) + spell.lifetime, null, spell, actor, staff, generation, origin, heading, source, from_caster)
+			repeat.again = true
+			repeat.echoed = echoed
 	# `on cast`: the payload leaves at once, from where the carrier did, cast by the carrier's caster.
 	if launched > 0 and spell.payload != null and spell.trigger_event == TriggerBase.Event.CAST:
 		if from_caster:
@@ -1484,8 +1494,8 @@ func _fire_spell(spell: CompiledSpell, actor: int, staff: int, generation: int, 
 		else:
 			_fire(spell.payload, actor, staff, generation, origin, heading, source, _caster)
 	var echo: float = spell.behaviour(ModifierBase.Behaviour.ECHO)
-	if launched > 0 and not echoed and echo > 0.0 and spell.behaviour(ModifierBase.Behaviour.HOLD) <= 0.0:
-		_delay(echo, null, spell, actor, staff, generation, origin, heading, source, from_caster)
+	if launched > 0 and not echoed and not again and echo > 0.0:
+		_delay(echo, null, spell, actor, staff, generation, origin, heading, source, from_caster).echoed = true
 	return launched
 
 
@@ -1538,6 +1548,8 @@ func _delay(wait: float, group: CompiledGroup, spell: CompiledSpell, actor: int,
 	var launch: PendingLaunch = _pending_free.pop_back()
 	launch.cost = 0
 	launch.landing = null
+	launch.echoed = false
+	launch.again = false
 	launch.seed = hash(Vector3i(_scatter.seed, roundi(wait * 1000.0), 0 if group != null else 1))
 	launch.due = _clock + maxf(wait, 0.0)
 	launch.actor = actor
@@ -1593,6 +1605,8 @@ func _run_pending() -> void:
 		var generation: int = launch.generation
 		var heading: Vector2 = launch.heading
 		var landing: CompiledSpell = launch.landing
+		var echoed: bool = launch.echoed
+		var again: bool = launch.again
 		_scatter.seed = launch.seed
 		_release_launch(launch)
 		var saved: int = _caster
@@ -1603,8 +1617,13 @@ func _run_pending() -> void:
 			_land_rain(landing, group, actor, staff, generation, origin, heading)
 		elif group != null:
 			_fire_group(group, actor, staff, generation, origin, heading, source, from_caster)
-		else:
-			_fire_spell(spell, actor, staff, generation, origin, heading, source, from_caster, true)
+		elif not again:
+			_fire_spell(spell, actor, staff, generation, origin, heading, source, from_caster, echoed)
+		elif _hold_tags[actor * SpellLimits.STAFFS + staff].has(SpellTag.make(actor, staff, spell.node, generation)):
+			# A held carrier cast again while it is on, along where its wizard aims now.
+			if caster == CASTER_WIZARD and _aim_dir[actor].is_finite():
+				heading = _aim_dir[actor]
+			_fire_spell(spell, actor, staff, generation, origin, heading, source, from_caster, echoed, true)
 		_caster = saved
 		_caster_seq = saved_seq
 		if keeps:
@@ -1637,10 +1656,13 @@ func _drop_pending(drops: Callable) -> void:
 		i -= 1
 
 
-## True when `launch` fires a carrier with one of `tags` (its group's own carriers, or its echo).
+## True when `launch` fires a carrier with one of `tags` (its group's own carriers, its echo, or
+## a rain of it landing).
 func _fires_any(launch: PendingLaunch, tags: PackedInt64Array) -> bool:
 	if launch.spell != null:
 		return tags.has(SpellTag.make(launch.actor, launch.staff, launch.spell.node, launch.generation))
+	if launch.landing != null and tags.has(SpellTag.make(launch.actor, launch.staff, launch.landing.node, launch.generation)):
+		return true
 	if launch.group != null:
 		for spell in launch.group.spells:
 			if tags.has(SpellTag.make(launch.actor, launch.staff, spell.node, launch.generation)):
@@ -2092,7 +2114,7 @@ func _beam_cast(at: int, hit: bool) -> void:
 	var steer: Callable = _steer_call if bounces > 0 and spell.homing_range > 0.0 else Callable()
 	_steer_row = at
 	if not hit:
-		_bm_reach[at] = projectiles.ray_points(actor, _bm_points, at * _bm_stride, _bm_count[at], spell.ray_length, spell.pierce, HITS, tag, spell.radius * 0.5, source, false, bounces, steer)
+		_bm_reach[at] = projectiles.ray_points(actor, _bm_points, at * _bm_stride, _bm_count[at], spell.ray_length, _pierce_of(spell), HITS, tag, spell.radius * 0.5, source, false, bounces, steer)
 		_bm_tip[at] = projectiles.ray_end
 		_bm_tip_dir[at] = projectiles.ray_end_heading
 		if bounces > 0:
@@ -2110,7 +2132,7 @@ func _beam_cast(at: int, hit: bool) -> void:
 	_ray_prev = _bm_prev[at]
 	_ray_hit = spell.echo_hit if _bm_echo[at] != 0 else null
 	_arc_slot = -1
-	var got: float = projectiles.ray_points(actor, _bm_points, at * _bm_stride, _bm_count[at], spell.ray_length, spell.pierce, HITS, tag, spell.radius * 0.5, source, true, bounces, steer)
+	var got: float = projectiles.ray_points(actor, _bm_points, at * _bm_stride, _bm_count[at], spell.ray_length, _pierce_of(spell), HITS, tag, spell.radius * 0.5, source, true, bounces, steer)
 	var tip: Vector2 = projectiles.ray_end
 	var tip_dir: Vector2 = projectiles.ray_end_heading
 	var turned: bool = bounces > 0 and projectiles.ray_path_count > 0
@@ -4076,12 +4098,24 @@ func _holds(spell: CompiledSpell, tag: int) -> bool:
 	return spell.behaviour(ModifierBase.Behaviour.HOLD) > 0.0 and _is_current(tag)
 
 
+## True when a held `spell` is cast again rather than kept on: a rain and a swing are over at once,
+## so while held each is cast anew every wind-up and lifetime (a rain falls again, a swing sweeps
+## back), until switched off. Its hold ends only then, not between two of them.
+static func _repeats(spell: CompiledSpell) -> bool:
+	return spell != null and (spell.motion == FormBase.Motion.RAIN or spell.motion == FormBase.Motion.SWING)
+
+
+## How many bodies `spell`'s ray passes through: a fissure all of them, a beam its pierce.
+static func _pierce_of(spell: CompiledSpell) -> int:
+	return PIERCE_ALL if spell.motion == FormBase.Motion.FISSURE else spell.pierce
+
+
 ## A sustained (`hold`) carrier made shots: it stays on and its staff reserves the mana of the
 ## cast it belongs to until it is switched off (`cast_staff` again, an edit) or its last shot ends.
 ## The same for every firing: the cast's own carrier, a payload's, a burst's later firing. The
 ## firings of one carrier share its tag, so it is listed once; a staff reserves one cast's mana.
 func _start_hold(tag: int) -> void:
-	if _live.get(tag, 0) <= 0:
+	if _live.get(tag, 0) <= 0 and not _repeats(profile(tag)):
 		return
 	var actor: int = SpellTag.caster_of(tag)
 	var index: int = actor * SpellLimits.STAFFS + SpellTag.staff_of(tag)
@@ -4131,6 +4165,7 @@ func _release_hold(index: int) -> void:
 	for tag in tags:
 		_end_beams_of(tag)
 		_end_swings_of(tag)
+		_lc_leave(tag, true)
 	if projectiles != null:
 		for tag in tags:
 			# remove_by_tag sends no shot_ended, so the counts are ended here.
@@ -4145,7 +4180,7 @@ func _end_hold_of(tag: int) -> void:
 		return
 	var index: int = SpellTag.caster_of(tag) * SpellLimits.STAFFS + SpellTag.staff_of(tag)
 	var at: int = _hold_tags[index].find(tag)
-	if at < 0:
+	if at < 0 or _repeats(profile(tag)):
 		return
 	_hold_tags[index].remove_at(at)
 	if _hold_tags[index].is_empty():

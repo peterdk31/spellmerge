@@ -31,14 +31,14 @@ func test_a_bolt_runs_every_behaviour() -> void:
 
 func test_cards_that_did_nothing_silently_are_listed() -> void:
 	# Cells the audit found silent (M2-rules.md findings 4, 5, 6, 9), now wasted with a reason.
-	for cards: Array in [["heavy", "dash"], ["chain", "teleport"], ["spiral", "rune"], ["ghost", "orbit"], ["linger", "wall"], ["ghost", "beam"], ["magnet", "beam"], ["relay", "fissure"], ["mirror", "hook"], ["siphon", "decoy"], ["shield", "rain"], ["hold", "fissure"]]:
+	for cards: Array in [["heavy", "dash"], ["chain", "teleport"], ["spiral", "rune"], ["ghost", "orbit"], ["linger", "wall"], ["ghost", "beam"], ["magnet", "beam"], ["relay", "fissure"], ["mirror", "hook"], ["siphon", "decoy"], ["shield", "rain"], ["hold", "slam"]]:
 		var staff: CompiledStaff = _staff(cards)
 		check(staff.wasted.has(0), "%s is listed as wasted: %s" % [cards, staff.wasted])
 		check(staff.wasted.has(0) and not String(staff.wasted[0]).is_empty(), "with a reason")
 
 
 func test_cards_that_work_are_not_listed() -> void:
-	for cards: Array in [["heavy", "bolt"], ["bounce", "beam"], ["chain", "swing"], ["shield", "beam"], ["mirror", "swing"], ["growth", "hook"], ["growth", "rune"], ["sticky", "orbit"], ["magnet", "rune"], ["arc", "wall"], ["blast", "rain"], ["shield", "dash"]]:
+	for cards: Array in [["heavy", "bolt"], ["bounce", "beam"], ["chain", "swing"], ["shield", "beam"], ["mirror", "swing"], ["growth", "hook"], ["growth", "rune"], ["sticky", "orbit"], ["magnet", "rune"], ["arc", "wall"], ["blast", "rain"], ["shield", "dash"], ["hold", "fissure"], ["hold", "rain"], ["hold", "swing"]]:
 		var staff: CompiledStaff = _staff(cards)
 		check(not staff.wasted.has(0), "%s counts: %s" % [cards, staff.wasted])
 

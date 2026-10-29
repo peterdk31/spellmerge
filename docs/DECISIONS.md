@@ -8,6 +8,13 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - **One seam:** `StaffCompiler.keep_wasted`, a test-only static switch that keeps every card the waste table would drop; the runtime never reads the table, so it alone decides. Costs (mana, a slower cast, less damage) are no effect and are paid by both casts.
 - **Findings:** none on main today; every W cell changes nothing when forced. Item 23 (rule 2 checks) stays in docs/BACKLOG.md.
 
+## 2026-10-29: Card rules R4e: hold (owner)
+
+- **One rule: hold keeps the carrier going until the staff is pressed again.** A carrier that lasts lives on (as before); one that is over at once is cast again every wind-up + lifetime (`Spells._repeats`): a held rain falls again every 0.8 s, a held swing sweeps back and forth, along the wizard's aim now. Its hold (and mana reservation) ends only when switched off, not between two repeats.
+- **A held fissure is a beam** with the fissure's pierce-all (`_pierce_of`, the one place a fissure's pierce lives): it stays open and hits everything on its line every beam tick. No second ray walk.
+- **Still wasted:** slam, dashes and teleport ("it is over at once"; a slam's repeat was not asked for).
+- **Echo on hold** is no longer skipped silently: the echo is a second held copy, N seconds later at half damage, switched off with the hold, reserving no extra mana (its firings share the hold's tag). A repeat does not echo again.
+
 ## 2026-10-29: Staff animations are carrier data (owner)
 
 - **Every carrier says how the staff moves** (`FormBase.staff_pose`), as it says its cast flash and impact (`cast_look`, `impact_look`): the owner asked for staff animations for slam and saw that every carrier could use the same thing for variety. One player of that data (`Spells.staff_pose` and the rest), drawn the same way by every look (`ActorLook`), so the strays play the same animations as the wizards.

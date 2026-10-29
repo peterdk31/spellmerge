@@ -220,12 +220,55 @@ func test_rain_payload_counts_as_live_until_it_ends() -> void:
 	check_equal(_spells.live_shots(tag + (1 << SpellTag.NODE_SHIFT)), 1, "the payload's shot is counted under its own node")
 
 
-func test_a_rain_with_hold_still_falls_on_time_and_is_not_held() -> void:
-	_build(0, [&"hold", &"rain", &"bolt"])
-	_cast()
-	check(not _spells.is_holding(0, 0), "a rain is no sustained carrier")
+func _rain_cues() -> int:
+	var count: int = 0
+	for shown: Array in _shown:
+		if shown[1] == &"rain":
+			count += 1
+	return count
+
+
+func test_a_held_rain_keeps_falling_until_switched_off() -> void:
+	# Rules R4e (owner, 2026-10-29): a held rain used to fall once.
+	_form(&"stone", 0.0, 10.0)
+	_build(0, [&"hold", &"rain", &"stone"])
+	var mana: float = _cast()
+	check(_spells.is_holding(0, 0), "a held rain is on")
+	check_equal(_spells.reserved_mana(0), mana, "and reserves its cast")
+	check_equal(_rain_cues(), 1, "one rain at the cast")
 	_tick(32)
-	check_equal(_mgr.get_count(), 1, "it fell after its own delay, not after the hold lifetime")
+	check_equal(_mgr.get_count(), 1, "the first fell after its own delay")
+	check_equal(_rain_cues(), 2, "and the next began as it fell")
+	_tick(30)
+	check_equal(_mgr.get_count(), 2, "the second fell a lifetime later")
+	check_equal(_rain_cues(), 3, "a third is on its way")
+	check(_spells.is_holding(0, 0), "still on between two falls")
+	check_equal(_cast(), 0.0, "the next press switches it off")
+	check(not _spells.is_holding(0, 0), "off")
+	check_equal(_spells.reserved_mana(0), 0.0, "its mana is free")
+	_tick(60)
+	check_equal(_rain_cues(), 3, "no new rain")
+	check_equal(_mgr.get_count(), 2, "and the third never fell")
+
+
+func test_a_held_fissure_stays_open_and_hits_its_whole_line_every_tick() -> void:
+	# Rules R4e (owner, 2026-10-29): a held fissure is a beam that pierces everything.
+	_build(0, [&"hold", &"fissure"])
+	for n in 3:
+		_target(Vector2(40.0 + n * 40.0, 0.0))
+	_cast()
+	check_equal(_hits.size(), 3, "all three at once")
+	check(_spells.is_holding(0, 0), "it stays open")
+	_tick(10)
+	check_equal(_hits.size(), 6, "and all three again a beam tick later")
+	check_equal(_spells.beam_count(), 1, "one live line")
+	_tick(60)
+	check(_hits.size() > 6, "still open past its lifetime")
+	_cast()
+	check_equal(_spells.beam_count(), 0, "the next press closes it")
+	var hits: int = _hits.size()
+	_tick(30)
+	check_equal(_hits.size(), hits, "and it hits no more")
 
 
 func test_familiar_asks_for_an_entity() -> void:

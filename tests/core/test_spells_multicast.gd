@@ -280,11 +280,38 @@ func test_an_echo_is_dropped_when_the_staff_is_rebuilt() -> void:
 	check_equal(_mgr.get_count(), 0, "the old build's echo never came")
 
 
-func test_a_held_carrier_does_not_echo() -> void:
+func test_a_held_carriers_echo_is_a_second_held_copy_switched_off_with_it() -> void:
+	# Rules R4e (owner, 2026-10-29): it used to be skipped silently.
+	_build(0, [&"echo", &"hold", &"bolt"])
+	var mana: float = _cast()
+	check_equal(_spells.reserved_mana(0), mana, "the hold reserves its cast")
+	_tick(30)
+	check_equal(_mgr.get_count(), 2, "the held shot and its echo")
+	check_equal(_spells.reserved_mana(0), mana, "the echo reserves nothing more")
+	_cast()
+	check_equal(_mgr.get_count(), 0, "one press switches both off")
+	_tick(30)
+	check_equal(_mgr.get_count(), 0, "and nothing comes back")
+
+
+func test_a_held_carriers_echo_hits_at_half_damage() -> void:
+	_target(Vector2(60, 0))
 	_build(0, [&"echo", &"hold", &"bolt"])
 	_cast()
+	_tick(40)
+	var damage: Array = []
+	for hit in _hits:
+		damage.append(hit[4])
+	check_equal(damage, [10, 5], "the held shot at full damage, its echo at half")
+
+
+func test_switching_a_hold_off_before_its_echo_drops_the_echo() -> void:
+	_build(0, [&"echo", &"hold", &"bolt"])
+	_cast()
+	_tick(5)
+	_spells._release_hold(0)
 	_tick(30)
-	check_equal(_mgr.get_count(), 1, "one held shot")
+	check_equal(_mgr.get_count(), 0, "the echo never came")
 
 
 func test_mirror_also_fires_backwards() -> void:

@@ -9,7 +9,6 @@
     "number": 399
   },
   "errors_in_a_row": 0,
-  "idle": null,
   "intake_tasks": {
     "208": {
       "author": "Brianmanden",
@@ -79,7 +78,13 @@
     6405166432,
     6415196364
   ],
-  "task_failures": {},
+  "task_failures": {
+    "**Card: relay (staffs C).** After B1 and B2. Data only (M2-staffs.md, \"Working in parallel\").": {
+      "count": 1,
+      "pr": "405",
+      "problems": "- The file ends after the last `<rect x=\"11\" y=\"11\" .../>` line, with no `</svg>`. I checked the committed file's last bytes, and sticky/icon.svg does end with `</svg>`. A truncated SVG is not valid XML, so Godot may fail to import it. The card's icon would then be null or broken, even though `relay.tres` references it and a committed `.import` exists. Fix: Append `</svg>` as the last line of icon.svg. Then re-run `ci/build/build.sh --quick --tests` and confirm the icon imports and the `.import` file is unchanged.\n- The Relay icon is missing a bottom outline row for the gold arrow, and its stated art structure is unverified. Because the file is truncated, it is also possible that rows after y=11 (for example the outline under the arrow, like sticky's last `y=13` rect) were cut off, so the picture may be incomplete. Fix: When you fix the closing tag, render the icon and check it at 16x16. Restore any lost rows so the arrow outline is closed."
+    }
+  },
   "usage": [
     {
       "at": "2026-10-21T07:59:42Z",

@@ -30,6 +30,9 @@ const COOP_ORIGINS: Array[Vector2] = [Vector2(0.0, -28.0), Vector2(0.0, 28.0)]
 const FOUR_ORIGINS: Array[Vector2] = [Vector2(0.0, -42.0), Vector2(0.0, -14.0), Vector2(0.0, 14.0), Vector2(0.0, 42.0)]
 const FOUR_PLAYER_CARDS: Array = [&"fire", &"frost", &"bigger", &"bolt"]
 const CROWD_CARDS: Array = [&"fire", &"frost", &"lightning", &"split", &"nova"]
+## The card a trigger's clip puts on its bolt, for a trigger whose event needs one (otherwise the
+## compiler lists it as wasted, rules R2b).
+const TRIGGER_NEEDS: Dictionary = {&"on_block": &"shield", &"on_reaction": &"fire"}
 const FOUR_PLAYER_ROUNDS: int = 3
 const FOUR_PLAYER_GAP: float = 0.6
 const FOUR_PLAYER_SECONDS: float = 3.0
@@ -105,13 +108,16 @@ static func _combo(combo: Dictionary) -> Dictionary:
 
 static func _component(id: StringName, kind: StringName, title: String) -> Dictionary:
 	# The card on a bolt: alone for a carrier, before the bolt for the others; a trigger fires a
-	# nova, a multicast pulls three bolts.
+	# nova (with the card its event needs on the bolt: a shield to block, an infusion to react),
+	# a multicast pulls three bolts.
 	var cards: Array = [id, &"bolt"]
 	match kind:
 		&"form":
 			cards = [id]
 		&"trigger":
 			cards = [id, &"bolt", &"nova"]
+			if TRIGGER_NEEDS.has(id):
+				cards.insert(1, TRIGGER_NEEDS[id])
 		&"multicast":
 			cards = [id, &"bolt", &"bolt", &"bolt"]
 	var casts: Array[Dictionary] = [_cast(0, 0, cards, 0.0)]

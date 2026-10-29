@@ -134,10 +134,78 @@ func test_while_it_swings_the_body_shows_the_swing_not_the_aim() -> void:
 	_world.input.send_virtual_aim(0, Vector2.RIGHT)
 	_world.run(1, false)
 	check_equal(look.direction(), 0, "aimed right, the right column")
-	_world.fake.swing_poses[body.id] = Vector2.from_angle(deg_to_rad(60.0))
+	_world.fake.staff_poses[body.id] = [Vector2.RIGHT, Vector3(deg_to_rad(60.0), 0.0, 0.0)]
 	_world.run(1, false)
 	check_equal(look.direction(), StaffLook.direction_of(Vector2.from_angle(deg_to_rad(60.0))), "mid-swing, the column of the swing")
 	check_equal(sprite.frame_coords.x, look.direction(), "and the sprite shows it")
-	_world.fake.swing_poses.erase(body.id)
+	_world.fake.staff_poses.erase(body.id)
 	_world.run(1, false)
 	check_equal(look.direction(), 0, "after the swing, the aim again")
+
+
+func test_a_pose_lifts_and_pushes_the_body_and_leaves_its_shadow() -> void:
+	# A slam's wind-up: risen 10 px and drawn back 5 along the aim.
+	var body := _wizard()
+	var look: StaffLook = WizardFixture.look(body)
+	var sprite := body.get_node(^"Sprite") as Sprite2D
+	_world.input.send_virtual_aim(0, Vector2.RIGHT)
+	_world.run(1, false)
+	var rest: Vector2 = sprite.position - Vector2(0.0, sprite.position.y - body.hand_offset.y)
+	_world.fake.staff_poses[body.id] = [Vector2.RIGHT, Vector3(0.0, 10.0, -5.0)]
+	_world.run(1, false)
+	check_equal(look.pose_offset(0.0), Vector2(-5.0, -10.0), "up 10, back 5")
+	check(absf(sprite.position.x - (rest.x - 5.0)) < 0.01, "the body is drawn back: %s" % sprite.position)
+	check(sprite.position.y < body.hand_offset.y - 8.0, "and risen: %s" % sprite.position)
+	var shadow := body.get_node(^"Shadow") as Node2D
+	check_equal(shadow.position, Vector2.ZERO, "its shadow stays on the floor")
+	_world.fake.staff_poses.erase(body.id)
+	_world.run(1, false)
+	check_equal(look.pose_offset(0.0), Vector2.ZERO, "back on its hover after")
+
+
+func test_a_glowing_pose_lights_the_body_in_its_colour_then_lets_go() -> void:
+	var body := _wizard()
+	var look: StaffLook = WizardFixture.look(body)
+	var sprite := body.get_node(^"Sprite") as Sprite2D
+	_world.input.send_virtual_aim(0, Vector2.RIGHT)
+	_world.run(1, false)
+	check(not look.is_glowing(sprite) and sprite.material == null, "no glow at rest")
+	_world.fake.staff_poses[body.id] = [Vector2.RIGHT, Vector3(0.0, 10.0, -5.0), 0.8]
+	_world.run(1, false)
+	check(look.is_glowing(sprite), "glowing while the pose does")
+	var material := sprite.material as ShaderMaterial
+	check(is_equal_approx(material.get_shader_parameter(&"sprite_glow") as float, 0.8 * StaffLook.POSE_GLOW), "as strongly as the pose says")
+	check((material.get_shader_parameter(&"glow_color") as Color).is_equal_approx(look.light_color()), "in its ramp's colour")
+	check_equal((material.get_shader_parameter(&"core_override") as Color).a, 0.0, "keeping the staff's own colours")
+	_world.fake.staff_poses.erase(body.id)
+	_world.run(1, false)
+	check(not look.is_glowing(sprite) and sprite.material == null, "the sprite is given back after")
+
+
+func test_a_pose_stretches_the_body_and_shows_its_mood() -> void:
+	var body := _wizard()
+	var look: StaffLook = WizardFixture.look(body)
+	var sprite := body.get_node(^"Sprite") as Sprite2D
+	_world.input.send_virtual_aim(0, Vector2.RIGHT)
+	_world.run(1, false)
+	_world.fake.staff_poses[body.id] = [Vector2.RIGHT, Vector3.ZERO, 0.0, 0.25, &"angry"]
+	_world.run(1, false)
+	check(sprite.scale.x > 1.2 and sprite.scale.y < 0.85, "longer along the aim, thinner across: %s" % sprite.scale)
+	var face: Face = null
+	for child in body.get_children():
+		if child is Face:
+			face = child as Face
+	check(face != null and face.mood() == Face.Mood.ANGRY, "the face shows the pose's mood")
+	_world.fake.staff_poses.erase(body.id)
+	_world.run(1, false)
+	check_equal(sprite.scale, Vector2.ONE, "its scale back after")
+
+
+func test_an_infused_glow_takes_the_infusions_colour() -> void:
+	var body := _wizard()
+	var sprite := body.get_node(^"Sprite") as Sprite2D
+	_world.input.send_virtual_aim(0, Vector2.RIGHT)
+	_world.fake.staff_poses[body.id] = [Vector2.RIGHT, Vector3.ZERO, 0.8, 0.0, &"", Color("e0592f")]
+	_world.run(1, false)
+	var material := sprite.material as ShaderMaterial
+	check(material != null and (material.get_shader_parameter(&"glow_color") as Color).is_equal_approx(Color("e0592f")), "a fire charge glows fire")

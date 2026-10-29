@@ -24,5 +24,6 @@ ray_length = 24.0
 arc = 90.0
 wind_up = 0.12
 knockback = 240.0
+staff_pose = Array[Dictionary]([{"phase": "wind", "at": 1.0, "turn": -67.5, "ease": "out"}, {"phase": "strike", "at": 1.0, "turn": 67.5}, {"phase": "after", "at": 0.08, "turn": 67.5}, {"phase": "after", "at": 0.38}])
 cast_look = {"seconds": 0.1, "size": 0.4, "stretch": 1.0, "aim": true, "grow": -0.2}
 impact_look = {"seconds": 0.12, "size": 0.4, "stretch": 1.4, "aim": true, "grow": 0.3}

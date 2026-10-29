@@ -61,6 +61,8 @@ func before_each() -> void:
 	_swing.wind_up = 0.12
 	_swing.cooldown = 0.05
 	_swing.knockback = 240.0
+	# The swing card's staff animation: lean back past the arc, sweep past its end, hold, settle.
+	_swing.staff_pose = [{"phase": "wind", "at": 1.0, "turn": -67.5, "ease": "out"}, {"phase": "strike", "at": 1.0, "turn": 67.5}, {"phase": "after", "at": 0.08, "turn": 67.5}, {"phase": "after", "at": 0.38}] as Array[Dictionary]
 	_put(_swing, &"swing")
 	var blast := ModifierBase.new()
 	blast.behaviour = ModifierBase.Behaviour.BLAST
@@ -269,15 +271,31 @@ func test_its_blast_goes_off_at_the_end_of_the_arc() -> void:
 func test_the_body_pose_leans_sweeps_holds_and_settles() -> void:
 	_build()
 	_spells.set_aim(0, Vector2.ZERO, Vector2.RIGHT)
-	check_equal(_spells.swing_pose(0), Vector2.ZERO, "no pose before a swing")
+	check_equal(_spells.staff_pose_dir(0), Vector2.ZERO, "no pose before a swing")
 	_cast()
 	_tick(6)
-	var leaning: Vector2 = _spells.swing_pose(0)
-	check(leaning.angle() < -deg_to_rad(45.0), "during the wind-up it leans back past the arc's start (%s)" % str(rad_to_deg(leaning.angle())))
+	var leaning: float = _pose_angle()
+	check(leaning < -45.0, "during the wind-up it leans back past the arc's start (%s)" % leaning)
 	_tick(6)
-	check(_spells.swing_pose(0).angle() > deg_to_rad(45.0), "after the sweep it holds past the arc's end")
+	check(_pose_angle() > 45.0, "after the sweep it holds past the arc's end (%s)" % _pose_angle())
 	_tick(40)
-	check_equal(_spells.swing_pose(0), Vector2.ZERO, "then it settles back onto the aim")
+	check_equal(_spells.staff_pose_dir(0), Vector2.ZERO, "then it settles back onto the aim")
+
+
+func test_a_chained_backhand_starts_where_the_forehand_ended() -> void:
+	_build()
+	_spells.set_aim(0, Vector2.ZERO, Vector2.RIGHT)
+	_cast()
+	_tick(12)
+	var ended: float = _pose_angle()
+	_tick(6)
+	_cast()
+	check(absf(_pose_angle() - ended) < 1.0, "no jump: %s then %s" % [ended, _pose_angle()])
+
+
+## Degrees the body's staff points off right now (its animation's turn on its locked aim).
+func _pose_angle() -> float:
+	return rad_to_deg(_spells.staff_pose_dir(0).rotated(_spells.staff_pose(0).x).angle())
 
 
 func test_the_split_swings_of_one_cast_turn_the_same_way() -> void:

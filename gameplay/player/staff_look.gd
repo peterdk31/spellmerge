@@ -37,7 +37,6 @@ extends ActorLook
 ## It redraws only when something drawn changed. Nothing here allocates per step (the ghosts are
 ## made the first time they are needed).
 
-const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 
 ## The head sheets: 48x48 frames, DIRECTIONS columns, one row per ramp (0-3), the grip at GRIP.
 const FRAME_SIZE: int = 48
@@ -63,8 +62,6 @@ const DASH_LEAN: float = 0.1
 const GHOST_INTERVAL: float = 0.04
 const GHOST_DISSOLVE: Array[float] = [0.2, 0.45, 0.7]
 const GHOST_GLOW: float = 0.7
-## The shots' sprite shader (core/README.md, "The shot shaders"): the ghosts' dissolve and glow.
-const SPRITE_SHADER: Shader = preload("res://core/projectiles/shot_sprite.gdshader")
 ## The reticle: its distance from the hand and its size, in pixels.
 const RETICLE_DISTANCE: float = 38.0
 const RETICLE_SIZE: float = 4.0
@@ -154,6 +151,7 @@ func step(delta: float) -> void:
 		_tick_trail(delta)
 	_step_poof(delta)
 	_place_body(_time)
+	apply_pose(_sprite, _face, moving or _dash_look)
 	if moving or _dash_look:
 		_apply_dash_look(moving)
 	_update_invulnerable_look(down)
@@ -175,17 +173,16 @@ func is_poofing() -> bool:
 	return _poof_age >= 0.0
 
 
-## The column of the head sheet that shows: the direction nearest the aim, or while the staff
-## swings (a `swing` carrier, `Spells.swing_pose`) the way it points in its swing, so the body
-## steps through the columns while the swing's trail follows the true arc (down: flat, the way
-## the staff faced).
+## The column of the head sheet that shows: the direction nearest the aim, or while the staff plays
+## its carrier's animation (`Spells.staff_pose`, the card's `staff_pose`) the aim locked at the cast
+## turned by it, so a swinging body steps through the columns while the swing's trail follows the
+## true arc (down: flat, the way the staff faced).
 func direction() -> int:
 	if actor.is_down():
 		return DIRECTIONS / 2 if _faces_left else 0
-	if actor.spells != null:
-		var pose: Vector2 = actor.spells.swing_pose(actor.id)
-		if not pose.is_zero_approx():
-			return direction_of(pose)
+	var dir: Vector2 = pose_dir()
+	if not dir.is_zero_approx():
+		return direction_of(dir.rotated(actor.spells.staff_pose(actor.id).x))
 	return direction_of(actor.aim)
 
 
@@ -262,7 +259,7 @@ func _place_body(time: float) -> void:
 	var at: Vector2 = Vector2(0.0, -DOWN_LIFT)
 	if not actor.is_down():
 		var phase: float = time * HOVER_RATE + float(maxi(actor.ramp, 0)) * HOVER_PHASE
-		at = actor.hand_offset + Vector2(0.0, roundf(sin(phase) * HOVER_BOB))
+		at = actor.hand_offset + Vector2(0.0, roundf(sin(phase) * HOVER_BOB)) + pose_offset(_time)
 	if _sprite != null:
 		_sprite.position = at
 		if _sprite.texture != null:

@@ -50,7 +50,7 @@ enum Behaviour {
 	## Takes on the infusions of the last cast of any actor its shot hits (B2; owner, 2026-10-28).
 	RELAY,
 	## Flies out for half its life, then back to its caster (owner, 2026-10-27: a modifier, not
-	## a boomerang carrier). Only on a carrier that flies (`StaffCompiler.behaviour_runs`).
+	## a boomerang carrier). Only on a carrier that flies (`StaffCompiler.behaviour_waste`).
 	RETURN,
 	## Zaps the nearest enemy within `behaviour_reach` pixels `behaviour_strength` times a second
 	## (arc cards add up) while the shot lives, at `SpellLimits.ARC_DAMAGE` of its damage with its infusions; a zap

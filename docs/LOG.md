@@ -2,9 +2,9 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
-## 2026-10-29: The compiler says what does nothing (phase R, R2)
+## 2026-10-29: Card rules R2 reconciled with main
 
-One table, `CardRules` (`core/spells/card_rules.gd`): every modifier behaviour and trigger event against every carrier motion, runs or a reason. The compiler asks it; the audit's silent cells (growth on a rune, heavy on a dash, timer on a beam, on hit on a familiar, on wall on an orbit, the melee carriers) are now listed as wasted with a reason in the builder and staff view. No shipped combo changed; `test_card_rules_table.gd` checks every cell and that the compiler wastes exactly what the table says. R3 next.
+PR #469 conflicted with the owner's R2/R3 work that reached main (#468). Both did the same job; main's version (`StaffCompiler.behaviour_waste`, `trigger_runs`, `test_card_rules.gd`) is kept and #469's `CardRules` table was dropped, so the branch equals main apart from the ticked tasks.
 
 ## 2026-10-29: Freezes in co-op (melee I7)
 

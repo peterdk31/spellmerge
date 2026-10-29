@@ -172,7 +172,7 @@ func test_return_is_wasted_on_a_carrier_that_does_not_fly_out() -> void:
 	for form: StringName in [&"beam", &"rune"]:
 		var staff: CompiledStaff = _compile([&"return", form])
 		check(staff.wasted.has(0), "return on a %s is wasted" % form)
-		check(String(staff.wasted.get(0, "")).contains("needs a shot that flies out"), "with its reason: %s" % staff.wasted.get(0, ""))
+		check(String(staff.wasted.get(0, "")).contains("does not fly out"), "with its reason: %s" % staff.wasted.get(0, ""))
 
 
 func test_the_boomerang_carrier_is_gone() -> void:

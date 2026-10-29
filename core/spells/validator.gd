@@ -211,6 +211,7 @@ static func format(problem: Dictionary) -> String:
 static func _check_form(form: FormBase) -> Array[Dictionary]:
 	var problems: Array[Dictionary] = []
 	var file: String = form.resource_path
+	problems.append_array(_check_pose(form, file))
 	match form.motion:
 		FormBase.Motion.STRAIGHT:
 			if form.speed <= 0.0:
@@ -229,6 +230,40 @@ static func _check_form(form: FormBase) -> Array[Dictionary]:
 		FormBase.Motion.SLAM:
 			if form.ray_length <= 0.0:
 				problems.append(_problem("required-field", file, "ray_length", "A SLAM form needs a `ray_length` (how far ahead it strikes) above 0."))
+	return problems
+
+
+## A carrier's `staff_pose` (FormBase): every key a dictionary of known names, a known phase, ease
+## and mood, its time inside its phase and not before the key before it, every channel in range.
+static func _check_pose(form: FormBase, file: String) -> Array[Dictionary]:
+	var problems: Array[Dictionary] = []
+	var allowed: Array[String] = ["phase", "at", "ease", "mood"]
+	allowed.append_array(FormBase.POSE_CHANNELS)
+	var last: Vector2 = Vector2.ZERO
+	for n in form.staff_pose.size():
+		var key: Dictionary = form.staff_pose[n]
+		for name: Variant in key.keys():
+			if not allowed.has(str(name)):
+				problems.append(_problem("pose", file, "staff_pose", "Key %d: `%s` is not a pose name (%s)." % [n, name, ", ".join(PackedStringArray(allowed))]))
+		var phase: String = str(key.get("phase", ""))
+		if not FormBase.POSE_PHASES.has(phase):
+			problems.append(_problem("pose", file, "staff_pose", "Key %d: its `phase` is one of %s." % [n, ", ".join(PackedStringArray(FormBase.POSE_PHASES.keys()))]))
+			continue
+		var at: float = float(key.get("at", 0.0))
+		var place: int = FormBase.POSE_PHASES[phase]
+		var fraction: bool = phase == "wind" or phase == "strike"
+		if at < 0.0 or (fraction and at > 1.0) or Vector2(place, at) < last:
+			problems.append(_problem("pose", file, "staff_pose", "Key %d: `at` is 0 to 1 in the wind-up and strike, seconds in the hold and after, and never before the key before it." % n))
+		last = Vector2(place, at)
+		if not FormBase.POSE_EASES.has(str(key.get("ease", "inout"))):
+			problems.append(_problem("pose", file, "staff_pose", "Key %d: its `ease` is one of %s." % [n, ", ".join(PackedStringArray(FormBase.POSE_EASES.keys()))]))
+		if key.has("mood") and not FormBase.POSE_MOODS.has(StringName(str(key["mood"]))):
+			problems.append(_problem("pose", file, "staff_pose", "Key %d: its `mood` is one of %s." % [n, ", ".join(PackedStringArray(FormBase.POSE_MOODS))]))
+		for channel: String in FormBase.POSE_CHANNELS:
+			var range_of: Vector2 = FormBase.POSE_RANGES[channel]
+			var value: float = float(key.get(channel, 0.0))
+			if value < range_of.x or value > range_of.y:
+				problems.append(_problem("pose", file, "staff_pose", "Key %d: `%s` %s is outside %s to %s." % [n, channel, value, range_of.x, range_of.y]))
 	return problems
 
 

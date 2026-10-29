@@ -1,7 +1,7 @@
 {
 	"id": "sticky_frost_plant",
 	"name": "Sticky frost plant",
-	"does": "A plain bolt sticks in an imp and then plants a frost nova on it: only the nova chills.",
+	"does": "A plain bolt sticks in an imp and then plants a frost nova on it that chills it.",
 	"casts": [{"staff": 0, "cards": ["sticky", "on_expire", "bolt", "frost", "nova"]}],
 	"imps": [[110, 0]],
 	"seconds": 2.0,

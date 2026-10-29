@@ -97,6 +97,55 @@ vec4 particle(float look, vec2 from, float a, float i, float cyc, vec2 q, float 
 		if (a < 0.5 && on(q, at)) {
 			return vec4(a < 0.25 ? BONE_LIGHT : SPARK_LIGHT, 1.0);
 		}
+	} else if (look == L_WEIGHT) {
+		// Heavy: a grey drip that falls, as long as it is fast.
+		vec2 at = floor(from + vec2((h - 0.5) * 6.0 * z, (2.0 + 9.0 * a * a) * z));
+		vec2 d = floor(q) - at;
+		if (a < 0.8 && d.x == 0.0 && d.y >= 0.0 && d.y <= 1.0 + a * 2.0 * z) {
+			return vec4(a < 0.4 ? BONE_LIGHT : vec3(0.639, 0.624, 0.722), 1.0);
+		}
+	} else if (look == L_RIPPLE) {
+		// Growth: a pixel on a ring that opens round the core.
+		float ang = h * 6.2832;
+		vec2 at = from + vec2(cos(ang), sin(ang)) * (1.0 + 8.0 * a) * z;
+		if (a < 0.7 && on(q, at)) {
+			return vec4(a < 0.35 ? BONE_LIGHT : vec3(0.639, 0.624, 0.722), 1.0);
+		}
+	} else if (look == L_CURL) {
+		// Spiral and return: a pixel that swings out and curls back.
+		float ang = h * 6.2832 + a * 7.0;
+		vec2 at = from + vec2(cos(ang) * 5.0 * a - 3.0 * a, sin(ang) * 5.0 * a) * z;
+		if (a < 0.8 && on(q, at)) {
+			return vec4(a < 0.4 ? BONE_LIGHT : vec3(0.831, 0.816, 0.878), 1.0);
+		}
+	} else if (look == L_ZIG) {
+		// Bounce: a short streak thrown back at an angle, either side.
+		float side = h < 0.5 ? -1.0 : 1.0;
+		vec2 at = floor(from + vec2(-3.0 - 6.0 * a, side * (1.0 + 7.0 * a)) * z);
+		vec2 d = floor(q) - at;
+		if (a < 0.5 && d.y == -side * d.x && d.x <= 0.0 && d.x >= -2.0 * z) {
+			return vec4(a < 0.25 ? BONE_LIGHT : SPARK_LIGHT, 1.0);
+		}
+	} else if (look == L_DOUBLE) {
+		// Echo, mirror, ghost: a faint dash peeling away to each side, a copy of the path.
+		float side = h < 0.5 ? -1.0 : 1.0;
+		vec2 at = floor(from + vec2(-2.0 * a * z, side * (2.0 + 5.0 * a) * z));
+		vec2 d = floor(q) - at;
+		if (a < 0.7 && mod(floor(sim_time * 10.0 + i), 3.0) < 2.0 && d.y == 0.0 && d.x >= 0.0 && d.x <= 1.0 + z) {
+			return vec4(vec3(0.639, 0.624, 0.722), 1.0);
+		}
+	} else if (look == L_CONVERGE) {
+		// Magnet, siphon, possess: a pixel pulled in towards the core from ahead.
+		vec2 at = from + vec2((10.0 - 10.0 * a) * z, (h - 0.5) * 6.0 * (1.0 - a) * z);
+		if (a < 0.9 && on(q, at)) {
+			return vec4(a < 0.6 ? SPARK_LIGHT : BONE_LIGHT, 1.0);
+		}
+	} else if (look == L_DRIFT) {
+		// Slow, hold, short delay: a dim pixel that hangs where it was and fades.
+		vec2 at = from + vec2(-2.0 * z - (h - 0.5) * 3.0 * z, (h - 0.5) * 3.0 * z);
+		if (a < 0.95 && mod(floor(sim_time * 12.0 + i), 3.0) > 0.5 && on(q, at)) {
+			return vec4(a < 0.5 ? vec3(0.949, 0.761, 0.188) : vec3(0.722, 0.502, 0.122), 1.0);
+		}
 	}
 	return vec4(0.0);
 }

@@ -12,3 +12,4 @@ complexity = 2
 icon = ExtResource("2_icon")
 behaviour = 13
 behaviour_strength = 70.0
+look_layer = 20

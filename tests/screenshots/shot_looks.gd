@@ -70,10 +70,12 @@ func take() -> void:
 	var fire_look: int = int(fire.get("look_layer"))
 	var extra: Array[int] = [int(BIGGER.get("look_layer")), int(PIERCE.get("look_layer")), int(HOMING.get("look_layer")),
 			ManagerScript.LOOK_MOTES, ManagerScript.LOOK_BURST, ManagerScript.LOOK_ORBITERS, ManagerScript.LOOK_GLITTER,
-				ManagerScript.LOOK_HOPS, ManagerScript.LOOK_WAKE]
+				ManagerScript.LOOK_HOPS, ManagerScript.LOOK_WAKE, ManagerScript.LOOK_WEIGHT, ManagerScript.LOOK_RIPPLE,
+			ManagerScript.LOOK_CURL, ManagerScript.LOOK_ZIG, ManagerScript.LOOK_DOUBLE, ManagerScript.LOOK_CONVERGE,
+			ManagerScript.LOOK_DRIFT]
 	for n in extra.size():
 		var radius: float = BOLT_RADIUS * (float(BIGGER.get("radius_mult")) if n == 0 else 1.0)
-		_bolt(0, Vector2(330.0 + (n % 4) * 70.0, 25.0 + (n / 4) * 38.0), radius, fire_tint, PackedInt32Array([fire_look, extra[n]]))
+		_bolt(0, Vector2(330.0 + (n % 4) * 70.0, 20.0 + (n / 4) * 28.0), radius, fire_tint, PackedInt32Array([fire_look, extra[n]]))
 	# Combined: all five infusions on one bolt, then every kind at once.
 	var infusions := PackedInt32Array()
 	for element: Resource in ELEMENTS:
@@ -112,8 +114,14 @@ func take() -> void:
 	save_crop(image, Vector2(160.0, 85.0), "looks_sheet_4x", Vector2i(160, 85))
 	save_crop(image, Vector2(460.0, 140.0), "looks_combined_4x", Vector2i(150, 40))
 	# The first cards' own kinds, close up: hops (chain) and wake (faster) on a fire bolt.
-	save_crop(image, Vector2(520.0, 63.0), "looks_hops_4x", Vector2i(80, 36))
-	save_crop(image, Vector2(310.0, 101.0), "looks_wake_4x", Vector2i(80, 36))
+	save_crop(image, Vector2(520.0, 48.0), "looks_hops_4x", Vector2i(80, 36))
+	save_crop(image, Vector2(310.0, 76.0), "looks_wake_4x", Vector2i(80, 36))
+	# The later cards' kinds (staffs C0b), each on a fire bolt, four to a crop at 4x: wake, weight,
+	# ripple, curl; then zig, double, converge, drift.
+	save_crop(image, Vector2(350.0, 76.0), "looks_later_a1_4x", Vector2i(70, 14))
+	save_crop(image, Vector2(490.0, 76.0), "looks_later_a2_4x", Vector2i(70, 14))
+	save_crop(image, Vector2(350.0, 104.0), "looks_later_b1_4x", Vector2i(70, 14))
+	save_crop(image, Vector2(490.0, 104.0), "looks_later_b2_4x", Vector2i(70, 14))
 
 
 ## A bolt of `caster` that barely moves (the sheet is a still), with a core and layers.

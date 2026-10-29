@@ -97,7 +97,7 @@ Look look_of(vec3 c, float who, float z, vec3 b, float s, bool particles) {
 		for (float look = 1.0; look <= KIND_COUNT; look += 1.0) {
 			if (look != L_WEAVE && bit_set(b, look)) {
 				float slot = mod(n, 4.0);
-				float add = look * exp2(slot * 4.0);
+				float add = look * exp2(slot * 5.0);
 				if (n < 4.0) {
 					packed.x += add;
 				} else if (n < 8.0) {
@@ -141,7 +141,7 @@ float emit_count() {
 // The `i`th kind that gives off particles.
 float emitter(int i) {
 	float word = i < 4 ? emits.x : (i < 8 ? emits.y : emits.z);
-	return mod(floor(word / exp2(float(i % 4) * 4.0) + 0.001), 16.0);
+	return mod(floor(word / exp2(float(i % 4) * 5.0) + 0.001), 32.0);
 }
 
 // The ramp at `u` (0 white-hot, 1 shadow): what cools as it ages.

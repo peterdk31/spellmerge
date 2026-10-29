@@ -13,4 +13,4 @@ icon = ExtResource("2_icon")
 speed_mult = 0.6
 behaviour = 10
 behaviour_strength = 4.0
-look_layer = 8
+look_layer = 15

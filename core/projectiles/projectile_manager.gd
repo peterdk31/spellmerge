@@ -318,7 +318,15 @@ const LOOK_WEAVE: int = 11
 const LOOK_GLITTER: int = 12
 const LOOK_HOPS: int = 13
 const LOOK_WAKE: int = 14
-const LOOK_COUNT: int = 15
+const LOOK_WEIGHT: int = 15
+const LOOK_RIPPLE: int = 16
+const LOOK_CURL: int = 17
+const LOOK_ZIG: int = 18
+const LOOK_DOUBLE: int = 19
+const LOOK_CONVERGE: int = 20
+const LOOK_DRIFT: int = 21
+## Kind 22 is the poof flag (`Feel.POOF`), 23 the enemy ramp and 24 the exact colour: not kinds.
+const LOOK_COUNT: int = 22
 ## The most kinds the instance data has room for: three bytes of bits (`_look_color`).
 const LOOK_MAX_KINDS: int = 24
 ## A flag in the look, not a kind (kind 23 of the shader): drawn in the enemy ramp (Blight

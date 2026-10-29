@@ -1,12 +1,15 @@
 {
 	"id": "decoy_and_fire",
 	"name": "Decoy and fire",
-	"does": "Leave a decoy with one staff, then throw a fire bolt from another: the imp burns.",
+	"does": "Two staffs side by side: one leaves a decoy, the other throws a fire bolt that burns the imp.",
 	"casts": [
 		{"staff": 0, "cards": ["decoy"]},
 		{"staff": 1, "cards": ["fire", "bolt"], "at": 0.1}
 	],
 	"imps": [[100, 0]],
 	"seconds": 1.5,
-	"checks": [{"kind": "status", "imps": [0], "status": "burn"}]
+	"checks": [
+		{"kind": "spawned", "entity": "decoy", "min": 1},
+		{"kind": "status", "imps": [0], "status": "burn"}
+	]
 }

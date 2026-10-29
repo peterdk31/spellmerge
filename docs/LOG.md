@@ -6,7 +6,21 @@ What each run did, newest first. Claude appends a short entry after each develop
 
 The bots (`Bot.build_random`, seeded) and the staff fuzz already existed from A6a/A6b; D1 adds the report. `test_spell_fuzz.gd` now prints `REPORT` lines after each run: the five best of its 600 random staffs by kills and by reactions, and the five costliest by mean step time and by safeguards met (dropped shots, then peak live shots), each with its cards and generated name. The fuzz imps now have 60 health (they had 400 and nothing died). Run it with `ci/build/build.sh --quick --tests` and read `build/logs`; paste a run here when cards land.
 
-First run (seed 20261026, 600 staffs, 2 s each): kills are rare (the best staff kills 2 of 7 imps, a beam with pierce); reactions are rarer (the best has 4, one kind, from lightning and storm staffs); no staff drops a shot at the pool, the most live shots are 105 (`burst wall mirror split echo`) and the slowest mean step is 0.18 ms. So random staffs mostly do little, and nothing needs a limit yet. Test: `test_report_ranking`.
+Review round: ties in a ranking now go to the lower staff number (`sort_custom` is not stable), each line starts with the ranked value and shows `(unnamed)` for a staff without a name, and a `REPORT WARNING` prints when no staff kills an imp, so an empty report is noticed. Tests: `test_report_ranking`, `test_report_ties_are_total`.
+
+First run (seed 20261026, 600 staffs, 2 s each), the lines that do not depend on the machine (cards shortened):
+
+```
+REPORT BEST BY KILLS: 2 kills | Skewering Lazy Patient Beam | staff 44 [on_cast pierce slow sniper sniper beam]
+REPORT BEST BY KILLS: 1 kills | Overcharged Echoing Rime Beam | staff 191
+REPORT BEST BY KILLS: 1 kills | Stuttering-Magnetic Plump Bolt | staff 315
+REPORT BEST BY REACTIONS: 4 reactions | Arcing Bloom | staff 89 [arc nova triple storm lightning faster void]
+REPORT BEST BY REACTIONS: 4 reactions | Zippy Bloom | staff 531
+REPORT BEST BY REACTIONS: 2 reactions | Bolt | staff 70 [bolt frost fire]
+REPORT COSTLIEST BY SAFEGUARDS: 105 | Stuttering-Wall | staff 462 [burst wall mirror split echo]
+```
+
+So random staffs mostly do little: kills are rare, reactions rarer (one kind), no staff drops a shot at the pool, and nothing needs a limit yet.
 
 ## 2026-10-29: The first cards' looks (staffs C0)
 

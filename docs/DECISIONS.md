@@ -21,7 +21,7 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - **The hold lives in `core/`, Feel only asks for it.** Areas only talk through `core/`, so the per-actor hold is in the actor table (`Actors.hold`, read by `Actor.step` with `spend_hold`) and the per-shot hold in the projectile manager (`freeze_shot`, state `S_FROZEN`); Feel decides who is held and for how long. A step longer than the hold runs for the rest, so a hold never eats a long step.
 - **Which bodies:** the attacker and the target of a hit, plus the shot whose `projectile_hit` is being sent (`event_slot`; a ray has none). A spent shot is already gone, so only a piercing, lingering or orbiting shot is held. A kill holds the killer (the dead body is freed at once). A reaction, which used to stop the whole game, holds its caster: it is a hit, not a rare moment.
 - **The rest is per actor** (`hit_stop_rest` after a hold), so one body is not frozen for ever by a stream of hits, while two players' hits never gate each other. Kills and reactions ignore the rest, as deaths did.
-- **Game-wide stop:** only `player_downed` and the death of an enemy whose `EnemyBase.boss` is true (a new flag; no boss exists yet). The parry's local stop is added when I5 lands (done: Feel's `parry_stop_seconds` on the parrying actor).
+- **Game-wide stop:** only `player_downed` and the death of an enemy whose `EnemyBase.boss` is true (a new flag; no boss exists yet). The parry's local stop is added when I5 lands (done: the parry cue's `hold` on the parrying actor, `content/cues/parry.tres`).
 - **Held bodies stop in Feel's own time:** the hold counts down in the simulation's time, not real time; with `Engine.time_scale` at 1 they are the same.
 
 ## 2026-10-29: Planning run on an empty queue
@@ -710,7 +710,7 @@ The frost tint is Ice base (`#4fd6dc`), not Ice light (`#c4f6f2`, nearly white);
 **Decided by:** Claude, from the owner's bug report on #102.
 
 - `muzzle_flash_size` goes from 2.4 to 0.5 (the `@export_range` minimum was already 0.1). With the 32 px `hit_spark.svg`, `MUZZLE_STRETCH` 1.8 and the 1.5× growth while it fades, the flash is 29 px long at the start and 43 px at its largest, about the size of the 32 px wizard. Before it was 138 px growing to 207 px.
-- The stretch stays, so the flash still reads along the aim. The death puff has its own size (`death_puff_size`) and is unchanged.
+- The stretch stays, so the flash still reads along the aim. The death puff has its own size (`death_puff_size`, now the cue `enemy_death`'s ring) and is unchanged.
 - `test_feel.gd` fails if the `punchy` muzzle flash is longer than 48 px at any step.
 
 ## 2026-10-18: Wave pacing: waves in the same room, +2 enemies a wave, downed wizards stand up between waves

@@ -25,8 +25,6 @@ func before_each() -> void:
 	feel = own(FeelScript.new()) as FeelScript
 	preset = FeelPresetScript.new()
 	preset.hit_sound = &""
-	preset.death_sound = &""
-	preset.downed_sound = &""
 	feel.events = bus
 	actors = own(ActorSeats.table()) as ActorSeats.ActorsScript
 	feel.actors = actors

@@ -1,5 +1,5 @@
 extends "res://tests/support/screenshot.gd"
-## Explosions as the game draws them (`explosion_shown`, Feel's `explode`): rows are blast in
+## Explosions as the game draws them (the cues `blast` and `fireball`, `cue_shown`): rows are blast in
 ## player 1's ramp, blast with fire, an enemy's blast, and the rising fireball (a barrel's);
 ## columns are moments after it goes off, each cell its own explosion of radius 40 by an actor of
 ## that row's ramp. `blast` is the whole screen and `blast_4x` a crop of the first row's first
@@ -48,7 +48,7 @@ func take() -> void:
 			if longest - frame == cell[2]:
 				var row: Array = cell[3]
 				var tint: Color = FIRE.tint if row[2] else Color.WHITE
-				events.emit_signal(&"explosion_shown", cell[0], cell[1], RADIUS, row[0], tint, 0)
+				events.emit_signal(&"cue_shown", cell[0], row[0], cell[1], Vector2.ZERO, RADIUS, tint, 0)
 		await physics_frame
 	var image: Image = await grab()
 	save(image, "blast")

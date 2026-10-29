@@ -2,6 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-29: The Rime Crook and the Bone Scepter
+
+- **The Scepter's eyes glow Void light, not Spark.** The design says its eyes are sparks in the sockets; the stray rule (README) is the light shade of the element's ramp, and Void pink reads against the dark sockets, which are painted Void shadow.
+- **Numbers:** Crook 20 health, speed 40, mana 20 (+3), range 120, windup 0.8 s (a hook reaches 150 px); Scepter 18 health, speed 30, mana 30 (+4), range 130, windup 1.0 s (rain's ray is 120 px).
+- **The Scepter's staff is void · rain · nova, three slots.** A rain with no payload hurts nobody (`test_rain.gd`), so `void · rain` alone never touched a player; the nova is what falls where the rain marks. The four-player test now checks that each new stray's spell reaches a player. No contact damage: both hurt only by the telegraphed cast.
+- **Bodies are laid out by hand** as rects (no script could be run in the session) and kept to the palette.
+
 ## 2026-10-29: Planning run, queue empty
 
 - **#417 (downed wizard shrinks into its hat) goes back to the backlog.** The wizard is a floating staff after living staffs H3, so there is no body or hat to shrink into; the downed look (lying flat) exists. #416 and #208 stay on the backlog: both belong to M3 and later.

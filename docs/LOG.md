@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-29: The Rime Crook and the Bone Scepter (living staffs H5)
+
+Two more strays, content only. The Rime Crook (`content/enemies/rime_crook/`) is a wooden crook with ice fangs and bands that casts frost · hook: it pulls a player toward it from 120 px. The Bone Scepter (`bone_scepter/`) is a skull on a stick whose dark sockets the shared face lights in Void pink; it casts void · rain from 130 px as a zoner. Folders are discovered, so nothing else lists them. `test_strays.gd` now covers five strays (style, glow, cards, valid staff) and runs each new one against four players.
+
 ## 2026-10-29: Staff codes (staffs D2)
 
 A staff copies as one line, `sm1:double,fire,-,bolt` (card ids by slot, `-` for an empty slot, the empty tail left off), and pastes back. `StaffCode` (`core/spells`) is pure text work: it takes only lower-case names, at most 40 cards and 600 characters, checks every id with the registry, and never loads or runs anything from the text. The list builder gained a row of "Copy code" and "Paste code" buttons (system clipboard; the d-pad reaches them between the tabs and the slots); a paste sends one `staff_cards_requested`, so the player still refuses cards it does not own. The radial builder and the pause menu have no code buttons yet.

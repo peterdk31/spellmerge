@@ -1,0 +1,12 @@
+{
+	"id": "on_reaction_shatter_fire",
+	"name": "On reaction shatter fire",
+	"does": "A frost bolt chills the imp, then a storm bolt on it sets off Shatter and a fire nova bursts there, burning the imp beside it.",
+	"casts": [
+		{"staff": 1, "cards": ["frost", "bolt"]},
+		{"staff": 0, "cards": ["on_reaction", "storm", "bolt", "fire", "nova"], "at": 0.3}
+	],
+	"imps": [[100, 0], [100, 45]],
+	"seconds": 2.0,
+	"checks": [{"kind": "status", "imps": [1], "status": "burn"}]
+}

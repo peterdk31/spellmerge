@@ -1,0 +1,10 @@
+{
+	"id": "heavy_wall_slam",
+	"name": "Heavy wall slam",
+	"does": "A heavy bolt knocks the imp into the wall behind it, and the imp takes the slam on top of the bolt.",
+	"casts": [{"staff": 0, "cards": ["heavy", "bolt"]}],
+	"imps": [[100, 0]],
+	"walls": [[108, -200, 16, 400]],
+	"seconds": 1.5,
+	"checks": [{"kind": "lost_at_least", "imps": [0], "min": 10}]
+}

@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-29: Card heavy (staffs C)
+
+Added the Heavy modifier card (data only: `.tres`, icon, assets, lore), two combos (`heavy_wall_slam`, `heavy_hex_slam`) and `test_heavy.gd`. All 139 unit tests pass.
+
 ## 2026-10-29: Card on wall (staffs C)
 
 Added the On Wall trigger card (data only: `.tres`, icon, assets, lore), two combos (`on_wall_bolt_nova`, `on_wall_bolt_rune`) and `test_on_wall.gd` (valid card; each combo holds with it, fails without it, and does nothing with no wall). The B2 engine already fired it.

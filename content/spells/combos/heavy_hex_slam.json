@@ -1,0 +1,10 @@
+{
+	"id": "heavy_hex_slam",
+	"name": "Heavy hexed slam",
+	"does": "A heavy void bolt hexes the imp and slams it into the wall behind it.",
+	"casts": [{"staff": 0, "cards": ["heavy", "void", "bolt"]}],
+	"imps": [[100, 0]],
+	"walls": [[108, -200, 16, 400]],
+	"seconds": 1.5,
+	"checks": [{"kind": "status", "imps": [0], "status": "hex"}, {"kind": "lost_at_least", "imps": [0], "min": 10}]
+}

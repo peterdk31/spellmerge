@@ -57,9 +57,10 @@ enum Behaviour {
 	## is a hit, so it sets off `on hit` and chains (owner, 2026-10-27). Only on a carrier that
 	## stays in the air as a shot.
 	ARC,
-	## The first actor the cast's carriers hit is possessed for `behaviour_strength` seconds: the
-	## caster's controller drives it, the caster's body stands (actors G9, `possess_requested`).
-	## One possession per cast.
+	## Every actor the carrier hits is possessed for `behaviour_strength` seconds (actors G9,
+	## `possess_requested`; owner, 2026-10-29): the caster's controller drives the oldest of the
+	## bodies it possesses and the others copy its intent; the caster's body stands. The rule is in
+	## `gameplay/actor/possession.gd`.
 	POSSESS,
 }
 

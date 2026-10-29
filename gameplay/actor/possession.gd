@@ -1,84 +1,92 @@
 class_name Possession
 extends RefCounted
-## One possession (actors G9, docs/milestones/M2-actors.md, "Possess (a card)"): the controller
-## of the body that cast `possess` (`by`) drives the actor its carrier hit (`target`) for
-## `seconds`. The rule, in full:
+## One possession (actors G9, docs/milestones/M2-actors.md, "Possess (a card)"): a controller
+## (`driver`) possesses the actor a carrier of its body hit (`target`) for `seconds`. The rule, in
+## full (owner, 2026-10-29):
 ##
-## - **It starts** (`begin`, when the target hears `possess_requested`): an older possession of
-##   the target ends first. Then the caster body's controller (`driver`) drives the target
-##   (`Actor.drive`, which takes it off the caster's body: that body stands with no controller,
-##   can be hit, and keeps its home team), and the target's own controller is put aside
-##   (`ActorController.set_aside`; a seat's panel goes on showing its own wizard). Team and seat
-##   follow the driver into the actor table on both bodies. Nothing starts when either body is
-##   down, dying or out of the tree, or when the caster's body has no controller.
-## - **It ends** (`end`) when its time is up, when the target dies or is down, or when the
-##   caster's body is down or dies: the target gets its own controller back (`started`: an AI
-##   picks a fresh target and winds up again), and the driver goes home to the caster's body. When
-##   someone else possesses that body meanwhile, the driver waits behind that possession and comes
-##   back when it ends.
-## - **Nested:** a driver who possesses again from a possessed body moves on (`newer`); ending a
-##   possession first ends the newer ones of its driver, so they unwind in order.
+## - **Each hit** possesses the actor it hits (`begin`, when the target hears `possess_requested`).
+##   The driver is the controller of the body that cast it (its home controller while it stands
+##   empty), or that controller's leader when it is a puppet (`ActorController.leader`). Nothing
+##   starts on the driver's own home body, on a body it drives or already possesses, when either
+##   body is down, dying or out of the tree, or when the caster's body has no controller at all.
+## - **The newest possession of a body holds it:** an older possession of the target (another
+##   driver's) ends first.
+## - **A controller drives the oldest body it possesses** (`ActorController.possessions`, oldest
+##   first); each other one is driven by a `PuppetController` that copies its intent. The target's
+##   own controller is put aside (`ActorController.set_aside`; a seat's panel goes on showing its
+##   own wizard). Team and seat follow the driver into the actor table; a puppet is no seat.
+## - **It ends** (`end`) when its time is up or the target dies or is down: the target gets its
+##   own controller back (`started`: an AI picks a fresh target and winds up again). When the
+##   driver was in it, it moves into its next oldest possession; with none left it goes home to
+##   its home body, or, while another controller possesses that body, waits behind that
+##   possession (it is put aside there) and comes back when it ends. A controller whose home body
+##   died has no home: it is freed when its last possession ends.
 ##
-## The target keeps its possession in `Actor.possessed_by` and steps it (`step`); the caster's body
-## lists those it cast in `Actor.possessions_cast`, so its death ends them. `possess_started` and
-## `possess_ended` (the caster's and the target's actor ids) tell Feel. A ring in the driver's
+## The target keeps its possession in `Actor.possessed_by` and steps it (`step`). `possess_started`
+## and `possess_ended` (`by_id` and the target's id) tell Feel. A ring in the driver's
 ## colour with the time left (`PossessedLook`) is drawn round the target while it lasts, and over
-## an actor a seat drives that is not its own wizard, its health and mana too. A builder never
+## an actor a seat possesses that is not its own wizard, its health and mana too. A builder never
 ## edits the target: a seat's builder edits its own wizard (owner, 2026-10-28).
 
 const EventsScript := preload("res://core/events/events.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 
-## The controller that drives the target, the body it came from, and the actor it drives.
+## The controller that possesses the target, and the actor it possesses.
 var driver: ActorController = null
-var by: Actor = null
 var target: Actor = null
 ## The target's own controller, put aside meanwhile (null when it had none).
 var put_aside: ActorController = null
+## The puppet driving the target while the driver drives an older body (null while it drives it).
+var puppet: PuppetController = null
 ## Its whole length and the seconds left.
 var seconds: float = 0.0
 var left: float = 0.0
-## The driver's possession it moved on from (whose target is `by`), and the one it moved on to.
-var older: Possession = null
-var newer: Possession = null
 var ended: bool = false
-## The ids at the start (sent with `possess_ended` even when a body is gone).
+## The ids at the start: the driver's home body (the body that cast it when it has none) and the
+## target (sent with `possess_ended` even when a body is gone).
 var by_id: int = -1
 var target_id: int = -1
 
 var _look: PossessedLook = null
 
 
-## `by`'s controller takes `target` for `seconds`. Returns the possession, or null when none
-## started (see the class doc).
+## The controller of `by_body` (or its leader) possesses `target_body` for `seconds`. Returns the
+## possession, or null when none started (see the class doc).
 static func begin(by_body: Actor, target_body: Actor, length: float) -> Possession:
 	if by_body == target_body or length <= 0.0 or not can_start(by_body) or not can_start(target_body):
 		return null
-	var taker: ActorController = by_body.controller
-	if taker == null:
+	# A body standing empty (its controller is away possessing) casts for its home controller.
+	var by: ActorController = by_body.controller if by_body.controller != null else by_body.home_controller
+	if by == null or not is_instance_valid(by):
 		return null
-	# A newer possession of an actor ends the older first.
+	var taker: ActorController = by.leader()
+	if target_body.home_controller == taker or target_body.controller == taker or taker.possesses(target_body):
+		return null
+	# The newest possession of a body holds it: another driver's older one ends first.
 	if target_body.possessed_by != null:
 		target_body.possessed_by.end()
-	# Ending it may have moved controllers: the caster must still be driven by the same one.
-	if taker.driving != by_body or not can_start(by_body) or not can_start(target_body):
+	if not is_instance_valid(taker) or not can_start(target_body):
 		return null
 	var possession := Possession.new()
 	possession.driver = taker
-	possession.by = by_body
 	possession.target = target_body
 	possession.put_aside = target_body.controller
 	possession.seconds = length
 	possession.left = length
-	possession.by_id = by_body.id
+	possession.by_id = taker.home_actor.id if is_instance_valid(taker.home_actor) else by_body.id
 	possession.target_id = target_body.id
-	var from: Possession = by_body.possessed_by
-	if from != null and not from.ended and from.driver == taker:
-		possession.older = from
-		from.newer = possession
 	target_body.possessed_by = possession
-	by_body.possessions_cast.append(possession)
-	target_body.drive(taker)
+	taker.possessions.append(possession)
+	if taker.possessions.size() == 1:
+		# Its first: the driver moves in, and the body it drove stands.
+		target_body.drive(taker)
+	else:
+		possession.puppet = PuppetController.new()
+		possession.puppet.name = "Puppet"
+		possession.puppet.leader_controller = taker
+		possession.puppet.team = taker.team
+		target_body.add_child(possession.puppet)
+		target_body.drive(possession.puppet)
 	if possession.put_aside != null:
 		possession.put_aside.set_aside(target_body, length)
 	possession._look = PossessedLook.new()
@@ -100,33 +108,26 @@ static func can_hold(body: Actor) -> bool:
 	return is_instance_valid(body) and body.is_inside_tree() and not body.is_leaving() and not body.is_dying()
 
 
-## Count `delta` seconds; end when the time is up or a body is down or gone. The target calls it
-## each step, before its controller thinks.
+## Count `delta` seconds; end when the time is up or the target is down or gone. The target calls
+## it each step, before its controller thinks.
 func step(delta: float) -> void:
 	if ended:
 		return
 	left = maxf(left - delta, 0.0)
-	if left <= 0.0 or should_end():
+	if left <= 0.0 or not can_start(target):
 		end()
 
 
-## True when a body is down, dying or gone.
-func should_end() -> bool:
-	return not can_start(target) or not can_start(by)
-
-
-## End it now (once): the newer possessions of its driver first, then the target gets its own
-## controller and staffs back and the driver goes home (see the class doc).
+## End it now (once): the target gets its own controller back, and the driver moves on to its next
+## oldest possession, or home (see the class doc).
 func end() -> void:
 	if ended:
 		return
 	ended = true
-	if newer != null:
-		newer.end()
-	if older != null and older.newer == self:
-		older.newer = null
-	if is_instance_valid(by):
-		by.possessions_cast.erase(self)
+	var bus: EventsScript = target.events if is_instance_valid(target) else null
+	var was_in: bool = is_instance_valid(driver) and driver.driving == target
+	if is_instance_valid(driver):
+		driver.possessions.erase(self)
 	var aside: ActorController = put_aside if is_instance_valid(put_aside) else null
 	if is_instance_valid(target):
 		if target.possessed_by == self:
@@ -135,29 +136,50 @@ func end() -> void:
 			target.remove_look(_look)
 		if can_hold(target):
 			target.drive(aside)
-		elif target.controller == driver:
+		elif target.controller == driver or (puppet != null and target.controller == puppet):
 			target.drive(null)
 	_look = null
-	if is_instance_valid(driver) and driver.driving == null and can_hold(by):
-		var holder: Possession = by.possessed_by
-		if holder != null and not holder.ended and holder.driver != driver:
-			# Someone else drives the body now: the driver waits behind that possession.
-			holder.put_aside = driver
-			driver.set_aside(by, holder.left)
-		else:
-			by.drive(driver)
-	var bus: EventsScript = null
-	if is_instance_valid(by):
-		bus = by.events
-	elif is_instance_valid(target):
-		bus = target.events
+	_free_puppet()
+	if was_in:
+		Possession.move_on(driver)
 	if bus != null and is_instance_valid(bus):
 		bus.possess_ended.emit(by_id, target_id)
 
 
-## The ramp of the driver's colour: its seat's, else the caster body's.
+## `driver` drives nothing: it moves into its oldest possession, or goes home (see the class doc).
+static func move_on(driver: ActorController) -> void:
+	if not is_instance_valid(driver) or driver.driving != null:
+		return
+	if not driver.possessions.is_empty():
+		var next: Possession = driver.possessions[0]
+		next.target.drive(driver)
+		next._free_puppet()
+		return
+	var home: Actor = driver.home_actor
+	if not can_hold(home):
+		if home == null or not is_instance_valid(home) or home.is_dying():
+			# Its body died meanwhile: nothing to come home to.
+			driver.queue_free()
+		return
+	var holder: Possession = home.possessed_by
+	if holder != null and not holder.ended and holder.driver != driver:
+		# Another controller possesses the body: the driver waits behind that possession.
+		holder.put_aside = driver
+		driver.set_aside(home, holder.left)
+	else:
+		home.drive(driver)
+
+
+## The ramp of the driver's colour: its seat's, else its home body's.
 func driver_ramp() -> int:
 	if is_instance_valid(driver) and driver.seat >= 0:
 		return driver.seat
-	return by.ramp if is_instance_valid(by) else ActorsScript.RAMP_ENEMY
+	if is_instance_valid(driver) and is_instance_valid(driver.home_actor):
+		return driver.home_actor.ramp
+	return ActorsScript.RAMP_ENEMY
 
+
+func _free_puppet() -> void:
+	if puppet != null and is_instance_valid(puppet):
+		puppet.queue_free()
+	puppet = null

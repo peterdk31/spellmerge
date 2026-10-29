@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-29: Card hold (staffs C)
+
+Added the Hold modifier (data only: `.tres`, icon, assets, lore), the combos `hold_fire_orbit` and `hold_shield_orbit` and `test_hold.gd`, which checks that the shots outlive an orbit's lifetime only with the card, that `mana_reserved` goes up and comes back down on the next cast, and four players at once. All unit tests pass except `test_svg_art` on the Shield icon, already on main (see BACKLOG).
+
 ## 2026-10-29: Card siphon (staffs C)
 
 Added the Siphon modifier (data only: `.tres`, icon, assets, lore), two combos (`siphon_split_bolts`, `siphon_chain_bolt`) and `test_siphon.gd`, which checks the refunds through `mana_refund_requested`. Strength: 1 mana per hit. The bolt costs 5 and split costs 1.5 times that, so a volley of three hits gives back about 3 of 7.5: Siphon softens a cast and never pays for it (a first try at 3 per hit made split bolts net positive; a test now keeps a combo's refund under a bolt's cost). All unit tests pass except `test_svg_art` on the Shield icon, already on main (see BACKLOG).

@@ -347,6 +347,11 @@ var _bm_turn: PackedFloat32Array = PackedFloat32Array()
 var _bm_chain: PackedInt32Array = PackedInt32Array()
 var _bm_prev: PackedInt64Array = PackedInt64Array()
 var _bm_echo: PackedByteArray = PackedByteArray()
+## Shield charges live beam `at` has left for shots it touches (melee I3, `_guard_path`).
+var _bm_shield: PackedInt32Array = PackedInt32Array()
+## The path of a fissure or a beam's jump, for its guard (`_shoot_ray`); RAY_SEGMENTS is plenty for
+## its turns at walls, and a path with more is guarded along its first ones.
+var _ray_guard_points: PackedVector2Array = PackedVector2Array()
 var _bm_origin: PackedVector2Array = PackedVector2Array()
 var _bm_dir: PackedVector2Array = PackedVector2Array()
 var _bm_bend: PackedVector2Array = PackedVector2Array()
@@ -379,6 +384,8 @@ var _sw_turned: PackedFloat32Array = PackedFloat32Array()
 var _sw_chain: PackedInt32Array = PackedInt32Array()
 var _sw_prev: PackedInt64Array = PackedInt64Array()
 var _sw_echo: PackedByteArray = PackedByteArray()
+## Shield charges swing `at` has left for shots its sweep touches (melee I3, `_swing_guard`).
+var _sw_shield: PackedInt32Array = PackedInt32Array()
 var _sw_struck: Array[Array] = []
 var _sw_points: Array[Array] = []
 var _sw_heads: Array[Array] = []
@@ -483,6 +490,8 @@ func _init() -> void:
 	_bm_chain.resize(SpellLimits.BEAM_ROWS_START)
 	_bm_prev.resize(SpellLimits.BEAM_ROWS_START)
 	_bm_echo.resize(SpellLimits.BEAM_ROWS_START)
+	_bm_shield.resize(SpellLimits.BEAM_ROWS_START)
+	_ray_guard_points.resize(64)
 	_bm_origin.resize(SpellLimits.BEAM_ROWS_START)
 	_bm_dir.resize(SpellLimits.BEAM_ROWS_START)
 	_bm_bend.resize(SpellLimits.BEAM_ROWS_START)
@@ -520,6 +529,7 @@ func bind(manager: ProjectilesScript, bus: EventsScript) -> void:
 		events.projectile_expired.disconnect(_on_expired)
 		events.shot_blocked.disconnect(_on_shot_blocked)
 		events.shield_blocked.disconnect(_on_shield_blocked)
+		events.shot_deflected.disconnect(_on_shot_deflected)
 		events.kill_landed.disconnect(_on_kill)
 		events.actor_hurt.disconnect(_on_hurt)
 		events.reaction_landed.disconnect(_on_reaction)
@@ -536,6 +546,7 @@ func bind(manager: ProjectilesScript, bus: EventsScript) -> void:
 		events.projectile_expired.connect(_on_expired)
 		events.shot_blocked.connect(_on_shot_blocked)
 		events.shield_blocked.connect(_on_shield_blocked)
+		events.shot_deflected.connect(_on_shot_deflected)
 		events.kill_landed.connect(_on_kill)
 		events.actor_hurt.connect(_on_hurt)
 		events.reaction_landed.connect(_on_reaction)
@@ -1213,6 +1224,8 @@ func _launch_wall(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, d
 		_register(slot, tag, spell, carried, prev)
 		if shield > 0:
 			projectiles.set_shield(slot, shield)
+		if spell.behaviour(ModifierBase.Behaviour.DEFLECT) > 0.0:
+			projectiles.set_deflect(slot, true)
 		if source != null:
 			projectiles.exclude(slot, source, SpellLimits.SOURCE_EXCLUSION)
 	return made
@@ -1317,6 +1330,8 @@ func _apply_shield(slot: int, spell: CompiledSpell) -> void:
 	var shield: float = spell.behaviour(ModifierBase.Behaviour.SHIELD)
 	if shield > 0.0:
 		projectiles.set_shield(slot, roundi(shield))
+	if spell.behaviour(ModifierBase.Behaviour.DEFLECT) > 0.0:
+		projectiles.set_deflect(slot, true)
 
 
 ## The shots of every spell of `group`, fired together from `origin` along `direction` by this
@@ -1640,6 +1655,15 @@ func _shoot_ray(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, hea
 	var got: float = projectiles.ray(actor, origin, heading, reach, spell.pierce if pierce < 0 else pierce, HITS, tag, spell.radius * 0.5, source, _bounces(spell))
 	var end: Vector2 = origin + heading * got
 	var end_heading: Vector2 = heading
+	if got > 0.0 and (spell.behaviour(ModifierBase.Behaviour.DEFLECT) > 0.0 or spell.behaviour(ModifierBase.Behaviour.SHIELD) > 0.0):
+		_ray_guard_points[0] = origin
+		_ray_guard_points[1] = end
+		var count: int = 2
+		if projectiles.ray_path_count > 2:
+			count = mini(projectiles.ray_path_count, _ray_guard_points.size())
+			for n in count:
+				_ray_guard_points[n] = projectiles.ray_path[n]
+		_guard_path(spell, tag, actor, _ray_guard_points, 0, count, got, roundi(spell.behaviour(ModifierBase.Behaviour.SHIELD)))
 	if got > 0.0 and projectiles.ray_path_count > 2:
 		# It turned at walls: a cue for every straight leg, and it ends where the last one does.
 		end = projectiles.ray_end
@@ -1665,6 +1689,53 @@ func _shoot_ray(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, hea
 	_arc_slot = saved_arc
 	shot_ended(tag)
 	_cast_jumps()
+
+
+## The shots of other teams touching the path `points[first]` to `points[first + count - 1]`
+## (cut `reach` pixels along) of a beam or fissure with `tag`, as wide as its hits: each is
+## deflected off the line (`deflect`), else stopped while `charges` last (melee I3). Returns
+## the charges left.
+func _guard_path(spell: CompiledSpell, tag: int, actor: int, points: PackedVector2Array, first: int, count: int, reach: float, charges: int) -> int:
+	var deflects: bool = spell.behaviour(ModifierBase.Behaviour.DEFLECT) > 0.0
+	if (not deflects and charges <= 0) or count < 2 or reach <= 0.0:
+		return charges
+	var walked: float = 0.0
+	for n in range(first, first + count - 1):
+		var a: Vector2 = points[n]
+		var b: Vector2 = points[n + 1]
+		var piece: float = a.distance_to(b)
+		if walked + piece > reach:
+			b = a.move_toward(b, reach - walked)
+		var found: int = projectiles.shots_on_segment(actor, a, b, spell.radius * 0.5)
+		charges = _guard(found, actor, tag, deflects, charges, a, b)
+		walked += piece
+		if walked >= reach or (not deflects and charges <= 0):
+			break
+	return charges
+
+
+## Deflects (with `deflects`) or stops (while `charges` last) the `found` shots of
+## `Projectiles.guard_slots` that touched a carrier of `actor` with `tag`: outward from `a` when
+## `b` is INF (a swing's hand), else off the segment from `a` to `b`. Returns the charges left.
+## The list is copied first: what a deflect sets off can run another guard.
+func _guard(found: int, actor: int, tag: int, deflects: bool, charges: int, a: Vector2, b: Vector2) -> int:
+	if found == 0:
+		return charges
+	var slots: PackedInt32Array = projectiles.guard_slots.slice(0, found)
+	for slot in slots:
+		if not projectiles.is_alive(slot):
+			continue
+		var at: Vector2 = projectiles.get_position_of(slot)
+		if deflects:
+			var from: Vector2 = a if not b.is_finite() else Geometry2D.get_closest_point_to_segment(at, a, b)
+			var normal: Vector2 = at - from
+			if normal.is_zero_approx():
+				normal = -projectiles.get_velocity_of(slot)
+			projectiles.deflect_shot(slot, actor, normal, tag)
+		elif charges > 0:
+			charges -= 1
+			projectiles.block_shot(slot, actor, tag)
+	return charges
 
 
 ## A live beam (`beam` carrier): it lives its `lifetime` (a `hold` one until it is switched off),
@@ -1695,6 +1766,7 @@ func _start_beam(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, he
 	_bm_chain[at] = chain
 	_bm_prev[at] = prev
 	_bm_echo[at] = 1 if _echo_spell == spell else 0
+	_bm_shield[at] = roundi(spell.behaviour(ModifierBase.Behaviour.SHIELD))
 	_bm_origin[at] = origin
 	_bm_dir[at] = heading.normalized()
 	_bm_reach[at] = 0.0
@@ -1737,7 +1809,12 @@ func _beam_step(at: int, delta: float) -> void:
 	var hit: bool = _bm_tick[at] <= 0.0
 	if hit:
 		_bm_tick[at] = maxf(_bm_tick[at] + SpellLimits.BEAM_TICK, 0.001)
+	var spell: CompiledSpell = _bm_spell[at]
+	var tag: int = _bm_tag[at]
 	_beam_cast(at, hit)
+	# Every step, not only on its hits: a shot must not slip through between two ticks.
+	if _bm_on[at] != 0 and _bm_spell[at] == spell and _bm_tag[at] == tag:
+		_bm_shield[at] = _guard_path(spell, tag, _bm_actor[at], _bm_points, at * _bm_stride, _bm_count[at], _bm_reach[at], _bm_shield[at])
 
 
 ## Puts live beam `at` where its caster holds it now. A beam whose wizard has no aim any more
@@ -1991,6 +2068,7 @@ func _grow_beams() -> void:
 	_bm_chain.resize(size)
 	_bm_prev.resize(size)
 	_bm_echo.resize(size)
+	_bm_shield.resize(size)
 	_bm_origin.resize(size)
 	_bm_dir.resize(size)
 	_bm_bend.resize(size)
@@ -2096,6 +2174,7 @@ func _start_swing(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, h
 	_sw_chain[at] = chain
 	_sw_prev[at] = prev
 	_sw_echo[at] = 1 if _echo_spell == spell else 0
+	_sw_shield[at] = roundi(spell.behaviour(ModifierBase.Behaviour.SHIELD))
 	_sw_struck[at].clear()
 	_sw_points[at].clear()
 	_sw_heads[at].clear()
@@ -2135,6 +2214,9 @@ func _swing_step(at: int, delta: float) -> void:
 	var to: float = minf(turned, half)
 	_sw_turned[at] = turned
 	if to >= from:
+		_swing_guard(at, from, to)
+		if _sw_on[at] == 0 or _sw_spell[at] != spell or _sw_tag[at] != tag:
+			return
 		_swing_cast(at, from, to)
 	if into >= sweep and _sw_on[at] != 0 and _sw_spell[at] == spell and _sw_tag[at] == tag:
 		_end_swing(at, true)
@@ -2162,6 +2244,19 @@ func _swing_follow(at: int) -> void:
 			_sw_origin[at] = projectiles.get_position_of(caster)
 		else:
 			_sw_caster[at] = CASTER_POINT
+
+
+## Swing `at` turned from `from` to `to` radians off its aim: the shots of other teams in that
+## wedge are deflected outward from the hand (`deflect`), else stopped while its shield has
+## charges (melee I3).
+func _swing_guard(at: int, from: float, to: float) -> void:
+	var spell: CompiledSpell = _sw_spell[at]
+	var deflects: bool = spell.behaviour(ModifierBase.Behaviour.DEFLECT) > 0.0
+	if not deflects and _sw_shield[at] <= 0:
+		return
+	var origin: Vector2 = _sw_origin[at]
+	var found: int = projectiles.shots_in_wedge(_sw_actor[at], origin, _sw_dir[at], _sw_side[at], from, to, spell.ray_length)
+	_sw_shield[at] = _guard(found, _sw_actor[at], _sw_tag[at], deflects, _sw_shield[at], origin, Vector2.INF)
 
 
 ## Swing `at` turned from `from` to `to` radians off its aim: it strikes each body in that wedge it
@@ -2266,6 +2361,7 @@ func _grow_swings(size: int) -> void:
 	_sw_chain.resize(size)
 	_sw_prev.resize(size)
 	_sw_echo.resize(size)
+	_sw_shield.resize(size)
 	for i in range(old, size):
 		_sw_struck.append([])
 		_sw_points.append([])
@@ -2357,6 +2453,34 @@ func swing_arc(at: int) -> float:
 
 func swing_reach(at: int) -> float:
 	return _sw_spell[at].ray_length if _sw_spell[at] != null else 0.0
+
+
+## Which swing row `at` holds: a number no other swing had, so its look knows a new swing in a
+## row used again.
+func swing_born(at: int) -> int:
+	return _sw_born[at]
+
+
+## Seconds swing `at` has run (its wind-up first), its wind-up and its sweep.
+func swing_age(at: int) -> float:
+	return _sw_age[at]
+
+
+func swing_wind(at: int) -> float:
+	return _sw_wind[at]
+
+
+func swing_sweep(at: int) -> float:
+	return maxf(_sw_spell[at].lifetime, 0.001) if _sw_spell[at] != null else 0.001
+
+
+## The tint and packed look kinds of swing `at` (`CompiledSpell.tint`, `look`), so it shows its cards.
+func swing_tint(at: int) -> Color:
+	return _sw_spell[at].tint if _sw_spell[at] != null else Color.WHITE
+
+
+func swing_look(at: int) -> int:
+	return _sw_spell[at].look if _sw_spell[at] != null else 0
 
 
 ## Live swings over every caster.
@@ -2898,6 +3022,11 @@ func _on_shot_blocked(actor: int, position: Vector2, tag: int) -> void:
 
 
 func _on_shield_blocked(actor: int, position: Vector2, tag: int) -> void:
+	_fire_event(TriggerBase.Event.BLOCK, actor, position, tag, null)
+
+
+## A deflect is a block (owner, 2026-10-29): it sets off `on block` too.
+func _on_shot_deflected(actor: int, position: Vector2, tag: int) -> void:
 	_fire_event(TriggerBase.Event.BLOCK, actor, position, tag, null)
 
 

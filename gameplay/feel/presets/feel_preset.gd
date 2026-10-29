@@ -107,13 +107,16 @@ extends Resource
 	&"hex": {"color": Color("a63cff"), "look": 4},
 	&"static": {"color": Color("b4e82a"), "look": 5},
 }
-## The default feel of each hit kind (`hit_landed`: `shot`, `ray`, `burst`, `reaction`, `status`),
-## so a new card feels like something before it has its own sound: `stop` and `shake` scale
-## `hit_stop_seconds` and `hit_shake` (0 turns it off), `sound` is the id asked from the registry
-## (silent until an `.ogg` exists). A kind not listed uses the shot's look.
+## The default feel of each hit kind (`hit_landed`: `shot`, `ray`, `swing`, `burst`, `reaction`,
+## `status`), so a new card feels like something before it has its own sound: `stop` and `shake`
+## scale `hit_stop_seconds` and `hit_shake` (0 turns it off), `sound` is the id asked from the
+## registry (silent until an `.ogg` exists). A kind not listed uses the shot's look. A swing's hit
+## holds its bodies 0.05 s and shakes the screen about 2 px (the melee playground's, owner
+## 2026-10-29: trauma 0.57 of `max_shake_pixels` 6 is 0.57² x 6).
 @export var kind_looks: Dictionary = {
 	&"shot": {"stop": 1.0, "shake": 1.0, "sound": &"hit"},
 	&"ray": {"stop": 0.5, "shake": 0.5, "sound": &"hit_ray"},
+	&"swing": {"stop": 1.25, "shake": 3.8, "sound": &"hit_swing"},
 	&"burst": {"stop": 1.5, "shake": 2.0, "sound": &"hit_burst"},
 	&"reaction": {"stop": 1.0, "shake": 1.0, "sound": &"hit_reaction"},
 	&"status": {"stop": 0.0, "shake": 0.0, "sound": &""},

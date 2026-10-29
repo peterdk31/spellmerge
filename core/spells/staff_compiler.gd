@@ -22,7 +22,7 @@ const TRAVEL_ONLY: Array[int] = [
 	ModifierBase.Behaviour.LINGER, ModifierBase.Behaviour.STICKY, ModifierBase.Behaviour.GHOST,
 	ModifierBase.Behaviour.SPIRAL, ModifierBase.Behaviour.MIRROR, ModifierBase.Behaviour.GROWTH,
 	ModifierBase.Behaviour.RELAY, ModifierBase.Behaviour.RETURN, ModifierBase.Behaviour.ARC,
-	ModifierBase.Behaviour.POSSESS, ModifierBase.Behaviour.MAGNET,
+	ModifierBase.Behaviour.POSSESS, ModifierBase.Behaviour.MAGNET, ModifierBase.Behaviour.DEFLECT,
 ]
 
 ## How the description says when a trigger fires, by `TriggerBase.Event`.
@@ -145,8 +145,11 @@ func _read_group(want: int, payload: bool) -> CompiledGroup:
 			# A behaviour its form cannot run (homing on a rune, return on a beam) is wasted, and
 			# changes nothing else either.
 			var kept_modifiers: Array[ModifierBase] = []
+			var deflects: bool = false
 			for modifier in modifiers:
-				if behaviour_runs(modifier.behaviour, form.motion):
+				deflects = deflects or (modifier.behaviour == ModifierBase.Behaviour.DEFLECT and behaviour_runs(modifier.behaviour, form.motion))
+			for modifier in modifiers:
+				if behaviour_runs(modifier.behaviour, form.motion) and not (deflects and _shield_outrun(modifier, form.motion)):
 					kept_modifiers.append(modifier)
 			var spell: CompiledSpell = _build(form, elements, kept_modifiers, trigger, CompiledSpell.FALLBACK_NONE)
 			spell.slot = slot
@@ -154,7 +157,8 @@ func _read_group(want: int, payload: bool) -> CompiledGroup:
 			for at: int in kept:
 				var modifier := _cards[at] as ModifierBase
 				if modifier != null and not kept_modifiers.has(modifier):
-					_waste(at, "%s does nothing on a %s: %s." % [_name(modifier), _name(form), _why_not(modifier.behaviour)])
+					var why: String = "deflect turns every shot that touches it first" if deflects and _shield_outrun(modifier, form.motion) else _why_not(modifier.behaviour)
+					_waste(at, "%s does nothing on a %s: %s." % [_name(modifier), _name(form), why])
 				else:
 					_attach(at, slot)
 			if form.carries_payload():
@@ -320,7 +324,9 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 	spell.hit.later_status_ids = later_ids
 	spell.hit.later_status_durations = later_durations
 	spell.hit.later_status_strengths = later_strengths
-	if spell.ray_length > 0.0 and spell.motion != FormBase.Motion.DASH and spell.motion != FormBase.Motion.TELEPORT:
+	if spell.motion == FormBase.Motion.SWING:
+		spell.hit.kind = &"swing"
+	elif spell.ray_length > 0.0 and spell.motion != FormBase.Motion.DASH and spell.motion != FormBase.Motion.TELEPORT:
 		spell.hit.kind = &"ray"
 	if spell.homing_turn > 0.0:
 		spell.homing_range = homing_range(spell.motion, spell.ray_length, homing_reach)
@@ -386,7 +392,25 @@ static func behaviour_runs(behaviour: int, motion: FormBase.Motion) -> bool:
 				FormBase.Motion.STRAIGHT, FormBase.Motion.STILL, FormBase.Motion.ORBIT, FormBase.Motion.HOOK, FormBase.Motion.SWAP, FormBase.Motion.WALL:
 					return true
 			return false
+		ModifierBase.Behaviour.DEFLECT:
+			return guards(motion) or motion == FormBase.Motion.HOOK or motion == FormBase.Motion.SWAP
 	return true
+
+
+## True for the carriers whose shield only stops shots that touch them (a shot, a beam's line, a
+## swing's sweep): on these a deflect turns every such shot first (owner, 2026-10-29), so a shield
+## with it never blocks. A hook's shield also guards its caster on the pull, a dash's and a
+## teleport's is a barrier on the caster: those keep it.
+static func guards(motion: FormBase.Motion) -> bool:
+	match motion:
+		FormBase.Motion.STRAIGHT, FormBase.Motion.STILL, FormBase.Motion.ORBIT, FormBase.Motion.WALL, FormBase.Motion.RAY, FormBase.Motion.FISSURE, FormBase.Motion.SWING:
+			return true
+	return false
+
+
+## True when `modifier` is a shield that a deflect on a carrier of `motion` leaves with nothing to do.
+static func _shield_outrun(modifier: ModifierBase, motion: FormBase.Motion) -> bool:
+	return modifier.behaviour == ModifierBase.Behaviour.SHIELD and guards(motion)
 
 
 ## Why a carrier cannot run `behaviour`, for the wasted card's reason.
@@ -398,6 +422,8 @@ static func _why_not(behaviour: int) -> String:
 			return "it does not fly out"
 		ModifierBase.Behaviour.ARC:
 			return "it is not a shot that stays in the air"
+		ModifierBase.Behaviour.DEFLECT:
+			return "it touches no shots"
 	return "it cannot run it"
 
 

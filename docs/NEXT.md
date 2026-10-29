@@ -14,7 +14,6 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
 - [x] **The old recipe path removed (staffs A6c).** Done in an owner session: `Spells.compile(recipe)`, `builder_view`, the recipe wrappers (`install`, `cast`, a spell's `begin_generation`) and the recipe compiler are gone, `begin_generation` takes a compiled staff; `CompiledSpell` lost `valid`, `reason`, `description`, `complexity`, `depth` and `held`; `SpellLimits` keeps only engine safeguards and tuning; the events `build_change_requested`, `spell_swap_requested`, `spell_changed`, `recipe_changed` and `active_spell_changed` are removed; tests build staffs (`tests/support/staff_kit.gd` turns the old recipe shorthand into card rows; `test_spell_tags.gd` replaces `test_spells_compile.gd`); the spells, core and gameplay READMEs say so. **Phase B and the cards can start; development is unpaused.**
 - [x] **Card: arc (staffs C).** After the slow, return and arc kit (owner, 2026-10-27). Data only.
 - [x] **Card: linger (staffs C).** After B1. Data only (M2-staffs.md, "Working in parallel").
-- [ ] **Card: on wall (staffs C).** After B1 and B2. Data only (M2-staffs.md, "Working in parallel").
 - [ ] **Card: heavy (staffs C).** After B1 and B3. Data only (M2-staffs.md, "Working in parallel").
 - [ ] **Card: magnet (staffs C).** After B1 and B3. Data only (M2-staffs.md, "Working in parallel").
 - [ ] **Card: shield (staffs C).** After B1, B2 and B3. Data only (M2-staffs.md, "Working in parallel").
@@ -75,6 +74,7 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 
 ## Done recently
 
+- [x] **Card: on wall (staffs C).** `content/spells/triggers/on_wall/` (`TriggerBase`, event WALL, one fire, icon, `assets.json`), the lore entry, the combos `on_wall_bolt_nova` and `on_wall_bolt_rune`, and `tests/content/spells/test_on_wall.gd` (valid card; each combo holds with it, fails without it and with no wall). The engine side was built in B2.
 - [ ] **Clip recorder: combo `mates` and cast `dir`.** `tests/clips/scenarios.gd` ignores them, so the clips of `relay_teammate_frost` and `relay_teammate_fire` show a bolt hitting nothing; teach the recorder both keys.
 
 - [x] **Card: relay (staffs C).** `content/spells/modifiers/relay/` (`ModifierBase`, behaviour RELAY, icon, `assets.json`), the lore entry, the combos `relay_teammate_frost` and `relay_teammate_fire` (combo files may now name `mates` and a cast `dir`), and `tests/content/spells/test_relay.gd`.

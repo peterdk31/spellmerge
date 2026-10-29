@@ -2,6 +2,10 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-29: Staff codes are text of card ids (staffs D2)
+
+The format is `sm1:` and card ids joined by commas (no levels, no staff type: a staff has only cards). The version tag lets a later format change be told apart. Copy and paste sit in the list builder as two buttons in their own row, not in the tab row, which has no room; the clipboard is the system one. Pasting replaces the whole shown staff and asks the player for it, so a card the player lacks is refused as for any build. A code never names a path, so nothing can be loaded from it.
+
 ## 2026-10-29: The first cards' looks (staffs C0)
 
 Split takes the burst look (9); chain and faster get two new kinds, hops (13: a pixel that jumps sideways) and wake (14: pixels flung back fast), because sparks (5) is lightning's and streaks (8) is pierce's and heavy's, and a look is a set of kinds, so a card that shares a kind with a card beside it adds nothing to the shot. No numbers change. Rule: the first six modifiers never share a kind with an infusion, and never share with one another (a test checks this); later modifiers that are rarely stacked (blast and overcharge share 9) may still share until the kinds run out (up to 24). Without the budget, the first cards' numbers still sit well beside the newer cards' (complexity and mana already price them), so rebalancing waits for the C2 playtest.

@@ -269,6 +269,66 @@ func test_a_refusal_shows_its_reason() -> void:
 	check(builder.note_text().begins_with(BuilderScript.REFUSED_PREFIX), "the refusal is shown: %s" % builder.note_text())
 
 
+## A fake clipboard for the builder of `player`: returns a Dictionary {"text": ...} it reads and writes.
+func _clipboard(player: int) -> Dictionary:
+	var board: Dictionary = {"text": ""}
+	var builder: BuilderScript = _builder(player)
+	builder.clipboard_get = func() -> String: return str(board["text"])
+	builder.clipboard_set = func(text: String) -> void: board["text"] = text
+	return board
+
+
+func test_copy_puts_the_staff_code_on_the_clipboard() -> void:
+	_start(1)
+	_open(0)
+	var builder: BuilderScript = _builder(0)
+	var board: Dictionary = _clipboard(0)
+	_press(0, builder.copy_button())
+	check_equal(board["text"], "sm1:fire,bolt", "the shown staff (fire, bolt) as a code")
+	check(builder.note_text().begins_with(BuilderScript.COPIED_PREFIX), "it says so: %s" % builder.note_text())
+	_press(0, builder.tab_button(Y))
+	_press(0, builder.copy_button())
+	check_equal(board["text"], "sm1:fire,bolt", "an empty staff copies nothing")
+	check_equal(builder.note_text(), BuilderScript.NOTHING_TO_COPY, "and says it is empty")
+
+
+func test_paste_builds_the_staff_from_a_code_and_a_bad_code_changes_nothing() -> void:
+	_start(1)
+	_open(0)
+	var builder: BuilderScript = _builder(0)
+	var board: Dictionary = _clipboard(0)
+	var requested: Array = []
+	_bus.staff_cards_requested.connect(func(player: int, staff: int, cards: Array[StringName]) -> void: requested.append([player, staff, cards]))
+	board["text"] = "sm1:frost,fire,-,nova"
+	_press(0, builder.paste_button())
+	check_equal(requested.size(), 1, "one request for the whole staff")
+	check_equal(requested[0][1], X, "for the staff shown")
+	check_equal(builder.cards_of(X).slice(0, 4), [&"frost", &"fire", &"", &"nova"] as Array[StringName], "the player built it")
+	check_equal(builder.cards_of(X).size(), 20, "the rest of the 20 slots is empty")
+	for text: String in ["not a code", "sm1:fire,no_such_card", "sm1:" + "fire,".repeat(25) + "fire", "sm1:res://core/spells/spells.gd"]:
+		board["text"] = text
+		_press(0, builder.paste_button())
+		check_equal(requested.size(), 1, "'%s' asks for nothing" % text.left(20))
+		check(builder.note_text().begins_with(BuilderScript.REFUSED_PREFIX), "'%s' says why: %s" % [text.left(20), builder.note_text()])
+		check_equal(builder.cards_of(X).slice(0, 4), [&"frost", &"fire", &"", &"nova"] as Array[StringName], "the staff stays")
+
+
+func test_a_pasted_code_travels_from_one_player_to_another() -> void:
+	_start(2)
+	_open(0)
+	_open(1)
+	var board: Dictionary = {"text": ""}
+	for player in 2:
+		var builder: BuilderScript = _builder(player)
+		builder.clipboard_get = func() -> String: return str(board["text"])
+		builder.clipboard_set = func(text: String) -> void: board["text"] = text
+	_press(0, _builder(0).copy_button())
+	_press(1, _builder(1).tab_button(Y))
+	_press(1, _builder(1).paste_button())
+	check_equal(_builder(1).cards_of(Y).slice(0, 2), [&"fire", &"bolt"] as Array[StringName], "player 2 got player 1's staff on staff 3")
+	check_equal(_builder(0).cards_of(Y).slice(0, 2), [&"", &""] as Array[StringName], "and player 1's staff 3 is untouched")
+
+
 func test_only_the_owner_drives_a_builder() -> void:
 	_start(2)
 	_open(0)
@@ -380,10 +440,19 @@ func test_the_dpad_moves_in_two_dimensions() -> void:
 	check_equal(_focus.focused(0), builder.slot_button(0), "start on the first slot")
 	_tap(0, &"move_up")
 	_frame()
-	check_equal(_focus.focused(0), builder.tab_button(X), "up from the first slot is the shown staff's tab")
+	check_equal(_focus.focused(0), builder.copy_button(), "up from the first slot is the code row")
+	_tap(0, &"move_right")
+	_frame()
+	check_equal(_focus.focused(0), builder.paste_button(), "right along the code row")
+	_tap(0, &"move_up")
+	_frame()
+	check_equal(_focus.focused(0), builder.tab_button(X), "up from the code row is the shown staff's tab")
 	_tap(0, &"move_right")
 	_frame()
 	check_equal(_focus.focused(0), builder.tab_button(Y), "right along the tabs")
+	_tap(0, &"move_down")
+	_frame()
+	check_equal(_focus.focused(0), builder.copy_button(), "down from a tab is the code row")
 	_tap(0, &"move_down")
 	_frame()
 	check_equal(_focus.focused(0), builder.slot_button(0), "down to the slots")

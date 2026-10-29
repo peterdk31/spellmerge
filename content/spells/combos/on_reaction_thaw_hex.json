@@ -1,0 +1,12 @@
+{
+	"id": "on_reaction_thaw_hex",
+	"name": "On reaction thaw hex",
+	"does": "A fire bolt burns the imp, then a frost bolt on it sets off Thaw and a void nova bursts there, hexing the imp beside it.",
+	"casts": [
+		{"staff": 1, "cards": ["fire", "bolt"]},
+		{"staff": 0, "cards": ["on_reaction", "frost", "bolt", "void", "nova"], "at": 0.3}
+	],
+	"imps": [[100, 0], [100, 45]],
+	"seconds": 2.0,
+	"checks": [{"kind": "status", "imps": [1], "status": "hex"}]
+}

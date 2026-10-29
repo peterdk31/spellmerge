@@ -2022,3 +2022,7 @@ The owner: restructure the projectile step from "for each shot, check every beha
 ## 2026-10-29: Teleport numbers (staffs C)
 
 - **Teleport blinks 96 px for 4 mana, 2.5 s cooldown, complexity 2.** The three dashes move 48, 80 and 128 px, all free every 2 s. A blink is at once (a dash takes time to travel and can be hit on the way), so it costs mana and a longer cooldown; 96 px is only a little past the medium dash and short of the long one, so the 4 mana and 2.5 s pay for the instant arrival, not for range. `speed` (0) and `lifetime` (0.1) are placeholders: the compiler takes the distance from `ray_length` alone. Its combos do not test an end point (blast, on expire): the combo arena does not move its caster, as for dash.
+
+## 2026-10-29: Hook numbers (staffs C)
+
+- **Hook flies 300 px/s for 0.5 s (150 px reach), 3 mana, 2 s cooldown, 1 damage, complexity 2.** It reaches farther than the long dash (128 px) but not across a room, and the pull takes `HOOK_SECONDS`, so it is a gap-closer that can be hit on the way; it costs a little less than the instant teleport (4 mana, 2.5 s). A miss pulls nobody. Its combos do not test an end point (blast, on expire): the combo arena does not move its caster, as for dash and teleport.

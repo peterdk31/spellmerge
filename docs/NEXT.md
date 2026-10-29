@@ -14,7 +14,6 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
 - [x] **The old recipe path removed (staffs A6c).** Done in an owner session: `Spells.compile(recipe)`, `builder_view`, the recipe wrappers (`install`, `cast`, a spell's `begin_generation`) and the recipe compiler are gone, `begin_generation` takes a compiled staff; `CompiledSpell` lost `valid`, `reason`, `description`, `complexity`, `depth` and `held`; `SpellLimits` keeps only engine safeguards and tuning; the events `build_change_requested`, `spell_swap_requested`, `spell_changed`, `recipe_changed` and `active_spell_changed` are removed; tests build staffs (`tests/support/staff_kit.gd` turns the old recipe shorthand into card rows; `test_spell_tags.gd` replaces `test_spells_compile.gd`); the spells, core and gameplay READMEs say so. **Phase B and the cards can start; development is unpaused.**
 - [x] **Card: arc (staffs C).** After the slow, return and arc kit (owner, 2026-10-27). Data only.
 - [x] **Card: linger (staffs C).** After B1. Data only (M2-staffs.md, "Working in parallel").
-- [ ] **Card: hook (staffs C).** After B2 and B4. Data only (M2-staffs.md, "Working in parallel"). Moved to the bot's queue by the owner on 2026-10-26.
 - [ ] **Card: recoil (staffs C).** After B2 and B4. Data only (M2-staffs.md, "Working in parallel"). Moved to the bot's queue by the owner on 2026-10-26.
 - [ ] **Card: swap (staffs C).** After B2, B4 and B5. Data only (M2-staffs.md, "Working in parallel"). Moved to the bot's queue by the owner on 2026-10-26.
 - [ ] **Card: decoy (staffs C).** After B2 and B5. Data only (M2-staffs.md, "Working in parallel"). Moved to the bot's queue by the owner on 2026-10-26.
@@ -60,6 +59,8 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 ## Blocked
 
 ## Done recently
+
+- [x] **Card: hook (staffs C).** `content/spells/forms/hook/` (`FormBase`, motion HOOK, a 150 px shot, 3 mana, 2 s cooldown, icon, `assets.json`), the lore entry, the combos `hook_pull`, `hook_miss` and `hook_and_fire`, and `tests/content/spells/test_hook.gd`. The engine side was built in B2 and B4.
 
 - [x] **Card: teleport (staffs C).** `content/spells/forms/teleport/` (`FormBase`, motion TELEPORT, 96 px, 4 mana, 2.5 s cooldown, icon, `assets.json`), the lore entry, the combos `teleport_away`, `teleport_and_fire` and `shield_teleport`, and `tests/content/spells/test_teleport.gd`. The engine side was built in B2 and B4.
 - [x] **Card: hold (staffs C).** `content/spells/modifiers/hold/` (`ModifierBase`, HOLD, icon, `assets.json`), the lore entry, the combos `hold_fire_orbit` and `hold_shield_orbit`, and `tests/content/spells/test_hold.gd` (valid card; the combos keep their shots past an orbit's 3 s and reserve mana only with the card, the next cast ends them and frees the mana; four players). The engine side was built in A5/B4.

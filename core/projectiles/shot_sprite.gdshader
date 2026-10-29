@@ -10,7 +10,8 @@ render_mode blend_premul_alpha;
 
 #include "res://core/projectiles/shot_palette.gdshaderinc"
 
-// The colour the warm pixels take (alpha above 0 turns it on; white leaves the sprite's colours).
+// The colour the warm pixels take (alpha above 0 turns it on; alpha 0 keeps the sprite's own colours:
+// a staff's body glowing with its animation, gameplay/player/staff_look.gd).
 uniform vec4 core_override = vec4(0.0);
 // Multiplies the vertex colour: the tint and the fade of a lone Sprite2D.
 uniform vec4 body_tint = vec4(1.0);
@@ -21,8 +22,10 @@ uniform float glow_strength = 1.0;
 uniform float dissolve = 0.0;
 uniform vec4 dissolve_color = vec4(0.957, 0.945, 0.918, 1.0);
 // The glow: light added round the sprite's own pixels (a combo mark, an afterimage), as bright
-// as this; the sprite needs a few empty pixels round it to hold it.
+// as this; the sprite needs a few empty pixels round it to hold it. Its hue is `glow_color` when
+// that has alpha above 0 (a staff's charge in its player's colour), else the tint's or the dissolve's.
 uniform float sprite_glow = 0.0;
+uniform vec4 glow_color = vec4(0.0);
 
 varying flat vec4 body;
 varying flat vec3 core;
@@ -35,7 +38,7 @@ void vertex() {
 void fragment() {
 	vec4 t = texture(TEXTURE, UV);
 	vec3 rgb = t.rgb * body.rgb;
-	float warm = smoothstep(0.1, 0.25, t.r - t.b);
+	float warm = core_override.a > 0.0 ? smoothstep(0.1, 0.25, t.r - t.b) : 0.0;
 	float lum = dot(t.rgb, vec3(0.3, 0.59, 0.11));
 	float shade = clamp((lum - 0.5) / 0.45, 0.0, 1.0);
 	vec3 lit = mix(core * 0.55, mix(core, vec3(1.0), 0.55), shade);
@@ -57,7 +60,7 @@ void fragment() {
 			vec2 dir = vec2(cos(float(k) * 0.7854), sin(float(k) * 0.7854)) * TEXTURE_PIXEL_SIZE;
 			near += texture(TEXTURE, UV + dir * 2.0).a * 0.09 + texture(TEXTURE, UV + dir * 4.0).a * 0.035;
 		}
-		vec3 hue = dissolve > 0.0 ? dissolve_color.rgb : body.rgb;
+		vec3 hue = glow_color.a > 0.0 ? glow_color.rgb : (dissolve > 0.0 ? dissolve_color.rgb : body.rgb);
 		COLOR = vec4(hue * near * sprite_glow * (1.0 - dissolve) * glow_strength, 0.0);
 	} else {
 		// Premultiplied, as the blend mode wants.

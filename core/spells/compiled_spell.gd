@@ -32,6 +32,8 @@ var ray_length: float = 0.0
 ## SWING: degrees its sweep hits over, and seconds it leans back first (`FormBase.arc`, `wind_up`).
 var arc: float = 0.0
 var wind_up: float = 0.0
+## The carrier's staff animation (`FormBase.packed_pose`, shared, never written).
+var staff_pose: PackedFloat32Array = PackedFloat32Array()
 ## The shots the cards asked for (the same as `shots`; kept for the description).
 var shots_requested: int = 1
 

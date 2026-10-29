@@ -48,9 +48,9 @@ extends Node
 ## sharing `effect_slots` (a setting: Settings, "Effect slots", through `effect_slots_changed`),
 ## each with the core colour and look of the shot it comes from (`impact_core`, `impact_look` of
 ## the projectile manager), so a frost bolt lands in frost flecks and a lightning one in sparks,
-## all glowing. A new effect takes the oldest slot when they are all busy. On
-## `actor_cast` (every actor's cast, from the kit's Caster, with the actor node) the caster's
-## `Sprite` gets thin and tall for a moment. None of this touches the cast itself.
+## all glowing. A new effect takes the oldest slot when they are all busy. How a caster's body
+## moves when it casts is its carrier card's `staff_pose`, drawn by its look (ActorLook), not here.
+## None of this touches the cast itself.
 ##
 ## Nothing is allocated while playing: the effect batch and sound players are made once.
 ## They live under this autoload (top level, so in world space), never under the scene:
@@ -470,7 +470,6 @@ func _ready() -> void:
 	events.enemy_died.connect(_on_enemy_died)
 	events.player_downed.connect(_on_player_downed)
 	events.spell_cast.connect(_on_spell_cast)
-	events.actor_cast.connect(_on_actor_cast)
 	events.staff_shown.connect(_on_staff_shown)
 	events.possess_started.connect(_on_possess_started)
 	events.possess_ended.connect(_on_possess_ended)
@@ -625,15 +624,11 @@ func _start_ghost(dead: Node) -> void:
 	_ghost_total[slot] = preset.death_anim_seconds
 
 
-## Start the flash and squash of the hit node's `Sprite` child, if it has one.
+## Start the white flash and the squash (wide and low) of the hit node's `Sprite` child, if it
+## has one, for `flash_seconds`; a hit on a sprite still reacting starts it again.
 func _react(target: Node) -> void:
-	_start_reaction(target, preset.flash_seconds, preset.hit_squash, true)
-
-
-## Squash the `Sprite` child of `target` by `amount` (positive: wide and low, negative:
-## thin and tall) for `seconds`, with the white flash if `flash`. A hit replaces a
-## running cast squash; a cast never replaces a running hit.
-func _start_reaction(target: Node, seconds: float, amount: float, flash: bool) -> void:
+	var seconds: float = preset.flash_seconds
+	var amount: float = preset.hit_squash
 	if seconds <= 0.0 or target == null or not is_instance_valid(target):
 		return
 	var sprite := target.get_node_or_null("Sprite") as Sprite2D
@@ -641,8 +636,6 @@ func _start_reaction(target: Node, seconds: float, amount: float, flash: bool) -
 		return
 	var at: int = _react_sprites.find(sprite.get_instance_id())
 	if at >= 0:
-		if not flash and sprite.material == _flash_material:
-			return
 		_react_left[at] = seconds
 		_react_total[at] = seconds
 		_react_amount[at] = amount
@@ -655,7 +648,7 @@ func _start_reaction(target: Node, seconds: float, amount: float, flash: bool) -
 		_react_amount.append(amount)
 	else:
 		return
-	sprite.material = _flash_material if flash else null
+	sprite.material = _flash_material
 
 
 ## Sprites flashing right now (for tests).
@@ -1703,14 +1696,6 @@ func _pose_form(slot: int, t: float) -> void:
 	var flicker: float = 1.0 - preset.beam_flicker_depth * float(step % 2)
 	material.set_shader_parameter(&"beam_swell", t * flare * flicker)
 	material.set_shader_parameter(&"beam_fade", t)
-
-
-## Any actor cast (a wizard's or an enemy's): its `Sprite` squashes thin and tall.
-func _on_actor_cast(_caster: int, actor: Node) -> void:
-	# The dash look owns the sprite scale while dodging; a squash would fight it.
-	if actor is Actor and (actor as Actor).mover != null and (actor as Actor).mover.is_moving():
-		return
-	_start_reaction(actor, preset.cast_squash_seconds, -preset.cast_squash, false)
 
 
 ## Another staff went on show (the personality swap, living staffs H4): a poof along the staff,

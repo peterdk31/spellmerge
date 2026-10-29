@@ -2,6 +2,15 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-29: Staff animations are carrier data (owner)
+
+- **Every carrier says how the staff moves** (`FormBase.staff_pose`), as it says its cast flash and impact (`cast_look`, `impact_look`): the owner asked for staff animations for slam and saw that every carrier could use the same thing for variety. One player of that data (`Spells.staff_pose` and the rest), drawn the same way by every look (`ActorLook`), so the strays play the same animations as the wizards.
+- **Channels** (owner's pick): turn, lift, push, glow (the owner: "would glow fit?": yes, it shares the timeline; the infusion's colour, else the player's), stretch, shake and the face's mood. Keys are dictionaries (readable, like `cast_look`), any channel left out at rest; packed into numbers once per card.
+- **Timing in the carrier's own time:** wind-up, strike (its working time: a swing's sweep, a slam's ring, a beam's, rain's or dash's life, ended by its last shot), a hold that loops while the strike lasts (a held beam straining), after. A new cast starts from where the staff is (no jumps).
+- **Aim:** a swing or slam keeps the aim of its cast (their aim is locked); every other animation turns with the live aim (a held beam follows it). For carriers that are no swing a negative turn lifts the head, whichever way the body faces (a slam raises, never dips, facing left).
+- **Not card order or special cases:** a shield and deflect question earlier the same day settled that rules, not order, decide; the same here: the strike is defined per motion in one table (`_pose_strike_of`).
+- **Cleanup:** Feel's thin-and-tall squash on every cast is gone (each card's `stretch` replaces it; the two together doubled up), and `SWING_HOLD`/`SWING_SETTLE` became the swing card's keys. The dash look (stretch, lean, ghosts) stays: it is a body being moved (a dash, a hook's or swap's pull), not a cast.
+
 ## 2026-10-29: Deflect's look and price (melee I5)
 
 - **Look: zig (18), shared with bounce and arc.** Every kind is taken (22 to 24 are flags), so the card shares one. Zig is streaks thrown back at an angle, which is what a deflect does to a shot: it is a bounce off the carrier instead of a wall, so it sits with bounce in the "turning off something" group. `test_original_looks.gd` lists it.

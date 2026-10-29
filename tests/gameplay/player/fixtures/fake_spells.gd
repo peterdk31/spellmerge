@@ -15,8 +15,9 @@ var origins: Array[Vector2] = []
 var directions: Array[Vector2] = []
 ## [player, staff] for every install, in order.
 var installed: Array[Vector2i] = []
-## actor -> the way its staff points in a swing, as a test sets it (`swing_pose`).
-var swing_poses: Dictionary = {}
+## actor -> [aim locked at the cast, pose (turn, lift, push)] of its staff's animation, as a test
+## sets it (`staff_pose`, `staff_pose_dir`).
+var staff_poses: Dictionary = {}
 
 var _left: PackedFloat32Array = PackedFloat32Array()
 var _has: PackedByteArray = PackedByteArray()
@@ -78,8 +79,37 @@ func last_form(player: int, staff: int) -> StringName:
 	return _first[player * 4 + staff]
 
 
-func swing_pose(actor: int) -> Vector2:
-	return swing_poses.get(actor, Vector2.ZERO)
+func staff_pose(actor: int) -> Vector3:
+	return staff_poses[actor][1] if staff_poses.has(actor) else Vector3.ZERO
+
+
+func staff_glow(actor: int) -> float:
+	return _pose_part(actor, 2, 0.0)
+
+
+func staff_glow_tint(actor: int) -> Color:
+	return _pose_part(actor, 5, Color.WHITE)
+
+
+func staff_stretch(actor: int) -> float:
+	return _pose_part(actor, 3, 0.0)
+
+
+func staff_shake(_actor: int) -> float:
+	return 0.0
+
+
+func staff_mood(actor: int) -> StringName:
+	return _pose_part(actor, 4, &"")
+
+
+## Part `n` of the pose a test set for `actor` ([dir, pose, glow, stretch, mood, glow tint]), or `none`.
+func _pose_part(actor: int, n: int, none: Variant) -> Variant:
+	return staff_poses[actor][n] if staff_poses.has(actor) and staff_poses[actor].size() > n else none
+
+
+func staff_pose_dir(actor: int) -> Vector2:
+	return staff_poses[actor][0] if staff_poses.has(actor) else Vector2.ZERO
 
 
 func is_holding(_player: int, _staff: int) -> bool:

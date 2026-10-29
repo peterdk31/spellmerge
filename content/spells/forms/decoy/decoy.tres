@@ -21,3 +21,4 @@ spread = 0.0
 motion = 11
 pierce = 0
 impact_look = {"seconds": 0.1, "size": 0.45}
+staff_pose = Array[Dictionary]([{"phase": "after", "at": 0.05, "lift": -1, "stretch": -0.3, "ease": "out"}, {"phase": "after", "at": 0.14, "lift": 3, "stretch": 0.25}, {"phase": "after", "at": 0.3}])

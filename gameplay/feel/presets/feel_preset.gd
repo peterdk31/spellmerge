@@ -42,9 +42,6 @@ extends Resource
 ## squashes then (0.25 is 25% wider and 25% lower), settling back in the same time.
 @export_range(0.0, 0.3, 0.01) var flash_seconds: float = 0.08
 @export_range(0.0, 0.6, 0.01) var hit_squash: float = 0.25
-## The caster's squash on a cast: seconds, and how much thinner and taller (0.15 is 15%).
-@export_range(0.0, 0.3, 0.01) var cast_squash_seconds: float = 0.12
-@export_range(0.0, 0.6, 0.01) var cast_squash: float = 0.2
 ## Seconds a dead enemy's copy takes to turn white-hot and fall apart.
 @export_range(0.0, 0.6, 0.01) var death_anim_seconds: float = 0.25
 ## The white-hot ring where an enemy dies: seconds and biggest size.

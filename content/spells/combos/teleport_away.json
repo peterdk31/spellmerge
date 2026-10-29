@@ -1,0 +1,9 @@
+{
+	"id": "teleport_away",
+	"name": "Teleport away",
+	"does": "The teleport card blinks its caster a fixed 96 px; nothing else happens.",
+	"casts": [{"staff": 0, "cards": ["teleport"]}],
+	"imps": [[100, 0]],
+	"seconds": 0.5,
+	"checks": [{"kind": "caster_moved", "mode": "teleport"}, {"kind": "max_shots", "max": 0}]
+}

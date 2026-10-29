@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-29: Card teleport (staffs C)
+
+Added the Teleport carrier (data only: `.tres`, icon, assets, lore), the combos `teleport_away`, `teleport_and_fire` and `shield_teleport`, and `test_teleport.gd` (the card's data, the move it asks for, four players).
+
 ## 2026-10-29: Card hold (staffs C)
 
 Added the Hold modifier (data only: `.tres`, icon, assets, lore), the combos `hold_fire_orbit` and `hold_shield_orbit` and `test_hold.gd`, which checks that the shots outlive an orbit's lifetime only with the card, that `mana_reserved` goes up and comes back down on the next cast, and four players at once. All unit tests pass except `test_svg_art` on the Shield icon, already on main (see BACKLOG).

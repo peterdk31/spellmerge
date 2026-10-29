@@ -122,6 +122,23 @@ func test_a_new_carrier_card_brings_its_own_look() -> void:
 	check_equal(feel.effects_of(FeelScript.KIND_RING_OUT), 1, "and a ring, as the card says")
 
 
+func test_a_carrier_whose_look_says_quake_strikes_the_ground_where_it_ends() -> void:
+	var card := FormBase.new()
+	card.id = &"test_meteor"
+	card.radius = 12.0
+	card.impact_look = {"seconds": 0.2, "size": 1.0, "quake": 2.0}
+	registry.extra = card
+	_impact(0, &"test_meteor", Color.WHITE, 0, own(Node2D.new()) as Node2D)
+	check_equal(feel.effects_of(FeelScript.KIND_QUAKE), 0, "not where it hits a body")
+	_impact(0, &"test_meteor")
+	check_equal(feel.effects_of(FeelScript.KIND_QUAKE), 1, "the floor cracks where it ends")
+	check_equal(feel.effect_info(FeelScript.KIND_QUAKE).get("zoom"), roundi(12.0 * 2.0 * FeelScript.QUAKE_PAST / FeelScript.QUAKE_REACH), "out to its radius times the quake")
+	check(is_equal_approx(feel.trauma(), preset.quake_shake), "with the ground's shake")
+	check(is_equal_approx(actors.held_left(0), preset.quake_stop_seconds), "and its caster held")
+	_impact(0, &"bolt")
+	check_equal(feel.effects_of(FeelScript.KIND_QUAKE), 1, "a carrier without it leaves no mark")
+
+
 func test_a_look_missed_for_want_of_a_registry_is_not_kept() -> void:
 	feel.registry = null
 	_cast(0, &"nova")

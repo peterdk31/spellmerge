@@ -84,6 +84,8 @@ const FORM_SLOTS: int = FORMS_PER_PLAYER * 5
 const ENEMY_FORMS: int = 4
 ## Beams and rings draw above the room, under the shots (50) and the flashes (20).
 const FORM_Z: int = 18
+## Marks on the floor (a quake) draw just under the beams and rings, under the enemies (40).
+const FLOOR_Z: int = FORM_Z - 1
 ## Live beams made at once (more are made when core/spells has more: no beam limit, owner
 ## 2026-10-29), and the most points of each one's drawn path (BEAM_POINTS in `shot_beam.gdshader`):
 ## a homing beam bends from target to target and a bouncing one turns at walls, so it is drawn
@@ -151,6 +153,11 @@ const KIND_PUFF: int = 12
 const KIND_CHIPS: int = 13
 const KIND_ARC: int = 14
 const KIND_STATUS: int = 15
+## The ground struck (`strike_ground`: a slam's impact, or any carrier whose impact look says
+## `quake`): cracks cooling from white-hot, rubble and dust, drawn by
+## the flares' shader in a batch of its own under the bodies (`FLOOR_Z`). Below KIND_BURST, where
+## the shots' kinds are, which never come to that shader.
+const KIND_QUAKE: int = 3
 ## The look bit that makes an effect take its colour exactly (a reaction's own colour) instead
 ## of the palette material it is nearest (kind 24 in the shader).
 const EXACT: int = 1 << 23
@@ -165,6 +172,11 @@ const POOF_ALONG: float = 4.0
 const SPRAY_SECONDS: float = 0.3
 const PUFF_SECONDS: float = 0.4
 const CHIPS_SECONDS: float = 0.5
+## A quake's seconds (its cracks cool and crumble away at the end), and its reach per zoom in
+## pixels (QUAKE_REACH in the shader): its zoom is the reach struck times QUAKE_PAST over that.
+const QUAKE_SECONDS: float = 1.4
+const QUAKE_REACH: float = 8.0
+const QUAKE_PAST: float = 1.5
 ## A status effect lasts until its status ends (Feel ends it).
 const FOREVER: float = 1.0e9
 const BURST_SECONDS: float = 0.3
@@ -338,7 +350,7 @@ var _reaction_names: Dictionary = {}
 ## Real seconds since feel started, and when each reaction id last gave a sound and a shake.
 var _clock: float = 0.0
 ## The effects' batches, one per shader (see "Effects" above): the flares, the arcs, the
-## statuses; each has room for every slot.
+## statuses, and the marks on the floor (the flares' shader, lower); each has room for every slot.
 var _effect_node: MultiMeshInstance2D = null
 var _effect_buffer: PackedFloat32Array = PackedFloat32Array()
 static var _effect_mesh: ArrayMesh = null
@@ -348,6 +360,8 @@ var _arc_node: MultiMeshInstance2D = null
 var _arc_buffer: PackedFloat32Array = PackedFloat32Array()
 var _status_node: MultiMeshInstance2D = null
 var _status_buffer: PackedFloat32Array = PackedFloat32Array()
+var _floor_node: MultiMeshInstance2D = null
+var _floor_buffer: PackedFloat32Array = PackedFloat32Array()
 var _effect_kind: PackedInt32Array = PackedInt32Array()
 var _effect_at: PackedVector2Array = PackedVector2Array()
 var _effect_dir: PackedVector2Array = PackedVector2Array()
@@ -963,12 +977,12 @@ func _on_projectile_impact(caster: int, target: Node, position: Vector2, directi
 		_impact_frame = Engine.get_physics_frames()
 		_impact_at = position
 		_impact_aim = direction
-		_show_impact(ramp, position, direction)
+		_show_impact(caster, ramp, position, direction, true)
 		return
 	# Stone chips knocked back off the surface.
 	if particles_enabled:
 		show_effect(KIND_CHIPS, position, -direction, Color.WHITE, 0, 0, clampi(roundi(preset.wall_chip_size), 1, 3), CHIPS_SECONDS)
-	_show_impact(ramp, position, direction)
+	_show_impact(caster, ramp, position, direction, false)
 
 
 ## A dash landed: a ring in its caster's ramp where the body stopped; lightning arcs from where it
@@ -1038,8 +1052,10 @@ func _on_shot_blocked(caster: int, position: Vector2, _tag: int) -> void:
 ## The payoff of a shot: a flare in the shot's colour, shaped by the form of the shot itself
 ## (the projectile manager's `impact_form` while the impact is sent; a rune goes off, a nova's
 ## adds a ring), in its caster's `ramp`: an enemy's lands the same way, in the enemy ramp where a
-## hat colour would show (staffs F7: one look for every spell).
-func _show_impact(ramp: int, position: Vector2, direction: Vector2) -> void:
+## hat colour would show (staffs F7: one look for every spell). A carrier whose impact look says
+## `quake` strikes the ground where it ends on no body (`on_body` false), out to its card's radius
+## times the quake.
+func _show_impact(caster: int, ramp: int, position: Vector2, direction: Vector2, on_body: bool) -> void:
 	var form: StringName = &""
 	if projectiles != null and "impact_form" in projectiles:
 		form = projectiles.impact_form as StringName
@@ -1057,6 +1073,30 @@ func _show_impact(ramp: int, position: Vector2, direction: Vector2) -> void:
 	show_effect(KIND_BURST, position, direction, core, ramp, bits, zoom, BURST_SECONDS)
 	if look.get("ring", false) as bool:
 		show_effect(KIND_RING_OUT, position, direction, core, ramp, 0, 1, RING_SECONDS)
+	var quake: float = look.get("quake", 0.0) as float
+	if quake > 0.0 and not on_body:
+		strike_ground(caster, position, (look.get("radius", 0.0) as float) * quake, core, bits)
+
+
+## The ground struck at `at` by `caster`'s spell (a slam's impact, or any carrier whose impact look
+## says `quake`), out to `reach` pixels, in the caster's ramp (`tint`, as `show_effect`'s `core`)
+## with the cards of the packed `look`: its mark on the floor (`KIND_QUAKE`: cracks cooling from
+## white-hot, a glow, rubble that lands, dust rolling out), stone chips, the caster held a moment
+## (hit or miss), and a shake with a punch down the screen, as if driven into the floor.
+func strike_ground(caster: int, at: Vector2, reach: float, tint: Color, look: int) -> void:
+	if not at.is_finite() or reach <= 0.0:
+		return
+	var ramp: int = _ramp_of(caster)
+	show_effect(KIND_QUAKE, at, Vector2.RIGHT, tint, ramp, look, clampi(roundi(reach * QUAKE_PAST / QUAKE_REACH), 1, 15), QUAKE_SECONDS)
+	if particles_enabled:
+		show_effect(KIND_CHIPS, at, Vector2.UP, Color.WHITE, 0, 0, 2, CHIPS_SECONDS)
+	var table: ActorsScript = _actor_table()
+	if table != null and preset.quake_stop_seconds > 0.0:
+		_hold_actor(table, caster, preset.quake_stop_seconds, true)
+	if shake_enabled:
+		_refresh_camera()
+		_trauma = minf(_trauma + preset.quake_shake, 1.0)
+		_kick = (_kick + Vector2.DOWN * preset.quake_kick_pixels).limit_length(MAX_KICK_PIXELS)
 
 
 ## A beam's node: a beam mesh in world space drawn by the beam shader, hidden until shown.
@@ -1118,6 +1158,8 @@ func _make_effects() -> void:
 	_status_node = _make_effect_batch(STATUS_SHADER, quad)
 	_effect_node = _make_effect_batch(EFFECT_SHADER, effect_mesh())
 	_arc_node = _make_effect_batch(ARC_SHADER, quad)
+	_floor_node = _make_effect_batch(EFFECT_SHADER, effect_mesh())
+	_floor_node.z_index = FLOOR_Z
 	_size_effects(effect_slots)
 
 
@@ -1185,11 +1227,12 @@ func _make_effect_batch(shader: Shader, mesh: Mesh) -> MultiMeshInstance2D:
 ## effects showing end (a setting changed in a menu: nobody misses a tenth of a second of sparks).
 func _size_effects(slots: int) -> void:
 	effect_slots = slots
-	for node: MultiMeshInstance2D in [_effect_node, _arc_node, _status_node]:
+	for node: MultiMeshInstance2D in [_effect_node, _arc_node, _status_node, _floor_node]:
 		node.multimesh.visible_instance_count = 0
 		node.multimesh.instance_count = slots
 	_effect_buffer.resize(slots * EFFECT_STRIDE)
 	_arc_buffer.resize(slots * EFFECT_STRIDE)
+	_floor_buffer.resize(slots * EFFECT_STRIDE)
 	_status_buffer.resize(slots * EFFECT_STRIDE)
 	_effect_kind.resize(slots)
 	_effect_at.resize(slots)
@@ -1267,8 +1310,10 @@ func _step_effects(real_delta: float) -> void:
 	(_effect_node.material as ShaderMaterial).set_shader_parameter(&"sim_time", _clock)
 	(_arc_node.material as ShaderMaterial).set_shader_parameter(&"sim_time", _clock)
 	(_status_node.material as ShaderMaterial).set_shader_parameter(&"sim_time", _clock)
+	(_floor_node.material as ShaderMaterial).set_shader_parameter(&"sim_time", _clock)
 	var out: int = 0
 	var arcs: int = 0
+	var floors: int = 0
 	var statuses: int = 0
 	for n in effect_slots:
 		var slot: int = (_next_effect + n) % effect_slots
@@ -1296,6 +1341,10 @@ func _step_effects(real_delta: float) -> void:
 			buffer = _status_buffer
 			i = statuses * EFFECT_STRIDE
 			statuses += 1
+		elif kind == KIND_QUAKE:
+			buffer = _floor_buffer
+			i = floors * EFFECT_STRIDE
+			floors += 1
 		else:
 			out += 1
 		var d: float = EFFECT_GRID * _effect_zoom[slot]
@@ -1335,6 +1384,9 @@ func _step_effects(real_delta: float) -> void:
 	if statuses > 0:
 		_status_node.multimesh.buffer = _status_buffer
 	_status_node.multimesh.visible_instance_count = statuses
+	if floors > 0:
+		_floor_node.multimesh.buffer = _floor_buffer
+	_floor_node.multimesh.visible_instance_count = floors
 
 
 ## How many effects are showing (for tests and the sheets).
@@ -1436,6 +1488,9 @@ func _form_look(form: StringName, cast: bool) -> Dictionary:
 	var card: Resource = registry.get_resource(&"spells", form)
 	if card is FormBase:
 		look = ((card as FormBase).cast_look if cast else (card as FormBase).impact_look).duplicate()
+		# A quake reaches as far as the card's radius times itself.
+		if look.has("quake"):
+			look["radius"] = (card as FormBase).radius
 	cache[form] = look
 	return look
 
@@ -1472,15 +1527,12 @@ func _on_form_shown(caster: int, form: StringName, origin: Vector2, direction: V
 			show_effect(KIND_RING_IN, origin, Vector2.RIGHT, tint, ramp, look, RAIN_MARK_ZOOM, length)
 		return
 	if form == &"slam":
-		# Its impact: a white-hot star, the shockwave ring out to its radius (`length`), stone chips
-		# thrown up off the floor and a shake.
+		# Its impact: a white-hot star (no ring, owner 2026-10-29: it looked too uniform), and the
+		# ground struck out to its radius (`length`) when its card's impact look says `quake`.
 		show_effect(KIND_BURST, origin, direction, tint, ramp, look, 3, BURST_SECONDS)
-		show_effect(KIND_RING_OUT, origin, direction, tint, ramp, look, clampi(roundi(length * 2.0 / 20.0), 1, 15), RING_SECONDS)
-		if particles_enabled:
-			show_effect(KIND_CHIPS, origin, -direction, Color.WHITE, 0, 0, 2, CHIPS_SECONDS)
-		if shake_enabled and preset.slam_shake > 0.0:
-			_refresh_camera()
-			_trauma = minf(_trauma + preset.slam_shake, 1.0)
+		var quake: float = _form_look(form, false).get("quake", 0.0) as float
+		if quake > 0.0:
+			strike_ground(caster, origin, length * quake, tint, look)
 		return
 	if form == &"rain":
 		if length > 0.0:

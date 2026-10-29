@@ -19,9 +19,7 @@ var _config: ConfigFile = null
 func _init(at: String = DEFAULT_PATH) -> void:
 	path = at if at.begins_with("user://") else DEFAULT_PATH
 	_config = ConfigFile.new()
-	# A missing or broken file is a new save.
-	if _config.load(path) != OK:
-		_config = ConfigFile.new()
+	_reload()
 
 
 ## True once `key` was set on this save.
@@ -32,6 +30,7 @@ func has_flag(key: StringName) -> bool:
 ## Set `key` on this save and write it. Returns false if it could not be written (it is still
 ## set for this session).
 func set_flag(key: StringName) -> bool:
+	_reload()
 	_config.set_value(SECTION, String(key), true)
 	return _config.save(path) == OK
 
@@ -49,5 +48,16 @@ func get_setting(key: StringName, fallback: Variant) -> Variant:
 ## Save `value` as setting `key` and write it. Returns false if it could not be written (it is
 ## still set for this session). Settings never make a save "not new": only flags do.
 func set_setting(key: StringName, value: Variant) -> bool:
+	_reload()
 	_config.set_value(SETTINGS_SECTION, String(key), value)
 	return _config.save(path) == OK
+
+
+## Read the file again, so a write keeps what another `SaveFile` on the same path saved since. A
+## missing or broken file changes nothing (a new save starts with an empty config).
+func _reload() -> void:
+	var fresh: ConfigFile = ConfigFile.new()
+	if fresh.load(path) == OK:
+		_config = fresh
+	elif _config == null:
+		_config = fresh

@@ -20,7 +20,7 @@ extends PanelContainer
 ##   Off again. "Effect slots" is a slider (the owner, 2026-10-27): left and right move it a step
 ##   (`EffectSlots` in core/settings: its STEP, from MIN to MAX), `accept` a step up (from the
 ##   top back to the bottom), up and down leave it; each move sends `effect_slots_changed`, which
-##   feel applies. It is kept in memory until core/save exists. "Screen shake: On" (or Off), the
+##   feel applies. It is kept in memory only: it is not saved yet (`core/save` has settings now). "Screen shake: On" (or Off), the
 ##   last switch above Back (melee I6): `accept` flips it, it sends `screen_shake_changed`, which
 ##   feel applies, and the choice is saved (`SaveFile` setting `screen_shake`) and read again
 ##   when the menu is bound, so it holds between plays. (The Gameplay page, with

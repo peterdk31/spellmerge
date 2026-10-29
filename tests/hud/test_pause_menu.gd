@@ -26,6 +26,10 @@ var _focus: UIFocusScript
 var _hud: HudScript
 var _actions: Array[Array] = []
 var _slots: Array[int] = []
+## Every `screen_shake_changed` the bus sent, from before the Hud binds.
+var _shakes: Array[bool] = []
+
+const SAVE_PATH: String = "user://test_pause_menu_save.cfg"
 
 
 func _initialize() -> void:
@@ -69,6 +73,7 @@ func _setup(count: int, sandbox: bool = false, save: SaveFile = null) -> void:
 	_focus._ready()
 	_bus.sandbox_action_requested.connect(func(player: int, action: StringName) -> void: _actions.append([player, action]))
 	_bus.effect_slots_changed.connect(func(slots: int) -> void: _slots.append(slots))
+	_bus.screen_shake_changed.connect(func(enabled: bool) -> void: _shakes.append(enabled))
 	for index in count:
 		_input.add_virtual_device(index)
 	_hud = (load(HUD_SCENE_PATH) as PackedScene).instantiate() as HudScript
@@ -88,6 +93,7 @@ func _teardown() -> void:
 	paused = false
 	_actions.clear()
 	_slots.clear()
+	_shakes.clear()
 	for node: Node in [_hud, _focus, _input, _bus]:
 		if node != null:
 			node.free()
@@ -256,16 +262,13 @@ func _test_the_settings_page() -> void:
 	_check(_menu().page == PauseMenuScript.Page.MAIN, "B goes up to the main page")
 
 
-const SAVE_PATH: String = "user://test_pause_menu_save.cfg"
-
-
 ## Screen shake is on by default, flips on accept, tells feel, and is kept in the save: a menu
 ## bound to the same save later starts with it off and tells feel.
 func _test_the_screen_shake_switch() -> void:
 	DirAccess.remove_absolute(SAVE_PATH)
 	_setup(1, false, SaveFile.new(SAVE_PATH))
-	var sent: Array[bool] = []
-	_bus.screen_shake_changed.connect(func(enabled: bool) -> void: sent.append(enabled))
+	var sent: Array[bool] = _shakes
+	_check(sent.is_empty(), "nothing is sent while shake is on")
 	_tap(0, &"pause")
 	_frame()
 	_press(0, "Settings")
@@ -278,11 +281,8 @@ func _test_the_screen_shake_switch() -> void:
 	_check(sent == [false, true] and SaveFile.new(SAVE_PATH).get_setting(&"screen_shake", false) == true, "and flips back on, saved")
 	_press(0, "ScreenShake")
 	_setup(1, false, SaveFile.new(SAVE_PATH))
-	var late: Array[bool] = []
-	_bus.screen_shake_changed.connect(func(enabled: bool) -> void: late.append(enabled))
 	_check(not _menu().screen_shake, "a later menu starts with it off")
-	_menu().call("_load_shake")
-	_check(late == [false], "and tells feel when it loads it")
+	_check(_shakes == [false], "and tells feel when the Hud binds, got %s" % [_shakes])
 	_teardown()
 	DirAccess.remove_absolute(SAVE_PATH)
 

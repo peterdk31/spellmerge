@@ -14,7 +14,10 @@ M2 started on 2026-10-21 (owner: "Start milestone 2", the go verdict at C1, #97)
 - [x] **The old recipe path removed (staffs A6c).** Done in an owner session: `Spells.compile(recipe)`, `builder_view`, the recipe wrappers (`install`, `cast`, a spell's `begin_generation`) and the recipe compiler are gone, `begin_generation` takes a compiled staff; `CompiledSpell` lost `valid`, `reason`, `description`, `complexity`, `depth` and `held`; `SpellLimits` keeps only engine safeguards and tuning; the events `build_change_requested`, `spell_swap_requested`, `spell_changed`, `recipe_changed` and `active_spell_changed` are removed; tests build staffs (`tests/support/staff_kit.gd` turns the old recipe shorthand into card rows; `test_spell_tags.gd` replaces `test_spells_compile.gd`); the spells, core and gameplay READMEs say so. **Phase B and the cards can start; development is unpaused.**
 - [x] **Card: arc (staffs C).** After the slow, return and arc kit (owner, 2026-10-27). Data only.
 - [x] **Card: linger (staffs C).** After B1. Data only (M2-staffs.md, "Working in parallel").
-- [ ] **Stress and C2 (staffs D3).** Last: when every other task in both lanes has merged. Then the C2 checkpoint, with the owner's sandbox playtest on `/preview/`.
+- [ ] **Card rules: the compiler says what does nothing (rules R2).** (`core/spells/`, builder text) Design: [M2-rules.md](milestones/M2-rules.md), "R2". One table `behaviour × motion` (runs, or a reason a player understands) kept next to the runtime that asks it (R2a); `trigger_runs(event, motion)` for triggers (R2b); the builder and staff view show the reasons (R2c). Tests: every ✗ of the audit matrix that R4 does not turn into ✓ is listed as wasted with a reason; the melee carriers (swing, slam) are in the matrix.
+- [ ] **Card rules: the permanent check (rules R3).** (`tests/core/test_card_rules.gd`) After R2. Finds every modifier, trigger, infusion and multicast card and every carrier by itself; a card is either listed as wasted with a reason or changes a recorded trace; per-behaviour probes; a behaviour or event with no probe fails with "no probe for `<name>`"; prints the matrix. See M2-rules.md, "R3" and "Automatic discovery".
+- [ ] **Clip recorder: combo `mates` and cast `dir`.** `tests/clips/scenarios.gd` ignores them, so the clips of `relay_teammate_frost` and `relay_teammate_fire` show a bolt hitting nothing; teach the recorder both keys. (Moved up from "Done recently" on 2026-10-29.)
+- [ ] **Stress and C2 (staffs D3).** Last: when every other task in both lanes has merged, R4 included. Then the C2 checkpoint, with the owner's sandbox playtest on `/preview/`.
 
 ## Owner lane
 
@@ -47,11 +50,11 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 - [x] **The intro (living staffs H6).** (`gameplay/flow/`, `content/story/`) After H3.
 - [x] **The docs (living staffs H7).** (`docs/STYLE.md`, READMEs, `art/kit/`) Last.
 - [x] **Melee: the playable mockup (melee I1).** Done in an owner session on 2026-10-29 (an artifact, no PR); the numbers are in M2-staffs.md, "Phase I: melee", "Tuning".
-- [ ] **Melee: the swing kit (melee I2).** (`core/spells/`, `core/projectiles/`) After I1.
-- [ ] **Melee: the deflect kit (melee I3).** (`core/projectiles/`, `core/spells/`) After I2.
-- [ ] **Card: swing (melee I4).** (`content/spells/forms/swing/`) After I2.
-- [ ] **Card: deflect (melee I5).** (`content/spells/modifiers/deflect/`) After I3 and I4.
-- [ ] **Card: slam (melee I8).** (the playground, `core/spells/`, `content/spells/forms/slam/`) After I4.
+- [x] **Melee: the swing kit (melee I2).** (`core/spells/`, `core/projectiles/`) After I1.
+- [x] **Melee: the deflect kit (melee I3).** (`core/projectiles/`, `core/spells/`) After I2.
+- [x] **Card: swing (melee I4).** (`content/spells/forms/swing/`) After I2.
+- [x] **Card: deflect (melee I5).** (`content/spells/modifiers/deflect/`) After I3 and I4.
+- [x] **Card: slam (melee I8).** (the playground, `core/spells/`, `content/spells/forms/slam/`) After I4.
 
 ## Blocked
 
@@ -86,8 +89,6 @@ For the owner's sessions (see the top of this file). Phase A runs one PR at a ti
 - [x] **Card: siphon (staffs C).** `content/spells/modifiers/siphon/` (`ModifierBase`, SIPHON, 1 mana back per hit, icon, `assets.json`), the lore entry, the combos `siphon_split_bolts` and `siphon_chain_bolt`, and `tests/content/spells/test_siphon.gd` (valid card; the combos hurt and refund with it, nothing without; four players). The engine side was built in B2.
 - [x] **Test: a possessing player cannot strand a room (staffs C).** It could: a possessed enemy that died was on the wizards' team, so `Combat._die` sent no `enemy_died` and the wave never cleared. Fixed in `combat.gd`; regression test `_test_possessed_enemy_does_not_strand_the_room` in `tests/gameplay/flow/test_flow.gd`; `possess` is back in `Bot.build_random`'s bag.
 - [x] **Card: on wall (staffs C).** `content/spells/triggers/on_wall/` (`TriggerBase`, event WALL, one fire, icon, `assets.json`), the lore entry, the combos `on_wall_bolt_nova` and `on_wall_bolt_rune`, and `tests/content/spells/test_on_wall.gd` (valid card; each combo holds with it, fails without it and with no wall). The engine side was built in B2.
-- [ ] **Clip recorder: combo `mates` and cast `dir`.** `tests/clips/scenarios.gd` ignores them, so the clips of `relay_teammate_frost` and `relay_teammate_fire` show a bolt hitting nothing; teach the recorder both keys.
-
 - [x] **Card: relay (staffs C).** `content/spells/modifiers/relay/` (`ModifierBase`, behaviour RELAY, icon, `assets.json`), the lore entry, the combos `relay_teammate_frost` and `relay_teammate_fire` (combo files may now name `mates` and a cast `dir`), and `tests/content/spells/test_relay.gd`.
 - [x] **Card: magnet (staffs C).** `content/spells/modifiers/magnet/` (`ModifierBase`, behaviour MAGNET, 70 px reach, icon, `assets.json`), the lore entry, the combos `magnet_pull_bolt` and `magnet_void_hex` (combo files may now say `pushed`), `Spells._step_magnets` (the engine hook, which was missing) and `tests/content/spells/test_magnet.gd`.
 - [x] **Card: on reaction (staffs C).** `content/spells/triggers/on_reaction/` (`TriggerBase`, event REACTION, one fire, icon, `assets.json`), the lore entry, the combos `on_reaction_thaw_hex` and `on_reaction_shatter_fire` (a staff-1 bolt sets the status up, then the carrier's hit sets off Thaw or Shatter and the payload nova hits the imp beside the target), and `tests/content/spells/test_on_reaction.gd` (valid card; each combo holds with it and fails without it and without the setup cast). Data only: the engine already fires REACTION.

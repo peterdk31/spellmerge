@@ -2,7 +2,7 @@ extends "res://tests/support/suite.gd"
 ## A slam's look in gameplay/feel (melee I8): while it winds up, a ring closes on where it will
 ## strike for the seconds until then (`form_shown` `slam_mark`); at the impact (`slam`) a white-hot
 ## star (no expanding ring: the cracks show its reach) and, as its card's impact look says
-## `quake`, the ground struck (`strike_ground`): its mark on the floor (a quake under the bodies
+## `quake`, the ground struck (the cue `quake`): its mark on the floor (a quake under the bodies
 ## that outlasts the flash), stone chips, the slammer held a moment, and a shake with a punch down
 ## the screen, which the screen shake setting turns off.
 
@@ -43,7 +43,7 @@ func test_its_impact_is_a_star_chips_and_a_shake_with_no_ring() -> void:
 	check_equal(feel.effects_of(FeelScript.KIND_BURST), 1, "a white-hot star")
 	check_equal(feel.effects_of(FeelScript.KIND_RING_OUT), 0, "no expanding ring (too uniform)")
 	check_equal(feel.effects_of(FeelScript.KIND_CHIPS), 1, "stone chips off the floor")
-	check(is_equal_approx(feel.trauma(), feel.preset.quake_shake), "a shake")
+	check(is_equal_approx(feel.trauma(), feel.cue_of(&"quake").shake), "a shake")
 	check(feel.kick().y > 0.0 and is_zero_approx(feel.kick().x), "a punch down the screen")
 
 
@@ -65,7 +65,7 @@ func test_it_leaves_a_mark_on_the_floor_under_the_bodies_after_the_flash() -> vo
 
 func test_the_slammer_is_held_as_its_staff_lands_hit_or_miss() -> void:
 	bus.form_shown.emit(0, &"slam", Vector2(20.0, 0.0), Vector2.RIGHT, 16.0, Color.WHITE, 0)
-	check(is_equal_approx(feel.actors.held_left(0), feel.preset.quake_stop_seconds), "the slammer holds")
+	check(is_equal_approx(feel.actors.held_left(0), feel.cue_of(&"quake").hold), "the slammer holds")
 	check_equal(feel.actors.held_left(1), 0.0, "nobody else does")
 
 

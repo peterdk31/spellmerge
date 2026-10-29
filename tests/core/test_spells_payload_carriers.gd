@@ -36,7 +36,7 @@ var _end_requests: Array = []
 var _areas: Array = []
 ## Every form_shown as [player, form, origin, direction, length].
 var _shown: Array = []
-## Every explosion_shown as [player, at, radius, style].
+## Every cue_shown as [player, at, size, cue].
 var _explosions: Array = []
 
 
@@ -55,8 +55,8 @@ func before_each() -> void:
 	_areas.clear()
 	_shown.clear()
 	_explosions.clear()
-	_bus.explosion_shown.connect(func(player: int, at: Vector2, radius: float, style: StringName, _tint: Color, _look: int) -> void:
-		_explosions.append([player, at, radius, style]))
+	_bus.cue_shown.connect(func(player: int, cue: StringName, at: Vector2, _direction: Vector2, size: float, _tint: Color, _look: int) -> void:
+		_explosions.append([player, at, size, cue]))
 	_bus.projectile_hit.connect(func(player: int, target: Node, at: Vector2, tag: int) -> void:
 		_hits.append([player, target, at, tag]))
 	_bus.entity_spawn_requested.connect(func(player: int, kind: StringName, at: Vector2, seconds: float, tag: int, caster: int) -> void:

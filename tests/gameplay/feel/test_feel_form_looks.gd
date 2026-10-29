@@ -133,8 +133,8 @@ func test_a_carrier_whose_look_says_quake_strikes_the_ground_where_it_ends() -> 
 	_impact(0, &"test_meteor")
 	check_equal(feel.effects_of(FeelScript.KIND_QUAKE), 1, "the floor cracks where it ends")
 	check_equal(feel.effect_info(FeelScript.KIND_QUAKE).get("zoom"), roundi(12.0 * 2.0 * FeelScript.QUAKE_PAST / FeelScript.QUAKE_REACH), "out to its radius times the quake")
-	check(is_equal_approx(feel.trauma(), preset.quake_shake), "with the ground's shake")
-	check(is_equal_approx(actors.held_left(0), preset.quake_stop_seconds), "and its caster held")
+	check(is_equal_approx(feel.trauma(), feel.cue_of(&"quake").shake), "with the ground's shake")
+	check(is_equal_approx(actors.held_left(0), feel.cue_of(&"quake").hold), "and its caster held")
 	_impact(0, &"bolt")
 	check_equal(feel.effects_of(FeelScript.KIND_QUAKE), 1, "a carrier without it leaves no mark")
 

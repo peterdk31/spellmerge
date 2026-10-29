@@ -145,23 +145,6 @@ extends Resource
 @export_range(0.05, 1.0, 0.01) var parry_seconds: float = 0.35
 @export_range(0.0, 0.3, 0.005) var parry_stop_seconds: float = 0.06
 @export var parry_sound: StringName = &"parry"
-## The ground struck (`Feel.strike_ground`: a slam's impact, a carrier whose impact look says
-## `quake`): the shake it adds (0 to 1, as `hit_shake`) on top of its hits' own, the camera punch
-## down the screen in pixels (given back as a cast's kick), and how long its caster holds (a local
-## stop, as a hit's), hit or miss.
-@export_range(0.0, 1.0, 0.01) var quake_shake: float = 0.45
-@export_range(0.0, 4.0, 0.1) var quake_kick_pixels: float = 3.0
-@export_range(0.0, 0.2, 0.01) var quake_stop_seconds: float = 0.06
-## Explosions by style (`Feel.explode`, `explosion_shown`): what each is made of and how hard it
-## hits. `shape` `ragged` (the ragged shell) or `fireball` (the rising fireball); `fragments` hot
-## chunks and rubble flung past the radius; `scorch` a burn under the bodies; `shake` trauma (0 to
-## 1, as `hit_shake`: about 3 px at 0.7) on top of its hits' own; `kick` a camera punch away from
-## the caster in pixels. `blast` is the blast modifier's (owner's picks, 2026-10-29: the ragged
-## shell, fragments and rubble, the scorch, all the weight); `fireball` an exploding barrel's.
-@export var explosion_looks: Dictionary = {
-	&"blast": {"shape": &"ragged", "fragments": true, "scorch": true, "shake": 0.7, "kick": 3.0},
-	&"fireball": {"shape": &"fireball", "fragments": true, "scorch": true, "shake": 0.75, "kick": 3.0},
-}
 ## How long the "downed by your own ..." note rises over a downed wizard, in seconds.
 @export_range(0.5, 6.0, 0.1) var downed_note_seconds: float = 2.5
 ## Sound ids asked from `core/registry`. A missing sound is silent.

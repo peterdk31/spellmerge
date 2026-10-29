@@ -46,6 +46,9 @@ extends CharacterBody2D
 ## health, walking speed, contact damage, staff, cards and mana. Data with no staff or no cards
 ## leaves the actor without a caster (an enemy that only chases).
 ##
+## Local stop: while `Actors.hold(id, seconds)` holds it (Feel's hit-stop, which holds only the
+## bodies in a hit), `step` does nothing and the body stands still.
+##
 ## Down and out: `is_down()` is true while a Downed component (gameplay/player, G7) holds the actor
 ## down (`set_down`); `die(killer)` sends the local `died` and frees the actor. When its Health is
 ## used up the actor dies, unless something downs it instead (`downable`).
@@ -188,6 +191,13 @@ func _physics_process(delta: float) -> void:
 func step(delta: float) -> void:
 	# Each component is called only when it has something to do (performance pass, 2026-10-28):
 	# a step runs for every actor every frame, and a call costs more than the checks here.
+	if actors != null and actors.held_count > 0 and id != ActorsScript.NONE:
+		# A local stop (hit-stop in co-op): the body holds still while it lasts; the rest of the
+		# game runs on. A step that outlasts it runs for what is left.
+		delta = actors.spend_hold(id, delta)
+		if delta <= 0.0:
+			velocity = Vector2.ZERO
+			return
 	intent.pressed_bits = 0
 	if health != null and health.protecting:
 		health.step(delta)

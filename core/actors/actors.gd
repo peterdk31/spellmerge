@@ -52,6 +52,10 @@ var _seat_actor: PackedInt32Array = PackedInt32Array()
 var _home_seat: PackedInt32Array = PackedInt32Array()
 var _seat_home: PackedInt32Array = PackedInt32Array()
 ## No id below this is free: where `open` starts looking.
+## Seconds each actor is still held by a local stop (hit-stop in co-op, melee I7), and how many
+## actors are held now, so a step with none held costs one comparison.
+var _held: PackedFloat32Array = PackedFloat32Array()
+var held_count: int = 0
 var _lowest_free: int = 0
 var _count: int = 0
 
@@ -62,6 +66,7 @@ func _init() -> void:
 	_ramp.resize(ACTORS)
 	_seat.resize(ACTORS)
 	_node.resize(ACTORS)
+	_held.resize(ACTORS)
 	_seat_actor.resize(SEATS)
 	_home_seat.resize(ACTORS)
 	_seat_home.resize(SEATS)
@@ -84,6 +89,7 @@ func open(team: int, ramp: int, seat: int = NONE) -> int:
 	_seat[id] = NONE
 	_home_seat[id] = NONE
 	_node[id] = 0
+	_release_hold(id)
 	_lowest_free = id + 1
 	_count += 1
 	_take_seat(id, seat)
@@ -100,6 +106,7 @@ func close(id: int) -> void:
 	_team[id] = NONE
 	_ramp[id] = NONE
 	_node[id] = 0
+	_release_hold(id)
 	_count -= 1
 	if id < _lowest_free:
 		_lowest_free = id
@@ -189,6 +196,44 @@ func node_of(id: int) -> Node:
 	return instance_from_id(_node[id]) as Node
 
 
+## Holds the actor `id` where it stands for `seconds` (a local stop: its body does nothing
+## meanwhile while the rest of the game runs on). The longer of two stops stands. Returns false
+## for an actor that is not open.
+func hold(id: int, seconds: float) -> bool:
+	if not is_open(id) or seconds <= 0.0:
+		return false
+	if _held[id] <= 0.0:
+		held_count += 1
+	_held[id] = maxf(_held[id], seconds)
+	return true
+
+
+## Seconds left of the local stop on `id` (0 when it is not held).
+func held_left(id: int) -> float:
+	return _held[id] if id >= 0 and id < ACTORS else 0.0
+
+
+## Spends the actor's local stop on a step of `delta` seconds and returns how many seconds of the
+## step it still runs: `delta` when it is not held, 0 while the stop covers the whole step (the
+## actor's own step calls it, and does nothing then).
+func spend_hold(id: int, delta: float) -> float:
+	if id < 0 or id >= ACTORS or _held[id] <= 0.0:
+		return delta
+	var held: float = _held[id]
+	if held > delta:
+		_held[id] = held - delta
+		return 0.0
+	_held[id] = 0.0
+	held_count -= 1
+	return delta - held
+
+
+func _release_hold(id: int) -> void:
+	if _held[id] > 0.0:
+		_held[id] = 0.0
+		held_count -= 1
+
+
 ## Every actor closed and every seat free (a new run, and tests).
 func clear() -> void:
 	_open.fill(0)
@@ -196,6 +241,8 @@ func clear() -> void:
 	_ramp.fill(NONE)
 	_seat.fill(NONE)
 	_node.fill(0)
+	_held.fill(0.0)
+	held_count = 0
 	_seat_actor.fill(NONE)
 	_home_seat.fill(NONE)
 	_seat_home.fill(NONE)

@@ -2,6 +2,14 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-29: Freezes in co-op (melee I7)
+
+- **The hold lives in `core/`, Feel only asks for it.** Areas only talk through `core/`, so the per-actor hold is in the actor table (`Actors.hold`, read by `Actor.step` with `spend_hold`) and the per-shot hold in the projectile manager (`freeze_shot`, state `S_FROZEN`); Feel decides who is held and for how long. A step longer than the hold runs for the rest, so a hold never eats a long step.
+- **Which bodies:** the attacker and the target of a hit, plus the shot whose `projectile_hit` is being sent (`event_slot`; a ray has none). A spent shot is already gone, so only a piercing, lingering or orbiting shot is held. A kill holds the killer (the dead body is freed at once). A reaction, which used to stop the whole game, holds its caster: it is a hit, not a rare moment.
+- **The rest is per actor** (`hit_stop_rest` after a hold), so one body is not frozen for ever by a stream of hits, while two players' hits never gate each other. Kills and reactions ignore the rest, as deaths did.
+- **Game-wide stop:** only `player_downed` and the death of an enemy whose `EnemyBase.boss` is true (a new flag; no boss exists yet). The parry's local stop is added when I5 lands.
+- **Held bodies stop in Feel's own time:** the hold counts down in the simulation's time, not real time; with `Engine.time_scale` at 1 they are the same.
+
 ## 2026-10-29: Planning run on an empty queue
 
 - The bot's queue held only D3, which waits for both lanes. The owner is on melee I2 (#448); B5, B6a, B8 and I3-I8 stay in the owner lane. **I7 (freezes in co-op) moves to the bot's queue**: it is decided, sits in `gameplay/feel/` and `core/projectiles/` mostly apart from the swing and deflect kits, and I6 moved the same way. The owner can move it back. I2 and I3 may also edit `core/projectiles/`, so I7 keeps its edits there small. The parry's local stop is added when I5 lands.

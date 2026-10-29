@@ -560,6 +560,8 @@ var _wave_age: PackedFloat32Array = PackedFloat32Array()
 var _base: PackedVector2Array = PackedVector2Array()
 var _linger: PackedFloat32Array = PackedFloat32Array()
 var _hold: PackedFloat32Array = PackedFloat32Array()
+## Seconds a shot is held by a local stop (`freeze_shot`); 0 for a shot that flies on.
+var _freeze: PackedFloat32Array = PackedFloat32Array()
 var _stick: PackedFloat32Array = PackedFloat32Array()
 var _stuck_to: Array = []
 var _stuck_off: PackedVector2Array = PackedVector2Array()
@@ -887,6 +889,7 @@ func set_cap(value: int) -> void:
 	_base.resize(_cap)
 	_linger.resize(_cap)
 	_hold.resize(_cap)
+	_freeze.resize(_cap)
 	_stick.resize(_cap)
 	_stuck_to.resize(_cap)
 	_stuck_off.resize(_cap)
@@ -1710,6 +1713,7 @@ func _spawn_row(caster: int, origin: Vector2, velocity: Vector2, lifetime: float
 	_wave_age[slot] = 0.0
 	_linger[slot] = 0.0
 	_hold[slot] = -1.0
+	_freeze[slot] = 0.0
 	_stick[slot] = 0.0
 	_stuck_to[slot] = null
 	_base[slot] = origin
@@ -1784,6 +1788,13 @@ func _pass_common(top: int, delta: float) -> void:
 	for slot in top:
 		if _alive[slot] == 0:
 			continue
+		if _freeze[slot] > 0.0:
+			# A local stop (`freeze_shot`): the shot holds where it is; its life, its motion and the
+			# behaviour passes (which read the state) wait.
+			_freeze[slot] -= delta
+			_prev[slot] = _pos[slot]
+			_state[slot] = S_FROZEN
+			continue
 		_life[slot] -= delta
 		if _skip_left[slot] > 0.0:
 			# Only a payload's skip counts down (read only while above 0).
@@ -1825,7 +1836,7 @@ func _pass_hits(top: int, delta: float) -> void:
 			if state == S_GONE:
 				_kill(slot)
 				continue
-			if state == S_STUCK:
+			if state == S_STUCK or state == S_FROZEN:
 				continue
 		if not limit.has_point(_pos[slot]):
 			_kill(slot)
@@ -1915,6 +1926,8 @@ const S_STUCK: int = 5
 const S_EXPIRE: int = 6
 const S_GONE: int = 7
 const S_WAITING: int = 8
+## Held by a local stop (`freeze_shot`): nothing of it runs and it tests no hits this step.
+const S_FROZEN: int = 9
 
 
 ## Give the shot in `slot` the behaviour `kind` (B_*): its pass steps it from now on. Nothing
@@ -3224,6 +3237,21 @@ func remove_by_tag(tag: int) -> int:
 			_kill(slot, false)
 			removed += 1
 	return removed
+
+
+## A local stop (hit-stop in co-op, melee I7): the shot in `slot` holds where it is for `seconds` of
+## simulation, its life and motion paused, while every other shot flies on. The longer of two
+## stops stands. Returns false for a shot that is not alive.
+func freeze_shot(slot: int, seconds: float) -> bool:
+	if slot < 0 or slot >= _cap or _alive[slot] == 0 or seconds <= 0.0:
+		return false
+	_freeze[slot] = maxf(_freeze[slot], seconds)
+	return true
+
+
+## Seconds left of the local stop on the shot in `slot` (0 when it flies).
+func freeze_left_of(slot: int) -> float:
+	return _freeze[slot] if slot >= 0 and slot < _cap and _alive[slot] != 0 else 0.0
 
 
 ## Keep the shot in `slot` from hitting `node` for `seconds` (a payload must not hit the

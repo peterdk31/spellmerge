@@ -19,6 +19,8 @@ The actor table: the one place an actor's id, team, look and seat are known (act
 
 ## Allowed files
 
+**Local stops (melee I7):** `hold(id, seconds)` holds an actor where it stands (the longer stop stands), `held_left(id)` reads it and `spend_hold(id, delta)` is what `Actor.step` calls: it returns the seconds of the step that still run (0 while held). `held_count` is how many are held, so a step with none held costs one comparison. A closed actor loses its hold. Feel is the one that holds (gameplay/feel/README.md).
+
 Claude only, like all of `core/`. Typed GDScript, no banned APIs. Tests in `tests/core/test_actors.gd`.
 
 ## Steps

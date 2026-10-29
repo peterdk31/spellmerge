@@ -9,6 +9,7 @@
     "number": 399
   },
   "errors_in_a_row": 0,
+  "idle": null,
   "intake_tasks": {
     "208": {
       "author": "Brianmanden",
@@ -39,7 +40,7 @@
   "last_plan": "2026-10-29T16:12:46Z",
   "last_weekly": "2026-10-25T10:11:43Z",
   "panel_applied": {
-    "automation_enabled": true,
+    "automation_enabled": false,
     "focus": "",
     "pause_development": false,
     "pause_merging": false,

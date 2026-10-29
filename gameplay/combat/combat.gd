@@ -715,7 +715,11 @@ func _die(row: int, by: int, where: Vector2, team: int) -> void:
 	if events != null:
 		if _tag != 0:
 			events.kill_landed.emit(by, node, where, _tag)
-		if team != ActorsScript.TEAM_WIZARDS:
+		# A possessed enemy is on its driver's team while it lasts, but its death is an enemy's
+		# (the wave counts on it): an actor counts by its own controller's team. Its depletion
+		# already ended the possession, so `team` (read before the hit) is the driver's.
+		var own_team: int = kit.home_controller.team if kit != null and kit.home_controller != null else team
+		if own_team != ActorsScript.TEAM_WIZARDS:
 			events.enemy_died.emit(by, node, where)
 	if kit != null:
 		kit.die(by)

@@ -2,6 +2,10 @@
 
 What each run did, newest first. Claude appends a short entry after each development session; the detailed record of every bot action is in the pinned Daily log issue. The "C2 evidence" section below is a standing section: it stays at the top, and dated entries go under it.
 
+## 2026-10-29: A possessing player cannot strand a room (staffs C)
+
+Found the bug behind the bots' missing `possess`: an enemy that died while possessed sent no `enemy_died` (its team was the wizards'), so flow kept counting it. Fixed in `Combat._die`, added a flow regression test, and put `possess` back in `Bot.build_random`'s bag. All unit tests pass except `test_svg_art` on the Shield icon, already on main (see BACKLOG).
+
 ## 2026-10-29: Card on reaction (staffs C)
 
 Added the On Reaction trigger (data only: `.tres`, icon, assets, lore), two combos (`on_reaction_thaw_hex`, `on_reaction_shatter_fire`) and `test_on_reaction.gd`. All unit tests pass except `test_svg_art` on the Shield icon, already on main (see BACKLOG).

@@ -22,6 +22,10 @@ Mirror is a complexity-1 modifier with no mana or cooldown of its own (the back 
 
 Scatter draws 2 extra carriers (three in all, as the design says) for 4 mana once, like triple. Its combos check reactions (thaw, kindle), which do not depend on the random direction, rather than damage totals; orbit combos were left out because an imp keeps one status at a time, so which orbit hexed or chilled it was not reliable.
 
+## 2026-10-29: A possessed enemy's death still counts as an enemy's
+
+The burst PR's bots left the room uncleared after possessing an enemy. The cause was `Combat._die`: it sends `enemy_died` only for a body not on the wizards' team, and a possessed enemy is on its driver's team, so flow never removed it from the wave. `_die` now judges an actor by its own (home) controller's team, not the driver's; the death itself ends the possession before `_die` runs, so `possessed_by` is no use there. Familiars and other allies of the wizards still send none. Regression test in `tests/gameplay/flow/test_flow.gd`; `Bot.build_random` builds `possess` again.
+
 ## 2026-10-28: Burst card numbers; bots build without possess
 
 Burst fires the group 3 times, 0.1 s apart (the interval the engine tests use), for 4 mana once (like triple; the later firings are free), and draws no extra carrier. The 4-bot smoke test builds seeded random staffs from the whole bag, so a new card can change them; with Burst a bot built `possess` and the room never cleared, so `Bot.build_random` takes `possess` out of the bag. Whether a possessing player can strand a room is a queued task in `docs/NEXT.md` ("Test: a possessing player cannot strand a room"), which also puts `possess` back in the bag.

@@ -38,7 +38,7 @@ func test_cards_that_did_nothing_silently_are_listed() -> void:
 
 
 func test_cards_that_work_are_not_listed() -> void:
-	for cards: Array in [["heavy", "bolt"], ["bounce", "beam"], ["chain", "swing"], ["shield", "beam"], ["mirror", "swing"], ["growth", "hook"], ["growth", "rune"], ["sticky", "orbit"], ["magnet", "rune"], ["arc", "wall"], ["blast", "rain"], ["shield", "dash"], ["hold", "fissure"], ["hold", "rain"], ["hold", "swing"], ["ghost", "beam"], ["magnet", "beam"], ["relay", "fissure"], ["spiral", "beam"], ["growth", "beam"], ["ghost", "fissure"]]:
+	for cards: Array in [["heavy", "bolt"], ["bounce", "beam"], ["chain", "swing"], ["shield", "beam"], ["mirror", "swing"], ["growth", "hook"], ["growth", "rune"], ["sticky", "orbit"], ["magnet", "rune"], ["arc", "wall"], ["blast", "rain"], ["shield", "dash"], ["hold", "fissure"], ["hold", "rain"], ["hold", "swing"], ["ghost", "beam"], ["magnet", "beam"], ["relay", "fissure"], ["spiral", "beam"], ["growth", "beam"], ["ghost", "fissure"], ["relay", "swing"]]:
 		var staff: CompiledStaff = _staff(cards)
 		check(not staff.wasted.has(0), "%s counts: %s" % [cards, staff.wasted])
 

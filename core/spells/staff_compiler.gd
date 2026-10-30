@@ -548,7 +548,8 @@ static func behaviour_waste(behaviour: int, motion: FormBase.Motion, blasts: boo
 		ModifierBase.Behaviour.MAGNET:
 			return "" if stays(motion) or motion == FormBase.Motion.RAY else "it needs a shot or a beam that stays in the world, and %s" % _what(motion)
 		ModifierBase.Behaviour.RELAY:
-			return "" if stays(motion) or rays(motion) else "it needs a shot or a line that hits, and %s" % _what(motion)
+			# Every hit takes it on: a shot's, a line's, a sweep's or a strike's (rules R4f).
+			return "" if hits(motion) else "it needs a hit of its own, and %s" % _what(motion)
 		ModifierBase.Behaviour.SHIELD:
 			match motion:
 				FormBase.Motion.RAIN, FormBase.Motion.DECOY, FormBase.Motion.FAMILIAR:

@@ -35,6 +35,9 @@ extends ActorController
 ##   possession. A change is refused only when the slot does not exist or the card is not in the
 ##   `bag` (every card in the registry until M3's rewards fill it); `card_move_requested`'s staff
 ##   BAG (-1) is the bag.
+## - **A set bag** (horde, docs/milestones/horde.md): `bag_set_requested` for this seat (or
+##   `set_bag`) makes the bag exactly that list and sends `bag_changed`. A set bag is never
+##   overwritten by the first fill, also when it was set before the wizard first drove.
 ## - **Possessed** (G9): when another actor's controller takes the actor it drives, it is set aside
 ##   (`set_aside`, `is_set_aside`) and drives nothing until `started` hands it an actor again; the
 ##   panel goes on showing the wizard, and the time is drawn over the wizard (`PossessedLook`).
@@ -71,7 +74,8 @@ const BAG: int = -1
 var input: InputManagerScript = null
 var registry: RegistryScript = null
 
-## The card ids this seat may build with. Filled from the registry when it first drives.
+## The card ids this seat may build with. Filled from the registry when it first drives, unless
+## it was set (`set_bag`) before.
 var bag: Array[StringName] = []
 
 ## Only tests set this: the mouse position in the world, instead of the real one.
@@ -185,8 +189,11 @@ func _bind_home(actor: Actor) -> void:
 		bus.staff_change_requested.connect(_on_staff_change_requested)
 		bus.card_move_requested.connect(_on_card_move_requested)
 		bus.staff_cards_requested.connect(_on_staff_cards_requested)
+		bus.bag_set_requested.connect(_on_bag_set_requested)
 		if not _bag_filled:
 			_fill_bag()
+		else:
+			_announce_bag()
 
 
 ## A possession took the actor it drove for `seconds`: it drives nothing until `started`.
@@ -348,6 +355,23 @@ func _fill_bag() -> void:
 		for id: StringName in registry.get_ids(&"spells"):
 			if registry.get_resource(&"spells", id) is SpellComponent:
 				bag.append(id)
+	_announce_bag()
+
+
+## Make the bag exactly `cards` (a copy) and announce it. The first fill never overwrites it.
+func set_bag(cards: Array[StringName]) -> void:
+	_bag_filled = true
+	bag.assign(cards)
+	_announce_bag()
+
+
+func _on_bag_set_requested(player: int, cards: Array[StringName]) -> void:
+	if player == seat:
+		set_bag(cards)
+
+
+## `bag_changed` for this seat, once it has a home body (before that, binding it announces).
+func _announce_bag() -> void:
 	if _home != null and _home.events != null:
 		_home.events.bag_changed.emit(seat, bag.duplicate())
 

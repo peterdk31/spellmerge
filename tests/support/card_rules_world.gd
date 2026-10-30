@@ -351,8 +351,8 @@ func _listen() -> void:
 		_put("kill %s %s %s at %s" % [_who(caster), _node(tag), _name_of(target), _at(at)]))
 	bus.actor_hurt.connect(func(actor: int, amount: int, _at_point: Vector2, tag: int, kind: StringName) -> void:
 		_put("hurt %s %d %s %s" % [_who(actor), amount, _node(tag), kind]))
-	bus.area_hit_requested.connect(func(caster: int, at: Vector2, radius: float, tag: int) -> void:
-		_put("area %s %s at %s r%d" % [_who(caster), _node(tag), _at(at), roundi(radius)]))
+	bus.cue_shown.connect(func(caster: int, cue: StringName, at: Vector2, _direction: Vector2, size: float, _tint: Color, _look: int) -> void:
+		_put("cue %s %s at %s r%d" % [_who(caster), cue, _at(at), roundi(size)]))
 	bus.caster_move_requested.connect(func(caster: int, mode: StringName, to: Vector2, seconds: float, tag: int) -> void:
 		_put("move %s %s %s by %s in %d ms" % [_who(caster), mode, _node(tag), _at(to), roundi(seconds * 1000.0)]))
 	bus.caster_move_finished.connect(func(caster: int, mode: StringName, at: Vector2, tag: int) -> void:

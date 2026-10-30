@@ -55,7 +55,7 @@ func _forms() -> Array[FormBase]:
 
 ## How far a form gets: a beam, a dash, a teleport or a rain its length, a shot in flight its
 ## speed for its life, a rune as far as it creeps in its life, a wall a little past where it
-## stands (rules R4i: homing places it on a target near that point).
+## rises (it creeps as a rune does, rules R4 F6).
 static func _reach(form: FormBase) -> float:
 	if form.motion == FormBase.Motion.STILL:
 		return SpellLimits.HOMING_DRIFT * form.lifetime
@@ -153,7 +153,7 @@ func _check_rain(form: FormBase, at: Vector2) -> void:
 
 ## Homing places a wall on a target near where it stands (rules R4i); its shots then keep still
 ## (they do not creep as a rune does), so it stays a wall.
-func test_a_homing_wall_stands_on_its_target_and_keeps_still() -> void:
+func test_a_homing_wall_creeps_toward_its_target_as_one_piece() -> void:
 	var target := Node2D.new()
 	root.add_child(target)
 	own(target)
@@ -161,20 +161,20 @@ func test_a_homing_wall_stands_on_its_target_and_keeps_still() -> void:
 	_mgr.add_target(target, 8.0, ManagerScript.LAYER_ENEMY)
 	StaffKit.build(_spells, 1, 0, [&"homing", &"wall"] as Array[StringName])
 	check(_spells.cast_staff(1, 0, Vector2.ZERO, Vector2.RIGHT, 100.0) != SpellsScript.REFUSED, "a homing wall is cast")
-	var placed: Dictionary = {}
+	var slots: Array[int] = []
 	for slot in _mgr._cap:
 		if _mgr.is_alive(slot):
-			placed[slot] = _mgr.get_position_of(slot)
-	check_equal(placed.size(), 5, "the wall stands")
-	var middle: Vector2 = Vector2.ZERO
-	for at: Vector2 in placed.values():
-		middle += at / placed.size()
-	check(middle.is_equal_approx(target.global_position), "its middle is on the target: %s" % middle)
-	# A shot that crept would move about 4 px in these steps (and die on the target soon after).
-	for i in 10:
+			slots.append(slot)
+	check_equal(slots.size(), 1, "the wall is one body (rules R4 F6)")
+	if slots.size() != 1:
+		return
+	var start: Vector2 = _mgr.get_position_of(slots[0])
+	check(start.is_equal_approx(Vector2(SpellLimits.WALL_REACH, 0.0)), "it rises ahead of the caster: %s" % start)
+	for i in 30:
 		_mgr.step(DT)
-	for slot: int in placed:
-		check(not _mgr.is_alive(slot) or _mgr.get_position_of(slot) == placed[slot], "a wall's shot keeps still")
+	var now: Vector2 = _mgr.get_position_of(slots[0])
+	check(now.distance_to(target.global_position) < start.distance_to(target.global_position) - 8.0, "it crept toward the target: %s" % now)
+	check(_mgr.clip_to_walls(now - Vector2(30.0, 0.0), now + Vector2(30.0, 0.0)) != now + Vector2(30.0, 0.0), "its wall went with it")
 
 
 func test_homing_on_a_form_it_cannot_steer_is_wasted_and_changes_nothing() -> void:

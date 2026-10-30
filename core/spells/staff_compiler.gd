@@ -26,6 +26,7 @@ const TRAVEL_ONLY: Array[int] = [
 	ModifierBase.Behaviour.SPIRAL, ModifierBase.Behaviour.MIRROR, ModifierBase.Behaviour.GROWTH,
 	ModifierBase.Behaviour.RELAY, ModifierBase.Behaviour.RETURN, ModifierBase.Behaviour.ARC,
 	ModifierBase.Behaviour.POSSESS, ModifierBase.Behaviour.MAGNET, ModifierBase.Behaviour.DEFLECT,
+	ModifierBase.Behaviour.PULL,
 ]
 
 ## How the description says when a trigger fires, by `TriggerBase.Event`.
@@ -169,7 +170,7 @@ func _read_group(want: int, payload: bool) -> CompiledGroup:
 					why_not[modifier] = why
 			# An infusion is a hit's element: on a carrier that hits nothing itself, only a blast carries it.
 			var kept_elements: Array[ElementBase] = []
-			if hits(form.motion) or blasts or keep_wasted:
+			if hits(form.motion, blasts) or keep_wasted:
 				kept_elements = elements
 			var spell: CompiledSpell = _build(form, kept_elements, kept_modifiers, trigger, CompiledSpell.FALLBACK_NONE)
 			spell.slot = slot
@@ -267,7 +268,7 @@ func _means_something_there(modifier: ModifierBase, payload: bool) -> bool:
 ## Why `trigger` never fires on `form` with these infusions and kept modifiers, as the wasted
 ## reason; "" when it can. First the carrier (`trigger_runs`), then the cards the event needs on
 ## it: a block needs a shield or deflect, a reaction an infusion (or relay), and a kill or reaction
-## on a carrier that hits nothing itself needs a blast, whose area hit carries the carrier's tag.
+## on a carrier that hits nothing itself needs a blast, whose strikes are the carrier's hits.
 ## A ghost shot or beam never meets a wall.
 func _trigger_never(trigger: TriggerBase, form: FormBase, elements: Array[ElementBase], modifiers: Array[ModifierBase]) -> String:
 	var head: String = "%s does nothing on a %s" % [_name(trigger), _name(form)]
@@ -281,8 +282,8 @@ func _trigger_never(trigger: TriggerBase, form: FormBase, elements: Array[Elemen
 		TriggerBase.Event.BLOCK:
 			if not has.has(ModifierBase.Behaviour.SHIELD) and not has.has(ModifierBase.Behaviour.DEFLECT):
 				return "%s without a shield or deflect: nothing else on it blocks." % head
-		TriggerBase.Event.KILL, TriggerBase.Event.REACTION:
-			if not hits(form.motion) and not has.has(ModifierBase.Behaviour.BLAST):
+		TriggerBase.Event.HIT, TriggerBase.Event.KILL, TriggerBase.Event.REACTION:
+			if not hits(form.motion, has.has(ModifierBase.Behaviour.BLAST)):
 				return "%s without a blast: %s." % [head, _hits_nothing(form.motion)]
 			if trigger.event == TriggerBase.Event.REACTION and elements.is_empty() and not has.has(ModifierBase.Behaviour.RELAY):
 				return "%s without an infusion: a hit with no element sets off no reaction." % head
@@ -294,7 +295,7 @@ func _trigger_never(trigger: TriggerBase, form: FormBase, elements: Array[Elemen
 
 ## Why a modifier's numbers do nothing on a carrier of `motion`, or "" when one of them counts. Its
 ## costs (more mana, a slower cast, less damage) are no effect; an effect counts where the carrier
-## uses that number: damage where it hits (or blasts), speed and lifetime where it moves or lasts,
+## uses that number: damage where it hits (`hits`, a blast's strikes too), speed and lifetime where it moves or lasts,
 ## shots, spread and pierce where it fires shots that use them. A behaviour card is judged by its
 ## behaviour (`behaviour_waste`), its numbers ride with it.
 static func _numbers_waste(modifier: ModifierBase, motion: FormBase.Motion, blasts: bool) -> String:
@@ -305,7 +306,7 @@ static func _numbers_waste(modifier: ModifierBase, motion: FormBase.Motion, blas
 		return ""
 	if modifier.damage_mult > 1.0:
 		any = true
-		if hits(motion) or blasts:
+		if hits(motion, blasts):
 			return ""
 	if not is_equal_approx(modifier.speed_mult, 1.0) or not is_equal_approx(modifier.lifetime_mult, 1.0):
 		any = true
@@ -323,7 +324,7 @@ static func _numbers_waste(modifier: ModifierBase, motion: FormBase.Motion, blas
 		any = true
 		# A placed carrier (rune, decoy, familiar) appears along its aim, so its spread moves it (rules R4 F3).
 		match motion:
-			FormBase.Motion.STRAIGHT, FormBase.Motion.RAY, FormBase.Motion.HOOK, FormBase.Motion.SWAP, FormBase.Motion.SWING, FormBase.Motion.SLAM, FormBase.Motion.STILL, FormBase.Motion.DECOY, FormBase.Motion.FAMILIAR:
+			FormBase.Motion.STRAIGHT, FormBase.Motion.RAY, FormBase.Motion.SWAP, FormBase.Motion.SWING, FormBase.Motion.SLAM, FormBase.Motion.STILL, FormBase.Motion.DECOY, FormBase.Motion.FAMILIAR:
 				return ""
 	if modifier.extra_pierce != 0:
 		any = true
@@ -506,7 +507,7 @@ static func stacked(behaviour: int, before: float, strength: float) -> float:
 ## every form card (tests/content/spells/test_homing_forms.gd) checks it reaches.
 static func homing_steers(motion: FormBase.Motion) -> bool:
 	match motion:
-		FormBase.Motion.STRAIGHT, FormBase.Motion.STILL, FormBase.Motion.HOOK, FormBase.Motion.SWAP, FormBase.Motion.RAY, FormBase.Motion.DASH, FormBase.Motion.TELEPORT, FormBase.Motion.WALL, FormBase.Motion.RAIN:
+		FormBase.Motion.STRAIGHT, FormBase.Motion.STILL, FormBase.Motion.SWAP, FormBase.Motion.RAY, FormBase.Motion.DASH, FormBase.Motion.TELEPORT, FormBase.Motion.WALL, FormBase.Motion.RAIN:
 			return true
 	return false
 
@@ -523,8 +524,8 @@ static func behaviour_runs(behaviour: int, motion: FormBase.Motion, blasts: bool
 ## left silent, and a wasted card changes nothing else either (its numbers too). When the runtime
 ## learns a behaviour on a new carrier, the carrier comes off its list here in the same change;
 ## tests/core/test_card_rules.gd plays every card on every carrier and fails on a silent one.
-## `blasts` is true when the carrier also has a blast: its area hit carries heavy's knockback and
-## slam even on a carrier that hits nothing itself (it sends no shot hit, so no chain or siphon).
+## `blasts` is true when the carrier also has a blast: its strikes are the carrier's hits (rules
+## R4 F2), so every hit card works on a carrier that hits nothing itself (`hits`).
 static func behaviour_waste(behaviour: int, motion: FormBase.Motion, blasts: bool = false) -> String:
 	match behaviour:
 		ModifierBase.Behaviour.HOMING:
@@ -536,7 +537,7 @@ static func behaviour_waste(behaviour: int, motion: FormBase.Motion, blasts: boo
 		ModifierBase.Behaviour.DEFLECT:
 			# What hits touches shots too (its shot, line, sweep or ring, a dash's way, a teleport's
 			# landing), and so does a decoy's body; a rain's strike meets bodies only.
-			return "" if guards(motion) or motion == FormBase.Motion.HOOK or motion == FormBase.Motion.SWAP or motion == FormBase.Motion.DASH or motion == FormBase.Motion.TELEPORT else "it touches no shots"
+			return "" if guards(motion) or motion == FormBase.Motion.SWAP or motion == FormBase.Motion.DASH or motion == FormBase.Motion.TELEPORT else "it touches no shots"
 		ModifierBase.Behaviour.GROWTH:
 			# A beam widens while it is on (rules R4f).
 			return "" if stays(motion) or motion == FormBase.Motion.RAY else "it grows a shot in the world or a beam, and %s" % _what(motion)
@@ -553,23 +554,20 @@ static func behaviour_waste(behaviour: int, motion: FormBase.Motion, blasts: boo
 			if flies(motion) or motion == FormBase.Motion.RAY:
 				return ""
 			return "it turns a shot or a beam at walls, and %s" % _what(motion)
-		ModifierBase.Behaviour.HEAVY:
-			return "" if hits(motion) or blasts else "it acts on what the carrier hits, and %s (a blast would carry it)" % _what(motion)
-		ModifierBase.Behaviour.CHAIN, ModifierBase.Behaviour.SIPHON, ModifierBase.Behaviour.POSSESS:
-			return "" if hits(motion) else "it acts on what the carrier hits, and %s" % _what(motion)
+		ModifierBase.Behaviour.HEAVY, ModifierBase.Behaviour.CHAIN, ModifierBase.Behaviour.SIPHON, ModifierBase.Behaviour.POSSESS:
+			return "" if hits(motion, blasts) else "it acts on what the carrier hits, and %s (a blast would hit for it)" % _what(motion)
+		ModifierBase.Behaviour.PULL:
+			# A blast's hits move nothing (rules R4 F2: a pull at every arrival would never end).
+			return "" if hits(motion) else "it pulls to what the carrier hits, and %s (a blast's hits move nothing)" % _what(motion)
 		ModifierBase.Behaviour.MAGNET:
 			return "" if stays(motion) or motion == FormBase.Motion.RAY else "it needs a shot or a beam that stays in the world, and %s" % _what(motion)
 		ModifierBase.Behaviour.RELAY:
 			# Every hit takes it on: a shot's, a line's, a sweep's or a strike's (rules R4f).
-			return "" if hits(motion) else "it needs a hit of its own, and %s" % _what(motion)
+			return "" if hits(motion, blasts) else "it needs a hit of its own, and %s (a blast would hit for it)" % _what(motion)
 		ModifierBase.Behaviour.SHIELD:
 			match motion:
 				FormBase.Motion.RAIN, FormBase.Motion.FAMILIAR:
 					return "it blocks shots that touch the carrier or guards the caster on a move, and %s" % _what(motion)
-		ModifierBase.Behaviour.MIRROR:
-			match motion:
-				FormBase.Motion.DASH, FormBase.Motion.TELEPORT:
-					return "a move and its mirror cancel"
 		ModifierBase.Behaviour.HOLD:
 			match motion:
 				FormBase.Motion.DASH, FormBase.Motion.TELEPORT, FormBase.Motion.SLAM:
@@ -577,9 +575,9 @@ static func behaviour_waste(behaviour: int, motion: FormBase.Motion, blasts: boo
 	return ""
 
 
-## True for the carriers that are a shot flying out on its own (a bolt, a hook, a swap).
+## True for the carriers that are a shot flying out on its own (a bolt, a swap).
 static func flies(motion: FormBase.Motion) -> bool:
-	return motion == FormBase.Motion.STRAIGHT or motion == FormBase.Motion.HOOK or motion == FormBase.Motion.SWAP
+	return motion == FormBase.Motion.STRAIGHT or motion == FormBase.Motion.SWAP
 
 
 ## True for the carriers that go a distance `reach` stretches: a flying shot (speed x life) and
@@ -593,10 +591,10 @@ static func reaches(motion: FormBase.Motion) -> bool:
 
 
 ## True for the carriers that are shots staying in the world for a while (a bolt, a rune, an orbit,
-## a wall, a hook, a swap): what rides on a live shot (arc, magnet, relay) runs on them.
+## a wall, a swap): what rides on a live shot (arc, magnet, relay) runs on them.
 static func stays(motion: FormBase.Motion) -> bool:
 	match motion:
-		FormBase.Motion.STRAIGHT, FormBase.Motion.STILL, FormBase.Motion.ORBIT, FormBase.Motion.HOOK, FormBase.Motion.SWAP, FormBase.Motion.WALL:
+		FormBase.Motion.STRAIGHT, FormBase.Motion.STILL, FormBase.Motion.ORBIT, FormBase.Motion.SWAP, FormBase.Motion.WALL:
 			return true
 	return false
 
@@ -608,9 +606,12 @@ static func lasts(motion: FormBase.Motion) -> bool:
 
 
 ## True for the carriers that hit under their own tag (a shot, a beam, a swing, a slam, a rain
-## as it lands, a dash what it passes, a teleport where it lands: rules R4c, R4g): a decoy and a
+## as it lands, a dash what it passes, a teleport where it lands: rules R4c, R4g), and any
+## carrier with a blast (`blasts`): what its blast strikes is its hit (rules R4 F2). A decoy and a
 ## familiar hit nothing themselves.
-static func hits(motion: FormBase.Motion) -> bool:
+static func hits(motion: FormBase.Motion, blasts: bool = false) -> bool:
+	if blasts:
+		return true
 	match motion:
 		FormBase.Motion.RAY, FormBase.Motion.SWING, FormBase.Motion.SLAM, FormBase.Motion.RAIN, FormBase.Motion.DASH, FormBase.Motion.TELEPORT:
 			return true
@@ -649,8 +650,8 @@ static func _what(motion: FormBase.Motion) -> String:
 
 ## True for the carriers whose shield only stops shots that touch them (a shot, a beam's line, a
 ## swing's sweep, a decoy's body): on these a deflect turns every such shot first (owner,
-## 2026-10-29), so a shield with it never blocks. A hook's shield also guards its caster on the
-## pull, a dash's and a teleport's is a barrier on the caster: those keep it.
+## 2026-10-29), so a shield with it never blocks. A swap's shield also guards its caster on the
+## move, a dash's and a teleport's is a barrier on the caster: those keep it.
 static func guards(motion: FormBase.Motion) -> bool:
 	match motion:
 		FormBase.Motion.STRAIGHT, FormBase.Motion.STILL, FormBase.Motion.ORBIT, FormBase.Motion.WALL, FormBase.Motion.RAY, FormBase.Motion.SWING, FormBase.Motion.SLAM, FormBase.Motion.DECOY:
@@ -668,14 +669,13 @@ static func _shield_outrun(modifier: ModifierBase, motion: FormBase.Motion) -> b
 ## cards on it (`_trigger_never` checks those). Where it cannot, the trigger and its payload are
 ## wasted (rules R2b, docs/milestones/M2-rules.md). The table is what the runtime does today:
 ## - on expire and on cast: every carrier (each has an end point; each is cast).
-## - on kill and on reaction: every carrier, by its hits, or by its blast's area hit on one
-##   that hits nothing itself (decoy, familiar).
-## - on hit: the carriers that hit (`hits`).
+## - on hit, on kill and on reaction: every carrier, by its hits, or by its blast's on one that
+##   hits nothing itself (decoy, familiar; `_trigger_never` checks the blast).
 ## - timer and on hurt: every carrier that lasts (`lasts`), while it lives (R4d).
 ## - on block: wherever a shield or deflect runs (`behaviour_waste`): a shot, beam, swing
 ##   or decoy that guards, and a dash's or teleport's barrier; a rain or familiar has
 ##   nothing that blocks.
-## - on wall: a flying shot (bolt, hook, swap) at a wall it bounces off or ends on, and a beam at
+## - on wall: a flying shot (bolt, swap) at a wall it bounces off or ends on, and a beam at
 ##   a wall it turns at or ends on.
 static func trigger_runs(event: int, motion: FormBase.Motion) -> bool:
 	return trigger_why_not(event, motion).is_empty()
@@ -685,9 +685,6 @@ static func trigger_runs(event: int, motion: FormBase.Motion) -> bool:
 ## player reads after "On Hit does nothing on a Rain: "; "" when it can fire.
 static func trigger_why_not(event: int, motion: FormBase.Motion) -> String:
 	match event:
-		TriggerBase.Event.HIT:
-			if not hits(motion):
-				return _hits_nothing(motion)
 		TriggerBase.Event.TIMER, TriggerBase.Event.HURT:
 			if not lasts(motion):
 				return "it is over at once"

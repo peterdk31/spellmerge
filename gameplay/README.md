@@ -35,7 +35,6 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `caster_move_requested` | `core/spells` | `actor` (the Mover), each for its own actor id |
 | `mana_reserved` | `core/spells` (to the seat that drives the caster) | none (the Caster reads `Spells.reserved_mana`, actors G7) |
 | `mana_refund_requested` | `core/spells` (for every actor) | `actor` (the Caster), each for its own actor id |
-| `area_hit_requested` | `core/spells` | `combat` |
 | `target_move_requested`, `entity_spawn_requested`, `entity_end_requested` | `core/spells` (staffs B2) | `ai`; `target_move_requested` also `actor` (the Mover) |
 | `caster_move_finished` | `actor` (the Mover), each with its own actor id | `core/spells`, `feel` (where a dash lands) |
 | `entity_ended` | `ai` (Entities) | `core/spells` |
@@ -43,7 +42,7 @@ One table for all sub-areas, so "each event has exactly one sender" can be check
 | `shield_blocked`, `kill_landed`, `actor_hurt`, `reaction_landed` | `combat` (for every actor: `actor_hurt` and `shield_blocked` name the hurt or shielded actor) | `core/spells` (on block, on kill, on hurt, on reaction) |
 | `hit_landed` | `combat` | `feel` |
 | `heal_dealt` | `combat` | `feel` |
-| `wizard_shield_requested`, `pull_requested`, `area_hit_requested` | `core/spells` (staffs B2) | `combat` |
+| `wizard_shield_requested`, `pull_requested` | `core/spells` (staffs B2) | `combat` |
 | `possess_requested` | `core/spells` (actors G9) | `actor` (each actor, for its own id: `Possession.begin`) |
 | `possess_started`, `possess_ended` | `actor` (the Possession) | `feel` (a ring in the driver's ramp) |
 | `reaction_triggered` | `combat` | `feel` |

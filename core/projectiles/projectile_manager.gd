@@ -166,7 +166,7 @@ extends Node2D
 ## Casters: every shot has a caster, its actor's anchor unless `set_caster_shot` (a payload's
 ## shot, cast by the shot whose trigger fired it) or `set_caster_point` says otherwise. An orbit
 ## circles its caster and a returning shot flies back to it; a caster shot that ends leaves the
-## point where it was last. `move_shot` moves a shot by a card (a payload's dash, hook, recoil).
+## point where it was last. `move_shot` moves a shot by a card (a payload's dash, pull, recoil).
 ##
 ## Ends: `shot_ended(tag)`, a signal of the manager itself (not on the event bus), is sent
 ## once for every shot with a non-zero tag when it ends for any reason: a hit that spends it,
@@ -185,7 +185,7 @@ extends Node2D
 ## "Shot behaviours, stepped in passes" below, and core/README.md for how to add a behaviour.
 ## A hit handler sees every shot already moved for this step, also those whose turn in the hit
 ## pass has not come yet (the caster of an orbit or returning shot is the exception: it is read
-## as it was before its turn). So a handler's change to another shot (a hook pulling its carrier,
+## as it was before its turn). So a handler's change to another shot (a pull moving its carrier,
 ## a blink) takes effect from that shot's next step whatever the slot order, where it used to
 ## take effect in this step for a shot in a later slot.
 ##
@@ -1644,7 +1644,7 @@ func get_caster_of(slot: int) -> Vector2:
 
 ## The slot of the live shot that cast the shot in `slot`, or -1 when its caster is the wizard,
 ## a point, or a shot that has ended. It still answers for a shot ended by the hit being sent
-## (a hook's), until its slot is used again.
+## (a pull's), until its slot is used again.
 func caster_shot_of(slot: int) -> int:
 	if slot < 0 or slot >= _cap:
 		return -1
@@ -1677,10 +1677,10 @@ func _caster_position(slot: int) -> Vector2:
 
 
 ## Move the shot in `slot` by `offset` pixels over `seconds` on top of its own motion (a dash,
-## hook or recoil card whose caster is this shot), or at once for `seconds` 0 or less (a
+## pull or recoil card whose caster is this shot), or at once for `seconds` 0 or less (a
 ## teleport or swap, stopped short at the first wall). Moves add up, as the wizard's pushes do: a
 ## new move runs beside the ones under way, each on its own time (two opposite pushes cancel, a
-## hook after a recoil gets both). A moving shot still hits what it passes and still ends on a
+## pull after a recoil gets both). A moving shot still hits what it passes and still ends on a
 ## wall. A homing move (`turn_rate` above 0) turns toward the nearest
 ## target within `within` pixels as it goes (`home_velocity`), the same distance in all.
 ## Returns false for an empty slot, an orbit shot (its caster holds it), or an offset or time
@@ -3052,10 +3052,11 @@ func _ray_level(level: int) -> void:
 ## `to_angle` not below `from_angle`), out to `reach` pixels, with no wall between it and
 ## `origin`. Targets `caster` owns (its body) and `exclude` are skipped. It sends nothing: it
 ## fills `sweep_nodes`, `sweep_points` (where the wedge meets the body, on its line from
-## `origin`) and `sweep_heads` (the way the sweep moves there) and returns how many (every one:
-## the results grow). Each step of a swing asks for the wedge it turned through since the last, so
-## a fast sweep misses nothing between two steps. Allocation-free.
-func sweep(caster: int, origin: Vector2, direction: Vector2, side: int, from_angle: float, to_angle: float, reach: float, layers: int = LAYER_ENEMY, exclude: Node = null) -> int:
+## `origin`; for a whole circle `origin` itself, what strikes from there) and `sweep_heads` (the
+## way the sweep moves there: round `origin`, or outward for a whole circle) and returns how many (every one: the results grow). Each step of a swing asks for
+## the wedge it turned through since the last, so a fast sweep misses nothing between two steps.
+## Without `walls` a wall between hides nothing (an explosion). Allocation-free.
+func sweep(caster: int, origin: Vector2, direction: Vector2, side: int, from_angle: float, to_angle: float, reach: float, layers: int = LAYER_ENEMY, exclude: Node = null, walls: bool = true) -> int:
 	if not is_caster(caster) or not origin.is_finite() or not direction.is_finite() or direction.is_zero_approx():
 		return 0
 	if not is_finite(reach) or reach <= 0.0 or not is_finite(from_angle) or not is_finite(to_angle) or to_angle < from_angle or _targets.is_empty():
@@ -3064,6 +3065,7 @@ func sweep(caster: int, origin: Vector2, direction: Vector2, side: int, from_ang
 	layers |= ACTOR_LAYERS
 	var base: float = direction.angle()
 	var turn: float = 1.0 if side >= 0 else -1.0
+	var whole: bool = to_angle - from_angle >= TAU
 	var skip: int = exclude.get_instance_id() if exclude != null else 0
 	var pad: Vector2 = Vector2.ONE * (reach + _max_target_radius)
 	var x0: int = clampi(floori((origin.x - pad.x - _bounds.position.x) / GRID_CELL), 0, _grid_w - 1)
@@ -3083,15 +3085,15 @@ func sweep(caster: int, origin: Vector2, direction: Vector2, side: int, from_ang
 						# How far either side of its centre line the body's circle reaches.
 						var width: float = PI if distance <= radius else asin(radius / distance)
 						var local: float = angle_difference(base, to.angle()) * turn
-						if local + width >= from_angle and local - width <= to_angle and not (_has_walls and _wall_hit(origin, _target_pos[t]) >= 0.0):
+						if local + width >= from_angle and local - width <= to_angle and not (walls and _has_walls and _wall_hit(origin, _target_pos[t]) >= 0.0):
 							var way: Vector2 = to / distance if distance > 0.0 else direction.normalized()
 							if found == sweep_nodes.size():
 								sweep_nodes.resize(found * 2)
 								sweep_points.resize(found * 2)
 								sweep_heads.resize(found * 2)
 							sweep_nodes[found] = _targets[t]
-							sweep_points[found] = origin + way * maxf(distance - radius, 0.0)
-							sweep_heads[found] = Vector2(-way.y, way.x) * turn
+							sweep_points[found] = origin if whole else origin + way * maxf(distance - radius, 0.0)
+							sweep_heads[found] = way if whole else Vector2(-way.y, way.x) * turn
 							found += 1
 				t = _target_next[t]
 	return found

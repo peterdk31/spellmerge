@@ -1,0 +1,9 @@
+{
+	"id": "pull_bolt",
+	"name": "Pull bolt",
+	"does": "A pull bolt hurts the imp it hits and pulls its caster to it.",
+	"casts": [{"staff": 0, "cards": ["pull", "bolt"]}],
+	"imps": [[100, 0]],
+	"seconds": 1.0,
+	"checks": [{"kind": "caster_moved", "mode": "pull"}, {"kind": "damaged", "imps": [0]}]
+}

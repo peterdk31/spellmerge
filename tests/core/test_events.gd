@@ -44,10 +44,9 @@ const EVENTS: Dictionary = {
 	# Staffs (docs/milestones/M2-staffs.md, "Events").
 	&"staff_changed": [["player", TYPE_INT], ["staff", TYPE_INT], ["plan", TYPE_DICTIONARY]],
 	&"staff_cast": [["player", TYPE_INT], ["staff", TYPE_INT], ["origin", TYPE_VECTOR2], ["direction", TYPE_VECTOR2]],
-	&"caster_move_requested": [["caster", TYPE_INT], ["mode", TYPE_STRING_NAME], ["to", TYPE_VECTOR2], ["seconds", TYPE_FLOAT], ["tag", TYPE_INT]],
+	&"caster_move_requested": [["caster", TYPE_INT], ["mode", TYPE_STRING_NAME], ["move", TYPE_VECTOR2], ["seconds", TYPE_FLOAT], ["tag", TYPE_INT]],
 	&"caster_move_finished": [["caster", TYPE_INT], ["mode", TYPE_STRING_NAME], ["position", TYPE_VECTOR2], ["tag", TYPE_INT]],
 	&"target_move_requested": [["caster", TYPE_INT], ["target", TYPE_OBJECT], ["to", TYPE_VECTOR2]],
-	&"area_hit_requested": [["caster", TYPE_INT], ["position", TYPE_VECTOR2], ["radius", TYPE_FLOAT], ["tag", TYPE_INT]],
 	&"entity_spawn_requested": [["caster", TYPE_INT], ["kind", TYPE_STRING_NAME], ["position", TYPE_VECTOR2], ["seconds", TYPE_FLOAT], ["tag", TYPE_INT], ["anchor", TYPE_INT]],
 	&"entity_end_requested": [["caster", TYPE_INT], ["tag", TYPE_INT]],
 	&"entity_ended": [["caster", TYPE_INT], ["kind", TYPE_STRING_NAME], ["position", TYPE_VECTOR2], ["tag", TYPE_INT]],

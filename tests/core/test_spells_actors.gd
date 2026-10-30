@@ -39,7 +39,7 @@ var _table: ActorSeats.ActorsScript
 ## Every projectile_hit as [caster, target, tag].
 var _hits: Array = []
 ## The first argument (the actor id) and the tag of every caster_move_requested and
-## area_hit_requested; the caster of every form_shown and entity_spawn_requested.
+## blast cue; the caster of every form_shown and entity_spawn_requested.
 var _moves: Array = []
 var _areas: Array = []
 var _shown: Array[int] = []
@@ -64,7 +64,7 @@ func before_each() -> void:
 		list.clear()
 	_bus.projectile_hit.connect(func(caster: int, target: Node, _at: Vector2, tag: int) -> void: _hits.append([caster, target, tag]))
 	_bus.caster_move_requested.connect(func(caster: int, _mode: StringName, _to: Vector2, _seconds: float, tag: int) -> void: _moves.append([caster, tag]))
-	_bus.area_hit_requested.connect(func(caster: int, _at: Vector2, _radius: float, tag: int) -> void: _areas.append([caster, tag]))
+	_bus.cue_shown.connect(func(player: int, _cue: StringName, at: Vector2, _direction: Vector2, radius: float, _tint: Color, _look: int) -> void: _areas.append([player, at, radius]))
 	_bus.form_shown.connect(func(caster: int, _form: StringName, _at: Vector2, _dir: Vector2, _length: float, _tint: Color, _look: int) -> void: _shown.append(caster))
 	_bus.entity_spawn_requested.connect(func(caster: int, _kind: StringName, _at: Vector2, _seconds: float, _tag: int, _anchor: int) -> void: _spawns.append(caster))
 	_bus.mana_refund_requested.connect(func(caster: int, amount: float) -> void: _refunds.append([caster, amount]))
@@ -394,7 +394,7 @@ func test_a_dash_is_asked_for_by_the_actor_and_ends_with_its_blast() -> void:
 	_bus.caster_move_finished.emit(W0, &"dash", Vector2(130.0, 50.0), tag)
 	check_equal(_areas.size(), 0, "another actor's answer for its tag is ignored")
 	_bus.caster_move_finished.emit(imp, &"dash", Vector2(130.0, 50.0), tag)
-	check(_areas.size() == 1 and _areas[0][0] == imp and _areas[0][1] == tag, "where it ends, its blast, by its id")
+	check(_areas.size() == 1 and _areas[0][0] == imp and (_areas[0][1] as Vector2).is_equal_approx(Vector2(130.0, 50.0)), "where it ends, its blast, by its id")
 
 
 func test_mana_reserved_goes_to_the_seat() -> void:

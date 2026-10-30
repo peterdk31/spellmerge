@@ -1,0 +1,9 @@
+{
+	"id": "pull_miss",
+	"name": "Pull miss",
+	"does": "A pull bolt that hits nothing pulls nobody: the bolt flies out and is gone.",
+	"casts": [{"staff": 0, "cards": ["pull", "bolt"]}],
+	"imps": [[0, 100]],
+	"seconds": 1.0,
+	"checks": [{"kind": "max_shots", "max": 1}, {"kind": "lost_at_most", "imps": [0], "max": 0}]
+}

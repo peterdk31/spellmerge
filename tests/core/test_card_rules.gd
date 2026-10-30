@@ -191,7 +191,7 @@ static func behaviour_scenes(behaviour: int) -> Array[Dictionary]:
 			return [TWO_TARGETS]
 		ModifierBase.Behaviour.SHIELD, ModifierBase.Behaviour.DEFLECT:
 			return [SHOOTER]
-		ModifierBase.Behaviour.BLAST, ModifierBase.Behaviour.ECHO, ModifierBase.Behaviour.HEAVY, ModifierBase.Behaviour.SIPHON, ModifierBase.Behaviour.STICKY, ModifierBase.Behaviour.POSSESS:
+		ModifierBase.Behaviour.BLAST, ModifierBase.Behaviour.ECHO, ModifierBase.Behaviour.HEAVY, ModifierBase.Behaviour.SIPHON, ModifierBase.Behaviour.STICKY, ModifierBase.Behaviour.POSSESS, ModifierBase.Behaviour.PULL:
 			return [LINE]
 		ModifierBase.Behaviour.HOLD, ModifierBase.Behaviour.RECOIL, ModifierBase.Behaviour.LINGER, ModifierBase.Behaviour.SPIRAL, ModifierBase.Behaviour.GROWTH, ModifierBase.Behaviour.RETURN:
 			return [OPEN]
@@ -230,7 +230,7 @@ static func event_scenes(event: int) -> Array[Dictionary]:
 ## when there is no rule for its motion yet.
 static func reach(form: FormBase) -> float:
 	match form.motion:
-		FormBase.Motion.STRAIGHT, FormBase.Motion.HOOK, FormBase.Motion.SWAP:
+		FormBase.Motion.STRAIGHT, FormBase.Motion.SWAP:
 			return minf(form.speed * form.lifetime * 0.5, 90.0)
 		FormBase.Motion.RAY:
 			return minf(form.ray_length * 0.5, 90.0)

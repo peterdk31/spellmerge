@@ -53,9 +53,9 @@ const RAIN_SPLASH: float = 16.0
 const WALL_REACH: float = 28.0
 ## Seconds a shot made sustained by `hold` lives: until it is switched off, in practice.
 const HOLD_LIFETIME: float = 100000.0
-## Seconds the wizard takes to be pulled by a hook, to swap places, and to be pushed by a recoil
+## Seconds the wizard takes to be pulled (`pull`), to swap places, and to be pushed by a recoil
 ## (the player's move may stop early at a wall). A teleport is at once.
-const HOOK_SECONDS: float = 0.15
+const PULL_SECONDS: float = 0.15
 const SWAP_SECONDS: float = 0.1
 const RECOIL_SECONDS: float = 0.1
 ## The per-step fire and chain caps count per budget (`Actors.budget_of`): one for each seat's

@@ -1,8 +1,8 @@
 extends "res://tests/support/suite.gd"
 ## Caster-side cards on enemies (staffs F8c, docs/milestones/M2-staffs.md, "Enemy staffs"): the
 ## moves an enemy's own cards ask for move it as they move a wizard: a dash from its staff tip
-## over the card's time, a teleport at once and short of a wall, a hook and a swap to a point, a
-## recoil back from its shot; a dash, hook or teleport says where it ended, so the card's blast
+## over the card's time, a teleport at once and short of a wall, a pull and a swap to a point, a
+## recoil back from its shot; every move says where it ended, so the card's blast
 ## goes off there. Moves are asked and answered under its actor id (`caster`, actors G3b); moves
 ## for another actor (an enemy or a wizard) are not its own. The same world as test_ai_staff.gd:
 ## bus, an actor table, projectiles, spells with cards built in code, combat, one wizard.
@@ -37,8 +37,8 @@ var _fake: FakeRegistry
 var _actors: ActorsScript
 var _wizard: Actor
 var _enemies: Array[Actor] = []
-## Every caster_move_finished as [caster, mode, position, tag], and area_hit_requested as
-## [caster, position, tag].
+## Every caster_move_finished as [caster, mode, position, tag], and every blast cue as
+## [caster, position, radius].
 var _finished: Array = []
 var _areas: Array = []
 
@@ -100,7 +100,7 @@ func before_each() -> void:
 	_finished.clear()
 	_areas.clear()
 	_bus.caster_move_finished.connect(func(player: int, mode: StringName, at: Vector2, tag: int) -> void: _finished.append([player, mode, at, tag]))
-	_bus.area_hit_requested.connect(func(player: int, at: Vector2, _radius: float, tag: int) -> void: _areas.append([player, at, tag]))
+	_bus.cue_shown.connect(func(player: int, _cue: StringName, at: Vector2, _direction: Vector2, radius: float, _tint: Color, _look: int) -> void: _areas.append([player, at, radius]))
 	# The wizard of seat 0 (actors G7: the real scene); its hurtbox registers it in Combat.
 	_wizard = own(WizardScene.instantiate()) as Actor
 	PlayerController.seat_wizard(_wizard, 0, null, [[], [], [], []])
@@ -197,7 +197,7 @@ func test_a_dash_card_dashes_the_enemy_and_its_blast_goes_off_where_it_ends() ->
 	check(not enemy.mover.is_moving(), "for the card's time")
 	check(is_equal_approx(enemy.position.x, 60.0), "the card's distance toward its aim (%.2f)" % enemy.position.x)
 	check(_finished.size() == 1 and _finished[0][0] == enemy.id and _finished[0][1] == &"dash" and _finished[0][3] == tag, "and says where it ended, under its actor id with its tag")
-	check(_areas.size() == 1 and (_areas[0][1] as Vector2).is_equal_approx(enemy.position) and _areas[0][2] == tag, "the card's blast goes off there")
+	check(_areas.size() == 1 and (_areas[0][1] as Vector2).is_equal_approx(enemy.position), "the card's blast goes off there")
 
 
 func test_a_teleport_jumps_at_once_and_stops_short_of_a_wall() -> void:
@@ -220,20 +220,20 @@ func test_a_recoil_pushes_the_enemy_back_from_its_shot() -> void:
 	check(is_equal_approx(enemy.position.x, -30.0), "pushed the recoil's distance back from the aim (%.2f)" % enemy.position.x)
 
 
-func test_hooks_and_swaps_pull_the_enemy_and_others_moves_are_not_its_own() -> void:
+func test_pulls_and_swaps_move_the_enemy_and_others_moves_are_not_its_own() -> void:
 	var enemy := _enemy(_data([&"bolt"]))
 	var tag: int = _spells.current_tag(enemy.id, 0)
-	_bus.caster_move_requested.emit(enemy.id, &"hook", Vector2(40.0, 20.0), 0.25, tag)
+	_bus.caster_move_requested.emit(enemy.id, &"pull", Vector2(40.0, 20.0), 0.25, tag)
 	_run(0.5)
-	check(enemy.position.is_equal_approx(Vector2(40.0, 20.0)), "a hook pulls it to the hit (%s)" % enemy.position)
-	check(_finished.size() == 1 and _finished[0][1] == &"hook", "and says it arrived")
-	_bus.caster_move_requested.emit(enemy.id, &"swap", Vector2(0.0, 0.0), 0.1, tag)
+	check(enemy.position.is_equal_approx(Vector2(40.0, 20.0)), "a pull moves it to the hit (%s)" % enemy.position)
+	check(_finished.size() == 1 and _finished[0][1] == &"pull", "and says it arrived")
+	_bus.caster_move_requested.emit(enemy.id, &"swap", Vector2(-40.0, -20.0), 0.1, tag)
 	_run(0.25)
 	check(enemy.position.is_equal_approx(Vector2.ZERO), "a swap takes it to the target's place")
-	check_equal(_finished.size(), 1, "and says nothing (its blast went off at the target)")
+	check(_finished.size() == 2 and _finished[1][1] == &"swap", "and says so too: %s" % [_finished])
 	var other := _enemy(_data([&"bolt"]), Vector2(0.0, 200.0))
 	var other_tag: int = _spells.current_tag(other.id, 0)
-	_bus.caster_move_requested.emit(other.id, &"hook", Vector2(100.0, 0.0), 0.25, other_tag)
-	_bus.caster_move_requested.emit(enemy.id, &"hook", Vector2(100.0, 0.0), 0.25, SpellTag.make(_wizard.id, 0, 0, 0))
+	_bus.caster_move_requested.emit(other.id, &"pull", Vector2(100.0, 0.0), 0.25, other_tag)
+	_bus.caster_move_requested.emit(enemy.id, &"pull", Vector2(100.0, 0.0), 0.25, SpellTag.make(_wizard.id, 0, 0, 0))
 	_run(0.5)
 	check(enemy.position.is_equal_approx(Vector2.ZERO), "another enemy's move, or one with a wizard's tag, do not move it (the tag says whose move it is: the actor kit's rule)")

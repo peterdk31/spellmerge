@@ -1,8 +1,7 @@
 extends "res://tests/support/suite.gd"
-## Tests for the caster kit on the wizard (staffs B4; the kit's Mover since actors G7 and G5): teleport (wall-safe), hook, swap and recoil moves asked by
-## `caster_move_requested` and answered by `caster_move_finished`; the recoil requests of one step
-## added up (so `mirror · recoil` cancels) while a later dash, teleport, hook or swap replaces an
-## earlier one; wizard statuses from Combat (`apply_status` on its actor id) that slow or
+## Tests for the caster kit on the wizard (staffs B4; the kit's Mover since actors G7 and G5): teleport (wall-safe), pull, swap and recoil moves asked by
+## `caster_move_requested` and answered by `caster_move_finished`; every move adding up (so
+## `mirror · recoil` cancels; rules R4 F1); wizard statuses from Combat (`apply_status` on its actor id) that slow or
 ## freeze walking; a hit's push (`consume_knockback`); and siphon's mana refund. Wizards
 ## are the real scene (content/wizard/base/wizard.tscn) in the tree, stepped by hand. A move is
 ## the wizard's when its card's tag names the wizard's caster number (its actor id).
@@ -43,14 +42,14 @@ func _tag(wizard: Actor, staff: int = 0) -> int:
 	return SpellTag.make(wizard.id, staff, 0, 0)
 
 
-## Ask for a move of `wizard`, measured like the spells do: `offset` from the staff tip.
-func _ask(wizard: Actor, mode: StringName, offset: Vector2, seconds: float, staff: int = 0) -> void:
-	_world.bus.caster_move_requested.emit(wizard.id, mode, wizard.muzzle_position() + offset, seconds, _tag(wizard, staff))
+## Ask for a move of `wizard` by `move` (the way and the distance), as the spells do.
+func _ask(wizard: Actor, mode: StringName, move: Vector2, seconds: float, staff: int = 0) -> void:
+	_world.bus.caster_move_requested.emit(wizard.id, mode, move, seconds, _tag(wizard, staff))
 
 
 ## Ask for a pull of `wizard` to the world point `to`.
 func _pull(wizard: Actor, mode: StringName, to: Vector2, seconds: float, staff: int = 0) -> void:
-	_world.bus.caster_move_requested.emit(wizard.id, mode, to, seconds, _tag(wizard, staff))
+	_ask(wizard, mode, to - wizard.global_position, seconds, staff)
 
 
 func _run(count: int) -> void:
@@ -87,24 +86,24 @@ func test_teleport_inside_a_wall_does_not_leave_the_start() -> void:
 	check(player.global_position.distance_to(START) < 0.01, "a wall right at the wizard allows no jump, got %s" % player.global_position)
 
 
-func test_hook_pulls_to_the_hit_over_the_time_asked() -> void:
+func test_a_pull_moves_to_the_hit_over_the_time_asked() -> void:
 	var player: Actor = _wizard(0)
-	_pull(player, &"hook", START + Vector2(0.0, 50.0), 0.25, 2)
-	check(player.mover.is_moving(), "a hook is a pull in progress")
+	_pull(player, &"pull", START + Vector2(0.0, 50.0), 0.25, 2)
+	check(player.mover.is_moving(), "a pull in progress")
 	_run(5)
 	check(not player.mover.is_moving(), "the pull ends after the time asked")
 	check(player.global_position.distance_to(START + Vector2(0.0, 50.0)) < 0.5, "the wizard is at the hit, got %s" % player.global_position)
 	check_equal(_finished.size(), 1, "one answer")
-	check_equal(_finished[0][1], &"hook", "it answers as a hook")
+	check_equal(_finished[0][1], &"pull", "it answers as a pull")
 	check_equal(_finished[0][3], _tag(player, 2), "with the card's tag")
 
 
-func test_swap_moves_to_the_target_and_sends_no_answer() -> void:
+func test_swap_moves_to_the_target_and_is_answered() -> void:
 	var player: Actor = _wizard(0)
 	_pull(player, &"swap", START + Vector2(-40.0, 0.0), 0.125)
 	_run(4)
 	check(player.global_position.distance_to(START + Vector2(-40.0, 0.0)) < 0.5, "the wizard takes the target's place, got %s" % player.global_position)
-	check(_finished.is_empty(), "a swap sends no caster_move_finished (its blast is the target's)")
+	check(_finished.size() == 1 and _finished[0][1] == &"swap", "every move is answered: %s" % [_finished])
 
 
 func test_recoil_pushes_back_over_the_time_asked() -> void:
@@ -112,7 +111,7 @@ func test_recoil_pushes_back_over_the_time_asked() -> void:
 	_ask(player, &"recoil", Vector2(-30.0, 0.0), 0.125)
 	_run(4)
 	check(player.global_position.distance_to(START + Vector2(-30.0, 0.0)) < 0.5, "pushed back 30 px, got %s" % player.global_position)
-	check(_finished.is_empty(), "a recoil sends no answer")
+	check(_finished.size() == 1 and _finished[0][1] == &"recoil", "a recoil is a move like the others: %s" % [_finished])
 
 
 func test_recoils_of_one_step_add_up_and_cancel() -> void:
@@ -147,9 +146,7 @@ func test_recoil_works_without_input() -> void:
 
 func test_a_dash_walks_its_whole_distance_and_is_answered_one_step_later() -> void:
 	# Regression: the move's last step was cut off and answered a step early.
-	# A standing wizard dashes the way it aims (actors G7; it used to be the way it last walked).
 	var player: Actor = _wizard(0)
-	player.aim = Vector2.RIGHT
 	_ask(player, &"dash", Vector2(55.0, 0.0), 0.25)
 	for n in 4:
 		_run(1)
@@ -158,23 +155,6 @@ func test_a_dash_walks_its_whole_distance_and_is_answered_one_step_later() -> vo
 	_run(1)
 	check_equal(_finished.size(), 1, "answered one step later")
 	check_equal(_finished[0][1], &"dash", "as a dash")
-
-
-func test_a_walking_wizard_dashes_the_way_it_walks_a_standing_one_the_way_it_aims() -> void:
-	var walker: Actor = _wizard(0)
-	walker.aim = Vector2.RIGHT
-	_world.hold(0, &"move_up")
-	var stander: Actor = _wizard(1)
-	stander.aim = Vector2.LEFT
-	_run(1)
-	var walked: Vector2 = walker.global_position
-	# The walker's stick also aims it up; the dash goes the way it walks either way.
-	_ask(walker, &"dash", Vector2(40.0, 0.0), 0.25)
-	_ask(stander, &"dash", Vector2(40.0, 0.0), 0.25)
-	_run(1)
-	check(walker.velocity.y < -walker.mover.speed, "a walking wizard dashes the way it walks: %s" % walker.velocity)
-	check(stander.velocity.x < -stander.mover.speed, "a standing one the way it aims: %s" % stander.velocity)
-	check(walked.y < START.y, "the walker had walked up first")
 
 
 func test_a_homing_dash_turns_toward_an_enemy_and_goes_its_whole_distance() -> void:
@@ -221,19 +201,19 @@ func test_teleport_does_not_leave_the_room() -> void:
 	check(player.global_position.x > START.x, "but it still moves, got %s" % player.global_position)
 
 
-func test_an_overlay_ends_a_hook_and_answers_it() -> void:
+func test_an_overlay_ends_a_pull_and_answers_it() -> void:
 	var player: Actor = _wizard(0)
-	_pull(player, &"hook", START + Vector2(0.0, 80.0), 0.5)
+	_pull(player, &"pull", START + Vector2(0.0, 80.0), 0.5)
 	_world.input.set_captured(0, true)
 	_run(1)
 	check(not player.mover.is_moving(), "the move ended")
 	check_equal(_finished.size(), 1, "and was answered")
-	check_equal(_finished[0][1], &"hook", "as a hook")
+	check_equal(_finished[0][1], &"pull", "as a pull")
 
 
 func test_downing_clears_moves_and_recoil() -> void:
 	var player: Actor = _wizard(0)
-	_pull(player, &"hook", START + Vector2(0.0, 80.0), 0.5)
+	_pull(player, &"pull", START + Vector2(0.0, 80.0), 0.5)
 	_ask(player, &"recoil", Vector2(-40.0, 0.0), 0.5)
 	_world.hurt(player, player.health.max_health)
 	_run(2)
@@ -241,28 +221,6 @@ func test_downing_clears_moves_and_recoil() -> void:
 	Fixture.downed(player).revive(1)
 	_run(8)
 	check_equal(player.global_position, START, "nothing carries over a revive")
-
-
-func test_a_replaced_swap_is_not_answered() -> void:
-	var player: Actor = _wizard(0)
-	_pull(player, &"swap", START + Vector2(-40.0, 0.0), 0.5, 0)
-	_ask(player, &"teleport", Vector2(30.0, 0.0), 0.0, 1)
-	check_equal(_finished.size(), 1, "only the teleport answers")
-	check_equal(_finished[0][1], &"teleport", "as a teleport")
-
-
-func test_a_later_move_replaces_an_earlier_one() -> void:
-	var player: Actor = _wizard(0)
-	_pull(player, &"hook", START + Vector2(0.0, 80.0), 0.5, 0)
-	_ask(player, &"teleport", Vector2(0.0, -30.0), 0.0, 1)
-	check(not player.mover.is_moving(), "the teleport ended the hook")
-	check_equal(player.global_position, START + Vector2(0.0, -30.0), "the wizard is where the teleport put it")
-	check_equal(_finished.size(), 2, "the replaced hook is answered too")
-	check_equal(_finished[0][1], &"hook", "first the hook, where the wizard was")
-	check_equal(_finished[0][2], START, "which went nowhere")
-	check_equal(_finished[1][1], &"teleport", "then the teleport")
-	_run(8)
-	check(player.global_position.distance_to(START + Vector2(0.0, -30.0)) < 0.01, "the hook does not pull any more, got %s" % player.global_position)
 
 
 func test_other_players_moves_are_ignored() -> void:
@@ -282,7 +240,7 @@ func test_a_move_is_matched_by_the_tag_not_the_event_caster() -> void:
 	# Actors G7: the old wizard checked the event's caster; the Mover checks the card's tag.
 	var player: Actor = _wizard(0)
 	var other: Actor = _wizard(1)
-	_world.bus.caster_move_requested.emit(player.id, &"teleport", player.muzzle_position() + Vector2(40.0, 0.0), 0.0, _tag(other))
+	_world.bus.caster_move_requested.emit(player.id, &"teleport", Vector2(40.0, 0.0), 0.0, _tag(other))
 	check_equal(player.global_position, START, "a card of another wizard does not move this one")
 	check_equal(other.global_position, START + Vector2(40.0, 0.0), "it moves the wizard its tag names")
 
@@ -313,7 +271,7 @@ func test_chill_slows_and_freeze_stops_walking() -> void:
 	check_equal(player.velocity, Vector2.ZERO, "a freeze holds the wizard")
 
 
-func test_freeze_stops_a_dash_but_not_a_hook() -> void:
+func test_freeze_stops_a_dash_but_not_a_pull() -> void:
 	var player: Actor = _wizard(0)
 	player.aim = Vector2.RIGHT
 	_freeze(player)
@@ -322,9 +280,9 @@ func test_freeze_stops_a_dash_but_not_a_hook() -> void:
 	check_equal(player.velocity, Vector2.ZERO, "a frozen wizard cannot dash")
 	var pulled: Actor = _wizard(1)
 	_freeze(pulled)
-	_pull(pulled, &"hook", START + Vector2(0.0, 40.0), 0.25)
+	_pull(pulled, &"pull", START + Vector2(0.0, 40.0), 0.25)
 	_run(1)
-	check(pulled.velocity.y > 0.0, "a hook still pulls a frozen wizard")
+	check(pulled.velocity.y > 0.0, "a pull still pulls a frozen wizard")
 
 
 func test_a_hit_pushes_the_wizard() -> void:

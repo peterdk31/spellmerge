@@ -29,7 +29,7 @@ var _spells: SpellsScript
 var _mgr: ManagerScript
 var _bus: EventsScript
 var _staff: StaffBase
-## Every area_hit_requested as [player, position, radius, tag].
+## Every blast (its `cue_shown`) as [player, position, radius].
 var _areas: Array = []
 ## The last mana_reserved per player.
 var _reserved: Dictionary = {}
@@ -48,7 +48,7 @@ func before_each() -> void:
 	_spells.bind(_mgr, _bus)
 	_areas.clear()
 	_reserved.clear()
-	_bus.area_hit_requested.connect(func(player: int, at: Vector2, radius: float, tag: int) -> void: _areas.append([player, at, radius, tag]))
+	_bus.cue_shown.connect(func(player: int, _cue: StringName, at: Vector2, _direction: Vector2, radius: float, _tint: Color, _look: int) -> void: _areas.append([player, at, radius]))
 	_bus.mana_reserved.connect(func(player: int, amount: float) -> void: _reserved[player] = amount)
 	_staff = StaffBase.new()
 	_staff.id = &"test"
@@ -179,7 +179,6 @@ func test_a_lone_blast_asks_for_an_area_hit_on_the_caster() -> void:
 		check_equal(_areas[0][0], 3, "for player 4")
 		check_equal(_areas[0][1], origin, "on the caster")
 		check(float(_areas[0][2]) >= 24.0, "as wide as the blast")
-		check(_spells.hit_profile(int(_areas[0][3])) != null, "with a profile combat can read")
 
 
 func test_a_blast_in_a_payload_lands_where_the_bolt_hits() -> void:

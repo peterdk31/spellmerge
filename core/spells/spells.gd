@@ -1334,32 +1334,24 @@ func _strike_round(spell: CompiledSpell, tag: int, actor: int, at: Vector2, way:
 	_cast_jumps()
 
 
-## Wall: `shots` still shots in a line across `direction`, `spread` pixels apart (the shot's
-## diameter when the form has none), centred `SpellLimits.WALL_REACH` ahead of `origin` (homing
-## moves the centre onto a target near it, `_homed_place`). A shot born in a wall is skipped.
-## Shield charges apply, so `shield . wall` stops other teams' shots.
+## Wall (rules R4 F6): one solid still shot centred `SpellLimits.WALL_REACH` ahead of `origin`,
+## a row of `shots` stones across `direction`, `spread` pixels apart (the shot's diameter when the
+## form has none): a wall while it lives (`set_solid`) that hurts what touches it and that its
+## hits never spend. Homing makes it creep toward a target as one piece, as a rune does.
 func _launch_wall(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direction: Vector2, source: Node, lifetime: float, carried: int, prev: int) -> int:
-	var centre: Vector2 = _homed_place(spell, actor, tag, origin, projectiles.clip_to_walls(origin, origin + direction * SpellLimits.WALL_REACH))
-	var across: Vector2 = direction.orthogonal()
-	var gap: float = spell.spread if spell.spread > 0.0 else spell.radius * 2.0
-	var made: int = 0
-	for n in spell.shots:
-		var at: Vector2 = centre + across * (n - (spell.shots - 1) * 0.5) * gap
-		var slot: int = projectiles.spawn(actor, at, Vector2.ZERO, lifetime, spell.radius, HITS, spell.pierce, tag, ProjectilesScript.MOTION_STILL)
-		if slot < 0:
-			continue
-		made += 1
-		_apply_travel(slot, spell)
-		if spell.homing_range > 0.0:
-			# Its homing went into where the wall stands: its shots keep still (a chain jump homes).
-			projectiles.set_homing(slot, 0.0, spell.homing_range)
-		_register(slot, tag, spell, carried, prev)
-		if source != null:
-			projectiles.exclude(slot, source, SpellLimits.SOURCE_EXCLUSION)
-	return made
+	var centre: Vector2 = projectiles.clip_to_walls(origin, origin + direction * SpellLimits.WALL_REACH)
+	var slot: int = projectiles.spawn(actor, centre, Vector2.ZERO, lifetime, spell.radius, HITS, PIERCE_ALL, tag, ProjectilesScript.MOTION_STILL)
+	if slot < 0:
+		return 0
+	_apply_travel(slot, spell)
+	projectiles.set_solid(slot, direction.orthogonal(), spell.shots, spell.spread if spell.spread > 0.0 else spell.radius * 2.0)
+	_register(slot, tag, spell, carried, prev)
+	if source != null:
+		projectiles.exclude(slot, source, SpellLimits.SOURCE_EXCLUSION)
+	return 1
 
 
-## Where a carrier placed at `point` ahead of its caster at `origin` (a rain, a wall) goes when it
+## Where a carrier placed at `point` ahead of its caster at `origin` (a rain) goes when it
 ## homes (rules R4i): onto a target within its homing reach of the point, picked as a homing
 ## shot picks one (`homing_point`, any way round), stopped at a wall on the way; else `point`.
 func _homed_place(spell: CompiledSpell, actor: int, tag: int, origin: Vector2, point: Vector2) -> Vector2:

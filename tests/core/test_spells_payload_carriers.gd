@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## Tests for the payload and line carriers of the staffs (B2c): rain drops its payload on the aim
 ## point after a delay, familiar and decoy ask for entities and cast or end through the events,
-## wall is a line of still shots and fissure a beam through everything on its line. It runs a real
+## wall is one solid still shot (a short-lived wall across the aim, rules R4 F6) and fissure a beam through everything on its line. It runs a real
 ## projectile manager and event bus, stepped by hand, with cards built in code.
 ##
 ## godot --headless --path . --script res://tests/core/test_spells_payload_carriers.gd
@@ -265,7 +265,8 @@ func test_a_mirrored_wall_stands_behind() -> void:
 			ahead += 1
 		elif is_equal_approx(at.x, -SpellLimits.WALL_REACH):
 			behind += 1
-	check_equal([ahead, behind], [3, 3], "a wall ahead and one behind")
+	check_equal([ahead, behind], [1, 1], "a wall ahead and one behind")
+	check(_blocked(Vector2(0.0, 5.0), Vector2(60.0, 5.0)) and _blocked(Vector2(0.0, 5.0), Vector2(-60.0, 5.0)), "both are solid")
 
 
 func test_a_mirrored_decoy_is_a_second_decoy() -> void:
@@ -492,23 +493,34 @@ func test_a_decoy_ending_twice_counts_once() -> void:
 	check_equal(_areas.size(), 1, "the second answer is ignored")
 
 
-func test_wall_is_a_line_of_still_shots_across_the_aim() -> void:
+## True when the segment `from`-`to` meets a wall.
+func _blocked(from: Vector2, to: Vector2) -> bool:
+	return _mgr.clip_to_walls(from, to) != to
+
+
+func test_wall_is_one_solid_row_across_the_aim() -> void:
 	_build(0, [&"wall"])
 	_cast()
 	var found: Array[Vector2] = _positions()
-	check_equal(found.size(), 3, "three shots")
-	if found.size() == 3:
-		check(is_equal_approx(found[0].x, SpellLimits.WALL_REACH) and is_equal_approx(found[1].x, SpellLimits.WALL_REACH) and is_equal_approx(found[2].x, SpellLimits.WALL_REACH), "all ahead of the caster, across the aim: %s" % [found])
-		check(is_equal_approx(absf(found[0].y - found[1].y), 10.0) and is_equal_approx(absf(found[1].y - found[2].y), 10.0), "ten pixels apart: %s" % [found])
+	check_equal(found, [Vector2(SpellLimits.WALL_REACH, 0.0)] as Array[Vector2], "one body, ahead of the caster")
+	# Three stones 10 px apart, 4 px round: the row reaches 14 px either side of its middle.
+	for y: float in [-12.0, 0.0, 12.0]:
+		check(_blocked(Vector2(0.0, y), Vector2(60.0, y)), "a line across it at y %s meets it" % y)
+	check(not _blocked(Vector2(0.0, 30.0), Vector2(60.0, 30.0)), "one well beside it does not")
 	_tick(30)
-	check_equal(_mgr.get_count(), 3, "they stay where they are")
+	check_equal(_mgr.get_count(), 1, "it stands")
+	check(_blocked(Vector2(0.0, 0.0), Vector2(60.0, 0.0)), "and is still solid")
+	_tick(180)
+	check_equal(_mgr.get_count(), 0, "its life over, it is gone")
+	check(not _blocked(Vector2(0.0, 0.0), Vector2(60.0, 0.0)), "and so is its wall")
 
 
 func test_wall_follows_the_aim() -> void:
 	_build(0, [&"wall"])
 	_spells.cast_staff(0, 0, Vector2.ZERO, Vector2.DOWN, 100.0)
-	var found: Array[Vector2] = _positions()
-	check(found.size() == 3 and is_equal_approx(found[0].y, SpellLimits.WALL_REACH) and is_equal_approx(absf(found[0].x - found[1].x), 10.0), "a horizontal line below the caster: %s" % [found])
+	check_equal(_positions(), [Vector2(0.0, SpellLimits.WALL_REACH)] as Array[Vector2], "below the caster")
+	check(_blocked(Vector2(-12.0, 0.0), Vector2(-12.0, 60.0)) and _blocked(Vector2(12.0, 0.0), Vector2(12.0, 60.0)), "a horizontal row")
+	check(not _blocked(Vector2(0.0, 0.0), Vector2(0.0, 15.0)), "short of it the way is open")
 
 
 func test_a_shield_wall_blocks_enemy_shots() -> void:
@@ -518,7 +530,28 @@ func test_a_shield_wall_blocks_enemy_shots() -> void:
 	for slot in _mgr.get_cap():
 		if _mgr.is_alive(slot) and _mgr.get_shield_of(slot) == 2:
 			charged += 1
-	check_equal(charged, 3, "every shot of the wall carries the shield's charges")
+	check_equal(charged, 1, "the wall carries the shield's charges")
+
+
+func test_a_shot_ends_on_the_wall_and_a_ghost_passes() -> void:
+	_build(0, [&"wall"])
+	_cast()
+	var plain: int = _mgr.spawn(9, Vector2(80.0, 8.0), Vector2(-300.0, 0.0), 2.0, 2.0, ManagerScript.LAYER_PLAYER)
+	var ghost: int = _mgr.spawn(9, Vector2(80.0, -8.0), Vector2(-300.0, 0.0), 2.0, 2.0, ManagerScript.LAYER_PLAYER)
+	_mgr.set_ghost(ghost)
+	_tick(20)
+	check(not _mgr.is_alive(plain), "the plain shot ended on the wall")
+	check(_mgr.is_alive(ghost) and _mgr.get_position_of(ghost).x < 0.0, "the ghost passed it")
+
+
+func test_an_enemy_touching_the_wall_anywhere_along_it_is_hit_once_while_it_stays() -> void:
+	_build(0, [&"wall"])
+	var target: Node2D = _target(Vector2(SpellLimits.WALL_REACH + 6.0, 13.0))
+	_cast()
+	_tick(30)
+	check_equal(_hits.size(), 1, "hit once at the row's end, and the wall stands on")
+	check(not _hits.is_empty() and _hits[0][1] == target, "it is the enemy")
+	check_equal(_mgr.get_count(), 1, "the hit did not spend the wall")
 
 
 func test_wall_shots_stay_out_of_a_wall() -> void:

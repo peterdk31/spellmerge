@@ -380,7 +380,8 @@ static func _numbers_waste(modifier: ModifierBase, motion: FormBase.Motion, blas
 				return ""
 	if modifier.extra_pierce != 0:
 		any = true
-		if stays(motion) or motion == FormBase.Motion.RAY:
+		# A wall stands through every hit (rules R4 F6).
+		if (stays(motion) and motion != FormBase.Motion.WALL) or motion == FormBase.Motion.RAY:
 			return ""
 	if not any:
 		return ""
@@ -547,9 +548,9 @@ static func stacked(behaviour: int, before: float, strength: float) -> float:
 
 ## Whether homing can steer a carrier of `motion`: what it moves turns toward a target as it
 ## goes, at the turn rate (a shot in flight, a dash, whether it carries the wizard or a shot),
-## a still shot (a rune) creeps toward one at SpellLimits.HOMING_DRIFT, what is over at once
-## bends its way toward one, up to `homing_angle` (a beam, a teleport), and what is placed ahead
-## of its caster is placed on one near that point (a wall, a rain; rules R4i). On any other form
+## a still shot (a rune, a wall) creeps toward one at SpellLimits.HOMING_DRIFT, what is over at
+## once bends its way toward one, up to `homing_angle` (a beam, a teleport), and a rain is placed
+## on one near the point ahead of its caster (rules R4i). On any other form
 ## a homing card is wasted. A new motion that should home goes here, and the homing test of
 ## every form card (tests/content/spells/test_homing_forms.gd) checks it reaches.
 static func homing_steers(motion: FormBase.Motion) -> bool:
@@ -683,7 +684,7 @@ static func _what(motion: FormBase.Motion) -> String:
 		FormBase.Motion.TELEPORT:
 			return "a teleport moves the wizard and hits nothing"
 		FormBase.Motion.WALL:
-			return "a wall stands still"
+			return "a wall stands still through every hit"
 		FormBase.Motion.RAIN:
 			return "a rain strikes once where it lands"
 		FormBase.Motion.FISSURE:

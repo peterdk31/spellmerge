@@ -87,6 +87,9 @@ extends Node2D
 ## target, also sends `Events.projectile_impact(caster, target, position,
 ## direction)` (target `null` for a wall), so a listener can show dust or a spray
 ## without asking the manager anything; it changes nothing here.
+## A solid shot (`set_solid`, the Wall card, rules R4 F6) is a wall too while it lives: a
+## segment across it that lies in the wall grid (shots end on it or bounce off it, a ghost passes)
+## and a static body on WALL_LAYER that bodies cannot walk through. It hits along that segment.
 ##
 ## The global cap (`get_cap()`, set by platform: DEFAULT_CAP_WEB or
 ## DEFAULT_CAP_DESKTOP) degrades gracefully. When it is full, a new projectile
@@ -437,6 +440,10 @@ const TINT_STRENGTH: float = 0.45
 ## Wall grid cell size in pixels. Walls are rounded out to whole cells, so they are
 ## exact when their edges are multiples of it (room tiles are 32 px).
 const WALL_CELL: float = 8.0
+## A room wall's mark in the wall grid; the bits below it count the solid shots on a cell.
+const ROOM_CELL: int = 128
+## The physics layer of the room's walls (the actors' `LAYER_WALLS`): a solid shot's body is on it.
+const WALL_LAYER: int = 1
 ## Spatial grid cell size in pixels.
 const GRID_CELL: float = 64.0
 ## Projectiles that leave the bounds by more than this are removed.
@@ -688,11 +695,28 @@ var _max_target_radius: float = 0.0
 ## True when targets were added since the grid was filled (a query refreshes it).
 var _grid_stale: bool = false
 
-## The wall grid over the bounds: one byte per WALL_CELL cell, 1 for solid.
+## The wall grid over the bounds: one byte per WALL_CELL cell, 0 for open: ROOM_CELL for a room
+## wall, plus one for every solid shot lying on it (`set_solid`).
 var _wall_w: int = 1
 var _wall_h: int = 1
 var _wall_cells: PackedByteArray = PackedByteArray()
 var _has_walls: bool = false
+## The solid shots (`set_solid`) by slot.
+var _solids: Dictionary = {}
+## Static bodies of solid shots that ended, kept for the next one.
+var _spare_bodies: Array[StaticBody2D] = []
+
+
+## A solid shot's wall (`set_solid`): `stones` stones `gap` radii apart across `across`, laid at
+## `at` with `radius` (where it lay last: it is laid again when the shot moves or grows).
+class Solid:
+	var across: Vector2 = Vector2.RIGHT
+	var stones: int = 1
+	var gap: float = 0.0
+	var at: Vector2 = Vector2.INF
+	var radius: float = 0.0
+	var cells: PackedInt32Array = PackedInt32Array()
+	var body: StaticBody2D = null
 
 ## The colour of each shot's core (white for a plain shot), see `set_core`.
 var _core: PackedColorArray = PackedColorArray()
@@ -1071,10 +1095,14 @@ func set_walls(rects: Array[Rect2]) -> void:
 		_add_wall(rect)
 
 
-## Remove every wall.
+## Remove every wall. A solid shot lays itself again at its next step.
 func clear_walls() -> void:
 	_wall_cells.fill(0)
 	_has_walls = false
+	for slot: int in _solids:
+		var solid: Solid = _solids[slot]
+		solid.cells.clear()
+		solid.at = Vector2.INF
 
 
 ## Add the rectangle shapes of a body (a room's static body) as walls. The body must
@@ -1108,8 +1136,114 @@ func _add_wall(rect: Rect2) -> void:
 	var y1: int = mini(ceili((rect.end.y - _bounds.position.y) / WALL_CELL), _wall_h)
 	for y in range(y0, y1):
 		for x in range(x0, x1):
-			_wall_cells[y * _wall_w + x] = 1
+			_wall_cells[y * _wall_w + x] |= ROOM_CELL
 			_has_walls = true
+
+
+## Make the still shot in `slot` a wall while it lives (the Wall card, rules R4 F6): a row of
+## `stones` stones across `across`, `gap` pixels apart (and its radius thick, both growing with
+## it). It lies in the wall grid and as a static body on WALL_LAYER, it hits along its row, and
+## it follows the shot when homing moves it, stopping at a wall. False for an empty slot or a
+## shot that is not still.
+func set_solid(slot: int, across: Vector2, stones: int, gap: float) -> bool:
+	if slot < 0 or slot >= _cap or _alive[slot] == 0 or _motion[slot] != MOTION_STILL or across.is_zero_approx() or not across.is_finite():
+		return false
+	var solid := Solid.new()
+	solid.across = across.normalized()
+	solid.stones = maxi(stones, 1)
+	solid.gap = gap / maxf(_radius[slot], 0.01)
+	_solids[slot] = solid
+	_lay_solid(slot, solid)
+	return true
+
+
+## Half the row of the solid shot in `slot`: from its middle to its last stone's centre.
+func _solid_half(slot: int, solid: Solid) -> Vector2:
+	return solid.across * (solid.stones - 1) * 0.5 * solid.gap * _radius[slot]
+
+
+## A solid shot's step, in place of a wall check: when it moved or grew it is lifted, stopped
+## where a wall cuts its way, and laid again.
+func _step_solid(slot: int, solid: Solid) -> void:
+	if _pos[slot] == solid.at and _radius[slot] == solid.radius:
+		return
+	_lift_solid(solid)
+	if _pos[slot] != _prev[slot] and _wall_hit(_prev[slot], _pos[slot]) >= 0.0:
+		_pos[slot] = _prev[slot]
+	_lay_solid(slot, solid)
+
+
+## Lay the solid shot in `slot` into the wall grid where it is now: every cell whose centre is
+## within its radius and half a cell of its row, so a shot cannot slip between two cells.
+func _lay_solid(slot: int, solid: Solid) -> void:
+	solid.at = _pos[slot]
+	solid.radius = _radius[slot]
+	var half: Vector2 = _solid_half(slot, solid)
+	var a: Vector2 = solid.at - half
+	var b: Vector2 = solid.at + half
+	var reach: float = solid.radius + WALL_CELL * 0.5
+	var low: Vector2 = a.min(b) - Vector2(reach, reach) - _bounds.position
+	var high: Vector2 = a.max(b) + Vector2(reach, reach) - _bounds.position
+	for y in range(maxi(floori(low.y / WALL_CELL), 0), mini(ceili(high.y / WALL_CELL), _wall_h)):
+		for x in range(maxi(floori(low.x / WALL_CELL), 0), mini(ceili(high.x / WALL_CELL), _wall_w)):
+			var centre: Vector2 = _bounds.position + (Vector2(x, y) + Vector2(0.5, 0.5)) * WALL_CELL
+			if Geometry2D.get_closest_point_to_segment(centre, a, b).distance_squared_to(centre) > reach * reach:
+				continue
+			var cell: int = y * _wall_w + x
+			if (_wall_cells[cell] & (ROOM_CELL - 1)) < ROOM_CELL - 1:
+				_wall_cells[cell] += 1
+				solid.cells.append(cell)
+	_has_walls = _has_walls or not solid.cells.is_empty()
+	if solid.body == null and is_inside_tree():
+		solid.body = _spare_bodies.pop_back() if not _spare_bodies.is_empty() else _new_solid_body()
+	if solid.body != null:
+		solid.body.collision_layer = WALL_LAYER
+		solid.body.position = solid.at
+		solid.body.rotation = solid.across.angle()
+		var shape := (solid.body.get_child(0) as CollisionShape2D).shape as RectangleShape2D
+		shape.size = Vector2(half.length() + solid.radius, solid.radius) * 2.0
+
+
+func _new_solid_body() -> StaticBody2D:
+	var body := StaticBody2D.new()
+	body.collision_mask = 0
+	var shape := CollisionShape2D.new()
+	shape.shape = RectangleShape2D.new()
+	body.add_child(shape)
+	add_child(body)
+	return body
+
+
+## Take a solid shot's cells out of the wall grid.
+func _lift_solid(solid: Solid) -> void:
+	_mark_solid(solid, -1)
+	solid.cells.clear()
+
+
+## Add `by` (1 or -1) to the count of every cell a solid shot lies on.
+func _mark_solid(solid: Solid, by: int) -> void:
+	for cell in solid.cells:
+		_wall_cells[cell] += by
+
+
+## The live solid shot that cast the shot in `slot` (a payload of a wall), or null.
+func _own_solid(slot: int) -> Solid:
+	if _solids.is_empty():
+		return null
+	var caster: int = _caster_slot[slot]
+	if caster >= 0 and _alive[caster] != 0 and _seq[caster] == _caster_seq[slot] and _solids.has(caster):
+		return _solids[caster]
+	return null
+
+
+## The solid shot in `slot` ended: its wall goes, and its body waits for the next one.
+func _drop_solid(slot: int) -> void:
+	var solid: Solid = _solids[slot]
+	_solids.erase(slot)
+	_lift_solid(solid)
+	if solid.body != null:
+		solid.body.collision_layer = 0
+		_spare_bodies.append(solid.body)
 
 
 ## The point where the segment from `from` to `to` first meets a wall, or `to` when
@@ -1218,6 +1352,8 @@ func clear() -> void:
 	for slot in _high:
 		if _alive[slot] != 0 and _tag[slot] != 0:
 			shot_ended.emit(_tag[slot])
+	for slot: int in _solids.keys():
+		_drop_solid(slot)
 	_alive.fill(0)
 	_state.fill(S_IDLE)
 	_member_count.fill(0)
@@ -1934,9 +2070,10 @@ func is_self_live(slot: int) -> bool:
 
 
 func _spawn_row(caster: int, origin: Vector2, velocity: Vector2, lifetime: float, radius: float, hit_layers: int, pierce: int, tag: int, motion: int) -> int:
-	# An orbit shot is held by its caster and ignores walls.
-	if motion != MOTION_ORBIT and _has_walls and _wall_hit(origin, origin) >= 0.0:
-		# Born inside a wall it would end in the next step: count it as ended, but
+	# An orbit shot is held by its caster and ignores walls. One born in a solid shot's row is
+	# made: it ends on that wall at its first step, unless the wall cast it (`_own_solid`).
+	if motion != MOTION_ORBIT and _has_walls and (_cell_at(origin) & ROOM_CELL) != 0:
+		# Born inside a room wall it would end in the next step: count it as ended, but
 		# take no pool slot (at the cap that would evict another shot).
 		# No shot existed, so no impact is shown (the staff tip is inside the wall).
 		wall_hits += 1
@@ -2117,10 +2254,19 @@ func _pass_hits(top: int, delta: float) -> void:
 			_kill(slot)
 			continue
 		# A shot that meets a wall is cut short there: it can still hit what is
-		# in front of the wall, then it ends (or bounces). An orbit or ghost shot ignores walls.
+		# in front of the wall, then it ends (or bounces). An orbit or ghost shot ignores walls; a
+		# solid one is a wall and stops at one (`_step_solid`).
 		var walled: bool = false
-		if _has_walls and _motion[slot] != MOTION_ORBIT and (_flags[slot] & F_GHOST) == 0:
+		if not _solids.is_empty() and _solids.has(slot):
+			_step_solid(slot, _solids[slot])
+		elif _has_walls and _motion[slot] != MOTION_ORBIT and (_flags[slot] & F_GHOST) == 0:
+			# A wall's own payloads leave it: its row is lifted while they look.
+			var own: Solid = _own_solid(slot)
+			if own != null:
+				_mark_solid(own, -1)
 			var cut: float = _wall_hit(_prev[slot], _pos[slot])
+			if own != null:
+				_mark_solid(own, 1)
 			if cut >= 0.0:
 				walled = true
 				_pos[slot] = _prev[slot].lerp(_pos[slot], cut)
@@ -2138,8 +2284,9 @@ func _pass_hits(top: int, delta: float) -> void:
 			# What its path no longer touches it may hit again.
 			if _alive[slot] != 0 and _seq[slot] == seq:
 				_forget_left(slot)
-		# A shot that stuck to a target this step stays stuck, even at a wall.
-		if walled and _alive[slot] != 0 and (_flags[slot] & F_STUCK) == 0:
+		# A shot that stuck to a target this step stays stuck, even at a wall. One that met a
+		# guarding solid shot is turned or stopped by it instead (`_solid_guard`).
+		if walled and _alive[slot] != 0 and (_flags[slot] & F_STUCK) == 0 and not (not _solids.is_empty() and _solid_guard(slot)):
 			_wall_end(slot)
 	_resume = maxi(starved_at, 0)
 
@@ -2544,9 +2691,14 @@ func _bounced(at: Vector2, heading: Vector2, velocity: Vector2) -> Vector2:
 
 
 func _solid_at(point: Vector2) -> bool:
+	return _cell_at(point) != 0
+
+
+## The wall grid's byte at `point` (0 outside the grid).
+func _cell_at(point: Vector2) -> int:
 	var x: int = floori((point.x - _bounds.position.x) / WALL_CELL)
 	var y: int = floori((point.y - _bounds.position.y) / WALL_CELL)
-	return x >= 0 and x < _wall_w and y >= 0 and y < _wall_h and _wall_cells[y * _wall_w + x] != 0
+	return _wall_cells[y * _wall_w + x] if x >= 0 and x < _wall_w and y >= 0 and y < _wall_h else 0
 
 
 ## Check a shielded shot against the shots of other teams (aim, actors G3a: a shield stops
@@ -2592,9 +2744,14 @@ func _shield_meets(slot: int, other: int) -> void:
 		along = clampf(-start.dot(path) / path.length_squared(), 0.0, 1.0)
 	if (start + path * along).length_squared() > reach * reach:
 		return
+	_guard_meets(slot, other, _pos[other] - _pos[slot])
+
+
+## The shot `other` touched the shield or deflect of the shot in `slot` (`normal` the way out of
+## it): turned (deflect goes first and keeps the shield's charge, owner 2026-10-29) or stopped.
+func _guard_meets(slot: int, other: int, normal: Vector2) -> void:
 	if _deflect[slot] != 0:
-		# Deflect goes first and keeps the shield's charge (owner, 2026-10-29).
-		deflect_shot(other, _actor[slot], _pos[other] - _pos[slot], _tag[slot])
+		deflect_shot(other, _actor[slot], normal, _tag[slot])
 		return
 	_shield[slot] -= 1
 	var at: Vector2 = _pos[other]
@@ -2603,6 +2760,26 @@ func _shield_meets(slot: int, other: int) -> void:
 		event_slot = slot
 		events.shot_blocked.emit(_actor[slot], at, _tag[slot])
 		event_slot = -1
+
+
+## The shot in `slot` met a wall: when it is the row of a solid shot of another team with a
+## shield charge or deflect, that guard turns or stops it (`_guard_meets`), as it would on any
+## carrier it touches, and this returns true. Else false: it meets the wall as any wall.
+func _solid_guard(slot: int) -> bool:
+	var at: Vector2 = _pos[slot]
+	for owner: int in _solids:
+		if owner == slot or _team[owner] == _team[slot] or (_shield[owner] <= 0 and _deflect[owner] == 0):
+			continue
+		var half: Vector2 = _solid_half(owner, _solids[owner])
+		var on: Vector2 = Geometry2D.get_closest_point_to_segment(at, _pos[owner] - half, _pos[owner] + half)
+		var reach: float = _radius[owner] + _radius[slot] + WALL_CELL
+		if on.distance_squared_to(at) <= reach * reach:
+			# Just out of the wall first, as a bounce does, so a turned shot leaves it.
+			_pos[slot] = at - _vel[slot].normalized() * 0.5
+			_base[slot] = _pos[slot]
+			_guard_meets(owner, slot, at - on)
+			return true
+	return false
 
 
 ## Put every live shot on the target grid's cell where it is now (chains in slot order), and
@@ -3422,11 +3599,9 @@ func update_draw(fraction: float = -1.0) -> void:
 			_write_trail(_enemy_buffer, enemy_out * DRAW_STRIDE, _trail[slot], at, flags, look_data, _core[slot])
 			enemy_out += 1
 		elif batch == BATCH_ENEMY_RUNE:
-			_write_quad(_enemy_rune_buffer, enemy_rune_out * DRAW_STRIDE, dir, size, at, look_data, _core[slot], KIND_RUNE, 0.0, trace_code(sim_time - _born[slot]))
-			enemy_rune_out += 1
+			enemy_rune_out = _write_stones(_enemy_rune_buffer, enemy_rune_out, slot, dir, size, at, look_data)
 		elif batch == BATCH_RUNE:
-			_write_quad(_rune_buffer, rune_out * DRAW_STRIDE, dir, size, at, look_data, _core[slot], KIND_RUNE, 0.0, trace_code(sim_time - _born[slot]))
-			rune_out += 1
+			rune_out = _write_stones(_rune_buffer, rune_out, slot, dir, size, at, look_data)
 		elif batch == BATCH_ORBIT:
 			_write_trail(_orbit_buffer, orbit_out * DRAW_STRIDE, _trail[slot], at, flags, look_data, _core[slot])
 			orbit_out += 1
@@ -3473,6 +3648,24 @@ func update_draw(fraction: float = -1.0) -> void:
 	drawn = shots_out
 	drawn_trails = out + rune_out + orbit_out + enemy_out + enemy_rune_out - shots_out
 	_share_pool(asked, trails)
+
+
+## Write the rune quad of the still shot in `slot` drawn at `at` into `buffer` from instance
+## `out` on, one for each stone of a solid shot's row; returns the instance after the last.
+func _write_stones(buffer: PackedFloat32Array, out: int, slot: int, dir: Vector2, size: float, at: Vector2, look_data: Color) -> int:
+	var stones: int = 1
+	var step: Vector2 = Vector2.ZERO
+	if not _solids.is_empty() and _solids.has(slot):
+		var solid: Solid = _solids[slot]
+		stones = solid.stones
+		step = solid.across * solid.gap * _radius[slot]
+		at -= _solid_half(slot, solid)
+	var code: float = trace_code(sim_time - _born[slot])
+	# A batch holds the cap at most: stones past it are not drawn.
+	for n in mini(stones, buffer.size() / DRAW_STRIDE - out):
+		_write_quad(buffer, out * DRAW_STRIDE, dir, size, at + step * n, look_data, _core[slot], KIND_RUNE, 0.0, code)
+		out += 1
+	return out
 
 
 ## Work out what `update_draw` keeps for the shot in `slot` (see `_drawn_seq`).
@@ -3563,7 +3756,8 @@ func _count_batches() -> void:
 		if _alive[slot] != 0:
 			if _drawn_seq[slot] != _seq[slot] or _drawn_radius[slot] != _radius[slot] or _drawn_look[slot] != _look[slot]:
 				_remember_drawn(slot)
-			_batch_counts[_drawn_batch[slot]] += 1
+			# A solid shot draws a quad for every stone of its row.
+			_batch_counts[_drawn_batch[slot]] += 1 if _solids.is_empty() or not _solids.has(slot) else (_solids[slot] as Solid).stones
 	for n in _loose_count:
 		var ramp: int = _trail_ramp[_loose[n]]
 		_batch_counts[BATCH_BOLT if ramp >= 0 and ramp < ActorsScript.RAMP_ENEMY else BATCH_ENEMY] += 1
@@ -3745,6 +3939,8 @@ static func ramp_light(ramp: int) -> Color:
 
 func _kill(slot: int, announce: bool = true) -> void:
 	_forget_all(slot)
+	if not _solids.is_empty() and _solids.has(slot):
+		_drop_solid(slot)
 	_drop_moves(slot)
 	if announce and _tag[slot] != 0:
 		shot_ended.emit(_tag[slot])
@@ -4048,6 +4244,11 @@ func _query_match(t: int, point: Vector2, radius: float, layers: int, skip: int)
 func _hit_test(slot: int) -> bool:
 	var from: Vector2 = _prev[slot]
 	var to: Vector2 = _pos[slot]
+	if not _solids.is_empty() and _solids.has(slot):
+		# A solid shot hits along its row.
+		var half: Vector2 = _solid_half(slot, _solids[slot])
+		from = to - half
+		to += half
 	var radius: float = _radius[slot]
 	var lowest: Vector2 = from.min(to)
 	var highest: Vector2 = from.max(to)

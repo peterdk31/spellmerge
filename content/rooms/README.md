@@ -32,6 +32,8 @@ Room templates, one folder per biome. A room is a tile-based arena where a wave 
 
 The sandbox room (staffs B7), `content/rooms/crypt/sandbox.tscn` and `sandbox.tres` (id `sandbox`, `demo` so the web preview has it): two shooting lanes split by a wall down the middle that stops three tiles short of the bottom, so players walk between the lanes; two player spawns at the bottom of each lane; `dummy_spawns` (a `DummySpawns` marker group) puts the training dummy at the top of the left lane and the shooting dummy at the top of the right one, then a group of four more training dummies round the first in the left lane (Flow stands a training dummy at every spawn after the first two), to try homing, pierce and spreads on. Test: `tests/content/rooms/test_sandbox_data.gd`.
 
+The horde arena (docs/milestones/horde.md), `content/rooms/horde/horde.tscn` and `horde.tres` (id `horde`, `demo`, since the Horde button is in every build): one open, walled crypt room of 1280×720 (the `Floor` sprite covers it all, and flow takes the room's size from it), built like arena_01 (wall tiles 32 px thick on every side, so the open floor is `Rect2(32, 32, 1216, 656)`), with torches, rubble and skulls but no pillars, so the director's spawns never land in cover. The four player spawns stand round the middle; the eight enemy spawns by the walls are a fallback only (the director picks its own points). Test: `tests/content/rooms/test_horde_room.gd`.
+
 ## Validate
 
 ```sh

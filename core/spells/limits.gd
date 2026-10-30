@@ -84,17 +84,13 @@ const DEFLECT_SPEEDUP: float = 1.7
 const SLAM_ROWS_START: int = 16
 const SLAM_GROW: float = 0.67
 ## A homing carrier that is over at once (a beam, a teleport) has no time to turn, so it bends
-## toward a target as far as its turn rate turns in this many seconds (the Homing card's 3
-## radians a second bend it 43 degrees; more homing bends it further, all the way round).
-const INSTANT_HOMING_SECONDS: float = 0.25
+## toward a target as far as a homing shot turns over this many pixels of its flight (the Homing
+## card's curve of 73 px bends it 43 degrees; more homing bends it further, all the way round).
+const INSTANT_HOMING_REACH: float = 55.0
 ## Pixels per second a homing still shot (a rune) creeps toward its target (rules R4i): below the
 ## slowest walking enemy (30), so a rune that homes is a trap that follows, never a chaser one can
 ## not walk away from, and over a rune's 8 s it creeps about the Homing card's reach (160 px).
 const HOMING_DRIFT: float = 24.0
-## Pixels per second (a bolt's) above which a homing shot turns faster, in step with its speed, so
-## its curve is never wider than a homing bolt's: an atom or a faster bolt bends onto what a
-## bolt would. A shot this fast or slower turns at its homing rate.
-const HOMING_PACE: float = 220.0
 ## A homing teleport whose target is within its distance lands this far outside the target's
 ## hit circle (a wizard's body radius), not on it.
 const LAND_CLEARANCE: float = 6.0

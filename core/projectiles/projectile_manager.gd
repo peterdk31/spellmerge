@@ -128,7 +128,8 @@ extends Node2D
 ##
 ## Homing: `set_homing(slot, turn_rate, within)` makes a straight shot turn toward a
 ## target no further than `within` pixels from it (picked at random and kept while it can), at most `turn_rate` radians a
-## second, keeping its speed; a still shot creeps toward it at SpellLimits.HOMING_DRIFT. The caller says how far (`CompiledSpell.homing_range`); there
+## second at its speed then (`set_homing_curve(slot, curve, within)`: on a curve of that radius),
+## keeping its speed and its curve whatever its speed later; a still shot creeps toward it at SpellLimits.HOMING_DRIFT. The caller says how far (`CompiledSpell.homing_range`); there
 ## is no default here, so a new caller cannot quietly get another form's reach.
 ## The search runs on the grid and only every HOMING_PERIOD-th step of a shot (slots take
 ## turns, so the cost is spread); in between the shot keeps turning toward the point it
@@ -551,7 +552,8 @@ var _orbit_angle: PackedFloat32Array = PackedFloat32Array()
 var _orbit_speed: PackedFloat32Array = PackedFloat32Array()
 ## Where an orbit shot's caster was at its last step (INF before its first), for `_drawn_at`.
 var _orbit_centre: PackedVector2Array = PackedVector2Array()
-## Homing: turn rate in rad/s (0 for none) and the point last found (INF for none).
+## Homing: how far it turns in radians a pixel flown (the same curve at any speed; 0 for none)
+## and the point last found (INF for none).
 var _turn: PackedFloat32Array = PackedFloat32Array()
 var _home_at: PackedVector2Array = PackedVector2Array()
 var _home_range: PackedFloat32Array = PackedFloat32Array()
@@ -1755,27 +1757,39 @@ func _grow_moves(size: int) -> void:
 		_move_free = at
 
 
-## The radians a second a homing shot of rate `rate` turns at `speed` pixels a second: its rate,
-## faster in step above SpellLimits.HOMING_PACE, so a fast shot's curve is no wider than a bolt's.
-static func turn_at(rate: float, speed: float) -> float:
-	return rate * maxf(speed / SpellLimits.HOMING_PACE, 1.0)
+## Make the shot in `slot` home on the curve of radius `curve` pixels (`CompiledSpell.homing_curve`:
+## the same curve at any speed, faster or slower later too). See `set_homing`.
+func set_homing_curve(slot: int, curve: float, within: float) -> bool:
+	if not is_finite(curve) or curve < 0.0:
+		return false
+	return _set_homing(slot, 0.0 if curve == 0.0 else 1.0 / curve, within)
 
 
 ## Make the shot in `slot` home on targets no further than `within` pixels from it: a straight
-## shot turns at most `turn_rate` radians a second (faster above SpellLimits.HOMING_PACE, `turn_at`), a still one (a rune) creeps toward its
+## shot turns at most `turn_rate` radians a second at the speed it has now, so on that curve
+## whatever its speed later (it keeps the radians a pixel flown, `_turn`), a still one (a rune) creeps toward its
 ## target at SpellLimits.HOMING_DRIFT. Returns false for an empty slot, an orbit shot (held on
 ## its circle), a rate that is negative or not finite, or a `within` that is not above 0 and
 ## finite; true when the rate was applied, 0 included (0 stops homing).
 func set_homing(slot: int, turn_rate: float, within: float) -> bool:
+	if slot < 0 or slot >= _cap or _alive[slot] == 0 or not is_finite(turn_rate) or turn_rate < 0.0:
+		return false
+	var pace: float = _vel[slot].length()
+	# (A still shot creeps at HOMING_DRIFT: any bend above 0 homes it.)
+	return _set_homing(slot, turn_rate / pace if pace > 0.0 else turn_rate, within)
+
+
+## Homing of `bend` radians a pixel flown (see `set_homing`).
+func _set_homing(slot: int, bend: float, within: float) -> bool:
 	if slot < 0 or slot >= _cap or _alive[slot] == 0 or _motion[slot] == MOTION_ORBIT:
 		return false
-	if not is_finite(turn_rate) or turn_rate < 0.0 or not is_finite(within) or within <= 0.0:
+	if not is_finite(bend) or bend < 0.0 or not is_finite(within) or within <= 0.0:
 		return false
-	_turn[slot] = turn_rate
+	_turn[slot] = bend
 	_home_range[slot] = within
 	_home_target[slot] = 0
 	_home_at[slot] = Vector2.INF
-	if turn_rate > 0.0:
+	if bend > 0.0:
 		_join(slot, B_HOMING)
 	else:
 		_leave(slot, B_HOMING)
@@ -2040,8 +2054,10 @@ func block_shot(slot: int, by: int, by_tag: int, form: StringName = &"") -> bool
 ## The shots of another team than the actor `caster`'s (a shot of no actor included, as a shield
 ## has it) whose circle reaches into the wedge round `origin` from `from_angle` to `to_angle`
 ## radians off `direction` (`side` as `sweep`), out to `reach`: a swing's guard (melee I3). Fills
-## `guard_slots` and returns how many. Allocation-free once the list has grown.
-func shots_in_wedge(caster: int, origin: Vector2, direction: Vector2, side: int, from_angle: float, to_angle: float, reach: float) -> int:
+## `guard_slots` and returns how many. `ahead` seconds: also where each shot will be by then, so a
+## parry meets a fast shot (an atom) that would otherwise go from outside the wedge into the body
+## behind it in one step. Allocation-free once the list has grown.
+func shots_in_wedge(caster: int, origin: Vector2, direction: Vector2, side: int, from_angle: float, to_angle: float, reach: float, ahead: float = 0.0) -> int:
 	if not origin.is_finite() or not direction.is_finite() or direction.is_zero_approx() or not (reach > 0.0) or to_angle < from_angle:
 		return 0
 	var mine: int = _team_now(caster)
@@ -2052,10 +2068,14 @@ func shots_in_wedge(caster: int, origin: Vector2, direction: Vector2, side: int,
 		if _alive[slot] == 0 or _team[slot] == mine:
 			continue
 		var radius: float = _radius[slot]
-		# Along its last step, so a small fast shot (an atom) does not slip past between steps.
+		# Along its last step (and its next `ahead`), so a small fast shot (an atom) does not slip
+		# past between steps.
+		var flies: bool = ahead > 0.0 and _state[slot] != S_STUCK and _state[slot] != S_FROZEN and _state[slot] != S_HELD
+		var next: Vector2 = _pos[slot] + _vel[slot] * ahead if flies else _pos[slot]
+		var later: int = _guard_samples_on(_pos[slot], next, radius) if next != _pos[slot] else 0
 		var samples: int = _guard_samples(slot)
-		for k in samples:
-			var to: Vector2 = _guard_point(slot, k, samples) - origin
+		for k in samples + later:
+			var to: Vector2 = (_guard_point(slot, k, samples) if k < samples else _pos[slot].lerp(next, float(k - samples + 1) / float(later))) - origin
 			var distance: float = to.length()
 			if distance > reach + radius:
 				continue
@@ -2092,8 +2112,14 @@ func shots_on_segment(caster: int, a: Vector2, b: Vector2, width: float, first: 
 ## its own width a step, else one every width (at most GUARD_PATH_SAMPLES), so a small fast shot
 ## (an atom: 1.5 px, 18 px a step) cannot pass a swing or a beam between two steps.
 func _guard_samples(slot: int) -> int:
-	var step: float = _pos[slot].distance_to(_prev[slot])
-	var width: float = maxf(_radius[slot] * 2.0, 1.0)
+	return maxi(_guard_samples_on(_prev[slot], _pos[slot], _radius[slot]), 1)
+
+
+## The points one every width of a shot of `radius` from `a` to `b` takes (at least 1, at most
+## GUARD_PATH_SAMPLES).
+func _guard_samples_on(a: Vector2, b: Vector2, radius: float) -> int:
+	var step: float = a.distance_to(b)
+	var width: float = maxf(radius * 2.0, 1.0)
 	return 1 if step <= width else mini(ceili(step / width), GUARD_PATH_SAMPLES)
 
 
@@ -2599,7 +2625,7 @@ func _pass_return(list: PackedInt32Array, first: int, count: int, delta: float) 
 			var want: float = 0.0
 			if goal.is_finite() and not goal.is_equal_approx(here):
 				want = clampf(heading.angle_to(goal - here), -RETURN_BEND, RETURN_BEND)
-			heading = heading.rotated(move_toward(bend, want, turn_at(_turn[slot], _speed[slot]) * delta))
+			heading = heading.rotated(move_toward(bend, want, _turn[slot] * _speed[slot] * delta))
 		_vel[slot] = heading * _speed[slot]
 		_pos[slot] = _prev[slot] + _vel[slot] * delta
 		_state[slot] = S_RETURNING
@@ -2635,7 +2661,8 @@ func _pass_homing(list: PackedInt32Array, first: int, count: int, delta: float) 
 			_pos[slot] = _prev[slot] + want.limit_length(SpellLimits.HOMING_DRIFT * delta)
 			continue
 		# `turned_toward`, written out (this runs for every homing shot every step).
-		var most: float = turn_at(_turn[slot], velocity.length()) * delta
+		# Its bend a pixel times the pixels it flies: the same curve at any speed.
+		var most: float = _turn[slot] * velocity.length() * delta
 		_vel[slot] = velocity.rotated(clampf(velocity.angle_to(want), -most, most))
 		_pos[slot] = _prev[slot] + _vel[slot] * delta
 

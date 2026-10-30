@@ -145,9 +145,7 @@ func _discover() -> void:
 			continue
 		if _payload == null or form.shots > _payload.shots:
 			_payload = form
-		# The shot an enemy fires, a donor casts and a payload is: one that hits for a point at least
-		# (an atom's speck, a stream, meets a swing only now and then: the swing sweeps a slice a step).
-		if form.shots == 1 and form.base_damage >= 1.0 and (_shot == null or form.speed * form.lifetime > _shot.speed * _shot.lifetime):
+		if form.shots == 1 and (_shot == null or form.speed * form.lifetime > _shot.speed * _shot.lifetime):
 			_shot = form
 
 

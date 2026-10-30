@@ -207,10 +207,14 @@ func _swing_step(at: int, delta: float) -> void:
 	var from: float = maxf(_sw_turned[at], -half)
 	var to: float = minf(turned, half)
 	_sw_turned[at] = turned
+	# Its guard is a parry: every step of its sweep (the blade leans past its arc at both ends, so it
+	# is in it only a step or so), its whole arc meets shots, a step ahead too, so a small fast shot
+	# (an atom crosses its reach in a step or two) is met whenever it comes in while the swing
+	# sweeps. Its strikes stay with the blade.
+	_swing_guard(at, -half, half, delta)
+	if _sw_on[at] == 0 or _sw_spell[at] != spell or _sw_tag[at] != tag:
+		return
 	if to >= from:
-		_swing_guard(at, from, to)
-		if _sw_on[at] == 0 or _sw_spell[at] != spell or _sw_tag[at] != tag:
-			return
 		_swing_cast(at, from, to)
 	if into >= sweep and _sw_on[at] != 0 and _sw_spell[at] == spell and _sw_tag[at] == tag:
 		_end_swing(at, true)
@@ -240,16 +244,17 @@ func _swing_follow(at: int) -> void:
 			_sw_caster[at] = SpellRuntime.CASTER_POINT
 
 
-## Swing `at` turned from `from` to `to` radians off its aim: the shots of other teams in that
-## wedge are deflected outward from the hand (`deflect`), else stopped while its shield has
-## charges (melee I3).
-func _swing_guard(at: int, from: float, to: float) -> void:
+## Swing `at` guards from `from` to `to` radians off its aim (and `ahead` seconds of each shot's
+## way): the shots of other teams in that wedge are deflected outward from the hand (`deflect`),
+## else stopped while its shield has charges (melee I3).
+func _swing_guard(at: int, from: float, to: float, ahead: float) -> void:
 	var spell: CompiledSpell = _sw_spell[at]
 	var deflects: bool = spell.behaviour(ModifierBase.Behaviour.DEFLECT) > 0.0
 	if not deflects and _sw_shield[at] <= 0:
 		return
 	var origin: Vector2 = _sw_origin[at]
-	var found: int = kit.projectiles.shots_in_wedge(_sw_actor[at], origin, _sw_dir[at], _sw_side[at], from, to, spell.ray_length)
+	# A step ahead too: a fast shot meets the parry before it is in the body behind it.
+	var found: int = kit.projectiles.shots_in_wedge(_sw_actor[at], origin, _sw_dir[at], _sw_side[at], from, to, spell.ray_length, ahead)
 	_sw_shield[at] = kit.guard(found, _sw_actor[at], _sw_tag[at], deflects, _sw_shield[at], origin, Vector2.INF, id())
 
 

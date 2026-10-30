@@ -43,7 +43,7 @@ func _initialize() -> void:
 	_test_homing_turns_toward_a_target()
 	_test_a_homing_shot_homes_after_it_bounces()
 	_test_homing_rules()
-	_test_a_fast_homing_shot_turns_faster()
+	_test_homing_turns_on_the_same_curve_at_any_speed()
 	_test_a_guard_meets_a_small_fast_shot_between_steps()
 	_test_a_homing_still_shot_creeps_toward_its_target()
 	_test_homing_skips_its_own_wizard_and_the_target_just_hit()
@@ -336,21 +336,25 @@ func _test_homing_turns_toward_a_target() -> void:
 	_check(_hits.is_empty(), "the same shot without homing misses")
 
 
-## A homing shot faster than a bolt (SpellLimits.HOMING_PACE) turns faster in step with its speed,
-## so its curve is no wider than a bolt's (the owner, 2026-10-30, for the atom): five times as fast,
-## five times the turn; a shot at a bolt's pace or slower turns at its rate.
-func _test_a_fast_homing_shot_turns_faster() -> void:
-	_check(is_equal_approx(ManagerScript.turn_at(3.0, SpellLimits.HOMING_PACE * 5.0), 15.0), "five times a bolt's pace: five times the turn")
-	_check(is_equal_approx(ManagerScript.turn_at(3.0, 100.0), 3.0), "slower than a bolt: its own rate")
+## Homing is a curve, not a rate (the owner, 2026-10-30: "it should just work at all speeds"): a
+## shot on a curve of 50 px turns its speed / 50 radians a second, whatever its speed, and keeps
+## that curve when its speed changes later.
+func _test_homing_turns_on_the_same_curve_at_any_speed() -> void:
+	for pace: float in [100.0, 1100.0]:
+		_setup()
+		_target(Vector2(100.0, 400.0), 8.0)
+		var slot: int = _mgr.spawn(0, Vector2(0.0, 100.0), Vector2(pace, 0.0), 5.0, 2.0)
+		_check(_mgr.set_homing_curve(slot, 50.0, 400.0), "a shot of %d px/s takes a curve" % pace)
+		for _i in 4:
+			_mgr.step(DT)
+		# Turned on its search step and after: at most the angle of its path on that curve.
+		var turned: float = (_mgr._vel[slot] as Vector2).angle()
+		var most: float = pace * 4.0 * DT / 50.0
+		_check(turned > 0.0 and turned <= most * 1.01, "at %d px/s it turned %f rad, the curve allows %f" % [pace, turned, most])
 	_setup()
-	_target(Vector2(100.0, 400.0), 8.0)
-	var pace: float = SpellLimits.HOMING_PACE * 5.0
-	var slot: int = _mgr.spawn(0, Vector2(0.0, 100.0), Vector2(pace, 0.0), 5.0, 2.0)
-	_mgr.set_homing(slot, 0.5, 400.0)
-	for _i in 4:
-		_mgr.step(DT)
-	var turned: float = (_mgr._vel[slot] as Vector2).angle()
-	_check(turned > 0.5 * 2.0 * DT and turned <= 0.5 * 5.0 * 4.0 * DT * 1.01, "it turned faster than its rate, at most five times (%f rad)" % turned)
+	var shot: int = _mgr.spawn(0, Vector2.ZERO, Vector2(200.0, 0.0), 5.0, 2.0)
+	_mgr.set_homing(shot, 4.0, 100.0)
+	_check(is_equal_approx(_mgr._turn[shot], 4.0 / 200.0), "a rate is taken as the curve it gives at the shot's speed then")
 
 
 ## A swing's or beam's guard tests a shot along its last step, not only where it is now: an atom

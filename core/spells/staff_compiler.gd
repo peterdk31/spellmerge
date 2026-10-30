@@ -401,13 +401,13 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 			spell.behaviour_cues[modifier.behaviour] = modifier.cue
 		match modifier.behaviour:
 			ModifierBase.Behaviour.HOMING:
-				# Homing stacks by multiplying: the strongest card's turn rate, x HOMING_STACK for
-				# each more (owner, 2026-10-27); an instant carrier's bend follows from it.
+				# Homing stacks by multiplying: the tightest card's curve, / HOMING_STACK for each
+				# more (owner, 2026-10-27); an instant carrier's bend follows from it.
 				homing_reach = maxf(homing_reach, modifier.behaviour_reach)
-				if spell.homing_turn <= 0.0:
-					spell.homing_turn = modifier.behaviour_strength
+				if spell.homing_curve <= 0.0:
+					spell.homing_curve = modifier.behaviour_strength
 				else:
-					spell.homing_turn = maxf(spell.homing_turn, modifier.behaviour_strength) * SpellLimits.HOMING_STACK
+					spell.homing_curve = minf(spell.homing_curve, modifier.behaviour_strength) / SpellLimits.HOMING_STACK
 			ModifierBase.Behaviour.CHAIN:
 				spell.chain_jumps += int(modifier.behaviour_strength)
 	spell.look = _look_of(elements, modifiers)
@@ -435,10 +435,10 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 	# A swing's sweep, a slam's shockwave (`burst`), a beam's or a rain's ray.
 	if carrier.hit_kind() != &"":
 		spell.hit.kind = carrier.hit_kind()
-	if spell.homing_turn > 0.0:
+	if spell.homing_curve > 0.0:
 		spell.homing_range = carrier.homing_range(spell.ray_length, homing_reach)
 		# Past 180 degrees it would be bending back the other way: that is all the way round.
-		spell.homing_angle = minf(rad_to_deg(spell.homing_turn * SpellLimits.INSTANT_HOMING_SECONDS), 180.0)
+		spell.homing_angle = minf(rad_to_deg(SpellLimits.INSTANT_HOMING_REACH / spell.homing_curve), 180.0)
 	if heals:
 		spell.hit.heal = maxi(roundi(spell.damage), 1)
 		spell.hit.damage = maxf(spell.damage * SpellLimits.HEAL_ENEMY_SHARE, 1.0)

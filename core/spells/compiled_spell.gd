@@ -64,10 +64,11 @@ var echo_hit: HitProfile = null
 var blast_hit: HitProfile = null
 var echo_blast_hit: HitProfile = null
 
-## Radians per second a shot turns toward a target; 0 means no homing.
-var homing_turn: float = 0.0
-## Degrees off its aim a homing beam or teleport still bends to a target: what `homing_turn`
-## turns in SpellLimits.INSTANT_HOMING_SECONDS, up to all the way round (0 without homing).
+## The radius in pixels of the tightest curve a homing carrier turns on toward a target, at any
+## speed (whatever moves turns its speed / this radians a second); 0 means no homing.
+var homing_curve: float = 0.0
+## Degrees off its aim a homing beam or teleport still bends to a target: what that curve turns
+## over SpellLimits.INSTANT_HOMING_REACH pixels, up to all the way round (0 without homing).
 var homing_angle: float = 0.0
 ## Pixels away a homing spell looks for its target (`Carrier.homing_range`); 0 when it does
 ## not home, or its form cannot be steered (its homing cards are then listed as wasted).

@@ -1003,7 +1003,7 @@ func _placed_at(spell: CompiledSpell, origin: Vector2, heading: Vector2) -> Vect
 ## orbit does not fly). A plain shot costs one comparison per behaviour and no call.
 func _apply_travel(slot: int, spell: CompiledSpell) -> void:
 	if spell.homing_range > 0.0:
-		projectiles.set_homing(slot, spell.homing_turn, spell.homing_range)
+		projectiles.set_homing_curve(slot, spell.homing_curve, spell.homing_range)
 	if spell.behaviour(ModifierBase.Behaviour.RETURN) > 0.0:
 		projectiles.set_return(slot)
 	if spell.behaviours.is_empty():

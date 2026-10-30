@@ -114,7 +114,8 @@ const NEEDS: Dictionary = {
 ## Targets added to each shot's pierce.
 @export var extra_pierce: int = 0
 @export var behaviour: Behaviour = Behaviour.NONE
-## Turn rate for HOMING, number of jumps for CHAIN; unused for NONE.
+## For HOMING the radius in pixels of the tightest curve it turns on (at any speed: a fast shot
+## turns faster, on the same curve); number of jumps for CHAIN; unused for NONE.
 @export var behaviour_strength: float = 0.0
 ## Pixels the behaviour reaches. For HOMING, how far a shot looks for a target (one in flight
 ## looks again as it flies; a beam looks at least as far as it is long), on every form homing

@@ -65,8 +65,8 @@ func before_each() -> void:
 	_form(&"bolt", 300.0, 1.0)
 	var decoy: FormBase = _form(&"decoy", 0.0, 2.0)
 	decoy.motion = FormBase.Motion.DECOY
-	var hook: FormBase = _form(&"hook", 300.0, 1.0)
-	hook.motion = FormBase.Motion.HOOK
+	_form(&"barb", 300.0, 1.0)
+	_modifier(&"pull", ModifierBase.Behaviour.PULL, 1.0)
 	var slam: FormBase = _form(&"slam", 0.0, 0.12)
 	slam.motion = FormBase.Motion.SLAM
 	slam.ray_length = 20.0
@@ -185,14 +185,14 @@ func test_a_hit_of_a_blast_does_not_blast_again_and_a_chain_runs_out() -> void:
 	check(_blasts.size() < 20, "a bounded number of explosions (%d)" % _blasts.size())
 
 
-func test_a_hooks_blast_moves_nothing_more() -> void:
-	var tag: int = _build([&"blast", &"hook"])
+func test_a_pulling_shots_blast_moves_nothing_more() -> void:
+	var tag: int = _build([&"blast", &"pull", &"barb"])
 	_target(Vector2(60.0, 0.0))
 	_target(Vector2(50.0, 10.0))
 	_cast()
 	_tick(20)
-	check_equal(_moves.size(), 1, "the hook pulls once, to its hit")
-	_bus.caster_move_finished.emit(0, &"hook", Vector2(55.0, 0.0), tag)
+	check_equal(_moves.size(), 1, "the shot pulls once, to its hit")
+	_bus.caster_move_finished.emit(0, &"pull", Vector2(55.0, 0.0), tag)
 	check_equal(_blasts.size(), 1, "it explodes where the wizard arrives")
 	check_equal(_moves.size(), 1, "what the explosion strikes pulls the wizard no more")
 

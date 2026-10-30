@@ -9,7 +9,7 @@ render_mode blend_premul_alpha, world_vertex_coords;
 // shot leaves its tail and its card particles in the world, where it was, as the mockup does.
 // The projectile manager keeps each shot's path in `trail_data`, one row per trail of
 // TRAIL_SAMPLES texels (x, y, odometer, time), a ring written 30 times a second and at every
-// bounce and end. Each pixel of travel leaves one tail pixel there, which drifts a little and
+// bounce and end. Each pixel of travel (a very fast shot's every 2-4, `gap`) leaves one tail pixel there, which drifts a little and
 // cools through the ramp in its own time (0.1-0.3 s), so the tail bends with any path and frays
 // at its end by itself; each 60th of a second may give off a particle of one of the shot's kinds
 // from where the shot was then, which moves on its own from there (embers rise, flecks hang,
@@ -69,6 +69,11 @@ const float TF_ORBIT = 2.0;
 const float TF_DASH = 4.0;
 // The longest anything of a trail lives (TRAIL_KEEP; no particle row lives longer).
 const float TRAIL_LONGEST = 1.0;
+// The tail pixels a trail has (TRAIL_TAIL_PIXELS), and the most pixels of path one of them
+// stands for: a shot too fast to leave one every pixel for its tail's life leaves one every
+// `gap` (up to TAIL_GAP_MAX), so its tail reaches as far, sparser (an atom's long streak).
+const float TAIL_PIXELS = 128.0;
+const float TAIL_GAP_MAX = 4.0;
 // The quad kinds (TRAIL_Q_* in projectile_manager.gd), in UV.y.
 const float Q_HEAD_LIGHT = 0.0;
 const float Q_PIECE_LIGHT = 1.0;
@@ -386,6 +391,8 @@ void vertex() {
 	float quad = floor(UV.y);
 	vec2 corner = vec2(fract(UV.x) > 0.5 ? 1.0 : 0.0, fract(UV.y) > 0.5 ? 1.0 : 0.0);
 	Look L = look_from_color(COLOR, INSTANCE_CUSTOM.rgb, row < 0.0 ? 0.0 : mod(row, 61.0) * 1.618, true);
+	// Zoom 0 in the look (`look_core_zoom`): a speck, its core one pixel; the rest is drawn at 1.
+	bool speck = floor(COLOR.r * 255.0 + 0.5) < 4.0;
 	float z = L.zoom;
 	vec3 b = L.bits;
 	int pi = int(L.player);
@@ -434,8 +441,16 @@ void vertex() {
 	bool is_spark = quad == Q_SPARK_LIGHT || quad == Q_SPARK || (dash && slot < 32.0 && (quad == Q_PIECE_LIGHT || quad == Q_TAIL));
 	bool streak_slot = quad == Q_PIECE_LIGHT || quad == Q_TAIL;
 	float id = floor(trail_now * BIRTHS) - (streak_slot ? floor(slot * 0.5) : slot);
-	// A tail pixel's number (its place on the path), and the ends of a step of lightning's line.
-	float n = ceil(o_top) - 1.0 - slot;
+	// A tail pixel's number (its place on the path: one every `gap` pixels, from the shot's pace
+	// over its whole kept path, so it holds still while the shot flies), and the ends of a step of
+	// lightning's line.
+	float gap = 1.0;
+	if (!dash && count - skip >= 2.0) {
+		vec4 oldest = trail_texel(row, newest, count - 1.0);
+		float pace = (o_top - oldest.z) / max(t_top - oldest.w, 0.001);
+		gap = clamp(ceil(pace * tail / TAIL_PIXELS), 1.0, TAIL_GAP_MAX);
+	}
+	float n = (ceil(o_top / gap) - 1.0 - slot) * gap;
 	float o_hi = min(4.0 * (floor(o_top / 4.0) - slot + 1.0), o_top);
 	float o_lo = 4.0 * (floor(o_top / 4.0) - slot);
 	// The one search of the path: the pieces the quad's moment, pixel or step ends are on.
@@ -488,19 +503,21 @@ void vertex() {
 			vec2 px = floor(at);
 			if (quad == Q_HEAD_LIGHT) {
 				m = M_GLOW;
-				float reach = 8.0 + 2.0 * z;
+				// A speck's light is a smaller one.
+				float reach = speck ? 6.0 : 8.0 + 2.0 * z;
 				q_lo = px + 0.5 - reach;
 				q_hi = px + 0.5 + reach;
 				a0 = vec4(px + 0.5, pull ? 0.45 : 0.0, 6.0);
-				a1 = vec4(0.8 * flicker, 3.0 + z, 0.35 * flicker, reach);
+				a1 = vec4((speck ? 0.6 : 0.8) * flicker, speck ? 2.0 : 3.0 + z, 0.35 * flicker, reach);
 				k0 = vec4(hue, 1.0);
 			} else {
-				// A white-hot pixel with four round it, a pixel more each side a zoom; pierce
-				// lengthens it along the flight; void's is a dark heart ringed in pink.
+				// A white-hot pixel with four round it, a pixel more each side a zoom (a speck's
+				// is the pixel alone); pierce lengthens it along the flight; void's is a dark
+				// heart ringed in pink.
 				float half_size = 3.0 + 2.0 * z;
 				q_lo = px - half_size;
 				q_hi = px + half_size + 1.0;
-				a0 = vec4(px, 1.0, z);
+				a0 = vec4(px, 1.0, speck ? 0.0 : z);
 				if (bit_set(b, L_STREAKS)) {
 					a1 = vec4(at, at - fly * (2.0 + z));
 				}

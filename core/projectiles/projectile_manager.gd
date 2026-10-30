@@ -355,6 +355,10 @@ const LOOK_GRID: int = 24
 const LOOK_LENGTH: int = 72
 const LOOK_CELL_PER_RADIUS: float = 0.25
 const LOOK_ZOOM_MAX: int = 15
+## A bolt-like shot of hit radius below this is a speck (an atom): its core is one pixel, no
+## cross. It travels as zoom 0 in the look (`look_core_zoom`); every other shape of it, and every
+## shader but the trail's core, reads zoom 1 (`look_from_color` never goes below 1).
+const SPECK_RADIUS: float = 2.0
 ## The spark pool (staffs B6b): the sparks, embers and the rest that all the shots give off come
 ## from one pool with a global count, `particle_cap` (a visual budget, under the effect quality
 ## setting once there is one; never a build rule). A shot with `n` emitting kinds asks for
@@ -398,8 +402,9 @@ const TRAIL_Q_TAIL: int = 4
 const TRAIL_Q_JAG: int = 5
 const TRAIL_Q_CORE: int = 6
 ## Slots a trail has for its particles (one per 60th of a second it keeps), its tail pixels (one
-## per pixel of travel; a tail longer than this, a very fast shot's, loses its oldest end) and the
-## steps of lightning's line (a tenth of a second at 4 px a step).
+## per pixel of travel; a shot too fast for that over its tail's life leaves one every 2 to 4
+## pixels, the shader's TAIL_GAP_MAX, so an atom's tail reaches as far, sparser) and the steps of
+## lightning's line (a tenth of a second at 4 px a step).
 const TRAIL_SPARKS: int = int(TRAIL_KEEP * 60.0) + 1
 const TRAIL_TAIL_PIXELS: int = 128
 const TRAIL_JAGS: int = 16
@@ -3447,7 +3452,7 @@ func _fade_row(row: int, slot: int) -> void:
 	_trail_ramp[row] = _ramp[slot]
 	_trail_look[row] = _look[slot]
 	_trail_core[row] = _core[slot]
-	_trail_zoom[row] = look_zoom(_radius[slot])
+	_trail_zoom[row] = look_core_zoom(_radius[slot])
 	_trail_flags[row] = TRAIL_ORBIT if _motion[slot] == MOTION_ORBIT else 0
 	_trail_color[row] = look_color(_trail_ramp[row], _trail_zoom[row], _trail_look[row])
 	_let_loose(row, sim_time + TRAIL_KEEP)
@@ -3838,6 +3843,12 @@ static func look_zoom(radius: float) -> int:
 	return clampi(roundi(radius * LOOK_CELL_PER_RADIUS), 1, LOOK_ZOOM_MAX)
 
 
+## The zoom a shot of hit radius `radius` tells its shaders: its `look_zoom`, or 0 for a speck
+## (below SPECK_RADIUS), whose core the trail draws as one pixel.
+static func look_core_zoom(radius: float) -> int:
+	return 0 if radius < SPECK_RADIUS else look_zoom(radius)
+
+
 ## The drawn size in pixels of a shot of hit radius `radius`.
 static func look_size(radius: float) -> float:
 	return float(LOOK_GRID * look_zoom(radius))
@@ -3870,7 +3881,7 @@ static func trace_code(age: float) -> float:
 ## channel: the hat ramp and the zoom in red (`look_red`), the look's bits in green (kinds 1-8),
 ## blue (9-16) and alpha (17-24; `ramp_look` adds the enemy ramp's flag).
 func _look_color(slot: int) -> Color:
-	return look_color(_ramp[slot], look_zoom(_radius[slot]), _look[slot])
+	return look_color(_ramp[slot], look_core_zoom(_radius[slot]), _look[slot])
 
 
 ## The instance colour the shot shaders read for a shot or effect in `ramp` (`Actors.

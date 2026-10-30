@@ -26,7 +26,7 @@ extends Node
 ## kit Actor is not hurt while down, dying or protected.
 ##
 ## A spell's hit (`projectile_hit`; a blast's too, rules R4 F2) is looked up in Spells' hit profiles
-## (`Spells.hit_profile(tag)`) and runs `_apply_spell`: a heal for the caster's team (a mend),
+## (`Spells.hit_profile(tag, shot)`) and runs `_apply_spell`: a heal for the caster's team (a mend),
 ## else damage and a push (a pull while hexed), the shock jump, the static discharge, then
 ## each element's reaction or status. Plain hits (`hit`, contact, reactions, burn) run `_hit`:
 ## a barrier takes the hit whole, then hex adds its share, static goes off, health goes down,
@@ -73,8 +73,8 @@ const STATIC: StringName = &"static"
 ## The id a discharge is announced with on `reaction_triggered`, at each actor it hits.
 const DISCHARGE: StringName = &"discharge"
 
-## The kinds of a hit (M2-staffs.md, "Self-harm and hits"). A shot, beam or swing of a spell, an
-## area hit (a slam's ring), a reaction's damage, damage over time, and a heal.
+## The kinds of a hit (M2-staffs.md, "Self-harm and hits"). A shot, beam or swing of a spell, a
+## slam's ring (`burst`), a reaction's damage, damage over time, and a heal.
 const KIND_SHOT: StringName = &"shot"
 const KIND_RAY: StringName = &"ray"
 const KIND_SWING: StringName = &"swing"
@@ -223,6 +223,9 @@ var _discharged: bool = false
 ## The tag of the spell hit being dealt now (0 for none): `kill_landed`, `reaction_landed` and
 ## `actor_hurt` carry it. Set around a spell's hit, restored after, so hits inside hits are right.
 var _tag: int = 0
+## The shot that hit (the projectile manager's slot from `projectile_hit`), -1 for none: what the
+## hit sets off names it as its `shot`, as `_tag` its tag.
+var _slot: int = -1
 
 # Burn damage due this step, sent after the status loop (hits can free rows): body, who, points.
 var _due_node: Array[Node2D] = []
@@ -240,7 +243,7 @@ var _touch_amount: PackedInt32Array = PackedInt32Array()
 var _victims: PackedInt32Array = PackedInt32Array()
 var _victim_team: PackedInt32Array = PackedInt32Array()
 var _toucher_teams: int = 0
-# Scratch lists for grid queries, one per nesting depth (a hit inside a burst inside an area hit
+# Scratch lists for grid queries, one per nesting depth (a hit set off by another hit's burst
 # gets its own), so nothing is allocated once the deepest nesting was seen.
 var _pool: Array = []
 var _pool_depth: int = 0
@@ -673,7 +676,7 @@ func _hit(by: int, row: int, amount: int, direction: Vector2, strength: float, k
 	var left: int = _take(row, by, amount, quiet)
 	# Nobody hears a quiet hit that does not kill (a wizard's went to it directly, `_take`).
 	if events != null and not (quiet and left != 0):
-		events.hit_landed.emit(by, node, amount, where, kind)
+		events.hit_landed.emit(by, node, amount, where, kind, _slot)
 		events.damage_dealt.emit(by, node, amount, where)
 		if node is Actor:
 			# The actor's own listeners (its AI's grudge, its look's hurt pose) hear it directly.
@@ -717,13 +720,13 @@ func _die(row: int, by: int, where: Vector2, team: int) -> void:
 	_free_row(row)
 	if events != null:
 		if _tag != 0:
-			events.kill_landed.emit(by, node, where, _tag)
+			events.kill_landed.emit(by, node, where, _tag, _slot)
 		# A possessed enemy is on its driver's team while it lasts, but its death is an enemy's
 		# (the wave counts on it): an actor counts by its own controller's team. Its depletion
 		# already ended the possession, so `team` (read before the hit) is the driver's.
 		var own_team: int = kit.home_controller.team if kit != null and kit.home_controller != null else team
 		if own_team != ActorsScript.TEAM_WIZARDS:
-			events.enemy_died.emit(by, node, where)
+			events.enemy_died.emit(by, node, where, _slot)
 	if kit != null:
 		kit.die(by)
 	elif is_instance_valid(node) and node.is_inside_tree():
@@ -745,7 +748,7 @@ func _heal(by: int, row: int, amount: int) -> bool:
 			_health[row] = mini(_health[row] + amount, _max_health[row])
 	var where: Vector2 = _position_of(node)
 	if events != null:
-		events.hit_landed.emit(by, node, amount, where, KIND_HEAL)
+		events.hit_landed.emit(by, node, amount, where, KIND_HEAL, _slot)
 		events.heal_dealt.emit(by, node, amount, where)
 	return true
 
@@ -753,19 +756,22 @@ func _heal(by: int, row: int, amount: int) -> bool:
 ## A shot landed. Every shot is a spell's, described by `Spells.hit_profile(tag)` (damage,
 ## knockback, status); a shot with no profile, or on a body Combat does not know (a decoy), does
 ## nothing.
-func _on_projectile_hit(caster: int, target: Node, position: Vector2, tag: int) -> void:
+func _on_projectile_hit(caster: int, target: Node, position: Vector2, tag: int, shot: int) -> void:
 	if target == null or not is_instance_valid(target):
 		return
 	var row: int = _row_of_node(target)
 	if row == ActorsScript.NONE:
 		return
-	var profile: HitProfile = spells.hit_profile(tag) if spells != null else null
+	var profile: HitProfile = spells.hit_profile(tag, shot) if spells != null else null
 	if profile == null:
 		return
 	var saved_tag: int = _tag
+	var saved_slot: int = _slot
 	_tag = tag
+	_slot = shot
 	_apply_spell(caster, row, position, profile, profile.kind)
 	_tag = saved_tag
+	_slot = saved_slot
 
 
 ## A spell's hit on the row `row`, struck at `position`: a mend heals an actor of the caster's
@@ -889,7 +895,7 @@ func _discharge(actor: int, team: int, victim: Node2D, from: Vector2, amount: in
 		if events != null:
 			# Feel shows a burst on each actor zapped and a jagged arc from the struck one.
 			var zapped: Vector2 = _position_of(other_node) + _hurt_offset[other]
-			events.reaction_triggered.emit(actor, DISCHARGE, zapped)
+			events.reaction_triggered.emit(actor, DISCHARGE, zapped, _slot)
 			events.discharge_arc.emit(actor, from, zapped)
 			# A listener may have changed the registrations.
 			other = _row_of_node(other_node)
@@ -938,9 +944,9 @@ func _react(by: int, row: int, reaction: ReactionRow) -> void:
 	var centre: Vector2 = _position_of(node) + _hurt_offset[row]
 	_react_wait[row] = REACTION_WAIT
 	if events != null:
-		events.reaction_triggered.emit(by, reaction.reaction_id, centre)
+		events.reaction_triggered.emit(by, reaction.reaction_id, centre, _slot)
 		if _tag != 0:
-			events.reaction_landed.emit(by, reaction.reaction_id, node, centre, _tag)
+			events.reaction_landed.emit(by, reaction.reaction_id, node, centre, _tag, _slot)
 		if not _same(row, node):
 			return
 	var spell_tag: int = _tag

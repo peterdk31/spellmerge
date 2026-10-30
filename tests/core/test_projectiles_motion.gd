@@ -82,8 +82,8 @@ func _setup() -> void:
 	_hits.clear()
 	_expired.clear()
 	_impacts.clear()
-	_bus.projectile_expired.connect(func(caster: int, position: Vector2, tag: int) -> void: _expired.append([caster, position, tag]))
-	_bus.projectile_hit.connect(func(caster: int, target: Node, position: Vector2, tag: int) -> void: _hits.append([caster, target, position, tag]))
+	_bus.projectile_expired.connect(func(caster: int, position: Vector2, tag: int, _shot: int) -> void: _expired.append([caster, position, tag]))
+	_bus.projectile_hit.connect(func(caster: int, target: Node, position: Vector2, tag: int, _shot: int) -> void: _hits.append([caster, target, position, tag]))
 	_bus.projectile_impact.connect(func(_caster: int, target: Node, position: Vector2, _direction: Vector2) -> void: _impacts.append([target, position]))
 
 
@@ -651,7 +651,7 @@ func _test_ray_handlers_may_remove_targets_and_fire_rays() -> void:
 	var seen: Array[Node] = []
 	var nested: Array[float] = []
 	var doomed: Array[Node2D] = [b]
-	_bus.projectile_hit.connect(func(_p: int, target: Node, _at: Vector2, tag: int) -> void:
+	_bus.projectile_hit.connect(func(_p: int, target: Node, _at: Vector2, tag: int, _shot: int) -> void:
 		seen.append(target)
 		if target == a and is_instance_valid(doomed[0]):
 			_mgr.remove_target(doomed[0])

@@ -248,7 +248,7 @@ func test_every_part_name_has_an_effect() -> void:
 
 func test_a_death_plays_its_cue() -> void:
 	var cue: CueBase = feel.cue_of(&"enemy_death")
-	bus.enemy_died.emit(0, null, Vector2(30.0, 30.0))
+	bus.enemy_died.emit(0, null, Vector2(30.0, 30.0), -1)
 	check_equal(feel.effect_dress(FeelScript.KIND_RING_OUT), [cue.parts[0]["color"], FeelScript.EXACT], "the white-hot ring, exactly its colour")
 	check_equal(feel.effect_info(FeelScript.KIND_RING_OUT).get("zoom"), cue.parts[0]["zoom"], "as big as the cue says")
 	check(is_equal_approx(feel.actors.held_left(0), cue.hold), "the killer held")

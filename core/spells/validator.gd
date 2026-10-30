@@ -17,7 +17,7 @@ extends RefCounted
 ## What it checks, per component: `id` set and equal to the folder name; a name; an icon that
 ## is listed in the art manifest; every number inside `ranges()` (which keeps a component's
 ## `complexity` to 1-4, well inside the whole-spell budget); and the fields its kind needs (a form's speed, orbit radius or ray
-## length for its motion; an element's known status and duration; a modifier's strength
+## length for its carrier (`Carrier.required_fields`); an element's known status and duration; a modifier's strength
 ## for its behaviour; a timer trigger's interval). Across the list: no id twice. For the
 ## reaction table: each row names a known status, an existing element and a real effect,
 ## has the numbers its effect uses, and no pair of status and element is listed twice.
@@ -212,24 +212,13 @@ static func _check_form(form: FormBase) -> Array[Dictionary]:
 	var problems: Array[Dictionary] = []
 	var file: String = form.resource_path
 	problems.append_array(_check_pose(form, file))
-	match form.motion:
-		FormBase.Motion.STRAIGHT:
-			if form.speed <= 0.0:
-				problems.append(_problem("required-field", file, "speed", "A STRAIGHT form needs a `speed` above 0."))
-		FormBase.Motion.ORBIT:
-			if form.orbit_radius <= 0.0:
-				problems.append(_problem("required-field", file, "orbit_radius", "An ORBIT form needs an `orbit_radius` above 0."))
-		FormBase.Motion.RAY:
-			if form.ray_length <= 0.0:
-				problems.append(_problem("required-field", file, "ray_length", "A RAY form needs a `ray_length` above 0."))
-		FormBase.Motion.SWING:
-			if form.ray_length <= 0.0:
-				problems.append(_problem("required-field", file, "ray_length", "A SWING form needs a `ray_length` (its reach) above 0."))
-			if form.arc <= 0.0:
-				problems.append(_problem("required-field", file, "arc", "A SWING form needs an `arc` (degrees it sweeps) above 0."))
-		FormBase.Motion.SLAM:
-			if form.ray_length <= 0.0:
-				problems.append(_problem("required-field", file, "ray_length", "A SLAM form needs a `ray_length` (how far ahead it strikes) above 0."))
+	var carrier: Carrier = Carriers.of(form.carrier)
+	if not Carriers.exists(form.carrier):
+		problems.append(_problem("unknown-carrier", file, "carrier", "`%s` is no carrier: use one of %s (core/spells/carriers/)." % [form.carrier, ", ".join(Carriers.ids())]))
+	var required: Dictionary = carrier.required_fields()
+	for field: String in required:
+		if float(form.get(field)) <= 0.0:
+			problems.append(_problem("required-field", file, field, str(required[field])))
 	return problems
 
 

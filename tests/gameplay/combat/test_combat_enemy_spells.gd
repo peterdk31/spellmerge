@@ -53,9 +53,9 @@ func before_each() -> void:
 	for list: Array in [_hurt, _landed, _reactions, _triggered]:
 		list.clear()
 	_bus.actor_hurt.connect(func(p: int, a: int, _at: Vector2, tag: int, k: StringName) -> void: _hurt.append([p, a, tag, k]))
-	_bus.hit_landed.connect(func(p: int, t: Node, a: int, _at: Vector2, k: StringName) -> void: _landed.append([p, t, a, k]))
-	_bus.reaction_landed.connect(func(p: int, id: StringName, t: Node, _at: Vector2, tag: int) -> void: _reactions.append([p, id, t, tag]))
-	_bus.reaction_triggered.connect(func(_p: int, id: StringName, _at: Vector2) -> void: _triggered.append(id))
+	_bus.hit_landed.connect(func(p: int, t: Node, a: int, _at: Vector2, k: StringName, _shot: int) -> void: _landed.append([p, t, a, k]))
+	_bus.reaction_landed.connect(func(p: int, id: StringName, t: Node, _at: Vector2, tag: int, _shot: int) -> void: _reactions.append([p, id, t, tag]))
+	_bus.reaction_triggered.connect(func(_p: int, id: StringName, _at: Vector2, _shot: int) -> void: _triggered.append(id))
 
 
 ## A wizard actor of seat `index` from the real scene (actors G7), in the tree at `at`; its
@@ -110,7 +110,7 @@ func _element(damage: int, element: StringName, status: StringName, duration: fl
 
 func _hit(wizard: Node2D, profile: HitProfile) -> int:
 	var tag: int = _enemy_tag(profile)
-	_bus.projectile_hit.emit(_caster, wizard, wizard.position + Vector2(-5.0, 0.0), tag)
+	_bus.projectile_hit.emit(_caster, wizard, wizard.position + Vector2(-5.0, 0.0), tag, -1)
 	return tag
 
 
@@ -196,7 +196,7 @@ func test_an_enemys_mend_heals_its_team_and_hurts_the_wizards() -> void:
 	profile.damage = 2
 	profile.heal = 10
 	var tag: int = _enemy_tag(profile)
-	_bus.projectile_hit.emit(_caster, wizard, Vector2.ZERO, tag)
-	_bus.projectile_hit.emit(_caster, imp, Vector2.ZERO, tag)
+	_bus.projectile_hit.emit(_caster, wizard, Vector2.ZERO, tag, -1)
+	_bus.projectile_hit.emit(_caster, imp, Vector2.ZERO, tag, -1)
 	check_equal(wizard.health.health, 48, "an enemy's mend is not the wizards': they take its damage")
 	check_equal(_combat.health_of(imp), 80, "it heals its caster's team (actors G5: a mend is for friends)")

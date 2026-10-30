@@ -58,7 +58,7 @@ func before_each() -> void:
 	_explosions.clear()
 	_bus.cue_shown.connect(func(player: int, cue: StringName, at: Vector2, _direction: Vector2, size: float, _tint: Color, _look: int) -> void:
 		_explosions.append([player, at, size, cue]))
-	_bus.projectile_hit.connect(func(player: int, target: Node, at: Vector2, tag: int) -> void:
+	_bus.projectile_hit.connect(func(player: int, target: Node, at: Vector2, tag: int, _shot: int) -> void:
 		_hits.append([player, target, at, tag]))
 	_bus.entity_spawn_requested.connect(func(player: int, kind: StringName, at: Vector2, seconds: float, tag: int, caster: int) -> void:
 		_spawns.append([player, kind, at, seconds, tag, caster]))
@@ -70,23 +70,23 @@ func before_each() -> void:
 	var bolt: FormBase = _form(&"bolt", 300.0, 1.0)
 	bolt.base_damage = 10
 	var rain: FormBase = _form(&"rain", 0.0, 0.5)
-	rain.motion = FormBase.Motion.RAIN
+	rain.carrier = &"rain"
 	var familiar: FormBase = _form(&"familiar", 0.0, 6.0)
-	familiar.motion = FormBase.Motion.FAMILIAR
+	familiar.carrier = &"familiar"
 	familiar.radius = 5.0
 	var decoy: FormBase = _form(&"decoy", 0.0, 4.0)
-	decoy.motion = FormBase.Motion.DECOY
+	decoy.carrier = &"decoy"
 	decoy.radius = 8.0
 	var rune: FormBase = _form(&"rune", 0.0, 3.0)
-	rune.motion = FormBase.Motion.STILL
+	rune.carrier = &"rune"
 	rune.radius = 7.0
 	var wall: FormBase = _form(&"wall", 0.0, 3.0)
-	wall.motion = FormBase.Motion.WALL
+	wall.carrier = &"wall"
 	wall.shots = 3
 	wall.spread = 10.0
 	wall.radius = 4.0
 	var beam: FormBase = _form(&"beam", 0.0, 0.2)
-	beam.motion = FormBase.Motion.RAY
+	beam.carrier = &"beam"
 	beam.ray_length = 300.0
 	beam.radius = 6.0
 	_modifier(&"hold", ModifierBase.Behaviour.HOLD, 1.0)
@@ -254,8 +254,8 @@ func test_a_landing_rain_fires_its_on_hit() -> void:
 func test_an_echoed_rain_strikes_at_half() -> void:
 	_target(Vector2(SpellLimits.RAIN_REACH, 0.0))
 	var damage: Array[int] = []
-	_bus.projectile_hit.connect(func(_player: int, _target_hit: Node, _at: Vector2, tag: int) -> void:
-		damage.append(_spells.hit_profile(tag).damage))
+	_bus.projectile_hit.connect(func(_player: int, _target_hit: Node, _at: Vector2, tag: int, shot: int) -> void:
+		damage.append(_spells.hit_profile(tag, shot).damage))
 	_build(0, [&"echo", &"rain"])
 	_cast()
 	_tick(90)

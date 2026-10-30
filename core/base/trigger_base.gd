@@ -27,6 +27,22 @@ enum Event {
 	REACTION,
 }
 
+## What each trigger needs to go off (`Carrier.fires`, `Carrier.fires_with`), in the rows of
+## `ModifierBase.NEEDS`: from its carrier "any" (one of these traits) and "not" (none of them), or
+## "or_cards" (a card with one of these behaviours on it does instead: what a blast strikes is the
+## carrier's hit, rules R4 F2); from the cards on it "cards" (one of these behaviours, or an
+## infusion where "or_infused") and "not_cards" (none of these where they work). A trigger not here
+## goes off on every carrier. A new trigger adds its line here, never per carrier or in the compiler.
+const NEEDS: Dictionary = {
+	Event.HIT: {"any": CarrierTraits.HITS, "or_cards": [ModifierBase.Behaviour.BLAST]},
+	Event.TIMER: {"any": CarrierTraits.LASTS},
+	Event.HURT: {"any": CarrierTraits.LASTS},
+	Event.BLOCK: {"any": CarrierTraits.MEETS_SHOTS, "cards": [ModifierBase.Behaviour.SHIELD, ModifierBase.Behaviour.DEFLECT]},
+	Event.KILL: {"any": CarrierTraits.HITS, "or_cards": [ModifierBase.Behaviour.BLAST]},
+	Event.REACTION: {"any": CarrierTraits.HITS, "or_cards": [ModifierBase.Behaviour.BLAST], "cards": [ModifierBase.Behaviour.RELAY], "or_infused": true},
+	Event.WALL: {"any": CarrierTraits.FLIES | CarrierTraits.LINE, "not_cards": [ModifierBase.Behaviour.GHOST]},
+}
+
 @export var event: Event = Event.HIT
 ## TIMER only: seconds between fires. A trigger fires every time its event happens, for as
 ## long as its carrier lives (owner, 2026-10-29: no per-shot count; the spell runtime's per-step

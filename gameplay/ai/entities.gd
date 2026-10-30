@@ -16,7 +16,7 @@ extends Node2D
 ## DECOY_LURE of a seated owner's decoy chase it before any wizard (`lure`, asked by `ai.gd`). It
 ## ends after DECOY_HITS hits or when its time runs out; where it ended is its end point. A decoy
 ## whose card has a shield or deflect guards itself (rules R4g): every step Spells turns away
-## (`Spells.guard_decoy`) the other teams' shots within DECOY_GUARD of its body, deflecting them
+## (`CarrierDecoy.guard_decoy`) the other teams' shots within DECOY_GUARD of its body, deflecting them
 ## or stopping them while its shield charges last, as a swing's guard does; each is a block.
 ##
 ## A **familiar** is a small orb circling its caster (FAMILIAR_ORBIT px): the wizard, or for a
@@ -291,7 +291,7 @@ func step(delta: float) -> void:
 			if _key[row] != 0 and spells != null:
 				spells.familiar_at(_key[row], _position[row])
 		elif (_shield[row] > 0 or _deflect[row] != 0) and spells != null:
-			_shield[row] = spells.guard_decoy(_owner[row], _tag[row], _position[row] + DECOY_OFFSET, DECOY_GUARD, _shield[row])
+			_shield[row] = CarrierDecoy.of(spells).guard_decoy(_owner[row], _tag[row], _position[row] + DECOY_OFFSET, DECOY_GUARD, _shield[row])
 	queue_redraw()
 	_write_familiars()
 
@@ -389,8 +389,8 @@ func _on_spawn_requested(caster: int, kind: StringName, at: Vector2, seconds: fl
 	_tag[row] = tag
 	_left[row] = seconds if seconds > 0.0 else INF
 	_hits[row] = DECOY_HITS
-	_shield[row] = spells.decoy_shield(tag) if kind == DECOY and spells != null else 0
-	_deflect[row] = 1 if kind == DECOY and spells != null and spells.decoy_deflects(tag) else 0
+	_shield[row] = CarrierDecoy.of(spells).decoy_shield(tag) if kind == DECOY and spells != null else 0
+	_deflect[row] = 1 if kind == DECOY and spells != null and CarrierDecoy.of(spells).decoy_deflects(tag) else 0
 	_angle[row] = 0.0
 	_position[row] = at
 	_key[row] = spells.entity_key if spells != null else 0
@@ -438,7 +438,7 @@ func _on_end_requested(caster: int, tag: int) -> void:
 
 ## Every hit wears a decoy down, whoever cast it (G3c); its own caster's shots never reach it
 ## (`core/projectiles` skips the targets a caster owns).
-func _on_projectile_hit(_caster: int, target: Node, _position_hit: Vector2, _tag_hit: int) -> void:
+func _on_projectile_hit(_caster: int, target: Node, _position_hit: Vector2, _tag_hit: int, _shot: int) -> void:
 	if not target is Decoy:
 		return
 	var row: int = _decoys.find(target as Decoy)

@@ -239,14 +239,14 @@ func _move_cards() -> Fixture.FakeRegistry:
 	bolt.mana_cost = 2.0
 	_put(fake, bolt, &"bolt")
 	var dash := FormBase.new()
-	dash.motion = FormBase.Motion.DASH
+	dash.carrier = &"dash"
 	dash.ray_length = 60.0
 	dash.speed = 300.0
 	dash.lifetime = 0.2
 	dash.mana_cost = 2.0
 	_put(fake, dash, &"dash")
 	var teleport := FormBase.new()
-	teleport.motion = FormBase.Motion.TELEPORT
+	teleport.carrier = &"teleport"
 	teleport.ray_length = 70.0
 	teleport.mana_cost = 2.0
 	_put(fake, teleport, &"teleport")

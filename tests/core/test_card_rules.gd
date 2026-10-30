@@ -1,7 +1,7 @@
 extends "res://tests/support/suite.gd"
 ## The card rules check (rules R3, docs/milestones/M2-rules.md, rule 1 "works or wasted"): every
 ## card in content/spells/ on every carrier either changes what happens in the game or is listed
-## by the compiler as wasted, with a reason. Nothing does nothing silently.
+## by the compiler as wasted. Nothing does nothing silently.
 ##
 ## It keeps no list of cards or carriers (owner, 2026-10-29: "It should just auto discover new
 ## cards and carriers"). It asks the registry for every card: the forms are the carriers, and every
@@ -10,7 +10,7 @@ extends "res://tests/support/suite.gd"
 ##
 ## A cell: compile the card on the carrier (`[card, carrier]`; a trigger gets a plain payload
 ## after its carrier, a carrier that reads its own payload, rain and familiar, gets one too). When
-## the compiler lists the card as wasted, its reason must not be empty: W. Otherwise the cast runs
+## the compiler lists the card as wasted: W. Otherwise the cast runs
 ## in a small world (tests/support/card_rules_world.gd: the real Spells, projectile manager, Combat,
 ## Entities and actor kit) and its trace (every hit with its whole profile, damage, statuses, moves,
 ## area hits, spawns, blocks, the shots' paths and sizes, the beams and swings, the actors' places
@@ -28,13 +28,13 @@ extends "res://tests/support/suite.gd"
 ## bounce a wall, ghost a wall with a target behind it, shield and deflect an enemy that shoots at
 ## the wizard, on kill a target that dies, on hurt the wizard hurt, on reaction a target with a
 ## status the carrier's infusion reacts with (see `behaviour_scenes` and `event_scenes`). How far
-## along the line things stand is the carrier's reach, chosen by its `FormBase.Motion` (`reach`). A
+## along the line things stand is the carrier's reach, chosen by its `FormBase.carrier` (`reach`). A
 ## card whose behaviour or event has no scene yet fails with "no probe for ...", and a carrier
-## whose motion has none with "no reach for ...", so a new kind of card or carrier brings its
+## that has none with "no reach for ...", so a new kind of card or carrier brings its
 ## probe in the same PR.
 ##
 ## The other way round (R4b): a W cell is also played with the card forced on, and fails with
-## "`card` on `carrier` is listed as wasted (reason) but changes the cast" when that trace differs
+## "`card` on `carrier` is listed as wasted but changes the cast" when that trace differs
 ## (slam was once wrongly listed, found by hand). The seam is one test-only switch,
 ## `StaffCompiler.keep_wasted`: with it the compiler keeps every card its waste table would drop
 ## (a behaviour, numbers, an infusion, a trigger that "never fires" and its payload), and the
@@ -141,7 +141,7 @@ func _discover() -> void:
 	_payload = null
 	_shot = null
 	for form in _forms:
-		if form.motion != FormBase.Motion.STRAIGHT:
+		if form.carrier != &"bolt":
 			continue
 		if _payload == null or form.shots > _payload.shots:
 			_payload = form
@@ -226,34 +226,34 @@ static func event_scenes(event: int) -> Array[Dictionary]:
 	return []
 
 
-## How far along the aim a carrier of `form` acts (where its target stands), by its motion; -1
-## when there is no rule for its motion yet.
+## How far along the aim a carrier of `form` acts (where its target stands), by its carrier; -1
+## when there is no rule for its carrier yet.
 static func reach(form: FormBase) -> float:
-	match form.motion:
-		FormBase.Motion.STRAIGHT, FormBase.Motion.SWAP:
+	match form.carrier:
+		&"bolt", &"swap":
 			return minf(form.speed * form.lifetime * 0.5, 90.0)
-		FormBase.Motion.RAY:
+		&"beam":
 			return minf(form.ray_length * 0.5, 90.0)
-		FormBase.Motion.SWING:
+		&"swing":
 			return form.ray_length * 0.75
-		FormBase.Motion.SLAM:
+		&"slam":
 			# The ring's middle: it strikes `ray_length` ahead and grows to `radius`.
 			return form.ray_length
-		FormBase.Motion.STILL:
+		&"rune":
 			return form.radius
-		FormBase.Motion.ORBIT:
+		&"orbit":
 			return form.orbit_radius
-		FormBase.Motion.WALL:
+		&"wall":
 			return SpellLimits.WALL_REACH
-		FormBase.Motion.RAIN:
+		&"rain":
 			return form.ray_length if form.ray_length > 0.0 else SpellLimits.RAIN_REACH
-		FormBase.Motion.DASH:
+		&"dash":
 			# On its way: a dash strikes what its body passes (rules R4c).
 			return form.ray_length * 0.5
-		FormBase.Motion.TELEPORT:
+		&"teleport":
 			# Where it lands: a teleport strikes what is there (rules R4c).
 			return form.ray_length
-		FormBase.Motion.DECOY, FormBase.Motion.FAMILIAR:
+		&"decoy", &"familiar":
 			return 60.0
 	return -1.0
 
@@ -266,7 +266,7 @@ func test_it_finds_the_cards_and_carriers_itself() -> void:
 	check(_payload != null, "a straight carrier to fire as a payload")
 	check(_shot != null, "a straight carrier of one shot for the enemy shooter")
 	for form in _forms:
-		check(reach(form) >= 0.0, "no reach for the motion %s of `%s`: add it to `reach`" % [FormBase.Motion.keys()[form.motion], form.id])
+		check(reach(form) >= 0.0, "no reach for the carrier %s of `%s`: add it to `reach`" % [form.carrier, form.id])
 
 
 func test_the_same_cast_writes_the_same_trace() -> void:
@@ -376,12 +376,10 @@ func _cell(card: SpellComponent, form: FormBase) -> String:
 		names.append(scene["name"])
 		var compiled: CompiledStaff = _compiler.compile_staff(_casts(card, form, scene, false)[0], _staff)
 		if compiled.wasted.has(0):
-			var why: String = String(compiled.wasted[0]).strip_edges()
-			check(not why.is_empty(), "`%s` on `%s` is wasted with no reason" % [card.id, form.id])
 			# The other way round: forced on, a wasted card must still change nothing.
 			for forced in scenes:
 				if _changes(card, form, forced, true):
-					check(false, "`%s` on `%s` is listed as wasted (%s) but changes the cast (scene: %s)" % [card.id, form.id, why, forced["name"]])
+					check(false, "`%s` on `%s` is listed as wasted but changes the cast (scene: %s)" % [card.id, form.id, forced["name"]])
 					break
 			return WASTED
 		if _changes(card, form, scene, false):

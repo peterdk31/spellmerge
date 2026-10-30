@@ -43,13 +43,13 @@ func before_each() -> void:
 	_spells.registry = _fake
 	_spells.bind(_mgr, _bus)
 	_hits.clear()
-	_bus.projectile_hit.connect(func(player: int, target: Node, at: Vector2, tag: int) -> void:
-		var profile: HitProfile = _spells.hit_profile(tag)
+	_bus.projectile_hit.connect(func(player: int, target: Node, at: Vector2, tag: int, shot: int) -> void:
+		var profile: HitProfile = _spells.hit_profile(tag, shot)
 		_hits.append([player, target, at, tag, profile.damage if profile != null else -1]))
 	var bolt: FormBase = _form(&"bolt", 300.0, 1.0)
 	bolt.base_damage = 10
 	var beam: FormBase = _form(&"beam", 0.0, 0.1)
-	beam.motion = FormBase.Motion.RAY
+	beam.carrier = &"beam"
 	beam.ray_length = 300.0
 	beam.base_damage = 10
 	_multicast(&"double", MulticastBase.Mode.TOGETHER, 1)
@@ -331,7 +331,7 @@ func test_mirror_only_mirrors_the_carrier_it_is_on() -> void:
 func test_a_mirrored_orbit_starts_on_the_other_side() -> void:
 	# Rules R4g: mirror is one rule, the carrier fired again with its aim reversed.
 	var orbit: FormBase = _form(&"orbit", 0.0, 2.0)
-	orbit.motion = FormBase.Motion.ORBIT
+	orbit.carrier = &"orbit"
 	orbit.orbit_radius = 40.0
 	_mgr.set_anchor(0, Vector2.ZERO)
 	_build(0, [&"mirror", &"orbit"])
@@ -346,7 +346,7 @@ func test_a_mirrored_orbit_starts_on_the_other_side() -> void:
 
 func test_a_mirrored_swap_flies_both_ways() -> void:
 	var swap: FormBase = _form(&"swap", 300.0, 0.5)
-	swap.motion = FormBase.Motion.SWAP
+	swap.carrier = &"swap"
 	_build(0, [&"mirror", &"swap"])
 	_cast()
 	var headings: Array[Vector2] = _headings()

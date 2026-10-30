@@ -317,7 +317,7 @@ func _advance_paths(count: int) -> void:
 		_mgr._pos[slot] += _mgr._vel[slot] * DT
 
 
-func _on_hit(_player: int, _node: Node, _at: Vector2, _tag: int) -> void:
+func _on_hit(_player: int, _node: Node, _at: Vector2, _tag: int, _shot: int = -1) -> void:
 	_hits += 1
 
 

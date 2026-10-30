@@ -43,24 +43,24 @@ func before_each() -> void:
 	_spells.registry = _fake
 	_spells.bind(_mgr, _bus)
 	_hits.clear()
-	_bus.projectile_hit.connect(func(_caster: int, _target: Node, at: Vector2, tag: int) -> void: _hits.append([tag, at]))
+	_bus.projectile_hit.connect(func(_caster: int, _target: Node, at: Vector2, tag: int, _shot: int) -> void: _hits.append([tag, at]))
 	# A shot of 0.4 s, as short as a nova's.
 	_form(&"short", 300.0, 0.4)
 	var rune: FormBase = _form(&"rune", 0.0, 10.0)
 	# The probe: a shot that does not move marks where a payload fires (a placed rune would
 	# appear a step ahead of it, rules R4 F3).
-	rune.motion = FormBase.Motion.STRAIGHT
+	rune.carrier = &"bolt"
 	rune.radius = 6.0
 	var beam: FormBase = _form(&"beam", 0.0, 0.4)
-	beam.motion = FormBase.Motion.RAY
+	beam.carrier = &"beam"
 	beam.ray_length = 200.0
 	var rain: FormBase = _form(&"rain", 0.0, 0.8)
-	rain.motion = FormBase.Motion.RAIN
+	rain.carrier = &"rain"
 	rain.ray_length = 120.0
 	var decoy: FormBase = _form(&"decoy", 0.0, 4.0)
-	decoy.motion = FormBase.Motion.DECOY
+	decoy.carrier = &"decoy"
 	var dash: FormBase = _form(&"dash", 100.0, 0.4)
-	dash.motion = FormBase.Motion.DASH
+	dash.carrier = &"dash"
 	dash.ray_length = 40.0
 	var arc := ModifierBase.new()
 	arc.behaviour = ModifierBase.Behaviour.ARC

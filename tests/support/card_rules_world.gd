@@ -278,9 +278,9 @@ func _shot_within(distance: float) -> bool:
 
 
 func _is_quiet() -> bool:
-	if projectiles.get_count() > 0 or spells.beam_count() > 0 or spells.swing_count() > 0 or spells.slam_count() > 0:
+	if projectiles.get_count() > 0 or CarrierBeam.of(spells).beam_count() > 0 or CarrierSwing.of(spells).swing_count() > 0 or CarrierSlam.of(spells).slam_count() > 0:
 		return false
-	if not spells._pending.is_empty() or spells._mv_count > 0 or spells._jq_count > 0:
+	if not spells._pending.is_empty() or spells._moves.under_way() > 0 or spells._jq_count > 0:
 		return false
 	if entities.count() > 0:
 		return false
@@ -322,8 +322,8 @@ func _put(text: String) -> void:
 	trace.append(line)
 
 
-func _profile(tag: int) -> String:
-	var hit: HitProfile = spells.hit_profile(tag)
+func _profile(tag: int, shot: int) -> String:
+	var hit: HitProfile = spells.hit_profile(tag, shot)
 	if hit == null:
 		return "none"
 	var statuses: Array = [hit.status_id] + Array(hit.later_status_ids)
@@ -331,23 +331,23 @@ func _profile(tag: int) -> String:
 
 
 func _listen() -> void:
-	bus.projectile_hit.connect(func(caster: int, target: Node, at: Vector2, tag: int) -> void:
-		_put("hit %s %s %s at %s [%s]" % [_who(caster), _node(tag), _name_of(target), _at(at), _profile(tag)]))
-	projectiles.wall_met.connect(func(caster: int, at: Vector2, _heading: Vector2, tag: int) -> void:
+	bus.projectile_hit.connect(func(caster: int, target: Node, at: Vector2, tag: int, shot: int) -> void:
+		_put("hit %s %s %s at %s [%s]" % [_who(caster), _node(tag), _name_of(target), _at(at), _profile(tag, shot)]))
+	projectiles.wall_met.connect(func(caster: int, at: Vector2, _heading: Vector2, tag: int, _shot: int) -> void:
 		_put("wall %s %s at %s" % [_who(caster), _node(tag), _at(at)]))
-	bus.projectile_expired.connect(func(caster: int, at: Vector2, tag: int) -> void:
+	bus.projectile_expired.connect(func(caster: int, at: Vector2, tag: int, _shot: int) -> void:
 		_put("expired %s %s at %s" % [_who(caster), _node(tag), _at(at)]))
 	bus.damage_dealt.connect(func(caster: int, target: Node, amount: int, _at_point: Vector2) -> void:
 		_put("damage %s -> %s %d" % [_who(caster), _name_of(target), amount]))
-	bus.hit_landed.connect(func(caster: int, target: Node, amount: int, _at_point: Vector2, kind: StringName) -> void:
+	bus.hit_landed.connect(func(caster: int, target: Node, amount: int, _at_point: Vector2, kind: StringName, _shot: int) -> void:
 		_put("landed %s -> %s %d %s" % [_who(caster), _name_of(target), amount, kind]))
 	bus.heal_dealt.connect(func(caster: int, target: Node, amount: int, _at_point: Vector2) -> void:
 		_put("heal %s -> %s %d" % [_who(caster), _name_of(target), amount]))
 	bus.status_applied.connect(func(caster: int, target: Node, id: StringName) -> void:
 		_put("status %s -> %s %s" % [_who(caster), _name_of(target), id]))
-	bus.reaction_triggered.connect(func(caster: int, id: StringName, at: Vector2) -> void:
+	bus.reaction_triggered.connect(func(caster: int, id: StringName, at: Vector2, _shot: int) -> void:
 		_put("reaction %s %s at %s" % [_who(caster), id, _at(at)]))
-	bus.kill_landed.connect(func(caster: int, target: Node, at: Vector2, tag: int) -> void:
+	bus.kill_landed.connect(func(caster: int, target: Node, at: Vector2, tag: int, _shot: int) -> void:
 		_put("kill %s %s %s at %s" % [_who(caster), _node(tag), _name_of(target), _at(at)]))
 	bus.actor_hurt.connect(func(actor: int, amount: int, _at_point: Vector2, tag: int, kind: StringName) -> void:
 		_put("hurt %s %d %s %s" % [_who(actor), amount, _node(tag), kind]))
@@ -367,11 +367,11 @@ func _listen() -> void:
 		_put("end %s %s" % [_who(caster), _node(tag)]))
 	bus.mana_refund_requested.connect(func(caster: int, amount: float) -> void:
 		_put("refund %s %s" % [_who(caster), str(snappedf(amount, 0.01))]))
-	bus.shot_blocked.connect(func(caster: int, at: Vector2, tag: int) -> void:
+	bus.shot_blocked.connect(func(caster: int, at: Vector2, tag: int, _shot: int) -> void:
 		_put("blocked %s %s at %s" % [_who(caster), _node(tag), _at(at)]))
 	bus.shield_blocked.connect(func(actor: int, at: Vector2, tag: int) -> void:
 		_put("shielded %s %s at %s" % [_who(actor), _node(tag), _at(at)]))
-	bus.shot_deflected.connect(func(caster: int, at: Vector2, tag: int) -> void:
+	bus.shot_deflected.connect(func(caster: int, at: Vector2, tag: int, _shot: int) -> void:
 		_put("deflected %s %s at %s" % [_who(caster), _node(tag), _at(at)]))
 	bus.wizard_shield_requested.connect(func(caster: int, charges: int, seconds: float, tag: int) -> void:
 		_put("barrier %s %s %d for %d ms" % [_who(caster), _node(tag), charges, roundi(seconds * 1000.0)]))
@@ -384,7 +384,7 @@ func _listen() -> void:
 	# A carrier's shape as a player sees it (so a longer reach shows; its tint and look are left out).
 	bus.form_shown.connect(func(caster: int, form: StringName, origin: Vector2, direction: Vector2, length: float, _tint: Color, _look: int) -> void:
 		_put("shown %s %s at %s to %s %d" % [_who(caster), form, _at(origin), _at(direction * 100.0), roundi(length)]))
-	bus.enemy_died.connect(func(killer: int, enemy: Node, at: Vector2) -> void:
+	bus.enemy_died.connect(func(killer: int, enemy: Node, at: Vector2, _shot: int) -> void:
 		_put("died %s by %s at %s" % [_name_of(enemy), _who(killer), _at(at)]))
 
 
@@ -393,20 +393,20 @@ func _sample() -> void:
 		if projectiles.is_alive(slot):
 			var tag: int = projectiles.get_tag_of(slot)
 			_put("shot %s %s at %s r%d" % [_who(projectiles.get_actor_of(slot)), _node(tag), _at(projectiles.get_position_of(slot)), roundi(projectiles._radius[slot])])
-	for at in spells.beam_slots():
-		if spells.beam_on(at):
+	for at in CarrierBeam.of(spells).beam_slots():
+		if CarrierBeam.of(spells).beam_on(at):
 			var points: PackedStringArray = PackedStringArray()
-			for n in spells.beam_point_count(at):
-				points.append(_at(spells.beam_point(at, n)))
+			for n in CarrierBeam.of(spells).beam_point_count(at):
+				points.append(_at(CarrierBeam.of(spells).beam_point(at, n)))
 			# How wide it hits (growth) as well as where.
-			_put("beam %s w%d %s" % [_who(spells.beam_caster(at)), roundi(spells.beam_growth(at) * 100.0), " ".join(points)])
-	for at in spells.slam_slots():
-		if spells.slam_on(at):
+			_put("beam %s w%d %s" % [_who(CarrierBeam.of(spells).beam_caster(at)), roundi(CarrierBeam.of(spells).beam_growth(at) * 100.0), " ".join(points)])
+	for at in CarrierSlam.of(spells).slam_slots():
+		if CarrierSlam.of(spells).slam_on(at):
 			# A slam's row is read directly: Spells has no getter for its caster and aim.
-			_put("slam %s %s from %s way %s impact %s" % [_who(spells._sl_actor[at]), _node(spells._sl_tag[at]), _at(spells._sl_origin[at]), _at(spells._sl_dir[at] * 100.0), _at(spells.slam_impact(at)) if spells.slam_impact(at).is_finite() else "-"])
-	for at in spells.swing_slots():
-		if spells.swing_on(at):
-			_put("swing %s %s at %s to %s side %d turned %d reach %d" % [_who(spells.swing_actor(at)), _node(spells.swing_tag(at)), _at(spells.swing_origin(at)), _at(spells.swing_dir(at) * 100.0), spells.swing_side(at), roundi(rad_to_deg(spells.swing_turned(at))), roundi(spells.swing_reach(at))])
+			_put("slam %s %s from %s way %s impact %s" % [_who(CarrierSlam.of(spells)._sl_actor[at]), _node(CarrierSlam.of(spells)._sl_tag[at]), _at(CarrierSlam.of(spells)._sl_origin[at]), _at(CarrierSlam.of(spells)._sl_dir[at] * 100.0), _at(CarrierSlam.of(spells).slam_impact(at)) if CarrierSlam.of(spells).slam_impact(at).is_finite() else "-"])
+	for at in CarrierSwing.of(spells).swing_slots():
+		if CarrierSwing.of(spells).swing_on(at):
+			_put("swing %s %s at %s to %s side %d turned %d reach %d" % [_who(CarrierSwing.of(spells).swing_actor(at)), _node(CarrierSwing.of(spells).swing_tag(at)), _at(CarrierSwing.of(spells).swing_origin(at)), _at(CarrierSwing.of(spells).swing_dir(at) * 100.0), CarrierSwing.of(spells).swing_side(at), roundi(rad_to_deg(CarrierSwing.of(spells).swing_turned(at))), roundi(CarrierSwing.of(spells).swing_reach(at))])
 	for body in _bodies:
 		var seen: String = "gone"
 		if is_instance_valid(body) and not body.is_dying():

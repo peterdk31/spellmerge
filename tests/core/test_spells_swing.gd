@@ -47,12 +47,12 @@ func before_each() -> void:
 	_spells.bind(_mgr, _bus)
 	_hits.clear()
 	_areas.clear()
-	_bus.projectile_hit.connect(func(player: int, target: Node, at: Vector2, tag: int) -> void:
+	_bus.projectile_hit.connect(func(player: int, target: Node, at: Vector2, tag: int, _shot: int) -> void:
 		_hits.append([player, target, at, tag]))
 	_bus.cue_shown.connect(func(player: int, _cue: StringName, at: Vector2, _direction: Vector2, radius: float, _tint: Color, _look: int) -> void: _areas.append([player, at, radius]))
 	# The playground's numbers (owner, 2026-10-29).
 	_swing = FormBase.new()
-	_swing.motion = FormBase.Motion.SWING
+	_swing.carrier = &"swing"
 	_swing.base_damage = 2
 	_swing.arc = 90.0
 	_swing.ray_length = REACH
@@ -120,8 +120,8 @@ func _struck(node: Node) -> int:
 
 ## The row of the one live swing, or -1.
 func _row() -> int:
-	for at in _spells.swing_slots():
-		if _spells.swing_on(at):
+	for at in CarrierSwing.of(_spells).swing_slots():
+		if CarrierSwing.of(_spells).swing_on(at):
 			return at
 	return -1
 
@@ -140,7 +140,7 @@ func test_the_arc_hits_what_is_in_it_and_nothing_behind_or_beside() -> void:
 	check_equal(_struck(behind), 0, "nothing behind")
 	check_equal(_struck(beside), 0, "nothing beside, past the arc")
 	check_equal(_struck(far), 0, "nothing past its reach")
-	check_equal(_spells.swing_count(), 0, "the swing is over")
+	check_equal(CarrierSwing.of(_spells).swing_count(), 0, "the swing is over")
 	check_equal(_spells.live_shots(_spells.current_tag(0, 0, 0)), 0, "and no longer counted")
 
 
@@ -189,14 +189,14 @@ func test_swings_turn_clockwise_and_back_by_turns() -> void:
 	var lower: Node2D = _at(30.0)
 	_build()
 	_cast()
-	check_equal(_spells.swing_side(_row()), 1, "the first swing is a forehand (clockwise on screen)")
+	check_equal(CarrierSwing.of(_spells).swing_side(_row()), 1, "the first swing is a forehand (clockwise on screen)")
 	_tick(30)
 	check_equal(_hits.size(), 2, "it hits both")
 	check(_hits[0][1] == upper and _hits[1][1] == lower, "turning clockwise it meets the upper body first")
 	_hits.clear()
 	_tick(30)
 	_cast()
-	check_equal(_spells.swing_side(_row()), -1, "the next is a backhand")
+	check_equal(CarrierSwing.of(_spells).swing_side(_row()), -1, "the next is a backhand")
 	_tick(30)
 	check(_hits.size() == 2 and _hits[0][1] == lower and _hits[1][1] == upper, "turning back it meets the lower body first")
 
@@ -207,7 +207,7 @@ func test_a_swing_right_after_the_last_chains_on_with_no_wind_up() -> void:
 	_cast()
 	_tick(12)
 	check_equal(_struck(front), 1, "the first swing hit")
-	check_equal(_spells.swing_count(), 0, "and is over")
+	check_equal(CarrierSwing.of(_spells).swing_count(), 0, "and is over")
 	_cast()
 	_tick(5)
 	check_equal(_struck(front), 2, "a swing within the chain window sweeps at once")
@@ -274,7 +274,7 @@ func test_its_blast_goes_off_at_the_end_of_the_arc() -> void:
 func test_the_body_pose_leans_sweeps_holds_and_settles() -> void:
 	_build()
 	_spells.set_aim(0, Vector2.ZERO, Vector2.RIGHT)
-	check_equal(_spells.staff_pose_dir(0), Vector2.ZERO, "no pose before a swing")
+	check_equal(_spells.poses().staff_pose_dir(0), Vector2.ZERO, "no pose before a swing")
 	_cast()
 	_tick(6)
 	var leaning: float = _pose_angle()
@@ -282,7 +282,7 @@ func test_the_body_pose_leans_sweeps_holds_and_settles() -> void:
 	_tick(6)
 	check(_pose_angle() > 45.0, "after the sweep it holds past the arc's end (%s)" % _pose_angle())
 	_tick(40)
-	check_equal(_spells.staff_pose_dir(0), Vector2.ZERO, "then it settles back onto the aim")
+	check_equal(_spells.poses().staff_pose_dir(0), Vector2.ZERO, "then it settles back onto the aim")
 
 
 func test_a_chained_backhand_starts_where_the_forehand_ended() -> void:
@@ -298,7 +298,7 @@ func test_a_chained_backhand_starts_where_the_forehand_ended() -> void:
 
 ## Degrees the body's staff points off right now (its animation's turn on its locked aim).
 func _pose_angle() -> float:
-	return rad_to_deg(_spells.staff_pose_dir(0).rotated(_spells.staff_pose(0).x).angle())
+	return rad_to_deg(_spells.poses().staff_pose_dir(0).rotated(_spells.poses().staff_pose(0).x).angle())
 
 
 func test_the_split_swings_of_one_cast_turn_the_same_way() -> void:
@@ -308,9 +308,9 @@ func test_the_split_swings_of_one_cast_turn_the_same_way() -> void:
 	_build([&"split", &"swing"])
 	_cast()
 	var sides: Array[int] = []
-	for at in _spells.swing_slots():
-		if _spells.swing_on(at):
-			sides.append(_spells.swing_side(at))
+	for at in CarrierSwing.of(_spells).swing_slots():
+		if CarrierSwing.of(_spells).swing_on(at):
+			sides.append(CarrierSwing.of(_spells).swing_side(at))
 	check_equal(sides, [1, 1] as Array[int], "both swings of a cleave are forehands")
 
 
@@ -324,8 +324,8 @@ func test_a_held_swing_sweeps_back_and_forth_until_switched_off() -> void:
 	for step in 60:
 		_tick(1)
 		var at: int = _row()
-		if at >= 0 and (sides.is_empty() or sides[-1] != _spells.swing_side(at)):
-			sides.append(_spells.swing_side(at))
+		if at >= 0 and (sides.is_empty() or sides[-1] != CarrierSwing.of(_spells).swing_side(at)):
+			sides.append(CarrierSwing.of(_spells).swing_side(at))
 	check(sides.size() >= 4, "it swung again and again: %s" % [sides])
 	for n in range(1, sides.size()):
 		check(sides[n] == -sides[n - 1], "each sweep turns back the other way: %s" % [sides])
@@ -335,7 +335,7 @@ func test_a_held_swing_sweeps_back_and_forth_until_switched_off() -> void:
 	var struck: int = _struck(front)
 	_tick(60)
 	check_equal(_struck(front), struck, "and it swings no more")
-	check_equal(_spells.swing_count(), 0, "no swing is left")
+	check_equal(CarrierSwing.of(_spells).swing_count(), 0, "no swing is left")
 
 
 func test_a_held_swing_turns_with_the_aim() -> void:
@@ -349,5 +349,5 @@ func test_a_held_swing_turns_with_the_aim() -> void:
 		_tick(1)
 		var at: int = _row()
 		if at >= 0:
-			dirs.append(_spells.swing_dir(at))
+			dirs.append(CarrierSwing.of(_spells).swing_dir(at))
 	check(not dirs.is_empty() and dirs[-1].is_equal_approx(Vector2.DOWN), "a later sweep is centred on the aim now: %s" % [dirs])

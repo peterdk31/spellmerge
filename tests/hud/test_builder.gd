@@ -260,7 +260,7 @@ func test_the_plan_and_the_notes_follow_the_staff() -> void:
 	_frame()
 	check(builder.slot_button(0).text.contains(BuilderScript.WASTED_MARK.strip_edges()), "homing with no carrier is marked: %s" % builder.slot_button(0).text)
 	check_equal(_focus.focused(0), builder.slot_button(0), "focus is on that slot")
-	check(builder.note_text().begins_with(BuilderScript.WASTED_PREFIX), "the note says why it does nothing: %s" % builder.note_text())
+	check(not builder.note_text().contains("does nothing"), "the mark is enough: the note gives no reason: %s" % builder.note_text())
 
 
 func test_a_refusal_shows_its_reason() -> void:

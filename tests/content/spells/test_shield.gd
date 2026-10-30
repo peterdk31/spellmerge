@@ -32,7 +32,7 @@ func _first(cards: Array) -> CompiledSpell:
 func _blocked_by(cards: Array, count: int, seat: int = 0) -> int:
 	var arena := ArenaScript.new(root)
 	var blocked: Array = []
-	arena.bus.shot_blocked.connect(func(_actor: int, _at: Vector2, _tag: int) -> void: blocked.append(1))
+	arena.bus.shot_blocked.connect(func(_actor: int, _at: Vector2, _tag: int, _shot: int) -> void: blocked.append(1))
 	var enemy: int = ActorSeats.enemy(arena.projectiles.actors)
 	arena.install_cards(seat, 0, cards)
 	arena.cast(seat, 0)

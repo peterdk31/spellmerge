@@ -24,6 +24,10 @@ class FakeSwings:
 	var age: float = 0.05
 	var origin: Vector2 = Vector2(40.0, 20.0)
 
+	## As the runtime hands Feel its swings (`Spells.carrier(&"swing")`): itself.
+	func carrier(id: StringName) -> Object:
+		return self if id == &"swing" else null
+
 	func swing_slots() -> int:
 		return rows
 

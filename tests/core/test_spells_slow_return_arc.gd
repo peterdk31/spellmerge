@@ -44,18 +44,18 @@ func before_each() -> void:
 	_spells.bind(_mgr, _bus)
 	_hits.clear()
 	_ended.clear()
-	_bus.projectile_hit.connect(func(player: int, target: Node, at: Vector2, tag: int) -> void:
-		_hits.append([player, target, at, tag, _spells.hit_profile(tag)]))
-	_bus.projectile_expired.connect(func(player: int, at: Vector2, tag: int) -> void: _ended.append([player, at, tag]))
+	_bus.projectile_hit.connect(func(player: int, target: Node, at: Vector2, tag: int, shot: int) -> void:
+		_hits.append([player, target, at, tag, _spells.hit_profile(tag, shot)]))
+	_bus.projectile_expired.connect(func(player: int, at: Vector2, tag: int, _shot: int) -> void: _ended.append([player, at, tag]))
 	var bolt: FormBase = _form(&"bolt", 300.0, 1.0)
 	bolt.base_damage = 10
 	var orb: FormBase = _form(&"orb", 30.0, 3.0)
 	orb.base_damage = 10
 	var rune: FormBase = _form(&"rune", 0.0, 4.0)
-	rune.motion = FormBase.Motion.STILL
+	rune.carrier = &"rune"
 	rune.base_damage = 10
 	var beam: FormBase = _form(&"beam", 0.0, 0.3)
-	beam.motion = FormBase.Motion.RAY
+	beam.carrier = &"beam"
 	beam.ray_length = 200.0
 	var nova: FormBase = _form(&"nova", 300.0, 0.2)
 	nova.shots = 8
@@ -175,11 +175,11 @@ func test_return_is_wasted_on_a_carrier_that_does_not_fly_out() -> void:
 	for form: StringName in [&"beam", &"rune"]:
 		var staff: CompiledStaff = _compile([&"return", form])
 		check(staff.wasted.has(0), "return on a %s is wasted" % form)
-		check(String(staff.wasted.get(0, "")).contains("does not fly out"), "with its reason: %s" % staff.wasted.get(0, ""))
+		check(staff.wasted.has(0), "return on it is wasted: %s" % staff.wasted)
 
 
 func test_the_boomerang_carrier_is_gone() -> void:
-	check(not FormBase.Motion.keys().has("RETURN"), "return is a modifier, not a carrier's motion")
+	check(not Carriers.ids().has(&"return"), "return is a modifier, not a carrier")
 
 
 # --- Arc ------------------------------------------------------------------------------------
@@ -249,7 +249,7 @@ func test_a_zap_ending_on_a_wall_does_not_set_off_on_wall() -> void:
 	_build(0, [&"arc", &"on_wall", &"orb", &"nova"])
 	_cast()
 	var walls: Array[int] = [0]
-	_mgr.wall_met.connect(func(_caster: int, _at: Vector2, _heading: Vector2, _tag: int) -> void: walls[0] += 1)
+	_mgr.wall_met.connect(func(_caster: int, _at: Vector2, _heading: Vector2, _tag: int, _shot: int) -> void: walls[0] += 1)
 	var most: int = 0
 	for _i in 90:
 		_tick(1)

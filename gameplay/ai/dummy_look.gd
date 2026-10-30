@@ -189,7 +189,7 @@ func _on_damage_dealt(_caster: int, target: Node, amount: int, _position: Vector
 	_next_number = (_next_number + 1) % NUMBER_COUNT
 
 
-func _on_reaction_triggered(_caster: int, reaction_id: StringName, position: Vector2) -> void:
+func _on_reaction_triggered(_caster: int, reaction_id: StringName, position: Vector2, _shot: int) -> void:
 	var body: Vector2 = actor.global_position + actor.body_offset
 	if position.distance_to(body) > REACTION_REACH:
 		return

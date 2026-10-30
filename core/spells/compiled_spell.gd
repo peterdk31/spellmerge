@@ -24,8 +24,15 @@ var radius: float = 4.0
 var shots: int = 1
 ## Degrees the shots fan over.
 var spread: float = 0.0
-## A `FormBase.Motion` value.
-var motion: int = FormBase.Motion.STRAIGHT
+## The id of its carrier (`FormBase.carrier`, `Carriers.of`); &"" for a fallback, which has none.
+## Setting it reads the carrier's `traits` once.
+var carrier: StringName = &"":
+	set(value):
+		carrier = value
+		traits = Carriers.of(value).traits()
+## Its carrier's yes/no answers (`Carrier.traits`, `CarrierTraits`), kept here so the runtime asks
+## them per shot with no lookup (`has_trait`).
+var traits: int = 0
 var pierce: int = 0
 var orbit_radius: float = 0.0
 var ray_length: float = 0.0
@@ -51,13 +58,17 @@ var hit: HitProfile = null
 ## What an echo's second firing does: the whole hit at ECHO_DAMAGE (heal, slam, every status
 ## and the kind kept). Null without an `echo` modifier.
 var echo_hit: HitProfile = null
+## What a `blast`'s strikes do: the carrier's hit (and its echo's), as `burst` (`StaffCompiler.blast_hit`),
+## so an explosion feels like one whatever set it off. Null without a blast.
+var blast_hit: HitProfile = null
+var echo_blast_hit: HitProfile = null
 
 ## Radians per second a shot turns toward a target; 0 means no homing.
 var homing_turn: float = 0.0
 ## Degrees off its aim a homing beam or teleport still bends to a target: what `homing_turn`
 ## turns in SpellLimits.INSTANT_HOMING_SECONDS, up to all the way round (0 without homing).
 var homing_angle: float = 0.0
-## Pixels away a homing spell looks for its target (`StaffCompiler.homing_range`); 0 when it does
+## Pixels away a homing spell looks for its target (`Carrier.homing_range`); 0 when it does
 ## not home, or its form cannot be steered (its homing cards are then listed as wasted).
 var homing_range: float = 0.0
 ## Times a hit jumps on to another target; 0 means no chain.
@@ -116,3 +127,8 @@ func chain_length() -> int:
 	if payload == null or payload.is_empty():
 		return 1
 	return 1 + payload.spells[0].chain_length()
+
+
+## True when its carrier answers yes to `flag` (a `CarrierTraits` flag).
+func has_trait(flag: int) -> bool:
+	return traits & flag != 0

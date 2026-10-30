@@ -80,7 +80,7 @@ func test_combat_takes_and_heals_through_health_and_the_bus_does_not() -> void:
 	spell.hit = mend
 	var tag: int = SpellTag.make(body.id, 0, 1, 1)
 	_world.spells._profiles[tag] = spell
-	_world.bus.projectile_hit.emit(body.id, body, body.position, tag)
+	_world.bus.projectile_hit.emit(body.id, body, body.position, tag, -1)
 	check_equal(body.health.health, 40, "a mend heals it through its Health")
 
 

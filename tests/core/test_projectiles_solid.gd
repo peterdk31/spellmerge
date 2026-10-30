@@ -101,7 +101,7 @@ func test_the_room_walls_stay_when_it_ends() -> void:
 
 func test_it_hits_along_its_row() -> void:
 	var hit: Array[Node] = []
-	bus.projectile_hit.connect(func(_caster: int, target: Node, _at: Vector2, _tag: int) -> void: hit.append(target))
+	bus.projectile_hit.connect(func(_caster: int, target: Node, _at: Vector2, _tag: int, _shot: int) -> void: hit.append(target))
 	var target := Node2D.new()
 	root.add_child(target)
 	own(target)

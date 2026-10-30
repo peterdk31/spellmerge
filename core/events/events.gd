@@ -57,12 +57,12 @@ signal actor_cast(caster: int, actor: Node)
 ## Sender: the actor kit (`Caster`). The actor `caster` (its node `actor`) put another of its staffs on show, `staff` (living staffs H4: a press of a different staff button; the personality swap), before that press casts. For visual reactions only (Feel's poof).
 signal staff_shown(caster: int, actor: Node, staff: int)
 ## Sender: core/projectiles. A projectile fired by the actor `caster` touched `target`.
-## `tag` is the value given to `Projectiles.spawn()`, for looking up the damage.
-signal projectile_hit(caster: int, target: Node, position: Vector2, tag: int)
+## `tag` is the value given to `Projectiles.spawn()`, for looking up the damage. `shot` is the projectile manager's row of the shot it is about (`Projectiles` slot), -1 for none (a ray, a strike, contact damage): read the shot from it while the event is sent.
+signal projectile_hit(caster: int, target: Node, position: Vector2, tag: int, shot: int)
 ## Sender: core/projectiles. Where and which way a projectile struck, for looks only (sparks, dust). `target` is the node it hit, sent just before `projectile_hit` for the same hit, or `null` when it ended on a wall or pillar. `caster` is the actor who fired it (NO_PLAYER for a shot of no actor), `position` the point it stopped at and `direction` the unit vector it was flying.
 signal projectile_impact(caster: int, target: Node, position: Vector2, direction: Vector2)
-## Sender: core/projectiles. A projectile fired by the actor `caster` ended without a hit: its life ran out or it struck a wall. `tag` is the value given to `Projectiles.spawn()`. Heard by core/spells (on expire) and feel (a small pop where a life ran out).
-signal projectile_expired(caster: int, position: Vector2, tag: int)
+## Sender: core/projectiles. A projectile fired by the actor `caster` ended without a hit: its life ran out or it struck a wall. `tag` is the value given to `Projectiles.spawn()`. Heard by core/spells (on expire) and feel (a small pop where a life ran out). `shot` is the projectile manager's row of the shot it is about (`Projectiles` slot), -1 for none (a ray, a strike, contact damage): read the shot from it while the event is sent.
+signal projectile_expired(caster: int, position: Vector2, tag: int, shot: int)
 ## Sender: core/spells. A beam, a nova or a rain of the actor `caster` just fired, for looks only (they have no shot to draw). `form` is `&"rain"` (a telegraph: its payload falls on `origin` after `length` seconds) or `&"beam"` (`length` is how far it got, along `direction`) or `&"nova"` (a ring of shots leaves `origin`; `length` is 0) or `&"dash"` (the wizard dashes from `origin` along `direction` for `length` pixels, as far as the walls let it). `tint` is the colour of the spell's element (white for plain arcane) and `look` its packed look kinds (`CompiledSpell.look`), so the cue shows its cards.
 signal form_shown(caster: int, form: StringName, origin: Vector2, direction: Vector2, length: float, tint: Color, look: int)
 ## Sender: core/spells (a `blast` going off: the cue its card names, `ModifierBase.cue`), and anything else with a moment to show (an exploding barrel: `&"fireball"`). Play the cue `cue` (a `CueBase`, `content/cues/<cue>.tres`; an unknown one shows nothing) at `at`, for looks and feel only (the hits are sent apart: each body a blast catches is a `projectile_hit` of its carrier). `caster` is the actor it is of (NO_PLAYER for none), `direction` the way it faces (zero for none), `size` how big in pixels (an explosion's radius, a ground strike's reach; what a part's `reach` is times), `tint` its element's colour (white for plain) and `look` its packed look kinds (`CompiledSpell.look`; 0 for none). Heard by gameplay/feel (`Feel.play_cue`).
@@ -91,29 +91,29 @@ signal entity_ended(caster: int, kind: StringName, position: Vector2, tag: int)
 signal mana_refund_requested(caster: int, amount: float)
 ## Sender: core/spells. `amount` of the mana of the seat `player`'s actor is now held by sustained cards (`hold`); 0 when none is on. Sent only for an actor a seat drives (every actor's Caster reads `Spells.reserved_mana`). Heard by nobody yet.
 signal mana_reserved(player: int, amount: float)
-## Sender: core/projectiles. A shot of the actor `caster` with `tag` stopped another team's shot at `position` with one of its shield charges (or a swing's or beam's shield did: `Projectiles.impact_form` is then `swing` or `beam` while this is sent; a swing's is a parry). Heard by core/spells and feel.
-signal shot_blocked(caster: int, position: Vector2, tag: int)
-## Sender: core/projectiles. The carrier with `tag` of the actor `caster` (a deflecting shot, a swing or a beam) deflected another team's shot at `position`: it turned, sped up and is `caster`'s now (melee I3). The deflected shot is `Projectiles.event_slot` while this is sent. Heard by core/spells (`on block`: a deflect is a block, owner 2026-10-29) and feel (the deflect's flash).
-signal shot_deflected(caster: int, position: Vector2, tag: int)
-## Sender: combat. The reaction `reaction_id` (for example &"shatter") fired for the actor `caster` (or NO_PLAYER) at `position`.
-signal reaction_triggered(caster: int, reaction_id: StringName, position: Vector2)
+## Sender: core/projectiles. A shot of the actor `caster` with `tag` stopped another team's shot at `position` with one of its shield charges (or a carrier's own shield did: `Projectiles.impact_form` is then that carrier's id, `swing`, `beam`, `slam` or `decoy`, while this is sent; a swing's is a parry). Heard by core/spells and feel. `shot` is the projectile manager's row of the shot it is about (`Projectiles` slot), -1 for none (a ray, a strike, contact damage): read the shot from it while the event is sent.
+signal shot_blocked(caster: int, position: Vector2, tag: int, shot: int)
+## Sender: core/projectiles. The carrier with `tag` of the actor `caster` (a deflecting shot, a swing or a beam) deflected another team's shot at `position`: it turned, sped up and is `caster`'s now (melee I3). The deflected shot is `shot`. Heard by core/spells (`on block`: a deflect is a block, owner 2026-10-29) and feel (the deflect's flash). `shot` is the projectile manager's row of the shot it is about (`Projectiles` slot), -1 for none (a ray, a strike, contact damage): read the shot from it while the event is sent.
+signal shot_deflected(caster: int, position: Vector2, tag: int, shot: int)
+## Sender: combat. The reaction `reaction_id` (for example &"shatter") fired for the actor `caster` (or NO_PLAYER) at `position`. `shot` is the projectile manager's row of the shot it is about (`Projectiles` slot), -1 for none (a ray, a strike, contact damage): read the shot from it while the event is sent.
+signal reaction_triggered(caster: int, reaction_id: StringName, position: Vector2, shot: int)
 ## Sender: combat. A discharge of the actor `caster` jumped from `from` (the body struck) to `to` (a body zapped), both in world pixels; one is sent for each body zapped, next to its `reaction_triggered` `discharge`. Heard by feel, which draws the arc.
 signal discharge_arc(caster: int, from: Vector2, to: Vector2)
 ## Sender: combat. The actor `caster` (or NO_PLAYER) dealt `amount` damage to `target`.
 signal damage_dealt(caster: int, target: Node, amount: int, position: Vector2)
 ## Sender: combat. A status effect from the actor `caster` (or NO_PLAYER) was put on `target`.
 signal status_applied(caster: int, target: Node, status_id: StringName)
-## Sender: combat. `enemy` died; the actor `killer` landed the last hit (or NO_PLAYER).
-signal enemy_died(killer: int, enemy: Node, position: Vector2)
+## Sender: combat. `enemy` died; the actor `killer` landed the last hit (or NO_PLAYER). `shot` is the projectile manager's row of the shot it is about (`Projectiles` slot), -1 for none (a ray, a strike, contact damage): read the shot from it while the event is sent.
+signal enemy_died(killer: int, enemy: Node, position: Vector2, shot: int)
 
 ## Sender: combat. A barrier on the actor `actor` (shield charges from the card with `tag`) stopped a hit at `position`. Heard by core/spells and feel.
 signal shield_blocked(actor: int, position: Vector2, tag: int)
-## Sender: combat. A hit of the actor `caster` with `tag` killed `target` at `position`. Heard by core/spells (on kill).
-signal kill_landed(caster: int, target: Node, position: Vector2, tag: int)
+## Sender: combat. A hit of the actor `caster` with `tag` killed `target` at `position`. Heard by core/spells (on kill). `shot` is the projectile manager's row of the shot it is about (`Projectiles` slot), -1 for none (a ray, a strike, contact damage): read the shot from it while the event is sent.
+signal kill_landed(caster: int, target: Node, position: Vector2, tag: int, shot: int)
 ## Sender: combat. The actor `actor` took `amount` damage at `position` from a hit with `tag` (a spell's tag, whose `SpellTag.caster_of` is the actor that cast it; 0 for contact damage and a reaction's damage) of kind `kind` (`&"shot"`, `&"ray"`, `&"swing"`, `&"burst"`, `&"reaction"`, `&"status"`; a burn tick is not a hit, so it is not sent here). Heard by core/spells (on hurt: the hurt actor's own carriers fire).
 signal actor_hurt(actor: int, amount: int, position: Vector2, tag: int, kind: StringName)
-## Sender: combat. A hit of the actor `caster` with `tag` on `target` at `position` set off the reaction `reaction_id`. Heard by core/spells (on reaction); feel keeps `reaction_triggered`.
-signal reaction_landed(caster: int, reaction_id: StringName, target: Node, position: Vector2, tag: int)
+## Sender: combat. A hit of the actor `caster` with `tag` on `target` at `position` set off the reaction `reaction_id`. Heard by core/spells (on reaction); feel keeps `reaction_triggered`. `shot` is the projectile manager's row of the shot it is about (`Projectiles` slot), -1 for none (a ray, a strike, contact damage): read the shot from it while the event is sent.
+signal reaction_landed(caster: int, reaction_id: StringName, target: Node, position: Vector2, tag: int, shot: int)
 ## Sender: core/spells. The actor `caster` gets a barrier of `charges` blocked hits for `seconds` (shield on a dash, a teleport or the caster); the card has `tag`. Heard by combat.
 signal wizard_shield_requested(caster: int, charges: int, seconds: float, tag: int)
 ## Sender: core/spells. A card of the actor `caster` (magnet) pulls every enemy within `radius` of the line from `position` to `to` toward its nearest point on it at `strength` pixels per second (a shot's: `to` is `position`; a beam's: one piece of its path); the card has `tag`. Heard by combat.
@@ -124,8 +124,8 @@ signal possess_requested(caster: int, target: int, seconds: float, tag: int)
 signal possess_started(caster: int, actor: int)
 ## Sender: actor. The possession of the actor `actor` by the controller whose home body is `caster` ended (time up, the actor down or dead, a newer possession); the actor has its own controller back. Heard by feel (a ring going out).
 signal possess_ended(caster: int, actor: int)
-## Sender: combat. Just before `damage_dealt`: the hit of the actor `caster` on `target` for `amount` is of `kind` (`&"shot"`, `&"ray"`, `&"swing"`, `&"burst"`, `&"reaction"`, `&"status"`, and `&"heal"` for a heal). A wizard's contact hit counts as `&"shot"`. A wizard hit by their own spell has `caster` equal to their own actor id. Heard by feel.
-signal hit_landed(caster: int, target: Node, amount: int, position: Vector2, kind: StringName)
+## Sender: combat. Just before `damage_dealt`: the hit of the actor `caster` on `target` for `amount` is of `kind` (`&"shot"`, `&"ray"`, `&"swing"`, `&"burst"`, `&"reaction"`, `&"status"`, and `&"heal"` for a heal). A wizard's contact hit counts as `&"shot"`. A wizard hit by their own spell has `caster` equal to their own actor id. Heard by feel. `shot` is the projectile manager's row of the shot it is about (`Projectiles` slot), -1 for none (a ray, a strike, contact damage): read the shot from it while the event is sent.
+signal hit_landed(caster: int, target: Node, amount: int, position: Vector2, kind: StringName, shot: int)
 ## Sender: combat. A heal hit of the actor `caster` gave the wizard `target` `amount` health at `position`. Heard by player and feel.
 signal heal_dealt(caster: int, target: Node, amount: int, position: Vector2)
 

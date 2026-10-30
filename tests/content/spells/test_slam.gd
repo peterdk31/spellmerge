@@ -23,7 +23,7 @@ func test_the_card_is_a_valid_carrier() -> void:
 	if card == null:
 		return
 	check_equal(card.id, &"slam", "its id is its folder")
-	check_equal(card.motion, FormBase.Motion.SLAM, "it is a slam")
+	check_equal(card.carrier, &"slam", "it is a slam")
 	check(card.range_problems().is_empty(), "inside every range: %s" % [card.range_problems()])
 	check_equal(card.mana_cost, 0.0, "it costs no mana")
 	check(card.wind_up > 0.0, "it winds up, so it can be seen coming")
@@ -44,7 +44,7 @@ func test_nothing_is_hit_before_it_strikes_then_the_ring_hits_round_the_impact()
 	check_equal(arena.lost(side), _card().base_damage, "and the one beside it")
 	check_equal(arena.lost(behind), 0, "not the one behind the caster")
 	check_equal(arena.lost(far), 0, "nor one outside the ring")
-	check_equal(arena.spells.slam_count(), 0, "the slam is over")
+	check_equal(CarrierSlam.of(arena.spells).slam_count(), 0, "the slam is over")
 	arena.free_all()
 
 
@@ -64,7 +64,7 @@ func test_it_throws_bodies_outward_from_the_impact() -> void:
 func test_its_caster_is_skipped_and_a_teammate_is_hit() -> void:
 	var arena := ArenaScript.new(root)
 	var hits: Array = []
-	arena.bus.projectile_hit.connect(func(_caster: int, target: Node, _at: Vector2, _tag: int) -> void: hits.append(target))
+	arena.bus.projectile_hit.connect(func(_caster: int, target: Node, _at: Vector2, _tag: int, _shot: int) -> void: hits.append(target))
 	var own: Node2D = arena.add_guard(0, Vector2(8.0, 0.0))
 	var mate: Node2D = arena.add_mate(Vector2(24.0, 8.0), 1)
 	arena.install_cards(0, 0, ["slam"])
@@ -89,7 +89,7 @@ func test_a_shield_blocks_and_a_deflect_throws_back_the_shots_in_its_ring() -> v
 	var arena := ArenaScript.new(root)
 	var enemy: int = ActorSeats.enemy(arena.projectiles.actors)
 	var blocked: Array = []
-	arena.bus.shot_blocked.connect(func(_actor: int, _at: Vector2, _tag: int) -> void: blocked.append(1))
+	arena.bus.shot_blocked.connect(func(_actor: int, _at: Vector2, _tag: int, _shot: int) -> void: blocked.append(1))
 	arena.install_cards(0, 0, ["shield", "slam"])
 	arena.cast(0, 0)
 	arena.projectiles.spawn(enemy, Vector2(28.0, 30.0), Vector2(0.0, -40.0), 3.0, 3.0, ManagerScript.LAYER_PLAYER)
@@ -99,7 +99,7 @@ func test_a_shield_blocks_and_a_deflect_throws_back_the_shots_in_its_ring() -> v
 	arena = ArenaScript.new(root)
 	enemy = ActorSeats.enemy(arena.projectiles.actors)
 	var deflected: Array = []
-	arena.bus.shot_deflected.connect(func(actor: int, _at: Vector2, _tag: int) -> void: deflected.append(actor))
+	arena.bus.shot_deflected.connect(func(actor: int, _at: Vector2, _tag: int, _shot: int) -> void: deflected.append(actor))
 	arena.install_cards(0, 0, ["deflect", "slam"])
 	arena.cast(0, 0)
 	var shot: int = arena.projectiles.spawn(enemy, Vector2(28.0, 30.0), Vector2(0.0, -40.0), 3.0, 3.0, ManagerScript.LAYER_PLAYER)
@@ -122,7 +122,7 @@ func test_a_payload_slam_ends_a_sweep() -> void:
 	check_equal(slams.size(), 1, "one slam after the sweep")
 	if slams.size() == 1:
 		check(slams[0].length() > 30.0, "struck ahead of the arc's end, not of the hand: %s" % slams[0])
-	check_equal(arena.spells.slam_count(), 0, "and it is over")
+	check_equal(CarrierSlam.of(arena.spells).slam_count(), 0, "and it is over")
 	arena.free_all()
 
 
@@ -149,15 +149,15 @@ func test_its_staff_rises_glowing_drops_and_settles() -> void:
 	arena.spells.set_aim(0, Vector2.ZERO, Vector2.RIGHT)
 	arena.cast(0, 0)
 	arena.run(0.18)
-	var risen: Vector3 = arena.spells.staff_pose(0)
+	var risen: Vector3 = arena.spells.poses().staff_pose(0)
 	check(risen.y > 4.0 and risen.z < -2.0 and risen.x < -0.5, "in the wind-up it rises, tilts up and draws back: %s" % risen)
-	check(arena.spells.staff_glow(0) > 0.5, "glowing as it charges: %f" % arena.spells.staff_glow(0))
+	check(arena.spells.poses().staff_glow(0) > 0.5, "glowing as it charges: %f" % arena.spells.poses().staff_glow(0))
 	arena.run(0.1)
-	var struck: Vector3 = arena.spells.staff_pose(0)
+	var struck: Vector3 = arena.spells.poses().staff_pose(0)
 	check(struck.y < 2.0 and struck.z > 3.0 and struck.x > 0.3, "at the impact it is down, tilted at the floor and thrust ahead: %s" % struck)
 	arena.run(0.8)
-	check_equal(arena.spells.staff_pose_dir(0), Vector2.ZERO, "then back on the aim")
-	check_equal(arena.spells.staff_glow(0), 0.0, "and dark")
+	check_equal(arena.spells.poses().staff_pose_dir(0), Vector2.ZERO, "then back on the aim")
+	check_equal(arena.spells.poses().staff_glow(0), 0.0, "and dark")
 	arena.free_all()
 
 
@@ -168,5 +168,35 @@ func test_a_payload_slam_moves_no_body() -> void:
 	arena.spells.set_aim(0, Vector2.ZERO, Vector2.RIGHT)
 	arena.cast(0, 0)
 	arena.run(0.5)
-	check_equal(arena.spells.staff_glow(0), 0.0, "the bolt's slam, cast where it hit, does not lift the wizard's staff")
+	check_equal(arena.spells.poses().staff_glow(0), 0.0, "the bolt's slam, cast where it hit, does not lift the wizard's staff")
+	arena.free_all()
+
+
+func test_clearing_the_runtime_ends_a_slam_in_its_wind_up() -> void:
+	# Regression: `Spells.clear` ended beams and swings but left slams on, so a slam winding up
+	# when a room was cleared still struck afterwards.
+	var arena := ArenaScript.new(root)
+	var near: Node2D = arena.add_imp(Vector2(34.0, 0.0))
+	arena.install_cards(0, 0, ["slam"])
+	arena.cast(0, 0)
+	arena.run(0.05)
+	check_equal(CarrierSlam.of(arena.spells).slam_count(), 1, "it is winding up")
+	arena.spells.clear()
+	check_equal(CarrierSlam.of(arena.spells).slam_count(), 0, "clearing ends it")
+	arena.run(1.0)
+	check_equal(arena.lost(near), 0, "and it never strikes")
+	arena.free_all()
+
+
+func test_closing_its_caster_ends_a_slam_in_its_wind_up() -> void:
+	# Regression: `Spells.close_caster` ended the caster's beams and swings but not its slams.
+	var arena := ArenaScript.new(root)
+	var near: Node2D = arena.add_imp(Vector2(34.0, 0.0))
+	arena.install_cards(0, 0, ["slam"])
+	arena.cast(0, 0)
+	arena.run(0.05)
+	arena.spells.close_caster(0)
+	check_equal(CarrierSlam.of(arena.spells).slam_count(), 0, "closing its caster ends it")
+	arena.run(1.0)
+	check_equal(arena.lost(near), 0, "and it never strikes")
 	arena.free_all()

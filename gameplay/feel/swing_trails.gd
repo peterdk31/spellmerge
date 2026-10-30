@@ -34,7 +34,7 @@ const SWING_QUADS: Array[Vector3i] = [
 ## Swings draw where beams do: above the room, under the shots and the flashes.
 const SWING_Z: int = 18
 
-## The trail nodes, and for each: the swing it shows (`Spells.swing_born`; -1 for none) and the
+## The trail nodes, and for each: the swing it shows (`CarrierSwing.swing_born`; -1 for none) and the
 ## clock time it goes (its sweep's end plus TRAIL_SECONDS; it is off once the clock is past it).
 var _nodes: Array[MeshInstance2D] = []
 var _born: PackedInt64Array = PackedInt64Array()
@@ -52,24 +52,24 @@ func _init(mesh: ArrayMesh) -> void:
 		_add_trail()
 
 
-## Draws the live swings of `spells` at Feel's clock `now`: a new one takes a free trail, a live
-## one moves its trail to its hand, and a trail past its time is hidden. `ramp_of` gives the
-## shader's player for an actor (0-3 a hat ramp, -1 the enemy ramp); `glow` is how strongly it
-## glows.
-func step(spells: Node, now: float, ramp_of: Callable, glow: float) -> void:
+## Draws the live swings of `swings` (`Spells.carrier(&"swing")`, a `CarrierSwing`; none when null) at Feel's
+## clock `now`: a new one takes a free trail, a live one moves its trail to its hand, and a trail
+## past its time is hidden. `ramp_of` gives the shader's player for an actor (0-3 a hat ramp, -1
+## the enemy ramp); `glow` is how strongly it glows.
+func step(swings: Object, now: float, ramp_of: Callable, glow: float) -> void:
 	var count: int = 0
-	if spells != null and spells.has_method("swing_slots"):
-		count = int(spells.call("swing_slots"))
+	if swings != null:
+		count = int(swings.call("swing_slots"))
 	for at in count:
-		if not bool(spells.call("swing_on", at)):
+		if not bool(swings.call("swing_on", at)):
 			continue
-		var born: int = int(spells.call("swing_born", at))
+		var born: int = int(swings.call("swing_born", at))
 		var slot: int = _born.find(born)
 		var fresh: bool = slot < 0
 		if fresh:
 			slot = _free_trail(now)
 			_born[slot] = born
-		_show(slot, spells, at, now, fresh, ramp_of, glow)
+		_show(slot, swings, at, now, fresh, ramp_of, glow)
 	for slot in _nodes.size():
 		var node: MeshInstance2D = _nodes[slot]
 		if not node.visible:
@@ -90,7 +90,7 @@ func live() -> int:
 	return count
 
 
-## The shader parameter `name` of the trail showing swing `born` (`Spells.swing_born`), or null
+## The shader parameter `name` of the trail showing swing `born` (`CarrierSwing.swing_born`), or null
 ## when none shows it (for tests).
 func parameter_of(born: int, name: StringName) -> Variant:
 	var slot: int = _born.find(born)
@@ -99,33 +99,33 @@ func parameter_of(born: int, name: StringName) -> Variant:
 	return (_nodes[slot].material as ShaderMaterial).get_shader_parameter(name)
 
 
-## Puts swing `at` of `spells` into trail `slot`: where its hand is and when its sweep starts on
+## Puts swing `at` of `swings` into trail `slot`: where its hand is and when its sweep starts on
 ## Feel's clock (kept in step with the swing every frame, so a local stop that holds it holds its
 ## trail); the rest once, when it is `fresh`.
-func _show(slot: int, spells: Node, at: int, now: float, fresh: bool, ramp_of: Callable, glow: float) -> void:
+func _show(slot: int, swings: Object, at: int, now: float, fresh: bool, ramp_of: Callable, glow: float) -> void:
 	var node: MeshInstance2D = _nodes[slot]
 	var material: ShaderMaterial = node.material as ShaderMaterial
-	var sweep: float = float(spells.call("swing_sweep", at))
-	var start: float = now - (float(spells.call("swing_age", at)) - float(spells.call("swing_wind", at)))
-	material.set_shader_parameter(&"swing_origin", spells.call("swing_origin", at) as Vector2)
+	var sweep: float = float(swings.call("swing_sweep", at))
+	var start: float = now - (float(swings.call("swing_age", at)) - float(swings.call("swing_wind", at)))
+	material.set_shader_parameter(&"swing_origin", swings.call("swing_origin", at) as Vector2)
 	material.set_shader_parameter(&"swing_start", start)
 	material.set_shader_parameter(&"sim_time", now)
 	_until[slot] = start + sweep + TRAIL_SECONDS
 	if not fresh:
 		return
-	var half: float = deg_to_rad(float(spells.call("swing_arc", at))) * 0.5
-	var tint: Color = spells.call("swing_tint", at) as Color
+	var half: float = deg_to_rad(float(swings.call("swing_arc", at))) * 0.5
+	var tint: Color = swings.call("swing_tint", at) as Color
 	material.set_shader_parameter(&"core_override", Color(tint.r, tint.g, tint.b, 1.0))
-	material.set_shader_parameter(&"swing_player", int(ramp_of.call(int(spells.call("swing_actor", at)))))
-	material.set_shader_parameter(&"swing_look", int(spells.call("swing_look", at)))
-	material.set_shader_parameter(&"swing_dir", (spells.call("swing_dir", at) as Vector2).normalized())
-	material.set_shader_parameter(&"swing_side", 1.0 if int(spells.call("swing_side", at)) >= 0 else -1.0)
+	material.set_shader_parameter(&"swing_player", int(ramp_of.call(int(swings.call("swing_actor", at)))))
+	material.set_shader_parameter(&"swing_look", int(swings.call("swing_look", at)))
+	material.set_shader_parameter(&"swing_dir", (swings.call("swing_dir", at) as Vector2).normalized())
+	material.set_shader_parameter(&"swing_side", 1.0 if int(swings.call("swing_side", at)) >= 0 else -1.0)
 	material.set_shader_parameter(&"swing_half", half)
 	material.set_shader_parameter(&"swing_lean", half + deg_to_rad(SpellLimits.SWING_LEAN))
-	material.set_shader_parameter(&"swing_reach", float(spells.call("swing_reach", at)))
+	material.set_shader_parameter(&"swing_reach", float(swings.call("swing_reach", at)))
 	material.set_shader_parameter(&"swing_sweep", sweep)
 	material.set_shader_parameter(&"swing_glow", glow)
-	material.set_shader_parameter(&"swing_seed", float(int(spells.call("swing_born", at)) % 61) * 1.618)
+	material.set_shader_parameter(&"swing_seed", float(int(swings.call("swing_born", at)) % 61) * 1.618)
 	node.visible = true
 
 

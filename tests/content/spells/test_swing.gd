@@ -31,7 +31,7 @@ func test_the_card_is_a_valid_carrier() -> void:
 	if card == null:
 		return
 	check_equal(card.id, &"swing", "its id is its folder")
-	check_equal(card.motion, FormBase.Motion.SWING, "it is a swing")
+	check_equal(card.carrier, &"swing", "it is a swing")
 	check(card.range_problems().is_empty(), "inside every range: %s" % [card.range_problems()])
 	check(not card.name_words.is_empty(), "it has name words")
 
@@ -66,7 +66,7 @@ func test_its_hits_are_swing_hits() -> void:
 	var arena := ArenaScript.new(root)
 	var imp: Node2D = arena.add_imp(Vector2(18.0, 0.0))
 	var kinds: Array[StringName] = []
-	arena.bus.hit_landed.connect(func(_caster: int, target: Node, _amount: int, _at: Vector2, kind: StringName) -> void:
+	arena.bus.hit_landed.connect(func(_caster: int, target: Node, _amount: int, _at: Vector2, kind: StringName, _shot: int) -> void:
 		if target == imp:
 			kinds.append(kind))
 	arena.install_cards(0, 0, ["swing"])
@@ -124,9 +124,9 @@ func test_two_presses_swing_forehand_then_backhand() -> void:
 
 ## The way the one live swing turns, or 0 for none.
 func _live_side(arena: ArenaScript) -> int:
-	for at in arena.spells.swing_slots():
-		if arena.spells.swing_on(at):
-			return arena.spells.swing_side(at)
+	for at in CarrierSwing.of(arena.spells).swing_slots():
+		if CarrierSwing.of(arena.spells).swing_on(at):
+			return CarrierSwing.of(arena.spells).swing_side(at)
 	return 0
 
 

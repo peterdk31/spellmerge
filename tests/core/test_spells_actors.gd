@@ -62,7 +62,7 @@ func before_each() -> void:
 	_spells.bind(_mgr, _bus)
 	for list: Array in [_hits, _moves, _areas, _shown, _spawns, _refunds, _reserved]:
 		list.clear()
-	_bus.projectile_hit.connect(func(caster: int, target: Node, _at: Vector2, tag: int) -> void: _hits.append([caster, target, tag]))
+	_bus.projectile_hit.connect(func(caster: int, target: Node, _at: Vector2, tag: int, _shot: int) -> void: _hits.append([caster, target, tag]))
 	_bus.caster_move_requested.connect(func(caster: int, _mode: StringName, _to: Vector2, _seconds: float, tag: int) -> void: _moves.append([caster, tag]))
 	_bus.cue_shown.connect(func(player: int, _cue: StringName, at: Vector2, _direction: Vector2, radius: float, _tint: Color, _look: int) -> void: _areas.append([player, at, radius]))
 	_bus.form_shown.connect(func(caster: int, _form: StringName, _at: Vector2, _dir: Vector2, _length: float, _tint: Color, _look: int) -> void: _shown.append(caster))
@@ -72,22 +72,22 @@ func before_each() -> void:
 	_form(&"bolt", 300.0, 1.0)
 	_form(&"slow", 30.0, 5.0)
 	var rune: FormBase = _form(&"rune", 0.0, 3.0)
-	rune.motion = FormBase.Motion.STILL
+	rune.carrier = &"rune"
 	# Many shots at once, each with its own timer: one cast fills a budget's room for a step.
 	var swarm: FormBase = _form(&"swarm", 30.0, 5.0)
 	swarm.shots = SpellLimits.FIRE_SHOTS_PER_STEP
 	swarm.spread = 360.0
 	var beam: FormBase = _form(&"beam", 0.0, 5.0)
-	beam.motion = FormBase.Motion.RAY
+	beam.carrier = &"beam"
 	beam.ray_length = 200.0
 	var dash: FormBase = _form(&"dash", 400.0, 0.2)
-	dash.motion = FormBase.Motion.DASH
+	dash.carrier = &"dash"
 	dash.ray_length = 80.0
 	var orb: FormBase = _form(&"orb", 0.0, 5.0)
-	orb.motion = FormBase.Motion.ORBIT
+	orb.carrier = &"orbit"
 	orb.orbit_radius = 30.0
 	var decoy: FormBase = _form(&"decoy", 0.0, 4.0)
-	decoy.motion = FormBase.Motion.DECOY
+	decoy.carrier = &"decoy"
 	_modifier(&"chain", ModifierBase.Behaviour.CHAIN, 1.0)
 	_modifier(&"echo", ModifierBase.Behaviour.ECHO, 1.0)
 	_modifier(&"siphon", ModifierBase.Behaviour.SIPHON, 2.0)
@@ -230,12 +230,12 @@ func test_close_caster_ends_its_beams_only() -> void:
 		_build(caster, [&"beam"])
 		_spells.set_aim(caster, Vector2(0.0, 50.0 * caster), Vector2.RIGHT)
 		_cast(caster, Vector2(0.0, 50.0 * caster))
-	check_equal(_spells.beam_count(), 2, "two beams on")
+	check_equal(CarrierBeam.of(_spells).beam_count(), 2, "two beams on")
 	_spells.close_caster(imp)
-	check_equal(_spells.beam_count(), 1, "the closed caster's beam ends")
-	for at in _spells.beam_slots():
-		if _spells.beam_on(at):
-			check_equal(_spells.beam_caster(at), W0, "the wizard's stays")
+	check_equal(CarrierBeam.of(_spells).beam_count(), 1, "the closed caster's beam ends")
+	for at in CarrierBeam.of(_spells).beam_slots():
+		if CarrierBeam.of(_spells).beam_on(at):
+			check_equal(CarrierBeam.of(_spells).beam_caster(at), W0, "the wizard's stays")
 
 
 func test_close_caster_lets_its_shots_fly_on_with_their_numbers() -> void:
@@ -333,10 +333,10 @@ func test_no_beam_ends_another_however_many_are_on() -> void:
 		_build(imp, [&"beam"])
 		_spells.set_aim(imp, Vector2(0.0, 10.0 * i), Vector2.RIGHT)
 		_cast(imp, Vector2(0.0, 10.0 * i))
-	check_equal(_spells.beam_count(), SpellLimits.BEAM_ROWS_START + 5, "every beam is on: the rows grew")
+	check_equal(CarrierBeam.of(_spells).beam_count(), SpellLimits.BEAM_ROWS_START + 5, "every beam is on: the rows grew")
 	var seated: int = 0
-	for at in _spells.beam_slots():
-		if _spells.beam_on(at) and _spells.beam_caster(at) == W0:
+	for at in CarrierBeam.of(_spells).beam_slots():
+		if CarrierBeam.of(_spells).beam_on(at) and CarrierBeam.of(_spells).beam_caster(at) == W0:
 			seated += 1
 	check_equal(seated, 1, "and the wizard's beam was never ended by another")
 

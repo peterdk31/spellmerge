@@ -117,7 +117,7 @@ func test_an_echoed_beams_jumps_hit_at_half_on_every_tick() -> void:
 	var spell: CompiledSpell = staff.casts[0].group.spells[0]
 	# [seconds, target, damage] of every hit.
 	var hits: Array = []
-	arena.bus.projectile_hit.connect(func(_actor: int, target: Node, _at: Vector2, tag: int) -> void:
+	arena.bus.projectile_hit.connect(func(_actor: int, target: Node, _at: Vector2, tag: int, _shot: int) -> void:
 		var profile: HitProfile = arena.spells.hit_profile(tag)
 		hits.append([arena.time, target, profile.damage if profile != null else -1]))
 	check(arena.cast(0, 0), "the beam is cast")

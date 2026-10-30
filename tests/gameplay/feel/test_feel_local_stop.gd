@@ -29,8 +29,10 @@ func before_each() -> void:
 	preset.hit_sound = &""
 	_feel.preset = preset
 	root.add_child(_feel)
-	# Stands in for combat: a shot's hit is a hit of 5 damage, sent while the shot's event is.
-	_world.bus.projectile_hit.connect(func(caster: int, target: Node, at: Vector2, _tag: int) -> void:
+	# Stands in for combat: a shot's hit is a hit of 5 damage, announced as combat does (`hit_landed`
+	# naming the shot, then `damage_dealt`).
+	_world.bus.projectile_hit.connect(func(caster: int, target: Node, at: Vector2, _tag: int, shot: int) -> void:
+		_world.bus.hit_landed.emit(caster, target, 5, at, &"shot", shot)
 		_world.bus.damage_dealt.emit(caster, target, 5, at))
 
 
@@ -95,7 +97,7 @@ func test_a_held_actor_does_nothing_and_the_others_step_on() -> void:
 func test_a_kill_holds_its_killer_not_the_game() -> void:
 	var killer: Actor = _body(Vector2.ZERO)
 	var other: Actor = _body(Vector2(100.0, 0.0))
-	_world.bus.enemy_died.emit(killer.id, null, Vector2.ZERO)
+	_world.bus.enemy_died.emit(killer.id, null, Vector2.ZERO, -1)
 	check(_world.table.held_left(killer.id) >= _feel.cue_of(&"enemy_death").hold, "the killer is held for the kill")
 	check_equal(_world.table.held_left(other.id), 0.0, "nobody else is")
 	check_equal(_feel.stop_left, 0.0, "the game runs on")
@@ -104,7 +106,7 @@ func test_a_kill_holds_its_killer_not_the_game() -> void:
 func test_a_reaction_holds_its_caster_not_the_game() -> void:
 	var caster: Actor = _body(Vector2.ZERO)
 	var other: Actor = _body(Vector2(100.0, 0.0))
-	_world.bus.reaction_triggered.emit(caster.id, &"steam", Vector2.ZERO)
+	_world.bus.reaction_triggered.emit(caster.id, &"steam", Vector2.ZERO, -1)
 	var power: float = _feel.preset.reaction_power.get(&"steam", 1.0) as float
 	check(_world.table.held_left(caster.id) >= _feel.preset.reaction_stop_seconds * power - 0.0001, "the caster is held for the reaction")
 	check_equal(_world.table.held_left(other.id), 0.0, "nobody else is")
@@ -128,12 +130,12 @@ func test_a_boss_kill_stops_the_game() -> void:
 	var data: EnemyBase = ImpData.duplicate() as EnemyBase
 	data.boss = true
 	boss.data = data
-	_world.bus.enemy_died.emit(0, boss, Vector2.ZERO)
+	_world.bus.enemy_died.emit(0, boss, Vector2.ZERO, -1)
 	check(_feel.stop_left > 0.0, "a boss's death stops the whole game")
 	var imp: Actor = _body(Vector2(40.0, 0.0))
 	imp.data = ImpData
 	_feel.stop_left = 0.0
-	_world.bus.enemy_died.emit(0, imp, Vector2.ZERO)
+	_world.bus.enemy_died.emit(0, imp, Vector2.ZERO, -1)
 	check_equal(_feel.stop_left, 0.0, "an ordinary enemy's does not")
 
 

@@ -19,7 +19,7 @@ var wrapped: bool = false
 ## What each modifier, infusion and trigger read in this cast attached to: card slot -> the
 ## slot of its carrier, or `StaffCompiler.TARGET_CASTER` / `TARGET_POINT` for a fallback.
 var targets: Dictionary = {}
-## Slots whose card did nothing in this cast -> the reason in plain words.
+## Slots whose card did nothing in this cast -> true.
 var wasted: Dictionary = {}
 ## The generated name of the cast (`SpellNamer`): the same cards always give the same name.
 var spell_name: String = ""

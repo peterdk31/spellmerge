@@ -125,7 +125,7 @@ The compiler (`Spells.compile_staff`, part A4) turns a staff's slots into its **
 3. **Wrap-around:** reading past the last slot goes on from the first. If any reading in the cast (payloads included) wrapped, the staff recharges after the cast.
 4. **Use once:** a card already read in this cast ends the current group where it is. This is what keeps wrap-around from looping forever, and why every staff's cycle is finite.
 5. **The fallback carrier:** if a group ends with modifiers or infusions kept and no carrier to take them, they land on a fallback carrier: **the caster** for the cast's own group, **the payload's origin point** for a payload (an instant hit there, radius 8 px). `blast` explodes there, `fire` burns whatever is there, `shield` gives the caster a barrier (on the caster only). Cards that mean nothing there (homing, pierce) are wasted. A kept trigger with no carrier is wasted.
-6. **Wasted cards** do nothing and are shown greyed out in the builder's cast plan, with the reason. They are never refused.
+6. **Wasted cards** do nothing and are shown greyed out in the builder's cast plan (no text since 2026-10-30, owner: the visuals are enough). They are never refused.
 7. **After a cast** the cursor moves past the last card the cast read, payloads included (a payload is read inline, right after its carrier, so that is the furthest card read). If the cast wrapped, or no card is left to the right, the staff recharges and the cursor goes back to 0.
 8. **Multicast counts per group:** a double in a payload wants two carriers for that payload only; the outer group's count is its own. Burst fires the same compiled group 3 times; nothing is read again.
 

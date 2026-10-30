@@ -40,7 +40,7 @@ func before_each() -> void:
 
 
 func test_a_reaction_shows_a_flash_and_a_name() -> void:
-	_bus.reaction_triggered.emit(0, &"shatter", Vector2(10.0, 20.0))
+	_bus.reaction_triggered.emit(0, &"shatter", Vector2(10.0, 20.0), -1)
 	check_equal(_feel.effects_of(FeelScript.KIND_PUFF), 1, "a puff")
 	check_equal(_feel.effects_of(FeelScript.KIND_RING_OUT), 1, "and a ring")
 	check_equal(_feel.live_labels(), 1, "one name")
@@ -48,7 +48,7 @@ func test_a_reaction_shows_a_flash_and_a_name() -> void:
 
 
 func test_the_name_and_flash_end_by_themselves() -> void:
-	_bus.reaction_triggered.emit(1, &"rift", Vector2.ZERO)
+	_bus.reaction_triggered.emit(1, &"rift", Vector2.ZERO, -1)
 	for i in 40:
 		_feel.step(STEP)
 	check_equal(_feel.live_effects(), 0, "the puff and ring are gone")
@@ -56,13 +56,13 @@ func test_the_name_and_flash_end_by_themselves() -> void:
 
 
 func test_the_sound_is_asked_by_reaction_id() -> void:
-	_bus.reaction_triggered.emit(2, &"thaw", Vector2.ZERO)
+	_bus.reaction_triggered.emit(2, &"thaw", Vector2.ZERO, -1)
 	check_equal(_registry.asked.has(&"reaction_thaw"), true, "reaction_thaw was asked for")
 
 
 func test_every_player_gets_the_same_reaction() -> void:
 	for player in 4:
-		_bus.reaction_triggered.emit(player, &"flare", Vector2(float(player) * 30.0, 0.0))
+		_bus.reaction_triggered.emit(player, &"flare", Vector2(float(player) * 30.0, 0.0), -1)
 	check_equal(_feel.live_labels(), 4, "four names")
 	_feel.step(STEP)
 	check_equal(_feel.live_labels(), 4, "and they stay for a moment")
@@ -70,13 +70,13 @@ func test_every_player_gets_the_same_reaction() -> void:
 
 func test_a_crowd_of_reactions_stays_inside_the_pools() -> void:
 	for i in 60:
-		_bus.reaction_triggered.emit(i % 4, &"kindle", Vector2(float(i), 0.0))
+		_bus.reaction_triggered.emit(i % 4, &"kindle", Vector2(float(i), 0.0), -1)
 	check(_feel.live_labels() <= FeelScript.REACTION_SLOTS, "labels are capped")
 	check(_feel.live_effects() <= _feel.effect_slots, "effects stay inside the slots")
 
 
 func test_an_unknown_reaction_still_shows_and_a_missing_sound_is_silent() -> void:
-	_bus.reaction_triggered.emit(0, &"brand_new", Vector2.ZERO)
+	_bus.reaction_triggered.emit(0, &"brand_new", Vector2.ZERO, -1)
 	check_equal(_feel.effects_of(FeelScript.KIND_PUFF) + _feel.effects_of(FeelScript.KIND_RING_OUT), 2, "a puff and a ring in the default colour")
 	check_equal(_feel.live_labels(), 1, "and its name")
 
@@ -84,19 +84,19 @@ func test_an_unknown_reaction_still_shows_and_a_missing_sound_is_silent() -> voi
 func test_a_reaction_does_not_touch_combat_events() -> void:
 	var seen: Array = []
 	_bus.damage_dealt.connect(func(_p: int, _t: Node, _a: int, _at: Vector2) -> void: seen.append(1))
-	_bus.reaction_triggered.emit(0, &"shatter", Vector2.ZERO)
+	_bus.reaction_triggered.emit(0, &"shatter", Vector2.ZERO, -1)
 	check(seen.is_empty(), "feel sends no damage")
 
 
 func test_the_same_reaction_on_the_same_spot_shows_one_name_and_one_sound() -> void:
 	for i in 5:
-		_bus.reaction_triggered.emit(0, &"flare", Vector2(10.0, 10.0))
+		_bus.reaction_triggered.emit(0, &"flare", Vector2(10.0, 10.0), -1)
 		_feel.step(STEP * 0.5)
 	check_equal(_feel.live_labels(), 1, "one name, not five")
 	check_equal(_registry.asked.count(&"reaction_flare"), 1, "one sound inside the repeat time")
 	for i in 10:
 		_feel.step(STEP)
-	_bus.reaction_triggered.emit(0, &"flare", Vector2(10.0, 10.0))
+	_bus.reaction_triggered.emit(0, &"flare", Vector2(10.0, 10.0), -1)
 	check_equal(_registry.asked.count(&"reaction_flare"), 2, "and the sound comes back later")
 
 
@@ -125,7 +125,7 @@ func test_the_reactions_have_colours_that_differ_at_a_glance() -> void:
 
 func test_a_discharge_asks_for_its_sound_and_the_new_reactions_for_theirs() -> void:
 	for id: StringName in [&"discharge", &"overload", &"superconduct"]:
-		_bus.reaction_triggered.emit(0, id, Vector2.ZERO)
+		_bus.reaction_triggered.emit(0, id, Vector2.ZERO, -1)
 		check_equal(_registry.asked.has(StringName("reaction_" + String(id))), true, "reaction_%s was asked for" % id)
 		check(_feel.preset.reaction_colors.has(id), "%s has a colour of its own" % id)
 
@@ -157,7 +157,7 @@ func test_a_crowd_of_arcs_stays_inside_the_slots() -> void:
 
 
 func test_a_reaction_keeps_its_own_colour_exactly() -> void:
-	_bus.reaction_triggered.emit(0, &"rift", Vector2(5.0, 5.0))
+	_bus.reaction_triggered.emit(0, &"rift", Vector2(5.0, 5.0), -1)
 	var want: Color = _feel.preset.reaction_colors[&"rift"] as Color
 	for kind: int in [FeelScript.KIND_PUFF, FeelScript.KIND_RING_OUT]:
 		var shown: Dictionary = _feel.effect_info(kind)

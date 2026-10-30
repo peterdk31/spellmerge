@@ -298,8 +298,8 @@ func _spawn_kit() -> void:
 		m.set_caster_shot(r, carrier)
 
 
-func _on_hit(caster: int, target: Node, position: Vector2, tag: int) -> void:
-	var slot: int = _mgr.event_slot
+func _on_hit(caster: int, target: Node, position: Vector2, tag: int, shot: int = -1) -> void:
+	var slot: int = shot
 	_events.append("hit c%d %s %s t%d slot%d seq%d v%s g%s" % [caster, _name_of(target), _v(position), tag, slot, _mgr.get_seq_of(slot), _v(_mgr.get_velocity_of(slot)), _f(_mgr.get_growth_of(slot))])
 	# Combat pushes what it hits a little (a stuck shot rides along), and some enemies are gone
 	# after their twelfth hit.
@@ -323,8 +323,8 @@ func _on_impact(caster: int, target: Node, position: Vector2, direction: Vector2
 	_events.append("impact c%d %s %s %s %s" % [caster, _name_of(target), _v(position), _v(direction), _mgr.impact_form])
 
 
-func _on_expired(caster: int, position: Vector2, tag: int) -> void:
-	var slot: int = _mgr.event_slot
+func _on_expired(caster: int, position: Vector2, tag: int, shot: int = -1) -> void:
+	var slot: int = shot
 	_events.append("expired c%d %s t%d slot%d wall%s h%s" % [caster, _v(position), tag, slot, _mgr.expired_on_wall, _v(_mgr.impact_heading)])
 	if tag == TAG_SPLITS and _children < 120:
 		_children += 1
@@ -332,8 +332,8 @@ func _on_expired(caster: int, position: Vector2, tag: int) -> void:
 		_events.append("  child slot%d" % child)
 
 
-func _on_blocked(caster: int, position: Vector2, tag: int) -> void:
-	_events.append("blocked c%d %s t%d slot%d" % [caster, _v(position), tag, _mgr.event_slot])
+func _on_blocked(caster: int, position: Vector2, tag: int, shot: int = -1) -> void:
+	_events.append("blocked c%d %s t%d slot%d" % [caster, _v(position), tag, shot])
 
 
 func _on_ended(tag: int) -> void:

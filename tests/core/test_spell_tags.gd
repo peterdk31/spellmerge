@@ -34,7 +34,7 @@ func before_each() -> void:
 	_form(&"nova", 2, 4, 8).spread = 360.0
 	_form(&"heavy", 4, 4, 1)
 	var beam: FormBase = _form(&"beam", 2, 3, 1)
-	beam.motion = FormBase.Motion.RAY
+	beam.carrier = &"beam"
 	beam.ray_length = 200.0
 	var fire: ElementBase = _element(&"fire", 1)
 	fire.damage_scale = 1.5

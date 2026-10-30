@@ -56,10 +56,10 @@ func before_each() -> void:
 	_next_tag = 0
 	for list: Array in [_landed, _hurt, _kills, _reactions, _blocked, _healed, _applied]:
 		list.clear()
-	_bus.hit_landed.connect(func(p: int, t: Node, a: int, _at: Vector2, k: StringName) -> void: _landed.append([p, t, a, k]))
+	_bus.hit_landed.connect(func(p: int, t: Node, a: int, _at: Vector2, k: StringName, _shot: int) -> void: _landed.append([p, t, a, k]))
 	_bus.actor_hurt.connect(func(p: int, a: int, _at: Vector2, tag: int, k: StringName) -> void: _hurt.append([p, a, tag, k]))
-	_bus.kill_landed.connect(func(p: int, t: Node, _at: Vector2, tag: int) -> void: _kills.append([p, t, tag]))
-	_bus.reaction_landed.connect(func(p: int, id: StringName, t: Node, _at: Vector2, tag: int) -> void: _reactions.append([p, id, t, tag]))
+	_bus.kill_landed.connect(func(p: int, t: Node, _at: Vector2, tag: int, _shot: int) -> void: _kills.append([p, t, tag]))
+	_bus.reaction_landed.connect(func(p: int, id: StringName, t: Node, _at: Vector2, tag: int, _shot: int) -> void: _reactions.append([p, id, t, tag]))
 	_bus.shield_blocked.connect(func(p: int, _at: Vector2, tag: int) -> void: _blocked.append([p, tag]))
 	_bus.heal_dealt.connect(func(p: int, t: Node, a: int, _at: Vector2) -> void: _healed.append([p, t, a]))
 	_bus.status_applied.connect(func(p: int, t: Node, id: StringName) -> void: _applied.append([p, t, id]))
@@ -126,7 +126,7 @@ func _run(seconds: float) -> void:
 func test_a_wizard_is_hurt_by_their_own_spell() -> void:
 	var wizard := _wizard(0, Vector2(100.0, 0.0))
 	var tag: int = _tag(_profile(6))
-	_bus.projectile_hit.emit(0, wizard, Vector2(90.0, 0.0), tag)
+	_bus.projectile_hit.emit(0, wizard, Vector2(90.0, 0.0), tag, -1)
 	check_equal(wizard.health.health, wizard.health.max_health - 6, "their own shot took health")
 	check_equal(_landed, [[0, wizard, 6, &"shot"]], "hit_landed names the caster as both the source and the target")
 	check_equal(_hurt, [[0, 6, tag, &"shot"]], "actor_hurt names the wizard's actor, the damage, the card's tag and the kind")
@@ -135,10 +135,10 @@ func test_a_wizard_is_hurt_by_their_own_spell() -> void:
 func test_an_enemys_spell_hurts_a_wizard_with_its_tag_in_actor_hurt() -> void:
 	var wizard := _wizard(1, Vector2.ZERO)
 	var tag: int = _enemy_tag(_profile(4))
-	_bus.projectile_hit.emit(_enemy_caster, wizard, Vector2(-5.0, 0.0), tag)
+	_bus.projectile_hit.emit(_enemy_caster, wizard, Vector2(-5.0, 0.0), tag, -1)
 	check_equal(wizard.health.health, wizard.health.max_health - 4, "the enemy's spell hurt")
 	check_equal(_hurt, [[1, 4, tag, &"shot"]], "actor_hurt names the wizard's actor and the tag (its caster is the enemy actor)")
-	_bus.projectile_hit.emit(_enemy_caster, wizard, Vector2(-5.0, 0.0), 9)
+	_bus.projectile_hit.emit(_enemy_caster, wizard, Vector2(-5.0, 0.0), 9, -1)
 	check_equal(wizard.health.health, wizard.health.max_health - 4, "a shot with no spell does nothing (staffs F9b: no table)")
 
 
@@ -146,7 +146,7 @@ func test_a_spell_hit_pushes_the_wizard_it_hurts() -> void:
 	var wizard := _wizard(0, Vector2(100.0, 0.0))
 	var profile := _profile(2)
 	profile.knockback = 200.0
-	_bus.projectile_hit.emit(0, wizard, Vector2(90.0, 0.0), _tag(profile))
+	_bus.projectile_hit.emit(0, wizard, Vector2(90.0, 0.0), _tag(profile), -1)
 	check_equal(_combat.consume_knockback(_wizards[0], 0.0), Vector2(200.0, 0.0), "pushed away from the hit")
 	_combat.consume_knockback(_wizards[0], 1.0)
 	check_equal(_combat.consume_knockback(_wizards[0], 0.0), Vector2.ZERO, "the push fades like an enemy's")
@@ -154,7 +154,7 @@ func test_a_spell_hit_pushes_the_wizard_it_hurts() -> void:
 
 func test_an_enemy_hit_has_the_kind_of_its_profile() -> void:
 	var enemy := _enemy(Vector2.ZERO)
-	_bus.projectile_hit.emit(0, enemy, Vector2(-5.0, 0.0), _tag(_profile(3, &"ray")))
+	_bus.projectile_hit.emit(0, enemy, Vector2(-5.0, 0.0), _tag(_profile(3, &"ray")), -1)
 	check_equal(_landed, [[0, enemy, 3, &"ray"]], "a beam's hit is a ray")
 
 
@@ -169,7 +169,7 @@ func test_a_burn_that_kills_is_kind_status_and_reaction_damage_is_kind_reaction(
 	var profile := _profile(4)
 	profile.element_id = &"frost"
 	profile.element_ids = [&"frost"]
-	_bus.projectile_hit.emit(0, enemy, Vector2(195.0, 0.0), _tag(profile))
+	_bus.projectile_hit.emit(0, enemy, Vector2(195.0, 0.0), _tag(profile), -1)
 	var kinds: Array[StringName] = []
 	for row: Array in _landed:
 		kinds.append(row[3] as StringName)
@@ -192,8 +192,8 @@ func test_a_later_element_reacts_with_the_status_the_first_left() -> void:
 	profile.later_status_durations = PackedFloat32Array([3.0])
 	profile.later_status_strengths = PackedFloat32Array([40.0])
 	var ids: Array[StringName] = []
-	_bus.reaction_triggered.connect(func(_p: int, id: StringName, _at: Vector2) -> void: ids.append(id))
-	_bus.projectile_hit.emit(0, enemy, Vector2(-5.0, 0.0), _tag(profile))
+	_bus.reaction_triggered.connect(func(_p: int, id: StringName, _at: Vector2, _shot: int) -> void: ids.append(id))
+	_bus.projectile_hit.emit(0, enemy, Vector2(-5.0, 0.0), _tag(profile), -1)
 	check_equal(ids, [&"thaw"], "fire then frost thaws on a single hit")
 	check(not _combat.has_status(enemy, &"chill"), "the reaction ran instead of the chill")
 
@@ -209,7 +209,7 @@ func test_a_later_element_without_a_reaction_puts_its_own_status_on() -> void:
 	profile.later_status_ids = [&"burn"]
 	profile.later_status_durations = PackedFloat32Array([3.0])
 	profile.later_status_strengths = PackedFloat32Array([9.0])
-	_bus.projectile_hit.emit(0, enemy, Vector2(-5.0, 0.0), _tag(profile))
+	_bus.projectile_hit.emit(0, enemy, Vector2(-5.0, 0.0), _tag(profile), -1)
 	check_equal(_reactions, [], "fire on fire reacts with nothing")
 	check_equal(_combat.status_left(enemy, &"burn"), 3.0, "burning")
 	_run(1.0)
@@ -224,8 +224,8 @@ func test_the_elements_of_one_hit_chain_their_reactions() -> void:
 	profile.element_id = &"frost"
 	profile.element_ids = [&"frost", &"fire"]
 	var ids: Array[StringName] = []
-	_bus.reaction_triggered.connect(func(_p: int, id: StringName, _at: Vector2) -> void: ids.append(id))
-	_bus.projectile_hit.emit(0, enemy, Vector2(-5.0, 0.0), _tag(profile))
+	_bus.reaction_triggered.connect(func(_p: int, id: StringName, _at: Vector2, _shot: int) -> void: ids.append(id))
+	_bus.projectile_hit.emit(0, enemy, Vector2(-5.0, 0.0), _tag(profile), -1)
 	check_equal(ids, [&"thaw", &"kindle"], "the second element reacts with what the first reaction left")
 
 
@@ -245,7 +245,7 @@ func test_every_element_of_a_hit_puts_its_status_on_the_wizard_it_hurt() -> void
 	profile.later_status_ids = [&"shock"]
 	profile.later_status_durations = PackedFloat32Array([3.0])
 	profile.later_status_strengths = PackedFloat32Array([40.0])
-	_bus.projectile_hit.emit(0, _wizards[0], Vector2(-5.0, 0.0), _tag(profile))
+	_bus.projectile_hit.emit(0, _wizards[0], Vector2(-5.0, 0.0), _tag(profile), -1)
 	check(_combat.status_left(0, &"static") > 0.0, "charged")
 	check(_combat.status_left(0, &"shock") > 0.0, "and shocked by the second element")
 
@@ -292,7 +292,7 @@ func test_a_shock_jump_kill_is_no_kill_for_a_card() -> void:
 	var weak := _enemy(Vector2(30.0, 0.0), 1)
 	_projectiles.step(STEP)
 	_combat.apply_status(0, struck, &"shock", 5.0, 100.0)
-	_bus.projectile_hit.emit(0, struck, Vector2(-5.0, 0.0), _tag(_profile(5)))
+	_bus.projectile_hit.emit(0, struck, Vector2(-5.0, 0.0), _tag(_profile(5)), -1)
 	check_equal(_combat.health_of(weak), -1, "the jump killed it")
 	check(_kills.is_empty(), "a jump is not the spell's own hit")
 
@@ -334,7 +334,7 @@ func test_a_hexed_wizard_is_pulled_toward_a_spell_hit() -> void:
 	_combat.apply_status(0, 0, &"hex", 5.0, 50.0)
 	var profile := _profile(2)
 	profile.knockback = 200.0
-	_bus.projectile_hit.emit(_enemy_caster, wizard, Vector2(90.0, 0.0), _enemy_tag(profile))
+	_bus.projectile_hit.emit(_enemy_caster, wizard, Vector2(90.0, 0.0), _enemy_tag(profile), -1)
 	check_equal(_combat.knockback_of(0), Vector2(-100.0, 0.0), "pulled toward the hit at half the push (actors G5: the enemy's rule)")
 
 
@@ -347,7 +347,7 @@ func test_a_shocked_wizards_next_spell_hit_jumps_to_its_nearest_teammate() -> vo
 	check(_combat.hit(EventsScript.NO_PLAYER, wizard, 4), "a plain hit")
 	check_equal(wizard.health.health, wizard.health.max_health - 4, "adds nothing (actors G5: no shock bonus)")
 	check(_combat.has_status(wizard, &"shock"), "and leaves the shock for a spell")
-	_bus.projectile_hit.emit(_enemy_caster, wizard, Vector2(-5.0, -12.0), _enemy_tag(_profile(4)))
+	_bus.projectile_hit.emit(_enemy_caster, wizard, Vector2(-5.0, -12.0), _enemy_tag(_profile(4)), -1)
 	check_equal(mate.health.health, mate.health.max_health - 4, "the spell hit jumped to the nearest actor of the wizard's team")
 	check_equal(_combat.health_of(enemy), 100, "not to the enemy, though it stands nearer")
 	check(not _combat.has_status(wizard, &"shock"), "the shock is spent")
@@ -402,7 +402,7 @@ func test_a_spell_hit_puts_its_status_on_the_wizard_it_hurt() -> void:
 	profile.status_id = &"hex"
 	profile.status_duration = 2.0
 	profile.status_strength = 40.0
-	_bus.projectile_hit.emit(0, wizard, Vector2(-5.0, 0.0), _tag(profile))
+	_bus.projectile_hit.emit(0, wizard, Vector2(-5.0, 0.0), _tag(profile), -1)
 	check(_combat.status_left(0, &"hex") > 0.0, "hexed by their own spell")
 
 
@@ -439,7 +439,7 @@ func test_a_barrier_blocks_a_spell_hit_with_its_status_and_push() -> void:
 	profile.status_strength = 3.0
 	profile.knockback = 100.0
 	_combat.give_shield(0, 1, 2.0, 3)
-	_bus.projectile_hit.emit(0, wizard, Vector2(90.0, 0.0), _tag(profile))
+	_bus.projectile_hit.emit(0, wizard, Vector2(90.0, 0.0), _tag(profile), -1)
 	check_equal(wizard.health.health, wizard.health.max_health, "no damage")
 	check_equal(_combat.status_left(0, &"burn"), 0.0, "no status")
 	check_equal(_combat.consume_knockback(_wizards[0], 0.0), Vector2.ZERO, "no push")
@@ -463,7 +463,7 @@ func test_a_heal_hit_gives_a_wizard_health_whoever_cast_it() -> void:
 	mate.health.take(30)
 	var profile := _profile(1)
 	profile.heal = 12
-	_bus.projectile_hit.emit(0, mate, Vector2(-5.0, 0.0), _tag(profile))
+	_bus.projectile_hit.emit(0, mate, Vector2(-5.0, 0.0), _tag(profile), -1)
 	check_equal(mate.health.health, mate.health.max_health - 18, "healed 12")
 	check_equal(_healed, [[0, mate, 12]], "heal_dealt")
 	check_equal(_landed[0][3], &"heal", "kind heal")
@@ -474,11 +474,11 @@ func test_a_heal_stops_at_full_health_and_skips_the_downed() -> void:
 	var wizard := _wizard(0, Vector2.ZERO)
 	var profile := _profile(1)
 	profile.heal = 500
-	_bus.projectile_hit.emit(0, wizard, Vector2(-5.0, 0.0), _tag(profile))
+	_bus.projectile_hit.emit(0, wizard, Vector2(-5.0, 0.0), _tag(profile), -1)
 	check_equal(wizard.health.health, wizard.health.max_health, "never above the maximum")
 	wizard.health.take(1000)
 	_healed.clear()
-	_bus.projectile_hit.emit(0, wizard, Vector2(-5.0, 0.0), _tag(profile))
+	_bus.projectile_hit.emit(0, wizard, Vector2(-5.0, 0.0), _tag(profile), -1)
 	check(_healed.is_empty(), "a downed wizard is not healed")
 
 
@@ -488,7 +488,7 @@ func test_a_heal_hit_heals_a_teammate() -> void:
 	mate.health.take(20)
 	var profile := _profile(1)
 	profile.heal = 8
-	_bus.projectile_hit.emit(0, mate, Vector2.ZERO, _tag(profile))
+	_bus.projectile_hit.emit(0, mate, Vector2.ZERO, _tag(profile), -1)
 	check_equal(mate.health.health, mate.health.max_health - 12, "the teammate was healed")
 
 
@@ -544,7 +544,7 @@ func test_a_heavy_hit_that_knocks_an_enemy_into_a_wall_hurts_once() -> void:
 	var profile := _profile(3)
 	profile.knockback = 300.0
 	profile.slam = 7
-	_bus.projectile_hit.emit(0, enemy, Vector2(0.0, 0.0), _tag(profile))
+	_bus.projectile_hit.emit(0, enemy, Vector2(0.0, 0.0), _tag(profile), -1)
 	check_equal(_combat.health_of(enemy), 97, "the hit itself")
 	_run(STEP)
 	check_equal(_combat.health_of(enemy), 90, "the slam into the wall")
@@ -558,11 +558,11 @@ func test_an_enemy_killed_by_the_slam_is_not_the_spells_kill() -> void:
 	_projectiles.set_walls([Rect2(20.0, -20.0, 20.0, 40.0)] as Array[Rect2])
 	var enemy := _enemy(Vector2(10.0, 0.0), 8)
 	var deaths: Array = []
-	_bus.enemy_died.connect(func(p: int, e: Node, _at: Vector2) -> void: deaths.append([p, e]))
+	_bus.enemy_died.connect(func(p: int, e: Node, _at: Vector2, _shot: int) -> void: deaths.append([p, e]))
 	var profile := _profile(3)
 	profile.knockback = 300.0
 	profile.slam = 7
-	_bus.projectile_hit.emit(0, enemy, Vector2(0.0, 0.0), _tag(profile))
+	_bus.projectile_hit.emit(0, enemy, Vector2(0.0, 0.0), _tag(profile), -1)
 	check(deaths.is_empty(), "the hit itself leaves it alive")
 	_run(STEP)
 	check_equal(deaths.size(), 1, "the slam killed it")
@@ -578,8 +578,8 @@ func test_a_later_plain_hit_disarms_the_slam() -> void:
 	heavy.slam = 7
 	var plain := _profile(3)
 	plain.knockback = 300.0
-	_bus.projectile_hit.emit(0, enemy, Vector2(0.0, 0.0), _tag(heavy))
-	_bus.projectile_hit.emit(1, enemy, Vector2(0.0, 0.0), _tag(plain))
+	_bus.projectile_hit.emit(0, enemy, Vector2(0.0, 0.0), _tag(heavy), -1)
+	_bus.projectile_hit.emit(1, enemy, Vector2(0.0, 0.0), _tag(plain), -1)
 	_run(0.5)
 	check_equal(_combat.health_of(enemy), 94, "two hits of 3 and no slam damage")
 
@@ -590,7 +590,7 @@ func test_a_heavy_hit_in_the_open_slams_nothing() -> void:
 	var profile := _profile(3)
 	profile.knockback = 300.0
 	profile.slam = 7
-	_bus.projectile_hit.emit(0, enemy, Vector2.ZERO, _tag(profile))
+	_bus.projectile_hit.emit(0, enemy, Vector2.ZERO, _tag(profile), -1)
 	_run(0.5)
 	check_equal(_combat.health_of(enemy), 97, "no wall, no slam")
 
@@ -601,7 +601,7 @@ func test_a_heavy_hit_in_the_open_slams_nothing() -> void:
 func test_a_kill_names_the_spell_that_landed_it() -> void:
 	var enemy := _enemy(Vector2.ZERO, 3)
 	var tag: int = _tag(_profile(5))
-	_bus.projectile_hit.emit(2, enemy, Vector2(-5.0, 0.0), tag)
+	_bus.projectile_hit.emit(2, enemy, Vector2(-5.0, 0.0), tag, -1)
 	check_equal(_kills, [[2, enemy, tag]], "kill_landed carries the player and the tag")
 
 
@@ -623,7 +623,7 @@ func test_a_reaction_names_the_hit_that_set_it_off() -> void:
 	profile.status_duration = 3.0
 	profile.status_strength = 40.0
 	var tag: int = _tag(profile)
-	_bus.projectile_hit.emit(1, enemy, Vector2(-5.0, 0.0), tag)
+	_bus.projectile_hit.emit(1, enemy, Vector2(-5.0, 0.0), tag, -1)
 	check_equal(_reactions, [[1, &"thaw", enemy, tag]], "reaction_landed has the player, the reaction, the target and the tag")
 
 
@@ -636,10 +636,10 @@ func test_the_note_tells_who_downed_the_wizard() -> void:
 	var profile := _profile(1000, &"burst")
 	profile.source_name = "Twice-Thawing Blast"
 	var tag: int = _tag(profile)
-	_bus.projectile_hit.emit(0, wizard, Vector2(-5.0, 0.0), tag)
+	_bus.projectile_hit.emit(0, wizard, Vector2(-5.0, 0.0), tag, -1)
 	check_equal(_combat.downed_note_of(0), "downed by your own Twice-Thawing Blast", "their own spell, by name")
 	var plain := _wizard(2, Vector2(900.0, 0.0))
-	_bus.projectile_hit.emit(2, plain, Vector2(895.0, 0.0), _tag(_profile(1000, &"burst")))
+	_bus.projectile_hit.emit(2, plain, Vector2(895.0, 0.0), _tag(_profile(1000, &"burst")), -1)
 	check(plain.is_down(), "downed")
 	check_equal(_combat.downed_note_of(2), "downed by your own Blast", "no name: the kind's word")
 
@@ -648,10 +648,10 @@ func test_the_note_names_a_teammate_and_is_empty_for_an_enemy() -> void:
 	var wizard := _wizard(1, Vector2.ZERO)
 	var profile := _profile(1000)
 	profile.source_name = "Frost Nova"
-	_bus.projectile_hit.emit(0, wizard, Vector2(-5.0, 0.0), _tag(profile))
+	_bus.projectile_hit.emit(0, wizard, Vector2(-5.0, 0.0), _tag(profile), -1)
 	check_equal(_combat.downed_note_of(1), "downed by player 1's Frost Nova", "a teammate's spell")
 	var other := _wizard(3, Vector2(900.0, 0.0))
-	_bus.projectile_hit.emit(_enemy_caster, other, Vector2(890.0, 0.0), _enemy_tag(_profile(1000)))
+	_bus.projectile_hit.emit(_enemy_caster, other, Vector2(890.0, 0.0), _enemy_tag(_profile(1000)), -1)
 	check_equal(_combat.downed_note_of(3), "", "an enemy gets no note")
 	check_equal(_combat.downed_note_of(99), "", "an actor Combat does not know gets none")
 
@@ -669,13 +669,13 @@ func test_a_wizard_whose_actor_id_is_not_its_seat_is_named_by_its_actor_id() -> 
 	var profile := _profile(1000)
 	profile.source_name = "Blast"
 	var tag: int = _tag(profile, 5)
-	_bus.projectile_hit.emit(5, wizard, Vector2(-5.0, 0.0), tag)
+	_bus.projectile_hit.emit(5, wizard, Vector2(-5.0, 0.0), tag, -1)
 	check_equal(_hurt, [[5, 1000, tag, &"shot"]], "actor_hurt names the wizard's actor id, not its seat")
 	check_equal(damage, [[5, wizard, 1000]], "damage_dealt names the caster's actor id")
 	check_equal(_combat.downed_note_of(wizard), "downed by your own Blast", "its own spell: its actor id is its own")
 	var nova := _profile(1000)
 	nova.source_name = "Frost Nova"
-	_bus.projectile_hit.emit(5, mate, Vector2(495.0, 0.0), _tag(nova, 5))
+	_bus.projectile_hit.emit(5, mate, Vector2(495.0, 0.0), _tag(nova, 5), -1)
 	check_equal(_combat.downed_note_of(mate), "downed by player 1's Frost Nova", "a teammate's: the seat that drives actor 5")
 	_wizard(2, Vector2(900.0, 0.0))
 	_bus.wizard_shield_requested.emit(7, 1, 2.0, 3)

@@ -53,8 +53,8 @@ func before_each() -> void:
 	_blasts.clear()
 	_moves.clear()
 	_refunds.clear()
-	_bus.projectile_hit.connect(func(caster: int, target: Node, at: Vector2, tag: int) -> void:
-		var hit: HitProfile = _spells.hit_profile(tag)
+	_bus.projectile_hit.connect(func(caster: int, target: Node, at: Vector2, tag: int, shot: int) -> void:
+		var hit: HitProfile = _spells.hit_profile(tag, shot)
 		_hits.append([caster, target, at, tag, hit.damage if hit != null else -1]))
 	_bus.cue_shown.connect(func(_caster: int, _cue: StringName, at: Vector2, _direction: Vector2, _size: float, _tint: Color, _look: int) -> void:
 		_blasts.append(at))
@@ -64,11 +64,11 @@ func before_each() -> void:
 		_refunds.append(amount))
 	_form(&"bolt", 300.0, 1.0)
 	var decoy: FormBase = _form(&"decoy", 0.0, 2.0)
-	decoy.motion = FormBase.Motion.DECOY
+	decoy.carrier = &"decoy"
 	_form(&"barb", 300.0, 1.0)
 	_modifier(&"pull", ModifierBase.Behaviour.PULL, 1.0)
 	var slam: FormBase = _form(&"slam", 0.0, 0.12)
-	slam.motion = FormBase.Motion.SLAM
+	slam.carrier = &"slam"
 	slam.ray_length = 20.0
 	slam.radius = 16.0
 	_modifier(&"blast", ModifierBase.Behaviour.BLAST, 30.0)
@@ -149,6 +149,37 @@ func test_a_blast_strikes_each_body_round_its_end_point_as_a_hit_of_its_carrier(
 	check_equal(_hits_on(struck, tag), 2, "the body the bolt hit: the bolt's hit, then its blast's")
 	check_equal(_hits_on(near, tag), 1, "a body near it is hit by the blast, under the bolt's tag")
 	check_equal(_hits_on(far, tag), 0, "one outside it is not")
+
+
+func test_a_blast_strikes_as_an_explosion() -> void:
+	# Its hits are the carrier's, but they feel like an explosion: kind `burst` (hit-stop, shake,
+	# sound, "downed by your own Blast"), whatever the carrier hits as.
+	var kinds: Dictionary = _record_kinds()
+	_build([&"blast", &"bolt"])
+	var struck: Node2D = _target(Vector2(60.0, 0.0))
+	var near: Node2D = _target(Vector2(66.0, 20.0))
+	_cast()
+	_tick(20)
+	var on_struck: Array = kinds.get(struck, [])
+	check(on_struck.size() == 2 and on_struck.has(&"shot") and on_struck.has(&"burst"), "the bolt hits as a shot, its blast as a burst: %s" % [on_struck])
+	check_equal(kinds.get(near, []), [&"burst"], "and the body near it is struck as a burst")
+
+
+func test_the_cards_that_land_on_a_point_strike_as_an_explosion() -> void:
+	var kinds: Dictionary = _record_kinds()
+	_build([&"blast"])
+	var enemy: Node2D = _target(Vector2(15.0, 0.0))
+	_cast()
+	check_equal(kinds.get(enemy, []), [&"burst"], "a blast on the caster strikes as a burst")
+
+
+## target -> the kinds of the hits it took (`HitProfile.kind`), as they are sent.
+func _record_kinds() -> Dictionary:
+	var kinds: Dictionary = {}
+	_bus.projectile_hit.connect(func(_caster: int, target: Node, _at: Vector2, tag: int, shot: int) -> void:
+		var hit: HitProfile = _spells.hit_profile(tag, shot)
+		kinds[target] = kinds.get(target, []) + [hit.kind if hit != null else &""])
+	return kinds
 
 
 func test_a_lone_blast_strikes_its_own_caster() -> void:

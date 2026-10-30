@@ -50,7 +50,7 @@ enum Behaviour {
 	## Takes on the infusions of the last cast of any actor its shot hits (B2; owner, 2026-10-28).
 	RELAY,
 	## Flies out for half its life, then back to its caster (owner, 2026-10-27: a modifier, not
-	## a boomerang carrier). Only on a carrier that flies (`StaffCompiler.behaviour_waste`).
+	## a boomerang carrier). Only on a carrier that flies (`ModifierBase.NEEDS`).
 	RETURN,
 	## Zaps the nearest enemy within `behaviour_reach` pixels `behaviour_strength` times a second
 	## (arc cards add up) while the shot lives, at `SpellLimits.ARC_DAMAGE` of its damage with its infusions; a zap
@@ -73,6 +73,36 @@ enum Behaviour {
 	PULL,
 }
 
+## What each behaviour needs from the carrier it rides on to do anything, in the carrier's yes/no
+## answers (`CarrierTraits`): "any": at least one of these flags; "not": none of these; "or_cards":
+## a card with one of these behaviours on the carrier does instead (what a blast strikes is the
+## carrier's hit, rules R4 F2). A behaviour not here works on every carrier (numbers, blast, echo,
+## recoil, mirror: a move and its mirror add up to none, rules R4 F1). A new behaviour adds its line here, never per carrier; the compiler checks it every
+## time a staff is built (`Carrier.works`).
+const NEEDS: Dictionary = {
+	Behaviour.HOMING: {"any": CarrierTraits.STEERS},
+	# What a blast strikes is the carrier's hit (rules R4 F2), so these work with one too.
+	Behaviour.CHAIN: {"any": CarrierTraits.HITS, "or_cards": [Behaviour.BLAST]},
+	Behaviour.SIPHON: {"any": CarrierTraits.HITS, "or_cards": [Behaviour.BLAST]},
+	Behaviour.POSSESS: {"any": CarrierTraits.HITS, "or_cards": [Behaviour.BLAST]},
+	Behaviour.HEAVY: {"any": CarrierTraits.HITS, "or_cards": [Behaviour.BLAST]},
+	Behaviour.RELAY: {"any": CarrierTraits.HITS, "or_cards": [Behaviour.BLAST]},
+	# A blast's hits move nothing (rules R4 F2: a pull at every arrival would never end).
+	Behaviour.PULL: {"any": CarrierTraits.HITS},
+	Behaviour.SHIELD: {"any": CarrierTraits.MEETS_SHOTS},
+	Behaviour.DEFLECT: {"any": CarrierTraits.MEETS_SHOTS},
+	Behaviour.HOLD: {"any": CarrierTraits.LASTS, "not": CarrierTraits.MOVES_CASTER},
+	Behaviour.BOUNCE: {"any": CarrierTraits.FLIES | CarrierTraits.LINE},
+	Behaviour.GHOST: {"any": CarrierTraits.FLIES | CarrierTraits.LINE},
+	Behaviour.RETURN: {"any": CarrierTraits.FLIES},
+	Behaviour.LINGER: {"any": CarrierTraits.MOVES},
+	Behaviour.STICKY: {"any": CarrierTraits.MOVES},
+	Behaviour.SPIRAL: {"any": CarrierTraits.MOVES | CarrierTraits.LINE},
+	Behaviour.GROWTH: {"any": CarrierTraits.STAYS | CarrierTraits.LINE},
+	Behaviour.MAGNET: {"any": CarrierTraits.STAYS | CarrierTraits.LINE},
+	Behaviour.ARC: {"any": CarrierTraits.STAYS},
+}
+
 @export var damage_mult: float = 1.0
 @export var speed_mult: float = 1.0
 @export var radius_mult: float = 1.0
@@ -88,7 +118,7 @@ enum Behaviour {
 @export var behaviour_strength: float = 0.0
 ## Pixels the behaviour reaches. For HOMING, how far a shot looks for a target (one in flight
 ## looks again as it flies; a beam looks at least as far as it is long), on every form homing
-## steers (`StaffCompiler.homing_range`). Unused by the others.
+## steers (`Carrier.homing_range`). Unused by the others.
 @export var behaviour_reach: float = 0.0
 
 # --- Look (staffs B6a) ----------------------------------------------------------------
@@ -119,7 +149,7 @@ enum Behaviour {
 
 ## Factor on how far the carrier goes: a flying shot's `lifetime` (its range is speed x life),
 ## every other carrier's `ray_length` (a beam's, a dash's, a rain's aim point...). Several
-## multiply. Wasted where the carrier has no range (`StaffCompiler.reaches`).
+## multiply. Wasted where the carrier has no range (`Carrier.reaches`).
 @export var reach_mult: float = 1.0
 
 

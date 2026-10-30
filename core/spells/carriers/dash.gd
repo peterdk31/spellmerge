@@ -1,0 +1,172 @@
+class_name CarrierDash
+extends CarrierMove
+## Moves its caster `ray_length` along the move direction, striking every body it passes once
+## (`&"dash"`). Homing turns it as it goes; its shield guards what it moves.
+
+
+## A dash under way (rules R4c, `_start_pass`): it strikes every body its mover passes, once each.
+class MovePass:
+	extends RefCounted
+	var tag: int = 0
+	var spell: CompiledSpell = null
+	var actor: int = 0
+	## The shot it moves and that shot's seq, or -1 for the actor's own body.
+	var shot: int = -1
+	var seq: int = 0
+	## Where the mover was at the last step (where it started, before the first), and the seconds left.
+	var last: Vector2 = Vector2.INF
+	var left: float = 0.0
+	## The chain jumps its hits carry, the body before them, and what it hits with when not its
+	## spell's own `hit` (an echo's), as a swing's.
+	var chain: int = 0
+	var prev: int = 0
+	var hit: HitProfile = null
+	var struck: Array[Node] = []
+## Per actor, the homing of the wizard's last dash; the actor steers with it (`move_homing`).
+var _dash_homing: Array[Homing] = []
+## The homing of a dash that does not home (`move_homing` for an actor out of range).
+var _no_homing: Homing = Homing.new()
+## The dashes under way (`_start_pass`), and spare records for the next ones.
+var _passes: Array[MovePass] = []
+var _passes_free: Array[MovePass] = []
+
+
+func id() -> StringName:
+	return &"dash"
+
+
+
+## The dash of the runtime `spells` (its bound `dash` carrier, `Spells.carrier`), for what reads
+## its own getters (the looks, `ai`, the actor's mover, the tests).
+static func of(spells: SpellRuntime) -> CarrierDash:
+	return spells.carrier(&"dash") as CarrierDash
+
+
+func traits() -> int:
+	return HITS | LASTS | REACHES | STEERS | SPEED | HOLDS_STAFF | MOVES_CASTER | MEETS_SHOTS
+
+
+func step_order() -> int:
+	return 1
+
+
+func bind(runtime_kit: CarrierKit, staff_poses: StaffPoses) -> void:
+	super(runtime_kit, staff_poses)
+	for i in SpellRuntime.ACTORS:
+		_dash_homing.append(Homing.new())
+
+
+## Every dash under way ends quietly (`Spells.clear`).
+func clear() -> void:
+	for dash in _passes:
+		dash.spell = null
+		dash.hit = null
+		dash.struck.clear()
+		_passes_free.append(dash)
+	_passes.clear()
+
+
+func _walks() -> bool:
+	return true
+
+
+func _move_seconds(spell: CompiledSpell) -> float:
+	return CasterMoves.move_seconds(spell.ray_length, spell.speed, spell.lifetime)
+
+
+## The body dashes: it may home with `move_homing`, and other moves add to it; its way is drawn
+## where it really goes, and it strikes every body it passes (`_start_pass`).
+func _move_body(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, way: Vector2, offset: Vector2, seconds: float, chain: int, prev: int) -> void:
+	_dash_homing[actor].start(spell, hash(Vector2i(actor, tag)))
+	kit.events.caster_move_requested.emit(actor, &"dash", offset, seconds, tag)
+	var reach: float = origin.distance_to(kit.projectiles.clip_to_walls(origin, origin + offset))
+	kit.events.form_shown.emit(actor, &"dash", origin, way, reach, spell.tint, spell.look)
+	kit.projectiles.follow_caster(actor, spell.tint, spell.look, seconds)
+	_start_pass(spell, tag, actor, -1, seconds, chain, prev)
+	kit.live_join(spell, tag, SpellRuntime.LC_ACTOR, actor, 0, false, seconds, origin, way)
+
+
+func _moved_shot(spell: CompiledSpell, tag: int, actor: int, shot: int, seconds: float, chain: int, prev: int) -> void:
+	_start_pass(spell, tag, actor, shot, seconds, chain, prev)
+
+
+## A dash under way (rules R4c): for its `seconds` (and SpellLimits.PASS_GRACE more, as its mover
+## is moved and told a step later) it strikes every body its mover passes, once each, with its hit
+## (`_pass_step`): the actor's own body (`shot` -1, its anchor) or the shot it moves. A new dash of
+## the same body ends the one before (its mover replaces the move). Its echo hits as an echo.
+func _start_pass(spell: CompiledSpell, tag: int, actor: int, shot: int, seconds: float, chain: int, prev: int) -> void:
+	for other in _passes:
+		if other.actor == actor and other.shot == shot:
+			other.left = 0.0
+	if _passes_free.is_empty():
+		_passes_free.append(MovePass.new())
+	var dash: MovePass = _passes_free.pop_back()
+	dash.tag = tag
+	dash.spell = spell
+	dash.actor = actor
+	dash.shot = shot
+	dash.seq = kit.projectiles.get_seq_of(shot) if shot >= 0 else 0
+	dash.last = kit.projectiles.get_anchor(actor) if shot < 0 else kit.projectiles.get_position_of(shot)
+	dash.left = seconds + SpellLimits.PASS_GRACE
+	dash.chain = chain
+	dash.prev = prev
+	dash.hit = spell.echo_hit if kit.is_echo(spell) else null
+	dash.struck.clear()
+	_passes.append(dash)
+	kit.shot_started(tag)
+
+
+## Runs the dashes under way on by `delta` (`Spells.step`): each strikes what its mover passed since the last step
+## (and deflects the shots it passed, with `deflect`), then ends when its time is up, its mover is
+## gone or its build is forgotten.
+func step(delta: float) -> void:
+	var i: int = 0
+	while i < _passes.size():
+		var dash: MovePass = _passes[i]
+		var at: Vector2 = Vector2.INF
+		if dash.shot < 0:
+			at = kit.projectiles.get_anchor(dash.actor)
+		elif kit.projectiles.is_alive(dash.shot) and kit.projectiles.get_seq_of(dash.shot) == dash.seq:
+			at = kit.projectiles.get_position_of(dash.shot)
+		if dash.left > 0.0 and at.is_finite() and kit.spell_of(dash.tag) == dash.spell:
+			_pass_step(dash, dash.last if dash.last.is_finite() else at, at)
+			dash.last = at
+			dash.left -= delta
+		else:
+			dash.left = 0.0
+		if dash.left > 0.0:
+			i += 1
+			continue
+		_passes.remove_at(i)
+		var tag: int = dash.tag
+		dash.spell = null
+		dash.hit = null
+		dash.struck.clear()
+		_passes_free.append(dash)
+		kit.shot_ended(tag)
+
+
+## The dash `dash` moved from `from` to `to`: it strikes each body within SpellLimits.PASS_REACH of that
+## way that it has not struck yet (`Projectiles.sweep` all round points PASS_REACH apart, so a
+## fast dash misses nothing), and with `deflect` turns the shots within MOVE_GUARD_REACH of it.
+func _pass_step(dash: MovePass, from: Vector2, to: Vector2) -> void:
+	var spell: CompiledSpell = dash.spell
+	var reach: float = SpellLimits.PASS_REACH
+	var way: Vector2 = from.direction_to(to) if not from.is_equal_approx(to) else kit.moves().move_heading[dash.actor]
+	if spell.behaviour(ModifierBase.Behaviour.DEFLECT) > 0.0:
+		kit.guard(kit.projectiles.shots_on_segment(dash.actor, from, to, SpellLimits.MOVE_GUARD_REACH), dash.actor, dash.tag, true, 0, from, to, id())
+	var samples: int = maxi(ceili(from.distance_to(to) / reach), 1)
+	for n in samples:
+		var point: Vector2 = from.lerp(to, float(n + 1) / samples)
+		var found: int = kit.projectiles.sweep(dash.actor, point, way, 1, -PI, PI, reach, SpellRuntime.HITS)
+		if found > 0:
+			var took: HitProfile = kit.strike(spell, dash.tag, dash.actor, found, dash.struck, point, dash.chain, dash.prev, dash.hit)
+			if dash.left <= 0.0 or dash.spell != spell:
+				return
+			dash.hit = took
+
+
+## The homing of `actor`'s last dash, for the wizard to turn it as it goes (`Homing.steer`); one
+## that does not home when the dash does not, or `actor` is out of range.
+func move_homing(actor: int) -> Homing:
+	return _dash_homing[actor] if actor >= 0 and actor < _dash_homing.size() else _no_homing

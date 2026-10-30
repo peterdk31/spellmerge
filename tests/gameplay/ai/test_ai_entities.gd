@@ -76,7 +76,7 @@ func before_each() -> void:
 	bolt.mana_cost = 2.0
 	_put(bolt, &"bolt")
 	var familiar := FormBase.new()
-	familiar.motion = FormBase.Motion.FAMILIAR
+	familiar.carrier = &"familiar"
 	familiar.lifetime = 6.0
 	familiar.mana_cost = 2.0
 	_put(familiar, &"familiar")
@@ -85,7 +85,7 @@ func before_each() -> void:
 	timer.interval = 0.25
 	_put(timer, &"timer")
 	var decoy := FormBase.new()
-	decoy.motion = FormBase.Motion.DECOY
+	decoy.carrier = &"decoy"
 	decoy.lifetime = 4.0
 	decoy.mana_cost = 2.0
 	_put(decoy, &"decoy")
@@ -185,12 +185,12 @@ func test_an_enemys_decoy_copies_it_and_every_hit_wears_it_down() -> void:
 	check(_entities.lure(at) == null, "enemies never chase an enemy's decoy")
 	# Another enemy's shot wears it too (its own enemy's never reach it: core/projectiles).
 	var other_enemy: int = _actors.open(ActorsScript.TEAM_ENEMIES, ActorsScript.RAMP_ENEMY)
-	_bus.projectile_hit.emit(other_enemy, decoy, at, SpellTag.make(other_enemy, 0, 0, 0))
+	_bus.projectile_hit.emit(other_enemy, decoy, at, SpellTag.make(other_enemy, 0, 0, 0), -1)
 	var wizard_tag: int = SpellTag.make(_wizard.id, 0, 0, 0)
 	for i in EntitiesScript.DECOY_HITS - 2:
-		_bus.projectile_hit.emit(_wizard.id, decoy, at, wizard_tag)
+		_bus.projectile_hit.emit(_wizard.id, decoy, at, wizard_tag, -1)
 	check_equal(_entities.count_owned(EntitiesScript.DECOY, enemy.id), 1, "it holds until its last hit")
-	_bus.projectile_hit.emit(_wizard.id, decoy, at, wizard_tag)
+	_bus.projectile_hit.emit(_wizard.id, decoy, at, wizard_tag, -1)
 	check_equal(_entities.count_owned(EntitiesScript.DECOY, enemy.id), 0, "DECOY_HITS hits break it, an enemy's among them")
 	check(_ended.size() == 1 and _ended[0][0] == enemy.id and _ended[0][1] == EntitiesScript.DECOY and _ended[0][2] == tag, "and its end is said under the enemy's actor id with its tag")
 

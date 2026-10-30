@@ -25,8 +25,9 @@ var later_status_durations: PackedFloat32Array = PackedFloat32Array()
 var later_status_strengths: PackedFloat32Array = PackedFloat32Array()
 
 # Staffs (B3, docs/milestones/M2-staffs.md, "Self-harm and hits").
-## The hit kind: `&"shot"`, `&"ray"`, `&"swing"` (melee) or `&"burst"` (an area hit is always `burst`). Combat sets
-## `reaction` and `status` for the hits it makes itself.
+## The hit kind: `&"shot"`, `&"ray"`, `&"swing"` (melee) or `&"burst"` (an explosion: a slam's
+## shockwave, a blast's strikes, the cards that land on a point; `StaffCompiler.blast_hit`). Combat
+## sets `reaction` and `status` for the hits it makes itself.
 var kind: StringName = &"shot"
 ## Health a hit gives a wizard instead of damage (mend); 0 for none. An enemy still takes `damage`.
 var heal: int = 0

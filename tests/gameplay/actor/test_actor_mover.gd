@@ -258,7 +258,7 @@ func test_a_homing_dash_turns_toward_a_target() -> void:
 	var homing: Actor = _mover(0)
 	_controller(homing).aim = Vector2.RIGHT
 	_world.run(1)
-	var dash_homing: Homing = _world.spells.move_homing(homing.caster_number())
+	var dash_homing: Homing = CarrierDash.of(_world.spells).move_homing(homing.caster_number())
 	dash_homing.turn = 3.0
 	dash_homing.reach = 160.0
 	_ask(plain, &"dash", Vector2(55.0, 0.0), 0.25)

@@ -202,13 +202,13 @@ func _test_room_cleared_once_when_the_wave_is_dead() -> void:
 	var enemies: Array[Node] = _flow._enemies.duplicate()
 	_check(enemies.size() == FlowScript.WAVE.size(), "four players: the test sees the wave")
 	for at in enemies.size() - 1:
-		_events.emit_signal("enemy_died", at % 4, enemies[at], Vector2.ZERO)
+		_events.emit_signal("enemy_died", at % 4, enemies[at], Vector2.ZERO, -1)
 	_check(_cleared.is_empty(), "room_cleared waits for the last enemy")
 	_check(_flow.enemies_left() == 1, "one enemy is left")
-	_events.emit_signal("enemy_died", 3, enemies[enemies.size() - 1], Vector2.ZERO)
+	_events.emit_signal("enemy_died", 3, enemies[enemies.size() - 1], Vector2.ZERO, -1)
 	_check(_cleared == [&"arena_01"], "room_cleared(arena_01) was sent once, got %s" % _cleared)
 	_check(_flow.state == FlowScript.State.CLEARED, "flow is in the cleared state")
-	_events.emit_signal("enemy_died", 0, enemies[0], Vector2.ZERO)
+	_events.emit_signal("enemy_died", 0, enemies[0], Vector2.ZERO, -1)
 	_check(_cleared.size() == 1, "a repeated death does not send room_cleared again")
 	_stop()
 
@@ -283,7 +283,7 @@ func _test_no_restart_after_clear() -> void:
 	_setup(1)
 	_play()
 	for enemy: Node in _flow._enemies.duplicate():
-		_events.emit_signal("enemy_died", 0, enemy, Vector2.ZERO)
+		_events.emit_signal("enemy_died", 0, enemy, Vector2.ZERO, -1)
 	_down(_wizard(0))
 	_check(not _flow.is_restarting(), "a cleared room does not restart when the players go down")
 	_stop()
@@ -299,7 +299,7 @@ func _test_last_enemy_dies_after_all_down() -> void:
 		_down(wizard)
 	_check(_flow.is_restarting(), "all down: restarting")
 	for enemy: Node in _flow._enemies.duplicate():
-		_events.emit_signal("enemy_died", 0, enemy, Vector2.ZERO)
+		_events.emit_signal("enemy_died", 0, enemy, Vector2.ZERO, -1)
 	_check(_cleared == [&"arena_01"], "the room still counts as cleared, got %s" % [_cleared])
 	_check(_flow.is_restarting(), "the last enemy dying does not cancel the restart")
 	_flow.step(FlowScript.RESTART_DELAY)
@@ -401,7 +401,7 @@ func _test_restart_leaves_no_old_enemies_or_shots() -> void:
 ## Kill every enemy of the current wave (as if shot down).
 func _kill_wave() -> void:
 	for enemy: Node in _flow._enemies.duplicate():
-		_events.emit_signal("enemy_died", 0, enemy, Vector2.ZERO)
+		_events.emit_signal("enemy_died", 0, enemy, Vector2.ZERO, -1)
 
 
 ## After a clear and BUILD_BREAK the next, bigger wave stands in the same world.

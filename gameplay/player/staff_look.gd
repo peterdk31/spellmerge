@@ -174,7 +174,7 @@ func is_poofing() -> bool:
 
 
 ## The column of the head sheet that shows: the direction nearest the aim, or while the staff plays
-## its carrier's animation (`Spells.staff_pose`, the card's `staff_pose`) the aim locked at the cast
+## its carrier's animation (`Spells.poses().staff_pose`, the card's `staff_pose`) the aim locked at the cast
 ## turned by it, so a swinging body steps through the columns while the swing's trail follows the
 ## true arc (down: flat, the way the staff faced).
 func direction() -> int:
@@ -182,7 +182,7 @@ func direction() -> int:
 		return DIRECTIONS / 2 if _faces_left else 0
 	var dir: Vector2 = pose_dir()
 	if not dir.is_zero_approx():
-		return direction_of(dir.rotated(actor.spells.staff_pose(actor.id).x))
+		return direction_of(dir.rotated(actor.spells.poses().staff_pose(actor.id).x))
 	return direction_of(actor.aim)
 
 

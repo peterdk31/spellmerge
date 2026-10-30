@@ -101,7 +101,7 @@ func _tag(player: int, element: StringName) -> int:
 func _hit(player: int, enemy: Node2D, tag: int) -> void:
 	# The manager's target grid is rebuilt in its step, which neighbour searches read.
 	_projectiles.step(STEP)
-	_bus.projectile_hit.emit(player, enemy, enemy.position + Vector2(-8.0, 0.0), tag)
+	_bus.projectile_hit.emit(player, enemy, enemy.position + Vector2(-8.0, 0.0), tag, -1)
 
 
 func _run(seconds: float) -> void:
@@ -170,7 +170,7 @@ func test_burn_deals_its_damage_over_time_to_the_player_who_set_it() -> void:
 func test_burn_can_kill_and_credits_the_killer() -> void:
 	var enemy := _enemy(Vector2.ZERO, 5)
 	var deaths: Array = []
-	_bus.enemy_died.connect(func(player: int, _enemy: Node, _at: Vector2) -> void: deaths.append(player))
+	_bus.enemy_died.connect(func(player: int, _enemy: Node, _at: Vector2, _shot: int) -> void: deaths.append(player))
 	_combat.apply_status(3, enemy, &"burn", 10.0, 4.0)
 	_run(2.0)
 	check_equal(deaths, [3], "player 3 got the kill")
@@ -380,7 +380,7 @@ func test_a_discharge_is_announced_at_each_actor_it_zaps_in_the_charged_actors_n
 	var right := _foe(Vector2(60.0, 0.0))
 	_combat.apply_status(0, struck, &"static", 5.0, 60.0)
 	var seen: Array = []
-	_bus.reaction_triggered.connect(func(player: int, id: StringName, at: Vector2) -> void: seen.append([player, id, at]))
+	_bus.reaction_triggered.connect(func(player: int, id: StringName, at: Vector2, _shot: int) -> void: seen.append([player, id, at]))
 	_hit(3, struck, _tag(3, &""))
 	check_equal(seen.size(), 2, "one announcement for each actor zapped, none for the struck one")
 	for row: Array in seen:
@@ -442,7 +442,7 @@ func test_a_discharge_cannot_loop_forever() -> void:
 	_bus.damage_dealt.connect(func(_player: int, target: Node, _amount: int, _at: Vector2) -> void:
 		if not reentered[0] and target == ring[1]:
 			reentered[0] = true
-			_bus.projectile_hit.emit(0, ring[2], ring[2].position, tag)
+			_bus.projectile_hit.emit(0, ring[2], ring[2].position, tag, -1)
 	)
 	_hit(0, ring[0], tag)
 	check(reentered[0], "the listener did hit from inside the discharge")

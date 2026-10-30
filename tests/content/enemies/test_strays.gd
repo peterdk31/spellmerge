@@ -114,7 +114,7 @@ func test_the_new_strays_attack_four_players() -> void:
 			start.append(player.position)
 		var body: Actor = world.enemy(data.scene, data, Vector2.ZERO)
 		var hits: Array[int] = []
-		world.bus.hit_landed.connect(func(caster: int, _t: Node, _a: int, _p: Vector2, _k: StringName) -> void: hits.append(caster))
+		world.bus.hit_landed.connect(func(caster: int, _t: Node, _a: int, _p: Vector2, _k: StringName, _shot: int) -> void: hits.append(caster))
 		var casts: Array[int] = []
 		world.bus.actor_cast.connect(func(actor_id: int, _actor: Node) -> void: casts.append(actor_id))
 		var winded_up: bool = false

@@ -145,7 +145,7 @@ func test_clearing_the_imps_starts_no_break() -> void:
 	_start(1)
 	events.emit_signal("sandbox_action_requested", 0, FlowScript.ACTION_IMP_WAVE)
 	for enemy: Node in flow._enemies.duplicate():
-		events.emit_signal("enemy_died", 0, enemy, Vector2.ZERO)
+		events.emit_signal("enemy_died", 0, enemy, Vector2.ZERO, -1)
 	check_equal(flow.enemies_left(), 0, "the imps are gone")
 	check_equal(cleared, 0, "no room_cleared in the sandbox")
 	check_equal(flow.build_break_left(), 0.0, "no build break")
@@ -156,7 +156,7 @@ func test_reset_dummies_puts_fresh_ones_back() -> void:
 	_start(1)
 	var old: Array[Node] = flow.dummies()
 	# The shooting dummy can be killed; reset brings it back.
-	events.emit_signal("enemy_died", 0, old[1], Vector2.ZERO)
+	events.emit_signal("enemy_died", 0, old[1], Vector2.ZERO, -1)
 	check_equal(flow.dummies().size(), _wanted_ids().size() - 1, "a killed dummy is gone")
 	events.emit_signal("sandbox_action_requested", 0, FlowScript.ACTION_RESET_DUMMIES)
 	var fresh: Array[Node] = flow.dummies()

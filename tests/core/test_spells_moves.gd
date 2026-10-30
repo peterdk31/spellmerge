@@ -64,14 +64,14 @@ func before_each() -> void:
 	var bolt: FormBase = _form(&"bolt", 300.0, 1.0)
 	bolt.base_damage = 10
 	var teleport: FormBase = _form(&"teleport", 400.0, 0.25)
-	teleport.motion = FormBase.Motion.TELEPORT
+	teleport.carrier = &"teleport"
 	var dash: FormBase = _form(&"dash", 400.0, 0.2)
-	dash.motion = FormBase.Motion.DASH
+	dash.carrier = &"dash"
 	_modifier(&"pull", ModifierBase.Behaviour.PULL, 1.0)
 	var swap: FormBase = _form(&"swap", 300.0, 1.0)
-	swap.motion = FormBase.Motion.SWAP
+	swap.carrier = &"swap"
 	var beam: FormBase = _form(&"beam", 0.0, 0.2)
-	beam.motion = FormBase.Motion.RAY
+	beam.carrier = &"beam"
 	beam.ray_length = 200.0
 	beam.radius = 6.0
 	_modifier(&"blast", ModifierBase.Behaviour.BLAST, 30.0)
@@ -83,7 +83,7 @@ func before_each() -> void:
 	piercing.extra_pierce = 2
 	_put(piercing, &"pierce")
 	var wall: FormBase = _form(&"wall", 0.0, 0.5)
-	wall.motion = FormBase.Motion.WALL
+	wall.carrier = &"wall"
 	wall.shots = 3
 	wall.spread = 10.0
 	wall.radius = 4.0
@@ -435,15 +435,15 @@ func test_a_teleport_of_player_three_ignores_other_players_arrivals() -> void:
 ## trigger that fires once after 0.25 s, an orbit, and faster (speed x1.5).
 func _distance_cards() -> void:
 	var short: FormBase = _form(&"short", 240.0, 0.25)
-	short.motion = FormBase.Motion.DASH
+	short.carrier = &"dash"
 	short.ray_length = 48.0
 	var blink: FormBase = _form(&"blink", 400.0, 0.25)
-	blink.motion = FormBase.Motion.TELEPORT
+	blink.carrier = &"teleport"
 	blink.ray_length = 64.0
 	var timer: TriggerBase = _trigger(&"timer", TriggerBase.Event.TIMER)
 	timer.interval = 0.25
 	var orbit: FormBase = _form(&"ring", 3.0, 1.0)
-	orbit.motion = FormBase.Motion.ORBIT
+	orbit.carrier = &"orbit"
 	orbit.orbit_radius = 20.0
 	var faster := ModifierBase.new()
 	faster.speed_mult = 1.5
@@ -495,6 +495,30 @@ func test_a_dash_is_drawn_where_its_caster_goes() -> void:
 	check_equal(_mgr.get_trail_count(), 1, "a teleport opens none")
 
 
+func test_a_dash_keeps_its_own_way_when_its_move_ends_another_dash() -> void:
+	# A dash's request to move may end another dash at once (here wizard 1's, when wizard 0 asks):
+	# that end fires its `on expire` payload, a dash too, before the new one is drawn. The dash
+	# carrier once kept the way of the move it was launching on itself, so the payload's launch
+	# wrote its own way over the new dash's.
+	_distance_cards()
+	_mgr.set_anchor(1, Vector2.ZERO)
+	var first: int = _build(1, [&"on_expire", &"short", &"short"])
+	_build(0, [&"short"])
+	var shown: Array[Vector2] = []
+	var ended: Array[bool] = [false]
+	_bus.form_shown.connect(func(caster: int, form: StringName, _origin: Vector2, direction: Vector2, _length: float, _tint: Color, _look: int) -> void:
+		if form == &"dash" and caster == 0:
+			shown.append(direction))
+	_bus.caster_move_requested.connect(func(player: int, _mode: StringName, _to: Vector2, _seconds: float, _tag: int) -> void:
+		if player == 0 and not ended[0]:
+			ended[0] = true
+			_bus.caster_move_finished.emit(1, &"dash", Vector2(48.0, 0.0), first))
+	_spells.cast_staff(1, 0, Vector2.ZERO, Vector2.RIGHT, 100.0)
+	check(_spells.cast_staff(0, 0, Vector2.ZERO, Vector2.DOWN, 100.0) >= 0.0, "wizard 0's dash is cast")
+	check(ended[0], "and it ended wizard 1's on the way")
+	check(shown.size() == 1 and shown[0].is_equal_approx(Vector2.DOWN), "wizard 0's dash is drawn along its own way, down: %s" % [shown])
+
+
 func test_a_teleport_blinks_its_card_distance() -> void:
 	_distance_cards()
 	_build(0, [&"blink"])
@@ -518,16 +542,16 @@ func test_a_homing_dash_tells_the_wizard_how_to_turn_and_a_plain_one_does_not() 
 	_distance_cards()
 	_build(0, [&"homing", &"short"])
 	_cast(0)
-	var homing: Homing = _spells.move_homing(0)
+	var homing: Homing = CarrierDash.of(_spells).move_homing(0)
 	check(is_equal_approx(homing.turn, 3.0) and is_equal_approx(homing.reach, 160.0), "the card's turn rate and reach: %s, %s" % [homing.turn, homing.reach])
 	_mgr.set_anchor(1, Vector2.ZERO)
 	_build(1, [&"short"])
 	_cast(1)
-	check(not _spells.move_homing(1).homes(), "a plain dash does not home")
+	check(not CarrierDash.of(_spells).move_homing(1).homes(), "a plain dash does not home")
 	_build(0, [&"short"])
 	_tick(30)
 	_cast(0)
-	check(not _spells.move_homing(0).homes(), "nor does the next plain dash of the same wizard")
+	check(not CarrierDash.of(_spells).move_homing(0).homes(), "nor does the next plain dash of the same wizard")
 
 
 func test_a_homing_teleport_bends_its_way_toward_a_target_and_blinks_its_distance() -> void:

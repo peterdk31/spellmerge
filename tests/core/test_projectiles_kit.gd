@@ -80,9 +80,9 @@ func _setup() -> void:
 	_hits.clear()
 	_expired.clear()
 	_blocked.clear()
-	_bus.projectile_expired.connect(func(caster: int, position: Vector2, tag: int) -> void: _expired.append([caster, position, tag, _mgr.expired_on_wall]))
-	_bus.projectile_hit.connect(func(caster: int, target: Node, position: Vector2, tag: int) -> void: _hits.append([caster, target, position, tag]))
-	_bus.shot_blocked.connect(func(caster: int, position: Vector2, tag: int) -> void: _blocked.append([caster, position, tag]))
+	_bus.projectile_expired.connect(func(caster: int, position: Vector2, tag: int, _shot: int) -> void: _expired.append([caster, position, tag, _mgr.expired_on_wall]))
+	_bus.projectile_hit.connect(func(caster: int, target: Node, position: Vector2, tag: int, _shot: int) -> void: _hits.append([caster, target, position, tag]))
+	_bus.shot_blocked.connect(func(caster: int, position: Vector2, tag: int, _shot: int) -> void: _blocked.append([caster, position, tag]))
 
 
 func _teardown() -> void:

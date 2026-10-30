@@ -413,12 +413,12 @@ func _on_spell_cast(player: int, _spell_id: StringName, _origin: Vector2, _direc
 
 
 ## Only shots made by spells have a tag; the fillers have tag 0.
-func _on_projectile_hit(_caster: int, _target: Node, _position: Vector2, tag: int) -> void:
+func _on_projectile_hit(_caster: int, _target: Node, _position: Vector2, tag: int, _shot: int) -> void:
 	if tag != 0:
 		_hits += 1
 
 
-func _on_reaction_triggered(_caster: int, _reaction_id: StringName, _position: Vector2) -> void:
+func _on_reaction_triggered(_caster: int, _reaction_id: StringName, _position: Vector2, _shot: int) -> void:
 	_reactions += 1
 
 

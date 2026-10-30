@@ -91,6 +91,10 @@ const INSTANT_HOMING_SECONDS: float = 0.25
 ## slowest walking enemy (30), so a rune that homes is a trap that follows, never a chaser one can
 ## not walk away from, and over a rune's 8 s it creeps about the Homing card's reach (160 px).
 const HOMING_DRIFT: float = 24.0
+## Pixels per second (a bolt's) above which a homing shot turns faster, in step with its speed, so
+## its curve is never wider than a homing bolt's: an atom or a faster bolt bends onto what a
+## bolt would. A shot this fast or slower turns at its homing rate.
+const HOMING_PACE: float = 220.0
 ## A homing teleport whose target is within its distance lands this far outside the target's
 ## hit circle (a wizard's body radius), not on it.
 const LAND_CLEARANCE: float = 6.0

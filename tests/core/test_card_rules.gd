@@ -145,7 +145,9 @@ func _discover() -> void:
 			continue
 		if _payload == null or form.shots > _payload.shots:
 			_payload = form
-		if form.shots == 1 and (_shot == null or form.speed * form.lifetime > _shot.speed * _shot.lifetime):
+		# The shot an enemy fires, a donor casts and a payload is: one that hits for a point at least
+		# (an atom's speck, a stream, meets a swing only now and then: the swing sweeps a slice a step).
+		if form.shots == 1 and form.base_damage >= 1.0 and (_shot == null or form.speed * form.lifetime > _shot.speed * _shot.lifetime):
 			_shot = form
 
 
@@ -158,7 +160,7 @@ func _discover() -> void:
 ## wall), `back` (a target behind the wizard, on the line), `shooter` (an enemy past the reach shooting along the line at the wizard all the time; the
 ## wizard casts once one of its shots is near),
 ## `donor` (the target on the line cast an infused shot just before), `weak` (that target dies of
-## one hit), `status` (that target has a status the carrier's infusion reacts with), `hurt` (the
+## any one hit: 1 health and 0.99 of a point owed), `status` (that target has a status the carrier's infusion reacts with), `hurt` (the
 ## wizard is hurt now and then), `repeat` (the wizard keeps casting whenever its staff is ready),
 ## `with` (a modifier of that behaviour joins both casts). `open` is nothing at all.
 const LINE: Dictionary = {"name": "target", "line": true}
@@ -393,10 +395,6 @@ func _cell(card: SpellComponent, form: FormBase) -> String:
 ## is kept and the runtime alone decides what it does.
 func _changes(card: SpellComponent, form: FormBase, scene: Dictionary, forced: bool) -> bool:
 	StaffCompiler.keep_wasted = forced
-	if scene.get("weak", false) and form.base_damage < 1.0:
-		# One hit of a speck (an atom, below a point) kills nothing; its stream does.
-		scene = scene.duplicate()
-		scene["repeat"] = true
 	var casts: Array = _casts(card, form, scene, forced)
 	var with: Array[StringName] = casts[0]
 	var without: Array[StringName] = casts[1]
@@ -539,6 +537,20 @@ func _costs_of(card: SpellComponent) -> StringName:
 	return id
 
 
+## How far along the aim the target off the line stands: at `r`, or for a shot so fast that an
+## arc's first zap (after its interval or half the shot's life) comes well past `r`, where that
+## zap is (an atom's, 165 px out), so an arc can reach it.
+func _side_at(form: FormBase, r: float) -> float:
+	if not Carriers.of(form.carrier).has(Carrier.FLIES):
+		return r
+	for modifier in _modifiers:
+		if modifier.behaviour == ModifierBase.Behaviour.ARC and modifier.behaviour_strength > 0.0:
+			var zap: float = form.speed * minf(1.0 / modifier.behaviour_strength, form.lifetime * 0.5)
+			if zap > r + modifier.behaviour_reach * 0.5:
+				return zap
+	return r
+
+
 ## Casts `cards` once (or for the whole run, `repeat`) in the scene for `form` and returns the trace,
 ## up to its first difference from `expect` (the whole trace when there is none).
 func _run(cards: Array[StringName], form: FormBase, scene: Dictionary, seconds: float, expect: PackedStringArray = PackedStringArray()) -> PackedStringArray:
@@ -558,6 +570,9 @@ func _run(cards: Array[StringName], form: FormBase, scene: Dictionary, seconds: 
 			# Its own cast flies off up into a wall.
 			world.add_wall(Rect2(-480.0, -160.0, 960.0, 8.0))
 		var target: Actor = world.add_enemy(&"A", Vector2(r, 0.0), 1 if scene.get("weak", false) else World.HEALTH, donor, Vector2.UP)
+		if scene.get("weak", false):
+			# It dies of any hit, a speck's below a point too (an atom).
+			world.owe(target, 0.99)
 		if scene.get("status", false):
 			var row: ReactionRow = _reaction()
 			if row != null:
@@ -571,7 +586,7 @@ func _run(cards: Array[StringName], form: FormBase, scene: Dictionary, seconds: 
 	if scene.get("second", false):
 		world.add_enemy(&"B", Vector2(r, SECOND))
 	if scene.get("side", false):
-		world.add_enemy(&"S", Vector2(r, SIDE))
+		world.add_enemy(&"S", Vector2(_side_at(form, r), SIDE))
 	if scene.has("wall"):
 		var x: float = r * float(scene["wall"])
 		world.add_wall(Rect2(x, -80.0, 8.0, 160.0))

@@ -511,14 +511,14 @@ func _is_card(id: StringName) -> bool:
 
 ## The damage one cast deals if every shot of it lands once (a beam: every hit of its life):
 ## each carrier's hit times its shots, times the group's repeats. Payloads are left out (they
-## depend on what is hit), so it is the builder's "at least" number.
-static func _cast_damage(cast: CompiledCast) -> int:
+## depend on what is hit), so it is the builder's "at least" number; to a tenth (an atom's 0.3).
+static func _cast_damage(cast: CompiledCast) -> float:
 	if cast.group == null:
-		return 0
+		return 0.0
 	var total: float = 0.0
 	for spell in cast.group.spells:
 		total += spell.damage * float(maxi(spell.shots, 1) * Carriers.of(spell.carrier).hits_per_target(spell.lifetime))
-	return roundi(total * float(maxi(cast.group.repeats, 1)))
+	return snappedf(total * float(maxi(cast.group.repeats, 1)), 0.1)
 
 
 ## What the builder shows of the component `id`: its name (the id when it has none, "" for

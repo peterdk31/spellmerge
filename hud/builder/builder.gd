@@ -1046,7 +1046,7 @@ func _link_sentence(slot: int) -> String:
 ## The live number the cast's own words leave out: its damage if every shot lands once (the
 ## words already give its mana and delay).
 func _numbers(cast: Dictionary) -> String:
-	return "%d dmg" % int(cast.get("damage", 0))
+	return "%s dmg" % SpellsScript._short(float(cast.get("damage", 0.0)))
 
 
 ## Player 1's mouse on `button`: a press focuses it; a release on the same control works as

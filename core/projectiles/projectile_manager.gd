@@ -257,6 +257,8 @@ const RETURN_BEND: float = PI / 3.0
 const HOMING_PERIOD: int = 4
 ## The straight pieces a bent beam (`ray_curve`) is walked as.
 const RAY_SEGMENTS: int = 8
+## The most points of its last step a swing's or beam's guard tests a shot at (`_guard_samples`).
+const GUARD_PATH_SAMPLES: int = 16
 ## Rows `sweep`'s results hold at first; they grow when a sweep finds more.
 const SWEEP_START: int = 32
 ## Points a ray's path holds at first; it grows when a path is longer (a homing beam bending on
@@ -1753,8 +1755,14 @@ func _grow_moves(size: int) -> void:
 		_move_free = at
 
 
+## The radians a second a homing shot of rate `rate` turns at `speed` pixels a second: its rate,
+## faster in step above SpellLimits.HOMING_PACE, so a fast shot's curve is no wider than a bolt's.
+static func turn_at(rate: float, speed: float) -> float:
+	return rate * maxf(speed / SpellLimits.HOMING_PACE, 1.0)
+
+
 ## Make the shot in `slot` home on targets no further than `within` pixels from it: a straight
-## shot turns at most `turn_rate` radians a second, a still one (a rune) creeps toward its
+## shot turns at most `turn_rate` radians a second (faster above SpellLimits.HOMING_PACE, `turn_at`), a still one (a rune) creeps toward its
 ## target at SpellLimits.HOMING_DRIFT. Returns false for an empty slot, an orbit shot (held on
 ## its circle), a rate that is negative or not finite, or a `within` that is not above 0 and
 ## finite; true when the rate was applied, 0 included (0 stops homing).
@@ -2043,15 +2051,19 @@ func shots_in_wedge(caster: int, origin: Vector2, direction: Vector2, side: int,
 	for slot in _high:
 		if _alive[slot] == 0 or _team[slot] == mine:
 			continue
-		var to: Vector2 = _pos[slot] - origin
-		var distance: float = to.length()
 		var radius: float = _radius[slot]
-		if distance > reach + radius:
-			continue
-		var width: float = PI if distance <= radius else asin(radius / distance)
-		var local: float = angle_difference(base, to.angle()) * turn
-		if local + width >= from_angle and local - width <= to_angle:
-			found = _guard_add(found, slot)
+		# Along its last step, so a small fast shot (an atom) does not slip past between steps.
+		var samples: int = _guard_samples(slot)
+		for k in samples:
+			var to: Vector2 = _guard_point(slot, k, samples) - origin
+			var distance: float = to.length()
+			if distance > reach + radius:
+				continue
+			var width: float = PI if distance <= radius else asin(radius / distance)
+			var local: float = angle_difference(base, to.angle()) * turn
+			if local + width >= from_angle and local - width <= to_angle:
+				found = _guard_add(found, slot)
+				break
 	return found
 
 
@@ -2067,9 +2079,28 @@ func shots_on_segment(caster: int, a: Vector2, b: Vector2, width: float, first: 
 		if _alive[slot] == 0 or _team[slot] == mine or _guard_has(found, slot):
 			continue
 		var reach: float = width + _radius[slot]
-		if Geometry2D.get_closest_point_to_segment(_pos[slot], a, b).distance_squared_to(_pos[slot]) <= reach * reach:
-			found = _guard_add(found, slot)
+		var samples: int = _guard_samples(slot)
+		for k in samples:
+			var at: Vector2 = _guard_point(slot, k, samples)
+			if Geometry2D.get_closest_point_to_segment(at, a, b).distance_squared_to(at) <= reach * reach:
+				found = _guard_add(found, slot)
+				break
 	return found
+
+
+## How many points of its last step a guard tests a shot at: one for a shot that moves less than
+## its own width a step, else one every width (at most GUARD_PATH_SAMPLES), so a small fast shot
+## (an atom: 1.5 px, 18 px a step) cannot pass a swing or a beam between two steps.
+func _guard_samples(slot: int) -> int:
+	var step: float = _pos[slot].distance_to(_prev[slot])
+	var width: float = maxf(_radius[slot] * 2.0, 1.0)
+	return 1 if step <= width else mini(ceili(step / width), GUARD_PATH_SAMPLES)
+
+
+## Point `k` of `samples` along the shot's last step, from where it is now (k 0) back toward where
+## it was (that point itself was tested on the step before).
+func _guard_point(slot: int, k: int, samples: int) -> Vector2:
+	return _pos[slot].lerp(_prev[slot], float(k) / float(samples))
 
 
 func _guard_has(found: int, slot: int) -> bool:
@@ -2568,7 +2599,7 @@ func _pass_return(list: PackedInt32Array, first: int, count: int, delta: float) 
 			var want: float = 0.0
 			if goal.is_finite() and not goal.is_equal_approx(here):
 				want = clampf(heading.angle_to(goal - here), -RETURN_BEND, RETURN_BEND)
-			heading = heading.rotated(move_toward(bend, want, _turn[slot] * delta))
+			heading = heading.rotated(move_toward(bend, want, turn_at(_turn[slot], _speed[slot]) * delta))
 		_vel[slot] = heading * _speed[slot]
 		_pos[slot] = _prev[slot] + _vel[slot] * delta
 		_state[slot] = S_RETURNING
@@ -2604,7 +2635,7 @@ func _pass_homing(list: PackedInt32Array, first: int, count: int, delta: float) 
 			_pos[slot] = _prev[slot] + want.limit_length(SpellLimits.HOMING_DRIFT * delta)
 			continue
 		# `turned_toward`, written out (this runs for every homing shot every step).
-		var most: float = _turn[slot] * delta
+		var most: float = turn_at(_turn[slot], velocity.length()) * delta
 		_vel[slot] = velocity.rotated(clampf(velocity.angle_to(want), -most, most))
 		_pos[slot] = _prev[slot] + _vel[slot] * delta
 

@@ -150,6 +150,12 @@ func add_enemy(label: StringName, at: Vector2, health: int = HEALTH, cards: Arra
 	return _body(label, at, mind, cards, health)
 
 
+## `body` is owed `share` of a point already (combat's leftover of hits below a point): at 1 health
+## and 0.99 owed, any hit kills it, a speck's too.
+func owe(body: Node2D, share: float) -> void:
+	combat._hit_carry[combat._row_of(body)] = share
+
+
 ## A wall over `rect`.
 func add_wall(rect: Rect2) -> void:
 	_walls.append(rect)

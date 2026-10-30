@@ -166,6 +166,17 @@ func test_a_death_outside_the_horde_does_not_count() -> void:
 	check_equal(run.director.gems().count, 0, "and drops no gem")
 
 
+func test_a_kill_after_the_end_does_not_count() -> void:
+	var run: Fixture = _make()
+	run.start()
+	run.run(1.0)
+	run.bus.player_downed.emit(0)
+	check(run.director.over, "everyone down: over")
+	run.kill(run.enemies()[0], Vector2(100.0, 100.0))
+	check_equal(run.director.kills, 0, "the summary's kills stand")
+	check_equal(run.director.gems().count, 0, "and no gem drops")
+
+
 func test_a_wizard_pulls_in_a_near_gem_for_the_party() -> void:
 	var run: Fixture = _make([0, 1])
 	run.start()

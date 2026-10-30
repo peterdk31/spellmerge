@@ -458,7 +458,8 @@ func _clear_of_wizards(at: Vector2) -> bool:
 func _on_enemy_died(_killer: int, enemy: Node, at: Vector2, _shot: int) -> void:
 	if world == null or _horde == null or enemy == null or not is_instance_valid(enemy):
 		return
-	if enemy.get_parent() != _horde:
+	# After `horde_over` the summary's numbers stand: a death in the last seconds counts for nothing.
+	if over or enemy.get_parent() != _horde:
 		return
 	kills += 1
 	alive = maxi(alive - 1, 0)

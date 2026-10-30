@@ -61,7 +61,7 @@ Numbers are first guesses for the card's own task to set. Examples are written i
 | teleport | Blink a fixed `ray_length` along the aim, stopping before walls. End point: the arrival | `blast · teleport` arrives with an explosion; `on expire · teleport · nova` rings out on arrival |
 | ~~hook~~ | Became the `pull` modifier (rules R4 F1, owner 2026-10-30): the old hook is `pull · bolt` | |
 | swap | A shot that trades places with the target it hits | an escape through an enemy; `frost · swap` leaves a chilled target where you stood |
-| wall | A line of still shots across the aim | `shield · wall` stops enemy shots; `fire · wall` is a burning fence |
+| wall | A short-lived solid wall across the aim: bodies and shots stop at it, touching it hurts | `shield · wall` stops enemy shots; `fire · wall` is a burning fence |
 | rain | Its payload falls on the aim point after a telegraphed delay | `rain · nova`; `rain · frost · nova` freezes an area from above |
 | decoy | A still copy of the wizard that enemies target. End point: where it dies | `blast · decoy` is an exploding decoy; `on expire · decoy · nova` |
 | familiar | A small helper that orbits the caster; it casts what its triggers give it (rules R4 F3) | `timer · familiar · bolt` casts a bolt every tick; `hold · timer · familiar · mend · bolt` is a lasting healer |

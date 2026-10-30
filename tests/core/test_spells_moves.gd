@@ -357,11 +357,11 @@ func test_a_chain_shot_blasts_where_each_jump_ends() -> void:
 	check_equal(_areas.size(), 2, "the first shot is spent on its hit and so is the jump shot: %s" % [_areas])
 
 
-func test_every_shot_of_a_wall_blasts_when_it_expires() -> void:
+func test_a_wall_blasts_once_when_it_expires() -> void:
 	_build(0, [&"blast", &"wall"])
 	_cast()
 	_tick(60)
-	check_equal(_areas.size(), 3, "one explosion for each of the three shots")
+	check_equal(_areas.size(), 1, "one wall, one explosion (rules R4 F6)")
 
 
 func test_the_move_heading_is_the_last_asked_move() -> void:

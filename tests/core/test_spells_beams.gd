@@ -50,7 +50,7 @@ func before_each() -> void:
 	_bus.area_hit_requested.connect(func(player: int, at: Vector2, radius: float, tag: int) -> void:
 		_areas.append([player, at, radius, tag]))
 	var beam: FormBase = _form(&"beam", 0.0, 0.3)
-	beam.motion = FormBase.Motion.RAY
+	beam.carrier = &"beam"
 	beam.ray_length = 200.0
 	beam.radius = 6.0
 	var bolt: FormBase = _form(&"bolt", 300.0, 1.0)
@@ -134,7 +134,7 @@ func test_a_beam_hits_at_once_then_every_tick_until_its_life_is_over() -> void:
 	check_equal(_hits.size(), 1, "a hit at once")
 	check_equal(_spells.beam_count(), 1, "the beam stays on")
 	_tick(60)
-	check_equal(_hits.size(), SpellsScript.beam_hits(FormBase.Motion.RAY, 0.3), "one hit every tick of its 0.3 s life")
+	check_equal(_hits.size(), SpellsScript.beam_hits(&"beam", 0.3), "one hit every tick of its 0.3 s life")
 	check_equal(_spells.beam_count(), 0, "then it is gone")
 	check_equal(_spells.live_shots(tag), 0, "and no longer counted")
 
@@ -304,7 +304,7 @@ func test_a_bouncing_beam_turns_at_a_wall_and_hits_what_is_past_the_turn() -> vo
 	var turn: Vector2 = _spells.beam_point(at, 1)
 	check(turn.x > 79.0 and turn.x < 80.0, "the turn is at the wall (%s)" % str(turn))
 	_tick(30)
-	check_equal(_hits.size(), SpellsScript.beam_hits(FormBase.Motion.RAY, 0.3), "it hits it every tick of its life, along the same turn")
+	check_equal(_hits.size(), SpellsScript.beam_hits(&"beam", 0.3), "it hits it every tick of its life, along the same turn")
 
 
 func test_a_bouncing_beam_ends_its_blast_past_the_turn() -> void:
@@ -325,7 +325,7 @@ func test_a_bouncing_beam_ends_its_blast_past_the_turn() -> void:
 func test_a_homing_beam_homes_again_after_it_turns_at_a_wall() -> void:
 	_turning_room()
 	var long: FormBase = _form(&"long_beam", 0.0, 0.3)
-	long.motion = FormBase.Motion.RAY
+	long.carrier = &"beam"
 	long.ray_length = 300.0
 	long.radius = 6.0
 	var behind: Node2D = _target(Vector2(-5.0, 120.0))

@@ -380,9 +380,9 @@ var _aim_pivot: PackedVector2Array = PackedVector2Array()
 ## caster * STAFFS + staff -> the last generation that staff used, so a build after an empty
 ## staff, or a caster opened again under the same id, goes on round the ring (old shots in the air keep theirs).
 var _ring: PackedInt32Array = PackedInt32Array()
-## This runtime's carriers, by `FormBase.Motion` (`Carriers.make_all`, bound to it), and the three
+## This runtime's carriers, by id (`Carriers.make_all`, bound to it), and the three
 ## that keep rows of their own, for their looks' getters.
-var _carriers: Array[Carrier] = []
+var _carriers: Dictionary = {}
 var _beams: CarrierBeam = null
 var _swings: CarrierSwing = null
 var _slams: CarrierSlam = null
@@ -393,11 +393,11 @@ var _poses: StaffPoses = null
 func _init() -> void:
 	_poses = StaffPoses.new(self)
 	_carriers = Carriers.make_all()
-	for carrier in _carriers:
+	for carrier: Carrier in _carriers.values():
 		carrier.bind(self, _poses)
-	_beams = _carriers[FormBase.Motion.RAY] as CarrierBeam
-	_swings = _carriers[FormBase.Motion.SWING] as CarrierSwing
-	_slams = _carriers[FormBase.Motion.SLAM] as CarrierSlam
+	_beams = _carriers[&"beam"] as CarrierBeam
+	_swings = _carriers[&"swing"] as CarrierSwing
+	_slams = _carriers[&"slam"] as CarrierSlam
 	_current.resize(ACTORS * SpellLimits.STAFFS)
 	_current.fill(-1)
 	_installed.resize(ACTORS * SpellLimits.STAFFS)
@@ -547,7 +547,7 @@ static func _cast_damage(cast: CompiledCast) -> int:
 		return 0
 	var total: int = 0
 	for spell in cast.group.spells:
-		total += spell.damage * maxi(spell.shots, 1) * CarrierBeam.beam_hits(spell.motion, spell.lifetime)
+		total += spell.damage * maxi(spell.shots, 1) * CarrierBeam.beam_hits(spell.carrier, spell.lifetime)
 	return total * maxi(cast.group.repeats, 1)
 
 
@@ -574,7 +574,7 @@ func component_stats(id: StringName) -> PackedStringArray:
 	var component: SpellComponent = _component(id)
 	if component is FormBase:
 		var form: FormBase = component
-		var hits: int = maxi(form.shots, 1) * CarrierBeam.beam_hits(form.motion, form.lifetime)
+		var hits: int = maxi(form.shots, 1) * CarrierBeam.beam_hits(form.carrier, form.lifetime)
 		out.append("Dmg %d" % form.base_damage if hits <= 1 else "Dmg %dx%d" % [form.base_damage, hits])
 		out.append("Mana " + _short(form.mana_cost))
 		out.append("Delay %ss" % _short(form.cooldown))
@@ -787,7 +787,7 @@ func install_staff(actor: int, staff: int, compiled: CompiledStaff) -> int:
 			projectiles.remove_by_tag(revoked)
 	for revoked in revoked_tags:
 		_end_entities(revoked)
-		for carrier in _carriers:
+		for carrier: Carrier in _carriers.values():
 			carrier.end_of(revoked)
 	return tag
 
@@ -878,7 +878,7 @@ func step(delta: float) -> void:
 	_run_waiting_fires()
 	_step_moves(delta)
 	_step_passes(delta)
-	for carrier in _carriers:
+	for carrier: Carrier in _carriers.values():
 		carrier.step(delta)
 	_step_live(delta)
 	_step_arcs(delta)
@@ -902,9 +902,9 @@ func _launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direct
 	return carrier.launch(spell, tag, actor, origin, direction, source, lifetime, carried, prev)
 
 
-## The carrier that runs `spell` (`Carrier`, one per `FormBase.Motion`).
+## The carrier that runs `spell` (`Carrier`, by its id; one that runs nothing for a fallback).
 func _carrier_of(spell: CompiledSpell) -> Carrier:
-	return _carriers[spell.motion] if spell.motion >= 0 and spell.motion < _carriers.size() else _carriers[FormBase.Motion._UNUSED_10]
+	return _carriers.get(spell.carrier, Carriers.of(&"")) as Carrier
 
 
 ## A shot a carrier spawned in `slot` (-1 when the manager refused it) takes its cards (`_apply_travel`)
@@ -1500,7 +1500,7 @@ func _fire_spell(spell: CompiledSpell, actor: int, staff: int, generation: int, 
 	if launched > 0:
 		_recoil(spell, tag, actor, origin, heading)
 	# A move's mirror would cancel it (rules R4g): a dash or teleport moves its caster once.
-	if launched > 0 and spell.behaviour(ModifierBase.Behaviour.MIRROR) > 0.0 and _carrier_of(spell).use_of(ModifierBase.Behaviour.MIRROR) != Carrier.Use.WASTED:
+	if launched > 0 and spell.behaviour(ModifierBase.Behaviour.MIRROR) > 0.0 and _carrier_of(spell).works(ModifierBase.Behaviour.MIRROR) != Carrier.Works.NO:
 		var backwards: int = _launch(spell, tag, actor, origin, -heading, source)
 		launched += backwards
 		if backwards > 0:
@@ -1529,7 +1529,7 @@ func _fire_spell(spell: CompiledSpell, actor: int, staff: int, generation: int, 
 ## and a teleport, over at once, has it taken off its distance instead (`_move_caster`).
 func _recoil(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading: Vector2) -> void:
 	var push: float = spell.behaviour(ModifierBase.Behaviour.RECOIL)
-	if push <= 0.0 or _carrier_of(spell).use_of(ModifierBase.Behaviour.RECOIL) == Carrier.Use.OWN:
+	if push <= 0.0 or _carrier_of(spell).works(ModifierBase.Behaviour.RECOIL) == Carrier.Works.OWN_WAY:
 		return
 	if _caster != CASTER_WIZARD:
 		# A payload's recoil pushes the shot that cast it (a point has nothing to push).
@@ -2611,7 +2611,7 @@ func clear() -> void:
 		_passes_free.append(dash)
 	_passes.clear()
 	_caster = CASTER_WIZARD
-	for carrier in _carriers:
+	for carrier: Carrier in _carriers.values():
 		carrier.clear()
 	_poses.clear()
 	_aim_pivot.fill(Vector2.INF)
@@ -2683,7 +2683,7 @@ func close_caster(actor: int) -> void:
 		_current[index] = -1
 		if old >= 0:
 			_release_generation(actor, staff, old)
-	for carrier in _carriers:
+	for carrier: Carrier in _carriers.values():
 		carrier.end_actor(actor)
 	_reset_caster(actor)
 
@@ -2851,7 +2851,7 @@ func _holds(spell: CompiledSpell, tag: int) -> bool:
 ## so while held each is cast anew every wind-up and lifetime (a rain falls again, a swing sweeps
 ## back), until switched off. Its hold ends only then, not between two of them.
 static func _repeats(spell: CompiledSpell) -> bool:
-	return spell != null and Carriers.of(spell.motion).has(Carrier.REPEATS_HELD)
+	return spell != null and Carriers.of(spell.carrier).has(Carrier.REPEATS_HELD)
 
 
 ## A sustained (`hold`) carrier made shots: it stays on and its staff reserves the mana of the
@@ -2967,8 +2967,8 @@ func _name_of(component: SpellComponent) -> String:
 # and the tests: each getter hands the question to the carrier that keeps those rows.
 
 ## Beams (`CarrierBeam`): `beam_slots()` rows, each on or off, with where it is and how it looks.
-static func beam_hits(motion: int, lifetime: float) -> int:
-	return CarrierBeam.beam_hits(motion, lifetime)
+static func beam_hits(carrier: StringName, lifetime: float) -> int:
+	return CarrierBeam.beam_hits(carrier, lifetime)
 
 
 func beam_slots() -> int:

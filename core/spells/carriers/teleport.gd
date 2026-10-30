@@ -1,34 +1,34 @@
 class_name CarrierTeleport
 extends Carrier
 ## Blinks its caster `ray_length` along the aim, stopping before walls, and strikes the bodies where
-## it lands (`FormBase.Motion.TELEPORT`). Over at once: homing bends its way, recoil shortens it.
+## it lands (`&"teleport"`). Over at once: homing bends its way, recoil shortens it.
 
 
 ## How the teleport takes each modifier (`ModifierBase.Behaviour`), every one: see `Carrier`.
 const BEHAVIOURS: Dictionary = {
-	B.NONE: [Use.RUNS, Look.NONE],
-	B.HOMING: [Use.OWN, Look.NONE],
-	B.CHAIN: [Use.RUNS, Look.NONE],
-	B.SHIELD: [Use.OWN, Look.NONE],
-	B.BLAST: [Use.RUNS, Look.CUE],
-	B.HOLD: [Use.WASTED, "nothing keeps it on: a teleport moves its caster at once and hits where it lands"],
-	B.RECOIL: [Use.OWN, Look.NONE],
-	B.BOUNCE: [Use.WASTED, "it turns a shot or a beam at walls, and a teleport moves its caster at once and hits where it lands"],
-	B.ECHO: [Use.RUNS, Look.NONE],
-	B.LINGER: [Use.WASTED, "it only changes a moving shot, and a teleport moves its caster at once and hits where it lands"],
-	B.HEAVY: [Use.RUNS, Look.NONE],
-	B.SIPHON: [Use.RUNS, Look.NONE],
-	B.STICKY: [Use.WASTED, "it only changes a moving shot, and a teleport moves its caster at once and hits where it lands"],
-	B.MAGNET: [Use.WASTED, "it needs a shot or a beam that stays in the world, and a teleport moves its caster at once and hits where it lands"],
-	B.GHOST: [Use.WASTED, "it only takes a flying shot or a line through walls, and a teleport moves its caster at once and hits where it lands"],
-	B.SPIRAL: [Use.WASTED, "it only changes a moving shot, and a teleport moves its caster at once and hits where it lands"],
-	B.MIRROR: [Use.WASTED, "a move and its mirror cancel"],
-	B.GROWTH: [Use.WASTED, "it grows a shot in the world or a beam, and a teleport moves its caster at once and hits where it lands"],
-	B.RELAY: [Use.RUNS, Look.NONE],
-	B.RETURN: [Use.WASTED, "it does not fly out"],
-	B.ARC: [Use.WASTED, "it is not a shot that stays in the air"],
-	B.POSSESS: [Use.RUNS, Look.NONE],
-	B.DEFLECT: [Use.OWN, Look.NONE],
+	B.NONE: [Works.YES, Shows.NOTHING],
+	B.HOMING: [Works.OWN_WAY, Shows.NOTHING],
+	B.CHAIN: [Works.YES, Shows.NOTHING],
+	B.SHIELD: [Works.OWN_WAY, Shows.NOTHING],
+	B.BLAST: [Works.YES, Shows.AS_EFFECT],
+	B.HOLD: [Works.NO, "nothing keeps it on: a teleport moves its caster at once and hits where it lands"],
+	B.RECOIL: [Works.OWN_WAY, Shows.NOTHING],
+	B.BOUNCE: [Works.NO, "it turns a shot or a beam at walls, and a teleport moves its caster at once and hits where it lands"],
+	B.ECHO: [Works.YES, Shows.NOTHING],
+	B.LINGER: [Works.NO, "it only changes a moving shot, and a teleport moves its caster at once and hits where it lands"],
+	B.HEAVY: [Works.YES, Shows.NOTHING],
+	B.SIPHON: [Works.YES, Shows.NOTHING],
+	B.STICKY: [Works.NO, "it only changes a moving shot, and a teleport moves its caster at once and hits where it lands"],
+	B.MAGNET: [Works.NO, "it needs a shot or a beam that stays in the world, and a teleport moves its caster at once and hits where it lands"],
+	B.GHOST: [Works.NO, "it only takes a flying shot or a line through walls, and a teleport moves its caster at once and hits where it lands"],
+	B.SPIRAL: [Works.NO, "it only changes a moving shot, and a teleport moves its caster at once and hits where it lands"],
+	B.MIRROR: [Works.NO, "a move and its mirror cancel"],
+	B.GROWTH: [Works.NO, "it grows a shot in the world or a beam, and a teleport moves its caster at once and hits where it lands"],
+	B.RELAY: [Works.YES, Shows.NOTHING],
+	B.RETURN: [Works.NO, "it does not fly out"],
+	B.ARC: [Works.NO, "it is not a shot that stays in the air"],
+	B.POSSESS: [Works.YES, Shows.NOTHING],
+	B.DEFLECT: [Works.OWN_WAY, Shows.NOTHING],
 }
 ## When each trigger (`TriggerBase.Event`) fires on the teleport: "" when it can, else why it never does.
 const EVENTS: Dictionary = {
@@ -43,11 +43,11 @@ const EVENTS: Dictionary = {
 	E.REACTION: "",
 }
 ## How the teleport takes an infusion.
-const INFUSIONS: Array = [Use.RUNS, Look.NONE]
+const INFUSIONS: Array = [Works.YES, Shows.NOTHING]
 
 
-func motion() -> int:
-	return FormBase.Motion.TELEPORT
+func id() -> StringName:
+	return &"teleport"
 
 
 func noun() -> String:
@@ -74,7 +74,7 @@ func infusions() -> Array:
 	return INFUSIONS
 
 
-func look_note() -> String:
+func nothing_shown_note() -> String:
 	return "a teleport is over at once and draws nothing of its own: its cards show only in its hits"
 
 

@@ -61,7 +61,7 @@ func before_each() -> void:
 	nova.shots = 8
 	nova.spread = 360.0
 	var orbit: FormBase = _form(&"orbit", 0.0, 2.0)
-	orbit.motion = FormBase.Motion.ORBIT
+	orbit.carrier = &"orbit"
 	orbit.orbit_radius = 40.0
 	orbit.pierce = 16
 	var fire := ElementBase.new()

@@ -1,6 +1,6 @@
 class_name CarrierBeam
 extends Carrier
-## A line held by its caster that hits at once and every `SpellLimits.BEAM_TICK` (`FormBase.Motion.RAY`:
+## A line held by its caster that hits at once and every `SpellLimits.BEAM_TICK` (`&"beam"`:
 ## the beam). It runs most shot cards its own way: it bends to a target, turns at walls, waves,
 ## widens, pulls and guards along its line.
 ##
@@ -12,29 +12,29 @@ extends Carrier
 
 ## How the beam takes each modifier (`ModifierBase.Behaviour`), every one: see `Carrier`.
 const BEHAVIOURS: Dictionary = {
-	B.NONE: [Use.RUNS, Look.SHOWN],
-	B.HOMING: [Use.OWN, Look.SHOWN],
-	B.CHAIN: [Use.RUNS, Look.SHOWN],
-	B.SHIELD: [Use.OWN, Look.SHOWN],
-	B.BLAST: [Use.RUNS, Look.CUE],
-	B.HOLD: [Use.RUNS, Look.SHOWN],
-	B.RECOIL: [Use.RUNS, Look.SHOWN],
-	B.BOUNCE: [Use.OWN, Look.SHOWN],
-	B.ECHO: [Use.RUNS, Look.SHOWN],
-	B.LINGER: [Use.WASTED, "it only changes a moving shot, and a beam is a line, not a shot"],
-	B.HEAVY: [Use.RUNS, Look.SHOWN],
-	B.SIPHON: [Use.RUNS, Look.SHOWN],
-	B.STICKY: [Use.WASTED, "it only changes a moving shot, and a beam is a line, not a shot"],
-	B.MAGNET: [Use.OWN, Look.SHOWN],
-	B.GHOST: [Use.OWN, Look.SHOWN],
-	B.SPIRAL: [Use.OWN, Look.SHOWN],
-	B.MIRROR: [Use.RUNS, Look.SHOWN],
-	B.GROWTH: [Use.OWN, Look.SHOWN],
-	B.RELAY: [Use.RUNS, Look.SHOWN],
-	B.RETURN: [Use.WASTED, "it does not fly out"],
-	B.ARC: [Use.WASTED, "it is not a shot that stays in the air"],
-	B.POSSESS: [Use.RUNS, Look.SHOWN],
-	B.DEFLECT: [Use.OWN, Look.SHOWN],
+	B.NONE: [Works.YES, Shows.DRAWN],
+	B.HOMING: [Works.OWN_WAY, Shows.DRAWN],
+	B.CHAIN: [Works.YES, Shows.DRAWN],
+	B.SHIELD: [Works.OWN_WAY, Shows.DRAWN],
+	B.BLAST: [Works.YES, Shows.AS_EFFECT],
+	B.HOLD: [Works.YES, Shows.DRAWN],
+	B.RECOIL: [Works.YES, Shows.DRAWN],
+	B.BOUNCE: [Works.OWN_WAY, Shows.DRAWN],
+	B.ECHO: [Works.YES, Shows.DRAWN],
+	B.LINGER: [Works.NO, "it only changes a moving shot, and a beam is a line, not a shot"],
+	B.HEAVY: [Works.YES, Shows.DRAWN],
+	B.SIPHON: [Works.YES, Shows.DRAWN],
+	B.STICKY: [Works.NO, "it only changes a moving shot, and a beam is a line, not a shot"],
+	B.MAGNET: [Works.OWN_WAY, Shows.DRAWN],
+	B.GHOST: [Works.OWN_WAY, Shows.DRAWN],
+	B.SPIRAL: [Works.OWN_WAY, Shows.DRAWN],
+	B.MIRROR: [Works.YES, Shows.DRAWN],
+	B.GROWTH: [Works.OWN_WAY, Shows.DRAWN],
+	B.RELAY: [Works.YES, Shows.DRAWN],
+	B.RETURN: [Works.NO, "it does not fly out"],
+	B.ARC: [Works.NO, "it is not a shot that stays in the air"],
+	B.POSSESS: [Works.YES, Shows.DRAWN],
+	B.DEFLECT: [Works.OWN_WAY, Shows.DRAWN],
 }
 ## When each trigger (`TriggerBase.Event`) fires on the beam: "" when it can, else why it never does.
 const EVENTS: Dictionary = {
@@ -49,7 +49,7 @@ const EVENTS: Dictionary = {
 	E.REACTION: "",
 }
 ## How the beam takes an infusion.
-const INFUSIONS: Array = [Use.RUNS, Look.SHOWN]
+const INFUSIONS: Array = [Works.YES, Shows.DRAWN]
 
 
 ## Points a live beam row has room for at first: its start, RAY_SEGMENTS a leg for each target it
@@ -107,8 +107,8 @@ var _bm_tip_dir: PackedVector2Array = PackedVector2Array()
 var _bm_hit_at: PackedFloat32Array = PackedFloat32Array()
 
 
-func motion() -> int:
-	return FormBase.Motion.RAY
+func id() -> StringName:
+	return &"beam"
 
 
 func noun() -> String:
@@ -120,8 +120,14 @@ func what() -> String:
 
 
 func traits() -> int:
-	return HITS | LASTS | REACHES | GUARDS | STEERS | SPEED | SHOTS | SPREAD | PIERCE | INSTANT_HOMING
+	return HITS | LASTS | REACHES | GUARDS | STEERS | SPEED | SHOTS | SPREAD | PIERCE | INSTANT_HOMING | HOLDS_STAFF
 
+
+
+func required_fields() -> Dictionary:
+	return {
+		"ray_length": "A beam needs a `ray_length` above 0.",
+	}
 
 func behaviours() -> Dictionary:
 	return BEHAVIOURS
@@ -179,8 +185,8 @@ func pull_magnets() -> void:
 
 ## How many times a carrier with `motion` that lives `lifetime` seconds hits one target: a live
 ## beam once at once and then every `SpellLimits.BEAM_TICK` seconds of its life; anything else once.
-static func beam_hits(motion: int, lifetime: float) -> int:
-	if motion != FormBase.Motion.RAY:
+static func beam_hits(carrier: StringName, lifetime: float) -> int:
+	if carrier != &"beam":
 		return 1
 	return maxi(ceili(lifetime / SpellLimits.BEAM_TICK - 0.001), 1)
 

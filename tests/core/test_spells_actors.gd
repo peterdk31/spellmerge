@@ -72,22 +72,22 @@ func before_each() -> void:
 	_form(&"bolt", 300.0, 1.0)
 	_form(&"slow", 30.0, 5.0)
 	var rune: FormBase = _form(&"rune", 0.0, 3.0)
-	rune.motion = FormBase.Motion.STILL
+	rune.carrier = &"rune"
 	# Many shots at once, each with its own timer: one cast fills a budget's room for a step.
 	var swarm: FormBase = _form(&"swarm", 30.0, 5.0)
 	swarm.shots = SpellLimits.FIRE_SHOTS_PER_STEP
 	swarm.spread = 360.0
 	var beam: FormBase = _form(&"beam", 0.0, 5.0)
-	beam.motion = FormBase.Motion.RAY
+	beam.carrier = &"beam"
 	beam.ray_length = 200.0
 	var dash: FormBase = _form(&"dash", 400.0, 0.2)
-	dash.motion = FormBase.Motion.DASH
+	dash.carrier = &"dash"
 	dash.ray_length = 80.0
 	var orb: FormBase = _form(&"orb", 0.0, 5.0)
-	orb.motion = FormBase.Motion.ORBIT
+	orb.carrier = &"orbit"
 	orb.orbit_radius = 30.0
 	var decoy: FormBase = _form(&"decoy", 0.0, 4.0)
-	decoy.motion = FormBase.Motion.DECOY
+	decoy.carrier = &"decoy"
 	_modifier(&"chain", ModifierBase.Behaviour.CHAIN, 1.0)
 	_modifier(&"echo", ModifierBase.Behaviour.ECHO, 1.0)
 	_modifier(&"siphon", ModifierBase.Behaviour.SIPHON, 2.0)

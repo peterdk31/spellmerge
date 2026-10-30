@@ -25,7 +25,7 @@ func test_the_card_is_a_valid_carrier() -> void:
 	if card == null:
 		return
 	check_equal(card.id, &"rain", "its id is its folder")
-	check_equal(card.motion, FormBase.Motion.RAIN, "it rains")
+	check_equal(card.carrier, &"rain", "it rains")
 	check(card.carries_payload(), "it reads a payload")
 	check(card.lifetime > 0.0 and card.ray_length > 0.0, "it has a delay and a reach")
 	check(card.range_problems().is_empty(), "inside every range: %s" % [card.range_problems()])

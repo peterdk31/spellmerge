@@ -54,11 +54,11 @@ func before_each() -> void:
 	_bus.pull_requested.connect(func(_player: int, at: Vector2, radius: float, _strength: float, _tag: int, to: Vector2) -> void:
 		_pulls.append([at, to, radius]))
 	var beam: FormBase = _form(&"beam", 0.0, 0.3)
-	beam.motion = FormBase.Motion.RAY
+	beam.carrier = &"beam"
 	beam.ray_length = 200.0
 	beam.radius = 6.0
 	var long: FormBase = _form(&"long_beam", 0.0, 0.3)
-	long.motion = FormBase.Motion.RAY
+	long.carrier = &"beam"
 	long.ray_length = 300.0
 	long.radius = 6.0
 	_modifier(&"chain", ModifierBase.Behaviour.CHAIN, 1.0)

@@ -31,7 +31,7 @@ func test_the_card_is_a_valid_carrier() -> void:
 	if card == null:
 		return
 	check_equal(card.id, &"swing", "its id is its folder")
-	check_equal(card.motion, FormBase.Motion.SWING, "it is a swing")
+	check_equal(card.carrier, &"swing", "it is a swing")
 	check(card.range_problems().is_empty(), "inside every range: %s" % [card.range_problems()])
 	check(not card.name_words.is_empty(), "it has name words")
 

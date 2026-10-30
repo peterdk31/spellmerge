@@ -78,14 +78,14 @@ func before_each() -> void:
 	nova.mana_cost = 2.0
 	_put(nova, &"nova")
 	var dash := FormBase.new()
-	dash.motion = FormBase.Motion.DASH
+	dash.carrier = &"dash"
 	dash.ray_length = 60.0
 	dash.speed = 300.0
 	dash.lifetime = 0.2
 	dash.mana_cost = 2.0
 	_put(dash, &"dash")
 	var teleport := FormBase.new()
-	teleport.motion = FormBase.Motion.TELEPORT
+	teleport.carrier = &"teleport"
 	teleport.ray_length = 70.0
 	teleport.mana_cost = 2.0
 	_put(teleport, &"teleport")

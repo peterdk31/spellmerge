@@ -45,7 +45,7 @@ func test_the_card_is_a_valid_carrier() -> void:
 		return
 	check_equal(card.id, &"familiar", "its id is its folder")
 	check_equal(card.kind(), &"form", "a carrier card")
-	check_equal(card.motion, FormBase.Motion.FAMILIAR, "it is a familiar")
+	check_equal(card.carrier, &"familiar", "it is a familiar")
 	check(not card.carries_payload(), "it has no payload of its own: it casts what its triggers give it (rules R4 F3)")
 	check(card.lifetime > 0.0, "it lasts a while")
 	check(card.range_problems().is_empty(), "inside every range: %s" % [card.range_problems()])

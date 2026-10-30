@@ -69,10 +69,7 @@ func started_at(actor: int) -> float:
 ## of a carrier the staff keeps working (a beam's, rain's or dash's `lifetime`, a held one's until its
 ## last shot ends); none for one that leaves the staff (a bolt, a rune, an orbit).
 static func strike_of(spell: CompiledSpell, lifetime: float) -> float:
-	match spell.motion:
-		FormBase.Motion.RAY, FormBase.Motion.RAIN, FormBase.Motion.DASH:
-			return maxf(lifetime, 0.0)
-	return 0.0
+	return maxf(lifetime, 0.0) if Carriers.of(spell.carrier).has(Carrier.HOLDS_STAFF) else 0.0
 
 
 ## Starts `actor`'s staff animation for `spell` (its `staff_pose`, cast with `tag`) now: `wind` and

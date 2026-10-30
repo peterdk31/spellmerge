@@ -45,7 +45,7 @@ func test_the_card_is_a_valid_carrier() -> void:
 		return
 	check_equal(card.id, &"hook", "its id is its folder")
 	check_equal(card.kind(), &"form", "a carrier card")
-	check_equal(card.motion, FormBase.Motion.HOOK, "it is a hook")
+	check_equal(card.carrier, &"hook", "it is a hook")
 	check(card.speed > 0.0 and card.lifetime > 0.0, "it flies")
 	check(card.range_problems().is_empty(), "inside every range: %s" % [card.range_problems()])
 

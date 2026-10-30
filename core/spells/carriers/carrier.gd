@@ -1,46 +1,48 @@
 class_name Carrier
 extends RefCounted
-## A carrier: what a form card fires (`FormBase.Motion`), and the one place that says what it does
-## with every other card (docs/CARRIERS.md). Each motion has one subclass in this folder,
-## found by `Carriers.of(motion)`; the compiler reads its tables, the spell runtime runs it.
+## A carrier: what a form card fires (`FormBase.carrier`), and the one place that says what it does
+## with every other card (docs/CARRIERS.md). Each carrier is one subclass in this folder, found by
+## its id (`Carriers.of(&"beam")`); the compiler reads its tables, the spell runtime runs it.
 ##
 ## A subclass must answer for every card kind, with no default (tests/core/test_carriers.gd fails
 ## on a missing row):
-## - `behaviours()`: one row per `ModifierBase.Behaviour`, `[Use, Look]` when it runs, with a
-##   reason after `Look.NONE` unless `look_note()` gives one for the carrier, and
-##   `[Use.WASTED, "why"]` when it does nothing (the reason a player reads after "Bounce does
-##   nothing on a Decoy: "). `Use.WITH_BLAST` runs only when the carrier also has a blast.
+## - `behaviours()`: one row per `ModifierBase.Behaviour`: whether the card works on this carrier
+##   (`Works`) and, if it does, how it shows (`Shows`): `[Works.YES, Shows.DRAWN]`,
+##   `[Works.OWN_WAY, Shows.NOTHING, "why"]`, `[Works.NO, "why"]` (the reason a player reads after
+##   "Bounce does nothing on a Decoy: "), `[Works.ONLY_WITH_BLAST, Shows.AS_EFFECT, "why not without"]`.
+##   A `Shows.NOTHING` row may leave its reason to `nothing_shown_note()`, said once for the carrier.
 ## - `events()`: one per `TriggerBase.Event`, "" when the trigger can fire on it, else why it never
 ##   does. The compiler adds the checks that depend on the other cards (a block needs a shield).
-## - `infusions()`: how it takes an element, `[Use, Look]` as a behaviour row.
+## - `infusions()`: how it takes an element, a row as a behaviour's.
 ## `traits()` says which numbers and shared rules apply to it (the flags below).
 
 const B := ModifierBase.Behaviour
 const E := TriggerBase.Event
 
-## How a card runs on a carrier.
-enum Use {
-	## The shared path runs it: the shot kit (`Spells._apply_travel`), the hit path (`_on_hit`), the
-	## cast path (`_fire_spell`: echo, mirror, recoil, hold) or the end point (blast).
-	RUNS,
-	## The carrier's own path runs it (its script, or a runtime service only it calls: a move, an
-	## entity's guard), and the shared path leaves it alone.
-	OWN,
-	## It does nothing on this carrier; the card is listed as wasted with the reason.
-	WASTED,
-	## It runs only when the carrier also has a blast, whose area hit carries it.
-	WITH_BLAST,
+## Does the card work on this carrier?
+enum Works {
+	## Yes, the usual way, by the code every carrier shares: the shot kit (`Spells._apply_travel`),
+	## the hit path (`_on_hit`), the cast path (`_fire_spell`: echo, mirror, recoil, hold) or the
+	## end point (blast).
+	YES,
+	## Yes, done by this carrier's own code (its script, or a runtime service only it calls), and the
+	## shared code leaves it alone: a beam bends, bounces and waves along its line.
+	OWN_WAY,
+	## No: the card does nothing here and is listed as wasted, with the reason.
+	NO,
+	## Only when the carrier also has a blast, whose area hit carries the card (heavy on a decoy).
+	ONLY_WITH_BLAST,
 }
 
-## How a card that runs shows on a carrier.
-enum Look {
-	## The carrier draws the card's `look_layer` (and an infusion's tint) on what it shows.
-	SHOWN,
-	## The card's cue plays (`ModifierBase.cue`: a blast's explosion, with the cast's tint and looks);
-	## on a `WITH_BLAST` row, the blast's cue that carries it.
-	CUE,
-	## Nothing of the card shows on this carrier: the row or `look_note()` says why.
-	NONE,
+## How a card that works shows on this carrier.
+enum Shows {
+	## Its look (`look_layer`, an infusion's tint) is drawn on what the carrier shows.
+	DRAWN,
+	## As its own effect (`ModifierBase.cue`: a blast's explosion, in the cast's tint and looks); on an
+	## `ONLY_WITH_BLAST` row, as the effect of the blast that carries it.
+	AS_EFFECT,
+	## Nothing of it shows on this carrier; the row or `nothing_shown_note()` says why.
+	NOTHING,
 }
 
 ## `traits()` flags.
@@ -76,21 +78,27 @@ const REPEATS_HELD: int = 1 << 13
 const OWN_POSE: int = 1 << 14
 ## It is over at once, so a homing one looks at least as far as it goes.
 const INSTANT_HOMING: int = 1 << 15
+## It reads a payload of its own after it, as a trigger does (a rain).
+const CARRIES_PAYLOAD: int = 1 << 16
+## The staff keeps working through its `lifetime` (a beam, a rain, a dash): its staff animation's
+## strike lasts that long.
+const HOLDS_STAFF: int = 1 << 17
 
 
-## The `FormBase.Motion` this carrier runs (-1 for the retired slot).
-func motion() -> int:
-	return -1
+## Its id, the `carrier` a form card names (&"bolt"); &"" for the carrier that runs nothing, which
+## `Carriers.of` answers for a name no carrier has.
+func id() -> StringName:
+	return &""
 
 
 ## Its plain name, as a player reads it ("beam").
 func noun() -> String:
-	return "retired carrier"
+	return "nothing"
 
 
 ## What it is, for a wasted card's reason ("a beam is a line, not a shot").
 func what() -> String:
-	return "no card may use this carrier"
+	return "no carrier has that name"
 
 
 func traits() -> int:
@@ -114,9 +122,15 @@ func hits_nothing() -> String:
 	return "it hits nothing"
 
 
-## Why none of its cards' looks show, for its `Look.NONE` rows that give no reason of their own.
-func look_note() -> String:
+## Why none of its cards' looks show, for its `Shows.NOTHING` rows that give no reason of their own.
+func nothing_shown_note() -> String:
 	return ""
+
+
+## The fields a form card of this carrier must set above 0, with the fix the validator gives
+## (`SpellValidator`): {"speed": "A bolt needs a `speed` above 0."}.
+func required_fields() -> Dictionary:
+	return {}
 
 
 ## The kind of its hits (`HitProfile.kind`), &"" for a shot's own.
@@ -156,10 +170,10 @@ func steers() -> bool:
 	return has(STEERS)
 
 
-## How `behaviour` runs on it (a `Use`); a row it lacks is wasted.
-func use_of(behaviour: int) -> int:
+## How `behaviour` runs on it (a `Works`); a row it lacks is `Works.NO`.
+func works(behaviour: int) -> int:
 	var row: Array = behaviours().get(behaviour, [])
-	return row[0] if not row.is_empty() else Use.WASTED
+	return row[0] if not row.is_empty() else Works.NO
 
 
 ## Why `behaviour` does nothing on it, or "" when it runs (with a blast on it, when `blasts`).
@@ -168,25 +182,25 @@ func waste(behaviour: int, blasts: bool = false) -> String:
 	if row.is_empty():
 		return what()
 	match row[0]:
-		Use.RUNS, Use.OWN:
+		Works.YES, Works.OWN_WAY:
 			return ""
-		Use.WITH_BLAST:
+		Works.ONLY_WITH_BLAST:
 			return "" if blasts else str(row[2])
 	return str(row[1])
 
 
-## How `behaviour` shows on it (a `Look`), or -1 where it does not run.
-func look_of(behaviour: int) -> int:
+## How `behaviour` shows on it (a `Shows`), or -1 where it does not work.
+func shows(behaviour: int) -> int:
 	var row: Array = behaviours().get(behaviour, [])
-	return row[1] if row.size() > 1 and row[0] != Use.WASTED else -1
+	return row[1] if row.size() > 1 and row[0] != Works.NO else -1
 
 
-## Why `behaviour` does not show on it (a `Look.NONE` row), "" otherwise.
-func look_reason(behaviour: int) -> String:
+## Why `behaviour` does not show on it (a `Shows.NOTHING` row), "" otherwise.
+func why_nothing_shows(behaviour: int) -> String:
 	var row: Array = behaviours().get(behaviour, [])
-	if look_of(behaviour) != Look.NONE:
+	if shows(behaviour) != Shows.NOTHING:
 		return ""
-	return str(row[2]) if row.size() > 2 else look_note()
+	return str(row[2]) if row.size() > 2 else nothing_shown_note()
 
 
 ## Why a trigger of `event` never fires on it, or "" when it can.
@@ -199,7 +213,7 @@ func takes_infusion(blasts: bool) -> bool:
 	var row: Array = infusions()
 	if row.is_empty():
 		return false
-	return row[0] == Use.RUNS or row[0] == Use.OWN or (row[0] == Use.WITH_BLAST and blasts)
+	return row[0] == Works.YES or row[0] == Works.OWN_WAY or (row[0] == Works.ONLY_WITH_BLAST and blasts)
 
 
 ## How far a homing one looks for its target, from its `ray_length` and its homing cards' `reach`

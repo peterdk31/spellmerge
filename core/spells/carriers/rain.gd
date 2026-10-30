@@ -1,34 +1,34 @@
 class_name CarrierRain
 extends Carrier
-## Strikes the aim point after `lifetime` seconds and drops its payload there (`FormBase.Motion.RAIN`).
+## Strikes the aim point after `lifetime` seconds and drops its payload there (`&"rain"`).
 ## Homing places it on a target near the point; held, it falls again and again.
 
 
 ## How the rain takes each modifier (`ModifierBase.Behaviour`), every one: see `Carrier`.
 const BEHAVIOURS: Dictionary = {
-	B.NONE: [Use.RUNS, Look.SHOWN],
-	B.HOMING: [Use.OWN, Look.SHOWN],
-	B.CHAIN: [Use.RUNS, Look.SHOWN],
-	B.SHIELD: [Use.WASTED, "it blocks shots that touch the carrier or guards the caster on a move, and a rain strikes once where it lands"],
-	B.BLAST: [Use.RUNS, Look.CUE],
-	B.HOLD: [Use.RUNS, Look.SHOWN],
-	B.RECOIL: [Use.RUNS, Look.SHOWN],
-	B.BOUNCE: [Use.WASTED, "it turns a shot or a beam at walls, and a rain strikes once where it lands"],
-	B.ECHO: [Use.RUNS, Look.SHOWN],
-	B.LINGER: [Use.WASTED, "it only changes a moving shot, and a rain strikes once where it lands"],
-	B.HEAVY: [Use.RUNS, Look.SHOWN],
-	B.SIPHON: [Use.RUNS, Look.SHOWN],
-	B.STICKY: [Use.WASTED, "it only changes a moving shot, and a rain strikes once where it lands"],
-	B.MAGNET: [Use.WASTED, "it needs a shot or a beam that stays in the world, and a rain strikes once where it lands"],
-	B.GHOST: [Use.WASTED, "it only takes a flying shot or a line through walls, and a rain strikes once where it lands"],
-	B.SPIRAL: [Use.WASTED, "it only changes a moving shot, and a rain strikes once where it lands"],
-	B.MIRROR: [Use.RUNS, Look.SHOWN],
-	B.GROWTH: [Use.WASTED, "it grows a shot in the world or a beam, and a rain strikes once where it lands"],
-	B.RELAY: [Use.RUNS, Look.SHOWN],
-	B.RETURN: [Use.WASTED, "it does not fly out"],
-	B.ARC: [Use.WASTED, "it is not a shot that stays in the air"],
-	B.POSSESS: [Use.RUNS, Look.SHOWN],
-	B.DEFLECT: [Use.WASTED, "it touches no shots"],
+	B.NONE: [Works.YES, Shows.DRAWN],
+	B.HOMING: [Works.OWN_WAY, Shows.DRAWN],
+	B.CHAIN: [Works.YES, Shows.DRAWN],
+	B.SHIELD: [Works.NO, "it blocks shots that touch the carrier or guards the caster on a move, and a rain strikes once where it lands"],
+	B.BLAST: [Works.YES, Shows.AS_EFFECT],
+	B.HOLD: [Works.YES, Shows.DRAWN],
+	B.RECOIL: [Works.YES, Shows.DRAWN],
+	B.BOUNCE: [Works.NO, "it turns a shot or a beam at walls, and a rain strikes once where it lands"],
+	B.ECHO: [Works.YES, Shows.DRAWN],
+	B.LINGER: [Works.NO, "it only changes a moving shot, and a rain strikes once where it lands"],
+	B.HEAVY: [Works.YES, Shows.DRAWN],
+	B.SIPHON: [Works.YES, Shows.DRAWN],
+	B.STICKY: [Works.NO, "it only changes a moving shot, and a rain strikes once where it lands"],
+	B.MAGNET: [Works.NO, "it needs a shot or a beam that stays in the world, and a rain strikes once where it lands"],
+	B.GHOST: [Works.NO, "it only takes a flying shot or a line through walls, and a rain strikes once where it lands"],
+	B.SPIRAL: [Works.NO, "it only changes a moving shot, and a rain strikes once where it lands"],
+	B.MIRROR: [Works.YES, Shows.DRAWN],
+	B.GROWTH: [Works.NO, "it grows a shot in the world or a beam, and a rain strikes once where it lands"],
+	B.RELAY: [Works.YES, Shows.DRAWN],
+	B.RETURN: [Works.NO, "it does not fly out"],
+	B.ARC: [Works.NO, "it is not a shot that stays in the air"],
+	B.POSSESS: [Works.YES, Shows.DRAWN],
+	B.DEFLECT: [Works.NO, "it touches no shots"],
 }
 ## When each trigger (`TriggerBase.Event`) fires on the rain: "" when it can, else why it never does.
 const EVENTS: Dictionary = {
@@ -43,11 +43,11 @@ const EVENTS: Dictionary = {
 	E.REACTION: "",
 }
 ## How the rain takes an infusion.
-const INFUSIONS: Array = [Use.RUNS, Look.SHOWN]
+const INFUSIONS: Array = [Works.YES, Shows.DRAWN]
 
 
-func motion() -> int:
-	return FormBase.Motion.RAIN
+func id() -> StringName:
+	return &"rain"
 
 
 func noun() -> String:
@@ -59,7 +59,7 @@ func what() -> String:
 
 
 func traits() -> int:
-	return HITS | LASTS | REACHES | STEERS | SPEED | SHOTS | REPEATS_HELD
+	return HITS | LASTS | REACHES | STEERS | SPEED | SHOTS | REPEATS_HELD | CARRIES_PAYLOAD | HOLDS_STAFF
 
 
 func behaviours() -> Dictionary:

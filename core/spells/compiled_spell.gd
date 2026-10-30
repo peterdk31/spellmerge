@@ -24,8 +24,8 @@ var radius: float = 4.0
 var shots: int = 1
 ## Degrees the shots fan over.
 var spread: float = 0.0
-## A `FormBase.Motion` value.
-var motion: int = FormBase.Motion.STRAIGHT
+## The id of its carrier (`FormBase.carrier`, `Carriers.of`); &"" for a fallback, which has none.
+var carrier: StringName = &""
 var pierce: int = 0
 var orbit_radius: float = 0.0
 var ray_length: float = 0.0

@@ -52,10 +52,10 @@ func before_each() -> void:
 	var orb: FormBase = _form(&"orb", 30.0, 3.0)
 	orb.base_damage = 10
 	var rune: FormBase = _form(&"rune", 0.0, 4.0)
-	rune.motion = FormBase.Motion.STILL
+	rune.carrier = &"rune"
 	rune.base_damage = 10
 	var beam: FormBase = _form(&"beam", 0.0, 0.3)
-	beam.motion = FormBase.Motion.RAY
+	beam.carrier = &"beam"
 	beam.ray_length = 200.0
 	var nova: FormBase = _form(&"nova", 300.0, 0.2)
 	nova.shots = 8
@@ -179,7 +179,7 @@ func test_return_is_wasted_on_a_carrier_that_does_not_fly_out() -> void:
 
 
 func test_the_boomerang_carrier_is_gone() -> void:
-	check(not FormBase.Motion.keys().has("RETURN"), "return is a modifier, not a carrier's motion")
+	check(not Carriers.ids().has(&"return"), "return is a modifier, not a carrier")
 
 
 # --- Arc ------------------------------------------------------------------------------------

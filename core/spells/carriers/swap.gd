@@ -1,34 +1,34 @@
 class_name CarrierSwap
 extends Carrier
-## A flying shot that trades places with the body it hits (`FormBase.Motion.SWAP`). Every shot card
+## A flying shot that trades places with the body it hits (`&"swap"`). Every shot card
 ## runs on it; its own part is the trade (`on_hit`).
 
 
 ## How the swap takes each modifier (`ModifierBase.Behaviour`), every one: see `Carrier`.
 const BEHAVIOURS: Dictionary = {
-	B.NONE: [Use.RUNS, Look.SHOWN],
-	B.HOMING: [Use.RUNS, Look.SHOWN],
-	B.CHAIN: [Use.RUNS, Look.SHOWN],
-	B.SHIELD: [Use.RUNS, Look.SHOWN],
-	B.BLAST: [Use.RUNS, Look.CUE],
-	B.HOLD: [Use.RUNS, Look.SHOWN],
-	B.RECOIL: [Use.RUNS, Look.SHOWN],
-	B.BOUNCE: [Use.RUNS, Look.SHOWN],
-	B.ECHO: [Use.RUNS, Look.SHOWN],
-	B.LINGER: [Use.RUNS, Look.SHOWN],
-	B.HEAVY: [Use.RUNS, Look.SHOWN],
-	B.SIPHON: [Use.RUNS, Look.SHOWN],
-	B.STICKY: [Use.RUNS, Look.SHOWN],
-	B.MAGNET: [Use.RUNS, Look.SHOWN],
-	B.GHOST: [Use.RUNS, Look.SHOWN],
-	B.SPIRAL: [Use.RUNS, Look.SHOWN],
-	B.MIRROR: [Use.RUNS, Look.SHOWN],
-	B.GROWTH: [Use.RUNS, Look.SHOWN],
-	B.RELAY: [Use.RUNS, Look.SHOWN],
-	B.RETURN: [Use.RUNS, Look.SHOWN],
-	B.ARC: [Use.RUNS, Look.SHOWN],
-	B.POSSESS: [Use.RUNS, Look.SHOWN],
-	B.DEFLECT: [Use.RUNS, Look.SHOWN],
+	B.NONE: [Works.YES, Shows.DRAWN],
+	B.HOMING: [Works.YES, Shows.DRAWN],
+	B.CHAIN: [Works.YES, Shows.DRAWN],
+	B.SHIELD: [Works.YES, Shows.DRAWN],
+	B.BLAST: [Works.YES, Shows.AS_EFFECT],
+	B.HOLD: [Works.YES, Shows.DRAWN],
+	B.RECOIL: [Works.YES, Shows.DRAWN],
+	B.BOUNCE: [Works.YES, Shows.DRAWN],
+	B.ECHO: [Works.YES, Shows.DRAWN],
+	B.LINGER: [Works.YES, Shows.DRAWN],
+	B.HEAVY: [Works.YES, Shows.DRAWN],
+	B.SIPHON: [Works.YES, Shows.DRAWN],
+	B.STICKY: [Works.YES, Shows.DRAWN],
+	B.MAGNET: [Works.YES, Shows.DRAWN],
+	B.GHOST: [Works.YES, Shows.DRAWN],
+	B.SPIRAL: [Works.YES, Shows.DRAWN],
+	B.MIRROR: [Works.YES, Shows.DRAWN],
+	B.GROWTH: [Works.YES, Shows.DRAWN],
+	B.RELAY: [Works.YES, Shows.DRAWN],
+	B.RETURN: [Works.YES, Shows.DRAWN],
+	B.ARC: [Works.YES, Shows.DRAWN],
+	B.POSSESS: [Works.YES, Shows.DRAWN],
+	B.DEFLECT: [Works.YES, Shows.DRAWN],
 }
 ## When each trigger (`TriggerBase.Event`) fires on the swap: "" when it can, else why it never does.
 const EVENTS: Dictionary = {
@@ -43,11 +43,11 @@ const EVENTS: Dictionary = {
 	E.REACTION: "",
 }
 ## How the swap takes an infusion.
-const INFUSIONS: Array = [Use.RUNS, Look.SHOWN]
+const INFUSIONS: Array = [Works.YES, Shows.DRAWN]
 
 
-func motion() -> int:
-	return FormBase.Motion.SWAP
+func id() -> StringName:
+	return &"swap"
 
 
 func noun() -> String:

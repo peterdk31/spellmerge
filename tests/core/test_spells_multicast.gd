@@ -49,7 +49,7 @@ func before_each() -> void:
 	var bolt: FormBase = _form(&"bolt", 300.0, 1.0)
 	bolt.base_damage = 10
 	var beam: FormBase = _form(&"beam", 0.0, 0.1)
-	beam.motion = FormBase.Motion.RAY
+	beam.carrier = &"beam"
 	beam.ray_length = 300.0
 	beam.base_damage = 10
 	_multicast(&"double", MulticastBase.Mode.TOGETHER, 1)
@@ -331,7 +331,7 @@ func test_mirror_only_mirrors_the_carrier_it_is_on() -> void:
 func test_a_mirrored_orbit_starts_on_the_other_side() -> void:
 	# Rules R4g: mirror is one rule, the carrier fired again with its aim reversed.
 	var orbit: FormBase = _form(&"orbit", 0.0, 2.0)
-	orbit.motion = FormBase.Motion.ORBIT
+	orbit.carrier = &"orbit"
 	orbit.orbit_radius = 40.0
 	_mgr.set_anchor(0, Vector2.ZERO)
 	_build(0, [&"mirror", &"orbit"])
@@ -346,7 +346,7 @@ func test_a_mirrored_orbit_starts_on_the_other_side() -> void:
 
 func test_a_mirrored_hook_flies_both_ways() -> void:
 	var hook: FormBase = _form(&"hook", 300.0, 0.5)
-	hook.motion = FormBase.Motion.HOOK
+	hook.carrier = &"hook"
 	_build(0, [&"mirror", &"hook"])
 	_cast()
 	var headings: Array[Vector2] = _headings()

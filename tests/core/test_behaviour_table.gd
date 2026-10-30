@@ -1,6 +1,6 @@
 extends "res://tests/support/suite.gd"
 ## The compiler's one table of behaviour x carrier (phase R, R2a, docs/milestones/M2-rules.md,
-## rule 1: works or wasted): every behaviour on every motion either runs or is wasted with a
+## rule 1: works or wasted): every behaviour on every carrier either runs or is wasted with a
 ## reason a player can read, and a wasted card changes nothing else. The real cards are played on
 ## every carrier by tests/core/test_card_rules.gd; here the table itself and a few real cells.
 ##
@@ -18,15 +18,15 @@ func _staff(cards: Array) -> CompiledStaff:
 
 func test_every_cell_runs_or_says_why() -> void:
 	for behaviour: int in ModifierBase.Behaviour.values():
-		for motion: int in FormBase.Motion.values():
+		for motion: StringName in Carriers.ids():
 			var why: String = StaffCompiler.behaviour_waste(behaviour, motion)
-			check_equal(StaffCompiler.behaviour_runs(behaviour, motion), why.is_empty(), "runs and reason agree for %s on %s" % [ModifierBase.Behaviour.keys()[behaviour], FormBase.Motion.keys()[motion]])
-			check(why.length() < 120, "a short reason for %s on %s: %s" % [ModifierBase.Behaviour.keys()[behaviour], FormBase.Motion.keys()[motion], why])
+			check_equal(StaffCompiler.behaviour_runs(behaviour, motion), why.is_empty(), "runs and reason agree for %s on %s" % [ModifierBase.Behaviour.keys()[behaviour], motion])
+			check(why.length() < 120, "a short reason for %s on %s: %s" % [ModifierBase.Behaviour.keys()[behaviour], motion, why])
 
 
 func test_a_bolt_runs_every_behaviour() -> void:
 	for behaviour: int in ModifierBase.Behaviour.values():
-		check(StaffCompiler.behaviour_runs(behaviour, FormBase.Motion.STRAIGHT), "%s runs on a bolt" % ModifierBase.Behaviour.keys()[behaviour])
+		check(StaffCompiler.behaviour_runs(behaviour, &"bolt"), "%s runs on a bolt" % ModifierBase.Behaviour.keys()[behaviour])
 
 
 func test_cards_that_did_nothing_silently_are_listed() -> void:

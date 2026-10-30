@@ -75,7 +75,7 @@ func before_each() -> void:
 	bolt.mana_cost = 2.0
 	_put(bolt, &"bolt")
 	var familiar := FormBase.new()
-	familiar.motion = FormBase.Motion.FAMILIAR
+	familiar.carrier = &"familiar"
 	familiar.lifetime = 6.0
 	familiar.mana_cost = 2.0
 	_put(familiar, &"familiar")
@@ -84,7 +84,7 @@ func before_each() -> void:
 	timer.interval = 0.25
 	_put(timer, &"timer")
 	var decoy := FormBase.new()
-	decoy.motion = FormBase.Motion.DECOY
+	decoy.carrier = &"decoy"
 	decoy.lifetime = 4.0
 	decoy.mana_cost = 2.0
 	_put(decoy, &"decoy")

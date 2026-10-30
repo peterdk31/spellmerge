@@ -53,7 +53,7 @@ func before_each() -> void:
 		_areas.append([player, at, radius, tag]))
 	# The playground's numbers (owner, 2026-10-29).
 	_swing = FormBase.new()
-	_swing.motion = FormBase.Motion.SWING
+	_swing.carrier = &"swing"
 	_swing.base_damage = 2
 	_swing.arc = 90.0
 	_swing.ray_length = REACH

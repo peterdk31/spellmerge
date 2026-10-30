@@ -28,7 +28,7 @@ extends "res://tests/support/suite.gd"
 ## bounce a wall, ghost a wall with a target behind it, shield and deflect an enemy that shoots at
 ## the wizard, on kill a target that dies, on hurt the wizard hurt, on reaction a target with a
 ## status the carrier's infusion reacts with (see `behaviour_scenes` and `event_scenes`). How far
-## along the line things stand is the carrier's reach, chosen by its `FormBase.Motion` (`reach`). A
+## along the line things stand is the carrier's reach, chosen by its `FormBase.carrier` (`reach`). A
 ## card whose behaviour or event has no scene yet fails with "no probe for ...", and a carrier
 ## whose motion has none with "no reach for ...", so a new kind of card or carrier brings its
 ## probe in the same PR.
@@ -141,7 +141,7 @@ func _discover() -> void:
 	_payload = null
 	_shot = null
 	for form in _forms:
-		if form.motion != FormBase.Motion.STRAIGHT:
+		if form.carrier != &"bolt":
 			continue
 		if _payload == null or form.shots > _payload.shots:
 			_payload = form
@@ -226,34 +226,34 @@ static func event_scenes(event: int) -> Array[Dictionary]:
 	return []
 
 
-## How far along the aim a carrier of `form` acts (where its target stands), by its motion; -1
-## when there is no rule for its motion yet.
+## How far along the aim a carrier of `form` acts (where its target stands), by its carrier; -1
+## when there is no rule for its carrier yet.
 static func reach(form: FormBase) -> float:
-	match form.motion:
-		FormBase.Motion.STRAIGHT, FormBase.Motion.HOOK, FormBase.Motion.SWAP:
+	match form.carrier:
+		&"bolt", &"hook", &"swap":
 			return minf(form.speed * form.lifetime * 0.5, 90.0)
-		FormBase.Motion.RAY:
+		&"beam":
 			return minf(form.ray_length * 0.5, 90.0)
-		FormBase.Motion.SWING:
+		&"swing":
 			return form.ray_length * 0.75
-		FormBase.Motion.SLAM:
+		&"slam":
 			# The ring's middle: it strikes `ray_length` ahead and grows to `radius`.
 			return form.ray_length
-		FormBase.Motion.STILL:
+		&"rune":
 			return form.radius
-		FormBase.Motion.ORBIT:
+		&"orbit":
 			return form.orbit_radius
-		FormBase.Motion.WALL:
+		&"wall":
 			return SpellLimits.WALL_REACH
-		FormBase.Motion.RAIN:
+		&"rain":
 			return form.ray_length if form.ray_length > 0.0 else SpellLimits.RAIN_REACH
-		FormBase.Motion.DASH:
+		&"dash":
 			# On its way: a dash strikes what its body passes (rules R4c).
 			return form.ray_length * 0.5
-		FormBase.Motion.TELEPORT:
+		&"teleport":
 			# Where it lands: a teleport strikes what is there (rules R4c).
 			return form.ray_length
-		FormBase.Motion.DECOY, FormBase.Motion.FAMILIAR:
+		&"decoy", &"familiar":
 			return 60.0
 	return -1.0
 
@@ -266,7 +266,7 @@ func test_it_finds_the_cards_and_carriers_itself() -> void:
 	check(_payload != null, "a straight carrier to fire as a payload")
 	check(_shot != null, "a straight carrier of one shot for the enemy shooter")
 	for form in _forms:
-		check(reach(form) >= 0.0, "no reach for the motion %s of `%s`: add it to `reach`" % [FormBase.Motion.keys()[form.motion], form.id])
+		check(reach(form) >= 0.0, "no reach for the carrier %s of `%s`: add it to `reach`" % [form.carrier, form.id])
 
 
 func test_the_same_cast_writes_the_same_trace() -> void:

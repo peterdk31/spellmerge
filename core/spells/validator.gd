@@ -212,24 +212,13 @@ static func _check_form(form: FormBase) -> Array[Dictionary]:
 	var problems: Array[Dictionary] = []
 	var file: String = form.resource_path
 	problems.append_array(_check_pose(form, file))
-	match form.motion:
-		FormBase.Motion.STRAIGHT:
-			if form.speed <= 0.0:
-				problems.append(_problem("required-field", file, "speed", "A STRAIGHT form needs a `speed` above 0."))
-		FormBase.Motion.ORBIT:
-			if form.orbit_radius <= 0.0:
-				problems.append(_problem("required-field", file, "orbit_radius", "An ORBIT form needs an `orbit_radius` above 0."))
-		FormBase.Motion.RAY:
-			if form.ray_length <= 0.0:
-				problems.append(_problem("required-field", file, "ray_length", "A RAY form needs a `ray_length` above 0."))
-		FormBase.Motion.SWING:
-			if form.ray_length <= 0.0:
-				problems.append(_problem("required-field", file, "ray_length", "A SWING form needs a `ray_length` (its reach) above 0."))
-			if form.arc <= 0.0:
-				problems.append(_problem("required-field", file, "arc", "A SWING form needs an `arc` (degrees it sweeps) above 0."))
-		FormBase.Motion.SLAM:
-			if form.ray_length <= 0.0:
-				problems.append(_problem("required-field", file, "ray_length", "A SLAM form needs a `ray_length` (how far ahead it strikes) above 0."))
+	var carrier: Carrier = Carriers.of(form.carrier)
+	if carrier.id() != form.carrier:
+		problems.append(_problem("unknown-carrier", file, "carrier", "`%s` is no carrier: use one of %s (core/spells/carriers/)." % [form.carrier, ", ".join(Carriers.ids())]))
+	var required: Dictionary = carrier.required_fields()
+	for field: String in required:
+		if float(form.get(field)) <= 0.0:
+			problems.append(_problem("required-field", file, field, str(required[field])))
 	return problems
 
 

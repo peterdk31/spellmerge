@@ -36,7 +36,7 @@ func before_each() -> void:
 	var nova: FormBase = _form(&"nova", 4, 8)
 	nova.spread = 360.0
 	nova.cooldown = 0.4
-	_form(&"rain", 3, 1).motion = FormBase.Motion.RAIN
+	_form(&"rain", 3, 1).carrier = &"rain"
 	_element(&"fire", &"burn", 1.5)
 	_element(&"frost", &"chill", 1.0)
 	_modifier(&"split").shot_mult = 3
@@ -219,7 +219,7 @@ func test_a_trigger_in_the_last_slot_wraps_and_is_wasted() -> void:
 
 
 func test_a_counter_dash_reads_in_slot_order() -> void:
-	_form(&"dash", 1, 1).motion = FormBase.Motion.DASH
+	_form(&"dash", 1, 1).carrier = &"dash"
 	_trigger(&"on_block", TriggerBase.Event.BLOCK)
 	var staff: CompiledStaff = _compile("shield on_block dash nova")
 	var dash: CompiledSpell = staff.casts[0].group.spells[0]
@@ -245,12 +245,12 @@ func test_how_far_homing_looks_comes_from_the_card_and_a_beam_s_length() -> void
 	far.behaviour_strength = 2.0
 	far.behaviour_reach = 240.0
 	var beam: FormBase = _form(&"beam", 3, 1)
-	beam.motion = FormBase.Motion.RAY
+	beam.carrier = &"beam"
 	beam.ray_length = 300.0
 	var rune: FormBase = _form(&"rune", 3, 1)
-	rune.motion = FormBase.Motion.STILL
+	rune.carrier = &"rune"
 	var orbit: FormBase = _form(&"orbit", 3, 1)
-	orbit.motion = FormBase.Motion.ORBIT
+	orbit.carrier = &"orbit"
 	check_equal((_compile("homing bolt").casts[0].group.spells[0] as CompiledSpell).homing_range, 160.0, "a bolt looks as far as its card reaches")
 	check_equal((_compile("far_homing bolt").casts[0].group.spells[0] as CompiledSpell).homing_range, 240.0, "a card that reaches further looks further, with no change to core")
 	check_equal((_compile("homing far_homing bolt").casts[0].group.spells[0] as CompiledSpell).homing_range, 240.0, "two cards look as far as the further one")
@@ -395,7 +395,7 @@ func test_a_mend_hit_heals_and_barely_hurts_enemies() -> void:
 
 func test_a_beam_is_a_ray_hit_and_a_bolt_a_shot() -> void:
 	var beam: FormBase = _form(&"beam", 3, 1)
-	beam.motion = FormBase.Motion.RAY
+	beam.carrier = &"beam"
 	beam.ray_length = 200.0
 	check_equal((_compile("beam").casts[0].group.spells[0] as CompiledSpell).hit.kind, &"ray", "a beam")
 	check_equal((_compile("bolt").casts[0].group.spells[0] as CompiledSpell).hit.kind, &"shot", "a bolt")
@@ -403,7 +403,7 @@ func test_a_beam_is_a_ray_hit_and_a_bolt_a_shot() -> void:
 
 func test_a_swing_is_a_swing_hit_though_it_has_a_reach() -> void:
 	var swing: FormBase = _form(&"swing", 2, 1)
-	swing.motion = FormBase.Motion.SWING
+	swing.carrier = &"swing"
 	swing.ray_length = 24.0
 	swing.arc = 90.0
 	check_equal((_compile("swing").casts[0].group.spells[0] as CompiledSpell).hit.kind, &"swing", "its own kind, for its own stop and shake")
@@ -411,7 +411,7 @@ func test_a_swing_is_a_swing_hit_though_it_has_a_reach() -> void:
 
 func test_a_slam_is_an_area_hit() -> void:
 	var slam: FormBase = _form(&"slam", 3, 1)
-	slam.motion = FormBase.Motion.SLAM
+	slam.carrier = &"slam"
 	slam.ray_length = 20.0
 	slam.radius = 16.0
 	check_equal((_compile("slam").casts[0].group.spells[0] as CompiledSpell).hit.kind, &"burst", "a shockwave hits as an area hit")
@@ -432,10 +432,10 @@ func test_reach_stretches_a_carriers_range_and_two_multiply() -> void:
 	var bolt: FormBase = _form(&"far_bolt", 3, 1)
 	bolt.lifetime = 1.0
 	var dash: FormBase = _form(&"far_dash", 1, 1)
-	dash.motion = FormBase.Motion.DASH
+	dash.carrier = &"dash"
 	dash.ray_length = 80.0
 	var rune: FormBase = _form(&"far_rune", 3, 1)
-	rune.motion = FormBase.Motion.STILL
+	rune.carrier = &"rune"
 	var shot: CompiledSpell = _compile("reach far_bolt").casts[0].group.spells[0]
 	check(is_equal_approx(shot.lifetime, 1.6) and is_equal_approx(shot.speed, 300.0), "a flying shot lives longer at its speed: %s s" % shot.lifetime)
 	var move: CompiledSpell = _compile("reach far_dash").casts[0].group.spells[0]

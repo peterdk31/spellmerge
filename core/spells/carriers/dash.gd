@@ -1,34 +1,34 @@
 class_name CarrierDash
 extends Carrier
 ## Moves its caster `ray_length` along the move direction, striking every body it passes once
-## (`FormBase.Motion.DASH`). Homing turns it as it goes; its shield guards what it moves.
+## (`&"dash"`). Homing turns it as it goes; its shield guards what it moves.
 
 
 ## How the dash takes each modifier (`ModifierBase.Behaviour`), every one: see `Carrier`.
 const BEHAVIOURS: Dictionary = {
-	B.NONE: [Use.RUNS, Look.SHOWN],
-	B.HOMING: [Use.OWN, Look.SHOWN],
-	B.CHAIN: [Use.RUNS, Look.SHOWN],
-	B.SHIELD: [Use.OWN, Look.SHOWN],
-	B.BLAST: [Use.RUNS, Look.CUE],
-	B.HOLD: [Use.WASTED, "nothing keeps it on: a dash moves its caster and hits what it passes, once each"],
-	B.RECOIL: [Use.RUNS, Look.SHOWN],
-	B.BOUNCE: [Use.WASTED, "it turns a shot or a beam at walls, and a dash moves its caster and hits what it passes, once each"],
-	B.ECHO: [Use.RUNS, Look.SHOWN],
-	B.LINGER: [Use.WASTED, "it only changes a moving shot, and a dash moves its caster and hits what it passes, once each"],
-	B.HEAVY: [Use.RUNS, Look.SHOWN],
-	B.SIPHON: [Use.RUNS, Look.SHOWN],
-	B.STICKY: [Use.WASTED, "it only changes a moving shot, and a dash moves its caster and hits what it passes, once each"],
-	B.MAGNET: [Use.WASTED, "it needs a shot or a beam that stays in the world, and a dash moves its caster and hits what it passes, once each"],
-	B.GHOST: [Use.WASTED, "it only takes a flying shot or a line through walls, and a dash moves its caster and hits what it passes, once each"],
-	B.SPIRAL: [Use.WASTED, "it only changes a moving shot, and a dash moves its caster and hits what it passes, once each"],
-	B.MIRROR: [Use.WASTED, "a move and its mirror cancel"],
-	B.GROWTH: [Use.WASTED, "it grows a shot in the world or a beam, and a dash moves its caster and hits what it passes, once each"],
-	B.RELAY: [Use.RUNS, Look.SHOWN],
-	B.RETURN: [Use.WASTED, "it does not fly out"],
-	B.ARC: [Use.WASTED, "it is not a shot that stays in the air"],
-	B.POSSESS: [Use.RUNS, Look.SHOWN],
-	B.DEFLECT: [Use.OWN, Look.SHOWN],
+	B.NONE: [Works.YES, Shows.DRAWN],
+	B.HOMING: [Works.OWN_WAY, Shows.DRAWN],
+	B.CHAIN: [Works.YES, Shows.DRAWN],
+	B.SHIELD: [Works.OWN_WAY, Shows.DRAWN],
+	B.BLAST: [Works.YES, Shows.AS_EFFECT],
+	B.HOLD: [Works.NO, "nothing keeps it on: a dash moves its caster and hits what it passes, once each"],
+	B.RECOIL: [Works.YES, Shows.DRAWN],
+	B.BOUNCE: [Works.NO, "it turns a shot or a beam at walls, and a dash moves its caster and hits what it passes, once each"],
+	B.ECHO: [Works.YES, Shows.DRAWN],
+	B.LINGER: [Works.NO, "it only changes a moving shot, and a dash moves its caster and hits what it passes, once each"],
+	B.HEAVY: [Works.YES, Shows.DRAWN],
+	B.SIPHON: [Works.YES, Shows.DRAWN],
+	B.STICKY: [Works.NO, "it only changes a moving shot, and a dash moves its caster and hits what it passes, once each"],
+	B.MAGNET: [Works.NO, "it needs a shot or a beam that stays in the world, and a dash moves its caster and hits what it passes, once each"],
+	B.GHOST: [Works.NO, "it only takes a flying shot or a line through walls, and a dash moves its caster and hits what it passes, once each"],
+	B.SPIRAL: [Works.NO, "it only changes a moving shot, and a dash moves its caster and hits what it passes, once each"],
+	B.MIRROR: [Works.NO, "a move and its mirror cancel"],
+	B.GROWTH: [Works.NO, "it grows a shot in the world or a beam, and a dash moves its caster and hits what it passes, once each"],
+	B.RELAY: [Works.YES, Shows.DRAWN],
+	B.RETURN: [Works.NO, "it does not fly out"],
+	B.ARC: [Works.NO, "it is not a shot that stays in the air"],
+	B.POSSESS: [Works.YES, Shows.DRAWN],
+	B.DEFLECT: [Works.OWN_WAY, Shows.DRAWN],
 }
 ## When each trigger (`TriggerBase.Event`) fires on the dash: "" when it can, else why it never does.
 const EVENTS: Dictionary = {
@@ -43,11 +43,11 @@ const EVENTS: Dictionary = {
 	E.REACTION: "",
 }
 ## How the dash takes an infusion.
-const INFUSIONS: Array = [Use.RUNS, Look.SHOWN]
+const INFUSIONS: Array = [Works.YES, Shows.DRAWN]
 
 
-func motion() -> int:
-	return FormBase.Motion.DASH
+func id() -> StringName:
+	return &"dash"
 
 
 func noun() -> String:
@@ -59,7 +59,7 @@ func what() -> String:
 
 
 func traits() -> int:
-	return HITS | LASTS | REACHES | STEERS | SPEED
+	return HITS | LASTS | REACHES | STEERS | SPEED | HOLDS_STAFF
 
 
 func behaviours() -> Dictionary:

@@ -1,7 +1,7 @@
 class_name CarrierSwing
 extends Carrier
 ## Melee: the staff leans back, then sweeps `arc` degrees round the hand, striking each body in
-## the wedge once (`FormBase.Motion.SWING`). Its shield and deflect guard the sweep.
+## the wedge once (`&"swing"`). Its shield and deflect guard the sweep.
 ##
 ## Its rows: the live swings, which it keeps itself (`bind` makes them), starts (`start`, from
 ## `shoot`), runs (`step`) and ends (`end_of`, `end_actor`). Its strikes go through the runtime as
@@ -11,29 +11,29 @@ extends Carrier
 
 ## How the swing takes each modifier (`ModifierBase.Behaviour`), every one: see `Carrier`.
 const BEHAVIOURS: Dictionary = {
-	B.NONE: [Use.RUNS, Look.SHOWN],
-	B.HOMING: [Use.WASTED, "it has nothing to aim, and a swing is a sweep that is over at once"],
-	B.CHAIN: [Use.RUNS, Look.SHOWN],
-	B.SHIELD: [Use.OWN, Look.SHOWN],
-	B.BLAST: [Use.RUNS, Look.CUE],
-	B.HOLD: [Use.RUNS, Look.SHOWN],
-	B.RECOIL: [Use.RUNS, Look.SHOWN],
-	B.BOUNCE: [Use.WASTED, "it turns a shot or a beam at walls, and a swing is a sweep that is over at once"],
-	B.ECHO: [Use.RUNS, Look.SHOWN],
-	B.LINGER: [Use.WASTED, "it only changes a moving shot, and a swing is a sweep that is over at once"],
-	B.HEAVY: [Use.RUNS, Look.SHOWN],
-	B.SIPHON: [Use.RUNS, Look.SHOWN],
-	B.STICKY: [Use.WASTED, "it only changes a moving shot, and a swing is a sweep that is over at once"],
-	B.MAGNET: [Use.WASTED, "it needs a shot or a beam that stays in the world, and a swing is a sweep that is over at once"],
-	B.GHOST: [Use.WASTED, "it only takes a flying shot or a line through walls, and a swing is a sweep that is over at once"],
-	B.SPIRAL: [Use.WASTED, "it only changes a moving shot, and a swing is a sweep that is over at once"],
-	B.MIRROR: [Use.RUNS, Look.SHOWN],
-	B.GROWTH: [Use.WASTED, "it grows a shot in the world or a beam, and a swing is a sweep that is over at once"],
-	B.RELAY: [Use.RUNS, Look.SHOWN],
-	B.RETURN: [Use.WASTED, "it does not fly out"],
-	B.ARC: [Use.WASTED, "it is not a shot that stays in the air"],
-	B.POSSESS: [Use.RUNS, Look.SHOWN],
-	B.DEFLECT: [Use.OWN, Look.SHOWN],
+	B.NONE: [Works.YES, Shows.DRAWN],
+	B.HOMING: [Works.NO, "it has nothing to aim, and a swing is a sweep that is over at once"],
+	B.CHAIN: [Works.YES, Shows.DRAWN],
+	B.SHIELD: [Works.OWN_WAY, Shows.DRAWN],
+	B.BLAST: [Works.YES, Shows.AS_EFFECT],
+	B.HOLD: [Works.YES, Shows.DRAWN],
+	B.RECOIL: [Works.YES, Shows.DRAWN],
+	B.BOUNCE: [Works.NO, "it turns a shot or a beam at walls, and a swing is a sweep that is over at once"],
+	B.ECHO: [Works.YES, Shows.DRAWN],
+	B.LINGER: [Works.NO, "it only changes a moving shot, and a swing is a sweep that is over at once"],
+	B.HEAVY: [Works.YES, Shows.DRAWN],
+	B.SIPHON: [Works.YES, Shows.DRAWN],
+	B.STICKY: [Works.NO, "it only changes a moving shot, and a swing is a sweep that is over at once"],
+	B.MAGNET: [Works.NO, "it needs a shot or a beam that stays in the world, and a swing is a sweep that is over at once"],
+	B.GHOST: [Works.NO, "it only takes a flying shot or a line through walls, and a swing is a sweep that is over at once"],
+	B.SPIRAL: [Works.NO, "it only changes a moving shot, and a swing is a sweep that is over at once"],
+	B.MIRROR: [Works.YES, Shows.DRAWN],
+	B.GROWTH: [Works.NO, "it grows a shot in the world or a beam, and a swing is a sweep that is over at once"],
+	B.RELAY: [Works.YES, Shows.DRAWN],
+	B.RETURN: [Works.NO, "it does not fly out"],
+	B.ARC: [Works.NO, "it is not a shot that stays in the air"],
+	B.POSSESS: [Works.YES, Shows.DRAWN],
+	B.DEFLECT: [Works.OWN_WAY, Shows.DRAWN],
 }
 ## When each trigger (`TriggerBase.Event`) fires on the swing: "" when it can, else why it never does.
 const EVENTS: Dictionary = {
@@ -48,7 +48,7 @@ const EVENTS: Dictionary = {
 	E.REACTION: "",
 }
 ## How the swing takes an infusion.
-const INFUSIONS: Array = [Use.RUNS, Look.SHOWN]
+const INFUSIONS: Array = [Works.YES, Shows.DRAWN]
 
 
 ## The live swings (melee I2, see `start`): `SpellLimits.SWING_ROWS_START` rows at first,
@@ -91,8 +91,8 @@ var _sw_last_start: PackedFloat32Array = PackedFloat32Array()
 var poses: StaffPoses = null
 
 
-func motion() -> int:
-	return FormBase.Motion.SWING
+func id() -> StringName:
+	return &"swing"
 
 
 func noun() -> String:
@@ -106,6 +106,13 @@ func what() -> String:
 func traits() -> int:
 	return HITS | LASTS | REACHES | GUARDS | SPEED | SHOTS | SPREAD | REPEATS_HELD | OWN_POSE
 
+
+
+func required_fields() -> Dictionary:
+	return {
+		"ray_length": "A swing needs a `ray_length` (its reach) above 0.",
+		"arc": "A swing needs an `arc` (degrees it sweeps) above 0.",
+	}
 
 func behaviours() -> Dictionary:
 	return BEHAVIOURS

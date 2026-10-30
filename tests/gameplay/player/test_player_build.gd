@@ -89,12 +89,12 @@ func before_each() -> void:
 	var bolt := _card(FormBase.new(), &"bolt") as FormBase
 	bolt.cooldown = 0.25
 	var orbit := _card(FormBase.new(), &"orbit") as FormBase
-	orbit.motion = FormBase.Motion.ORBIT
+	orbit.carrier = &"orbit"
 	orbit.orbit_radius = 30.0
 	orbit.lifetime = 5.0
 	orbit.pierce = 16
 	var dash := _card(FormBase.new(), &"dash") as FormBase
-	dash.motion = FormBase.Motion.DASH
+	dash.carrier = &"dash"
 	dash.speed = 220.0
 	dash.lifetime = 0.25
 	dash.mana_cost = 0.0

@@ -163,24 +163,24 @@ func test_the_broken_reaction_table_fails() -> void:
 		check_equal(problem["file"], table.resource_path, "the problem names the table")
 
 
-func test_a_form_needs_what_its_motion_uses() -> void:
+func test_a_form_needs_what_its_carrier_uses() -> void:
 	var form := _fine(FormBase.new()) as FormBase
-	form.motion = FormBase.Motion.STRAIGHT
+	form.carrier = &"bolt"
 	form.speed = 100.0
 	check_equal(SpellValidator.check_component(form, _listed()).size(), 0, "a straight form with speed is fine")
 	form.speed = 0.0
 	check_equal(_fields(SpellValidator.check_component(form, _listed()), "required-field"), ["speed"] as Array[String], "straight needs speed")
-	form.motion = FormBase.Motion.ORBIT
+	form.carrier = &"orbit"
 	check_equal(_fields(SpellValidator.check_component(form, _listed()), "required-field"), ["orbit_radius"] as Array[String], "orbit needs a radius")
-	form.motion = FormBase.Motion.RAY
+	form.carrier = &"beam"
 	check_equal(_fields(SpellValidator.check_component(form, _listed()), "required-field"), ["ray_length"] as Array[String], "a ray needs a length")
-	form.motion = FormBase.Motion.STILL
+	form.carrier = &"rune"
 	check_equal(SpellValidator.check_component(form, _listed()).size(), 0, "a rune needs nothing more")
 
 
 func test_a_staff_pose_must_be_known_keys_in_order_and_in_range() -> void:
 	var form := _fine(FormBase.new()) as FormBase
-	form.motion = FormBase.Motion.STILL
+	form.carrier = &"rune"
 	form.staff_pose = [{"phase": "wind", "at": 1.0, "lift": 10, "push": -5, "ease": "out", "mood": "angry"}, {"phase": "after", "at": 0.1}] as Array[Dictionary]
 	check_equal(SpellValidator.check_component(form, _listed()).size(), 0, "two keys in order are fine")
 	form.staff_pose = [{"phase": "later", "at": 0.1}] as Array[Dictionary]

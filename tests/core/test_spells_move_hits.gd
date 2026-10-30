@@ -61,16 +61,16 @@ func before_each() -> void:
 		_barriers.append([caster, charges, seconds, tag]))
 	# A dash of 48 px over 0.2 s, a teleport of 100 px, a bolt of 300 px over 1 s, a hook and a swap.
 	var dash: FormBase = _form(&"dash", 240.0, 0.2)
-	dash.motion = FormBase.Motion.DASH
+	dash.carrier = &"dash"
 	dash.ray_length = 48.0
 	var teleport: FormBase = _form(&"teleport", 400.0, 0.25)
-	teleport.motion = FormBase.Motion.TELEPORT
+	teleport.carrier = &"teleport"
 	teleport.ray_length = 100.0
 	_form(&"bolt", 300.0, 1.0)
 	var hook: FormBase = _form(&"hook", 300.0, 1.0)
-	hook.motion = FormBase.Motion.HOOK
+	hook.carrier = &"hook"
 	var swap: FormBase = _form(&"swap", 300.0, 1.0)
-	swap.motion = FormBase.Motion.SWAP
+	swap.carrier = &"swap"
 	_modifier(&"chain", ModifierBase.Behaviour.CHAIN, 1.0)
 	_modifier(&"recoil", ModifierBase.Behaviour.RECOIL, 20.0)
 	_modifier(&"kick", ModifierBase.Behaviour.RECOIL, 130.0)
@@ -202,8 +202,8 @@ func test_pierce_is_wasted_on_a_dash_that_hits_everything_it_passes() -> void:
 	var staff: CompiledStaff = StaffKit.compile(_spells, [&"pierce", &"dash"])
 	check(staff.wasted.has(0), "pierce is wasted on a dash: %s" % staff.wasted)
 	check(String(staff.wasted.get(0, "")).contains("hits what it passes"), "because it hits what it passes already: %s" % staff.wasted)
-	check(StaffCompiler.trigger_runs(TriggerBase.Event.HIT, FormBase.Motion.DASH), "on hit fires on a dash")
-	check(StaffCompiler.behaviour_runs(ModifierBase.Behaviour.HEAVY, FormBase.Motion.TELEPORT), "heavy works on a teleport")
+	check(StaffCompiler.trigger_runs(TriggerBase.Event.HIT, &"dash"), "on hit fires on a dash")
+	check(StaffCompiler.behaviour_runs(ModifierBase.Behaviour.HEAVY, &"teleport"), "heavy works on a teleport")
 
 
 # --- Recoil adds to a move ----------------------------------------------------------------------

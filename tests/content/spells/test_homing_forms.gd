@@ -57,16 +57,16 @@ func _forms() -> Array[FormBase]:
 ## speed for its life, a rune as far as it creeps in its life, a wall a little past where it
 ## rises (it creeps as a rune does, rules R4 F6).
 static func _reach(form: FormBase) -> float:
-	if form.motion == FormBase.Motion.STILL:
+	if form.carrier == &"rune":
 		return SpellLimits.HOMING_DRIFT * form.lifetime
-	if form.motion == FormBase.Motion.WALL:
+	if form.carrier == &"wall":
 		return SpellLimits.WALL_REACH * 3.0
 	return form.ray_length if form.ray_length > 0.0 else form.speed * form.lifetime
 
 
 ## Forms that move their caster instead of hitting: their homing shows in the move asked for.
 static func _moves_caster(form: FormBase) -> bool:
-	return form.motion == FormBase.Motion.DASH or form.motion == FormBase.Motion.TELEPORT
+	return form.carrier == &"dash" or form.carrier == &"teleport"
 
 
 ## Casts `cards` for `player` from the origin to the right, runs it out, and says whether
@@ -85,7 +85,7 @@ func test_there_are_forms_of_both_kinds() -> void:
 	var steered: int = 0
 	var not_steered: int = 0
 	for form in _forms():
-		if StaffCompiler.homing_steers(form.motion):
+		if StaffCompiler.homing_steers(form.carrier):
 			steered += 1
 		else:
 			not_steered += 1
@@ -94,7 +94,7 @@ func test_there_are_forms_of_both_kinds() -> void:
 
 func test_a_homing_form_reaches_a_target_off_its_line_near_the_end_of_its_reach() -> void:
 	for form in _forms():
-		if not StaffCompiler.homing_steers(form.motion):
+		if not StaffCompiler.homing_steers(form.carrier):
 			continue
 		before_each()
 		var at: Vector2 = Vector2.from_angle(deg_to_rad(OFF_AIM)) * _reach(form) * FAR
@@ -107,7 +107,7 @@ func test_a_homing_form_reaches_a_target_off_its_line_near_the_end_of_its_reach(
 		if _moves_caster(form):
 			_check_move(form, at)
 			continue
-		if form.motion == FormBase.Motion.RAIN:
+		if form.carrier == &"rain":
 			_check_rain(form, at)
 			continue
 		# A lone shot on its line misses it, so a hit below is the homing's doing.
@@ -126,7 +126,7 @@ func _check_move(form: FormBase, at: Vector2) -> void:
 	check_equal(_moves.size(), 1, "a homing %s asks for one move" % form.id)
 	if _moves.size() != 1:
 		return
-	if form.motion == FormBase.Motion.TELEPORT:
+	if form.carrier == &"teleport":
 		var to: Vector2 = _moves[0][2]
 		check(absf(to.angle_to(at)) < 0.01, "a homing %s blinks straight at a target %s px off at %s degrees: %s" % [form.id, roundi(at.length()), OFF_AIM, to])
 	else:
@@ -179,7 +179,7 @@ func test_a_homing_wall_creeps_toward_its_target_as_one_piece() -> void:
 
 func test_homing_on_a_form_it_cannot_steer_is_wasted_and_changes_nothing() -> void:
 	for form in _forms():
-		if StaffCompiler.homing_steers(form.motion):
+		if StaffCompiler.homing_steers(form.carrier):
 			continue
 		var staff: CompiledStaff = StaffKit.compile(_spells, [&"homing", form.id] as Array[StringName])
 		check(staff.wasted.has(0), "homing on a %s is listed as wasted" % form.id)
@@ -194,4 +194,4 @@ func test_the_compiled_range_is_the_rule_for_each_form() -> void:
 	var reach: float = (_registry.call("get_resource", &"spells", &"homing") as ModifierBase).behaviour_reach
 	for form in _forms():
 		var spell: CompiledSpell = StaffKit.first(_spells, [&"homing", form.id] as Array[StringName])
-		check_equal(spell.homing_range, StaffCompiler.homing_range(form.motion, form.ray_length, reach), "a homing %s looks as far as the rule says" % form.id)
+		check_equal(spell.homing_range, StaffCompiler.homing_range(form.carrier, form.ray_length, reach), "a homing %s looks as far as the rule says" % form.id)

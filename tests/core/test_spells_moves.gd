@@ -65,15 +65,15 @@ func before_each() -> void:
 	var bolt: FormBase = _form(&"bolt", 300.0, 1.0)
 	bolt.base_damage = 10
 	var teleport: FormBase = _form(&"teleport", 400.0, 0.25)
-	teleport.motion = FormBase.Motion.TELEPORT
+	teleport.carrier = &"teleport"
 	var dash: FormBase = _form(&"dash", 400.0, 0.2)
-	dash.motion = FormBase.Motion.DASH
+	dash.carrier = &"dash"
 	var hook: FormBase = _form(&"hook", 300.0, 1.0)
-	hook.motion = FormBase.Motion.HOOK
+	hook.carrier = &"hook"
 	var swap: FormBase = _form(&"swap", 300.0, 1.0)
-	swap.motion = FormBase.Motion.SWAP
+	swap.carrier = &"swap"
 	var beam: FormBase = _form(&"beam", 0.0, 0.2)
-	beam.motion = FormBase.Motion.RAY
+	beam.carrier = &"beam"
 	beam.ray_length = 200.0
 	beam.radius = 6.0
 	_modifier(&"blast", ModifierBase.Behaviour.BLAST, 30.0)
@@ -85,7 +85,7 @@ func before_each() -> void:
 	piercing.extra_pierce = 2
 	_put(piercing, &"pierce")
 	var wall: FormBase = _form(&"wall", 0.0, 0.5)
-	wall.motion = FormBase.Motion.WALL
+	wall.carrier = &"wall"
 	wall.shots = 3
 	wall.spread = 10.0
 	wall.radius = 4.0
@@ -442,15 +442,15 @@ func test_a_teleport_of_player_three_ignores_other_players_arrivals() -> void:
 ## trigger that fires once after 0.25 s, an orbit, and faster (speed x1.5).
 func _distance_cards() -> void:
 	var short: FormBase = _form(&"short", 240.0, 0.25)
-	short.motion = FormBase.Motion.DASH
+	short.carrier = &"dash"
 	short.ray_length = 48.0
 	var blink: FormBase = _form(&"blink", 400.0, 0.25)
-	blink.motion = FormBase.Motion.TELEPORT
+	blink.carrier = &"teleport"
 	blink.ray_length = 64.0
 	var timer: TriggerBase = _trigger(&"timer", TriggerBase.Event.TIMER)
 	timer.interval = 0.25
 	var orbit: FormBase = _form(&"ring", 3.0, 1.0)
-	orbit.motion = FormBase.Motion.ORBIT
+	orbit.carrier = &"orbit"
 	orbit.orbit_radius = 20.0
 	var faster := ModifierBase.new()
 	faster.speed_mult = 1.5
@@ -668,7 +668,7 @@ func test_a_hook_after_a_recoil_on_a_shot_gets_both_moves() -> void:
 	# push back. Player 0's payload has recoil, player 1's the same without it.
 	_distance_cards()
 	var quick: FormBase = _form(&"quick_hook", 900.0, 1.0)
-	quick.motion = FormBase.Motion.HOOK
+	quick.carrier = &"hook"
 	_mgr.set_anchor(1, Vector2(0.0, 100.0))
 	_target(Vector2(130.0, 0.0))
 	_target(Vector2(130.0, 100.0))

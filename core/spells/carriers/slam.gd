@@ -1,7 +1,7 @@
 class_name CarrierSlam
 extends Carrier
 ## Melee: the staff rises, then strikes the floor ahead and a ring grows from the impact, striking
-## each body in it once (`FormBase.Motion.SLAM`). Over at once.
+## each body in it once (`&"slam"`). Over at once.
 ##
 ## Its rows: the live slams, which it keeps itself (`bind` makes them), starts (`start`, from
 ## `shoot`), runs (`step`) and ends (`end_of`). Its strikes go through the runtime as rays
@@ -11,29 +11,29 @@ extends Carrier
 
 ## How the slam takes each modifier (`ModifierBase.Behaviour`), every one: see `Carrier`.
 const BEHAVIOURS: Dictionary = {
-	B.NONE: [Use.RUNS, Look.SHOWN],
-	B.HOMING: [Use.WASTED, "it has nothing to aim, and a slam is a strike that is over at once"],
-	B.CHAIN: [Use.RUNS, Look.SHOWN],
-	B.SHIELD: [Use.OWN, Look.SHOWN],
-	B.BLAST: [Use.RUNS, Look.CUE],
-	B.HOLD: [Use.WASTED, "nothing keeps it on: a slam is a strike that is over at once"],
-	B.RECOIL: [Use.RUNS, Look.SHOWN],
-	B.BOUNCE: [Use.WASTED, "it turns a shot or a beam at walls, and a slam is a strike that is over at once"],
-	B.ECHO: [Use.RUNS, Look.SHOWN],
-	B.LINGER: [Use.WASTED, "it only changes a moving shot, and a slam is a strike that is over at once"],
-	B.HEAVY: [Use.RUNS, Look.SHOWN],
-	B.SIPHON: [Use.RUNS, Look.SHOWN],
-	B.STICKY: [Use.WASTED, "it only changes a moving shot, and a slam is a strike that is over at once"],
-	B.MAGNET: [Use.WASTED, "it needs a shot or a beam that stays in the world, and a slam is a strike that is over at once"],
-	B.GHOST: [Use.WASTED, "it only takes a flying shot or a line through walls, and a slam is a strike that is over at once"],
-	B.SPIRAL: [Use.WASTED, "it only changes a moving shot, and a slam is a strike that is over at once"],
-	B.MIRROR: [Use.RUNS, Look.SHOWN],
-	B.GROWTH: [Use.WASTED, "it grows a shot in the world or a beam, and a slam is a strike that is over at once"],
-	B.RELAY: [Use.RUNS, Look.SHOWN],
-	B.RETURN: [Use.WASTED, "it does not fly out"],
-	B.ARC: [Use.WASTED, "it is not a shot that stays in the air"],
-	B.POSSESS: [Use.RUNS, Look.SHOWN],
-	B.DEFLECT: [Use.OWN, Look.SHOWN],
+	B.NONE: [Works.YES, Shows.DRAWN],
+	B.HOMING: [Works.NO, "it has nothing to aim, and a slam is a strike that is over at once"],
+	B.CHAIN: [Works.YES, Shows.DRAWN],
+	B.SHIELD: [Works.OWN_WAY, Shows.DRAWN],
+	B.BLAST: [Works.YES, Shows.AS_EFFECT],
+	B.HOLD: [Works.NO, "nothing keeps it on: a slam is a strike that is over at once"],
+	B.RECOIL: [Works.YES, Shows.DRAWN],
+	B.BOUNCE: [Works.NO, "it turns a shot or a beam at walls, and a slam is a strike that is over at once"],
+	B.ECHO: [Works.YES, Shows.DRAWN],
+	B.LINGER: [Works.NO, "it only changes a moving shot, and a slam is a strike that is over at once"],
+	B.HEAVY: [Works.YES, Shows.DRAWN],
+	B.SIPHON: [Works.YES, Shows.DRAWN],
+	B.STICKY: [Works.NO, "it only changes a moving shot, and a slam is a strike that is over at once"],
+	B.MAGNET: [Works.NO, "it needs a shot or a beam that stays in the world, and a slam is a strike that is over at once"],
+	B.GHOST: [Works.NO, "it only takes a flying shot or a line through walls, and a slam is a strike that is over at once"],
+	B.SPIRAL: [Works.NO, "it only changes a moving shot, and a slam is a strike that is over at once"],
+	B.MIRROR: [Works.YES, Shows.DRAWN],
+	B.GROWTH: [Works.NO, "it grows a shot in the world or a beam, and a slam is a strike that is over at once"],
+	B.RELAY: [Works.YES, Shows.DRAWN],
+	B.RETURN: [Works.NO, "it does not fly out"],
+	B.ARC: [Works.NO, "it is not a shot that stays in the air"],
+	B.POSSESS: [Works.YES, Shows.DRAWN],
+	B.DEFLECT: [Works.OWN_WAY, Shows.DRAWN],
 }
 ## When each trigger (`TriggerBase.Event`) fires on the slam: "" when it can, else why it never does.
 const EVENTS: Dictionary = {
@@ -48,7 +48,7 @@ const EVENTS: Dictionary = {
 	E.REACTION: "",
 }
 ## How the slam takes an infusion.
-const INFUSIONS: Array = [Use.RUNS, Look.SHOWN]
+const INFUSIONS: Array = [Works.YES, Shows.DRAWN]
 
 
 ## The live slams (melee I8, see `start`): SLAM_ROWS_START rows at first, more when every
@@ -79,8 +79,8 @@ var _sl_struck: Array[Array] = []
 var poses: StaffPoses = null
 
 
-func motion() -> int:
-	return FormBase.Motion.SLAM
+func id() -> StringName:
+	return &"slam"
 
 
 func noun() -> String:
@@ -94,6 +94,12 @@ func what() -> String:
 func traits() -> int:
 	return HITS | REACHES | GUARDS | SPEED | SHOTS | SPREAD | OWN_POSE
 
+
+
+func required_fields() -> Dictionary:
+	return {
+		"ray_length": "A slam needs a `ray_length` (how far ahead it strikes) above 0.",
+	}
 
 func behaviours() -> Dictionary:
 	return BEHAVIOURS

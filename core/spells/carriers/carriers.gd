@@ -1,29 +1,35 @@
 class_name Carriers
 extends RefCounted
-## Finds the carrier of each `FormBase.Motion` (`Carrier`, one script each in this folder). `of`
-## answers the compiler and anything that reads a carrier's tables; the spell runtime makes its
-## own set with `make_all` and binds them, since a carrier with rows of its own (a beam, a swing,
-## a slam) keeps them per runtime.
+## Finds each carrier by its id (`Carrier.id`, the `carrier` a form card names: &"bolt", &"beam"...).
+## `of` answers the compiler and anything that reads a carrier's tables; the spell runtime makes its
+## own set with `make_all` and binds them, since a carrier with rows of its own (a beam, a swing, a
+## slam) keeps them per runtime. A carrier is named, never numbered, so adding or removing one is
+## its script and its line in `make_all`, and no card's file changes.
 
-static var _shared: Array[Carrier] = []
+static var _shared: Dictionary = {}
+static var _none: Carrier = Carrier.new()
 
 
-## The carrier of `motion` (the retired slot's, which runs nothing, for one with none).
-static func of(motion: int) -> Carrier:
+## The carrier named `id`, or one that runs nothing (`Carrier`, id &"") for a name no carrier has.
+static func of(id: StringName) -> Carrier:
 	if _shared.is_empty():
 		_shared = make_all()
-	if motion < 0 or motion >= _shared.size():
-		return _shared[FormBase.Motion._UNUSED_10]
-	return _shared[motion]
+	return _shared.get(id, _none) as Carrier
 
 
-## A fresh carrier for every motion, indexed by `FormBase.Motion`.
-static func make_all() -> Array[Carrier]:
-	var all: Array[Carrier] = []
-	all.resize(FormBase.Motion.size())
+## Every carrier's id, in the order `make_all` lists them.
+static func ids() -> Array[StringName]:
+	if _shared.is_empty():
+		_shared = make_all()
+	var out: Array[StringName] = []
+	for id: StringName in _shared:
+		out.append(id)
+	return out
+
+
+## A fresh carrier of every kind, by id.
+static func make_all() -> Dictionary:
+	var all: Dictionary = {}
 	for carrier: Carrier in [CarrierBolt.new(), CarrierRune.new(), CarrierOrbit.new(), CarrierBeam.new(), CarrierDash.new(), CarrierTeleport.new(), CarrierHook.new(), CarrierSwap.new(), CarrierWall.new(), CarrierRain.new(), CarrierDecoy.new(), CarrierFamiliar.new(), CarrierSwing.new(), CarrierSlam.new()]:
-		all[carrier.motion()] = carrier
-	for motion in all.size():
-		if all[motion] == null:
-			all[motion] = Carrier.new()
+		all[carrier.id()] = carrier
 	return all

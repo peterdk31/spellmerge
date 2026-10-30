@@ -112,12 +112,12 @@ func test_the_registry_finds_the_five_forms_and_the_validator_passes_them() -> v
 			check(false, SpellValidator.format(problem))
 
 
-func test_each_form_has_the_motion_its_shape_needs() -> void:
-	check_equal(_form(&"bolt").motion, FormBase.Motion.STRAIGHT, "bolt flies")
-	check_equal(_form(&"nova").motion, FormBase.Motion.STRAIGHT, "nova flies")
-	check_equal(_form(&"beam").motion, FormBase.Motion.RAY, "beam is a ray")
-	check_equal(_form(&"rune").motion, FormBase.Motion.STILL, "rune waits")
-	check_equal(_form(&"orbit").motion, FormBase.Motion.ORBIT, "orbit circles")
+func test_each_form_has_the_carrier_its_shape_needs() -> void:
+	check_equal(_form(&"bolt").carrier, &"bolt", "bolt flies")
+	check_equal(_form(&"nova").carrier, &"bolt", "nova flies")
+	check_equal(_form(&"beam").carrier, &"beam", "beam is a ray")
+	check_equal(_form(&"rune").carrier, &"rune", "rune waits")
+	check_equal(_form(&"orbit").carrier, &"orbit", "orbit circles")
 	check(_form(&"beam").ray_length > 0.0, "a beam has a reach")
 	check(_form(&"orbit").orbit_radius > 0.0, "an orbit has a radius")
 
@@ -177,7 +177,7 @@ func test_one_beam_hits_at_once_and_every_tick_of_its_life() -> void:
 	check_equal(_hits.size(), 1, "a hit at once")
 	check_equal(_spells.beam_count(), 1, "and the beam stays on")
 	_tick(60)
-	var hits: int = SpellsScript.beam_hits(FormBase.Motion.RAY, spell.lifetime)
+	var hits: int = SpellsScript.beam_hits(&"beam", spell.lifetime)
 	check_equal(_hits.size(), hits, "then one hit every %s s of its %s s life" % [SpellLimits.BEAM_TICK, spell.lifetime])
 	check_equal(_spells.beam_count(), 0, "then it is gone")
 	check_equal(spell.damage, 2, "a hit does 2 damage")

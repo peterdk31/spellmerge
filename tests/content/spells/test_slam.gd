@@ -23,7 +23,7 @@ func test_the_card_is_a_valid_carrier() -> void:
 	if card == null:
 		return
 	check_equal(card.id, &"slam", "its id is its folder")
-	check_equal(card.motion, FormBase.Motion.SLAM, "it is a slam")
+	check_equal(card.carrier, &"slam", "it is a slam")
 	check(card.range_problems().is_empty(), "inside every range: %s" % [card.range_problems()])
 	check_equal(card.mana_cost, 0.0, "it costs no mana")
 	check(card.wind_up > 0.0, "it winds up, so it can be seen coming")

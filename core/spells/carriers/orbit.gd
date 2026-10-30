@@ -1,34 +1,34 @@
 class_name CarrierOrbit
 extends Carrier
-## Shots that circle their caster at `orbit_radius` (`FormBase.Motion.ORBIT`), spread evenly round
+## Shots that circle their caster at `orbit_radius` (`&"orbit"`), spread evenly round
 ## the circle. They pass through walls and cannot home.
 
 
 ## How the orbit takes each modifier (`ModifierBase.Behaviour`), every one: see `Carrier`.
 const BEHAVIOURS: Dictionary = {
-	B.NONE: [Use.RUNS, Look.SHOWN],
-	B.HOMING: [Use.WASTED, "it has nothing to aim, and an orbit is held on its circle"],
-	B.CHAIN: [Use.RUNS, Look.SHOWN],
-	B.SHIELD: [Use.RUNS, Look.SHOWN],
-	B.BLAST: [Use.RUNS, Look.CUE],
-	B.HOLD: [Use.RUNS, Look.SHOWN],
-	B.RECOIL: [Use.RUNS, Look.SHOWN],
-	B.BOUNCE: [Use.WASTED, "it turns a shot or a beam at walls, and an orbit is held on its circle"],
-	B.ECHO: [Use.RUNS, Look.SHOWN],
-	B.LINGER: [Use.RUNS, Look.SHOWN],
-	B.HEAVY: [Use.RUNS, Look.SHOWN],
-	B.SIPHON: [Use.RUNS, Look.SHOWN],
-	B.STICKY: [Use.RUNS, Look.SHOWN],
-	B.MAGNET: [Use.RUNS, Look.SHOWN],
-	B.GHOST: [Use.WASTED, "an orbit already passes walls"],
-	B.SPIRAL: [Use.RUNS, Look.SHOWN],
-	B.MIRROR: [Use.RUNS, Look.SHOWN],
-	B.GROWTH: [Use.RUNS, Look.SHOWN],
-	B.RELAY: [Use.RUNS, Look.SHOWN],
-	B.RETURN: [Use.WASTED, "it does not fly out"],
-	B.ARC: [Use.RUNS, Look.SHOWN],
-	B.POSSESS: [Use.RUNS, Look.SHOWN],
-	B.DEFLECT: [Use.RUNS, Look.SHOWN],
+	B.NONE: [Works.YES, Shows.DRAWN],
+	B.HOMING: [Works.NO, "it has nothing to aim, and an orbit is held on its circle"],
+	B.CHAIN: [Works.YES, Shows.DRAWN],
+	B.SHIELD: [Works.YES, Shows.DRAWN],
+	B.BLAST: [Works.YES, Shows.AS_EFFECT],
+	B.HOLD: [Works.YES, Shows.DRAWN],
+	B.RECOIL: [Works.YES, Shows.DRAWN],
+	B.BOUNCE: [Works.NO, "it turns a shot or a beam at walls, and an orbit is held on its circle"],
+	B.ECHO: [Works.YES, Shows.DRAWN],
+	B.LINGER: [Works.YES, Shows.DRAWN],
+	B.HEAVY: [Works.YES, Shows.DRAWN],
+	B.SIPHON: [Works.YES, Shows.DRAWN],
+	B.STICKY: [Works.YES, Shows.DRAWN],
+	B.MAGNET: [Works.YES, Shows.DRAWN],
+	B.GHOST: [Works.NO, "an orbit already passes walls"],
+	B.SPIRAL: [Works.YES, Shows.DRAWN],
+	B.MIRROR: [Works.YES, Shows.DRAWN],
+	B.GROWTH: [Works.YES, Shows.DRAWN],
+	B.RELAY: [Works.YES, Shows.DRAWN],
+	B.RETURN: [Works.NO, "it does not fly out"],
+	B.ARC: [Works.YES, Shows.DRAWN],
+	B.POSSESS: [Works.YES, Shows.DRAWN],
+	B.DEFLECT: [Works.YES, Shows.DRAWN],
 }
 ## When each trigger (`TriggerBase.Event`) fires on the orbit: "" when it can, else why it never does.
 const EVENTS: Dictionary = {
@@ -43,11 +43,11 @@ const EVENTS: Dictionary = {
 	E.REACTION: "",
 }
 ## How the orbit takes an infusion.
-const INFUSIONS: Array = [Use.RUNS, Look.SHOWN]
+const INFUSIONS: Array = [Works.YES, Shows.DRAWN]
 
 
-func motion() -> int:
-	return FormBase.Motion.ORBIT
+func id() -> StringName:
+	return &"orbit"
 
 
 func noun() -> String:
@@ -61,6 +61,12 @@ func what() -> String:
 func traits() -> int:
 	return STAYS | HITS | LASTS | GUARDS | SPEED | SHOTS | PIERCE | RING | OUTWARD
 
+
+
+func required_fields() -> Dictionary:
+	return {
+		"orbit_radius": "An orbit needs an `orbit_radius` above 0.",
+	}
 
 func behaviours() -> Dictionary:
 	return BEHAVIOURS

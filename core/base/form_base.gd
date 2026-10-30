@@ -26,45 +26,6 @@ const POSE_RANGES: Dictionary = {
 	"glow": Vector2(0.0, 1.0), "stretch": Vector2(-0.5, 1.0), "shake": Vector2(0.0, 4.0),
 }
 
-## How the shots move once spawned.
-enum Motion {
-	## A shot flies in a line (bolt, nova).
-	STRAIGHT,
-	## A shot stays where it was placed and waits for a target to enter (rune).
-	STILL,
-	## A shot circles its caster at `orbit_radius` (orbit).
-	ORBIT,
-	## No shot: one ray of `ray_length` hits along a line at once (beam).
-	RAY,
-	# Staffs (A3). Each is run by the kit named, until then the carrier does nothing.
-	## The wizard dashes along the move direction for `lifetime` seconds at `speed` (A6a).
-	DASH,
-	## The wizard blinks `speed` x `lifetime` pixels along the aim, stopping before walls (B2, B4).
-	TELEPORT,
-	## A straight shot that pulls the caster to where it hits (B2, B4).
-	HOOK,
-	## A straight shot that trades places with the target it hits (B2, B4, B5).
-	SWAP,
-	## `shots` still shots in a line across the aim, `spread` pixels apart (B2).
-	WALL,
-	## Reads a payload and drops it on the aim point after `lifetime` seconds (B2).
-	RAIN,
-	## Was FISSURE, removed 2026-10-30 (owner). The slot stays so the numbers stored in every
-	## other carrier's .tres keep their meaning; no card may use it (`range_problems`).
-	_UNUSED_10,
-	## A still copy of the wizard that enemies target, for `lifetime` seconds (B2, B5).
-	DECOY,
-	## A helper that orbits the caster and casts its payload every `cooldown` seconds (B2, B5).
-	FAMILIAR,
-	## Melee (I2): the staff leans back for `wind_up` seconds, then sweeps `arc` degrees round the
-	## hand, centred on the aim locked at the cast, out to `ray_length`, in `lifetime` seconds,
-	## hitting each body in the swept wedge once. Forehand and backhand by turns.
-	SWING,
-	## Melee (I8): the staff rises for `wind_up` seconds, then strikes the floor `ray_length` ahead
-	## of the hand, aimed as at the cast; a ring grows from the impact to `radius` and holds for
-	## `lifetime` seconds, striking each body in it once and throwing it outward.
-	SLAM,
-}
 
 ## Damage of one hit before the element and modifiers.
 @export var base_damage: int = 1
@@ -83,7 +44,10 @@ enum Motion {
 @export var shots: int = 1
 ## Angle in degrees the shots are spread over (360 for a full ring).
 @export_range(0.0, 360.0) var spread: float = 0.0
-@export var motion: Motion = Motion.STRAIGHT
+## What it fires: the id of its carrier (`core/spells/carriers/`, docs/CARRIERS.md): &"bolt", &"rune",
+## &"orbit", &"beam", &"dash", &"teleport", &"hook", &"swap", &"wall", &"rain", &"decoy",
+## &"familiar", &"swing" or &"slam". The carrier decides what every other card does on it.
+@export var carrier: StringName = &"bolt"
 ## Extra targets each shot passes through before it ends.
 @export var pierce: int = 0
 ## ORBIT only: distance from the caster in pixels.
@@ -167,7 +131,7 @@ static func pack_pose(keys: Array[Dictionary]) -> PackedFloat32Array:
 ## True for the carriers that read a payload of their own, as a trigger does (a rain; a familiar
 ## casts only what its triggers give it, rules R4 F3).
 func carries_payload() -> bool:
-	return motion == Motion.RAIN
+	return Carriers.of(carrier).has(Carrier.CARRIES_PAYLOAD)
 
 
 func ranges() -> Dictionary:
@@ -181,7 +145,6 @@ func ranges() -> Dictionary:
 		"radius": Vector2(1.0, 64.0),
 		"shots": Vector2(1, 24),
 		"spread": Vector2(0.0, 360.0),
-		"motion": Vector2(0, Motion.size() - 1),
 		"pierce": Vector2(0, 16),
 		"orbit_radius": Vector2(0.0, 256.0),
 		"ray_length": Vector2(0.0, 1024.0),
@@ -192,9 +155,9 @@ func ranges() -> Dictionary:
 	return limits
 
 
-## The ranges, and the empty motion slot a removed carrier left.
+## The ranges, and a carrier id that names no carrier.
 func range_problems() -> PackedStringArray:
 	var problems: PackedStringArray = super()
-	if motion == Motion._UNUSED_10:
-		problems.append("motion: 10 was fissure, removed 2026-10-30")
+	if Carriers.of(carrier).id() != carrier:
+		problems.append("carrier: %s is no carrier (one of %s)" % [carrier, ", ".join(Carriers.ids())])
 	return problems

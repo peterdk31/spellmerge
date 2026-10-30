@@ -5,28 +5,36 @@ extends Control
 ## - **Status** (top middle, between the two top corner panels): "03:12  Kills 140  Level 4" and
 ##   the experience bar with "XP 12/30", from `horde_status`; shown on `horde_started`, hidden
 ##   on `horde_ended`.
-## - **Picks**, one box per seat (`horde_pick.gd`), beside that seat's corner panel toward the
-##   middle, in the seat's colour: on `horde_picks_offered(seat, card_ids)` up to three cards
-##   (icon, name, kind word and colour), closed on `horde_pick_taken(seat, _)`. The seat chooses
-##   with its own device, read here from `core/input` press counts like the radial builder:
-##   the d-pad's left and right (`kind_prev`, `kind_next`; PgUp and PgDn) move the choice and
-##   `accept` (A; Enter) sends `horde_pick_requested(seat, choice)`; P1 on the keyboard also
-##   points with the mouse and clicks (the left button, `staff_2`). The picks never open a
-##   `core/ui_focus` panel, so they capture nothing: the wizard keeps walking and casting while
-##   its player picks (nobody stops for a pick, and the horde may not be frozen any more), and
-##   the shoulders stay the staffs. The d-pad is the only overlap (it also walks, on a pad);
-##   the stick walks. While the seat has a menu open (its builder, or the pause menu it works)
-##   the box hides and reads nothing, since that menu owns `accept` and the d-pad; it shows
-##   again, the offer kept, when the menu closes. Nothing is read while the game is paused,
-##   nor at the first poll after a menu closed or the game resumed, so the `accept` that
-##   closed a menu never takes a card.
-## - **The build break** (under the status): a hammer and "Build! 8" counting down from
-##   `horde_break_changed(seconds)`, hidden at 0. Display only: the director ends the break.
+## - **The build break** (owner, 2026-10-31: in Horde the game pauses until every player is
+##   ready). A level-up pauses the whole game (the director, `horde_break_changed(true)`); this
+##   node and the builders run while paused (the HUD is PROCESS_MODE_ALWAYS). One box per seat
+##   (`horde_pick.gd`), beside that seat's corner panel toward the middle, in the seat's colour,
+##   walks the seat through it with its own device, read here from `core/input` press counts:
+##   1. **Pick:** on `horde_picks_offered(seat, card_ids)` up to three cards (icon, name, kind
+##      word and colour). The d-pad's left and right (`kind_prev`, `kind_next`; PgUp and PgDn)
+##      move the choice and `accept` (A; Enter) sends `horde_pick_requested(seat, choice)`; P1
+##      on the keyboard also points with the mouse and clicks (the left button, `staff_2`).
+##      A queued offer comes right after the pick.
+##   2. **Build, then ready:** with no offer open and the seat not ready, the box says "Build,
+##      then ready" with `back` (B; Tab, E) "Build" and `accept` (A; Enter) "Ready". B opens the
+##      seat's builder as in play (`hud/panels` reads it, also while paused); the box hides while
+##      the builder is open, since the builder owns `accept`, and shows again when it closes
+##      (B or Start). `accept` on the box sends `horde_ready_requested(seat)`.
+##   3. **Ready:** on `horde_ready_changed(seat, true)` the box says "Ready" until the break ends.
+##   Under the status, a hammer and "Waiting for P2, P3" name the seats not ready yet (from
+##   `horde_ready_changed`, `player_left`), until `horde_break_changed(false)`. Since the game is
+##   paused, nothing walks or casts meanwhile: the d-pad and the click take nothing else.
+##   Outside a break an offer works the same way (it does not happen in play: offers come with
+##   a break). While the seat has a menu open (its builder, or the pause menu it works) its box
+##   hides and reads nothing; while the pause menu is open (anyone's: `pause_open`) or the game
+##   is paused outside a break, no box reads anything; nor at the first poll after a menu
+##   closed or the game resumed, so the `accept` that closed a menu never takes a card or says
+##   ready.
 ## - **The end** (the middle of the view): "The horde won" with the time, kills and level from
 ##   `horde_over`, until the next `horde_started` (or `horde_ended`).
 ##
 ## Nothing here allocates per frame: the texts change only on events (status four times a
-## second) and while the countdown's whole second changes.
+## second).
 
 const EventsScript := preload("res://core/events/events.gd")
 const UIFocusScript := preload("res://core/ui_focus/ui_focus.gd")
@@ -44,11 +52,12 @@ const PICK_SIDE: float = 118.0
 const STATUS_WIDTH: float = 156.0
 const XP_BAR_SIZE: Vector2 = Vector2(96.0, 4.0)
 const BREAK_FONT_SIZE: int = 12
-## The buttons read per seat.
+## The buttons read per seat: choose left, right, take (also ready), click.
 const READ_ACTIONS: Array[StringName] = [
 	HordePickScript.PREV_ACTION, HordePickScript.NEXT_ACTION, HordePickScript.TAKE_ACTION, &"staff_2",
 ]
 const OVER_TITLE: String = "The horde won"
+const WAITING_TEXT: String = "Waiting for %s"
 
 var _events: EventsScript = null
 var _ui_focus: UIFocusScript = null
@@ -56,6 +65,8 @@ var _input: InputManagerScript = null
 var _spells: SpellsScript = null
 ## Where P1's mouse is, in the view's pixels; a Callable so tests can point.
 var mouse_position: Callable = _mouse_position
+## True while the pause menu is open (set by `panels.gd`); it stops every box.
+var pause_open: Callable = _no_pause
 
 var _column: VBoxContainer = null
 var _status: PanelContainer = null
@@ -64,8 +75,9 @@ var _xp_bar: ProgressBar = null
 var _xp_label: Label = null
 var _break_row: PanelContainer = null
 var _break_label: Label = null
-var _break_left: float = 0.0
-var _break_shown: int = -1
+## True during a build break; per seat, whether the break waits for it (joined, not ready).
+var _break_on: bool = false
+var _waiting: Array[bool] = [false, false, false, false]
 var _summary: PanelContainer = null
 var _summary_label: Label = null
 var _picks: Array[HordePickScript] = []
@@ -219,40 +231,34 @@ func bind(events: EventsScript, ui_focus: UIFocusScript, spells: SpellsScript, i
 		_events.horde_picks_offered.connect(_on_picks_offered)
 		_events.horde_pick_taken.connect(_on_pick_taken)
 		_events.horde_break_changed.connect(_on_break_changed)
+		_events.horde_ready_changed.connect(_on_ready_changed)
 		_events.horde_over.connect(_on_over)
 		_events.player_left.connect(_on_player_left)
 
 
-func _process(delta: float) -> void:
-	if get_tree().paused:
-		# The director stands still while paused; read the presses so none waits for the resume.
-		poll()
-		return
-	step(delta)
+func _process(_delta: float) -> void:
 	poll()
 
 
-## Count the break down by `delta` seconds. Called every frame (not while paused); tests call it.
-func step(delta: float) -> void:
-	if not _break_row.visible:
-		return
-	_break_left = maxf(_break_left - delta, 0.0)
-	_show_break()
-
-
-## Read every seat's new presses and work its open pick, as the top of this file says. Called
-## every frame; tests call it directly. One seat's presses never touch another seat's pick.
+## Read every seat's new presses and work its box, as the top of this file says. Called every
+## frame (also while paused); tests call it directly. One seat's presses never touch another
+## seat's box.
 func poll() -> void:
-	var paused: bool = is_inside_tree() and get_tree().paused
+	var stopped: bool = _stopped()
 	for seat in SEATS:
 		var pick: HordePickScript = _picks[seat]
 		_read_presses(seat)
 		var menu: bool = _ui_focus != null and _ui_focus.is_open(seat)
-		pick.visible = pick.has_offer() and not menu
-		var blocked: bool = menu or paused or not pick.has_offer()
+		var mode: HordePickScript.Mode = pick.mode()
+		pick.visible = mode != HordePickScript.Mode.HIDDEN and not menu
+		var blocked: bool = menu or stopped or (mode != HordePickScript.Mode.OFFER and mode != HordePickScript.Mode.PROMPT)
 		var was_blocked: bool = _blocked[seat]
 		_blocked[seat] = blocked
 		if blocked or was_blocked:
+			continue
+		if mode == HordePickScript.Mode.PROMPT:
+			if _presses[2] > 0 and _events != null:
+				_events.horde_ready_requested.emit(seat)
 			continue
 		var clicks: int = 0
 		if _uses_mouse(seat):
@@ -282,18 +288,27 @@ func _mouse_position() -> Vector2:
 	return get_global_mouse_position()
 
 
+func _no_pause() -> bool:
+	return false
+
+
+## True while no box may read: the pause menu is open, or the game is paused outside a break.
+func _stopped() -> bool:
+	if bool(pause_open.call()):
+		return true
+	return is_inside_tree() and get_tree().paused and not _break_on
+
+
 func _on_started(_world: Node2D) -> void:
-	_clear_picks()
+	_end_break()
 	_summary.visible = false
-	_break_row.visible = false
 	_show_status(0.0, 0, 1, 0, 1)
 	_status.visible = true
 
 
 func _on_ended() -> void:
-	_clear_picks()
+	_end_break()
 	_summary.visible = false
-	_break_row.visible = false
 	_status.visible = false
 
 
@@ -328,52 +343,93 @@ func _on_picks_offered(seat: int, card_ids: Array[StringName]) -> void:
 		return
 	var pick: HordePickScript = _picks[seat]
 	if card_ids.is_empty():
-		pick.clear()
-		pick.visible = false
+		_show_after_picks(seat)
 		return
 	pick.offer(card_ids, _spells)
-	# Presses from before the offer take nothing: the counts start now.
+	_freshen(seat)
+
+
+## After the box of `seat` changed: presses from before take nothing (the counts start now), and
+## it shows unless the seat has a menu open.
+func _freshen(seat: int) -> void:
 	_read_presses(seat)
 	var menu: bool = _ui_focus != null and _ui_focus.is_open(seat)
-	pick.visible = not menu
-	_blocked[seat] = menu or (is_inside_tree() and get_tree().paused)
+	_picks[seat].visible = _picks[seat].mode() != HordePickScript.Mode.HIDDEN and not menu
+	_blocked[seat] = menu or _stopped()
 
 
 func _on_pick_taken(seat: int, _card_id: StringName) -> void:
-	if seat >= 0 and seat < SEATS:
-		_picks[seat].clear()
-		_picks[seat].visible = false
-		_blocked[seat] = true
+	if seat < 0 or seat >= SEATS:
+		return
+	# A queued offer follows at once (`horde_picks_offered`); otherwise the seat builds.
+	_show_after_picks(seat)
+
+
+## The box of `seat` with no offer open: the prompt while the break waits for it, else nothing.
+func _show_after_picks(seat: int) -> void:
+	var pick: HordePickScript = _picks[seat]
+	if _break_on and _waiting[seat]:
+		pick.show_prompt()
+	else:
+		pick.clear()
+	_freshen(seat)
 
 
 func _on_player_left(seat: int) -> void:
-	_on_pick_taken(seat, &"")
+	if seat < 0 or seat >= SEATS:
+		return
+	_waiting[seat] = false
+	_picks[seat].clear()
+	_freshen(seat)
+	_show_waiting()
 
 
-func _on_break_changed(seconds: float) -> void:
-	_break_left = maxf(seconds, 0.0)
-	_break_shown = -1
-	_show_break()
+func _on_break_changed(on: bool) -> void:
+	if on:
+		_break_on = true
+		_show_waiting()
+	else:
+		_end_break()
 
 
-func _show_break() -> void:
-	var whole: int = ceili(_break_left)
-	_break_row.visible = whole > 0
-	if whole != _break_shown:
-		_break_shown = whole
-		_break_label.text = "Build! %d" % whole
+func _on_ready_changed(seat: int, on: bool) -> void:
+	if seat < 0 or seat >= SEATS or not _break_on:
+		return
+	_waiting[seat] = not on
+	var pick: HordePickScript = _picks[seat]
+	if on:
+		pick.show_ready()
+		_freshen(seat)
+	elif not pick.has_offer():
+		_show_after_picks(seat)
+	_show_waiting()
+
+
+## The break is over (or the run): every box closes, the waiting line goes.
+func _end_break() -> void:
+	_break_on = false
+	for seat in SEATS:
+		_waiting[seat] = false
+		_picks[seat].clear()
+		_freshen(seat)
+	_show_waiting()
+
+
+## "Waiting for P2, P3" under the status while the break waits for someone; hidden otherwise.
+func _show_waiting() -> void:
+	var names: PackedStringArray = PackedStringArray()
+	for seat in SEATS:
+		if _break_on and _waiting[seat]:
+			names.append("P%d" % (seat + 1))
+	_break_row.visible = not names.is_empty()
+	if not names.is_empty():
+		_break_label.text = WAITING_TEXT % ", ".join(names)
 
 
 func _on_over(seconds: float, kills: int, level: int) -> void:
-	_clear_picks()
-	_break_row.visible = false
+	_end_break()
 	_summary_label.text = "Time %s  Kills %d  Level %d" % [clock(seconds), kills, level]
 	_summary.visible = true
-
-
-func _clear_picks() -> void:
-	for seat in SEATS:
-		_on_pick_taken(seat, &"")
 
 
 # --- For tests and screenshots ------------------------------------------------------------
@@ -398,8 +454,14 @@ func get_break_row() -> PanelContainer:
 	return _break_row
 
 
+## The waiting line's words ("Waiting for P2, P3").
 func break_text() -> String:
 	return _break_label.text
+
+
+## True while a build break is on.
+func in_break() -> bool:
+	return _break_on
 
 
 func get_summary() -> PanelContainer:

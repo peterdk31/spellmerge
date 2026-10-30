@@ -17,8 +17,8 @@ weights = Dictionary[StringName, float]({
 [sub_resource type="Resource" id="Point_1"]
 script = ExtResource("2_point")
 seconds = 60.0
-spawns_per_second = 2.0
-cap_alive = 80
+spawns_per_second = 1.5
+cap_alive = 70
 weights = Dictionary[StringName, float]({
 &"bone_husk": 4.0,
 &"crypt_mite": 6.0,
@@ -28,9 +28,9 @@ weights = Dictionary[StringName, float]({
 
 [sub_resource type="Resource" id="Point_2"]
 script = ExtResource("2_point")
-seconds = 180.0
-spawns_per_second = 4.0
-cap_alive = 220
+seconds = 120.0
+spawns_per_second = 2.0
+cap_alive = 120
 weights = Dictionary[StringName, float]({
 &"bone_husk": 5.0,
 &"crypt_mite": 6.0,
@@ -42,9 +42,9 @@ weights = Dictionary[StringName, float]({
 
 [sub_resource type="Resource" id="Point_3"]
 script = ExtResource("2_point")
-seconds = 300.0
-spawns_per_second = 6.0
-cap_alive = 380
+seconds = 180.0
+spawns_per_second = 3.0
+cap_alive = 165
 weights = Dictionary[StringName, float]({
 &"bone_husk": 6.0,
 &"bone_scepter": 0.5,
@@ -57,9 +57,9 @@ weights = Dictionary[StringName, float]({
 
 [sub_resource type="Resource" id="Point_4"]
 script = ExtResource("2_point")
-seconds = 480.0
-spawns_per_second = 10.0
-cap_alive = 600
+seconds = 240.0
+spawns_per_second = 4.0
+cap_alive = 200
 weights = Dictionary[StringName, float]({
 &"bone_husk": 6.0,
 &"bone_scepter": 1.0,

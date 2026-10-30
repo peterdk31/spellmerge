@@ -1,7 +1,7 @@
 extends RefCounted
 ## A small horde run for the director's tests: its own event bus, actor table, a stand-in
-## registry (made-up enemies and cards) and a stand-in projectile manager that counts its
-## clears, a director (`HordeScript`) wired to them in `root` (stepped only by hand), and a world
+## registry (made-up enemies and cards), a director (`HordeScript`) wired to them in `root`
+## (stepped only by hand, on the desktop cap), and a world
 ## out of the tree: a 1280x720 room walled 32 pixels thick, a camera in its middle, and a wizard
 ## per seat, registered as that seat's home body. Every event the director sends is recorded.
 ## `free_all()` frees everything.
@@ -42,19 +42,9 @@ class FakeRegistry:
 		return out
 
 
-## A projectile manager stand-in that only counts its clears.
-class FakeProjectiles:
-	extends "res://core/projectiles/projectile_manager.gd"
-	var clears: int = 0
-
-	func clear() -> void:
-		clears += 1
-
-
 var bus: EventsScript
 var actors: ActorsScript
 var registry: FakeRegistry
-var projectiles: FakeProjectiles
 var director: HordeScript
 var world: Node2D
 var camera: Camera2D
@@ -65,7 +55,9 @@ var statuses: int = 0
 var offers: Array[Array] = []
 var taken: Array[Array] = []
 var bags: Array[Array] = []
-var breaks: Array[float] = []
+var breaks: Array[bool] = []
+## Each `horde_ready_changed`, as [seat, ready].
+var readies: Array[Array] = []
 var overs: int = 0
 
 var _root: Node
@@ -77,7 +69,6 @@ func _init(root: Node, seats: Array[int] = [0]) -> void:
 	bus = EventsScript.new()
 	actors = ActorsScript.new()
 	registry = FakeRegistry.new()
-	projectiles = FakeProjectiles.new()
 	var enemies: Dictionary = {}
 	for id: StringName in [ENEMY_A, ENEMY_B]:
 		var body := Node2D.new()
@@ -101,8 +92,8 @@ func _init(root: Node, seats: Array[int] = [0]) -> void:
 	director.events = bus
 	director.actors = actors
 	director.registry = registry
-	director.projectiles = projectiles
 	director.view_size = VIEW
+	director.web = false
 	director.curve = curve([[0.0, 4.0, 50]], {ENEMY_A: 1.0})
 	director.rng.seed = 7
 	root.add_child(director)
@@ -112,7 +103,8 @@ func _init(root: Node, seats: Array[int] = [0]) -> void:
 	bus.horde_picks_offered.connect(func(seat: int, ids: Array[StringName]) -> void: offers.append([seat, ids]))
 	bus.horde_pick_taken.connect(func(seat: int, id: StringName) -> void: taken.append([seat, id]))
 	bus.bag_set_requested.connect(func(seat: int, bag: Array[StringName]) -> void: bags.append([seat, bag]))
-	bus.horde_break_changed.connect(func(seconds: float) -> void: breaks.append(seconds))
+	bus.horde_break_changed.connect(func(on: bool) -> void: breaks.append(on))
+	bus.horde_ready_changed.connect(func(seat: int, on: bool) -> void: readies.append([seat, on]))
 	bus.horde_over.connect(func(_s: float, _k: int, _l: int) -> void: overs += 1)
 
 
@@ -214,15 +206,32 @@ func kill_beside(count: int, seat: int = 0) -> void:
 		kill(list[0], at)
 
 
-## Kills enough beside seat 0's wizard for one level-up, and lets the gems come in.
+## Kills enough beside seat 0's wizard for one level-up, and lets the gems come in. In a build
+## break (the game paused: nothing dies, no gem comes in) the experience is given directly.
 func level_up() -> void:
 	var need: int = HordeScript.xp_next(director.level) - director.xp
 	var goal: int = director.level + 1
+	if director.in_break():
+		director._gain(need)
+		return
 	kill_beside(need)
 	for i in 60:
 		director.step(1.0 / 60.0)
 		if director.level >= goal:
 			break
+
+
+## Takes every offer of `seat` (its open one and those queued behind it), the first card each.
+func take_all(seat: int) -> void:
+	while not director.offer_of(seat).is_empty():
+		bus.horde_pick_requested.emit(seat, 0)
+
+
+## Every joined seat takes its offers and says it is ready.
+func all_ready() -> void:
+	for seat in 4:
+		take_all(seat)
+		bus.horde_ready_requested.emit(seat)
 
 
 func free_all() -> void:
@@ -232,6 +241,6 @@ func free_all() -> void:
 		director.free()
 	if is_instance_valid(world):
 		world.free()
-	for node: Node in [bus, actors, registry, projectiles]:
+	for node: Node in [bus, actors, registry]:
 		if is_instance_valid(node):
 			node.free()

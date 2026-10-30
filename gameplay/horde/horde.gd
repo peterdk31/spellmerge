@@ -6,7 +6,8 @@ extends Node
 ## - **Spawning:** who and how many comes from the curve (`horde_curve.tres`, a `HordeCurve`).
 ##   Enemies appear on a ring just outside the camera's view around the party's middle, clamped
 ##   inside the arena's floor (the room's walls, WALL_MARGIN in), never closer than
-##   SPAWN_MIN_DISTANCE to a wizard, at most SPAWN_PER_FRAME a step. They are ordinary enemy
+##   SPAWN_MIN_DISTANCE to a wizard, at most SPAWN_PER_FRAME a step, never more alive than
+##   `max_alive()` (MAX_ALIVE_DESKTOP, or MAX_ALIVE_WEB on the web). They are ordinary enemy
 ##   actors from the registry (`enemies`), added under one `Horde` Node2D in the world. An id
 ##   the registry does not have is skipped, with one warning.
 ## - **Kills and experience:** `enemy_died` of an enemy under the `Horde` node counts a kill and
@@ -16,10 +17,18 @@ extends Node
 ##   card ids)` from the spell cards (`spells`, `SpellComponent`) not yet in its bag. One open
 ##   offer per seat; a level-up while one is open waits behind it. `horde_pick_requested` puts
 ##   the card in the bag (`bag_set_requested`) and sends `horde_pick_taken`.
-## - **Build break:** a level-up starts BUILD_BREAK seconds (`horde_break_changed`): the `Horde`
-##   node is disabled (the horde stands frozen), nothing spawns, the shots in flight are
-##   cleared; it ends on time (`horde_break_changed(0)`). A level-up in a break does not lengthen
-##   it. The run's clock stands still in a break.
+## - **Build break** (owner, 2026-10-31: in Horde only, the game waits for every player): a
+##   level-up pauses the game for everyone with the SceneTree pause (`horde_break_changed(true)`),
+##   so wizards, enemies, shots, statuses and timers all stand still, and every joined seat is
+##   not ready (`horde_ready_changed(seat, false)`). A seat is ready when it sends
+##   `horde_ready_requested` with every offer taken (open and queued); a ready sent before that
+##   is ignored, and the HUD only offers it after the last pick. A seat with no offer (every card
+##   owned) still says ready. The break ends (`horde_break_changed(false)`, un-paused) once every
+##   joined seat is ready: a seat that leaves no longer counts, one that joins in a break counts
+##   as ready, and a level-up in a break adds offers and un-readies the seats that got one.
+##   `horde_over`, `horde_ended` and a restart end it too. The run's clock stands still in a
+##   break. This node runs while paused (PROCESS_MODE_ALWAYS) but steps only in a break, so the
+##   pause menu still stops it.
 ## - **Bags:** `bag_set_requested(seat, START_BAG)` for every wizard on start, and for a joiner on
 ##   the step after its `player_joined` (Flow adds its wizard in its own handler of that event).
 ## - **Status:** `horde_status` every STATUS_INTERVAL seconds.
@@ -33,7 +42,6 @@ extends Node
 
 const EventsScript := preload("res://core/events/events.gd")
 const RegistryScript := preload("res://core/registry/registry.gd")
-const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const GemsScript := preload("res://gameplay/horde/horde_gems.gd")
 const DefaultCurve: HordeCurve = preload("res://gameplay/horde/horde_curve.tres")
@@ -44,8 +52,11 @@ const SEATS: int = 4
 const START_BAG: Array[StringName] = [&"dash", &"swing"]
 ## Cards in one level-up offer.
 const OFFER_SIZE: int = 3
-## Seconds of the build break a level-up starts.
-const BUILD_BREAK: float = 8.0
+## The most horde enemies alive at once, whatever the curve says (owner, 2026-10-31: playtest at
+## these until a swarm without a node per enemy exists; H1 measured about 200-250 on desktop and
+## 80-100 on web at 60 FPS).
+const MAX_ALIVE_DESKTOP: int = 200
+const MAX_ALIVE_WEB: int = 100
 ## At most this many enemies appear in one step, so a burst never hitches.
 const SPAWN_PER_FRAME: int = 4
 ## No enemy appears closer than this to a wizard (pixels).
@@ -78,7 +89,6 @@ const NO_LIMIT: int = 1000000
 ## The services. Only tests set these, before adding the node; otherwise the autoloads are used.
 var events: EventsScript = null
 var registry: RegistryScript = null
-var projectiles: ProjectileManagerScript = null
 var actors: ActorsScript = null
 ## The curve the next start uses.
 var curve: HordeCurve = DefaultCurve
@@ -86,6 +96,8 @@ var curve: HordeCurve = DefaultCurve
 var view_size: Vector2 = Vector2.ZERO
 ## The randomness of spawns and offers. Tests seed it.
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+## True on the web build (the lower cap, MAX_ALIVE_WEB). Tests set it.
+var web: bool = OS.has_feature("web")
 
 ## The world of the run, or null while no horde runs.
 var world: Node2D = null
@@ -112,7 +124,10 @@ var _kinds: Array[EnemyBase] = []
 ## Every spell card id in the registry, read on start.
 var _cards: Array[StringName] = []
 var _spawn_debt: float = 0.0
-var _break_left: float = 0.0
+## True while a build break holds the game paused.
+var _break_on: bool = false
+## Per seat: ready to end the build break (only meaningful in one).
+var _is_ready: Array[bool] = [false, false, false, false]
 var _status_left: float = 0.0
 ## Per seat: joined this run, down, its bag, its open offer (empty: none) and how many offers
 ## wait behind it.
@@ -138,12 +153,13 @@ func _init() -> void:
 
 
 func _ready() -> void:
+	# A build break pauses the tree; the director goes on hearing picks and readiness (signals) and
+	# giving a joiner its bag (`_process`).
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	if events == null:
 		events = get_node_or_null("/root/Events") as EventsScript
 	if registry == null:
 		registry = get_node_or_null("/root/Registry") as RegistryScript
-	if projectiles == null:
-		projectiles = get_node_or_null("/root/Projectiles") as ProjectileManagerScript
 	if actors == null:
 		actors = get_node_or_null("/root/Actors") as ActorsScript
 	if events == null:
@@ -153,6 +169,7 @@ func _ready() -> void:
 	events.horde_ended.connect(stop)
 	events.enemy_died.connect(_on_enemy_died)
 	events.horde_pick_requested.connect(_on_pick_requested)
+	events.horde_ready_requested.connect(_on_ready_requested)
 	events.player_downed.connect(_on_player_downed)
 	events.player_revived.connect(_on_player_revived)
 	events.player_joined.connect(_on_player_joined)
@@ -160,6 +177,9 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	# Runs while paused (to give a joiner its bag in a break), but the pause menu's pause stops it.
+	if get_tree().paused and not _break_on:
+		return
 	step(delta)
 
 
@@ -168,9 +188,19 @@ func is_running() -> bool:
 	return world != null
 
 
-## Seconds of the build break left, or 0 when there is none.
-func break_left() -> float:
-	return _break_left
+## True while a build break holds the game paused.
+func in_break() -> bool:
+	return _break_on
+
+
+## True when `seat` is ready to end the build break (false outside one).
+func is_ready(seat: int) -> bool:
+	return _break_on and seat >= 0 and seat < SEATS and _is_ready[seat]
+
+
+## The most enemies alive at once here: MAX_ALIVE_WEB on the web, else MAX_ALIVE_DESKTOP.
+func max_alive() -> int:
+	return MAX_ALIVE_WEB if web else MAX_ALIVE_DESKTOP
 
 
 ## The `Horde` node the enemies stand under, or null while no run is up.
@@ -228,7 +258,6 @@ func start(new_world: Node2D) -> void:
 	alive = 0
 	over = false
 	_spawn_debt = 0.0
-	_break_left = 0.0
 	_status_left = 0.0
 	_horde = Node2D.new()
 	_horde.name = HORDE_NODE_NAME
@@ -261,10 +290,8 @@ func stop() -> void:
 		_joined[seat] = false
 		_down[seat] = false
 		_bag_due[seat] = false
-	if _break_left > 0.0:
-		_break_left = 0.0
-		if events != null:
-			events.horde_break_changed.emit(0.0)
+	if _break_on:
+		_end_break()
 	for node: Node in [_horde, _gems]:
 		if node != null and is_instance_valid(node):
 			var parent: Node = node.get_parent()
@@ -292,14 +319,10 @@ func step(delta: float) -> void:
 			if _joined[seat]:
 				_give_start_bag(seat)
 	_read_wizards()
-	if _break_left > 0.0:
-		_break_left -= delta
-		if _break_left <= 0.0:
-			_end_break()
-	elif not over:
+	if not _break_on and not over:
 		seconds += delta
 		_spawn(delta)
-	if _gems != null:
+	if _gems != null and not _break_on:
 		var picked: int = _gems.step(delta, _wizard_at, _standing, PICKUP_RADIUS)
 		if picked > 0:
 			_gain(picked)
@@ -314,7 +337,7 @@ func _spawn(delta: float) -> void:
 	if curve == null or _kinds.is_empty():
 		return
 	var rate: float = curve.rate_at(seconds)
-	var room: int = curve.cap_at(seconds) - alive
+	var room: int = mini(curve.cap_at(seconds), max_alive()) - alive
 	_spawn_debt = minf(_spawn_debt + rate * delta, maxf(rate, float(SPAWN_PER_FRAME)))
 	var count: int = mini(mini(floori(_spawn_debt), SPAWN_PER_FRAME), room)
 	for n in count:
@@ -477,18 +500,21 @@ func _gain(amount: int) -> void:
 		_level_up()
 
 
-## A level-up: an offer for every joined seat (or one more waiting behind its open one), and a
-## build break unless one is on.
+## A level-up: a build break unless one is on, and an offer for every joined seat (or one more
+## waiting behind its open one); in a break, a seat that got one is not ready any more.
 func _level_up() -> void:
+	if not _break_on and not over:
+		_start_break()
 	for seat in SEATS:
 		if not _joined[seat]:
 			continue
+		var got: bool = true
 		if not _offers[seat].is_empty():
 			_queued[seat] += 1
 		else:
-			_offer(seat)
-	if _break_left <= 0.0 and not over:
-		_start_break()
+			got = _offer(seat)
+		if got and _break_on and _is_ready[seat]:
+			_set_ready(seat, false)
 
 
 ## Opens a new offer for `seat` from the cards not in its bag; with every card owned, none.
@@ -549,22 +575,58 @@ func _give_start_bag(seat: int) -> void:
 
 # --- The build break ----------------------------------------------------------------------------
 
+## The game pauses for everyone and every joined seat is not ready.
 func _start_break() -> void:
-	_break_left = BUILD_BREAK
-	if _horde != null:
-		_horde.process_mode = Node.PROCESS_MODE_DISABLED
-	if projectiles != null:
-		projectiles.clear()
+	_break_on = true
+	_set_paused(true)
 	if events != null:
-		events.horde_break_changed.emit(BUILD_BREAK)
+		events.horde_break_changed.emit(true)
+	for seat in SEATS:
+		_is_ready[seat] = false
+		if _joined[seat] and events != null:
+			events.horde_ready_changed.emit(seat, false)
 
 
+## The game goes on. Un-paused before `horde_break_changed(false)`, so a listener that must keep
+## the game paused (the pause menu, open) can pause it again.
 func _end_break() -> void:
-	_break_left = 0.0
-	if _horde != null and is_instance_valid(_horde):
-		_horde.process_mode = Node.PROCESS_MODE_INHERIT
+	_break_on = false
+	for seat in SEATS:
+		_is_ready[seat] = false
+	_set_paused(false)
 	if events != null:
-		events.horde_break_changed.emit(0.0)
+		events.horde_break_changed.emit(false)
+
+
+func _set_paused(on: bool) -> void:
+	if is_inside_tree():
+		get_tree().paused = on
+
+
+func _set_ready(seat: int, on: bool) -> void:
+	_is_ready[seat] = on
+	if events != null:
+		events.horde_ready_changed.emit(seat, on)
+
+
+## `seat` is done: it counts as ready once every offer of it is taken (else the request is ignored).
+func _on_ready_requested(seat: int) -> void:
+	if world == null or not _break_on or seat < 0 or seat >= SEATS or not _joined[seat]:
+		return
+	if _is_ready[seat] or not _offers[seat].is_empty() or _queued[seat] > 0:
+		return
+	_set_ready(seat, true)
+	_end_break_if_ready()
+
+
+## Ends the break when every joined seat is ready (also when no seat is left).
+func _end_break_if_ready() -> void:
+	if not _break_on:
+		return
+	for seat in SEATS:
+		if _joined[seat] and not _is_ready[seat]:
+			return
+	_end_break()
 
 
 # --- Players ------------------------------------------------------------------------------------
@@ -578,6 +640,9 @@ func _on_player_joined(seat: int) -> void:
 	# Its bag goes out on the next step, when Flow has surely added its wizard.
 	_bag_due[seat] = true
 	_bags[seat].assign(START_BAG)
+	# A joiner in a break was offered nothing: nobody waits for it.
+	if _break_on:
+		_set_ready(seat, true)
 
 
 func _on_player_left(seat: int) -> void:
@@ -587,7 +652,10 @@ func _on_player_left(seat: int) -> void:
 	_down[seat] = false
 	_bag_due[seat] = false
 	_drop_offer(seat)
+	_is_ready[seat] = false
 	_check_over()
+	# It no longer counts in a break.
+	_end_break_if_ready()
 
 
 func _on_player_downed(seat: int) -> void:
@@ -616,7 +684,7 @@ func _check_over() -> void:
 	if not any:
 		return
 	over = true
-	if _break_left > 0.0:
+	if _break_on:
 		_end_break()
 	if events != null:
 		events.horde_over.emit(seconds, kills, level)

@@ -1,7 +1,8 @@
 extends "res://tests/support/suite.gd"
 ## Tests for gameplay/horde, the horde director (docs/milestones/horde.md, H3), on a fixture of
 ## its own (horde_fixture.gd): spawning (outside the view, inside the walls, the cap, the per-step
-## limit), kills, gems, levels, offers and picks, the build break, the end, a restart and the
+## limit), kills, gems, levels, offers and picks, the build break (a pause until every seat is ready), the
+## enemy cap, the end, a restart and the
 ## missing-enemy warning. Time moves by fixed steps through `step()`; nothing waits.
 ##
 ## godot --headless --path . --script res://tests/gameplay/horde/test_horde.gd
@@ -254,7 +255,7 @@ func test_a_picked_card_is_never_offered_again() -> void:
 			check(not run.director.bag_of(0).has(id), "an owned card came back: %s" % id)
 		run.bus.horde_pick_requested.emit(0, 0)
 		check(run.director.bag_of(0).has(offer[0]), "the pick is in the bag")
-		run.run(HordeScript.BUILD_BREAK + 0.1)
+		run.bus.horde_ready_requested.emit(0)
 
 
 func test_a_level_up_while_an_offer_is_open_waits_behind_it() -> void:
@@ -326,45 +327,183 @@ func test_a_leaver_drops_its_offer() -> void:
 
 # --- The build break ----------------------------------------------------------------------------
 
-func test_a_level_up_starts_a_build_break_that_freezes_the_horde() -> void:
-	var run: Fixture = _make()
+func test_a_level_up_pauses_the_game_until_every_seat_is_ready() -> void:
+	var run: Fixture = _make([0, 1])
 	run.start()
 	run.run(1.0)
-	var clears: int = run.projectiles.clears
 	run.level_up()
-	var expected: Array[float] = [HordeScript.BUILD_BREAK]
-	check_equal(run.breaks, expected, "the break is announced")
-	check_equal(run.director.horde_node().process_mode, Node.PROCESS_MODE_DISABLED, "the horde stands frozen")
-	check_equal(run.projectiles.clears - clears, 1, "the shots in flight are cleared")
+	var on: Array[bool] = [true]
+	check_equal(run.breaks, on, "the break is announced")
+	check(paused, "the whole game is paused")
+	check(run.director.in_break(), "the director is in a break")
+	check(run.readies.has([0, false]) and run.readies.has([1, false]), "both seats start not ready")
+	check_equal(run.director.process_mode, Node.PROCESS_MODE_ALWAYS, "the director keeps hearing while paused")
+	run.take_all(0)
+	run.bus.horde_ready_requested.emit(0)
+	check(run.director.is_ready(0) and run.readies.back() == [0, true], "seat 0 is ready")
+	check(paused and run.director.in_break(), "still paused: seat 1 is not ready")
+	run.take_all(1)
+	check(paused, "a pick alone does not end the break")
+	run.bus.horde_ready_requested.emit(1)
+	var both: Array[bool] = [true, false]
+	check_equal(run.breaks, both, "the last ready ends the break")
+	check(not paused and not run.director.in_break(), "and the game goes on")
 
 
-func test_the_build_break_blocks_spawns_and_ends_on_time() -> void:
+func test_the_break_blocks_spawns_and_stops_the_clock() -> void:
 	var run: Fixture = _make()
 	run.start()
 	run.level_up()
 	var count: int = run.enemies().size()
 	var clock: float = run.director.seconds
-	run.run(HordeScript.BUILD_BREAK - 0.5)
+	run.run(30.0)
 	check_equal(run.enemies().size(), count, "nothing appears in the break")
 	check_equal(run.director.seconds, clock, "the clock stands still")
-	check_equal(run.breaks.size(), 1, "still in the break")
-	run.run(0.6)
-	var expected: Array[float] = [HordeScript.BUILD_BREAK, 0.0]
-	check_equal(run.breaks, expected, "it ended on time, whoever is picking")
-	check_equal(run.director.horde_node().process_mode, Node.PROCESS_MODE_INHERIT, "the horde moves again")
+	check(run.director.in_break(), "a break has no end in time: it waits")
+	run.all_ready()
 	run.run(1.0)
-	check(run.enemies().size() > count, "and spawns again")
+	check(run.enemies().size() > count, "it spawns again after the break")
+	check(run.director.seconds > clock, "and the clock runs")
 
 
-func test_a_level_up_in_a_break_does_not_lengthen_it() -> void:
+func test_a_ready_before_the_picks_are_taken_is_ignored() -> void:
 	var run: Fixture = _make()
 	run.start()
 	run.level_up()
-	run.run(4.0)
+	run.bus.horde_ready_requested.emit(0)
+	check(not run.director.is_ready(0) and run.director.in_break(), "an open offer: not ready")
+	run.bus.horde_pick_requested.emit(0, 0)
+	run.bus.horde_ready_requested.emit(0)
+	check(not run.director.in_break() and not paused, "after the pick the ready counts")
+
+
+func test_queued_offers_must_all_be_taken_first() -> void:
+	var run: Fixture = _make()
+	run.start()
+	# Two levels at once: one open offer, one queued behind it.
+	run.director._gain(HordeScript.xp_next(1) + HordeScript.xp_next(2))
+	check_equal(run.director.queued_of(0), 1, "a second offer waits")
+	var on: Array[bool] = [true]
+	check_equal(run.breaks, on, "one break for both")
+	run.bus.horde_pick_requested.emit(0, 0)
+	run.bus.horde_ready_requested.emit(0)
+	check(run.director.in_break(), "the queued offer is open now: not ready")
+	run.bus.horde_pick_requested.emit(0, 0)
+	run.bus.horde_ready_requested.emit(0)
+	check(not run.director.in_break(), "every offer taken: ready, and the break ends")
+
+
+func test_a_seat_with_no_offer_still_says_ready() -> void:
+	var run: Fixture = _make()
+	var owned: Dictionary = {}
+	for id: StringName in HordeScript.START_BAG:
+		owned[id] = SpellComponent.new()
+	run.registry.folders[&"spells"] = owned
+	run.start()
 	run.level_up()
+	check(run.offers.is_empty(), "every card owned: no offer")
+	check(run.director.in_break() and paused, "but the break is on")
+	run.bus.horde_ready_requested.emit(0)
+	check(not run.director.in_break() and not paused, "the seat's ready ends it")
+
+
+func test_a_seat_that_leaves_no_longer_counts() -> void:
+	var run: Fixture = _make([0, 1])
+	run.start()
+	run.level_up()
+	run.take_all(0)
+	run.bus.horde_ready_requested.emit(0)
+	check(run.director.in_break(), "seat 1 is still picking")
+	run.bus.player_left.emit(1)
+	check(not run.director.in_break() and not paused, "seat 1 left: everyone left is ready")
+
+
+func test_a_seat_that_joins_in_a_break_counts_as_ready() -> void:
+	var run: Fixture = _make([0])
+	run.start()
+	run.level_up()
+	run.add_wizard(run.world, 2, Vector2(300.0, 300.0))
+	run.bus.player_joined.emit(2)
+	check(run.director.is_ready(2) and run.readies.back() == [2, true], "the joiner is ready at once")
+	run.director.step(1.0 / 60.0)
+	check(run.bags.has([2, HordeScript.START_BAG]), "its bag still goes out in the break")
+	run.take_all(0)
+	run.bus.horde_ready_requested.emit(0)
+	check(not run.director.in_break(), "only seat 0 was waited for")
+
+
+func test_a_level_up_in_a_break_unreadies_the_seats_it_offers_to() -> void:
+	var run: Fixture = _make([0, 1])
+	run.start()
+	run.level_up()
+	run.take_all(0)
+	run.bus.horde_ready_requested.emit(0)
+	check(run.director.is_ready(0), "seat 0 is ready")
+	run.director._gain(HordeScript.xp_next(run.director.level))
 	check_equal(run.breaks.size(), 1, "no second break")
-	run.run(HordeScript.BUILD_BREAK - 4.0 + 0.1)
-	check_equal(run.breaks.back(), 0.0, "the break ended on its first time")
+	check(not run.director.is_ready(0) and run.readies.back() == [0, false], "the new offer un-readies seat 0")
+	check_equal(run.director.offer_of(0).size(), HordeScript.OFFER_SIZE, "with its new offer open")
+	check_equal(run.director.queued_of(1), 1, "seat 1's waits behind its open one")
+	run.all_ready()
+	check(not run.director.in_break() and not paused, "every offer taken and ready: it ends")
+
+
+func test_the_end_and_a_stop_end_the_break() -> void:
+	var run: Fixture = _make([0])
+	run.start()
+	run.level_up()
+	run.bus.player_downed.emit(0)
+	check_equal(run.overs, 1, "the run is over")
+	check(not run.director.in_break() and not paused, "horde_over un-pauses")
+	check_equal(run.breaks.back(), false, "and says the break ended")
+	var old_world: Node2D = run.world
+	run.world = run.make_world([0])
+	run.start()
+	old_world.free()
+	run.level_up()
+	check(paused, "a new break")
+	run.bus.horde_ended.emit()
+	check(not paused, "horde_ended un-pauses")
+	check_equal(run.breaks.back(), false, "and ends the break")
+
+
+func test_a_restart_ends_the_break() -> void:
+	var run: Fixture = _make([0])
+	run.start()
+	run.level_up()
+	var old_world: Node2D = run.world
+	run.world = run.make_world([0])
+	run.start()
+	check(not paused and not run.director.in_break(), "a restart un-pauses")
+	old_world.free()
+
+
+# --- The enemy cap ------------------------------------------------------------------------------
+
+func test_the_cap_alive_is_clamped_on_desktop_and_web() -> void:
+	var run: Fixture = _make()
+	run.director.curve = Fixture.curve([[0.0, 600.0, 5000]], {Fixture.ENEMY_A: 1.0})
+	run.start()
+	check_equal(run.director.max_alive(), HordeScript.MAX_ALIVE_DESKTOP, "the desktop cap")
+	run.run(10.0)
+	check_equal(run.director.alive, HordeScript.MAX_ALIVE_DESKTOP, "the curve's 5000 is held at the desktop cap")
+	run.director.web = true
+	check_equal(run.director.max_alive(), HordeScript.MAX_ALIVE_WEB, "the web cap")
+	run.world = run.make_world([0])
+	var old_world: Node2D = run.director.world
+	run.start()
+	old_world.free()
+	run.run(10.0)
+	check_equal(run.director.alive, HordeScript.MAX_ALIVE_WEB, "the web holds at its own cap")
+
+
+func test_the_shipped_curve_tops_out_at_the_desktop_cap() -> void:
+	var curve: HordeCurve = load("res://gameplay/horde/horde_curve.tres") as HordeCurve
+	curve.prepare()
+	check_equal(curve.cap_at(0.0), 30, "it starts at 30 alive")
+	check_equal(curve.rate_at(0.0), 1.0, "and 1 a second")
+	check_equal(curve.cap_at(99999.0), HordeScript.MAX_ALIVE_DESKTOP, "its last point is the desktop cap")
+	check(curve.points.back().seconds <= 300.0, "reached within five minutes")
 
 
 # --- Status, the end and restarts ---------------------------------------------------------------
@@ -431,7 +570,8 @@ func test_horde_ended_stops_the_director() -> void:
 	run.bus.horde_ended.emit()
 	check(not run.director.is_running(), "it stopped")
 	check(run.taken.has([0, &""]), "the open offer was dropped")
-	check_equal(run.breaks.back(), 0.0, "the break ended")
+	check_equal(run.breaks.back(), false, "the break ended")
+	check(not paused, "and the game is not paused")
 
 
 func test_a_real_enemy_is_an_actor_with_its_data() -> void:

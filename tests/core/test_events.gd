@@ -24,6 +24,7 @@ const EVENTS: Dictionary = {
 	&"sandbox_action_requested": [["player", TYPE_INT], ["action", TYPE_STRING_NAME]],
 	&"horde_requested": [["player", TYPE_INT]],
 	&"horde_pick_requested": [["player", TYPE_INT], ["choice", TYPE_INT]],
+	&"horde_ready_requested": [["player", TYPE_INT]],
 	# Devices.
 	&"device_joined": [["player", TYPE_INT], ["device", TYPE_INT]],
 	&"device_left": [["player", TYPE_INT], ["device", TYPE_INT]],
@@ -87,7 +88,8 @@ const EVENTS: Dictionary = {
 	&"horde_started": [["world", TYPE_OBJECT]],
 	&"horde_ended": [],
 	&"horde_status": [["seconds", TYPE_FLOAT], ["kills", TYPE_INT], ["alive", TYPE_INT], ["level", TYPE_INT], ["xp", TYPE_INT], ["xp_next", TYPE_INT]],
-	&"horde_break_changed": [["seconds", TYPE_FLOAT]],
+	&"horde_break_changed": [["on", TYPE_BOOL]],
+	&"horde_ready_changed": [["player", TYPE_INT], ["ready", TYPE_BOOL]],
 	&"horde_over": [["seconds", TYPE_FLOAT], ["kills", TYPE_INT], ["level", TYPE_INT]],
 	&"horde_picks_offered": [["player", TYPE_INT], ["card_ids", TYPE_ARRAY]],
 	&"horde_pick_taken": [["player", TYPE_INT], ["card_id", TYPE_STRING_NAME]],

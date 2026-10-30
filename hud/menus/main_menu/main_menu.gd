@@ -1,9 +1,11 @@
 extends Control
-## The main menu: the name, the tagline, the build version and the Play button.
+## The main menu: the name, the tagline, the build version and the Play and Horde buttons.
 ## Play only sends the intent event `play_requested`; the flow area hears it and
 ## starts the arena. The menu never calls flow and never changes the scene itself.
 ## In `dev` and `preview` builds a Sandbox button stands above Play and has the focus, so
 ## those builds start in the sandbox with one press (staffs B7); it sends `sandbox_requested`.
+## Below Play, in every build, the Horde button sends `horde_requested` (docs/milestones/horde.md):
+## the horde run, a walled arena against a growing horde.
 ## Below Play, "Fullscreen: Off" (or On) asks `Display` (core) to fill the screen: on the web a
 ## click or key press is what lets the browser do it (owner, 2026-10-27). F11 or Alt+Enter do the
 ## same anywhere.
@@ -43,6 +45,7 @@ var display: Node = null
 @onready var _version: Label = %Version
 @onready var _play: Button = %Play
 @onready var _sandbox: Button = %Sandbox
+@onready var _horde: Button = %Horde
 @onready var _fullscreen: Button = %Fullscreen
 
 
@@ -52,6 +55,7 @@ func _ready() -> void:
 		events = get_node_or_null("/root/Events") as EventsScript
 	_play.pressed.connect(_on_play_pressed)
 	_sandbox.pressed.connect(_on_sandbox_pressed)
+	_horde.pressed.connect(_on_horde_pressed)
 	if display == null:
 		display = get_node_or_null(^"/root/Display")
 	_fullscreen.pressed.connect(_on_fullscreen_pressed)
@@ -155,6 +159,13 @@ func _on_sandbox_pressed() -> void:
 		push_warning("Main menu: the Events autoload is missing, so Sandbox does nothing.")
 		return
 	events.sandbox_requested.emit(MENU_PLAYER)
+
+
+func _on_horde_pressed() -> void:
+	if events == null:
+		push_warning("Main menu: the Events autoload is missing, so Horde does nothing.")
+		return
+	events.horde_requested.emit(MENU_PLAYER)
 
 
 func _on_fullscreen_pressed() -> void:

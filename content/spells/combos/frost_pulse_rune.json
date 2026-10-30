@@ -3,7 +3,7 @@
 	"name": "Frost pulse rune",
 	"does": "A frost rune that pulses a frost nova every half second; imps standing round it freeze.",
 	"casts": [{"staff": 0, "cards": ["frost", "timer", "rune", "frost", "nova"]}],
-	"imps": [[30, 0], [0, 30], [-30, 0]],
+	"imps": [[58, 0], [28, 30], [-2, 0]],
 	"seconds": 2.6,
 	"checks": [{"kind": "status", "imps": [0, 1, 2], "status": "freeze"}]
 }

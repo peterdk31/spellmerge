@@ -92,7 +92,7 @@ var behaviours: PackedFloat32Array = PackedFloat32Array()
 var behaviour_cues: Dictionary = {}
 ## The group the trigger fires, or null.
 var payload: CompiledGroup = null
-## The group a payload carrier (rain, familiar) carries, or null.
+## The group a rain carries (its payload), or null.
 var own_payload: CompiledGroup = null
 ## Index in `CompiledStaff.nodes`; the tag of this spell's shots carries it.
 var node: int = -1

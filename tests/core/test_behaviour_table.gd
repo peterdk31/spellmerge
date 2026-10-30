@@ -43,21 +43,15 @@ func test_cards_that_work_are_not_listed() -> void:
 		check(not staff.wasted.has(0), "%s counts: %s" % [cards, staff.wasted])
 
 
-func test_a_familiar_hands_its_hit_cards_to_what_it_casts() -> void:
-	# Rules R4g: its infusions and hit cards ride on every carrier it casts, as if they were on it.
-	var staff: CompiledStaff = _staff(["fire", "heavy", "chain", "familiar", "bolt"])
-	check(not staff.wasted.has(0) and not staff.wasted.has(1) and not staff.wasted.has(2), "none wasted: %s" % staff.wasted)
+func test_a_familiar_hands_nothing_on() -> void:
+	# Rules R4 F3: a familiar has no payload of its own; its hit cards are wasted as on any body
+	# that hits nothing, and the carrier after it is the next carrier, not its payload.
+	var staff: CompiledStaff = _staff(["heavy", "familiar", "bolt"])
+	check(str(staff.wasted.get(0, "")).contains("a familiar is a body that hits nothing"), "heavy on a familiar is wasted: %s" % staff.wasted)
 	var familiar: CompiledSpell = staff.casts[0].group.spells[0]
-	var bolt: CompiledSpell = familiar.own_payload.spells[0] if familiar.own_payload != null and not familiar.own_payload.is_empty() else null
-	check(bolt != null, "it casts a bolt")
-	if bolt != null:
-		check(bolt.element_ids.has(&"fire"), "the bolt burns: %s" % [bolt.element_ids])
-		check(bolt.behaviour(ModifierBase.Behaviour.HEAVY) > 0.0 and bolt.hit.slam > 0, "the bolt is heavy")
-		check_equal(bolt.chain_jumps, _staff(["chain", "bolt"]).casts[0].group.spells[0].chain_jumps, "and chains as a chain bolt does")
-	var alone: CompiledStaff = _staff(["heavy", "familiar"])
-	check(alone.wasted.has(0), "with nothing to cast it is wasted: %s" % alone.wasted)
-	check(_staff(["heavy", "familiar", "dash"]).wasted.has(0), "and on a dash it casts, which hits nothing")
-	check(_staff(["homing", "familiar", "bolt"]).wasted.has(0), "a card that steers is not handed on")
+	check(familiar.own_payload == null, "it reads no payload of its own")
+	check(familiar.payload == null, "and has none without a trigger")
+	check(staff.casts.size() == 2, "the bolt is the next cast: %d casts" % staff.casts.size())
 
 
 func test_heavy_counts_on_a_dash_with_a_blast() -> void:

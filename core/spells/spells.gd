@@ -65,10 +65,10 @@ extends Node
 ## Payload and line carriers (B2c): `rain` strikes the aim point after its `lifetime` with its own
 ## hit and cards and drops its payload there (a `form_shown` cue `&"rain"` says where and when; an
 ## `on expire` trigger on it fires as it lands); `familiar` and `decoy` ask `ai` for an entity
-## (`entity_spawn_requested`), count it as a live shot of their tag until `entity_ended`, fire a
-## familiar's payload on every `familiar_cast_requested` (the familiar's infusions and hit cards
-## ride on it, compiled in), guard a decoy with its shield or deflect (`guard_decoy`), and fire an
-## entity's `on expire` payload and `blast` at its end point; `hold` keeps an entity until its staff is cast again (`entity_end_requested`). `wall`
+## (`entity_spawn_requested`) a step ahead along the aim, as a rune is placed (`_placed_at`),
+## count it as a live shot of their tag until `entity_ended`, guard a decoy with its shield or
+## deflect (`guard_decoy`), and fire an entity's `on expire` payload and `blast` at its end
+## point. A familiar casts only what its triggers give it (rules R4 F3), as any carrier that lasts; `hold` keeps an entity until its staff is cast again (`entity_end_requested`). `wall`
 ## is a line of still shots across the aim; `fissure` is a beam that pierces everything on its line.
 ##
 ## Moves, areas and refunds (B2d): a `teleport` asks the caster's body to blink along the aim
@@ -231,7 +231,7 @@ var _rec_prev: PackedInt64Array = PackedInt64Array()
 ## tip, an actor's body (a wizard's dash, a familiar round its wizard) or a fixed point (a rain's
 ## spot, a decoy). One `_lc_tied` to its row ends with it (a shot, a beam, a swing); the others
 ## live `_lc_left` seconds (a rain, a dash, an entity) or until they leave (`_lc_leave`: an
-## entity that ended). `_lc_clock` is the seconds to the next tick, `_lc_at` where it was last,
+## entity that ended, a rain whose landing was dropped). `_lc_clock` is the seconds to the next tick, `_lc_at` where it was last,
 ## `_lc_way` its way where nothing else gives one.
 const LC_SLOT: int = 0
 const LC_BEAM: int = 1
@@ -607,7 +607,6 @@ func bind(manager: ProjectilesScript, bus: EventsScript) -> void:
 		events.actor_hurt.disconnect(_on_hurt)
 		events.reaction_landed.disconnect(_on_reaction)
 		events.entity_ended.disconnect(_on_entity_ended)
-		events.familiar_cast_requested.disconnect(_on_familiar_cast)
 		events.caster_move_finished.disconnect(_on_move_finished)
 	projectiles = manager
 	events = bus
@@ -624,7 +623,6 @@ func bind(manager: ProjectilesScript, bus: EventsScript) -> void:
 		events.actor_hurt.connect(_on_hurt)
 		events.reaction_landed.connect(_on_reaction)
 		events.entity_ended.connect(_on_entity_ended)
-		events.familiar_cast_requested.connect(_on_familiar_cast)
 		events.caster_move_finished.connect(_on_move_finished)
 
 
@@ -1046,8 +1044,6 @@ func _launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direct
 			_start_pose(actor, spell, tag, maxf(spell.wind_up, 0.0), _pose_strike_of(spell, lifetime), direction.normalized(), up_side(direction))
 	if spell.motion == FormBase.Motion.DASH or spell.motion == FormBase.Motion.TELEPORT:
 		return _move_caster(spell, tag, actor, origin, direction)
-	if spell.motion == FormBase.Motion.DECOY or spell.motion == FormBase.Motion.FAMILIAR:
-		return _spawn_entities(spell, tag, actor, origin, count, lifetime)
 	if spell.motion == FormBase.Motion.RAIN:
 		return _telegraph_rain(spell, tag, actor, origin, direction)
 	if spell.motion == FormBase.Motion.WALL:
@@ -1073,6 +1069,9 @@ func _launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direct
 			_shoot_ray(spell, tag, actor, origin, heading, carried, prev, source, -1.0, spell.echo_hit if _echo_spell == spell else null)
 			made += 1
 			continue
+		if spell.motion == FormBase.Motion.DECOY or spell.motion == FormBase.Motion.FAMILIAR:
+			made += _spawn_entity(spell, tag, actor, _placed_at(spell, origin, heading), heading, lifetime)
+			continue
 		var slot: int = -1
 		match spell.motion:
 			FormBase.Motion.ORBIT:
@@ -1086,8 +1085,7 @@ func _launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direct
 					centre = projectiles.get_position_of(shot) if shot >= 0 else origin
 				slot = projectiles.spawn_orbit(actor, spell.orbit_radius, base + TAU * n / count, turn, lifetime, spell.radius, HITS, spell.pierce, tag, centre)
 			FormBase.Motion.STILL:
-				var at: Vector2 = origin if count == 1 else origin + heading * spell.radius * 2.0
-				slot = projectiles.spawn(actor, at, Vector2.ZERO, lifetime, spell.radius, HITS, spell.pierce, tag, ProjectilesScript.MOTION_STILL)
+				slot = projectiles.spawn(actor, _placed_at(spell, origin, heading), Vector2.ZERO, lifetime, spell.radius, HITS, spell.pierce, tag, ProjectilesScript.MOTION_STILL)
 			_:
 				slot = projectiles.spawn(actor, origin, heading * spell.speed, lifetime, spell.radius, HITS, spell.pierce, tag)
 		if slot < 0:
@@ -1369,10 +1367,18 @@ func _homed_place(spell: CompiledSpell, actor: int, tag: int, origin: Vector2, p
 	return point if not goal.is_finite() else projectiles.clip_to_walls(origin, goal)
 
 
-## Decoys and familiars: `ai` makes the entity (`entity_spawn_requested`, `lifetime` seconds, or
-## until ended for a `hold`). Each counts as a live shot of `tag` until `entity_ended`, so its
-## build stays known while it lives. Returns how many were asked for.
-func _spawn_entities(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, count: int, lifetime: float) -> int:
+## Where a carrier its caster places (a rune, a decoy, a familiar) appears: a step ahead of
+## `origin` along `heading`, twice its size (rules R4 F3), so a mirror's copy is placed behind;
+## with a wall in the way, at `origin` (never in the wall).
+func _placed_at(spell: CompiledSpell, origin: Vector2, heading: Vector2) -> Vector2:
+	var ahead: Vector2 = origin + heading * spell.radius * 2.0
+	return ahead if projectiles.clip_to_walls(origin, ahead) == ahead else origin
+
+
+## A decoy or familiar: `ai` makes the entity at `at` (`entity_spawn_requested`, `lifetime`
+## seconds, or until ended for a `hold`). It counts as a live shot of `tag` until `entity_ended`,
+## so its build stays known while it lives; its timer fires along `heading`. Returns 1 when asked for.
+func _spawn_entity(spell: CompiledSpell, tag: int, actor: int, at: Vector2, heading: Vector2, lifetime: float) -> int:
 	if events == null or not _profiles.has(tag):
 		return 0
 	var kind: StringName = &"decoy" if spell.motion == FormBase.Motion.DECOY else &"familiar"
@@ -1383,12 +1389,11 @@ func _spawn_entities(spell: CompiledSpell, tag: int, actor: int, origin: Vector2
 	if kind == &"familiar" and anchor != -2:
 		where = LC_ACTOR if anchor == -1 else LC_SLOT
 	var ref: int = actor if where == LC_ACTOR else anchor
-	for n in count:
-		_entities[tag] = _entities.get(tag, 0) + 1
-		shot_started(tag)
-		events.entity_spawn_requested.emit(actor, kind, origin, seconds, tag, anchor)
-		_lc_join(spell, tag, where, ref, projectiles.get_seq_of(ref) if where == LC_SLOT else 0, false, seconds, origin, Vector2.RIGHT)
-	return count
+	_entities[tag] = _entities.get(tag, 0) + 1
+	shot_started(tag)
+	events.entity_spawn_requested.emit(actor, kind, at, seconds, tag, anchor)
+	_lc_join(spell, tag, where, ref, projectiles.get_seq_of(ref) if where == LC_SLOT else 0, false, seconds, at, heading)
+	return 1
 
 
 ## What an entity circles or copies, for `entity_spawn_requested`: the wizard (-1), the shot that
@@ -1419,18 +1424,6 @@ func _on_entity_ended(actor: int, _kind: StringName, position: Vector2, tag: int
 		if spell.payload != null and spell.trigger_event == TriggerBase.Event.EXPIRE:
 			_fire(spell.payload, actor, SpellTag.staff_of(tag), SpellTag.generation_of(tag), position, Vector2.RIGHT, null, CASTER_POINT)
 	shot_ended(tag)
-
-
-## The familiar with `tag` casts: its payload (what came after it on the staff) leaves `position`
-## along `direction`, in the staff and generation of the familiar's own cards.
-func _on_familiar_cast(actor: int, position: Vector2, direction: Vector2, tag: int) -> void:
-	if not SpellTag.is_spell_tag(tag) or actor != SpellTag.caster_of(tag) or not _entities.has(tag) or not position.is_finite():
-		return
-	var spell: CompiledSpell = _profiles.get(tag)
-	if spell == null or spell.own_payload == null or spell.own_payload.is_empty():
-		return
-	var aim: Vector2 = direction.normalized() if direction.is_finite() and not direction.is_zero_approx() else Vector2.RIGHT
-	_fire(spell.own_payload, actor, SpellTag.staff_of(tag), SpellTag.generation_of(tag), position, aim, null, CASTER_POINT)
 
 
 ## The shield charges of the decoy with `tag`, and whether it deflects (rules R4g), for Entities as
@@ -1721,13 +1714,16 @@ func _release_launch(launch: PendingLaunch) -> void:
 
 
 ## Forgets the waiting launches `drops` picks (an edit, a switch-off or a closed caster; never
-## per frame). One that kept its build (`_delay`) lets go of it.
+## per frame). One that kept its build (`_delay`) lets go of it; a rain's landing that goes takes
+## the rain off the live carriers, so its timer ends with it.
 func _drop_pending(drops: Callable) -> void:
 	var i: int = _pending.size() - 1
 	while i >= 0:
 		var launch: PendingLaunch = _pending[i]
 		if drops.call(launch):
 			_pending.remove_at(i)
+			if launch.landing != null:
+				_lc_leave(SpellTag.make(launch.actor, launch.staff, launch.landing.node, launch.generation), false)
 			var keeps: bool = launch.caster != CASTER_WIZARD
 			var tag: int = SpellTag.make(launch.actor, launch.staff, 0, launch.generation)
 			_release_launch(launch)

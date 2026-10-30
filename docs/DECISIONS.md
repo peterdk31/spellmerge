@@ -2,6 +2,11 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-30: Card rules R4 F8, walls let out what they cast; the familiar casts from its orb (owner)
+
+- **What a wall casts comes out of it, beams too:** one rule for every payload of a wall: the wall's row does not count for what it cast. A flying shot's step and a beam's ray walk ask the same thing (`_solid_of`; a beam names its caster shot with `Projectiles.ray_cast_by`). A beam cast by a still carrier (a rune, a wall) keeps it as its caster and starts where it is.
+- **The familiar casts from its orb** (replaces F3's "from its wizard's body"): Entities reports each orb's place every step (`Spells.familiar_at`, keyed by `Spells.entity_key`), and the payload flies outward from what the familiar circles through the orb (the existing live-carrier rule: outward from the caster's body through the carrier), so `timer · familiar · bolt` is a rotating sprinkler a player can predict from where the orb is. An enemy's familiar sprays the same way, so it no longer casts at the wizard.
+
 ## 2026-10-30: Card rules R4 F1: every move adds up; Hook becomes Pull (owner)
 
 - **Every move adds up** (docs/milestones/M2-rules.md "R4 F1"): the mover keeps one list of moves, each with its own way, distance and time, as shots' moves do (R1e) and as recoil did. Nothing replaces a move in progress any more, so "a later dash, teleport, hook or swap replaces an earlier one" (staffs B4, "Simultaneous moves" below) is gone; two dashes stack, two pulls add, recoil is one more move (its own arrays and the teleport's recoil folding of R4c went). Every move answers `caster_move_finished`.

@@ -701,8 +701,13 @@ var _wall_w: int = 1
 var _wall_h: int = 1
 var _wall_cells: PackedByteArray = PackedByteArray()
 var _has_walls: bool = false
-## The solid shots (`set_solid`) by slot.
+## The solid shots (`set_solid`) by slot, and whether there are any (a field: the hot loops ask
+## it for every shot).
 var _solids: Dictionary = {}
+var _any_solid: bool = false
+## The shot that cast the next ray (`ray_cast_by`), and its number then; -1 for none.
+var _ray_caster: int = -1
+var _ray_caster_seq: int = -1
 ## Static bodies of solid shots that ended, kept for the next one.
 var _spare_bodies: Array[StaticBody2D] = []
 
@@ -1153,6 +1158,7 @@ func set_solid(slot: int, across: Vector2, stones: int, gap: float) -> bool:
 	solid.stones = maxi(stones, 1)
 	solid.gap = gap / maxf(_radius[slot], 0.01)
 	_solids[slot] = solid
+	_any_solid = true
 	_lay_solid(slot, solid)
 	return true
 
@@ -1228,18 +1234,44 @@ func _mark_solid(solid: Solid, by: int) -> void:
 
 ## The live solid shot that cast the shot in `slot` (a payload of a wall), or null.
 func _own_solid(slot: int) -> Solid:
-	if _solids.is_empty():
+	return _solid_of(_caster_slot[slot], _caster_seq[slot])
+
+
+## Where the shot in `slot` meets a wall this step (`cut`, as `_wall_hit` found it) when the
+## wall that cast it does not count: a wall's own payloads leave it (its row is lifted while
+## they look again). Asked only when it met a wall, so a step with none costs nothing.
+func _past_own_solid(slot: int, cut: float) -> float:
+	var own: Solid = _own_solid(slot)
+	if own == null:
+		return cut
+	_mark_solid(own, -1)
+	cut = _wall_hit(_prev[slot], _pos[slot])
+	_mark_solid(own, 1)
+	return cut
+
+
+## The solid shot in `caster` while it is still the shot numbered `seq`, or null.
+func _solid_of(caster: int, seq: int) -> Solid:
+	if not _any_solid or caster < 0 or caster >= _cap:
 		return null
-	var caster: int = _caster_slot[slot]
-	if caster >= 0 and _alive[caster] != 0 and _seq[caster] == _caster_seq[slot] and _solids.has(caster):
+	if _alive[caster] != 0 and _seq[caster] == seq and _solids.has(caster):
 		return _solids[caster]
 	return null
+
+
+## The next ray (`ray`, `ray_points`, `ray_curve`) was cast by the shot in `slot` (a payload's
+## carrier, as `set_caster_shot` says for a shot): a wall's own ray walks out of it, as its shots
+## fly out of it. It holds for that one ray.
+func ray_cast_by(slot: int) -> void:
+	_ray_caster = slot if slot >= 0 and slot < _cap and _alive[slot] != 0 else -1
+	_ray_caster_seq = _seq[_ray_caster] if _ray_caster >= 0 else -1
 
 
 ## The solid shot in `slot` ended: its wall goes, and its body waits for the next one.
 func _drop_solid(slot: int) -> void:
 	var solid: Solid = _solids[slot]
 	_solids.erase(slot)
+	_any_solid = not _solids.is_empty()
 	_lift_solid(solid)
 	if solid.body != null:
 		solid.body.collision_layer = 0
@@ -2257,16 +2289,12 @@ func _pass_hits(top: int, delta: float) -> void:
 		# in front of the wall, then it ends (or bounces). An orbit or ghost shot ignores walls; a
 		# solid one is a wall and stops at one (`_step_solid`).
 		var walled: bool = false
-		if not _solids.is_empty() and _solids.has(slot):
+		if _any_solid and _solids.has(slot):
 			_step_solid(slot, _solids[slot])
 		elif _has_walls and _motion[slot] != MOTION_ORBIT and (_flags[slot] & F_GHOST) == 0:
-			# A wall's own payloads leave it: its row is lifted while they look.
-			var own: Solid = _own_solid(slot)
-			if own != null:
-				_mark_solid(own, -1)
 			var cut: float = _wall_hit(_prev[slot], _pos[slot])
-			if own != null:
-				_mark_solid(own, 1)
+			if cut >= 0.0 and _any_solid:
+				cut = _past_own_solid(slot, cut)
 			if cut >= 0.0:
 				walled = true
 				_pos[slot] = _prev[slot].lerp(_pos[slot], cut)
@@ -2286,7 +2314,7 @@ func _pass_hits(top: int, delta: float) -> void:
 				_forget_left(slot)
 		# A shot that stuck to a target this step stays stuck, even at a wall. One that met a
 		# guarding solid shot is turned or stopped by it instead (`_solid_guard`).
-		if walled and _alive[slot] != 0 and (_flags[slot] & F_STUCK) == 0 and not (not _solids.is_empty() and _solid_guard(slot)):
+		if walled and _alive[slot] != 0 and (_flags[slot] & F_STUCK) == 0 and not (_any_solid and _solid_guard(slot)):
 			_wall_end(slot)
 	_resume = maxi(starved_at, 0)
 
@@ -2937,7 +2965,7 @@ func _home_pick(caster: int, team: int, origin: Vector2, direction: Vector2, max
 func ray(caster: int, origin: Vector2, direction: Vector2, length: float, pierce: int = 0, layers: int = LAYER_ENEMY, tag: int = 0, width: float = 0.0, exclude: Node = null, bounces: int = 0, ghost: bool = false) -> float:
 	ray_path_count = 0
 	if not direction.is_finite() or direction.is_zero_approx() or not is_finite(length) or length <= 0.0 or not origin.is_finite():
-		return 0.0
+		return _no_ray()
 	_path[0] = origin
 	_path[1] = origin + direction.normalized() * length
 	return _ray_path(caster, 1, pierce, layers, tag, width, exclude, true, bounces, Callable(), ghost)
@@ -2956,7 +2984,7 @@ func ray(caster: int, origin: Vector2, direction: Vector2, length: float, pierce
 func ray_points(caster: int, points: PackedVector2Array, offset: int, count: int, length: float, pierce: int = 0, layers: int = LAYER_ENEMY, tag: int = 0, width: float = 0.0, exclude: Node = null, hit: bool = true, bounces: int = 0, steer: Callable = Callable(), ghost: bool = false) -> float:
 	ray_path_count = 0
 	if count < 2 or offset < 0 or offset + count > points.size() or not is_finite(length) or length <= 0.0 or not points[offset].is_finite():
-		return 0.0
+		return _no_ray()
 	_fit_path(count)
 	_path[0] = points[offset]
 	var total: float = 0.0
@@ -2973,7 +3001,7 @@ func ray_points(caster: int, points: PackedVector2Array, offset: int, count: int
 		total += piece
 		_path[i] = point
 	if used == 0:
-		return 0.0
+		return _no_ray()
 	return _ray_path(caster, used, pierce, layers, tag, width, exclude, hit, bounces, steer, ghost)
 
 
@@ -2986,13 +3014,19 @@ func ray_points(caster: int, points: PackedVector2Array, offset: int, count: int
 func ray_curve(caster: int, origin: Vector2, bend: Vector2, end: Vector2, pierce: int = 0, layers: int = LAYER_ENEMY, tag: int = 0, width: float = 0.0, exclude: Node = null, hit: bool = true, bounces: int = 0) -> float:
 	ray_path_count = 0
 	if not origin.is_finite() or not bend.is_finite() or not end.is_finite() or origin.is_equal_approx(end):
-		return 0.0
+		return _no_ray()
 	_path[0] = origin
 	for i in range(1, RAY_SEGMENTS + 1):
 		var t: float = float(i) / RAY_SEGMENTS
 		var u: float = 1.0 - t
 		_path[i] = origin * (u * u) + bend * (2.0 * u * t) + end * (t * t)
 	return _ray_path(caster, RAY_SEGMENTS, pierce, layers, tag, width, exclude, hit, bounces)
+
+
+## A ray that is not cast: its `ray_cast_by` is used up all the same.
+func _no_ray() -> float:
+	_ray_caster = -1
+	return 0.0
 
 
 ## `_path` holds at least `count` points.
@@ -3091,10 +3125,15 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 	ray_end = Vector2.INF
 	ray_end_heading = Vector2.ZERO
 	ray_path_count = 0
+	# A wall's own ray leaves it: its row is lifted while the ray walks (`ray_cast_by`).
+	var own: Solid = _solid_of(_ray_caster, _ray_caster_seq)
+	_ray_caster = -1
 	if not is_caster(caster):
 		return 0.0
 	var level: int = _ray_depth
 	_ray_level(level)
+	if own != null:
+		_mark_solid(own, -1)
 	# Cut the path at the first wall, or turn there while it has bounces: the rest of the path
 	# is dropped and it goes on, off the wall, for the length the rest had: along `steer`'s path
 	# (a homing beam homes again), else straight.
@@ -3167,6 +3206,8 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 		left -= piece
 		reach += piece
 		at_piece += 1
+	if own != null:
+		_mark_solid(own, 1)
 	var nodes: Array = _ray_nodes[level]
 	var alongs: Array = _ray_along[level]
 	var points: Array = _ray_points[level]
@@ -3660,7 +3701,7 @@ func update_draw(fraction: float = -1.0) -> void:
 func _write_stones(buffer: PackedFloat32Array, out: int, slot: int, dir: Vector2, size: float, at: Vector2, look_data: Color) -> int:
 	var stones: int = 1
 	var step: Vector2 = Vector2.ZERO
-	if not _solids.is_empty() and _solids.has(slot):
+	if _any_solid and _solids.has(slot):
 		var solid: Solid = _solids[slot]
 		stones = solid.stones
 		step = solid.across * solid.gap * _radius[slot]
@@ -3762,7 +3803,7 @@ func _count_batches() -> void:
 			if _drawn_seq[slot] != _seq[slot] or _drawn_radius[slot] != _radius[slot] or _drawn_look[slot] != _look[slot]:
 				_remember_drawn(slot)
 			# A solid shot draws a quad for every stone of its row.
-			_batch_counts[_drawn_batch[slot]] += 1 if _solids.is_empty() or not _solids.has(slot) else (_solids[slot] as Solid).stones
+			_batch_counts[_drawn_batch[slot]] += 1 if not _any_solid or not _solids.has(slot) else (_solids[slot] as Solid).stones
 	for n in _loose_count:
 		var ramp: int = _trail_ramp[_loose[n]]
 		_batch_counts[BATCH_BOLT if ramp >= 0 and ramp < ActorsScript.RAMP_ENEMY else BATCH_ENEMY] += 1
@@ -3944,7 +3985,7 @@ static func ramp_light(ramp: int) -> Color:
 
 func _kill(slot: int, announce: bool = true) -> void:
 	_forget_all(slot)
-	if not _solids.is_empty() and _solids.has(slot):
+	if _any_solid and _solids.has(slot):
 		_drop_solid(slot)
 	_drop_moves(slot)
 	if announce and _tag[slot] != 0:
@@ -4249,7 +4290,7 @@ func _query_match(t: int, point: Vector2, radius: float, layers: int, skip: int)
 func _hit_test(slot: int) -> bool:
 	var from: Vector2 = _prev[slot]
 	var to: Vector2 = _pos[slot]
-	if not _solids.is_empty() and _solids.has(slot):
+	if _any_solid and _solids.has(slot):
 		# A solid shot hits along its row.
 		var half: Vector2 = _solid_half(slot, _solids[slot])
 		from = to - half

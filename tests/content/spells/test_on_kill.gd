@@ -28,7 +28,7 @@ func _combo(id: String) -> Dictionary:
 func _holds(combo: Dictionary, drop: String = "", sturdy: bool = false) -> bool:
 	var arena := ArenaScript.new(root)
 	for at: Array in combo["imps"]:
-		var health: int = int(at[2]) if at.size() > 2 and not sturdy else ArenaScript.IMP_HEALTH
+		var health: float = float(at[2]) if at.size() > 2 and not sturdy else ArenaScript.IMP_HEALTH
 		arena.add_imp(Vector2(float(at[0]), float(at[1])), health)
 	var entry: Dictionary = combo["casts"][0]
 	var cards: Array = []

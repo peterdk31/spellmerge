@@ -71,7 +71,7 @@ func before_each() -> void:
 		_fake.items[element] = load("res://content/spells/elements/%s/%s.tres" % [element, element])
 
 
-func _enemy(at: Vector2 = Vector2.ZERO, health: int = 100) -> Node2D:
+func _enemy(at: Vector2 = Vector2.ZERO, health: float = 100.0) -> Node2D:
 	var enemy := own(Node2D.new()) as Node2D
 	enemy.position = at
 	root.add_child(enemy)
@@ -80,7 +80,7 @@ func _enemy(at: Vector2 = Vector2.ZERO, health: int = 100) -> Node2D:
 
 
 ## A body of the wizards' team (an unseated actor of the test table) at `at`.
-func _foe(at: Vector2, health: int = 100) -> Node2D:
+func _foe(at: Vector2, health: float = 100.0) -> Node2D:
 	var body := own(TeamBody.new()) as TeamBody
 	body.actor_id = _actors.open(ActorSeats.ActorsScript.TEAM_WIZARDS, 0)
 	body.position = at
@@ -298,7 +298,7 @@ func test_stillness_the_other_way_lengthens_and_strengthens_hex() -> void:
 	check_equal(_ids(), [&"stillness"], "frost on hex")
 	check_equal(_combat.status_left(enemy, &"hex"), 6.0, "two seconds longer")
 	check(not _combat.has_status(enemy, &"chill"), "and no chill went on")
-	var before: int = _combat.health_of(enemy)
+	var before: float = _combat.health_of(enemy)
 	_combat.hit(0, enemy, 20)
 	check_equal(before - _combat.health_of(enemy), 20 + 10, "hex now adds 50 per cent (25 plus 25)")
 
@@ -449,7 +449,7 @@ func test_twenty_stillness_hits_on_hex_stay_under_the_caps() -> void:
 		_hit(0, enemy, &"frost")
 		_run(CombatScript.REACTION_WAIT + STEP)
 	check(_combat.status_left(enemy, &"hex") <= CombatScript.MAX_EXTENDED_TIME, "hex time under its cap")
-	var before: int = _combat.health_of(enemy)
+	var before: float = _combat.health_of(enemy)
 	_combat.hit(0, enemy, 100)
 	check(before - _combat.health_of(enemy) <= 100 + 100, "hex adds at most 100 per cent")
 

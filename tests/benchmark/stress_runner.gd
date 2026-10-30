@@ -59,7 +59,7 @@ const SCENARIOS: Array[Dictionary] = [
 const WARM_UP: float = 3.0
 const MEASURE: float = 10.0
 ## Health of a stress enemy (the game's imp has 20), so the crowd lasts.
-const ENEMY_HEALTH: int = 120
+const ENEMY_HEALTH: float = 120.0
 ## Enemies added per frame at most, and filler shots per physics step at most.
 const SPAWN_PER_FRAME: int = 10
 const TOP_UP_PER_STEP: int = 120

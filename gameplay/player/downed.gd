@@ -20,7 +20,7 @@ extends ActorComponent
 const ActorsScript := preload("res://core/actors/actors.gd")
 
 ## Health after a revive.
-const REVIVE_HEALTH: int = 50
+const REVIVE_HEALTH: float = 50.0
 ## Seconds a wizard who joins mid-run (or stands up for a new wave) cannot be hurt.
 const JOIN_PROTECTION: float = 2.0
 

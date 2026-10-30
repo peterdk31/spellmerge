@@ -9,7 +9,7 @@ extends "res://tests/support/suite.gd"
 const Fixture := preload("res://tests/gameplay/actor/actor_fixture.gd")
 
 var _world: Fixture
-var _changes: Array[int] = []
+var _changes: Array[float] = []
 var _depleted: Array[int] = []
 
 
@@ -26,7 +26,7 @@ func after_each() -> void:
 func _body() -> Actor:
 	var body: Actor = _world.actor(Vector2.ZERO, [&"health"])
 	body.downable = true
-	body.health.changed.connect(func(health: int, _most: int) -> void: _changes.append(health))
+	body.health.changed.connect(func(health: float, _most: float) -> void: _changes.append(health))
 	body.health.depleted.connect(func(killer: int) -> void: _depleted.append(killer))
 	return body
 
@@ -39,7 +39,7 @@ func test_take_and_heal_stay_between_zero_and_the_most() -> void:
 	check_equal(body.health.health, 50, "never above the most")
 	check(not body.health.heal(5), "a full actor gains nothing")
 	check(not body.health.take(0) and not body.health.take(-3), "nothing for 0 or less")
-	check_equal(_changes, [30, 50] as Array[int], "changed on each change only")
+	check_equal(_changes, [30.0, 50.0] as Array[float], "changed on each change only")
 
 
 func test_depleted_comes_once_with_the_killer() -> void:

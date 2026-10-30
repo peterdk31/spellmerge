@@ -20,6 +20,6 @@ Cards name the cues they play: a carrier's `impact_look` `cue` (`FormBase`; play
 | `self_hit` | Feel, for a hit of an actor by its own spell | a ring in exactly pink, so it is never taken for an enemy's hit |
 | `heal` | Feel, for `heal_dealt` | a soft ring in exactly green, no stop and no shake |
 | `nova` | Feel, for `form_shown` `nova` (`FORM_CUES`) | the ring leaving the caster, 120 px across |
-| `telegraph` | Feel, for `form_shown` `rain` and `slam_mark` (`FORM_CUES`) | a ring closing on where a rain falls or a slam strikes, for the seconds until then (`size`) |
+| `telegraph` | Feel, for `form_shown` `rain` (`FORM_CUES`) | a ring closing on where a rain falls, for the seconds until then (`size`) |
 
 To add one: copy `quake.tres`, give it a new `id` and file name, pick its parts from `CueBase.EFFECTS`, and play it by name. `tests/content/test_cues.gd` checks every cue file (`CueBase.problems()`). Moments with a life of their own (beams, dashes, swing trails, statuses, ghosts) are not cues.

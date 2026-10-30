@@ -161,6 +161,28 @@ func test_its_staff_rises_glowing_drops_and_settles() -> void:
 	arena.free_all()
 
 
+func test_its_staff_lands_its_tip_on_the_impact_short_of_a_wall() -> void:
+	# The card's strike keys `land` the staff (StaffLook puts the drawn tip on the point struck),
+	# and the slam strikes a point (`STRIKES_POINT`): `ray_length` along the locked aim, short of a wall.
+	var arena := ArenaScript.new(root)
+	arena.install_cards(0, 0, ["slam"])
+	arena.spells.set_aim(0, Vector2.ZERO, Vector2.RIGHT)
+	arena.cast(0, 0)
+	arena.run(0.1)
+	check_equal(arena.spells.poses().staff_land(0), 0.0, "rising, it lands nowhere yet")
+	arena.run(0.16)
+	check(is_equal_approx(arena.spells.poses().staff_land(0), 1.0), "at the impact it lands: %f" % arena.spells.poses().staff_land(0))
+	check(arena.spells.poses().staff_land_point(0).is_equal_approx(Vector2(_card().ray_length, 0.0)), "on the impact, ray_length ahead: %s" % arena.spells.poses().staff_land_point(0))
+	arena.run(0.8)
+	check_equal(arena.spells.poses().staff_land(0), 0.0, "then it lets go")
+	arena.add_wall(Rect2(10.0, -20.0, 10.0, 40.0))
+	arena.spells.set_aim(0, Vector2.ZERO, Vector2.RIGHT)
+	arena.cast(0, 0)
+	arena.run(0.26)
+	check(arena.spells.poses().staff_land_point(0).x < 10.5, "short of a wall, on the wall: %s" % arena.spells.poses().staff_land_point(0))
+	arena.free_all()
+
+
 func test_a_payload_slam_moves_no_body() -> void:
 	var arena := ArenaScript.new(root)
 	arena.install_cards(0, 0, ["on_hit", "bolt", "slam"])

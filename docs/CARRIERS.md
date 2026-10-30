@@ -25,6 +25,7 @@ A carrier answers yes/no questions about itself, in `traits()`, and nothing abou
 | `STEERS` | Can homing steer it (turn it, bend it, or place it on a target)? |
 | `MEETS_SHOTS` | Can it stop or turn other shots (not a rain or a familiar)? |
 | `MOVES_CASTER` | Does it move its caster (a dash, a teleport)? |
+| `STRIKES_POINT` | Does it strike one point near its caster's hand (a slam)? Its staff animation can `land` there (`strike_point`). |
 
 (and the number questions: `SPEED`, `SHOTS`, `SPREAD`, `PIERCE`, `REACHES`, ... all in
 `carrier.gd`.)
@@ -127,6 +128,22 @@ carrier with rows others read adds the same `static func of`.
 2. Override the hooks it needs (at least `launch` or `shoot`), asking the runtime only through
    `kit` (`CarrierKit`, above). Nothing in `spells.gd` changes.
 3. Add its form card under `content/spells/forms/` with `carrier = &"<name>"`.
+4. If its look strikes one point near the caster (a slam's impact), give it `STRIKES_POINT` and
+   draw that look at `strike_point` (override it for a point off the aim; the runtime stops it at a
+   wall; tell `StaffPoses.land_at` if the point moves before the strike). Its card's staff
+   animation can then `land` the staff's tip there, with no pixels to tune.
+
+### Lining a staff animation up with its look
+
+A key's `land` (0 to 1) moves the drawn staff so its tip lies on the point the carrier strikes,
+whichever of the 16 head columns shows and whichever way it aims; `turn`, `lift` and `push` then
+only shape the way there. Two checks keep it lined up: `tests/gameplay/player/test_staff_alignment.gd`
+casts every card that lands, in 32 aims and by a wall, and fails when the drawn tip
+(`StaffLook.tip_position`) or the strike's look (`form_shown`) is more than a pixel off the point
+struck; the screenshot `shot_staff_alignment` (`ci/build/build.sh --quick --screenshots`) draws
+them, a white cross on each tip and a red ring on each point struck. A card asks for nothing: it is
+found because it lands. While a hit holds the caster (a local stop), the body shows the moment of
+the hit, not the step before (`Actor.step`).
 
 Removing a carrier is deleting its script. A form card that still names
 it is refused by the validator.

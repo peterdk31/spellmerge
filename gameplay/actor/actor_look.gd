@@ -10,7 +10,8 @@ extends Node2D
 ## for the actor's own cast) every look shows the same way through `apply_pose` and `pose_offset`:
 ## the body lifted, pushed along the aim and shaking, stretched along the aim, glowing in the
 ## infusion's colour (else the ramp's) and the face's brows in the animation's mood. Only the turn
-## is the look's own (a wizard's head sheet has 16 directions; a creature's sprite has none).
+## and the land are the look's own (a wizard's head sheet has 16 directions and a tip to land; a
+## creature's sprite has neither).
 const ProjectilesScript := preload("res://core/projectiles/projectile_manager.gd")
 ## The shots' sprite shader (core/README.md, "The shot shaders"): the body's glow keeps the
 ## sprite's own colours (`core_override` alpha 0) and adds light round it.

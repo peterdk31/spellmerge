@@ -23,6 +23,6 @@ pierce = 0
 ray_length = 20.0
 wind_up = 0.25
 knockback = 240.0
-staff_pose = Array[Dictionary]([{"phase": "wind", "at": 0.8, "turn": -50, "lift": 6, "push": -4, "glow": 1.0, "shake": 0.6, "ease": "out", "mood": "angry"}, {"phase": "wind", "at": 1.0, "turn": 35, "push": 6, "glow": 0.3, "ease": "in"}, {"phase": "after", "at": 0.1, "turn": 35, "push": 6}, {"phase": "after", "at": 0.32}])
+staff_pose = Array[Dictionary]([{"phase": "wind", "at": 0.8, "turn": -50, "lift": 6, "push": -4, "glow": 1.0, "shake": 0.6, "ease": "out", "mood": "angry"}, {"phase": "wind", "at": 1.0, "turn": 35, "push": 6, "land": 1.0, "glow": 0.3, "ease": "in"}, {"phase": "after", "at": 0.1, "turn": 35, "push": 6, "land": 1.0}, {"phase": "after", "at": 0.32}])
 cast_look = {"seconds": 0.12, "size": 0.5, "stretch": 1.0, "tall": 1.6, "grow": -0.3}
 impact_look = {"seconds": 0.14, "size": 0.5, "stretch": 1.0, "aim": true, "grow": 0.4, "cue": &"slam"}

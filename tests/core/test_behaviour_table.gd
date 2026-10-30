@@ -16,12 +16,10 @@ func _staff(cards: Array) -> CompiledStaff:
 	return staff
 
 
-func test_every_cell_runs_or_says_why() -> void:
+func test_every_cell_is_answered() -> void:
 	for behaviour: int in ModifierBase.Behaviour.values():
 		for motion: StringName in Carriers.ids():
-			var why: String = StaffCompiler.behaviour_waste(behaviour, motion)
-			check_equal(StaffCompiler.behaviour_runs(behaviour, motion), why.is_empty(), "runs and reason agree for %s on %s" % [ModifierBase.Behaviour.keys()[behaviour], motion])
-			check(why.length() < 120, "a short reason for %s on %s: %s" % [ModifierBase.Behaviour.keys()[behaviour], motion, why])
+			check_equal(StaffCompiler.behaviour_runs(behaviour, motion), Carriers.of(motion).works(behaviour), "the compiler asks the carrier for %s on %s" % [ModifierBase.Behaviour.keys()[behaviour], motion])
 
 
 func test_a_bolt_runs_every_behaviour() -> void:
@@ -34,7 +32,6 @@ func test_cards_that_did_nothing_silently_are_listed() -> void:
 	for cards: Array in [["spiral", "rune"], ["ghost", "orbit"], ["linger", "wall"], ["linger", "beam"], ["magnet", "swing"], ["growth", "slam"], ["mirror", "dash"], ["mirror", "teleport"], ["siphon", "decoy"], ["shield", "rain"], ["hold", "slam"]]:
 		var staff: CompiledStaff = _staff(cards)
 		check(staff.wasted.has(0), "%s is listed as wasted: %s" % [cards, staff.wasted])
-		check(staff.wasted.has(0) and not String(staff.wasted[0]).is_empty(), "with a reason")
 
 
 func test_cards_that_work_are_not_listed() -> void:
@@ -47,7 +44,7 @@ func test_a_familiar_hands_nothing_on() -> void:
 	# Rules R4 F3: a familiar has no payload of its own; its hit cards are wasted as on any body
 	# that hits nothing, and the carrier after it is the next carrier, not its payload.
 	var staff: CompiledStaff = _staff(["heavy", "familiar", "bolt"])
-	check(str(staff.wasted.get(0, "")).contains("a familiar is a body that hits nothing"), "heavy on a familiar is wasted: %s" % staff.wasted)
+	check(staff.wasted.has(0), "heavy on a familiar is wasted: %s" % staff.wasted)
 	var familiar: CompiledSpell = staff.casts[0].group.spells[0]
 	check(familiar.own_payload == null, "it reads no payload of its own")
 	check(familiar.payload == null, "and has none without a trigger")

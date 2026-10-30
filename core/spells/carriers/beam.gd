@@ -69,14 +69,6 @@ func id() -> StringName:
 	return &"beam"
 
 
-func noun() -> String:
-	return "beam"
-
-
-func what() -> String:
-	return "a beam is a line, not a shot"
-
-
 func traits() -> int:
 	return HITS | LASTS | REACHES | GUARDS | STEERS | SPEED | SHOTS | SPREAD | PIERCE | INSTANT_HOMING | HOLDS_STAFF | LINE | MEETS_SHOTS
 

@@ -8,14 +8,6 @@ func id() -> StringName:
 	return &"orbit"
 
 
-func noun() -> String:
-	return "orbit"
-
-
-func what() -> String:
-	return "an orbit is held on its circle"
-
-
 func traits() -> int:
 	return STAYS | HITS | LASTS | GUARDS | SPEED | SHOTS | PIERCE | RING | OUTWARD | MOVES | MEETS_SHOTS
 

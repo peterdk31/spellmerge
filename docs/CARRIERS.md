@@ -34,14 +34,15 @@ carrier (`ModifierBase.NEEDS` for modifier behaviours, `TriggerBase.NEEDS` for t
 are `CarrierTraits`):
 
 ```gdscript
-B.RETURN: {"any": FLIES, "why_not": "it does not fly out"},
-B.CHAIN:  {"any": HITS, "why_not": "it acts on what the carrier hits"},
-B.HOLD:   {"any": LASTS, "not": MOVES_CASTER, "why_not": "nothing keeps it on"},
+B.RETURN: {"any": FLIES},
+B.CHAIN:  {"any": HITS},
+B.HOLD:   {"any": LASTS, "not": MOVES_CASTER},
 ```
 
 From those two the compiler works out, every time a staff is built, whether a card does anything
-on a carrier, and if not, the sentence the builder shows: "Return does nothing on a Decoy: it does
-not fly out, and a decoy is a body that hits nothing." A card not in `NEEDS` works on every carrier
+on a carrier: yes or no (Return needs `FLIES`; a decoy does not fly, so Return does nothing on a
+decoy). A card that does nothing is marked in the builder; no text explains it (owner, 2026-10-30:
+the visuals are enough). A card not in `NEEDS` works on every carrier
 (numbers, blast, echo, recoil). On a carrier that hits nothing, a blast carries an infusion and
 heavy (`takes_infusion`, `BLAST_CARRIES`).
 
@@ -49,9 +50,9 @@ heavy (`takes_infusion`, `BLAST_CARRIES`).
 the answer is wrong (a card that does nothing but is not said to, or the other way round), so a
 wrong yes/no answer is caught by CI; you don't need to run it to know what to write.
 
-**Asking about one card.** `Spells.card_waste(card_id, carrier)` (`StaffCompiler.card_waste`)
-answers "does this card do anything on this carrier on its own, and if not, why?" before the card is
-placed, with the same rules and words as a compile; for the builder, a reward screen or a bot.
+**Asking about one card.** `Spells.card_works(card_id, carrier)` (`StaffCompiler.card_works`)
+answers yes or no to "does this card do anything on this carrier on its own?" before the card is
+placed, with the same rules as a compile; for the builder, a reward screen or a bot.
 `tests/core/test_carriers.gd` checks it against a real compile for every card on every carrier.
 
 **Required fields**, in `required_fields()`: what a form card of this carrier must set above 0 (a

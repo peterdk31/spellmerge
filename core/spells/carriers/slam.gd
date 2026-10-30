@@ -41,14 +41,6 @@ func id() -> StringName:
 	return &"slam"
 
 
-func noun() -> String:
-	return "slam"
-
-
-func what() -> String:
-	return "a slam is a strike that is over at once"
-
-
 func traits() -> int:
 	return HITS | REACHES | GUARDS | SPEED | SHOTS | SPREAD | OWN_POSE | MEETS_SHOTS
 

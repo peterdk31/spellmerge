@@ -2,11 +2,11 @@ class_name Carrier
 extends RefCounted
 ## A carrier: what a form card fires (`FormBase.carrier`), and the one place that says what it does
 ## with every other card (docs/CARRIERS.md). Each carrier is one subclass in this folder, found by
-## its id (`Carriers.of(&"beam")`); the compiler reads its tables, the spell runtime runs it.
+## its id (`Carriers.of(&"beam")`); the compiler asks it, the spell runtime runs it.
 ##
 ## A subclass answers yes/no questions about itself in `traits()` (the flags below: does it fly?
 ## does it hit? does it last? ...), and from those alone the compiler works out which cards do
-## nothing on it, and why (`waste`, `event_waste`): each card says what it needs from a carrier
+## something on it (`works`, `fires`): each card says what it needs from a carrier
 ## (`ModifierBase.NEEDS`, `TriggerBase.NEEDS`), once for every carrier. A new carrier writes no
 ## list of cards.
 ## tests/core/test_card_rules.gd plays every card on every carrier and fails where the answer is
@@ -50,24 +50,9 @@ func id() -> StringName:
 	return &""
 
 
-## Its plain name, as a player reads it ("beam").
-func noun() -> String:
-	return "nothing"
-
-
-## What it is, for a wasted card's reason ("a beam is a line, not a shot").
-func what() -> String:
-	return "no carrier has that name"
-
-
 func traits() -> int:
 	return 0
 
-
-
-## Why it sets off no hit of its own, for a reason ("a decoy hits nothing").
-func hits_nothing() -> String:
-	return "it hits nothing"
 
 
 ## The fields a form card of this carrier must set above 0, with the fix the validator gives
@@ -113,35 +98,26 @@ func steers() -> bool:
 	return has(STEERS)
 
 
-## Why `behaviour` does nothing on it, or "" when it does something (with a blast on it, when
-## `blasts`): worked out from `ModifierBase.NEEDS` and its traits. The carrier that runs nothing (id &"") says so
-## for every card.
-func waste(behaviour: int, blasts: bool = false) -> String:
+## True when `behaviour` does something on it (with a blast on it, when `blasts`): its traits meet
+## what the behaviour needs (`ModifierBase.NEEDS`). The carrier that runs nothing (id &"") runs no card.
+func works(behaviour: int, blasts: bool = false) -> bool:
 	if id() == &"":
-		return what()
+		return false
 	if blasts and BLAST_CARRIES.has(behaviour):
-		return ""
-	return _lacks(ModifierBase.NEEDS.get(behaviour, {}))
+		return true
+	return _meets(ModifierBase.NEEDS.get(behaviour, {}))
 
 
-## Why a trigger of `event` never fires on it, or "" when it can: from `TriggerBase.NEEDS`.
-func event_waste(event: int) -> String:
-	if id() == &"":
-		return what()
-	if event == E.HIT and not hits():
-		return hits_nothing()
-	return _lacks(TriggerBase.NEEDS.get(event, {}), false)
+## True when a trigger of `event` can ever go off on it: its traits meet what the trigger needs
+## (`TriggerBase.NEEDS`).
+func fires(event: int) -> bool:
+	return id() != &"" and _meets(TriggerBase.NEEDS.get(event, {}))
 
 
-## The sentence of a need (a `NEEDS` row) its traits do not meet, else "": its "why_not", and what
-## the carrier is when `say_what`.
-func _lacks(need: Dictionary, say_what: bool = true) -> String:
-	if need.is_empty():
-		return ""
+## True when its traits meet `need` (a `NEEDS` row; empty: always).
+func _meets(need: Dictionary) -> bool:
 	var any: int = int(need.get("any", 0))
-	if (any == 0 or traits() & any != 0) and traits() & int(need.get("not", 0)) == 0:
-		return ""
-	return "%s, and %s" % [need["why_not"], what()] if say_what else str(need["why_not"])
+	return (any == 0 or traits() & any != 0) and traits() & int(need.get("not", 0)) == 0
 
 
 ## True when an infusion counts on it: it hits, or a blast on it carries the infusion.

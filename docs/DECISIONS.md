@@ -2,6 +2,10 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-30: A wasted card has no text; works is yes or no (owner)
+
+- **No reasons** (owner: "I don't need a string explaining why! Just a works = yes/no ... No text should be shown. The visuals are enough"): a card that does nothing is marked in the builder (the "!" on its slot, greyed in the staff rows and the radial builder) and nothing says why. The needs are flags only (`ModifierBase.NEEDS`: `{"any": FLIES}`), a carrier answers `works(behaviour)` and `fires(event)` with a bool, `CompiledCast.wasted` and `CompiledStaff.wasted` are slot -> true, and `Spells.card_works(card_id, carrier)` replaces `card_waste`. The carriers lost the words that only built sentences (`noun`, `what`, `hits_nothing`). This reverses rule 1's "with a reason a player can read" (M2-rules.md R2a, R2c); the rule itself, works or wasted and never silent, stands, and `test_card_rules` still checks it.
+
 ## 2026-10-30: A card's needs live with the card; one question for the builder (owner)
 
 - **Needs moved to the cards** (owner, after "what if the cards had defined traits?"): what each behaviour needs from a carrier is `ModifierBase.NEEDS`, and each trigger's is `TriggerBase.NEEDS`, next to their enums, per kind of card rather than per card file (two cards with one behaviour cannot disagree, and a card file cannot claim more than its code does). The flags they are written in are `CarrierTraits`, on their own because a constant cannot reach across `Carrier` and `ModifierBase` both ways.

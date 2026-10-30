@@ -35,14 +35,6 @@ func id() -> StringName:
 	return &"dash"
 
 
-func noun() -> String:
-	return "dash"
-
-
-func what() -> String:
-	return "a dash moves its caster and hits what it passes, once each"
-
-
 func traits() -> int:
 	return HITS | LASTS | REACHES | STEERS | SPEED | HOLDS_STAFF | MOVES_CASTER | MEETS_SHOTS
 

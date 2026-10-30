@@ -27,13 +27,13 @@ enum Event {
 	REACTION,
 }
 
-## What each trigger needs from its carrier for it ever to go off (`Carrier.event_waste`), and why not.
+## What each trigger needs from its carrier for it ever to go off (`Carrier.fires`).
 const NEEDS: Dictionary = {
-	Event.HIT: {"any": CarrierTraits.HITS, "why_not": "it hits nothing"},
-	Event.TIMER: {"any": CarrierTraits.LASTS, "why_not": "it is over at once"},
-	Event.HURT: {"any": CarrierTraits.LASTS, "why_not": "it is over at once"},
-	Event.BLOCK: {"any": CarrierTraits.MEETS_SHOTS, "why_not": "nothing on it can block a shot"},
-	Event.WALL: {"any": CarrierTraits.FLIES | CarrierTraits.LINE, "why_not": "it never meets a wall"},
+	Event.HIT: {"any": CarrierTraits.HITS},
+	Event.TIMER: {"any": CarrierTraits.LASTS},
+	Event.HURT: {"any": CarrierTraits.LASTS},
+	Event.BLOCK: {"any": CarrierTraits.MEETS_SHOTS},
+	Event.WALL: {"any": CarrierTraits.FLIES | CarrierTraits.LINE},
 }
 
 @export var event: Event = Event.HIT

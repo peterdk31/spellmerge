@@ -15,7 +15,7 @@
 
 ## The general rules
 
-1. **Works or wasted.** Every modifier behaviour and trigger works on every carrier where it can physically mean something, the same way. Where it cannot, the compiler (`StaffCompiler.behaviour_runs` / `_why_not`, `TRAVEL_ONLY`, and a new trigger check) lists the card as wasted with a reason. A card that silently does nothing breaks this rule.
+1. **Works or wasted.** Every modifier behaviour and trigger works on every carrier where it can physically mean something, the same way. Where it cannot, the compiler (`StaffCompiler.behaviour_runs` / `_why_not`, `TRAVEL_ONLY`, and a new trigger check) lists the card as wasted with a reason. A card that silently does nothing breaks this rule. (Since 2026-10-30 the compiler lists it as wasted with no reason text, owner: the builder's mark is enough; docs/DECISIONS.md.)
 2. **Nothing takes a card away.** A behaviour persists through other events: bounce, wall turn, hit, pierce, chain jump, return, stick, payload firing, echo, mirror, split. (Example fixed in #453: a homing beam homes again after a wall.)
 3. **Counts add, multipliers multiply.** Bounces, pierce, chain jumps and shields add; damage, speed, size, knockback (heavy), growth and homing multiply.
 4. **A trigger means the same on every carrier,** and fires every time its event happens while its carrier lives. A payload is cast by the shot that fired it, or by its point if that is gone.

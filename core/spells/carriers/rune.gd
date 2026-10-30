@@ -8,14 +8,6 @@ func id() -> StringName:
 	return &"rune"
 
 
-func noun() -> String:
-	return "rune"
-
-
-func what() -> String:
-	return "a rune stays where it is"
-
-
 func traits() -> int:
 	return STAYS | HITS | LASTS | GUARDS | STEERS | SPEED | SHOTS | SPREAD | PIERCE | OUTWARD | MEETS_SHOTS
 

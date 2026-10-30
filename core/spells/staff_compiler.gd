@@ -9,7 +9,7 @@ extends RefCounted
 ## for the next carrier, whose payload is the group read right after it. Reading wraps past the
 ## last slot, and a card already read in this cast ends the group. Cards left with no carrier
 ## land on the caster (the cast's own group) or on the payload's origin (a payload). Nothing is
-## refused: a card that does nothing is listed as wasted, with the reason.
+## refused: a card that does nothing is listed as wasted (`wasted`); the builder shows it.
 
 ## The behaviours whose strength is a factor: more cards multiply it (`stacked`).
 const MULTIPLIED: Array[int] = [ModifierBase.Behaviour.HEAVY, ModifierBase.Behaviour.GROWTH]
@@ -62,7 +62,7 @@ func _init(lookup: Callable) -> void:
 
 
 ## The cycle of `cards` (ids by slot, `&""` for empty) in `staff`. Cards past `staff.slots`
-## are ignored; an unknown id is wasted with its reason.
+## are ignored; an unknown id is wasted.
 func compile(cards: Array[StringName], staff: StaffBase) -> CompiledStaff:
 	_out = CompiledStaff.new()
 	_out.staff = staff
@@ -76,7 +76,7 @@ func compile(cards: Array[StringName], staff: StaffBase) -> CompiledStaff:
 		if cards[slot] != &"":
 			card = _lookup.call(cards[slot]) as SpellComponent
 			if card == null:
-				unknown[slot] = "Unknown card '%s'." % cards[slot]
+				unknown[slot] = true
 		_cards.append(card)
 	var cursor: int = 0
 	while _has_card_from(cursor) and _out.casts.size() < _count + 1:
@@ -88,7 +88,7 @@ func compile(cards: Array[StringName], staff: StaffBase) -> CompiledStaff:
 	for cast in _out.casts:
 		for slot: int in cast.wasted:
 			if not _useful.has(slot):
-				_out.wasted[slot] = cast.wasted[slot]
+				_out.wasted[slot] = true
 	_out.wasted.merge(unknown)
 	return _out
 
@@ -144,7 +144,7 @@ func _read_group(want: int, payload: bool) -> CompiledGroup:
 					group.repeat_interval = maxf(group.repeat_interval, multicast.repeat_interval)
 		elif card is TriggerBase:
 			if trigger != null:
-				_waste(slot, "A second trigger before the same carrier does nothing.")
+				_waste(slot)
 			else:
 				trigger = card as TriggerBase
 				trigger_slot = slot
@@ -158,15 +158,11 @@ func _read_group(want: int, payload: bool) -> CompiledGroup:
 			for modifier in modifiers:
 				deflects = deflects or (modifier.behaviour == ModifierBase.Behaviour.DEFLECT and behaviour_runs(modifier.behaviour, form.carrier))
 				blasts = blasts or (modifier.behaviour == ModifierBase.Behaviour.BLAST and behaviour_runs(modifier.behaviour, form.carrier))
-			var why_not: Dictionary = {}
 			for modifier in modifiers:
-				var why: String = "deflect turns every shot that touches it first" if deflects and _shield_outrun(modifier, form.carrier) else behaviour_waste(modifier.behaviour, form.carrier, blasts)
-				if why.is_empty():
-					why = _numbers_waste(modifier, form.carrier, blasts)
-				if why.is_empty() or keep_wasted:
+				# A deflect turns every shot that touches it first, so a shield with it never blocks.
+				var works: bool = not (deflects and _shield_outrun(modifier, form.carrier)) and behaviour_runs(modifier.behaviour, form.carrier, blasts) and _numbers_count(modifier, form.carrier, blasts)
+				if works or keep_wasted:
 					kept_modifiers.append(modifier)
-				else:
-					why_not[modifier] = why
 			# An infusion is a hit's element: on a carrier that hits nothing itself, only a blast carries it.
 			var kept_elements: Array[ElementBase] = []
 			if Carriers.of(form.carrier).takes_infusion(blasts) or keep_wasted:
@@ -177,9 +173,9 @@ func _read_group(want: int, payload: bool) -> CompiledGroup:
 			for at: int in kept:
 				var modifier := _cards[at] as ModifierBase
 				if modifier != null and not kept_modifiers.has(modifier):
-					_waste(at, "%s does nothing on a %s: %s." % [_name(modifier), _name(form), why_not[modifier]])
+					_waste(at)
 				elif _cards[at] is ElementBase and kept_elements.is_empty():
-					_waste(at, "%s does nothing on a %s: %s, and it has no blast to carry it." % [_name(_cards[at]), _name(form), _hits_nothing(form.carrier)])
+					_waste(at)
 				else:
 					_attach(at, slot)
 			if form.carries_payload():
@@ -188,17 +184,17 @@ func _read_group(want: int, payload: bool) -> CompiledGroup:
 				# A trigger whose event never happens on this carrier still reads its payload, so the
 				# cards after it are read in the same order whether it fires or not; the payload is
 				# then wasted with it (rules R2b).
-				var never: String = "" if keep_wasted else _trigger_never(trigger, form, kept_elements, kept_modifiers)
+				var never: bool = not keep_wasted and not _trigger_fires(trigger, form, kept_elements, kept_modifiers)
 				var first: int = _cast.slots.size()
 				var mana: float = _cast.mana
 				var delay: float = _cast.delay
-				var useful: Dictionary = _useful.duplicate() if not never.is_empty() else {}
+				var useful: Dictionary = _useful.duplicate() if never else {}
 				var held: CompiledGroup = _read_group(1, true)
 				if held.is_empty():
-					_waste(trigger_slot, "Nothing is left after its carrier for it to fire.")
+					_waste(trigger_slot)
 					spell.trigger_id = &""
-				elif not never.is_empty():
-					_waste(trigger_slot, never)
+				elif never:
+					_waste(trigger_slot)
 					spell.trigger_id = &""
 					_cast.mana = mana
 					_cast.delay = delay
@@ -207,7 +203,7 @@ func _read_group(want: int, payload: bool) -> CompiledGroup:
 						if not useful.has(at):
 							_useful.erase(at)
 						if not _cast.wasted.has(at):
-							_waste(at, "Nothing casts it: %s before it never fires on a %s." % [_name(trigger), _name(form)])
+							_waste(at)
 				else:
 					_attach(trigger_slot, slot)
 					spell.payload = held
@@ -218,7 +214,7 @@ func _read_group(want: int, payload: bool) -> CompiledGroup:
 			trigger = null
 			want -= 1
 	if trigger != null:
-		_waste(trigger_slot, "No carrier comes after it.")
+		_waste(trigger_slot)
 	if not elements.is_empty() or not modifiers.is_empty():
 		var fallback: CompiledSpell = _fallback(elements, modifiers, kept, payload)
 		if fallback != null:
@@ -230,7 +226,6 @@ func _read_group(want: int, payload: bool) -> CompiledGroup:
 ## mean something there; a modifier that only steers a shot in flight is wasted.
 func _fallback(elements: Array[ElementBase], modifiers: Array[ModifierBase], kept: PackedInt32Array, payload: bool) -> CompiledSpell:
 	var target: int = TARGET_POINT if payload else TARGET_CASTER
-	var where: String = "where the payload starts" if payload else "on the caster"
 	var kept_modifiers: Array[ModifierBase] = []
 	var kept_slots: PackedInt32Array = PackedInt32Array()
 	for at: int in kept:
@@ -243,7 +238,7 @@ func _fallback(elements: Array[ElementBase], modifiers: Array[ModifierBase], kep
 			kept_modifiers.append(modifier)
 			kept_slots.append(at)
 		else:
-			_waste(at, "%s does nothing %s." % [_name(modifier), where])
+			_waste(at)
 	if elements.is_empty() and kept_modifiers.is_empty():
 		return null
 	var kind: int = CompiledSpell.FALLBACK_POINT if payload else CompiledSpell.FALLBACK_CASTER
@@ -264,103 +259,89 @@ func _means_something_there(modifier: ModifierBase, payload: bool) -> bool:
 	return not is_equal_approx(modifier.damage_mult, 1.0) or not is_equal_approx(modifier.radius_mult, 1.0)
 
 
-## Why `trigger` never fires on `form` with these infusions and kept modifiers, as the wasted
-## reason; "" when it can. First the carrier (`trigger_runs`), then the cards the event needs on
-## it: a block needs a shield or deflect, a reaction an infusion (or relay), and a kill or reaction
-## on a carrier that hits nothing itself needs a blast, whose area hit carries the carrier's tag.
-## A ghost shot or beam never meets a wall.
-func _trigger_never(trigger: TriggerBase, form: FormBase, elements: Array[ElementBase], modifiers: Array[ModifierBase]) -> String:
+## True when `trigger` can fire on `form` with these infusions and kept modifiers (`trigger_fires`).
+func _trigger_fires(trigger: TriggerBase, form: FormBase, elements: Array[ElementBase], modifiers: Array[ModifierBase]) -> bool:
 	var has: Dictionary = {}
 	for modifier in modifiers:
 		has[modifier.behaviour] = true
-	var why: String = trigger_waste(trigger.event, form.carrier, has, not elements.is_empty())
-	if why.is_empty():
-		return ""
-	return "%s does nothing on a %s%s." % [_name(trigger), _name(form), why]
+	return trigger_fires(trigger.event, form.carrier, has, not elements.is_empty())
 
 
-## The rest of `_trigger_never`'s sentence for a trigger of `event` on the carrier `carrier` with the
-## modifier behaviours in `has` (behaviour -> true) and an infusion when `infused`: ": <why>" when
-## the carrier alone never sets it off, " without <card>: <why>" when a card it needs is missing,
-## "" when it can fire. One rule for the compiler and `card_waste`.
-static func trigger_waste(event: int, carrier: StringName, has: Dictionary, infused: bool) -> String:
-	var why: String = trigger_why_not(event, carrier)
-	if not why.is_empty():
-		return ": %s" % why
+## True when a trigger of `event` can fire on the carrier `carrier` with the modifier behaviours in
+## `has` (behaviour -> true) and an infusion when `infused`: the carrier must be able to set it off
+## (`trigger_runs`), and the cards the event needs must be on it: a block needs a shield or
+## deflect, a kill or reaction on a carrier that hits nothing a blast (whose area hit carries the
+## carrier's tag), a reaction an infusion (or relay); a ghost never meets a wall. One rule for the
+## compiler and `card_works`.
+static func trigger_fires(event: int, carrier: StringName, has: Dictionary, infused: bool) -> bool:
+	if not trigger_runs(event, carrier):
+		return false
 	match event:
 		TriggerBase.Event.BLOCK:
-			if not has.has(ModifierBase.Behaviour.SHIELD) and not has.has(ModifierBase.Behaviour.DEFLECT):
-				return " without a shield or deflect: nothing else on it blocks"
+			return has.has(ModifierBase.Behaviour.SHIELD) or has.has(ModifierBase.Behaviour.DEFLECT)
 		TriggerBase.Event.KILL, TriggerBase.Event.REACTION:
 			if not hits(carrier) and not has.has(ModifierBase.Behaviour.BLAST):
-				return " without a blast: %s" % _hits_nothing(carrier)
+				return false
 			if event == TriggerBase.Event.REACTION and not infused and not has.has(ModifierBase.Behaviour.RELAY):
-				return " without an infusion: a hit with no element sets off no reaction"
+				return false
 		TriggerBase.Event.WALL:
-			if has.has(ModifierBase.Behaviour.GHOST) and behaviour_runs(ModifierBase.Behaviour.GHOST, carrier):
-				return " with ghost: it passes through walls"
-	return ""
+			return not (has.has(ModifierBase.Behaviour.GHOST) and behaviour_runs(ModifierBase.Behaviour.GHOST, carrier))
+	return true
 
 
-## Why `card` does nothing on the carrier `carrier` when it is the only other card there, in the
-## words after "<Card> does nothing on a <carrier>" ("" when it does something): what the builder,
-## a reward screen or a bot asks before a card is placed. The same rules as a compile of
-## `[card, carrier]` (a trigger with a payload after it); a form or a multicast is never wasted.
-static func card_waste(card: SpellComponent, carrier: StringName) -> String:
+## True when `card` does something on the carrier `carrier` when it is the only other card there:
+## what the builder, a reward screen or a bot asks before a card is placed. The same rules as a
+## compile of `[card, carrier]` (a trigger with a payload after it); a form or a multicast always.
+static func card_works(card: SpellComponent, carrier: StringName) -> bool:
 	if card is ModifierBase:
 		var modifier := card as ModifierBase
-		var why: String = behaviour_waste(modifier.behaviour, carrier)
-		if why.is_empty():
-			why = _numbers_waste(modifier, carrier, false)
-		return ": %s" % why if not why.is_empty() else ""
+		return behaviour_runs(modifier.behaviour, carrier) and _numbers_count(modifier, carrier, false)
 	if card is ElementBase:
-		return "" if Carriers.of(carrier).takes_infusion(false) else ": %s, and it has no blast to carry it" % _hits_nothing(carrier)
+		return Carriers.of(carrier).takes_infusion(false)
 	if card is TriggerBase:
-		return trigger_waste((card as TriggerBase).event, carrier, {}, false)
-	return ""
+		return trigger_fires((card as TriggerBase).event, carrier, {}, false)
+	return true
 
 
-## Why a modifier's numbers do nothing on the carrier `carrier`, or "" when one of them counts. Its
+## True when one of a modifier's numbers counts on the carrier `carrier` (or it has a behaviour). Its
 ## costs (more mana, a slower cast, less damage) are no effect; an effect counts where the carrier
 ## uses that number: damage where it hits (or blasts), speed and lifetime where it moves or lasts,
 ## shots, spread and pierce where it fires shots that use them. A behaviour card is judged by its
-## behaviour (`behaviour_waste`), its numbers ride with it.
-static func _numbers_waste(modifier: ModifierBase, carrier: StringName, blasts: bool) -> String:
+## behaviour (`behaviour_runs`), its numbers ride with it.
+static func _numbers_count(modifier: ModifierBase, carrier: StringName, blasts: bool) -> bool:
 	if modifier.behaviour != ModifierBase.Behaviour.NONE:
-		return ""
+		return true
 	var on: Carrier = Carriers.of(carrier)
 	var any: bool = false
 	if modifier.cooldown_mult < 1.0 or not is_equal_approx(modifier.radius_mult, 1.0):
-		return ""
+		return true
 	if modifier.damage_mult > 1.0:
 		any = true
 		if on.hits() or blasts:
-			return ""
+			return true
 	if not is_equal_approx(modifier.speed_mult, 1.0) or not is_equal_approx(modifier.lifetime_mult, 1.0):
 		any = true
 		if on.has(Carrier.SPEED):
-			return ""
+			return true
 	if modifier.shot_mult != 1:
 		any = true
 		if on.has(Carrier.SHOTS):
-			return ""
+			return true
 	if not is_equal_approx(modifier.reach_mult, 1.0):
 		any = true
 		if on.reaches():
-			return ""
+			return true
 	if not is_equal_approx(modifier.spread_mult, 1.0):
 		any = true
 		# A placed carrier (rune, decoy, familiar) appears along its aim, so its spread moves it (rules R4 F3).
 		if on.has(Carrier.SPREAD):
-			return ""
+			return true
 	if modifier.extra_pierce != 0:
 		any = true
 		# A wall stands through every hit (rules R4 F6).
 		if on.has(Carrier.PIERCE):
-			return ""
-	if not any:
-		return ""
-	return "none of its numbers count here: %s" % on.what()
+			return true
+	return not any
 
 
 ## A compiled spell from a carrier (or none, for a fallback) and the cards that attach to it.
@@ -529,19 +510,12 @@ static func homing_steers(carrier: StringName) -> bool:
 	return Carriers.of(carrier).steers()
 
 
-## True when the carrier `carrier` can run `behaviour` (`behaviour_waste` gives no reason). A
-## card whose behaviour cannot run is wasted.
+## True when the carrier `carrier` can run `behaviour` (with a blast on it, when `blasts`): its
+## yes/no answers (`CarrierTraits`) meet what the behaviour needs (`ModifierBase.NEEDS`). A card
+## whose behaviour cannot run is wasted, and changes nothing else either. tests/core/test_card_rules.gd
+## plays every card on every carrier and fails where this is wrong.
 static func behaviour_runs(behaviour: int, carrier: StringName, blasts: bool = false) -> bool:
-	return behaviour_waste(behaviour, carrier, blasts).is_empty()
-
-
-## Why the carrier `carrier` cannot run `behaviour`, for the wasted card's reason, or "" when it
-## runs it: the carrier's own table (`Carrier.behaviours`, rule 1, docs/milestones/M2-rules.md
-## R2a). `blasts` is true when the carrier also has a blast, whose area hit carries a `WITH_BLAST`
-## row (heavy on a decoy). tests/core/test_card_rules.gd plays every card on every carrier and
-## fails on a row that says it runs where the runtime does nothing.
-static func behaviour_waste(behaviour: int, carrier: StringName, blasts: bool = false) -> String:
-	return Carriers.of(carrier).waste(behaviour, blasts)
+	return Carriers.of(carrier).works(behaviour, blasts)
 
 
 ## True for the carriers that are a shot flying out on its own (a bolt, a hook, a swap).
@@ -569,11 +543,6 @@ static func hits(carrier: StringName) -> bool:
 	return Carriers.of(carrier).hits()
 
 
-## What the carrier `carrier` is, for a wasted card's reason.
-static func _what(carrier: StringName) -> String:
-	return Carriers.of(carrier).what()
-
-
 ## True for the carriers whose shield only stops shots that touch them (`Carrier.GUARDS`): on these
 ## a deflect turns every such shot first (owner, 2026-10-29), so a shield with it never blocks.
 static func guards(carrier: StringName) -> bool:
@@ -589,18 +558,7 @@ static func _shield_outrun(modifier: ModifierBase, carrier: StringName) -> bool:
 ## carrier's table (`Carrier.events`); `_trigger_never` adds the cards the event needs. Where it
 ## cannot, the trigger and its payload are wasted (rules R2b, docs/milestones/M2-rules.md).
 static func trigger_runs(event: int, carrier: StringName) -> bool:
-	return trigger_why_not(event, carrier).is_empty()
-
-
-## Why a trigger of `event` never fires on the carrier `carrier` (`trigger_runs`), in words a
-## player reads after "On Hit does nothing on a Rain: "; "" when it can fire.
-static func trigger_why_not(event: int, carrier: StringName) -> String:
-	return Carriers.of(carrier).event_waste(event)
-
-
-## Why a carrier that hits nothing under its own tag sets off no hit, for a reason.
-static func _hits_nothing(carrier: StringName) -> String:
-	return Carriers.of(carrier).hits_nothing()
+	return Carriers.of(carrier).fires(event)
 
 
 ## How far a homing carrier looks for its target, the one rule for every form: as far as its
@@ -660,8 +618,8 @@ func _attach(slot: int, target: int) -> void:
 	_useful[slot] = true
 
 
-func _waste(slot: int, reason: String) -> void:
-	_cast.wasted[slot] = reason
+func _waste(slot: int) -> void:
+	_cast.wasted[slot] = true
 
 
 func _group_text(group: CompiledGroup) -> String:

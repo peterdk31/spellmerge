@@ -8,14 +8,6 @@ func id() -> StringName:
 	return &"hook"
 
 
-func noun() -> String:
-	return "hook"
-
-
-func what() -> String:
-	return "a hook flies out and pulls its caster to what it hits"
-
-
 func traits() -> int:
 	return FLIES | STAYS | HITS | LASTS | REACHES | STEERS | SPEED | SHOTS | SPREAD | PIERCE | MOVES | MEETS_SHOTS
 

@@ -439,19 +439,18 @@ func bind(manager: ProjectilesScript, bus: EventsScript) -> void:
 		events.caster_move_finished.connect(_moves.finished)
 
 
-## Why the card `card_id` does nothing on the carrier `carrier` (`FormBase.carrier`) on its own, in
-## the words after "<Card> does nothing on a <carrier>" ("" when it does something, or for an
-## unknown card): for the builder, a reward screen or a bot, before the card is placed
-## (`StaffCompiler.card_waste`).
-func card_waste(card_id: StringName, carrier: StringName) -> String:
+## True when the card `card_id` does something on the carrier `carrier` (`FormBase.carrier`) on its
+## own: for the builder, a reward screen or a bot, before the card is placed
+## (`StaffCompiler.card_works`). False for an unknown card.
+func card_works(card_id: StringName, carrier: StringName) -> bool:
 	var card: SpellComponent = _component(card_id)
-	return StaffCompiler.card_waste(card, carrier) if card != null else ""
+	return card != null and StaffCompiler.card_works(card, carrier)
 
 
 ## Compiles a staff's cards (ids by slot, `&""` for an empty slot) into its cycle, the casts it
 ## makes until it recharges (staffs A4; the rules are docs/milestones/M2-staffs.md, "Reading a
 ## staff", and `StaffCompiler`). It never errors and refuses nothing: an unknown or useless
-## card is listed in `wasted` with the reason.
+## card is listed in `wasted`.
 func compile_staff(cards: Array[StringName], staff: StaffBase) -> CompiledStaff:
 	return StaffCompiler.new(_component).compile(cards, staff)
 
@@ -460,7 +459,7 @@ func compile_staff(cards: Array[StringName], staff: StaffBase) -> CompiledStaff:
 ## reads a compiled staff: `empty`; `cards` (the card ids by slot, `&""` for an empty slot); `casts`, one Dictionary per cast of the cycle with `slots`
 ## (read order), `name` (the generated spell name, `SpellNamer`), `text`, `mana`, `delay`, `damage` (each carrier's hit times its shots and the group's repeats, payloads left out), `recharges`, `wrapped`, `targets` (card slot -> the
 ## carrier's slot, or `StaffCompiler.TARGET_CASTER` / `TARGET_POINT`) and `wasted` (slot ->
-## reason); `wasted` for the staff (cards that did nothing in any cast that read them); and
+## true); `wasted` for the staff (cards that did nothing in any cast that read them); and
 ## `staff`, the StaffBase given, only to hand back to `staff_view` for a preview of other cards
 ## (the radial builder shows what a card would change before it is put in).
 func staff_view(cards: Array[StringName], staff: StaffBase) -> Dictionary:
@@ -1043,7 +1042,7 @@ func _fire_spell(spell: CompiledSpell, actor: int, staff: int, generation: int, 
 	if launched > 0:
 		_recoil(spell, tag, actor, origin, heading)
 	# A move's mirror would cancel it (rules R4g): a dash or teleport moves its caster once.
-	if launched > 0 and spell.behaviour(ModifierBase.Behaviour.MIRROR) > 0.0 and _carrier_of(spell).waste(ModifierBase.Behaviour.MIRROR).is_empty():
+	if launched > 0 and spell.behaviour(ModifierBase.Behaviour.MIRROR) > 0.0 and _carrier_of(spell).works(ModifierBase.Behaviour.MIRROR):
 		var backwards: int = _launch(spell, tag, actor, origin, -heading, source)
 		launched += backwards
 		if backwards > 0:

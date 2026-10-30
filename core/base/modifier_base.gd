@@ -50,7 +50,7 @@ enum Behaviour {
 	## Takes on the infusions of the last cast of any actor its shot hits (B2; owner, 2026-10-28).
 	RELAY,
 	## Flies out for half its life, then back to its caster (owner, 2026-10-27: a modifier, not
-	## a boomerang carrier). Only on a carrier that flies (`StaffCompiler.behaviour_waste`).
+	## a boomerang carrier). Only on a carrier that flies (`ModifierBase.NEEDS`).
 	RETURN,
 	## Zaps the nearest enemy within `behaviour_reach` pixels `behaviour_strength` times a second
 	## (arc cards add up) while the shot lives, at `SpellLimits.ARC_DAMAGE` of its damage with its infusions; a zap
@@ -69,31 +69,30 @@ enum Behaviour {
 	DEFLECT,
 }
 
-## What each behaviour needs from the carrier it rides on to do anything (the carrier's yes/no
-## answers, `CarrierTraits`), and the words the builder shows when it gets none of it ("<Card> does nothing on a <carrier>: <why_not>, and <what()>"):
-## "any": at least one of these flags; "not": none of these. A behaviour not here works on every
+## What each behaviour needs from the carrier it rides on to do anything, in the carrier's yes/no
+## answers (`CarrierTraits`): "any": at least one of these flags; "not": none of these. A behaviour not here works on every
 ## carrier (numbers, blast, echo, recoil). A new behaviour adds its line here, never per
-## carrier; the compiler checks it every time a staff is built (`Carrier.waste`).
+## carrier; the compiler checks it every time a staff is built (`Carrier.works`).
 const NEEDS: Dictionary = {
-	Behaviour.HOMING: {"any": CarrierTraits.STEERS, "why_not": "it has nothing to aim"},
-	Behaviour.CHAIN: {"any": CarrierTraits.HITS, "why_not": "it acts on what the carrier hits"},
-	Behaviour.SIPHON: {"any": CarrierTraits.HITS, "why_not": "it acts on what the carrier hits"},
-	Behaviour.POSSESS: {"any": CarrierTraits.HITS, "why_not": "it acts on what the carrier hits"},
-	Behaviour.HEAVY: {"any": CarrierTraits.HITS, "why_not": "it acts on what the carrier hits (a blast would carry it)"},
-	Behaviour.RELAY: {"any": CarrierTraits.HITS, "why_not": "it needs a hit of its own"},
-	Behaviour.SHIELD: {"any": CarrierTraits.MEETS_SHOTS, "why_not": "it blocks shots that touch the carrier or guards the caster on a move"},
-	Behaviour.DEFLECT: {"any": CarrierTraits.MEETS_SHOTS, "why_not": "it touches no shots"},
-	Behaviour.HOLD: {"any": CarrierTraits.LASTS, "not": CarrierTraits.MOVES_CASTER, "why_not": "nothing keeps it on"},
-	Behaviour.MIRROR: {"not": CarrierTraits.MOVES_CASTER, "why_not": "a move and its mirror cancel"},
-	Behaviour.BOUNCE: {"any": CarrierTraits.FLIES | CarrierTraits.LINE, "why_not": "it turns a shot or a beam at walls"},
-	Behaviour.GHOST: {"any": CarrierTraits.FLIES | CarrierTraits.LINE, "why_not": "it only takes a flying shot or a line through walls"},
-	Behaviour.RETURN: {"any": CarrierTraits.FLIES, "why_not": "it does not fly out"},
-	Behaviour.LINGER: {"any": CarrierTraits.MOVES, "why_not": "it only changes a moving shot"},
-	Behaviour.STICKY: {"any": CarrierTraits.MOVES, "why_not": "it only changes a moving shot"},
-	Behaviour.SPIRAL: {"any": CarrierTraits.MOVES | CarrierTraits.LINE, "why_not": "it only changes a moving shot or a beam"},
-	Behaviour.GROWTH: {"any": CarrierTraits.STAYS | CarrierTraits.LINE, "why_not": "it grows a shot in the world or a beam"},
-	Behaviour.MAGNET: {"any": CarrierTraits.STAYS | CarrierTraits.LINE, "why_not": "it needs a shot or a beam that stays in the world"},
-	Behaviour.ARC: {"any": CarrierTraits.STAYS, "why_not": "it is not a shot that stays in the air"},
+	Behaviour.HOMING: {"any": CarrierTraits.STEERS},
+	Behaviour.CHAIN: {"any": CarrierTraits.HITS},
+	Behaviour.SIPHON: {"any": CarrierTraits.HITS},
+	Behaviour.POSSESS: {"any": CarrierTraits.HITS},
+	Behaviour.HEAVY: {"any": CarrierTraits.HITS},
+	Behaviour.RELAY: {"any": CarrierTraits.HITS},
+	Behaviour.SHIELD: {"any": CarrierTraits.MEETS_SHOTS},
+	Behaviour.DEFLECT: {"any": CarrierTraits.MEETS_SHOTS},
+	Behaviour.HOLD: {"any": CarrierTraits.LASTS, "not": CarrierTraits.MOVES_CASTER},
+	Behaviour.MIRROR: {"not": CarrierTraits.MOVES_CASTER},
+	Behaviour.BOUNCE: {"any": CarrierTraits.FLIES | CarrierTraits.LINE},
+	Behaviour.GHOST: {"any": CarrierTraits.FLIES | CarrierTraits.LINE},
+	Behaviour.RETURN: {"any": CarrierTraits.FLIES},
+	Behaviour.LINGER: {"any": CarrierTraits.MOVES},
+	Behaviour.STICKY: {"any": CarrierTraits.MOVES},
+	Behaviour.SPIRAL: {"any": CarrierTraits.MOVES | CarrierTraits.LINE},
+	Behaviour.GROWTH: {"any": CarrierTraits.STAYS | CarrierTraits.LINE},
+	Behaviour.MAGNET: {"any": CarrierTraits.STAYS | CarrierTraits.LINE},
+	Behaviour.ARC: {"any": CarrierTraits.STAYS},
 }
 
 @export var damage_mult: float = 1.0

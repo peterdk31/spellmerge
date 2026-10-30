@@ -53,14 +53,6 @@ func id() -> StringName:
 	return &"swing"
 
 
-func noun() -> String:
-	return "swing"
-
-
-func what() -> String:
-	return "a swing is a sweep that is over at once"
-
-
 func traits() -> int:
 	return HITS | LASTS | REACHES | GUARDS | SPEED | SHOTS | SPREAD | REPEATS_HELD | OWN_POSE | MEETS_SHOTS
 

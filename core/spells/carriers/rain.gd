@@ -8,14 +8,6 @@ func id() -> StringName:
 	return &"rain"
 
 
-func noun() -> String:
-	return "rain"
-
-
-func what() -> String:
-	return "a rain strikes once where it lands"
-
-
 func traits() -> int:
 	return HITS | LASTS | REACHES | STEERS | SPEED | SHOTS | REPEATS_HELD | CARRIES_PAYLOAD | HOLDS_STAFF
 

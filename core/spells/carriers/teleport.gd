@@ -13,14 +13,6 @@ func id() -> StringName:
 	return &"teleport"
 
 
-func noun() -> String:
-	return "teleport"
-
-
-func what() -> String:
-	return "a teleport moves its caster at once and hits where it lands"
-
-
 func traits() -> int:
 	return HITS | REACHES | STEERS | INSTANT_HOMING | MOVES_CASTER | MEETS_SHOTS
 

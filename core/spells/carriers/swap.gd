@@ -8,14 +8,6 @@ func id() -> StringName:
 	return &"swap"
 
 
-func noun() -> String:
-	return "swap"
-
-
-func what() -> String:
-	return "a swap flies out and trades places with what it hits"
-
-
 func traits() -> int:
 	return FLIES | STAYS | HITS | LASTS | REACHES | STEERS | SPEED | SHOTS | SPREAD | PIERCE | MOVES | MEETS_SHOTS
 

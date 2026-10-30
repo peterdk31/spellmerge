@@ -8,14 +8,6 @@ func id() -> StringName:
 	return &"wall"
 
 
-func noun() -> String:
-	return "wall"
-
-
-func what() -> String:
-	return "a wall stands still through every hit"
-
-
 func traits() -> int:
 	return STAYS | HITS | LASTS | REACHES | GUARDS | STEERS | SPEED | SHOTS | MEETS_SHOTS
 

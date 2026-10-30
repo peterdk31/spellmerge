@@ -9,20 +9,8 @@ func id() -> StringName:
 	return &"decoy"
 
 
-func noun() -> String:
-	return "decoy"
-
-
-func what() -> String:
-	return "a decoy is a body that hits nothing"
-
-
 func traits() -> int:
 	return LASTS | GUARDS | SPEED | SHOTS | SPREAD | MEETS_SHOTS
-
-
-func hits_nothing() -> String:
-	return "a decoy hits nothing"
 
 
 ## The shield charges of the decoy with `tag`, and whether it deflects (rules R4g), for Entities as

@@ -9,14 +9,6 @@ func id() -> StringName:
 	return &"bolt"
 
 
-func noun() -> String:
-	return "bolt"
-
-
-func what() -> String:
-	return "a bolt flies on its own"
-
-
 func traits() -> int:
 	return FLIES | STAYS | HITS | LASTS | REACHES | GUARDS | STEERS | SPEED | SHOTS | SPREAD | PIERCE | MOVES | MEETS_SHOTS
 

@@ -31,13 +31,13 @@ extends PanelContainer
 ##
 ## The focused control is marked with "> ", the selected slot is shown in brackets and a held
 ## card with "^", so nothing is shown by colour alone; a card that does nothing where it is (a
-## wasted card) has a "!" and the note says why. Links: each modifier, infusion and trigger shows
+## wasted card) has a "!" (no words: the mark is enough, owner 2026-10-30). Links: each modifier, infusion and trigger shows
 ## where it goes ("> 4" for the carrier in slot 4, "> you" for the caster, "> aim" for the aim
 ## point) and each carrier its cast ("#1"); the cards linked to the focused one are marked "<".
 ##
 ## The info panel (`Info`, in the free strip of the player's quarter) shows the cast plan, one
 ## line per cast of the staff's cycle with its live numbers (its mana and delay in its words,
-## then its damage if every shot lands once), and a note: the refusal reason, else why the focused slot's card is wasted,
+## then its damage if every shot lands once), and a note: the refusal reason,
 ## else where it goes and the description of the card in focus; and a hint line with what
 ## `accept` (and `back` or `alternate`) do on the focused control.
 ##
@@ -110,7 +110,6 @@ const HINT_ACTION: StringName = &"accept"
 const HINT_BACK_ACTION: StringName = &"back"
 const HINT_BAG_ACTION: StringName = &"alternate"
 const REFUSED_PREFIX: String = "Refused: "
-const WASTED_PREFIX: String = "Does nothing: "
 const COPIED_PREFIX: String = "Copied the staff code"
 const CLIPBOARD_EMPTY: String = "The clipboard is empty, or the browser blocked it."
 const PASTED_TEXT: String = "Pasted the code."
@@ -400,7 +399,7 @@ func plan_text() -> String:
 	return _plan.text
 
 
-## The refusal reason, the wasted reason or the description in focus ("" if none).
+## The refusal reason or the description in focus ("" if none).
 func note_text() -> String:
 	return _note.text
 
@@ -577,17 +576,13 @@ func _render_plan() -> void:
 	_render_note()
 
 
-## The refusal reason, else why the focused slot's card is wasted, else the description of what
-## the player points at.
+## The refusal reason, else the description of what the player points at.
 func _render_note() -> void:
 	var at_slot: int = _slots.find(_focused as Button)
-	var wasted: Dictionary = _wasted()
 	if _reason != "":
 		_note.text = REFUSED_PREFIX + _reason
 	elif _message != "":
 		_note.text = _message
-	elif at_slot >= 0 and wasted.has(at_slot):
-		_note.text = WASTED_PREFIX + str(wasted[at_slot])
 	else:
 		var link: String = _link_sentence(at_slot)
 		var description: String = _description_in_focus()

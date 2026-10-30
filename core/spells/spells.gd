@@ -69,7 +69,7 @@ extends Node
 ## familiar's payload on every `familiar_cast_requested` (the familiar's infusions and hit cards
 ## ride on it, compiled in), guard a decoy with its shield or deflect (`guard_decoy`), and fire an
 ## entity's `on expire` payload and `blast` at its end point; `hold` keeps an entity until its staff is cast again (`entity_end_requested`). `wall`
-## is a line of still shots across the aim; `fissure` is a beam that pierces everything on its line.
+## is one solid still shot across the aim, a short-lived wall (`_launch_wall`); `fissure` is a beam that pierces everything on its line.
 ##
 ## Moves, areas and refunds (B2d): a `teleport` asks the caster's body to blink along the aim
 ## (`caster_move_requested`, cut short at the first wall); a `hook` shot that hits asks the body

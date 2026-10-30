@@ -217,9 +217,18 @@ func _pick_detour(wizard: Node2D, target: Node2D) -> Vector2:
 	return best
 
 
-## The enemy about to shoot at the wizard (see DODGE_*), or null.
+## The enemy about to shoot at the wizard (see DODGE_*), or null. Enemies stand in the world, or
+## one level down under its `Horde` node (a horde run's enemies).
 func _incoming(world: Node2D, wizard: Node2D) -> Node2D:
-	for child in world.get_children():
+	var found: Node2D = _incoming_among(world, wizard)
+	var horde: Node = world.get_node_or_null(^"Horde")
+	if found == null and horde != null:
+		found = _incoming_among(horde, wizard)
+	return found
+
+
+func _incoming_among(parent: Node, wizard: Node2D) -> Node2D:
+	for child in parent.get_children():
 		var enemy := child as Actor
 		var ai: AIController = _ai_of(enemy)
 		if ai == null or enemy.is_queued_for_deletion():
@@ -235,10 +244,20 @@ func _incoming(world: Node2D, wizard: Node2D) -> Node2D:
 	return null
 
 
+## The nearest enemy to `from`: among the world's children and, one level down, those of its
+## `Horde` node (a horde run's enemies); null when there is none.
 func _nearest_enemy(world: Node2D, from: Vector2) -> Node2D:
-	var best: Node2D = null
-	var best_distance: float = INF
-	for child in world.get_children():
+	var best: Node2D = _nearest_among(world, from, null)
+	var horde: Node = world.get_node_or_null(^"Horde")
+	if horde != null:
+		best = _nearest_among(horde, from, best)
+	return best
+
+
+## The nearest enemy to `from` among `parent`'s children, or `best` when it is nearer.
+func _nearest_among(parent: Node, from: Vector2, best: Node2D) -> Node2D:
+	var best_distance: float = from.distance_squared_to(best.global_position) if best != null else INF
+	for child in parent.get_children():
 		# Enemies are the actors an AI drives (actors G6).
 		var enemy := child as Actor
 		if _ai_of(enemy) == null or enemy.is_queued_for_deletion():

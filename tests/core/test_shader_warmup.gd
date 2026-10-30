@@ -64,6 +64,8 @@ func test_each_is_drawn_the_way_the_game_draws_it() -> void:
 			check(child is MultiMeshInstance2D, "%s by a batch" % shader.resource_path)
 		elif WarmupScript.MESH_SHADERS.has(shader):
 			check(child is MeshInstance2D, "%s by a mesh, as Feel draws a beam" % shader.resource_path)
+		elif WarmupScript._wanted.has(shader) and WarmupScript._wanted_how[WarmupScript._wanted.find(shader)] == WarmupScript.BATCH:
+			check(child is MultiMeshInstance2D, "%s by a batch, as its area wanted it" % shader.resource_path)
 		else:
 			check(child is Sprite2D, "%s by a sprite" % shader.resource_path)
 

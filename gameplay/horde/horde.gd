@@ -36,6 +36,9 @@ const RegistryScript := preload("res://core/registry/registry.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 const ActorsScript := preload("res://core/actors/actors.gd")
 const GemsScript := preload("res://gameplay/horde/horde_gems.gd")
+const ShaderWarmupScript := preload("res://core/projectiles/shader_warmup.gd")
+## The swarm's look's shader (swarm_look.gd), compiled before the first room with the rest.
+const SwarmLookShader: Shader = preload("res://gameplay/horde/swarm_look.gdshader")
 const DefaultCurve: HordeCurve = preload("res://gameplay/horde/horde_curve.tres")
 
 const SEATS: int = 4
@@ -137,6 +140,7 @@ func _init() -> void:
 
 
 func _ready() -> void:
+	ShaderWarmupScript.want(SwarmLookShader, ShaderWarmupScript.BATCH)
 	if events == null:
 		events = get_node_or_null("/root/Events") as EventsScript
 	if registry == null:

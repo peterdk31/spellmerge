@@ -394,7 +394,9 @@ func test_a_mend_hit_heals_and_barely_hurts_enemies() -> void:
 
 
 func test_a_beam_is_a_ray_hit_and_a_bolt_a_shot() -> void:
-	_form(&"beam", 3, 1).ray_length = 200.0
+	var beam: FormBase = _form(&"beam", 3, 1)
+	beam.motion = FormBase.Motion.RAY
+	beam.ray_length = 200.0
 	check_equal((_compile("beam").casts[0].group.spells[0] as CompiledSpell).hit.kind, &"ray", "a beam")
 	check_equal((_compile("bolt").casts[0].group.spells[0] as CompiledSpell).hit.kind, &"shot", "a bolt")
 
@@ -422,3 +424,23 @@ func test_the_builder_view_counts_a_casts_damage() -> void:
 	check_equal(int((view["casts"] as Array)[0]["damage"]), 37, "a bolt and a nova together")
 	var payload: Dictionary = _spells.call("staff_view", [&"on_hit", &"bolt", &"nova"] as Array[StringName], _staff)
 	check_equal(int((payload["casts"] as Array)[0]["damage"]), 5, "a payload is not counted: it depends on what is hit")
+
+
+func test_reach_stretches_a_carriers_range_and_two_multiply() -> void:
+	var reach: ModifierBase = _modifier(&"reach")
+	reach.reach_mult = 1.6
+	var bolt: FormBase = _form(&"far_bolt", 3, 1)
+	bolt.lifetime = 1.0
+	var dash: FormBase = _form(&"far_dash", 1, 1)
+	dash.motion = FormBase.Motion.DASH
+	dash.ray_length = 80.0
+	var rune: FormBase = _form(&"far_rune", 3, 1)
+	rune.motion = FormBase.Motion.STILL
+	var shot: CompiledSpell = _compile("reach far_bolt").casts[0].group.spells[0]
+	check(is_equal_approx(shot.lifetime, 1.6) and is_equal_approx(shot.speed, 300.0), "a flying shot lives longer at its speed: %s s" % shot.lifetime)
+	var move: CompiledSpell = _compile("reach far_dash").casts[0].group.spells[0]
+	check(is_equal_approx(move.ray_length, 128.0), "a dash goes 128 px: %s" % move.ray_length)
+	var twice: CompiledSpell = _compile("reach reach far_dash").casts[0].group.spells[0]
+	check(is_equal_approx(twice.ray_length, 80.0 * 1.6 * 1.6), "two reach cards multiply: %s" % twice.ray_length)
+	var staff: CompiledStaff = _compile("reach far_rune")
+	check(staff.wasted.has(0), "a rune has no range: reach is wasted")

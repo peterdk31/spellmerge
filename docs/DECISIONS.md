@@ -2280,6 +2280,13 @@ The owner: restructure the projectile step from "for each shot, check every beha
 - **One mechanism:** `Spells._apply_travel` runs on every shot a carrier makes (bolt, rune, orbit, a wall's shots, a chain jump), and each `ProjectileManager` setter takes what the shot can physically do: growth any shot, linger, spiral and sticky a shot that moves (`_moves`), bounce, ghost, return and homing a straight shot. The wall's own copy of shield and deflect is gone (it calls `_apply_travel`). The existing passes do the rest: linger holds the orbit (the orbit pass keeps a held shot on its caster without turning), the stuck pass takes a sticky orbit shot, and the orbit pass adds the spiral's sine to its radius (an orbit joins no spiral pass).
 - **The waste table lists fewer cells:** `behaviour_waste` lists growth off shots that stay in the world, and linger, spiral, sticky off a rune and a wall only.
 
+## 2026-10-30: Card rules R4 F5: one Dash and a Reach card (owner decisions, 2026-10-30)
+
+- **One Dash:** Medium Dash and Long Dash are gone (folders, icons, lore, combos); the kept Dash has the medium's numbers (80 px at 300 px/s) and the starter keeps it. A longer dash is `reach · dash` (128 px).
+- **Reach** ("goes farther"): `ModifierBase.reach_mult` (1.6) multiplies the carrier's range in the compiler's one multiplier loop: a flying shot's `lifetime` (bolt, nova, hook, swap), every other carrier's `ray_length` (beam, fissure, dash, teleport, rain, wall, swing, slam). Several multiply (two: x2.56). Wasted on a rune, an orbit, a decoy and a familiar (`StaffCompiler.reaches`, through `_numbers_waste`: no new row). Look: glitter (12), shared with sniper (both say "long shot").
+- **A wall's distance is its card's `ray_length`** (28 px, `WALL_REACH` only without one), so reach moves it farther; the compiler's ray hit kind is now by motion (`rays()` and rain), not "has a `ray_length`".
+- **Ring** (a multicast that fires the carrier's shots in a full circle, like nova) is in docs/BACKLOG.md as an idea.
+
 ## 2026-10-30: Card rules R4i: homing on placed carriers (owner decisions, 2026-10-30)
 
 - **The owner's decision:** homing was wasted on a rune, a wall and a rain. A homing rune drifts: it creeps toward its target at `SpellLimits.HOMING_DRIFT` (24 px/s: below the slowest walking enemy, 30, so it is a trap that follows, not a chaser; over a rune's 8 s about the card's 160 px reach), with a bolt's pick and reach; with nothing in reach it stays put. A rain's and a wall's aim point moves onto a target near it, as homing bends a beam's or a teleport's aim. An orbit stays wasted: it circles its caster, nothing to aim.

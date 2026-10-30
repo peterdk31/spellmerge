@@ -1,7 +1,7 @@
 extends "res://tests/support/screenshot.gd"
 ## A wizard's dash (the owner, 2026-10-28: the dash look went the aim's way, not the wizard's): a
 ## row per infusion (plain, fire, frost, storm, void, lightning; the real cards' colours and
-## looks), each caster dashing 80 px (Medium Dash) to the right and bending down on the way, as
+## looks), each caster dashing 80 px (Dash) to the right and bending down on the way, as
 ## a wizard does that walks while it dashes. The way is the caster's trail (`follow_caster`, the
 ## projectile manager): speed streaks in the player's colours and the cards where it went; Feel
 ## draws the dust where it left and the ring where it landed (`caster_move_finished`).
@@ -17,7 +17,7 @@ const ELEMENTS: Array[Resource] = [
 	preload("res://content/spells/elements/void/void.tres"),
 	preload("res://content/spells/elements/lightning/lightning.tres"),
 ]
-const MEDIUM_DASH := preload("res://content/spells/forms/medium_dash/medium_dash.tres")
+const DASH := preload("res://content/spells/forms/dash/dash.tres")
 const ROW: float = 58.0
 ## Physics steps the dash takes (0.27 s, as the mockup's).
 const STEPS: int = 16
@@ -33,7 +33,7 @@ func take() -> void:
 	lay_floor()
 	shots.call("set_bounds", Rect2(Vector2.ZERO, SCREEN))
 	await settle()
-	var length: float = float(MEDIUM_DASH.get("ray_length"))
+	var length: float = float(DASH.get("ray_length"))
 	var casters: Array[int] = []
 	# Casters are actor ids (actors G8): the four wizards seated 0-3 (ids 0-3) and two enemies.
 	var actors: ActorSeats.ActorsScript = ActorSeats.autoload()

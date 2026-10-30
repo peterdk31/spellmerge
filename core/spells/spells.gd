@@ -762,7 +762,7 @@ func component_stats(id: StringName) -> PackedStringArray:
 		var mults: Array = [
 			["Dmg", modifier.damage_mult], ["Mana", modifier.mana_mult], ["Shots", float(modifier.shot_mult)],
 			["Delay", modifier.cooldown_mult], ["Speed", modifier.speed_mult], ["Size", modifier.radius_mult],
-			["Spread", modifier.spread_mult],
+			["Spread", modifier.spread_mult], ["Reach", modifier.reach_mult],
 		]
 		for pair: Array in mults:
 			if not is_equal_approx(float(pair[1]), 1.0):
@@ -1512,11 +1512,12 @@ func _strike_round(spell: CompiledSpell, tag: int, actor: int, at: Vector2, way:
 
 
 ## Wall: `shots` still shots in a line across `direction`, `spread` pixels apart (the shot's
-## diameter when the form has none), centred `SpellLimits.WALL_REACH` ahead of `origin` (homing
+## diameter when the form has none), centred `ray_length` (or `SpellLimits.WALL_REACH`) ahead of `origin` (homing
 ## moves the centre onto a target near it, `_homed_place`). A shot born in a wall is skipped.
 ## Shield charges apply, so `shield . wall` stops other teams' shots.
 func _launch_wall(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direction: Vector2, source: Node, lifetime: float, carried: int, prev: int) -> int:
-	var centre: Vector2 = _homed_place(spell, actor, tag, origin, projectiles.clip_to_walls(origin, origin + direction * SpellLimits.WALL_REACH))
+	var reach: float = spell.ray_length if spell.ray_length > 0.0 else SpellLimits.WALL_REACH
+	var centre: Vector2 = _homed_place(spell, actor, tag, origin, projectiles.clip_to_walls(origin, origin + direction * reach))
 	var across: Vector2 = direction.orthogonal()
 	var gap: float = spell.spread if spell.spread > 0.0 else spell.radius * 2.0
 	var made: int = 0

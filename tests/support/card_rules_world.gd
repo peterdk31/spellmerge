@@ -7,7 +7,7 @@ extends RefCounted
 ##
 ## Everything a player could see is written to `trace`, one line per thing, in order: every bus
 ## event that changes the game (hits with their whole profile, damage, heals, statuses, kills,
-## area hits, moves, spawns, blocks, deflects, pulls, possessions, refunds, zaps, expiries, walls
+## area hits, moves, shapes shown, spawns, blocks, deflects, pulls, possessions, refunds, zaps, expiries, walls
 ## met), and every SAMPLE_EVERY steps the live shots (who cast them, their spell node, place and
 ## size), the beams' points, the swings' sweep, the slams, and the actors' places and health when they
 ## changed. Looks (tint, particles, the cast flash) are left out: a card that only changes its look
@@ -383,6 +383,9 @@ func _listen() -> void:
 		_put("possess %s %s %s for %d ms" % [_who(caster), _who(target), _node(tag), roundi(seconds * 1000.0)]))
 	bus.discharge_arc.connect(func(caster: int, from: Vector2, to: Vector2) -> void:
 		_put("arc %s %s -> %s" % [_who(caster), _at(from), _at(to)]))
+	# A carrier's shape as a player sees it (a fissure's line is shown once; its tint and look are left out).
+	bus.form_shown.connect(func(caster: int, form: StringName, origin: Vector2, direction: Vector2, length: float, _tint: Color, _look: int) -> void:
+		_put("shown %s %s at %s to %s %d" % [_who(caster), form, _at(origin), _at(direction * 100.0), roundi(length)]))
 	bus.enemy_died.connect(func(killer: int, enemy: Node, at: Vector2) -> void:
 		_put("died %s by %s at %s" % [_name_of(enemy), _who(killer), _at(at)]))
 

@@ -62,6 +62,9 @@ func _compile(cards: Array[StringName]) -> CompiledStaff:
 
 
 func _expected(event: int, motion: int) -> bool:
+	# The retired slot (no card may use it) runs nothing.
+	if motion == M._UNUSED_10:
+		return false
 	match event:
 		E.HIT:
 			return HITTERS.has(motion)

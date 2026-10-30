@@ -14,7 +14,8 @@ var element_name: String = ""
 var modifier_ids: Array[StringName] = []
 var trigger_id: StringName = &""
 
-var damage: int = 1
+## Damage of one hit; may be below 1 (combat keeps each target's leftover, `Combat._whole`).
+var damage: float = 1.0
 var mana_cost: float = 0.0
 var cooldown: float = 0.5
 var speed: float = 0.0

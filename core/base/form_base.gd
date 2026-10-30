@@ -27,8 +27,9 @@ const POSE_RANGES: Dictionary = {
 }
 
 
-## Damage of one hit before the element and modifiers.
-@export var base_damage: int = 1
+## Damage of one hit before the element and modifiers. It may be below 1 (an atom's speck):
+## combat keeps what each target is owed and takes a whole point once it adds up.
+@export var base_damage: float = 1.0
 ## Mana taken per cast.
 @export var mana_cost: float = 0.0
 ## Seconds before the same player can cast this spell again. There is no separate cast
@@ -137,7 +138,7 @@ func carries_payload() -> bool:
 func ranges() -> Dictionary:
 	var limits: Dictionary = super()
 	limits.merge({
-		"base_damage": Vector2(1, 200),
+		"base_damage": Vector2(0.05, 200),
 		"mana_cost": Vector2(0.0, 100.0),
 		"cooldown": Vector2(0.05, 10.0),
 		"speed": Vector2(0.0, 2000.0),

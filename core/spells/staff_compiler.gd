@@ -411,7 +411,7 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 			ModifierBase.Behaviour.CHAIN:
 				spell.chain_jumps += int(modifier.behaviour_strength)
 	spell.look = _look_of(elements, modifiers)
-	spell.damage = maxi(roundi(damage), 1)
+	spell.damage = maxf(damage, SpellLimits.MIN_DAMAGE)
 	spell.mana_cost = mana
 	spell.cooldown = maxf(cooldown, 0.0)
 	spell.speed = speed
@@ -440,12 +440,12 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 		# Past 180 degrees it would be bending back the other way: that is all the way round.
 		spell.homing_angle = minf(rad_to_deg(spell.homing_turn * SpellLimits.INSTANT_HOMING_SECONDS), 180.0)
 	if heals:
-		spell.hit.heal = spell.damage
-		spell.hit.damage = maxi(roundi(float(spell.damage) * SpellLimits.HEAL_ENEMY_SHARE), 1)
+		spell.hit.heal = maxi(roundi(spell.damage), 1)
+		spell.hit.damage = maxf(spell.damage * SpellLimits.HEAL_ENEMY_SHARE, 1.0)
 	var heavy: float = spell.behaviour(ModifierBase.Behaviour.HEAVY)
 	if heavy > 0.0:
 		spell.hit.knockback *= heavy
-		spell.hit.slam = roundi(float(spell.damage) * SpellLimits.SLAM_SHARE)
+		spell.hit.slam = roundi(spell.damage * SpellLimits.SLAM_SHARE)
 	if spell.behaviour(ModifierBase.Behaviour.ECHO) > 0.0:
 		spell.echo_hit = spell.hit.scaled(SpellLimits.ECHO_DAMAGE, 1.0)
 	if spell.behaviour(ModifierBase.Behaviour.BLAST) > 0.0:

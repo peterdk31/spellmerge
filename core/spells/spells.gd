@@ -515,10 +515,10 @@ func _is_card(id: StringName) -> bool:
 static func _cast_damage(cast: CompiledCast) -> int:
 	if cast.group == null:
 		return 0
-	var total: int = 0
+	var total: float = 0.0
 	for spell in cast.group.spells:
-		total += spell.damage * maxi(spell.shots, 1) * Carriers.of(spell.carrier).hits_per_target(spell.lifetime)
-	return total * maxi(cast.group.repeats, 1)
+		total += spell.damage * float(maxi(spell.shots, 1) * Carriers.of(spell.carrier).hits_per_target(spell.lifetime))
+	return roundi(total * float(maxi(cast.group.repeats, 1)))
 
 
 ## What the builder shows of the component `id`: its name (the id when it has none, "" for
@@ -545,7 +545,7 @@ func component_stats(id: StringName) -> PackedStringArray:
 	if component is FormBase:
 		var form: FormBase = component
 		var hits: int = maxi(form.shots, 1) * Carriers.of(form.carrier).hits_per_target(form.lifetime)
-		out.append("Dmg %d" % form.base_damage if hits <= 1 else "Dmg %dx%d" % [form.base_damage, hits])
+		out.append("Dmg " + _short(form.base_damage) if hits <= 1 else "Dmg %sx%d" % [_short(form.base_damage), hits])
 		out.append("Mana " + _short(form.mana_cost))
 		out.append("Delay %ss" % _short(form.cooldown))
 	elif component is ModifierBase:

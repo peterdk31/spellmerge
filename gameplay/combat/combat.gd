@@ -174,6 +174,9 @@ var _seat_row: PackedInt32Array = PackedInt32Array()
 # The body: health (plain bodies only), its most, the damage of its touch, its hurt circle,
 # its push, and seconds before contact may hurt it again.
 var _health: PackedInt32Array = PackedInt32Array()
+# The part of a point of damage each body is owed by hits below a whole point (an atom's
+# speck, `_whole`).
+var _hit_carry: PackedFloat32Array = PackedFloat32Array()
 var _max_health: PackedInt32Array = PackedInt32Array()
 var _contact_damage: PackedInt32Array = PackedInt32Array()
 var _hurt_radius: PackedFloat32Array = PackedFloat32Array()
@@ -263,6 +266,7 @@ func _init() -> void:
 	_seat_row.fill(ActorsScript.NONE)
 	# (Packed arrays are values: each is resized by name.)
 	_health.resize(ACTORS)
+	_hit_carry.resize(ACTORS)
 	_max_health.resize(ACTORS)
 	_contact_damage.resize(ACTORS)
 	_burn_by.resize(ACTORS)
@@ -641,10 +645,12 @@ func hit(caster: int, target: Variant, amount: int, direction: Vector2 = Vector2
 ## One hit on the row `row` (see `hit`). A `quiet` hit (a burn tick) takes the whole pipeline,
 ## deaths included, but sends no event for an actor that survives, so Feel and the AI do not
 ## stutter, shake or flinch twice a second per burning actor; a status tick is no hit for a
-## barrier, a hex, a static charge or `actor_hurt`. Sets `_discharged`.
-func _hit(by: int, row: int, amount: int, direction: Vector2, strength: float, kind: StringName, profile: HitProfile, quiet: bool) -> bool:
+## barrier, a hex, a static charge or `actor_hurt`. `amount` may be below 1 (an atom's speck):
+## the body takes the whole points it is owed (`_whole`), and a hit that adds up to none yet still
+## lands (push, statuses, `hit_landed`, `actor_hurt`) but sends no `damage_dealt`. Sets `_discharged`.
+func _hit(by: int, row: int, amount: float, direction: Vector2, strength: float, kind: StringName, profile: HitProfile, quiet: bool) -> bool:
 	_discharged = false
-	if amount <= 0 or not _can_hurt(row):
+	if amount <= 0.0 or not _can_hurt(row):
 		return false
 	var node: Node2D = _nodes[row]
 	var where: Vector2 = _position_of(node)
@@ -663,7 +669,7 @@ func _hit(by: int, row: int, amount: int, direction: Vector2, strength: float, k
 	var centre: Vector2 = where + _hurt_offset[row]
 	if not tick:
 		if _hex_left[row] > 0.0:
-			amount += roundi(float(amount) * _hex_extra[row] / 100.0)
+			amount += amount * _hex_extra[row] / 100.0
 		# A charge goes off on any hit and is always spent (not by a discharge's own damage).
 		if _static_left[row] > 0.0 and not _discharging:
 			discharge_share = _static_share[row]
@@ -673,25 +679,47 @@ func _hit(by: int, row: int, amount: int, direction: Vector2, strength: float, k
 	_last_by[row] = by
 	_last_kind[row] = kind
 	_last_name[row] = profile.source_name if profile != null else ""
-	var left: int = _take(row, by, amount, quiet)
+	var whole: int = _whole(row, amount)
+	var left: int = _take(row, by, whole, quiet) if whole > 0 else _left(row)
 	# Nobody hears a quiet hit that does not kill (a wizard's went to it directly, `_take`).
 	if events != null and not (quiet and left != 0):
-		events.hit_landed.emit(by, node, amount, where, kind, _slot)
-		events.damage_dealt.emit(by, node, amount, where)
+		events.hit_landed.emit(by, node, whole, where, kind, _slot)
+		# Feel's flash, shake and sound and the damage numbers come with a whole point, so a
+		# stream of specks lands them only as often as it takes health.
+		if whole > 0:
+			events.damage_dealt.emit(by, node, whole, where)
 		if node is Actor:
 			# The actor's own listeners (its AI's grudge, its look's hurt pose) hear it directly.
-			(node as Actor).damaged.emit(by, amount)
+			(node as Actor).damaged.emit(by, whole)
 		# A burn tick is not a hit: cards that fire on hurt are not set off by it.
 		if not tick:
-			events.actor_hurt.emit(actor, amount, where, _tag, kind)
+			events.actor_hurt.emit(actor, whole, where, _tag, kind)
 	# A listener may have forgotten the body: it is not killed by Combat then.
 	if left == 0 and _same(row, node):
 		_die(row, by, where, team)
 	if discharge_share > 0.0:
 		# A charged actor is a lightning rod: the charge leaves in one step to the other teams near.
-		_discharge(actor, team, node, centre, maxi(roundi(float(amount) * discharge_share / 100.0), 1))
+		_discharge(actor, team, node, centre, maxi(roundi(amount * discharge_share / 100.0), 1))
 	_discharged = discharge_share > 0.0
 	return true
+
+
+## The whole points of `amount` the row `row` takes now: what it was owed before plus `amount`,
+## rounded down; the rest it is owed for the next hit (a 0.25 hit takes a point every fourth).
+func _whole(row: int, amount: float) -> int:
+	var owed: float = _hit_carry[row] + amount
+	# (A hair over, so 0.1 ten times is a point, whatever float rounding left.)
+	var whole: int = floori(owed + 0.0001)
+	_hit_carry[row] = maxf(owed - float(whole), 0.0)
+	return whole
+
+
+## The body's health now (-1 for a kit Actor with no Health), as `_take` would return it.
+func _left(row: int) -> int:
+	if _body[row] == BODY_ACTOR:
+		var kit: Actor = _nodes[row] as Actor
+		return kit.health.health if kit.health != null else -1
+	return _health[row]
 
 
 ## Take `amount` off the body's health; returns what is left (-1 for a kit Actor with no
@@ -784,7 +812,7 @@ func _apply_spell(by: int, row: int, position: Vector2, profile: HitProfile, kin
 		_heal(by, row, profile.heal)
 		return
 	var node: Node2D = _nodes[row]
-	var damage: int = profile.damage
+	var damage: float = profile.damage
 	var strength: float = profile.knockback
 	var direction: Vector2 = (_position_of(node) - position).normalized()
 	if _hex_left[row] > 0.0:
@@ -812,7 +840,7 @@ func _apply_spell(by: int, row: int, position: Vector2, profile: HitProfile, kin
 	if jump_share > 0.0:
 		var spell_tag: int = _tag
 		_tag = 0
-		_shock_jump(by, team, node, jump_from, roundi(float(damage) * jump_share / 100.0))
+		_shock_jump(by, team, node, jump_from, roundi(damage * jump_share / 100.0))
 		_tag = spell_tag
 	# (One reaction per hit on a target, but within a hit the chain goes on: `reacted` lets the
 	# next element read what is left.)
@@ -1374,6 +1402,7 @@ func _clear_state(row: int) -> void:
 	_burn_left[row] = 0.0
 	_burn_rate[row] = 0.0
 	_burn_carry[row] = 0.0
+	_hit_carry[row] = 0.0
 	_burn_by[row] = EventsScript.NO_PLAYER
 	_chill_left[row] = 0.0
 	_chill_slow[row] = 0.0

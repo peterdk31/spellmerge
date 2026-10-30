@@ -15,6 +15,9 @@ const ActorsScript := preload("res://core/actors/actors.gd")
 ## Staffs (A4): the numbers of a fallback, the hit made when cards land on the caster or on a
 ## payload's origin with no carrier (docs/milestones/M2-staffs.md, "Reading a staff").
 const FALLBACK_DAMAGE: float = 4.0
+## The least damage a compiled hit does (a card may go below 1, an atom's speck; combat keeps each
+## target's leftover and takes a whole point once it adds up), so every hit still counts.
+const MIN_DAMAGE: float = 0.01
 const FALLBACK_RADIUS: float = 8.0
 
 ## Engine pacing, never a limit (owner, 2026-10-29: interactions are not limited, they follow

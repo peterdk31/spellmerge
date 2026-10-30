@@ -21,7 +21,7 @@ const ActorSeats := preload("res://tests/support/actor_seats.gd")
 
 const STEP: float = 1.0 / 60.0
 ## Health of an imp, high enough that no combo kills it by accident.
-const IMP_HEALTH: int = 400
+const IMP_HEALTH: float = 400.0
 const IMP_RADIUS: float = 10.0
 ## Mana handed to every cast.
 const MANA: float = 100.0
@@ -98,7 +98,7 @@ func _init(root: Node) -> void:
 
 
 ## Puts an imp at `at`; it can be hurt and killed, and shots can hit it.
-func add_imp(at: Vector2, health: int = IMP_HEALTH) -> Node2D:
+func add_imp(at: Vector2, health: float = IMP_HEALTH) -> Node2D:
 	var imp := _own(Node2D.new()) as Node2D
 	_root.add_child(imp)
 	imp.global_position = at
@@ -213,8 +213,9 @@ func run(seconds: float) -> void:
 
 ## Health `imp` has lost (all of it once it is dead and gone).
 func lost(imp: Node2D) -> int:
-	var left: int = combat.health_of(imp) if is_instance_valid(imp) else -1
-	return IMP_HEALTH if left < 0 else IMP_HEALTH - left
+	var left: float = combat.health_of(imp) if is_instance_valid(imp) else -1.0
+	# Whole points: health is decimal, 7.5 lost is 7 (a hair over, for float sums of specks).
+	return roundi(IMP_HEALTH) if left < 0.0 else floori(IMP_HEALTH - left + 0.0001)
 
 
 ## True when `imp` has died (a spell's hit or anything else took all its health).

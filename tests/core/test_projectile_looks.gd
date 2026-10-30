@@ -184,6 +184,9 @@ func test_an_enemy_is_drawn_in_the_enemy_ramp() -> void:
 func test_shots_are_drawn_about_their_hit_size_in_whole_pixels() -> void:
 	check_equal(ManagerScript.look_size(5.0), 24.0, "a bolt (radius 5) has zoom 1: a 3 px core in a 10 px circle, in a quad 24 px across")
 	check_equal(ManagerScript.look_size(1.0), 24.0, "never below zoom 1")
+	check_equal(ManagerScript.look_core_zoom(1.5), 0, "a speck (an atom) tells its shaders zoom 0: a one-pixel core")
+	check_equal(ManagerScript.look_core_zoom(5.0), 1, "a bolt its own zoom")
+	check_equal(ManagerScript.look_red(1, 0), 1, "a speck's look still holds its ramp")
 	check_equal(ManagerScript.look_size(8.0), 48.0, "a bigger bolt (radius 8) has zoom 2")
 	check_equal(ManagerScript.look_size(14.0), 96.0, "a rune (radius 14) has zoom 4")
 	check_equal(ManagerScript.look_length(5.0), 72.0, "and 72 px long, for its tail")
@@ -341,6 +344,7 @@ func test_the_shader_holds_the_same_trail_numbers() -> void:
 	check(shader.code.contains("const float TF_ORBIT = %d.0;" % ManagerScript.TRAIL_ORBIT), "the same orbit flag")
 	check(shader.code.contains("const float TF_DASH = %d.0;" % ManagerScript.TRAIL_DASH), "the same dash flag")
 	check(shader.code.contains("const float TRAIL_LONGEST = %s;" % str(ManagerScript.TRAIL_KEEP)), "and a trail is drawn as long as it is kept")
+	check(shader.code.contains("const float TAIL_PIXELS = %d.0;" % ManagerScript.TRAIL_TAIL_PIXELS), "the same tail pixels")
 	check(ManagerScript.TRAIL_KEEP <= (ManagerScript.TRAIL_SAMPLES - 1) * ManagerScript.TRAIL_EVERY, "which the samples cover")
 	var orbit: Shader = load("res://core/projectiles/shot_orbit.gdshader")
 	check(orbit.code.contains("const float BEND_ZERO = %s;" % str(ManagerScript.BEND_ZERO)), "a familiar's bend code is the same")

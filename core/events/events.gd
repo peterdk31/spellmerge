@@ -107,7 +107,7 @@ signal reaction_triggered(caster: int, reaction_id: StringName, position: Vector
 ## Sender: combat. A discharge of the actor `caster` jumped from `from` (the body struck) to `to` (a body zapped), both in world pixels; one is sent for each body zapped, next to its `reaction_triggered` `discharge`. Heard by feel, which draws the arc.
 signal discharge_arc(caster: int, from: Vector2, to: Vector2)
 ## Sender: combat. The actor `caster` (or NO_PLAYER) dealt `amount` damage to `target`.
-signal damage_dealt(caster: int, target: Node, amount: int, position: Vector2)
+signal damage_dealt(caster: int, target: Node, amount: float, position: Vector2)
 ## Sender: combat. A status effect from the actor `caster` (or NO_PLAYER) was put on `target`.
 signal status_applied(caster: int, target: Node, status_id: StringName)
 ## Sender: combat. `enemy` died; the actor `killer` landed the last hit (or NO_PLAYER). `shot` is the projectile manager's row of the shot it is about (`Projectiles` slot), -1 for none (a ray, a strike, contact damage): read the shot from it while the event is sent.
@@ -118,7 +118,7 @@ signal shield_blocked(actor: int, position: Vector2, tag: int)
 ## Sender: combat. A hit of the actor `caster` with `tag` killed `target` at `position`. Heard by core/spells (on kill). `shot` is the projectile manager's row of the shot it is about (`Projectiles` slot), -1 for none (a ray, a strike, contact damage): read the shot from it while the event is sent.
 signal kill_landed(caster: int, target: Node, position: Vector2, tag: int, shot: int)
 ## Sender: combat. The actor `actor` took `amount` damage at `position` from a hit with `tag` (a spell's tag, whose `SpellTag.caster_of` is the actor that cast it; 0 for contact damage and a reaction's damage) of kind `kind` (`&"shot"`, `&"ray"`, `&"swing"`, `&"burst"`, `&"reaction"`, `&"status"`; a burn tick is not a hit, so it is not sent here). Heard by core/spells (on hurt: the hurt actor's own carriers fire).
-signal actor_hurt(actor: int, amount: int, position: Vector2, tag: int, kind: StringName)
+signal actor_hurt(actor: int, amount: float, position: Vector2, tag: int, kind: StringName)
 ## Sender: combat. A hit of the actor `caster` with `tag` on `target` at `position` set off the reaction `reaction_id`. Heard by core/spells (on reaction); feel keeps `reaction_triggered`. `shot` is the projectile manager's row of the shot it is about (`Projectiles` slot), -1 for none (a ray, a strike, contact damage): read the shot from it while the event is sent.
 signal reaction_landed(caster: int, reaction_id: StringName, target: Node, position: Vector2, tag: int, shot: int)
 ## Sender: core/spells. The actor `caster` gets a barrier of `charges` blocked hits for `seconds` (shield on a dash, a teleport or the caster); the card has `tag`. Heard by combat.
@@ -132,9 +132,9 @@ signal possess_started(caster: int, actor: int)
 ## Sender: actor. The possession of the actor `actor` by the controller whose home body is `caster` ended (time up, the actor down or dead, a newer possession); the actor has its own controller back. Heard by feel (a ring going out).
 signal possess_ended(caster: int, actor: int)
 ## Sender: combat. Just before `damage_dealt`: the hit of the actor `caster` on `target` for `amount` is of `kind` (`&"shot"`, `&"ray"`, `&"swing"`, `&"burst"`, `&"reaction"`, `&"status"`, and `&"heal"` for a heal). A wizard's contact hit counts as `&"shot"`. A wizard hit by their own spell has `caster` equal to their own actor id. Heard by feel. `shot` is the projectile manager's row of the shot it is about (`Projectiles` slot), -1 for none (a ray, a strike, contact damage): read the shot from it while the event is sent.
-signal hit_landed(caster: int, target: Node, amount: int, position: Vector2, kind: StringName, shot: int)
+signal hit_landed(caster: int, target: Node, amount: float, position: Vector2, kind: StringName, shot: int)
 ## Sender: combat. A heal hit of the actor `caster` gave the wizard `target` `amount` health at `position`. Heard by player and feel.
-signal heal_dealt(caster: int, target: Node, amount: int, position: Vector2)
+signal heal_dealt(caster: int, target: Node, amount: float, position: Vector2)
 
 # --- Players ----------------------------------------------------------------
 
@@ -145,7 +145,7 @@ signal player_revived(player: int, reviver: int)
 ## Sender: coop. `player` is downed and being revived: `progress` (0 to 1) is how far the hold has got. Sent when it changes (so every frame while a revive fills or drains); 0 means the revive stopped or is done.
 signal revive_progress(player: int, progress: float)
 ## Sender: player. The health or the whole-number mana of `player`'s own wizard changed (also while the seat drives another actor or an enemy drives the wizard), or the wizard appeared. Carries all the numbers so a listener never has to ask.
-signal player_stats_changed(player: int, health: int, max_health: int, mana: float, max_mana: float)
+signal player_stats_changed(player: int, health: float, max_health: float, mana: float, max_mana: float)
 ## Sender: coop. `player` joined the game.
 signal player_joined(player: int)
 ## Sender: coop. `player` left the game.

@@ -70,7 +70,7 @@ func before_each() -> void:
 		_fake.items[element] = load("res://content/spells/elements/%s/%s.tres" % [element, element])
 
 
-func _enemy(at: Vector2 = Vector2.ZERO, health: int = 100) -> Node2D:
+func _enemy(at: Vector2 = Vector2.ZERO, health: float = 100.0) -> Node2D:
 	var enemy := own(Node2D.new()) as Node2D
 	enemy.position = at
 	# Only nodes in the tree are on the manager's target grid.
@@ -80,7 +80,7 @@ func _enemy(at: Vector2 = Vector2.ZERO, health: int = 100) -> Node2D:
 
 
 ## A body of the wizards' team (an unseated actor of the test table) at `at`.
-func _foe(at: Vector2, health: int = 100) -> Node2D:
+func _foe(at: Vector2, health: float = 100.0) -> Node2D:
 	var body := own(TeamBody.new()) as TeamBody
 	body.actor_id = _actors.open(ActorSeats.ActorsScript.TEAM_WIZARDS, 0)
 	body.position = at
@@ -159,7 +159,7 @@ func test_a_shot_with_no_spell_does_nothing() -> void:
 func test_burn_deals_its_damage_over_time_to_the_player_who_set_it() -> void:
 	var enemy := _enemy()
 	_hit(2, enemy, _tag(2, &"fire"))
-	var before: int = _combat.health_of(enemy)
+	var before: float = _combat.health_of(enemy)
 	_run(1.0)
 	check_equal(before - _combat.health_of(enemy), 2, "2 damage per second")
 	_run(5.0)
@@ -183,7 +183,7 @@ func test_burning_again_refreshes_without_adding_up() -> void:
 	_run(1.0)
 	_combat.apply_status(0, enemy, &"burn", 2.0, 1.0)
 	check(_combat.status_left(enemy, &"burn") > 1.9, "the time was refreshed")
-	var before: int = _combat.health_of(enemy)
+	var before: float = _combat.health_of(enemy)
 	_run(1.0)
 	check_equal(before - _combat.health_of(enemy), 2, "the stronger burn kept its rate")
 
@@ -295,7 +295,7 @@ func test_statuses_stay_with_their_own_enemy_when_another_dies() -> void:
 	_combat.hit(0, first, 3)
 	check(_combat.has_status(second, &"hex") and _combat.has_status(second, &"burn"), "the survivor keeps both")
 	check(not _combat.has_status(first, &"hex"), "the dead enemy has none")
-	var before: int = _combat.health_of(second)
+	var before: float = _combat.health_of(second)
 	_run(1.0)
 	check_equal(before - _combat.health_of(second), 2, "the burn kept ticking on the right enemy")
 
@@ -366,8 +366,8 @@ func test_a_charged_enemy_discharges_to_every_actor_of_another_team_nearby() -> 
 	_combat.apply_status(0, kin, &"static", 5.0, 60.0)
 	_hit(1, struck, _tag(1, &""))
 	check_equal(_combat.health_of(struck), 96, "the hit itself did its damage")
-	check_equal(_combat.health_of(left), 98, "an actor of another team near took 60% of the hit")
-	check_equal(_combat.health_of(right), 98, "so did the other, whichever side it is on, charged or not")
+	check(is_equal_approx(_combat.health_of(left), 97.6), "an actor of another team near took 60% of the hit (2.4)")
+	check(is_equal_approx(_combat.health_of(right), 97.6), "so did the other, whichever side it is on, charged or not")
 	check_equal(_combat.health_of(kin), 100, "the struck enemy's own team is left alone, charged or not")
 	check_equal(_combat.health_of(far), 100, "and so is anyone out of reach")
 	check(not _combat.has_status(struck, &"static"), "the struck enemy spent its charge")
@@ -423,7 +423,7 @@ func test_a_discharge_is_one_step_not_a_second_jump() -> void:
 	_combat.apply_status(0, struck, &"static", 5.0, 60.0)
 	_combat.apply_status(0, near, &"static", 5.0, 60.0)
 	_hit(0, struck, _tag(0, &""))
-	check_equal(_combat.health_of(near), 98, "the near one was zapped")
+	check(is_equal_approx(_combat.health_of(near), 97.6), "the near one was zapped (60% of 4)")
 	check(_combat.has_status(near, &"static"), "and the zap did not set its own charge off")
 	check_equal(_combat.health_of(beyond), 100, "one in reach of the near one only is not: the discharge does not go on")
 
@@ -503,7 +503,7 @@ func test_a_lightning_hit_that_discharges_does_not_charge_the_struck_enemy_again
 	var other := _foe(Vector2(40.0, 0.0))
 	_combat.apply_status(0, struck, &"static", 5.0, 60.0)
 	_hit(0, struck, _tag(0, &"lightning"))
-	check_equal(_combat.health_of(other), 98, "it discharged")
+	check(is_equal_approx(_combat.health_of(other), 97.6), "it discharged (60% of 4)")
 	check(not _combat.has_status(struck, &"static"), "the discharge replaced the charge")
 
 

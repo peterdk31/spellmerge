@@ -930,14 +930,14 @@ func _refresh_preview() -> void:
 ## A staff view's numbers: the dearest cast's mana, the cycle's damage and time.
 func _numbers(plan: Dictionary) -> Dictionary:
 	var mana: float = 0.0
-	var damage: int = 0
+	var damage: float = 0.0
 	var seconds: float = 0.0
 	var casts: Variant = plan.get("casts", [])
 	if casts is Array:
 		for cast: Variant in casts:
 			if cast is Dictionary:
 				mana = maxf(mana, float((cast as Dictionary).get("mana", 0.0)))
-				damage += int((cast as Dictionary).get("damage", 0))
+				damage += float((cast as Dictionary).get("damage", 0.0))
 				seconds += float((cast as Dictionary).get("delay", 0.0))
 	return {"mana": mana, "damage": damage, "seconds": seconds}
 
@@ -949,13 +949,14 @@ func _percent(mana: float) -> int:
 
 func _number_lines(now: Dictionary, then: Dictionary) -> PackedStringArray:
 	var mana: String = "Mana %d%%%s" % [_percent(float(now["mana"])), "!" if _percent(float(now["mana"])) > 100 else ""]
-	var damage: String = "Dmg %d" % int(now["damage"])
+	# To a tenth: an atom's cast is 0.3.
+	var damage: String = "Dmg %s" % SpellsScript._short(snappedf(float(now["damage"]), 0.1))
 	var seconds: String = "Time %ss" % SpellsScript._short(float(now["seconds"]))
 	if not then.is_empty():
 		if _percent(float(then["mana"])) != _percent(float(now["mana"])):
 			mana += " > %d%%%s" % [_percent(float(then["mana"])), "!" if _percent(float(then["mana"])) > 100 else ""]
-		if int(then["damage"]) != int(now["damage"]):
-			damage += " > %d" % int(then["damage"])
+		if not is_equal_approx(snappedf(float(then["damage"]), 0.1), snappedf(float(now["damage"]), 0.1)):
+			damage += " > %s" % SpellsScript._short(snappedf(float(then["damage"]), 0.1))
 		if not is_equal_approx(float(then["seconds"]), float(now["seconds"])):
 			seconds += " > %ss" % SpellsScript._short(float(then["seconds"]))
 	return PackedStringArray([mana, damage, seconds])
@@ -1015,7 +1016,7 @@ func _on_build_refused(player: int, reason: String) -> void:
 		_say(reason)
 
 
-func _on_stats_changed(player: int, _health: int, _max_health: int, _mana: float, max_mana: float) -> void:
+func _on_stats_changed(player: int, _health: float, _max_health: float, _mana: float, max_mana: float) -> void:
 	if player == index and max_mana > 0.0 and not is_equal_approx(max_mana, _max_mana):
 		_max_mana = max_mana
 		_changed()

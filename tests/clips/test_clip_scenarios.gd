@@ -204,7 +204,7 @@ func test_the_relay_clips_show_the_bolt_reach_the_imp() -> void:
 			continue
 		var stage := StageScript.new(root, _registry)
 		check(stage.start(scenario), "%s builds on the stage" % id)
-		var first_health: int = stage.combat.health_of(stage.imps[0])
+		var first_health: float = stage.combat.health_of(stage.imps[0])
 		for i in int(float(scenario["seconds"]) * 60.0):
 			stage.tick()
 		check(stage.combat.health_of(stage.imps[0]) < first_health, "%s: the bolt that passed the teammate hurts the imp" % id)

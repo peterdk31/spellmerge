@@ -1,11 +1,11 @@
 # Carriers
 
-A carrier is what a form card fires: a bolt, a rune, a beam, a dash, a decoy and so on. The carrier
+A carrier is what a form card fires: an atom (the Atom, Bolt and Nova cards), a rune, a beam, a dash, a decoy and so on. The carrier
 is the important part of a cast. **Each carrier decides for itself what it does with every other
 card on it, both in what the card does and in how it looks**, and it has to decide every one:
 there is no default.
 
-The code is in `core/spells/carriers/`: one script per carrier (`bolt.gd`, `beam.gd`,
+The code is in `core/spells/carriers/`: one script per carrier (`atom.gd`, `beam.gd`,
 `decoy.gd`...) on the base `Carrier` (`carrier.gd`). A carrier is known by its name: a form card
 says `carrier = &"beam"`, and `Carriers.of(&"beam")` (`carriers.gd`) finds it. Carriers are never
 numbered, so adding or removing one never touches another card's file.
@@ -74,14 +74,14 @@ to its carrier. Nothing in `spells.gd` asks which carrier a spell has or names o
 
 | Hook | Default | Overridden by |
 | --- | --- | --- |
-| `launch` | a fan (or ring) of `spell.shots`, each made by `shoot` | dash and teleport (a move, `CarrierMove`), rain (marks its aim point and lands later, `land`), wall (one solid line), bolt (adds the nova's ring) |
+| `launch` | a fan (or ring) of `spell.shots`, each made by `shoot` | dash and teleport (a move, `CarrierMove`), rain (marks its aim point and lands later, `land`), wall (one solid line), atom (adds the nova's ring) |
 | `shoot` | a shot flying along its heading | rune (still, placed ahead), orbit (on its circle), beam, swing, slam (a row of their own), decoy and familiar (a body, `CarrierEntity`) |
 | `on_hit` | nothing | hook (pulls its caster), swap (trades places) |
 | `on_move_end` | nothing | teleport (strikes where it lands) |
 | `step` | nothing | dash (strikes what it passes), beam, swing, slam (their rows) |
 | `end_of`, `end_actor`, `clear`, `reset_actor` | nothing | dash, teleport, beam, swing, slam, decoy, familiar (what they keep) |
 | `switch_off` | nothing | beam, swing (end), decoy, familiar (asked to end): a held carrier switched off |
-| `reach_of` | 0 | bolt, beam, swing, slam, rain (for an enemy's telegraph) |
+| `reach_of` | 0 | atom, beam, swing, slam, rain (for an enemy's telegraph) |
 | `tip_of` | INF | beam, swing: where a row is, for a `timer` or `on hurt` on it (`LC_ROW`) |
 
 Carriers that share a mechanism share a base or a kit: dash and teleport extend `CarrierMove` (the

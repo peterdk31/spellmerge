@@ -43,6 +43,8 @@ func _initialize() -> void:
 	_test_homing_turns_toward_a_target()
 	_test_a_homing_shot_homes_after_it_bounces()
 	_test_homing_rules()
+	_test_homing_turns_on_the_same_curve_at_any_speed()
+	_test_a_guard_meets_a_small_fast_shot_between_steps()
 	_test_a_homing_still_shot_creeps_toward_its_target()
 	_test_homing_skips_its_own_wizard_and_the_target_just_hit()
 	_test_homing_checks_every_fourth_step()
@@ -332,6 +334,41 @@ func _test_homing_turns_toward_a_target() -> void:
 	for _i in 120:
 		_mgr.step(DT)
 	_check(_hits.is_empty(), "the same shot without homing misses")
+
+
+## Homing is a curve, not a rate (the owner, 2026-10-30: "it should just work at all speeds"): a
+## shot on a curve of 50 px turns its speed / 50 radians a second, whatever its speed, and keeps
+## that curve when its speed changes later.
+func _test_homing_turns_on_the_same_curve_at_any_speed() -> void:
+	for pace: float in [100.0, 1100.0]:
+		_setup()
+		_target(Vector2(100.0, 400.0), 8.0)
+		var slot: int = _mgr.spawn(0, Vector2(0.0, 100.0), Vector2(pace, 0.0), 5.0, 2.0)
+		_check(_mgr.set_homing_curve(slot, 50.0, 400.0), "a shot of %d px/s takes a curve" % pace)
+		for _i in 4:
+			_mgr.step(DT)
+		# Turned on its search step and after: at most the angle of its path on that curve.
+		var turned: float = (_mgr._vel[slot] as Vector2).angle()
+		var most: float = pace * 4.0 * DT / 50.0
+		_check(turned > 0.0 and turned <= most * 1.01, "at %d px/s it turned %f rad, the curve allows %f" % [pace, turned, most])
+	_setup()
+	var shot: int = _mgr.spawn(0, Vector2.ZERO, Vector2(200.0, 0.0), 5.0, 2.0)
+	_mgr.set_homing(shot, 4.0, 100.0)
+	_check(is_equal_approx(_mgr._turn[shot], 4.0 / 200.0), "a rate is taken as the curve it gives at the shot's speed then")
+
+
+## A swing's or beam's guard tests a shot along its last step, not only where it is now: an atom
+## (1.5 px, 1100 px/s, 18 px a step) crossing a beam's line or a swing's slice between two steps is
+## met (it slipped past both before).
+func _test_a_guard_meets_a_small_fast_shot_between_steps() -> void:
+	_setup()
+	var guard: int = _table.open(ActorSeats.ActorsScript.TEAM_ENEMIES, ActorSeats.ActorsScript.RAMP_ENEMY)
+	var slot: int = _mgr.spawn(0, Vector2.ZERO, Vector2(1100.0, 0.0), 1.0, 1.5)
+	_mgr.step(DT)
+	_check((_mgr.get_position_of(slot) as Vector2).x > 15.0, "the atom went past the line in one step")
+	_check(_mgr.shots_on_segment(guard, Vector2(9.0, -50.0), Vector2(9.0, 50.0), 1.0) == 1, "a beam's line it crossed meets it")
+	_check(_mgr.shots_in_wedge(guard, Vector2(9.0, -20.0), Vector2.DOWN, 1, -0.3, 0.3, 24.0) == 1, "and so does a swing's slice it crossed")
+	_check(_mgr.shots_on_segment(guard, Vector2(-9.0, -50.0), Vector2(-9.0, 50.0), 1.0) == 0, "a line behind where it came from does not")
 
 
 func _test_homing_rules() -> void:

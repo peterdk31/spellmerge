@@ -21,7 +21,7 @@ const FeelScript := preload("res://gameplay/feel/feel.gd")
 const ActorSeats := preload("res://tests/support/actor_seats.gd")
 
 const STEP: float = 1.0 / 60.0
-const IMP_HEALTH: int = 400
+const IMP_HEALTH: float = 400.0
 const IMP_RADIUS: float = 10.0
 const MANA: float = 100.0
 ## Feel's hit sprays are CPU particles, which simulate by the real time of each frame, so two

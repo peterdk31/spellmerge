@@ -139,7 +139,7 @@ func _profile(tag: int, damage: int, knockback: float = 0.0) -> void:
 	_spells.get("_profiles")[tag] = spell
 
 
-func _enemy(health: int, at: Vector2 = Vector2.ZERO, contact: int = 0) -> Node2D:
+func _enemy(health: float, at: Vector2 = Vector2.ZERO, contact: int = 0) -> Node2D:
 	var enemy := Node2D.new()
 	enemy.position = at
 	_enemies.append(enemy)
@@ -285,7 +285,7 @@ func _test_contact_damage_and_cooldown() -> void:
 	_run(int(CombatScript.CONTACT_COOLDOWN / STEP))
 	_check(_players[0].health.health == _players[0].health.max_health - 4, "a second hit after the cooldown")
 	enemy.position += Vector2(500.0, 0.0)
-	var before: int = _players[0].health.health
+	var before: float = _players[0].health.health
 	_run(int(CombatScript.CONTACT_COOLDOWN / STEP) + 1)
 	_check(_players[0].health.health == before, "an enemy out of reach does nothing")
 
@@ -295,8 +295,8 @@ func _test_contact_hurts_only_the_one_touched() -> void:
 	_enemy(10, _players[2].position, 1)
 	_run(1)
 	for index in 4:
-		var expected: int = _players[index].health.max_health - (1 if index == 2 else 0)
-		_check(_players[index].health.health == expected, "player %d health is %d" % [index, expected])
+		var expected: float = _players[index].health.max_health - (1.0 if index == 2 else 0.0)
+		_check(_players[index].health.health == expected, "player %d health is %s" % [index, expected])
 
 
 func _test_four_players_kill_credit() -> void:

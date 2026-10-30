@@ -106,6 +106,35 @@ func test_a_deflecting_swing_bats_a_bolt_into_the_imp_behind_its_shooter() -> vo
 	check_equal(_lost_behind(["swing"], Vector2(60.0, 0.0), Vector2(150.0, 0.0)), 0, "a plain swing sends nothing back")
 
 
+## Every step of its sweep a swing's whole arc parries, a step of each shot's way ahead too (the
+## owner, 2026-10-30): an atom (1.5 px, 1100 px/s) crosses the swing's reach in a step or two and
+## the blade is in its arc only a step or so, so it was met now and then; now it is batted back
+## whenever it reaches the wizard during the sweep (0.12 s to 0.18 s), and hits during the wind-up.
+func test_a_deflecting_swing_bats_an_atom_coming_in_at_any_moment_of_its_sweep() -> void:
+	var missed: PackedStringArray = PackedStringArray()
+	for n in 8:
+		# When the atom would reach the wizard's body (radius 10, at the hand).
+		var at: float = 0.135 + 0.006 * n
+		if _atom_batted(at) != 1:
+			missed.append("%.3f" % at)
+	check(missed.is_empty(), "an atom reaching the wizard during the sweep is batted back (missed at %s s)" % ", ".join(missed))
+	check_equal(_atom_batted(0.09), 0, "one that comes during the wind-up still hits")
+
+
+## Shots a casting `deflect · swing` turns when an atom reaches the wizard's body at `at` seconds.
+func _atom_batted(at: float) -> int:
+	var arena := ArenaScript.new(root)
+	arena.add_guard(0, Vector2.ZERO)
+	var enemy: int = ActorSeats.enemy(arena.projectiles.actors)
+	arena.install_cards(0, 0, ["deflect", "swing"])
+	arena.cast(0, 0)
+	arena.projectiles.spawn(enemy, Vector2(11.5 + 1100.0 * at, 0.0), Vector2(-1100.0, 0.0), 1.0, 1.5, ManagerScript.LAYER_PLAYER)
+	arena.run(0.4)
+	var batted: int = arena.deflects.size()
+	arena.free_all()
+	return batted
+
+
 func test_a_deflected_shot_is_faster() -> void:
 	var arena := ArenaScript.new(root)
 	var enemy: int = ActorSeats.enemy(arena.projectiles.actors)

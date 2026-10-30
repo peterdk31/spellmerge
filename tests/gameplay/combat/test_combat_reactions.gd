@@ -71,7 +71,7 @@ func before_each() -> void:
 		_fake.items[element] = load("res://content/spells/elements/%s/%s.tres" % [element, element])
 
 
-func _enemy(at: Vector2 = Vector2.ZERO, health: int = 100) -> Node2D:
+func _enemy(at: Vector2 = Vector2.ZERO, health: float = 100.0) -> Node2D:
 	var enemy := own(Node2D.new()) as Node2D
 	enemy.position = at
 	root.add_child(enemy)
@@ -80,7 +80,7 @@ func _enemy(at: Vector2 = Vector2.ZERO, health: int = 100) -> Node2D:
 
 
 ## A body of the wizards' team (an unseated actor of the test table) at `at`.
-func _foe(at: Vector2, health: int = 100) -> Node2D:
+func _foe(at: Vector2, health: float = 100.0) -> Node2D:
 	var body := own(TeamBody.new()) as TeamBody
 	body.actor_id = _actors.open(ActorSeats.ActorsScript.TEAM_WIZARDS, 0)
 	body.position = at
@@ -224,7 +224,9 @@ func test_flare_on_a_shocked_enemy_hit_by_fire() -> void:
 	_combat.apply_status(0, enemy, &"shock", 4.0, 0.0001)
 	_hit(0, enemy, &"fire")
 	check(_ids().has(&"flare"), "fire on shock flares")
-	check_equal(_combat.health_of(wide), 98 - 1, "the burst plus the shock's one-point jump (the jump is at least 1)")
+	# Health is decimal (2026-10-30): the jump is its share of the hit, here a hair, no longer at
+	# least a point.
+	check(absf(_combat.health_of(wide) - 98.0) < 0.001, "the burst plus the shock's tiny jump (%s)" % _combat.health_of(wide))
 
 
 # --- Kindle: fire and void, spread ---
@@ -296,7 +298,7 @@ func test_stillness_the_other_way_lengthens_and_strengthens_hex() -> void:
 	check_equal(_ids(), [&"stillness"], "frost on hex")
 	check_equal(_combat.status_left(enemy, &"hex"), 6.0, "two seconds longer")
 	check(not _combat.has_status(enemy, &"chill"), "and no chill went on")
-	var before: int = _combat.health_of(enemy)
+	var before: float = _combat.health_of(enemy)
 	_combat.hit(0, enemy, 20)
 	check_equal(before - _combat.health_of(enemy), 20 + 10, "hex now adds 50 per cent (25 plus 25)")
 
@@ -313,7 +315,7 @@ func test_rift_bursts_and_pulls_toward_the_centre() -> void:
 	check_equal(_ids(), [&"rift"], "rift fired")
 	# The burst's 2, and the shock's own jump of at least 1 to the nearest enemy (the hit
 	# spends the shock before the reaction runs, so rift only adds the burst).
-	check_equal(_combat.health_of(near), 100 - 2 - 1, "the neighbour takes the burst and the jump")
+	check(absf(_combat.health_of(near) - 98.0) < 0.001, "the neighbour takes the burst and the jump, its tiny share (%s)" % _combat.health_of(near))
 	check(_combat.knockback_of(near).x < 0.0, "and is pulled toward the centre")
 	check_equal(_combat.health_of(outside), 100, "out of reach is untouched")
 
@@ -447,7 +449,7 @@ func test_twenty_stillness_hits_on_hex_stay_under_the_caps() -> void:
 		_hit(0, enemy, &"frost")
 		_run(CombatScript.REACTION_WAIT + STEP)
 	check(_combat.status_left(enemy, &"hex") <= CombatScript.MAX_EXTENDED_TIME, "hex time under its cap")
-	var before: int = _combat.health_of(enemy)
+	var before: float = _combat.health_of(enemy)
 	_combat.hit(0, enemy, 100)
 	check(before - _combat.health_of(enemy) <= 100 + 100, "hex adds at most 100 per cent")
 
@@ -530,8 +532,8 @@ func test_fire_on_a_charged_enemy_discharges_and_then_bursts() -> void:
 	check_equal(ids.size(), 2, "two reactions, no more: the discharge does not start another")
 	check(ids.has(CombatScript.DISCHARGE) and ids.has(&"overload"), "the discharge and the overload both fired")
 	check_equal(arcs.size(), 1, "one arc, to the one neighbour of another team")
-	# The discharge is 60% of the 4 damage (2); the burst is 4.
-	check_equal(_combat.health_of(near), 100 - 2 - 4, "the neighbour takes the discharge and the burst")
+	# The discharge is 60% of the 4 damage (2.4); the burst is 4.
+	check(is_equal_approx(_combat.health_of(near), 100.0 - 2.4 - 4.0), "the neighbour takes the discharge and the burst (%s)" % _combat.health_of(near))
 	check_equal(_combat.health_of(enemy), 100 - BOLT - 4, "the struck enemy takes its hit and the burst, not the discharge")
 
 

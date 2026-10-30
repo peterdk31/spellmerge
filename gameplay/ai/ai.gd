@@ -245,7 +245,7 @@ func _pace(actor: Actor) -> float:
 
 
 ## Someone hurt the actor it drives: an actor of its own team (not itself) earns a grudge.
-func _on_damaged(caster: int, _amount: int) -> void:
+func _on_damaged(caster: int, _amount: float) -> void:
 	if _actor == null or caster < 0 or caster == _actor.id or _actor.actors == null:
 		return
 	if _actor.actors.team_of(caster) != _actor.team():

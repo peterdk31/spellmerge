@@ -167,7 +167,7 @@ func test_a_homing_dash_turns_toward_an_enemy_and_goes_its_whole_distance() -> v
 	var homing: Actor = _wizard(1)
 	homing.aim = Vector2.RIGHT
 	var dash_homing: Homing = CarrierDash.of(_world.spells).move_homing(homing.id)
-	dash_homing.turn = 3.0
+	dash_homing.curve = 73.0
 	dash_homing.reach = 160.0
 	_ask(plain, &"dash", Vector2(55.0, 0.0), 0.25)
 	_ask(homing, &"dash", Vector2(55.0, 0.0), 0.25)

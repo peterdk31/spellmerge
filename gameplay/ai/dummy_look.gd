@@ -45,12 +45,12 @@ const STATUSES: Array[StringName] = [
 ]
 
 ## Damage taken since this dummy stood up.
-var total_damage: int = 0
+var total_damage: float = 0.0
 
-var _buckets: PackedInt32Array = PackedInt32Array()
+var _buckets: PackedFloat64Array = PackedFloat64Array()
 var _bucket: int = 0
 ## Health in Combat at the last step (-1 for not known yet).
-var _health: int = -1
+var _health: float = -1.0
 var _bucket_left: float = 0.0
 ## Seconds since the first hit of the streak, or -1 with no streak.
 var _streak: float = -1.0
@@ -72,7 +72,7 @@ var _next_number: int = 0
 func setup(owner_actor: Actor) -> void:
 	super.setup(owner_actor)
 	_buckets.resize(DPS_BUCKETS)
-	_buckets.fill(0)
+	_buckets.fill(0.0)
 	_bucket_left = DPS_WINDOW / float(DPS_BUCKETS)
 	_number_template.visible = false
 	for i in NUMBER_COUNT:
@@ -86,7 +86,7 @@ func setup(owner_actor: Actor) -> void:
 	_number_x.resize(NUMBER_COUNT)
 	_number_x.fill(0.0)
 	# Combat registers the actor with its full health once it is in the tree (the Hurtbox).
-	_health = actor.health.max_health if actor.health != null else -1
+	_health = actor.health.max_health if actor.health != null else -1.0
 	if actor.events != null:
 		actor.events.damage_dealt.connect(_on_damage_dealt)
 		actor.events.reaction_triggered.connect(_on_reaction_triggered)
@@ -126,10 +126,10 @@ func step(delta: float) -> void:
 func dps() -> float:
 	if _streak < 0.0:
 		return 0.0
-	var sum: int = 0
-	for amount: int in _buckets:
+	var sum: float = 0.0
+	for amount: float in _buckets:
 		sum += amount
-	return float(sum) / clampf(_streak, 1.0, DPS_WINDOW)
+	return sum / clampf(_streak, 1.0, DPS_WINDOW)
 
 
 ## The status line: the statuses on the dummy and the last reaction, or "" for none.
@@ -162,12 +162,12 @@ func _show() -> void:
 func _take_health() -> void:
 	if actor.combat == null:
 		return
-	var health: int = actor.combat.health_of(actor)
-	if health < 0:
+	var health: float = actor.combat.health_of(actor)
+	if health < 0.0:
 		return
-	var taken: int = _health - health if _health >= 0 else 0
+	var taken: float = _health - health if _health >= 0.0 else 0.0
 	_health = health
-	if taken <= 0:
+	if taken <= 0.0:
 		return
 	total_damage += taken
 	_buckets[_bucket] += taken
@@ -176,13 +176,14 @@ func _take_health() -> void:
 	_quiet = 0.0
 
 
-func _on_damage_dealt(_caster: int, target: Node, amount: int, _position: Vector2) -> void:
-	if target != actor or amount <= 0:
+func _on_damage_dealt(_caster: int, target: Node, amount: float, _position: Vector2) -> void:
+	if target != actor or amount <= 0.0:
 		return
 	var label: Label = _numbers[_next_number]
 	_number_left[_next_number] = NUMBER_TIME
 	_number_x[_next_number] = NUMBER_SPREAD * float(_next_number % 3 - 1)
-	label.text = str(amount)
+	# To a tenth: an atom's speck shows 0.3, a bolt 5.
+	label.text = ("%.1f" % amount).trim_suffix(".0")
 	label.position = NUMBER_START + Vector2(_number_x[_next_number], 0.0)
 	label.modulate.a = 1.0
 	label.visible = true

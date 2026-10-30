@@ -224,7 +224,7 @@ func test_zaps_keep_to_the_clock() -> void:
 	_cast()
 	_tick(121)
 	var zaps: int = _hits_on(imp).size()
-	check(zaps >= 3 and zaps <= 5, "a rune zapping twice a second for 2 s zaps about 4 times (%d)" % zaps)
+	check(zaps >= 4 and zaps <= 5, "a rune zapping at once, then twice a second for 2 s, zaps about 5 times (%d)" % zaps)
 
 
 func test_a_zap_sets_off_on_hit() -> void:
@@ -232,7 +232,8 @@ func test_a_zap_sets_off_on_hit() -> void:
 	var imp: Node2D = _target(Vector2(0.0, 40.0))
 	_build(0, [&"arc", &"on_hit", &"rune", &"nova"])
 	_cast()
-	_tick(60)
+	# Its first zap is at once; the next would come at 0.5 s.
+	_tick(25)
 	var novas: int = 0
 	for row: Array in _ended:
 		var spell: CompiledSpell = _spells._profiles.get(row[2])

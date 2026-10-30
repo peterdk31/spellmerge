@@ -293,7 +293,7 @@ func test_an_enemys_bolt_hits_another_enemy_in_its_way() -> void:
 	_wizard.position = Vector2(80.0, 0.0)
 	var blocker := _enemy(_data([&"bolt"]), Vector2(40.0, 0.0))
 	blocker.caster.mana = 0.0
-	var health: int = _combat.health_of(blocker)
+	var health: float = _combat.health_of(blocker)
 	_run(_ai(caster).windup_time + 0.5)
 	check(_combat.health_of(blocker) < health, "the enemy in the way is hit")
 	check(_combat.health_of(caster) == ImpData.max_health, "the caster is never hit by its own bolt")

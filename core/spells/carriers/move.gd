@@ -42,7 +42,8 @@ func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, directi
 			_move_body(spell, tag, actor, origin, way, offset, seconds, chain, prev)
 			kit.moves().shield(spell, tag, actor, -1, seconds)
 		return 1
-	var turn: float = spell.homing_turn if spell.homing_range > 0.0 else 0.0
+	# The move turns on the homing curve at its own speed.
+	var turn: float = offset.length() / seconds / spell.homing_curve if spell.homing_range > 0.0 and spell.homing_curve > 0.0 and seconds > 0.0 else 0.0
 	if not kit.projectiles.move_shot(shot, offset, seconds, turn, spell.homing_range):
 		return 0
 	kit.moves().shield(spell, tag, actor, shot, seconds)

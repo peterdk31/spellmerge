@@ -4,8 +4,8 @@ extends RefCounted
 ## `gameplay/combat`: the numbers it needs and nothing else, so combat reads no spell
 ## field. One object per compiled spell, shared and read-only: no hit allocates.
 
-## Damage of one hit.
-var damage: int = 1
+## Damage of one hit; may be below 1 (health is decimal: an atom's speck takes 0.3).
+var damage: float = 1.0
 ## Knockback strength of one hit, in pixels per second.
 var knockback: float = 0.0
 ## The element's id, or `&""` for plain arcane damage.
@@ -43,12 +43,12 @@ func copy() -> HitProfile:
 	return scaled(1.0, 1.0)
 
 
-## This hit at `share` of its strength (an echo, an arc zap): damage (at least 1), heal and slam
+## This hit at `share` of its strength (an echo, an arc zap): damage, heal and slam
 ## scaled, knockback by `knock_share`, and the rest (elements, statuses, kind) all kept, so a scaled
 ## hit is the same hit, weaker: an echoed mend still heals, an echoed heavy hit still slams.
 func scaled(share: float, knock_share: float) -> HitProfile:
 	var made: HitProfile = HitProfile.new()
-	made.damage = damage if share == 1.0 else maxi(roundi(float(damage) * share), 1)
+	made.damage = damage * share
 	made.heal = heal if share == 1.0 else roundi(float(heal) * share)
 	made.slam = slam if share == 1.0 else roundi(float(slam) * share)
 	made.knockback = knockback * knock_share

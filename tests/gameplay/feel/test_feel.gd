@@ -301,7 +301,7 @@ func _test_feel_never_changes_damage() -> void:
 		combat.register_actor(enemy, 10, 10.0, 0)
 		for player in 4:
 			combat.hit(player, enemy, 2)
-		var health: int = combat.health_of(enemy)
+		var health: float = combat.health_of(enemy)
 		results.append([damage, deaths, health])
 		if _feel != null:
 			_feel.step(STEP)

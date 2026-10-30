@@ -95,7 +95,7 @@ func _seat(wizard: Actor) -> int:
 
 
 ## The health of player `index`'s wizard.
-func _health(index: int) -> int:
+func _health(index: int) -> float:
 	return _wizard(index).health.health
 
 
@@ -604,7 +604,7 @@ func _test_a_wizards_bolt_hits_a_teammate() -> void:
 	_projectiles.step(0.1)
 	_check(_health(0) == _wizard(0).health.max_health, "the shooter is never hit by its own shot")
 	_check(_health(2) == _wizard(2).health.max_health, "a wizard off the line of fire is untouched")
-	_check(_health(1) == _wizard(1).health.max_health - SHOT_DAMAGE, "the teammate is hurt, health %d" % _health(1))
+	_check(_health(1) == _wizard(1).health.max_health - SHOT_DAMAGE, "the teammate is hurt, health %s" % _health(1))
 	_check(_projectiles.get_count() == 0, "the shot ended on the hit")
 	# An enemy shot hurts players as ever.
 	_projectiles.clear()

@@ -52,7 +52,7 @@ func _teardown() -> void:
 func _setup(count: int) -> void:
 	_teardown()
 	_world = Fixture.new(root, true)
-	_world.bus.player_stats_changed.connect(func(p: int, h: int, mh: int, m: float, mm: float) -> void:
+	_world.bus.player_stats_changed.connect(func(p: int, h: float, mh: float, m: float, mm: float) -> void:
 		_stats.append([p, h, mh, m, mm]))
 	for index in count:
 		_players.append(_world.wizard(index, Vector2(40.0 * index, 0.0)))

@@ -1,6 +1,6 @@
 class_name Carriers
 extends RefCounted
-## Finds each carrier by its id (`Carrier.id`, the `carrier` a form card names: &"bolt", &"beam"...).
+## Finds each carrier by its id (`Carrier.id`, the `carrier` a form card names: &"atom", &"beam"...).
 ## `of` answers the compiler and anything that reads a carrier's tables; the spell runtime makes its
 ## own set with `make_all` and binds them, since a carrier with rows of its own (a beam, a swing, a
 ## slam) keeps them per runtime. A carrier is named, never numbered, and found by its script, so

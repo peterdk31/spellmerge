@@ -7,5 +7,5 @@
 script = ExtResource("1_base")
 id = &"training_dummy"
 demo = true
-max_health = 1000000000
+max_health = 1000000000.0
 scene = ExtResource("2_scene")

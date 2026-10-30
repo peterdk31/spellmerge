@@ -173,8 +173,8 @@ var _seat_row: PackedInt32Array = PackedInt32Array()
 
 # The body: health (plain bodies only), its most, the damage of its touch, its hurt circle,
 # its push, and seconds before contact may hurt it again.
-var _health: PackedInt32Array = PackedInt32Array()
-var _max_health: PackedInt32Array = PackedInt32Array()
+var _health: PackedFloat64Array = PackedFloat64Array()
+var _max_health: PackedFloat64Array = PackedFloat64Array()
 var _contact_damage: PackedInt32Array = PackedInt32Array()
 var _hurt_radius: PackedFloat32Array = PackedFloat32Array()
 var _hurt_offset: PackedVector2Array = PackedVector2Array()
@@ -351,9 +351,9 @@ func _physics_process(delta: float) -> void:
 ## does `contact_damage` to other teams. `health` is used only by a body without the kit (a kit
 ## Actor's is its Health). Returns the actor id its row is kept under (see the top), or
 ## Actors.NONE when it could not be registered. Registering again resets its numbers.
-func register_actor(actor: Node2D, health: int = 1, radius: float = 8.0, contact_damage: int = 0, offset: Vector2 = Vector2.ZERO) -> int:
+func register_actor(actor: Node2D, health: float = 1.0, radius: float = 8.0, contact_damage: int = 0, offset: Vector2 = Vector2.ZERO) -> int:
 	var body: int = BODY_ACTOR if actor is Actor else BODY_PLAIN
-	return _register(actor, body, maxi(health, 1), radius, contact_damage, offset, ActorsScript.NONE, ActorsScript.TEAM_ENEMIES, ActorsScript.RAMP_ENEMY, ActorsScript.NONE)
+	return _register(actor, body, maxf(health, Health.EMPTY), radius, contact_damage, offset, ActorsScript.NONE, ActorsScript.TEAM_ENEMIES, ActorsScript.RAMP_ENEMY, ActorsScript.NONE)
 
 
 ## Forget `actor` (an id or its node) without killing it (no event).
@@ -378,15 +378,15 @@ func actor_count() -> int:
 	return _live.size()
 
 
-## Health left of `actor`, or -1 if it is not registered (or dead).
-func health_of(actor: Variant) -> int:
+## Health left of `actor` (parts of a point too), or -1 if it is not registered (or dead).
+func health_of(actor: Variant) -> float:
 	var row: int = _row_of(actor)
 	if row == ActorsScript.NONE:
-		return -1
+		return -1.0
 	match _body[row]:
 		BODY_ACTOR:
 			var kit: Actor = _nodes[row] as Actor
-			return kit.health.health if kit.health != null else -1
+			return kit.health.health if kit.health != null else -1.0
 	return _health[row]
 
 
@@ -631,7 +631,7 @@ func home_actor_of(seat: int) -> int:
 ## counted (`damage_dealt` was sent). A hit on an unknown body, a dead or down one, a protected
 ## one, or for 0 or less does nothing; a barrier takes it whole (false).
 ## `kind` is the hit kind (`KIND_*`), told to Feel by `hit_landed`.
-func hit(caster: int, target: Variant, amount: int, direction: Vector2 = Vector2.ZERO, strength: float = 0.0, kind: StringName = KIND_SHOT) -> bool:
+func hit(caster: int, target: Variant, amount: float, direction: Vector2 = Vector2.ZERO, strength: float = 0.0, kind: StringName = KIND_SHOT) -> bool:
 	var row: int = _row_of(target)
 	if row == ActorsScript.NONE:
 		return false
@@ -641,10 +641,11 @@ func hit(caster: int, target: Variant, amount: int, direction: Vector2 = Vector2
 ## One hit on the row `row` (see `hit`). A `quiet` hit (a burn tick) takes the whole pipeline,
 ## deaths included, but sends no event for an actor that survives, so Feel and the AI do not
 ## stutter, shake or flinch twice a second per burning actor; a status tick is no hit for a
-## barrier, a hex, a static charge or `actor_hurt`. Sets `_discharged`.
-func _hit(by: int, row: int, amount: int, direction: Vector2, strength: float, kind: StringName, profile: HitProfile, quiet: bool) -> bool:
+## barrier, a hex, a static charge or `actor_hurt`. `amount` may be part of a point (an atom's
+## speck takes 0.3 health). Sets `_discharged`.
+func _hit(by: int, row: int, amount: float, direction: Vector2, strength: float, kind: StringName, profile: HitProfile, quiet: bool) -> bool:
 	_discharged = false
-	if amount <= 0 or not _can_hurt(row):
+	if amount <= 0.0 or not _can_hurt(row):
 		return false
 	var node: Node2D = _nodes[row]
 	var where: Vector2 = _position_of(node)
@@ -663,7 +664,7 @@ func _hit(by: int, row: int, amount: int, direction: Vector2, strength: float, k
 	var centre: Vector2 = where + _hurt_offset[row]
 	if not tick:
 		if _hex_left[row] > 0.0:
-			amount += roundi(float(amount) * _hex_extra[row] / 100.0)
+			amount += amount * _hex_extra[row] / 100.0
 		# A charge goes off on any hit and is always spent (not by a discharge's own damage).
 		if _static_left[row] > 0.0 and not _discharging:
 			discharge_share = _static_share[row]
@@ -673,9 +674,9 @@ func _hit(by: int, row: int, amount: int, direction: Vector2, strength: float, k
 	_last_by[row] = by
 	_last_kind[row] = kind
 	_last_name[row] = profile.source_name if profile != null else ""
-	var left: int = _take(row, by, amount, quiet)
+	var left: float = _take(row, by, amount, quiet)
 	# Nobody hears a quiet hit that does not kill (a wizard's went to it directly, `_take`).
-	if events != null and not (quiet and left != 0):
+	if events != null and not (quiet and left != 0.0):
 		events.hit_landed.emit(by, node, amount, where, kind, _slot)
 		events.damage_dealt.emit(by, node, amount, where)
 		if node is Actor:
@@ -685,26 +686,28 @@ func _hit(by: int, row: int, amount: int, direction: Vector2, strength: float, k
 		if not tick:
 			events.actor_hurt.emit(actor, amount, where, _tag, kind)
 	# A listener may have forgotten the body: it is not killed by Combat then.
-	if left == 0 and _same(row, node):
+	if left == 0.0 and _same(row, node):
 		_die(row, by, where, team)
 	if discharge_share > 0.0:
 		# A charged actor is a lightning rod: the charge leaves in one step to the other teams near.
-		_discharge(actor, team, node, centre, maxi(roundi(float(amount) * discharge_share / 100.0), 1))
+		_discharge(actor, team, node, centre, amount * discharge_share / 100.0)
 	_discharged = discharge_share > 0.0
 	return true
 
 
 ## Take `amount` off the body's health; returns what is left (-1 for a kit Actor with no
 ## Health, which never dies of hits).
-func _take(row: int, by: int, amount: int, quiet: bool) -> int:
+func _take(row: int, by: int, amount: float, quiet: bool) -> float:
 	match _body[row]:
 		BODY_ACTOR:
 			var kit: Actor = _nodes[row] as Actor
 			if kit.health == null:
-				return -1
+				return -1.0
 			kit.health.take(amount, by)
 			return kit.health.health
-	_health[row] = maxi(_health[row] - amount, 0)
+	_health[row] = maxf(_health[row] - amount, 0.0)
+	if _health[row] < Health.EMPTY:
+		_health[row] = 0.0
 	return _health[row]
 
 
@@ -735,8 +738,8 @@ func _die(row: int, by: int, where: Vector2, team: int) -> void:
 
 ## A heal hit: `amount` health for the row `row` from `by`'s spell. A down or dead actor is not
 ## healed. A wizard's own code adds it (`heal_dealt`).
-func _heal(by: int, row: int, amount: int) -> bool:
-	if amount <= 0 or not _can_heal(row):
+func _heal(by: int, row: int, amount: float) -> bool:
+	if amount <= 0.0 or not _can_heal(row):
 		return false
 	var node: Node2D = _nodes[row]
 	match _body[row]:
@@ -745,7 +748,7 @@ func _heal(by: int, row: int, amount: int) -> bool:
 			if kit.health != null:
 				kit.health.heal(amount)
 		BODY_PLAIN:
-			_health[row] = mini(_health[row] + amount, _max_health[row])
+			_health[row] = minf(_health[row] + amount, _max_health[row])
 	var where: Vector2 = _position_of(node)
 	if events != null:
 		events.hit_landed.emit(by, node, amount, where, KIND_HEAL, _slot)
@@ -784,7 +787,7 @@ func _apply_spell(by: int, row: int, position: Vector2, profile: HitProfile, kin
 		_heal(by, row, profile.heal)
 		return
 	var node: Node2D = _nodes[row]
-	var damage: int = profile.damage
+	var damage: float = profile.damage
 	var strength: float = profile.knockback
 	var direction: Vector2 = (_position_of(node) - position).normalized()
 	if _hex_left[row] > 0.0:
@@ -812,7 +815,7 @@ func _apply_spell(by: int, row: int, position: Vector2, profile: HitProfile, kin
 	if jump_share > 0.0:
 		var spell_tag: int = _tag
 		_tag = 0
-		_shock_jump(by, team, node, jump_from, roundi(float(damage) * jump_share / 100.0))
+		_shock_jump(by, team, node, jump_from, damage * jump_share / 100.0)
 		_tag = spell_tag
 	# (One reaction per hit on a target, but within a hit the chain goes on: `reacted` lets the
 	# next element read what is left.)
@@ -850,8 +853,8 @@ func _heals(by: int, row: int) -> bool:
 
 
 ## The spell hit on `node` (of `team`) jumps from `from` to the nearest other actor of that team
-## in reach, for `amount` (at least 1). The jump pushes nothing and puts on no status.
-func _shock_jump(by: int, team: int, node: Node2D, from: Vector2, amount: int) -> void:
+## in reach, for `amount`. The jump pushes nothing and puts on no status.
+func _shock_jump(by: int, team: int, node: Node2D, from: Vector2, amount: float) -> void:
 	if projectiles == null:
 		return
 	var near: Array[Node2D] = _take_scratch()
@@ -870,14 +873,14 @@ func _shock_jump(by: int, team: int, node: Node2D, from: Vector2, amount: int) -
 			best = other
 	_give_scratch()
 	if best != ActorsScript.NONE:
-		_hit(by, best, maxi(amount, 1), Vector2.ZERO, 0.0, KIND_SHOT, null, false)
+		_hit(by, best, amount, Vector2.ZERO, 0.0, KIND_SHOT, null, false)
 
 
 ## A charged actor (`actor`, of `team`, the body `victim`) was hit: every actor of another team
 ## within STATIC_RANGE of `from` takes `amount`, credited to the charged actor, and
 ## `reaction_triggered(actor, &"discharge", ...)` and `discharge_arc(actor, from, to)` are sent for
 ## each. One step: the damage sets off nothing else (`_discharging`), and is no spell's kill.
-func _discharge(actor: int, team: int, victim: Node2D, from: Vector2, amount: int) -> void:
+func _discharge(actor: int, team: int, victim: Node2D, from: Vector2, amount: float) -> void:
 	if projectiles == null or _discharging:
 		return
 	_discharging = true
@@ -953,7 +956,7 @@ func _react(by: int, row: int, reaction: ReactionRow) -> void:
 	_tag = 0
 	match reaction.effect:
 		ReactionRow.Effect.CONSUME:
-			var amount: int = reaction.damage
+			var amount: float = reaction.damage
 			if _freeze_left[row] > 0.0:
 				amount *= FROZEN_BONUS
 				_remove_status(row, CHILL)
@@ -1283,7 +1286,7 @@ func _send_touches() -> void:
 ## Register `node` as a body of kind `body` (see `register_actor`). Its row is its own actor id;
 ## else `fallback` (an id the caller found for it); else one Combat opens with `team`, `ramp`
 ## and `seat`. Returns the row, or NONE.
-func _register(node: Node2D, body: int, health: int, radius: float, contact: int, offset: Vector2, fallback: int, team: int, ramp: int, seat: int) -> int:
+func _register(node: Node2D, body: int, health: float, radius: float, contact: int, offset: Vector2, fallback: int, team: int, ramp: int, seat: int) -> int:
 	if node == null or not is_instance_valid(node):
 		return ActorsScript.NONE
 	var row: int = _row_of_node(node)

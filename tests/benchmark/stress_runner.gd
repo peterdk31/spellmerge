@@ -84,7 +84,7 @@ const HORDE: Array[int] = [4, 5]
 const WARM_UP: float = 3.0
 const MEASURE: float = 10.0
 ## Health of a stress enemy (the game's imp has 20), so the crowd lasts.
-const ENEMY_HEALTH: int = 120
+const ENEMY_HEALTH: float = 120.0
 ## A horde swarmer: the imp's body with no staff, a little faster, hurting by touch.
 const SWARM_SPEED: float = 55.0
 const SWARM_CONTACT: int = 3

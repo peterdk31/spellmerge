@@ -1,4 +1,4 @@
-# Horde swarm: 500+ enemies at 60 FPS (draft, for the owner)
+# Horde swarm: 500+ enemies at 60 FPS
 
 Part of [horde.md](horde.md). H1 measured that the horde cannot go past about 200–250 enemies on desktop (80–100 on web) at 60 FPS while every enemy is a full actor: at 600 one physics step costs about 31 ms against 16.7 allowed. This document proposes **the swarm**, a cheaper body for the horde's touch-only enemies, so the horde reaches 500+. It changes nothing for wizards, staff enemies or any other mode, and it lives with the horde, so it is removed with it.
 
@@ -9,11 +9,11 @@ Part of [horde.md](horde.md). H1 measured that the horde cannot go past about 20
 | Looks (`CreatureLook`, `Face`) | 6.5 | a node tree and scripts drawing | **gone:** one MultiMesh draws every swarmer |
 | AI `think` | 6.0 | a controller each | **gone:** one shared chase step |
 | Mover and `move_and_slide` | 3.2 | a physics body each | **gone:** one step moves every swarmer, walls as the arena's rect plus a coarse grid, spacing by a spatial hash |
-| Projectile target grid | 5.0 | a hurt circle each | stays (every swarmer can still be hit by everything); a later pass can make it cheaper |
+| Projectile target grid | 5.0 | a hurt circle each | stays (every swarmer can still be hit by everything), made cheaper in S5 |
 | Combat | 1.7 | a row each | stays as it is |
 | Spells and the rest | ~8 | | unchanged |
 
-Expected at 600: about 12–15 ms per step on desktop. Web runs scripts about two to three times slower, so web's realistic swarm is about 250–300. Both are estimates; the stress run decides (S4).
+Expected at 600: about 12–15 ms per step on desktop before S5. **Target (owner, 2026-10-31: aim higher):** 1,000 on desktop and 500 on web, measured by the stress run (S4); the caps are set to what it holds.
 
 ## The idea: a light node per swarmer, everything else in rows
 
@@ -21,7 +21,7 @@ Every rule in the game finds a body by its node: shots hit target nodes, `strike
 
 - **Combat:** each swarmer is registered as a **plain body** (Combat's `BODY_PLAIN`, which exists for bodies without the actor kit): health, hurt circle, touch damage and team in Combat's rows; it opens the actor id. So every hit, status, reaction, shock jump, static, hex, pull, barrier and touch rule applies to a swarmer exactly as to any actor (the rules pass: one rule, no special cases).
 - **The swarm** (`gameplay/horde/swarm.gd`, owned by the director): packed arrays by swarm row: node, actor id, kind, velocity, target, flash time, animation phase. One `step(delta)` for all: chase the nearest wizard (target grid query staggered as the AI does), times `Combat.pace` (chill and freeze), plus `consume_knockback`, spacing from a spatial hash so they do not stack, stopped by the arena's walls; then writes each node's `position`. Nothing is allocated per step.
-- **The look:** one `MultiMeshInstance2D` per swarmer kind: per instance a transform and custom data (hit flash, facing, frame). Hit flash from `damage_dealt` (one bus listener for the whole swarm, row found by node in a dictionary). Statuses keep their look from Feel, which draws by node position as for any body.
+- **The look: identical to a full enemy** (owner, 2026-10-31: a simpler look is not fine). Drawn in batches, one `MultiMeshInstance2D` per layer and kind (body, eyes, brows), with per-instance transform and custom data and a small shader that picks the atlas frame, but showing everything a full stray shows: CreatureLook's hop while walking and bob while standing, the hurt pose for HURT_TIME, Feel's hit flash and squash, and the whole `Face` (eyes in the nine look directions and the blink, brows by mood: worried on a hit, the stray's own idle habits from a per-row seed, the follow-through lag of eyes and brows behind the body). The rules are the same numbers as `creature_look.gd`, `face.gd` and Feel's (read from their constants, not copied), so a change there changes both. Statuses keep their look from Feel, which draws by node position as for any body. **Parity test:** a full `crypt_mite` and a swarm `crypt_mite` play the same scripted second (walk, stop, a hit, a status) side by side and their frames are compared pixel for pixel, within a small tolerance.
 - **Death:** Combat kills a plain body as any other (`enemy_died`, then frees the node); the swarm drops the row when the node leaves (row found by node; O(1) swap-remove).
 - **Kinds:** `crypt_mite` and `bone_husk` get a `swarm: true` flag in their EnemyBase (or a small `SwarmKind` resource next to them): the director spawns a kind with that flag into the swarm, and everything else as a full actor, as now.
 
@@ -34,14 +34,18 @@ Some cards act on what only a full actor has: `possess` takes over a body's cont
 | # | Part | Paths | Delivers |
 |---|---|---|---|
 | S1 | **The swarm step** | `gameplay/horde/swarm.gd`, tests | Rows, chase, pace, knockback, spacing, walls, plain-body registration, death clean-up |
-| S2 | **The swarm look** | `gameplay/horde/swarm_look.gd`, the swarmers' art | MultiMesh per kind, hit flash, facing, a two-frame walk in the art |
+| S2 | **The swarm look** | `gameplay/horde/swarm_look.gd`, its shader | Batched body, eyes and brows per kind with every pose, flash, squash and face habit of a full enemy; the parity test |
 | S3 | **Promotion** | `gameplay/horde/` | Possess (and any later actor-only rule) promotes a swarmer; card-rules case |
-| S4 | **Scale and caps** | `tests/benchmark/`, the curve | The horde stress scenarios on the swarm; the caps raised to what holds 60 FPS (target 600 desktop, 300 web) |
-| S5 | *(if S4 asks)* **Cheaper targets** | `core/projectiles` | The target grid's per-target cost |
+| S4 | **Scale and caps** | `tests/benchmark/`, the curve | The horde stress scenarios on the swarm; the caps raised to what holds 60 FPS (target 1,000 desktop, 500 web) |
+| S5 | **Cheaper targets** | `core/projectiles` | The target grid's per-target cost, measured before and after; no rule changes |
 
-S1 and S2 can be built in parallel (S2 reads the rows S1 defines); S3 after S1; S4 last.
+S1, S2 and S5 are built in parallel (S2 reads the rows S1 defines, below); S3 after S1; S4 last.
 
-## Questions for the owner
+## The rows S1 gives S2
 
-1. Is a swarmer that looks simpler than a full enemy fine (no separate face, a two-frame walk in its sprite)?
-2. Web target: is about 300 on web acceptable, with 600 on desktop?
+`Swarm` (in `swarm.gd`) keeps, by row 0 to `count - 1` (packed arrays, rows swap-removed on death): `nodes` (the bare Node2D), `kinds` (index into `kinds_list`, each a `SwarmKind`: enemy id, the full scene to promote to, the body texture and the stray face style read from that scene), `positions`, `velocities`, `aims` (the look direction), `seeds` (per-row, for idle habits), `hurt_left` (seconds of the hurt pose left, set on `damage_dealt`), `down` (never true for a swarmer today), and `moved` (the step after which the look reads them). The look never writes them.
+
+## Owner answers (2026-10-31)
+
+1. A simpler look is not fine: swarmers look exactly like full enemies.
+2. Aim higher than 600 desktop / 300 web; the measurement decides.

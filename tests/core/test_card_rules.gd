@@ -232,7 +232,7 @@ static func reach(form: FormBase) -> float:
 	match form.motion:
 		FormBase.Motion.STRAIGHT, FormBase.Motion.HOOK, FormBase.Motion.SWAP:
 			return minf(form.speed * form.lifetime * 0.5, 90.0)
-		FormBase.Motion.RAY, FormBase.Motion.FISSURE:
+		FormBase.Motion.RAY:
 			return minf(form.ray_length * 0.5, 90.0)
 		FormBase.Motion.SWING:
 			return form.ray_length * 0.75
@@ -581,7 +581,7 @@ func _run(cards: Array[StringName], form: FormBase, scene: Dictionary, seconds: 
 		# A carrier that leans back first (a swing) is cast that much sooner.
 		world.press_when_shot_within(r + SHOT_NEAR + form.wind_up * _shot.speed)
 	elif scene.get("donor", false):
-		# The donor casts first, so a carrier that hits at once (a fissure) finds what it cast.
+		# The donor casts first, so a carrier that hits at once finds what it cast.
 		world.at_step[2] = [world.press]
 	else:
 		world.press(scene.get("repeat", false))

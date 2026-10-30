@@ -2,6 +2,12 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-30: Fissure removed (owner)
+
+- **The fissure carrier is gone** (owner, 2026-10-30): the card, its icon and lore, its runtime cases (the fissure launch, the held fissure as a beam, `PIERCE_ALL` and `_ray_pierce`: a ray's pierce is now just its card's), its compiler cases (`StaffCompiler.rays` was only beam and fissure: inlined as `RAY`) and its tests. A beam does what it did.
+- **Its two combos keep their idea on a beam:** `beam_fire_line` (pierce · fire · beam burns both imps on its line) and `beam_hit_nova` (on hit · beam · frost · nova).
+- **`FormBase.Motion` keeps slot 10** as `_UNUSED_10` so the numbers stored in every other carrier's `.tres` keep their meaning; a card that uses it fails `range_problems`.
+
 ## 2026-10-29: Card rules R4b, a wasted card is checked too (owner)
 
 - **A W cell is played with the card forced on** (owner item 22): the card rules test failed only on a card that does nothing unlisted, not on a card listed as wasted that would work (slam's was found by hand). Now every W cell also runs with the card kept, and a different trace fails the test. Still auto-discovering, no new job.

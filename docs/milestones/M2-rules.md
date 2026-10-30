@@ -60,6 +60,8 @@ Since R3 the live matrix is printed by `tests/core/test_card_rules.gd` (✓ work
 
 ✓ works · W listed as wasted · ✗ silently ignored or special-cased · (n) the finding.
 
+Fissure removed 2026-10-30 (owner): its column below is history.
+
 | | Bolt | Rune | Orbit | Beam | Dash | Telep | Hook | Swap | Wall | Rain | Fiss | Decoy | Famil |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | homing | ✓ | W | W | ✓ | ✓ | ✓ | ✓ | ✓ | W | W | W | W | W |
@@ -84,17 +86,17 @@ Since R3 the live matrix is printed by `tests/core/test_card_rules.gd` (✓ work
 
 **Triggers (R2b, what the runtime does today; timer and on hurt after R4d):** `StaffCompiler.trigger_runs` and `trigger_why_not`. ✓ fires · W listed as wasted with its payload · s only with a shield or deflect on the carrier (a dash's or teleport's is a barrier on the wizard) · b only with a blast, whose area hit carries the carrier's tag. On reaction also needs an infusion or relay, and on wall is wasted on a ghost shot. Every W is a cell for R4.
 
-| | Bolt | Rune | Orbit | Beam | Dash | Telep | Hook | Swap | Wall | Rain | Fiss | Decoy | Famil | Swing |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| on hit | ✓ | ✓ | ✓ | ✓ | W | W | ✓ | ✓ | ✓ | ✓ | ✓ | W | W | ✓ |
-| on expire | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| timer | ✓ | ✓ | ✓ | ✓ | ✓ | W | ✓ | ✓ | ✓ | ✓ | W | ✓ | ✓ | ✓ |
-| on block | s | s | s | s | s | s | s | s | s | W | s | s | W | s |
-| on kill | ✓ | ✓ | ✓ | ✓ | b | b | ✓ | ✓ | ✓ | ✓ | ✓ | b | b | ✓ |
-| on cast | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| on wall | ✓ | W | W | ✓ | W | W | ✓ | ✓ | W | W | ✓ | W | W | W |
-| on hurt | ✓ | ✓ | ✓ | ✓ | ✓ | W | ✓ | ✓ | ✓ | ✓ | W | ✓ | ✓ | ✓ |
-| on reaction | ✓ | ✓ | ✓ | ✓ | b | b | ✓ | ✓ | ✓ | ✓ | ✓ | b | b | ✓ |
+| | Bolt | Rune | Orbit | Beam | Dash | Telep | Hook | Swap | Wall | Rain | Decoy | Famil | Swing |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| on hit | ✓ | ✓ | ✓ | ✓ | W | W | ✓ | ✓ | ✓ | ✓ | W | W | ✓ |
+| on expire | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| timer | ✓ | ✓ | ✓ | ✓ | ✓ | W | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| on block | s | s | s | s | s | s | s | s | s | W | s | W | s |
+| on kill | ✓ | ✓ | ✓ | ✓ | b | b | ✓ | ✓ | ✓ | ✓ | b | b | ✓ |
+| on cast | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| on wall | ✓ | W | W | ✓ | W | W | ✓ | ✓ | W | W | W | W | W |
+| on hurt | ✓ | ✓ | ✓ | ✓ | ✓ | W | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| on reaction | ✓ | ✓ | ✓ | ✓ | b | b | ✓ | ✓ | ✓ | ✓ | b | b | ✓ |
 
 The melee carriers (swing, slam) arrived on main after the audit: R2 and R3 cover them like the rest.
 
@@ -158,6 +160,7 @@ The owner re-decides these under the new rule; each "yes, it should work" become
 - **R4h travel (done 2026-10-29):** every shot a carrier makes gets every travel card, and the shot takes what it can do: growth grows a rune (its trigger circle), an orbit's and a wall's shots; on an orbit, linger stops the circling, spiral weaves its radius and sticky takes the shot that hits off its circle onto the target. Still wasted: bounce and return on all three (they do not fly), homing on an orbit (R4i), ghost on an orbit (it passes walls already), linger, spiral and sticky on a rune and a wall (they do not move).
 - **R4i homing on placed carriers (done 2026-10-30):** a homing rune creeps toward its target at `SpellLimits.HOMING_DRIFT` (24 px/s, below the slowest walker), with a bolt's pick and reach, and stays put with nothing in reach: one line in `_pass_homing` (a shot with no speed drifts). A rain's and a wall's aim point moves onto a target within the card's reach of it (`Spells._homed_place`, the one homing search); the wall's shots then keep still. Homing is still wasted on an orbit (it circles its caster: nothing to aim), a fissure, a swing, a slam, a decoy and a familiar.
 - **R4f (rays) done:** a beam's chain jump pierces as the beam does, a fissure's everything (item 13); relay on a beam and a fissure, from the actors its line hits, for every hit after while it is on (15); ghost on a beam and a fissure, magnet, growth and spiral on a beam (20). Linger, sticky and return stay wasted on both, magnet, growth and spiral on a fissure (DECISIONS.md, "Card rules R4f").
+- **F7, fissure removed (owner, 2026-10-30):** the fissure carrier is gone (card, combos, runtime cases, tests); its column left the trigger table. `FormBase.Motion` keeps slot 10 unused so stored numbers keep their meaning.
 - **R4g, bodies and mirror (done, owner decisions 2026-10-29):** a rain strikes every body within `RAIN_SPLASH` of where it lands with its own hit and cards (infusions, heavy, chain, siphon, possess, on hit, on kill, on reaction), then drops its payload. A familiar hands its infusions and hit cards to every carrier it casts (compiled in, costs included; wasted when nothing it casts takes them on). A decoy with a shield stops the other teams' shots that reach it, one charge each; with deflect it turns them; each is a block (`on block`). Mirror is one rule: the carrier fired again with its aim reversed, on every carrier but dash and teleport (wasted: "a move and its mirror cancel"); the allow-list in `_fire_spell` and the MIRROR rows of `behaviour_waste` are gone but for the moves. Left for the owner: a rune, decoy or familiar is made at the caster, so its mirror lands on the same spot; two hook pulls on the wizard replace each other (the mover's rule), they do not add.
 
 ## Notes for the sessions

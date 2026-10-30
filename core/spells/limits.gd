@@ -135,5 +135,5 @@ const ORBIT_TURN: float = 3.0
 ## Pixels a payload fired when a shot expires starts back along its path, so a shot that
 ## ended on a wall fires in front of it.
 const EXPIRE_BACKOFF: float = 2.0
-## Seconds the hit of a fallback lasts (it is an instant area hit; the shot fields need a value).
+## Seconds the hit of a fallback lasts (it is an instant strike; the shot fields need a value).
 const MIN_LIFETIME: float = 0.05

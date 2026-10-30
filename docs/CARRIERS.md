@@ -42,8 +42,8 @@ E.BLOCK:  {"any": MEETS_SHOTS, "cards": [B.SHIELD, B.DEFLECT]},
 E.WALL:   {"any": FLIES | LINE, "not_cards": [B.GHOST]},
 ```
 
-A need may also name cards: `"or_cards"` stand in for the traits (a blast's area hit carries the
-carrier's tag), `"cards"` must be on the carrier (or an infusion, where `"or_infused"`), and
+A need may also name cards: `"or_cards"` stand in for the traits (what a blast strikes is the
+carrier's hit, rules R4 F2), `"cards"` must be on the carrier (or an infusion, where `"or_infused"`), and
 `"not_cards"` stop it where they work. The compiler has no case per behaviour or trigger.
 
 From those two the compiler works out, every time a staff is built, whether a card does anything

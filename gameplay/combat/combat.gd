@@ -73,8 +73,8 @@ const STATIC: StringName = &"static"
 ## The id a discharge is announced with on `reaction_triggered`, at each actor it hits.
 const DISCHARGE: StringName = &"discharge"
 
-## The kinds of a hit (M2-staffs.md, "Self-harm and hits"). A shot, beam or swing of a spell, an
-## area hit (a slam's ring), a reaction's damage, damage over time, and a heal.
+## The kinds of a hit (M2-staffs.md, "Self-harm and hits"). A shot, beam or swing of a spell, a
+## slam's ring (`burst`), a reaction's damage, damage over time, and a heal.
 const KIND_SHOT: StringName = &"shot"
 const KIND_RAY: StringName = &"ray"
 const KIND_SWING: StringName = &"swing"
@@ -243,7 +243,7 @@ var _touch_amount: PackedInt32Array = PackedInt32Array()
 var _victims: PackedInt32Array = PackedInt32Array()
 var _victim_team: PackedInt32Array = PackedInt32Array()
 var _toucher_teams: int = 0
-# Scratch lists for grid queries, one per nesting depth (a hit inside a burst inside an area hit
+# Scratch lists for grid queries, one per nesting depth (a hit set off by another hit's burst
 # gets its own), so nothing is allocated once the deepest nesting was seen.
 var _pool: Array = []
 var _pool_depth: int = 0

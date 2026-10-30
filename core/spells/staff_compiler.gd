@@ -432,7 +432,7 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 	spell.hit.later_status_ids = later_ids
 	spell.hit.later_status_durations = later_durations
 	spell.hit.later_status_strengths = later_strengths
-	# A swing's sweep, a slam's shockwave (an area hit's kind), a beam's or a rain's ray.
+	# A swing's sweep, a slam's shockwave (`burst`), a beam's or a rain's ray.
 	if carrier.hit_kind() != &"":
 		spell.hit.kind = carrier.hit_kind()
 	if spell.homing_turn > 0.0:

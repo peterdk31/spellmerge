@@ -732,8 +732,8 @@ func generations_held(actor: int, slot: int) -> int:
 
 
 ## What one hit of a shot with `tag` does, or null when the tag is no spell's (a shot of no staff)
-## or its generation is gone. `shot` is the shot that hit (the event's `shot`; -1 for a ray or an
-## area hit). Shared and read-only; allocates nothing.
+## or its generation is gone. `shot` is the shot that hit (the event's `shot`; -1 for a ray or a
+## strike). Shared and read-only; allocates nothing.
 func hit_profile(tag: int, shot: int = -1) -> HitProfile:
 	var spell: CompiledSpell = _profiles.get(tag)
 	if spell == null:
@@ -1046,7 +1046,7 @@ func _apply_shield(slot: int, spell: CompiledSpell) -> void:
 ## made (a fallback counts as one). The carriers of one group leave along the same aim (only the
 ## staff's `spread` sets them apart, shot by shot); a scatter group sends each in a random
 ## direction instead. A burst group fires again `repeats - 1` times, `repeat_interval` seconds
-## apart (at once when that is 0), reading nothing again. A fallback asks for an area hit on the
+## apart (at once when that is 0), reading nothing again. A fallback strikes everything on the
 ## spot: the caster's for a cast, the payload's origin for a payload. `source` is the target that
 ## fired the payload, or null. `from_caster` is true for the cast's own group, whose later
 ## firings (burst, echo) start from where the caster has moved to.

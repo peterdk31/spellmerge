@@ -114,7 +114,14 @@ class SetPoses:
 	func staff_pose_dir(actor: int) -> Vector2:
 		return _part(actor, 0, Vector2.ZERO)
 
-	## Part `n` of the pose a test set for `actor` ([dir, pose, glow, stretch, mood, glow tint]), or `none`.
+	func staff_land(actor: int) -> float:
+		return _part(actor, 6, 0.0)
+
+	func staff_land_point(actor: int) -> Vector2:
+		return _part(actor, 7, Vector2.INF)
+
+	## Part `n` of the pose a test set for `actor` ([dir, pose, glow, stretch, mood, glow tint,
+	## land, land point]), or `none`.
 	func _part(actor: int, n: int, none: Variant) -> Variant:
 		var set_poses: Dictionary = fake.get("staff_poses")
 		return set_poses[actor][n] if set_poses.has(actor) and set_poses[actor].size() > n else none

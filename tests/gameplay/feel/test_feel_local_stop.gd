@@ -94,6 +94,35 @@ func test_a_held_actor_does_nothing_and_the_others_step_on() -> void:
 	check_equal(held.intent.pressed_bits, 0, "then it steps again")
 
 
+func test_a_held_actors_looks_show_the_moment_it_was_stopped_then_hold_still() -> void:
+	# What holds it (a hit, a slam's impact) comes after its own step, so the stop must show that
+	# moment: its looks step once, with no time passing, then not again until it runs on.
+	var held: Actor = _body(Vector2.ZERO)
+	var probe := StepProbe.new()
+	held.add_look(probe)
+	held.step(0.0625)
+	check_equal(probe.steps, [0.0625], "a free actor's looks step with it")
+	_world.table.hold(held.id, 0.125)
+	held.step(0.0625)
+	check_equal(probe.steps, [0.0625, 0.0], "held, they catch up once with no time")
+	held.step(0.0625)
+	check_equal(probe.steps.size(), 2, "and stand still for the rest of the stop")
+	held.step(0.0625)
+	check_equal(probe.steps.size(), 3, "then step on")
+	_world.table.hold(held.id, 0.125)
+	held.step(0.0625)
+	check_equal(probe.steps.back(), 0.0, "a new stop catches up again")
+
+
+## A look that notes each step's time.
+class StepProbe:
+	extends ActorLook
+	var steps: Array[float] = []
+
+	func step(delta: float) -> void:
+		steps.append(delta)
+
+
 func test_a_kill_holds_its_killer_not_the_game() -> void:
 	var killer: Actor = _body(Vector2.ZERO)
 	var other: Actor = _body(Vector2(100.0, 0.0))

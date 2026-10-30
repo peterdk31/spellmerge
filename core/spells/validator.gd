@@ -223,7 +223,8 @@ static func _check_form(form: FormBase) -> Array[Dictionary]:
 
 
 ## A carrier's `staff_pose` (FormBase): every key a dictionary of known names, a known phase, ease
-## and mood, its time inside its phase and not before the key before it, every channel in range.
+## and mood, its time inside its phase and not before the key before it, every channel in range,
+## and `land` only on a carrier that strikes a point to land on (`STRIKES_POINT`).
 static func _check_pose(form: FormBase, file: String) -> Array[Dictionary]:
 	var problems: Array[Dictionary] = []
 	var allowed: Array[String] = ["phase", "at", "ease", "mood"]
@@ -253,6 +254,8 @@ static func _check_pose(form: FormBase, file: String) -> Array[Dictionary]:
 			var value: float = float(key.get(channel, 0.0))
 			if value < range_of.x or value > range_of.y:
 				problems.append(_problem("pose", file, "staff_pose", "Key %d: `%s` %s is outside %s to %s." % [n, channel, value, range_of.x, range_of.y]))
+		if float(key.get("land", 0.0)) > 0.0 and not Carriers.of(form.carrier).has(Carrier.STRIKES_POINT):
+			problems.append(_problem("pose", file, "staff_pose", "Key %d: `land` puts the tip on the point the carrier strikes, and `%s` strikes none (`STRIKES_POINT`, core/spells/carriers/)." % [n, form.carrier]))
 	return problems
 
 

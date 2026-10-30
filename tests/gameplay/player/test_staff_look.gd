@@ -163,6 +163,30 @@ func test_a_pose_lifts_and_pushes_the_body_and_leaves_its_shadow() -> void:
 	check_equal(look.pose_offset(0.0), Vector2.ZERO, "back on its hover after")
 
 
+func test_a_landing_pose_puts_the_tip_on_the_point_struck_whichever_way_it_faces() -> void:
+	# A slam's strike: turned 35 degrees at the floor, its tip landed 20 px along the aim.
+	var body := _wizard()
+	var look: StaffLook = WizardFixture.look(body)
+	var sprite := body.get_node(^"Sprite") as Sprite2D
+	for aim: Vector2 in [Vector2.RIGHT, Vector2.LEFT, Vector2.UP, Vector2.DOWN, Vector2(1.0, 1.0).normalized()]:
+		var side: float = 1.0 if aim.x >= 0.0 else -1.0
+		_world.fake.staff_poses[body.id] = [aim, Vector3(deg_to_rad(35.0) * side, 0.0, 6.0), 0.0, 0.0, &"", Color.WHITE, 1.0, aim * 20.0]
+		_world.run(1, false)
+		var tip: Vector2 = sprite.position + Vector2.RIGHT.rotated(look.direction() * TAU / StaffLook.DIRECTIONS) * body.reach()
+		var struck: Vector2 = body.hand_offset + aim * 20.0
+		check(tip.distance_to(struck) <= 1.0, "aiming %s the tip %s lands on the point struck %s" % [aim, tip, struck])
+		check(look.tip_position().distance_to(body.global_position + struck) <= 1.0, "and says so: %s" % look.tip_position())
+	_world.fake.staff_poses[body.id] = [Vector2.RIGHT, Vector3(deg_to_rad(35.0), 0.0, 6.0), 0.0, 0.0, &"", Color.WHITE, 0.5, Vector2(20.0, 0.0)]
+	_world.run(1, false)
+	var half: Vector2 = sprite.position
+	_world.fake.staff_poses[body.id] = [Vector2.RIGHT, Vector3(deg_to_rad(35.0), 0.0, 6.0), 0.0, 0.0, &"", Color.WHITE, 0.0, Vector2(20.0, 0.0)]
+	_world.run(1, false)
+	check(sprite.position.distance_to(half) > 3.0, "half a land is half way there, none is the plain pose: %s, %s" % [half, sprite.position])
+	_world.fake.staff_poses.erase(body.id)
+	_world.run(1, false)
+	check_equal(look.pose_offset(0.0), Vector2.ZERO, "back on its hover after")
+
+
 func test_a_glowing_pose_lights_the_body_in_its_colour_then_lets_go() -> void:
 	var body := _wizard()
 	var look: StaffLook = WizardFixture.look(body)

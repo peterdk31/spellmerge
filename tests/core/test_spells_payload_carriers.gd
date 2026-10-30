@@ -1,7 +1,8 @@
 extends "res://tests/support/suite.gd"
 ## Tests for the payload and line carriers of the staffs (B2c): rain drops its payload on the aim
-## point after a delay, familiar and decoy ask for entities and cast or end through the events,
-## wall is a line of still shots and fissure a beam through everything on its line. It runs a real
+## point after a delay, familiar and decoy ask for entities a step ahead and end through the events
+## (a familiar casts what its triggers give it, rules R4 F3),
+## wall is one solid still shot (a short-lived wall across the aim, rules R4 F6). It runs a real
 ## projectile manager and event bus, stepped by hand, with cards built in code.
 ##
 ## godot --headless --path . --script res://tests/core/test_spells_payload_carriers.gd
@@ -72,17 +73,18 @@ func before_each() -> void:
 	rain.motion = FormBase.Motion.RAIN
 	var familiar: FormBase = _form(&"familiar", 0.0, 6.0)
 	familiar.motion = FormBase.Motion.FAMILIAR
+	familiar.radius = 5.0
 	var decoy: FormBase = _form(&"decoy", 0.0, 4.0)
 	decoy.motion = FormBase.Motion.DECOY
+	decoy.radius = 8.0
+	var rune: FormBase = _form(&"rune", 0.0, 3.0)
+	rune.motion = FormBase.Motion.STILL
+	rune.radius = 7.0
 	var wall: FormBase = _form(&"wall", 0.0, 3.0)
 	wall.motion = FormBase.Motion.WALL
 	wall.shots = 3
 	wall.spread = 10.0
 	wall.radius = 4.0
-	var fissure: FormBase = _form(&"fissure", 0.0, 0.2)
-	fissure.motion = FormBase.Motion.FISSURE
-	fissure.ray_length = 300.0
-	fissure.radius = 6.0
 	var beam: FormBase = _form(&"beam", 0.0, 0.2)
 	beam.motion = FormBase.Motion.RAY
 	beam.ray_length = 300.0
@@ -96,6 +98,7 @@ func before_each() -> void:
 	_modifier(&"echo", ModifierBase.Behaviour.ECHO, 0.2)
 	_trigger(&"on_expire", TriggerBase.Event.EXPIRE)
 	_trigger(&"on_hit", TriggerBase.Event.HIT)
+	_trigger(&"timer", TriggerBase.Event.TIMER).interval = 0.5
 	var spark: FormBase = _form(&"spark", 100.0, 1.0)
 	spark.base_damage = 3
 
@@ -200,6 +203,19 @@ func test_rain_is_dropped_when_the_staff_is_rebuilt() -> void:
 	check_equal(_mgr.get_count(), 0, "the old build's rain never fell")
 
 
+func test_a_dropped_rains_timer_ends_with_its_landing() -> void:
+	# Rules R4 F3 (from #478): the rebuild drops the landing, and the rain's clock with it.
+	(_fake.items[&"rain"] as FormBase).lifetime = 2.0
+	_build(0, [&"timer", &"rain", &"bolt", &"bolt"])
+	_cast()
+	_tick(40)
+	check_equal(_mgr.get_count(), 1, "its timer ticks while it falls")
+	# Its bolt in the air keeps the old build known, as any shot of it does.
+	_build(0, [&"bolt"])
+	_tick(90)
+	check_equal(_mgr.get_count(), 0, "after the rebuild its timer casts no more (its last bolt is gone)")
+
+
 func test_rain_fires_its_own_on_expire_trigger_as_it_lands() -> void:
 	_build(0, [&"on_expire", &"rain", &"bolt", &"bolt"])
 	_cast()
@@ -264,13 +280,40 @@ func test_a_mirrored_wall_stands_behind() -> void:
 			ahead += 1
 		elif is_equal_approx(at.x, -SpellLimits.WALL_REACH):
 			behind += 1
-	check_equal([ahead, behind], [3, 3], "a wall ahead and one behind")
+	check_equal([ahead, behind], [1, 1], "a wall ahead and one behind")
+	check(_blocked(Vector2(0.0, 5.0), Vector2(60.0, 5.0)) and _blocked(Vector2(0.0, 5.0), Vector2(-60.0, 5.0)), "both are solid")
 
 
 func test_a_mirrored_decoy_is_a_second_decoy() -> void:
 	_build(0, [&"mirror", &"decoy"])
 	_cast()
 	check_equal(_spawns.size(), 2, "two decoys")
+
+
+func test_a_decoy_and_a_familiar_appear_a_step_ahead_and_a_mirror_puts_its_copy_behind() -> void:
+	# Rules R4 F3: what a caster places appears twice its size ahead along the aim.
+	for card: StringName in [&"decoy", &"familiar"]:
+		_spawns.clear()
+		_spells.clear()
+		_build(0, [&"mirror", card])
+		_cast()
+		var step: float = (_fake.items[card] as FormBase).radius * 2.0
+		check(_spawns.size() == 2 and (_spawns[0][2] as Vector2).is_equal_approx(Vector2(step, 0.0)), "the %s ahead: %s" % [card, _spawns])
+		check(_spawns.size() == 2 and (_spawns[1][2] as Vector2).is_equal_approx(Vector2(-step, 0.0)), "its mirror's behind: %s" % [_spawns])
+
+
+func test_a_lone_rune_appears_a_step_ahead() -> void:
+	_build(0, [&"rune"])
+	_cast()
+	var found: Array[Vector2] = _positions()
+	check(found.size() == 1 and found[0].is_equal_approx(Vector2(14.0, 0.0)), "twice its size ahead: %s" % [found])
+
+
+func test_a_mirrored_rune_is_placed_behind() -> void:
+	_build(0, [&"mirror", &"rune"])
+	_cast()
+	var found: Array[Vector2] = _positions()
+	check(found.size() == 2 and found[0].distance_to(-found[1]) < 0.01 and absf(absf(found[0].x) - 14.0) < 0.01, "one ahead, one behind: %s" % [found])
 
 
 func test_rain_payload_counts_as_live_until_it_ends() -> void:
@@ -311,26 +354,6 @@ func test_a_held_rain_keeps_falling_until_switched_off() -> void:
 	check_equal(_mgr.get_count(), 2, "and the third never fell")
 
 
-func test_a_held_fissure_stays_open_and_hits_its_whole_line_every_tick() -> void:
-	# Rules R4e (owner, 2026-10-29): a held fissure is a beam that pierces everything.
-	_build(0, [&"hold", &"fissure"])
-	for n in 3:
-		_target(Vector2(40.0 + n * 40.0, 0.0))
-	_cast()
-	check_equal(_hits.size(), 3, "all three at once")
-	check(_spells.is_holding(0, 0), "it stays open")
-	_tick(10)
-	check_equal(_hits.size(), 6, "and all three again a beam tick later")
-	check_equal(_spells.beam_count(), 1, "one live line")
-	_tick(60)
-	check(_hits.size() > 6, "still open past its lifetime")
-	_cast()
-	check_equal(_spells.beam_count(), 0, "the next press closes it")
-	var hits: int = _hits.size()
-	_tick(30)
-	check_equal(_hits.size(), hits, "and it hits no more")
-
-
 func test_familiar_asks_for_an_entity() -> void:
 	var tag: int = _build(0, [&"familiar", &"bolt"])
 	_cast()
@@ -340,50 +363,49 @@ func test_familiar_asks_for_an_entity() -> void:
 	check_equal(_spells.live_shots(tag), 1, "the entity keeps its build alive")
 
 
-func test_familiar_casts_its_payload_when_asked() -> void:
-	var tag: int = _build(0, [&"familiar", &"bolt"])
+func test_a_familiar_casts_nothing_of_its_own() -> void:
+	# Rules R4 F3: no built-in payload; the bolt after it is the staff's next cast.
+	_build(0, [&"familiar", &"bolt"])
 	_cast()
-	_bus.familiar_cast_requested.emit(0, Vector2(30, 40), Vector2.DOWN, tag)
+	_tick(120)
+	check_equal(_mgr.get_count(), 0, "a familiar with no trigger casts nothing")
+
+
+func test_a_familiar_casts_what_its_timer_gives_it() -> void:
+	var tag: int = _build(0, [&"timer", &"familiar", &"bolt"])
+	_cast()
+	_tick(31)
 	var found: Array[Vector2] = _positions()
-	check_equal(found.size(), 1, "the bolt left the familiar")
-	check(found.size() == 1 and found[0].is_equal_approx(Vector2(30, 40)), "from the familiar's place")
+	check_equal(found.size(), 1, "its timer cast a bolt after the interval")
 	for slot in _mgr.get_cap():
 		if _mgr.is_alive(slot):
-			check(_mgr.get_velocity_of(slot).normalized().is_equal_approx(Vector2.DOWN), "along the direction it gave")
-
-
-func test_a_familiar_cast_for_an_unknown_tag_is_ignored() -> void:
-	var tag: int = _build(0, [&"familiar", &"bolt"])
-	_bus.familiar_cast_requested.emit(0, Vector2.ZERO, Vector2.RIGHT, tag)
-	check_equal(_mgr.get_count(), 0, "no familiar was ever spawned")
-	_cast()
-	_bus.familiar_cast_requested.emit(0, Vector2.ZERO, Vector2.RIGHT, tag + (1 << SpellTag.NODE_SHIFT))
-	check_equal(_mgr.get_count(), 0, "a tag that is not a familiar's is ignored")
+			check(_mgr.get_velocity_of(slot).normalized().is_equal_approx(Vector2.RIGHT), "along the aim it was cast with")
+			check_equal(SpellTag.node_of(_mgr.get_tag_of(slot)), SpellTag.node_of(tag) + 1, "the timer's payload, under its own node")
+	_tick(30)
+	check_equal(_mgr.get_count(), 2, "and again every tick")
 
 
 func test_entity_events_for_another_player_are_ignored() -> void:
 	var tag: int = _build(0, [&"familiar", &"bolt"])
 	_cast()
-	_bus.familiar_cast_requested.emit(1, Vector2.ZERO, Vector2.RIGHT, tag)
-	check_equal(_mgr.get_count(), 0, "player 1 cannot make player 0's familiar cast")
 	_bus.entity_ended.emit(1, &"familiar", Vector2.ZERO, tag)
-	check_equal(_spells.live_shots(tag), 1, "nor end it")
+	check_equal(_spells.live_shots(tag), 1, "player 1 cannot end player 0's familiar")
 
 
 func test_a_familiar_stops_casting_when_it_ends() -> void:
-	var tag: int = _build(0, [&"familiar", &"bolt"])
+	var tag: int = _build(0, [&"timer", &"familiar", &"bolt"])
 	_cast()
 	_bus.entity_ended.emit(0, &"familiar", Vector2.ZERO, tag)
-	_bus.familiar_cast_requested.emit(0, Vector2.ZERO, Vector2.RIGHT, tag)
+	_tick(60)
 	check_equal(_mgr.get_count(), 0, "it is gone")
 	check_equal(_spells.live_shots(tag), 0, "and no longer counted")
 
 
 func test_a_familiar_outlives_a_rebuild_of_its_staff() -> void:
-	var tag: int = _build(0, [&"familiar", &"bolt"])
+	var tag: int = _build(0, [&"timer", &"familiar", &"bolt"])
 	_cast()
 	_build(0, [&"bolt"])
-	_bus.familiar_cast_requested.emit(0, Vector2.ZERO, Vector2.RIGHT, tag)
+	_tick(31)
 	check_equal(_mgr.get_count(), 1, "the old familiar still casts what it was built with")
 	_mgr.clear()
 	_bus.entity_ended.emit(0, &"familiar", Vector2.ZERO, tag)
@@ -491,23 +513,34 @@ func test_a_decoy_ending_twice_counts_once() -> void:
 	check_equal(_areas.size(), 1, "the second answer is ignored")
 
 
-func test_wall_is_a_line_of_still_shots_across_the_aim() -> void:
+## True when the segment `from`-`to` meets a wall.
+func _blocked(from: Vector2, to: Vector2) -> bool:
+	return _mgr.clip_to_walls(from, to) != to
+
+
+func test_wall_is_one_solid_row_across_the_aim() -> void:
 	_build(0, [&"wall"])
 	_cast()
 	var found: Array[Vector2] = _positions()
-	check_equal(found.size(), 3, "three shots")
-	if found.size() == 3:
-		check(is_equal_approx(found[0].x, SpellLimits.WALL_REACH) and is_equal_approx(found[1].x, SpellLimits.WALL_REACH) and is_equal_approx(found[2].x, SpellLimits.WALL_REACH), "all ahead of the caster, across the aim: %s" % [found])
-		check(is_equal_approx(absf(found[0].y - found[1].y), 10.0) and is_equal_approx(absf(found[1].y - found[2].y), 10.0), "ten pixels apart: %s" % [found])
+	check_equal(found, [Vector2(SpellLimits.WALL_REACH, 0.0)] as Array[Vector2], "one body, ahead of the caster")
+	# Three stones 10 px apart, 4 px round: the row reaches 14 px either side of its middle.
+	for y: float in [-12.0, 0.0, 12.0]:
+		check(_blocked(Vector2(0.0, y), Vector2(60.0, y)), "a line across it at y %s meets it" % y)
+	check(not _blocked(Vector2(0.0, 30.0), Vector2(60.0, 30.0)), "one well beside it does not")
 	_tick(30)
-	check_equal(_mgr.get_count(), 3, "they stay where they are")
+	check_equal(_mgr.get_count(), 1, "it stands")
+	check(_blocked(Vector2(0.0, 0.0), Vector2(60.0, 0.0)), "and is still solid")
+	_tick(180)
+	check_equal(_mgr.get_count(), 0, "its life over, it is gone")
+	check(not _blocked(Vector2(0.0, 0.0), Vector2(60.0, 0.0)), "and so is its wall")
 
 
 func test_wall_follows_the_aim() -> void:
 	_build(0, [&"wall"])
 	_spells.cast_staff(0, 0, Vector2.ZERO, Vector2.DOWN, 100.0)
-	var found: Array[Vector2] = _positions()
-	check(found.size() == 3 and is_equal_approx(found[0].y, SpellLimits.WALL_REACH) and is_equal_approx(absf(found[0].x - found[1].x), 10.0), "a horizontal line below the caster: %s" % [found])
+	check_equal(_positions(), [Vector2(0.0, SpellLimits.WALL_REACH)] as Array[Vector2], "below the caster")
+	check(_blocked(Vector2(-12.0, 0.0), Vector2(-12.0, 60.0)) and _blocked(Vector2(12.0, 0.0), Vector2(12.0, 60.0)), "a horizontal row")
+	check(not _blocked(Vector2(0.0, 0.0), Vector2(0.0, 15.0)), "short of it the way is open")
 
 
 func test_a_shield_wall_blocks_enemy_shots() -> void:
@@ -517,7 +550,28 @@ func test_a_shield_wall_blocks_enemy_shots() -> void:
 	for slot in _mgr.get_cap():
 		if _mgr.is_alive(slot) and _mgr.get_shield_of(slot) == 2:
 			charged += 1
-	check_equal(charged, 3, "every shot of the wall carries the shield's charges")
+	check_equal(charged, 1, "the wall carries the shield's charges")
+
+
+func test_a_shot_ends_on_the_wall_and_a_ghost_passes() -> void:
+	_build(0, [&"wall"])
+	_cast()
+	var plain: int = _mgr.spawn(9, Vector2(80.0, 8.0), Vector2(-300.0, 0.0), 2.0, 2.0, ManagerScript.LAYER_PLAYER)
+	var ghost: int = _mgr.spawn(9, Vector2(80.0, -8.0), Vector2(-300.0, 0.0), 2.0, 2.0, ManagerScript.LAYER_PLAYER)
+	_mgr.set_ghost(ghost)
+	_tick(20)
+	check(not _mgr.is_alive(plain), "the plain shot ended on the wall")
+	check(_mgr.is_alive(ghost) and _mgr.get_position_of(ghost).x < 0.0, "the ghost passed it")
+
+
+func test_an_enemy_touching_the_wall_anywhere_along_it_is_hit_once_while_it_stays() -> void:
+	_build(0, [&"wall"])
+	var target: Node2D = _target(Vector2(SpellLimits.WALL_REACH + 6.0, 13.0))
+	_cast()
+	_tick(30)
+	check_equal(_hits.size(), 1, "hit once at the row's end, and the wall stands on")
+	check(not _hits.is_empty() and _hits[0][1] == target, "it is the enemy")
+	check_equal(_mgr.get_count(), 1, "the hit did not spend the wall")
 
 
 func test_wall_shots_stay_out_of_a_wall() -> void:
@@ -536,39 +590,9 @@ func test_an_enemy_touching_a_wall_is_hit() -> void:
 	check(not _hits.is_empty() and _hits[0][1] == target, "an enemy that touches the wall is hit")
 
 
-func test_fissure_hits_everything_on_its_line() -> void:
-	_build(0, [&"fissure"])
-	for n in 5:
-		_target(Vector2(40.0 + n * 40.0, 0.0))
-	_cast()
-	check_equal(_hits.size(), 5, "all five on the line")
-
-
-func test_fissure_hits_everything_on_its_line_however_many() -> void:
-	_build(0, [&"fissure"])
-	for n in 100:
-		_target(Vector2(20.0 + n * 1.5, 0.0))
-	_cast()
-	check_equal(_hits.size(), 100, "all of them, however many")
-
-
 func test_a_beam_with_no_pierce_hits_only_the_first() -> void:
 	_build(0, [&"beam"])
 	for n in 5:
 		_target(Vector2(40.0 + n * 40.0, 0.0))
 	_cast()
-	check_equal(_hits.size(), 1, "the contrast: a beam stops at one")
-
-
-func test_fissure_shows_as_a_line() -> void:
-	_build(0, [&"fissure"])
-	_cast()
-	check(_shown.size() == 1 and _shown[0][1] == &"beam" and _shown[0][4] > 0.0, "drawn like a beam, as far as it got: %s" % [_shown])
-
-
-func test_fissure_fires_its_on_hit_payload_for_each_target() -> void:
-	_build(0, [&"on_hit", &"fissure", &"spark"])
-	for n in 3:
-		_target(Vector2(40.0 + n * 40.0, 0.0))
-	_cast()
-	check_equal(_mgr.get_count(), 3, "a spark from every enemy on the line")
+	check_equal(_hits.size(), 1, "a beam stops at one")

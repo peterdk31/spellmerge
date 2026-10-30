@@ -31,7 +31,7 @@ A card is a `.tres` on one of five classes in `core/base/`, in its own folder un
 
 | Kind | Class | Role | Cards (new in bold) |
 | --- | --- | --- | --- |
-| Carrier (14) | `FormBase` | Ends a group: something leaves the caster | bolt, beam, nova, rune, orbit, **dash, teleport, hook, swap, wall, rain, fissure, decoy, familiar** (the boomerang carrier became the `return` modifier, owner 2026-10-27) |
+| Carrier (13) | `FormBase` | Ends a group: something leaves the caster | bolt, beam, nova, rune, orbit, **dash, teleport, hook, swap, wall, rain, decoy, familiar** (the boomerang carrier became the `return` modifier, owner 2026-10-27; fissure removed, owner 2026-10-30) |
 | Modifier (27) | `ModifierBase` | Attaches to the next carrier | split, pierce, homing, chain, bigger, faster, **shield, blast, hold, recoil, bounce, echo, linger, heavy, siphon, overcharge, sticky, magnet, ghost, spiral, mirror, growth, relay, sniper, return, slow, arc** |
 | Infusion (6) | `ElementBase` | Attaches to the next carrier; several may | fire, frost, storm, void, lightning, **mend** |
 | Trigger (9) | `TriggerBase` | Attaches to the next carrier; the group read after that carrier is its payload | on hit, on expire, timer, **on block, on kill, on cast, on wall, on hurt, on reaction** |
@@ -47,7 +47,7 @@ A card is a `.tres` on one of five classes in `core/base/`, in its own folder un
 
 **Live beams** (owner, 2026-10-27): a beam is a carrier that lives its `lifetime` like a shot (0.3 s, one cast cycle of the starter staff, so held fire keeps a beam on with no gap; `hold · beam` stays on until switched off). It follows its caster while it lives (the wizard's aim, or the shot that fired it), hits what is on it at once and then every `SpellLimits.BEAM_TICK` (0.15 s), and a homing beam bends along a curve onto the nearest target within 45 degrees of its aim. Homing stacks by multiplying (owner, 2026-10-27): each homing card after the first turns a shot 1.5 times faster and widens a beam's bend 1.5 times (`SpellLimits.HOMING_STACK`), up to all the way round (owner, 2026-10-29: no cap). Multipliers (damage, speed, size, delay, mana) always multiplied, and since rules R1c (2026-10-29) the factor behaviours too: heavy's knockback (two cards ×16) and growth's rate (`StaffCompiler.stacked`, `MULTIPLIED`); counts (chain jumps, bounces, pierce, shields) add. Its `blast` and `on expire` happen where it got when its life is over. `bounce · beam` turns at walls (owner, 2026-10-29): it reflects off the wall face, once per bounce, and goes on for the length it has left, hitting what is on every leg.
 
-**Two carriers carry a payload of their own:** `rain` and `familiar` read the group after them as their payload, the way a trigger does (rain drops it on the aim point; familiar casts it). If one of them also has a trigger, the carrier's own payload is read first, then the trigger's.
+**One carrier carries a payload of its own:** `rain` reads the group after it as its payload, the way a trigger does, and drops it on the aim point. If it also has a trigger, its own payload is read first, then the trigger's. (A familiar did too until rules R4 F3, 2026-10-30: now it casts only what its triggers give it.)
 
 ### What each new card does
 
@@ -61,11 +61,10 @@ Numbers are first guesses for the card's own task to set. Examples are written i
 | teleport | Blink a fixed `ray_length` along the aim, stopping before walls. End point: the arrival | `blast · teleport` arrives with an explosion; `on expire · teleport · nova` rings out on arrival |
 | hook | A shot that pulls the caster to where it hits | `shield · hook` is a safe gap-closer; `blast · hook` charges in with a bang |
 | swap | A shot that trades places with the target it hits | an escape through an enemy; `frost · swap` leaves a chilled target where you stood |
-| wall | A line of still shots across the aim | `shield · wall` stops enemy shots; `fire · wall` is a burning fence |
+| wall | A short-lived solid wall across the aim: bodies and shots stop at it, touching it hurts | `shield · wall` stops enemy shots; `fire · wall` is a burning fence |
 | rain | Its payload falls on the aim point after a telegraphed delay | `rain · nova`; `rain · frost · nova` freezes an area from above |
-| fissure | A crack along the ground that hits everything on its line | `on hit · fissure · nova` sets off a nova on every enemy in the line; `bounce · fissure` turns at walls |
 | decoy | A still copy of the wizard that enemies target. End point: where it dies | `blast · decoy` is an exploding decoy; `on expire · decoy · nova` |
-| familiar | A small helper that orbits the caster and casts its payload at the nearest enemy every second | `hold · familiar · bolt` keeps it; `familiar · mend · bolt` is a healer |
+| familiar | A small helper that orbits the caster; it casts what its triggers give it (rules R4 F3) | `timer · familiar · bolt` casts a bolt every tick; `hold · timer · familiar · mend · bolt` is a lasting healer |
 | swing | Melee (owner, 2026-10-29; see "Phase I"): the staff sweeps a 90° arc in front of its tip, about 24 px, hitting every body in it. No mana, a short delay, strong knockback. End point: the end of the arc | `shield · swing` is a parry; `heavy · swing` bats enemies into walls |
 | slam | Melee (owner, 2026-10-29; see "Phase I"): the staff rises and slams the floor in front of its tip, a shockwave ring that hits every body in it and throws them outward. No mana, a longer wind-up and delay than swing. End point: the impact | `burst · swing` then `slam` is a combo string; `on expire · swing · slam` ends a sweep in a slam |
 
@@ -121,7 +120,7 @@ The compiler (`Spells.compile_staff`, part A4) turns a staff's slots into its **
    - A **modifier or infusion** is kept for the next carrier of this group.
    - A **multicast** card adds its `extra_draws` to the carriers this group wants (double adds 1, triple 2, scatter 2); burst marks the group to fire 3 times.
    - A **trigger** is kept for the next carrier. A second trigger before the same carrier is wasted.
-   - A **carrier** takes every kept modifier, infusion and trigger. If it has a trigger (or is `rain` or `familiar`), its **payload** is read right now, as a new group by these same rules; the payload's cards are part of this cast. Then this group wants one carrier fewer. When it wants none, the group ends.
+   - A **carrier** takes every kept modifier, infusion and trigger. If it has a trigger (or is `rain`), its **payload** is read right now, as a new group by these same rules; the payload's cards are part of this cast. Then this group wants one carrier fewer. When it wants none, the group ends.
 3. **Wrap-around:** reading past the last slot goes on from the first. If any reading in the cast (payloads included) wrapped, the staff recharges after the cast.
 4. **Use once:** a card already read in this cast ends the current group where it is. This is what keeps wrap-around from looping forever, and why every staff's cycle is finite.
 5. **The fallback carrier:** if a group ends with modifiers or infusions kept and no carrier to take them, they land on a fallback carrier: **the caster** for the cast's own group, **the payload's origin point** for a payload (an instant hit there, radius 8 px). `blast` explodes there, `fire` burns whatever is there, `shield` gives the caster a barrier (on the caster only). Cards that mean nothing there (homing, pierce) are wasted. A kept trigger with no carrier is wasted.
@@ -261,7 +260,6 @@ Added in part A3, so later parts in different areas don't all edit `core/events/
 | `entity_spawn_requested(player, kind: StringName, position: Vector2, seconds: float, tag: int, caster: int)` (decoy, familiar; `caster` -1 the wizard, a projectile slot, or -2 the point) | spells | ai |
 | `entity_end_requested(player, tag: int)` (a `hold` switched off; added in B5) | spells | ai |
 | `entity_ended(player, kind: StringName, position: Vector2, tag: int)` | ai | spells (a decoy's end point) |
-| `familiar_cast_requested(player, position: Vector2, direction: Vector2, tag: int)` | ai | spells |
 | `mana_refund_requested(player, amount: float)` | spells | player |
 | `mana_reserved(player, amount: float)` | spells | player, hud |
 | `shot_blocked(player, position: Vector2, tag: int)` (a shot's shield stopped an enemy shot) | projectiles | spells, feel |
@@ -403,10 +401,10 @@ Combos to prove (two per card in its task, the rest for the combo report): `shie
 
 **Deflect:** a shot of another team touching the carrier turns around and takes the carrier's caster (its actor, team and hit credit), so a homing shot deflected hunts the new caster's targets. A shot can be deflected again (a rally), within the engine's limits. Decided for I3 (owner, 2026-10-29):
 
-- **Deflect goes first**, a fixed rule, not card order (order deciding between two modifiers would be a special rule only these two follow): a touching shot is turned and a shield keeps its charge. On a carrier whose shield only stops shots touching it (a shot, a beam, a fissure, a swing) a shield beside a deflect never blocks, so the compiler lists it as wasted ("deflect turns every shot that touches it first"); a hook's, dash's or teleport's shield also guards the caster and is kept.
+- **Deflect goes first**, a fixed rule, not card order (order deciding between two modifiers would be a special rule only these two follow): a touching shot is turned and a shield keeps its charge. On a carrier whose shield only stops shots touching it (a shot, a beam, a swing) a shield beside a deflect never blocks, so the compiler lists it as wasted ("deflect turns every shot that touches it first"); a hook's, dash's or teleport's shield also guards the caster and is kept.
 - **A deflect sets off `on block`** (a deflect is a block): `shot_deflected` fires the carrier's block payload as `shot_blocked` does.
 - **No count:** a deflect turns every shot that touches the carrier while it lives; more deflect cards add nothing.
-- **Swings and beams touch shots** (the rules audit's shield × beam ✗): a swing's sweep each step (its wedge) and a beam's or fissure's line (every step, not only on hits) deflect or block the shots of other teams they touch, so `shield · swing` parries and `shield · beam` blocks.
+- **Swings and beams touch shots** (the rules audit's shield × beam ✗): a swing's sweep each step (its wedge) and a beam's line (every step, not only on hits) deflect or block the shots of other teams they touch, so `shield · swing` parries and `shield · beam` blocks.
 - **How a shot turns:** it is mirrored off what it touched (outward from a swing's hand, off a deflecting shot's body, off a beam's line); one already going away keeps its way. It flies 1.7× faster and its life starts again; an orbiting shot leaves its circle. It keeps its own cards (its tag), may hit what it hit before, and is drawn in its new caster's colours.
 
 | # | Part | Area | Delivers |

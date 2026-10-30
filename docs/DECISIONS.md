@@ -2,6 +2,17 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-30: Card rules R4 F3, placing (owner)
+
+- **What you place appears a step ahead along the aim** (twice the card's size; with a wall in the way, where it is cast, never in the wall: `Spells._placed_at`): a rune, a decoy, a familiar. One rule, so a mirror's reversed aim puts its copy behind you instead of on the same spot; the rune's `count == 1` case is gone. Decoy and familiar sizes are now their bodies' (8 and 3 px), so the step is visible. Spread (sniper) now counts on all three: their spot follows the aim.
+- **The familiar has no payload of its own** (replaces R4g's hand-on): it is a body that lasts, and casts what its triggers give it, as any lasting carrier (`timer · familiar · bolt` fires a bolt every tick). Gone: `familiar_cast_requested`, Entities' once-a-second foe search, `StaffCompiler.hands_on` and its helpers; `carries_payload` is rain's alone (owner: rain keeps its payload). Its timer fires from its wizard's body along the aim at the cast, not from the orb (the orb's place is Entities'; see the PR for the question).
+- **A rain's timer ends with its landing:** an edit that drops the landing also takes the rain off the live carriers (`_drop_pending`), so a rebuilt staff's rain stops ticking at once.
+## 2026-10-30: Fissure removed (owner)
+
+- **The fissure carrier is gone** (owner, 2026-10-30): the card, its icon and lore, its runtime cases (the fissure launch, the held fissure as a beam, `PIERCE_ALL` and `_ray_pierce`: a ray's pierce is now just its card's), its compiler cases (`StaffCompiler.rays` was only beam and fissure: inlined as `RAY`) and its tests. A beam does what it did.
+- **Its two combos keep their idea on a beam:** `beam_fire_line` (pierce · fire · beam burns both imps on its line) and `beam_hit_nova` (on hit · beam · frost · nova).
+- **`FormBase.Motion` keeps slot 10** as `_UNUSED_10` so the numbers stored in every other carrier's `.tres` keep their meaning; a card that uses it fails `range_problems`.
+
 ## 2026-10-29: Card rules R4b, a wasted card is checked too (owner)
 
 - **A W cell is played with the card forced on** (owner item 22): the card rules test failed only on a card that does nothing unlisted, not on a card listed as wasted that would work (slam's was found by hand). Now every W cell also runs with the card kept, and a different trace fails the test. Still auto-discovering, no new job.
@@ -2306,3 +2317,16 @@ The owner: restructure the projectile step from "for each shot, check every beha
 - **Wasted still, with the reason:** linger, sticky and return on both; magnet, growth and spiral on a fissure (it is over at once; spiral is not free there: a fissure walks one straight `ray`). A beam's chain jump flies straight at its target (no wave).
 - **Simpler:** the waste table lost the beam and fissure cells for ghost, relay, magnet, growth and spiral; `StaffCompiler.rays` names the line carriers once; `on wall` with ghost asks the table instead of "a flying shot".
 - **Relay on a swing and a slam (merging R4f with R4b, 2026-10-30):** a swing and a slam strike through the same ray hit (`_ray_hit`), so with R4f their relay takes on what an earlier body of the same sweep or strike was infused with, and R4b's forced check found them listed as wasted while they changed the cast. Relay now runs on every carrier that hits (`StaffCompiler.hits`), one row instead of "a shot or a line".
+
+## 2026-10-30: Card rules R4 F4: a boomerang always comes home; a closed caster's payloads fire on (owner decisions)
+
+- **A returning shot always comes home:** its way back takes no life (`_pass_return` gives back the step's life while it heads home), so a caster who walks away is still reached; it ends with its expiry there, and vanishes only when its caster's anchor is gone. Homing's 60° bend (R4a) keeps it closing in. Nothing else read the life on the way home (linger fires before the turn; growth, trails, the live-carrier clock and arcs go by the step or the shot's row). A stick or a deflect sets the life anew, as before.
+- **A closed caster's payloads fire on:** `close_caster` drops only the caster's own waiting launches (a cast's later firings, a rain's landing), the same predicate as an edit (R4a); its shots in the air already flew on, and now their waiting payloads (an echo, a fire waiting for room) fire too, keeping their build as after an edit.
+## 2026-10-30: Card rules R4 F6: the wall is solid (owner decisions, 2026-10-30)
+
+- **The owner's decision:** a wall is a real wall, a short-lived piece of terrain that bodies cannot walk through and that stops shots, like the room's walls. It was five still stones that each hurt the first thing touching them and crumbled; enemies walked through the gaps.
+- **One body:** `Spells._launch_wall` makes one still shot that pierces everything (its hits never spend it) and `Projectiles.set_solid` makes it a wall while it lives: its row of stones lies in the wall grid (a count per cell on top of the room's mark, so it goes cleanly when it ends) and is a `StaticBody2D` on the walls' physics layer, which the actors already collide with. Everything that asks the grid (shots, beams, `on wall`, ghost, dashes, teleports, knockback into walls) and every body's `move_and_slide` sees it with no change of their own. The enemies walk straight at their target (no pathfinding), so they slide along it.
+- **Its hits:** it hits along its row, each body once while it stays against it, with all its cards. Pierce is wasted on it ("a wall stands still through every hit").
+- **Homing:** it creeps toward a target as one piece, as a rune does, and stops at a room wall; the R4i guard and the wall's `_homed_place` call are gone (a rain keeps it).
+- **Shield and deflect:** decided by the general rule, a shield or deflect acts on the shots that touch its carrier, so it guards the whole row: another team's shot that meets the wall is turned (deflect) or stopped with a block (shield, `on block`, its own payloads stay quiet) while charges last; without one it ends on the wall as on any wall. It keeps the mirror-wall and shielded-wall combos working with one function shared with the shot-against-shot guard (`_guard_meets`), where wasting both would have added table rows.
+- **Its own payloads leave it:** a shot cast by a live solid shot does not end on that wall (its row is lifted while that shot looks); every other shot born inside it ends on it at once.

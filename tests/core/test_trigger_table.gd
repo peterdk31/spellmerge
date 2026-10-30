@@ -15,7 +15,7 @@ const M := FormBase.Motion
 ## M2-rules.md ("Triggers" under "Card x carrier") and docs/DECISIONS.md.
 const SHOTS: Array = [M.STRAIGHT, M.STILL, M.ORBIT, M.HOOK, M.SWAP, M.WALL]
 ## What is over at once: no timer ticks and nothing hears a hurt on it (rules R4d).
-const AT_ONCE: Array = [M.FISSURE, M.SLAM, M.TELEPORT]
+const AT_ONCE: Array = [M.SLAM, M.TELEPORT]
 
 var _items: Dictionary = {}
 var _compiler: StaffCompiler
@@ -68,7 +68,7 @@ func _expected(event: int, motion: int) -> bool:
 			# Wherever a shield or deflect runs: not on a rain or familiar (rules R4g: a decoy guards).
 			return motion != M.RAIN and motion != M.FAMILIAR
 		E.WALL:
-			return [M.STRAIGHT, M.HOOK, M.SWAP, M.RAY, M.FISSURE].has(motion)
+			return [M.STRAIGHT, M.HOOK, M.SWAP, M.RAY].has(motion)
 	return true
 
 
@@ -82,14 +82,14 @@ func test_every_event_on_every_carrier_runs_or_says_why() -> void:
 			check_equal(why.is_empty(), runs, "%s has a reason exactly when it cannot run (%s)" % [cell, why])
 
 
-func test_a_timer_on_a_fissure_is_wasted_with_its_payload() -> void:
-	var built: CompiledStaff = _compile([&"on_timer", &"fissure", &"straight"])
+func test_a_timer_on_a_slam_is_wasted_with_its_payload() -> void:
+	var built: CompiledStaff = _compile([&"on_timer", &"slam", &"straight"])
 	var cast: CompiledCast = built.casts[0]
 	check(str(built.wasted.get(0, "")).contains("over at once"), "the timer is wasted with its reason: %s" % built.wasted)
 	check(str(built.wasted.get(2, "")).begins_with("Nothing casts it"), "its payload is wasted too: %s" % built.wasted)
-	check(not built.wasted.has(1), "the fissure still casts")
+	check(not built.wasted.has(1), "the slam still casts")
 	check_equal(cast.slots, PackedInt32Array([0, 1, 2]), "the payload is read in this cast, as when it fires")
-	check(cast.group.spells[0].payload == null, "no payload hangs on the fissure")
+	check(cast.group.spells[0].payload == null, "no payload hangs on the slam")
 	check_equal(cast.group.spells[0].trigger_id, &"", "nor a trigger")
 	check(not cast.targets.has(0) and not cast.targets.has(2), "nothing is attached")
 	check_equal(cast.mana, 2.0, "the wasted payload costs no mana")
@@ -116,7 +116,7 @@ func test_wasted_cells_say_why() -> void:
 		[&"on_wall", &"swing", "a swing's sweep never meets a wall"],
 		[&"on_hurt", &"slam", "over at once"],
 		[&"on_hurt", &"teleport", "over at once"],
-		[&"on_timer", &"fissure", "over at once"],
+		[&"on_timer", &"slam", "over at once"],
 		[&"on_timer", &"teleport", "over at once"],
 		[&"on_block", &"rain", "nothing on it can block"],
 		[&"on_kill", &"decoy", "without a blast"],
@@ -124,8 +124,8 @@ func test_wasted_cells_say_why() -> void:
 	]
 	for cell: Array in cells:
 		var cards: Array[StringName] = [cell[0], cell[1], &"straight"]
-		if cell[1] == &"rain" or cell[1] == &"familiar":
-			# A rain and a familiar read a payload of their own first.
+		if cell[1] == &"rain":
+			# A rain reads a payload of its own first.
 			cards.append(&"straight")
 		var built: CompiledStaff = _compile(cards)
 		var why: String = str(built.wasted.get(0, ""))
@@ -136,7 +136,7 @@ func test_triggers_that_fire_are_not_wasted() -> void:
 	var cells: Array = [
 		[&"on_hit", &"straight"], [&"on_timer", &"straight"], [&"on_hurt", &"orbit"], [&"on_timer", &"wall"],
 		[&"on_hit", &"ray"], [&"on_hit", &"swing"], [&"on_wall", &"ray"], [&"on_wall", &"hook"],
-		[&"on_expire", &"rain"], [&"on_hit", &"rain"], [&"on_expire", &"decoy"], [&"on_cast", &"dash"], [&"on_kill", &"fissure"],
+		[&"on_expire", &"rain"], [&"on_hit", &"rain"], [&"on_expire", &"decoy"], [&"on_cast", &"dash"], [&"on_kill", &"slam"],
 		[&"on_timer", &"ray"], [&"on_timer", &"rain"], [&"on_timer", &"dash"], [&"on_timer", &"swing"],
 		[&"on_hurt", &"ray"], [&"on_hurt", &"decoy"], [&"on_hurt", &"dash"], [&"on_hurt", &"rain"],
 	]
@@ -170,8 +170,7 @@ func test_the_cards_an_event_needs() -> void:
 	# A ghost shot flies through walls.
 	var ghost: String = str(_compile([&"on_wall", &"ghost", &"straight", &"straight"]).wasted.get(0, ""))
 	check(ghost.contains("passes through walls"), "on wall on a ghost bolt says why: %s" % ghost)
-	# So do a ghost beam and a ghost fissure (rules R4f).
-	for form: StringName in [&"ray", &"fissure"]:
-		var ghost_line: String = str(_compile([&"on_wall", &"ghost", form, &"straight"]).wasted.get(0, ""))
-		check(ghost_line.contains("passes through walls"), "on wall on a ghost %s says why: %s" % [form, ghost_line])
+	# So does a ghost beam (rules R4f).
+	var ghost_line: String = str(_compile([&"on_wall", &"ghost", &"ray", &"straight"]).wasted.get(0, ""))
+	check(ghost_line.contains("passes through walls"), "on wall on a ghost beam says why: %s" % ghost_line)
 	check(not _compile([&"on_wall", &"ray", &"straight"]).wasted.has(0), "a plain beam meets walls")

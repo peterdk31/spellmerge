@@ -49,8 +49,9 @@ enum Motion {
 	WALL,
 	## Reads a payload and drops it on the aim point after `lifetime` seconds (B2).
 	RAIN,
-	## A crack along the ground that hits every target on its line, `ray_length` long (B2).
-	FISSURE,
+	## Was FISSURE, removed 2026-10-30 (owner). The slot stays so the numbers stored in every
+	## other carrier's .tres keep their meaning; no card may use it (`range_problems`).
+	_UNUSED_10,
 	## A still copy of the wizard that enemies target, for `lifetime` seconds (B2, B5).
 	DECOY,
 	## A helper that orbits the caster and casts its payload every `cooldown` seconds (B2, B5).
@@ -87,7 +88,7 @@ enum Motion {
 @export var pierce: int = 0
 ## ORBIT only: distance from the caster in pixels.
 @export var orbit_radius: float = 0.0
-## RAY, FISSURE and RAIN: how far it reaches in pixels. DASH and TELEPORT: how far the caster
+## RAY and RAIN: how far it reaches in pixels. DASH and TELEPORT: how far the caster
 ## moves (fixed: speed only changes how long a dash takes).
 @export var ray_length: float = 0.0
 ## SWING: degrees the sweep hits over, centred on the aim.
@@ -163,9 +164,10 @@ static func pack_pose(keys: Array[Dictionary]) -> PackedFloat32Array:
 	return out
 
 
-## True for the carriers that read a payload of their own, as a trigger does (rain, familiar).
+## True for the carriers that read a payload of their own, as a trigger does (a rain; a familiar
+## casts only what its triggers give it, rules R4 F3).
 func carries_payload() -> bool:
-	return motion == Motion.RAIN or motion == Motion.FAMILIAR
+	return motion == Motion.RAIN
 
 
 func ranges() -> Dictionary:
@@ -188,3 +190,11 @@ func ranges() -> Dictionary:
 		"knockback": Vector2(0.0, 2000.0),
 	})
 	return limits
+
+
+## The ranges, and the empty motion slot a removed carrier left.
+func range_problems() -> PackedStringArray:
+	var problems: PackedStringArray = super()
+	if motion == Motion._UNUSED_10:
+		problems.append("motion: 10 was fissure, removed 2026-10-30")
+	return problems

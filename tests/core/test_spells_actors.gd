@@ -199,6 +199,20 @@ func test_close_caster_drops_its_waiting_launches() -> void:
 	check_equal(_shots(tag), 1, "the echo never fires; the first shot flies on")
 
 
+## Regression (rules R4 F4): closing a caster dropped the waiting payloads of its shots in the air
+## (here a timer's echoed slow). They fire on, as its shots fly on and as after an edit.
+func test_close_caster_lets_its_shots_payloads_fire_on() -> void:
+	var imp: int = ActorSeats.enemy(_table)
+	_build(imp, [&"timer", &"slow", &"echo", &"slow"])
+	var payload: int = _spells.current_tag(imp, 0, 1)
+	_cast(imp)
+	_tick(40)
+	check_equal(_shots(payload), 1, "the timer fired once; its echo waits")
+	_spells.close_caster(imp)
+	_tick(60)
+	check_equal(_shots(payload), 4, "the echo fired on with the timer's later firings (0.5 s, 1 s, 1.5 s and its echo)")
+
+
 func test_close_caster_ends_its_hold() -> void:
 	var imp: int = ActorSeats.enemy(_table)
 	var tag: int = _build(imp, [&"hold", &"slow"])

@@ -8,7 +8,8 @@ extends SceneTree
 ## to add up, rules R1e: the shots do the same, only the state line now shows the moves under way,
 ## added up, where it showed a finished move's stale numbers; and again in rules R4a, when a
 ## shield's scan stopped spending the hit-work budget: the shots do the same, only the work left
-## is higher).
+## is higher; and again in rules R4 F4, when the way home stopped taking a returning shot's life:
+## the shots do the same, only a returning shot's life stays where it turned).
 ##
 ## The scene has every behaviour the manager knows: plain shots that pierce, homing shots (their
 ## searches included), orbit shots round wizards and round other shots (in lower and higher slots),

@@ -1,7 +1,7 @@
 extends SceneTree
 ## Tests for the entity kit (staffs B5, gameplay/ai/entities.gd and its use in ai.gd): decoys
-## that enemies chase and shoot down, familiars that circle their wizard and ask for casts at
-## the nearest enemy, the per-player cap, ending by tag, quiet clears, swap moves, and four
+## that enemies chase and shoot down, familiars that circle their wizard (they cast nothing
+## themselves: core/spells fires their triggers, rules R4 F3), the per-player cap, ending by tag, quiet clears, swap moves, and four
 ## players at once. Time moves by fixed binary-fraction deltas.
 ##
 ## godot --headless --path . --script res://tests/gameplay/ai/test_entities.gd
@@ -20,8 +20,6 @@ var _entities: EntitiesScript = null
 ## Every entity_ended as [caster, kind, position, tag] (the owner's actor id; the fixture's
 ## wizards are the actors 0-3, seated 0-3).
 var _ended: Array[Array] = []
-## Every familiar_cast_requested as [caster, position, direction, tag].
-var _casts: Array[Array] = []
 
 
 func _initialize() -> void:
@@ -33,8 +31,6 @@ func _initialize() -> void:
 	_test_decoy_copies_its_wizard()
 	_test_familiar_circles_its_wizard()
 	_test_a_familiar_from_a_trigger_circles_the_shot_then_where_it_ended()
-	_test_familiar_casts_at_the_nearest_enemy()
-	_test_familiar_waits_without_an_enemy()
 	_test_cap_ends_the_oldest()
 	_test_end_requested_by_tag()
 	_test_held_entity_lasts()
@@ -66,11 +62,8 @@ func _setup(player_count: int = 1) -> void:
 	# In the tree, so the decoys are projectile targets at their real positions.
 	root.add_child(_entities)
 	_ended.clear()
-	_casts.clear()
 	_world.bus.entity_ended.connect(func(player: int, kind: StringName, at: Vector2, tag: int) -> void:
 		_ended.append([player, kind, at, tag]))
-	_world.bus.familiar_cast_requested.connect(func(player: int, at: Vector2, direction: Vector2, tag: int) -> void:
-		_casts.append([player, at, direction, tag]))
 
 
 func _teardown() -> void:
@@ -234,37 +227,6 @@ func _test_a_familiar_from_a_trigger_circles_the_shot_then_where_it_ended() -> v
 	_run(10)
 	var later: Vector2 = _entities.positions_of(0, TAG)[0]
 	_check(not later.is_equal_approx(last) and absf(later.distance_to(Vector2(180.0, 0.0)) - EntitiesScript.FAMILIAR_ORBIT) < 6.0, "it keeps circling where the shot ended: %s" % later)
-
-
-func _test_familiar_casts_at_the_nearest_enemy() -> void:
-	_setup(1)
-	_world.players[0].position = Vector2(0.0, 0.0)
-	var near: Node2D = _enemy_target(Vector2(0.0, 120.0))
-	_enemy_target(Vector2(-180.0, 0.0))
-	_spawn(0, EntitiesScript.FAMILIAR, Vector2(20.0, -14.0), 10.0)
-	_entities.step(STEP)
-	_world.projectiles.step(STEP)
-	for i in int(2.6 / STEP):
-		_entities.step(STEP)
-	_check(_casts.size() == 3, "a familiar casts after FAMILIAR_FIRST and then every second (got %d in 2.6 s)" % _casts.size())
-	if not _casts.is_empty():
-		var cast: Array = _casts[0]
-		_check(cast[0] == 0 and cast[3] == TAG, "the cast names the player and the familiar's tag")
-		var want: Vector2 = (cast[1] as Vector2).direction_to(near.position)
-		_check((cast[2] as Vector2).dot(want) > 0.99, "it casts toward the nearest enemy")
-		_check((cast[2] as Vector2).is_normalized(), "along a unit direction")
-
-
-func _test_familiar_waits_without_an_enemy() -> void:
-	_setup(1)
-	_spawn(0, EntitiesScript.FAMILIAR, Vector2.ZERO, 10.0)
-	_run(int(3.0 / STEP))
-	_check(_casts.is_empty(), "with no enemy in range a familiar does not cast")
-	_enemy_target(Vector2(EntitiesScript.FAMILIAR_RANGE + 200.0, 0.0))
-	_world.projectiles.step(STEP)
-	for i in int(2.0 / STEP):
-		_entities.step(STEP)
-	_check(_casts.is_empty(), "nor at an enemy beyond FAMILIAR_RANGE")
 
 
 func _test_cap_ends_the_oldest() -> void:

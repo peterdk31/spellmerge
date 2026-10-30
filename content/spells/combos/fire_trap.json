@@ -1,9 +1,9 @@
 {
 	"id": "fire_trap",
 	"name": "Fire trap",
-	"does": "A fire rune waits on the floor and, when it ends, bursts into a ring of fire that burns the imps standing near it.",
+	"does": "A fire rune waits on the floor a step ahead and, when it ends, bursts into a ring of fire that burns the imps standing near it.",
 	"casts": [{"staff": 0, "cards": ["fire", "on_expire", "rune", "fire", "nova"]}],
-	"imps": [[40, 0], [0, 40], [-40, 0]],
+	"imps": [[68, 0], [28, 40], [-12, 0]],
 	"seconds": 9.0,
 	"checks": [{"kind": "status", "imps": [0, 1, 2], "status": "burn"}]
 }

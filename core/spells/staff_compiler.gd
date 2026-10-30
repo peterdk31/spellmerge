@@ -51,10 +51,6 @@ var _pos: int = 0
 var _reached_end: bool = false
 ## Slots that did something in some cast, so they are not listed as wasted for the staff.
 var _useful: Dictionary = {}
-## A familiar's infusions and hit cards, handed to the carriers of the group read next (its own
-## payload, the spells it casts; `hands_on`).
-var _handed_elements: Array[ElementBase] = []
-var _handed_modifiers: Array[ModifierBase] = []
 
 
 var _namer: SpellNamer = null
@@ -122,11 +118,6 @@ func _read_group(want: int, payload: bool) -> CompiledGroup:
 	var kept: PackedInt32Array = PackedInt32Array()
 	var trigger: TriggerBase = null
 	var trigger_slot: int = -1
-	# A familiar's hit cards ride on the carriers of this group only, not on what those fire.
-	var handed_elements: Array[ElementBase] = _handed_elements
-	var handed_modifiers: Array[ModifierBase] = _handed_modifiers
-	_handed_elements = []
-	_handed_modifiers = []
 	while want > 0:
 		var slot: int = _next_slot()
 		if slot < 0:
@@ -159,10 +150,6 @@ func _read_group(want: int, payload: bool) -> CompiledGroup:
 				trigger_slot = slot
 		elif card is FormBase:
 			var form := card as FormBase
-			for element in handed_elements:
-				if not elements.has(element):
-					elements.append(element)
-			modifiers.append_array(handed_modifiers)
 			# A behaviour its form cannot run (homing on a rune, return on a beam) is wasted, and
 			# changes nothing else either.
 			var kept_modifiers: Array[ModifierBase] = []
@@ -196,9 +183,7 @@ func _read_group(want: int, payload: bool) -> CompiledGroup:
 				else:
 					_attach(at, slot)
 			if form.carries_payload():
-				var handed: PackedInt32Array = _hand_on(kept) if hands_on(form.motion) else PackedInt32Array()
 				spell.own_payload = _read_group(1, true)
-				_settle_handed(handed, spell.own_payload, form, slot)
 			if trigger != null:
 				# A trigger whose event never happens on this carrier still reads its payload, so the
 				# cards after it are read in the same order whether it fires or not; the payload is
@@ -239,49 +224,6 @@ func _read_group(want: int, payload: bool) -> CompiledGroup:
 		if fallback != null:
 			group.spells.append(fallback)
 	return group
-
-
-## A familiar's infusions and hit cards (`hands_on`) at the slots `kept` ride on the carriers of
-## the group read next; returns their slots.
-func _hand_on(kept: PackedInt32Array) -> PackedInt32Array:
-	var handed: PackedInt32Array = PackedInt32Array()
-	for at: int in kept:
-		var card: SpellComponent = _cards[at]
-		if card is ElementBase:
-			_handed_elements.append(card as ElementBase)
-		elif card is ModifierBase and _is_hit_card(card as ModifierBase):
-			_handed_modifiers.append(card as ModifierBase)
-		else:
-			continue
-		handed.append(at)
-	return handed
-
-
-## A card `handed` on (`_hand_on`) that a carrier of `group` took on counts, on the familiar at
-## `slot`; one that none took on and that does nothing on the familiar itself stays wasted, and
-## says so.
-func _settle_handed(handed: PackedInt32Array, group: CompiledGroup, form: FormBase, slot: int) -> void:
-	for at: int in handed:
-		var card: SpellComponent = _cards[at]
-		var used: bool = false
-		for spell in group.spells:
-			if spell.fallback == CompiledSpell.FALLBACK_NONE and (spell.element_ids.has(card.id) or spell.modifier_ids.has(card.id)):
-				used = true
-		if used:
-			_cast.wasted.erase(at)
-			_attach(at, slot)
-		elif _cast.wasted.has(at):
-			_waste(at, "%s does nothing on a %s: %s, and nothing it casts takes it on." % [_name(card), _name(form), _hits_nothing(form.motion)])
-
-
-## True for a card that acts on what its carrier hits: heavy, chain, siphon, possess, or more damage.
-static func _is_hit_card(modifier: ModifierBase) -> bool:
-	match modifier.behaviour:
-		ModifierBase.Behaviour.HEAVY, ModifierBase.Behaviour.CHAIN, ModifierBase.Behaviour.SIPHON, ModifierBase.Behaviour.POSSESS:
-			return true
-		ModifierBase.Behaviour.NONE:
-			return modifier.damage_mult > 1.0
-	return false
 
 
 ## The cards left without a carrier, on the caster or on the payload's origin. Elements always
@@ -326,7 +268,7 @@ func _means_something_there(modifier: ModifierBase, payload: bool) -> bool:
 ## reason; "" when it can. First the carrier (`trigger_runs`), then the cards the event needs on
 ## it: a block needs a shield or deflect, a reaction an infusion (or relay), and a kill or reaction
 ## on a carrier that hits nothing itself needs a blast, whose strikes are the carrier's hits.
-## A ghost shot, beam or fissure never meets a wall.
+## A ghost shot or beam never meets a wall.
 func _trigger_never(trigger: TriggerBase, form: FormBase, elements: Array[ElementBase], modifiers: Array[ModifierBase]) -> String:
 	var head: String = "%s does nothing on a %s" % [_name(trigger), _name(form)]
 	var why: String = trigger_why_not(trigger.event, form.motion)
@@ -367,7 +309,7 @@ static func _numbers_waste(modifier: ModifierBase, motion: FormBase.Motion, blas
 			return ""
 	if not is_equal_approx(modifier.speed_mult, 1.0) or not is_equal_approx(modifier.lifetime_mult, 1.0):
 		any = true
-		if motion != FormBase.Motion.FISSURE and motion != FormBase.Motion.TELEPORT:
+		if motion != FormBase.Motion.TELEPORT:
 			return ""
 	if modifier.shot_mult != 1:
 		any = true
@@ -375,12 +317,14 @@ static func _numbers_waste(modifier: ModifierBase, motion: FormBase.Motion, blas
 			return ""
 	if not is_equal_approx(modifier.spread_mult, 1.0):
 		any = true
+		# A placed carrier (rune, decoy, familiar) appears along its aim, so its spread moves it (rules R4 F3).
 		match motion:
-			FormBase.Motion.STRAIGHT, FormBase.Motion.RAY, FormBase.Motion.FISSURE, FormBase.Motion.HOOK, FormBase.Motion.SWAP, FormBase.Motion.SWING, FormBase.Motion.SLAM:
+			FormBase.Motion.STRAIGHT, FormBase.Motion.RAY, FormBase.Motion.HOOK, FormBase.Motion.SWAP, FormBase.Motion.SWING, FormBase.Motion.SLAM, FormBase.Motion.STILL, FormBase.Motion.DECOY, FormBase.Motion.FAMILIAR:
 				return ""
 	if modifier.extra_pierce != 0:
 		any = true
-		if stays(motion) or motion == FormBase.Motion.RAY:
+		# A wall stands through every hit (rules R4 F6).
+		if (stays(motion) and motion != FormBase.Motion.WALL) or motion == FormBase.Motion.RAY:
 			return ""
 	if not any:
 		return ""
@@ -547,9 +491,9 @@ static func stacked(behaviour: int, before: float, strength: float) -> float:
 
 ## Whether homing can steer a carrier of `motion`: what it moves turns toward a target as it
 ## goes, at the turn rate (a shot in flight, a dash, whether it carries the wizard or a shot),
-## a still shot (a rune) creeps toward one at SpellLimits.HOMING_DRIFT, what is over at once
-## bends its way toward one, up to `homing_angle` (a beam, a teleport), and what is placed ahead
-## of its caster is placed on one near that point (a wall, a rain; rules R4i). On any other form
+## a still shot (a rune, a wall) creeps toward one at SpellLimits.HOMING_DRIFT, what is over at
+## once bends its way toward one, up to `homing_angle` (a beam, a teleport), and a rain is placed
+## on one near the point ahead of its caster (rules R4i). On any other form
 ## a homing card is wasted. A new motion that should home goes here, and the homing test of
 ## every form card (tests/content/spells/test_homing_forms.gd) checks it reaches.
 static func homing_steers(motion: FormBase.Motion) -> bool:
@@ -586,7 +530,7 @@ static func behaviour_waste(behaviour: int, motion: FormBase.Motion, blasts: boo
 			# landing), and so does a decoy's body; a rain's strike meets bodies only.
 			return "" if guards(motion) or motion == FormBase.Motion.HOOK or motion == FormBase.Motion.SWAP or motion == FormBase.Motion.DASH or motion == FormBase.Motion.TELEPORT else "it touches no shots"
 		ModifierBase.Behaviour.GROWTH:
-			# A beam widens while it is on (rules R4f); a fissure is over at once.
+			# A beam widens while it is on (rules R4f).
 			return "" if stays(motion) or motion == FormBase.Motion.RAY else "it grows a shot in the world or a beam, and %s" % _what(motion)
 		ModifierBase.Behaviour.SPIRAL, ModifierBase.Behaviour.LINGER, ModifierBase.Behaviour.STICKY:
 			# A beam waves while it is on (rules R4f); it neither lingers nor sticks.
@@ -596,9 +540,9 @@ static func behaviour_waste(behaviour: int, motion: FormBase.Motion, blasts: boo
 		ModifierBase.Behaviour.GHOST:
 			if motion == FormBase.Motion.ORBIT:
 				return "an orbit already passes walls"
-			return "" if flies(motion) or rays(motion) else "it only takes a flying shot or a line through walls, and %s" % _what(motion)
+			return "" if flies(motion) or motion == FormBase.Motion.RAY else "it only takes a flying shot or a line through walls, and %s" % _what(motion)
 		ModifierBase.Behaviour.BOUNCE:
-			if flies(motion) or rays(motion):
+			if flies(motion) or motion == FormBase.Motion.RAY:
 				return ""
 			return "it turns a shot or a beam at walls, and %s" % _what(motion)
 		ModifierBase.Behaviour.HEAVY, ModifierBase.Behaviour.CHAIN, ModifierBase.Behaviour.SIPHON, ModifierBase.Behaviour.POSSESS:
@@ -628,12 +572,6 @@ static func flies(motion: FormBase.Motion) -> bool:
 	return motion == FormBase.Motion.STRAIGHT or motion == FormBase.Motion.HOOK or motion == FormBase.Motion.SWAP
 
 
-## True for the carriers that are a line walked at once (a beam, a fissure): what a ray walk runs
-## (bounce, ghost, relay) runs on them.
-static func rays(motion: FormBase.Motion) -> bool:
-	return motion == FormBase.Motion.RAY or motion == FormBase.Motion.FISSURE
-
-
 ## True for the carriers that are shots staying in the world for a while (a bolt, a rune, an orbit,
 ## a wall, a hook, a swap): what rides on a live shot (arc, magnet, relay) runs on them.
 static func stays(motion: FormBase.Motion) -> bool:
@@ -643,31 +581,23 @@ static func stays(motion: FormBase.Motion) -> bool:
 	return false
 
 
-## True for the carriers that last a while (all but a fissure, a slam and a teleport, which are
-## over at once): a timer ticks and `on hurt` listens on them while they live (rules R4d).
+## True for the carriers that last a while (all but a slam and a teleport, which are over at
+## once): a timer ticks and `on hurt` listens on them while they live (rules R4d).
 static func lasts(motion: FormBase.Motion) -> bool:
-	return motion != FormBase.Motion.FISSURE and motion != FormBase.Motion.SLAM and motion != FormBase.Motion.TELEPORT
+	return motion != FormBase.Motion.SLAM and motion != FormBase.Motion.TELEPORT
 
 
-## True for the carriers that hit under their own tag (a shot, a beam, a fissure, a swing, a slam,
-## a rain as it lands, a dash what it passes, a teleport where it lands: rules R4c, R4g), and any
+## True for the carriers that hit under their own tag (a shot, a beam, a swing, a slam, a rain
+## as it lands, a dash what it passes, a teleport where it lands: rules R4c, R4g), and any
 ## carrier with a blast (`blasts`): what its blast strikes is its hit (rules R4 F2). A decoy and a
 ## familiar hit nothing themselves.
 static func hits(motion: FormBase.Motion, blasts: bool = false) -> bool:
 	if blasts:
 		return true
 	match motion:
-		FormBase.Motion.RAY, FormBase.Motion.FISSURE, FormBase.Motion.SWING, FormBase.Motion.SLAM, FormBase.Motion.RAIN, FormBase.Motion.DASH, FormBase.Motion.TELEPORT:
+		FormBase.Motion.RAY, FormBase.Motion.SWING, FormBase.Motion.SLAM, FormBase.Motion.RAIN, FormBase.Motion.DASH, FormBase.Motion.TELEPORT:
 			return true
 	return stays(motion)
-
-
-## True for a familiar (rules R4g): a caster carrying cards. Its infusions and hit cards (heavy,
-## chain, siphon, possess, more damage) ride on every carrier it casts, as if they were on it,
-## costs included; on the familiar itself they act as on any carrier that hits nothing (only a
-## blast carries them).
-static func hands_on(motion: FormBase.Motion) -> bool:
-	return motion == FormBase.Motion.FAMILIAR
 
 
 ## What a carrier of `motion` is, for a wasted card's reason.
@@ -686,11 +616,9 @@ static func _what(motion: FormBase.Motion) -> String:
 		FormBase.Motion.TELEPORT:
 			return "a teleport moves its caster at once and hits where it lands"
 		FormBase.Motion.WALL:
-			return "a wall stands still"
+			return "a wall stands still through every hit"
 		FormBase.Motion.RAIN:
 			return "a rain strikes once where it lands"
-		FormBase.Motion.FISSURE:
-			return "a fissure is a crack that is over at once"
 		FormBase.Motion.DECOY:
 			return "a decoy is a body that hits nothing"
 		FormBase.Motion.FAMILIAR:
@@ -708,7 +636,7 @@ static func _what(motion: FormBase.Motion) -> String:
 ## pull, a dash's and a teleport's is a barrier on the caster: those keep it.
 static func guards(motion: FormBase.Motion) -> bool:
 	match motion:
-		FormBase.Motion.STRAIGHT, FormBase.Motion.STILL, FormBase.Motion.ORBIT, FormBase.Motion.WALL, FormBase.Motion.RAY, FormBase.Motion.FISSURE, FormBase.Motion.SWING, FormBase.Motion.SLAM, FormBase.Motion.DECOY:
+		FormBase.Motion.STRAIGHT, FormBase.Motion.STILL, FormBase.Motion.ORBIT, FormBase.Motion.WALL, FormBase.Motion.RAY, FormBase.Motion.SWING, FormBase.Motion.SLAM, FormBase.Motion.DECOY:
 			return true
 	return false
 
@@ -726,11 +654,11 @@ static func _shield_outrun(modifier: ModifierBase, motion: FormBase.Motion) -> b
 ## - on hit, on kill and on reaction: every carrier, by its hits, or by its blast's on one that
 ##   hits nothing itself (decoy, familiar; `_trigger_never` checks the blast).
 ## - timer and on hurt: every carrier that lasts (`lasts`), while it lives (R4d).
-## - on block: wherever a shield or deflect runs (`behaviour_waste`): a shot, beam, fissure,
-##   swing or decoy that guards, and a dash's or teleport's barrier; a rain or familiar has
+## - on block: wherever a shield or deflect runs (`behaviour_waste`): a shot, beam, swing
+##   or decoy that guards, and a dash's or teleport's barrier; a rain or familiar has
 ##   nothing that blocks.
-## - on wall: a flying shot (bolt, hook, swap) at a wall it bounces off or ends on, and a beam
-##   or fissure at a wall it turns at or ends on.
+## - on wall: a flying shot (bolt, hook, swap) at a wall it bounces off or ends on, and a beam at
+##   a wall it turns at or ends on.
 static func trigger_runs(event: int, motion: FormBase.Motion) -> bool:
 	return trigger_why_not(event, motion).is_empty()
 
@@ -746,7 +674,7 @@ static func trigger_why_not(event: int, motion: FormBase.Motion) -> String:
 			if not behaviour_waste(ModifierBase.Behaviour.SHIELD, motion).is_empty() and not behaviour_waste(ModifierBase.Behaviour.DEFLECT, motion).is_empty():
 				return "nothing on it can block a shot"
 		TriggerBase.Event.WALL:
-			if not (flies(motion) or motion == FormBase.Motion.RAY or motion == FormBase.Motion.FISSURE):
+			if not (flies(motion) or motion == FormBase.Motion.RAY):
 				match motion:
 					FormBase.Motion.STILL, FormBase.Motion.WALL:
 						return "it stays where it is and never meets a wall"
@@ -770,7 +698,7 @@ static func _hits_nothing(motion: FormBase.Motion) -> String:
 		FormBase.Motion.DECOY:
 			return "a decoy hits nothing"
 		FormBase.Motion.FAMILIAR:
-			return "a familiar hits nothing itself, only what it casts does"
+			return "a familiar hits nothing"
 	return "it hits nothing"
 
 

@@ -58,14 +58,14 @@ func test_a_multicast_card_is_its_own_kind() -> void:
 	check(not double.range_problems().is_empty(), "nine extra draws is out of range")
 
 
-func test_only_rain_and_familiar_carry_a_payload() -> void:
+func test_only_rain_carries_a_payload() -> void:
 	var form := FormBase.new()
 	var carrying: Array[int] = []
 	for motion: int in FormBase.Motion.size():
 		form.motion = motion as FormBase.Motion
 		if form.carries_payload():
 			carrying.append(motion)
-	check_equal(carrying, [FormBase.Motion.RAIN, FormBase.Motion.FAMILIAR] as Array[int], "rain and familiar only")
+	check_equal(carrying, [FormBase.Motion.RAIN] as Array[int], "rain only: a familiar casts what its triggers give it (rules R4 F3)")
 
 
 func test_every_new_enum_value_is_inside_the_validator_range() -> void:
@@ -79,3 +79,11 @@ func test_every_new_enum_value_is_inside_the_validator_range() -> void:
 	var form := FormBase.new()
 	form.motion = FormBase.Motion.FAMILIAR
 	check(form.range_problems().is_empty(), "the last motion is in range")
+
+
+func test_the_removed_fissure_slot_is_kept_and_refused() -> void:
+	# Fissure removed (owner, 2026-10-30): its number stays so stored motions keep their meaning.
+	check_equal(int(FormBase.Motion.DECOY), 11, "the carriers after it keep their numbers")
+	var form := FormBase.new()
+	form.motion = FormBase.Motion._UNUSED_10
+	check(not form.range_problems().is_empty(), "no card may use the empty slot")

@@ -64,7 +64,7 @@ func _wizard(index: int) -> Actor:
 
 ## What combat sends for one hit: its kind, then the damage.
 func _hit(player: int, target: Node, kind: StringName) -> void:
-	bus.hit_landed.emit(player, target, 5, Vector2.ZERO, kind)
+	bus.hit_landed.emit(player, target, 5, Vector2.ZERO, kind, -1)
 	bus.damage_dealt.emit(player, target, 5, Vector2.ZERO)
 
 
@@ -108,7 +108,7 @@ func test_a_hit_with_no_kind_feels_like_a_shot() -> void:
 
 func test_a_stale_kind_is_not_applied_to_a_later_hit() -> void:
 	var other: Node2D = _enemy()
-	bus.hit_landed.emit(0, other, 5, Vector2.ZERO, &"burst")
+	bus.hit_landed.emit(0, other, 5, Vector2.ZERO, &"burst", -1)
 	bus.damage_dealt.emit(0, _enemy(), 5, Vector2.ZERO)
 	check(is_equal_approx(actors.held_left(0), preset.hit_stop_seconds), "the kind belongs to the target it was sent for")
 

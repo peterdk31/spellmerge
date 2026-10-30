@@ -87,11 +87,11 @@ func _init(root: Node) -> void:
 	combat.projectiles = projectiles
 	combat.spells = spells
 	combat._ready()
-	bus.reaction_triggered.connect(func(player: int, id: StringName, at: Vector2) -> void: reactions.append([player, id, at]))
+	bus.reaction_triggered.connect(func(player: int, id: StringName, at: Vector2, _shot: int) -> void: reactions.append([player, id, at]))
 	bus.caster_move_requested.connect(func(player: int, mode: StringName, _to: Vector2, _seconds: float, _tag: int) -> void: caster_moves.append([player, mode]))
 	bus.shield_blocked.connect(func(actor: int, _at: Vector2, _tag: int) -> void: blocks.append(actor))
-	bus.shot_blocked.connect(func(actor: int, _at: Vector2, _tag: int) -> void: blocks.append(actor))
-	bus.shot_deflected.connect(func(actor: int, _at: Vector2, _tag: int) -> void: deflects.append(actor))
+	bus.shot_blocked.connect(func(actor: int, _at: Vector2, _tag: int, _shot: int) -> void: blocks.append(actor))
+	bus.shot_deflected.connect(func(actor: int, _at: Vector2, _tag: int, _shot: int) -> void: deflects.append(actor))
 	bus.entity_spawn_requested.connect(func(actor: int, kind: StringName, _at: Vector2, _seconds: float, _tag: int, _caster: int) -> void: spawns.append([actor, kind]))
 	bus.heal_dealt.connect(func(caster: int, target: Node, amount: int, _at: Vector2) -> void: heals.append([caster, target, amount]))
 	bus.status_applied.connect(func(player: int, target: Node, id: StringName) -> void: statuses.append([player, target, id, lost(target as Node2D)]))

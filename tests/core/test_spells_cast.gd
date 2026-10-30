@@ -48,7 +48,7 @@ func before_each() -> void:
 	_hits.clear()
 	_ended.clear()
 	_mgr.shot_ended.connect(func(tag: int) -> void: _ended[tag] = _ended.get(tag, 0) + 1)
-	_bus.projectile_hit.connect(func(player: int, target: Node, at: Vector2, tag: int) -> void: _hits.append([player, target, at, tag]))
+	_bus.projectile_hit.connect(func(player: int, target: Node, at: Vector2, tag: int, _shot: int) -> void: _hits.append([player, target, at, tag]))
 	_form(&"bolt", 5, 300.0, 1.0)
 	_form(&"slow", 5, 60.0, 5.0)
 	_form(&"short", 5, 300.0, 0.1)

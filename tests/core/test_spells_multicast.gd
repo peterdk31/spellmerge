@@ -43,8 +43,8 @@ func before_each() -> void:
 	_spells.registry = _fake
 	_spells.bind(_mgr, _bus)
 	_hits.clear()
-	_bus.projectile_hit.connect(func(player: int, target: Node, at: Vector2, tag: int) -> void:
-		var profile: HitProfile = _spells.hit_profile(tag)
+	_bus.projectile_hit.connect(func(player: int, target: Node, at: Vector2, tag: int, shot: int) -> void:
+		var profile: HitProfile = _spells.hit_profile(tag, shot)
 		_hits.append([player, target, at, tag, profile.damage if profile != null else -1]))
 	var bolt: FormBase = _form(&"bolt", 300.0, 1.0)
 	bolt.base_damage = 10

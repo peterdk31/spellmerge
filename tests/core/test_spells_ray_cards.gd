@@ -49,7 +49,7 @@ func before_each() -> void:
 	_mgr.set_anchor(0, Vector2.ZERO)
 	_hits.clear()
 	_pulls.clear()
-	_bus.projectile_hit.connect(func(player: int, target: Node, at: Vector2, tag: int) -> void:
+	_bus.projectile_hit.connect(func(player: int, target: Node, at: Vector2, tag: int, _shot: int) -> void:
 		_hits.append([player, target, at, tag]))
 	_bus.pull_requested.connect(func(_player: int, at: Vector2, radius: float, _strength: float, _tag: int, to: Vector2) -> void:
 		_pulls.append([at, to, radius]))
@@ -303,9 +303,9 @@ func test_a_relay_beam_takes_on_what_it_passes_through_while_it_is_on() -> void:
 		var imp: Node2D = arena.imps[0]
 		# The elements of every hit on the imp.
 		var hits: Array = []
-		arena.bus.projectile_hit.connect(func(_actor: int, target: Node, _at: Vector2, tag: int) -> void:
+		arena.bus.projectile_hit.connect(func(_actor: int, target: Node, _at: Vector2, tag: int, shot: int) -> void:
 			if target == imp:
-				var profile: HitProfile = arena.spells.hit_profile(tag)
+				var profile: HitProfile = arena.spells.hit_profile(tag, shot)
 				hits.append(profile.element_ids.duplicate() if profile != null else PackedStringArray()))
 		check(arena.cast(0, 0), "the beam is cast")
 		arena.run(0.05)

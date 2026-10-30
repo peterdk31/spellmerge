@@ -1,6 +1,6 @@
 extends "res://tests/support/suite.gd"
 ## Tests for what core/projectiles gives the spell runtime (M2 part 6): the `shot_ended`
-## signal for every way a shot can end, `remove_by_tag`, `event_slot` and the per-slot
+## signal for every way a shot can end, `remove_by_tag`, each event's `shot` and the per-slot
 ## readers, and `exclude`. The manager is stepped by hand.
 ##
 ## godot --headless --path . --script res://tests/core/test_projectiles_ends.gd
@@ -16,7 +16,7 @@ var _bus: EventsScript
 var _mgr: ManagerScript
 ## Every tag shot_ended was sent with.
 var _ended: Array[int] = []
-## The event_slot seen in each projectile_hit and projectile_expired handler.
+## The `shot` each projectile_hit and projectile_expired event named.
 var _seen_slots: Array[int] = []
 var _hits: int = 0
 
@@ -31,10 +31,10 @@ func before_each() -> void:
 	_seen_slots.clear()
 	_hits = 0
 	_mgr.shot_ended.connect(func(tag: int) -> void: _ended.append(tag))
-	_bus.projectile_hit.connect(func(_p: int, _t: Node, _at: Vector2, _tag: int) -> void:
+	_bus.projectile_hit.connect(func(_p: int, _t: Node, _at: Vector2, _tag: int, shot: int) -> void:
 		_hits += 1
-		_seen_slots.append(_mgr.event_slot))
-	_bus.projectile_expired.connect(func(_p: int, _at: Vector2, _tag: int) -> void: _seen_slots.append(_mgr.event_slot))
+		_seen_slots.append(shot))
+	_bus.projectile_expired.connect(func(_p: int, _at: Vector2, _tag: int, shot: int) -> void: _seen_slots.append(shot))
 
 
 func _target(position: Vector2, radius: float = 10.0) -> Node2D:
@@ -55,7 +55,7 @@ func test_a_spent_hit_ends_the_shot_once_after_the_handlers() -> void:
 	_target(Vector2(30, 0))
 	_mgr.spawn(0, Vector2.ZERO, Vector2(300, 0), 2.0, 4.0, ManagerScript.LAYER_ENEMY, 0, TAG)
 	var order: Array[String] = []
-	_bus.projectile_hit.connect(func(_p: int, _t: Node, _at: Vector2, _tag: int) -> void: order.append("hit:%d" % _ended.size()))
+	_bus.projectile_hit.connect(func(_p: int, _t: Node, _at: Vector2, _tag: int, _shot: int) -> void: order.append("hit:%d" % _ended.size()))
 	_step(20)
 	check_equal(_ended, [TAG] as Array[int], "one end, with the shot's tag")
 	check_equal(order, ["hit:0"] as Array[String], "the handler ran before the end was announced")
@@ -123,13 +123,11 @@ func test_remove_by_tag_is_quiet_and_exact() -> void:
 	check_equal(_mgr.get_count(), 2, "the freed rows can be used again")
 
 
-func test_event_slot_is_set_in_handlers_only() -> void:
+func test_every_event_names_its_shot() -> void:
 	_target(Vector2(30, 0))
 	var slot: int = _mgr.spawn(0, Vector2.ZERO, Vector2(300, 0), 2.0, 4.0, ManagerScript.LAYER_ENEMY, 0, TAG)
-	check_equal(_mgr.event_slot, -1, "-1 outside")
 	_step(20)
-	check_equal(_seen_slots, [slot] as Array[int], "the hit handler saw the shot's slot")
-	check_equal(_mgr.event_slot, -1, "and it is reset")
+	check_equal(_seen_slots, [slot] as Array[int], "the hit named the shot's slot")
 	_target(Vector2(100, 100))
 	_seen_slots.clear()
 	_mgr.ray(0, Vector2(0, 100), Vector2.RIGHT, 200.0, 0, ManagerScript.LAYER_ENEMY, TAG)
@@ -140,15 +138,15 @@ func test_a_ray_inside_a_handler_does_not_inherit_its_slot() -> void:
 	_target(Vector2(30, 0))
 	_target(Vector2(100, 100))
 	var inner: Array[int] = []
-	_bus.projectile_hit.connect(func(_p: int, _t: Node, at: Vector2, tag: int) -> void:
+	_bus.projectile_hit.connect(func(_p: int, _t: Node, at: Vector2, tag: int, shot: int) -> void:
 		if tag == TAG:
 			_mgr.ray(0, Vector2(0, 100), Vector2.RIGHT, 200.0, 0, ManagerScript.LAYER_ENEMY, TAG + 1)
-			inner.append(_mgr.event_slot)
+			inner.append(shot)
 		elif tag == TAG + 1:
-			inner.append(_mgr.event_slot))
+			inner.append(shot))
 	_mgr.spawn(0, Vector2.ZERO, Vector2(300, 0), 2.0, 4.0, ManagerScript.LAYER_ENEMY, 0, TAG)
 	_step(20)
-	check_equal(inner, [-1, 0] as Array[int], "the ray's hit saw -1, the outer handler 0 again afterwards")
+	check_equal(inner, [-1, 0] as Array[int], "the ray's hit named -1, the outer hit its own shot, 0")
 
 
 func test_the_readers_follow_a_slot() -> void:

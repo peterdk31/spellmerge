@@ -97,7 +97,7 @@ func start(scenario: Dictionary) -> bool:
 	combat.projectiles = projectiles
 	combat.spells = spells
 	combat.setup()
-	bus.reaction_triggered.connect(func(caster: int, id: StringName, at: Vector2) -> void: reactions.append([caster, id, at]))
+	bus.reaction_triggered.connect(func(caster: int, id: StringName, at: Vector2, _shot: int) -> void: reactions.append([caster, id, at]))
 	feel = _own(FeelScript.new()) as FeelScript
 	feel.events = bus
 	feel.actors = actors

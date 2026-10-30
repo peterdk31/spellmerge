@@ -173,10 +173,10 @@ extends Node2D
 ## its life, a wall, the bounds, the cap dropping it, a cleared anchor, `clear()`. It is sent
 ## after that shot's `projectile_hit` or `projectile_expired` handlers have run, so a handler
 ## can spawn children first. `remove_by_tag` is the exception: it is silent, because its
-## caller is the one that revoked the tag. While a `projectile_hit` or `projectile_expired`
-## event of a shot is being sent, `event_slot` is that shot's slot (-1 otherwise, and for a
-## ray), so a listener can read per-shot state with `get_seq_of` and `get_velocity_of`; a
-## slot that just ended is not reused until the next spawn. `exclude(slot, node, seconds)`
+## caller is the one that revoked the tag. Every event of a shot (`projectile_hit`,
+## `projectile_expired`, `shot_blocked`, `shot_deflected`, `wall_met`) names its slot as `shot`
+## (-1 for a ray), so a listener can read per-shot state with `get_seq_of` and `get_velocity_of`
+## while it is sent; a slot that just ended is not reused until the next spawn. `exclude(slot, node, seconds)`
 ## keeps one shot from hitting one target for a while.
 ##
 ## The step (shots stepped by behaviour, 2026-10-28): every shot moves on in one short common
@@ -202,9 +202,8 @@ signal shot_ended(tag: int)
 ## Something met a wall and was not over (for `on wall`, which also fires on a shot's last wall
 ## through `projectile_expired` and `expired_on_wall`): a shot bounced off one, or a ray (sent
 ## with `hit`) turned at one or ended on one. `position` is just out of the wall and `heading`
-## the way it goes on (at a ray's end, the way it came). While a shot's is sent, `event_slot`
-## is that shot; a ray's has -1.
-signal wall_met(caster: int, position: Vector2, heading: Vector2, tag: int)
+## the way it goes on (at a ray's end, the way it came). `shot` is the shot's slot; a ray's is -1.
+signal wall_met(caster: int, position: Vector2, heading: Vector2, tag: int, shot: int)
 
 ## Every caster number there is: the actor ids (see "Casters").
 const ACTORS: int = ActorsScript.ACTORS
@@ -474,8 +473,9 @@ var texture: Texture2D = null:
 var events: EventsScript = null
 ## How many projectiles were dropped because the cap was full, since start.
 var dropped: int = 0
-## The slot of the shot whose hit or expiry event is being sent, else -1. See "Ends".
-var event_slot: int = -1
+## The slot of the shot whose event is being sent, else -1: inside the manager only (a shot that
+## just ended still answers its own event's handlers). Listeners get it as the event's `shot`.
+var _event_slot: int = -1
 ## The form of the shot whose `projectile_impact` is being sent: `&"bolt"`, `&"rune"`, `&"orbit"`
 ## or `&"beam"`, whoever cast it, and the carrier's while `block_shot` sends `shot_blocked` (a
 ## swing's: a parry) (any time outside these: `&""`). For looks only.
@@ -1866,7 +1866,7 @@ func set_growth(slot: int, factor: float) -> bool:
 ## How many times bigger the shot in `slot` is than when it started (1.0 for a plain shot).
 func get_growth_of(slot: int) -> float:
 	# The shot whose hit is being sent counts even when that hit spent it (it is gone already).
-	if slot < 0 or slot >= _cap or (_alive[slot] == 0 and slot != event_slot) or _radius0[slot] <= 0.0:
+	if slot < 0 or slot >= _cap or (_alive[slot] == 0 and slot != _event_slot) or _radius0[slot] <= 0.0:
 		return 1.0
 	return _radius[slot] / _radius0[slot]
 
@@ -1964,10 +1964,10 @@ func deflect_shot(slot: int, by: int, normal: Vector2, by_tag: int) -> bool:
 	# Its colours are its new caster's: work its look out again.
 	_drawn_seq[slot] = -1
 	if events != null:
-		var outer_slot: int = event_slot
-		event_slot = slot
-		events.shot_deflected.emit(by, _pos[slot], by_tag)
-		event_slot = outer_slot
+		var outer_slot: int = _event_slot
+		_event_slot = slot
+		events.shot_deflected.emit(by, _pos[slot], by_tag, slot)
+		_event_slot = outer_slot
 	return true
 
 
@@ -1983,7 +1983,7 @@ func block_shot(slot: int, by: int, by_tag: int, form: StringName = &"") -> bool
 	if events != null:
 		var outer_form: StringName = impact_form
 		impact_form = form
-		events.shot_blocked.emit(by, at, by_tag)
+		events.shot_blocked.emit(by, at, by_tag, _event_slot)
 		impact_form = outer_form
 	return true
 
@@ -2674,10 +2674,10 @@ func _wall_end(slot: int) -> void:
 	# A bounced shot may hit what it hit before.
 	_forget_all(slot)
 	# Last: a handler's payload may take this slot over (a cap drop).
-	var outer_slot: int = event_slot
-	event_slot = slot
-	wall_met.emit(_actor[slot], at, _vel[slot].normalized(), _tag[slot])
-	event_slot = outer_slot
+	var outer_slot: int = _event_slot
+	_event_slot = slot
+	wall_met.emit(_actor[slot], at, _vel[slot].normalized(), _tag[slot], slot)
+	_event_slot = outer_slot
 
 
 ## `velocity` turned off the wall face met at `at` (just out of the wall, heading `heading`): a
@@ -2760,9 +2760,9 @@ func _guard_meets(slot: int, other: int, normal: Vector2) -> void:
 	var at: Vector2 = _pos[other]
 	_kill(other)
 	if events != null:
-		event_slot = slot
-		events.shot_blocked.emit(_actor[slot], at, _tag[slot])
-		event_slot = -1
+		_event_slot = slot
+		events.shot_blocked.emit(_actor[slot], at, _tag[slot], slot)
+		_event_slot = -1
 
 
 ## The shot in `slot` met a wall: when it is the row of a solid shot of another team with a
@@ -3071,16 +3071,16 @@ func strike(caster: int, target: Node, point: Vector2, heading: Vector2, tag: in
 	if events == null or not is_instance_valid(target) or not is_caster(caster):
 		return false
 	_ray_depth += 1
-	var outer_slot: int = event_slot
-	event_slot = -1
+	var outer_slot: int = _event_slot
+	_event_slot = -1
 	impact_form = form
 	impact_core = Color.WHITE
 	impact_look = 0
 	events.projectile_impact.emit(caster, target, point, heading)
 	impact_form = &""
-	events.projectile_hit.emit(caster, target, point, tag)
+	events.projectile_hit.emit(caster, target, point, tag, -1)
 	_ray_depth -= 1
-	event_slot = outer_slot
+	_event_slot = outer_slot
 	return true
 
 
@@ -3226,8 +3226,8 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 		_keep_ray_path(walk, walked)
 		return got
 	_ray_depth += 1
-	var outer_slot: int = event_slot
-	event_slot = -1
+	var outer_slot: int = _event_slot
+	_event_slot = -1
 	for i in found:
 		var node: Variant = nodes[i]
 		if events != null and is_instance_valid(node):
@@ -3238,7 +3238,7 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 			impact_form = &""
 			impact_core = Color.WHITE
 			impact_look = 0
-			events.projectile_hit.emit(caster, node, points[i], tag)
+			events.projectile_hit.emit(caster, node, points[i], tag, -1)
 		nodes[i] = null
 	# A spark at every wall it turned at before it ended, and at the wall it ended on; then
 	# `wall_met` for each (a handler's payload may fire rays: this level's scratch is kept).
@@ -3268,11 +3268,11 @@ func _ray_path(caster: int, segments: int, pierce: int, layers: int, tag: int, w
 		if n >= walked - 1:
 			break
 		var turn: Vector2 = walk[n]
-		wall_met.emit(caster, turn, turn.direction_to(walk[n + 1]), tag)
+		wall_met.emit(caster, turn, turn.direction_to(walk[n + 1]), tag, -1)
 	if walled:
-		wall_met.emit(caster, end - end_heading * 0.5, end_heading, tag)
+		wall_met.emit(caster, end - end_heading * 0.5, end_heading, tag, -1)
 	_ray_depth -= 1
-	event_slot = outer_slot
+	_event_slot = outer_slot
 	ray_end = end
 	ray_end_heading = end_heading
 	_keep_ray_path(walk, walked)
@@ -3980,17 +3980,17 @@ func _expire(slot: int) -> void:
 	var tag: int = _tag[slot]
 	_kill(slot, false)
 	if events != null:
-		event_slot = slot
+		_event_slot = slot
 		impact_form = _form_of(slot)
 		impact_core = _core[slot]
 		impact_look = _look[slot]
 		impact_heading = _vel[slot].normalized()
-		events.projectile_expired.emit(caster, at, tag)
+		events.projectile_expired.emit(caster, at, tag, slot)
 		impact_form = &""
 		impact_core = Color.WHITE
 		impact_look = 0
 		impact_heading = Vector2.ZERO
-		event_slot = -1
+		_event_slot = -1
 	if tag != 0:
 		shot_ended.emit(tag)
 
@@ -4511,8 +4511,8 @@ func _register_hit(slot: int, target: int, at: Vector2) -> void:
 		impact_form = &""
 		impact_core = Color.WHITE
 		impact_look = 0
-		event_slot = slot
-		events.projectile_hit.emit(caster, node, at, tag)
-		event_slot = -1
+		_event_slot = slot
+		events.projectile_hit.emit(caster, node, at, tag, slot)
+		_event_slot = -1
 	if spent and tag != 0:
 		shot_ended.emit(tag)

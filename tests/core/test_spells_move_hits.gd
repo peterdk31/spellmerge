@@ -53,7 +53,7 @@ func before_each() -> void:
 	_hits.clear()
 	_moves.clear()
 	_barriers.clear()
-	_bus.projectile_hit.connect(func(caster: int, target: Node, at: Vector2, tag: int) -> void:
+	_bus.projectile_hit.connect(func(caster: int, target: Node, at: Vector2, tag: int, _shot: int) -> void:
 		_hits.append([caster, target, at, tag]))
 	_bus.caster_move_requested.connect(func(caster: int, mode: StringName, to: Vector2, seconds: float, tag: int) -> void:
 		_moves.append([caster, mode, to, seconds, tag]))

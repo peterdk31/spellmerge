@@ -44,7 +44,7 @@ func before_each() -> void:
 	_spells.bind(_mgr, _bus)
 	_hits.clear()
 	# Connected after Spells, as Combat is: it sees the profile a relay has already changed.
-	_bus.projectile_hit.connect(func(caster: int, target: Node, at: Vector2, tag: int) -> void: _hits.append([caster, target, at, tag, _spells.hit_profile(tag)]))
+	_bus.projectile_hit.connect(func(caster: int, target: Node, at: Vector2, tag: int, shot: int) -> void: _hits.append([caster, target, at, tag, _spells.hit_profile(tag, shot)]))
 	_form(&"bolt", 300.0, 1.0)
 	_form(&"short", 300.0, 0.1)
 	var rune: FormBase = _form(&"rune", 0.0, 10.0)
@@ -255,8 +255,8 @@ func test_a_beam_on_kill_fires_at_every_kill() -> void:
 	beam.carrier = &"beam"
 	beam.ray_length = 300.0
 	beam.pierce = 3
-	_bus.projectile_hit.connect(func(player: int, target: Node, at: Vector2, tag: int) -> void:
-		_bus.kill_landed.emit(player, target, at, tag))
+	_bus.projectile_hit.connect(func(player: int, target: Node, at: Vector2, tag: int, shot: int) -> void:
+		_bus.kill_landed.emit(player, target, at, tag, shot))
 	_target(Vector2(100, 0))
 	_target(Vector2(150, 0))
 	var killed: int = _build(0, [&"on_kill", &"beam", &"rune"])
@@ -272,11 +272,11 @@ func test_a_beam_on_kill_fires_at_every_kill() -> void:
 
 func test_on_kill_and_on_reaction_fire_from_the_hit() -> void:
 	# What combat does: tell about the kill and the reaction while the hit is being sent.
-	_bus.projectile_hit.connect(func(player: int, target: Node, at: Vector2, tag: int) -> void:
+	_bus.projectile_hit.connect(func(player: int, target: Node, at: Vector2, tag: int, shot: int) -> void:
 		if player == 0:
-			_bus.kill_landed.emit(player, target, at, tag)
+			_bus.kill_landed.emit(player, target, at, tag, shot)
 		else:
-			_bus.reaction_landed.emit(player, &"steam", target, at, tag))
+			_bus.reaction_landed.emit(player, &"steam", target, at, tag, shot))
 	_target(Vector2(100, 0))
 	var killed: int = _build(0, [&"on_kill", &"bolt", &"rune"])
 	# A hit with no element sets off no reaction (rules R2b): the bolt carries fire.
@@ -302,10 +302,10 @@ func test_a_trigger_that_does_not_match_stays_quiet() -> void:
 	var carrier: int = _spells.current_tag(0, 0, 0)
 	_cast(0)
 	var slot: int = _first(carrier)
-	_bus.reaction_landed.emit(0, &"steam", null, Vector2(10, 0), carrier)
-	_bus.shot_blocked.emit(0, Vector2(10, 0), carrier)
-	_bus.kill_landed.emit(0, null, Vector2(10, 0), 77)
-	_bus.projectile_expired.emit(0, Vector2(10, 0), carrier)
+	_bus.reaction_landed.emit(0, &"steam", null, Vector2(10, 0), carrier, -1)
+	_bus.shot_blocked.emit(0, Vector2(10, 0), carrier, -1)
+	_bus.kill_landed.emit(0, null, Vector2(10, 0), 77, -1)
+	_bus.projectile_expired.emit(0, Vector2(10, 0), carrier, -1)
 	check(slot >= 0, "the carrier flew")
 	check_equal(_spells.live_shots(held), 0, "no other event, a bad tag or a null target fired the kill payload")
 
@@ -398,7 +398,7 @@ func test_a_carrier_that_hits_nothing_fires_on_kill_from_its_blast() -> void:
 	StaffKit.build(_spells, 0, 0, [&"on_kill", &"blast", &"decoy", &"rune"])
 	var carrier: int = _spells.current_tag(0, 0, 0)
 	var held: int = _spells.current_tag(0, 0, 1)
-	_bus.kill_landed.emit(0, null, Vector2(40, 0), carrier)
+	_bus.kill_landed.emit(0, null, Vector2(40, 0), carrier, -1)
 	check_equal(_slots(held).size(), 1, "a kill under the decoy's tag fires its payload")
 	var bare: CompiledStaff = _spells.compile_staff([&"on_kill", &"decoy", &"rune"] as Array[StringName], null)
 	check(bare.wasted.has(0), "without a blast it is wasted: %s" % bare.wasted)

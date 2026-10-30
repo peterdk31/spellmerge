@@ -30,7 +30,7 @@ func before_each() -> void:
 		forms.append(mgr.impact_form)
 		impacts.append([caster, target, position, direction])
 		order.append("impact"))
-	bus.projectile_hit.connect(func(_caster: int, _target: Node, _position: Vector2, _tag: int) -> void: order.append("hit"))
+	bus.projectile_hit.connect(func(_caster: int, _target: Node, _position: Vector2, _tag: int, _shot: int) -> void: order.append("hit"))
 
 
 func test_a_shot_that_ends_on_a_wall_says_where_and_which_way() -> void:

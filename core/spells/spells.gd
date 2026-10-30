@@ -63,7 +63,7 @@ extends Node
 ## `bind` connects to the manager and the event bus (`_ready` binds the autoloads; tests
 ## bind their own).
 ##
-## `hit_profile(tag)` is what `gameplay/combat` asks on `projectile_hit`.
+## `hit_profile(tag, shot)` is what `gameplay/combat` asks on `projectile_hit`.
 ##
 ## Multicast spread (B2b): a scatter group sends each carrier in a random direction, drawn from
 ## a generator seeded by the actor, staff and how many casts the staff has made (a replay is
@@ -704,14 +704,15 @@ func generations_held(actor: int, slot: int) -> int:
 	return count
 
 
-## What one hit of a shot with `tag` does, or null when the tag is no spell's (a shot of
-## no staff) or its generation is gone. Shared and read-only; allocates nothing.
-func hit_profile(tag: int) -> HitProfile:
+## What one hit of a shot with `tag` does, or null when the tag is no spell's (a shot of no staff)
+## or its generation is gone. `shot` is the shot that hit (the event's `shot`; -1 for a ray or an
+## area hit). Shared and read-only; allocates nothing.
+func hit_profile(tag: int, shot: int = -1) -> HitProfile:
 	var spell: CompiledSpell = _profiles.get(tag)
 	if spell == null:
 		return null
-	# A relay shot hits with what it took on (the hit being sent names its slot).
-	var slot: int = projectiles.event_slot if projectiles != null else -1
+	# A relay shot hits with what it took on (the hit names its shot).
+	var slot: int = shot if projectiles != null else -1
 	if slot >= 0 and slot < _rec_relay.size() and _rec_relay[slot] != null and _same(slot) and projectiles.get_tag_of(slot) == tag:
 		return _rec_relay[slot]
 	# A ray (a beam, a swing, a zap, a jump of any) has no slot: it hits with what the
@@ -1077,10 +1078,10 @@ func _recoil(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, headin
 ## The area hit of a `blast` at the end point `at` of the carrier with `tag`, as wide as its
 ## strength, with the hit profile of its tag, and its explosion (`cue_shown`, the cue its blast card
 ## names). Nothing without a blast.
-func _blast(spell: CompiledSpell, tag: int, actor: int, at: Vector2) -> void:
+func _blast(spell: CompiledSpell, tag: int, actor: int, at: Vector2, shot: int = -1) -> void:
 	var radius: float = spell.behaviour(ModifierBase.Behaviour.BLAST)
 	if radius > 0.0 and events != null and at.is_finite():
-		events.area_hit_requested.emit(actor, at, radius, tag)
+		events.area_hit_requested.emit(actor, at, radius, tag, shot)
 		events.cue_shown.emit(actor, spell.cue_of(ModifierBase.Behaviour.BLAST), at, Vector2.ZERO, radius, spell.tint, spell.look)
 
 
@@ -1225,7 +1226,7 @@ func _fires_any(launch: PendingLaunch, tags: PackedInt64Array) -> bool:
 func _fallback_hit(spell: CompiledSpell, tag: int, actor: int, at: Vector2) -> int:
 	if events != null:
 		var blast: float = spell.behaviour(ModifierBase.Behaviour.BLAST)
-		events.area_hit_requested.emit(actor, at, maxf(spell.radius, blast), tag)
+		events.area_hit_requested.emit(actor, at, maxf(spell.radius, blast), tag, -1)
 		if blast > 0.0 and at.is_finite():
 			events.cue_shown.emit(actor, spell.cue_of(ModifierBase.Behaviour.BLAST), at, Vector2.ZERO, blast, spell.tint, spell.look)
 	# After the area hit, which can reach the caster itself and would spend the barrier.
@@ -1816,7 +1817,7 @@ func _zap(slot: int) -> void:
 	_cast_jumps()
 
 
-func _on_hit(actor: int, target: Node, position: Vector2, tag: int) -> void:
+func _on_hit(actor: int, target: Node, position: Vector2, tag: int, shot: int) -> void:
 	if not SpellTag.is_spell_tag(tag):
 		return
 	var spell: CompiledSpell = _profiles.get(tag)
@@ -1824,8 +1825,8 @@ func _on_hit(actor: int, target: Node, position: Vector2, tag: int) -> void:
 		return
 	# `relay` takes on what the actor hit last cast, before Combat reads this hit's profile (Spells
 	# hears `projectile_hit` first: its autoload comes before Combat's).
-	_relay(target, tag)
-	var slot: int = projectiles.event_slot
+	_relay(target, tag, shot)
+	var slot: int = shot
 	var chain: int = spell.chain_jumps
 	var prev: int = 0
 	var heading: Vector2 = Vector2.RIGHT
@@ -1874,7 +1875,7 @@ func _on_hit_effects(spell: CompiledSpell, tag: int, actor: int, target: Node, p
 	var pulled: bool = _carrier_of(spell).on_hit(spell, tag, actor, target, position, slot)
 	# A spent shot's blast goes off where it hit; a hook's waits for the arrival of what it pulls.
 	if slot >= 0 and not projectiles.is_alive(slot) and not pulled:
-		_blast(spell, tag, actor, position)
+		_blast(spell, tag, actor, position, slot)
 
 
 ## `possess` (actors G9; owner, 2026-10-29): every actor a carrier with it hits is possessed for
@@ -1936,59 +1937,60 @@ func _jump(spell: CompiledSpell, tag: int, actor: int, position: Vector2, target
 	projectiles.exclude(slot, target, SpellLimits.SOURCE_EXCLUSION)
 
 
-func _on_expired(actor: int, position: Vector2, tag: int) -> void:
+func _on_expired(actor: int, position: Vector2, tag: int, shot: int) -> void:
 	var event: int = TriggerBase.Event.EXPIRE
 	var spell: CompiledSpell = _profiles.get(tag)
 	if spell != null and spell.trigger_event == TriggerBase.Event.WALL and projectiles.expired_on_wall:
 		event = TriggerBase.Event.WALL
 	# Every carrier blasts at its end point (rules R1d): a hook that missed, where it ended.
 	if spell != null:
-		_blast(spell, tag, actor, position)
-	_fire_event(event, actor, position, tag, null, true)
+		_blast(spell, tag, actor, position, shot)
+	_fire_event(event, actor, position, tag, null, shot, true)
 
 
 ## `on wall` at every wall that does not end the shot (a bounce) and at every wall a beam
 ## turns at or ends on (owner, 2026-10-29); a shot's last wall is `_on_expired`'s. The
 ## payload goes the way the shot or beam goes on. A zap (`_zap`, its shot's tag) that ends on a
 ## wall is not its shot meeting one: it sets off nothing (rules R4a).
-func _on_wall_met(actor: int, position: Vector2, heading: Vector2, tag: int) -> void:
+func _on_wall_met(actor: int, position: Vector2, heading: Vector2, tag: int, shot: int) -> void:
 	if _ray.arc_slot >= 0:
 		return
-	_fire_event(TriggerBase.Event.WALL, actor, position, tag, null, false, heading)
+	_fire_event(TriggerBase.Event.WALL, actor, position, tag, null, shot, false, heading)
 
 
-func _on_shot_blocked(actor: int, position: Vector2, tag: int) -> void:
-	_fire_event(TriggerBase.Event.BLOCK, actor, position, tag, null)
+func _on_shot_blocked(actor: int, position: Vector2, tag: int, shot: int) -> void:
+	_fire_event(TriggerBase.Event.BLOCK, actor, position, tag, null, shot)
 
 
 func _on_shield_blocked(actor: int, position: Vector2, tag: int) -> void:
-	_fire_event(TriggerBase.Event.BLOCK, actor, position, tag, null)
+	# A barrier on the caster blocks: no shot of this carrier is part of it.
+	_fire_event(TriggerBase.Event.BLOCK, actor, position, tag, null, -1)
 
 
 ## A deflect is a block (owner, 2026-10-29): it sets off `on block` too.
-func _on_shot_deflected(actor: int, position: Vector2, tag: int) -> void:
-	_fire_event(TriggerBase.Event.BLOCK, actor, position, tag, null)
+func _on_shot_deflected(actor: int, position: Vector2, tag: int, shot: int) -> void:
+	_fire_event(TriggerBase.Event.BLOCK, actor, position, tag, null, shot)
 
 
-func _on_kill(actor: int, target: Node, position: Vector2, tag: int) -> void:
-	_fire_event(TriggerBase.Event.KILL, actor, position, tag, target if is_instance_valid(target) else null)
+func _on_kill(actor: int, target: Node, position: Vector2, tag: int, shot: int) -> void:
+	_fire_event(TriggerBase.Event.KILL, actor, position, tag, target if is_instance_valid(target) else null, shot)
 
 
-func _on_reaction(actor: int, _reaction_id: StringName, target: Node, position: Vector2, tag: int) -> void:
-	_fire_event(TriggerBase.Event.REACTION, actor, position, tag, target if is_instance_valid(target) else null)
+func _on_reaction(actor: int, _reaction_id: StringName, target: Node, position: Vector2, tag: int, shot: int) -> void:
+	_fire_event(TriggerBase.Event.REACTION, actor, position, tag, target if is_instance_valid(target) else null, shot)
 
 
 ## Fires the payload of the shot with `tag` from `at`, when that shot's trigger is `event` (the
 ## shared way of the events that name a shot's tag). When the event is being sent for that
-## very shot, its record limits how often it fires. `back_off` pulls the point out of a wall;
-## `way`, when given, is the way the payload goes.
-func _fire_event(event: int, actor: int, at: Vector2, tag: int, source: Node, back_off: bool = false, way: Vector2 = Vector2.ZERO) -> void:
+## very shot (`shot`, the event's), its record limits how often it fires. `back_off` pulls the
+## point out of a wall; `way`, when given, is the way the payload goes.
+func _fire_event(event: int, actor: int, at: Vector2, tag: int, source: Node, shot: int, back_off: bool = false, way: Vector2 = Vector2.ZERO) -> void:
 	if not SpellTag.is_spell_tag(tag):
 		return
 	var spell: CompiledSpell = _profiles.get(tag)
 	if spell == null or spell.payload == null or spell.trigger_event != event:
 		return
-	var slot: int = projectiles.event_slot
+	var slot: int = shot
 	if slot >= 0 and (not _same(slot) or projectiles.get_tag_of(slot) != tag):
 		slot = -1
 	# A beam has no slot: while its `ray()` runs, its payload goes along the beam.
@@ -2027,14 +2029,14 @@ func _on_hurt(actor: int, _amount: int, position: Vector2, _tag: int, _kind: Str
 ## An actor that never cast an infused carrier gives nothing. A ray with it (a beam or a
 ## jump of one; rules R4f) keeps what it took on in `_ray.hit` for its later hits, a live beam
 ## for as long as it is on (`_bm_hit`). Allocates two profiles per such hit, never per frame.
-func _relay(target: Node, tag: int) -> void:
+func _relay(target: Node, tag: int, shot: int) -> void:
 	var spell: CompiledSpell = _profiles.get(tag)
 	if spell == null or spell.behaviour(ModifierBase.Behaviour.RELAY) <= 0.0 or not is_instance_valid(target):
 		return
 	var donor_actor: int = projectiles.target_owner_of(target)
 	if donor_actor < 0 or donor_actor >= ACTORS:
 		return
-	var slot: int = projectiles.event_slot
+	var slot: int = shot
 	if slot < 0 and tag == _ray.tag:
 		slot = _ray.arc_slot
 	var by_ray: bool = slot < 0 and tag == _ray.tag

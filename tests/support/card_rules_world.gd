@@ -322,8 +322,8 @@ func _put(text: String) -> void:
 	trace.append(line)
 
 
-func _profile(tag: int) -> String:
-	var hit: HitProfile = spells.hit_profile(tag)
+func _profile(tag: int, shot: int) -> String:
+	var hit: HitProfile = spells.hit_profile(tag, shot)
 	if hit == null:
 		return "none"
 	var statuses: Array = [hit.status_id] + Array(hit.later_status_ids)
@@ -331,27 +331,27 @@ func _profile(tag: int) -> String:
 
 
 func _listen() -> void:
-	bus.projectile_hit.connect(func(caster: int, target: Node, at: Vector2, tag: int) -> void:
-		_put("hit %s %s %s at %s [%s]" % [_who(caster), _node(tag), _name_of(target), _at(at), _profile(tag)]))
-	projectiles.wall_met.connect(func(caster: int, at: Vector2, _heading: Vector2, tag: int) -> void:
+	bus.projectile_hit.connect(func(caster: int, target: Node, at: Vector2, tag: int, shot: int) -> void:
+		_put("hit %s %s %s at %s [%s]" % [_who(caster), _node(tag), _name_of(target), _at(at), _profile(tag, shot)]))
+	projectiles.wall_met.connect(func(caster: int, at: Vector2, _heading: Vector2, tag: int, _shot: int) -> void:
 		_put("wall %s %s at %s" % [_who(caster), _node(tag), _at(at)]))
-	bus.projectile_expired.connect(func(caster: int, at: Vector2, tag: int) -> void:
+	bus.projectile_expired.connect(func(caster: int, at: Vector2, tag: int, _shot: int) -> void:
 		_put("expired %s %s at %s" % [_who(caster), _node(tag), _at(at)]))
 	bus.damage_dealt.connect(func(caster: int, target: Node, amount: int, _at_point: Vector2) -> void:
 		_put("damage %s -> %s %d" % [_who(caster), _name_of(target), amount]))
-	bus.hit_landed.connect(func(caster: int, target: Node, amount: int, _at_point: Vector2, kind: StringName) -> void:
+	bus.hit_landed.connect(func(caster: int, target: Node, amount: int, _at_point: Vector2, kind: StringName, _shot: int) -> void:
 		_put("landed %s -> %s %d %s" % [_who(caster), _name_of(target), amount, kind]))
 	bus.heal_dealt.connect(func(caster: int, target: Node, amount: int, _at_point: Vector2) -> void:
 		_put("heal %s -> %s %d" % [_who(caster), _name_of(target), amount]))
 	bus.status_applied.connect(func(caster: int, target: Node, id: StringName) -> void:
 		_put("status %s -> %s %s" % [_who(caster), _name_of(target), id]))
-	bus.reaction_triggered.connect(func(caster: int, id: StringName, at: Vector2) -> void:
+	bus.reaction_triggered.connect(func(caster: int, id: StringName, at: Vector2, _shot: int) -> void:
 		_put("reaction %s %s at %s" % [_who(caster), id, _at(at)]))
-	bus.kill_landed.connect(func(caster: int, target: Node, at: Vector2, tag: int) -> void:
+	bus.kill_landed.connect(func(caster: int, target: Node, at: Vector2, tag: int, _shot: int) -> void:
 		_put("kill %s %s %s at %s" % [_who(caster), _node(tag), _name_of(target), _at(at)]))
 	bus.actor_hurt.connect(func(actor: int, amount: int, _at_point: Vector2, tag: int, kind: StringName) -> void:
 		_put("hurt %s %d %s %s" % [_who(actor), amount, _node(tag), kind]))
-	bus.area_hit_requested.connect(func(caster: int, at: Vector2, radius: float, tag: int) -> void:
+	bus.area_hit_requested.connect(func(caster: int, at: Vector2, radius: float, tag: int, _shot: int) -> void:
 		_put("area %s %s at %s r%d" % [_who(caster), _node(tag), _at(at), roundi(radius)]))
 	bus.caster_move_requested.connect(func(caster: int, mode: StringName, to: Vector2, seconds: float, tag: int) -> void:
 		_put("move %s %s %s to %s in %d ms" % [_who(caster), mode, _node(tag), _at(to), roundi(seconds * 1000.0)]))
@@ -367,11 +367,11 @@ func _listen() -> void:
 		_put("end %s %s" % [_who(caster), _node(tag)]))
 	bus.mana_refund_requested.connect(func(caster: int, amount: float) -> void:
 		_put("refund %s %s" % [_who(caster), str(snappedf(amount, 0.01))]))
-	bus.shot_blocked.connect(func(caster: int, at: Vector2, tag: int) -> void:
+	bus.shot_blocked.connect(func(caster: int, at: Vector2, tag: int, _shot: int) -> void:
 		_put("blocked %s %s at %s" % [_who(caster), _node(tag), _at(at)]))
 	bus.shield_blocked.connect(func(actor: int, at: Vector2, tag: int) -> void:
 		_put("shielded %s %s at %s" % [_who(actor), _node(tag), _at(at)]))
-	bus.shot_deflected.connect(func(caster: int, at: Vector2, tag: int) -> void:
+	bus.shot_deflected.connect(func(caster: int, at: Vector2, tag: int, _shot: int) -> void:
 		_put("deflected %s %s at %s" % [_who(caster), _node(tag), _at(at)]))
 	bus.wizard_shield_requested.connect(func(caster: int, charges: int, seconds: float, tag: int) -> void:
 		_put("barrier %s %s %d for %d ms" % [_who(caster), _node(tag), charges, roundi(seconds * 1000.0)]))
@@ -384,7 +384,7 @@ func _listen() -> void:
 	# A carrier's shape as a player sees it (so a longer reach shows; its tint and look are left out).
 	bus.form_shown.connect(func(caster: int, form: StringName, origin: Vector2, direction: Vector2, length: float, _tint: Color, _look: int) -> void:
 		_put("shown %s %s at %s to %s %d" % [_who(caster), form, _at(origin), _at(direction * 100.0), roundi(length)]))
-	bus.enemy_died.connect(func(killer: int, enemy: Node, at: Vector2) -> void:
+	bus.enemy_died.connect(func(killer: int, enemy: Node, at: Vector2, _shot: int) -> void:
 		_put("died %s by %s at %s" % [_name_of(enemy), _who(killer), _at(at)]))
 
 

@@ -2,7 +2,7 @@ class_name RayHit
 extends RefCounted
 ## What a hit with no shot slot carries (a beam's ray, a swing's sweep, a slam's ring, a dash's
 ## pass, a rain's strike, a zap or a chain jump of any of them): the projectile manager sends such
-## a hit with `event_slot` -1, so `Spells` reads what it is from the ray being sent instead. One
+## a hit with `shot` -1, so `Spells` reads what it is from the ray being sent instead. One
 ## record per nesting level (a hit handler may send another ray), kept in `Spells`' stack and
 ## reused, so sending a ray allocates nothing (`Spells._ray_begin`, `_ray_end`).
 

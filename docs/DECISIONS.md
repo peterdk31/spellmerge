@@ -2,6 +2,12 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-30: The shot travels with its events; carriers own their mechanics (owner)
+
+- **No "current shot" on the manager** (owner, 2026-10-30): `Projectiles.event_slot` was a public global the spell runtime, combat's listeners and Feel read to know which shot an event was about. Every event of a shot now names it as its last argument, `shot` (`projectile_hit`, `projectile_expired`, `shot_blocked`, `shot_deflected`, the manager's `wall_met`; -1 for a ray), combat keeps it beside its tag and names it in what a hit sets off (`hit_landed`, `kill_landed`, `reaction_landed`, `reaction_triggered`, `enemy_died`), and spells names it in a blast's `area_hit_requested`, so an `on kill` from a spent shot's blast still leaves along that shot. `Spells.hit_profile(tag, shot)` takes it from combat. The manager keeps `_event_slot` for itself only. Each emit passes what the global held at that moment, so nothing plays differently.
+- **Carriers own their mechanics:** dash and teleport share `CarrierMove`; every move of a caster goes through `CasterMoves` (dash, teleport, hook, swap, recoil); decoy and familiar share `CarrierEntity`; the rain's telegraph and landing and the wall's line are in their carriers. Two carrier hooks, `reset_actor` and `switch_off`, replace hand-picked calls in the runtime.
+- **Bug fixed on the way:** `Spells.clear` and `close_caster` ended beams and swings but not slams, so a slam winding up still struck afterwards (regression tests in `test_slam.gd`).
+
 ## 2026-10-30: Carriers are named; the table's words read plainly (owner)
 
 - **A carrier is known by its name** (owner, 2026-10-30): a form card says `carrier = &"beam"`, not `motion = 3`, and `FormBase.Motion` is gone. The enum's numbers were stored in every form card, so a removed carrier had to leave a placeholder (`_UNUSED_10`, the fissure's) and the order could never change; now adding or removing a carrier is its script and its line in `Carriers.make_all`, and a card that names a carrier that is gone is refused by the validator (`unknown-carrier`). `CompiledSpell.carrier` is the name too.

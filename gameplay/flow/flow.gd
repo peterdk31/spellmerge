@@ -523,7 +523,7 @@ func _on_player_left(player: int) -> void:
 		_restart_left = RESTART_DELAY
 
 
-func _on_enemy_died(_player: int, enemy: Node, _position: Vector2) -> void:
+func _on_enemy_died(_player: int, enemy: Node, _position: Vector2, _shot: int) -> void:
 	_dummies.erase(enemy)
 	var at: int = _enemies.find(enemy)
 	if at < 0:

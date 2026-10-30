@@ -47,9 +47,9 @@ func before_each() -> void:
 	_spells.bind(_mgr, _bus)
 	_hits.clear()
 	_areas.clear()
-	_bus.projectile_hit.connect(func(player: int, target: Node, at: Vector2, tag: int) -> void:
+	_bus.projectile_hit.connect(func(player: int, target: Node, at: Vector2, tag: int, _shot: int) -> void:
 		_hits.append([player, target, at, tag]))
-	_bus.area_hit_requested.connect(func(player: int, at: Vector2, radius: float, tag: int) -> void:
+	_bus.area_hit_requested.connect(func(player: int, at: Vector2, radius: float, tag: int, _shot: int) -> void:
 		_areas.append([player, at, radius, tag]))
 	# The playground's numbers (owner, 2026-10-29).
 	_swing = FormBase.new()

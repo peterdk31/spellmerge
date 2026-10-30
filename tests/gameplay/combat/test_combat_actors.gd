@@ -20,8 +20,8 @@ func before_each() -> void:
 	_world = Fixture.new(root, Fixture.FakeRegistry.new())
 	_deaths.clear()
 	_kills.clear()
-	_world.bus.enemy_died.connect(func(killer: int, body: Node, _at: Vector2) -> void: _deaths.append([killer, body]))
-	_world.bus.kill_landed.connect(func(caster: int, body: Node, _at: Vector2, tag: int) -> void: _kills.append([caster, body, tag]))
+	_world.bus.enemy_died.connect(func(killer: int, body: Node, _at: Vector2, _shot: int) -> void: _deaths.append([killer, body]))
+	_world.bus.kill_landed.connect(func(caster: int, body: Node, _at: Vector2, tag: int, _shot: int) -> void: _kills.append([caster, body, tag]))
 
 
 func after_each() -> void:
@@ -105,8 +105,29 @@ func test_a_spell_kill_on_a_kit_actor_is_the_spells() -> void:
 	spell.hit = hit
 	var tag: int = SpellTag.make(0, 0, 1, 1)
 	_world.spells._profiles[tag] = spell
-	_world.bus.projectile_hit.emit(0, imp, Vector2(-5.0, -12.0), tag)
+	_world.bus.projectile_hit.emit(0, imp, Vector2(-5.0, -12.0), tag, -1)
 	check_equal(_kills, [[0, imp, tag]], "kill_landed names the caster, the actor and the tag")
+
+
+func test_what_a_hit_sets_off_names_the_shot_that_hit() -> void:
+	# The shot travels with the events (no "current shot" on the manager): a kill by the hit of
+	# shot 7 names shot 7, and one by an area hit names the shot the area hit came from.
+	var shots: Array = []
+	_world.bus.kill_landed.connect(func(_caster: int, _body: Node, _at: Vector2, _tag: int, shot: int) -> void: shots.append(shot))
+	_world.bus.enemy_died.connect(func(_killer: int, _body: Node, _at: Vector2, shot: int) -> void: shots.append(shot))
+	var hit := HitProfile.new()
+	hit.damage = 10
+	var spell := CompiledSpell.new()
+	spell.hit = hit
+	var tag: int = SpellTag.make(0, 0, 1, 1)
+	_world.spells._profiles[tag] = spell
+	var imp: Actor = _actor(Vector2.ZERO, ActorsScript.TEAM_ENEMIES, 0, 4)
+	_world.bus.projectile_hit.emit(0, imp, Vector2(-5.0, -12.0), tag, 7)
+	check_equal(shots, [7, 7], "the kill and the death name shot 7")
+	shots.clear()
+	var other: Actor = _actor(Vector2(200.0, 0.0), ActorsScript.TEAM_ENEMIES, 0, 4)
+	_world.bus.area_hit_requested.emit(0, other.global_position, 30.0, tag, 3)
+	check_equal(shots, [3, 3], "an area hit's kill names the shot it came from")
 
 
 func test_a_body_without_an_id_gets_one_and_gives_it_back() -> void:

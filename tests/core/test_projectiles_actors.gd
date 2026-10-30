@@ -48,10 +48,10 @@ func before_each() -> void:
 	expired.clear()
 	impacts.clear()
 	blocked.clear()
-	bus.projectile_hit.connect(func(caster: int, target: Node, _at: Vector2, tag: int) -> void: hits.append([caster, target, tag]))
-	bus.projectile_expired.connect(func(caster: int, _at: Vector2, _tag: int) -> void: expired.append(caster))
+	bus.projectile_hit.connect(func(caster: int, target: Node, _at: Vector2, tag: int, _shot: int) -> void: hits.append([caster, target, tag]))
+	bus.projectile_expired.connect(func(caster: int, _at: Vector2, _tag: int, _shot: int) -> void: expired.append(caster))
 	bus.projectile_impact.connect(func(caster: int, _target: Node, _at: Vector2, _dir: Vector2) -> void: impacts.append(caster))
-	bus.shot_blocked.connect(func(caster: int, _at: Vector2, tag: int) -> void: blocked.append([caster, tag]))
+	bus.shot_blocked.connect(func(caster: int, _at: Vector2, tag: int, _shot: int) -> void: blocked.append([caster, tag]))
 
 
 func _target(at: Vector2, layer: int, owner: int = EventsScript.NO_PLAYER) -> Node2D:

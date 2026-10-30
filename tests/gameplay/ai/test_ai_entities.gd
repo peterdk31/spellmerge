@@ -184,12 +184,12 @@ func test_an_enemys_decoy_copies_it_and_every_hit_wears_it_down() -> void:
 	check(_entities.lure(at) == null, "enemies never chase an enemy's decoy")
 	# Another enemy's shot wears it too (its own enemy's never reach it: core/projectiles).
 	var other_enemy: int = _actors.open(ActorsScript.TEAM_ENEMIES, ActorsScript.RAMP_ENEMY)
-	_bus.projectile_hit.emit(other_enemy, decoy, at, SpellTag.make(other_enemy, 0, 0, 0))
+	_bus.projectile_hit.emit(other_enemy, decoy, at, SpellTag.make(other_enemy, 0, 0, 0), -1)
 	var wizard_tag: int = SpellTag.make(_wizard.id, 0, 0, 0)
 	for i in EntitiesScript.DECOY_HITS - 2:
-		_bus.projectile_hit.emit(_wizard.id, decoy, at, wizard_tag)
+		_bus.projectile_hit.emit(_wizard.id, decoy, at, wizard_tag, -1)
 	check_equal(_entities.count_owned(EntitiesScript.DECOY, enemy.id), 1, "it holds until its last hit")
-	_bus.projectile_hit.emit(_wizard.id, decoy, at, wizard_tag)
+	_bus.projectile_hit.emit(_wizard.id, decoy, at, wizard_tag, -1)
 	check_equal(_entities.count_owned(EntitiesScript.DECOY, enemy.id), 0, "DECOY_HITS hits break it, an enemy's among them")
 	check(_ended.size() == 1 and _ended[0][0] == enemy.id and _ended[0][1] == EntitiesScript.DECOY and _ended[0][2] == tag, "and its end is said under the enemy's actor id with its tag")
 
@@ -204,7 +204,7 @@ func test_an_enemys_familiar_circles_it_and_its_timer_casts_at_the_wizard() -> v
 	var centre: Vector2 = enemy.global_position + EntitiesScript.FAMILIAR_CENTRE
 	check(is_equal_approx(at.distance_to(centre), EntitiesScript.FAMILIAR_ORBIT), "it circles the enemy (%.2f from it)" % at.distance_to(centre))
 	var hits: Array = []
-	_bus.projectile_hit.connect(func(player: int, target: Node, _hit_at: Vector2, _hit_tag: int) -> void: hits.append([player, target]))
+	_bus.projectile_hit.connect(func(player: int, target: Node, _hit_at: Vector2, _hit_tag: int, _shot: int) -> void: hits.append([player, target]))
 	var peak: int = 0
 	for i in 12:
 		_run(STEP)

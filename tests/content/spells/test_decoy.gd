@@ -97,10 +97,10 @@ func _guarded(cards: Array[StringName]) -> Dictionary:
 	world.add_enemy(&"E", Vector2(140.0, 0.0), World.HEALTH, [&"bolt"], Vector2.LEFT, true)
 	var got: Dictionary = {"blocked": 0, "deflected": 0, "fired": 0}
 	var me: int = wizard.caster_number()
-	world.bus.shot_blocked.connect(func(caster: int, _at: Vector2, tag: int) -> void:
+	world.bus.shot_blocked.connect(func(caster: int, _at: Vector2, tag: int, _shot: int) -> void:
 		if caster == me and SpellTag.node_of(tag) == 0:
 			got["blocked"] += 1)
-	world.bus.shot_deflected.connect(func(caster: int, _at: Vector2, tag: int) -> void:
+	world.bus.shot_deflected.connect(func(caster: int, _at: Vector2, tag: int, _shot: int) -> void:
 		if caster == me and SpellTag.node_of(tag) == 0:
 			got["deflected"] += 1)
 	world.press()

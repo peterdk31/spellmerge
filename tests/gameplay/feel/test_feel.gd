@@ -195,7 +195,7 @@ func _test_shake_off_does_nothing() -> void:
 	_setup()
 	_feel.shake_enabled = false
 	_hit(0)
-	_bus.enemy_died.emit(1, null, Vector2.ZERO)
+	_bus.enemy_died.emit(1, null, Vector2.ZERO, -1)
 	_bus.player_downed.emit(2)
 	_feel.step(0.015625)
 	_check(_feel.trauma() == 0.0, "no trauma with shake off")
@@ -220,7 +220,7 @@ func _test_particle_limit_holds_with_four_players() -> void:
 		for player in 4:
 			for shot in 5:
 				_hit(player, Vector2(10.0 * shot, 10.0 * player))
-			_bus.enemy_died.emit(player, null, Vector2(5.0 * player, 0.0))
+			_bus.enemy_died.emit(player, null, Vector2(5.0 * player, 0.0), -1)
 		_feel.step(0.015625)
 		most = maxi(most, _feel.live_effects())
 		_check(_feel.live_effects() <= _feel.effect_slots, "live effects stay within the slots (frame %d)" % frame)
@@ -246,7 +246,7 @@ func _test_particles_can_be_turned_off() -> void:
 	_feel.particles_enabled = false
 	for i in 20:
 		_hit(i % 4)
-	_bus.enemy_died.emit(0, null, Vector2(5.0, 0.0))
+	_bus.enemy_died.emit(0, null, Vector2(5.0, 0.0), -1)
 	_feel.step(STEP)
 	_check(_feel.effects_of(FeelScript.KIND_PUFF) == 0 and _feel.effects_of(FeelScript.KIND_SPRAY) == 0, "no hit effects start with particles off")
 	_feel.particles_enabled = true
@@ -257,7 +257,7 @@ func _test_particles_can_be_turned_off() -> void:
 func _test_missing_sound_is_silent() -> void:
 	_setup(&"no_such_sound")
 	_hit(0)
-	_bus.enemy_died.emit(0, null, Vector2.ZERO)
+	_bus.enemy_died.emit(0, null, Vector2.ZERO, -1)
 	_bus.player_downed.emit(1)
 	_check(_voices_with_stream() == 0, "an unknown sound id plays nothing")
 	_feel.registry = null
@@ -295,7 +295,7 @@ func _test_feel_never_changes_damage() -> void:
 		var deaths: Array = []
 		_bus.damage_dealt.connect(func(p: int, _t: Node, amount: int, _at: Vector2) -> void:
 			damage.append([p, amount]))
-		_bus.enemy_died.connect(func(p: int, _e: Node, _at: Vector2) -> void:
+		_bus.enemy_died.connect(func(p: int, _e: Node, _at: Vector2, _shot: int) -> void:
 			deaths.append(p))
 		var enemy := Node2D.new()
 		combat.register_actor(enemy, 10, 10.0, 0)
@@ -351,7 +351,7 @@ func _test_hit_stops_are_limited() -> void:
 	_check(_actors.held_left(0) == 0.0, "a plain hit in the rest does not hold the body again")
 	_hit(1)
 	_check(_actors.held_left(1) > 0.0, "but another body's rest is its own")
-	_bus.enemy_died.emit(0, null, Vector2.ZERO)
+	_bus.enemy_died.emit(0, null, Vector2.ZERO, -1)
 	_check(_actors.held_left(0) > 0.0, "a kill holds its killer even in the rest")
 	_check(_feel.stop_left == 0.0, "and does not stop the game")
 
@@ -359,7 +359,7 @@ func _test_hit_stops_are_limited() -> void:
 func _test_a_kill_uses_one_slot_and_beats_a_full_pool() -> void:
 	_setup()
 	_hit(0, Vector2(7.0, 7.0))
-	_bus.enemy_died.emit(0, null, Vector2(7.0, 7.0))
+	_bus.enemy_died.emit(0, null, Vector2(7.0, 7.0), -1)
 	_check(_feel.effects_of(FeelScript.KIND_PUFF) == 1, "a killing blow's puff becomes the death puff: one slot, not two")
 	_check(_feel.effects_of(FeelScript.KIND_RING_OUT) == 1, "and a white-hot ring")
 	_feel.step(STEP)
@@ -367,7 +367,7 @@ func _test_a_kill_uses_one_slot_and_beats_a_full_pool() -> void:
 	for i in _feel.effect_slots:
 		_hit(i % 4, Vector2(100.0 + i, 0.0))
 	_check(_feel.live_effects() == _feel.effect_slots, "the slots are full of hit effects")
-	_bus.enemy_died.emit(1, null, Vector2(-50.0, 9.0))
+	_bus.enemy_died.emit(1, null, Vector2(-50.0, 9.0), -1)
 	_check(_feel.effects_of(FeelScript.KIND_PUFF) >= 1, "a kill gets its puff even when the slots are full (the oldest is taken)")
 	_check(_feel.live_effects() == _feel.effect_slots, "taking one over keeps the limit")
 
@@ -376,7 +376,7 @@ func _test_engine_time_scale_comes_back() -> void:
 	_setup()
 	_feel.drive_engine = true
 	_hit(0)
-	_bus.enemy_died.emit(0, null, Vector2.ZERO)
+	_bus.enemy_died.emit(0, null, Vector2.ZERO, -1)
 	_check(Engine.time_scale == 1.0, "a hit and a kill leave the engine alone")
 	_bus.player_downed.emit(0)
 	_check(Engine.time_scale < 1.0, "a down slows the engine")
@@ -512,7 +512,7 @@ func _test_death_animation() -> void:
 	sprite.texture = texture
 	enemy.add_child(sprite)
 	root.add_child(enemy)
-	_bus.enemy_died.emit(0, enemy, enemy.position)
+	_bus.enemy_died.emit(0, enemy, enemy.position, -1)
 	enemy.free()
 	_check(_feel.live_ghosts() == 1, "a death starts an animation although the enemy is freed")
 	var copy: Sprite2D = _feel.ghost(0)
@@ -533,12 +533,12 @@ func _test_death_animation() -> void:
 		s.texture = texture
 		many.add_child(s)
 		root.add_child(many)
-		_bus.enemy_died.emit(0, many, Vector2.ZERO)
+		_bus.enemy_died.emit(0, many, Vector2.ZERO, -1)
 		many.free()
 	_check(_feel.live_ghosts() == FeelScript.GHOST_SLOTS, "death animations stay within their limit")
 	var bare := Node2D.new()
-	_bus.enemy_died.emit(0, null, Vector2.ZERO)
-	_bus.enemy_died.emit(0, bare, Vector2.ZERO)
+	_bus.enemy_died.emit(0, null, Vector2.ZERO, -1)
+	_bus.enemy_died.emit(0, bare, Vector2.ZERO, -1)
 	bare.free()
 
 
@@ -546,7 +546,7 @@ func _test_death_puff_is_limited() -> void:
 	_setup()
 	_feel.set_effect_slots(EffectSlots.MIN)
 	for i in 100:
-		_bus.enemy_died.emit(i % 4, null, Vector2(i, 0))
+		_bus.enemy_died.emit(i % 4, null, Vector2(i, 0), -1)
 	_check(_feel.live_effects() <= _feel.effect_slots, "death puffs stay within the effect slots")
 	for i in 30:
 		_feel.step(STEP)
@@ -566,7 +566,7 @@ func _test_death_animation_starts_at_rest_scale() -> void:
 	_bus.damage_dealt.emit(0, enemy, 1, Vector2.ZERO)
 	_feel.step(0.015625)
 	_check(sprite.scale != Vector2(2.0, 2.0), "the enemy is squashed when it is killed")
-	_bus.enemy_died.emit(0, enemy, Vector2.ZERO)
+	_bus.enemy_died.emit(0, enemy, Vector2.ZERO, -1)
 	enemy.free()
 	var copy: Sprite2D = _feel.ghost(0)
 	_check(copy.scale.is_equal_approx(Vector2(2.0, 2.0)), "the copy starts at the rest scale, not the squashed one")

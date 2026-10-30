@@ -26,8 +26,8 @@ func before_each() -> void:
 	enemy = ActorSeats.enemy(arena.projectiles.actors)
 	deflected.clear()
 	blocked.clear()
-	arena.bus.shot_deflected.connect(func(actor: int, _at: Vector2, tag: int) -> void: deflected.append([actor, tag]))
-	arena.bus.shot_blocked.connect(func(actor: int, _at: Vector2, tag: int) -> void: blocked.append([actor, tag]))
+	arena.bus.shot_deflected.connect(func(actor: int, _at: Vector2, tag: int, _shot: int) -> void: deflected.append([actor, tag]))
+	arena.bus.shot_blocked.connect(func(actor: int, _at: Vector2, tag: int, _shot: int) -> void: blocked.append([actor, tag]))
 
 
 func after_each() -> void:

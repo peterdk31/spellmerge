@@ -58,7 +58,7 @@ func before_each() -> void:
 		_moves.append([player, mode, to, seconds, tag]))
 	_bus.target_move_requested.connect(func(player: int, target: Node, to: Vector2) -> void:
 		_target_moves.append([player, target, to]))
-	_bus.area_hit_requested.connect(func(player: int, at: Vector2, radius: float, tag: int) -> void:
+	_bus.area_hit_requested.connect(func(player: int, at: Vector2, radius: float, tag: int, _shot: int) -> void:
 		_areas.append([player, at, radius, tag]))
 	_bus.mana_refund_requested.connect(func(player: int, amount: float) -> void:
 		_refunds.append([player, amount]))

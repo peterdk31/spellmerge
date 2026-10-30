@@ -166,7 +166,7 @@ func test_a_dash_card_dashes_the_actor_and_its_blast_goes_off_where_it_ends() ->
 	var finished: Array = []
 	var areas: Array = []
 	_world.bus.caster_move_finished.connect(func(player: int, mode: StringName, at: Vector2, tag: int) -> void: finished.append([player, mode, at, tag]))
-	_world.bus.area_hit_requested.connect(func(player: int, at: Vector2, _radius: float, tag: int) -> void: areas.append([player, at, tag]))
+	_world.bus.area_hit_requested.connect(func(player: int, at: Vector2, _radius: float, tag: int, _shot: int) -> void: areas.append([player, at, tag]))
 	var imp: Actor = _creature([[&"blast", &"dash"]])
 	(imp.controller as Fixture.Scripted).aim = Vector2.RIGHT
 	_world.run(1)

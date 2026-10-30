@@ -43,7 +43,7 @@ func before_each() -> void:
 	_spells.registry = _fake
 	_spells.bind(_mgr, _bus)
 	_hits.clear()
-	_bus.projectile_hit.connect(func(_caster: int, _target: Node, at: Vector2, tag: int) -> void: _hits.append([tag, at]))
+	_bus.projectile_hit.connect(func(_caster: int, _target: Node, at: Vector2, tag: int, _shot: int) -> void: _hits.append([tag, at]))
 	# A shot of 0.4 s, as short as a nova's.
 	_form(&"short", 300.0, 0.4)
 	var rune: FormBase = _form(&"rune", 0.0, 10.0)

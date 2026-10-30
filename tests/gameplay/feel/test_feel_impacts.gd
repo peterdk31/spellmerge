@@ -112,7 +112,7 @@ func test_an_impact_is_used_once_and_only_for_its_target() -> void:
 func test_a_killing_blow_keeps_one_effect_and_the_colour() -> void:
 	var enemy: Node2D = _enemy()
 	_strike(0, enemy, Vector2.ZERO, Vector2.RIGHT, 5)
-	bus.enemy_died.emit(0, enemy, enemy.global_position)
+	bus.enemy_died.emit(0, enemy, enemy.global_position, -1)
 	check_equal(feel.effects_of(FeelScript.KIND_SPRAY), 0, "the kill turns the hit's spray")
 	check_equal(feel.effects_of(FeelScript.KIND_PUFF), 1, "into one bigger puff, not a second effect")
 	check_equal(feel.effect_info(FeelScript.KIND_PUFF)["core"], preset.enemy_hit_color, "still ember")
@@ -184,7 +184,7 @@ func test_a_kill_keeps_the_effect_where_the_shot_struck() -> void:
 	var enemy: Node2D = _enemy()
 	enemy.global_position = Vector2(100.0, 50.0)
 	_strike(0, enemy, Vector2(92.0, 50.0), Vector2.RIGHT, 5)
-	bus.enemy_died.emit(0, enemy, enemy.global_position)
+	bus.enemy_died.emit(0, enemy, enemy.global_position, -1)
 	check((feel.effect_info(FeelScript.KIND_PUFF)["at"] as Vector2).is_equal_approx(Vector2(92.0, 50.0)), "the bigger puff stays where the shot struck")
 
 

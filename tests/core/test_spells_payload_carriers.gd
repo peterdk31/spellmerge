@@ -58,13 +58,13 @@ func before_each() -> void:
 	_explosions.clear()
 	_bus.cue_shown.connect(func(player: int, cue: StringName, at: Vector2, _direction: Vector2, size: float, _tint: Color, _look: int) -> void:
 		_explosions.append([player, at, size, cue]))
-	_bus.projectile_hit.connect(func(player: int, target: Node, at: Vector2, tag: int) -> void:
+	_bus.projectile_hit.connect(func(player: int, target: Node, at: Vector2, tag: int, _shot: int) -> void:
 		_hits.append([player, target, at, tag]))
 	_bus.entity_spawn_requested.connect(func(player: int, kind: StringName, at: Vector2, seconds: float, tag: int, caster: int) -> void:
 		_spawns.append([player, kind, at, seconds, tag, caster]))
 	_bus.entity_end_requested.connect(func(player: int, tag: int) -> void:
 		_end_requests.append([player, tag]))
-	_bus.area_hit_requested.connect(func(player: int, at: Vector2, radius: float, tag: int) -> void:
+	_bus.area_hit_requested.connect(func(player: int, at: Vector2, radius: float, tag: int, _shot: int) -> void:
 		_areas.append([player, at, radius, tag]))
 	_bus.form_shown.connect(func(player: int, form: StringName, at: Vector2, direction: Vector2, length: float, _tint: Color, _look: int) -> void:
 		_shown.append([player, form, at, direction, length]))
@@ -255,8 +255,8 @@ func test_a_landing_rain_fires_its_on_hit() -> void:
 func test_an_echoed_rain_strikes_at_half() -> void:
 	_target(Vector2(SpellLimits.RAIN_REACH, 0.0))
 	var damage: Array[int] = []
-	_bus.projectile_hit.connect(func(_player: int, _target_hit: Node, _at: Vector2, tag: int) -> void:
-		damage.append(_spells.hit_profile(tag).damage))
+	_bus.projectile_hit.connect(func(_player: int, _target_hit: Node, _at: Vector2, tag: int, shot: int) -> void:
+		damage.append(_spells.hit_profile(tag, shot).damage))
 	_build(0, [&"echo", &"rain"])
 	_cast()
 	_tick(90)

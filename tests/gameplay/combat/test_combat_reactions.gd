@@ -59,7 +59,7 @@ func before_each() -> void:
 	_combat._ready()
 	_reacted.clear()
 	_applied.clear()
-	_bus.reaction_triggered.connect(func(player: int, id: StringName, at: Vector2) -> void: _reacted.append([player, id, at]))
+	_bus.reaction_triggered.connect(func(player: int, id: StringName, at: Vector2, _shot: int) -> void: _reacted.append([player, id, at]))
 	_bus.status_applied.connect(func(player: int, target: Node, id: StringName) -> void: _applied.append([player, target, id]))
 	var bolt := FormBase.new()
 	bolt.id = &"bolt"
@@ -97,7 +97,7 @@ func _tag(player: int, element: StringName) -> int:
 func _hit(player: int, enemy: Node2D, element: StringName) -> void:
 	var tag: int = _tag(player, element)
 	_projectiles.step(STEP)
-	_bus.projectile_hit.emit(player, enemy, enemy.position + Vector2(-8.0, 0.0), tag)
+	_bus.projectile_hit.emit(player, enemy, enemy.position + Vector2(-8.0, 0.0), tag, -1)
 
 
 func _run(seconds: float) -> void:
@@ -259,7 +259,7 @@ func test_kindled_burn_is_credited_to_the_player_who_spread_it() -> void:
 	var near := _enemy(Vector2(40.0, 0.0), 2)
 	_combat.apply_status(0, enemy, &"burn", 3.0, 2.0)
 	var killers: Array[int] = []
-	_bus.enemy_died.connect(func(player: int, who: Node, _at: Vector2) -> void:
+	_bus.enemy_died.connect(func(player: int, who: Node, _at: Vector2, _shot: int) -> void:
 		if who == near:
 			killers.append(player))
 	_hit(2, enemy, &"void")
@@ -343,7 +343,7 @@ func test_the_same_element_does_not_react() -> void:
 func test_a_hit_with_no_element_does_not_react() -> void:
 	var enemy := _enemy()
 	_combat.apply_status(0, enemy, &"chill", 3.0, 40.0)
-	_bus.projectile_hit.emit(0, enemy, enemy.position + Vector2(-8.0, 0.0), StaffKit.build(_spells, 0, 0, [&"bolt"] as Array[StringName]))
+	_bus.projectile_hit.emit(0, enemy, enemy.position + Vector2(-8.0, 0.0), StaffKit.build(_spells, 0, 0, [&"bolt"] as Array[StringName]), -1)
 	check(_reacted.is_empty(), "plain damage reacts with nothing")
 	check(_combat.has_status(enemy, &"chill"), "and leaves the chill")
 
@@ -369,7 +369,7 @@ func test_a_reaction_can_kill_and_credits_the_player() -> void:
 	var enemy := _enemy(Vector2.ZERO, BOLT + 3)
 	_combat.apply_status(0, enemy, &"chill", 3.0, 40.0)
 	var killers: Array[int] = []
-	_bus.enemy_died.connect(func(player: int, _who: Node, _at: Vector2) -> void: killers.append(player))
+	_bus.enemy_died.connect(func(player: int, _who: Node, _at: Vector2, _shot: int) -> void: killers.append(player))
 	_hit(2, enemy, &"storm")
 	check_equal(killers, [2], "player 2's shatter finished it")
 

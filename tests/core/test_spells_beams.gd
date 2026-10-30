@@ -45,9 +45,9 @@ func before_each() -> void:
 	_mgr.set_anchor(0, Vector2.ZERO)
 	_hits.clear()
 	_areas.clear()
-	_bus.projectile_hit.connect(func(player: int, target: Node, at: Vector2, tag: int) -> void:
+	_bus.projectile_hit.connect(func(player: int, target: Node, at: Vector2, tag: int, _shot: int) -> void:
 		_hits.append([player, target, at, tag]))
-	_bus.area_hit_requested.connect(func(player: int, at: Vector2, radius: float, tag: int) -> void:
+	_bus.area_hit_requested.connect(func(player: int, at: Vector2, radius: float, tag: int, _shot: int) -> void:
 		_areas.append([player, at, radius, tag]))
 	var beam: FormBase = _form(&"beam", 0.0, 0.3)
 	beam.carrier = &"beam"
@@ -243,7 +243,7 @@ func test_a_curved_ray_hits_a_target_on_its_curve_once() -> void:
 	var on_curve: Node2D = _target(Vector2(100, 40))
 	var on_line: Node2D = _target(Vector2(100, -40))
 	var hits: Array = []
-	_bus.projectile_hit.connect(func(_player: int, target: Node, _at: Vector2, _tag: int) -> void: hits.append(target))
+	_bus.projectile_hit.connect(func(_player: int, target: Node, _at: Vector2, _tag: int, _shot: int) -> void: hits.append(target))
 	var got: float = _mgr.ray_curve(0, Vector2.ZERO, Vector2(60, 0), Vector2(100, 40), 4, ManagerScript.LAYER_ENEMY, 1, 2.0)
 	check(got > 0.0, "it got somewhere")
 	check(hits.has(on_curve), "the target at the curve's end is hit")

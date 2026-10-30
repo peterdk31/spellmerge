@@ -108,8 +108,8 @@ func _setup() -> void:
 	_mgr.events = _bus
 	_hits.clear()
 	_expired.clear()
-	_bus.projectile_expired.connect(func(caster: int, position: Vector2, tag: int) -> void: _expired.append([caster, position, tag]))
-	_bus.projectile_hit.connect(func(caster: int, target: Node, position: Vector2, tag: int) -> void: _hits.append([caster, target, position, tag]))
+	_bus.projectile_expired.connect(func(caster: int, position: Vector2, tag: int, _shot: int) -> void: _expired.append([caster, position, tag]))
+	_bus.projectile_hit.connect(func(caster: int, target: Node, position: Vector2, tag: int, _shot: int) -> void: _hits.append([caster, target, position, tag]))
 
 
 func _teardown() -> void:
@@ -720,7 +720,7 @@ func _test_target_removed_by_a_hit_handler() -> void:
 	_setup()
 	_target(Vector2(30.0, 0.0))
 	_target(Vector2(30.0, 300.0))
-	_bus.projectile_hit.connect(func(_p: int, target: Node, _at: Vector2, _tag: int) -> void: _mgr.remove_target(target as Node2D))
+	_bus.projectile_hit.connect(func(_p: int, target: Node, _at: Vector2, _tag: int, _shot: int) -> void: _mgr.remove_target(target as Node2D))
 	_mgr.spawn(0, Vector2.ZERO, Vector2(1200.0, 0.0), 1.0)
 	_mgr.spawn(1, Vector2(0.0, 300.0), Vector2(1200.0, 0.0), 1.0)
 	_mgr.step(DT)
@@ -734,7 +734,7 @@ func _test_spawn_in_a_hit_handler_waits_a_step() -> void:
 	_setup()
 	_target(Vector2(30.0, 0.0))
 	var spawned: Array[int] = []
-	_bus.projectile_hit.connect(func(_p: int, _t: Node, at: Vector2, _tag: int) -> void: spawned.append(_mgr.spawn(0, at, Vector2(600.0, 0.0), 1.0)))
+	_bus.projectile_hit.connect(func(_p: int, _t: Node, at: Vector2, _tag: int, _shot: int) -> void: spawned.append(_mgr.spawn(0, at, Vector2(600.0, 0.0), 1.0)))
 	_mgr.spawn(0, Vector2.ZERO, Vector2(1200.0, 0.0), 1.0)
 	_mgr.step(DT)
 	_check(spawned.size() == 1 and _mgr.get_count() == 1, "a spawn from a handler is kept")
@@ -1034,7 +1034,7 @@ func _test_no_expiry_on_a_hit_a_cap_drop_or_leaving() -> void:
 
 func _test_expiry_handler_may_spawn() -> void:
 	_setup()
-	_bus.projectile_expired.connect(func(player: int, position: Vector2, _tag: int) -> void:
+	_bus.projectile_expired.connect(func(player: int, position: Vector2, _tag: int, _shot: int) -> void:
 		if _mgr.get_count() == 0:
 			_mgr.spawn(player, position, Vector2(10.0, 0.0), 1.0))
 	_mgr.spawn(0, Vector2.ZERO, Vector2(10.0, 0.0), 0.1)
@@ -1164,7 +1164,7 @@ func _test_queries_inside_a_hit_handler() -> void:
 	_target(Vector2(30.0, 0.0))
 	var second: Node2D = _target(Vector2(60.0, 0.0))
 	var found: Array[Node2D] = []
-	_bus.projectile_hit.connect(func(_player: int, target: Node, position: Vector2, _tag: int) -> void:
+	_bus.projectile_hit.connect(func(_player: int, target: Node, position: Vector2, _tag: int, _shot: int) -> void:
 		found.append(_mgr.nearest_target(position, 80.0, ManagerScript.LAYER_ENEMY, target as Node2D)))
 	_mgr.spawn(0, Vector2.ZERO, Vector2(1200.0, 0.0), 1.0)
 	_mgr.step(DT)

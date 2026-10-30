@@ -27,7 +27,7 @@ func before_each() -> void:
 	hits.clear()
 	bus.projectile_impact.connect(func(_caster: int, target: Node, position: Vector2, _direction: Vector2) -> void:
 		impacts.append([target, position]))
-	bus.projectile_hit.connect(func(_caster: int, target: Node, _position: Vector2, _tag: int) -> void:
+	bus.projectile_hit.connect(func(_caster: int, target: Node, _position: Vector2, _tag: int, _shot: int) -> void:
 		hits.append(target))
 
 

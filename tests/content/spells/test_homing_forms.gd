@@ -41,7 +41,7 @@ func before_each() -> void:
 	_spells.bind(_mgr, _bus)
 	_hit.clear()
 	_moves.clear()
-	_bus.projectile_hit.connect(func(_player: int, target: Node, _at: Vector2, _tag: int) -> void: _hit.append(target))
+	_bus.projectile_hit.connect(func(_player: int, target: Node, _at: Vector2, _tag: int, _shot: int) -> void: _hit.append(target))
 	_bus.caster_move_requested.connect(func(player: int, mode: StringName, to: Vector2, _seconds: float, _tag: int) -> void: _moves.append([player, mode, to]))
 
 

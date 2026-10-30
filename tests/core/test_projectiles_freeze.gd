@@ -27,7 +27,7 @@ func before_each() -> void:
 	mgr.set_bounds(Rect2(-1000.0, -1000.0, 2000.0, 2000.0))
 	root.add_child(mgr)
 	expired = 0
-	bus.projectile_expired.connect(func(_caster: int, _at: Vector2, _tag: int) -> void: expired += 1)
+	bus.projectile_expired.connect(func(_caster: int, _at: Vector2, _tag: int, _shot: int) -> void: expired += 1)
 
 
 func _run(steps: int) -> void:
@@ -99,7 +99,7 @@ func test_a_frozen_shot_hits_nothing_until_it_thaws() -> void:
 	target.position = Vector2(2.0, 0.0)
 	mgr.add_target(target, 6.0, ManagerScript.LAYER_ENEMY)
 	var hits: Array[int] = [0]
-	bus.projectile_hit.connect(func(_c: int, _t: Node, _p: Vector2, _tag: int) -> void: hits[0] += 1)
+	bus.projectile_hit.connect(func(_c: int, _t: Node, _p: Vector2, _tag: int, _shot: int) -> void: hits[0] += 1)
 	var slot: int = mgr.spawn(0, Vector2.ZERO, Vector2(160.0, 0.0), 5.0, 4.0, ManagerScript.LAYER_ENEMY)
 	mgr.freeze_shot(slot, 0.25)
 	_run(2)

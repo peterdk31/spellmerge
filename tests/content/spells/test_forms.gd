@@ -36,7 +36,7 @@ func before_each() -> void:
 	_spells.registry = _registry
 	_spells.bind(_mgr, _bus)
 	_hits.clear()
-	_bus.projectile_hit.connect(func(player: int, target: Node, at: Vector2, tag: int) -> void: _hits.append([player, target, at, tag]))
+	_bus.projectile_hit.connect(func(player: int, target: Node, at: Vector2, tag: int, _shot: int) -> void: _hits.append([player, target, at, tag]))
 
 
 func _form(id: StringName) -> FormBase:

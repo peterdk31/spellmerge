@@ -62,9 +62,9 @@ func before_each() -> void:
 	_spells.bind(_mgr, _bus)
 	for list: Array in [_hits, _moves, _areas, _shown, _spawns, _refunds, _reserved]:
 		list.clear()
-	_bus.projectile_hit.connect(func(caster: int, target: Node, _at: Vector2, tag: int) -> void: _hits.append([caster, target, tag]))
+	_bus.projectile_hit.connect(func(caster: int, target: Node, _at: Vector2, tag: int, _shot: int) -> void: _hits.append([caster, target, tag]))
 	_bus.caster_move_requested.connect(func(caster: int, _mode: StringName, _to: Vector2, _seconds: float, tag: int) -> void: _moves.append([caster, tag]))
-	_bus.area_hit_requested.connect(func(caster: int, _at: Vector2, _radius: float, tag: int) -> void: _areas.append([caster, tag]))
+	_bus.area_hit_requested.connect(func(caster: int, _at: Vector2, _radius: float, tag: int, _shot: int) -> void: _areas.append([caster, tag]))
 	_bus.form_shown.connect(func(caster: int, _form: StringName, _at: Vector2, _dir: Vector2, _length: float, _tint: Color, _look: int) -> void: _shown.append(caster))
 	_bus.entity_spawn_requested.connect(func(caster: int, _kind: StringName, _at: Vector2, _seconds: float, _tag: int, _anchor: int) -> void: _spawns.append(caster))
 	_bus.mana_refund_requested.connect(func(caster: int, amount: float) -> void: _refunds.append([caster, amount]))

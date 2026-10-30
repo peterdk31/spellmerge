@@ -85,7 +85,7 @@ func _setup(player_count: int = 0, with_projectiles: bool = false) -> void:
 	_combat._ready()
 	_bus.damage_dealt.connect(func(p: int, target: Node, amount: int, _at: Vector2) -> void:
 		_damage.append([p, target, amount]))
-	_bus.enemy_died.connect(func(p: int, enemy: Node, _at: Vector2) -> void:
+	_bus.enemy_died.connect(func(p: int, enemy: Node, _at: Vector2, _shot: int) -> void:
 		_deaths.append([p, enemy]))
 	_actors = ActorsScript.new()
 	# One actor table for the wizards, Combat and the projectile manager (teams aim contact).
@@ -232,7 +232,7 @@ func _test_projectile_hit_uses_profile() -> void:
 	_setup()
 	var enemy := _enemy(20, Vector2(10.0, 0.0))
 	_profile(7, 5, 100.0)
-	_bus.projectile_hit.emit(1, enemy, Vector2(0.0, 0.0), 7)
+	_bus.projectile_hit.emit(1, enemy, Vector2(0.0, 0.0), 7, -1)
 	_check(_damage == [[1, enemy, 5]], "projectile_hit with tag 7 deals the profile's damage for the shooter")
 	_check(_combat.health_of(enemy) == 15, "health 20 minus 5")
 	_check(_combat.knockback_of(enemy).x > 0.0, "pushed away from the hit position")
@@ -241,8 +241,8 @@ func _test_projectile_hit_uses_profile() -> void:
 func _test_projectile_hit_without_profile_is_ignored() -> void:
 	_setup()
 	var enemy := _enemy(5)
-	_bus.projectile_hit.emit(0, enemy, Vector2.ZERO, 0)
-	_bus.projectile_hit.emit(0, enemy, Vector2.ZERO, 99)
+	_bus.projectile_hit.emit(0, enemy, Vector2.ZERO, 0, -1)
+	_bus.projectile_hit.emit(0, enemy, Vector2.ZERO, 99, -1)
 	_check(_damage.is_empty() and _combat.health_of(enemy) == 5, "tags without a profile do no damage")
 
 
@@ -304,11 +304,11 @@ func _test_four_players_kill_credit() -> void:
 	_profile(1, 1)
 	var enemy := _enemy(4)
 	for index in 4:
-		_bus.projectile_hit.emit(index, enemy, Vector2.ZERO, 1)
+		_bus.projectile_hit.emit(index, enemy, Vector2.ZERO, 1, -1)
 	_check(_damage.size() == 4, "four hits, four damage events")
 	_check(_deaths == [[3, enemy]], "player 3 landed the last hit and gets the kill")
 	var second := _enemy(1)
-	_bus.projectile_hit.emit(0, second, Vector2.ZERO, 1)
+	_bus.projectile_hit.emit(0, second, Vector2.ZERO, 1, -1)
 	_check(_deaths.size() == 2 and _deaths[1] == [0, second], "the next kill goes to player 0")
 
 

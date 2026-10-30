@@ -100,7 +100,7 @@ func before_each() -> void:
 	_finished.clear()
 	_areas.clear()
 	_bus.caster_move_finished.connect(func(player: int, mode: StringName, at: Vector2, tag: int) -> void: _finished.append([player, mode, at, tag]))
-	_bus.area_hit_requested.connect(func(player: int, at: Vector2, _radius: float, tag: int) -> void: _areas.append([player, at, tag]))
+	_bus.area_hit_requested.connect(func(player: int, at: Vector2, _radius: float, tag: int, _shot: int) -> void: _areas.append([player, at, tag]))
 	# The wizard of seat 0 (actors G7: the real scene); its hurtbox registers it in Combat.
 	_wizard = own(WizardScene.instantiate()) as Actor
 	PlayerController.seat_wizard(_wizard, 0, null, [[], [], [], []])

@@ -69,7 +69,7 @@ func test_a_reaction_stops_longer_and_shakes_more_than_a_plain_hit() -> void:
 	var death: CueBase = _feel.cue_of(&"enemy_death")
 	check(death != null and preset.reaction_stop_seconds >= death.hold, "at least as long as a death's stop")
 	check(death != null and preset.reaction_shake > death.shake * 0.5, "a strong shake")
-	_bus.reaction_triggered.emit(0, &"flare", Vector2.ZERO)
+	_bus.reaction_triggered.emit(0, &"flare", Vector2.ZERO, -1)
 	check(_actors.held_left(0) >= preset.reaction_stop_seconds, "its caster is held for the reaction")
 	check_equal(_feel.stop_left, 0.0, "and the game runs on")
 	check(_feel.trauma() >= preset.reaction_shake, "and shake")
@@ -84,7 +84,7 @@ func test_every_reaction_has_a_power_and_a_colour() -> void:
 func test_the_puff_is_bigger_than_a_hit_and_the_ring_ends() -> void:
 	_bus.damage_dealt.emit(0, null, 5, Vector2(50.0, 0.0))
 	var hit: int = _feel.effect_info(FeelScript.KIND_PUFF)["zoom"] as int
-	_bus.reaction_triggered.emit(0, &"shatter", Vector2.ZERO)
+	_bus.reaction_triggered.emit(0, &"shatter", Vector2.ZERO, -1)
 	check((_feel.effect_info(FeelScript.KIND_PUFF)["zoom"] as int) > hit, "a reaction's puff is bigger than a hit's")
 	check_equal(_feel.effects_of(FeelScript.KIND_RING_OUT), 1, "with a ring")
 	for i in 40:
@@ -94,7 +94,7 @@ func test_the_puff_is_bigger_than_a_hit_and_the_ring_ends() -> void:
 
 func test_four_players_reacting_at_once_stay_inside_the_effect_slots() -> void:
 	for player in 4:
-		_bus.reaction_triggered.emit(player, &"shatter", Vector2(float(player) * 20.0, 0.0))
+		_bus.reaction_triggered.emit(player, &"shatter", Vector2(float(player) * 20.0, 0.0), -1)
 	check_equal(_feel.effects_of(FeelScript.KIND_PUFF), 4, "four puffs")
 	check(_feel.live_effects() <= _feel.effect_slots, "inside the effect slots")
 

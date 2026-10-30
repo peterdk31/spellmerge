@@ -48,7 +48,7 @@ func before_each() -> void:
 	_spells.bind(_mgr, _bus)
 	_areas.clear()
 	_reserved.clear()
-	_bus.area_hit_requested.connect(func(player: int, at: Vector2, radius: float, tag: int) -> void: _areas.append([player, at, radius, tag]))
+	_bus.area_hit_requested.connect(func(player: int, at: Vector2, radius: float, tag: int, _shot: int) -> void: _areas.append([player, at, radius, tag]))
 	_bus.mana_reserved.connect(func(player: int, amount: float) -> void: _reserved[player] = amount)
 	_staff = StaffBase.new()
 	_staff.id = &"test"

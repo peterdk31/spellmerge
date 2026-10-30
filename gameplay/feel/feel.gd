@@ -446,6 +446,8 @@ var _kind_target: int = 0
 var _kind: StringName = &"shot"
 var _kind_frame: int = -1
 var _kind_own: bool = false
+## The shot whose hit `hit_landed` announced (its `shot`, -1 for none): the one a hit's stop holds.
+var _kind_shot: int = -1
 var _impact_at: Vector2 = Vector2.ZERO
 var _impact_aim: Vector2 = Vector2.ZERO
 ## Death animations: sprites made once (drawn by `shot_sprite.gdshader`'s dissolve), seconds left
@@ -771,7 +773,9 @@ func _on_damage_dealt(caster: int, target: Node, amount: int, position: Vector2)
 	var shake: float = preset.hit_shake
 	var sound: StringName = preset.hit_sound
 	var own: bool = false
+	var shot: int = -1
 	if target != null and target.get_instance_id() == _kind_target and Engine.get_physics_frames() == _kind_frame:
+		shot = _kind_shot
 		var look_kind: StringName = _kind if preset.kind_looks.has(_kind) else &"shot"
 		var look: Dictionary = preset.kind_looks[look_kind] as Dictionary if preset.kind_looks.has(look_kind) else NO_LOOK
 		stop *= look.get("stop", 1.0) as float
@@ -779,7 +783,7 @@ func _on_damage_dealt(caster: int, target: Node, amount: int, position: Vector2)
 		sound = look.get("sound", preset.hit_sound) as StringName
 		own = _kind_own
 	_kind_target = 0
-	_hold_bodies(caster, _actor_of(target), stop, false)
+	_hold_bodies(caster, _actor_of(target), stop, false, shot)
 	_juice(position, shake, sound, aim, tint, size, at, colours)
 	if own:
 		# Their own spell: the cue `self_hit` (a ring in its own colour) on this frame, so it is
@@ -788,11 +792,12 @@ func _on_damage_dealt(caster: int, target: Node, amount: int, position: Vector2)
 
 
 ## The kind of the hit that `damage_dealt` announces next, and whether an actor hit itself.
-func _on_hit_landed(caster: int, target: Node, _amount: int, _position: Vector2, kind: StringName) -> void:
+func _on_hit_landed(caster: int, target: Node, _amount: int, _position: Vector2, kind: StringName, shot: int) -> void:
 	if target == null:
 		return
 	_kind_target = target.get_instance_id()
 	_kind = kind
+	_kind_shot = shot
 	_kind_frame = Engine.get_physics_frames()
 	_kind_own = kind != &"heal" and kind != &"status" and caster != ActorsScript.NONE and _actor_of(target) == caster
 
@@ -827,7 +832,7 @@ func _show_note(text: String, position: Vector2, tint: Color, seconds: float) ->
 ## An element reaction fired at `position`: a puff and a ring in the reaction's colour, its
 ## name rising from the spot, a little shake and the sound `reaction_<id>`. The same for every
 ## player; it changes nothing in the fight.
-func _on_reaction_triggered(caster: int, reaction_id: StringName, position: Vector2) -> void:
+func _on_reaction_triggered(caster: int, reaction_id: StringName, position: Vector2, shot: int) -> void:
 	var tint: Color = preset.reaction_colors.get(reaction_id, Color.WHITE) as Color
 	var power: float = preset.reaction_power.get(reaction_id, 1.0) as float
 	var slot: int = _next_reaction
@@ -856,7 +861,7 @@ func _on_reaction_triggered(caster: int, reaction_id: StringName, position: Vect
 	# The hit-stop is longer than a death's and, like a death's, ignores the rest after a stop. The
 	# reaction's own hit (kind `reaction`) holds its target by the plain rule; a hold only ever
 	# lengthens, so whichever of the two comes first, the caster is held for the longer one.
-	_hold_bodies(caster, ActorsScript.NONE, preset.reaction_stop_seconds * power, true)
+	_hold_bodies(caster, ActorsScript.NONE, preset.reaction_stop_seconds * power, true, shot)
 	if shake_enabled:
 		_refresh_camera()
 		_trauma = minf(_trauma + preset.reaction_shake * power, 1.0)
@@ -1058,7 +1063,7 @@ func _on_caster_move_finished(caster: int, mode: StringName, position: Vector2, 
 ## A bolt or orbit shot whose life ran out goes off in a small pop of its own colours where it
 ## was (the mockup's); one that ended on a wall already showed its impact, and a rune's going off
 ## is its own burst.
-func _on_projectile_expired(caster: int, position: Vector2, _tag: int) -> void:
+func _on_projectile_expired(caster: int, position: Vector2, _tag: int, _shot: int) -> void:
 	if projectiles == null or not position.is_finite() or caster < ActorsScript.NONE or caster >= ActorsScript.ACTORS:
 		return
 	if bool(projectiles.get("expired_on_wall")) or not ("impact_form" in projectiles):
@@ -1072,23 +1077,21 @@ func _on_projectile_expired(caster: int, position: Vector2, _tag: int) -> void:
 
 ## A shot was deflected (melee I5; docs/milestones/M2-staffs.md, "The look"): the cue `deflect`,
 ## a big white-hot cross in its new caster's (`caster`'s) colours, bigger than a hit's, aimed the
-## way it leaves (the projectile manager's `event_slot` is the shot). Its longer tail needs
+## way it leaves (`shot`, the deflected shot). Its longer tail needs
 ## nothing here: it flies 1.7x faster, and its tail is a pixel per pixel of travel.
-func _on_shot_deflected(caster: int, position: Vector2, _tag: int) -> void:
+func _on_shot_deflected(caster: int, position: Vector2, _tag: int, shot: int) -> void:
 	if not position.is_finite() or caster < ActorsScript.NONE or caster >= ActorsScript.ACTORS:
 		return
 	var heading: Vector2 = Vector2.RIGHT
-	if projectiles != null and "event_slot" in projectiles:
-		var slot: int = projectiles.event_slot as int
-		if slot >= 0:
-			heading = projectiles.get_velocity_of(slot) as Vector2
+	if projectiles != null and shot >= 0:
+		heading = projectiles.get_velocity_of(shot) as Vector2
 	play_cue(&"deflect", caster, position, heading)
 
 
 ## A shot was blocked. A swing's block is a parry (`shield · swing`; the projectile manager's
 ## `impact_form` says which carrier blocked): the cue `parry`, a big four-point star in Spark gold
 ## and a local stop on the parrying actor alone. Other blocks show nothing of their own.
-func _on_shot_blocked(caster: int, position: Vector2, _tag: int) -> void:
+func _on_shot_blocked(caster: int, position: Vector2, _tag: int, _shot: int) -> void:
 	if projectiles == null or not ("impact_form" in projectiles) or (projectiles.impact_form as StringName) != &"swing":
 		return
 	if not position.is_finite():
@@ -1129,7 +1132,7 @@ func _show_impact(caster: int, ramp: int, position: Vector2, direction: Vector2,
 ## lasts), in its ramp with `tint` (as `show_effect`'s `core`) and the cards of the packed `look`,
 ## on `target` (an actor, for `hold_target`). Draws its parts, then its weight: holds, the game-wide stop, shake and punch
 ## (both off with the screen shake setting) and its sound. An unknown cue plays nothing.
-func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.ZERO, size: float = 0.0, tint: Color = Color.WHITE, look: int = 0, target: int = ActorsScript.NONE) -> void:
+func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.ZERO, size: float = 0.0, tint: Color = Color.WHITE, look: int = 0, target: int = ActorsScript.NONE, shot: int = -1) -> void:
 	if not at.is_finite() or caster < ActorsScript.NONE or caster >= ActorsScript.ACTORS:
 		return
 	var cue: CueBase = cue_of(id)
@@ -1167,8 +1170,8 @@ func play_cue(id: StringName, caster: int, at: Vector2, dir: Vector2 = Vector2.Z
 	if table != null:
 		var held: bool = cue.hold > 0.0 and _hold_actor(table, caster, cue.hold, true)
 		held = (cue.hold_target > 0.0 and _hold_actor(table, target, cue.hold_target, true)) or held
-		if cue.hold_shot and held and projectiles != null and "event_slot" in projectiles and (projectiles.event_slot as int) >= 0:
-			projectiles.freeze_shot(projectiles.event_slot as int, maxf(cue.hold, cue.hold_target))
+		if cue.hold_shot and held and projectiles != null and shot >= 0:
+			projectiles.freeze_shot(shot, maxf(cue.hold, cue.hold_target))
 	if cue.stop_game > 0.0:
 		_stop_game(cue.stop_game)
 	if shake_enabled and (cue.shake > 0.0 or cue.kick > 0.0):
@@ -1611,13 +1614,13 @@ func _ramp_of(caster: int) -> int:
 ## whole game; and a puff. The puff is the killing blow's own spray turned into a bigger one when
 ## it is at this spot (one slot, and the hit's sound gives way to the death's), else a new puff
 ## in the enemy colour after the cue's ring.
-func _on_enemy_died(killer: int, enemy: Node, position: Vector2) -> void:
+func _on_enemy_died(killer: int, enemy: Node, position: Vector2, shot: int) -> void:
 	_start_ghost(enemy)
 	var zoom: int = clampi(roundi(preset.death_particle_size), 1, 3)
 	var upgraded: bool = particles_enabled and _upgrade_hit(position, zoom)
 	if upgraded and _hit_voice >= 0:
 		_voices[_hit_voice].stop()
-	play_cue(&"boss_death" if _is_boss(enemy) else &"enemy_death", killer, position)
+	play_cue(&"boss_death" if _is_boss(enemy) else &"enemy_death", killer, position, Vector2.ZERO, 0.0, Color.WHITE, 0, ActorsScript.NONE, shot)
 	if particles_enabled and not upgraded:
 		show_effect(KIND_PUFF, position, Vector2.RIGHT, preset.enemy_hit_color, 0, 0, zoom, PUFF_SECONDS)
 
@@ -1996,20 +1999,18 @@ func _stop_game(seconds: float) -> void:
 
 
 ## The local stop of a hit or a kill: the attacker `attacker`, the target `target` and the shot
-## whose hit is being sent (the projectile manager's `event_slot`) hold for `seconds`, and nothing
+## that hit (`shot`, the event's; -1 for none) hold for `seconds`, and nothing
 ## else does: another player, another enemy and every other shot run on. A plain hit (not
 ## `strong`) holds a body only when its rest from the last stop is over, so a crowd of hits does
 ## not freeze it for ever; a kill or a reaction always holds. Either actor may be NONE.
-func _hold_bodies(attacker: int, target: int, seconds: float, strong: bool) -> void:
+func _hold_bodies(attacker: int, target: int, seconds: float, strong: bool, shot: int = -1) -> void:
 	var table: ActorsScript = _actor_table()
 	if table == null or seconds <= 0.0:
 		return
 	var held: bool = _hold_actor(table, attacker, seconds, strong)
 	held = _hold_actor(table, target, seconds, strong) or held
-	if held and projectiles != null and "event_slot" in projectiles:
-		var slot: int = projectiles.event_slot as int
-		if slot >= 0:
-			projectiles.freeze_shot(slot, seconds)
+	if held and projectiles != null and shot >= 0:
+		projectiles.freeze_shot(shot, seconds)
 
 
 func _hold_actor(table: ActorsScript, id: int, seconds: float, strong: bool) -> bool:

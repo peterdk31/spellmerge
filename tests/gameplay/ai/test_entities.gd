@@ -145,11 +145,11 @@ func _test_every_hit_wears_a_decoy() -> void:
 	_setup(2)
 	_spawn(0, EntitiesScript.DECOY, Vector2(0.0, 0.0))
 	var decoy: Node2D = _entities.lure(Vector2.ZERO)
-	_world.bus.projectile_hit.emit(1, decoy, Vector2.ZERO, TAG)
+	_world.bus.projectile_hit.emit(1, decoy, Vector2.ZERO, TAG, -1)
 	for i in EntitiesScript.DECOY_HITS - 2:
-		_world.bus.projectile_hit.emit(EventsScript.NO_PLAYER, decoy, Vector2.ZERO, 1000)
+		_world.bus.projectile_hit.emit(EventsScript.NO_PLAYER, decoy, Vector2.ZERO, 1000, -1)
 	_check(_entities.count(EntitiesScript.DECOY) == 1 and _ended.is_empty(), "it holds until its last hit")
-	_world.bus.projectile_hit.emit(EventsScript.NO_PLAYER, decoy, Vector2.ZERO, 1000)
+	_world.bus.projectile_hit.emit(EventsScript.NO_PLAYER, decoy, Vector2.ZERO, 1000, -1)
 	_check(_entities.count() == 0 and _ended.size() == 1, "DECOY_HITS hits break it, a teammate's among them")
 
 

@@ -430,7 +430,7 @@ func _on_end_requested(caster: int, tag: int) -> void:
 
 ## Every hit wears a decoy down, whoever cast it (G3c); its own caster's shots never reach it
 ## (`core/projectiles` skips the targets a caster owns).
-func _on_projectile_hit(_caster: int, target: Node, _position_hit: Vector2, _tag_hit: int) -> void:
+func _on_projectile_hit(_caster: int, target: Node, _position_hit: Vector2, _tag_hit: int, _shot: int) -> void:
 	if not target is Decoy:
 		return
 	var row: int = _decoys.find(target as Decoy)

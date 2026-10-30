@@ -64,7 +64,7 @@ func test_it_throws_bodies_outward_from_the_impact() -> void:
 func test_its_caster_is_skipped_and_a_teammate_is_hit() -> void:
 	var arena := ArenaScript.new(root)
 	var hits: Array = []
-	arena.bus.projectile_hit.connect(func(_caster: int, target: Node, _at: Vector2, _tag: int) -> void: hits.append(target))
+	arena.bus.projectile_hit.connect(func(_caster: int, target: Node, _at: Vector2, _tag: int, _shot: int) -> void: hits.append(target))
 	var own: Node2D = arena.add_guard(0, Vector2(8.0, 0.0))
 	var mate: Node2D = arena.add_mate(Vector2(24.0, 8.0), 1)
 	arena.install_cards(0, 0, ["slam"])
@@ -89,7 +89,7 @@ func test_a_shield_blocks_and_a_deflect_throws_back_the_shots_in_its_ring() -> v
 	var arena := ArenaScript.new(root)
 	var enemy: int = ActorSeats.enemy(arena.projectiles.actors)
 	var blocked: Array = []
-	arena.bus.shot_blocked.connect(func(_actor: int, _at: Vector2, _tag: int) -> void: blocked.append(1))
+	arena.bus.shot_blocked.connect(func(_actor: int, _at: Vector2, _tag: int, _shot: int) -> void: blocked.append(1))
 	arena.install_cards(0, 0, ["shield", "slam"])
 	arena.cast(0, 0)
 	arena.projectiles.spawn(enemy, Vector2(28.0, 30.0), Vector2(0.0, -40.0), 3.0, 3.0, ManagerScript.LAYER_PLAYER)
@@ -99,7 +99,7 @@ func test_a_shield_blocks_and_a_deflect_throws_back_the_shots_in_its_ring() -> v
 	arena = ArenaScript.new(root)
 	enemy = ActorSeats.enemy(arena.projectiles.actors)
 	var deflected: Array = []
-	arena.bus.shot_deflected.connect(func(actor: int, _at: Vector2, _tag: int) -> void: deflected.append(actor))
+	arena.bus.shot_deflected.connect(func(actor: int, _at: Vector2, _tag: int, _shot: int) -> void: deflected.append(actor))
 	arena.install_cards(0, 0, ["deflect", "slam"])
 	arena.cast(0, 0)
 	var shot: int = arena.projectiles.spawn(enemy, Vector2(28.0, 30.0), Vector2(0.0, -40.0), 3.0, 3.0, ManagerScript.LAYER_PLAYER)

@@ -14,6 +14,17 @@ extends Node
 ## budget, which the desktop export measures, and in CI's software renderer it alone took about
 ## seven of the web run's fourteen minutes (2026-10-28, when the run went past its timeout).
 ##
+## The horde scenarios (Horde H1, docs/milestones/horde.md, "Scale") hold 500+ enemies: mostly
+## swarmers (the imp's data with no staff: they only chase and hurt by touch, as the horde's
+## swarm enemies do) and a share (`staffed`, 10%) of staff enemies (the imp as above), against
+## the same four bots, in the usual room (the 1280x720 horde arena is H2's). `horde` (600
+## enemies) is the desktop's, `horde, web` (500) the web's; both keep the web cap of shots (500),
+## as the `web` scenario does with 100 enemies, so the enemies are what differs. They are not in the default run
+## (`scenarios`): they take longer than the rest together, and the exported runs have fixed
+## timeouts (tests/build.json). `stress.gd -- --horde` runs them (`HORDE`), alone. They pass
+## like the others plus a frame line (`p95_line_ms`): a provisional line from the first
+## measurement (2026-10-30), past which the scenario fails, unlike the others, which only warn.
+##
 ## How the numbers are held. The bots cast their built spells through the real input
 ## path (`staff_2` and `staff_3` held together, so both built staffs are used). Their
 ## mana and health are kept full (so they keep casting), and enemies are added whenever
@@ -46,20 +57,37 @@ const ProbeScript := preload("res://tests/benchmark/probe.gd")
 const ProjectileManagerScript := preload("res://core/projectiles/projectile_manager.gd")
 
 const PLAYERS: int = 4
+## The horde scenarios' frame line (p95, milliseconds; headless, so game logic only):
+## provisional, from the first measurement (2026-10-30, docs/milestones/horde.md, "Scale": p95
+## about 310 ms at 600 enemies on the build machine, the physics steps at their limit of 8 a
+## frame), with room for a slower or busier machine. It only catches a collapse; 60 FPS at 500+
+## enemies needs the swarm work described there (H6). Not checked in a web build, whose WASM
+## and software renderer are several times slower.
+const P95_LINE_HORDE_MS: float = 600.0
 ## The scenarios: label, enemies, shots, and (variants only) whether the scene is drawn and
 ## whether hit particles start. The web scenarios follow the web cap on purpose (the web
-## budget is that cap); the PLAN's 1,000 is the older figure to compare against.
+## budget is that cap); the PLAN's 1,000 is the older figure to compare against. `desktop_only`
+## scenarios are left out of a web build (`scenarios_for`). A horde scenario (`staffed`: the
+## share of its enemies that carry a staff, the rest are swarmers) has a frame line,
+## `p95_line_ms`: its 95th percentile frame must stay under it.
 const SCENARIOS: Array[Dictionary] = [
 	{"label": "web", "enemies": 100, "shots": ProjectileManagerScript.DEFAULT_CAP_WEB},
-	{"label": "desktop", "enemies": 200, "shots": 3000},
+	{"label": "desktop", "enemies": 200, "shots": 3000, "desktop_only": true},
 	{"label": "web, render loop off", "enemies": 100, "shots": ProjectileManagerScript.DEFAULT_CAP_WEB, "render": false},
 	{"label": "web, hit particles off", "enemies": 100, "shots": ProjectileManagerScript.DEFAULT_CAP_WEB, "particles": false},
+	{"label": "horde", "enemies": 600, "shots": ProjectileManagerScript.DEFAULT_CAP_WEB, "staffed": 0.1, "p95_line_ms": P95_LINE_HORDE_MS, "desktop_only": true},
+	{"label": "horde, web", "enemies": 500, "shots": ProjectileManagerScript.DEFAULT_CAP_WEB, "staffed": 0.1, "p95_line_ms": P95_LINE_HORDE_MS},
 ]
+## The horde scenarios, run by `stress.gd -- --horde` instead of the default ones.
+const HORDE: Array[int] = [4, 5]
 ## Game seconds a scenario takes to build up before frames are measured, and to measure.
 const WARM_UP: float = 3.0
 const MEASURE: float = 10.0
 ## Health of a stress enemy (the game's imp has 20), so the crowd lasts.
 const ENEMY_HEALTH: int = 120
+## A horde swarmer: the imp's body with no staff, a little faster, hurting by touch.
+const SWARM_SPEED: float = 55.0
+const SWARM_CONTACT: int = 3
 ## Enemies added per frame at most, and filler shots per physics step at most.
 const SPAWN_PER_FRAME: int = 10
 const TOP_UP_PER_STEP: int = 120
@@ -103,6 +131,9 @@ const STAFFS: Array[Array] = [
 ## tree) for a short run.
 var warm_up: float = WARM_UP
 var measure: float = MEASURE
+## Whether a horde scenario's frame line can fail it; a short test run turns it off (its
+## measured window is too short and its machine too busy for a frame time to mean much).
+var frame_lines: bool = true
 ## The scenarios to run, in order (indexes into SCENARIOS); `_ready` keeps the ones for this
 ## build (`scenarios_for`).
 var scenarios: Array[int] = [0, 2, 3, 1]
@@ -120,6 +151,11 @@ var _probe: Node
 var _rng := RandomNumberGenerator.new()
 var _enemies: Array[Node2D] = []
 var _enemy_data: EnemyBase = null
+## The horde's swarmer (`_swarm_data`), how many staff enemies a horde scenario keeps standing,
+## and how many of the crowd carry a staff now.
+var _swarm_data: EnemyBase = null
+var _target_staffed: int = 0
+var _staffed: int = 0
 ## The wizards of the scenario running and their Downed components, by seat.
 var _wizards: Array[Actor] = []
 var _downs: Array[Downed] = []
@@ -167,7 +203,9 @@ func _ready() -> void:
 		_finish(["the Events, PlayerInput, Flow and Projectiles autoloads must exist"])
 		return
 	_default_cap = int(_projectiles.call("get_cap"))
-	scenarios = scenarios_for(scenarios, OS.has_feature("web"))
+	scenarios = scenarios_for(scenarios_from_args(OS.get_cmdline_user_args() + OS.get_cmdline_args(), scenarios), OS.has_feature("web"))
+	if OS.has_feature("web"):
+		frame_lines = false
 	_events.connect("spell_cast", _on_spell_cast)
 	_events.connect("build_refused", _on_build_refused)
 	_events.connect("projectile_hit", _on_projectile_hit)
@@ -175,13 +213,19 @@ func _ready() -> void:
 	_next_scenario()
 
 
-## `wanted` without the desktop scenario when `web` (a web build measures the web budget only).
+## `wanted` without the desktop-only scenarios when `web` (a web build measures the web budget
+## only).
 static func scenarios_for(wanted: Array[int], web: bool) -> Array[int]:
 	var out: Array[int] = []
 	for index in wanted:
-		if not (web and SCENARIOS[index]["label"] == "desktop"):
+		if not (web and bool(SCENARIOS[index].get("desktop_only", false))):
 			out.append(index)
 	return out
+
+
+## The scenarios a run's user arguments ask for: the horde ones for `--horde`, else `default`.
+static func scenarios_from_args(args: PackedStringArray, default: Array[int]) -> Array[int]:
+	return HORDE.duplicate() if args.has("--horde") else default.duplicate()
 
 
 func _exit_tree() -> void:
@@ -203,6 +247,8 @@ func _next_scenario() -> void:
 	var scenario: Dictionary = SCENARIOS[scenarios[_current]]
 	_target_enemies = scenario["enemies"]
 	_target_shots = scenario["shots"]
+	_target_staffed = ceili(float(_target_enemies) * float(scenario.get("staffed", 1.0)))
+	_staffed = 0
 	_rng.seed = SEED
 	_casts = [0, 0, 0, 0]
 	_peak_enemies = 0
@@ -255,6 +301,7 @@ func _start_measuring(scenario: Dictionary) -> void:
 	if _enemy_data == null:
 		_finish(["the enemy data is missing"])
 		return
+	_swarm_data = swarm_data(_enemy_data)
 	_wizards.clear()
 	_downs.clear()
 	for index in PLAYERS:
@@ -284,6 +331,20 @@ func _stress_enemy_data() -> EnemyBase:
 		return null
 	var copy: EnemyBase = data.duplicate() as EnemyBase
 	copy.max_health = ENEMY_HEALTH
+	return copy
+
+
+## A horde swarmer made from a staff enemy's data: the same body with no staff, cards or mana,
+## so it only chases and hurts by touch (the horde's swarm enemies are made in parallel, Horde
+## H4; the run does not depend on their folders).
+static func swarm_data(from: EnemyBase) -> EnemyBase:
+	var copy: EnemyBase = from.duplicate() as EnemyBase
+	copy.staff = null
+	copy.cards = [] as Array[StringName]
+	copy.max_mana = 0.0
+	copy.mana_regen = 0.0
+	copy.move_speed = SWARM_SPEED
+	copy.contact_damage = SWARM_CONTACT
 	return copy
 
 
@@ -367,10 +428,13 @@ func _keep_wizards_up() -> void:
 
 func _top_up_enemies() -> void:
 	var alive: int = 0
+	_staffed = 0
 	for i in range(_enemies.size() - 1, -1, -1):
 		var enemy: Node2D = _enemies[i]
 		if is_instance_valid(enemy) and not enemy.is_queued_for_deletion():
 			alive += 1
+			if (enemy as Actor).data == _enemy_data:
+				_staffed += 1
 		else:
 			_enemies.remove_at(i)
 	var world := _flow.get("world") as Node2D
@@ -378,10 +442,13 @@ func _top_up_enemies() -> void:
 		return
 	var add: int = mini(_target_enemies - alive, SPAWN_PER_FRAME)
 	for i in add:
-		var enemy := _enemy_data.scene.instantiate() as Actor
+		var data: EnemyBase = _enemy_data if _staffed < _target_staffed else _swarm_data
+		var enemy := data.scene.instantiate() as Actor
 		if enemy == null:
 			continue
-		enemy.data = _enemy_data
+		enemy.data = data
+		if data == _enemy_data:
+			_staffed += 1
 		enemy.position = ENEMY_AREA.position + Vector2(_rng.randf() * ENEMY_AREA.size.x, _rng.randf() * ENEMY_AREA.size.y)
 		world.add_child(enemy)
 		_enemies.append(enemy)
@@ -438,6 +505,8 @@ func _end_scenario() -> void:
 		_report_parts()
 	var mean_enemies: float = float(_enemy_sum) / maxf(1.0, float(_enemy_samples))
 	var mean_shots: float = float(_shot_sum) / maxf(1.0, float(_shot_samples))
+	if scenario.has("staffed"):
+		print("BENCH: stress %s: staff enemies standing at the end %d (target %d), the rest swarmers" % [label, _staffed, _target_staffed])
 	print("BENCH: stress %s: enemies mean %.0f peak %d of %d, shots mean %.0f peak %d of %d, spell hits %d, reactions %d, casts per player (measured window) %s" % [label, mean_enemies, _peak_enemies, _target_enemies, mean_shots, _peak_shots, _target_shots, _hits, _reactions, str(_casts)])
 	# The run holds the cap full on purpose, so `dropped` is how often shots pushed past it; the
 	# fires that waited are the trigger fires the pacing moved to a later step (none is lost).
@@ -453,6 +522,11 @@ func _end_scenario() -> void:
 			_failures.append("%s: bot %d never cast a spell while measured" % [label, index + 1])
 	if _probe == null or int(_probe.call("frame_count")) == 0:
 		_failures.append("%s: no frames were measured" % label)
+	elif frame_lines and scenario.has("p95_line_ms"):
+		var p95: float = _probe.call("percentile_95")
+		var line: float = scenario["p95_line_ms"]
+		if p95 > line:
+			_failures.append("%s: p95 frame time %.2f ms is over its line of %.1f ms" % [label, p95, line])
 	_teardown_scenario()
 	_next_scenario()
 

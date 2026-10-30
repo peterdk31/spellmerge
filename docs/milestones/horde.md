@@ -45,6 +45,22 @@ Called **Horde** in code, files, commits and the game (owner, 2026-10-30), never
 - **The stress run** gets a `horde` scenario: 500 swarm enemies (touch only) plus a share of staff enemies, against four bots, in the horde arena; on desktop and on web. It reports the frame times like the others. The pass line is set after the first measurement, and the session writes down what costs the most.
 - **Spawning and dying** must not hitch: a few spawns a frame, and enemies freed as today. If the measurement shows instantiating or freeing as a cost, recycling the director's enemies is the follow-up (H6), not a guess now.
 
+### H1: what was built and the first numbers (2026-10-30)
+
+- **Built:** `Actors.ACTORS` is 1024; `SpellTag` packs the caster in bits 14-23 (`CASTER_MASK` 1023) under `FLAG` at bit 24, so the largest tag is below 1 << 25 (`LIMIT` stays 1 << 29). The per-actor arrays grow with it (the spell runtime's per-staff rows are 4,096: a few hundred KB, allocated once). `Spells.step` counted down all 4,096 staff cooldowns every physics step (about 0.3 ms in GDScript); it now counts only up to the highest row that ever cast. Found by the horde run and fixed: `Projectiles.set_cap` to a smaller cap with shots alive past it read past its shrunk arrays (now it clears first).
+- **The scenarios** (`tests/benchmark/stress_runner.gd`): `horde` (600 enemies, desktop only) and `horde, web` (500), each 10% staff enemies (the imp with 120 health) and 90% swarmers (the imp's body with no staff, 55 px/s, 3 touch damage; built in the runner, so it does not wait for H4), against the four bots, at the web cap of 500 shots, in the usual 640×360 room (the arena is H2's). They are not in the default run (they take longer than the rest together, and the exported runs have fixed timeouts): `godot --headless --path . --script res://tests/benchmark/stress.gd -- --horde`, or an exported test build with `--stress --horde`. They pass like the others (enemies and shots at 90% of the targets, every bot casts, spell hits, no errors) plus a provisional frame line: p95 under 600 ms headless (not checked on web).
+- **Measured** (headless Linux, 24 threads under WSL, shared with other builds; game logic only, no rendering):
+
+| Scenario | Enemies (mean) | Frame avg | p95 | Physics steps a frame |
+| --- | --- | --- | --- | --- |
+| `web` (100 enemies, 500 shots), for comparison | 100 | 8.7-17 ms | 16.5-31 ms | 0.5-1 |
+| `horde` sweep, 300 enemies, 500 shots | 295 | 146 ms | 166 ms | 8 (the limit) |
+| `horde` (600) | 556 | 271 ms | 319 ms | 8 |
+| `horde, web` (500) | 490 | 232 ms | 267 ms | 8 |
+
+  Past about 250 enemies a physics step costs more than its 16.7 ms, so the engine runs the most steps it may (8) every frame and the game falls behind real time (10 game seconds took about 20). At 600 a physics step costs about 31 ms: the enemies' own step 15 ms (their looks, `CreatureLook` and `Face`, 6.5 ms; the AI's `think` 6 ms; the mover 1.5 ms; caster and hurtbox under 1 ms), `move_and_slide` 1.7 ms, the projectile manager 5 ms (600 hurt circles in its target grid), Combat 1.7 ms, Spells 1.2 ms, and the rest (wizards, the run's own top-ups) about 6 ms. The per-enemy cost is about 50 µs a physics step all in. Instantiating and freeing did not show (at most 10 spawns a frame).
+- **For the director (H3) and tuning (H6):** with one node-based actor per enemy, the realistic cap at 60 FPS is about **200-250 alive on desktop** and about **80-100 on web** (WASM GDScript is several times slower; the `web` scenario at 100 enemies is already at the budget there). The curve's 600 alive by 8 minutes holds only as a slow-motion game today. Reaching 500+ at 60 FPS needs a swarm without a node per swarmer (rows in packed arrays like the projectiles and `Entities`, drawn by one MultiMesh, a shared step for chase and touch, hurt circles in the target grid): the looks and the AI are two thirds of the enemy cost, and they would be one loop. Cheaper steps first, if a smaller win is wanted: step the looks of off-screen or idle enemies less often, and run the swarmers' AI retarget less often. Recycling instead of instantiating is not needed by these numbers.
+
 ## Parts
 
 Built in parallel from the foundation commit (the events, this document, the ROADMAP line); each part is one branch and one PR, and touches only its own paths.

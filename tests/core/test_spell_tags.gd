@@ -1,6 +1,6 @@
 extends "res://tests/support/suite.gd"
 ## Tests for the tags and generations of the spell runtime (staffs A5/A6c; M2 part 5 before):
-## the tag layout (staff, generation, node and caster, every actor id 0-511 since actors G2), every compiled spell of a staff registered
+## the tag layout (staff, generation, node and caster, every actor id 0-1023 since Horde H1), every compiled spell of a staff registered
 ## under its node, four players building at once, a rebuild mid-flight, the generation ring
 ## wrapping and revoking. It uses cards built in code and a stand-in registry, so no content is
 ## needed. The compiler's own rules are in test_staff_compiler.gd.
@@ -111,7 +111,7 @@ func _begin(actor: int, staff: int, compiled: CompiledStaff) -> int:
 
 
 func test_tags_pack_and_unpack() -> void:
-	for caster in [0, 1, 3, 4, 259, 260, 300, SpellTag.CASTER_MASK]:
+	for caster in [0, 1, 3, 4, 259, 260, 300, 511, 512, 700, 1023, SpellTag.CASTER_MASK]:
 		for staff in SpellLimits.STAFFS:
 			for node in [0, 1, 2, SpellTag.NODE_MASK]:
 				for generation in SpellLimits.GENERATIONS:
@@ -148,6 +148,9 @@ func test_tags_fit_an_int32_and_miss_the_ai_tags() -> void:
 	check_equal(shields[0], largest, "an int32 array keeps the largest tag")
 	check(SpellTag.make(0, 0, 0, 0) > 101000, "the smallest tag is above the AI's attack tags")
 	check(not SpellTag.is_spell_tag(SpellTag.LIMIT), "nothing at the limit is a spell tag")
+	check_equal(SpellTag.CASTER_MASK, 1023, "the caster has 10 bits (Horde H1)")
+	check_equal(SpellTag.FLAG, 1 << 24, "the flag sits above them, at bit 24")
+	check(SpellTag.FLAG > SpellTag.CASTER_MASK << SpellTag.CASTER_SHIFT, "no caster reaches the flag")
 	check_equal(SpellTag.generation_key(SpellTag.make(7, 0, 9, 2)), SpellTag.make(7, 0, 0, 2), "a generation key keeps its caster")
 	check(SpellTag.generation_key(SpellTag.make(7, 0, 9, 2)) != SpellTag.generation_key(SpellTag.make(8, 0, 9, 2)), "two casters have their own keys")
 
@@ -164,7 +167,10 @@ func test_a_built_staff_registers_every_node() -> void:
 func test_empty_staffs_and_bad_arguments_give_tag_zero() -> void:
 	check_equal(_begin(0, 0, StaffKit.compile(_spells, [] as Array[StringName])), 0, "an empty staff is not registered")
 	var good: CompiledStaff = _staff({"form": &"bolt"})
-	check_equal(_begin(ActorsScript.ACTORS, 0, good), 0, "actor 512 does not exist")
+	check_equal(_begin(ActorsScript.ACTORS, 0, good), 0, "actor %d does not exist" % ActorsScript.ACTORS)
+	var high: int = _begin(1023, 3, good)
+	check(high != 0 and SpellTag.caster_of(high) == 1023 and SpellTag.staff_of(high) == 3, "actor 1023 builds and its tag names it")
+	check(_spells.call("profile", high) != null, "and its spell is found by the tag")
 	check(_begin(ActorsScript.ACTORS - 1, 0, good) != 0, "the last actor id may build")
 	check_equal(_begin(0, SpellLimits.STAFFS, good), 0, "a fifth staff does not exist")
 	check_equal(_begin(-1, 0, good), 0, "actor -1 does not exist")

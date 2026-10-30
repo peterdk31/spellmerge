@@ -102,6 +102,26 @@ func test_a_hit_and_its_impact_carry_the_casters_actor_id() -> void:
 	check(not impacts.is_empty() and impacts.all(func(c: int) -> bool: return c == IMP), "its impacts name the id too")
 
 
+## Horde H1: an actor id past the old 512 casts, hits and is hit like any other, and its tag
+## names it.
+func test_a_high_actor_id_casts_and_its_hit_names_it() -> void:
+	while table.open_count() < 1000:
+		ActorSeats.enemy(table)
+	var high: int = ActorSeats.enemy(table)
+	check_equal(high, 1000, "the horde's actor 1000 is open")
+	var tag: int = SpellTagScript.make(high, 2, 3, 1)
+	var wizard: Node2D = _target(Vector2(200.0, 100.0), ManagerScript.LAYER_PLAYER, WIZ_0)
+	check(mgr.spawn(high, Vector2(100.0, 100.0), Vector2(300.0, 0.0), 2.0, 4.0, ManagerScript.LAYER_PLAYER, 0, tag) >= 0, "its shot is made")
+	check_equal(mgr.get_count_for(high), 1, "and counted under its id")
+	_run(30)
+	check(hits.size() == 1 and hits[0][1] == wizard and hits[0][0] == high and hits[0][2] == tag, "the hit names actor 1000 and its tag")
+	check_equal(SpellTagScript.caster_of(hits[0][2] if hits.size() == 1 else 0), high, "the tag reads back actor 1000")
+	var body: Node2D = _enemy(Vector2(300.0, 200.0), high)
+	mgr.spawn(WIZ_0, Vector2(200.0, 200.0), Vector2(300.0, 0.0), 2.0, 4.0, ManagerScript.LAYER_ENEMY)
+	_run(30)
+	check(hits.size() == 2 and hits[1][1] == body and hits[1][0] == WIZ_0, "its body is hit")
+
+
 func test_an_expiry_carries_the_casters_actor_id() -> void:
 	mgr.spawn(WIZ_1, Vector2(300.0, 300.0), Vector2(10.0, 0.0), 0.1, 4.0)
 	mgr.spawn(IMP, Vector2(300.0, 200.0), Vector2(10.0, 0.0), 0.1, 4.0)

@@ -1,13 +1,13 @@
 class_name CarrierWall
 extends Carrier
 ## `shots` still, solid shots in a line across the aim, `spread` pixels apart: a short-lived wall that
-## stands through every hit (`FormBase.Motion.WALL`). Homing places it on a target near its aim.
+## stands through every hit (`FormBase.Motion.WALL`). Homing makes it creep toward a target, as a rune.
 
 
 ## How the wall takes each modifier (`ModifierBase.Behaviour`), every one: see `Carrier`.
 const BEHAVIOURS: Dictionary = {
 	B.NONE: [Use.RUNS, Look.SHOWN],
-	B.HOMING: [Use.OWN, Look.SHOWN],
+	B.HOMING: [Use.RUNS, Look.SHOWN],
 	B.CHAIN: [Use.RUNS, Look.SHOWN],
 	B.SHIELD: [Use.RUNS, Look.SHOWN],
 	B.BLAST: [Use.RUNS, Look.CUE],
@@ -72,3 +72,8 @@ func events() -> Dictionary:
 
 func infusions() -> Array:
 	return INFUSIONS
+
+
+## One solid line of still shots across the aim (`Spells._launch_wall`).
+func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direction: Vector2, source: Node, lifetime: float, chain: int, prev: int) -> int:
+	return rt._launch_wall(spell, tag, actor, origin, direction, source, lifetime, chain, prev)

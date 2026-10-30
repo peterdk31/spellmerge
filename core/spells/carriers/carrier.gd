@@ -1,7 +1,7 @@
 class_name Carrier
 extends RefCounted
 ## A carrier: what a form card fires (`FormBase.Motion`), and the one place that says what it does
-## with every other card (docs/design/carriers.md). Each motion has one subclass in this folder,
+## with every other card (docs/CARRIERS.md). Each motion has one subclass in this folder,
 ## found by `Carriers.of(motion)`; the compiler reads its tables, the spell runtime runs it.
 ##
 ## A subclass must answer for every card kind, with no default (tests/core/test_carriers.gd fails
@@ -23,7 +23,8 @@ enum Use {
 	## The shared path runs it: the shot kit (`Spells._apply_travel`), the hit path (`_on_hit`), the
 	## cast path (`_fire_spell`: echo, mirror, recoil, hold) or the end point (blast).
 	RUNS,
-	## The carrier's own code runs it, and the shared path leaves it alone.
+	## The carrier's own path runs it (its script, or a runtime service only it calls: a move, an
+	## entity's guard), and the shared path leaves it alone.
 	OWN,
 	## It does nothing on this carrier; the card is listed as wasted with the reason.
 	WASTED,
@@ -207,3 +208,74 @@ func homing_range(ray_length: float, reach: float) -> float:
 	if not steers():
 		return 0.0
 	return maxf(reach, ray_length) if has(INSTANT_HOMING) else reach
+
+
+# The runtime side. The compiler's carriers (`Carriers.of`) are never bound; the spell runtime
+# makes its own (`Carriers.make_all`) and binds them, and each runs what it fires. A carrier asks
+# the runtime for the shared path (the shot kit, the hit path, moves, entities) through `rt`.
+
+## The runtime that casts this carrier (null for the compiler's, which only reads the tables).
+var rt: SpellRuntime = null
+
+
+## Binds this carrier to `runtime`, which casts it, and the staff animations its casts play. A
+## carrier with rows of its own makes them here.
+func bind(runtime: SpellRuntime, _staff_poses: StaffPoses) -> void:
+	rt = runtime
+
+
+## One launch of `spell` from `origin` along `direction` (`Spells._launch`): how many shots, rows or
+## moves it made (0 when none could start). `lifetime` is the carrier's (a held one's is longer),
+## `chain` the jumps its hits carry and `prev` the target they jump from. By default `spell.shots`
+## leave in a fan (or round a ring), each made by `shoot`.
+func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direction: Vector2, source: Node, lifetime: float, chain: int, prev: int) -> int:
+	var made: int = 0
+	var count: int = spell.shots
+	for n in count:
+		var angle: float = direction.angle() + rt._fan_angle(n, count, spell) + rt._staff_spread(tag, spell)
+		made += shoot(spell, tag, actor, origin, direction, Vector2.from_angle(angle), n, count, source, lifetime, chain, prev)
+	return made
+
+
+## Shot `n` of `count` of one launch, along `heading` (`direction` is the launch's aim): 1 when it
+## was made. By default a shot flying along `heading`.
+func shoot(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, _direction: Vector2, heading: Vector2, _n: int, _count: int, source: Node, lifetime: float, chain: int, prev: int) -> int:
+	var slot: int = rt.projectiles.spawn(actor, origin, heading * spell.speed, lifetime, spell.radius, SpellRuntime.HITS, spell.pierce, tag)
+	return rt._land_shot(slot, spell, tag, source, chain, prev)
+
+
+## What a hit of this carrier does of its own, besides the shared hit path (`Spells._on_hit_effects`):
+## a hook's pull, a swap's trade. True when it moves what cast it, so its blast waits for the arrival.
+func on_hit(_spell: CompiledSpell, _tag: int, _actor: int, _target: Node, _position: Vector2, _slot: int) -> bool:
+	return false
+
+
+## A move of this carrier ended at `at` (`Spells._move_end`), before its blast and `on expire`.
+func on_move_end(_spell: CompiledSpell, _tag: int, _actor: int, _at: Vector2, _heading: Vector2) -> void:
+	pass
+
+
+## Runs its rows on by `delta` (`Spells.step`).
+func step(_delta: float) -> void:
+	pass
+
+
+## Ends its rows of `tag` quietly (a revoked build, a hold switched off).
+func end_of(_tag: int) -> void:
+	pass
+
+
+## Ends its rows of `actor` quietly (its caster closed).
+func end_actor(_actor: int) -> void:
+	pass
+
+
+## Every row of it gone at once, quietly (`Spells.clear`).
+func clear() -> void:
+	pass
+
+
+## How far a cast of `spell` reaches along its aim, for an enemy's telegraph (`Spells.next_cast_reach`);
+## 0 for one that is not aimed.
+func reach_of(_spell: CompiledSpell) -> float:
+	return 0.0

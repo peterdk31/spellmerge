@@ -1,5 +1,5 @@
 extends "res://tests/support/suite.gd"
-## The carriers' contract (docs/design/carriers.md, core/spells/carriers/): every carrier answers
+## The carriers' contract (docs/CARRIERS.md, core/spells/carriers/): every carrier answers
 ## for every card kind, with no default, in its logic (`Carrier.Use`) and its look (`Carrier.Look`),
 ## and what it says agrees with its traits and with what its renderer really gets. A new carrier,
 ## behaviour or trigger fails here until each carrier has decided.

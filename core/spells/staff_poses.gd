@@ -260,4 +260,4 @@ static func pose_ease(x: float, ease: int) -> float:
 			return 1.0 - (1.0 - x) * (1.0 - x)
 		2:
 			return x * x
-	return SpellSwings.swing_ease(x)
+	return CarrierSwing.swing_ease(x)

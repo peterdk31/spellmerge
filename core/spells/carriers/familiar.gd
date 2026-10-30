@@ -80,3 +80,8 @@ func hits_nothing() -> String:
 
 func look_note() -> String:
 	return "a familiar is drawn as a plain orbit shot, without its cards' looks"
+
+
+## Asks `ai` for a familiar a step ahead along `heading` (`Spells._spawn_entity`).
+func shoot(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, _direction: Vector2, heading: Vector2, _n: int, _count: int, _source: Node, lifetime: float, _chain: int, _prev: int) -> int:
+	return rt._spawn_entity(spell, tag, actor, &"familiar", rt._placed_at(spell, origin, heading), heading, lifetime)

@@ -76,3 +76,13 @@ func infusions() -> Array:
 
 func look_note() -> String:
 	return "a teleport is over at once and draws nothing of its own: its cards show only in its hits"
+
+
+## Blinks its caster (`Spells._move_caster`).
+func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direction: Vector2, _source: Node, _lifetime: float, chain: int, prev: int) -> int:
+	return rt._move_caster(spell, tag, actor, origin, direction, chain, prev, false)
+
+
+## It strikes what is where it landed (`Spells._land_strike`).
+func on_move_end(spell: CompiledSpell, tag: int, actor: int, at: Vector2, heading: Vector2) -> void:
+	rt._land_strike(spell, tag, actor, at, heading)

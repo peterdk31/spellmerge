@@ -76,3 +76,12 @@ func infusions() -> Array:
 
 func hit_kind() -> StringName:
 	return &"ray"
+
+
+## Marks the aim point and strikes it after its `lifetime` (`Spells._telegraph_rain`).
+func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direction: Vector2, _source: Node, _lifetime: float, _chain: int, _prev: int) -> int:
+	return rt._telegraph_rain(spell, tag, actor, origin, direction)
+
+
+func reach_of(spell: CompiledSpell) -> float:
+	return spell.ray_length if spell.ray_length > 0.0 else SpellLimits.RAIN_REACH

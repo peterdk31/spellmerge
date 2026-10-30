@@ -72,3 +72,17 @@ func events() -> Dictionary:
 
 func infusions() -> Array:
 	return INFUSIONS
+
+
+## Shot `n` of `count` evenly round the circle from the aim: it circles its caster, the wizard, or
+## for a payload the shot that cast it (or the point it was cast from).
+func shoot(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direction: Vector2, _heading: Vector2, n: int, count: int, source: Node, lifetime: float, chain: int, prev: int) -> int:
+	var turn: float = SpellLimits.ORBIT_TURN
+	if spell.speed > 0.0 and spell.orbit_radius > 0.0:
+		turn = spell.speed / spell.orbit_radius
+	var centre: Vector2 = Vector2.INF
+	if rt._caster != SpellRuntime.CASTER_WIZARD:
+		var shot: int = rt._caster_shot()
+		centre = rt.projectiles.get_position_of(shot) if shot >= 0 else origin
+	var slot: int = rt.projectiles.spawn_orbit(actor, spell.orbit_radius, direction.angle() + TAU * n / count, turn, lifetime, spell.radius, SpellRuntime.HITS, spell.pierce, tag, centre)
+	return rt._land_shot(slot, spell, tag, source, chain, prev)

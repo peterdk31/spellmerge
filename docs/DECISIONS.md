@@ -2,6 +2,13 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-30: Carriers decide every card (owner direction)
+
+- **The carrier is the important part** (owner, 2026-10-30): each carrier (one per `FormBase.Motion`, `core/spells/carriers/`) decides for itself what it does with every modifier behaviour, trigger and infusion, both in logic (`Use`: runs on the shared path, runs its own way, only with a blast, or wasted with the reason) and in look (`Look`: drawn, shown by its cue, or not shown with the reason). There is no default: `tests/core/test_carriers.gd` fails until a new carrier, behaviour or trigger is decided on every carrier, and casts every carrier to check that what it says it draws reaches its renderer. The design is docs/CARRIERS.md.
+- **Why:** the answers were spread over the compiler's waste table (one `match` per behaviour, carriers listed inside), the runtime's motion checks and the projectile manager's refusals, and the waste table's default was "runs", so a new behaviour was assumed to work everywhere until `test_card_rules` caught a silent cell. Grouping by carrier puts the decision where a designer thinks about it ("what does bounce mean on a beam?"); the shared implementations (homing, bounce, the hit path) stay written once.
+- **One mechanism:** the compiler reads the carriers' tables and traits (its static helpers are thin wrappers now); the runtime hands every launch to its carrier (`Carrier.launch`, `shoot`, `on_hit`, `on_move_end`, `step`...) and never asks which motion a spell has. The beam, swing and slam carriers keep their own rows (they were the `SpellBeams`, `SpellSwings`, `SpellSlams` kits split out of `spells.gd` earlier the same day); a hit with no shot slot goes back through the runtime as one `RayHit`.
+- **No card reads differently:** the tables were generated from what the compiler answered before. The retired motion slot (`_UNUSED_10`) now runs nothing. The look column states three gaps the tests confirm: a teleport, a decoy and a familiar draw none of their cards' looks.
+
 ## 2026-10-30: Card rules R4 F3, placing (owner)
 
 - **What you place appears a step ahead along the aim** (twice the card's size; with a wall in the way, where it is cast, never in the wall: `Spells._placed_at`): a rune, a decoy, a familiar. One rule, so a mirror's reversed aim puts its copy behind you instead of on the same spot; the rune's `count == 1` case is gone. Decoy and familiar sizes are now their bodies' (8 and 3 px), so the step is visible. Spread (sniper) now counts on all three: their spot follows the aim.

@@ -72,3 +72,8 @@ func events() -> Dictionary:
 
 func infusions() -> Array:
 	return INFUSIONS
+
+
+## Moves its caster (`Spells._move_caster`), striking what it passes.
+func launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direction: Vector2, _source: Node, _lifetime: float, chain: int, prev: int) -> int:
+	return rt._move_caster(spell, tag, actor, origin, direction, chain, prev, true)

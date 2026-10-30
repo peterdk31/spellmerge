@@ -81,3 +81,8 @@ func hits_nothing() -> String:
 
 func look_note() -> String:
 	return "a decoy wears its caster's look, not its cards'"
+
+
+## Asks `ai` for a decoy a step ahead along `heading` (`Spells._spawn_entity`).
+func shoot(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, _direction: Vector2, heading: Vector2, _n: int, _count: int, _source: Node, lifetime: float, _chain: int, _prev: int) -> int:
+	return rt._spawn_entity(spell, tag, actor, &"decoy", rt._placed_at(spell, origin, heading), heading, lifetime)

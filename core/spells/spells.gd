@@ -35,15 +35,17 @@ extends Node
 ## (`fires_waited` counts them). A beam fires an on-expire payload where it ends when its
 ## life is over, and a timer from its tip while it is on.
 ##
-## Kits: the forms that live a while in rows of their own, not as the manager's shots, are each run
-## by a kit this script owns and steps: `SpellBeams` (beam), `SpellSwings` (swing), `SpellSlams`
-## (slam), and `StaffPoses` plays every carrier's staff animation. A kit starts its rows from
-## `_launch` (who casts it passed in), runs them in `step` and sends its hits back through this
-## script as rays (`_ray_begin`, `RayHit`), so cards, payloads and chains are one path for every
-## form. The `beam_*`, `swing_*`, `slam_*` and `staff_*` getters at the end of this script hand the
-## looks' questions to the kits.
+## Carriers (docs/CARRIERS.md): each form's motion has a `Carrier` (core/spells/carriers/) that this
+## script makes and binds (`Carriers.make_all`) and hands each launch to (`_launch` ->
+## `Carrier.launch`); nothing here asks which motion a spell has. A carrier runs what is its own (a
+## hook's pull, a beam's rows, a teleport's landing) and asks this script for the shared path: the
+## shot kit (`_land_shot`, `_apply_travel`), moves (`_move_caster`), entities (`_spawn_entity`) and
+## the hit path, which every hit with no shot slot goes back through as a ray (`_ray_begin`,
+## `RayHit`), so cards, payloads and chains are one path for every carrier. The beam, the swing and
+## the slam keep rows of their own; `StaffPoses` plays every carrier's staff animation. The `beam_*`,
+## `swing_*`, `slam_*` and `staff_*` getters at the end of this script hand the looks' questions on.
 ##
-## Beams: a beam lives its `lifetime` (`SpellBeams.start`), held by its caster (the wizard's aim from
+## Beams: a beam lives its `lifetime` (`CarrierBeam.start`), held by its caster (the wizard's aim from
 ## `set_aim`, or its shot), hits at once and every `SpellLimits.BEAM_TICK`, and a homing one bends
 ## onto a target. `beam_*` give its look to `gameplay/feel`. Dash and teleport move their caster a
 ## fixed `ray_length`; speed only sets how long a dash takes. Payloads send no `spell_cast`: the wizard's player does, for its seat.
@@ -378,20 +380,24 @@ var _aim_pivot: PackedVector2Array = PackedVector2Array()
 ## caster * STAFFS + staff -> the last generation that staff used, so a build after an empty
 ## staff, or a caster opened again under the same id, goes on round the ring (old shots in the air keep theirs).
 var _ring: PackedInt32Array = PackedInt32Array()
-## The forms that live a while in the runtime's own rows, not as the manager's shots: each kit
-## keeps its rows and runs them; this script starts them (`_launch`), steps them and ends them.
-var _beams: SpellBeams = null
-var _swings: SpellSwings = null
-var _slams: SpellSlams = null
+## This runtime's carriers, by `FormBase.Motion` (`Carriers.make_all`, bound to it), and the three
+## that keep rows of their own, for their looks' getters.
+var _carriers: Array[Carrier] = []
+var _beams: CarrierBeam = null
+var _swings: CarrierSwing = null
+var _slams: CarrierSlam = null
 ## Each actor's staff animation, for any carrier with a `staff_pose`.
 var _poses: StaffPoses = null
 
 
 func _init() -> void:
 	_poses = StaffPoses.new(self)
-	_beams = SpellBeams.new(self)
-	_swings = SpellSwings.new(self, _poses)
-	_slams = SpellSlams.new(self, _poses)
+	_carriers = Carriers.make_all()
+	for carrier in _carriers:
+		carrier.bind(self, _poses)
+	_beams = _carriers[FormBase.Motion.RAY] as CarrierBeam
+	_swings = _carriers[FormBase.Motion.SWING] as CarrierSwing
+	_slams = _carriers[FormBase.Motion.SLAM] as CarrierSlam
 	_current.resize(ACTORS * SpellLimits.STAFFS)
 	_current.fill(-1)
 	_installed.resize(ACTORS * SpellLimits.STAFFS)
@@ -541,7 +547,7 @@ static func _cast_damage(cast: CompiledCast) -> int:
 		return 0
 	var total: int = 0
 	for spell in cast.group.spells:
-		total += spell.damage * maxi(spell.shots, 1) * SpellBeams.beam_hits(spell.motion, spell.lifetime)
+		total += spell.damage * maxi(spell.shots, 1) * CarrierBeam.beam_hits(spell.motion, spell.lifetime)
 	return total * maxi(cast.group.repeats, 1)
 
 
@@ -568,7 +574,7 @@ func component_stats(id: StringName) -> PackedStringArray:
 	var component: SpellComponent = _component(id)
 	if component is FormBase:
 		var form: FormBase = component
-		var hits: int = maxi(form.shots, 1) * SpellBeams.beam_hits(form.motion, form.lifetime)
+		var hits: int = maxi(form.shots, 1) * CarrierBeam.beam_hits(form.motion, form.lifetime)
 		out.append("Dmg %d" % form.base_damage if hits <= 1 else "Dmg %dx%d" % [form.base_damage, hits])
 		out.append("Mana " + _short(form.mana_cost))
 		out.append("Delay %ss" % _short(form.cooldown))
@@ -781,9 +787,8 @@ func install_staff(actor: int, staff: int, compiled: CompiledStaff) -> int:
 			projectiles.remove_by_tag(revoked)
 	for revoked in revoked_tags:
 		_end_entities(revoked)
-		_beams.end_of(revoked)
-		_swings.end_of(revoked)
-		_slams.end_of(revoked)
+		for carrier in _carriers:
+			carrier.end_of(revoked)
 	return tag
 
 
@@ -873,9 +878,8 @@ func step(delta: float) -> void:
 	_run_waiting_fires()
 	_step_moves(delta)
 	_step_passes(delta)
-	_beams.step(delta)
-	_swings.step(delta)
-	_slams.step(delta)
+	for carrier in _carriers:
+		carrier.step(delta)
 	_step_live(delta)
 	_step_arcs(delta)
 	_step_magnets()
@@ -885,69 +889,34 @@ func step(delta: float) -> void:
 ## The shots made by one launch of `spell`, returned as how many were made (a beam counts
 ## as one). `source` is the target that fired the trigger, or null.
 func _launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direction: Vector2, source: Node, chain: int = -1, prev: int = 0) -> int:
-	var count: int = spell.shots
-	var made: int = 0
+	var carrier: Carrier = _carrier_of(spell)
 	var carried: int = spell.chain_jumps if chain < 0 else chain
 	# A held carrier lives until switched off; one that repeats (`_repeats`) lives its own life each time.
 	var held: bool = _holds(spell, tag)
 	var lifetime: float = SpellLimits.HOLD_LIFETIME if held and not _repeats(spell) else spell.lifetime
 	# Any carrier may move the staff (its card's `staff_pose`); a swing's and a slam's start theirs
 	# with their own wind-up, side and strike.
-	if not spell.staff_pose.is_empty() and spell.motion != FormBase.Motion.SWING and spell.motion != FormBase.Motion.SLAM:
+	if not spell.staff_pose.is_empty() and not carrier.has(Carrier.OWN_POSE):
 		if _caster == CASTER_WIZARD and actor >= 0 and actor < ACTORS and _poses.started_at(actor) != _clock and direction.is_finite() and not direction.is_zero_approx():
 			_poses.start(actor, spell, tag, maxf(spell.wind_up, 0.0), StaffPoses.strike_of(spell, lifetime), direction.normalized(), StaffPoses.up_side(direction))
-	if spell.motion == FormBase.Motion.DASH or spell.motion == FormBase.Motion.TELEPORT:
-		return _move_caster(spell, tag, actor, origin, direction, carried, prev)
-	if spell.motion == FormBase.Motion.RAIN:
-		return _telegraph_rain(spell, tag, actor, origin, direction)
-	if spell.motion == FormBase.Motion.WALL:
-		return _launch_wall(spell, tag, actor, origin, direction, source, lifetime, carried, prev)
-	var base: float = direction.angle()
-	for n in count:
-		var angle: float = base + _fan_angle(n, count, spell) + _staff_spread(tag, spell)
-		var heading: Vector2 = Vector2.from_angle(angle)
-		if spell.motion == FormBase.Motion.RAY:
-			if _beams.start(spell, tag, actor, origin, heading, carried, prev, source, lifetime, _caster, _caster_seq, _echo_spell == spell):
-				made += 1
-			continue
-		if spell.motion == FormBase.Motion.SWING:
-			if _swings.start(spell, tag, actor, origin, heading, carried, prev, source, _caster, _caster_seq, _echo_spell == spell):
-				made += 1
-			continue
-		if spell.motion == FormBase.Motion.SLAM:
-			if _slams.start(spell, tag, actor, origin, heading, carried, prev, source, _caster, _caster_seq, _echo_spell == spell):
-				made += 1
-			continue
-		if spell.motion == FormBase.Motion.DECOY or spell.motion == FormBase.Motion.FAMILIAR:
-			made += _spawn_entity(spell, tag, actor, _placed_at(spell, origin, heading), heading, lifetime)
-			continue
-		var slot: int = -1
-		match spell.motion:
-			FormBase.Motion.ORBIT:
-				var turn: float = SpellLimits.ORBIT_TURN
-				if spell.speed > 0.0 and spell.orbit_radius > 0.0:
-					turn = spell.speed / spell.orbit_radius
-				# An orbit circles its caster: the wizard, or for a payload the shot or the point.
-				var centre: Vector2 = Vector2.INF
-				if _caster != CASTER_WIZARD:
-					var shot: int = _caster_shot()
-					centre = projectiles.get_position_of(shot) if shot >= 0 else origin
-				slot = projectiles.spawn_orbit(actor, spell.orbit_radius, base + TAU * n / count, turn, lifetime, spell.radius, HITS, spell.pierce, tag, centre)
-			FormBase.Motion.STILL:
-				slot = projectiles.spawn(actor, _placed_at(spell, origin, heading), Vector2.ZERO, lifetime, spell.radius, HITS, spell.pierce, tag, ProjectilesScript.MOTION_STILL)
-			_:
-				slot = projectiles.spawn(actor, origin, heading * spell.speed, lifetime, spell.radius, HITS, spell.pierce, tag)
-		if slot < 0:
-			continue
-		_apply_travel(slot, spell)
-		made += 1
-		_register(slot, tag, spell, carried, prev)
-		if source != null:
-			projectiles.exclude(slot, source, SpellLimits.SOURCE_EXCLUSION)
-	# The ring is only a cue, drawn once, and only when a shot really flew.
-	if events != null and made > 0 and count > 1 and spell.spread >= 360.0 and spell.motion == FormBase.Motion.STRAIGHT:
-		events.form_shown.emit(actor, &"nova", origin, direction, 0.0, spell.tint, spell.look)
-	return made
+	return carrier.launch(spell, tag, actor, origin, direction, source, lifetime, carried, prev)
+
+
+## The carrier that runs `spell` (`Carrier`, one per `FormBase.Motion`).
+func _carrier_of(spell: CompiledSpell) -> Carrier:
+	return _carriers[spell.motion] if spell.motion >= 0 and spell.motion < _carriers.size() else _carriers[FormBase.Motion._UNUSED_10]
+
+
+## A shot a carrier spawned in `slot` (-1 when the manager refused it) takes its cards (`_apply_travel`)
+## and its record, and does not hit `source` for a while: 1 when it was made.
+func _land_shot(slot: int, spell: CompiledSpell, tag: int, source: Node, chain: int, prev: int) -> int:
+	if slot < 0:
+		return 0
+	_apply_travel(slot, spell)
+	_register(slot, tag, spell, chain, prev)
+	if source != null:
+		projectiles.exclude(slot, source, SpellLimits.SOURCE_EXCLUSION)
+	return 1
 
 
 ## Dash and teleport move their caster `ray_length` pixels: a card's distance is fixed, and its
@@ -965,8 +934,7 @@ func _launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direct
 ## runs with it (`_recoil`). Its `shield` guards what it moves (`_shield_move`). A point cannot
 ## move: a teleport cast by one blinks the wizard to it (rules R4c). A dash cast by a point, or a
 ## move with nothing to move, does nothing and returns 0.
-func _move_caster(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direction: Vector2, chain: int, prev: int) -> int:
-	var dash: bool = spell.motion == FormBase.Motion.DASH
+func _move_caster(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direction: Vector2, chain: int, prev: int, dash: bool) -> int:
 	var distance: float = move_distance(spell.ray_length, spell.speed, spell.lifetime)
 	var shot: int = _caster_shot()
 	var wizard: bool = _caster == CASTER_WIZARD
@@ -1231,8 +1199,7 @@ func _move_end(tag: int, at: Vector2, heading: Vector2, caster: int) -> void:
 	var actor: int = SpellTag.caster_of(tag)
 	if spell == null or not at.is_finite():
 		return
-	if spell.motion == FormBase.Motion.TELEPORT:
-		_land_strike(spell, tag, actor, at, heading)
+	_carrier_of(spell).on_move_end(spell, tag, actor, at, heading)
 	_blast(spell, tag, actor, at)
 	if spell.payload != null and spell.trigger_event == TriggerBase.Event.EXPIRE:
 		_fire(spell.payload, actor, SpellTag.staff_of(tag), SpellTag.generation_of(tag), at, heading, null, caster)
@@ -1364,10 +1331,9 @@ func _placed_at(spell: CompiledSpell, origin: Vector2, heading: Vector2) -> Vect
 ## A decoy or familiar: `ai` makes the entity at `at` (`entity_spawn_requested`, `lifetime`
 ## seconds, or until ended for a `hold`). It counts as a live shot of `tag` until `entity_ended`,
 ## so its build stays known while it lives; its timer fires along `heading`. Returns 1 when asked for.
-func _spawn_entity(spell: CompiledSpell, tag: int, actor: int, at: Vector2, heading: Vector2, lifetime: float) -> int:
+func _spawn_entity(spell: CompiledSpell, tag: int, actor: int, kind: StringName, at: Vector2, heading: Vector2, lifetime: float) -> int:
 	if events == null or not _profiles.has(tag):
 		return 0
-	var kind: StringName = &"decoy" if spell.motion == FormBase.Motion.DECOY else &"familiar"
 	var seconds: float = INF if lifetime >= SpellLimits.HOLD_LIFETIME else lifetime
 	var anchor: int = _entity_caster()
 	# Where it is: a decoy stays where it was made, a familiar circles its caster.
@@ -1534,7 +1500,7 @@ func _fire_spell(spell: CompiledSpell, actor: int, staff: int, generation: int, 
 	if launched > 0:
 		_recoil(spell, tag, actor, origin, heading)
 	# A move's mirror would cancel it (rules R4g): a dash or teleport moves its caster once.
-	if launched > 0 and spell.behaviour(ModifierBase.Behaviour.MIRROR) > 0.0 and spell.motion != FormBase.Motion.DASH and spell.motion != FormBase.Motion.TELEPORT:
+	if launched > 0 and spell.behaviour(ModifierBase.Behaviour.MIRROR) > 0.0 and _carrier_of(spell).use_of(ModifierBase.Behaviour.MIRROR) != Carrier.Use.WASTED:
 		var backwards: int = _launch(spell, tag, actor, origin, -heading, source)
 		launched += backwards
 		if backwards > 0:
@@ -1563,7 +1529,7 @@ func _fire_spell(spell: CompiledSpell, actor: int, staff: int, generation: int, 
 ## and a teleport, over at once, has it taken off its distance instead (`_move_caster`).
 func _recoil(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading: Vector2) -> void:
 	var push: float = spell.behaviour(ModifierBase.Behaviour.RECOIL)
-	if push <= 0.0 or spell.motion == FormBase.Motion.TELEPORT:
+	if push <= 0.0 or _carrier_of(spell).use_of(ModifierBase.Behaviour.RECOIL) == Carrier.Use.OWN:
 		return
 	if _caster != CASTER_WIZARD:
 		# A payload's recoil pushes the shot that cast it (a point has nothing to push).
@@ -1772,7 +1738,7 @@ func _fallback_hit(spell: CompiledSpell, tag: int, actor: int, at: Vector2) -> i
 ## Degrees (as radians) off the aim of shot `n` of `count`: none for one shot, an even ring
 ## for a 360 degree spread, otherwise an even fan centred on the aim.
 func _fan_angle(n: int, count: int, spell: CompiledSpell) -> float:
-	if count <= 1 or spell.motion == FormBase.Motion.ORBIT:
+	if count <= 1 or _carrier_of(spell).has(Carrier.RING):
 		return 0.0
 	if spell.spread >= 360.0:
 		return TAU * n / count
@@ -2142,7 +2108,7 @@ func _knows(slot: int) -> bool:
 ## through the shot for an orbit or still one (or one with no velocity).
 func _heading(spell: CompiledSpell, slot: int, at: Vector2, actor: int) -> Vector2:
 	var velocity: Vector2 = projectiles.get_velocity_of(slot)
-	if spell.motion == FormBase.Motion.ORBIT or spell.motion == FormBase.Motion.STILL or velocity.is_zero_approx():
+	if _carrier_of(spell).has(Carrier.OUTWARD) or velocity.is_zero_approx():
 		var anchor: Vector2 = projectiles.get_caster_of(slot) if slot >= 0 else projectiles.get_anchor(actor)
 		if anchor.is_finite() and not (at - anchor).is_zero_approx():
 			return (at - anchor).normalized()
@@ -2395,9 +2361,9 @@ func _on_hit(actor: int, target: Node, position: Vector2, tag: int) -> void:
 		_jump(spell, tag, actor, position, target as Node2D, struck, prev, chain - 1, by_ray, carried, carried_zap)
 
 
-## What a hit of a carrier does besides its payload and chain: siphon refunds mana; a hook pulls
-## the caster to the hit; a swap trades places with the target; a spent shot's `blast` goes off
-## (a beam's waits for its end, a hook's for the arrival).
+## What a hit of a carrier does besides its payload and chain: siphon refunds mana, possess takes
+## the target, the carrier's own part runs (`Carrier.on_hit`: a hook's pull, a swap's trade), and a
+## spent shot's `blast` goes off (a beam's waits for its end, a hook's for the arrival).
 func _on_hit_effects(spell: CompiledSpell, tag: int, actor: int, target: Node, position: Vector2, slot: int) -> void:
 	var refund: float = spell.behaviour(ModifierBase.Behaviour.SIPHON)
 	if refund > 0.0:
@@ -2405,43 +2371,8 @@ func _on_hit_effects(spell: CompiledSpell, tag: int, actor: int, target: Node, p
 	var possess: float = spell.behaviour(ModifierBase.Behaviour.POSSESS)
 	if possess > 0.0:
 		_possess(actor, target, possess, tag)
-	# A hook pulls its caster and a swap trades places with it: the body (through its owner),
-	# or the shot that cast this one. A point cannot move, so one cast from a point moves the
-	# wizard (rules R4c). Either is guarded by the card's shield for the move (`_shield_move`).
-	var caster: int = projectiles.caster_shot_of(slot) if slot >= 0 and not projectiles.is_cast_by_wizard(slot) else -1
-	var pulled: bool = false
-	if spell.motion == FormBase.Motion.HOOK:
-		# The hook's end is its shot's (rules R4a): where what it pulls arrives when this hit
-		# spent the shot; a shot with pierce left flies on and ends by itself (`_on_expired`).
-		var spent: bool = slot < 0 or not projectiles.is_alive(slot)
-		if caster < 0 and events != null:
-			var anchor: Vector2 = projectiles.get_anchor(actor)
-			_move_heading[actor] = anchor.direction_to(position) if anchor.is_finite() and not anchor.is_equal_approx(position) else Vector2.RIGHT
-			events.caster_move_requested.emit(actor, &"hook", position, SpellLimits.HOOK_SECONDS, tag)
-			# After the request: a hook move it replaced was answered with the old value.
-			_hook_ends[actor] = 1 if spent else 0
-			_shield_move(spell, tag, actor, -1, SpellLimits.HOOK_SECONDS)
-			pulled = true
-		elif caster >= 0:
-			var from: Vector2 = projectiles.get_position_of(caster)
-			if projectiles.move_shot(caster, position - from, SpellLimits.HOOK_SECONDS):
-				_shield_move(spell, tag, actor, caster, SpellLimits.HOOK_SECONDS)
-				if spent:
-					_track_move(caster, tag, SpellLimits.HOOK_SECONDS, from.direction_to(position))
-				pulled = true
-	elif spell.motion == FormBase.Motion.SWAP and events != null:
-		var node := target as Node2D
-		if caster < 0:
-			var anchor: Vector2 = projectiles.get_anchor(actor)
-			if node != null and anchor.is_finite():
-				events.target_move_requested.emit(actor, target, anchor)
-				events.caster_move_requested.emit(actor, &"swap", node.global_position, SpellLimits.SWAP_SECONDS, tag)
-				_shield_move(spell, tag, actor, -1, SpellLimits.SWAP_SECONDS)
-		elif node != null:
-			var from: Vector2 = projectiles.get_position_of(caster)
-			events.target_move_requested.emit(actor, target, from)
-			projectiles.move_shot(caster, node.global_position - from, 0.0)
-			_shield_move(spell, tag, actor, caster, 0.0)
+	# What the carrier does of its own: a hook pulls its caster, a swap trades places (`Carrier.on_hit`).
+	var pulled: bool = _carrier_of(spell).on_hit(spell, tag, actor, target, position, slot)
 	# A spent shot's blast goes off where it hit; a hook's waits for the arrival of what it pulls.
 	if slot >= 0 and not projectiles.is_alive(slot) and not pulled:
 		_blast(spell, tag, actor, position)
@@ -2680,8 +2611,8 @@ func clear() -> void:
 		_passes_free.append(dash)
 	_passes.clear()
 	_caster = CASTER_WIZARD
-	_beams.clear()
-	_swings.clear()
+	for carrier in _carriers:
+		carrier.clear()
 	_poses.clear()
 	_aim_pivot.fill(Vector2.INF)
 	_aim_origin.fill(Vector2.INF)
@@ -2752,8 +2683,8 @@ func close_caster(actor: int) -> void:
 		_current[index] = -1
 		if old >= 0:
 			_release_generation(actor, staff, old)
-	_beams.end_actor(actor)
-	_swings.end_actor(actor)
+	for carrier in _carriers:
+		carrier.end_actor(actor)
 	_reset_caster(actor)
 
 
@@ -2802,16 +2733,7 @@ func next_cast_reach(actor: int, staff: int) -> float:
 	var first: CompiledSpell = _next_carrier(actor, staff)
 	if first == null:
 		return 0.0
-	match first.motion:
-		FormBase.Motion.STRAIGHT:
-			return first.speed * first.lifetime if first.spread < 360.0 else 0.0
-		FormBase.Motion.RAY, FormBase.Motion.SWING:
-			return first.ray_length
-		FormBase.Motion.SLAM:
-			return first.ray_length + first.radius
-		FormBase.Motion.RAIN:
-			return first.ray_length if first.ray_length > 0.0 else SpellLimits.RAIN_REACH
-	return 0.0
+	return _carrier_of(first).reach_of(first)
 
 
 ## The hit radius of the next cast's first carrier (0 for none), for the width of a telegraph.
@@ -2929,7 +2851,7 @@ func _holds(spell: CompiledSpell, tag: int) -> bool:
 ## so while held each is cast anew every wind-up and lifetime (a rain falls again, a swing sweeps
 ## back), until switched off. Its hold ends only then, not between two of them.
 static func _repeats(spell: CompiledSpell) -> bool:
-	return spell != null and (spell.motion == FormBase.Motion.RAIN or spell.motion == FormBase.Motion.SWING)
+	return spell != null and Carriers.of(spell.motion).has(Carrier.REPEATS_HELD)
 
 
 ## A sustained (`hold`) carrier made shots: it stays on and its staff reserves the mana of the
@@ -3041,12 +2963,12 @@ func _name_of(component: SpellComponent) -> String:
 	return component.display_name if not component.display_name.is_empty() else String(component.id)
 
 
-# The forms the kits run, for their looks (`gameplay/feel`, the actor's look) and the tests: each
-# getter hands the question to the kit that keeps those rows.
+# The carriers' rows and the staff animations, for their looks (`gameplay/feel`, the actor's look)
+# and the tests: each getter hands the question to the carrier that keeps those rows.
 
-## Beams (`SpellBeams`): `beam_slots()` rows, each on or off, with where it is and how it looks.
+## Beams (`CarrierBeam`): `beam_slots()` rows, each on or off, with where it is and how it looks.
 static func beam_hits(motion: int, lifetime: float) -> int:
-	return SpellBeams.beam_hits(motion, lifetime)
+	return CarrierBeam.beam_hits(motion, lifetime)
 
 
 func beam_slots() -> int:
@@ -3109,13 +3031,13 @@ func beam_count() -> int:
 	return _beams.beam_count()
 
 
-## Swings (`SpellSwings`): `swing_slots()` rows, each on or off, with its sweep and look.
+## Swings (`CarrierSwing`): `swing_slots()` rows, each on or off, with its sweep and look.
 static func swing_ease(x: float) -> float:
-	return SpellSwings.swing_ease(x)
+	return CarrierSwing.swing_ease(x)
 
 
 static func swing_end_point(origin: Vector2, direction: Vector2, side: int, arc: float, reach: float) -> Vector2:
-	return SpellSwings.swing_end_point(origin, direction, side, arc, reach)
+	return CarrierSwing.swing_end_point(origin, direction, side, arc, reach)
 
 
 func swing_tip(at: int) -> Vector2:
@@ -3190,7 +3112,7 @@ func swing_count() -> int:
 	return _swings.swing_count()
 
 
-## Slams (`SpellSlams`): `slam_slots()` rows, each on or off, with its impact.
+## Slams (`CarrierSlam`): `slam_slots()` rows, each on or off, with its impact.
 func slam_count() -> int:
 	return _slams.slam_count()
 

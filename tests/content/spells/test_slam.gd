@@ -170,3 +170,33 @@ func test_a_payload_slam_moves_no_body() -> void:
 	arena.run(0.5)
 	check_equal(arena.spells.staff_glow(0), 0.0, "the bolt's slam, cast where it hit, does not lift the wizard's staff")
 	arena.free_all()
+
+
+func test_clearing_the_runtime_ends_a_slam_in_its_wind_up() -> void:
+	# Regression: `Spells.clear` ended beams and swings but left slams on, so a slam winding up
+	# when a room was cleared still struck afterwards.
+	var arena := ArenaScript.new(root)
+	var near: Node2D = arena.add_imp(Vector2(34.0, 0.0))
+	arena.install_cards(0, 0, ["slam"])
+	arena.cast(0, 0)
+	arena.run(0.05)
+	check_equal(arena.spells.slam_count(), 1, "it is winding up")
+	arena.spells.clear()
+	check_equal(arena.spells.slam_count(), 0, "clearing ends it")
+	arena.run(1.0)
+	check_equal(arena.lost(near), 0, "and it never strikes")
+	arena.free_all()
+
+
+func test_closing_its_caster_ends_a_slam_in_its_wind_up() -> void:
+	# Regression: `Spells.close_caster` ended the caster's beams and swings but not its slams.
+	var arena := ArenaScript.new(root)
+	var near: Node2D = arena.add_imp(Vector2(34.0, 0.0))
+	arena.install_cards(0, 0, ["slam"])
+	arena.cast(0, 0)
+	arena.run(0.05)
+	arena.spells.close_caster(0)
+	check_equal(arena.spells.slam_count(), 0, "closing its caster ends it")
+	arena.run(1.0)
+	check_equal(arena.lost(near), 0, "and it never strikes")
+	arena.free_all()

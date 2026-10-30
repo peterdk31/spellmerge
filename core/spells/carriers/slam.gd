@@ -4,7 +4,7 @@ extends Carrier
 ## each body in it once (`&"slam"`). Over at once.
 ##
 ## Its rows: the live slams, which it keeps itself (`bind` makes them), starts (`start`, from
-## `shoot`), runs (`step`) and ends (`end_of`). Its strikes go through the runtime as rays
+## `shoot`), runs (`step`) and ends (`end_of`, `end_actor`, `clear`). Its strikes go through the runtime as rays
 ## (`Spells._ray_begin`), so its cards, payloads and chains work as a shot's do; its looks read the
 ## `slam_*` getters (through `Spells`).
 
@@ -324,6 +324,22 @@ func end_of(tag: int) -> void:
 		if _sl_on[at] != 0 and _sl_tag[at] == tag:
 			_end_slam(at, false)
 
+
+
+## Every slam gone at once, quietly (`Spells.clear`).
+func clear() -> void:
+	_sl_on.fill(0)
+	_sl_spell.fill(null)
+	_sl_source.fill(null)
+	for at in _sl_struck.size():
+		_sl_struck[at].clear()
+
+
+## The slams of `actor` end quietly (its caster closed).
+func end_actor(actor: int) -> void:
+	for at in _sl_on.size():
+		if _sl_on[at] != 0 and _sl_actor[at] == actor:
+			_end_slam(at, false)
 
 ## Runs every live slam on by `delta` (one started meanwhile, by a payload, waits for the next).
 func step(delta: float) -> void:

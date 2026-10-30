@@ -1,0 +1,75 @@
+[gd_resource type="Resource" script_class="HordeCurve" load_steps=8 format=3]
+
+[ext_resource type="Script" path="res://gameplay/horde/horde_curve.gd" id="1_curve"]
+[ext_resource type="Script" path="res://gameplay/horde/horde_curve_point.gd" id="2_point"]
+
+[sub_resource type="Resource" id="Point_0"]
+script = ExtResource("2_point")
+seconds = 0.0
+spawns_per_second = 1.0
+cap_alive = 30
+weights = Dictionary[StringName, float]({
+&"bone_husk": 3.0,
+&"crypt_mite": 6.0,
+&"ember_imp": 0.5
+})
+
+[sub_resource type="Resource" id="Point_1"]
+script = ExtResource("2_point")
+seconds = 60.0
+spawns_per_second = 2.0
+cap_alive = 80
+weights = Dictionary[StringName, float]({
+&"bone_husk": 4.0,
+&"crypt_mite": 6.0,
+&"ember_imp": 1.0,
+&"rime_crook": 0.5
+})
+
+[sub_resource type="Resource" id="Point_2"]
+script = ExtResource("2_point")
+seconds = 180.0
+spawns_per_second = 4.0
+cap_alive = 220
+weights = Dictionary[StringName, float]({
+&"bone_husk": 5.0,
+&"crypt_mite": 6.0,
+&"ember_imp": 1.5,
+&"rime_crook": 1.0,
+&"splinter": 0.5,
+&"storm_fork": 0.5
+})
+
+[sub_resource type="Resource" id="Point_3"]
+script = ExtResource("2_point")
+seconds = 300.0
+spawns_per_second = 6.0
+cap_alive = 380
+weights = Dictionary[StringName, float]({
+&"bone_husk": 6.0,
+&"bone_scepter": 0.5,
+&"crypt_mite": 6.0,
+&"ember_imp": 2.0,
+&"rime_crook": 1.5,
+&"splinter": 1.0,
+&"storm_fork": 1.0
+})
+
+[sub_resource type="Resource" id="Point_4"]
+script = ExtResource("2_point")
+seconds = 480.0
+spawns_per_second = 10.0
+cap_alive = 600
+weights = Dictionary[StringName, float]({
+&"bone_husk": 6.0,
+&"bone_scepter": 1.0,
+&"crypt_mite": 6.0,
+&"ember_imp": 2.5,
+&"rime_crook": 2.0,
+&"splinter": 1.5,
+&"storm_fork": 1.5
+})
+
+[resource]
+script = ExtResource("1_curve")
+points = Array[ExtResource("2_point")]([SubResource("Point_0"), SubResource("Point_1"), SubResource("Point_2"), SubResource("Point_3"), SubResource("Point_4")])

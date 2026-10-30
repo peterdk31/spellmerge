@@ -40,6 +40,10 @@ signal screen_shake_changed(enabled: bool)
 signal sandbox_requested(player: int)
 ## `player` picked a sandbox action on the pause menu's sandbox page: `imp_wave` or `reset_dummies`. Heard by flow (staffs B7).
 signal sandbox_action_requested(player: int, action: StringName)
+## The Horde button was pressed (docs/milestones/horde.md). Heard by flow, which starts a horde run.
+signal horde_requested(player: int)
+## `player` picked offer number `choice` (0-2) of their open level-up pick. Heard by horde.
+signal horde_pick_requested(player: int, choice: int)
 
 # --- Devices (sender: core/input) -------------------------------------------
 
@@ -163,6 +167,13 @@ signal loading_finished()
 signal room_cleared(room_id: StringName)
 ## Sender: flow. A run started in the sandbox (`on` true) or out of it (false), or the sandbox run ended (false). Heard by hud, whose pause menu shows its Sandbox entry only while it is on.
 signal sandbox_changed(on: bool)
+## Sender: flow. A horde run's world `world` stands, its wizards in it (docs/milestones/horde.md): sent
+## after `room_entered` at the start of a horde run and after each of its restarts. Heard by horde, which
+## starts its director on that world, and hud.
+signal horde_started(world: Node2D)
+## Sender: flow. The horde run ended (stopped, or another run started). Heard by horde, which stops and
+## forgets its world, and hud.
+signal horde_ended()
 ## Sender: flow. Wave number `wave` (1 for the first of a run) of the room began.
 signal wave_started(wave: int)
 ## Sender: flow. The build break between waves began and lasts `seconds`; the next wave starts when it ends, whoever is building. Follows `room_cleared`; `wave_started` ends it.
@@ -173,6 +184,23 @@ signal door_voted(player: int, door: int)
 signal difficulty_changed(level: float)
 
 # --- Rewards and progression ------------------------------------------------
+
+## Sender: horde. The horde run's numbers, a few times a second: seconds survived, kills, horde
+## enemies alive, the party's level and its experience towards the next level. Heard by hud.
+signal horde_status(seconds: float, kills: int, alive: int, level: int, xp: int, xp_next: int)
+## Sender: horde. `player` may pick one of `card_ids` (up to three) for their bag. Heard by hud.
+signal horde_picks_offered(player: int, card_ids: Array[StringName])
+## Sender: horde. The result of a pick: `card_id` went into `player`'s bag (`&""`: the offer was dropped). Heard by hud.
+signal horde_pick_taken(player: int, card_id: StringName)
+## Sender: horde. A level-up build break began and lasts `seconds`; the horde stands frozen until it ends,
+## whoever is still building or picking (`seconds` 0: it ended). Heard by hud.
+signal horde_break_changed(seconds: float)
+## Sender: horde. Every wizard of the horde run is down: it lasted `seconds`, with `kills` kills, at party
+## level `level`. The director stops; flow restarts the run a few seconds later. Heard by hud (the summary).
+signal horde_over(seconds: float, kills: int, level: int)
+## Sender: horde. Set the bag of `player` (the card ids it may build with) to `bag`, instead of every
+## card. Heard by player, which keeps it until its wizard leaves and sends `bag_changed`.
+signal bag_set_requested(player: int, bag: Array[StringName])
 
 ## Sender: rewards. These rewards were offered to the players.
 signal reward_rolled(reward_ids: Array[StringName])

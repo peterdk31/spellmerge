@@ -24,7 +24,7 @@ Spellmerge is a 2D top-down action roguelite for 1–4 local co-op players, wher
 | Spells | Cards placed in a staff in any order and read left to right: carriers (what leaves the caster), modifiers and infusions (change the next carrier, or the caster when none follows), multicast (more carriers per cast) and triggers (the next cast becomes the payload). Reading wraps around the staff. Every arrangement is legal and does something; there is no complexity budget. |
 | Relics | Passives found in runs, some altering how cards behave. |
 
-Starting cards: carriers (bolt, beam, nova, rune, orbit, dash, teleport, hook, swap, wall, rain, fissure, decoy, familiar, swing, slam), modifiers (split, pierce, homing, chain, bigger, faster, shield, blast, hold, recoil, bounce, echo, linger, heavy, siphon, overcharge, sticky, magnet, ghost, spiral, mirror, growth, relay, sniper, return, slow, arc, possess, deflect), infusions (fire, frost, storm, void, lightning, mend), triggers (on hit, on expire, timer, on block, on kill, on cast, on wall, on hurt, on reaction), multicast (double, triple, scatter, burst).
+Starting cards: carriers (bolt, beam, nova, rune, orbit, dash, teleport, swap, wall, rain, fissure, decoy, familiar, swing, slam), modifiers (split, pierce, homing, chain, bigger, faster, shield, blast, hold, recoil, bounce, echo, linger, heavy, siphon, overcharge, sticky, magnet, ghost, spiral, mirror, growth, relay, sniper, return, slow, arc, possess, deflect, pull), infusions (fire, frost, storm, void, lightning, mend), triggers (on hit, on expire, timer, on block, on kill, on cast, on wall, on hurt, on reaction), multicast (double, triple, scatter, burst).
 
 Spell rules (chosen on 2026-10-26, the pivot at C2):
 

@@ -67,6 +67,10 @@ enum Behaviour {
 	## that touches shots (a shot, a swing's sweep, a beam's line). It turns as many as touch it, goes
 	## before a shield (which keeps its charge) and sets off `on block`. Strength unused (1).
 	DEFLECT,
+	## Whatever the carrier hits, its caster is pulled to, over `SpellLimits.PULL_SECONDS` (rules R4
+	## F1; owner, 2026-10-30: the old Hook carrier is `pull · bolt`): the wizard, or the shot that
+	## cast it. Several hits make several pulls, and they add. Strength unused (1).
+	PULL,
 }
 
 @export var damage_mult: float = 1.0

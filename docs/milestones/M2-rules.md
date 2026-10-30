@@ -84,17 +84,17 @@ Since R3 the live matrix is printed by `tests/core/test_card_rules.gd` (✓ work
 
 **Triggers (R2b, what the runtime does today; timer and on hurt after R4d):** `StaffCompiler.trigger_runs` and `trigger_why_not`. ✓ fires · W listed as wasted with its payload · s only with a shield or deflect on the carrier (a dash's or teleport's shield is a barrier on the wizard; since R4c a dash and a teleport hit, and their deflect turns the shots they pass or land by) · b only with a blast, whose area hit carries the carrier's tag. On reaction also needs an infusion or relay, and on wall is wasted on a ghost shot. Every W is a cell for R4.
 
-| | Bolt | Rune | Orbit | Beam | Dash | Telep | Hook | Swap | Wall | Rain | Fiss | Decoy | Famil | Swing |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| on hit | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | W | W | ✓ |
-| on expire | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| timer | ✓ | ✓ | ✓ | ✓ | ✓ | W | ✓ | ✓ | ✓ | ✓ | W | ✓ | ✓ | ✓ |
-| on block | s | s | s | s | s | s | s | s | s | W | s | s | W | s |
-| on kill | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | b | b | ✓ |
-| on cast | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| on wall | ✓ | W | W | ✓ | W | W | ✓ | ✓ | W | W | ✓ | W | W | W |
-| on hurt | ✓ | ✓ | ✓ | ✓ | ✓ | W | ✓ | ✓ | ✓ | ✓ | W | ✓ | ✓ | ✓ |
-| on reaction | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | b | b | ✓ |
+| | Bolt | Rune | Orbit | Beam | Dash | Telep | Swap | Wall | Rain | Fiss | Decoy | Famil | Swing |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| on hit | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | W | W | ✓ |
+| on expire | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| timer | ✓ | ✓ | ✓ | ✓ | ✓ | W | ✓ | ✓ | ✓ | W | ✓ | ✓ | ✓ |
+| on block | s | s | s | s | s | s | s | s | W | s | s | W | s |
+| on kill | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | b | b | ✓ |
+| on cast | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| on wall | ✓ | W | W | ✓ | W | W | ✓ | W | W | ✓ | W | W | W |
+| on hurt | ✓ | ✓ | ✓ | ✓ | ✓ | W | ✓ | ✓ | ✓ | W | ✓ | ✓ | ✓ |
+| on reaction | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | b | b | ✓ |
 
 The melee carriers (swing, slam) arrived on main after the audit: R2 and R3 cover them like the rest.
 
@@ -164,8 +164,14 @@ The owner re-decides these under the new rule; each "yes, it should work" become
 
 - **Dash and teleport hit.** A dash strikes every body its mover (the wizard's body, or the shot a payload dash moves) passes, once each, within `PASS_REACH` (8 px) of its way, sampled so a fast dash misses nothing; a teleport strikes the bodies within `LAND_REACH` (24 px) of where it lands. Both go through the swing's path (`Projectiles.sweep`, `strike`, the beam hit context), so every hit card works as on a shot: the six infusions, chain, heavy (the shoulder charge of M2-staffs.md), siphon, possess, overcharge, on hit, on kill, on reaction; deflect turns the shots within `MOVE_GUARD_REACH` (24 px, before they reach the body). Pierce is wasted on a dash ("it hits what it passes, once each": it already hits everything on its way); split and sniper stay wasted (one body, no spread). `hits()` now includes them; their `_hits_nothing` rows and the recoil row are gone, and deflect runs on every carrier that hits.
 - **Recoil adds to the move.** A dash's recoil is the usual push, which the body adds to the dash; a teleport, over at once, has it taken off its distance (past it, it goes backwards).
-- **One shield rule for every move** (`Spells._shield_move`): dash, teleport, hook and swap guard what they move, the wizard by a barrier for the move, a shot (a payload move) by that many more shield charges (kept until spent: a shot's shield has no clock).
+- **One shield rule for every move** (`Spells._shield_move`): dash, teleport, hook (now pull, F1) and swap guard what they move, the wizard by a barrier for the move, a shot (a payload move) by that many more shield charges (kept until spent: a shot's shield has no clock).
 - **A point cannot move:** a teleport cast by a point blinks the wizard to it, and a hook or swap cast by one moves the wizard (to the hit, as the wizard's own). A dash cast by a point still does nothing: the wizard's dash goes the way its body walks (staffs A6a), so the mover would need to take a way from the card (open question).
+
+#### R4 F1: every move adds up; Hook becomes Pull (owner decisions 2026-10-30; DECISIONS.md "Card rules R4 F1")
+
+- **One list of moves on the body** (`gameplay/actor/mover.gd`): every request carries its own way and distance (`caster_move_requested`'s `move`) and runs on its own time; nothing replaces anything. A teleport adds its jump at once; recoil is just one more move (its separate arrays, the per-step sum and the teleport's recoil folding are gone: a recoil longer than a teleport still takes it back past its start, now as a push after the blink). Two dashes cast close together stack, two pulls add. Every move answers `caster_move_finished` (a swap and a recoil too; Spells and Feel read only the modes they need). A dash is the actor's own legs: it walks instead of the intent and statuses slow it; a pull, swap or recoil is done to the actor and adds to its walk.
+- **A dash goes the way its card is cast** (along the aim), no longer the way the body walks (staffs A6a). So a dash cast by a point dashes the wizard to the point (decision 14, left open in R4c), with the same code as a teleport cast by one.
+- **Hook is the Pull modifier** (`ModifierBase.Behaviour.PULL`): whatever its carrier hits, its caster (the wizard, or the shot that cast it) is pulled to, over `PULL_SECONDS`; several hits make several pulls, and they add. It is checked where hits land, as possess and siphon are (`Spells._on_hit_effects`), so it works on every carrier that hits and is wasted through `hits()` elsewhere (decoy). A pulling shot that the hit spent ends where the caster arrives (its blast and `on expire`, R4a's hook rule; `_pull_ends`). Shield on it is the one shield rule (`_shield_move`). `Motion.HOOK` left every table; its number stays as an unused slot (`_UNUSED_6`) so stored motions keep their meaning. The Rime Crook casts `frost · pull · bolt`.
 
 ## Notes for the sessions
 

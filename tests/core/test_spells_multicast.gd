@@ -344,13 +344,13 @@ func test_a_mirrored_orbit_starts_on_the_other_side() -> void:
 	check(found.size() == 2 and found[0].is_equal_approx(-found[1]) and found[0].x > 30.0, "on opposite sides of the circle, the first along the aim: %s" % [found])
 
 
-func test_a_mirrored_hook_flies_both_ways() -> void:
-	var hook: FormBase = _form(&"hook", 300.0, 0.5)
-	hook.motion = FormBase.Motion.HOOK
-	_build(0, [&"mirror", &"hook"])
+func test_a_mirrored_swap_flies_both_ways() -> void:
+	var swap: FormBase = _form(&"swap", 300.0, 0.5)
+	swap.motion = FormBase.Motion.SWAP
+	_build(0, [&"mirror", &"swap"])
 	_cast()
 	var headings: Array[Vector2] = _headings()
-	check_equal(headings.size(), 2, "two hooks")
+	check_equal(headings.size(), 2, "two swaps")
 	check(headings.size() == 2 and headings[0].is_equal_approx(-headings[1]), "opposite ways")
 
 

@@ -354,7 +354,7 @@ func _listen() -> void:
 	bus.area_hit_requested.connect(func(caster: int, at: Vector2, radius: float, tag: int) -> void:
 		_put("area %s %s at %s r%d" % [_who(caster), _node(tag), _at(at), roundi(radius)]))
 	bus.caster_move_requested.connect(func(caster: int, mode: StringName, to: Vector2, seconds: float, tag: int) -> void:
-		_put("move %s %s %s to %s in %d ms" % [_who(caster), mode, _node(tag), _at(to), roundi(seconds * 1000.0)]))
+		_put("move %s %s %s by %s in %d ms" % [_who(caster), mode, _node(tag), _at(to), roundi(seconds * 1000.0)]))
 	bus.caster_move_finished.connect(func(caster: int, mode: StringName, at: Vector2, tag: int) -> void:
 		_put("moved %s %s %s at %s" % [_who(caster), mode, _node(tag), _at(at)]))
 	bus.target_move_requested.connect(func(caster: int, target: Node, to: Vector2) -> void:

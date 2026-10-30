@@ -26,7 +26,7 @@ const GLOWS: Array[Color] = [
 	Color(0.878, 0.541, 0.847, 1),
 ]
 ## The cards each stray's staff holds, in the same order.
-const CARDS: Array[Array] = [[&"fire", &"bolt"], [&"dash"], [&"triple", &"lightning", &"bolt"], [&"frost", &"hook"], [&"void", &"rain", &"nova"]]
+const CARDS: Array[Array] = [[&"fire", &"bolt"], [&"dash"], [&"triple", &"lightning", &"bolt"], [&"frost", &"pull", &"bolt"], [&"void", &"rain", &"nova"]]
 const FRAME: int = 32
 
 var _world: AiFixture

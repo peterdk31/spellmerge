@@ -13,10 +13,10 @@ const M := FormBase.Motion
 ## The table as the runtime runs it today (core/spells/spells.gd): event -> the motions it can
 ## fire on. Every motion not listed is wasted. A change here is a change of the rules: say so in
 ## M2-rules.md ("Triggers" under "Card x carrier") and docs/DECISIONS.md.
-const SHOTS: Array = [M.STRAIGHT, M.STILL, M.ORBIT, M.HOOK, M.SWAP, M.WALL]
+const SHOTS: Array = [M.STRAIGHT, M.STILL, M.ORBIT, M.SWAP, M.WALL]
 ## What is over at once: no timer ticks and nothing hears a hurt on it (rules R4d).
 const AT_ONCE: Array = [M.FISSURE, M.SLAM, M.TELEPORT]
-const HITTERS: Array = [M.STRAIGHT, M.STILL, M.ORBIT, M.HOOK, M.SWAP, M.WALL, M.RAY, M.FISSURE, M.SWING, M.SLAM, M.RAIN, M.DASH, M.TELEPORT]
+const HITTERS: Array = [M.STRAIGHT, M.STILL, M.ORBIT, M.SWAP, M.WALL, M.RAY, M.FISSURE, M.SWING, M.SLAM, M.RAIN, M.DASH, M.TELEPORT]
 
 var _items: Dictionary = {}
 var _compiler: StaffCompiler
@@ -71,7 +71,7 @@ func _expected(event: int, motion: int) -> bool:
 			# Wherever a shield or deflect runs: not on a rain or familiar (rules R4g: a decoy guards).
 			return motion != M.RAIN and motion != M.FAMILIAR
 		E.WALL:
-			return [M.STRAIGHT, M.HOOK, M.SWAP, M.RAY, M.FISSURE].has(motion)
+			return [M.STRAIGHT, M.SWAP, M.RAY, M.FISSURE].has(motion)
 	return true
 
 
@@ -138,7 +138,7 @@ func test_wasted_cells_say_why() -> void:
 func test_triggers_that_fire_are_not_wasted() -> void:
 	var cells: Array = [
 		[&"on_hit", &"straight"], [&"on_timer", &"straight"], [&"on_hurt", &"orbit"], [&"on_timer", &"wall"],
-		[&"on_hit", &"ray"], [&"on_hit", &"swing"], [&"on_wall", &"ray"], [&"on_wall", &"hook"],
+		[&"on_hit", &"ray"], [&"on_hit", &"swing"], [&"on_wall", &"ray"], [&"on_wall", &"swap"],
 		[&"on_expire", &"rain"], [&"on_hit", &"rain"], [&"on_expire", &"decoy"], [&"on_cast", &"dash"], [&"on_kill", &"fissure"],
 		[&"on_timer", &"ray"], [&"on_timer", &"rain"], [&"on_timer", &"dash"], [&"on_timer", &"swing"],
 		[&"on_hurt", &"ray"], [&"on_hurt", &"decoy"], [&"on_hurt", &"dash"], [&"on_hurt", &"rain"],

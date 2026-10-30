@@ -32,7 +32,7 @@ func _initialize() -> void:
 	_test_walks_at_move_speed()
 	_test_diagonal_is_not_faster()
 	_test_dash_runs_at_the_card_speed_without_invulnerability()
-	_test_dash_without_direction_uses_the_aim()
+	_test_dash_goes_the_way_its_card_asks()
 	_test_dash_direction_is_locked()
 	_test_dash_end_is_reported_where_it_stopped()
 	_test_dash_for_another_player_is_ignored()
@@ -79,11 +79,12 @@ func _release(player: int, action: StringName) -> void:
 	_world.release(player, action)
 
 
-## A dash card's request for `player`: `distance` pixels over `seconds`. The Mover acts only on a
-## card of its own actor (the tag names the wizard's id).
-func _dash(player: int, distance: float = DASH_DISTANCE, seconds: float = DASH_TIME) -> void:
+## A dash card's request for `player`: `distance` pixels along `way` over `seconds` (the card
+## says its way, rules R4 F1). The Mover acts only on a card of its own actor (the tag names the
+## wizard's id).
+func _dash(player: int, way: Vector2 = Vector2.RIGHT, distance: float = DASH_DISTANCE, seconds: float = DASH_TIME) -> void:
 	var wizard: Actor = _players[player]
-	_world.bus.caster_move_requested.emit(player, &"dash", wizard.muzzle_position() + Vector2(distance, 0.0), seconds, _tag(wizard))
+	_world.bus.caster_move_requested.emit(player, &"dash", way * distance, seconds, _tag(wizard))
 
 
 func _tag(wizard: Actor) -> int:
@@ -169,34 +170,27 @@ func _test_dash_runs_at_the_card_speed_without_invulnerability() -> void:
 	var player: Actor = _players[0]
 	_hold(0, &"move_left")
 	_run(1)
-	_dash(0)
+	_dash(0, Vector2.LEFT)
 	_run(1)
 	_check(player.mover.is_moving(), "the request starts a dash")
 	_check(not player.health.is_protected(), "a dash gives no invulnerability")
-	_check(_near(player.velocity, Vector2(-DASH_SPEED, 0.0)), "the dash goes the way the wizard walks, as fast as asked, got %s" % player.velocity)
+	_check(_near(player.velocity, Vector2(-DASH_SPEED, 0.0)), "the dash goes as fast as asked, got %s" % player.velocity)
 	_run(int(DASH_TIME / STEP))
 	_check(not player.mover.is_moving(), "the dash ends after the time asked")
 	_check(_near(player.velocity, Vector2(-MOVE_SPEED, 0.0)), "then the wizard walks again")
 
 
-## Changed in actors G7 (owner-approved): a standing wizard dashes the way it aims, not the way
-## it last walked. A fresh wizard aims down; one that aims up with the stick dashes up.
-func _test_dash_without_direction_uses_the_aim() -> void:
+## Changed in rules R4 F1 (owner, 2026-10-30): the request carries its way, so the wizard dashes
+## the way its card asks, not the way it walks or aims.
+func _test_dash_goes_the_way_its_card_asks() -> void:
 	_setup(1)
 	var player: Actor = _players[0]
-	_dash(0)
-	_run(1)
-	_check(_near(player.velocity, Vector2(0.0, DASH_SPEED)), "a fresh standing wizard dashes the way it aims (down), got %s" % player.velocity)
-	_setup(1)
-	player = _players[0]
 	_hold(0, &"move_left")
+	_world.input.send_virtual_aim(0, Vector2.DOWN)
 	_run(1)
-	_release(0, &"move_left")
-	_world.input.send_virtual_aim(0, Vector2.UP)
+	_dash(0, Vector2.UP)
 	_run(1)
-	_dash(0)
-	_run(1)
-	_check(_near(player.velocity, Vector2(0.0, -DASH_SPEED)), "a standing wizard dashes the way it aims, not the way it last walked, got %s" % player.velocity)
+	_check(_near(player.velocity, Vector2(0.0, -DASH_SPEED)), "a wizard walking left and aiming down dashes up as asked, got %s" % player.velocity)
 
 
 func _test_dash_direction_is_locked() -> void:
@@ -262,7 +256,7 @@ func _test_two_players_at_once() -> void:
 	_hold(0, &"move_right")
 	_hold(1, &"move_left")
 	_run(1)
-	_dash(1)
+	_dash(1, Vector2.LEFT)
 	_run(1)
 	_check(_near(_players[0].velocity, Vector2(MOVE_SPEED, 0.0)), "player 0 walks right")
 	_check(not _players[0].mover.is_moving(), "player 1's dash does not touch player 0")
@@ -277,7 +271,7 @@ func _test_four_players_at_once() -> void:
 	for index in 4:
 		_hold(index, &"move_down")
 	_run(1)
-	_dash(2)
+	_dash(2, Vector2.DOWN)
 	_run(1)
 	for index in 4:
 		var dashing: bool = index == 2

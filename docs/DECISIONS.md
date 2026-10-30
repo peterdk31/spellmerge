@@ -2,6 +2,12 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-30: Card rules R4 F1: every move adds up; Hook becomes Pull (owner)
+
+- **Every move adds up** (docs/milestones/M2-rules.md "R4 F1"): the mover keeps one list of moves, each with its own way, distance and time, as shots' moves do (R1e) and as recoil did. Nothing replaces a move in progress any more, so "a later dash, teleport, hook or swap replaces an earlier one" (staffs B4, "Simultaneous moves" below) is gone; two dashes stack, two pulls add, recoil is one more move (its own arrays and the teleport's recoil folding of R4c went). Every move answers `caster_move_finished`.
+- **A request carries its way:** `caster_move_requested` sends the move itself (way × distance) instead of a point measured from the staff tip or the feet. A dash goes the way its card is cast (the aim), not the way the body walks (staffs A6a): that is what makes a dash cast by a point go to the point with no special case, and `mirror` is a move backwards like any other. Walking still stops while a dash runs (the actor's own legs); a pull, swap or recoil adds to the walk.
+- **Hook is the Pull modifier:** whatever its carrier hits, its caster is pulled to; several hits, several pulls. Checked where hits land (as possess and siphon), wasted through `hits()`. R4a's "a hook's on expire happens once" is now Pull's: a shot its hit spent ends where the caster arrives. The Rime Crook casts `frost · pull · bolt`. `Motion.HOOK`'s number stays as an unused slot so stored motions keep their meaning.
+
 ## 2026-10-29: Card rules R4b, a wasted card is checked too (owner)
 
 - **A W cell is played with the card forced on** (owner item 22): the card rules test failed only on a card that does nothing unlisted, not on a card listed as wasted that would work (slam's was found by hand). Now every W cell also runs with the card kept, and a different trace fails the test. Still auto-discovering, no new job.
@@ -28,7 +34,7 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - **A dash hits what it passes, a teleport where it lands** (docs/milestones/M2-rules.md R4c): every hit card was wasted on them; now they hit once each body with the carrier's damage and cards, through the swing's hit path (no second pipeline). Pierce on a dash is wasted with a reason: a dash already hits everything on its way.
 - **Recoil adds to a move:** a dash's push runs with it; a teleport's is taken off its distance, and a recoil longer than the teleport sends it backwards.
 - **One shield rule for every move:** dash, teleport, hook and swap guard what they move (the wizard by a barrier, a moved shot by shield charges).
-- **A point cannot move, so the wizard does:** a teleport cast by a point blinks the wizard to it; a hook or swap cast by one moves the wizard. A dash cast by a point is left for the owner (the mover picks a dash's way from the walk).
+- **A point cannot move, so the wizard does:** a teleport cast by a point blinks the wizard to it; a hook or swap cast by one moves the wizard. A dash cast by a point is left for the owner (the mover picks a dash's way from the walk; done in R4 F1: it dashes to the point).
 
 ## 2026-10-29: Staff animations are carrier data (owner)
 
@@ -149,7 +155,7 @@ The owner's direction after B7a: "The 4 staffs should be mapped to lb/rb lt/rt i
 
 ## 2026-10-26: Caster kit details (staffs B4)
 
-- **Only recoil is held to the next step.** The events ask for "the recoils of a step added up, a later dash, teleport, hook or swap replaces an earlier one". A move that is not a recoil is acted on the moment it arrives (so "later replaces earlier" is the order of arrival), and the replaced one is answered with `caster_move_finished` where the wizard stands, so its blast and `on expire` payload are not lost. Recoil requests are summed and applied by the next `step`; the distance of each is measured from the staff tip.
+- ~~**Only recoil is held to the next step.**~~ Replaced on 2026-10-30 (rules R4 F1): nothing is held; every move adds up. The events ask for "the recoils of a step added up, a later dash, teleport, hook or swap replaces an earlier one". A move that is not a recoil is acted on the moment it arrives (so "later replaces earlier" is the order of arrival), and the replaced one is answered with `caster_move_finished` where the wizard stands, so its blast and `on expire` payload are not lost. Recoil requests are summed and applied by the next `step`; the distance of each is measured from the staff tip.
 - **A move walks its whole time.** The dash used to end at the start of the step in which its time ran out, so it walked one step too few (a quarter of a short swap). The time now runs after the step's velocity is set and the move is answered by the next step, when the body has got there.
 - **Statuses and pushes.** Chill and freeze slow walking and dashing; a hook, swap, recoil and combat's push are not slowed (they are done to the wizard, not by it). A swap sends no `caster_move_finished` (core/spells ignores it; its blast goes off at the target).
 - **Wall safety.** A teleport is clipped by the projectile manager's wall grid and backs off `TELEPORT_CLEARANCE` (8 px); hook, swap and recoil are moved by `move_and_slide` and so stop at walls.
@@ -176,7 +182,7 @@ The owner's direction after B7a: "The 4 staffs should be mapped to lb/rb lt/rt i
 - **Swap needs the caster's place**, read from the manager's anchor; without one nothing is traded. `target_move_requested` carries the player first (as in `events.gd`, which differs from the milestone table).
 - **End points from `caster_move_finished`** (dash, teleport, hook; other modes are ignored) fire the carrier's `blast` and its `on expire` payload at the arrival. The payload goes along the move's heading. A forgotten build (tag unknown) does nothing.
 - **Blast on shots** goes off where a spent shot hit, where a shot expired (also a sticky one, or a wall), and at the end of a beam or fissure. A piercing shot or beam does not blast per target. A hook's blast waits for the arrival; a missing hook blasts where it ends (since rules R1d, 2026-10-29; before, it did not explode).
-- **Simultaneous moves.** The player (B4) sums the `recoil` requests of one step and lets a later non-recoil move replace an earlier one (written in `events.gd` and the B4 task). `Spells` keeps one move heading per player, so the last asked move wins: of two moves in flight, the first one's `on expire` payload leaves along the later heading. A hook's `on expire` fires once, where the hook shot ends (rules R4a, replacing "both accepted for now"): at the arrival when the hit spent it, at the end of its flight when it had pierce left.
+- ~~**Simultaneous moves.**~~ Replaced on 2026-10-30 (rules R4 F1): every move adds up. The player (B4) sums the `recoil` requests of one step and lets a later non-recoil move replace an earlier one (written in `events.gd` and the B4 task). `Spells` keeps one move heading per player, so the last asked move wins: of two moves in flight, the first one's `on expire` payload leaves along the later heading. A hook's `on expire` fires once, where the hook shot ends (rules R4a, replacing "both accepted for now"): at the arrival when the hit spent it, at the end of its flight when it had pierce left.
 - **Every spent shot blasts.** The blast rule is per shot: each chain jump shot, each echo and each shot of a wall or orbit blasts where it is spent, so a wall of N shots expiring together sends N area hits in one step. A piercing shot does not blast at a hit it survives. Pinned by tests.
 - **Siphon** sends one refund of its strength per hit (a beam's every target too); the pool is `player`'s concern (B4).
 

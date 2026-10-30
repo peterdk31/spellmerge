@@ -2,6 +2,12 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-30: A carrier lists only the cards that do nothing on it (owner)
+
+- **The table is cut down** (owner: "I would not be able to fill it out on my own... why is this table even needed?"): the per-carrier table that answered, for every card, whether it works, whose code runs it and how it looks (`Works`, `Shows`, a row per card) is gone. Only the part the game uses stays: `DOES_NOTHING` (modifier behaviour -> the sentence the builder shows) and `NEVER_FIRES` (trigger -> sentence). Every card not listed does something.
+- **Why that is enough:** the compiler and the builder only ever needed the sentences; whether a card works is already found by `tests/core/test_card_rules.gd`, which plays every card on every carrier and fails on a card that does nothing but is not listed, or the other way round, so nobody has to predict the list. "Whose code runs it" was documentation, and the look column was only read by a test.
+- **What became plain code:** a teleport takes recoil off its distance (`Carrier.handles_recoil`); on a carrier that hits nothing, an infusion and heavy count only with a blast (`takes_infusion`, `BLAST_CARRIES`). The three carriers that show no card visuals (teleport, decoy, familiar) are a backlog note, not a declaration.
+
 ## 2026-10-30: The shot travels with its events; carriers own their mechanics (owner)
 
 - **No "current shot" on the manager** (owner, 2026-10-30): `Projectiles.event_slot` was a public global the spell runtime, combat's listeners and Feel read to know which shot an event was about. Every event of a shot now names it as its last argument, `shot` (`projectile_hit`, `projectile_expired`, `shot_blocked`, `shot_deflected`, the manager's `wall_met`; -1 for a ray), combat keeps it beside its tag and names it in what a hit sets off (`hit_landed`, `kill_landed`, `reaction_landed`, `reaction_triggered`, `enemy_died`), and spells names it in a blast's `area_hit_requested`, so an `on kill` from a spent shot's blast still leaves along that shot. `Spells.hit_profile(tag, shot)` takes it from combat. The manager keeps `_event_slot` for itself only. Each emit passes what the global held at that moment, so nothing plays differently.

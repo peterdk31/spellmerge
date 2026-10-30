@@ -4,47 +4,26 @@ extends Carrier
 ## Homing places it on a target near the point; held, it falls again and again.
 
 
-## Each modifier behaviour (`ModifierBase.Behaviour`) on the rain, every one (keys: see `Carrier`).
-const BEHAVIOURS: Dictionary = {
-	B.NONE: {"works": Works.YES, "shows": Shows.DRAWN},
-	B.HOMING: {"works": Works.OWN_WAY, "shows": Shows.DRAWN},
-	B.CHAIN: {"works": Works.YES, "shows": Shows.DRAWN},
-	B.SHIELD: {"works": Works.NO, "why_not": "it blocks shots that touch the carrier or guards the caster on a move, and a rain strikes once where it lands"},
-	B.BLAST: {"works": Works.YES, "shows": Shows.AS_EFFECT},
-	B.HOLD: {"works": Works.YES, "shows": Shows.DRAWN},
-	B.RECOIL: {"works": Works.YES, "shows": Shows.DRAWN},
-	B.BOUNCE: {"works": Works.NO, "why_not": "it turns a shot or a beam at walls, and a rain strikes once where it lands"},
-	B.ECHO: {"works": Works.YES, "shows": Shows.DRAWN},
-	B.LINGER: {"works": Works.NO, "why_not": "it only changes a moving shot, and a rain strikes once where it lands"},
-	B.HEAVY: {"works": Works.YES, "shows": Shows.DRAWN},
-	B.SIPHON: {"works": Works.YES, "shows": Shows.DRAWN},
-	B.STICKY: {"works": Works.NO, "why_not": "it only changes a moving shot, and a rain strikes once where it lands"},
-	B.MAGNET: {"works": Works.NO, "why_not": "it needs a shot or a beam that stays in the world, and a rain strikes once where it lands"},
-	B.GHOST: {"works": Works.NO, "why_not": "it only takes a flying shot or a line through walls, and a rain strikes once where it lands"},
-	B.SPIRAL: {"works": Works.NO, "why_not": "it only changes a moving shot, and a rain strikes once where it lands"},
-	B.MIRROR: {"works": Works.YES, "shows": Shows.DRAWN},
-	B.GROWTH: {"works": Works.NO, "why_not": "it grows a shot in the world or a beam, and a rain strikes once where it lands"},
-	B.RELAY: {"works": Works.YES, "shows": Shows.DRAWN},
-	B.RETURN: {"works": Works.NO, "why_not": "it does not fly out"},
-	B.ARC: {"works": Works.NO, "why_not": "it is not a shot that stays in the air"},
-	B.POSSESS: {"works": Works.YES, "shows": Shows.DRAWN},
-	B.DEFLECT: {"works": Works.NO, "why_not": "it touches no shots"},
+## Modifier cards that do nothing on a rain, with the sentence the builder shows after
+## "<Card> does nothing on a Rain: ". Every card not listed does something here.
+const DOES_NOTHING: Dictionary = {
+	B.SHIELD: "it blocks shots that touch the carrier or guards the caster on a move, and a rain strikes once where it lands",
+	B.BOUNCE: "it turns a shot or a beam at walls, and a rain strikes once where it lands",
+	B.LINGER: "it only changes a moving shot, and a rain strikes once where it lands",
+	B.STICKY: "it only changes a moving shot, and a rain strikes once where it lands",
+	B.MAGNET: "it needs a shot or a beam that stays in the world, and a rain strikes once where it lands",
+	B.GHOST: "it only takes a flying shot or a line through walls, and a rain strikes once where it lands",
+	B.SPIRAL: "it only changes a moving shot, and a rain strikes once where it lands",
+	B.GROWTH: "it grows a shot in the world or a beam, and a rain strikes once where it lands",
+	B.RETURN: "it does not fly out",
+	B.ARC: "it is not a shot that stays in the air",
+	B.DEFLECT: "it touches no shots",
 }
-## Each trigger (`TriggerBase.Event`) on the rain: "fires" (does it ever go off here?) and, when it
-## never does, "why_not".
-const EVENTS: Dictionary = {
-	E.HIT: {"fires": true},
-	E.EXPIRE: {"fires": true},
-	E.TIMER: {"fires": true},
-	E.BLOCK: {"fires": false, "why_not": "nothing on it can block a shot"},
-	E.KILL: {"fires": true},
-	E.CAST: {"fires": true},
-	E.WALL: {"fires": false, "why_not": "a rain falls from above and never meets a wall"},
-	E.HURT: {"fires": true},
-	E.REACTION: {"fires": true},
+## Trigger cards that never go off on a rain, with the sentence the builder shows.
+const NEVER_FIRES: Dictionary = {
+	E.BLOCK: "nothing on it can block a shot",
+	E.WALL: "a rain falls from above and never meets a wall",
 }
-## An infusion (an element card) on the rain, with the same keys as a behaviour.
-const INFUSIONS: Dictionary = {"works": Works.YES, "shows": Shows.DRAWN}
 
 
 func id() -> StringName:
@@ -63,16 +42,12 @@ func traits() -> int:
 	return HITS | LASTS | REACHES | STEERS | SPEED | SHOTS | REPEATS_HELD | CARRIES_PAYLOAD | HOLDS_STAFF
 
 
-func behaviours() -> Dictionary:
-	return BEHAVIOURS
+func does_nothing() -> Dictionary:
+	return DOES_NOTHING
 
 
-func events() -> Dictionary:
-	return EVENTS
-
-
-func infusions() -> Dictionary:
-	return INFUSIONS
+func never_fires() -> Dictionary:
+	return NEVER_FIRES
 
 
 func hit_kind() -> StringName:

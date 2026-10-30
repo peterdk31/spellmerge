@@ -4,47 +4,11 @@ extends Carrier
 ## runs on it; its own part is the trade (`on_hit`).
 
 
-## Each modifier behaviour (`ModifierBase.Behaviour`) on the swap, every one (keys: see `Carrier`).
-const BEHAVIOURS: Dictionary = {
-	B.NONE: {"works": Works.YES, "shows": Shows.DRAWN},
-	B.HOMING: {"works": Works.YES, "shows": Shows.DRAWN},
-	B.CHAIN: {"works": Works.YES, "shows": Shows.DRAWN},
-	B.SHIELD: {"works": Works.YES, "shows": Shows.DRAWN},
-	B.BLAST: {"works": Works.YES, "shows": Shows.AS_EFFECT},
-	B.HOLD: {"works": Works.YES, "shows": Shows.DRAWN},
-	B.RECOIL: {"works": Works.YES, "shows": Shows.DRAWN},
-	B.BOUNCE: {"works": Works.YES, "shows": Shows.DRAWN},
-	B.ECHO: {"works": Works.YES, "shows": Shows.DRAWN},
-	B.LINGER: {"works": Works.YES, "shows": Shows.DRAWN},
-	B.HEAVY: {"works": Works.YES, "shows": Shows.DRAWN},
-	B.SIPHON: {"works": Works.YES, "shows": Shows.DRAWN},
-	B.STICKY: {"works": Works.YES, "shows": Shows.DRAWN},
-	B.MAGNET: {"works": Works.YES, "shows": Shows.DRAWN},
-	B.GHOST: {"works": Works.YES, "shows": Shows.DRAWN},
-	B.SPIRAL: {"works": Works.YES, "shows": Shows.DRAWN},
-	B.MIRROR: {"works": Works.YES, "shows": Shows.DRAWN},
-	B.GROWTH: {"works": Works.YES, "shows": Shows.DRAWN},
-	B.RELAY: {"works": Works.YES, "shows": Shows.DRAWN},
-	B.RETURN: {"works": Works.YES, "shows": Shows.DRAWN},
-	B.ARC: {"works": Works.YES, "shows": Shows.DRAWN},
-	B.POSSESS: {"works": Works.YES, "shows": Shows.DRAWN},
-	B.DEFLECT: {"works": Works.YES, "shows": Shows.DRAWN},
-}
-## Each trigger (`TriggerBase.Event`) on the swap: "fires" (does it ever go off here?) and, when it
-## never does, "why_not".
-const EVENTS: Dictionary = {
-	E.HIT: {"fires": true},
-	E.EXPIRE: {"fires": true},
-	E.TIMER: {"fires": true},
-	E.BLOCK: {"fires": true},
-	E.KILL: {"fires": true},
-	E.CAST: {"fires": true},
-	E.WALL: {"fires": true},
-	E.HURT: {"fires": true},
-	E.REACTION: {"fires": true},
-}
-## An infusion (an element card) on the swap, with the same keys as a behaviour.
-const INFUSIONS: Dictionary = {"works": Works.YES, "shows": Shows.DRAWN}
+## Modifier cards that do nothing on a swap, with the sentence the builder shows after
+## "<Card> does nothing on a Swap: ". Every card not listed does something here.
+const DOES_NOTHING: Dictionary = {}
+## Trigger cards that never go off on a swap, with the sentence the builder shows.
+const NEVER_FIRES: Dictionary = {}
 
 
 func id() -> StringName:
@@ -63,16 +27,12 @@ func traits() -> int:
 	return FLIES | STAYS | HITS | LASTS | REACHES | STEERS | SPEED | SHOTS | SPREAD | PIERCE
 
 
-func behaviours() -> Dictionary:
-	return BEHAVIOURS
+func does_nothing() -> Dictionary:
+	return DOES_NOTHING
 
 
-func events() -> Dictionary:
-	return EVENTS
-
-
-func infusions() -> Dictionary:
-	return INFUSIONS
+func never_fires() -> Dictionary:
+	return NEVER_FIRES
 
 
 ## A swap trades places with the target it hits: its caster's body (through its owner) or the shot

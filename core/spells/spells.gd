@@ -1034,7 +1034,7 @@ func _fire_spell(spell: CompiledSpell, actor: int, staff: int, generation: int, 
 	if launched > 0:
 		_recoil(spell, tag, actor, origin, heading)
 	# A move's mirror would cancel it (rules R4g): a dash or teleport moves its caster once.
-	if launched > 0 and spell.behaviour(ModifierBase.Behaviour.MIRROR) > 0.0 and _carrier_of(spell).works(ModifierBase.Behaviour.MIRROR) != Carrier.Works.NO:
+	if launched > 0 and spell.behaviour(ModifierBase.Behaviour.MIRROR) > 0.0 and _carrier_of(spell).waste(ModifierBase.Behaviour.MIRROR).is_empty():
 		var backwards: int = _launch(spell, tag, actor, origin, -heading, source)
 		launched += backwards
 		if backwards > 0:
@@ -1060,10 +1060,10 @@ func _fire_spell(spell: CompiledSpell, actor: int, staff: int, generation: int, 
 
 ## `recoil`: the caster is pushed back from a firing along `heading` (a firing the other way
 ## pushes the other way, so `mirror` cancels it). Moves add up: a dash's push runs with the dash,
-## and a teleport, over at once, has it taken off its distance instead (`CarrierTeleport`, whose recoil row is `OWN_WAY`).
+## and a teleport, over at once, has it taken off its distance instead (`CarrierTeleport.handles_recoil`).
 func _recoil(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading: Vector2) -> void:
 	var push: float = spell.behaviour(ModifierBase.Behaviour.RECOIL)
-	if push <= 0.0 or _carrier_of(spell).works(ModifierBase.Behaviour.RECOIL) == Carrier.Works.OWN_WAY:
+	if push <= 0.0 or _carrier_of(spell).handles_recoil():
 		return
 	if _caster != CASTER_WIZARD:
 		# A payload's recoil pushes the shot that cast it (a point has nothing to push).

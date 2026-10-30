@@ -9,57 +9,49 @@ The code is in `core/spells/carriers/`: one script per carrier (`bolt.gd`, `beam
 `decoy.gd`...) on the base `Carrier` (`carrier.gd`). A carrier is known by its name: a form card
 says `carrier = &"beam"`, and `Carriers.of(&"beam")` (`carriers.gd`) finds it. Carriers are never
 numbered, so adding or removing one never touches another card's file.
-`tests/core/test_carriers.gd` enforces everything below.
 
-## What a carrier decides
+## What a carrier writes about the other cards
 
-Each carrier has three tables. Every row is a small dictionary, and its keys say which question
-each value answers.
-
-**`BEHAVIOURS`: every modifier behaviour** (`ModifierBase.Behaviour`, what a modifier card does),
-one row each:
+Only the cards that do nothing on it, each with the sentence the builder shows the player. Every
+card not listed does something there.
 
 ```gdscript
-const BEHAVIOURS: Dictionary = {
-	B.HOMING: {"works": Works.OWN_WAY, "shows": Shows.DRAWN},
-	B.BLAST:  {"works": Works.YES, "shows": Shows.AS_EFFECT},
-	B.RETURN: {"works": Works.NO, "why_not": "it does not fly out"},
-	B.SHIELD: {"works": Works.OWN_WAY, "shows": Shows.NOTHING, "why_nothing_shows": "a decoy wears its caster's look, not its cards'"},
+## Modifier cards that do nothing on a decoy, with the sentence the builder shows after
+## "<Card> does nothing on a Decoy: ".
+const DOES_NOTHING: Dictionary = {
+	B.RETURN: "it does not fly out",
+	B.BOUNCE: "it turns a shot or a beam at walls, and a decoy is a body that hits nothing",
 	...
+}
+## Trigger cards that never go off on a decoy, with the sentence the builder shows.
+const NEVER_FIRES: Dictionary = {
+	E.HIT: "a decoy hits nothing",
 }
 ```
 
-| Key | The question it answers | Values |
-| --- | --- | --- |
-| `"works"` | Does the card work on this carrier? | `Works.YES`: yes, done by the code every carrier shares (the shot kit, the hit path, echo/mirror/recoil/hold, the blast at the end point). `Works.OWN_WAY`: yes, done by this carrier's own code (a beam bends, bounces and waves along its line). `Works.ONLY_WITH_BLAST`: only when the carrier also has a blast, which carries it (heavy on a decoy). `Works.NO`: no, it does nothing here. |
-| `"shows"` | If it works, how does it look? | `Shows.DRAWN`: the card's look is drawn on what the carrier shows. `Shows.AS_EFFECT`: it shows as its own effect, as a blast's explosion. `Shows.NOTHING`: nothing of it shows. |
-| `"why_not"` | If it does not work (or only with a blast), why? | The words a player reads in the builder: "Return does nothing on a Decoy: it does not fly out." |
-| `"why_nothing_shows"` | If it shows nothing, why? | "a decoy wears its caster's look, not its cards'". |
+In the game these sentences do two things: the compiler leaves a card that does nothing out of
+the spell, and the builder greys it out and shows why.
 
-**`EVENTS`: every trigger** (`TriggerBase.Event`, what a trigger card waits for):
+**You don't have to work the list out.** `tests/core/test_card_rules.gd` plays every card on every
+carrier in a small world and compares what happens with and without the card. A card that
+changes nothing and is not listed fails it:
 
-```gdscript
-const EVENTS: Dictionary = {
-	E.HIT: {"fires": false, "why_not": "a decoy hits nothing"},
-	E.EXPIRE: {"fires": true},
-	...
-}
-```
+    `return` on `decoy` does nothing and is not listed as wasted
 
-`"fires"` answers "does this trigger ever go off on this carrier?", and `"why_not"` says why when
-it never does. The compiler adds the checks that depend on the other cards (a block needs a
-shield or deflect, a reaction an infusion).
+so you add that line with a sentence (or make the card work there). A card that is listed but
+does change something fails it the other way.
 
-**`INFUSIONS`: an element card** on this carrier, as one row with a behaviour's keys:
-`{"works": Works.ONLY_WITH_BLAST, "shows": Shows.AS_EFFECT, "why_not": "a decoy hits nothing"}`.
-An infusion is a hit's element, so it works where the carrier hits, or with a blast.
+Two rules hold for every carrier and are not listed: on a carrier that hits nothing itself (a
+decoy, a familiar), an infusion and heavy count only when a blast on it carries them
+(`Carrier.takes_infusion`, `Carrier.BLAST_CARRIES`).
 
 **Traits**, in `traits()`: the numbers and shared rules it takes (`FLIES`, `STAYS`, `HITS`,
 `LASTS`, `REACHES`, `GUARDS`, `STEERS`, `SPEED`, `SHOTS`, `SPREAD`, `PIERCE`, `RING`, `OUTWARD`,
 `REPEATS_HELD`, `OWN_POSE`, `INSTANT_HOMING`, `CARRIES_PAYLOAD`, `HOLDS_STAFF`; each is documented
 in `carrier.gd`). The compiler's rules for numbers (does a split count here? does pierce?) read
 these. **Required fields**, in `required_fields()`: what a form card of this carrier must set
-above 0 (a beam's `ray_length`); the spell validator checks them.
+above 0 (a beam's `ray_length`); the spell validator checks them. `tests/core/test_carriers.gd`
+checks the lists against the traits (a carrier that hits nothing must list `on hit`).
 
 ## What a carrier runs
 
@@ -89,34 +81,19 @@ a sweep's, a strike's, a zap, a jump) goes back through `Spells` as one `RayHit`
 
 ## Adding a carrier
 
-1. Add `core/spells/carriers/<name>.gd`, `extends Carrier`, with `id()` returning `&"<name>"`, and
-   list it in `Carriers.make_all`.
-2. Fill `BEHAVIOURS`, `EVENTS` and `INFUSIONS` with every row, and `traits()` and
-   `required_fields()`. `tests/core/test_carriers.gd` fails until every row is there and agrees
-   with the traits.
-3. Override the hooks it needs (at least `launch` or `shoot`).
-4. Add its form card under `content/spells/forms/` with `carrier = &"<name>"`. The test then casts
-   it and checks that every card its rows say `Shows.DRAWN` really reaches a renderer, and that one they
-   say `Shows.NOTHING` doesn't.
-5. `tests/core/test_card_rules.gd` plays every card on it and fails on a row that says a card works
-   where the runtime does nothing.
+1. Add `core/spells/carriers/<name>.gd`, `extends Carrier`, with `id()` returning `&"<name>"`, its
+   `traits()` and `required_fields()`, and empty `DOES_NOTHING` and `NEVER_FIRES`; list it in
+   `Carriers.make_all`.
+2. Override the hooks it needs (at least `launch` or `shoot`).
+3. Add its form card under `content/spells/forms/` with `carrier = &"<name>"`.
+4. Run `tests/core/test_card_rules.gd`. For every card it says does nothing on your carrier, add a
+   line with a sentence, or make the card work there. Run `tests/core/test_carriers.gd` too.
 
 Removing a carrier is deleting its script and its line in `make_all`. A form card that still names
 it is refused by the validator.
 
-## Adding a modifier behaviour
+## Adding a modifier behaviour or a trigger
 
-Add the value at the end of `ModifierBase.Behaviour`, implement it on the shared path (or not at
-all), and then decide it on **every** carrier: `test_carriers.gd` fails for each carrier that has
-no row for it. That is on purpose: the question "what does this card do on a beam? On a decoy?"
-gets answered when the card is made, not found later as a card that silently does nothing.
-
-A new trigger event works the same way through `EVENTS`.
-
-## What the tables show today
-
-The look column made three gaps visible, which the tests confirm: a **teleport**, a **decoy** and a
-**familiar** draw none of their cards' looks (a teleport draws nothing of its own, a decoy wears
-its caster's look, a familiar is drawn as a plain orbit shot). Their blasts still show as the
-blast's effect. Giving them looks is a feel task: change their rows' `"shows"` to `Shows.DRAWN` and the test
-will check that the renderer really gets the looks.
+Add the value at the end of `ModifierBase.Behaviour` (or `TriggerBase.Event`) and implement it.
+`test_card_rules.gd` then plays it on every carrier and names each carrier where it does nothing,
+for a line in that carrier's list.

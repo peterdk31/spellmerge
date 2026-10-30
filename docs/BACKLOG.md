@@ -7,6 +7,7 @@ Ideas and future work outside the current milestone (docs/PLAN.md, "Planning sys
 For later milestones; see `docs/milestones/M2-staffs.md`, "Later".
 
 
+- **Card visuals on three carriers (found 2026-10-30).** A teleport, a decoy and a familiar show none of their cards' visual styles (`look_layer`: fire's embers, frost's sparkles...): a teleport draws nothing of its own, a decoy looks like its caster, a familiar is drawn as a plain orb (`Entities`, `look_color(..., 0)`). Their blasts still show. Every other carrier draws its cards' styles.
 - **More melee carriers (owner 2026-10-29, after `swing` has been played).** `lunge` (a short step forward with a hit at its end), `whirl` (a 360° sweep round the caster) and `saw` (tiny repeated hits at the tip, close to 0 mana and delay; `hold · saw`, `siphon · saw`). See M2-staffs.md, "Phase I".
 - **Staff types (M3).** An always-cast slot, a shuffle staff (random order), built-in recoil, cheaper `hold`; staffs found in runs with other slot counts, delays and recharges.
 - **Arc zaps and `on hit` (M3 staffs or relics, owner 2026-10-27).** For now an `arc` zap is a hit like any other, so it sets off `on hit` payloads and chains. Later that should not be the card's default but something a build earns: either an implicit mod on a staff type ("zaps count as hits") or a relic. Then the plain arc zap stops setting off `on hit`.

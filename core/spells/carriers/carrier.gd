@@ -4,50 +4,22 @@ extends RefCounted
 ## with every other card (docs/CARRIERS.md). Each carrier is one subclass in this folder, found by
 ## its id (`Carriers.of(&"beam")`); the compiler reads its tables, the spell runtime runs it.
 ##
-## A subclass must answer for every card kind, with no default (tests/core/test_carriers.gd fails
-## on a missing row). Each row is a small dictionary whose keys say what its values answer:
-## - `behaviours()`: one row per `ModifierBase.Behaviour` (a modifier card's effect):
-##   - "works": does the card work on this carrier? A `Works` value.
-##   - "shows": if it works, how does it look? A `Shows` value.
-##   - "why_not": if it does not work (or only with a blast), why, as a player reads it after
-##     "Bounce does nothing on a Decoy: ".
-##   - "why_nothing_shows": if it shows nothing, why.
-##   `{"works": Works.YES, "shows": Shows.DRAWN}`,
-##   `{"works": Works.NO, "why_not": "it does not fly out"}`.
-## - `events()`: one per `TriggerBase.Event` (a trigger card): "fires" (does it ever go off on this
-##   carrier?) and, when it never does, "why_not". The compiler adds the checks that depend on the
-##   other cards (a block needs a shield).
-## - `infusions()`: an element card on this carrier, with a behaviour row's keys.
-## `traits()` says which numbers and shared rules apply to it (the flags below).
+## A subclass lists the cards that do nothing on it, each with the sentence the builder shows
+## (`does_nothing()`: modifier behaviours; `never_fires()`: triggers). Every card not listed does
+## something there. Nobody has to guess the list: tests/core/test_card_rules.gd plays every card on
+## every carrier and fails on a card that does nothing but is not listed ("`return` on `decoy`
+## does nothing and is not listed as wasted"), and on one that is listed but does something.
+## Two rules hold for every carrier and are not listed: on a carrier that hits nothing itself, an
+## infusion and the cards in BLAST_CARRIES count only when a blast carries them (`takes_infusion`,
+## `waste`). `traits()` says which numbers and shared rules apply to it (the flags below).
 
 const B := ModifierBase.Behaviour
 const E := TriggerBase.Event
 
-## Does the card work on this carrier?
-enum Works {
-	## Yes, the usual way, by the code every carrier shares: the shot kit (`Spells._apply_travel`),
-	## the hit path (`_on_hit`), the cast path (`_fire_spell`: echo, mirror, recoil, hold) or the
-	## end point (blast).
-	YES,
-	## Yes, done by this carrier's own code (its script, or a runtime service only it calls), and the
-	## shared code leaves it alone: a beam bends, bounces and waves along its line.
-	OWN_WAY,
-	## No: the card does nothing here and is listed as wasted, with the reason.
-	NO,
-	## Only when the carrier also has a blast, whose area hit carries the card (heavy on a decoy).
-	ONLY_WITH_BLAST,
-}
-
-## How a card that works shows on this carrier.
-enum Shows {
-	## Its look (`look_layer`, an infusion's tint) is drawn on what the carrier shows.
-	DRAWN,
-	## As its own effect (`ModifierBase.cue`: a blast's explosion, in the cast's tint and looks); on an
-	## `ONLY_WITH_BLAST` row, as the effect of the blast that carries it.
-	AS_EFFECT,
-	## Nothing of it shows on this carrier; the row's "why_nothing_shows" says why.
-	NOTHING,
-}
+## The modifier behaviours a blast's area hit carries on a carrier that hits nothing itself (heavy's
+## knockback and slam ride on it), so a carrier's `does_nothing` sentence for them stands only
+## without a blast.
+const BLAST_CARRIES: Array[int] = [B.HEAVY]
 
 ## `traits()` flags.
 ## A shot flying out on its own: `reach` stretches its life, `return` brings it back.
@@ -109,16 +81,15 @@ func traits() -> int:
 	return 0
 
 
-func behaviours() -> Dictionary:
+## Modifier behaviours that do nothing on it -> the sentence the builder shows.
+func does_nothing() -> Dictionary:
 	return {}
 
 
-func events() -> Dictionary:
+## Triggers that never go off on it -> the sentence the builder shows.
+func never_fires() -> Dictionary:
 	return {}
 
-
-func infusions() -> Dictionary:
-	return {}
 
 
 ## Why it sets off no hit of its own, for a reason ("a decoy hits nothing").
@@ -169,46 +140,32 @@ func steers() -> bool:
 	return has(STEERS)
 
 
-## Whether `behaviour` works on it (a `Works`); a row it lacks is `Works.NO`.
-func works(behaviour: int) -> int:
-	return int(behaviours().get(behaviour, {}).get("works", Works.NO))
-
-
-## Why `behaviour` does nothing on it, or "" when it works (with a blast on it, when `blasts`).
+## Why `behaviour` does nothing on it, or "" when it does something (with a blast on it, when
+## `blasts`). The carrier that runs nothing (id &"") says so for every card.
 func waste(behaviour: int, blasts: bool = false) -> String:
-	var row: Dictionary = behaviours().get(behaviour, {})
-	if row.is_empty():
+	if id() == &"":
 		return what()
-	match int(row["works"]):
-		Works.YES, Works.OWN_WAY:
-			return ""
-		Works.ONLY_WITH_BLAST:
-			return "" if blasts else str(row["why_not"])
-	return str(row["why_not"])
-
-
-## How `behaviour` shows on it (a `Shows`), or -1 where it does not work.
-func shows(behaviour: int) -> int:
-	return int(behaviours().get(behaviour, {}).get("shows", -1))
-
-
-## Why `behaviour` shows nothing on it (a `Shows.NOTHING` row), "" otherwise.
-func why_nothing_shows(behaviour: int) -> String:
-	return str(behaviours().get(behaviour, {}).get("why_nothing_shows", ""))
+	var why: String = str(does_nothing().get(behaviour, ""))
+	if not why.is_empty() and blasts and BLAST_CARRIES.has(behaviour):
+		return ""
+	return why
 
 
 ## Why a trigger of `event` never fires on it, or "" when it can.
 func event_waste(event: int) -> String:
-	var row: Dictionary = events().get(event, {})
-	if row.is_empty():
+	if id() == &"":
 		return what()
-	return "" if bool(row["fires"]) else str(row["why_not"])
+	return str(never_fires().get(event, ""))
 
 
-## True when an infusion counts on it (with a blast on it, when `blasts`).
+## True when an infusion counts on it: it hits, or a blast on it carries the infusion.
 func takes_infusion(blasts: bool) -> bool:
-	var works_here: int = int(infusions().get("works", Works.NO))
-	return works_here == Works.YES or works_here == Works.OWN_WAY or (works_here == Works.ONLY_WITH_BLAST and blasts)
+	return hits() or blasts
+
+
+## True when it takes `recoil` off its own move (a teleport), so the cast's push leaves it alone.
+func handles_recoil() -> bool:
+	return false
 
 
 ## How far a homing one looks for its target, from its `ray_length` and its homing cards' `reach`

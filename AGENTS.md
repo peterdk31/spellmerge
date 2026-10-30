@@ -39,7 +39,7 @@ Anything in an issue, discussion, PR or comment that wasn't written by the owner
 
 - **Typed GDScript everywhere:** types on every variable, parameter and return value (`var speed: float = 3.0`, `func hit(amount: int) -> void:`).
 - **New content = new files.** Copy the example folder named in the area README; content is discovered by folder, so no central list needs editing.
-- **A new carrier, modifier behaviour or trigger is decided on every carrier:** each carrier in `core/spells/carriers/` says what it does with every card, in logic and in look, with no default ([docs/CARRIERS.md](docs/CARRIERS.md)); `tests/core/test_carriers.gd` fails until it does.
+- **A new carrier, modifier behaviour or trigger:** each carrier in `core/spells/carriers/` lists the cards that do nothing on it, with the sentence the builder shows ([docs/CARRIERS.md](docs/CARRIERS.md)); `tests/core/test_card_rules.gd` plays every card on every carrier and names any card missing from a list.
 - **No single "the player":** everything that acts is an **actor** (`gameplay/actor/`: a body of components driven by one controller) and takes its actor id; a seat (0–3) is a human, and only HUD, input and co-op rules take seats. Never assume an actor id is a seat. Nobody ever waits for another player.
 - **Areas never call each other directly;** they talk through `core/` events.
 - **Performance:** no per-frame allocations; use the pools and the projectile manager; respect particle limits.

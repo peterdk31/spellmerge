@@ -31,6 +31,7 @@ const LATER: Array[ModifierBase] = [
 	preload("res://content/spells/modifiers/mirror/mirror.tres"),
 	preload("res://content/spells/modifiers/overcharge/overcharge.tres"),
 	preload("res://content/spells/modifiers/possess/possess.tres"),
+	preload("res://content/spells/modifiers/reach/reach.tres"),
 	preload("res://content/spells/modifiers/recoil/recoil.tres"),
 	preload("res://content/spells/modifiers/relay/relay.tres"),
 	preload("res://content/spells/modifiers/return/return.tres"),
@@ -57,6 +58,7 @@ const INFUSIONS: Array[ElementBase] = [
 ## not listed here must have a kind of its own.
 const ALLOWED_SHARES: Dictionary = {
 	9: ["split", "blast", "overcharge"],
+	12: ["sniper", "reach"],
 	15: ["heavy", "sticky"],
 	16: ["growth", "linger"],
 	17: ["spiral", "return", "relay", "recoil"],

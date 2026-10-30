@@ -1,9 +1,0 @@
-{
-	"id": "medium_dash_away",
-	"name": "Medium dash away",
-	"does": "The medium dash moves its caster a fixed 80 px; nothing else happens.",
-	"casts": [{"staff": 0, "cards": ["medium_dash"]}],
-	"imps": [[100, 0]],
-	"seconds": 0.5,
-	"checks": [{"kind": "caster_moved", "mode": "dash"}, {"kind": "max_shots", "max": 0}]
-}

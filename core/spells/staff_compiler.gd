@@ -315,6 +315,10 @@ static func _numbers_waste(modifier: ModifierBase, motion: FormBase.Motion, blas
 		any = true
 		if motion != FormBase.Motion.DASH and motion != FormBase.Motion.TELEPORT:
 			return ""
+	if not is_equal_approx(modifier.reach_mult, 1.0):
+		any = true
+		if reaches(motion):
+			return ""
 	if not is_equal_approx(modifier.spread_mult, 1.0):
 		any = true
 		# A placed carrier (rune, decoy, familiar) appears along its aim, so its spread moves it (rules R4 F3).
@@ -396,6 +400,10 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 		pierce += modifier.extra_pierce
 		spell.spread_mult *= modifier.spread_mult
 		spell.lifetime *= modifier.lifetime_mult
+		if flies(spell.motion):
+			spell.lifetime *= modifier.reach_mult
+		else:
+			spell.ray_length *= modifier.reach_mult
 		if modifier.behaviour == ModifierBase.Behaviour.ARC:
 			spell.arc_reach = maxf(spell.arc_reach, modifier.behaviour_reach)
 		spell.behaviours[modifier.behaviour] = stacked(modifier.behaviour, spell.behaviours[modifier.behaviour], modifier.behaviour_strength)
@@ -439,7 +447,7 @@ func _build(form: FormBase, elements: Array[ElementBase], modifiers: Array[Modif
 	elif spell.motion == FormBase.Motion.SLAM:
 		# A shockwave on an area: the hit kind of an area hit.
 		spell.hit.kind = &"burst"
-	elif spell.ray_length > 0.0 and spell.motion != FormBase.Motion.DASH and spell.motion != FormBase.Motion.TELEPORT:
+	elif spell.motion == FormBase.Motion.RAY or spell.motion == FormBase.Motion.RAIN:
 		spell.hit.kind = &"ray"
 	if spell.homing_turn > 0.0:
 		spell.homing_range = homing_range(spell.motion, spell.ray_length, homing_reach)
@@ -570,6 +578,16 @@ static func behaviour_waste(behaviour: int, motion: FormBase.Motion, blasts: boo
 ## True for the carriers that are a shot flying out on its own (a bolt, a hook, a swap).
 static func flies(motion: FormBase.Motion) -> bool:
 	return motion == FormBase.Motion.STRAIGHT or motion == FormBase.Motion.HOOK or motion == FormBase.Motion.SWAP
+
+
+## True for the carriers that go a distance `reach` stretches: a flying shot (speed x life) and
+## every carrier with a `ray_length` (a beam, a move, a rain, a wall, a swing, a slam);
+## a rune, an orbit, a decoy and a familiar stay where they are put.
+static func reaches(motion: FormBase.Motion) -> bool:
+	match motion:
+		FormBase.Motion.STILL, FormBase.Motion.ORBIT, FormBase.Motion.DECOY, FormBase.Motion.FAMILIAR:
+			return false
+	return true
 
 
 ## True for the carriers that are shots staying in the world for a while (a bolt, a rune, an orbit,

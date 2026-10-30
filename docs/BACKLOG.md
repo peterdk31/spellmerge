@@ -171,6 +171,8 @@ Weak spots found in the architecture review of 2026-10-20 (docs/ARCHITECTURE.md)
 
 ## Ideas from the community
 
+- **Ring multicast (owner, 2026-10-30, idea).** A multicast that fires the carrier's shots in a full circle round the caster, like nova does for a bolt, so any carrier can be a ring. Not scheduled.
+
 - **Relic idea: The Nuke (#416, p3, idea).** For M3, when relics arrive: no mana regeneration, every cast spends all current mana, a full refill every X seconds. Open: how a cast scales with the mana spent, and the refill interval.
 
 - **Card rules R3, rule 2 checks.** `tests/core/test_card_rules.gd` does not yet check that a card's effect survives a bounce, a chain jump, an echo and a payload firing (M2-rules.md, "R3", last bullet). Add probes that compare the second leg's trace. Schedule it before the C2 checkpoint (it is the check for the "nothing takes a card away" rule of #453); it is not in `docs/NEXT.md` because R3 itself is done and nothing else waits on it. R4 only adds cards that turn W into ✓, so the work does not change, but each new ✓ needs a probe.

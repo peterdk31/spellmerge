@@ -166,6 +166,7 @@ The owner re-decides these under the new rule; each "yes, it should work" become
 - **Recoil adds to the move.** A dash's recoil is the usual push, which the body adds to the dash; a teleport, over at once, has it taken off its distance (past it, it goes backwards).
 - **One shield rule for every move** (`Spells._shield_move`): dash, teleport, hook and swap guard what they move, the wizard by a barrier for the move, a shot (a payload move) by that many more shield charges (kept until spent: a shot's shield has no clock).
 - **A point cannot move:** a teleport cast by a point blinks the wizard to it, and a hook or swap cast by one moves the wizard (to the hit, as the wizard's own). A dash cast by a point still does nothing: the wizard's dash goes the way its body walks (staffs A6a), so the mover would need to take a way from the card (open question).
+- **R4 F4 rules (done, owner 2026-10-30):** a returning shot's way home takes no life, so it always comes home (it still vanishes when its caster's anchor is gone; with homing's 60° bend it always closes in). A closed caster's shots in the air keep their waiting payloads (echoes, fires waiting for room), as after an edit; only its own cast's waiting launches go. DECISIONS "Card rules R4 F4".
 
 ## Notes for the sessions
 

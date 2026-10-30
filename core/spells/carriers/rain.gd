@@ -4,46 +4,47 @@ extends Carrier
 ## Homing places it on a target near the point; held, it falls again and again.
 
 
-## How the rain takes each modifier (`ModifierBase.Behaviour`), every one: see `Carrier`.
+## Each modifier behaviour (`ModifierBase.Behaviour`) on the rain, every one (keys: see `Carrier`).
 const BEHAVIOURS: Dictionary = {
-	B.NONE: [Works.YES, Shows.DRAWN],
-	B.HOMING: [Works.OWN_WAY, Shows.DRAWN],
-	B.CHAIN: [Works.YES, Shows.DRAWN],
-	B.SHIELD: [Works.NO, "it blocks shots that touch the carrier or guards the caster on a move, and a rain strikes once where it lands"],
-	B.BLAST: [Works.YES, Shows.AS_EFFECT],
-	B.HOLD: [Works.YES, Shows.DRAWN],
-	B.RECOIL: [Works.YES, Shows.DRAWN],
-	B.BOUNCE: [Works.NO, "it turns a shot or a beam at walls, and a rain strikes once where it lands"],
-	B.ECHO: [Works.YES, Shows.DRAWN],
-	B.LINGER: [Works.NO, "it only changes a moving shot, and a rain strikes once where it lands"],
-	B.HEAVY: [Works.YES, Shows.DRAWN],
-	B.SIPHON: [Works.YES, Shows.DRAWN],
-	B.STICKY: [Works.NO, "it only changes a moving shot, and a rain strikes once where it lands"],
-	B.MAGNET: [Works.NO, "it needs a shot or a beam that stays in the world, and a rain strikes once where it lands"],
-	B.GHOST: [Works.NO, "it only takes a flying shot or a line through walls, and a rain strikes once where it lands"],
-	B.SPIRAL: [Works.NO, "it only changes a moving shot, and a rain strikes once where it lands"],
-	B.MIRROR: [Works.YES, Shows.DRAWN],
-	B.GROWTH: [Works.NO, "it grows a shot in the world or a beam, and a rain strikes once where it lands"],
-	B.RELAY: [Works.YES, Shows.DRAWN],
-	B.RETURN: [Works.NO, "it does not fly out"],
-	B.ARC: [Works.NO, "it is not a shot that stays in the air"],
-	B.POSSESS: [Works.YES, Shows.DRAWN],
-	B.DEFLECT: [Works.NO, "it touches no shots"],
+	B.NONE: {"works": Works.YES, "shows": Shows.DRAWN},
+	B.HOMING: {"works": Works.OWN_WAY, "shows": Shows.DRAWN},
+	B.CHAIN: {"works": Works.YES, "shows": Shows.DRAWN},
+	B.SHIELD: {"works": Works.NO, "why_not": "it blocks shots that touch the carrier or guards the caster on a move, and a rain strikes once where it lands"},
+	B.BLAST: {"works": Works.YES, "shows": Shows.AS_EFFECT},
+	B.HOLD: {"works": Works.YES, "shows": Shows.DRAWN},
+	B.RECOIL: {"works": Works.YES, "shows": Shows.DRAWN},
+	B.BOUNCE: {"works": Works.NO, "why_not": "it turns a shot or a beam at walls, and a rain strikes once where it lands"},
+	B.ECHO: {"works": Works.YES, "shows": Shows.DRAWN},
+	B.LINGER: {"works": Works.NO, "why_not": "it only changes a moving shot, and a rain strikes once where it lands"},
+	B.HEAVY: {"works": Works.YES, "shows": Shows.DRAWN},
+	B.SIPHON: {"works": Works.YES, "shows": Shows.DRAWN},
+	B.STICKY: {"works": Works.NO, "why_not": "it only changes a moving shot, and a rain strikes once where it lands"},
+	B.MAGNET: {"works": Works.NO, "why_not": "it needs a shot or a beam that stays in the world, and a rain strikes once where it lands"},
+	B.GHOST: {"works": Works.NO, "why_not": "it only takes a flying shot or a line through walls, and a rain strikes once where it lands"},
+	B.SPIRAL: {"works": Works.NO, "why_not": "it only changes a moving shot, and a rain strikes once where it lands"},
+	B.MIRROR: {"works": Works.YES, "shows": Shows.DRAWN},
+	B.GROWTH: {"works": Works.NO, "why_not": "it grows a shot in the world or a beam, and a rain strikes once where it lands"},
+	B.RELAY: {"works": Works.YES, "shows": Shows.DRAWN},
+	B.RETURN: {"works": Works.NO, "why_not": "it does not fly out"},
+	B.ARC: {"works": Works.NO, "why_not": "it is not a shot that stays in the air"},
+	B.POSSESS: {"works": Works.YES, "shows": Shows.DRAWN},
+	B.DEFLECT: {"works": Works.NO, "why_not": "it touches no shots"},
 }
-## When each trigger (`TriggerBase.Event`) fires on the rain: "" when it can, else why it never does.
+## Each trigger (`TriggerBase.Event`) on the rain: "fires" (does it ever go off here?) and, when it
+## never does, "why_not".
 const EVENTS: Dictionary = {
-	E.HIT: "",
-	E.EXPIRE: "",
-	E.TIMER: "",
-	E.BLOCK: "nothing on it can block a shot",
-	E.KILL: "",
-	E.CAST: "",
-	E.WALL: "a rain falls from above and never meets a wall",
-	E.HURT: "",
-	E.REACTION: "",
+	E.HIT: {"fires": true},
+	E.EXPIRE: {"fires": true},
+	E.TIMER: {"fires": true},
+	E.BLOCK: {"fires": false, "why_not": "nothing on it can block a shot"},
+	E.KILL: {"fires": true},
+	E.CAST: {"fires": true},
+	E.WALL: {"fires": false, "why_not": "a rain falls from above and never meets a wall"},
+	E.HURT: {"fires": true},
+	E.REACTION: {"fires": true},
 }
-## How the rain takes an infusion.
-const INFUSIONS: Array = [Works.YES, Shows.DRAWN]
+## An infusion (an element card) on the rain, with the same keys as a behaviour.
+const INFUSIONS: Dictionary = {"works": Works.YES, "shows": Shows.DRAWN}
 
 
 func id() -> StringName:
@@ -70,7 +71,7 @@ func events() -> Dictionary:
 	return EVENTS
 
 
-func infusions() -> Array:
+func infusions() -> Dictionary:
 	return INFUSIONS
 
 

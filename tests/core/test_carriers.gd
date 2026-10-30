@@ -22,26 +22,36 @@ func _carriers() -> Array[Carrier]:
 	return all
 
 
-func _valid_look(carrier: Carrier, row: Array, at: int, cell: String) -> void:
-	check(row.size() > at and row[at] is int and Carrier.Shows.values().has(row[at]), "%s has a look" % cell)
-	if row.size() > at and row[at] == Carrier.Shows.NOTHING:
-		var why: String = str(row[at + 1]) if row.size() > at + 1 else carrier.nothing_shown_note()
-		check(not why.is_empty(), "%s says why it shows nothing" % cell)
+## The keys a behaviour (or infusion) row may have, by what "works" says.
+const ROW_KEYS: Dictionary = {
+	Carrier.Works.YES: ["works", "shows"],
+	Carrier.Works.OWN_WAY: ["works", "shows"],
+	Carrier.Works.NO: ["works", "why_not"],
+	Carrier.Works.ONLY_WITH_BLAST: ["works", "shows", "why_not"],
+}
 
 
-func _check_row(carrier: Carrier, row: Array, cell: String) -> void:
-	check(not row.is_empty() and row[0] is int and Carrier.Works.values().has(row[0]), "%s has a use" % cell)
-	if row.is_empty():
+func _reason(row: Dictionary, key: String, cell: String) -> void:
+	check(row.has(key) and row[key] is String and not String(row[key]).is_empty(), "%s says %s" % [cell, key])
+	check(not row.has(key) or String(row[key]).length() < 140, "%s: a short %s" % [cell, key])
+
+
+func _check_row(row: Dictionary, cell: String) -> void:
+	check(row.has("works") and row["works"] is int and Carrier.Works.values().has(row["works"]), "%s says whether it works" % cell)
+	if not row.has("works"):
 		return
-	match row[0]:
-		Carrier.Works.YES, Carrier.Works.OWN_WAY:
-			_valid_look(carrier, row, 1, cell)
-		Carrier.Works.NO:
-			check(row.size() == 2 and row[1] is String and not String(row[1]).is_empty(), "%s says why it is wasted" % cell)
-			check(row.size() < 2 or String(row[1]).length() < 140, "%s: a short reason" % cell)
-		Carrier.Works.ONLY_WITH_BLAST:
-			_valid_look(carrier, row, 1, cell)
-			check(row.size() == 3 and row[2] is String and not String(row[2]).is_empty(), "%s says why it is wasted without a blast" % cell)
+	var keys: Array = (ROW_KEYS[row["works"]] as Array).duplicate()
+	if row.has("shows"):
+		check(row["shows"] is int and Carrier.Shows.values().has(row["shows"]), "%s says how it shows" % cell)
+		if row["shows"] == Carrier.Shows.NOTHING:
+			keys.append("why_nothing_shows")
+			_reason(row, "why_nothing_shows", cell)
+	for key: String in keys:
+		check(row.has(key), "%s has %s" % [cell, key])
+	for key: String in row:
+		check(keys.has(key), "%s has no key %s" % [cell, key])
+	if row.has("why_not"):
+		_reason(row, "why_not", cell)
 
 
 func test_every_carrier_is_found_by_its_name() -> void:
@@ -73,7 +83,7 @@ func test_every_carrier_decides_every_behaviour() -> void:
 			var cell: String = "%s on a %s" % [BEHAVIOURS.keys()[behaviour], carrier.noun()]
 			check(table.has(behaviour), "%s is decided" % cell)
 			if table.has(behaviour):
-				_check_row(carrier, table[behaviour], cell)
+				_check_row(table[behaviour], cell)
 		check_equal(table.size(), BEHAVIOURS.size(), "%s lists nothing else" % carrier.noun())
 
 
@@ -81,14 +91,20 @@ func test_every_carrier_decides_every_trigger() -> void:
 	for carrier in _carriers():
 		var table: Dictionary = carrier.events()
 		for event: int in EVENTS.values():
-			check(table.has(event) and table[event] is String, "%s on a %s is decided" % [EVENTS.keys()[event], carrier.noun()])
+			var cell: String = "%s on a %s" % [EVENTS.keys()[event], carrier.noun()]
+			check(table.has(event) and table[event] is Dictionary and table[event].get("fires") is bool, "%s says whether it fires" % cell)
+			if table.has(event) and table[event] is Dictionary:
+				var row: Dictionary = table[event]
+				if row.get("fires") == false:
+					_reason(row, "why_not", cell)
+				check(row.size() == (1 if row.get("fires") == true else 2), "%s has no other key" % cell)
 		check_equal(table.size(), EVENTS.size(), "%s lists nothing else" % carrier.noun())
 
 
 func test_every_carrier_decides_infusions() -> void:
 	for carrier in _carriers():
-		_check_row(carrier, carrier.infusions(), "an infusion on a %s" % carrier.noun())
-		check(carrier.infusions()[0] != Carrier.Works.NO, "an infusion is a hit's element: it counts on a %s at least with a blast" % carrier.noun())
+		_check_row(carrier.infusions(), "an infusion on a %s" % carrier.noun())
+		check(carrier.infusions().get("works") != Carrier.Works.NO, "an infusion is a hit's element: it counts on a %s at least with a blast" % carrier.noun())
 
 
 func test_the_tables_agree_with_the_traits() -> void:
@@ -99,7 +115,7 @@ func test_the_tables_agree_with_the_traits() -> void:
 		check_equal(carrier.event_waste(EVENTS.HURT).is_empty(), carrier.lasts(), "on hurt listens on a %s exactly when it lasts" % name)
 		var blocks: bool = carrier.works(BEHAVIOURS.SHIELD) != Carrier.Works.NO or carrier.works(BEHAVIOURS.DEFLECT) != Carrier.Works.NO
 		check_equal(carrier.event_waste(EVENTS.BLOCK).is_empty(), blocks, "on block fires on a %s exactly where a shield or deflect runs" % name)
-		check_equal(carrier.infusions()[0] == Carrier.Works.YES or carrier.infusions()[0] == Carrier.Works.OWN_WAY, carrier.hits(), "an infusion runs on a %s exactly when it hits" % name)
+		check_equal(carrier.takes_infusion(false), carrier.hits(), "an infusion runs on a %s exactly when it hits" % name)
 		check_equal(carrier.works(BEHAVIOURS.HOMING) != Carrier.Works.NO, carrier.steers(), "homing runs on a %s exactly when it steers" % name)
 		for behaviour: int in [BEHAVIOURS.CHAIN, BEHAVIOURS.SIPHON, BEHAVIOURS.POSSESS, BEHAVIOURS.RELAY]:
 			check_equal(carrier.works(behaviour) != Carrier.Works.NO, carrier.hits(), "%s runs on a %s exactly when it hits" % [BEHAVIOURS.keys()[behaviour], name])
@@ -160,6 +176,6 @@ func test_what_a_carrier_says_it_shows_is_drawn() -> void:
 		var drawn: int = _looks_drawn([NUMBERS_CARD, carrier.id()])
 		var says: bool = carrier.shows(BEHAVIOURS.NONE) == Carrier.Shows.DRAWN
 		check_equal(ManagerScript.look_has(drawn, numbers), says, "%s's look on a %s is drawn exactly when its row says DRAWN" % [NUMBERS_CARD, carrier.noun()])
-		if carrier.infusions()[1] == Carrier.Shows.DRAWN:
+		if carrier.infusions().get("shows") == Carrier.Shows.DRAWN:
 			drawn = _looks_drawn([INFUSION_CARD, carrier.id()])
 			check(ManagerScript.look_has(drawn, infusion), "%s's look on a %s is drawn, as its row says" % [INFUSION_CARD, carrier.noun()])

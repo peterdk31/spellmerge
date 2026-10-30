@@ -10,46 +10,47 @@ extends Carrier
 ## `beam_*` getters (through `Spells`).
 
 
-## How the beam takes each modifier (`ModifierBase.Behaviour`), every one: see `Carrier`.
+## Each modifier behaviour (`ModifierBase.Behaviour`) on the beam, every one (keys: see `Carrier`).
 const BEHAVIOURS: Dictionary = {
-	B.NONE: [Works.YES, Shows.DRAWN],
-	B.HOMING: [Works.OWN_WAY, Shows.DRAWN],
-	B.CHAIN: [Works.YES, Shows.DRAWN],
-	B.SHIELD: [Works.OWN_WAY, Shows.DRAWN],
-	B.BLAST: [Works.YES, Shows.AS_EFFECT],
-	B.HOLD: [Works.YES, Shows.DRAWN],
-	B.RECOIL: [Works.YES, Shows.DRAWN],
-	B.BOUNCE: [Works.OWN_WAY, Shows.DRAWN],
-	B.ECHO: [Works.YES, Shows.DRAWN],
-	B.LINGER: [Works.NO, "it only changes a moving shot, and a beam is a line, not a shot"],
-	B.HEAVY: [Works.YES, Shows.DRAWN],
-	B.SIPHON: [Works.YES, Shows.DRAWN],
-	B.STICKY: [Works.NO, "it only changes a moving shot, and a beam is a line, not a shot"],
-	B.MAGNET: [Works.OWN_WAY, Shows.DRAWN],
-	B.GHOST: [Works.OWN_WAY, Shows.DRAWN],
-	B.SPIRAL: [Works.OWN_WAY, Shows.DRAWN],
-	B.MIRROR: [Works.YES, Shows.DRAWN],
-	B.GROWTH: [Works.OWN_WAY, Shows.DRAWN],
-	B.RELAY: [Works.YES, Shows.DRAWN],
-	B.RETURN: [Works.NO, "it does not fly out"],
-	B.ARC: [Works.NO, "it is not a shot that stays in the air"],
-	B.POSSESS: [Works.YES, Shows.DRAWN],
-	B.DEFLECT: [Works.OWN_WAY, Shows.DRAWN],
+	B.NONE: {"works": Works.YES, "shows": Shows.DRAWN},
+	B.HOMING: {"works": Works.OWN_WAY, "shows": Shows.DRAWN},
+	B.CHAIN: {"works": Works.YES, "shows": Shows.DRAWN},
+	B.SHIELD: {"works": Works.OWN_WAY, "shows": Shows.DRAWN},
+	B.BLAST: {"works": Works.YES, "shows": Shows.AS_EFFECT},
+	B.HOLD: {"works": Works.YES, "shows": Shows.DRAWN},
+	B.RECOIL: {"works": Works.YES, "shows": Shows.DRAWN},
+	B.BOUNCE: {"works": Works.OWN_WAY, "shows": Shows.DRAWN},
+	B.ECHO: {"works": Works.YES, "shows": Shows.DRAWN},
+	B.LINGER: {"works": Works.NO, "why_not": "it only changes a moving shot, and a beam is a line, not a shot"},
+	B.HEAVY: {"works": Works.YES, "shows": Shows.DRAWN},
+	B.SIPHON: {"works": Works.YES, "shows": Shows.DRAWN},
+	B.STICKY: {"works": Works.NO, "why_not": "it only changes a moving shot, and a beam is a line, not a shot"},
+	B.MAGNET: {"works": Works.OWN_WAY, "shows": Shows.DRAWN},
+	B.GHOST: {"works": Works.OWN_WAY, "shows": Shows.DRAWN},
+	B.SPIRAL: {"works": Works.OWN_WAY, "shows": Shows.DRAWN},
+	B.MIRROR: {"works": Works.YES, "shows": Shows.DRAWN},
+	B.GROWTH: {"works": Works.OWN_WAY, "shows": Shows.DRAWN},
+	B.RELAY: {"works": Works.YES, "shows": Shows.DRAWN},
+	B.RETURN: {"works": Works.NO, "why_not": "it does not fly out"},
+	B.ARC: {"works": Works.NO, "why_not": "it is not a shot that stays in the air"},
+	B.POSSESS: {"works": Works.YES, "shows": Shows.DRAWN},
+	B.DEFLECT: {"works": Works.OWN_WAY, "shows": Shows.DRAWN},
 }
-## When each trigger (`TriggerBase.Event`) fires on the beam: "" when it can, else why it never does.
+## Each trigger (`TriggerBase.Event`) on the beam: "fires" (does it ever go off here?) and, when it
+## never does, "why_not".
 const EVENTS: Dictionary = {
-	E.HIT: "",
-	E.EXPIRE: "",
-	E.TIMER: "",
-	E.BLOCK: "",
-	E.KILL: "",
-	E.CAST: "",
-	E.WALL: "",
-	E.HURT: "",
-	E.REACTION: "",
+	E.HIT: {"fires": true},
+	E.EXPIRE: {"fires": true},
+	E.TIMER: {"fires": true},
+	E.BLOCK: {"fires": true},
+	E.KILL: {"fires": true},
+	E.CAST: {"fires": true},
+	E.WALL: {"fires": true},
+	E.HURT: {"fires": true},
+	E.REACTION: {"fires": true},
 }
-## How the beam takes an infusion.
-const INFUSIONS: Array = [Works.YES, Shows.DRAWN]
+## An infusion (an element card) on the beam, with the same keys as a behaviour.
+const INFUSIONS: Dictionary = {"works": Works.YES, "shows": Shows.DRAWN}
 
 
 ## Points a live beam row has room for at first: its start, RAY_SEGMENTS a leg for each target it
@@ -137,7 +138,7 @@ func events() -> Dictionary:
 	return EVENTS
 
 
-func infusions() -> Array:
+func infusions() -> Dictionary:
 	return INFUSIONS
 
 

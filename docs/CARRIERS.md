@@ -13,38 +13,46 @@ numbered, so adding or removing one never touches another card's file.
 
 ## What a carrier decides
 
-**Every modifier behaviour** (`ModifierBase.Behaviour`), in `BEHAVIOURS`, one row each. A row says
-whether the card works on this carrier (`Works`) and, when it does, how it shows (`Shows`):
+Each carrier has three tables. Every row is a small dictionary, and its keys say which question
+each value answers.
+
+**`BEHAVIOURS`: every modifier behaviour** (`ModifierBase.Behaviour`, what a modifier card does),
+one row each:
 
 ```gdscript
 const BEHAVIOURS: Dictionary = {
-	B.HOMING: [Works.OWN_WAY, Shows.DRAWN],
-	B.BLAST:  [Works.YES, Shows.AS_EFFECT],
-	B.RETURN: [Works.NO, "it does not fly out"],
-	B.HEAVY:  [Works.ONLY_WITH_BLAST, Shows.AS_EFFECT, "it acts on what the carrier hits..."],
+	B.HOMING: {"works": Works.OWN_WAY, "shows": Shows.DRAWN},
+	B.BLAST:  {"works": Works.YES, "shows": Shows.AS_EFFECT},
+	B.RETURN: {"works": Works.NO, "why_not": "it does not fly out"},
+	B.SHIELD: {"works": Works.OWN_WAY, "shows": Shows.NOTHING, "why_nothing_shows": "a decoy wears its caster's look, not its cards'"},
 	...
 }
 ```
 
-| `Works` | Meaning |
-| --- | --- |
-| `YES` | It works, the usual way, through the code every carrier shares: the shot kit (`Spells._apply_travel`, the projectile manager's setters), the hit path (chain, siphon, possess, relay, heavy), the cast path (echo, mirror, recoil, hold) or the end point (blast). |
-| `OWN_WAY` | It works, done by this carrier's own code, and the shared code leaves it alone: a beam bends, bounces, waves, grows and guards along its line; a teleport takes recoil off its distance. |
-| `ONLY_WITH_BLAST` | It works only when the carrier also has a blast, whose area hit carries it (heavy on a decoy). The reason after it is shown when there is no blast. |
-| `NO` | It does nothing here. The card is listed as wasted in the builder with the reason after it, read after "Bounce does nothing on a Decoy: ". |
+| Key | The question it answers | Values |
+| --- | --- | --- |
+| `"works"` | Does the card work on this carrier? | `Works.YES`: yes, done by the code every carrier shares (the shot kit, the hit path, echo/mirror/recoil/hold, the blast at the end point). `Works.OWN_WAY`: yes, done by this carrier's own code (a beam bends, bounces and waves along its line). `Works.ONLY_WITH_BLAST`: only when the carrier also has a blast, which carries it (heavy on a decoy). `Works.NO`: no, it does nothing here. |
+| `"shows"` | If it works, how does it look? | `Shows.DRAWN`: the card's look is drawn on what the carrier shows. `Shows.AS_EFFECT`: it shows as its own effect, as a blast's explosion. `Shows.NOTHING`: nothing of it shows. |
+| `"why_not"` | If it does not work (or only with a blast), why? | The words a player reads in the builder: "Return does nothing on a Decoy: it does not fly out." |
+| `"why_nothing_shows"` | If it shows nothing, why? | "a decoy wears its caster's look, not its cards'". |
 
-| `Shows` | Meaning |
-| --- | --- |
-| `DRAWN` | The card's look (`look_layer`, and an infusion's tint) is drawn on what the carrier shows. |
-| `AS_EFFECT` | The card shows as its own effect (`ModifierBase.cue`: a blast's explosion); on an `ONLY_WITH_BLAST` row, as the effect of the blast that carries it. |
-| `NOTHING` | Nothing of the card shows on this carrier. The reason comes after it, or once for the whole carrier in `nothing_shown_note()`. |
+**`EVENTS`: every trigger** (`TriggerBase.Event`, what a trigger card waits for):
 
-**Every trigger** (`TriggerBase.Event`), in `EVENTS`: `""` when it can fire on the carrier, else
-why it never does. The compiler adds the checks that depend on the other cards (a block needs a
+```gdscript
+const EVENTS: Dictionary = {
+	E.HIT: {"fires": false, "why_not": "a decoy hits nothing"},
+	E.EXPIRE: {"fires": true},
+	...
+}
+```
+
+`"fires"` answers "does this trigger ever go off on this carrier?", and `"why_not"` says why when
+it never does. The compiler adds the checks that depend on the other cards (a block needs a
 shield or deflect, a reaction an infusion).
 
-**Infusions**, in `INFUSIONS`, as one row like a behaviour's. An infusion is a hit's element, so it
-works where the carrier hits, or with a blast.
+**`INFUSIONS`: an element card** on this carrier, as one row with a behaviour's keys:
+`{"works": Works.ONLY_WITH_BLAST, "shows": Shows.AS_EFFECT, "why_not": "a decoy hits nothing"}`.
+An infusion is a hit's element, so it works where the carrier hits, or with a blast.
 
 **Traits**, in `traits()`: the numbers and shared rules it takes (`FLIES`, `STAYS`, `HITS`,
 `LASTS`, `REACHES`, `GUARDS`, `STEERS`, `SPEED`, `SHOTS`, `SPREAD`, `PIERCE`, `RING`, `OUTWARD`,
@@ -88,8 +96,8 @@ a sweep's, a strike's, a zap, a jump) goes back through `Spells` as one `RayHit`
    with the traits.
 3. Override the hooks it needs (at least `launch` or `shoot`).
 4. Add its form card under `content/spells/forms/` with `carrier = &"<name>"`. The test then casts
-   it and checks that every card it says is `DRAWN` really reaches a renderer, and that one it says
-   shows `NOTHING` doesn't.
+   it and checks that every card its rows say `Shows.DRAWN` really reaches a renderer, and that one they
+   say `Shows.NOTHING` doesn't.
 5. `tests/core/test_card_rules.gd` plays every card on it and fails on a row that says a card works
    where the runtime does nothing.
 
@@ -110,5 +118,5 @@ A new trigger event works the same way through `EVENTS`.
 The look column made three gaps visible, which the tests confirm: a **teleport**, a **decoy** and a
 **familiar** draw none of their cards' looks (a teleport draws nothing of its own, a decoy wears
 its caster's look, a familiar is drawn as a plain orbit shot). Their blasts still show as the
-blast's effect. Giving them looks is a feel task: change their rows to `Shows.DRAWN` and the test
+blast's effect. Giving them looks is a feel task: change their rows' `"shows"` to `Shows.DRAWN` and the test
 will check that the renderer really gets the looks.

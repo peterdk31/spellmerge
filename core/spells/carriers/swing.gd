@@ -9,46 +9,47 @@ extends Carrier
 ## the `swing_*` getters (through `Spells`).
 
 
-## How the swing takes each modifier (`ModifierBase.Behaviour`), every one: see `Carrier`.
+## Each modifier behaviour (`ModifierBase.Behaviour`) on the swing, every one (keys: see `Carrier`).
 const BEHAVIOURS: Dictionary = {
-	B.NONE: [Works.YES, Shows.DRAWN],
-	B.HOMING: [Works.NO, "it has nothing to aim, and a swing is a sweep that is over at once"],
-	B.CHAIN: [Works.YES, Shows.DRAWN],
-	B.SHIELD: [Works.OWN_WAY, Shows.DRAWN],
-	B.BLAST: [Works.YES, Shows.AS_EFFECT],
-	B.HOLD: [Works.YES, Shows.DRAWN],
-	B.RECOIL: [Works.YES, Shows.DRAWN],
-	B.BOUNCE: [Works.NO, "it turns a shot or a beam at walls, and a swing is a sweep that is over at once"],
-	B.ECHO: [Works.YES, Shows.DRAWN],
-	B.LINGER: [Works.NO, "it only changes a moving shot, and a swing is a sweep that is over at once"],
-	B.HEAVY: [Works.YES, Shows.DRAWN],
-	B.SIPHON: [Works.YES, Shows.DRAWN],
-	B.STICKY: [Works.NO, "it only changes a moving shot, and a swing is a sweep that is over at once"],
-	B.MAGNET: [Works.NO, "it needs a shot or a beam that stays in the world, and a swing is a sweep that is over at once"],
-	B.GHOST: [Works.NO, "it only takes a flying shot or a line through walls, and a swing is a sweep that is over at once"],
-	B.SPIRAL: [Works.NO, "it only changes a moving shot, and a swing is a sweep that is over at once"],
-	B.MIRROR: [Works.YES, Shows.DRAWN],
-	B.GROWTH: [Works.NO, "it grows a shot in the world or a beam, and a swing is a sweep that is over at once"],
-	B.RELAY: [Works.YES, Shows.DRAWN],
-	B.RETURN: [Works.NO, "it does not fly out"],
-	B.ARC: [Works.NO, "it is not a shot that stays in the air"],
-	B.POSSESS: [Works.YES, Shows.DRAWN],
-	B.DEFLECT: [Works.OWN_WAY, Shows.DRAWN],
+	B.NONE: {"works": Works.YES, "shows": Shows.DRAWN},
+	B.HOMING: {"works": Works.NO, "why_not": "it has nothing to aim, and a swing is a sweep that is over at once"},
+	B.CHAIN: {"works": Works.YES, "shows": Shows.DRAWN},
+	B.SHIELD: {"works": Works.OWN_WAY, "shows": Shows.DRAWN},
+	B.BLAST: {"works": Works.YES, "shows": Shows.AS_EFFECT},
+	B.HOLD: {"works": Works.YES, "shows": Shows.DRAWN},
+	B.RECOIL: {"works": Works.YES, "shows": Shows.DRAWN},
+	B.BOUNCE: {"works": Works.NO, "why_not": "it turns a shot or a beam at walls, and a swing is a sweep that is over at once"},
+	B.ECHO: {"works": Works.YES, "shows": Shows.DRAWN},
+	B.LINGER: {"works": Works.NO, "why_not": "it only changes a moving shot, and a swing is a sweep that is over at once"},
+	B.HEAVY: {"works": Works.YES, "shows": Shows.DRAWN},
+	B.SIPHON: {"works": Works.YES, "shows": Shows.DRAWN},
+	B.STICKY: {"works": Works.NO, "why_not": "it only changes a moving shot, and a swing is a sweep that is over at once"},
+	B.MAGNET: {"works": Works.NO, "why_not": "it needs a shot or a beam that stays in the world, and a swing is a sweep that is over at once"},
+	B.GHOST: {"works": Works.NO, "why_not": "it only takes a flying shot or a line through walls, and a swing is a sweep that is over at once"},
+	B.SPIRAL: {"works": Works.NO, "why_not": "it only changes a moving shot, and a swing is a sweep that is over at once"},
+	B.MIRROR: {"works": Works.YES, "shows": Shows.DRAWN},
+	B.GROWTH: {"works": Works.NO, "why_not": "it grows a shot in the world or a beam, and a swing is a sweep that is over at once"},
+	B.RELAY: {"works": Works.YES, "shows": Shows.DRAWN},
+	B.RETURN: {"works": Works.NO, "why_not": "it does not fly out"},
+	B.ARC: {"works": Works.NO, "why_not": "it is not a shot that stays in the air"},
+	B.POSSESS: {"works": Works.YES, "shows": Shows.DRAWN},
+	B.DEFLECT: {"works": Works.OWN_WAY, "shows": Shows.DRAWN},
 }
-## When each trigger (`TriggerBase.Event`) fires on the swing: "" when it can, else why it never does.
+## Each trigger (`TriggerBase.Event`) on the swing: "fires" (does it ever go off here?) and, when it
+## never does, "why_not".
 const EVENTS: Dictionary = {
-	E.HIT: "",
-	E.EXPIRE: "",
-	E.TIMER: "",
-	E.BLOCK: "",
-	E.KILL: "",
-	E.CAST: "",
-	E.WALL: "a swing's sweep never meets a wall",
-	E.HURT: "",
-	E.REACTION: "",
+	E.HIT: {"fires": true},
+	E.EXPIRE: {"fires": true},
+	E.TIMER: {"fires": true},
+	E.BLOCK: {"fires": true},
+	E.KILL: {"fires": true},
+	E.CAST: {"fires": true},
+	E.WALL: {"fires": false, "why_not": "a swing's sweep never meets a wall"},
+	E.HURT: {"fires": true},
+	E.REACTION: {"fires": true},
 }
-## How the swing takes an infusion.
-const INFUSIONS: Array = [Works.YES, Shows.DRAWN]
+## An infusion (an element card) on the swing, with the same keys as a behaviour.
+const INFUSIONS: Dictionary = {"works": Works.YES, "shows": Shows.DRAWN}
 
 
 ## The live swings (melee I2, see `start`): `SpellLimits.SWING_ROWS_START` rows at first,
@@ -122,7 +123,7 @@ func events() -> Dictionary:
 	return EVENTS
 
 
-func infusions() -> Array:
+func infusions() -> Dictionary:
 	return INFUSIONS
 
 

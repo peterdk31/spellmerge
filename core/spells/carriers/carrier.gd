@@ -5,15 +5,19 @@ extends RefCounted
 ## its id (`Carriers.of(&"beam")`); the compiler reads its tables, the spell runtime runs it.
 ##
 ## A subclass must answer for every card kind, with no default (tests/core/test_carriers.gd fails
-## on a missing row):
-## - `behaviours()`: one row per `ModifierBase.Behaviour`: whether the card works on this carrier
-##   (`Works`) and, if it does, how it shows (`Shows`): `[Works.YES, Shows.DRAWN]`,
-##   `[Works.OWN_WAY, Shows.NOTHING, "why"]`, `[Works.NO, "why"]` (the reason a player reads after
-##   "Bounce does nothing on a Decoy: "), `[Works.ONLY_WITH_BLAST, Shows.AS_EFFECT, "why not without"]`.
-##   A `Shows.NOTHING` row may leave its reason to `nothing_shown_note()`, said once for the carrier.
-## - `events()`: one per `TriggerBase.Event`, "" when the trigger can fire on it, else why it never
-##   does. The compiler adds the checks that depend on the other cards (a block needs a shield).
-## - `infusions()`: how it takes an element, a row as a behaviour's.
+## on a missing row). Each row is a small dictionary whose keys say what its values answer:
+## - `behaviours()`: one row per `ModifierBase.Behaviour` (a modifier card's effect):
+##   - "works": does the card work on this carrier? A `Works` value.
+##   - "shows": if it works, how does it look? A `Shows` value.
+##   - "why_not": if it does not work (or only with a blast), why, as a player reads it after
+##     "Bounce does nothing on a Decoy: ".
+##   - "why_nothing_shows": if it shows nothing, why.
+##   `{"works": Works.YES, "shows": Shows.DRAWN}`,
+##   `{"works": Works.NO, "why_not": "it does not fly out"}`.
+## - `events()`: one per `TriggerBase.Event` (a trigger card): "fires" (does it ever go off on this
+##   carrier?) and, when it never does, "why_not". The compiler adds the checks that depend on the
+##   other cards (a block needs a shield).
+## - `infusions()`: an element card on this carrier, with a behaviour row's keys.
 ## `traits()` says which numbers and shared rules apply to it (the flags below).
 
 const B := ModifierBase.Behaviour
@@ -41,7 +45,7 @@ enum Shows {
 	## As its own effect (`ModifierBase.cue`: a blast's explosion, in the cast's tint and looks); on an
 	## `ONLY_WITH_BLAST` row, as the effect of the blast that carries it.
 	AS_EFFECT,
-	## Nothing of it shows on this carrier; the row or `nothing_shown_note()` says why.
+	## Nothing of it shows on this carrier; the row's "why_nothing_shows" says why.
 	NOTHING,
 }
 
@@ -113,18 +117,13 @@ func events() -> Dictionary:
 	return {}
 
 
-func infusions() -> Array:
-	return []
+func infusions() -> Dictionary:
+	return {}
 
 
 ## Why it sets off no hit of its own, for a reason ("a decoy hits nothing").
 func hits_nothing() -> String:
 	return "it hits nothing"
-
-
-## Why none of its cards' looks show, for its `Shows.NOTHING` rows that give no reason of their own.
-func nothing_shown_note() -> String:
-	return ""
 
 
 ## The fields a form card of this carrier must set above 0, with the fix the validator gives
@@ -170,50 +169,46 @@ func steers() -> bool:
 	return has(STEERS)
 
 
-## How `behaviour` runs on it (a `Works`); a row it lacks is `Works.NO`.
+## Whether `behaviour` works on it (a `Works`); a row it lacks is `Works.NO`.
 func works(behaviour: int) -> int:
-	var row: Array = behaviours().get(behaviour, [])
-	return row[0] if not row.is_empty() else Works.NO
+	return int(behaviours().get(behaviour, {}).get("works", Works.NO))
 
 
-## Why `behaviour` does nothing on it, or "" when it runs (with a blast on it, when `blasts`).
+## Why `behaviour` does nothing on it, or "" when it works (with a blast on it, when `blasts`).
 func waste(behaviour: int, blasts: bool = false) -> String:
-	var row: Array = behaviours().get(behaviour, [])
+	var row: Dictionary = behaviours().get(behaviour, {})
 	if row.is_empty():
 		return what()
-	match row[0]:
+	match int(row["works"]):
 		Works.YES, Works.OWN_WAY:
 			return ""
 		Works.ONLY_WITH_BLAST:
-			return "" if blasts else str(row[2])
-	return str(row[1])
+			return "" if blasts else str(row["why_not"])
+	return str(row["why_not"])
 
 
 ## How `behaviour` shows on it (a `Shows`), or -1 where it does not work.
 func shows(behaviour: int) -> int:
-	var row: Array = behaviours().get(behaviour, [])
-	return row[1] if row.size() > 1 and row[0] != Works.NO else -1
+	return int(behaviours().get(behaviour, {}).get("shows", -1))
 
 
-## Why `behaviour` does not show on it (a `Shows.NOTHING` row), "" otherwise.
+## Why `behaviour` shows nothing on it (a `Shows.NOTHING` row), "" otherwise.
 func why_nothing_shows(behaviour: int) -> String:
-	var row: Array = behaviours().get(behaviour, [])
-	if shows(behaviour) != Shows.NOTHING:
-		return ""
-	return str(row[2]) if row.size() > 2 else nothing_shown_note()
+	return str(behaviours().get(behaviour, {}).get("why_nothing_shows", ""))
 
 
 ## Why a trigger of `event` never fires on it, or "" when it can.
 func event_waste(event: int) -> String:
-	return str(events().get(event, what()))
+	var row: Dictionary = events().get(event, {})
+	if row.is_empty():
+		return what()
+	return "" if bool(row["fires"]) else str(row["why_not"])
 
 
 ## True when an infusion counts on it (with a blast on it, when `blasts`).
 func takes_infusion(blasts: bool) -> bool:
-	var row: Array = infusions()
-	if row.is_empty():
-		return false
-	return row[0] == Works.YES or row[0] == Works.OWN_WAY or (row[0] == Works.ONLY_WITH_BLAST and blasts)
+	var works_here: int = int(infusions().get("works", Works.NO))
+	return works_here == Works.YES or works_here == Works.OWN_WAY or (works_here == Works.ONLY_WITH_BLAST and blasts)
 
 
 ## How far a homing one looks for its target, from its `ray_length` and its homing cards' `reach`

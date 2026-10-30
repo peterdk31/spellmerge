@@ -4,46 +4,47 @@ extends CarrierMove
 ## it lands (`&"teleport"`). Over at once: homing bends its way, recoil shortens it.
 
 
-## How the teleport takes each modifier (`ModifierBase.Behaviour`), every one: see `Carrier`.
+## Each modifier behaviour (`ModifierBase.Behaviour`) on the teleport, every one (keys: see `Carrier`).
 const BEHAVIOURS: Dictionary = {
-	B.NONE: [Works.YES, Shows.NOTHING],
-	B.HOMING: [Works.OWN_WAY, Shows.NOTHING],
-	B.CHAIN: [Works.YES, Shows.NOTHING],
-	B.SHIELD: [Works.OWN_WAY, Shows.NOTHING],
-	B.BLAST: [Works.YES, Shows.AS_EFFECT],
-	B.HOLD: [Works.NO, "nothing keeps it on: a teleport moves its caster at once and hits where it lands"],
-	B.RECOIL: [Works.OWN_WAY, Shows.NOTHING],
-	B.BOUNCE: [Works.NO, "it turns a shot or a beam at walls, and a teleport moves its caster at once and hits where it lands"],
-	B.ECHO: [Works.YES, Shows.NOTHING],
-	B.LINGER: [Works.NO, "it only changes a moving shot, and a teleport moves its caster at once and hits where it lands"],
-	B.HEAVY: [Works.YES, Shows.NOTHING],
-	B.SIPHON: [Works.YES, Shows.NOTHING],
-	B.STICKY: [Works.NO, "it only changes a moving shot, and a teleport moves its caster at once and hits where it lands"],
-	B.MAGNET: [Works.NO, "it needs a shot or a beam that stays in the world, and a teleport moves its caster at once and hits where it lands"],
-	B.GHOST: [Works.NO, "it only takes a flying shot or a line through walls, and a teleport moves its caster at once and hits where it lands"],
-	B.SPIRAL: [Works.NO, "it only changes a moving shot, and a teleport moves its caster at once and hits where it lands"],
-	B.MIRROR: [Works.NO, "a move and its mirror cancel"],
-	B.GROWTH: [Works.NO, "it grows a shot in the world or a beam, and a teleport moves its caster at once and hits where it lands"],
-	B.RELAY: [Works.YES, Shows.NOTHING],
-	B.RETURN: [Works.NO, "it does not fly out"],
-	B.ARC: [Works.NO, "it is not a shot that stays in the air"],
-	B.POSSESS: [Works.YES, Shows.NOTHING],
-	B.DEFLECT: [Works.OWN_WAY, Shows.NOTHING],
+	B.NONE: {"works": Works.YES, "shows": Shows.NOTHING, "why_nothing_shows": "a teleport is over at once and draws nothing of its own: its cards show only in its hits"},
+	B.HOMING: {"works": Works.OWN_WAY, "shows": Shows.NOTHING, "why_nothing_shows": "a teleport is over at once and draws nothing of its own: its cards show only in its hits"},
+	B.CHAIN: {"works": Works.YES, "shows": Shows.NOTHING, "why_nothing_shows": "a teleport is over at once and draws nothing of its own: its cards show only in its hits"},
+	B.SHIELD: {"works": Works.OWN_WAY, "shows": Shows.NOTHING, "why_nothing_shows": "a teleport is over at once and draws nothing of its own: its cards show only in its hits"},
+	B.BLAST: {"works": Works.YES, "shows": Shows.AS_EFFECT},
+	B.HOLD: {"works": Works.NO, "why_not": "nothing keeps it on: a teleport moves its caster at once and hits where it lands"},
+	B.RECOIL: {"works": Works.OWN_WAY, "shows": Shows.NOTHING, "why_nothing_shows": "a teleport is over at once and draws nothing of its own: its cards show only in its hits"},
+	B.BOUNCE: {"works": Works.NO, "why_not": "it turns a shot or a beam at walls, and a teleport moves its caster at once and hits where it lands"},
+	B.ECHO: {"works": Works.YES, "shows": Shows.NOTHING, "why_nothing_shows": "a teleport is over at once and draws nothing of its own: its cards show only in its hits"},
+	B.LINGER: {"works": Works.NO, "why_not": "it only changes a moving shot, and a teleport moves its caster at once and hits where it lands"},
+	B.HEAVY: {"works": Works.YES, "shows": Shows.NOTHING, "why_nothing_shows": "a teleport is over at once and draws nothing of its own: its cards show only in its hits"},
+	B.SIPHON: {"works": Works.YES, "shows": Shows.NOTHING, "why_nothing_shows": "a teleport is over at once and draws nothing of its own: its cards show only in its hits"},
+	B.STICKY: {"works": Works.NO, "why_not": "it only changes a moving shot, and a teleport moves its caster at once and hits where it lands"},
+	B.MAGNET: {"works": Works.NO, "why_not": "it needs a shot or a beam that stays in the world, and a teleport moves its caster at once and hits where it lands"},
+	B.GHOST: {"works": Works.NO, "why_not": "it only takes a flying shot or a line through walls, and a teleport moves its caster at once and hits where it lands"},
+	B.SPIRAL: {"works": Works.NO, "why_not": "it only changes a moving shot, and a teleport moves its caster at once and hits where it lands"},
+	B.MIRROR: {"works": Works.NO, "why_not": "a move and its mirror cancel"},
+	B.GROWTH: {"works": Works.NO, "why_not": "it grows a shot in the world or a beam, and a teleport moves its caster at once and hits where it lands"},
+	B.RELAY: {"works": Works.YES, "shows": Shows.NOTHING, "why_nothing_shows": "a teleport is over at once and draws nothing of its own: its cards show only in its hits"},
+	B.RETURN: {"works": Works.NO, "why_not": "it does not fly out"},
+	B.ARC: {"works": Works.NO, "why_not": "it is not a shot that stays in the air"},
+	B.POSSESS: {"works": Works.YES, "shows": Shows.NOTHING, "why_nothing_shows": "a teleport is over at once and draws nothing of its own: its cards show only in its hits"},
+	B.DEFLECT: {"works": Works.OWN_WAY, "shows": Shows.NOTHING, "why_nothing_shows": "a teleport is over at once and draws nothing of its own: its cards show only in its hits"},
 }
-## When each trigger (`TriggerBase.Event`) fires on the teleport: "" when it can, else why it never does.
+## Each trigger (`TriggerBase.Event`) on the teleport: "fires" (does it ever go off here?) and, when it
+## never does, "why_not".
 const EVENTS: Dictionary = {
-	E.HIT: "",
-	E.EXPIRE: "",
-	E.TIMER: "it is over at once",
-	E.BLOCK: "",
-	E.KILL: "",
-	E.CAST: "",
-	E.WALL: "it stops before walls",
-	E.HURT: "it is over at once",
-	E.REACTION: "",
+	E.HIT: {"fires": true},
+	E.EXPIRE: {"fires": true},
+	E.TIMER: {"fires": false, "why_not": "it is over at once"},
+	E.BLOCK: {"fires": true},
+	E.KILL: {"fires": true},
+	E.CAST: {"fires": true},
+	E.WALL: {"fires": false, "why_not": "it stops before walls"},
+	E.HURT: {"fires": false, "why_not": "it is over at once"},
+	E.REACTION: {"fires": true},
 }
-## How the teleport takes an infusion.
-const INFUSIONS: Array = [Works.YES, Shows.NOTHING]
+## An infusion (an element card) on the teleport, with the same keys as a behaviour.
+const INFUSIONS: Dictionary = {"works": Works.YES, "shows": Shows.NOTHING, "why_nothing_shows": "a teleport is over at once and draws nothing of its own: its cards show only in its hits"}
 
 
 ## Its homing, and actor -> the target its last teleport landed at (so the next one picks another).
@@ -74,12 +75,8 @@ func events() -> Dictionary:
 	return EVENTS
 
 
-func infusions() -> Array:
+func infusions() -> Dictionary:
 	return INFUSIONS
-
-
-func nothing_shown_note() -> String:
-	return "a teleport is over at once and draws nothing of its own: its cards show only in its hits"
 
 
 

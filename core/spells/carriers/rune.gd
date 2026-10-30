@@ -4,46 +4,47 @@ extends Carrier
 ## (`&"rune"`: the rune). Homing makes it creep toward a target.
 
 
-## How the rune takes each modifier (`ModifierBase.Behaviour`), every one: see `Carrier`.
+## Each modifier behaviour (`ModifierBase.Behaviour`) on the rune, every one (keys: see `Carrier`).
 const BEHAVIOURS: Dictionary = {
-	B.NONE: [Works.YES, Shows.DRAWN],
-	B.HOMING: [Works.YES, Shows.DRAWN],
-	B.CHAIN: [Works.YES, Shows.DRAWN],
-	B.SHIELD: [Works.YES, Shows.DRAWN],
-	B.BLAST: [Works.YES, Shows.AS_EFFECT],
-	B.HOLD: [Works.YES, Shows.DRAWN],
-	B.RECOIL: [Works.YES, Shows.DRAWN],
-	B.BOUNCE: [Works.NO, "it turns a shot or a beam at walls, and a rune stays where it is"],
-	B.ECHO: [Works.YES, Shows.DRAWN],
-	B.LINGER: [Works.NO, "it does not move"],
-	B.HEAVY: [Works.YES, Shows.DRAWN],
-	B.SIPHON: [Works.YES, Shows.DRAWN],
-	B.STICKY: [Works.NO, "it does not move"],
-	B.MAGNET: [Works.YES, Shows.DRAWN],
-	B.GHOST: [Works.NO, "it only takes a flying shot or a line through walls, and a rune stays where it is"],
-	B.SPIRAL: [Works.NO, "it does not move"],
-	B.MIRROR: [Works.YES, Shows.DRAWN],
-	B.GROWTH: [Works.YES, Shows.DRAWN],
-	B.RELAY: [Works.YES, Shows.DRAWN],
-	B.RETURN: [Works.NO, "it does not fly out"],
-	B.ARC: [Works.YES, Shows.DRAWN],
-	B.POSSESS: [Works.YES, Shows.DRAWN],
-	B.DEFLECT: [Works.YES, Shows.DRAWN],
+	B.NONE: {"works": Works.YES, "shows": Shows.DRAWN},
+	B.HOMING: {"works": Works.YES, "shows": Shows.DRAWN},
+	B.CHAIN: {"works": Works.YES, "shows": Shows.DRAWN},
+	B.SHIELD: {"works": Works.YES, "shows": Shows.DRAWN},
+	B.BLAST: {"works": Works.YES, "shows": Shows.AS_EFFECT},
+	B.HOLD: {"works": Works.YES, "shows": Shows.DRAWN},
+	B.RECOIL: {"works": Works.YES, "shows": Shows.DRAWN},
+	B.BOUNCE: {"works": Works.NO, "why_not": "it turns a shot or a beam at walls, and a rune stays where it is"},
+	B.ECHO: {"works": Works.YES, "shows": Shows.DRAWN},
+	B.LINGER: {"works": Works.NO, "why_not": "it does not move"},
+	B.HEAVY: {"works": Works.YES, "shows": Shows.DRAWN},
+	B.SIPHON: {"works": Works.YES, "shows": Shows.DRAWN},
+	B.STICKY: {"works": Works.NO, "why_not": "it does not move"},
+	B.MAGNET: {"works": Works.YES, "shows": Shows.DRAWN},
+	B.GHOST: {"works": Works.NO, "why_not": "it only takes a flying shot or a line through walls, and a rune stays where it is"},
+	B.SPIRAL: {"works": Works.NO, "why_not": "it does not move"},
+	B.MIRROR: {"works": Works.YES, "shows": Shows.DRAWN},
+	B.GROWTH: {"works": Works.YES, "shows": Shows.DRAWN},
+	B.RELAY: {"works": Works.YES, "shows": Shows.DRAWN},
+	B.RETURN: {"works": Works.NO, "why_not": "it does not fly out"},
+	B.ARC: {"works": Works.YES, "shows": Shows.DRAWN},
+	B.POSSESS: {"works": Works.YES, "shows": Shows.DRAWN},
+	B.DEFLECT: {"works": Works.YES, "shows": Shows.DRAWN},
 }
-## When each trigger (`TriggerBase.Event`) fires on the rune: "" when it can, else why it never does.
+## Each trigger (`TriggerBase.Event`) on the rune: "fires" (does it ever go off here?) and, when it
+## never does, "why_not".
 const EVENTS: Dictionary = {
-	E.HIT: "",
-	E.EXPIRE: "",
-	E.TIMER: "",
-	E.BLOCK: "",
-	E.KILL: "",
-	E.CAST: "",
-	E.WALL: "it stays where it is and never meets a wall",
-	E.HURT: "",
-	E.REACTION: "",
+	E.HIT: {"fires": true},
+	E.EXPIRE: {"fires": true},
+	E.TIMER: {"fires": true},
+	E.BLOCK: {"fires": true},
+	E.KILL: {"fires": true},
+	E.CAST: {"fires": true},
+	E.WALL: {"fires": false, "why_not": "it stays where it is and never meets a wall"},
+	E.HURT: {"fires": true},
+	E.REACTION: {"fires": true},
 }
-## How the rune takes an infusion.
-const INFUSIONS: Array = [Works.YES, Shows.DRAWN]
+## An infusion (an element card) on the rune, with the same keys as a behaviour.
+const INFUSIONS: Dictionary = {"works": Works.YES, "shows": Shows.DRAWN}
 
 
 func id() -> StringName:
@@ -70,7 +71,7 @@ func events() -> Dictionary:
 	return EVENTS
 
 
-func infusions() -> Array:
+func infusions() -> Dictionary:
 	return INFUSIONS
 
 

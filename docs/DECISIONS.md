@@ -12,6 +12,7 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 
 - **A carrier is known by its name** (owner, 2026-10-30): a form card says `carrier = &"beam"`, not `motion = 3`, and `FormBase.Motion` is gone. The enum's numbers were stored in every form card, so a removed carrier had to leave a placeholder (`_UNUSED_10`, the fissure's) and the order could never change; now adding or removing a carrier is its script and its line in `Carriers.make_all`, and a card that names a carrier that is gone is refused by the validator (`unknown-carrier`). `CompiledSpell.carrier` is the name too.
 - **The table's words** (owner: "really hard to understand"): `Use` is now `Works` (`YES`, `OWN_WAY`, `ONLY_WITH_BLAST`, `NO`) and `Look` is now `Shows` (`DRAWN`, `AS_EFFECT`, `NOTHING`), so a row reads as a sentence: `B.RETURN: [Works.NO, "it does not fly out"]`.
+- **Rows name their answers** (owner, later the same day: "a json like structure would help"): a row is a dictionary whose keys say which question each value answers, `{"works": Works.NO, "why_not": "it does not fly out"}`, `{"fires": false, "why_not": "a decoy hits nothing"}`; `tests/core/test_carriers.gd` checks every row has exactly the keys its answer needs.
 - **Two more rules moved into the carriers:** the fields a form must set (`required_fields`, read by the validator) and how long the staff keeps working for its animation (`HOLDS_STAFF`).
 
 ## 2026-10-30: Carriers decide every card (owner direction)

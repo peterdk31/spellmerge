@@ -4,46 +4,47 @@ extends CarrierEntity
 ## It hits nothing itself: only a blast carries hit cards and infusions.
 
 
-## How the familiar takes each modifier (`ModifierBase.Behaviour`), every one: see `Carrier`.
+## Each modifier behaviour (`ModifierBase.Behaviour`) on the familiar, every one (keys: see `Carrier`).
 const BEHAVIOURS: Dictionary = {
-	B.NONE: [Works.YES, Shows.NOTHING],
-	B.HOMING: [Works.NO, "it has nothing to aim, and a familiar is a body that hits nothing"],
-	B.CHAIN: [Works.NO, "it acts on what the carrier hits, and a familiar is a body that hits nothing"],
-	B.SHIELD: [Works.NO, "it blocks shots that touch the carrier or guards the caster on a move, and a familiar is a body that hits nothing"],
-	B.BLAST: [Works.YES, Shows.AS_EFFECT],
-	B.HOLD: [Works.YES, Shows.NOTHING],
-	B.RECOIL: [Works.YES, Shows.NOTHING],
-	B.BOUNCE: [Works.NO, "it turns a shot or a beam at walls, and a familiar is a body that hits nothing"],
-	B.ECHO: [Works.YES, Shows.NOTHING],
-	B.LINGER: [Works.NO, "it only changes a moving shot, and a familiar is a body that hits nothing"],
-	B.HEAVY: [Works.ONLY_WITH_BLAST, Shows.AS_EFFECT, "it acts on what the carrier hits, and a familiar is a body that hits nothing (a blast would carry it)"],
-	B.SIPHON: [Works.NO, "it acts on what the carrier hits, and a familiar is a body that hits nothing"],
-	B.STICKY: [Works.NO, "it only changes a moving shot, and a familiar is a body that hits nothing"],
-	B.MAGNET: [Works.NO, "it needs a shot or a beam that stays in the world, and a familiar is a body that hits nothing"],
-	B.GHOST: [Works.NO, "it only takes a flying shot or a line through walls, and a familiar is a body that hits nothing"],
-	B.SPIRAL: [Works.NO, "it only changes a moving shot, and a familiar is a body that hits nothing"],
-	B.MIRROR: [Works.YES, Shows.NOTHING],
-	B.GROWTH: [Works.NO, "it grows a shot in the world or a beam, and a familiar is a body that hits nothing"],
-	B.RELAY: [Works.NO, "it needs a hit of its own, and a familiar is a body that hits nothing"],
-	B.RETURN: [Works.NO, "it does not fly out"],
-	B.ARC: [Works.NO, "it is not a shot that stays in the air"],
-	B.POSSESS: [Works.NO, "it acts on what the carrier hits, and a familiar is a body that hits nothing"],
-	B.DEFLECT: [Works.NO, "it touches no shots"],
+	B.NONE: {"works": Works.YES, "shows": Shows.NOTHING, "why_nothing_shows": "a familiar is drawn as a plain orbit shot, without its cards' looks"},
+	B.HOMING: {"works": Works.NO, "why_not": "it has nothing to aim, and a familiar is a body that hits nothing"},
+	B.CHAIN: {"works": Works.NO, "why_not": "it acts on what the carrier hits, and a familiar is a body that hits nothing"},
+	B.SHIELD: {"works": Works.NO, "why_not": "it blocks shots that touch the carrier or guards the caster on a move, and a familiar is a body that hits nothing"},
+	B.BLAST: {"works": Works.YES, "shows": Shows.AS_EFFECT},
+	B.HOLD: {"works": Works.YES, "shows": Shows.NOTHING, "why_nothing_shows": "a familiar is drawn as a plain orbit shot, without its cards' looks"},
+	B.RECOIL: {"works": Works.YES, "shows": Shows.NOTHING, "why_nothing_shows": "a familiar is drawn as a plain orbit shot, without its cards' looks"},
+	B.BOUNCE: {"works": Works.NO, "why_not": "it turns a shot or a beam at walls, and a familiar is a body that hits nothing"},
+	B.ECHO: {"works": Works.YES, "shows": Shows.NOTHING, "why_nothing_shows": "a familiar is drawn as a plain orbit shot, without its cards' looks"},
+	B.LINGER: {"works": Works.NO, "why_not": "it only changes a moving shot, and a familiar is a body that hits nothing"},
+	B.HEAVY: {"works": Works.ONLY_WITH_BLAST, "shows": Shows.AS_EFFECT, "why_not": "it acts on what the carrier hits, and a familiar is a body that hits nothing (a blast would carry it)"},
+	B.SIPHON: {"works": Works.NO, "why_not": "it acts on what the carrier hits, and a familiar is a body that hits nothing"},
+	B.STICKY: {"works": Works.NO, "why_not": "it only changes a moving shot, and a familiar is a body that hits nothing"},
+	B.MAGNET: {"works": Works.NO, "why_not": "it needs a shot or a beam that stays in the world, and a familiar is a body that hits nothing"},
+	B.GHOST: {"works": Works.NO, "why_not": "it only takes a flying shot or a line through walls, and a familiar is a body that hits nothing"},
+	B.SPIRAL: {"works": Works.NO, "why_not": "it only changes a moving shot, and a familiar is a body that hits nothing"},
+	B.MIRROR: {"works": Works.YES, "shows": Shows.NOTHING, "why_nothing_shows": "a familiar is drawn as a plain orbit shot, without its cards' looks"},
+	B.GROWTH: {"works": Works.NO, "why_not": "it grows a shot in the world or a beam, and a familiar is a body that hits nothing"},
+	B.RELAY: {"works": Works.NO, "why_not": "it needs a hit of its own, and a familiar is a body that hits nothing"},
+	B.RETURN: {"works": Works.NO, "why_not": "it does not fly out"},
+	B.ARC: {"works": Works.NO, "why_not": "it is not a shot that stays in the air"},
+	B.POSSESS: {"works": Works.NO, "why_not": "it acts on what the carrier hits, and a familiar is a body that hits nothing"},
+	B.DEFLECT: {"works": Works.NO, "why_not": "it touches no shots"},
 }
-## When each trigger (`TriggerBase.Event`) fires on the familiar: "" when it can, else why it never does.
+## Each trigger (`TriggerBase.Event`) on the familiar: "fires" (does it ever go off here?) and, when it
+## never does, "why_not".
 const EVENTS: Dictionary = {
-	E.HIT: "a familiar hits nothing",
-	E.EXPIRE: "",
-	E.TIMER: "",
-	E.BLOCK: "nothing on it can block a shot",
-	E.KILL: "",
-	E.CAST: "",
-	E.WALL: "a familiar hits nothing",
-	E.HURT: "",
-	E.REACTION: "",
+	E.HIT: {"fires": false, "why_not": "a familiar hits nothing"},
+	E.EXPIRE: {"fires": true},
+	E.TIMER: {"fires": true},
+	E.BLOCK: {"fires": false, "why_not": "nothing on it can block a shot"},
+	E.KILL: {"fires": true},
+	E.CAST: {"fires": true},
+	E.WALL: {"fires": false, "why_not": "a familiar hits nothing"},
+	E.HURT: {"fires": true},
+	E.REACTION: {"fires": true},
 }
-## How the familiar takes an infusion.
-const INFUSIONS: Array = [Works.ONLY_WITH_BLAST, Shows.AS_EFFECT, "a familiar hits nothing"]
+## An infusion (an element card) on the familiar, with the same keys as a behaviour.
+const INFUSIONS: Dictionary = {"works": Works.ONLY_WITH_BLAST, "shows": Shows.AS_EFFECT, "why_not": "a familiar hits nothing"}
 
 
 func id() -> StringName:
@@ -70,16 +71,12 @@ func events() -> Dictionary:
 	return EVENTS
 
 
-func infusions() -> Array:
+func infusions() -> Dictionary:
 	return INFUSIONS
 
 
 func hits_nothing() -> String:
 	return "a familiar hits nothing"
-
-
-func nothing_shown_note() -> String:
-	return "a familiar is drawn as a plain orbit shot, without its cards' looks"
 
 
 ## A familiar circles its caster.

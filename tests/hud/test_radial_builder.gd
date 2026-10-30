@@ -194,6 +194,31 @@ func test_the_right_stick_picks_a_card_with_a_rumble() -> void:
 	check_equal(_rumbles.size(), 1, "staying on the same card does not rumble again")
 
 
+## Hysteresis: a wobble just past the border between two cards keeps the card pointed (no
+## flicker, no second rumble); the neighbour's middle picks the neighbour, and it holds the same way.
+func test_a_wobble_past_the_border_keeps_the_card() -> void:
+	_start(1)
+	var radial: RadialScript = _open(0)
+	var entries: Array[Dictionary] = radial.ring_entries()
+	var first: StringName = entries[0]["id"]
+	var second: StringName = entries[1]["id"]
+	check_equal(entries[1]["kind"], entries[0]["kind"], "two neighbours of one kind, no gap between")
+	var a: float = radial.direction_to(first).angle()
+	var b: float = radial.direction_to(second).angle()
+	var border: float = a + angle_difference(a, b) * 0.5
+	var nudge: float = signf(angle_difference(a, b)) * 0.02
+	_point(0, first)
+	_input.send_virtual_aim(0, Vector2.from_angle(border + nudge))
+	_frame()
+	check_equal(radial.pointed_id(), first, "a wobble just past the border keeps %s" % first)
+	check_equal(_rumbles.size(), 1, "and does not rumble again")
+	_point(0, second)
+	check_equal(radial.pointed_id(), second, "the neighbour's middle picks %s" % second)
+	_input.send_virtual_aim(0, Vector2.from_angle(border - nudge))
+	_frame()
+	check_equal(radial.pointed_id(), second, "and it holds the same way back")
+
+
 func test_letting_go_of_the_stick_lets_the_card_go_and_shows_the_staff() -> void:
 	_start(1)
 	var radial: RadialScript = _open(0)

@@ -7,6 +7,11 @@ Why things were decided, so they aren't reversed by accident. Newest first.
 - **What you place appears a step ahead along the aim** (twice the card's size; with a wall in the way, where it is cast, never in the wall: `Spells._placed_at`): a rune, a decoy, a familiar. One rule, so a mirror's reversed aim puts its copy behind you instead of on the same spot; the rune's `count == 1` case is gone. Decoy and familiar sizes are now their bodies' (8 and 3 px), so the step is visible. Spread (sniper) now counts on all three: their spot follows the aim.
 - **The familiar has no payload of its own** (replaces R4g's hand-on): it is a body that lasts, and casts what its triggers give it, as any lasting carrier (`timer · familiar · bolt` fires a bolt every tick). Gone: `familiar_cast_requested`, Entities' once-a-second foe search, `StaffCompiler.hands_on` and its helpers; `carries_payload` is rain's alone (owner: rain keeps its payload). Its timer fires from its wizard's body along the aim at the cast, not from the orb (the orb's place is Entities'; see the PR for the question).
 - **A rain's timer ends with its landing:** an edit that drops the landing also takes the rain off the live carriers (`_drop_pending`), so a rebuilt staff's rain stops ticking at once.
+## 2026-10-30: Fissure removed (owner)
+
+- **The fissure carrier is gone** (owner, 2026-10-30): the card, its icon and lore, its runtime cases (the fissure launch, the held fissure as a beam, `PIERCE_ALL` and `_ray_pierce`: a ray's pierce is now just its card's), its compiler cases (`StaffCompiler.rays` was only beam and fissure: inlined as `RAY`) and its tests. A beam does what it did.
+- **Its two combos keep their idea on a beam:** `beam_fire_line` (pierce · fire · beam burns both imps on its line) and `beam_hit_nova` (on hit · beam · frost · nova).
+- **`FormBase.Motion` keeps slot 10** as `_UNUSED_10` so the numbers stored in every other carrier's `.tres` keep their meaning; a card that uses it fails `range_problems`.
 
 ## 2026-10-29: Card rules R4b, a wasted card is checked too (owner)
 

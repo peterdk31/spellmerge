@@ -31,7 +31,7 @@ A card is a `.tres` on one of five classes in `core/base/`, in its own folder un
 
 | Kind | Class | Role | Cards (new in bold) |
 | --- | --- | --- | --- |
-| Carrier (14) | `FormBase` | Ends a group: something leaves the caster | bolt, beam, nova, rune, orbit, **dash, teleport, hook, swap, wall, rain, fissure, decoy, familiar** (the boomerang carrier became the `return` modifier, owner 2026-10-27) |
+| Carrier (13) | `FormBase` | Ends a group: something leaves the caster | bolt, beam, nova, rune, orbit, **dash, teleport, hook, swap, wall, rain, decoy, familiar** (the boomerang carrier became the `return` modifier, owner 2026-10-27; fissure removed, owner 2026-10-30) |
 | Modifier (27) | `ModifierBase` | Attaches to the next carrier | split, pierce, homing, chain, bigger, faster, **shield, blast, hold, recoil, bounce, echo, linger, heavy, siphon, overcharge, sticky, magnet, ghost, spiral, mirror, growth, relay, sniper, return, slow, arc** |
 | Infusion (6) | `ElementBase` | Attaches to the next carrier; several may | fire, frost, storm, void, lightning, **mend** |
 | Trigger (9) | `TriggerBase` | Attaches to the next carrier; the group read after that carrier is its payload | on hit, on expire, timer, **on block, on kill, on cast, on wall, on hurt, on reaction** |
@@ -63,7 +63,6 @@ Numbers are first guesses for the card's own task to set. Examples are written i
 | swap | A shot that trades places with the target it hits | an escape through an enemy; `frost · swap` leaves a chilled target where you stood |
 | wall | A line of still shots across the aim | `shield · wall` stops enemy shots; `fire · wall` is a burning fence |
 | rain | Its payload falls on the aim point after a telegraphed delay | `rain · nova`; `rain · frost · nova` freezes an area from above |
-| fissure | A crack along the ground that hits everything on its line | `on hit · fissure · nova` sets off a nova on every enemy in the line; `bounce · fissure` turns at walls |
 | decoy | A still copy of the wizard that enemies target. End point: where it dies | `blast · decoy` is an exploding decoy; `on expire · decoy · nova` |
 | familiar | A small helper that orbits the caster; it casts what its triggers give it (rules R4 F3) | `timer · familiar · bolt` casts a bolt every tick; `hold · timer · familiar · mend · bolt` is a lasting healer |
 | swing | Melee (owner, 2026-10-29; see "Phase I"): the staff sweeps a 90° arc in front of its tip, about 24 px, hitting every body in it. No mana, a short delay, strong knockback. End point: the end of the arc | `shield · swing` is a parry; `heavy · swing` bats enemies into walls |
@@ -403,10 +402,10 @@ Combos to prove (two per card in its task, the rest for the combo report): `shie
 
 **Deflect:** a shot of another team touching the carrier turns around and takes the carrier's caster (its actor, team and hit credit), so a homing shot deflected hunts the new caster's targets. A shot can be deflected again (a rally), within the engine's limits. Decided for I3 (owner, 2026-10-29):
 
-- **Deflect goes first**, a fixed rule, not card order (order deciding between two modifiers would be a special rule only these two follow): a touching shot is turned and a shield keeps its charge. On a carrier whose shield only stops shots touching it (a shot, a beam, a fissure, a swing) a shield beside a deflect never blocks, so the compiler lists it as wasted ("deflect turns every shot that touches it first"); a hook's, dash's or teleport's shield also guards the caster and is kept.
+- **Deflect goes first**, a fixed rule, not card order (order deciding between two modifiers would be a special rule only these two follow): a touching shot is turned and a shield keeps its charge. On a carrier whose shield only stops shots touching it (a shot, a beam, a swing) a shield beside a deflect never blocks, so the compiler lists it as wasted ("deflect turns every shot that touches it first"); a hook's, dash's or teleport's shield also guards the caster and is kept.
 - **A deflect sets off `on block`** (a deflect is a block): `shot_deflected` fires the carrier's block payload as `shot_blocked` does.
 - **No count:** a deflect turns every shot that touches the carrier while it lives; more deflect cards add nothing.
-- **Swings and beams touch shots** (the rules audit's shield × beam ✗): a swing's sweep each step (its wedge) and a beam's or fissure's line (every step, not only on hits) deflect or block the shots of other teams they touch, so `shield · swing` parries and `shield · beam` blocks.
+- **Swings and beams touch shots** (the rules audit's shield × beam ✗): a swing's sweep each step (its wedge) and a beam's line (every step, not only on hits) deflect or block the shots of other teams they touch, so `shield · swing` parries and `shield · beam` blocks.
 - **How a shot turns:** it is mirrored off what it touched (outward from a swing's hand, off a deflecting shot's body, off a beam's line); one already going away keeps its way. It flies 1.7× faster and its life starts again; an orbiting shot leaves its circle. It keeps its own cards (its tag), may hit what it hit before, and is drawn in its new caster's colours.
 
 | # | Part | Area | Delivers |

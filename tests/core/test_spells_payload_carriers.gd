@@ -2,7 +2,7 @@ extends "res://tests/support/suite.gd"
 ## Tests for the payload and line carriers of the staffs (B2c): rain drops its payload on the aim
 ## point after a delay, familiar and decoy ask for entities a step ahead and end through the events
 ## (a familiar casts what its triggers give it, rules R4 F3),
-## wall is a line of still shots and fissure a beam through everything on its line. It runs a real
+## wall is a line of still shots. It runs a real
 ## projectile manager and event bus, stepped by hand, with cards built in code.
 ##
 ## godot --headless --path . --script res://tests/core/test_spells_payload_carriers.gd
@@ -86,10 +86,6 @@ func before_each() -> void:
 	wall.shots = 3
 	wall.spread = 10.0
 	wall.radius = 4.0
-	var fissure: FormBase = _form(&"fissure", 0.0, 0.2)
-	fissure.motion = FormBase.Motion.FISSURE
-	fissure.ray_length = 300.0
-	fissure.radius = 6.0
 	var beam: FormBase = _form(&"beam", 0.0, 0.2)
 	beam.motion = FormBase.Motion.RAY
 	beam.ray_length = 300.0
@@ -358,26 +354,6 @@ func test_a_held_rain_keeps_falling_until_switched_off() -> void:
 	check_equal(_mgr.get_count(), 2, "and the third never fell")
 
 
-func test_a_held_fissure_stays_open_and_hits_its_whole_line_every_tick() -> void:
-	# Rules R4e (owner, 2026-10-29): a held fissure is a beam that pierces everything.
-	_build(0, [&"hold", &"fissure"])
-	for n in 3:
-		_target(Vector2(40.0 + n * 40.0, 0.0))
-	_cast()
-	check_equal(_hits.size(), 3, "all three at once")
-	check(_spells.is_holding(0, 0), "it stays open")
-	_tick(10)
-	check_equal(_hits.size(), 6, "and all three again a beam tick later")
-	check_equal(_spells.beam_count(), 1, "one live line")
-	_tick(60)
-	check(_hits.size() > 6, "still open past its lifetime")
-	_cast()
-	check_equal(_spells.beam_count(), 0, "the next press closes it")
-	var hits: int = _hits.size()
-	_tick(30)
-	check_equal(_hits.size(), hits, "and it hits no more")
-
-
 func test_familiar_asks_for_an_entity() -> void:
 	var tag: int = _build(0, [&"familiar", &"bolt"])
 	_cast()
@@ -582,39 +558,9 @@ func test_an_enemy_touching_a_wall_is_hit() -> void:
 	check(not _hits.is_empty() and _hits[0][1] == target, "an enemy that touches the wall is hit")
 
 
-func test_fissure_hits_everything_on_its_line() -> void:
-	_build(0, [&"fissure"])
-	for n in 5:
-		_target(Vector2(40.0 + n * 40.0, 0.0))
-	_cast()
-	check_equal(_hits.size(), 5, "all five on the line")
-
-
-func test_fissure_hits_everything_on_its_line_however_many() -> void:
-	_build(0, [&"fissure"])
-	for n in 100:
-		_target(Vector2(20.0 + n * 1.5, 0.0))
-	_cast()
-	check_equal(_hits.size(), 100, "all of them, however many")
-
-
 func test_a_beam_with_no_pierce_hits_only_the_first() -> void:
 	_build(0, [&"beam"])
 	for n in 5:
 		_target(Vector2(40.0 + n * 40.0, 0.0))
 	_cast()
-	check_equal(_hits.size(), 1, "the contrast: a beam stops at one")
-
-
-func test_fissure_shows_as_a_line() -> void:
-	_build(0, [&"fissure"])
-	_cast()
-	check(_shown.size() == 1 and _shown[0][1] == &"beam" and _shown[0][4] > 0.0, "drawn like a beam, as far as it got: %s" % [_shown])
-
-
-func test_fissure_fires_its_on_hit_payload_for_each_target() -> void:
-	_build(0, [&"on_hit", &"fissure", &"spark"])
-	for n in 3:
-		_target(Vector2(40.0 + n * 40.0, 0.0))
-	_cast()
-	check_equal(_mgr.get_count(), 3, "a spark from every enemy on the line")
+	check_equal(_hits.size(), 1, "a beam stops at one")

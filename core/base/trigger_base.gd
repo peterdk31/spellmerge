@@ -27,6 +27,15 @@ enum Event {
 	REACTION,
 }
 
+## What each trigger needs from its carrier for it ever to go off (`Carrier.event_waste`), and why not.
+const NEEDS: Dictionary = {
+	Event.HIT: {"any": CarrierTraits.HITS, "why_not": "it hits nothing"},
+	Event.TIMER: {"any": CarrierTraits.LASTS, "why_not": "it is over at once"},
+	Event.HURT: {"any": CarrierTraits.LASTS, "why_not": "it is over at once"},
+	Event.BLOCK: {"any": CarrierTraits.MEETS_SHOTS, "why_not": "nothing on it can block a shot"},
+	Event.WALL: {"any": CarrierTraits.FLIES | CarrierTraits.LINE, "why_not": "it never meets a wall"},
+}
+
 @export var event: Event = Event.HIT
 ## TIMER only: seconds between fires. A trigger fires every time its event happens, for as
 ## long as its carrier lives (owner, 2026-10-29: no per-shot count; the spell runtime's per-step

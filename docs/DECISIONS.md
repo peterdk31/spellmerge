@@ -2,6 +2,11 @@
 
 Why things were decided, so they aren't reversed by accident. Newest first.
 
+## 2026-10-30: A card's needs live with the card; one question for the builder (owner)
+
+- **Needs moved to the cards** (owner, after "what if the cards had defined traits?"): what each behaviour needs from a carrier is `ModifierBase.NEEDS`, and each trigger's is `TriggerBase.NEEDS`, next to their enums, per kind of card rather than per card file (two cards with one behaviour cannot disagree, and a card file cannot claim more than its code does). The flags they are written in are `CarrierTraits`, on their own because a constant cannot reach across `Carrier` and `ModifierBase` both ways.
+- **One question for everyone:** `Spells.card_waste(card_id, carrier)` answers, before a card is placed, whether it does anything on a carrier on its own and why not, with the compiler's own rules and words (the compiler's trigger check is the shared `StaffCompiler.trigger_waste`); a test asks it for every card on every carrier and compares with a real compile. What it opens (builder marks, reward hints and offers, bots, category tags, granted traits) is in docs/BACKLOG.md, by milestone.
+
 ## 2026-10-30: Which cards do nothing on a carrier is worked out (owner)
 
 - **No lists per carrier** (owner: "I don't like that I have to run a test to find out if I should add something to some lists on a new carrier. This sounds like something that can be computed"): a carrier answers yes/no questions about itself (`traits()`, four new: `MOVES`, `LINE`, `MEETS_SHOTS`, `MOVES_CASTER`), and each card says once, for every carrier, what it needs from one (`Carrier.NEEDS`, `EVENT_NEEDS`: "any" of some flags, "not" others, and its "why_not"). The compiler works out from the two, every time a staff is built, whether a card does anything on a carrier and the sentence the builder shows ("<why_not>, and <what the carrier is>"). Every one of the 14 x 32 answers is the same as the lists gave (checked cell by cell); 98 sentences read a little differently, as they are now put together from the card's reason and the carrier's description.

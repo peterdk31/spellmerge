@@ -2,6 +2,16 @@
 
 Ideas and future work outside the current milestone (docs/PLAN.md, "Planning system"). Players' ideas wait as issues labelled `backlog` (the daily intake puts them there); this file holds Claude's own. The weekly planning run moves items from both into the work queue or `docs/NEXT.md` when their milestone comes.
 
+## Carrier traits and card needs (owner, 2026-10-30)
+
+Since 2026-10-30 a carrier answers yes/no questions about itself (`CarrierTraits`), each kind of card says what it needs from one (`ModifierBase.NEEDS`, `TriggerBase.NEEDS`), and `Spells.card_waste(card_id, carrier)` answers "does this card do anything on this carrier, and why not" before it is placed (docs/CARRIERS.md). What that opens, by milestone:
+
+- **Builder: say it before the drop (M2 polish).** The builder greys a card out once it sits on a carrier where it does nothing; with `card_waste` it can mark the cards in the bag that would do nothing on the carrier being built on, while choosing.
+- **Reward hints and offers (M3 rewards).** "Works with" hints on a reward from the player's own staffs ("Bounce: works on 2 of your carriers"; docs/PLAN.md's "Works with: Split, Chain"), and offers that lean away from cards that would do nothing on any carrier the player holds.
+- **Bots and enemy staffs (M2–M3).** Test bots and enemies that build staffs from cards pick pairs that do something, with `card_waste`, instead of trying them.
+- **Category tags on cards (M3 relics).** A designer's labels on each card (fire, melee, movement, defence...), for relics, rewards and builder filters to target ("fire cards cost no mana", "melee carriers get +1 pierce"). Rule: a tag nothing a player can see uses is removed.
+- **Granted traits (M3 relics, staff types).** A relic or staff type that adds a trait to carriers ("every carrier on this staff stays in the world", so arc and magnet work on a swing; the "zaps count as hits" idea below is one). Rule: only a trait whose behaviour the runtime already runs on that carrier can be granted, and `test_card_rules` must play the card with the relic on, or the game would say a card works where it does nothing.
+
 ## From the staffs rework (pivot at C2, 2026-10-26)
 
 For later milestones; see `docs/milestones/M2-staffs.md`, "Later".

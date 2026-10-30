@@ -7,7 +7,8 @@ extends RefCounted
 ## A subclass answers yes/no questions about itself in `traits()` (the flags below: does it fly?
 ## does it hit? does it last? ...), and from those alone the compiler works out which cards do
 ## nothing on it, and why (`waste`, `event_waste`): each card says what it needs from a carrier
-## (`NEEDS`, `EVENT_NEEDS`), once for every carrier. A new carrier writes no list of cards.
+## (`ModifierBase.NEEDS`, `TriggerBase.NEEDS`), once for every carrier. A new carrier writes no
+## list of cards.
 ## tests/core/test_card_rules.gd plays every card on every carrier and fails where the answer is
 ## wrong (a card that does nothing but is not said to, or the other way round).
 
@@ -15,92 +16,32 @@ const B := ModifierBase.Behaviour
 const E := TriggerBase.Event
 
 ## The modifier behaviours a blast's area hit carries on a carrier that hits nothing itself (heavy's
-## knockback and slam ride on it), so what they need (`NEEDS`) stands only without a blast.
+## knockback and slam ride on it), so what they need (`ModifierBase.NEEDS`) stands only without a blast.
 const BLAST_CARRIES: Array[int] = [B.HEAVY]
 
-## `traits()` flags.
-## A shot flying out on its own: `reach` stretches its life, `return` brings it back.
-const FLIES: int = 1 << 0
-## A shot that stays in the world a while: arc, magnet and relay ride on it.
-const STAYS: int = 1 << 1
-## It hits under its own tag: hit cards, infusions and `on hit` work on it.
-const HITS: int = 1 << 2
-## It lasts a while: timers tick and `on hurt` listens while it lives.
-const LASTS: int = 1 << 3
-## It goes a distance `reach` stretches (its flight or its `ray_length`).
-const REACHES: int = 1 << 4
-## Its shield stops only the shots that touch it, so a deflect on it outruns a shield.
-const GUARDS: int = 1 << 5
-## Homing can steer it (turn it, bend it or place it on a target).
-const STEERS: int = 1 << 6
-## It uses `speed` and `lifetime` (all but a teleport, which is over at once).
-const SPEED: int = 1 << 7
-## It fires `shots` (a split makes more).
-const SHOTS: int = 1 << 8
-## Its shots leave along a fan or a line that `spread` widens.
-const SPREAD: int = 1 << 9
-## Its hits spend `pierce`.
-const PIERCE: int = 1 << 10
-## Its shots spread round a circle instead of a fan.
-const RING: int = 1 << 11
-## A payload its shot fires goes outward from the shot's caster, not along the shot's way.
-const OUTWARD: int = 1 << 12
-## Held, it is cast anew each time it is over (a rain falls again, a swing sweeps back).
-const REPEATS_HELD: int = 1 << 13
-## It plays its own staff animation with its wind-up and strike.
-const OWN_POSE: int = 1 << 14
-## It is over at once, so a homing one looks at least as far as it goes.
-const INSTANT_HOMING: int = 1 << 15
-## It reads a payload of its own after it, as a trigger does (a rain).
-const CARRIES_PAYLOAD: int = 1 << 16
-## The staff keeps working through its `lifetime` (a beam, a rain, a dash): its staff animation's
-## strike lasts that long.
-const HOLDS_STAFF: int = 1 << 17
-## Does it travel along a path through the world (a bolt, a hook, a swap, an orbit)? Linger, sticky
-## and spiral change that path.
-const MOVES: int = 1 << 18
-## Is it a line that is there at once (a beam)? It turns at walls, waves, grows and pulls as a line.
-const LINE: int = 1 << 19
-## Can it stop or turn other shots (its shot, line, sweep or body touches them, or it moves its
-## caster, whom its shield then guards)? Shield, deflect and `on block` need it.
-const MEETS_SHOTS: int = 1 << 20
-## Does it move its caster (a dash, a teleport)? A mirror would cancel it, and nothing keeps it on.
-const MOVES_CASTER: int = 1 << 21
-
-## What each modifier behaviour needs from a carrier to do anything, and the words the builder shows
-## when it gets none of it ("<Card> does nothing on a <carrier>: <why_not>, and <what()>"):
-## "any": at least one of these flags; "not": none of these. A behaviour not here works on every
-## carrier (numbers, blast, echo, recoil). A new behaviour adds its line here, never per carrier.
-const NEEDS: Dictionary = {
-	B.HOMING: {"any": STEERS, "why_not": "it has nothing to aim"},
-	B.CHAIN: {"any": HITS, "why_not": "it acts on what the carrier hits"},
-	B.SIPHON: {"any": HITS, "why_not": "it acts on what the carrier hits"},
-	B.POSSESS: {"any": HITS, "why_not": "it acts on what the carrier hits"},
-	B.HEAVY: {"any": HITS, "why_not": "it acts on what the carrier hits (a blast would carry it)"},
-	B.RELAY: {"any": HITS, "why_not": "it needs a hit of its own"},
-	B.SHIELD: {"any": MEETS_SHOTS, "why_not": "it blocks shots that touch the carrier or guards the caster on a move"},
-	B.DEFLECT: {"any": MEETS_SHOTS, "why_not": "it touches no shots"},
-	B.HOLD: {"any": LASTS, "not": MOVES_CASTER, "why_not": "nothing keeps it on"},
-	B.MIRROR: {"not": MOVES_CASTER, "why_not": "a move and its mirror cancel"},
-	B.BOUNCE: {"any": FLIES | LINE, "why_not": "it turns a shot or a beam at walls"},
-	B.GHOST: {"any": FLIES | LINE, "why_not": "it only takes a flying shot or a line through walls"},
-	B.RETURN: {"any": FLIES, "why_not": "it does not fly out"},
-	B.LINGER: {"any": MOVES, "why_not": "it only changes a moving shot"},
-	B.STICKY: {"any": MOVES, "why_not": "it only changes a moving shot"},
-	B.SPIRAL: {"any": MOVES | LINE, "why_not": "it only changes a moving shot or a beam"},
-	B.GROWTH: {"any": STAYS | LINE, "why_not": "it grows a shot in the world or a beam"},
-	B.MAGNET: {"any": STAYS | LINE, "why_not": "it needs a shot or a beam that stays in the world"},
-	B.ARC: {"any": STAYS, "why_not": "it is not a shot that stays in the air"},
-}
-
-## The same for each trigger: what the carrier needs for it ever to go off.
-const EVENT_NEEDS: Dictionary = {
-	E.HIT: {"any": HITS, "why_not": "it hits nothing"},
-	E.TIMER: {"any": LASTS, "why_not": "it is over at once"},
-	E.HURT: {"any": LASTS, "why_not": "it is over at once"},
-	E.BLOCK: {"any": MEETS_SHOTS, "why_not": "nothing on it can block a shot"},
-	E.WALL: {"any": FLIES | LINE, "why_not": "it never meets a wall"},
-}
+## The questions a carrier answers in `traits()` (`CarrierTraits`, where each is explained).
+const FLIES: int = CarrierTraits.FLIES
+const STAYS: int = CarrierTraits.STAYS
+const HITS: int = CarrierTraits.HITS
+const LASTS: int = CarrierTraits.LASTS
+const REACHES: int = CarrierTraits.REACHES
+const GUARDS: int = CarrierTraits.GUARDS
+const STEERS: int = CarrierTraits.STEERS
+const SPEED: int = CarrierTraits.SPEED
+const SHOTS: int = CarrierTraits.SHOTS
+const SPREAD: int = CarrierTraits.SPREAD
+const PIERCE: int = CarrierTraits.PIERCE
+const RING: int = CarrierTraits.RING
+const OUTWARD: int = CarrierTraits.OUTWARD
+const REPEATS_HELD: int = CarrierTraits.REPEATS_HELD
+const OWN_POSE: int = CarrierTraits.OWN_POSE
+const INSTANT_HOMING: int = CarrierTraits.INSTANT_HOMING
+const CARRIES_PAYLOAD: int = CarrierTraits.CARRIES_PAYLOAD
+const HOLDS_STAFF: int = CarrierTraits.HOLDS_STAFF
+const MOVES: int = CarrierTraits.MOVES
+const LINE: int = CarrierTraits.LINE
+const MEETS_SHOTS: int = CarrierTraits.MEETS_SHOTS
+const MOVES_CASTER: int = CarrierTraits.MOVES_CASTER
 
 
 ## Its id, the `carrier` a form card names (&"bolt"); &"" for the carrier that runs nothing, which
@@ -173,23 +114,23 @@ func steers() -> bool:
 
 
 ## Why `behaviour` does nothing on it, or "" when it does something (with a blast on it, when
-## `blasts`): worked out from `NEEDS` and its traits. The carrier that runs nothing (id &"") says so
+## `blasts`): worked out from `ModifierBase.NEEDS` and its traits. The carrier that runs nothing (id &"") says so
 ## for every card.
 func waste(behaviour: int, blasts: bool = false) -> String:
 	if id() == &"":
 		return what()
 	if blasts and BLAST_CARRIES.has(behaviour):
 		return ""
-	return _lacks(NEEDS.get(behaviour, {}))
+	return _lacks(ModifierBase.NEEDS.get(behaviour, {}))
 
 
-## Why a trigger of `event` never fires on it, or "" when it can: from `EVENT_NEEDS`.
+## Why a trigger of `event` never fires on it, or "" when it can: from `TriggerBase.NEEDS`.
 func event_waste(event: int) -> String:
 	if id() == &"":
 		return what()
 	if event == E.HIT and not hits():
 		return hits_nothing()
-	return _lacks(EVENT_NEEDS.get(event, {}), false)
+	return _lacks(TriggerBase.NEEDS.get(event, {}), false)
 
 
 ## The sentence of a need (a `NEEDS` row) its traits do not meet, else "": its "why_not", and what

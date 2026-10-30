@@ -270,25 +270,53 @@ func _means_something_there(modifier: ModifierBase, payload: bool) -> bool:
 ## on a carrier that hits nothing itself needs a blast, whose area hit carries the carrier's tag.
 ## A ghost shot or beam never meets a wall.
 func _trigger_never(trigger: TriggerBase, form: FormBase, elements: Array[ElementBase], modifiers: Array[ModifierBase]) -> String:
-	var head: String = "%s does nothing on a %s" % [_name(trigger), _name(form)]
-	var why: String = trigger_why_not(trigger.event, form.carrier)
-	if not why.is_empty():
-		return "%s: %s." % [head, why]
 	var has: Dictionary = {}
 	for modifier in modifiers:
 		has[modifier.behaviour] = true
-	match trigger.event:
+	var why: String = trigger_waste(trigger.event, form.carrier, has, not elements.is_empty())
+	if why.is_empty():
+		return ""
+	return "%s does nothing on a %s%s." % [_name(trigger), _name(form), why]
+
+
+## The rest of `_trigger_never`'s sentence for a trigger of `event` on the carrier `carrier` with the
+## modifier behaviours in `has` (behaviour -> true) and an infusion when `infused`: ": <why>" when
+## the carrier alone never sets it off, " without <card>: <why>" when a card it needs is missing,
+## "" when it can fire. One rule for the compiler and `card_waste`.
+static func trigger_waste(event: int, carrier: StringName, has: Dictionary, infused: bool) -> String:
+	var why: String = trigger_why_not(event, carrier)
+	if not why.is_empty():
+		return ": %s" % why
+	match event:
 		TriggerBase.Event.BLOCK:
 			if not has.has(ModifierBase.Behaviour.SHIELD) and not has.has(ModifierBase.Behaviour.DEFLECT):
-				return "%s without a shield or deflect: nothing else on it blocks." % head
+				return " without a shield or deflect: nothing else on it blocks"
 		TriggerBase.Event.KILL, TriggerBase.Event.REACTION:
-			if not hits(form.carrier) and not has.has(ModifierBase.Behaviour.BLAST):
-				return "%s without a blast: %s." % [head, _hits_nothing(form.carrier)]
-			if trigger.event == TriggerBase.Event.REACTION and elements.is_empty() and not has.has(ModifierBase.Behaviour.RELAY):
-				return "%s without an infusion: a hit with no element sets off no reaction." % head
+			if not hits(carrier) and not has.has(ModifierBase.Behaviour.BLAST):
+				return " without a blast: %s" % _hits_nothing(carrier)
+			if event == TriggerBase.Event.REACTION and not infused and not has.has(ModifierBase.Behaviour.RELAY):
+				return " without an infusion: a hit with no element sets off no reaction"
 		TriggerBase.Event.WALL:
-			if has.has(ModifierBase.Behaviour.GHOST) and behaviour_runs(ModifierBase.Behaviour.GHOST, form.carrier):
-				return "%s with ghost: it passes through walls." % head
+			if has.has(ModifierBase.Behaviour.GHOST) and behaviour_runs(ModifierBase.Behaviour.GHOST, carrier):
+				return " with ghost: it passes through walls"
+	return ""
+
+
+## Why `card` does nothing on the carrier `carrier` when it is the only other card there, in the
+## words after "<Card> does nothing on a <carrier>" ("" when it does something): what the builder,
+## a reward screen or a bot asks before a card is placed. The same rules as a compile of
+## `[card, carrier]` (a trigger with a payload after it); a form or a multicast is never wasted.
+static func card_waste(card: SpellComponent, carrier: StringName) -> String:
+	if card is ModifierBase:
+		var modifier := card as ModifierBase
+		var why: String = behaviour_waste(modifier.behaviour, carrier)
+		if why.is_empty():
+			why = _numbers_waste(modifier, carrier, false)
+		return ": %s" % why if not why.is_empty() else ""
+	if card is ElementBase:
+		return "" if Carriers.of(carrier).takes_infusion(false) else ": %s, and it has no blast to carry it" % _hits_nothing(carrier)
+	if card is TriggerBase:
+		return trigger_waste((card as TriggerBase).event, carrier, {}, false)
 	return ""
 
 

@@ -73,3 +73,32 @@ func test_a_blast_carries_heavy_and_infusions_on_a_carrier_that_hits_nothing() -
 	check(not decoy.waste(BEHAVIOURS.SIPHON, true).is_empty(), "but not siphon: a blast is no shot hit")
 	check(not decoy.takes_infusion(false) and decoy.takes_infusion(true), "nor an infusion without a blast")
 	check(Carriers.of(&"bolt").takes_infusion(false), "a bolt takes one on its own hits")
+
+
+func test_asking_about_one_card_says_what_a_compile_says() -> void:
+	# `Spells.card_waste` is what the builder, a reward screen or a bot asks before a card is
+	# placed: for every card in the game on every carrier it must say exactly what a compile of
+	# that card on that carrier lists (a trigger with a payload after it).
+	var arena := ArenaScript.new(root)
+	var cards: Array = arena.registry.call("get_all", "spells")
+	var asked: int = 0
+	for card: Variant in cards:
+		if not (card is ModifierBase or card is ElementBase or card is TriggerBase):
+			continue
+		var component := card as SpellComponent
+		for carrier: StringName in Carriers.ids():
+			var ids: Array[StringName] = [component.id, carrier]
+			if card is TriggerBase or carrier == &"rain":
+				ids.append(&"bolt")
+			if card is TriggerBase and carrier == &"rain":
+				ids.append(&"bolt")
+			var built: CompiledStaff = arena.spells.compile_staff(ids, ArenaScript.plain_staff(ids.size()))
+			var form: SpellComponent = arena.registry.call("get_resource", "spells", carrier) as SpellComponent
+			var why: String = arena.spells.card_waste(component.id, carrier)
+			var cell: String = "%s on a %s" % [component.id, carrier]
+			check_equal(built.wasted.has(0), not why.is_empty(), "%s: wasted exactly when asked says so (%s)" % [cell, why])
+			if built.wasted.has(0):
+				check_equal(str(built.wasted[0]), "%s does nothing on a %s%s." % [component.display_name, form.display_name, why], "%s: the same words" % cell)
+			asked += 1
+	arena.free_all()
+	check(asked > 100, "every card on every carrier was asked: %d" % asked)

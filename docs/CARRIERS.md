@@ -29,8 +29,9 @@ A carrier answers yes/no questions about itself, in `traits()`, and nothing abou
 (and the number questions: `SPEED`, `SHOTS`, `SPREAD`, `PIERCE`, `REACHES`, ... all in
 `carrier.gd`.)
 
-Each card says, once for every carrier, what it needs from a carrier (`Carrier.NEEDS`, and
-`EVENT_NEEDS` for triggers):
+Each kind of card says, next to its own definition and once for every carrier, what it needs from a
+carrier (`ModifierBase.NEEDS` for modifier behaviours, `TriggerBase.NEEDS` for triggers; the flags
+are `CarrierTraits`):
 
 ```gdscript
 B.RETURN: {"any": FLIES, "why_not": "it does not fly out"},
@@ -47,6 +48,11 @@ heavy (`takes_infusion`, `BLAST_CARRIES`).
 `tests/core/test_card_rules.gd` plays every card on every carrier in a small world and fails where
 the answer is wrong (a card that does nothing but is not said to, or the other way round), so a
 wrong yes/no answer is caught by CI; you don't need to run it to know what to write.
+
+**Asking about one card.** `Spells.card_waste(card_id, carrier)` (`StaffCompiler.card_waste`)
+answers "does this card do anything on this carrier on its own, and if not, why?" before the card is
+placed, with the same rules and words as a compile; for the builder, a reward screen or a bot.
+`tests/core/test_carriers.gd` checks it against a real compile for every card on every carrier.
 
 **Required fields**, in `required_fields()`: what a form card of this carrier must set above 0 (a
 beam's `ray_length`); the spell validator checks them.
@@ -90,5 +96,5 @@ it is refused by the validator.
 ## Adding a modifier behaviour or a trigger
 
 Add the value at the end of `ModifierBase.Behaviour` (or `TriggerBase.Event`), implement it, and,
-if it does not work on every carrier, say what it needs in `Carrier.NEEDS` (or `EVENT_NEEDS`). If it
+if it does not work on every carrier, say what it needs in `ModifierBase.NEEDS` (or `TriggerBase.NEEDS`). If it
 needs something no flag asks yet, add the flag and answer it on each carrier.

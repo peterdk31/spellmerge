@@ -439,6 +439,15 @@ func bind(manager: ProjectilesScript, bus: EventsScript) -> void:
 		events.caster_move_finished.connect(_moves.finished)
 
 
+## Why the card `card_id` does nothing on the carrier `carrier` (`FormBase.carrier`) on its own, in
+## the words after "<Card> does nothing on a <carrier>" ("" when it does something, or for an
+## unknown card): for the builder, a reward screen or a bot, before the card is placed
+## (`StaffCompiler.card_waste`).
+func card_waste(card_id: StringName, carrier: StringName) -> String:
+	var card: SpellComponent = _component(card_id)
+	return StaffCompiler.card_waste(card, carrier) if card != null else ""
+
+
 ## Compiles a staff's cards (ids by slot, `&""` for an empty slot) into its cycle, the casts it
 ## makes until it recharges (staffs A4; the rules are docs/milestones/M2-staffs.md, "Reading a
 ## staff", and `StaffCompiler`). It never errors and refuses nothing: an unknown or useless

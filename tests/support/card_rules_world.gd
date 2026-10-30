@@ -403,7 +403,7 @@ func _sample() -> void:
 	for at in spells.slam_slots():
 		if spells.slam_on(at):
 			# A slam's row is read directly: Spells has no getter for its caster and aim.
-			_put("slam %s %s from %s way %s impact %s" % [_who(spells._sl_actor[at]), _node(spells._sl_tag[at]), _at(spells._sl_origin[at]), _at(spells._sl_dir[at] * 100.0), _at(spells.slam_impact(at)) if spells.slam_impact(at).is_finite() else "-"])
+			_put("slam %s %s from %s way %s impact %s" % [_who(spells._slams._sl_actor[at]), _node(spells._slams._sl_tag[at]), _at(spells._slams._sl_origin[at]), _at(spells._slams._sl_dir[at] * 100.0), _at(spells.slam_impact(at)) if spells.slam_impact(at).is_finite() else "-"])
 	for at in spells.swing_slots():
 		if spells.swing_on(at):
 			_put("swing %s %s at %s to %s side %d turned %d reach %d" % [_who(spells.swing_actor(at)), _node(spells.swing_tag(at)), _at(spells.swing_origin(at)), _at(spells.swing_dir(at) * 100.0), spells.swing_side(at), roundi(rad_to_deg(spells.swing_turned(at))), roundi(spells.swing_reach(at))])

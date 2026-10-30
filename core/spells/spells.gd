@@ -1,3 +1,4 @@
+class_name SpellRuntime
 extends Node
 ## The spell runtime (autoload `Spells`): staffs compiled from cards and cast (docs/milestones/
 ## M2-staffs.md). The reading rules live in `StaffCompiler` (`compile_staff`); this script casts.
@@ -34,7 +35,15 @@ extends Node
 ## (`fires_waited` counts them). A beam fires an on-expire payload where it ends when its
 ## life is over, and a timer from its tip while it is on.
 ##
-## Beams: a beam lives its `lifetime` (`_start_beam`), held by its caster (the wizard's aim from
+## Kits: the forms that live a while in rows of their own, not as the manager's shots, are each run
+## by a kit this script owns and steps: `SpellBeams` (beam), `SpellSwings` (swing), `SpellSlams`
+## (slam), and `StaffPoses` plays every carrier's staff animation. A kit starts its rows from
+## `_launch` (who casts it passed in), runs them in `step` and sends its hits back through this
+## script as rays (`_ray_begin`, `RayHit`), so cards, payloads and chains are one path for every
+## form. The `beam_*`, `swing_*`, `slam_*` and `staff_*` getters at the end of this script hand the
+## looks' questions to the kits.
+##
+## Beams: a beam lives its `lifetime` (`SpellBeams.start`), held by its caster (the wizard's aim from
 ## `set_aim`, or its shot), hits at once and every `SpellLimits.BEAM_TICK`, and a homing one bends
 ## onto a target. `beam_*` give its look to `gameplay/feel`. Dash and teleport move their caster a
 ## fixed `ray_length`; speed only sets how long a dash takes. Payloads send no `spell_cast`: the wizard's player does, for its seat.
@@ -314,10 +323,6 @@ var _echo_spell: CompiledSpell = null
 ## recoil move it; orbit, familiar and a returning shot circle it or come back to it.
 const CASTER_WIZARD: int = ProjectilesScript.CASTER_WIZARD
 const CASTER_POINT: int = ProjectilesScript.CASTER_POINT
-## Points a live beam row has room for at first: its start, RAY_SEGMENTS a leg for each target it
-## bends to and a straight end (`_beam_path`), or the path its ray walked with a point at every
-## turn at a wall (`_beam_keep_path`). The rows grow when one needs more (`_fit_beam_points`).
-const BEAM_POINTS_START: int = SpellLimits.BEAM_LEGS_START * ProjectilesScript.RAY_SEGMENTS + 2
 var _caster: int = CASTER_WIZARD
 var _caster_seq: int = 0
 ## Moves of shots whose end point is still to come (a dash whose caster is a shot): the shot,
@@ -360,138 +365,9 @@ var _jq_head: int = 0
 var _jq_count: int = 0
 var _jq_busy: bool = false
 
-## The live beams (see `_start_beam`), rows that double when every one is on (`_grow_beams`);
-## `_bm_on` says which are in use. Each keeps what a shot's record keeps (fires, chain) plus where it is: its origin,
-## way, the curve's pull and end, how far it got and where (its tip), and its caster.
-var _bm_on: PackedByteArray = PackedByteArray()
-var _bm_born: PackedInt64Array = PackedInt64Array()
-var _bm_next_born: int = 0
-var _bm_spell: Array[CompiledSpell] = []
-var _bm_source: Array[Node] = []
-var _bm_tag: PackedInt64Array = PackedInt64Array()
-var _bm_actor: PackedInt32Array = PackedInt32Array()
-var _bm_caster: PackedInt32Array = PackedInt32Array()
-var _bm_caster_seq: PackedInt64Array = PackedInt64Array()
-var _bm_life: PackedFloat32Array = PackedFloat32Array()
-var _bm_span: PackedFloat32Array = PackedFloat32Array()
-var _bm_tick: PackedFloat32Array = PackedFloat32Array()
-## The homing of each leg of each live beam (`_bm_legs` a row): the target it keeps.
-var _bm_homing: Array[Homing] = []
-var _bm_legs: int = SpellLimits.BEAM_LEGS_START
-## Each live beam's path, `_bm_stride` points a row (see `_beam_path`), and how many it uses.
-var _bm_points: PackedVector2Array = PackedVector2Array()
-var _bm_stride: int = BEAM_POINTS_START
-## For `_beam_steer`: the beam being walked, where its legs' targets are in its path (made by
-## `_beam_path`, the reached ones kept at each turn), the points it hands back, and the Callable
-## made once.
-var _steer_row: int = -1
-var _steer_goals: PackedInt32Array = PackedInt32Array()
-var _steer_goal_count: int = 0
-var _steer_points: PackedVector2Array = PackedVector2Array()
-var _steer_call: Callable = _beam_steer
-## The scratch of `_wave` (a spiral beam's path).
-var _wave_points: PackedVector2Array = PackedVector2Array()
-var _wave_index: PackedInt32Array = PackedInt32Array()
-var _bm_count: PackedInt32Array = PackedInt32Array()
-var _bm_turn: PackedFloat32Array = PackedFloat32Array()
-var _bm_chain: PackedInt32Array = PackedInt32Array()
-var _bm_prev: PackedInt64Array = PackedInt64Array()
-## What live beam `at` hits with when not its spell's own `hit` (null): an echo's half, and what
-## `relay` took on while it is on (`_relay`).
-var _bm_hit: Array[HitProfile] = []
-## Shield charges live beam `at` has left for shots it touches (melee I3, `_guard_path`).
-var _bm_shield: PackedInt32Array = PackedInt32Array()
 ## The path of a beam's jump, for its guard (`_shoot_ray`); RAY_SEGMENTS is plenty for
 ## its turns at walls, and a path with more is guarded along its first ones.
 var _ray_guard_points: PackedVector2Array = PackedVector2Array()
-var _bm_origin: PackedVector2Array = PackedVector2Array()
-var _bm_dir: PackedVector2Array = PackedVector2Array()
-var _bm_bend: PackedVector2Array = PackedVector2Array()
-var _bm_end: PackedVector2Array = PackedVector2Array()
-var _bm_reach: PackedFloat32Array = PackedFloat32Array()
-var _bm_tip: PackedVector2Array = PackedVector2Array()
-var _bm_tip_dir: PackedVector2Array = PackedVector2Array()
-var _bm_hit_at: PackedFloat32Array = PackedFloat32Array()
-## The live swings (melee I2, see `_start_swing`): `SpellLimits.SWING_ROWS_START` rows at first,
-## more when every one is on (no swing ends another); `_sw_on` says which are in use. Each keeps what a beam keeps for its hits (fires, chain, echo, its
-## caster) and its sweep: the point it turns round (`_sw_origin`, the wizard's hand), the aim
-## locked at the cast, which way it turns (1 clockwise on screen, -1 back), how long it has run,
-## its wind-up, and how far it has turned (radians off the aim). The bodies it has struck (a list
-## a swing, with where and which way; as many as it meets) are not struck by it again.
-var _sw_on: PackedByteArray = PackedByteArray()
-var _sw_born: PackedInt64Array = PackedInt64Array()
-var _sw_next_born: int = 0
-var _sw_spell: Array[CompiledSpell] = []
-var _sw_source: Array[Node] = []
-var _sw_tag: PackedInt64Array = PackedInt64Array()
-var _sw_actor: PackedInt32Array = PackedInt32Array()
-var _sw_caster: PackedInt32Array = PackedInt32Array()
-var _sw_caster_seq: PackedInt64Array = PackedInt64Array()
-var _sw_origin: PackedVector2Array = PackedVector2Array()
-var _sw_dir: PackedVector2Array = PackedVector2Array()
-var _sw_side: PackedInt32Array = PackedInt32Array()
-var _sw_age: PackedFloat32Array = PackedFloat32Array()
-var _sw_wind: PackedFloat32Array = PackedFloat32Array()
-var _sw_turned: PackedFloat32Array = PackedFloat32Array()
-var _sw_chain: PackedInt32Array = PackedInt32Array()
-var _sw_prev: PackedInt64Array = PackedInt64Array()
-var _sw_echo: PackedByteArray = PackedByteArray()
-## Shield charges swing `at` has left for shots its sweep touches (melee I3, `_swing_guard`).
-var _sw_shield: PackedInt32Array = PackedInt32Array()
-var _sw_struck: Array[Array] = []
-var _sw_points: Array[Array] = []
-var _sw_heads: Array[Array] = []
-## The live slams (melee I8, see `_start_slam`): SLAM_ROWS_START rows at first, more when every
-## one is on. Each keeps what a swing keeps for its hits, the hand it is held by and the aim locked
-## at the cast, how long it has run and its wind-up, where it struck (INF before the impact), its
-## shield charges for shots in its ring, and the bodies its ring has struck.
-var _sl_on: PackedByteArray = PackedByteArray()
-var _sl_born: PackedInt64Array = PackedInt64Array()
-var _sl_next_born: int = 0
-var _sl_spell: Array[CompiledSpell] = []
-var _sl_source: Array[Node] = []
-var _sl_tag: PackedInt64Array = PackedInt64Array()
-var _sl_actor: PackedInt32Array = PackedInt32Array()
-var _sl_caster: PackedInt32Array = PackedInt32Array()
-var _sl_caster_seq: PackedInt64Array = PackedInt64Array()
-var _sl_origin: PackedVector2Array = PackedVector2Array()
-var _sl_dir: PackedVector2Array = PackedVector2Array()
-var _sl_impact: PackedVector2Array = PackedVector2Array()
-var _sl_age: PackedFloat32Array = PackedFloat32Array()
-var _sl_wind: PackedFloat32Array = PackedFloat32Array()
-var _sl_chain: PackedInt32Array = PackedInt32Array()
-var _sl_prev: PackedInt64Array = PackedInt64Array()
-var _sl_echo: PackedByteArray = PackedByteArray()
-var _sl_shield: PackedInt32Array = PackedInt32Array()
-var _sl_struck: Array[Array] = []
-## actor -> which way its last swing turned (the next turns the other way) and when its last sweep
-## ended (a swing within SWING_CHAIN of it has no wind-up).
-var _sw_last_side: PackedInt32Array = PackedInt32Array()
-var _sw_last_end: PackedFloat32Array = PackedFloat32Array()
-## actor -> when its last swing started: the swings of one cast (a split, a mirror) turn the same way.
-var _sw_last_start: PackedFloat32Array = PackedFloat32Array()
-## actor -> its body's last staff animation (`staff_pose`): when it began (INF for none), the
-## carrier's wind-up and strike in seconds (its strike ends early when its last shot does: the tag
-## it plays for), the aim locked at the cast, which way it turns (a swing's side), its keys
-## (`FormBase.packed_pose`), the carrier's tint (its glow's colour), and where the staff was when it
-## began (POSE_CHANNELS numbers a body, in its own frame: what the first key starts from).
-var _pose_start: PackedFloat32Array = PackedFloat32Array()
-var _pose_wind: PackedFloat32Array = PackedFloat32Array()
-var _pose_strike: PackedFloat32Array = PackedFloat32Array()
-var _pose_tag: PackedInt64Array = PackedInt64Array()
-var _pose_dir: PackedVector2Array = PackedVector2Array()
-## 1 when the animation keeps the aim of the cast (a swing, a slam: their aim is locked), 0 when
-## it turns with the live aim (a held beam follows it).
-var _pose_lock: PackedByteArray = PackedByteArray()
-var _pose_side: PackedInt32Array = PackedInt32Array()
-var _pose_keys: Array[PackedFloat32Array] = []
-var _pose_tint: PackedColorArray = PackedColorArray()
-var _pose_from: PackedFloat32Array = PackedFloat32Array()
-## The pose worked out last (`_pose_now`), for whom and when: the channels and the mood.
-var _pose_out: PackedFloat32Array = PackedFloat32Array()
-var _pose_out_mood: int = 0
-var _pose_out_actor: int = -1
-var _pose_out_clock: float = -1.0
 ## actor -> the wizard's staff tip and aim from `set_aim` (INF when it holds none), and 1 once
 ## the actor has sent one (a test that never does keeps its beams where they were cast).
 var _aim_origin: PackedVector2Array = PackedVector2Array()
@@ -502,9 +378,20 @@ var _aim_pivot: PackedVector2Array = PackedVector2Array()
 ## caster * STAFFS + staff -> the last generation that staff used, so a build after an empty
 ## staff, or a caster opened again under the same id, goes on round the ring (old shots in the air keep theirs).
 var _ring: PackedInt32Array = PackedInt32Array()
+## The forms that live a while in the runtime's own rows, not as the manager's shots: each kit
+## keeps its rows and runs them; this script starts them (`_launch`), steps them and ends them.
+var _beams: SpellBeams = null
+var _swings: SpellSwings = null
+var _slams: SpellSlams = null
+## Each actor's staff animation, for any carrier with a `staff_pose`.
+var _poses: StaffPoses = null
 
 
 func _init() -> void:
+	_poses = StaffPoses.new(self)
+	_beams = SpellBeams.new(self)
+	_swings = SpellSwings.new(self, _poses)
+	_slams = SpellSlams.new(self, _poses)
 	_current.resize(ACTORS * SpellLimits.STAFFS)
 	_current.fill(-1)
 	_installed.resize(ACTORS * SpellLimits.STAFFS)
@@ -527,24 +414,6 @@ func _init() -> void:
 	_aim_seen.resize(ACTORS)
 	_aim_pivot.resize(ACTORS)
 	_aim_pivot.fill(Vector2.INF)
-	_sw_last_side.resize(ACTORS)
-	_sw_last_side.fill(-1)
-	_sw_last_end.resize(ACTORS)
-	_sw_last_end.fill(-INF)
-	_sw_last_start.resize(ACTORS)
-	_sw_last_start.fill(-INF)
-	_pose_start.resize(ACTORS)
-	_pose_start.fill(INF)
-	_pose_wind.resize(ACTORS)
-	_pose_strike.resize(ACTORS)
-	_pose_dir.resize(ACTORS)
-	_pose_side.resize(ACTORS)
-	_pose_keys.resize(ACTORS)
-	_pose_tag.resize(ACTORS)
-	_pose_lock.resize(ACTORS)
-	_pose_tint.resize(ACTORS)
-	_pose_from.resize(ACTORS * POSE_CHANNELS)
-	_pose_out.resize(POSE_CHANNELS)
 	_ring.resize(ACTORS * SpellLimits.STAFFS)
 	_ring.fill(-1)
 	_cooldown.resize(ACTORS * SpellLimits.STAFFS)
@@ -564,39 +433,9 @@ func _init() -> void:
 	_lc_grow(64)
 	_arcs.resize(64)
 	_magnets.resize(64)
-	_bm_on.resize(SpellLimits.BEAM_ROWS_START)
-	_bm_born.resize(SpellLimits.BEAM_ROWS_START)
-	_bm_spell.resize(SpellLimits.BEAM_ROWS_START)
-	_bm_source.resize(SpellLimits.BEAM_ROWS_START)
-	_bm_tag.resize(SpellLimits.BEAM_ROWS_START)
-	_bm_actor.resize(SpellLimits.BEAM_ROWS_START)
-	_bm_caster.resize(SpellLimits.BEAM_ROWS_START)
-	_bm_caster_seq.resize(SpellLimits.BEAM_ROWS_START)
-	_bm_life.resize(SpellLimits.BEAM_ROWS_START)
-	_bm_span.resize(SpellLimits.BEAM_ROWS_START)
-	_bm_tick.resize(SpellLimits.BEAM_ROWS_START)
-	_bm_turn.resize(SpellLimits.BEAM_ROWS_START)
-	for i in SpellLimits.BEAM_ROWS_START * _bm_legs:
-		_bm_homing.append(Homing.new())
 	for i in ACTORS:
 		_dash_homing.append(Homing.new())
-	_bm_points.resize(SpellLimits.BEAM_ROWS_START * _bm_stride)
-	_bm_count.resize(SpellLimits.BEAM_ROWS_START)
-	_bm_chain.resize(SpellLimits.BEAM_ROWS_START)
-	_bm_prev.resize(SpellLimits.BEAM_ROWS_START)
-	_bm_hit.resize(SpellLimits.BEAM_ROWS_START)
-	_bm_shield.resize(SpellLimits.BEAM_ROWS_START)
 	_ray_guard_points.resize(64)
-	_bm_origin.resize(SpellLimits.BEAM_ROWS_START)
-	_bm_dir.resize(SpellLimits.BEAM_ROWS_START)
-	_bm_bend.resize(SpellLimits.BEAM_ROWS_START)
-	_bm_end.resize(SpellLimits.BEAM_ROWS_START)
-	_bm_reach.resize(SpellLimits.BEAM_ROWS_START)
-	_bm_tip.resize(SpellLimits.BEAM_ROWS_START)
-	_bm_tip_dir.resize(SpellLimits.BEAM_ROWS_START)
-	_bm_hit_at.resize(SpellLimits.BEAM_ROWS_START)
-	_grow_swings(SpellLimits.SWING_ROWS_START)
-	_grow_slams(SpellLimits.SLAM_ROWS_START)
 	_mv_slot.resize(SpellLimits.SHOT_MOVES_START)
 	_mv_seq.resize(SpellLimits.SHOT_MOVES_START)
 	_mv_tag.resize(SpellLimits.SHOT_MOVES_START)
@@ -702,16 +541,8 @@ static func _cast_damage(cast: CompiledCast) -> int:
 		return 0
 	var total: int = 0
 	for spell in cast.group.spells:
-		total += spell.damage * maxi(spell.shots, 1) * beam_hits(spell.motion, spell.lifetime)
+		total += spell.damage * maxi(spell.shots, 1) * SpellBeams.beam_hits(spell.motion, spell.lifetime)
 	return total * maxi(cast.group.repeats, 1)
-
-
-## How many times a carrier with `motion` that lives `lifetime` seconds hits one target: a live
-## beam once at once and then every `SpellLimits.BEAM_TICK` seconds of its life; anything else once.
-static func beam_hits(motion: int, lifetime: float) -> int:
-	if motion != FormBase.Motion.RAY:
-		return 1
-	return maxi(ceili(lifetime / SpellLimits.BEAM_TICK - 0.001), 1)
 
 
 ## What the builder shows of the component `id`: its name (the id when it has none, "" for
@@ -737,7 +568,7 @@ func component_stats(id: StringName) -> PackedStringArray:
 	var component: SpellComponent = _component(id)
 	if component is FormBase:
 		var form: FormBase = component
-		var hits: int = maxi(form.shots, 1) * beam_hits(form.motion, form.lifetime)
+		var hits: int = maxi(form.shots, 1) * SpellBeams.beam_hits(form.motion, form.lifetime)
 		out.append("Dmg %d" % form.base_damage if hits <= 1 else "Dmg %dx%d" % [form.base_damage, hits])
 		out.append("Mana " + _short(form.mana_cost))
 		out.append("Delay %ss" % _short(form.cooldown))
@@ -886,7 +717,7 @@ func shot_ended(tag: int) -> void:
 	if live == 1:
 		_live.erase(tag)
 		_end_hold_of(tag)
-		_end_pose_strike(tag)
+		_poses.end_strike(tag)
 	else:
 		_live[tag] = live - 1
 	_generation_gone(tag)
@@ -939,7 +770,6 @@ func hit_profile(tag: int) -> HitProfile:
 	return spell.hit
 
 
-
 ## Makes `compiled` (from `compile_staff`) the build of this actor's staff (0-3), starting its
 ## cycle at the first cast, and removes the shots the new generation revoked. Editing a staff
 ## switches its sustained (`hold`) carriers off. Returns the tag of its first spell, or 0 for an
@@ -951,9 +781,9 @@ func install_staff(actor: int, staff: int, compiled: CompiledStaff) -> int:
 			projectiles.remove_by_tag(revoked)
 	for revoked in revoked_tags:
 		_end_entities(revoked)
-		_end_beams_of(revoked)
-		_end_swings_of(revoked)
-		_end_slams_of(revoked)
+		_beams.end_of(revoked)
+		_swings.end_of(revoked)
+		_slams.end_of(revoked)
 	return tag
 
 
@@ -1043,9 +873,9 @@ func step(delta: float) -> void:
 	_run_waiting_fires()
 	_step_moves(delta)
 	_step_passes(delta)
-	_step_beams(delta)
-	_step_swings(delta)
-	_step_slams(delta)
+	_beams.step(delta)
+	_swings.step(delta)
+	_slams.step(delta)
 	_step_live(delta)
 	_step_arcs(delta)
 	_step_magnets()
@@ -1064,8 +894,8 @@ func _launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direct
 	# Any carrier may move the staff (its card's `staff_pose`); a swing's and a slam's start theirs
 	# with their own wind-up, side and strike.
 	if not spell.staff_pose.is_empty() and spell.motion != FormBase.Motion.SWING and spell.motion != FormBase.Motion.SLAM:
-		if _caster == CASTER_WIZARD and actor >= 0 and actor < ACTORS and _pose_start[actor] != _clock and direction.is_finite() and not direction.is_zero_approx():
-			_start_pose(actor, spell, tag, maxf(spell.wind_up, 0.0), _pose_strike_of(spell, lifetime), direction.normalized(), up_side(direction))
+		if _caster == CASTER_WIZARD and actor >= 0 and actor < ACTORS and _poses.started_at(actor) != _clock and direction.is_finite() and not direction.is_zero_approx():
+			_poses.start(actor, spell, tag, maxf(spell.wind_up, 0.0), StaffPoses.strike_of(spell, lifetime), direction.normalized(), StaffPoses.up_side(direction))
 	if spell.motion == FormBase.Motion.DASH or spell.motion == FormBase.Motion.TELEPORT:
 		return _move_caster(spell, tag, actor, origin, direction, carried, prev)
 	if spell.motion == FormBase.Motion.RAIN:
@@ -1077,15 +907,15 @@ func _launch(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, direct
 		var angle: float = base + _fan_angle(n, count, spell) + _staff_spread(tag, spell)
 		var heading: Vector2 = Vector2.from_angle(angle)
 		if spell.motion == FormBase.Motion.RAY:
-			if _start_beam(spell, tag, actor, origin, heading, carried, prev, source, lifetime):
+			if _beams.start(spell, tag, actor, origin, heading, carried, prev, source, lifetime, _caster, _caster_seq, _echo_spell == spell):
 				made += 1
 			continue
 		if spell.motion == FormBase.Motion.SWING:
-			if _start_swing(spell, tag, actor, origin, heading, carried, prev, source):
+			if _swings.start(spell, tag, actor, origin, heading, carried, prev, source, _caster, _caster_seq, _echo_spell == spell):
 				made += 1
 			continue
 		if spell.motion == FormBase.Motion.SLAM:
-			if _start_slam(spell, tag, actor, origin, heading, carried, prev, source):
+			if _slams.start(spell, tag, actor, origin, heading, carried, prev, source, _caster, _caster_seq, _echo_spell == spell):
 				made += 1
 			continue
 		if spell.motion == FormBase.Motion.DECOY or spell.motion == FormBase.Motion.FAMILIAR:
@@ -1411,8 +1241,13 @@ func _move_end(tag: int, at: Vector2, heading: Vector2, caster: int) -> void:
 ## The live shot casting the launch being fired, or -1 when the caster is the wizard, a point,
 ## or a shot that has ended since.
 func _caster_shot() -> int:
-	if _caster >= 0 and projectiles.is_alive(_caster) and projectiles.get_seq_of(_caster) == _caster_seq:
-		return _caster
+	return live_caster_shot(_caster, _caster_seq)
+
+
+## `caster` when it is a shot's slot and that shot (`seq`) still flies, else -1.
+func live_caster_shot(caster: int, seq: int) -> int:
+	if caster >= 0 and projectiles.is_alive(caster) and projectiles.get_seq_of(caster) == seq:
+		return caster
 	return -1
 
 
@@ -2103,305 +1938,6 @@ func _guard(found: int, actor: int, tag: int, deflects: bool, charges: int, a: V
 	return charges
 
 
-## A live beam (`beam` carrier): it lives its `lifetime` (a `hold` one until it is switched off),
-## held by its caster: from the wizard's staff tip along its aim (`set_aim`), from the shot whose
-## trigger cast it along that shot's way, or from a fixed point. A homing one bends along a curve
-## to the nearest target in front of it. It hits what is on it at once and then every
-## `SpellLimits.BEAM_TICK` seconds; between hits it only finds how far it gets, for its look.
-## Its `blast` and `on expire` payload happen where it ends when its life is over. Returns false
-## when it could not start (no direction).
-func _start_beam(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading: Vector2, chain: int, prev: int, source: Node, lifetime: float) -> bool:
-	if not heading.is_finite() or heading.is_zero_approx() or not origin.is_finite():
-		return false
-	# A free row, or new rows when every one is on: no beam ends another.
-	var at: int = _bm_on.find(0)
-	if at < 0:
-		at = _bm_on.size()
-		_grow_beams()
-	_bm_on[at] = 1
-	_bm_born[at] = _bm_next_born
-	_bm_next_born += 1
-	_bm_spell[at] = spell
-	_bm_source[at] = source
-	_bm_tag[at] = tag
-	_bm_actor[at] = actor
-	_bm_life[at] = lifetime
-	_bm_span[at] = lifetime
-	_bm_tick[at] = 0.0
-	_bm_chain[at] = chain
-	_bm_prev[at] = prev
-	_bm_hit[at] = spell.echo_hit if _echo_spell == spell else null
-	_bm_shield[at] = roundi(spell.behaviour(ModifierBase.Behaviour.SHIELD))
-	_bm_origin[at] = origin
-	_bm_dir[at] = heading.normalized()
-	_bm_reach[at] = 0.0
-	_bm_hit_at[at] = _clock
-	# How far off its caster's way the beam points (a fan, a multicast or a mirror keeps it).
-	_bm_caster[at] = _caster
-	_bm_caster_seq[at] = _caster_seq
-	_bm_turn[at] = 0.0
-	var legs: int = maxi(spell.pierce, 0) + 1
-	_fit_beam_legs(legs)
-	for leg in legs:
-		_bm_homing[at * _bm_legs + leg].start(spell, hash(Vector2i(_bm_born[at], leg)))
-	_bm_count[at] = 0
-	if _caster == CASTER_WIZARD:
-		if _aim_dir[actor].is_finite():
-			_bm_turn[at] = _aim_dir[actor].angle_to(heading)
-	else:
-		var shot: int = _caster_shot()
-		var way: Vector2 = projectiles.get_velocity_of(shot) if shot >= 0 else Vector2.ZERO
-		if way.is_zero_approx():
-			_bm_caster[at] = CASTER_POINT
-		else:
-			_bm_turn[at] = way.angle_to(heading)
-	shot_started(tag)
-	_beam_step(at, 0.0)
-	if _bm_on[at] != 0:
-		_lc_join(spell, tag, LC_BEAM, at, _bm_born[at], true, lifetime, _bm_tip[at], _bm_dir[at])
-	return true
-
-
-## Runs live beam `at` on by `delta`: its life, where its caster holds it, its path and its hit.
-func _beam_step(at: int, delta: float) -> void:
-	_bm_life[at] -= delta
-	if _bm_life[at] <= 0.0:
-		_end_beam(at, true)
-		return
-	_beam_follow(at)
-	if _bm_on[at] == 0:
-		return
-	_beam_path(at)
-	_bm_tick[at] -= delta
-	var hit: bool = _bm_tick[at] <= 0.0
-	if hit:
-		_bm_tick[at] = maxf(_bm_tick[at] + SpellLimits.BEAM_TICK, 0.001)
-	var spell: CompiledSpell = _bm_spell[at]
-	var tag: int = _bm_tag[at]
-	_beam_cast(at, hit)
-	# Every step, not only on its hits: a shot must not slip through between two ticks.
-	if _bm_on[at] != 0 and _bm_spell[at] == spell and _bm_tag[at] == tag:
-		_bm_shield[at] = _guard_path(spell, tag, _bm_actor[at], _bm_points, at * _bm_stride, _bm_count[at], _bm_reach[at], _beam_width(at), _bm_shield[at])
-
-
-## Puts live beam `at` where its caster holds it now. A beam whose wizard has no aim any more
-## (down, gone) ends quietly; one whose shot is gone stays where the shot last was.
-func _beam_follow(at: int) -> void:
-	var caster: int = _bm_caster[at]
-	if caster == CASTER_WIZARD:
-		var actor: int = _bm_actor[at]
-		if _aim_origin[actor].is_finite():
-			_bm_origin[at] = _aim_origin[actor]
-			_bm_dir[at] = _aim_dir[actor].rotated(_bm_turn[at])
-		elif _aim_seen[actor] != 0:
-			_end_beam(at, false)
-	elif caster >= 0:
-		if projectiles.is_alive(caster) and projectiles.get_seq_of(caster) == _bm_caster_seq[at]:
-			_bm_origin[at] = projectiles.get_position_of(caster)
-			var way: Vector2 = projectiles.get_velocity_of(caster)
-			if not way.is_zero_approx():
-				_bm_dir[at] = way.normalized().rotated(_bm_turn[at])
-		else:
-			_bm_caster[at] = CASTER_POINT
-
-
-## The path live beam `at` follows (`_bm_points`): straight along its way for its `ray_length`,
-## or, when it homes, bent onto a target in front of it (picked by `Projectiles.homing_point` and
-## kept while it can), then for each pierce it has bent on from there toward another, as a homing
-## shot picks a new target after a hit; past the last it goes straight on. With spiral the whole
-## path waves sideways (`_wave`). Its hits cut it at its `ray_length` (`ray_points`). `beam_bend`
-## and `beam_end` keep its first curve. Where each
-## leg's target is in the path goes to `_steer_goals`, for `_beam_steer`: a homing beam that turns
-## at a wall homes again from there with the legs it has not reached.
-func _beam_path(at: int) -> void:
-	var spell: CompiledSpell = _bm_spell[at]
-	var origin: Vector2 = _bm_origin[at]
-	var way: Vector2 = _bm_dir[at]
-	var length: float = spell.ray_length
-	var legs: int = maxi(spell.pierce, 0) + 1 if spell.homing_range > 0.0 else 0
-	_fit_beam_points(legs * ProjectilesScript.RAY_SEGMENTS + 2)
-	var base: int = at * _bm_stride
-	_bm_points[base] = origin
-	var count: int = 1
-	_bm_bend[at] = origin + way * (length * 0.5)
-	_bm_end[at] = origin + way * length
-	var from: Vector2 = origin
-	var walked: float = 0.0
-	_steer_goal_count = 0
-	if spell.homing_range > 0.0:
-		for leg in legs:
-			var homing: Homing = _bm_homing[at * _bm_legs + leg]
-			var goal: Vector2 = homing.point(projectiles, _bm_actor[at], from, way)
-			if not goal.is_finite() or walked >= length or _picked_before(at, leg):
-				homing.keep = 0
-				break
-			var bend: Vector2 = from + way * (from.distance_to(goal) * 0.6)
-			if leg == 0:
-				_bm_bend[at] = bend
-				_bm_end[at] = goal
-			for n in range(1, ProjectilesScript.RAY_SEGMENTS + 1):
-				var t: float = float(n) / ProjectilesScript.RAY_SEGMENTS
-				var u: float = 1.0 - t
-				var point: Vector2 = from * (u * u) + bend * (2.0 * u * t) + goal * (t * t)
-				walked += _bm_points[base + count - 1].distance_to(point)
-				_bm_points[base + count] = point
-				count += 1
-			_add_steer_goal(count - 1)
-			# It leaves the target the way the curve came in.
-			if not goal.is_equal_approx(bend):
-				way = bend.direction_to(goal)
-			from = goal
-	if walked < length:
-		_bm_points[base + count] = from + way * (length - walked)
-		count += 1
-	var spiral: float = spell.behaviour(ModifierBase.Behaviour.SPIRAL)
-	if spiral > 0.0:
-		# It waves along the whole path; its legs' targets keep their place in it.
-		var made: int = _wave(_bm_points, base + 1, count - 1, spiral * 0.5, origin)
-		_fit_beam_points(made + 1)
-		base = at * _bm_stride
-		for n in made:
-			_bm_points[base + 1 + n] = _wave_points[n]
-		for k in _steer_goal_count:
-			_steer_goals[k] = _wave_index[_steer_goals[k] - 1]
-		count = made + 1
-	_bm_count[at] = count
-
-
-## A homing or spiral live beam (`_steer_row`) turned off a wall at point `turn` of its path
-## (`at`, going `way` off the wall, `left` pixels of it left): it homes again from there, as it did
-## from its staff, with the legs it had not reached before the wall (a leg's target past the turn
-## was not reached: `_steer_goals`), then goes straight on for what is left, waving all the way
-## with spiral. Returns the points after `at` (`Projectiles.ray_points` asks at every turn); the
-## same rule as a homing or spiral shot, which steers and weaves again after it bounces.
-func _beam_steer(turn: int, at: Vector2, way: Vector2, left: float) -> PackedVector2Array:
-	var row: int = _steer_row
-	var spell: CompiledSpell = _bm_spell[row] if row >= 0 else null
-	var count: int = 0
-	var spiral: float = spell.behaviour(ModifierBase.Behaviour.SPIRAL) if spell != null else 0.0
-	if spell == null or (spell.homing_range <= 0.0 and spiral <= 0.0):
-		_steer_points.resize(0)
-		return _steer_points
-	var reached: int = 0
-	while reached < _steer_goal_count and _steer_goals[reached] < turn:
-		reached += 1
-	_steer_goal_count = reached
-	var legs: int = maxi(spell.pierce, 0) + 1 if spell.homing_range > 0.0 else 0
-	var from: Vector2 = at
-	var heading: Vector2 = way
-	var walked: float = 0.0
-	if _steer_points.size() < legs * ProjectilesScript.RAY_SEGMENTS + 1:
-		_steer_points.resize(legs * ProjectilesScript.RAY_SEGMENTS + 1)
-	for leg in range(reached, mini(legs, _bm_legs)):
-		var homing: Homing = _bm_homing[row * _bm_legs + leg]
-		var goal: Vector2 = homing.point(projectiles, _bm_actor[row], from, heading)
-		if not goal.is_finite() or walked >= left or _picked_before(row, leg):
-			homing.keep = 0
-			break
-		var bend: Vector2 = from + heading * (from.distance_to(goal) * 0.6)
-		var prev: Vector2 = from
-		for n in range(1, ProjectilesScript.RAY_SEGMENTS + 1):
-			var t: float = float(n) / ProjectilesScript.RAY_SEGMENTS
-			var u: float = 1.0 - t
-			var point: Vector2 = from * (u * u) + bend * (2.0 * u * t) + goal * (t * t)
-			walked += prev.distance_to(point)
-			_steer_points[count] = point
-			count += 1
-			prev = point
-		# The goal's index in the path: the turn's, plus the points after it.
-		_add_steer_goal(turn + count)
-		if not goal.is_equal_approx(bend):
-			heading = bend.direction_to(goal)
-		from = goal
-	if walked < left:
-		if _steer_points.size() <= count:
-			_steer_points.resize(count + 1)
-		_steer_points[count] = from + heading * (left - walked)
-		count += 1
-	if spiral > 0.0 and count > 0:
-		var made: int = _wave(_steer_points, 0, count, spiral * 0.5, at)
-		for k in range(reached, _steer_goal_count):
-			_steer_goals[k] = turn + _wave_index[_steer_goals[k] - turn - 1]
-		if _steer_points.size() < made:
-			_steer_points.resize(made)
-		for n in made:
-			_steer_points[n] = _wave_points[n]
-		count = made
-	_steer_points.resize(count)
-	return _steer_points
-
-
-## Notes that a leg's target is point `index` of the steered beam's path.
-func _add_steer_goal(index: int) -> void:
-	if _steer_goal_count == _steer_goals.size():
-		_steer_goals.resize(maxi(8, _steer_goal_count * 2))
-	_steer_goals[_steer_goal_count] = index
-	_steer_goal_count += 1
-
-
-## True when leg `leg` of live beam `at` picked a target an earlier leg already bent to: the
-## beam then goes straight on instead of doubling back.
-func _picked_before(at: int, leg: int) -> bool:
-	var id: int = _bm_homing[at * _bm_legs + leg].keep
-	for before in leg:
-		if _bm_homing[at * _bm_legs + before].keep == id:
-			return true
-	return false
-
-
-## Live beam `at` along its curve: with `hit`, its hits, payloads and chain jumps (sent as a
-## ray, `_ray_begin`, that `_on_hit` reads); without, only how far it gets.
-func _beam_cast(at: int, hit: bool) -> void:
-	var spell: CompiledSpell = _bm_spell[at]
-	var tag: int = _bm_tag[at]
-	var actor: int = _bm_actor[at]
-	var source: Node = _bm_source[at] if is_instance_valid(_bm_source[at]) else null
-	var bounces: int = _bounces(spell)
-	var ghost: bool = _ghost(spell)
-	var width: float = _beam_width(at)
-	# A homing or spiral beam that turns at a wall homes and waves again from there (`_beam_steer`).
-	var steer: Callable = _steer_call if bounces > 0 and (spell.homing_range > 0.0 or spell.behaviour(ModifierBase.Behaviour.SPIRAL) > 0.0) else Callable()
-	_steer_row = at
-	if not hit:
-		_bm_reach[at] = projectiles.ray_points(actor, _bm_points, at * _bm_stride, _bm_count[at], spell.ray_length, spell.pierce, HITS, tag, width, source, false, bounces, steer, ghost)
-		_bm_tip[at] = projectiles.ray_end
-		_bm_tip_dir[at] = projectiles.ray_end_heading
-		if bounces > 0:
-			_beam_keep_path(at)
-		return
-	var ray: RayHit = _ray_begin(tag, _bm_dir[at], _bm_chain[at], _bm_prev[at], _bm_hit[at], -1)
-	var got: float = projectiles.ray_points(actor, _bm_points, at * _bm_stride, _bm_count[at], spell.ray_length, spell.pierce, HITS, tag, width, source, true, bounces, steer, ghost)
-	var tip: Vector2 = projectiles.ray_end
-	var tip_dir: Vector2 = projectiles.ray_end_heading
-	var turned: bool = bounces > 0 and projectiles.ray_path_count > 0
-	# What relay took on stays for its later hits.
-	var took: HitProfile = ray.hit
-	_ray_end()
-	# A hit handler may have ended this beam (a rebuild) or reused its row.
-	if _bm_on[at] != 0 and _bm_spell[at] == spell and _bm_tag[at] == tag:
-		_bm_hit[at] = took
-		_bm_reach[at] = got
-		_bm_tip[at] = tip
-		_bm_tip_dir[at] = tip_dir
-		_bm_hit_at[at] = _clock
-		if turned:
-			_beam_keep_path(at)
-	_cast_jumps()
-
-
-## Live beam `at` follows the path its last ray walked (`Projectiles.ray_path`), so a beam that
-## turned at walls is drawn along its turns.
-func _beam_keep_path(at: int) -> void:
-	var count: int = projectiles.ray_path_count
-	if count < 2:
-		return
-	_fit_beam_points(count)
-	var base: int = at * _bm_stride
-	for n in count:
-		_bm_points[base + n] = projectiles.ray_path[n]
-	_bm_count[at] = count
-
-
 ## How many times `spell`'s beam turns at a wall: its bounce cards' count.
 func _bounces(spell: CompiledSpell) -> int:
 	return roundi(spell.behaviour(ModifierBase.Behaviour.BOUNCE))
@@ -2410,917 +1946,6 @@ func _bounces(spell: CompiledSpell) -> int:
 ## True when `spell`'s rays pass through walls (ghost), as its shots do.
 static func _ghost(spell: CompiledSpell) -> bool:
 	return spell.behaviour(ModifierBase.Behaviour.GHOST) > 0.0
-
-
-## How far either side of its line live beam `at` hits: half its carrier's size, times its
-## growth for every second it has been on, up to the room's size (as a growing shot).
-func _beam_width(at: int) -> float:
-	var spell: CompiledSpell = _bm_spell[at]
-	var width: float = spell.radius * 0.5
-	var growth: float = spell.behaviour(ModifierBase.Behaviour.GROWTH)
-	if growth > 1.0:
-		width = minf(width * pow(growth, _bm_span[at] - _bm_life[at]), maxf(projectiles.room_size(), width))
-	return width
-
-
-## Live beam `at` pulls (magnet) the enemies within its card's reach toward its line: one pull for
-## each piece of its path, as far as it got (`pull_requested` with the piece's two ends).
-func _beam_pull(at: int) -> void:
-	var spell: CompiledSpell = _bm_spell[at]
-	var reach: float = spell.behaviour(ModifierBase.Behaviour.MAGNET)
-	var base: int = at * _bm_stride
-	var walked: float = 0.0
-	for n in _bm_count[at] - 1:
-		if walked >= _bm_reach[at]:
-			break
-		var a: Vector2 = _bm_points[base + n]
-		var b: Vector2 = _bm_points[base + n + 1]
-		var piece: float = a.distance_to(b)
-		if walked + piece > _bm_reach[at]:
-			b = a.move_toward(b, _bm_reach[at] - walked)
-		events.pull_requested.emit(_bm_actor[at], a, reach, SpellLimits.MAGNET_PULL, _bm_tag[at], b)
-		walked += piece
-
-
-## The path `start`, `points[first]` .. `points[first + count - 1]` waving sideways (spiral on a
-## beam, rules R4f), as a spiral shot weaves round its line: every piece cut into pieces of
-## BEAM_WAVE / BEAM_WAVE_STEPS pixels at most, each new point moved `amp * sin` of how far along
-## it is (a wave every BEAM_WAVE pixels; `start` stays put) off its piece. The points after
-## `start` go to `_wave_points`; `_wave_index[i]` is how many of them reach `points[first + i]`
-## (its index in the waved path, `start` being 0). Returns how many. Allocation-free once grown.
-func _wave(points: PackedVector2Array, first: int, count: int, amp: float, start: Vector2) -> int:
-	var most: float = SpellLimits.BEAM_WAVE / SpellLimits.BEAM_WAVE_STEPS
-	if _wave_index.size() < count:
-		_wave_index.resize(count)
-	var made: int = 0
-	var walked: float = 0.0
-	var from: Vector2 = start
-	for i in count:
-		var to: Vector2 = points[first + i]
-		var piece: float = from.distance_to(to)
-		var pieces: int = maxi(ceili(piece / most), 1)
-		var side: Vector2 = from.direction_to(to).orthogonal()
-		if _wave_points.size() < made + pieces:
-			_wave_points.resize(maxi(made + pieces, _wave_points.size() * 2))
-		for n in range(1, pieces + 1):
-			var t: float = float(n) / pieces
-			_wave_points[made] = from.lerp(to, t) + side * (amp * sin(TAU * (walked + piece * t) / SpellLimits.BEAM_WAVE))
-			made += 1
-		_wave_index[i] = made
-		walked += piece
-		from = to
-	return made
-
-
-## Live beam `at` is over. With `finished` (its life ran out), its `blast` and its `on expire`
-## payload happen where it ends; a beam switched off, rebuilt or dropped ends quietly.
-func _end_beam(at: int, finished: bool) -> void:
-	if _bm_on[at] == 0:
-		return
-	_bm_on[at] = 0
-	var spell: CompiledSpell = _bm_spell[at]
-	var tag: int = _bm_tag[at]
-	var actor: int = _bm_actor[at]
-	_bm_spell[at] = null
-	_bm_source[at] = null
-	_bm_hit[at] = null
-	var tip: Vector2 = _bm_tip[at]
-	if finished and spell != null and _bm_reach[at] > 0.0 and tip.is_finite():
-		_blast(spell, tag, actor, tip)
-		if spell.payload != null and spell.trigger_event == TriggerBase.Event.EXPIRE:
-			_fire_payload(spell, tag, actor, tip, _bm_tip_dir[at] if not _bm_tip_dir[at].is_zero_approx() else _bm_dir[at], null)
-	shot_ended(tag)
-
-
-## Doubles the live beam rows (every one is on). A frame allocates only the first time it has
-## more beams than any before it.
-func _grow_beams() -> void:
-	var size: int = _bm_on.size() * 2
-	_bm_on.resize(size)
-	_bm_born.resize(size)
-	_bm_spell.resize(size)
-	_bm_source.resize(size)
-	_bm_tag.resize(size)
-	_bm_actor.resize(size)
-	_bm_caster.resize(size)
-	_bm_caster_seq.resize(size)
-	_bm_life.resize(size)
-	_bm_span.resize(size)
-	_bm_tick.resize(size)
-	_bm_turn.resize(size)
-	_bm_count.resize(size)
-	_bm_chain.resize(size)
-	_bm_prev.resize(size)
-	_bm_hit.resize(size)
-	_bm_shield.resize(size)
-	_bm_origin.resize(size)
-	_bm_dir.resize(size)
-	_bm_bend.resize(size)
-	_bm_end.resize(size)
-	_bm_reach.resize(size)
-	_bm_tip.resize(size)
-	_bm_tip_dir.resize(size)
-	_bm_hit_at.resize(size)
-	_bm_points.resize(size * _bm_stride)
-	while _bm_homing.size() < size * _bm_legs:
-		_bm_homing.append(Homing.new())
-
-
-## Every live beam row has room for `count` points: the rows are laid out again, wider, the
-## first time a beam needs more (a homing beam with more pierce, a beam turning at more walls).
-func _fit_beam_points(count: int) -> void:
-	if count <= _bm_stride:
-		return
-	var stride: int = maxi(count, _bm_stride * 2)
-	var points := PackedVector2Array()
-	points.resize(_bm_on.size() * stride)
-	for row in _bm_on.size():
-		for n in mini(_bm_count[row], _bm_stride):
-			points[row * stride + n] = _bm_points[row * _bm_stride + n]
-	_bm_points = points
-	_bm_stride = stride
-
-
-## Every live beam row has room for `legs` homing legs (laid out again, wider, when it has not).
-func _fit_beam_legs(legs: int) -> void:
-	if legs <= _bm_legs:
-		return
-	var width: int = maxi(legs, _bm_legs * 2)
-	var homing: Array[Homing] = []
-	for row in _bm_on.size():
-		for leg in width:
-			homing.append(_bm_homing[row * _bm_legs + leg] if leg < _bm_legs else Homing.new())
-	_bm_homing = homing
-	_bm_legs = width
-
-
-## Ends the live beams of `tag` quietly (a `hold` switched off, a revoked build).
-func _end_beams_of(tag: int) -> void:
-	for at in _bm_on.size():
-		if _bm_on[at] != 0 and _bm_tag[at] == tag:
-			_end_beam(at, false)
-
-
-## Runs every live beam on by `delta` (a beam started meanwhile, by a payload, waits for the next).
-func _step_beams(delta: float) -> void:
-	var first_new: int = _bm_next_born
-	for at in _bm_on.size():
-		if _bm_on[at] != 0 and _bm_born[at] < first_new:
-			_beam_step(at, delta)
-
-
-## A swing (`swing` carrier, melee I2; docs/milestones/M2-staffs.md, "Phase I: melee"): the staff
-## leans back for the carrier's `wind_up`, then sweeps its `arc` round the wizard's hand in its
-## `lifetime`, out to its `ray_length`, centred on the aim locked now. Each step it strikes every
-## body in the wedge it turned through since the last step (`Projectiles.sweep`), so a fast
-## sweep misses nothing, and each body once; its hits carry payloads and chains as a beam's do.
-## Swings turn clockwise and back by turns, and one cast within SWING_CHAIN of the last sweep's
-## end has no wind-up. It is held by its caster as a beam is: the wizard's hand (`set_aim`), the
-## shot that cast it, or a fixed point. Its `blast` and `on expire` happen at the end of the arc.
-## Returns false when it could not start (no direction).
-func _start_swing(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading: Vector2, chain: int, prev: int, source: Node) -> bool:
-	if not heading.is_finite() or heading.is_zero_approx() or not origin.is_finite():
-		return false
-	# A free row, or new rows when every one is on: no swing ends another.
-	var at: int = _sw_on.find(0)
-	if at < 0:
-		at = _sw_on.size()
-		_grow_swings(at * 2)
-	var side: int = 1
-	var wind: float = maxf(spell.wind_up, 0.0)
-	var mine: bool = actor >= 0 and actor < ACTORS
-	# The first swing of a cast is the body's; the others of the same cast (a split, a mirror) turn
-	# the same way and move no body of their own.
-	var first: bool = true
-	if mine:
-		first = _sw_last_start[actor] != _clock
-		side = -_sw_last_side[actor] if first else _sw_last_side[actor]
-		_sw_last_side[actor] = side
-		_sw_last_start[actor] = _clock
-		if _clock - _sw_last_end[actor] <= SpellLimits.SWING_CHAIN:
-			wind = 0.0
-	var half: float = deg_to_rad(spell.arc) * 0.5
-	_sw_on[at] = 1
-	_sw_born[at] = _sw_next_born
-	_sw_next_born += 1
-	_sw_spell[at] = spell
-	_sw_source[at] = source
-	_sw_tag[at] = tag
-	_sw_actor[at] = actor
-	_sw_caster[at] = _caster
-	_sw_caster_seq[at] = _caster_seq
-	_sw_origin[at] = origin
-	_sw_dir[at] = heading.normalized()
-	_sw_side[at] = side
-	_sw_age[at] = 0.0
-	_sw_wind[at] = wind
-	_sw_turned[at] = -(half + deg_to_rad(SpellLimits.SWING_LEAN))
-	_sw_chain[at] = chain
-	_sw_prev[at] = prev
-	_sw_echo[at] = 1 if _echo_spell == spell else 0
-	_sw_shield[at] = roundi(spell.behaviour(ModifierBase.Behaviour.SHIELD))
-	_sw_struck[at].clear()
-	_sw_points[at].clear()
-	_sw_heads[at].clear()
-	if _caster == CASTER_WIZARD:
-		if mine and _aim_pivot[actor].is_finite():
-			_sw_origin[at] = _aim_pivot[actor]
-		if mine and first:
-			_start_pose(actor, spell, tag, wind, maxf(spell.lifetime, 0.001), _sw_dir[at], side, true)
-	elif _caster_shot() < 0:
-		_sw_caster[at] = CASTER_POINT
-	shot_started(tag)
-	_swing_step(at, 0.0)
-	if _sw_on[at] != 0:
-		_lc_join(spell, tag, LC_SWING, at, _sw_born[at], true, wind + spell.lifetime, swing_tip(at), _sw_dir[at])
-	return true
-
-
-## Runs swing `at` on by `delta`: where its caster holds it, then, past its wind-up, its sweep.
-func _swing_step(at: int, delta: float) -> void:
-	_sw_age[at] += delta
-	_swing_follow(at)
-	if _sw_on[at] == 0:
-		return
-	var spell: CompiledSpell = _sw_spell[at]
-	var into: float = _sw_age[at] - _sw_wind[at]
-	if into < 0.0:
-		return
-	var tag: int = _sw_tag[at]
-	var sweep: float = maxf(spell.lifetime, 0.001)
-	var half: float = deg_to_rad(spell.arc) * 0.5
-	var lean: float = half + deg_to_rad(SpellLimits.SWING_LEAN)
-	var turned: float = lerpf(-lean, lean, swing_ease(clampf(into / sweep, 0.0, 1.0)))
-	var from: float = maxf(_sw_turned[at], -half)
-	var to: float = minf(turned, half)
-	_sw_turned[at] = turned
-	if to >= from:
-		_swing_guard(at, from, to)
-		if _sw_on[at] == 0 or _sw_spell[at] != spell or _sw_tag[at] != tag:
-			return
-		_swing_cast(at, from, to)
-	if into >= sweep and _sw_on[at] != 0 and _sw_spell[at] == spell and _sw_tag[at] == tag:
-		_end_swing(at, true)
-
-
-## How far through its turn a sweep is, `x` of its time gone: slow, fast, slow (the playground's).
-static func swing_ease(x: float) -> float:
-	return 2.0 * x * x if x < 0.5 else 1.0 - 2.0 * (1.0 - x) * (1.0 - x)
-
-
-## Puts swing `at` where its caster holds it now: the wizard's hand (a wizard with no aim any more,
-## down or gone, ends it quietly), or the shot that cast it while that flies.
-func _swing_follow(at: int) -> void:
-	var caster: int = _sw_caster[at]
-	if caster == CASTER_WIZARD:
-		var actor: int = _sw_actor[at]
-		if actor < 0 or actor >= ACTORS:
-			return
-		if _aim_origin[actor].is_finite():
-			_sw_origin[at] = _aim_pivot[actor] if _aim_pivot[actor].is_finite() else _aim_origin[actor]
-		elif _aim_seen[actor] != 0:
-			_end_swing(at, false)
-	elif caster >= 0:
-		if projectiles.is_alive(caster) and projectiles.get_seq_of(caster) == _sw_caster_seq[at]:
-			_sw_origin[at] = projectiles.get_position_of(caster)
-		else:
-			_sw_caster[at] = CASTER_POINT
-
-
-## Swing `at` turned from `from` to `to` radians off its aim: the shots of other teams in that
-## wedge are deflected outward from the hand (`deflect`), else stopped while its shield has
-## charges (melee I3).
-func _swing_guard(at: int, from: float, to: float) -> void:
-	var spell: CompiledSpell = _sw_spell[at]
-	var deflects: bool = spell.behaviour(ModifierBase.Behaviour.DEFLECT) > 0.0
-	if not deflects and _sw_shield[at] <= 0:
-		return
-	var origin: Vector2 = _sw_origin[at]
-	var found: int = projectiles.shots_in_wedge(_sw_actor[at], origin, _sw_dir[at], _sw_side[at], from, to, spell.ray_length)
-	_sw_shield[at] = _guard(found, _sw_actor[at], _sw_tag[at], deflects, _sw_shield[at], origin, Vector2.INF)
-
-
-## Swing `at` turned from `from` to `to` radians off its aim: it strikes each body in that wedge it
-## has not struck yet (as a ray (`_ray_begin`) that `_on_hit` reads), outward from its hand.
-func _swing_cast(at: int, from: float, to: float) -> void:
-	var spell: CompiledSpell = _sw_spell[at]
-	var tag: int = _sw_tag[at]
-	var actor: int = _sw_actor[at]
-	var source: Node = _sw_source[at] if is_instance_valid(_sw_source[at]) else null
-	var origin: Vector2 = _sw_origin[at]
-	var found: int = projectiles.sweep(actor, origin, _sw_dir[at], _sw_side[at], from, to, spell.ray_length, HITS, source)
-	if found == 0:
-		return
-	var struck: Array = _sw_struck[at]
-	var points: Array = _sw_points[at]
-	var heads: Array = _sw_heads[at]
-	var first: int = struck.size()
-	for i in found:
-		var node: Node = projectiles.sweep_nodes[i]
-		if struck.has(node):
-			continue
-		struck.append(node)
-		points.append(projectiles.sweep_points[i])
-		heads.append(projectiles.sweep_heads[i])
-	var last: int = struck.size()
-	if last == first:
-		return
-	var ray: RayHit = _ray_begin(tag, _ray.dir, _sw_chain[at], _sw_prev[at], spell.echo_hit if _sw_echo[at] != 0 else null, -1)
-	for row in range(first, last):
-		# A hit handler may have ended this swing (a rebuild) or reused its row.
-		if _sw_on[at] == 0 or _sw_tag[at] != tag:
-			break
-		var point: Vector2 = points[row]
-		ray.dir = origin.direction_to(point) if not origin.is_equal_approx(point) else _sw_dir[at]
-		projectiles.strike(actor, struck[row], point, heads[row], tag, &"swing")
-	_ray_end()
-	_cast_jumps()
-
-
-## Swing `at` is over. With `finished` (its sweep is done), its `blast` and `on expire` payload
-## happen at the end of its arc, and its caster's next swing may chain on; one ended early (a
-## rebuild, its wizard down, the cap) ends quietly.
-func _end_swing(at: int, finished: bool) -> void:
-	if _sw_on[at] == 0:
-		return
-	_sw_on[at] = 0
-	var spell: CompiledSpell = _sw_spell[at]
-	var tag: int = _sw_tag[at]
-	var actor: int = _sw_actor[at]
-	_sw_spell[at] = null
-	_sw_source[at] = null
-	_sw_struck[at].clear()
-	if finished and spell != null:
-		if actor >= 0 and actor < ACTORS:
-			_sw_last_end[actor] = _clock
-		var end: Vector2 = swing_end_point(_sw_origin[at], _sw_dir[at], _sw_side[at], spell.arc, spell.ray_length)
-		end = projectiles.clip_to_walls(_sw_origin[at], end)
-		_blast(spell, tag, actor, end)
-		if spell.payload != null and spell.trigger_event == TriggerBase.Event.EXPIRE:
-			_fire_payload(spell, tag, actor, end, _sw_dir[at], null)
-	shot_ended(tag)
-
-
-## The end point of a swing round `origin` aimed along `direction`, turning `side` through `arc`
-## degrees out to `reach`: where its arc ends.
-static func swing_end_point(origin: Vector2, direction: Vector2, side: int, arc: float, reach: float) -> Vector2:
-	return origin + direction.normalized().rotated(deg_to_rad(arc) * 0.5 * (1.0 if side >= 0 else -1.0)) * reach
-
-
-## Where the tip of swing `at`'s staff is now: on its arc as far as it has turned (leaning back
-## before its sweep), `ray_length` out.
-func swing_tip(at: int) -> Vector2:
-	var half: float = deg_to_rad(swing_arc(at)) * 0.5
-	var turned: float = clampf(_sw_turned[at], -half, half) * (1.0 if _sw_side[at] >= 0 else -1.0)
-	return _sw_origin[at] + _sw_dir[at].rotated(turned) * swing_reach(at)
-
-
-## Makes room for `size` swing rows (the new ones off, each with its own struck list).
-func _grow_swings(size: int) -> void:
-	var old: int = _sw_on.size()
-	_sw_on.resize(size)
-	_sw_born.resize(size)
-	_sw_spell.resize(size)
-	_sw_source.resize(size)
-	_sw_tag.resize(size)
-	_sw_actor.resize(size)
-	_sw_caster.resize(size)
-	_sw_caster_seq.resize(size)
-	_sw_origin.resize(size)
-	_sw_dir.resize(size)
-	_sw_side.resize(size)
-	_sw_age.resize(size)
-	_sw_wind.resize(size)
-	_sw_turned.resize(size)
-	_sw_chain.resize(size)
-	_sw_prev.resize(size)
-	_sw_echo.resize(size)
-	_sw_shield.resize(size)
-	for i in range(old, size):
-		_sw_struck.append([])
-		_sw_points.append([])
-		_sw_heads.append([])
-
-
-## Ends the swings of `tag` quietly (a revoked build, a hold switched off).
-func _end_swings_of(tag: int) -> void:
-	for at in _sw_on.size():
-		if _sw_on[at] != 0 and _sw_tag[at] == tag:
-			_end_swing(at, false)
-
-
-## A slam (`slam` carrier, melee I8; docs/milestones/M2-staffs.md, "Phase I: melee"): the staff
-## rises for the carrier's `wind_up`, held by its caster as a swing is (the wizard's hand, the shot
-## that cast it, or a point), with the aim locked now; then it strikes the floor `ray_length`
-## ahead (short of a wall) and a ring grows from there to its `radius` over SLAM_GROW of its
-## `lifetime` and holds for the rest. The ring strikes each body in it once (`Projectiles.sweep`
-## all round the impact, so a wall between hides a body), outward from the impact, so the hit's
-## knockback throws it outward; its caster's own body is skipped, a teammate is hit. Its hits carry
-## payloads and chains as a beam's do, and a shield or deflect works on the shots in its ring. Its
-## `blast` and `on expire` happen at the impact when the ring is done. `form_shown` tells looks of
-## the wind-up (`slam_mark`: where it will strike, for the seconds until then) and the impact.
-## Returns false when it could not start (no direction).
-func _start_slam(spell: CompiledSpell, tag: int, actor: int, origin: Vector2, heading: Vector2, chain: int, prev: int, source: Node) -> bool:
-	if not heading.is_finite() or heading.is_zero_approx() or not origin.is_finite():
-		return false
-	var at: int = _sl_on.find(0)
-	if at < 0:
-		at = _sl_on.size()
-		_grow_slams(at * 2)
-	_sl_on[at] = 1
-	_sl_born[at] = _sl_next_born
-	_sl_next_born += 1
-	_sl_spell[at] = spell
-	_sl_source[at] = source
-	_sl_tag[at] = tag
-	_sl_actor[at] = actor
-	_sl_caster[at] = _caster
-	_sl_caster_seq[at] = _caster_seq
-	_sl_origin[at] = origin
-	_sl_dir[at] = heading.normalized()
-	_sl_impact[at] = Vector2.INF
-	_sl_age[at] = 0.0
-	_sl_wind[at] = maxf(spell.wind_up, 0.0)
-	_sl_chain[at] = chain
-	_sl_prev[at] = prev
-	_sl_echo[at] = 1 if _echo_spell == spell else 0
-	_sl_shield[at] = roundi(spell.behaviour(ModifierBase.Behaviour.SHIELD))
-	_sl_struck[at].clear()
-	var mine: bool = actor >= 0 and actor < ACTORS
-	if _caster == CASTER_WIZARD:
-		if mine and _aim_pivot[actor].is_finite():
-			_sl_origin[at] = _aim_pivot[actor]
-		if mine and _pose_start[actor] != _clock:
-			_start_pose(actor, spell, tag, _sl_wind[at], maxf(spell.lifetime, 0.001), _sl_dir[at], up_side(_sl_dir[at]), true)
-	elif _caster_shot() < 0:
-		_sl_caster[at] = CASTER_POINT
-	shot_started(tag)
-	if events != null and _sl_wind[at] > 0.0:
-		var mark: Vector2 = projectiles.clip_to_walls(_sl_origin[at], _sl_origin[at] + _sl_dir[at] * spell.ray_length)
-		events.form_shown.emit(actor, &"slam_mark", mark, _sl_dir[at], _sl_wind[at], spell.tint, spell.look)
-	_slam_step(at, 0.0)
-	return true
-
-
-## Runs slam `at` on by `delta`: held by its caster through its wind-up, then its impact and ring.
-func _slam_step(at: int, delta: float) -> void:
-	_sl_age[at] += delta
-	var spell: CompiledSpell = _sl_spell[at]
-	var tag: int = _sl_tag[at]
-	if not _sl_impact[at].is_finite():
-		_slam_follow(at)
-		if _sl_on[at] == 0 or _sl_age[at] < _sl_wind[at]:
-			return
-		var impact: Vector2 = projectiles.clip_to_walls(_sl_origin[at], _sl_origin[at] + _sl_dir[at] * spell.ray_length)
-		_sl_impact[at] = impact
-		if events != null:
-			events.form_shown.emit(_sl_actor[at], &"slam", impact, _sl_dir[at], spell.radius, spell.tint, spell.look)
-	var into: float = _sl_age[at] - _sl_wind[at]
-	var life: float = maxf(spell.lifetime, 0.001)
-	var reach: float = spell.radius * clampf(into / (life * SpellLimits.SLAM_GROW), 0.0, 1.0)
-	_slam_guard(at, reach)
-	if _sl_on[at] == 0 or _sl_spell[at] != spell or _sl_tag[at] != tag:
-		return
-	_slam_cast(at, reach)
-	if into >= life and _sl_on[at] != 0 and _sl_spell[at] == spell and _sl_tag[at] == tag:
-		_end_slam(at, true)
-
-
-## Puts slam `at` where its caster holds it now, until it strikes (as `_swing_follow`).
-func _slam_follow(at: int) -> void:
-	var caster: int = _sl_caster[at]
-	if caster == CASTER_WIZARD:
-		var actor: int = _sl_actor[at]
-		if actor < 0 or actor >= ACTORS:
-			return
-		if _aim_origin[actor].is_finite():
-			_sl_origin[at] = _aim_pivot[actor] if _aim_pivot[actor].is_finite() else _aim_origin[actor]
-		elif _aim_seen[actor] != 0:
-			_end_slam(at, false)
-	elif caster >= 0:
-		if projectiles.is_alive(caster) and projectiles.get_seq_of(caster) == _sl_caster_seq[at]:
-			_sl_origin[at] = projectiles.get_position_of(caster)
-		else:
-			_sl_caster[at] = CASTER_POINT
-
-
-## The shots of other teams in slam `at`'s ring (`reach` across now): deflected outward from the
-## impact (`deflect`), else stopped while its shield has charges (melee I3).
-func _slam_guard(at: int, reach: float) -> void:
-	var spell: CompiledSpell = _sl_spell[at]
-	var deflects: bool = spell.behaviour(ModifierBase.Behaviour.DEFLECT) > 0.0
-	if (not deflects and _sl_shield[at] <= 0) or reach <= 0.0:
-		return
-	var impact: Vector2 = _sl_impact[at]
-	var found: int = projectiles.shots_in_wedge(_sl_actor[at], impact, _sl_dir[at], 1, -PI, PI, reach)
-	_sl_shield[at] = _guard(found, _sl_actor[at], _sl_tag[at], deflects, _sl_shield[at], impact, Vector2.INF, &"slam")
-
-
-## Slam `at`'s ring, `reach` across now: it strikes each body in it it has not struck yet, outward
-## from the impact, as a ray (`_ray_begin`) that `_on_hit` reads (as `_swing_cast`).
-func _slam_cast(at: int, reach: float) -> void:
-	if reach <= 0.0:
-		return
-	var spell: CompiledSpell = _sl_spell[at]
-	var tag: int = _sl_tag[at]
-	var actor: int = _sl_actor[at]
-	var source: Node = _sl_source[at] if is_instance_valid(_sl_source[at]) else null
-	var impact: Vector2 = _sl_impact[at]
-	var found: int = projectiles.sweep(actor, impact, _sl_dir[at], 1, -PI, PI, reach, HITS, source)
-	if found == 0:
-		return
-	var struck: Array = _sl_struck[at]
-	var first: int = struck.size()
-	for i in found:
-		var node: Node = projectiles.sweep_nodes[i]
-		if not struck.has(node):
-			struck.append(node)
-	var last: int = struck.size()
-	if last == first:
-		return
-	var ray: RayHit = _ray_begin(tag, _ray.dir, _sl_chain[at], _sl_prev[at], null, _ray.arc_slot)
-	var saved_echo: CompiledSpell = _echo_spell
-	_echo_spell = spell if _sl_echo[at] != 0 else null
-	for row in range(first, last):
-		# A hit handler may have ended this slam (a rebuild) or reused its row.
-		if _sl_on[at] == 0 or _sl_tag[at] != tag:
-			break
-		var node: Node = struck[row]
-		if not is_instance_valid(node) or not (node is Node2D):
-			continue
-		var body: Vector2 = (node as Node2D).global_position
-		var out: Vector2 = impact.direction_to(body) if not impact.is_equal_approx(body) else _sl_dir[at]
-		ray.dir = out
-		# Struck at the impact, so the hit's push throws it outward from there.
-		projectiles.strike(actor, node, impact, out, tag, &"slam")
-	_ray_end()
-	_echo_spell = saved_echo
-	_cast_jumps()
-
-
-## Slam `at` is over. With `finished` (its ring is done), its `blast` and `on expire` payload happen
-## at the impact, the payload along the slam's aim; one ended early ends quietly.
-func _end_slam(at: int, finished: bool) -> void:
-	if _sl_on[at] == 0:
-		return
-	_sl_on[at] = 0
-	var spell: CompiledSpell = _sl_spell[at]
-	var tag: int = _sl_tag[at]
-	var actor: int = _sl_actor[at]
-	var impact: Vector2 = _sl_impact[at]
-	_sl_spell[at] = null
-	_sl_source[at] = null
-	_sl_struck[at].clear()
-	if finished and spell != null and impact.is_finite():
-		_blast(spell, tag, actor, impact)
-		if spell.payload != null and spell.trigger_event == TriggerBase.Event.EXPIRE:
-			_fire_payload(spell, tag, actor, impact, _sl_dir[at], null)
-	shot_ended(tag)
-
-
-## Makes room for `size` slam rows (the new ones off, each with its own struck list).
-func _grow_slams(size: int) -> void:
-	var old: int = _sl_on.size()
-	_sl_on.resize(size)
-	_sl_born.resize(size)
-	_sl_spell.resize(size)
-	_sl_source.resize(size)
-	_sl_tag.resize(size)
-	_sl_actor.resize(size)
-	_sl_caster.resize(size)
-	_sl_caster_seq.resize(size)
-	_sl_origin.resize(size)
-	_sl_dir.resize(size)
-	_sl_impact.resize(size)
-	_sl_age.resize(size)
-	_sl_wind.resize(size)
-	_sl_chain.resize(size)
-	_sl_prev.resize(size)
-	_sl_echo.resize(size)
-	_sl_shield.resize(size)
-	for i in range(old, size):
-		_sl_struck.append([])
-
-
-## Ends the slams of `tag` quietly (a revoked build, a hold switched off).
-func _end_slams_of(tag: int) -> void:
-	for at in _sl_on.size():
-		if _sl_on[at] != 0 and _sl_tag[at] == tag:
-			_end_slam(at, false)
-
-
-## Runs every live slam on by `delta` (one started meanwhile, by a payload, waits for the next).
-func _step_slams(delta: float) -> void:
-	var first_new: int = _sl_next_born
-	for at in _sl_on.size():
-		if _sl_on[at] != 0 and _sl_born[at] < first_new:
-			_slam_step(at, delta)
-
-
-## Live slams over every caster, and whether row `at` is one, for tests.
-func slam_count() -> int:
-	return _sl_on.count(1)
-
-
-func slam_slots() -> int:
-	return _sl_on.size()
-
-
-func slam_on(at: int) -> bool:
-	return at >= 0 and at < _sl_on.size() and _sl_on[at] != 0
-
-
-## Where slam `at` struck (INF while it winds up).
-func slam_impact(at: int) -> Vector2:
-	return _sl_impact[at]
-
-
-## Runs every live swing on by `delta` (one started meanwhile, by a payload, waits for the next).
-func _step_swings(delta: float) -> void:
-	var first_new: int = _sw_next_born
-	for at in _sw_on.size():
-		if _sw_on[at] != 0 and _sw_born[at] < first_new:
-			_swing_step(at, delta)
-
-
-## Numbers a pose has: FormBase.POSE_CHANNELS (turn, lift, push, glow, stretch, shake).
-const POSE_CHANNELS: int = 6
-
-
-## How long `spell`'s strike lasts for its staff animation (`FormBase.staff_pose`): the working time
-## of a carrier the staff keeps working (a beam's, rain's or dash's `lifetime`, a held one's until its
-## last shot ends); none for one that leaves the staff (a bolt, a rune, an orbit).
-static func _pose_strike_of(spell: CompiledSpell, lifetime: float) -> float:
-	match spell.motion:
-		FormBase.Motion.RAY, FormBase.Motion.RAIN, FormBase.Motion.DASH:
-			return maxf(lifetime, 0.0)
-	return 0.0
-
-
-## Starts `actor`'s staff animation for `spell` (its `staff_pose`, cast with `tag`) now: `wind` and
-## `strike` seconds of wind-up and strike, the aim `dir` locked now, turning `side` (1, or -1 for a
-## backhand). It starts from where the last one has the staff now, so a new cast never jumps.
-func _start_pose(actor: int, spell: CompiledSpell, tag: int, wind: float, strike: float, dir: Vector2, side: int, lock: bool = false) -> void:
-	var at: int = actor * POSE_CHANNELS
-	var was: Vector2 = staff_pose_dir(actor)
-	if was.is_zero_approx():
-		for c in POSE_CHANNELS:
-			_pose_from[at + c] = 0.0
-	else:
-		_pose_now(actor)
-		var heading: float = was.angle() + deg_to_rad(_pose_out[0]) * _pose_side[actor]
-		for c in POSE_CHANNELS:
-			_pose_from[at + c] = _pose_out[c]
-		_pose_from[at] = rad_to_deg(angle_difference(dir.angle(), heading)) * side
-	_pose_out_actor = -1
-	if spell.staff_pose.is_empty():
-		_pose_start[actor] = INF
-		return
-	_pose_start[actor] = _clock
-	_pose_wind[actor] = wind
-	_pose_strike[actor] = strike
-	_pose_tag[actor] = tag
-	_pose_dir[actor] = dir
-	_pose_lock[actor] = 1 if lock else 0
-	_pose_side[actor] = side
-	_pose_keys[actor] = spell.staff_pose
-	_pose_tint[actor] = spell.tint
-
-
-## The carrier with `tag` has no shot left: the strike of the animation it plays ends now.
-func _end_pose_strike(tag: int) -> void:
-	var actor: int = SpellTag.caster_of(tag)
-	if actor < 0 or actor >= ACTORS or not is_finite(_pose_start[actor]) or _pose_tag[actor] != tag:
-		return
-	var into: float = maxf(_clock - _pose_start[actor] - _pose_wind[actor], 0.0)
-	if into < _pose_strike[actor]:
-		_pose_strike[actor] = into
-		_pose_out_actor = -1
-
-
-## Where `actor`'s staff is in its animation now (its carrier's `staff_pose`), for its look: x the
-## turn off the aim locked at the cast (radians, a backhand's the other way), y the lift and z the
-## push along that aim (pixels). Zero when it plays none: then `staff_pose_dir` is zero too and the
-## look follows the aim. A new animation starts from where the last one had the staff.
-func staff_pose(actor: int) -> Vector3:
-	if not _pose_now(actor):
-		return Vector3.ZERO
-	return Vector3(deg_to_rad(_pose_out[0]) * _pose_side[actor], _pose_out[1], _pose_out[2])
-
-
-## How strongly `actor`'s staff glows now (0 to 1), and in what colour: its carrier's infusion's,
-## or white for a plain one (the look takes the player's colour then).
-func staff_glow(actor: int) -> float:
-	return _pose_out[3] if _pose_now(actor) else 0.0
-
-
-func staff_glow_tint(actor: int) -> Color:
-	return _pose_tint[actor] if actor >= 0 and actor < ACTORS else Color.WHITE
-
-
-## How much `actor`'s staff is stretched along its aim now (0 none, negative squashed), and the
-## pixels it shakes by.
-func staff_stretch(actor: int) -> float:
-	return _pose_out[4] if _pose_now(actor) else 0.0
-
-
-func staff_shake(actor: int) -> float:
-	return _pose_out[5] if _pose_now(actor) else 0.0
-
-
-## The mood `actor`'s staff animation shows on its face now (`FormBase.POSE_MOODS`), or empty.
-func staff_mood(actor: int) -> StringName:
-	if not _pose_now(actor) or _pose_out_mood <= 0:
-		return &""
-	return FormBase.POSE_MOODS[_pose_out_mood - 1]
-
-
-## The aim `actor`'s staff animation turns from, or zero when it plays none: the aim of the cast
-## for a carrier that locks it (a swing, a slam), else the live aim (a held beam turns with it).
-func staff_pose_dir(actor: int) -> Vector2:
-	if not _pose_now(actor):
-		return Vector2.ZERO
-	if _pose_lock[actor] == 0 and _aim_dir[actor].is_finite() and not _aim_dir[actor].is_zero_approx():
-		return _aim_dir[actor]
-	return _pose_dir[actor]
-
-
-## Works out `actor`'s animation now into `_pose_out` and `_pose_out_mood` (once per actor and
-## clock); false when it plays none (none started, or past its last key). The keys run from where
-## the staff was at the cast; "hold" keys repeat, each round from the last of them, while the
-## strike lasts. Allocation-free.
-func _pose_now(actor: int) -> bool:
-	if actor < 0 or actor >= ACTORS or not is_finite(_pose_start[actor]):
-		return false
-	if _pose_out_actor == actor and _pose_out_clock == _clock:
-		return _pose_out_mood >= 0
-	_pose_out_actor = actor
-	_pose_out_clock = _clock
-	var keys: PackedFloat32Array = _pose_keys[actor]
-	var s: float = _clock - _pose_start[actor]
-	var wind: float = _pose_wind[actor]
-	var strike: float = _pose_strike[actor]
-	var stride: int = FormBase.POSE_STRIDE
-	var count: int = keys.size() / stride
-	# Where the last key passed left the staff (the start: where it was at the cast), and when.
-	var base: int = actor * POSE_CHANNELS
-	var from_key: int = -1
-	var from_t: float = 0.0
-	var mood: int = 0
-	var k: int = 0
-	while k < count:
-		var phase: int = roundi(keys[k * stride + FormBase.PK_PHASE])
-		if phase == FormBase.POSE_PHASES["hold"]:
-			# The run of hold keys, played round and round through the strike.
-			var first: int = k
-			while k < count and roundi(keys[k * stride + FormBase.PK_PHASE]) == phase:
-				k += 1
-			var last: int = k - 1
-			var period: float = keys[last * stride + FormBase.PK_AT]
-			if s < wind and strike > 0.0:
-				# Still winding up past its last wind key: it stays there until the strike.
-				return _pose_between(keys, actor, from_key, first, 0.0, mood)
-			if s >= wind and s < wind + strike and period > 0.0:
-				var into: float = s - wind
-				var round_n: int = floori(into / period)
-				var u: float = into - round_n * period
-				var h_from: int = from_key if round_n == 0 else last
-				var h_t: float = 0.0
-				for h in range(first, last + 1):
-					var t: float = keys[h * stride + FormBase.PK_AT]
-					if u < t:
-						return _pose_between(keys, actor, h_from, h, clampf((u - h_t) / (t - h_t), 0.0, 1.0) if t > h_t else 1.0, mood)
-					h_from = h
-					h_t = t
-					mood = _mood_of(keys, h, mood)
-				return _pose_between(keys, actor, h_from, h_from, 1.0, mood)
-			if s >= wind + strike or strike <= 0.0:
-				from_key = last if strike > 0.0 else from_key
-				from_t = wind + strike
-			continue
-		var at: float = keys[k * stride + FormBase.PK_AT]
-		var t: float = at * wind if phase == 0 else (wind + at * strike if phase == 1 else wind + strike + at)
-		if s < t:
-			return _pose_between(keys, actor, from_key, k, clampf((s - from_t) / (t - from_t), 0.0, 1.0) if t > from_t else 1.0, mood)
-		from_key = k
-		from_t = t
-		mood = _mood_of(keys, k, mood)
-		k += 1
-	_pose_out_mood = -1
-	return false
-
-
-## The mood shown once key `k` is passed: its own, else the one before.
-static func _mood_of(keys: PackedFloat32Array, k: int, mood: int) -> int:
-	var own: int = roundi(keys[k * FormBase.POSE_STRIDE + FormBase.PK_MOOD])
-	return own if own > 0 else mood
-
-
-## Puts into `_pose_out` the pose `x` of the way from key `from` (-1: where the staff was at the
-## cast) to key `to`, eased by `to`'s ease, with `mood`; true.
-func _pose_between(keys: PackedFloat32Array, actor: int, from: int, to: int, x: float, mood: int) -> bool:
-	var stride: int = FormBase.POSE_STRIDE
-	var eased: float = pose_ease(x, roundi(keys[to * stride + FormBase.PK_EASE]))
-	for c in POSE_CHANNELS:
-		var a: float = _pose_from[actor * POSE_CHANNELS + c] if from < 0 else keys[from * stride + FormBase.PK_CHANNELS + c]
-		_pose_out[c] = lerpf(a, keys[to * stride + FormBase.PK_CHANNELS + c], eased)
-	_pose_out_mood = mood
-	return true
-
-
-## The side a staff animation turns for a carrier that is no swing: the one where a negative turn
-## lifts the head (toward the top of the screen) whichever way it faces.
-static func up_side(aim: Vector2) -> int:
-	return 1 if aim.x >= 0.0 else -1
-
-
-## `x` (0 to 1) of the way into a key, eased by `ease` (`FormBase.POSE_EASES`: 0 slow, fast, slow;
-## 1 slowing into the key; 2 speeding up into it).
-static func pose_ease(x: float, ease: int) -> float:
-	match ease:
-		1:
-			return 1.0 - (1.0 - x) * (1.0 - x)
-		2:
-			return x * x
-	return swing_ease(x)
-
-
-## The live swings, for their look (`gameplay/feel`): `swing_slots()` rows, each on or off. A
-## swing on turns round `swing_origin` from `swing_dir` (the aim locked at the cast), `swing_side`
-## 1 clockwise on screen or -1 back; `swing_turned` is how far it has turned (radians, from minus
-## to plus half its `swing_arc` and SWING_LEAN past; it waits at the start through its wind-up),
-## out to `swing_reach`.
-func swing_slots() -> int:
-	return _sw_on.size()
-
-
-func swing_on(at: int) -> bool:
-	return at >= 0 and at < _sw_on.size() and _sw_on[at] != 0
-
-
-func swing_actor(at: int) -> int:
-	return _sw_actor[at]
-
-
-func swing_tag(at: int) -> int:
-	return _sw_tag[at]
-
-
-func swing_origin(at: int) -> Vector2:
-	return _sw_origin[at]
-
-
-func swing_dir(at: int) -> Vector2:
-	return _sw_dir[at]
-
-
-func swing_side(at: int) -> int:
-	return _sw_side[at]
-
-
-func swing_turned(at: int) -> float:
-	return _sw_turned[at]
-
-
-func swing_arc(at: int) -> float:
-	return _sw_spell[at].arc if _sw_spell[at] != null else 0.0
-
-
-func swing_reach(at: int) -> float:
-	return _sw_spell[at].ray_length if _sw_spell[at] != null else 0.0
-
-
-## Which swing row `at` holds: a number no other swing had, so its look knows a new swing in a
-## row used again.
-func swing_born(at: int) -> int:
-	return _sw_born[at]
-
-
-## Seconds swing `at` has run (its wind-up first), its wind-up and its sweep.
-func swing_age(at: int) -> float:
-	return _sw_age[at]
-
-
-func swing_wind(at: int) -> float:
-	return _sw_wind[at]
-
-
-func swing_sweep(at: int) -> float:
-	return maxf(_sw_spell[at].lifetime, 0.001) if _sw_spell[at] != null else 0.001
-
-
-## The tint and packed look kinds of swing `at` (`CompiledSpell.tint`, `look`), so it shows its cards.
-func swing_tint(at: int) -> Color:
-	return _sw_spell[at].tint if _sw_spell[at] != null else Color.WHITE
-
-
-func swing_look(at: int) -> int:
-	return _sw_spell[at].look if _sw_spell[at] != null else 0
-
-
-## Live swings over every caster.
-func swing_count() -> int:
-	return _sw_on.count(1)
 
 
 ## Where `actor`'s wizard holds its staffs now: the staff tip (`origin`) and the aim. The actor
@@ -3342,80 +1967,6 @@ func clear_aim(actor: int) -> void:
 		return
 	_aim_origin[actor] = Vector2.INF
 	_aim_dir[actor] = Vector2.INF
-
-
-## The live beams, for their look (`gameplay/feel` draws them every frame): `beam_slots()` rows,
-## each on or off. A beam on runs along its path (`beam_point_count`, `beam_point`; a homing one
-## bends onto a target, `beam_end`, through `beam_bend`, and with pierce on to more), cut to its
-## first `beam_reach` pixels (its length, a wall, or the target that spends it).
-## `beam_since_hit` is seconds since its last hit; `beam_left` is its life left, 0 to 1.
-func beam_slots() -> int:
-	return _bm_on.size()
-
-
-func beam_on(at: int) -> bool:
-	return at >= 0 and at < _bm_on.size() and _bm_on[at] != 0
-
-
-## The caster (actor id) of live beam `at`; its look is drawn in that actor's ramp.
-func beam_caster(at: int) -> int:
-	return _bm_actor[at]
-
-
-func beam_origin(at: int) -> Vector2:
-	return _bm_origin[at]
-
-
-## The points of live beam `at`'s path, from its start; it is drawn along them for its first
-## `beam_reach` pixels.
-func beam_point_count(at: int) -> int:
-	return _bm_count[at]
-
-
-func beam_point(at: int, n: int) -> Vector2:
-	return _bm_points[at * _bm_stride + n]
-
-
-func beam_bend(at: int) -> Vector2:
-	return _bm_bend[at]
-
-
-func beam_end(at: int) -> Vector2:
-	return _bm_end[at]
-
-
-func beam_reach(at: int) -> float:
-	return _bm_reach[at]
-
-
-## How many times wider than its carrier live beam `at` is now (growth; 1.0 for a plain beam).
-func beam_growth(at: int) -> float:
-	var spell: CompiledSpell = _bm_spell[at]
-	if spell == null or spell.radius <= 0.0:
-		return 1.0
-	return _beam_width(at) / (spell.radius * 0.5)
-
-
-func beam_tint(at: int) -> Color:
-	return _bm_spell[at].tint if _bm_spell[at] != null else Color.WHITE
-
-
-## The packed look kinds of live beam `at` (`CompiledSpell.look`), so it shows its cards.
-func beam_look(at: int) -> int:
-	return _bm_spell[at].look if _bm_spell[at] != null else 0
-
-
-func beam_since_hit(at: int) -> float:
-	return _clock - _bm_hit_at[at]
-
-
-func beam_left(at: int) -> float:
-	return clampf(_bm_life[at] / _bm_span[at], 0.0, 1.0) if _bm_span[at] > 0.0 and _bm_span[at] < SpellLimits.HOLD_LIFETIME else 1.0
-
-
-## Live beams on now (tests).
-func beam_count() -> int:
-	return _bm_on.count(1)
 
 
 ## Casts the queued beam jumps, if this is the outermost beam. Each jump's own jumps join the
@@ -3671,9 +2222,9 @@ func _lc_where(i: int) -> Vector2:
 		LC_SLOT:
 			return projectiles.get_position_of(ref) if projectiles.get_seq_of(ref) == _lc_seq[i] else Vector2.INF
 		LC_BEAM:
-			return _bm_tip[ref] if _bm_on[ref] != 0 and _bm_born[ref] == _lc_seq[i] else Vector2.INF
+			return _beams.tip_of(ref, _lc_seq[i])
 		LC_SWING:
-			return swing_tip(ref) if _sw_on[ref] != 0 and _sw_born[ref] == _lc_seq[i] else Vector2.INF
+			return _swings.tip_of(ref, _lc_seq[i])
 		LC_ACTOR:
 			return projectiles.get_anchor(ref)
 	return _lc_at[i]
@@ -3745,9 +2296,7 @@ func _step_arcs(delta: float) -> void:
 ## shots pull in a step; which ones rotates, so none starves.
 func _step_magnets() -> void:
 	# A live beam with magnet pulls toward its line every step it is on (rules R4f).
-	for at in _bm_on.size():
-		if _bm_on[at] != 0 and _bm_spell[at].behaviour(ModifierBase.Behaviour.MAGNET) > 0.0:
-			_beam_pull(at)
+	_beams.pull_magnets()
 	var i: int = 0
 	while i < _magnet_count:
 		var slot: int = _magnets[i]
@@ -4131,18 +2680,9 @@ func clear() -> void:
 		_passes_free.append(dash)
 	_passes.clear()
 	_caster = CASTER_WIZARD
-	_bm_on.fill(0)
-	_bm_spell.fill(null)
-	_bm_source.fill(null)
-	_sw_on.fill(0)
-	_sw_spell.fill(null)
-	_sw_source.fill(null)
-	for at in _sw_struck.size():
-		_sw_struck[at].clear()
-	_sw_last_side.fill(-1)
-	_sw_last_end.fill(-INF)
-	_sw_last_start.fill(-INF)
-	_pose_start.fill(INF)
+	_beams.clear()
+	_swings.clear()
+	_poses.clear()
 	_aim_pivot.fill(Vector2.INF)
 	_aim_origin.fill(Vector2.INF)
 	_aim_dir.fill(Vector2.INF)
@@ -4212,12 +2752,8 @@ func close_caster(actor: int) -> void:
 		_current[index] = -1
 		if old >= 0:
 			_release_generation(actor, staff, old)
-	for at in _bm_on.size():
-		if _bm_on[at] != 0 and _bm_actor[at] == actor:
-			_end_beam(at, false)
-	for at in _sw_on.size():
-		if _sw_on[at] != 0 and _sw_actor[at] == actor:
-			_end_swing(at, false)
+	_beams.end_actor(actor)
+	_swings.end_actor(actor)
 	_reset_caster(actor)
 
 
@@ -4352,10 +2888,8 @@ func _reset_caster(caster: int) -> void:
 	_aim_dir[caster] = Vector2.INF
 	_aim_seen[caster] = 0
 	_aim_pivot[caster] = Vector2.INF
-	_sw_last_side[caster] = -1
-	_sw_last_end[caster] = -INF
-	_sw_last_start[caster] = -INF
-	_pose_start[caster] = INF
+	_swings.reset_actor(caster)
+	_poses.reset_actor(caster)
 	_last_infused[caster] = null
 
 
@@ -4451,8 +2985,8 @@ func _release_hold(index: int) -> void:
 			if _entities.has(tag):
 				events.entity_end_requested.emit(SpellTag.caster_of(tag), tag)
 	for tag in tags:
-		_end_beams_of(tag)
-		_end_swings_of(tag)
+		_beams.end_of(tag)
+		_swings.end_of(tag)
 		_lc_leave(tag, true)
 	if projectiles != null:
 		for tag in tags:
@@ -4505,3 +3039,206 @@ func _component(id: StringName) -> SpellComponent:
 
 func _name_of(component: SpellComponent) -> String:
 	return component.display_name if not component.display_name.is_empty() else String(component.id)
+
+
+# The forms the kits run, for their looks (`gameplay/feel`, the actor's look) and the tests: each
+# getter hands the question to the kit that keeps those rows.
+
+## Beams (`SpellBeams`): `beam_slots()` rows, each on or off, with where it is and how it looks.
+static func beam_hits(motion: int, lifetime: float) -> int:
+	return SpellBeams.beam_hits(motion, lifetime)
+
+
+func beam_slots() -> int:
+	return _beams.beam_slots()
+
+
+func beam_on(at: int) -> bool:
+	return _beams.beam_on(at)
+
+
+func beam_caster(at: int) -> int:
+	return _beams.beam_caster(at)
+
+
+func beam_origin(at: int) -> Vector2:
+	return _beams.beam_origin(at)
+
+
+func beam_point_count(at: int) -> int:
+	return _beams.beam_point_count(at)
+
+
+func beam_point(at: int, n: int) -> Vector2:
+	return _beams.beam_point(at, n)
+
+
+func beam_bend(at: int) -> Vector2:
+	return _beams.beam_bend(at)
+
+
+func beam_end(at: int) -> Vector2:
+	return _beams.beam_end(at)
+
+
+func beam_reach(at: int) -> float:
+	return _beams.beam_reach(at)
+
+
+func beam_growth(at: int) -> float:
+	return _beams.beam_growth(at)
+
+
+func beam_tint(at: int) -> Color:
+	return _beams.beam_tint(at)
+
+
+func beam_look(at: int) -> int:
+	return _beams.beam_look(at)
+
+
+func beam_since_hit(at: int) -> float:
+	return _beams.beam_since_hit(at)
+
+
+func beam_left(at: int) -> float:
+	return _beams.beam_left(at)
+
+
+func beam_count() -> int:
+	return _beams.beam_count()
+
+
+## Swings (`SpellSwings`): `swing_slots()` rows, each on or off, with its sweep and look.
+static func swing_ease(x: float) -> float:
+	return SpellSwings.swing_ease(x)
+
+
+static func swing_end_point(origin: Vector2, direction: Vector2, side: int, arc: float, reach: float) -> Vector2:
+	return SpellSwings.swing_end_point(origin, direction, side, arc, reach)
+
+
+func swing_tip(at: int) -> Vector2:
+	return _swings.swing_tip(at)
+
+
+func swing_slots() -> int:
+	return _swings.swing_slots()
+
+
+func swing_on(at: int) -> bool:
+	return _swings.swing_on(at)
+
+
+func swing_actor(at: int) -> int:
+	return _swings.swing_actor(at)
+
+
+func swing_tag(at: int) -> int:
+	return _swings.swing_tag(at)
+
+
+func swing_origin(at: int) -> Vector2:
+	return _swings.swing_origin(at)
+
+
+func swing_dir(at: int) -> Vector2:
+	return _swings.swing_dir(at)
+
+
+func swing_side(at: int) -> int:
+	return _swings.swing_side(at)
+
+
+func swing_turned(at: int) -> float:
+	return _swings.swing_turned(at)
+
+
+func swing_arc(at: int) -> float:
+	return _swings.swing_arc(at)
+
+
+func swing_reach(at: int) -> float:
+	return _swings.swing_reach(at)
+
+
+func swing_born(at: int) -> int:
+	return _swings.swing_born(at)
+
+
+func swing_age(at: int) -> float:
+	return _swings.swing_age(at)
+
+
+func swing_wind(at: int) -> float:
+	return _swings.swing_wind(at)
+
+
+func swing_sweep(at: int) -> float:
+	return _swings.swing_sweep(at)
+
+
+func swing_tint(at: int) -> Color:
+	return _swings.swing_tint(at)
+
+
+func swing_look(at: int) -> int:
+	return _swings.swing_look(at)
+
+
+func swing_count() -> int:
+	return _swings.swing_count()
+
+
+## Slams (`SpellSlams`): `slam_slots()` rows, each on or off, with its impact.
+func slam_count() -> int:
+	return _slams.slam_count()
+
+
+func slam_slots() -> int:
+	return _slams.slam_slots()
+
+
+func slam_on(at: int) -> bool:
+	return _slams.slam_on(at)
+
+
+func slam_impact(at: int) -> Vector2:
+	return _slams.slam_impact(at)
+
+
+## Staff animations (`StaffPoses`): where each actor's staff is now.
+func staff_pose(actor: int) -> Vector3:
+	return _poses.staff_pose(actor)
+
+
+func staff_glow(actor: int) -> float:
+	return _poses.staff_glow(actor)
+
+
+func staff_glow_tint(actor: int) -> Color:
+	return _poses.staff_glow_tint(actor)
+
+
+func staff_stretch(actor: int) -> float:
+	return _poses.staff_stretch(actor)
+
+
+func staff_shake(actor: int) -> float:
+	return _poses.staff_shake(actor)
+
+
+func staff_mood(actor: int) -> StringName:
+	return _poses.staff_mood(actor)
+
+
+func staff_pose_dir(actor: int) -> Vector2:
+	return _poses.staff_pose_dir(actor)
+
+
+static func up_side(aim: Vector2) -> int:
+	return StaffPoses.up_side(aim)
+
+
+static func pose_ease(x: float, ease: int) -> float:
+	return StaffPoses.pose_ease(x, ease)

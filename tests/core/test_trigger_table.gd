@@ -16,7 +16,7 @@ const M := FormBase.Motion
 const SHOTS: Array = [M.STRAIGHT, M.STILL, M.ORBIT, M.HOOK, M.SWAP, M.WALL]
 ## What is over at once: no timer ticks and nothing hears a hurt on it (rules R4d).
 const AT_ONCE: Array = [M.FISSURE, M.SLAM, M.TELEPORT]
-const HITTERS: Array = [M.STRAIGHT, M.STILL, M.ORBIT, M.HOOK, M.SWAP, M.WALL, M.RAY, M.FISSURE, M.SWING, M.SLAM]
+const HITTERS: Array = [M.STRAIGHT, M.STILL, M.ORBIT, M.HOOK, M.SWAP, M.WALL, M.RAY, M.FISSURE, M.SWING, M.SLAM, M.RAIN]
 
 var _items: Dictionary = {}
 var _compiler: StaffCompiler
@@ -68,7 +68,8 @@ func _expected(event: int, motion: int) -> bool:
 		E.TIMER, E.HURT:
 			return not AT_ONCE.has(motion)
 		E.BLOCK:
-			return SHOTS.has(motion) or HITTERS.has(motion) or motion == M.DASH or motion == M.TELEPORT
+			# Wherever a shield or deflect runs: not on a rain or familiar (rules R4g: a decoy guards).
+			return motion != M.RAIN and motion != M.FAMILIAR
 		E.WALL:
 			return [M.STRAIGHT, M.HOOK, M.SWAP, M.RAY, M.FISSURE].has(motion)
 	return true
@@ -111,7 +112,7 @@ func test_the_same_cards_read_alike_whether_the_trigger_fires_or_not() -> void:
 func test_wasted_cells_say_why() -> void:
 	var cells: Array = [
 		[&"on_hit", &"decoy", "a decoy hits nothing"],
-		[&"on_hit", &"rain", "a rain hits nothing itself"],
+		[&"on_wall", &"rain", "never meets a wall"],
 		[&"on_wall", &"dash", "it stops before walls"],
 		[&"on_wall", &"orbit", "an orbit passes through walls"],
 		[&"on_wall", &"still", "never meets a wall"],
@@ -138,7 +139,7 @@ func test_triggers_that_fire_are_not_wasted() -> void:
 	var cells: Array = [
 		[&"on_hit", &"straight"], [&"on_timer", &"straight"], [&"on_hurt", &"orbit"], [&"on_timer", &"wall"],
 		[&"on_hit", &"ray"], [&"on_hit", &"swing"], [&"on_wall", &"ray"], [&"on_wall", &"hook"],
-		[&"on_expire", &"rain"], [&"on_expire", &"decoy"], [&"on_cast", &"dash"], [&"on_kill", &"fissure"],
+		[&"on_expire", &"rain"], [&"on_hit", &"rain"], [&"on_expire", &"decoy"], [&"on_cast", &"dash"], [&"on_kill", &"fissure"],
 		[&"on_timer", &"ray"], [&"on_timer", &"rain"], [&"on_timer", &"dash"], [&"on_timer", &"swing"],
 		[&"on_hurt", &"ray"], [&"on_hurt", &"decoy"], [&"on_hurt", &"dash"], [&"on_hurt", &"rain"],
 	]
@@ -159,7 +160,8 @@ func test_the_cards_an_event_needs() -> void:
 	check(_compile([&"on_block", &"deflect", &"swing", &"straight"]).wasted.is_empty(), "with a deflect on a swing it fires")
 	check(_compile([&"on_block", &"shield", &"dash", &"straight"]).wasted.is_empty(), "a dash's barrier blocks")
 	# A kill or reaction of a carrier that hits nothing itself comes from its blast.
-	check(_compile([&"on_kill", &"blast", &"rain", &"straight", &"straight"]).wasted.is_empty(), "a rain with a blast can kill")
+	check(_compile([&"on_kill", &"rain", &"straight", &"straight"]).wasted.is_empty(), "a rain kills by its own strike")
+	check(_compile([&"on_kill", &"blast", &"decoy", &"straight"]).wasted.is_empty(), "a decoy with a blast can kill")
 	check(_compile([&"on_kill", &"blast", &"dash", &"straight"]).wasted.is_empty(), "so can a dash with a blast")
 	# A reaction needs an element on the hit.
 	var bare: String = str(_compile([&"on_reaction", &"straight", &"straight"]).wasted.get(0, ""))

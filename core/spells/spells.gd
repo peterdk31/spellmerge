@@ -59,15 +59,16 @@ extends Node
 ## the same). A burst group fires `repeats` times; the later firings, and an `echo` carrier's
 ## second firing, wait in a queue (it grows as needed, nothing is dropped for room) and are
 ## dropped only if the staff was rebuilt or switched off meanwhile. A cast's
-## own later firings start from where the caster has moved to. `mirror` also fires the carrier
-## backwards; an echo hits at half damage.
+## own later firings start from where the caster has moved to. `mirror` fires the carrier again
+## with its aim reversed (every carrier but a move, rules R4g); an echo hits at half damage.
 ##
-## Payload and line carriers (B2c): `rain` drops its payload on the aim point after its
-## `lifetime` (a `form_shown` cue `&"rain"` says where and when; an `on expire` trigger on it
-## fires as it lands); `familiar` and `decoy` ask `ai` for an entity (`entity_spawn_requested`),
-## count it as a live shot of their tag until `entity_ended`, fire a familiar's payload on every
-## `familiar_cast_requested`, and fire an entity's `on expire` payload and `blast` at its end
-## point; `hold` keeps an entity until its staff is cast again (`entity_end_requested`). `wall`
+## Payload and line carriers (B2c): `rain` strikes the aim point after its `lifetime` with its own
+## hit and cards and drops its payload there (a `form_shown` cue `&"rain"` says where and when; an
+## `on expire` trigger on it fires as it lands); `familiar` and `decoy` ask `ai` for an entity
+## (`entity_spawn_requested`), count it as a live shot of their tag until `entity_ended`, fire a
+## familiar's payload on every `familiar_cast_requested` (the familiar's infusions and hit cards
+## ride on it, compiled in), guard a decoy with its shield or deflect (`guard_decoy`), and fire an
+## entity's `on expire` payload and `blast` at its end point; `hold` keeps an entity until its staff is cast again (`entity_end_requested`). `wall`
 ## is a line of still shots across the aim; `fissure` is a beam that pierces everything on its line.
 ##
 ## Moves, areas and refunds (B2d): a `teleport` asks the caster's body to blink along the aim
@@ -130,7 +131,8 @@ class PendingLaunch:
 	## The group to fire, or null for the single `spell` of an echo or a held carrier's repeat.
 	var group: CompiledGroup = null
 	var spell: CompiledSpell = null
-	## For a single `spell`: an echo's copy (half damage), and a held carrier cast again (`_repeats`).
+	## For a single `spell` or a rain's `landing`: an echo's copy (half damage); for a single
+	## `spell`, `again` is a held carrier cast again (`_repeats`).
 	var echoed: bool = false
 	var again: bool = false
 	var origin: Vector2 = Vector2.ZERO
@@ -146,7 +148,8 @@ class PendingLaunch:
 	var cost: int = 0
 	## The scatter stream's seed for this firing, so it points the same way however late it runs.
 	var seed: int = 0
-	## The rain whose payload this is, so its own trigger (`on expire`) fires as it lands.
+	## The rain whose payload this is, so it strikes and its own trigger (`on expire`) fires as it
+	## lands; `echoed` when that rain is an echo (it strikes at half damage).
 	var landing: CompiledSpell = null
 
 
@@ -1272,6 +1275,7 @@ func _telegraph_rain(spell: CompiledSpell, tag: int, actor: int, origin: Vector2
 		var group: CompiledGroup = spell.own_payload if spell.own_payload != null else CompiledGroup.new()
 		var launch: PendingLaunch = _delay(spell.lifetime, group, null, actor, SpellTag.staff_of(tag), SpellTag.generation_of(tag), point, along, null, false)
 		launch.landing = spell
+		launch.echoed = _echo_spell == spell
 		_lc_join(spell, tag, LC_POINT, -1, 0, false, spell.lifetime, point, along)
 		placed += 1
 		if events != null:
@@ -1279,14 +1283,55 @@ func _telegraph_rain(spell: CompiledSpell, tag: int, actor: int, origin: Vector2
 	return placed
 
 
-## A rain lands: its `blast` goes off, its payload falls (a group, so a burst repeats it), then
-## its own `on expire` trigger fires, all at the aim point (its end point, rules R1d).
-func _land_rain(spell: CompiledSpell, group: CompiledGroup, actor: int, staff: int, generation: int, point: Vector2, heading: Vector2) -> void:
-	_blast(spell, SpellTag.make(actor, staff, spell.node, generation), actor, point)
+## A rain lands: it strikes every body within its splash (`SpellLimits.RAIN_SPLASH`, or its size
+## when that is larger) with its own hit and cards (an echo's at half), then its `blast` goes off,
+## its payload falls (a group, so a burst repeats it), then its own `on expire` trigger fires, all
+## at the aim point (its end point, rules R1d and R4g).
+func _land_rain(spell: CompiledSpell, group: CompiledGroup, actor: int, staff: int, generation: int, point: Vector2, heading: Vector2, echoed: bool = false) -> void:
+	var tag: int = SpellTag.make(actor, staff, spell.node, generation)
+	_strike_round(spell, tag, actor, point, heading, maxf(spell.radius, SpellLimits.RAIN_SPLASH), spell.echo_hit if echoed else null)
+	_blast(spell, tag, actor, point)
 	if group != null and not group.is_empty():
 		_fire(group, actor, staff, generation, point, heading, null, CASTER_POINT)
 	if spell.payload != null and spell.trigger_event == TriggerBase.Event.EXPIRE:
 		_fire(spell.payload, actor, staff, generation, point, heading, null, CASTER_POINT)
+
+
+## The carrier `spell` with `tag` strikes every body within `reach` of `at` at once, outward from
+## `at`, with `hit` (null: its own) in the beam context `_ray_*` that `_on_hit` reads, so the
+## whole hit goes with it: infusions, heavy, chain, siphon, possess and `on hit` (a slam's ring
+## strikes the same way as it grows). The bodies are copied first: what a hit sets off can sweep.
+func _strike_round(spell: CompiledSpell, tag: int, actor: int, at: Vector2, way: Vector2, reach: float, hit: HitProfile) -> void:
+	var found: int = projectiles.sweep(actor, at, way, 1, -PI, PI, reach, HITS)
+	if found == 0:
+		return
+	var struck: Array[Node] = []
+	for i in found:
+		struck.append(projectiles.sweep_nodes[i])
+	var saved_tag: int = _ray_tag
+	var saved_dir: Vector2 = _ray_dir
+	var saved_chain: int = _ray_chain
+	var saved_prev: int = _ray_prev
+	var saved_hit: HitProfile = _ray_hit
+	var saved_arc: int = _arc_slot
+	_ray_tag = tag
+	_ray_chain = spell.chain_jumps
+	_ray_prev = 0
+	_ray_hit = hit
+	_arc_slot = -1
+	for node in struck:
+		if not is_instance_valid(node) or not (node is Node2D):
+			continue
+		var body: Vector2 = (node as Node2D).global_position
+		_ray_dir = at.direction_to(body) if not at.is_equal_approx(body) else way
+		projectiles.strike(actor, node, at, _ray_dir, tag, &"rain")
+	_ray_tag = saved_tag
+	_ray_dir = saved_dir
+	_ray_chain = saved_chain
+	_ray_prev = saved_prev
+	_ray_hit = saved_hit
+	_arc_slot = saved_arc
+	_cast_jumps()
 
 
 ## Wall: `shots` still shots in a line across `direction`, `spread` pixels apart (the shot's
@@ -1388,6 +1433,33 @@ func _on_familiar_cast(actor: int, position: Vector2, direction: Vector2, tag: i
 	_fire(spell.own_payload, actor, SpellTag.staff_of(tag), SpellTag.generation_of(tag), position, aim, null, CASTER_POINT)
 
 
+## The shield charges of the decoy with `tag`, and whether it deflects (rules R4g), for Entities as
+## it makes one; none for a tag no build knows.
+func decoy_shield(tag: int) -> int:
+	var spell: CompiledSpell = _profiles.get(tag)
+	return roundi(spell.behaviour(ModifierBase.Behaviour.SHIELD)) if spell != null else 0
+
+
+func decoy_deflects(tag: int) -> bool:
+	var spell: CompiledSpell = _profiles.get(tag)
+	return spell != null and spell.behaviour(ModifierBase.Behaviour.DEFLECT) > 0.0
+
+
+## A decoy's guard (rules R4g), asked by Entities every step for each decoy with a shield or
+## deflect: the shots of other teams than `actor`'s within `reach` of `at` are deflected outward
+## by the decoy with `tag` when it deflects, else stopped while its `charges` last, each sending
+## its block (`on block`); the one guard of swings and slams (`_guard`). Returns the charges left.
+func guard_decoy(actor: int, tag: int, at: Vector2, reach: float, charges: int) -> int:
+	var spell: CompiledSpell = _profiles.get(tag)
+	if spell == null or projectiles == null:
+		return charges
+	var deflects: bool = spell.behaviour(ModifierBase.Behaviour.DEFLECT) > 0.0
+	if not deflects and charges <= 0:
+		return charges
+	var found: int = projectiles.shots_in_wedge(actor, at, Vector2.RIGHT, 1, -PI, PI, reach)
+	return _guard(found, actor, tag, deflects, charges, at, Vector2.INF, &"decoy")
+
+
 ## A revoked build's entities are told to end, and forgotten (their `entity_ended` is then ignored).
 func _end_entities(tag: int) -> void:
 	_lc_leave(tag, true)
@@ -1468,10 +1540,12 @@ func _fire_group(group: CompiledGroup, actor: int, staff: int, generation: int, 
 	return made
 
 
-## One carrier of a group, launched; returns the shots made. `mirror` also sends it backwards
-## (straight, returning and beam carriers), and `echo` schedules it once more. `echoed` is true
-## for that second firing, which hits at half damage and does not echo again; on a held carrier
-## it is a second held copy. `again` is a held carrier cast again (`_repeats`): it echoes no more.
+## One carrier of a group, launched; returns the shots made. `mirror` fires it once more with its
+## aim reversed (a wall behind, a rain at the point mirrored through the caster, an orbit starting
+## on the other side of its circle; a dash or teleport has its mirror wasted), and `echo` schedules
+## it once more. `echoed` is true for that second firing, which hits at half damage and does not
+## echo again; on a held carrier it is a second held copy. `again` is a held carrier cast again
+## (`_repeats`): it echoes no more.
 func _fire_spell(spell: CompiledSpell, actor: int, staff: int, generation: int, origin: Vector2, heading: Vector2, source: Node, from_caster: bool, echoed: bool, again: bool = false) -> int:
 	var tag: int = SpellTag.make(actor, staff, spell.node, generation)
 	if spell.fallback != CompiledSpell.FALLBACK_NONE:
@@ -1480,7 +1554,8 @@ func _fire_spell(spell: CompiledSpell, actor: int, staff: int, generation: int, 
 	var launched: int = _launch(spell, tag, actor, origin, heading, source)
 	if launched > 0:
 		_recoil(spell, tag, actor, origin, heading)
-	if launched > 0 and spell.behaviour(ModifierBase.Behaviour.MIRROR) > 0.0 and (spell.motion == FormBase.Motion.STRAIGHT or spell.motion == FormBase.Motion.RAY or spell.motion == FormBase.Motion.FISSURE or spell.motion == FormBase.Motion.SWING or spell.motion == FormBase.Motion.SLAM):
+	# A move's mirror would cancel it (rules R4g): a dash or teleport moves its caster once.
+	if launched > 0 and spell.behaviour(ModifierBase.Behaviour.MIRROR) > 0.0 and spell.motion != FormBase.Motion.DASH and spell.motion != FormBase.Motion.TELEPORT:
 		var backwards: int = _launch(spell, tag, actor, origin, -heading, source)
 		launched += backwards
 		if backwards > 0:
@@ -1619,7 +1694,7 @@ func _run_pending() -> void:
 		_caster = caster
 		_caster_seq = caster_seq
 		if landing != null:
-			_land_rain(landing, group, actor, staff, generation, origin, heading)
+			_land_rain(landing, group, actor, staff, generation, origin, heading, echoed)
 		elif group != null:
 			_fire_group(group, actor, staff, generation, origin, heading, source, from_caster)
 		elif not again:
